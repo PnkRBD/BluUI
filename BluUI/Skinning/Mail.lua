@@ -136,11 +136,9 @@ local function SkinSendAttachment(button)
 		Fade(button.IconOverlay)
 		Fade(button.IconOverlay2)
 		Body(button.Count)
+		Skin.TipIconFrame(button, button)
 	end
-	local icon = button:GetNormalTexture()
-	if not icon then return end
-	CropIcon(icon)
-	Skin.TipIconFrame(button, icon)
+	CropIcon(button.icon or button:GetNormalTexture())
 end
 
 local function SkinPanelFrame(frame)

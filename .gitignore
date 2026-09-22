@@ -8,10 +8,6 @@
 # Dev tool, kept in its own repo
 /BUIShowcase/
 
-# Claude Code workspace files
-.claude/
-CLAUDE.md
-
 # Editor and OS files
 .vscode/
 .idea/
