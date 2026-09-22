@@ -10,6 +10,10 @@ local crosshairEye
 local markWarningEye
 local bloodlustEye
 
+local function ClearPreviewToggle(toggle)
+	if toggle then toggle:SetValue(false) end
+end
+
 local function AlertMover(parent, db, apply, options)
 	options = options or {}
 	local fieldMap = options.fields or {}
@@ -599,18 +603,18 @@ BUI.PageEngine.RegisterPage('auras', {
 		if settings.locked then BUI.Auras.ShowPreview(false) end
 		settings.lowHpLocked = true
 		BUI.Auras.UpdateLowHp()
-		lowHpEye:SetValue(false)
+		ClearPreviewToggle(lowHpEye)
 		if settings.markLocked == false then
 			settings.markLocked = true
 			BUI.Auras.UpdateMark()
 		end
-		markWarningEye:SetValue(false)
+		ClearPreviewToggle(markWarningEye)
 		BUI.Crosshair.SetPreview(false)
-		crosshairEye:SetValue(false)
+		ClearPreviewToggle(crosshairEye)
 		if BUI.Bloodlust.IsPreviewing() then
 			BUI.Bloodlust.StopPreview()
 		end
-		bloodlustEye:SetValue(false)
+		ClearPreviewToggle(bloodlustEye)
 		if not BUI.GetDB().gcdHistory.locked then
 			BUI.GCDHistory.SetLocked(true)
 		end
