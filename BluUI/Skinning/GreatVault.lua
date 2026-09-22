@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('GreatVault')
+local _, HookScript = BUI.Prof.Scripts('GreatVault')
 
 local hooksecurefunc = BUI.Prof.MakeHooker('greatvault')
 local ipairs, select = ipairs, select

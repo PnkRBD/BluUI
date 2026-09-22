@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('CastBar.Core')
+local _, HookScript = BUI.Prof.Scripts('CastBar.Core')
 local Pixel = BUI.Pixel
 
 local CastBar = BUI.CastBar

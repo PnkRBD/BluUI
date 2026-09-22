@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Util.Dragging')
+local SetScript = BUI.Prof.Scripts('Util.Dragging')
 BUI.Dragging = {}
 local Dragging = BUI.Dragging
 local Pixel = BUI.Pixel

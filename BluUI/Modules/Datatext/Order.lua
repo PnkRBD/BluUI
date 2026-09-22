@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Datatext.Order')
+local SetScript = BUI.Prof.Scripts('Datatext.Order')
 
 local Datatext = BUI.Datatext
 local BUILib = LibStub('BUILib')

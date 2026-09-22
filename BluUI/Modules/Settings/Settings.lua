@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Settings.Settings')
+local _, HookScript = BUI.Prof.Scripts('Settings.Settings')
 local AceHook = LibStub('AceHook-3.0')
 
 local Pixel = BUI.Pixel

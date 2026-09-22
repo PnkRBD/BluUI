@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('BuffTracking.PackLeader')
+local SetScript = BUI.Prof.Scripts('BuffTracking.PackLeader')
 
 local PackLeader = {}
 BUI.BuffTracking.PackLeader = PackLeader

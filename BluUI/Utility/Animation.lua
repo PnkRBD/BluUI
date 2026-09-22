@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Util.Animation')
+local SetScript = BUI.Prof.Scripts('Util.Animation')
 local Animation = {}
 BUI.Animation = Animation
 local GetTime = GetTime

@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Util.SearchResults')
+local SetScript = BUI.Prof.Scripts('Util.SearchResults')
 local Pixel = BUI.Pixel
 
 local BUILib = BluUI.BUILibClient

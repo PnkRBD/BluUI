@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Mail')
+local _, HookScript = BUI.Prof.Scripts('Mail')
 
 local hooksecurefunc = BUI.Prof.MakeHooker('mail')
 local ipairs = ipairs

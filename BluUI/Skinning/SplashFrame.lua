@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('SplashFrame')
+local _, HookScript = BUI.Prof.Scripts('SplashFrame')
 
 local hooksecurefunc = BUI.Prof.MakeHooker('splash')
 local ipairs = ipairs

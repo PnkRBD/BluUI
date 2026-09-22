@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('ItemSocketing')
+local _, HookScript = BUI.Prof.Scripts('ItemSocketing')
 
 local ipairs = ipairs
 local select = select

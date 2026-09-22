@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Util.ExportImport')
+local _, HookScript = BUI.Prof.Scripts('Util.ExportImport')
 local LibSerialize = LibStub("LibSerialize")
 local LibDeflate = LibStub("LibDeflate")
 local DeepCopy = BUI.Tools.DeepCopy

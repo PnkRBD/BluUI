@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Cursor.Cursor')
+local SetScript = BUI.Prof.Scripts('Cursor.Cursor')
 
 local Events = BUI.Events
 local Tools  = BUI.Tools

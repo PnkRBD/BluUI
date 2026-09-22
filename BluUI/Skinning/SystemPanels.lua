@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('SystemPanels')
+local _, HookScript = BUI.Prof.Scripts('SystemPanels')
 
 local hooksecurefunc = BUI.Prof.MakeHooker('systempanels')
 local pairs = pairs

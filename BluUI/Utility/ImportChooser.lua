@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Util.ImportChooser')
+local SetScript = BUI.Prof.Scripts('Util.ImportChooser')
 local BUILib = BluUI.BUILibClient
 local Pixel = BUI.Pixel
 local Controls = BUILib.Controls

@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Calendar')
+local _, HookScript = BUI.Prof.Scripts('Calendar')
 
 local hooksecurefunc = BUI.Prof.MakeHooker('calendar')
 local ipairs = ipairs

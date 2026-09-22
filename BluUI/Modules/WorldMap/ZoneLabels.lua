@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('WorldMap.ZoneLabels')
+local _, HookScript = BUI.Prof.Scripts('WorldMap.ZoneLabels')
 
 local hooksecurefunc = BUI.Prof.MakeHooker('zonelabels')
 local Pixel = BUI.Pixel

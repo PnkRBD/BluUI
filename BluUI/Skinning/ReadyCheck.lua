@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('ReadyCheck')
+local _, HookScript = BUI.Prof.Scripts('ReadyCheck')
 
 local hooksecurefunc = BUI.Prof.MakeHooker('readycheck')
 local select, max, min, floor = select, math.max, math.min, math.floor
