@@ -2,7 +2,7 @@ local BUI = BluUI
 local SetScript, HookScript = BUI.Prof.Scripts('Pages.Settings')
 
 local BUILib = BluUI.BUILibClient
-local Controls, Layout, Modals = BUILib.Controls, BUILib.Layout, BUILib.Modals
+local Controls, Layout, Modals, Widget = BUILib.Controls, BUILib.Layout, BUILib.Modals, BUILib.Widget
 local Pixel = BUI.Pixel
 
 function BUI.Settings.OpenDiagnostics()
@@ -334,9 +334,10 @@ BUI.PageEngine.RegisterPage("settings", {
 				local titleText = Modals.CreateTitle(dialog, 'Apply FPS Preset')
 				local summary = Modals.CreateMessage(dialog, ('%d of %d settings will change'):format(total, known), 'CENTER', titleText, -16)
 				local list = Controls.ScrollFrame(dialog, 480, 300, 100, 452)
-				list:SetPoint('TOP', summary, 'BOTTOM', 0, -14)
+				local listFrame = Widget.Unwrap(list)
+				listFrame:SetPoint('TOP', summary, 'BOTTOM', 0, -14)
 				FillPreviewList(list, pending)
-				Modals.CreateMessage(dialog, 'Current values are backed up, and Restore Original puts them back.', 'CENTER', list, -12)
+				Modals.CreateMessage(dialog, 'Current values are backed up, and Restore Original puts them back.', 'CENTER', listFrame, -12)
 				Modals.LayoutButtons(dialog, {
 					{ text = 'Apply', color = Modals.BTN_CONFIRM, onClick = function(close) close(); ApplyFPSPreset(pending) end },
 					{ text = 'Cancel', color = Modals.BTN_CANCEL, onClick = function(close) close() end },
