@@ -517,6 +517,8 @@ local entries = {
 	{ label = "Absorbs", page = "groupframes", tab = 2, panel = "Absorbs", keywords = "absorb shield heal" },
 	{ label = "Target Border", page = "groupframes", tab = 2, panel = "Selection Borders", keywords = "target mouseover border highlight" },
 	{ label = "Font", page = "groupframes", tab = 2, panel = "Font & Name", keywords = "font name text" },
+	{ label = "Max Letters", page = "groupframes", tab = 2, panel = "Font & Name", keywords = "name length truncate letters max" },
+	{ label = "Max Letters", page = "groupframes", tab = 3, panel = "Font & Name", keywords = "raid name length truncate letters max" },
 	{ label = "Health Text", page = "groupframes", tab = 2, panel = "Health Text", keywords = "health percent text format" },
 	{ label = "Power Text", page = "groupframes", tab = 2, panel = "Power Text", keywords = "power mana text" },
 	{ label = "Status Text", page = "groupframes", tab = 2, panel = "Status Text (Dead / Offline / AFK)", keywords = "dead ghost offline afk dnd status color" },
