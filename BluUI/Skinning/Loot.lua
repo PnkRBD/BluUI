@@ -7,7 +7,6 @@ local ROW_ART_KEYS = { 'NameFrame', 'IconBorder', 'IconOverlay', 'IconOverlay2',
 local FONT_DEPTH = 2
 
 local skinned = false
-local testShown = {}
 
 local function Enabled()
 	return Skin.IsSkinEnabled(SKIN_ID)
@@ -73,17 +72,6 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Loot Window',
 	description = 'The loot window you get from a corpse or a chest: dark shell, framed icons, house font.',
 	icon = 'Interface/Icons/INV_Misc_Bag_10_Green',
-	test = function()
-		Apply()
-		local frame = _G.LootFrame
-		if not frame or frame:IsShown() or not pcall(frame.Show, frame) then return nil end
-		testShown[#testShown + 1] = frame
-		return frame
-	end,
-	stopTest = function()
-		for index = 1, #testShown do pcall(testShown[index].Hide, testShown[index]) end
-		wipe(testShown)
-	end,
 })
 
 BUI.Events:Once('PLAYER_LOGIN', 'Skin.Loot', Apply)

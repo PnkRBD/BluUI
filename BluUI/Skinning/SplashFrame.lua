@@ -209,17 +209,4 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = "What's New",
 	description = "The seasonal What's New splash: parchment and banner art replaced by the dark shell, the feature pictures kept as framed cards and a round portrait, house fonts and buttons.",
 	icon = 'Interface/Icons/INV_Misc_Note_06',
-	test = function()
-		local frame = _G.SplashFrame
-		if not frame then return end
-		if not frame:IsShown() then
-			C_SplashScreen.RequestLatestSplashScreen(false)
-			return
-		end
-		return frame
-	end,
-	stopTest = function()
-		local frame = _G.SplashFrame
-		if frame and frame:IsShown() then HideUIPanel(frame) end
-	end,
 })

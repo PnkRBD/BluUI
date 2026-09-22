@@ -5,7 +5,6 @@ local Skin = BUI.Skinning
 local hooker = BUI.Prof.MakeHooker('skin')
 
 local SKIN_ID = 'cooldownmanager'
-local ADDON = 'Blizzard_CooldownViewer'
 local MAIN_ART = { 'Bg', 'Background', 'TopTileStreaks', 'Inset', 'Border', 'TitleBg', 'BottomInset', 'ScrollInset' }
 local TAB_KEYS = { 'SpellsTab', 'AurasTab', 'ItemsTab', 'BarsTab', 'UtilityTab' }
 local TAB_SYSTEM_KEYS = { 'TabSystem', 'CategoryTabSystem' }
@@ -21,7 +20,6 @@ local FONT_DEPTH = 3
 local chrome = {}
 local sideTabs = {}
 local scrollBox
-local testShown = false
 
 local function Enabled()
 	return Skin.IsSkinEnabled(SKIN_ID)
@@ -247,20 +245,6 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Cooldown Manager',
 	description = 'The Cooldown Manager settings window: the metal frame stripped off, dark category headers, framed icons, and the search box, layout dropdown, buttons and side tabs in the house style.',
 	icon = 'Interface/Icons/INV_Misc_PocketWatch_01',
-	test = function()
-		pcall(C_AddOns.LoadAddOn, ADDON)
-		Apply()
-		local frame = _G.CooldownViewerSettings
-		if not frame then return end
-		if not frame:IsShown() and pcall(frame.Show, frame) then testShown = true end
-		return frame
-	end,
-	stopTest = function()
-		if not testShown then return end
-		testShown = false
-		local frame = _G.CooldownViewerSettings
-		if frame then pcall(frame.Hide, frame) end
-	end,
 })
 
 BUI.Events:Register('ADDON_LOADED', 'Skin.CooldownManager', Apply)

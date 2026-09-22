@@ -17,8 +17,6 @@ local COVER_PAD = 6
 local COVER_SUBLEVEL = -7
 
 local skinnedWindows = {}
-local testShown = {}
-local TEST_ADDONS = { 'Blizzard_DelvesDifficultyPicker', 'Blizzard_DelvesCompanionConfiguration' }
 
 local function Enabled()
 	return Skin.IsSkinEnabled(SKIN_ID)
@@ -120,23 +118,6 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Delves',
 	description = 'The delve entrance window where you pick a tier, plus the companion panels: the metal frame stripped off, the delve scene left alone.',
 	icon = 'Interface/Icons/INV_Misc_Cave_01',
-	test = function()
-		for index = 1, #TEST_ADDONS do pcall(C_AddOns.LoadAddOn, TEST_ADDONS[index]) end
-		Apply()
-		local shown = {}
-		for index = 1, #WINDOW_NAMES do
-			local frame = _G[WINDOW_NAMES[index]]
-			if frame and not frame:IsShown() and pcall(frame.Show, frame) then
-				testShown[#testShown + 1] = frame
-				shown[#shown + 1] = frame
-			end
-		end
-		return unpack(shown)
-	end,
-	stopTest = function()
-		for index = 1, #testShown do pcall(testShown[index].Hide, testShown[index]) end
-		wipe(testShown)
-	end,
 })
 
 BUI.Events:Register('ADDON_LOADED', 'Skin.Delves', Apply)

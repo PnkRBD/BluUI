@@ -10,7 +10,6 @@ local Theme = BUILib.Theme
 local Pixel = BUI.Pixel
 
 local SKIN_ID = 'achievements'
-local ACHIEVEMENT_ADDON = 'Blizzard_AchievementUI'
 local ROW_HIDDEN_ART = { 'TitleBar', 'Glow', 'BottomLeftTsunami', 'BottomRightTsunami', 'TopLeftTsunami', 'TopRightTsunami', 'BottomTsunami1', 'TopTsunami1' }
 local ROW_KEPT_ART = { 'Check', 'PlusMinus' }
 local SEARCH_PREVIEW_COUNT = 5
@@ -521,17 +520,4 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Achievements',
 	description = 'The achievements window: dark shell, flat category list, card rows for achievements, summary and comparison, accent progress bars, statistics, search and tabs.',
 	icon = 'Interface/Icons/Achievement_Level_10',
-	test = function()
-		if not _G.AchievementFrame then
-			C_AddOns.LoadAddOn(ACHIEVEMENT_ADDON)
-			TryInstall()
-		end
-		local frame = _G.AchievementFrame
-		if not frame then return end
-		if not frame:IsShown() then ToggleAchievementFrame() end
-		return frame
-	end,
-	stopTest = function()
-		if _G.AchievementFrame then HideUIPanel(_G.AchievementFrame) end
-	end,
 })

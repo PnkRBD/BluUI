@@ -156,15 +156,6 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Dressing Room',
 	description = 'The dressing room and its outfit panels: dark shell, house buttons and dropdown, flat set list and glyph maximize buttons.',
 	icon = 'Interface/Icons/INV_Chest_Cloth_17',
-	test = function()
-		local frame = _G.DressUpFrame
-		if not frame then return end
-		DressUpFrame_Show(frame, nil, true)
-		return frame
-	end,
-	stopTest = function()
-		if _G.DressUpFrame then HideUIPanel(_G.DressUpFrame) end
-	end,
 })
 
 BUI.Events:Once('PLAYER_LOGIN', 'Skin.DressUpInstall', function()

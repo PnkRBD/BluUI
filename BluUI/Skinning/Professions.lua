@@ -9,7 +9,6 @@ local Skin = BUI.Skinning
 local Theme = BUILib.Theme
 
 local SKIN_ID = 'professions'
-local BOOK_ADDON = 'Blizzard_ProfessionsBook'
 local MAIN_ART = { 'Bg', 'TopTileStreaks', 'Inset' }
 local CUSTOMER_MAIN_ART = { 'MoneyFrameInset', 'MoneyFrameBorder' }
 local RECIPE_LIST_ART = { 'Background', 'BackgroundNineSlice' }
@@ -788,19 +787,6 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Professions',
 	description = 'The professions book, crafting window and crafting orders: recipe list, schematic panel, rank bar, tabs, the crafter order browser and order view, and the customer order window (NPC only, so the preview shows the book).',
 	icon = 'Interface/Icons/Trade_Engineering',
-	test = function()
-		if not _G.ProfessionsBookFrame then
-			C_AddOns.LoadAddOn(BOOK_ADDON)
-			TryInstall()
-		end
-		local frame = _G.ProfessionsBookFrame
-		if not frame then return end
-		if not frame:IsShown() then ToggleProfessionsBook() end
-		return frame
-	end,
-	stopTest = function()
-		if _G.ProfessionsBookFrame then HideUIPanel(_G.ProfessionsBookFrame) end
-	end,
 })
 
 BUI.Events:Once('PLAYER_LOGIN', 'Skin.ProfessionsInstall', function()

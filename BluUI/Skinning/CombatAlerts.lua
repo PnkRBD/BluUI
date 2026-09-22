@@ -11,8 +11,6 @@ local MIRROR_COUNT = 3
 local FONT_DEPTH = 2
 
 local skinnedFrames = {}
-local testShown = {}
-local TEST_NAMES = { 'LossOfControlFrame', 'DeathRecapFrame', 'MirrorTimer1' }
 
 local function Enabled()
 	return Skin.IsSkinEnabled(SKIN_ID)
@@ -99,23 +97,6 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Combat Alerts',
 	description = 'Loss of control, the death recap window, and the breath and fatigue timers.',
 	icon = 'Interface/Icons/Spell_Shadow_DeathScream',
-	test = function()
-		pcall(C_AddOns.LoadAddOn, 'Blizzard_DeathRecap')
-		Apply()
-		local shown = {}
-		for index = 1, #TEST_NAMES do
-			local frame = _G[TEST_NAMES[index]]
-			if frame and not frame:IsShown() and pcall(frame.Show, frame) then
-				testShown[#testShown + 1] = frame
-				shown[#shown + 1] = frame
-			end
-		end
-		return unpack(shown)
-	end,
-	stopTest = function()
-		for index = 1, #testShown do pcall(testShown[index].Hide, testShown[index]) end
-		wipe(testShown)
-	end,
 })
 
 BUI.Events:Register('ADDON_LOADED', 'Skin.CombatAlerts', Apply)

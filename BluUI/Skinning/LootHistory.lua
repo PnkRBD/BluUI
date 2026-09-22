@@ -194,13 +194,4 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Loot History',
 	description = 'The Loot Rolls window drawn like the BluUI tooltip: flat shell, accent timer, clean rows.',
 	icon = 'Interface/Icons/INV_Misc_Bag_10',
-	test = function()
-		local frame = Frame()
-		if frame then frame:Show() end
-		return frame
-	end,
-	stopTest = function()
-		local frame = Frame()
-		if frame then HideUIPanel(frame) end
-	end,
 })

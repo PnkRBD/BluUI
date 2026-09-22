@@ -8,7 +8,6 @@ local WINDOW_NAMES = { 'TaxiFrame', 'FlightMapFrame' }
 local FONT_DEPTH = 2
 
 local skinnedWindows = {}
-local testShown = {}
 
 local function Enabled()
 	return Skin.IsSkinEnabled(SKIN_ID)
@@ -56,23 +55,6 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Flight Master',
 	description = 'The taxi window at a flight master and the flight map.',
 	icon = 'Interface/Icons/Ability_Mount_Gryphon_01',
-	test = function()
-		pcall(C_AddOns.LoadAddOn, 'Blizzard_FlightMap')
-		Apply()
-		local shown = {}
-		for index = 1, #WINDOW_NAMES do
-			local frame = _G[WINDOW_NAMES[index]]
-			if frame and not frame:IsShown() and pcall(frame.Show, frame) then
-				testShown[#testShown + 1] = frame
-				shown[#shown + 1] = frame
-			end
-		end
-		return unpack(shown)
-	end,
-	stopTest = function()
-		for index = 1, #testShown do pcall(testShown[index].Hide, testShown[index]) end
-		wipe(testShown)
-	end,
 })
 
 BUI.Events:Register('ADDON_LOADED', 'Skin.Travel', Apply)

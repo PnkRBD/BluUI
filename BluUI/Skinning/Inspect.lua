@@ -11,7 +11,6 @@ local Skin = BUI.Skinning
 local IsSecretValue = BUI.Tools.IsSecretValue
 
 local SKIN_ID = 'inspect'
-local INSPECT_ADDON = 'Blizzard_InspectUI'
 local BOTTOM_TAB_COUNT = 3
 local PVP_TALENT_SLOT_COUNT = 3
 local MAIN_ART = { 'Bg', 'TopTileStreaks', 'Inset' }
@@ -679,20 +678,6 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Inspect',
 	description = 'The inspect window: dark shell, house tabs, framed equipment slots with quality edges and item levels, flat PvP ratings and guild panel. Preview needs an inspectable target.',
 	icon = 'Interface/Icons/INV_Misc_Spyglass_03',
-	test = function()
-		if not CanInspect('target') then return end
-		if not _G.InspectFrame then
-			C_AddOns.LoadAddOn(INSPECT_ADDON)
-			TryInstall()
-		end
-		local frame = _G.InspectFrame
-		if not frame then return end
-		InspectUnit('target')
-		return frame
-	end,
-	stopTest = function()
-		if _G.InspectFrame then HideUIPanel(_G.InspectFrame) end
-	end,
 })
 
 BUI.Events:Once('PLAYER_LOGIN', 'Skin.InspectInstall', function()

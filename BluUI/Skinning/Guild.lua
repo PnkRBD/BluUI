@@ -8,7 +8,6 @@ local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 
 local SKIN_ID = 'guild'
-local COMMUNITIES_ADDON = 'Blizzard_Communities'
 local HOVER_ALPHA = 0.06
 local SELECTED_ALPHA = 0.18
 local ROW_TEXTURE_INSET = 1
@@ -1346,17 +1345,4 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Guild & Communities',
 	description = 'The Guild & Communities window with its chat, roster, perks, guild info, finder and dialogs; also skins the Guild Bank and Guild Control windows, which only open at a guild vault.',
 	icon = 'Interface/Icons/achievement_guildperk_everybodysfriend',
-	test = function()
-		if not _G.CommunitiesFrame then
-			C_AddOns.LoadAddOn(COMMUNITIES_ADDON)
-			TryInstall()
-		end
-		local frame = _G.CommunitiesFrame
-		if not frame then return end
-		if not frame:IsShown() then ToggleCommunitiesFrame() end
-		return frame
-	end,
-	stopTest = function()
-		if _G.CommunitiesFrame then HideUIPanel(_G.CommunitiesFrame) end
-	end,
 })

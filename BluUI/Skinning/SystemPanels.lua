@@ -849,13 +849,4 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Settings & Editors',
 	description = 'The game settings window, Edit Mode manager and dialogs, quick keybinding, macro editor and addon list: dark shells, house controls, flat sliders and clean list rows.',
 	icon = 'Interface/Icons/INV_Misc_Gear_01',
-	test = function()
-		local frame = _G.SettingsPanel
-		if not frame then return end
-		if not frame:IsShown() then frame:Open() end
-		return frame
-	end,
-	stopTest = function()
-		if _G.SettingsPanel then HideUIPanel(_G.SettingsPanel) end
-	end,
 })
