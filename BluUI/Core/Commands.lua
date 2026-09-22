@@ -162,8 +162,6 @@ SlashCmdList['BUI'] = function(message)
 			BUI.Prof.Start()
 			BUI.Print('CPU profiler running. Do a pull, then /bui cpu again for the report.')
 		end
-	elseif command == 'skins' then
-		BUI.Skinning.Test()
 	elseif command == 'currency' then
 		local id = tonumber(rest)
 		if id then BUI.Currency.Dump(id) else BUI.Print('Usage: /bui currency <currency id>') end
