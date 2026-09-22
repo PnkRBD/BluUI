@@ -6,12 +6,9 @@ local CombatMessage = BUI.CombatMessage
 
 local messageFrame, messageText
 local eventsWired = false
-local positionCallback
 
 local function GetDB() return BUI.GetDB().combatMessage end
 
-function CombatMessage.RegisterPositionCallback(callback) positionCallback = callback end
-function CombatMessage.UnregisterPositionCallback() positionCallback = nil end
 
 local function Apply()
     if not messageFrame or not messageText then return end
@@ -46,7 +43,6 @@ local function Build()
             end
             db.posX, db.posY = x, y
             Apply()
-            if positionCallback then positionCallback(x, y) end
         end,
         onRightClick = function() CombatMessage.SetLocked(true) end,
         usePointPosition = true,
