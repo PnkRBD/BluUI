@@ -11,8 +11,7 @@ local C_Spell = C_Spell
 local C_Container = C_Container
 local C_Item = C_Item
 local GetItemSpell = GetItemSpell
-local IsPlayerSpell = IsPlayerSpell
-local IsSpellKnown = IsSpellKnown
+local IsSpellKnown = C_SpellBook.IsSpellKnown
 local IsEquippedItem = IsEquippedItem
 
 local STANDARD_TEXT_FONT = STANDARD_TEXT_FONT
@@ -1327,11 +1326,11 @@ local function SetupIcon(icon, storedValue, viewerKey, index)
     end
 
     if not isItemByPrefix and not overrideTexture then
-        local spellKnown = IsPlayerSpell(spellID) or IsSpellKnown(spellID)
+        local spellKnown = IsSpellKnown(spellID)
 
         if viewerKey ~= "buffs" and not spellKnown and frameData._activeChoiceID then
             local activeID = frameData._activeChoiceID
-            if activeID ~= spellID and (IsPlayerSpell(activeID) or IsSpellKnown(activeID)) then
+            if activeID ~= spellID and IsSpellKnown(activeID) then
                 spellID = activeID
                 frameData.customSpellID = spellID
                 frameData.customKey = 'custom:' .. spellID
@@ -1362,7 +1361,7 @@ local function SetupIcon(icon, storedValue, viewerKey, index)
         end
         iconTexture = itemIcon or 134400
         frameData.itemID = spellID
-    elseif IsPlayerSpell(spellID) or IsSpellKnown(spellID) then
+    elseif IsSpellKnown(spellID) then
         iconTexture = C_Spell.GetSpellTexture(spellID)
     else
         local itemName, _, _, _, _, _, _, _, _, itemIcon = C_Item.GetItemInfo(spellID)

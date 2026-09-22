@@ -1,7 +1,6 @@
 local _, BUI = ...
 
-local IsPlayerSpell = IsPlayerSpell
-local IsSpellKnown = IsSpellKnown
+local C_SpellBook = C_SpellBook
 local C_Spell = C_Spell
 
 local Tools = {}
@@ -9,7 +8,7 @@ BUI.Tools = Tools
 
 function Tools.IsSpellUsable(spellID)
     if not spellID then return false end
-    return IsPlayerSpell(spellID) or IsSpellKnown(spellID)
+    return C_SpellBook.IsSpellKnown(spellID)
 end
 
 local EMPOWER_RACE_TOKENS = { EarthenDwarf = true }

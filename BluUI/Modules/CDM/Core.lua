@@ -326,7 +326,7 @@ function CDM.GetKnownRacialSpellIDs(out)
     out = out or {}
     wipe(out)
     for id in pairs(RACIAL_SPELL_IDS) do
-        if IsPlayerSpell(id) or IsSpellKnown(id) then
+        if C_SpellBook.IsSpellKnown(id) then
             out[#out + 1] = id
         end
     end
@@ -388,7 +388,7 @@ function CDM.GetUnavailableTag(storedValue, isItemID)
     local name = C_Spell.GetSpellName(id)
     if not name then return "Unknown Spell" end
 
-    if IsPlayerSpell(id) or IsSpellKnown(id) then
+    if C_SpellBook.IsSpellKnown(id) then
         return nil
     end
 
