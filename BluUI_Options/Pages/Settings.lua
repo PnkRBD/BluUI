@@ -230,6 +230,70 @@ BUI.PageEngine.RegisterPage("settings", {
 				CameraReduceUnexpectedMovement = '1',
 			}
 
+			local FPS_CVAR_GROUPS = {
+				{ label = 'Shadows', cvars = { 'graphicsShadowQuality', 'graphicsRayTracedShadows', 'rtShadowQuality', 'entityShadowFadeScale' } },
+				{ label = 'Anti-aliasing', cvars = { 'MSAAQuality', 'ffxAntiAliasingMode', 'alphaTestMSAA' } },
+				{ label = 'View distance', cvars = { 'graphicsViewDistance', 'farclip', 'horizonStart', 'horizonClip' } },
+				{ label = 'Ground clutter', cvars = { 'graphicsGroundClutter', 'graphicsEnvironmentDetail', 'doodadLodScale', 'groundEffectDist' } },
+				{ label = 'Particles and spell density', cvars = { 'graphicsParticleDensity', 'graphicsSpellDensity', 'spellClutter', 'spellVisualDensityFilterSetting', 'particulatesEnabled' } },
+				{ label = 'Lighting and reflections', cvars = { 'graphicsSSAO', 'graphicsDepthEffects', 'graphicsComputeEffects', 'volumeFogLevel', 'reflectionMode', 'ffxGlow', 'clusteredShading' } },
+				{ label = 'Water and weather', cvars = { 'graphicsLiquidDetail', 'waterDetail', 'rippleDetail', 'weatherDensity' } },
+				{ label = 'Textures', cvars = { 'graphicsTextureResolution', 'textureFilteringMode' } },
+				{ label = 'Frame rate cap', cvars = { 'maxFPS', 'maxFPSBk', 'targetFPS', 'useTargetFPS' } },
+				{ label = 'Camera', cvars = { 'cameraFov', 'cameraDistanceMaxZoomFactor', 'CameraReduceUnexpectedMovement' } },
+			}
+
+			local function SameCVarValue(current, target)
+				local currentNumber, targetNumber = tonumber(current), tonumber(target)
+				if currentNumber and targetNumber then return currentNumber == targetNumber end
+				return current == target
+			end
+
+			local function PendingCVars()
+				local pending, total = {}, 0
+				for cvar, value in pairs(FPS_CVARS) do
+					local current = C_CVar.GetCVar(cvar)
+					if current and not SameCVarValue(current, value) then
+						pending[cvar] = current
+						total = total + 1
+					end
+				end
+				return pending, total
+			end
+
+			local function PreviewText(pending, total)
+				local lines, grouped = {}, 0
+				for _, group in ipairs(FPS_CVAR_GROUPS) do
+					local headline, changed = nil, 0
+					for _, cvar in ipairs(group.cvars) do
+						if pending[cvar] then
+							changed = changed + 1
+							headline = headline or cvar
+						end
+					end
+					if headline then
+						grouped = grouped + changed
+						lines[#lines + 1] = ('%s   |cff9a9a9a%s|r  ->  |cffffffff%s|r'):format(group.label, pending[headline], FPS_CVARS[headline])
+					end
+				end
+				local rest = total - grouped
+				if rest > 0 then lines[#lines + 1] = ('|cff9a9a9a+%d more detail settings lowered|r'):format(rest) end
+				return table.concat(lines, '\n')
+			end
+
+			local function ApplyFPSPreset()
+				globalDB.cvarBackup = globalDB.cvarBackup or {}
+				local applied = 0
+				for cvar, value in pairs(FPS_CVARS) do
+					if not globalDB.cvarBackup[cvar] then
+						local currentValue = C_CVar.GetCVar(cvar)
+						if currentValue then globalDB.cvarBackup[cvar] = currentValue end
+					end
+					if C_CVar.SetCVar(cvar, value) then applied = applied + 1 end
+				end
+				print('|cff6D00FDBluUI:|r Applied ' .. applied .. ' FPS CVars. Original values backed up.')
+			end
+
 			AddRow({
 				spanFull = true,
 				title = 'FPS Preset',
@@ -238,16 +302,19 @@ BUI.PageEngine.RegisterPage("settings", {
 				accessoryWidth = 320,
 				accessories = function(row)
 					local applyButton = Controls.Button(row, 'Apply FPS Settings', 150, function()
-						globalDB.cvarBackup = globalDB.cvarBackup or {}
-						local applied = 0
-						for cvar, value in pairs(FPS_CVARS) do
-							if not globalDB.cvarBackup[cvar] then
-								local currentValue = C_CVar.GetCVar(cvar)
-								if currentValue then globalDB.cvarBackup[cvar] = currentValue end
-							end
-							if C_CVar.SetCVar(cvar, value) then applied = applied + 1 end
+						local pending, total = PendingCVars()
+						if total == 0 then
+							print('|cff6D00FDBluUI:|r Every FPS CVar is already at its preset value.')
+							return
 						end
-						print('|cff6D00FDBluUI:|r Applied ' .. applied .. ' FPS CVars. Original values backed up.')
+						Modals.Confirm({
+							parent = BUI.PageEngine.window.frame,
+							title = 'Apply FPS Preset',
+							message = ('%d settings will change.\n\n%s\n\nCurrent values are backed up, and Restore Original puts them back.'):format(total, PreviewText(pending, total)),
+							confirmText = 'Apply', cancelText = 'Cancel',
+							width = 460, height = 400,
+							onConfirm = ApplyFPSPreset,
+						})
 					end)
 					local restoreButton = Controls.Button(row, 'Restore Original', 150, function()
 						if not globalDB.cvarBackup or not next(globalDB.cvarBackup) then
