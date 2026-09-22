@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Util.Visibility')
+local SetScript = BUI.Prof.Scripts('Util.Visibility')
 local Visibility = {}
 BUI.Visibility = Visibility
 local InCombatLockdown      = InCombatLockdown
@@ -11,6 +11,16 @@ local IsFlying              = IsFlying
 local IsMounted             = IsMounted
 local IsInInstance          = IsInInstance
 local C_PetBattles          = C_PetBattles
+local GetShapeshiftFormID   = GetShapeshiftFormID
+
+local TRAVEL_FORM        = 3
+local SWIFT_FLIGHT_FORM  = 27
+local FLIGHT_FORM        = 29
+
+local function InDruidTravelForm()
+	local form = GetShapeshiftFormID()
+	return form == TRAVEL_FORM or form == SWIFT_FLIGHT_FORM or form == FLIGHT_FORM
+end
 
 local CONDITIONS = {
 	petBattle = function()
@@ -29,16 +39,10 @@ local CONDITIONS = {
 		return HasOverrideActionBar()
 	end,
 	flying = function()
-		if not IsFlying() then return false end
-
-		local form = GetShapeshiftFormID()
-		if form == 27 or form == 3 then return false end
-		return true
+		return IsFlying() and not InDruidTravelForm()
 	end,
 	mounted = function()
-		if IsMounted() then return true end
-		local form = GetShapeshiftFormID()
-		return form == 27 or form == 3
+		return IsMounted() or InDruidTravelForm()
 	end,
 	inInstance = function()
 		local inInstance, instanceType = IsInInstance()
@@ -47,11 +51,6 @@ local CONDITIONS = {
 	end,
 }
 Visibility.CONDITIONS = CONDITIONS
-
-local FALLBACKS = {
-	petBattle = 0, dead = 50, combat = 100, vehicle = 100,
-	override = 0, flying = 30, mounted = 100, inInstance = 100,
-}
 
 local DEFAULT_PRIORITY = {'petBattle', 'dead', 'combat', 'vehicle', 'override', 'flying', 'mounted', 'inInstance'}
 Visibility.DEFAULT_PRIORITY = DEFAULT_PRIORITY
@@ -79,25 +78,22 @@ local function RefreshCache()
 	end
 end
 
-local function IsModuleDisabled(moduleKey)
-	if not moduleKey then return false end
-	local db = BUI.GetDB()
-	local disabledModules = db and db.general.visibilityModulesDisabled
-	return disabledModules and disabledModules[moduleKey] == true
-end
-
 local currentKey = nil
 
+local function ResolveOpacity(moduleKey, opacity, disabledModules)
+	if moduleKey and disabledModules and disabledModules[moduleKey] == true then return 100 end
+	if not opacity then return 100 end
+	if cachedKey then return opacity[cachedKey] end
+	return opacity.outOfCombat
+end
 
 function Visibility.GetContextualOpacity(moduleKey)
-	local key = moduleKey or currentKey
-	if IsModuleDisabled(key) then return 100 end
-	local opacity = BUI.GetDB().general.visibilityOpacity
+	local general = BUI.GetDB()
+	general = general and general.general
 	RefreshCache()
-	if cachedKey then
-		return opacity[cachedKey]
-	end
-	return opacity.outOfCombat
+	return ResolveOpacity(moduleKey or currentKey,
+		general and general.visibilityOpacity,
+		general and general.visibilityModulesDisabled)
 end
 
 local modules = {}
@@ -110,7 +106,7 @@ local pureOpacity = {}
 function Visibility.Register(key, updateCallback, pure)
 	if modules[key] then return end
 	modules[key] = updateCallback
-	pureOpacity[key] = pure or nil
+	pureOpacity[key] = pure
 	count        = count + 1
 	keys[count]  = key
 	if lastAppliedKey ~= false then
@@ -141,14 +137,19 @@ local function ApplyUpdate(instant)
 	RefreshCache()
 	if not instant and cachedKey == lastAppliedKey then return end
 	lastAppliedKey = cachedKey
+	local general = BUI.GetDB()
+	general = general and general.general
+	local opacityTable = general and general.visibilityOpacity
+	local disabledModules = general and general.visibilityModulesDisabled
+	local errorHandler = geterrorhandler()
 	for keyIndex = 1, count do
 		local moduleKey = keys[keyIndex]
 		local callback = modules[moduleKey]
 		if callback then
-			local opacity = Visibility.GetContextualOpacity(moduleKey)
+			local opacity = ResolveOpacity(moduleKey, opacityTable, disabledModules)
 			if instant or not pureOpacity[moduleKey] or lastModuleOpacity[moduleKey] ~= opacity then
 				currentKey = moduleKey
-				if xpcall(callback, geterrorhandler(), instant) then
+				if xpcall(callback, errorHandler, instant) then
 					lastModuleOpacity[moduleKey] = opacity
 				end
 			end
@@ -190,11 +191,10 @@ local flyStateFrame
 
 local function FlyingMatters()
 	if count == 0 then return false end
-	local db = BUI.GetDB()
-	local opacity = db and db.general.visibilityOpacity
-	local fly = opacity and opacity.flying or FALLBACKS.flying
-	local mount = opacity and opacity.mounted or FALLBACKS.mounted
-	return fly ~= mount
+	local general = BUI.GetDB()
+	general = general and general.general
+	local opacity = general and general.visibilityOpacity or BUI.Defaults.profile.general.visibilityOpacity
+	return opacity.flying ~= opacity.mounted
 end
 
 local function EnsureFlyStateDriver()
