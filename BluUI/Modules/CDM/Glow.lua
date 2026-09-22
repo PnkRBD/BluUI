@@ -4,7 +4,6 @@ local SetScript = BUI.Prof.Scripts('CDM.Glow')
 local hooksecurefunc = BUI.Prof.MakeHooker('glow')
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
-local LibCustomGlow = LibStub('LibCustomGlow-1.0')
 
 local ipairs, pairs = ipairs, pairs
 local CreateFrame = CreateFrame
@@ -89,88 +88,23 @@ function CDM.ShowBlizzardGlow(icon)
 	if icon.Glow    then icon.Glow:Show()    end
 end
 
-local function SpeedMultiplier(speed)
-	local multiplier = speed / 100
-	if multiplier < 0.01 then multiplier = 0.01 end
-	return multiplier
-end
+local GlowManager = BUI.GlowManager
 
 local function PixelLength(icon, lineCount)
 	local frameData = FrameData[icon]
 	local settings = frameData and frameData.viewerKey and BUI.GetDB().cdm[frameData.viewerKey]
 	if not settings then return nil end
-	local width = settings._pxW or Pixel.Scale(settings.iconWidth)
-	local height = settings._pxH or Pixel.Scale(settings.iconHeight)
-	if width < 1 or height < 1 then return nil end
-	return math.min(math.floor((width + height) * (2 / lineCount - 0.1)), math.min(width, height))
+	return GlowManager.PixelLength(settings._pxW or Pixel.Scale(settings.iconWidth), settings._pxH or Pixel.Scale(settings.iconHeight), lineCount)
 end
-
-local function StartPixel(icon, config)
-	local color = config.color
-	local lineCount = config.lines
-	local frequency = SpeedMultiplier(config.speed) * 0.25
-	local thickness = config.thickness
-	LibCustomGlow.PixelGlow_Start(icon, color, lineCount, frequency, PixelLength(icon, lineCount), thickness, 0, 0, false, GLOW_KEY, GLOW_LAYER)
-end
-local function StopPixel(icon) LibCustomGlow.PixelGlow_Stop(icon, GLOW_KEY) end
-
-local function StartAutoCast(icon, config)
-	local color = config.color
-	local lineCount = config.lines
-	local frequency = SpeedMultiplier(config.speed) * 0.125
-	LibCustomGlow.AutoCastGlow_Start(icon, color, lineCount, frequency, 1, 0, 0, GLOW_KEY, GLOW_LAYER)
-end
-local function StopAutoCast(icon) LibCustomGlow.AutoCastGlow_Stop(icon, GLOW_KEY) end
-
-local function StartButton(icon, config)
-	local color = config.color
-
-	local speed = config.speed
-	local frequency
-	if speed ~= 100 then frequency = SpeedMultiplier(speed) end
-	LibCustomGlow.ButtonGlow_Start(icon, color, frequency, GLOW_LAYER)
-end
-local function StopButton(icon) LibCustomGlow.ButtonGlow_Stop(icon) end
-
-local procGlowOpts = {
-	color      = nil,
-	startAnim  = false,
-	duration   = 1.0,
-	xOffset    = 0,
-	yOffset    = 0,
-	key        = GLOW_KEY,
-	frameLevel = 0,
-}
-
-local function StartProc(icon, config)
-	procGlowOpts.color      = config.color
-	procGlowOpts.duration   = 1.0 / SpeedMultiplier(config.speed)
-	procGlowOpts.frameLevel = GLOW_LAYER
-	LibCustomGlow.ProcGlow_Start(icon, procGlowOpts)
-end
-local function StopProc(icon) LibCustomGlow.ProcGlow_Stop(icon, GLOW_KEY) end
-
-local StartByType = {
-	pixel    = StartPixel,
-	autocast = StartAutoCast,
-	button   = StartButton,
-	proc     = StartProc,
-}
-local StopByType = {
-	pixel    = StopPixel,
-	autocast = StopAutoCast,
-	button   = StopButton,
-	proc     = StopProc,
-}
 
 local function DispatchStart(icon, config)
-	local handler = StartByType[config.type] or StartPixel
-	handler(icon, config)
+	local glowType = config.type
+	local length = glowType == 'pixel' and PixelLength(icon, config.lines) or nil
+	GlowManager.Start(icon, glowType, config.color, config.speed, config.lines, config.thickness, GLOW_KEY, GLOW_LAYER, length)
 end
 
 local function DispatchStop(icon, glowType)
-	local handler = StopByType[glowType] or StopPixel
-	handler(icon)
+	GlowManager.Stop(icon, glowType, GLOW_KEY)
 end
 
 local function ColorsMatch(colorA, colorB)
@@ -450,8 +384,6 @@ do
 		CDM.StopProcGlow(icon)
 
 		if ReadGlowDB().enabled then
-			local frameData = FrameData[icon]
-			if frameData then frameData.glowActive = nil end
 			CDM.StartProcGlow(icon)
 		end
 	end
