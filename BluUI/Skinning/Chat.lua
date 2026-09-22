@@ -31,10 +31,6 @@ local EDITBOX_OPTIONS = {
 	{ value = 'INSIDE_BOTTOM', text = 'Inside Bottom' },
 	{ value = 'INSIDE_TOP', text = 'Inside Top' },
 }
-local GROW_OPTIONS = {
-	{ value = 'UP', text = 'Grip Top-Right' },
-	{ value = 'DOWN', text = 'Grip Bottom-Right' },
-}
 local TAB_STYLE_OPTIONS = {
 	{ value = 'UNDERLINE', text = 'Underline' },
 	{ value = 'FILL', text = 'Filled' },
@@ -145,9 +141,7 @@ local function ColorReader(key)
 	end
 end
 local InactiveColor = ColorReader('inactiveColor')
-local TimestampColor = ColorReader('timestampColor')
 local FlashColor = ColorReader('flashColor')
-local URLColor = ColorReader('urlColor')
 
 local function ResolveFont()
 	local config = GetConfig()
@@ -186,17 +180,11 @@ local MsgFadeTime = NumReader('msgFadeTime')
 local FadeDelay = NumReader('fadeDelay')
 
 local BGTexture = StrReader('bgTexture')
-local TimestampFormat = StrReader('timestampFormat')
-local SizerGrow = StrReader('sizerGrow')
 
 local FontShadow = BoolReader('fontShadow')
 local TabUppercase = BoolReader('tabUppercase')
 local TabFlash = BoolReader('tabFlash', true)
 local HideLogTab = BoolReader('hideLogTab')
-local TimestampsEnabled = BoolReader('timestamps')
-local HideChannelNumbers = BoolReader('hideChannelNumbers')
-local AbbreviateChannels = BoolReader('abbreviateChannels')
-local URLCopyEnabled = BoolReader('urlCopy', true)
 local EditHistory = BoolReader('editHistory', true)
 local DragToMove = BoolReader('dragToMove', true)
 local MsgFade = BoolReader('msgFade')
