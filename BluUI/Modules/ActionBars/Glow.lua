@@ -2,14 +2,12 @@ local _, BUI = ...
 
 local ActionBars = BUI.ActionBars
 local LibActionButton = LibStub('LibActionButton-1.0-BluUI')
-local LibCustomGlow = LibStub('LibCustomGlow-1.0')
 
 local GLOW_KEY = '_BUIProc'
 local GLOW_LAYER = 12
 local PROC_GLOW_FIELD = '_ProcGlow' .. GLOW_KEY
 local EVENT_KEY = 'ActionBars.ProcGlow'
 
-local glowOptions = { key = GLOW_KEY, frameLevel = GLOW_LAYER, startAnim = true, duration = 1 }
 local glowOwner = {}
 local IsSpellOverlayed = C_SpellActivationOverlay.IsSpellOverlayed
 local Plain = ActionBars.Plain
@@ -36,61 +34,24 @@ local function TintGlow(button)
 	TintTexture(frame.ProcLoop, color)
 end
 
-local function SpeedMultiplier(speed)
-	local multiplier = speed / 100
-	if multiplier < 0.01 then multiplier = 0.01 end
-	return multiplier
-end
-
-local function PixelLength(button, lineCount)
-	local width, height = button:GetSize()
-	if not width or not height or width < 1 or height < 1 then return nil end
-	return math.min(math.floor((width + height) * (2 / lineCount - 0.1)), math.min(width, height))
-end
-
-local function StartProc(button, settings)
-	glowOptions.duration = 1 / SpeedMultiplier(settings.procGlowSpeed)
-	LibCustomGlow.ProcGlow_Start(button, glowOptions)
-	TintGlow(button)
-end
-
-local function StartPixel(button, settings)
-	local lineCount = settings.procGlowLines
-	LibCustomGlow.PixelGlow_Start(button, settings.procGlowColor, lineCount, SpeedMultiplier(settings.procGlowSpeed) * 0.25,
-		PixelLength(button, lineCount), settings.procGlowThickness, 0, 0, false, GLOW_KEY, GLOW_LAYER)
-end
-
-local function StartAutoCast(button, settings)
-	LibCustomGlow.AutoCastGlow_Start(button, settings.procGlowColor, math.max(1, math.floor(settings.procGlowLines / 2)),
-		SpeedMultiplier(settings.procGlowSpeed) * 0.125, 1, 0, 0, GLOW_KEY, GLOW_LAYER)
-end
-
-local function StartButton(button, settings)
-	local speed = settings.procGlowSpeed
-	local frequency = speed ~= 100 and SpeedMultiplier(speed) or nil
-	LibCustomGlow.ButtonGlow_Start(button, settings.procGlowColor, frequency, GLOW_LAYER)
-end
-
-local StartByStyle = {
-	proc     = StartProc,
-	pixel    = StartPixel,
-	autocast = StartAutoCast,
-	button   = StartButton,
-}
-
-local StopByStyle = {
-	proc     = function(button) LibCustomGlow.ProcGlow_Stop(button, GLOW_KEY) end,
-	pixel    = function(button) LibCustomGlow.PixelGlow_Stop(button, GLOW_KEY) end,
-	autocast = function(button) LibCustomGlow.AutoCastGlow_Stop(button, GLOW_KEY) end,
-	button   = function(button) LibCustomGlow.ButtonGlow_Stop(button) end,
-}
+local GlowManager = BUI.GlowManager
 
 local function ShowGlow(button)
 	if button._buiProcGlow then return end
 	local settings = ActionBars.GetSettings()
-	local style = StartByStyle[settings.procGlowStyle] and settings.procGlowStyle or 'proc'
+	local style = settings.procGlowStyle
+	if not GlowManager.STYLES[style] then style = 'proc' end
 	button._buiProcGlow = style
-	StartByStyle[style](button, settings)
+	local lines = settings.procGlowLines
+	local length
+	if style == 'pixel' then
+		local width, height = button:GetSize()
+		length = GlowManager.PixelLength(width, height, lines)
+	elseif style == 'autocast' then
+		lines = math.max(1, math.floor(lines / 2))
+	end
+	GlowManager.Start(button, style, settings.procGlowColor, settings.procGlowSpeed, lines, settings.procGlowThickness, GLOW_KEY, GLOW_LAYER, length, true)
+	if style == 'proc' then TintGlow(button) end
 	local libraryOverlay = button.__LBGoverlay
 	if libraryOverlay then libraryOverlay:Hide() end
 end
@@ -99,7 +60,7 @@ local function HideGlow(button)
 	local style = button._buiProcGlow
 	if not style then return end
 	button._buiProcGlow = nil
-	StopByStyle[style](button)
+	GlowManager.Stop(button, style, GLOW_KEY)
 end
 
 local function SpellOverlayed(spellID)
