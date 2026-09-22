@@ -493,7 +493,7 @@ local HUNTERS_MARK_SPELL = 257284
 local MARK_WINDOW_WIDTH = 420
 local MARK_WINDOW_HEIGHT = 60
 local MARK_SLIDE_GAP = 2
-local MARK_EMPTY_WIDTH = 1
+local MARK_AURA_WIDTH = MARK_WINDOW_WIDTH / 2
 
 local markFrame, markContainer, markPanel
 local markText, markIcon, markPulse
@@ -541,13 +541,18 @@ local function SetMarkRuntime(enabled)
     ApplyMarkRuntime()
 end
 
+local function MarkAuraPresent()
+    if not markContainer then return false end
+    return (markContainer:GetWidth() or 0) > MARK_AURA_WIDTH
+end
+
 local function RefreshMarkShown()
     if not markPanel then return end
     if GetDB().markLocked == false then
         markPanel:Show()
         return
     end
-    markPanel:SetShown(MarkTargetNeedsCallout())
+    markPanel:SetShown(MarkTargetNeedsCallout() and not MarkAuraPresent())
 end
 
 local function RefreshMarkTarget()
@@ -596,13 +601,14 @@ local function BuildMarkWarning()
         })
     end
     Engine.BindUnit(container, nil)
+    container:HookScript("OnSizeChanged", function() RefreshMarkShownDispatch() end)
     container:Hide()
 
     local panel = CreateFrame("Frame", nil, clip, "DisableUntrustedLayoutScriptsTemplate")
     panel:SetSize(MARK_WINDOW_WIDTH, MARK_WINDOW_HEIGHT)
     panel:SetFrameLevel(clip:GetFrameLevel() + 5)
     panel:EnableMouse(false)
-    panel:SetPoint("TOPLEFT", container, "TOPLEFT", MARK_SLIDE_GAP + MARK_EMPTY_WIDTH, 0)
+    panel:SetPoint("TOPLEFT", clip, "TOPLEFT", 0, 0)
 
     local text = panel:CreateFontString(nil, "OVERLAY")
     Pixel.ApplyFont(text, 24)
