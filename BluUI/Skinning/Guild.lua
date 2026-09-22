@@ -13,6 +13,8 @@ local SELECTED_ALPHA = 0.18
 local ROW_TEXTURE_INSET = 1
 local SIDE_TAB_TOP_OFFSET = -36
 local SIDE_TAB_OPTIONS = { width = 32, height = 32, crop = true }
+local LIST_SHELL_INSET = { left = 1 }
+local SEARCH_BOX_INSET = { top = 7, bottom = 7 }
 local CHAT_EDIT_INSET = 6
 local CHECK_INSET_DIVISOR = 4
 local NAME_SCALE = 1.5
@@ -217,6 +219,7 @@ local function RefreshFinderTabs(finder)
 		Skin.SideTab(context, tab, SIDE_TAB_OPTIONS)
 		RefreshTabSelected(tab)
 	end
+	Skin.LayoutSideTabs(_G.CommunitiesFrame, { finder[FINDER_TAB_KEYS[1]], finder[FINDER_TAB_KEYS[2]] }, SIDE_TAB_TOP_OFFSET)
 end
 
 local function SkinSideTab(tab, onClick)
@@ -265,7 +268,7 @@ local function SkinCommunitiesList(list)
 	FadeKeys(list, LIST_ART)
 	FadeRegions(list.FilligreeOverlay)
 	FadeArt(list.InsetFrame)
-	Shell(list)
+	Shell(list, LIST_SHELL_INSET)
 	ScrollBar(list.ScrollBar)
 	Skin.SweepScrollBox(list.ScrollBox, GuardEnabled(SkinListEntry))
 end
@@ -860,7 +863,7 @@ local function SkinFinderOptions(options)
 		local role = options[key]
 		if role then SizedCheckBox(role.Checkbox) end
 	end
-	EditBox(options.SearchBox)
+	EditBox(options.SearchBox, SEARCH_BOX_INSET)
 	Button(options.Search)
 end
 
