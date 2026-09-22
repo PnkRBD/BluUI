@@ -811,13 +811,14 @@ end
 
 function Skin.Test(onClosed, ids)
 	Skin.StopTest()
+	if not ids then return end
 	if InCombatLockdown() then
 		BUI.Print('Skin showcase is unavailable in combat.')
 		return
 	end
 
 	wipe(showcaseQueue)
-	for _, id in ipairs(ids or skinOrder) do
+	for _, id in ipairs(ids) do
 		local info = skinRegistry[id]
 		if info and info.test and Skin.IsSkinEnabled(id) then
 			showcaseQueue[#showcaseQueue + 1] = id
