@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Core.Startup')
+local _, HookScript = BUI.Prof.Scripts('Core.Startup')
 local Modals = BUI.Modals
 
 do

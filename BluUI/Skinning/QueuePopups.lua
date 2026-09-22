@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('QueuePopups')
+local _, HookScript = BUI.Prof.Scripts('QueuePopups')
 
 local ipairs, pairs, type = ipairs, pairs, type
 local floor = math.floor

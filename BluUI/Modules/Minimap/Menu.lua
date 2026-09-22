@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Minimap.Menu')
+local SetScript = BUI.Prof.Scripts('Minimap.Menu')
 
 local Menu = {}
 BUI.MinimapMenu = Menu

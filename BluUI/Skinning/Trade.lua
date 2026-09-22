@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Trade')
+local _, HookScript = BUI.Prof.Scripts('Trade')
 
 local hooksecurefunc = BUI.Prof.MakeHooker('trade')
 local ipairs = ipairs

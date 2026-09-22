@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Util.IconSearch')
+local SetScript = BUI.Prof.Scripts('Util.IconSearch')
 
 local IconSearch = {}
 BUI.IconSearch = IconSearch

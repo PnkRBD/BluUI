@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Util.SlidePanel')
+local SetScript = BUI.Prof.Scripts('Util.SlidePanel')
 
 BUI.SlidePanel = {}
 

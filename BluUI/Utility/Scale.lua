@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Util.Scale')
+local SetScript = BUI.Prof.Scripts('Util.Scale')
 BUI.Scale = {}
 local Scale = BUI.Scale
 local Pixel = BUI.Pixel

@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('CustomBars.CustomBars')
+local SetScript = BUI.Prof.Scripts('CustomBars.CustomBars')
 
 local CustomBars = {}
 BUI.CustomBars = CustomBars

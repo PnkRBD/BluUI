@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('GroupLoot')
+local _, HookScript = BUI.Prof.Scripts('GroupLoot')
 
 local hooksecurefunc = BUI.Prof.MakeHooker('grouploot')
 local select, type = select, type

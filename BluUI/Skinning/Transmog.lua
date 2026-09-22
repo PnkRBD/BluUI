@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Transmog')
+local _, HookScript = BUI.Prof.Scripts('Transmog')
 
 local hooksecurefunc = BUI.Prof.MakeHooker('transmog')
 local ipairs = ipairs

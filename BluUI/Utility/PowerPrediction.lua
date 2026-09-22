@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Util.PowerPrediction')
+local _, HookScript = BUI.Prof.Scripts('Util.PowerPrediction')
 
 local PowerPrediction = {}
 BUI.PowerPrediction = PowerPrediction
