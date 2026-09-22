@@ -1,0 +1,74 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/">
+    <Script file="Core\Init.lua"/>
+    <Script file="Core\Theme.lua"/>
+    <Script file="Core\Widget.lua"/>
+    <Script file="Core\NavChip.lua"/>
+    <Script file="Core\Skin.lua"/>
+    <Script file="Core\Layout.lua"/>
+    <Script file="Core\Modals.lua"/>
+    <Script file="Core\Toast.lua"/>
+
+    <Script file="Retained\Init.lua"/>
+    <Script file="Retained\Widget.lua"/>
+    <Script file="Retained\Pool.lua"/>
+    <Script file="Retained\Registry.lua"/>
+    <Script file="Retained\Spec.lua"/>
+    <Script file="Retained\Reconcile.lua"/>
+    <Script file="Retained\Legacy.lua"/>
+
+    <Script file="Controls\Buttons\Button.lua"/>
+    <Script file="Controls\Buttons\HoldButton.lua"/>
+    <Script file="Controls\Buttons\Icon.lua"/>
+    <Script file="Controls\Buttons\GhostButton.lua"/>
+    <Script file="Controls\Buttons\ToolButton.lua"/>
+    <Script file="Controls\Text\Text.lua"/>
+    <Script file="Controls\Toggles\Toggle.lua"/>
+    <Script file="Controls\Toggles\ToggleVariants.lua"/>
+    <Script file="Controls\Cards\Patterns.lua"/>
+    <Script file="Controls\Inputs\Slider.lua"/>
+    <Script file="Controls\Inputs\CompactSlider.lua"/>
+    <Script file="Controls\Inputs\RowSlider.lua"/>
+    <Script file="Controls\Inputs\Stepper.lua"/>
+    <Script file="Controls\Inputs\TextBox.lua"/>
+    <Script file="Controls\Inputs\Keybind.lua"/>
+    <Script file="Controls\Menus\Dropdown.lua"/>
+    <Script file="Controls\Menus\MultiDropdown.lua"/>
+    <Script file="Controls\Menus\ContextMenu.lua"/>
+    <Script file="Controls\Menus\Popover.lua"/>
+    <Script file="Controls\Text\CategoryLabel.lua"/>
+    <Script file="Controls\Text\InfoBox.lua"/>
+    <Script file="Controls\Color\ColorSwatch.lua"/>
+    <Script file="Controls\Color\ColorCards.lua"/>
+    <Script file="Controls\Inputs\TickEditor.lua"/>
+    <Script file="Controls\Containers\ScrollFrame.lua"/>
+    <Script file="Controls\Display\Preview.lua"/>
+    <Script file="Controls\Lists\SelectableGrid.lua"/>
+
+    <Script file="Controls\Text\LinkText.lua"/>
+    <Script file="Controls\Inputs\SearchBox.lua"/>
+    <Script file="Controls\Inputs\Tags.lua"/>
+    <Script file="Controls\Inputs\Frames.lua"/>
+    <Script file="Controls\Containers\TabLineBar.lua"/>
+    <Script file="Controls\Cards\Card.lua"/>
+    <Script file="Controls\Containers\SidePanel.lua"/>
+    <Script file="Controls\Cards\DraggableCardGrid.lua"/>
+    <Script file="Controls\Lists\SelectableList.lua"/>
+    <Script file="Controls\Color\ColorPicker.lua"/>
+
+    <Script file="Controls\Cards\SettingsCard.lua"/>
+    <Script file="Controls\Cards\SettingRow.lua"/>
+    <Script file="Controls\Lists\ItemList.lua"/>
+
+    <Script file="Controls\Containers\SidebarPage.lua"/>
+    <Script file="Core\LayoutControls.lua"/>
+    <Script file="PageKit\Core.lua"/>
+    <Script file="PageKit\Locks.lua"/>
+    <Script file="PageKit\Movers.lua"/>
+    <Script file="PageKit\Cards.lua"/>
+    <Script file="PageKit\Title.lua"/>
+    <Script file="PageKit\Bands.lua"/>
+    <Script file="PageKit\Tabs.lua"/>
+    <Script file="PageKit\Scaffold.lua"/>
+    <Script file="PageKit\Helpers.lua"/>
+    <Script file="Core\Window.lua"/>
+</Ui>

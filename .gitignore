@@ -1,0 +1,43 @@
+# The repo root is the AddOns folder, so everything else installed here is someone else's
+/*
+!/.gitignore
+!/.gitattributes
+!/BluUI/
+!/BluUI_Options/
+
+# Dev tool, kept in its own repo
+/BUIShowcase/
+
+# Claude Code workspace files
+.claude/
+CLAUDE.md
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
+*.swp
+
+# Bytecode left behind by running luac without -p
+luac.out
+*.luac
+
+# Backups and archives that collect in an addon folder
+*.bak
+*.old
+*.orig
+*.rej
+*.zip
+*.7z
+*.rar
+*.log
+
+# Nothing like this should reach an addon folder, but don't let it through
+.env
+.netrc
+*.pem
+id_rsa*
+id_ed25519*
