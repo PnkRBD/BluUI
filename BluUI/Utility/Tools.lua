@@ -2,6 +2,7 @@ local _, BUI = ...
 
 local C_SpellBook = C_SpellBook
 local C_Spell = C_Spell
+local format = string.format
 
 local Tools = {}
 BUI.Tools = Tools
@@ -474,4 +475,15 @@ function Tools.CooldownFontString(cooldown)
         end
     end
     return nil
+end
+
+local truncateFormats = {}
+
+function Tools.TruncateName(name, limit)
+    local pattern = truncateFormats[limit]
+    if not pattern then
+        pattern = '%.' .. limit .. 's'
+        truncateFormats[limit] = pattern
+    end
+    return format(pattern, name)
 end
