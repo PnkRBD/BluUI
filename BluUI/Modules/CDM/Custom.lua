@@ -39,9 +39,9 @@ local GetStableSpellTexture = Tools.GetStableSpellTexture
 
 local manualStartByStored = {}
 
-local warningFrame, warningText
+local warningFrame, warningText, warningOwner
 local warningTemplate, warningExpiry, warningSpellName, warningThreshold
-local warningShowDecimals, warningLastBucket
+local warningShowDecimals, warningLastBucket, warningFont, warningColor
 
 local function UpdateWarningText()
 	if not warningFrame or not warningFrame:IsShown() then return end
@@ -67,7 +67,7 @@ end
 
 local warningLastSound
 
-local function ShowBuffWarning(text, color, remaining, spellName, font, _, decimalThreshold)
+local function ShowBuffWarning(icon, text, color, remaining, spellName, font, decimalThreshold)
 	if not warningFrame then
 		warningFrame = CreateFrame("Frame", nil, UIParent)
 		warningFrame:SetSize(Pixel.Scale(500), Pixel.Scale(50))
@@ -79,7 +79,13 @@ local function ShowBuffWarning(text, color, remaining, spellName, font, _, decim
 		warningText:SetPoint("CENTER")
 		SetScript(warningFrame, "OnUpdate", BUI.Prof.Wrap("cdm#BuffWarningText", UpdateWarningText))
 	end
-	warningTemplate = text or "BUFF EXPIRING!"
+	text = text or "BUFF EXPIRING!"
+	if warningOwner == icon and warningTemplate == text and warningSpellName == spellName
+		and warningFont == font and warningColor == color and warningFrame:IsShown() then
+		return
+	end
+	warningOwner = icon
+	warningTemplate = text
 	if spellName ~= warningSpellName then warningExpiry = nil end
 	warningSpellName = spellName
 	warningLastBucket = nil
@@ -89,6 +95,7 @@ local function ShowBuffWarning(text, color, remaining, spellName, font, _, decim
 	end
 	if decimalThreshold then warningThreshold = decimalThreshold end
 	warningShowDecimals = BUI.GetDB().cdm.buffs.showCooldownDecimals
+	warningFont, warningColor = font, color
 	if font then
 		Pixel.ApplyFont(warningText, 28, font)
 	else
@@ -103,8 +110,10 @@ local function ShowBuffWarning(text, color, remaining, spellName, font, _, decim
 	warningFrame:Show()
 end
 
-local function HideBuffWarning()
-	if warningFrame then warningFrame:Hide() end
+local function HideBuffWarning(icon)
+	if warningOwner ~= icon then return end
+	warningFrame:Hide()
+	warningOwner = nil
 	warningTemplate = nil
 	warningExpiry = nil
 	warningSpellName = nil
@@ -112,6 +121,8 @@ local function HideBuffWarning()
 	warningThreshold = nil
 	warningShowDecimals = nil
 	warningLastBucket = nil
+	warningFont = nil
+	warningColor = nil
 end
 
 
@@ -128,7 +139,7 @@ local function DeferredGlowActivate(icon, frameData)
         if warning.enabled then
             local threshold = glowConfig.threshold or 5
             local spellName = C_Spell.GetSpellName(frameData._deferredGlowSpellID) or tostring(frameData._deferredGlowSpellID)
-            ShowBuffWarning(warning.text or "BUFF EXPIRING!", warning.color, threshold, spellName, warning.font, nil, threshold)
+            ShowBuffWarning(icon, warning.text, warning.color, threshold, spellName, warning.font, threshold)
         end
     end
     frameData._deferredGlowCfg = nil
@@ -290,9 +301,6 @@ local function ReleaseIcon(icon)
         frameData.lastBestTier = nil
         frameData._manualBuff = nil
         frameData._manualStart = nil
-        frameData._manualExpiry = nil
-        frameData._manualGlowCfg = nil
-        frameData._manualGlowThresh = nil
         frameData._manualGlowActive = nil
         frameData._auraSpellID = nil
         frameData._origTexture = nil
@@ -756,7 +764,7 @@ local function ManualBuffActivateGlow(icon, frameData, glowConfig, remaining)
     end
     if warn.enabled then
         local spellName = C_Spell.GetSpellName(frameData.customSpellID) or tostring(frameData.customSpellID)
-        ShowBuffWarning(warn.text or "BUFF EXPIRING!", warn.color, remaining, spellName, warn.font, nil, glowConfig.threshold or 5)
+        ShowBuffWarning(icon, warn.text, warn.color, remaining, spellName, warn.font, glowConfig.threshold or 5)
     end
 end
 
@@ -764,7 +772,7 @@ local function ManualBuffDeactivateGlow(icon, frameData)
     if not frameData._manualGlowActive then return end
     frameData._manualGlowActive = false
     CDM.StopProcGlow(icon)
-    HideBuffWarning()
+    HideBuffWarning(icon)
 end
 
 CancelManualBuffGlowTimer = function(frameData)
@@ -815,9 +823,6 @@ CleanupManualBuff = function(icon, frameData, caller)
     end
     CancelManualBuffGlowTimer(frameData)
     frameData._manualStart = nil
-    frameData._manualExpiry = nil
-    frameData._manualGlowCfg = nil
-    frameData._manualGlowThresh = nil
     frameData._manualGlowActive = nil
     local cooldown = icon.Cooldown
     if cooldown then
@@ -826,7 +831,7 @@ CleanupManualBuff = function(icon, frameData, caller)
     end
     GlowManager.CancelDeferred(frameData)
     CDM.StopProcGlow(icon)
-    HideBuffWarning()
+    HideBuffWarning(icon)
     frameData.lastCDStart = 0
     icon:Hide()
     if wasShown and frameData.viewerKey then CDM.MarkDirty(frameData.viewerKey) end
@@ -939,9 +944,6 @@ local function UpdateIcon(icon)
 
                     if frameData._manualStart ~= frameData.lastCDStart then
                         frameData.lastCDStart = frameData._manualStart
-                        frameData._manualExpiry = expiry
-                        frameData._manualGlowCfg = manualBuff.glow
-                        frameData._manualGlowThresh = (manualBuff.glow and manualBuff.glow.threshold) or 5
                         cooldown:SetCooldown(frameData._manualStart, duration)
                         SetScript(cooldown, "OnCooldownDone", function()
                             CleanupManualBuff(icon, frameData, "OnCooldownDone")
@@ -1036,7 +1038,7 @@ local function UpdateIcon(icon)
                     CDM.StartProcGlow(icon, glowConfig)
                 else
                     CDM.StopProcGlow(icon)
-                    HideBuffWarning()
+                    HideBuffWarning(icon)
                 end
             elseif glowConfig and glowConfig.enabled then
                 local thresh = glowConfig.threshold or 5
@@ -1053,15 +1055,16 @@ local function UpdateIcon(icon)
                             PlaySound(warn.sound, 'Master')
                         end
                         if warn.enabled then
-                            ShowBuffWarning(warn.text or "BUFF EXPIRING!", warn.color, remaining, C_Spell.GetSpellName(id) or tostring(id), warn.font, nil, glowConfig.threshold or 5)
+                            ShowBuffWarning(icon, warn.text, warn.color, remaining, C_Spell.GetSpellName(id) or tostring(id), warn.font, glowConfig.threshold or 5)
                         end
                     end
                 else
                     CDM.StopProcGlow(icon)
-                    HideBuffWarning()
-                    if glowConfig.mode == 'below' and remaining > thresh then
+                    HideBuffWarning(icon)
+                    if glowConfig.mode == 'below' and remaining > thresh and (not frameData._glowTimer or frameData._deferredGlowExpiry ~= expiry) then
                         frameData._deferredGlowCfg = glowConfig
                         frameData._deferredGlowSpellID = id
+                        frameData._deferredGlowExpiry = expiry
                         GlowManager.ScheduleDeferred(frameData, remaining - thresh, function()
                             DeferredGlowActivate(icon, frameData)
                         end)
@@ -1091,7 +1094,7 @@ local function UpdateIcon(icon)
         GlowManager.ResetIconState(frameData)
         local wasShown = icon:IsShown()
         CDM.StopProcGlow(icon)
-        HideBuffWarning()
+        HideBuffWarning(icon)
         icon:Hide()
         if frameData.lastCDStart ~= 0 then frameData.lastCDStart = 0; cooldown:Clear() end
         if wasShown then CDM.MarkDirty(frameData.viewerKey) end
@@ -1300,9 +1303,6 @@ local function SetupIcon(icon, storedValue, viewerKey, index)
     frameData._manualStart = preservedStart
 
     if not preservedStart then
-        frameData._manualExpiry = nil
-        frameData._manualGlowCfg = nil
-        frameData._manualGlowThresh = nil
         frameData._manualGlowActive = nil
         ResetManualBuffOverlay(icon, frameData)
     end
