@@ -576,6 +576,9 @@ local SHOWCASE_MARGIN = 40
 local SHOWCASE_TOP_RESERVE = 120
 local SHOWCASE_DIM = { 0, 0, 0, 0.75 }
 local SHOWCASE_STRATA = 'TOOLTIP'
+local SHOWCASE_QUEUE_KEY = 'Skin.ShowcaseQueue'
+local SHOWCASE_STEP_INTERVAL = 0.05
+local showcaseQueue = {}
 local showcase
 local showcaseEntries = {}
 local showcaseActive = false
@@ -750,6 +753,8 @@ end
 function Skin.StopTest()
 	if not showcaseActive then return end
 	showcaseActive = false
+	BUI.Scheduler.UnregisterUpdate(SHOWCASE_QUEUE_KEY)
+	wipe(showcaseQueue)
 	local stopped = {}
 	for _, entry in ipairs(showcaseEntries) do
 		RestorePlacement(entry)
@@ -767,38 +772,67 @@ function Skin.StopTest()
 	if onClosed then onClosed() end
 end
 
+local function CollectPreviewFrames(id, info, ok, ...)
+	if not ok then
+		BUI.Print(('Skin preview failed for %s.'):format(info.name or id))
+		return
+	end
+	for resultIndex = 1, select('#', ...) do
+		local frame = select(resultIndex, ...)
+		if type(frame) == 'table' and frame.GetNumPoints then
+			local entry = { id = id, frame = frame, name = info.name }
+			RememberPlacement(entry)
+			WatchShowcaseFrame(frame)
+			frame:SetFrameStrata(SHOWCASE_STRATA)
+			showcaseEntries[#showcaseEntries + 1] = entry
+		end
+	end
+end
+
+local function StepShowcase()
+	if not showcaseActive then return end
+	local id = table.remove(showcaseQueue, 1)
+	if id then
+		local info = skinRegistry[id]
+		CollectPreviewFrames(id, info, pcall(info.test))
+		LayoutShowcase()
+	end
+	if #showcaseQueue > 0 then return end
+
+	BUI.Scheduler.UnregisterUpdate(SHOWCASE_QUEUE_KEY)
+	local frameCount = #showcaseEntries
+	if frameCount == 0 then
+		BUI.Print('No enabled skin has a preview.')
+		Skin.StopTest()
+		return
+	end
+	BUI.Print(('Showcasing %d skin window%s. Press Escape to close.'):format(frameCount, frameCount == 1 and '' or 's'))
+end
+
 function Skin.Test(onClosed, ids)
 	Skin.StopTest()
 	if InCombatLockdown() then
 		BUI.Print('Skin showcase is unavailable in combat.')
 		return
 	end
+
+	wipe(showcaseQueue)
 	for _, id in ipairs(ids or skinOrder) do
 		local info = skinRegistry[id]
 		if info and info.test and Skin.IsSkinEnabled(id) then
-			local shown = { info.test() }
-			for _, frame in ipairs(shown) do
-				if type(frame) == 'table' and frame.GetNumPoints then
-					local entry = { id = id, frame = frame, name = info.name }
-					RememberPlacement(entry)
-					WatchShowcaseFrame(frame)
-					frame:SetFrameStrata(SHOWCASE_STRATA)
-					showcaseEntries[#showcaseEntries + 1] = entry
-				end
-			end
+			showcaseQueue[#showcaseQueue + 1] = id
 		end
 	end
-	local frameCount = #showcaseEntries
-	if frameCount == 0 then
+	if #showcaseQueue == 0 then
 		BUI.Print('No enabled skin has a preview.')
 		return
 	end
+
 	showcaseActive = true
 	showcaseOnClosed = onClosed
 	EnsureShowcase():Show()
 	if not tContains(UISpecialFrames, SHOWCASE_NAME) then tinsert(UISpecialFrames, SHOWCASE_NAME) end
-	LayoutShowcase()
-	BUI.Print(('Showcasing %d skin window%s. Press Escape to close.'):format(frameCount, frameCount == 1 and '' or 's'))
+	BUI.Scheduler.RegisterUpdate(SHOWCASE_QUEUE_KEY, StepShowcase, SHOWCASE_STEP_INTERVAL, true)
 	return true
 end
 
