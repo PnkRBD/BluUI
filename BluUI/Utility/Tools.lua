@@ -462,3 +462,16 @@ end
 function Tools.PoolHideFrom(pool, startIndex)
     for poolIndex = startIndex, #pool do pool[poolIndex]:Hide() end
 end
+
+function Tools.CooldownFontString(cooldown)
+    local region = cooldown._buiCountdown
+    if region then return region end
+    for index = 1, select('#', cooldown:GetRegions()) do
+        region = select(index, cooldown:GetRegions())
+        if region:GetObjectType() == 'FontString' then
+            cooldown._buiCountdown = region
+            return region
+        end
+    end
+    return nil
+end
