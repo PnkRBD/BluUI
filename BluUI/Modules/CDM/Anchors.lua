@@ -69,9 +69,9 @@ function CDM.CreateAnchor(key)
     if settings.anchorFrame and settings.anchorFrame ~= "" then
         resolved = BUI.Anchor.ApplyPosition(frame, {
             anchorFrame = settings.anchorFrame,
-            anchorPoint = settings.anchorPoint or "BOTTOM",
-            anchorOffsetX = settings.anchorOffsetX or 0,
-            anchorOffsetY = settings.anchorOffsetY or 0,
+            anchorPoint = settings.anchorPoint,
+            anchorOffsetX = settings.anchorOffsetX,
+            anchorOffsetY = settings.anchorOffsetY,
         })
     end
     if not resolved then
@@ -99,16 +99,16 @@ function CDM.ApplyAnchorPosition(key)
     if not settings then return end
 
     if settings.anchorFrame and settings.anchorFrame ~= "" then
-        local target = BUI.ResolveAnchorFrame(settings.anchorFrame, settings.anchorPoint or "BOTTOM")
+        local target = BUI.ResolveAnchorFrame(settings.anchorFrame, settings.anchorPoint)
         if not target and anchor._everAnchored then
             return
         end
         if target then
             BUI.Anchor.ApplyPosition(anchor, {
                 anchorFrame = settings.anchorFrame,
-                anchorPoint = settings.anchorPoint or "BOTTOM",
-                anchorOffsetX = settings.anchorOffsetX or 0,
-                anchorOffsetY = settings.anchorOffsetY or 0,
+                anchorPoint = settings.anchorPoint,
+                anchorOffsetX = settings.anchorOffsetX,
+                anchorOffsetY = settings.anchorOffsetY,
             })
             anchor._everAnchored = true
             return
@@ -185,10 +185,6 @@ function CDM.OnCenterHorizontallyChanged(key, enabled)
 
     if enabled then
         settings.positionX = 0
-        local entry = CDM.controls[key .. "_X"]
-        if entry and entry.control and entry.control.SetValue then
-            entry.control:SetValue(0)
-        end
     end
 
     CDM.ApplyAnchorPosition(key)

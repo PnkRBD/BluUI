@@ -429,7 +429,7 @@ do
 		if unit ~= 'player' then return false end
 		wipe(feignSalveAuras)
 		feignFirstID, feignSignature = nil, 0
-		if not (IS_HUNTER and IsPlayerSpell(EMERGENCY_SALVE_SPELL_ID)) then return false end
+		if not (IS_HUNTER and C_SpellBook.IsSpellKnown(EMERGENCY_SALVE_SPELL_ID)) then return false end
 		if BUI.Tools.ShouldAurasBeSecret() or BUI.Tools.AuraQueriesBlocked() then return false end
 		ScanFeignSalveSet(unit)
 		return feignFirstID ~= nil
@@ -440,14 +440,14 @@ do
 	local function BuildCleanseCallouts()
 		local list = {}
 
-		if IS_HUNTER and IsPlayerSpell(EMERGENCY_SALVE_SPELL_ID) then
+		if IS_HUNTER and C_SpellBook.IsSpellKnown(EMERGENCY_SALVE_SPELL_ID) then
 			list[#list + 1] = { word = 'FD', spellID = 5384, types = { 'Poison', 'Disease' } }
 			list[#list + 1] = { word = 'TURT', spellID = 186265, types = { 'Poison', 'Disease' } }
 		end
 		if playerClass == 'ROGUE' then
 			list[#list + 1] = { word = 'CLOAK', spellID = 31224, types = { 'Magic' } }
 		end
-		if playerClass == 'DEATHKNIGHT' and IsPlayerSpell(457574) then
+		if playerClass == 'DEATHKNIGHT' and C_SpellBook.IsSpellKnown(457574) then
 			list[#list + 1] = { word = 'AMS', spellID = 48707, types = { 'Magic' } }
 		end
 		if playerClass == 'PALADIN' then
@@ -462,7 +462,7 @@ do
 
 	local selfCleanseTypes, selfCleanseSignature = {}, nil
 	function GetSelfCleanseTypes()
-		local signature = (IsPlayerSpell(EMERGENCY_SALVE_SPELL_ID) and 1 or 0) + (IsPlayerSpell(457574) and 2 or 0)
+		local signature = (C_SpellBook.IsSpellKnown(EMERGENCY_SALVE_SPELL_ID) and 1 or 0) + (C_SpellBook.IsSpellKnown(457574) and 2 or 0)
 		if signature ~= selfCleanseSignature then
 			selfCleanseSignature = signature
 			wipe(selfCleanseTypes)

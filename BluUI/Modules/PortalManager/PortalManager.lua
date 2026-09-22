@@ -38,7 +38,7 @@ local function ResolveSpellID(entry)
     if entry.spellIDs then
         local fallback
         for _, spellID in ipairs(entry.spellIDs) do
-            if IsPlayerSpell(spellID) then return spellID end
+            if C_SpellBook.IsSpellKnown(spellID) then return spellID end
             if not fallback and C_Spell.DoesSpellExist(spellID) then fallback = spellID end
         end
         return fallback or entry.spellIDs[1]
@@ -387,7 +387,7 @@ RefreshContent = function()
     for index = 1, shown do
         local row, item = rows[index], sorted[index]
         local spellID = ResolveSpellID(item.entry)
-        local known = IsSpellKnown(spellID)
+        local known = C_SpellBook.IsSpellInSpellBook(spellID)
         row._spellID = spellID
         if not inCombat then
             row:SetAttribute('spell', known and spellID or nil)

@@ -124,12 +124,8 @@ function CDM.ShowBuffsPreview(buffsSettings)
         local db = BUI.GetDB().cdm.buffs
         if not db.centerHorizontally then
             db.positionX = x
-            local xEntry = CDM.controls["buffs_X"]
-            if xEntry and xEntry.control then xEntry.control:SetValue(x) end
         end
         db.positionY = y
-        local yEntry = CDM.controls["buffs_Y"]
-        if yEntry and yEntry.control then yEntry.control:SetValue(y) end
         CDM.RefreshAll()
     end)
 

@@ -2,7 +2,7 @@ local _, BUI = ...
 
 local GetPlayerAuraBySpellID = C_UnitAuras.GetPlayerAuraBySpellID
 local GetSpecialization = GetSpecialization
-local IsPlayerSpell = IsPlayerSpell
+local IsSpellKnown = C_SpellBook.IsSpellKnown
 local GetTime = GetTime
 local Tools = BUI.Tools
 
@@ -90,7 +90,7 @@ local packLeaderDirty = true
 local scan
 
 local function UpdateTalents()
-	hasPackLeader = (isBeastMastery or isSurvival) and IsPlayerSpell(PACK_LEADER_TALENT) == true
+	hasPackLeader = (isBeastMastery or isSurvival) and IsSpellKnown(PACK_LEADER_TALENT) == true
 end
 
 local function AuraActive(spellID)
@@ -225,7 +225,7 @@ function Hunter.GetRaptorPromptStacks()
 end
 
 local function MaxBulletstormShots()
-	return IsPlayerSpell(ACCURACY_BY_VOLUME_TALENT) and 2 or 1
+	return IsSpellKnown(ACCURACY_BY_VOLUME_TALENT) and 2 or 1
 end
 
 local function ProbeBulletstormBuff()
