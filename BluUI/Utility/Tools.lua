@@ -210,6 +210,19 @@ Tools.OnCooldownCurve = TwoPointStep(0, 0, 0.001, 1)
 Tools.IsReadyCurve = TwoPointStep(0, 1, 0.001, 0)
 Tools.GCDFilterCurve = TwoPointStep(0, 0, 1.6, 1)
 
+local alphaCurves = {}
+
+function Tools.ThresholdAlphaCurve(threshold)
+    local curve = alphaCurves[threshold]
+    if curve then return curve end
+    curve = C_CurveUtil.CreateColorCurve()
+    curve:SetType(Enum.LuaCurveType.Step)
+    curve:AddPoint(0, CreateColor(1, 1, 1, 1))
+    curve:AddPoint(threshold / 100, CreateColor(1, 1, 1, 0))
+    alphaCurves[threshold] = curve
+    return curve
+end
+
 function Tools.IsSpellOnCooldown(spellID)
     if Tools.IsChargeSpell(spellID) then
         local chargeInfo = C_Spell.GetSpellCharges(spellID)

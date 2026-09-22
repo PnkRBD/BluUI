@@ -5,11 +5,6 @@ local Pixel = BUI.Pixel
 BUI.Auras = {}
 local Auras = BUI.Auras
 
-local positionCallback
-
-function Auras.RegisterPositionCallback(callback) positionCallback = callback end
-function Auras.UnregisterPositionCallback() positionCallback = nil end
-
 local PetClasses = { HUNTER = true, WARLOCK = true, DEATHKNIGHT = true }
 
 local NoPetSpecs = { [254] = true, [250] = true, [251] = true }
@@ -127,7 +122,6 @@ local function BuildPetWarning()
             db.posY = math.floor(y)
             warningFrame:ClearAllPoints()
             warningFrame:SetPoint(point or "CENTER", UIParent, point or "CENTER", x, y)
-            if positionCallback then positionCallback(x, y) end
         end,
         onRightClick = function() Auras.SetLocked(true) end,
         usePointPosition = true,
@@ -153,7 +147,7 @@ local function Warn(message)
     warningFrame:Show()
 end
 
-local healthFrame, healthCurve, healthCurveThreshold
+local healthFrame
 
 local function BuildHealthWarning()
     if healthFrame then return end
@@ -161,25 +155,13 @@ local function BuildHealthWarning()
     healthFrame.text:SetText("***HEAL PET***")
 end
 
-local function GetHealthCurve(threshold)
-    if healthCurve and healthCurveThreshold == threshold then return healthCurve end
-    healthCurve = C_CurveUtil.CreateColorCurve()
-    healthCurve:SetType(Enum.LuaCurveType.Step)
-    healthCurve:AddPoint(0, CreateColor(1, 1, 1, 1))
-    healthCurve:AddPoint(threshold / 100, CreateColor(1, 1, 1, 0))
-    healthCurveThreshold = threshold
-    return healthCurve
+local function ApplyThresholdAlpha(frame, unit, threshold)
+    local color = UnitHealthPercent(unit, false, BUI.Tools.ThresholdAlphaCurve(threshold))
+    frame:SetAlpha(color and select(4, color:GetRGBA()) or 0)
 end
 
 local function UpdateHealthAlpha()
-    local db = GetDB()
-    local curve = GetHealthCurve(db.petHealthWarning.threshold)
-    local color = UnitHealthPercent("pet", false, curve)
-    if color then
-        healthFrame:SetAlpha(select(4, color:GetRGBA()))
-    else
-        healthFrame:SetAlpha(0)
-    end
+    ApplyThresholdAlpha(healthFrame, "pet", GetDB().petHealthWarning.threshold)
     healthFrame:Show()
 end
 
@@ -398,7 +380,6 @@ function Auras.Initialize()
 end
 
 local lowHpFrame, lowHpText
-local lowHpCurve, lowHpCurveThreshold
 
 local function BuildLowHp()
     if lowHpFrame then return end
@@ -432,16 +413,6 @@ local function BuildLowHp()
     })
 end
 
-local function GetLowHpCurve(threshold)
-    if lowHpCurve and lowHpCurveThreshold == threshold then return lowHpCurve end
-    lowHpCurve = C_CurveUtil.CreateColorCurve()
-    lowHpCurve:SetType(Enum.LuaCurveType.Step)
-    lowHpCurve:AddPoint(0, CreateColor(1, 1, 1, 1))
-    lowHpCurve:AddPoint(threshold / 100, CreateColor(1, 1, 1, 0))
-    lowHpCurveThreshold = threshold
-    return lowHpCurve
-end
-
 local function LowHpSuppressed()
     if UnitIsDeadOrGhost("player") then return true end
     if InCombatLockdown() then return false end
@@ -458,15 +429,10 @@ local function UpdateLowHpAlpha()
         lowHpFrame:SetAlpha(0)
         return
     end
-    local curve = GetLowHpCurve(db.lowHpThreshold)
-    local color = UnitHealthPercent("player", false, curve)
-    if color then
-        lowHpFrame:SetAlpha(select(4, color:GetRGBA()))
-    else
-        lowHpFrame:SetAlpha(0)
-    end
+    ApplyThresholdAlpha(lowHpFrame, "player", db.lowHpThreshold)
 end
 
+local UpdateLowHpAlphaDispatch = BUI.Dispatcher.New(UpdateLowHpAlpha, "Auras.LowHpAlpha")
 local lowHpEventsRegistered = false
 
 local function HideLowHp()
@@ -506,10 +472,9 @@ function Auras.UpdateLowHp()
         lowHpText:GetStringHeight() + 20
     )
     BUI.Dragging.SetLocked(lowHpFrame, db.lowHpLocked ~= false)
-    lowHpCurve = nil
     if not lowHpEventsRegistered then
         lowHpEventsRegistered = true
-        BUI.Events:RegisterUnit("UNIT_HEALTH",                  "player", "LowHpWarning", UpdateLowHpAlpha)
+        BUI.Events:RegisterUnit("UNIT_HEALTH",                  "player", "LowHpWarning", UpdateLowHpAlphaDispatch)
         BUI.Events:RegisterUnit("UNIT_SPELLCAST_START",         "player", "LowHpWarning", UpdateLowHpAlpha)
         BUI.Events:RegisterUnit("UNIT_SPELLCAST_STOP",          "player", "LowHpWarning", UpdateLowHpAlpha)
         BUI.Events:RegisterUnit("UNIT_SPELLCAST_CHANNEL_START", "player", "LowHpWarning", UpdateLowHpAlpha)

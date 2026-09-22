@@ -216,6 +216,7 @@ local function BuildAlertsTab(tab)
 					db.lowHpLocked = not previewing; Apply()
 				end, { texture = BUILib.GetLibMedia('eye'), size = 18, tooltip = 'Preview (drag to move)' })
 				lowHpEye = eye
+				BUI.Auras._lowHpLockToggle = eye
 				local mover = AlertMover(row, db, Apply, {
 					selfTag = 'BUI_LowHpWarning',
 					fields = {
