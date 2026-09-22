@@ -8,7 +8,6 @@ local timerFrame, timerText
 local startTime = 0
 local enabled = false
 local inCombat = false
-local positionCallback
 
 local groupWatchActive = false
 
@@ -19,8 +18,6 @@ local MILLISECOND_TEMPLATES = { minutes = "88:88.8", hours = "88:88:88.8" }
 
 local function GetDB() return BUI.GetDB().combatTimer end
 
-function CombatTimer.RegisterPositionCallback(callback) positionCallback = callback end
-function CombatTimer.UnregisterPositionCallback() positionCallback = nil end
 
 local lastShownStep = -1
 local currentLayoutKey
@@ -124,7 +121,6 @@ local function Build()
             local currentDB = GetDB()
             currentDB.posX = math.floor(x)
             currentDB.posY = math.floor(y)
-            if positionCallback then positionCallback(x, y) end
         end,
         onRightClick = function() CombatTimer.SetLocked(true) end,
         usePointPosition = false,
