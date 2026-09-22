@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Achievements')
+local _, HookScript = BUI.Prof.Scripts('Achievements')
 
 local hooksecurefunc = BUI.Prof.MakeHooker('achievements')
 local ipairs = ipairs
@@ -146,9 +146,9 @@ local function SkinBar(bar, sideText)
 	if not bar then return end
 	if not bar._buiMeter then
 		BuildMeter(bar)
-		local name = bar:GetName() or ''
-		local label = bar.Label or bar.Title or _G[name .. 'Title']
-		local text = bar.Text or _G[name .. 'Text']
+		local name = bar:GetName()
+		local label = bar.Label or bar.Title or (name and _G[name .. 'Title'])
+		local text = bar.Text or (name and _G[name .. 'Text'])
 		MeterText(label)
 		MeterText(text)
 		if sideText then AnchorBarText(bar, label, text) end
