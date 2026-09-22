@@ -1854,7 +1854,6 @@ BUI.PageEngine.RegisterPage("cdm", {
         end
 
         CDM.Initialize()
-        CDM.ClearControls()
 
         local page = Layout.Page(pageFrame, { "General", "Essential", "Utility", "Buffs", "Buff Bars", "Layouts", "Icon Management" })
         pageFrame._page = page

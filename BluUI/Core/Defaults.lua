@@ -149,6 +149,10 @@ local CdmViewerBase = {
 	centerHorizontally    = true,
 	positionX             = 0,
 	positionY             = 0,
+	anchorFrame           = "",
+	anchorPoint           = "BOTTOM",
+	anchorOffsetX         = 0,
+	anchorOffsetY         = 0,
 }
 
 local UnitFrameBase = {
@@ -1180,7 +1184,7 @@ BUI.Defaults = {
 			},
 			essential = Merge(CdmViewerBase, { iconWidth = 50, iconHeight = 50, spacing = 1, positionY = -200, hiddenSlots = {}, detachedIcons = {}, showKeybinds = false, keybindAnchor = 'TOPRIGHT', keybindFontSize = 12, keybindOffsetX = 2, keybindOffsetY = 2, keybindFont = BUI.C.GLOBAL_OPTION, keybindColor = { 1, 1, 1, 1 }, customSpells = {}, iconOrder = {}, hiddenIcons = {}, iconOverrides = {}, buffTracking = {}, showOnlyOnCD = {} }),
 			utility   = Merge(CdmViewerBase, { iconWidth = 50, iconHeight = 50, spacing = 1, iconsPerRow = 6, positionY = -251, hiddenSlots = {}, detachedIcons = {}, showKeybinds = false, keybindAnchor = 'TOPRIGHT', keybindFontSize = 12, keybindOffsetX = 2, keybindOffsetY = 2, keybindFont = BUI.C.GLOBAL_OPTION, keybindColor = { 1, 1, 1, 1 }, customSpells = {}, iconOrder = {}, hiddenIcons = {}, iconOverrides = {}, buffTracking = {}, showOnlyOnCD = {} }),
-			buffs     = Merge(CdmViewerBase, { iconWidth = 36, iconHeight = 36, spacing = 1, textSize = 19, cooldownTextSize = 23, positionY = -126, hiddenSlots = {}, detachedIcons = {}, anchorFrame = '', anchorPoint = 'BOTTOM', anchorOffsetX = 0, anchorOffsetY = 0, customSpells = {}, iconOrder = {}, hiddenIcons = {}, iconOverrides = {}, buffTracking = {} }),
+			buffs     = Merge(CdmViewerBase, { iconWidth = 36, iconHeight = 36, spacing = 1, textSize = 19, cooldownTextSize = 23, positionY = -126, hiddenSlots = {}, detachedIcons = {}, customSpells = {}, iconOrder = {}, hiddenIcons = {}, iconOverrides = {}, buffTracking = {} }),
 			buffBars = {
 				skinEnabled    = true,
 				anchorFrame    = '',

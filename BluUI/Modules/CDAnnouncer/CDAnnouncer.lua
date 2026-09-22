@@ -540,7 +540,7 @@ local function UpdateRow(entry, index, context)
 
     local activeID = ActiveID(entry)
 
-    if context.hideUnusable and entry.kind ~= 'item' and activeID and not IsPlayerSpell(activeID) then
+    if context.hideUnusable and entry.kind ~= 'item' and activeID and not C_SpellBook.IsSpellKnown(activeID) then
         StopFlash(row)
         return false
     end
