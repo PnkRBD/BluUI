@@ -578,7 +578,6 @@ local function BuildPreview(parent, opts)
             proxy:SetPoint(corner, barHolder, corner, x * anchor.dirX, y * anchor.dirY)
             local icon = entries[index].icon
             if icon then proxy.icon:SetTexture(icon); proxy.icon:Show() else proxy.icon:Hide() end
-            proxy.icon:SetDesaturated(config.desaturate == true)
             proxy:Show()
         end
         for index = count + 1, #barProxies do barProxies[index]:Hide() end
@@ -1018,9 +1017,6 @@ BUI.PageEngine.RegisterPage('minimap', {
                             { kind = 'slider', label = 'Y Offset', min = -300, max = 300,
                               get = function() return GetInterfaceConfig().drawerY end,
                               set = function(value) GetInterfaceConfig().drawerY = value; MinimapModule.RepositionDrawer() end },
-                            { label = 'Desaturate Icons',
-                              get = function() return GetInterfaceConfig().drawerDesaturate == true end,
-                              set = function(value) MinimapModule.SetDrawerDesaturated(value) end },
                         },
                     }) }
                 end,
@@ -1099,9 +1095,6 @@ BUI.PageEngine.RegisterPage('minimap', {
                             { kind = 'swatch', label = 'Background', hasOpacity = true, tooltip = 'Tile color & opacity behind every icon',
                               get = function() return ButtonBarConfig().background end,
                               set = function(value) ButtonBarConfig().background = value end, apply = RefreshButtonBar },
-                            { label = 'Desaturate Icons',
-                              get = function() return ButtonBarConfig().desaturate == true end,
-                              set = function(value) ButtonBarConfig().desaturate = value end, apply = RefreshButtonBar },
                         },
                     })
                     return { cog, pickButton }

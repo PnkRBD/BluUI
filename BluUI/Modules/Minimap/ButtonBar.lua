@@ -103,7 +103,7 @@ local function EnsureFrame()
 	return frame
 end
 
-local function PlaceButton(button, size, edge, corner, x, y, desaturate, background)
+local function PlaceButton(button, size, edge, corner, x, y, background)
 	local original = button._buiOriginalFuncs
 	if not original then return end
 	local fill = button._buiBarBg
@@ -134,7 +134,6 @@ local function PlaceButton(button, size, edge, corner, x, y, desaturate, backgro
 		icon:SetPoint('TOPLEFT', button, 'TOPLEFT', edge, -edge)
 		icon:SetPoint('BOTTOMRIGHT', button, 'BOTTOMRIGHT', -edge, edge)
 		icon:SetTexCoord(ICON_CROP, 1 - ICON_CROP, ICON_CROP, 1 - ICON_CROP)
-		icon:SetDesaturated(desaturate)
 		icon:Show()
 	end
 	local highlight = button.GetHighlightTexture and button:GetHighlightTexture()
@@ -210,7 +209,7 @@ local function Layout()
 		end
 		drawer.Claim(button, 'bar')
 		placed[button] = true
-		PlaceButton(button, size, edge, corner, x * anchor.dirX, y * anchor.dirY, config.desaturate == true, background)
+		PlaceButton(button, size, edge, corner, x * anchor.dirX, y * anchor.dirY, background)
 	end
 	frame:SetShown(count > 0)
 end

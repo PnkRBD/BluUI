@@ -369,10 +369,9 @@ BUI.Defaults = {
 			drawerEnabled          = true,
 			drawerX                = 0,
 			drawerY                = 0,
-			drawerDesaturate       = false,
 			buttonBar = {
 				enabled = false, side = 'BOTTOM', align = 'CENTER', size = 22, spacing = 1, perLine = 0,
-				offsetX = 0, offsetY = 0, gap = 4, desaturate = false, background = { 0.06, 0.06, 0.07, 1 }, excluded = {}, order = {},
+				offsetX = 0, offsetY = 0, gap = 4, background = { 0.06, 0.06, 0.07, 1 }, excluded = {}, order = {},
 			},
 			skinBlizzardFrames     = false,
 			fasterMovieSkip        = true,
@@ -1886,6 +1885,8 @@ BUI.DeprecatedKeys = {
 	['general.visibilitySelection']      = true,
 	['huntersMark']                      = true,
 	['minimapRecentTracking']            = true,
+	['interface.drawerDesaturate']       = true,
+	['interface.buttonBar.desaturate']   = true,
 	['notes']                            = true,
 
 	['unitFrames.boss.bgColor']            = true,
