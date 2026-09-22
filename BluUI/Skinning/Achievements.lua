@@ -24,6 +24,7 @@ local METER_INSET = 1
 local METER_TEXT_SIZE = 11
 local COMPARISON_HEADER_INSET = 8
 local CARD_DESCRIPTION_GAP = 4
+local CARD_SEAM = 1
 local CARD_DESCRIPTION_TOP = -30
 local BODY_TEXT = { 0.87, 0.87, 0.9, 1 }
 local MUTED_TEXT = { 0.62, 0.62, 0.66, 1 }
@@ -290,7 +291,18 @@ local function OnSummaryUpdated()
 	if not Enabled() then return end
 	local cards = _G.AchievementFrameSummaryAchievements.buttons
 	if not cards then return end
-	for _, card in ipairs(cards) do SkinCard(card) end
+	local previous
+	for _, card in ipairs(cards) do
+		SkinCard(card)
+		if card:IsShown() then
+			if previous then
+				card:ClearAllPoints()
+				card:SetPoint('TOPLEFT', previous, 'BOTTOMLEFT', 0, CARD_SEAM)
+				card:SetPoint('TOPRIGHT', previous, 'BOTTOMRIGHT', 0, CARD_SEAM)
+			end
+			previous = card
+		end
+	end
 end
 
 local function OnStatRow(row)
