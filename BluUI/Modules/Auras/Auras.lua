@@ -399,6 +399,10 @@ local function BuildLowHp()
         isLocked = function() return GetDB().lowHpLocked ~= false end,
         onPositionChanged = function(x, y)
             local db = GetDB()
+            if db.lowHpCenterHorizontally then
+                local _, centerY = BUI.Dragging.GetCenterOffset(lowHpFrame)
+                x, y = 0, centerY
+            end
             db.lowHpPosX = math.floor(x)
             db.lowHpPosY = math.floor(y)
             lowHpFrame:ClearAllPoints()
@@ -445,6 +449,18 @@ local function HideLowHp()
     end
 end
 
+local function LowHpAnchorSettings(db)
+    return {
+        anchorFrame        = db.lowHpAnchorFrame,
+        anchorPoint        = db.lowHpAnchorPoint,
+        anchorOffsetX      = db.lowHpAnchorOffsetX,
+        anchorOffsetY      = db.lowHpAnchorOffsetY,
+        posX               = db.lowHpPosX,
+        posY               = db.lowHpPosY,
+        centerHorizontally = db.lowHpCenterHorizontally,
+    }
+end
+
 function Auras.UpdateLowHp()
     local db = GetDB()
     if not db.lowHpWarning then
@@ -458,15 +474,7 @@ function Auras.UpdateLowHp()
     local color = db.lowHpColor
     lowHpText:SetTextColor(color.r, color.g, color.b, color.a)
 
-    BUI.Anchor.ApplyPosition(lowHpFrame, {
-        anchorFrame        = db.lowHpAnchorFrame,
-        anchorPoint        = db.lowHpAnchorPoint,
-        anchorOffsetX      = db.lowHpAnchorOffsetX,
-        anchorOffsetY      = db.lowHpAnchorOffsetY,
-        posX               = db.lowHpPosX,
-        posY               = db.lowHpPosY,
-        centerHorizontally = db.lowHpCenterHorizontally,
-    })
+    BUI.Anchor.ApplyPosition(lowHpFrame, LowHpAnchorSettings(db))
     lowHpFrame:SnapSize(
         lowHpText:GetStringWidth() + 40,
         lowHpText:GetStringHeight() + 20
@@ -633,6 +641,10 @@ local function BuildMarkWarning()
         isLocked = function() return GetDB().markLocked ~= false end,
         onPositionChanged = function(x, y)
             local db = GetDB()
+            if db.markCenterHorizontally then
+                local _, centerY = BUI.Dragging.GetCenterOffset(markFrame)
+                x, y = 0, centerY
+            end
             db.markPosX = math.floor(x)
             db.markPosY = math.floor(y)
             markFrame:ClearAllPoints()
@@ -646,6 +658,18 @@ local function BuildMarkWarning()
         end,
         usePointPosition = true,
     })
+end
+
+local function MarkAnchorSettings(db)
+    return {
+        anchorFrame        = db.markAnchorFrame,
+        anchorPoint        = db.markAnchorPoint,
+        anchorOffsetX      = db.markAnchorOffsetX,
+        anchorOffsetY      = db.markAnchorOffsetY,
+        posX               = db.markPosX,
+        posY               = db.markPosY,
+        centerHorizontally = db.markCenterHorizontally,
+    }
 end
 
 local function StyleMarkWarning()
@@ -671,15 +695,7 @@ local function StyleMarkWarning()
         markText:SetPoint("CENTER", markPanel, "CENTER", 0, 0)
     end
 
-    BUI.Anchor.ApplyPosition(markFrame, {
-        anchorFrame        = db.markAnchorFrame,
-        anchorPoint        = db.markAnchorPoint,
-        anchorOffsetX      = db.markAnchorOffsetX,
-        anchorOffsetY      = db.markAnchorOffsetY,
-        posX               = db.markPosX,
-        posY               = db.markPosY,
-        centerHorizontally = db.markCenterHorizontally,
-    })
+    BUI.Anchor.ApplyPosition(markFrame, MarkAnchorSettings(db))
 
     if db.markPulse ~= false and showIcon then markPulse:Play() else markPulse:Stop() end
 end
@@ -737,3 +753,19 @@ function Auras.UpdateMark()
 end
 
 BUI.Events:OnLogin("Auras", Auras.Initialize)
+
+local function NeedsReanchor(frame, settings)
+    if not frame then return false end
+    if BUI.Anchor.ShouldRefreshOnAnchorChange(settings) then return true end
+    return settings.anchorFrame ~= "" and not frame._isAnchored
+end
+
+BUI.Anchor.RegisterCallback("Auras", function()
+    local db = GetDB()
+    if db.petWarningsEnabled and NeedsReanchor(warningFrame, db) then
+        StyleWarningFrame(warningFrame)
+        StyleWarningFrame(healthFrame)
+    end
+    if db.lowHpWarning and NeedsReanchor(lowHpFrame, LowHpAnchorSettings(db)) then Auras.UpdateLowHp() end
+    if db.markWarning and NeedsReanchor(markFrame, MarkAnchorSettings(db)) then Auras.UpdateMark() end
+end)
