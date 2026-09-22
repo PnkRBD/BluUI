@@ -337,7 +337,7 @@ function BUI.SkinningPage.BuildTab(tab)
 		title = 'All Skins',
 		description = 'Enable or disable every skin at once.',
 		plain = true,
-		accessoryWidth = 420,
+		accessoryWidth = 290,
 		accessories = function(row)
 			local enableButton = Controls.Button(row, 'Enable All', 120, function()
 				BUI.Skinning.SetAllSkinsEnabled(true)
@@ -347,10 +347,7 @@ function BUI.SkinningPage.BuildTab(tab)
 				BUI.Skinning.SetAllSkinsEnabled(false)
 				SyncAllCards()
 			end)
-			local previewButton = Controls.Button(row, 'Preview All', 120, function()
-				BUI.Skinning.Test()
-			end)
-			return { previewButton, disableButton, enableButton }
+			return { disableButton, enableButton }
 		end,
 	})
 	controlGrid:Flush()
