@@ -110,7 +110,7 @@ local function StartPixel(icon, config)
 	local lineCount = config.lines
 	local frequency = SpeedMultiplier(config.speed) * 0.25
 	local thickness = config.thickness
-	LibCustomGlow.PixelGlow_Start(icon, color, lineCount, frequency, PixelLength(icon, lineCount), thickness, 0, 0, false, GLOW_KEY, icon:GetFrameLevel() + GLOW_LAYER)
+	LibCustomGlow.PixelGlow_Start(icon, color, lineCount, frequency, PixelLength(icon, lineCount), thickness, 0, 0, false, GLOW_KEY, GLOW_LAYER)
 end
 local function StopPixel(icon) LibCustomGlow.PixelGlow_Stop(icon, GLOW_KEY) end
 
@@ -118,7 +118,7 @@ local function StartAutoCast(icon, config)
 	local color = config.color
 	local lineCount = config.lines
 	local frequency = SpeedMultiplier(config.speed) * 0.125
-	LibCustomGlow.AutoCastGlow_Start(icon, color, lineCount, frequency, 1, 0, 0, GLOW_KEY, icon:GetFrameLevel() + GLOW_LAYER)
+	LibCustomGlow.AutoCastGlow_Start(icon, color, lineCount, frequency, 1, 0, 0, GLOW_KEY, GLOW_LAYER)
 end
 local function StopAutoCast(icon) LibCustomGlow.AutoCastGlow_Stop(icon, GLOW_KEY) end
 
@@ -128,7 +128,7 @@ local function StartButton(icon, config)
 	local speed = config.speed
 	local frequency
 	if speed ~= 100 then frequency = SpeedMultiplier(speed) * 1.0 end
-	LibCustomGlow.ButtonGlow_Start(icon, color, frequency, icon:GetFrameLevel() + GLOW_LAYER)
+	LibCustomGlow.ButtonGlow_Start(icon, color, frequency, GLOW_LAYER)
 end
 local function StopButton(icon) LibCustomGlow.ButtonGlow_Stop(icon) end
 
@@ -145,7 +145,7 @@ local procGlowOpts = {
 local function StartProc(icon, config)
 	procGlowOpts.color      = config.color
 	procGlowOpts.duration   = 1.0 / SpeedMultiplier(config.speed)
-	procGlowOpts.frameLevel = icon:GetFrameLevel() + GLOW_LAYER
+	procGlowOpts.frameLevel = GLOW_LAYER
 	LibCustomGlow.ProcGlow_Start(icon, procGlowOpts)
 end
 local function StopProc(icon) LibCustomGlow.ProcGlow_Stop(icon, GLOW_KEY) end
