@@ -2,6 +2,7 @@ local _, BUI = ...
 
 local Pixel = BUI.Pixel
 local UnitFrames = BUI.UnitFrames
+local Tools = BUI.Tools
 local oUF = BUI.oUF
 
 local floor = math.floor
@@ -359,7 +360,7 @@ local Handlers = {
 		return Abbreviate(health + absorb)
 	end,
 	['name'] = function(unit) return UnitName(unit) or '' end,
-	['name:short'] = function(unit) local name = UnitName(unit) return name and format('%.10s', name) or '' end,
+	['name:short'] = function(unit) local name = UnitName(unit) return name and Tools.TruncateName(name, 10) or '' end,
 	['level'] = function(unit) local level = UnitLevel(unit) return level == -1 and '??' or tostring(level) end,
 	['class'] = function(unit) local _, class = UnitClass(unit) return class or '' end,
 	['classname'] = function(unit) return UnitClass(unit) or '' end,
@@ -680,8 +681,8 @@ local function EnsureRegistered(tagName)
 
 	local shortLength = tagName:match('^name:short(%d+)$')
 	if shortLength then
-		local truncateFormat = '%.' .. shortLength .. 's'
-		oUF.Tags.Methods['bui:' .. tagName] = BUI.Prof.WrapTag('tag#bui:' .. tagName, function(unit) local name = UnitName(unit) return name and format(truncateFormat, name) or '' end)
+		local limit = tonumber(shortLength)
+		oUF.Tags.Methods['bui:' .. tagName] = BUI.Prof.WrapTag('tag#bui:' .. tagName, function(unit) local name = UnitName(unit) return name and Tools.TruncateName(name, limit) or '' end)
 		oUF.Tags.Events['bui:' .. tagName] = 'UNIT_NAME_UPDATE'
 		return true
 	end
@@ -691,15 +692,13 @@ local function EnsureRegistered(tagName)
 		local nameLimit = nameLength ~= '' and tonumber(nameLength) or nil
 		local targetLimit = targetLength ~= '' and tonumber(targetLength) or nil
 		separator = (separator and separator ~= '') and separator or '>'
-		local nameFormat = nameLimit and ('%.' .. nameLimit .. 's') or nil
-		local targetFormat = targetLimit and ('%.' .. targetLimit .. 's') or nil
 		oUF.Tags.Methods['bui:' .. tagName] = BUI.Prof.WrapTag('tag#bui:' .. tagName, function(unit)
 			local name = UnitName(unit) or ''
 			local targetUnit = unit .. 'target'
 			local targetName = UnitName(targetUnit)
-			if nameFormat then name = format(nameFormat, name) end
+			if nameLimit then name = Tools.TruncateName(name, nameLimit) end
 			if targetName and (issecretvalue(targetName) or targetName ~= '') then
-				if targetFormat then targetName = format(targetFormat, targetName) end
+				if targetLimit then targetName = Tools.TruncateName(targetName, targetLimit) end
 				targetName = ClassColoredName(targetUnit, targetName, GetParentUnitType(unit))
 				return format('%s |cFFFFFFFF%s|r %s', name, separator, targetName)
 			end
