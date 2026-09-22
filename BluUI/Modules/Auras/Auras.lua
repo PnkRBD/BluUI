@@ -543,7 +543,9 @@ end
 
 local function MarkAuraPresent()
     if not markContainer then return false end
-    return (markContainer:GetWidth() or 0) > MARK_AURA_WIDTH
+    local width = markContainer:GetWidth()
+    if not width or issecretvalue(width) then return false end
+    return width > MARK_AURA_WIDTH
 end
 
 local function RefreshMarkShown()
