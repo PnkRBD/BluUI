@@ -127,7 +127,7 @@ local function StartButton(icon, config)
 
 	local speed = config.speed
 	local frequency
-	if speed ~= 100 then frequency = SpeedMultiplier(speed) * 1.0 end
+	if speed ~= 100 then frequency = SpeedMultiplier(speed) end
 	LibCustomGlow.ButtonGlow_Start(icon, color, frequency, GLOW_LAYER)
 end
 local function StopButton(icon) LibCustomGlow.ButtonGlow_Stop(icon) end

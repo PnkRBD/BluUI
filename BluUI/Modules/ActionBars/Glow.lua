@@ -6,6 +6,7 @@ local LibCustomGlow = LibStub('LibCustomGlow-1.0')
 
 local GLOW_KEY = '_BUIProc'
 local GLOW_LAYER = 12
+local PROC_GLOW_FIELD = '_ProcGlow' .. GLOW_KEY
 local EVENT_KEY = 'ActionBars.ProcGlow'
 
 local glowOptions = { key = GLOW_KEY, frameLevel = GLOW_LAYER, startAnim = true, duration = 1 }
@@ -28,7 +29,7 @@ local function TintTexture(texture, color)
 end
 
 local function TintGlow(button)
-	local frame = button['_ProcGlow' .. GLOW_KEY]
+	local frame = button[PROC_GLOW_FIELD]
 	if not frame then return end
 	local color = GlowColor()
 	TintTexture(frame.ProcStart, color)
@@ -56,18 +57,18 @@ end
 local function StartPixel(button, settings)
 	local lineCount = settings.procGlowLines
 	LibCustomGlow.PixelGlow_Start(button, settings.procGlowColor, lineCount, SpeedMultiplier(settings.procGlowSpeed) * 0.25,
-		PixelLength(button, lineCount), settings.procGlowThickness, 0, 0, false, GLOW_KEY, button:GetFrameLevel() + GLOW_LAYER)
+		PixelLength(button, lineCount), settings.procGlowThickness, 0, 0, false, GLOW_KEY, GLOW_LAYER)
 end
 
 local function StartAutoCast(button, settings)
 	LibCustomGlow.AutoCastGlow_Start(button, settings.procGlowColor, math.max(1, math.floor(settings.procGlowLines / 2)),
-		SpeedMultiplier(settings.procGlowSpeed) * 0.125, 1, 0, 0, GLOW_KEY, button:GetFrameLevel() + GLOW_LAYER)
+		SpeedMultiplier(settings.procGlowSpeed) * 0.125, 1, 0, 0, GLOW_KEY, GLOW_LAYER)
 end
 
 local function StartButton(button, settings)
 	local speed = settings.procGlowSpeed
 	local frequency = speed ~= 100 and SpeedMultiplier(speed) or nil
-	LibCustomGlow.ButtonGlow_Start(button, settings.procGlowColor, frequency, button:GetFrameLevel() + GLOW_LAYER)
+	LibCustomGlow.ButtonGlow_Start(button, settings.procGlowColor, frequency, GLOW_LAYER)
 end
 
 local StartByStyle = {
