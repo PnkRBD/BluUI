@@ -1,7 +1,6 @@
 local _, BUI = ...
 local SetScript, HookScript = BUI.Prof.Scripts('StaticPopup')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('staticpopup')
 local select = select
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')

@@ -195,8 +195,6 @@ local function Restyle()
 	for _, button in ipairs(skinnedButtons) do StyleButton(button) end
 end
 
-local DispatchRestyle = BUI.Dispatcher.New(Restyle, 'Skin.PlayerAurasRestyle')
-
 local function HookAuraFrame(frame)
 	if frame._buiAuraHooked then return end
 	frame._buiAuraHooked = true
