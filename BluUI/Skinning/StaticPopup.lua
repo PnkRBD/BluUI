@@ -184,12 +184,6 @@ Skin.RegisterSkin(SKIN_ID, {
 	description = 'Resurrect, release, confirm and other Blizzard popup dialogs drawn like the BluUI tooltip.',
 	icon = 'Interface/Icons/INV_Misc_Note_02',
 	settingsHeight = 240,
-	test = function()
-		return StaticPopup_Show('BUI_SKIN_TEST')
-	end,
-	stopTest = function()
-		StaticPopup_Hide('BUI_SKIN_TEST')
-	end,
 	buildSettings = function(content)
 		Skin.TipScaleCard(content, SCALE_KEY, ApplyShown)
 	end,

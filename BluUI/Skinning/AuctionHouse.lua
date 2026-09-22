@@ -9,7 +9,6 @@ local Skin = BUI.Skinning
 local Theme = BUILib.Theme
 
 local SKIN_ID = 'auctionhouse'
-local AUCTION_ADDON = 'Blizzard_AuctionHouseUI'
 local BACKGROUND_KEYS = { 'Background', 'NineSlice' }
 local MAIN_ART = { 'Bg', 'TopTileStreaks', 'MoneyFrameInset', 'MoneyFrameBorder' }
 local HEADER_ART = { 'Left', 'Middle', 'Right' }
@@ -421,17 +420,4 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Auction House',
 	description = 'Browse, buy, sell and manage auctions in the dark panel look: categories, result tables, sell forms and the buy dialog.',
 	icon = 'Interface/Icons/INV_Misc_Coin_01',
-	test = function()
-		if not _G.AuctionHouseFrame then
-			C_AddOns.LoadAddOn(AUCTION_ADDON)
-			TryInstall()
-		end
-		local frame = _G.AuctionHouseFrame
-		if not frame then return end
-		frame:Show()
-		return frame
-	end,
-	stopTest = function()
-		if _G.AuctionHouseFrame then HideUIPanel(_G.AuctionHouseFrame) end
-	end,
 })

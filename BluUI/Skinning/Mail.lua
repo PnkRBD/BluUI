@@ -9,9 +9,6 @@ local Skin = BUI.Skinning
 
 local SKIN_ID = 'mail'
 local INBOX_ROW_COUNT = 7
-local PREVIEW_SENDER = 'Auction House'
-local PREVIEW_SUBJECT = 'Auction successful: Slitherscale Girdle'
-local PREVIEW_BODY = 'Your auction sold. The gold is attached below.'
 local ATTACHMENT_COUNT = 16
 local BOTTOM_TAB_COUNT = 2
 local BODY_FONT_SIZE = 12
@@ -302,22 +299,4 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Mail',
 	description = 'The mailbox: inbox rows, the open-mail letter with its invoice and attachments, and the send-mail form.',
 	icon = 'Interface/MailFrame/Mail-Icon',
-	test = function()
-		local frame, openMail = _G.MailFrame, _G.OpenMailFrame
-		if not frame then return end
-		frame:Show()
-		_G.OpenMailInvoiceFrame:Hide()
-		_G.ConsortiumMailFrame:Hide()
-		_G.OpenMailAttachmentText:SetAlpha(0)
-		_G.OpenMailSender.Name:SetText(PREVIEW_SENDER)
-		_G.OpenMailSubject:SetText(PREVIEW_SUBJECT)
-		_G.OpenMailBodyText:SetText(PREVIEW_BODY)
-		openMail:Show()
-		return frame, openMail
-	end,
-	stopTest = function()
-		if _G.OpenMailAttachmentText then _G.OpenMailAttachmentText:SetAlpha(1) end
-		if _G.OpenMailFrame then HideUIPanel(_G.OpenMailFrame) end
-		if _G.MailFrame then HideUIPanel(_G.MailFrame) end
-	end,
 })

@@ -7,7 +7,6 @@ local ipairs, select = ipairs, select
 local Skin = BUI.Skinning
 
 local SKIN_ID = 'greatvault'
-local VAULT_ADDON = 'Blizzard_WeeklyRewards'
 local PANEL_INSET = 8
 local SELECT_BUTTON_ROOM = 14
 local CARD_INSET = 2
@@ -300,21 +299,4 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Great Vault',
 	description = 'The Great Vault window: dark shell, faded gold chrome, house row titles and progress text, framed reward icons and accent-edged selection.',
 	icon = 'Interface/Icons/INV_Box_01',
-	test = function()
-		if not _G.WeeklyRewardsFrame then
-			C_AddOns.LoadAddOn(VAULT_ADDON)
-			TryInstall()
-		end
-		local frame = _G.WeeklyRewardsFrame
-		if not frame then return end
-		if _G.WeeklyRewards_ShowUI then
-			WeeklyRewards_ShowUI()
-		else
-			ShowUIPanel(frame, true)
-		end
-		return frame
-	end,
-	stopTest = function()
-		if _G.WeeklyRewardsFrame then HideUIPanel(_G.WeeklyRewardsFrame) end
-	end,
 })

@@ -122,7 +122,4 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Pet Battle Bar',
 	description = 'The pet battle action bar: square ability, swap, trap and forfeit buttons with the action bar border, no ornate bar art. No preview: it only shows during a pet battle.',
 	icon = 'Interface/Icons/INV_Pet_BattlePetTraining',
-	test = function()
-		return nil
-	end,
 })

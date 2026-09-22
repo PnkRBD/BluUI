@@ -491,14 +491,6 @@ Skin.RegisterSkin(SKIN_ID, {
 			RefreshExtras()
 		end)
 	end,
-	test = function()
-		local map = _G.WorldMapFrame
-		if not map:IsShown() then ToggleWorldMap() end
-		return map
-	end,
-	stopTest = function()
-		if _G.WorldMapFrame:IsShown() then ToggleWorldMap() end
-	end,
 })
 
 BUI.Events:Once('PLAYER_LOGIN', 'Skin.WorldMapInstall', TryInstall)

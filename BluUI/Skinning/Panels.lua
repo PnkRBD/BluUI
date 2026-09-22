@@ -211,31 +211,9 @@ local function LoadWindows(entry)
 	end
 end
 
-local function TestEntry(entry)
-	LoadWindows(entry)
-	TrySkin(entry)
-	local shown = {}
-	for index = 1, #entry.frames do
-		local frame = _G[entry.frames[index]]
-		if frame and frame.GetNumPoints and not frame:IsShown() and pcall(frame.Show, frame) then
-			entry.testShown[#entry.testShown + 1] = frame
-			shown[#shown + 1] = frame
-		end
-	end
-	return unpack(shown)
-end
-
-local function StopTestEntry(entry)
-	for index = 1, #entry.testShown do
-		pcall(entry.testShown[index].Hide, entry.testShown[index])
-	end
-	wipe(entry.testShown)
-end
-
 for index = 1, #WINDOWS do
 	local entry = WINDOWS[index]
 	entry.skinned = {}
-	entry.testShown = {}
 	entry.enabled = function() return Skin.IsSkinEnabled(entry.id) end
 	entry.context = Skin.NewContext(entry.enabled)
 	Skin.OnToggle(entry.id, function(enabled)
@@ -251,8 +229,6 @@ for index = 1, #WINDOWS do
 		description = entry.description,
 		icon = entry.icon,
 		legacy = entry.legacy,
-		test = function() return TestEntry(entry) end,
-		stopTest = function() StopTestEntry(entry) end,
 	})
 end
 

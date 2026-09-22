@@ -221,7 +221,4 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Trade',
 	description = 'The trade window: dark shell, framed item slots with quality edges, house money boxes and buttons, accent accept highlight. No preview: it only opens while trading with another player.',
 	icon = 'Interface/Icons/INV_Misc_Coin_01',
-	test = function()
-		return nil
-	end,
 })

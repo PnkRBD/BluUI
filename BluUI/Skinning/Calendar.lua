@@ -7,7 +7,6 @@ local ipairs = ipairs
 local Skin = BUI.Skinning
 
 local SKIN_ID = 'calendar'
-local CALENDAR_ADDON = 'Blizzard_Calendar'
 local FRAME_ART_NAMES = {
 	'TopLeftTexture', 'TopMiddleTexture', 'TopRightTexture', 'LeftTopTexture', 'LeftMiddleTexture', 'LeftBottomTexture',
 	'RightTopTexture', 'RightMiddleTexture', 'RightBottomTexture', 'BottomLeftTexture', 'BottomMiddleTexture', 'BottomRightTexture',
@@ -155,17 +154,4 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Calendar',
 	description = 'The calendar: dark month grid with accent day highlights, house arrows and filter, and dark event dialogs.',
 	icon = 'Interface/Icons/INV_Misc_Note_02',
-	test = function()
-		if not _G.CalendarFrame then
-			C_AddOns.LoadAddOn(CALENDAR_ADDON)
-			TryInstall()
-		end
-		local frame = _G.CalendarFrame
-		if not frame then return end
-		if not frame:IsShown() then ToggleCalendar() end
-		return frame
-	end,
-	stopTest = function()
-		if _G.CalendarFrame and _G.CalendarFrame:IsShown() then ToggleCalendar() end
-	end,
 })
