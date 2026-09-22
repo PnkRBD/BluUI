@@ -107,7 +107,7 @@ local function EnsureOverlay(icon)
     if overlay.icon ~= icon then
         overlay.icon = icon
         overlay.frame:SetFrameStrata(icon:GetFrameStrata())
-        overlay.frame:SetFrameLevel(icon:GetFrameLevel() + 5)
+        overlay.frame:SetFrameLevel(icon:GetFrameLevel() + BUI.CDM.GLOW_LAYER + 1)
         overlay.frame:ClearAllPoints()
         overlay.frame:SetPoint('TOPLEFT',     icon, 'TOPLEFT', 0, 0)
         overlay.frame:SetPoint('BOTTOMRIGHT', icon, 'BOTTOMRIGHT', 0, 0)
