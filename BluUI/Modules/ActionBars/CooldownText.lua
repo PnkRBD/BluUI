@@ -7,25 +7,12 @@ local function BarSettingsFor(button)
 	return ActionBars.GetBarSettings(button._buiBar) or ActionBars.GetBarSettings(1)
 end
 
-local function CountdownRegion(cooldown)
-	local region = cooldown._buiCountdown
-	if region then return region end
-	for index = 1, select('#', cooldown:GetRegions()) do
-		local candidate = select(index, cooldown:GetRegions())
-		if candidate:GetObjectType() == 'FontString' then
-			cooldown._buiCountdown = candidate
-			return candidate
-		end
-	end
-	return nil
-end
-
 function ActionBars.StyleCooldownText(button)
 	local cooldown = button.cooldown
 	if not cooldown then return end
 	local barSettings = BarSettingsFor(button)
 	cooldown:SetHideCountdownNumbers(not barSettings.showCooldownText)
-	local region = CountdownRegion(cooldown)
+	local region = BUI.Tools.CooldownFontString(cooldown)
 	if not region then return end
 	local settings = ActionBars.GetSettings()
 	Pixel.ApplyFont(region, barSettings.cooldownFontSize, BUI.GetAddonFont(), 'OUTLINE')

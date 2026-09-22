@@ -71,13 +71,6 @@ end
 
 local overlay
 
-local function FindCooldownFontString(cooldown)
-    local regions = { cooldown:GetRegions() }
-    for regionIndex = 1, #regions do
-        if regions[regionIndex]:GetObjectType() == 'FontString' then return regions[regionIndex] end
-    end
-end
-
 local function EnsureOverlay(icon)
     if not overlay then
         local frame = CreateFrame('Frame', nil, UIParent)
@@ -98,7 +91,7 @@ local function EnsureOverlay(icon)
         overlay = {
             frame            = frame,
             cooldown         = cooldown,
-            timerFS          = FindCooldownFontString(cooldown),
+            timerFS          = BUI.Tools.CooldownFontString(cooldown),
             beastText        = beastText,
             lastPreviewPhase = nil,
         }
@@ -142,7 +135,7 @@ local function StyleLiveTimer(cooldown, button)
     cooldown:SetDrawBling(false)
     cooldown:SetHideCountdownNumbers(false)
     cooldown:SetCountdownMillisecondsThreshold(config.showDecimals and config.decimalThreshold or 0)
-    local fontString = FindCooldownFontString(cooldown)
+    local fontString = BUI.Tools.CooldownFontString(cooldown)
     if not fontString then return end
     local color = config.timerColor
     local anchor = config.timerAnchor
