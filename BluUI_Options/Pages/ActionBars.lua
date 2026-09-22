@@ -427,9 +427,11 @@ local function BuildGeneral(tab, settings, Apply)
 		})
 	end
 	Row({
-		title = 'Cooldown Text', description = 'Countdown numbers on a button on cooldown. Each bar turns them on or off and sets their size. The cog recolors the last few seconds.', plain = true, accessoryWidth = 96,
+		title = 'Cooldown Text', description = 'Countdown numbers on a button on cooldown. Each bar turns them on or off and sets their size. The cog adds decimals and recolors the last few seconds.', plain = true, accessoryWidth = 96,
 		accessories = function(row)
-			local cog = PageKit.SettingsIcon(row, { title = 'COOLDOWN WARNING', tooltip = 'Recolor the countdown in its final seconds', options = {
+			local cog = PageKit.SettingsIcon(row, { title = 'COOLDOWN TEXT', tooltip = 'Decimals and the final-seconds color', options = {
+				Option(nil, 'Show Decimals', 'showCooldownDecimals'),
+				Option('slider', 'Decimal Threshold', 'cooldownDecimalThreshold', { min = 1, max = 30 }),
 				Option('slider', 'Warning Seconds', 'cooldownThreshold', { min = 0, max = 10 }),
 				Option('swatch', 'Warning Color', 'cooldownThresholdColor'),
 			} })

@@ -19,9 +19,12 @@ function ActionBars.StyleCooldownText(button)
 	local color = settings.cooldownColor
 	region:SetTextColor(color[1], color[2], color[3], color[4])
 	local threshold = settings.cooldownThreshold
-	if threshold > 0 or cooldown._buiFormatter then
-		cooldown._buiFormatter = threshold > 0 or nil
-		cooldown:SetCountdownFormatter(BUI.TimeFormat.GetFormatter(0, threshold, settings.cooldownThresholdColor))
+	local decimalThreshold = settings.showCooldownDecimals and settings.cooldownDecimalThreshold or 0
+	cooldown:SetCountdownMillisecondsThreshold(decimalThreshold)
+	local wantFormatter = threshold > 0 or decimalThreshold > 0
+	if wantFormatter or cooldown._buiFormatter then
+		cooldown._buiFormatter = wantFormatter or nil
+		cooldown:SetCountdownFormatter(BUI.TimeFormat.GetFormatter(decimalThreshold, threshold, settings.cooldownThresholdColor))
 	end
 	local anchor = settings.cooldownAnchor
 	region:ClearAllPoints()
