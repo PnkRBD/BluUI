@@ -35,7 +35,6 @@ local side = 'LEFT'
 local offsetX, offsetY = 0, 0
 local enabled = false
 local hasSessionError = false
-local desaturateIcons = false
 local claims = {}
 local captureListeners = {}
 local captureWanted = false
@@ -244,14 +243,6 @@ function Drawer.SetOffset(x, y)
 	if bar and bar:IsShown() then HideDrawer() end
 end
 
-function Drawer.SetDesaturated(value)
-	desaturateIcons = value and true or false
-	for buttonIndex = 1, #buttons do
-		local iconTexture = buttons[buttonIndex]._buiIcon
-		if iconTexture then iconTexture:SetDesaturated(desaturateIcons) end
-	end
-end
-
 function Drawer.Create()
 	if bar then return end
 
@@ -420,7 +411,6 @@ local function CaptureButton(button)
 		iconTexture:SetPoint('CENTER')
 		iconTexture:SetSize(iconScaledSize, iconScaledSize)
 		iconTexture:SetTexCoord(ICON_CROP, 1 - ICON_CROP, ICON_CROP, 1 - ICON_CROP)
-		iconTexture:SetDesaturated(desaturateIcons)
 		iconTexture:Show()
 	end
 
@@ -477,7 +467,6 @@ local function ReleaseButton(button)
 		end
 		if button._buiIcon then
 			local iconTexture = button._buiIcon
-			iconTexture:SetDesaturated(false)
 			if button._buiIconCoord then iconTexture:SetTexCoord(unpack(button._buiIconCoord)) end
 			if button._buiIconW then iconTexture:SetSize(button._buiIconW, button._buiIconH) end
 			iconTexture:ClearAllPoints()
@@ -576,7 +565,6 @@ function StyleDrawerButton(button)
 		iconTexture:SetPoint('CENTER')
 		iconTexture:SetSize(iconSize, iconSize)
 		iconTexture:SetTexCoord(ICON_CROP, 1 - ICON_CROP, ICON_CROP, 1 - ICON_CROP)
-		iconTexture:SetDesaturated(desaturateIcons)
 	end
 	local highlight = button.GetHighlightTexture and button:GetHighlightTexture()
 	if highlight then

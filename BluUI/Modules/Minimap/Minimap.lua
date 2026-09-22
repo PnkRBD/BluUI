@@ -949,7 +949,6 @@ function Minimap.ToggleDrawer(enabled)
 	if enabled then
 		BUI.Drawer.SetOffset(interfaceDB.drawerX, interfaceDB.drawerY)
 		BUI.Drawer.SetSide(interfaceDB.drawerSide)
-		BUI.Drawer.SetDesaturated(interfaceDB.drawerDesaturate)
 		BUI.Drawer.Enable()
 	else
 		BUI.Drawer.Disable()
@@ -959,11 +958,6 @@ end
 function Minimap.SetDrawerSide(side)
 	GetConfig().drawerSide = side
 	BUI.Drawer.SetSide(side)
-end
-
-function Minimap.SetDrawerDesaturated(value)
-	GetConfig().drawerDesaturate = value and true or false
-	BUI.Drawer.SetDesaturated(value)
 end
 
 function Minimap.RefreshButtonBar()
@@ -998,7 +992,6 @@ function Minimap.Enable()
 	if interfaceDB.drawerEnabled then
 		BUI.Drawer.SetOffset(interfaceDB.drawerX, interfaceDB.drawerY)
 		BUI.Drawer.SetSide(interfaceDB.drawerSide)
-		BUI.Drawer.SetDesaturated(interfaceDB.drawerDesaturate)
 		BUI.Drawer.Enable()
 	else
 		BUI.Drawer.Disable()
