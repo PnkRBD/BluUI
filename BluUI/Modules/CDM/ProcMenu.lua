@@ -9,7 +9,10 @@ local CreateFrame = CreateFrame
 local PlaySound = PlaySound
 local pairs, wipe = pairs, wipe
 
+local Tools = BUI.Tools
 local IsSecret = BUI.Tools.IsSecretValue
+local IsSpellOverlayed = C_SpellActivationOverlay.IsSpellOverlayed
+local GetPlayerAuraBySpellID = C_UnitAuras.GetPlayerAuraBySpellID
 local hooksecurefunc = BUI.Prof.MakeHooker('procmenu')
 
 CDM.PROC_MSG_POSITIONS = {
@@ -88,12 +91,15 @@ end
 
 local function ApplyOverlay(icon, key, entry)
 	local overlay = GetOverlay(icon)
+	local font = BUI.GetGlobalFont()
+	local color = entry.msgColor or entry.color or GlowDB().color
+	if overlay.entry == entry and overlay.font == font and overlay.color == color and overlay.frame:IsShown() then return end
+	overlay.entry, overlay.font, overlay.color = entry, font, color
 	local anchor = ANCHOR_POINTS[entry.msgAnchor or 'center'] or ANCHOR_POINTS.center
 	local target = OverlayAnchor(icon)
-	Pixel.ApplyFont(overlay.text, entry.msgSize or 14, BUI.GetGlobalFont(), 'OUTLINE')
+	Pixel.ApplyFont(overlay.text, entry.msgSize or 14, font, 'OUTLINE')
 	overlay.text:ClearAllPoints()
 	overlay.text:SetPoint(anchor[1], target, anchor[2], Pixel.Scale(entry.msgOffsetX or 0), Pixel.Scale(anchor[3] + (entry.msgOffsetY or 0)))
-	local color = entry.msgColor or entry.color or GlowDB().color
 	overlay.text:SetTextColor(color[1], color[2], color[3], 1)
 	overlay.text:SetText(MessageText(key, entry))
 	overlay.frame:Show()
@@ -193,15 +199,15 @@ local function CancelAppearTimer(icon)
 	end
 end
 
+local appearGlowConfig = { enabled = true }
+
 local function AppearGlowNow(icon, entry)
-	CDM.StartProcGlow(icon, {
-		enabled = true,
-		style = entry.style,
-		color = entry.color,
-		speed = entry.speed,
-		lines = entry.lines,
-		thickness = entry.thickness,
-	})
+	appearGlowConfig.style = entry.style
+	appearGlowConfig.color = entry.color
+	appearGlowConfig.speed = entry.speed
+	appearGlowConfig.lines = entry.lines
+	appearGlowConfig.thickness = entry.thickness
+	CDM.StartProcGlow(icon, appearGlowConfig)
 end
 
 local function WantsSteadyGlow(entry)
@@ -260,7 +266,7 @@ local function StopAppearAlert(key, icons)
 	end
 	HideOverlayFor(key)
 	if activeEntries[key] then
-		if type(key) == 'number' and IsSpellOverlayed and not IsSpellOverlayed(key) then
+		if type(key) == 'number' and not IsSpellOverlayed(key) then
 			activeEntries[key] = nil
 		else
 			local perSpell = GlowDB().perSpell
@@ -336,6 +342,42 @@ local function AddCandidate(perSpell, id)
 	candidateKeys[candidateCount] = key
 end
 
+local mergedEntries = setmetatable({}, { __mode = 'k' })
+
+local function MergedEntry(primaryEntry, appearEntry)
+	local byAppear = mergedEntries[primaryEntry]
+	if not byAppear then
+		byAppear = setmetatable({}, { __mode = 'k' })
+		mergedEntries[primaryEntry] = byAppear
+	end
+	local merged = byAppear[appearEntry]
+	if merged then return merged end
+	merged = {
+		trigger = appearEntry.trigger,
+		glowTarget = primaryEntry.glowTarget or appearEntry.glowTarget,
+		glowTargetSpell = primaryEntry.glowTargetSpell or appearEntry.glowTargetSpell,
+		glowMode = primaryEntry.glowMode or appearEntry.glowMode,
+		glowThreshold = primaryEntry.glowThreshold or appearEntry.glowThreshold,
+		duration = primaryEntry.duration or appearEntry.duration,
+		style = primaryEntry.style or appearEntry.style,
+		color = primaryEntry.color or appearEntry.color,
+		speed = primaryEntry.speed or appearEntry.speed,
+		lines = primaryEntry.lines or appearEntry.lines,
+		thickness = primaryEntry.thickness or appearEntry.thickness,
+		msg = appearEntry.msg,
+		msgText = appearEntry.msgText,
+		msgColor = appearEntry.msgColor,
+		msgAnchor = appearEntry.msgAnchor,
+		msgSize = appearEntry.msgSize,
+		msgOffsetX = appearEntry.msgOffsetX,
+		msgOffsetY = appearEntry.msgOffsetY,
+		tts = appearEntry.tts,
+		sound = appearEntry.sound,
+	}
+	byAppear[appearEntry] = merged
+	return merged
+end
+
 local function ResolveEntryForIcon(icon, perSpell)
 	candidateCount = 0
 	local cooldownInfo = icon.cooldownInfo
@@ -390,28 +432,7 @@ local function ResolveEntryForIcon(icon, perSpell)
 		end
 	end
 	if not appearEntry then return end
-	return {
-		trigger = appearEntry.trigger,
-		glowTarget = primaryEntry.glowTarget or appearEntry.glowTarget,
-		glowTargetSpell = primaryEntry.glowTargetSpell or appearEntry.glowTargetSpell,
-		glowMode = primaryEntry.glowMode or appearEntry.glowMode,
-		glowThreshold = primaryEntry.glowThreshold or appearEntry.glowThreshold,
-		duration = primaryEntry.duration or appearEntry.duration,
-		style = primaryEntry.style or appearEntry.style,
-		color = primaryEntry.color or appearEntry.color,
-		speed = primaryEntry.speed or appearEntry.speed,
-		lines = primaryEntry.lines or appearEntry.lines,
-		thickness = primaryEntry.thickness or appearEntry.thickness,
-		msg = appearEntry.msg,
-		msgText = appearEntry.msgText,
-		msgColor = appearEntry.msgColor,
-		msgAnchor = appearEntry.msgAnchor,
-		msgSize = appearEntry.msgSize,
-		msgOffsetX = appearEntry.msgOffsetX,
-		msgOffsetY = appearEntry.msgOffsetY,
-		tts = appearEntry.tts,
-		sound = appearEntry.sound,
-	}, appearKey
+	return MergedEntry(primaryEntry, appearEntry), appearKey
 end
 
 local function UpdateAppearOverlay(key, entry, icons)
@@ -429,40 +450,37 @@ local function UpdateAppearOverlay(key, entry, icons)
 	end
 end
 
+local function AuraStamp(id)
+	if type(id) ~= 'number' or IsSecret(id) then return nil end
+	local aura = GetPlayerAuraBySpellID(id)
+	if not aura then return nil end
+	local expiration = aura.expirationTime
+	if expiration ~= nil and not IsSecret(expiration) then return expiration end
+	local instanceID = aura.auraInstanceID
+	if instanceID ~= nil and not IsSecret(instanceID) then return instanceID end
+	return true
+end
+
 local function IconBuffActive(icon)
-	local Tools = BUI.Tools
-	local GetPlayerAura = C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID
-	if not GetPlayerAura
-		or (Tools.ShouldAurasBeSecret and Tools.ShouldAurasBeSecret())
-		or (Tools.AuraQueriesBlocked and Tools.AuraQueriesBlocked()) then
+	if Tools.ShouldAurasBeSecret() or Tools.AuraQueriesBlocked() then
 		local instanceID = icon.auraInstanceID
 		if not instanceID then return nil end
 		if IsSecret(instanceID) then return true end
 		return instanceID
 	end
-	local function Stamp(id)
-		if type(id) ~= 'number' or IsSecret(id) then return nil end
-		local aura = GetPlayerAura(id)
-		if not aura then return nil end
-		local expiration = aura.expirationTime
-		if expiration ~= nil and not IsSecret(expiration) then return expiration end
-		local instanceID = aura.auraInstanceID
-		if instanceID ~= nil and not IsSecret(instanceID) then return instanceID end
-		return true
-	end
 	local cooldownInfo = icon.cooldownInfo
 	if cooldownInfo then
-		local stamp = Stamp(cooldownInfo.overrideSpellID) or Stamp(cooldownInfo.spellID)
+		local stamp = AuraStamp(cooldownInfo.overrideSpellID) or AuraStamp(cooldownInfo.spellID)
 		if stamp then return stamp end
 		if cooldownInfo.linkedSpellIDs then
 			for _, linkedSpellID in ipairs(cooldownInfo.linkedSpellIDs) do
-				stamp = Stamp(linkedSpellID)
+				stamp = AuraStamp(linkedSpellID)
 				if stamp then return stamp end
 			end
 		end
 		return nil
 	end
-	return Stamp(CDM.GetStableSpellID(icon))
+	return AuraStamp(CDM.GetStableSpellID(icon))
 end
 
 local function CarryIcon(id, icon)
