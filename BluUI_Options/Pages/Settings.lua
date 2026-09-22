@@ -250,48 +250,106 @@ BUI.PageEngine.RegisterPage("settings", {
 			end
 
 			local function PendingCVars()
-				local pending, total = {}, 0
+				local pending, total, known = {}, 0, 0
 				for cvar, value in pairs(FPS_CVARS) do
 					local current = C_CVar.GetCVar(cvar)
-					if current and not SameCVarValue(current, value) then
-						pending[cvar] = current
-						total = total + 1
-					end
-				end
-				return pending, total
-			end
-
-			local function PreviewText(pending, total)
-				local lines, grouped = {}, 0
-				for _, group in ipairs(FPS_CVAR_GROUPS) do
-					local headline, changed = nil, 0
-					for _, cvar in ipairs(group.cvars) do
-						if pending[cvar] then
-							changed = changed + 1
-							headline = headline or cvar
+					if current then
+						known = known + 1
+						if not SameCVarValue(current, value) then
+							pending[cvar] = current
+							total = total + 1
 						end
 					end
-					if headline then
-						grouped = grouped + changed
-						lines[#lines + 1] = ('%s   |cff9a9a9a%s|r  ->  |cffffffff%s|r'):format(group.label, pending[headline], FPS_CVARS[headline])
-					end
 				end
-				local rest = total - grouped
-				if rest > 0 then lines[#lines + 1] = ('|cff9a9a9a+%d more detail settings lowered|r'):format(rest) end
-				return table.concat(lines, '\n')
+				return pending, total, known
 			end
 
-			local function ApplyFPSPreset()
-				globalDB.cvarBackup = globalDB.cvarBackup or {}
-				local applied = 0
-				for cvar, value in pairs(FPS_CVARS) do
-					if not globalDB.cvarBackup[cvar] then
-						local currentValue = C_CVar.GetCVar(cvar)
-						if currentValue then globalDB.cvarBackup[cvar] = currentValue end
+			local PREVIEW_LINE_HEIGHT = 15
+			local PREVIEW_HEADER_HEIGHT = 20
+
+			local function PreviewLine(child, offsetY, name, valueText, isHeader)
+				local label = child:CreateFontString(nil, 'OVERLAY')
+				label:SetFont(Modals.BodyFont(), isHeader and 12 or 11, '')
+				label:SetPoint('TOPLEFT', child, 'TOPLEFT', isHeader and 6 or 18, -offsetY)
+				label:SetJustifyH('LEFT')
+				label:SetText(name)
+				if isHeader then label:SetTextColor(0.4, 0.72, 1, 1) else label:SetTextColor(0.78, 0.78, 0.82, 1) end
+				if not valueText then return end
+				local value = child:CreateFontString(nil, 'OVERLAY')
+				value:SetFont(Modals.BodyFont(), 11, '')
+				value:SetPoint('TOPRIGHT', child, 'TOPRIGHT', -10, -offsetY)
+				value:SetJustifyH('RIGHT')
+				value:SetText(valueText)
+				value:SetTextColor(1, 1, 1, 1)
+			end
+
+			local function FillPreviewList(list, pending)
+				local child = list.child
+				local offsetY, remaining = 6, {}
+				for cvar in pairs(pending) do remaining[cvar] = true end
+				local function AddSection(label, cvars)
+					if #cvars == 0 then return end
+					PreviewLine(child, offsetY, label, nil, true)
+					offsetY = offsetY + PREVIEW_HEADER_HEIGHT
+					for _, cvar in ipairs(cvars) do
+						PreviewLine(child, offsetY, cvar, ('%s  ->  %s'):format(pending[cvar], FPS_CVARS[cvar]))
+						offsetY = offsetY + PREVIEW_LINE_HEIGHT
 					end
-					if C_CVar.SetCVar(cvar, value) then applied = applied + 1 end
+					offsetY = offsetY + 8
 				end
-				print('|cff6D00FDBluUI:|r Applied ' .. applied .. ' FPS CVars. Original values backed up.')
+				for _, group in ipairs(FPS_CVAR_GROUPS) do
+					local rows = {}
+					for _, cvar in ipairs(group.cvars) do
+						if pending[cvar] then
+							rows[#rows + 1] = cvar
+							remaining[cvar] = nil
+						end
+					end
+					AddSection(group.label, rows)
+				end
+				local others = {}
+				for cvar in pairs(remaining) do others[#others + 1] = cvar end
+				table.sort(others)
+				AddSection('Other', others)
+				list:SetChildHeight(offsetY)
+			end
+
+			local function ApplyFPSPreset(pending)
+				globalDB.cvarBackup = globalDB.cvarBackup or {}
+				local changed, failed = 0, 0
+				for cvar, value in pairs(FPS_CVARS) do
+					local current = C_CVar.GetCVar(cvar)
+					if current and not globalDB.cvarBackup[cvar] then globalDB.cvarBackup[cvar] = current end
+					if pending[cvar] then
+						if C_CVar.SetCVar(cvar, value) then changed = changed + 1 else failed = failed + 1 end
+					end
+				end
+				local report = ('|cff6D00FDBluUI:|r Changed %d graphics settings. Originals backed up.'):format(changed)
+				if failed > 0 then report = report .. (' %d could not be set.'):format(failed) end
+				print(report)
+			end
+
+			local function ShowFPSPreview(pending, total, known)
+				local overlay, dialog, Close = Modals.CreateBase(540, 500, true, BUI.PageEngine.window.frame)
+				local titleText = Modals.CreateTitle(dialog, 'Apply FPS Preset')
+				local summary = Modals.CreateMessage(dialog, ('%d of %d settings will change'):format(total, known), 'CENTER', titleText, -16)
+				local list = Controls.ScrollFrame(dialog, 480, 300, 100, 452)
+				list:SetPoint('TOP', summary, 'BOTTOM', 0, -14)
+				FillPreviewList(list, pending)
+				Modals.CreateMessage(dialog, 'Current values are backed up, and Restore Original puts them back.', 'CENTER', list, -12)
+				Modals.LayoutButtons(dialog, {
+					{ text = 'Apply', color = Modals.BTN_CONFIRM, onClick = function(close) close(); ApplyFPSPreset(pending) end },
+					{ text = 'Cancel', color = Modals.BTN_CANCEL, onClick = function(close) close() end },
+				}, Close)
+				overlay:SetScript('OnKeyDown', function(self, key)
+					if key == 'ESCAPE' then
+						self:SetPropagateKeyboardInput(false)
+						Close()
+					else
+						self:SetPropagateKeyboardInput(true)
+					end
+				end)
+				overlay:Show()
 			end
 
 			AddRow({
@@ -302,19 +360,12 @@ BUI.PageEngine.RegisterPage("settings", {
 				accessoryWidth = 320,
 				accessories = function(row)
 					local applyButton = Controls.Button(row, 'Apply FPS Settings', 150, function()
-						local pending, total = PendingCVars()
+						local pending, total, known = PendingCVars()
 						if total == 0 then
-							print('|cff6D00FDBluUI:|r Every FPS CVar is already at its preset value.')
+							print('|cff6D00FDBluUI:|r Every FPS setting is already at its preset value.')
 							return
 						end
-						Modals.Confirm({
-							parent = BUI.PageEngine.window.frame,
-							title = 'Apply FPS Preset',
-							message = ('%d settings will change.\n\n%s\n\nCurrent values are backed up, and Restore Original puts them back.'):format(total, PreviewText(pending, total)),
-							confirmText = 'Apply', cancelText = 'Cancel',
-							width = 460, height = 400,
-							onConfirm = ApplyFPSPreset,
-						})
+						ShowFPSPreview(pending, total, known)
 					end)
 					local restoreButton = Controls.Button(row, 'Restore Original', 150, function()
 						if not globalDB.cvarBackup or not next(globalDB.cvarBackup) then
@@ -323,10 +374,11 @@ BUI.PageEngine.RegisterPage("settings", {
 						end
 						local restored = 0
 						for cvar, value in pairs(globalDB.cvarBackup) do
-							if C_CVar.SetCVar(cvar, tostring(value)) then restored = restored + 1 end
+							local current = C_CVar.GetCVar(cvar)
+							if current and not SameCVarValue(current, tostring(value)) and C_CVar.SetCVar(cvar, tostring(value)) then restored = restored + 1 end
 						end
 						globalDB.cvarBackup = nil
-						print('|cff6D00FDBluUI:|r Restored ' .. restored .. ' CVars to original values.')
+						print('|cff6D00FDBluUI:|r Restored ' .. restored .. ' settings to their original values.')
 					end)
 					return { restoreButton, applyButton }
 				end,
