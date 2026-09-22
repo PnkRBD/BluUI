@@ -356,7 +356,7 @@ local function ResolveEntryForIcon(icon, perSpell)
 		local shownTexture = (texture and not IsSecret(texture)) and texture or nil
 		for candidateIndex = 1, candidateCount do
 			local key = candidateKeys[candidateIndex]
-			local castable = IsPlayerSpell(key) or IsSpellKnown(key)
+			local castable = C_SpellBook.IsSpellKnown(key)
 			local texMatch = shownTexture and C_Spell.GetSpellTexture(key) == shownTexture
 			if texMatch and not castable then candidateRanks[candidateIndex] = 1
 			elseif not castable then candidateRanks[candidateIndex] = 2

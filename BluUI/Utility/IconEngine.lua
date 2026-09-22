@@ -2,8 +2,7 @@ local _, BUI = ...
 
 local tonumber, type = tonumber, type
 local C_Item = C_Item
-local IsPlayerSpell = IsPlayerSpell
-local IsSpellKnown = IsSpellKnown
+local C_SpellBook = C_SpellBook
 local IsEquippedItem = IsEquippedItem
 local GetInventoryItemTexture = GetInventoryItemTexture
 local UnitIsDeadOrGhost = UnitIsDeadOrGhost
@@ -127,7 +126,7 @@ end
 
 local function IsKnownSpell(spellID)
 	if not spellID then return false end
-	if IsPlayerSpell(spellID) or IsSpellKnown(spellID) then return true end
+	if C_SpellBook.IsSpellKnown(spellID) then return true end
 	if C_SpellBook.IsSpellKnownOrInSpellBook(spellID) then return true end
 	if C_SpellBook.HasPetSpells() and C_SpellBook.IsSpellKnownOrInSpellBook(spellID, Enum.SpellBookSpellBank.Pet) then
 		return true
@@ -183,7 +182,7 @@ function IconEngine.IsEquippedOrKnownOrInBags(iconType, id, itemID)
 		return IsEquippedItem(itemID or id)
 	end
 	if iconType == "spell" then
-		return IsPlayerSpell(id) or IsSpellKnown(id)
+		return C_SpellBook.IsSpellKnown(id)
 	end
 	if iconType == "consumable" then
 		local checkID = itemID or id

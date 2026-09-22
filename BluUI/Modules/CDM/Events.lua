@@ -201,7 +201,7 @@ local function ClassifyWatchEntry(id)
         return nil
     end
     if kind == 'custom' then
-        if IsPlayerSpell(numericID) or IsSpellKnown(numericID) then return 'spell', numericID end
+        if C_SpellBook.IsSpellKnown(numericID) then return 'spell', numericID end
         if C_Item.GetItemInfoInstant(numericID) then return 'item', numericID end
         return 'spell', numericID
     end
