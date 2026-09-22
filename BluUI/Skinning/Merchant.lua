@@ -234,6 +234,7 @@ local function CollectVisibleCurrencies()
 		end
 	end
 	for currencyIndex = count + 1, #visibleCurrencies do visibleCurrencies[currencyIndex] = nil end
+	table.sort(visibleCurrencies, function(leftCurrency, rightCurrency) return leftCurrency.id < rightCurrency.id end)
 end
 
 local function CreateIconLabel(parent, fontSize)
