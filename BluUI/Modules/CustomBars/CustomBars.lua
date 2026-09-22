@@ -417,7 +417,7 @@ local function CollectItems(settings, outEntries)
                 if iconType == "spell" then
                     local info = C_Spell.GetSpellInfo(entryID)
                     local isUnusableRacial = BUI.CDM.IsRacialSpell(entryID)
-                        and not (IsPlayerSpell(entryID) or IsSpellKnown(entryID))
+                        and not C_SpellBook.IsSpellKnown(entryID)
                     if info and not seen[entryID] and not isUnusableRacial then
                         local charges = C_Spell.GetSpellCharges(entryID)
                         local entry = AcquireEntry()

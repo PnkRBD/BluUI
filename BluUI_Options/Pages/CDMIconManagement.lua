@@ -127,7 +127,7 @@ local function BuildCDMSectionMap()
 					end
 					local known = info.isKnown
 					if known == nil then
-						known = IsPlayerSpell(spellID) or IsSpellKnown(spellID)
+						known = C_SpellBook.IsSpellKnown(spellID)
 					end
 					if not linkedHit and known then
 						MapCooldownInfo(map, info, nil, false)
@@ -281,7 +281,7 @@ local function CollectCustomIcons(CDM, viewerSettings, icons, seen, customSeen, 
 						C_Item.RequestLoadItemDataByID(id)
 					end
 				else
-					local isKnownSpell = IsPlayerSpell(id) or IsSpellKnown(id)
+					local isKnownSpell = C_SpellBook.IsSpellKnown(id)
 					if not isKnownSpell and viewerKey ~= "buffs" then
 						itemName, itemLink, _, _, _, _, _, _, _, itemIcon = C_Item.GetItemInfo(id)
 						local count = C_Item.GetItemCount(id, true)
@@ -295,7 +295,7 @@ local function CollectCustomIcons(CDM, viewerSettings, icons, seen, customSeen, 
 				local displayID = id
 				if viewerKey ~= 'buffs' and not isItem then
 					local activeID = BUI.Tools.GetActiveChoice(id)
-					if activeID and activeID ~= id and (IsPlayerSpell(activeID) or IsSpellKnown(activeID)) then
+					if activeID and activeID ~= id and C_SpellBook.IsSpellKnown(activeID) then
 						displayID = activeID
 					end
 				end
@@ -366,7 +366,7 @@ local function CollectCooldownViewerSpells(CDM, viewerKey, icons, seen, customSe
 							local displayed = enabledSet[cdID]
 							local known = info.isKnown
 							if known == nil then
-								known = IsPlayerSpell(spellID) or IsSpellKnown(spellID)
+								known = C_SpellBook.IsSpellKnown(spellID)
 							end
 							local notLearned = not known
 							local notDisplayed = known and not displayed
@@ -429,7 +429,7 @@ local function CollectCooldownViewerSpells(CDM, viewerKey, icons, seen, customSe
 			if not seenNumeric[spellID] and not linkedCollision then
 				seenNumeric[spellID] = true
 
-				local known = IsPlayerSpell(spellID) or IsSpellKnown(spellID)
+				local known = C_SpellBook.IsSpellKnown(spellID)
 				local inOwnPool = IsInSet(ownPool, spellID, info.linkedSpellIDs)
 				local inOtherPool = IsInSet(otherPool, spellID, info.linkedSpellIDs)
 				local inOther = inOtherPool
@@ -496,7 +496,7 @@ local function ParseDurationFromDescription(spellID)
 	local dur = ParseDurationFromText(desc)
 	if dur then return dur end
 
-	if isItem or not (IsPlayerSpell(numID) or IsSpellKnown(numID)) then
+	if isItem or not C_SpellBook.IsSpellKnown(numID) then
 		local _, sid = GetItemSpell(numID)
 		if sid then
 			desc = C_Spell.GetSpellDescription(sid)
@@ -1717,7 +1717,7 @@ local function ShowProcModal(CDM, spellID, RefreshIconList, backTo, viewerSettin
 		local GetCategorySet = C_CooldownViewer.GetCooldownViewerCategorySet
 		local seen = {}
 		local function IsCastable(id)
-			return IsPlayerSpell(id) or IsSpellKnown(id)
+			return C_SpellBook.IsSpellKnown(id)
 		end
 		local function AddRelated(relID, entrySaysApplies)
 			if relID == spellID or seen[relID] or not C_Spell.GetSpellName(relID) then return end
@@ -2709,7 +2709,7 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 			return
 		end
 
-		if viewerKey ~= 'buffs' and not isItem and not (IsPlayerSpell(id) or IsSpellKnown(id)) then
+		if viewerKey ~= 'buffs' and not isItem and not (C_SpellBook.IsSpellKnown(id)) then
 			local activeID = BUI.Tools.GetActiveChoice(id)
 			if activeID and activeID ~= id then
 				CDM.SetChoiceNode(viewerSettings, id, activeID)

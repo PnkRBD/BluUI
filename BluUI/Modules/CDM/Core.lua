@@ -85,7 +85,6 @@ CDM.state = {
     skinVersion = 1,
 }
 
-CDM.controls = {}
 
 function CDM.PackInto(buf, ...)
     local count = select('#', ...)
@@ -427,27 +426,6 @@ function CDM.GetCountFont(icon)
     return result
 end
 
-function CDM.RegisterControl(viewerKey, settingKey, control, controlType)
-    CDM.controls[viewerKey .. "_" .. settingKey] = { control = control, type = controlType or "slider" }
-end
-
-function CDM.ClearControls() wipe(CDM.controls) end
-
-local function UpdateSyncedControl(viewerKey, settingKey, value, includeColorZoom)
-    local entry = CDM.controls[viewerKey .. "_" .. settingKey]
-    if not entry or not entry.control then return end
-    local control, controlType = entry.control, entry.type
-    if includeColorZoom and controlType == "zoom" then
-        if control.SetValue then control:SetValue(value * 100) end
-    elseif controlType == "slider" or controlType == "toggle" or controlType == "dropdown" then
-        if control.SetValue then control:SetValue(value) end
-    elseif includeColorZoom and controlType == "colorswatch" then
-        if control.SetColor and type(value) == "table" then
-            control:SetColor(value[1], value[2], value[3], value[4])
-        end
-    end
-end
-
 function CDM.SyncSetting(settingKey, value)
     local db = BUI.GetDB()
     if not db.cdm.syncViewers then return false end
@@ -457,22 +435,9 @@ function CDM.SyncSetting(settingKey, value)
     if essential then essential[settingKey] = value end
     if utility then utility[settingKey] = value end
 
-    UpdateSyncedControl("essential", settingKey, value, true)
-    UpdateSyncedControl("utility", settingKey, value, true)
-
-    if settingKey == "centerHorizontally" then
-        local essX = CDM.controls["essential_X"]
-        local utilX = CDM.controls["utility_X"]
-        local essSlider = essX and essX.control
-        local utilSlider = utilX and utilX.control
-        if value then
-            if essential then essential.positionX = 0 end
-            if utility then utility.positionX = 0 end
-            if essSlider and essSlider.SetValue then essSlider:SetValue(0) end
-            if utilSlider and utilSlider.SetValue then utilSlider:SetValue(0) end
-        end
-        if essSlider and essSlider.SetLocked then essSlider:SetLocked(value) end
-        if utilSlider and utilSlider.SetLocked then utilSlider:SetLocked(value) end
+    if settingKey == "centerHorizontally" and value then
+        if essential then essential.positionX = 0 end
+        if utility then utility.positionX = 0 end
     end
 
     if CDM.SIZE_SETTINGS[settingKey] then
@@ -492,8 +457,6 @@ function CDM.SyncSettingLayout(settingKey, value)
     if essential then essential[settingKey] = value end
     if utility then utility[settingKey] = value end
 
-    UpdateSyncedControl("essential", settingKey, value, false)
-    UpdateSyncedControl("utility", settingKey, value, false)
     CDM.RefreshLayoutOnly()
     return true
 end
