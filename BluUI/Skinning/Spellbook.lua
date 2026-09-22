@@ -7,7 +7,6 @@ local ipairs = ipairs
 local Skin = BUI.Skinning
 
 local SKIN_ID = 'spellbook'
-local SPELLS_ADDON = 'Blizzard_PlayerSpells'
 local MAIN_ART = { 'Bg', 'TopTileStreaks' }
 local BOOK_ART = { 'TopBar', 'BookBGHalved', 'BookBGLeft', 'BookBGRight', 'BookCornerFlipbook', 'Bookmark' }
 local ITEM_BUTTON_ART = { 'Border', 'BorderSheen', 'IconHighlight' }
@@ -427,17 +426,4 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Spellbook',
 	description = 'The spellbook, talents and specialization window: dark pages, framed spell icons, house tabs, search and paging, dimmed talent tree, loadout and hero talent dialogs.',
 	icon = 'Interface/Icons/INV_Misc_Book_09',
-	test = function()
-		if not _G.PlayerSpellsFrame then
-			C_AddOns.LoadAddOn(SPELLS_ADDON)
-			TryInstall()
-		end
-		local frame = _G.PlayerSpellsFrame
-		if not frame then return end
-		if not frame:IsShown() and PlayerSpellsUtil and PlayerSpellsUtil.ToggleSpellBookFrame then PlayerSpellsUtil.ToggleSpellBookFrame() end
-		return frame
-	end,
-	stopTest = function()
-		if _G.PlayerSpellsFrame then HideUIPanel(_G.PlayerSpellsFrame) end
-	end,
 })

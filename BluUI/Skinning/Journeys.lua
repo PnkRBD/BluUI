@@ -9,7 +9,6 @@ local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 
 local SKIN_ID = 'journeys'
-local JOURNAL_ADDON = 'Blizzard_EncounterJournal'
 local MAIN_ART = { 'Bg', 'TopTileStreaks', 'inset', 'InsetBorderBottomLeft', 'InsetBorderBottomRight', 'InsetBorderBottom', 'InsetBorderLeft', 'InsetBorderRight' }
 local TAB_KEYS = { 'JourneysTab', 'MonthlyActivitiesTab', 'suggestTab', 'dungeonsTab', 'raidsTab', 'LootJournalTab', 'TutorialsTab' }
 local SIDE_TAB_KEYS = { 'overviewTab', 'lootTab', 'bossTab', 'modelTab' }
@@ -593,17 +592,4 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Journeys',
 	description = 'The Adventure Guide: renown cards, dungeon and raid tiles, boss lists, encounter overviews, abilities, loot tables, search and the suggested content pages.',
 	icon = 'Interface/EncounterJournal/UI-EJ-PortraitIcon',
-	test = function()
-		if not _G.EncounterJournal then
-			C_AddOns.LoadAddOn(JOURNAL_ADDON)
-			TryInstall()
-		end
-		local frame = _G.EncounterJournal
-		if not frame then return end
-		if not frame:IsShown() then ToggleEncounterJournal() end
-		return frame
-	end,
-	stopTest = function()
-		if _G.EncounterJournal then HideUIPanel(_G.EncounterJournal) end
-	end,
 })

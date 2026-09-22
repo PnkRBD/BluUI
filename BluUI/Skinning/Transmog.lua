@@ -7,7 +7,6 @@ local ipairs = ipairs
 local Skin = BUI.Skinning
 
 local SKIN_ID = 'transmog'
-local TRANSMOG_ADDON = 'Blizzard_Transmog'
 local SLOT_CONTAINERS = { 'LeftSlots', 'RightSlots', 'BottomSlots' }
 local SLOT_ART_KEYS = { 'Border', 'ShowEquippedIcon' }
 local TOGGLE_KEYS = { 'HideIgnoredToggle', 'SheatheWeaponToggle', 'PreviewedWeaponToggle' }
@@ -169,18 +168,4 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Transmogrify',
 	description = 'The transmogrifier at the vendor: dark shell over the stone window, framed slot icons around the model, house buttons and checkboxes, and the appearance tabs on the house tab strip.',
 	icon = 'Interface/Icons/INV_Arcane_Orb',
-	test = function()
-		if not _G.TransmogFrame then
-			C_AddOns.LoadAddOn(TRANSMOG_ADDON)
-			TryInstall()
-		end
-		local frame = _G.TransmogFrame
-		if not frame then return end
-		ShowUIPanel(frame)
-		if not frame:IsShown() then return end
-		return frame
-	end,
-	stopTest = function()
-		if _G.TransmogFrame then HideUIPanel(_G.TransmogFrame) end
-	end,
 })

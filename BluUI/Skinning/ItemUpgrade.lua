@@ -7,7 +7,6 @@ local ipairs, pairs = ipairs, pairs
 local Skin = BUI.Skinning
 
 local SKIN_ID = 'itemupgrade'
-local UPGRADE_ADDON = 'Blizzard_ItemUpgradeUI'
 local SLOT_ART = { 'ButtonFrame', 'EmptySlotGlow', 'IconBorder' }
 local PANEL_KEYS = { 'TopBG', 'BottomBG' }
 local PREVIEW_KEYS = { 'LeftItemPreviewFrame', 'RightItemPreviewFrame', 'ItemHoverPreviewFrame' }
@@ -225,20 +224,6 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Item Upgrade',
 	description = 'The item upgrade window: dark shell over the stone panels, framed item slot and currency icons, house fonts on the upgrade previews, level dropdown and cost strip.',
 	icon = 'Interface/Icons/UI_ItemUpgrade',
-	test = function()
-		if not _G.ItemUpgradeFrame then
-			C_AddOns.LoadAddOn(UPGRADE_ADDON)
-			TryInstall()
-		end
-		local frame = _G.ItemUpgradeFrame
-		if not frame then return end
-		ShowUIPanel(frame)
-		if not frame:IsShown() then return end
-		return frame
-	end,
-	stopTest = function()
-		if _G.ItemUpgradeFrame then HideUIPanel(_G.ItemUpgradeFrame) end
-	end,
 })
 
 BUI.Events:Once('PLAYER_LOGIN', 'Skin.ItemUpgradeInstall', function()

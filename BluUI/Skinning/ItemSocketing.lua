@@ -8,7 +8,6 @@ local hooksecurefunc = BUI.Prof.MakeHooker('itemsocketing')
 local Skin = BUI.Skinning
 
 local SKIN_ID = 'itemsocketing'
-local SOCKET_ADDON = 'Blizzard_ItemSocketingUI'
 local TOOLTIP_ART = { 'NineSlice', 'Bg' }
 local APPLY_INSET = 4
 
@@ -145,18 +144,4 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Item Socketing',
 	description = 'The gem socketing window: the parchment and gold filigree stripped back to the dark shell, framed socket icons and a house-styled Apply button.',
 	icon = 'Interface/Icons/INV_Misc_Gem_Variety_01',
-	test = function()
-		if not _G.ItemSocketingFrame then
-			C_AddOns.LoadAddOn(SOCKET_ADDON)
-			TryInstall()
-		end
-		local frame = _G.ItemSocketingFrame
-		if not frame then return end
-		ShowUIPanel(frame)
-		if not frame:IsShown() then return end
-		return frame
-	end,
-	stopTest = function()
-		if _G.ItemSocketingFrame then HideUIPanel(_G.ItemSocketingFrame) end
-	end,
 })
