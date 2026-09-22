@@ -3,6 +3,7 @@ local _, BUI = ...
 local GroupFrames   = BUI.GroupFrames
 local oUF  = BUI.oUF
 local Util = GroupFrames.Util
+local Tools = BUI.Tools
 
 local UnitHealth        = UnitHealth
 local UnitHealthMax     = UnitHealthMax
@@ -143,23 +144,12 @@ Methods["blu:pwrpct"] = function(unit)
 end
 Events["blu:pwrpct"] = "UNIT_POWER_UPDATE UNIT_MAXPOWER UNIT_DISPLAYPOWER UNIT_CONNECTION"
 
-local truncatePatterns = {}
-
-function GroupFrames.TruncateName(name, limit)
-	local pattern = truncatePatterns[limit]
-	if not pattern then
-		pattern = "^" .. ("[%z\1-\127\194-\244][\128-\191]*"):rep(limit)
-		truncatePatterns[limit] = pattern
-	end
-	return name:match(pattern) or name
-end
-
 Methods["blu:name"] = function(unit)
 	if not unit then return "" end
 	local name = UnitName(unit)
 	if not name or IsSecret(name) then return "" end
 	local limit = GroupFrames.SettingsForUnit(unit).nameMaxLength
-	if limit > 0 then return GroupFrames.TruncateName(name, limit) end
+	if limit > 0 then return Tools.TruncateName(name, limit) end
 	return name
 end
 Events["blu:name"] = "UNIT_NAME_UPDATE UNIT_CLASSIFICATION_CHANGED"
