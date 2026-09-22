@@ -749,17 +749,22 @@ end
 
 local function VerifyHeld()
     local now = GetTime()
+    local released = false
     for keyName, pressedAt in pairs(heldKeys) do
         local elapsed = now - pressedAt
         if elapsed >= MAX_HOLD then
             heldKeys[keyName] = nil
+            released = true
         elseif elapsed >= MIN_VISIBLE then
             local mouseButton = mouseButtonForKey[keyName]
             local isDown = mouseButton and IsMouseButtonDown(mouseButton) or IsKeyDown(keyName)
-            if not isDown then heldKeys[keyName] = nil end
+            if not isDown then
+                heldKeys[keyName] = nil
+                released = true
+            end
         end
     end
-    RefreshActive()
+    if released then RefreshActive() end
     if not next(heldKeys) then pollFrame:Hide() end
 end
 
