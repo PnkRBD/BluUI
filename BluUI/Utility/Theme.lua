@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Util.Theme')
+local SetScript = BUI.Prof.Scripts('Util.Theme')
 local sharedMedia = LibStub('LibSharedMedia-3.0')
 
 local function GetGeneral()

@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('StaticPopup')
+local _, HookScript = BUI.Prof.Scripts('StaticPopup')
 
 local select = select
 

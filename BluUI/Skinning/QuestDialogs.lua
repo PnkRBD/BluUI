@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('QuestDialogs')
+local _, HookScript = BUI.Prof.Scripts('QuestDialogs')
 
 local hooksecurefunc = BUI.Prof.MakeHooker('questdialogs')
 local ipairs, pairs = ipairs, pairs

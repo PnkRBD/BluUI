@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Spellbook')
+local _, HookScript = BUI.Prof.Scripts('Spellbook')
 
 local hooksecurefunc = BUI.Prof.MakeHooker('spellbook')
 local ipairs = ipairs

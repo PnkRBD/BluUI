@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('LootHistory')
+local _, HookScript = BUI.Prof.Scripts('LootHistory')
 
 local hooksecurefunc = BUI.Prof.MakeHooker('loothistory')
 local select, pcall = select, pcall

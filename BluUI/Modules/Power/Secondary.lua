@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Power.Secondary')
+local _, HookScript = BUI.Prof.Scripts('Power.Secondary')
 
 BUI.Power.Secondary = {}
 local SecondaryPower = BUI.Power.Secondary

@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Util.AuraContainerEngine')
+local _, HookScript = BUI.Prof.Scripts('Util.AuraContainerEngine')
 
 local Pixel = BUI.Pixel
 local AR    = BUI.AuraRules

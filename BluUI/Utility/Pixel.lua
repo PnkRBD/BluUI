@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Util.Pixel')
+local _, HookScript = BUI.Prof.Scripts('Util.Pixel')
 local hooksecurefunc = BUI.Prof.MakeHooker('pixel')
 local Count = BUI.Prof.Count
 local Pixel = {}

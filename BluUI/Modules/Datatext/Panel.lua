@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Datatext.Panel')
+local SetScript = BUI.Prof.Scripts('Datatext.Panel')
 
 local Datatext = BUI.Datatext
 local Pixel = BUI.Pixel

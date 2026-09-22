@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('ChatConfig')
+local _, HookScript = BUI.Prof.Scripts('ChatConfig')
 
 local Skin = BUI.Skinning
 

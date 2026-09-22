@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Util.Anchors')
+local SetScript = BUI.Prof.Scripts('Util.Anchors')
 BUI.C.ANCHOR_FRAMES = {
     { tag = "BUI_PlayerFrame", desc = "BUI_PlayerFrame" },
     { tag = "BUI_TargetFrame", desc = "BUI_TargetFrame" },

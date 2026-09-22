@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('StreamerTools.GCDHistory')
+local SetScript = BUI.Prof.Scripts('StreamerTools.GCDHistory')
 
 local hooksecurefunc = BUI.Prof.MakeHooker('gcdhistory')
 BUI.GCDHistory = {}

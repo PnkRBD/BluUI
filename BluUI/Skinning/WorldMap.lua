@@ -1,5 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('WorldMap')
+local _, HookScript = BUI.Prof.Scripts('WorldMap')
 
 local hooksecurefunc = BUI.Prof.MakeHooker('worldmap')
 local ipairs = ipairs
