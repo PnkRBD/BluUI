@@ -435,6 +435,7 @@ local entries = {
 	{ label = "Hotkey Text", page = "actionbars", sidebar = "general", panel = "General > Button Text", keywords = "action bar keybind text size anchor color" },
 	{ label = "Count Text", page = "actionbars", sidebar = "general", panel = "General > Button Text", keywords = "action bar stack charges count text" },
 	{ label = "Macro Text", page = "actionbars", sidebar = "general", panel = "General > Button Text", keywords = "action bar macro name text" },
+	{ label = "Cooldown Text", page = "actionbars", sidebar = "general", panel = "General > Button Text", keywords = "action bar cooldown countdown decimals warning seconds color" },
 	{ label = "Empty Buttons", page = "actionbars", sidebar = "general", panel = "General > Appearance", keywords = "action bar empty slot background opacity" },
 	{ label = "Key Presses", page = "actionbars", sidebar = "general", panel = "General > Appearance", keywords = "action bar key press flash" },
 	{ label = "Proc Glow", page = "actionbars", sidebar = "general", panel = "General > Effects", keywords = "action bar proc glow cast animation assisted combat" },
