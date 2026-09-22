@@ -1,0 +1,215 @@
+local BUILib = LibStub("BUILib")
+if not BUILib.__loadChildren then return end
+local Widget = BUILib.Widget
+
+local cachedTheme
+local function theme() if not cachedTheme then cachedTheme = BUILib.Theme end return cachedTheme end
+
+local CHIP_X = 14
+local CHIP_HEIGHT = 30
+local CHIP_TEXT_X = 14
+local HEADER_X = 24
+local PILL_RADIUS = 8
+local SLIDE_SECONDS = 0.30
+local FADE_IN = 0.18
+local TEXT_REST = { 0.74, 0.74, 0.78, 1 }
+local TEXT_HOVER = { 0.95, 0.95, 0.95, 1 }
+local TEXT_SELECTED = { 0.98, 0.98, 1, 1 }
+local TEXT_DISABLED = { 0.4, 0.4, 0.42, 1 }
+local HEADER_COLOR = { 0.42, 0.44, 0.50, 1 }
+local PILL_FILL = { 0.07, 0.075, 0.09, 1 }
+local unpack = unpack
+
+Widget.NAV_CHIP_X = CHIP_X
+Widget.NAV_CHIP_HEIGHT = CHIP_HEIGHT
+Widget.NAV_HEADER_HEIGHT = 18
+
+local function EnsurePill(rail)
+	if rail._navPill then return rail._navPill end
+	local pill = CreateFrame('Frame', nil, rail)
+	pill:SetFrameLevel(rail:GetFrameLevel())
+	pill:SetSize(rail:GetWidth() - CHIP_X * 2, CHIP_HEIGHT)
+	local red, green, blue = theme().GetAccent()
+	local ring = Widget.DrawRoundedRect(pill, PILL_RADIUS, { red, green, blue, 0.35 }, 'ARTWORK', 0, 0)
+	Widget.DrawRoundedRect(pill, PILL_RADIUS - 1, PILL_FILL, 'ARTWORK', 1, 1)
+	local tint = Widget.DrawRoundedRect(pill, PILL_RADIUS - 1, { red, green, blue, 0.10 }, 'ARTWORK', 2, 1)
+	pill:Hide()
+	rail._navPill = pill
+	theme().RegisterAccentElement(pill, function(_, newRed, newGreen, newBlue)
+		Widget.SetRectColor(ring, newRed, newGreen, newBlue, 0.35)
+		Widget.SetRectColor(tint, newRed, newGreen, newBlue, 0.10)
+	end)
+
+	local pillX = CHIP_X + pill:GetWidth() / 2
+	local ticker = CreateFrame('Frame', nil, rail)
+	ticker:Hide()
+	rail._navPillTicker = ticker
+	ticker:SetScript('OnUpdate', function(self)
+		local pillState = rail._navPillState
+		if not pillState then self:Hide(); return end
+		local progress = (GetTime() - pillState.start) / pillState.dur
+		if progress >= 1 then
+			pill:ClearAllPoints()
+			pill:SetPoint('CENTER', rail, 'TOPLEFT', pillX, -pillState.toY)
+			pill:SetAlpha(1)
+			rail._navPillPosY = pillState.toY
+			rail._navPillState = nil
+			self:Hide()
+			return
+		end
+		if pillState.kind == 'slide' then
+			local eased = 1 - (1 - progress) ^ 3
+			local y = pillState.fromY + (pillState.toY - pillState.fromY) * eased
+			pill:ClearAllPoints()
+			pill:SetPoint('CENTER', rail, 'TOPLEFT', pillX, -y)
+		else
+			pill:ClearAllPoints()
+			pill:SetPoint('CENTER', rail, 'TOPLEFT', pillX, -pillState.toY)
+			pill:SetAlpha(progress)
+		end
+	end)
+	return pill
+end
+
+function Widget.NavSelect(chip)
+	local rail = chip:GetParent()
+	if not rail then return end
+	local pill = EnsurePill(rail)
+	local pillX = CHIP_X + pill:GetWidth() / 2
+
+	local _, _, _, _, yOff = chip:GetPoint(1)
+	if not yOff then return end
+	local centerY = -yOff + chip:GetHeight() / 2
+
+	if rail._navPillPosY == nil then
+		pill:SetAlpha(0)
+		pill:ClearAllPoints()
+		pill:SetPoint('CENTER', rail, 'TOPLEFT', pillX, -centerY)
+		pill:Show()
+		rail._navPillState = { kind = 'fade', start = GetTime(), dur = FADE_IN, toY = centerY }
+		rail._navPillPosY = centerY
+		rail._navPillTicker:Show()
+		return
+	end
+
+	local currentY = rail._navPillPosY
+	local pillState = rail._navPillState
+	if pillState and pillState.kind == 'slide' then
+		local progress = math.min(1, (GetTime() - pillState.start) / pillState.dur)
+		local eased = 1 - (1 - progress) ^ 3
+		currentY = pillState.fromY + (pillState.toY - pillState.fromY) * eased
+	end
+
+	if math.abs(currentY - centerY) < 0.5 then
+		pill:SetAlpha(1)
+		pill:Show()
+		return
+	end
+
+	pill:SetAlpha(1)
+	rail._navPillState = {
+		kind  = 'slide',
+		start = GetTime(),
+		dur   = SLIDE_SECONDS,
+		fromY = currentY,
+		toY   = centerY,
+	}
+	rail._navPillPosY = centerY
+	pill:Show()
+	rail._navPillTicker:Show()
+end
+
+function Widget.NavResetPill(rail)
+	if not rail then return end
+	if rail._navPill then rail._navPill:Hide() end
+	if rail._navPillTicker then rail._navPillTicker:Hide() end
+	rail._navPillPosY = nil
+	rail._navPillState = nil
+end
+
+function Widget.NavHeader(rail, text, y, x)
+	local header = rail:CreateFontString(nil, 'OVERLAY')
+	header:SetFont(BUILib.Font, 9, 'OUTLINE')
+	header:SetPoint('TOPLEFT', x or HEADER_X, y)
+	header:SetText((text or ''):upper())
+	header:SetTextColor(unpack(HEADER_COLOR))
+	return header
+end
+
+function Widget.NavChip(rail, label, callback, options)
+	options = options or {}
+	local chip = CreateFrame('Button', nil, rail)
+	chip:SetHeight(CHIP_HEIGHT)
+	chip:SetWidth(rail:GetWidth() - CHIP_X * 2)
+	chip:RegisterForClicks('LeftButtonUp')
+	if callback then chip:SetScript('OnClick', callback) end
+
+	local text = chip:CreateFontString(nil, 'OVERLAY', nil, 3)
+	text:SetFont(BUILib.Font, options.fontSize or 12, '')
+	text:SetText(label)
+	text:SetPoint('LEFT', CHIP_TEXT_X + (options.indent or 0), 0)
+	text:SetTextColor(unpack(TEXT_REST))
+	chip.text = text
+
+	local hoverTextures = Widget.DrawRoundedRect(chip, PILL_RADIUS, { 1, 1, 1, 0.04 }, 'BACKGROUND', 0, 0)
+	local function SetHoverShown(shown)
+		for _, texture in ipairs(hoverTextures) do texture:SetShown(shown) end
+	end
+	SetHoverShown(false)
+
+	chip:HookScript('OnEnter', function(self)
+		if self.selected or self.disabled then return end
+		text:SetTextColor(unpack(TEXT_HOVER))
+		SetHoverShown(true)
+	end)
+	chip:HookScript('OnLeave', function(self)
+		if self.selected or self.disabled then return end
+		text:SetTextColor(unpack(TEXT_REST))
+		SetHoverShown(false)
+	end)
+
+	function chip:SetSelected(isSelected)
+		if self.disabled then return end
+		self.selected = isSelected
+		if isSelected then
+			text:SetTextColor(unpack(TEXT_SELECTED))
+			SetHoverShown(false)
+			Widget.NavSelect(self)
+		else
+			text:SetTextColor(unpack(TEXT_REST))
+		end
+	end
+
+	function chip:SetLabel(newLabel)
+		text:SetText(newLabel)
+	end
+
+	function chip:SetIndent(indent)
+		text:ClearAllPoints()
+		text:SetPoint('LEFT', CHIP_TEXT_X + (indent or 0), 0)
+	end
+
+	return chip
+end
+
+function Widget.NavChipDisable(chip)
+	chip.disabled = true
+	chip.selected = false
+	chip:SetScript('OnClick', nil)
+	chip:EnableMouse(false)
+	if chip.text then chip.text:SetTextColor(unpack(TEXT_DISABLED)) end
+end
+
+function Widget.NavChipEnable(chip, callback)
+	chip.disabled = nil
+	chip:EnableMouse(true)
+	chip:SetScript('OnClick', callback)
+	if chip.text then chip.text:SetTextColor(unpack(TEXT_REST)) end
+end
+
+function Widget.NavChipMute(chip)
+	chip.disabled = true
+	chip.selected = false
+	chip:SetScript('OnClick', nil)
+	if chip.text then chip.text:SetTextColor(unpack(TEXT_DISABLED)) end
+end

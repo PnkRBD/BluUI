@@ -1,0 +1,32 @@
+## Interface: 120100
+## Title: |cff6D00FDBluUI|r Options
+## Notes: Settings window for BluUI. Loaded on demand when the window opens.
+## Author: Blu
+## Version: 4.0.4
+## Category: BluUI
+## Dependencies: BluUI
+## LoadOnDemand: 1
+## IconTexture: Interface\AddOns\BluUI\Media\Icon\logo_small
+
+Pages\Cursor.lua
+Pages\Minimap.lua
+Pages\Datatext.lua
+Pages\Markers.lua
+Pages\Appearance.lua
+Pages\Auras.lua
+Pages\ActionBars.lua
+Pages\Power.lua
+Pages\CDMIconManagement.lua
+Pages\CDM.lua
+Pages\CustomBars.lua
+Pages\CDAnnouncer.lua
+Pages\Bars.lua
+Pages\UnitFrames.lua
+Pages\GroupFrames.lua
+Pages\StreamerTools.lua
+Pages\BuffTracking.lua
+Pages\Bloodlust.lua
+Pages\Visibility.lua
+Pages\Skinning.lua
+Pages\Settings.lua
+Pages\ExportImport.lua
