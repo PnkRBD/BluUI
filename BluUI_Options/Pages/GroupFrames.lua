@@ -327,7 +327,9 @@ local function TextRows(tab, rows, sectionKey)
 		accessoryWidth = 60,
 		accessories = function(row)
 			local function TextSettings() return Section().name end
-			return { Cog(row, 'NAME', 'Size & placement', TextOptions(TextSettings, Refresh)),
+			local optionList = TextOptions(TextSettings, Refresh)
+			optionList[#optionList + 1] = OptionSlider('Max Letters', 0, 20, function() return Section().nameMaxLength end, function(value) Section().nameMaxLength = value; Refresh() end)
+			return { Cog(row, 'NAME', 'Size, placement & length', optionList),
 				Swatch(row, TextSettings, 'color', nil, 'Name Color') }
 		end,
 	})

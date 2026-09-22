@@ -58,6 +58,7 @@ local function CommonSettings(sizes)
 	return {
 		useClassColor        = true,
 		classColorNames      = true,
+		nameMaxLength        = 0,
 		classColorBackground = false,
 		healthColor          = { 0.20, 0.70, 0.20, 1 },
 		borderColor          = { 0, 0, 0, 1 },

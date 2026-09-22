@@ -131,7 +131,8 @@ local function PaintText(child, decoy, settings)
 	local nameText = child.NameText
 	if nameText then
 		child:Untag(nameText)
-		nameText:SetText(decoy.name)
+		local limit = settings.nameMaxLength
+		nameText:SetText(limit > 0 and GroupFrames.TruncateName(decoy.name, limit) or decoy.name)
 	end
 
 	local hpText = child.HpText
