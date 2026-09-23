@@ -36,8 +36,12 @@ local function IsType(frame, kind)
 end
 
 local function HasBackdrop(frame)
-	return frame.NineSlice ~= nil or frame.Center ~= nil or frame.TopEdge ~= nil or frame.Bg ~= nil or frame.BG ~= nil
+	return frame.NineSlice ~= nil or frame.Bg ~= nil or frame.BG ~= nil
 		or frame.Background ~= nil or frame.backdropInfo ~= nil
+end
+
+local function IsNineSlice(frame)
+	return frame.Center ~= nil or frame.TopEdge ~= nil
 end
 
 local function IsCloseButton(button)
@@ -107,6 +111,10 @@ local function SkinChild(child, depth)
 		else
 			DeepSkin(child, depth - 1)
 		end
+		return
+	end
+	if IsNineSlice(child) then
+		FadeRegions(child)
 		return
 	end
 	if HasBackdrop(child) then
