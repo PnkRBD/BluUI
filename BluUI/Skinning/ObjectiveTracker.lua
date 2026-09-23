@@ -924,6 +924,7 @@ local function EnsureTrackerCard()
 		trackerCard:EnableMouse(true)
 		trackerCard:EnableMouseWheel(true)
 		BUI.Prof.SetScript('ObjectiveTracker', trackerCard, 'OnMouseWheel', OnTrackerWheel)
+		BUI.Prof.HookScript('ObjectiveTracker', trackerCard, 'OnSizeChanged', Skin.TrackerClamp)
 
 		scrollTrack = CreateFrame('Frame', nil, trackerCard)
 		scrollTrack:SetWidth(Pixel.PixelSize(8))
@@ -1716,6 +1717,33 @@ local function ApplyTrackerPosition()
 	reasserting = false
 end
 
+function Skin.TrackerClamp()
+	if scrollHolder or not trackerCard or not IsEnabled() then return end
+	if InCombatLockdown() then
+		BUI.Events:AfterCombat(Skin.TrackerClamp, 'Skinning.TrackerClamp')
+		return
+	end
+	local trackerFrame = _G.ObjectiveTrackerFrame
+	local left, right, top, bottom = trackerCard:GetLeft(), trackerCard:GetRight(), trackerCard:GetTop(), trackerCard:GetBottom()
+	local frameLeft, frameRight, frameTop, frameBottom = trackerFrame:GetLeft(), trackerFrame:GetRight(), trackerFrame:GetTop(), trackerFrame:GetBottom()
+	if not IsFiniteNumber(left) or not IsFiniteNumber(bottom) or not IsFiniteNumber(frameLeft) or not IsFiniteNumber(frameBottom) then return end
+	for panel in pairs(linkedPanels) do
+		local panelTop, panelBottom = panel:GetTop(), panel:GetBottom()
+		if panel:IsShown() and IsFiniteNumber(panelTop) and IsFiniteNumber(panelBottom) then
+			top = math.max(top, panelTop)
+			bottom = math.min(bottom, panelBottom)
+		end
+	end
+	local ratio = trackerCard:GetEffectiveScale() / trackerFrame:GetEffectiveScale()
+	local insetLeft, insetRight = left * ratio - frameLeft, right * ratio - frameRight
+	local insetTop, insetBottom = top * ratio - frameTop, bottom * ratio - frameBottom
+	local applied = trackerCard._buiClamp
+	if applied and applied[1] == insetLeft and applied[2] == insetRight and applied[3] == insetTop and applied[4] == insetBottom then return end
+	trackerCard._buiClamp = { insetLeft, insetRight, insetTop, insetBottom }
+	trackerFrame:SetClampRectInsets(insetLeft, insetRight, insetTop, insetBottom)
+	ApplyTrackerPosition()
+end
+
 local moveDriver
 
 local function StopMoverDrag()
@@ -1753,6 +1781,7 @@ local function OnMoverDragStart()
 	end
 	local mover = _G.ObjectiveTrackerFrame
 	if not mover or not IsEnabled() or not IsControlKeyDown() then return end
+	Skin.TrackerClamp()
 	mover:SetMovable(true)
 	mover._buiDragging = true
 	mover:StartMoving()
@@ -1989,6 +2018,7 @@ local function InstallTrackerMove()
 		end
 		ApplyTrackerPosition()
 	end)
+	hooksecurefunc(trackerFrame, 'UpdateClampOffsets', Skin.TrackerClamp)
 	ApplyTrackerPosition()
 end
 
@@ -2539,6 +2569,8 @@ Skin.OnToggle('objectivetracker', function(enabled)
 	ApplyHeaderRowVisibility()
 	HideQuestTip()
 	Scenario.Remove()
+	if trackerCard then trackerCard._buiClamp = nil end
+	_G.ObjectiveTrackerFrame:UpdateClampOffsets()
 	UpdateQuestItemBinding()
 	ApplyPoiVisibility()
 	ApplyDashAlpha()
