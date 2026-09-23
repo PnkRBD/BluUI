@@ -98,7 +98,7 @@ local EXTRA_PAGES = {
 		scaleOnly = true, rows = CLICK_THROUGH_ROW,
 	},
 	{
-		key = 'extra', title = 'Extra Action', desc = "Blizzard's extra action and zone ability buttons on a bar you control.",
+		key = 'extra', title = 'Extra Action', desc = "Blizzard's extra action and zone ability buttons on a bar you control. Turning it off needs a reload to bring Blizzard's back.",
 		scaleOnly = true, scaleDesc = 'Overall size of the extra action buttons.', rows = { clickThrough = true, blizzardArt = true },
 	},
 }
