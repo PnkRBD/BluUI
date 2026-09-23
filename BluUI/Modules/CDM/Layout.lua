@@ -14,7 +14,6 @@ local PackInto = CDM.PackInto
 
 local iconBuffer = {}
 local layoutBuffer = {}
-local blizzardSpells = {}
 local viewerChildBuf = {}
 local poolActiveBuf = {}
 
@@ -105,7 +104,6 @@ local function BuildViewerIcons(viewerKey)
 
     CollectCustomIcons(viewerKey, iconBuffer)
 
-    wipe(blizzardSpells)
     local isBuff = viewerKey == "buffs"
 
     local poolActive
@@ -121,23 +119,8 @@ local function BuildViewerIcons(viewerKey)
         local included = child:IsShown() or (poolActive and poolActive[child] and child.cooldownInfo and true)
         if included and isCDMIcon then
             local childFrameData = FrameData[child]
-            if childFrameData and childFrameData.customIcon then
-            else
+            if not (childFrameData and childFrameData.customIcon) then
                 iconBuffer[#iconBuffer + 1] = child
-                local spellID
-                local info = child.cooldownInfo
-                if info then
-                    spellID = info.spellID
-                elseif child.cooldownID then
-                    local cdInfo = C_CooldownViewer.GetCooldownViewerCooldownInfo(child.cooldownID)
-                    spellID = cdInfo and cdInfo.spellID
-                end
-                if not spellID and child.GetSpellID then
-                    spellID = child:GetSpellID()
-                end
-                if spellID and not issecretvalue(spellID) then
-                    blizzardSpells[spellID] = true
-                end
             end
         end
     end
