@@ -89,6 +89,18 @@ local function Apply()
 	MirrorTimers()
 end
 
+local function Preview()
+	local frame = _G.LossOfControlFrame
+	if not frame or not frame.SetIsInEditMode then return end
+	frame:SetIsInEditMode(true)
+	return frame
+end
+
+local function StopPreview()
+	local frame = _G.LossOfControlFrame
+	if frame and frame.SetIsInEditMode then frame:SetIsInEditMode(false) end
+end
+
 Skin.OnToggle(SKIN_ID, function(enabled)
 	if enabled then
 		for index = 1, #skinnedFrames do skinnedFrames[index]._buiCombatAlert = nil end
@@ -102,6 +114,8 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Combat Alerts',
 	description = 'Loss of control, the death recap window, and the breath and fatigue timers.',
 	icon = 'Interface/Icons/Spell_Shadow_DeathScream',
+	test = Preview,
+	stopTest = StopPreview,
 })
 
 BUI.Events:Register('ADDON_LOADED', 'Skin.CombatAlerts', Apply)
