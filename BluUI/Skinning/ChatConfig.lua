@@ -1,5 +1,6 @@
 local _, BUI = ...
 local _, HookScript = BUI.Prof.Scripts('ChatConfig')
+local hooksecurefunc = BUI.Prof.MakeHooker('ChatConfig')
 
 local Skin = BUI.Skinning
 
@@ -13,8 +14,15 @@ local BACKDROP_KEYS = { 'Center', 'TopEdge', 'BottomEdge', 'LeftEdge', 'RightEdg
 local CLOSE_KEYS = { 'CloseButton', 'ClosePanelButton', 'CloseDialogButton', 'closeButton' }
 local BUTTON_KEYS = { 'OkayButton', 'OkButton', 'OKButton', 'CancelButton', 'DefaultButton', 'DefaultsButton', 'RedockButton', 'NewButton', 'SettingsButton', 'ResetButton', 'SaveButton', 'DeleteButton' }
 local SCROLL_LIST_KEYS = { 'ChannelList', 'ChannelRoster' }
+local CONFIG_PANELS = { 'ChatConfigCategoryFrame', 'ChatConfigBackgroundFrame', 'ChatConfigCombatSettingsFilters' }
+local PANEL_INSET = 2
+local CATEGORY_BUTTON_COUNT = 7
+local CATEGORY_BUTTON_HEIGHT = 20
+local NAV_TEXT_INSET = 6
+local CHECK_SIZE = 16
+local SWATCH_INSET = 2
+local WHITE = [[Interface\Buttons\WHITE8X8]]
 
-local skinned = {}
 local testShown = {}
 
 local function Enabled()
@@ -25,14 +33,30 @@ local context = Skin.NewContext(Enabled)
 local Fade, FadeRegions, FadeKeys, FadeArt = context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt
 local Shell, Button, Close, Dropdown = context.Shell, context.Button, context.Close, context.Dropdown
 local EditBox, CheckBox, ScrollBar, Tab = context.EditBox, context.CheckBox, context.ScrollBar, context.Tab
+local Face, Title = context.Face, context.Title
 
 local function FrameName(frame)
 	return (frame.GetName and frame:GetName()) or ''
 end
 
-local function IsType(frame, kind)
-	local ok, result = pcall(frame.IsObjectType, frame, kind)
+local function IsType(object, kind)
+	local ok, result = pcall(object.IsObjectType, object, kind)
 	return ok and result == true
+end
+
+local function NamedFontString(name)
+	local object = _G[name]
+	if type(object) == 'table' and IsType(object, 'FontString') then return object end
+end
+
+local function ForEachNumbered(prefix, callback)
+	local index = 1
+	local frame = _G[prefix .. index]
+	while frame do
+		callback(frame)
+		index = index + 1
+		frame = _G[prefix .. index]
+	end
 end
 
 local function HasBackdrop(frame)
@@ -41,7 +65,7 @@ local function HasBackdrop(frame)
 end
 
 local function IsNineSlice(frame)
-	return frame.Center ~= nil or frame.TopEdge ~= nil
+	return frame.backdropInfo == nil and (frame.Center ~= nil or frame.TopEdge ~= nil)
 end
 
 local function IsCloseButton(button)
@@ -50,9 +74,7 @@ end
 
 local function IsTabButton(button)
 	if FrameName(button):find('Tab%d*$') then return true end
-	local parent = button:GetParent()
-	local manager = _G.ChatConfigFrame and _G.ChatConfigFrame.ChatTabManager
-	return manager ~= nil and parent == manager
+	return button:GetParent() == ChatConfigFrame.ChatTabManager
 end
 
 local function IsPanelButton(button)
@@ -62,8 +84,24 @@ local function IsPanelButton(button)
 	return text ~= nil and text ~= '' and button.GetNormalTexture ~= nil and button:GetNormalTexture() ~= nil
 end
 
+local function IsNavButton(button)
+	return button.Highlight ~= nil and button.NormalText ~= nil
+end
+
+local function IsSwatch(button)
+	return button.SwatchBg ~= nil or FrameName(button):find('ColorSwatch$') ~= nil
+end
+
 local function IsLegacyDropdown(frame)
 	return frame.Left ~= nil and frame.Middle ~= nil and frame.Right ~= nil and frame.Button ~= nil
+end
+
+local function IsCheckRow(frame)
+	return frame.BlankText ~= nil and frame.CheckButton ~= nil
+end
+
+local function IsSwatchRow(frame)
+	return FrameName(frame):find('Swatch%d+$') ~= nil
 end
 
 local function SkinScrollHost(frame)
@@ -79,12 +117,116 @@ local function SkinScrollHost(frame)
 	end
 end
 
+local function CheckLabel(check)
+	if check.Text then return check.Text end
+	local name = FrameName(check)
+	if name ~= '' then return NamedFontString(name .. 'Text') end
+end
+
+local function Check(check)
+	local width = check:GetWidth()
+	CheckBox(check, width > CHECK_SIZE and math.floor((width - CHECK_SIZE) / 2) or 0)
+	local label = CheckLabel(check)
+	if not label then return end
+	Face(label)
+	local point, relativeTo, relativePoint, offsetX = label:GetPoint(1)
+	if point == 'LEFT' and relativeTo == check and relativePoint == 'RIGHT' then
+		label:SetPoint('LEFT', check, 'RIGHT', offsetX, 0)
+	end
+end
+
+local function SwatchEnter(swatch)
+	Skin.TipShellEdges(swatch, true)
+end
+
+local function SwatchLeave(swatch)
+	Skin.TipShellEdges(swatch, false)
+end
+
+local function Swatch(swatch)
+	if not swatch then return end
+	Shell(swatch)
+	Fade(swatch.SwatchBg or _G[FrameName(swatch) .. 'SwatchBg'])
+	Fade(swatch.InnerBorder)
+	if swatch._buiSwatch then return end
+	swatch._buiSwatch = true
+	local fill = swatch.Color
+	if not fill then
+		fill = swatch:GetNormalTexture()
+		fill:SetTexture(WHITE)
+	end
+	fill:ClearAllPoints()
+	fill:SetPoint('TOPLEFT', swatch, 'TOPLEFT', SWATCH_INSET, -SWATCH_INSET)
+	fill:SetPoint('BOTTOMRIGHT', swatch, 'BOTTOMRIGHT', -SWATCH_INSET, SWATCH_INSET)
+	HookScript(swatch, 'OnEnter', SwatchEnter)
+	HookScript(swatch, 'OnLeave', SwatchLeave)
+end
+
+local function CheckRow(row)
+	Fade(row.NineSlice)
+	Check(row.CheckButton)
+	Face(row.BlankText)
+	Swatch(row.ColorSwatch)
+	Close(row.CloseChannel)
+end
+
+local function SwatchRow(row)
+	Fade(row.NineSlice)
+	local name = FrameName(row)
+	Face(NamedFontString(name .. 'Text'))
+	Swatch(_G[name .. 'ColorSwatch'])
+end
+
+local function CheckEntry(entry)
+	if IsCheckRow(entry) then
+		CheckRow(entry)
+		return
+	end
+	Check(entry)
+	ForEachNumbered(FrameName(entry) .. '_', Check)
+end
+
+local function NavButton(button)
+	Skin.TipButtonFonts(button)
+	Skin.RowHighlight(button)
+	button.Highlight:SetVertexColor(1, 1, 1, 1)
+	if button._buiNav then return end
+	button._buiNav = true
+	button.NormalText:ClearAllPoints()
+	button.NormalText:SetPoint('LEFT', button, 'LEFT', NAV_TEXT_INSET, 0)
+end
+
+local function BoxHeaders(frame)
+	local name = FrameName(frame)
+	if name == '' then return end
+	Title(NamedFontString(name .. 'Title'))
+	local colorHeader = NamedFontString(name .. 'ColorHeader')
+	if colorHeader then Skin.TipFont(colorHeader, 'label') end
+end
+
 local DeepSkin
 
-local function SkinChild(child, depth)
+local function SkinButton(button, depth, flat)
+	if IsCloseButton(button) then
+		Close(button)
+	elseif IsTabButton(button) then
+		Tab(button)
+	elseif IsSwatch(button) then
+		Swatch(button)
+	elseif IsNavButton(button) then
+		NavButton(button)
+	elseif IsPanelButton(button) then
+		Button(button)
+	else
+		DeepSkin(button, depth - 1, flat)
+	end
+end
+
+local function SkinChild(child, depth, flat)
 	if child._buiDeepSkip or child:IsForbidden() then return end
 	if IsType(child, 'CheckButton') then
-		CheckBox(child)
+		Check(child)
+		DeepSkin(child, depth - 1, flat)
 		return
 	end
 	if IsType(child, 'EditBox') then
@@ -98,37 +240,38 @@ local function SkinChild(child, depth)
 	end
 	if IsType(child, 'ScrollFrame') then
 		SkinScrollHost(child)
-		DeepSkin(child, depth - 1)
+		DeepSkin(child, depth - 1, flat)
 		return
 	end
 	if IsType(child, 'Button') then
-		if IsCloseButton(child) then
-			Close(child)
-		elseif IsTabButton(child) then
-			Tab(child)
-		elseif IsPanelButton(child) then
-			Button(child)
-		else
-			DeepSkin(child, depth - 1)
-		end
+		SkinButton(child, depth, flat)
 		return
 	end
 	if IsNineSlice(child) then
 		FadeRegions(child)
 		return
 	end
+	if IsCheckRow(child) then
+		CheckRow(child)
+		return
+	end
+	if IsSwatchRow(child) then
+		SwatchRow(child)
+		return
+	end
 	if HasBackdrop(child) then
 		FadeKeys(child, BACKDROP_KEYS)
-		Shell(child)
+		if not flat then Shell(child) end
 	end
+	BoxHeaders(child)
 	SkinScrollHost(child)
-	DeepSkin(child, depth - 1)
+	DeepSkin(child, depth - 1, flat)
 end
 
-DeepSkin = function(frame, depth)
-	if depth <= 0 or not frame or not frame.GetChildren then return end
+DeepSkin = function(frame, depth, flat)
+	if depth <= 0 then return end
 	for _, child in ipairs({ frame:GetChildren() }) do
-		SkinChild(child, depth)
+		SkinChild(child, depth, flat)
 	end
 end
 
@@ -149,11 +292,55 @@ local function SkinChannelLists(frame)
 	end
 end
 
-local function SkinWindow(frame)
-	if not frame or frame._buiChatSkin or frame:IsForbidden() or not Enabled() then return end
-	frame._buiChatSkin = true
-	skinned[#skinned + 1] = frame
+local function StyleTab(tab, selected)
+	Tab(tab)
+	Skin.TipTabSelected(tab, selected)
+	tab:SetAlpha(1)
+	local text = tab:GetFontString()
+	text:SetVertexColor(1, 1, 1, 1)
+	text:SetTextColor(tab:GetNormalFontObject():GetTextColor())
+end
 
+local function RefreshWindowTabs(manager)
+	if not Enabled() then return end
+	for tab in manager.tabPool:EnumerateActive() do
+		StyleTab(tab, tab:GetID() == CURRENT_CHAT_FRAME_ID)
+	end
+end
+
+local function RefreshCombatTabs()
+	if not Enabled() then return end
+	for index, info in ipairs(COMBAT_CONFIG_TABS) do
+		StyleTab(_G[CHAT_CONFIG_COMBAT_TAB_NAME .. index], _G[info.frame]:IsShown())
+	end
+end
+
+local function FilterRow(button)
+	if Enabled() then NavButton(button) end
+end
+
+local function WindowTitle(frame)
+	if frame.Header then Title(frame.Header.Text) end
+	if frame.TitleContainer then Title(frame.TitleContainer.TitleText) end
+end
+
+local function SkinConfigWindow(frame)
+	for index = 1, #CONFIG_PANELS do
+		Shell(_G[CONFIG_PANELS[index]], PANEL_INSET)
+	end
+	for index = 1, CATEGORY_BUTTON_COUNT do
+		_G['ChatConfigCategoryFrameButton' .. index]:SetHeight(CATEGORY_BUTTON_HEIGHT)
+	end
+	Skin.TipPageButton(ChatConfigMoveFilterUpButton, 'up')
+	Skin.TipPageButton(ChatConfigMoveFilterDownButton, 'down')
+	Skin.SweepScrollBox(ChatConfigCombatSettingsFilters.ScrollBox, FilterRow)
+	RefreshWindowTabs(frame.ChatTabManager)
+	RefreshCombatTabs()
+end
+
+local function SkinWindow(frame)
+	if frame:IsForbidden() or not Enabled() then return end
+	local isConfig = frame == ChatConfigFrame
 	FadeArt(frame)
 	FadeKeys(frame, ART_KEYS)
 	Shell(frame)
@@ -172,9 +359,11 @@ local function SkinWindow(frame)
 		end
 	end
 	SkinChannelLists(frame)
-	DeepSkin(frame, MAX_DEPTH)
-	Skin.HideHelpButtons(frame)
 	Skin.TipFaceTree(frame, FONT_DEPTH)
+	DeepSkin(frame, MAX_DEPTH, isConfig)
+	Skin.HideHelpButtons(frame)
+	WindowTitle(frame)
+	if isConfig then SkinConfigWindow(frame) end
 end
 
 local function SweepAll()
@@ -182,11 +371,11 @@ local function SweepAll()
 	for index = 1, #FRAMES do
 		local frame = _G[FRAMES[index]]
 		if frame then
-			SkinWindow(frame)
 			if not frame._buiChatShowHook then
 				frame._buiChatShowHook = true
-				HookScript(frame, 'OnShow', function(shown) SkinWindow(shown) end)
+				HookScript(frame, 'OnShow', SkinWindow)
 			end
+			if frame:IsShown() then SkinWindow(frame) end
 		end
 	end
 end
@@ -220,9 +409,15 @@ end
 
 local function Deactivate()
 	context.Restore()
-	for index = 1, #skinned do skinned[index]._buiChatSkin = nil end
-	wipe(skinned)
 	BUI.Print('Chat Settings skin disabled. /reload for a full visual reset.')
+end
+
+local function OnCheckboxesCreated(frame)
+	if Enabled() then ForEachNumbered(FrameName(frame) .. 'Checkbox', CheckEntry) end
+end
+
+local function OnSwatchesCreated(frame)
+	if Enabled() then ForEachNumbered(FrameName(frame) .. 'Swatch', SwatchRow) end
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)
@@ -241,6 +436,13 @@ Skin.RegisterSkin(SKIN_ID, {
 	stopTest = StopTest,
 })
 
+hooksecurefunc('ChatConfig_CreateCheckboxes', OnCheckboxesCreated)
+hooksecurefunc('ChatConfig_CreateTieredCheckboxes', OnCheckboxesCreated)
+hooksecurefunc('ChatConfig_CreateColorSwatches', OnSwatchesCreated)
+hooksecurefunc('TextToSpeechFrame_CreateCheckboxes', OnCheckboxesCreated)
+hooksecurefunc('ChatConfig_UpdateCombatTabs', RefreshCombatTabs)
+hooksecurefunc(ChatConfigFrame.ChatTabManager, 'UpdateSelection', RefreshWindowTabs)
+hooksecurefunc(ChatConfigFrame.ChatTabManager, 'UpdateWidth', RefreshWindowTabs)
+
 BUI.Events:Register('ADDON_LOADED', 'Skin.ChatConfig', SweepAll)
-BUI.Events:Register('PLAYER_ENTERING_WORLD', 'Skin.ChatConfig', SweepAll)
 BUI.Events:Once('PLAYER_LOGIN', 'Skin.ChatConfig', SweepAll)
