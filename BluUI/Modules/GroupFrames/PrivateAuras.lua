@@ -63,6 +63,42 @@ local function RegisterAnchors(frame, container, settings)
 	end
 end
 
+local function ReleaseAnchors(container)
+	ClearAnchors(container)
+	container._regUnit = nil
+end
+
+local function SyncAnchors(frame, container, settings)
+	local size      = Scale(settings.size)
+	local count     = settings.num
+	local showTimer = settings.showTimer ~= false
+
+	if container._regUnit == frame.unit and container._regSize == size
+		and container._regCount == count and container._regTimer == showTimer then
+		return
+	end
+
+	ClearAnchors(container)
+	RegisterAnchors(frame, container, settings)
+	container._regUnit, container._regSize = frame.unit, size
+	container._regCount, container._regTimer = count, showTimer
+end
+
+local function RefreshAnchors(frame)
+	local container = frame.BluPrivateAuras
+	if not container then return end
+
+	local settings = Config(frame)
+	if settings.enabled == false or not frame.unit or not UnitExists(frame.unit) then
+		ReleaseAnchors(container)
+		container:Hide()
+		return
+	end
+
+	SyncAnchors(frame, container, settings)
+	container:Show()
+end
+
 local function EnsureContainer(frame)
 	local container = frame.BluPrivateAuras
 	if container then return container end
@@ -78,7 +114,7 @@ local function EnsureContainer(frame)
 	if not frame._bluPaUnitHook then
 		frame._bluPaUnitHook = true
 		HookScript(frame, "OnAttributeChanged", function(self, name)
-			if name == "unit" then GroupFrames.ApplyPrivateAuras(self) end
+			if name == "unit" then RefreshAnchors(self) end
 		end)
 	end
 	return container
@@ -90,8 +126,7 @@ function GroupFrames.ApplyPrivateAuras(frame)
 
 	if settings.enabled == false or not frame.unit or not UnitExists(frame.unit) then
 		if container then
-			ClearAnchors(container)
-			container._registeredKey = nil
+			ReleaseAnchors(container)
 			container:Hide()
 		end
 		return
@@ -138,18 +173,12 @@ function GroupFrames.ApplyPrivateAuras(frame)
 	end
 	for slotIndex = auraCount + 1, #container.slots do container.slots[slotIndex]:Hide() end
 
-	local key = ("%s:%s:%d:%s"):format(frame.unit, size, auraCount, tostring(settings.showTimer ~= false))
-	if container._registeredKey ~= key then
-		ClearAnchors(container)
-		RegisterAnchors(frame, container, settings)
-		container._registeredKey = key
-	end
+	SyncAnchors(frame, container, settings)
 end
 
 function GroupFrames.NudgePrivateAuras(frame)
 	local container = frame.BluPrivateAuras
 	if not container then return end
-	ClearAnchors(container)
-	container._registeredKey = nil
+	ReleaseAnchors(container)
 	GroupFrames.ApplyPrivateAuras(frame)
 end
