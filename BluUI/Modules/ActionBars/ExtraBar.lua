@@ -4,7 +4,6 @@ local hooksecurefunc = BUI.Prof.MakeHooker('ActionBars.ExtraBar')
 
 local ActionBars = BUI.ActionBars
 local Pixel = BUI.Pixel
-local LibEMO = LibStub('LibEditModeOverride-1.0')
 
 local EVENT_KEY = 'ActionBars.ExtraBar'
 local EMPTY_SIZE = 52
@@ -82,19 +81,12 @@ local function Measure(self)
 end
 
 local function LeaveFrameManager(self)
-	local container = Container()
-	local systemInfo = container.systemInfo
-	if not (systemInfo and systemInfo.isInDefaultPosition) then return end
-	if not BUI.CanWriteEditModeLayout() or not LibEMO:IsReady() then return end
-	LibEMO:LoadLayouts()
-	if not LibEMO:CanEditActiveLayout() or not LibEMO:HasEditModeSettings(container) then return end
 	local header = self.bar.header
 	local centerX, centerY = header:GetCenter()
 	local parentX, parentY = UIParent:GetCenter()
 	if not centerX or not parentX then return end
 	local ratio = header:GetEffectiveScale() / UIParent:GetEffectiveScale()
-	LibEMO:ReanchorFrame(container, 'CENTER', UIParent, 'CENTER', centerX * ratio - parentX, centerY * ratio - parentY)
-	LibEMO:SaveOnly()
+	BUI.LeaveFrameManager(Container(), 'CENTER', 'CENTER', centerX * ratio - parentX, centerY * ratio - parentY)
 end
 
 local function Retake(self)
