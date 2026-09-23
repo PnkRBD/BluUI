@@ -50,6 +50,7 @@ local function BuildPreview(parent, opts)
     local interfaceDB = GetInterfaceConfig()
     local minimapWidth = Minimap:GetWidth()
     local scale = PREVIEW_MAP / minimapWidth
+    local uiScale = scale * UIParent:GetEffectiveScale() / Minimap:GetEffectiveScale()
 
     local borderFrame = CreateFrame('Frame', nil, stage)
     borderFrame:SetPoint('CENTER')
@@ -497,12 +498,12 @@ local function BuildPreview(parent, opts)
     local function RefreshDrawer()
         if not interfaceDB.drawerEnabled then drawerTab:Hide(); return end
         local side = interfaceDB.drawerSide
-        local tabWidth, tabHeight = DRAWER_TAB_W * scale, DRAWER_TAB_H * scale
+        local tabWidth, tabHeight = DRAWER_TAB_W * uiScale, DRAWER_TAB_H * uiScale
         if side == 'TOP' or side == 'BOTTOM' then tabWidth, tabHeight = tabHeight, tabWidth end
         drawerTab:SetSize(max(2, tabWidth), max(2, tabHeight))
-        local offsetX = interfaceDB.drawerX * scale
-        local offsetY = interfaceDB.drawerY * scale
-        local inset = DRAWER_TAB_INSET * scale
+        local offsetX = interfaceDB.drawerX * uiScale
+        local offsetY = interfaceDB.drawerY * uiScale
+        local inset = DRAWER_TAB_INSET * uiScale
         drawerTab:ClearAllPoints()
         if side == 'LEFT' then
             drawerTab:SetPoint('CENTER', mapFrame, 'LEFT', inset + offsetX, offsetY)
@@ -547,24 +548,25 @@ local function BuildPreview(parent, opts)
         if count == 0 then barHolder:Hide(); return end
 
         local anchor = module.ANCHORS[config.side] or module.ANCHORS.BOTTOM
-        local size = max(4, floor(config.size * scale + 0.5))
-        local gap = floor(config.spacing * scale + 0.5)
+        local size = max(4, floor(config.size * uiScale + 0.5))
+        local spacing = floor(config.spacing * uiScale + 0.5)
         local perLine = config.perLine > 0 and config.perLine or count
         local lineCount = min(count, perLine)
         local crossCount = math.ceil(count / perLine)
-        local lineExtent = lineCount * size + (lineCount - 1) * gap
-        local crossExtent = crossCount * size + (crossCount - 1) * gap
+        local lineExtent = lineCount * size + (lineCount - 1) * spacing
+        local crossExtent = crossCount * size + (crossCount - 1) * spacing
         if anchor.horizontal then barHolder:SetSize(max(1, lineExtent), max(1, crossExtent))
         else barHolder:SetSize(max(1, crossExtent), max(1, lineExtent)) end
         local points = anchor[config.align] or anchor.CENTER
         barHolder:ClearAllPoints()
-        local gap = config.gap * scale
-        local gapX = (config.side == 'LEFT' and -gap) or (config.side == 'RIGHT' and gap) or 0
-        local gapY = (config.side == 'TOP' and gap) or (config.side == 'BOTTOM' and -gap) or 0
-        barHolder:SetPoint(points[1], mapFrame, points[2], config.offsetX * scale + gapX, config.offsetY * scale + gapY)
+        local mapGap = config.gap * uiScale
+        local gapX = (config.side == 'LEFT' and -mapGap) or (config.side == 'RIGHT' and mapGap) or 0
+        local gapY = (config.side == 'TOP' and mapGap) or (config.side == 'BOTTOM' and -mapGap) or 0
+        barHolder:SetPoint(points[1], mapFrame, points[2], config.offsetX * uiScale + gapX, config.offsetY * uiScale + gapY)
 
         local corner = (anchor.dirY == 1 and 'BOTTOM' or 'TOP') .. (anchor.dirX == -1 and 'RIGHT' or 'LEFT')
-        local step = size + gap
+        local step = size + spacing
+        local background = config.background
         for index = 1, count do
             local proxy = BarProxy(index)
             local lineIndex = (index - 1) % perLine
@@ -572,8 +574,7 @@ local function BuildPreview(parent, opts)
             local x, y
             if anchor.horizontal then x, y = lineIndex * step, crossIndex * step else x, y = crossIndex * step, lineIndex * step end
             proxy:SetSize(size, size)
-            local background = config.background or { 0.06, 0.06, 0.07, 1 }
-            proxy:SetBackdropColor(background[1] or 0, background[2] or 0, background[3] or 0, background[4] or 1)
+            proxy:SetBackdropColor(background[1], background[2], background[3], background[4])
             proxy:ClearAllPoints()
             proxy:SetPoint(corner, barHolder, corner, x * anchor.dirX, y * anchor.dirY)
             local icon = entries[index].icon
@@ -588,6 +589,7 @@ local function BuildPreview(parent, opts)
         interfaceDB = GetInterfaceConfig()
         minimapWidth = Minimap:GetWidth()
         scale = PREVIEW_MAP / minimapWidth
+        uiScale = scale * UIParent:GetEffectiveScale() / Minimap:GetEffectiveScale()
         ApplyMapSnapshot()
         ApplyBorder()
         RefreshIcons()
