@@ -169,6 +169,9 @@ SlashCmdList['BUI'] = function(message)
 		DumpFrame(rest)
 	elseif command == 'keybind' or command == 'kb' then
 		BUI.ActionBars.ToggleKeybindMode()
+	elseif command == 'skins' then
+		local _, order = BUI.Skinning.GetSkinRegistry()
+		BUI.Skinning.Test(nil, order)
 	else
 		BUI.PageEngine.Toggle()
 	end
