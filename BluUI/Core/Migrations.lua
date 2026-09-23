@@ -325,7 +325,6 @@ function BUI.MigrateProfile(profile)
 		profile.general._combatAlertsSplit = true
 		local skinning = profile.skinning
 		if type(skinning) == 'table' and skinning.combatalerts ~= nil then
-			skinning.lossofcontrol = skinning.combatalerts
 			skinning.deathrecap = skinning.combatalerts
 			skinning.mirrortimers = skinning.combatalerts
 		end
