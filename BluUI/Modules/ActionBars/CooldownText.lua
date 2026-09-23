@@ -7,9 +7,7 @@ local function BarSettingsFor(button)
 	return ActionBars.GetBarSettings(button._buiBar) or ActionBars.GetBarSettings(1)
 end
 
-function ActionBars.StyleCooldownText(button)
-	local cooldown = button.cooldown
-	if not cooldown then return end
+function ActionBars.StyleCooldownText(button, cooldown)
 	local barSettings = BarSettingsFor(button)
 	cooldown:SetHideCountdownNumbers(not barSettings.showCooldownText)
 	local region = BUI.Tools.CooldownFontString(cooldown)
@@ -33,6 +31,10 @@ function ActionBars.StyleCooldownText(button)
 	region:SetDrawLayer('OVERLAY', 7)
 end
 
+local function RefreshButtonCooldownText(button)
+	if button.cooldown then ActionBars.StyleCooldownText(button, button.cooldown) end
+end
+
 function ActionBars.RefreshCooldownText()
-	ActionBars.ForEachButton(ActionBars.StyleCooldownText)
+	ActionBars.ForEachButton(RefreshButtonCooldownText)
 end
