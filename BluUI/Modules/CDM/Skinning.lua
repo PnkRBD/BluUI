@@ -298,42 +298,42 @@ local function OnCooldownApplied(cooldown)
     CDM.RestyleCooldown(cooldown)
 end
 
-local reclaimingStyle = false
+local reclaimingStyle = setmetatable({}, { __mode = 'k' })
 
 local function ReclaimDrawEdge(cooldown)
-    if reclaimingStyle then return end
+    if reclaimingStyle[cooldown] then return end
     local cooldownFrameData = FrameData[cooldown]
     if not cooldownFrameData or not cooldownFrameData.cdSetup then return end
-    reclaimingStyle = true
+    reclaimingStyle[cooldown] = true
     cooldown:SetDrawEdge(cooldownFrameData.showEdge or false)
-    reclaimingStyle = false
+    reclaimingStyle[cooldown] = nil
 end
 
 local function ReclaimReverse(cooldown)
-    if reclaimingStyle then return end
+    if reclaimingStyle[cooldown] then return end
     local cooldownFrameData = FrameData[cooldown]
     if not cooldownFrameData or not cooldownFrameData.cdSetup then return end
-    reclaimingStyle = true
+    reclaimingStyle[cooldown] = true
     cooldown:SetReverse(cooldownFrameData.reverseSwipe or false)
-    reclaimingStyle = false
+    reclaimingStyle[cooldown] = nil
 end
 
 local function ReclaimSwipeColor(cooldown)
-    if reclaimingStyle then return end
+    if reclaimingStyle[cooldown] then return end
     local cooldownFrameData = FrameData[cooldown]
     if not cooldownFrameData or not cooldownFrameData.cdSetup or cooldownFrameData.swA == nil then return end
-    reclaimingStyle = true
+    reclaimingStyle[cooldown] = true
     cooldown:SetSwipeColor(cooldownFrameData.swR, cooldownFrameData.swG, cooldownFrameData.swB, cooldownFrameData.swA)
-    reclaimingStyle = false
+    reclaimingStyle[cooldown] = nil
 end
 
 local function ReclaimBling(cooldown)
-    if reclaimingStyle then return end
+    if reclaimingStyle[cooldown] then return end
     local cooldownFrameData = FrameData[cooldown]
     if not cooldownFrameData or not cooldownFrameData.cdSetup then return end
-    reclaimingStyle = true
+    reclaimingStyle[cooldown] = true
     cooldown:SetDrawBling(false)
-    reclaimingStyle = false
+    reclaimingStyle[cooldown] = nil
 end
 
 function CDM.RefreshCooldownStyleFlags()
