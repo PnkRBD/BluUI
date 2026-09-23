@@ -188,12 +188,15 @@ end
 function CDM.IconMatchesSpell(icon, spellID)
     local cooldownInfo = icon.cooldownInfo
     if not cooldownInfo then return false end
-    if cooldownInfo.overrideSpellID == spellID then return true end
-    if cooldownInfo.spellID == spellID then return true end
+    local overrideSpellID = cooldownInfo.overrideSpellID
+    if not issecretvalue(overrideSpellID) and overrideSpellID == spellID then return true end
+    local sid = cooldownInfo.spellID
+    if not issecretvalue(sid) and sid == spellID then return true end
     local linked = cooldownInfo.linkedSpellIDs
-    if linked then
+    if linked and not issecretvalue(linked) then
         for j = 1, #linked do
-            if linked[j] == spellID then return true end
+            local linkedID = linked[j]
+            if not issecretvalue(linkedID) and linkedID == spellID then return true end
         end
     end
     return false
