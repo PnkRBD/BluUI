@@ -80,6 +80,10 @@ function Pixel.PixelSize(pixels)
     return unitsFor(Pixel.ClampBorder(pixels))
 end
 
+function Pixel.PixelSizeFor(frame, pixels)
+    return Pixel.ClampBorder(pixels) * perfectScale / frame:GetEffectiveScale()
+end
+
 local function KillSnap(object)
     if type(object) ~= "table" or rawget(object, "_noSnap") then return end
     if object.IsForbidden and object:IsForbidden() then return end
@@ -138,6 +142,8 @@ end
 
 local borderBackdrops = {}
 local templateBackdrops = {}
+local borderFrames = setmetatable({}, { __mode = 'k' })
+local templateFrames = setmetatable({}, { __mode = 'k' })
 
 local function GetBorderBackdrop(edge)
     local backdrop = borderBackdrops[edge]
@@ -169,7 +175,8 @@ function Pixel.SetTemplate(frame, backgroundRed, backgroundGreen, backgroundBlue
     borderSize = borderSize or 1
 
     local edge = borderSize
-    if not noScale then edge = Pixel.PixelSize(borderSize) end
+    if not noScale then edge = Pixel.PixelSizeFor(frame, borderSize) end
+    templateFrames[frame] = not noScale and borderSize or nil
 
     GiveBackdrop(frame)
 
@@ -189,7 +196,8 @@ function Pixel.ApplyBorder(frame, thickness, red, green, blue, alpha)
     blue = blue or 0
     alpha = alpha or 1
 
-    local edge = Pixel.PixelSize(thickness)
+    local edge = Pixel.PixelSizeFor(frame, thickness)
+    borderFrames[frame] = thickness
 
     GiveBackdrop(frame)
 
@@ -202,6 +210,29 @@ function Pixel.ApplyBorder(frame, thickness, red, green, blue, alpha)
 
     frame._edgeRGBA = frame._edgeRGBA or {}
     frame._edgeRGBA[1], frame._edgeRGBA[2], frame._edgeRGBA[3], frame._edgeRGBA[4] = red, green, blue, alpha
+end
+
+local function RefreshEdge(frame, pixels, template)
+    local backdropFor = template and GetTemplateBackdrop or GetBorderBackdrop
+    local edge = Pixel.PixelSizeFor(frame, pixels)
+    if frame._bdEdge == edge or frame.backdropInfo ~= backdropFor(frame._bdEdge) then return end
+    frame._bdEdge = edge
+    local fillRed, fillGreen, fillBlue, fillAlpha = frame:GetBackdropColor()
+    local edgeRed, edgeGreen, edgeBlue, edgeAlpha = frame:GetBackdropBorderColor()
+    frame:SetBackdrop(backdropFor(edge))
+    if template then frame:SetBackdropColor(fillRed, fillGreen, fillBlue, fillAlpha) end
+    frame:SetBackdropBorderColor(edgeRed, edgeGreen, edgeBlue, edgeAlpha)
+end
+
+function Pixel.RefreshBorders()
+    for frame, pixels in pairs(borderFrames) do RefreshEdge(frame, pixels, false) end
+    for frame, pixels in pairs(templateFrames) do RefreshEdge(frame, pixels, true) end
+end
+
+function Pixel.SetScale(frame, scale)
+    if frame:GetScale() == scale then return end
+    frame:SetScale(scale)
+    Pixel.RefreshBorders()
 end
 
 function Pixel.GetBorderSize(frame)
@@ -302,6 +333,7 @@ end
 
 local function OnScaleChanged()
     if Recompute() then
+        Pixel.RefreshBorders()
         Broadcast()
     end
 end

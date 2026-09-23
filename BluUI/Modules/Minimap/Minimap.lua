@@ -786,7 +786,7 @@ function Minimap.ApplyPosition()
 	local x = interfaceDB.minimapScreenX or DEFAULT_SCREEN_OFFSET
 	local y = interfaceDB.minimapScreenY or DEFAULT_SCREEN_OFFSET
 
-	WoWMinimap:SetScale(scale)
+	Pixel.SetScale(WoWMinimap, scale)
 	WoWMinimap:ClearAllPoints()
 	WoWMinimap:SetPoint('TOPRIGHT', UIParent, 'TOPRIGHT', x, y)
 	UpdateBackdrop()

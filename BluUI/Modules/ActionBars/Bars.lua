@@ -73,7 +73,7 @@ function ActionBars.LayoutBar(bar, buttonCountOverride)
 
 	bar.empty = buttonCount == 0
 	bar.header:SetSize(GridSize(bar.empty and configuredCount or buttonCount, perRow, buttonSize, buttonHeight, spacing))
-	bar.header:SetScale(barSettings.scale / 100)
+	Pixel.SetScale(bar.header, barSettings.scale / 100)
 end
 
 function ActionBars.PositionBar(bar)
