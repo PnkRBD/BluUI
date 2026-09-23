@@ -124,7 +124,6 @@ local function PrintHelp()
 	line('/bui cpu reload', 'reload and profile everything BluUI runs during login')
 	line('/bui framescan', 'list every visible frame running an OnUpdate script')
 	line('/bui keybind', 'toggle action bar keybind mode (hover a button, press a key)')
-	line('/bui skins', 'showcase every enabled skin in a grid (Escape closes it)')
 	line('/bui currency <id>', 'print the cap fields the game reports for a currency (3418 = Nebulous Voidcore)')
 	line('/bui dump <frame>', 'print a frame\'s parentKeys, textures and children')
 	line('/cdm', "toggle Blizzard's Cooldown Viewer settings")
@@ -169,9 +168,6 @@ SlashCmdList['BUI'] = function(message)
 		DumpFrame(rest)
 	elseif command == 'keybind' or command == 'kb' then
 		BUI.ActionBars.ToggleKeybindMode()
-	elseif command == 'skins' then
-		local _, order = BUI.Skinning.GetSkinRegistry()
-		BUI.Skinning.Test(nil, order)
 	else
 		BUI.PageEngine.Toggle()
 	end
