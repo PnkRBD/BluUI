@@ -46,8 +46,8 @@ local HEADER_ROW_HEIGHT = 22
 local HEADER_ROW_TOP_PAD = 4
 local MINIMIZE_SIZE     = 15
 local BAR_ICON_SIZE     = 20
-local CARD_PAD_LEFT     = 14
-local CARD_PAD_RIGHT    = 24
+local CARD_PAD_LEFT     = 22
+local CARD_PAD_RIGHT    = 10
 local CARD_PAD_Y        = 6
 
 local LAYOUT_HEIGHT     = 2600
@@ -868,7 +868,7 @@ local function UpdateCardAnchors()
 	if scrollHolder then
 		local rowShown = headerRow and headerRow:IsShown()
 		local rowHeight = rowShown and (headerRow:GetHeight() + Pixel.Scale(HEADER_ROW_TOP_PAD)) or 0
-		local cardGapLeft, cardGapRight = 22, 10
+		local cardGapLeft, cardGapRight = CARD_PAD_LEFT, CARD_PAD_RIGHT
 		trackerCard:SetPoint('TOPLEFT', scrollHolder, 'TOPLEFT', Pixel.Scale(POI_CLIP_PAD - cardGapLeft), padY + rowHeight)
 		trackerCard:SetPoint('TOPRIGHT', scrollHolder, 'TOPRIGHT', -Pixel.Scale(RIGHT_CLIP_PAD - cardGapRight), padY + rowHeight)
 		scrollHolder:SetClampRectInsets(Pixel.Scale(POI_CLIP_PAD - cardGapLeft), -Pixel.Scale(RIGHT_CLIP_PAD - cardGapRight), padY + rowHeight, -padY)
@@ -1803,12 +1803,55 @@ local function ApplyTrackerCollapse()
 	if wasCollapsed == true and not collapsed then RefreshTrackerLayout() end
 end
 
+function Skin.TrackerHeaderControls(parent, anchor)
+	local filterButton = CreateFrame('Button', nil, parent)
+	filterButton:SetSize(Pixel.PixelSize(MINIMIZE_SIZE), Pixel.PixelSize(MINIMIZE_SIZE))
+	filterButton:SetPoint('RIGHT', anchor, 'LEFT', -Pixel.Scale(4), 0)
+	local filterGlyph = filterButton:CreateTexture(nil, 'OVERLAY')
+	filterGlyph:SetTexture(BUILib.GetLibMedia('eye'))
+	filterGlyph:SetPoint('CENTER', 0, 0)
+	filterGlyph:SetSize(Pixel.Scale(GLYPH_SIZE + 2), Pixel.Scale(GLYPH_SIZE + 2))
+	headerFilter = filterButton
+	headerFilter.glyph = filterGlyph
+	BUI.Prof.SetScript('ObjectiveTracker', filterButton, 'OnEnter', function()
+		filterGlyph:SetVertexColor(1, 1, 1, 1)
+	end)
+	BUI.Prof.SetScript('ObjectiveTracker', filterButton, 'OnLeave', function()
+		QuestFilter.UpdateTint()
+	end)
+	BUI.Prof.SetScript('ObjectiveTracker', filterButton, 'OnClick', QuestFilter.ShowMenu)
+	QuestFilter.UpdateTint()
+
+	headerCounts = parent:CreateFontString(nil, 'ARTWORK')
+	ApplySkinFont(headerCounts, 'line')
+	headerCounts:SetPoint('RIGHT', filterButton, 'LEFT', -Pixel.Scale(8), 0)
+	headerCounts:SetJustifyH('RIGHT')
+	headerCounts:SetTextColor(Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3], 1)
+	UpdateHeaderCounts()
+end
+
+function Skin.TrackerDecorateHeader(trackerFrame)
+	local header = trackerFrame.Header
+	if not header.__buiDecorated then
+		header.__buiDecorated = true
+		Skin.TrackerHeaderControls(header, header.MinimizeButton)
+		hooksecurefunc(trackerFrame, 'Init', Skin.TrackerDecorateHeader)
+	end
+	local enabled = IsEnabled()
+	header.Text:SetText(enabled and 'OBJECTIVES' or trackerFrame.headerText)
+	headerFilter:SetShown(enabled)
+	headerCounts:SetShown(enabled)
+end
+
 local function ApplyHeaderRowVisibility()
 	local show = GetSettings().showHeaderRow ~= false
 	if not scrollHolder then
 		local trackerFrame = _G.ObjectiveTrackerFrame
 		local header = trackerFrame and trackerFrame.Header
-		if header then header:SetShown(not IsEnabled() or show) end
+		if header then
+			header:SetShown(not IsEnabled() or show)
+			Skin.TrackerDecorateHeader(trackerFrame)
+		end
 	end
 	if not headerRow then return end
 	local visible = IsEnabled() and show
@@ -1867,30 +1910,7 @@ local function EnsureHeaderRow()
 		ApplyTrackerCollapse()
 	end)
 
-	local filterButton = CreateFrame('Button', nil, headerRow)
-	filterButton:SetSize(Pixel.PixelSize(MINIMIZE_SIZE), Pixel.PixelSize(MINIMIZE_SIZE))
-	filterButton:SetPoint('RIGHT', toggle, 'LEFT', -Pixel.Scale(4), 0)
-	local filterGlyph = filterButton:CreateTexture(nil, 'OVERLAY')
-	filterGlyph:SetTexture(BUILib.GetLibMedia('eye'))
-	filterGlyph:SetPoint('CENTER', 0, 0)
-	filterGlyph:SetSize(Pixel.Scale(GLYPH_SIZE + 2), Pixel.Scale(GLYPH_SIZE + 2))
-	headerFilter = filterButton
-	headerFilter.glyph = filterGlyph
-	BUI.Prof.SetScript('ObjectiveTracker', filterButton, 'OnEnter', function()
-		filterGlyph:SetVertexColor(1, 1, 1, 1)
-	end)
-	BUI.Prof.SetScript('ObjectiveTracker', filterButton, 'OnLeave', function()
-		QuestFilter.UpdateTint()
-	end)
-	BUI.Prof.SetScript('ObjectiveTracker', filterButton, 'OnClick', QuestFilter.ShowMenu)
-	QuestFilter.UpdateTint()
-
-	headerCounts = headerRow:CreateFontString(nil, 'ARTWORK')
-	ApplySkinFont(headerCounts, 'line')
-	headerCounts:SetPoint('RIGHT', filterButton, 'LEFT', -Pixel.Scale(8), 0)
-	headerCounts:SetJustifyH('RIGHT')
-	headerCounts:SetTextColor(Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3], 1)
-	UpdateHeaderCounts()
+	Skin.TrackerHeaderControls(headerRow, toggle)
 
 	BUI.Prof.SetScript('ObjectiveTracker', headerRow, 'OnEnter', function(self)
 		if GetSettings().trackerCollapsed ~= true then return end
@@ -2077,8 +2097,7 @@ local function SkinHeader(header)
 	HideFrameTextures(header)
 	HideBlizzardTexture(header.Background)
 
-	local headerTextInset = Pixel.Scale(HEADER_TEXT_INSET)
-	if GetSettings().scrollEnabled == true then headerTextInset = -headerTextInset end
+	local headerTextInset = -Pixel.Scale(HEADER_TEXT_INSET)
 
 	local rule = Track(header:CreateTexture(nil, 'ARTWORK'))
 	rule:SetPoint('BOTTOMLEFT', header, 'BOTTOMLEFT', headerTextInset, 0)
@@ -2546,7 +2565,7 @@ end)
 
 Skin.RegisterSkin('objectivetracker', {
 	name = 'Objective Tracker',
-	description = 'Tooltip-style dark cards behind each tracker section, clean library fonts on quest text, accent-marked headers, flat progress bars, and square quest item icons. Optional scrolling mode adds a collapsible OBJECTIVES title row. Hides itself during Mythic+ runs. Hold Ctrl and drag any section header to move the tracker.',
+	description = 'Tooltip-style dark cards behind each tracker section, clean library fonts on quest text, accent-marked headers, flat progress bars, and square quest item icons. An OBJECTIVES title row carries quest counts and filters, and optional scrolling mode caps the height with a scroll bar. Hides itself during Mythic+ runs. Hold Ctrl and drag any section header to move the tracker.',
 	icon = 'Interface\\Icons\\INV_Misc_Book_07',
 	settingsWidth = 430,
 	settingsHeight = 1200,
