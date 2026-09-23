@@ -15,7 +15,9 @@ local CLOSE_KEYS = { 'CloseButton', 'ClosePanelButton', 'CloseDialogButton', 'cl
 local BUTTON_KEYS = { 'OkayButton', 'OkButton', 'OKButton', 'CancelButton', 'DefaultButton', 'DefaultsButton', 'RedockButton', 'NewButton', 'SettingsButton', 'ResetButton', 'SaveButton', 'DeleteButton' }
 local SCROLL_LIST_KEYS = { 'ChannelList', 'ChannelRoster' }
 local CONFIG_PANELS = { 'ChatConfigCategoryFrame', 'ChatConfigBackgroundFrame', 'ChatConfigCombatSettingsFilters' }
-local PANEL_INSET = 2
+local PANEL_INSET = Skin.TIP_TAB_INSET
+local FOOTER_GAP = 4
+local TAB_ROW_OFFSET = 2
 local CATEGORY_BUTTON_COUNT = 7
 local CATEGORY_BUTTON_HEIGHT = 20
 local NAV_TEXT_INSET = 6
@@ -324,10 +326,25 @@ local function WindowTitle(frame)
 	if frame.TitleContainer then Title(frame.TitleContainer.TitleText) end
 end
 
+local function AlignEdges(frame)
+	local category, background = ChatConfigCategoryFrame, ChatConfigBackgroundFrame
+	frame.DefaultButton:ClearAllPoints()
+	frame.DefaultButton:SetPoint('TOPLEFT', category, 'BOTTOMLEFT', PANEL_INSET, -FOOTER_GAP)
+	frame.DefaultButton:SetPoint('TOPRIGHT', category, 'BOTTOMRIGHT', -PANEL_INSET, -FOOTER_GAP)
+	frame.RedockButton:ClearAllPoints()
+	frame.RedockButton:SetPoint('TOPLEFT', background, 'BOTTOMLEFT', PANEL_INSET, -FOOTER_GAP)
+	ChatConfigFrameOkayButton:ClearAllPoints()
+	ChatConfigFrameOkayButton:SetPoint('TOPRIGHT', background, 'BOTTOMRIGHT', -PANEL_INSET, -FOOTER_GAP)
+	local firstCombatTab = _G[CHAT_CONFIG_COMBAT_TAB_NAME .. 1]
+	firstCombatTab:ClearAllPoints()
+	firstCombatTab:SetPoint('BOTTOMLEFT', background, 'TOPLEFT', 0, -TAB_ROW_OFFSET)
+end
+
 local function SkinConfigWindow(frame)
 	for index = 1, #CONFIG_PANELS do
 		Shell(_G[CONFIG_PANELS[index]], PANEL_INSET)
 	end
+	AlignEdges(frame)
 	for index = 1, CATEGORY_BUTTON_COUNT do
 		_G['ChatConfigCategoryFrameButton' .. index]:SetHeight(CATEGORY_BUTTON_HEIGHT)
 	end
