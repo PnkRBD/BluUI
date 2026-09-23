@@ -112,7 +112,6 @@ end
 local function GetSettings()
 	local skinningDB = BUI.GetDB().skinning
 	if not skinningDB.objectivetrackerSettings then skinningDB.objectivetrackerSettings = {} end
-	if skinningDB.objectivetrackerSettings.scrollEnabled == false then skinningDB.objectivetrackerSettings.scrollEnabled = nil end
 	return skinningDB.objectivetrackerSettings
 end
 
@@ -259,6 +258,7 @@ local function RefreshTrackerLayout()
 		hostedContainer:Update()
 		return
 	end
+	if not QuestFilter.HasWrappers() then return end
 	local mainTracker = _G.ObjectiveTrackerFrame
 	if mainTracker and mainTracker.Update then mainTracker:Update() end
 end
@@ -1362,6 +1362,7 @@ function QuestFilter.SectionShown(moduleName)
 end
 
 function QuestFilter.Refresh()
+	QuestFilter.Sync()
 	QuestFilter.UpdateTint()
 	if scrollHolder then
 		AdoptModules()
@@ -1430,45 +1431,72 @@ function QuestFilter.Passes(quest)
 	return ready == true
 end
 
-function QuestFilter.Install()
-	if QuestFilter.installed then return end
+QuestFilter.readyModules = { 'QuestObjectiveTracker', 'CampaignQuestObjectiveTracker' }
+QuestFilter.wrapped = {}
+
+function QuestFilter.HasWrappers()
+	return next(QuestFilter.wrapped) ~= nil
+end
+
+function QuestFilter.WrapShouldDisplay(module)
+	local blizzardShouldDisplay = module.ShouldDisplayQuest
+	module.ShouldDisplayQuest = function(self, quest)
+		if not blizzardShouldDisplay(self, quest) then return false end
+		if not IsEnabled() then return true end
+		return QuestFilter.Passes(quest)
+	end
+end
+
+function QuestFilter.WrapSectionLayout(module, moduleName)
+	local blizzardLayout = module.LayoutContents
+	module.LayoutContents = function(self, ...)
+		if IsEnabled() and GetSettings().scrollEnabled ~= true and not QuestFilter.SectionShown(moduleName) then
+			return
+		end
+		return blizzardLayout(self, ...)
+	end
+end
+
+function QuestFilter.Sync()
+	if not IsEnabled() then return end
 	local settings = GetSettings()
-	settings.trackerTypeFilters = nil
-	if not settings.trackerFilterRebuilt then
-		settings.trackerFilterRebuilt = true
-		settings.trackerSectionFilters = nil
-		settings.trackerReadyOnly = nil
-	end
-	local sectionFilters = settings.trackerSectionFilters
-	if sectionFilters then
-		sectionFilters.CampaignQuestObjectiveTracker = nil
-		sectionFilters.QuestObjectiveTracker = nil
-	end
-	for _, moduleName in ipairs({ 'QuestObjectiveTracker', 'CampaignQuestObjectiveTracker' }) do
-		local module = _G[moduleName]
-		if module and module.ShouldDisplayQuest then
-			local blizzardShouldDisplay = module.ShouldDisplayQuest
-			module.ShouldDisplayQuest = function(self, quest)
-				if not blizzardShouldDisplay(self, quest) then return false end
-				if not IsEnabled() then return true end
-				return QuestFilter.Passes(quest)
+	local wrapped = QuestFilter.wrapped
+	if settings.trackerReadyOnly == true then
+		for _, moduleName in ipairs(QuestFilter.readyModules) do
+			local module = _G[moduleName]
+			if module and module.ShouldDisplayQuest and not wrapped[module] then
+				wrapped[module] = true
+				QuestFilter.WrapShouldDisplay(module)
 			end
-			QuestFilter.installed = true
 		end
 	end
+	if settings.scrollEnabled == true then return end
 	for _, section in ipairs(QuestFilter.sections) do
 		local module = _G[section.module]
-		if module and module.LayoutContents then
-			local blizzardLayout = module.LayoutContents
-			local moduleName = section.module
-			module.LayoutContents = function(self, ...)
-				if IsEnabled() and GetSettings().scrollEnabled ~= true and not QuestFilter.SectionShown(moduleName) then
-					return
-				end
-				return blizzardLayout(self, ...)
-			end
+		if module and module.LayoutContents and not wrapped[module] and not QuestFilter.SectionShown(section.module) then
+			wrapped[module] = true
+			QuestFilter.WrapSectionLayout(module, section.module)
 		end
 	end
+end
+
+function QuestFilter.Install()
+	if not QuestFilter.migrated then
+		QuestFilter.migrated = true
+		local settings = GetSettings()
+		settings.trackerTypeFilters = nil
+		if not settings.trackerFilterRebuilt then
+			settings.trackerFilterRebuilt = true
+			settings.trackerSectionFilters = nil
+			settings.trackerReadyOnly = nil
+		end
+		local sectionFilters = settings.trackerSectionFilters
+		if sectionFilters then
+			sectionFilters.CampaignQuestObjectiveTracker = nil
+			sectionFilters.QuestObjectiveTracker = nil
+		end
+	end
+	QuestFilter.Sync()
 end
 
 function QuestFilter.UpdateTint()
@@ -2298,142 +2326,8 @@ local function ApplyChallengeModeVisibility()
 	if target then target:SetShown(not shouldHide) end
 end
 
-local function IsTorghastActive()
-	return IsInJailersTower and IsInJailersTower() or false
-end
-
-Scenario.layout = function(self)
-	local stageIsNew = self.hasNewStage
-	self:SetHasNewStage(false)
-
-	local scenarioName, currentStage, stageCount, scenarioFlags, _, _, _, _, _, scenarioType, _, textureKit, scenarioID = C_Scenario.GetInfo()
-	textureKit = textureKit or 'evergreen-scenario'
-
-	local inScenario = stageCount > 0
-	local torghastActive = IsTorghastActive()
-	local onTorghastGroundFloor = IsOnGroundFloorInJailersTower and IsOnGroundFloorInJailersTower() or false
-	if not inScenario and (not torghastActive or onTorghastGroundFloor) then
-		self.currentStage = nil
-		self.scenarioID = nil
-		self.slidOutStage = nil
-		self.StageBlock:ClearWidgetSet()
-		return
-	end
-
-	if self:IsSliding() then self:EndSlide() end
-
-	local stageName, stageDescription, criteriaCount, _, _, _, _, _, spellInfo, weightedProgress, _, widgetSetID = C_Scenario.GetStepInfo()
-
-	local challengeMode = scenarioType == LE_SCENARIO_TYPE_CHALLENGE_MODE
-	local provingGrounds = scenarioType == LE_SCENARIO_TYPE_PROVING_GROUNDS
-	local dungeonDisplay = scenarioType == LE_SCENARIO_TYPE_USE_DUNGEON_DISPLAY
-	local stagesComplete = currentStage > stageCount
-	local collapsed = self:IsCollapsed() or (self.parentContainer and self.parentContainer:IsCollapsed())
-
-	local slidingState = ObjectiveTrackerSlidingState.None
-	if stageIsNew and not challengeMode then
-		if not collapsed then
-			if currentStage == 1 or currentStage == self.slidOutStage then
-				slidingState = ObjectiveTrackerSlidingState.SlideIn
-			elseif not stagesComplete then
-				slidingState = ObjectiveTrackerSlidingState.SlideOut
-			end
-		end
-		if currentStage > 1 and currentStage <= stageCount then
-			PlaySound(SOUNDKIT.UI_SCENARIO_STAGE_END)
-		end
-	end
-
-	local provingGroundsActive = self.ProvingGroundsBlock:IsActive()
-
-	if inScenario then
-		if challengeMode then
-			if self.ChallengeModeBlock:IsActive() then
-				self:LayoutBlock(self.ChallengeModeBlock)
-			end
-		elseif provingGroundsActive then
-			self:LayoutBlock(self.ProvingGroundsBlock)
-		else
-			self:LayoutBlock(self.StageBlock)
-			if self.currentStage ~= currentStage or self.scenarioID ~= scenarioID then
-				self.currentStage = currentStage
-				self.scenarioID = scenarioID
-				self.StageBlock:UpdateStageBlock(scenarioID, scenarioType, widgetSetID, textureKit, scenarioFlags, currentStage, stageName, stageCount)
-			end
-			self.StageBlock:UpdateWidgetRegistration()
-		end
-	end
-
-	if challengeMode then
-		self.Header.Text:SetText(scenarioName)
-	elseif provingGrounds or provingGroundsActive then
-		self.Header.Text:SetText(TRACKER_HEADER_PROVINGGROUNDS)
-	elseif dungeonDisplay then
-		self.Header.Text:SetText(TRACKER_HEADER_DUNGEON)
-	else
-		self.Header.Text:SetText(scenarioName)
-	end
-
-	if slidingState == ObjectiveTrackerSlidingState.SlideOut then
-		self.StageBlock:SetupStageTransition(stageIsNew, stagesComplete)
-		self:SlideOutContents()
-		return
-	end
-
-	if C_ScenarioInfo and C_ScenarioInfo.IsTieredEntranceScenario and C_ScenarioInfo.IsTieredEntranceScenario() then
-		local activeSpells = C_ScenarioInfo.GetTieredEntranceActiveSpells()
-		if activeSpells then
-			self.TieredEntranceTraitsBlock.Container:SetSpells(activeSpells)
-			self:LayoutBlock(self.TieredEntranceTraitsBlock)
-		end
-	end
-
-	if inScenario then
-		if not provingGroundsActive and not stagesComplete then
-			local objectivesBlock = self.ObjectivesBlock
-			objectivesBlock:Reset()
-			if weightedProgress then
-				self:AddWeightedProgressObjective(stageDescription)
-			else
-				self:UpdateCriteria(criteriaCount)
-				self:AddSpells(spellInfo)
-				if objectivesBlock.height > 0 then
-					self:LayoutBlock(objectivesBlock)
-				end
-			end
-		end
-		self:LayoutWidgetBlock(self.TopWidgetContainerBlock)
-	end
-
-	if torghastActive then
-		self:LayoutBlock(self.MawBuffsBlock)
-		self.MawBuffsBlock.Container:UpdateAlignment()
-	end
-
-	if inScenario then
-		self:LayoutWidgetBlock(self.BottomWidgetContainerBlock)
-	end
-
-	if slidingState == ObjectiveTrackerSlidingState.SlideIn and self:IsShown() then
-		self.StageBlock:SetupStageTransition(stageIsNew, stagesComplete)
-		self:SlideInContents()
-	end
-end
-
-Scenario.onEvent = function(self, event, ...)
-	if event == 'UNIT_AURA' then
-		local showingMawBuffs = self:IsShown() and self.MawBuffsBlock and self.MawBuffsBlock:IsShown() or false
-		if IsTorghastActive() ~= showingMawBuffs then
-			self:MarkDirty()
-		end
-		return
-	end
-	Scenario.blizzardOnEvent(self, event, ...)
-end
-
 Scenario.delveHeaders = {}
 
-Scenario.headerOffsetY = -18
 Scenario.delveOverhangKeys = { 'SpellContainer', 'CurrencyContainer', 'RewardFrame' }
 Scenario.delveBackdropInset = 1
 Scenario.delveBackdropPad = 4
@@ -2513,35 +2407,12 @@ Scenario.InstallDelveHook = function()
 end
 
 function Scenario.Install()
-	if Scenario.installed then return end
 	Scenario.InstallDelveHook()
 	Scenario.ScanDelveHeaders()
-	local scenarioTracker = _G.ScenarioObjectiveTracker
-	if not scenarioTracker or not scenarioTracker.LayoutContents or not scenarioTracker.OnEvent then return end
-	Scenario.installed = true
-	Scenario.blizzardHeaderOffsetY = scenarioTracker.fromHeaderOffsetY
-	scenarioTracker.fromHeaderOffsetY = Scenario.headerOffsetY
-	Scenario.blizzardLayout = scenarioTracker.LayoutContents
-	Scenario.blizzardOnEvent = scenarioTracker.OnEvent
-	scenarioTracker.LayoutContents = Scenario.layout
-	scenarioTracker.OnEvent = Scenario.onEvent
 end
 
 function Scenario.Remove()
-	if not Scenario.installed then return end
-	Scenario.installed = false
 	for widget in pairs(Scenario.delveHeaders) do Scenario.ApplyDelveHeader(widget) end
-	local scenarioTracker = _G.ScenarioObjectiveTracker
-	if not scenarioTracker then return end
-	if Scenario.blizzardHeaderOffsetY then
-		scenarioTracker.fromHeaderOffsetY = Scenario.blizzardHeaderOffsetY
-	end
-	if scenarioTracker.LayoutContents == Scenario.layout then
-		scenarioTracker.LayoutContents = Scenario.blizzardLayout
-	end
-	if scenarioTracker.OnEvent == Scenario.onEvent then
-		scenarioTracker.OnEvent = Scenario.blizzardOnEvent
-	end
 end
 
 local function Install()
@@ -2675,10 +2546,10 @@ end)
 
 Skin.RegisterSkin('objectivetracker', {
 	name = 'Objective Tracker',
-	description = 'Tooltip-style dark cards behind each tracker section, clean library fonts on quest text, accent-marked headers, flat progress bars, and square quest item icons. Scrolling mode adds a collapsible OBJECTIVES title row. Hides itself during Mythic+ runs. Hold Ctrl and drag any section header to move the tracker.',
+	description = 'Tooltip-style dark cards behind each tracker section, clean library fonts on quest text, accent-marked headers, flat progress bars, and square quest item icons. Optional scrolling mode adds a collapsible OBJECTIVES title row. Hides itself during Mythic+ runs. Hold Ctrl and drag any section header to move the tracker.',
 	icon = 'Interface\\Icons\\INV_Misc_Book_07',
 	settingsWidth = 430,
-	settingsHeight = 1160,
+	settingsHeight = 1200,
 	buildSettings = function(content)
 		local settings = GetSettings()
 		local pageKit = PageKit
@@ -2687,7 +2558,7 @@ Skin.RegisterSkin('objectivetracker', {
 
 		local textHeight = pageKit.CardHeight(3)
 		local colorsHeight = pageKit.CardHeight(7)
-		local panelHeight = pageKit.CardHeight(10)
+		local panelHeight = pageKit.CardHeight(11)
 		local positionHeight = pageKit.CardHeight(1)
 
 		local root = CreateFrame('Frame', nil, content.child)
@@ -2817,6 +2688,19 @@ Skin.RegisterSkin('objectivetracker', {
 			ApplyChallengeModeVisibility()
 		end)
 		pageKit.Row(panelCard, 398, 'Hide Tracker Completely', hideTrackerToggle)
+
+		local scrollToggle = Controls.SwitchToggle(panelCard, nil, settings.scrollEnabled == true, function(value)
+			settings.scrollEnabled = value
+			BUI.Modals.Confirm({
+				title = 'Reload Required',
+				message = value
+					and "Scrolling moves Blizzard's tracker sections into a BluUI panel. Blizzard's widget code then runs as addon code, so tooltips that show progress widgets can throw errors.\n\nReload now to apply?"
+					or "Reload now to put the tracker back in Blizzard's own frame?",
+				confirmText = 'Reload Now', cancelText = 'Later',
+				onConfirm = ReloadUI,
+			})
+		end)
+		pageKit.Row(panelCard, 438, 'Scrolling', scrollToggle)
 
 		local questIconsToggle = Controls.SwitchToggle(panelCard, nil, settings.showQuestIcons == true, function(value)
 			settings.showQuestIcons = value
