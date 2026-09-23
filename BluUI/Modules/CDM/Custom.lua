@@ -28,8 +28,10 @@ local SetColor = BUI.IconEngine.SetColor
 
 local function SafeGetPlayerAura(spellID)
 	if not spellID then return nil, false end
-	if Tools.ShouldAurasBeSecret() then return nil, true end
-	return GetPlayerAuraBySpellID(spellID), false
+	if Tools.AuraQueriesBlocked() then return nil, true end
+	local aura = GetPlayerAuraBySpellID(spellID)
+	if issecretvalue(aura) then return nil, true end
+	return aura, false
 end
 
 local FrameData = CDM.FrameData
