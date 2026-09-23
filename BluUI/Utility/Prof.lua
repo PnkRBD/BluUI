@@ -48,10 +48,6 @@ function Prof.Count(key)
 	counters[key] = (counters[key] or 0) + 1
 end
 
-function Prof.GetData()
-	return data, counters
-end
-
 local wrapperOf = setmetatable({}, { __mode = 'k' })
 local rawOf = setmetatable({}, { __mode = 'k' })
 
