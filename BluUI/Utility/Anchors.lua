@@ -324,6 +324,26 @@ function Anchor.ApplyPosition(frame, settings)
     end
 end
 
+function Anchor.SaveDragOffsets(frame, settings)
+    if not frame then return nil end
+    local anchorFrame = settings.anchorFrame
+    if not anchorFrame or anchorFrame == "" or anchorFrame == "Mouse" then return nil end
+
+    local droppedX, droppedY = frame:GetLeft(), frame:GetBottom()
+    if not droppedX or not droppedY then return nil end
+
+    local savedX, savedY = settings.anchorOffsetX, settings.anchorOffsetY
+    settings.anchorOffsetX, settings.anchorOffsetY = 0, 0
+    local anchorTarget = Anchor.ApplyPosition(frame, settings)
+    settings.anchorOffsetX, settings.anchorOffsetY = savedX, savedY
+    if not anchorTarget then return nil end
+
+    local baseX, baseY = frame:GetLeft(), frame:GetBottom()
+    if not baseX or not baseY then return nil end
+
+    return droppedX - baseX, droppedY - baseY
+end
+
 function Anchor.GetAnchorWidth(frame, settings)
     local powerContainer = BUI.Power and BUI.Power.Container
     if powerContainer and powerContainer.GetMemberWidth then
