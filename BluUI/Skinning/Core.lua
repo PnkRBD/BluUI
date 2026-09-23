@@ -1631,6 +1631,19 @@ function Skin.TipPageButton(button, direction)
 	Skin.RefreshPageButton(button)
 end
 
+local function MuteNavArrowArt(button)
+	if not button._buiTipArrow:IsShown() then return end
+	button.NormalTexture:SetAlpha(0)
+	button.PushedTexture:SetAlpha(0)
+end
+
+function Skin.TipNavArrow(button)
+	if not button or button._buiPageArrow then return end
+	button.Art:SetAlpha(0)
+	Skin.TipPageButton(button, 'down')
+	HookScript(button, 'OnEnter', MuteNavArrowArt)
+end
+
 function Skin.SetPageButtonSkinned(button, skinned)
 	if not button or not button._buiPageArrow then return end
 	local alpha = 1
