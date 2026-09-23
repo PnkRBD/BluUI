@@ -241,6 +241,8 @@ local function RefreshAllModules()
         local aurasOn = on('auras')
         if aurasOn and BUI.Auras then
             BUI.Auras.Update()
+            if BUI.Auras.UpdateLowHp then BUI.Auras.UpdateLowHp() end
+            if BUI.Auras.UpdateMark then BUI.Auras.UpdateMark() end
             if BUI.Crosshair then BUI.Crosshair.Refresh() end
             if BUI.Auras.GatewayAlert then BUI.Auras.GatewayAlert.Refresh() end
         end
