@@ -36,8 +36,13 @@ local function SkinLossOfControl(frame)
 	end
 	FadeArt(frame)
 	FadeKeys(frame, ART_KEYS)
+	Shell(frame)
 	if icon and icon.SetTexCoord then Skin.TipIconFrame(frame, icon) end
 	Skin.TipFaceTree(frame, FONT_DEPTH)
+	local timeLeft = frame.TimeLeft
+	if timeLeft and timeLeft.SecondsText then
+		timeLeft.secondsWidth = timeLeft.SecondsText:GetStringWidth()
+	end
 end
 
 local function SkinDeathRecap(frame)
