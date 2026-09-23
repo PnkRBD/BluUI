@@ -1247,9 +1247,18 @@ function Skin.SetIconEdgeColor(icon, red, green, blue)
 	local edges = icon and icon._buiIconFrame
 	if not edges then return end
 	if red then
+		local secret = issecretvalue and (issecretvalue(red) or issecretvalue(green) or issecretvalue(blue))
+		if not secret and icon._buiEdgeR == red and icon._buiEdgeG == green and icon._buiEdgeB == blue then return end
+		if secret then
+			icon._buiEdgeR, icon._buiEdgeG, icon._buiEdgeB = nil, nil, nil
+		else
+			icon._buiEdgeR, icon._buiEdgeG, icon._buiEdgeB = red, green, blue
+		end
 		iconEdgeColor[1], iconEdgeColor[2], iconEdgeColor[3] = red, green, blue
 		BUILib.Skin.SetEdgeColor(edges, iconEdgeColor)
 	else
+		if icon._buiEdgeR == false then return end
+		icon._buiEdgeR, icon._buiEdgeG, icon._buiEdgeB = false, nil, nil
 		BUILib.Skin.SetEdgeColor(edges, PANEL_EDGE)
 	end
 end
