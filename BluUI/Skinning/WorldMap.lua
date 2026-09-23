@@ -117,6 +117,7 @@ local function SkinNavButton(button)
 	FadeStateTextures(button)
 	Shell(button)
 	Body(button.text)
+	Skin.TipNavArrow(button.MenuArrowButton)
 end
 
 local function OnNavButtonAdded(navBar)

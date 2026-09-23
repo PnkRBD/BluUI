@@ -101,6 +101,7 @@ local function SkinNavButton(button)
 	FadeStateTextures(button)
 	Shell(button)
 	Body(button.text or (button.GetFontString and button:GetFontString()))
+	Skin.TipNavArrow(button.MenuArrowButton)
 end
 
 local function OnNavButtonAdded(navBar)
