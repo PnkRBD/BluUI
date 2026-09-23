@@ -23,6 +23,7 @@ local DEFAULT_FONT_SIZE      = 11
 local DEFAULT_CARD_OPACITY   = 98
 local ROLE_SIZE_DELTA        = { line = 0, title = 1, header = 2 }
 local POSITION_KEY           = 'objectivetracker'
+local TRACKER_STASH_SCALE    = 0.01
 local DEFAULT_TRACKER_COLORS = {
 	title     = { 1, 0.82, 0.25 },
 	hover     = { 1, 1, 1 },
@@ -248,19 +249,14 @@ function Skin.TrackerModulesOrdered()
 end
 
 local function RefreshTrackerLayout()
+	if not hostedContainer then return end
 	if InCombatLockdown() then
 		BUI.Events:AfterCombat(RefreshTrackerLayout, 'Skinning.TrackerRefresh')
 		return
 	end
 	if not Skin.TrackerModulesOrdered() then return end
-	if hostedContainer and hostedContainer.Update then
-		if hostedContainer.UpdateHeight then hostedContainer:UpdateHeight() end
-		hostedContainer:Update()
-		return
-	end
-	if not QuestFilter.HasWrappers() then return end
-	local mainTracker = _G.ObjectiveTrackerFrame
-	if mainTracker and mainTracker.Update then mainTracker:Update() end
+	hostedContainer:UpdateHeight()
+	hostedContainer:Update()
 end
 
 local function GetMaxTrackerHeight()
@@ -336,31 +332,6 @@ end
 
 local QueueTrackerRectRepair = BUI.Dispatcher.New(RepairTrackerRect, 'Skinning.TrackerRectRepair')
 
-local liveTrackerHeight
-
-local function MustFitHeight(trackerFrame)
-	local height = 0
-	for _, module in ipairs(trackerFrame.modules or {}) do
-		if module.mustFit and module.GetContentsHeight then height = height + module:GetContentsHeight() end
-	end
-	return height
-end
-
-local function AssertLiveTrackerHeight(trackerFrame)
-	if not liveTrackerHeight or IsEditModeActive() then return end
-	if trackerFrame.IsInDefaultPosition and trackerFrame:IsInDefaultPosition() then return end
-	trackerFrame:SetHeight(math.max(liveTrackerHeight, MustFitHeight(trackerFrame)))
-end
-
-local function SetLiveTrackerHeight(trackerFrame, height)
-	liveTrackerHeight = height
-	if not trackerFrame._buiLiveHeight then
-		trackerFrame._buiLiveHeight = true
-		hooksecurefunc(trackerFrame, 'UpdateHeight', AssertLiveTrackerHeight)
-	end
-	AssertLiveTrackerHeight(trackerFrame)
-end
-
 local function ApplyEditModeHeight()
 	if not LibEMO or not IsEnabled() then return end
 	if GetSettings().scrollEnabled == true then return end
@@ -384,7 +355,6 @@ local function ApplyEditModeHeight()
 			LibEMO:SaveOnly()
 		end
 	end
-	SetLiveTrackerHeight(trackerFrame, target)
 	local point, relativePoint, x, y = Skin.SavedPosition(POSITION_KEY)
 	if point then BUI.LeaveFrameManager(trackerFrame, point, relativePoint, x, y) end
 end
@@ -495,7 +465,7 @@ function Skin.TrackerEditModeHooks()
 	if not EventRegistry or not EventRegistry.RegisterCallback then return end
 	Skin.trackerEditModeHooked = true
 	local guardedFrame = _G.ObjectiveTrackerFrame
-	if guardedFrame and not guardedFrame.__buiSafeSelectionSides then
+	if guardedFrame and GetSettings().scrollEnabled == true and not guardedFrame.__buiSafeSelectionSides then
 		guardedFrame.__buiSafeSelectionSides = true
 		local function GuardMethod(methodName, fallback)
 			local blizzardMethod = guardedFrame[methodName]
@@ -905,10 +875,11 @@ local function SyncTrackerCardShown()
 	end
 	local trackerFrame = _G.ObjectiveTrackerFrame
 	local nineSlice = trackerFrame and trackerFrame.NineSlice
+	local shown = IsEnabled() and not Skin.trackerStashScale
 	if nineSlice then
-		trackerCard:SetShown(IsEnabled() and nineSlice:IsShown())
+		trackerCard:SetShown(shown and nineSlice:IsShown())
 	else
-		trackerCard:SetShown(IsEnabled())
+		trackerCard:SetShown(shown)
 	end
 end
 
@@ -1347,9 +1318,8 @@ QuestFilter.sections = {
 
 function QuestFilter.HasActive()
 	local settings = GetSettings()
-	if settings.trackerReadyOnly == true then return true end
 	if settings.trackerTrackSpec and settings.trackerTrackSpec ~= 'all' then return true end
-	local sectionFilters = settings.trackerSectionFilters
+	local sectionFilters = settings.scrollEnabled == true and settings.trackerSectionFilters
 	if sectionFilters then
 		for _, section in ipairs(QuestFilter.sections) do
 			if sectionFilters[section.module] == false then return true end
@@ -1365,13 +1335,8 @@ function QuestFilter.SectionShown(moduleName)
 end
 
 function QuestFilter.Refresh()
-	QuestFilter.Sync()
 	QuestFilter.UpdateTint()
-	if scrollHolder then
-		AdoptModules()
-	else
-		RefreshTrackerLayout()
-	end
+	if scrollHolder then AdoptModules() end
 end
 
 function QuestFilter.Trackable(info)
@@ -1427,79 +1392,21 @@ function QuestFilter.Retrack(spec)
 	RefreshTrackerLayout()
 end
 
-function QuestFilter.Passes(quest)
-	if GetSettings().trackerReadyOnly ~= true then return true end
-	local questID = quest.GetID and quest:GetID()
-	local ready = (questID and readyQuestIDs[questID]) or (quest.IsComplete and quest:IsComplete())
-	return ready == true
-end
-
-QuestFilter.readyModules = { 'QuestObjectiveTracker', 'CampaignQuestObjectiveTracker' }
-QuestFilter.wrapped = {}
-
-function QuestFilter.HasWrappers()
-	return next(QuestFilter.wrapped) ~= nil
-end
-
-function QuestFilter.WrapShouldDisplay(module)
-	local blizzardShouldDisplay = module.ShouldDisplayQuest
-	module.ShouldDisplayQuest = function(self, quest)
-		if not blizzardShouldDisplay(self, quest) then return false end
-		if not IsEnabled() then return true end
-		return QuestFilter.Passes(quest)
-	end
-end
-
-function QuestFilter.WrapSectionLayout(module, moduleName)
-	local blizzardLayout = module.LayoutContents
-	module.LayoutContents = function(self, ...)
-		if IsEnabled() and GetSettings().scrollEnabled ~= true and not QuestFilter.SectionShown(moduleName) then
-			return
-		end
-		return blizzardLayout(self, ...)
-	end
-end
-
-function QuestFilter.Sync()
-	if not IsEnabled() then return end
-	local settings = GetSettings()
-	local wrapped = QuestFilter.wrapped
-	if settings.trackerReadyOnly == true then
-		for _, moduleName in ipairs(QuestFilter.readyModules) do
-			local module = _G[moduleName]
-			if module and module.ShouldDisplayQuest and not wrapped[module] then
-				wrapped[module] = true
-				QuestFilter.WrapShouldDisplay(module)
-			end
-		end
-	end
-	if settings.scrollEnabled == true then return end
-	for _, section in ipairs(QuestFilter.sections) do
-		local module = _G[section.module]
-		if module and module.LayoutContents and not wrapped[module] and not QuestFilter.SectionShown(section.module) then
-			wrapped[module] = true
-			QuestFilter.WrapSectionLayout(module, section.module)
-		end
-	end
-end
-
 function QuestFilter.Install()
-	if not QuestFilter.migrated then
-		QuestFilter.migrated = true
-		local settings = GetSettings()
-		settings.trackerTypeFilters = nil
-		if not settings.trackerFilterRebuilt then
-			settings.trackerFilterRebuilt = true
-			settings.trackerSectionFilters = nil
-			settings.trackerReadyOnly = nil
-		end
-		local sectionFilters = settings.trackerSectionFilters
-		if sectionFilters then
-			sectionFilters.CampaignQuestObjectiveTracker = nil
-			sectionFilters.QuestObjectiveTracker = nil
-		end
+	if QuestFilter.migrated then return end
+	QuestFilter.migrated = true
+	local settings = GetSettings()
+	settings.trackerTypeFilters = nil
+	settings.trackerReadyOnly = nil
+	if not settings.trackerFilterRebuilt then
+		settings.trackerFilterRebuilt = true
+		settings.trackerSectionFilters = nil
 	end
-	QuestFilter.Sync()
+	local sectionFilters = settings.trackerSectionFilters
+	if sectionFilters then
+		sectionFilters.CampaignQuestObjectiveTracker = nil
+		sectionFilters.QuestObjectiveTracker = nil
+	end
 end
 
 function QuestFilter.UpdateTint()
@@ -1517,18 +1424,6 @@ function QuestFilter.ShowMenu()
 	if not settings.trackerSectionFilters then settings.trackerSectionFilters = {} end
 	local sectionFilters = settings.trackerSectionFilters
 	local items = {}
-	items[#items + 1] = { title = 'FILTER' }
-	items[#items + 1] = {
-		text = 'Ready to turn in only',
-		checked = settings.trackerReadyOnly == true,
-		callback = function(item)
-			settings.trackerReadyOnly = not (settings.trackerReadyOnly == true)
-			item.checked = settings.trackerReadyOnly
-			QuestFilter.Refresh()
-			return true
-		end,
-	}
-	items[#items + 1] = { separator = true }
 	items[#items + 1] = { title = 'TRACK' }
 	for _, preset in ipairs({
 		{ spec = 'zone', label = 'Zone' },
@@ -1549,32 +1444,34 @@ function QuestFilter.ShowMenu()
 			end,
 		}
 	end
-	items[#items + 1] = { separator = true }
-	items[#items + 1] = { title = 'SECTIONS' }
-	for _, section in ipairs(QuestFilter.sections) do
-		local module = _G[section.module]
-		local blockCount = 0
-		if module and module.usedBlocks then
-			for _, blocks in pairs(module.usedBlocks) do
-				for _ in pairs(blocks) do blockCount = blockCount + 1 end
-			end
-		end
-		items[#items + 1] = {
-			text = section.label,
-			sub = tostring(blockCount),
-			checked = sectionFilters[section.module] ~= false,
-			callback = function(item)
-				local nowShown = sectionFilters[section.module] == false
-				if nowShown then
-					sectionFilters[section.module] = nil
-				else
-					sectionFilters[section.module] = false
+	if settings.scrollEnabled == true then
+		items[#items + 1] = { separator = true }
+		items[#items + 1] = { title = 'SECTIONS' }
+		for _, section in ipairs(QuestFilter.sections) do
+			local module = _G[section.module]
+			local blockCount = 0
+			if module and module.usedBlocks then
+				for _, blocks in pairs(module.usedBlocks) do
+					for _ in pairs(blocks) do blockCount = blockCount + 1 end
 				end
-				item.checked = nowShown
-				QuestFilter.Refresh()
-				return true
-			end,
-		}
+			end
+			items[#items + 1] = {
+				text = section.label,
+				sub = tostring(blockCount),
+				checked = sectionFilters[section.module] ~= false,
+				callback = function(item)
+					local nowShown = sectionFilters[section.module] == false
+					if nowShown then
+						sectionFilters[section.module] = nil
+					else
+						sectionFilters[section.module] = false
+					end
+					item.checked = nowShown
+					QuestFilter.Refresh()
+					return true
+				end,
+			}
+		end
 	end
 	Controls.ContextMenu(items, { width = 180, anchor = headerFilter, point = 'TOPRIGHT', relPt = 'BOTTOMRIGHT', offsetY = -4 })
 end
@@ -1724,8 +1621,24 @@ local function ApplyTrackerPosition()
 	ApplyTrackerPosition()
 end
 
+function Skin.StashTracker(stashed)
+	local trackerFrame = _G.ObjectiveTrackerFrame
+	if stashed == (Skin.trackerStashScale ~= nil) then return end
+	if stashed then
+		Skin.trackerStashScale = trackerFrame:GetScale()
+		trackerFrame:SetScaleBase(TRACKER_STASH_SCALE)
+		trackerFrame:SetAlpha(0)
+	else
+		trackerFrame:SetScaleBase(Skin.trackerStashScale)
+		trackerFrame:SetAlpha(1)
+		Skin.trackerStashScale = nil
+	end
+	SyncTrackerCardShown()
+	Skin.TrackerClamp()
+end
+
 function Skin.TrackerClamp()
-	if scrollHolder or not trackerCard or not IsEnabled() then return end
+	if scrollHolder or not trackerCard or not IsEnabled() or Skin.trackerStashScale then return end
 	if InCombatLockdown() then
 		BUI.Events:AfterCombat(Skin.TrackerClamp, 'Skinning.TrackerClamp')
 		return
@@ -2394,8 +2307,11 @@ local function ApplyChallengeModeVisibility()
 		return
 	end
 	challengeModeHidden = shouldHide
-	local target = scrollHolder or _G.ObjectiveTrackerFrame
-	if target then target:SetShown(not shouldHide) end
+	if scrollHolder then
+		scrollHolder:SetShown(not shouldHide)
+		return
+	end
+	Skin.StashTracker(shouldHide)
 end
 
 Scenario.delveHeaders = {}
@@ -2808,7 +2724,6 @@ Skin.RegisterSkin('objectivetracker', {
 		local headerRowToggle = Controls.SwitchToggle(panelCard, nil, settings.showHeaderRow ~= false, function(value)
 			settings.showHeaderRow = value
 			if value == false then
-				settings.trackerReadyOnly = nil
 				settings.trackerSectionFilters = nil
 				settings.trackerTrackSpec = nil
 				QuestFilter.Refresh()
