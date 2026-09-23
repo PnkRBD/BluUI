@@ -2249,6 +2249,19 @@ local function SkinItemButton(button)
 
 	Pixel.ApplyBorder(button, 1, Theme.border.light[1], Theme.border.light[2], Theme.border.light[3], 1)
 
+	local glow = button.Glow
+	if glow then
+		local outset = Pixel.PixelSize(2)
+		glow:SetAtlas(nil)
+		glow:SetColorTexture(Theme.GetAccent())
+		glow:ClearAllPoints()
+		glow:SetPoint('TOPLEFT', button, 'TOPLEFT', -outset, outset)
+		glow:SetPoint('BOTTOMRIGHT', button, 'BOTTOMRIGHT', outset, -outset)
+		Theme.RegisterAccentElement(glow, function(element, red, green, blue)
+			element:SetColorTexture(red, green, blue, 1)
+		end)
+	end
+
 	local count = button.Count or button.count
 	if count then Pixel.ApplyFont(count, BAR_LABEL_SIZE, FONT, 'OUTLINE') end
 end
