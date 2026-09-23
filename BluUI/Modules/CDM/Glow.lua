@@ -222,8 +222,9 @@ end
 
 local function ResolveViewerIcon(frame)
 	if not frame then return nil end
+	local host = frame:GetParent()
 	local cached = FrameData[frame]
-	if cached and cached.cdmGlowResolvedIcon ~= nil then
+	if cached and cached.cdmGlowResolvedIcon ~= nil and cached.cdmGlowResolvedHost == host then
 		return cached.cdmGlowResolvedIcon or nil
 	end
 
@@ -237,6 +238,7 @@ local function ResolveViewerIcon(frame)
 			if key and CDM.IsViewerEnabled(key) then
 				local frameData = GetFrameData(frame)
 				frameData.cdmGlowResolvedIcon = current
+				frameData.cdmGlowResolvedHost = host
 				return current
 			end
 		end
@@ -245,6 +247,7 @@ local function ResolveViewerIcon(frame)
 
 	local frameData = GetFrameData(frame)
 	frameData.cdmGlowResolvedIcon = false
+	frameData.cdmGlowResolvedHost = host
 	return nil
 end
 
