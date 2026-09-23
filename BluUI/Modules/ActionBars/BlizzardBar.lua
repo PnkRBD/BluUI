@@ -69,9 +69,17 @@ function BlizzardBar:EnsureBar()
 	return self.bar
 end
 
+function BlizzardBar:MuteSelection(muted)
+	local selection = self.Frame().Selection
+	if not selection then return end
+	selection:SetAlpha(muted and 0 or 1)
+	selection:EnableMouse(not muted)
+end
+
 function BlizzardBar:ReleaseFrame()
 	if not self:Owned() then return end
 	self.Release(self)
+	self:MuteSelection(false)
 	self.bar.header:Hide()
 	if self.bar.mouseEnabled == false then
 		for _, child in ipairs({ self.Frame():GetChildren() }) do child:EnableMouse(true) end
@@ -105,6 +113,7 @@ function BlizzardBar:Refresh()
 		self.InstallHooks(self)
 	end
 	self.Retake(self)
+	self:MuteSelection(true)
 	self:SyncHover()
 	ActionBars.ApplyBarMouse(self.bar, { frame:GetChildren() })
 end
