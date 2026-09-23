@@ -331,7 +331,7 @@ function CDM.RestoreViewer(viewer, key)
     BUI.Print('Cooldown viewer restored. /reload to let Blizzard lay it out again.')
 end
 
-function CDM.OnCooldownFrameSet(cooldown)
+function CDM.RestyleCooldown(cooldown)
     if issecretvalue(cooldown) then return end
     if not CDMCooldowns[cooldown] then return end
 
