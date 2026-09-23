@@ -31,7 +31,7 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 5
+local PROFILE_MIGRATION_VERSION = 6
 
 function BUI.MigrateProfile(profile)
 	if not profile then return end
@@ -319,6 +319,16 @@ function BUI.MigrateProfile(profile)
 			for _, barConfig in pairs(profile.datatextBars) do StripLDB(barConfig) end
 		end
 		StripLDB(profile.datatextMinimap)
+	end
+
+	if not profile.general._combatAlertsSplit then
+		profile.general._combatAlertsSplit = true
+		local skinning = profile.skinning
+		if type(skinning) == 'table' and skinning.combatalerts ~= nil then
+			skinning.lossofcontrol = skinning.combatalerts
+			skinning.deathrecap = skinning.combatalerts
+			skinning.mirrortimers = skinning.combatalerts
+		end
 	end
 
 	profile.general._buiMigrationVersion = PROFILE_MIGRATION_VERSION

@@ -60,7 +60,7 @@ end
 
 local BASELINE_SKINS = {}
 for _, id in ipairs({
-	'achievements', 'alerts', 'auctionhouse', 'bonusroll', 'calendar', 'chatpanels', 'collections', 'combatalerts',
+	'achievements', 'alerts', 'auctionhouse', 'bonusroll', 'calendar', 'chatpanels', 'collections', 'lossofcontrol', 'deathrecap', 'mirrortimers',
 	'cooldownmanager', 'delves', 'dressup', 'friends', 'greatvault', 'groupfinder', 'grouploot', 'guild', 'inspect',
 	'instanceabandon', 'itemsocketing', 'itemupgrade', 'journeys', 'loothistory', 'lootwindow', 'mail', 'playerauras',
 	'professions', 'questdialogs', 'queuepopups', 'readycheck', 'spellbook', 'splash', 'staticpopup', 'systempanels',
@@ -111,6 +111,7 @@ function Skin.SeedSkinStates()
 	skinDB.miscpanels = nil
 	skinDB.shop = nil
 	skinDB.micromenu = nil
+	skinDB.combatalerts = nil
 end
 
 function Skin.SetSkinEnabled(id, enabled)
