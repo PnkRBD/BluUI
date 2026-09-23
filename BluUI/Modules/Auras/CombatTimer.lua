@@ -119,6 +119,13 @@ local function Build()
         hintAnchor = "TOP",
         onPositionChanged = function(x, y)
             local currentDB = GetDB()
+            local anchorX, anchorY = BUI.Anchor.SaveDragOffsets(timerFrame, currentDB)
+            if anchorX then
+                currentDB.anchorOffsetX = math.floor(anchorX)
+                currentDB.anchorOffsetY = math.floor(anchorY)
+                BUI.Anchor.ApplyPosition(timerFrame, currentDB)
+                return
+            end
             currentDB.posX = math.floor(x)
             currentDB.posY = math.floor(y)
         end,

@@ -37,6 +37,13 @@ local function Build()
         isLocked = function() return GetDB().locked end,
         onPositionChanged = function(x, y)
             local db = GetDB()
+            local anchorX, anchorY = BUI.Anchor.SaveDragOffsets(messageFrame, db)
+            if anchorX then
+                db.anchorOffsetX = math.floor(anchorX)
+                db.anchorOffsetY = math.floor(anchorY)
+                Apply()
+                return
+            end
             if db.centerHorizontally then
                 local _, centerY = BUI.Dragging.GetCenterOffset(messageFrame)
                 x, y = 0, centerY
