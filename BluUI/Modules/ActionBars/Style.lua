@@ -53,6 +53,7 @@ local function FlattenStateTexture(texture, red, green, blue, alpha)
 	texture:ClearAllPoints()
 	texture:SetAllPoints(texture:GetParent())
 end
+ActionBars.FlattenStateTexture = FlattenStateTexture
 
 function ActionBars.FitButtonOverlays(button)
 	local width = button:GetWidth()
@@ -152,7 +153,7 @@ local function ApplyCooldownStyle(cooldown)
 		cooldown:SetSwipeColor(color[1], color[2], color[3], color[4])
 	end
 	local button = cooldown:GetParent()
-	if button then ActionBars.StyleCooldownText(button) end
+	if button then ActionBars.StyleCooldownText(button, cooldown) end
 	reassertingCooldown = false
 end
 
@@ -161,9 +162,7 @@ local function OnSwipeColorSet(cooldown, red, _, _, alpha)
 	ApplyCooldownStyle(cooldown)
 end
 
-local function StyleCooldown(button)
-	local cooldown = button.cooldown
-	if not cooldown then return end
+function ActionBars.StyleCooldown(cooldown)
 	if not cooldown._buiStyleHooked then
 		cooldown._buiStyleHooked = true
 		ActionBars.hooksecurefunc(cooldown, 'SetSwipeColor', OnSwipeColorSet)
@@ -224,13 +223,12 @@ function ActionBars.PrepareTemplateButton(button, barKey, command)
 	button.config = { showGrid = true, keyBoundTarget = command }
 end
 
-function ActionBars.SkinButton(button)
+function ActionBars.SkinButtonArt(button)
 	local settings = ActionBars.GetSettings()
 	local borderColor = settings.borderColor
 	StripTemplateArt(button)
 	ActionBars.ApplyIconCrop(button)
-	StyleCooldown(button)
-	ActionBars.SyncEmptyButtonColor(button)
+	if button.cooldown then ActionBars.StyleCooldown(button.cooldown) end
 	FlattenStateTexture(button.HighlightTexture, 1, 1, 1, 0.15)
 	local pressColor = settings.pressColor
 	local pressAlpha = settings.showKeyPresses and settings.pressOpacity / 100 or 0
@@ -240,6 +238,11 @@ function ActionBars.SkinButton(button)
 	FlattenStateTexture(button.NewActionTexture, 1, 1, 1, 0.2)
 	if button.FlyoutBorderShadow then button.FlyoutBorderShadow:SetAlpha(0) end
 	Pixel.ApplyBorder(button, settings.borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
+end
+
+function ActionBars.SkinButton(button)
+	ActionBars.SkinButtonArt(button)
+	ActionBars.SyncEmptyButtonColor(button)
 	button._buiBorderState = nil
 	ActionBars.SyncButtonBorder(button)
 	ActionBars.FitButtonOverlays(button)

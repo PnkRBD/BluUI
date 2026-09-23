@@ -17,51 +17,100 @@ local function Container()
 end
 
 local function ArtTextures()
-	local textures = {}
-	local extraButton = _G.ExtraActionButton1
-	if extraButton and extraButton.style then textures[#textures + 1] = extraButton.style end
-	local zone = _G.ZoneAbilityFrame
-	if zone and zone.Style then textures[#textures + 1] = zone.Style end
-	return textures
+	return { _G.ExtraActionButton1.style, _G.ZoneAbilityFrame.Style }
 end
 
 local function ZoneButtons()
-	local zone = _G.ZoneAbilityFrame
-	local holder = zone and zone.SpellButtonContainer
-	if not holder then return {} end
-	return { holder:GetChildren() }
+	return { _G.ZoneAbilityFrame.SpellButtonContainer:GetChildren() }
 end
 
 local function Buttons()
 	local buttons = ZoneButtons()
-	if _G.ExtraActionButton1 then buttons[#buttons + 1] = _G.ExtraActionButton1 end
+	buttons[#buttons + 1] = _G.ExtraActionButton1
 	return buttons
 end
 
-local function StyleButton(button, showArt)
-	local icon = button.icon or button.Icon
-	if icon and not button._buiExtraCropped then
-		button._buiExtraCropped = true
-		icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+local function StyleText(fontString, button, size, color, anchor, offsetX, offsetY)
+	Pixel.ApplyFont(fontString, size, BUI.GetAddonFont(), 'OUTLINE')
+	fontString:SetTextColor(color[1], color[2], color[3], color[4])
+	fontString:SetSize(0, 0)
+	fontString:ClearAllPoints()
+	fontString:SetPoint(anchor, button, anchor, offsetX, offsetY)
+	fontString:SetJustifyH(ActionBars.JustifyForAnchor(anchor))
+end
+
+local function StyleCount(button)
+	local settings = ActionBars.GetSettings()
+	StyleText(button.Count, button, settings.countFontSize, settings.countColor, settings.countAnchor, settings.countOffsetX, settings.countOffsetY)
+end
+
+local function StyleHotkey(button)
+	local settings = ActionBars.GetSettings()
+	local hotkey = button.HotKey
+	StyleText(hotkey, button, settings.hotkeyFontSize, settings.hotkeyColor, settings.hotkeyAnchor, settings.hotkeyOffsetX, settings.hotkeyOffsetY)
+	local text = BUI.Keybinds.Format(GetBindingKey(button.commandName)) or ''
+	hotkey:SetText(text)
+	hotkey:SetShown(text ~= '' and extraBar:Settings().showHotkey)
+end
+
+local function ShowBorder(button, showArt)
+	if showArt then Pixel.HideBorder(button) else Pixel.ShowBorder(button) end
+end
+
+local function StyleExtraButton(button, showArt)
+	button._buiBar = 'extra'
+	ActionBars.SkinButtonArt(button)
+	for _, region in ipairs({ button.lossOfControlCooldown, button.chargeCooldown, button.QuickKeybindHighlightTexture }) do
+		region:ClearAllPoints()
+		region:SetAllPoints(button)
 	end
+	StyleCount(button)
+	StyleHotkey(button)
+	ShowBorder(button, showArt)
+end
+
+local function StyleZoneButton(button, showArt)
+	button._buiBar = 'extra'
+	button._buiExtraStyled = true
+	button.NormalTexture:SetAlpha(0)
+	ActionBars.FlattenStateTexture(button:GetHighlightTexture(), 1, 1, 1, 0.15)
+	button.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	for _, cooldown in ipairs({ button.Cooldown, button.ChargeCooldown }) do
+		cooldown:ClearAllPoints()
+		cooldown:SetAllPoints(button)
+	end
+	ActionBars.StyleCooldown(button.Cooldown)
+	StyleCount(button)
 	local settings = ActionBars.GetSettings()
 	local borderColor = settings.borderColor
-	if showArt then
-		Pixel.HideBorder(button)
-	else
-		Pixel.ApplyBorder(button, settings.borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
-		Pixel.ShowBorder(button)
-	end
+	Pixel.ApplyBorder(button, settings.borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
+	ShowBorder(button, showArt)
 end
 
 local function ApplyArt(self)
 	local showArt = self:Settings().blizzardArt == true
 	for _, texture in ipairs(ArtTextures()) do texture:SetAlpha(showArt and 1 or 0) end
-	for _, button in ipairs(Buttons()) do StyleButton(button, showArt) end
+	StyleExtraButton(_G.ExtraActionButton1, showArt)
+	for _, button in ipairs(ZoneButtons()) do StyleZoneButton(button, showArt) end
 end
 
 local function RefreshArt()
 	if extraBar:Active() then ApplyArt(extraBar) end
+end
+
+local function OnHotkeysUpdated(button)
+	if extraBar:Active() then StyleHotkey(button) end
+end
+
+local function OnZoneAbilitiesUpdated()
+	if not extraBar:Active() then return end
+	local showArt = extraBar:Settings().blizzardArt == true
+	for button in _G.ZoneAbilityFrame.SpellButtonContainer:EnumerateActive() do
+		if not button._buiExtraStyled then
+			StyleZoneButton(button, showArt)
+			ActionBars.HookFadeFrames(extraBar.bar, { button })
+		end
+	end
 end
 
 local function Measure(self)
@@ -144,6 +193,8 @@ local function InstallHooks()
 	hooksecurefunc(container, 'AddFrame', OnFrameAdded)
 	hooksecurefunc(container, 'RemoveFrame', OnBlizzardLayout)
 	HookScript(container, 'OnHide', OnBlizzardLayout)
+	hooksecurefunc(_G.ExtraActionButton1, 'UpdateHotkeys', OnHotkeysUpdated)
+	hooksecurefunc(_G.ZoneAbilityFrame, 'UpdateDisplayedZoneAbilities', OnZoneAbilitiesUpdated)
 	BUI.Events:Register('UPDATE_EXTRA_ACTIONBAR', EVENT_KEY .. '.Art', RefreshArt)
 	BUI.Events:Register('ZONE_CHANGED_NEW_AREA', EVENT_KEY .. '.Art', RefreshArt)
 end
