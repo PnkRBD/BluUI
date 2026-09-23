@@ -54,7 +54,6 @@ local function AlertMover(parent, db, apply, options)
 						xSlider:SetLocked(anchored)
 						ySlider:SetLocked(anchored)
 						if centerCheckbox then Widget.Unwrap(centerCheckbox):SetEnabled(not anchored) end
-						if unlockCheckbox then Widget.Unwrap(unlockCheckbox):SetEnabled(not anchored) end
 					end
 					if not options.noCenter then
 						centerCheckbox = Controls.StampCheckbox(panel, nil, Get('centerHorizontally'), function(value)

@@ -114,6 +114,13 @@ local function BuildPetWarning()
         isLocked = function() return GetDB().locked end,
         onPositionChanged = function(x, y, point)
             local db = GetDB()
+            local anchorX, anchorY = BUI.Anchor.SaveDragOffsets(warningFrame, db)
+            if anchorX then
+                db.anchorOffsetX = math.floor(anchorX)
+                db.anchorOffsetY = math.floor(anchorY)
+                BUI.Anchor.ApplyPosition(warningFrame, db)
+                return
+            end
             if db.centerHorizontally then
                 local _, centerY = BUI.Dragging.GetCenterOffset(warningFrame)
                 x, y, point = 0, centerY, "CENTER"
@@ -381,6 +388,18 @@ end
 
 local lowHpFrame, lowHpText
 
+local function LowHpAnchorSettings(db)
+    return {
+        anchorFrame        = db.lowHpAnchorFrame,
+        anchorPoint        = db.lowHpAnchorPoint,
+        anchorOffsetX      = db.lowHpAnchorOffsetX,
+        anchorOffsetY      = db.lowHpAnchorOffsetY,
+        posX               = db.lowHpPosX,
+        posY               = db.lowHpPosY,
+        centerHorizontally = db.lowHpCenterHorizontally,
+    }
+end
+
 local function BuildLowHp()
     if lowHpFrame then return end
     lowHpFrame = CreateFrame("Frame", "BUI_LowHpWarning", UIParent)
@@ -399,6 +418,13 @@ local function BuildLowHp()
         isLocked = function() return GetDB().lowHpLocked ~= false end,
         onPositionChanged = function(x, y)
             local db = GetDB()
+            local anchorX, anchorY = BUI.Anchor.SaveDragOffsets(lowHpFrame, LowHpAnchorSettings(db))
+            if anchorX then
+                db.lowHpAnchorOffsetX = math.floor(anchorX)
+                db.lowHpAnchorOffsetY = math.floor(anchorY)
+                BUI.Anchor.ApplyPosition(lowHpFrame, LowHpAnchorSettings(db))
+                return
+            end
             if db.lowHpCenterHorizontally then
                 local _, centerY = BUI.Dragging.GetCenterOffset(lowHpFrame)
                 x, y = 0, centerY
@@ -447,18 +473,6 @@ local function HideLowHp()
     if lowHpFrame then
         lowHpFrame:Hide()
     end
-end
-
-local function LowHpAnchorSettings(db)
-    return {
-        anchorFrame        = db.lowHpAnchorFrame,
-        anchorPoint        = db.lowHpAnchorPoint,
-        anchorOffsetX      = db.lowHpAnchorOffsetX,
-        anchorOffsetY      = db.lowHpAnchorOffsetY,
-        posX               = db.lowHpPosX,
-        posY               = db.lowHpPosY,
-        centerHorizontally = db.lowHpCenterHorizontally,
-    }
 end
 
 function Auras.UpdateLowHp()
@@ -572,6 +586,18 @@ local function HideMarkButton(button)
     button:EnableMouse(false)
 end
 
+local function MarkAnchorSettings(db)
+    return {
+        anchorFrame        = db.markAnchorFrame,
+        anchorPoint        = db.markAnchorPoint,
+        anchorOffsetX      = db.markAnchorOffsetX,
+        anchorOffsetY      = db.markAnchorOffsetY,
+        posX               = db.markPosX,
+        posY               = db.markPosY,
+        centerHorizontally = db.markCenterHorizontally,
+    }
+end
+
 local function BuildMarkWarning()
     if markFrame then return end
     local Engine = BUI.AuraEngine
@@ -641,6 +667,13 @@ local function BuildMarkWarning()
         isLocked = function() return GetDB().markLocked ~= false end,
         onPositionChanged = function(x, y)
             local db = GetDB()
+            local anchorX, anchorY = BUI.Anchor.SaveDragOffsets(markFrame, MarkAnchorSettings(db))
+            if anchorX then
+                db.markAnchorOffsetX = math.floor(anchorX)
+                db.markAnchorOffsetY = math.floor(anchorY)
+                BUI.Anchor.ApplyPosition(markFrame, MarkAnchorSettings(db))
+                return
+            end
             if db.markCenterHorizontally then
                 local _, centerY = BUI.Dragging.GetCenterOffset(markFrame)
                 x, y = 0, centerY
@@ -658,18 +691,6 @@ local function BuildMarkWarning()
         end,
         usePointPosition = true,
     })
-end
-
-local function MarkAnchorSettings(db)
-    return {
-        anchorFrame        = db.markAnchorFrame,
-        anchorPoint        = db.markAnchorPoint,
-        anchorOffsetX      = db.markAnchorOffsetX,
-        anchorOffsetY      = db.markAnchorOffsetY,
-        posX               = db.markPosX,
-        posY               = db.markPosY,
-        centerHorizontally = db.markCenterHorizontally,
-    }
 end
 
 local function StyleMarkWarning()
