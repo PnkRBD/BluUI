@@ -484,5 +484,5 @@ function IconEngine.ApplySpellVisual(texture, cooldown, spellID, hasCharges, onE
 		end
 	end
 
-	return chargeInfo and chargeInfo.currentCharges
+	return safeCharges
 end
