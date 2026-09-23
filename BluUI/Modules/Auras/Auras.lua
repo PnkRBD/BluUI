@@ -388,16 +388,18 @@ end
 
 local lowHpFrame, lowHpText
 
+local lowHpAnchorSettings = {}
+
 local function LowHpAnchorSettings(db)
-    return {
-        anchorFrame        = db.lowHpAnchorFrame,
-        anchorPoint        = db.lowHpAnchorPoint,
-        anchorOffsetX      = db.lowHpAnchorOffsetX,
-        anchorOffsetY      = db.lowHpAnchorOffsetY,
-        posX               = db.lowHpPosX,
-        posY               = db.lowHpPosY,
-        centerHorizontally = db.lowHpCenterHorizontally,
-    }
+    local settings = lowHpAnchorSettings
+    settings.anchorFrame        = db.lowHpAnchorFrame
+    settings.anchorPoint        = db.lowHpAnchorPoint
+    settings.anchorOffsetX      = db.lowHpAnchorOffsetX
+    settings.anchorOffsetY      = db.lowHpAnchorOffsetY
+    settings.posX               = db.lowHpPosX
+    settings.posY               = db.lowHpPosY
+    settings.centerHorizontally = db.lowHpCenterHorizontally
+    return settings
 end
 
 local function BuildLowHp()
@@ -516,8 +518,9 @@ local MARK_WINDOW_WIDTH = 420
 local MARK_WINDOW_HEIGHT = 60
 local MARK_SLIDE_GAP = 2
 local MARK_EMPTY_WIDTH = 1
+local MARK_SLIDE_WIDTH = 10000
 
-local markFrame, markContainer, markPanel
+local markFrame, markClip, markContainer, markPanel
 local markText, markIcon, markPulse
 local markRuntimeOn = false
 local markEventsRegistered = false
@@ -586,16 +589,27 @@ local function HideMarkButton(button)
     button:EnableMouse(false)
 end
 
+local markAnchorSettings = {}
+
 local function MarkAnchorSettings(db)
-    return {
-        anchorFrame        = db.markAnchorFrame,
-        anchorPoint        = db.markAnchorPoint,
-        anchorOffsetX      = db.markAnchorOffsetX,
-        anchorOffsetY      = db.markAnchorOffsetY,
-        posX               = db.markPosX,
-        posY               = db.markPosY,
-        centerHorizontally = db.markCenterHorizontally,
-    }
+    local settings = markAnchorSettings
+    settings.anchorFrame        = db.markAnchorFrame
+    settings.anchorPoint        = db.markAnchorPoint
+    settings.anchorOffsetX      = db.markAnchorOffsetX
+    settings.anchorOffsetY      = db.markAnchorOffsetY
+    settings.posX               = db.markPosX
+    settings.posY               = db.markPosY
+    settings.centerHorizontally = db.markCenterHorizontally
+    return settings
+end
+
+local function AnchorMarkPanel(locked)
+    markPanel:ClearAllPoints()
+    if locked then
+        markPanel:SetPoint("TOPLEFT", markContainer, "TOPLEFT", MARK_SLIDE_GAP + MARK_EMPTY_WIDTH, 0)
+    else
+        markPanel:SetPoint("TOPLEFT", markClip, "TOPLEFT", 0, 0)
+    end
 end
 
 local function BuildMarkWarning()
@@ -625,7 +639,7 @@ local function BuildMarkWarning()
         container:AddAuraGroup("markMissing", "HARMFUL", {
             maxFrameCount = 1,
             candidateFilters = { includeSpellIDs = { [HUNTERS_MARK_SPELL] = true } },
-            layout = { elementWidth = MARK_WINDOW_WIDTH + MARK_SLIDE_GAP, elementHeight = MARK_WINDOW_HEIGHT },
+            layout = { elementWidth = MARK_SLIDE_WIDTH, elementHeight = MARK_WINDOW_HEIGHT },
             initializeFrame = HideMarkButton,
         })
     end
@@ -654,6 +668,7 @@ local function BuildMarkWarning()
     pulseAlpha:SetDuration(0.5)
 
     markFrame = frame
+    markClip = clip
     markContainer = container
     markPanel = panel
     markText = text
@@ -765,11 +780,13 @@ function Auras.UpdateMark()
         BuildMarkWarning()
         if not markFrame then return end
     end
+    local locked = db.markLocked ~= false
     StyleMarkWarning()
-    BUI.Dragging.SetLocked(markFrame, db.markLocked ~= false)
+    AnchorMarkPanel(locked)
+    BUI.Dragging.SetLocked(markFrame, locked)
     WireMarkEvents()
     markFrame:Show()
-    SetMarkRuntime(db.markLocked ~= false)
+    SetMarkRuntime(locked)
     RefreshMarkShown()
 end
 

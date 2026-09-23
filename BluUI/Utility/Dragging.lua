@@ -63,6 +63,7 @@ local function OnDragStart(self)
     end
 
     self:StartMoving()
+    self:SetUserPlaced(false)
     if self.dragLockHorizontal or self.dragOnDragging then
         SetScript(self, "OnUpdate", OnDragUpdate)
     end
@@ -251,6 +252,7 @@ function Dragging.EnableAnchorDrag(frame, options)
 
     SetScript(frame, "OnDragStart", function(self)
         self:StartMoving()
+        self:SetUserPlaced(false)
         if options.isCentered and options.isCentered() then
             self._centerDrag = true
             SetScript(self, "OnUpdate", CenterDragOnUpdate)
