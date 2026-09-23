@@ -27,6 +27,7 @@ Libs\LibActionButton-1.0\LibActionButton-1.0.lua
 Libs\BUILib\BUILib.xml
 
 Utility\Prof.lua
+Utility\Trace.lua
 
 Core\Constants.lua
 Core\Defaults.lua
