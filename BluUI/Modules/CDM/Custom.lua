@@ -37,8 +37,6 @@ local GetFrameData = CDM.GetFrameData
 
 local GetStableSpellTexture = Tools.GetStableSpellTexture
 
-local manualStartByStored = {}
-
 local warningFrame, warningText, warningOwner
 local warningTemplate, warningExpiry, warningSpellName, warningThreshold
 local warningShowDecimals, warningLastBucket, warningFont, warningColor
@@ -156,6 +154,13 @@ local iconCounts = {
     utility = 0,
     buffs = 0,
 }
+local iconRegistry = {
+    essential = {},
+    utility = {},
+    buffs = {},
+}
+local consideredKeys = {}
+local placedKeys = {}
 
 local function CopyColor(source)
     if not source then return { 0, 0, 0, 1 } end
@@ -320,6 +325,14 @@ local function ReleaseIcon(icon)
     end
     poolCount = poolCount + 1
     pool[poolCount] = icon
+end
+
+local function ParkIcon(icon)
+    if not icon then return end
+    CDM.StopProcGlow(icon)
+    UnwatchIcon(icon)
+    icon:Hide()
+    icon:ClearAllPoints()
 end
 
 local GetTime = GetTime
@@ -818,9 +831,6 @@ end
 
 CleanupManualBuff = function(icon, frameData, caller)
     local wasShown = icon:IsShown()
-    if frameData.storedValue ~= nil then
-        manualStartByStored[frameData.storedValue] = nil
-    end
     CancelManualBuffGlowTimer(frameData)
     frameData._manualStart = nil
     frameData._manualGlowActive = nil
@@ -1290,14 +1300,13 @@ local function SetupIcon(icon, storedValue, viewerKey, index)
     frameData._cdFingerDuration = nil
     frameData._manualBuff = nil
 
-    local preservedStart = manualStartByStored[storedValue] or priorManualStart
+    local preservedStart = priorManualStart
     if preservedStart then
         local manualBuffs = CDM.GetManualBuffs(config)
         local entry = manualBuffs[storedValue] or manualBuffs[spellID]
         local duration = entry and entry.duration
         if not (duration and duration > 0 and GetTime() < preservedStart + duration) then
             preservedStart = nil
-            manualStartByStored[storedValue] = nil
         end
     end
     frameData._manualStart = preservedStart
@@ -1442,6 +1451,9 @@ local function RefreshViewer(viewerKey)
 
     local viewerIcons = icons[viewerKey]
     local oldCount = iconCounts[viewerKey]
+    local registry = iconRegistry[viewerKey]
+    wipe(consideredKeys)
+    wipe(placedKeys)
 
     local opacity = CDM.GetContextualOpacity(viewerKey)
     local visAlpha = anchor and anchor._iconAlpha or 1
@@ -1450,16 +1462,19 @@ local function RefreshViewer(viewerKey)
     local visibleCount = 0
 
     local function Place(v, versionIndex)
+        consideredKeys[v] = true
         local numId = tonumber(tostring(v):match('(%d+)'))
         local customKey = numId and ('custom:' .. numId)
         local forceShow = customKey and alwaysShow[customKey]
         if viewerKey == "buffs" or forceShow or IsTrackedEntryUsable(v) then
             visibleCount = visibleCount + 1
-            local icon = viewerIcons[visibleCount]
+            local icon = registry[v]
             if not icon then
                 icon = AcquireIcon(parentFrame, config.borderSize, config.borderColor, config.zoom) or CreateIconFrame(parentFrame, config.borderSize, config.borderColor, config.zoom)
-                viewerIcons[visibleCount] = icon
+                registry[v] = icon
             end
+            viewerIcons[visibleCount] = icon
+            placedKeys[v] = true
             icon:SetParent(parentFrame)
             icon:SetFrameStrata(viewer:GetFrameStrata())
             icon:SetFrameLevel(viewer:GetFrameLevel() + 1)
@@ -1499,13 +1514,19 @@ local function RefreshViewer(viewerKey)
         Place('racial:1', 90010)
     end
 
-    for versionIndex = visibleCount + 1, oldCount do
-        local icon = viewerIcons[versionIndex]
-        if icon then
+    for key, icon in pairs(registry) do
+        if not consideredKeys[key] then
             CDM.UntrackIcon(viewerKey, icon)
             ReleaseIcon(icon)
-            viewerIcons[versionIndex] = nil
+            registry[key] = nil
+        elseif not placedKeys[key] then
+            CDM.UntrackIcon(viewerKey, icon)
+            ParkIcon(icon)
         end
+    end
+
+    for versionIndex = visibleCount + 1, oldCount do
+        viewerIcons[versionIndex] = nil
     end
 
     iconCounts[viewerKey] = visibleCount
@@ -1783,9 +1804,6 @@ local function OnSpellCastSucceeded(spellID)
         local frameData = FrameData[icon]
         if frameData then
             frameData._manualStart = now
-            if frameData.storedValue ~= nil then
-                manualStartByStored[frameData.storedValue] = now
-            end
             UpdateIcon(icon)
         end
     end
