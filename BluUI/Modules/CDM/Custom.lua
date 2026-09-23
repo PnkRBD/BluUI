@@ -236,6 +236,7 @@ local function UnwatchIcon(icon)
     end
     if frameData._auraInstanceID then
         buffInstanceToIcon[frameData._auraInstanceID] = nil
+        frameData._auraInstanceID = nil
     end
 end
 
@@ -333,6 +334,12 @@ local function ParkIcon(icon)
     UnwatchIcon(icon)
     icon:Hide()
     icon:ClearAllPoints()
+    local frameData = FrameData[icon]
+    if frameData then
+        frameData.parked = true
+        frameData.hidden = nil
+        frameData.hiddenParked = nil
+    end
 end
 
 local GetTime = GetTime
@@ -1514,18 +1521,25 @@ local function RefreshViewer(viewerKey)
         Place('racial:1', 90010)
     end
 
+    local manualBuffs = CDM.GetManualBuffs(config)
+    local now = GetTime()
     for key, icon in pairs(registry) do
-        if not consideredKeys[key] then
+        if not placedKeys[key] then
             CDM.UntrackIcon(viewerKey, icon)
-            ReleaseIcon(icon)
-            registry[key] = nil
-        elseif not placedKeys[key] then
-            CDM.UntrackIcon(viewerKey, icon)
-            ParkIcon(icon)
+            local frameData = FrameData[icon]
+            local manualStart = frameData and frameData._manualStart
+            local entry = manualStart and (manualBuffs[key] or manualBuffs[frameData.customSpellID])
+            local duration = entry and entry.duration
+            if consideredKeys[key] or (duration and duration > 0 and now < manualStart + duration) then
+                ParkIcon(icon)
+            else
+                ReleaseIcon(icon)
+                registry[key] = nil
+            end
         end
     end
 
-    for versionIndex = visibleCount + 1, oldCount do
+    for versionIndex = visibleCount + 1, #viewerIcons do
         viewerIcons[versionIndex] = nil
     end
 
