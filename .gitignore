@@ -4,15 +4,3 @@
 !/.gitattributes
 !/BluUI/
 !/BluUI_Options/
-
-# Dev tool, kept in its own repo
-/BUIShowcase/
-
-# Editor and OS files
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
-desktop.ini
-*~
-*.swp
