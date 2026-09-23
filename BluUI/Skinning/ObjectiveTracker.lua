@@ -385,6 +385,8 @@ local function ApplyEditModeHeight()
 		end
 	end
 	SetLiveTrackerHeight(trackerFrame, target)
+	local point, relativePoint, x, y = Skin.SavedPosition(POSITION_KEY)
+	if point then BUI.LeaveFrameManager(trackerFrame, point, relativePoint, x, y) end
 end
 
 local function GetTrackerContentHeight()
@@ -1709,12 +1711,17 @@ end
 
 local function ApplyTrackerPosition()
 	if not IsEnabled() or reasserting then return end
-	if not HasSavedTrackerPosition() then return end
-	local target = scrollHolder or _G.ObjectiveTrackerFrame
-	if not target then return end
-	reasserting = true
-	Skin.RestorePosition(target, POSITION_KEY)
-	reasserting = false
+	if scrollHolder then
+		Skin.RestorePosition(scrollHolder, POSITION_KEY)
+		return
+	end
+	local point, relativePoint, x, y = Skin.SavedPosition(POSITION_KEY)
+	if not point then return end
+	local trackerFrame = _G.ObjectiveTrackerFrame
+	trackerFrame:ClearAllPointsBase()
+	trackerFrame:SetPointBase(point, UIParent, relativePoint, x, y)
+	if point:sub(1, 3) == 'TOP' or not Skin.SaveTopPosition(trackerFrame, POSITION_KEY) then return end
+	ApplyTrackerPosition()
 end
 
 function Skin.TrackerClamp()
@@ -1785,6 +1792,7 @@ local function OnMoverDragStart()
 	mover:SetMovable(true)
 	mover._buiDragging = true
 	mover:StartMoving()
+	mover:SetUserPlaced(false)
 end
 
 local function OnMoverDragStop()
@@ -1796,7 +1804,9 @@ local function OnMoverDragStop()
 	if not mover or not mover._buiDragging then return end
 	mover:StopMovingOrSizing()
 	mover._buiDragging = false
-	Skin.SavePosition(mover, POSITION_KEY)
+	if not Skin.SaveTopPosition(mover, POSITION_KEY) then return end
+	ApplyTrackerPosition()
+	BUI.LeaveFrameManager(mover, Skin.SavedPosition(POSITION_KEY))
 end
 
 local function MakeHeaderDragHandle(header)

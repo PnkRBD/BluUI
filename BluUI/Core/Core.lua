@@ -16,6 +16,18 @@ function BUI.CloseEditModeWriteWindow()
 	BUI.Prof.After('Core.Core', EDIT_MODE_WRITE_WINDOW, function() editModeWriteWindowOpen = false end)
 end
 
+local LibEMO = LibStub('LibEditModeOverride-1.0')
+
+function BUI.LeaveFrameManager(frame, point, relativePoint, offsetX, offsetY)
+	local systemInfo = frame.systemInfo
+	if not (systemInfo and systemInfo.isInDefaultPosition) then return end
+	if not editModeWriteWindowOpen or InCombatLockdown() or not LibEMO:IsReady() then return end
+	LibEMO:LoadLayouts()
+	if not LibEMO:CanEditActiveLayout() or not LibEMO:HasEditModeSettings(frame) then return end
+	LibEMO:ReanchorFrame(frame, point, UIParent, relativePoint, offsetX, offsetY)
+	LibEMO:SaveOnly()
+end
+
 function BUI.GetDB()
 	return BUI.db and BUI.db.profile
 end
