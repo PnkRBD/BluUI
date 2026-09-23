@@ -65,7 +65,7 @@ local function UpdateIndicators()
     if not built then return end
     for markIndex = 1, #MARKS do
         local button = markerButtons[markIndex]
-        button.worldLine:SetShown(IsRaidMarkerActive(MARKS[markIndex].world))
+        button.worldLine:SetAlphaFromBoolean(IsRaidMarkerActive(MARKS[markIndex].world), 1, 0)
     end
 end
 
@@ -235,7 +235,7 @@ local function Build()
 
         local line = button:CreateTexture(nil, 'OVERLAY')
         Tools.SetColorTex(line, mark.tint[1], mark.tint[2], mark.tint[3], 0.95)
-        line:Hide()
+        line:SetAlpha(0)
         button.worldLine = line
 
         SetScript(button, 'OnEnter', function(self)
