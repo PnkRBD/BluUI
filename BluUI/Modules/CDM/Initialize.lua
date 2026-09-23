@@ -1,7 +1,6 @@
 local _, BUI = ...
 local SetScript, HookScript = BUI.Prof.Scripts('CDM.Initialize')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('cdminit')
 local _G = _G
 
 local CDM = BUI.CDM
@@ -132,8 +131,6 @@ function CDM.Initialize()
             end
         end
     end)
-
-    hooksecurefunc("CooldownFrame_Set", CDM.OnCooldownFrameSet)
 
     Pixel.OnScaleChange("CDM", function()
         CDM.InvalidateSkinCache()

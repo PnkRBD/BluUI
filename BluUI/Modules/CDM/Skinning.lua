@@ -293,6 +293,11 @@ local function ReenforceCooldownStyle(cooldown)
     ApplyAuraCooldownOverride(cooldown)
 end
 
+local function OnCooldownApplied(cooldown)
+    ReenforceCooldownStyle(cooldown)
+    CDM.RestyleCooldown(cooldown)
+end
+
 local reclaimingStyle = false
 
 local function ReclaimDrawEdge(cooldown)
@@ -378,7 +383,7 @@ local function SetupCooldown(icon)
 
     if not cooldownFrameData.cdHooked then
         cooldownFrameData.cdHooked = true
-        hooksecurefunc(cooldown, 'SetCooldown', ReenforceCooldownStyle)
+        hooksecurefunc(cooldown, 'SetCooldown', OnCooldownApplied)
         hooksecurefunc(cooldown, 'SetCooldownFromDurationObject', ReenforceCooldownStyle)
         hooksecurefunc(cooldown, 'SetDrawEdge', ReclaimDrawEdge)
         hooksecurefunc(cooldown, 'SetReverse', ReclaimReverse)
