@@ -21,6 +21,9 @@ local DIVIDER_ALPHA = 0.1
 local CHECKBOX_INSET = 1
 local ACTIVE_RING_PADDING = 3
 local PARENT_WALK_DEPTH = 6
+local SEARCH_WIDTH, SEARCH_HEIGHT = 160, 22
+local SEARCH_INSET = 8
+local SEARCH_TEXT_INSET = 6
 
 local installed = false
 local skinned = false
@@ -163,6 +166,45 @@ local function SkinOverlayFrames(map)
 			Dropdown(frame)
 		end
 	end
+end
+
+local rareScannerSearch
+
+local function FindRareScannerSearch(map)
+	local mixin = _G.RSSearchMixin
+	if rareScannerSearch or not mixin then return rareScannerSearch end
+	for _, child in ipairs({ map:GetChildren() }) do
+		if child.OnLoad == mixin.OnLoad then
+			rareScannerSearch = child
+			return child
+		end
+	end
+end
+
+local function SkinRareScannerSearch(map)
+	local search = FindRareScannerSearch(map)
+	if not search or search._buiHome then return end
+	local editBox = search.EditBox
+	search._buiHome = { point = { search:GetPoint(1) }, width = editBox:GetWidth(), height = editBox:GetHeight() }
+	FadeRegions(editBox)
+	EditBox(editBox)
+	editBox:SetTextInsets(SEARCH_TEXT_INSET, SEARCH_TEXT_INSET, 0, 0)
+	editBox:SetSize(SEARCH_WIDTH, SEARCH_HEIGHT)
+	search:SetSize(SEARCH_WIDTH, SEARCH_HEIGHT)
+	search:ClearAllPoints()
+	search:SetPoint('TOPLEFT', map:GetCanvasContainer(), 'TOPLEFT', SEARCH_INSET, -SEARCH_INSET)
+end
+
+local function ReleaseRareScannerSearch()
+	local home = rareScannerSearch and rareScannerSearch._buiHome
+	if not home then return end
+	rareScannerSearch._buiHome = nil
+	local editBox = rareScannerSearch.EditBox
+	editBox:SetTextInsets(0, 0, 0, 0)
+	editBox:SetSize(home.width, home.height)
+	rareScannerSearch:SetSize(home.width, home.height)
+	rareScannerSearch:ClearAllPoints()
+	rareScannerSearch:SetPoint(unpack(home.point))
 end
 
 local function IsTabSelected(questLog, tab)
@@ -423,6 +465,7 @@ local function Apply()
 		SkinOverlayFrames(map)
 		SkinQuestLog(_G.QuestMapFrame)
 	end
+	SkinRareScannerSearch(map)
 	SweepQuestLog()
 	RefreshSideTabs(_G.QuestMapFrame)
 end
@@ -455,6 +498,7 @@ end
 
 local function Deactivate()
 	context.Restore()
+	ReleaseRareScannerSearch()
 	if sideTabs then
 		for _, tab in ipairs(sideTabs) do Skin.ResetSideTab(tab) end
 	end
