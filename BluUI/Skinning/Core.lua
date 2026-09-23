@@ -227,18 +227,37 @@ local VALID_ANCHOR_POINTS = {
 	BOTTOMLEFT = true, BOTTOM = true, BOTTOMRIGHT = true,
 }
 
-function Skin.RestorePosition(frame, dbKey)
+function Skin.SaveTopPosition(frame, dbKey)
+	local left, right, top = frame:GetLeft(), frame:GetRight(), frame:GetTop()
+	if type(left) ~= 'number' or type(right) ~= 'number' or type(top) ~= 'number' then return false end
+	if issecretvalue(left) or issecretvalue(right) or issecretvalue(top) then return false end
+	local parentWidth = UIParent:GetWidth() * UIParent:GetEffectiveScale() / frame:GetEffectiveScale()
 	local db = BUI.GetDB()
-	if not db.framePositions then return false end
-	local position = db.framePositions[dbKey]
-	if not position then return false end
-	if not VALID_ANCHOR_POINTS[position.point] or type(position.x) ~= 'number' or type(position.y) ~= 'number' then
-		db.framePositions[dbKey] = nil
-		return false
+	if not db.framePositions then db.framePositions = {} end
+	if left + right > parentWidth then
+		db.framePositions[dbKey] = { point = 'TOPRIGHT', relPoint = 'BOTTOMRIGHT', x = right - parentWidth, y = top }
+	else
+		db.framePositions[dbKey] = { point = 'TOPLEFT', relPoint = 'BOTTOMLEFT', x = left, y = top }
 	end
-	local relativePoint = VALID_ANCHOR_POINTS[position.relPoint] and position.relPoint or position.point
+	return true
+end
+
+function Skin.SavedPosition(dbKey)
+	local positions = BUI.GetDB().framePositions
+	local position = positions and positions[dbKey]
+	if not position then return nil end
+	if not VALID_ANCHOR_POINTS[position.point] or type(position.x) ~= 'number' or type(position.y) ~= 'number' then
+		positions[dbKey] = nil
+		return nil
+	end
+	return position.point, VALID_ANCHOR_POINTS[position.relPoint] and position.relPoint or position.point, position.x, position.y
+end
+
+function Skin.RestorePosition(frame, dbKey)
+	local point, relativePoint, x, y = Skin.SavedPosition(dbKey)
+	if not point then return false end
 	frame:ClearAllPoints()
-	frame:SetPoint(position.point, UIParent, relativePoint, position.x, position.y)
+	frame:SetPoint(point, UIParent, relativePoint, x, y)
 	return true
 end
 
