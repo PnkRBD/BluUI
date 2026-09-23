@@ -21,7 +21,7 @@ local LibEMO = LibStub and LibStub('LibEditModeOverride-1.0', true)
 local LIBRARY_FONT_OPTION    = 'LIBRARY'
 local DEFAULT_FONT_SIZE      = 11
 local DEFAULT_CARD_OPACITY   = 98
-local ROLE_SIZE_DELTA        = { line = 0, title = 1, header = 2 }
+local ROLE_SIZE_DELTA        = { line = 0, title = 1, header = 2, timer = 8 }
 local POSITION_KEY           = 'objectivetracker'
 local TRACKER_STASH_SCALE    = 0.01
 local DEFAULT_TRACKER_COLORS = {
@@ -141,10 +141,10 @@ local function ApplySkinFont(fontString, role)
 	local entry = restoreFonts[fontString]
 	if entry then
 		entry.role = role
-		return
+	else
+		local font, oldSize, flags = fontString:GetFont()
+		restoreFonts[fontString] = { font = font, size = oldSize, flags = flags, role = role }
 	end
-	local font, oldSize, flags = fontString:GetFont()
-	restoreFonts[fontString] = { font = font, size = oldSize, flags = flags, role = role }
 	Pixel.ApplyFont(fontString, GetRoleSize(role), GetSkinFont(), GetSkinFontFlags())
 end
 
@@ -2123,12 +2123,10 @@ local function SkinStageBlock()
 	HideBlizzardTexture(stageBlock.FinalBG)
 	HideBlizzardTexture(stageBlock.GlowTexture)
 
-	local backdrop = Skin3.ChildBackdrop(stageBlock, { bg = Theme.bg.light, border = Theme.border.light })
-	skinnedBars[stageBlock] = backdrop
-	BUI.Prof.HookScript('ObjectiveTracker', stageBlock, 'OnShow', function(self)
-		backdrop:SetShown(IsEnabled() and self:IsShown())
-	end)
-	backdrop:SetShown(IsEnabled() and stageBlock:IsShown())
+	skinnedBars[stageBlock] = Skin3.ChildBackdrop(stageBlock, { bg = Theme.bg.light, border = Theme.border.light })
+	BUI.Prof.HookScript('ObjectiveTracker', stageBlock, 'OnShow', Scenario.SyncStageBackdrop)
+	hooksecurefunc(stageBlock, 'UpdateWidgetRegistration', Scenario.SyncStageBackdrop)
+	Scenario.SyncStageBackdrop(stageBlock)
 
 	ApplySkinFont(stageBlock.Stage, 'header')
 	ApplySkinFont(stageBlock.Name, 'title')
@@ -2314,93 +2312,98 @@ local function ApplyChallengeModeVisibility()
 	Skin.StashTracker(shouldHide)
 end
 
-Scenario.delveHeaders = {}
+Scenario.headers = {}
+Scenario.headerMixins = { 'UIWidgetTemplateScenarioHeaderDelvesMixin', 'UIWidgetTemplateScenarioHeaderTimerMixin', 'UIWidgetTemplateScenarioHeaderCurrenciesAndBackgroundMixin' }
+Scenario.headerOverhangKeys = { 'SpellContainer', 'CurrencyContainer', 'RewardFrame' }
+Scenario.headerBackdropInset = 1
+Scenario.headerBackdropPad = 4
 
-Scenario.delveOverhangKeys = { 'SpellContainer', 'CurrencyContainer', 'RewardFrame' }
-Scenario.delveBackdropInset = 1
-Scenario.delveBackdropPad = 4
-
-Scenario.FitDelveBackdrop = function(widget, backdrop)
+Scenario.FitHeaderBackdrop = function(widget, backdrop)
 	local bottom = widget:GetBottom()
 	if not bottom then return false end
-	local keys, lowest = Scenario.delveOverhangKeys, bottom
+	local keys, lowest = Scenario.headerOverhangKeys, bottom
 	for keyIndex = 1, #keys do
 		local child = widget[keys[keyIndex]]
-		if child and child.IsShown and child:IsShown() and child.GetBottom then
+		if child and child:IsShown() then
 			local childBottom = child:GetBottom()
 			if childBottom and childBottom < lowest then lowest = childBottom end
 		end
 	end
-	local inset = Scenario.delveBackdropInset
+	local inset = Scenario.headerBackdropInset
 	local drop = bottom - lowest
-	if drop > 0 then drop = drop + Scenario.delveBackdropPad end
-	if backdrop._buiDelveDrop == drop then return true end
-	backdrop._buiDelveDrop = drop
+	if drop > 0 then drop = drop + Scenario.headerBackdropPad end
+	if backdrop._buiHeaderDrop == drop then return true end
+	backdrop._buiHeaderDrop = drop
 	backdrop:ClearAllPoints()
 	backdrop:SetPoint('TOPLEFT', widget, 'TOPLEFT', inset, -inset)
 	backdrop:SetPoint('BOTTOMRIGHT', widget, 'BOTTOMRIGHT', -inset, inset - drop)
 	return true
 end
 
-Scenario.ApplyDelveHeader = function(widget)
+Scenario.ApplyHeader = function(widget)
+	Scenario.headers[widget] = true
 	local enabled = IsEnabled()
 	local alpha = enabled and 0 or 1
-	if widget.Frame then widget.Frame:SetAlpha(alpha) end
-	if widget.ThemeOverlay then widget.ThemeOverlay:SetAlpha(alpha) end
-	if widget.DecorationBottomLeft then widget.DecorationBottomLeft:SetAlpha(alpha) end
+	widget.Frame:SetAlpha(alpha)
+	widget.ThemeOverlay:SetAlpha(alpha)
+	widget.DecorationBottomLeft:SetAlpha(alpha)
 	local backdrop = skinnedBars[widget]
 	if enabled then
 		if not backdrop then
 			backdrop = Skin3.ChildBackdrop(widget, { bg = Theme.bg.light, border = Theme.border.light })
 			skinnedBars[widget] = backdrop
 		end
-		if not Scenario.FitDelveBackdrop(widget, backdrop) then
-			C_Timer.After(0, function() Scenario.FitDelveBackdrop(widget, backdrop) end)
+		if not Scenario.FitHeaderBackdrop(widget, backdrop) then
+			C_Timer.After(0, function() Scenario.FitHeaderBackdrop(widget, backdrop) end)
 		end
-		if widget.HeaderText then
-			ApplySkinFont(widget.HeaderText, 'title')
-			widget.HeaderText:SetTextColor(Skin.TrackerColorRGB('title'))
+		ApplySkinFont(widget.HeaderText, 'title')
+		widget.HeaderText:SetTextColor(Skin.TrackerColorRGB('title'))
+		local timerBar = widget.TimerBar
+		if timerBar then
+			SkinBar(timerBar)
+			timerBar:SetStatusBarTexture(FLAT_TEXTURE)
+			timerBar:SetStatusBarColor(Theme.GetAccent())
+			ApplySkinFont(widget.Timer.Text, 'timer')
 		end
 	end
 	if backdrop then backdrop:SetShown(enabled and widget:IsShown()) end
 end
 
-Scenario.TrackDelveHeader = function(widget)
-	if not widget or not widget.TierFrame or not widget.HeaderText then return end
-	if not Scenario.delveHeaders[widget] then
-		Scenario.delveHeaders[widget] = true
-		hooksecurefunc(widget, 'Setup', Scenario.ApplyDelveHeader)
-	end
-	Scenario.ApplyDelveHeader(widget)
+Scenario.TrackHeader = function(widget)
+	if Scenario.headers[widget] or not widget.Frame or not widget.HeaderText then return end
+	hooksecurefunc(widget, 'Setup', Scenario.ApplyHeader)
+	Scenario.ApplyHeader(widget)
 end
 
-Scenario.ScanDelveHeaders = function()
+Scenario.ScanHeaders = function()
 	local scenarioTracker = _G.ScenarioObjectiveTracker
 	local container = scenarioTracker and scenarioTracker.StageBlock and scenarioTracker.StageBlock.WidgetContainer
 	local frames = container and container.widgetFrames
 	if type(frames) ~= 'table' then return end
-	for _, widget in pairs(frames) do Scenario.TrackDelveHeader(widget) end
+	for _, widget in pairs(frames) do Scenario.TrackHeader(widget) end
 end
 
-Scenario.InstallDelveHook = function()
-	if Scenario.delveHooked then return end
-	local mixin = _G.UIWidgetTemplateScenarioHeaderDelvesMixin
-	if not mixin or not mixin.Setup then return end
-	Scenario.delveHooked = true
-	hooksecurefunc(mixin, 'Setup', function(widget)
-		if Scenario.delveHeaders[widget] then return end
-		Scenario.delveHeaders[widget] = true
-		Scenario.ApplyDelveHeader(widget)
-	end)
+Scenario.InstallHeaderHooks = function()
+	if Scenario.headerHooked then return end
+	Scenario.headerHooked = true
+	for _, mixinName in ipairs(Scenario.headerMixins) do
+		local mixin = _G[mixinName]
+		if mixin then hooksecurefunc(mixin, 'Setup', Scenario.ApplyHeader) end
+	end
+end
+
+Scenario.SyncStageBackdrop = function(stageBlock)
+	local backdrop = skinnedBars[stageBlock]
+	if backdrop then backdrop:SetShown(IsEnabled() and stageBlock:IsShown() and not stageBlock.widgetSetID) end
 end
 
 function Scenario.Install()
-	Scenario.InstallDelveHook()
-	Scenario.ScanDelveHeaders()
+	Scenario.ScanHeaders()
+	Scenario.InstallHeaderHooks()
 end
 
 function Scenario.Remove()
-	for widget in pairs(Scenario.delveHeaders) do Scenario.ApplyDelveHeader(widget) end
+	for widget in pairs(Scenario.headers) do Scenario.ApplyHeader(widget) end
 end
 
 local function Install()
@@ -2468,6 +2471,7 @@ Skin.OnToggle('objectivetracker', function(enabled)
 		Install()
 		for _, element in ipairs(addedElements) do element:Show() end
 		for bar, backdrop in pairs(skinnedBars) do backdrop:SetShown(bar:IsShown()) end
+		Scenario.SyncStageBackdrop(_G.ScenarioObjectiveTracker.StageBlock)
 		for button in pairs(hiddenPoiButtons) do button:SetScale(POI_BUTTON_SCALE) end
 		ApplyPoiVisibility()
 		ApplyDashAlpha()
