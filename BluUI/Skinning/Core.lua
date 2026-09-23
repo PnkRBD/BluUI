@@ -516,6 +516,13 @@ local function ButtonFontObjects(scale)
 	return fonts
 end
 
+function Skin.TipButtonFonts(button, scale)
+	local fonts = ButtonFontObjects(scale)
+	if button.SetNormalFontObject then button:SetNormalFontObject(fonts.normal) end
+	if button.SetHighlightFontObject then button:SetHighlightFontObject(fonts.normal) end
+	if button.SetDisabledFontObject then button:SetDisabledFontObject(fonts.disabled) end
+end
+
 local function TipButtonEnter(button)
 	local red, green, blue = BUILib.Theme.GetAccent()
 	BUILib.Skin.SetEdgeColor(button._buiShell.edges, { red, green, blue, 1 })
@@ -534,10 +541,7 @@ function Skin.TipButton(button, scale)
 		HookScript(button, 'OnLeave', TipButtonLeave)
 	end
 	Skin.TipShell(button)
-	local fonts = ButtonFontObjects(scale)
-	if button.SetNormalFontObject then button:SetNormalFontObject(fonts.normal) end
-	if button.SetHighlightFontObject then button:SetHighlightFontObject(fonts.normal) end
-	if button.SetDisabledFontObject then button:SetDisabledFontObject(fonts.disabled) end
+	Skin.TipButtonFonts(button, scale)
 end
 
 function Skin.TipCardSlider(card, config)
@@ -1128,10 +1132,7 @@ function Skin.TipBackdropButton(button, scale)
 		HookScript(button, 'OnEnter', BackdropButtonEnter)
 		HookScript(button, 'OnLeave', BackdropButtonLeave)
 	end
-	local fonts = ButtonFontObjects(scale)
-	if button.SetNormalFontObject then button:SetNormalFontObject(fonts.normal) end
-	if button.SetHighlightFontObject then button:SetHighlightFontObject(fonts.normal) end
-	if button.SetDisabledFontObject then button:SetDisabledFontObject(fonts.disabled) end
+	Skin.TipButtonFonts(button, scale)
 end
 
 function Skin.TipFaceTree(frame, depth, kind)
