@@ -122,7 +122,6 @@ local function PrintHelp()
 	line('/bui install', 'run the setup wizard')
 	line('/bui cpu', 'toggle CPU profiling')
 	line('/bui cpu reload', 'reload and profile everything BluUI runs during login')
-	line('/bui burst [seconds]', 'profile everything for 10 seconds, then print the top costs')
 	line('/bui framescan', 'list every visible frame running an OnUpdate script')
 	line('/bui keybind', 'toggle action bar keybind mode (hover a button, press a key)')
 	line('/bui skins', 'showcase every enabled skin in a grid (Escape closes it)')
@@ -147,8 +146,6 @@ SlashCmdList['BUI'] = function(message)
 		CenterWindow()
 	elseif command == 'install' then
 		if BUI.Installer then BUI.Installer.Open() end
-	elseif command == 'burst' then
-		BUI.Trace.Burst(rest)
 	elseif command == 'framescan' then
 		FrameScan()
 	elseif command == 'cpu' then
