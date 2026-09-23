@@ -559,11 +559,9 @@ function CDM.SkinIcon(icon, settings, key)
     if not texture then return end
 
     local currentVersion = CDM.state.skinVersion
-    local iconFrameData = FrameData[icon]
-    if iconFrameData and iconFrameData.skinVer == currentVersion then return end
-
-    if not iconFrameData then iconFrameData = GetFrameData(icon) end
+    local iconFrameData = FrameData[icon] or GetFrameData(icon)
     iconFrameData.viewerKey = key
+    if iconFrameData.skinVer == currentVersion then return end
 
     if not iconFrameData.texHooked then
         iconFrameData.texHooked = true
