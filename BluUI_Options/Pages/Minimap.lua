@@ -877,7 +877,7 @@ BUI.PageEngine.RegisterPage('minimap', {
                 accessories = function(row)
                     local modulesCog = Controls.Icon(row, {
                         title = 'DISPLAY MODULES', tooltip = 'Modules', texture = BUILib.GetLibMedia('modules5'),
-                        options = dtModuleOptions, width = 260,
+                        options = dtModuleOptions, width = 260, columns = 2,
                     })
                     local orderButton = Controls.Icon(row, {
                         texture = BUILib.GetLibMedia('order'), tooltip = 'Reorder modules',

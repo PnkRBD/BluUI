@@ -8,46 +8,95 @@ local function OptionRowHeight(option)
 	return (option.kind == 'dropdown' or option.kind == 'slider' or option.kind == 'textbox') and 34 or 30
 end
 
+local COLUMN_GAP = 24
+
+local function SplitOptionColumns(options, columnCount)
+	local groups, total = {}, 0
+	for _, option in ipairs(options) do
+		local group = groups[#groups]
+		if not group or not option.indent or option.indent == 0 then
+			group = { height = 0 }
+			groups[#groups + 1] = group
+		end
+		local rowHeight = OptionRowHeight(option)
+		group[#group + 1] = option
+		group.height = group.height + rowHeight
+		total = total + rowHeight
+	end
+	local target = total / columnCount
+	local columns = { { height = 0 } }
+	for _, group in ipairs(groups) do
+		local column = columns[#columns]
+		if #columns < columnCount and column.height > 0 and column.height + group.height / 2 > target then
+			column = { height = 0 }
+			columns[#columns + 1] = column
+		end
+		for _, option in ipairs(group) do column[#column + 1] = option end
+		column.height = column.height + group.height
+	end
+	local tallest = 0
+	for _, column in ipairs(columns) do tallest = math.max(tallest, column.height) end
+	return columns, tallest
+end
+
+local function BuildOptionRow(panel, config, option, columnX, columnWidth, yOffset)
+	local rowHeight = OptionRowHeight(option)
+	local fontString = panel:CreateFontString(nil, "OVERLAY")
+	fontString:SetFont(BUILib.Font, 11, "")
+	fontString:SetPoint("TOPLEFT", columnX + (option.indent or 0) * 14, -(yOffset + math.floor(rowHeight / 2 - 5)))
+	if (option.indent or 0) > 0 then
+		fontString:SetTextColor(unpack(Theme.text.secondary))
+	else
+		fontString:SetTextColor(0.85, 0.85, 0.88, 1)
+	end
+	fontString:SetText(option.label)
+	local function changed(value)
+		option.set(value)
+		if config.onChange then config.onChange() end
+	end
+	local control
+	if option.kind == 'slider' then
+		control = Controls.CompactSlider(panel, nil, option.min, option.max, option.get(), changed, option.step or 1, option.controlWidth or 130)
+		if option.locked then
+			control:SetLockedText(option.lockedText or 'LOCKED')
+			control:SetLocked(true)
+		end
+	elseif option.kind == 'dropdown' then
+		control = Controls.Dropdown(panel, nil, option.items, option.get(), changed, nil, option.controlWidth or 110)
+	elseif option.kind == 'textbox' then
+		control = Controls.TextBox(panel, nil, option.get(), changed, nil, option.controlWidth or 130)
+	else
+		control = Controls.StampCheckbox(panel, nil, option.get(), changed, nil, true, nil, "small")
+	end
+	local controlFrame = Widget.Unwrap(control)
+	controlFrame:ClearAllPoints()
+	local controlHeight = controlFrame:GetHeight() or 20
+	controlFrame:SetPoint("TOPRIGHT", panel, "TOPLEFT", columnX + columnWidth, -(yOffset + math.max(2, math.floor((rowHeight - controlHeight) / 2))))
+	if option.kind == 'dropdown' and control.SetWidth then control:SetWidth(option.controlWidth or 110) end
+	return rowHeight
+end
+
 local function BuildOptionsPopover(anchorButton, config)
-	local options = config.options or {}
-	local totalHeight = 0
-	for _, option in ipairs(options) do totalHeight = totalHeight + OptionRowHeight(option) end
+	local columnCount = config.columns or 1
+	local columns, tallest = SplitOptionColumns(config.options or {}, columnCount)
 	Controls.Popover({
-		anchor = anchorButton, width = config.width or 240, title = config.title,
-		height = totalHeight,
+		anchor = anchorButton, width = (config.width or 240) * #columns, title = config.title,
+		height = tallest,
 		build = function(panel)
-			local yOffset = 0
-			for _, option in ipairs(options) do
-				local rowHeight = OptionRowHeight(option)
-				local fontString = panel:CreateFontString(nil, "OVERLAY")
-				fontString:SetFont(BUILib.Font, 11, "")
-				fontString:SetPoint("TOPLEFT", (option.indent or 0) * 14, -(yOffset + math.floor(rowHeight / 2 - 5)))
-				fontString:SetTextColor(0.85, 0.85, 0.88, 1)
-				fontString:SetText(option.label)
-				local function changed(value)
-					option.set(value)
-					if config.onChange then config.onChange() end
+			local columnWidth = (panel.width - COLUMN_GAP * (#columns - 1)) / #columns
+			for columnIndex, column in ipairs(columns) do
+				local columnX = (columnIndex - 1) * (columnWidth + COLUMN_GAP)
+				if columnIndex > 1 then
+					local divider = panel:CreateTexture(nil, "ARTWORK")
+					divider:SetColorTexture(unpack(Theme.border.light))
+					divider:SetPoint("TOP", panel, "TOPLEFT", columnX - COLUMN_GAP / 2, 0)
+					divider:SetHeight(tallest)
+					PixelUtil.SetWidth(divider, 1, 1)
 				end
-				local control
-				if option.kind == 'slider' then
-					control = Controls.CompactSlider(panel, nil, option.min, option.max, option.get(), changed, option.step or 1, option.controlWidth or 130)
-					if option.locked then
-						control:SetLockedText(option.lockedText or 'LOCKED')
-						control:SetLocked(true)
-					end
-				elseif option.kind == 'dropdown' then
-					control = Controls.Dropdown(panel, nil, option.items, option.get(), changed, nil, option.controlWidth or 110)
-				elseif option.kind == 'textbox' then
-					control = Controls.TextBox(panel, nil, option.get(), changed, nil, option.controlWidth or 130)
-				else
-					control = Controls.StampCheckbox(panel, nil, option.get(), changed)
+				local yOffset = 0
+				for _, option in ipairs(column) do
+					yOffset = yOffset + BuildOptionRow(panel, config, option, columnX, columnWidth, yOffset)
 				end
-				local controlFrame = Widget.Unwrap(control)
-				controlFrame:ClearAllPoints()
-				local controlHeight = controlFrame:GetHeight() or 20
-				controlFrame:SetPoint("TOPRIGHT", panel, "TOPRIGHT", 0, -(yOffset + math.max(2, math.floor((rowHeight - controlHeight) / 2))))
-				if option.kind == 'dropdown' and control.SetWidth then control:SetWidth(option.controlWidth or 110) end
-				yOffset = yOffset + rowHeight
 			end
 		end,
 	})

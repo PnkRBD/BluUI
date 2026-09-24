@@ -475,7 +475,7 @@ BUI.PageEngine.RegisterPage('datatext', {
                         local modulesCog = Controls.Icon(row, {
                             title = 'DISPLAY MODULES', tooltip = 'Choose which modules show',
                             texture = BUILib.GetLibMedia('modules5'),
-                            options = moduleOptions, onChange = function() RefreshPreview() end,
+                            options = moduleOptions, columns = 2, onChange = function() RefreshPreview() end,
                         })
                         local orderButton = Controls.Icon(row, {
                             texture = BUILib.GetLibMedia('order'), tooltip = 'Reorder modules',
