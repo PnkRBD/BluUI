@@ -801,7 +801,7 @@ BUI.PageEngine.RegisterPage('actionbars', {
 			Layout.Section(tab, 'Action Bars', 'Module disabled. Enable it below, then reload.')
 			local enableButton = Controls.Button(tab.child, 'Enable Action Bars & Reload', 220, function()
 				BUI.SetModuleEnabled('actionBars', true)
-				ReloadUI()
+				BUI.Reload()
 			end)
 			Layout.Add(tab, enableButton, 12)
 			page:AutoRefresh()
@@ -831,7 +831,7 @@ BUI.PageEngine.RegisterPage('actionbars', {
 					title = 'Disable Action Bars',
 					message = 'This change requires a UI reload to take effect.',
 					confirmText = 'Reload Now', cancelText = 'Cancel',
-					onConfirm = function() BUI.SetModuleEnabled('actionBars', false); ReloadUI() end,
+					onConfirm = function() BUI.SetModuleEnabled('actionBars', false); BUI.Reload() end,
 					onCancel = function() titleBar.enableToggle:SetValue(true) end,
 				})
 			end },

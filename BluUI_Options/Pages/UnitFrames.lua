@@ -627,7 +627,7 @@ BUI.PageEngine.RegisterPage("unitframes", {
                         title = value and "Enable Unit Frames" or "Disable Unit Frames",
                         message = "This change requires a UI reload.\n\nReload now?",
                         confirmText = "Reload", cancelText = "Later",
-                        onConfirm = function() ReloadUI() end,
+                        onConfirm = function() BUI.Reload() end,
                     })
                 end },
                 button = { text = 'Toggle Test Mode', width = 130, onClick = function()

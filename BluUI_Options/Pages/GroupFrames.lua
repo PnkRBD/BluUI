@@ -874,7 +874,7 @@ local function BuildGeneralTab(tab)
 					title = 'Disable Group Frames',
 					message = 'Frames are hidden now, but the Blizzard party/raid frames only come back after a UI reload.\n\nReload now?',
 					confirmText = 'Reload', cancelText = 'Later',
-					onConfirm = function() ReloadUI() end,
+					onConfirm = function() BUI.Reload() end,
 				})
 			end
 		end,
@@ -902,7 +902,7 @@ local function BuildGeneralTab(tab)
 					title = 'Restore Blizzard Frames',
 					message = 'Blizzard party/raid frames only come back after a UI reload.\n\nReload now?',
 					confirmText = 'Reload', cancelText = 'Later',
-					onConfirm = function() ReloadUI() end,
+					onConfirm = function() BUI.Reload() end,
 				})
 			end
 		end,
