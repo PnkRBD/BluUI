@@ -30,29 +30,10 @@ local function Build()
 
     Apply()
 
-    BUI.Dragging.MakeDraggable(messageFrame, {
-        showHint = true,
-        showUnlockedBg = true,
-        hintAnchor = "TOP",
+    BUI.Dragging.MakeAnchoredAlert(messageFrame, {
+        settings = GetDB,
         isLocked = function() return GetDB().locked end,
-        onPositionChanged = function(x, y)
-            local db = GetDB()
-            local anchorX, anchorY = BUI.Anchor.SaveDragOffsets(messageFrame, db)
-            if anchorX then
-                db.anchorOffsetX = math.floor(anchorX)
-                db.anchorOffsetY = math.floor(anchorY)
-                Apply()
-                return
-            end
-            if db.centerHorizontally then
-                local _, centerY = BUI.Dragging.GetCenterOffset(messageFrame)
-                x, y = 0, centerY
-            end
-            db.posX, db.posY = x, y
-            Apply()
-        end,
         onRightClick = function() CombatMessage.SetLocked(true) end,
-        usePointPosition = true,
     })
 end
 
@@ -160,3 +141,5 @@ function CombatMessage.Initialize()
 end
 
 BUI.Events:OnLogin("CombatMessage", CombatMessage.Initialize)
+
+BUI.Anchor.Follow("CombatMessage", function() return GetDB().enabled and messageFrame end, GetDB)
