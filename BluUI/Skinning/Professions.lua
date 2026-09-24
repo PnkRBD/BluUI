@@ -33,6 +33,7 @@ local CATEGORY_FILL_ALPHA = 0.04
 local ROW_SELECTED_ALPHA = 0.18
 local ROW_HOVER_ALPHA = 0.06
 local OUTPUT_TITLE_SCALE = 1.2
+local OUTPUT_CRIT_SCALE = 0.8
 local BOOK_TITLE_SCALE = 1.25
 local BOOK_SUBTITLE_SCALE = 1.1
 local BOOK_CARD_WIDTH = 437
@@ -278,6 +279,32 @@ local function SkinConcentration(concentration)
 	Skin.TipFont(concentration.Label, 'label')
 end
 
+local function OnOutputEntry(entry)
+	if not Enabled() then return end
+	local container = entry.ItemContainer
+	if not entry._buiOutput then
+		entry._buiOutput = true
+		FadeRegions(container)
+		Shell(container)
+		SkinItemButton(container.Item)
+		Skin.TipFace(container.Text, 'title')
+		Skin.TipFace(container.CritText, 'body', OUTPUT_CRIT_SCALE)
+		for _, row in ipairs(entry.Rows) do
+			Fade(row.Bracket)
+			Body(row.Text)
+			SkinItemButton(row.Item)
+		end
+	end
+	Skin.TipShellEdges(container, container.CritFrame:IsShown())
+	for button in entry.itemButtonPool:EnumerateActive() do SkinSlotButton(button) end
+end
+
+local function SkinOutputLog(log)
+	SkinDialogPanel(log)
+	Close(log.ClosePanelButton)
+	ScrollBar(log.ScrollBar)
+end
+
 local function SkinCraftingPage(page)
 	if not page then return end
 	SkinRecipeList(page.RecipeList)
@@ -295,6 +322,7 @@ local function SkinCraftingPage(page)
 	for _, slot in ipairs(page.InventorySlots or {}) do SkinItemButton(slot) end
 	SkinConcentration(page.ConcentrationDisplay)
 	EditBox(page.MinimizedSearchBox)
+	SkinOutputLog(page.CraftingOutputLog)
 end
 
 local function OnOrderTypeTab(tab, selected)
@@ -410,6 +438,7 @@ local function SkinOrderView(view)
 	SkinConcentration(view.ConcentrationDisplay)
 	for _, key in ipairs(ORDER_VIEW_BUTTON_KEYS) do Button(view[key]) end
 	SkinDeclineDialog(view.DeclineOrderDialog)
+	SkinOutputLog(view.CraftingOutputLog)
 	if not view._buiOrderHook and view.SetOrder then
 		view._buiOrderHook = true
 		hooksecurefunc(view, 'SetOrder', OnOrderSet)
@@ -727,6 +756,7 @@ local function InstallFrame()
 	frame:HookScript('OnShow', ApplyFrame)
 	HookMixin(_G.ProfessionsRecipeListCategoryMixin, 'Init', OnCategoryRow)
 	HookMixin(_G.ProfessionsRecipeListRecipeMixin, 'Init', OnRecipeRow)
+	HookMixin(_G.ProfessionsCraftingOutputLogElementMixin, 'Init', OnOutputEntry)
 	HookTemplates()
 	if frame:IsShown() then ApplyFrame() end
 end
