@@ -326,7 +326,7 @@ end
 
 local function StartTicker()
     StopTicker()
-    ticker = BUI.Prof.NewTicker('BuffTracking.KillCommandOverlay', 1, SyncWrapped)
+    ticker = C_Timer.NewTicker(1, SyncWrapped)
 end
 
 local function DisarmWake()
@@ -357,7 +357,7 @@ local function Sync()
     end
 end
 
-SyncWrapped = BUI.Prof.Wrap('tick#KillCommandSync', Sync)
+SyncWrapped = Sync
 QueueTick = BUI.Dispatcher.New(Sync, 'KCO.Tick')
 
 function KillCommandOverlay.Refresh()

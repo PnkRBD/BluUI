@@ -1,5 +1,4 @@
 local BUI = BluUI
-local SetScript = BUI.Prof.Scripts('Pages.Datatext')
 
 local BUILib = BluUI.BUILibClient
 local Controls = BUILib.Controls
@@ -602,7 +601,7 @@ BUI.PageEngine.RegisterPage('datatext', {
 
         SyncDim()
 
-        SetScript(pageFrame, 'OnShow', function()
+        pageFrame:SetScript('OnShow', function()
             for _, refresh in ipairs(refreshers) do refresh() end
             SyncDim(); RefreshPreview()
         end)

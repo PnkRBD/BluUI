@@ -1,7 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Minimap.Minimap')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('minimap')
 local Minimap = {}
 BUI.Minimap = Minimap
 
@@ -252,7 +250,7 @@ local function BeginMinuteAlignedTicker()
 	alignmentTimer = nil
 	if not clockFrame or not clockFrame:IsShown() then return end
 	UpdateClock()
-	clockTicker = BUI.Prof.NewTicker('Minimap.Minimap', 60, BUI.Prof.Wrap('tick#MinimapClock', UpdateClock))
+	clockTicker = C_Timer.NewTicker(60, UpdateClock)
 end
 
 local function StartClock()
@@ -260,7 +258,7 @@ local function StartClock()
 	UpdateClock()
 	local secondsToNextMinute = 60 - tonumber(date('%S'))
 	if secondsToNextMinute <= 0 then secondsToNextMinute = 60 end
-	alignmentTimer = BUI.Prof.NewTimer('Minimap.Minimap', secondsToNextMinute, BeginMinuteAlignedTicker)
+	alignmentTimer = C_Timer.NewTimer(secondsToNextMinute, BeginMinuteAlignedTicker)
 end
 
 local function CreateClock()
@@ -515,13 +513,13 @@ local function MakeDraggable(frame, key)
 	frame:SetMovable(true)
 	frame:RegisterForDrag('LeftButton')
 
-	HookScript(frame, 'OnDragStart', function(self)
+	frame:HookScript('OnDragStart', function(self)
 		if not IsControlKeyDown() then return end
 		self:StartMoving()
 		self._buiDragging = true
 	end)
 
-	HookScript(frame, 'OnDragStop', function(self)
+	frame:HookScript('OnDragStop', function(self)
 		if not self._buiDragging then return end
 		self:StopMovingOrSizing()
 		self._buiDragging = false
@@ -744,8 +742,8 @@ local function PositionAllIndicators()
 							PositionAllIndicators()
 						end
 					end
-					HookScript(frame, 'OnShow', RelayoutDock)
-					HookScript(frame, 'OnHide', RelayoutDock)
+					frame:HookScript('OnShow', RelayoutDock)
+					frame:HookScript('OnHide', RelayoutDock)
 				end
 			end
 		end
@@ -774,7 +772,7 @@ end
 
 local function EnableScrollZoom()
 	WoWMinimap:EnableMouseWheel(true)
-	SetScript(WoWMinimap, 'OnMouseWheel', OnMouseWheel)
+	WoWMinimap:SetScript('OnMouseWheel', OnMouseWheel)
 end
 
 local DEFAULT_SCREEN_OFFSET = -20
@@ -886,7 +884,7 @@ local function CreateUnlockOverlay()
 
 	local startX, startY, startCursorX, startCursorY = 0, 0, 0, 0
 
-	SetScript(unlockOverlay, 'OnDragStart', function(self)
+	unlockOverlay:SetScript('OnDragStart', function(self)
 		local interfaceDB = GetConfig()
 		startX = interfaceDB.minimapScreenX or -20
 		startY = interfaceDB.minimapScreenY or -20
@@ -894,7 +892,7 @@ local function CreateUnlockOverlay()
 		self.dragging = true
 	end)
 
-	SetScript(unlockOverlay, 'OnUpdate', function(self)
+	unlockOverlay:SetScript('OnUpdate', function(self)
 		if not self.dragging then return end
 		local cursorX, cursorY = GetCursorPosition()
 		local uiScale = UIParent:GetEffectiveScale()
@@ -913,7 +911,7 @@ local function CreateUnlockOverlay()
 		UpdateBackdrop()
 	end)
 
-	SetScript(unlockOverlay, 'OnDragStop', function(self)
+	unlockOverlay:SetScript('OnDragStop', function(self)
 		self.dragging = false
 		local _, _, _, x, y = WoWMinimap:GetPoint()
 		local interfaceDB = GetConfig()
@@ -921,7 +919,7 @@ local function CreateUnlockOverlay()
 		interfaceDB.minimapScreenY = y
 	end)
 
-	SetScript(unlockOverlay, 'OnMouseUp', function(_, button)
+	unlockOverlay:SetScript('OnMouseUp', function(_, button)
 		if button == 'RightButton' then
 			Minimap.ToggleUnlock(false)
 			if lockReleaseCallback then lockReleaseCallback() end
@@ -1034,7 +1032,7 @@ function Minimap.Initialize()
 		initialized = true
 
 		local lastWidth, lastHeight = 0, 0
-		HookScript(WoWMinimap, 'OnSizeChanged', function(_, width, height)
+		WoWMinimap:HookScript('OnSizeChanged', function(_, width, height)
 			if not IsEnabled() then return end
 			width, height = math.floor(width + 0.5), math.floor(height + 0.5)
 			if width == lastWidth and height == lastHeight then return end
@@ -1058,7 +1056,7 @@ function Minimap.Initialize()
 		end)
 
 		if EditModeManagerFrame then
-			HookScript(EditModeManagerFrame, 'OnHide', function()
+			EditModeManagerFrame:HookScript('OnHide', function()
 				if IsEnabled() then
 					PositionAllIndicators()
 					Minimap.ApplyVisibility()
@@ -1072,12 +1070,12 @@ function Minimap.Initialize()
 
 		local farmHud = _G.FarmHud
 		if farmHud then
-			HookScript(farmHud, 'OnShow', function()
+			farmHud:HookScript('OnShow', function()
 				if not IsEnabled() then return end
 				if backdropFrame then backdropFrame:Hide() end
 				WoWMinimap:SetMaskTexture('Textures\\MinimapMask')
 			end)
-			HookScript(farmHud, 'OnHide', function()
+			farmHud:HookScript('OnHide', function()
 				if not IsEnabled() then return end
 				UpdateBackdrop()
 				ApplyShape()

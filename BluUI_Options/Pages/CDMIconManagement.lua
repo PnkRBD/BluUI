@@ -1,5 +1,4 @@
 local BUI = BluUI
-local SetScript, HookScript = BUI.Prof.Scripts('Pages.CDMIconManagement')
 
 local BUILib = BluUI.BUILibClient
 local Controls, Layout, Modals, Widget = BUILib.Controls, BUILib.Layout, BUILib.Modals, BUILib.Widget
@@ -585,7 +584,7 @@ local function ShowTrinketSlotModal(CDM, viewerSettings, storedValue, RefreshIco
 	blListFrame:SetPoint('TOPLEFT', curBtnFrame, 'BOTTOMLEFT', 0, Pixel.Scale(-8))
 	RebuildBlList()
 
-	SetScript(overlay, 'OnKeyDown', function(_, key) if key == 'ESCAPE' then Close() end end)
+	overlay:SetScript('OnKeyDown', function(_, key) if key == 'ESCAPE' then Close() end end)
 	Modals.LayoutButtons(dialog, {
 		{ text = 'Close', color = Modals.BTN_CONFIRM, onClick = function(close)
 			close()
@@ -653,7 +652,7 @@ local function ShowRacialSlotModal(CDM, viewerSettings, viewerKey, storedValue, 
 	blListFrame:SetPoint('TOPLEFT', curBtnFrame, 'BOTTOMLEFT', 0, Pixel.Scale(-8))
 	RebuildBlList()
 
-	SetScript(overlay, 'OnKeyDown', function(_, key) if key == 'ESCAPE' then Close() end end)
+	overlay:SetScript('OnKeyDown', function(_, key) if key == 'ESCAPE' then Close() end end)
 	Modals.LayoutButtons(dialog, {
 		{ text = 'Close', color = Modals.BTN_CONFIRM, onClick = function(close)
 			close()
@@ -782,7 +781,7 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 	iconInput:SetPoint('TOPLEFT', iconLabel, 'BOTTOMLEFT', 0, -LABEL_GAP)
 	iconInput:SetAutoFocus(false)
 
-	SetScript(iconInput, 'OnTextChanged', function(self)
+	iconInput:SetScript('OnTextChanged', function(self)
 		preview:SetTexture(tonumber(self:GetText()) or defaultIcon)
 	end)
 
@@ -1028,7 +1027,7 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 		if not dur or dur <= 0 then
 			durInput:SetFocus()
 			durInput:SetTextColor(1, 0.3, 0.3)
-			BUI.Prof.After('Pages.CDMIconManagement', 0.8, function()
+			C_Timer.After(0.8, function()
 				durInput:SetTextColor(1, 1, 1)
 			end)
 			return
@@ -1051,9 +1050,9 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 		PerformSave()
 	end
 
-	SetScript(durInput, 'OnEnterPressed', function() DoConfirm() end)
-	SetScript(iconInput, 'OnEnterPressed', function() DoConfirm() end)
-	SetScript(overlay, 'OnKeyDown', function(_, key) if key == 'ESCAPE' then Close() end end)
+	durInput:SetScript('OnEnterPressed', function() DoConfirm() end)
+	iconInput:SetScript('OnEnterPressed', function() DoConfirm() end)
+	overlay:SetScript('OnKeyDown', function(_, key) if key == 'ESCAPE' then Close() end end)
 	Modals.LayoutButtons(dialog, {
 		{ text = 'Save', color = Modals.BTN_CONFIRM, onClick = function() DoConfirm() end },
 		{ text = 'Cancel', color = Modals.BTN_CANCEL, onClick = function(close) close() end },
@@ -1124,15 +1123,15 @@ local function ShowIconOverrideModal(CDM, spellID, viewerSettings, onSaved)
 			btn.tex:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 			btn:SetBackdrop({ edgeFile = 'Interface\\Buttons\\WHITE8X8', edgeSize = 1 })
 			btn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
-			SetScript(btn, 'OnEnter', function(self)
+			btn:SetScript('OnEnter', function(self)
 				self:SetBackdropBorderColor(1, 0.82, 0, 1)
 				if self._name then Widget.ShowTip(self, self._name) end
 			end)
-			SetScript(btn, 'OnLeave', function(self)
+			btn:SetScript('OnLeave', function(self)
 				self:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
 				Widget.HideTip()
 			end)
-			SetScript(btn, 'OnClick', function(self)
+			btn:SetScript('OnClick', function(self)
 				if self._tex then input:SetText(tostring(self._tex)) end
 			end)
 			resultButtons[i] = btn
@@ -1196,7 +1195,7 @@ local function ShowIconOverrideModal(CDM, spellID, viewerSettings, onSaved)
 			return
 		end
 		pendingQuery = text
-		BUI.Prof.After('Pages.CDMIconManagement', 0.15, function()
+		C_Timer.After(0.15, function()
 			if pendingQuery == text then RunSearch(text) end
 		end)
 	end
@@ -1227,7 +1226,7 @@ local function ShowIconOverrideModal(CDM, spellID, viewerSettings, onSaved)
 	rowFrame:SetPoint('TOPLEFT', dialog, 'TOPLEFT', PAD, -96)
 	dialog:SetHeight(96 + (rowFrame.layoutHeight or rowFrame:GetHeight()) + 70)
 
-	SetScript(input, 'OnTextChanged', function(self)
+	input:SetScript('OnTextChanged', function(self)
 		local text = self:GetText():gsub('^%s+', ''):gsub('%s+$', '')
 		if text == '' then
 			preview:SetTexture(defaultIcon)
@@ -1247,8 +1246,8 @@ local function ShowIconOverrideModal(CDM, spellID, viewerSettings, onSaved)
 		if onSaved then onSaved() end
 	end
 
-	SetScript(input, 'OnEnterPressed', DoSave)
-	SetScript(overlay, 'OnKeyDown', function(_, key) if key == 'ESCAPE' then Close() end end)
+	input:SetScript('OnEnterPressed', DoSave)
+	overlay:SetScript('OnKeyDown', function(_, key) if key == 'ESCAPE' then Close() end end)
 	Modals.LayoutButtons(dialog, {
 		{ text = 'Save', color = Modals.BTN_CONFIRM, onClick = function() DoSave() end },
 		{ text = 'Cancel', color = Modals.BTN_CANCEL, onClick = function(close) close() end },
@@ -1460,7 +1459,7 @@ local function ShowPotionDisplayModal(CDM, itemID, storedValue, viewerSettings, 
 		tickMark:SetSize(10, 10)
 		tickMark:SetPoint('CENTER')
 		card.tickMark = tickMark
-		SetScript(tick, 'OnClick', function()
+		tick:SetScript('OnClick', function()
 			card.enabled = not card.enabled
 			ApplyEnabledVisual(card)
 			SaveNow()
@@ -1483,11 +1482,11 @@ local function ShowPotionDisplayModal(CDM, itemID, storedValue, viewerSettings, 
 
 		cardFrame:EnableMouse(true)
 		cardFrame:RegisterForDrag('LeftButton')
-		SetScript(cardFrame, 'OnEnter', ShowHover)
-		SetScript(cardFrame, 'OnLeave', HideHover)
-		SetScript(tick, 'OnEnter', ShowHover)
-		SetScript(tick, 'OnLeave', HideHover)
-		SetScript(cardFrame, 'OnDragStart', function()
+		cardFrame:SetScript('OnEnter', ShowHover)
+		cardFrame:SetScript('OnLeave', HideHover)
+		tick:SetScript('OnEnter', ShowHover)
+		tick:SetScript('OnLeave', HideHover)
+		cardFrame:SetScript('OnDragStart', function()
 			dragIndex = card.index
 			ghostIcon:SetTexture(icon:GetTexture())
 			ghostLabel:SetText(label:GetText())
@@ -1499,7 +1498,7 @@ local function ShowPotionDisplayModal(CDM, itemID, storedValue, viewerSettings, 
 				ghostBadge:Hide()
 			end
 			ghost:Show()
-			SetScript(gridFrame, 'OnUpdate', function()
+			gridFrame:SetScript('OnUpdate', function()
 				local cx, cy = GetCursorPosition()
 				local scale = UIParent:GetEffectiveScale()
 				cx, cy = cx / scale, cy / scale
@@ -1518,10 +1517,10 @@ local function ShowPotionDisplayModal(CDM, itemID, storedValue, viewerSettings, 
 				end
 			end)
 		end)
-		SetScript(cardFrame, 'OnDragStop', function()
+		cardFrame:SetScript('OnDragStop', function()
 			dragIndex = nil
 			ghost:Hide()
-			SetScript(gridFrame, 'OnUpdate', nil)
+			gridFrame:SetScript('OnUpdate', nil)
 			LayoutCards()
 			SaveNow()
 		end)
@@ -1677,7 +1676,7 @@ local function ShowPotionDisplayModal(CDM, itemID, storedValue, viewerSettings, 
 	end
 	WatchPending(Rebuild())
 
-	SetScript(overlay, 'OnKeyDown', function(_, key) if key == 'ESCAPE' then Close() end end)
+	overlay:SetScript('OnKeyDown', function(_, key) if key == 'ESCAPE' then Close() end end)
 	Modals.LayoutButtons(dialog, {
 		{ text = 'Done', color = Modals.BTN_CONFIRM, onClick = function(close) close() end },
 		{ text = 'Reset', color = Modals.BTN_CANCEL, onClick = function()
@@ -2042,7 +2041,7 @@ local function ShowProcModal(CDM, spellID, RefreshIconList, backTo, viewerSettin
 		local backName = C_Spell.GetSpellName(backTo) or 'previous'
 		local backBtn = Modals.CreateButton(header, '< ' .. backName, { ar, ag, ab, 1 }, 150)
 		backBtn:SetPoint('TOPRIGHT', header, 'TOPRIGHT', 0, -6)
-		SetScript(backBtn, 'OnClick', function() NavigateTo(backTo) end)
+		backBtn:SetScript('OnClick', function() NavigateTo(backTo) end)
 	end
 
 	local msgPreviewHost = CreateFrame('Frame', nil, header)
@@ -2073,18 +2072,18 @@ local function ShowProcModal(CDM, spellID, RefreshIconList, backTo, viewerSettin
 			local br, bg, bb = 0.3, 0.3, 0.3
 			if configured then br, bg, bb = ar, ag, ab end
 			btn:SetBackdropBorderColor(br, bg, bb, 1)
-			SetScript(btn, 'OnEnter', function(self)
+			btn:SetScript('OnEnter', function(self)
 				self:SetBackdropBorderColor(1, 0.82, 0, 1)
 				GameTooltip:SetOwner(self, 'ANCHOR_TOP')
 				GameTooltip:SetSpellByID(otherID)
 				GameTooltip:AddLine(configured and '|cffffe066Has an alert. Click to edit it.|r' or '|cff888888Click to set up an alert for this spell.|r')
 				GameTooltip:Show()
 			end)
-			SetScript(btn, 'OnLeave', function(self)
+			btn:SetScript('OnLeave', function(self)
 				self:SetBackdropBorderColor(br, bg, bb, 1)
 				GameTooltip:Hide()
 			end)
-			SetScript(btn, 'OnClick', function() NavigateTo(otherID) end)
+			btn:SetScript('OnClick', function() NavigateTo(otherID) end)
 			x = x + 28
 		end
 		famY = famY + 28
@@ -2102,7 +2101,7 @@ local function ShowProcModal(CDM, spellID, RefreshIconList, backTo, viewerSettin
 			thickness = thickVal,
 		})
 	end
-	HookScript(dialog, 'OnHide', function() CDM.StopProcGlow(glowHost) end)
+	dialog:HookScript('OnHide', function() CDM.StopProcGlow(glowHost) end)
 
 	local function RefreshMsgPreview()
 		if not msgOn then
@@ -2270,7 +2269,7 @@ local function ShowProcModal(CDM, spellID, RefreshIconList, backTo, viewerSettin
 	local msgBox = Controls.TextBox(rowMsg, nil, msgTextVal, function(t) msgTextVal = t end, nil, 300)
 	rowMsg:Place(msgBox, 300)
 	local msgEdit = Widget.Unwrap(msgBox).editbox
-	HookScript(msgEdit, 'OnTextChanged', function(box)
+	msgEdit:HookScript('OnTextChanged', function(box)
 		msgTextVal = box:GetText() or ''
 		RefreshMsgPreview()
 	end)
@@ -2351,7 +2350,7 @@ local function ShowProcModal(CDM, spellID, RefreshIconList, backTo, viewerSettin
 		local iconBox = Controls.TextBox(rowIcon, nil, initialIconText, nil, nil, 300)
 		rowIcon:Place(iconBox, 300)
 		iconEdit = Widget.Unwrap(iconBox).editbox
-		HookScript(iconEdit, 'OnTextChanged', function(self)
+		iconEdit:HookScript('OnTextChanged', function(self)
 			local text = self:GetText():gsub('^%s+', ''):gsub('%s+$', '')
 			if text == '' then
 				preview:SetTexture(defaultIcon)
@@ -2373,7 +2372,7 @@ local function ShowProcModal(CDM, spellID, RefreshIconList, backTo, viewerSettin
 		RefreshMsgPreview()
 	end
 
-	HookScript(watchEdit, 'OnTextChanged', function(box, userInput)
+	watchEdit:HookScript('OnTextChanged', function(box, userInput)
 		if not userInput then return end
 		watchText = box:GetText() or ''
 		watchID = nil
@@ -3218,7 +3217,7 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 	resetAllBtn:SetPoint('LEFT', resetBtn, 'RIGHT', 10, 0)
 
 	Layout.PositionInTab(container, btnContainer, 26, 4)
-	BUI.Prof.After('Pages.CDMIconManagement', 0.1, RefreshIconList)
+	C_Timer.After(0.1, RefreshIconList)
 	return iconList
 end
 
@@ -3309,7 +3308,7 @@ function BUI.BuildCDMIconManagementTab(tab, db)
 
 	local baseContentH = containers[1] and math.abs(containers[1].y) + 20 or 400
 	local lastListH = listH
-	HookScript(tab.frame, 'OnSizeChanged', function(_, w, h)
+	tab.frame:HookScript('OnSizeChanged', function(_, w, h)
 		local newListH = math.max(200, h - OVERHEAD)
 		if math.abs(newListH - lastListH) < 5 then return end
 		local delta = newListH - listH

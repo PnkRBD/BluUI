@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('GroupFrames.Indicators')
 
 local GroupFrames    = BUI.GroupFrames
 local Util  = GroupFrames.Util
@@ -127,10 +126,10 @@ local function WirePlayerReadyCheck(frame, texture)
 			texture:Hide()
 		end
 	end
-	SetScript(watcher, "OnEvent", BUI.Prof.Wrap("groupframes#ReadyCheck", function(_, event)
+	watcher:SetScript("OnEvent", function(_, event)
 		if event == "READY_CHECK_FINISHED" then
 			if hideTimer then hideTimer:Cancel() end
-			hideTimer = BUI.Prof.NewTimer('GroupFrames.Indicators', 10, function()
+			hideTimer = C_Timer.NewTimer(10, function()
 				hideTimer = nil
 				texture:Hide()
 			end)
@@ -138,7 +137,7 @@ local function WirePlayerReadyCheck(frame, texture)
 			if hideTimer then hideTimer:Cancel(); hideTimer = nil end
 			ApplyReadyStatus()
 		end
-	end))
+	end)
 	watcher:RegisterEvent("READY_CHECK")
 	watcher:RegisterEvent("READY_CHECK_CONFIRM")
 	watcher:RegisterEvent("READY_CHECK_FINISHED")
@@ -276,11 +275,11 @@ function GroupFrames.BuildSelection(frame, unit)
 	selection:Hide()
 	frame.Selection = selection
 
-	HookScript(frame, "OnEnter", function(self)
+	frame:HookScript("OnEnter", function(self)
 		self._isMouseover = true
 		UpdateSelection(self)
 	end)
-	HookScript(frame, "OnLeave", function(self)
+	frame:HookScript("OnLeave", function(self)
 		self._isMouseover = false
 		UpdateSelection(self)
 	end)
@@ -301,9 +300,9 @@ function GroupFrames.HookSelection()
 	if selectionWatcher then return end
 	selectionWatcher = CreateFrame("Frame")
 	selectionWatcher:RegisterEvent("PLAYER_TARGET_CHANGED")
-	SetScript(selectionWatcher, "OnEvent", BUI.Prof.Wrap("groupframes#Selection", function()
+	selectionWatcher:SetScript("OnEvent", function()
 		GroupFrames.EachChild(UpdateSelection)
-	end))
+	end)
 end
 
 BUI.oUF:RegisterInitCallback(function(frame)

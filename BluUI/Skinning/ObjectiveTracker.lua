@@ -1,6 +1,5 @@
 local _, BUI = ...
 
-local hooksecurefunc = BUI.Prof.MakeHooker('tracker')
 local pairs = pairs
 local ipairs = ipairs
 local select = select
@@ -528,17 +527,17 @@ function Skin.TrackerEditModeHooks()
 	end
 	if guardedFrame and not guardedFrame.__buiStateProbes then
 		guardedFrame.__buiStateProbes = true
-		BUI.Prof.HookScript('ObjectiveTracker', guardedFrame, 'OnHide', function(self)
+		guardedFrame:HookScript('OnHide', function(self)
 			if IsEditModeActive() then LogTrackerEvent('tracker hidden dragging=' .. tostring(self.isDragging)) end
 		end)
-		BUI.Prof.HookScript('ObjectiveTracker', guardedFrame, 'OnShow', function()
+		guardedFrame:HookScript('OnShow', function()
 			if IsEditModeActive() then LogTrackerEvent('tracker shown') end
 		end)
 		if guardedFrame.Selection then
-			BUI.Prof.HookScript('ObjectiveTracker', guardedFrame.Selection, 'OnHide', function()
+			guardedFrame.Selection:HookScript('OnHide', function()
 				if IsEditModeActive() then LogTrackerEvent('selection hidden dragging=' .. tostring(guardedFrame.isDragging)) end
 			end)
-			BUI.Prof.HookScript('ObjectiveTracker', guardedFrame.Selection, 'OnShow', function()
+			guardedFrame.Selection:HookScript('OnShow', function()
 				if IsEditModeActive() then LogTrackerEvent('selection shown') end
 			end)
 		end
@@ -666,7 +665,7 @@ local function EnsureHostedContainer()
 	local container = CreateFrame('Frame', 'BUI_TrackerContainer', staging, 'ObjectiveTrackerContainerTemplate')
 	if savedOnShow then mixin.OnShow = savedOnShow end
 	container.modules = {}
-	BUI.Prof.SetScript('ObjectiveTracker', container, 'OnShow', function(self) self:UpdateHeight() end)
+	container:SetScript('OnShow', function(self) self:UpdateHeight() end)
 	container.editModeHeight = LAYOUT_HEIGHT
 	container.IsInDefaultPosition = function() return false end
 	container.SetCollapsed = function(self, collapsed)
@@ -762,7 +761,7 @@ local function StartScrollGlide()
 	glide.startTime = GetTime()
 	if not glide.frame then
 		glide.frame = CreateFrame('Frame')
-		BUI.Prof.SetScript('ObjectiveTracker', glide.frame, 'OnUpdate', BUI.Prof.Wrap('tick#TrackerGlide', GlideStep))
+		glide.frame:SetScript('OnUpdate', GlideStep)
 	end
 	glide.frame:Show()
 end
@@ -779,9 +778,9 @@ local function OnTrackerWheel(_, delta)
 end
 
 function Skin.ForwardTrackerWheel(frame)
-	if not frame or BUI.Prof.Unwrap(frame:GetScript('OnMouseWheel')) == OnTrackerWheel then return end
+	if not frame or frame:GetScript('OnMouseWheel') == OnTrackerWheel then return end
 	frame:EnableMouseWheel(true)
-	BUI.Prof.SetScript('ObjectiveTracker', frame, 'OnMouseWheel', OnTrackerWheel)
+	frame:SetScript('OnMouseWheel', OnTrackerWheel)
 end
 
 local function EnsureScrollHolder()
@@ -808,7 +807,7 @@ local function EnsureScrollHolder()
 	scrollHolder:SetMovable(true)
 	scrollHolder:SetClampedToScreen(true)
 	scrollHolder:EnableMouseWheel(true)
-	BUI.Prof.SetScript('ObjectiveTracker', scrollHolder, 'OnMouseWheel', OnTrackerWheel)
+	scrollHolder:SetScript('OnMouseWheel', OnTrackerWheel)
 
 	scrollChild = CreateFrame('Frame', 'BUI_TrackerScrollChild', scrollHolder)
 	scrollChild:SetSize(width, LAYOUT_HEIGHT)
@@ -896,8 +895,8 @@ local function EnsureTrackerCard()
 
 		trackerCard:EnableMouse(true)
 		trackerCard:EnableMouseWheel(true)
-		BUI.Prof.SetScript('ObjectiveTracker', trackerCard, 'OnMouseWheel', OnTrackerWheel)
-		BUI.Prof.HookScript('ObjectiveTracker', trackerCard, 'OnSizeChanged', Skin.TrackerClamp)
+		trackerCard:SetScript('OnMouseWheel', OnTrackerWheel)
+		trackerCard:HookScript('OnSizeChanged', Skin.TrackerClamp)
 
 		scrollTrack = CreateFrame('Frame', nil, trackerCard)
 		scrollTrack:SetWidth(Pixel.PixelSize(8))
@@ -924,7 +923,7 @@ local function EnsureTrackerCard()
 		local dragStartCursorY = 0
 		local dragStartOffset = 0
 		local function EndThumbDrag()
-			BUI.Prof.SetScript('ObjectiveTracker', scrollThumb, 'OnUpdate', nil)
+			scrollThumb:SetScript('OnUpdate', nil)
 			thumbTexture:SetColorTexture(Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3], 0.8)
 		end
 		local function ThumbDragUpdate(self)
@@ -939,25 +938,25 @@ local function EnsureTrackerCard()
 			scrollTarget = scrollOffset
 			RefreshScroll()
 		end
-		BUI.Prof.SetScript('ObjectiveTracker', scrollThumb, 'OnMouseDown', function()
+		scrollThumb:SetScript('OnMouseDown', function()
 			local _, cursorY = GetCursorPosition()
 			dragStartCursorY = cursorY
 			dragStartOffset = scrollOffset
 			thumbTexture:SetColorTexture(1, 1, 1, 0.9)
-			BUI.Prof.SetScript('ObjectiveTracker', scrollThumb, 'OnUpdate', ThumbDragUpdate)
+			scrollThumb:SetScript('OnUpdate', ThumbDragUpdate)
 		end)
-		BUI.Prof.SetScript('ObjectiveTracker', scrollThumb, 'OnMouseUp', EndThumbDrag)
+		scrollThumb:SetScript('OnMouseUp', EndThumbDrag)
 		if mirrorFrame.SetCollapsed then hooksecurefunc(mirrorFrame, 'SetCollapsed', UpdateCardAnchors) end
 		if nineSlice then
 			nineSlice:SetAlpha(0)
 			hooksecurefunc(nineSlice, 'SetAlpha', function(self, alpha)
 				if IsEnabled() and alpha ~= 0 then self:SetAlpha(0) end
 			end)
-			BUI.Prof.HookScript('ObjectiveTracker', nineSlice, 'OnShow', SyncTrackerCardShown)
-			BUI.Prof.HookScript('ObjectiveTracker', nineSlice, 'OnHide', SyncTrackerCardShown)
+			nineSlice:HookScript('OnShow', SyncTrackerCardShown)
+			nineSlice:HookScript('OnHide', SyncTrackerCardShown)
 		end
-		BUI.Prof.HookScript('ObjectiveTracker', mirrorFrame, 'OnHide', SyncTrackerCardShown)
-		BUI.Prof.HookScript('ObjectiveTracker', mirrorFrame, 'OnShow', SyncTrackerCardShown)
+		mirrorFrame:HookScript('OnHide', SyncTrackerCardShown)
+		mirrorFrame:HookScript('OnShow', SyncTrackerCardShown)
 		if mirrorFrame == trackerFrame then
 			hooksecurefunc(trackerFrame, 'SetAlpha', function(_, alpha)
 				local fadedOut = not issecretvalue(alpha) and alpha == 0 and not Skin.trackerStashScale
@@ -1500,7 +1499,6 @@ end
 local function RefreshQuestCache()
 	if not IsEnabled() then return end
 	if not C_QuestLog.GetNumQuestWatches or not C_QuestLog.GetQuestIDForQuestWatchIndex then return end
-	local profileStart = BUI.Prof.active and debugprofilestop() or nil
 	local newReadyByQuest = {}
 	local chime = false
 	local readyChanged = false
@@ -1528,10 +1526,9 @@ local function RefreshQuestCache()
 	if readyChanged then RepaintSkinColors() end
 	UpdateQuestItemBinding()
 	if chime then BUI.PlaySoundByName(GetSettings().completionSound) end
-	if profileStart then BUI.Prof.Add('tracker.questCache', debugprofilestop() - profileStart) end
 end
 
-local queueQuestCacheRefresh = BUI.Dispatcher.NewDelayed(RefreshQuestCache, 0.3, 'Skinning.TrackerQuestCache')
+local queueQuestCacheRefresh = BUI.Dispatcher.NewDelayed(RefreshQuestCache, 0.3)
 
 local function ScrollBlockIntoView(block)
 	if not scrollHolder or not scrollHolder:IsShown() then return end
@@ -1571,12 +1568,12 @@ local function FlashProgressBlock()
 	for _, line in pairs(targetBlock.usedLines) do
 		if line.Text then line.Text:SetTextColor(flashRed, flashGreen, flashBlue, 1) end
 	end
-	BUI.Prof.After('ObjectiveTracker', FLASH_SECONDS, function()
+	C_Timer.After(FLASH_SECONDS, function()
 		if IsEnabled() then OnUpdateHighlight(targetBlock) end
 	end)
 end
 
-local queueProgressFlash = BUI.Dispatcher.NewDelayed(FlashProgressBlock, 0.15, 'Skinning.TrackerFlash')
+local queueProgressFlash = BUI.Dispatcher.NewDelayed(FlashProgressBlock, 0.15)
 
 local function OnQuestProgress(_, questID)
 	if not IsEnabled() or not questID then return end
@@ -1675,7 +1672,7 @@ end
 local moveDriver
 
 local function StopMoverDrag()
-	if moveDriver then BUI.Prof.SetScript('ObjectiveTracker', moveDriver, 'OnUpdate', nil) end
+	if moveDriver then moveDriver:SetScript('OnUpdate', nil) end
 	if scrollHolder and scrollHolder._buiDragging then
 		scrollHolder._buiDragging = false
 		Skin.SavePosition(scrollHolder, POSITION_KEY)
@@ -1691,7 +1688,7 @@ local function StartMoverDrag()
 	local startX, startY = GetCursorPosition()
 	scrollHolder._buiDragging = true
 	if not moveDriver then moveDriver = CreateFrame('Frame') end
-	BUI.Prof.SetScript('ObjectiveTracker', moveDriver, 'OnUpdate', function()
+	moveDriver:SetScript('OnUpdate', function()
 		if not IsMouseButtonDown('LeftButton') then
 			StopMoverDrag()
 			return
@@ -1736,16 +1733,16 @@ local function MakeHeaderDragHandle(header)
 	header:EnableMouse(true)
 	Skin.ForwardTrackerWheel(header)
 	header:RegisterForDrag('LeftButton')
-	BUI.Prof.HookScript('ObjectiveTracker', header, 'OnDragStart', OnMoverDragStart)
-	BUI.Prof.HookScript('ObjectiveTracker', header, 'OnDragStop', OnMoverDragStop)
+	header:HookScript('OnDragStart', OnMoverDragStart)
+	header:HookScript('OnDragStop', OnMoverDragStop)
 end
 
 local function WireCardDragHandles()
 	if not trackerCard or trackerCard.__buiDragWired then return end
 	trackerCard.__buiDragWired = true
 	trackerCard:RegisterForDrag('LeftButton')
-	BUI.Prof.SetScript('ObjectiveTracker', trackerCard, 'OnDragStart', OnMoverDragStart)
-	BUI.Prof.SetScript('ObjectiveTracker', trackerCard, 'OnDragStop', OnMoverDragStop)
+	trackerCard:SetScript('OnDragStart', OnMoverDragStart)
+	trackerCard:SetScript('OnDragStop', OnMoverDragStop)
 end
 
 local appliedTrackerCollapse
@@ -1773,13 +1770,13 @@ function Skin.TrackerHeaderControls(parent, anchor)
 	filterGlyph:SetSize(Pixel.Scale(GLYPH_SIZE + 2), Pixel.Scale(GLYPH_SIZE + 2))
 	headerFilter = filterButton
 	headerFilter.glyph = filterGlyph
-	BUI.Prof.SetScript('ObjectiveTracker', filterButton, 'OnEnter', function()
+	filterButton:SetScript('OnEnter', function()
 		filterGlyph:SetVertexColor(1, 1, 1, 1)
 	end)
-	BUI.Prof.SetScript('ObjectiveTracker', filterButton, 'OnLeave', function()
+	filterButton:SetScript('OnLeave', function()
 		QuestFilter.UpdateTint()
 	end)
-	BUI.Prof.SetScript('ObjectiveTracker', filterButton, 'OnClick', QuestFilter.ShowMenu)
+	filterButton:SetScript('OnClick', QuestFilter.ShowMenu)
 	QuestFilter.UpdateTint()
 
 	headerCounts = parent:CreateFontString(nil, 'ARTWORK')
@@ -1858,13 +1855,13 @@ local function EnsureHeaderRow()
 	headerChevron:SetPoint('CENTER', 0, 0)
 	headerChevron:SetSize(Pixel.Scale(GLYPH_SIZE), Pixel.Scale(GLYPH_SIZE))
 	headerChevron:SetVertexColor(Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3], 1)
-	BUI.Prof.SetScript('ObjectiveTracker', toggle, 'OnEnter', function()
+	toggle:SetScript('OnEnter', function()
 		headerChevron:SetVertexColor(1, 1, 1, 1)
 	end)
-	BUI.Prof.SetScript('ObjectiveTracker', toggle, 'OnLeave', function()
+	toggle:SetScript('OnLeave', function()
 		headerChevron:SetVertexColor(Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3], 1)
 	end)
-	BUI.Prof.SetScript('ObjectiveTracker', toggle, 'OnClick', function()
+	toggle:SetScript('OnClick', function()
 		local settings = GetSettings()
 		settings.trackerCollapsed = not (settings.trackerCollapsed == true)
 		ApplyTrackerCollapse()
@@ -1872,7 +1869,7 @@ local function EnsureHeaderRow()
 
 	Skin.TrackerHeaderControls(headerRow, toggle)
 
-	BUI.Prof.SetScript('ObjectiveTracker', headerRow, 'OnEnter', function(self)
+	headerRow:SetScript('OnEnter', function(self)
 		if GetSettings().trackerCollapsed ~= true then return end
 		if #watchedQuestCache == 0 then return end
 		local rows = {}
@@ -1899,13 +1896,13 @@ local function EnsureHeaderRow()
 		end
 		LibWidget.ShowTipRows(self, 'Objectives', rows)
 	end)
-	BUI.Prof.SetScript('ObjectiveTracker', headerRow, 'OnLeave', function()
+	headerRow:SetScript('OnLeave', function()
 		LibWidget.HideTip()
 	end)
 
 	headerRow:RegisterForDrag('LeftButton')
-	BUI.Prof.SetScript('ObjectiveTracker', headerRow, 'OnDragStart', OnMoverDragStart)
-	BUI.Prof.SetScript('ObjectiveTracker', headerRow, 'OnDragStop', OnMoverDragStop)
+	headerRow:SetScript('OnDragStart', OnMoverDragStart)
+	headerRow:SetScript('OnDragStop', OnMoverDragStop)
 
 	if scrollTrack then
 		scrollTrack:SetPoint('TOPRIGHT', trackerCard, 'TOPRIGHT', -Pixel.PixelSize(2), -(Pixel.PixelSize(CARD_PAD_Y) + headerRow:GetHeight() + Pixel.Scale(HEADER_ROW_TOP_PAD)))
@@ -2037,10 +2034,10 @@ local function SkinMinimizeButton(header)
 	end
 	PaintGlyph(Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3])
 
-	BUI.Prof.HookScript('ObjectiveTracker', button, 'OnEnter', function()
+	button:HookScript('OnEnter', function()
 		if IsEnabled() then PaintGlyph(1, 1, 1) end
 	end)
-	BUI.Prof.HookScript('ObjectiveTracker', button, 'OnLeave', function()
+	button:HookScript('OnLeave', function()
 		PaintGlyph(Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3])
 	end)
 
@@ -2098,7 +2095,7 @@ local function SkinBar(bar)
 	end)
 	local backdrop = Skin3.ChildBackdrop(bar, { bg = Theme.bg.dark, border = Theme.border.default })
 	skinnedBars[bar] = backdrop
-	BUI.Prof.HookScript('ObjectiveTracker', bar, 'OnShow', function(self)
+	bar:HookScript('OnShow', function(self)
 		backdrop:SetShown(IsEnabled() and self:IsShown())
 	end)
 	backdrop:SetShown(IsEnabled() and bar:IsShown())
@@ -2132,7 +2129,7 @@ local function SkinStageBlock()
 	HideBlizzardTexture(stageBlock.GlowTexture)
 
 	skinnedBars[stageBlock] = Skin3.ChildBackdrop(stageBlock, { bg = Theme.bg.light, border = Theme.border.light })
-	BUI.Prof.HookScript('ObjectiveTracker', stageBlock, 'OnShow', Scenario.SyncStageBackdrop)
+	stageBlock:HookScript('OnShow', Scenario.SyncStageBackdrop)
 	hooksecurefunc(stageBlock, 'UpdateWidgetRegistration', Scenario.SyncStageBackdrop)
 	Scenario.SyncStageBackdrop(stageBlock)
 
@@ -2269,7 +2266,7 @@ local function OnAddBlock(_, block)
 	end
 	if not block.__buiMenuHook then
 		block.__buiMenuHook = true
-		BUI.Prof.HookScript('ObjectiveTracker', block, 'OnMouseDown', function(self)
+		block:HookScript('OnMouseDown', function(self)
 			pendingMenuQuestID = self.poiQuestID or self.id
 		end)
 	end

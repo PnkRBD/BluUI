@@ -1,5 +1,4 @@
 local BUI = BluUI
-local SetScript = BUI.Prof.Scripts('Pages.Cursor')
 local Pixel = BUI.Pixel
 
 local BUILib = BluUI.BUILibClient
@@ -113,7 +112,7 @@ local function BuildPreview(parent)
     end
 
     local demoX, demoY, wasDown
-    SetScript(card, 'OnUpdate', function(self, elapsed)
+    card:SetScript('OnUpdate', function(self, elapsed)
         local stageLeft, stageBottom = stage:GetLeft(), stage:GetBottom()
         local stageWidth, stageHeight = stage:GetWidth(), stage:GetHeight()
         if not stageLeft or not stageWidth or stageWidth <= 0 then return end
@@ -352,7 +351,7 @@ BUI.PageEngine.RegisterPage("cursor", {
 
         SyncDim()
 
-        SetScript(pageFrame, "OnShow", function()
+        pageFrame:SetScript("OnShow", function()
             for _, refresh in ipairs(refreshers) do refresh() end
             SyncDim(); RefreshPreview()
         end)

@@ -1,5 +1,4 @@
 local BUI = BluUI
-local SetScript = BUI.Prof.Scripts('Pages.CustomBars')
 
 local wipe = wipe
 local Pixel = BUI.Pixel
@@ -645,11 +644,11 @@ local function BuildItemsCard(grid, onItemsChanged)
                 hideTexture:SetAllPoints()
                 hideTexture:SetAtlas('talents-heroclass-ring-minimize-hide')
                 hideButton._tex = hideTexture
-                SetScript(hideButton, 'OnEnter', function(self)
+                hideButton:SetScript('OnEnter', function(self)
                     hideTexture:SetVertexColor(1, 1, 1, 1)
                     Widget.ShowTip(self, self._tip or 'Hide from bar')
                 end)
-                SetScript(hideButton, 'OnLeave', function(self)
+                hideButton:SetScript('OnLeave', function(self)
                     if self._hiddenState then
                         hideTexture:SetVertexColor(1, 0.3, 0.3, 1)
                     else
@@ -668,7 +667,7 @@ local function BuildItemsCard(grid, onItemsChanged)
                 frame._hideBtn._tex:SetVertexColor(0.6, 0.6, 0.6, 1)
                 frame._hideBtn._tip = 'Hide from bar'
             end
-            SetScript(frame._hideBtn, 'OnClick', function()
+            frame._hideBtn:SetScript('OnClick', function()
                 local currentBar = Current()
                 if not currentBar or not hideKey then return end
                 currentBar.hiddenIcons[hideKey] = (not currentBar.hiddenIcons[hideKey]) and true or nil
@@ -689,11 +688,11 @@ local function BuildItemsCard(grid, onItemsChanged)
                     potionTexture:SetPoint('BOTTOMRIGHT', -Pixel.Scale(3), Pixel.Scale(3))
                     potionTexture:SetTexture(BUILib.GetLibMedia('order'))
                     potionButton._tex = potionTexture
-                    SetScript(potionButton, 'OnEnter', function(self)
+                    potionButton:SetScript('OnEnter', function(self)
                         potionTexture:SetVertexColor(1, 1, 1, 1)
                         Widget.ShowTip(self, self._tip)
                     end)
-                    SetScript(potionButton, 'OnLeave', function(self)
+                    potionButton:SetScript('OnLeave', function(self)
                         potionTexture:SetVertexColor(unpack(self._tint))
                         Widget.HideTip()
                     end)
@@ -704,7 +703,7 @@ local function BuildItemsCard(grid, onItemsChanged)
                 frame._potionBtn._tip = label
                 frame._potionBtn._tint = hasPriority and PRIORITY_TINT or IDLE_TINT
                 frame._potionBtn._tex:SetVertexColor(unpack(frame._potionBtn._tint))
-                SetScript(frame._potionBtn, 'OnClick', function()
+                frame._potionBtn:SetScript('OnClick', function()
                     local currentBar = Current()
                     if not currentBar then return end
                     BUI.ShowCDMPotionModal(BUI.CDM, potionItemID, storedValue, currentBar, nil, function()
@@ -1048,7 +1047,7 @@ BUI.PageEngine.RegisterPage("customBars", {
         RegisterSync()
         page:AutoRefresh()
 
-        SetScript(pageFrame, 'OnShow', function()
+        pageFrame:SetScript('OnShow', function()
             RebindAll()
             RebuildPreview()
             SyncTitle()

@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Trade')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('trade')
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
@@ -105,8 +103,8 @@ local function SkinHighlight(name, frame, insetNames)
 	highlight:SetFrameLevel(frame:GetFrameLevel() + HIGHLIGHT_LEVEL_OFFSET)
 	if highlight._buiAcceptHooked then return end
 	highlight._buiAcceptHooked = true
-	HookScript(highlight, 'OnShow', function() SetColumnAccent(insetNames, true) end)
-	HookScript(highlight, 'OnHide', function() SetColumnAccent(insetNames, false) end)
+	highlight:HookScript('OnShow', function() SetColumnAccent(insetNames, true) end)
+	highlight:HookScript('OnHide', function() SetColumnAccent(insetNames, false) end)
 end
 
 local function SkinHighlights(frame)
@@ -187,7 +185,7 @@ local function Install()
 	local frame = _G.TradeFrame
 	if not frame then return end
 	installed = true
-	HookScript(frame, 'OnShow', Apply)
+	frame:HookScript('OnShow', Apply)
 	hooksecurefunc('TradeFrame_UpdatePlayerItem', OnPlayerItemUpdated)
 	hooksecurefunc('TradeFrame_UpdateTargetItem', OnTargetItemUpdated)
 	if frame:IsShown() then Apply() end

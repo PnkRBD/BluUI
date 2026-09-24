@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('Util.Anchors')
 BUI.C.ANCHOR_FRAMES = {
     { tag = "BUI_PlayerFrame", desc = "BUI_PlayerFrame" },
     { tag = "BUI_TargetFrame", desc = "BUI_TargetFrame" },
@@ -129,24 +128,14 @@ end
 local function FlushAnchorCallbacks(self)
     if self._armTime == GetTime() then return end
     self:Hide()
-    local profiler = BUI.Prof
-    if profiler.active then
-        for key, callback in pairs(anchorCallbacks) do
-            local startKB = collectgarbage('count')
-            local startTime = debugprofilestop()
-            callback()
-            profiler.Add('anchor#' .. key, debugprofilestop() - startTime, collectgarbage('count') - startKB)
-        end
-    else
-        for _, callback in pairs(anchorCallbacks) do callback() end
-    end
+    for _, callback in pairs(anchorCallbacks) do callback() end
 end
 
 function Anchor.OnAnchorSizeChanged()
     if not flushFrame then
         flushFrame = CreateFrame("Frame", "BUI_AnchorFlush")
         flushFrame:Hide()
-        SetScript(flushFrame, "OnUpdate", FlushAnchorCallbacks)
+        flushFrame:SetScript("OnUpdate", FlushAnchorCallbacks)
     end
     flushFrame._armTime = GetTime()
     flushFrame:Show()
@@ -165,7 +154,7 @@ end
 
 local function ClearMouseFollow(frame)
     if frame._mouseFollower then
-        SetScript(frame._mouseFollower, "OnUpdate", nil)
+        frame._mouseFollower:SetScript("OnUpdate", nil)
         frame._mouseFollower:Hide()
     end
 end
@@ -187,7 +176,7 @@ local function ApplyMouseAnchor(frame, settings)
     frame._isAnchored = true
 
     follower:Show()
-    SetScript(follower, "OnUpdate", function(self)
+    follower:SetScript("OnUpdate", function(self)
         local x, y = GetCursorPosition()
         if x == self._lastX and y == self._lastY then return end
         self._lastX, self._lastY = x, y

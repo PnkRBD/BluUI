@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('GroupFrames.Auras')
 
 local GroupFrames = BUI.GroupFrames
 local Util   = GroupFrames.Util
@@ -10,6 +9,7 @@ local Engine = BUI.AuraEngine
 local CreateFrame       = CreateFrame
 local UnitIsVisible     = UnitIsVisible
 local UnitIsDeadOrGhost = UnitIsDeadOrGhost
+local UnitCanAssist     = UnitCanAssist
 local CanAccess         = Util.CanAccess
 
 local BASE_FILTER = {
@@ -127,14 +127,13 @@ local function ApplyKind(frame, settings, kind)
 	end
 
 	if not container then
-		container = BUI.Prof.Measure("gf.aura#NewContainer", Engine.NewContainer, frame, KIND_POLARITY[kind] == "HARMFUL", GroupFrames.Layers.auras)
+		container = Engine.NewContainer(frame, KIND_POLARITY[kind] == "HARMFUL", GroupFrames.Layers.auras)
 		container._buiScope = "group"
 		frame[key] = container
 	end
 
 	local candidates, candidateFingerprint = KindCandidates(kind)
-	BUI.Prof.Measure("gf.aura#Configure", Engine.Configure, container, KindStyle(settings, kind), GroupFrames.ContainerRules(config, kind),
-		BASE_FILTER[KIND_POLARITY[kind]], candidates, candidateFingerprint, KindSuffix(settings, kind))
+	Engine.Configure(container, KindStyle(settings, kind), GroupFrames.ContainerRules(config, kind), BASE_FILTER[KIND_POLARITY[kind]], candidates, candidateFingerprint, KindSuffix(settings, kind))
 
 	container:ClearAllPoints()
 	container:SetPoint(config.anchorPoint, frame, config.relativePoint, Pixel.Scale(config.offsetX), Pixel.Scale(config.offsetY))
@@ -148,7 +147,7 @@ local debugprofilestop = debugprofilestop
 
 local updateDriver = CreateFrame("Frame", "BUI_GroupAuraFlush")
 updateDriver:Hide()
-SetScript(updateDriver, "OnUpdate", BUI.Prof.Wrap("groupframes#AuraFlush", function(self)
+updateDriver:SetScript("OnUpdate", function(self)
 	local startTime = debugprofilestop()
 	for frame in pairs(dirtyFrames) do
 		dirtyFrames[frame] = nil
@@ -156,7 +155,7 @@ SetScript(updateDriver, "OnUpdate", BUI.Prof.Wrap("groupframes#AuraFlush", funct
 		if debugprofilestop() - startTime > AURA_FLUSH_BUDGET_MS then return end
 	end
 	if next(dirtyFrames) == nil then self:Hide() end
-end))
+end)
 
 function GroupFrames.MarkAurasDirty(frame)
 	dirtyFrames[frame] = true
@@ -167,7 +166,6 @@ function GroupFrames.RefreshFrameAuras(frame)
 	local unit = frame.unit
 	if not unit then return end
 	GroupFrames.UpdateDispelBorder(frame, unit)
-	if frame._missingBuffWatch then GroupFrames.UpdateMissingRaidBuff(frame) end
 
 	local dead = UnitIsDeadOrGhost(unit) and true or false
 	if frame._bluWasDead ~= dead then
@@ -228,8 +226,7 @@ local function AuraUpdateRelevant(frame, info)
 	if not info then return true end
 	local isFullUpdate = info.isFullUpdate
 	if not CanAccess(isFullUpdate) or isFullUpdate then return true end
-	if (frame._missingBuffWatch or not GroupFrames.DispelViaEngine) and ListHasEntries(info.addedAuras) then return true end
-	if frame._missingBuffWatch and ListHasEntries(info.removedAuraInstanceIDs) then return true end
+	if not GroupFrames.DispelViaEngine and ListHasEntries(info.addedAuras) then return true end
 	return not GroupFrames.DispelViaEngine and frame._dispelColor ~= nil
 end
 
@@ -246,14 +243,14 @@ function GroupFrames.BuildAuraContainers(frame, unit)
 	for kindIndex = 1, #KIND_LIST do
 		ApplyKind(frame, settings, KIND_LIST[kindIndex])
 	end
-	if GroupFrames.DispelViaEngine then BUI.Prof.Measure("gf.aura#DispelHighlight", GroupFrames.ConfigureDispelHighlight, frame) end
+	if GroupFrames.DispelViaEngine then GroupFrames.ConfigureDispelHighlight(frame) end
 	frame.dispelBorderEnabled = settings.dispelBorder.enabled
 
 	local watcher = frame._auraWatcher
 	if not watcher then
 		watcher = CreateFrame("Frame", nil, frame)
 		frame._auraWatcher = watcher
-		SetScript(watcher, "OnEvent", BUI.Prof.Wrap("groupframes#AuraWatcher", function(_, event, _, updateInfo)
+		watcher:SetScript("OnEvent", function(_, event, _, updateInfo)
 			if event == "UNIT_AURA" then
 				RecordAddedAuras(updateInfo)
 				if AuraUpdateRelevant(frame, updateInfo) then GroupFrames.MarkAurasDirty(frame) end
@@ -261,7 +258,7 @@ function GroupFrames.BuildAuraContainers(frame, unit)
 			end
 			if event == "PLAYER_ENTERING_WORLD" then ResetFrameAuras(frame, frame.unit) end
 			GroupFrames.MarkAurasDirty(frame)
-		end))
+		end)
 		watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
 	end
 	frame._bluLastUnit = frame.unit or frame:GetAttribute("unit")
@@ -269,7 +266,7 @@ function GroupFrames.BuildAuraContainers(frame, unit)
 
 	if not frame._bluUnitHookInstalled then
 		frame._bluUnitHookInstalled = true
-		HookScript(frame, "OnAttributeChanged", function(self, name, value)
+		frame:HookScript("OnAttributeChanged", function(self, name, value)
 			if name == "unit" and value ~= self._bluLastUnit then
 				self._bluLastUnit = value
 				ResetFrameAuras(self, value)
@@ -295,7 +292,7 @@ end
 local function reflowAuraVisibility(frame)
 	local unit = frame.unit
 	if not unit then return end
-	local isVisible = UnitIsVisible(unit) and true or false
+	local isVisible = (UnitIsVisible(unit) and UnitCanAssist("player", unit)) and true or false
 	if frame._bluAurasVisible == isVisible then return end
 	frame._bluAurasVisible = isVisible
 	local settings = GroupFrames.SettingsForFrame(frame)
@@ -311,13 +308,25 @@ local function reflowAuraVisibility(frame)
 end
 GroupFrames.ReflowAuraVisibility = reflowAuraVisibility
 
+local REACHABILITY_EVENTS = {
+	"UNIT_CONNECTION", "UNIT_PHASE", "UNIT_FACTION", "UNIT_IN_RANGE_UPDATE", "UNIT_DISTANCE_CHECK_UPDATE",
+}
+
 function GroupFrames.AttachReachabilityHooks(frame)
 	local sink = CreateFrame("Frame", nil, frame)
-	SetScript(sink, "OnEvent", BUI.Prof.Wrap("groupframes#ConnectionSink", function(_, _, eventUnit)
-		if eventUnit == frame.unit then reflowAuraVisibility(frame) end
-	end))
-	sink:RegisterEvent("UNIT_CONNECTION")
-	HookScript(frame, "OnShow", reflowAuraVisibility)
+	sink:SetScript("OnEvent", function(_, _, eventUnit)
+		if eventUnit ~= frame.unit then return end
+		reflowAuraVisibility(frame)
+		if not frame._bluAurasVisible then return end
+		for kindIndex = 1, #KIND_LIST do
+			local container = frame[KIND_KEYS[KIND_LIST[kindIndex]]]
+			if container and container:IsShown() and container.UpdateAllAuras then container:UpdateAllAuras() end
+		end
+	end)
+	for _, event in ipairs(REACHABILITY_EVENTS) do
+		if C_EventUtils.IsEventValid(event) then sink:RegisterEvent(event) end
+	end
+	frame:HookScript("OnShow", reflowAuraVisibility)
 end
 
 local function ApplyAurasToChild(child)

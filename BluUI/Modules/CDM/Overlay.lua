@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('CDM.Overlay')
 
 local CreateFrame = CreateFrame
 local UIParent = UIParent
@@ -47,10 +46,10 @@ function CDM.SetupBlizzardOverlay()
     buttonText:SetText("Dismiss")
     buttonText:SetTextColor(1, 1, 1)
 
-    SetScript(dismissButton, "OnEnter", function(self) self:SetBackdropColor(0.2, 0.0, 0.3, 1) end)
-    SetScript(dismissButton, "OnLeave", function(self) self:SetBackdropColor(0.12, 0.0, 0.18, 0.95) end)
+    dismissButton:SetScript("OnEnter", function(self) self:SetBackdropColor(0.2, 0.0, 0.3, 1) end)
+    dismissButton:SetScript("OnLeave", function(self) self:SetBackdropColor(0.12, 0.0, 0.18, 0.95) end)
     local dismissed = false
-    SetScript(dismissButton, "OnClick", function()
+    dismissButton:SetScript("OnClick", function()
         dismissed = true
         overlay:Hide()
     end)
@@ -68,13 +67,13 @@ function CDM.SetupBlizzardOverlay()
                 local tabText = child:GetText()
                 if tabText then
                     if tabText:find("Spell") or tabText:find("Cooldown") then
-                        HookScript(child, "OnClick", function()
+                        child:HookScript("OnClick", function()
                             onSpellsTab = true
                             if PollTick then PollTick() end
                         end)
                         hookedAny = true
                     elseif tabText:find("Aura") or tabText:find("Buff") then
-                        HookScript(child, "OnClick", function()
+                        child:HookScript("OnClick", function()
                             onSpellsTab = false
                             if PollTick then PollTick() end
                         end)
@@ -135,14 +134,14 @@ function CDM.SetupBlizzardOverlay()
         end
     end
 
-    HookScript(CooldownViewerSettings, "OnShow", function()
+    CooldownViewerSettings:HookScript("OnShow", function()
         cachedDB = BUI.GetDB()
         PollTick()
         if not pollTicker and not tabsHooked then
-            pollTicker = BUI.Prof.NewTicker('CDM.Overlay', 1.0, BUI.Prof.Wrap('tick#CDMOverlayPoll', PollTick))
+            pollTicker = C_Timer.NewTicker(1.0, PollTick)
         end
     end)
-    HookScript(CooldownViewerSettings, "OnHide", function()
+    CooldownViewerSettings:HookScript("OnHide", function()
         overlay:Hide()
         dismissed = false
         cachedDB = nil
@@ -157,7 +156,7 @@ function CDM.SetupBlizzardOverlay()
         cachedDB = BUI.GetDB()
         PollTick()
         if not pollTicker and not tabsHooked then
-            pollTicker = BUI.Prof.NewTicker('CDM.Overlay', 1.0, BUI.Prof.Wrap('tick#CDMOverlayPoll', PollTick))
+            pollTicker = C_Timer.NewTicker(1.0, PollTick)
         end
     end
 end

@@ -47,22 +47,6 @@ local CLASS_RAID_BUFF = {
 	MAGE    = 1459,
 }
 
-local EVOKER_BUFF_BY_CLASS = {
-	DEATHKNIGHT = 381732,
-	DEMONHUNTER = 381741,
-	DRUID       = 381746,
-	EVOKER      = 381748,
-	HUNTER      = 381749,
-	MAGE        = 381750,
-	MONK        = 381751,
-	PALADIN     = 381752,
-	PRIEST      = 381753,
-	ROGUE       = 381754,
-	SHAMAN      = 381756,
-	WARLOCK     = 381757,
-	WARRIOR     = 381758,
-}
-
 local FLAT_RAID_BUFFS = {}
 for _, spellID in pairs(CLASS_RAID_BUFF) do FLAT_RAID_BUFFS[spellID] = true end
 for spellID in pairs(EVOKER_BLESSING) do FLAT_RAID_BUFFS[spellID] = true end
@@ -73,6 +57,4 @@ GroupFrames.AuraRegistry = {
 	skyridingIDs      = SKYRIDING_IDS,
 	debuffBlacklist   = DEBUFF_BLACKLIST,
 	flatRaidBuffs     = FLAT_RAID_BUFFS,
-	classRaidBuff     = CLASS_RAID_BUFF,
-	evokerBuffByClass = EVOKER_BUFF_BY_CLASS,
 }

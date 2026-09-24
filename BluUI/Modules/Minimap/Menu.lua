@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('Minimap.Menu')
 
 local Menu = {}
 BUI.MinimapMenu = Menu
@@ -166,7 +165,6 @@ local function CreateToolRow(action)
 		labelOffsetX = Pixel.Scale(11),
 		dotSize      = Pixel.Scale(5),
 		dotInset     = Pixel.Scale(5),
-		setScript    = SetScript,
 		onClick      = function() menu:Hide(); action.onClick() end,
 	})
 	Pixel.ApplyFont(row.label, 11, BUI.GetGlobalFont())
@@ -226,7 +224,7 @@ local function BuildMenu()
 			menu:Hide()
 		end
 	end
-	SetScript(menu, 'OnShow', function()
+	menu:SetScript('OnShow', function()
 		pressedOutside = false
 		BUI.Events:Register('GLOBAL_MOUSE_DOWN', 'Minimap.Menu', OnGlobalMouse)
 		BUI.Events:Register('GLOBAL_MOUSE_UP',   'Minimap.Menu', OnGlobalMouse)
@@ -234,7 +232,7 @@ local function BuildMenu()
 			if menu:IsShown() then RefreshSelection() end
 		end)
 	end)
-	SetScript(menu, 'OnHide', function()
+	menu:SetScript('OnHide', function()
 		BUI.Events:UnregisterAll('Minimap.Menu')
 		CloseDropdowns()
 	end)
@@ -327,7 +325,7 @@ function Menu.Setup()
 	BuildMenu()
 	local minimap = _G.Minimap
 	local originalOnMouseUp = minimap:GetScript('OnMouseUp')
-	SetScript(minimap, 'OnMouseUp', function(self, button, ...)
+	minimap:SetScript('OnMouseUp', function(self, button, ...)
 		if button == 'RightButton' then
 			Menu.Show()
 		elseif button == 'MiddleButton' then

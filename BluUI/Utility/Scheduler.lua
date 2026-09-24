@@ -86,15 +86,7 @@ frame:SetScript('OnUpdate', function()
         if entry.active then
             if now >= entry.due then
                 entry.due = now + entry.interval
-                local profiler = BUI.Prof
-                if profiler.active then
-                    local startKB = collectgarbage('count')
-                    local startTime = debugprofilestop()
-                    entry.fn()
-                    profiler.Add('tick#' .. entry.name, debugprofilestop() - startTime, collectgarbage('count') - startKB)
-                else
-                    entry.fn()
-                end
+                entry.fn()
             end
             if entry.due < earliest then
                 earliest = entry.due

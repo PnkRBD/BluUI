@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('SplashFrame')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('splash')
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -140,8 +138,8 @@ local function Build(frame)
 	local right = frame.RightFeature
 	FrameCircle(frame, right)
 	local questButton = right.StartQuestButton
-	HookScript(questButton, 'OnEnter', RefreshQuestButtonText)
-	HookScript(questButton, 'OnLeave', RefreshQuestButtonText)
+	questButton:HookScript('OnEnter', RefreshQuestButtonText)
+	questButton:HookScript('OnLeave', RefreshQuestButtonText)
 end
 
 local function SkinFrame(frame)
@@ -170,7 +168,7 @@ local function Install()
 	local frame = _G.SplashFrame
 	if not frame then return end
 	installed = true
-	HookScript(frame, 'OnShow', Apply)
+	frame:HookScript('OnShow', Apply)
 	hooksecurefunc(frame, 'SetupFrame', Apply)
 	if frame:IsShown() then Apply() end
 end

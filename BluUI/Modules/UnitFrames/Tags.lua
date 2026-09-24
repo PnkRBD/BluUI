@@ -484,7 +484,7 @@ local Handlers = {
 }
 
 for tag, handler in pairs(Handlers) do
-	oUF.Tags.Methods['bui:' .. tag] = BUI.Prof.WrapTag('tag#bui:' .. tag, handler)
+	oUF.Tags.Methods['bui:' .. tag] = handler
 	oUF.Tags.Events['bui:' .. tag] = TagEvents[tag]
 end
 
@@ -554,7 +554,7 @@ end
 local function StartRestingAnimation()
 	if restingTicker then return end
 	restingIndex = 1
-	restingTicker = BUI.Prof.NewTicker('UnitFrames.Tags', 0.1, BUI.Prof.Wrap('tick#RestingTag', UpdateRestingTags))
+	restingTicker = C_Timer.NewTicker(0.1, UpdateRestingTags)
 end
 
 local function StopRestingAnimation()
@@ -603,7 +603,7 @@ do
 		if directGroups.combattime.count == 0 then return end
 		combatStartTime = GetTime()
 		combatTimerText = FormatCombatTime(0)
-		combatTicker = BUI.Prof.NewTicker('UnitFrames.Tags', 0.1, BUI.Prof.Wrap('tick#CombatTimeTag', UpdateCombatTimerTags))
+		combatTicker = C_Timer.NewTicker(0.1, UpdateCombatTimerTags)
 	end
 
 	local function FinalizeStop()
@@ -682,7 +682,7 @@ local function EnsureRegistered(tagName)
 	local shortLength = tagName:match('^name:short(%d+)$')
 	if shortLength then
 		local limit = tonumber(shortLength)
-		oUF.Tags.Methods['bui:' .. tagName] = BUI.Prof.WrapTag('tag#bui:' .. tagName, function(unit) local name = UnitName(unit) return name and Tools.TruncateName(name, limit) or '' end)
+		oUF.Tags.Methods['bui:' .. tagName] = function(unit) local name = UnitName(unit) return name and Tools.TruncateName(name, limit) or '' end
 		oUF.Tags.Events['bui:' .. tagName] = 'UNIT_NAME_UPDATE'
 		return true
 	end
@@ -692,7 +692,7 @@ local function EnsureRegistered(tagName)
 		local nameLimit = nameLength ~= '' and tonumber(nameLength) or nil
 		local targetLimit = targetLength ~= '' and tonumber(targetLength) or nil
 		separator = (separator and separator ~= '') and separator or '>'
-		oUF.Tags.Methods['bui:' .. tagName] = BUI.Prof.WrapTag('tag#bui:' .. tagName, function(unit)
+		oUF.Tags.Methods['bui:' .. tagName] = function(unit)
 			local name = UnitName(unit) or ''
 			local targetUnit = unit .. 'target'
 			local targetName = UnitName(targetUnit)
@@ -703,7 +703,7 @@ local function EnsureRegistered(tagName)
 				return format('%s |cFFFFFFFF%s|r %s', name, separator, targetName)
 			end
 			return name
-		end)
+		end
 		oUF.Tags.Events['bui:' .. tagName] = 'UNIT_TARGET UNIT_NAME_UPDATE'
 		return true
 	end

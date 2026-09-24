@@ -1,8 +1,6 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('ActionBars.BlizzardHide')
 
 local ActionBars = BUI.ActionBars
-local hooksecurefunc = ActionBars.hooksecurefunc
 local ipairs = ipairs
 
 local BLIZZARD_BAR_FOR_INDEX = {
@@ -72,7 +70,7 @@ local function Suppress(frame)
 	suppressed[frame] = true
 	frame:UnregisterAllEvents()
 	frame:SetParent(Hider())
-	HookScript(frame, 'OnShow', Rehide)
+	frame:HookScript('OnShow', Rehide)
 	hooksecurefunc(frame, 'SetParent', SnapParent)
 	HideFrame(frame)
 end

@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('ActionBars.BlizzardBar')
 
 local ActionBars = BUI.ActionBars
 
@@ -95,7 +94,7 @@ function BlizzardBar:Refresh()
 		self:ReleaseFrame()
 		if not self.hideHooked then
 			self.hideHooked = true
-			HookScript(frame, 'OnShow', function(shown)
+			frame:HookScript('OnShow', function(shown)
 				if self:Hidden() then shown:Hide() end
 			end)
 		end

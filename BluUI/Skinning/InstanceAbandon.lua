@@ -1,5 +1,4 @@
 local _, BUI = ...
-local HookScript = select(2, BUI.Prof.Scripts('InstanceAbandon'))
 
 local Skin = BUI.Skinning
 
@@ -73,7 +72,7 @@ local function SkinDialog(frame)
 	Shell(frame)
 	SkinButtons(frame, BUTTON_DEPTH)
 	Skin.TipFaceTree(frame, FONT_DEPTH)
-	HookScript(frame, 'OnShow', function(self)
+	frame:HookScript('OnShow', function(self)
 		if not Enabled() then return end
 		Skin.TipFaceTree(self, FONT_DEPTH)
 	end)
@@ -89,7 +88,7 @@ end
 local function ApplySoon()
 	Apply()
 	if dialog then return end
-	BUI.Prof.After('Skin.InstanceAbandon', 0, Apply)
+	C_Timer.After(0, Apply)
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

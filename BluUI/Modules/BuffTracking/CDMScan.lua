@@ -1,6 +1,5 @@
 local _, BUI = ...
 
-local hooksecurefunc = BUI.Prof.MakeHooker('cdmscan')
 local GetCooldownInfo = C_CooldownViewer.GetCooldownViewerCooldownInfo
 local GetCategorySet  = C_CooldownViewer.GetCooldownViewerCategorySet
 local issecretvalue = issecretvalue

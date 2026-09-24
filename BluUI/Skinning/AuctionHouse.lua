@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('AuctionHouse')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('auctionhouse')
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -73,8 +71,8 @@ local function SkinIconButton(button)
 	if not button._buiIconButton then
 		button._buiIconButton = true
 		FadeStateTextures(button)
-		HookScript(button, 'OnEnter', IconButtonEnter)
-		HookScript(button, 'OnLeave', IconButtonLeave)
+		button:HookScript('OnEnter', IconButtonEnter)
+		button:HookScript('OnLeave', IconButtonLeave)
 	end
 	Shell(button)
 end
@@ -387,7 +385,7 @@ local function Install()
 	local frame = _G.AuctionHouseFrame
 	if not frame then return end
 	installed = true
-	HookScript(frame, 'OnShow', Apply)
+	frame:HookScript('OnShow', Apply)
 	HookRows()
 	if frame:IsShown() then Apply() end
 end

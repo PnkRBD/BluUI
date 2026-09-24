@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('Util.IconSearch')
 
 local IconSearch = {}
 BUI.IconSearch = IconSearch
@@ -22,7 +21,7 @@ local function Finish()
     ready = true
     building = false
     seenPairs = nil
-    if scanFrame then SetScript(scanFrame, 'OnUpdate', nil) end
+    if scanFrame then scanFrame:SetScript('OnUpdate', nil) end
     for listenerIndex = 1, #listeners do listeners[listenerIndex]() end
     wipe(listeners)
 end
@@ -71,7 +70,7 @@ function IconSearch.EnsureIndex(onReady)
     if building then return end
     building = true
     scanFrame = scanFrame or CreateFrame('Frame')
-    SetScript(scanFrame, 'OnUpdate', ScanChunk)
+    scanFrame:SetScript('OnUpdate', ScanChunk)
 end
 
 function IconSearch.Search(query, cap)

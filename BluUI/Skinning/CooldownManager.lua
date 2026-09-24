@@ -1,8 +1,6 @@
 local _, BUI = ...
-local HookScript = select(2, BUI.Prof.Scripts('CooldownManager'))
 
 local Skin = BUI.Skinning
-local hooker = BUI.Prof.MakeHooker('skin')
 
 local SKIN_ID = 'cooldownmanager'
 local MAIN_ART = { 'Bg', 'Background', 'TopTileStreaks', 'Inset', 'Border', 'TitleBg', 'BottomInset', 'ScrollInset' }
@@ -123,7 +121,7 @@ local function SkinTabSystem(tabSystem)
 	end
 	if not tabSystem._buiCdmTabs then
 		tabSystem._buiCdmTabs = true
-		hooker(tabSystem, 'SetTab', RefreshTabSystem)
+		hooksecurefunc(tabSystem, 'SetTab', RefreshTabSystem)
 	end
 	RefreshTabSystem(tabSystem)
 end
@@ -140,9 +138,9 @@ local function SkinTab(tab)
 	if tab._buiCdmMirror then return end
 	tab._buiCdmMirror = true
 	local function Mirror() MirrorTab(tab, selected) end
-	hooker(selected, 'Show', Mirror)
-	hooker(selected, 'Hide', Mirror)
-	hooker(selected, 'SetShown', Mirror)
+	hooksecurefunc(selected, 'Show', Mirror)
+	hooksecurefunc(selected, 'Hide', Mirror)
+	hooksecurefunc(selected, 'SetShown', Mirror)
 end
 
 local function Classify(frame, child)
@@ -218,7 +216,7 @@ local function Apply()
 	SkinMainFrame(frame)
 	if not frame._buiCdmHooked then
 		frame._buiCdmHooked = true
-		HookScript(frame, 'OnShow', OnShow)
+		frame:HookScript('OnShow', OnShow)
 	end
 end
 

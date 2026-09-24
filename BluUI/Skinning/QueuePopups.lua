@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('QueuePopups')
 
 local ipairs, pairs, type = ipairs, pairs, type
 local floor = math.floor
@@ -56,14 +55,14 @@ local function StartGroup(group, seconds)
 	if not Enabled() or type(seconds) ~= 'number' or seconds <= 0 then return end
 	group.expiry = GetTime() + seconds
 	TickGroup(group)
-	group.ticker = BUI.Prof.NewTicker('QueuePopups', 1, group.tick)
+	group.ticker = C_Timer.NewTicker(1, group.tick)
 end
 
 local function EnsureGroup(name)
 	local group = groups[name]
 	if group then return group end
 	group = { texts = {} }
-	group.tick = BUI.Prof.Wrap('tick#QueuePopupCountdown', function() TickGroup(group) end)
+	group.tick = function() TickGroup(group) end
 	groups[name] = group
 	return group
 end
@@ -269,8 +268,8 @@ local function Install()
 	BUI.Events:Register('LFG_PROPOSAL_SUCCEEDED', EVENT_KEY, OnProposalEnded)
 	local pvpReady = _G.PVPReadyDialog
 	if pvpReady then
-		HookScript(pvpReady, 'OnShow', OnPvpReadyShow)
-		HookScript(pvpReady, 'OnHide', OnPvpReadyHide)
+		pvpReady:HookScript('OnShow', OnPvpReadyShow)
+		pvpReady:HookScript('OnHide', OnPvpReadyHide)
 	end
 end
 

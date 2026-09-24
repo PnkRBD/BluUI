@@ -1,5 +1,4 @@
 local BUI = BluUI
-local SetScript, HookScript = BUI.Prof.Scripts('Pages.ActionBars')
 
 local BUILib = BluUI.BUILibClient
 local Controls, Layout, Modals = BUILib.Controls, BUILib.Layout, BUILib.Modals
@@ -382,7 +381,7 @@ local function CreatePreview(tab, key)
 		end
 	end
 
-	SetScript(card, 'OnUpdate', function(self, elapsed)
+	card:SetScript('OnUpdate', function(self, elapsed)
 		self.elapsed = self.elapsed + elapsed
 		if self.elapsed < PREVIEW_TICK then return end
 		self.elapsed = 0
@@ -915,7 +914,7 @@ BUI.PageEngine.RegisterPage('actionbars', {
 			if kind == 'unlocked' then SyncUnlockControls() end
 			if kind == 'unlocked' or kind == 'barUnlocked' then SyncPreviewEyes() end
 		end)
-		HookScript(pageFrame, 'OnShow', function()
+		pageFrame:HookScript('OnShow', function()
 			SyncUnlockControls()
 			SyncPreviewEyes()
 			if currentPreview then currentPreview:Render() end

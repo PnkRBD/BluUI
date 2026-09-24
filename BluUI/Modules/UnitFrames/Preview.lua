@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('UnitFrames.Preview')
 
 local UnitFrames = BUI.UnitFrames
 local Pixel = BUI.Pixel
@@ -367,10 +366,10 @@ end
 
 local function TeardownDrag(frame)
 	if not frame then return end
-	SetScript(frame, 'OnDragStart', nil)
-	SetScript(frame, 'OnDragStop', nil)
-	SetScript(frame, 'OnMouseUp', nil)
-	SetScript(frame, 'OnUpdate', nil)
+	frame:SetScript('OnDragStart', nil)
+	frame:SetScript('OnDragStop', nil)
+	frame:SetScript('OnMouseUp', nil)
+	frame:SetScript('OnUpdate', nil)
 	frame:SetMovable(false)
 	frame.dragActive = nil
 	frame.dragLocked = nil
@@ -498,7 +497,7 @@ local function QueueAfterCombat(unitType)
 	if unitType then pendingHides[unitType] = true else pendingHideAll = true end
 	if not regenWatcher then
 		regenWatcher = CreateFrame('Frame')
-		SetScript(regenWatcher, 'OnEvent', BUI.Prof.Wrap('unitframes#PreviewRegen', function(self)
+		regenWatcher:SetScript('OnEvent', function(self)
 			self:UnregisterAllEvents()
 			local doAll = pendingHideAll
 			pendingHideAll = false
@@ -507,7 +506,7 @@ local function QueueAfterCombat(unitType)
 				pendingHides[unitType] = nil
 				UnitFrames.HidePreview(unitType)
 			end
-		end))
+		end)
 	end
 	regenWatcher:RegisterEvent('PLAYER_REGEN_ENABLED')
 end
@@ -782,7 +781,7 @@ function UnitFrames.ShowAll()
 	end
 
 	if not animFrame then animFrame = CreateFrame('Frame') end
-	SetScript(animFrame, 'OnUpdate', OnAnimUpdate)
+	animFrame:SetScript('OnUpdate', OnAnimUpdate)
 	print('|cff6D00FDBluUI:|r Test mode |cff00ff00enabled|r. Type |cffFD008B/buitest|r to disable.')
 end
 
@@ -794,7 +793,7 @@ function UnitFrames.HideAll()
 	end
 	testActive = false
 
-	if animFrame then SetScript(animFrame, 'OnUpdate', nil) end
+	if animFrame then animFrame:SetScript('OnUpdate', nil) end
 	wipe(animEntries)
 
 	for key, frame in pairs(testFrames) do

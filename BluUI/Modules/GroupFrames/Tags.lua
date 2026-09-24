@@ -205,5 +205,5 @@ end
 
 oUF:AddElement("BluHpTextDirect", DirectHpPath, DirectHpEnable, DirectHpDisable)
 for _, tagName in ipairs({ "blu:status", "blu:hp", "blu:hpmax", "blu:hppct", "blu:hpmissing", "blu:absorb", "blu:pwr", "blu:pwrmax", "blu:pwrpct", "blu:name" }) do
-	Methods[tagName] = BUI.Prof.WrapTag("tag#" .. tagName, Methods[tagName])
+	Methods[tagName] = Methods[tagName]
 end

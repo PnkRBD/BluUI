@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('ToastAnchors')
 
 local Skin = BUI.Skinning
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -238,8 +237,8 @@ local function EnsureSample(entry)
 	sample:SetFrameLevel(anchor:GetFrameLevel() + 1)
 	sample:EnableMouse(true)
 	sample:RegisterForDrag('LeftButton')
-	SetScript(sample, 'OnDragStart', SampleDragStart)
-	SetScript(sample, 'OnDragStop', SampleDragStop)
+	sample:SetScript('OnDragStart', SampleDragStart)
+	sample:SetScript('OnDragStop', SampleDragStop)
 	local point = entry.samplePoint or entry.point
 	sample:SetPoint(point, anchor, entry.sampleRelativePoint or point, 0, 0)
 	sample:Hide()
@@ -262,8 +261,8 @@ local function CreateAnchor(entry)
 	anchor:SetClampedToScreen(true)
 	anchor:EnableMouse(false)
 	anchor:RegisterForDrag('LeftButton')
-	SetScript(anchor, 'OnDragStart', OnDragStart)
-	SetScript(anchor, 'OnDragStop', OnDragStop)
+	anchor:SetScript('OnDragStart', OnDragStart)
+	anchor:SetScript('OnDragStop', OnDragStop)
 
 	local caption = CreateFrame('Frame', nil, anchor)
 	caption:SetAllPoints(anchor)
@@ -289,9 +288,9 @@ local function CreateAnchor(entry)
 		local buttonText = button:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
 		buttonText:SetPoint('CENTER')
 		buttonText:SetText(text)
-		SetScript(button, 'OnClick', onClick)
-		SetScript(button, 'OnEnter', function() buttonText:SetTextColor(1, 0.82, 0) end)
-		SetScript(button, 'OnLeave', function() buttonText:SetTextColor(1, 1, 1) end)
+		button:SetScript('OnClick', onClick)
+		button:SetScript('OnEnter', function() buttonText:SetTextColor(1, 0.82, 0) end)
+		button:SetScript('OnLeave', function() buttonText:SetTextColor(1, 1, 1) end)
 		return button
 	end
 	local reset = CaptionButton('RESET', nil, function() ToastAnchors.Reset(entry.key) end)
@@ -322,7 +321,7 @@ local function Install(entry)
 	SnapshotPoints(entry)
 	CreateAnchor(entry)
 	local function Reapply() Apply(entry) end
-	HookScript(frame, 'OnShow', Reapply)
+	frame:HookScript('OnShow', Reapply)
 	if entry.hooks then entry.hooks(Reapply) end
 	Config(entry).unlocked = nil
 	Apply(entry)

@@ -1,5 +1,4 @@
 local BUI = BluUI
-local SetScript, HookScript = BUI.Prof.Scripts('Pages.Settings')
 
 local BUILib = BluUI.BUILibClient
 local Controls, Layout, Modals, Widget = BUILib.Controls, BUILib.Layout, BUILib.Modals, BUILib.Widget
@@ -425,7 +424,7 @@ BUI.PageEngine.RegisterPage("settings", {
 						if not C_AddOns.IsAddOnLoaded('Blizzard_PlayerSpells') then
 							C_AddOns.LoadAddOn('Blizzard_PlayerSpells')
 						end
-						BUI.Prof.After('Pages.Settings', 0.2, function()
+						C_Timer.After(0.2, function()
 							local Print = function(message) print('|cff6D00FDBUI/Talents:|r '..message) end
 							local timeStamp = tostring(time())
 							local loadoutIndex = 0
@@ -434,10 +433,10 @@ BUI.PageEngine.RegisterPage("settings", {
 
 							local watcher = CreateFrame('Frame')
 							watcher:RegisterEvent('TRAIT_CONFIG_CREATED')
-							SetScript(watcher, 'OnEvent', function()
+							watcher:SetScript('OnEvent', function()
 								if pending then
 									pending = false
-									BUI.Prof.After('Pages.Settings', 0.3, createNext)
+									C_Timer.After(0.3, createNext)
 								end
 							end)
 
@@ -445,7 +444,7 @@ BUI.PageEngine.RegisterPage("settings", {
 								loadoutIndex = loadoutIndex + 1
 								if loadoutIndex > 10 then
 									watcher:UnregisterAllEvents()
-									SetScript(watcher, 'OnEvent', nil)
+									watcher:SetScript('OnEvent', nil)
 									Print('Create batch done.')
 									if PlayerSpellsFrame and PlayerSpellsFrame:IsShown() and not InCombatLockdown() then
 										HideUIPanel(PlayerSpellsFrame)
@@ -459,7 +458,7 @@ BUI.PageEngine.RegisterPage("settings", {
 								if success then
 									pending = true
 								else
-									BUI.Prof.After('Pages.Settings', 0.3, createNext)
+									C_Timer.After(0.3, createNext)
 								end
 							end
 
@@ -484,7 +483,7 @@ BUI.PageEngine.RegisterPage("settings", {
 									C_AddOns.LoadAddOn('Blizzard_PlayerSpells')
 								end
 
-								BUI.Prof.After('Pages.Settings', 0.2, function()
+								C_Timer.After(0.2, function()
 									local specIndex = GetSpecialization()
 									local specID = specIndex and GetSpecializationInfo(specIndex)
 									if not specID then
@@ -519,8 +518,8 @@ BUI.PageEngine.RegisterPage("settings", {
 
 									local function finish()
 										watcher:UnregisterAllEvents()
-										SetScript(watcher, 'OnEvent', nil)
-										BUI.Prof.After('Pages.Settings', 0.3, function()
+										watcher:SetScript('OnEvent', nil)
+										C_Timer.After(0.3, function()
 											local after = C_ClassTalents.GetConfigIDsBySpecID(specID) or {}
 											local actuallyDeleted = #before - #after
 											Print(('Final: %d of %d deleted, %d remain.'):format(actuallyDeleted, #before, #after))
@@ -547,14 +546,14 @@ BUI.PageEngine.RegisterPage("settings", {
 										Print(('DeleteConfig(%s "%s") -> %s'):format(tostring(configID), NameOfConfig(configID), tostring(success)))
 										if not success then
 											pending = nil
-											BUI.Prof.After('Pages.Settings', 0.3, deleteNext)
+											C_Timer.After(0.3, deleteNext)
 										end
 									end
 
-									SetScript(watcher, 'OnEvent', function(_, _, configID)
+									watcher:SetScript('OnEvent', function(_, _, configID)
 										if configID == pending then
 											pending = nil
-											BUI.Prof.After('Pages.Settings', 0.3, deleteNext)
+											C_Timer.After(0.3, deleteNext)
 										end
 									end)
 
@@ -644,7 +643,7 @@ BUI.PageEngine.RegisterPage("settings", {
 								local confirmed = 0
 								local watcher = CreateFrame('Frame')
 								watcher:RegisterEvent('QUEST_REMOVED')
-								SetScript(watcher, 'OnEvent', function(_, _, questID)
+								watcher:SetScript('OnEvent', function(_, _, questID)
 									if seen[questID] then
 										confirmed = confirmed + 1
 										seen[questID] = nil
@@ -652,14 +651,14 @@ BUI.PageEngine.RegisterPage("settings", {
 								end)
 
 								local queueIndex = 1
-								BUI.Prof.NewTicker('Pages.Settings', 0.05, function(ticker)
+								C_Timer.NewTicker(0.05, function(ticker)
 									local questID = queue[queueIndex]
 									queueIndex = queueIndex + 1
 									if not questID then
 										ticker:Cancel()
-										BUI.Prof.After('Pages.Settings', 0.5, function()
+										C_Timer.After(0.5, function()
 											watcher:UnregisterAllEvents()
-											SetScript(watcher, 'OnEvent', nil)
+											watcher:SetScript('OnEvent', nil)
 											if confirmed == 0 then
 												print('|cff6D00FDBluUI:|r Quest log already clear.')
 											else
@@ -791,9 +790,9 @@ BUI.PageEngine.RegisterPage("settings", {
 				end,
 			})
 			moduleListFrame = BUILib.Widget.Unwrap(moduleList)
-			HookScript(moduleListFrame, 'OnHide', SyncModules)
+			moduleListFrame:HookScript('OnHide', SyncModules)
 
-			HookScript(moduleListFrame, 'OnShow', function()
+			moduleListFrame:HookScript('OnShow', function()
 				for _, entry in ipairs(MODULE_ORDER) do
 					moduleListFrame:SetItemChecked(entry.key, db.modules[entry.key])
 				end

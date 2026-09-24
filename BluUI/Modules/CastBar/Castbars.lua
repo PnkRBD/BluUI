@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('CastBar.Castbars')
 
 local CastBar = BUI.CastBar
 local Pixel = BUI.Pixel
@@ -323,7 +322,7 @@ function CastBar.CreateCastbar(frame, barType)
 		end
 	end
 
-	HookScript(castbar, 'OnHide', function(self)
+	castbar:HookScript('OnHide', function(self)
 		self._pipFractions = nil
 		self._lastStage = nil
 		self._empoweredSettings = nil

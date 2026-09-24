@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Collections')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('collections')
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -308,7 +306,7 @@ local function Install()
 	local frame = _G.CollectionsJournal
 	if not frame then return end
 	installed = true
-	HookScript(frame, 'OnShow', Apply)
+	frame:HookScript('OnShow', Apply)
 	HookRows()
 	if frame:IsShown() then Apply() end
 end

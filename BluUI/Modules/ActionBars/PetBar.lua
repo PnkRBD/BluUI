@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('ActionBars.PetBar')
 
 local ActionBars = BUI.ActionBars
 local Plain = ActionBars.Plain
@@ -57,10 +56,10 @@ local function CreateButton(index)
 	button:SetID(index)
 	ActionBars.PrepareTemplateButton(button, 'pet', COMMAND .. index)
 	button:RegisterForDrag('LeftButton')
-	SetScript(button, 'OnEnter', OnEnter)
-	SetScript(button, 'OnLeave', GameTooltip_Hide)
-	SetScript(button, 'OnDragStart', OnDragStart)
-	SetScript(button, 'OnReceiveDrag', OnReceiveDrag)
+	button:SetScript('OnEnter', OnEnter)
+	button:SetScript('OnLeave', GameTooltip_Hide)
+	button:SetScript('OnDragStart', OnDragStart)
+	button:SetScript('OnReceiveDrag', OnReceiveDrag)
 	ActionBars.SkinButton(button)
 	ActionBars.ApplyHotkeyText(button)
 	return button

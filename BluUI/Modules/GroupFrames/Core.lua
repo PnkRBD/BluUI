@@ -12,7 +12,6 @@ GroupFrames.Layers = {
 	auras       = 10,
 	selection   = 20,
 	indicators  = 25,
-	missingBuff = 28,
 	privateAura = 30,
 }
 
@@ -192,7 +191,7 @@ do
 		end
 		queued = true
 		queuedSection = section
-		BUI.Prof.After('GroupFrames.Core', 0, function()
+		C_Timer.After(0, function()
 			local pendingSection = queuedSection
 			queued, queuedSection = false, nil
 			GroupFrames.InvalidateLargeRaidSettings()

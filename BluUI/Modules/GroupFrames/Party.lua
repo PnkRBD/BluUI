@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('GroupFrames.Party')
 
 local oUF    = BUI.oUF
 local GroupFrames     = BUI.GroupFrames
@@ -62,7 +61,7 @@ local function WatchAnchorTarget(target)
 	watchedTarget = target
 	if target and not target._bluFramesPartyHook then
 		target._bluFramesPartyHook = true
-		HookScript(target, "OnSizeChanged", function(self)
+		target:HookScript("OnSizeChanged", function(self)
 			if watchedTarget == self then SyncAnchorWidth() end
 		end)
 	end
@@ -137,7 +136,7 @@ function GroupFrames.SpawnParty()
 	PositionHeader(header, partySettings)
 	GroupFrames.headers.party = header
 	GroupFrames.ApplyPartyRaidMode()
-	BUI.Prof.Measure("gf.spawn#PrecreateParty", GroupFrames.PrecreateParty)
+	GroupFrames.PrecreateParty()
 end
 
 function GroupFrames.SetPartyEnabled(enabled)

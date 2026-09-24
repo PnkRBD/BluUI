@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('CDM.Events')
 
 local GetTime = GetTime
 local wipe = wipe
@@ -99,7 +98,7 @@ local function UpdateCDPollTicker()
         end
     end
     if needed and not cdPollTicker then
-        cdPollTicker = BUI.Prof.NewTicker('CDM.Events', 0.5, BUI.Prof.Wrap('tick#CDWatchPoll', function() CheckCDWatchList() end))
+        cdPollTicker = C_Timer.NewTicker(0.5, function() CheckCDWatchList() end)
     elseif not needed and cdPollTicker then
         cdPollTicker:Cancel()
         cdPollTicker = nil
@@ -294,7 +293,7 @@ local function RefreshCDExpectation(spellID)
     cdExpectedEnd[spellID] = endTime
     cdEstimatedEnd[spellID] = nil
     CancelCDEndTimer(spellID)
-    cdEndTimers[spellID] = BUI.Prof.NewTimer('CDM.Events', endTime - now + CD_END_GRACE, function() OnCDEndReached(spellID) end)
+    cdEndTimers[spellID] = C_Timer.NewTimer(endTime - now + CD_END_GRACE, function() OnCDEndReached(spellID) end)
 end
 
 CheckCDWatchList = function()
@@ -332,7 +331,7 @@ CheckCDWatchList = function()
             if endTime and endTime > now and itemExpectedEnd[itemID] ~= endTime then
                 itemExpectedEnd[itemID] = endTime
                 if itemEndTimers[itemID] then itemEndTimers[itemID]:Cancel() end
-                itemEndTimers[itemID] = BUI.Prof.NewTimer('CDM.Events', endTime - now + 0.1, function()
+                itemEndTimers[itemID] = C_Timer.NewTimer(endTime - now + 0.1, function()
                     itemEndTimers[itemID] = nil
                     itemExpectedEnd[itemID] = nil
                     QueueCDCheck()
@@ -374,7 +373,7 @@ local function MarkWatchedSpellActive(targetID, castSpellID)
             cdExpectedEnd[targetID] = start + duration
             cdEstimatedEnd[targetID] = nil
             CancelCDEndTimer(targetID)
-            cdEndTimers[targetID] = BUI.Prof.NewTimer('CDM.Events', start + duration - now + CD_END_GRACE, function() OnCDEndReached(targetID) end)
+            cdEndTimers[targetID] = C_Timer.NewTimer(start + duration - now + CD_END_GRACE, function() OnCDEndReached(targetID) end)
         end
         return
     end
@@ -392,7 +391,7 @@ local function MarkWatchedSpellActive(targetID, castSpellID)
         cdExpectedEnd[targetID] = endTime
         cdEstimatedEnd[targetID] = estimated
         CancelCDEndTimer(targetID)
-        cdEndTimers[targetID] = BUI.Prof.NewTimer('CDM.Events', endTime - now + CD_END_GRACE, function() OnCDEndReached(targetID) end)
+        cdEndTimers[targetID] = C_Timer.NewTimer(endTime - now + CD_END_GRACE, function() OnCDEndReached(targetID) end)
     end
     if cdWatchedSpells[targetID] == true then return end
     cdWatchedSpells[targetID] = true
@@ -521,7 +520,7 @@ local RequestLayoutRefresh
 local function DoLayoutRefresh()
     layoutRefreshing = true
     CDM.RefreshAll(true)
-    BUI.Prof.After('CDM.Events', 0.2, function()
+    C_Timer.After(0.2, function()
         layoutRefreshing = false
         if layoutRefreshPending then
             layoutRefreshPending = false
@@ -546,7 +545,7 @@ RequestLayoutRefresh = function(force)
         end
     end
     layoutRefreshPending = false
-    BUI.Prof.After('CDM.Events', 0, DoLayoutRefresh)
+    C_Timer.After(0, DoLayoutRefresh)
 end
 
 local function FlushPendingLayoutRefresh()
@@ -563,6 +562,6 @@ function CDM.RegisterEvents()
     BUI.Events:Register("PLAYER_REGEN_ENABLED", "CDM.LayoutPending", function() BUI.Events:AfterCombatSettled(FlushPendingLayoutRefresh, "CDM.LayoutPending") end)
     if not layoutHooksDone and _G.EditModeManagerFrame then
         layoutHooksDone = true
-        HookScript(_G.EditModeManagerFrame, "OnHide", FlushPendingLayoutRefresh)
+        _G.EditModeManagerFrame:HookScript("OnHide", FlushPendingLayoutRefresh)
     end
 end

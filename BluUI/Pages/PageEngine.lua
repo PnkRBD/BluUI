@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Pages.PageEngine')
 local Pixel = BUI.Pixel
 local Layout = BUI.BUILibClient.Layout
 
@@ -29,7 +28,7 @@ local function TeardownPageContent(pageConfig)
 	if pageConfig.frame:IsShown() and pageConfig.OnHide then pageConfig.OnHide(pageConfig.frame) end
 	pageConfig.frame:Hide()
 	pageConfig.frame:UnregisterAllEvents()
-	SetScript(pageConfig.frame, 'OnUpdate', nil)
+	pageConfig.frame:SetScript('OnUpdate', nil)
 	pageConfig.frame:SetParent(nil)
 	pageConfig.frame = nil
 	pageConfig.stale = nil
@@ -81,7 +80,7 @@ local function CreateWindow()
 	PageEngine.searchBox = window.searchBox
 	BUI.Scale.SetupButtons(window, PageEngine.frame)
 
-	HookScript(window.frame, 'OnHide', HideCurrentPage)
+	window.frame:HookScript('OnHide', HideCurrentPage)
 
 	local searchBoxFrame = window.searchBox.frame
 	local buttonFrame = window.footerLeftmost.frame or window.footerLeftmost

@@ -1,8 +1,6 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('ActionBars.BagBar')
 
 local ActionBars = BUI.ActionBars
-local hooksecurefunc = ActionBars.hooksecurefunc
 
 local EVENT_KEY = 'ActionBars.BagBar'
 local SLOT_NAMES = {
@@ -86,8 +84,8 @@ local function InstallHooks()
 	hooksecurefunc(BagsBar, 'UpdateSystemSettingSize', OnBlizzardLayout)
 	for _, name in ipairs(SLOT_NAMES) do
 		local slot = _G[name]
-		HookScript(slot, 'OnShow', OnBlizzardLayout)
-		HookScript(slot, 'OnHide', OnBlizzardLayout)
+		slot:HookScript('OnShow', OnBlizzardLayout)
+		slot:HookScript('OnHide', OnBlizzardLayout)
 	end
 end
 

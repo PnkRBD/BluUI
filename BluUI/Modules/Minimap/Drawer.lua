@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Minimap.Drawer')
 local AceHook = LibStub('AceHook-3.0')
 
 local Drawer = {}
@@ -160,7 +159,7 @@ end
 
 local function ScheduleHide()
 	CancelHide()
-	hideTimer = BUI.Prof.NewTimer('Minimap.Drawer', HIDE_DELAY, HideDrawer)
+	hideTimer = C_Timer.NewTimer(HIDE_DELAY, HideDrawer)
 end
 
 local function AnchorBarToTab(target)
@@ -268,12 +267,12 @@ function Drawer.Create()
 	Pixel.SetTemplate(tab, color[1], color[2], color[3], color[4], 0.1, 0.1, 0.1, 1)
 	PlaceTab()
 
-	SetScript(tab, 'OnEnter', ShowDrawer)
-	SetScript(tab, 'OnLeave', ScheduleHide)
-	SetScript(bar, 'OnEnter', CancelHide)
-	SetScript(bar, 'OnLeave', ScheduleHide)
-	SetScript(bgFrame, 'OnEnter', CancelHide)
-	SetScript(bgFrame, 'OnLeave', ScheduleHide)
+	tab:SetScript('OnEnter', ShowDrawer)
+	tab:SetScript('OnLeave', ScheduleHide)
+	bar:SetScript('OnEnter', CancelHide)
+	bar:SetScript('OnLeave', ScheduleHide)
+	bgFrame:SetScript('OnEnter', CancelHide)
+	bgFrame:SetScript('OnLeave', ScheduleHide)
 
 	if _G.BugGrabber then
 		HasBugSackError()
@@ -433,8 +432,8 @@ local function CaptureButton(button)
 	buttons[#buttons + 1] = button
 
 	if not button._buiHooked then
-		AceHook.HookScript(BUI, button, 'OnEnter', BUI.Prof.Wrap('Minimap.Drawer#OnEnter', CancelHide))
-		AceHook.HookScript(BUI, button, 'OnLeave', BUI.Prof.Wrap('Minimap.Drawer#OnLeave', ScheduleHide))
+		AceHook.HookScript(BUI, button, 'OnEnter', CancelHide)
+		AceHook.HookScript(BUI, button, 'OnLeave', ScheduleHide)
 		button._buiHooked = true
 	end
 	for _, listener in pairs(captureListeners) do listener(button) end

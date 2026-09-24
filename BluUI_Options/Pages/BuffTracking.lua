@@ -560,7 +560,7 @@ BUI.PageEngine.RegisterPage("buffTracking", {
 
 BUI.Events:Register("PLAYER_SPECIALIZATION_CHANGED", "BuffTrackingPage", function(_, unit)
     if unit ~= "player" then return end
-    BUI.Prof.After('Pages.BuffTracking', 0.3, function()
+    C_Timer.After(0.3, function()
         local pageConfig = BUI.PageEngine.pages.buffTracking
         if pageConfig.frame then pageConfig.stale = true end
         if BUI.PageEngine.GetCurrentPage() == "buffTracking" then

@@ -1,6 +1,5 @@
 local _, BUI = ...
 
-local hooksecurefunc = BUI.Prof.MakeHooker('chat')
 local _G = _G
 local tconcat = table.concat
 local upper = string.upper
@@ -475,8 +474,8 @@ local function GetCopyWindow()
 	window:EnableMouse(true)
 	window:SetMovable(true)
 	window:RegisterForDrag('LeftButton')
-	BUI.Prof.SetScript('Chat', window, 'OnDragStart', window.StartMoving)
-	BUI.Prof.SetScript('Chat', window, 'OnDragStop', window.StopMovingOrSizing)
+	window:SetScript('OnDragStart', window.StartMoving)
+	window:SetScript('OnDragStop', window.StopMovingOrSizing)
 	window:Hide()
 	if _G.UISpecialFrames then table.insert(_G.UISpecialFrames, 'BUI_ChatCopy') end
 	Skin3.Backdrop(window, { bg = { 0.05, 0.05, 0.05, 0.96 }, border = { 0, 0, 0, 1 } })
@@ -495,9 +494,9 @@ local function GetCopyWindow()
 	closeGlyph:SetPoint('CENTER')
 	closeGlyph:SetText('×')
 	closeGlyph:SetTextColor(0.7, 0.7, 0.7)
-	BUI.Prof.SetScript('Chat', close, 'OnEnter', function() closeGlyph:SetTextColor(theme.GetAccent()) end)
-	BUI.Prof.SetScript('Chat', close, 'OnLeave', function() closeGlyph:SetTextColor(0.7, 0.7, 0.7) end)
-	BUI.Prof.SetScript('Chat', close, 'OnClick', function() window:Hide() end)
+	close:SetScript('OnEnter', function() closeGlyph:SetTextColor(theme.GetAccent()) end)
+	close:SetScript('OnLeave', function() closeGlyph:SetTextColor(0.7, 0.7, 0.7) end)
+	close:SetScript('OnClick', function() window:Hide() end)
 
 	local scroll = CreateFrame('ScrollFrame', 'BUI_ChatCopyScroll', window)
 	scroll:SetPoint('TOPLEFT', 14, -38)
@@ -510,12 +509,12 @@ local function GetCopyWindow()
 	editBox:SetAutoFocus(false)
 	editBox:SetFontObject(_G.ChatFontNormal)
 	editBox:SetWidth(540)
-	BUI.Prof.SetScript('Chat', editBox, 'OnEscapePressed', function() window:Hide() end)
+	editBox:SetScript('OnEscapePressed', function() window:Hide() end)
 	if _G.ScrollingEdit_OnTextChanged then
-		BUI.Prof.SetScript('Chat', editBox, 'OnTextChanged', function(self) _G.ScrollingEdit_OnTextChanged(self, self:GetParent()) end)
+		editBox:SetScript('OnTextChanged', function(self) _G.ScrollingEdit_OnTextChanged(self, self:GetParent()) end)
 	end
 	if _G.ScrollingEdit_OnCursorChanged then
-		BUI.Prof.SetScript('Chat', editBox, 'OnCursorChanged', _G.ScrollingEdit_OnCursorChanged)
+		editBox:SetScript('OnCursorChanged', _G.ScrollingEdit_OnCursorChanged)
 	end
 	scroll:SetScrollChild(editBox)
 	window.editBox = editBox
@@ -537,7 +536,7 @@ local function GetCopyWindow()
 	end
 
 	local clicks = { 0, 0, 0 }
-	BUI.Prof.HookScript('Chat', editBox, 'OnMouseDown', function(self)
+	editBox:HookScript('OnMouseDown', function(self)
 		local now = GetTime()
 		if now - clicks[#clicks] < 0.5 then
 			local triple = clicks[#clicks] - clicks[#clicks - 1] < 0.5
@@ -552,7 +551,7 @@ local function GetCopyWindow()
 					startPos, endPos = Expand(text, cursorPosition, '[%s%p]')
 				end
 			end
-			BUI.Prof.After('Chat', 0, function() self:HighlightText(startPos, endPos) end)
+			C_Timer.After(0, function() self:HighlightText(startPos, endPos) end)
 		end
 		clicks[#clicks + 1] = now
 		if #clicks > 3 then tremove(clicks, 1) end
@@ -592,18 +591,18 @@ local function GetCopyWindow()
 	end
 	window._updateBar = UpdateCopyBar
 
-	BUI.Prof.SetScript('Chat', scroll, 'OnScrollRangeChanged', UpdateCopyBar)
-	BUI.Prof.SetScript('Chat', scroll, 'OnVerticalScroll', UpdateCopyBar)
-	BUI.Prof.SetScript('Chat', scroll, 'OnMouseWheel', function(self, delta)
+	scroll:SetScript('OnScrollRangeChanged', UpdateCopyBar)
+	scroll:SetScript('OnVerticalScroll', UpdateCopyBar)
+	scroll:SetScript('OnMouseWheel', function(self, delta)
 		local range = self:GetVerticalScrollRange() or 0
 		self:SetVerticalScroll(min(max(0, (self:GetVerticalScroll() or 0) - delta * 40), range))
 	end)
 
-	BUI.Prof.SetScript('Chat', thumb, 'OnEnter', function() thumbTexture:SetAlpha(0.9) end)
-	BUI.Prof.SetScript('Chat', thumb, 'OnLeave', function() if not thumb._drag then thumbTexture:SetAlpha(0.55) end end)
-	BUI.Prof.SetScript('Chat', thumb, 'OnDragStart', function(self) self._drag = true; thumbTexture:SetAlpha(0.9) end)
-	BUI.Prof.SetScript('Chat', thumb, 'OnDragStop', function(self) self._drag = false; thumbTexture:SetAlpha(0.55); UpdateCopyBar() end)
-	BUI.Prof.SetScript('Chat', thumb, 'OnUpdate', function(self)
+	thumb:SetScript('OnEnter', function() thumbTexture:SetAlpha(0.9) end)
+	thumb:SetScript('OnLeave', function() if not thumb._drag then thumbTexture:SetAlpha(0.55) end end)
+	thumb:SetScript('OnDragStart', function(self) self._drag = true; thumbTexture:SetAlpha(0.9) end)
+	thumb:SetScript('OnDragStop', function(self) self._drag = false; thumbTexture:SetAlpha(0.55); UpdateCopyBar() end)
+	thumb:SetScript('OnUpdate', function(self)
 		if not self._drag then return end
 		local trackHeight = bar:GetHeight() or 0
 		local thumbHeight = self:GetHeight() or 20
@@ -644,7 +643,7 @@ local function CopyChat(frame)
 	window.editBox:SetCursorPosition(0)
 	window.editBox:HighlightText()
 	window.editBox:SetFocus()
-	if window._updateBar then BUI.Prof.After('Chat', 0, window._updateBar) end
+	if window._updateBar then C_Timer.After(0, window._updateBar) end
 end
 
 local function GetHistory()
@@ -678,7 +677,7 @@ local function SetupEditHistory(editBox)
 		end)
 	end
 
-	BUI.Prof.HookScript('Chat', editBox, 'OnKeyDown', function(self, key)
+	editBox:HookScript('OnKeyDown', function(self, key)
 		if C_ChatInfo and C_ChatInfo.InChatMessagingLockdown and C_ChatInfo.InChatMessagingLockdown() then return end
 		if not (Enabled() and EditHistory()) then return end
 		local history = GetHistory()
@@ -706,7 +705,7 @@ local function SetupEditHistory(editBox)
 		end
 	end)
 
-	BUI.Prof.HookScript('Chat', editBox, 'OnEditFocusLost', function(self) self._histIdx = nil end)
+	editBox:HookScript('OnEditFocusLost', function(self) self._histIdx = nil end)
 end
 
 local historyHooked
@@ -918,7 +917,7 @@ local function SkinTab(tab, chat)
 	tab._buiChat = chat
 	tab._buiText = tab.Text or (tab.GetName and _G[tab:GetName() .. 'Text'])
 	skinnedTabs[#skinnedTabs + 1] = tab
-	BUI.Prof.HookScript('Chat', tab, 'OnEnter', function()
+	tab:HookScript('OnEnter', function()
 		if Enabled() then StartFader() end
 	end)
 	StyleTab(tab)
@@ -971,9 +970,9 @@ local function SkinEditBox(editBox, chat)
 	editBox:SetTextColor(1, 1, 1)
 	PositionEditBox(chat)
 
-	BUI.Prof.HookScript('Chat', editBox, 'OnShow', function(self) PositionEditBox(self._buiChat) end)
-	BUI.Prof.HookScript('Chat', editBox, 'OnEditFocusGained', function(self) self:SetBackdropBorderColor(theme.GetAccent()) end)
-	BUI.Prof.HookScript('Chat', editBox, 'OnEditFocusLost', function(self) self:SetBackdropBorderColor(BorderColor()) end)
+	editBox:HookScript('OnShow', function(self) PositionEditBox(self._buiChat) end)
+	editBox:HookScript('OnEditFocusGained', function(self) self:SetBackdropBorderColor(theme.GetAccent()) end)
+	editBox:HookScript('OnEditFocusLost', function(self) self:SetBackdropBorderColor(BorderColor()) end)
 end
 
 local function AnchorPanel()
@@ -1056,13 +1055,13 @@ local function MakeCornerButton(chat, mediaKey, fallbackTexture)
 	texture:SetTexture(BUILib.GetLibMedia(mediaKey) or fallbackTexture)
 	texture:SetVertexColor(0.65, 0.65, 0.7, 1)
 	button._tex = texture
-	BUI.Prof.SetScript('Chat', button, 'OnEnter', function()
+	button:SetScript('OnEnter', function()
 		texture:SetVertexColor(theme.GetAccent())
 		fadeState.lastActive = GetTime()
 		StartFader()
 		UpdateCornerButtons()
 	end)
-	BUI.Prof.SetScript('Chat', button, 'OnLeave', function()
+	button:SetScript('OnLeave', function()
 		texture:SetVertexColor(0.65, 0.65, 0.7, 1)
 		UpdateCornerButtons()
 	end)
@@ -1084,7 +1083,7 @@ local function SkinPanel()
 	panel:SetFrameLevel(max(0, chat:GetFrameLevel() - 1))
 	chatPanel = panel
 	AnchorPanel()
-	BUI.Prof.After('Chat', 0, function()
+	C_Timer.After(0, function()
 		if BUI.Datatext and BUI.Datatext.Apply then BUI.Datatext.Apply() end
 	end)
 	panelSquare = Skin3.SquarePanel(panel, { bg = { BGColor() }, border = { BorderColor() } })
@@ -1104,13 +1103,13 @@ local function SkinPanel()
 	gutter:EnableMouse(true)
 	if gutter.SetPropagateMouseClicks then gutter:SetPropagateMouseClicks(true) end
 	panel._gutter = gutter
-	BUI.Prof.SetScript('Chat', gutter, 'OnEnter', function()
+	gutter:SetScript('OnEnter', function()
 		if not Enabled() then return end
 		fadeState.lastActive = GetTime()
 		StartFader()
 		UpdateCornerButtons()
 	end)
-	BUI.Prof.SetScript('Chat', gutter, 'OnLeave', function()
+	gutter:SetScript('OnLeave', function()
 		if not Enabled() then return end
 		UpdateCornerButtons()
 	end)
@@ -1118,7 +1117,7 @@ local function SkinPanel()
 
 	local cog = MakeCornerButton(chat, 'cog', 'Interface\\Buttons\\UI-OptionsButton')
 	cog:SetPoint('TOP', verticalStrip, 'TOP', 0, -3)
-	BUI.Prof.SetScript('Chat', cog, 'OnClick', function()
+	cog:SetScript('OnClick', function()
 		if BUI.PageEngine.EnsureLoaded() and BUI.SkinningPage and BUI.SkinningPage.OpenSkinSettings then
 			BUI.SkinningPage.OpenSkinSettings('chat')
 		end
@@ -1127,7 +1126,7 @@ local function SkinPanel()
 
 	local copy = MakeCornerButton(chat, 'copy', 'Interface\\BUTTONS\\UI-GuildButton-PublicNote-Up')
 	copy:SetPoint('TOP', cog, 'BOTTOM', 0, -5)
-	BUI.Prof.SetScript('Chat', copy, 'OnClick', function()
+	copy:SetScript('OnClick', function()
 		local win = GetCopyWindow()
 		if win:IsShown() then
 			win:Hide()
@@ -1154,17 +1153,17 @@ local function SkinPanel()
 		lock._lockedTint = Locked() and true or false
 		PaintLock(lock:IsMouseOver())
 	end
-	BUI.Prof.SetScript('Chat', lock, 'OnEnter', function()
+	lock:SetScript('OnEnter', function()
 		PaintLock(true)
 		fadeState.lastActive = GetTime()
 		StartFader()
 		UpdateCornerButtons()
 	end)
-	BUI.Prof.SetScript('Chat', lock, 'OnLeave', function()
+	lock:SetScript('OnLeave', function()
 		PaintLock(false)
 		UpdateCornerButtons()
 	end)
-	BUI.Prof.SetScript('Chat', lock, 'OnClick', function()
+	lock:SetScript('OnClick', function()
 		local config = GetConfig()
 		if not config then return end
 		config.locked = not Locked()
@@ -1203,15 +1202,15 @@ local function CreateMover()
 	highlight:SetColorTexture(theme.GetAccent())
 	highlight:SetAlpha(0)
 	mover._hl = highlight
-	BUI.Prof.SetScript('Chat', mover, 'OnEnter', function(self) self._hl:SetAlpha(0.18) end)
-	BUI.Prof.SetScript('Chat', mover, 'OnLeave', function(self) self._hl:SetAlpha(0) end)
-	BUI.Prof.SetScript('Chat', mover, 'OnDragStart', function()
+	mover:SetScript('OnEnter', function(self) self._hl:SetAlpha(0.18) end)
+	mover:SetScript('OnLeave', function(self) self._hl:SetAlpha(0) end)
+	mover:SetScript('OnDragStart', function()
 		if InCombatLockdown and InCombatLockdown() then return end
 		if chat.SetClampRectInsets then chat:SetClampRectInsets(0, 0, 0, 0) end
 		chat:SetMovable(true)
 		chat:StartMoving()
 	end)
-	BUI.Prof.SetScript('Chat', mover, 'OnDragStop', function()
+	mover:SetScript('OnDragStop', function()
 		chat:StopMovingOrSizing()
 		SaveGeometry(chat)
 	end)
@@ -1257,15 +1256,15 @@ local function CreateSizer()
 	end
 	GripColor(false)
 
-	BUI.Prof.SetScript('Chat', sizer, 'OnEnter', function(self) self:SetAlpha(1); GripColor(true) end)
-	BUI.Prof.SetScript('Chat', sizer, 'OnLeave', function(self) self:SetAlpha(SIZER_IDLE_ALPHA); GripColor(false) end)
-	BUI.Prof.SetScript('Chat', sizer, 'OnMouseDown', function(self)
+	sizer:SetScript('OnEnter', function(self) self:SetAlpha(1); GripColor(true) end)
+	sizer:SetScript('OnLeave', function(self) self:SetAlpha(SIZER_IDLE_ALPHA); GripColor(false) end)
+	sizer:SetScript('OnMouseDown', function(self)
 		if InCombatLockdown and InCombatLockdown() then return end
 		if chat.SetClampRectInsets then chat:SetClampRectInsets(0, 0, 0, 0) end
 		chat:SetResizable(true)
 		chat:StartSizing(self._handle or 'BOTTOMRIGHT')
 	end)
-	BUI.Prof.SetScript('Chat', sizer, 'OnMouseUp', function()
+	sizer:SetScript('OnMouseUp', function()
 		chat:StopMovingOrSizing()
 		SaveGeometry(chat)
 	end)
@@ -1308,7 +1307,7 @@ end
 local function SetupScroll(frame)
 	if frame._buiScroll then return end
 	frame._buiScroll = true
-	BUI.Prof.SetScript('Chat', frame, 'OnMouseWheel', function(self, delta)
+	frame:SetScript('OnMouseWheel', function(self, delta)
 		if not Enabled() then
 			if delta > 0 then self:ScrollUp() else self:ScrollDown() end
 			return
@@ -1343,18 +1342,18 @@ local function SetupScroll(frame)
 	end)
 	frame:EnableMouseWheel(true)
 	frame:EnableMouse(true)
-	BUI.Prof.HookScript('Chat', frame, 'OnEnter', function()
+	frame:HookScript('OnEnter', function()
 		if Enabled() then StartFader() end
 	end)
 	local editBox = frame.editBox or _G[frame:GetName() .. 'EditBox']
 	if editBox and not editBox._buiFadeHook then
 		editBox._buiFadeHook = true
-		BUI.Prof.HookScript('Chat', editBox, 'OnEditFocusGained', function()
+		editBox:HookScript('OnEditFocusGained', function()
 			if not Enabled() then return end
 			if FadeEnabled() then fadeState.lastActive = GetTime() end
 			StartFader()
 		end)
-		BUI.Prof.HookScript('Chat', editBox, 'OnTextChanged', function(self, userInput)
+		editBox:HookScript('OnTextChanged', function(self, userInput)
 			if not userInput or not Enabled() then return end
 			local text = self:GetText()
 			if not TARGET_TELL_COMMANDS[text:lower()] then return end
@@ -1372,7 +1371,7 @@ local function SetupScroll(frame)
 	end
 	if not frame._buiLinkHover then
 		frame._buiLinkHover = true
-		BUI.Prof.HookScript('Chat', frame, 'OnHyperlinkEnter', function(self, link)
+		frame:HookScript('OnHyperlinkEnter', function(self, link)
 			if not Enabled() then return end
 			local config = GetConfig()
 			if config and config.hoverTooltips == false then return end
@@ -1383,7 +1382,7 @@ local function SetupScroll(frame)
 			local shown = pcall(GameTooltip.SetHyperlink, GameTooltip, link)
 			if shown then GameTooltip:Show() else GameTooltip:Hide() end
 		end)
-		BUI.Prof.HookScript('Chat', frame, 'OnHyperlinkLeave', function()
+		frame:HookScript('OnHyperlinkLeave', function()
 			GameTooltip:Hide()
 		end)
 	end
@@ -1470,11 +1469,11 @@ local function CreateChatScrollBar(chat)
 	chat._buiSB = scrollBar
 	PositionScrollBar(chat)
 
-	BUI.Prof.SetScript('Chat', thumb, 'OnEnter', function() ThumbColor(true) end)
-	BUI.Prof.SetScript('Chat', thumb, 'OnLeave', function() if not thumb._drag then ThumbColor(false) end end)
-	BUI.Prof.SetScript('Chat', thumb, 'OnDragStart', function(self) self._drag = true; ThumbColor(true) end)
-	BUI.Prof.SetScript('Chat', thumb, 'OnDragStop', function(self) self._drag = false; ThumbColor(false) end)
-	BUI.Prof.SetScript('Chat', thumb, 'OnUpdate', function(self)
+	thumb:SetScript('OnEnter', function() ThumbColor(true) end)
+	thumb:SetScript('OnLeave', function() if not thumb._drag then ThumbColor(false) end end)
+	thumb:SetScript('OnDragStart', function(self) self._drag = true; ThumbColor(true) end)
+	thumb:SetScript('OnDragStop', function(self) self._drag = false; ThumbColor(false) end)
+	thumb:SetScript('OnUpdate', function(self)
 		if not self._drag then return end
 		local trackHeight = scrollBar:GetHeight() or 0
 		local thumbHeight = self:GetHeight() or 16
@@ -1496,7 +1495,7 @@ local function CreateChatScrollBar(chat)
 	for _, methodName in ipairs({ 'SetScrollOffset', 'ScrollUp', 'ScrollDown', 'ScrollToTop', 'ScrollToBottom', 'PageUp', 'PageDown' }) do
 		if chat[methodName] then hooksecurefunc(chat, methodName, Update) end
 	end
-	BUI.Prof.HookScript('Chat', chat, 'OnSizeChanged', Update)
+	chat:HookScript('OnSizeChanged', Update)
 	Update()
 end
 
@@ -1523,7 +1522,7 @@ local function ApplyFadeAlpha(alpha)
 end
 
 function StopFader()
-	if fader then BUI.Prof.SetScript('Chat', fader, 'OnUpdate', nil) end
+	if fader then fader:SetScript('OnUpdate', nil) end
 	fadeState.target = nil
 	fadeState.lastHovered = nil
 	if fadeState.alpha ~= 1 then
@@ -1572,12 +1571,12 @@ function StartFader()
 				UpdateCornerButtons()
 			end
 			if target == 0 and alpha == 0 then
-				BUI.Prof.SetScript('Chat', fader, 'OnUpdate', nil)
+				fader:SetScript('OnUpdate', nil)
 			end
 		end
 	end
 	if not fader:GetScript('OnUpdate') then
-		BUI.Prof.SetScript('Chat', fader, 'OnUpdate', fader._handler)
+		fader:SetScript('OnUpdate', fader._handler)
 	end
 end
 
@@ -1751,7 +1750,7 @@ end
 
 local function StopTabPulse(tab)
 	if not tab or not tab._buiPulse then return end
-	BUI.Prof.SetScript('Chat', tab._buiPulse, 'OnUpdate', nil)
+	tab._buiPulse:SetScript('OnUpdate', nil)
 	tab._buiPulse = nil
 	if tab._buiText then ApplyTabColor(tab, IsTabSelected(tab)) end
 	ApplyTabAlpha(tab)
@@ -1768,7 +1767,7 @@ local function StartTabPulse(tab)
 	local inactiveRed, inactiveGreen, inactiveBlue = InactiveColor()
 	local flashRed, flashGreen, flashBlue = FlashColor()
 	ApplyTabAlpha(tab)
-	BUI.Prof.SetScript('Chat', pulseFrame, 'OnUpdate', function(self, elapsed)
+	pulseFrame:SetScript('OnUpdate', function(self, elapsed)
 		if not (Enabled() and TabFlash()) or not tab._buiText or IsTabSelected(tab) then
 			StopTabPulse(tab)
 			return
@@ -1801,7 +1800,7 @@ local function Refresh()
 	SkinAllChatFrames()
 	ApplySettings()
 	RestoreGeometry()
-	BUI.Prof.After('Chat', 0.5, RestoreGeometry)
+	C_Timer.After(0.5, RestoreGeometry)
 end
 
 local installed = false
@@ -1822,7 +1821,7 @@ local function Install()
 
 	if _G.FCF_OpenTemporaryWindow then
 		hooksecurefunc('FCF_OpenTemporaryWindow', function()
-			BUI.Prof.After('Chat', 0, function()
+			C_Timer.After(0, function()
 				if not Enabled() then return end
 				SkinAllChatFrames()
 				RefreshTabs()
@@ -1883,7 +1882,7 @@ local function Install()
 	local function ReassertGeometry()
 		if geometryReassertPending or not Enabled() then return end
 		geometryReassertPending = true
-		BUI.Prof.After('Chat', 0, function()
+		C_Timer.After(0, function()
 			geometryReassertPending = false
 			if not Enabled() or GeometryMatches() then return end
 			RestoreGeometry()

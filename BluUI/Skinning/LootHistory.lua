@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('LootHistory')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('loothistory')
 local select, pcall = select, pcall
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -94,8 +92,8 @@ local function SkinClose(frame)
 	glyph:SetSize(12, 12)
 	glyph:SetPoint('CENTER', close, 'CENTER', 0, 0)
 	glyph:SetVertexColor(0.75, 0.75, 0.8, 1)
-	HookScript(close, 'OnEnter', function() glyph:SetVertexColor(1, 1, 1, 1) end)
-	HookScript(close, 'OnLeave', function() glyph:SetVertexColor(0.75, 0.75, 0.8, 1) end)
+	close:HookScript('OnEnter', function() glyph:SetVertexColor(1, 1, 1, 1) end)
+	close:HookScript('OnLeave', function() glyph:SetVertexColor(0.75, 0.75, 0.8, 1) end)
 end
 
 local function SkinDropdown(dropdown)
@@ -160,7 +158,7 @@ local function Install()
 	local frame = Frame()
 	if not frame then return end
 	installed = true
-	HookScript(frame, 'OnShow', Apply)
+	frame:HookScript('OnShow', Apply)
 	if frame:IsShown() then Apply() end
 end
 

@@ -1,7 +1,5 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('StreamerTools.GCDHistory')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('gcdhistory')
 BUI.GCDHistory = {}
 local GCDHistory = BUI.GCDHistory
 local Pixel = BUI.Pixel
@@ -169,7 +167,7 @@ end
 
 local fadeDriver = CreateFrame('Frame')
 fadeDriver:Hide()
-SetScript(fadeDriver, 'OnUpdate', function(_, deltaTime)
+fadeDriver:SetScript('OnUpdate', function(_, deltaTime)
     local alive = false
     for fadeIndex = #fading, 1, -1 do
         local fadeFrame = fading[fadeIndex]
@@ -258,7 +256,7 @@ local function BounceOnUpdate(self, deltaTime)
     local elapsed = (self._bounceElapsed or 0) + deltaTime
     if elapsed >= BOUNCE_TOTAL then
         self:SetScale(1)
-        SetScript(self, 'OnUpdate', nil)
+        self:SetScript('OnUpdate', nil)
         self._bounceElapsed = nil
         return
     end
@@ -274,7 +272,7 @@ end
 local function PlayBounce(frame)
     frame._bounceElapsed = 0
     frame:SetScale(1)
-    SetScript(frame, 'OnUpdate', BounceOnUpdate)
+    frame:SetScript('OnUpdate', BounceOnUpdate)
 end
 
 local function ShowActiveCast(spellID, startMs, endMs, isChannel)

@@ -195,7 +195,7 @@ function GroupFrames.PrecreateRaid()
 		return
 	end
 	if precreateTicker then return end
-	precreateTicker = BUI.Prof.NewTicker('GroupFrames.Raid', PRECREATE_STAGGER, BUI.Prof.Wrap('tick#PrecreateRaid', PrecreateStep))
+	precreateTicker = C_Timer.NewTicker(PRECREATE_STAGGER, PrecreateStep)
 end
 
 function GroupFrames.UpdateInstanceClamp()
@@ -310,14 +310,13 @@ function GroupFrames.SpawnRaid()
 	GroupFrames.InvalidateLargeRaidSettings()
 	local raidSettings = GroupFrames.GetDB().raid
 
-	local Measure = BUI.Prof.Measure
-	GroupFrames.headers.raid     = Measure("gf.spawn#RaidHeaders", SpawnGroupBank, "base", raidSettings)
-	GroupFrames.headers.raidWide = Measure("gf.spawn#RaidWide", SpawnWide, "base", raidSettings)
-	Measure("gf.spawn#RaidLarge", EnsureLargeBank)
+	GroupFrames.headers.raid     = SpawnGroupBank("base", raidSettings)
+	GroupFrames.headers.raidWide = SpawnWide("base", raidSettings)
+	EnsureLargeBank()
 
 	GroupFrames.UpdateInstanceClamp()
 	GroupFrames.ApplyRaidRoleFilter()
-	Measure("gf.spawn#PrecreateRaid", GroupFrames.PrecreateRaid)
+	GroupFrames.PrecreateRaid()
 end
 
 function GroupFrames.PreviewRaidHeaders()

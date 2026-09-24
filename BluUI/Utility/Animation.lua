@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('Util.Animation')
 local Animation = {}
 BUI.Animation = Animation
 local GetTime = GetTime
@@ -48,13 +47,13 @@ OnUpdate = function(self)
 	end
 	if animationCount <= 0 then
 		animationCount = 0
-		SetScript(self, 'OnUpdate', nil)
+		self:SetScript('OnUpdate', nil)
 	end
 end
 
 local function EnsureUpdateFrame()
 	if not updateFrame then updateFrame = CreateFrame('Frame') end
-	if animationCount > 0 then SetScript(updateFrame, 'OnUpdate', OnUpdate) end
+	if animationCount > 0 then updateFrame:SetScript('OnUpdate', OnUpdate) end
 end
 
 function Animation.To(frame, property, targetValue, duration, options)

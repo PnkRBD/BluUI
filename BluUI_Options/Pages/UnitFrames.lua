@@ -1,5 +1,4 @@
 local BUI = BluUI
-local SetScript, HookScript = BUI.Prof.Scripts('Pages.UnitFrames')
 
 local BUILib = BluUI.BUILibClient
 local Controls, Layout, Modals = BUILib.Controls, BUILib.Layout, BUILib.Modals
@@ -538,10 +537,10 @@ BUI.PageEngine.RegisterPage("unitframes", {
         for tabIndex, content in pairs(page.tabContents) do
             if not content.frame._buiTabHooked then
                 content.frame._buiTabHooked = true
-                HookScript(content.frame, "OnShow", function() _currentTabIndex = tabIndex end)
+                content.frame:HookScript("OnShow", function() _currentTabIndex = tabIndex end)
             end
         end
-        BUI.Prof.After('Pages.UnitFrames', 0.02, function()
+        C_Timer.After(0.02, function()
             if _currentTabIndex > 1 then _currentPage:SetTab(_currentTabIndex) end
         end)
 
@@ -735,7 +734,7 @@ BUI.PageEngine.RegisterPage("unitframes", {
                 end
             end
             local unitTab = page:GetTab(headerDef.index)
-            HookScript(unitTab.frame, 'OnShow', function()
+            unitTab.frame:HookScript('OnShow', function()
                 local unitSettings = settings[headerDef.key]
                 header.titleBar.enableToggle:SetValue((unitSettings and unitSettings.enabled) ~= false)
                 SyncEye()
@@ -1287,10 +1286,10 @@ BUI.PageEngine.RegisterPage("unitframes", {
         local function MakeTagBox(parent, text)
             local tagBox = Controls.TextBox(parent, nil, text, function() end, nil, 100)
             local editBox = tagBox.editbox
-            SetScript(editBox, "OnTextChanged", function(self, userInput)
+            editBox:SetScript("OnTextChanged", function(self, userInput)
                 if userInput then self:SetText(text) end
             end)
-            SetScript(editBox, "OnEditFocusGained", function(self) self:HighlightText() end)
+            editBox:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
             return tagBox
         end
 
@@ -1433,11 +1432,11 @@ BUI.PageEngine.RegisterPage("unitframes", {
                             xyRange = { x = 4000, y = 3000 },
                             matchWidth = {
                                 get = function() return unitSettings.matchAnchorWidth == true end,
-                                set = function(value) unitSettings.matchAnchorWidth = value; BUI.Prof.After('Pages.UnitFrames', 0.1, RefreshFrames) end,
+                                set = function(value) unitSettings.matchAnchorWidth = value; C_Timer.After(0.1, RefreshFrames) end,
                             },
                             matchHeight = {
                                 get = function() return unitSettings.matchAnchorHeight == true end,
-                                set = function(value) unitSettings.matchAnchorHeight = value; BUI.Prof.After('Pages.UnitFrames', 0.1, RefreshFrames) end,
+                                set = function(value) unitSettings.matchAnchorHeight = value; C_Timer.After(0.1, RefreshFrames) end,
                             },
                         })
                         return { mover, SizeIcon(row) }
@@ -1477,7 +1476,7 @@ BUI.PageEngine.RegisterPage("unitframes", {
 
             if not tab._buiUnitPosHook then
                 tab._buiUnitPosHook = true
-                HookScript(tab.frame, "OnHide", function() if UnitFrames and UnitFrames.UnregisterPositionCallback then UnitFrames.UnregisterPositionCallback(unitKey) end end)
+                tab.frame:HookScript("OnHide", function() if UnitFrames and UnitFrames.UnregisterPositionCallback then UnitFrames.UnregisterPositionCallback(unitKey) end end)
             end
 
             Section('General')
@@ -1896,7 +1895,7 @@ BUI.PageEngine.RegisterPage("unitframes", {
 
         local function LazyBuild(tab, builder)
             local built = false
-            HookScript(tab.frame, "OnShow", function()
+            tab.frame:HookScript("OnShow", function()
                 if built then return end
                 built = true; builder(); tab:Refresh()
             end)
@@ -1904,7 +1903,7 @@ BUI.PageEngine.RegisterPage("unitframes", {
 
         local function SyncableBuild(tab, unitKey)
             local built = false
-            HookScript(tab.frame, "OnShow", function()
+            tab.frame:HookScript("OnShow", function()
                 if built and not syncDirty[unitKey] then return end
                 if built then tab:Clear() end
                 built, syncDirty[unitKey] = true, false

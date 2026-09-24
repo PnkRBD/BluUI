@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('ItemUpgrade')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('itemupgrade')
 local ipairs, pairs = ipairs, pairs
 
 local Skin = BUI.Skinning
@@ -182,7 +180,7 @@ local function Install()
 	local frame = _G.ItemUpgradeFrame
 	if not frame then return end
 	installed = true
-	HookScript(frame, 'OnShow', Apply)
+	frame:HookScript('OnShow', Apply)
 	hooksecurefunc(frame, 'UpdateUpgradeItemInfo', OnItemInfoUpdated)
 	hooksecurefunc(frame, 'PopulatePreviewFrames', OnPreviewFramesPopulated)
 	if frame.ItemInfo then hooksecurefunc(frame.ItemInfo, 'Setup', OnItemInfoSetup) end

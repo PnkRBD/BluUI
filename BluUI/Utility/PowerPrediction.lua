@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Util.PowerPrediction')
 
 local PowerPrediction = {}
 BUI.PowerPrediction = PowerPrediction
@@ -111,7 +110,7 @@ function PowerPrediction.Attach(parentBar, options)
 
     ApplyAnchors(instance)
 
-    HookScript(parentBar, 'OnSizeChanged', function() ApplyAnchors(instance) end)
+    parentBar:HookScript('OnSizeChanged', function() ApplyAnchors(instance) end)
 
     return predict
 end

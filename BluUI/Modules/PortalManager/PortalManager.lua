@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('PortalManager.PortalManager')
 local Pixel = BUI.Pixel
 
 local BUILib = BluUI.BUILibClient
@@ -165,7 +164,7 @@ local function RowForSpell(spellID)
     return nil
 end
 
-SetScript(castDriver, 'OnUpdate', function()
+castDriver:SetScript('OnUpdate', function()
     if not castingSpellID or not panel:IsVisible() then
         StopCastFill()
         return
@@ -252,14 +251,14 @@ local function CreateRow(parent, index)
     name:SetWordWrap(false)
     row.nameText = name
 
-    SetScript(row, 'OnEnter', function(self)
+    row:SetScript('OnEnter', function(self)
         self:SetBackdropBorderColor(Colors.GetAccent())
         GameTooltip:SetOwner(self, 'ANCHOR_NONE')
         GameTooltip:SetPoint('TOPRIGHT', self, 'TOPLEFT', -6, 0)
         GameTooltip:SetSpellByID(self._spellID)
         GameTooltip:Show()
     end)
-    SetScript(row, 'OnLeave', function(self)
+    row:SetScript('OnLeave', function(self)
         self:SetBackdropBorderColor(0.13, 0.13, 0.15, 1)
         GameTooltip:Hide()
     end)
@@ -324,7 +323,7 @@ local function BuildPanel()
     scrollArea:SetPoint('BOTTOMRIGHT', Pixel.Scale(-8), Pixel.Scale(12))
     panel.scroll, panel.child = BUI.Skinning.CreateScrollArea(scrollArea, ROW_H, 4)
 
-    HookScript(panel, 'OnHide', StopCastFill)
+    panel:HookScript('OnHide', StopCastFill)
 end
 
 local function SortedEntries(entries)
@@ -448,7 +447,7 @@ RefreshContent = function()
     panel.scroll:SetVerticalScroll(0)
 end
 
-local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3, 'PortalManager.Refresh')
+local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3)
 
 slide = BUI.SlidePanel.New({
     skin = 'portalManager',
@@ -483,7 +482,7 @@ local function OnCastEnd()
 end
 
 BUI.Events:OnLogin('PortalManager', function()
-    HookScript(CharacterFrame, 'OnHide', function() slide.Close(true) end)
+    CharacterFrame:HookScript('OnHide', function() slide.Close(true) end)
 
     BUI.Events:Register('SPELL_UPDATE_COOLDOWN',       'PortalManager', OnPortalEvent)
     BUI.Events:Register('SPELLS_CHANGED',              'PortalManager', OnPortalEvent)

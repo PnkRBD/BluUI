@@ -269,7 +269,7 @@ local function PlayFlash(durationSec)
 	local myGeneration = flashGeneration
 	if flashAnimationGroup:IsPlaying() then flashAnimationGroup:Stop() end
 	flashAnimationGroup:Play()
-	BUI.Prof.After('Bloodlust.Bloodlust', durationSec, function()
+	C_Timer.After(durationSec, function()
 		if myGeneration == flashGeneration then StopFlash() end
 	end)
 end

@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('UnitFrames.Auras')
 
 local UnitFrames = BUI.UnitFrames
 local Pixel = BUI.Pixel
@@ -252,7 +251,7 @@ local function EngineCreateAuraElements(frame, unitType)
 	frame.BuffContainer._buiScope = 'unit'
 	auraFrames[#auraFrames + 1] = { frame = frame, unitType = unitType }
 	if unitType == 'targettarget' then
-		HookScript(frame, 'OnShow', function(shownFrame)
+		frame:HookScript('OnShow', function(shownFrame)
 			BindUnit(shownFrame, true)
 			EnsureEventlessTicker()
 		end)
@@ -309,7 +308,7 @@ function EnsureEventlessTicker()
 		if entry.unitType == 'targettarget' then hasTargetOfTarget = true; break end
 	end
 	if not hasTargetOfTarget then return end
-	eventlessTicker = BUI.Prof.NewTicker('UnitFrames.Auras', 0.5, BUI.Prof.Wrap('tick#TargetTargetAuras', function()
+	eventlessTicker = C_Timer.NewTicker(0.5, function()
 		local active = false
 		for _, entry in ipairs(auraFrames) do
 			if entry.unitType == 'targettarget' and entry.frame:IsVisible() then
@@ -321,7 +320,7 @@ function EnsureEventlessTicker()
 			eventlessTicker:Cancel()
 			eventlessTicker = nil
 		end
-	end))
+	end)
 end
 
 if ENGINE_OK then

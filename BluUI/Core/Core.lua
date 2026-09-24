@@ -13,7 +13,7 @@ function BUI.CanWriteEditModeLayout()
 end
 
 function BUI.CloseEditModeWriteWindow()
-	BUI.Prof.After('Core.Core', EDIT_MODE_WRITE_WINDOW, function() editModeWriteWindowOpen = false end)
+	C_Timer.After(EDIT_MODE_WRITE_WINDOW, function() editModeWriteWindowOpen = false end)
 end
 
 local LibEMO = LibStub('LibEditModeOverride-1.0')
@@ -166,8 +166,6 @@ local function PromptAzorImport()
 end
 
 function Addon:OnInitialize()
-	BUI.Prof.CheckStartupCapture()
-	local initializeStart = debugprofilestop()
 	local forcedAdopt = BluUI_DB and BluUI_DB.__forceAdoptOnLoad
 	if BluUI_DB then BluUI_DB.__forceAdoptOnLoad = nil end
 
@@ -177,23 +175,23 @@ function Addon:OnInitialize()
 		BluUI_DB.__adoptedLegacySettings_v2 = true
 		if forcedAdopt == 'disableAfter' then
 			C_AddOns.DisableAddOn('AzortharionUI')
-			BUI.Prof.After('Core.Core', 1, function()
+			C_Timer.After(1, function()
 				BUI.Print('Profiles copied, reloading.')
-				BUI.Prof.After('Core.Core', 1.5, BUI.Reload)
+				C_Timer.After(1.5, BUI.Reload)
 			end)
 		else
-			BUI.Prof.After('Core.Core', 1, function()
+			C_Timer.After(1, function()
 				BUI.Print('Copied your AzortharionUI profiles.')
 			end)
 		end
 	elseif forcedAdopt then
-		BUI.Prof.After('Core.Core', 1, function()
+		C_Timer.After(1, function()
 			BUI.Print('AzortharionUI did not load. Enable it and retry.')
 		end)
 	elseif type(AzortharionUI_DB) == 'table'
 		and not (BluUI_DB and (BluUI_DB.__adoptedLegacySettings_v2 or BluUI_DB.__azorImportDeclined)) then
 		BUI.Events:Once('PLAYER_ENTERING_WORLD', 'AzorImportPrompt', function()
-			BUI.Prof.After('Core.Core', 2, PromptAzorImport)
+			C_Timer.After(2, PromptAzorImport)
 		end)
 	end
 
@@ -234,24 +232,22 @@ function Addon:OnInitialize()
 
 	BUI.Print('Using profile: |cff' .. BUI.C.COLOR_PINK .. BUI.db:GetCurrentProfile() .. '|r')
 	if BUI.InitializeMinimapButton then BUI.InitializeMinimapButton() end
-	if BUI.Prof.active then BUI.Prof.Add('startup#OnInitialize', debugprofilestop() - initializeStart) end
 end
 
 function Addon:OnEnable()
-	local Measure = BUI.Prof.Measure
-	Measure('startup#SpecProfiles', BUI.SpecProfiles.ApplyOnLogin)
+	BUI.SpecProfiles.ApplyOnLogin()
 
 	BUI.BUILibClient.defaultWidth = BUI.C.PAGE_CONTENT_W
 	BUI.BUILibClient.modalColor = { BUI.C.PANEL_BACKDROP[1], BUI.C.PANEL_BACKDROP[2], BUI.C.PANEL_BACKDROP[3], BUI.C.PANEL_BACKDROP[4] }
 	BUI.BUILibClient.modalBorderColor = { BUI.C.PANEL_BACKDROP[5], BUI.C.PANEL_BACKDROP[6], BUI.C.PANEL_BACKDROP[7], BUI.C.PANEL_BACKDROP[8] }
 	BUI.BUILibClient.bodyFont = BUI.GetGlobalFont()
 
-	if BUI.ActionBars and BUI.IsModuleEnabled('actionBars') then Measure('startup#ActionBars', BUI.ActionBars.Initialize) end
-	if BUI.UnitFrames and BUI.IsModuleEnabled('unitFrames') then Measure('startup#UnitFrames', BUI.UnitFrames.Initialize, BUI.UnitFrames) end
-	if BUI.GroupFrames and BUI.IsModuleEnabled('groupFrames') then Measure('startup#GroupFrames', BUI.GroupFrames.Initialize) end
-	if BUI.CDM and BUI.IsModuleEnabled('cdm') then Measure('startup#CDM', BUI.CDM.Initialize) end
-	if BUI.CastBar and BUI.CastBar.RefreshAll and BUI.IsModuleEnabled('castBars') then BUI.Prof.After('Core.CastBars', 0.1, BUI.CastBar.RefreshAll) end
-	if BUI.Power and BUI.Power.Secondary and BUI.IsModuleEnabled('power') then Measure('startup#Power', BUI.Power.Secondary.Initialize) end
+	if BUI.ActionBars and BUI.IsModuleEnabled('actionBars') then BUI.ActionBars.Initialize() end
+	if BUI.UnitFrames and BUI.IsModuleEnabled('unitFrames') then BUI.UnitFrames:Initialize() end
+	if BUI.GroupFrames and BUI.IsModuleEnabled('groupFrames') then BUI.GroupFrames.Initialize() end
+	if BUI.CDM and BUI.IsModuleEnabled('cdm') then BUI.CDM.Initialize() end
+	if BUI.CastBar and BUI.CastBar.RefreshAll and BUI.IsModuleEnabled('castBars') then C_Timer.After(0.1, BUI.CastBar.RefreshAll) end
+	if BUI.Power and BUI.Power.Secondary and BUI.IsModuleEnabled('power') then BUI.Power.Secondary.Initialize() end
 
 	if BUI.db.global.layoutStyle then
 		BUI.BUILibClient.Layout.SetStyle(BUI.db.global.layoutStyle)
@@ -289,22 +285,19 @@ function Addon:OnEnable()
 	BUI.Events:Once('PLAYER_ENTERING_WORLD', 'Core', function()
 		ReassertBUILib()
 		local scaleBefore = UIParent:GetScale()
-		Measure('startup#ApplyScale', BUI.ApplyScale)
+		BUI.ApplyScale()
 		BUI.CloseEditModeWriteWindow()
 		if not BUI.ApproxEqual(scaleBefore, UIParent:GetScale()) then
-			Measure('startup#RefreshAllModules', BUI.ExportImport.RefreshAllModules)
+			BUI.ExportImport.RefreshAllModules()
 		else
 			if BUI.UnitFrames and BUI.IsModuleEnabled('unitFrames') then
-				Measure('startup#RefreshUnitFrames', function()
-					BUI.UnitFrames.InvalidateFilterCache()
-					BUI.UnitFrames:Refresh()
-				end)
+				BUI.UnitFrames.InvalidateFilterCache()
+				BUI.UnitFrames:Refresh()
 			end
-			Measure('startup#RefreshSkins', BUI.Skinning.RefreshAll)
+			BUI.Skinning.RefreshAll()
 		end
 		if BUI.CDM then BUI.QueueStartupCheck(BUI.CDM.CheckDisabled) end
 		BUI.QueueStartupCheck(BUI.CheckPlatynatorPrompt)
 		if BUI.CDM then BUI.QueueStartupCheck(BUI.CDM.CheckUtilityPrompt) end
 	end)
 end
-Addon.OnEnable = BUI.Prof.Wrap('startup#OnEnable', Addon.OnEnable)

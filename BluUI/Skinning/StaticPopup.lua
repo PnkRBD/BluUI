@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('StaticPopup')
 
 local select = select
 
@@ -139,8 +138,8 @@ local function Install()
 	for dialogIndex = 1, DIALOG_COUNT do
 		local dialog = _G['StaticPopup' .. dialogIndex]
 		if dialog then
-			HookScript(dialog, 'OnShow', Apply)
-			HookScript(dialog, 'OnHide', StopAcceptGlow)
+			dialog:HookScript('OnShow', Apply)
+			dialog:HookScript('OnHide', StopAcceptGlow)
 		end
 	end
 	ApplyShown()
