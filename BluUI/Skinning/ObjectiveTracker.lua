@@ -98,12 +98,13 @@ local readyQuestIDs = {}
 local previousReadyByQuest = {}
 local watchedCount = 0
 local readyCount = 0
-local questItemButton
 local pendingMenuQuestID
 local wrapAdjustedText = { titles = {}, objectives = {} }
 local questClassificationLabels
 local Scenario = {}
 local QuestFilter = {}
+local QuestItem = { POSITION_KEY = 'trackerquestitem', SIZE = 40 }
+local QuestInfo = { WOWHEAD_URL = 'https://www.wowhead.com/%s=%d', previousObjectives = {} }
 
 local function IsEnabled()
 	return Skin.IsSkinEnabled('objectivetracker')
@@ -1090,54 +1091,155 @@ function Skin.ApplyTrackerColors()
 	end
 end
 
-local function EnsureQuestItemButton()
-	if questItemButton then return end
-	questItemButton = CreateFrame('Button', 'BUI_TrackerQuestItemButton', UIParent, 'SecureActionButtonTemplate')
-	questItemButton:SetAttribute('type', 'item')
-	questItemButton:RegisterForClicks('AnyDown')
-	questItemButton:SetSize(1, 1)
-	questItemButton:SetPoint('BOTTOMLEFT', UIParent, 'BOTTOMLEFT', -50, -50)
-	questItemButton:SetAlpha(0)
-	questItemButton:EnableMouse(false)
+function QuestItem.UpdateCooldown()
+	local button = QuestItem.button
+	if not button or not button.questLogIndex or not button:IsShown() then return end
+	local start, duration, enable = GetQuestLogSpecialItemCooldown(button.questLogIndex)
+	if start then CooldownFrame_Set(button.cooldown, start, duration, enable) end
 end
 
-local function UpdateQuestItemBinding()
-	local key = GetSettings().questItemKey
-	local wantBinding = IsEnabled() and key and key ~= 'NONE'
-	if not questItemButton and not wantBinding then return end
-	if InCombatLockdown() then
-		BUI.Events:AfterCombat(UpdateQuestItemBinding, 'Skinning.TrackerItemKey')
+function QuestItem.OnEnter(self)
+	if not self.questLogIndex then return end
+	GameTooltip:SetOwner(self, 'ANCHOR_LEFT')
+	GameTooltip:SetQuestLogSpecialItem(self.questLogIndex)
+	GameTooltip:AddLine('Ctrl+drag to move', Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3])
+	GameTooltip:Show()
+end
+
+function QuestItem.OnDragStart(self)
+	if IsControlKeyDown() and not InCombatLockdown() then self:StartMoving() end
+end
+
+function QuestItem.OnDragStop(self)
+	self:StopMovingOrSizing()
+	Skin.SavePosition(self, QuestItem.POSITION_KEY)
+end
+
+function QuestItem.Ensure()
+	if QuestItem.button then return end
+	local button = CreateFrame('Button', 'BUI_TrackerQuestItemButton', UIParent, 'SecureActionButtonTemplate')
+	button:SetAttribute('type', 'item')
+	button:RegisterForClicks('AnyUp', 'AnyDown')
+	button:RegisterForDrag('LeftButton')
+	button:SetMovable(true)
+	button:SetClampedToScreen(true)
+
+	local icon = button:CreateTexture(nil, 'ARTWORK')
+	icon:SetAllPoints(button)
+	icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	button.icon = icon
+
+	local cooldown = CreateFrame('Cooldown', nil, button, 'CooldownFrameTemplate')
+	cooldown:SetAllPoints(button)
+	button.cooldown = cooldown
+
+	local hotkey = button:CreateFontString(nil, 'OVERLAY')
+	Pixel.ApplyFont(hotkey, BAR_LABEL_SIZE, FONT, 'OUTLINE')
+	hotkey:SetPoint('TOPRIGHT', button, 'TOPRIGHT', -Pixel.Scale(2), -Pixel.Scale(3))
+	button.hotkey = hotkey
+
+	local count = button:CreateFontString(nil, 'OVERLAY')
+	Pixel.ApplyFont(count, BAR_LABEL_SIZE, FONT, 'OUTLINE')
+	count:SetPoint('BOTTOMRIGHT', button, 'BOTTOMRIGHT', -Pixel.Scale(2), Pixel.Scale(3))
+	button.count = count
+
+	local highlight = button:CreateTexture(nil, 'HIGHLIGHT')
+	highlight:SetAllPoints(button)
+	highlight:SetColorTexture(1, 1, 1, 0.22)
+
+	Pixel.ApplyBorder(button, 1, Theme.border.light[1], Theme.border.light[2], Theme.border.light[3], 1)
+	button:SetScript('OnEnter', QuestItem.OnEnter)
+	button:SetScript('OnLeave', GameTooltip_Hide)
+	button:SetScript('OnDragStart', QuestItem.OnDragStart)
+	button:SetScript('OnDragStop', QuestItem.OnDragStop)
+	QuestItem.button = button
+end
+
+function QuestItem.Place(visible)
+	local button = QuestItem.button
+	if button.placedVisible == visible then return end
+	button.placedVisible = visible
+	button:ClearAllPoints()
+	if not visible then
+		button:SetSize(1, 1)
+		button:SetPoint('BOTTOMLEFT', UIParent, 'BOTTOMLEFT', -50, -50)
+		button:SetAlpha(0)
+		button:EnableMouse(false)
 		return
 	end
-	EnsureQuestItemButton()
-	ClearOverrideBindings(questItemButton)
-	if not wantBinding then return end
-	local getSpecialItem = C_QuestLog.GetQuestLogSpecialItemInfo or _G.GetQuestLogSpecialItemInfo
-	if not getSpecialItem or not C_QuestLog.GetNumQuestWatches then return end
-	local bestLink
+	button:SetSize(Pixel.Scale(QuestItem.SIZE), Pixel.Scale(QuestItem.SIZE))
+	if not Skin.RestorePosition(button, QuestItem.POSITION_KEY) then
+		button:SetPoint('CENTER', UIParent, 'CENTER', 0, -200)
+	end
+	button:SetAlpha(1)
+	button:EnableMouse(true)
+end
+
+function QuestItem.FindClosest()
+	local bestLink, bestLogIndex
 	local bestDistance = math.huge
 	for watchIndex = 1, C_QuestLog.GetNumQuestWatches() do
 		local questID = C_QuestLog.GetQuestIDForQuestWatchIndex(watchIndex)
 		local logIndex = questID and C_QuestLog.GetLogIndexForQuestID(questID)
 		if logIndex then
-			local link = getSpecialItem(logIndex)
-			if link then
-				local distanceSq = C_QuestLog.GetDistanceSqToQuest and C_QuestLog.GetDistanceSqToQuest(logIndex)
+			local link, _, _, showWhenComplete = GetQuestLogSpecialItemInfo(logIndex)
+			if link and (showWhenComplete or not C_QuestLog.IsComplete(questID)) then
+				local distanceSq = C_QuestLog.GetDistanceSqToQuest(questID)
 				if type(distanceSq) ~= 'number' then distanceSq = math.huge - 1 end
 				if distanceSq < bestDistance then
 					bestDistance = distanceSq
 					bestLink = link
+					bestLogIndex = logIndex
 				end
 			end
 		end
 	end
-	if bestLink then
-		questItemButton:SetAttribute('item', bestLink)
-		SetOverrideBindingClick(questItemButton, true, key, 'BUI_TrackerQuestItemButton')
-	end
+	return bestLink, bestLogIndex
 end
 
-local function AddTomTomWaypointButton(_, rootDescription)
+function QuestItem.Update()
+	local settings = GetSettings()
+	local key = settings.questItemKey
+	local wantBinding = IsEnabled() and key and key ~= 'NONE'
+	local wantButton = IsEnabled() and settings.showQuestItemButton == true
+	if not QuestItem.button and not wantBinding and not wantButton then return end
+	if InCombatLockdown() then
+		BUI.Events:AfterCombat(QuestItem.Update, 'Skinning.TrackerItemKey')
+		return
+	end
+	QuestItem.Ensure()
+	local button = QuestItem.button
+	ClearOverrideBindings(button)
+	local link, logIndex
+	if wantBinding or wantButton then link, logIndex = QuestItem.FindClosest() end
+	button:SetAttribute('item', link)
+	button.questLogIndex = logIndex
+	QuestItem.Place(wantButton)
+	button:SetShown(not wantButton or link ~= nil)
+	if link and wantBinding then
+		SetOverrideBindingClick(button, true, key, 'BUI_TrackerQuestItemButton')
+	end
+	if not link then return end
+	local _, texture, charges = GetQuestLogSpecialItemInfo(logIndex)
+	button.icon:SetTexture(texture)
+	button.count:SetText(charges and charges > 1 and charges or '')
+	button.hotkey:SetText(wantBinding and BUI.Keybinds.Format(key) or '')
+	QuestItem.UpdateCooldown()
+end
+
+function QuestInfo.AddWowheadButton(rootDescription, kind, id)
+	if not IsEnabled() or not id then return end
+	rootDescription:CreateButton('Copy Wowhead Link', function()
+		BUI.Modals.Input({
+			title = 'Wowhead Link',
+			message = 'Press Ctrl+C to copy.',
+			defaultText = QuestInfo.WOWHEAD_URL:format(kind, id),
+			confirmText = 'Done',
+		})
+	end)
+end
+
+function QuestInfo.AddTomTomButton(rootDescription)
 	if not IsEnabled() then return end
 	local TomTom = _G.TomTom
 	if not TomTom or not TomTom.AddWaypoint then return end
@@ -1192,7 +1294,16 @@ local function InstallMenuHook()
 	if menuHookInstalled then return end
 	if not Menu or not Menu.ModifyMenu then return end
 	menuHookInstalled = true
-	Menu.ModifyMenu('MENU_QUEST_OBJECTIVE_TRACKER', AddTomTomWaypointButton)
+	Menu.ModifyMenu('MENU_QUEST_OBJECTIVE_TRACKER', function(_, rootDescription)
+		QuestInfo.AddTomTomButton(rootDescription)
+		QuestInfo.AddWowheadButton(rootDescription, 'quest', pendingMenuQuestID)
+	end)
+	Menu.ModifyMenu('MENU_BONUS_OBJECTIVE_TRACKER', function(_, rootDescription, block)
+		QuestInfo.AddWowheadButton(rootDescription, 'quest', block and block.id)
+	end)
+	Menu.ModifyMenu('MENU_ACHIEVEMENT_TRACKER', function(_, rootDescription, block)
+		QuestInfo.AddWowheadButton(rootDescription, 'achievement', block and block.id)
+	end)
 end
 
 local function SingleLineTitlesEnabled()
@@ -1247,6 +1358,47 @@ local function GetQuestClassificationLabel(questID)
 	local entry = classification and questClassificationLabels[classification]
 	if not entry then return nil end
 	return entry[1], entry[2]
+end
+
+function QuestInfo.RewardRow(texture, name, amount, quality)
+	local red, green, blue = C_Item.GetItemQualityColor(quality or 1)
+	return {
+		left = ('|T%s:14:14:0:0:64:64:5:59:5:59|t %s'):format(texture, name),
+		right = amount and amount > 1 and BreakUpLargeNumbers(amount) or nil,
+		leftColor = { red, green, blue },
+	}
+end
+
+function QuestInfo.AddRewardRows(rows, questID)
+	local rewardRows = {}
+	local _, baseXP = GetQuestLogRewardXP(questID)
+	if baseXP and baseXP > 0 then
+		rewardRows[#rewardRows + 1] = { left = BreakUpLargeNumbers(baseXP) .. ' XP' }
+	end
+	local money = GetQuestLogRewardMoney(questID)
+	if money and money > 0 then
+		rewardRows[#rewardRows + 1] = { left = GetMoneyString(money, true) }
+	end
+	for rewardIndex = 1, GetNumQuestLogRewards(questID) do
+		local name, texture, amount, quality = GetQuestLogRewardInfo(rewardIndex, questID)
+		if name then rewardRows[#rewardRows + 1] = QuestInfo.RewardRow(texture, name, amount, quality) end
+	end
+	for _, currency in ipairs(C_QuestLog.GetQuestRewardCurrencies(questID)) do
+		local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(currency.currencyID)
+		rewardRows[#rewardRows + 1] = QuestInfo.RewardRow(currency.texture, currency.name, currency.totalRewardAmount, currencyInfo and currencyInfo.quality)
+	end
+	local choiceCount = GetNumQuestLogChoices(questID)
+	if choiceCount > 0 then
+		rewardRows[#rewardRows + 1] = { left = 'Choose one:', leftColor = Skin.TrackerColor('dim') }
+		for choiceIndex = 1, choiceCount do
+			local name, texture, amount, quality = GetQuestLogChoiceInfo(choiceIndex, questID)
+			if name then rewardRows[#rewardRows + 1] = QuestInfo.RewardRow(texture, name, amount, quality) end
+		end
+	end
+	if #rewardRows == 0 then return end
+	rows[#rows + 1] = { space = true }
+	rows[#rows + 1] = { left = 'Rewards', leftColor = Skin.TrackerColor('dim') }
+	for _, row in ipairs(rewardRows) do rows[#rows + 1] = row end
 end
 
 local function OnQuestBlockHeaderEnter(_, block, questID, isInGroup)
@@ -1310,6 +1462,7 @@ local function OnQuestBlockHeaderEnter(_, block, questID, isInGroup)
 	if readyQuestIDs[questID] then
 		rows[#rows + 1] = { left = '|A:UI-QuestIcon-TurnIn-Normal:14:14|a Ready to turn in', leftColor = Skin.TrackerColor('ready') }
 	end
+	QuestInfo.AddRewardRows(rows, questID)
 	if #rows == 0 then return end
 
 	local blockCenterX = block.GetCenter and block:GetCenter()
@@ -1367,14 +1520,18 @@ function QuestFilter.Trackable(info)
 	return not info.isHeader and not info.isTask and (not info.isBounty or C_QuestLog.IsComplete(info.questID))
 end
 
-function QuestFilter.Retrack(spec)
+function QuestFilter.MaxWatches()
+	return Constants and Constants.QuestWatchConsts and Constants.QuestWatchConsts.MAX_QUEST_WATCHES or 25
+end
+
+function QuestFilter.Retrack(spec, automatic)
 	if not C_QuestLog.GetNumQuestLogEntries or not C_QuestLog.GetInfo then return end
 	GetSettings().trackerTrackSpec = spec
 	QuestFilter.UpdateTint()
 	local numEntries = C_QuestLog.GetNumQuestLogEntries()
-	local maxWatches = Constants and Constants.QuestWatchConsts and Constants.QuestWatchConsts.MAX_QUEST_WATCHES or 25
+	local maxWatches = QuestFilter.MaxWatches()
 	local superTracked = C_SuperTrack and C_SuperTrack.GetSuperTrackedQuestID and C_SuperTrack.GetSuperTrackedQuestID() or 0
-	if not IsShiftKeyDown() then
+	if automatic or not IsShiftKeyDown() then
 		for entryIndex = 1, numEntries do
 			local info = C_QuestLog.GetInfo(entryIndex)
 			if info and QuestFilter.Trackable(info) then
@@ -1416,6 +1573,22 @@ function QuestFilter.Retrack(spec)
 	RefreshTrackerLayout()
 end
 
+function QuestFilter.FollowZone()
+	if not IsEnabled() or GetSettings().trackerTrackSpec ~= 'zone' then return end
+	QuestFilter.Retrack('zone', true)
+end
+
+QuestFilter.QueueFollowZone = BUI.Dispatcher.NewDelayed(QuestFilter.FollowZone, 1)
+
+function QuestFilter.TrackProgressed(questID)
+	if C_QuestLog.GetQuestWatchType(questID) then return end
+	if C_QuestLog.GetNumQuestWatches() >= QuestFilter.MaxWatches() then return end
+	local logIndex = C_QuestLog.GetLogIndexForQuestID(questID)
+	local info = logIndex and C_QuestLog.GetInfo(logIndex)
+	if not info or info.isHidden or not QuestFilter.Trackable(info) then return end
+	C_QuestLog.AddQuestWatch(questID)
+end
+
 function QuestFilter.Install()
 	if QuestFilter.migrated then return end
 	QuestFilter.migrated = true
@@ -1450,7 +1623,7 @@ function QuestFilter.ShowMenu()
 	local items = {}
 	items[#items + 1] = { title = 'TRACK' }
 	for _, preset in ipairs({
-		{ spec = 'zone', label = 'Zone' },
+		{ spec = 'zone', label = 'Current Zone' },
 		{ spec = 'campaign', label = 'Campaign' },
 		{ spec = 'daily', label = 'Daily & Weekly' },
 		{ spec = 'ready', label = 'Completed' },
@@ -1513,9 +1686,29 @@ local function UpdateHeaderCounts()
 	headerCounts:SetText(text)
 end
 
+function QuestInfo.AnnounceObjectives(questID, previousFinished)
+	local finished = {}
+	local objectives = C_QuestLog.GetQuestObjectives(questID)
+	if not objectives then return finished end
+	for objectiveIndex, objective in ipairs(objectives) do
+		finished[objectiveIndex] = objective.finished
+		if objective.finished and previousFinished and previousFinished[objectiveIndex] == false and objective.text and objective.text ~= '' then
+			UIErrorsFrame:AddMessage('Objective complete: ' .. objective.text, Skin.TrackerColorRGB('completed'))
+		end
+	end
+	return finished
+end
+
+function QuestInfo.AnnounceReady(questID)
+	local title = C_QuestLog.GetTitleForQuestID(questID)
+	if title then UIErrorsFrame:AddMessage(title .. ' complete', Skin.TrackerColorRGB('ready')) end
+end
+
 local function RefreshQuestCache()
 	if not IsEnabled() then return end
 	if not C_QuestLog.GetNumQuestWatches or not C_QuestLog.GetQuestIDForQuestWatchIndex then return end
+	local announce = GetSettings().completionMessage == true
+	local newObjectivesByQuest = {}
 	local newReadyByQuest = {}
 	local chime = false
 	local readyChanged = false
@@ -1531,7 +1724,12 @@ local function RefreshQuestCache()
 			if ready then
 				readyCount = readyCount + 1
 				readyQuestIDs[questID] = true
-				if previousReadyByQuest[questID] == false then chime = true end
+				if previousReadyByQuest[questID] == false then
+					chime = true
+					if announce then QuestInfo.AnnounceReady(questID) end
+				end
+			elseif announce then
+				newObjectivesByQuest[questID] = QuestInfo.AnnounceObjectives(questID, QuestInfo.previousObjectives[questID])
 			end
 			if previousReadyByQuest[questID] ~= ready then readyChanged = true end
 			newReadyByQuest[questID] = ready
@@ -1539,9 +1737,10 @@ local function RefreshQuestCache()
 		end
 	end
 	previousReadyByQuest = newReadyByQuest
+	QuestInfo.previousObjectives = newObjectivesByQuest
 	UpdateHeaderCounts()
 	if readyChanged then RepaintSkinColors() end
-	UpdateQuestItemBinding()
+	QuestItem.Update()
 	if chime then BUI.PlaySoundByName(GetSettings().completionSound) end
 end
 
@@ -1594,6 +1793,7 @@ local queueProgressFlash = BUI.Dispatcher.NewDelayed(FlashProgressBlock, 0.15)
 
 local function OnQuestProgress(_, questID)
 	if not IsEnabled() or not questID then return end
+	if GetSettings().trackOnProgress == true then QuestFilter.TrackProgressed(questID) end
 	flashQuestID = questID
 	queueProgressFlash()
 end
@@ -2416,7 +2616,13 @@ end
 
 Scenario.SyncStageBackdrop = function(stageBlock)
 	local backdrop = skinnedBars[stageBlock]
-	if backdrop then backdrop:SetShown(IsEnabled() and stageBlock:IsShown() and not stageBlock.widgetSetID) end
+	if not backdrop then return end
+	local blockParent = stageBlock:GetParent()
+	if backdrop:GetParent() ~= blockParent then
+		backdrop:SetParent(blockParent)
+		backdrop:SetFrameLevel(math.max(0, stageBlock:GetFrameLevel() - 1))
+	end
+	backdrop:SetShown(IsEnabled() and stageBlock:IsShown() and not stageBlock.widgetSetID)
 end
 
 function Scenario.Install()
@@ -2481,7 +2687,10 @@ local function Install()
 	BUI.Events:Register('QUEST_TURNED_IN', 'Skinning.TrackerQuestCache', queueQuestCacheRefresh)
 	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'Skinning.TrackerQuestCache', queueQuestCacheRefresh)
 	BUI.Events:Register('QUEST_WATCH_UPDATE', 'Skinning.TrackerProgress', OnQuestProgress)
-	BUI.Events:Register('ZONE_CHANGED_NEW_AREA', 'Skinning.TrackerItemKey', UpdateQuestItemBinding)
+	BUI.Events:Register('ZONE_CHANGED_NEW_AREA', 'Skinning.TrackerItemKey', QuestItem.Update)
+	BUI.Events:Register('BAG_UPDATE_COOLDOWN', 'Skinning.TrackerItemCooldown', QuestItem.UpdateCooldown)
+	BUI.Events:Register('ZONE_CHANGED_NEW_AREA', 'Skinning.TrackerZoneFilter', QuestFilter.QueueFollowZone)
+	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'Skinning.TrackerZoneFilter', QuestFilter.QueueFollowZone)
 	queueQuestCacheRefresh()
 end
 
@@ -2503,7 +2712,7 @@ Skin.OnToggle('objectivetracker', function(enabled)
 		ApplyTextSettings()
 		Skin.ApplyTrackerColors()
 		queueQuestCacheRefresh()
-		UpdateQuestItemBinding()
+		QuestItem.Update()
 		if scrollHolder then
 			scrollHolder:SetShown(not challengeModeHidden)
 			AdoptModules()
@@ -2536,7 +2745,7 @@ Skin.OnToggle('objectivetracker', function(enabled)
 	Scenario.Remove()
 	if trackerCard then trackerCard._buiClamp = nil end
 	_G.ObjectiveTrackerFrame:UpdateClampOffsets()
-	UpdateQuestItemBinding()
+	QuestItem.Update()
 	ApplyPoiVisibility()
 	ApplyDashAlpha()
 	ApplyChallengeModeVisibility()
@@ -2565,7 +2774,7 @@ Skin.RegisterSkin('objectivetracker', {
 	description = 'Tooltip-style dark cards behind each tracker section, clean library fonts on quest text, accent-marked headers, flat progress bars, and square quest item icons. An OBJECTIVES title row carries quest counts and filters, and optional scrolling mode caps the height with a scroll bar. Hides itself during Mythic+ runs. Hold Ctrl and drag any section header to move the tracker.',
 	icon = 'Interface\\Icons\\INV_Misc_Book_07',
 	settingsWidth = 430,
-	settingsHeight = 1200,
+	settingsHeight = 1400,
 	buildSettings = function(content)
 		local settings = GetSettings()
 		local pageKit = PageKit
@@ -2575,11 +2784,14 @@ Skin.RegisterSkin('objectivetracker', {
 		local textHeight = pageKit.CardHeight(3)
 		local colorsHeight = pageKit.CardHeight(7)
 		local panelHeight = pageKit.CardHeight(11)
-		local positionHeight = pageKit.CardHeight(1)
+		local behaviorHeight = pageKit.CardHeight(3)
+		local positionHeight = pageKit.CardHeight(2)
+		local behaviorTop = textHeight + GAP + colorsHeight + GAP + panelHeight + GAP
+		local positionTop = behaviorTop + behaviorHeight + GAP
 
 		local root = CreateFrame('Frame', nil, content.child)
 		root:SetPoint('TOPLEFT', 0, -8)
-		root:SetSize(width, textHeight + GAP + colorsHeight + GAP + panelHeight + GAP + positionHeight)
+		root:SetSize(width, positionTop + positionHeight)
 
 		local function MakeCard(title, y, height)
 			local cardWidget = Controls.SettingsCard(root, { title = title, width = width })
@@ -2593,7 +2805,8 @@ Skin.RegisterSkin('objectivetracker', {
 		local textCard = MakeCard('TEXT', 0, textHeight)
 		local colorsCard = MakeCard('COLORS', textHeight + GAP, colorsHeight)
 		local panelCard = MakeCard('PANEL', textHeight + GAP + colorsHeight + GAP, panelHeight)
-		local positionCard = MakeCard('POSITION', textHeight + GAP + colorsHeight + GAP + panelHeight + GAP, positionHeight)
+		local behaviorCard = MakeCard('BEHAVIOR', behaviorTop, behaviorHeight)
+		local positionCard = MakeCard('POSITION', positionTop, positionHeight)
 
 		local fontCog = pageKit.SettingsIcon(textCard, {
 			title = 'TEXT', tooltip = 'Size & outline', options = {
@@ -2738,7 +2951,7 @@ Skin.RegisterSkin('objectivetracker', {
 
 		local itemKeybind = Controls.Keybind(panelCard, nil, settings.questItemKey or 'NONE', function(value)
 			settings.questItemKey = value
-			UpdateQuestItemBinding()
+			QuestItem.Update()
 		end, 190)
 		pageKit.Row(panelCard, 238, 'Quest Item Key', itemKeybind)
 
@@ -2764,6 +2977,30 @@ Skin.RegisterSkin('objectivetracker', {
 			print('|cff6D00FDBluUI:|r Tracker position cleared. Reload the UI to restore the Blizzard anchor.')
 		end)
 		pageKit.Row(positionCard, 38, 'Reset Position', resetButton)
+
+		local resetItemButton = Controls.Button(positionCard, 'Reset', 84, function()
+			local positions = BUI.GetDB().framePositions
+			if positions then positions[QuestItem.POSITION_KEY] = nil end
+			if QuestItem.button then QuestItem.button.placedVisible = nil end
+			QuestItem.Update()
+		end)
+		pageKit.Row(positionCard, 78, 'Reset Item Button', resetItemButton)
+
+		local itemButtonToggle = Controls.SwitchToggle(behaviorCard, nil, settings.showQuestItemButton == true, function(value)
+			settings.showQuestItemButton = value
+			QuestItem.Update()
+		end)
+		pageKit.Row(behaviorCard, 38, 'Quest Item Button', itemButtonToggle)
+
+		local trackOnProgressToggle = Controls.SwitchToggle(behaviorCard, nil, settings.trackOnProgress == true, function(value)
+			settings.trackOnProgress = value
+		end)
+		pageKit.Row(behaviorCard, 78, 'Track Quests on Progress', trackOnProgressToggle)
+
+		local completionMessageToggle = Controls.SwitchToggle(behaviorCard, nil, settings.completionMessage == true, function(value)
+			settings.completionMessage = value
+		end)
+		pageKit.Row(behaviorCard, 118, 'Completion Messages', completionMessageToggle)
 
 		content:Refresh()
 	end,
