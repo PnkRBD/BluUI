@@ -592,6 +592,28 @@ local function OnHonorListUpdated()
 	if honor then SkinSpecificRows(honor.SpecificScrollBox) end
 end
 
+local function RefreshConquestBar(bar)
+	if not Enabled() then return end
+	for keyIndex = 1, #CONQUEST_BAR_ART do bar[CONQUEST_BAR_ART[keyIndex]]:SetAlpha(0) end
+	bar:SetStatusBarTexture(BUI.GetGlobalTexture())
+	local red, green, blue = Theme.GetAccent()
+	bar:SetStatusBarColor(red, green, blue, 1)
+end
+
+local function SkinConquestBar(bar)
+	FadeKeys(bar, CONQUEST_BAR_ART)
+	Shell(bar)
+	Face(bar.Label)
+	RefreshConquestBar(bar)
+	local reward = bar.Reward
+	SkinRoundIcon(reward)
+	reward:ClearAllPoints()
+	reward:SetPoint('LEFT', bar, 'RIGHT')
+	if bar._buiConquestHooked then return end
+	bar._buiConquestHooked = true
+	hooksecurefunc(bar, 'Update', RefreshConquestBar)
+end
+
 local function SkinQueuePanel(panel)
 	if not panel then return end
 	FadeRegions(panel)
@@ -618,12 +640,7 @@ local function SkinQueuePanel(panel)
 		SkinSpecificRows(specificTraining.ScrollBox)
 	end
 	SkinActivityButtons(panel, CONQUEST_KEYS)
-	local bar = panel.ConquestBar
-	if bar then
-		FadeKeys(bar, CONQUEST_BAR_ART)
-		Shell(bar)
-		SkinRoundIcon(bar.Reward)
-	end
+	SkinConquestBar(panel.ConquestBar)
 end
 
 local function OnPvpSelection(index)
