@@ -281,7 +281,7 @@ end
 
 function Tools.GetAuraStacks(unit, spellID)
     if unit ~= 'player' then return nil end
-    if Tools.ShouldAurasBeSecret() then return nil end
+    if Tools.ShouldAurasBeSecret() and C_Secrets.GetSpellAuraSecrecy(spellID) ~= Enum.SecrecyLevel.NeverSecret then return nil end
     local aura = C_UnitAuras.GetPlayerAuraBySpellID(spellID)
     if not aura then return 0 end
     local stackCount = Tools.SafeNum(aura.applications)
