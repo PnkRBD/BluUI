@@ -217,6 +217,17 @@ function Dragging.MakeDraggable(frame, options)
     end
 end
 
+function Dragging.MakeAnchoredAlert(frame, options)
+    Dragging.MakeDraggable(frame, {
+        showHint = true,
+        showUnlockedBg = true,
+        hintAnchor = "TOP",
+        isLocked = options.isLocked,
+        onRightClick = options.onRightClick,
+        onPositionChanged = function() BUI.Anchor.SaveDrop(frame, options.settings()) end,
+    })
+end
+
 function Dragging.SetLocked(frame, locked)
     if not frame then return end
     frame.dragLocked = locked
