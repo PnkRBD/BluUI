@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('Datatext.Bars')
 
 local Datatext = BUI.Datatext
 local Pixel = BUI.Pixel
@@ -142,12 +141,12 @@ local function SetHitDrag(hit, enabled)
     hit._dragEnabled = enabled
     if enabled then
         hit:RegisterForDrag('LeftButton')
-        SetScript(hit, 'OnDragStart', HitOnDragStart)
-        SetScript(hit, 'OnDragStop', HitOnDragStop)
+        hit:SetScript('OnDragStart', HitOnDragStart)
+        hit:SetScript('OnDragStop', HitOnDragStop)
     else
         hit:RegisterForDrag()
-        SetScript(hit, 'OnDragStart', nil)
-        SetScript(hit, 'OnDragStop', nil)
+        hit:SetScript('OnDragStart', nil)
+        hit:SetScript('OnDragStop', nil)
     end
 end
 
@@ -171,7 +170,7 @@ local function HitOnEnter(self)
     if not entry.OnEnter then return end
     if entry._profOnEnter == nil or entry._profOnEnterRaw ~= entry.OnEnter then
         entry._profOnEnterRaw = entry.OnEnter
-        entry._profOnEnter = BUI.Prof.Wrap('datatext#' .. tostring(entry.id) .. '.OnEnter', entry.OnEnter)
+        entry._profOnEnter = entry.OnEnter
     end
     entry._profOnEnter(self, self.bar)
 end
@@ -190,9 +189,9 @@ local function GetHit(bar, entry)
         hit:SetFrameLevel(bar.frame:GetFrameLevel() + 10)
         hit:EnableMouse(true)
         hit:RegisterForClicks('LeftButtonUp', 'RightButtonUp')
-        SetScript(hit, 'OnClick', HitOnClick)
-        SetScript(hit, 'OnEnter', HitOnEnter)
-        SetScript(hit, 'OnLeave', HitOnLeave)
+        hit:SetScript('OnClick', HitOnClick)
+        hit:SetScript('OnEnter', HitOnEnter)
+        hit:SetScript('OnLeave', HitOnLeave)
         hit.isDatatextHit = true
         hit.bar = bar
         hit:Hide()
@@ -541,8 +540,8 @@ local function CreateMainBarObject(frameName, configProvider)
     local bar = { getConfig = configProvider, frame = frame, hits = {} }
     frame.bar = bar
 
-    SetScript(frame, 'OnMouseUp', MainOnMouseUp)
-    SetScript(frame, 'OnShow', MainOnShow)
+    frame:SetScript('OnMouseUp', MainOnMouseUp)
+    frame:SetScript('OnShow', MainOnShow)
     return bar
 end
 
@@ -601,14 +600,14 @@ local function ApplyMainBar(bar)
     local bgAlpha = config.bgAlpha
     local backgroundColor = config.bgColor
     if config.lock then
-        SetScript(frame, 'OnDragStart', nil)
-        SetScript(frame, 'OnDragStop', nil)
+        frame:SetScript('OnDragStart', nil)
+        frame:SetScript('OnDragStop', nil)
         BUI.Tools.SetColorTex(frame.bg, backgroundColor.r, backgroundColor.g, backgroundColor.b, bgAlpha)
         frame.bg:SetShown(bgAlpha > 0)
         frame.hint:Hide()
     else
-        SetScript(frame, 'OnDragStart', MainOnDragStart)
-        SetScript(frame, 'OnDragStop', MainOnDragStop)
+        frame:SetScript('OnDragStart', MainOnDragStart)
+        frame:SetScript('OnDragStop', MainOnDragStop)
         BUI.Tools.SetColorTex(frame.bg, backgroundColor.r, backgroundColor.g, backgroundColor.b, math.max(bgAlpha, 0.5))
         frame.bg:Show()
         frame.hint:Show()
@@ -673,7 +672,7 @@ local function BuildMinimapBar()
 
     minimapBar = { getConfig = GetMinimapConfig, frame = frame, hits = {}, anchoredHeight = true }
     frame.bar = minimapBar
-    SetScript(frame, 'OnShow', MainOnShow)
+    frame:SetScript('OnShow', MainOnShow)
 end
 
 local function ApplyMinimapBar()

@@ -70,11 +70,6 @@ local CLICK_MODE_ITEMS = {
 	{ value = 'both', text = 'Both' },
 }
 
-local MISSING_BUFF_ITEMS = {
-	{ value = 'missing', text = 'Show When Missing' },
-	{ value = 'never',   text = 'Never' },
-}
-
 local SORT_BY_ITEMS = {
 	{ value = 'GROUP',        text = 'Party Slot (1-4)' },
 	{ value = 'ASSIGNEDROLE', text = 'Role' },
@@ -654,32 +649,6 @@ local function PrivateAurasRow(tab, rows, sectionKey)
 	})
 end
 
-local function MissingBuffRow(tab, rows, sectionKey)
-	local Section = SectionEnv(sectionKey)
-	local function MissingBuff() return Section().missingRaidBuff end
-	local RefreshMissingBuff = function() GroupFrames().RefreshMissingRaidBuff() end
-	AddRow(tab, rows, {
-		title = 'Missing Raid Buff',
-		description = 'Flags members missing a raid-wide buff',
-		controlWidth = 212,
-		control = function(row)
-			return Dropdown(row, MISSING_BUFF_ITEMS, function() return MissingBuff().mode end, function(value) MissingBuff().mode = value; RefreshMissingBuff() end, 180)
-		end,
-		accessoryWidth = 70,
-		accessories = function(row)
-			local previewEye = PreviewEye(row, GroupFrames().IsAuraPreviewing(sectionKey, 'missingRaidBuff'), function(value)
-				GroupFrames().PreviewAuraKind(sectionKey, 'missingRaidBuff', value)
-			end, 'Show the missing buff icon on every frame')
-			return { previewEye, Cog(row, 'MISSING RAID BUFF', 'Icon size & placement', {
-				OptionSlider('Icon Size', 10, 48, function() return MissingBuff().size end, function(value) MissingBuff().size = value; RefreshMissingBuff() end),
-				OptionDropdown('Anchor', ANCHOR_ITEMS, function() return MissingBuff().anchor end, function(value) MissingBuff().anchor = value; RefreshMissingBuff() end),
-				OptionSlider('X Offset', -200, 200, function() return MissingBuff().offsetX end, function(value) MissingBuff().offsetX = value; RefreshMissingBuff() end),
-				OptionSlider('Y Offset', -200, 200, function() return MissingBuff().offsetY end, function(value) MissingBuff().offsetY = value; RefreshMissingBuff() end),
-			}) }
-		end,
-	})
-end
-
 local function SectionHeader(tab, sectionKey, title, subtitle, rowsRef)
 	local Section, Refresh = SectionEnv(sectionKey)
 	local isParty = sectionKey == 'party'
@@ -851,7 +820,6 @@ local function BuildAuraTab(tab, sectionKey)
 	AuraContainerRow(tab, rows, sectionKey, 'crowdControl', 'Crowd Control', 'Stuns, fears and other loss of control')
 	DispelRow(tab, rows, sectionKey)
 	PrivateAurasRow(tab, rows, sectionKey)
-	MissingBuffRow(tab, rows, sectionKey)
 end
 
 local function BuildGeneralTab(tab)
@@ -942,7 +910,7 @@ local function ShareBlacklistToggle(tab, label)
 	local toggleControl = Controls.Toggle(tab.child, label, AuraBlacklist.IsShared(), function(value)
 		AuraBlacklist.SetShared(value)
 		AuraBlacklist.RefreshConsumers()
-		BUI.Prof.After('Pages.GroupFrames', 0, function() BUI.PageEngine.RebuildAllPages() end)
+		C_Timer.After(0, function() BUI.PageEngine.RebuildAllPages() end)
 	end, 0, true, nil, tab.width, 'Both frame modules use one combined blacklist.')
 	Layout.PositionInTab(tab, toggleControl, 40)
 end

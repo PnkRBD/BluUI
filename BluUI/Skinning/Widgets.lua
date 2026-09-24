@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Widgets')
 
 local max, min = math.max, math.min
 local GetCursorPosition = GetCursorPosition
@@ -26,8 +25,8 @@ function Skin.SmallButton(parent, width, height, label)
 	text:SetText(label)
 	text:SetTextColor(0.9, 0.9, 0.9, 1)
 
-	HookScript(button, 'OnEnter', function(self) self:SetBackdropBorderColor(Colors.GetAccent()) end)
-	HookScript(button, 'OnLeave', function(self) self:SetBackdropBorderColor(unpack(Colors.border.default)) end)
+	button:HookScript('OnEnter', function(self) self:SetBackdropBorderColor(Colors.GetAccent()) end)
+	button:HookScript('OnLeave', function(self) self:SetBackdropBorderColor(unpack(Colors.border.default)) end)
 	return button
 end
 
@@ -82,30 +81,30 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 
 	thumb:EnableMouse(true)
 	thumb:RegisterForDrag('LeftButton')
-	SetScript(thumb, 'OnDragStart', function(self) self.dragging = true end)
-	SetScript(thumb, 'OnDragStop', function(self) self.dragging = false end)
-	SetScript(thumb, 'OnUpdate', function(self)
+	thumb:SetScript('OnDragStart', function(self) self.dragging = true end)
+	thumb:SetScript('OnDragStop', function(self) self.dragging = false end)
+	thumb:SetScript('OnUpdate', function(self)
 		if self.dragging then ApplyScrollPct(CursorToScrollPct()) end
 	end)
-	SetScript(thumb, 'OnEnter', function() SetColorTex(thumbTex, unpack(THUMB_HOVER)) end)
-	SetScript(thumb, 'OnLeave', function() SetColorTex(thumbTex, unpack(THUMB_IDLE)) end)
+	thumb:SetScript('OnEnter', function() SetColorTex(thumbTex, unpack(THUMB_HOVER)) end)
+	thumb:SetScript('OnLeave', function() SetColorTex(thumbTex, unpack(THUMB_IDLE)) end)
 	track:EnableMouse(true)
-	SetScript(track, 'OnMouseDown', function(_, button)
+	track:SetScript('OnMouseDown', function(_, button)
 		if button == 'LeftButton' then ApplyScrollPct(CursorToScrollPct()) end
 	end)
 
 	scroll:EnableMouseWheel(true)
-	SetScript(scroll, 'OnMouseWheel', function(self, delta)
+	scroll:SetScript('OnMouseWheel', function(self, delta)
 		local currentScroll = self:GetVerticalScroll()
 		local maxScroll = max(0, child:GetHeight() - self:GetHeight())
 		self:SetVerticalScroll(min(maxScroll, max(0, currentScroll - delta * rowHeight * 2)))
 	end)
 
-	SetScript(scroll, 'OnSizeChanged', function(_, width)
+	scroll:SetScript('OnSizeChanged', function(_, width)
 		if width and width > 0 then child:SetWidth(width) end
 	end)
 
-	SetScript(scroll, 'OnScrollRangeChanged', function(self, _, yMax)
+	scroll:SetScript('OnScrollRangeChanged', function(self, _, yMax)
 		yMax = yMax or 0
 		if yMax <= 0 then
 			thumb:Hide()
@@ -119,7 +118,7 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 		end
 	end)
 
-	SetScript(scroll, 'OnVerticalScroll', function(self, offset)
+	scroll:SetScript('OnVerticalScroll', function(self, offset)
 		local yMax = max(0, child:GetHeight() - self:GetHeight())
 		if yMax <= 0 then return end
 		thumb:ClearAllPoints()
@@ -149,20 +148,20 @@ function Skin.CreateSearchBox(parent, width, callback)
 	Pixel.ApplyFont(editBox, 11, FONT, '')
 	editBox:SetTextColor(0.9, 0.9, 0.9, 1)
 	editBox:SetAutoFocus(false)
-	SetScript(editBox, 'OnTextChanged', function(self, userInput)
+	editBox:SetScript('OnTextChanged', function(self, userInput)
 		if not userInput then return end
 		local text = self:GetText():lower()
 		hint:SetShown(text == '')
 		callback(text)
 	end)
-	SetScript(editBox, 'OnEscapePressed', function(self) self:SetText(''); self:ClearFocus() end)
+	editBox:SetScript('OnEscapePressed', function(self) self:SetText(''); self:ClearFocus() end)
 	local function showAccent() container:SetBackdropBorderColor(Colors.GetAccent()) end
 	local function showIdle() container:SetBackdropBorderColor(unpack(idleBorder)) end
 
-	SetScript(container, 'OnEnter', showAccent)
-	SetScript(container, 'OnLeave', function() if not editBox:HasFocus() then showIdle() end end)
-	SetScript(editBox, 'OnEditFocusGained', showAccent)
-	SetScript(editBox, 'OnEditFocusLost', showIdle)
+	container:SetScript('OnEnter', showAccent)
+	container:SetScript('OnLeave', function() if not editBox:HasFocus() then showIdle() end end)
+	editBox:SetScript('OnEditFocusGained', showAccent)
+	editBox:SetScript('OnEditFocusLost', showIdle)
 
 	container.editBox = editBox
 	container.hint = hint
@@ -224,8 +223,8 @@ function Skin.CreateListRow(parent, height, iconSize)
 	row.priceText:SetPoint('LEFT', row.iconBorder, 'RIGHT', Pixel.Scale(8), Pixel.Scale(-8))
 	row.priceText:SetTextColor(0.65, 0.65, 0.65, 1)
 
-	SetScript(row, 'OnEnter', function(self) self:SetBackdropBorderColor(Colors.GetAccent()) end)
-	SetScript(row, 'OnLeave', function(self)
+	row:SetScript('OnEnter', function(self) self:SetBackdropBorderColor(Colors.GetAccent()) end)
+	row:SetScript('OnLeave', function(self)
 		self:SetBackdropBorderColor(unpack(Colors.border.dark))
 		GameTooltip:Hide()
 	end)
@@ -290,7 +289,7 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 		highlight:SetAllPoints()
 		SetColorTex(highlight, 1, 1, 1, 0.06)
 
-		SetScript(row, 'OnClick', function()
+		row:SetScript('OnClick', function()
 			label:SetText(item.label)
 			menu:Hide()
 			SetArrowOpen(false)
@@ -300,7 +299,7 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 	menu:SetHeight(Pixel.Scale(#items * rowHeight + 4))
 
 	dropdown:EnableMouse(true)
-	SetScript(dropdown, 'OnMouseDown', function()
+	dropdown:SetScript('OnMouseDown', function()
 		if menu:IsShown() then
 			menu:Hide()
 			SetArrowOpen(false)
@@ -309,15 +308,15 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 			SetArrowOpen(true)
 		end
 	end)
-	SetScript(dropdown, 'OnEnter', function(self) self:SetBackdropBorderColor(Colors.GetAccent()) end)
-	SetScript(dropdown, 'OnLeave', function(self)
+	dropdown:SetScript('OnEnter', function(self) self:SetBackdropBorderColor(Colors.GetAccent()) end)
+	dropdown:SetScript('OnLeave', function(self)
 		if not menu:IsShown() then self:SetBackdropBorderColor(unpack(idleBorder)) end
 	end)
 
 	local grace = 0
-	SetScript(menu, 'OnShow', function(menuFrame)
+	menu:SetScript('OnShow', function(menuFrame)
 		grace = 0
-		SetScript(menuFrame, 'OnUpdate', function(updatingMenu, elapsed)
+		menuFrame:SetScript('OnUpdate', function(updatingMenu, elapsed)
 			if dropdown:IsMouseOver() or updatingMenu:IsMouseOver() then
 				grace = 0
 			else
@@ -330,7 +329,7 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 			end
 		end)
 	end)
-	SetScript(menu, 'OnHide', function(menuFrame) SetScript(menuFrame, 'OnUpdate', nil) end)
+	menu:SetScript('OnHide', function(menuFrame) menuFrame:SetScript('OnUpdate', nil) end)
 	return dropdown
 end
 

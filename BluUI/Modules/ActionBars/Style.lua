@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('ActionBars.Style')
 
 local ActionBars = BUI.ActionBars
 local Pixel = BUI.Pixel
@@ -165,9 +164,9 @@ end
 function ActionBars.StyleCooldown(cooldown)
 	if not cooldown._buiStyleHooked then
 		cooldown._buiStyleHooked = true
-		ActionBars.hooksecurefunc(cooldown, 'SetSwipeColor', OnSwipeColorSet)
-		ActionBars.hooksecurefunc(cooldown, 'SetCooldown', ApplyCooldownStyle)
-		ActionBars.hooksecurefunc(cooldown, 'SetCooldownFromDurationObject', ApplyCooldownStyle)
+		hooksecurefunc(cooldown, 'SetSwipeColor', OnSwipeColorSet)
+		hooksecurefunc(cooldown, 'SetCooldown', ApplyCooldownStyle)
+		hooksecurefunc(cooldown, 'SetCooldownFromDurationObject', ApplyCooldownStyle)
 	end
 	ApplyCooldownStyle(cooldown)
 end
@@ -201,7 +200,7 @@ local TEMPLATE_SCRIPTS = { 'OnAttributeChanged', 'OnEvent', 'OnUpdate', 'OnMouse
 local function NeutralizeTemplateButton(button)
 	button:UnregisterAllEvents()
 	for _, script in ipairs(TEMPLATE_SCRIPTS) do
-		if button:HasScript(script) then SetScript(button, script, nil) end
+		if button:HasScript(script) then button:SetScript(script, nil) end
 	end
 	local arrow = button.Arrow
 	if arrow then
@@ -397,37 +396,4 @@ function ActionBars.ApplyButtonConfig(bar)
 		ActionBars.ApplyHotkeyText(button)
 		ActionBars.SyncEmptyButtonAlpha(button)
 	end
-end
-
-do
-	local function WrapLibraryFrame()
-		local frame = LibActionButton.eventFrame
-		if not frame or frame._buiProfWrapped then return end
-		local onEvent = frame:GetScript('OnEvent')
-		local onUpdate = frame:GetScript('OnUpdate')
-		if not onEvent then return end
-		frame._buiProfWrapped = true
-		BUI.Prof.SetScript('LAB', frame, 'OnEvent', onEvent)
-		if onUpdate then frame:SetScript('OnUpdate', BUI.Prof.WrapScript('tick#LAB.Update', onUpdate)) end
-		local pass = LibActionButton.cooldownPassFrame
-		if pass and not pass._buiProfWrapped then
-			pass._buiProfWrapped = true
-			local passUpdate = pass:GetScript('OnUpdate')
-			if passUpdate then pass:SetScript('OnUpdate', BUI.Prof.WrapScript('tick#LAB.CooldownPass', passUpdate)) end
-		end
-	end
-	local function WrapButton(button)
-		if button._buiProfWrapped then return end
-		local onEvent = button:GetScript('OnEvent')
-		if not onEvent then return end
-		button._buiProfWrapped = true
-		BUI.Prof.SetScript('LAB.Button', button, 'OnEvent', onEvent)
-	end
-	for button in pairs(LibActionButton.buttonRegistry) do WrapButton(button) end
-	WrapLibraryFrame()
-	local profOwner = {}
-	LibActionButton.RegisterCallback(profOwner, 'OnButtonCreated', function(_, button)
-		WrapButton(button)
-		WrapLibraryFrame()
-	end)
 end

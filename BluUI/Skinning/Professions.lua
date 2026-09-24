@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Professions')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('professions')
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -89,8 +87,8 @@ local function SkinIconButton(button)
 	if not button._buiIconButton then
 		button._buiIconButton = true
 		FadeStateTextures(button)
-		HookScript(button, 'OnEnter', IconButtonEnter)
-		HookScript(button, 'OnLeave', IconButtonLeave)
+		button:HookScript('OnEnter', IconButtonEnter)
+		button:HookScript('OnLeave', IconButtonLeave)
 	end
 	Shell(button)
 end
@@ -726,7 +724,7 @@ local function InstallFrame()
 	local frame = _G.ProfessionsFrame
 	if not frame then return end
 	frameInstalled = true
-	HookScript(frame, 'OnShow', ApplyFrame)
+	frame:HookScript('OnShow', ApplyFrame)
 	HookMixin(_G.ProfessionsRecipeListCategoryMixin, 'Init', OnCategoryRow)
 	HookMixin(_G.ProfessionsRecipeListRecipeMixin, 'Init', OnRecipeRow)
 	HookTemplates()
@@ -738,7 +736,7 @@ local function InstallBook()
 	local frame = _G.ProfessionsBookFrame
 	if not frame then return end
 	bookInstalled = true
-	HookScript(frame, 'OnShow', ApplyBook)
+	frame:HookScript('OnShow', ApplyBook)
 	if frame:IsShown() then ApplyBook() end
 end
 
@@ -747,7 +745,7 @@ local function InstallCustomer()
 	local frame = _G.ProfessionsCustomerOrdersFrame
 	if not frame then return end
 	customerInstalled = true
-	HookScript(frame, 'OnShow', ApplyCustomer)
+	frame:HookScript('OnShow', ApplyCustomer)
 	HookTemplates()
 	if frame:IsShown() then ApplyCustomer() end
 end

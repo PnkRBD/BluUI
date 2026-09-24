@@ -83,10 +83,10 @@ local function Flash(inCombat)
     messageFrame:SetAlpha(1)
     messageFrame:Show()
 
-    BUI.Prof.After('Auras.CombatMessage', db.fadeTime, function()
+    C_Timer.After(db.fadeTime, function()
         if not messageFrame or messageFrame._flashToken ~= token then return end
         UIFrameFadeOut(messageFrame, 0.4, 1, 0)
-        BUI.Prof.After('Auras.CombatMessage', 0.5, function()
+        C_Timer.After(0.5, function()
             if messageFrame and messageFrame._flashToken == token then
                 messageFrame:Hide()
             end

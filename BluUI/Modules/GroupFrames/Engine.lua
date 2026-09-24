@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('GroupFrames.Engine')
 
 local GroupFrames = BUI.GroupFrames
 
@@ -114,7 +113,6 @@ function GroupFrames.ApplyChildAll(child, settings, geometry)
 	GroupFrames.ApplyAbsorbToChild(child, settings)
 	GroupFrames.ApplyTextToChild(child, settings)
 	GroupFrames.ApplyIndicatorsToChild(child, settings)
-	GroupFrames.ApplyMissingRaidBuffToChild(child, settings)
 	GroupFrames.ApplyKeystoneToChild(child, settings)
 	GroupFrames.ApplyPrivateAuras(child)
 	GroupFrames.ApplySelectionToChild(child, settings)
@@ -219,31 +217,8 @@ end
 
 local rosterWatcher
 
-local function CountHeaderEvent(_, event)
-	if BUI.Prof.active then BUI.Prof.Count("gfheader#" .. tostring(event)) end
-end
-
-local function CountHeaderAttribute(_, name)
-	if BUI.Prof.active then BUI.Prof.Count("gfheaderattr#" .. tostring(name)) end
-end
-
-function GroupFrames.WatchHeader(header)
-	if not header or header._buiWatched then return header end
-	header._buiWatched = true
-	header:HookScript("OnEvent", CountHeaderEvent)
-	header:HookScript("OnAttributeChanged", CountHeaderAttribute)
-	return header
-end
-
 function GroupFrames.Setup()
 	local oUF = BUI.oUF
-	if not oUF._buiHeaderWatch then
-		oUF._buiHeaderWatch = true
-		local spawnHeader = oUF.SpawnHeader
-		oUF.SpawnHeader = function(self, ...)
-			return GroupFrames.WatchHeader(spawnHeader(self, ...))
-		end
-	end
 	oUF:RegisterStyle(GroupFrames.STYLE_NAME, GroupFrames.Style)
 	oUF:Factory(function()
 		oUF:SetActiveStyle(GroupFrames.STYLE_NAME)
@@ -261,13 +236,13 @@ function GroupFrames.Setup()
 		rosterWatcher:RegisterEvent("PARTY_MEMBER_DISABLE")
 		rosterWatcher:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 		rosterWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
-		SetScript(rosterWatcher, "OnEvent", BUI.Prof.Wrap("groupframes#Roster", function(_, event)
+		rosterWatcher:SetScript("OnEvent", function(_, event)
 			if event == "PLAYER_REGEN_ENABLED" then
 				BUI.Events:AfterCombatSettled(function() QueueRosterSweep(false) end, "GF.RosterSweep")
 				return
 			end
 			QueueRosterSweep(event == "PLAYER_ENTERING_WORLD")
-		end))
+		end)
 		BUI.Tools.OnAuraQueriesUnblocked(function()
 			GroupFrames.PrecreateParty()
 			GroupFrames.PrecreateRaid()

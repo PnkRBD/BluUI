@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('BuffTracking.PackLeader')
 
 local PackLeader = {}
 BUI.BuffTracking.PackLeader = PackLeader
@@ -114,7 +113,7 @@ function PackLeader.Create()
         fade:SetToAlpha(0)
         fade:SetDuration(0.45)
         fade:SetSmoothing('OUT')
-        SetScript(pip.flashAnimation, 'OnFinished', function() pip.flash:SetAlpha(0) end)
+        pip.flashAnimation:SetScript('OnFinished', function() pip.flash:SetAlpha(0) end)
     end
 
     local function PlayFlash(pip, red, green, blue)

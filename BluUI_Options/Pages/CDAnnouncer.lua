@@ -1,5 +1,4 @@
 local BUI = BluUI
-local SetScript = BUI.Prof.Scripts('Pages.CDAnnouncer')
 
 local BUILib = BluUI.BUILibClient
 local Controls, Layout, Widget, Modals, Toast = BUILib.Controls, BUILib.Layout, BUILib.Widget, BUILib.Modals, BUILib.Toast
@@ -388,7 +387,7 @@ local function MakeChip(parent, key)
     chip.label = chip:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(chip.label, 10, BUILib.Font, 'OUTLINE')
     chip.label:SetPoint('CENTER')
-    SetScript(chip, 'OnClick', function() JumpToPhase(key) end)
+    chip:SetScript('OnClick', function() JumpToPhase(key) end)
     return chip
 end
 
@@ -870,7 +869,7 @@ local function BuildEditor(pageFrame)
     editor.root:SetWidth(CONTENT_W)
     editor.root:SetHeight(1)
 
-    SetScript(editor, 'OnUpdate', EditorDriver)
+    editor:SetScript('OnUpdate', EditorDriver)
 end
 
 local function FinishClose(frame)
@@ -1200,7 +1199,7 @@ BUI.PageEngine.RegisterPage('cdAnnouncer', {
 
         BuildEditor(pageFrame)
 
-        SetScript(pageFrame, 'OnShow', function()
+        pageFrame:SetScript('OnShow', function()
             titleBar.enableToggle:SetValue(GetCfg().enabled)
             titleBar.anchorToggle:SetValue(GetCfg().showAnchor)
             hideUnusableRow:SetValue(GetCfg().hideUnusable)

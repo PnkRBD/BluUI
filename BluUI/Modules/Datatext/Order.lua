@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('Datatext.Order')
 
 local Datatext = BUI.Datatext
 local BUILib = LibStub('BUILib')
@@ -93,19 +92,19 @@ function Datatext.OpenOrderPopover(anchorButton, config, onApply)
                 local item = { frame = row, label = label, grip = grip, id = id }
                 items[slot] = item
 
-                SetScript(row, 'OnEnter', function()
+                row:SetScript('OnEnter', function()
                     if dragSlot then return end
                     local accentRed, accentGreen, accentBlue = Theme.GetAccent()
                     row:SetBackdropBorderColor(accentRed, accentGreen, accentBlue, 1)
                     SetGrip(grip, accentRed, accentGreen, accentBlue)
                 end)
-                SetScript(row, 'OnLeave', function()
+                row:SetScript('OnLeave', function()
                     if dragSlot then return end
                     row:SetBackdropBorderColor(Theme.border.dark[1], Theme.border.dark[2], Theme.border.dark[3], 1)
                     SetGrip(grip, 0.55, 0.55, 0.58)
                 end)
 
-                SetScript(row, 'OnDragStart', function()
+                row:SetScript('OnDragStart', function()
                     for slotIndex, candidate in ipairs(items) do if candidate == item then dragSlot = slotIndex break end end
                     if not closeGuard then
                         BUILib._popupCount = (BUILib._popupCount or 0) + 1
@@ -114,7 +113,7 @@ function Datatext.OpenOrderPopover(anchorButton, config, onApply)
                     ghostLabel:SetText(label:GetText())
                     ghost:Show(); ghost:Raise()
                     row:SetAlpha(0.35)
-                    SetScript(row, 'OnUpdate', function()
+                    row:SetScript('OnUpdate', function()
                         local scale = UIParent:GetEffectiveScale()
                         local cursorX, cursorY = GetCursorPosition()
                         cursorX, cursorY = cursorX / scale, cursorY / scale
@@ -132,7 +131,7 @@ function Datatext.OpenOrderPopover(anchorButton, config, onApply)
 
                 local function EndDrag()
                     if not dragSlot then return end
-                    SetScript(row, 'OnUpdate', nil)
+                    row:SetScript('OnUpdate', nil)
                     row:SetAlpha(1)
                     ghost:Hide()
                     dragSlot = nil
@@ -143,8 +142,8 @@ function Datatext.OpenOrderPopover(anchorButton, config, onApply)
                     Relayout()
                     SaveOrder()
                 end
-                SetScript(row, 'OnDragStop', EndDrag)
-                SetScript(row, 'OnHide', EndDrag)
+                row:SetScript('OnDragStop', EndDrag)
+                row:SetScript('OnHide', EndDrag)
             end
 
             Relayout()

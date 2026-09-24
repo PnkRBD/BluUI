@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('CastBar.Core')
 local Pixel = BUI.Pixel
 
 local CastBar = BUI.CastBar
@@ -125,7 +124,7 @@ local CheckInterruptCooldowns
 
 local function StartInterruptPoller()
 	if interruptTicker then return end
-	interruptTicker = BUI.Prof.NewTicker('CastBar.Core', 0.1, CheckInterruptCooldowns)
+	interruptTicker = C_Timer.NewTicker(0.1, CheckInterruptCooldowns)
 end
 
 local function StopInterruptPoller()
@@ -138,7 +137,7 @@ function CastBar.StartTrackingInterrupts(castbar)
 	if not castbar then return end
 	if not castbar._intHideHooked then
 		castbar._intHideHooked = true
-		HookScript(castbar, 'OnHide', CastBar.HideInterruptOverlays)
+		castbar:HookScript('OnHide', CastBar.HideInterruptOverlays)
 	end
 	trackedCastbars[castbar] = true
 	StartInterruptPoller()
@@ -449,7 +448,7 @@ function CastBar.PreviewInterrupt(barType)
 	local onCD = ValidColor(settings.interruptOnCDColor, { 0.9, 0.5, 0, 1 })
 	local elapsed, duration = 0, 4
 	local spokeSoon, spokeReady = false, false
-	local ticker = BUI.Prof.NewTicker('CastBar.Core', 0.03, BUI.Prof.Wrap('tick#CastbarPreview', function()
+	local ticker = C_Timer.NewTicker(0.03, function()
 		elapsed = elapsed + 0.03
 		local frac = elapsed / duration
 		if frac >= 1 then CastBar.StopInterruptPreview(barType); return end
@@ -473,7 +472,7 @@ function CastBar.PreviewInterrupt(barType)
 				BUI.TTS.Speak(settings.interruptTTSText)
 			end
 		end
-	end))
+	end)
 	previewTickers[barType] = { ticker = ticker, castbar = castbar, parent = parent, strata = strata, frame = frame }
 end
 

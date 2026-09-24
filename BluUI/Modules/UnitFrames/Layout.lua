@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('UnitFrames.Layout')
 
 local oUF = BUI.oUF
 local UnitFrames = BUI.UnitFrames
@@ -116,7 +115,7 @@ local function FramePostUpdate(self)
 end
 
 local function SetupTooltip(frame)
-	HookScript(frame, 'OnEnter', function(self)
+	frame:HookScript('OnEnter', function(self)
 		if not self.unit or GetMouseFoci()[1] ~= self then return end
 		local settings = UnitFrames.GetSettings()
 		if settings and settings.showTooltips ~= false then
@@ -124,7 +123,7 @@ local function SetupTooltip(frame)
 			GameTooltip:SetUnit(self.unit)
 		end
 	end)
-	HookScript(frame, 'OnLeave', function()
+	frame:HookScript('OnLeave', function()
 		GameTooltip:Hide()
 	end)
 end

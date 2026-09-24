@@ -1,5 +1,4 @@
 local BUI = BluUI
-local SetScript, HookScript = BUI.Prof.Scripts('Pages.Skinning')
 
 local max, min = math.max, math.min
 
@@ -48,13 +47,13 @@ local function OpenSkinSettings(id, info, parentOverride, savedScroll)
 
 	activeSettingsPanel = overlay
 	if info.onCloseSettings then
-		HookScript(overlay, 'OnHide', function() info.onCloseSettings() end)
+		overlay:HookScript('OnHide', function() info.onCloseSettings() end)
 	end
 
 	local activeClient = BUILib.GetActiveClient()
 	local prevStrata, prevLevel, prevParent = activeClient.popupStrata, activeClient.popupLevel, activeClient.popupParent
 	BUILib.SetPopupParent(panel)
-	HookScript(overlay, 'OnHide', function()
+	overlay:HookScript('OnHide', function()
 		activeClient.popupStrata, activeClient.popupLevel, activeClient.popupParent = prevStrata, prevLevel, prevParent
 	end)
 
@@ -64,10 +63,10 @@ local function OpenSkinSettings(id, info, parentOverride, savedScroll)
 		activeSettingsPanel = nil
 	end
 
-	SetScript(overlay, 'OnMouseDown', function(_, mouseButton)
+	overlay:SetScript('OnMouseDown', function(_, mouseButton)
 		if mouseButton == 'LeftButton' then Close() end
 	end)
-	SetScript(overlay, 'OnKeyDown', function(_, key)
+	overlay:SetScript('OnKeyDown', function(_, key)
 		if key == 'ESCAPE' then
 			overlay:SetPropagateKeyboardInput(false)
 			Close()
@@ -128,7 +127,7 @@ local function OpenSkinSettings(id, info, parentOverride, savedScroll)
 
 	local done = BUILib.Modals.CreateButton(panel, 'Done', nil, 90)
 	done:SetPoint('BOTTOMRIGHT', Pixel.Scale(-PADDING), Pixel.Scale(8))
-	SetScript(done, 'OnClick', Close)
+	done:SetScript('OnClick', Close)
 
 	local contentWidth = PANEL_WIDTH - 14
 	local scrollContainer = Widget.Unwrap(Controls.ScrollFrame(scrollArea, nil, nil, nil, Pixel.Scale(contentWidth)))
@@ -240,7 +239,7 @@ local function OpenSkinSettings(id, info, parentOverride, savedScroll)
 	info.buildSettings(content, tabIndex)
 	BUILib.SetCardStyle(previousStyle)
 	overlay:Show()
-	BUI.Prof.After('Pages.Skinning', 0, function()
+	C_Timer.After(0, function()
 		if not overlay:IsShown() then return end
 		content:Refresh()
 		if savedScroll and savedScroll > 0 then
@@ -400,12 +399,12 @@ function BUI.SkinningPage.BuildTab(tab)
 	local windowFrame = BUI.PageEngine.frame
 	if not windowFrame._buiSkinUnlockHooked then
 		windowFrame._buiSkinUnlockHooked = true
-		HookScript(windowFrame, 'OnHide', function()
+		windowFrame:HookScript('OnHide', function()
 			for id, info in pairs(registry) do
 				if info.unlock and info.unlock.get() then info.unlock.set(false) end
 			end
 			SyncUnlockToggles()
 		end)
-		HookScript(windowFrame, 'OnShow', SyncUnlockToggles)
+		windowFrame:HookScript('OnShow', SyncUnlockToggles)
 	end
 end

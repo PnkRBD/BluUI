@@ -1,5 +1,4 @@
 local BUI = BluUI
-local SetScript = BUI.Prof.Scripts('Pages.Markers')
 
 local BUILib = BluUI.BUILibClient
 local Layout = BUILib.Layout
@@ -189,7 +188,7 @@ BUI.PageEngine.RegisterPage('markers', {
 
         SyncDim()
 
-        SetScript(pageFrame, 'OnShow', function()
+        pageFrame:SetScript('OnShow', function()
             for _, refresh in ipairs(refreshers) do refresh() end
             SyncDim()
         end)

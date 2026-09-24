@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Journeys')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('journeys')
 local ipairs = ipairs
 local pairs = pairs
 
@@ -557,7 +555,7 @@ local function Install()
 	local frame = _G.EncounterJournal
 	if not frame then return end
 	installed = true
-	HookScript(frame, 'OnShow', Apply)
+	frame:HookScript('OnShow', Apply)
 	HookRows()
 	if frame:IsShown() then Apply() end
 end

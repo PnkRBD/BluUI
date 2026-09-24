@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Merchant')
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Widget = BUILib.Widget
@@ -132,7 +131,7 @@ local function SellJunkNext()
 			local info = C_Container.GetContainerItemInfo(bag, slot)
 			if info and info.quality == 0 and not info.hasNoValue and info.itemID then
 				C_Container.UseContainerItem(bag, slot)
-				BUI.Prof.After('Merchant', 0.2, SellJunkNext)
+				C_Timer.After(0.2, SellJunkNext)
 				return
 			end
 		end
@@ -252,14 +251,14 @@ local function CreateIconLabel(parent, fontSize)
 	frame.qtyText:SetPoint('LEFT', frame.icon, 'RIGHT', Pixel.Scale(2), 0)
 	frame.qtyText:SetTextColor(0.8, 0.8, 0.8, 1)
 
-	SetScript(frame, 'OnEnter', function(self)
+	frame:SetScript('OnEnter', function(self)
 		if self.link then
 			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 			GameTooltip:SetHyperlink(self.link)
 			GameTooltip:Show()
 		end
 	end)
-	SetScript(frame, 'OnLeave', function() GameTooltip:Hide() end)
+	frame:SetScript('OnLeave', function() GameTooltip:Hide() end)
 	return frame
 end
 
@@ -379,7 +378,7 @@ local function CreateBuyRow(parent)
 
 	row.qty = 0
 
-	SetScript(buyButton, 'OnClick', function()
+	buyButton:SetScript('OnClick', function()
 		if not row.merchantIdx or not row.canAfford then return end
 		local stepperFrame = Widget.Unwrap(row.stepper)
 		if stepperFrame.valueBox and stepperFrame.valueBox:HasFocus() then stepperFrame.valueBox:ClearFocus() end
@@ -396,12 +395,12 @@ local function CreateBuyRow(parent)
 			if not merchantFrame or not merchantFrame:IsShown() then return end
 			remaining = remaining - 1
 			BuyMerchantItem(row.merchantIdx, 1)
-			if remaining > 0 then BUI.Prof.After('Merchant', 0.2, BuyOne) end
+			if remaining > 0 then C_Timer.After(0.2, BuyOne) end
 		end
 		BuyOne()
 	end)
 
-	HookScript(row, 'OnClick', function(self)
+	row:HookScript('OnClick', function(self)
 		if not self.merchantIdx then return end
 		if IsModifiedClick('DRESSUP') then
 			local link = GetMerchantItemLink(self.merchantIdx)
@@ -411,7 +410,7 @@ local function CreateBuyRow(parent)
 		end
 	end)
 
-	HookScript(row, 'OnEnter', function(self)
+	row:HookScript('OnEnter', function(self)
 		if self.merchantIdx then
 			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 			GameTooltip:SetMerchantItem(self.merchantIdx)
@@ -428,11 +427,11 @@ local function CreateBuybackRow(parent)
 
 	local buybackButton = Skin.SmallButton(row, 62, 22, 'Buyback')
 	buybackButton:SetPoint('RIGHT', row, 'RIGHT', Pixel.Scale(-8), 0)
-	SetScript(buybackButton, 'OnClick', function()
+	buybackButton:SetScript('OnClick', function()
 		if row.buybackIdx then BuybackItem(row.buybackIdx) end
 	end)
 
-	HookScript(row, 'OnClick', function(self)
+	row:HookScript('OnClick', function(self)
 		if not self.buybackIdx then return end
 		local link = GetBuybackItemLink(self.buybackIdx)
 		if not link then return end
@@ -443,7 +442,7 @@ local function CreateBuybackRow(parent)
 		end
 	end)
 
-	HookScript(row, 'OnEnter', function(self)
+	row:HookScript('OnEnter', function(self)
 		if self.buybackIdx then
 			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 			GameTooltip:SetBuybackItem(self.buybackIdx)
@@ -623,7 +622,7 @@ local function BuildFrame()
 			queueIndex = queueIndex + 1
 			if queue[queueIndex] then
 				BuyMerchantItem(queue[queueIndex].idx, queue[queueIndex].qty)
-				BUI.Prof.After('Merchant', 0.2, BuyNext)
+				C_Timer.After(0.2, BuyNext)
 			end
 		end
 		BuyNext()
@@ -641,7 +640,7 @@ local function BuildFrame()
 			if previousCount and numItems >= previousCount then return end
 			previousCount = numItems
 			BuybackItem(numItems)
-			BUI.Prof.After('Merchant', 0.2, BuybackNext)
+			C_Timer.After(0.2, BuybackNext)
 		end
 		BuybackNext()
 	end)
@@ -724,7 +723,7 @@ RefreshContent = function()
 			return
 		end
 		local previous = scroll:GetVerticalScroll()
-		BUI.Prof.After('Merchant', 0, function()
+		C_Timer.After(0, function()
 			local maxScroll = math.max(0, scroll:GetScrollChild():GetHeight() - scroll:GetHeight())
 			scroll:SetVerticalScroll(math.min(previous, maxScroll))
 		end)
@@ -784,7 +783,7 @@ local function OnMerchantEvent(event)
 			Skin.SuppressBlizzardFrame(MerchantFrame)
 			if not MerchantFrame._buiReassertHooked then
 				MerchantFrame._buiReassertHooked = true
-				HookScript(MerchantFrame, 'OnShow', function(self)
+				MerchantFrame:HookScript('OnShow', function(self)
 					if merchantFrame and merchantFrame:IsShown() and Skin.IsSkinEnabled('merchant') then Skin.SuppressBlizzardFrame(self) end
 				end)
 			end
@@ -803,7 +802,7 @@ local function OnMerchantEvent(event)
 		BUI.Events:Register('BAG_UPDATE', 'Skinning.Merchant.Live', OnMerchantEvent)
 		BUI.Events:Register('PLAYER_MONEY', 'Skinning.Merchant.Live', OnMerchantEvent)
 		BUI.Events:Register('CURRENCY_DISPLAY_UPDATE', 'Skinning.Merchant.Live', OnMerchantEvent)
-		BUI.Prof.After('Merchant', 0, RefreshContent)
+		C_Timer.After(0, RefreshContent)
 	elseif event == 'MERCHANT_CLOSED' then
 		sellJunkActive = false
 		BUI.Events:UnregisterAll('Skinning.Merchant.Live')
@@ -816,7 +815,7 @@ local function OnMerchantEvent(event)
 		ClearRowData()
 	elseif merchantFrame and merchantFrame:IsShown() and not merchantFrame.pendingRefresh then
 		merchantFrame.pendingRefresh = true
-		BUI.Prof.After('Merchant', 0.1, function()
+		C_Timer.After(0.1, function()
 			merchantFrame.pendingRefresh = false
 			RefreshContent()
 		end)

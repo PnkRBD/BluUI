@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('Util.SlidePanel')
 
 BUI.SlidePanel = {}
 
@@ -39,13 +38,13 @@ function BUI.SlidePanel.New(options)
         local _, _, _, startX = panel:GetPoint(1)
         startX = startX or hiddenX
         local elapsed = 0
-        SetScript(panel, 'OnUpdate', function(self, deltaTime)
+        panel:SetScript('OnUpdate', function(self, deltaTime)
             elapsed = elapsed + deltaTime
             local progress = math.min(1, elapsed / SLIDE_DURATION)
             local eased = 1 - (1 - progress) * (1 - progress) * (1 - progress)
             SetOffset(startX + (targetX - startX) * eased)
             if progress >= 1 then
-                SetScript(self, 'OnUpdate', nil)
+                self:SetScript('OnUpdate', nil)
                 if onDone then onDone() end
             end
         end)
@@ -77,7 +76,7 @@ function BUI.SlidePanel.New(options)
             return
         end
         if immediate then
-            SetScript(panel, 'OnUpdate', nil)
+            panel:SetScript('OnUpdate', nil)
             panel:Hide()
             slidePanel.open = false
             return

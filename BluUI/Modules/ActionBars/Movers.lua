@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('ActionBars.Movers')
 
 local ActionBars = BUI.ActionBars
 local Pixel = BUI.Pixel
@@ -174,7 +173,7 @@ local EndDrag
 local function DragUpdate(overlay)
 	local bar = state.dragging
 	if not bar then
-		SetScript(overlay, 'OnUpdate', nil)
+		overlay:SetScript('OnUpdate', nil)
 		return
 	end
 	if InCombatLockdown() then
@@ -209,11 +208,11 @@ local function BeginDrag(bar, overlay)
 	overlay.lockX = settings.centerHorizontally
 	overlay:Paint(true)
 	overlay.hint:Show()
-	SetScript(overlay, 'OnUpdate', DragUpdate)
+	overlay:SetScript('OnUpdate', DragUpdate)
 end
 
 EndDrag = function(bar, overlay)
-	SetScript(overlay, 'OnUpdate', nil)
+	overlay:SetScript('OnUpdate', nil)
 	if state.dragging ~= bar then return end
 	state.dragging = nil
 	ShowGuides(nil, nil)
@@ -263,16 +262,16 @@ local function CreateOverlay(bar)
 		hint:SetText(ActionBars.GetBarSettings(bar.key).centerHorizontally and CENTERED_HINT or HINT_TEXT)
 	end
 
-	SetScript(overlay, 'OnEnter', function(self)
+	overlay:SetScript('OnEnter', function(self)
 		self:Paint(true)
 		self.hint:Show()
 	end)
-	SetScript(overlay, 'OnLeave', function(self)
+	overlay:SetScript('OnLeave', function(self)
 		if state.dragging == bar then return end
 		self:Paint(false)
 		self.hint:Hide()
 	end)
-	SetScript(overlay, 'OnMouseUp', function(_, button)
+	overlay:SetScript('OnMouseUp', function(_, button)
 		if button ~= 'RightButton' or state.dragging then return end
 		if state.bars[bar.key] and not state.unlocked then
 			ActionBars.SetBarUnlocked(bar.key, false)
@@ -280,8 +279,8 @@ local function CreateOverlay(bar)
 			ActionBars.SetMoversUnlocked(false)
 		end
 	end)
-	SetScript(overlay, 'OnDragStart', function(self) BeginDrag(bar, self) end)
-	SetScript(overlay, 'OnDragStop', function(self) EndDrag(bar, self) end)
+	overlay:SetScript('OnDragStart', function(self) BeginDrag(bar, self) end)
+	overlay:SetScript('OnDragStop', function(self) EndDrag(bar, self) end)
 	overlay:Paint(false)
 	overlay:RefreshHint()
 	bar.mover = overlay
@@ -368,12 +367,12 @@ local function HookEditMode()
 	local manager = EditModeManagerFrame
 	if editModeHooked or not manager then return end
 	editModeHooked = true
-	HookScript(manager, 'OnShow', function()
+	manager:HookScript('OnShow', function()
 		if not BUI.IsModuleEnabled('actionBars') or state.unlocked then return end
 		state.editMode = true
 		ActionBars.SetMoversUnlocked(true)
 	end)
-	HookScript(manager, 'OnHide', function()
+	manager:HookScript('OnHide', function()
 		if not state.editMode then return end
 		state.editMode = false
 		ActionBars.SetMoversUnlocked(false)

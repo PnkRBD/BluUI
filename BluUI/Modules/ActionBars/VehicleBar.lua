@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('ActionBars.VehicleBar')
 
 local ActionBars = BUI.ActionBars
 local Pixel = BUI.Pixel
@@ -46,9 +45,9 @@ local function CreateBar()
 	button:SetAttribute('type', 'macro')
 	button:SetAttribute('macrotext', '/leavevehicle')
 	button:RegisterForClicks('AnyUp')
-	SetScript(button, 'PostClick', OnPostClick)
-	SetScript(button, 'OnEnter', OnEnter)
-	SetScript(button, 'OnLeave', GameTooltip_Hide)
+	button:SetScript('PostClick', OnPostClick)
+	button:SetScript('OnEnter', OnEnter)
+	button:SetScript('OnLeave', GameTooltip_Hide)
 
 	local background = button:CreateTexture(nil, 'BACKGROUND')
 	background:SetAllPoints()

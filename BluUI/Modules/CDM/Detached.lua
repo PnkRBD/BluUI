@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('CDM.Detached')
 
 local _G = _G
 local pairs, abs, min, max = pairs, math.abs, math.min, math.max
@@ -214,7 +213,7 @@ local function GetDragFrame()
     DragFrame:SetFrameStrata("TOOLTIP")
     DragFrame:SetSize(Pixel.Scale(50), Pixel.Scale(50))
     DragFrame:Hide()
-    SetScript(DragFrame, "OnUpdate", DragFrameOnUpdate)
+    DragFrame:SetScript("OnUpdate", DragFrameOnUpdate)
     return DragFrame
 end
 
@@ -357,7 +356,7 @@ local function EnsureOverlay(icon, key)
     overlay:SetFrameLevel(icon:GetFrameLevel() + 10)
     overlay:RegisterForClicks("AnyDown")
 
-    SetScript(overlay, "OnMouseDown", function(self, button)
+    overlay:SetScript("OnMouseDown", function(self, button)
         if not IsIndividualMoveEnabled() then return end
         if InCombatLockdown() then return end
 
@@ -375,7 +374,7 @@ local function EnsureOverlay(icon, key)
     end)
 
     overlay:EnableMouseWheel(true)
-    SetScript(overlay, "OnMouseWheel", function(_, delta)
+    overlay:SetScript("OnMouseWheel", function(_, delta)
         if not IsControlKeyDown() then return end
         ResizeDetachedIcon(icon, key, delta)
     end)

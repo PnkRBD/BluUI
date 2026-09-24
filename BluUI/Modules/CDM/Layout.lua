@@ -4,7 +4,6 @@ local _G = _G
 local ipairs, wipe = ipairs, wipe
 local sort = table.sort
 
-local function C_Timer_After(delay, callback) BUI.Prof.After('CDM.Layout', delay, callback) end
 
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
@@ -57,7 +56,7 @@ local function CollectCustomIcons(viewerKey, outIcons)
                     local aura = C_UnitAuras.GetPlayerAuraBySpellID(spellID)
                     if aura then
                         CDM._deferredIconUpdate = true
-                        C_Timer_After(0, function()
+                        C_Timer.After(0, function()
                             CDM._deferredIconUpdate = nil
                             local list, count = Custom.GetIcons("buffs")
                             if not list then return end

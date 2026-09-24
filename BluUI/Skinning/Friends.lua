@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Friends')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('friends')
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -669,7 +667,7 @@ local function HookRows()
 end
 
 local function HookDialog(frame, callback)
-	if frame then HookScript(frame, 'OnShow', callback) end
+	if frame then frame:HookScript('OnShow', callback) end
 end
 
 local function HookDialogs()
@@ -684,7 +682,7 @@ local function Install()
 	local frame = _G.FriendsFrame
 	if not frame then return end
 	installed = true
-	HookScript(frame, 'OnShow', Apply)
+	frame:HookScript('OnShow', Apply)
 	hooksecurefunc('FriendsFrame_Update', OnFriendsUpdated)
 	HookRows()
 	HookDialogs()

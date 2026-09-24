@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('ReadyCheck')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('readycheck')
 local select, max, min, floor = select, math.max, math.min, math.floor
 local GetTime = GetTime
 
@@ -92,14 +90,14 @@ local function StartCountdown(timeLeft)
 	if type(timeLeft) ~= 'number' or timeLeft <= 0 then return end
 	countdownExpiry = GetTime() + timeLeft
 	CountdownTick()
-	countdownTicker = BUI.Prof.NewTicker('ReadyCheck', 1, BUI.Prof.Wrap('tick#ReadyCheckCountdown', CountdownTick))
+	countdownTicker = C_Timer.NewTicker(1, CountdownTick)
 end
 
 local function EnsureCountdown(listener)
 	if countdownText then return countdownText end
 	countdownText = listener:CreateFontString(nil, 'OVERLAY')
 	countdownText:SetJustifyH('RIGHT')
-	HookScript(listener, 'OnHide', StopCountdown)
+	listener:HookScript('OnHide', StopCountdown)
 	return countdownText
 end
 
@@ -210,7 +208,7 @@ local function Install()
 	local listener = _G.ReadyCheckListenerFrame
 	if not listener then return end
 	installed = true
-	HookScript(listener, 'OnShow', Apply)
+	listener:HookScript('OnShow', Apply)
 	BUI.Events:Register('READY_CHECK', 'Skin.ReadyCheck', OnReadyCheck)
 	BUI.Events:Register('READY_CHECK_FINISHED', 'Skin.ReadyCheck', StopCountdown)
 	if listener:IsShown() then Apply() end

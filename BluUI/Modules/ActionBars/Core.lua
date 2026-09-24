@@ -41,7 +41,6 @@ ActionBars.LABELS = {
 }
 
 ActionBars.bars = {}
-ActionBars.hooksecurefunc = BUI.Prof.MakeHooker('actionbars')
 
 function ActionBars.GetSettings()
 	local db = BUI.GetDB()

@@ -87,7 +87,7 @@ function Shared.ShouldReanchor(frame, db)
 end
 
 function Shared.DeferRefresh(getFrame, getDB, reposition)
-    BUI.Prof.After('Power.Shared', 0.1, function()
+    C_Timer.After(0.1, function()
         if getFrame() and getDB().enabled then reposition() end
     end)
 end

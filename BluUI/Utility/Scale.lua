@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('Util.Scale')
 BUI.Scale = {}
 local Scale = BUI.Scale
 local Pixel = BUI.Pixel
@@ -78,10 +77,10 @@ local function ShowCustomDialog(parent)
 
     local confirmButton = Modals.CreateButton(dialog, "Set", Modals.BTN_CONFIRM, 100)
     confirmButton:SetPoint("BOTTOM", dialog, "BOTTOM", Pixel.Scale(-55), Pixel.Scale(20))
-    SetScript(confirmButton, "OnClick", function() close(); Apply(chosen) end)
+    confirmButton:SetScript("OnClick", function() close(); Apply(chosen) end)
     local cancelButton = Modals.CreateButton(dialog, "Cancel", Modals.BTN_CANCEL, 100)
     cancelButton:SetPoint("BOTTOM", dialog, "BOTTOM", Pixel.Scale(55), Pixel.Scale(20))
-    SetScript(cancelButton, "OnClick", close)
+    cancelButton:SetScript("OnClick", close)
 
     overlay:Show()
 end
@@ -114,9 +113,9 @@ function Scale.SetupButtons(window, parent)
         if button then
             buttons[preset.key] = button
             if preset.key == "Custom" then
-                SetScript(button, "OnClick", function() ShowCustomDialog(parent) end)
+                button:SetScript("OnClick", function() ShowCustomDialog(parent) end)
             else
-                SetScript(button, "OnClick", function() Apply(preset.value) end)
+                button:SetScript("OnClick", function() Apply(preset.value) end)
             end
         end
     end

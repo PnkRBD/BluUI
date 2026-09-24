@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('GreatVault')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('greatvault')
 local ipairs, select = ipairs, select
 
 local Skin = BUI.Skinning
@@ -259,14 +257,14 @@ local function Install()
 	local frame = _G.WeeklyRewardsFrame
 	if not frame then return end
 	installed = true
-	HookScript(frame, 'OnShow', Apply)
+	frame:HookScript('OnShow', Apply)
 	hooksecurefunc(frame, 'Refresh', OnRefresh)
 	hooksecurefunc(frame, 'UpdateSelection', OnSelection)
 	hooksecurefunc(frame, 'SetUpActivity', OnSetUpActivity)
 	hooksecurefunc(frame, 'UpdateOverlay', OnOverlay)
 	hooksecurefunc(frame, 'SelectReward', OnSelectReward)
 	local warning = _G.WeeklyRewardExpirationWarningDialog
-	if warning then HookScript(warning, 'OnShow', SkinWarning) end
+	if warning then warning:HookScript('OnShow', SkinWarning) end
 	if frame:IsShown() then Apply() end
 end
 

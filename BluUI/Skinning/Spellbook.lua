@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Spellbook')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('spellbook')
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
@@ -160,7 +158,7 @@ local function SkinSearchPreview(container)
 	container._buiPreview = true
 	FadeArt(container)
 	Shell(container)
-	HookScript(container, 'OnShow', StyleSearchPreview)
+	container:HookScript('OnShow', StyleSearchPreview)
 	StyleSearchPreview(container)
 end
 
@@ -181,10 +179,10 @@ local function SkinSpellBook(book)
 	if book._buiSweepHooked then return end
 	book._buiSweepHooked = true
 	if book.SetTab then hooksecurefunc(book, 'SetTab', QueuePageSweep) end
-	HookScript(book, 'OnShow', QueuePageSweep)
-	if paged then HookScript(paged, 'OnMouseWheel', QueuePageSweep) end
-	if paging and paging.PrevPageButton then HookScript(paging.PrevPageButton, 'OnClick', QueuePageSweep) end
-	if paging and paging.NextPageButton then HookScript(paging.NextPageButton, 'OnClick', QueuePageSweep) end
+	book:HookScript('OnShow', QueuePageSweep)
+	if paged then paged:HookScript('OnMouseWheel', QueuePageSweep) end
+	if paging and paging.PrevPageButton then paging.PrevPageButton:HookScript('OnClick', QueuePageSweep) end
+	if paging and paging.NextPageButton then paging.NextPageButton:HookScript('OnClick', QueuePageSweep) end
 end
 
 local function SkinCurrencyDisplay(display)
@@ -386,7 +384,7 @@ local function Install()
 	local frame = _G.PlayerSpellsFrame
 	if not frame then return end
 	installed = true
-	HookScript(frame, 'OnShow', Apply)
+	frame:HookScript('OnShow', Apply)
 	HookMixin(_G.SpellBookItemMixin, 'UpdateVisuals', StyleSpellItem)
 	HookMixin(_G.SpellBookItemMixin, 'OnIconEnter', StyleSpellItem)
 	HookMixin(_G.SpellBookItemMixin, 'OnIconLeave', StyleSpellItem)

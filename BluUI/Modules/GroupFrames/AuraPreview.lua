@@ -1,12 +1,10 @@
 local _, BUI = ...
-local hooksecurefunc = BUI.Prof.MakeHooker('gfaurapreview')
 
 local GroupFrames = BUI.GroupFrames
 local Pixel = BUI.Pixel
 
 local FALLBACK_ICON = 'Interface\\Icons\\INV_Misc_QuestionMark'
 local ICON_CROP = 0.08
-local MISSING_BUFF_SPELL = 1126
 
 local SAMPLE_SPELLS = {
 	buffs        = { 21562, 1459, 6673 },
@@ -148,25 +146,7 @@ local function ApplyPrivateSample(child, settings)
 	})
 end
 
-local function ApplyMissingSample(child, settings)
-	local icon = child.MissingRaidBuff
-	if not icon then return end
-	icon._buiPreview = true
-	GroupFrames.ApplyMissingRaidBuffToChild(child, settings)
-	icon.texture:SetTexture(SpellIcon(MISSING_BUFF_SPELL))
-	icon:Show()
-end
-
 local function ClearSample(child, kind, settings)
-	if kind == 'missingRaidBuff' then
-		local icon = child.MissingRaidBuff
-		if icon and icon._buiPreview then
-			icon._buiPreview = nil
-			icon:Hide()
-			GroupFrames.ApplyMissingRaidBuffToChild(child, settings)
-		end
-		return
-	end
 	local holder = child._buiAuraSamples and child._buiAuraSamples[kind]
 	if holder then holder:Hide() end
 end
@@ -176,8 +156,6 @@ local function ApplySample(child, kind, settings)
 		ApplyContainerSample(child, kind, settings)
 	elseif kind == 'privateAuras' then
 		ApplyPrivateSample(child, settings)
-	elseif kind == 'missingRaidBuff' then
-		ApplyMissingSample(child, settings)
 	end
 end
 
@@ -224,8 +202,7 @@ end
 
 local function ReapplyLater()
 	if next(active) == nil then return end
-	BUI.Prof.After('GroupFrames.AuraPreview', 0, GroupFrames.ReapplyAuraPreviews)
+	C_Timer.After(0, GroupFrames.ReapplyAuraPreviews)
 end
 
 hooksecurefunc(GroupFrames, 'RefreshAuras', ReapplyLater)
-hooksecurefunc(GroupFrames, 'RefreshMissingRaidBuff', ReapplyLater)

@@ -1,6 +1,5 @@
 local _, BUI = ...
 
-local _, HookScript = BUI.Prof.Scripts('CDM.Hooks')
 local abs = math.abs
 local _G = _G
 local pairs = pairs
@@ -138,31 +137,30 @@ function CDM.HookIconFrame(icon, key)
     if frameData.posHooked then return end
     frameData.posHooked = true
     frameData.viewerKey = key
-    local hook = CDM.ProfHooker(key)
     if key ~= 'buffs' and icon.Cooldown and not frameData.customIcon then
-        HookScript(icon.Cooldown, 'OnCooldownDone', CDM.OnCooldownWidgetDone)
+        icon.Cooldown:HookScript('OnCooldownDone', CDM.OnCooldownWidgetDone)
     end
 
-    hook(icon, "SetPoint", OnIconSetPoint)
-    hook(icon, "SetScale", OnIconSetScale)
-    hook(icon, "SetAlpha", OnIconSetAlpha)
-    hook(icon, "SetSize", OnIconSetSize)
-    hook(icon, "SetWidth", OnIconSetSize)
-    hook(icon, "SetHeight", OnIconSetSize)
+    hooksecurefunc(icon, "SetPoint", OnIconSetPoint)
+    hooksecurefunc(icon, "SetScale", OnIconSetScale)
+    hooksecurefunc(icon, "SetAlpha", OnIconSetAlpha)
+    hooksecurefunc(icon, "SetSize", OnIconSetSize)
+    hooksecurefunc(icon, "SetWidth", OnIconSetSize)
+    hooksecurefunc(icon, "SetHeight", OnIconSetSize)
     if icon.SetCooldownID then
         local cooldownID = icon.cooldownID
         if not issecretvalue(cooldownID) then
             frameData.lastCooldownID = cooldownID
         end
-        hook(icon, "SetCooldownID", OnIconSetCooldownID)
+        hooksecurefunc(icon, "SetCooldownID", OnIconSetCooldownID)
     end
     if icon.OnActiveStateChanged then
-        hook(icon, "OnActiveStateChanged", OnIconActiveStateChanged)
+        hooksecurefunc(icon, "OnActiveStateChanged", OnIconActiveStateChanged)
     end
     if key == 'buffs' then
-        hook(icon, "Show", CDM._OnBuffIconShow)
-        hook(icon, "Hide", CDM._OnBuffIconHide)
-        hook(icon, "SetShown", CDM._OnBuffIconShow)
+        hooksecurefunc(icon, "Show", CDM._OnBuffIconShow)
+        hooksecurefunc(icon, "Hide", CDM._OnBuffIconHide)
+        hooksecurefunc(icon, "SetShown", CDM._OnBuffIconShow)
     end
 end
 
@@ -247,24 +245,23 @@ function CDM.HookViewer(viewer, key)
     if not viewerFrameData.hooked then
         viewerFrameData.hooked = true
         viewerFrameData.viewerKey = key
-        local hook = CDM.ProfHooker(key)
 
-        hook(viewer, "Show", OnViewerVisibilityChanged)
-        hook(viewer, "Hide", OnViewerVisibilityChanged)
-        hook(viewer, "SetShown", OnViewerVisibilityChanged)
+        hooksecurefunc(viewer, "Show", OnViewerVisibilityChanged)
+        hooksecurefunc(viewer, "Hide", OnViewerVisibilityChanged)
+        hooksecurefunc(viewer, "SetShown", OnViewerVisibilityChanged)
 
         if not viewerFrameData.poolHooked and viewer.itemFramePool then
             viewerFrameData.poolHooked = true
 
-            hook(viewer, "OnAcquireItemFrame", OnViewerAcquireFrame)
+            hooksecurefunc(viewer, "OnAcquireItemFrame", OnViewerAcquireFrame)
 
             if viewer.RefreshLayout then
-                hook(viewer, "RefreshLayout", OnRefreshLayoutComplete)
+                hooksecurefunc(viewer, "RefreshLayout", OnRefreshLayoutComplete)
             end
 
             if viewer.itemFramePool.Release then
                 GetFrameData(viewer.itemFramePool).viewer = viewer
-                hook(viewer.itemFramePool, "Release", OnPoolRelease)
+                hooksecurefunc(viewer.itemFramePool, "Release", OnPoolRelease)
             end
 
             if viewer.itemFramePool.EnumerateActive then

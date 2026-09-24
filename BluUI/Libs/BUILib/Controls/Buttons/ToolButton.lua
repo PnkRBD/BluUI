@@ -30,7 +30,6 @@ function Controls.ToolButton(parent, options)
 	options = options or {}
 	local fill = options.fill or FILL_COLOR
 	local hoverScale = Option(options, "hoverScale")
-	local setScript = options.setScript or function(frame, script, handler) frame:SetScript(script, handler) end
 
 	local button = CreateFrame("Button", nil, Widget.Unwrap(parent))
 	button:SetHeight(Option(options, "height"))
@@ -78,19 +77,19 @@ function Controls.ToolButton(parent, options)
 	if options.atlas then button:SetIconAtlas(options.atlas)
 	elseif options.texture then button:SetIconTexture(options.texture) end
 
-	setScript(button, "OnEnter", function(self)
+	button:SetScript("OnEnter", function(self)
 		local red, green, blue = Theme.GetAccent()
 		Widget.SetShapeColor(self.fill, red * hoverScale, green * hoverScale, blue * hoverScale, 1)
 		self.icon:SetVertexColor(1, 1, 1)
 		self.label:SetTextColor(1, 1, 1)
 	end)
-	setScript(button, "OnLeave", function(self)
+	button:SetScript("OnLeave", function(self)
 		Widget.SetShapeColor(self.fill, fill[1], fill[2], fill[3], fill[4] or 1)
 		self.icon:SetVertexColor(ICON_IDLE[1], ICON_IDLE[2], ICON_IDLE[3])
 		self.label:SetTextColor(LABEL_IDLE[1], LABEL_IDLE[2], LABEL_IDLE[3])
 	end)
 	if options.onClick then
-		setScript(button, "OnClick", function(self, mouseButton) options.onClick(self, mouseButton) end)
+		button:SetScript("OnClick", function(self, mouseButton) options.onClick(self, mouseButton) end)
 	end
 
 	return button

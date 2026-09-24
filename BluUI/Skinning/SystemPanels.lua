@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('SystemPanels')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('systempanels')
 local pairs = pairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -307,7 +305,7 @@ local function StyleRowButton(row)
 			Shell(button)
 			Skin.TipArrow(button, false, ARROW_EXPANDED)
 			Skin.TipFont(button.Text, 'title')
-			HookScript(button, 'OnClick', OnSectionToggle)
+			button:HookScript('OnClick', OnSectionToggle)
 		end
 		FadeAgain(button.Left)
 		FadeAgain(button.Right)
@@ -759,7 +757,7 @@ local function ApplyQuickKeybind()
 end
 
 local function HookDialog(frame, callback)
-	if frame then HookScript(frame, 'OnShow', callback) end
+	if frame then frame:HookScript('OnShow', callback) end
 end
 
 local function InstallMacro()
@@ -767,7 +765,7 @@ local function InstallMacro()
 	local frame = _G.MacroFrame
 	if not frame then return end
 	macroInstalled = true
-	HookScript(frame, 'OnShow', ApplyMacro)
+	frame:HookScript('OnShow', ApplyMacro)
 	HookDialog(_G.MacroPopupFrame, SkinIconPopup)
 	if frame:IsShown() then ApplyMacro() end
 end
@@ -777,7 +775,7 @@ local function InstallQuickKeybind()
 	local frame = _G.QuickKeybindFrame
 	if not frame then return end
 	quickKeybindInstalled = true
-	HookScript(frame, 'OnShow', ApplyQuickKeybind)
+	frame:HookScript('OnShow', ApplyQuickKeybind)
 	if frame:IsShown() then ApplyQuickKeybind() end
 end
 
@@ -786,14 +784,14 @@ local function Install()
 	local settings = _G.SettingsPanel
 	if not settings then return end
 	installed = true
-	HookScript(settings, 'OnShow', ApplySettings)
+	settings:HookScript('OnShow', ApplySettings)
 	if settings:IsShown() then ApplySettings() end
 	local editMode = _G.EditModeManagerFrame
 	if editMode then
-		HookScript(editMode, 'OnShow', ApplyEditMode)
+		editMode:HookScript('OnShow', ApplyEditMode)
 		local systemDialog = _G.EditModeSystemSettingsDialog
 		if systemDialog then
-			HookScript(systemDialog, 'OnShow', SkinSystemDialog)
+			systemDialog:HookScript('OnShow', SkinSystemDialog)
 			hooksecurefunc(systemDialog, 'UpdateSettings', SweepSystemDialog)
 			hooksecurefunc(systemDialog, 'UpdateExtraButtons', SweepSystemDialog)
 		end
@@ -805,7 +803,7 @@ local function Install()
 	end
 	local addonList = _G.AddonList
 	if addonList then
-		HookScript(addonList, 'OnShow', ApplyAddonList)
+		addonList:HookScript('OnShow', ApplyAddonList)
 		if _G.AddonList_InitAddon then hooksecurefunc('AddonList_InitAddon', OnAddonEntry) end
 		HookDialog(_G.AddonDialog, SkinAddonDialog)
 		if addonList:IsShown() then ApplyAddonList() end

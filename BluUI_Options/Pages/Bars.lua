@@ -1,5 +1,4 @@
 local BUI = BluUI
-local SetScript = BUI.Prof.Scripts('Pages.Bars')
 
 local BUILib = BluUI.BUILibClient
 local Controls, Layout, Colors, Modals = BUILib.Controls, BUILib.Layout, BUILib.Colors, BUILib.Modals
@@ -550,7 +549,7 @@ BUI.PageEngine.RegisterPage("castbars", {
         previewRefresh = function() preview:UpdatePreview() end
         preview:SetUnit('player')
 
-        SetScript(pageFrame, 'OnShow', SyncTitle)
+        pageFrame:SetScript('OnShow', SyncTitle)
     end,
     OnHide = function()
         for _, barType in ipairs({ "player", "target", "focus" }) do

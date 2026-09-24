@@ -102,7 +102,7 @@ end
 local function QueueRefresh()
 	if refreshQueued then return end
 	refreshQueued = true
-	BUI.Prof.After("GroupFrames.Keystone", 0, RefreshAll)
+	C_Timer.After(0, RefreshAll)
 end
 
 local function Receive(level, mapID, _, sender)

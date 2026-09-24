@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Power.Power')
 
 BUI.Power.Primary = {}
 local PrimaryPower = BUI.Power.Primary
@@ -179,8 +178,8 @@ local function Build()
             BUI.Anchor.OnAnchorSizeChanged()
         end
     end
-    HookScript(frame, "OnShow", NotifyAnchorChange)
-    HookScript(frame, "OnHide", NotifyAnchorChange)
+    frame:HookScript("OnShow", NotifyAnchorChange)
+    frame:HookScript("OnHide", NotifyAnchorChange)
 
     text = frame:CreateFontString(nil, "OVERLAY")
     text:SetPoint("CENTER")

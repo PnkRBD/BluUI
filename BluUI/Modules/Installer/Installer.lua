@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Installer.Installer')
 local BUILib = LibStub('BUILib')
 local Widget = BUILib.Widget
 local Theme = BUILib.Theme
@@ -68,7 +67,7 @@ local function MakeButton(parent, text, width, onClick)
 	button:SetSize(width, BUTTON_HEIGHT)
 	Skin().TipButton(button)
 	button:SetText(text)
-	SetScript(button, 'OnClick', onClick)
+	button:SetScript('OnClick', onClick)
 	return button
 end
 
@@ -80,8 +79,8 @@ end
 
 local function MakeStepButton(parent, text, width, onClick)
 	local button = MakeButton(parent, text, width, onClick)
-	HookScript(button, 'OnEnter', function(self) BUILib.Skin.SetShellFill(self, CHOICE_HOVER_FILL) end)
-	HookScript(button, 'OnLeave', function(self) BUILib.Skin.SetShellFill(self, PanelFill()) end)
+	button:HookScript('OnEnter', function(self) BUILib.Skin.SetShellFill(self, CHOICE_HOVER_FILL) end)
+	button:HookScript('OnLeave', function(self) BUILib.Skin.SetShellFill(self, PanelFill()) end)
 	return button
 end
 
@@ -112,9 +111,9 @@ local function MakeChoice(parent, width, height, onClick)
 			end
 		end
 	end
-	SetScript(choice, 'OnEnter', function(self) self:Paint(true) end)
-	SetScript(choice, 'OnLeave', function(self) self:Paint(false) end)
-	SetScript(choice, 'OnClick', onClick)
+	choice:SetScript('OnEnter', function(self) self:Paint(true) end)
+	choice:SetScript('OnLeave', function(self) self:Paint(false) end)
+	choice:SetScript('OnClick', onClick)
 	return choice
 end
 
@@ -161,7 +160,7 @@ local function MakeHero(parent)
 		model:SetUnit('player')
 		model:SetFacing(0.35)
 		model:SetAnimation(WAVE_ANIMATION)
-		BUI.Prof.After('Installer.Installer', WAVE_SECONDS, function()
+		C_Timer.After(WAVE_SECONDS, function()
 			if host:IsVisible() then model:SetAnimation(0) end
 		end)
 	end
@@ -296,7 +295,7 @@ local function BuildScale(frame)
 		if value < SCALE_MIN then value = SCALE_MIN elseif value > SCALE_MAX then value = SCALE_MAX end
 		BUI.GetDB().uiScale.scale = value
 		BUI.ApplyScale()
-		BUI.Prof.After('Installer.Installer', 0.05, Refresh)
+		C_Timer.After(0.05, Refresh)
 	end
 
 	local pendingScale
@@ -471,9 +470,9 @@ local function MakePickerRow(list, id, name, width, onToggle)
 	mark:SetPoint('BOTTOMRIGHT', -PICKER_CHECK_INSET, PICKER_CHECK_INSET)
 	local label = MakeText(row, 11, name, TEXT_BODY)
 	label:SetPoint('LEFT', box, 'RIGHT', 8, 0)
-	SetScript(row, 'OnEnter', function() hover:Show() end)
-	SetScript(row, 'OnLeave', function() hover:Hide() end)
-	SetScript(row, 'OnClick', function()
+	row:SetScript('OnEnter', function() hover:Show() end)
+	row:SetScript('OnLeave', function() hover:Hide() end)
+	row:SetScript('OnClick', function()
 		skinSelection[id] = not skinSelection[id]
 		onToggle()
 	end)
@@ -524,7 +523,7 @@ local function MakePicker(frame, onToggle)
 		rows[#rows + 1] = row
 	end
 
-	SetScript(picker, 'OnClick', function() list:SetShown(not list:IsShown()) end)
+	picker:SetScript('OnClick', function() list:SetShown(not list:IsShown()) end)
 	function picker:Paint()
 		local selectedCount, total = SelectionCounts()
 		if selectedCount == total then
@@ -713,9 +712,9 @@ local function MakeTextureRow(list, width, onSelect)
 	label:SetPoint('RIGHT', -6, 0)
 	label:SetJustifyH('LEFT')
 	label:SetWordWrap(false)
-	SetScript(row, 'OnEnter', function() hover:Show() end)
-	SetScript(row, 'OnLeave', function() hover:Hide() end)
-	SetScript(row, 'OnClick', function(self) if self.value then onSelect(self.value) end end)
+	row:SetScript('OnEnter', function() hover:Show() end)
+	row:SetScript('OnLeave', function() hover:Hide() end)
+	row:SetScript('OnClick', function(self) if self.value then onSelect(self.value) end end)
 	function row:Bind(item, selected)
 		self.value = item and item.value
 		self:SetShown(item ~= nil)
@@ -780,11 +779,11 @@ local function MakeTexturePicker(frame, getValue, onSelect)
 			row:Bind(item, item ~= nil and item.value == current)
 		end
 	end
-	SetScript(list, 'OnMouseWheel', function(_, delta)
+	list:SetScript('OnMouseWheel', function(_, delta)
 		offset = math.max(0, math.min(MaxOffset(), offset - delta * TEXTURE_COLUMNS * TEXTURE_SCROLL_ROWS))
 		BindRows()
 	end)
-	SetScript(picker, 'OnClick', function()
+	picker:SetScript('OnClick', function()
 		if list:IsShown() then
 			list:Hide()
 			return
@@ -966,9 +965,9 @@ local function BuildTheme(frame)
 	end
 
 	for _, tile in ipairs(tiles) do
-		HookScript(tile, 'OnEnter', function(self) StylePreview(self.style.uf) end)
-		HookScript(tile, 'OnLeave', function() StylePreview(CurrentUnitFrames()) end)
-		SetScript(tile, 'OnClick', function(self)
+		tile:HookScript('OnEnter', function(self) StylePreview(self.style.uf) end)
+		tile:HookScript('OnLeave', function() StylePreview(CurrentUnitFrames()) end)
+		tile:SetScript('OnClick', function(self)
 			ApplyFrameStyle(self.style)
 			PaintStyles()
 			SyncSliders()
@@ -1020,7 +1019,7 @@ local function BuildTheme(frame)
 		swatch.mark:SetTexture(BUILib.GetLibMedia('check'))
 		swatch.mark:SetVertexColor(0, 0, 0, 0.85)
 		Widget.Tooltip(swatch, accent.class and 'Your class color, always' or accent.name)
-		SetScript(swatch, 'OnClick', function(self)
+		swatch:SetScript('OnClick', function(self)
 			ApplyAccentChoice(self.accent)
 			RefreshAddonAccent()
 			if wizard then wizard:ApplyAccent() end
@@ -1150,7 +1149,7 @@ local function BuildWizard(onClosed)
 	exitButton:SetSize(22, 22)
 	exitButton:SetPoint('TOPRIGHT', -12, -10)
 	Skin().TipClose(exitButton)
-	SetScript(exitButton, 'OnClick', function() wizardInstance:Exit() end)
+	exitButton:SetScript('OnClick', function() wizardInstance:Exit() end)
 	Widget.Tooltip(exitButton, 'Exit setup')
 	local headerLine = card:CreateTexture(nil, 'BORDER')
 	headerLine:SetPoint('TOPLEFT', 1, -42)
@@ -1166,7 +1165,7 @@ local function BuildWizard(onClosed)
 	end
 	wizardInstance.Close = Close
 
-	SetScript(overlay, 'OnKeyDown', function(self, key)
+	overlay:SetScript('OnKeyDown', function(self, key)
 		if key == 'ESCAPE' then
 			self:SetPropagateKeyboardInput(false)
 			Close()
@@ -1191,8 +1190,8 @@ local function BuildWizard(onClosed)
 			if stepFrame.ClosePopups then stepFrame.ClosePopups() end
 		end
 	end
-	SetScript(overlay, 'OnMouseDown', ClosePopups)
-	SetScript(card, 'OnMouseDown', ClosePopups)
+	overlay:SetScript('OnMouseDown', ClosePopups)
+	card:SetScript('OnMouseDown', ClosePopups)
 
 	local nextButton = MakeStepButton(card, 'Get Started', NEXT_MIN_WIDTH, function() wizardInstance:Next() end)
 	nextButton:SetPoint('BOTTOMRIGHT', -20, 16)
@@ -1281,7 +1280,7 @@ local function BuildWizard(onClosed)
 		BUI.Print('Setup closed. Run it anytime with |cff' .. BUI.C.COLOR_PINK .. '/bui install|r.')
 	end
 
-	HookScript(overlay, 'OnHide', function()
+	overlay:HookScript('OnHide', function()
 		if wizardInstance.suspended then return end
 		wizard = nil
 		if onClosed then onClosed() end

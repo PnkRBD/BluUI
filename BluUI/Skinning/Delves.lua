@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Delves')
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
@@ -95,7 +94,7 @@ local function SkinWindow(frame)
 	if rewards then
 		FadeRegions(rewards)
 		if rewards.ScrollBox then Skin.SweepScrollBox(rewards.ScrollBox, SkinReward) end
-		HookScript(frame, 'OnShow', FitCover)
+		frame:HookScript('OnShow', FitCover)
 		if not FitCover(frame) then C_Timer.After(0, function() FitCover(frame) end) end
 	end
 	Skin.TipFaceTree(frame, FONT_DEPTH)

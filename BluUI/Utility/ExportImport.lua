@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Util.ExportImport')
 local LibSerialize = LibStub("LibSerialize")
 local LibDeflate = LibStub("LibDeflate")
 local DeepCopy = BUI.Tools.DeepCopy
@@ -174,33 +173,28 @@ end
 local function RefreshAllModules()
     local modules = BUI.GetDB().modules
     local function on(key) return modules[key] ~= false end
-    local Measure = BUI.Prof.Measure
 
     if on('unitFrames') and BUI.UnitFrames then
-        Measure('refresh#UnitFrames', function()
-            if BUI.UnitFrames.InvalidateFilterCache then BUI.UnitFrames.InvalidateFilterCache() end
-            if BUI.UnitFrames.InvalidateSettingsCache then BUI.UnitFrames.InvalidateSettingsCache() end
-            if BUI.UnitFrames.Refresh then BUI.UnitFrames:Refresh() end
-        end)
+        if BUI.UnitFrames.InvalidateFilterCache then BUI.UnitFrames.InvalidateFilterCache() end
+        if BUI.UnitFrames.InvalidateSettingsCache then BUI.UnitFrames.InvalidateSettingsCache() end
+        if BUI.UnitFrames.Refresh then BUI.UnitFrames:Refresh() end
     end
 
     if on('groupFrames') and BUI.GroupFrames and BUI.GroupFrames.OnProfileChanged then
-        Measure('refresh#GroupFrames', BUI.GroupFrames.OnProfileChanged)
+        BUI.GroupFrames.OnProfileChanged()
     end
 
     if on('actionBars') and BUI.ActionBars and BUI.ActionBars.OnProfileChanged then
-        Measure('refresh#ActionBars', BUI.ActionBars.OnProfileChanged)
+        BUI.ActionBars.OnProfileChanged()
     end
 
     if on('cdm') and BUI.CDM then
-        Measure('refresh#CDM', function()
-            if BUI.CDM.RefreshAll then BUI.CDM.RefreshAll(true) end
-            if BUI.CDM.RefreshAssistHighlight then BUI.CDM.RefreshAssistHighlight() end
-        end)
+        if BUI.CDM.RefreshAll then BUI.CDM.RefreshAll(true) end
+        if BUI.CDM.RefreshAssistHighlight then BUI.CDM.RefreshAssistHighlight() end
     end
 
     if on('castBars') and BUI.CastBar then
-        BUI.Prof.After('Util.ExportImport', 0.05, function()
+        C_Timer.After(0.05, function()
             for _, unit in ipairs({ "Player", "Target", "Focus", "Boss" }) do
                 local bar = BUI.CastBar[unit]
                 if bar and bar.Refresh then bar:Refresh() end
@@ -209,7 +203,6 @@ local function RefreshAllModules()
     end
 
     if BUI.Power then
-        Measure('refresh#Power', function()
         local powerOn = on('power')
         local powerDB = (BUI.Power.GetPrimaryDB and BUI.Power.GetPrimaryDB()) or BUI.GetDB().powerBar
         if BUI.Power.Primary and BUI.Power.Primary.Toggle then
@@ -228,73 +221,62 @@ local function RefreshAllModules()
         if powerOn and BUI.Power.Stack and BUI.Power.Stack.IsEnabled and BUI.Power.Stack.IsEnabled() and BUI.Power.Stack.Apply then
             BUI.Power.Stack.Apply()
         end
-        end)
     end
 
-    Measure('refresh#StreamerTools', function()
-        local streamerToolsOn = on('streamerTools')
-        local gcdDB = BUI.GetDB().gcdHistory
-        if BUI.GCDHistory then BUI.GCDHistory.Toggle(streamerToolsOn and gcdDB and gcdDB.enabled and true or false) end
-    end)
+    local streamerToolsOn = on('streamerTools')
+    local gcdDB = BUI.GetDB().gcdHistory
+    if BUI.GCDHistory then BUI.GCDHistory.Toggle(streamerToolsOn and gcdDB and gcdDB.enabled and true or false) end
 
-    Measure('refresh#Auras', function()
-        local aurasOn = on('auras')
-        if aurasOn and BUI.Auras then
-            BUI.Auras.Update()
-            if BUI.Auras.UpdateLowHp then BUI.Auras.UpdateLowHp() end
-            if BUI.Auras.UpdateMark then BUI.Auras.UpdateMark() end
-            if BUI.Crosshair then BUI.Crosshair.Refresh() end
-            if BUI.Auras.GatewayAlert then BUI.Auras.GatewayAlert.Refresh() end
+    local aurasOn = on('auras')
+    if aurasOn and BUI.Auras then
+        BUI.Auras.Update()
+        if BUI.Auras.UpdateLowHp then BUI.Auras.UpdateLowHp() end
+        if BUI.Auras.UpdateMark then BUI.Auras.UpdateMark() end
+        if BUI.Crosshair then BUI.Crosshair.Refresh() end
+        if BUI.Auras.GatewayAlert then BUI.Auras.GatewayAlert.Refresh() end
+    end
+
+    local combatMessageDB = BUI.GetDB().combatMessage
+    if BUI.CombatMessage then
+        if aurasOn and combatMessageDB and combatMessageDB.enabled then
+            if BUI.CombatMessage.Enable then BUI.CombatMessage.Enable() end
+        elseif BUI.CombatMessage.Disable then
+            BUI.CombatMessage.Disable()
         end
+        if aurasOn and BUI.CombatMessage.Refresh then BUI.CombatMessage.Refresh() end
+    end
 
-        local combatMessageDB = BUI.GetDB().combatMessage
-        if BUI.CombatMessage then
-            if aurasOn and combatMessageDB and combatMessageDB.enabled then
-                if BUI.CombatMessage.Enable then BUI.CombatMessage.Enable() end
-            elseif BUI.CombatMessage.Disable then
-                BUI.CombatMessage.Disable()
-            end
-            if aurasOn and BUI.CombatMessage.Refresh then BUI.CombatMessage.Refresh() end
-        end
-
-        local combatTimerDB = BUI.GetDB().combatTimer
-        if BUI.CombatTimer then BUI.CombatTimer.Toggle(aurasOn and combatTimerDB and combatTimerDB.enabled and true or false) end
-    end)
+    local combatTimerDB = BUI.GetDB().combatTimer
+    if BUI.CombatTimer then BUI.CombatTimer.Toggle(aurasOn and combatTimerDB and combatTimerDB.enabled and true or false) end
 
     if on('datatext') and BUI.Datatext then
-        Measure('refresh#Datatext', function()
-            if BUI.Datatext.Initialize then BUI.Datatext.Initialize() end
-            if BUI.Datatext.Apply then BUI.Datatext.Apply() end
-        end)
+        if BUI.Datatext.Initialize then BUI.Datatext.Initialize() end
+        if BUI.Datatext.Apply then BUI.Datatext.Apply() end
     end
 
-    if on('cursor') and BUI.MouseCursor and BUI.MouseCursor.Initialize then Measure('refresh#Cursor', BUI.MouseCursor.Initialize) end
-    if on('minimap') and BUI.Minimap and BUI.Minimap.Initialize then Measure('refresh#Minimap', BUI.Minimap.Initialize) end
+    if on('cursor') and BUI.MouseCursor and BUI.MouseCursor.Initialize then BUI.MouseCursor.Initialize() end
+    if on('minimap') and BUI.Minimap and BUI.Minimap.Initialize then BUI.Minimap.Initialize() end
 
     if on('customBars') and BUI.CustomBars then
-        Measure('refresh#CustomBars', function()
-            if BUI.CustomBars.Initialize then BUI.CustomBars.Initialize() end
-            if BUI.CustomBars.RefreshAllBars then BUI.CustomBars.RefreshAllBars() end
-        end)
+        if BUI.CustomBars.Initialize then BUI.CustomBars.Initialize() end
+        if BUI.CustomBars.RefreshAllBars then BUI.CustomBars.RefreshAllBars() end
     end
 
     if on('buffTracking') and BUI.BuffTracking and BUI.BuffTracking.Display then
-        Measure('refresh#BuffTracking', function()
-            for _, tracker in pairs(BUI.BuffTracking.Display.GetTrackers()) do
-                if tracker.Refresh then tracker.Refresh() end
-                if tracker.RecheckActive then tracker.RecheckActive() end
-            end
-        end)
+        for _, tracker in pairs(BUI.BuffTracking.Display.GetTrackers()) do
+            if tracker.Refresh then tracker.Refresh() end
+            if tracker.RecheckActive then tracker.RecheckActive() end
+        end
     end
 
-    if BUI.Skinning.RefreshAll then Measure('refresh#Skinning', BUI.Skinning.RefreshAll) end
-    if BUI.MoveFrames and BUI.MoveFrames.Refresh then Measure('refresh#MoveFrames', BUI.MoveFrames.Refresh) end
+    if BUI.Skinning.RefreshAll then BUI.Skinning.RefreshAll() end
+    if BUI.MoveFrames and BUI.MoveFrames.Refresh then BUI.MoveFrames.Refresh() end
 
-    Measure('refresh#ApplyScale', BUI.ApplyScale)
-    Measure('refresh#SyncButtons', BUI.Scale.SyncButtons)
-    Measure('refresh#RebuildAllPages', BUI.PageEngine.RebuildAllPages)
+    BUI.ApplyScale()
+    BUI.Scale.SyncButtons()
+    BUI.PageEngine.RebuildAllPages()
 
-    if on('cdm') and BUI.CDM and BUI.CDM.ApplyAllPositions then Measure('refresh#CDMPositions', BUI.CDM.ApplyAllPositions) end
+    if on('cdm') and BUI.CDM and BUI.CDM.ApplyAllPositions then BUI.CDM.ApplyAllPositions() end
 end
 
 local function HasStringKeys(candidate)
@@ -561,7 +543,7 @@ function BUIG:Import(importString)
             }
         })
         if modalOverlay then
-            HookScript(modalOverlay, "OnHide", function() importPending = false end)
+            modalOverlay:HookScript("OnHide", function() importPending = false end)
         end
         return "pending", profileKey
     end

@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Util.AuraContainerEngine')
 
 local Pixel = BUI.Pixel
 local AR    = BUI.AuraRules
@@ -387,7 +386,7 @@ local function MakeInitializer(container, groupInfo)
 		local capturable = not container._buiNoCapture
 		if capturable then
 			captureButtons[button] = container
-			HookScript(button, 'OnMouseDown', OnButtonMouseDown)
+			button:HookScript('OnMouseDown', OnButtonMouseDown)
 		end
 		if button.SetMouseClickEnabled then
 			button:SetMouseClickEnabled(capturable and captureArmed or false)
@@ -526,7 +525,7 @@ local function EnsureRuleGroups(container, style, rules, baseFilter, candidates,
 			local groupInfo = { key = key, active = true }
 			local groupOptions = {
 				maxFrameCount = style.max,
-				initializeFrame = BUI.Prof.Wrap('aura#initializeFrame', MakeInitializer(container, groupInfo)),
+				initializeFrame = MakeInitializer(container, groupInfo),
 				candidateFilters = spec.cand,
 				layout = layout,
 			}

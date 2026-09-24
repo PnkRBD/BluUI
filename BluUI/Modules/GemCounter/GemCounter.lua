@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('GemCounter.GemCounter')
 local PoolGet, PoolHideFrom = BUI.Tools.PoolGet, BUI.Tools.PoolHideFrom
 local Pixel = BUI.Pixel
 
@@ -228,7 +227,7 @@ local function StartGemDrag(itemID, icon)
 	dragGemID = itemID
 	selectedBagGemID = itemID
 	ghost:Show()
-	SetScript(ghost, 'OnUpdate', function(self)
+	ghost:SetScript('OnUpdate', function(self)
 		local cursorX, cursorY = GetCursorPosition()
 		local scale = UIParent:GetEffectiveScale()
 		self:ClearAllPoints()
@@ -240,7 +239,7 @@ local function StopGemDrag()
 	if not dragGemID then return end
 	if dragGhost then
 		dragGhost:Hide()
-		SetScript(dragGhost, 'OnUpdate', nil)
+		dragGhost:SetScript('OnUpdate', nil)
 	end
 
 	for _, socketRow in ipairs(allSocketRows) do
@@ -435,7 +434,7 @@ local function OnSocketInfoUpdate()
 	if not applying or not applyQueue[applyIndex] or applyReady then return end
 	applyReady = true
 	local group = applyQueue[applyIndex]
-	BUI.Prof.After('GemCounter.GemCounter', 0.1, function()
+	C_Timer.After(0.1, function()
 		local numSockets = GetOpenSocketCount()
 		local clicked = false
 		for _, gem in ipairs(group.gems) do
@@ -446,9 +445,9 @@ local function OnSocketInfoUpdate()
 			end
 		end
 		if clicked then
-			BUI.Prof.After('GemCounter.GemCounter', 0.2, function()
+			C_Timer.After(0.2, function()
 				C_ItemSocketInfo.AcceptSockets()
-				BUI.Prof.After('GemCounter.GemCounter', 0.2, CloseSocketInfo)
+				C_Timer.After(0.2, CloseSocketInfo)
 			end)
 		else
 			CloseSocketInfo()
@@ -458,7 +457,7 @@ end
 
 local function OnSocketInfoClose()
 	if not applying then return end
-	BUI.Prof.After('GemCounter.GemCounter', 0.3, ProcessNextItem)
+	C_Timer.After(0.3, ProcessNextItem)
 end
 
 ProcessNextItem = function()
@@ -468,7 +467,7 @@ ProcessNextItem = function()
 		applyReady = false
 		wipe(applyQueue)
 		ClearAllPending()
-		BUI.Prof.After('GemCounter.GemCounter', 0.5, RefreshContent)
+		C_Timer.After(0.5, RefreshContent)
 		return
 	end
 	applyReady = false
@@ -516,7 +515,7 @@ local function CreateItemHeader(parent)
 	slotLabel:SetTextColor(0.5, 0.5, 0.5)
 	row.slotText = slotLabel
 
-	SetScript(row, 'OnEnter', function(self)
+	row:SetScript('OnEnter', function(self)
 		self:SetBackdropBorderColor(Colors.GetAccent())
 		if self._slotID then
 			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
@@ -524,7 +523,7 @@ local function CreateItemHeader(parent)
 			GameTooltip:Show()
 		end
 	end)
-	SetScript(row, 'OnLeave', function(self)
+	row:SetScript('OnLeave', function(self)
 		self:SetBackdropBorderColor(0.15, 0.15, 0.15, 1)
 		GameTooltip:Hide()
 	end)
@@ -552,7 +551,7 @@ local function CreateSocketRow(parent)
 	nameLabel:SetWordWrap(false)
 	row.nameText = nameLabel
 
-	SetScript(row, 'OnEnter', function(self)
+	row:SetScript('OnEnter', function(self)
 		self:SetBackdropBorderColor(0.3, 0.3, 0.3, 0.6)
 		if self._gemItemID then
 			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
@@ -560,7 +559,7 @@ local function CreateSocketRow(parent)
 			GameTooltip:Show()
 		end
 	end)
-	SetScript(row, 'OnLeave', function(self)
+	row:SetScript('OnLeave', function(self)
 		if self._pendingKey and pendingByKey[self._pendingKey] then
 			self:SetBackdropBorderColor(0.2, 0.7, 0.2, 0.5)
 		else
@@ -569,7 +568,7 @@ local function CreateSocketRow(parent)
 		GameTooltip:Hide()
 	end)
 
-	SetScript(row, 'OnClick', function(self)
+	row:SetScript('OnClick', function(self)
 		if not self._slotID or not self._socketIdx then return end
 
 		if pendingByKey[PendingKey(self._slotID, self._socketIdx)] then
@@ -618,7 +617,7 @@ local function CreateGemRow(parent)
 
 	nameLabel:SetPoint('RIGHT', countText, 'LEFT', Pixel.Scale(-4), 0)
 
-	SetScript(row, 'OnEnter', function(self)
+	row:SetScript('OnEnter', function(self)
 		if self._itemID ~= selectedBagGemID then
 			self:SetBackdropBorderColor(Colors.GetAccent())
 		end
@@ -628,7 +627,7 @@ local function CreateGemRow(parent)
 			GameTooltip:Show()
 		end
 	end)
-	SetScript(row, 'OnLeave', function(self)
+	row:SetScript('OnLeave', function(self)
 		if self._itemID == selectedBagGemID then
 			self:SetBackdropBorderColor(Colors.GetAccent())
 		else
@@ -636,7 +635,7 @@ local function CreateGemRow(parent)
 		end
 		GameTooltip:Hide()
 	end)
-	SetScript(row, 'OnClick', function(self)
+	row:SetScript('OnClick', function(self)
 		if not self._itemID or GemAvailable(self._itemID) <= 0 then return end
 		if selectedBagGemID == self._itemID then
 			selectedBagGemID = nil
@@ -647,11 +646,11 @@ local function CreateGemRow(parent)
 	end)
 
 	row:RegisterForDrag('LeftButton')
-	SetScript(row, 'OnDragStart', function(self)
+	row:SetScript('OnDragStart', function(self)
 		if not self._itemID or GemAvailable(self._itemID) <= 0 then return end
 		StartGemDrag(self._itemID, self.icon:GetTexture())
 	end)
-	SetScript(row, 'OnDragStop', StopGemDrag)
+	row:SetScript('OnDragStop', StopGemDrag)
 	return row
 end
 
@@ -672,12 +671,12 @@ local function CreateGemIcon(parent)
 	frame.count = countText
 
 	frame:EnableMouse(true)
-	SetScript(frame, 'OnEnter', function(self)
+	frame:SetScript('OnEnter', function(self)
 		if self._gemName then
 			Widget.ShowTip(self, self._gemName .. '  |  Socketed: ' .. (self._count or 1))
 		end
 	end)
-	SetScript(frame, 'OnLeave', function() Widget.HideTip() end)
+	frame:SetScript('OnLeave', function() Widget.HideTip() end)
 	return frame
 end
 
@@ -1031,7 +1030,7 @@ RefreshContent = function()
 	RefreshInventory()
 end
 
-local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3, 'GemCounter.Refresh')
+local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3)
 
 local slide = BUI.SlidePanel.New({
 	skin = 'gemcounter',
@@ -1103,17 +1102,17 @@ local function BuildFallbackButton()
 	iconTexture:SnapPoint('TOPLEFT', 3, -3)
 	iconTexture:SnapPoint('BOTTOMRIGHT', -3, 3)
 
-	SetScript(fallbackButton, 'OnEnter', function(self)
+	fallbackButton:SetScript('OnEnter', function(self)
 		self:SetBackdropBorderColor(Colors.GetAccent())
 		GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 		GameTooltip:SetText('Gem Manager', 1, 1, 1)
 		GameTooltip:Show()
 	end)
-	SetScript(fallbackButton, 'OnLeave', function(self)
+	fallbackButton:SetScript('OnLeave', function(self)
 		self:SetBackdropBorderColor(0.2, 0.2, 0.22, 1)
 		GameTooltip:Hide()
 	end)
-	SetScript(fallbackButton, 'OnClick', BUI.GemCounter.Toggle)
+	fallbackButton:SetScript('OnClick', BUI.GemCounter.Toggle)
 end
 
 local function OnGemEvent(event)
@@ -1130,7 +1129,7 @@ end
 BUI.Events:OnLogin('GemCounter', function()
 	isInitialized = true
 	if CharacterFrame then
-		HookScript(CharacterFrame, 'OnHide', OnCharacterHide)
+		CharacterFrame:HookScript('OnHide', OnCharacterHide)
 		BuildFallbackButton()
 		UpdateFallbackButton()
 	end

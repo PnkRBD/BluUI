@@ -1,7 +1,6 @@
 local _, BUI = ...
 
 local Skin = BUI.Skinning
-local hooksecurefunc = BUI.Prof.MakeHooker('alertframes')
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Layout = BUILib.Layout
 

@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('Cursor.Cursor')
 
 local Events = BUI.Events
 local Tools  = BUI.Tools
@@ -55,7 +54,7 @@ local function CreateSlot(parent)
     slot.cd:SetDrawEdge(false)
     slot.cd:SetDrawBling(false)
     slot.cd:SetHideCountdownNumbers(true)
-    SetScript(slot.cd, 'OnCooldownDone', function() slot.cd:Hide() end)
+    slot.cd:SetScript('OnCooldownDone', function() slot.cd:Hide() end)
     slot.cd:Hide()
 
     return slot
@@ -225,7 +224,7 @@ local function WireCursor()
     enabled = true
     SyncMenuHiding()
     lastX, lastY = nil, nil
-    SetScript(cursorFrame, 'OnUpdate', FollowCursor)
+    cursorFrame:SetScript('OnUpdate', FollowCursor)
     for _, name in ipairs(SLOT_NAMES) do ApplySlot(name) end
     Events:Register('GLOBAL_MOUSE_DOWN', 'Cursor:Down', OnMouseDown)
     Events:Register('GLOBAL_MOUSE_UP',   'Cursor:Up',   OnMouseUp)
@@ -237,7 +236,7 @@ end
 local function UnwireCursor()
     enabled  = false
     clicking = false
-    SetScript(cursorFrame, 'OnUpdate', nil)
+    cursorFrame:SetScript('OnUpdate', nil)
     for _, name in ipairs(SLOT_NAMES) do
         local slot = slots[name]
         slot.tex:Hide(); slot.cd:Hide()
@@ -261,8 +260,8 @@ local function Build()
         slots[name] = CreateSlot(cursorFrame)
     end
 
-    SetScript(cursorFrame, 'OnShow', WireCursor)
-    SetScript(cursorFrame, 'OnHide', UnwireCursor)
+    cursorFrame:SetScript('OnShow', WireCursor)
+    cursorFrame:SetScript('OnHide', UnwireCursor)
 end
 
 local function ShowCursor()

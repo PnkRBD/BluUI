@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('GroupFinder')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('groupfinder')
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -744,7 +742,7 @@ local function SkinChallenges()
 	challengesHooked = true
 	if frame.Update then hooksecurefunc(frame, 'Update', OnChallengesUpdated) end
 	if keystone then
-		HookScript(keystone, 'OnShow', SkinKeystoneFrame)
+		keystone:HookScript('OnShow', SkinKeystoneFrame)
 		if keystone.Reset then hooksecurefunc(keystone, 'Reset', RefadeKeystoneArt) end
 	end
 end
@@ -822,7 +820,7 @@ local function Install()
 	local frame = _G.PVEFrame
 	if not frame then return end
 	installed = true
-	HookScript(frame, 'OnShow', Apply)
+	frame:HookScript('OnShow', Apply)
 	HookRows()
 	BUI.Events:Register('ADDON_LOADED', 'Skin.GroupFinder', OnAddonLoaded)
 	if frame:IsShown() then Apply() end

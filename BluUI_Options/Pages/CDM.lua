@@ -1,5 +1,4 @@
 local BUI = BluUI
-local SetScript, HookScript = BUI.Prof.Scripts('Pages.CDM')
 
 local BUILib = BluUI.BUILibClient
 local Controls, Layout, Modals = BUILib.Controls, BUILib.Layout, BUILib.Modals
@@ -302,7 +301,7 @@ local function CreateViewerMock(stage, withKeybinds)
         ghostFrame:SetSize(draggedCell.frame:GetWidth() * scale, draggedCell.frame:GetHeight() * scale)
         ghostFrame.tex:SetTexture(entry.tex)
         ghostFrame:Show()
-        SetScript(ghostFrame, 'OnUpdate', function(self, elapsed)
+        ghostFrame:SetScript('OnUpdate', function(self, elapsed)
             local cursorX, cursorY = GetCursorPosition()
             local uiScale = UIParent:GetEffectiveScale()
             self:ClearAllPoints()
@@ -330,7 +329,7 @@ local function CreateViewerMock(stage, withKeybinds)
     end
 
     local function EndDrag(draggedCell)
-        if ghost then ghost:Hide(); SetScript(ghost, 'OnUpdate', nil) end
+        if ghost then ghost:Hide(); ghost:SetScript('OnUpdate', nil) end
         draggedCell.frame:SetAlpha(1)
         local state = dragState
         dragState = nil
@@ -371,17 +370,17 @@ local function CreateViewerMock(stage, withKeybinds)
             cell.cd = cellButton:CreateFontString(nil, 'OVERLAY')
             cell.stack = cellButton:CreateFontString(nil, 'OVERLAY')
             cell.kb = cellButton:CreateFontString(nil, 'OVERLAY')
-            SetScript(cellButton, 'OnClick', function() ShowCellMenu(cell) end)
-            SetScript(cellButton, 'OnDragStart', function() BeginDrag(cell) end)
-            SetScript(cellButton, 'OnDragStop', function() EndDrag(cell) end)
-            SetScript(cellButton, 'OnEnter', function(self)
+            cellButton:SetScript('OnClick', function() ShowCellMenu(cell) end)
+            cellButton:SetScript('OnDragStart', function() BeginDrag(cell) end)
+            cellButton:SetScript('OnDragStop', function() EndDrag(cell) end)
+            cellButton:SetScript('OnEnter', function(self)
                 local entry = cell._entry
                 if not (entry and entry.key) then return end
                 local name = CellDisplayName(cell)
                 BUILib.Widget.ShowTip(self, (name ~= '' and name or 'Icon')
                     .. '|n|cff888888Ctrl+drag to reorder - click for options|r')
             end)
-            SetScript(cellButton, 'OnLeave', function() BUILib.Widget.HideTip() end)
+            cellButton:SetScript('OnLeave', function() BUILib.Widget.HideTip() end)
             cells[cellIndex] = cell
         end
         return cells[cellIndex]
@@ -594,7 +593,7 @@ local function CreateBuffBarMock(stage)
             bar.dur = holder:CreateFontString(nil, 'OVERLAY')
             bar.hit = CreateFrame('Button', nil, holder)
             bar.hit:RegisterForClicks('LeftButtonUp', 'RightButtonUp')
-            SetScript(bar.hit, 'OnClick', function(self)
+            bar.hit:SetScript('OnClick', function(self)
                 if not self._spellID then return end
                 local items = { { title = true, text = self._name or 'Buff Bar' } }
                 local procConfig = BUI.CDM.GetProcConfig(self._spellID)
@@ -612,11 +611,11 @@ local function CreateBuffBarMock(stage)
                 end }
                 Controls.ContextMenu(items, { width = 230 })
             end)
-            SetScript(bar.hit, 'OnEnter', function(self)
+            bar.hit:SetScript('OnEnter', function(self)
                 if not self._spellID then return end
                 BUILib.Widget.ShowTip(self, (self._name or 'Buff Bar') .. '|n|cff888888Click for options|r')
             end)
-            SetScript(bar.hit, 'OnLeave', function() BUILib.Widget.HideTip() end)
+            bar.hit:SetScript('OnLeave', function() BUILib.Widget.HideTip() end)
             barsPool[barIndex] = bar
         end
         return barsPool[barIndex]
@@ -1758,8 +1757,8 @@ local function BuildLayoutsTab(tab, CDM)
             })
             local deleteFrame = BUILib.Widget.Unwrap(deleteButton)
             deleteFrame.icon:SetVertexColor(0.55, 0.5, 0.52, 1)
-            HookScript(deleteFrame, 'OnEnter', function() deleteFrame.icon:SetVertexColor(1, 0.35, 0.35, 1) end)
-            HookScript(deleteFrame, 'OnLeave', function() deleteFrame.icon:SetVertexColor(0.55, 0.5, 0.52, 1) end)
+            deleteFrame:HookScript('OnEnter', function() deleteFrame.icon:SetVertexColor(1, 0.35, 0.35, 1) end)
+            deleteFrame:HookScript('OnLeave', function() deleteFrame.icon:SetVertexColor(0.55, 0.5, 0.52, 1) end)
             return { deleteButton, applyButton, snapshotDropdown }
         end,
     })
@@ -1845,7 +1844,7 @@ local function BuildLayoutsTab(tab, CDM)
         { text = "Clear", width = 60, callback = function() shareBox.editbox:SetText("") end },
     })
 
-    HookScript(tab.frame, "OnShow", RefreshLists)
+    tab.frame:HookScript("OnShow", RefreshLists)
     RefreshLists()
 end
 
@@ -1942,7 +1941,7 @@ BUI.PageEngine.RegisterPage("cdm", {
             local mock = CreateViewerMock(header.stage, viewerDef.keybinds)
             header.Update = function() mock:Render(viewerDef.key) end
             local viewerTab = page:GetTab(viewerDef.index)
-            HookScript(viewerTab.frame, 'OnShow', function()
+            viewerTab.frame:HookScript('OnShow', function()
                 header.titleBar.enableToggle:SetValue(db.cdm[viewerDef.key].enabled)
                 if viewerDef.key == 'buffs' then
                     header.titleBar.anchorToggle:SetValue(CDM.state.buffsPreview and CDM.state.buffsPreview:IsShown() or false)
@@ -1979,7 +1978,7 @@ BUI.PageEngine.RegisterPage("cdm", {
             local mock = CreateBuffBarMock(header.stage)
             header.Update = function() mock:Render() end
             local buffBarsTab = page:GetTab(5)
-            HookScript(buffBarsTab.frame, 'OnShow', function()
+            buffBarsTab.frame:HookScript('OnShow', function()
                 header.titleBar.enableToggle:SetValue(db.cdm.buffBars.skinEnabled)
                 header.titleBar.anchorToggle:SetValue(BarEye())
                 header.Update()
@@ -2034,15 +2033,15 @@ end
 
 BUI.Events:Register("PLAYER_SPECIALIZATION_CHANGED", "CDMPage", function(_, unit)
     if unit ~= "player" then return end
-    BUI.Prof.After('Pages.CDM', 0.3, RefreshCDMPageIfOpen)
+    C_Timer.After(0.3, RefreshCDMPageIfOpen)
 end)
 
 BUI.Events:Register("TRAIT_CONFIG_UPDATED", "CDMPage", function()
-    BUI.Prof.After('Pages.CDM', 0.3, RefreshCDMPageIfOpen)
+    C_Timer.After(0.3, RefreshCDMPageIfOpen)
 end)
 
 BUI.Events:Register("COOLDOWN_VIEWER_DATA_LOADED", "CDMPage", function()
-    BUI.Prof.After('Pages.CDM', 0.3, RefreshCDMPageIfOpen)
+    C_Timer.After(0.3, RefreshCDMPageIfOpen)
 end)
 
 BUI.Events:Register("EDIT_MODE_LAYOUTS_UPDATED", "CDMPage", function()

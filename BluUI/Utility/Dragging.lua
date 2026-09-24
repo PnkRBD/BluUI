@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('Util.Dragging')
 BUI.Dragging = {}
 local Dragging = BUI.Dragging
 local Pixel = BUI.Pixel
@@ -65,7 +64,7 @@ local function OnDragStart(self)
     self:StartMoving()
     self:SetUserPlaced(false)
     if self.dragLockHorizontal or self.dragOnDragging then
-        SetScript(self, "OnUpdate", OnDragUpdate)
+        self:SetScript("OnUpdate", OnDragUpdate)
     end
 end
 
@@ -73,7 +72,7 @@ local function OnDragStop(self)
     if not self.dragActive then return end
     self:StopMovingOrSizing()
     self.dragActive = false
-    SetScript(self, "OnUpdate", nil)
+    self:SetScript("OnUpdate", nil)
 
     local Scale = BUI.Pixel.Scale
     local offsetX, offsetY = Dragging.GetCenterOffset(self)
@@ -158,7 +157,7 @@ local function CreateHintUI(parent, options)
     label:SetText(options.hintText or HintText)
     hint.text = label
 
-    BUI.Prof.After('Util.Dragging', 0, function()
+    C_Timer.After(0, function()
         if hint:IsShown() then hint:SnapSize(label:GetStringWidth() + 16, 20) end
     end)
     hint:SnapSize(120, 20)
@@ -206,9 +205,9 @@ function Dragging.MakeDraggable(frame, options)
 
     if options.showHint then frame.dragHint = CreateHintUI(frame, options) end
 
-    SetScript(frame, "OnDragStart", OnDragStart)
-    SetScript(frame, "OnDragStop", OnDragStop)
-    SetScript(frame, "OnMouseUp", OnMouseUp)
+    frame:SetScript("OnDragStart", OnDragStart)
+    frame:SetScript("OnDragStop", OnDragStop)
+    frame:SetScript("OnMouseUp", OnMouseUp)
     UpdateDragVisuals(frame)
 
     function frame:RefreshDragState()
@@ -250,25 +249,25 @@ function Dragging.EnableAnchorDrag(frame, options)
     frame:SetMovable(true)
     frame:RegisterForDrag("LeftButton")
 
-    SetScript(frame, "OnDragStart", function(self)
+    frame:SetScript("OnDragStart", function(self)
         self:StartMoving()
         self:SetUserPlaced(false)
         if options.isCentered and options.isCentered() then
             self._centerDrag = true
-            SetScript(self, "OnUpdate", CenterDragOnUpdate)
+            self:SetScript("OnUpdate", CenterDragOnUpdate)
         end
     end)
 
-    SetScript(frame, "OnDragStop", function(self)
+    frame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
         if self._centerDrag then
-            SetScript(self, "OnUpdate", nil)
+            self:SetScript("OnUpdate", nil)
             self._centerDrag = nil
         end
         if options.onSave then options.onSave() end
     end)
 
-    SetScript(frame, "OnMouseDown", function(_, button)
+    frame:SetScript("OnMouseDown", function(_, button)
         if button == "RightButton" and options.onRightClick then
             options.onRightClick()
         end
@@ -277,13 +276,13 @@ end
 
 function Dragging.DisableAnchorDrag(frame)
     if frame._centerDrag then
-        SetScript(frame, "OnUpdate", nil)
+        frame:SetScript("OnUpdate", nil)
         frame._centerDrag = nil
     end
     frame:EnableMouse(false)
     frame:SetMovable(false)
     frame:RegisterForDrag()
-    SetScript(frame, "OnDragStart", nil)
-    SetScript(frame, "OnDragStop", nil)
-    SetScript(frame, "OnMouseDown", nil)
+    frame:SetScript("OnDragStart", nil)
+    frame:SetScript("OnDragStop", nil)
+    frame:SetScript("OnMouseDown", nil)
 end

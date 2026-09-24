@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('Util.ImportChooser')
 local BUILib = BluUI.BUILibClient
 local Pixel = BUI.Pixel
 local Controls = BUILib.Controls
@@ -279,9 +278,9 @@ local function ShowChooser(importData, currentDB, onConfirm, onCancel)
 		label:SetPoint('LEFT')
 		button:SetWidth(label:GetStringWidth() + 4)
 		button:SetPoint('LEFT', selectionRow, 'LEFT', xOffset, 0)
-		SetScript(button, 'OnEnter', function() label:SetTextColor(1, 1, 1, 1) end)
-		SetScript(button, 'OnLeave', function() label:SetTextColor(accentRed, accentGreen, accentBlue, 1) end)
-		SetScript(button, 'OnClick', onClick)
+		button:SetScript('OnEnter', function() label:SetTextColor(1, 1, 1, 1) end)
+		button:SetScript('OnLeave', function() label:SetTextColor(accentRed, accentGreen, accentBlue, 1) end)
+		button:SetScript('OnClick', onClick)
 		return button
 	end
 
@@ -327,7 +326,7 @@ local function ShowChooser(importData, currentDB, onConfirm, onCancel)
 				badge:SetTextColor(1, 0.8, 0.2, 1)
 
 				if changedKeys and #changedKeys > 0 then
-					SetScript(frame, 'OnEnter', function(self)
+					frame:SetScript('OnEnter', function(self)
 						GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
 						GameTooltip:AddLine(section.name .. ' changes', 1, 0.8, 0.2)
 						for _, changedKey in ipairs(changedKeys) do
@@ -335,7 +334,7 @@ local function ShowChooser(importData, currentDB, onConfirm, onCancel)
 						end
 						GameTooltip:Show()
 					end)
-					SetScript(frame, 'OnLeave', GameTooltip_Hide)
+					frame:SetScript('OnLeave', GameTooltip_Hide)
 				end
 			else
 				local badge = frame:CreateFontString(nil, 'OVERLAY')

@@ -1,6 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('ChatConfig')
-local hooksecurefunc = BUI.Prof.MakeHooker('ChatConfig')
 
 local Skin = BUI.Skinning
 
@@ -160,8 +158,8 @@ local function Swatch(swatch)
 	fill:ClearAllPoints()
 	fill:SetPoint('TOPLEFT', swatch, 'TOPLEFT', SWATCH_INSET, -SWATCH_INSET)
 	fill:SetPoint('BOTTOMRIGHT', swatch, 'BOTTOMRIGHT', -SWATCH_INSET, SWATCH_INSET)
-	HookScript(swatch, 'OnEnter', SwatchEnter)
-	HookScript(swatch, 'OnLeave', SwatchLeave)
+	swatch:HookScript('OnEnter', SwatchEnter)
+	swatch:HookScript('OnLeave', SwatchLeave)
 end
 
 local function CheckRow(row)
@@ -390,7 +388,7 @@ local function SweepAll()
 		if frame then
 			if not frame._buiChatShowHook then
 				frame._buiChatShowHook = true
-				HookScript(frame, 'OnShow', SkinWindow)
+				frame:HookScript('OnShow', SkinWindow)
 			end
 			if frame:IsShown() then SkinWindow(frame) end
 		end

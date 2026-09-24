@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Transmog')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('transmog')
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
@@ -130,7 +128,7 @@ local function Install()
 	local frame = _G.TransmogFrame
 	if not frame then return end
 	installed = true
-	HookScript(frame, 'OnShow', Apply)
+	frame:HookScript('OnShow', Apply)
 	if frame:IsShown() then Apply() end
 end
 

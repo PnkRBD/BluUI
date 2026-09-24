@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('UnitFrames.Core')
 
 local Pixel = BUI.Pixel
 local sharedMedia = LibStub('LibSharedMedia-3.0')
@@ -15,22 +14,6 @@ local UnitReaction = UnitReaction
 local SetColorTex = BUI.Tools.SetColorTex
 local UnitFrames = {}
 BUI.UnitFrames = UnitFrames
-
-local debugprofilestop = debugprofilestop
-
-BUI.oUF:RegisterInitCallback(function(object)
-	local originalOnEvent = object:GetScript('OnEvent')
-	if not originalOnEvent or object._buiProfWrapped then return end
-	object._buiProfWrapped = true
-	object:SetScript('OnEvent', function(self, event, ...)
-		local profiler = BUI.Prof
-		if not profiler.active then return originalOnEvent(self, event, ...) end
-		local startKB = collectgarbage('count')
-		local startTime = debugprofilestop()
-		originalOnEvent(self, event, ...)
-		profiler.Add('oUF@' .. tostring(self.unit) .. '#' .. event, debugprofilestop() - startTime, collectgarbage('count') - startKB)
-	end)
-end)
 
 UnitFrames.UNIT_CONFIG = {
 	player = {
@@ -1045,7 +1028,7 @@ do
 		end
 	end
 
-	local QueueCalloutReadiness = BUI.Dispatcher.NewDelayed(ApplyCalloutReadiness, 0.25, 'UF.CalloutReadiness')
+	local QueueCalloutReadiness = BUI.Dispatcher.NewDelayed(ApplyCalloutReadiness, 0.25)
 
 	local calloutEventsOn
 	local function StartCalloutEvents()
@@ -1180,7 +1163,7 @@ do
 	local flushPending = false
 	local flushFrame = CreateFrame('Frame')
 	flushFrame:Hide()
-	SetScript(flushFrame, 'OnUpdate', function(self)
+	flushFrame:SetScript('OnUpdate', function(self)
 		self:Hide()
 		flushPending = false
 		for unit in pairs(dirtyUnits) do

@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('CDM.Preview')
 
 local floor, max = math.floor, math.max
 
@@ -112,10 +111,10 @@ function CDM.ShowBuffsPreview(buffsSettings)
     previewFrame:RegisterForDrag("LeftButton")
     previewFrame:SetClampedToScreen(true)
 
-    SetScript(previewFrame, "OnDragStart", function(self)
+    previewFrame:SetScript("OnDragStart", function(self)
         if not self._anchorLocked then self:StartMoving() end
     end)
-    SetScript(previewFrame, "OnDragStop", function(self)
+    previewFrame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
         if self._anchorLocked then return end
         local centerX, centerY = self:GetCenter()
@@ -129,7 +128,7 @@ function CDM.ShowBuffsPreview(buffsSettings)
         CDM.RefreshAll()
     end)
 
-    SetScript(previewFrame, "OnMouseUp", function(self, mouseButton)
+    previewFrame:SetScript("OnMouseUp", function(self, mouseButton)
         if mouseButton == "RightButton" then
             self:Hide()
             if state.buffsPreviewButton then state.buffsPreviewButton:SetText("Show Preview") end

@@ -148,7 +148,7 @@ function CombatTimer.ApplySettings()
     local showMilliseconds = ShowMilliseconds()
     BUI.Scheduler.RegisterUpdate("CombatTimer", Tick, showMilliseconds and 0.05 or 0.1, inCombat)
 
-    BUI.Prof.After('Auras.CombatTimer', 0, function()
+    C_Timer.After(0, function()
         if not timerFrame or not timerText then return end
         currentLayoutKey = nil
         lastShownStep = -1

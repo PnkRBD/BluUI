@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Markers.Markers')
 
 local Pixel  = BUI.Pixel
 local Tools  = BUI.Tools
@@ -70,7 +69,7 @@ local function UpdateIndicators()
 end
 
 local function ScheduleIndicatorUpdate()
-    BUI.Prof.After('Markers.Markers', 0.2, UpdateIndicators)
+    C_Timer.After(0.2, UpdateIndicators)
 end
 
 local function UpdateUsability()
@@ -148,17 +147,17 @@ end
 local function QueueHoverCheck()
     if hoverPending or not built or not GetConfig().fadeEnabled then return end
     hoverPending = true
-    BUI.Prof.After('Markers.Fade', 0, EvaluateHover)
+    C_Timer.After(0, EvaluateHover)
 end
 
 local function EnsureHoverHooks()
     if hoverHooked or not built then return end
     hoverHooked = true
-    HookScript(bar, 'OnEnter', QueueHoverCheck)
-    HookScript(bar, 'OnLeave', QueueHoverCheck)
+    bar:HookScript('OnEnter', QueueHoverCheck)
+    bar:HookScript('OnLeave', QueueHoverCheck)
     for _, child in ipairs({ bar:GetChildren() }) do
-        HookScript(child, 'OnEnter', QueueHoverCheck)
-        HookScript(child, 'OnLeave', QueueHoverCheck)
+        child:HookScript('OnEnter', QueueHoverCheck)
+        child:HookScript('OnLeave', QueueHoverCheck)
     end
 end
 
@@ -238,14 +237,14 @@ local function Build()
         line:SetAlpha(0)
         button.worldLine = line
 
-        SetScript(button, 'OnEnter', function(self)
+        button:SetScript('OnEnter', function(self)
             ShowTip(self, _G['BINDING_NAME_RAIDTARGET' .. mark.raid],
                 'Click: mark target',
                 'Shift-Click: place world marker',
                 'Shift-Right-Click: clear world marker')
         end)
-        SetScript(button, 'OnLeave', HideTip)
-        SetScript(button, 'PostClick', ScheduleIndicatorUpdate)
+        button:SetScript('OnLeave', HideTip)
+        button:SetScript('PostClick', ScheduleIndicatorUpdate)
 
         markerButtons[markIndex] = button
     end
@@ -258,25 +257,25 @@ local function Build()
     clear:SetAttribute('macrotext1', '/tm 0')
     clear:SetAttribute('shift-type1', 'macro')
     clear:SetAttribute('shift-macrotext1', '/cwm all')
-    SetScript(clear, 'OnEnter', function(self)
+    clear:SetScript('OnEnter', function(self)
         ShowTip(self, 'Clear',
             'Click: remove mark from target',
             'Shift-Click: clear all world markers')
     end)
-    SetScript(clear, 'OnLeave', HideTip)
-    SetScript(clear, 'PostClick', ScheduleIndicatorUpdate)
+    clear:SetScript('OnLeave', HideTip)
+    clear:SetScript('PostClick', ScheduleIndicatorUpdate)
     controls.clear = clear
 
     local ready = CreateFrame('Button', 'BUI_MarkerReadyCheck', bar, 'BackdropTemplate')
     ready:RegisterForClicks('LeftButtonUp')
     DecorateButton(ready)
     Glyph(ready, 'check', READY_COLOR)
-    SetScript(ready, 'OnClick', function() DoReadyCheck() end)
-    SetScript(ready, 'OnEnter', function(self)
+    ready:SetScript('OnClick', function() DoReadyCheck() end)
+    ready:SetScript('OnEnter', function(self)
         ShowTip(self, READY_CHECK, 'Click: start a ready check',
             'Requires lead or assist')
     end)
-    SetScript(ready, 'OnLeave', HideTip)
+    ready:SetScript('OnLeave', HideTip)
     controls.ready = ready
 
     local timer = CreateFrame('Button', 'BUI_MarkerCountdown', bar, 'BackdropTemplate')
@@ -288,7 +287,7 @@ local function Build()
     timer.text:SetText('5')
     local accentRed, accentGreen, accentBlue = BUILib.Theme.GetAccent()
     timer.text:SetTextColor(accentRed, accentGreen, accentBlue, 1)
-    SetScript(timer, 'OnClick', function(_, mouseButton)
+    timer:SetScript('OnClick', function(_, mouseButton)
         local config = GetConfig()
         if IsShiftKeyDown() then
             C_PartyInfo.DoCountdown(0)
@@ -298,14 +297,14 @@ local function Build()
             C_PartyInfo.DoCountdown(config.countdownTime)
         end
     end)
-    SetScript(timer, 'OnEnter', function(self)
+    timer:SetScript('OnEnter', function(self)
         local config = GetConfig()
         ShowTip(self, 'Countdown',
             ('Click: %ds countdown'):format(config.countdownTime),
             ('Right-Click: %ds countdown'):format(config.countdownTime2),
             'Shift-Click: cancel countdown')
     end)
-    SetScript(timer, 'OnLeave', HideTip)
+    timer:SetScript('OnLeave', HideTip)
     controls.timer = timer
 
     BUI.Dragging.MakeDraggable(bar, {
@@ -328,8 +327,8 @@ local function Build()
     end
     local function ForwardDrag(button)
         button:RegisterForDrag('LeftButton')
-        SetScript(button, 'OnDragStart', OnButtonDragStart)
-        SetScript(button, 'OnDragStop', OnButtonDragStop)
+        button:SetScript('OnDragStart', OnButtonDragStart)
+        button:SetScript('OnDragStop', OnButtonDragStop)
     end
     for _, button in ipairs(markerButtons) do ForwardDrag(button) end
     for _, button in pairs(controls) do ForwardDrag(button) end

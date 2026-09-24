@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('ReputationManager.ReputationManager')
 local PoolGet, PoolHideFrom = BUI.Tools.PoolGet, BUI.Tools.PoolHideFrom
 local Pixel = BUI.Pixel
 
@@ -99,7 +98,7 @@ local function BuildJourneyPanel()
 
     journeyPanel.lines = {}
 
-    HookScript(journeyPanel, 'OnHide', function()
+    journeyPanel:HookScript('OnHide', function()
         BUI.Events:Unregister('GLOBAL_MOUSE_DOWN', 'RepManager.Journey')
     end)
 end
@@ -388,7 +387,7 @@ local function CreateRow(parent)
     bar:SetPoint('TOPLEFT', barBg, 'TOPLEFT', 0, 0)
     row.bar = bar
 
-    SetScript(row, 'OnEnter', function(self)
+    row:SetScript('OnEnter', function(self)
         self:SetBackdropBorderColor(Colors.GetAccent())
         GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
         GameTooltip:SetText(self._name, 1, 1, 1)
@@ -405,11 +404,11 @@ local function CreateRow(parent)
         GameTooltip:AddLine('|cff888888Right-click for options|r', 0.7, 0.7, 0.7)
         GameTooltip:Show()
     end)
-    SetScript(row, 'OnLeave', function(self)
+    row:SetScript('OnLeave', function(self)
         self:SetBackdropBorderColor(0.13, 0.13, 0.15, 1)
         GameTooltip:Hide()
     end)
-    SetScript(row, 'OnClick', function(self) ShowRowMenu(self) end)
+    row:SetScript('OnClick', function(self) ShowRowMenu(self) end)
     return row
 end
 
@@ -585,7 +584,7 @@ RefreshContent = function()
     panel.emptyText:SetText(searchText ~= '' and 'No matching factions.' or 'No factions tracked.')
 end
 
-local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3, 'ReputationManager.Refresh')
+local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3)
 
 slide = BUI.SlidePanel.New({
     skin = 'reputationManager',
@@ -610,7 +609,7 @@ local function OnRepEvent()
 end
 
 BUI.Events:OnLogin('ReputationManager', function()
-    HookScript(CharacterFrame, 'OnHide', function() slide.Close(true) end)
+    CharacterFrame:HookScript('OnHide', function() slide.Close(true) end)
 
     BUI.Events:Register('UPDATE_FACTION',                    'ReputationManager', OnRepEvent)
     BUI.Events:Register('MAJOR_FACTION_UNLOCKED',            'ReputationManager', OnRepEvent)

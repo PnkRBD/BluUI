@@ -1,6 +1,5 @@
 local _, BUI = ...
 
-local hooksecurefunc = BUI.Prof.MakeHooker('menus')
 local next = next
 local pairs = pairs
 local wipe = wipe
@@ -57,7 +56,7 @@ local function SkinFrame(frame)
 	pendingMenus[frame] = true
 	if flushScheduled then return end
 	flushScheduled = true
-	BUI.Prof.After('Menus', 0, FlushPending)
+	C_Timer.After(0, FlushPending)
 end
 
 local function SkinAttachments(compositor)

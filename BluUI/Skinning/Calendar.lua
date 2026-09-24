@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Calendar')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('calendar')
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
@@ -121,7 +119,7 @@ local function Install()
 	local frame = _G.CalendarFrame
 	if not frame then return end
 	installed = true
-	HookScript(frame, 'OnShow', Apply)
+	frame:HookScript('OnShow', Apply)
 	if _G.CalendarDayEventButton_OnLoad then hooksecurefunc('CalendarDayEventButton_OnLoad', OnDayEventButton) end
 	if frame:IsShown() then Apply() end
 end
