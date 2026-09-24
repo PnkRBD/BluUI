@@ -78,8 +78,21 @@ local ImportCompanionKeys = {
     secondaryPower = { "powerScope", "powerVariants" },
     datatextBars = { "datatextBarsInit", "datatextEnabled", "datatextMinimap" },
     datatext = { "datatextEnabled", "datatextMinimap", "datatextHideHoversInCombat", "datatextRosterTooltips" },
-    social = { "socialShowBattleTag", "socialAdvancedView", "socialCollapsedSections", "datatextSortState" },
+    social = { "socialShowBattleTag", "socialAdvancedView", "socialCollapsedSections", "datatextSortState", "guildTooltipScore", "guildTooltipRanks" },
 }
+
+local function MigrationMarkers(general)
+    local markers = {}
+    for key, value in pairs(general) do
+        if type(key) == "string" and key:match("^_") then markers[key] = value end
+    end
+    return markers
+end
+
+local function RestoreMigrationMarkers(profile, data)
+    if not data._migrations then return end
+    for key, value in pairs(data._migrations) do profile.general[key] = value end
+end
 
 local function ApplyImportData(db, data, selectedKeys)
     MigrateLegacyKeysInUnitFrames(data)
@@ -102,6 +115,7 @@ local function ApplyImportData(db, data, selectedKeys)
         end
     end
     MergeDefaults(db, BUI.Defaults.profile)
+    RestoreMigrationMarkers(db, data)
     if (not keySet or keySet.customBars) and data.customBars and BUI.CustomBars and BUI.CustomBars.AdoptProfileSpells then
         BUI.CustomBars.AdoptProfileSpells()
     end
@@ -116,6 +130,7 @@ local function SerializeProfile(db, profileName)
     end
     MigrateLegacyKeysInUnitFrames(exportData)
     CompletePartialArrays(exportData, BUI.Defaults.profile)
+    exportData._migrations = MigrationMarkers(db.general)
     local Profiles = BUI.CDM and BUI.CDM.Profiles
     if Profiles and Profiles.ExportCurrent then
         exportData._cdmLayoutData = Profiles.ExportCurrent()
@@ -368,6 +383,7 @@ local function ApplyDefaultProfile(profile)
         end
     end
     MergeDefaults(profile, BUI.Defaults.profile)
+    RestoreMigrationMarkers(profile, data)
     if profile.customBars and BUI.CustomBars and BUI.CustomBars.AdoptProfileSpells then
         BUI.CustomBars.AdoptProfileSpells()
     end
@@ -382,6 +398,7 @@ BUI.ExportImport = {
     ClassifyData = ClassifyData,
     MergeDefaults = MergeDefaults,
     ApplyDefaultProfile = ApplyDefaultProfile,
+    CompanionKeys = ImportCompanionKeys,
 }
 
 BUIG = {}

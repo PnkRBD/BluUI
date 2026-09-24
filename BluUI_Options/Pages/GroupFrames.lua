@@ -10,6 +10,16 @@ local function GroupFrames() return BUI.GroupFrames end
 local function Config() return BUI.GetDB().groupFrames end
 
 local ANCHOR_ITEMS = BUI.C.ANCHOR_POINT_OPTIONS
+local AURA_PLACEMENT_ITEMS = BUI.C.TEXT_PLACEMENT_OPTIONS
+
+local AURA_PLACEMENT_BY_POINTS = (function()
+	local lookup = {}
+	for _, item in ipairs(AURA_PLACEMENT_ITEMS) do
+		local point, relativePoint = BUI.Tools.ResolvePlacement(item.value)
+		lookup[point .. ':' .. relativePoint] = item.value
+	end
+	return lookup
+end)()
 
 local OUTLINE_ITEMS = {
 	{ value = '',             text = 'None'          },
@@ -137,6 +147,17 @@ end
 
 local function OptionDropdown(label, items, get, set, controlWidth)
 	return { kind = 'dropdown', label = label, items = items, get = get, set = set, controlWidth = controlWidth }
+end
+
+local function AuraPlacementOption(getSettings, refresh)
+	return OptionDropdown('Anchor', AURA_PLACEMENT_ITEMS, function()
+		local settings = getSettings()
+		return AURA_PLACEMENT_BY_POINTS[settings.anchorPoint .. ':' .. settings.relativePoint]
+	end, function(value)
+		local settings = getSettings()
+		settings.anchorPoint, settings.relativePoint = BUI.Tools.ResolvePlacement(value)
+		refresh()
+	end)
 end
 
 local function AddRow(tab, rows, config)
@@ -536,7 +557,7 @@ local function AuraContainerRow(tab, rows, sectionKey, configKey, title, descrip
 				OptionSlider('Stack Text Size', 6, 24, function() return AuraSettings().stackSize end, function(value) AuraSettings().stackSize = value; Refresh() end),
 				OptionDropdown('Sort By', SORT_METHOD_ITEMS, function() return AuraSettings().sortMethod or 'default' end, function(value) AuraSettings().sortMethod = value; Refresh() end),
 				OptionDropdown('Grow Direction', GROW_ITEMS, function() return AuraSettings().growDirection end, function(value) AuraSettings().growDirection = value; Refresh() end),
-				OptionDropdown('Anchor', ANCHOR_ITEMS, function() return AuraSettings().anchorPoint end, function(value) AuraSettings().anchorPoint = value; AuraSettings().relativePoint = value; Refresh() end),
+				AuraPlacementOption(AuraSettings, Refresh),
 				OptionSlider('X Offset', -200, 200, function() return AuraSettings().offsetX end, function(value) AuraSettings().offsetX = value; Refresh() end),
 				OptionSlider('Y Offset', -200, 200, function() return AuraSettings().offsetY end, function(value) AuraSettings().offsetY = value; Refresh() end),
 			})
@@ -641,7 +662,7 @@ local function PrivateAurasRow(tab, rows, sectionKey)
 				OptionSlider('Icon Size', 12, 48, function() return AuraSettings().size end, function(value) AuraSettings().size = value; Refresh() end),
 				OptionCheckbox('Show Timer', function() return AuraSettings().showTimer end, function(value) AuraSettings().showTimer = value; Refresh() end),
 				OptionDropdown('Grow Direction', GROW_ITEMS, function() return AuraSettings().growDirection end, function(value) AuraSettings().growDirection = value; Refresh() end),
-				OptionDropdown('Anchor', ANCHOR_ITEMS, function() return AuraSettings().anchorPoint end, function(value) AuraSettings().anchorPoint = value; AuraSettings().relativePoint = value; Refresh() end),
+				AuraPlacementOption(AuraSettings, Refresh),
 				OptionSlider('X Offset', -200, 200, function() return AuraSettings().offsetX end, function(value) AuraSettings().offsetX = value; Refresh() end),
 				OptionSlider('Y Offset', -200, 200, function() return AuraSettings().offsetY end, function(value) AuraSettings().offsetY = value; Refresh() end),
 			}) }
