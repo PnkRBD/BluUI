@@ -23,6 +23,8 @@ local ARROW_COLLAPSED = math.pi / 2
 local CATEGORY_ACTIVE_ATLAS = 'Options_List_Active'
 local CATEGORY_HOVER_ATLAS = 'Options_List_Hover'
 local SETTINGS_TAB_KEYS = { 'GameTab', 'AddOnsTab' }
+local QUALITY_TAB_KEYS = { 'BaseTab', 'RaidTab' }
+local QUALITY_GROUP_KEYS = { 'BaseQualityControls', 'RaidQualityControls' }
 local SETTINGS_BUTTON_KEYS = { 'ApplyButton', 'CloseButton' }
 local SLIDER_TEXT_KEYS = { 'LeftText', 'RightText', 'TopText', 'MinText', 'MaxText' }
 local BINDING_BUTTON_KEYS = { 'Button1', 'Button2', 'CustomButton' }
@@ -112,10 +114,13 @@ end
 
 local function StyleStepper(button, direction)
 	if not button then return end
-	Skin.TipPageButton(button, direction)
-	FadeButtonStates(button)
-	FadeAgain(button.Texture)
-	Skin.RefreshPageButton(button)
+	if not button._buiStepper then
+		button._buiStepper = true
+		Skin.TipPageButton(button, direction)
+		button:HookScript('OnEnable', Skin.RefreshPageButton)
+		button:HookScript('OnDisable', Skin.RefreshPageButton)
+	end
+	FadeRegions(button)
 end
 
 local function StyleSliderTrack(slider)
@@ -281,11 +286,47 @@ local function StyleControl(control)
 		return
 	end
 	Face(control.text)
-	Face(control.Text)
+	Body(control.Text)
 	Face(control.Label)
 	if control.Checkbox then CheckBox(control.Checkbox, CHECK_INSET) end
 	StyleStepSlider(control.SliderWithSteppers)
 	StyleDropdownControl(control.Control)
+end
+
+local function StyleControls(holder)
+	local controls = holder.Controls
+	if not controls then return end
+	for controlIndex = 1, #controls do StyleControl(controls[controlIndex]) end
+end
+
+local function StyleTabText(tab)
+	local text = tab.Text
+	Skin.TipFont(text, 'title')
+	if tab:IsSelected() then
+		local red, green, blue = Theme.GetAccent()
+		text:SetTextColor(red, green, blue, 1)
+	end
+end
+
+local function OnTabHover(tab)
+	if Enabled() then StyleTabText(tab) end
+end
+
+local function RefreshMinimalTab(tab)
+	if not Enabled() then return end
+	Skin.TipTabSelected(tab, tab:IsSelected())
+	StyleTabText(tab)
+end
+
+local function SkinMinimalTab(tab)
+	Tab(tab, false)
+	if not tab._buiTabHook then
+		tab._buiTabHook = true
+		hooksecurefunc(tab, 'OnSelected', RefreshMinimalTab)
+		tab:HookScript('OnEnter', OnTabHover)
+		tab:HookScript('OnLeave', OnTabHover)
+	end
+	RefreshMinimalTab(tab)
 end
 
 local function OnSectionToggle(button)
@@ -359,38 +400,10 @@ local function StyleSettingsRow(row)
 		Fade(row.NineSlice)
 		Shell(row)
 	end
-	local controls = row.Controls
-	if controls then
-		for controlIndex = 1, #controls do StyleControl(controls[controlIndex]) end
-	end
-end
-
-local function RefreshSettingsTabs()
-	local frame = _G.SettingsPanel
-	if not frame or not Enabled() then return end
-	for keyIndex = 1, #SETTINGS_TAB_KEYS do
-		local tab = frame[SETTINGS_TAB_KEYS[keyIndex]]
-		if tab and tab._buiTab then
-			local selected = tab.selected == true
-			Skin.TipTabSelected(tab, selected)
-			local text = tab.Text
-			if text then
-				Skin.TipFont(text, 'title')
-				if selected then
-					local red, green, blue = Theme.GetAccent()
-					text:SetTextColor(red, green, blue, 1)
-				end
-			end
-		end
-	end
-end
-
-local function SkinSettingsTab(tab)
-	if not tab then return end
-	Tab(tab, false)
-	if not tab._buiTabHook then
-		tab._buiTabHook = true
-		hooksecurefunc(tab, 'SetSelectedState', RefreshSettingsTabs)
+	StyleControls(row)
+	if row.BaseQualityControls then
+		for keyIndex = 1, #QUALITY_TAB_KEYS do SkinMinimalTab(row[QUALITY_TAB_KEYS[keyIndex]]) end
+		for keyIndex = 1, #QUALITY_GROUP_KEYS do StyleControls(row[QUALITY_GROUP_KEYS[keyIndex]]) end
 	end
 end
 
@@ -414,7 +427,6 @@ local function SkinSettingsPanel(frame)
 	Body(frame.OutputText)
 	EditBox(frame.SearchBox)
 	for keyIndex = 1, #SETTINGS_BUTTON_KEYS do Button(frame[SETTINGS_BUTTON_KEYS[keyIndex]]) end
-	for keyIndex = 1, #SETTINGS_TAB_KEYS do SkinSettingsTab(frame[SETTINGS_TAB_KEYS[keyIndex]]) end
 	local categoryList = frame.CategoryList
 	if categoryList then
 		Shell(categoryList)
@@ -445,7 +457,7 @@ local function ApplySettings()
 	local frame = _G.SettingsPanel
 	if not frame or frame:IsForbidden() or not Enabled() then return end
 	if Once('settings') then SkinSettingsPanel(frame) end
-	RefreshSettingsTabs()
+	for keyIndex = 1, #SETTINGS_TAB_KEYS do SkinMinimalTab(frame[SETTINGS_TAB_KEYS[keyIndex]]) end
 	SweepSettingsLists()
 end
 
