@@ -1,3 +1,0 @@
-local _, BUI = ...
-
-BUI.loadStart = debugprofilestop()
