@@ -43,20 +43,8 @@ function UnitFrames.InvalidateFilterCache()
 	filterCache = nil
 end
 
-local DEBUFF_FILTERS = {
-	all            = 'HARMFUL|INCLUDE_NAME_PLATE_ONLY',
-	mine           = 'HARMFUL|PLAYER',
-	dispellable    = 'HARMFUL|RAID_PLAYER_DISPELLABLE',
-	allDispellable = 'HARMFUL',
-	blizzardRaid   = 'HARMFUL|RAID',
-}
-
-local BUFF_FILTERS = {
-	mine    = 'HELPFUL|PLAYER|RAID_IN_COMBAT',
-	mineAll = 'HELPFUL|PLAYER',
-	raid    = 'HELPFUL|RAID',
-	all     = 'HELPFUL',
-}
+local DEBUFF_FILTER = 'HARMFUL|INCLUDE_NAME_PLATE_ONLY'
+local BUFF_FILTER = 'HELPFUL'
 
 local SHOWMODE_TO_RULES = {
 	debuff = {
@@ -265,7 +253,7 @@ local function ApplyContainer(frame, container, style, rules)
 	container:SetShown(style.shown)
 
 	local isDebuff = container._buiIsDebuff
-	local baseFilter = isDebuff and DEBUFF_FILTERS.all or BUFF_FILTERS.all
+	local baseFilter = isDebuff and DEBUFF_FILTER or BUFF_FILTER
 	local candidates, candidatesFingerprint = BuildCandidates(isDebuff)
 	Engine.Configure(container, style, rules, baseFilter, candidates, candidatesFingerprint)
 end
@@ -562,7 +550,7 @@ local function LegacyApplyAuraPositions(frame, unitType)
 		frame.Debuffs.growthY = style.growY
 		frame.Debuffs.initialAnchor = anchor
 		frame.Debuffs.onlyShowPlayer = false
-		frame.Debuffs.filter = DEBUFF_FILTERS.all
+		frame.Debuffs.filter = DEBUFF_FILTER
 		frame.Debuffs._bluRules = UnitRules(unitSettings, true)
 		frame.Debuffs._bluSets = frame.Debuffs._bluSets or {}
 		frame.Debuffs.PreUpdate = LegacyPreUpdate
@@ -595,7 +583,7 @@ local function LegacyApplyAuraPositions(frame, unitType)
 		frame.Buffs.growthY = style.growY
 		frame.Buffs.initialAnchor = anchor
 		frame.Buffs.onlyShowPlayer = false
-		frame.Buffs.filter = BUFF_FILTERS.all
+		frame.Buffs.filter = BUFF_FILTER
 		frame.Buffs._bluRules = UnitRules(unitSettings, false)
 		frame.Buffs._bluSets = frame.Buffs._bluSets or {}
 		frame.Buffs.PreUpdate = LegacyPreUpdate
