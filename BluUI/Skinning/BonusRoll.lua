@@ -1,7 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('BonusRoll')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('bonusroll')
 
 local Skin = BUI.Skinning
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -105,7 +103,7 @@ end
 local function StopHold(button, completed)
 	local wasHolding = button._buiHolding
 	button._buiHolding = nil
-	SetScript(button, 'OnUpdate', nil)
+	button:SetScript('OnUpdate', nil)
 	holdElapsed = 0
 	local sweep = button._buiHoldSweep
 	if sweep then
@@ -116,7 +114,7 @@ local function StopHold(button, completed)
 		SetHint(button, 'hidden')
 	elseif wasHolding then
 		SetHint(button, 'warn')
-		BUI.Prof.After('BonusRoll', HINT_WARN_SECONDS, function() RefreshHint(button) end)
+		C_Timer.After(HINT_WARN_SECONDS, function() RefreshHint(button) end)
 	else
 		SetHint(button, 'idle')
 	end
@@ -147,7 +145,7 @@ local function OnRollMouseDown(button, mouseButton)
 	sweep:Show()
 	sweep:SetCooldown(GetTime(), HOLD_SECONDS)
 	SetHint(button, 'holding')
-	SetScript(button, 'OnUpdate', OnHoldUpdate)
+	button:SetScript('OnUpdate', OnHoldUpdate)
 end
 
 local function OnRollMouseUp(button)
@@ -156,7 +154,7 @@ end
 
 local function OnRollHide(button)
 	button._buiHolding = nil
-	SetScript(button, 'OnUpdate', nil)
+	button:SetScript('OnUpdate', nil)
 	holdElapsed = 0
 	if button._buiHoldSweep then
 		button._buiHoldSweep:Clear()
@@ -185,17 +183,17 @@ end
 
 local function SkinRollButton(button)
 	if not button then return end
-	if BUI.Prof.Unwrap(button:GetScript('OnClick')) ~= OnRollClick then
+	if button:GetScript('OnClick') ~= OnRollClick then
 		originalRollClick = button:GetScript('OnClick')
-		SetScript(button, 'OnClick', OnRollClick)
+		button:SetScript('OnClick', OnRollClick)
 	end
 	if button._buiRoll then return end
 	button._buiRoll = true
-	HookScript(button, 'OnMouseDown', OnRollMouseDown)
-	HookScript(button, 'OnMouseUp', OnRollMouseUp)
-	HookScript(button, 'OnEnter', OnRollEnter)
-	HookScript(button, 'OnHide', OnRollHide)
-	HookScript(button, 'OnShow', RefreshHint)
+	button:HookScript('OnMouseDown', OnRollMouseDown)
+	button:HookScript('OnMouseUp', OnRollMouseUp)
+	button:HookScript('OnEnter', OnRollEnter)
+	button:HookScript('OnHide', OnRollHide)
+	button:HookScript('OnShow', RefreshHint)
 	RefreshHint(button)
 end
 
@@ -229,7 +227,7 @@ local function Deactivate()
 	skinned = false
 	local frame = _G.BonusRollFrame
 	local button = frame and frame.PromptFrame and frame.PromptFrame.RollButton
-	if button and originalRollClick and BUI.Prof.Unwrap(button:GetScript('OnClick')) == OnRollClick then button:SetScript('OnClick', originalRollClick) end
+	if button and originalRollClick and button:GetScript('OnClick') == OnRollClick then button:SetScript('OnClick', originalRollClick) end
 	if button then
 		OnRollHide(button)
 		if button._buiHoldHint then button._buiHoldHint:Hide() end

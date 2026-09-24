@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Power.Secondary')
 
 BUI.Power.Secondary = {}
 local SecondaryPower = BUI.Power.Secondary
@@ -912,8 +911,8 @@ local function Build()
             BUI.Anchor.OnAnchorSizeChanged()
         end
     end
-    HookScript(frame, "OnShow", NotifyAnchorChange)
-    HookScript(frame, "OnHide", NotifyAnchorChange)
+    frame:HookScript("OnShow", NotifyAnchorChange)
+    frame:HookScript("OnHide", NotifyAnchorChange)
 
     local overlay = CreateFrame("Frame", nil, frame)
     overlay:SetAllPoints()

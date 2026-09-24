@@ -1,6 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('ExperienceBar')
-local hooksecurefunc = BUI.Prof.MakeHooker('ExperienceBar')
 
 local floor, format, max, min = math.floor, string.format, math.max, math.min
 local GetTime = GetTime
@@ -518,7 +516,7 @@ local function SuppressBlizzard()
 			Skin.SuppressBlizzardFrame(frame)
 			if not frame._buiReassertHooked then
 				frame._buiReassertHooked = true
-				HookScript(frame, 'OnShow', function(self) if isActive then Skin.SuppressBlizzardFrame(self) end end)
+				frame:HookScript('OnShow', function(self) if isActive then Skin.SuppressBlizzardFrame(self) end end)
 				hooksecurefunc(frame, 'SetAlpha', function(self, alpha)
 					if isActive and alpha ~= 0 and not self._buiReasserting then
 						self._buiReasserting = true
@@ -617,7 +615,7 @@ local function CreateBars()
 	hoverTicker = CreateFrame('Frame')
 	hoverTicker:Hide()
 	local tickElapsed = 0
-	SetScript(hoverTicker, 'OnUpdate', function(_, elapsed)
+	hoverTicker:SetScript('OnUpdate', function(_, elapsed)
 		tickElapsed = tickElapsed + elapsed
 		if tickElapsed < 0.5 then return end
 		tickElapsed = 0
@@ -625,7 +623,7 @@ local function CreateBars()
 	end)
 
 	barFrame:EnableMouse(true)
-	SetScript(barFrame, 'OnEnter', function(self)
+	barFrame:SetScript('OnEnter', function(self)
 		local config = GetConfig()
 		local hover = config.hoverHeight
 		local position = config.position or 'BOTTOM'
@@ -667,7 +665,7 @@ local function CreateBars()
 		hoverTicker:Show()
 	end)
 
-	SetScript(barFrame, 'OnLeave', function()
+	barFrame:SetScript('OnLeave', function()
 		xpText:Hide()
 		reputationText:Hide()
 		HideHoverStats()

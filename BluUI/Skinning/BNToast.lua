@@ -95,7 +95,7 @@ local function StartPreview()
 	if not toast or not toast.AddToast or InCombatLockdown() then return end
 	previewing = true
 	toast:AddToast(BN_TOAST_TYPE_NEW_INVITE)
-	BUI.Prof.After('BNToast', 0.05, function()
+	C_Timer.After(0.05, function()
 		if previewing and toast:IsShown() and _G.AlertFrame_PauseOutAnimation then _G.AlertFrame_PauseOutAnimation(toast) end
 	end)
 end

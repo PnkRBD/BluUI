@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Mail')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('mail')
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -263,8 +261,8 @@ local function Install()
 	local frame = _G.MailFrame
 	if not frame then return end
 	installed = true
-	HookScript(frame, 'OnShow', Apply)
-	HookScript(_G.OpenMailFrame, 'OnShow', Apply)
+	frame:HookScript('OnShow', Apply)
+	_G.OpenMailFrame:HookScript('OnShow', Apply)
 	hooksecurefunc('InboxFrame_Update', OnInboxUpdated)
 	hooksecurefunc('OpenMail_Update', OnOpenMailUpdated)
 	hooksecurefunc('SendMailFrame_Update', OnSendMailUpdated)

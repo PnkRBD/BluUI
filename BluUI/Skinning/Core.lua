@@ -1,6 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Core')
-local hooksecurefunc = BUI.Prof.MakeHooker('Core')
 
 BUI.Skinning = {}
 local Skin = BUI.Skinning
@@ -330,11 +328,11 @@ function Skin.MakeDraggable(frame, dbKey, point, x, y, follow)
 	frame:SetClampedToScreen(true)
 	frame:EnableMouse(true)
 	frame:RegisterForDrag('LeftButton')
-	SetScript(frame, 'OnDragStart', function(self)
+	frame:SetScript('OnDragStart', function(self)
 		self._buiDragged = true
 		self:StartMoving()
 	end)
-	SetScript(frame, 'OnDragStop', function(self)
+	frame:SetScript('OnDragStop', function(self)
 		self:StopMovingOrSizing()
 		if dbKey and Skin.PositionMode() == 'remember' then Skin.SavePosition(self, dbKey) end
 	end)
@@ -346,24 +344,24 @@ function Skin.MakeDraggable(frame, dbKey, point, x, y, follow)
 		local panel = follow and ResolvePanel(follow)
 		if not panel or panel == hookedPanel or not panel.HookScript then return panel end
 		hookedPanel = panel
-		HookScript(panel, 'OnShow', function()
+		panel:HookScript('OnShow', function()
 			if frame:IsShown() and WantsHome() then Home() end
 		end)
 		return panel
 	end
 
-	HookScript(frame, 'OnShow', function(self)
+	frame:HookScript('OnShow', function(self)
 		if follow then Skin.ReservePanelSlot(follow, self:GetWidth(), self:GetHeight()) end
 		local panel = WatchPanel()
 		if WantsHome() then Home() end
 		if follow and not (panel and panel:IsShown()) then
-			BUI.Prof.After('Core', 0, function()
+			C_Timer.After(0, function()
 				local latePanel = WatchPanel()
 				if latePanel and latePanel:IsShown() and self:IsShown() and WantsHome() then Home() end
 			end)
 		end
 	end)
-	HookScript(frame, 'OnHide', function(self)
+	frame:HookScript('OnHide', function(self)
 		if Skin.PositionMode() == 'reset' then
 			Home()
 			self._buiDragged = false
@@ -556,8 +554,8 @@ function Skin.TipButton(button, scale)
 	if not button._buiTipButton then
 		button._buiTipButton = true
 		BUILib.Skin.StripButton(button)
-		HookScript(button, 'OnEnter', TipButtonEnter)
-		HookScript(button, 'OnLeave', TipButtonLeave)
+		button:HookScript('OnEnter', TipButtonEnter)
+		button:HookScript('OnLeave', TipButtonLeave)
 	end
 	Skin.TipShell(button)
 	Skin.TipButtonFonts(button, scale)
@@ -631,8 +629,8 @@ local function EnsureShowcase()
 	Skin.TipFont(hint, 'body', 1.8)
 	hint:SetPoint('TOP', title, 'BOTTOM', 0, -8)
 	hint:SetText('Press Escape to close the showcase')
-	SetScript(showcase, 'OnHide', function() if showcaseActive then Skin.StopTest() end end)
-	SetScript(showcase, 'OnUpdate', ShowcaseOnUpdate)
+	showcase:SetScript('OnHide', function() if showcaseActive then Skin.StopTest() end end)
+	showcase:SetScript('OnUpdate', ShowcaseOnUpdate)
 	return showcase
 end
 
@@ -659,7 +657,7 @@ end
 local function WatchShowcaseFrame(frame)
 	if frame.__buiShowcaseWatched then return end
 	frame.__buiShowcaseWatched = true
-	HookScript(frame, 'OnHide', OnShowcaseFrameHidden)
+	frame:HookScript('OnHide', OnShowcaseFrameHidden)
 	hooksecurefunc(frame, 'SetPoint', OnEntrySetPoint)
 	hooksecurefunc(frame, 'StartMoving', OnEntryStartMoving)
 end
@@ -938,8 +936,8 @@ local function ScrollStepper(button, rotation)
 	if not button or button._buiTipArrow then return end
 	local arrow = Skin.TipArrow(button, true, rotation)
 	arrow:SetSize(SCROLL_ARROW_SIZE, SCROLL_ARROW_SIZE)
-	HookScript(button, 'OnEnter', ArrowEnter)
-	HookScript(button, 'OnLeave', ArrowLeave)
+	button:HookScript('OnEnter', ArrowEnter)
+	button:HookScript('OnLeave', ArrowLeave)
 end
 
 local function FadeStepperArt(button)
@@ -971,10 +969,10 @@ function Skin.TipScrollBar(scrollBar, keepThumb)
 	fill:SetPoint('BOTTOMRIGHT', thumb, 'BOTTOMRIGHT', -1, 0)
 	thumb._buiThumbFill = fill
 	ThumbFill(thumb, SCROLL_THUMB_REST)
-	HookScript(thumb, 'OnEnter', ThumbEnter)
-	HookScript(thumb, 'OnLeave', ThumbLeave)
-	HookScript(thumb, 'OnMouseDown', ThumbDown)
-	HookScript(thumb, 'OnMouseUp', ThumbUp)
+	thumb:HookScript('OnEnter', ThumbEnter)
+	thumb:HookScript('OnLeave', ThumbLeave)
+	thumb:HookScript('OnMouseDown', ThumbDown)
+	thumb:HookScript('OnMouseUp', ThumbUp)
 end
 
 local EDIT_BOX_ART = {
@@ -1069,8 +1067,8 @@ function Skin.TipClose(button)
 	glyph:SetPoint('CENTER', button, 'CENTER', 0, 0)
 	glyph:SetVertexColor(CLOSE_IDLE[1], CLOSE_IDLE[2], CLOSE_IDLE[3], CLOSE_IDLE[4])
 	button._buiCloseGlyph = glyph
-	HookScript(button, 'OnEnter', CloseEnter)
-	HookScript(button, 'OnLeave', CloseLeave)
+	button:HookScript('OnEnter', CloseEnter)
+	button:HookScript('OnLeave', CloseLeave)
 end
 
 local STATE_TEXTURE_GETTERS = { 'GetNormalTexture', 'GetPushedTexture', 'GetHighlightTexture', 'GetDisabledTexture' }
@@ -1121,8 +1119,8 @@ function Skin.TipCheckBox(check, inset)
 	FadeStateTextures(check)
 	Skin.TipCheckGlyph(check, false)
 	Skin.TipFace(check.Text or (check.GetFontString and check:GetFontString()), 'body')
-	HookScript(check, 'OnEnter', TipButtonEnter)
-	HookScript(check, 'OnLeave', TipButtonLeave)
+	check:HookScript('OnEnter', TipButtonEnter)
+	check:HookScript('OnLeave', TipButtonLeave)
 end
 
 local BACKDROP_BUTTON_ART = { 'Left', 'Middle', 'Right', 'LeftDisabled', 'MiddleDisabled', 'RightDisabled' }
@@ -1148,8 +1146,8 @@ function Skin.TipBackdropButton(button, scale)
 			if texture and texture.SetAlpha then texture:SetAlpha(0) end
 		end
 		Skin.ApplyBackdrop(button, PANEL_FILL, PANEL_EDGE)
-		HookScript(button, 'OnEnter', BackdropButtonEnter)
-		HookScript(button, 'OnLeave', BackdropButtonLeave)
+		button:HookScript('OnEnter', BackdropButtonEnter)
+		button:HookScript('OnLeave', BackdropButtonLeave)
 	end
 	Skin.TipButtonFonts(button, scale)
 end
@@ -1320,7 +1318,6 @@ local SIDE_TAB_SELECTED_ALPHA = 0.3
 local SIDE_TAB_HOVER_ALPHA = 0.15
 local NO_OPTIONS = {}
 local SIDE_TAB_ICON_KEYS = { 'Icon' }
-local sideTabHooker = BUI.Prof.MakeHooker('skin')
 
 local function CenterSideTabIcon(icon)
 	if icon._buiCentering then return end
@@ -1350,7 +1347,7 @@ function Skin.SideTab(context, tab, options)
 				if options.crop then Skin.CropIcon(icon) end
 				if options.iconWidth then icon:SetSize(options.iconWidth, options.iconHeight or options.iconWidth) end
 				CenterSideTabIcon(icon)
-				sideTabHooker(icon, 'SetPoint', CenterSideTabIcon)
+				hooksecurefunc(icon, 'SetPoint', CenterSideTabIcon)
 			end
 		end
 		if tab.IconOverlay then tab.IconOverlay.__buiSkin = true end
@@ -1526,7 +1523,6 @@ end
 
 local tabStrips = {}
 local tabHooksInstalled = false
-local stripHooker = BUI.Prof.MakeHooker('skin')
 
 function Skin.RefreshTabStrip(frame)
 	local strip = tabStrips[frame]
@@ -1546,10 +1542,10 @@ end
 local function InstallTabHooks()
 	if tabHooksInstalled then return end
 	tabHooksInstalled = true
-	stripHooker('PanelTemplates_UpdateTabs', OnTabsChanged)
-	stripHooker('PanelTemplates_ShowTab', OnTabsChanged)
-	stripHooker('PanelTemplates_HideTab', OnTabsChanged)
-	stripHooker('PanelTemplates_TabResize', OnTabResized)
+	hooksecurefunc('PanelTemplates_UpdateTabs', OnTabsChanged)
+	hooksecurefunc('PanelTemplates_ShowTab', OnTabsChanged)
+	hooksecurefunc('PanelTemplates_HideTab', OnTabsChanged)
+	hooksecurefunc('PanelTemplates_TabResize', OnTabResized)
 end
 
 function Skin.RegisterTabStrip(frame, tabs, context)
@@ -1580,8 +1576,8 @@ end
 function Skin.RegisterTabSystem(tabSystem, context, panel)
 	if not tabSystem or tabSystems[tabSystem] then return end
 	tabSystems[tabSystem] = { context = context, panel = panel }
-	stripHooker(tabSystem, 'SetTab', Skin.RefreshTabSystem)
-	stripHooker(tabSystem, 'Layout', Skin.RefreshTabSystem)
+	hooksecurefunc(tabSystem, 'SetTab', Skin.RefreshTabSystem)
+	hooksecurefunc(tabSystem, 'Layout', Skin.RefreshTabSystem)
 	Skin.RefreshTabSystem(tabSystem)
 end
 
@@ -1626,8 +1622,8 @@ function Skin.TipPageButton(button, direction)
 	local arrow = Skin.TipArrow(button, true, PAGE_ROTATION[direction] or 0)
 	arrow:SetSize(PAGE_ARROW_SIZE, PAGE_ARROW_SIZE)
 	PageArrowLeave(button)
-	HookScript(button, 'OnEnter', PageArrowEnter)
-	HookScript(button, 'OnLeave', PageArrowLeave)
+	button:HookScript('OnEnter', PageArrowEnter)
+	button:HookScript('OnLeave', PageArrowLeave)
 	Skin.RefreshPageButton(button)
 end
 
@@ -1641,7 +1637,7 @@ function Skin.TipNavArrow(button)
 	if not button or button._buiPageArrow then return end
 	button.Art:SetAlpha(0)
 	Skin.TipPageButton(button, 'down')
-	HookScript(button, 'OnEnter', MuteNavArrowArt)
+	button:HookScript('OnEnter', MuteNavArrowArt)
 end
 
 function Skin.SetPageButtonSkinned(button, skinned)
@@ -1656,7 +1652,6 @@ function Skin.SetPageButtonSkinned(button, skinned)
 	if button._buiTipArrow then button._buiTipArrow:SetShown(skinned) end
 end
 
-local sweepHooker = BUI.Prof.MakeHooker('skin')
 
 function Skin.ForEachScrollFrame(box, callback)
 	if not box or not box.ForEachFrame then return end
@@ -1668,6 +1663,6 @@ function Skin.SweepScrollBox(scrollBox, callback)
 	if not scrollBox or scrollBox._buiSweep then return end
 	scrollBox._buiSweep = true
 	local function Sweep(box) Skin.ForEachScrollFrame(box, callback) end
-	sweepHooker(scrollBox, 'Update', Sweep)
+	hooksecurefunc(scrollBox, 'Update', Sweep)
 	Sweep(scrollBox)
 end

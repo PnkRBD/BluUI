@@ -1,7 +1,5 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('CDM.Glow')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('glow')
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
 
@@ -256,7 +254,7 @@ function CDM.SetupGlowHooks()
 		local pendingHide = {}
 		local hideDrainer = CreateFrame('Frame')
 		hideDrainer:Hide()
-		SetScript(hideDrainer, 'OnUpdate', function(self)
+		hideDrainer:SetScript('OnUpdate', function(self)
 			self:Hide()
 			for icon in pairs(pendingHide) do
 				pendingHide[icon] = nil

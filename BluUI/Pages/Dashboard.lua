@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Pages.Dashboard')
 local Pixel = BUI.Pixel
 
 local BUILib = BluUI.BUILibClient
@@ -739,7 +738,7 @@ end
 local activeSlideIn
 
 local function FinalizeSlideIn(state)
-    SetScript(state.ticker, "OnUpdate", nil)
+    state.ticker:SetScript("OnUpdate", nil)
     state.ticker:Hide()
     for cardIndex, card in ipairs(state.cards) do
         local snapshot = state.snapshots[cardIndex]
@@ -785,7 +784,7 @@ function PlayCardSlideIn(cards, parent)
     local state  = { ticker = ticker, cards = visibleCards, snapshots = snapshots }
     activeSlideIn = state
 
-    SetScript(ticker, "OnUpdate", function(self)
+    ticker:SetScript("OnUpdate", function(self)
         local now = GetTime()
         local allDone = true
         for cardIndex, card in ipairs(visibleCards) do
@@ -807,7 +806,7 @@ function PlayCardSlideIn(cards, parent)
             end
         end
         if allDone then
-            SetScript(self, "OnUpdate", nil)
+            self:SetScript("OnUpdate", nil)
             self:Hide()
             if activeSlideIn == state then activeSlideIn = nil end
         end
@@ -1132,7 +1131,7 @@ local function BuildDashboard(canvas)
     end
     SyncChildWidth()
     BUILib.Defer(SyncChildWidth)
-    HookScript(innerScrollFrame, "OnSizeChanged", SyncChildWidth)
+    innerScrollFrame:HookScript("OnSizeChanged", SyncChildWidth)
     scrollContainer:SetChildHeight(Layout.DASH_H + Layout.PAD * 2)
 
     local dashboard = CreateFrame("Frame", nil, scrollChild)
@@ -1279,15 +1278,15 @@ local function BuildDashboard(canvas)
         card:SetMovable(true)
         card:EnableMouse(true)
         card:RegisterForDrag("LeftButton")
-        SetScript(card, "OnDragStart", function(self)
+        card:SetScript("OnDragStart", function(self)
             if activeSlideIn then FinalizeSlideIn(activeSlideIn); activeSlideIn = nil end
             self:SetAlpha(0.7)
             self:Raise()
             self:StartMoving()
-            SetScript(self, "OnUpdate", ClampDuringDrag)
+            self:SetScript("OnUpdate", ClampDuringDrag)
         end)
-        SetScript(card, "OnDragStop", function(self)
-            SetScript(self, "OnUpdate", nil)
+        card:SetScript("OnDragStop", function(self)
+            self:SetScript("OnUpdate", nil)
             self:StopMovingOrSizing()
             self:SetAlpha(1)
             local fromSlot = slotForCard[self]
@@ -1373,15 +1372,15 @@ local function BuildDashboard(canvas)
         card:SetMovable(true)
         card:EnableMouse(true)
         card:RegisterForDrag("LeftButton")
-        SetScript(card, "OnDragStart", function(self)
+        card:SetScript("OnDragStart", function(self)
             if activeSlideIn then FinalizeSlideIn(activeSlideIn); activeSlideIn = nil end
             self:SetAlpha(0.7)
             self:Raise()
             self:StartMoving()
-            SetScript(self, "OnUpdate", ClampDuringDrag)
+            self:SetScript("OnUpdate", ClampDuringDrag)
         end)
-        SetScript(card, "OnDragStop", function(self)
-            SetScript(self, "OnUpdate", nil)
+        card:SetScript("OnDragStop", function(self)
+            self:SetScript("OnUpdate", nil)
             self:StopMovingOrSizing()
             self:SetAlpha(1)
             local entry = topEntryByCard[self]
@@ -1452,7 +1451,7 @@ local function BuildDashboard(canvas)
     end)
     RefreshWeeklyMplus()
 
-    HookScript(weeklyTile, "OnEnter", function(self)
+    weeklyTile:HookScript("OnEnter", function(self)
         local rows = {}
         for _, entry in ipairs(WeeklyMplusHistoryEntries()) do
             rows[#rows + 1] = { left = entry.label, right = tostring(entry.count) }
@@ -1464,7 +1463,7 @@ local function BuildDashboard(canvas)
         end
         BUILib.Widget.ShowTipRows(self, "Weekly M+ Runs", rows, { anchor = "RIGHT" })
     end)
-    HookScript(weeklyTile, "OnLeave", function() BUILib.Widget.HideTip() end)
+    weeklyTile:HookScript("OnLeave", function() BUILib.Widget.HideTip() end)
 
     local function RefreshTiles()
         for _, refresher in ipairs(tileRefreshers) do refresher.fs:SetText(refresher.fn()) end
@@ -1827,7 +1826,7 @@ local function BuildDashboard(canvas)
     local refreshTicker
     local function StartRefreshTicker()
         if refreshTicker then return end
-        refreshTicker = BUI.Prof.NewTicker('Pages.Dashboard', 1, BUI.Prof.Wrap('tick#DashboardRefresh', function()
+        refreshTicker = C_Timer.NewTicker(1, function()
             if not dashboard:IsVisible() then
                 refreshTicker:Cancel()
                 refreshTicker = nil
@@ -1840,7 +1839,7 @@ local function BuildDashboard(canvas)
                 RefreshDungeons(); RefreshVault(); RefreshWeeklyMplus()
                 RefreshRaidProgress(); RefreshCrests(); RefreshAlts()
             end
-        end))
+        end)
     end
     StartRefreshTicker()
 
@@ -1852,7 +1851,7 @@ local function BuildDashboard(canvas)
     canvas:RegisterEvent("UPDATE_INSTANCE_INFO")
     canvas:RegisterEvent("BOSS_KILL")
     canvas:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
-    SetScript(canvas, "OnEvent", BUI.Prof.Wrap('dashboard#Canvas', function(_, event)
+    canvas:SetScript("OnEvent", function(_, event)
         if not canvas:IsVisible() then return end
         if event == "PLAYER_EQUIPMENT_CHANGED" or event == "PLAYER_AVG_ITEM_LEVEL_UPDATE" then
             RefreshTiles()
@@ -1865,9 +1864,9 @@ local function BuildDashboard(canvas)
         elseif event == "CURRENCY_DISPLAY_UPDATE" then
             RefreshCrests()
         end
-    end))
+    end)
 
-    HookScript(canvas, "OnShow", function()
+    canvas:HookScript("OnShow", function()
         RefreshTiles()
         RefreshDungeons(); RefreshVault(); RefreshWeeklyMplus()
         RequestRaidInfo()
@@ -2007,7 +2006,7 @@ local function BuildDashboard(canvas)
             x = x + buttonFrame:GetWidth() + gap
         end
     end
-    SetScript(cogButton, "OnClick", OpenLayoutSettings)
+    cogButton:SetScript("OnClick", OpenLayoutSettings)
 
     ApplyCardVisibility()
     return dashboard

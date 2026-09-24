@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Achievements')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('achievements')
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -161,9 +159,9 @@ local function BuildMeter(bar, gutter)
 	meter:SetPoint('BOTTOMLEFT', bar, 'BOTTOMLEFT', METER_INSET, METER_INSET)
 	bar._buiMeter = meter
 	bar._buiGutter = gutter
-	HookScript(bar, 'OnValueChanged', LayoutMeter)
-	HookScript(bar, 'OnMinMaxChanged', LayoutMeter)
-	HookScript(bar, 'OnSizeChanged', LayoutMeter)
+	bar:HookScript('OnValueChanged', LayoutMeter)
+	bar:HookScript('OnMinMaxChanged', LayoutMeter)
+	bar:HookScript('OnSizeChanged', LayoutMeter)
 end
 
 local function MeterText(fontString)
@@ -688,7 +686,7 @@ local function Install()
 	local frame = _G.AchievementFrame
 	if not frame then return end
 	installed = true
-	HookScript(frame, 'OnShow', Apply)
+	frame:HookScript('OnShow', Apply)
 	HookMixin(_G.AchievementCategoryTemplateMixin, 'Init', OnCategoryRow)
 	HookMixin(_G.AchievementCategoryTemplateMixin, 'UpdateSelectionState', OnCategorySelection)
 	HookMixin(_G.AchievementTemplateMixin, 'Init', OnAchievementRow)

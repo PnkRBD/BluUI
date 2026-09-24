@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('CDM.Initialize')
 
 local _G = _G
 
@@ -47,7 +46,7 @@ function CDM.Initialize()
         CDM.UpdateShowOnlyOnCDWatcher()
         CDM.UpdateHideWhenZeroWatcher()
         CDM.NotifyUnitFrames()
-        BUI.Prof.After('CDM.Initialize', 0, function()
+        C_Timer.After(0, function()
             CDM.state.settling = nil
             CDM.MarkAllDirty()
         end)
@@ -85,7 +84,7 @@ function CDM.Initialize()
 
         if allEnabledHooked and retryFrame then
             retryFrame:UnregisterAllEvents()
-            SetScript(retryFrame, "OnEvent", nil)
+            retryFrame:SetScript("OnEvent", nil)
             retryFrame = nil
         end
 
@@ -97,17 +96,17 @@ function CDM.Initialize()
     else
         retryFrame = CreateFrame("Frame")
         retryFrame:RegisterEvent("COOLDOWN_VIEWER_DATA_LOADED")
-        SetScript(retryFrame, "OnEvent", function(self, event)
+        retryFrame:SetScript("OnEvent", function(self, event)
             if TryHookAll() then FinishInit() end
         end)
     end
 
     if EditModeManagerFrame then
         local function MarkDirtySoon()
-            BUI.Prof.After('CDM.Initialize', 0, CDM.MarkAllDirty)
+            C_Timer.After(0, CDM.MarkAllDirty)
         end
-        HookScript(EditModeManagerFrame, "OnShow", MarkDirtySoon)
-        HookScript(EditModeManagerFrame, "OnHide", MarkDirtySoon)
+        EditModeManagerFrame:HookScript("OnShow", MarkDirtySoon)
+        EditModeManagerFrame:HookScript("OnHide", MarkDirtySoon)
     end
 
     CDM.SetupGlowHooks()

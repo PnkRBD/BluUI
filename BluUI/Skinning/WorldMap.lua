@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('WorldMap')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('worldmap')
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
@@ -484,7 +482,7 @@ local function Install()
 	local map = _G.WorldMapFrame
 	if not map then return end
 	installed = true
-	HookScript(map, 'OnShow', Apply)
+	map:HookScript('OnShow', Apply)
 	hooksecurefunc('NavBar_AddButton', OnNavButtonAdded)
 	hooksecurefunc('QuestLogQuests_Update', OnQuestLogUpdated)
 	hooksecurefunc('QuestInfo_Display', OnQuestInfoDisplayed)

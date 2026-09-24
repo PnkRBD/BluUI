@@ -1,7 +1,5 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('GroupFrames.BlizzardHide')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('blizzhide')
 local GroupFrames = BUI.GroupFrames
 
 local InCombatLockdown = InCombatLockdown
@@ -65,8 +63,8 @@ end
 
 local function silenceCompactUnit(frame, unit)
 	if unit == nil or not setupFrames[frame] then return end
-	SetScript(frame, "OnEvent", nil)
-	SetScript(frame, "OnUpdate", nil)
+	frame:SetScript("OnEvent", nil)
+	frame:SetScript("OnUpdate", nil)
 end
 
 local compactHookInstalled = false

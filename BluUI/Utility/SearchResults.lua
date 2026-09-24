@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('Util.SearchResults')
 local Pixel = BUI.Pixel
 
 local BUILib = BluUI.BUILibClient
@@ -72,7 +71,7 @@ function SearchResults.Show(results, anchor)
 		if result.panel then crumb = crumb .. ' > ' .. result.panel end
 		row._crumb:SetText(crumb)
 		row._label:SetText(result.label)
-		SetScript(row, 'OnClick', function()
+		row:SetScript('OnClick', function()
 			SearchResults.Hide()
 			SearchResults.NavigateTo(result)
 			local searchBox = BUI.PageEngine and BUI.PageEngine.searchBox
@@ -106,13 +105,13 @@ function SearchResults.NavigateTo(result)
 
 	pageEngine.ShowPage(pageIndex)
 
-	BUI.Prof.After('Util.SearchResults', 0, function()
+	C_Timer.After(0, function()
 		local pageOptions = pageEngine.pages[result.page]
 		if not pageOptions or not pageOptions.frame then return end
 
 		if result.sidebar and pageOptions.frame._selectModule then
 			pageOptions.frame._selectModule(result.sidebar)
-			BUI.Prof.After('Util.SearchResults', 0.15, function()
+			C_Timer.After(0.15, function()
 				SearchResults.HighlightSetting(pageOptions.frame, result)
 			end)
 			return
@@ -127,7 +126,7 @@ function SearchResults.NavigateTo(result)
 				if tab.scroll.UpdateScroll then tab.scroll:UpdateScroll() end
 			end
 		end
-		BUI.Prof.After('Util.SearchResults', 0.15, function()
+		C_Timer.After(0.15, function()
 			SearchResults.HighlightSetting(pageOptions.frame, result)
 		end)
 	end)
@@ -179,9 +178,9 @@ function SearchResults.HighlightSetting(pageFrame, result)
 				local scrollParent = scrollFrame:GetParent()
 				local start = scrollFrame:GetVerticalScroll()
 				local elapsedTime = 0
-				if SearchResults._scrollAnim then SetScript(SearchResults._scrollAnim, 'OnUpdate', nil) end
+				if SearchResults._scrollAnim then SearchResults._scrollAnim:SetScript('OnUpdate', nil) end
 				if not SearchResults._scrollAnim then SearchResults._scrollAnim = CreateFrame('Frame') end
-				SetScript(SearchResults._scrollAnim, 'OnUpdate', function(self, deltaTime)
+				SearchResults._scrollAnim:SetScript('OnUpdate', function(self, deltaTime)
 					elapsedTime = elapsedTime + deltaTime
 					local progress = math.min(elapsedTime / 0.3, 1)
 					progress = 1 - (1 - progress) * (1 - progress)
@@ -190,7 +189,7 @@ function SearchResults.HighlightSetting(pageFrame, result)
 					if elapsedTime >= 0.3 then
 						scrollFrame:SetVerticalScroll(goal)
 						if scrollParent and scrollParent.UpdateScroll then scrollParent:UpdateScroll() end
-						SetScript(self, 'OnUpdate', nil)
+						self:SetScript('OnUpdate', nil)
 					end
 				end)
 			end
@@ -218,7 +217,7 @@ function SearchResults.HighlightSetting(pageFrame, result)
 
 	local elapsed = 0
 	if not SearchResults._pulseAnim then SearchResults._pulseAnim = CreateFrame('Frame') end
-	SetScript(SearchResults._pulseAnim, 'OnUpdate', function(self, deltaTime)
+	SearchResults._pulseAnim:SetScript('OnUpdate', function(self, deltaTime)
 		elapsed = elapsed + deltaTime
 		if elapsed < 4 then
 			bar:SetAlpha(0.4 + 0.2 * math.sin(elapsed * 8))
@@ -227,7 +226,7 @@ function SearchResults.HighlightSetting(pageFrame, result)
 		else
 			SearchResults.ClearHighlight()
 			target:SetTextColor(originalRed, originalGreen, originalBlue)
-			SetScript(self, 'OnUpdate', nil)
+			self:SetScript('OnUpdate', nil)
 		end
 	end)
 
@@ -235,7 +234,7 @@ function SearchResults.HighlightSetting(pageFrame, result)
 end
 
 function SearchResults.ClearHighlight()
-	if SearchResults._pulseAnim then SetScript(SearchResults._pulseAnim, 'OnUpdate', nil) end
+	if SearchResults._pulseAnim then SearchResults._pulseAnim:SetScript('OnUpdate', nil) end
 	local highlight = SearchResults._highlight
 	if highlight then
 		highlight.bar:Hide()

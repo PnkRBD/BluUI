@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('CDM.PressHighlight')
 
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
@@ -768,7 +767,7 @@ local function VerifyHeld()
     if not next(heldKeys) then pollFrame:Hide() end
 end
 
-SetScript(pollFrame, 'OnUpdate', VerifyHeld)
+pollFrame:SetScript('OnUpdate', VerifyHeld)
 
 local function OnInputDown(keyName)
     if not running then return end
@@ -817,8 +816,8 @@ local function StartInput()
         listener = CreateFrame('Frame', nil, UIParent)
         listener:EnableKeyboard(true)
         listener:SetPropagateKeyboardInput(true)
-        SetScript(listener, 'OnKeyDown', function(_, key) OnInputDown(key) end)
-        SetScript(listener, 'OnKeyUp', function(_, key) OnInputUp(key) end)
+        listener:SetScript('OnKeyDown', function(_, key) OnInputDown(key) end)
+        listener:SetScript('OnKeyUp', function(_, key) OnInputUp(key) end)
     end
     listener:Show()
     for _, event in ipairs(KEY_CACHE_EVENTS) do BUI.Events:Register(event, 'CDM.PressHL.Keys', WipeKeyCache) end

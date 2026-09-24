@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Power.Container')
 
 local ipairs = ipairs
 local wipe = wipe
@@ -195,9 +194,9 @@ local function HookMembers()
         local frame = FrameFor(MEMBER_KEYS[keyIndex])
         if frame and not hooked[frame] then
             hooked[frame] = true
-            HookScript(frame, 'OnShow', OnMemberVisibility)
-            HookScript(frame, 'OnHide', OnMemberVisibility)
-            HookScript(frame, 'OnSizeChanged', function() Container.QueueRelayout() end)
+            frame:HookScript('OnShow', OnMemberVisibility)
+            frame:HookScript('OnHide', OnMemberVisibility)
+            frame:HookScript('OnSizeChanged', function() Container.QueueRelayout() end)
         end
     end
 end
@@ -334,7 +333,7 @@ function Container.QueueRelayout()
     if not queueFrame then
         queueFrame = CreateFrame('Frame')
         queueFrame:Hide()
-        SetScript(queueFrame, 'OnUpdate', function(self)
+        queueFrame:SetScript('OnUpdate', function(self)
             self:Hide()
             Container.Relayout()
         end)
@@ -458,7 +457,7 @@ BUI.Events:OnLogin('StackLab', function()
     BUI.Events:Register('UPDATE_SHAPESHIFT_FORMS', 'StackLab', RequestRelayout)
     BUI.Events:RegisterUnit('UNIT_DISPLAYPOWER', 'player', 'StackLab', RequestRelayout)
 
-    BUI.Prof.After('Power.Container', 0.3, function()
+    C_Timer.After(0.3, function()
         MigrateClassicStack()
         if Container.IsEnabled() then Container.ApplyAll() end
     end)

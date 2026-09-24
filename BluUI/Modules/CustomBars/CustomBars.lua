@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('CustomBars.CustomBars')
 
 local CustomBars = {}
 BUI.CustomBars = CustomBars
@@ -211,12 +210,12 @@ local function CreateIcon(parent, barIndex, iconIndex)
     icon:EnableMouse(true)
     icon:RegisterForDrag("LeftButton")
 
-    SetScript(icon, "OnDragStart", function()
+    icon:SetScript("OnDragStart", function()
         if IsDragBlocked(barIndex) then return end
         parent.dragActive = true
         parent:StartMoving()
     end)
-    SetScript(icon, "OnDragStop", function()
+    icon:SetScript("OnDragStop", function()
         parent:StopMovingOrSizing()
         parent.dragActive = false
         local settings = GetBar(barIndex)
@@ -226,7 +225,7 @@ local function CreateIcon(parent, barIndex, iconIndex)
             if callback then callback(settings.posX, settings.posY) end
         end
     end)
-    SetScript(icon, "OnMouseUp", function(_, button)
+    icon:SetScript("OnMouseUp", function(_, button)
         if button == "RightButton" and not parent.dragActive then
             LockBar(barIndex)
         end
@@ -253,7 +252,7 @@ local function CreateIcon(parent, barIndex, iconIndex)
     overlay:EnableMouse(false)
     icon._tooltipOverlay = overlay
 
-    SetScript(icon, "OnEnter", function()
+    icon:SetScript("OnEnter", function()
         local settings = GetBar(barIndex)
         if not settings or settings.showTooltips == false then return end
         if not icon.itemID or not icon.iconType then return end
@@ -265,7 +264,7 @@ local function CreateIcon(parent, barIndex, iconIndex)
         end
         GameTooltip:Show()
     end)
-    SetScript(icon, "OnLeave", function() GameTooltip:Hide() end)
+    icon:SetScript("OnLeave", function() GameTooltip:Hide() end)
     icon.stack = overlay:CreateFontString(nil, "OVERLAY")
     Pixel.ApplyFont(icon.stack, 12, BUI.GetTrackingFont())
 
@@ -515,7 +514,7 @@ local function PositionBar(bar, settings)
         end
         if not frame._hintSizeTimer then
             frame._hintSizeTimer = true
-            BUI.Prof.After('CustomBars.CustomBars', 0, function()
+            C_Timer.After(0, function()
                 frame._hintSizeTimer = nil
                 if frame.dragHint and frame.dragHint:IsShown() then
                     frame.dragHint:SetWidth(Pixel.Scale(frame.dragHint.text:GetStringWidth() + 16))
@@ -897,7 +896,7 @@ local function ScheduleCooldownRefresh()
     if not cooldownDispatchFrame then
         cooldownDispatchFrame = CreateFrame("Frame", "BUI_CustomBarsFlush")
         cooldownDispatchFrame:Hide()
-        SetScript(cooldownDispatchFrame, "OnUpdate", BUI.Prof.Wrap("custombars#CooldownFlush", FlushCooldownDispatch))
+        cooldownDispatchFrame:SetScript("OnUpdate", FlushCooldownDispatch)
     end
     cooldownDispatchFrame:Show()
 end
@@ -909,7 +908,7 @@ end
 local OnEvent = BUI.Dispatcher.NewDelayed(function()
     BUI.CDM.Custom.InvalidateBagCache()
     CustomBars.RefreshAllBars()
-end, 0.1, 'CustomBars.Refresh')
+end, 0.1)
 
 local hotEventsRegistered = false
 

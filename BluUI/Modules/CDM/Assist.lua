@@ -1,6 +1,5 @@
 local _, BUI = ...
 
-local hooksecurefunc = BUI.Prof.MakeHooker('assist')
 local CDM = BUI.CDM
 
 local GetCVarBool = GetCVarBool

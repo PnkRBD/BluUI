@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('CDM.ProcMenu')
 
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
@@ -13,7 +12,6 @@ local Tools = BUI.Tools
 local IsSecret = BUI.Tools.IsSecretValue
 local IsSpellOverlayed = C_SpellActivationOverlay.IsSpellOverlayed
 local GetPlayerAuraBySpellID = C_UnitAuras.GetPlayerAuraBySpellID
-local hooksecurefunc = BUI.Prof.MakeHooker('procmenu')
 
 CDM.PROC_MSG_POSITIONS = {
 	{ value = 'above',  text = 'Above Icon' },
@@ -150,7 +148,7 @@ local function ResolveEntry(spellID)
 	end
 end
 
-SetScript(watcher, 'OnEvent', BUI.Prof.Wrap('cdm#ProcGlowWatcher', function(_, event, spellID)
+watcher:SetScript('OnEvent', function(_, event, spellID)
 	if not spellID or IsSecret(spellID) then return end
 	if event == 'SPELL_ACTIVATION_OVERLAY_GLOW_HIDE' then
 		RemoveActive(spellID)
@@ -175,7 +173,7 @@ SetScript(watcher, 'OnEvent', BUI.Prof.Wrap('cdm#ProcGlowWatcher', function(_, e
 	if entry.sound then
 		PlaySound(entry.sound, 'Master')
 	end
-end))
+end)
 
 local appearWatchEnabled = false
 local appearActive = {}
@@ -229,7 +227,7 @@ local function StartAppearGlow(key, icon, entry)
 		if untilThreshold <= 0 then
 			AppearGlowNow(icon, entry)
 		else
-			appearTimers[icon] = BUI.Prof.NewTimer('CDM.ProcMenu', untilThreshold, function()
+			appearTimers[icon] = C_Timer.NewTimer(untilThreshold, function()
 				appearTimers[icon] = nil
 				if IsAppearIconLive(key, icon) and icon:IsShown() then
 					AppearGlowNow(icon, entry)
@@ -239,7 +237,7 @@ local function StartAppearGlow(key, icon, entry)
 	elseif mode == 'above' then
 		AppearGlowNow(icon, entry)
 		if untilThreshold > 0 then
-			appearTimers[icon] = BUI.Prof.NewTimer('CDM.ProcMenu', untilThreshold, function()
+			appearTimers[icon] = C_Timer.NewTimer(untilThreshold, function()
 				appearTimers[icon] = nil
 				if IsAppearIconLive(key, icon) then
 					CDM.StopProcGlow(icon)
@@ -702,9 +700,9 @@ HookBarViewer = function()
 end
 
 local auraWatcher = CreateFrame('Frame')
-SetScript(auraWatcher, 'OnEvent', BUI.Prof.Wrap('cdm#AppearAuraWake', function()
+auraWatcher:SetScript('OnEvent', function()
 	if appearWatchEnabled then QueueAppearScan() end
-end))
+end)
 
 local trackHooked
 

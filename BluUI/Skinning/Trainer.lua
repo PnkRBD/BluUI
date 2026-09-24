@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Trainer')
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Widget = BUILib.Widget
@@ -112,17 +111,17 @@ local function CreateRow(parent)
 	row.trainBtn = Skin.SmallButton(row, 50, ROW_HEIGHT - 6, 'Train')
 	row.trainBtn:SetPoint('RIGHT', Pixel.Scale(-4), 0)
 	row.trainBtn:SetFrameLevel(row:GetFrameLevel() + 5)
-	SetScript(row.trainBtn, 'OnClick', function(self)
+	row.trainBtn:SetScript('OnClick', function(self)
 		local index = self:GetParent().serviceIndex
 		if index then
 			BuyTrainerService(index)
-			BUI.Prof.After('Trainer', 0.1, RefreshContent)
+			C_Timer.After(0.1, RefreshContent)
 		end
 	end)
 
 	Pixel.ApplyFont(row.priceText, 11, FONT, '')
 
-	SetScript(row, 'OnEnter', function(self)
+	row:SetScript('OnEnter', function(self)
 		self:SetBackdropBorderColor(Colors.GetAccent())
 		if self.serviceIndex then
 			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
@@ -130,7 +129,7 @@ local function CreateRow(parent)
 			GameTooltip:Show()
 		end
 	end)
-	SetScript(row, 'OnLeave', function(self)
+	row:SetScript('OnLeave', function(self)
 		self:SetBackdropBorderColor(unpack(Colors.border.dark))
 		GameTooltip:Hide()
 	end)
@@ -232,7 +231,7 @@ local function TrainAll()
 		queueIndex = queueIndex + 1
 		if queue[queueIndex] then
 			BuyTrainerService(queue[queueIndex])
-			BUI.Prof.After('Trainer', BUY_DELAY, BuyNext)
+			C_Timer.After(BUY_DELAY, BuyNext)
 		end
 	end
 	BuyNext()
@@ -354,7 +353,7 @@ local function SuppressBlizzardTrainer()
 	if not blizzHooked then
 		WithBlizzTrainer(function(blizzardFrame)
 			blizzHooked = true
-			HookScript(blizzardFrame, 'OnShow', function() if isOpen then HideBlizzardTrainer() end end)
+			blizzardFrame:HookScript('OnShow', function() if isOpen then HideBlizzardTrainer() end end)
 		end)
 	end
 	HideBlizzardTrainer()
@@ -380,7 +379,7 @@ local function OpenTrainer()
 	trainerFrame:Show()
 
 	SuppressBlizzardTrainer()
-	BUI.Prof.After('Trainer', 0, function()
+	C_Timer.After(0, function()
 		if not isOpen then return end
 		SuppressBlizzardTrainer()
 		RefreshContent()

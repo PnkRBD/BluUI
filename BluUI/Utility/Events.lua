@@ -12,18 +12,8 @@ local onceSnapshot = {}
 
 globalFrame:SetScript('OnEvent', function(_, event, ...)
     if globalCallbacks[event] then
-        local profiler = BUI.Prof
-        if profiler.active then
-            for key, callback in pairs(globalCallbacks[event]) do
-                local startKB = collectgarbage('count')
-                local startTime = debugprofilestop()
-                xpcall(callback, geterrorhandler(), event, ...)
-                profiler.Add(event .. '#' .. key, debugprofilestop() - startTime, collectgarbage('count') - startKB)
-            end
-        else
-            for key, callback in pairs(globalCallbacks[event]) do
-                xpcall(callback, geterrorhandler(), event, ...)
-            end
+        for _, callback in pairs(globalCallbacks[event]) do
+            xpcall(callback, geterrorhandler(), event, ...)
         end
     end
 
@@ -36,15 +26,7 @@ globalFrame:SetScript('OnEvent', function(_, event, ...)
             if onceCallbacks[event] then
                 onceCallbacks[event][key] = nil
             end
-            local profiler = BUI.Prof
-            if profiler.active then
-                local startKB = collectgarbage('count')
-                local startTime = debugprofilestop()
-                xpcall(callback, geterrorhandler(), event, ...)
-                profiler.Add('once:' .. event .. '#' .. key, debugprofilestop() - startTime, collectgarbage('count') - startKB)
-            else
-                xpcall(callback, geterrorhandler(), event, ...)
-            end
+            xpcall(callback, geterrorhandler(), event, ...)
         end
         if onceCallbacks[event] and not next(onceCallbacks[event]) then
             onceCallbacks[event] = nil
@@ -84,18 +66,8 @@ local function AcquireUnitFrame(event, unit)
     frame:SetScript('OnEvent', function(_, firedEvent, ...)
         local handlers = unitCallbacks[firedEvent] and unitCallbacks[firedEvent][unit]
         if handlers then
-            local profiler = BUI.Prof
-            if profiler.active then
-                for key, callback in pairs(handlers) do
-                    local startKB = collectgarbage('count')
-                    local startTime = debugprofilestop()
-                    xpcall(callback, geterrorhandler(), firedEvent, ...)
-                    profiler.Add(firedEvent .. '@' .. unit .. '#' .. key, debugprofilestop() - startTime, collectgarbage('count') - startKB)
-                end
-            else
-                for key, callback in pairs(handlers) do
-                    xpcall(callback, geterrorhandler(), firedEvent, ...)
-                end
+            for _, callback in pairs(handlers) do
+                xpcall(callback, geterrorhandler(), firedEvent, ...)
             end
         end
     end)
@@ -285,7 +257,7 @@ end
 local function EnsureFlushDriver()
     if flushDriver._ready then return end
     flushDriver._ready = true
-    flushDriver:SetScript('OnUpdate', BUI.Prof.Wrap('tick#CombatQueue', FlushTick))
+    flushDriver:SetScript('OnUpdate', FlushTick)
 end
 
 local function Enqueue(callback, key)

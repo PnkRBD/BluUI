@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('CDM.BuffCenter')
 
 local _G = _G
 local sort = table.sort
@@ -111,7 +110,7 @@ local function PlaceRow(list, iconCount, anchor, vertical, growUp, stepX, stepY,
 	end
 end
 
-local function CenterNowInner()
+local function CenterNow()
 	if not active then return end
 
 	local viewerName = CDM.VIEWERS.buffs
@@ -231,22 +230,11 @@ local function CenterNowInner()
 	lastGrowUp = growUp
 end
 
-local function CenterNow()
-	local profiler = BUI.Prof
-	if profiler.active then
-		local startTime = debugprofilestop()
-		CenterNowInner()
-		profiler.Add(CDM.ProfKey('center', 'buffs'), debugprofilestop() - startTime)
-	else
-		CenterNowInner()
-	end
-end
-
 local function ScheduleCenter()
 	if not active then return end
 	if not pendingFrame then
 		pendingFrame = CreateFrame("Frame", "BUI_CDMBuffCenterFlush")
-		SetScript(pendingFrame, "OnUpdate", function(self)
+		pendingFrame:SetScript("OnUpdate", function(self)
 			self:Hide()
 			CenterNow()
 		end)

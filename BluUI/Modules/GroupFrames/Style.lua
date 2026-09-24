@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('GroupFrames.Style')
 
 local GroupFrames    = BUI.GroupFrames
 local Util  = GroupFrames.Util
@@ -581,46 +580,43 @@ local function ApplySecureClicks(frame)
 end
 
 local function HookTooltip(frame)
-	HookScript(frame, "OnEnter", function(self)
+	frame:HookScript("OnEnter", function(self)
 		local settings = GroupFrames.SettingsForFrame(self)
 		if not settings.showUnitTooltips or not self.unit or not UnitExists(self.unit) then return end
 		if GetMouseFoci()[1] ~= self then return end
 		GameTooltip_SetDefaultAnchor(GameTooltip, self)
 		GameTooltip:SetUnit(self.unit)
 	end)
-	HookScript(frame, "OnLeave", function() GameTooltip:Hide() end)
+	frame:HookScript("OnLeave", function() GameTooltip:Hide() end)
 end
 
 local function GroupFrameStyle(frame, unit)
-	BUI.Prof.After('GroupFrames.Style', 0, function() ApplySecureClicks(frame) end)
-	HookScript(frame, "OnShow", function(self)
+	C_Timer.After(0, function() ApplySecureClicks(frame) end)
+	frame:HookScript("OnShow", function(self)
 		if self._bluClicksMode == GroupFrames.GetDB().clickMode and self:GetFrameStrata() == "LOW" then return end
-		BUI.Prof.After('GroupFrames.Style', 0, function() ApplySecureClicks(self) end)
+		C_Timer.After(0, function() ApplySecureClicks(self) end)
 	end)
 
 	HookTooltip(frame)
 
-	local Measure = BUI.Prof.Measure
-	Measure("gf.style#Backdrop", BuildBackdrop, frame, unit)
-	Measure("gf.style#Health", BuildHealth, frame, unit)
-	Measure("gf.style#Power", BuildPower, frame, unit)
-	Measure("gf.style#Text", BuildText, frame, unit)
-	Measure("gf.style#Absorb", BuildAbsorb, frame, unit)
-	Measure("gf.style#Indicators", GroupFrames.BuildIndicators, frame, unit)
-	Measure("gf.style#Selection", GroupFrames.BuildSelection, frame, unit)
-	Measure("gf.style#RangeFade", BuildRangeFade, frame, unit)
-	Measure("gf.style#MissingRaidBuff", GroupFrames.BuildMissingRaidBuff, frame, unit)
-	Measure("gf.style#Keystone", GroupFrames.BuildKeystone, frame, unit)
+	BuildBackdrop(frame, unit)
+	BuildHealth(frame, unit)
+	BuildPower(frame, unit)
+	BuildText(frame, unit)
+	BuildAbsorb(frame, unit)
+	GroupFrames.BuildIndicators(frame, unit)
+	GroupFrames.BuildSelection(frame, unit)
+	BuildRangeFade(frame, unit)
+	GroupFrames.BuildKeystone(frame, unit)
 
-	Measure("gf.style#Geometry", GroupFrames.ApplyGeometry, frame, GroupFrames.SettingsForFrame(frame))
+	GroupFrames.ApplyGeometry(frame, GroupFrames.SettingsForFrame(frame))
 	if frame:GetAttribute("unit") then
-		Measure("gf.style#AuraContainers", GroupFrames.BuildAuraContainers, frame, unit)
-		Measure("gf.style#Reachability", GroupFrames.AttachReachabilityHooks, frame)
+		GroupFrames.BuildAuraContainers(frame, unit)
+		GroupFrames.AttachReachabilityHooks(frame)
 	else
-		HookScript(frame, "OnAttributeChanged", function(self, name, value)
-			if BUI.Prof.active then BUI.Prof.Count("gfattr#" .. tostring(name)) end
+		frame:HookScript("OnAttributeChanged", function(self, name, value)
 			if name ~= "unit" or not value or self._auraWatcher then return end
-			BUI.Prof.After("GroupFrames.Style", 0, function() GroupFrames.FinishChildAuraSetup(self) end)
+			C_Timer.After(0, function() GroupFrames.FinishChildAuraSetup(self) end)
 		end)
 	end
 end

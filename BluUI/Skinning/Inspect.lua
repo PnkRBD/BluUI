@@ -1,7 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('Inspect')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('inspect')
 local ipairs = ipairs
 local floor = math.floor
 local max = math.max
@@ -335,8 +333,8 @@ local function CreateGemFrame()
 	gem.icon:SetPoint('TOPLEFT', 1, -1)
 	gem.icon:SetPoint('BOTTOMRIGHT', -1, 1)
 	gem:EnableMouse(true)
-	SetScript(gem, 'OnEnter', GemTooltip)
-	SetScript(gem, 'OnLeave', function() GameTooltip:Hide() end)
+	gem:SetScript('OnEnter', GemTooltip)
+	gem:SetScript('OnLeave', function() GameTooltip:Hide() end)
 	gem:Hide()
 	return gem
 end
@@ -416,8 +414,8 @@ local function CreateSlotLabels(button, info)
 	labels.hover:SetPoint(inner, button, outer, offsetX, -LABEL_LINE_Y)
 	labels.hover:EnableMouse(true)
 	labels.hover.anchor = outer == 'RIGHT' and 'ANCHOR_RIGHT' or 'ANCHOR_LEFT'
-	SetScript(labels.hover, 'OnEnter', EnchantTooltip)
-	SetScript(labels.hover, 'OnLeave', function() GameTooltip:Hide() end)
+	labels.hover:SetScript('OnEnter', EnchantTooltip)
+	labels.hover:SetScript('OnLeave', function() GameTooltip:Hide() end)
 	labels.hover:Hide()
 
 	return labels
@@ -638,7 +636,7 @@ local function Install()
 	local frame = _G.InspectFrame
 	if not frame then return end
 	installed = true
-	HookScript(frame, 'OnShow', Apply)
+	frame:HookScript('OnShow', Apply)
 	hooksecurefunc('InspectPaperDollItemSlotButton_Update', RefreshSlot)
 	BUI.Events:Register('INSPECT_READY', 'Skin.InspectLevels', function()
 		if not Enabled() or not skinned then return end

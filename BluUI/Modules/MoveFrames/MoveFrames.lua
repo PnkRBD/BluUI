@@ -1,6 +1,4 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('MoveFrames.MoveFrames')
-local hooksecurefunc = BUI.Prof.MakeHooker('MoveFrames.MoveFrames')
 
 local Events = BUI.Events
 
@@ -418,8 +416,8 @@ local function OnHandleMouseUp(handle, button)
 end
 
 local function InstallHandleHooks(handle)
-	if handle:HasScript('OnMouseDown') then HookScript(handle, 'OnMouseDown', OnHandleMouseDown) end
-	if handle:HasScript('OnMouseUp') then HookScript(handle, 'OnMouseUp', OnHandleMouseUp) end
+	if handle:HasScript('OnMouseDown') then handle:HookScript('OnMouseDown', OnHandleMouseDown) end
+	if handle:HasScript('OnMouseUp') then handle:HookScript('OnMouseUp', OnHandleMouseUp) end
 end
 
 local function HookFrame(path, rootPath)
@@ -448,9 +446,9 @@ local function HookFrame(path, rootPath)
 		if scriptName ~= 'OnMouseDown' and scriptName ~= 'OnMouseUp' then return end
 		rehooking = true
 		if scriptName == 'OnMouseDown' then
-			HookScript(handle, 'OnMouseDown', OnHandleMouseDown)
+			handle:HookScript('OnMouseDown', OnHandleMouseDown)
 		else
-			HookScript(handle, 'OnMouseUp', OnHandleMouseUp)
+			handle:HookScript('OnMouseUp', OnHandleMouseUp)
 		end
 		rehooking = false
 	end)
@@ -461,8 +459,8 @@ local function HookFrame(path, rootPath)
 		target:SetClampedToScreen(true)
 		SnapshotBlizzardPoints(target)
 		hooksecurefunc(target, 'SetPoint', OnTargetSetPoint)
-		HookScript(target, 'OnHide', OnTargetHide)
-		HookScript(target, 'OnShow', OnTargetShow)
+		target:HookScript('OnHide', OnTargetHide)
+		target:HookScript('OnShow', OnTargetShow)
 		ApplySavedPosition(target)
 	end
 end

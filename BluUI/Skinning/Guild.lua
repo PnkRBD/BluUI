@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Guild')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('guild')
 local ipairs, pairs = ipairs, pairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -227,7 +225,7 @@ local function SkinSideTab(tab, onClick)
 	tab._buiGuildTab = true
 	Skin.SideTab(context, tab, SIDE_TAB_OPTIONS)
 	skinnedSideTabs[#skinnedSideTabs + 1] = tab
-	HookScript(tab, 'OnClick', onClick)
+	tab:HookScript('OnClick', onClick)
 	RefreshTabSelected(tab)
 end
 
@@ -1284,7 +1282,7 @@ local function InstallCommunities()
 	local frame = _G.CommunitiesFrame
 	if not frame then return end
 	communitiesInstalled = true
-	HookScript(frame, 'OnShow', ApplyCommunities)
+	frame:HookScript('OnShow', ApplyCommunities)
 	if frame:IsShown() then ApplyCommunities() end
 end
 
@@ -1293,7 +1291,7 @@ local function InstallGuildBank()
 	local frame = _G.GuildBankFrame
 	if not frame then return end
 	bankInstalled = true
-	HookScript(frame, 'OnShow', ApplyGuildBank)
+	frame:HookScript('OnShow', ApplyGuildBank)
 	if frame.Update then hooksecurefunc(frame, 'Update', RefreshBankSlots) end
 	if frame.UpdateTabs then hooksecurefunc(frame, 'UpdateTabs', RefreshBankTabs) end
 	if frame:IsShown() then ApplyGuildBank() end
@@ -1304,7 +1302,7 @@ local function InstallGuildControl()
 	local frame = _G.GuildControlUI
 	if not frame then return end
 	controlInstalled = true
-	HookScript(frame, 'OnShow', ApplyGuildControl)
+	frame:HookScript('OnShow', ApplyGuildControl)
 	hooksecurefunc('GuildControlUI_RankOrder_Update', SkinRankRows)
 	hooksecurefunc('GuildControlUI_BankTabPermissions_Update', SkinBankPermissionRows)
 	hooksecurefunc('GuildControlUI_Discord_Update', SkinDiscordPanels)

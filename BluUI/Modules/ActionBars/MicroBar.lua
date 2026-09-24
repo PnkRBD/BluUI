@@ -1,7 +1,6 @@
 local _, BUI = ...
 
 local ActionBars = BUI.ActionBars
-local hooksecurefunc = ActionBars.hooksecurefunc
 
 local BLIZZARD_PADDING = -5
 local SIZE_TOLERANCE = 0.5

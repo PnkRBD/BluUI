@@ -1,7 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('WorldMap.InstancePins')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('instancepins')
 local Pixel = BUI.Pixel
 
 BUI.WorldMapInstancePins = {}
@@ -45,7 +43,7 @@ local function AcquirePin(shelf)
     pin.label:SetShadowColor(0, 0, 0, 0.9)
     pin.label:SetShadowOffset(1, -1)
     pin.label:SetPoint('TOP', pin, 'BOTTOM', 0, -1)
-    SetScript(pin, 'OnEnter', function(self)
+    pin:SetScript('OnEnter', function(self)
         self.icon:SetVertexColor(1, 0.82, 0)
         GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
         GameTooltip:SetText(self._name or '', 1, 1, 1)
@@ -60,7 +58,7 @@ local function AcquirePin(shelf)
         GameTooltip:AddLine('Click to view zone', 0.5, 0.5, 0.5)
         GameTooltip:Show()
     end)
-    SetScript(pin, 'OnLeave', function(self)
+    pin:SetScript('OnLeave', function(self)
         self.icon:SetVertexColor(1, 1, 1)
         GameTooltip:Hide()
     end)
@@ -145,7 +143,7 @@ local OnCanvasScaleChanged = BUI.Dispatcher.New(Update, 'WorldMapPins.Rescale')
 BUI.Events:OnLogin('WorldMapInstancePins', function()
     if not WorldMapFrame then return end
     hooksecurefunc(WorldMapFrame, 'OnMapChanged', Update)
-    HookScript(WorldMapFrame, 'OnShow', Update)
+    WorldMapFrame:HookScript('OnShow', Update)
     local scroll = WorldMapFrame.ScrollContainer
     if scroll and scroll.SetCanvasScale then
         hooksecurefunc(scroll, 'SetCanvasScale', OnCanvasScaleChanged)

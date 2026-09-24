@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('ActionBars.Fade')
 
 local ActionBars = BUI.ActionBars
 local LibActionButton = LibStub('LibActionButton-1.0-BluUI')
@@ -109,7 +108,7 @@ end
 
 local function StartGapWatch(bar)
 	if bar.gapWatch then return end
-	bar.gapWatch = BUI.Prof.NewTicker('ActionBars.FadeGap', GAP_INTERVAL, function()
+	bar.gapWatch = C_Timer.NewTicker(GAP_INTERVAL, function()
 		if (bar.hoverCount or 0) > 0 then
 			StopGapWatch(bar)
 		elseif not CursorOverBar(bar) then
@@ -131,7 +130,7 @@ local function Leave(bar)
 	bar.hoverCount = math.max(0, (bar.hoverCount or 0) - 1)
 	if bar.hoverCount > 0 or bar.leavePending then return end
 	bar.leavePending = true
-	BUI.Prof.After('ActionBars.Fade', 0, function()
+	C_Timer.After(0, function()
 		bar.leavePending = nil
 		if bar.hoverCount > 0 then return end
 		if CursorOverBar(bar) then
@@ -159,8 +158,8 @@ local function HookHoverFrame(frame, bar)
 	frame._buiFadeBar = bar
 	if frame._buiFadeHooked then return end
 	frame._buiFadeHooked = true
-	HookScript(frame, 'OnEnter', OnFrameEnter)
-	HookScript(frame, 'OnLeave', OnFrameLeave)
+	frame:HookScript('OnEnter', OnFrameEnter)
+	frame:HookScript('OnLeave', OnFrameLeave)
 end
 
 function ActionBars.HookFadeFrames(bar, frames)
@@ -173,12 +172,12 @@ end
 local function HookFlyoutButton(button)
 	if button._buiFadeHooked then return end
 	button._buiFadeHooked = true
-	HookScript(button, 'OnEnter', OnFlyoutButtonEnter)
-	HookScript(button, 'OnLeave', OnFlyoutButtonLeave)
+	button:HookScript('OnEnter', OnFlyoutButtonEnter)
+	button:HookScript('OnLeave', OnFlyoutButtonLeave)
 	local handler = LibActionButton.flyoutHandler
 	if handler and not handler._buiFadeHooked then
 		handler._buiFadeHooked = true
-		HookScript(handler, 'OnHide', OnFlyoutHidden)
+		handler:HookScript('OnHide', OnFlyoutHidden)
 	end
 end
 
@@ -193,7 +192,7 @@ end
 local function EnsureHooks(bar)
 	local header = bar.header
 	if not header._buiFadeHooked then
-		HookScript(header, 'OnShow', OnHeaderShown)
+		header:HookScript('OnShow', OnHeaderShown)
 	end
 	HookHoverFrame(header, bar)
 	for _, button in ipairs(bar.buttons) do HookHoverFrame(button, bar) end

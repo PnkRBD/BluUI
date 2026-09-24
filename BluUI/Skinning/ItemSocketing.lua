@@ -1,10 +1,8 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('ItemSocketing')
 
 local ipairs = ipairs
 local select = select
 
-local hooksecurefunc = BUI.Prof.MakeHooker('itemsocketing')
 local Skin = BUI.Skinning
 
 local SKIN_ID = 'itemsocketing'
@@ -106,7 +104,7 @@ local function Install()
 	local frame = _G.ItemSocketingFrame
 	if not frame then return end
 	installed = true
-	HookScript(frame, 'OnShow', Apply)
+	frame:HookScript('OnShow', Apply)
 	if frame:IsShown() then Apply() end
 end
 

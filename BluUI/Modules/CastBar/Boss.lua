@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('CastBar.Boss')
 
 local CastBar = BUI.CastBar
 local Pixel = BUI.Pixel
@@ -95,8 +94,8 @@ function CastBar.CreateBossCastbar(frame)
 	castbar.Time = time
 	castbar.timeToHold = 0.5
 
-	HookScript(castbar, 'OnShow', function() container:Show() end)
-	HookScript(castbar, 'OnHide', function() container:Hide() end)
+	castbar:HookScript('OnShow', function() container:Show() end)
+	castbar:HookScript('OnHide', function() container:Hide() end)
 	castbar.PostCastStart = BossPostCastStart
 	castbar.PostCastStop = function(bar) CastBar.HideInterruptOverlays(bar) end
 	castbar.PostCastInterrupted = function(bar) bar._interrupted = true; CastBar.HideInterruptOverlays(bar); bar:SetStatusBarColor(1, 0, 0, 1) end
@@ -125,7 +124,7 @@ function CastBar.ApplyBossCastbar(frame, index)
 	if frame:GetWidth() == 0 then
 		if not frame._castbarSizeHooked then
 			frame._castbarSizeHooked = true
-			HookScript(frame, 'OnSizeChanged', function(self)
+			frame:HookScript('OnSizeChanged', function(self)
 				if self:GetWidth() > 0 and self.Castbar then
 					CastBar.ApplyBossCastbar(self)
 				end

@@ -245,7 +245,7 @@ CheckPet = function()
                 return
             elseif not attackRecheckPending then
                 attackRecheckPending = true
-                BUI.Prof.After('Auras.Auras', ATTACK_GRACE - elapsed + 0.05, function()
+                C_Timer.After(ATTACK_GRACE - elapsed + 0.05, function()
                     attackRecheckPending = false
                     ScheduleCheck()
                 end)

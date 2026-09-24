@@ -6,7 +6,6 @@
 ## SavedVariables: BluUI_DB
 ## IconTexture: Interface\AddOns\BluUI\Media\Icon\logo_small
 
-Core\LoadStart.lua
 Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
 Libs\Ace3\AceAddon-3.0\AceAddon-3.0.lua
@@ -26,7 +25,6 @@ Libs\LibActionButton-1.0\LibActionButton-1.0.lua
 
 Libs\BUILib\BUILib.xml
 
-Utility\Prof.lua
 
 Core\Constants.lua
 Core\Defaults.lua
@@ -93,7 +91,6 @@ Modules\GroupFrames\Indicators.lua
 Modules\GroupFrames\Auras.lua
 Modules\GroupFrames\Dispel.lua
 Modules\GroupFrames\PrivateAuras.lua
-Modules\GroupFrames\MissingRaidBuff.lua
 Modules\GroupFrames\Keystone.lua
 Modules\GroupFrames\BlizzardHide.lua
 Modules\GroupFrames\Party.lua
@@ -138,7 +135,6 @@ Modules\ActionBars\KeyPress.lua
 Modules\ActionBars\Initialize.lua
 
 Modules\CDM\Core.lua
-Modules\CDM\Profiler.lua
 Modules\CDM\PerSpec.lua
 Modules\CDM\Checks.lua
 Modules\CDM\Glow.lua

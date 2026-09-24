@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('Datatext.Panel')
 
 local Datatext = BUI.Datatext
 local Pixel = BUI.Pixel
@@ -74,15 +73,15 @@ function Datatext.CreateHoverPanel(name, width)
     panel.introFade = panel:CreateAnimationGroup()
     local fade = panel.introFade:CreateAnimation('Alpha')
     fade:SetFromAlpha(0); fade:SetToAlpha(1); fade:SetDuration(0.12); fade:SetSmoothing('OUT')
-    SetScript(panel.introFade, 'OnFinished', function() panel:SetAlpha(1) end)
+    panel.introFade:SetScript('OnFinished', function() panel:SetAlpha(1) end)
 
     panel.outroFade = panel:CreateAnimationGroup()
     local outro = panel.outroFade:CreateAnimation('Alpha')
     outro:SetFromAlpha(1); outro:SetToAlpha(0); outro:SetDuration(0.22); outro:SetSmoothing('IN')
-    SetScript(panel.outroFade, 'OnFinished', function() panel._fadingOut = false; panel:Hide() end)
+    panel.outroFade:SetScript('OnFinished', function() panel._fadingOut = false; panel:Hide() end)
 
     panel.Reveal, panel.FadeOut, panel.ForceHide = Reveal, FadeOut, ForceHide
-    SetScript(panel, 'OnUpdate', OnUpdate)
+    panel:SetScript('OnUpdate', OnUpdate)
 
     hoverPanels[#hoverPanels + 1] = panel
     return panel

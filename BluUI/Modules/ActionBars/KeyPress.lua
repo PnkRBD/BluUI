@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('ActionBars.KeyPress')
 
 local ActionBars = BUI.ActionBars
 
@@ -133,7 +132,7 @@ local function VerifyHeld()
 	if not next(heldKeys) then pollFrame:Hide() end
 end
 
-SetScript(pollFrame, 'OnUpdate', VerifyHeld)
+pollFrame:SetScript('OnUpdate', VerifyHeld)
 
 local function OnInputDown(keyName)
 	if not running then return end
@@ -164,8 +163,8 @@ local function StartListener()
 		listener = CreateFrame('Frame', nil, UIParent)
 		listener:EnableKeyboard(true)
 		listener:SetPropagateKeyboardInput(true)
-		SetScript(listener, 'OnKeyDown', function(_, key) OnInputDown(key) end)
-		SetScript(listener, 'OnKeyUp', function(_, key) OnInputUp(key) end)
+		listener:SetScript('OnKeyDown', function(_, key) OnInputDown(key) end)
+		listener:SetScript('OnKeyUp', function(_, key) OnInputUp(key) end)
 	end
 	listener:Show()
 	BUI.Events:Register('GLOBAL_MOUSE_DOWN', 'ActionBars.KeyPress', function(_, mouseButton)

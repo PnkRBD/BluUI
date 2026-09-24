@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('CDM.Skinning')
 
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
@@ -7,11 +6,6 @@ local BLANK = BUI.C.FALLBACK_TEXTURE
 local FrameData = CDM.FrameData
 local GetFrameData = CDM.GetFrameData
 local PackInto = CDM.PackInto
-
-local function IconHook(icon)
-    local frameData = FrameData[icon]
-    return CDM.ProfHooker(frameData and frameData.viewerKey)
-end
 
 local COUNT_HOST_LEVEL = 30
 
@@ -64,7 +58,7 @@ local function KillOverlays(icon)
                 region:SetAtlas(nil)
                 region:Hide()
                 region:SetAlpha(0)
-                IconHook(icon)(region, "Show", SuppressShow)
+                hooksecurefunc(region, "Show", SuppressShow)
             end
         end
     end
@@ -80,12 +74,12 @@ local function KillDebuffBorder(icon)
 
     debuffBorder:Hide()
     debuffBorder:SetAlpha(0)
-    IconHook(icon)(debuffBorder, "Show", SuppressShow)
+    hooksecurefunc(debuffBorder, "Show", SuppressShow)
 
     if debuffBorder.Texture then
         debuffBorder.Texture:Hide()
         debuffBorder.Texture:SetAlpha(0)
-        IconHook(icon)(debuffBorder.Texture, "Show", SuppressShow)
+        hooksecurefunc(debuffBorder.Texture, "Show", SuppressShow)
     end
 
     if not borderFrameData then borderFrameData = GetFrameData(debuffBorder) end
@@ -286,8 +280,8 @@ local function HookIconDesaturation(icon)
         applying = false
     end
 
-    IconHook(icon)(texture, "SetDesaturation", reapply)
-    IconHook(icon)(texture, "SetDesaturated", reapply)
+    hooksecurefunc(texture, "SetDesaturation", reapply)
+    hooksecurefunc(texture, "SetDesaturated", reapply)
 end
 
 local function ReenforceCooldownStyle(cooldown)
@@ -389,12 +383,12 @@ local function SetupCooldown(icon)
 
     if not cooldownFrameData.cdHooked then
         cooldownFrameData.cdHooked = true
-        IconHook(icon)(cooldown, 'SetCooldown', OnCooldownApplied)
-        IconHook(icon)(cooldown, 'SetCooldownFromDurationObject', ReenforceCooldownStyle)
-        IconHook(icon)(cooldown, 'SetDrawEdge', ReclaimDrawEdge)
-        IconHook(icon)(cooldown, 'SetReverse', ReclaimReverse)
-        IconHook(icon)(cooldown, 'SetSwipeColor', ReclaimSwipeColor)
-        IconHook(icon)(cooldown, 'SetDrawBling', ReclaimBling)
+        hooksecurefunc(cooldown, 'SetCooldown', OnCooldownApplied)
+        hooksecurefunc(cooldown, 'SetCooldownFromDurationObject', ReenforceCooldownStyle)
+        hooksecurefunc(cooldown, 'SetDrawEdge', ReclaimDrawEdge)
+        hooksecurefunc(cooldown, 'SetReverse', ReclaimReverse)
+        hooksecurefunc(cooldown, 'SetSwipeColor', ReclaimSwipeColor)
+        hooksecurefunc(cooldown, 'SetDrawBling', ReclaimBling)
     end
 end
 
@@ -571,7 +565,7 @@ function CDM.SkinIcon(icon, settings, key)
 
     if not iconFrameData.texHooked then
         iconFrameData.texHooked = true
-        IconHook(icon)(texture, 'SetTexture', OnIconTextureChanged)
+        hooksecurefunc(texture, 'SetTexture', OnIconTextureChanged)
     end
     CDM.ApplyIconOverrideTexture(icon)
 
@@ -635,10 +629,10 @@ function CDM.SkinIcon(icon, settings, key)
         if not flashFrameData or not flashFrameData.showHooked then
             if not flashFrameData then flashFrameData = GetFrameData(icon.CooldownFlash) end
             flashFrameData.showHooked = true
-            IconHook(icon)(icon.CooldownFlash, "Show", CDM.OnCooldownFlashShow)
+            hooksecurefunc(icon.CooldownFlash, "Show", CDM.OnCooldownFlashShow)
             local anim = icon.CooldownFlash.FlashAnim
             if anim then
-                IconHook(icon)(anim, "Play", CDM.OnCooldownFlashPlay)
+                hooksecurefunc(anim, "Play", CDM.OnCooldownFlashPlay)
             end
         end
         flashFrameData.viewerKey = key
@@ -704,7 +698,7 @@ function CDM.SkinIcon(icon, settings, key)
     if not iconFrameData then iconFrameData = GetFrameData(icon) end
     if not iconFrameData.customIcon and not iconFrameData.tooltipHooked then
         iconFrameData.tooltipHooked = true
-        HookScript(icon, "OnEnter", OnBlizzardIconEnter)
+        icon:HookScript("OnEnter", OnBlizzardIconEnter)
     end
 
     iconFrameData.viewerKey = key
@@ -770,17 +764,5 @@ function CDM.UnskinViewer(key)
         if CDM.IsCooldownIcon(frame) then
             CDM.UnskinIcon(frame)
         end
-    end
-end
-
-local RealSkinIcon = CDM.SkinIcon
-function CDM.SkinIcon(icon, settings, key)
-    local profiler = BUI.Prof
-    if profiler.active then
-        local startTime = debugprofilestop()
-        RealSkinIcon(icon, settings, key)
-        profiler.Add(CDM.ProfKey('skinIcon', key), debugprofilestop() - startTime)
-    else
-        RealSkinIcon(icon, settings, key)
     end
 end

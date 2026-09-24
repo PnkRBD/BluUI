@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('GroupLoot')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('grouploot')
 local select, type = select, type
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -126,7 +124,7 @@ local function Install()
 	if _G.GroupLootContainer_AddFrame then hooksecurefunc('GroupLootContainer_AddFrame', Resweep) end
 	if _G.GroupLootContainer_Update then hooksecurefunc('GroupLootContainer_Update', Resweep) end
 	local container = _G.GroupLootContainer
-	if container then HookScript(container, 'OnShow', Resweep) end
+	if container then container:HookScript('OnShow', Resweep) end
 	BUI.Events:Register('START_LOOT_ROLL', 'Skin.GroupLoot', Resweep)
 	Resweep()
 end

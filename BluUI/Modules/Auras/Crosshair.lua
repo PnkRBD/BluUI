@@ -221,7 +221,7 @@ end
 
 local function StartRangeTicker()
     if not rangeTicker then
-        rangeTicker = BUI.Prof.NewTicker('Auras.Crosshair', RANGE_TICK, BUI.Prof.Wrap('tick#CrosshairRange', UpdateColor))
+        rangeTicker = C_Timer.NewTicker(RANGE_TICK, UpdateColor)
     end
 end
 

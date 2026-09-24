@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Settings.Settings')
 local AceHook = LibStub('AceHook-3.0')
 
 local Pixel = BUI.Pixel
@@ -39,7 +38,7 @@ local function HideFrameToggle(key, getFrame)
         if enabled then
             frame:Hide()
             if not AceHook.IsHooked(BUI, frame, "OnShow") then
-                AceHook.HookScript(BUI, frame, "OnShow", BUI.Prof.Wrap('Settings#OnShow', function(self) self:Hide() end))
+                AceHook.HookScript(BUI, frame, "OnShow", function(self) self:Hide() end)
             end
         else
             if AceHook.IsHooked(BUI, frame, "OnShow") then AceHook.Unhook(BUI, frame, "OnShow") end
@@ -154,7 +153,7 @@ do
                 local info = C_Container.GetContainerItemInfo(bag, slot)
                 if info and info.quality == Enum.ItemQuality.Poor and not info.hasNoValue then
                     C_Container.UseContainerItem(bag, slot)
-                    BUI.Prof.After('Settings.Settings', 0.2, SellNext)
+                    C_Timer.After(0.2, SellNext)
                     return
                 end
             end
@@ -178,7 +177,7 @@ do
             StopSelling()
             sellActive = true
             BUI.Events:Register("UI_ERROR_MESSAGE", "Settings.junkSell", OnSellError)
-            BUI.Prof.After('Settings.Settings', 0.3, SellNext)
+            C_Timer.After(0.3, SellNext)
         elseif event == "MERCHANT_CLOSED" then
             StopSelling()
         end
@@ -345,7 +344,7 @@ do
 			pendingGossipType = event == 'QUEST_GREETING' and 'greeting' or 'gossip'
 			if not gossipPending then
 				gossipPending = true
-				BUI.Prof.After('Settings.Settings', 0, DeferredGossip)
+				C_Timer.After(0, DeferredGossip)
 			end
 		elseif event == 'QUEST_DETAIL' and WantAccept() then
 			if not IsQuestLogFull() then AcceptQuest() end
@@ -361,7 +360,7 @@ do
 		elseif event == 'QUEST_COMPLETE' and WantComplete() then
 			if not completePending then
 				completePending = true
-				BUI.Prof.After('Settings.Settings', 0, DeferredComplete)
+				C_Timer.After(0, DeferredComplete)
 			end
 		elseif event == 'QUEST_AUTOCOMPLETE' and WantComplete() then
 			local index = arg1 and C_QuestLog.GetLogIndexForQuestID(arg1)
@@ -507,7 +506,7 @@ end)
 Settings.ToggleAutoConfirmRole = function(_, enabled)
 	if enabled then
 		if not LFDRoleCheckPopupAcceptButton then return end
-		HookScript(LFDRoleCheckPopupAcceptButton, 'OnShow', function(self)
+		LFDRoleCheckPopupAcceptButton:HookScript('OnShow', function(self)
 			if not BUI.GetDB().social.autoConfirmRole then return end
 			self:Click()
 		end)
@@ -584,14 +583,14 @@ Settings.ToggleFasterMovieSkip = function(_, enabled)
         if not frame or not button then return end
         if enabled then
             if not AceHook.IsHooked(BUI, frame, "OnKeyUp") then
-                AceHook.HookScript(BUI, frame, "OnKeyUp", BUI.Prof.Wrap('Settings#OnKeyUp', function(_, key)
+                AceHook.HookScript(BUI, frame, "OnKeyUp", function(_, key)
                     if key == "ESCAPE" or key == "SPACE" or key == "ENTER" then button:Click() end
-                end))
+                end)
             end
             if not AceHook.IsHooked(BUI, frame, "OnShow") then
-                AceHook.HookScript(BUI, frame, "OnShow", BUI.Prof.Wrap('Settings#OnShow', function()
-                    BUI.Prof.After('Settings.Settings', 0, function() if frame:IsShown() and button then button:Click() end end)
-                end))
+                AceHook.HookScript(BUI, frame, "OnShow", function()
+                    C_Timer.After(0, function() if frame:IsShown() and button then button:Click() end end)
+                end)
             end
         else
             if AceHook.IsHooked(BUI, frame, "OnKeyUp") then AceHook.Unhook(BUI, frame, "OnKeyUp") end

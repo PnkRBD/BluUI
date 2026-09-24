@@ -1,5 +1,4 @@
 local BUI = BluUI
-local SetScript, HookScript = BUI.Prof.Scripts('Pages.Power')
 
 local BUILib = BluUI.BUILibClient
 local Controls, Layout, Modals = BUILib.Controls, BUILib.Layout, BUILib.Modals
@@ -179,13 +178,13 @@ local function LockAnchorCardIfStacked(card, selfTag)
         local overlay, text = Widget.AttachLockOverlay(frame, { nonGridPad = 0 })
         text:SetText('STACKED')
         overlay:Show()
-        SetScript(overlay, 'OnEnter', function(overlayFrame) Widget.ShowTip(overlayFrame, 'Position is set by Stacking. Detach the bar to edit it.') end)
-        SetScript(overlay, 'OnLeave', function() Widget.HideTip() end)
+        overlay:SetScript('OnEnter', function(overlayFrame) Widget.ShowTip(overlayFrame, 'Position is set by Stacking. Detach the bar to edit it.') end)
+        overlay:SetScript('OnLeave', function() Widget.HideTip() end)
     end
     refresh()
     if not frame._buiStackLockHook then
         frame._buiStackLockHook = true
-        HookScript(frame, 'OnShow', refresh)
+        frame:HookScript('OnShow', refresh)
     end
 end
 
@@ -222,7 +221,7 @@ local function AddPositionRow(sections, positionDb, applyFn, selfTag)
                 selfTag = selfTag,
                 matchWidth = {
                     get = function() return positionDb.matchAnchorWidth == true end,
-                    set = function(value) positionDb.matchAnchorWidth = value; BUI.Prof.After('Pages.Power', 0.1, applyFn) end,
+                    set = function(value) positionDb.matchAnchorWidth = value; C_Timer.After(0.1, applyFn) end,
                 },
             }) }
         end,
@@ -353,7 +352,7 @@ local function BuildPowerPreview(parent)
         if card:IsVisible() then card:UpdatePreview() end
     end, 'Power.Preview')
 
-    SetScript(card, 'OnShow', function()
+    card:SetScript('OnShow', function()
         BUI.Events:RegisterUnit('UNIT_POWER_FREQUENT', 'player', EVENT_KEY, QueueUpdate)
         BUI.Events:RegisterUnit('UNIT_POWER_POINT_CHARGE', 'player', EVENT_KEY, QueueUpdate)
         BUI.Events:RegisterUnit('UNIT_MAXPOWER', 'player', EVENT_KEY, QueueUpdate)
@@ -361,7 +360,7 @@ local function BuildPowerPreview(parent)
         BUI.Events:Register('RUNE_POWER_UPDATE', EVENT_KEY, QueueUpdate)
         QueueUpdate()
     end)
-    SetScript(card, 'OnHide', function()
+    card:SetScript('OnHide', function()
         BUI.Events:UnregisterAll(EVENT_KEY)
         SyncPoll(false)
     end)
@@ -1958,10 +1957,10 @@ BUI.PageEngine.RegisterPage("power", {
         badge.fs = badge:CreateFontString(nil, 'OVERLAY')
         badge.fs:SetFont(BUILib.Font, 10, 'OUTLINE')
         badge.fs:SetPoint('CENTER')
-        SetScript(badge, 'OnEnter', function(self)
+        badge:SetScript('OnEnter', function(self)
             Widget.ShowTip(self, ScopeStatusText() .. '\nChange under General > Settings Scope.')
         end)
-        SetScript(badge, 'OnLeave', function() Widget.HideTip() end)
+        badge:SetScript('OnLeave', function() Widget.HideTip() end)
 
         UpdateScopeBadge = function()
             local scope, label, detail = ScopeInfo()
@@ -1978,7 +1977,7 @@ BUI.PageEngine.RegisterPage("power", {
         end
         UpdateScopeBadge()
 
-        SetScript(pageFrame, 'OnShow', function()
+        pageFrame:SetScript('OnShow', function()
             SyncTitle()
             preview:UpdatePreview()
             UpdateScopeBadge()

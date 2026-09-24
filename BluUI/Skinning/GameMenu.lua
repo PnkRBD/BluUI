@@ -1,7 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('GameMenu')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('gamemenu')
 local CreateFrame = CreateFrame
 local InCombatLockdown = InCombatLockdown
 local HideUIPanel = HideUIPanel
@@ -56,13 +54,13 @@ local function BUIOnLeave(self)
 end
 
 local function EnsureHover(button)
-	if BUI.Prof.Unwrap(button:GetScript('OnEnter')) ~= BUIOnEnter then
+	if button:GetScript('OnEnter') ~= BUIOnEnter then
 		button._buiOrigEnter = button:GetScript('OnEnter')
-		SetScript(button, 'OnEnter', BUIOnEnter)
+		button:SetScript('OnEnter', BUIOnEnter)
 	end
-	if BUI.Prof.Unwrap(button:GetScript('OnLeave')) ~= BUIOnLeave then
+	if button:GetScript('OnLeave') ~= BUIOnLeave then
 		button._buiOrigLeave = button:GetScript('OnLeave')
-		SetScript(button, 'OnLeave', BUIOnLeave)
+		button:SetScript('OnLeave', BUIOnLeave)
 	end
 	if button.SetMotionScriptsWhileDisabled then button:SetMotionScriptsWhileDisabled(true) end
 end
@@ -109,7 +107,7 @@ local function EnsureBUIButton(frame)
 	fontString:SetPoint('CENTER')
 	fontString:SetText('BluUI')
 	button:SetFontString(fontString)
-	SetScript(button, 'OnClick', OnBUIClick)
+	button:SetScript('OnClick', OnBUIClick)
 	frame.BUIButton = button
 	return button
 end
@@ -243,7 +241,7 @@ local function EnsureDim(frame)
 
 	dim:EnableMouse(true)
 	dim:EnableMouseWheel(true)
-	SetScript(dim, 'OnMouseWheel', function() end)
+	dim:SetScript('OnMouseWheel', function() end)
 	local texture = dim:CreateTexture(nil, 'BACKGROUND')
 	texture:SetAllPoints(dim)
 	texture:SetColorTexture(0, 0, 0, 0.6)
@@ -269,7 +267,7 @@ local function Install()
 	if frame.Layout then hooksecurefunc(frame, 'Layout', Refresh) end
 	if frame.InitButtons then hooksecurefunc(frame, 'InitButtons', Refresh) end
 
-	HookScript(frame, 'OnShow', function(self)
+	frame:HookScript('OnShow', function(self)
 		if not Skin.IsSkinEnabled('gameMenu') then return end
 		HideBlizzArt(self)
 		Refresh(self)
@@ -280,7 +278,7 @@ local function Install()
 			dim:Show()
 		end
 	end)
-	HookScript(frame, 'OnHide', function(self)
+	frame:HookScript('OnHide', function(self)
 		if self._buiDim then self._buiDim:Hide() end
 	end)
 
@@ -292,8 +290,8 @@ BUI.Events:OnLogin('Skinning.GameMenu', Install)
 local function RestoreButton(button)
 	if button._fill then button._fill:Hide() end
 	if button._edges then for edgeIndex = 1, 4 do button._edges[edgeIndex]:Hide() end end
-	if BUI.Prof.Unwrap(button:GetScript('OnEnter')) == BUIOnEnter then button:SetScript('OnEnter', button._buiOrigEnter) end
-	if BUI.Prof.Unwrap(button:GetScript('OnLeave')) == BUIOnLeave then button:SetScript('OnLeave', button._buiOrigLeave) end
+	if button:GetScript('OnEnter') == BUIOnEnter then button:SetScript('OnEnter', button._buiOrigEnter) end
+	if button:GetScript('OnLeave') == BUIOnLeave then button:SetScript('OnLeave', button._buiOrigLeave) end
 end
 
 local function Deactivate()

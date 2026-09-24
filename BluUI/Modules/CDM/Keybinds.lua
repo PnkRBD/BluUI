@@ -1,7 +1,5 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('CDM.Keybinds')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('keybinds')
 local _G = _G
 local wipe, type = wipe, type
 local tonumber = tonumber
@@ -21,7 +19,6 @@ local GetActionText = GetActionText
 local GetItemSpell = GetItemSpell
 local C_Spell = C_Spell
 local C_ActionBar = C_ActionBar
-local function C_Timer_After(delay, callback) BUI.Prof.After('CDM.Keybinds', delay, callback) end
 
 local Tools = BUI.Tools
 local Pixel = BUI.Pixel
@@ -622,7 +619,7 @@ end
 local eventFrame = CreateFrame("Frame", "BUI_CDMKeybindFlush")
 eventFrame:Hide()
 
-SetScript(eventFrame, "OnUpdate", BUI.Prof.Wrap("cdm#KeybindRefresh", function(self)
+eventFrame:SetScript("OnUpdate", function(self)
     self:Hide()
     dirty = false
     local full = pendingFull
@@ -634,11 +631,11 @@ SetScript(eventFrame, "OnUpdate", BUI.Prof.Wrap("cdm#KeybindRefresh", function(s
     if needsRetry then
         needsRetry = false
 
-        C_Timer_After(0.1, function()
+        C_Timer.After(0.1, function()
             DoRefresh(true)
         end)
     end
-end))
+end)
 
 function Keybinds.ScheduleRebuild()
     if not active then return end

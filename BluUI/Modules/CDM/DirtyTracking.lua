@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('CDM.DirtyTracking')
 
 local wipe = wipe
 
@@ -42,9 +41,6 @@ local function FlushDirty()
 
     if CDM.state.settling then return end
 
-    local profiler = BUI.Prof
-    local profiling = profiler.active
-
     local buffsDirty = DirtyViewers['buffs']
     local anyDirty = false
     for keyIndex = 1, CDM.VIEWER_KEYS_COUNT do
@@ -52,23 +48,11 @@ local function FlushDirty()
         if DirtyViewers[key] then
             anyDirty = true
             DirtyViewers[key] = nil
-            if profiling then
-                local startTime = debugprofilestop()
-                CDM.ApplyIconPositions(key)
-                profiler.Add(CDM.ProfKey('layout', key), debugprofilestop() - startTime)
-            else
-                CDM.ApplyIconPositions(key)
-            end
+            CDM.ApplyIconPositions(key)
         end
     end
     if anyDirty then
-        if profiling then
-            local startTime = debugprofilestop()
-            CDM.NotifyDependents()
-            profiler.Add(CDM.ProfKey('notifyDependents'), debugprofilestop() - startTime)
-        else
-            CDM.NotifyDependents()
-        end
+        CDM.NotifyDependents()
         if not buffsDirty then CDM.CenterBuffsNow() end
     end
 end
@@ -76,7 +60,7 @@ end
 function CDM.CreateUpdateFrame()
     if UpdateFrame then return end
     UpdateFrame = CreateFrame("Frame", "BUI_CDMDirtyFlush")
-    SetScript(UpdateFrame, "OnUpdate", FlushDirty)
+    UpdateFrame:SetScript("OnUpdate", FlushDirty)
     UpdateFrame:Hide()
 end
 

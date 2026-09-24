@@ -1,7 +1,5 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('QuestDialogs')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('questdialogs')
 local ipairs, pairs = ipairs, pairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -467,7 +465,7 @@ local function Apply()
 end
 
 local function HookQuest(frame)
-	HookScript(frame, 'OnShow', ApplyQuest)
+	frame:HookScript('OnShow', ApplyQuest)
 	hooksecurefunc('QuestInfo_Display', OnQuestInfoDisplay)
 	hooksecurefunc('QuestInfo_ShowRewards', OnQuestInfoRewards)
 	hooksecurefunc('QuestFrame_SetTextColor', OnPanelText)
@@ -478,12 +476,12 @@ local function HookQuest(frame)
 end
 
 local function HookGossip(frame)
-	HookScript(frame, 'OnShow', ApplyGossip)
+	frame:HookScript('OnShow', ApplyGossip)
 	hooksecurefunc(frame, 'Update', OnGossipUpdated)
 end
 
 local function HookItemText(frame)
-	HookScript(frame, 'OnShow', ApplyItemText)
+	frame:HookScript('OnShow', ApplyItemText)
 	hooksecurefunc('ItemTextFrame_OnEvent', OnItemTextEvent)
 end
 

@@ -1,7 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Util.Pixel')
-local hooksecurefunc = BUI.Prof.MakeHooker('pixel')
-local Count = BUI.Prof.Count
 local Pixel = {}
 BUI.Pixel = Pixel
 
@@ -119,11 +116,7 @@ local function HookSnapMethods(widget)
 
     for method, handler in pairs(SNAP_HOOKS) do
         if prototype[method] then
-            local key = "pixel#" .. method
-            _G.hooksecurefunc(prototype, method, function(object, ...)
-                Count(key)
-                handler(object, ...)
-            end)
+            _G.hooksecurefunc(prototype, method, handler)
         end
     end
 end
@@ -136,7 +129,7 @@ local function GiveBackdrop(frame)
         end
     end
     if frame.OnBackdropSizeChanged then
-        HookScript(frame, "OnSizeChanged", frame.OnBackdropSizeChanged)
+        frame:HookScript("OnSizeChanged", frame.OnBackdropSizeChanged)
     end
 end
 
@@ -340,7 +333,7 @@ end
 
 local function OnGXRestarted()
     OnScaleChanged()
-    BUI.Prof.After('Util.Pixel', 0, OnScaleChanged)
+    C_Timer.After(0, OnScaleChanged)
 end
 
 BUI.Events:Register('UI_SCALE_CHANGED', 'Pixel', OnScaleChanged)

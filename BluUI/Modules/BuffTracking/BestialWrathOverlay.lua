@@ -465,7 +465,7 @@ function BestialWrathOverlay.Refresh()
         if WantsIcon(config) then BuildIconCallouts() end
         if WantsScreen(config) then BuildScreenCallout() end
         StyleAll(config)
-        if not ticker then ticker = BUI.Prof.NewTicker('BuffTracking.BestialWrathOverlay', TICK_SECONDS, Tick) end
+        if not ticker then ticker = C_Timer.NewTicker(TICK_SECONDS, Tick) end
         Tick()
     else
         StopTicker()

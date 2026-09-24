@@ -72,14 +72,6 @@ end
 
 local function onEvent(self, event, ...)
 	if(self:IsVisible()) then
-		local profiler = ns.Prof
-		if(profiler and profiler.active) then
-			local startKB = collectgarbage('count')
-			local startTime = debugprofilestop()
-			self[event](self, event, ...)
-			profiler.Add('ouf#' .. event, debugprofilestop() - startTime, collectgarbage('count') - startKB)
-			return
-		end
 		return self[event](self, event, ...)
 	end
 end

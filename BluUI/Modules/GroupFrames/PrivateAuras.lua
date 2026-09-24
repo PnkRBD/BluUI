@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('GroupFrames.PrivateAuras')
 
 local GroupFrames = BUI.GroupFrames
 
@@ -113,7 +112,7 @@ local function EnsureContainer(frame)
 
 	if not frame._bluPaUnitHook then
 		frame._bluPaUnitHook = true
-		HookScript(frame, "OnAttributeChanged", function(self, name)
+		frame:HookScript("OnAttributeChanged", function(self, name)
 			if name == "unit" then RefreshAnchors(self) end
 		end)
 	end

@@ -1,8 +1,6 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('CDM.BuffBarSkin')
 
 local _G = _G
-local hooksecurefunc = BUI.Prof.MakeHooker('buffbarskin')
 local ipairs = ipairs
 local UnitClass = UnitClass
 
@@ -119,7 +117,7 @@ local function PositionViewer()
     elseif config.anchorFrame ~= "" and not anchorRetryScheduled and anchorRetries < 5 then
         anchorRetries = anchorRetries + 1
         anchorRetryScheduled = true
-        BUI.Prof.After('CDM.BuffBarSkin', 1, function()
+        C_Timer.After(1, function()
             anchorRetryScheduled = nil
             PositionViewer()
         end)
@@ -371,10 +369,10 @@ function CDM.InitBuffBarSkin()
     local watcher = CreateFrame("Frame")
     watcher:RegisterEvent("COOLDOWN_VIEWER_DATA_LOADED")
     watcher:RegisterEvent("PLAYER_LOGIN")
-    SetScript(watcher, "OnEvent", function(self)
+    watcher:SetScript("OnEvent", function(self)
         if HookBuffBarViewer() then
             self:UnregisterAllEvents()
-            SetScript(self, "OnEvent", nil)
+            self:SetScript("OnEvent", nil)
         end
     end)
 end

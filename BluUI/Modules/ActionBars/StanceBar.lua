@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('ActionBars.StanceBar')
 
 local ActionBars = BUI.ActionBars
 local Plain = ActionBars.Plain
@@ -38,8 +37,8 @@ local function CreateButton(index)
 	button:SetID(index)
 	ActionBars.PrepareTemplateButton(button, 'stance', COMMAND .. index)
 	button:SetAttribute('type', 'spell')
-	SetScript(button, 'OnEnter', OnEnter)
-	SetScript(button, 'OnLeave', GameTooltip_Hide)
+	button:SetScript('OnEnter', OnEnter)
+	button:SetScript('OnLeave', GameTooltip_Hide)
 	ActionBars.SkinButton(button)
 	ActionBars.ApplyHotkeyText(button)
 	return button

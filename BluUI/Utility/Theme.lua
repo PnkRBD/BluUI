@@ -1,5 +1,4 @@
 local _, BUI = ...
-local SetScript = BUI.Prof.Scripts('Util.Theme')
 local sharedMedia = LibStub('LibSharedMedia-3.0')
 
 local function GetGeneral()
@@ -208,11 +207,11 @@ local function IconStrip(tab, options)
 		local highlight = button:CreateTexture(nil, 'HIGHLIGHT')
 		highlight:SetAllPoints()
 		highlight:SetColorTexture(1, 1, 1, 0.25)
-		SetScript(button, 'OnClick', function()
+		button:SetScript('OnClick', function()
 			if button._sid and options.onPick then options.onPick(button._sid) end
 			GameTooltip:Hide()
 		end)
-		SetScript(button, 'OnEnter', function()
+		button:SetScript('OnEnter', function()
 			if not button._sid then return end
 			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 			GameTooltip:SetSpellByID(button._sid)
@@ -220,7 +219,7 @@ local function IconStrip(tab, options)
 			if options.pickText then GameTooltip:AddLine(options.pickText, pickColor[1], pickColor[2], pickColor[3]) end
 			GameTooltip:Show()
 		end)
-		SetScript(button, 'OnLeave', function() GameTooltip:Hide() end)
+		button:SetScript('OnLeave', function() GameTooltip:Hide() end)
 		button:Hide()
 		buttons[buttonIndex] = button
 	end
@@ -261,7 +260,7 @@ local function IconStrip(tab, options)
 	end
 	api.Rebuild()
 
-	SetScript(frame, 'OnShow', api.Rebuild)
+	frame:SetScript('OnShow', api.Rebuild)
 
 	Layout.PositionInTab(tab, frame, stripHeight, 8)
 	return api
@@ -317,21 +316,21 @@ local function SpellInputRow(tab, options)
 		return false
 	end
 
-	SetScript(edit, 'OnTextChanged', function(self) placeholder:SetShown(self:GetText() == '') end)
-	SetScript(edit, 'OnEnterPressed', Submit)
-	SetScript(edit, 'OnEscapePressed', function(self) self:ClearFocus() end)
-	SetScript(edit, 'OnEnter', function() SetHovered(true) end)
-	SetScript(edit, 'OnLeave', function() if not edit:HasFocus() then SetHovered(false) end end)
-	SetScript(edit, 'OnEditFocusGained', function() SetHovered(true) end)
-	SetScript(edit, 'OnEditFocusLost', function() SetHovered(false) end)
-	SetScript(edit, 'OnReceiveDrag', HandleDrop)
-	SetScript(edit, 'OnMouseDown', function(self, mouseButton)
+	edit:SetScript('OnTextChanged', function(self) placeholder:SetShown(self:GetText() == '') end)
+	edit:SetScript('OnEnterPressed', Submit)
+	edit:SetScript('OnEscapePressed', function(self) self:ClearFocus() end)
+	edit:SetScript('OnEnter', function() SetHovered(true) end)
+	edit:SetScript('OnLeave', function() if not edit:HasFocus() then SetHovered(false) end end)
+	edit:SetScript('OnEditFocusGained', function() SetHovered(true) end)
+	edit:SetScript('OnEditFocusLost', function() SetHovered(false) end)
+	edit:SetScript('OnReceiveDrag', HandleDrop)
+	edit:SetScript('OnMouseDown', function(self, mouseButton)
 		if mouseButton == 'LeftButton' and not HandleDrop() then self:SetFocus() end
 	end)
-	SetScript(box, 'OnMouseDown', function(_, mouseButton)
+	box:SetScript('OnMouseDown', function(_, mouseButton)
 		if mouseButton == 'LeftButton' and not HandleDrop() then edit:SetFocus() end
 	end)
-	SetScript(box, 'OnReceiveDrag', HandleDrop)
+	box:SetScript('OnReceiveDrag', HandleDrop)
 
 	local addButton = Controls.Button(container, 'Add', 48, Submit)
 	addButton:SetHeight(rowHeight)
@@ -396,7 +395,7 @@ local function BlacklistRows(tab, options)
 		row.xBtn = closeButton
 
 		row:EnableMouse(true)
-		SetScript(row, 'OnEnter', function()
+		row:SetScript('OnEnter', function()
 			row:SetBackdropColor(unpack(Theme.bg.hover))
 			local entry = row._entry
 			if entry then
@@ -409,7 +408,7 @@ local function BlacklistRows(tab, options)
 				GameTooltip:Show()
 			end
 		end)
-		SetScript(row, 'OnLeave', function()
+		row:SetScript('OnLeave', function()
 			row:SetBackdropColor(unpack(Theme.bg.light))
 			GameTooltip:Hide()
 		end)

@@ -1,7 +1,5 @@
 local _, BUI = ...
-local SetScript, HookScript = BUI.Prof.Scripts('CDM.EditModeLock')
 
-local hooksecurefunc = BUI.Prof.MakeHooker('editmodelock')
 local CDM = BUI.CDM
 local EditModeLock = {}
 CDM.EditModeLock = EditModeLock
@@ -88,7 +86,7 @@ local function ShowLockText(systemFrame)
     state.notice:Show()
     state.token = state.token + 1
     local myToken = state.token
-    BUI.Prof.After('CDM.EditModeLock', LOCK_TEXT_TIMEOUT, function()
+    C_Timer.After(LOCK_TEXT_TIMEOUT, function()
         if state.token == myToken then state.notice:Hide() end
     end)
 end
@@ -134,8 +132,8 @@ local function HookSystemFrame(name)
 
     frame:SetMovable(false)
     if frame.Selection then
-        SetScript(frame.Selection, "OnDragStart", nil)
-        SetScript(frame.Selection, "OnDragStop", nil)
+        frame.Selection:SetScript("OnDragStart", nil)
+        frame.Selection:SetScript("OnDragStop", nil)
     end
 
     if frame.SelectSystem then
@@ -382,7 +380,7 @@ function EditModeLock.Initialize()
         HookAllSystemFrames()
     end)
 
-    HookScript(EditModeManagerFrame, "OnShow", OnEditModeShow)
-    HookScript(EditModeManagerFrame, "OnHide", OnEditModeHide)
+    EditModeManagerFrame:HookScript("OnShow", OnEditModeShow)
+    EditModeManagerFrame:HookScript("OnHide", OnEditModeHide)
     if EditModeManagerFrame:IsShown() then OnEditModeShow() end
 end

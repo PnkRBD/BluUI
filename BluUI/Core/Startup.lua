@@ -1,5 +1,4 @@
 local _, BUI = ...
-local _, HookScript = BUI.Prof.Scripts('Core.Startup')
 local Modals = BUI.Modals
 
 do
@@ -52,7 +51,7 @@ function BUI.CheckPlatynatorPrompt(done)
 	local overlay, dialog, close = Modals.CreateBase(440, 170, false)
 
 	local resumed = false
-	HookScript(overlay, 'OnHide', function()
+	overlay:HookScript('OnHide', function()
 		if resumed then return end
 		resumed = true
 		done()

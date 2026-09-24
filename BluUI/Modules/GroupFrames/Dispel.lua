@@ -616,7 +616,7 @@ function GroupFrames.StartDispelPartyPreview()
 	StopCycle()
 	cycleIndex = 0
 	StepCycle()
-	cycleTicker = BUI.Prof.NewTicker('GroupFrames.Dispel', DISPEL_INTERVAL, BUI.Prof.Wrap('tick#DispelPreview', StepCycle))
+	cycleTicker = C_Timer.NewTicker(DISPEL_INTERVAL, StepCycle)
 	GroupFrames.Print("Party dispel preview started. Click again to stop.")
 end
 
