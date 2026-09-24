@@ -2691,7 +2691,7 @@ Skin.RegisterSkin('objectivetracker', {
 					and "Scrolling moves Blizzard's tracker sections into a BluUI panel. Blizzard's widget code then runs as addon code, so tooltips that show progress widgets can throw errors.\n\nReload now to apply?"
 					or "Reload now to put the tracker back in Blizzard's own frame?",
 				confirmText = 'Reload Now', cancelText = 'Later',
-				onConfirm = ReloadUI,
+				onConfirm = BUI.Reload,
 			})
 		end)
 		pageKit.Row(panelCard, 438, 'Scrolling', scrollToggle)

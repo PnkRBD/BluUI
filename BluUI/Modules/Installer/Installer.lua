@@ -1273,7 +1273,7 @@ local function BuildWizard(onClosed)
 		self.Close()
 		Skin().WriteSkinsEnabled(skinSelection)
 		BUI.Print('Setup complete. Open settings anytime with |cff' .. BUI.C.COLOR_PINK .. '/bui|r.')
-		ReloadUI()
+		BUI.Reload()
 	end
 
 	function wizardInstance:Exit()

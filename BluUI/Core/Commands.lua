@@ -151,7 +151,7 @@ SlashCmdList['BUI'] = function(message)
 	elseif command == 'cpu' then
 		if rest:lower() == 'reload' then
 			BluUI_DB.__profileNextLoad = true
-			ReloadUI()
+			BUI.Reload()
 		elseif rest:lower() == 'login' then
 			BluUI_DB.__profileNextLoad = true
 			BUI.Print('Profiler armed for the next login. Log out to the character screen and back in.')
