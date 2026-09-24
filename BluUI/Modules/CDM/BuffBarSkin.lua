@@ -74,6 +74,14 @@ local function RemoveMasks(texture)
     end
 end
 
+local function PlaceStacks(text, config, iconFrame, bar, showIcon)
+    local point = config.stackPoint
+    local target = (showIcon and config.stackAttach == "ICON") and iconFrame or bar
+    text:ClearAllPoints()
+    text:SetPoint(point, target, point, config.stackOffsetX, config.stackOffsetY)
+    text:SetShown(config.showStacks ~= false)
+end
+
 local function HAlignOf(point)
     if type(point) ~= "string" then return "" end
     if point:find("LEFT",  1, true) then return "LEFT"  end
@@ -200,10 +208,6 @@ local function SkinBarItem(item)
                 inner:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", -1, 1)
             end
             Pixel.ApplyBorder(iconFrame, borderSize, border[1], border[2], border[3], border[4] or 1)
-            if iconFrame.Applications then
-                Pixel.ApplyFont(iconFrame.Applications, math.max(6, config.stackSize), font)
-                iconFrame.Applications:SetShown(config.showStacks ~= false)
-            end
         end
     end
 
@@ -243,6 +247,17 @@ local function SkinBarItem(item)
         bar._buiBorderHost:ClearAllPoints()
         bar._buiBorderHost:SetAllPoints(bar)
         Pixel.ApplyBorder(bar._buiBorderHost, borderSize, border[1], border[2], border[3], border[4] or 1)
+
+        local stacks = iconFrame and iconFrame.Applications
+        if stacks then
+            if not bar._buiTextLayer then
+                bar._buiTextLayer = CreateFrame("Frame", nil, bar._buiBorderHost)
+                bar._buiTextLayer:SetAllPoints(bar)
+            end
+            stacks:SetParent(bar._buiTextLayer)
+            Pixel.ApplyFont(stacks, math.max(6, config.stackSize), font)
+            PlaceStacks(stacks, config, iconFrame, bar, showIcon)
+        end
 
         if bar.Name then
             Pixel.ApplyFont(bar.Name, math.max(6, config.nameSize), font)
@@ -398,9 +413,11 @@ local function BuildPreviewFrame(previewIndex, shelf)
     local frame = CreateFrame("Frame", nil, shelf)
     frame.Icon = CreateFrame("Frame", nil, frame)
     frame.Icon.Icon = frame.Icon:CreateTexture(nil, "ARTWORK")
-    frame.Icon.Applications = frame.Icon:CreateFontString(nil, "OVERLAY")
     frame.Bar = CreateFrame("StatusBar", nil, frame)
     frame.BarBG = frame.Bar:CreateTexture(nil, "BACKGROUND")
+    frame.TextLayer = CreateFrame("Frame", nil, frame.Bar)
+    frame.TextLayer:SetFrameLevel(frame.Bar:GetFrameLevel() + 2)
+    frame.Stacks = frame.TextLayer:CreateFontString(nil, "OVERLAY")
     frame.Bar.Name = frame.Bar:CreateFontString(nil, "OVERLAY")
     frame.Bar.Duration = frame.Bar:CreateFontString(nil, "OVERLAY")
     return frame
@@ -431,11 +448,6 @@ local function StylePreviewFrame(frame, previewIndex, config)
         frame.Icon.Icon:SetPoint("BOTTOMRIGHT", frame.Icon, "BOTTOMRIGHT", Pixel.Scale(-1), Pixel.Scale(1))
         frame.Icon.Icon:SetTexture(PREVIEW_ICONS[((previewIndex - 1) % #PREVIEW_ICONS) + 1])
         frame.Icon.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        Pixel.ApplyFont(frame.Icon.Applications, math.max(6, config.stackSize), font, "OUTLINE")
-        frame.Icon.Applications:ClearAllPoints()
-        frame.Icon.Applications:SetPoint("BOTTOMRIGHT", frame.Icon, "BOTTOMRIGHT", Pixel.Scale(-2), Pixel.Scale(2))
-        frame.Icon.Applications:SetText(PREVIEW_STACKS[((previewIndex - 1) % #PREVIEW_STACKS) + 1])
-        frame.Icon.Applications:SetShown(config.showStacks ~= false)
     end
 
     frame.Bar:ClearAllPoints()
@@ -460,6 +472,10 @@ local function StylePreviewFrame(frame, previewIndex, config)
     frame.Bar._buiBorderHost:ClearAllPoints()
     frame.Bar._buiBorderHost:SetAllPoints(frame.Bar)
     Pixel.ApplyBorder(frame.Bar._buiBorderHost, borderSize, border[1], border[2], border[3], border[4] or 1)
+
+    Pixel.ApplyFont(frame.Stacks, math.max(6, config.stackSize), font, "OUTLINE")
+    frame.Stacks:SetText(PREVIEW_STACKS[((previewIndex - 1) % #PREVIEW_STACKS) + 1])
+    PlaceStacks(frame.Stacks, config, frame.Icon, frame.Bar, showIcon)
 
     Pixel.ApplyFont(frame.Bar.Name, math.max(6, config.nameSize), font)
     frame.Bar.Name:ClearAllPoints()
