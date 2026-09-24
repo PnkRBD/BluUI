@@ -64,6 +64,7 @@ local GROUPS = {
 		{ key = 'misdirectAlert',             name = 'Misdirect Alert' },
 		{ key = 'petAlert',                   name = 'Pet Alert' },
 		{ key = 'killCommandOverlay',         name = 'Pack Leader Overlay on KC' },
+		{ key = 'bestialWrathOverlay',        name = 'Bestial Wrath AoE Callout' },
 		{ key = 'monkVivaciousVivification',  name = 'Monk Vivacious Vivification' },
 	}},
 	{ header = 'Layout', sections = {

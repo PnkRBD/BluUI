@@ -138,6 +138,7 @@ Modules\ActionBars\KeyPress.lua
 Modules\ActionBars\Initialize.lua
 
 Modules\CDM\Core.lua
+Modules\CDM\Profiler.lua
 Modules\CDM\PerSpec.lua
 Modules\CDM\Checks.lua
 Modules\CDM\Glow.lua
@@ -269,6 +270,7 @@ Modules\BuffTracking\PackLeader.lua
 Modules\BuffTracking\PetAlert.lua
 Modules\BuffTracking\SmartMisdirect.lua
 Modules\BuffTracking\KillCommandOverlay.lua
+Modules\BuffTracking\BestialWrathOverlay.lua
 
 Modules\Bloodlust\Bloodlust.lua
 

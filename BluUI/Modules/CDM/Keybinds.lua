@@ -652,8 +652,8 @@ local hooksInstalled = false
 local function EnsureHooks()
     if hooksInstalled then return end
     local hookedViewer = false
-    for viewerIndex = 1, #CDM.VIEWER_NAMES do
-        local viewer = _G[CDM.VIEWER_NAMES[viewerIndex]]
+    for key, viewerName in pairs(CDM.VIEWERS) do
+        local viewer = key ~= 'buffs' and _G[viewerName]
         if viewer and viewer.RefreshLayout then
             hooksecurefunc(viewer, "RefreshLayout", Keybinds.ScheduleRebuild)
             hookedViewer = true

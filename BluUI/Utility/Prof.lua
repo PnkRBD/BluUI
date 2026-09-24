@@ -347,6 +347,10 @@ function Prof.Stop()
 	SampleExternal()
 end
 
+function Prof.Entries()
+	return data, debugprofilestop() - startedAt, attributedMilliseconds, exactAttribution
+end
+
 function Prof.Report(limit)
 	limit = limit or 20
 	local wallTime = debugprofilestop() - startedAt
