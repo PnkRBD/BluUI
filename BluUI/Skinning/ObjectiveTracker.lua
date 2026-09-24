@@ -829,15 +829,18 @@ local function ApplyTrackerWidth()
 	end
 end
 
-local function GetTrackerSlideOffset()
-	local total = 0
-	for _, trackerName in ipairs(TRACKER_NAMES) do
-		local module = _G[trackerName]
-		if module and module.heightModifiers then
-			for _, height in pairs(module.heightModifiers) do total = total + height end
+local function GetLaidOutTrackerHeight(trackerFrame)
+	local total, shownModules = 0, 0
+	for _, module in ipairs(trackerFrame.modules) do
+		local contentsHeight = module:GetContentsHeight()
+		if contentsHeight > 0 then
+			if shownModules > 0 then total = total + trackerFrame.moduleSpacing end
+			total = total + contentsHeight + module.bottomSpacing
+			shownModules = shownModules + 1
 		end
 	end
-	return total
+	if shownModules == 0 then return 0 end
+	return trackerFrame.topModulePadding + total + trackerFrame.bottomModulePadding
 end
 
 local function UpdateCardAnchors()
@@ -868,14 +871,12 @@ local function UpdateCardAnchors()
 	local collapsed = trackerFrame.IsCollapsed and trackerFrame:IsCollapsed()
 	if collapsed and trackerFrame.Header then
 		trackerCard:SetPoint('BOTTOM', trackerFrame.Header, 'BOTTOM', 0, -padY)
-	elseif trackerFrame.NineSlice then
-		trackerCard:SetPoint('BOTTOM', trackerFrame.NineSlice, 'BOTTOM', 0, GetTrackerSlideOffset() - padY)
 	else
-		trackerCard:SetPoint('BOTTOM', trackerFrame, 'BOTTOM', 0, -padY)
+		trackerCard:SetHeight(GetLaidOutTrackerHeight(trackerFrame) + padY * 2)
 	end
 end
 
-local function FollowTrackerSlide()
+local function FollowTrackerLayout()
 	if not scrollHolder then UpdateCardAnchors() end
 end
 
@@ -969,16 +970,10 @@ local function EnsureTrackerCard()
 			end)
 			nineSlice:HookScript('OnShow', SyncTrackerCardShown)
 			nineSlice:HookScript('OnHide', SyncTrackerCardShown)
+			hooksecurefunc(nineSlice, 'SetPoint', FollowTrackerLayout)
 		end
 		mirrorFrame:HookScript('OnHide', SyncTrackerCardShown)
 		mirrorFrame:HookScript('OnShow', SyncTrackerCardShown)
-		for _, trackerName in ipairs(TRACKER_NAMES) do
-			local module = _G[trackerName]
-			if module then
-				hooksecurefunc(module, 'SetHeightModifier', FollowTrackerSlide)
-				hooksecurefunc(module, 'ClearHeightModifier', FollowTrackerSlide)
-			end
-		end
 		if mirrorFrame == trackerFrame then
 			hooksecurefunc(trackerFrame, 'SetAlpha', function(_, alpha)
 				local fadedOut = not issecretvalue(alpha) and alpha == 0 and not Skin.trackerStashScale
