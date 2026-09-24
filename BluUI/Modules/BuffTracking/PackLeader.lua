@@ -354,13 +354,14 @@ function PackLeader.Create()
         BUI.Anchor.ApplyPosition(root, GetConfig())
     end
 
-    local function SavePosition()
-        Display.SavePosition(root, GetConfig(), false)
-    end
+    BUI.Anchor.Follow('BuffTracking.packLeader', function()
+        local config = GetConfig()
+        return (config.enabled or config.showAnchor) and root
+    end, GetConfig)
 
     tracker.isActive = Hunter.IsBeastMasteryOrSurvival
 
-    function tracker.EnableDragging()  Display.EnableDragging(tracker, GetConfig, SavePosition) end
+    function tracker.EnableDragging()  Display.EnableDragging(tracker, GetConfig) end
     function tracker.DisableDragging() Display.DisableDragging(tracker) end
     function tracker.MarkDirty()       Render() end
 

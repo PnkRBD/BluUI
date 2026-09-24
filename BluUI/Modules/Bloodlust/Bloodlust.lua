@@ -529,12 +529,7 @@ function Bloodlust.Initialize()
 	end
 	ApplyLayout()
 
-	BUI.Anchor.RegisterCallback('Bloodlust', function()
-		local config = GetConfig()
-		if config.enabled and BUI.Anchor.ShouldRefreshOnAnchorChange(config) then
-			BUI.Anchor.ApplyPosition(frame, config)
-		end
-	end)
+	BUI.Anchor.Follow('Bloodlust', function() return GetConfig().enabled and frame end, GetConfig)
 
 	BUI.Scheduler.RegisterUpdate(MODULE_KEY, Tick, TICK_INTERVAL, config.enabled)
 	BUI.Events:RegisterUnit('UNIT_AURA', 'player', 'Bloodlust.Wake', OnPlayerAura)

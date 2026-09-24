@@ -113,24 +113,10 @@ local function Build()
 
     ShowIdleText()
 
-    BUI.Dragging.MakeDraggable(timerFrame, {
-        showHint = true,
-        showUnlockedBg = true,
-        hintAnchor = "TOP",
-        onPositionChanged = function(x, y)
-            local currentDB = GetDB()
-            local anchorX, anchorY = BUI.Anchor.SaveDragOffsets(timerFrame, currentDB)
-            if anchorX then
-                currentDB.anchorOffsetX = math.floor(anchorX)
-                currentDB.anchorOffsetY = math.floor(anchorY)
-                BUI.Anchor.ApplyPosition(timerFrame, currentDB)
-                return
-            end
-            currentDB.posX = math.floor(x)
-            currentDB.posY = math.floor(y)
-        end,
+    BUI.Dragging.MakeAnchoredAlert(timerFrame, {
+        settings = GetDB,
+        isLocked = function() return GetDB().locked end,
         onRightClick = function() CombatTimer.SetLocked(true) end,
-        usePointPosition = false,
     })
 
     BUI.Scheduler.RegisterUpdate("CombatTimer", Tick, 0.1, false)
@@ -293,6 +279,8 @@ function CombatTimer.Toggle(enabledFlag)
     GetDB().enabled = enabledFlag
     if enabledFlag then CombatTimer.Enable() else CombatTimer.Disable() end
 end
+
+BUI.Anchor.Follow("CombatTimer", function() return GetDB().enabled and timerFrame end, GetDB)
 
 BUI.Events:OnLogin("CombatTimer", function()
     if GetDB().enabled then CombatTimer.Enable() end

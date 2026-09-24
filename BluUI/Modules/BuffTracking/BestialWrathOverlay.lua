@@ -199,22 +199,6 @@ local function BuildIconCallouts()
     thrashCallout.thrashText:Hide()
 end
 
-local function SaveScreenPosition(x, y)
-    local config = GetConfig()
-    local frame = screenCallout.root
-    local anchorX, anchorY = BUI.Anchor.SaveDragOffsets(frame, config)
-    if anchorX then
-        config.anchorOffsetX = math.floor(anchorX)
-        config.anchorOffsetY = math.floor(anchorY)
-        BUI.Anchor.ApplyPosition(frame, config)
-        return
-    end
-    config.posX = math.floor(x)
-    config.posY = math.floor(y)
-    frame:ClearAllPoints()
-    frame:SetPoint('CENTER', UIParent, 'CENTER', x, y)
-end
-
 local function BuildScreenCallout()
     if screenCallout then return end
     local root = CreateFrame('Frame', SCREEN_FRAME_NAME, UIParent)
@@ -224,17 +208,13 @@ local function BuildScreenCallout()
     root:Hide()
     screenCallout = NewCallout(root, 'HOLD THRASH')
 
-    BUI.Dragging.MakeDraggable(root, {
-        showHint = true,
-        showUnlockedBg = true,
-        hintAnchor = 'TOP',
+    BUI.Dragging.MakeAnchoredAlert(root, {
+        settings = GetConfig,
         isLocked = function() return GetConfig().screenLocked ~= false end,
-        onPositionChanged = SaveScreenPosition,
         onRightClick = function()
             GetConfig().screenLocked = true
             BestialWrathOverlay.Refresh()
         end,
-        usePointPosition = true,
     })
 end
 
@@ -494,6 +474,11 @@ local function Initialize()
 end
 
 BUI.Events:OnLogin('BuffTrackingBWO', Initialize)
+
+BUI.Anchor.Follow('BuffTrackingBWO', function()
+    local config = GetConfig()
+    return config.enabled and WantsScreen(config) and screenCallout and screenCallout.root
+end, GetConfig)
 
 local QueueRefresh = BUI.Dispatcher.New(BestialWrathOverlay.Refresh, 'BWO.Refresh')
 BUI.Events:Register('PLAYER_SPECIALIZATION_CHANGED', 'BuffTrackingBWO', QueueRefresh)

@@ -191,7 +191,17 @@ local MODE_POS_KEYS = {
     anchorFrame = true, anchorPoint = true, anchorOffsetX = true, anchorOffsetY = true,
     matchAnchorWidth = true, matchAnchorHeight = true,
 }
-local function modePosKey(key) return 'text' .. key:sub(1, 1):upper() .. key:sub(2) end
+local function PrefixedKey(prefix, key) return prefix .. key:sub(1, 1):upper() .. key:sub(2) end
+local function modePosKey(key) return PrefixedKey('text', key) end
+
+function Anchor.PrefixedSettings(getDB, prefix)
+    local fields = {}
+    for key in pairs(MODE_POS_KEYS) do fields[key] = PrefixedKey(prefix, key) end
+    return setmetatable({}, {
+        __index = function(_, key) return getDB()[fields[key] or key] end,
+        __newindex = function(_, key, value) getDB()[fields[key] or key] = value end,
+    })
+end
 
 function Anchor.ModePos(db, isText)
     if not isText then return db end
@@ -373,4 +383,33 @@ function Anchor.ShouldRefreshOnAnchorChange(settings)
     if CDM_FRAMES[settings.anchorFrame] then return true end
     if POWER_FRAMES[settings.anchorFrame] then return true end
     return settings.matchAnchorWidth or settings.matchAnchorHeight
+end
+
+local function NeedsReanchor(frame, settings)
+    if not frame then return false end
+    if Anchor.ShouldRefreshOnAnchorChange(settings) then return true end
+    local anchorFrame = settings.anchorFrame
+    return anchorFrame ~= nil and anchorFrame ~= "" and not frame._isAnchored
+end
+
+function Anchor.SaveDrop(frame, settings)
+    local x, y = BUI.Dragging.GetCenterOffset(frame)
+    local anchorX, anchorY = Anchor.SaveDragOffsets(frame, settings)
+    if anchorX then
+        settings.anchorOffsetX = math.floor(anchorX)
+        settings.anchorOffsetY = math.floor(anchorY)
+    else
+        settings.posX = settings.centerHorizontally and 0 or math.floor(x)
+        settings.posY = math.floor(y)
+    end
+    Anchor.ApplyPosition(frame, settings)
+end
+
+function Anchor.Follow(key, getFrame, getSettings)
+    Anchor.RegisterCallback(key, function()
+        local frame = getFrame()
+        if not frame then return end
+        local settings = getSettings()
+        if NeedsReanchor(frame, settings) then Anchor.ApplyPosition(frame, settings) end
+    end)
 end

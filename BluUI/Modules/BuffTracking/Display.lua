@@ -61,17 +61,13 @@ function Display.MakeAnchorOverlay(frame)
     frame.anchorText:Hide()
 end
 
-function Display.SavePosition(frame, config, honorCenter)
-    return BUI.Dragging.SaveCenterPosition(frame, config, honorCenter)
-end
-
-function Display.EnableDragging(tracker, GetConfig, SavePosition)
+function Display.EnableDragging(tracker, GetConfig)
     local frame = tracker.frame
     if not frame then return end
 
     BUI.Dragging.EnableAnchorDrag(frame, {
-        isCentered = function() return GetConfig().centerHorizontally end,
-        onSave     = SavePosition,
+        isCentered = function() return GetConfig().centerHorizontally and not frame._isAnchored end,
+        onSave     = function() BUI.Anchor.SaveDrop(frame, GetConfig()) end,
         onRightClick = function()
             GetConfig().showAnchor = false
             tracker.DisableDragging()
@@ -449,28 +445,16 @@ function Display.CreateTracker(config)
 
     function tracker.ApplyPosition()
         if not tracker.frame then return end
-        local settings = GetSettings()
-        if BUI.ResolveAnchorFrame(settings.anchorFrame) then
-            BUI.Anchor.ApplyPosition(tracker.frame, {
-                anchorFrame = settings.anchorFrame,
-                anchorPoint = settings.anchorPoint,
-                anchorOffsetX = settings.anchorOffsetX,
-                anchorOffsetY = settings.anchorOffsetY,
-                noGap = true,
-            })
-            return
-        end
-        local x = settings.centerHorizontally and 0 or settings.posX
-        tracker.frame:ClearAllPoints()
-        tracker.frame:SetPoint("CENTER", UIParent, "CENTER", x, settings.posY)
+        BUI.Anchor.ApplyPosition(tracker.frame, GetSettings())
     end
 
-    local function SavePosition()
-        Display.SavePosition(tracker.frame, GetSettings(), true)
-    end
-
-    function tracker.EnableDragging()  Display.EnableDragging(tracker, GetSettings, SavePosition) end
+    function tracker.EnableDragging()  Display.EnableDragging(tracker, GetSettings) end
     function tracker.DisableDragging() Display.DisableDragging(tracker) end
+
+    BUI.Anchor.Follow("BuffTracking." .. config.settingsKey, function()
+        local settings = GetSettings()
+        return (settings.enabled or settings.showAnchor) and tracker.frame
+    end, GetSettings)
 
     function tracker.RecheckActive()
         BUI.Scheduler.SetUpdateEnabled(tracker.frameName, GetSettings().enabled and tracker.isActive())

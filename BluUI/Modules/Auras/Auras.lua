@@ -107,31 +107,10 @@ local function BuildPetWarning()
 
     warningFrame = MakeWarningFrame("BUI_PetWarning", 100)
 
-    BUI.Dragging.MakeDraggable(warningFrame, {
-        showHint = true,
-        showUnlockedBg = true,
-        hintAnchor = "TOP",
+    BUI.Dragging.MakeAnchoredAlert(warningFrame, {
+        settings = GetDB,
         isLocked = function() return GetDB().locked end,
-        onPositionChanged = function(x, y, point)
-            local db = GetDB()
-            local anchorX, anchorY = BUI.Anchor.SaveDragOffsets(warningFrame, db)
-            if anchorX then
-                db.anchorOffsetX = math.floor(anchorX)
-                db.anchorOffsetY = math.floor(anchorY)
-                BUI.Anchor.ApplyPosition(warningFrame, db)
-                return
-            end
-            if db.centerHorizontally then
-                local _, centerY = BUI.Dragging.GetCenterOffset(warningFrame)
-                x, y, point = 0, centerY, "CENTER"
-            end
-            db.posX = math.floor(x)
-            db.posY = math.floor(y)
-            warningFrame:ClearAllPoints()
-            warningFrame:SetPoint(point or "CENTER", UIParent, point or "CENTER", x, y)
-        end,
         onRightClick = function() Auras.SetLocked(true) end,
-        usePointPosition = true,
     })
 end
 
@@ -388,19 +367,8 @@ end
 
 local lowHpFrame, lowHpText
 
-local lowHpAnchorSettings = {}
-
-local function LowHpAnchorSettings(db)
-    local settings = lowHpAnchorSettings
-    settings.anchorFrame        = db.lowHpAnchorFrame
-    settings.anchorPoint        = db.lowHpAnchorPoint
-    settings.anchorOffsetX      = db.lowHpAnchorOffsetX
-    settings.anchorOffsetY      = db.lowHpAnchorOffsetY
-    settings.posX               = db.lowHpPosX
-    settings.posY               = db.lowHpPosY
-    settings.centerHorizontally = db.lowHpCenterHorizontally
-    return settings
-end
+local lowHpSettings = BUI.Anchor.PrefixedSettings(GetDB, "lowHp")
+local function LowHpSettings() return lowHpSettings end
 
 local function BuildLowHp()
     if lowHpFrame then return end
@@ -413,35 +381,14 @@ local function BuildLowHp()
     Pixel.ApplyFont(lowHpText, 28)
     lowHpText:SetPoint("CENTER")
 
-    BUI.Dragging.MakeDraggable(lowHpFrame, {
-        showHint = true,
-        showUnlockedBg = true,
-        hintAnchor = "TOP",
+    BUI.Dragging.MakeAnchoredAlert(lowHpFrame, {
+        settings = LowHpSettings,
         isLocked = function() return GetDB().lowHpLocked ~= false end,
-        onPositionChanged = function(x, y)
-            local db = GetDB()
-            local anchorX, anchorY = BUI.Anchor.SaveDragOffsets(lowHpFrame, LowHpAnchorSettings(db))
-            if anchorX then
-                db.lowHpAnchorOffsetX = math.floor(anchorX)
-                db.lowHpAnchorOffsetY = math.floor(anchorY)
-                BUI.Anchor.ApplyPosition(lowHpFrame, LowHpAnchorSettings(db))
-                return
-            end
-            if db.lowHpCenterHorizontally then
-                local _, centerY = BUI.Dragging.GetCenterOffset(lowHpFrame)
-                x, y = 0, centerY
-            end
-            db.lowHpPosX = math.floor(x)
-            db.lowHpPosY = math.floor(y)
-            lowHpFrame:ClearAllPoints()
-            lowHpFrame:SetPoint("CENTER", UIParent, "CENTER", x, y)
-        end,
         onRightClick = function()
             GetDB().lowHpLocked = true
             BUI.Dragging.SetLocked(lowHpFrame, true)
             if Auras._lowHpLockToggle then Auras._lowHpLockToggle:SetValue(false) end
         end,
-        usePointPosition = true,
     })
 end
 
@@ -490,7 +437,7 @@ function Auras.UpdateLowHp()
     local color = db.lowHpColor
     lowHpText:SetTextColor(color.r, color.g, color.b, color.a)
 
-    BUI.Anchor.ApplyPosition(lowHpFrame, LowHpAnchorSettings(db))
+    BUI.Anchor.ApplyPosition(lowHpFrame, lowHpSettings)
     lowHpFrame:SnapSize(
         lowHpText:GetStringWidth() + 40,
         lowHpText:GetStringHeight() + 20
@@ -589,19 +536,8 @@ local function HideMarkButton(button)
     button:EnableMouse(false)
 end
 
-local markAnchorSettings = {}
-
-local function MarkAnchorSettings(db)
-    local settings = markAnchorSettings
-    settings.anchorFrame        = db.markAnchorFrame
-    settings.anchorPoint        = db.markAnchorPoint
-    settings.anchorOffsetX      = db.markAnchorOffsetX
-    settings.anchorOffsetY      = db.markAnchorOffsetY
-    settings.posX               = db.markPosX
-    settings.posY               = db.markPosY
-    settings.centerHorizontally = db.markCenterHorizontally
-    return settings
-end
+local markSettings = BUI.Anchor.PrefixedSettings(GetDB, "mark")
+local function MarkSettings() return markSettings end
 
 local function AnchorMarkPanel(locked)
     markPanel:ClearAllPoints()
@@ -675,36 +611,15 @@ local function BuildMarkWarning()
     markIcon = icon
     markPulse = pulse
 
-    BUI.Dragging.MakeDraggable(markFrame, {
-        showHint = true,
-        showUnlockedBg = true,
-        hintAnchor = "TOP",
+    BUI.Dragging.MakeAnchoredAlert(markFrame, {
+        settings = MarkSettings,
         isLocked = function() return GetDB().markLocked ~= false end,
-        onPositionChanged = function(x, y)
-            local db = GetDB()
-            local anchorX, anchorY = BUI.Anchor.SaveDragOffsets(markFrame, MarkAnchorSettings(db))
-            if anchorX then
-                db.markAnchorOffsetX = math.floor(anchorX)
-                db.markAnchorOffsetY = math.floor(anchorY)
-                BUI.Anchor.ApplyPosition(markFrame, MarkAnchorSettings(db))
-                return
-            end
-            if db.markCenterHorizontally then
-                local _, centerY = BUI.Dragging.GetCenterOffset(markFrame)
-                x, y = 0, centerY
-            end
-            db.markPosX = math.floor(x)
-            db.markPosY = math.floor(y)
-            markFrame:ClearAllPoints()
-            markFrame:SetPoint("CENTER", UIParent, "CENTER", x, y)
-        end,
         onRightClick = function()
             GetDB().markLocked = true
             BUI.Dragging.SetLocked(markFrame, true)
             if Auras._markLockToggle then Auras._markLockToggle:SetValue(false) end
             Auras.UpdateMark()
         end,
-        usePointPosition = true,
     })
 end
 
@@ -731,7 +646,7 @@ local function StyleMarkWarning()
         markText:SetPoint("CENTER", markPanel, "CENTER", 0, 0)
     end
 
-    BUI.Anchor.ApplyPosition(markFrame, MarkAnchorSettings(db))
+    BUI.Anchor.ApplyPosition(markFrame, markSettings)
 
     if db.markPulse ~= false and showIcon then markPulse:Play() else markPulse:Stop() end
 end
@@ -792,18 +707,7 @@ end
 
 BUI.Events:OnLogin("Auras", Auras.Initialize)
 
-local function NeedsReanchor(frame, settings)
-    if not frame then return false end
-    if BUI.Anchor.ShouldRefreshOnAnchorChange(settings) then return true end
-    return settings.anchorFrame ~= "" and not frame._isAnchored
-end
-
-BUI.Anchor.RegisterCallback("Auras", function()
-    local db = GetDB()
-    if db.petWarningsEnabled and NeedsReanchor(warningFrame, db) then
-        StyleWarningFrame(warningFrame)
-        StyleWarningFrame(healthFrame)
-    end
-    if db.lowHpWarning and NeedsReanchor(lowHpFrame, LowHpAnchorSettings(db)) then Auras.UpdateLowHp() end
-    if db.markWarning and NeedsReanchor(markFrame, MarkAnchorSettings(db)) then Auras.UpdateMark() end
-end)
+BUI.Anchor.Follow("Auras.Pet", function() return GetDB().petWarningsEnabled and warningFrame end, GetDB)
+BUI.Anchor.Follow("Auras.PetHealth", function() return GetDB().petWarningsEnabled and healthFrame end, GetDB)
+BUI.Anchor.Follow("Auras.LowHp", function() return GetDB().lowHpWarning and lowHpFrame end, LowHpSettings)
+BUI.Anchor.Follow("Auras.Mark", function() return GetDB().markWarning and markFrame end, MarkSettings)
