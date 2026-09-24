@@ -566,9 +566,9 @@ local function CreateViewerMock(stage, withKeybinds)
 end
 
 local CDM_MOCK_BARS = {
-    { icon = 'Interface\\Icons\\Spell_Nature_Rejuvenation', name = 'Rejuvenation', dur = '12s', fill = 0.78 },
+    { icon = 'Interface\\Icons\\Spell_Nature_Rejuvenation', name = 'Rejuvenation', dur = '12s', fill = 0.78, stacks = '3' },
     { icon = 'Interface\\Icons\\Ability_Warrior_BattleShout', name = 'Battle Shout', dur = '48s', fill = 0.52 },
-    { icon = 'Interface\\Icons\\Spell_Holy_PowerWordShield', name = 'Power Word: Shield', dur = '8s', fill = 0.24 },
+    { icon = 'Interface\\Icons\\Spell_Holy_PowerWordShield', name = 'Power Word: Shield', dur = '8s', fill = 0.24, stacks = '2' },
 }
 
 local function CreateBuffBarMock(stage)
@@ -591,7 +591,8 @@ local function CreateBuffBarMock(stage)
             bar.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
             bar.name = holder:CreateFontString(nil, 'OVERLAY')
             bar.dur = holder:CreateFontString(nil, 'OVERLAY')
-            bar.hit = CreateFrame('Button', nil, holder)
+            bar.stacks = holder:CreateFontString(nil, 'OVERLAY', nil, 1)
+            bar.hit =CreateFrame('Button', nil, holder)
             bar.hit:RegisterForClicks('LeftButtonUp', 'RightButtonUp')
             bar.hit:SetScript('OnClick', function(self)
                 if not self._spellID then return end
@@ -710,6 +711,17 @@ local function CreateBuffBarMock(stage)
             else
                 bar.dur:Hide()
             end
+            if config.showStacks ~= false and mockBar.stacks then
+                local stackPoint = config.stackPoint
+                BUI.Pixel.ApplyFont(bar.stacks, config.stackSize, font, 'OUTLINE')
+                bar.stacks:SetText(mockBar.stacks)
+                bar.stacks:ClearAllPoints()
+                bar.stacks:SetPoint(stackPoint, (showIcon and config.stackAttach == 'ICON') and bar.icon or bar.bg, stackPoint, config.stackOffsetX, config.stackOffsetY)
+                bar.stacks:SetTextColor(1, 1, 1, 1)
+                bar.stacks:Show()
+            else
+                bar.stacks:Hide()
+            end
             bar.hit._spellID = entry.spellID
             bar.hit._name = barName
             bar.hit:ClearAllPoints()
@@ -721,7 +733,7 @@ local function CreateBuffBarMock(stage)
             local bar = barsPool[barIndex]
             bar.border:Hide(); bar.bg:Hide(); bar.fill:Hide()
             bar.iconBorder:Hide(); bar.icon:Hide()
-            bar.name:Hide(); bar.dur:Hide()
+            bar.name:Hide(); bar.dur:Hide(); bar.stacks:Hide()
             bar.hit:Hide()
         end
         self:Show()
@@ -1594,7 +1606,36 @@ local function BuildBuffBarsTab(tab, db, CDM)
 
     TextRow('Name', 'Buff name on each bar.', 'showName', 'nameSize', 'NAME TEXT')
     TextRow('Duration', 'Remaining time on each bar.', 'showDuration', 'durationSize', 'DURATION TEXT')
-    TextRow('Stacks', 'Stack count on each bar.', 'showStacks', 'stackSize', 'STACK TEXT')
+
+    AddRow({
+        title = 'Stacks',
+        description = 'Stack count on each bar.',
+        checked = config.showStacks ~= false,
+        callback = function(value) config.showStacks = value; Refresh() end,
+        accessoryWidth = 36,
+        accessories = function(row)
+            return { PageKit.SettingsIcon(row, { title = 'STACK TEXT', tooltip = 'Position, size & offset', options = {
+                { kind = 'dropdown', label = 'Attach To', items = {
+                      { value = 'ICON', text = 'Icon' },
+                      { value = 'BAR',  text = 'Bar'  },
+                  },
+                  get = function() return config.stackAttach end,
+                  set = function(value) config.stackAttach = value; Refresh() end },
+                { kind = 'dropdown', label = 'Position', items = POS_OPTIONS,
+                  get = function() return config.stackPoint end,
+                  set = function(value) config.stackPoint = value; Refresh() end },
+                { kind = 'slider', label = 'Size', min = 6, max = 24,
+                  get = function() return config.stackSize end,
+                  set = function(value) config.stackSize = value; Refresh() end },
+                { kind = 'slider', label = 'Offset X', min = -40, max = 40,
+                  get = function() return config.stackOffsetX end,
+                  set = function(value) config.stackOffsetX = value; Refresh() end },
+                { kind = 'slider', label = 'Offset Y', min = -40, max = 40,
+                  get = function() return config.stackOffsetY end,
+                  set = function(value) config.stackOffsetY = value; Refresh() end },
+            } }) }
+        end,
+    })
 
     grid:Flush()
     cdmGrids.buffBars:SyncDim(config.skinEnabled)
