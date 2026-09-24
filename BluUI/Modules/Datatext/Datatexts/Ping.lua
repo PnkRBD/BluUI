@@ -59,7 +59,7 @@ Datatext.Register('ping', {
     options = function(getConfig, apply)
         return {
             {
-                kind = 'dropdown', label = 'Ping Source', items = PING_SOURCES, controlWidth = 150,
+                kind = 'dropdown', label = 'Source', items = PING_SOURCES, controlWidth = 150,
                 get = function() return getConfig().pingSource end,
                 set = function(value) getConfig().pingSource = value; apply() end,
             },
