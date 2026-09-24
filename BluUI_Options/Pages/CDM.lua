@@ -81,10 +81,12 @@ local function GetLiveViewerIcons(CDMModule, viewerKey, viewerSettings)
             local info = icon.cooldownInfo
             local spellID = info and BUI.Tools.SafeNum(info.overrideSpellID or info.spellID)
             local iconTexture = icon.Icon:GetTexture() or (spellID and C_Spell.GetSpellTexture(spellID))
+            local frameData = CDMModule.FrameData[icon]
             results[#results + 1] = {
                 tex = iconTexture or 134400,
                 key = CDMModule.GetSortKey(icon),
                 spellID = spellID,
+                itemID = frameData and frameData.itemID,
             }
         end
     end
@@ -104,11 +106,16 @@ local function CreateViewerMock(stage, withKeybinds)
             return C_Spell.GetSpellName(key) or ('Spell ' .. key)
         end
         local keyText = tostring(key)
-        local numericID = tonumber(keyText:match('^custom:(%d+)$') or keyText:match('^item:(%d+)$'))
-        if numericID then
-            return C_Spell.GetSpellName(numericID)
-                or C_Item.GetItemNameByID(numericID)
-                or ('Custom ' .. numericID)
+        local itemKeyID = tonumber(keyText:match('^item:(%d+)$'))
+        if itemKeyID then
+            return C_Item.GetItemNameByID(itemKeyID) or ('Item ' .. itemKeyID)
+        end
+        local customID = tonumber(keyText:match('^custom:(%d+)$'))
+        if customID then
+            if not C_SpellBook.IsSpellKnown(customID) and C_Item.GetItemInfoInstant(customID) then
+                return C_Item.GetItemNameByID(customID) or ('Item ' .. customID)
+            end
+            return C_Spell.GetSpellName(customID) or ('Custom ' .. customID)
         end
         local trinketSlot = keyText:match('^trinket:(%d)$')
         if trinketSlot then return 'Trinket Slot ' .. trinketSlot end
@@ -119,6 +126,10 @@ local function CreateViewerMock(stage, withKeybinds)
     local function CellDisplayName(cell)
         local entry = cell._entry
         if not entry then return '' end
+        if entry.itemID then
+            local itemName = C_Item.GetItemNameByID(entry.itemID)
+            if itemName then return itemName end
+        end
         if entry.spellID then
             local spellName = C_Spell.GetSpellName(entry.spellID)
             if spellName then return spellName end
