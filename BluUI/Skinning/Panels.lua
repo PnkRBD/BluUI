@@ -8,6 +8,25 @@ local SCROLL_KEYS = { 'ScrollBar', 'scrollBar' }
 local BUTTON_KEYS = { 'OkayButton', 'OkButton', 'CancelButton', 'AcceptButton', 'DeclineButton', 'ApplyButton', 'ResetButton', 'DefaultsButton', 'SaveButton', 'DeleteButton', 'PurchaseButton', 'ContinueButton', 'StartButton', 'UnlockButton', 'LeaveButton', 'RequestButton' }
 local DROPDOWN_KEYS = { 'Dropdown', 'DropDown', 'FilterDropdown', 'SelectionDropdown', 'CategoryDropdown' }
 local FONT_DEPTH = 2
+local MODEL_CONTROL_KEYS = { 'zoomInButton', 'zoomOutButton', 'rotateLeftButton', 'rotateRightButton', 'resetButton' }
+local MODEL_CONTROL_INSET = 4
+
+local function SkinHousingPreview(frame, context)
+	local preview = frame.ModelPreview
+	if not preview then return end
+	context.FadeRegions(preview)
+	local controls = preview.ModelSceneControls
+	for index = 1, #MODEL_CONTROL_KEYS do
+		local button = controls[MODEL_CONTROL_KEYS[index]]
+		context.Fade(button.NormalTexture)
+		context.Fade(button.PushedTexture)
+		context.Shell(button, MODEL_CONTROL_INSET)
+	end
+	Skin.TipPageButton(preview.VariantLeftButton, 'previous')
+	Skin.TipPageButton(preview.VariantRightButton, 'next')
+	Skin.TipFaceTree(preview, FONT_DEPTH)
+	context.Title(preview.NameContainer.Name)
+end
 
 local WINDOWS = {
 	{
@@ -15,7 +34,6 @@ local WINDOWS = {
 		name = 'Pet Stable',
 		description = 'The stable master window where you swap and rename pets.',
 		icon = 'Interface/Icons/Ability_Hunter_BeastCall',
-		addons = { 'Blizzard_StableUI' },
 		frames = { 'StableFrame', 'PetStableFrame' },
 	},
 	{
@@ -23,7 +41,6 @@ local WINDOWS = {
 		name = 'Quest Choice',
 		description = 'The card popup where a quest or event asks you to pick one option.',
 		icon = 'Interface/Icons/INV_Misc_Book_09',
-		addons = { 'Blizzard_PlayerChoice' },
 		frames = { 'PlayerChoiceFrame' },
 	},
 	{
@@ -32,7 +49,6 @@ local WINDOWS = {
 		name = 'Trading Post',
 		description = 'The monthly trading post window.',
 		icon = 'Interface/Icons/INV_Misc_Coin_01',
-		addons = { 'Blizzard_PerksProgram' },
 		frames = { 'PerksProgramFrame' },
 	},
 	{
@@ -41,7 +57,6 @@ local WINDOWS = {
 		name = 'In-Game Shop',
 		description = 'The Blizzard shop browser.',
 		icon = 'Interface/Icons/INV_Misc_Coin_02',
-		addons = { 'Blizzard_CatalogShop' },
 		frames = { 'CatalogShopFrame' },
 	},
 	{
@@ -49,7 +64,6 @@ local WINDOWS = {
 		name = 'PvP Scoreboard',
 		description = 'The end-of-match results window and the in-match scoreboard.',
 		icon = 'Interface/Icons/Achievement_PVP_A_01',
-		addons = { 'Blizzard_PVPMatch', 'Blizzard_PVPUI' },
 		frames = { 'PVPMatchResults', 'PVPMatchScoreboard' },
 	},
 	{
@@ -57,7 +71,6 @@ local WINDOWS = {
 		name = 'Renown',
 		description = 'The major faction renown track window.',
 		icon = 'Interface/Icons/Achievement_Reputation_01',
-		addons = { 'Blizzard_MajorFactions' },
 		frames = { 'MajorFactionRenownFrame' },
 	},
 	{
@@ -66,7 +79,6 @@ local WINDOWS = {
 		name = 'Expansion Summary',
 		description = 'The expansion landing page opened from the minimap.',
 		icon = 'Interface/Icons/INV_Misc_Map_01',
-		addons = { 'Blizzard_ExpansionLandingPage' },
 		frames = { 'ExpansionLandingPage' },
 	},
 	{
@@ -74,7 +86,6 @@ local WINDOWS = {
 		name = 'Key Bindings',
 		description = 'The key bindings window from the game menu.',
 		icon = 'Interface/Icons/INV_Misc_Key_03',
-		addons = { 'Blizzard_BindingUI' },
 		frames = { 'KeyBindingFrame' },
 	},
 	{
@@ -82,7 +93,6 @@ local WINDOWS = {
 		name = 'Currency Transfer',
 		description = 'The Warband currency transfer dialog.',
 		icon = 'Interface/Icons/INV_Misc_Coin_02',
-		addons = { 'Blizzard_TokenUI' },
 		frames = { 'CurrencyTransferMenu' },
 		extra = function(frame, context)
 			local content = frame.Content
@@ -100,10 +110,10 @@ local WINDOWS = {
 	{
 		id = 'housing',
 		name = 'Housing',
-		description = 'The housing dashboard, house finder, bulletin board and cornerstone windows.',
+		description = 'The housing dashboard, house finder, bulletin board, cornerstone and decor preview windows.',
 		icon = 'Interface/Icons/INV_Misc_Bell_01',
-		addons = { 'Blizzard_HousingDashboard', 'Blizzard_HousingHouseFinder', 'Blizzard_HousingBulletinBoard', 'Blizzard_HousingCornerstone', 'Blizzard_HouseList', 'Blizzard_HousingHouseSettings' },
-		frames = { 'HousingDashboardFrame', 'HouseFinderFrame', 'HouseListFrame', 'HousingBulletinBoardFrame', 'HousingInviteResidentFrame', 'HousingCornerstoneFrame', 'HousingCornerstoneHouseInfoFrame', 'HousingCornerstonePurchaseFrame', 'HousingCornerstoneVisitorFrame', 'HousingHouseSettingsFrame' },
+		frames = { 'HousingDashboardFrame', 'HouseFinderFrame', 'HouseListFrame', 'HousingBulletinBoardFrame', 'HousingInviteResidentFrame', 'HousingCornerstoneFrame', 'HousingCornerstoneHouseInfoFrame', 'HousingCornerstonePurchaseFrame', 'HousingCornerstoneVisitorFrame', 'HousingHouseSettingsFrame', 'HousingModelPreviewFrame' },
+		extra = SkinHousingPreview,
 	},
 	{
 		id = 'barbershop',
@@ -111,7 +121,6 @@ local WINDOWS = {
 		name = 'Barber Shop',
 		description = 'The barber shop appearance window.',
 		icon = 'Interface/Icons/INV_Misc_Comb_01',
-		addons = { 'Blizzard_BarbershopUI' },
 		frames = { 'BarberShopFrame' },
 	},
 	{
@@ -120,7 +129,6 @@ local WINDOWS = {
 		name = 'Item Interaction',
 		description = 'The drop-an-item-here window used by catalysts, upgrade NPCs and similar.',
 		icon = 'Interface/Icons/INV_Misc_Gear_01',
-		addons = { 'Blizzard_ItemInteractionUI' },
 		frames = { 'ItemInteractionFrame' },
 	},
 	{
@@ -129,7 +137,6 @@ local WINDOWS = {
 		name = 'Clock & Stopwatch',
 		description = 'The clock window from the minimap and the stopwatch.',
 		icon = 'Interface/Icons/INV_Misc_PocketWatch_01',
-		addons = { 'Blizzard_TimeManager' },
 		frames = { 'TimeManagerFrame', 'StopwatchFrame' },
 	},
 	{
@@ -162,7 +169,6 @@ local WINDOWS = {
 		name = 'Talking Head',
 		description = 'The NPC dialogue popup with the animated portrait.',
 		icon = 'Interface/Icons/Achievement_Reputation_01',
-		addons = { 'Blizzard_TalkingHeadUI' },
 		frames = { 'TalkingHeadFrame' },
 	},
 	{
@@ -202,13 +208,6 @@ end
 
 local function SweepAll()
 	for index = 1, #WINDOWS do TrySkin(WINDOWS[index]) end
-end
-
-local function LoadWindows(entry)
-	if not entry.addons then return end
-	for index = 1, #entry.addons do
-		pcall(C_AddOns.LoadAddOn, entry.addons[index])
-	end
 end
 
 for index = 1, #WINDOWS do
