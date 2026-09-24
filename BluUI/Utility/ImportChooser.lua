@@ -18,6 +18,7 @@ local GROUPS = {
 	}},
 	{ header = 'Frames', sections = {
 		{ key = 'unitFrames',  name = 'Unit Frames' },
+		{ key = 'groupFrames', name = 'Group Frames' },
 		{ key = 'castBars',    name = 'Cast Bars' },
 		{ key = 'actionBars',  name = 'Action Bars' },
 	}},
@@ -39,6 +40,8 @@ local GROUPS = {
 		{ key = 'datatextBars', name = 'Datatext Bars' },
 		{ key = 'cursor',       name = 'Cursor' },
 		{ key = 'crosshair',    name = 'Crosshair' },
+		{ key = 'markers',      name = 'Markers' },
+		{ key = 'gcdHistory',   name = 'GCD History' },
 	}},
 	{ header = 'Automation & Social', sections = {
 		{ key = 'social',        name = 'Social' },
@@ -68,6 +71,8 @@ local GROUPS = {
 	}},
 	{ header = 'Layout', sections = {
 		{ key = 'framePositions',  name = 'Frame Positions' },
+		{ key = 'moveFrames',      name = 'Moved Blizzard Frames' },
+		{ key = 'alerts',          name = 'Alert Position' },
 		{ key = 'uiScale',        name = 'UI Scale' },
 	}},
 }
@@ -125,13 +130,7 @@ local function ChangedKeys(left, right)
 	return keys
 end
 
-local SECTION_COMPANIONS = {
-	powerBar = { 'powerBar2', 'powerScope', 'powerVariants' },
-	secondaryPower = { 'powerScope', 'powerVariants' },
-	datatextBars = { 'datatextBarsInit', 'datatextEnabled', 'datatextMinimap' },
-	datatext = { 'datatextEnabled', 'datatextMinimap', 'datatextHideHoversInCombat', 'datatextRosterTooltips' },
-	social = { 'socialShowBattleTag', 'socialAdvancedView', 'socialCollapsedSections', 'datatextSortState' },
-}
+local SECTION_COMPANIONS = BUI.ExportImport.CompanionKeys
 
 local function ChangedCompanions(currentDB, importData, sectionKey)
 	local changed = {}
