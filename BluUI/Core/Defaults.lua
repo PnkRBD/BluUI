@@ -819,6 +819,27 @@ BUI.Defaults = {
 			beastOffsetY       = -2,
 		},
 
+		bestialWrathOverlay = {
+			enabled          = false,
+			displayMode      = 'icon',
+			showHoldThrash   = true,
+			textSize         = 13,
+			textAnchor       = 'CENTER',
+			textOffsetX      = 0,
+			textOffsetY      = 0,
+			screenTextSize   = 28,
+			screenLocked     = true,
+			screenCombatOnly = true,
+			tts              = false,
+			ttsHold          = true,
+			posX             = 0,
+			posY             = 120,
+			anchorFrame      = '',
+			anchorPoint      = 'BOTTOM',
+			anchorOffsetX    = 0,
+			anchorOffsetY    = 0,
+		},
+
 		smartMisdirect = {
 			enabled        = false,
 			useFocus       = true,

@@ -428,43 +428,26 @@ function CDM.ApplyIconPositions(key)
     end
 
     local Detached = CDM.Detached
-    local noAutosort = settings.noAutosort
     local gridCount = 0
-
-    if noAutosort then
-        for iconIndex = 1, #layoutBuffer do
-            local icon = layoutBuffer[iconIndex]
-            local spellID = CDM.GetStableSpellID(icon)
-            if spellID and CDM.IsIconDetached(settings, spellID) then
-                Detached.PlaceIcon(icon, key, iconWidth, iconHeight, settings)
-                layoutBuffer[iconIndex] = false
-            else
-                Detached.HookIcon(icon, key)
-                gridCount = gridCount + 1
-            end
+    for iconIndex = 1, #layoutBuffer do
+        local icon = layoutBuffer[iconIndex]
+        local spellID = CDM.GetStableSpellID(icon)
+        if spellID and CDM.IsIconDetached(settings, spellID) then
+            Detached.PlaceIcon(icon, key, iconWidth, iconHeight, settings)
+        else
+            Detached.HookIcon(icon, key)
+            gridCount = gridCount + 1
+            layoutBuffer[gridCount] = icon
         end
-    else
-        gridCount = 0
-        for iconIndex = 1, #layoutBuffer do
-            local icon = layoutBuffer[iconIndex]
-            local spellID = CDM.GetStableSpellID(icon)
-            if spellID and CDM.IsIconDetached(settings, spellID) then
-                Detached.PlaceIcon(icon, key, iconWidth, iconHeight, settings)
-            else
-                Detached.HookIcon(icon, key)
-                gridCount = gridCount + 1
-                layoutBuffer[gridCount] = icon
-            end
-        end
-        for iconIndex = gridCount + 1, #layoutBuffer do
-            layoutBuffer[iconIndex] = nil
-        end
+    end
+    for iconIndex = gridCount + 1, #layoutBuffer do
+        layoutBuffer[iconIndex] = nil
     end
 
     local icons = layoutBuffer
-    local count = #icons
+    local count = gridCount
 
-    if count == 0 or (gridCount == 0 and not noAutosort) then
+    if count == 0 then
         anchor:Hide()
         return
     end
@@ -526,16 +509,13 @@ function CDM.ApplyIconPositions(key)
                 icons[iconIndex]:SetScale(1)
                 icons[iconIndex]:SetSize(scaledWidth, scaledHeight)
                 iconFrameData.locking = false
-                iconFrameData.parked = nil
                 if not iconFrameData.hidden then
                     iconFrameData.locking = true
                     icons[iconIndex]:SetAlpha(alpha)
                     iconFrameData.locking = false
                 end
             end
-            CDM.SetBuffIconList(icons, count)
-            CDM.SetupBuffCentering()
-            CDM.CenterBuffsNow(true)
+            CDM.CenterBuffList(icons, count)
             return
         end
 
@@ -548,9 +528,7 @@ function CDM.ApplyIconPositions(key)
                 left = startLeft + (iconIndex - 1) * stepX
                 top = startTop
             end
-            if icons[iconIndex] then
-                PlaceIcon(icons[iconIndex], key, anchor, left, top, settings, opacity)
-            end
+            PlaceIcon(icons[iconIndex], key, anchor, left, top, settings, opacity)
         end
         return
     end
@@ -652,9 +630,7 @@ function CDM.ApplyIconPositions(key)
             icons[iconListIndex]:SetSize(scaledWidth, scaledHeight)
             iconFrameData.locking = false
         end
-        CDM.SetBuffIconList(icons, count)
-        CDM.SetupBuffCentering()
-        CDM.CenterBuffsNow(true)
+        CDM.CenterBuffList(icons, count)
         return
     end
 
@@ -671,9 +647,7 @@ function CDM.ApplyIconPositions(key)
             local colTopBase = IconCornerTop(totalHeight, scaledHeight, vertColStart * yDirection)
             for col = 0, rowCount - 1 do
                 if iconIndex > count then break end
-                if icons[iconIndex] then
-                    PlaceIcon(icons[iconIndex], key, anchor, colLeft, colTopBase - col * stepY * yDirection, settings, opacity)
-                end
+                PlaceIcon(icons[iconIndex], key, anchor, colLeft, colTopBase - col * stepY * yDirection, settings, opacity)
                 iconIndex = iconIndex + 1
             end
         else
@@ -687,9 +661,7 @@ function CDM.ApplyIconPositions(key)
             local rowTop = IconCornerTop(totalHeight, scaledHeight, (row - 1) * stepY * yDirection)
             for col = 0, rowCount - 1 do
                 if iconIndex > count then break end
-                if icons[iconIndex] then
-                    PlaceIcon(icons[iconIndex], key, anchor, rowLeft + col * stepX, rowTop, settings, opacity)
-                end
+                PlaceIcon(icons[iconIndex], key, anchor, rowLeft + col * stepX, rowTop, settings, opacity)
                 iconIndex = iconIndex + 1
             end
         end

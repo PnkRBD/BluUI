@@ -18,6 +18,7 @@ local pendingFrame = nil
 local lastSnap = {}
 local lastSnapCount = 0
 local lastWidth, lastHeight, lastSpacing, lastVertical
+local lastAnchorWidth, lastAnchorHeight, lastAlpha, lastGrowUp
 local forceLayout = false
 
 local prefilteredIcons
@@ -96,19 +97,16 @@ local function PlaceIconCentered(icon, anchor, x, y, alpha)
 	frameData.locking = false
 end
 
-local scratchRow1, scratchRow2 = {}, {}
-
-local function PlaceRowLine(list, iconCount, anchor, originX, originY, vertical, growUp, stepX, stepY, alpha)
-	if iconCount == 0 then return end
+local function PlaceRow(list, iconCount, anchor, vertical, growUp, stepX, stepY, alpha)
 	if not vertical then
 		local startX = Pixel.Snap(-((iconCount - 1) * stepX) / 2)
 		for slotIndex = 1, iconCount do
-			PlaceIconCentered(list[slotIndex], anchor, originX + startX + (slotIndex - 1) * stepX, originY, alpha)
+			PlaceIconCentered(list[slotIndex], anchor, startX + (slotIndex - 1) * stepX, 0, alpha)
 		end
 	else
 		local signedStepY = growUp and stepY or -stepY
 		for slotIndex = 1, iconCount do
-			PlaceIconCentered(list[slotIndex], anchor, originX, originY + (slotIndex - 1) * signedStepY, alpha)
+			PlaceIconCentered(list[slotIndex], anchor, 0, (slotIndex - 1) * signedStepY, alpha)
 		end
 	end
 end
@@ -158,16 +156,10 @@ local function CenterNowInner()
 	local vertical = settings.vertical and true or false
 	anchor._cachedScaledW = scaledWidth
 	anchor._cachedScaledH = scaledHeight
-
-	if not forceLayout and visibleCount == lastSnapCount
-		and scaledWidth == lastWidth and scaledHeight == lastHeight and spacing == lastSpacing and vertical == lastVertical then
-		local same = true
-		for iconIndex = 1, visibleCount do
-			if visible[iconIndex] ~= lastSnap[iconIndex] then same = false break end
-		end
-		if same then return end
-	end
-	forceLayout = false
+	local anchorWidth, anchorHeight = anchor._layoutW, anchor._layoutH
+	local alpha = (cachedOpacity / 100) * (anchor._iconAlpha or 1)
+	local growUp = settings.rowGrowth == "Up"
+	local skinVersion = CDM.state.skinVersion
 
 	if not usedPrefiltered then
 		local savedOrder = CDM.GetIconOrder(settings)
@@ -181,7 +173,20 @@ local function CenterNowInner()
 		end
 	end
 
-	local skinVersion = CDM.state.skinVersion
+	if not forceLayout and visibleCount == lastSnapCount
+		and scaledWidth == lastWidth and scaledHeight == lastHeight and spacing == lastSpacing and vertical == lastVertical
+		and anchorWidth == lastAnchorWidth and anchorHeight == lastAnchorHeight and alpha == lastAlpha and growUp == lastGrowUp then
+		local same = true
+		for iconIndex = 1, visibleCount do
+			local icon = visible[iconIndex]
+			if icon ~= lastSnap[iconIndex] then same = false break end
+			local frameData = FrameData[icon]
+			if not frameData or frameData.parked or frameData.anchor ~= anchor or frameData.skinVer ~= skinVersion then same = false break end
+		end
+		if same then return end
+	end
+	forceLayout = false
+
 	for iconIndex = 1, visibleCount do
 		local icon = visible[iconIndex]
 		local frameData = FrameData[icon]
@@ -209,39 +214,9 @@ local function CenterNowInner()
 		end
 	end
 
-	local iconAlpha = anchor._iconAlpha or 1
-	local alpha = (cachedOpacity / 100) * iconAlpha
-
 	local stepX = Pixel.Snap(scaledWidth + spacing)
 	local stepY = Pixel.Snap(scaledHeight + spacing)
-	local growUp = settings.rowGrowth == "Up"
-
-	local buffRows = CDM.GetBuffRows(settings)
-	local row1, row2 = scratchRow1, scratchRow2
-	local row1Count, row2Count = 0, 0
-	if next(buffRows) then
-		for iconIndex = 1, visibleCount do
-			local icon = visible[iconIndex]
-			if buffRows[CDM.GetSortKey(icon)] == 2 then
-				row2Count = row2Count + 1
-				row2[row2Count] = icon
-			else
-				row1Count = row1Count + 1
-				row1[row1Count] = icon
-			end
-		end
-	else
-		for iconIndex = 1, visibleCount do row1[iconIndex] = visible[iconIndex] end
-		row1Count = visibleCount
-	end
-
-	if not vertical then
-		PlaceRowLine(row1, row1Count, anchor, 0, 0, false, growUp, stepX, stepY, alpha)
-		PlaceRowLine(row2, row2Count, anchor, 0, growUp and stepY or -stepY, false, growUp, stepX, stepY, alpha)
-	else
-		PlaceRowLine(row1, row1Count, anchor, 0, 0, true, growUp, stepX, stepY, alpha)
-		PlaceRowLine(row2, row2Count, anchor, stepX, 0, true, growUp, stepX, stepY, alpha)
-	end
+	PlaceRow(visible, visibleCount, anchor, vertical, growUp, stepX, stepY, alpha)
 
 	for iconIndex = 1, visibleCount do lastSnap[iconIndex] = visible[iconIndex] end
 	for staleIndex = visibleCount + 1, #lastSnap do lastSnap[staleIndex] = nil end
@@ -250,6 +225,10 @@ local function CenterNowInner()
 	lastHeight = scaledHeight
 	lastSpacing = spacing
 	lastVertical = vertical
+	lastAnchorWidth = anchorWidth
+	lastAnchorHeight = anchorHeight
+	lastAlpha = alpha
+	lastGrowUp = growUp
 end
 
 local function CenterNow()
@@ -257,7 +236,7 @@ local function CenterNow()
 	if profiler.active then
 		local startTime = debugprofilestop()
 		CenterNowInner()
-		profiler.Add('cdm.buffCenter', debugprofilestop() - startTime)
+		profiler.Add(CDM.ProfKey('center', 'buffs'), debugprofilestop() - startTime)
 	else
 		CenterNowInner()
 	end
@@ -297,14 +276,17 @@ function CDM.RefreshBuffOpacityCache()
 	ScheduleCenter()
 end
 
-function CDM.SetBuffIconList(icons, count)
+function CDM.CenterBuffList(icons, count)
 	prefilteredIcons = icons
-	prefilteredCount = count or (icons and #icons or 0)
+	prefilteredCount = count
+	active = true
+	CenterNow()
 end
 
 function CDM.SetupBuffCentering()
 	if not BUI.GetDB().cdm.buffs.enabled then return end
 	active = true
+	forceLayout = true
 	CenterNow()
 end
 

@@ -6,22 +6,12 @@ local wipe = wipe
 
 local CDM = BUI.CDM
 
-local NotifyIconListRefreshers = BUI.Dispatcher.New(function()
-    if InCombatLockdown() then return end
-    if not CDM._iconListRefreshers then return end
-    if not (BUI.PageEngine.frame and BUI.PageEngine.frame:IsShown()) then return end
-    for _, callback in pairs(CDM._iconListRefreshers) do
-        callback()
-    end
-end, 'CDM.IconListRefresh')
-
 local function OnTalentBurst()
     BUI.Tools.InvalidateOverrideCache()
     BUI.Tools.InvalidateSpellBookIconCache()
     BUI.Tools.InvalidateChargeSpellCache()
     CDM.InvalidateClassSpellCache()
     CDM.MarkAllDirty()
-    NotifyIconListRefreshers()
 
     CDM.UpdateShowOnlyOnCDWatcher()
     CDM.UpdateHideWhenZeroWatcher()
@@ -30,7 +20,6 @@ end
 local function OnCooldownViewerDataLoaded()
     CDM.InvalidateSkinCache()
     CDM.MarkAllDirty()
-    NotifyIconListRefreshers()
 end
 
 local cdSnapshotTime = 0

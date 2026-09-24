@@ -55,7 +55,7 @@ local function FlushDirty()
             if profiling then
                 local startTime = debugprofilestop()
                 CDM.ApplyIconPositions(key)
-                profiler.Add('cdm.layout#' .. key, debugprofilestop() - startTime)
+                profiler.Add(CDM.ProfKey('layout', key), debugprofilestop() - startTime)
             else
                 CDM.ApplyIconPositions(key)
             end
@@ -65,16 +65,11 @@ local function FlushDirty()
         if profiling then
             local startTime = debugprofilestop()
             CDM.NotifyDependents()
-            profiler.Add('cdm.notifyDependents', debugprofilestop() - startTime)
+            profiler.Add(CDM.ProfKey('notifyDependents'), debugprofilestop() - startTime)
         else
             CDM.NotifyDependents()
         end
         if not buffsDirty then CDM.CenterBuffsNow() end
-        if CDM._iconListRefreshers and BUI.PageEngine.frame and BUI.PageEngine.frame:IsShown() then
-            for _, callback in pairs(CDM._iconListRefreshers) do
-                callback()
-            end
-        end
     end
 end
 

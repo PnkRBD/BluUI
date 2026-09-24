@@ -127,6 +127,7 @@ local function PrintHelp()
 	line('/bui currency <id>', 'print the cap fields the game reports for a currency (3418 = Nebulous Voidcore)')
 	line('/bui dump <frame>', 'print a frame\'s parentKeys, textures and children')
 	line('/cdm', "toggle Blizzard's Cooldown Viewer settings")
+	line('/cdm cpu', 'toggle CPU profiling for just the cooldown manager, split by viewer (same as /bui cpu cdm)')
 	line('/rl', 'reload the UI')
 	line('/edit', "open Blizzard's Edit Mode")
 	line('/buitest', 'toggle unit frame test mode')
@@ -154,6 +155,8 @@ SlashCmdList['BUI'] = function(message)
 		elseif rest:lower() == 'login' then
 			BluUI_DB.__profileNextLoad = true
 			BUI.Print('Profiler armed for the next login. Log out to the character screen and back in.')
+		elseif rest:lower() == 'cdm' or BUI.CDM.Profiler.IsRunning() then
+			BUI.CDM.Profiler.Toggle()
 		elseif BUI.Prof.active then
 			BUI.Prof.Stop()
 			BUI.Prof.Report(30)
@@ -174,7 +177,11 @@ SlashCmdList['BUI'] = function(message)
 end
 
 SLASH_BUICDM1 = '/cdm'
-SlashCmdList['BUICDM'] = function()
+SlashCmdList['BUICDM'] = function(message)
+	if message:match('^%s*(%S*)'):lower() == 'cpu' then
+		BUI.CDM.Profiler.Toggle()
+		return
+	end
 	if not CooldownViewerSettings then
 		BUI.Print('CooldownViewerSettings panel not found.')
 		return
