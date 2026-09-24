@@ -478,7 +478,7 @@ BUI.PageEngine.RegisterPage('datatext', {
                             options = moduleOptions, columns = 2, onChange = function() RefreshPreview() end,
                         })
                         local orderButton = Controls.Icon(row, {
-                            texture = BUILib.GetLibMedia('order'), tooltip = 'Reorder modules',
+                            texture = BUILib.GetLibMedia('shuffle'), tooltip = 'Reorder modules',
                             onClick = function(button)
                                 Datatext.OpenOrderPopover(button, CurText(), function() Datatext.Apply(); RefreshPreview() end)
                             end,

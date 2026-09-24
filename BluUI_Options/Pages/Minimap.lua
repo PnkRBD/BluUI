@@ -880,7 +880,7 @@ BUI.PageEngine.RegisterPage('minimap', {
                         options = dtModuleOptions, width = 260, columns = 2,
                     })
                     local orderButton = Controls.Icon(row, {
-                        texture = BUILib.GetLibMedia('order'), tooltip = 'Reorder modules',
+                        texture = BUILib.GetLibMedia('shuffle'), tooltip = 'Reorder modules',
                         onClick = function(button)
                             Datatext.OpenOrderPopover(button, GetDatatextConfig(), function() ApplyDatatext(); RefreshPreview() end)
                         end,
