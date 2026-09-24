@@ -398,6 +398,12 @@ end
 
 local scratchWanted = {}
 
+local NAMEPLATE_ONLY_TOKEN = 'INCLUDE_NAME_PLATE_ONLY'
+
+local function HasFilterToken(filter, token)
+	return ('|' .. filter .. '|'):find('|' .. token .. '|', 1, true) ~= nil
+end
+
 local function EnsureRuleGroups(container, style, rules, baseFilter, candidates, candidateFingerprint, excludeSuffix)
 	local wanted = scratchWanted
 	wipe(wanted)
@@ -420,9 +426,20 @@ local function EnsureRuleGroups(container, style, rules, baseFilter, candidates,
 		wanted['wl#' .. fingerprintTail] = { index = 1, filter = baseFilter, cand = candidates }
 	else
 		local claimedTokens, claimedFlagNames, claimedFlagValues
+		local keepNameplateOnly = HasFilterToken(baseFilter, NAMEPLATE_ONLY_TOKEN)
 		for ruleIndex = 1, #rules do
 			local rule = AR.BY_ID[rules[ruleIndex]]
-			if rule then
+			local ruleFilter = rule and (rule.engineFilter or baseFilter)
+			local alreadyClaimed = false
+			if claimedTokens and ruleFilter then
+				for tokenIndex = 1, #claimedTokens do
+					if HasFilterToken(ruleFilter, claimedTokens[tokenIndex]) then
+						alreadyClaimed = true
+						break
+					end
+				end
+			end
+			if rule and not alreadyClaimed then
 				local cascade = ''
 				local candidateFilters = candidates
 				if rule.engineCandidates or claimedFlagNames then
@@ -443,11 +460,14 @@ local function EnsureRuleGroups(container, style, rules, baseFilter, candidates,
 						for key, value in pairs(rule.engineCandidates) do candidateFilters[key] = value end
 					end
 				end
-				local filter = rule.engineFilter or baseFilter
+				local filter = ruleFilter
+				if keepNameplateOnly and not HasFilterToken(filter, NAMEPLATE_ONLY_TOKEN) then
+					filter = filter .. '|' .. NAMEPLATE_ONLY_TOKEN
+				end
 				if claimedTokens then
 					for tokenIndex = 1, #claimedTokens do
 						local token = claimedTokens[tokenIndex]
-						if not filter:find(token, 1, true) then
+						if not HasFilterToken(filter, '!' .. token) then
 							filter = filter .. '|!' .. token
 							cascade = cascade .. '!' .. token
 						end

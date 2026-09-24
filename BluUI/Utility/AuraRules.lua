@@ -29,6 +29,7 @@ AuraRules.CATALOG = {
 		desc = 'Debuffs you can currently dispel.',
 		setFilter = 'HARMFUL|RAID_PLAYER_DISPELLABLE',
 		engineFilter = 'HARMFUL|RAID_PLAYER_DISPELLABLE',
+		engineExcludeToken = 'RAID_PLAYER_DISPELLABLE',
 		unitFrames = true, icon = 135894,
 	},
 	{
@@ -54,7 +55,8 @@ AuraRules.CATALOG = {
 			if not CanAccess(dispelName) then return false end
 			return dispelName ~= nil and dispelName ~= ''
 		end,
-		engineCandidates = { includeDispelTypes = { Magic = true, Curse = true, Disease = true, Poison = true, Bleed = true } },
+		engineFilter = 'HARMFUL|DISPELLABLE',
+		engineExcludeToken = 'DISPELLABLE',
 		unitFrames = true, icon = 135739,
 	},
 	{
@@ -62,6 +64,7 @@ AuraRules.CATALOG = {
 		desc = 'Debuffs you applied.',
 		setFilter = 'HARMFUL|PLAYER',
 		engineFilter = 'HARMFUL|PLAYER',
+		engineExcludeToken = 'PLAYER',
 		unitFrames = true, icon = 132212,
 	},
 	{
@@ -85,7 +88,16 @@ AuraRules.CATALOG = {
 		desc = 'Buffs you applied.',
 		setFilter = 'HELPFUL|PLAYER',
 		engineFilter = 'HELPFUL|PLAYER',
+		engineExcludeToken = 'PLAYER',
 		unitFrames = true, icon = 135932,
+	},
+	{
+		id = 'important', polarity = 'HELPFUL', label = 'Important Buffs',
+		desc = 'Buffs Blizzard flags as important, the ones enemy nameplates always show.',
+		setFilter = 'HELPFUL|IMPORTANT',
+		engineFilter = 'HELPFUL|IMPORTANT',
+		engineExcludeToken = 'IMPORTANT',
+		unitFrames = true, icon = C_Spell.GetSpellTexture(10060),
 	},
 	{
 		id = 'mineRaidCombat', polarity = 'HELPFUL', label = 'My Healing Buffs',
@@ -100,6 +112,7 @@ AuraRules.CATALOG = {
 		setFilter = 'HELPFUL|RAID',
 		predicate = function(data) return not IsWorldNoise(data) end,
 		engineFilter = 'HELPFUL|RAID',
+		engineExcludeToken = 'RAID',
 		unitFrames = true, icon = 135987,
 	},
 	{
