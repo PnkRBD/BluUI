@@ -875,7 +875,7 @@ local function SyncTrackerCardShown()
 	end
 	local trackerFrame = _G.ObjectiveTrackerFrame
 	local nineSlice = trackerFrame and trackerFrame.NineSlice
-	local shown = IsEnabled() and not Skin.trackerStashScale
+	local shown = IsEnabled() and not Skin.trackerStashScale and not Skin.trackerFadedOut
 	if nineSlice then
 		trackerCard:SetShown(shown and nineSlice:IsShown())
 	else
@@ -958,6 +958,14 @@ local function EnsureTrackerCard()
 		end
 		BUI.Prof.HookScript('ObjectiveTracker', mirrorFrame, 'OnHide', SyncTrackerCardShown)
 		BUI.Prof.HookScript('ObjectiveTracker', mirrorFrame, 'OnShow', SyncTrackerCardShown)
+		if mirrorFrame == trackerFrame then
+			hooksecurefunc(trackerFrame, 'SetAlpha', function(_, alpha)
+				local fadedOut = not issecretvalue(alpha) and alpha == 0 and not Skin.trackerStashScale
+				if fadedOut == (Skin.trackerFadedOut or false) then return end
+				Skin.trackerFadedOut = fadedOut or nil
+				SyncTrackerCardShown()
+			end)
+		end
 	end
 	UpdateCardAnchors()
 	ApplyCardStyle()
