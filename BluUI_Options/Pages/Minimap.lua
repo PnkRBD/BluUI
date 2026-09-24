@@ -643,7 +643,7 @@ BUI.PageEngine.RegisterPage('minimap', {
                 confirmText = 'Reload Now', cancelText = 'Cancel', laterText = 'Later',
                 onConfirm = function()
                     GetInterfaceConfig().minimapEnabled = value
-                    ReloadUI()
+                    BUI.Reload()
                 end,
                 onLater = function()
                     GetInterfaceConfig().minimapEnabled = value

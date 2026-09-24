@@ -132,6 +132,15 @@ local function AdoptOldDB(legacyDatabase)
 	return copy
 end
 
+function BUI.Reload()
+	if InCombatLockdown() then
+		BUI.Print('Reloading when combat ends.')
+		BUI.Events:AfterCombat(ReloadUI, 'Core.Reload')
+		return
+	end
+	ReloadUI()
+end
+
 function BUI.ImportAzorProfiles()
 	if not BluUI_DB then return end
 	if type(AzortharionUI_DB) == 'table' then
@@ -140,7 +149,7 @@ function BUI.ImportAzorProfiles()
 		C_AddOns.EnableAddOn('AzortharionUI')
 		BluUI_DB.__forceAdoptOnLoad = 'disableAfter'
 	end
-	ReloadUI()
+	BUI.Reload()
 end
 
 local function PromptAzorImport()
@@ -170,7 +179,7 @@ function Addon:OnInitialize()
 			C_AddOns.DisableAddOn('AzortharionUI')
 			BUI.Prof.After('Core.Core', 1, function()
 				BUI.Print('Profiles copied, reloading.')
-				BUI.Prof.After('Core.Core', 1.5, ReloadUI)
+				BUI.Prof.After('Core.Core', 1.5, BUI.Reload)
 			end)
 		else
 			BUI.Prof.After('Core.Core', 1, function()
