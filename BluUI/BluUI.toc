@@ -176,6 +176,8 @@ Modules\Datatext\Datatexts\Ping.lua
 Modules\Datatext\Datatexts\Durability.lua
 Modules\Datatext\Datatexts\Gold.lua
 Modules\Datatext\Datatexts\ItemLevel.lua
+Modules\Datatext\Datatexts\Coordinates.lua
+Modules\Datatext\Datatexts\LootSpec.lua
 Modules\Datatext\Datatexts\Friends.lua
 Modules\Datatext\Datatexts\Guild.lua
 Modules\Datatext\Datatexts\Combat.lua
