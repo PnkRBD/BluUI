@@ -357,7 +357,7 @@ local entries = {
 	{ label = "Orientation", page = "datatext", panel = "Style", keywords = "orientation vertical horizontal text align stack" },
 	{ label = "Value Color", page = "datatext", panel = "Style" },
 	{ label = "Ping Source", page = "datatext", panel = "Modules", keywords = "ping source home world display modules" },
-	{ label = "Display Modules", page = "datatext", panel = "Modules", keywords = "fps framerate ping latency durability gold ilvl item level coords location loot spec memory friends guild modules" },
+	{ label = "Display Modules", page = "datatext", panel = "Modules", keywords = "fps framerate ping latency durability gold ilvl item level friends guild modules" },
 
 	{ label = "Enable", page = "cursor", keywords = "cursor ring circle enable" },
 	{ label = "Cursor Size", page = "cursor", panel = "General", keywords = "cursor ring size" },
