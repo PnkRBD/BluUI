@@ -12,8 +12,9 @@ local ROW_TEXTURE_INSET = 1
 local SIDE_TAB_TOP_OFFSET = -36
 local SIDE_TAB_OPTIONS = { width = 32, height = 32, crop = true }
 local LIST_SHELL_INSET = { left = 1 }
-local SEARCH_BOX_INSET = { top = 7, bottom = 7 }
-local CHAT_EDIT_INSET = 6
+local MEMBER_LIST_SHELL_INSET = { top = -3 }
+local SEARCH_BOX_INSET = { left = -5, top = 7, bottom = 7 }
+local CHAT_EDIT_INSET = { left = -2, right = -3, top = 2, bottom = 10 }
 local CHECK_INSET_DIVISOR = 4
 local NAME_SCALE = 1.5
 local BIG_TITLE_SCALE = 2
@@ -319,7 +320,7 @@ end
 local function SkinMemberList(memberList)
 	if not memberList then return end
 	FadeArt(memberList.InsetFrame)
-	Shell(memberList)
+	Shell(memberList, MEMBER_LIST_SHELL_INSET)
 	local watermarkFrame = memberList.WatermarkFrame
 	if watermarkFrame then
 		Fade(watermarkFrame.Watermark)
@@ -370,6 +371,7 @@ local function SkinChat(frame)
 	if editBox then
 		FadeKeys(editBox, CHAT_EDIT_ART)
 		EditBox(editBox, CHAT_EDIT_INSET)
+		editBox:SetTextInsets(6, 6, 0, 8)
 	end
 end
 
