@@ -351,10 +351,6 @@ end
 
 function CDM.SetHideWhenZero(config, id, enabled) PerSpecSet(config, 'hideWhenZero', id, enabled and true or nil) end
 
-function CDM.GetBuffRows(config) return PerSpecGet(config, 'buffRows') end
-function CDM.GetBuffRow(config, id) return PerSpecGet(config, 'buffRows')[id] == 2 and 2 or 1 end
-function CDM.SetBuffRow(config, id, row) PerSpecSet(config, 'buffRows', id, row == 2 and 2 or nil) end
-
 function CDM.GetChoiceNodes(config) return PerSpecGet(config, 'choiceNodes') end
 function CDM.SetChoiceNode(config, id, activeID) PerSpecSet(config, 'choiceNodes', id, activeID or nil) end
 

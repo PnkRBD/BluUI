@@ -358,6 +358,73 @@ local function KillCommandOverlayRow(tab)
     })
 end
 
+local function BestialWrathOverlayRow(tab)
+    local function GetSettings() return BUI.GetDB().bestialWrathOverlay end
+    local Refresh = BuffTracking.BestialWrathOverlay.Refresh
+
+    AddRow(tab, {
+        title = 'Bestial Wrath AoE Callout',
+        description = 'HOLD BW / SEND BW / THRASH! on the BW icon or on screen (needs Wild Thrash)',
+        icon = SpellIcon(19574),
+        checked = GetSettings().enabled,
+        callback = function(value)
+            GetSettings().enabled = value
+            Refresh()
+        end,
+        accessoryWidth = 90,
+        accessories = function(row)
+            local Overlay = BuffTracking.BestialWrathOverlay
+            local preview = Controls.IconToggle(row, Overlay.IsPreviewing(), function(value)
+                if value then Overlay.StartPreview() else Overlay.StopPreview() end
+            end, { texture = BUILib.GetLibMedia('eye'), size = 18, tooltip = 'Preview' })
+
+            local settingsIcon = PageKit.SettingsIcon(row, {
+                title = 'BESTIAL WRATH AOE CALLOUT', tooltip = 'Text & hints', width = 320,
+                options = {
+                    { kind = 'dropdown', label = 'Display', items = {
+                        { value = 'icon',   text = 'On BW Icon' },
+                        { value = 'screen', text = 'On Screen' },
+                        { value = 'both',   text = 'Both' },
+                      },
+                      get = function() return GetSettings().displayMode end,
+                      set = function(value) GetSettings().displayMode = value end, apply = Refresh },
+                    { label = 'Text To Speech',
+                      get = function() return GetSettings().tts end,
+                      set = function(value) GetSettings().tts = value end, apply = Refresh },
+                    { label = 'Speak Hold Cues',
+                      get = function() return GetSettings().ttsHold end,
+                      set = function(value) GetSettings().ttsHold = value end, apply = Refresh },
+                    { label = 'Hold Thrash Hint (BW 10-13s)',
+                      get = function() return GetSettings().showHoldThrash end,
+                      set = function(value) GetSettings().showHoldThrash = value end, apply = Refresh },
+                    { label = 'Unlock Screen Text',
+                      get = function() return GetSettings().screenLocked == false end,
+                      set = function(value) GetSettings().screenLocked = not value end, apply = Refresh },
+                    { label = 'Screen Text In Combat Only',
+                      get = function() return GetSettings().screenCombatOnly end,
+                      set = function(value) GetSettings().screenCombatOnly = value end, apply = Refresh },
+                    { kind = 'slider', label = 'Screen Size', min = 12, max = 64,
+                      get = function() return GetSettings().screenTextSize end,
+                      set = function(value) GetSettings().screenTextSize = value end, apply = Refresh },
+                    { kind = 'slider', label = 'Icon Size', min = 6, max = 32,
+                      get = function() return GetSettings().textSize end,
+                      set = function(value) GetSettings().textSize = value end, apply = Refresh },
+                    { kind = 'dropdown', label = 'Icon Anchor', items = BUI.C.ANCHOR_POINT_OPTIONS,
+                      get = function() return GetSettings().textAnchor end,
+                      set = function(value) GetSettings().textAnchor = value end, apply = Refresh },
+                    { kind = 'slider', label = 'Icon X', min = -30, max = 30,
+                      get = function() return GetSettings().textOffsetX end,
+                      set = function(value) GetSettings().textOffsetX = value end, apply = Refresh },
+                    { kind = 'slider', label = 'Icon Y', min = -30, max = 30,
+                      get = function() return GetSettings().textOffsetY end,
+                      set = function(value) GetSettings().textOffsetY = value end, apply = Refresh },
+                },
+            })
+            return { preview, settingsIcon }
+        end,
+    })
+end
+
 BUI.PageEngine.RegisterPage("buffTracking", {
     title = "Buff Tracking",
     buttonText = "Buff Tracking",
@@ -391,6 +458,9 @@ BUI.PageEngine.RegisterPage("buffTracking", {
                 description = 'Live tier set stack count, spent by Cobra Shot (max 4)',
                 icon = SpellIcon(193455),
             })
+
+            Layout.Section(tab, 'AoE Burst')
+            BestialWrathOverlayRow(tab)
         elseif isSurvival then
             Layout.Section(tab, 'Procs')
             StackTrackerRow(tab, 'hunterTip', 'BUI_BuffTrackingHunterTip', 3, {
@@ -482,6 +552,7 @@ BUI.PageEngine.RegisterPage("buffTracking", {
     end,
     OnHide = function()
         if KillCommandOverlay.IsPreviewing() then KillCommandOverlay.StopPreview() end
+        if BuffTracking.BestialWrathOverlay.IsPreviewing() then BuffTracking.BestialWrathOverlay.StopPreview() end
         for key in pairs(registeredCallbackKeys) do Display.UnregisterAnchorCallback(key) end
         wipe(registeredCallbackKeys)
     end,

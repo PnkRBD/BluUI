@@ -1,6 +1,5 @@
 local _, BUI = ...
 
-local hooksecurefunc = BUI.Prof.MakeHooker('cdmhooks')
 local _, HookScript = BUI.Prof.Scripts('CDM.Hooks')
 local abs = math.abs
 local _G = _G
@@ -45,7 +44,7 @@ end
 local lastPoolActive = {}
 local lastChurn = {}
 
-local function OnRefreshLayoutCompleteInner(viewer)
+local function OnRefreshLayoutComplete(viewer)
     local key = CDM.GetViewerKey(viewer)
     if not key then return end
 
@@ -62,17 +61,6 @@ local function OnRefreshLayoutCompleteInner(viewer)
         CDM.MarkDirty(key)
     else
         CDM.MarkLayoutDirty(key)
-    end
-end
-
-local function OnRefreshLayoutComplete(viewer)
-    local profiler = BUI.Prof
-    if profiler.active then
-        local startTime = debugprofilestop()
-        OnRefreshLayoutCompleteInner(viewer)
-        profiler.Add('cdm.refreshLayoutHook', debugprofilestop() - startTime)
-    else
-        OnRefreshLayoutCompleteInner(viewer)
     end
 end
 
@@ -150,30 +138,31 @@ function CDM.HookIconFrame(icon, key)
     if frameData.posHooked then return end
     frameData.posHooked = true
     frameData.viewerKey = key
+    local hook = CDM.ProfHooker(key)
     if key ~= 'buffs' and icon.Cooldown and not frameData.customIcon then
         HookScript(icon.Cooldown, 'OnCooldownDone', CDM.OnCooldownWidgetDone)
     end
 
-    hooksecurefunc(icon, "SetPoint", OnIconSetPoint)
-    hooksecurefunc(icon, "SetScale", OnIconSetScale)
-    hooksecurefunc(icon, "SetAlpha", OnIconSetAlpha)
-    hooksecurefunc(icon, "SetSize", OnIconSetSize)
-    hooksecurefunc(icon, "SetWidth", OnIconSetSize)
-    hooksecurefunc(icon, "SetHeight", OnIconSetSize)
+    hook(icon, "SetPoint", OnIconSetPoint)
+    hook(icon, "SetScale", OnIconSetScale)
+    hook(icon, "SetAlpha", OnIconSetAlpha)
+    hook(icon, "SetSize", OnIconSetSize)
+    hook(icon, "SetWidth", OnIconSetSize)
+    hook(icon, "SetHeight", OnIconSetSize)
     if icon.SetCooldownID then
         local cooldownID = icon.cooldownID
         if not issecretvalue(cooldownID) then
             frameData.lastCooldownID = cooldownID
         end
-        hooksecurefunc(icon, "SetCooldownID", OnIconSetCooldownID)
+        hook(icon, "SetCooldownID", OnIconSetCooldownID)
     end
     if icon.OnActiveStateChanged then
-        hooksecurefunc(icon, "OnActiveStateChanged", OnIconActiveStateChanged)
+        hook(icon, "OnActiveStateChanged", OnIconActiveStateChanged)
     end
     if key == 'buffs' then
-        hooksecurefunc(icon, "Show", CDM._OnBuffIconShow)
-        hooksecurefunc(icon, "Hide", CDM._OnBuffIconHide)
-        hooksecurefunc(icon, "SetShown", CDM._OnBuffIconShow)
+        hook(icon, "Show", CDM._OnBuffIconShow)
+        hook(icon, "Hide", CDM._OnBuffIconHide)
+        hook(icon, "SetShown", CDM._OnBuffIconShow)
     end
 end
 
@@ -216,7 +205,7 @@ local function SkinAndPark(frame, key)
     parkData.locking = false
 end
 
-local function OnViewerAcquireFrameInner(viewer, frame)
+local function OnViewerAcquireFrame(viewer, frame)
     local viewerFrameData = FrameData[viewer]
     local key = viewerFrameData and viewerFrameData.viewerKey
     local isValid = key == "buffs" and frame.Icon or CDM.IsCooldownIcon(frame)
@@ -239,17 +228,6 @@ local function OnViewerAcquireFrameInner(viewer, frame)
     end
 end
 
-local function OnViewerAcquireFrame(viewer, frame)
-    local profiler = BUI.Prof
-    if profiler.active then
-        local startTime = debugprofilestop()
-        OnViewerAcquireFrameInner(viewer, frame)
-        profiler.Add('cdm.acquireFrame', debugprofilestop() - startTime)
-    else
-        OnViewerAcquireFrameInner(viewer, frame)
-    end
-end
-
 local function OnViewerReleaseFrame(viewer, frame)
     local key = CDM.GetViewerKey(viewer)
     if key then
@@ -269,23 +247,24 @@ function CDM.HookViewer(viewer, key)
     if not viewerFrameData.hooked then
         viewerFrameData.hooked = true
         viewerFrameData.viewerKey = key
+        local hook = CDM.ProfHooker(key)
 
-        hooksecurefunc(viewer, "Show", OnViewerVisibilityChanged)
-        hooksecurefunc(viewer, "Hide", OnViewerVisibilityChanged)
-        hooksecurefunc(viewer, "SetShown", OnViewerVisibilityChanged)
+        hook(viewer, "Show", OnViewerVisibilityChanged)
+        hook(viewer, "Hide", OnViewerVisibilityChanged)
+        hook(viewer, "SetShown", OnViewerVisibilityChanged)
 
         if not viewerFrameData.poolHooked and viewer.itemFramePool then
             viewerFrameData.poolHooked = true
 
-            hooksecurefunc(viewer, "OnAcquireItemFrame", OnViewerAcquireFrame)
+            hook(viewer, "OnAcquireItemFrame", OnViewerAcquireFrame)
 
             if viewer.RefreshLayout then
-                hooksecurefunc(viewer, "RefreshLayout", OnRefreshLayoutComplete)
+                hook(viewer, "RefreshLayout", OnRefreshLayoutComplete)
             end
 
             if viewer.itemFramePool.Release then
                 GetFrameData(viewer.itemFramePool).viewer = viewer
-                hooksecurefunc(viewer.itemFramePool, "Release", OnPoolRelease)
+                hook(viewer.itemFramePool, "Release", OnPoolRelease)
             end
 
             if viewer.itemFramePool.EnumerateActive then
@@ -345,11 +324,12 @@ function CDM.RestyleCooldown(cooldown)
     local viewerKey = parentFrameData and parentFrameData.viewerKey
     local settings = viewerKey and CDM.GetSettings(viewerKey)
 
-    if parent then
+    local scaledEdge = (parentFrameData and parentFrameData.skinVer and settings and settings.borderSize and settings.borderSize > 0)
+        and (Pixel.Scale(settings.borderSize) - Pixel.PixelSize(1)) or 0
+    if parent and (cooldownFrameData.anchoredParent ~= parent or cooldownFrameData.anchoredEdge ~= scaledEdge) then
+        cooldownFrameData.anchoredParent = parent
+        cooldownFrameData.anchoredEdge = scaledEdge
         cooldown:ClearAllPoints()
-
-        local scaledEdge = (parentFrameData and parentFrameData.skinVer and settings and settings.borderSize and settings.borderSize > 0)
-            and (Pixel.Scale(settings.borderSize) - Pixel.PixelSize(1)) or 0
         if scaledEdge > 0 then
             cooldown:SetPoint("TOPLEFT", parent, "TOPLEFT", scaledEdge, -scaledEdge)
             cooldown:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -scaledEdge, scaledEdge)
