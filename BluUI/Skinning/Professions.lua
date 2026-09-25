@@ -1,25 +1,29 @@
 local _, BUI = ...
 
-local ipairs = ipairs
+local ipairs, pairs, xpcall, geterrorhandler, hooksecurefunc = ipairs, pairs, xpcall, geterrorhandler, hooksecurefunc
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 local Theme = BUILib.Theme
 
 local SKIN_ID = 'professions'
-local MAIN_ART = { 'Bg', 'TopTileStreaks', 'Inset' }
-local CUSTOMER_MAIN_ART = { 'MoneyFrameInset', 'MoneyFrameBorder' }
+local FRAME_ART = { 'NineSlice', 'Bg', 'TopTileStreaks', 'Inset' }
+local CUSTOMER_FRAME_ART = { 'MoneyFrameInset', 'MoneyFrameBorder' }
+local DIALOG_ART = { 'NineSlice', 'Bg' }
+local LIST_ART = { 'Background', 'NineSlice' }
 local RECIPE_LIST_ART = { 'Background', 'BackgroundNineSlice' }
 local SCHEMATIC_ART = { 'Background', 'MinimalBackground', 'NineSlice' }
+local QUALITY_PANE_ART = { 'BackgroundTop', 'BackgroundMiddle', 'BackgroundBottom', 'BackgroundMinimized' }
 local RANK_BAR_ART = { 'Background', 'Border' }
 local CATEGORY_ART = { 'LeftPiece', 'RightPiece', 'CenterPiece' }
-local LIST_ART = { 'Background', 'NineSlice' }
 local HEADER_ART = { 'Left', 'Middle', 'Right' }
-local DIALOG_ART = { 'NineSlice', 'Bg' }
+local PANEL_BUTTON_ART = { 'Left', 'Middle', 'Right' }
+local STRETCH_BUTTON_ART = { 'TopLeft', 'TopRight', 'BottomLeft', 'BottomRight', 'TopMiddle', 'MiddleLeft', 'MiddleRight', 'BottomMiddle', 'MiddleMiddle' }
 local REAGENT_CONTAINER_KEYS = { 'Reagents', 'OptionalReagents', 'FinishingReagents' }
 local QUALITY_CONTAINER_KEYS = { 'Container1', 'Container2', 'Container3' }
 local SCHEMATIC_BODY_KEYS = { 'OutputSubText', 'Description', 'RequiredTools', 'RecraftingDescription', 'RecraftingRequiredTools' }
-local ORDER_TYPE_TAB_KEYS = { 'PublicOrdersButton', 'GuildOrdersButton', 'NpcOrdersButton', 'PersonalOrdersButton' }
+local CRAFTING_BUTTON_KEYS = { 'CreateButton', 'CreateAllButton', 'ViewGuildCraftersButton' }
+local SPEC_BUTTON_KEYS = { 'ApplyButton', 'UnlockTabButton', 'ViewTreeButton', 'BackToPreviewButton', 'ViewPreviewButton', 'BackToFullTreeButton' }
 local ORDER_INFO_LABEL_KEYS = { 'PostedByTitle', 'CommissionTitle', 'ConsortiumCutTitle', 'FinalTipTitle', 'TimeRemainingTitle' }
 local ORDER_INFO_BODY_KEYS = { 'PostedByValue', 'TimeRemainingValue' }
 local ORDER_INFO_BUTTON_KEYS = { 'BackButton', 'StartOrderButton', 'DeclineOrderButton', 'ReleaseOrderButton' }
@@ -29,11 +33,15 @@ local FORM_PANEL_KEYS = { 'LeftPanelBackground', 'RightPanelBackground' }
 local BOOK_ROW_NAMES = { 'PrimaryProfession1', 'PrimaryProfession2', 'SecondaryProfession1', 'SecondaryProfession2', 'SecondaryProfession3' }
 local BOOK_BAR_ART = { 'Left', 'Right', 'BGLeft', 'BGRight', 'BGMiddle' }
 local BOOK_PAGE_NAMES = { 'ProfessionsBookPage1', 'ProfessionsBookPage2' }
+local NOTE_FONT, NOTE_HINT_FONT = 'BUI_ProfessionsNoteFont', 'BUI_ProfessionsNoteHintFont'
 local CATEGORY_FILL_ALPHA = 0.04
 local ROW_SELECTED_ALPHA = 0.18
 local ROW_HOVER_ALPHA = 0.06
 local OUTPUT_TITLE_SCALE = 1.2
 local OUTPUT_CRIT_SCALE = 0.8
+local PREVIEW_TITLE_SCALE = 1.5
+local CATEGORY_TITLE_SCALE = 12 / 11
+local TAB_BASELINE_OFFSET = 8
 local BOOK_TITLE_SCALE = 1.25
 local BOOK_SUBTITLE_SCALE = 1.1
 local BOOK_CARD_WIDTH = 437
@@ -49,9 +57,9 @@ local SPELL_LABEL_WIDTH = 100
 local SPELL_BUTTON_SIZE = 40
 local SECONDARY_TEXT_WIDTH = 120
 
-local frameInstalled, bookInstalled, customerInstalled = false, false, false
-local frameSkinned, bookSkinned, customerSkinned = false, false, false
-local templatesHooked = false
+local frameInstalled, bookInstalled, customerInstalled, templatesInstalled = false, false, false, false
+local frameSkinned, bookSkinned, bookLaidOut, customerSkinned = false, false, false, false
+local owned = {}
 
 local function Enabled()
 	return Skin.IsSkinEnabled(SKIN_ID)
@@ -63,9 +71,52 @@ local Shell, Button, Close, Dropdown, EditBox, CheckBox = context.Shell, context
 local ScrollBar, Tab, Body, Title = context.ScrollBar, context.Tab, context.Body, context.Title
 local FlatTexture, AccentTexture, CropIcon = Skin.FlatTexture, Skin.AccentTexture, Skin.CropIcon
 
-local function AccentColor(fontString)
+local function Safely(handler, ...)
+	xpcall(handler, geterrorhandler(), ...)
+end
+
+local function Guard(handler)
+	return function(...)
+		if Enabled() then xpcall(handler, geterrorhandler(), ...) end
+	end
+end
+
+local function Hook(target, method, handler)
+	hooksecurefunc(target, method, Guard(handler))
+end
+
+local function Own(texture)
+	texture.__buiSkin = true
+	owned[texture] = true
+	return texture
+end
+
+local function NoteFonts()
+	if _G[NOTE_FONT] then return end
+	Skin.TipFont(CreateFont(NOTE_FONT), 'body')
+	Skin.TipFont(CreateFont(NOTE_HINT_FONT), 'label')
+end
+
+local function HoverEdges(button)
+	if button._buiHoverEdges then return end
 	local red, green, blue = Theme.GetAccent()
-	fontString:SetTextColor(red, green, blue, 1)
+	local edges = {}
+	for edgeIndex = 1, 4 do
+		local edge = Own(button:CreateTexture(nil, 'HIGHLIGHT'))
+		edge:SetColorTexture(red, green, blue, 1)
+		edges[edgeIndex] = edge
+	end
+	edges[1]:SetPoint('TOPLEFT'); edges[1]:SetPoint('TOPRIGHT'); edges[1]:SetHeight(1)
+	edges[2]:SetPoint('BOTTOMLEFT'); edges[2]:SetPoint('BOTTOMRIGHT'); edges[2]:SetHeight(1)
+	edges[3]:SetPoint('TOPLEFT'); edges[3]:SetPoint('BOTTOMLEFT'); edges[3]:SetWidth(1)
+	edges[4]:SetPoint('TOPRIGHT'); edges[4]:SetPoint('BOTTOMRIGHT'); edges[4]:SetWidth(1)
+	button._buiHoverEdges = edges
+end
+
+local function SkinButton(button)
+	if not button then return end
+	Button(button)
+	HoverEdges(button)
 end
 
 local function FadeStateTextures(button)
@@ -75,28 +126,15 @@ local function FadeStateTextures(button)
 	Fade(button:GetHighlightTexture())
 end
 
-local function IconButtonEnter(button)
-	Skin.TipShellEdges(button, true)
-end
-
-local function IconButtonLeave(button)
-	Skin.TipShellEdges(button, false)
-end
-
 local function SkinIconButton(button)
 	if not button then return end
-	if not button._buiIconButton then
-		button._buiIconButton = true
-		FadeStateTextures(button)
-		button:HookScript('OnEnter', IconButtonEnter)
-		button:HookScript('OnLeave', IconButtonLeave)
-	end
+	FadeStateTextures(button)
 	Shell(button)
+	HoverEdges(button)
 end
 
-local function SkinPanelFrame(frame)
-	Fade(frame.NineSlice)
-	FadeKeys(frame, MAIN_ART)
+local function SkinPanel(frame)
+	FadeKeys(frame, FRAME_ART)
 	FadeRegions(frame)
 	if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
 	Shell(frame)
@@ -104,12 +142,27 @@ local function SkinPanelFrame(frame)
 	Close(frame.CloseButton)
 end
 
-local function SkinDialogPanel(panel)
-	if not panel then return end
-	FadeRegions(panel)
-	FadeKeys(panel, DIALOG_ART)
-	Shell(panel)
-	Title(panel.TitleContainer and panel.TitleContainer.TitleText)
+local function SkinDialog(dialog)
+	FadeRegions(dialog)
+	FadeKeys(dialog, DIALOG_ART)
+	Shell(dialog)
+	Title(dialog.TitleContainer and dialog.TitleContainer.TitleText)
+	Close(dialog.ClosePanelButton)
+end
+
+local function TrackArrowState(arrow)
+	arrow:HookScript('OnEnable', Skin.RefreshPageButton)
+	arrow:HookScript('OnDisable', Skin.RefreshPageButton)
+end
+
+local function SkinSpinner(spinner)
+	EditBox(spinner)
+	Skin.TipPageButton(spinner.DecrementButton, 'previous')
+	Skin.TipPageButton(spinner.IncrementButton, 'next')
+	if spinner._buiSpinner then return end
+	spinner._buiSpinner = true
+	TrackArrowState(spinner.DecrementButton)
+	TrackArrowState(spinner.IncrementButton)
 end
 
 local function SkinItemButton(button)
@@ -130,40 +183,73 @@ local function SkinSlotButton(button)
 	Skin.TipFace(button.Count, 'body')
 end
 
-local function SkinStatusBar(bar)
-	if not bar or bar._buiBar then return end
-	bar._buiBar = true
-	bar:SetStatusBarTexture(BUI.GetGlobalTexture())
-	local red, green, blue = Theme.GetAccent()
-	bar:SetStatusBarColor(red, green, blue, 1)
-	Shell(bar)
+local function SkinNoteEditBox(scrolling)
+	local editBox = scrolling:GetEditBox()
+	NoteFonts()
+	editBox.fontName, editBox.defaultFontName = NOTE_FONT, NOTE_HINT_FONT
+	Skin.TipFace(editBox, 'body')
 end
 
-local function OnCategoryRow(category)
-	if not Enabled() or category._buiCategory then return end
-	category._buiCategory = true
-	FadeKeys(category, CATEGORY_ART)
-	local fill = category:CreateTexture(nil, 'BACKGROUND')
-	fill.__buiSkin = true
-	fill:SetAllPoints(category)
-	FlatTexture(fill, 1, 1, 1, CATEGORY_FILL_ALPHA)
+local function SkinNoteFrame(note)
+	Fade(note.Border)
+	Shell(note)
+	Skin.TipFont(note.TitleBox.Title, 'label')
+	SkinNoteEditBox(note.ScrollingEditBox)
+end
+
+local function DividerLine(frame, vertical)
+	FadeRegions(frame)
+	if frame._buiLine then return end
+	local line = Own(frame:CreateTexture(nil, 'ARTWORK'))
+	local edge = BUI.C.PANEL_BACKDROP
+	line:SetColorTexture(edge[5], edge[6], edge[7], edge[8])
+	if vertical then
+		line:SetPoint('TOP')
+		line:SetPoint('BOTTOM')
+		line:SetWidth(1)
+	else
+		line:SetPoint('BOTTOMLEFT', 0, TAB_BASELINE_OFFSET)
+		line:SetPoint('BOTTOMRIGHT', 0, TAB_BASELINE_OFFSET)
+		line:SetHeight(1)
+	end
+	frame._buiLine = line
+end
+
+local function CategoryLabel(category)
 	Skin.TipFace(category.Label, 'title')
 end
 
-local function OnRecipeRow(row)
-	if not Enabled() or row._buiRecipe then return end
+local function OnCategoryInit(category)
+	if not category._buiCategory then
+		category._buiCategory = true
+		FadeKeys(category, CATEGORY_ART)
+		local fill = Own(category:CreateTexture(nil, 'BACKGROUND'))
+		fill:SetAllPoints(category)
+		FlatTexture(fill, 1, 1, 1, CATEGORY_FILL_ALPHA)
+	end
+	CategoryLabel(category)
+end
+
+local function FillRow(texture, row)
+	texture:ClearAllPoints()
+	texture:SetAllPoints(row)
+	texture:SetBlendMode('BLEND')
+end
+
+local function OnRecipeInit(row)
+	if row._buiRecipe then return end
 	row._buiRecipe = true
-	row.SelectedOverlay:SetBlendMode('BLEND')
+	FillRow(row.SelectedOverlay, row)
 	AccentTexture(row.SelectedOverlay, ROW_SELECTED_ALPHA)
-	row.HighlightOverlay:SetBlendMode('BLEND')
+	FillRow(row.HighlightOverlay, row)
+	row.HighlightOverlay:SetAlpha(1)
 	FlatTexture(row.HighlightOverlay, 1, 1, 1, ROW_HOVER_ALPHA)
 	Skin.TipFace(row.Label, 'body')
 	Skin.TipFace(row.Count, 'body')
-	if row.SkillUps then Skin.TipFace(row.SkillUps.Text, 'body') end
+	Skin.TipFace(row.SkillUps.Text, 'body')
 end
 
-local function OnReagentSlot(slot)
-	if not Enabled() then return end
+local function OnSlotInit(slot)
 	SkinSlotButton(slot.Button)
 	Skin.TipFace(slot.Name, 'body')
 	if slot.Checkbox and not slot._buiCheck then
@@ -172,8 +258,14 @@ local function OnReagentSlot(slot)
 	end
 end
 
+local function OnModifyingRequired(button, isModifyingRequired)
+	local alpha = isModifyingRequired and 1 or 0
+	button:GetNormalTexture():SetAlpha(alpha)
+	button:GetPushedTexture():SetAlpha(alpha)
+end
+
 local function OnHeaderInit(header)
-	if not Enabled() or header._buiHeader or not header.Arrow then return end
+	if header._buiHeader then return end
 	header._buiHeader = true
 	FadeKeys(header, HEADER_ART)
 	Fade(header:GetHighlightTexture())
@@ -186,7 +278,7 @@ local function SkinCell(cell)
 	if cell._buiCell then return end
 	cell._buiCell = true
 	Skin.TipFace(cell.Text, 'title')
-	if cell.Icon and cell.IconBorder then
+	if cell.IconBorder then
 		Fade(cell.IconBorder)
 		CropIcon(cell.Icon)
 		Skin.TipIconFrame(cell, cell.Icon)
@@ -194,31 +286,26 @@ local function SkinCell(cell)
 end
 
 local function OnTableRow(row)
-	if not Enabled() then return end
 	local highlight = row.HighlightTexture
-	if highlight then
-		highlight:SetBlendMode('BLEND')
-		FlatTexture(highlight, 1, 1, 1, ROW_HOVER_ALPHA)
+	highlight:SetBlendMode('BLEND')
+	FlatTexture(highlight, 1, 1, 1, ROW_HOVER_ALPHA)
+	if row.cells then
+		for _, cell in ipairs(row.cells) do SkinCell(cell) end
 	end
-	for _, cell in ipairs(row.cells or {}) do SkinCell(cell) end
 end
 
 local function SkinList(list)
-	if not list or list._buiList then return end
-	list._buiList = true
 	FadeKeys(list, LIST_ART)
 	Shell(list.NineSlice)
-	Shell(list.HeaderContainer)
 	ScrollBar(list.ScrollBar)
 	Body(list.ResultsText)
-	if list.HeaderContainer then
-		for _, header in ipairs({ list.HeaderContainer:GetChildren() }) do OnHeaderInit(header) end
+	for _, header in ipairs({ list.HeaderContainer:GetChildren() }) do
+		if header.Arrow then OnHeaderInit(header) end
 	end
 	Skin.SweepScrollBox(list.ScrollBox, OnTableRow)
 end
 
 local function SkinRecipeList(list)
-	if not list then return end
 	FadeKeys(list, RECIPE_LIST_ART)
 	Shell(list)
 	Dropdown(list.FilterDropdown)
@@ -227,60 +314,62 @@ local function SkinRecipeList(list)
 	Body(list.NoResultsText)
 end
 
+local function SkinQualityDialog(dialog)
+	SkinDialog(dialog)
+	for _, key in ipairs(QUALITY_CONTAINER_KEYS) do
+		local container = dialog[key]
+		SkinSlotButton(container.Button)
+		SkinSpinner(container.EditBox)
+	end
+	SkinButton(dialog.AcceptButton)
+	SkinButton(dialog.CancelButton)
+end
+
 local function SkinSchematicText(form)
 	CheckBox(form.TrackRecipeCheckbox)
 	CheckBox(form.AllocateBestQualityCheckbox)
+	local track = form.TrackRecipeCheckbox
+	track:SetPoint('TOPRIGHT', -(track.text:GetStringWidth() + 20), -16)
 	Skin.TipFont(form.OutputText, 'title', OUTPUT_TITLE_SCALE)
 	Skin.TipFace(form.RecraftingOutputText, 'title')
 	for _, key in ipairs(SCHEMATIC_BODY_KEYS) do Skin.TipFace(form[key], 'body') end
-	for _, key in ipairs(REAGENT_CONTAINER_KEYS) do
-		local container = form[key]
-		if container then Skin.TipFont(container.Label, 'label') end
-	end
-	if form.RecipeSourceButton then Body(form.RecipeSourceButton.Text) end
-end
-
-local function SkinQualitySpinner(spinner)
-	EditBox(spinner)
-	Skin.TipPageButton(spinner.DecrementButton, 'previous')
-	Skin.TipPageButton(spinner.IncrementButton, 'next')
-end
-
-local function SkinQualityDialog(dialog)
-	if not dialog then return end
-	SkinDialogPanel(dialog)
-	Close(dialog.ClosePanelButton)
-	for _, key in ipairs(QUALITY_CONTAINER_KEYS) do
-		local container = dialog[key]
-		SkinItemButton(container.Button)
-		SkinQualitySpinner(container.EditBox)
-	end
-	Button(dialog.AcceptButton)
-	Button(dialog.CancelButton)
-end
-
-local function SkinSchematic(form)
-	if not form then return end
-	FadeKeys(form, SCHEMATIC_ART)
-	Shell(form)
-	SkinSchematicText(form)
+	for _, key in ipairs(REAGENT_CONTAINER_KEYS) do Skin.TipFont(form[key].Label, 'label') end
+	Body(form.RecipeSourceButton.Text)
+	FadeKeys(form.Details, QUALITY_PANE_ART)
+	Skin.TipFont(form.Details.Label, 'label')
 	SkinQualityDialog(form.QualityDialog)
 end
 
-local function SkinRankBar(rankBar)
-	if not rankBar then return end
-	FadeKeys(rankBar, RANK_BAR_ART)
-	Shell(rankBar)
+local function UpdateRankFill(rankBar)
+	local ratio = rankBar.ratio or 0
+	local fill = rankBar._buiFill
+	fill:SetShown(ratio > 0)
+	if ratio > 0 then fill:SetWidth((rankBar:GetWidth() - 2) * ratio) end
+	rankBar.Flare:Hide()
 end
 
-local function SkinConcentration(concentration)
-	if not concentration then return end
-	Body(concentration.Amount)
-	Skin.TipFont(concentration.Label, 'label')
+local function SkinRankBar(rankBar)
+	FadeKeys(rankBar, RANK_BAR_ART)
+	Fade(rankBar.Fill)
+	Shell(rankBar)
+	if not rankBar._buiFill then
+		local fill = Own(rankBar:CreateTexture(nil, 'ARTWORK'))
+		fill:SetPoint('TOPLEFT', 1, -1)
+		fill:SetPoint('BOTTOMLEFT', 1, 1)
+		fill:SetTexture(BUI.GetGlobalTexture())
+		rankBar._buiFill = fill
+		Hook(rankBar, 'Update', UpdateRankFill)
+	end
+	local red, green, blue = Theme.GetAccent()
+	rankBar._buiFill:SetVertexColor(red, green, blue, 1)
+	Skin.TipFace(rankBar.Rank.Text, 'body')
+	local expansion = rankBar.ExpansionDropdownButton
+	Fade(expansion.Texture)
+	Skin.TipArrow(expansion, true)
+	UpdateRankFill(rankBar)
 end
 
 local function OnOutputEntry(entry)
-	if not Enabled() then return end
 	local container = entry.ItemContainer
 	if not entry._buiOutput then
 		entry._buiOutput = true
@@ -300,180 +389,175 @@ local function OnOutputEntry(entry)
 end
 
 local function SkinOutputLog(log)
-	SkinDialogPanel(log)
-	Close(log.ClosePanelButton)
+	SkinDialog(log)
 	ScrollBar(log.ScrollBar)
 end
 
 local function SkinCraftingPage(page)
-	if not page then return end
 	SkinRecipeList(page.RecipeList)
-	SkinSchematic(page.SchematicForm)
+	local form = page.SchematicForm
+	FadeKeys(form, SCHEMATIC_ART)
+	Shell(form)
+	SkinSchematicText(form)
 	SkinRankBar(page.RankBar)
-	Button(page.CreateButton)
-	Button(page.CreateAllButton)
-	Button(page.ViewGuildCraftersButton)
-	local spinner = page.CreateMultipleInputBox
-	if spinner then
-		EditBox(spinner)
-		Skin.TipPageButton(spinner.DecrementButton, 'previous')
-		Skin.TipPageButton(spinner.IncrementButton, 'next')
-	end
-	for _, slot in ipairs(page.InventorySlots or {}) do SkinItemButton(slot) end
-	SkinConcentration(page.ConcentrationDisplay)
+	for _, key in ipairs(CRAFTING_BUTTON_KEYS) do SkinButton(page[key]) end
+	SkinSpinner(page.CreateMultipleInputBox)
+	for _, slot in ipairs(page.InventorySlots) do SkinItemButton(slot) end
+	FadeRegions(page.GearSlotDivider)
+	Body(page.ConcentrationDisplay.Amount)
 	EditBox(page.MinimizedSearchBox)
+	SkinPanel(page.MinimizedSearchResults)
+	ScrollBar(page.MinimizedSearchResults.ScrollBar)
 	SkinOutputLog(page.CraftingOutputLog)
 end
 
-local function OnOrderTypeTab(tab, selected)
-	if Enabled() then Skin.TipTabSelected(tab, selected == true) end
+local function OnSpecTabSelected(tab, selected)
+	Skin.TipTabSelected(tab, selected == true)
 end
 
-local function SkinOrderTypeTabs(browse)
-	for _, key in ipairs(ORDER_TYPE_TAB_KEYS) do
-		local tab = browse[key]
-		if tab then
-			Tab(tab)
-			Skin.TipTabSelected(tab, tab.isSelected == true)
-			if not tab._buiTypeTab then
-				tab._buiTypeTab = true
-				hooksecurefunc(tab, 'SetTabSelected', OnOrderTypeTab)
-			end
-		end
+local function SkinSpecTab(tab)
+	if not tab._buiSpecTab then
+		tab._buiSpecTab = true
+		tab.StateIcon.__buiSkin = true
+		tab.StateIconGlow.__buiSkin = true
+		Tab(tab)
+		Hook(tab, 'SetTabSelected', OnSpecTabSelected)
 	end
+	Skin.TipTabSelected(tab, tab.isSelected == true)
+end
+
+local function SweepSpecTabs(spec)
+	for tab in spec.tabsPool:EnumerateActive() do SkinSpecTab(tab) end
+end
+
+local function SkinSpecPage(spec)
+	FadeRegions(spec.PanelFooter)
+	local tree = spec.TreeView
+	Fade(tree.Background)
+	Title(tree.TreeName)
+	Body(tree.TreeDescription)
+	local detailed = spec.DetailedView
+	Fade(detailed.Background)
+	Title(detailed.PathName)
+	Fade(detailed.UnspentPoints.CurrencyBackground)
+	Body(detailed.UnspentPoints.Count)
+	SkinButton(detailed.SpendPointsButton)
+	SkinButton(detailed.UnlockPathButton)
+	DividerLine(spec.VerticalDivider, true)
+	DividerLine(spec.TopDivider, false)
+	local preview = spec.TreePreview
+	Fade(preview.Background)
+	Shell(preview)
+	Skin.TipFont(preview.Title, 'title', PREVIEW_TITLE_SCALE)
+	Body(preview.Description)
+	Skin.TipFont(preview.HighlightsHeader, 'label')
+	for _, highlight in ipairs(preview.Highlights) do Body(highlight.Description) end
+	for _, key in ipairs(SPEC_BUTTON_KEYS) do SkinButton(spec[key]) end
+	if not spec._buiSpecHooked then
+		spec._buiSpecHooked = true
+		Hook(spec, 'InitializeTabs', SweepSpecTabs)
+	end
+	SweepSpecTabs(spec)
+end
+
+local function OnOrderTypeTab(tab, selected)
+	Skin.TipTabSelected(tab, selected == true)
 end
 
 local function SkinOrderBrowse(browse)
-	if not browse then return end
 	SkinRecipeList(browse.RecipeList)
 	SkinIconButton(browse.FavoritesSearchButton)
-	Button(browse.SearchButton)
+	SkinButton(browse.SearchButton)
+	FadeKeys(browse.BackButton, PANEL_BUTTON_ART)
 	Skin.TipPageButton(browse.BackButton, 'previous')
 	SkinList(browse.OrderList)
-	SkinOrderTypeTabs(browse)
-	local remaining = browse.OrdersRemainingDisplay
-	if remaining then
-		Fade(remaining.Background)
-		Body(remaining.OrdersRemaining)
+	for _, tab in ipairs(browse.orderTypeTabs) do
+		Tab(tab)
+		Skin.TipTabSelected(tab, tab.isSelected == true)
+		if not tab._buiTypeTab then
+			tab._buiTypeTab = true
+			Hook(tab, 'SetTabSelected', OnOrderTypeTab)
+		end
 	end
+	local remaining = browse.OrdersRemainingDisplay
+	Fade(remaining.Background)
+	Body(remaining.OrdersRemaining)
 end
 
-local function SkinNoteFrame(note)
-	if not note then return end
-	Fade(note.Border)
-	Shell(note)
-	if note.TitleBox then Skin.TipFont(note.TitleBox.Title, 'label') end
-	local scrolling = note.ScrollingEditBox
-	local editBox = scrolling and scrolling.GetEditBox and scrolling:GetEditBox()
-	if editBox then Skin.TipFace(editBox, 'body') end
+local function SkinStretchButton(button)
+	FadeKeys(button, STRETCH_BUTTON_ART)
+	SkinIconButton(button)
 end
 
-local function SkinNoteBox(box)
-	if not box then return end
-	if box.Background then Fade(box.Background.Border) end
-	Shell(box)
-	Skin.TipFont(box.NoteTitle, 'label')
-	Skin.TipFace(box.NoteText, 'body')
+local function SkinOrderRewards(info)
+	for _, item in ipairs(info.NPCRewardsFrame.RewardItems) do SkinSlotButton(item) end
 end
 
 local function SkinOrderInfo(info)
-	if not info then return end
 	FadeKeys(info, LIST_ART)
 	Fade(info.CutDivider)
 	Shell(info)
 	for _, key in ipairs(ORDER_INFO_LABEL_KEYS) do Skin.TipFont(info[key], 'label') end
 	for _, key in ipairs(ORDER_INFO_BODY_KEYS) do Body(info[key]) end
-	for _, key in ipairs(ORDER_INFO_BUTTON_KEYS) do Button(info[key]) end
-	SkinIconButton(info.SocialDropdown)
-	SkinNoteBox(info.NoteBox)
-	if info.OrderReagentsWarning then Skin.TipFace(info.OrderReagentsWarning.Text, 'body') end
+	for _, key in ipairs(ORDER_INFO_BUTTON_KEYS) do SkinButton(info[key]) end
+	SkinStretchButton(info.SocialDropdown)
+	local noteBox = info.NoteBox
+	Fade(noteBox.Background.Border)
+	Shell(noteBox)
+	Skin.TipFont(noteBox.NoteTitle, 'label')
+	Skin.TipFace(noteBox.NoteText, 'body')
+	Skin.TipFace(info.OrderReagentsWarning.Text, 'body')
 	local rewards = info.NPCRewardsFrame
-	if rewards then
-		Fade(rewards.Background)
-		Skin.TipFont(rewards.RewardText, 'label')
-		for _, item in ipairs(rewards.RewardItems or {}) do SkinSlotButton(item) end
-	end
-end
-
-local function SkinOrderDetails(details)
-	if not details then return end
-	FadeKeys(details, LIST_ART)
-	Shell(details)
-	local form = details.SchematicForm
-	if form then
-		FadeKeys(form, SCHEMATIC_ART)
-		SkinSchematicText(form)
-	end
-	local fulfillment = details.FulfillmentForm
-	if fulfillment then
-		Skin.TipFace(fulfillment.ItemName, 'title', OUTPUT_TITLE_SCALE)
-		Body(fulfillment.OrderCompleteText)
-		SkinNoteFrame(fulfillment.NoteEditBox)
-	end
-end
-
-local function SkinDeclineDialog(dialog)
-	if not dialog then return end
-	SkinDialogPanel(dialog)
-	Body(dialog.ConfirmationText)
-	SkinNoteFrame(dialog.NoteEditBox)
-	Button(dialog.CancelButton)
-	Button(dialog.ConfirmButton)
+	Fade(rewards.Background)
+	Skin.TipFont(rewards.RewardText, 'label')
+	SkinOrderRewards(info)
 end
 
 local function OnOrderSet(view)
-	if not Enabled() then return end
-	local info = view.OrderInfo
-	if info.NoteBox then Skin.TipFont(info.NoteBox.NoteTitle, 'label') end
-	if info.NPCRewardsFrame then
-		for _, item in ipairs(info.NPCRewardsFrame.RewardItems or {}) do SkinSlotButton(item) end
-	end
+	Skin.TipFont(view.OrderInfo.NoteBox.NoteTitle, 'label')
+	SkinOrderRewards(view.OrderInfo)
 end
 
 local function SkinOrderView(view)
-	if not view then return end
 	SkinOrderInfo(view.OrderInfo)
-	SkinOrderDetails(view.OrderDetails)
+	local details = view.OrderDetails
+	FadeKeys(details, LIST_ART)
+	Shell(details)
+	SkinSchematicText(details.SchematicForm)
+	local fulfillment = details.FulfillmentForm
+	Skin.TipFace(fulfillment.ItemName, 'title', OUTPUT_TITLE_SCALE)
+	Body(fulfillment.OrderCompleteText)
+	SkinNoteFrame(fulfillment.NoteEditBox)
 	SkinRankBar(view.RankBar)
-	SkinConcentration(view.ConcentrationDisplay)
-	for _, key in ipairs(ORDER_VIEW_BUTTON_KEYS) do Button(view[key]) end
-	SkinDeclineDialog(view.DeclineOrderDialog)
+	Body(view.ConcentrationDisplay.Amount)
+	for _, key in ipairs(ORDER_VIEW_BUTTON_KEYS) do SkinButton(view[key]) end
+	local decline = view.DeclineOrderDialog
+	SkinDialog(decline)
+	Body(decline.ConfirmationText)
+	SkinNoteFrame(decline.NoteEditBox)
+	SkinButton(decline.CancelButton)
+	SkinButton(decline.ConfirmButton)
 	SkinOutputLog(view.CraftingOutputLog)
-	if not view._buiOrderHook and view.SetOrder then
+	if not view._buiOrderHook then
 		view._buiOrderHook = true
-		hooksecurefunc(view, 'SetOrder', OnOrderSet)
+		Hook(view, 'SetOrder', OnOrderSet)
 	end
-end
-
-local function SkinOrdersPage(page)
-	if not page then return end
-	SkinOrderBrowse(page.BrowseFrame)
-	SkinOrderView(page.OrderView)
 end
 
 local function SkinProfessionsFrame(frame)
-	SkinPanelFrame(frame)
-	if frame.MaximizeMinimize then
-		Skin.TipPageButton(frame.MaximizeMinimize.MaximizeButton, 'expand')
-		Skin.TipPageButton(frame.MaximizeMinimize.MinimizeButton, 'condense')
-	end
+	SkinPanel(frame)
+	Skin.TipPageButton(frame.MaximizeMinimize.MaximizeButton, 'expand')
+	Skin.TipPageButton(frame.MaximizeMinimize.MinimizeButton, 'condense')
 	Skin.RegisterTabSystem(frame.TabSystem, context, frame)
+	Skin.RefreshTabSystem(frame.TabSystem)
 	SkinCraftingPage(frame.CraftingPage)
-	SkinOrdersPage(frame.OrdersPage)
-end
-
-local function RecolorCategoryButton(button)
-	if not Enabled() or button.isSpacer then return end
-	local text = button.Text
-	if not text then return end
-	local info = button.categoryInfo
-	local primary = info and info.type == Enum.CraftingOrderCustomerCategoryType.Primary
-	Skin.TipFont(text, primary and 'title' or 'body')
-	if button.SelectedTexture:IsShown() then AccentColor(text) end
+	SkinSpecPage(frame.SpecPage)
+	SkinOrderBrowse(frame.OrdersPage.BrowseFrame)
+	SkinOrderView(frame.OrdersPage.OrderView)
 end
 
 local function OnCategoryButton(button)
-	if not Enabled() or button.isSpacer then return end
+	if button.isSpacer then return end
 	button.NormalTexture:SetAlpha(0)
 	button.Lines:SetAlpha(0)
 	local selected, highlight = button.SelectedTexture, button.HighlightTexture
@@ -481,67 +565,56 @@ local function OnCategoryButton(button)
 	AccentTexture(selected, ROW_SELECTED_ALPHA)
 	highlight:SetBlendMode('BLEND')
 	FlatTexture(highlight, 1, 1, 1, ROW_HOVER_ALPHA)
-	if not button._buiCategoryButton and button.UpdateSelected then
-		button._buiCategoryButton = true
-		hooksecurefunc(button, 'UpdateSelected', RecolorCategoryButton)
-	end
-	RecolorCategoryButton(button)
+	local info = button.categoryInfo
+	local primary = info == nil or info.type == Enum.CraftingOrderCustomerCategoryType.Primary
+	Skin.TipButtonFonts(button, primary and CATEGORY_TITLE_SCALE or nil)
 end
 
 local function SkinSearchBar(bar)
-	if not bar then return end
 	SkinIconButton(bar.FavoritesSearchButton)
 	EditBox(bar.SearchBox)
-	Button(bar.SearchButton)
+	SkinButton(bar.SearchButton)
 	Dropdown(bar.FilterDropdown)
 end
 
 local function SkinBrowseOrders(page)
-	if not page then return end
 	SkinSearchBar(page.SearchBar)
 	local categories = page.CategoryList
-	if categories then
-		FadeKeys(categories, LIST_ART)
-		Shell(categories)
-		ScrollBar(categories.ScrollBar)
-		Skin.SweepScrollBox(categories.ScrollBox, OnCategoryButton)
-	end
+	FadeKeys(categories, LIST_ART)
+	Shell(categories)
+	ScrollBar(categories.ScrollBar)
+	Skin.SweepScrollBox(categories.ScrollBox, OnCategoryButton)
 	SkinList(page.RecipeList)
 end
 
-local function SkinMyOrders(page)
-	if not page then return end
-	SkinIconButton(page.RefreshButton)
-	SkinList(page.OrderList)
-end
-
 local function SkinMoneyInput(frame)
-	if not frame then return end
 	for _, child in ipairs({ frame:GetChildren() }) do
 		if child:IsObjectType('EditBox') then EditBox(child) end
 	end
 end
 
+local function OnDurationDropdown(form)
+	Skin.TipFace(form.PaymentContainer.DurationDropdown.Text, 'body')
+end
+
 local function SkinPayment(payment)
-	if not payment then return end
 	for _, key in ipairs(PAYMENT_LABEL_KEYS) do Skin.TipFont(payment[key], 'label') end
 	SkinNoteFrame(payment.NoteEditBox)
 	SkinMoneyInput(payment.TipMoneyInputFrame)
-	if payment.TimeRemainingDisplay then Body(payment.TimeRemainingDisplay.Text) end
+	Body(payment.TimeRemainingDisplay.Text)
 	Dropdown(payment.DurationDropdown)
-	Button(payment.ListOrderButton)
-	Button(payment.CancelOrderButton)
+	SkinButton(payment.ListOrderButton)
+	SkinButton(payment.CancelOrderButton)
 end
 
 local function SkinListings(listings)
-	if not listings then return end
-	SkinDialogPanel(listings)
+	SkinDialog(listings)
+	FadeKeys(listings, FRAME_ART)
 	SkinList(listings.OrderList)
-	Button(listings.CloseButton)
+	SkinButton(listings.CloseButton)
 end
 
 local function SkinCustomerForm(form)
-	if not form then return end
 	Fade(form.RecipeHeader)
 	Skin.TipFace(form.RecipeName, 'title', OUTPUT_TITLE_SCALE)
 	Skin.TipFace(form.RecraftRecipeName, 'title', OUTPUT_TITLE_SCALE)
@@ -549,73 +622,74 @@ local function SkinCustomerForm(form)
 	Body(form.OrderStateText)
 	for _, key in ipairs(FORM_PANEL_KEYS) do
 		local panel = form[key]
-		if panel then
-			FadeKeys(panel, LIST_ART)
-			Shell(panel)
-		end
+		FadeKeys(panel, LIST_ART)
+		Shell(panel)
 	end
-	Button(form.BackButton)
-	local minimum = form.MinimumQuality
-	if minimum then
-		Skin.TipFont(minimum.Text, 'label')
-		Dropdown(minimum.Dropdown)
-	end
+	SkinButton(form.BackButton)
+	Skin.TipFont(form.MinimumQuality.Text, 'label')
+	Dropdown(form.MinimumQuality.Dropdown)
 	Dropdown(form.OrderRecipientDropdown)
 	EditBox(form.OrderRecipientTarget)
 	local recipient = form.OrderRecipientDisplay
-	if recipient then
-		Skin.TipFont(recipient.PostedTo, 'label')
-		Skin.TipFont(recipient.Crafter, 'label')
-		Body(recipient.CrafterValue)
-		SkinIconButton(recipient.SocialDropdown)
-	end
+	Skin.TipFont(recipient.PostedTo, 'label')
+	Skin.TipFont(recipient.Crafter, 'label')
+	Body(recipient.CrafterValue)
+	SkinStretchButton(recipient.SocialDropdown)
 	local reagents = form.ReagentContainer
-	if reagents then
-		for _, key in ipairs(REAGENT_CONTAINER_KEYS) do
-			local container = reagents[key]
-			if container then Skin.TipFont(container.Label, 'label') end
-		end
-		Skin.TipFace(reagents.RecraftInfoText, 'body')
-	end
+	Skin.TipFont(reagents.Reagents.Label, 'label')
+	Skin.TipFont(reagents.OptionalReagents.Label, 'label')
+	Skin.TipFace(reagents.RecraftInfoText, 'body')
 	SkinPayment(form.PaymentContainer)
 	local track = form.TrackRecipeCheckbox
-	if track then
-		Skin.TipFont(track.Text, 'label')
-		CheckBox(track.Checkbox)
-	end
+	Skin.TipFont(track.Text, 'label')
+	CheckBox(track.Checkbox)
+	track:Layout()
 	CheckBox(form.AllocateBestQualityCheckbox)
 	SkinListings(form.CurrentListings)
+	if not form._buiDurationHook then
+		form._buiDurationHook = true
+		Hook(form, 'SetupDurationDropdown', OnDurationDropdown)
+	end
 end
 
 local function SkinCustomerFrame(frame)
-	SkinPanelFrame(frame)
-	FadeKeys(frame, CUSTOMER_MAIN_ART)
+	SkinPanel(frame)
+	FadeKeys(frame, CUSTOMER_FRAME_ART)
 	Skin.RegisterTabStrip(frame, frame.Tabs, context)
+	Skin.RefreshTabStrip(frame)
 	SkinBrowseOrders(frame.BrowseOrders)
-	SkinMyOrders(frame.MyOrdersPage)
+	SkinIconButton(frame.MyOrdersPage.RefreshButton)
+	SkinList(frame.MyOrdersPage.OrderList)
 	SkinCustomerForm(frame.Form)
 end
 
+local function RecolorSpellButton(button)
+	Body(button.spellString)
+end
+
 local function SkinBookSpellButton(button)
-	if not button then return end
 	local name = button:GetName()
-	Fade(name and _G[name .. 'NameFrame'])
+	Fade(_G[name .. 'NameFrame'])
 	CropIcon(button.IconTexture)
 	Skin.TipIconFrame(button, button.IconTexture)
-	Body(button.spellString)
 	Skin.TipFont(button.subSpellString, 'label')
+	RecolorSpellButton(button)
+	if button._buiSpellHook then return end
+	button._buiSpellHook = true
+	Hook(button, 'UpdateButton', RecolorSpellButton)
 end
 
 local function SkinBookBar(bar)
-	if not bar then return end
 	local name = bar:GetName()
-	for _, key in ipairs(BOOK_BAR_ART) do Fade(name and _G[name .. key]) end
-	SkinStatusBar(bar)
+	for _, key in ipairs(BOOK_BAR_ART) do Fade(_G[name .. key]) end
+	bar:SetStatusBarTexture(BUI.GetGlobalTexture())
+	local red, green, blue = Theme.GetAccent()
+	bar:SetStatusBarColor(red, green, blue, 1)
+	Shell(bar)
 	Skin.TipFace(bar.rankText, 'body')
 end
 
 local function PlaceSpellButton(button, point, relativeTo, relativePoint, x, y)
-	if not button then return end
 	button:ClearAllPoints()
 	button:SetPoint(point, relativeTo, relativePoint, x, y)
 end
@@ -623,11 +697,9 @@ end
 local function LayoutPrimaryCard(row)
 	local textX = BOOK_CARD_PADDING + BOOK_ICON_SIZE + BOOK_ICON_GAP
 	local border = _G[row:GetName() .. 'IconBorder']
-	if border then
-		border:ClearAllPoints()
-		border:SetSize(BOOK_ICON_SIZE, BOOK_ICON_SIZE)
-		border:SetPoint('LEFT', row, 'LEFT', BOOK_CARD_PADDING, 0)
-	end
+	border:ClearAllPoints()
+	border:SetSize(BOOK_ICON_SIZE, BOOK_ICON_SIZE)
+	border:SetPoint('LEFT', row, 'LEFT', BOOK_CARD_PADDING, 0)
 	row.professionName:ClearAllPoints()
 	row.professionName:SetPoint('TOPLEFT', row, 'TOPLEFT', textX, -BOOK_CARD_PADDING)
 	row.specialization:ClearAllPoints()
@@ -664,14 +736,38 @@ local function LayoutSecondaryCard(row)
 	PlaceSpellButton(row.SpellButton2, 'TOPRIGHT', row.SpellButton1, 'TOPLEFT', -(SPELL_LABEL_WIDTH + BOOK_CARD_PADDING), 0)
 end
 
+local function LayoutBookCards(frame)
+	if bookLaidOut or not Enabled() then return end
+	local previous
+	for index, name in ipairs(BOOK_ROW_NAMES) do
+		local row = _G[name]
+		local primary = index <= PRIMARY_CARD_COUNT
+		row:SetSize(BOOK_CARD_WIDTH, primary and PRIMARY_CARD_HEIGHT or SECONDARY_CARD_HEIGHT)
+		row:ClearAllPoints()
+		if previous then
+			row:SetPoint('TOPLEFT', previous, 'BOTTOMLEFT', 0, -(index == PRIMARY_CARD_COUNT + 1 and BOOK_GROUP_GAP or BOOK_CARD_GAP))
+		else
+			row:SetPoint('TOPLEFT', frame, 'TOPLEFT', BOOK_COLUMN_X, BOOK_TOP_Y)
+		end
+		if primary then LayoutPrimaryCard(row) else LayoutSecondaryCard(row) end
+		previous = row
+	end
+	bookLaidOut = true
+end
+
 local function SkinBookRow(row, primary)
-	if not row then return end
-	Fade(_G[row:GetName() .. 'IconBorder'])
-	if row.icon then
-		if row.CircleMask then row.icon:RemoveMaskTexture(row.CircleMask) end
-		row.icon:SetBlendMode('BLEND')
-		CropIcon(row.icon)
-		Skin.TipIconFrame(row, row.icon)
+	local icon = row.icon
+	if icon then
+		Fade(_G[row:GetName() .. 'IconBorder'])
+	end
+	if icon and not row._buiIcon then
+		row._buiIcon = true
+		icon:RemoveMaskTexture(row.CircleMask)
+		icon:SetBlendMode('BLEND')
+		icon:SetAlpha(1)
+		icon:SetDesaturation(0)
+		CropIcon(icon)
+		Skin.TipIconFrame(row, icon)
 	end
 	Shell(row)
 	Skin.TipFont(row.professionName, 'title', primary and BOOK_TITLE_SCALE or BOOK_SUBTITLE_SCALE)
@@ -682,102 +778,73 @@ local function SkinBookRow(row, primary)
 	SkinBookSpellButton(row.SpellButton1)
 	SkinBookSpellButton(row.SpellButton2)
 	SkinBookBar(row.statusBar)
-	if primary then LayoutPrimaryCard(row) else LayoutSecondaryCard(row) end
-end
-
-local function LayoutBookCards(frame)
-	local previous
-	for index, name in ipairs(BOOK_ROW_NAMES) do
-		local row = _G[name]
-		if row then
-			local primary = index <= PRIMARY_CARD_COUNT
-			row:SetSize(BOOK_CARD_WIDTH, primary and PRIMARY_CARD_HEIGHT or SECONDARY_CARD_HEIGHT)
-			row:ClearAllPoints()
-			if previous then
-				row:SetPoint('TOPLEFT', previous, 'BOTTOMLEFT', 0, -(index == PRIMARY_CARD_COUNT + 1 and BOOK_GROUP_GAP or BOOK_CARD_GAP))
-			else
-				row:SetPoint('TOPLEFT', frame, 'TOPLEFT', BOOK_COLUMN_X, BOOK_TOP_Y)
-			end
-			SkinBookRow(row, primary)
-			previous = row
-		end
-	end
 end
 
 local function SkinBook(frame)
-	SkinPanelFrame(frame)
+	SkinPanel(frame)
 	for _, name in ipairs(BOOK_PAGE_NAMES) do Fade(_G[name]) end
-	LayoutBookCards(frame)
+	for index, name in ipairs(BOOK_ROW_NAMES) do SkinBookRow(_G[name], index <= PRIMARY_CARD_COUNT) end
+	BUI.Events:AfterCombat(function() Safely(LayoutBookCards, frame) end, 'Skin.ProfessionsBookLayout')
 end
 
 local function ApplyFrame()
 	local frame = _G.ProfessionsFrame
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if not frameSkinned then
-		frameSkinned = true
-		SkinProfessionsFrame(frame)
-	end
-	Skin.RefreshTabSystem(frame.TabSystem)
+	if frameSkinned or not frame or frame:IsForbidden() or not Enabled() then return end
+	SkinProfessionsFrame(frame)
+	frameSkinned = true
 end
 
 local function ApplyBook()
 	local frame = _G.ProfessionsBookFrame
-	if not frame or frame:IsForbidden() or not Enabled() or bookSkinned then return end
-	bookSkinned = true
+	if bookSkinned or not frame or frame:IsForbidden() or not Enabled() then return end
 	SkinBook(frame)
+	bookSkinned = true
 end
 
 local function ApplyCustomer()
 	local frame = _G.ProfessionsCustomerOrdersFrame
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if not customerSkinned then
-		customerSkinned = true
-		SkinCustomerFrame(frame)
-	end
-	Skin.RefreshTabStrip(frame)
+	if customerSkinned or not frame or frame:IsForbidden() or not Enabled() then return end
+	SkinCustomerFrame(frame)
+	customerSkinned = true
 end
 
-local function HookMixin(mixin, method, callback)
-	if mixin and mixin[method] then hooksecurefunc(mixin, method, callback) end
-end
-
-local function HookTemplates()
-	if templatesHooked or not _G.ProfessionsCrafterTableHeaderStringMixin then return end
-	templatesHooked = true
-	HookMixin(_G.ProfessionsCrafterTableHeaderStringMixin, 'Init', OnHeaderInit)
-	HookMixin(_G.ProfessionsReagentSlotMixin, 'Init', OnReagentSlot)
+local function InstallTemplates()
+	if templatesInstalled then return end
+	templatesInstalled = true
+	Hook(ProfessionsRecipeListCategoryMixin, 'Init', OnCategoryInit)
+	Hook(ProfessionsRecipeListCategoryMixin, 'OnEnter', CategoryLabel)
+	Hook(ProfessionsRecipeListCategoryMixin, 'OnLeave', CategoryLabel)
+	Hook(ProfessionsRecipeListRecipeMixin, 'Init', OnRecipeInit)
+	Hook(ProfessionsRecipeSlotBaseMixin, 'Init', OnSlotInit)
+	Hook(ProfessionsReagentSlotButtonMixin, 'SetModifyingRequired', OnModifyingRequired)
+	Hook(ProfessionsCrafterTableHeaderStringMixin, 'Init', OnHeaderInit)
 end
 
 local function InstallFrame()
-	if frameInstalled then return end
 	local frame = _G.ProfessionsFrame
-	if not frame then return end
+	if frameInstalled or not frame then return end
 	frameInstalled = true
-	frame:HookScript('OnShow', ApplyFrame)
-	HookMixin(_G.ProfessionsRecipeListCategoryMixin, 'Init', OnCategoryRow)
-	HookMixin(_G.ProfessionsRecipeListRecipeMixin, 'Init', OnRecipeRow)
-	HookMixin(_G.ProfessionsCraftingOutputLogElementMixin, 'Init', OnOutputEntry)
-	HookTemplates()
-	if frame:IsShown() then ApplyFrame() end
+	InstallTemplates()
+	Hook(ProfessionsCraftingOutputLogElementMixin, 'Init', OnOutputEntry)
+	frame:HookScript('OnShow', Guard(ApplyFrame))
+	Safely(ApplyFrame)
 end
 
 local function InstallBook()
-	if bookInstalled then return end
 	local frame = _G.ProfessionsBookFrame
-	if not frame then return end
+	if bookInstalled or not frame then return end
 	bookInstalled = true
-	frame:HookScript('OnShow', ApplyBook)
-	if frame:IsShown() then ApplyBook() end
+	frame:HookScript('OnShow', Guard(ApplyBook))
+	Safely(ApplyBook)
 end
 
 local function InstallCustomer()
-	if customerInstalled then return end
 	local frame = _G.ProfessionsCustomerOrdersFrame
-	if not frame then return end
+	if customerInstalled or not frame then return end
 	customerInstalled = true
-	frame:HookScript('OnShow', ApplyCustomer)
-	HookTemplates()
-	if frame:IsShown() then ApplyCustomer() end
+	InstallTemplates()
+	frame:HookScript('OnShow', Guard(ApplyCustomer))
+	Safely(ApplyCustomer)
 end
 
 local function AllInstalled()
@@ -791,21 +858,25 @@ local function TryInstall()
 	if AllInstalled() then BUI.Events:Unregister('ADDON_LOADED', 'Skin.Professions') end
 end
 
+local function SetOwnedShown(shown)
+	for texture in pairs(owned) do texture:SetShown(shown) end
+end
+
 local function Deactivate()
 	context.Restore()
-	frameSkinned = false
-	bookSkinned = false
-	customerSkinned = false
+	SetOwnedShown(false)
+	frameSkinned, bookSkinned, customerSkinned = false, false, false
 	BUI.Print('Professions skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)
 	if enabled then
+		SetOwnedShown(true)
 		TryInstall()
 		if not AllInstalled() then BUI.Events:Register('ADDON_LOADED', 'Skin.Professions', TryInstall) end
-		ApplyFrame()
-		ApplyBook()
-		ApplyCustomer()
+		Safely(ApplyFrame)
+		Safely(ApplyBook)
+		Safely(ApplyCustomer)
 	else
 		Deactivate()
 	end
@@ -813,7 +884,7 @@ end)
 
 Skin.RegisterSkin(SKIN_ID, {
 	name = 'Professions',
-	description = 'The professions book, crafting window and crafting orders: recipe list, schematic panel, rank bar, tabs, the crafter order browser and order view, and the customer order window (NPC only, so the preview shows the book).',
+	description = 'The professions book, crafting window and crafting orders: recipe list, schematic panel, flat rank bar, tabs, specializations, the crafter order browser and order view, and the customer order window (NPC only, so the preview shows the book).',
 	icon = 'Interface/Icons/Trade_Engineering',
 })
 

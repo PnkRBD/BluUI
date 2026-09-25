@@ -1516,12 +1516,12 @@ function Skin.RefreshTabStrip(frame)
 end
 
 local function OnTabsChanged(frame)
-	if tabStrips[frame] then Skin.RefreshTabStrip(frame) end
+	if tabStrips[frame] then xpcall(Skin.RefreshTabStrip, geterrorhandler(), frame) end
 end
 
 local function OnTabResized(tab)
 	local parent = tab and tab.GetParent and tab:GetParent()
-	if parent and tabStrips[parent] then Skin.RefreshTabStrip(parent) end
+	if parent and tabStrips[parent] then xpcall(Skin.RefreshTabStrip, geterrorhandler(), parent) end
 end
 
 local function InstallTabHooks()
@@ -1558,11 +1558,15 @@ function Skin.RefreshTabSystem(tabSystem)
 	end
 end
 
+local function OnTabSystemChanged(tabSystem)
+	xpcall(Skin.RefreshTabSystem, geterrorhandler(), tabSystem)
+end
+
 function Skin.RegisterTabSystem(tabSystem, context, panel)
 	if not tabSystem or tabSystems[tabSystem] then return end
 	tabSystems[tabSystem] = { context = context, panel = panel }
-	hooksecurefunc(tabSystem, 'SetTab', Skin.RefreshTabSystem)
-	hooksecurefunc(tabSystem, 'Layout', Skin.RefreshTabSystem)
+	hooksecurefunc(tabSystem, 'SetTabVisuallySelected', OnTabSystemChanged)
+	hooksecurefunc(tabSystem, 'Layout', OnTabSystemChanged)
 	Skin.RefreshTabSystem(tabSystem)
 end
 
