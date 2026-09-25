@@ -115,7 +115,7 @@ function GroupFrames.ApplyChildAll(child, settings, geometry)
 	GroupFrames.ApplyIndicatorsToChild(child, settings)
 	GroupFrames.ApplyKeystoneToChild(child, settings)
 	GroupFrames.ApplyPrivateAuras(child)
-	GroupFrames.ApplySelectionToChild(child, settings)
+	GroupFrames.RefreshSelection(child)
 	if child.unit then
 		if child.Health and child:IsElementEnabled("Health") then child.Health:ForceUpdate() end
 		if child.Power and child:IsElementEnabled("Power") then child.Power:ForceUpdate() end
@@ -133,6 +133,7 @@ function GroupFrames.RecolorChild(child, settings)
 	if child.HpText then GroupFrames.ReTagHp(child, settings) end
 	if child.unit then child:UpdateTags() end
 	GroupFrames.RefreshDispelBorder(child, settings)
+	GroupFrames.RefreshSelection(child)
 	GroupFrames.RepaintPreviewChild(child)
 end
 

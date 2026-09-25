@@ -289,10 +289,26 @@ function GroupFrames.RefreshDispelBorder(frame, settings)
 	if frame.unit then GroupFrames.UpdateDispelBorder(frame, frame.unit) end
 end
 
+local function IsReachable(unit)
+	local visible, assist = UnitIsVisible(unit), UnitCanAssist("player", unit)
+	if not (CanAccess(visible) and CanAccess(assist)) then return false end
+	return (visible and assist) and true or false
+end
+
+local function ReparseShown(frame)
+	for kindIndex = 1, #KIND_LIST do
+		local container = frame[KIND_KEYS[KIND_LIST[kindIndex]]]
+		if container and container:IsShown() then container:UpdateAllAuras() end
+	end
+	local highlight = frame[GroupFrames.DISPEL_HL_KEY]
+	if highlight and highlight:IsShown() then highlight:UpdateAllAuras() end
+end
+
 local function reflowAuraVisibility(frame)
 	local unit = frame.unit
 	if not unit then return end
-	local isVisible = (UnitIsVisible(unit) and UnitCanAssist("player", unit)) and true or false
+	local isVisible = IsReachable(unit)
+	local wasHidden = frame._bluAurasVisible == false
 	if frame._bluAurasVisible == isVisible then return end
 	frame._bluAurasVisible = isVisible
 	local settings = GroupFrames.SettingsForFrame(frame)
@@ -305,6 +321,7 @@ local function reflowAuraVisibility(frame)
 	if highlight and not frame._dispelPreview then
 		highlight:SetShown(isVisible and GroupFrames.DispelHighlightWanted(settings) and true or false)
 	end
+	if isVisible and wasHidden then ReparseShown(frame) end
 end
 GroupFrames.ReflowAuraVisibility = reflowAuraVisibility
 
@@ -315,19 +332,32 @@ local REACHABILITY_EVENTS = {
 function GroupFrames.AttachReachabilityHooks(frame)
 	local sink = CreateFrame("Frame", nil, frame)
 	sink:SetScript("OnEvent", function(_, _, eventUnit)
-		if eventUnit ~= frame.unit then return end
-		reflowAuraVisibility(frame)
-		if not frame._bluAurasVisible then return end
-		for kindIndex = 1, #KIND_LIST do
-			local container = frame[KIND_KEYS[KIND_LIST[kindIndex]]]
-			if container and container:IsShown() and container.UpdateAllAuras then container:UpdateAllAuras() end
-		end
+		if eventUnit == frame.unit then reflowAuraVisibility(frame) end
 	end)
 	for _, event in ipairs(REACHABILITY_EVENTS) do
 		if C_EventUtils.IsEventValid(event) then sink:RegisterEvent(event) end
 	end
 	frame:HookScript("OnShow", reflowAuraVisibility)
+	reflowAuraVisibility(frame)
 end
+
+local REACHABILITY_SWEEP_SECONDS = 1
+local reachabilityTicker
+
+local function SyncReachabilitySweep()
+	local wanted = IsInGroup()
+	if wanted and not reachabilityTicker then
+		reachabilityTicker = C_Timer.NewTicker(REACHABILITY_SWEEP_SECONDS, function()
+			GroupFrames.EachChild(reflowAuraVisibility)
+		end)
+	elseif not wanted and reachabilityTicker then
+		reachabilityTicker:Cancel()
+		reachabilityTicker = nil
+	end
+end
+
+BUI.Events:Register("GROUP_ROSTER_UPDATE", "GroupFrames.ReachabilitySweep", SyncReachabilitySweep)
+BUI.Events:Register("PLAYER_ENTERING_WORLD", "GroupFrames.ReachabilitySweep", SyncReachabilitySweep)
 
 local function ApplyAurasToChild(child)
 	if not child._auraWatcher then return end
