@@ -39,14 +39,7 @@ local GetSpellCooldownDuration = C_Spell.GetSpellCooldownDuration
 local InCombatLockdown = InCombatLockdown
 local issecretvalue = issecretvalue
 local GetTime = GetTime
-
-local function StepCurve(x1, y1, x2, y2)
-    local curve = C_CurveUtil.CreateCurve()
-    curve:SetType(Enum.LuaCurveType.Step)
-    curve:AddPoint(x1, y1)
-    curve:AddPoint(x2, y2)
-    return curve
-end
+local StepCurve = BUI.Tools.StepCurve
 
 local READY_SOON_CURVE = StepCurve(0, 1, READY_WINDOW, 0)
 local NOT_READY_CURVE  = StepCurve(0, 0, READY_WINDOW, 1)
