@@ -1655,3 +1655,97 @@ function Skin.SweepScrollBox(scrollBox, callback)
 	hooksecurefunc(scrollBox, 'Update', Sweep)
 	Sweep(scrollBox)
 end
+
+local ICON_HOVER_ALPHA = 0.15
+local ICON_SELECTED_ALPHA = 0.35
+local ICON_POPUP_EDIT_ART = { 'IconSelectorPopupNameLeft', 'IconSelectorPopupNameMiddle', 'IconSelectorPopupNameRight' }
+
+function Skin.TipIconButton(button)
+	if not button or button:IsForbidden() then return end
+	local icon = button.Icon
+	if not icon then return end
+	local highlight = button.Highlight or (button.GetHighlightTexture and button:GetHighlightTexture())
+	if not button._buiIconButton then
+		button._buiIconButton = true
+		for regionIndex = 1, select('#', button:GetRegions()) do
+			local region = select(regionIndex, button:GetRegions())
+			if region ~= icon and region ~= highlight and region ~= button.SelectedTexture and region.IsObjectType and region:IsObjectType('Texture') and not region.__buiSkin then
+				region:SetAlpha(0)
+			end
+		end
+		Skin.CropIcon(icon)
+		Skin.TipIconFrame(button, icon)
+		if highlight then
+			highlight:SetBlendMode('BLEND')
+			Skin.FlatTexture(highlight, 1, 1, 1, ICON_HOVER_ALPHA)
+		end
+	end
+	local selected = button.SelectedTexture
+	if selected then
+		selected:SetBlendMode('BLEND')
+		Skin.AccentTexture(selected, ICON_SELECTED_ALPHA)
+	end
+end
+
+function Skin.SweepIconSelector(selector)
+	Skin.ForEachScrollFrame(selector and selector.ScrollBox, Skin.TipIconButton)
+end
+
+function Skin.TipIconSelector(context, selector)
+	if not selector then return end
+	context.FadeArt(selector)
+	context.Shell(selector)
+	context.ScrollBar(selector.ScrollBar)
+	Skin.SweepScrollBox(selector.ScrollBox, Skin.TipIconButton)
+	if selector.UpdateAllSelectedTextures and not selector._buiSelectionHook then
+		selector._buiSelectionHook = true
+		hooksecurefunc(selector, 'UpdateAllSelectedTextures', function(host)
+			if context.enabled() then Skin.SweepIconSelector(host) end
+		end)
+	end
+end
+
+local function TipSelectedIcon(context, button)
+	if not button then return end
+	local icon = button.Icon
+	for regionIndex = 1, select('#', button:GetRegions()) do
+		local region = select(regionIndex, button:GetRegions())
+		if region ~= icon and region ~= button.Highlight and region.IsObjectType and region:IsObjectType('Texture') and not region.__buiSkin then context.Fade(region) end
+	end
+	Skin.CropIcon(icon)
+	Skin.TipIconFrame(button, icon)
+	if button.Highlight then
+		button.Highlight:SetBlendMode('BLEND')
+		Skin.FlatTexture(button.Highlight, 1, 1, 1, ICON_HOVER_ALPHA)
+	end
+end
+
+function Skin.TipIconPopup(context, popup)
+	if not popup or popup:IsForbidden() then return end
+	context.Fade(popup.BG)
+	local border = popup.BorderBox
+	if border then
+		context.FadeArt(border)
+		Skin.TipFont(border.EditBoxHeaderText, 'label')
+		Skin.TipFont(border.IconSelectionText, 'label')
+		local editBox = border.IconSelectorEditBox
+		if editBox then
+			for keyIndex = 1, #ICON_POPUP_EDIT_ART do context.Fade(editBox[ICON_POPUP_EDIT_ART[keyIndex]]) end
+			context.EditBox(editBox)
+		end
+		context.Dropdown(border.IconTypeDropdown)
+		local area = border.SelectedIconArea
+		if area then
+			TipSelectedIcon(context, area.SelectedIconButton)
+			local text = area.SelectedIconText
+			if text then
+				Skin.TipFont(text.SelectedIconHeader, 'label')
+				context.Face(text.SelectedIconDescription)
+			end
+		end
+		context.Button(border.OkayButton)
+		context.Button(border.CancelButton)
+	end
+	context.Shell(popup)
+	Skin.TipIconSelector(context, popup.IconSelector)
+end

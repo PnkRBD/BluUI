@@ -12,8 +12,6 @@ local LIST_TITLE_SCALE = 1.4
 local SECTION_TITLE_SCALE = 1.2
 local ROW_SELECTED_ALPHA = 0.2
 local ROW_HOVER_ALPHA = 0.06
-local ICON_HOVER_ALPHA = 0.15
-local ICON_SELECTED_ALPHA = 0.35
 local BINDING_SELECTED_ALPHA = 0.3
 local SLIDER_TRACK_HEIGHT = 2
 local CHECK_INSET = 4
@@ -35,7 +33,6 @@ local EDIT_MODE_LABEL_KEYS = { 'EditBoxLabel', 'NameEditBoxLabel' }
 local UNSAVED_BUTTON_KEYS = { 'SaveAndProceedButton', 'ProceedButton', 'CancelButton' }
 local MACRO_BUTTON_NAMES = { 'MacroEditButton', 'MacroSaveButton', 'MacroCancelButton', 'MacroDeleteButton', 'MacroNewButton', 'MacroExitButton' }
 local MACRO_TAB_COUNT = 2
-local ICON_EDIT_ART = { 'IconSelectorPopupNameLeft', 'IconSelectorPopupNameMiddle', 'IconSelectorPopupNameRight' }
 local ADDON_BUTTON_KEYS = { 'EnableAllButton', 'DisableAllButton', 'OkayButton', 'CancelButton' }
 local PERFORMANCE_TEXT_KEYS = { 'Current', 'Average', 'Peak' }
 local QUICK_KEYBIND_TEXT_KEYS = { 'InstructionText', 'CancelDescriptionText', 'OutputText' }
@@ -55,7 +52,7 @@ local context = Skin.NewContext(Enabled)
 local Fade, FadeRegions, FadeKeys, FadeArt = context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt
 local Shell, Button, Close, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.Dropdown, context.EditBox, context.CheckBox
 local TextBox, ScrollBar, Tab, Face, Title, Body = context.TextBox, context.ScrollBar, context.Tab, context.Face, context.Title, context.Body
-local FlatTexture, AccentTexture, RowHighlight, CropIcon = Skin.FlatTexture, Skin.AccentTexture, Skin.RowHighlight, Skin.CropIcon
+local FlatTexture, AccentTexture, RowHighlight = Skin.FlatTexture, Skin.AccentTexture, Skin.RowHighlight
 
 local function Once(key)
 	if skinnedWindows[key] then return false end
@@ -172,52 +169,6 @@ local function StyleLabeledCheck(holder, inset)
 	if not holder then return end
 	CheckBox(holder.Button, inset)
 	Face(holder.Label)
-end
-
-local function StyleIconButton(button)
-	if not button or button:IsForbidden() then return end
-	local icon = button.Icon
-	if not icon then return end
-	local highlight = button.Highlight or (button.GetHighlightTexture and button:GetHighlightTexture())
-	if not button._buiIconButton then
-		button._buiIconButton = true
-		for regionIndex = 1, select('#', button:GetRegions()) do
-			local region = select(regionIndex, button:GetRegions())
-			if region ~= icon and region ~= highlight and region ~= button.SelectedTexture and region.IsObjectType and region:IsObjectType('Texture') and not region.__buiSkin then
-				Fade(region)
-			end
-		end
-		CropIcon(icon)
-		Skin.TipIconFrame(button, icon)
-		if highlight then
-			highlight:SetBlendMode('BLEND')
-			FlatTexture(highlight, 1, 1, 1, ICON_HOVER_ALPHA)
-		end
-	end
-	local selected = button.SelectedTexture
-	if selected then
-		selected:SetBlendMode('BLEND')
-		AccentTexture(selected, ICON_SELECTED_ALPHA)
-	end
-end
-
-local function SweepIconSelector(selector, callback)
-	local box = selector and selector.ScrollBox
-	Skin.ForEachScrollFrame(box, callback)
-end
-
-local function SkinIconSelector(selector)
-	if not selector then return end
-	FadeArt(selector)
-	Shell(selector)
-	ScrollBar(selector.ScrollBar)
-	Skin.SweepScrollBox(selector.ScrollBox, StyleIconButton)
-	if selector.UpdateAllSelectedTextures and not selector._buiSelectionHook then
-		selector._buiSelectionHook = true
-		hooksecurefunc(selector, 'UpdateAllSelectedTextures', function(host)
-			if Enabled() then SweepIconSelector(host, StyleIconButton) end
-		end)
-	end
 end
 
 local function RefreshCategoryState(button)
@@ -589,8 +540,8 @@ local function SkinMacroFrame(frame)
 	local tabs = {}
 	for tabIndex = 1, MACRO_TAB_COUNT do tabs[tabIndex] = _G['MacroFrameTab' .. tabIndex] end
 	Skin.RegisterTabStrip(frame, tabs, context)
-	SkinIconSelector(frame.MacroSelector)
-	StyleIconButton(frame.SelectedMacroButton)
+	Skin.TipIconSelector(context, frame.MacroSelector)
+	Skin.TipIconButton(frame.SelectedMacroButton)
 	for nameIndex = 1, #MACRO_BUTTON_NAMES do Button(_G[MACRO_BUTTON_NAMES[nameIndex]]) end
 	local textBackground = _G.MacroFrameTextBackground
 	if textBackground then
@@ -603,53 +554,13 @@ local function SkinMacroFrame(frame)
 	if scrollFrame then ScrollBar(scrollFrame.ScrollBar) end
 end
 
-local function SkinSelectedIcon(button)
-	if not button then return end
-	local icon = button.Icon
-	for regionIndex = 1, select('#', button:GetRegions()) do
-		local region = select(regionIndex, button:GetRegions())
-		if region ~= icon and region ~= button.Highlight and region.IsObjectType and region:IsObjectType('Texture') and not region.__buiSkin then Fade(region) end
-	end
-	CropIcon(icon)
-	Skin.TipIconFrame(button, icon)
-	if button.Highlight then
-		button.Highlight:SetBlendMode('BLEND')
-		FlatTexture(button.Highlight, 1, 1, 1, ICON_HOVER_ALPHA)
-	end
-end
-
 local function SkinIconPopup(popup)
 	if not popup or popup:IsForbidden() or not Enabled() then return end
-	if not Once('iconPopup') then
-		SweepIconSelector(popup.IconSelector, StyleIconButton)
-		return
+	if Once('iconPopup') then
+		Skin.TipIconPopup(context, popup)
+	else
+		Skin.SweepIconSelector(popup.IconSelector)
 	end
-	Fade(popup.BG)
-	local border = popup.BorderBox
-	if border then
-		FadeArt(border)
-		Skin.TipFont(border.EditBoxHeaderText, 'label')
-		Skin.TipFont(border.IconSelectionText, 'label')
-		local editBox = border.IconSelectorEditBox
-		if editBox then
-			for keyIndex = 1, #ICON_EDIT_ART do Fade(editBox[ICON_EDIT_ART[keyIndex]]) end
-			EditBox(editBox)
-		end
-		Dropdown(border.IconTypeDropdown)
-		local area = border.SelectedIconArea
-		if area then
-			SkinSelectedIcon(area.SelectedIconButton)
-			local text = area.SelectedIconText
-			if text then
-				Skin.TipFont(text.SelectedIconHeader, 'label')
-				Face(text.SelectedIconDescription)
-			end
-		end
-		Button(border.OkayButton)
-		Button(border.CancelButton)
-	end
-	Shell(popup)
-	SkinIconSelector(popup.IconSelector)
 end
 
 local function ApplyMacro()
@@ -657,8 +568,8 @@ local function ApplyMacro()
 	if not frame or frame:IsForbidden() or not Enabled() then return end
 	if Once('macro') then SkinMacroFrame(frame) end
 	Skin.RefreshTabStrip(frame)
-	SweepIconSelector(frame.MacroSelector, StyleIconButton)
-	StyleIconButton(frame.SelectedMacroButton)
+	Skin.SweepIconSelector(frame.MacroSelector)
+	Skin.TipIconButton(frame.SelectedMacroButton)
 end
 
 local function StyleAddonEntry(entry)
