@@ -150,7 +150,7 @@ end
 local toolActions = {
 	{ label = 'Settings',  texture = BUI.C.ICON_PATH,    onClick = function() BUI.PageEngine.Toggle() end },
 	{ label = 'Calendar',  dynamic = true,               onClick = OpenCalendar },
-	{ label = 'Reload',    texture = LibMedia('reload'), onClick = BUI.Reload },
+	{ label = 'Reload',    texture = LibMedia('reload'), onClick = ReloadUI },
 }
 
 local function CreateToolRow(action)
