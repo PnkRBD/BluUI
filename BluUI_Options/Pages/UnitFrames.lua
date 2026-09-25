@@ -104,7 +104,7 @@ local function BuildFiltersTab(tab, RefreshAurasOnly)
     BUI.BlacklistSection(tab, {
         scope = 'unit', polarity = 'HELPFUL',
         title = 'Buff Blacklist',
-        desc = shared and 'Buffs that never show anywhere, shared with Group Frames.'
+        desc = shared and 'Buffs hidden on unit and group frames, shared with Group Frames.'
             or 'Buffs that never show on unit frames.',
         onChange = Apply,
     })
@@ -122,7 +122,7 @@ local function BuildFiltersTab(tab, RefreshAurasOnly)
     BUI.BlacklistSection(tab, {
         scope = 'unit', polarity = 'HARMFUL',
         title = 'Debuff Blacklist',
-        desc = shared and 'Debuffs that never show anywhere, shared with Group Frames.'
+        desc = shared and 'Debuffs hidden on unit and group frames, shared with Group Frames.'
             or 'Debuffs that never show on unit frames.',
         onChange = Apply,
     })
