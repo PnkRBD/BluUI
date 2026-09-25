@@ -1738,7 +1738,7 @@ local function BuildLayoutsTab(tab, CDM)
                         title = "Snapshot Applied",
                         message = backed and ("'" .. name .. "' is applied. Your previous layouts were saved as '" .. backupName .. "'.\n\nReload now to finish?") or ("'" .. name .. "' is applied. Reload now to finish?"),
                         confirmText = "Reload Now", cancelText = "Later",
-                        onConfirm = function() BUI.Reload() end,
+                        onConfirm = ReloadUI,
                     })
                 else
                     BUI.Print(err or "Could not apply snapshot.")
@@ -1858,7 +1858,7 @@ local function BuildLayoutsTab(tab, CDM)
                             title = "Layouts Added",
                             message = "Layouts imported. Reload so everything picks them up?",
                             confirmText = "Reload Now", cancelText = "Later",
-                            onConfirm = function() BUI.Reload() end,
+                            onConfirm = ReloadUI,
                         })
                     else
                         BUI.Print(result or "Import failed.")
@@ -1874,7 +1874,7 @@ local function BuildLayoutsTab(tab, CDM)
                             title = "Setup Replaced",
                             message = backed and ("Done. Your previous layouts were saved as '" .. backupName .. "'.\n\nReload now to finish?") or "Done. Reload now to finish?",
                             confirmText = "Reload Now", cancelText = "Later",
-                            onConfirm = function() BUI.Reload() end,
+                            onConfirm = ReloadUI,
                         })
                     else
                         BUI.Print(err or "Could not apply that string.")
@@ -1951,7 +1951,7 @@ BUI.PageEngine.RegisterPage("cdm", {
                         message = 'This change requires a UI reload to take effect.',
                         confirmText = 'Reload Now', cancelText = 'Cancel',
                         laterText = 'Later',
-                        onConfirm = function() viewerSettings.enabled = enabled; BUI.Reload() end,
+                        onConfirm = function() viewerSettings.enabled = enabled; ReloadUI() end,
                         onLater = function() viewerSettings.enabled = enabled end,
                         onCancel = function()
                             header.titleBar.enableToggle:SetValue(not enabled)
@@ -2034,7 +2034,7 @@ BUI.PageEngine.RegisterPage("cdm", {
                 message = 'Blizzard\'s Cooldown Manager is turned off.\n\nBluUI\'s CDM requires it. Enable and reload?',
                 confirmText = 'Enable & Reload', cancelText = 'Close',
                 laterText = 'Enable Later',
-                onConfirm = function() SetCVar('cooldownViewerEnabled', '1'); BUI.Reload() end,
+                onConfirm = function() SetCVar('cooldownViewerEnabled', '1'); ReloadUI() end,
                 onLater = function() SetCVar('cooldownViewerEnabled', '1') end,
             })
         end

@@ -399,7 +399,7 @@ BUI.PageEngine.RegisterPage("settings", {
 							title = 'Reset All Settings',
 							message = 'This will reset ALL BluUI settings to their defaults. This cannot be undone.',
 							confirmText = 'Reset', cancelText = 'Cancel',
-							onConfirm = function() BUI.GetAceDB():ResetDB(); BUI.Reload() end,
+							onConfirm = function() BUI.GetAceDB():ResetDB(); ReloadUI() end,
 						})
 					end, 3, 180)
 					holdButton.frame:SetHeight(Pixel.Scale(24))
@@ -785,7 +785,7 @@ BUI.PageEngine.RegisterPage("settings", {
 						title = 'Reload Required',
 						message = 'Some module changes take effect after a /reload.',
 						confirmText = 'Reload Now', cancelText = 'Later',
-						onConfirm = function() SyncModules(); BUI.Reload() end,
+						onConfirm = function() SyncModules(); ReloadUI() end,
 					})
 				end,
 			})
