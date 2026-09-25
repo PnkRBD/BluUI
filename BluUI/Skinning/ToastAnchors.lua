@@ -41,6 +41,12 @@ local function Config(entry)
 	return config or SharedConfig(entry.key)
 end
 
+local function EntryPoint(entry)
+	local point = entry.point
+	if type(point) == 'function' then return point() end
+	return point
+end
+
 local function IsSecret(value)
 	return issecretvalue and issecretvalue(value)
 end
@@ -55,6 +61,10 @@ local function ScreenOffset(frame, point)
 		local bottom = frame:GetBottom()
 		if type(bottom) ~= 'number' or IsSecret(bottom) then return nil end
 		y = bottom + ANCHOR_HEIGHT / 2
+	elseif point == 'TOP' then
+		local top = frame:GetTop()
+		if type(top) ~= 'number' or IsSecret(top) then return nil end
+		y = top - ANCHOR_HEIGHT / 2
 	end
 	local ratio = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
 	return x * ratio - parentX, y * ratio - parentY
@@ -98,7 +108,7 @@ local function PlaceAnchor(entry)
 	if entry.followFrame then
 		local frame = entry.frame()
 		if frame and frame:GetNumPoints() > 0 then
-			local x, y = ScreenOffset(frame, entry.point)
+			local x, y = ScreenOffset(frame, EntryPoint(entry))
 			if x then
 				anchor:SetPoint('CENTER', UIParent, 'CENTER', x, y)
 				return
@@ -109,8 +119,9 @@ local function PlaceAnchor(entry)
 end
 
 local function DefaultApply(entry, frame, anchor)
+	local point = EntryPoint(entry)
 	frame:ClearAllPoints()
-	frame:SetPoint(entry.point, anchor, entry.point, 0, 0)
+	frame:SetPoint(point, anchor, point, 0, 0)
 end
 
 local function Apply(entry)
@@ -227,6 +238,12 @@ local function SampleDragStop(sample)
 	OnDragStop(sample._buiAnchor)
 end
 
+local function PointSample(entry, sample)
+	local point = entry.samplePoint or EntryPoint(entry)
+	sample:ClearAllPoints()
+	sample:SetPoint(point, entry.anchor, entry.sampleRelativePoint or point, 0, 0)
+end
+
 local function EnsureSample(entry)
 	if entry.sampleFrame or not entry.sample then return entry.sampleFrame end
 	local builder = SAMPLES[entry.sample]
@@ -239,8 +256,7 @@ local function EnsureSample(entry)
 	sample:RegisterForDrag('LeftButton')
 	sample:SetScript('OnDragStart', SampleDragStart)
 	sample:SetScript('OnDragStop', SampleDragStop)
-	local point = entry.samplePoint or entry.point
-	sample:SetPoint(point, anchor, entry.sampleRelativePoint or point, 0, 0)
+	PointSample(entry, sample)
 	sample:Hide()
 	entry.sampleFrame = sample
 	local caption = entry.caption
@@ -392,6 +408,14 @@ end
 
 function ToastAnchors.Apply(key)
 	Each(key, Apply)
+end
+
+function ToastAnchors.Refresh(key)
+	Each(key, function(entry)
+		if entry.sampleFrame then PointSample(entry, entry.sampleFrame) end
+		PlaceAnchor(entry)
+		Apply(entry)
+	end)
 end
 
 function ToastAnchors.Center(key)

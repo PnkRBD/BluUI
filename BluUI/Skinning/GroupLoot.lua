@@ -8,6 +8,7 @@ local Tools = BUI.Tools
 local Layout = BUILib.Layout
 
 local SKIN_ID = 'grouploot'
+local GROW_DOWN_SETTING = 'grouplootGrowDown'
 local FRAME_COUNT = 4
 local ART_KEYS = { 'Border', 'BorderFrame', 'Background', 'Bg', 'Decoration', 'Corner', 'SlotTexture', 'NameFrame', 'Backdrop' }
 local ICON_ART_KEYS = { 'IconBorder', 'Border', 'IconQuestTexture' }
@@ -148,14 +149,33 @@ local function AnchorHooks(reapply)
 	if alertFrame and alertFrame.UpdateAnchors then hooksecurefunc(alertFrame, 'UpdateAnchors', reapply) end
 end
 
+local function GrowPoint()
+	return BUI.GetDB().skinning[GROW_DOWN_SETTING] and 'TOP' or 'BOTTOM'
+end
+
+local function PlaceRolls(container, anchor)
+	local point = GrowPoint()
+	local step = point == 'TOP' and -container.reservedSize or container.reservedSize
+	container:ClearAllPoints()
+	container:SetPoint(point, anchor, point, 0, 0)
+	for index = 1, container.maxIndex do
+		local frame = container.rollFrames[index]
+		if frame then
+			frame:ClearAllPoints()
+			frame:SetPoint('CENTER', container, point, 0, step * (index - 0.5))
+		end
+	end
+end
+
 Skin.ToastAnchors.Register({
 	key = 'lootrolls',
 	label = 'LOOT ROLLS',
-	point = 'BOTTOM',
+	point = GrowPoint,
 	sample = 'roll',
 	followFrame = true,
 	defaultY = 260,
 	frame = function() return _G.GroupLootContainer end,
+	apply = PlaceRolls,
 	hooks = AnchorHooks,
 })
 
@@ -172,6 +192,17 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Loot Rolls',
 	description = 'Need, greed and pass roll popups drawn like the BluUI tooltip, with a quality border on the item.',
 	icon = 'Interface/Buttons/UI-GroupLoot-Dice-Up',
+	buildSettings = function(content)
+		local skinDB = BUI.GetDB().skinning
+		local panel = Layout.SettingsCard(content, { title = 'Layout' })
+		Layout.Toggle(panel, {
+			label = 'Grow downwards',
+			tooltip = 'Stack new rolls below the first one. Takes effect once the roll window has been moved with the unlock eye.',
+		}, skinDB[GROW_DOWN_SETTING], function(value)
+			skinDB[GROW_DOWN_SETTING] = value
+			Skin.ToastAnchors.Refresh('lootrolls')
+		end)
+	end,
 	unlock = {
 		tooltip = 'Unlock position. Drag the roll popup window, then click again to lock.',
 		get = function() return Skin.ToastAnchors.IsUnlocked('lootrolls') end,
