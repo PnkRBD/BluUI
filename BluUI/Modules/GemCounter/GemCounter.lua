@@ -52,7 +52,7 @@ local pendingByKey     = {}
 local selectedBagGemID = nil
 
 local dragGhost, dragGemID
-local applying, applyReady, applyQueue, applyIndex = false, false, nil, 0
+local applying, applyStep, applyQueue, applyIndex = false, nil, nil, 0
 
 local headerPool, socketPool, gemPool, qualityPool = {}, {}, {}, {}
 
@@ -325,9 +325,13 @@ local function BuildApplyGroups()
 	return groups, dropped
 end
 
+local function CloseSocketInfo()
+	C_ItemSocketInfo.CloseSocketInfo()
+end
+
 local function AcceptAndClose()
 	C_ItemSocketInfo.AcceptSockets()
-	C_Timer.After(0.2, C_ItemSocketInfo.CloseSocketInfo)
+	C_Timer.After(0.2, CloseSocketInfo)
 end
 
 local function SocketCurrentGroup()
@@ -348,16 +352,17 @@ local function SocketCurrentGroup()
 end
 
 local function OnSocketInfoUpdate()
-	if not applying or applyReady then return end
-	applyReady = true
+	if not applying or applyStep ~= 'open' then return end
+	applyStep = 'socket'
 	C_Timer.After(0.1, SocketCurrentGroup)
 end
 
 local function ProcessNextItem()
-	applyReady = false
+	applyStep  = 'open'
 	applyIndex = applyIndex + 1
 	if applyIndex > #applyQueue then
 		applying   = false
+		applyStep  = nil
 		applyQueue = nil
 		ClearAllPending()
 		C_Timer.After(0.5, RefreshContent)
@@ -367,7 +372,9 @@ local function ProcessNextItem()
 end
 
 local function OnSocketInfoClose()
-	if applying then C_Timer.After(0.3, ProcessNextItem) end
+	if not applying or applyStep ~= 'socket' then return end
+	applyStep = 'next'
+	C_Timer.After(0.3, ProcessNextItem)
 end
 
 local function BeginApply()
