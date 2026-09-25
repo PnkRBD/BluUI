@@ -198,7 +198,7 @@ function Tools.GetActiveChoice(spellID)
     return spellID
 end
 
-local function TwoPointStep(x1, y1, x2, y2)
+function Tools.StepCurve(x1, y1, x2, y2)
     local curve = C_CurveUtil.CreateCurve()
     curve:SetType(Enum.LuaCurveType.Step)
     curve:AddPoint(x1, y1)
@@ -206,9 +206,9 @@ local function TwoPointStep(x1, y1, x2, y2)
     return curve
 end
 
-Tools.OnCooldownCurve = TwoPointStep(0, 0, 0.001, 1)
-Tools.IsReadyCurve = TwoPointStep(0, 1, 0.001, 0)
-Tools.GCDFilterCurve = TwoPointStep(0, 0, 1.6, 1)
+Tools.OnCooldownCurve = Tools.StepCurve(0, 0, 0.001, 1)
+Tools.IsReadyCurve = Tools.StepCurve(0, 1, 0.001, 0)
+Tools.GCDFilterCurve = Tools.StepCurve(0, 0, 1.6, 1)
 
 local alphaCurves = {}
 
