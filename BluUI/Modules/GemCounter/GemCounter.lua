@@ -125,10 +125,17 @@ local function ClearAllPending()
 	selectedBagGemID = nil
 end
 
-local function PendingCount()
-	local count = 0
-	for _ in pairs(pendingByKey) do count = count + 1 end
-	return count
+local function ApplyMessage()
+	local count, replaced = 0, 0
+	for _, pending in pairs(pendingByKey) do
+		count = count + 1
+		if pending.replaces then replaced = replaced + 1 end
+	end
+	local message = 'Socket ' .. count .. ' gems?'
+	if replaced > 0 then
+		message = message .. '\n|cffff5555' .. replaced .. ' socketed gem(s) will be destroyed.|r'
+	end
+	return message
 end
 
 local function PendingCountFor(gemID)
@@ -145,8 +152,12 @@ local function GemAvailable(itemID)
 end
 
 local function AssignGem(row, itemID)
-	if GemAvailable(itemID) > 0 then
-		pendingByKey[row._pendingKey] = { slotID = row._slotID, socketIdx = row._socketIdx, gem = bagGemByID[itemID] }
+	if itemID == row._socketedID then
+		pendingByKey[row._pendingKey] = nil
+	elseif GemAvailable(itemID) > 0 then
+		pendingByKey[row._pendingKey] = {
+			slotID = row._slotID, socketIdx = row._socketIdx, gem = bagGemByID[itemID], replaces = row._socketedID,
+		}
 	end
 end
 
@@ -179,7 +190,7 @@ local function StopGemDrag()
 	if not dragGemID then return end
 	dragGhost:Hide()
 	for _, socketRow in ipairs(socketPool) do
-		if socketRow:IsShown() and socketRow._empty and socketRow:IsMouseOver() then
+		if socketRow:IsShown() and socketRow:IsMouseOver() then
 			AssignGem(socketRow, dragGemID)
 			break
 		end
@@ -338,7 +349,7 @@ local function SocketCurrentGroup()
 	local numSockets = C_ItemSocketInfo.GetNumSockets()
 	local clicked = false
 	for _, gem in ipairs(applyQueue[applyIndex].gems) do
-		if gem.socketIdx <= numSockets and not C_ItemSocketInfo.GetExistingSocketInfo(gem.socketIdx) then
+		if gem.socketIdx <= numSockets then
 			C_Container.PickupContainerItem(gem.bag, gem.slot)
 			C_ItemSocketInfo.ClickSocketButton(gem.socketIdx)
 			clicked = true
@@ -429,14 +440,15 @@ local function SocketLeave(self)
 end
 
 local function SocketClick(self)
-	if pendingByKey[self._pendingKey] then
-		pendingByKey[self._pendingKey] = nil
-		Redraw()
-	elseif selectedBagGemID and self._empty then
+	if selectedBagGemID then
 		AssignGem(self, selectedBagGemID)
 		selectedBagGemID = nil
-		Redraw()
+	elseif pendingByKey[self._pendingKey] then
+		pendingByKey[self._pendingKey] = nil
+	else
+		return
 	end
+	Redraw()
 end
 
 local function GemEnter(self)
@@ -673,7 +685,7 @@ local function BuildPanel()
 	panelFrame.applyBtn = Controls.Button(panelFrame, 'Apply', 72, function()
 		Modals.Confirm({
 			title = 'Apply Gem Changes',
-			message = 'Socket ' .. PendingCount() .. ' gems?',
+			message = ApplyMessage(),
 			parent = panelFrame,
 			onConfirm = BeginApply,
 		})
@@ -787,6 +799,7 @@ local function RefreshEquipped()
 				socketRow._slotID     = item.slotID
 				socketRow._socketIdx  = socket.index
 				socketRow._pendingKey = socket.key
+				socketRow._socketedID = socket.gemItemID
 				socketRow:SetBackdropBorderColor(0.1, 0.1, 0.1, 0)
 
 				local pending = pendingByKey[socket.key]
@@ -799,14 +812,14 @@ local function RefreshEquipped()
 					socketRow:SetBackdropBorderColor(0.2, 0.7, 0.2, 0.4)
 					socketRow.iconBorder:SetBackdropBorderColor(qualityRed, qualityGreen, qualityBlue, 0.8)
 					SetQualityAtlas(socketRow.qualPip, gem.itemID)
-					socketRow._empty, socketRow._gemItemID = false, gem.itemID
+					socketRow._gemItemID = gem.itemID
 				elseif socket.empty then
 					socketRow.icon:SetAtlas('Professions-Icon-Jewel-Empty')
 					socketRow.nameText:SetText('Empty Socket')
 					socketRow.nameText:SetTextColor(0.9, 0.3, 0.3)
 					socketRow.iconBorder:SetBackdropBorderColor(0.5, 0.15, 0.15, 0.8)
 					socketRow.qualPip:Hide()
-					socketRow._empty, socketRow._gemItemID = true, nil
+					socketRow._gemItemID = nil
 				else
 					local qualityRed, qualityGreen, qualityBlue = QualityColor(socket.gemQuality)
 					SetIconTexture(socketRow.icon, socket.gemIcon)
@@ -814,7 +827,7 @@ local function RefreshEquipped()
 					socketRow.nameText:SetTextColor(qualityRed, qualityGreen, qualityBlue)
 					socketRow.iconBorder:SetBackdropBorderColor(qualityRed, qualityGreen, qualityBlue, 0.6)
 					SetQualityAtlas(socketRow.qualPip, socket.gemItemID)
-					socketRow._empty, socketRow._gemItemID = false, socket.gemItemID
+					socketRow._gemItemID = socket.gemItemID
 				end
 				socketRow:Show()
 				cursorY = cursorY + SOCKET_HEIGHT
