@@ -1610,6 +1610,8 @@ local function EquipSet(setID)
     if EquipmentManager_EquipSet then EquipmentManager_EquipSet(setID) else C_EquipmentSet.UseEquipmentSet(setID) end
 end
 
+local iconPopupContext = Skin.NewContext(function() return Skin.IsSkinEnabled('characterFrame') end)
+
 local function EditSetIcon(setID, setName)
     if InCombatNotice() then return end
     local popup = GearManagerPopupFrame
@@ -1619,6 +1621,7 @@ local function EditSetIcon(setID, setName)
     popup:EnableMouse(true)
     popup:ClearAllPoints()
     popup:SetPoint('TOPLEFT', frame, 'TOPRIGHT', Pixel.Scale(4), 0)
+    Skin.TipIconPopup(iconPopupContext, popup)
     popup.mode = IconSelectorPopupFrameModes.Edit
     popup.setID = setID
     popup.origName = setName
