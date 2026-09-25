@@ -96,7 +96,7 @@ BUI.C.ROW_GROWTH_OPTIONS = {
 BUI.C.MODULE_MAP = {
 	Minimap = "minimap",
 	Auras = "auras", Crosshair = "auras", CombatTimer = "auras", CombatMessage = "auras", GatewayAlert = "auras",
-	BuffTrackingHunter = "buffTracking", BuffTrackingDisplay = "buffTracking", BuffTrackingMonk = "buffTracking", BuffTrackingKCO = "buffTracking", SmartMisdirect = "buffTracking",
+	BuffTrackingHunter = "buffTracking", BuffTrackingDisplay = "buffTracking", BuffTrackingMonk = "buffTracking", BuffTrackingDruid = "buffTracking", BuffTrackingKCO = "buffTracking", SmartMisdirect = "buffTracking",
 	Datatext = "datatext",
 	CustomBars = "customBars",
 	Cursor = "cursor",

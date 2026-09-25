@@ -258,6 +258,7 @@ Modules\MoveFrames\MoveFrames.lua
 Modules\BuffTracking\CDMScan.lua
 Modules\BuffTracking\Hunter.lua
 Modules\BuffTracking\Monk.lua
+Modules\BuffTracking\Druid.lua
 Modules\BuffTracking\Display.lua
 Modules\BuffTracking\PackLeader.lua
 Modules\BuffTracking\PetAlert.lua
