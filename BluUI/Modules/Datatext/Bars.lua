@@ -159,7 +159,7 @@ local function HitOnClick(self, mouseButton)
     if entry.OnClick and entry.OnClick(self, mouseButton, bar) then return end
     if mouseButton == 'RightButton' then
         LockBar(bar)
-    elseif mouseButton == 'LeftButton' and bar.index and not InCombatLockdown() then
+    elseif mouseButton == 'LeftButton' and not InCombatLockdown() then
         ToggleCharacter('PaperDollFrame')
     end
 end
