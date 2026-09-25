@@ -425,22 +425,22 @@ function Display.CreateTracker(config)
         local colorStacks = stacks
         if tracker.getColorStacks then colorStacks = tracker.getColorStacks() end
 
-        if stacks == lastStacks and colorStacks == lastColorStacks and not layoutDirty then
-            return
+        if stacks ~= lastStacks or colorStacks ~= lastColorStacks or layoutDirty then
+            if lastStacks == -1 and stacks > 0 and not config.previewTextOnly then PlaySound(settings) end
+
+            local restyle = layoutDirty
+            lastStacks = stacks
+            lastColorStacks = colorStacks
+            layoutDirty = false
+
+            if not config.textOnly and settings.displayMode == "BARS" then
+                UpdateBars(stacks, colorStacks, restyle)
+            else
+                UpdateText(stacks, colorStacks, restyle)
+            end
         end
 
-        if lastStacks == -1 and stacks > 0 then PlaySound(settings) end
-
-        local restyle = layoutDirty
-        lastStacks = stacks
-        lastColorStacks = colorStacks
-        layoutDirty = false
-
-        if not config.textOnly and settings.displayMode == "BARS" then
-            UpdateBars(stacks, colorStacks, restyle)
-        else
-            UpdateText(stacks, colorStacks, restyle)
-        end
+        if config.previewTextOnly then tracker.textDisplay:SetAlpha(forceShow and 1 or 0) end
     end
 
     function tracker.ApplyPosition()
@@ -473,6 +473,7 @@ function Display.CreateTracker(config)
             tracker.DisableDragging()
         end
         tracker.RecheckActive()
+        if config.onRefresh then config.onRefresh() end
     end
 
     function tracker.Initialize()

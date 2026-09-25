@@ -68,6 +68,7 @@ local GROUPS = {
 		{ key = 'killCommandOverlay',         name = 'Pack Leader Overlay on KC' },
 		{ key = 'bestialWrathOverlay',        name = 'Bestial Wrath AoE Callout' },
 		{ key = 'monkVivaciousVivification',  name = 'Monk Vivacious Vivification' },
+		{ key = 'druidLifebloom',             name = 'Druid Lifebloom Refresh' },
 	}},
 	{ header = 'Layout', sections = {
 		{ key = 'framePositions',  name = 'Frame Positions' },

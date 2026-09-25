@@ -72,9 +72,11 @@ local function TextTrackerRow(tab, settingsKey, frameName, rowDef)
         options[#options + 1] = { kind = 'slider', label = 'Text Size', min = 10, max = 48,
           get = function() return GetSettings().textSize end,
           set = function(value) GetSettings().textSize = value end, apply = Refresh }
-        options[#options + 1] = { kind = 'dropdown', label = 'Sound', items = BUI.BuildSoundDropdownItems(),
-          get = function() return GetSettings().sound end,
-          set = function(value) GetSettings().sound = value; BUI.PlaySoundByName(value) end }
+        if not rowDef.noSound then
+            options[#options + 1] = { kind = 'dropdown', label = 'Sound', items = BUI.BuildSoundDropdownItems(),
+              get = function() return GetSettings().sound end,
+              set = function(value) GetSettings().sound = value; BUI.PlaySoundByName(value) end }
+        end
         if rowDef.extraOptions then
             for _, option in ipairs(rowDef.extraOptions(GetSettings, Refresh)) do
                 options[#options + 1] = option
@@ -82,7 +84,7 @@ local function TextTrackerRow(tab, settingsKey, frameName, rowDef)
         end
 
         local settingsIcon = PageKit.SettingsIcon(row, {
-            title = rowDef.title:upper(), tooltip = 'Text & sound', options = options,
+            title = rowDef.title:upper(), tooltip = rowDef.noSound and 'Text' or 'Text & sound', options = options,
         })
         local fontDropdown = Controls.Dropdown(row, nil, fonts, GetSettings().font, function(value)
             GetSettings().font = value
@@ -431,12 +433,13 @@ BUI.PageEngine.RegisterPage("buffTracking", {
     OnBuild = function(pageFrame)
         fonts = BUI.BuildFontDropdownItems('GLOBAL')
 
-        local Hunter, Monk = BuffTracking.Hunter, BuffTracking.Monk
+        local Hunter, Monk, Druid = BuffTracking.Hunter, BuffTracking.Monk, BuffTracking.Druid
 
         local isSurvival = Hunter.IsSurvivalHunter()
         local isMarksmanship = Hunter.IsMarksmanshipHunter()
         local isBeastMastery = Hunter.IsBeastMastery()
         local isMistweaver = Monk.IsMistweaver()
+        local isRestoration = Druid.IsRestoration()
 
         local page = Layout.Page(pageFrame, nil)
         pageFrame._page = page
@@ -539,11 +542,26 @@ BUI.PageEngine.RegisterPage("buffTracking", {
                 description = 'Reminder when your instant Vivify is ready',
                 icon = SpellIcon(392883),
             })
+        elseif isRestoration then
+            Layout.Section(tab, 'Restoration')
+            TextTrackerRow(tab, 'druidLifebloom', 'BUI_DruidLifebloom', {
+                title = 'Lifebloom Refresh',
+                description = 'REFRESH when your Lifebloom on anyone in your group is about to fall off',
+                icon = SpellIcon(33763),
+                noSound = true,
+                extraOptions = function(GetSettings, Refresh)
+                    return {
+                        { kind = 'slider', label = 'Refresh At Seconds Left', min = 1, max = 8, step = 0.5,
+                          get = function() return GetSettings().refreshSeconds end,
+                          set = function(value) GetSettings().refreshSeconds = value end, apply = Refresh },
+                    }
+                end,
+            })
         elseif not (isBeastMastery or isSurvival or isMarksmanship) then
             Layout.Section(tab, 'Buff Tracking')
             AddRow(tab, {
                 title = 'Not Available',
-                description = 'Buff tracking is only available for Hunter and Mistweaver Monk specs.',
+                description = 'Buff tracking is only available for Hunter, Mistweaver Monk and Restoration Druid specs.',
                 plain = true,
             })
         end
