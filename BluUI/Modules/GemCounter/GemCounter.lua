@@ -23,15 +23,12 @@ local ITEM_GAP       = 4
 local BOTTOM_HEIGHT  = 58
 local BOTTOM_OFFSET  = 76
 local BAGS           = { 0, 1, 2, 3, 4, 5 }
-local GEAR_SLOTS     = 17
 local MAX_GEM_FIELDS = 4
 local QUALITY_HEADER_HEIGHT = 22
 local STRIP_ICON_GAP = 28
 local STRIP_MAX_ICONS = 14
-local FALLBACK_ICON  = 134400
 local BLANK          = BUI.C.FALLBACK_TEXTURE
 local ICON_BACKDROP  = { bgFile = BLANK, edgeFile = BLANK, edgeSize = 1, insets = { left = 1, right = 1, top = 1, bottom = 1 } }
-local TEXTURE_CROP   = { 0.08, 0.92, 0.08, 0.92 }
 
 local SLOT_NAMES = {
 	[1]  = 'Head',       [2]  = 'Neck',      [3]  = 'Shoulder',  [5]  = 'Chest',
@@ -41,57 +38,55 @@ local SLOT_NAMES = {
 	[16] = 'Main Hand',  [17] = 'Off Hand',
 }
 
-
-local panel
-local isInitialized = false
+local panel, slide
 local searchText, qualityFilter = '', 0
 
 local equippedData = {}
 local bagGemData   = {}
+local bagGemByID   = {}
 local bagSlotIndex = {}
-local summary      = { emptySockets = 0, totalSocketed = 0, totalBagGems = 0, uniqueGemCount = 0, gemCounts = {} }
+local gemCounts    = {}
+local emptySockets, totalSocketed, totalBagGems = 0, 0, 0
 
 local pendingByKey     = {}
 local selectedBagGemID = nil
-local allSocketRows    = {}
 
 local dragGhost, dragGemID
-local applying, applyQueue, applyIndex, applyReady = false, {}, 0, false
+local applying, applyReady, applyQueue, applyIndex = false, false, nil, 0
 
 local headerPool, socketPool, gemPool, qualityPool = {}, {}, {}, {}
 
-local RefreshContent, CloseSlide
+local Redraw, RefreshContent
 
 local function QualityColor(quality)
 	if quality and quality > 1 then
 		local color = ITEM_QUALITY_COLORS[quality]
-		if color then return color.r, color.g, color.b end
+		return color.r, color.g, color.b
 	end
 	return 0.9, 0.9, 0.9
 end
 
 local function SetQualityAtlas(pipTexture, itemID)
-	local info = itemID and BUI.Lookup.CraftedQualityInfo(itemID)
+	local info = BUI.Lookup.CraftedQualityInfo(itemID)
 	if info then
 		pipTexture:SetAtlas(info.iconSmall)
-		pipTexture:SetTexCoord(0, 1, 0, 1)
 		pipTexture:Show()
 	else
 		pipTexture:Hide()
 	end
 end
 
-local function SetIconTexture(iconTexture, texturePath)
-	iconTexture:SetTexCoord(unpack(TEXTURE_CROP))
-	iconTexture:SetTexture(texturePath or FALLBACK_ICON)
+local function SetIconTexture(iconTexture, texture)
+	BUI.Skinning.CropIcon(iconTexture)
+	iconTexture:SetTexture(texture)
 end
 
 local function NameFromLink(link)
-	return link and link:match('%[(.-)%]') or ''
+	return link:match('%[(.-)%]')
 end
 
 local function IdFromLink(link)
-	return tonumber(link and link:match('item:(%d+)'))
+	return tonumber(link:match('item:(%d+)'))
 end
 
 local function MakeIconFrame(parent, frameSize, iconSize)
@@ -102,7 +97,7 @@ local function MakeIconFrame(parent, frameSize, iconSize)
 	local icon = iconFrame:CreateTexture(nil, 'ARTWORK')
 	icon:SetSize(Pixel.Scale(iconSize), Pixel.Scale(iconSize))
 	icon:SetPoint('CENTER')
-	icon:SetTexCoord(unpack(TEXTURE_CROP))
+	BUI.Skinning.CropIcon(icon)
 	iconFrame.icon = icon
 	return iconFrame
 end
@@ -123,49 +118,7 @@ local function MakeLabel(parent, size, flags)
 	return fontString
 end
 
-local scanTooltip = CreateFrame('GameTooltip', 'BUIGemScanTip', nil, 'GameTooltipTemplate')
-scanTooltip:SetOwner(WorldFrame, 'ANCHOR_NONE')
-
-local EMPTY_SOCKET_LABELS = {}
-for _, globalName in ipairs({
-	'EMPTY_SOCKET_PRISMATIC', 'EMPTY_SOCKET_RED', 'EMPTY_SOCKET_YELLOW', 'EMPTY_SOCKET_BLUE',
-	'EMPTY_SOCKET_META', 'EMPTY_SOCKET_COGWHEEL', 'EMPTY_SOCKET_HYDRAULIC', 'EMPTY_SOCKET_DOMINATION',
-	'EMPTY_SOCKET_PRIMORDIAL', 'EMPTY_SOCKET_TINKER',
-	'EMPTY_SOCKET_SINGINGTHUNDER', 'EMPTY_SOCKET_SINGINGSEA', 'EMPTY_SOCKET_SINGINGWIND',
-}) do
-	local label = _G[globalName]
-	if label then EMPTY_SOCKET_LABELS[label] = true end
-end
-
-local function CountEmptySockets(slotID)
-	scanTooltip:ClearLines()
-	scanTooltip:SetInventoryItem('player', slotID)
-	local count, heuristic = 0, 0
-	for lineIndex = 1, scanTooltip:NumLines() do
-		local line = _G['BUIGemScanTipTextLeft' .. lineIndex]
-		local text = line and line:GetText()
-		if text then
-			if EMPTY_SOCKET_LABELS[text] then
-				count = count + 1
-			elseif text:find('Socket') and (text:find('Empty') or text:find('Prismatic')) then
-				heuristic = heuristic + 1
-			end
-		end
-	end
-
-	return count + heuristic
-end
-
 local function PendingKey(slotID, index) return slotID .. ':' .. index end
-
-local function AddPending(slotID, index, gemID, icon, name, quality)
-	pendingByKey[PendingKey(slotID, index)] = {
-		slotID = slotID, socketIdx = index,
-		gemItemID = gemID, gemIcon = icon, gemName = name, gemQuality = quality,
-	}
-end
-
-local function RemovePending(slotID, index) pendingByKey[PendingKey(slotID, index)] = nil end
 
 local function ClearAllPending()
 	wipe(pendingByKey)
@@ -181,297 +134,240 @@ end
 local function PendingCountFor(gemID)
 	local count = 0
 	for _, pending in pairs(pendingByKey) do
-		if pending.gemItemID == gemID then count = count + 1 end
+		if pending.gem.itemID == gemID then count = count + 1 end
 	end
 	return count
 end
 
-local function HasPending() return next(pendingByKey) ~= nil end
-
-local function GetPendingList()
-	local list = {}
-	for _, entry in pairs(pendingByKey) do list[#list + 1] = entry end
-	return list
+local function GemAvailable(itemID)
+	local gem = bagGemByID[itemID]
+	return gem and gem.count - PendingCountFor(itemID) or 0
 end
 
-local function FindBagGem(itemID)
-	for _, gem in ipairs(bagGemData) do
-		if gem.itemID == itemID then return gem end
+local function AssignGem(row, itemID)
+	if GemAvailable(itemID) > 0 then
+		pendingByKey[row._pendingKey] = { slotID = row._slotID, socketIdx = row._socketIdx, gem = bagGemByID[itemID] }
 	end
 end
 
-local function GemAvailable(itemID)
-	local gem = FindBagGem(itemID)
-	return gem and (gem.count - PendingCountFor(itemID)) or 0
-end
-
-local function CreateDragGhost()
-	if dragGhost then return dragGhost end
-	local ghost = CreateFrame('Frame', nil, UIParent)
-	ghost:SetSize(Pixel.Scale(28), Pixel.Scale(28))
-	ghost:SetFrameStrata('TOOLTIP')
-	ghost:SetFrameLevel(999)
-	ghost:EnableMouse(false)
-	local ghostTexture = ghost:CreateTexture(nil, 'ARTWORK')
-	ghostTexture:SetAllPoints()
-	ghostTexture:SetTexCoord(unpack(TEXTURE_CROP))
-	ghost.tex = ghostTexture
-	ghost:Hide()
-	dragGhost = ghost
-	return ghost
+local function FollowCursor(ghost)
+	local cursorX, cursorY = GetCursorPosition()
+	local scale = UIParent:GetEffectiveScale()
+	ghost:ClearAllPoints()
+	ghost:SetPoint('CENTER', UIParent, 'BOTTOMLEFT', cursorX / scale, cursorY / scale)
 end
 
 local function StartGemDrag(itemID, icon)
-	local ghost = CreateDragGhost()
-	ghost.tex:SetTexture(icon)
+	if not dragGhost then
+		dragGhost = CreateFrame('Frame', nil, UIParent)
+		dragGhost:SetSize(Pixel.Scale(28), Pixel.Scale(28))
+		dragGhost:SetFrameStrata('TOOLTIP')
+		dragGhost:SetFrameLevel(999)
+		local ghostTexture = dragGhost:CreateTexture(nil, 'ARTWORK')
+		ghostTexture:SetAllPoints()
+		BUI.Skinning.CropIcon(ghostTexture)
+		dragGhost.tex = ghostTexture
+		dragGhost:SetScript('OnUpdate', FollowCursor)
+	end
+	dragGhost.tex:SetTexture(icon)
 	dragGemID = itemID
 	selectedBagGemID = itemID
-	ghost:Show()
-	ghost:SetScript('OnUpdate', function(self)
-		local cursorX, cursorY = GetCursorPosition()
-		local scale = UIParent:GetEffectiveScale()
-		self:ClearAllPoints()
-		self:SetPoint('CENTER', UIParent, 'BOTTOMLEFT', cursorX / scale, cursorY / scale)
-	end)
+	dragGhost:Show()
 end
 
 local function StopGemDrag()
 	if not dragGemID then return end
-	if dragGhost then
-		dragGhost:Hide()
-		dragGhost:SetScript('OnUpdate', nil)
-	end
-
-	for _, socketRow in ipairs(allSocketRows) do
+	dragGhost:Hide()
+	for _, socketRow in ipairs(socketPool) do
 		if socketRow:IsShown() and socketRow._empty and socketRow:IsMouseOver() then
-			local gem = FindBagGem(dragGemID)
-			if gem and GemAvailable(gem.itemID) > 0 then
-				AddPending(socketRow._slotID, socketRow._socketIdx, gem.itemID, gem.icon, gem.name, gem.quality)
-			end
+			AssignGem(socketRow, dragGemID)
 			break
 		end
 	end
-
 	dragGemID = nil
 	selectedBagGemID = nil
-	RefreshContent()
+	Redraw()
+end
+
+local function SortSockets(first, second)
+	return first.empty and not second.empty
+end
+
+local function SortItems(first, second)
+	if first.hasEmpty ~= second.hasEmpty then return first.hasEmpty end
+	return first.slotID < second.slotID
+end
+
+local function SortGems(first, second)
+	if first.quality ~= second.quality then return first.quality > second.quality end
+	return first.name < second.name
 end
 
 local function ScanEquipped()
 	wipe(equippedData)
-	for slot = 1, GEAR_SLOTS do
+	for slot, slotName in pairs(SLOT_NAMES) do
 		local link = GetInventoryItemLink('player', slot)
-		if link and SLOT_NAMES[slot] then
-			local filledByIndex, numFilled = {}, 0
-			for gemFieldIndex = 1, MAX_GEM_FIELDS do
-				local gemName, gemLink = C_Item.GetItemGem(link, gemFieldIndex)
+		if link then
+			local sockets, total, hasEmpty = {}, C_Item.GetItemNumSockets(link), false
+			for index = 1, MAX_GEM_FIELDS do
+				local gemName, gemLink = C_Item.GetItemGem(link, index)
 				if gemLink then
-					filledByIndex[gemFieldIndex] = { name = gemName, link = gemLink }
-					numFilled = numFilled + 1
-				end
-			end
-
-			local emptyCount = CountEmptySockets(slot)
-			local totalSockets = numFilled + emptyCount
-			for gemFieldIndex = MAX_GEM_FIELDS, 1, -1 do
-				if filledByIndex[gemFieldIndex] and gemFieldIndex > totalSockets then totalSockets = gemFieldIndex end
-			end
-
-			local sockets, emptiesRemaining = {}, emptyCount
-			for index = 1, totalSockets do
-				local filled = filledByIndex[index]
-				if filled then
-					local gemID = IdFromLink(filled.link)
-					local gemIcon, gemQuality
-					if gemID then
-						gemIcon = select(5, C_Item.GetItemInfoInstant(gemID))
-						gemQuality = C_Item.GetItemQualityByID(gemID)
-					end
-					sockets[#sockets + 1] = {
-						empty = false, index = index, gemName = filled.name, gemItemID = gemID,
-						gemIcon = gemIcon, gemQuality = gemQuality,
+					local gemID = IdFromLink(gemLink)
+					sockets[index] = {
+						index = index, key = PendingKey(slot, index), gemItemID = gemID,
+						gemName = gemName, searchName = gemName and gemName:lower(),
+						gemIcon = C_Item.GetItemIconByID(gemID), gemQuality = C_Item.GetItemQualityByID(gemID),
 					}
-				elseif emptiesRemaining > 0 then
-					emptiesRemaining = emptiesRemaining - 1
-					sockets[#sockets + 1] = { empty = true, index = index }
+					if index > total then total = index end
 				end
 			end
-
-			if #sockets > 0 then
-				local itemID = IdFromLink(link)
-				local icon, quality
-				if itemID then
-					icon = select(5, C_Item.GetItemInfoInstant(itemID))
-					quality = C_Item.GetItemQualityByID(itemID)
+			for index = 1, total do
+				if not sockets[index] then
+					sockets[index] = { empty = true, index = index, key = PendingKey(slot, index) }
+					hasEmpty = true
 				end
-
-				table.sort(sockets, function(firstSocket, secondSocket) return firstSocket.empty and not secondSocket.empty end)
+			end
+			if total > 0 then
+				table.sort(sockets, SortSockets)
+				local itemName = NameFromLink(link)
 				equippedData[#equippedData + 1] = {
-					slotID = slot, slotName = SLOT_NAMES[slot], itemLink = link,
-					itemName = NameFromLink(link), itemIcon = icon, quality = quality,
-					sockets = sockets, hasEmpty = emptyCount > 0,
+					slotID = slot, slotName = slotName, itemName = itemName, searchName = itemName:lower(),
+					itemIcon = GetInventoryItemTexture('player', slot), quality = GetInventoryItemQuality('player', slot),
+					sockets = sockets, hasEmpty = hasEmpty,
 				}
 			end
 		end
 	end
-
-	table.sort(equippedData, function(firstItem, secondItem)
-		if firstItem.hasEmpty ~= secondItem.hasEmpty then return firstItem.hasEmpty end
-		return firstItem.slotID < secondItem.slotID
-	end)
+	table.sort(equippedData, SortItems)
 end
 
 local function ScanBagGems()
-	local counts, order = {}, {}
+	wipe(bagGemData)
+	wipe(bagGemByID)
 	wipe(bagSlotIndex)
-
 	for _, bag in ipairs(BAGS) do
 		for slot = 1, C_Container.GetContainerNumSlots(bag) do
-			local info = C_Container.GetContainerItemInfo(bag, slot)
-			if info and info.itemID then
-				local _, _, _, _, icon, classID = C_Item.GetItemInfoInstant(info.itemID)
-				if classID == GEM_CLASS then
-					local itemID = info.itemID
-					if not counts[itemID] then
-						counts[itemID] = {
-							itemID = itemID, icon = info.iconFileID or icon, count = 0,
-							quality = C_Item.GetItemQualityByID(itemID) or 1,
-							name = C_Item.GetItemInfo(itemID) or '',
-						}
-						order[#order + 1] = itemID
-						bagSlotIndex[itemID] = {}
-					end
-					counts[itemID].count = counts[itemID].count + (info.stackCount or 1)
-					bagSlotIndex[itemID][#bagSlotIndex[itemID] + 1] = { bag = bag, slot = slot, count = info.stackCount or 1 }
+			local itemID = C_Container.GetContainerItemID(bag, slot)
+			if itemID and select(6, C_Item.GetItemInfoInstant(itemID)) == GEM_CLASS then
+				local info = C_Container.GetContainerItemInfo(bag, slot)
+				local gem = bagGemByID[itemID]
+				if not gem then
+					local name = C_Item.GetItemInfo(itemID) or ''
+					gem = {
+						itemID = itemID, icon = info.iconFileID, count = 0, quality = info.quality or 1,
+						name = name, searchName = name:lower(),
+					}
+					bagGemByID[itemID] = gem
+					bagGemData[#bagGemData + 1] = gem
+					bagSlotIndex[itemID] = {}
 				end
+				gem.count = gem.count + info.stackCount
+				local slots = bagSlotIndex[itemID]
+				slots[#slots + 1] = { bag = bag, slot = slot, count = info.stackCount }
 			end
 		end
 	end
-
-	wipe(bagGemData)
-	for _, itemID in ipairs(order) do bagGemData[#bagGemData + 1] = counts[itemID] end
-	table.sort(bagGemData, function(firstGem, secondGem)
-		if firstGem.quality ~= secondGem.quality then return firstGem.quality > secondGem.quality end
-		return firstGem.name < secondGem.name
-	end)
+	table.sort(bagGemData, SortGems)
 end
 
 local function ComputeSummary()
-	summary.emptySockets   = 0
-	summary.totalSocketed  = 0
-	summary.totalBagGems   = 0
-	summary.uniqueGemCount = 0
-	summary.gemCounts      = {}
-
-	local byName, order = {}, {}
+	local byName = {}
+	wipe(gemCounts)
+	emptySockets, totalSocketed, totalBagGems = 0, 0, 0
 	for _, item in ipairs(equippedData) do
 		for _, socket in ipairs(item.sockets) do
 			if socket.empty then
-				summary.emptySockets = summary.emptySockets + 1
+				emptySockets = emptySockets + 1
 			else
-				summary.totalSocketed = summary.totalSocketed + 1
-				if socket.gemName then
-					if not byName[socket.gemName] then
-						byName[socket.gemName] = {
-							gemName = socket.gemName, gemIcon = socket.gemIcon,
-							gemQuality = socket.gemQuality, gemItemID = socket.gemItemID, count = 0,
-						}
-						order[#order + 1] = socket.gemName
+				totalSocketed = totalSocketed + 1
+				local name = socket.gemName
+				if name then
+					local entry = byName[name]
+					if not entry then
+						entry = { name = name, icon = socket.gemIcon, quality = socket.gemQuality, count = 0 }
+						byName[name] = entry
+						gemCounts[#gemCounts + 1] = entry
 					end
-					byName[socket.gemName].count = byName[socket.gemName].count + 1
+					entry.count = entry.count + 1
 				end
 			end
 		end
 	end
-	for _, name in ipairs(order) do summary.gemCounts[#summary.gemCounts + 1] = byName[name] end
-	summary.uniqueGemCount = #order
-
-	for _, gem in ipairs(bagGemData) do summary.totalBagGems = summary.totalBagGems + gem.count end
+	for _, gem in ipairs(bagGemData) do totalBagGems = totalBagGems + gem.count end
 end
 
-local ProcessNextItem
-
-local function FindBagSlot(gemID)
+local function TakeBagSlot(gemID)
 	local slots = bagSlotIndex[gemID]
 	local entry = slots and slots[1]
 	if not entry then return end
 	entry.count = entry.count - 1
 	if entry.count <= 0 then table.remove(slots, 1) end
-	return { bag = entry.bag, slot = entry.slot }
+	return entry.bag, entry.slot
 end
 
 local function BuildApplyGroups()
-	local groups, order = {}, {}
-	local dropped = 0
 	ScanBagGems()
-	for _, pending in ipairs(GetPendingList()) do
-		local bagInfo = FindBagSlot(pending.gemItemID)
-		if bagInfo then
-			if not groups[pending.slotID] then
-				groups[pending.slotID] = { slotID = pending.slotID, gems = {} }
-				order[#order + 1] = pending.slotID
+	local groups, bySlot, dropped = {}, {}, 0
+	for _, pending in pairs(pendingByKey) do
+		local bag, slot = TakeBagSlot(pending.gem.itemID)
+		if bag then
+			local group = bySlot[pending.slotID]
+			if not group then
+				group = { slotID = pending.slotID, gems = {} }
+				bySlot[pending.slotID] = group
+				groups[#groups + 1] = group
 			end
-			local gemList = groups[pending.slotID].gems
-			gemList[#gemList + 1] = { socketIdx = pending.socketIdx, bagInfo = bagInfo }
+			group.gems[#group.gems + 1] = { socketIdx = pending.socketIdx, bag = bag, slot = slot }
 		else
 			dropped = dropped + 1
 		end
 	end
-	local orderedGroups = {}
-	for _, slotID in ipairs(order) do orderedGroups[#orderedGroups + 1] = groups[slotID] end
-	return orderedGroups, dropped
+	return groups, dropped
 end
 
-local function GetOpenSocketCount()
-	return C_ItemSocketInfo.GetNumSockets()
+local function AcceptAndClose()
+	C_ItemSocketInfo.AcceptSockets()
+	C_Timer.After(0.2, C_ItemSocketInfo.CloseSocketInfo)
 end
 
-local function IsSocketOccupied(index)
-	return C_ItemSocketInfo.GetExistingSocketInfo(index) ~= nil
+local function SocketCurrentGroup()
+	local numSockets = C_ItemSocketInfo.GetNumSockets()
+	local clicked = false
+	for _, gem in ipairs(applyQueue[applyIndex].gems) do
+		if gem.socketIdx <= numSockets and not C_ItemSocketInfo.GetExistingSocketInfo(gem.socketIdx) then
+			C_Container.PickupContainerItem(gem.bag, gem.slot)
+			C_ItemSocketInfo.ClickSocketButton(gem.socketIdx)
+			clicked = true
+		end
+	end
+	if clicked then
+		C_Timer.After(0.2, AcceptAndClose)
+	else
+		C_ItemSocketInfo.CloseSocketInfo()
+	end
 end
 
 local function OnSocketInfoUpdate()
-	if not applying or not applyQueue[applyIndex] or applyReady then return end
+	if not applying or applyReady then return end
 	applyReady = true
-	local group = applyQueue[applyIndex]
-	C_Timer.After(0.1, function()
-		local numSockets = GetOpenSocketCount()
-		local clicked = false
-		for _, gem in ipairs(group.gems) do
-			if (not numSockets or gem.socketIdx <= numSockets) and not IsSocketOccupied(gem.socketIdx) then
-				C_Container.PickupContainerItem(gem.bagInfo.bag, gem.bagInfo.slot)
-				C_ItemSocketInfo.ClickSocketButton(gem.socketIdx)
-				clicked = true
-			end
-		end
-		if clicked then
-			C_Timer.After(0.2, function()
-				C_ItemSocketInfo.AcceptSockets()
-				C_Timer.After(0.2, C_ItemSocketInfo.CloseSocketInfo)
-			end)
-		else
-			C_ItemSocketInfo.CloseSocketInfo()
-		end
-	end)
+	C_Timer.After(0.1, SocketCurrentGroup)
 end
 
-local function OnSocketInfoClose()
-	if not applying then return end
-	C_Timer.After(0.3, ProcessNextItem)
-end
-
-ProcessNextItem = function()
+local function ProcessNextItem()
+	applyReady = false
 	applyIndex = applyIndex + 1
 	if applyIndex > #applyQueue then
 		applying   = false
-		applyReady = false
-		wipe(applyQueue)
+		applyQueue = nil
 		ClearAllPending()
 		C_Timer.After(0.5, RefreshContent)
 		return
 	end
-	applyReady = false
 	SocketInventoryItem(applyQueue[applyIndex].slotID)
+end
+
+local function OnSocketInfoClose()
+	if applying then C_Timer.After(0.3, ProcessNextItem) end
 end
 
 local function BeginApply()
@@ -486,13 +382,86 @@ local function BeginApply()
 	end
 	if #groups == 0 then
 		ClearAllPending()
-		RefreshContent()
+		Redraw()
 		return
 	end
 	applying   = true
 	applyIndex = 0
 	applyQueue = groups
 	ProcessNextItem()
+end
+
+local function HeaderEnter(self)
+	self:SetBackdropBorderColor(Colors.GetAccent())
+	GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
+	GameTooltip:SetInventoryItem('player', self._slotID)
+	GameTooltip:Show()
+end
+
+local function HeaderLeave(self)
+	self:SetBackdropBorderColor(0.15, 0.15, 0.15, 1)
+	GameTooltip:Hide()
+end
+
+local function SocketEnter(self)
+	self:SetBackdropBorderColor(0.3, 0.3, 0.3, 0.6)
+	if self._gemItemID then
+		GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
+		GameTooltip:SetItemByID(self._gemItemID)
+		GameTooltip:Show()
+	end
+end
+
+local function SocketLeave(self)
+	if pendingByKey[self._pendingKey] then
+		self:SetBackdropBorderColor(0.2, 0.7, 0.2, 0.5)
+	else
+		self:SetBackdropBorderColor(0.1, 0.1, 0.1, 0)
+	end
+	GameTooltip:Hide()
+end
+
+local function SocketClick(self)
+	if pendingByKey[self._pendingKey] then
+		pendingByKey[self._pendingKey] = nil
+		Redraw()
+	elseif selectedBagGemID and self._empty then
+		AssignGem(self, selectedBagGemID)
+		selectedBagGemID = nil
+		Redraw()
+	end
+end
+
+local function GemEnter(self)
+	if self._itemID ~= selectedBagGemID then
+		self:SetBackdropBorderColor(Colors.GetAccent())
+	end
+	GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
+	GameTooltip:SetItemByID(self._itemID)
+	GameTooltip:Show()
+end
+
+local function GemLeave(self)
+	if self._itemID == selectedBagGemID then
+		self:SetBackdropBorderColor(Colors.GetAccent())
+	else
+		self:SetBackdropBorderColor(0.12, 0.12, 0.12, 1)
+	end
+	GameTooltip:Hide()
+end
+
+local function GemClick(self)
+	if GemAvailable(self._itemID) <= 0 then return end
+	selectedBagGemID = selectedBagGemID ~= self._itemID and self._itemID or nil
+	Redraw()
+end
+
+local function GemDragStart(self)
+	if GemAvailable(self._itemID) > 0 then StartGemDrag(self._itemID, self.icon:GetTexture()) end
+end
+
+local function StripIconEnter(self)
+	Widget.ShowTip(self, self._gemName .. '  |  Socketed: ' .. self._count)
 end
 
 local function CreateItemHeader(parent)
@@ -515,18 +484,8 @@ local function CreateItemHeader(parent)
 	slotLabel:SetTextColor(0.5, 0.5, 0.5)
 	row.slotText = slotLabel
 
-	row:SetScript('OnEnter', function(self)
-		self:SetBackdropBorderColor(Colors.GetAccent())
-		if self._slotID then
-			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
-			GameTooltip:SetInventoryItem('player', self._slotID)
-			GameTooltip:Show()
-		end
-	end)
-	row:SetScript('OnLeave', function(self)
-		self:SetBackdropBorderColor(0.15, 0.15, 0.15, 1)
-		GameTooltip:Hide()
-	end)
+	row:SetScript('OnEnter', HeaderEnter)
+	row:SetScript('OnLeave', HeaderLeave)
 	return row
 end
 
@@ -535,7 +494,6 @@ local function CreateSocketRow(parent)
 
 	local iconBorder = MakeIconFrame(row, 20, 16)
 	iconBorder:SetPoint('LEFT', INDENT, 0)
-	iconBorder:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
 	row.iconBorder = iconBorder
 	row.icon = iconBorder.icon
 
@@ -551,42 +509,9 @@ local function CreateSocketRow(parent)
 	nameLabel:SetWordWrap(false)
 	row.nameText = nameLabel
 
-	row:SetScript('OnEnter', function(self)
-		self:SetBackdropBorderColor(0.3, 0.3, 0.3, 0.6)
-		if self._gemItemID then
-			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
-			GameTooltip:SetItemByID(self._gemItemID)
-			GameTooltip:Show()
-		end
-	end)
-	row:SetScript('OnLeave', function(self)
-		if self._pendingKey and pendingByKey[self._pendingKey] then
-			self:SetBackdropBorderColor(0.2, 0.7, 0.2, 0.5)
-		else
-			self:SetBackdropBorderColor(0.1, 0.1, 0.1, 0)
-		end
-		GameTooltip:Hide()
-	end)
-
-	row:SetScript('OnClick', function(self)
-		if not self._slotID or not self._socketIdx then return end
-
-		if pendingByKey[PendingKey(self._slotID, self._socketIdx)] then
-			RemovePending(self._slotID, self._socketIdx)
-			RefreshContent()
-			return
-		end
-
-		if selectedBagGemID and self._empty then
-			local gem = FindBagGem(selectedBagGemID)
-			if gem and GemAvailable(gem.itemID) > 0 then
-				AddPending(self._slotID, self._socketIdx, gem.itemID, gem.icon, gem.name, gem.quality)
-			end
-			selectedBagGemID = nil
-			RefreshContent()
-		end
-	end)
-
+	row:SetScript('OnEnter', SocketEnter)
+	row:SetScript('OnLeave', SocketLeave)
+	row:SetScript('OnClick', SocketClick)
 	return row
 end
 
@@ -617,39 +542,11 @@ local function CreateGemRow(parent)
 
 	nameLabel:SetPoint('RIGHT', countText, 'LEFT', Pixel.Scale(-4), 0)
 
-	row:SetScript('OnEnter', function(self)
-		if self._itemID ~= selectedBagGemID then
-			self:SetBackdropBorderColor(Colors.GetAccent())
-		end
-		if self._itemID then
-			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
-			GameTooltip:SetItemByID(self._itemID)
-			GameTooltip:Show()
-		end
-	end)
-	row:SetScript('OnLeave', function(self)
-		if self._itemID == selectedBagGemID then
-			self:SetBackdropBorderColor(Colors.GetAccent())
-		else
-			self:SetBackdropBorderColor(0.12, 0.12, 0.12, 1)
-		end
-		GameTooltip:Hide()
-	end)
-	row:SetScript('OnClick', function(self)
-		if not self._itemID or GemAvailable(self._itemID) <= 0 then return end
-		if selectedBagGemID == self._itemID then
-			selectedBagGemID = nil
-		else
-			selectedBagGemID = self._itemID
-		end
-		RefreshContent()
-	end)
-
+	row:SetScript('OnEnter', GemEnter)
+	row:SetScript('OnLeave', GemLeave)
+	row:SetScript('OnClick', GemClick)
 	row:RegisterForDrag('LeftButton')
-	row:SetScript('OnDragStart', function(self)
-		if not self._itemID or GemAvailable(self._itemID) <= 0 then return end
-		StartGemDrag(self._itemID, self.icon:GetTexture())
-	end)
+	row:SetScript('OnDragStart', GemDragStart)
 	row:SetScript('OnDragStop', StopGemDrag)
 	return row
 end
@@ -671,18 +568,16 @@ local function CreateGemIcon(parent)
 	frame.count = countText
 
 	frame:EnableMouse(true)
-	frame:SetScript('OnEnter', function(self)
-		if self._gemName then
-			Widget.ShowTip(self, self._gemName .. '  |  Socketed: ' .. (self._count or 1))
-		end
-	end)
-	frame:SetScript('OnLeave', function() Widget.HideTip() end)
+	frame:SetScript('OnEnter', StripIconEnter)
+	frame:SetScript('OnLeave', Widget.HideTip)
 	return frame
 end
 
-local function BuildPanel()
-	if panel then return end
+local function RankLabel(rank)
+	return ITEM_QUALITY_COLORS[rank].hex .. _G['ITEM_QUALITY' .. rank .. '_DESC'] .. '|r'
+end
 
+local function BuildPanel()
 	local panelFrame = Widget.New(UIParent, 'Frame', nil, { bg = Colors.bg.dark, border = Colors.border.light, size = { PANEL_WIDTH, 400 } }).frame
 	panelFrame:SetFrameStrata('HIGH')
 	panelFrame:SetFrameLevel(50)
@@ -690,29 +585,24 @@ local function BuildPanel()
 	panelFrame:Hide()
 	panel = panelFrame
 
-	BUI.Skinning.CreateTitleBar(panelFrame, 'Gem Manager', 36, function() CloseSlide() end)
+	BUI.Skinning.CreateTitleBar(panelFrame, 'Gem Manager', 36, function() slide.Close() end)
 	local toolbar = CreateFrame('Frame', nil, panelFrame)
 	toolbar:SetPoint('TOPLEFT', 12, -40)
 	toolbar:SetPoint('TOPRIGHT', -12, -40)
 	toolbar:SetHeight(Pixel.Scale(30))
 
-	panelFrame.searchBox = BUI.Skinning.CreateSearchBox(panelFrame, 240, function(text) searchText = text; RefreshContent() end)
-	panelFrame.searchBox:SetPoint('TOPLEFT', toolbar, 'TOPLEFT')
+	local searchBox = BUI.Skinning.CreateSearchBox(panelFrame, 240, function(text) searchText = text; Redraw() end)
+	searchBox:SetPoint('TOPLEFT', toolbar, 'TOPLEFT')
 
-	local function RankLabel(rank)
-		local color = ITEM_QUALITY_COLORS[rank]
-		local name = _G['ITEM_QUALITY' .. rank .. '_DESC'] or ('Quality ' .. rank)
-		return (color and color.hex or '') .. name .. '|r'
-	end
-	panelFrame.filterDD = BUI.Skinning.CreateDropdown(panelFrame, {
+	local filterDropdown = BUI.Skinning.CreateDropdown(panelFrame, {
 		{ label = 'All Qualities', value = 0 },
 		{ label = RankLabel(1), value = 1 },
 		{ label = RankLabel(2), value = 2 },
 		{ label = RankLabel(3), value = 3 },
 		{ label = RankLabel(4), value = 4 },
 		{ label = RankLabel(5), value = 5 },
-	}, function(item) qualityFilter = item.value; RefreshContent() end, 140)
-	panelFrame.filterDD:SetPoint('TOPRIGHT', toolbar, 'TOPRIGHT')
+	}, function(item) qualityFilter = item.value; Redraw() end, 140)
+	filterDropdown:SetPoint('TOPRIGHT', toolbar, 'TOPRIGHT')
 
 	local leftHeader = MakeLabel(panelFrame, 10)
 	leftHeader:SetPoint('TOPLEFT', 14, -76)
@@ -764,6 +654,10 @@ local function BuildPanel()
 	panelFrame.gemStrip:SetSize(Pixel.Scale(400), Pixel.Scale(24))
 	panelFrame.gemIcons = {}
 
+	panelFrame.gemOverflowText = MakeLabel(panelFrame.gemStrip, 10)
+	panelFrame.gemOverflowText:SetPoint('LEFT', (STRIP_MAX_ICONS - 1) * STRIP_ICON_GAP + Pixel.Scale(2), 0)
+	panelFrame.gemOverflowText:SetTextColor(0.6, 0.6, 0.6)
+
 	panelFrame.statsText = MakeLabel(bottomBar, 10)
 	panelFrame.statsText:SetPoint('BOTTOMLEFT', 0, 0)
 	panelFrame.statsText:SetJustifyH('LEFT')
@@ -781,7 +675,7 @@ local function BuildPanel()
 	panelFrame.applyBtn:SetPoint('BOTTOMRIGHT', bottomBar, 'BOTTOMRIGHT')
 	panelFrame.applyBtn:SetFrameLevel(panelFrame:GetFrameLevel() + 10)
 
-	panelFrame.clearBtn = Controls.Button(panelFrame, 'Clear', 72, function() ClearAllPending(); RefreshContent() end)
+	panelFrame.clearBtn = Controls.Button(panelFrame, 'Clear', 72, function() ClearAllPending(); Redraw() end)
 	panelFrame.clearBtn.frame:SetHeight(Pixel.Scale(26))
 	panelFrame.clearBtn:SetPoint('RIGHT', panelFrame.applyBtn, 'LEFT', Pixel.Scale(-8), 0)
 	panelFrame.clearBtn:SetFrameLevel(panelFrame:GetFrameLevel() + 10)
@@ -800,55 +694,45 @@ local function BuildPanel()
 end
 
 local function RefreshSummary()
-	local gems = summary.gemCounts
-
-	local shownCount = #gems > STRIP_MAX_ICONS and (STRIP_MAX_ICONS - 1) or #gems
+	local shownCount = #gemCounts > STRIP_MAX_ICONS and (STRIP_MAX_ICONS - 1) or #gemCounts
 	for gemIndex = 1, shownCount do
-		local gem = gems[gemIndex]
-		if not panel.gemIcons[gemIndex] then panel.gemIcons[gemIndex] = CreateGemIcon(panel.gemStrip) end
-		local gemIcon = panel.gemIcons[gemIndex]
+		local gem = gemCounts[gemIndex]
+		local gemIcon = PoolGet(panel.gemIcons, gemIndex, CreateGemIcon, panel.gemStrip)
 		gemIcon:ClearAllPoints()
 		gemIcon:SetPoint('LEFT', (gemIndex - 1) * STRIP_ICON_GAP, 0)
-		gemIcon.icon:SetTexture(gem.gemIcon or FALLBACK_ICON)
-		gemIcon:SetBackdropBorderColor(QualityColor(gem.gemQuality))
+		gemIcon.icon:SetTexture(gem.icon)
+		gemIcon:SetBackdropBorderColor(QualityColor(gem.quality))
 		gemIcon.count:SetText(gem.count > 1 and gem.count or '')
-		gemIcon._gemName = gem.gemName
+		gemIcon._gemName = gem.name
 		gemIcon._count   = gem.count
 		gemIcon:Show()
 	end
-	for gemIndex = shownCount + 1, #panel.gemIcons do panel.gemIcons[gemIndex]:Hide() end
+	PoolHideFrom(panel.gemIcons, shownCount + 1)
 
-	if not panel.gemOverflowText then
-		panel.gemOverflowText = MakeLabel(panel.gemStrip, 10)
-		panel.gemOverflowText:SetTextColor(0.6, 0.6, 0.6)
-	end
-	if #gems > shownCount then
-		panel.gemOverflowText:ClearAllPoints()
-		panel.gemOverflowText:SetPoint('LEFT', shownCount * STRIP_ICON_GAP + Pixel.Scale(2), 0)
-		panel.gemOverflowText:SetText('+' .. (#gems - shownCount))
-		panel.gemOverflowText:Show()
-	else
-		panel.gemOverflowText:Hide()
-	end
+	local overflow = #gemCounts - shownCount
+	panel.gemOverflowText:SetText('+' .. overflow)
+	panel.gemOverflowText:SetShown(overflow > 0)
 
-	local emptyCount = summary.emptySockets
-	local emptyColor = emptyCount > 0 and 'ffee5555' or 'ff55cc55'
+	local emptyColor = emptySockets > 0 and 'ffee5555' or 'ff55cc55'
 	local separator = '  |cff444444||  '
 	panel.statsText:SetText(
-		'|c' .. emptyColor .. emptyCount .. '|r |cff888888Empty|r' .. separator ..
-		'|cffffffff' .. summary.totalSocketed .. '|r |cff888888Socketed|r' .. separator ..
-		'|cffffffff' .. summary.uniqueGemCount .. '|r |cff888888Unique|r' .. separator ..
-		'|cffffffff' .. summary.totalBagGems .. '|r |cff888888in Bags|r'
+		'|c' .. emptyColor .. emptySockets .. '|r |cff888888Empty|r' .. separator ..
+		'|cffffffff' .. totalSocketed .. '|r |cff888888Socketed|r' .. separator ..
+		'|cffffffff' .. #gemCounts .. '|r |cff888888Unique|r' .. separator ..
+		'|cffffffff' .. totalBagGems .. '|r |cff888888in Bags|r'
 	)
+end
 
-	local hasPendingChanges = HasPending()
-	panel.applyBtn:SetAlpha(hasPendingChanges and 1 or 0.3)
-	panel.applyBtn:EnableMouse(hasPendingChanges)
-	panel.clearBtn:SetAlpha(hasPendingChanges and 1 or 0.3)
-	panel.clearBtn:EnableMouse(hasPendingChanges)
+local function RefreshActions()
+	local hasPending = next(pendingByKey) ~= nil
+	local alpha = hasPending and 1 or 0.3
+	panel.applyBtn:SetAlpha(alpha)
+	panel.applyBtn:EnableMouse(hasPending)
+	panel.clearBtn:SetAlpha(alpha)
+	panel.clearBtn:EnableMouse(hasPending)
 
 	if selectedBagGemID then
-		local gem = FindBagGem(selectedBagGemID)
+		local gem = bagGemByID[selectedBagGemID]
 		panel.hintText:SetText('Click a socket to assign: ' .. (gem and gem.name or ''))
 		panel.hintText:Show()
 	else
@@ -856,26 +740,22 @@ local function RefreshSummary()
 	end
 end
 
-local function MatchesSearch(item, search)
-	local itemName = item.itemName or ''
-	if itemName:lower():find(search, 1, true) then return true end
+local function MatchesSearch(item)
+	if item.searchName:find(searchText, 1, true) then return true end
 	for _, socket in ipairs(item.sockets) do
-		if socket.gemName and socket.gemName:lower():find(search, 1, true) then return true end
-		local pending = pendingByKey[PendingKey(item.slotID, socket.index)]
-		if pending and pending.gemName:lower():find(search, 1, true) then return true end
+		if socket.searchName and socket.searchName:find(searchText, 1, true) then return true end
+		local pending = pendingByKey[socket.key]
+		if pending and pending.gem.searchName:find(searchText, 1, true) then return true end
 	end
 	return false
 end
 
 local function RefreshEquipped()
-	local child       = panel.leftChild
-	local headerIndex = 0
-	local socketIndex = 0
-	local cursorY     = 0
-	local search      = searchText:lower()
+	local child = panel.leftChild
+	local headerIndex, socketIndex, cursorY = 0, 0, 0
 
 	for _, item in ipairs(equippedData) do
-		if search == '' or MatchesSearch(item, search) then
+		if searchText == '' or MatchesSearch(item) then
 			headerIndex = headerIndex + 1
 			local header = PoolGet(headerPool, headerIndex, CreateItemHeader, child)
 			header:ClearAllPoints()
@@ -894,48 +774,40 @@ local function RefreshEquipped()
 			for _, socket in ipairs(item.sockets) do
 				socketIndex = socketIndex + 1
 				local socketRow = PoolGet(socketPool, socketIndex, CreateSocketRow, child)
-				local key = PendingKey(item.slotID, socket.index)
 				socketRow:ClearAllPoints()
 				socketRow:SetPoint('TOPLEFT', 0, -cursorY)
 				socketRow:SetPoint('RIGHT')
 				socketRow._slotID     = item.slotID
 				socketRow._socketIdx  = socket.index
-				socketRow._pendingKey = key
-				socketRow._empty      = false
-				socketRow._gemItemID  = nil
-				allSocketRows[#allSocketRows + 1] = socketRow
-
-				socketRow.icon:SetTexture(0)
-				socketRow.icon:SetTexCoord(unpack(TEXTURE_CROP))
-				socketRow.qualPip:Hide()
-				socketRow:SetBackdropColor(0.06, 0.06, 0.06, 0.5)
+				socketRow._pendingKey = socket.key
 				socketRow:SetBackdropBorderColor(0.1, 0.1, 0.1, 0)
-				socketRow.iconBorder:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
 
-				local pending = pendingByKey[key]
+				local pending = pendingByKey[socket.key]
 				if pending then
-					local qualityRed, qualityGreen, qualityBlue = QualityColor(pending.gemQuality)
-					SetIconTexture(socketRow.icon, pending.gemIcon)
-					socketRow.nameText:SetText(pending.gemName .. ' |cff55cc55(pending)|r')
+					local gem = pending.gem
+					local qualityRed, qualityGreen, qualityBlue = QualityColor(gem.quality)
+					SetIconTexture(socketRow.icon, gem.icon)
+					socketRow.nameText:SetText(gem.name .. ' |cff55cc55(pending)|r')
 					socketRow.nameText:SetTextColor(qualityRed, qualityGreen, qualityBlue)
 					socketRow:SetBackdropBorderColor(0.2, 0.7, 0.2, 0.4)
 					socketRow.iconBorder:SetBackdropBorderColor(qualityRed, qualityGreen, qualityBlue, 0.8)
-					SetQualityAtlas(socketRow.qualPip, pending.gemItemID)
-					socketRow._gemItemID = pending.gemItemID
+					SetQualityAtlas(socketRow.qualPip, gem.itemID)
+					socketRow._empty, socketRow._gemItemID = false, gem.itemID
 				elseif socket.empty then
 					socketRow.icon:SetAtlas('Professions-Icon-Jewel-Empty')
 					socketRow.nameText:SetText('Empty Socket')
 					socketRow.nameText:SetTextColor(0.9, 0.3, 0.3)
 					socketRow.iconBorder:SetBackdropBorderColor(0.5, 0.15, 0.15, 0.8)
-					socketRow._empty = true
+					socketRow.qualPip:Hide()
+					socketRow._empty, socketRow._gemItemID = true, nil
 				else
+					local qualityRed, qualityGreen, qualityBlue = QualityColor(socket.gemQuality)
 					SetIconTexture(socketRow.icon, socket.gemIcon)
 					socketRow.nameText:SetText(socket.gemName or '')
-					local qualityRed, qualityGreen, qualityBlue = QualityColor(socket.gemQuality)
 					socketRow.nameText:SetTextColor(qualityRed, qualityGreen, qualityBlue)
 					socketRow.iconBorder:SetBackdropBorderColor(qualityRed, qualityGreen, qualityBlue, 0.6)
 					SetQualityAtlas(socketRow.qualPip, socket.gemItemID)
-					socketRow._gemItemID = socket.gemItemID
+					socketRow._empty, socketRow._gemItemID = false, socket.gemItemID
 				end
 				socketRow:Show()
 				cursorY = cursorY + SOCKET_HEIGHT
@@ -951,19 +823,13 @@ local function RefreshEquipped()
 end
 
 local function RefreshInventory()
-	local child        = panel.rightChild
-	local gemIndex     = 0
-	local qualityIndex = 0
-	local cursorY      = 0
-	local lastQuality  = nil
-	local search       = searchText:lower()
+	local child = panel.rightChild
+	local gemIndex, qualityIndex, cursorY, lastQuality = 0, 0, 0, nil
 
 	for _, gem in ipairs(bagGemData) do
-		local pass = true
-		if qualityFilter > 0 and gem.quality ~= qualityFilter then pass = false end
-		if pass and search ~= '' and not (gem.name and gem.name:lower():find(search, 1, true)) then pass = false end
-
-		if pass then
+		if (qualityFilter == 0 or gem.quality == qualityFilter)
+			and (searchText == '' or gem.searchName:find(searchText, 1, true)) then
+			local red, green, blue = QualityColor(gem.quality)
 			if gem.quality ~= lastQuality then
 				lastQuality = gem.quality
 				qualityIndex = qualityIndex + 1
@@ -971,7 +837,6 @@ local function RefreshInventory()
 				qualityHeader:ClearAllPoints()
 				qualityHeader:SetPoint('TOPLEFT', 0, -cursorY)
 				qualityHeader:SetPoint('RIGHT')
-				local red, green, blue = QualityColor(gem.quality)
 				qualityHeader.text:SetText('Rank ' .. gem.quality)
 				qualityHeader.text:SetTextColor(red, green, blue)
 				qualityHeader:Show()
@@ -984,8 +849,7 @@ local function RefreshInventory()
 			row:SetPoint('TOPLEFT', 0, -cursorY)
 			row:SetPoint('RIGHT')
 			row.icon:SetTexture(gem.icon)
-			local red, green, blue = QualityColor(gem.quality)
-			row.nameText:SetText(gem.name or '')
+			row.nameText:SetText(gem.name)
 			row.nameText:SetTextColor(red, green, blue)
 			row.iconBg:SetBackdropBorderColor(red, green, blue, 0.4)
 			SetQualityAtlas(row.qualPip, gem.itemID)
@@ -1015,58 +879,38 @@ local function RefreshInventory()
 
 	panel.rightEmpty:SetShown(gemIndex == 0)
 	if gemIndex == 0 then
-		panel.rightEmpty:SetText(search ~= '' and 'No matching gems.' or 'No gems in bags.')
+		panel.rightEmpty:SetText(searchText ~= '' and 'No matching gems.' or 'No gems in bags.')
 	end
 end
 
-RefreshContent = function()
-	if not panel or not panel:IsShown() then return end
-	wipe(allSocketRows)
-	ScanEquipped()
-	ScanBagGems()
-	ComputeSummary()
-	RefreshSummary()
+Redraw = function()
+	RefreshActions()
 	RefreshEquipped()
 	RefreshInventory()
 end
 
-local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3)
+RefreshContent = function()
+	if not panel or not panel:IsShown() then return end
+	ScanEquipped()
+	ScanBagGems()
+	ComputeSummary()
+	RefreshSummary()
+	Redraw()
+end
 
-local slide = BUI.SlidePanel.New({
+local ThrottledRefresh = BUI.Dispatcher.NewDelayed(RefreshContent, 0.3)
+
+slide = BUI.SlidePanel.New({
 	skin = 'gemcounter',
 	width = PANEL_WIDTH,
 	hiddenX = -PANEL_WIDTH,
 	panel = function() return panel end,
-	build = function() BuildPanel() end,
-	onOpen = function() RefreshContent() end,
+	build = BuildPanel,
+	onOpen = RefreshContent,
 })
 
-CloseSlide = function(immediate)
-	slide.Close(immediate)
-end
-
-local summaryStale = true
-
-function BUI.GemCounter.InvalidateSummary()
-	summaryStale = true
-end
-
-function BUI.GemCounter.GetEquippedSummary()
-	if summaryStale then
-		summaryStale = false
-		ScanEquipped()
-		ComputeSummary()
-	end
-	return summary
-end
-
 function BUI.GemCounter.Toggle()
-	if not isInitialized then return end
 	slide.Toggle()
-end
-
-function BUI.GemCounter.IsOpen()
-	return slide.IsOpen()
 end
 
 local function OnCharacterHide()
@@ -1077,22 +921,14 @@ end
 local fallbackButton
 
 local function UpdateFallbackButton()
-	if not fallbackButton then return end
-	local skinOn = BUI.Skinning.IsSkinEnabled('characterFrame')
-	local gemOn  = BUI.Skinning.IsSkinEnabled('gemcounter')
-	fallbackButton:SetShown(gemOn and not skinOn)
+	fallbackButton:SetShown(BUI.Skinning.IsSkinEnabled('gemcounter') and not BUI.Skinning.IsSkinEnabled('characterFrame'))
 end
 
 local function BuildFallbackButton()
-	if fallbackButton or not CharacterFrame then return end
 	fallbackButton = CreateFrame('Button', nil, CharacterFrame, 'BackdropTemplate')
 	fallbackButton:SetSize(28, 28)
 	fallbackButton:SetFrameLevel(CharacterFrame:GetFrameLevel() + 5)
-	fallbackButton:SetBackdrop({
-		bgFile   = 'Interface\\Buttons\\WHITE8x8',
-		edgeFile = 'Interface\\Buttons\\WHITE8x8',
-		edgeSize = 1,
-	})
+	fallbackButton:SetBackdrop(Widget.BACKDROP)
 	fallbackButton:SetBackdropColor(0.05, 0.05, 0.06, 1)
 	fallbackButton:SetBackdropBorderColor(0.2, 0.2, 0.22, 1)
 	fallbackButton:SetPoint('TOPLEFT', CharacterFrame, 'TOPRIGHT', 4, -36)
@@ -1115,33 +951,23 @@ local function BuildFallbackButton()
 	fallbackButton:SetScript('OnClick', BUI.GemCounter.Toggle)
 end
 
-local function OnGemEvent(event)
-	BUI.GemCounter.InvalidateSummary()
-	if event == 'SOCKET_INFO_UPDATE' then
-		OnSocketInfoUpdate()
-	elseif event == 'SOCKET_INFO_CLOSE' then
-		OnSocketInfoClose()
-	elseif panel and panel:IsShown() and not applying then
-		ThrottledRefresh()
-	end
+local function OnInventoryChanged()
+	if not applying and panel and panel:IsShown() then ThrottledRefresh() end
 end
 
 BUI.Events:OnLogin('GemCounter', function()
-	isInitialized = true
-	if CharacterFrame then
-		CharacterFrame:HookScript('OnHide', OnCharacterHide)
-		BuildFallbackButton()
-		UpdateFallbackButton()
-	end
+	CharacterFrame:HookScript('OnHide', OnCharacterHide)
+	BuildFallbackButton()
+	UpdateFallbackButton()
 
-	BUI.Events:Register('BAG_UPDATE_DELAYED',       'GemCounter', OnGemEvent)
-	BUI.Events:Register('PLAYER_EQUIPMENT_CHANGED', 'GemCounter', OnGemEvent)
-	BUI.Events:Register('SOCKET_INFO_UPDATE',       'GemCounter', OnGemEvent)
-	BUI.Events:Register('SOCKET_INFO_CLOSE',        'GemCounter', OnGemEvent)
+	BUI.Events:Register('BAG_UPDATE_DELAYED',       'GemCounter', OnInventoryChanged)
+	BUI.Events:Register('PLAYER_EQUIPMENT_CHANGED', 'GemCounter', OnInventoryChanged)
+	BUI.Events:Register('SOCKET_INFO_UPDATE',       'GemCounter', OnSocketInfoUpdate)
+	BUI.Events:Register('SOCKET_INFO_CLOSE',        'GemCounter', OnSocketInfoClose)
 
 	BUI.Skinning.OnToggle('gemcounter', function(enabled)
 		if not enabled then
-			CloseSlide(true)
+			slide.Close(true)
 			ClearAllPending()
 		end
 		UpdateFallbackButton()

@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local select, type = select, type
-
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 local Tools = BUI.Tools
@@ -9,111 +7,56 @@ local Layout = BUILib.Layout
 
 local SKIN_ID = 'grouploot'
 local GROW_DOWN_SETTING = 'grouplootGrowDown'
-local FRAME_COUNT = 4
-local ART_KEYS = { 'Border', 'BorderFrame', 'Background', 'Bg', 'Decoration', 'Corner', 'SlotTexture', 'NameFrame', 'Backdrop' }
-local ICON_ART_KEYS = { 'IconBorder', 'Border', 'IconQuestTexture' }
 
 local installed = false
-local fadedArt = {}
+local skinned = {}
 
 local function Enabled()
 	return Skin.IsSkinEnabled(SKIN_ID)
 end
 
-local function FadeTextures(frame, keep)
-	if not frame or not frame.GetRegions then return end
-	for regionIndex = 1, select('#', frame:GetRegions()) do
-		local region = select(regionIndex, frame:GetRegions())
-		if region and region ~= keep and region.IsObjectType and region:IsObjectType('Texture') and not region.__buiSkin then
-			fadedArt[region] = true
-			region:SetAlpha(0)
-		end
-	end
-end
-
-local function FadeKeys(frame, keys)
-	for keyIndex = 1, #keys do
-		local child = frame[keys[keyIndex]]
-		if child and child.IsObjectType then
-			if child:IsObjectType('Texture') then
-				fadedArt[child] = true
-				child:SetAlpha(0)
-			else
-				FadeTextures(child)
-			end
-		end
-	end
-end
+local context = Skin.NewContext(Enabled)
+local Fade = context.Fade
 
 local function QualityColor(frame)
-	local rollID = frame.rollID
-	if type(rollID) ~= 'number' or not GetLootRollItemInfo then return nil end
-	local _, _, _, quality = GetLootRollItemInfo(rollID)
-	if type(quality) ~= 'number' or issecretvalue(quality) or quality < 2 then return nil end
+	local _, _, _, quality = GetLootRollItemInfo(frame.rollID)
+	if not quality or issecretvalue(quality) or quality < 2 then return nil end
 	return ITEM_QUALITY_COLORS[quality]
 end
 
-local function SkinIcon(frame, color)
-	local host = frame.IconFrame or frame.Item
-	if not host then return end
-	local icon = host.Icon or host.icon
-	if not icon then return end
-	if not host._buiIconSkinned then
-		host._buiIconSkinned = true
-		FadeKeys(host, ICON_ART_KEYS)
-		local normal = host.GetNormalTexture and host:GetNormalTexture()
-		if normal then normal:SetAlpha(0) end
-		icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-		local border = host:CreateTexture(nil, 'BACKGROUND', nil, -1)
-		border.__buiSkin = true
-		border:SetPoint('TOPLEFT', icon, 'TOPLEFT', -1, 1)
-		border:SetPoint('BOTTOMRIGHT', icon, 'BOTTOMRIGHT', 1, -1)
-		host._buiIconBorder = border
-	end
-	if color then
-		Tools.SetColorTex(host._buiIconBorder, color.r, color.g, color.b, 1)
-	else
-		Tools.SetColorTex(host._buiIconBorder, 0, 0, 0, 1)
-	end
-end
-
-local function SkinTimer(frame)
-	local bar = frame.Timer
-	if not bar or not bar.SetStatusBarTexture then return end
-	if not bar._buiSkinned then
-		bar._buiSkinned = true
-		FadeTextures(bar, bar:GetStatusBarTexture())
-		bar:SetStatusBarTexture(BUI.GetGlobalTexture())
-		local background = bar:CreateTexture(nil, 'BACKGROUND')
-		background.__buiSkin = true
-		background:SetAllPoints(bar)
-		Tools.SetColorTex(background, 0, 0, 0, 0.5)
-	end
-	local red, green, blue = BUILib.Theme.GetAccent()
-	bar:SetStatusBarColor(red, green, blue, 1)
-end
-
-local function SkinRollFrame(frame)
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if not frame._buiGroupLoot then
-		frame._buiGroupLoot = true
-		FadeTextures(frame)
-		FadeKeys(frame, ART_KEYS)
-		if frame.NineSlice then frame.NineSlice:SetAlpha(0) end
-	end
-	Skin.TipShell(frame)
+local function SkinFrame(frame)
+	local iconFrame, timer = frame.IconFrame, frame.Timer
+	Fade(frame.Background)
+	Fade(frame.Border)
+	Fade(iconFrame.Border)
+	context.Shell(frame)
 	Skin.TipFace(frame.Name, 'body')
-	SkinIcon(frame, QualityColor(frame))
-	SkinTimer(frame)
+	if not iconFrame._buiIconBorder then
+		Skin.CropIcon(iconFrame.Icon)
+		local border = iconFrame:CreateTexture(nil, 'BACKGROUND', nil, -1)
+		border:SetPoint('TOPLEFT', iconFrame.Icon, 'TOPLEFT', -1, 1)
+		border:SetPoint('BOTTOMRIGHT', iconFrame.Icon, 'BOTTOMRIGHT', 1, -1)
+		iconFrame._buiIconBorder = border
+	end
+	timer:SetStatusBarTexture(BUI.GetGlobalTexture())
+	Tools.SetColorTex(timer.Background, 0, 0, 0, 0.5)
 end
 
 local function SkinAll()
-	for frameIndex = 1, FRAME_COUNT do
-		SkinRollFrame(_G['GroupLootFrame' .. frameIndex])
-	end
-	local container = _G.GroupLootContainer
-	if container and type(container.rollFrames) == 'table' then
-		for _, frame in pairs(container.rollFrames) do SkinRollFrame(frame) end
+	if not Enabled() then return end
+	local red, green, blue = BUILib.Theme.GetAccent()
+	for _, frame in pairs(_G.GroupLootContainer.rollFrames) do
+		if not skinned[frame] then
+			skinned[frame] = true
+			SkinFrame(frame)
+		end
+		local color = QualityColor(frame)
+		if color then
+			Tools.SetColorTex(frame.IconFrame._buiIconBorder, color.r, color.g, color.b, 1)
+		else
+			Tools.SetColorTex(frame.IconFrame._buiIconBorder, 0, 0, 0, 1)
+		end
+		frame.Timer:SetStatusBarColor(red, green, blue, 1)
 	end
 end
 
@@ -122,31 +65,18 @@ local Resweep = BUI.Dispatcher.New(SkinAll, 'Skin.GroupLoot')
 local function Install()
 	if installed then return end
 	installed = true
-	if _G.GroupLootContainer_AddFrame then hooksecurefunc('GroupLootContainer_AddFrame', Resweep) end
-	if _G.GroupLootContainer_Update then hooksecurefunc('GroupLootContainer_Update', Resweep) end
-	local container = _G.GroupLootContainer
-	if container then container:HookScript('OnShow', Resweep) end
-	BUI.Events:Register('START_LOOT_ROLL', 'Skin.GroupLoot', Resweep)
-	Resweep()
+	hooksecurefunc('GroupLootContainer_Update', Resweep)
 end
 
 local function Deactivate()
-	for region in pairs(fadedArt) do region:SetAlpha(1) end
-	for frameIndex = 1, FRAME_COUNT do
-		local frame = _G['GroupLootFrame' .. frameIndex]
-		if frame and frame._buiGroupLoot then
-			if frame.NineSlice then frame.NineSlice:SetAlpha(1) end
-			Skin.HideTipShell(frame)
-		end
-	end
+	context.Restore()
+	wipe(skinned)
 	BUI.Print('Loot Rolls skin disabled. /reload for a full visual reset.')
 end
 
 local function AnchorHooks(reapply)
-	if _G.UIParent_ManageFramePositions then hooksecurefunc('UIParent_ManageFramePositions', reapply) end
-	if _G.GroupLootContainer_Update then hooksecurefunc('GroupLootContainer_Update', reapply) end
-	local alertFrame = _G.AlertFrame
-	if alertFrame and alertFrame.UpdateAnchors then hooksecurefunc(alertFrame, 'UpdateAnchors', reapply) end
+	hooksecurefunc('GroupLootContainer_Update', reapply)
+	hooksecurefunc(AlertFrame, 'UpdateAnchors', reapply)
 end
 
 local function GrowPoint()
