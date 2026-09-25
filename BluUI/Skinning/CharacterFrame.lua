@@ -1610,6 +1610,21 @@ local function EquipSet(setID)
     if EquipmentManager_EquipSet then EquipmentManager_EquipSet(setID) else C_EquipmentSet.UseEquipmentSet(setID) end
 end
 
+local function EditSetIcon(setID, setName)
+    if InCombatNotice() then return end
+    local popup = GearManagerPopupFrame
+    popup:Hide()
+    popup:SetParent(UIParent)
+    popup:SetFrameStrata('DIALOG')
+    popup:EnableMouse(true)
+    popup:ClearAllPoints()
+    popup:SetPoint('TOPLEFT', frame, 'TOPRIGHT', Pixel.Scale(4), 0)
+    popup.mode = IconSelectorPopupFrameModes.Edit
+    popup.setID = setID
+    popup.origName = setName
+    popup:Show()
+end
+
 local function ShowSetMenu(row)
     local setID, setName = row.setID, row.setName
     local assigned = C_EquipmentSet.GetEquipmentSetAssignedSpec and C_EquipmentSet.GetEquipmentSetAssignedSpec(setID)
@@ -1648,6 +1663,10 @@ local function ShowSetMenu(row)
             local dialog = StaticPopup_Show('BUI_RENAME_EQUIPMENT_SET', setName)
             if dialog then dialog.data = setID end
         end,
+    }
+    items[#items + 1] = {
+        text = 'Change Icon',
+        callback = function() EditSetIcon(setID, setName) end,
     }
     items[#items + 1] = {
         text = 'Delete',
