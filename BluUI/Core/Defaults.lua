@@ -772,6 +772,19 @@ BUI.Defaults = {
 			sound             = 'None',
 		},
 
+		druidLifebloom = {
+			enabled           = false,
+			showAnchor        = false,
+			centerHorizontally = true,
+			customText        = 'REFRESH',
+			refreshSeconds    = 4.5,
+			posX              = 0,
+			posY              = -100,
+			textSize          = 22,
+			font              = BUI.C.GLOBAL_OPTION,
+			textColor         = { r = 0.4, g = 1.0, b = 0.4, a = 1 },
+		},
+
 		petAlert = {
 			enabled            = false,
 			showAnchor         = false,
