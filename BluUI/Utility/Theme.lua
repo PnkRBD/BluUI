@@ -342,6 +342,8 @@ end
 
 local ROW_H, ROW_STRIDE = 28, 30
 local LIST_MIN_H, LIST_MAX_H = 44, 310
+local ENEMIES_ONLY_TAG = ' |cffff8040(enemies only)|r'
+local ENEMIES_ONLY_TIP = "Blizzard doesn't let addons hide this debuff on you or your group, so it only hides on enemies."
 
 local function BlacklistRows(tab, options)
 	local lib = BluUI.BUILibClient
@@ -404,6 +406,9 @@ local function BlacklistRows(tab, options)
 				GameTooltip:AddLine('ID: ' .. table.concat(entry.ids, ', '), 0.5, 0.5, 0.5)
 				if entry.builtin then
 					GameTooltip:AddLine('Removing a built-in only disables it.', 0.7, 0.7, 0.7)
+				end
+				if entry.enemiesOnly then
+					GameTooltip:AddLine(ENEMIES_ONLY_TIP, 1, 0.5, 0.3, true)
 				end
 				GameTooltip:Show()
 			end
@@ -482,6 +487,16 @@ function BUI.BlacklistSection(tab, options)
 		return GroupSpellsByName(shown)
 	end
 
+	local function MarkEnemiesOnly(group)
+		for _, spellID in ipairs(group.ids) do
+			if not AB.HidesOnFriendly(spellID, polarity) then
+				group.enemiesOnly = true
+				group.label = group.label .. ENEMIES_ONLY_TAG
+				return
+			end
+		end
+	end
+
 	local function CollectEntries()
 		local entries = {}
 		for _, group in ipairs(GroupSpellsByName(AB.UserEntries(scope, polarity))) do
@@ -499,6 +514,7 @@ function BUI.BlacklistSection(tab, options)
 			end
 		end
 		table.sort(entries, function(entryA, entryB) return entryA.name < entryB.name end)
+		for _, entry in ipairs(entries) do MarkEnemiesOnly(entry) end
 		return entries
 	end
 
@@ -506,6 +522,9 @@ function BUI.BlacklistSection(tab, options)
 		AB.UserAdd(scope, polarity, spellID)
 		Rebuild()
 		Changed()
+		if not AB.HidesOnFriendly(spellID, polarity) then
+			Err((C_Spell.GetSpellName(spellID) or ('Spell ' .. spellID)) .. ': ' .. ENEMIES_ONLY_TIP)
+		end
 	end
 
 	recent = IconStrip(tab, {
