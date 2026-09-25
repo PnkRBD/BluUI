@@ -248,30 +248,26 @@ local function UpdateSelection(frame)
 	local unit = frame.unit
 	if not unit then selection:Hide(); return end
 	local settings = GroupFrames.SettingsForFrame(frame)
-	local isTarget    = UnitIsUnit("target", unit) and settings.targetBorder.enabled
-	local isMouseover = frame._isMouseover and settings.mouseoverBorder.enabled
-
-	if isTarget then
-		local color = settings.targetBorder.color
-		Pixel.SetBorderColor(selection, color[1], color[2], color[3], color[4])
-		selection:Show()
-	elseif isMouseover then
-		local color = settings.mouseoverBorder.color
-		Pixel.SetBorderColor(selection, color[1], color[2], color[3], color[4])
-		selection:Show()
-	else
-		selection:Hide()
+	local border
+	if UnitIsUnit("target", unit) and settings.targetBorder.enabled then
+		border = settings.targetBorder
+	elseif frame._isMouseover and settings.mouseoverBorder.enabled then
+		border = settings.mouseoverBorder
 	end
+	if not border then
+		selection:Hide()
+		return
+	end
+	local color = border.color
+	Pixel.SetTemplate(selection, 0, 0, 0, 0, color[1], color[2], color[3], color[4], border.thickness)
+	selection:Show()
 end
 
 function GroupFrames.BuildSelection(frame, unit)
-	local settings = GroupFrames.SettingsForFrame(frame)
-	local thickness = math.max(settings.targetBorder.thickness, settings.mouseoverBorder.thickness)
 	local selection = CreateFrame("Frame", nil, frame)
 	selection:SetFrameLevel(frame:GetFrameLevel() + GroupFrames.Layers.selection)
 	selection:SetPoint("TOPLEFT", 0, 0)
 	selection:SetPoint("BOTTOMRIGHT", 0, 0)
-	Pixel.SetTemplate(selection, 0, 0, 0, 0, 1, 1, 0, 1, thickness)
 	selection:Hide()
 	frame.Selection = selection
 
@@ -285,15 +281,7 @@ function GroupFrames.BuildSelection(frame, unit)
 	end)
 end
 
-function GroupFrames.ApplySelectionToChild(child, settings)
-	if not child.Selection then return end
-	local thickness = math.max(settings.targetBorder.thickness, settings.mouseoverBorder.thickness)
-	child.Selection:ClearAllPoints()
-	child.Selection:SetPoint("TOPLEFT", 0, 0)
-	child.Selection:SetPoint("BOTTOMRIGHT", 0, 0)
-	Pixel.SetTemplate(child.Selection, 0, 0, 0, 0, 1, 1, 0, 1, thickness)
-	UpdateSelection(child)
-end
+GroupFrames.RefreshSelection = UpdateSelection
 
 local selectionWatcher
 function GroupFrames.HookSelection()
