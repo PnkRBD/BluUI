@@ -225,21 +225,6 @@ local VALID_ANCHOR_POINTS = {
 	BOTTOMLEFT = true, BOTTOM = true, BOTTOMRIGHT = true,
 }
 
-function Skin.SaveTopPosition(frame, dbKey)
-	local left, right, top = frame:GetLeft(), frame:GetRight(), frame:GetTop()
-	if type(left) ~= 'number' or type(right) ~= 'number' or type(top) ~= 'number' then return false end
-	if issecretvalue(left) or issecretvalue(right) or issecretvalue(top) then return false end
-	local parentWidth = UIParent:GetWidth() * UIParent:GetEffectiveScale() / frame:GetEffectiveScale()
-	local db = BUI.GetDB()
-	if not db.framePositions then db.framePositions = {} end
-	if left + right > parentWidth then
-		db.framePositions[dbKey] = { point = 'TOPRIGHT', relPoint = 'BOTTOMRIGHT', x = right - parentWidth, y = top }
-	else
-		db.framePositions[dbKey] = { point = 'TOPLEFT', relPoint = 'BOTTOMLEFT', x = left, y = top }
-	end
-	return true
-end
-
 function Skin.SavedPosition(dbKey)
 	local positions = BUI.GetDB().framePositions
 	local position = positions and positions[dbKey]
