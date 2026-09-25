@@ -78,6 +78,10 @@ function AuraBlacklist.UnitSet(polarity)
 	return UnitOwn(polarity) or EMPTY
 end
 
+function AuraBlacklist.HidesOnFriendly(spellID, polarity)
+	return polarity == 'HELPFUL' or C_Secrets.GetSpellAuraSecrecy(spellID) == Enum.SecrecyLevel.NeverSecret
+end
+
 function AuraBlacklist.IsGroupBlacklisted(spellID, polarity)
 	return AuraBlacklist.GroupSet(polarity)[spellID] == true
 end
