@@ -398,7 +398,6 @@ BUI.Defaults = {
 		},
 
 		alerts = {
-			unlocked          = false,
 			positioned        = false,
 			posX              = 0,
 			posY              = 0,
