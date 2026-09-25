@@ -750,6 +750,9 @@ local function LayoutBookCards(frame)
 			row:SetPoint('TOPLEFT', frame, 'TOPLEFT', BOOK_COLUMN_X, BOOK_TOP_Y)
 		end
 		if primary then LayoutPrimaryCard(row) else LayoutSecondaryCard(row) end
+		local rankText = row.statusBar.rankText
+		rankText:ClearAllPoints()
+		rankText:SetPoint('CENTER', row.statusBar, 'CENTER', 0, 0)
 		previous = row
 	end
 	bookLaidOut = true
