@@ -447,10 +447,10 @@ local function OnSocketInfoUpdate()
 		if clicked then
 			C_Timer.After(0.2, function()
 				C_ItemSocketInfo.AcceptSockets()
-				C_Timer.After(0.2, CloseSocketInfo)
+				C_Timer.After(0.2, C_ItemSocketInfo.CloseSocketInfo)
 			end)
 		else
-			CloseSocketInfo()
+			C_ItemSocketInfo.CloseSocketInfo()
 		end
 	end)
 end
