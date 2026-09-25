@@ -368,7 +368,7 @@ function BUI.SkinningPage.BuildTab(tab)
 					title = 'Reload Recommended',
 					message = info.name .. ' skin is now off, but some of its hooks only release on an interface reload.\n\nReload now for a 100% default ' .. info.name .. '?',
 					confirmText = 'Reload Now', cancelText = 'Later',
-					onConfirm = function() BUI.Reload() end,
+					onConfirm = ReloadUI,
 				})
 			end
 		end, info.description)

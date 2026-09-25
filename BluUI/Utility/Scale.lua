@@ -100,7 +100,7 @@ function Scale.GetFooterButtons()
         key = "finish",
         text = "Finish & Reload",
         width = 140,
-        callback = BUI.Reload,
+        callback = ReloadUI,
     }
     return buttonDefinitions
 end

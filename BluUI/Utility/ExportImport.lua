@@ -451,7 +451,7 @@ local function ShowImportResult(message)
         confirmText = "Reload Now",
         cancelText = "Later",
         fullscreen = true,
-        onConfirm = function() BUI.Reload() end,
+        onConfirm = ReloadUI,
     })
 end
 

@@ -61,7 +61,7 @@ function CDM.CheckDisabled(done)
 			cancelText  = 'Close',
 			onConfirm   = function()
 				SetCVar(COOLDOWN_VIEWER_CVAR, '1')
-				BUI.Reload()
+				ReloadUI()
 			end,
 			onCancel = done,
 		})
@@ -132,7 +132,7 @@ function CDM.CheckUtilityPrompt(done)
 					desc    = "Turn on BluUI's Utility Viewer (/bui > CDM > Utility Viewer) and reload the UI.",
 					onClick = function()
 						utilitySettings.enabled = true
-						BUI.Reload()
+						ReloadUI()
 					end,
 				},
 			},
