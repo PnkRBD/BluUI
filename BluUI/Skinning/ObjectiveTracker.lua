@@ -15,13 +15,11 @@ local FONT = BUILib.Font or STANDARD_TEXT_FONT
 local Skin = BUI.Skinning
 local Pixel = BUI.Pixel
 local sharedMedia = LibStub and LibStub('LibSharedMedia-3.0', true)
-local LibEMO = LibStub and LibStub('LibEditModeOverride-1.0', true)
 
 local LIBRARY_FONT_OPTION    = 'LIBRARY'
 local DEFAULT_FONT_SIZE      = 11
 local DEFAULT_CARD_OPACITY   = 98
 local ROLE_SIZE_DELTA        = { line = 0, title = 1, header = 2, timer = 8 }
-local POSITION_KEY           = 'objectivetracker'
 local TRACKER_STASH_SCALE    = 0.01
 local DEFAULT_TRACKER_COLORS = {
 	title     = { 1, 0.82, 0.25 },
@@ -35,29 +33,19 @@ local DEFAULT_TRACKER_COLORS = {
 local TIP_TEXT_MAX_LENGTH    = 46
 local CARD_TEXTURE_TINT      = { 0.18, 0.19, 0.21 }
 local READY_COUNT_HEX        = 'ffd140'
-local PEEK_MAX_ROWS          = 12
-local GLIDE_SECONDS          = 0.12
 local FLASH_SECONDS          = 0.7
 
 local GLYPH_SIZE        = 10
 local BAR_LABEL_SIZE    = 11
 local HEADER_TEXT_INSET = 11
-local HEADER_ROW_HEIGHT = 22
-local HEADER_ROW_TOP_PAD = 4
 local MINIMIZE_SIZE     = 15
 local BAR_ICON_SIZE     = 20
 local CARD_PAD_LEFT     = 22
 local CARD_PAD_RIGHT    = 10
 local CARD_PAD_Y        = 6
 
-local LAYOUT_HEIGHT     = 2600
-local DEFAULT_MAX_HEIGHT = 700
-local DEFAULT_TRACKER_WIDTH = 280
-local SCROLL_STEP       = 44
 local POI_BUTTON_SCALE  = 0.8
 local POI_ANCHOR_OFFSET_X = -10
-local POI_CLIP_PAD      = 16
-local RIGHT_CLIP_PAD    = 34
 local FLAT_TEXTURE      = 'Interface\\Buttons\\WHITE8X8'
 
 local TRACKER_NAMES = {
@@ -81,19 +69,8 @@ local hiddenTextures = {}
 local restoreFonts = {}
 local hiddenPoiButtons = {}
 local trackerCard
-local headerRow
-local headerChevron
 local headerCounts
 local headerFilter
-local scrollHolder
-local scrollChild
-local hostedContainer
-local scrollOffset = 0
-local scrollTarget = 0
-local scrollTrack, scrollThumb
-local queueScrollRefresh
-local reasserting = false
-local watchedQuestCache = {}
 local readyQuestIDs = {}
 local previousReadyByQuest = {}
 local watchedCount = 0
@@ -240,594 +217,10 @@ function Skin.GetTrackerPanelOutsets()
 	return Pixel.PixelSize(CARD_PAD_LEFT), Pixel.PixelSize(CARD_PAD_RIGHT), Pixel.PixelSize(CARD_PAD_Y)
 end
 
-function Skin.TrackerModulesOrdered()
-	for _, trackerName in ipairs(TRACKER_NAMES) do
-		local module = _G[trackerName]
-		if module and module.uiOrder == nil then return false end
-	end
-	return true
-end
-
-local function RefreshTrackerLayout()
-	if not hostedContainer then return end
-	if InCombatLockdown() then
-		BUI.Events:AfterCombat(RefreshTrackerLayout, 'Skinning.TrackerRefresh')
-		return
-	end
-	if not Skin.TrackerModulesOrdered() then return end
-	hostedContainer:UpdateHeight()
-	hostedContainer:Update()
-end
-
-local function GetMaxTrackerHeight()
-	return GetSettings().maxHeight or DEFAULT_MAX_HEIGHT
-end
-
-local function GetTrackerWidth()
-	return GetSettings().trackerWidth or DEFAULT_TRACKER_WIDTH
-end
-
 local function IsFiniteNumber(value)
 	if type(value) ~= 'number' then return false end
 	if issecretvalue and issecretvalue(value) then return false end
 	return value == value and value ~= math.huge and value ~= -math.huge
-end
-
-local function IsEditModeActive()
-	return _G.EditModeManagerFrame and _G.EditModeManagerFrame.IsEditModeActive and _G.EditModeManagerFrame:IsEditModeActive() or false
-end
-
-local function GetFallbackTrackerAnchor()
-	local right = scrollHolder and scrollHolder:GetRight()
-	local top = scrollHolder and scrollHolder:GetTop()
-	if IsFiniteNumber(right) and IsFiniteNumber(top) then
-		return right + Pixel.Scale(RIGHT_CLIP_PAD), top
-	end
-	return UIParent:GetWidth() - 90, UIParent:GetHeight() - 260
-end
-
-local function HasUsableRect(frame)
-	local left, bottom, width, height = frame:GetRect()
-	return IsFiniteNumber(left) and IsFiniteNumber(bottom) and IsFiniteNumber(width) and IsFiniteNumber(height)
-end
-
-local function LogTrackerEvent(eventText)
-	local log = Skin.trackerEventLog
-	if not log then
-		log = {}
-		Skin.trackerEventLog = log
-	end
-	log[#log + 1] = ('%.2f %s'):format(GetTime(), eventText)
-	if #log > 30 then table.remove(log, 1) end
-end
-
-local function RepairSelectionRect(mainTracker)
-	local selection = mainTracker.Selection
-	if not selection or HasUsableRect(selection) then return end
-	selection:ClearAllPoints()
-	selection:SetPoint('TOPLEFT', mainTracker, 'TOPLEFT', -30, 0)
-	selection:SetPoint('BOTTOMRIGHT', mainTracker, 'BOTTOMRIGHT', 0, 0)
-end
-
-local function RepairTrackerRect()
-	local mainTracker = _G.ObjectiveTrackerFrame
-	if not mainTracker then return end
-	if mainTracker.isDragging then return end
-	if not HasUsableRect(mainTracker) then
-		reasserting = true
-		local offsetX, offsetY = GetFallbackTrackerAnchor()
-		mainTracker:ClearAllPoints()
-		mainTracker:SetPoint('TOPRIGHT', UIParent, 'BOTTOMLEFT', offsetX, offsetY)
-		if not IsFiniteNumber(mainTracker:GetWidth()) or mainTracker:GetWidth() < 1 then
-			mainTracker:SetWidth(GetTrackerWidth())
-		end
-		if not IsFiniteNumber(mainTracker:GetHeight()) or mainTracker:GetHeight() < 1 then
-			local holderHeight = scrollHolder and scrollHolder:GetHeight()
-			mainTracker:SetHeight(math.max(200, IsFiniteNumber(holderHeight) and holderHeight or 200))
-		end
-		reasserting = false
-	end
-	RepairSelectionRect(mainTracker)
-end
-
-local QueueTrackerRectRepair = BUI.Dispatcher.New(RepairTrackerRect, 'Skinning.TrackerRectRepair')
-
-local function ApplyEditModeHeight()
-	if not LibEMO or not IsEnabled() then return end
-	if GetSettings().scrollEnabled == true then return end
-	if InCombatLockdown() then return end
-	if IsEditModeActive() then return end
-	local trackerFrame = _G.ObjectiveTrackerFrame
-	if not trackerFrame or not Enum.EditModeObjectiveTrackerSetting then return end
-	if not LibEMO:IsReady() then
-		BUI.Events:Once('EDIT_MODE_LAYOUTS_UPDATED', 'Skinning.TrackerEditModeHeight', function()
-			ApplyEditModeHeight()
-		end)
-		return
-	end
-	local target = math.max(400, math.min(600, GetMaxTrackerHeight()))
-	LibEMO:LoadLayouts()
-	if not LibEMO:CanEditActiveLayout() then return end
-	if not LibEMO:HasEditModeSettings(trackerFrame) then return end
-	if LibEMO:GetFrameSetting(trackerFrame, Enum.EditModeObjectiveTrackerSetting.Height) ~= target then
-		if BUI.CanWriteEditModeLayout() then
-			LibEMO:SetFrameSetting(trackerFrame, Enum.EditModeObjectiveTrackerSetting.Height, target)
-			LibEMO:SaveOnly()
-		end
-	end
-	local point, relativePoint, x, y = Skin.SavedPosition(POSITION_KEY)
-	if point then BUI.LeaveFrameManager(trackerFrame, point, relativePoint, x, y) end
-end
-
-local function GetTrackerContentHeight()
-	if not hostedContainer then return 0 end
-	local total = 0
-	local spacing = hostedContainer.moduleSpacing or 10
-	for _, trackerName in ipairs(TRACKER_NAMES) do
-		local module = _G[trackerName]
-		if module and module.GetContentsHeight and module:GetParent() == hostedContainer then
-			local moduleHeight = module:GetContentsHeight()
-			if moduleHeight and moduleHeight > 0 then
-				if total > 0 then total = total + spacing end
-				total = total + moduleHeight
-			end
-		end
-	end
-	if total > 0 then
-		total = total + (hostedContainer.topModulePadding or 0) + (hostedContainer.bottomModulePadding or 10)
-	end
-	return total
-end
-
-local function AdoptModules()
-	if not hostedContainer then return end
-	if not IsEnabled() or GetSettings().scrollEnabled ~= true then return end
-	if not Skin.TrackerModulesOrdered() then return end
-	if IsEditModeActive() then return end
-	local manager = _G.ObjectiveTrackerManager
-	local mainTracker = _G.ObjectiveTrackerFrame
-	if not manager or not manager.moduleToContainerMap or not mainTracker then return end
-	for _, trackerName in ipairs(TRACKER_NAMES) do
-		local module = _G[trackerName]
-		if module then
-			local target = QuestFilter.SectionShown(trackerName) and hostedContainer or mainTracker
-			if manager.moduleToContainerMap[module] ~= target then
-				manager:SetModuleContainer(module, target)
-			end
-		end
-	end
-	mainTracker:SetAlpha(0)
-	if mainTracker.Header then
-		mainTracker.Header:EnableMouse(false)
-		if mainTracker.Header.MinimizeButton then mainTracker.Header.MinimizeButton:EnableMouse(false) end
-	end
-	if not hostedContainer:IsShown() then hostedContainer:Show() end
-	RefreshTrackerLayout()
-end
-
-local function ReleaseModules()
-	local manager = _G.ObjectiveTrackerManager
-	local mainTracker = _G.ObjectiveTrackerFrame
-	if not hostedContainer or not manager or not manager.moduleToContainerMap or not mainTracker then return end
-	for _, trackerName in ipairs(TRACKER_NAMES) do
-		local module = _G[trackerName]
-		if module and manager.moduleToContainerMap[module] == hostedContainer then
-			manager:SetModuleContainer(module, mainTracker)
-		end
-	end
-	mainTracker:SetAlpha(1)
-	if mainTracker.Header then
-		mainTracker.Header:EnableMouse(true)
-		if mainTracker.Header.MinimizeButton then mainTracker.Header.MinimizeButton:EnableMouse(true) end
-	end
-end
-
-function Skin.TrackerRepairEditModeAnchor()
-	if not LibEMO or not IsEnabled() then return end
-	if InCombatLockdown() then return end
-	if IsEditModeActive() then return end
-	local trackerFrame = _G.ObjectiveTrackerFrame
-	if not trackerFrame then return end
-	local scrollMode = scrollHolder ~= nil and GetSettings().scrollEnabled == true
-	if not scrollMode and HasUsableRect(trackerFrame) then return end
-	if not BUI.CanWriteEditModeLayout() then return end
-	if not LibEMO:IsReady() then
-		BUI.Events:Once('EDIT_MODE_LAYOUTS_UPDATED', 'Skinning.TrackerAnchorRepair', Skin.TrackerRepairEditModeAnchor)
-		return
-	end
-	LibEMO:LoadLayouts()
-	if not LibEMO:CanEditActiveLayout() then
-		LogTrackerEvent('edit mode anchor repair skipped: preset layout')
-		return
-	end
-	if not LibEMO:HasEditModeSettings(trackerFrame) then return end
-	local right, top
-	if scrollMode then
-		right, top = scrollHolder:GetRight(), scrollHolder:GetTop()
-	end
-	if not IsFiniteNumber(right) or not IsFiniteNumber(top) then
-		right, top = trackerFrame:GetRight(), trackerFrame:GetTop()
-	end
-	if not IsFiniteNumber(right) or not IsFiniteNumber(top) then
-		right, top = UIParent:GetWidth() - 90, UIParent:GetHeight() - 260
-	end
-	LibEMO:ReanchorFrame(trackerFrame, 'TOPRIGHT', UIParent, 'BOTTOMLEFT', right, top)
-	LibEMO:SaveOnly()
-	RepairTrackerRect()
-end
-
-local QueueTrackerAnchorRepair = BUI.Dispatcher.New(function()
-	Skin.TrackerRepairEditModeAnchor()
-end, 'Skinning.TrackerAnchorRepairQueue')
-
-function Skin.TrackerEditModeHooks()
-	if Skin.trackerEditModeHooked then return end
-	if not EventRegistry or not EventRegistry.RegisterCallback then return end
-	Skin.trackerEditModeHooked = true
-	local guardedFrame = _G.ObjectiveTrackerFrame
-	if guardedFrame and GetSettings().scrollEnabled == true and not guardedFrame.__buiSafeSelectionSides then
-		guardedFrame.__buiSafeSelectionSides = true
-		local function GuardMethod(methodName, fallback)
-			local blizzardMethod = guardedFrame[methodName]
-			if type(blizzardMethod) ~= 'function' then return end
-			guardedFrame[methodName] = function(self, ...)
-				local ok, first, second, third, fourth = pcall(blizzardMethod, self, ...)
-				if ok and first ~= nil then return first, second, third, fourth end
-				Skin.trackerGuardTrips = (Skin.trackerGuardTrips or 0) + 1
-				Skin.trackerGuardLast = ('%s frameRect=%s frameShown=%s selectionPoints=%s selectionShown=%s movable=%s selected=%s'):format(
-					methodName, tostring(HasUsableRect(self)), tostring(self:IsShown()),
-					tostring(self.Selection and self.Selection:GetNumPoints() or 'nil'),
-					tostring(self.Selection and self.Selection:IsShown() or 'nil'),
-					tostring(self:IsMovable()), tostring(self.isSelected))
-				return fallback(self)
-			end
-		end
-		local function GetRectOrDraggedRect(self)
-			local left, bottom, width, height = self:GetRect()
-			if IsFiniteNumber(left) and IsFiniteNumber(bottom) and IsFiniteNumber(width) and IsFiniteNumber(height) then
-				return left, bottom, width, height
-			end
-			if not self.isDragging then return nil end
-			width = self:GetWidth()
-			height = self:GetHeight()
-			if not IsFiniteNumber(width) or width < 1 then width = GetTrackerWidth() end
-			if not IsFiniteNumber(height) or height < 1 then height = 400 end
-			local effectiveScale = self:GetEffectiveScale()
-			if not IsFiniteNumber(effectiveScale) or effectiveScale <= 0 then effectiveScale = 1 end
-			local cursorX, cursorY = GetCursorPosition()
-			if not IsFiniteNumber(cursorX) or not IsFiniteNumber(cursorY) then return nil end
-			return cursorX / effectiveScale - width / 2, cursorY / effectiveScale - height / 2, width, height
-		end
-		GuardMethod('GetScaledSelectionSides', function(self)
-			local left, bottom, width, height = GetRectOrDraggedRect(self)
-			if left then
-				local scale = self:GetScale()
-				return (left - 30) * scale, (left + width) * scale, bottom * scale, (bottom + height) * scale
-			end
-			return 0, 0, 0, 0
-		end)
-		GuardMethod('GetScaledSelectionCenter', function(self)
-			local left, bottom, width, height = GetRectOrDraggedRect(self)
-			if left then
-				local scale = self:GetScale()
-				return (left + width / 2 - 15) * scale, (bottom + height / 2) * scale
-			end
-			return 0, 0
-		end)
-		GuardMethod('GetScaledCenter', function(self)
-			local left, bottom, width, height = GetRectOrDraggedRect(self)
-			if left then
-				local scale = self:GetScale()
-				return (left + width / 2) * scale, (bottom + height / 2) * scale
-			end
-			return 0, 0
-		end)
-		GuardMethod('GetSelectionOffset', function()
-			return 0
-		end)
-	end
-	if guardedFrame and not guardedFrame.__buiStateProbes then
-		guardedFrame.__buiStateProbes = true
-		guardedFrame:HookScript('OnHide', function(self)
-			if IsEditModeActive() then LogTrackerEvent('tracker hidden dragging=' .. tostring(self.isDragging)) end
-		end)
-		guardedFrame:HookScript('OnShow', function()
-			if IsEditModeActive() then LogTrackerEvent('tracker shown') end
-		end)
-		if guardedFrame.Selection then
-			guardedFrame.Selection:HookScript('OnHide', function()
-				if IsEditModeActive() then LogTrackerEvent('selection hidden dragging=' .. tostring(guardedFrame.isDragging)) end
-			end)
-			guardedFrame.Selection:HookScript('OnShow', function()
-				if IsEditModeActive() then LogTrackerEvent('selection shown') end
-			end)
-		end
-		hooksecurefunc(guardedFrame, 'SetMovable', function(self, movable)
-			if IsEditModeActive() then
-				LogTrackerEvent(('setmovable %s dragging=%s'):format(tostring(movable), tostring(self.isDragging)))
-			end
-		end)
-		hooksecurefunc(guardedFrame, 'ClearAllPoints', function(self)
-			if self.isDragging then LogTrackerEvent('clearallpoints during drag') end
-		end)
-		if type(guardedFrame.OnDragStart) == 'function' then
-			hooksecurefunc(guardedFrame, 'OnDragStart', function(self)
-				LogTrackerEvent(('dragstart selected=%s movable=%s rect=%s selShown=%s selRect=%s'):format(
-					tostring(self.isSelected), tostring(self:IsMovable()), tostring(HasUsableRect(self)),
-					tostring(self.Selection and self.Selection:IsShown()),
-					tostring(self.Selection and HasUsableRect(self.Selection))))
-			end)
-		end
-		if type(guardedFrame.OnDragStop) == 'function' then
-			hooksecurefunc(guardedFrame, 'OnDragStop', function(self)
-				LogTrackerEvent(('dragstop mousedown=%s selected=%s shown=%s selShown=%s rect=%s'):format(
-					tostring(IsMouseButtonDown('LeftButton')), tostring(self.isSelected), tostring(self:IsShown()),
-					tostring(self.Selection and self.Selection:IsShown()), tostring(HasUsableRect(self))))
-			end)
-		end
-	end
-	if _G.EditModeManagerFrame and _G.EditModeManagerFrame.SetSnapPreviewFrame then
-		hooksecurefunc(_G.EditModeManagerFrame, 'SetSnapPreviewFrame', function(_, frame)
-			local mainTracker = _G.ObjectiveTrackerFrame
-			if not frame or frame ~= mainTracker or not IsEnabled() then return end
-			local point, relativeTo, relativePoint, offsetX, offsetY = mainTracker:GetPoint(1)
-			Skin.trackerDragState = {
-				numPoints = mainTracker:GetNumPoints(),
-				point = tostring(point),
-				relativeTo = relativeTo and ((relativeTo.GetName and relativeTo:GetName()) or tostring(relativeTo)) or 'nil',
-				relativePoint = tostring(relativePoint),
-				offsetX = tostring(offsetX),
-				offsetY = tostring(offsetY),
-				parent = tostring(mainTracker:GetParent() and mainTracker:GetParent():GetName() or mainTracker:GetParent()),
-				frameRectOk = HasUsableRect(mainTracker),
-				frameShown = mainTracker:IsShown(),
-				selectionRectOk = mainTracker.Selection and HasUsableRect(mainTracker.Selection) or false,
-				selectionPoints = tostring(mainTracker.Selection and mainTracker.Selection:GetNumPoints() or 'nil'),
-				selectionShown = tostring(mainTracker.Selection and mainTracker.Selection:IsShown() or 'nil'),
-				width = tostring(mainTracker:GetWidth()),
-				height = tostring(mainTracker:GetHeight()),
-			}
-		end)
-	end
-	BUI.Events:Register('EDIT_MODE_LAYOUTS_UPDATED', 'Skinning.TrackerRectRepair', function()
-		if IsEnabled() and IsEditModeActive() then QueueTrackerRectRepair() end
-	end)
-	EventRegistry:RegisterCallback('EditMode.Enter', function()
-		if not IsEnabled() then return end
-		local mainTracker = _G.ObjectiveTrackerFrame
-		if not mainTracker then return end
-		if scrollHolder and GetSettings().scrollEnabled == true then
-			if not mainTracker.__buiNativeWidth then mainTracker.__buiNativeWidth = mainTracker:GetWidth() end
-			local overlayTarget = (trackerCard and trackerCard:IsShown() and trackerCard) or scrollHolder
-			local overlayRight, overlayTop = overlayTarget:GetRight(), overlayTarget:GetTop()
-			local overlayWidth, overlayHeight = overlayTarget:GetWidth(), overlayTarget:GetHeight()
-			if IsFiniteNumber(overlayWidth) and overlayWidth > 50 then
-				mainTracker:SetWidth(overlayWidth)
-			else
-				mainTracker:SetWidth(GetTrackerWidth() + Pixel.Scale(POI_CLIP_PAD) + Pixel.Scale(RIGHT_CLIP_PAD))
-			end
-			if IsFiniteNumber(overlayHeight) and overlayHeight > 50 then
-				mainTracker:SetHeight(overlayHeight)
-				if mainTracker.__buiNativeEditModeHeight == nil then
-					mainTracker.__buiNativeEditModeHeight = mainTracker.editModeHeight or false
-				end
-				mainTracker.editModeHeight = overlayHeight
-			end
-			if IsFiniteNumber(overlayRight) and IsFiniteNumber(overlayTop) then
-				reasserting = true
-				mainTracker:ClearAllPoints()
-				mainTracker:SetPoint('TOPRIGHT', UIParent, 'BOTTOMLEFT', overlayRight, overlayTop)
-				reasserting = false
-			end
-			mainTracker:SetAlpha(1)
-			if mainTracker.Header then mainTracker.Header:SetAlpha(0) end
-			if not mainTracker.isLocked then
-				mainTracker.__buiLockedForEditMode = true
-				mainTracker.isLocked = true
-			end
-			if not Skin.printedTrackerMoveHint then
-				Skin.printedTrackerMoveHint = true
-				BUI.Print('Objective tracker: Edit Mode moving is disabled for the scrolling tracker. Hold Ctrl and drag the tracker header to move it; sizing lives in BluUI settings.')
-			end
-		end
-		RepairTrackerRect()
-		QueueTrackerRectRepair()
-	end, QuestFilter)
-	EventRegistry:RegisterCallback('EditMode.Exit', function()
-		if not IsEnabled() then return end
-		local mainTracker = _G.ObjectiveTrackerFrame
-		if mainTracker and mainTracker.__buiLockedForEditMode then
-			mainTracker.__buiLockedForEditMode = nil
-			mainTracker.isLocked = nil
-		end
-		if mainTracker and mainTracker.Header then mainTracker.Header:SetAlpha(1) end
-		if mainTracker and mainTracker.__buiNativeEditModeHeight ~= nil then
-			mainTracker.editModeHeight = mainTracker.__buiNativeEditModeHeight or nil
-			mainTracker.__buiNativeEditModeHeight = nil
-		end
-		if scrollHolder and mainTracker and mainTracker.__buiNativeWidth then
-			mainTracker:SetWidth(mainTracker.__buiNativeWidth)
-			mainTracker.__buiNativeWidth = nil
-		end
-		QueueTrackerAnchorRepair()
-		if scrollHolder and IsEnabled() then AdoptModules() end
-	end, QuestFilter)
-end
-
-local function EnsureHostedContainer()
-	if hostedContainer or not scrollChild then return end
-	local manager = _G.ObjectiveTrackerManager
-	if not manager or not manager.AddContainer then return end
-	local staging = CreateFrame('Frame')
-	staging:Hide()
-	local mixin = _G.ObjectiveTrackerContainerMixin
-	local savedOnShow = mixin and mixin.OnShow
-	if savedOnShow then mixin.OnShow = function() end end
-	local container = CreateFrame('Frame', 'BUI_TrackerContainer', staging, 'ObjectiveTrackerContainerTemplate')
-	if savedOnShow then mixin.OnShow = savedOnShow end
-	container.modules = {}
-	container:SetScript('OnShow', function(self) self:UpdateHeight() end)
-	container.editModeHeight = LAYOUT_HEIGHT
-	container.IsInDefaultPosition = function() return false end
-	container.SetCollapsed = function(self, collapsed)
-		self.isCollapsed = collapsed and true or false
-		self:Update()
-	end
-	hostedContainer = container
-	manager:AddContainer(container)
-	if container.SetDirtyMethod then
-		container:SetDirtyMethod(function()
-			if Skin.TrackerModulesOrdered() then container:Update(true) end
-		end)
-	end
-	hooksecurefunc(container, 'Update', function()
-		if queueScrollRefresh then queueScrollRefresh() end
-	end)
-	local mainTracker = _G.ObjectiveTrackerFrame
-	if mainTracker and mainTracker.AddModule then
-		local queueAdopt = BUI.Dispatcher.New(AdoptModules, 'Skinning.TrackerAdopt')
-		hooksecurefunc(mainTracker, 'AddModule', queueAdopt)
-	end
-	container:SetParent(scrollChild)
-	container:SetPoint('TOPLEFT', scrollChild, 'TOPLEFT', Pixel.Scale(POI_CLIP_PAD), 0)
-	container:SetPoint('TOPRIGHT', scrollChild, 'TOPRIGHT', -Pixel.Scale(RIGHT_CLIP_PAD), 0)
-	AdoptModules()
-	container:UpdateHeight()
-end
-
-local function RefreshScroll()
-	if not scrollHolder or not IsEnabled() then return end
-	local containerHidden = hostedContainer and not hostedContainer:IsShown()
-	local contentHeight = GetTrackerContentHeight()
-	if headerRow and (GetSettings().trackerCollapsed == true or containerHidden or contentHeight <= 0) then
-		if math.abs((scrollHolder:GetHeight() or 0) - 1) > 0.01 then scrollHolder:SetHeight(1) end
-		if math.abs(scrollHolder:GetAlpha() or 0) > 0.01 then scrollHolder:SetAlpha(0) end
-		scrollOffset = 0
-		scrollTarget = 0
-		if math.abs(scrollHolder:GetVerticalScroll() or 0) > 0.01 then scrollHolder:SetVerticalScroll(0) end
-		if scrollTrack and scrollTrack:IsShown() then scrollTrack:Hide() end
-		if scrollThumb and scrollThumb:IsShown() then scrollThumb:Hide() end
-		if trackerCard then
-			local keepStrip = GetSettings().trackerCollapsed == true or (QuestFilter.HasActive and QuestFilter.HasActive())
-			local wantCard = (keepStrip and scrollHolder:IsShown()) and true or false
-			if trackerCard:IsShown() ~= wantCard then trackerCard:SetShown(wantCard) end
-		end
-		return
-	end
-	if contentHeight <= 0 then return end
-	if math.abs((scrollHolder:GetAlpha() or 0) - 1) > 0.01 then scrollHolder:SetAlpha(1) end
-	if trackerCard then
-		local wantCard = scrollHolder:IsShown() and true or false
-		if trackerCard:IsShown() ~= wantCard then trackerCard:SetShown(wantCard) end
-	end
-	local windowHeight = math.min(contentHeight, GetMaxTrackerHeight())
-	if math.abs((scrollHolder:GetHeight() or 0) - windowHeight) > 0.01 then scrollHolder:SetHeight(windowHeight) end
-	local maxOffset = math.max(0, contentHeight - windowHeight)
-	if scrollOffset > maxOffset then scrollOffset = maxOffset end
-	if scrollTarget > maxOffset then scrollTarget = maxOffset end
-	if scrollTarget < 0 then scrollTarget = 0 end
-	if math.abs((scrollHolder:GetVerticalScroll() or 0) - scrollOffset) > 0.01 then scrollHolder:SetVerticalScroll(scrollOffset) end
-
-	local overflow = maxOffset > 0
-	if scrollTrack then
-		if scrollTrack:IsShown() ~= overflow then scrollTrack:SetShown(overflow) end
-		if scrollThumb:IsShown() ~= overflow then scrollThumb:SetShown(overflow) end
-		if overflow then
-			local trackHeight = scrollTrack:GetHeight() or 0
-			if trackHeight > 0 then
-				local thumbHeight = math.max(Pixel.Scale(20), trackHeight * windowHeight / contentHeight)
-				if math.abs((scrollThumb:GetHeight() or 0) - thumbHeight) > 0.01 then scrollThumb:SetHeight(thumbHeight) end
-				local travel = math.max(0, trackHeight - thumbHeight)
-				scrollThumb:SetPoint('TOP', scrollTrack, 'TOP', 0, -(travel * scrollOffset / maxOffset))
-			end
-		end
-	end
-end
-
-local glide = { from = 0, startTime = 0 }
-
-local function GlideStep()
-	local progress = math.min(1, (GetTime() - glide.startTime) / GLIDE_SECONDS)
-	local remaining = 1 - progress
-	scrollOffset = glide.from + (scrollTarget - glide.from) * (1 - remaining * remaining)
-	if progress >= 1 then
-		scrollOffset = scrollTarget
-		glide.frame:Hide()
-	end
-	RefreshScroll()
-end
-
-local function StartScrollGlide()
-	glide.from = scrollOffset
-	glide.startTime = GetTime()
-	if not glide.frame then
-		glide.frame = CreateFrame('Frame')
-		glide.frame:SetScript('OnUpdate', GlideStep)
-	end
-	glide.frame:Show()
-end
-
-local function OnTrackerWheel(_, delta)
-	if not scrollHolder or not IsEnabled() then return end
-	if headerRow and GetSettings().trackerCollapsed == true then return end
-	local contentHeight = GetTrackerContentHeight()
-	local maxOffset = math.max(0, contentHeight - scrollHolder:GetHeight())
-	local newTarget = math.max(0, math.min(maxOffset, scrollTarget - delta * Pixel.Scale(SCROLL_STEP)))
-	if newTarget == scrollTarget then return end
-	scrollTarget = newTarget
-	StartScrollGlide()
-end
-
-function Skin.ForwardTrackerWheel(frame)
-	if not frame or frame:GetScript('OnMouseWheel') == OnTrackerWheel then return end
-	frame:EnableMouseWheel(true)
-	frame:SetScript('OnMouseWheel', OnTrackerWheel)
-end
-
-local function EnsureScrollHolder()
-	if GetSettings().scrollEnabled ~= true then return end
-	if scrollHolder then
-		EnsureHostedContainer()
-		return
-	end
-	local manager = _G.ObjectiveTrackerManager
-	if not manager or not manager.AddContainer or not manager.SetModuleContainer then return end
-	local trackerFrame = _G.ObjectiveTrackerFrame
-
-	scrollHolder = CreateFrame('ScrollFrame', 'BUI_TrackerScroll', UIParent)
-	scrollHolder:SetClipsChildren(true)
-	local width = GetTrackerWidth() + Pixel.Scale(POI_CLIP_PAD) + Pixel.Scale(RIGHT_CLIP_PAD)
-	scrollHolder:SetSize(width, GetMaxTrackerHeight())
-	local right = trackerFrame and trackerFrame:GetRight()
-	local top = trackerFrame and trackerFrame:GetTop()
-	if IsFiniteNumber(right) and IsFiniteNumber(top) then
-		scrollHolder:SetPoint('TOPRIGHT', UIParent, 'BOTTOMLEFT', right + Pixel.Scale(RIGHT_CLIP_PAD), top)
-	else
-		scrollHolder:SetPoint('TOPRIGHT', UIParent, 'TOPRIGHT', -90, -260)
-	end
-	scrollHolder:SetMovable(true)
-	scrollHolder:SetClampedToScreen(true)
-	scrollHolder:EnableMouseWheel(true)
-	scrollHolder:SetScript('OnMouseWheel', OnTrackerWheel)
-
-	scrollChild = CreateFrame('Frame', 'BUI_TrackerScrollChild', scrollHolder)
-	scrollChild:SetSize(width, LAYOUT_HEIGHT)
-	scrollHolder:SetScrollChild(scrollChild)
-
-	queueScrollRefresh = BUI.Dispatcher.New(RefreshScroll, 'Skinning.TrackerScroll')
-	EnsureHostedContainer()
-end
-
-local function ApplyTrackerWidth()
-	if not scrollHolder then return end
-	local width = GetTrackerWidth()
-	local holderWidth = width + Pixel.Scale(POI_CLIP_PAD) + Pixel.Scale(RIGHT_CLIP_PAD)
-	scrollHolder:SetWidth(holderWidth)
-	scrollChild:SetWidth(holderWidth)
-	for _, trackerName in ipairs(TRACKER_NAMES) do
-		local module = _G[trackerName]
-		if module then module:SetWidth(width - Pixel.Scale(8)) end
-	end
 end
 
 local function GetLaidOutTrackerHeight(trackerFrame)
@@ -845,28 +238,12 @@ local function GetLaidOutTrackerHeight(trackerFrame)
 end
 
 local function UpdateCardAnchors()
-	if not trackerCard then return end
 	local trackerFrame = _G.ObjectiveTrackerFrame
+	if not trackerCard or not trackerFrame then return end
 	local padLeft = Pixel.PixelSize(CARD_PAD_LEFT)
 	local padRight = Pixel.PixelSize(CARD_PAD_RIGHT)
 	local padY = Pixel.PixelSize(CARD_PAD_Y)
 	trackerCard:ClearAllPoints()
-	if scrollHolder then
-		local rowShown = headerRow and headerRow:IsShown()
-		local rowHeight = rowShown and (headerRow:GetHeight() + Pixel.Scale(HEADER_ROW_TOP_PAD)) or 0
-		local cardGapLeft, cardGapRight = CARD_PAD_LEFT, CARD_PAD_RIGHT
-		trackerCard:SetPoint('TOPLEFT', scrollHolder, 'TOPLEFT', Pixel.Scale(POI_CLIP_PAD - cardGapLeft), padY + rowHeight)
-		trackerCard:SetPoint('TOPRIGHT', scrollHolder, 'TOPRIGHT', -Pixel.Scale(RIGHT_CLIP_PAD - cardGapRight), padY + rowHeight)
-		scrollHolder:SetClampRectInsets(Pixel.Scale(POI_CLIP_PAD - cardGapLeft), -Pixel.Scale(RIGHT_CLIP_PAD - cardGapRight), padY + rowHeight, -padY)
-		local containerHidden = hostedContainer and not hostedContainer:IsShown()
-		if rowShown and (GetSettings().trackerCollapsed == true or containerHidden) then
-			trackerCard:SetPoint('BOTTOM', scrollHolder, 'TOP', 0, 0)
-		else
-			trackerCard:SetPoint('BOTTOM', scrollHolder, 'BOTTOM', 0, -padY)
-		end
-		return
-	end
-	if not trackerFrame then return end
 	trackerCard:SetPoint('TOPLEFT', trackerFrame, 'TOPLEFT', -padLeft, padY)
 	trackerCard:SetPoint('TOPRIGHT', trackerFrame, 'TOPRIGHT', padRight, padY)
 	local collapsed = trackerFrame.IsCollapsed and trackerFrame:IsCollapsed()
@@ -877,18 +254,8 @@ local function UpdateCardAnchors()
 	end
 end
 
-local function FollowTrackerLayout()
-	if not scrollHolder then UpdateCardAnchors() end
-end
-
 local function SyncTrackerCardShown()
 	if not trackerCard then return end
-	if scrollHolder then
-		trackerCard:SetShown(IsEnabled() and scrollHolder:IsShown())
-		UpdateCardAnchors()
-		RefreshScroll()
-		return
-	end
 	local trackerFrame = _G.ObjectiveTrackerFrame
 	local nineSlice = trackerFrame and trackerFrame.NineSlice
 	local shown = IsEnabled() and not Skin.trackerStashScale and not Skin.trackerFadedOut
@@ -901,69 +268,16 @@ end
 
 local function EnsureTrackerCard()
 	local trackerFrame = _G.ObjectiveTrackerFrame
-	local mirrorFrame = hostedContainer or trackerFrame
-	if not mirrorFrame then return end
-	local nineSlice = mirrorFrame.NineSlice
+	if not trackerFrame then return end
+	local nineSlice = trackerFrame.NineSlice
 	if not trackerCard then
 		trackerCard = CreateFrame('Frame', 'BUI_TrackerPanel', UIParent, 'BackdropTemplate')
 		trackerCard:SetFrameStrata('LOW')
 		trackerCard:SetFrameLevel(0)
 		Skin3.Backdrop(trackerCard, { bg = Theme.bg.dark, border = Theme.border.light })
-
-		trackerCard:EnableMouse(true)
-		trackerCard:EnableMouseWheel(true)
-		trackerCard:SetScript('OnMouseWheel', OnTrackerWheel)
 		trackerCard:HookScript('OnSizeChanged', Skin.TrackerClamp)
 
-		scrollTrack = CreateFrame('Frame', nil, trackerCard)
-		scrollTrack:SetWidth(Pixel.PixelSize(8))
-		scrollTrack:SetPoint('TOPRIGHT', trackerCard, 'TOPRIGHT', -Pixel.PixelSize(2), -Pixel.PixelSize(CARD_PAD_Y))
-		scrollTrack:SetPoint('BOTTOMRIGHT', trackerCard, 'BOTTOMRIGHT', -Pixel.PixelSize(2), Pixel.PixelSize(CARD_PAD_Y))
-		local trackTexture = scrollTrack:CreateTexture(nil, 'ARTWORK')
-		trackTexture:SetPoint('TOP')
-		trackTexture:SetPoint('BOTTOM')
-		trackTexture:SetWidth(Pixel.PixelSize(3))
-		trackTexture:SetColorTexture(1, 1, 1, 0.06)
-		scrollTrack:Hide()
-
-		scrollThumb = CreateFrame('Frame', nil, scrollTrack)
-		scrollThumb:SetWidth(Pixel.PixelSize(8))
-		scrollThumb:SetPoint('TOP', scrollTrack, 'TOP', 0, 0)
-		scrollThumb:EnableMouse(true)
-		local thumbTexture = scrollThumb:CreateTexture(nil, 'ARTWORK', nil, 1)
-		thumbTexture:SetPoint('TOP')
-		thumbTexture:SetPoint('BOTTOM')
-		thumbTexture:SetWidth(Pixel.PixelSize(3))
-		thumbTexture:SetColorTexture(Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3], 0.8)
-		scrollThumb:Hide()
-
-		local dragStartCursorY = 0
-		local dragStartOffset = 0
-		local function EndThumbDrag()
-			scrollThumb:SetScript('OnUpdate', nil)
-			thumbTexture:SetColorTexture(Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3], 0.8)
-		end
-		local function ThumbDragUpdate(self)
-			if not IsMouseButtonDown('LeftButton') then EndThumbDrag() return end
-			if not scrollHolder then return end
-			local _, cursorY = GetCursorPosition()
-			local deltaPixels = (dragStartCursorY - cursorY) / self:GetEffectiveScale()
-			local contentHeight = GetTrackerContentHeight()
-			local maxOffset = math.max(0, contentHeight - scrollHolder:GetHeight())
-			local travel = math.max(1, (scrollTrack:GetHeight() or 1) - (self:GetHeight() or 1))
-			scrollOffset = math.max(0, math.min(maxOffset, dragStartOffset + deltaPixels * maxOffset / travel))
-			scrollTarget = scrollOffset
-			RefreshScroll()
-		end
-		scrollThumb:SetScript('OnMouseDown', function()
-			local _, cursorY = GetCursorPosition()
-			dragStartCursorY = cursorY
-			dragStartOffset = scrollOffset
-			thumbTexture:SetColorTexture(1, 1, 1, 0.9)
-			scrollThumb:SetScript('OnUpdate', ThumbDragUpdate)
-		end)
-		scrollThumb:SetScript('OnMouseUp', EndThumbDrag)
-		if mirrorFrame.SetCollapsed then hooksecurefunc(mirrorFrame, 'SetCollapsed', UpdateCardAnchors) end
+		if trackerFrame.SetCollapsed then hooksecurefunc(trackerFrame, 'SetCollapsed', UpdateCardAnchors) end
 		if nineSlice then
 			nineSlice:SetAlpha(0)
 			hooksecurefunc(nineSlice, 'SetAlpha', function(self, alpha)
@@ -971,18 +285,16 @@ local function EnsureTrackerCard()
 			end)
 			nineSlice:HookScript('OnShow', SyncTrackerCardShown)
 			nineSlice:HookScript('OnHide', SyncTrackerCardShown)
-			hooksecurefunc(nineSlice, 'SetPoint', FollowTrackerLayout)
+			hooksecurefunc(nineSlice, 'SetPoint', UpdateCardAnchors)
 		end
-		mirrorFrame:HookScript('OnHide', SyncTrackerCardShown)
-		mirrorFrame:HookScript('OnShow', SyncTrackerCardShown)
-		if mirrorFrame == trackerFrame then
-			hooksecurefunc(trackerFrame, 'SetAlpha', function(_, alpha)
-				local fadedOut = not issecretvalue(alpha) and alpha == 0 and not Skin.trackerStashScale
-				if fadedOut == (Skin.trackerFadedOut or false) then return end
-				Skin.trackerFadedOut = fadedOut or nil
-				SyncTrackerCardShown()
-			end)
-		end
+		trackerFrame:HookScript('OnHide', SyncTrackerCardShown)
+		trackerFrame:HookScript('OnShow', SyncTrackerCardShown)
+		hooksecurefunc(trackerFrame, 'SetAlpha', function(_, alpha)
+			local fadedOut = not issecretvalue(alpha) and alpha == 0 and not Skin.trackerStashScale
+			if fadedOut == (Skin.trackerFadedOut or false) then return end
+			Skin.trackerFadedOut = fadedOut or nil
+			SyncTrackerCardShown()
+		end)
 	end
 	UpdateCardAnchors()
 	ApplyCardStyle()
@@ -1483,37 +795,9 @@ local function InstallQuestTipHook()
 	EventRegistry:RegisterCallback('OnQuestBlockHeader.OnEnter', OnQuestBlockHeaderEnter, wrapAdjustedText)
 end
 
-QuestFilter.sections = {
-	{ module = 'ProfessionsRecipeTracker', label = 'Professions' },
-	{ module = 'AchievementObjectiveTracker', label = 'Achievements' },
-	{ module = 'WorldQuestObjectiveTracker', label = 'World Quests' },
-	{ module = 'BonusObjectiveTracker', label = 'Bonus Objectives' },
-	{ module = 'MonthlyActivitiesObjectiveTracker', label = "Traveler's Log" },
-	{ module = 'InitiativeTasksObjectiveTracker', label = 'Endeavors' },
-	{ module = 'AdventureObjectiveTracker', label = 'Adventures' },
-}
-
 function QuestFilter.HasActive()
-	local settings = GetSettings()
-	if settings.trackerTrackSpec and settings.trackerTrackSpec ~= 'all' then return true end
-	local sectionFilters = settings.scrollEnabled == true and settings.trackerSectionFilters
-	if sectionFilters then
-		for _, section in ipairs(QuestFilter.sections) do
-			if sectionFilters[section.module] == false then return true end
-		end
-	end
-	return false
-end
-
-function QuestFilter.SectionShown(moduleName)
-	if not IsEnabled() then return true end
-	local sectionFilters = GetSettings().trackerSectionFilters
-	return not (sectionFilters and sectionFilters[moduleName] == false)
-end
-
-function QuestFilter.Refresh()
-	QuestFilter.UpdateTint()
-	if scrollHolder then AdoptModules() end
+	local spec = GetSettings().trackerTrackSpec
+	return spec ~= nil and spec ~= 'all'
 end
 
 function QuestFilter.Trackable(info)
@@ -1524,14 +808,14 @@ function QuestFilter.MaxWatches()
 	return Constants and Constants.QuestWatchConsts and Constants.QuestWatchConsts.MAX_QUEST_WATCHES or 25
 end
 
-function QuestFilter.Retrack(spec, automatic)
+function QuestFilter.Retrack(spec)
 	if not C_QuestLog.GetNumQuestLogEntries or not C_QuestLog.GetInfo then return end
 	GetSettings().trackerTrackSpec = spec
 	QuestFilter.UpdateTint()
 	local numEntries = C_QuestLog.GetNumQuestLogEntries()
 	local maxWatches = QuestFilter.MaxWatches()
 	local superTracked = C_SuperTrack and C_SuperTrack.GetSuperTrackedQuestID and C_SuperTrack.GetSuperTrackedQuestID() or 0
-	if automatic or not IsShiftKeyDown() then
+	if not IsShiftKeyDown() then
 		for entryIndex = 1, numEntries do
 			local info = C_QuestLog.GetInfo(entryIndex)
 			if info and QuestFilter.Trackable(info) then
@@ -1570,40 +854,6 @@ function QuestFilter.Retrack(spec, automatic)
 	if superTracked > 0 and C_QuestLog.GetQuestWatchType and C_QuestLog.GetQuestWatchType(superTracked) then
 		C_SuperTrack.SetSuperTrackedQuestID(superTracked)
 	end
-	RefreshTrackerLayout()
-end
-
-function QuestFilter.FollowZone()
-	if not IsEnabled() or GetSettings().trackerTrackSpec ~= 'zone' then return end
-	QuestFilter.Retrack('zone', true)
-end
-
-QuestFilter.QueueFollowZone = BUI.Dispatcher.NewDelayed(QuestFilter.FollowZone, 1)
-
-function QuestFilter.TrackProgressed(questID)
-	if C_QuestLog.GetQuestWatchType(questID) then return end
-	if C_QuestLog.GetNumQuestWatches() >= QuestFilter.MaxWatches() then return end
-	local logIndex = C_QuestLog.GetLogIndexForQuestID(questID)
-	local info = logIndex and C_QuestLog.GetInfo(logIndex)
-	if not info or info.isHidden or not QuestFilter.Trackable(info) then return end
-	C_QuestLog.AddQuestWatch(questID)
-end
-
-function QuestFilter.Install()
-	if QuestFilter.migrated then return end
-	QuestFilter.migrated = true
-	local settings = GetSettings()
-	settings.trackerTypeFilters = nil
-	settings.trackerReadyOnly = nil
-	if not settings.trackerFilterRebuilt then
-		settings.trackerFilterRebuilt = true
-		settings.trackerSectionFilters = nil
-	end
-	local sectionFilters = settings.trackerSectionFilters
-	if sectionFilters then
-		sectionFilters.CampaignQuestObjectiveTracker = nil
-		sectionFilters.QuestObjectiveTracker = nil
-	end
 end
 
 function QuestFilter.UpdateTint()
@@ -1618,8 +868,6 @@ end
 
 function QuestFilter.ShowMenu()
 	local settings = GetSettings()
-	if not settings.trackerSectionFilters then settings.trackerSectionFilters = {} end
-	local sectionFilters = settings.trackerSectionFilters
 	local items = {}
 	items[#items + 1] = { title = 'TRACK' }
 	for _, preset in ipairs({
@@ -1640,35 +888,6 @@ function QuestFilter.ShowMenu()
 				return true
 			end,
 		}
-	end
-	if settings.scrollEnabled == true then
-		items[#items + 1] = { separator = true }
-		items[#items + 1] = { title = 'SECTIONS' }
-		for _, section in ipairs(QuestFilter.sections) do
-			local module = _G[section.module]
-			local blockCount = 0
-			if module and module.usedBlocks then
-				for _, blocks in pairs(module.usedBlocks) do
-					for _ in pairs(blocks) do blockCount = blockCount + 1 end
-				end
-			end
-			items[#items + 1] = {
-				text = section.label,
-				sub = tostring(blockCount),
-				checked = sectionFilters[section.module] ~= false,
-				callback = function(item)
-					local nowShown = sectionFilters[section.module] == false
-					if nowShown then
-						sectionFilters[section.module] = nil
-					else
-						sectionFilters[section.module] = false
-					end
-					item.checked = nowShown
-					QuestFilter.Refresh()
-					return true
-				end,
-			}
-		end
 	end
 	Controls.ContextMenu(items, { width = 180, anchor = headerFilter, point = 'TOPRIGHT', relPt = 'BOTTOMRIGHT', offsetY = -4 })
 end
@@ -1712,7 +931,6 @@ local function RefreshQuestCache()
 	local newReadyByQuest = {}
 	local chime = false
 	local readyChanged = false
-	watchedQuestCache = {}
 	readyQuestIDs = {}
 	watchedCount = 0
 	readyCount = 0
@@ -1733,7 +951,6 @@ local function RefreshQuestCache()
 			end
 			if previousReadyByQuest[questID] ~= ready then readyChanged = true end
 			newReadyByQuest[questID] = ready
-			watchedQuestCache[#watchedQuestCache + 1] = { questID = questID, ready = ready }
 		end
 	end
 	previousReadyByQuest = newReadyByQuest
@@ -1745,22 +962,6 @@ local function RefreshQuestCache()
 end
 
 local queueQuestCacheRefresh = BUI.Dispatcher.NewDelayed(RefreshQuestCache, 0.3)
-
-local function ScrollBlockIntoView(block)
-	if not scrollHolder or not scrollHolder:IsShown() then return end
-	if GetSettings().trackerCollapsed == true then return end
-	local holderTop, holderBottom = scrollHolder:GetTop(), scrollHolder:GetBottom()
-	local blockTop, blockBottom = block:GetTop(), block:GetBottom()
-	if not holderTop or not holderBottom or not blockTop or not blockBottom then return end
-	local pad = Pixel.Scale(12)
-	if blockTop > holderTop then
-		scrollTarget = math.max(0, scrollOffset - (blockTop - holderTop) - pad)
-		StartScrollGlide()
-	elseif blockBottom < holderBottom then
-		scrollTarget = scrollOffset + (holderBottom - blockBottom) + pad
-		StartScrollGlide()
-	end
-end
 
 local flashQuestID
 
@@ -1777,9 +978,7 @@ local function FlashProgressBlock()
 	ForEachTrackedBlock(function(block)
 		if block.poiQuestID == questID then targetBlock = block end
 	end)
-	if not targetBlock then return end
-	ScrollBlockIntoView(targetBlock)
-	if not targetBlock.usedLines then return end
+	if not targetBlock or not targetBlock.usedLines then return end
 	local flashRed, flashGreen, flashBlue = GetFlashColor()
 	for _, line in pairs(targetBlock.usedLines) do
 		if line.Text then line.Text:SetTextColor(flashRed, flashGreen, flashBlue, 1) end
@@ -1793,7 +992,6 @@ local queueProgressFlash = BUI.Dispatcher.NewDelayed(FlashProgressBlock, 0.15)
 
 local function OnQuestProgress(_, questID)
 	if not IsEnabled() or not questID then return end
-	if GetSettings().trackOnProgress == true then QuestFilter.TrackProgressed(questID) end
 	flashQuestID = questID
 	queueProgressFlash()
 end
@@ -1823,26 +1021,6 @@ local function ApplyPoiVisibility()
 	end
 end
 
-local function HasSavedTrackerPosition()
-	local positions = BUI.GetDB().framePositions
-	return positions and positions[POSITION_KEY] ~= nil
-end
-
-local function ApplyTrackerPosition()
-	if not IsEnabled() or reasserting then return end
-	if scrollHolder then
-		Skin.RestorePosition(scrollHolder, POSITION_KEY)
-		return
-	end
-	local point, relativePoint, x, y = Skin.SavedPosition(POSITION_KEY)
-	if not point then return end
-	local trackerFrame = _G.ObjectiveTrackerFrame
-	trackerFrame:ClearAllPointsBase()
-	trackerFrame:SetPointBase(point, UIParent, relativePoint, x, y)
-	if point:sub(1, 3) == 'TOP' or not Skin.SaveTopPosition(trackerFrame, POSITION_KEY) then return end
-	ApplyTrackerPosition()
-end
-
 function Skin.StashTracker(stashed)
 	local trackerFrame = _G.ObjectiveTrackerFrame
 	if stashed == (Skin.trackerStashScale ~= nil) then return end
@@ -1860,7 +1038,7 @@ function Skin.StashTracker(stashed)
 end
 
 function Skin.TrackerClamp()
-	if scrollHolder or not trackerCard or not IsEnabled() or Skin.trackerStashScale then return end
+	if not trackerCard or not IsEnabled() or Skin.trackerStashScale then return end
 	if InCombatLockdown() then
 		BUI.Events:AfterCombat(Skin.TrackerClamp, 'Skinning.TrackerClamp')
 		return
@@ -1883,98 +1061,6 @@ function Skin.TrackerClamp()
 	if applied and applied[1] == insetLeft and applied[2] == insetRight and applied[3] == insetTop and applied[4] == insetBottom then return end
 	trackerCard._buiClamp = { insetLeft, insetRight, insetTop, insetBottom }
 	trackerFrame:SetClampRectInsets(insetLeft, insetRight, insetTop, insetBottom)
-	ApplyTrackerPosition()
-end
-
-local moveDriver
-
-local function StopMoverDrag()
-	if moveDriver then moveDriver:SetScript('OnUpdate', nil) end
-	if scrollHolder and scrollHolder._buiDragging then
-		scrollHolder._buiDragging = false
-		Skin.SavePosition(scrollHolder, POSITION_KEY)
-	end
-end
-
-local function StartMoverDrag()
-	if not scrollHolder or not IsEnabled() or not IsControlKeyDown() then return end
-	local left, top = scrollHolder:GetLeft(), scrollHolder:GetTop()
-	if not IsFiniteNumber(left) or not IsFiniteNumber(top) then return end
-	local scale = scrollHolder:GetEffectiveScale()
-	if not scale or scale <= 0 then scale = 1 end
-	local startX, startY = GetCursorPosition()
-	scrollHolder._buiDragging = true
-	if not moveDriver then moveDriver = CreateFrame('Frame') end
-	moveDriver:SetScript('OnUpdate', function()
-		if not IsMouseButtonDown('LeftButton') then
-			StopMoverDrag()
-			return
-		end
-		local cursorX, cursorY = GetCursorPosition()
-		scrollHolder:ClearAllPoints()
-		scrollHolder:SetPoint('TOPLEFT', UIParent, 'BOTTOMLEFT', left + (cursorX - startX) / scale, top + (cursorY - startY) / scale)
-	end)
-end
-
-local function OnMoverDragStart()
-	if scrollHolder then
-		StartMoverDrag()
-		return
-	end
-	local mover = _G.ObjectiveTrackerFrame
-	if not mover or not IsEnabled() or not IsControlKeyDown() then return end
-	Skin.TrackerClamp()
-	mover:SetMovable(true)
-	mover._buiDragging = true
-	mover:StartMoving()
-	mover:SetUserPlaced(false)
-end
-
-local function OnMoverDragStop()
-	if scrollHolder then
-		StopMoverDrag()
-		return
-	end
-	local mover = _G.ObjectiveTrackerFrame
-	if not mover or not mover._buiDragging then return end
-	mover:StopMovingOrSizing()
-	mover._buiDragging = false
-	if not Skin.SaveTopPosition(mover, POSITION_KEY) then return end
-	ApplyTrackerPosition()
-	BUI.LeaveFrameManager(mover, Skin.SavedPosition(POSITION_KEY))
-end
-
-local function MakeHeaderDragHandle(header)
-	if header.__buiDragHandle then return end
-	header.__buiDragHandle = true
-	header:EnableMouse(true)
-	Skin.ForwardTrackerWheel(header)
-	header:RegisterForDrag('LeftButton')
-	header:HookScript('OnDragStart', OnMoverDragStart)
-	header:HookScript('OnDragStop', OnMoverDragStop)
-end
-
-local function WireCardDragHandles()
-	if not trackerCard or trackerCard.__buiDragWired then return end
-	trackerCard.__buiDragWired = true
-	trackerCard:RegisterForDrag('LeftButton')
-	trackerCard:SetScript('OnDragStart', OnMoverDragStart)
-	trackerCard:SetScript('OnDragStop', OnMoverDragStop)
-end
-
-local appliedTrackerCollapse
-
-local function ApplyTrackerCollapse()
-	if not scrollHolder or not headerRow then return end
-	local collapsed = GetSettings().trackerCollapsed == true
-	if headerChevron then headerChevron:SetRotation(collapsed and 0 or math.pi) end
-	local wasCollapsed = appliedTrackerCollapse
-	if collapsed == wasCollapsed then return end
-	appliedTrackerCollapse = collapsed
-	if not collapsed then scrollHolder:SetAlpha(1) end
-	UpdateCardAnchors()
-	RefreshScroll()
-	if wasCollapsed == true and not collapsed then RefreshTrackerLayout() end
 end
 
 function Skin.TrackerHeaderControls(parent, anchor)
@@ -2012,159 +1098,18 @@ function Skin.TrackerDecorateHeader(trackerFrame)
 		hooksecurefunc(trackerFrame, 'Init', Skin.TrackerDecorateHeader)
 	end
 	local enabled = IsEnabled()
-	header.Text:SetText(enabled and 'OBJECTIVES' or trackerFrame.headerText)
+	local text = header.Text
+	getmetatable(text).__index.SetText(text, enabled and 'OBJECTIVES' or trackerFrame.headerText)
 	headerFilter:SetShown(enabled)
 	headerCounts:SetShown(enabled)
 end
 
 local function ApplyHeaderRowVisibility()
-	local show = GetSettings().showHeaderRow ~= false
-	if not scrollHolder then
-		local trackerFrame = _G.ObjectiveTrackerFrame
-		local header = trackerFrame and trackerFrame.Header
-		if header then
-			header:SetShown(not IsEnabled() or show)
-			Skin.TrackerDecorateHeader(trackerFrame)
-		end
-	end
-	if not headerRow then return end
-	local visible = IsEnabled() and show
-	headerRow:SetShown(visible)
-	if not visible and GetSettings().trackerCollapsed == true then
-		GetSettings().trackerCollapsed = false
-		ApplyTrackerCollapse()
-	else
-		UpdateCardAnchors()
-		RefreshScroll()
-	end
-	if scrollTrack then
-		local topInset = visible and (headerRow:GetHeight() + Pixel.Scale(HEADER_ROW_TOP_PAD)) or 0
-		scrollTrack:SetPoint('TOPRIGHT', trackerCard, 'TOPRIGHT', -Pixel.PixelSize(2), -(Pixel.PixelSize(CARD_PAD_Y) + topInset))
-	end
-end
-
-local function EnsureHeaderRow()
-	if headerRow or not trackerCard or not scrollHolder then return end
-	headerRow = CreateFrame('Button', nil, trackerCard)
-	headerRow:SetPoint('TOPLEFT', trackerCard, 'TOPLEFT', 0, -Pixel.Scale(HEADER_ROW_TOP_PAD))
-	headerRow:SetPoint('TOPRIGHT', trackerCard, 'TOPRIGHT', 0, -Pixel.Scale(HEADER_ROW_TOP_PAD))
-	headerRow:SetHeight(Pixel.Scale(HEADER_ROW_HEIGHT))
-	headerRow:SetFrameLevel(trackerCard:GetFrameLevel() + 2)
-
-	local rule = headerRow:CreateTexture(nil, 'ARTWORK')
-	rule:SetPoint('BOTTOMLEFT', headerRow, 'BOTTOMLEFT', 0, 0)
-	rule:SetPoint('BOTTOMRIGHT', headerRow, 'BOTTOMRIGHT', 0, 0)
-	rule:SetHeight(Pixel.PixelSize(1))
-	Skin.trackerRules[rule] = true
-	rule:SetColorTexture(Skin.TrackerSeparatorColor())
-
-	local label = headerRow:CreateFontString(nil, 'ARTWORK')
-	ApplySkinFont(label, 'header')
-	label:SetPoint('LEFT', headerRow, 'LEFT', Pixel.Scale(HEADER_TEXT_INSET), 0)
-	label:SetText('OBJECTIVES')
-	label:SetTextColor(Theme.text.label[1], Theme.text.label[2], Theme.text.label[3], 1)
-
-	local toggle = CreateFrame('Button', nil, headerRow)
-	toggle:SetSize(Pixel.PixelSize(MINIMIZE_SIZE), Pixel.PixelSize(MINIMIZE_SIZE))
-	toggle:SetPoint('RIGHT', headerRow, 'RIGHT', -Pixel.Scale(8), 0)
-	headerChevron = toggle:CreateTexture(nil, 'OVERLAY')
-	headerChevron:SetTexture(BUILib.GetLibMedia('dropdown'))
-	headerChevron:SetPoint('CENTER', 0, 0)
-	headerChevron:SetSize(Pixel.Scale(GLYPH_SIZE), Pixel.Scale(GLYPH_SIZE))
-	headerChevron:SetVertexColor(Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3], 1)
-	toggle:SetScript('OnEnter', function()
-		headerChevron:SetVertexColor(1, 1, 1, 1)
-	end)
-	toggle:SetScript('OnLeave', function()
-		headerChevron:SetVertexColor(Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3], 1)
-	end)
-	toggle:SetScript('OnClick', function()
-		local settings = GetSettings()
-		settings.trackerCollapsed = not (settings.trackerCollapsed == true)
-		ApplyTrackerCollapse()
-	end)
-
-	Skin.TrackerHeaderControls(headerRow, toggle)
-
-	headerRow:SetScript('OnEnter', function(self)
-		if GetSettings().trackerCollapsed ~= true then return end
-		if #watchedQuestCache == 0 then return end
-		local rows = {}
-		for questIndex, entry in ipairs(watchedQuestCache) do
-			if questIndex > PEEK_MAX_ROWS then
-				rows[#rows + 1] = { left = ('+%d more'):format(#watchedQuestCache - PEEK_MAX_ROWS) }
-				break
-			end
-			local title = C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(entry.questID)
-			local done, total = 0, 0
-			local objectives = C_QuestLog.GetQuestObjectives and C_QuestLog.GetQuestObjectives(entry.questID)
-			if objectives then
-				for _, objective in ipairs(objectives) do
-					total = total + 1
-					if objective.finished then done = done + 1 end
-				end
-			end
-			rows[#rows + 1] = {
-				left = title or ('Quest ' .. entry.questID),
-				leftColor = Skin.TrackerColor(entry.ready and 'ready' or 'title'),
-				right = entry.ready and 'Ready' or (total > 0 and (done .. '/' .. total) or ''),
-				rightColor = entry.ready and Skin.TrackerColor('ready') or nil,
-			}
-		end
-		LibWidget.ShowTipRows(self, 'Objectives', rows)
-	end)
-	headerRow:SetScript('OnLeave', function()
-		LibWidget.HideTip()
-	end)
-
-	headerRow:RegisterForDrag('LeftButton')
-	headerRow:SetScript('OnDragStart', OnMoverDragStart)
-	headerRow:SetScript('OnDragStop', OnMoverDragStop)
-
-	if scrollTrack then
-		scrollTrack:SetPoint('TOPRIGHT', trackerCard, 'TOPRIGHT', -Pixel.PixelSize(2), -(Pixel.PixelSize(CARD_PAD_Y) + headerRow:GetHeight() + Pixel.Scale(HEADER_ROW_TOP_PAD)))
-	end
-end
-
-local trackerMoveInstalled = false
-
-local function InstallTrackerMove()
-	if trackerMoveInstalled then return end
 	local trackerFrame = _G.ObjectiveTrackerFrame
-	if not trackerFrame then return end
-	trackerMoveInstalled = true
-	hooksecurefunc(trackerFrame, 'SetPoint', function(self, pointArg, relativeArg)
-		if self.isDragging then
-			local relativeName = relativeArg
-			if type(relativeArg) == 'table' then
-				relativeName = (relativeArg.GetName and relativeArg:GetName()) or 'unnamed frame'
-			end
-			LogTrackerEvent(('setpoint during drag %s %s'):format(tostring(pointArg), tostring(relativeName)))
-		end
-		if reasserting or self._buiDragging then return end
-		local editModeActive = IsEditModeActive()
-		if scrollHolder then
-			if editModeActive then
-				local positions = BUI.GetDB().framePositions
-				if positions then positions[POSITION_KEY] = nil end
-			elseif HasSavedTrackerPosition() then
-				return
-			end
-			local right, top = self:GetRight(), self:GetTop()
-			if not IsFiniteNumber(right) or not IsFiniteNumber(top) then return end
-			scrollHolder:ClearAllPoints()
-			scrollHolder:SetPoint('TOPRIGHT', UIParent, 'BOTTOMLEFT', right + Pixel.Scale(RIGHT_CLIP_PAD), top)
-			return
-		end
-		if editModeActive then
-			local positions = BUI.GetDB().framePositions
-			if positions then positions[POSITION_KEY] = nil end
-			return
-		end
-		ApplyTrackerPosition()
-	end)
-	hooksecurefunc(trackerFrame, 'UpdateClampOffsets', Skin.TrackerClamp)
-	ApplyTrackerPosition()
+	local header = trackerFrame and trackerFrame.Header
+	if not header then return end
+	header:SetShown(not IsEnabled() or GetSettings().showHeaderRow ~= false)
+	Skin.TrackerDecorateHeader(trackerFrame)
 end
 
 local function ApplyTextSettings()
@@ -2174,7 +1119,6 @@ local function ApplyTextSettings()
 		Pixel.ApplyFont(fontString, GetRoleSize(entry.role), font, flags)
 	end
 	ApplyCardStyle()
-	if IsEnabled() then RefreshTrackerLayout() end
 end
 
 local function Track(element)
@@ -2291,7 +1235,6 @@ local function SkinHeader(header)
 		text:SetTextColor(Theme.text.label[1], Theme.text.label[2], Theme.text.label[3], 1)
 	end
 
-	MakeHeaderDragHandle(header)
 	SkinMinimizeButton(header)
 end
 
@@ -2492,7 +1435,6 @@ local function OnAddBlock(_, block)
 		if block.SetStringText then hooksecurefunc(block, 'SetStringText', OnSetStringText) end
 		if block.UpdateHighlight then hooksecurefunc(block, 'UpdateHighlight', OnUpdateHighlight) end
 	end
-	Skin.ForwardTrackerWheel(block)
 	OnUpdateHighlight(block)
 end
 
@@ -2510,28 +1452,12 @@ end
 
 local hookedTrackers = {}
 
-local challengeModeHidden = false
-
-local function IsChallengeModeRunning()
-	if not C_ChallengeMode then return false end
-	if C_ChallengeMode.IsChallengeModeActive then return C_ChallengeMode.IsChallengeModeActive() end
-	if C_ChallengeMode.GetActiveChallengeMapID then return C_ChallengeMode.GetActiveChallengeMapID() ~= nil end
-	return false
-end
-
-local function ApplyChallengeModeVisibility()
-	local shouldHide = IsEnabled() and (IsChallengeModeRunning() or GetSettings().trackerHidden == true) or false
-	if shouldHide == (challengeModeHidden or false) then return end
+local function ApplyTrackerHidden()
 	if InCombatLockdown() then
-		BUI.Events:AfterCombat(ApplyChallengeModeVisibility, 'Skinning.TrackerChallengeMode')
+		BUI.Events:AfterCombat(ApplyTrackerHidden, 'Skinning.TrackerHidden')
 		return
 	end
-	challengeModeHidden = shouldHide
-	if scrollHolder then
-		scrollHolder:SetShown(not shouldHide)
-		return
-	end
-	Skin.StashTracker(shouldHide)
+	Skin.StashTracker(IsEnabled() and GetSettings().trackerHidden == true)
 end
 
 Scenario.headers = {}
@@ -2639,17 +1565,15 @@ local function Install()
 	Scenario.Install()
 	InstallMenuHook()
 	InstallQuestTipHook()
-	Skin.TrackerEditModeHooks()
-	QuestFilter.Install()
 
 	local trackerFrame = _G.ObjectiveTrackerFrame
 	if trackerFrame then
 		if trackerFrame.Header then SkinHeader(trackerFrame.Header) end
 		if trackerFrame.NineSlice then HideFrameTextures(trackerFrame.NineSlice) end
-		EnsureScrollHolder()
-		ApplyTrackerWidth()
-		InstallTrackerMove()
-		Skin.TrackerRepairEditModeAnchor()
+		if not hookedTrackers[trackerFrame] then
+			hookedTrackers[trackerFrame] = true
+			hooksecurefunc(trackerFrame, 'UpdateClampOffsets', Skin.TrackerClamp)
+		end
 	end
 
 	for _, trackerName in ipairs(TRACKER_NAMES) do
@@ -2668,17 +1592,8 @@ local function Install()
 
 	SkinStageBlock()
 	EnsureTrackerCard()
-	WireCardDragHandles()
-	EnsureHeaderRow()
-	ApplyTrackerCollapse()
 	ApplyHeaderRowVisibility()
-	ApplyEditModeHeight()
-
-	BUI.Events:Register('CHALLENGE_MODE_START', 'Skinning.TrackerChallengeMode', ApplyChallengeModeVisibility)
-	BUI.Events:Register('CHALLENGE_MODE_COMPLETED', 'Skinning.TrackerChallengeMode', ApplyChallengeModeVisibility)
-	BUI.Events:Register('CHALLENGE_MODE_RESET', 'Skinning.TrackerChallengeMode', ApplyChallengeModeVisibility)
-	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'Skinning.TrackerChallengeMode', ApplyChallengeModeVisibility)
-	ApplyChallengeModeVisibility()
+	ApplyTrackerHidden()
 
 	BUI.Events:Register('QUEST_LOG_UPDATE', 'Skinning.TrackerQuestCache', queueQuestCacheRefresh)
 	BUI.Events:Register('QUEST_WATCH_LIST_CHANGED', 'Skinning.TrackerQuestCache', queueQuestCacheRefresh)
@@ -2689,8 +1604,6 @@ local function Install()
 	BUI.Events:Register('QUEST_WATCH_UPDATE', 'Skinning.TrackerProgress', OnQuestProgress)
 	BUI.Events:Register('ZONE_CHANGED_NEW_AREA', 'Skinning.TrackerItemKey', QuestItem.Update)
 	BUI.Events:Register('BAG_UPDATE_COOLDOWN', 'Skinning.TrackerItemCooldown', QuestItem.UpdateCooldown)
-	BUI.Events:Register('ZONE_CHANGED_NEW_AREA', 'Skinning.TrackerZoneFilter', QuestFilter.QueueFollowZone)
-	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'Skinning.TrackerZoneFilter', QuestFilter.QueueFollowZone)
 	queueQuestCacheRefresh()
 end
 
@@ -2708,16 +1621,10 @@ Skin.OnToggle('objectivetracker', function(enabled)
 		ApplyDashAlpha()
 		ApplyTitleWrap()
 		Skin.ApplyTrackerSeparators()
-		ApplyTrackerPosition()
 		ApplyTextSettings()
 		Skin.ApplyTrackerColors()
 		queueQuestCacheRefresh()
 		QuestItem.Update()
-		if scrollHolder then
-			scrollHolder:SetShown(not challengeModeHidden)
-			AdoptModules()
-		end
-		RefreshScroll()
 		for _, texture in ipairs(hiddenTextures) do ReassertHidden(texture) end
 		return
 	end
@@ -2725,16 +1632,6 @@ Skin.OnToggle('objectivetracker', function(enabled)
 	for _, element in ipairs(addedElements) do element:Hide() end
 	for _, backdrop in pairs(skinnedBars) do backdrop:Hide() end
 	if trackerCard then trackerCard:Hide() end
-	if scrollHolder then
-		scrollOffset = 0
-		scrollHolder:SetVerticalScroll(0)
-		ReleaseModules()
-		scrollHolder:Hide()
-		for _, trackerName in ipairs(TRACKER_NAMES) do
-			local module = _G[trackerName]
-			if module then module:SetWidth(260) end
-		end
-	end
 	for button in pairs(hiddenPoiButtons) do
 		button:SetScale(1)
 		button:ClearAllPoints()
@@ -2748,7 +1645,7 @@ Skin.OnToggle('objectivetracker', function(enabled)
 	QuestItem.Update()
 	ApplyPoiVisibility()
 	ApplyDashAlpha()
-	ApplyChallengeModeVisibility()
+	ApplyTrackerHidden()
 	RepaintBlizzardColors()
 	for _, texture in ipairs(hiddenTextures) do
 		if texture.__buiOldAtlas then
@@ -2771,7 +1668,7 @@ end)
 
 Skin.RegisterSkin('objectivetracker', {
 	name = 'Objective Tracker',
-	description = 'Tooltip-style dark cards behind each tracker section, clean library fonts on quest text, accent-marked headers, flat progress bars, and square quest item icons. An OBJECTIVES title row carries quest counts and filters, and optional scrolling mode caps the height with a scroll bar. Hides itself during Mythic+ runs. Hold Ctrl and drag any section header to move the tracker.',
+	description = 'Tooltip-style dark cards behind each tracker section, clean library fonts on quest text, accent-marked headers, flat progress bars, and square quest item icons. The OBJECTIVES header carries quest counts and track presets. Move and size the tracker in Edit Mode.',
 	icon = 'Interface\\Icons\\INV_Misc_Book_07',
 	settingsWidth = 430,
 	settingsHeight = 1400,
@@ -2783,9 +1680,9 @@ Skin.RegisterSkin('objectivetracker', {
 
 		local textHeight = pageKit.CardHeight(3)
 		local colorsHeight = pageKit.CardHeight(7)
-		local panelHeight = pageKit.CardHeight(11)
-		local behaviorHeight = pageKit.CardHeight(3)
-		local positionHeight = pageKit.CardHeight(2)
+		local panelHeight = pageKit.CardHeight(10)
+		local behaviorHeight = pageKit.CardHeight(2)
+		local positionHeight = pageKit.CardHeight(1)
 		local behaviorTop = textHeight + GAP + colorsHeight + GAP + panelHeight + GAP
 		local positionTop = behaviorTop + behaviorHeight + GAP
 
@@ -2830,14 +1727,12 @@ Skin.RegisterSkin('objectivetracker', {
 		local singleLineToggle = Controls.SwitchToggle(textCard, nil, settings.singleLineTitles ~= false, function(value)
 			settings.singleLineTitles = value
 			ApplyTitleWrap()
-			RefreshTrackerLayout()
 		end)
 		pageKit.Row(textCard, 78, 'Single-line Titles', singleLineToggle)
 
 		local singleLineObjectivesToggle = Controls.SwitchToggle(textCard, nil, settings.singleLineObjectives ~= false, function(value)
 			settings.singleLineObjectives = value
 			ApplyTitleWrap()
-			RefreshTrackerLayout()
 		end)
 		pageKit.Row(textCard, 118, 'Single-line Objectives', singleLineObjectivesToggle)
 
@@ -2864,7 +1759,7 @@ Skin.RegisterSkin('objectivetracker', {
 		ColorRow(278, 'Time Left', 'timeLeft')
 
 		local backgroundCog = pageKit.SettingsIcon(panelCard, {
-			title = 'PANEL', tooltip = 'Background & sizing', options = {
+			title = 'PANEL', tooltip = 'Background', options = {
 				{ kind = 'slider', label = 'Opacity', min = 0, max = 100,
 				  get = function() return settings.cardOpacity or DEFAULT_CARD_OPACITY end,
 				  set = function(value) settings.cardOpacity = value end, apply = ApplyCardStyle },
@@ -2879,14 +1774,6 @@ Skin.RegisterSkin('objectivetracker', {
 							  ApplyCardStyle()
 						  end }
 				  end },
-				{ kind = 'slider', label = 'Max Height', min = 400, max = 1000,
-				  get = function() return settings.maxHeight or DEFAULT_MAX_HEIGHT end,
-				  set = function(value) settings.maxHeight = value end,
-				  apply = function() RefreshScroll() ApplyEditModeHeight() end },
-				{ kind = 'slider', label = 'Width', min = 260, max = 400,
-				  get = function() return settings.trackerWidth or DEFAULT_TRACKER_WIDTH end,
-				  set = function(value) settings.trackerWidth = value end,
-				  apply = function() ApplyTrackerWidth() RefreshScroll() RefreshTrackerLayout() end },
 			},
 		})
 		pageKit.Row(panelCard, 38, 'Background', backgroundCog)
@@ -2914,22 +1801,9 @@ Skin.RegisterSkin('objectivetracker', {
 
 		local hideTrackerToggle = Controls.SwitchToggle(panelCard, nil, settings.trackerHidden == true, function(value)
 			settings.trackerHidden = value
-			ApplyChallengeModeVisibility()
+			ApplyTrackerHidden()
 		end)
 		pageKit.Row(panelCard, 398, 'Hide Tracker Completely', hideTrackerToggle)
-
-		local scrollToggle = Controls.SwitchToggle(panelCard, nil, settings.scrollEnabled == true, function(value)
-			settings.scrollEnabled = value
-			BUI.Modals.Confirm({
-				title = 'Reload Required',
-				message = value
-					and "Scrolling moves Blizzard's tracker sections into a BluUI panel. Blizzard's widget code then runs as addon code, so tooltips that show progress widgets can throw errors.\n\nReload now to apply?"
-					or "Reload now to put the tracker back in Blizzard's own frame?",
-				confirmText = 'Reload Now', cancelText = 'Later',
-				onConfirm = BUI.Reload,
-			})
-		end)
-		pageKit.Row(panelCard, 438, 'Scrolling', scrollToggle)
 
 		local questIconsToggle = Controls.SwitchToggle(panelCard, nil, settings.showQuestIcons == true, function(value)
 			settings.showQuestIcons = value
@@ -2963,20 +1837,12 @@ Skin.RegisterSkin('objectivetracker', {
 		local headerRowToggle = Controls.SwitchToggle(panelCard, nil, settings.showHeaderRow ~= false, function(value)
 			settings.showHeaderRow = value
 			if value == false then
-				settings.trackerSectionFilters = nil
 				settings.trackerTrackSpec = nil
-				QuestFilter.Refresh()
+				QuestFilter.UpdateTint()
 			end
 			ApplyHeaderRowVisibility()
 		end)
 		pageKit.Row(panelCard, 318, 'Objectives Header', headerRowToggle)
-
-		local resetButton = Controls.Button(positionCard, 'Reset', 84, function()
-			local positions = BUI.GetDB().framePositions
-			if positions then positions[POSITION_KEY] = nil end
-			print('|cff6D00FDBluUI:|r Tracker position cleared. Reload the UI to restore the Blizzard anchor.')
-		end)
-		pageKit.Row(positionCard, 38, 'Reset Position', resetButton)
 
 		local resetItemButton = Controls.Button(positionCard, 'Reset', 84, function()
 			local positions = BUI.GetDB().framePositions
@@ -2984,7 +1850,7 @@ Skin.RegisterSkin('objectivetracker', {
 			if QuestItem.button then QuestItem.button.placedVisible = nil end
 			QuestItem.Update()
 		end)
-		pageKit.Row(positionCard, 78, 'Reset Item Button', resetItemButton)
+		pageKit.Row(positionCard, 38, 'Reset Item Button', resetItemButton)
 
 		local itemButtonToggle = Controls.SwitchToggle(behaviorCard, nil, settings.showQuestItemButton == true, function(value)
 			settings.showQuestItemButton = value
@@ -2992,15 +1858,10 @@ Skin.RegisterSkin('objectivetracker', {
 		end)
 		pageKit.Row(behaviorCard, 38, 'Quest Item Button', itemButtonToggle)
 
-		local trackOnProgressToggle = Controls.SwitchToggle(behaviorCard, nil, settings.trackOnProgress == true, function(value)
-			settings.trackOnProgress = value
-		end)
-		pageKit.Row(behaviorCard, 78, 'Track Quests on Progress', trackOnProgressToggle)
-
 		local completionMessageToggle = Controls.SwitchToggle(behaviorCard, nil, settings.completionMessage == true, function(value)
 			settings.completionMessage = value
 		end)
-		pageKit.Row(behaviorCard, 118, 'Completion Messages', completionMessageToggle)
+		pageKit.Row(behaviorCard, 78, 'Completion Messages', completionMessageToggle)
 
 		content:Refresh()
 	end,
