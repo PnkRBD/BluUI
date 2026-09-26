@@ -87,7 +87,7 @@ function Layout.TopNavWindow(config)
 	if config.icon then
 		avatar:SetTexture(config.icon)
 	else
-		SetPortraitTexture(avatar, 'player')
+		Layout.PlayerPortrait(avatar)
 	end
 	avatar:SetMask(BUILib.GetLibMedia('circle_mask'))
 
