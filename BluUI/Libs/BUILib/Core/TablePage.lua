@@ -453,12 +453,20 @@ function Layout.TablePage(tab, shell, spec)
 		Resize()
 	end)
 	for index, pane in ipairs(spec.tabs) do labels[index] = pane.label end
-	contentTop = kit.Tabs(block, y + HEADER_GAP, labels, function(index)
-		panes[current].frame:Hide()
-		current = index
-		panes[current].frame:Show()
-		Resize()
-	end)
+	if #labels > 1 then
+		contentTop = kit.Tabs(block, y + HEADER_GAP, labels, function(index)
+			panes[current].frame:Hide()
+			current = index
+			panes[current].frame:Show()
+			Resize()
+		end)
+	else
+		local rule = shell.window:Fill(block, 'rule', 'ARTWORK')
+		rule:SetPoint('TOPLEFT', 0, -(y + HEADER_GAP))
+		rule:SetPoint('TOPRIGHT', 0, -(y + HEADER_GAP))
+		rule:SetHeight(1)
+		contentTop = y + HEADER_GAP + 1
+	end
 
 	for index, pane in ipairs(spec.tabs) do
 		local frame = CreateFrame('Frame', nil, block)

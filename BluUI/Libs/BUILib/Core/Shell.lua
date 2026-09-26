@@ -17,9 +17,10 @@ local function RestoreGeometry(shell)
 end
 
 local function SelectNav(shell, pageID)
+	local highlight = shell.pages[pageID].parent or pageID
 	for index, id in ipairs(shell.order) do
 		local button = shell.navButtons[index]
-		if button then button:SetSelected(id == pageID) end
+		if button then button:SetSelected(id == highlight) end
 	end
 end
 
@@ -47,6 +48,7 @@ local function CreateWindow(shell)
 	}, { __index = shell.config }))
 	RestoreGeometry(shell)
 	shell:BuildNav()
+	if shell.config.onWindowCreated then shell.config.onWindowCreated(shell.window) end
 end
 
 function Shell:Store()
