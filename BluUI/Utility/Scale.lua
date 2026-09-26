@@ -4,13 +4,13 @@ local Scale = BUI.Scale
 local BUILib = BluUI.BUILibClient
 
 local PRESETS = {
-    { key = "1080p",  value = 0.711111,          label = "1080p Scale" },
-    { key = "1440p",  value = 0.533333333333333, label = "1440p Scale" },
-    { key = "4K",     value = 0.355556,          label = "4K Scale" },
-    { key = "Custom",                             label = "Custom" },
+    { key = "1080p",  value = 768 / 1080, label = "1080p Scale" },
+    { key = "1440p",  value = 768 / 1440, label = "1440p Scale" },
+    { key = "4K",     value = 768 / 2160, label = "4K Scale" },
+    { key = "Custom",                     label = "Custom" },
 }
 
-local buttons = {}
+local windows = setmetatable({}, { __mode = "k" })
 
 local function GetSavedScale()
     local db = BUI.GetDB()
@@ -33,16 +33,17 @@ local function FindPresetKey(scale)
 end
 
 local function RefreshButtons(scale)
-    if not next(buttons) then return end
     local matched = FindPresetKey(scale)
     local isCustom = scale ~= nil and matched == nil
-    for presetIndex = 1, #PRESETS do
-        local preset = PRESETS[presetIndex]
-        local button = buttons[preset.key]
-        if button then
-            local active = (preset.key == "Custom") and isCustom or (preset.key == matched)
-            if button.SetActive then button:SetActive(active) end
-            if button.SetFlashing then button:SetFlashing(scale == nil) end
+    for _, buttons in pairs(windows) do
+        for presetIndex = 1, #PRESETS do
+            local preset = PRESETS[presetIndex]
+            local button = buttons[preset.key]
+            if button then
+                local active = (preset.key == "Custom") and isCustom or (preset.key == matched)
+                if button.SetActive then button:SetActive(active) end
+                if button.SetFlashing then button:SetFlashing(scale == nil) end
+            end
         end
     end
 end
@@ -108,7 +109,7 @@ function Scale.GetFooterButtons()
 end
 
 function Scale.SetupButtons(window, parent)
-    buttons = {}
+    local buttons = {}
     for presetIndex = 1, #PRESETS do
         local preset = PRESETS[presetIndex]
         local button = window.footerButtons[preset.key]
@@ -121,6 +122,7 @@ function Scale.SetupButtons(window, parent)
             end
         end
     end
+    windows[window] = buttons
     RefreshButtons(GetSavedScale())
 end
 
