@@ -113,7 +113,7 @@ function Controls.SelectableGrid(parent, config)
 		local rowIndex = #rows + 1
 		local row = CreateFrame("Button", nil, rowContainer)
 		row:SetPoint("TOPLEFT", 0, -((rowIndex - 1) * rowHeight))
-		row:SetPoint("RIGHT"); row:SetHeight(rowHeight)
+		row:SetPoint("TOPRIGHT", 0, -((rowIndex - 1) * rowHeight)); row:SetHeight(rowHeight)
 		row._data = rowData
 
 		local selectBg = Widget.Create(row, 0, 0, 0, 0)
