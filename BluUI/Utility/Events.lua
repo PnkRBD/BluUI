@@ -209,17 +209,14 @@ function Events:OnTalentBurst(key, callback)
     talentBurstCallbacks[key] = callback
 end
 
-function Events:OnLogin(key, callback)
-    local module = BUI.C.MODULE_MAP[key]
-    if module then
-        self:Once('PLAYER_LOGIN', key, function(...)
-            local profile = BUI.GetDB()
-            if profile and profile.modules and profile.modules[module] == false then return end
-            callback(...)
-        end)
-    else
+function Events:OnLogin(key, callback, module)
+    if not module then
         self:Once('PLAYER_LOGIN', key, callback)
+        return
     end
+    self:Once('PLAYER_LOGIN', key, function(...)
+        if BUI.IsModuleEnabled(module) then callback(...) end
+    end)
 end
 
 local SETTLE_DELAY = 0.35

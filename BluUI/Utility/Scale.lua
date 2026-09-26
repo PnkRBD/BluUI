@@ -5,7 +5,6 @@ local Pixel = BUI.Pixel
 local BUILib = BluUI.BUILibClient
 
 local PRESETS = {
-    { key = "1080p",  value = 0.711111,          label = "1080p Scale" },
     { key = "1440p",  value = 0.533333333333333, label = "1440p Scale" },
     { key = "4K",     value = 0.355556,          label = "4K Scale" },
     { key = "Custom",                             label = "Custom" },

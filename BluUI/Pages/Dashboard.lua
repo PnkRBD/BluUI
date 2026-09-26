@@ -1147,8 +1147,8 @@ local function BuildDashboard(canvas)
     greeting:SetText("Welcome back, " .. UnitName("player"))
     greeting:SetTextColor(1, 1, 1, 1)
 
-    local cogButton = Widget.Unwrap(Controls.Icon(dashboard, { size = 20 }))
-    cogButton:SetPoint("LEFT", greeting, "RIGHT", Pixel.Scale(8), Pixel.Scale(-2))
+    local cogButton = Widget.Unwrap(Controls.Icon(dashboard, { size = 14 }))
+    cogButton:SetPoint("LEFT", greeting, "RIGHT", Pixel.Scale(8), Pixel.Scale(1))
 
     local className, classFile = UnitClass("player")
     local localizedClass = LOCALIZED_CLASS_NAMES_MALE[classFile] or className or ""
@@ -1979,7 +1979,7 @@ local function BuildDashboard(canvas)
                 toggle = Controls.StampCheckbox(row, nil, checked, function(isVisible)
                     Apply(isVisible)
                     BUI.PageEngine.RefreshCurrentPage()
-                end)
+                end, nil, true, nil, "mini")
                 local toggleFrame = toggle.frame or toggle
                 toggleFrame:ClearAllPoints(); toggleFrame:SetParent(row); toggleFrame:SetPoint("RIGHT", Pixel.Scale(-8), 0)
             end

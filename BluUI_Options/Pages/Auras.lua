@@ -60,7 +60,7 @@ local function AlertMover(parent, db, apply, options)
 							Set('centerHorizontally', value)
 							if value then Set('posX', 0); xSlider:SetValue(0) end
 							apply()
-						end)
+						end, nil, true, nil, 'mini')
 						PageKit.PopRow(panel, y, 'Center Horizontally', centerCheckbox); y = y + 40
 					end
 					for _, dropdown in ipairs(dropdowns) do
@@ -72,18 +72,18 @@ local function AlertMover(parent, db, apply, options)
 					if options.unlock then
 						unlockCheckbox = Controls.StampCheckbox(panel, nil, options.unlock.get(), function(value)
 							options.unlock.set(value)
-						end)
+						end, nil, true, nil, 'mini')
 						PageKit.PopRow(panel, y, 'Unlock (drag to move)', unlockCheckbox); y = y + 40
 					end
 					if options.matchWidth then
 						PageKit.PopRow(panel, y, 'Match Anchor Width', Controls.StampCheckbox(panel, nil, options.matchWidth.get(), function(value)
 							options.matchWidth.set(value)
-						end)); y = y + 40
+						end, nil, true, nil, 'mini')); y = y + 40
 					end
 					if options.matchHeight then
 						PageKit.PopRow(panel, y, 'Match Anchor Height', Controls.StampCheckbox(panel, nil, options.matchHeight.get(), function(value)
 							options.matchHeight.set(value)
-						end)); y = y + 40
+						end, nil, true, nil, 'mini')); y = y + 40
 					end
 					PageKit.PopRow(panel, y, 'Anchor Frame', Controls.Dropdown(panel, nil, frameItems, Get('anchorFrame') or '', function(value)
 						Set('anchorFrame', value); apply()

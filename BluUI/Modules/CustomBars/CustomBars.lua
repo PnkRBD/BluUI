@@ -1076,4 +1076,4 @@ function CustomBars.Initialize()
     CustomBars.Enable()
 end
 
-BUI.Events:OnLogin("CustomBars", function() CustomBars.Initialize() end)
+BUI.Events:OnLogin("CustomBars", function() CustomBars.Initialize() end, "customBars")

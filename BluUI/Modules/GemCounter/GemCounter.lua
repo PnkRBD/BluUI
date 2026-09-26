@@ -998,4 +998,4 @@ BUI.Events:OnLogin('GemCounter', function()
 		description = 'Two-column gem panel beside the Character frame with sandbox socketing.',
 		icon = 'Interface\\Icons\\INV_Misc_Gem_01',
 	})
-end)
+end, 'gemCounter')

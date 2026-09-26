@@ -21,8 +21,7 @@ ClassPowers.Specs = Specs
 local playerClass, specID, isDruid
 
 function ClassPowers.UpdateSpecID()
-    local specIndex = GetSpecialization()
-    local newSpec = specIndex and GetSpecializationInfo(specIndex)
+    local newSpec = PlayerUtil.GetCurrentSpecID()
     if newSpec then specID = newSpec end
     return specID
 end

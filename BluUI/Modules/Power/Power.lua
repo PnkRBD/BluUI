@@ -342,4 +342,4 @@ end
 BUI.Events:OnLogin("PowerBar", function()
     PrimaryPower.Initialize()
     Shared.DeferRefresh(function() return frame end, GetDB, function() Position() Style() end)
-end)
+end, "power")

@@ -38,8 +38,7 @@ end
 
 function BUI.IsModuleEnabled(key)
 	local db = BUI.GetDB()
-	local modules = db and db.modules
-	return not modules or modules[key] ~= false
+	return not db or db.modules[key] ~= false
 end
 
 BUI.ModuleControls = {}
@@ -52,11 +51,8 @@ function BUI.ApplyModuleRuntime(key)
 end
 
 function BUI.SetModuleEnabled(key, enabled)
-	local db = BUI.GetDB()
-	if not db then return end
-	db.modules = db.modules or {}
-	db.modules[key] = enabled and true or false
-	BUI.ApplyModuleRuntime(key)
+	BUI.GetDB().modules[key] = enabled and true or false
+	return BUI.ApplyModuleRuntime(key)
 end
 
 local BUILib     = LibStub('BUILib')
@@ -107,7 +103,7 @@ function BUI.ApplyScale()
 		BUI._applyingScale = true
 		UIParent:SetScale(newScale)
 		BUI._applyingScale = false
-		if BUI.Minimap then BUI.Minimap.ApplyPosition() end
+		BUI.Minimap.ApplyPosition()
 	end, 'ApplyScale.SetScale')
 end
 
@@ -127,7 +123,7 @@ function BUI:OnProfileChanged(event)
 end
 
 local function AdoptOldDB(legacyDatabase)
-	local copy = BUI.Tools.DeepCopy(legacyDatabase)
+	local copy = CopyTable(legacyDatabase)
 	BUI.FixLegacyValues(copy)
 	return copy
 end
@@ -162,7 +158,6 @@ function Addon:OnInitialize()
 
 	if forcedAdopt and type(AzortharionUI_DB) == 'table' then
 		BluUI_DB = AdoptOldDB(AzortharionUI_DB)
-		BluUI_DB.__adoptedLegacySettings = true
 		BluUI_DB.__adoptedLegacySettings_v2 = true
 		if forcedAdopt == 'disableAfter' then
 			C_AddOns.DisableAddOn('AzortharionUI')
@@ -194,12 +189,6 @@ function Addon:OnInitialize()
 
 	BUI.db = AceDB:New('BluUI_DB', BUI.Defaults, true)
 
-	BUI.Events:Register('ADDON_LOADED', 'Core.DBGuard', function()
-		if BluUI_DB ~= BUI.db.sv then
-			BluUI_DB = BUI.db.sv
-		end
-	end)
-
 	BUI.BUILibClient.SetFont(BUI.GetAddonFont())
 	BUI.BUILibClient.SetCardStyle('datasheet')
 
@@ -222,7 +211,7 @@ function Addon:OnInitialize()
 	BUI.Skinning.SeedSkinStates()
 
 	BUI.Print('Using profile: |cff' .. BUI.C.COLOR_PINK .. BUI.db:GetCurrentProfile() .. '|r')
-	if BUI.InitializeMinimapButton then BUI.InitializeMinimapButton() end
+	BUI.InitializeMinimapButton()
 end
 
 function Addon:OnEnable()
@@ -233,12 +222,11 @@ function Addon:OnEnable()
 	BUI.BUILibClient.modalBorderColor = { BUI.C.PANEL_BACKDROP[5], BUI.C.PANEL_BACKDROP[6], BUI.C.PANEL_BACKDROP[7], BUI.C.PANEL_BACKDROP[8] }
 	BUI.BUILibClient.bodyFont = BUI.GetGlobalFont()
 
-	if BUI.ActionBars and BUI.IsModuleEnabled('actionBars') then BUI.ActionBars.Initialize() end
-	if BUI.UnitFrames and BUI.IsModuleEnabled('unitFrames') then BUI.UnitFrames:Initialize() end
-	if BUI.GroupFrames and BUI.IsModuleEnabled('groupFrames') then BUI.GroupFrames.Initialize() end
-	if BUI.CDM and BUI.IsModuleEnabled('cdm') then BUI.CDM.Initialize() end
-	if BUI.CastBar and BUI.CastBar.RefreshAll and BUI.IsModuleEnabled('castBars') then C_Timer.After(0.1, BUI.CastBar.RefreshAll) end
-	if BUI.Power and BUI.Power.Secondary and BUI.IsModuleEnabled('power') then BUI.Power.Secondary.Initialize() end
+	if BUI.IsModuleEnabled('actionBars') then BUI.ActionBars.Initialize() end
+	if BUI.IsModuleEnabled('unitFrames') then BUI.UnitFrames:Initialize() end
+	if BUI.IsModuleEnabled('groupFrames') then BUI.GroupFrames.Initialize() end
+	if BUI.IsModuleEnabled('cdm') then BUI.CDM.Initialize() end
+	if BUI.IsModuleEnabled('castBars') then C_Timer.After(0.1, BUI.CastBar.RefreshAll) end
 
 	if BUI.db.global.layoutStyle then
 		BUI.BUILibClient.Layout.SetStyle(BUI.db.global.layoutStyle)
@@ -254,16 +242,12 @@ function Addon:OnEnable()
 	end)
 
 	local lastSpecID
-	local function CurrentSpecID()
-		local spec = GetSpecialization()
-		return spec and GetSpecializationInfo(spec)
-	end
 	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'Core.SpecPageRebuildSeed', function()
-		if lastSpecID == nil then lastSpecID = CurrentSpecID() end
+		if lastSpecID == nil then lastSpecID = PlayerUtil.GetCurrentSpecID() end
 		if lastSpecID then BUI.Events:Unregister('PLAYER_ENTERING_WORLD', 'Core.SpecPageRebuildSeed') end
 	end)
 	BUI.Events:OnTalentBurst('Core.SpecPageRebuild', function()
-		local specID = CurrentSpecID()
+		local specID = PlayerUtil.GetCurrentSpecID()
 		if not specID or specID == lastSpecID then return end
 		lastSpecID = specID
 		BUI.PageEngine.RebuildAllPages()
@@ -287,8 +271,8 @@ function Addon:OnEnable()
 			end
 			BUI.Skinning.RefreshAll()
 		end
-		if BUI.CDM then BUI.QueueStartupCheck(BUI.CDM.CheckDisabled) end
+		if BUI.IsModuleEnabled('cdm') then BUI.QueueStartupCheck(BUI.CDM.CheckDisabled) end
 		BUI.QueueStartupCheck(BUI.CheckPlatynatorPrompt)
-		if BUI.CDM then BUI.QueueStartupCheck(BUI.CDM.CheckUtilityPrompt) end
+		if BUI.IsModuleEnabled('cdm') then BUI.QueueStartupCheck(BUI.CDM.CheckUtilityPrompt) end
 	end)
 end

@@ -13,7 +13,7 @@ function Datatext.Initialize()
     Datatext.Apply()
 end
 
-BUI.Events:OnLogin('Datatext', Datatext.Initialize)
+BUI.Events:OnLogin('Datatext', Datatext.Initialize, 'datatext')
 
 BUI.Events:Register('PLAYER_REGEN_DISABLED', 'Datatext.CombatHovers', function()
     if BUI.GetDB().datatextHideHoversInCombat == false then return end

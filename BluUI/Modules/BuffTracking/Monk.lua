@@ -44,7 +44,7 @@ function Monk.Initialize()
     tracker.Initialize()
 end
 
-BUI.Events:OnLogin('BuffTrackingMonk', Monk.Initialize)
+BUI.Events:OnLogin('BuffTrackingMonk', Monk.Initialize, 'buffTracking')
 BUI.Events:Register('PLAYER_SPECIALIZATION_CHANGED', 'BuffTrackingMonk', function(_, unit)
     if unit == 'player' then DetectSpec() end
 end)

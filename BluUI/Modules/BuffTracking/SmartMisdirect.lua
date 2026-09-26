@@ -363,5 +363,5 @@ BINDING_HEADER_BLUUI = 'BluUI'
 _G['BINDING_NAME_CLICK ' .. BUTTON_NAME .. ':LeftButton'] = 'Smart Misdirection'
 
 if playerIsHunter then
-	BUI.Events:OnLogin('SmartMisdirect', SmartMisdirect.Setup)
+	BUI.Events:OnLogin('SmartMisdirect', SmartMisdirect.Setup, 'buffTracking')
 end

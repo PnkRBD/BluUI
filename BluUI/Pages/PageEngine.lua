@@ -48,8 +48,6 @@ local function CreateWindow()
 		minWidth     = 1044, minHeight = 640,
 		version      = BUI.Version, sidebarWidth = 190,
 		strata       = 'FULLSCREEN_DIALOG', frameLevel = 200, escapable = true,
-		onSettings   = function() PageEngine.NavigateToID('settings') end,
-		onHelp       = function() BUI.Settings.OpenDiagnostics() end,
 		globalName   = 'BluUIFrame', footerButtons = BUI.Scale.GetFooterButtons(),
 		clampedToScreen = false,
 		searchBox    = {

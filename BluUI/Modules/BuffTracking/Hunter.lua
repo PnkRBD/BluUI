@@ -385,7 +385,7 @@ end
 
 if Hunter.PlayerIsHunter then
 	scan = BUI.BuffTracking.NewCDMScan(TRACKED_SPELL_IDS, UpdateTalents)
-	BUI.Events:OnLogin('BuffTrackingHunter', Hunter.Initialize)
+	BUI.Events:OnLogin('BuffTrackingHunter', Hunter.Initialize, 'buffTracking')
 	BUI.Events:Register('PLAYER_SPECIALIZATION_CHANGED', 'BuffTrackingHunter', function(_, unit)
 		if unit == 'player' then DetectSpecialization(true) end
 	end)
