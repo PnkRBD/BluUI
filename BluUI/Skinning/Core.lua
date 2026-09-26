@@ -66,7 +66,7 @@ for _, id in ipairs({
 	'merchant', 'objectivetracker', 'trainer', 'petstable', 'playerchoice', 'pvpmatch', 'renown', 'keybinds',
 	'currencytransfer', 'housing', 'tradingpost', 'catalogshop', 'landingpage', 'barbershop', 'iteminteraction',
 	'clock', 'tabard', 'petition', 'help', 'talkinghead', 'guildregistrar', 'bnetToast', 'petBattle',
-	'currencyManager', 'gemcounter', 'portalManager', 'reputationManager', 'questoverlay',
+	'currencyManager', 'gemcounter', 'portalManager', 'reputationManager', 'questoverlay', 'guildinvite',
 }) do BASELINE_SKINS[id] = true end
 
 function Skin.SeedSkinStates()
