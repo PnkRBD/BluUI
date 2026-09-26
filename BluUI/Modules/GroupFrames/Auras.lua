@@ -8,6 +8,7 @@ local Engine = BUI.AuraEngine
 
 local CreateFrame       = CreateFrame
 local UnitIsVisible     = UnitIsVisible
+local UnitIsConnected   = UnitIsConnected
 local UnitIsDeadOrGhost = UnitIsDeadOrGhost
 local UnitCanAssist     = UnitCanAssist
 local CanAccess         = Util.CanAccess
@@ -168,8 +169,9 @@ function GroupFrames.RefreshFrameAuras(frame)
 	GroupFrames.UpdateDispelBorder(frame, unit)
 
 	local dead = UnitIsDeadOrGhost(unit) and true or false
-	if frame._bluWasDead ~= dead then
-		frame._bluWasDead = dead
+	local offline = not UnitIsConnected(unit)
+	if frame._bluWasDead ~= dead or frame._bluWasOffline ~= offline then
+		frame._bluWasDead, frame._bluWasOffline = dead, offline
 		GroupFrames.NudgePrivateAuras(frame)
 	end
 end
@@ -290,9 +292,9 @@ function GroupFrames.RefreshDispelBorder(frame, settings)
 end
 
 local function IsReachable(unit)
-	local visible, assist = UnitIsVisible(unit), UnitCanAssist("player", unit)
-	if not (CanAccess(visible) and CanAccess(assist)) then return false end
-	return (visible and assist) and true or false
+	local connected, visible, assist = UnitIsConnected(unit), UnitIsVisible(unit), UnitCanAssist("player", unit)
+	if not (CanAccess(connected) and CanAccess(visible) and CanAccess(assist)) then return false end
+	return (connected and visible and assist) and true or false
 end
 
 local function ReparseShown(frame)

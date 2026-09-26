@@ -2,9 +2,10 @@ local _, BUI = ...
 
 local GroupFrames = BUI.GroupFrames
 
-local CreateFrame   = CreateFrame
-local UnitExists    = UnitExists
-local ResolveGrowth = GroupFrames.Util.ResolveGrowth
+local CreateFrame     = CreateFrame
+local UnitExists      = UnitExists
+local UnitIsConnected = UnitIsConnected
+local ResolveGrowth   = GroupFrames.Util.ResolveGrowth
 local Scale         = BUI.Pixel.Scale
 
 local AddAnchor    = C_UnitAuras.AddPrivateAuraAnchor
@@ -12,6 +13,11 @@ local RemoveAnchor = C_UnitAuras.RemovePrivateAuraAnchor
 
 local function Config(frame)
 	return GroupFrames.SettingsForFrame(frame).privateAuras
+end
+
+local function Wanted(frame, settings)
+	local unit = frame.unit
+	return settings.enabled ~= false and unit and UnitExists(unit) and UnitIsConnected(unit)
 end
 
 local function ResolveLayer(frame)
@@ -88,7 +94,7 @@ local function RefreshAnchors(frame)
 	if not container then return end
 
 	local settings = Config(frame)
-	if settings.enabled == false or not frame.unit or not UnitExists(frame.unit) then
+	if not Wanted(frame, settings) then
 		ReleaseAnchors(container)
 		container:Hide()
 		return
@@ -123,7 +129,7 @@ function GroupFrames.ApplyPrivateAuras(frame)
 	local settings = Config(frame)
 	local container = frame.BluPrivateAuras
 
-	if settings.enabled == false or not frame.unit or not UnitExists(frame.unit) then
+	if not Wanted(frame, settings) then
 		if container then
 			ReleaseAnchors(container)
 			container:Hide()
