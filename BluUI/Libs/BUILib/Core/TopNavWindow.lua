@@ -2,7 +2,9 @@ local BUILib = LibStub("BUILib")
 if not BUILib.__loadChildren then return end
 local Layout = BUILib.Layout
 local Widget = BUILib.Widget
+local Theme = BUILib.Theme
 
+local EDGE_ACCENT_SCALE = 0.45
 local BAR_HEIGHT = 64
 local PAGE_WIDTH = 1040
 local BRAND_SIZE = 15
@@ -14,12 +16,50 @@ local ACTION_GAP = 8
 local AVATAR_SIZE = 30
 local SIDEBAR_INSET = 16
 local SIDEBAR_TOP = 24
+local FOOTER_HEIGHT = 56
+local FOOTER_GAP = 8
+local FOOTER_DOT = 7
+
+local function FooterButton(window, kit, parent, spec)
+	local button = CreateFrame('Button', nil, parent)
+	window:Fill(button, 'secondary'):SetAllPoints()
+	kit.Hover(button)
+	local textX = 14
+	local dot
+	if spec.indicator or spec.roundedIndicator then
+		dot = kit.Disc(button, FOOTER_DOT, 'faint')
+		dot:SetPoint('LEFT', 12, 0)
+		textX = 26
+	end
+	local label = kit.Text(button, spec.text, 12, 'secondaryText')
+	label:SetPoint('LEFT', textX, 0)
+	button:SetSize(Widget.EvenSize(textX + label:GetStringWidth() + 14), 30)
+	button:SetScript('OnClick', function()
+		if spec.callback then spec.callback() end
+	end)
+	if spec.tooltip then
+		button:HookScript('OnEnter', function(self) Widget.ShowTip(self, spec.tooltip) end)
+		button:HookScript('OnLeave', Widget.HideTip)
+	end
+	function button:SetActive(active)
+		if dot then window:Paint(dot, active and 'accent' or 'faint') end
+		window:Paint(label, active and 'text' or 'secondaryText')
+	end
+	return button
+end
 
 function Layout.TopNavWindow(config)
 	local window = Layout.WindowFrame(config)
 	local frame = window.frame
 	local pageWidth = config.pageWidth or PAGE_WIDTH
 	local sidebarWidth = config.sidebarWidth
+
+	function window:ChromeColor(role, theme, mode)
+		if role == 'edge' and theme.edgeAccent and not (theme[mode] and theme[mode].edge) then
+			local red, green, blue = Theme.GetAccent()
+			return { red * EDGE_ACCENT_SCALE, green * EDGE_ACCENT_SCALE, blue * EDGE_ACCENT_SCALE, 1 }
+		end
+	end
 
 	function window:PaintChrome()
 		self:PaintFrame({ self:Color('page') }, { self:Color('edge') })
@@ -117,7 +157,8 @@ function Layout.TopNavWindow(config)
 		sidebar:SetPoint('TOPLEFT', 1, -(BAR_HEIGHT + 1))
 		sidebar:SetPoint('BOTTOMLEFT', 1, 1)
 		sidebar:SetWidth(sidebarWidth)
-		local edge = window:Fill(sidebar, 'rule', 'ARTWORK')
+		window:Fill(sidebar, 'sidebar'):SetAllPoints()
+		local edge = window:Fill(sidebar, 'sidebarEdge', 'ARTWORK')
 		edge:SetPoint('TOPRIGHT')
 		edge:SetPoint('BOTTOMRIGHT')
 		edge:SetWidth(1)
@@ -161,14 +202,43 @@ function Layout.TopNavWindow(config)
 		return buttons
 	end
 
+	local footerConfig = config.footerButtons or {}
+	local footerHeight = #footerConfig > 0 and FOOTER_HEIGHT or 0
+	if footerHeight > 0 then
+		local footer = CreateFrame('Frame', nil, frame)
+		footer:SetPoint('BOTTOMLEFT', (sidebarWidth or 0) + 1, 1)
+		footer:SetPoint('BOTTOMRIGHT', -1, 1)
+		footer:SetHeight(FOOTER_HEIGHT)
+		local rule = window:Fill(footer, 'rule', 'ARTWORK')
+		rule:SetPoint('TOPLEFT', SIDEBAR_INSET, 0)
+		rule:SetPoint('TOPRIGHT', -SIDEBAR_INSET, 0)
+		rule:SetHeight(1)
+		if config.version then window:Text(footer, 'v' .. config.version, 12, 'faint'):SetPoint('LEFT', SIDEBAR_INSET, 0) end
+		local kit = Layout.TableKit(window)
+		window.footerButtons = {}
+		local anchor
+		for index = #footerConfig, 1, -1 do
+			local spec = footerConfig[index]
+			local button = FooterButton(window, kit, footer, spec)
+			if anchor then
+				button:SetPoint('RIGHT', anchor, 'LEFT', -FOOTER_GAP, 0)
+			else
+				button:SetPoint('RIGHT', -SIDEBAR_INSET, 0)
+			end
+			window.footerButtons[spec.key or spec.text] = button
+			anchor = button
+		end
+		window.footerLeftmost = anchor
+	end
+
 	local content = CreateFrame('Frame', nil, frame)
 	content:SetPoint('TOPLEFT', (sidebarWidth or 0) + 1, -(BAR_HEIGHT + 1))
-	content:SetPoint('BOTTOMRIGHT', -1, 1)
+	content:SetPoint('BOTTOMRIGHT', -1, footerHeight + 1)
 	window.content = content
 
-	window:SetMinimum('page', pageWidth + 48 + (sidebarWidth or 0), BAR_HEIGHT + 240)
+	window:SetMinimum('page', pageWidth + 48 + (sidebarWidth or 0), BAR_HEIGHT + footerHeight + 240)
 	function window:SetContentMinSize(width, height)
-		self:SetMinimum('content', width + 2 + (sidebarWidth or 0), height + BAR_HEIGHT + 2)
+		self:SetMinimum('content', width + 2 + (sidebarWidth or 0), height + BAR_HEIGHT + footerHeight + 2)
 	end
 
 	window:ApplyTheme(config.theme)

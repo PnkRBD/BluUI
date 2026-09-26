@@ -161,9 +161,10 @@ local function NavGroups(navConfig)
 	for _, section in ipairs(navConfig.sections or {}) do
 		local items = {}
 		for _, pageID in ipairs(section.ids) do
-			if navConfig.pages[pageID] and indexOf[pageID] then items[#items + 1] = Item(pageID) end
+			local page = navConfig.pages[pageID]
+			if page and indexOf[pageID] and not page.hidden then items[#items + 1] = Item(pageID) end
 		end
-		groups[#groups + 1] = { title = Widget.StripColorCodes(section.header), items = items }
+		if #items > 0 then groups[#groups + 1] = { title = Widget.StripColorCodes(section.header), items = items } end
 	end
 	local rest = {}
 	for _, pageID in ipairs(navConfig.pageOrder) do
