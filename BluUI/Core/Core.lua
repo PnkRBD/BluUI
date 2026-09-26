@@ -84,6 +84,10 @@ function BUI.DeviceScale()
 	return 768 / physicalHeight
 end
 
+function BUI.ScaleBounds()
+	return SCALE_FLOOR, SCALE_CEILING
+end
+
 function BUI.ClampedUIScale()
 	return ClampScale(BUI.DeviceScale())
 end
