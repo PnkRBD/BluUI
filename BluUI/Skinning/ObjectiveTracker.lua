@@ -259,11 +259,13 @@ local function SyncTrackerCardShown()
 	local trackerFrame = _G.ObjectiveTrackerFrame
 	local nineSlice = trackerFrame and trackerFrame.NineSlice
 	local shown = IsEnabled() and not Skin.trackerStashScale and not Skin.trackerFadedOut
-	if nineSlice then
-		trackerCard:SetShown(shown and nineSlice:IsShown())
-	else
-		trackerCard:SetShown(shown)
-	end
+	if trackerFrame then shown = shown and trackerFrame:IsVisible() end
+	if nineSlice then shown = shown and nineSlice:IsShown() end
+	trackerCard:SetShown(shown and true or false)
+end
+
+local function SyncTrackerCardSoon()
+	C_Timer.After(0, SyncTrackerCardShown)
 end
 
 local function EnsureTrackerCard()
@@ -289,6 +291,7 @@ local function EnsureTrackerCard()
 		end
 		trackerFrame:HookScript('OnHide', SyncTrackerCardShown)
 		trackerFrame:HookScript('OnShow', SyncTrackerCardShown)
+		if trackerFrame.SetRolesets then hooksecurefunc(trackerFrame, 'SetRolesets', SyncTrackerCardSoon) end
 		hooksecurefunc(trackerFrame, 'SetAlpha', function(_, alpha)
 			local fadedOut = not issecretvalue(alpha) and alpha == 0 and not Skin.trackerStashScale
 			if fadedOut == (Skin.trackerFadedOut or false) then return end
@@ -1290,7 +1293,9 @@ local function SkinStageBlock()
 
 	skinnedBars[stageBlock] = Skin3.ChildBackdrop(stageBlock, { bg = Theme.bg.light, border = Theme.border.light })
 	stageBlock:HookScript('OnShow', Scenario.SyncStageBackdrop)
+	stageBlock:HookScript('OnHide', Scenario.SyncStageBackdrop)
 	hooksecurefunc(stageBlock, 'UpdateWidgetRegistration', Scenario.SyncStageBackdrop)
+	hooksecurefunc(stageBlock, 'SetupStageTransition', Scenario.SyncStageBackdrop)
 	Scenario.SyncStageBackdrop(stageBlock)
 
 	ApplySkinFont(stageBlock.Stage, 'header')
@@ -1540,6 +1545,32 @@ Scenario.InstallHeaderHooks = function()
 	end
 end
 
+Scenario.stageTextKeys = { 'Stage', 'Name', 'CompleteLabel' }
+Scenario.stageBackdropPad = 8
+
+Scenario.FitStageBackdrop = function(stageBlock, backdrop)
+	local top = stageBlock:GetTop()
+	if not top then return false end
+	local lowest
+	for _, key in ipairs(Scenario.stageTextKeys) do
+		local text = stageBlock[key]
+		if text and text:IsShown() and (text:GetText() or '') ~= '' then
+			local bottom = text:GetBottom()
+			if bottom and (not lowest or bottom < lowest) then lowest = bottom end
+		end
+	end
+	local height = stageBlock:GetHeight()
+	if lowest then height = math.min(height, top - lowest + Scenario.stageBackdropPad) end
+	if backdrop._buiStageHeight == height then return true end
+	backdrop._buiStageHeight = height
+	local inset = Scenario.headerBackdropInset
+	backdrop:ClearAllPoints()
+	backdrop:SetPoint('TOPLEFT', stageBlock, 'TOPLEFT', inset, -inset)
+	backdrop:SetPoint('TOPRIGHT', stageBlock, 'TOPRIGHT', -inset, -inset)
+	backdrop:SetHeight(math.max(1, height - inset * 2))
+	return true
+end
+
 Scenario.SyncStageBackdrop = function(stageBlock)
 	local backdrop = skinnedBars[stageBlock]
 	if not backdrop then return end
@@ -1548,7 +1579,13 @@ Scenario.SyncStageBackdrop = function(stageBlock)
 		backdrop:SetParent(blockParent)
 		backdrop:SetFrameLevel(math.max(0, stageBlock:GetFrameLevel() - 1))
 	end
-	backdrop:SetShown(IsEnabled() and stageBlock:IsShown() and not stageBlock.widgetSetID)
+	local shown = IsEnabled() and stageBlock:IsShown() and not stageBlock.widgetSetID
+	backdrop:SetShown(shown)
+	if shown and not Scenario.FitStageBackdrop(stageBlock, backdrop) then
+		C_Timer.After(0, function()
+			if backdrop:IsShown() then Scenario.FitStageBackdrop(stageBlock, backdrop) end
+		end)
+	end
 end
 
 function Scenario.Install()
