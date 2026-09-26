@@ -242,6 +242,7 @@ Skinning\GreatVault.lua
 Skinning\QuestDialogs.lua
 Skinning\SystemPanels.lua
 Skinning\Guild.lua
+Skinning\GuildInvite.lua
 Skinning\ItemSocketing.lua
 Skinning\Transmog.lua
 Skinning\ItemUpgrade.lua
