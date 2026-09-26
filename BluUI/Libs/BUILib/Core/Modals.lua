@@ -499,7 +499,10 @@ local NUMBER = {
 	knobSize = 14,
 	fieldWidth = 200,
 	fieldHeight = 30,
-	chipGap = 8,
+	markTick = 6,
+	markGap = 10,
+	markMerge = 0.0005,
+	markEpsilon = 0.0000005,
 	sectionGap = 22,
 	buttonArea = 68,
 }
@@ -524,7 +527,7 @@ function Modals.Number(options)
 	local innerWidth = dialog:GetWidth() - padding * 2
 	local accentRed, accentGreen, accentBlue = theme.GetAccent()
 	local fireOnce = OnceGuard()
-	local value
+	local value, Set, field
 
 	local function Clamp(number)
 		if number < minimum then return minimum end
@@ -620,20 +623,83 @@ function Modals.Number(options)
 	knob:SetTexture(BUILib.GetLibMedia('smoothdisc'))
 	knob:SetSize(NUMBER.knobSize, NUMBER.knobSize)
 	knob:SetVertexColor(unpack(theme.text.primary))
-	y = y + NUMBER.trackHit + 4
-	local lowLabel = dialog:CreateFontString(nil, 'OVERLAY')
-	lowLabel:SetFont(Modals.BodyFont(), 10, '')
-	lowLabel:SetShadowColor(0, 0, 0, 0)
-	lowLabel:SetPoint('TOPLEFT', padding, -y)
-	lowLabel:SetText(Format(minimum))
-	lowLabel:SetTextColor(unpack(theme.text.muted))
-	local highLabel = dialog:CreateFontString(nil, 'OVERLAY')
-	highLabel:SetFont(Modals.BodyFont(), 10, '')
-	highLabel:SetShadowColor(0, 0, 0, 0)
-	highLabel:SetPoint('TOPRIGHT', -padding, -y)
-	highLabel:SetText(Format(maximum))
-	highLabel:SetTextColor(unpack(theme.text.muted))
-	y = y + 12 + NUMBER.sectionGap
+	y = y + NUMBER.trackHit
+	local marks = {}
+	local function PaintMarks(current)
+		for _, mark in ipairs(marks) do
+			local active = math.abs(current - mark.value) < NUMBER.markEpsilon
+			mark.tick:SetVertexColor(active and accentRed or theme.control.trackOff[1], active and accentGreen or theme.control.trackOff[2], active and accentBlue or theme.control.trackOff[3], 1)
+			if active then
+				mark.text:SetTextColor(accentRed, accentGreen, accentBlue, 1)
+			else
+				mark.text:SetTextColor(unpack(theme.text.muted))
+			end
+		end
+	end
+	if options.presets and #options.presets > 0 then
+		for _, preset in ipairs(options.presets) do
+			local presetValue = Clamp(preset.value)
+			local merged
+			for _, mark in ipairs(marks) do
+				if math.abs(mark.value - presetValue) < NUMBER.markMerge then merged = mark end
+			end
+			if merged then
+				merged.label = merged.label .. ' / ' .. preset.label
+			else
+				marks[#marks + 1] = { value = presetValue, label = preset.label, fraction = maximum > minimum and (presetValue - minimum) / (maximum - minimum) or 0 }
+			end
+		end
+		table.sort(marks, function(first, second) return first.fraction < second.fraction end)
+		for _, mark in ipairs(marks) do
+			local tick = dialog:CreateTexture(nil, 'ARTWORK')
+			tick:SetTexture(Widget.WHITE)
+			tick:SetSize(1, NUMBER.markTick)
+			tick:SetPoint('TOP', track, 'TOPLEFT', mark.fraction * innerWidth, -(NUMBER.trackHit / 2 + NUMBER.trackHeight / 2 + 2))
+			local button = CreateFrame('Button', nil, dialog)
+			local text = button:CreateFontString(nil, 'OVERLAY')
+			text:SetFont(Modals.BodyFont(), 10, '')
+			text:SetShadowColor(0, 0, 0, 0)
+			text:SetText(mark.label)
+			text:SetPoint('CENTER')
+			button:SetSize(math.ceil(text:GetStringWidth()) + 8, 16)
+			button:SetScript('OnClick', function()
+				Set(mark.value)
+				field:ClearFocus()
+			end)
+			button:SetScript('OnEnter', function() text:SetTextColor(unpack(theme.text.primary)) end)
+			button:SetScript('OnLeave', function() PaintMarks(value) end)
+			mark.tick, mark.button, mark.text = tick, button, text
+			mark.width = button:GetWidth()
+			mark.left = math.max(0, math.min(innerWidth - mark.width, mark.fraction * innerWidth - mark.width / 2))
+		end
+		for index = 2, #marks do
+			local previous = marks[index - 1]
+			marks[index].left = math.max(marks[index].left, previous.left + previous.width + NUMBER.markGap)
+		end
+		for index = #marks, 1, -1 do
+			local limit = index == #marks and innerWidth or (marks[index + 1].left - NUMBER.markGap)
+			marks[index].left = math.min(marks[index].left, limit - marks[index].width)
+		end
+		for _, mark in ipairs(marks) do
+			mark.button:SetPoint('TOPLEFT', padding + mark.left, -(y + NUMBER.markTick + 2))
+		end
+		y = y + NUMBER.markTick + 2 + 16
+	else
+		local lowLabel = dialog:CreateFontString(nil, 'OVERLAY')
+		lowLabel:SetFont(Modals.BodyFont(), 10, '')
+		lowLabel:SetShadowColor(0, 0, 0, 0)
+		lowLabel:SetPoint('TOPLEFT', padding, -(y + 4))
+		lowLabel:SetText(Format(minimum))
+		lowLabel:SetTextColor(unpack(theme.text.muted))
+		local highLabel = dialog:CreateFontString(nil, 'OVERLAY')
+		highLabel:SetFont(Modals.BodyFont(), 10, '')
+		highLabel:SetShadowColor(0, 0, 0, 0)
+		highLabel:SetPoint('TOPRIGHT', -padding, -(y + 4))
+		highLabel:SetText(Format(maximum))
+		highLabel:SetTextColor(unpack(theme.text.muted))
+		y = y + 16
+	end
+	y = y + NUMBER.sectionGap
 
 	local fieldLabel = dialog:CreateFontString(nil, 'OVERLAY')
 	fieldLabel:SetFont(Modals.BodyFont(), NUMBER.messageSize, '')
@@ -641,7 +707,7 @@ function Modals.Number(options)
 	fieldLabel:SetPoint('TOPLEFT', padding, -(y + 8))
 	fieldLabel:SetText(options.fieldLabel or 'Exact value')
 	fieldLabel:SetTextColor(unpack(theme.text.primary))
-	local field = CreateFrame('EditBox', nil, dialog)
+	field = CreateFrame('EditBox', nil, dialog)
 	field:SetSize(NUMBER.fieldWidth, NUMBER.fieldHeight)
 	field:SetPoint('TOPRIGHT', -padding, -y)
 	field:SetAutoFocus(false)
@@ -663,7 +729,7 @@ function Modals.Number(options)
 		BUILib.Skin.SetShellEdges(field, edge)
 	end
 
-	local function Set(newValue, source)
+	function Set(newValue, source)
 		value = Clamp(newValue)
 		local fraction = maximum > minimum and (value - minimum) / (maximum - minimum) or 0
 		readout:SetText(Format(value))
@@ -673,6 +739,7 @@ function Modals.Number(options)
 		knob:SetPoint('CENTER', track, 'LEFT', fraction * innerWidth, 0)
 		if source ~= 'field' then field:SetText(Format(value)) end
 		PaintField(false)
+		PaintMarks(value)
 	end
 
 	local function ValueAtCursor()
@@ -716,29 +783,6 @@ function Modals.Number(options)
 	end)
 	field:SetScript('OnEnterPressed', Confirm)
 	field:SetScript('OnEscapePressed', Cancel)
-
-	if options.presets and #options.presets > 0 then
-		y = y + NUMBER.sectionGap
-		local caption = dialog:CreateFontString(nil, 'OVERLAY')
-		caption:SetFont(Modals.BodyFont(), 9, '')
-		caption:SetShadowColor(0, 0, 0, 0)
-		caption:SetPoint('TOPLEFT', padding, -y)
-		caption:SetText((options.presetLabel or 'Quick picks'):upper())
-		caption:SetTextColor(unpack(theme.text.muted))
-		y = y + 18
-		local x = padding
-		for _, preset in ipairs(options.presets) do
-			local chip = Modals.CreateButton(dialog, preset.label, Modals.BTN_PRIMARY, 60)
-			chip:SetWidth(Widget.EvenSize(chip.text:GetStringWidth() + SIZES.buttonTextPadding * 2))
-			chip:SetPoint('TOPLEFT', x, -y)
-			chip:SetScript('OnClick', function()
-				Set(preset.value)
-				field:ClearFocus()
-			end)
-			x = x + chip:GetWidth() + NUMBER.chipGap
-		end
-		y = y + SIZES.buttonHeight
-	end
 
 	dialog:SetHeight(Widget.EvenSize(y + NUMBER.buttonArea))
 	Modals.LayoutButtons(dialog, {
