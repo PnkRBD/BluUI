@@ -231,14 +231,14 @@ BUI.PageEngine.RegisterPage('datatext', {
                     alignMinimapCheckbox = Controls.StampCheckbox(panel, nil, GetConfig().alignMinimap, function(value)
                         GetConfig().alignMinimap = value
                         Datatext.Apply()
-                    end)
+                    end, nil, true, nil, 'mini')
                     PopRow(panel, 138, 'Align Below Minimap', alignMinimapCheckbox)
 
                     local y = 178
                     if isPanel then
                         PopRow(panel, y, 'Mirror Chat Window', Controls.StampCheckbox(panel, nil, GetConfig().mirrorChat, function(value)
                             GetConfig().mirrorChat = value; Datatext.Apply()
-                        end, nil, nil, 'Keep this panel sized and positioned as a mirror image of the chat window'))
+                        end, nil, nil, 'Keep this panel sized and positioned as a mirror image of the chat window', 'mini'))
                         y = y + 40
                     end
 
@@ -267,7 +267,7 @@ BUI.PageEngine.RegisterPage('datatext', {
 
                     local borderCheckbox = Controls.StampCheckbox(panel, nil, GetConfig().border, function(value)
                         GetConfig().border = value; Datatext.Apply()
-                    end)
+                    end, nil, true, nil, 'mini')
                     PopRow(panel, 58, 'Border', borderCheckbox)
                     local borderColor = GetConfig().borderColor or { r = 0.2, g = 0.2, b = 0.24, a = 1 }
                     PageKit.AttachLeft(Controls.ColorSwatch(panel, { r = borderColor.r, g = borderColor.g, b = borderColor.b, a = borderColor.a, callback = function(red, green, blue, alpha)

@@ -140,6 +140,6 @@ function CombatMessage.Initialize()
     if GetDB().enabled then CombatMessage.Enable() end
 end
 
-BUI.Events:OnLogin("CombatMessage", CombatMessage.Initialize)
+BUI.Events:OnLogin("CombatMessage", CombatMessage.Initialize, "auras")
 
 BUI.Anchor.Follow("CombatMessage", function() return GetDB().enabled and messageFrame end, GetDB)

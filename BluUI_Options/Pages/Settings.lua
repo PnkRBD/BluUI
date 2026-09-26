@@ -4,16 +4,13 @@ local BUILib = BluUI.BUILibClient
 local Controls, Layout, Modals, Widget = BUILib.Controls, BUILib.Layout, BUILib.Modals, BUILib.Widget
 local Pixel = BUI.Pixel
 
-function BUI.Settings.OpenDiagnostics()
-	BUI.PageEngine.NavigateToID('settings')
-	BUI.PageEngine.pages.settings.frame._page:SetTab(6)
-	BUI.Settings.RunDiagnosticsReport()
+local function PrintTalents(message)
+	print('|cff' .. BUI.C.COLOR_BRAND .. 'BUI/Talents:|r ' .. message)
 end
 
 BUI.PageEngine.RegisterPage("settings", {
 	title = "Settings",
 	OnBuild = function(pageFrame)
-		local Settings = BUI.Settings
 		local db = BUI.GetDB()
 		local globalDB = BUI.db.global
 		local PageKit = BUILib.PageKit
@@ -323,9 +320,9 @@ BUI.PageEngine.RegisterPage("settings", {
 						if C_CVar.SetCVar(cvar, value) then changed = changed + 1 else failed = failed + 1 end
 					end
 				end
-				local report = ('|cff6D00FDBluUI:|r Changed %d graphics settings. Originals backed up.'):format(changed)
+				local report = ('Changed %d graphics settings. Originals backed up.'):format(changed)
 				if failed > 0 then report = report .. (' %d could not be set.'):format(failed) end
-				print(report)
+				BUI.Print(report)
 			end
 
 			local function ShowFPSPreview(pending, total, known)
@@ -362,14 +359,14 @@ BUI.PageEngine.RegisterPage("settings", {
 					local applyButton = Controls.Button(row, 'Apply FPS Settings', 150, function()
 						local pending, total, known = PendingCVars()
 						if total == 0 then
-							print('|cff6D00FDBluUI:|r Every FPS setting is already at its preset value.')
+							BUI.Print('Every FPS setting is already at its preset value.')
 							return
 						end
 						ShowFPSPreview(pending, total, known)
 					end)
 					local restoreButton = Controls.Button(row, 'Restore Original', 150, function()
 						if not globalDB.cvarBackup or not next(globalDB.cvarBackup) then
-							print('|cff6D00FDBluUI:|r No backup found, apply FPS settings first.')
+							BUI.Print('No backup found, apply FPS settings first.')
 							return
 						end
 						local restored = 0
@@ -378,7 +375,7 @@ BUI.PageEngine.RegisterPage("settings", {
 							if current and not SameCVarValue(current, tostring(value)) and C_CVar.SetCVar(cvar, tostring(value)) then restored = restored + 1 end
 						end
 						globalDB.cvarBackup = nil
-						print('|cff6D00FDBluUI:|r Restored ' .. restored .. ' settings to their original values.')
+						BUI.Print('Restored ' .. restored .. ' settings to their original values.')
 					end)
 					return { restoreButton, applyButton }
 				end,
@@ -418,14 +415,13 @@ BUI.PageEngine.RegisterPage("settings", {
 				accessories = function(row)
 					local createButton = Controls.Button(row, 'Create 10 Test Loadouts', 200, function()
 						if InCombatLockdown() then
-							print('|cff6D00FDBluUI:|r Cannot create loadouts in combat.')
+							BUI.Print('Cannot create loadouts in combat.')
 							return
 						end
 						if not C_AddOns.IsAddOnLoaded('Blizzard_PlayerSpells') then
 							C_AddOns.LoadAddOn('Blizzard_PlayerSpells')
 						end
 						C_Timer.After(0.2, function()
-							local Print = function(message) print('|cff6D00FDBUI/Talents:|r '..message) end
 							local timeStamp = tostring(time())
 							local loadoutIndex = 0
 							local pending = false
@@ -445,7 +441,7 @@ BUI.PageEngine.RegisterPage("settings", {
 								if loadoutIndex > 10 then
 									watcher:UnregisterAllEvents()
 									watcher:SetScript('OnEvent', nil)
-									Print('Create batch done.')
+									PrintTalents('Create batch done.')
 									if PlayerSpellsFrame and PlayerSpellsFrame:IsShown() and not InCombatLockdown() then
 										HideUIPanel(PlayerSpellsFrame)
 										ShowUIPanel(PlayerSpellsFrame)
@@ -454,7 +450,7 @@ BUI.PageEngine.RegisterPage("settings", {
 								end
 								local name = ('test_%s_%d'):format(timeStamp, loadoutIndex)
 								local success = C_ClassTalents.RequestNewConfig(name)
-								Print(('RequestNewConfig("%s") -> %s'):format(name, tostring(success)))
+								PrintTalents(('RequestNewConfig("%s") -> %s'):format(name, tostring(success)))
 								if success then
 									pending = true
 								else
@@ -467,7 +463,7 @@ BUI.PageEngine.RegisterPage("settings", {
 					end)
 					local deleteButton = Controls.Button(row, 'Delete Talent Loadouts', 200, function()
 						if InCombatLockdown() then
-							print('|cff6D00FDBluUI:|r Cannot delete loadouts in combat.')
+							BUI.Print('Cannot delete loadouts in combat.')
 							return
 						end
 						Modals.Confirm({
@@ -476,27 +472,24 @@ BUI.PageEngine.RegisterPage("settings", {
 							message = 'Delete every talent loadout for this spec? Other specs must be cleaned from those specs.',
 							confirmText = 'Delete', cancelText = 'Cancel',
 							onConfirm = function()
-								local Print = function(message) print('|cff6D00FDBUI/Talents:|r '..message) end
-
 								if not C_AddOns.IsAddOnLoaded('Blizzard_PlayerSpells') then
-									Print('Loading Blizzard_PlayerSpells...')
+									PrintTalents('Loading Blizzard_PlayerSpells...')
 									C_AddOns.LoadAddOn('Blizzard_PlayerSpells')
 								end
 
 								C_Timer.After(0.2, function()
-									local specIndex = GetSpecialization()
-									local specID = specIndex and GetSpecializationInfo(specIndex)
+									local specID = PlayerUtil.GetCurrentSpecID()
 									if not specID then
-										Print('ERROR: no current spec.')
+										PrintTalents('ERROR: no current spec.')
 										return
 									end
 
 									local activeID = C_ClassTalents.GetActiveConfigID()
 									local before = C_ClassTalents.GetConfigIDsBySpecID(specID) or {}
-									Print(('Spec %d, %d loadout(s), active=%s'):format(specID, #before, tostring(activeID)))
+									PrintTalents(('Spec %d, %d loadout(s), active=%s'):format(specID, #before, tostring(activeID)))
 
 									if #before == 0 then
-										Print('No loadouts on current spec.')
+										PrintTalents('No loadouts on current spec.')
 										return
 									end
 
@@ -506,7 +499,7 @@ BUI.PageEngine.RegisterPage("settings", {
 									end
 									for configIndex, configID in ipairs(before) do
 										local tag = (configID == activeID) and ' [ACTIVE]' or ''
-										Print(('  [%d] id=%s name="%s"%s'):format(configIndex, tostring(configID), NameOfConfig(configID), tag))
+										PrintTalents(('  [%d] id=%s name="%s"%s'):format(configIndex, tostring(configID), NameOfConfig(configID), tag))
 									end
 
 									local deleteIndex = 1
@@ -522,14 +515,14 @@ BUI.PageEngine.RegisterPage("settings", {
 										C_Timer.After(0.3, function()
 											local after = C_ClassTalents.GetConfigIDsBySpecID(specID) or {}
 											local actuallyDeleted = #before - #after
-											Print(('Final: %d of %d deleted, %d remain.'):format(actuallyDeleted, #before, #after))
+											PrintTalents(('Final: %d of %d deleted, %d remain.'):format(actuallyDeleted, #before, #after))
 											for configIndex, configID in ipairs(after) do
-												Print(('  REMAIN [%d] id=%s name="%s"'):format(configIndex, tostring(configID), NameOfConfig(configID)))
+												PrintTalents(('  REMAIN [%d] id=%s name="%s"'):format(configIndex, tostring(configID), NameOfConfig(configID)))
 											end
 											if PlayerSpellsFrame and PlayerSpellsFrame:IsShown() and not InCombatLockdown() then
 												HideUIPanel(PlayerSpellsFrame)
 												ShowUIPanel(PlayerSpellsFrame)
-												Print('Dropdown refreshed.')
+												PrintTalents('Dropdown refreshed.')
 											end
 										end)
 									end
@@ -543,7 +536,7 @@ BUI.PageEngine.RegisterPage("settings", {
 										end
 										pending = configID
 										local success = C_ClassTalents.DeleteConfig(configID)
-										Print(('DeleteConfig(%s "%s") -> %s'):format(tostring(configID), NameOfConfig(configID), tostring(success)))
+										PrintTalents(('DeleteConfig(%s "%s") -> %s'):format(tostring(configID), NameOfConfig(configID), tostring(success)))
 										if not success then
 											pending = nil
 											C_Timer.After(0.3, deleteNext)
@@ -584,7 +577,7 @@ BUI.PageEngine.RegisterPage("settings", {
 								for macroIndex = generalMacroCount, 1, -1 do
 									DeleteMacro(macroIndex)
 								end
-								print(('|cff6D00FDBluUI:|r Deleted %d general macro(s).'):format(generalMacroCount))
+								BUI.Print(('Deleted %d general macro(s).'):format(generalMacroCount))
 							end,
 						})
 					end)
@@ -599,7 +592,7 @@ BUI.PageEngine.RegisterPage("settings", {
 								for macroIndex = MAX_ACCOUNT_MACROS + characterMacroCount, MAX_ACCOUNT_MACROS + 1, -1 do
 									DeleteMacro(macroIndex)
 								end
-								print(('|cff6D00FDBluUI:|r Deleted %d character macro(s).'):format(characterMacroCount))
+								BUI.Print(('Deleted %d character macro(s).'):format(characterMacroCount))
 							end,
 						})
 					end)
@@ -616,7 +609,7 @@ BUI.PageEngine.RegisterPage("settings", {
 				accessories = function(row)
 					return { Controls.Button(row, 'Abandon All Quests', 200, function()
 						if InCombatLockdown() then
-							print('|cff6D00FDBluUI:|r Cannot abandon quests in combat.')
+							BUI.Print('Cannot abandon quests in combat.')
 							return
 						end
 						Modals.Confirm({
@@ -636,7 +629,7 @@ BUI.PageEngine.RegisterPage("settings", {
 								end
 
 								if #queue == 0 then
-									print('|cff6D00FDBluUI:|r Quest log already clear.')
+									BUI.Print('Quest log already clear.')
 									return
 								end
 
@@ -660,9 +653,9 @@ BUI.PageEngine.RegisterPage("settings", {
 											watcher:UnregisterAllEvents()
 											watcher:SetScript('OnEvent', nil)
 											if confirmed == 0 then
-												print('|cff6D00FDBluUI:|r Quest log already clear.')
+												BUI.Print('Quest log already clear.')
 											else
-												print(('|cff6D00FDBluUI:|r Abandoned %d quest(s).'):format(confirmed))
+												BUI.Print(('Abandoned %d quest(s).'):format(confirmed))
 											end
 										end)
 										return
@@ -759,9 +752,7 @@ BUI.PageEngine.RegisterPage("settings", {
 				for _, entry in ipairs(MODULE_ORDER) do
 					local key = entry.key
 					local newValue = selected[key] == true
-					local changed = db.modules[key] ~= newValue
-					db.modules[key] = newValue
-					if changed and not BUI.ApplyModuleRuntime(key) then
+					if db.modules[key] ~= newValue and not BUI.SetModuleEnabled(key, newValue) then
 						needReload = true
 					end
 				end
@@ -871,7 +862,6 @@ BUI.PageEngine.RegisterPage("settings", {
 				helpBox.editbox:HighlightText()
 				helpBox.editbox:SetFocus()
 			end
-			Settings.RunDiagnosticsReport = RunDiagnosticsReport
 
 			grid:Add({
 				spanFull = true,

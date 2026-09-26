@@ -20,8 +20,7 @@ local function HasPetSpec()
         cachedIsPetSpec = false
         return false
     end
-    local specIndex = GetSpecialization()
-    local specID = specIndex and GetSpecializationInfo(specIndex)
+    local specID = PlayerUtil.GetCurrentSpecID()
     cachedIsPetSpec = not (specID and NoPetSpecs[specID])
     return cachedIsPetSpec
 end
@@ -705,7 +704,7 @@ function Auras.UpdateMark()
     RefreshMarkShown()
 end
 
-BUI.Events:OnLogin("Auras", Auras.Initialize)
+BUI.Events:OnLogin("Auras", Auras.Initialize, "auras")
 
 BUI.Anchor.Follow("Auras.Pet", function() return GetDB().petWarningsEnabled and warningFrame end, GetDB)
 BUI.Anchor.Follow("Auras.PetHealth", function() return GetDB().petWarningsEnabled and healthFrame end, GetDB)

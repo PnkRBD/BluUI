@@ -347,7 +347,7 @@ function MouseCursor.Initialize()
     MouseCursor.Refresh()
 end
 
-Events:OnLogin('Cursor', MouseCursor.Initialize)
+Events:OnLogin('Cursor', MouseCursor.Initialize, 'cursor')
 
 BUI.RegisterModuleControl('cursor', function(enabled)
     if enabled then

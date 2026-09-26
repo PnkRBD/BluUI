@@ -29,8 +29,7 @@ Crosshair.MELEE_SPEC_IDS = {
 }
 
 function Crosshair.IsMeleeSpec()
-    local specIndex = GetSpecialization()
-    local specID = specIndex and GetSpecializationInfo(specIndex)
+    local specID = PlayerUtil.GetCurrentSpecID()
     return specID ~= nil and Crosshair.MELEE_SPEC_IDS[specID] == true
 end
 
@@ -108,9 +107,9 @@ local function IsSpecAllowed()
     local db = GetDB()
     if not db.specs then return true end
     if not next(db.specs) then return false end
-    local specIndex = GetSpecialization()
-    if not specIndex then return true end
-    return db.specs[GetSpecializationInfo(specIndex)] == true
+    local specID = PlayerUtil.GetCurrentSpecID()
+    if not specID then return true end
+    return db.specs[specID] == true
 end
 
 local function UpdateVisibility()
@@ -249,5 +248,5 @@ end
 
 function Crosshair.IsPreviewing() return previewing end
 
-BUI.Events:OnLogin("Crosshair", Crosshair.Refresh)
+BUI.Events:OnLogin("Crosshair", Crosshair.Refresh, "auras")
 Pixel.OnScaleChange("Crosshair", Crosshair.Refresh)

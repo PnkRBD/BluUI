@@ -140,4 +140,4 @@ BUI.Events:OnLogin(EVENT_KEY, function()
         trackerRefresh()
     end
     tracker.Initialize()
-end)
+end, 'auras')

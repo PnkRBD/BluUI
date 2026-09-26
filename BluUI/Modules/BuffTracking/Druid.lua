@@ -146,4 +146,4 @@ function Druid.Initialize()
     BUI.Events:Register('PLAYER_SPECIALIZATION_CHANGED', 'BuffTrackingDruid', OnSpecChanged)
 end
 
-BUI.Events:OnLogin('BuffTrackingDruid', Druid.Initialize)
+BUI.Events:OnLogin('BuffTrackingDruid', Druid.Initialize, 'buffTracking')

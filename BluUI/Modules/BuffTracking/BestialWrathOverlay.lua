@@ -466,7 +466,7 @@ local function Initialize()
     BestialWrathOverlay.Refresh()
 end
 
-BUI.Events:OnLogin('BuffTrackingBWO', Initialize)
+BUI.Events:OnLogin('BuffTrackingBWO', Initialize, 'buffTracking')
 
 BUI.Anchor.Follow('BuffTrackingBWO', function()
     local config = GetConfig()

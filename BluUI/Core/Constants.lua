@@ -7,12 +7,12 @@ BUI.C.FONT_PATH     = [[Interface\AddOns\BluUI\Media\Fonts\gotham_narrow_ultra.t
 BUI.C.BLIZZARD_FONT = [[Fonts\FRIZQT__.TTF]]
 BUI.C.ICON_PATH = [[Interface\AddOns\BluUI\Media\Icon\logo_small]]
 BUI.C.FALLBACK_TEXTURE    = [[Interface\Buttons\WHITE8X8]]
-BUI.C.BAR_TEXTURE         = [[Interface\AddOns\BluUI\Media\Textures\melli.tga]]
 BUI.C.CURSOR_RING_TEXTURE = [[Interface\AddOns\BluUI\Media\Textures\cursor_ring.tga]]
 BUI.C.RAID_ICON_TEXTURE   = [[Interface\TargetingFrame\UI-RaidTargetingIcons]]
 BUI.C.PANEL_BACKDROP = { 0.045, 0.045, 0.055, 0.97, 0.09, 0.09, 0.11, 1 }
 BUI.C.COLOR_PINK         = 'FD008B'
-BUI.C.CHAT_PREFIX        = '|cff6D00FDBluUI:|r '
+BUI.C.COLOR_BRAND        = '6D00FD'
+BUI.C.CHAT_PREFIX        = '|cff' .. BUI.C.COLOR_BRAND .. 'BluUI:|r '
 BUI.C.DEFAULT_ACCENT = { 0.667, 0.831, 0.451, 1 }
 BUI.C.DEFAULT_FONT       = 'Gotham Narrow Ultra'
 BUI.C.DEFAULT_TEXTURE    = 'Solid'
@@ -91,19 +91,6 @@ BUI.C.STRATA_OPTIONS = {
 BUI.C.ROW_GROWTH_OPTIONS = {
 	{ value = 'Up',   text = 'Up'   },
 	{ value = 'Down', text = 'Down' },
-}
-
-BUI.C.MODULE_MAP = {
-	Minimap = "minimap",
-	Auras = "auras", Crosshair = "auras", CombatTimer = "auras", CombatMessage = "auras", GatewayAlert = "auras",
-	BuffTrackingHunter = "buffTracking", BuffTrackingDisplay = "buffTracking", BuffTrackingMonk = "buffTracking", BuffTrackingDruid = "buffTracking", BuffTrackingKCO = "buffTracking", SmartMisdirect = "buffTracking",
-	Datatext = "datatext",
-	CustomBars = "customBars",
-	Cursor = "cursor",
-	Markers = "markers",
-	GCDHistory = "streamerTools",
-	GemCounter = "gemCounter",
-	SecondaryPower = "power", PowerBar = "power",
 }
 
 local sharedMedia = LibStub('LibSharedMedia-3.0')

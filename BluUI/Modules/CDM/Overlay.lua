@@ -25,13 +25,13 @@ function CDM.SetupBlizzardOverlay()
 
     local text = overlay:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     text:SetPoint("CENTER", overlay, "CENTER", 0, Pixel.Scale(10))
-    text:SetText("|cff6D00FDBluUI|r is controlling icon order.")
+    text:SetText("|cff" .. BUI.C.COLOR_BRAND .. "BluUI|r is controlling icon order.")
     text:SetTextColor(1, 1, 1)
     text:SetShadowOffset(0, 0)
 
     local subtext = overlay:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     subtext:SetPoint("TOP", text, "BOTTOM", 0, Pixel.Scale(-6))
-    subtext:SetText("Disable in |cff6D00FD/bluui|r > CDM > Blizzard Panel Overlay.")
+    subtext:SetText("Disable in |cff" .. BUI.C.COLOR_BRAND .. "/bluui|r > CDM > Blizzard Panel Overlay.")
     subtext:SetTextColor(0.7, 0.7, 0.7)
     subtext:SetShadowOffset(0, 0)
 

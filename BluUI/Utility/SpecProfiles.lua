@@ -27,11 +27,6 @@ local function Store()
     return store
 end
 
-local function CurrentSpecID()
-    local index = GetSpecialization()
-    return index and GetSpecializationInfo(index) or nil
-end
-
 local function ProfileExists(name)
     for _, existing in pairs(BUI.db:GetProfiles()) do
         if existing == name then return true end
@@ -43,7 +38,7 @@ local function ApplyForCurrentSpec(announce)
     if switching then return end
     local store = Store()
     if not store or not store.enabled then return end
-    local specID = CurrentSpecID()
+    local specID = PlayerUtil.GetCurrentSpecID()
     local target = specID and store.map[specID]
     if not target then return end
     if not ProfileExists(target) then
@@ -70,7 +65,7 @@ function SpecProfiles.SetEnabled(value)
     if not store then return end
     store.enabled = value and true or false
     if store.enabled then
-        local specID = CurrentSpecID()
+        local specID = PlayerUtil.GetCurrentSpecID()
         if specID and not store.map[specID] then
             store.map[specID] = BUI.db:GetCurrentProfile()
         end
@@ -134,7 +129,7 @@ function SpecProfiles.ApplyOnLogin()
         MigrateOldData(Store())
     end
 
-    if not CurrentSpecID() then
+    if not PlayerUtil.GetCurrentSpecID() then
         BUI.Events:Once('PLAYER_ENTERING_WORLD', 'SpecProfiles.LateLogin', function()
             ApplyForCurrentSpec(true)
         end)

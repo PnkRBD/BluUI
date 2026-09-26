@@ -434,7 +434,7 @@ function Markers.Initialize()
     end)
 end
 
-Events:OnLogin('Markers', Markers.Initialize)
+Events:OnLogin('Markers', Markers.Initialize, 'markers')
 
 BUI.RegisterModuleControl('markers', function(enabled)
     if enabled and not built then

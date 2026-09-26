@@ -133,8 +133,7 @@ local function BuildChoiceCache(configID)
         BUI.Events:OnTalentBurst('Tools.ChoiceCache', InvalidateChoiceCache)
     end
 
-    local specIndex = GetSpecialization()
-    local specID = specIndex and GetSpecializationInfo(specIndex)
+    local specID = PlayerUtil.GetCurrentSpecID()
     if not specID then return end
     local treeID = C_ClassTalents.GetTraitTreeForSpec(specID)
     if not treeID then return end
@@ -396,13 +395,10 @@ do
     end
 end
 
-local function DeepCopy(original)
+function Tools.DeepCopy(original)
     if type(original) ~= 'table' then return original end
-    local copy = {}
-    for key, value in pairs(original) do copy[key] = DeepCopy(value) end
-    return copy
+    return CopyTable(original)
 end
-Tools.DeepCopy = DeepCopy
 
 function Tools.GetLogo()
     return BUI.C.ICON_PATH

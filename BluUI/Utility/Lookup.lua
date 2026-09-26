@@ -118,8 +118,7 @@ local function SearchTalents(needle, hits, already, cap, keyPrefix, includePassi
     local configID = C_ClassTalents.GetActiveConfigID()
     if not configID then return false end
 
-    local specIndex = GetSpecialization()
-    local specID = specIndex and GetSpecializationInfo(specIndex)
+    local specID = PlayerUtil.GetCurrentSpecID()
     if not specID then return false end
 
     local seenTrees = {}

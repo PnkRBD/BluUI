@@ -405,7 +405,7 @@ function KillCommandOverlay.Initialize()
     KillCommandOverlay.Refresh()
 end
 
-BUI.Events:OnLogin('BuffTrackingKCO', KillCommandOverlay.Initialize)
+BUI.Events:OnLogin('BuffTrackingKCO', KillCommandOverlay.Initialize, 'buffTracking')
 
 local QueueRefresh = BUI.Dispatcher.New(KillCommandOverlay.Refresh, 'KCO.Refresh')
 

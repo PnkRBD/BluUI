@@ -32,17 +32,17 @@ function BUI.FixLegacyValues(targetTable)
 end
 
 local PROFILE_MIGRATION_VERSION = 6
+local LEGACY_UNIT_KEYS = { 'player', 'target', 'targettarget', 'focus', 'focustarget', 'pet', 'boss', 'arena', 'party' }
 
 function BUI.MigrateProfile(profile)
-	if not profile then return end
+	profile.general = profile.general or {}
 	local general = profile.general
-	if general and (general._buiMigrationVersion or 0) >= PROFILE_MIGRATION_VERSION then return end
+	if (general._buiMigrationVersion or 0) >= PROFILE_MIGRATION_VERSION then return end
 
 	FixLegacyValues(profile, 1)
 
-	if profile.unitFrames and not (profile.general and profile.general._absorbColorBluFramesMigrated_v3) then
-		profile.general = profile.general or {}
-		profile.general._absorbColorBluFramesMigrated_v3 = true
+	if profile.unitFrames and not general._absorbColorBluFramesMigrated_v3 then
+		general._absorbColorBluFramesMigrated_v3 = true
 		profile.unitFrames.shieldColor           = { 1, 1, 1, 0.6 }
 		profile.unitFrames.shieldDirection       = 'right'
 		profile.unitFrames.shieldOverlay         = 'Stripes'
@@ -53,26 +53,23 @@ function BUI.MigrateProfile(profile)
 		profile.unitFrames.healAbsorbShowTexture = nil
 	end
 
-	if profile.unitFrames and not (profile.general and profile.general._absorbColorGreenFix_v4) then
-		profile.general = profile.general or {}
-		profile.general._absorbColorGreenFix_v4 = true
+	if profile.unitFrames and not general._absorbColorGreenFix_v4 then
+		general._absorbColorGreenFix_v4 = true
 		profile.unitFrames.shieldColor = { 0, 1, 0.239, 0.5 }
 	end
 
-	if not (profile.general and profile.general._fontShadowMigrated) then
-		profile.general = profile.general or {}
-		profile.general._fontShadowMigrated = true
-		profile.general.fontShadowEnabled = nil
-		profile.general.fontShadowX       = nil
-		profile.general.fontShadowY       = nil
-		profile.general.fontShadowAlpha   = nil
+	if not general._fontShadowMigrated then
+		general._fontShadowMigrated = true
+		general.fontShadowEnabled = nil
+		general.fontShadowX       = nil
+		general.fontShadowY       = nil
+		general.fontShadowAlpha   = nil
 	end
 
-	if profile.unitFrames and not (profile.general and profile.general._dispelHighlightBluForced) then
-		profile.general = profile.general or {}
-		profile.general._dispelHighlightBluForced = true
+	if profile.unitFrames and not general._dispelHighlightBluForced then
+		general._dispelHighlightBluForced = true
 		local deadKeys = { 'debuffHighlight', 'debuffHighlightAlert', 'debuffHighlightTint', 'debuffHighlightTintAlpha', 'debuffHighlightStripes', 'debuffHighlightStripeTexture', 'debuffHighlightStripeBlend', 'debuffHighlightStripeAlpha' }
-		for _, unitKey in ipairs({ 'player', 'target', 'targettarget', 'focus', 'focustarget', 'pet', 'boss', 'arena', 'party' }) do
+		for _, unitKey in ipairs(LEGACY_UNIT_KEYS) do
 			local unitTable = profile.unitFrames[unitKey]
 			if type(unitTable) == 'table' then
 				unitTable.debuffHighlightBorder = true
@@ -124,38 +121,34 @@ function BUI.MigrateProfile(profile)
 		unitFrames.alignWithCDM = nil
 		unitFrames.syncPositions = nil
 		unitFrames._cdmPosCache = nil
-		if profile.general then profile.general._cdmSyncToAnchorMigrated = nil end
+		general._cdmSyncToAnchorMigrated = nil
 	end
 
-	if profile.unitFrames and not (profile.general and profile.general._syncPlayerTargetOptIn) then
-		profile.general = profile.general or {}
-		profile.general._syncPlayerTargetOptIn = true
+	if profile.unitFrames and not general._syncPlayerTargetOptIn then
+		general._syncPlayerTargetOptIn = true
 		if profile.unitFrames.syncPlayerTarget then
 			profile.unitFrames.syncPlayerTarget = false
 		end
 	end
 
-	if profile.unitFrames and not (profile.general and profile.general._ufMatchWidthReset) then
-		profile.general = profile.general or {}
-		profile.general._ufMatchWidthReset = true
-		for _, unit in ipairs({ 'player', 'target', 'targettarget', 'focus', 'focustarget', 'pet', 'boss', 'arena', 'party' }) do
+	if profile.unitFrames and not general._ufMatchWidthReset then
+		general._ufMatchWidthReset = true
+		for _, unit in ipairs(LEGACY_UNIT_KEYS) do
 			local unitTable = profile.unitFrames[unit]
 			if type(unitTable) == 'table' and unitTable.matchAnchorWidth then unitTable.matchAnchorWidth = false end
 		end
 	end
 
-	if not (profile.general and profile.general._cursorMasterUnified) then
-		profile.general = profile.general or {}
-		profile.general._cursorMasterUnified = true
+	if not general._cursorMasterUnified then
+		general._cursorMasterUnified = true
 		if profile.cursor and profile.cursor.enabled == false then
 			profile.modules = profile.modules or {}
 			profile.modules.cursor = false
 		end
 	end
 
-	if not (profile.general and profile.general._skinMasterRetired) then
-		profile.general = profile.general or {}
-		profile.general._skinMasterRetired = true
+	if not general._skinMasterRetired then
+		general._skinMasterRetired = true
 		local masterOn = profile.interface and profile.interface.skinBlizzardFrames == true
 		local hasSkinningTable = type(profile.skinning) == 'table' and next(profile.skinning) ~= nil
 		if not masterOn and not hasSkinningTable and BUI.Skinning and BUI.Skinning.GetSkinRegistry then
@@ -167,9 +160,8 @@ function BUI.MigrateProfile(profile)
 		end
 	end
 
-	if not (profile.general and profile.general._powerBarAnyAnchorMigrated) then
-		profile.general = profile.general or {}
-		profile.general._powerBarAnyAnchorMigrated = true
+	if not general._powerBarAnyAnchorMigrated then
+		general._powerBarAnyAnchorMigrated = true
 		local POWER_TAGS = { BUI_PowerBar = true, BUI_SecondaryPower = true }
 		local function migrateAnchors(targetTable, depth)
 			if type(targetTable) ~= 'table' or depth > 12 then return end
@@ -216,9 +208,8 @@ function BUI.MigrateProfile(profile)
 		end
 	end
 
-	if not (profile.general and profile.general._rangeTagSeeded) then
-		profile.general = profile.general or {}
-		profile.general._rangeTagSeeded = true
+	if not general._rangeTagSeeded then
+		general._rangeTagSeeded = true
 		profile.unitFrames = profile.unitFrames or {}
 		local targetSettings = profile.unitFrames.target
 		if type(targetSettings) ~= 'table' then targetSettings = {}; profile.unitFrames.target = targetSettings end
@@ -239,9 +230,8 @@ function BUI.MigrateProfile(profile)
 		end
 	end
 
-	if not (profile.general and profile.general._dispelColorsShared) then
-		profile.general = profile.general or {}
-		profile.general._dispelColorsShared = true
+	if not general._dispelColorsShared then
+		general._dispelColorsShared = true
 		local legacyKeys = {
 			dispelColorMagic   = 'dispel_magic',
 			dispelColorCurse   = 'dispel_curse',
@@ -264,13 +254,12 @@ function BUI.MigrateProfile(profile)
 		end
 	end
 
-	if not (profile.general and profile.general._smoothBarsShared) then
-		profile.general = profile.general or {}
-		profile.general._smoothBarsShared = true
+	if not general._smoothBarsShared then
+		general._smoothBarsShared = true
 		local unitFrames, groupFrames = profile.unitFrames, profile.groupFrames
 		if (type(unitFrames) == 'table' and unitFrames.smoothBars == false)
 			or (type(groupFrames) == 'table' and groupFrames.smoothBars == false) then
-			profile.general.smoothBars = false
+			general.smoothBars = false
 		end
 		if type(unitFrames) == 'table' then unitFrames.smoothBars = nil end
 		if type(groupFrames) == 'table' then groupFrames.smoothBars = nil end
@@ -278,9 +267,8 @@ function BUI.MigrateProfile(profile)
 
 	profile.killCommandSend = nil
 
-	profile.general = profile.general or {}
-	if not profile.general._actionBarFadePerBarMigrated then
-		profile.general._actionBarFadePerBarMigrated = true
+	if not general._actionBarFadePerBarMigrated then
+		general._actionBarFadePerBarMigrated = true
 		local actionBars = profile.actionBars
 		if actionBars and (actionBars.fadeAnimated ~= nil or actionBars.fadeDuration ~= nil) then
 			local function MigrateBar(barSettings)
@@ -299,8 +287,8 @@ function BUI.MigrateProfile(profile)
 		end
 	end
 
-	if not profile.general._ldbDatatextsRemoved then
-		profile.general._ldbDatatextsRemoved = true
+	if not general._ldbDatatextsRemoved then
+		general._ldbDatatextsRemoved = true
 		local function StripLDB(config)
 			if type(config) ~= 'table' then return end
 			for key in pairs(config) do
@@ -321,8 +309,8 @@ function BUI.MigrateProfile(profile)
 		StripLDB(profile.datatextMinimap)
 	end
 
-	if not profile.general._combatAlertsSplit then
-		profile.general._combatAlertsSplit = true
+	if not general._combatAlertsSplit then
+		general._combatAlertsSplit = true
 		local skinning = profile.skinning
 		if type(skinning) == 'table' and skinning.combatalerts ~= nil then
 			skinning.deathrecap = skinning.combatalerts
@@ -330,7 +318,7 @@ function BUI.MigrateProfile(profile)
 		end
 	end
 
-	profile.general._buiMigrationVersion = PROFILE_MIGRATION_VERSION
+	general._buiMigrationVersion = PROFILE_MIGRATION_VERSION
 end
 
 function BUI.RunMigrations()

@@ -3,6 +3,7 @@ local _, BUI = ...
 BUI.GCDHistory = {}
 local GCDHistory = BUI.GCDHistory
 local Pixel = BUI.Pixel
+local DEBUG_PREFIX = '|cff' .. BUI.C.COLOR_BRAND .. 'GCD:|r '
 
 local wipe, ipairs = wipe, ipairs
 local floor, min = math.floor, math.min
@@ -379,12 +380,12 @@ local function AddSpell(spellID, failed)
     if GCDHistory.debug then
         local name = C_Spell.GetSpellName(spellID)
         print(string.format(
-            '|cff6D00FDGCD:|r AddSpell id=%s name=%s texture=%s failed=%s validIcon=%s channelActive=%s',
+            DEBUG_PREFIX .. 'AddSpell id=%s name=%s texture=%s failed=%s validIcon=%s channelActive=%s',
             tostring(spellID), tostring(name), tostring(texture), tostring(failed),
             tostring(texture ~= nil), tostring(channelActive)))
     end
     if not texture then
-        if GCDHistory.debug then print('|cff6D00FDGCD:|r  -> filtered (back-end / blacklisted)') end
+        if GCDHistory.debug then print(DEBUG_PREFIX .. ' -> filtered (back-end / blacklisted)') end
         return
     end
 
@@ -393,7 +394,7 @@ local function AddSpell(spellID, failed)
         if (now - entry.time) >= REPEAT_GAP then break end
         if entry.spellID == spellID or entry.texture == texture then
             if GCDHistory.debug then
-                print(string.format('|cff6D00FDGCD:|r  -> skipped (recent dupe id=%s within %.2fs)', tostring(entry.spellID), now - entry.time))
+                print(string.format(DEBUG_PREFIX .. ' -> skipped (recent dupe id=%s within %.2fs)', tostring(entry.spellID), now - entry.time))
             end
             return
         end
@@ -438,7 +439,7 @@ local function OnSpellEvent(event, unit, _, spellID)
     if GCDHistory.debug then
         local name = spellID and C_Spell.GetSpellName(spellID)
         print(string.format(
-            '|cff6D00FDGCD:|r %s unit=%s id=%s name=%s casting=%s channeling=%s',
+            DEBUG_PREFIX .. '%s unit=%s id=%s name=%s casting=%s channeling=%s',
             tostring(event), tostring(unit), tostring(spellID), tostring(name),
             tostring(UnitCastingInfo('player') ~= nil), tostring(UnitChannelInfo('player') ~= nil)))
     end
@@ -518,7 +519,7 @@ local function CreateContainer()
         end,
         onRightClick = function()
             GCDHistory.SetLocked(true)
-            print('|cff6D00FDBluUI:|r GCD History locked.')
+            BUI.Print('GCD History locked.')
         end,
         showHint   = true,
         hintAnchor = 'TOP',
@@ -531,7 +532,7 @@ end
 GCDHistory.debug = false
 function GCDHistory.SetDebug(on)
     GCDHistory.debug = on and true or false
-    print(string.format('|cff6D00FDBluUI:|r GCD History debug %s', GCDHistory.debug and '|cff44ff44ON|r' or '|cffff4444OFF|r'))
+    BUI.Print(string.format('GCD History debug %s', GCDHistory.debug and '|cff44ff44ON|r' or '|cffff4444OFF|r'))
 end
 
 function GCDHistory.Enable()
@@ -583,7 +584,7 @@ end
 
 BUI.Events:OnLogin('GCDHistory', function()
     if GetDB().enabled then GCDHistory.Enable() end
-end)
+end, 'streamerTools')
 
 BUI.Anchor.RegisterCallback('GCDHistory', function()
     if container and container:IsShown() and GetDB().locked then UpdateLayout() end

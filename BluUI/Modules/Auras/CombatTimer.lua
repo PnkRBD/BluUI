@@ -284,4 +284,4 @@ BUI.Anchor.Follow("CombatTimer", function() return GetDB().enabled and timerFram
 
 BUI.Events:OnLogin("CombatTimer", function()
     if GetDB().enabled then CombatTimer.Enable() end
-end)
+end, "auras")
