@@ -67,6 +67,10 @@ function Widget.New(parent, frameType, template, config)
 	return self
 end
 
+function Widget.EvenSize(size)
+	return math.ceil(size / 2) * 2
+end
+
 function Widget.StripColorCodes(text)
 	if type(text) ~= "string" then return tostring(text or "") end
 	return (text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
