@@ -1,7 +1,6 @@
 local _, BUI = ...
 BUI.Scale = {}
 local Scale = BUI.Scale
-local Pixel = BUI.Pixel
 local BUILib = BluUI.BUILibClient
 
 local PRESETS = {
@@ -57,32 +56,35 @@ local function Apply(newScale)
     RefreshButtons(newScale)
 end
 
+local function Describe(value, format)
+    local width, height = GetPhysicalScreenSize()
+    local perfect = BUI.DeviceScale()
+    if BUI.ApproxEqual(value, perfect, 0.000001) then return ("Pixel perfect for %d x %d"):format(width, height) end
+    local key = FindPresetKey(value)
+    if key then return "The " .. key .. " preset" end
+    return ("Pixel perfect for %d x %d is %s"):format(width, height, format(perfect))
+end
+
 local function ShowCustomDialog(parent)
-    local Modals = BUILib.Modals
-    local Controls = BUILib.Controls
-    local current = GetSavedScale() or 0.5
-    local chosen = current
-
-    local overlay, dialog, close = Modals.CreateBase(340, 200, true, parent)
-    Modals.CreateTitle(dialog, "Custom Scale")
-
-    local hint = dialog:CreateFontString(nil, "OVERLAY")
-    hint:SetFont(BUILib.Font, 11, "")
-    hint:SetPoint("TOP", dialog, "TOP", 0, Pixel.Scale(-50))
-    hint:SetTextColor(0.6, 0.6, 0.6)
-    hint:SetText("Lower = smaller UI (for higher resolutions)")
-
-    local slider = Controls.Slider(dialog, nil, 0.30, 0.90, current, function(value) chosen = value end, 0, false, nil, 0.01, 260)
-    slider:SetPoint("CENTER", 0, Pixel.Scale(5))
-
-    local confirmButton = Modals.CreateButton(dialog, "Set", Modals.BTN_CONFIRM, 100)
-    confirmButton:SetPoint("BOTTOM", dialog, "BOTTOM", Pixel.Scale(-55), Pixel.Scale(20))
-    confirmButton:SetScript("OnClick", function() close(); Apply(chosen) end)
-    local cancelButton = Modals.CreateButton(dialog, "Cancel", Modals.BTN_CANCEL, 100)
-    cancelButton:SetPoint("BOTTOM", dialog, "BOTTOM", Pixel.Scale(55), Pixel.Scale(20))
-    cancelButton:SetScript("OnClick", close)
-
-    overlay:Show()
+    local minimum, maximum = BUI.ScaleBounds()
+    local presets = { { label = "Pixel perfect", value = BUI.DeviceScale() } }
+    for presetIndex = 1, #PRESETS do
+        local preset = PRESETS[presetIndex]
+        if preset.value then presets[#presets + 1] = { label = preset.key, value = preset.value } end
+    end
+    BUILib.Modals.Number({
+        parent = parent,
+        title = "Custom scale",
+        message = "Type the exact value or drag the slider. Lower numbers make the interface smaller.",
+        value = GetSavedScale() or BUI.ClampedUIScale(),
+        min = minimum,
+        max = maximum,
+        decimals = 8,
+        presets = presets,
+        hint = Describe,
+        confirmText = "Apply",
+        onConfirm = Apply,
+    })
 end
 
 function Scale.GetFooterButtons()

@@ -487,6 +487,270 @@ function Modals.CardPicker(options)
 	return overlay, Close
 end
 
+local NUMBER = {
+	width = 520,
+	padding = 24,
+	titleSize = 16,
+	messageSize = 12,
+	readoutSize = 32,
+	hintSize = 11,
+	trackHeight = 4,
+	trackHit = 22,
+	knobSize = 14,
+	fieldWidth = 200,
+	fieldHeight = 30,
+	chipGap = 8,
+	sectionGap = 22,
+	buttonArea = 68,
+}
+
+local function TrimNumber(text)
+	local whole, fraction = text:match('^(%-?%d+)%.(%d+)$')
+	if not fraction then return text end
+	fraction = fraction:gsub('0+$', '')
+	if #fraction < 2 then fraction = fraction .. string.rep('0', 2 - #fraction) end
+	return whole .. '.' .. fraction
+end
+
+function Modals.Number(options)
+	options = options or {}
+	local theme = GetTheme()
+	local minimum, maximum = options.min or 0, options.max or 1
+	local decimals = options.decimals or 2
+	local wheelStep = options.wheelStep or (maximum - minimum) / 200
+	local padding = NUMBER.padding
+	local bounded = not options.fullscreen
+	local overlay, dialog, Close = Modals.CreateBase(options.width or NUMBER.width, 400, bounded, options.parent)
+	local innerWidth = dialog:GetWidth() - padding * 2
+	local accentRed, accentGreen, accentBlue = theme.GetAccent()
+	local fireOnce = OnceGuard()
+	local value
+
+	local function Clamp(number)
+		if number < minimum then return minimum end
+		if number > maximum then return maximum end
+		return number
+	end
+
+	local function Format(number)
+		return TrimNumber(('%.' .. decimals .. 'f'):format(number))
+	end
+
+	local function Cancel()
+		Close()
+		fireOnce(options.onCancel)
+	end
+
+	local function Confirm()
+		Close()
+		fireOnce(options.onConfirm, value)
+	end
+
+	overlay:SetScript('OnKeyDown', function(self, key)
+		if key == 'ESCAPE' then
+			self:SetPropagateKeyboardInput(false)
+			Cancel()
+		else
+			self:SetPropagateKeyboardInput(true)
+		end
+	end)
+
+	local title = dialog:CreateFontString(nil, 'OVERLAY')
+	title:SetFont(BUILib.Font, NUMBER.titleSize, '')
+	title:SetShadowColor(0, 0, 0, 0)
+	title:SetPoint('TOPLEFT', padding, -padding)
+	title:SetText(options.title or '')
+	title:SetTextColor(unpack(theme.text.primary))
+	local y = padding + math.ceil(title:GetStringHeight())
+
+	if options.message then
+		local message = dialog:CreateFontString(nil, 'OVERLAY')
+		message:SetFont(Modals.BodyFont(), NUMBER.messageSize, '')
+		message:SetShadowColor(0, 0, 0, 0)
+		message:SetPoint('TOPLEFT', padding, -(y + 6))
+		message:SetWidth(innerWidth - 40)
+		message:SetJustifyH('LEFT')
+		message:SetSpacing(3)
+		message:SetText(options.message)
+		message:SetTextColor(unpack(theme.text.muted))
+		y = y + 6 + math.ceil(message:GetStringHeight())
+	end
+
+	local closeButton = Widget.Unwrap(BUILib.Controls.Icon(dialog, { preset = 'close', size = 28, onClick = Cancel }))
+	closeButton:SetPoint('TOPRIGHT', -10, -10)
+
+	y = y + 18
+	local divider = dialog:CreateTexture(nil, 'ARTWORK')
+	divider:SetTexture(Widget.WHITE)
+	divider:SetPoint('TOPLEFT', padding, -y)
+	divider:SetPoint('TOPRIGHT', -padding, -y)
+	divider:SetHeight(1)
+	divider:SetVertexColor(accentRed, accentGreen, accentBlue, 0.25)
+
+	y = y + NUMBER.sectionGap
+	local readout = dialog:CreateFontString(nil, 'OVERLAY')
+	readout:SetFont(BUILib.Font, NUMBER.readoutSize, '')
+	readout:SetShadowColor(0, 0, 0, 0)
+	readout:SetPoint('TOP', 0, -y)
+	readout:SetTextColor(accentRed, accentGreen, accentBlue, 1)
+	y = y + NUMBER.readoutSize + 6
+	local hint = dialog:CreateFontString(nil, 'OVERLAY')
+	hint:SetFont(Modals.BodyFont(), NUMBER.hintSize, '')
+	hint:SetShadowColor(0, 0, 0, 0)
+	hint:SetPoint('TOP', 0, -y)
+	hint:SetTextColor(unpack(theme.text.muted))
+	y = y + NUMBER.hintSize + NUMBER.sectionGap
+
+	local track = CreateFrame('Button', nil, dialog)
+	track:SetPoint('TOPLEFT', padding, -y)
+	track:SetSize(innerWidth, NUMBER.trackHit)
+	track:EnableMouseWheel(true)
+	local rail = track:CreateTexture(nil, 'ARTWORK')
+	rail:SetTexture(Widget.WHITE)
+	rail:SetVertexColor(unpack(theme.control.track))
+	rail:SetPoint('LEFT')
+	rail:SetPoint('RIGHT')
+	rail:SetHeight(NUMBER.trackHeight)
+	local fill = track:CreateTexture(nil, 'ARTWORK', nil, 1)
+	fill:SetTexture(Widget.WHITE)
+	fill:SetVertexColor(accentRed, accentGreen, accentBlue, 1)
+	fill:SetPoint('LEFT')
+	fill:SetHeight(NUMBER.trackHeight)
+	local knob = track:CreateTexture(nil, 'OVERLAY')
+	knob:SetTexture(BUILib.GetLibMedia('smoothdisc'))
+	knob:SetSize(NUMBER.knobSize, NUMBER.knobSize)
+	knob:SetVertexColor(unpack(theme.text.primary))
+	y = y + NUMBER.trackHit + 4
+	local lowLabel = dialog:CreateFontString(nil, 'OVERLAY')
+	lowLabel:SetFont(Modals.BodyFont(), 10, '')
+	lowLabel:SetShadowColor(0, 0, 0, 0)
+	lowLabel:SetPoint('TOPLEFT', padding, -y)
+	lowLabel:SetText(Format(minimum))
+	lowLabel:SetTextColor(unpack(theme.text.muted))
+	local highLabel = dialog:CreateFontString(nil, 'OVERLAY')
+	highLabel:SetFont(Modals.BodyFont(), 10, '')
+	highLabel:SetShadowColor(0, 0, 0, 0)
+	highLabel:SetPoint('TOPRIGHT', -padding, -y)
+	highLabel:SetText(Format(maximum))
+	highLabel:SetTextColor(unpack(theme.text.muted))
+	y = y + 12 + NUMBER.sectionGap
+
+	local fieldLabel = dialog:CreateFontString(nil, 'OVERLAY')
+	fieldLabel:SetFont(Modals.BodyFont(), NUMBER.messageSize, '')
+	fieldLabel:SetShadowColor(0, 0, 0, 0)
+	fieldLabel:SetPoint('TOPLEFT', padding, -(y + 8))
+	fieldLabel:SetText(options.fieldLabel or 'Exact value')
+	fieldLabel:SetTextColor(unpack(theme.text.primary))
+	local field = CreateFrame('EditBox', nil, dialog)
+	field:SetSize(NUMBER.fieldWidth, NUMBER.fieldHeight)
+	field:SetPoint('TOPRIGHT', -padding, -y)
+	field:SetAutoFocus(false)
+	field:SetFont(BUILib.Font, 13, '')
+	field:SetTextColor(unpack(theme.text.primary))
+	field:SetTextInsets(10, 10, 0, 0)
+	field:SetJustifyH('RIGHT')
+	BUILib.Skin.Shell(field, { fill = theme.bg.input, edge = theme.border.input })
+	y = y + NUMBER.fieldHeight
+
+	local fieldFocused = false
+	local function PaintField(invalid)
+		local edge = theme.border.input
+		if invalid then
+			edge = Modals.BTN_WARNING
+		elseif fieldFocused then
+			edge = { accentRed, accentGreen, accentBlue, 1 }
+		end
+		BUILib.Skin.SetShellEdges(field, edge)
+	end
+
+	local function Set(newValue, source)
+		value = Clamp(newValue)
+		local fraction = maximum > minimum and (value - minimum) / (maximum - minimum) or 0
+		readout:SetText(Format(value))
+		hint:SetText(options.hint and options.hint(value, Format) or '')
+		fill:SetWidth(math.max(1, fraction * innerWidth))
+		knob:ClearAllPoints()
+		knob:SetPoint('CENTER', track, 'LEFT', fraction * innerWidth, 0)
+		if source ~= 'field' then field:SetText(Format(value)) end
+		PaintField(false)
+	end
+
+	local function ValueAtCursor()
+		local cursorX = GetCursorPosition() / track:GetEffectiveScale()
+		local fraction = (cursorX - track:GetLeft()) / track:GetWidth()
+		if fraction < 0 then fraction = 0 elseif fraction > 1 then fraction = 1 end
+		return minimum + fraction * (maximum - minimum)
+	end
+
+	track:SetScript('OnMouseDown', function(self)
+		Set(ValueAtCursor())
+		field:ClearFocus()
+		self:SetScript('OnUpdate', function(frame)
+			if IsMouseButtonDown('LeftButton') then
+				Set(ValueAtCursor())
+			else
+				frame:SetScript('OnUpdate', nil)
+			end
+		end)
+	end)
+	track:SetScript('OnMouseWheel', function(_, delta) Set(value + delta * wheelStep) end)
+
+	field:SetScript('OnTextChanged', function(self, userInput)
+		if not userInput then return end
+		local parsed = tonumber(self:GetText())
+		if parsed and parsed >= minimum and parsed <= maximum then
+			Set(parsed, 'field')
+		else
+			PaintField(true)
+		end
+	end)
+	field:SetScript('OnEditFocusGained', function(self)
+		fieldFocused = true
+		PaintField(false)
+		self:HighlightText()
+	end)
+	field:SetScript('OnEditFocusLost', function(self)
+		fieldFocused = false
+		self:SetText(Format(value))
+		PaintField(false)
+	end)
+	field:SetScript('OnEnterPressed', Confirm)
+	field:SetScript('OnEscapePressed', Cancel)
+
+	if options.presets and #options.presets > 0 then
+		y = y + NUMBER.sectionGap
+		local caption = dialog:CreateFontString(nil, 'OVERLAY')
+		caption:SetFont(Modals.BodyFont(), 9, '')
+		caption:SetShadowColor(0, 0, 0, 0)
+		caption:SetPoint('TOPLEFT', padding, -y)
+		caption:SetText((options.presetLabel or 'Quick picks'):upper())
+		caption:SetTextColor(unpack(theme.text.muted))
+		y = y + 18
+		local x = padding
+		for _, preset in ipairs(options.presets) do
+			local chip = Modals.CreateButton(dialog, preset.label, Modals.BTN_PRIMARY, 60)
+			chip:SetWidth(Widget.EvenSize(chip.text:GetStringWidth() + SIZES.buttonTextPadding * 2))
+			chip:SetPoint('TOPLEFT', x, -y)
+			chip:SetScript('OnClick', function()
+				Set(preset.value)
+				field:ClearFocus()
+			end)
+			x = x + chip:GetWidth() + NUMBER.chipGap
+		end
+		y = y + SIZES.buttonHeight
+	end
+
+	dialog:SetHeight(Widget.EvenSize(y + NUMBER.buttonArea))
+	Modals.LayoutButtons(dialog, {
+		{ text = options.confirmText or 'Apply', color = Modals.BTN_CONFIRM, width = options.buttonWidth, onClick = Confirm },
+		{ text = options.cancelText or 'Cancel', color = Modals.BTN_CANCEL, width = options.buttonWidth, onClick = Cancel },
+	}, Cancel)
+
+	Set(options.value or minimum)
+	overlay:Show()
+	return overlay, Close
+end
+
 function Modals.SetParent(parent)
 	defaultParent = parent
 end
