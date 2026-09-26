@@ -556,7 +556,7 @@ BUI.Events:OnLogin("BuffTrackingDisplay", function()
     CreateModuleTracker(BUI.BuffTracking.PetAlert)
     CreateModuleTracker(BUI.BuffTracking.SmartMisdirect)
     RecheckAllActive()
-end)
+end, "buffTracking")
 
 BUI.Events:Register("PLAYER_REGEN_DISABLED", "BuffTrackingDisplay", OnCombat)
 BUI.Events:Register("PLAYER_REGEN_ENABLED",  "BuffTrackingDisplay", OnCombat)

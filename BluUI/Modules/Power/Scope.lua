@@ -8,8 +8,7 @@ local VALID = { profile = true, class = true, spec = true }
 local specKey, classKey
 
 local function SpecKey()
-    local specIndex = GetSpecialization()
-    local specID = specIndex and GetSpecializationInfo(specIndex)
+    local specID = PlayerUtil.GetCurrentSpecID()
     if specID then specKey = 'spec:' .. specID end
     return specKey or nil
 end

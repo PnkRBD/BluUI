@@ -11,7 +11,7 @@ end
 
 local function PrintHelp()
 	local function line(command, description)
-		print('  |cff6D00FD' .. command .. '|r  ' .. description)
+		print('  |cff' .. BUI.C.COLOR_BRAND .. command .. '|r  ' .. description)
 	end
 	BUI.Print('Commands:')
 	line('/bui', 'open/close the settings window')
@@ -38,7 +38,7 @@ SlashCmdList['BUI'] = function(message)
 	elseif command == 'center' then
 		CenterWindow()
 	elseif command == 'install' then
-		if BUI.Installer then BUI.Installer.Open() end
+		BUI.Installer.Open()
 	elseif command == 'currency' then
 		local id = tonumber(rest)
 		if id then BUI.Currency.Dump(id) else BUI.Print('Usage: /bui currency <currency id>') end
@@ -80,7 +80,6 @@ end
 
 SLASH_BUIEDIT1 = '/edit'
 SlashCmdList['BUIEDIT'] = BUI.ToggleEditMode
-
 
 SLASH_BUITEST1 = '/buitest'
 SlashCmdList['BUITEST'] = function()

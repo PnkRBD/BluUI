@@ -1097,4 +1097,4 @@ function Minimap.Initialize()
 	Minimap.Enable()
 end
 
-Events:OnLogin('Minimap', Minimap.Initialize)
+Events:OnLogin('Minimap', Minimap.Initialize, 'minimap')

@@ -6,32 +6,15 @@ do
 	local active = false
 
 	local function RunNext()
-		while true do
-			local check = table.remove(queue, 1)
-			if not check then
-				active = false
-				return
-			end
-
-			active = true
-			local insideCheck = true
-			local resumed = false
-			local resumedWhileInside = false
-
-			local function Done()
-				if resumed then return end
-				resumed = true
-				if insideCheck then
-					resumedWhileInside = true
-				else
-					RunNext()
-				end
-			end
-
-			check(Done)
-			insideCheck = false
-			if not resumedWhileInside then return end
-		end
+		local check = table.remove(queue, 1)
+		active = check ~= nil
+		if not check then return end
+		local finished = false
+		check(function()
+			if finished then return end
+			finished = true
+			RunNext()
+		end)
 	end
 
 	function BUI.QueueStartupCheck(check)
@@ -49,13 +32,7 @@ function BUI.CheckPlatynatorPrompt(done)
 	if global.platynatorDismissedDate == bundledDate then done(); return end
 
 	local overlay, dialog, close = Modals.CreateBase(440, 170, false)
-
-	local resumed = false
-	overlay:HookScript('OnHide', function()
-		if resumed then return end
-		resumed = true
-		done()
-	end)
+	overlay:HookScript('OnHide', done)
 
 	Modals.CreateTitle(dialog, 'Platynator Detected')
 	Modals.CreateMessage(dialog,

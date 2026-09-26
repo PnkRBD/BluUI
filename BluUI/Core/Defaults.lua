@@ -1,52 +1,43 @@
 local _, BUI = ...
-local function Merge(base, overrides)
-	local merged = {}
-	for key, value in pairs(base) do
-		merged[key] = type(value) == 'table' and Merge(value) or value
-	end
-	if overrides then
-		for key, value in pairs(overrides) do
-			merged[key] = type(value) == 'table' and Merge(value) or value
-		end
+local function Merge(base, ...)
+	local merged = CopyTable(base)
+	for index = 1, select('#', ...) do
+		MergeTable(merged, CopyTable((select(index, ...))))
 	end
 	return merged
 end
 
-local function ActionBarDefaults(overrides)
-	local bar = {
-		enabled            = false,
-		buttonCount        = 12,
-		buttonsPerRow      = 12,
-		buttonSize         = 36,
-		spacing            = 2,
-		scale              = 100,
-		centerHorizontally = false,
-		posX               = 0,
-		posY               = 0,
-		anchorFrame        = '',
-		anchorPoint        = 'BOTTOM',
-		anchorOffsetX      = 0,
-		anchorOffsetY      = 0,
-		showHotkey         = true,
-		showMacroText      = false,
-		showCooldownText   = true,
-		hideEmptyButtons   = false,
-		clickThrough       = false,
-		frameStrata        = 'MEDIUM',
-		fadeEnabled        = false,
-		fadeAlpha          = 30,
-		fadeAnimated       = true,
-		fadeDuration       = 0.2,
-		pagingEnabled      = false,
-		modifierPages      = { ctrl = 0, alt = 0, shift = 0 },
-		alpha              = 100,
-		growth             = 'TOPLEFT',
-		buttonHeight       = 0,
-		cooldownFontSize   = 14,
-	}
-	for key, value in pairs(overrides) do bar[key] = value end
-	return bar
-end
+local ActionBarBase = {
+	enabled            = false,
+	buttonCount        = 12,
+	buttonsPerRow      = 12,
+	buttonSize         = 36,
+	spacing            = 2,
+	scale              = 100,
+	centerHorizontally = false,
+	posX               = 0,
+	posY               = 0,
+	anchorFrame        = '',
+	anchorPoint        = 'BOTTOM',
+	anchorOffsetX      = 0,
+	anchorOffsetY      = 0,
+	showHotkey         = true,
+	showMacroText      = false,
+	showCooldownText   = true,
+	hideEmptyButtons   = false,
+	clickThrough       = false,
+	frameStrata        = 'MEDIUM',
+	fadeEnabled        = false,
+	fadeAlpha          = 30,
+	fadeAnimated       = true,
+	fadeDuration       = 0.2,
+	pagingEnabled      = false,
+	modifierPages      = { ctrl = 0, alt = 0, shift = 0 },
+	alpha              = 100,
+	growth             = 'TOPLEFT',
+	buttonHeight       = 0,
+	cooldownFontSize   = 14,
+}
 
 local CastBarBase = {
 	enabled        = true,
@@ -102,18 +93,6 @@ local CastBarBase = {
 	matchAnchorWidth = false,
 }
 
-local BaseOpacity = {
-	combat      = 100,
-	outOfCombat = 100,
-	mounted     = 100,
-	flying      = 30,
-	inInstance  = 100,
-	override    = 0,
-	vehicle     = 100,
-	dead        = 50,
-	petBattle   = 0,
-}
-
 local CdmViewerBase = {
 	enabled               = true,
 	iconWidth             = 38,
@@ -153,7 +132,27 @@ local CdmViewerBase = {
 	anchorPoint           = "BOTTOM",
 	anchorOffsetX         = 0,
 	anchorOffsetY         = 0,
+	hiddenSlots           = {},
+	detachedIcons         = {},
+	customSpells          = {},
+	iconOrder             = {},
+	hiddenIcons           = {},
+	iconOverrides         = {},
+	buffTracking          = {},
 }
+
+local CdmCooldownViewerBase = Merge(CdmViewerBase, {
+	iconWidth       = 50,
+	iconHeight      = 50,
+	showKeybinds    = false,
+	keybindAnchor   = 'TOPRIGHT',
+	keybindFontSize = 12,
+	keybindOffsetX  = 2,
+	keybindOffsetY  = 2,
+	keybindFont     = BUI.C.GLOBAL_OPTION,
+	keybindColor    = { 1, 1, 1, 1 },
+	showOnlyOnCD    = {},
+})
 
 local UnitFrameBase = {
 	enabled           = true,
@@ -218,6 +217,24 @@ local UnitFrameBase = {
 	position          = { point = 'CENTER', relPoint = 'CENTER', x = 0, y = -200 },
 }
 
+local UnitAuraBase = {
+	showDebuffs    = true,
+	debuffShowMode = 'mine',
+	auraSpacing    = 2,
+	auraStackSize  = 10,
+	auraCdSize     = 10,
+	showDebuffType = true,
+}
+
+local UnitBuffBase = Merge(UnitAuraBase, {
+	buffShowMode    = 'all',
+	buffAnchorPoint = 'BOTTOMLEFT',
+	buffOffsetX     = 0,
+	buffOffsetY     = -4,
+	buffGrowthX     = 'RIGHT',
+	buffGrowthY     = 'DOWN',
+})
+
 BUI.Defaults = {
 	global = {
 		layoutStyle    = 'centered',
@@ -239,33 +256,42 @@ BUI.Defaults = {
 			ttsVolume             = 100,
 			soundChannel          = 'Master',
 			visibilityPriority    = {'petBattle', 'dead', 'combat', 'vehicle', 'override', 'flying', 'mounted', 'inInstance'},
-			visibilityOpacity     = Merge(BaseOpacity),
+			visibilityOpacity     = {
+				combat      = 100,
+				outOfCombat = 100,
+				mounted     = 100,
+				flying      = 30,
+				inInstance  = 100,
+				override    = 0,
+				vehicle     = 100,
+				dead        = 50,
+				petBattle   = 0,
+			},
 			visibilityModulesDisabled = {},
 		},
 
 		actionBars = {
 			bars = {
-				ActionBarDefaults({
+				Merge(ActionBarBase, {
 					enabled = true,
 					posY = 60,
 					centerHorizontally = true,
 					pagingEnabled = true,
-					modifierPages = { ctrl = 0, alt = 0, shift = 0 },
 				}),
-				ActionBarDefaults({ posY = 100, centerHorizontally = true }),
-				ActionBarDefaults({ posY = 140, centerHorizontally = true }),
-				ActionBarDefaults({}),
-				ActionBarDefaults({}),
-				ActionBarDefaults({}),
-				ActionBarDefaults({}),
-				ActionBarDefaults({}),
+				Merge(ActionBarBase, { posY = 100, centerHorizontally = true }),
+				Merge(ActionBarBase, { posY = 140, centerHorizontally = true }),
+				CopyTable(ActionBarBase),
+				CopyTable(ActionBarBase),
+				CopyTable(ActionBarBase),
+				CopyTable(ActionBarBase),
+				CopyTable(ActionBarBase),
 			},
-			petBar = ActionBarDefaults({ enabled = true, buttonCount = 10, buttonsPerRow = 10, buttonSize = 30, posY = 180, centerHorizontally = true, showHotkey = false }),
-			stanceBar = ActionBarDefaults({ enabled = true, buttonCount = 10, buttonsPerRow = 10, buttonSize = 28, posY = 210, centerHorizontally = true }),
-			vehicleBar = ActionBarDefaults({ enabled = true, buttonCount = 1, buttonsPerRow = 1, buttonSize = 40, posX = 320, posY = 60 }),
-			microBar = ActionBarDefaults({ enabled = true, hidden = false, buttonsPerRow = 13, spacing = 0, vertical = false, posX = 420, posY = -380 }),
-			bagBar = ActionBarDefaults({ enabled = true, hidden = false, posX = 620, posY = -380 }),
-			extraBar = ActionBarDefaults({ enabled = true, hidden = false, posX = 0, posY = -250, blizzardArt = false }),
+			petBar = Merge(ActionBarBase, { enabled = true, buttonCount = 10, buttonsPerRow = 10, buttonSize = 30, posY = 180, centerHorizontally = true, showHotkey = false }),
+			stanceBar = Merge(ActionBarBase, { enabled = true, buttonCount = 10, buttonsPerRow = 10, buttonSize = 28, posY = 210, centerHorizontally = true }),
+			vehicleBar = Merge(ActionBarBase, { enabled = true, buttonCount = 1, buttonsPerRow = 1, buttonSize = 40, posX = 320, posY = 60 }),
+			microBar = Merge(ActionBarBase, { enabled = true, hidden = false, buttonsPerRow = 13, spacing = 0, vertical = false, posX = 420, posY = -380 }),
+			bagBar = Merge(ActionBarBase, { enabled = true, hidden = false, posX = 620, posY = -380 }),
+			extraBar = Merge(ActionBarBase, { enabled = true, hidden = false, posX = 0, posY = -250, blizzardArt = false }),
 			cooldownColor  = { 1, 1, 1, 1 },
 			cooldownAnchor = 'CENTER',
 			cooldownOffsetX = 0,
@@ -379,7 +405,6 @@ BUI.Defaults = {
 				enabled = false, side = 'BOTTOM', align = 'CENTER', size = 22, spacing = 1, perLine = 0,
 				offsetX = 0, offsetY = 0, gap = 4, background = { 0.06, 0.06, 0.07, 1 }, excluded = {}, order = {},
 			},
-			skinBlizzardFrames     = false,
 			fasterMovieSkip        = true,
 			easyItemDestroy        = true,
 			hideTalkingFrame       = true,
@@ -1078,18 +1103,6 @@ BUI.Defaults = {
 			runeRechargingColorR = 0.4,
 			runeRechargingColorG = 0.4,
 			runeRechargingColorB = 0.4,
-			staggerBarMode    = true,
-			staggerBarWidth   = 200,
-			staggerBarHeight  = 16,
-			staggerValueSize  = 14,
-			staggerValueOffsetX = 0,
-			staggerValueOffsetY = 0,
-			staggerHideBarText  = false,
-			staggerTextColorR   = 1,
-			staggerTextColorG   = 1,
-			staggerTextColorB   = 1,
-			staggerShowPercent  = true,
-			staggerShowValue    = true,
 			staggerLightColorR    = 0.52,
 			staggerLightColorG    = 1.0,
 			staggerLightColorB    = 0.52,
@@ -1107,91 +1120,6 @@ BUI.Defaults = {
 			runeBgColorG        = 0.15,
 			runeBgColorB        = 0.15,
 			runeBgColorA        = 1,
-
-			staggerColorR          = 0.52,
-			staggerColorG          = 1.00,
-			staggerColorB          = 0.52,
-			staggerBgColorR        = 0.15,
-			staggerBgColorG        = 0.15,
-			staggerBgColorB        = 0.15,
-			staggerBgColorA        = 1,
-			staggerBarOffsetX      = 0,
-			staggerBarOffsetY      = 0,
-			staggerValueColorR     = 1,
-			staggerValueColorG     = 1,
-			staggerValueColorB     = 1,
-
-			casterManaBarMode      = false,
-			casterManaBarWidth     = 200,
-			casterManaBarHeight    = 16,
-			casterManaColorR       = 1,
-			casterManaColorG       = 1,
-			casterManaColorB       = 1,
-			casterManaBgColorR     = 0.1,
-			casterManaBgColorG     = 0.1,
-			casterManaBgColorB     = 0.1,
-			casterManaBgColorA     = 1,
-			casterManaBarOffsetX   = 0,
-			casterManaBarOffsetY   = 0,
-			casterManaHideBarText  = false,
-			casterManaShowValue    = true,
-			casterManaShowPercent  = false,
-			casterManaValueColorR  = 1,
-			casterManaValueColorG  = 1,
-			casterManaValueColorB  = 1,
-			casterManaValueOffsetX = 0,
-			casterManaValueOffsetY = 0,
-			casterManaValueSize    = 14,
-
-			overrideBarMode         = true,
-			overrideBarWidth        = 200,
-			overrideBarHeight       = 16,
-			overrideColorR          = 0.20,
-			overrideColorG          = 0.60,
-			overrideColorB          = 1.00,
-			overrideBgColorR        = 0.15,
-			overrideBgColorG        = 0.15,
-			overrideBgColorB        = 0.15,
-			overrideBgColorA        = 1,
-			overrideBarOffsetX      = 0,
-			overrideBarOffsetY      = 0,
-			overrideHideBarText     = false,
-			overrideShowValue       = true,
-			overrideShowPercent     = false,
-			overrideTextColorR      = 1,
-			overrideTextColorG      = 1,
-			overrideTextColorB      = 1,
-			overrideValueColorR     = 1,
-			overrideValueColorG     = 1,
-			overrideValueColorB     = 1,
-			overrideValueOffsetX    = 0,
-			overrideValueOffsetY    = 0,
-			overrideValueSize       = 14,
-
-			soulFragsBarMode         = true,
-			soulFragsBarWidth        = 200,
-			soulFragsBarHeight       = 16,
-			soulFragsColorR          = 0.40,
-			soulFragsColorG          = 1.00,
-			soulFragsColorB          = 0.40,
-			soulFragsBgColorR        = 0.15,
-			soulFragsBgColorG        = 0.15,
-			soulFragsBgColorB        = 0.15,
-			soulFragsBgColorA        = 1,
-			soulFragsBarOffsetX      = 0,
-			soulFragsBarOffsetY      = 0,
-			soulFragsHideBarText     = false,
-			soulFragsShowValue       = true,
-			soulFragsShowPercent     = true,
-			soulFragsTextColorR      = 1,
-			soulFragsTextColorG      = 1,
-			soulFragsTextColorB      = 1,
-			soulFragsValueColorR     = 1,
-			soulFragsValueColorG     = 1,
-			soulFragsValueColorB     = 1,
-			soulFragsValueOffsetX    = 0,
-			soulFragsValueOffsetY    = 0,
-			soulFragsValueSize       = 14,
 		},
 
 		cdm = {
@@ -1220,9 +1148,9 @@ BUI.Defaults = {
 				showBorder   = false,
 				borderColor  = { 1, 1, 1, 1 },
 			},
-			essential = Merge(CdmViewerBase, { iconWidth = 50, iconHeight = 50, spacing = 1, positionY = -200, hiddenSlots = {}, detachedIcons = {}, showKeybinds = false, keybindAnchor = 'TOPRIGHT', keybindFontSize = 12, keybindOffsetX = 2, keybindOffsetY = 2, keybindFont = BUI.C.GLOBAL_OPTION, keybindColor = { 1, 1, 1, 1 }, customSpells = {}, iconOrder = {}, hiddenIcons = {}, iconOverrides = {}, buffTracking = {}, showOnlyOnCD = {} }),
-			utility   = Merge(CdmViewerBase, { iconWidth = 50, iconHeight = 50, spacing = 1, iconsPerRow = 6, positionY = -251, hiddenSlots = {}, detachedIcons = {}, showKeybinds = false, keybindAnchor = 'TOPRIGHT', keybindFontSize = 12, keybindOffsetX = 2, keybindOffsetY = 2, keybindFont = BUI.C.GLOBAL_OPTION, keybindColor = { 1, 1, 1, 1 }, customSpells = {}, iconOrder = {}, hiddenIcons = {}, iconOverrides = {}, buffTracking = {}, showOnlyOnCD = {} }),
-			buffs     = Merge(CdmViewerBase, { iconWidth = 36, iconHeight = 36, spacing = 1, textSize = 19, cooldownTextSize = 23, positionY = -126, hiddenSlots = {}, detachedIcons = {}, customSpells = {}, iconOrder = {}, hiddenIcons = {}, iconOverrides = {}, buffTracking = {} }),
+			essential = Merge(CdmCooldownViewerBase, { positionY = -200 }),
+			utility   = Merge(CdmCooldownViewerBase, { iconsPerRow = 6, positionY = -251 }),
+			buffs     = Merge(CdmViewerBase, { iconWidth = 36, iconHeight = 36, textSize = 19, cooldownTextSize = 23, positionY = -126 }),
 			buffBars = {
 				skinEnabled    = true,
 				anchorFrame    = '',
@@ -1285,7 +1213,6 @@ BUI.Defaults = {
 			player = Merge(CastBarBase, {
 				barColor      = { 0.4, 0.6, 1.0, 1.0 },
 				width         = 284,
-				posX          = 0,
 				posY          = -164,
 				useSpellColors = true,
 			}),
@@ -1620,43 +1547,28 @@ BUI.Defaults = {
 				showPowerText     = true,
 				powerTextSize     = 11,
 				combatBorder      = true,
-				combatBorderColor = { 0.8, 0.1, 0.1, 1 },
-				classColorName    = false,
 				customName        = '',
 				position          = { point = 'CENTER', relPoint = 'CENTER', x = -290, y = -195 },
 			}),
 
-			target = Merge(UnitFrameBase, {
+			target = Merge(UnitFrameBase, UnitBuffBase, {
 				width                   = 271,
 				height                  = 41,
 				powerHeight             = 11,
 				showPower               = true,
 				showPowerText           = true,
-				classColorName          = false,
 				position                = { point = 'CENTER', relPoint = 'CENTER', x = 290, y = -195 },
-				showDebuffs             = true,
 				showBuffs               = true,
-				debuffShowMode          = 'mine',
-				buffShowMode            = 'all',
 				auraIconSize            = 22,
-				auraSpacing             = 2,
-				auraStackSize           = 10,
-				auraCdSize              = 10,
 				maxDebuffs              = 8,
 				maxBuffs                = 16,
 				debuffsPerRow           = 8,
 				buffsPerRow             = 8,
 				debuffStackPos          = 'BOTTOMRIGHT',
-				buffAnchorPoint         = 'BOTTOMLEFT',
-				buffOffsetX             = 0,
-				buffOffsetY             = -4,
-				buffGrowthX             = 'RIGHT',
-				buffGrowthY             = 'DOWN',
 				buffStackPos            = 'BOTTOMRIGHT',
-				showDebuffType          = true,
 			}),
 
-			targettarget = Merge(UnitFrameBase, {
+			targettarget = Merge(UnitFrameBase, UnitBuffBase, {
 				width          = 110,
 				height         = 30,
 				showHealthText = false,
@@ -1664,59 +1576,31 @@ BUI.Defaults = {
 				healthTextSize = 10,
 				powerTextSize  = 8,
 				position       = { point = 'CENTER', relPoint = 'CENTER', x = 481, y = -195 },
-				anchorFrame    = '',
-				anchorPoint    = 'RIGHT',
 				anchorOffsetX  = 5,
-				anchorOffsetY  = 0,
 
-				showDebuffs             = true,
 				showBuffs               = false,
-				debuffShowMode          = 'mine',
-				buffShowMode            = 'all',
 				auraIconSize            = 18,
-				auraSpacing             = 2,
-				auraStackSize           = 10,
-				auraCdSize              = 10,
 				maxDebuffs              = 6,
 				maxBuffs                = 8,
 				debuffsPerRow           = 6,
 				buffsPerRow             = 6,
 				debuffStackPos          = 'BOTTOMRIGHT',
-				buffAnchorPoint         = 'BOTTOMLEFT',
-				buffOffsetX             = 0,
-				buffOffsetY             = -4,
-				buffGrowthX             = 'RIGHT',
-				buffGrowthY             = 'DOWN',
 				buffStackPos            = 'BOTTOMRIGHT',
-				showDebuffType          = true,
 			}),
 
-			focus = Merge(UnitFrameBase, {
+			focus = Merge(UnitFrameBase, UnitBuffBase, {
 				width                   = 186,
 				height                  = 80,
-				powerHeight             = 8,
 				nameTextSize            = 11,
 				healthTextSize          = 11,
 				powerTextSize           = 9,
 				position                = { point = 'CENTER', relPoint = 'CENTER', x = -302, y = 95 },
-				showDebuffs             = true,
 				showBuffs               = false,
-				debuffShowMode          = 'mine',
-				buffShowMode            = 'all',
 				auraIconSize            = 20,
-				auraSpacing             = 2,
-				auraStackSize           = 10,
-				auraCdSize              = 10,
 				maxDebuffs              = 6,
 				maxBuffs                = 6,
 				debuffsPerRow           = 6,
 				buffsPerRow             = 6,
-				buffAnchorPoint         = 'BOTTOMLEFT',
-				buffOffsetX             = 0,
-				buffOffsetY             = -4,
-				buffGrowthX             = 'RIGHT',
-				buffGrowthY             = 'DOWN',
-				showDebuffType          = true,
 			}),
 
 			focustarget = Merge(UnitFrameBase, {
@@ -1733,7 +1617,6 @@ BUI.Defaults = {
 			pet = Merge(UnitFrameBase, {
 				width          = 105,
 				height         = 41,
-				powerHeight    = 8,
 				showPower      = true,
 				showPowerText  = true,
 				nameTextSize   = 10,
@@ -1744,30 +1627,22 @@ BUI.Defaults = {
 				position       = { point = 'CENTER', relPoint = 'CENTER', x = -480, y = -195 },
 			}),
 
-			boss = Merge(UnitFrameBase, {
+			boss = Merge(UnitFrameBase, UnitAuraBase, {
 				targetBorder         = { enabled = true, color = { 1, 1, 1, 1 }, thickness = 2 },
 				width                = 291,
 				height               = 40,
-				powerHeight          = 8,
 				nameTextSize         = 11,
 				healthTextSize       = 10,
 				powerTextSize        = 9,
 				showPower            = true,
 				showPowerText        = true,
 				classColorName       = true,
-				growthDirection      = 'DOWN',
 				spacing              = 1,
 				position             = { point = 'CENTER', relPoint = 'CENTER', x = 581, y = 60 },
-				showDebuffs          = true,
-				debuffShowMode       = 'mine',
 				auraIconSize         = 20,
-				auraSpacing          = 2,
-				auraStackSize        = 10,
-				auraCdSize           = 10,
 				maxDebuffs           = 6,
 				debuffsPerRow        = 6,
 				debuffStackPos       = 'BOTTOMRIGHT',
-				showDebuffType       = true,
 			}),
 		},
 	},
@@ -1811,6 +1686,41 @@ end
 secondaryPower.comboChargedColorR = 0.96
 secondaryPower.comboChargedColorG = 0.55
 secondaryPower.comboChargedColorB = 0.73
+
+for _, entry in ipairs({
+	{ 'stagger',    0.52, 1.00, 0.52, 0.15, showPercent = true },
+	{ 'casterMana', 1.00, 1.00, 1.00, 0.10, barMode = false, textColor = false },
+	{ 'override',   0.20, 0.60, 1.00, 0.15 },
+	{ 'soulFrags',  0.40, 1.00, 0.40, 0.15, showPercent = true },
+}) do
+	local prefix = entry[1]
+	secondaryPower[prefix .. 'BarMode']      = entry.barMode ~= false
+	secondaryPower[prefix .. 'BarWidth']     = 200
+	secondaryPower[prefix .. 'BarHeight']    = 16
+	secondaryPower[prefix .. 'ColorR']       = entry[2]
+	secondaryPower[prefix .. 'ColorG']       = entry[3]
+	secondaryPower[prefix .. 'ColorB']       = entry[4]
+	secondaryPower[prefix .. 'BgColorR']     = entry[5]
+	secondaryPower[prefix .. 'BgColorG']     = entry[5]
+	secondaryPower[prefix .. 'BgColorB']     = entry[5]
+	secondaryPower[prefix .. 'BgColorA']     = 1
+	secondaryPower[prefix .. 'BarOffsetX']   = 0
+	secondaryPower[prefix .. 'BarOffsetY']   = 0
+	secondaryPower[prefix .. 'HideBarText']  = false
+	secondaryPower[prefix .. 'ShowValue']    = true
+	secondaryPower[prefix .. 'ShowPercent']  = entry.showPercent == true
+	secondaryPower[prefix .. 'ValueSize']    = 14
+	secondaryPower[prefix .. 'ValueColorR']  = 1
+	secondaryPower[prefix .. 'ValueColorG']  = 1
+	secondaryPower[prefix .. 'ValueColorB']  = 1
+	secondaryPower[prefix .. 'ValueOffsetX'] = 0
+	secondaryPower[prefix .. 'ValueOffsetY'] = 0
+	if entry.textColor ~= false then
+		secondaryPower[prefix .. 'TextColorR'] = 1
+		secondaryPower[prefix .. 'TextColorG'] = 1
+		secondaryPower[prefix .. 'TextColorB'] = 1
+	end
+end
 
 BUI.NilDefaultKeys = {
 	minimapScreenX    = true,

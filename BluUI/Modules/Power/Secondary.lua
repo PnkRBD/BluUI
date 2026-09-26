@@ -1139,4 +1139,4 @@ end
 BUI.Events:OnLogin("SecondaryPower", function()
     SecondaryPower.Initialize()
     Shared.DeferRefresh(function() return frame end, GetDB, function() Position() Style() end)
-end)
+end, "power")

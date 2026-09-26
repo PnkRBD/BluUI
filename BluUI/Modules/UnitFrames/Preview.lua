@@ -460,7 +460,7 @@ function UnitFrames.HideBossCastbarPreview()
 end
 
 function UnitFrames.ShowPreview(unitType)
-	if InCombatLockdown() then print('|cff6D00FDBluUI:|r Cannot preview during combat.') return end
+	if InCombatLockdown() then BUI.Print('Cannot preview during combat.') return end
 	if active[unitType] then return end
 	active[unitType] = true
 
@@ -486,7 +486,7 @@ function UnitFrames.ShowPreview(unitType)
 
 	local button = UnitFrames._previewButtons[unitType]
 	if button and button.SetText then button:SetText('Hide Preview') end
-	print('|cff6D00FDBluUI:|r ' .. unitType .. ' preview shown, right-click hides it.')
+	BUI.Print('' .. unitType .. ' preview shown, right-click hides it.')
 end
 
 local pendingHides = {}
@@ -571,7 +571,7 @@ end
 
 function UnitFrames.LockPreview(unitType)
 	UnitFrames.HidePreview(unitType)
-	print('|cff6D00FDBluUI:|r ' .. unitType:sub(1, 1):upper() .. unitType:sub(2) .. ' preview hidden.')
+	BUI.Print('' .. unitType:sub(1, 1):upper() .. unitType:sub(2) .. ' preview hidden.')
 end
 
 function UnitFrames.TogglePreview(unitType)
@@ -720,7 +720,7 @@ local function OnAnimUpdate(_, elapsed)
 end
 
 function UnitFrames.ShowAll()
-	if InCombatLockdown() then print('|cff6D00FDBluUI:|r Cannot show test mode during combat.') return end
+	if InCombatLockdown() then BUI.Print('Cannot show test mode during combat.') return end
 	if testActive then return end
 	testActive = true
 	wipe(animEntries)
@@ -782,7 +782,7 @@ function UnitFrames.ShowAll()
 
 	if not animFrame then animFrame = CreateFrame('Frame') end
 	animFrame:SetScript('OnUpdate', OnAnimUpdate)
-	print('|cff6D00FDBluUI:|r Test mode |cff00ff00enabled|r. Type |cffFD008B/buitest|r to disable.')
+	BUI.Print('Test mode |cff00ff00enabled|r. Type |cff' .. BUI.C.COLOR_PINK .. '/buitest|r to disable.')
 end
 
 function UnitFrames.HideAll()
@@ -826,7 +826,7 @@ function UnitFrames.HideAll()
 	wipe(testFrames)
 	UnitFrames:Refresh()
 
-	print('|cff6D00FDBluUI:|r Test mode |cffff6600disabled|r.')
+	BUI.Print('Test mode |cffff6600disabled|r.')
 end
 
 function UnitFrames.ToggleShowAll()

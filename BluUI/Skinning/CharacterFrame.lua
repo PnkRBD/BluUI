@@ -1003,8 +1003,7 @@ local function PrimaryStatIndex()
 end
 
 local function IsBrewmaster()
-    local specIndex = GetSpecialization()
-    return specIndex ~= nil and (GetSpecializationInfo(specIndex)) == 268
+    return PlayerUtil.GetCurrentSpecID() == 268
 end
 
 local function PctStat(name, percentFn, ratingID, tooltip, title)

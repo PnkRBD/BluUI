@@ -48,9 +48,9 @@ local function Announce(active)
 	local config = GetConfig()
 	if not config.chatMessage then return end
 	if active then
-		print('|cff6D00FDBluUI:|r Combat logging |cff40ff40ON|r (' .. DescribeLocation() .. ')')
+		BUI.Print('Combat logging |cff40ff40ON|r (' .. DescribeLocation() .. ')')
 	else
-		print('|cff6D00FDBluUI:|r Combat logging |cffff4040OFF|r')
+		BUI.Print('Combat logging |cffff4040OFF|r')
 	end
 end
 

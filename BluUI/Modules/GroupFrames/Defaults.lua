@@ -1,16 +1,5 @@
 local _, BUI = ...
 
-local function copy(source)
-	local result = {}
-	for key, value in pairs(source) do result[key] = type(value) == "table" and copy(value) or value end
-	return result
-end
-
-local function merge(dest, source)
-	for key, value in pairs(source) do dest[key] = value end
-	return dest
-end
-
 local function TextDefaults(size, anchor, offsetX, offsetY, format)
 	return {
 		format = format, size = size, outline = "OUTLINE",
@@ -53,7 +42,7 @@ local STATUS_COLORS = {
 local function CommonSettings(sizes)
 	local statusText = TextDefaults(sizes.statusSize, "CENTER", 0, 0)
 	statusText.format = nil
-	statusText.colors = copy(STATUS_COLORS)
+	statusText.colors = CopyTable(STATUS_COLORS)
 
 	return {
 		useClassColor        = true,
@@ -137,14 +126,15 @@ end
 local KEYSTONE_TEXT = TextDefaults(10, "TOPRIGHT", -3, -1)
 KEYSTONE_TEXT.outline = ""
 
-local PARTY = merge(CommonSettings({
+local PARTY = CommonSettings({
 	nameSize = 11, hpSize = 11, pwrSize = 9, statusSize = 12,
 	smallIcon = 20, markerIcon = 32, rezIcon = 30, readyIcon = 28,
 	combatIcon = 18, badgeSize = 28, iconY = 22,
 	smallAura = 22, auraGap = 2, buffMax = 6, debuffMax = 8, buffsOn = true, debuffsOn = true,
 	bigDefSize = 28, bigDefOX = 4, ccSize = 24, ccMax = 4,
 	paSize = 30,
-}), {
+})
+MergeTable(PARTY, {
 	enabled     = true,
 	width       = 160,
 	height      = 36,
@@ -179,7 +169,7 @@ local PARTY = merge(CommonSettings({
 	classOrder = "DEATHKNIGHT,DEMONHUNTER,DRUID,EVOKER,HUNTER,MAGE,MONK,PALADIN,PRIEST,ROGUE,SHAMAN,WARLOCK,WARRIOR",
 })
 
-local RAID = merge(CommonSettings({
+local RAID = CommonSettings({
 	nameSize = 10, hpSize = 10, pwrSize = 8, statusSize = 10,
 	nameOX = 3,
 	smallIcon = 16, markerIcon = 26, rezIcon = 24, readyIcon = 22,
@@ -188,7 +178,8 @@ local RAID = merge(CommonSettings({
 	bigDefSize = 24, bigDefOX = 2, ccSize = 20, ccMax = 3,
 	paSize = 24,
 	showAuraTooltips = true,
-}), {
+})
+MergeTable(RAID, {
 	enabled         = true,
 	roleIconFilter  = "all",
 	clampGroups     = true,
