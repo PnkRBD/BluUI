@@ -131,7 +131,7 @@ function Layout.WindowFrame(config)
 	if config.escapable then
 		local globalName = config.globalName or ('BUILibWindow_' .. BUILib.GetActiveClient().name)
 		_G[globalName] = frame
-		tinsert(UISpecialFrames, globalName)
+		if not tContains(UISpecialFrames, globalName) then tinsert(UISpecialFrames, globalName) end
 	end
 
 	frame.__bui3client = BUILib.GetActiveClient()
@@ -419,16 +419,26 @@ function Layout.Window(config)
 	versionLabel:SetPoint('BOTTOMLEFT', 18, 14)
 	versionLabel:SetText('v' .. (config.version or '1.0'))
 
+	local function Override(theme, mode, role)
+		local overrides = theme[mode]
+		return overrides and overrides[role]
+	end
+
 	function window:ChromeColor(role, theme, mode)
-		if role == 'page' then return theme.background or Theme.window[mode].background end
+		if role == 'page' then return Override(theme, mode, 'page') or Theme.window[mode].background end
+		if role == 'edge' and not Override(theme, mode, 'edge') then
+			local red, green, blue = Theme.GetAccent()
+			return { red * BORDER_ACCENT_SCALE, green * BORDER_ACCENT_SCALE, blue * BORDER_ACCENT_SCALE, 1 }
+		end
 	end
 
 	function window:PaintChrome(theme)
-		local look = Theme.window[self:GetMode()]
-		self:PaintFrame(theme.background or look.background, theme.border)
-		Paint(titleBarTexture, theme.titleBar or look.titleBar)
-		Paint(sidebarTexture, theme.sidebar or look.sidebar)
-		Paint(divider, theme.divider or look.divider)
+		local mode = self:GetMode()
+		local look = Theme.window[mode]
+		self:PaintFrame({ self:Color('page') }, Override(theme, mode, 'edge'))
+		Paint(titleBarTexture, Override(theme, mode, 'bar') or look.titleBar)
+		Paint(sidebarTexture, Override(theme, mode, 'sidebar') or look.sidebar)
+		Paint(divider, Override(theme, mode, 'sidebarEdge') or look.divider)
 		brand:SetFont(BUILib.Font, 15, look.outline and 'OUTLINE' or '')
 		brand:SetTextColor(unpack(look.text))
 		versionLabel:SetTextColor(unpack(look.faint))
