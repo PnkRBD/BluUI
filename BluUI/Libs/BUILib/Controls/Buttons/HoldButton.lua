@@ -10,7 +10,7 @@ local GetTime = GetTime
 
 function Controls.HoldButton(parent, text, callback, duration, width)
 	duration = duration or 1.5
-	width = width or 100
+	width = Widget.EvenSize(width or 100)
 	local self = Widget.New(parent, "Button", nil, { raw = true, size = {width, CONTROL_HEIGHT} })
 	local frame = self.frame
 	frame._noGridStretch = true
@@ -27,7 +27,7 @@ function Controls.HoldButton(parent, text, callback, duration, width)
 	label:SetPoint("CENTER")
 	local textWidth = label:GetStringWidth() + 24
 	if textWidth > width then
-		width = textWidth
+		width = Widget.EvenSize(textWidth)
 		frame:SetWidth(width)
 	end
 
@@ -61,7 +61,7 @@ function Controls.HoldButton(parent, text, callback, duration, width)
 	function frame:SetText(newText)
 		label:SetText(newText)
 		local newWidth = label:GetStringWidth() + 24
-		if newWidth > frame:GetWidth() then frame:SetWidth(newWidth) end
+		if newWidth > frame:GetWidth() then frame:SetWidth(Widget.EvenSize(newWidth)) end
 	end
 	function frame:UpdateAccent(newRed, newGreen, newBlue) Widget.SetColor(progress, newRed, newGreen, newBlue, 0.3) end
 	Theme.RegisterAccentElement(frame, function(element, newRed, newGreen, newBlue) element:UpdateAccent(newRed, newGreen, newBlue) end)

@@ -71,4 +71,9 @@
     <Script file="PageKit\Scaffold.lua"/>
     <Script file="PageKit\Helpers.lua"/>
     <Script file="Core\Window.lua"/>
+    <Script file="Core\TopNavWindow.lua"/>
+    <Script file="Core\TablePage.lua"/>
+    <Script file="Core\Rail.lua"/>
+    <Script file="Core\RailPage.lua"/>
+    <Script file="Core\Shell.lua"/>
 </Ui>

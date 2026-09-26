@@ -6,7 +6,7 @@ local Theme = BUILib.Theme
 local ROW_HEIGHT = BUILib.ROW_HEIGHT
 
 function Controls.GhostButton(parent, text, width, callback, tooltip)
-	width = width or 100
+	width = Widget.EvenSize(width or 100)
 	local self = Widget.New(parent, "Button", nil, { raw = true, size = {width, ROW_HEIGHT} })
 	local ghostBorder = Widget.DrawOutline(self.frame, Widget.INPUT_RADIUS, Theme.border.light)
 	self.frame._noGridStretch = true
@@ -15,7 +15,7 @@ function Controls.GhostButton(parent, text, width, callback, tooltip)
 	local label = self:CreateText({text = text or "", color = Theme.text.secondary})
 	label:SetPoint("CENTER")
 	local textWidth = label:GetStringWidth() + 24
-	if textWidth > width then frame:SetWidth(textWidth) end
+	if textWidth > width then frame:SetWidth(Widget.EvenSize(textWidth)) end
 	frame:HookScript("OnEnter", function(button)
 		local red, green, blue = Theme.GetAccent()
 		Widget.SetShapeColor(ghostBorder, red, green, blue, 1)
@@ -31,7 +31,7 @@ function Controls.GhostButton(parent, text, width, callback, tooltip)
 	function frame:SetText(newText)
 		label:SetText(newText)
 		local newWidth = label:GetStringWidth() + 24
-		if newWidth > frame:GetWidth() then frame:SetWidth(newWidth) end
+		if newWidth > frame:GetWidth() then frame:SetWidth(Widget.EvenSize(newWidth)) end
 	end
 	function frame:GetText() return label:GetText() end
 	function frame:SetCallback(newCallback) frame:SetScript("OnClick", function() if newCallback then newCallback() end end) end

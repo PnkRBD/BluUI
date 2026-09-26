@@ -675,15 +675,10 @@ function Controls.SpellColorList(parent, placeholder, width, height, onAdd, onRe
 			Controls.OpenColorPicker({
 				r = color[1], g = color[2], b = color[3], a = 1,
 				anchorTo = swatch,
-				callback = function(red, green, blue, alpha, cancelled)
-					if cancelled then
-						Widget.SetColor(swatchTexture, color[1], color[2], color[3], 1)
-						if onColorChange and row.data then onColorChange(row.data.id, {color[1], color[2], color[3], 1}) end
-					else
-						Widget.SetColor(swatchTexture, red, green, blue, 1)
-						color[1], color[2], color[3] = red, green, blue
-						if onColorChange and row.data then onColorChange(row.data.id, {red, green, blue, 1}) end
-					end
+				callback = function(red, green, blue)
+					Widget.SetColor(swatchTexture, red, green, blue, 1)
+					color[1], color[2], color[3] = red, green, blue
+					if onColorChange and row.data then onColorChange(row.data.id, {red, green, blue, 1}) end
 				end,
 			})
 		end)

@@ -1,9 +1,7 @@
 local BUILib = LibStub("BUILib")
 if not BUILib.__loadChildren then return end
 local Widget = BUILib.Widget
-
-local cachedTheme
-local function theme() if not cachedTheme then cachedTheme = BUILib.Theme end return cachedTheme end
+local Theme = BUILib.Theme
 
 local CHIP_X = 14
 local CHIP_HEIGHT = 30
@@ -12,30 +10,41 @@ local HEADER_X = 24
 local PILL_RADIUS = 8
 local SLIDE_SECONDS = 0.30
 local FADE_IN = 0.18
-local TEXT_REST = { 0.74, 0.74, 0.78, 1 }
-local TEXT_HOVER = { 0.95, 0.95, 0.95, 1 }
-local TEXT_SELECTED = { 0.98, 0.98, 1, 1 }
-local TEXT_DISABLED = { 0.4, 0.4, 0.42, 1 }
-local HEADER_COLOR = { 0.42, 0.44, 0.50, 1 }
-local PILL_FILL = { 0.07, 0.075, 0.09, 1 }
+local WEAK_KEYS = { __mode = 'k' }
 local unpack = unpack
 
 Widget.NAV_CHIP_X = CHIP_X
 Widget.NAV_CHIP_HEIGHT = CHIP_HEIGHT
 Widget.NAV_HEADER_HEIGHT = 18
 
+local function Colors(rail)
+	return rail._navColors or Theme.window.dark.nav
+end
+
+local function Track(rail, key, item)
+	rail[key] = rail[key] or setmetatable({}, WEAK_KEYS)
+	rail[key][item] = true
+end
+
+function Widget.NavSetColors(rail, colors)
+	rail._navColors = colors
+	for chip in pairs(rail._navChips or {}) do chip:Repaint() end
+	for header in pairs(rail._navHeaders or {}) do header:SetTextColor(unpack(colors.header)) end
+	if rail._navPillFill then Widget.SetRectColor(rail._navPillFill, unpack(colors.pill)) end
+end
+
 local function EnsurePill(rail)
 	if rail._navPill then return rail._navPill end
 	local pill = CreateFrame('Frame', nil, rail)
 	pill:SetFrameLevel(rail:GetFrameLevel())
 	pill:SetSize(rail:GetWidth() - CHIP_X * 2, CHIP_HEIGHT)
-	local red, green, blue = theme().GetAccent()
+	local red, green, blue = Theme.GetAccent()
 	local ring = Widget.DrawRoundedRect(pill, PILL_RADIUS, { red, green, blue, 0.35 }, 'ARTWORK', 0, 0)
-	Widget.DrawRoundedRect(pill, PILL_RADIUS - 1, PILL_FILL, 'ARTWORK', 1, 1)
+	rail._navPillFill = Widget.DrawRoundedRect(pill, PILL_RADIUS - 1, Colors(rail).pill, 'ARTWORK', 1, 1)
 	local tint = Widget.DrawRoundedRect(pill, PILL_RADIUS - 1, { red, green, blue, 0.10 }, 'ARTWORK', 2, 1)
 	pill:Hide()
 	rail._navPill = pill
-	theme().RegisterAccentElement(pill, function(_, newRed, newGreen, newBlue)
+	Theme.RegisterAccentElement(pill, function(_, newRed, newGreen, newBlue)
 		Widget.SetRectColor(ring, newRed, newGreen, newBlue, 0.35)
 		Widget.SetRectColor(tint, newRed, newGreen, newBlue, 0.10)
 	end)
@@ -132,7 +141,8 @@ function Widget.NavHeader(rail, text, y, x)
 	header:SetFont(BUILib.Font, 9, 'OUTLINE')
 	header:SetPoint('TOPLEFT', x or HEADER_X, y)
 	header:SetText((text or ''):upper())
-	header:SetTextColor(unpack(HEADER_COLOR))
+	header:SetTextColor(unpack(Colors(rail).header))
+	Track(rail, '_navHeaders', header)
 	return header
 end
 
@@ -148,35 +158,38 @@ function Widget.NavChip(rail, label, callback, options)
 	text:SetFont(BUILib.Font, options.fontSize or 12, '')
 	text:SetText(label)
 	text:SetPoint('LEFT', CHIP_TEXT_X + (options.indent or 0), 0)
-	text:SetTextColor(unpack(TEXT_REST))
 	chip.text = text
 
-	local hoverTextures = Widget.DrawRoundedRect(chip, PILL_RADIUS, { 1, 1, 1, 0.04 }, 'BACKGROUND', 0, 0)
+	local hoverTextures = Widget.DrawRoundedRect(chip, PILL_RADIUS, Colors(rail).hoverFill, 'BACKGROUND', 0, 0)
 	local function SetHoverShown(shown)
 		for _, texture in ipairs(hoverTextures) do texture:SetShown(shown) end
 	end
 	SetHoverShown(false)
 
+	function chip:Repaint()
+		local colors = Colors(rail)
+		Widget.SetRectColor(hoverTextures, unpack(colors.hoverFill))
+		text:SetTextColor(unpack(colors[self.disabled and 'disabled' or self.selected and 'selected' or 'rest']))
+	end
+
 	chip:HookScript('OnEnter', function(self)
 		if self.selected or self.disabled then return end
-		text:SetTextColor(unpack(TEXT_HOVER))
+		text:SetTextColor(unpack(Colors(rail).hover))
 		SetHoverShown(true)
 	end)
 	chip:HookScript('OnLeave', function(self)
 		if self.selected or self.disabled then return end
-		text:SetTextColor(unpack(TEXT_REST))
+		self:Repaint()
 		SetHoverShown(false)
 	end)
 
 	function chip:SetSelected(isSelected)
 		if self.disabled then return end
 		self.selected = isSelected
+		self:Repaint()
 		if isSelected then
-			text:SetTextColor(unpack(TEXT_SELECTED))
 			SetHoverShown(false)
 			Widget.NavSelect(self)
-		else
-			text:SetTextColor(unpack(TEXT_REST))
 		end
 	end
 
@@ -189,6 +202,8 @@ function Widget.NavChip(rail, label, callback, options)
 		text:SetPoint('LEFT', CHIP_TEXT_X + (indent or 0), 0)
 	end
 
+	Track(rail, '_navChips', chip)
+	chip:Repaint()
 	return chip
 end
 
@@ -197,19 +212,19 @@ function Widget.NavChipDisable(chip)
 	chip.selected = false
 	chip:SetScript('OnClick', nil)
 	chip:EnableMouse(false)
-	if chip.text then chip.text:SetTextColor(unpack(TEXT_DISABLED)) end
+	chip:Repaint()
 end
 
 function Widget.NavChipEnable(chip, callback)
 	chip.disabled = nil
 	chip:EnableMouse(true)
 	chip:SetScript('OnClick', callback)
-	if chip.text then chip.text:SetTextColor(unpack(TEXT_REST)) end
+	chip:Repaint()
 end
 
 function Widget.NavChipMute(chip)
 	chip.disabled = true
 	chip.selected = false
 	chip:SetScript('OnClick', nil)
-	if chip.text then chip.text:SetTextColor(unpack(TEXT_DISABLED)) end
+	chip:Repaint()
 end
