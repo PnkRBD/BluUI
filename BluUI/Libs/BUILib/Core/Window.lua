@@ -78,6 +78,17 @@ local function BuildChipRail(window, navConfig)
 	return buttons, 16 - y
 end
 
+function Layout.PlayerPortrait(texture)
+	local function Refresh() SetPortraitTexture(texture, 'player') end
+	local owner = texture:GetParent()
+	local watcher = CreateFrame('Frame', nil, owner)
+	watcher:RegisterUnitEvent('UNIT_PORTRAIT_UPDATE', 'player')
+	watcher:RegisterEvent('PORTRAITS_UPDATED')
+	watcher:SetScript('OnEvent', Refresh)
+	owner:HookScript('OnShow', Refresh)
+	Refresh()
+end
+
 function Layout.WindowFrame(config)
 	local window = { navFrames = {} }
 
@@ -313,7 +324,7 @@ function Layout.Window(config)
 	if config.icon then
 		portrait:SetTexture(config.icon)
 	else
-		SetPortraitTexture(portrait, 'player')
+		Layout.PlayerPortrait(portrait)
 	end
 	portrait:SetMask(BUILib.GetLibMedia('circle_mask'))
 
