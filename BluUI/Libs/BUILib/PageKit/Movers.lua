@@ -27,7 +27,7 @@ function PageKit.PositionMover(parent, config)
 						if value then SetValue("posX", 0); xSlider:SetValue(0) end
 						config.apply()
 						PageKit.SyncAnchorLocks(xSlider, ySlider, centerCheckbox, anchored, value)
-					end)
+					end, nil, true, nil, "mini")
 					PageKit.PopRow(panel, 98, "Center Horizontally", centerCheckbox)
 					local offsets = config.offsets
 					if offsets then
@@ -92,7 +92,7 @@ local function BuildOptionRows(panel, options, onChange)
 				callback = function(red, green, blue, alpha) changed({ red, green, blue, alpha }) end,
 			})
 		else
-			control = Controls.StampCheckbox(panel, nil, option.get(), changed)
+			control = Controls.StampCheckbox(panel, nil, option.get(), changed, nil, true, nil, "mini")
 		end
 		PageKit.PopRow(panel, yOffset, option.label, control)
 		if option.swatch then

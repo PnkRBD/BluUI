@@ -66,7 +66,7 @@ local function BuildOptionRow(panel, config, option, columnX, columnWidth, yOffs
 	elseif option.kind == 'textbox' then
 		control = Controls.TextBox(panel, nil, option.get(), changed, nil, option.controlWidth or 130)
 	else
-		control = Controls.StampCheckbox(panel, nil, option.get(), changed, nil, true, nil, "small")
+		control = Controls.StampCheckbox(panel, nil, option.get(), changed, nil, true, nil, "mini")
 	end
 	local controlFrame = Widget.Unwrap(control)
 	controlFrame:ClearAllPoints()

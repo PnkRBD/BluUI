@@ -62,8 +62,8 @@ local function OnceGuard()
 end
 
 function Modals.CreateBase(width, height, bounded, parent)
-	width = width or SIZES.width
-	height = height or SIZES.height
+	width = Widget.EvenSize(width or SIZES.width)
+	height = Widget.EvenSize(height or SIZES.height)
 	local theme = GetTheme()
 
 	parent = parent or BUILib.GetActiveClient().popupParent or defaultParent
@@ -216,7 +216,7 @@ function Modals.LayoutButtons(dialog, buttons, closeFunc, bottomMargin)
 	for index, buttonOptions in ipairs(buttons) do
 		local button = Modals.CreateButton(dialog, buttonOptions.text, buttonOptions.color, buttonOptions.width)
 		local fitted = math.ceil(button.text:GetStringWidth() + SIZES.buttonTextPadding * 2)
-		local buttonWidth = math.max(buttonOptions.width or SIZES.buttonWidth, fitted)
+		local buttonWidth = Widget.EvenSize(math.max(buttonOptions.width or SIZES.buttonWidth, fitted))
 		button:SetWidth(buttonWidth)
 		created[index], widths[index] = button, buttonWidth
 		totalWidth = totalWidth + buttonWidth

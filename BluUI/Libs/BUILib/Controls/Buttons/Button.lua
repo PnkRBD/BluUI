@@ -54,7 +54,7 @@ function Controls.Button(parent, text, width, callback, tooltipOrOptions, accent
 		label:SetTextColor(red, green, blue, 1)
 	end
 	local textWidth = label:GetStringWidth() + 24 + (indicator and 14 or 0)
-	button:SetWidth(math.max(width, textWidth))
+	button:SetWidth(Widget.EvenSize(math.max(width, textWidth)))
 
 	local function UpdateIndicator()
 		if not indicator then return end
@@ -86,7 +86,7 @@ function Controls.Button(parent, text, width, callback, tooltipOrOptions, accent
 	function button:SetText(newText)
 		label:SetText(newText)
 		local newWidth = label:GetStringWidth() + 24 + (indicator and 14 or 0)
-		if newWidth > button:GetWidth() then button:SetWidth(newWidth) end
+		if newWidth > button:GetWidth() then button:SetWidth(Widget.EvenSize(newWidth)) end
 	end
 	function button:GetText() return label:GetText() end
 	function button:SetCallback(newCallback) button:SetScript("OnClick", function() if newCallback then newCallback(state.active) end end) end
