@@ -40,7 +40,7 @@ local function DiscardPage(page)
 end
 
 local function CreateWindow(shell)
-	local build = shell.config.chrome == 'topnav' and Layout.TopNavWindow or Layout.Window
+	local build = shell:Chrome() == 'topnav' and Layout.TopNavWindow or Layout.Window
 	shell.window = build(setmetatable({
 		escapable = true,
 		theme = shell:Theme(),
@@ -68,6 +68,24 @@ function Shell:Theme()
 	local store = self:Store()
 	store.theme = store.theme or {}
 	return store.theme
+end
+
+function Shell:Chrome()
+	return self:Store().chrome or self.config.chrome
+end
+
+function Shell:SetChrome(chrome)
+	self:Store().chrome = chrome
+	if not self.window then return end
+	local current = self.current
+	for _, page in pairs(self.pages) do
+		if page.container then DiscardPage(page) end
+	end
+	self.window:Hide()
+	self.window.frame:SetParent(nil)
+	self.window = nil
+	self.current = nil
+	self:Open(current)
 end
 
 function Shell:ApplyTheme()
