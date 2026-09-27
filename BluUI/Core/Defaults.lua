@@ -1290,6 +1290,7 @@ BUI.Defaults = {
 			posY            = 300,
 		},
 
+		windowTheme = {},
 		framePositions = {},
 
 		auras = {
