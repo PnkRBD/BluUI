@@ -744,97 +744,11 @@ BUI.PageEngine.RegisterPage("settings", {
 			end
 		end
 
-		local function BuildHelp(tab)
-			Layout.Section(tab, 'Diagnostics')
-			local grid = PageKit.RowGrid(tab)
-
-			local helpBox
-
-			local function GatherDiagnostics()
-				local lines = {}
-				local function AddLine(line) lines[#lines + 1] = line end
-
-				AddLine('== BluUI ==')
-				AddLine('Version: ' .. BUI.Version)
-
-				local _, class = UnitClass('player')
-				local specIndex = GetSpecialization()
-				local specName = specIndex and select(2, GetSpecializationInfo(specIndex)) or 'none'
-				AddLine('')
-				AddLine('== Character ==')
-				AddLine('Name: ' .. UnitName('player') .. ' - ' .. GetRealmName())
-				AddLine('Class: ' .. class)
-				AddLine('Spec: ' .. specName)
-				AddLine('Level: ' .. UnitLevel('player'))
-
-				local clientVersion, build, _, tocVersion = GetBuildInfo()
-				AddLine('')
-				AddLine('== Client ==')
-				AddLine('Version: ' .. clientVersion .. ' (build ' .. build .. ')')
-				AddLine('TOC: ' .. tocVersion)
-				AddLine('Locale: ' .. GetLocale())
-				local screenWidth, screenHeight = GetPhysicalScreenSize()
-				AddLine('Screen: ' .. screenWidth .. 'x' .. screenHeight)
-				AddLine('UI Scale: ' .. format('%.4f', UIParent:GetEffectiveScale()))
-
-				AddLine('')
-				AddLine('== Settings ==')
-				AddLine('Font: ' .. tostring(db.general.font))
-				AddLine('Texture: ' .. tostring(db.general.texture))
-				AddLine('Class Color Theme: ' .. tostring(db.general.useClassColorTheme))
-				local themeColor = db.general.themeColor
-				AddLine('Theme Color: ' .. format('%.2f, %.2f, %.2f', themeColor[1], themeColor[2], themeColor[3]))
-				AddLine('')
-				AddLine('== Modules ==')
-				for moduleKey, moduleEnabled in pairs(db.modules) do
-					AddLine('  ' .. moduleKey .. ': ' .. tostring(moduleEnabled))
-				end
-
-				AddLine('')
-				AddLine('== Addons (' .. C_AddOns.GetNumAddOns() .. ') ==')
-				for addonIndex = 1, C_AddOns.GetNumAddOns() do
-					local addonName = C_AddOns.GetAddOnInfo(addonIndex)
-					local loaded = C_AddOns.IsAddOnLoaded(addonIndex)
-					if loaded then
-						local addonVersion = C_AddOns.GetAddOnMetadata(addonName, 'Version') or ''
-						if addonVersion ~= '' then
-							AddLine('  ' .. addonName .. ' v' .. addonVersion)
-						else
-							AddLine('  ' .. addonName)
-						end
-					end
-				end
-
-				return table.concat(lines, '\n')
-			end
-
-			local function RunDiagnosticsReport()
-				helpBox.editbox:SetText(GatherDiagnostics())
-				helpBox.editbox:HighlightText()
-				helpBox.editbox:SetFocus()
-			end
-
-			grid:Add({
-				spanFull = true,
-				title = 'Diagnostics Report',
-				description = 'Character, client, settings and addon info. Copy and paste it with bug reports.',
-				plain = true,
-				accessoryWidth = 130,
-				accessories = function(row)
-					return { Controls.Button(row, 'Generate Report', 120, RunDiagnosticsReport) }
-				end,
-			})
-			grid:Flush()
-
-			helpBox = Layout.TextArea(tab, nil, 500)
-		end
-
 		local builders = {
 			appearance = BUI.AppearancePage.BuildTab,
 			settings = BuildSettings,
 			skinning = BUI.SkinningPage.BuildTab,
 			visibility = BUI.VisibilityPage.BuildTab,
-			help = BuildHelp,
 		}
 		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
 		local adapter = { tabContents = {}, currentTab = 1 }
@@ -847,6 +761,7 @@ BUI.PageEngine.RegisterPage("settings", {
 			build = function(kit, shell, parent, width, item, railPage)
 				if item.id == 'theme' then return BUI.ThemePage.Sections(kit, shell, parent, width, railPage) end
 				if item.id == 'modules' then return BUI.ModulesPage.Sections(kit, shell, parent, width, railPage) end
+				if item.id == 'help' then return BUI.HelpPage.Sections(kit, shell, parent, width, railPage) end
 				return { Host(parent, width, builders[item.id], railPage, adapter, TAB_INDEX[item.id]) }
 			end,
 		})
