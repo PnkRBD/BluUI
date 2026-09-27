@@ -1,6 +1,7 @@
 local _, BUI = ...
 local Pixel = BUI.Pixel
 local Layout = BUI.BUILibClient.Layout
+local Controls = BUI.BUILibClient.Controls
 
 local PageEngine = {
 	pages        = {},
@@ -42,52 +43,48 @@ local function CreateWindow()
 	local SearchResults = BUI.SearchResults
 
 	local window
-	window = Layout.Window({
-		width        = 1100, height    = 700, title = 'BluUI',
+	window = Layout.TopNavWindow({
+		width        = 1240, height    = 860, title = 'BluUI',
 		icon         = BUI.C.ICON_PATH,
-		minWidth     = 1044, minHeight = 640,
-		version      = BUI.Version, sidebarWidth = 190,
+		minWidth     = 1228, minHeight = 720, pageWidth = 960,
+		version      = BUI.Version, sidebarWidth = 220,
 		strata       = 'FULLSCREEN_DIALOG', frameLevel = 200, escapable = true,
 		globalName   = 'BluUIFrame', footerButtons = BUI.Scale.GetFooterButtons(),
 		clampedToScreen = false,
-		searchBox    = {
-			placeholder = 'Search...',
-			width       = 200,
-			onSearch    = function(query)
-				if not query or query == '' then SearchResults.Hide(); return end
-				local results = SearchIndex.Search(query)
-				if #results > 0 then
-					SearchResults.Show(results, window.searchBox.frame)
-				else
-					SearchResults.Hide()
-				end
-			end,
-			onSubmit    = function(query)
-				local results = SearchIndex.Search(query)
-				if results[1] then
-					SearchResults.Hide()
-					SearchResults.NavigateTo(results[1])
-					return true
-				end
-			end,
-		},
+		theme        = BUI.GetDB().windowTheme,
 	})
 	window.frame:Hide()
 	PageEngine.window = window
 	PageEngine.frame  = window.frame
-	PageEngine.searchBox = window.searchBox
 	BUI.Scale.SetupButtons(window, PageEngine.frame)
 
 	window.frame:HookScript('OnHide', HideCurrentPage)
 
-	local searchBoxFrame = window.searchBox.frame
-	local buttonFrame = window.footerLeftmost.frame or window.footerLeftmost
-	searchBoxFrame:SetParent(buttonFrame:GetParent())
-	searchBoxFrame:ClearAllPoints()
+	local buttonFrame = window.footerLeftmost
+	local searchBox = Controls.SearchBox(buttonFrame:GetParent(), 'Search...', function(query)
+		if query == '' then SearchResults.Hide(); return end
+		local results = SearchIndex.Search(query)
+		if #results > 0 then
+			SearchResults.Show(results, PageEngine.searchBox.frame)
+		else
+			SearchResults.Hide()
+		end
+	end, 200)
+	PageEngine.searchBox = searchBox
+	local searchBoxFrame = searchBox.frame
 	searchBoxFrame:SetPoint('TOP', buttonFrame, 'TOP', 0, 0)
 	searchBoxFrame:SetPoint('BOTTOM', buttonFrame, 'BOTTOM', 0, 0)
-	if window.sidebar then searchBoxFrame:SetPoint('LEFT', window.sidebar, 'RIGHT', Pixel.Scale(12), 0) end
+	searchBoxFrame:SetPoint('LEFT', window.footerVersion, 'RIGHT', Pixel.Scale(12), 0)
 	searchBoxFrame:SetPoint('RIGHT', buttonFrame, 'LEFT', Pixel.Scale(-8), 0)
+	searchBoxFrame.editbox:SetScript('OnEnterPressed', function(self)
+		local results = SearchIndex.Search(self:GetText())
+		if results[1] then
+			SearchResults.Hide()
+			SearchResults.NavigateTo(results[1])
+			self:SetText('')
+			self:ClearFocus()
+		end
+	end)
 end
 
 local function BuildPageContent(pageConfig)
@@ -106,8 +103,8 @@ local function UpdateNavSelection()
 			if PageEngine.pageOrder[pageIndex] == pageConfig.navParent then selectedIndex = pageIndex; break end
 		end
 	end
-	for _, button in ipairs(PageEngine.buttons) do
-		button:SetSelected(button.pageIndex == selectedIndex)
+	for pageIndex, button in pairs(PageEngine.buttons) do
+		button:SetSelected(pageIndex == selectedIndex)
 	end
 end
 
