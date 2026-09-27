@@ -31,6 +31,8 @@ local BUTTON_STYLES = {
 	secondary = { fill = 'secondary', text = 'secondaryText' },
 }
 
+Layout.TableKitExtensions = {}
+
 local function Hex(red, green, blue)
 	return ('#%02X%02X%02X'):format(math.floor(red * 255 + 0.5), math.floor(green * 255 + 0.5), math.floor(blue * 255 + 0.5))
 end
@@ -472,6 +474,7 @@ function Layout.TableKit(window)
 		return row
 	end
 
+	for _, extend in ipairs(Layout.TableKitExtensions) do extend(kit, window) end
 	return kit
 end
 
