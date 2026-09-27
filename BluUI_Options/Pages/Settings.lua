@@ -6,7 +6,7 @@ local Pixel = BUI.Pixel
 
 local RAIL_GROUPS = {
 	{ title = 'BluUI', items = {
-		{ id = 'theme', label = 'Theme', icon = 'copy' },
+		{ id = 'theme', label = 'Theme', icon = 'theme' },
 		{ id = 'modules', label = 'Modules', icon = 'modules5' },
 		{ id = 'help', label = 'Help', icon = 'question' },
 	} },
