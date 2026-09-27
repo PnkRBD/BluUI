@@ -4,16 +4,14 @@ local Layout = BUILib.Layout
 
 local RAIL_WIDTH = 210
 local RAIL_GAP = 40
+local RAIL_STEP = 40
 local HEADER_GAP = 26
-local TOP_GAP = 24
+local BLOCK_GAP = 8
 local BOTTOM_GAP = 24
-local STICKY_TOP = 24
 
 function Layout.RailPage(tab, shell, spec)
 	local window = shell.window
 	local kit = Layout.TableKit(window)
-	local block = CreateFrame('Frame', nil, tab.child)
-	block:SetWidth(tab.width)
 	local railWidth = spec.rail.width or RAIL_WIDTH
 	local contentX = railWidth + RAIL_GAP
 	local contentWidth = tab.width - contentX
@@ -21,38 +19,60 @@ function Layout.RailPage(tab, shell, spec)
 	local panes = {}
 	local page = {}
 
-	local y = kit.Header(block, spec.icon, spec.title, spec.placeholder, function(text)
+	local head = CreateFrame('Frame', nil, tab.pinned)
+	head:SetPoint('TOPLEFT')
+	head:SetSize(tab.width, 1)
+	local y = kit.Header(head, spec.icon, spec.title, spec.placeholder, function(text)
 		query = text
 		page:Resize()
 	end)
 	local top = y + HEADER_GAP
-	local rule = kit.DottedRule(block)
+	local rule = kit.DottedRule(head)
 	rule:SetPoint('TOPLEFT', 0, -top)
 	rule:SetPoint('TOPRIGHT', 0, -top)
-	top = top + 1 + TOP_GAP
+	top = top + 1
+	tab:SetPinnedHeight(top)
+	local contentTop = top + (tab.topPadding or Layout.DEFAULT_PADDING) + BLOCK_GAP
 
-	local rail = Layout.Rail(window, block, railWidth, {
+	local railScroll = CreateFrame('ScrollFrame', nil, head)
+	railScroll:SetPoint('TOPLEFT', 0, -contentTop)
+	railScroll:SetPoint('BOTTOM', tab.frame, 'BOTTOM', 0, 0)
+	railScroll:SetWidth(railWidth)
+	local railHost = CreateFrame('Frame', nil, railScroll)
+	railHost:SetSize(railWidth, 1)
+	railScroll:SetScrollChild(railHost)
+	local rail = Layout.Rail(window, railHost, railWidth, {
 		style = spec.rail.style,
 		groups = spec.rail.groups,
 		isDone = spec.rail.isDone,
 		onSelect = function(item) page:Select(item.id) end,
 	})
-	rail.frame:SetPoint('TOPLEFT', 0, -top)
-	local scrollFrame = tab.scroll.scrollFrame
-	local function Pin()
-		local childTop, blockTop = tab.child:GetTop(), block:GetTop()
-		if not childTop or not blockTop then return end
-		local extra = scrollFrame:GetVerticalScroll() - (childTop - blockTop) - top + STICKY_TOP
-		extra = math.max(0, math.min(extra, block:GetHeight() - top - rail.height - BOTTOM_GAP))
-		rail.frame:SetPoint('TOPLEFT', 0, -(top + extra))
-	end
-	scrollFrame:HookScript('OnVerticalScroll', Pin)
-	local divider = window:Fill(block, 'rule', 'ARTWORK')
-	divider:SetPoint('TOPLEFT', railWidth + math.floor(RAIL_GAP / 2), -top)
+	rail.frame:SetPoint('TOPLEFT')
+	railHost:SetHeight(rail.height)
+	railScroll:EnableMouseWheel(true)
+	railScroll:SetScript('OnMouseWheel', function(self, delta)
+		local range = math.max(0, rail.height - self:GetHeight())
+		self:SetVerticalScroll(math.max(0, math.min(range, self:GetVerticalScroll() - delta * RAIL_STEP)))
+	end)
+
+	local divider = window:Fill(head, 'rule', 'ARTWORK')
+	divider:SetPoint('TOP', head, 'TOP', 0, -contentTop)
+	divider:SetPoint('LEFT', head, 'LEFT', railWidth + math.floor(RAIL_GAP / 2), 0)
+	divider:SetPoint('BOTTOM', tab.frame, 'BOTTOM', 0, 0)
 	divider:SetWidth(1)
+
+	local block = CreateFrame('Frame', nil, tab.child)
+	block:SetWidth(tab.width)
 	local content = CreateFrame('Frame', nil, block)
-	content:SetPoint('TOPLEFT', contentX, -top)
+	content:SetPoint('TOPLEFT', contentX, 0)
 	content:SetSize(contentWidth, 1)
+
+	local function Align()
+		local blockLeft, pinnedLeft = block:GetLeft(), tab.pinned:GetLeft()
+		if not blockLeft or not pinnedLeft then return end
+		head:SetPoint('TOPLEFT', math.floor(blockLeft - pinnedLeft + 0.5), 0)
+	end
+	tab.frame:HookScript('OnSizeChanged', Align)
 
 	local function Place()
 		local height = 0
@@ -68,9 +88,7 @@ function Layout.RailPage(tab, shell, spec)
 			end
 		end
 		content:SetHeight(math.max(1, height))
-		height = math.max(rail.height, height)
-		divider:SetHeight(height)
-		return top + height + BOTTOM_GAP
+		return height + BOTTOM_GAP
 	end
 
 	function page:RefreshRail()
@@ -81,8 +99,10 @@ function Layout.RailPage(tab, shell, spec)
 		local height = Place()
 		block:SetHeight(height)
 		block.layoutHeight = height
-		Pin()
-		BUILib.Defer(function() tab:Refresh() end)
+		BUILib.Defer(function()
+			Align()
+			tab:Refresh()
+		end)
 	end
 
 	function page:Select(id)
@@ -102,6 +122,17 @@ function Layout.RailPage(tab, shell, spec)
 		self:Resize()
 	end
 
+	function page:Invalidate()
+		for paneID, pane in pairs(panes) do
+			if not current or paneID ~= current.id then
+				pane.frame:Hide()
+				pane.frame:SetParent(nil)
+				panes[paneID] = nil
+			end
+		end
+		self:Resize()
+	end
+
 	function page:Rebuild(id)
 		for paneID, pane in pairs(panes) do
 			if id == nil or paneID == id then
@@ -114,6 +145,6 @@ function Layout.RailPage(tab, shell, spec)
 	end
 
 	page:Select(rail.entries[1].item.id)
-	Layout.Add(tab, block, 8)
+	Layout.Add(tab, block, BLOCK_GAP)
 	return page
 end
