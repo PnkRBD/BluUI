@@ -36,8 +36,12 @@ local OFFSETS = {
 	labelGap = 6,
 }
 
-local RADIUS = 10
-local INPUT_RADIUS = 6
+local EDGES = {
+	{"TOPLEFT", "TOPRIGHT", "SetHeight"},
+	{"BOTTOMLEFT", "BOTTOMRIGHT", "SetHeight"},
+	{"TOPLEFT", "BOTTOMLEFT", "SetWidth"},
+	{"TOPRIGHT", "BOTTOMRIGHT", "SetWidth"},
+}
 local SOLID_HOVER = { 1, 1, 1, 0.12 }
 
 Modals.BTN_CONFIRM = {0.3, 1, 0.3, 1}
@@ -82,6 +86,22 @@ local function FontOf(dialog, tier)
 	return window and window:FontPath(tier) or BUILib.Font
 end
 
+local function Surface(frame, fillColor, edgeColor)
+	local fill = frame:CreateTexture(nil, "BACKGROUND")
+	fill:SetTexture(Widget.WHITE)
+	fill:SetAllPoints()
+	fill:SetVertexColor(unpack(fillColor))
+	for _, side in ipairs(EDGES) do
+		local edge = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
+		edge:SetTexture(Widget.WHITE)
+		edge:SetPoint(side[1])
+		edge:SetPoint(side[2])
+		edge[side[3]](edge, 1)
+		edge:SetVertexColor(unpack(edgeColor))
+	end
+	return fill
+end
+
 function Modals.CreateBase(width, height, bounded, parent)
 	width = Widget.EvenSize(width or SIZES.width)
 	height = Widget.EvenSize(height or SIZES.height)
@@ -113,7 +133,7 @@ function Modals.CreateBase(width, height, bounded, parent)
 	dialog:SetSize(width, height)
 	dialog:SetPoint("CENTER")
 	dialog.window = WindowOf(parent)
-	Widget.DrawCardShape(dialog, RADIUS, { Paint(dialog, "panel", theme.bg.panel) }, { Paint(dialog, "rule", theme.border.dark) }, "BACKGROUND", 0, 0)
+	Surface(dialog, { Paint(dialog, "panel", theme.bg.panel) }, { Paint(dialog, "rule", theme.border.dark) })
 	dialog:SetFrameLevel(overlay:GetFrameLevel() + 10)
 	dialog:EnableMouse(true)
 
@@ -244,7 +264,10 @@ function Modals.CreateInput(dialog, defaultText, width, height)
 	input:SetFont(FontOf(dialog, "control"), SIZES.messageFontSize, "")
 	input:SetTextColor(Paint(dialog, "text", theme.text.primary))
 	input:SetTextInsets(12, 12, 0, 0)
-	Widget.DrawRoundedRect(input, INPUT_RADIUS, { Paint(dialog, "input", theme.bg.input) }, "BACKGROUND", 0, 0)
+	local fill = input:CreateTexture(nil, "BACKGROUND")
+	fill:SetTexture(Widget.WHITE)
+	fill:SetAllPoints()
+	fill:SetVertexColor(Paint(dialog, "input", theme.bg.input))
 	input:SetText(defaultText or "")
 	input:HighlightText()
 	return input
