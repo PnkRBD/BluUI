@@ -2606,7 +2606,7 @@ Skin.RegisterSkin('characterFrame', {
             skinning.characterFrameTint = skinning.characterFrameTint or tint
             ApplyBackground()
         end)
-        Layout.ColorSwatch(background, 'Tint colour and strength', tint[1], tint[2], tint[3], tint[4], function(red, green, blue, alpha)
+        Layout.ColorSwatch(background, 'Tint color and strength', tint[1], tint[2], tint[3], tint[4], function(red, green, blue, alpha)
             skinning.characterFrameTint = { red, green, blue, alpha }
             ApplyBackground()
         end)
@@ -2625,7 +2625,7 @@ Skin.RegisterSkin('characterFrame', {
         Swatch('Arrow (something in bags)', arrowColor, 'characterFrameArrow')
         Swatch('Arrow (nothing in bags)', emptyColor, 'characterFrameArrowEmpty')
         Swatch('Plate behind the arrow', plateColor, 'characterFrameArrowPlate')
-        Layout.ButtonRow(arrows, { buttons = { { text = 'Reset arrow colours', width = 150, callback = function()
+        Layout.ButtonRow(arrows, { buttons = { { text = 'Reset arrow colors', width = 150, callback = function()
             skinning.characterFrameArrow, skinning.characterFrameArrowEmpty, skinning.characterFrameArrowPlate = nil, nil, nil
             local arrow, empty, plate = BAG.Colors()
             swatches.characterFrameArrow:SetColor(arrow[1], arrow[2], arrow[3], arrow[4])
