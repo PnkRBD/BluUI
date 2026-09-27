@@ -3,7 +3,6 @@ local BUI = BluUI
 local BUILib = BluUI.BUILibClient
 local Controls, Layout, Widget, Modals, Toast = BUILib.Controls, BUILib.Layout, BUILib.Widget, BUILib.Modals, BUILib.Toast
 local PageKit = BUILib.PageKit
-local Reconciler = BUILib.R
 local Pixel = BUI.Pixel
 local Animation = BUI.Animation
 local TimeFormat = BUI.TimeFormat
@@ -25,6 +24,35 @@ local CDAnnouncer = BUI.CDAnnouncer
 local function GetCfg() return BUI.GetDB().cdAnnouncer end
 local function Refresh() CDAnnouncer.Refresh() end
 
+local function Mount(parent, specs)
+    local previous = parent.mounted or {}
+    local byKey = {}
+    local y = 0
+    for _, spec in ipairs(specs) do
+        local props = spec.props
+        local child = previous[spec.key]
+        if child and child.rebuildKey ~= props.rebuildKey then
+            child.frame:Hide()
+            child = nil
+        end
+        if not child then
+            local control = props.make(parent)
+            child = { control = control, frame = Widget.Unwrap(control), rebuildKey = props.rebuildKey }
+        end
+        previous[spec.key] = nil
+        byKey[spec.key] = child
+        if props.update then props.update(child.control) end
+        y = y + (props.topMargin or 0)
+        child.frame:ClearAllPoints()
+        child.frame:SetPoint('TOPLEFT', parent, 'TOPLEFT', 0, -y)
+        child.frame:Show()
+        y = y + child.frame:GetHeight() + (props.gap or 0)
+    end
+    for _, child in pairs(previous) do child.frame:Hide() end
+    parent.mounted = byKey
+    parent:SetHeight(math.max(1, y))
+end
+
 local function BarOpts()
     return {
         style    = 'bar',
@@ -37,7 +65,6 @@ local fonts
 local editor
 local RenderList
 
-local TRow, TCat, TInfo
 
 local function LookupRow(entry)
     if entry.kind == 'item' then
@@ -411,11 +438,11 @@ local function EditorSpec()
     local specs = {}
 
     local function Cat(key, text, first)
-        specs[#specs + 1] = { type = TCat, key = key, props = { gap = 6, topMargin = first and 0 or 20,
+        specs[#specs + 1] = { key = key, props = { gap = 6, topMargin = first and 0 or 20,
             make = function(p) return Controls.CategoryLabel(p, text, CONTENT_W) end } }
     end
     local function Row(key, buildCfg, sync)
-        specs[#specs + 1] = { type = TRow, key = key, props = { gap = ROW_GAP, rebuildKey = rebuildKey,
+        specs[#specs + 1] = { key = key, props = { gap = ROW_GAP, rebuildKey = rebuildKey,
             make = function(p)
                 local cfg = buildCfg()
                 cfg.width = CONTENT_W
@@ -704,7 +731,7 @@ local function EditorSpec()
 end
 
 local function RenderEditor()
-    Reconciler.Reconcile.Children(editor.root, EditorSpec())
+    Mount(editor.root, EditorSpec())
     editor.tab:Refresh()
     BUILib.Defer(function() editor.tab:Refresh() end)
 end
@@ -1024,7 +1051,7 @@ local function ListSpec()
     local specs = {}
     local spells = CDAnnouncer.GetSpells()
     if #spells == 0 then
-        specs[1] = { type = TInfo, key = 'empty', props = { gap = ROW_GAP,
+        specs[1] = { key = 'empty', props = { gap = ROW_GAP,
             make = function(p)
                 return Controls.InfoBox(p,
                     'Nothing tracked yet. Drag a spell or item onto the bar above to start announcing its cooldown.',
@@ -1037,7 +1064,7 @@ local function ListSpec()
         local sub = ListSubtitle(entry)
         local id = entry.spellID
         local editorEntry = entry
-        specs[#specs + 1] = { type = TRow, key = 'sp' .. id, props = {
+        specs[#specs + 1] = { key = 'sp' .. id, props = {
             gap = ROW_GAP,
             rebuildKey = table.concat({ id, entry.kind or 'spell', name, sub }, '|'),
             make = function(p)
@@ -1072,7 +1099,7 @@ local function ListSpec()
 end
 
 RenderList = function()
-    Reconciler.Reconcile.Children(listRoot, ListSpec())
+    Mount(listRoot, ListSpec())
     listTab:Refresh()
     BUILib.Defer(function() listTab:Refresh() end)
 end
@@ -1159,9 +1186,6 @@ BUI.PageEngine.RegisterPage('cdAnnouncer', {
     minContentHeight = 620,
     OnBuild = function(pageFrame)
         fonts = BUI.BuildFontDropdownItems('GLOBAL')
-        TRow  = TRow or Reconciler.Legacy('SettingRow')
-        TCat  = TCat or Reconciler.Legacy('CategoryLabel')
-        TInfo = TInfo or Reconciler.Legacy('InfoBox')
 
         local cfg = GetCfg()
         BUI.Tools.AddPageWatermark(pageFrame)
