@@ -14,13 +14,15 @@ local CHIP_HEIGHT = 24
 local CHIP_GAP = 8
 local KEYCAP_HEIGHT = 22
 local KEY_CAPS = 3
+local KEY_ROOM = 110
 local SWITCH_WIDTH, SWITCH_HEIGHT = 40, 22
 local PROGRESS_ROW = 48
 local ROSTER_ROW = 44
 local LIST_ROW = 44
 local KEY_ROW = 30
 local SWITCH_ROW = 58
-local STRIP_HEIGHT = 84
+local CELL_INSET = 16
+local TITLE_ROOM = 100
 local BAR_ROW = 44
 local STEP_ROW = 44
 local STEP_DISC = 22
@@ -111,6 +113,13 @@ function Layout.CardKit(window)
 
 	function cards.Title(card, text, y)
 		return cards.Label(card, text, PAD, y or 18, 13, 'text')
+	end
+
+	local function TitledRow(card, text, width)
+		local title = cards.Title(card, text)
+		title:SetWidth(width - PAD * 2 - TITLE_ROOM)
+		title:SetWordWrap(false)
+		return title
 	end
 
 	function cards.Caption(parent, text, x, y)
@@ -259,7 +268,7 @@ function Layout.CardKit(window)
 		local widths = { third = third, twoThirds = width - third - GAP, half = math.floor((width - GAP) / 2), full = width }
 		local y = 0
 		for _, row in ipairs(rows) do
-			local x, tallest = 0, 0
+			local x, tallest, placed = 0, 0, {}
 			for _, entry in ipairs(row) do
 				local span = widths[entry.span or 'full']
 				local top = y
@@ -269,8 +278,13 @@ function Layout.CardKit(window)
 				end
 				local built = entry.build(parent, x, top, span)
 				local height = type(built) == 'number' and built or built.height
+				if type(built) ~= 'number' then placed[#placed + 1] = { frame = built, offset = top - y } end
 				tallest = math.max(tallest, top - y + height)
 				x = x + span + GAP
+			end
+			for _, item in ipairs(placed) do
+				item.frame:SetHeight(tallest - item.offset)
+				item.frame.height = tallest - item.offset
 			end
 			y = y + tallest + ROW_GAP
 		end
@@ -297,19 +311,28 @@ function Layout.CardKit(window)
 	end
 
 	function cards.Strip(parent, x, y, width, spec)
-		local height = STRIP_HEIGHT + 2
+		local height = spec.height or 128
 		local card = cards.Card(parent, x, y, width, height)
 		local cellWidth = math.floor((width - 2) / #spec.cells)
+		local inner = cellWidth - CELL_INSET * 2
 		card.values = {}
 		for index, cell in ipairs(spec.cells) do
 			local cellX = 1 + (index - 1) * cellWidth
 			if index > 1 then
 				local divider = kit.Fill(card, 'rule', 'ARTWORK')
 				divider:SetPoint('TOPLEFT', cellX, -1)
-				divider:SetSize(1, STRIP_HEIGHT)
+				divider:SetPoint('BOTTOMLEFT', cellX, 1)
+				divider:SetWidth(1)
 			end
-			card.values[index] = cell.accent and cards.Readout(card, cellX + PAD, 20, 22) or cards.Label(card, '', cellX + PAD, 20, 22, 'text')
-			cards.Label(card, cell.sub, cellX + PAD, 50, 11, 'muted')
+			local value = kit.Text(card, '', 20, cell.accent and 'accent' or 'text', nil, 'title')
+			value:SetPoint('LEFT', card, 'LEFT', cellX + CELL_INSET, 10)
+			value:SetWidth(inner)
+			value:SetWordWrap(false)
+			local sub = kit.Text(card, cell.sub, 11, 'muted')
+			sub:SetPoint('LEFT', card, 'LEFT', cellX + CELL_INSET, -12)
+			sub:SetWidth(inner)
+			sub:SetWordWrap(false)
+			card.values[index] = value
 		end
 		function card:Set(values)
 			for index, value in ipairs(values) do self.values[index]:SetText(value) end
@@ -323,7 +346,7 @@ function Layout.CardKit(window)
 		local textX = spec.icons and PAD + 36 or PAD
 		local height = 46 + count * PROGRESS_ROW + PAD - 6
 		local card = cards.Card(parent, x, y, width, height)
-		cards.Title(card, spec.title)
+		TitledRow(card, spec.title, width)
 		card.summary = kit.Text(card, '', 11, 'muted')
 		card.summary:SetPoint('TOPRIGHT', -PAD, -20)
 		card.empty = cards.Description(card, spec.empty or 'Nothing to show yet.', PAD, 52, width - PAD * 2)
@@ -375,7 +398,7 @@ function Layout.CardKit(window)
 		local count = spec.rows or 4
 		local height = 46 + count * BAR_ROW + PAD - 10
 		local card = cards.Card(parent, x, y, width, height)
-		cards.Title(card, spec.title)
+		TitledRow(card, spec.title, width)
 		card.total = kit.Text(card, '', 11, 'muted')
 		card.total:SetPoint('TOPRIGHT', -PAD, -20)
 		card.rows = {}
@@ -501,7 +524,7 @@ function Layout.CardKit(window)
 		local count = spec.rows or 4
 		local height = 46 + count * ROSTER_ROW + PAD - 4
 		local card = cards.Card(parent, x, y, width, height)
-		cards.Title(card, spec.title)
+		TitledRow(card, spec.title, width)
 		card.count = kit.Text(card, '', 11, 'muted')
 		card.count:SetPoint('TOPRIGHT', -PAD, -20)
 		card.empty = cards.Description(card, spec.empty or 'No one here yet.', PAD, 52, width - PAD * 2)
@@ -571,7 +594,10 @@ function Layout.CardKit(window)
 				row.swatch = kit.Disc(row, 14, nil, 'ARTWORK', 1)
 				row.swatch:SetPoint('CENTER', ring)
 			end
-			kit.Text(row, entry.label, 12, 'text'):SetPoint('LEFT', PAD + 28, 0)
+			local label = kit.Text(row, entry.label, 12, 'text')
+			label:SetPoint('LEFT', PAD + 28, 0)
+			label:SetWidth(width - PAD * 2 - 28 - 130)
+			label:SetWordWrap(false)
 			local chevron = cards.Chevron(row, 9, 'muted')
 			chevron:SetPoint('RIGHT', -PAD, 0)
 			row.value = kit.Text(row, entry.value or '', 12, 'muted')
@@ -661,7 +687,9 @@ function Layout.CardKit(window)
 		card.rows = {}
 		for index, row in ipairs(spec.rows) do
 			local rowY = 46 + (index - 1) * KEY_ROW
-			cards.Label(card, row.label, PAD, rowY + 4, 12, 'text')
+			local label = cards.Label(card, row.label, PAD, rowY + 4, 12, 'text')
+			label:SetWidth(width - PAD * 2 - KEY_ROOM)
+			label:SetWordWrap(false)
 			local caps = {}
 			for slot = 1, KEY_CAPS do
 				local cap = cards.Keycap(card, '')
@@ -842,8 +870,13 @@ function Layout.CardKit(window)
 			number:SetPoint('CENTER', disc)
 			local check = kit.Glyph(card, 'check', 10, 'onAccent', 'OVERLAY')
 			check:SetPoint('CENTER', disc)
+			local textWidth = width - PAD * 2 - STEP_DISC - 14
 			local label = cards.Label(card, step.label, PAD + STEP_DISC + 14, rowY + 2, 12, 'text')
+			label:SetWidth(textWidth)
+			label:SetWordWrap(false)
 			local sub = cards.Label(card, step.sub or '', PAD + STEP_DISC + 14, rowY + 18, 10, 'muted')
+			sub:SetWidth(textWidth)
+			sub:SetWordWrap(false)
 			card.rows[index] = { disc = disc, number = number, check = check, label = label, sub = sub }
 		end
 		function card:Set(states)
