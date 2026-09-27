@@ -9,13 +9,13 @@ local L = {
 	PAD = 14,
 	RADIUS = 10,
 	WHEEL = 200,
-	WHEEL_INNER = 60,
+	WHEEL_INNER = 52,
 	WHEEL_CROP = 28 / 256,
 	WHEEL_OUTER = 97,
 	READOUT_HEIGHT = 18,
 	READOUT_GAP = 6,
 	READOUT_BOX = 46,
-	CENTER_DISC = 112,
+	CENTER_DISC = 96,
 	HEX_WIDTH = 120,
 	HEX_SIZE = 18,
 	VALUE_WIDTH = 60,
@@ -356,10 +356,16 @@ local function ValueBox(parent, width, justify, tooltip)
 	box:SetJustifyH(justify)
 	box:SetTextColor(unpack(C.TEXT))
 	box.underline = Solid(box, 'ARTWORK')
-	box.underline:SetPoint('BOTTOMLEFT')
-	box.underline:SetPoint('BOTTOMRIGHT')
+	box.underline:SetPoint(justify == 'RIGHT' and 'BOTTOMRIGHT' or justify == 'LEFT' and 'BOTTOMLEFT' or 'BOTTOM')
 	box.underline:SetHeight(1)
 	box.underline:Hide()
+	local measure = box:CreateFontString(nil, 'ARTWORK')
+	measure:SetFont(BUILib.Font, 12, '')
+	measure:Hide()
+	box:SetScript('OnTextChanged', function(self)
+		measure:SetText(self:GetText())
+		self.underline:SetWidth(math.max(8, math.ceil(measure:GetStringWidth())))
+	end)
 	Widget.Tooltip(box, tooltip)
 	box:SetScript('OnEscapePressed', function(self) self:ClearFocus() end)
 	box:SetScript('OnEditFocusGained', function(self)
