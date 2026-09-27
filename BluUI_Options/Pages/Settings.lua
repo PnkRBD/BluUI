@@ -744,86 +744,6 @@ BUI.PageEngine.RegisterPage("settings", {
 			end
 		end
 
-		local function BuildModules(tab)
-			Layout.Section(tab, 'Modules', 'Turn BluUI modules on or off. Some changes take effect after a /reload.')
-
-			local MODULE_ORDER = {
-				{ key = 'actionBars',    label = 'Action Bars' },
-				{ key = 'unitFrames',    label = 'Unit Frames' },
-				{ key = 'groupFrames',   label = 'Group Frames (Party/Raid)' },
-				{ key = 'cdm',           label = 'Cooldown Manager' },
-				{ key = 'castBars',      label = 'Cast Bars' },
-				{ key = 'power',         label = 'Power Bars' },
-				{ key = 'minimap',       label = 'Minimap' },
-				{ key = 'auras',         label = 'Auras' },
-				{ key = 'buffTracking',  label = 'Buff Tracking' },
-				{ key = 'datatext',      label = 'Datatext' },
-				{ key = 'customBars',    label = 'Custom Bars' },
-				{ key = 'cursor',        label = 'Cursor' },
-				{ key = 'markers',       label = 'Markers' },
-				{ key = 'streamerTools', label = 'Streamer Tools' },
-				{ key = 'gemCounter',    label = 'Gem Manager' },
-			}
-
-			local moduleItems = {}
-			for _, entry in ipairs(MODULE_ORDER) do
-				moduleItems[#moduleItems + 1] = {
-					key     = entry.key,
-					title   = entry.label,
-					checked = db.modules[entry.key],
-				}
-			end
-
-			local moduleListFrame
-			local moduleDirty = false
-
-			local function SyncModules()
-				local selected = {}
-				for _, key in ipairs(moduleListFrame:GetSelected()) do selected[key] = true end
-				local needReload = false
-				for _, entry in ipairs(MODULE_ORDER) do
-					local key = entry.key
-					local newValue = selected[key] == true
-					if db.modules[key] ~= newValue and not BUI.SetModuleEnabled(key, newValue) then
-						needReload = true
-					end
-				end
-				return needReload
-			end
-
-			local moduleList = Controls.SelectableList(tab.child, {
-				width        = tab.width,
-				rowHeight    = 34,
-				items        = moduleItems,
-				nameLabel    = 'Module',
-				includeLabel = '',
-				hideStatus   = true,
-				hideSummary  = true,
-				onChange = function()
-					local needReload = SyncModules()
-					if not needReload or moduleDirty then return end
-					moduleDirty = true
-					Modals.Confirm({
-						parent = BUI.PageEngine.window.frame,
-						title = 'Reload Required',
-						message = 'Some module changes take effect after a /reload.',
-						confirmText = 'Reload Now', cancelText = 'Later',
-						onConfirm = function() SyncModules(); ReloadUI() end,
-					})
-				end,
-			})
-			moduleListFrame = BUILib.Widget.Unwrap(moduleList)
-			moduleListFrame:HookScript('OnHide', SyncModules)
-
-			moduleListFrame:HookScript('OnShow', function()
-				for _, entry in ipairs(MODULE_ORDER) do
-					moduleListFrame:SetItemChecked(entry.key, db.modules[entry.key])
-				end
-			end)
-
-			Layout.Add(tab, moduleListFrame, 8)
-		end
-
 		local function BuildHelp(tab)
 			Layout.Section(tab, 'Diagnostics')
 			local grid = PageKit.RowGrid(tab)
@@ -914,7 +834,6 @@ BUI.PageEngine.RegisterPage("settings", {
 			settings = BuildSettings,
 			skinning = BUI.SkinningPage.BuildTab,
 			visibility = BUI.VisibilityPage.BuildTab,
-			modules = BuildModules,
 			help = BuildHelp,
 		}
 		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
@@ -927,6 +846,7 @@ BUI.PageEngine.RegisterPage("settings", {
 			rail = { groups = RAIL_GROUPS },
 			build = function(kit, shell, parent, width, item, railPage)
 				if item.id == 'theme' then return BUI.ThemePage.Sections(kit, shell, parent, width, railPage) end
+				if item.id == 'modules' then return BUI.ModulesPage.Sections(kit, shell, parent, width, railPage) end
 				return { Host(parent, width, builders[item.id], railPage, adapter, TAB_INDEX[item.id]) }
 			end,
 		})
