@@ -262,29 +262,6 @@ local function AccentGallery(ui, parent, width)
 	})
 end
 
-local function FontGallery(ui, parent, width)
-	local tiles = {}
-	for _, font in ipairs(BUI.BuildFontDropdownItems()) do
-		tiles[#tiles + 1] = {
-			label = font.text,
-			build = function(content)
-				local sample = content:CreateFontString(nil, 'OVERLAY')
-				sample:SetFont(font.fontPath, 22, '')
-				sample:SetPoint('CENTER', 0, -2)
-				sample:SetText('Aa')
-				Window():Paint(sample, 'text')
-			end,
-			selected = function() return General().font == font.value end,
-			onClick = function() SetFont(font.value) end,
-		}
-	end
-	return ui.Gallery(parent, width, {
-		title = 'Font',
-		description = 'Every module inherits this font unless it picks its own below or on its page.',
-		tiles = tiles,
-	})
-end
-
 local function TextureGallery(ui, parent, width)
 	local tiles = {}
 	for _, texture in ipairs(BUI.BuildTextureDropdownItems()) do
@@ -329,18 +306,46 @@ local function TextSection(ui, parent, width)
 	local section = ui.Section(parent, width, {
 		stacked = true,
 		title = 'Text',
-		description = 'How the font renders, and the modules that use a font of their own.',
+		description = 'The font every module inherits, how it renders, and the modules that use a font of their own.',
 		columns = { { 'Name', ui.AVATAR_X }, { 'Font', FIRST_COLUMN } },
 	})
+	local fontRow = section:AddRow('Font global every module')
+	ui.Initials(fontRow, SWATCH_SIZE, 'Aa'):SetPoint('LEFT', ui.AVATAR_X, 0)
+	ui.RowTitle(fontRow, 'Font', 'Every module inherits this unless it picks its own', ui.NAME_X)
+	local fontName = ui.Cell(fontRow, '', FIRST_COLUMN, 200)
+	local fontReset = ui.IconButton(fontRow, 'reset', 'Back to the BluUI font', function() SetFont(BUI.C.DEFAULT_FONT) end)
+	fontReset:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
+	local fontMenu = ui.Dropdown(fontRow, FONT_DROPDOWN_WIDTH, function()
+		local items = {}
+		for _, font in ipairs(BUI.BuildFontDropdownItems()) do
+			items[#items + 1] = { text = font.text, fontPath = font.fontPath, checked = font.value == General().font, callback = function() SetFont(font.value) end }
+		end
+		return items
+	end)
+	fontMenu:SetPoint('RIGHT', fontReset, 'LEFT', -10, 0)
+	ui.Bind(fontRow, function()
+		fontName:SetText(General().font)
+		fontMenu.label:SetText(General().font)
+		fontReset:SetActive(General().font ~= BUI.C.DEFAULT_FONT)
+	end)
+
 	local row = section:AddRow('Slug rendering thicker outline')
 	ui.IconAvatar(row, SWATCH_SIZE, 'glow'):SetPoint('LEFT', ui.AVATAR_X, 0)
 	ui.RowTitle(row, 'Slug rendering', 'Thicker outline on every BluUI font', ui.NAME_X)
+	local slugReset = ui.IconButton(row, 'reset', 'Back to the plain outline', function()
+		General().fontSlug = false
+		RefreshAllVisuals()
+	end)
+	slugReset:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
 	local slug = ui.Dropdown(row, DROPDOWN_WIDTH, OnOff(function() return General().fontSlug == true end, function(value)
 		General().fontSlug = value
 		RefreshAllVisuals()
 	end))
-	slug:SetPoint('RIGHT', -ui.ROW_INSET, 0)
-	ui.Bind(row, function() slug.label:SetText(General().fontSlug == true and 'On' or 'Off') end)
+	slug:SetPoint('RIGHT', slugReset, 'LEFT', -10, 0)
+	ui.Bind(row, function()
+		slug.label:SetText(General().fontSlug == true and 'On' or 'Off')
+		slugReset:SetActive(General().fontSlug == true)
+	end)
 
 	for _, override in ipairs(FONT_OVERRIDES) do
 		local fontRow = section:AddRow(override.name .. ' ' .. override.sub)
@@ -469,7 +474,6 @@ end
 local function Sections(ui, _, parent, width)
 	local sections = { Stage(ui, parent, width) }
 	sections[#sections + 1] = AccentGallery(ui, parent, width)
-	sections[#sections + 1] = FontGallery(ui, parent, width)
 	sections[#sections + 1] = TextSection(ui, parent, width)
 	sections[#sections + 1] = TextureGallery(ui, parent, width)
 	sections[#sections + 1] = BarSection(ui, parent, width)
