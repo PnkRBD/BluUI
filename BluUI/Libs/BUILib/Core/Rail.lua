@@ -18,7 +18,7 @@ local STEP_LABEL_X = 42
 local Rail = {}
 Rail.__index = Rail
 
-local function ListButton(window, kit, parent, item, width)
+local function ListButton(window, kit, parent, item, width, iconColumn)
 	local button = CreateFrame('Button', nil, parent)
 	button:SetSize(width, ITEM_HEIGHT)
 	local fill = window:Fill(button, 'panel')
@@ -29,13 +29,12 @@ local function ListButton(window, kit, parent, item, width)
 	bar:SetWidth(ACCENT_BAR)
 	kit.Hover(button)
 
-	local textX = ITEM_INSET
+	local textX = iconColumn and LABEL_X or ITEM_INSET
 	if item.icon then
 		button.icon = kit.Glyph(button, item.icon, ICON_SIZE, 'muted')
 		button.icon:SetPoint('LEFT', ITEM_INSET, 0)
-		textX = LABEL_X
 	end
-	button.label = kit.Text(button, item.label, 12, 'muted')
+	button.label = kit.Text(button, item.label, 12, 'muted', nil, 'title')
 	button.label:SetPoint('LEFT', textX, 0)
 	button.label:SetWidth(width - textX - (item.count and COUNT_WIDTH or ITEM_INSET))
 	button.label:SetWordWrap(false)
@@ -64,7 +63,7 @@ local function StepButton(window, kit, parent, item, index, width)
 	button.number:SetPoint('CENTER', button.disc)
 	button.check = kit.Glyph(button, 'check', 11, 'onAccent', 'OVERLAY')
 	button.check:SetPoint('CENTER', button.disc)
-	button.label = kit.Text(button, item.label, 12, 'muted')
+	button.label = kit.Text(button, item.label, 12, 'muted', nil, 'title')
 	button.label:SetPoint('TOPLEFT', STEP_LABEL_X, -(item.sub and 9 or 18))
 	if item.sub then
 		button.sub = kit.Text(button, item.sub, 11, 'faint')
@@ -119,6 +118,13 @@ function Layout.Rail(window, parent, width, spec)
 		rail.progress:SetWidth(1)
 	end
 
+	local iconColumn = false
+	for _, group in ipairs(spec.groups) do
+		for _, item in ipairs(group.items) do
+			if item.icon then iconColumn = true end
+		end
+	end
+
 	local y = 0
 	for _, group in ipairs(spec.groups) do
 		if group.title then
@@ -127,7 +133,7 @@ function Layout.Rail(window, parent, width, spec)
 		end
 		for _, item in ipairs(group.items) do
 			local index = #rail.entries + 1
-			local button = rail.steps and StepButton(window, kit, frame, item, index, width) or ListButton(window, kit, frame, item, width)
+			local button = rail.steps and StepButton(window, kit, frame, item, index, width) or ListButton(window, kit, frame, item, width, iconColumn)
 			button:SetPoint('TOPLEFT', 0, -y)
 			button:SetScript('OnClick', function() rail:Click(item) end)
 			local entry = { item = item, button = button }
