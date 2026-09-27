@@ -3,9 +3,26 @@ if not BUILib.__loadChildren then return end
 local Layout = BUILib.Layout
 
 local DEFAULT_PAGE_WIDTH = 800
+local BACK_TOP = 16
+local BACK_HEIGHT = 60
 
 local Shell = {}
 Shell.__index = Shell
+
+local function BackRow(shell, page, container)
+	local kit = Layout.TableKit(shell.window)
+	local strip = CreateFrame('Frame', nil, container)
+	strip:SetPoint('TOP', 0, -BACK_TOP)
+	strip:SetSize(shell.config.pageWidth or DEFAULT_PAGE_WIDTH, BACK_HEIGHT - BACK_TOP)
+	local back = kit.Button(strip, shell.pages[page.parent].title, 'secondary', function() shell:ShowPage(page.parent) end, 'dropdown')
+	back.glyph:SetRotation(-math.pi / 2)
+	back:SetPoint('TOPLEFT')
+
+	local host = CreateFrame('Frame', nil, container)
+	host:SetPoint('TOPLEFT', 0, -BACK_HEIGHT)
+	host:SetPoint('BOTTOMRIGHT')
+	return host
+end
 
 local function RestoreGeometry(shell)
 	local geometry = shell:Store().geometry
@@ -17,17 +34,17 @@ local function RestoreGeometry(shell)
 end
 
 local function SelectNav(shell, pageID)
-	local highlight = shell.pages[pageID].parent or pageID
 	for index, id in ipairs(shell.order) do
 		local button = shell.navButtons[index]
-		if button then button:SetSelected(id == highlight) end
+		if button then button:SetSelected(id == pageID) end
 	end
 end
 
 local function BuildPage(shell, page)
 	local container = CreateFrame('Frame', nil, shell.window.content)
 	container:SetAllPoints()
-	local layoutPage = Layout.Page(container, nil, shell.config.pageWidth or DEFAULT_PAGE_WIDTH)
+	local host = page.parent and BackRow(shell, page, container) or container
+	local layoutPage = Layout.Page(host, nil, shell.config.pageWidth or DEFAULT_PAGE_WIDTH)
 	page.build(layoutPage:GetTab(1), shell)
 	layoutPage:AutoRefresh()
 	page.container = container
@@ -74,8 +91,7 @@ function Shell:Chrome()
 	return self:Store().chrome or self.config.chrome
 end
 
-function Shell:SetChrome(chrome)
-	self:Store().chrome = chrome
+function Shell:Rebuild()
 	if not self.window then return end
 	local current = self.current
 	for _, page in pairs(self.pages) do
@@ -86,6 +102,11 @@ function Shell:SetChrome(chrome)
 	self.window = nil
 	self.current = nil
 	self:Open(current)
+end
+
+function Shell:SetChrome(chrome)
+	self:Store().chrome = chrome
+	self:Rebuild()
 end
 
 function Shell:ApplyTheme()

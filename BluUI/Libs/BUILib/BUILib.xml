@@ -8,14 +8,6 @@
     <Script file="Core\Modals.lua"/>
     <Script file="Core\Toast.lua"/>
 
-    <Script file="Retained\Init.lua"/>
-    <Script file="Retained\Widget.lua"/>
-    <Script file="Retained\Pool.lua"/>
-    <Script file="Retained\Registry.lua"/>
-    <Script file="Retained\Spec.lua"/>
-    <Script file="Retained\Reconcile.lua"/>
-    <Script file="Retained\Legacy.lua"/>
-
     <Script file="Controls\Buttons\Button.lua"/>
     <Script file="Controls\Buttons\HoldButton.lua"/>
     <Script file="Controls\Buttons\Icon.lua"/>
