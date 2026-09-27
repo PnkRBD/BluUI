@@ -123,14 +123,19 @@ function Layout.RailPage(tab, shell, spec)
 	end
 
 	function page:Invalidate()
-		for paneID, pane in pairs(panes) do
-			if not current or paneID ~= current.id then
+		for _, paneID in ipairs(spec.legacy or {}) do
+			local pane = panes[paneID]
+			if pane and (not current or paneID ~= current.id) then
 				pane.frame:Hide()
 				pane.frame:SetParent(nil)
 				panes[paneID] = nil
 			end
 		end
 		self:Resize()
+	end
+
+	function page:RebuildCurrent()
+		if current then self:Rebuild(current.id) end
 	end
 
 	function page:Rebuild(id)

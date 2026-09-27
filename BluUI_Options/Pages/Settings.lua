@@ -757,6 +757,7 @@ BUI.PageEngine.RegisterPage("settings", {
 			title = 'Settings',
 			placeholder = 'Search settings...',
 			rail = { groups = RAIL_GROUPS },
+			legacy = { 'settings', 'skinning', 'visibility' },
 			build = function(kit, shell, parent, width, item, railPage)
 				if item.id == 'theme' then return BUI.ThemePage.Sections(kit, shell, parent, width, railPage) end
 				if item.id == 'modules' then return BUI.ModulesPage.Sections(kit, shell, parent, width, railPage) end

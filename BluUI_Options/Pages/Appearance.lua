@@ -80,7 +80,7 @@ end
 
 local function ApplyAccent()
 	BUILib.Colors.RefreshAccent()
-	BUI.Nav.Apply(BUI.Nav.GetCurrentStyle())
+	BUI.PageEngine.MarkPagesStale()
 	Window():Repaint()
 end
 
