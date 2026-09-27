@@ -40,47 +40,36 @@ function Controls.ScrollFrame(parent, width, height, childHeight, childWidth)
 	thumb:SetScript("OnEnter", function(frame) frame:SetBackdropColor(unpack(Theme.scrollbar.thumbHover)) end)
 	thumb:SetScript("OnLeave", function(frame) frame:SetBackdropColor(unpack(Theme.scrollbar.thumb)) end)
 
-	local isUpdating = false
 	local scrollLogic = Widget.ScrollLogic(scrollFrame, child, track, thumb, {draggable = true})
-
-	local baseUpdateThumb = scrollLogic.UpdateThumb
-	local function UpdateThumb()
-		if isUpdating or container._refreshLock then return end
-		isUpdating = true
-		local currentScroll = scrollFrame:GetVerticalScroll()
-		local range = math.max(0, child:GetHeight() - scrollFrame:GetHeight())
-		if currentScroll > range then scrollFrame:SetVerticalScroll(range) end
-		baseUpdateThumb()
-		isUpdating = false
-	end
+	local Refresh = scrollLogic.UpdateThumb
 
 	container._buiScrollContainer = true
 
-	local function FindWheelAncestor()
+	local function WheelAncestor()
 		local ancestor = container:GetParent()
 		while ancestor do
-			if ancestor._buiScrollContainer and ancestor:GetScript("OnMouseWheel") then return ancestor end
+			if ancestor._buiScrollContainer then return ancestor end
 			ancestor = ancestor:GetParent()
 		end
 	end
 
 	container:EnableMouseWheel(true)
 	container:SetScript("OnMouseWheel", function(_, delta)
-		local range = math.max(0, (child:GetHeight() or 0) - (scrollFrame:GetHeight() or 0))
-		local currentScroll = scrollFrame:GetVerticalScroll() or 0
-		local atEdge = (delta < 0 and currentScroll >= range - 1) or (delta > 0 and currentScroll <= 1)
+		local range = math.max(0, child:GetHeight() - scrollFrame:GetHeight())
+		local current = scrollFrame:GetVerticalScroll()
+		local atEdge = (delta < 0 and current >= range - 1) or (delta > 0 and current <= 1)
 		if range > 1 and not atEdge then
 			scrollLogic.DoScroll(delta)
 			return
 		end
-		local ancestor = FindWheelAncestor()
+		local ancestor = WheelAncestor()
 		if ancestor then ancestor:GetScript("OnMouseWheel")(ancestor, delta) else scrollLogic.DoScroll(delta) end
 	end)
 
-	scrollFrame:SetScript("OnScrollRangeChanged", UpdateThumb)
-	scrollFrame:SetScript("OnSizeChanged", UpdateThumb)
-	child:SetScript("OnSizeChanged", UpdateThumb)
-	BUILib.Defer(UpdateThumb)
+	scrollFrame:SetScript("OnScrollRangeChanged", Refresh)
+	scrollFrame:SetScript("OnSizeChanged", Refresh)
+	child:SetScript("OnSizeChanged", Refresh)
+	BUILib.Defer(Refresh)
 
 	container.scrollFrame = scrollFrame
 	container.scrollChild = child
@@ -88,10 +77,10 @@ function Controls.ScrollFrame(parent, width, height, childHeight, childWidth)
 	container.scrollbar = track
 	container.thumb = thumb
 
-	function container:SetChildHeight(newHeight) child:SetHeight(newHeight); BUILib.Defer(UpdateThumb) end
-	function container:ScrollToTop() scrollLogic.Stop(); scrollFrame:SetVerticalScroll(0); UpdateThumb() end
-	function container:ScrollToBottom() scrollLogic.Stop(); scrollFrame:SetVerticalScroll(scrollLogic.GetMax()); UpdateThumb() end
-	function container:UpdateScroll() UpdateThumb() end
+	function container:SetChildHeight(newHeight) child:SetHeight(newHeight) end
+	function container:ScrollToTop() scrollLogic.ScrollTo(0) end
+	function container:ScrollToBottom() scrollLogic.ScrollTo(math.huge) end
+	function container:UpdateScroll() Refresh() end
 
 	function container:RefreshContentHeight()
 		local lowestPoint = Layout.MeasureLowestExtent(child)
@@ -111,7 +100,6 @@ function Controls.ScrollFrame(parent, width, height, childHeight, childWidth)
 		local viewportHeight = container:GetHeight() or 400
 		local needsScroll = lowestPoint + 40 > viewportHeight
 		child:SetHeight(needsScroll and (lowestPoint + 40) or viewportHeight)
-		BUILib.Defer(UpdateThumb)
 		return needsScroll
 	end
 

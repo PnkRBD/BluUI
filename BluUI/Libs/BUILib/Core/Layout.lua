@@ -140,24 +140,9 @@ function ContentMixin:Refresh()
 	local visibleHeight = containerHeight - 8
 	local needsScroll = rawHeight > visibleHeight
 
-	self.scroll._refreshLock = true
 	self.scroll:SetChildHeight(needsScroll and contentHeight or visibleHeight)
-
-	if self.scroll.scrollbar then self.scroll.scrollbar:SetShown(needsScroll) end
-	if self.scroll.thumb then self.scroll.thumb:SetShown(needsScroll) end
-	if self.scroll.scrollFrame then
-		self.scroll.scrollFrame:SetPoint("BOTTOMRIGHT", needsScroll and -14 or -4, 4)
-		local currentScroll = self.scroll.scrollFrame:GetVerticalScroll() or 0
-		local maxScroll = math.max(contentHeight - visibleHeight, 0)
-		if not needsScroll then
-			self.scroll.scrollFrame:SetVerticalScroll(0)
-		elseif currentScroll > maxScroll then
-			self.scroll.scrollFrame:SetVerticalScroll(maxScroll)
-		end
-	end
+	if self.scroll.scrollFrame then self.scroll.scrollFrame:SetPoint("BOTTOMRIGHT", needsScroll and -14 or -4, 4) end
 	self._isRefreshing = false
-
-	BUILib.Defer(function() self.scroll._refreshLock = nil end)
 end
 
 function ContentMixin:Clear()
@@ -505,7 +490,7 @@ function Layout.TextArea(tab, labelOrDef, height, topMargin)
 	scroll:SetScript("OnMouseWheel", function(self, delta)
 		local currentScroll = self:GetVerticalScroll()
 		local maxScroll = self:GetVerticalScrollRange()
-		self:SetVerticalScroll(math.max(0, math.min(maxScroll, currentScroll - delta * 20)))
+		self:SetVerticalScroll(math.floor(math.max(0, math.min(maxScroll, currentScroll - delta * 20)) + 0.5))
 	end)
 	scroll:EnableMouse(true)
 	scroll:SetScript("OnMouseDown", function() editbox:SetFocus() end)
@@ -536,7 +521,7 @@ function Layout.TextArea(tab, labelOrDef, height, topMargin)
 	editbox:HookScript("OnTextChanged", SyncLayout)
 	editbox:HookScript("OnTextSet", SyncLayout)
 
-	scrollbar:SetScript("OnValueChanged", function(_, value) scroll:SetVerticalScroll(value) end)
+	scrollbar:SetScript("OnValueChanged", function(_, value) scroll:SetVerticalScroll(math.floor(value + 0.5)) end)
 	editbox:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
 	editbox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 	scrollbar:Hide()

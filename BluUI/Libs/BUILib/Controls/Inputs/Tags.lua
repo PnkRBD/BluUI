@@ -209,8 +209,8 @@ function Controls.Tags(parent, label, initial, callback, width, placeholder, sug
 		local itemBottom = itemTop + itemHeight
 		local viewTop = scrollFrame:GetVerticalScroll()
 		local viewBottom = viewTop + scrollFrame:GetHeight()
-		if itemTop < viewTop then scrollFrame:SetVerticalScroll(itemTop); tagsScrollLogic.UpdateThumb()
-		elseif itemBottom > viewBottom then scrollFrame:SetVerticalScroll(itemBottom - scrollFrame:GetHeight()); tagsScrollLogic.UpdateThumb() end
+		if itemTop < viewTop then tagsScrollLogic.ScrollTo(itemTop)
+		elseif itemBottom > viewBottom then tagsScrollLogic.ScrollTo(itemBottom - scrollFrame:GetHeight()) end
 	end
 
 	editBox:SetScript("OnKeyDown", function(self, key)
