@@ -1,7 +1,7 @@
 ## Interface: 120100
 ## Title: |cff6D00FDBluUI|r
 ## Author: Blu
-## Version: 4.0.4
+## Version: 4.0.5
 ## Category: BluUI
 ## SavedVariables: BluUI_DB
 ## IconTexture: Interface\AddOns\BluUI\Media\Icon\logo_small
