@@ -24,7 +24,6 @@ local PRESETS = {
 	{ name = 'Graphite', note = 'Soft grey all over', theme = { page = { 0.11, 0.115, 0.125, 1 }, sidebarEdge = { 0.17, 0.18, 0.2, 1 } } },
 	{ name = 'Forest', note = 'Dark green all over', theme = { page = { 0.03, 0.06, 0.045, 1 }, sidebarEdge = { 0.09, 0.17, 0.125, 1 } } },
 	{ name = 'Plum', note = 'Dark purple all over', theme = { page = { 0.06, 0.035, 0.075, 1 }, sidebarEdge = { 0.17, 0.1, 0.2, 1 } } },
-	{ name = 'White', mode = 'light', note = 'White page, dark text', theme = {} },
 }
 local PRESET_ROLES = { 'page', 'bar', 'sidebar', 'sidebarEdge' }
 
@@ -190,7 +189,7 @@ local function SetOpacity(percent)
 end
 
 local function PresetColor(preset, role)
-	local color = preset.theme[role] or Layout.DefaultColor(role, preset.mode or 'dark')
+	local color = preset.theme[role] or Layout.DefaultColor(role, 'dark')
 	return color[1], color[2], color[3], color[4] or 1
 end
 
@@ -205,7 +204,7 @@ local function ActivePreset()
 	local window = Window()
 	local gradient = Gradient()
 	for _, preset in ipairs(PRESETS) do
-		local matches = (preset.mode or 'dark') == window:GetMode()
+		local matches = window:GetMode() == 'dark'
 		for _, role in ipairs(PRESET_ROLES) do
 			local red, green, blue, alpha = window:Color(role)
 			local wantedRed, wantedGreen, wantedBlue, wantedAlpha = PresetColor(preset, role)
@@ -221,11 +220,10 @@ end
 
 local function ApplyPreset(preset)
 	local store = Store()
-	local mode = preset.mode or 'dark'
-	local overrides = store[mode]
-	store[mode] = { edge = overrides and overrides.edge }
-	for role, value in pairs(preset.theme) do store[mode][role] = CopyTable(value) end
-	Window():SetMode(mode)
+	local overrides = store.dark
+	store.dark = { edge = overrides and overrides.edge }
+	for role, value in pairs(preset.theme) do store.dark[role] = CopyTable(value) end
+	Window():SetMode('dark')
 end
 
 local function ResetAll()
