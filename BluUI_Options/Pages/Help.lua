@@ -23,56 +23,142 @@ local function Window()
 	return BUI.PageEngine.window
 end
 
+local function Megabytes(kilobytes)
+	return ('%.1f MB'):format(kilobytes / 1024)
+end
+
+local function CVar(name)
+	return tostring(GetCVar(name))
+end
+
+local function Elapsed(seconds)
+	seconds = math.max(0, math.floor(seconds))
+	return ('%dh %02dm'):format(math.floor(seconds / 3600), math.floor(seconds % 3600 / 60))
+end
+
 local function GatherDiagnostics()
 	local db = BUI.GetDB()
+	local theme = db.windowTheme
 	local lines = {}
-	local function AddLine(line) lines[#lines + 1] = line end
-
-	AddLine('== BluUI ==')
-	AddLine('Version: ' .. BUI.Version)
-
-	local _, class = UnitClass('player')
-	local specIndex = GetSpecialization()
-	local specName = specIndex and select(2, GetSpecializationInfo(specIndex)) or 'none'
-	AddLine('')
-	AddLine('== Character ==')
-	AddLine('Name: ' .. UnitName('player') .. ' - ' .. GetRealmName())
-	AddLine('Class: ' .. class)
-	AddLine('Spec: ' .. specName)
-	AddLine('Level: ' .. UnitLevel('player'))
-
-	local clientVersion, build, _, tocVersion = GetBuildInfo()
-	AddLine('')
-	AddLine('== Client ==')
-	AddLine('Version: ' .. clientVersion .. ' (build ' .. build .. ')')
-	AddLine('TOC: ' .. tocVersion)
-	AddLine('Locale: ' .. GetLocale())
-	local screenWidth, screenHeight = GetPhysicalScreenSize()
-	AddLine('Screen: ' .. screenWidth .. 'x' .. screenHeight)
-	AddLine('UI Scale: ' .. format('%.4f', UIParent:GetEffectiveScale()))
-
-	AddLine('')
-	AddLine('== Settings ==')
-	AddLine('Font: ' .. tostring(db.general.font))
-	AddLine('Texture: ' .. tostring(db.general.texture))
-	AddLine('Class Color Theme: ' .. tostring(db.general.useClassColorTheme))
-	local themeColor = db.general.themeColor
-	AddLine('Theme Color: ' .. format('%.2f, %.2f, %.2f', themeColor[1], themeColor[2], themeColor[3]))
-	AddLine('')
-	AddLine('== Modules ==')
-	for moduleKey, moduleEnabled in pairs(db.modules) do
-		AddLine('  ' .. moduleKey .. ': ' .. tostring(moduleEnabled))
+	local function Add(line) lines[#lines + 1] = line end
+	local function Section(title)
+		if #lines > 0 then Add('') end
+		Add('== ' .. title .. ' ==')
 	end
+	local function Row(label, value) Add(label .. ': ' .. tostring(value)) end
 
-	AddLine('')
-	AddLine('== Addons (' .. C_AddOns.GetNumAddOns() .. ') ==')
-	for addonIndex = 1, C_AddOns.GetNumAddOns() do
-		local addonName = C_AddOns.GetAddOnInfo(addonIndex)
-		if C_AddOns.IsAddOnLoaded(addonIndex) then
-			local addonVersion = C_AddOns.GetAddOnMetadata(addonName, 'Version') or ''
-			AddLine(addonVersion ~= '' and ('  ' .. addonName .. ' v' .. addonVersion) or ('  ' .. addonName))
+	Section('BluUI')
+	Row('Version', BUI.Version)
+	Row('Profile', BUI.GetAceDB():GetCurrentProfile())
+	Row('Theme', theme.name or 'Custom')
+	local fonts = theme.fonts or {}
+	Row('Window font', fonts.base or 'Default')
+	for _, tier in ipairs({ 'title', 'body', 'hint', 'control' }) do
+		if fonts[tier] then Row('Font for ' .. tier, fonts[tier]) end
+	end
+	local overrides = 0
+	for _ in pairs(theme.dark or {}) do overrides = overrides + 1 end
+	Row('Color overrides', overrides)
+	Row('Saved themes', #BUI.db.global.savedThemes)
+
+	Section('Character')
+	Row('Name', UnitName('player') .. ' - ' .. GetRealmName())
+	local className, classFile = UnitClass('player')
+	Row('Class', className .. ' (' .. classFile .. ')')
+	local specIndex = GetSpecialization()
+	Row('Spec', specIndex and select(2, GetSpecializationInfo(specIndex)) or 'none')
+	Row('Race', (UnitRace('player')))
+	Row('Faction', (UnitFactionGroup('player')))
+	Row('Level', UnitLevel('player'))
+	local overall, equipped = GetAverageItemLevel()
+	Row('Item level', ('%.1f equipped, %.1f overall'):format(equipped, overall))
+	local money = GetMoney()
+	Row('Gold', ('%s gold %d silver'):format(BreakUpLargeNumbers(math.floor(money / 10000)), math.floor(money / 100) % 100))
+	Row('Group', IsInRaid() and ('Raid of ' .. GetNumGroupMembers()) or (IsInGroup() and ('Party of ' .. GetNumGroupMembers()) or 'Solo'))
+	local subZone = GetSubZoneText()
+	Row('Zone', GetZoneText() .. (subZone ~= '' and (' / ' .. subZone) or ''))
+	local instanceName, instanceType, _, difficultyName = GetInstanceInfo()
+	Row('Instance', instanceType == 'none' and 'None' or (instanceName .. ' (' .. (difficultyName ~= '' and difficultyName or instanceType) .. ')'))
+	Row('Mythic+ rating', C_ChallengeMode.GetOverallDungeonScore() or 0)
+	Row('Session', Elapsed(GetSessionTime()))
+
+	Section('Client')
+	local clientVersion, build, buildDate, tocVersion = GetBuildInfo()
+	Row('Version', clientVersion .. ' (build ' .. build .. ', ' .. buildDate .. ')')
+	Row('TOC', tocVersion)
+	Row('Locale', GetLocale())
+	Row('Region', GetCurrentRegionName())
+	Row('Frame rate', ('%d fps'):format(GetFramerate()))
+	local bandwidthIn, bandwidthOut, home, world = GetNetStats()
+	Row('Latency', ('%d ms home, %d ms world'):format(home, world))
+	Row('Bandwidth', ('%.1f KB/s in, %.1f KB/s out'):format(bandwidthIn, bandwidthOut))
+
+	Section('Display')
+	local screenWidth, screenHeight = GetPhysicalScreenSize()
+	Row('Monitor', ('%d x %d'):format(screenWidth, screenHeight))
+	Row('Logical size', ('%d x %d'):format(GetScreenWidth(), GetScreenHeight()))
+	Row('Resolution', CVar('gxWindowedResolution') .. ' windowed, ' .. CVar('gxFullscreenResolution') .. ' fullscreen')
+	Row('Window mode', 'gxWindow ' .. CVar('gxWindow') .. ', gxMaximize ' .. CVar('gxMaximize'))
+	Row('Monitor index', CVar('gxMonitor'))
+	Row('Render scale', CVar('renderScale'))
+	Row('Graphics quality', CVar('graphicsQuality'))
+	Row('VSync', CVar('vsync'))
+	Row('FPS cap', CVar('maxFPS') .. ' foreground, ' .. CVar('maxFPSBk') .. ' background')
+	Row('UI scale', CVar('uiScale') .. ' (useUiScale ' .. CVar('useUiScale') .. ')')
+	Row('UIParent scale', ('%.4f effective'):format(UIParent:GetEffectiveScale()))
+	Row('Pixel perfect scale', ('%.4f'):format(768 / screenHeight))
+	local frame = BUI.PageEngine.window.frame
+	Row('BluUI window', ('%d x %d at %.4f effective'):format(frame:GetWidth(), frame:GetHeight(), frame:GetEffectiveScale()))
+
+	Section('Memory')
+	UpdateAddOnMemoryUsage()
+	Row('Lua heap', Megabytes(collectgarbage('count')))
+	Row('BluUI', Megabytes(GetAddOnMemoryUsage('BluUI')))
+	Row('BluUI_Options', Megabytes(GetAddOnMemoryUsage('BluUI_Options')))
+	local heaviest, total = {}, 0
+	for index = 1, C_AddOns.GetNumAddOns() do
+		if C_AddOns.IsAddOnLoaded(index) then
+			local memory = GetAddOnMemoryUsage(index)
+			total = total + memory
+			heaviest[#heaviest + 1] = { name = (C_AddOns.GetAddOnInfo(index)), memory = memory }
 		end
 	end
+	table.sort(heaviest, function(first, second) return first.memory > second.memory end)
+	Row('All addons', Megabytes(total))
+	Add('Heaviest:')
+	for index = 1, math.min(10, #heaviest) do
+		Add(('  %-30s %s'):format(heaviest[index].name, Megabytes(heaviest[index].memory)))
+	end
+
+	Section('Settings')
+	Row('Global font', db.general.font)
+	Row('Slug outline', db.general.fontSlug)
+	Row('Texture', db.general.texture)
+	Row('Class color theme', db.general.useClassColorTheme)
+	local themeColor = db.general.themeColor
+	Row('Theme color', ('%.2f, %.2f, %.2f'):format(themeColor[1], themeColor[2], themeColor[3]))
+	Row('Smooth bars', db.general.smoothBars)
+
+	Section('Modules')
+	local keys = {}
+	for key in pairs(db.modules) do keys[#keys + 1] = key end
+	table.sort(keys)
+	for _, key in ipairs(keys) do Add(('  %-16s %s'):format(key, db.modules[key] and 'on' or 'off')) end
+
+	Section('Addons')
+	local loaded, waiting = {}, 0
+	for index = 1, C_AddOns.GetNumAddOns() do
+		local name = C_AddOns.GetAddOnInfo(index)
+		if C_AddOns.IsAddOnLoaded(index) then
+			local version = C_AddOns.GetAddOnMetadata(name, 'Version') or ''
+			loaded[#loaded + 1] = version ~= '' and (name .. ' v' .. version) or name
+		elseif C_AddOns.GetAddOnEnableState(index, UnitName('player')) > 0 then
+			waiting = waiting + 1
+		end
+	end
+	table.sort(loaded, function(first, second) return first:lower() < second:lower() end)
+	Row('Loaded', #loaded .. ' of ' .. C_AddOns.GetNumAddOns() .. (waiting > 0 and (', ' .. waiting .. ' enabled but not loaded') or ''))
+	for _, entry in ipairs(loaded) do Add('  ' .. entry) end
 
 	return table.concat(lines, '\n')
 end
