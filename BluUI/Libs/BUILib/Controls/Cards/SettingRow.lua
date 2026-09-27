@@ -152,12 +152,6 @@ function Controls.SettingRow(parent, config)
 		local knobTexture = knob:CreateTexture(nil, "ARTWORK", nil, 2)
 		knobTexture:SetTexture(BUILib.GetLibMedia("knob"))
 		knobTexture:SetAllPoints()
-		for _, switchTexture in ipairs({trackTexture, shadowTexture, knobTexture}) do
-			if switchTexture.SetSnapToPixelGrid then
-				switchTexture:SetSnapToPixelGrid(false)
-				switchTexture:SetTexelSnappingBias(0)
-			end
-		end
 
 		local function RenderSwitch()
 			local clampedProgress = progress

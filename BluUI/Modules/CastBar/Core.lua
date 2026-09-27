@@ -75,14 +75,6 @@ local function SyncOverlayAnchors(castbar)
 	if castbar._niOverlay then castbar._niOverlay:SetAllPoints(barTexture) end
 end
 
-local function UnsnapFill(statusBar)
-	local fillTexture = statusBar:GetStatusBarTexture()
-	if fillTexture and fillTexture.SetSnapToPixelGrid then
-		fillTexture:SetSnapToPixelGrid(false)
-		fillTexture:SetTexelSnappingBias(0)
-	end
-end
-
 local function EnsureInterruptTick(castbar)
 	if castbar._intBar then return end
 
@@ -289,8 +281,6 @@ function CastBar.SetupInterruptTick(castbar, settings)
 	marker:SetMinMaxValues(0, total)
 	marker:SetSize(width, height)
 	marker:SetReverseFill(drains and true or false)
-	UnsnapFill(positioner)
-	UnsnapFill(marker)
 
 	positioner:ClearAllPoints()
 	marker:ClearAllPoints()

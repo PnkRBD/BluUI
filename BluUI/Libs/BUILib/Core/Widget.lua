@@ -152,13 +152,6 @@ Widget.WHITE = WHITE_TEX
 
 local RING_MIN, RING_MAX = 4, 14
 
-local function PrepShapeTexture(texture)
-	if texture.SetSnapToPixelGrid then
-		texture:SetSnapToPixelGrid(false)
-		texture:SetTexelSnappingBias(0)
-	end
-end
-
 local RING_TEX_SIZE = 48
 
 function Widget.DrawRoundedRect(frame, radius, color, drawLayer, subLayer, inset, ringOnly)
@@ -172,14 +165,13 @@ function Widget.DrawRoundedRect(frame, radius, color, drawLayer, subLayer, inset
 	local cornerCoordMin, cornerCoordMax = 1 / textureSize, (1 + cornerSize) / textureSize
 	local edgeCoordMin, edgeCoordMax = 1 / textureSize, (1 + ringRadius) / textureSize
 	local spanMin, spanMax = cornerSize / textureSize, 1 - cornerSize / textureSize
-	local textures = {}
+	local textures = { radius = ringRadius, corner = cornerSize, inset = inset }
 
 	local function piece(texturePath, x1, x2, y1, y2)
 		local texture = frame:CreateTexture(nil, drawLayer, nil, subLayer)
 		texture:SetTexture(texturePath)
 		if x1 then texture:SetTexCoord(x1, x2, y1, y2) end
 		texture:SetVertexColor(colorRed, colorGreen, colorBlue, colorAlpha)
-		PrepShapeTexture(texture)
 		textures[#textures + 1] = texture
 		return texture
 	end
@@ -240,7 +232,6 @@ local function ApplySlicedShape(texture, texturePath, radius, color, inset)
 		texture:SetTextureSliceMode(Enum.UITextureSliceMode.Stretched)
 	end
 	texture:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
-	PrepShapeTexture(texture)
 	texture:SetPoint("TOPLEFT", inset, -inset)
 	texture:SetPoint("BOTTOMRIGHT", -inset, inset)
 end
@@ -301,7 +292,6 @@ function Widget.DrawCapsule(frame, color, drawLayer, subLayer, inset)
 	local textures = {left, center, right}
 	for _, texture in ipairs(textures) do
 		texture:SetVertexColor(colorRed, colorGreen, colorBlue, colorAlpha)
-		PrepShapeTexture(texture)
 	end
 	return textures
 end
@@ -310,6 +300,46 @@ function Widget.SetRectColor(textures, red, green, blue, alpha)
 	alpha = alpha or 1
 	for _, texture in ipairs(textures) do
 		texture:SetVertexColor(red, green, blue, alpha)
+	end
+end
+
+local RECT_EXTENTS = {
+	HORIZONTAL = { { 0, 'c' }, { '-c', 1 }, { 0, 'c' }, { '-c', 1 }, { 'c', '-c' }, { 'c', '-c' }, { 0, 'r' }, { '-r', 1 }, { 'r', '-r' } },
+	VERTICAL = { { 0, 'c' }, { 0, 'c' }, { '-c', 1 }, { '-c', 1 }, { 0, 'r' }, { '-r', 1 }, { 'c', '-c' }, { 'c', '-c' }, { 'r', '-r' } },
+}
+
+local function Extent(code, span, radius, corner)
+	if code == 0 then return 0 end
+	if code == 1 then return span end
+	if code == 'c' then return corner end
+	if code == 'r' then return radius end
+	if code == '-c' then return span - corner end
+	return span - radius
+end
+
+local function Mix(from, to, fraction)
+	local fromAlpha, toAlpha = from[4] or 1, to[4] or 1
+	return CreateColor(
+		from[1] + (to[1] - from[1]) * fraction,
+		from[2] + (to[2] - from[2]) * fraction,
+		from[3] + (to[3] - from[3]) * fraction,
+		fromAlpha + (toAlpha - fromAlpha) * fraction)
+end
+
+function Widget.PaintGradient(texture, orientation, from, to, startFraction, endFraction)
+	local first, second = Mix(from, to, startFraction or 0), Mix(from, to, endFraction or 1)
+	if orientation == 'VERTICAL' then first, second = second, first end
+	texture:SetGradient(orientation, first, second)
+end
+
+function Widget.PaintGradientRect(frame, textures, orientation, from, to)
+	local extents = RECT_EXTENTS[orientation]
+	local span = (orientation == 'VERTICAL' and frame:GetHeight() or frame:GetWidth()) - textures.inset * 2
+	for index, texture in ipairs(textures) do
+		local extent = extents[index]
+		local startPixel = Extent(extent[1], span, textures.radius, textures.corner)
+		local endPixel = Extent(extent[2], span, textures.radius, textures.corner)
+		Widget.PaintGradient(texture, orientation, from, to, startPixel / span, endPixel / span)
 	end
 end
 
@@ -704,112 +734,115 @@ function Widget.CreateAccent(parent, alpha)
 	return texture
 end
 
+local SCROLL_THUMB_MIN = 20
+local SCROLL_SPEED = 16
+
 function Widget.ScrollLogic(scrollFrame, child, track, thumb, config)
 	config = config or {}
 	local step = config.step or 40
-	local scrollMax = 0
-	local shown = false
+	local range, shown, target = 0, false, nil
 	local math_max, math_min, math_floor, math_abs, math_exp = math.max, math.min, math.floor, math.abs, math.exp
 
-	local function UpdateThumb()
-		local childHeight = child:GetHeight() or 0
-		local viewHeight = scrollFrame:GetHeight() or 0
-		local range = math_max(0, childHeight - viewHeight)
-		scrollMax = range
-		local needsScrollbar = range > 1
-		if needsScrollbar ~= shown then
-			shown = needsScrollbar
-			thumb:SetShown(needsScrollbar)
-			track:SetShown(needsScrollbar)
-			if not needsScrollbar then scrollFrame:SetVerticalScroll(0) end
-			if config.onShow then config.onShow(needsScrollbar) end
-		end
-		if needsScrollbar then
-			local trackHeight = track:GetHeight()
-			if trackHeight > 0 then
-				local thumbHeight = math_max(20, math_min(trackHeight - 4, trackHeight * (viewHeight / childHeight)))
-				thumb:SetHeight(thumbHeight)
-				local scroll = math_min(scrollFrame:GetVerticalScroll(), range)
-				thumb:ClearAllPoints()
-				thumb:SetPoint("TOP", track, "TOP", 0, -(scroll / range) * (trackHeight - thumbHeight))
-			end
-		end
+	local function Measure()
+		range = math_floor(math_max(0, (child:GetHeight() or 0) - (scrollFrame:GetHeight() or 0)))
 	end
 
-	local targetScroll = nil
-	local animator = CreateFrame("Frame")
+	local function PlaceThumb(offset)
+		local trackHeight = track:GetHeight()
+		if range <= 0 or trackHeight <= 0 then return end
+		local viewHeight = scrollFrame:GetHeight()
+		local thumbHeight = math_max(SCROLL_THUMB_MIN, math_min(trackHeight - 4, math_floor(trackHeight * viewHeight / (viewHeight + range))))
+		thumb:SetHeight(thumbHeight)
+		thumb:ClearAllPoints()
+		thumb:SetPoint("TOP", track, "TOP", 0, -math_floor(offset / range * (trackHeight - thumbHeight) + 0.5))
+	end
+
+	local function Apply(value)
+		local offset = math_max(0, math_min(range, math_floor(value + 0.5)))
+		scrollFrame:SetVerticalScroll(offset)
+		PlaceThumb(offset)
+	end
+
+	local function Refresh()
+		Measure()
+		local needed = range > 0
+		if needed ~= shown then
+			shown = needed
+			track:SetShown(needed)
+			thumb:SetShown(needed)
+			if config.onShow then config.onShow(needed) end
+		end
+		Apply(scrollFrame:GetVerticalScroll())
+	end
+
+	local animator = CreateFrame("Frame", nil, scrollFrame)
 	animator:Hide()
 	animator:SetScript("OnUpdate", function(self, elapsed)
-		if not targetScroll then self:Hide(); return end
-		local maxScrollNow = math_max(0, (child:GetHeight() or 0) - (scrollFrame:GetHeight() or 0))
-		if targetScroll > maxScrollNow then targetScroll = maxScrollNow end
-		if targetScroll < 0 then targetScroll = 0 end
-		local currentScroll = scrollFrame:GetVerticalScroll()
-		local difference = targetScroll - currentScroll
-		if math_abs(difference) < 0.5 then
-			scrollFrame:SetVerticalScroll(targetScroll)
-			targetScroll = nil
-			UpdateThumb()
+		if not target then self:Hide() return end
+		Measure()
+		target = math_max(0, math_min(range, target))
+		local current = scrollFrame:GetVerticalScroll()
+		local difference = target - current
+		if math_abs(difference) < 1 then
+			Apply(target)
+			target = nil
 			self:Hide()
 			return
 		end
-		local factor = 1 - math_exp(-elapsed * 16)
-		scrollFrame:SetVerticalScroll(currentScroll + difference * factor)
-		UpdateThumb()
+		local move = difference * (1 - math_exp(-elapsed * SCROLL_SPEED))
+		if math_abs(move) < 1 then move = difference > 0 and 1 or -1 end
+		Apply(current + move)
+	end)
+	animator:SetScript("OnHide", function()
+		if not target then return end
+		Measure()
+		Apply(target)
+		target = nil
 	end)
 
-	local function StopAnim() targetScroll = nil; animator:Hide() end
+	local function Stop()
+		target = nil
+		animator:Hide()
+	end
+
+	local function ScrollTo(value)
+		Stop()
+		Measure()
+		Apply(value)
+	end
 
 	local function DoScroll(delta)
-		scrollMax = math_max(0, (child:GetHeight() or 0) - (scrollFrame:GetHeight() or 0))
-		if scrollMax <= 0 then return end
-		local base = targetScroll or scrollFrame:GetVerticalScroll()
-		targetScroll = math_max(0, math_min(scrollMax, base - delta * step))
+		Measure()
+		if range <= 0 then return end
+		local base = target or scrollFrame:GetVerticalScroll()
+		target = math_max(0, math_min(range, math_floor(base - delta * step + 0.5)))
 		animator:Show()
 	end
 
-	scrollFrame:EnableMouseWheel(true)
-	scrollFrame:SetScript("OnMouseWheel", function(_, wheelDelta) DoScroll(wheelDelta) end)
-
 	if config.draggable then
-		local dragStart, dragScrollStart
-		local function OnDragUpdate()
-			if not dragStart or scrollMax <= 0 then return end
-			local cursorY = select(2, GetCursorPosition()) / UIParent:GetEffectiveScale()
-			local travel = track:GetHeight() - thumb:GetHeight()
-			if travel <= 0 then return end
-			local delta = (dragStart - cursorY) / travel * scrollMax
-			scrollFrame:SetVerticalScroll(math_floor(math_max(0, math_min(scrollMax, dragScrollStart + delta)) + 0.5))
-			UpdateThumb()
-		end
-		thumb:SetScript("OnMouseDown", function(_, mouseButton)
-			if mouseButton ~= "LeftButton" then return end
-			StopAnim()
-			UpdateThumb()
-			dragStart = select(2, GetCursorPosition()) / UIParent:GetEffectiveScale()
-			dragScrollStart = scrollFrame:GetVerticalScroll()
-			thumb:SetScript("OnUpdate", OnDragUpdate)
+		local grabStart, scrollStart
+		local function CursorY() return select(2, GetCursorPosition()) / track:GetEffectiveScale() end
+		thumb:SetScript("OnMouseDown", function(_, button)
+			if button ~= "LeftButton" then return end
+			Stop()
+			Measure()
+			grabStart, scrollStart = CursorY(), scrollFrame:GetVerticalScroll()
+			thumb:SetScript("OnUpdate", function()
+				local travel = track:GetHeight() - thumb:GetHeight()
+				if travel <= 0 then return end
+				Apply(scrollStart + (grabStart - CursorY()) / travel * range)
+			end)
 		end)
-		thumb:SetScript("OnMouseUp", function()
-			dragStart = nil
-			thumb:SetScript("OnUpdate", nil)
-		end)
-
+		thumb:SetScript("OnMouseUp", function() thumb:SetScript("OnUpdate", nil) end)
 		track:EnableMouse(true)
-		track:SetScript("OnMouseDown", function(self, mouseButton)
-			if mouseButton ~= "LeftButton" or scrollMax <= 0 then return end
-			StopAnim()
-			local cursorY = select(2, GetCursorPosition()) / UIParent:GetEffectiveScale()
-			local ratio = (self:GetTop() - cursorY) / self:GetHeight()
-			scrollFrame:SetVerticalScroll(math_floor(ratio * scrollMax + 0.5))
-			UpdateThumb()
+		track:SetScript("OnMouseDown", function(self, button)
+			if button ~= "LeftButton" then return end
+			Stop()
+			Measure()
+			if range <= 0 then return end
+			Apply((self:GetTop() - CursorY()) / self:GetHeight() * range)
 		end)
 	end
 
-	return {
-		UpdateThumb = UpdateThumb,
-		DoScroll = DoScroll,
-		Stop = StopAnim,
-		GetMax = function() return scrollMax end,
-	}
+	return { UpdateThumb = Refresh, DoScroll = DoScroll, Stop = Stop, ScrollTo = ScrollTo }
 end

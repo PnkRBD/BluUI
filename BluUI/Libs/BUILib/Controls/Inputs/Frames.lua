@@ -193,9 +193,8 @@ function Controls.Frames(parent, label, initial, callback, width, hint, suggesti
 		local itemBottom = itemTop + itemHeight
 		local scroll = scrollFrame:GetVerticalScroll()
 		local viewHeight = scrollFrame:GetHeight()
-		if itemTop < scroll then scrollFrame:SetVerticalScroll(itemTop)
-		elseif itemBottom > scroll + viewHeight then scrollFrame:SetVerticalScroll(itemBottom - viewHeight) end
-		framesScrollLogic.UpdateThumb()
+		if itemTop < scroll then framesScrollLogic.ScrollTo(itemTop)
+		elseif itemBottom > scroll + viewHeight then framesScrollLogic.ScrollTo(itemBottom - viewHeight) end
 	end
 	searchBox:SetScript("OnKeyDown", function(_, key)
 		if key == "DOWN" then state.selectedIndex = math_min(state.selectedIndex + 1, #filteredSuggestions); UpdateHighlight(); ScrollToSelected()
