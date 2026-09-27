@@ -54,22 +54,22 @@ function Section:AddRow(search)
 end
 
 function Section:Layout(y, query)
-	local shown = 0
+	local shown, panelHeight = 0, TABLE_HEAD
 	for _, row in ipairs(self.rows) do
 		local match = query == '' or row.search:find(query, 1, true) ~= nil
 		row.frame:SetShown(match)
 		if match then
 			row.frame:ClearAllPoints()
-			row.frame:SetPoint('TOPLEFT', 0, -(TABLE_HEAD + shown * ROW_HEIGHT))
+			row.frame:SetPoint('TOPLEFT', 0, -panelHeight)
 			row.rule:SetShown(shown > 0)
 			shown = shown + 1
+			panelHeight = panelHeight + row.frame:GetHeight()
 		end
 	end
 	if shown == 0 and query ~= '' then
 		self.frame:Hide()
 		return y
 	end
-	local panelHeight = TABLE_HEAD + shown * ROW_HEIGHT
 	self.panel:SetHeight(panelHeight)
 	local height = self.pad * 2 + math.max(self.leftHeight, self.panelTop - self.pad + panelHeight) + 1
 	self.frame:ClearAllPoints()
@@ -139,7 +139,8 @@ function Layout.TableKit(window)
 		Overlay(button, look.solid)
 		local textX = 14
 		if icon then
-			kit.Glyph(button, icon, 12, look.text):SetPoint('LEFT', 12, 0)
+			button.glyph = kit.Glyph(button, icon, 12, look.text)
+			button.glyph:SetPoint('LEFT', 12, 0)
 			textX = 32
 		end
 		local label = kit.Text(button, text, 12, look.text)
@@ -164,7 +165,7 @@ function Layout.TableKit(window)
 		label:SetWordWrap(false)
 		kit.Glyph(button, 'dropdown', 9, 'controlText'):SetPoint('RIGHT', -12, 0)
 		button:SetScript('OnClick', function(self)
-			Controls.ContextMenu(items(), { anchor = self, width = math.max(width, 170), offsetY = -4 })
+			Controls.ContextMenu(items(), { anchor = self, width = math.max(width, 170), offsetY = -4, window = window })
 		end)
 		button.label = label
 		return button
@@ -300,10 +301,9 @@ function Layout.TableKit(window)
 	end
 
 	function kit.Tabs(parent, y, labels, onSelect)
-		local rule = window:Fill(parent, 'rule', 'ARTWORK')
+		local rule = kit.DottedRule(parent)
 		rule:SetPoint('TOPLEFT', 0, -(y + TAB_HEIGHT))
 		rule:SetPoint('TOPRIGHT', 0, -(y + TAB_HEIGHT))
-		rule:SetHeight(1)
 		local tabs, selected, x = {}, 1, 0
 		local function Refresh()
 			for index, tab in ipairs(tabs) do
@@ -334,6 +334,14 @@ function Layout.TableKit(window)
 		end
 		Refresh()
 		return y + TAB_HEIGHT + 1
+	end
+
+	function kit.DottedRule(parent, role, layer, subLayer)
+		local rule = parent:CreateTexture(nil, layer or 'ARTWORK', nil, subLayer or 0)
+		rule:SetTexture(BUILib.GetLibMedia('dots'), 'REPEAT', 'REPEAT', 'NEAREST')
+		rule:SetHorizTile(true)
+		rule:SetHeight(1)
+		return window:Paint(rule, role or 'dots')
 	end
 
 	function kit.Section(parent, width, spec)
@@ -397,10 +405,9 @@ function Layout.TableKit(window)
 			kit.Text(panel, column[1]:upper(), 9, 'faint'):SetPoint('TOPLEFT', column[2], -20)
 		end
 
-		local rule = window:Fill(frame, 'rule', 'ARTWORK')
+		local rule = kit.DottedRule(frame)
 		rule:SetPoint('BOTTOMLEFT')
 		rule:SetPoint('BOTTOMRIGHT')
-		rule:SetHeight(1)
 		return section
 	end
 
@@ -461,10 +468,9 @@ function Layout.TablePage(tab, shell, spec)
 			Resize()
 		end)
 	else
-		local rule = shell.window:Fill(block, 'rule', 'ARTWORK')
+		local rule = kit.DottedRule(block)
 		rule:SetPoint('TOPLEFT', 0, -(y + HEADER_GAP))
 		rule:SetPoint('TOPRIGHT', 0, -(y + HEADER_GAP))
-		rule:SetHeight(1)
 		contentTop = y + HEADER_GAP + 1
 	end
 
