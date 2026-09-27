@@ -29,6 +29,7 @@ local BORDER_SIDES = {
 	{ 'TOPRIGHT', 'BOTTOMRIGHT', 'SetWidth' },
 }
 local LOOK_ROLES = { page = 'background', bar = 'titleBar', barText = 'text', barIcon = 'icon', sidebar = 'sidebar', sidebarEdge = 'divider' }
+local FONT_ROLES = { text = 'title', barText = 'title', barMuted = 'title', muted = 'body', faint = 'hint', controlText = 'control', onAccent = 'control', secondaryText = 'control' }
 
 Layout.TITLE_BAR_HEIGHT = TOPBAR_HEIGHT
 Layout.FOOTER_HEIGHT = FOOTER_HEIGHT
@@ -118,6 +119,7 @@ function Layout.WindowFrame(config)
 	frame:EnableMouse(true)
 	frame:SetClampedToScreen(config.clampedToScreen ~= false)
 	window.frame = frame
+	frame.window = window
 
 	local floorWidth = config.minWidth or 1130
 	local floorHeight = config.minHeight or 720
@@ -202,8 +204,8 @@ function Layout.WindowFrame(config)
 	resize:SetScript('OnLeave', RepaintGrip)
 	RepaintGrip()
 
-	function window:PaintFrame(background, border, gradient)
-		Widget.PaintGradient(backgroundTexture, gradient and gradient.orientation or 'HORIZONTAL', background, gradient or background)
+	function window:PaintFrame(background, border)
+		backgroundTexture:SetVertexColor(background[1], background[2], background[3], background[4])
 		Widget.SetRectColor(borderEdges, border[1], border[2], border[3], border[4])
 	end
 
@@ -212,6 +214,7 @@ function Layout.WindowFrame(config)
 	end
 
 	local roles = setmetatable({}, { __mode = 'k' })
+	local fonts = setmetatable({}, { __mode = 'k' })
 	local theme = {}
 	window.font = config.font or BUILib.Font
 
@@ -224,8 +227,10 @@ function Layout.WindowFrame(config)
 		return overrides and overrides[role]
 	end
 
-	function window:Gradient(mode)
-		return self:Override('pageGradient', mode)
+	function window:FontPath(fontRole)
+		local fonts = theme.fonts
+		local name = fonts and (fonts[fontRole] or fonts.base)
+		return name and config.resolveFont(name) or self.font
 	end
 
 	function window:ChromeColor(role, mode)
@@ -244,7 +249,7 @@ function Layout.WindowFrame(config)
 	end
 
 	function window:PaintChrome()
-		self:PaintFrame({ self:Color('page') }, { self:Color('edge') }, self:Gradient())
+		self:PaintFrame({ self:Color('page') }, { self:Color('edge') })
 	end
 
 	local function Apply(region, role)
@@ -252,6 +257,12 @@ function Layout.WindowFrame(config)
 			role(region)
 		elseif region.SetTextColor then
 			region:SetTextColor(window:Color(role))
+			local fontRole = fonts[region]
+			if fontRole then
+				local path, size, flags = region:GetFont()
+				local wanted = window:FontPath(fontRole)
+				if path ~= wanted then region:SetFont(wanted, size, flags) end
+			end
 		else
 			region:SetVertexColor(window:Color(role))
 		end
@@ -273,10 +284,18 @@ function Layout.WindowFrame(config)
 		return self:Paint(texture, role)
 	end
 
-	function window:Text(parent, text, size, role)
+	function window:SetFontRole(region, fontRole)
+		fonts[region] = fontRole
+		local _, size, flags = region:GetFont()
+		region:SetFont(self:FontPath(fontRole), size, flags)
+		return region
+	end
+
+	function window:Text(parent, text, size, role, fontRole)
 		local label = parent:CreateFontString(nil, 'OVERLAY')
 		label:SetFont(self.font, size, '')
 		label:SetText(text)
+		fonts[label] = fontRole or FONT_ROLES[role]
 		return self:Paint(label, role)
 	end
 

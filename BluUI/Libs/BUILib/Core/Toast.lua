@@ -35,11 +35,10 @@ local function Reanchor()
 	for index, token in ipairs(stack) do
 		local frame = token.frame
 		frame:ClearAllPoints()
-		if index == 1 then
-			frame:SetPoint('BOTTOMRIGHT', token.parent, 'BOTTOMRIGHT', -EDGE_OFFSET, EDGE_OFFSET)
-		else
-			frame:SetPoint('BOTTOMRIGHT', stack[index - 1].frame, 'TOPRIGHT', 0, STACK_GAP)
-		end
+		local below, corner, offsetX = token.parent, 'BOTTOM', EDGE_OFFSET
+		if index > 1 then below, corner, offsetX = stack[index - 1].frame, 'TOP', 0 end
+		frame:SetPoint('BOTTOMRIGHT', below, corner .. 'RIGHT', -offsetX, index == 1 and EDGE_OFFSET or STACK_GAP)
+		if token.bar then frame:SetPoint('BOTTOMLEFT', below, corner .. 'LEFT', offsetX, index == 1 and EDGE_OFFSET or STACK_GAP) end
 	end
 end
 
@@ -73,7 +72,6 @@ end
 
 local function Sit(token)
 	local started = GetTime()
-	local width = WIDTH - PADDING_X * 2
 	token.frame:SetScript('OnUpdate', function(self)
 		local progress = (GetTime() - started) / token.duration
 		if progress >= 1 then
@@ -81,7 +79,7 @@ local function Sit(token)
 			token:Dismiss()
 			return
 		end
-		token.line:SetWidth(math.max(1, width * (1 - progress)))
+		token.line:SetWidth(math.max(1, (self:GetWidth() - PADDING_X * 2) * (1 - progress)))
 	end)
 end
 
@@ -94,7 +92,8 @@ end
 local function Build(token, text, subtext, color, onClick)
 	local frame = CreateFrame('Button', nil, token.parent)
 	local height = PADDING_Y + TITLE_SIZE + (subtext and (SUB_SIZE + 4) or 0) + 8 + LINE_HEIGHT + LINE_INSET
-	frame:SetSize(WIDTH, height)
+	frame:SetHeight(height)
+	if not token.bar then frame:SetWidth(WIDTH) end
 	frame:SetFrameStrata(token.parent:GetFrameStrata())
 	frame:SetFrameLevel((token.parent:GetFrameLevel() or 0) + 100)
 	Widget.DrawCardShape(frame, RADIUS, SURFACE, EDGE, 'BACKGROUND', 0, 0)
@@ -135,7 +134,7 @@ local function Build(token, text, subtext, color, onClick)
 	line:SetTexture(Widget.WHITE)
 	line:SetVertexColor(color[1], color[2], color[3], 0.9)
 	line:SetPoint('BOTTOMLEFT', PADDING_X, LINE_INSET)
-	line:SetSize(WIDTH - PADDING_X * 2, LINE_HEIGHT)
+	line:SetHeight(LINE_HEIGHT)
 
 	frame:SetScript('OnClick', function()
 		if onClick then onClick() end
@@ -150,11 +149,13 @@ function Toast.Show(options)
 	local token = {
 		parent = options.parent or BUILib.GetActiveClient().popupParent or UIParent,
 		duration = options.duration or DEFAULT_DURATION,
+		bar = options.style == 'bar',
 		Dismiss = Dismiss,
 	}
 	Build(token, options.text or '', options.subtext, color, options.onClick)
 	stack[#stack + 1] = token
 	Reanchor()
+	token.line:SetWidth(token.frame:GetWidth() - PADDING_X * 2)
 	token.frame:SetAlpha(0)
 	Fade(token, FADE_IN, 0, 1, Sit)
 	return token

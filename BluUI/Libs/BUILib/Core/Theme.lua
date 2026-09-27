@@ -27,7 +27,7 @@ Theme.sidebar = {
 
 Theme.window = {
 	dark = {
-		background = {0.04, 0.045, 0.05, 0.98},
+		background = {0.055, 0.063, 0.071, 0.98},
 		titleBar   = {0, 0, 0, 0},
 		sidebar    = {0, 0, 0, 0},
 		divider    = {0.1, 0.1, 0.12, 1},
