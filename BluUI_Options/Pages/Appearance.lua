@@ -1,7 +1,6 @@
 local BUI = BluUI
 local BUILib = BUI.BUILibClient
 local Controls, Widget = BUILib.Controls, BUILib.Widget
-local sharedMedia = LibStub('LibSharedMedia-3.0')
 
 local SETTINGS_TAB = 1
 local FIRST_COLUMN = 267
@@ -262,36 +261,6 @@ local function AccentGallery(ui, parent, width)
 	})
 end
 
-local function TextureGallery(ui, parent, width)
-	local tiles = {}
-	for _, texture in ipairs(BUI.BuildTextureDropdownItems()) do
-		local path = sharedMedia:Fetch('statusbar', texture.value)
-		tiles[#tiles + 1] = {
-			label = texture.text,
-			build = function(content)
-				local track = ui.Fill(content, 'control', 'ARTWORK')
-				track:SetPoint('LEFT', 10, 0)
-				track:SetPoint('RIGHT', -10, 0)
-				track:SetHeight(14)
-				local bar = content:CreateTexture(nil, 'ARTWORK', nil, 1)
-				bar:SetTexture(path)
-				bar:SetPoint('TOPLEFT', track)
-				bar:SetPoint('BOTTOMLEFT', track)
-				bar:SetWidth(78)
-				Window():Paint(bar, 'accent')
-			end,
-			selected = function() return General().texture == texture.value end,
-			onClick = function() SetTexture(texture.value) end,
-		}
-	end
-	return ui.Gallery(parent, width, {
-		title = 'Bar texture',
-		description = 'Every statusbar inherits this texture unless its page picks another.',
-		tileWidth = 132,
-		tiles = tiles,
-	})
-end
-
 local function OnOff(get, set)
 	return function()
 		local on = get()
@@ -386,9 +355,41 @@ local function BarSection(ui, parent, width)
 	local section = ui.Section(parent, width, {
 		stacked = true,
 		title = 'Bars',
-		description = 'Motion and the tint the gradient texture fades through.',
+		description = 'The texture every statusbar inherits, motion, and the tint the gradient texture fades through.',
 		columns = { { 'Name', ui.AVATAR_X }, { 'Hex', FIRST_COLUMN }, { 'Opacity', SECOND_COLUMN } },
 	})
+	local textureRow = section:AddRow('Bar texture statusbar')
+	local sample = CreateFrame('Frame', nil, textureRow)
+	sample:SetSize(SWATCH_SIZE, SWATCH_SIZE)
+	sample:SetPoint('LEFT', ui.AVATAR_X, 0)
+	local track = ui.Fill(sample, 'control', 'ARTWORK')
+	track:SetPoint('LEFT')
+	track:SetPoint('RIGHT')
+	track:SetHeight(10)
+	local bar = sample:CreateTexture(nil, 'ARTWORK', nil, 1)
+	bar:SetPoint('TOPLEFT', track)
+	bar:SetPoint('BOTTOMLEFT', track)
+	bar:SetWidth(SWATCH_SIZE - 6)
+	Window():Paint(bar, 'accent')
+	ui.RowTitle(textureRow, 'Bar texture', 'Every statusbar inherits it unless its page picks another', ui.NAME_X)
+	local textureName = ui.Cell(textureRow, '', FIRST_COLUMN, 200)
+	local textureReset = ui.IconButton(textureRow, 'reset', 'Back to the BluUI texture', function() SetTexture(BUI.C.DEFAULT_TEXTURE) end)
+	textureReset:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
+	local textureMenu = ui.Dropdown(textureRow, FONT_DROPDOWN_WIDTH, function()
+		local items = {}
+		for _, texture in ipairs(BUI.BuildTextureDropdownItems()) do
+			items[#items + 1] = { text = texture.text, checked = texture.value == General().texture, callback = function() SetTexture(texture.value) end }
+		end
+		return items
+	end)
+	textureMenu:SetPoint('RIGHT', textureReset, 'LEFT', -10, 0)
+	ui.Bind(textureRow, function()
+		bar:SetTexture(BUI.GetGlobalTexture())
+		textureName:SetText(General().texture)
+		textureMenu.label:SetText(General().texture)
+		textureReset:SetActive(General().texture ~= BUI.C.DEFAULT_TEXTURE)
+	end)
+
 	local row = section:AddRow('Smooth bars animate health and power')
 	ui.IconAvatar(row, SWATCH_SIZE, 'play'):SetPoint('LEFT', ui.AVATAR_X, 0)
 	ui.RowTitle(row, 'Smooth bars', 'Animate health and power changes on the frames', ui.NAME_X)
@@ -475,7 +476,6 @@ local function Sections(ui, _, parent, width)
 	local sections = { Stage(ui, parent, width) }
 	sections[#sections + 1] = AccentGallery(ui, parent, width)
 	sections[#sections + 1] = TextSection(ui, parent, width)
-	sections[#sections + 1] = TextureGallery(ui, parent, width)
 	sections[#sections + 1] = BarSection(ui, parent, width)
 	local cards = {}
 	for _, card in ipairs(BUI.Colors.BuildCards()) do cards[card.name] = card end
