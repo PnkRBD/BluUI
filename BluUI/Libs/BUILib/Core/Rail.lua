@@ -1,7 +1,6 @@
 local BUILib = LibStub("BUILib")
 if not BUILib.__loadChildren then return end
 local Layout = BUILib.Layout
-local Widget = BUILib.Widget
 
 local GROUP_GAP = 22
 local CAPTION_HEIGHT = 24
@@ -148,41 +147,4 @@ function Layout.Rail(window, parent, width, spec)
 	end
 	rail:Refresh()
 	return rail
-end
-
-local function NavGroups(navConfig)
-	local groups, placed, indexOf = {}, {}, {}
-	for index, pageID in ipairs(navConfig.pageOrder) do indexOf[pageID] = index end
-	local function Item(pageID)
-		local page = navConfig.pages[pageID]
-		placed[pageID] = true
-		return { id = pageID, index = indexOf[pageID], label = Widget.StripColorCodes(page.buttonText or page.title or pageID), icon = page.icon, count = page.count, disabled = page.disabled }
-	end
-	for _, section in ipairs(navConfig.sections or {}) do
-		local items = {}
-		for _, pageID in ipairs(section.ids) do
-			local page = navConfig.pages[pageID]
-			if page and indexOf[pageID] and not page.hidden then items[#items + 1] = Item(pageID) end
-		end
-		if #items > 0 then groups[#groups + 1] = { title = Widget.StripColorCodes(section.header), items = items } end
-	end
-	local rest = {}
-	for _, pageID in ipairs(navConfig.pageOrder) do
-		if not placed[pageID] and not navConfig.pages[pageID].hidden then rest[#rest + 1] = Item(pageID) end
-	end
-	if #rest > 0 then groups[#groups + 1] = { items = rest } end
-	return groups
-end
-
-function Layout.NavRail(window, parent, width, navConfig)
-	local rail = Layout.Rail(window, parent, width, { groups = NavGroups(navConfig), onSelect = function(item) navConfig.showPage(item.index) end })
-	local buttons = {}
-	for _, entry in ipairs(rail.entries) do
-		local item = entry.item
-		function entry.button:SetSelected(isSelected)
-			if isSelected then rail:Select(item.id) end
-		end
-		buttons[item.index] = entry.button
-	end
-	return rail, buttons
 end
