@@ -48,7 +48,7 @@ local function Palette(window)
 	return {
 		fill = fill, edge = { window:Color('rule') }, hover = Blend(fill, { window:Color('hover') }),
 		text = { window:Color('text') }, muted = { window:Color('muted') }, disabled = { window:Color('faint') },
-		thumb = { window:Color('faint') }, check = { texture = BUILib.GetLibMedia('check'), color = { window:Color('accent') } }, font = window.font,
+		thumb = { window:Color('faint') }, check = { texture = BUILib.GetLibMedia('check'), color = { window:Color('accent') } }, font = window:FontPath('control'),
 	}
 end
 

@@ -54,6 +54,7 @@ function Section:AddRow(search)
 end
 
 function Section:Layout(y, query)
+	self:Measure()
 	local shown, panelHeight = 0, TABLE_HEAD
 	for _, row in ipairs(self.rows) do
 		local match = query == '' or row.search:find(query, 1, true) ~= nil
@@ -84,8 +85,8 @@ function Layout.TableKit(window)
 
 	function kit.Bind(region, update) return window:Bind(region, update) end
 
-	function kit.Text(parent, text, size, role, width)
-		local label = window:Text(parent, text, size, role)
+	function kit.Text(parent, text, size, role, width, fontRole)
+		local label = window:Text(parent, text, size, role, fontRole)
 		label:SetJustifyH('LEFT')
 		if width then
 			label:SetWidth(width)
@@ -145,11 +146,16 @@ function Layout.TableKit(window)
 		end
 		local label = kit.Text(button, text, 12, look.text)
 		label:SetPoint('LEFT', textX, 0)
-		button:SetSize(Widget.EvenSize(textX + label:GetStringWidth() + 14), CONTROL_HEIGHT)
+		button:SetHeight(CONTROL_HEIGHT)
+		local function Measure()
+			window:Paint(label, look.text)
+			button:SetWidth(Widget.EvenSize(textX + label:GetStringWidth() + 14))
+		end
+		window:Bind(button, Measure)
 		button:SetScript('OnClick', function() onClick() end)
 		function button:SetText(newText)
 			label:SetText(newText)
-			self:SetWidth(Widget.EvenSize(textX + label:GetStringWidth() + 14))
+			Measure()
 		end
 		return button
 	end
@@ -174,17 +180,20 @@ function Layout.TableKit(window)
 	function kit.IconButton(parent, icon, tooltip, onClick, hoverRole)
 		local button = CreateFrame('Button', nil, parent)
 		button:SetSize(22, 22)
-		local glyph = kit.Glyph(button, icon, 13, 'faint')
+		local glyph = kit.Glyph(button, icon, 13, 'text')
 		glyph:SetPoint('CENTER')
 		button:SetScript('OnEnter', function(self)
-			window:Paint(glyph, hoverRole or 'text')
+			window:Paint(glyph, hoverRole or 'accent')
 			Widget.ShowTip(self, tooltip)
 		end)
 		button:SetScript('OnLeave', function()
-			window:Paint(glyph, 'faint')
+			window:Paint(glyph, 'text')
 			Widget.HideTip()
 		end)
 		button:SetScript('OnClick', function() onClick() end)
+		function button:SetActive(active)
+			self:SetShown(active)
+		end
 		return button
 	end
 
@@ -222,11 +231,11 @@ function Layout.TableKit(window)
 		return avatar
 	end
 
-	function kit.Initials(parent, size, text)
+	function kit.Initials(parent, size, text, fontRole)
 		local avatar = CreateFrame('Frame', nil, parent)
 		avatar:SetSize(size, size)
 		kit.Disc(avatar, size, 'secondary'):SetPoint('CENTER')
-		window:Text(avatar, text, 10, 'secondaryText'):SetPoint('CENTER')
+		window:Text(avatar, text, 11, 'secondaryText', fontRole):SetPoint('CENTER')
 		return avatar
 	end
 
@@ -235,7 +244,10 @@ function Layout.TableKit(window)
 		kit.Disc(status, 7, 'accent'):SetPoint('LEFT')
 		local label = kit.Text(status, text, 12, 'text')
 		label:SetPoint('LEFT', 14, 0)
-		status:SetSize(14 + math.ceil(label:GetStringWidth()), 16)
+		window:Bind(status, function()
+			window:Paint(label, 'text')
+			status:SetSize(14 + math.ceil(label:GetStringWidth()), 16)
+		end)
 		return status
 	end
 
@@ -269,21 +281,40 @@ function Layout.TableKit(window)
 		window:Paint(icon, 'faint')
 		local edit = CreateFrame('EditBox', nil, box)
 		edit:SetPoint('LEFT', icon, 'RIGHT', 8, 1)
-		edit:SetPoint('RIGHT', -10, 0)
+		edit:SetPoint('RIGHT', -30, 0)
 		edit:SetHeight(20)
 		edit:SetAutoFocus(false)
 		edit:SetFont(window.font, 12, '')
 		window:Paint(edit, 'text')
+		window:SetFontRole(edit, 'control')
 		local hint = kit.Text(edit, placeholder, 12, 'faint')
 		hint:SetPoint('LEFT')
-		edit:SetScript('OnTextChanged', function(self)
+		local clear = CreateFrame('Button', nil, box)
+		clear:SetSize(22, 22)
+		clear:SetPoint('RIGHT', -6, 0)
+		local cross = kit.Glyph(clear, 'x', 9, 'faint')
+		cross:SetPoint('CENTER')
+		clear:SetScript('OnEnter', function() window:Paint(cross, 'text') end)
+		clear:SetScript('OnLeave', function() window:Paint(cross, 'faint') end)
+		clear:Hide()
+		local function Changed(self)
 			local text = self:GetText()
 			hint:SetShown(text == '')
+			clear:SetShown(text ~= '')
 			onChange(text:lower())
+		end
+		clear:SetScript('OnClick', function()
+			edit:SetText('')
+			edit:ClearFocus()
+			Changed(edit)
+		end)
+		edit:SetScript('OnTextChanged', function(self, userInput)
+			if userInput then Changed(self) end
 		end)
 		edit:SetScript('OnEscapePressed', function(self)
 			self:SetText('')
 			self:ClearFocus()
+			Changed(self)
 		end)
 		edit:SetScript('OnEnterPressed', function(self) self:ClearFocus() end)
 		box:EnableMouse(true)
@@ -314,7 +345,7 @@ function Layout.TableKit(window)
 		end
 		for index, text in ipairs(labels) do
 			local tab = CreateFrame('Button', nil, parent)
-			tab.label = kit.Text(tab, text, 13, 'muted')
+			tab.label = kit.Text(tab, text, 13, 'muted', nil, 'title')
 			tab.label:SetPoint('TOP', 0, -4)
 			tab:SetSize(math.ceil(tab.label:GetStringWidth()), TAB_HEIGHT)
 			tab:SetPoint('TOPLEFT', x, -y)
@@ -354,53 +385,59 @@ function Layout.TableKit(window)
 
 		local title = kit.Text(frame, spec.title, 13, 'text')
 		title:SetPoint('TOPLEFT', 0, -(pad + 2))
-		local leftHeight = 2 + kit.Height(title)
 
 		for _, buttonSpec in ipairs(spec.buttons or {}) do
 			section.buttons[#section.buttons + 1] = kit.Button(frame, buttonSpec.text, buttonSpec.style, buttonSpec.onClick, buttonSpec.icon)
 		end
-		local buttonsWidth = 0
 		if stacked then
-			local anchor
-			for index = #section.buttons, 1, -1 do
-				local button = section.buttons[index]
-				if anchor then
-					button:SetPoint('RIGHT', anchor, 'LEFT', -BUTTON_GAP, 0)
-				else
-					button:SetPoint('TOPRIGHT', 0, -(pad - 6))
-				end
-				buttonsWidth = buttonsWidth + button:GetWidth() + BUTTON_GAP
-				anchor = button
+			for index = #section.buttons - 1, 1, -1 do
+				section.buttons[index]:SetPoint('RIGHT', section.buttons[index + 1], 'LEFT', -BUTTON_GAP, 0)
+			end
+		else
+			for index = 2, #section.buttons do
+				section.buttons[index]:SetPoint('LEFT', section.buttons[index - 1], 'RIGHT', BUTTON_GAP, 0)
 			end
 		end
 
+		local description, descriptionGap
 		if spec.description then
-			local descriptionGap = stacked and 8 or 16
-			local descriptionWidth = stacked and (width - buttonsWidth - LEFT_GAP) or math.min(LEFT_WIDTH, panelX - LEFT_GAP)
-			local description = kit.Text(frame, spec.description, 12, 'muted', descriptionWidth)
+			descriptionGap = stacked and 8 or 16
+			description = kit.Text(frame, spec.description, 12, 'muted')
+			description:SetWordWrap(true)
 			description:SetSpacing(4)
 			description:SetPoint('TOPLEFT', title, 'BOTTOMLEFT', 0, -descriptionGap)
-			leftHeight = leftHeight + descriptionGap + kit.Height(description)
 		end
-
-		if not stacked and section.buttons[1] then
-			for index, button in ipairs(section.buttons) do
-				if index == 1 then
-					button:SetPoint('TOPLEFT', 0, -(pad + leftHeight + 28))
-				else
-					button:SetPoint('LEFT', section.buttons[index - 1], 'RIGHT', BUTTON_GAP, 0)
-				end
-			end
-			leftHeight = leftHeight + 28 + CONTROL_HEIGHT
-		end
-		section.leftHeight = leftHeight
-		section.panelTop = stacked and (pad + leftHeight + STACK_GAP) or pad
 
 		local panel = CreateFrame('Frame', nil, frame)
-		panel:SetPoint('TOPLEFT', panelX, -section.panelTop)
 		panel:SetWidth(section.panelWidth)
 		window:Fill(panel, 'panel'):SetAllPoints()
 		section.panel = panel
+
+		function section:Measure()
+			local buttonsWidth = 0
+			if stacked then
+				for _, button in ipairs(self.buttons) do buttonsWidth = buttonsWidth + button:GetWidth() + BUTTON_GAP end
+			end
+			local leftHeight = 2 + kit.Height(title)
+			if description then
+				description:SetWidth(stacked and (width - buttonsWidth - LEFT_GAP) or math.min(LEFT_WIDTH, panelX - LEFT_GAP))
+				leftHeight = leftHeight + descriptionGap + kit.Height(description)
+			end
+			local rightmost = self.buttons[#self.buttons]
+			if stacked and rightmost then
+				rightmost:ClearAllPoints()
+				rightmost:SetPoint('BOTTOMRIGHT', frame, 'TOPRIGHT', 0, -(pad + leftHeight))
+			elseif self.buttons[1] then
+				self.buttons[1]:ClearAllPoints()
+				self.buttons[1]:SetPoint('TOPLEFT', 0, -(pad + leftHeight + 28))
+				leftHeight = leftHeight + 28 + CONTROL_HEIGHT
+			end
+			self.leftHeight = leftHeight
+			self.panelTop = stacked and (pad + leftHeight + STACK_GAP) or pad
+			panel:ClearAllPoints()
+			panel:SetPoint('TOPLEFT', panelX, -self.panelTop)
+		end
+		section:Measure()
 		for _, column in ipairs(spec.columns or {}) do
 			kit.Text(panel, column[1]:upper(), 9, 'faint'):SetPoint('TOPLEFT', column[2], -20)
 		end
@@ -418,17 +455,19 @@ function Layout.TableKit(window)
 		kit.RowTitle(row, spec.name, spec.sub, NAME_X)
 		local hex = kit.Cell(row, '', spec.hexX)
 		local opacity = kit.Cell(row, '', spec.opacityX)
-		local reset = kit.IconButton(row, 'delete', 'Back to default', spec.reset, 'danger')
+		local reset = kit.IconButton(row, 'reset', 'Back to default', spec.reset)
 		reset:SetPoint('RIGHT', -(ROW_INSET - 2), 0)
 		local dropdown
 		dropdown = kit.Dropdown(row, spec.dropdownWidth or DROPDOWN_WIDTH, function() return spec.items(dropdown) end)
 		dropdown:SetPoint('RIGHT', reset, 'LEFT', -10, 0)
 		kit.Bind(row, function()
 			local red, green, blue, alpha = spec.get()
+			local custom = spec.custom()
 			swatch.fill:SetVertexColor(red, green, blue, alpha)
 			hex:SetText(Hex(red, green, blue))
 			opacity:SetText(Percent(alpha))
-			dropdown.label:SetText(spec.state())
+			dropdown.label:SetText(custom and 'Custom' or spec.defaultLabel or 'Default')
+			reset:SetActive(custom)
 		end)
 		return row
 	end

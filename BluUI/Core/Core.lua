@@ -193,7 +193,7 @@ function Addon:OnInitialize()
 
 	BUI.db = AceDB:New('BluUI_DB', BUI.Defaults, true)
 
-	BUI.BUILibClient.SetFont(BUI.GetAddonFont())
+	BUI.BUILibClient.SetFont(BUI.WindowFont())
 	BUI.BUILibClient.SetCardStyle('datasheet')
 
 	if isNewChar and BUI.db.global.defaultProfile then
@@ -222,8 +222,6 @@ function Addon:OnEnable()
 	BUI.SpecProfiles.ApplyOnLogin()
 
 	BUI.BUILibClient.defaultWidth = BUI.C.PAGE_CONTENT_W
-	BUI.BUILibClient.modalColor = { BUI.C.PANEL_BACKDROP[1], BUI.C.PANEL_BACKDROP[2], BUI.C.PANEL_BACKDROP[3], BUI.C.PANEL_BACKDROP[4] }
-	BUI.BUILibClient.modalBorderColor = { BUI.C.PANEL_BACKDROP[5], BUI.C.PANEL_BACKDROP[6], BUI.C.PANEL_BACKDROP[7], BUI.C.PANEL_BACKDROP[8] }
 	BUI.BUILibClient.bodyFont = BUI.GetGlobalFont()
 
 	if BUI.IsModuleEnabled('actionBars') then BUI.ActionBars.Initialize() end

@@ -13,29 +13,32 @@ local CreateFrame, GetCursorPosition, UIParent = CreateFrame, GetCursorPosition,
 local Modals = BUILib.Modals
 
 local SIZES = {
-	width = 420,
-	height = 180,
-	buttonHeight = 28,
-	buttonWidth = 100,
+	width = 440,
+	height = 190,
+	buttonHeight = 30,
+	buttonWidth = 90,
 	buttonTextPadding = 14,
 	buttonSpacing = 10,
 	buttonBottomMargin = 20,
-	titleFontSize = 18,
-	messageFontSize = 14,
-	buttonFontSize = 13,
-	padding = 20,
-	inputHeight = 28,
+	titleFontSize = 15,
+	messageFontSize = 12,
+	buttonFontSize = 12,
+	padding = 24,
+	inputHeight = 34,
 	inputWidth = 300,
 }
 
-
 local OFFSETS = {
-	titleY = -25,
+	titleY = -22,
 	messageY = 10,
-	messageBelowTitle = -20,
-	inputY = -10,
+	messageBelowTitle = -8,
+	inputY = -12,
 	labelGap = 6,
 }
+
+local RADIUS = 10
+local INPUT_RADIUS = 6
+local SOLID_HOVER = { 1, 1, 1, 0.12 }
 
 Modals.BTN_CONFIRM = {0.3, 1, 0.3, 1}
 Modals.BTN_CANCEL = {1, 1, 1, 1}
@@ -43,7 +46,7 @@ Modals.BTN_NEUTRAL = {0.5, 0.5, 0.5, 1}
 Modals.BTN_PRIMARY = {1, 1, 1, 1}
 Modals.BTN_WARNING = {1, 0.6, 0.3, 1}
 
-local OVERLAY_COLOR = {0, 0, 0, 0.7}
+local OVERLAY_COLOR = {0, 0, 0, 0.6}
 
 function Modals.BodyFont()
 	local client = BUILib.GetActiveClient()
@@ -59,6 +62,24 @@ local function OnceGuard()
 		fired = true
 		callback(...)
 	end
+end
+
+local function WindowOf(frame)
+	while frame do
+		if frame.window then return frame.window end
+		frame = frame:GetParent()
+	end
+end
+
+local function Paint(dialog, role, fallback)
+	local window = dialog.window
+	if window then return window:Color(role) end
+	return fallback[1], fallback[2], fallback[3], fallback[4]
+end
+
+local function FontOf(dialog, tier)
+	local window = dialog.window
+	return window and window:FontPath(tier) or BUILib.Font
 end
 
 function Modals.CreateBase(width, height, bounded, parent)
@@ -88,11 +109,11 @@ function Modals.CreateBase(width, height, bounded, parent)
 	overlay:SetBackdropColor(unpack(OVERLAY_COLOR))
 	overlay:EnableKeyboard(true)
 
-	local dialog = Widget.New(overlay, "Frame", nil, {bg = theme.bg.panel, border = theme.border.dark, size = {width, height}}).frame
+	local dialog = CreateFrame("Frame", nil, overlay)
+	dialog:SetSize(width, height)
 	dialog:SetPoint("CENTER")
-	local client = BUILib.GetActiveClient()
-	if client.modalColor then dialog:SetBackdropColor(unpack(client.modalColor)) end
-	if client.modalBorderColor then dialog:SetBackdropBorderColor(unpack(client.modalBorderColor)) end
+	dialog.window = WindowOf(parent)
+	Widget.DrawCardShape(dialog, RADIUS, { Paint(dialog, "panel", theme.bg.panel) }, { Paint(dialog, "rule", theme.border.dark) }, "BACKGROUND", 0, 0)
 	dialog:SetFrameLevel(overlay:GetFrameLevel() + 10)
 	dialog:EnableMouse(true)
 
@@ -126,85 +147,106 @@ function Modals.CreateBase(width, height, bounded, parent)
 	return overlay, dialog, Close
 end
 
-function Modals.CreateButton(parent, text, textColor, width)
-	width = width or SIZES.buttonWidth
+function Modals.CreateButton(dialog, text, color, width)
 	local theme = GetTheme()
-	local normal, hover = theme.button.normal, theme.button.hover
-	local button = Widget.New(parent, "Button", nil, {raw = true, size = {width, SIZES.buttonHeight}}).frame
-	local client = BUILib.GetActiveClient()
-	local fillColor = client.modalColor or normal
-	local edgeColor = client.modalBorderColor or theme.border.default
-	BUILib.Skin.Shell(button, { fill = fillColor, edge = edgeColor })
+	local primary = color == Modals.BTN_CONFIRM
+	local button = CreateFrame("Button", nil, dialog)
+	button:SetSize(width or SIZES.buttonWidth, SIZES.buttonHeight)
+
+	local fill = button:CreateTexture(nil, "BACKGROUND")
+	fill:SetTexture(Widget.WHITE)
+	fill:SetAllPoints()
+	local hover = button:CreateTexture(nil, "BACKGROUND", nil, 1)
+	hover:SetTexture(Widget.WHITE)
+	hover:SetAllPoints()
+	hover:Hide()
 
 	button.text = button:CreateFontString(nil, "OVERLAY")
-	button.text:SetFont(BUILib.Font, SIZES.buttonFontSize, "")
+	button.text:SetFont(FontOf(dialog, "control"), SIZES.buttonFontSize, "")
 	button.text:SetShadowColor(0, 0, 0, 0)
-	button.text:SetText(text or "OK")
 	button.text:SetPoint("CENTER")
-	button.text:SetTextColor(unpack(textColor or Modals.BTN_PRIMARY))
+	button.text:SetText(text or "OK")
 
-	button:SetScript("OnEnter", function(self)
-		BUILib.Skin.SetShellFill(self, hover)
-		local red, green, blue = theme.GetAccent()
-		BUILib.Skin.SetShellEdges(self, { red, green, blue, 1 })
-	end)
-	button:SetScript("OnLeave", function(self)
-		BUILib.Skin.SetShellFill(self, fillColor)
-		BUILib.Skin.SetShellEdges(self, edgeColor)
-	end)
-	button:SetScript("OnMouseDown", function(self) self.text:SetPoint("CENTER", 1, -1) end)
-	button:SetScript("OnMouseUp", function(self) self.text:SetPoint("CENTER", 0, 0) end)
+	if primary then
+		fill:SetVertexColor(Paint(dialog, "accent", { theme.GetAccent() }))
+		hover:SetVertexColor(unpack(SOLID_HOVER))
+		button.text:SetTextColor(Paint(dialog, "onAccent", theme.text.primary))
+	else
+		fill:SetVertexColor(Paint(dialog, "secondary", theme.button.normal))
+		hover:SetVertexColor(Paint(dialog, "hover", theme.button.hover))
+		if color == Modals.BTN_WARNING then
+			button.text:SetTextColor(Paint(dialog, "danger", color))
+		elseif color and color ~= Modals.BTN_CANCEL and color ~= Modals.BTN_NEUTRAL and color ~= Modals.BTN_PRIMARY then
+			button.text:SetTextColor(unpack(color))
+		else
+			button.text:SetTextColor(Paint(dialog, "secondaryText", theme.text.primary))
+		end
+	end
 
+	button:SetScript("OnEnter", function() hover:Show() end)
+	button:SetScript("OnLeave", function() hover:Hide() end)
 	return button
 end
 
-function Modals.CreateTitle(dialog, text, color)
+function Modals.CreateTitle(dialog, text, color, justify)
 	local theme = GetTheme()
 	local title = dialog:CreateFontString(nil, "OVERLAY")
-	title:SetFont(BUILib.Font, SIZES.titleFontSize, "")
+	title:SetFont(FontOf(dialog, "title"), SIZES.titleFontSize, "")
 	title:SetShadowColor(0, 0, 0, 0)
-	title:SetPoint("TOP", 0, OFFSETS.titleY)
+	if justify == "CENTER" then
+		title:SetPoint("TOP", 0, OFFSETS.titleY)
+	else
+		title:SetPoint("TOPLEFT", SIZES.padding, OFFSETS.titleY)
+		title:SetPoint("TOPRIGHT", -SIZES.padding, OFFSETS.titleY)
+		title:SetJustifyH("LEFT")
+	end
 	title:SetText(text or "")
-	title:SetTextColor(unpack(color or theme.text.primary))
+	if color then title:SetTextColor(unpack(color)) else title:SetTextColor(Paint(dialog, "text", theme.text.primary)) end
+	dialog.title = title
 	return title
 end
 
 function Modals.CreateMessage(dialog, text, justify, anchorTo, offsetY)
 	local theme = GetTheme()
 	local messageText = dialog:CreateFontString(nil, "OVERLAY")
-	messageText:SetFont(Modals.BodyFont(), SIZES.messageFontSize, "")
+	messageText:SetFont(FontOf(dialog, "body"), SIZES.messageFontSize, "")
 	messageText:SetShadowColor(0, 0, 0, 0)
-
-	if anchorTo then
-		messageText:SetPoint("TOP", anchorTo, "BOTTOM", 0, offsetY or OFFSETS.messageBelowTitle)
-	else
-		messageText:SetPoint("CENTER", 0, OFFSETS.messageY)
-	end
-
-	messageText:SetWidth(dialog:GetWidth() - (SIZES.padding * 2))
+	messageText:SetSpacing(4)
+	messageText:SetWidth(dialog:GetWidth() - SIZES.padding * 2)
 	messageText:SetText(text or "")
-	messageText:SetTextColor(unpack(theme.text.primary))
-	messageText:SetJustifyH(justify or "CENTER")
+	messageText:SetTextColor(Paint(dialog, "muted", theme.text.muted))
+
+	local above = anchorTo or dialog.title
+	if justify == "CENTER" then
+		messageText:SetJustifyH("CENTER")
+		if above then
+			messageText:SetPoint("TOP", above, "BOTTOM", 0, offsetY or OFFSETS.messageBelowTitle)
+		else
+			messageText:SetPoint("CENTER", 0, OFFSETS.messageY)
+		end
+	else
+		messageText:SetJustifyH("LEFT")
+		if above then
+			messageText:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, offsetY or OFFSETS.messageBelowTitle)
+		else
+			messageText:SetPoint("TOPLEFT", SIZES.padding, OFFSETS.titleY)
+		end
+	end
+	dialog.message = messageText
 	return messageText
 end
 
-function Modals.CreateInput(parent, defaultText, width, height)
-	width = width or SIZES.inputWidth
-	height = height or SIZES.inputHeight
+function Modals.CreateInput(dialog, defaultText, width, height)
 	local theme = GetTheme()
-
-	local input = CreateFrame("EditBox", nil, parent, "BackdropTemplate")
-	input:SetSize(width, height)
+	local input = CreateFrame("EditBox", nil, dialog)
+	input:SetSize(width or SIZES.inputWidth, height or SIZES.inputHeight)
 	input:SetAutoFocus(true)
-	input:SetFont(BUILib.Font, SIZES.messageFontSize, "")
-	input:SetTextColor(unpack(theme.text.primary))
-	input:SetTextInsets(8, 8, 0, 0)
-	input:SetBackdrop(Widget.BACKDROP)
-	input:SetBackdropColor(unpack(theme.bg.input))
-	input:SetBackdropBorderColor(unpack(theme.border.input))
+	input:SetFont(FontOf(dialog, "control"), SIZES.messageFontSize, "")
+	input:SetTextColor(Paint(dialog, "text", theme.text.primary))
+	input:SetTextInsets(12, 12, 0, 0)
+	Widget.DrawRoundedRect(input, INPUT_RADIUS, { Paint(dialog, "input", theme.bg.input) }, "BACKGROUND", 0, 0)
 	input:SetText(defaultText or "")
 	input:HighlightText()
-
 	return input
 end
 
@@ -212,25 +254,20 @@ function Modals.LayoutButtons(dialog, buttons, closeFunc, bottomMargin)
 	if not buttons or #buttons == 0 then return end
 	bottomMargin = bottomMargin or SIZES.buttonBottomMargin
 
-	local created, widths, totalWidth = {}, {}, 0
+	local anchor
+	local totalWidth = 0
 	for index, buttonOptions in ipairs(buttons) do
 		local button = Modals.CreateButton(dialog, buttonOptions.text, buttonOptions.color, buttonOptions.width)
 		local fitted = math.ceil(button.text:GetStringWidth() + SIZES.buttonTextPadding * 2)
-		local buttonWidth = Widget.EvenSize(math.max(buttonOptions.width or SIZES.buttonWidth, fitted))
-		button:SetWidth(buttonWidth)
-		created[index], widths[index] = button, buttonWidth
-		totalWidth = totalWidth + buttonWidth
-	end
-	totalWidth = totalWidth + (SIZES.buttonSpacing * (#buttons - 1))
-
-	local minimumDialogWidth = totalWidth + SIZES.padding * 2
-	if dialog:GetWidth() < minimumDialogWidth then dialog:SetWidth(minimumDialogWidth) end
-
-	local xOffset = -totalWidth / 2
-	for index, button in ipairs(created) do
-		local buttonOptions, buttonWidth = buttons[index], widths[index]
-		button:SetPoint("BOTTOM", dialog, "BOTTOM", xOffset + buttonWidth / 2, bottomMargin)
-		xOffset = xOffset + buttonWidth + SIZES.buttonSpacing
+		button:SetWidth(Widget.EvenSize(math.max(buttonOptions.width or SIZES.buttonWidth, fitted)))
+		if anchor then
+			button:SetPoint("RIGHT", anchor, "LEFT", -SIZES.buttonSpacing, 0)
+			totalWidth = totalWidth + SIZES.buttonSpacing
+		else
+			button:SetPoint("BOTTOMRIGHT", dialog, "BOTTOMRIGHT", -SIZES.padding, bottomMargin)
+		end
+		totalWidth = totalWidth + button:GetWidth()
+		anchor = button
 
 		if buttonOptions.onClick then
 			button:SetScript("OnClick", function() buttonOptions.onClick(closeFunc) end)
@@ -238,6 +275,9 @@ function Modals.LayoutButtons(dialog, buttons, closeFunc, bottomMargin)
 			button:SetScript("OnClick", closeFunc)
 		end
 	end
+
+	local minimumDialogWidth = totalWidth + SIZES.padding * 2
+	if dialog:GetWidth() < minimumDialogWidth then dialog:SetWidth(minimumDialogWidth) end
 end
 
 function Modals.Confirm(options)
@@ -295,17 +335,12 @@ end
 function Modals.Input(options)
 	options = options or {}
 	local bounded = not options.fullscreen
-	local overlay, dialog, Close = Modals.CreateBase(options.width or SIZES.width, options.height or 200, bounded, options.parent)
+	local overlay, dialog, Close = Modals.CreateBase(options.width or SIZES.width, options.height or 210, bounded, options.parent)
 
 	Modals.CreateTitle(dialog, options.title, options.titleColor)
-
 	local messageText = Modals.CreateMessage(dialog, options.message)
-	messageText:ClearAllPoints()
-	messageText:SetPoint("CENTER", 0, 25)
-
-	local inputWidth = dialog:GetWidth() - 60
-	local input = Modals.CreateInput(dialog, options.defaultText, inputWidth)
-	input:SetPoint("CENTER", 0, OFFSETS.inputY)
+	local input = Modals.CreateInput(dialog, options.defaultText, dialog:GetWidth() - SIZES.padding * 2)
+	input:SetPoint("TOPLEFT", messageText, "BOTTOMLEFT", 0, OFFSETS.inputY)
 
 	local fireOnce = OnceGuard()
 
@@ -340,26 +375,50 @@ function Modals.Input(options)
 	return overlay, Close
 end
 
+function Modals.Copy(options)
+	local bounded = not options.fullscreen
+	local overlay, dialog, Close = Modals.CreateBase(options.width or SIZES.width, options.height or 210, bounded, options.parent)
+
+	Modals.CreateTitle(dialog, options.title)
+	local messageText = Modals.CreateMessage(dialog, options.message)
+	local input = Modals.CreateInput(dialog, options.text, dialog:GetWidth() - SIZES.padding * 2)
+	input:SetPoint("TOPLEFT", messageText, "BOTTOMLEFT", 0, OFFSETS.inputY)
+	input:SetScript("OnTextChanged", function(self, userInput)
+		if userInput then
+			self:SetText(options.text)
+			self:HighlightText()
+		end
+	end)
+	input:SetScript("OnEnterPressed", function() Close() end)
+	input:SetScript("OnEscapePressed", function() Close() end)
+
+	overlay:SetScript("OnKeyDown", function(self, key)
+		if key == "ESCAPE" then
+			self:SetPropagateKeyboardInput(false)
+			Close()
+		else
+			self:SetPropagateKeyboardInput(true)
+		end
+	end)
+
+	Modals.LayoutButtons(dialog, {
+		{text = options.buttonText or "Done", color = Modals.BTN_CONFIRM, width = options.buttonWidth},
+	}, Close)
+
+	overlay:Show()
+	return overlay, Close
+end
+
 function Modals.Custom(options)
 	options = options or {}
 	local bounded = not options.fullscreen
 	local overlay, dialog, Close = Modals.CreateBase(options.width, options.height, bounded, options.parent)
-	local theme = GetTheme()
 
-	local titleText = Modals.CreateTitle(dialog, options.title, options.titleColor)
+	Modals.CreateTitle(dialog, options.title, options.titleColor)
 
 	if options.message then
-		local messageText = dialog:CreateFontString(nil, "OVERLAY")
-		messageText:SetFont(Modals.BodyFont(), SIZES.messageFontSize, "")
-		messageText:SetShadowColor(0, 0, 0, 0)
-		messageText:SetPoint("TOP", titleText, "BOTTOM", 0, OFFSETS.messageBelowTitle)
-		messageText:SetPoint("LEFT", dialog, "LEFT", SIZES.padding, 0)
-		messageText:SetPoint("RIGHT", dialog, "RIGHT", -SIZES.padding, 0)
-		messageText:SetText(options.message)
-		messageText:SetTextColor(unpack(options.messageColor or theme.text.primary))
-		messageText:SetJustifyH(options.justify or "CENTER")
-		messageText:SetSpacing(4)
-		dialog.message = messageText
+		local messageText = Modals.CreateMessage(dialog, options.message, options.justify)
+		if options.messageColor then messageText:SetTextColor(unpack(options.messageColor)) end
 	end
 
 	if options.buttons and #options.buttons > 0 then
@@ -462,7 +521,7 @@ function Modals.CardPicker(options)
 	end
 
 	local accentRed, accentGreen, accentBlue = theme.GetAccent()
-	local title = Modals.CreateTitle(dialog, options.title, options.titleColor or {accentRed, accentGreen, accentBlue, 1})
+	local title = Modals.CreateTitle(dialog, options.title, options.titleColor or {accentRed, accentGreen, accentBlue, 1}, "CENTER")
 	local messageText = Modals.CreateMessage(dialog, options.message, "CENTER", title)
 
 	local cardArea = CreateFrame("Frame", nil, dialog)

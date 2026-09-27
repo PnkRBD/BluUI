@@ -52,6 +52,7 @@ local function CreateWindow()
 		globalName   = 'BluUIFrame', footerButtons = BUI.Scale.GetFooterButtons(),
 		clampedToScreen = false,
 		theme        = BUI.GetDB().windowTheme,
+		resolveFont  = BUI.FetchFont,
 	})
 	window.frame:Hide()
 	PageEngine.window = window
@@ -211,10 +212,14 @@ local function RestorePageTab(tabIndex)
 	end
 end
 
-function PageEngine.RebuildAllPages()
+function PageEngine.MarkPagesStale()
 	for _, pageConfig in pairs(PageEngine.pages) do
 		if pageConfig.frame then pageConfig.stale = true end
 	end
+end
+
+function PageEngine.RebuildAllPages()
+	PageEngine.MarkPagesStale()
 	if PageEngine.frame and PageEngine.frame:IsShown() then
 		PageEngine.RefreshCurrentPage()
 	end
