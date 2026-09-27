@@ -4,6 +4,50 @@ local BUILib = BluUI.BUILibClient
 local Controls, Layout, Modals, Widget = BUILib.Controls, BUILib.Layout, BUILib.Modals, BUILib.Widget
 local Pixel = BUI.Pixel
 
+local RAIL_GROUPS = {
+	{ title = 'Look', items = {
+		{ id = 'appearance', label = 'Appearance', icon = 'glow' },
+		{ id = 'theme', label = 'Theme', icon = 'copy' },
+	} },
+	{ title = 'Game', items = {
+		{ id = 'settings', label = 'Settings', icon = 'cog' },
+		{ id = 'skinning', label = 'Skinning', icon = 'edit' },
+		{ id = 'visibility', label = 'Visibility', icon = 'eye' },
+	} },
+	{ title = 'BluUI', items = {
+		{ id = 'modules', label = 'Modules', icon = 'modules5' },
+		{ id = 'help', label = 'Help', icon = 'question' },
+	} },
+}
+local PAGE_WIDTH = 960
+local TAB_IDS = { 'appearance', 'settings', 'skinning', 'visibility', 'modules', 'help', 'theme' }
+local TAB_INDEX = {}
+for index, id in ipairs(TAB_IDS) do TAB_INDEX[id] = index end
+local HOST_HEIGHT = 400
+
+local function Host(parent, width, build, railPage, adapter, index)
+	local block = CreateFrame('Frame', nil, parent)
+	block:SetSize(width, HOST_HEIGHT)
+	local inner = Layout.Page(block, nil, width)
+	local tab = inner:GetTab(1)
+	tab.topPadding = 0
+	adapter.tabContents[index] = tab
+	build(tab)
+	local Refresh = tab.Refresh
+	function tab:Refresh(...)
+		Refresh(self, ...)
+		local viewHeight = self.scroll.scrollFrame:GetHeight()
+		if viewHeight <= 0 then return end
+		local height = self.child:GetHeight() + block:GetHeight() - viewHeight
+		if block:GetHeight() ~= height then
+			block:SetHeight(height)
+			railPage:Resize()
+		end
+	end
+	inner:AutoRefresh()
+	return block
+end
+
 local function PrintTalents(message)
 	print('|cff' .. BUI.C.COLOR_BRAND .. 'BUI/Talents:|r ' .. message)
 end
@@ -15,11 +59,7 @@ BUI.PageEngine.RegisterPage("settings", {
 		local globalDB = BUI.db.global
 		local PageKit = BUILib.PageKit
 
-		local page = Layout.Page(pageFrame, {'Appearance', 'Settings', 'Skinning', 'Visibility', 'Modules', 'Help'})
-		pageFrame._page = page
-
-		do
-			local tab = page:GetTab(2)
+		local function BuildSettings(tab)
 			local grid
 			local function Section(title)
 				if grid then grid:Flush() end
@@ -705,14 +745,7 @@ BUI.PageEngine.RegisterPage("settings", {
 			end
 		end
 
-		if BUI.AppearancePage then BUI.AppearancePage.BuildTab(page:GetTab(1)) end
-
-		if BUI.SkinningPage then BUI.SkinningPage.BuildTab(page:GetTab(3)) end
-
-		if BUI.VisibilityPage then BUI.VisibilityPage.BuildTab(page:GetTab(4)) end
-
-		do
-			local tab = page:GetTab(5)
+		local function BuildModules(tab)
 			Layout.Section(tab, 'Modules', 'Turn BluUI modules on or off. Some changes take effect after a /reload.')
 
 			local MODULE_ORDER = {
@@ -792,8 +825,7 @@ BUI.PageEngine.RegisterPage("settings", {
 			Layout.Add(tab, moduleListFrame, 8)
 		end
 
-		do
-			local tab = page:GetTab(6)
+		local function BuildHelp(tab)
 			Layout.Section(tab, 'Diagnostics')
 			local grid = PageKit.RowGrid(tab)
 
@@ -878,6 +910,36 @@ BUI.PageEngine.RegisterPage("settings", {
 			helpBox = Layout.TextArea(tab, nil, 500)
 		end
 
+		local builders = {
+			appearance = BUI.AppearancePage.BuildTab,
+			settings = BuildSettings,
+			skinning = BUI.SkinningPage.BuildTab,
+			visibility = BUI.VisibilityPage.BuildTab,
+			modules = BuildModules,
+			help = BuildHelp,
+		}
+		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
+		local adapter = { tabContents = {}, currentTab = 1 }
+		local rail
+		rail = Layout.RailPage(page:GetTab(1), { window = BUI.PageEngine.window }, {
+			icon = 'cog',
+			title = 'Settings',
+			placeholder = 'Search settings...',
+			rail = { groups = RAIL_GROUPS },
+			build = function(kit, shell, parent, width, item, railPage)
+				if item.id == 'theme' then return BUI.ThemePage.Sections(kit, shell, parent, width) end
+				return { Host(parent, width, builders[item.id], railPage, adapter, TAB_INDEX[item.id]) }
+			end,
+		})
+		local Select = rail.Select
+		function rail:Select(id)
+			Select(self, id)
+			adapter.currentTab = TAB_INDEX[id]
+		end
+		function adapter:SetTab(index)
+			rail:Select(TAB_IDS[index])
+		end
+		pageFrame._page = adapter
 		page:AutoRefresh()
 	end,
 })
