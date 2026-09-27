@@ -745,7 +745,6 @@ BUI.PageEngine.RegisterPage("settings", {
 		end
 
 		local builders = {
-			appearance = BUI.AppearancePage.BuildTab,
 			settings = BuildSettings,
 			skinning = BUI.SkinningPage.BuildTab,
 			visibility = BUI.VisibilityPage.BuildTab,
@@ -762,6 +761,7 @@ BUI.PageEngine.RegisterPage("settings", {
 				if item.id == 'theme' then return BUI.ThemePage.Sections(kit, shell, parent, width, railPage) end
 				if item.id == 'modules' then return BUI.ModulesPage.Sections(kit, shell, parent, width, railPage) end
 				if item.id == 'help' then return BUI.HelpPage.Sections(kit, shell, parent, width, railPage) end
+				if item.id == 'appearance' then return BUI.AppearancePage.Sections(kit, shell, parent, width, railPage) end
 				return { Host(parent, width, builders[item.id], railPage, adapter, TAB_INDEX[item.id]) }
 			end,
 		})
