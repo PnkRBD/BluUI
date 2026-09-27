@@ -9,12 +9,21 @@ local L = {
 	PAD = 14,
 	RADIUS = 10,
 	WHEEL = 200,
-	WHEEL_KNOB_RADIUS = 83,
-	CENTER_DISC = 124,
+	WHEEL_INNER = 60,
+	WHEEL_CROP = 28 / 256,
+	WHEEL_OUTER = 97,
+	READOUT_HEIGHT = 18,
+	READOUT_GAP = 6,
+	READOUT_BOX = 46,
+	CENTER_DISC = 112,
 	HEX_WIDTH = 120,
 	HEX_SIZE = 18,
+	VALUE_WIDTH = 60,
+	VALUE_HEIGHT = 18,
 	SWATCH_LABEL_SIZE = 18,
 	KNOB_SIZE = 14,
+	CROSS_SIZE = 14,
+	CROSS_ARM = 2,
 	TITLE_HEIGHT = 20,
 	TITLE_SIZE = 13,
 	PILL_WIDTH = 28,
@@ -25,8 +34,8 @@ local L = {
 	TRACK_HEIGHT = 8,
 	TRACK_RADIUS = 4,
 	ROW_HEIGHT = 28,
-	DOT_SIZE = 16,
-	DOT_GAP = 3,
+	DOT_SIZE = 14,
+	DOT_GAP = 5,
 	DOT_COUNT = 13,
 	LABEL_HEIGHT = 14,
 	GAP = 12,
@@ -43,7 +52,6 @@ L.INNER = L.WIDTH - L.PAD * 2
 local C = {
 	SURFACE = { 0.055, 0.06, 0.068, 0.98 },
 	EDGE = { 0.19, 0.2, 0.23, 1 },
-	DISC = { 0.085, 0.09, 0.105, 1 },
 	TRACK = { 0.14, 0.15, 0.175, 1 },
 	TEXT = { 0.93, 0.94, 0.95, 1 },
 	LABEL = { 0.5, 0.53, 0.58, 1 },
@@ -175,6 +183,13 @@ local function Disc(parent, size, layer, subLevel)
 	return disc
 end
 
+local function Square(parent, size, layer, subLevel)
+	local square = Solid(parent, layer, subLevel)
+	square:SetSize(size, size)
+	square:SetPoint('CENTER')
+	return square
+end
+
 local function Checker(parent, layer, subLevel)
 	local texture = parent:CreateTexture(nil, layer or 'BACKGROUND', nil, subLevel or 0)
 	texture:SetTexture(BUILib.GetLibMedia('checker'), 'REPEAT', 'REPEAT', 'NEAREST')
@@ -191,6 +206,24 @@ local function Knob(parent)
 	Disc(knob, L.KNOB_SIZE, 'OVERLAY', 1):SetVertexColor(1, 1, 1, 1)
 	knob.fill = Disc(knob, L.KNOB_SIZE - 4, 'OVERLAY', 2)
 	return knob
+end
+
+local function Cross(parent)
+	local cross = CreateFrame('Frame', nil, parent)
+	cross:SetSize(L.CROSS_SIZE, L.CROSS_SIZE)
+	cross:SetFrameLevel(parent:GetFrameLevel() + 5)
+	for _, arm in ipairs({ { L.CROSS_SIZE + 2, L.CROSS_ARM + 2 }, { L.CROSS_ARM + 2, L.CROSS_SIZE + 2 } }) do
+		local shadow = Solid(cross, 'OVERLAY', 0)
+		shadow:SetSize(arm[1], arm[2])
+		shadow:SetPoint('CENTER')
+		shadow:SetVertexColor(unpack(C.KNOB_SHADOW))
+	end
+	for _, arm in ipairs({ { L.CROSS_SIZE, L.CROSS_ARM }, { L.CROSS_ARM, L.CROSS_SIZE } }) do
+		local bar = Solid(cross, 'OVERLAY', 1)
+		bar:SetSize(arm[1], arm[2])
+		bar:SetPoint('CENTER')
+	end
+	return cross
 end
 
 local function Label(parent, text, color, size)
@@ -214,14 +247,21 @@ local function DottedRule(parent)
 	return rule
 end
 
-local function Link(parent, text, onClick)
+local function Link(parent, text, onClick, plain)
 	local link = CreateFrame('Button', nil, parent)
 	local label = Label(link, text, C.LABEL)
 	label:SetPoint('RIGHT')
 	link:SetSize(math.ceil(label:GetStringWidth()), L.LABEL_HEIGHT)
 	link.label = label
 	local function Paint()
-		if link.active or link:IsMouseOver() then label:SetTextColor(1, 1, 1, 1) else label:SetTextColor(Theme.GetAccent()) end
+		local hovered = link:IsMouseOver()
+		if plain then
+			if hovered then label:SetTextColor(Theme.GetAccent()) else label:SetTextColor(unpack(C.TEXT)) end
+		elseif link.active or hovered then
+			label:SetTextColor(1, 1, 1, 1)
+		else
+			label:SetTextColor(Theme.GetAccent())
+		end
 	end
 	link.Paint = Paint
 	Paint()
@@ -259,12 +299,12 @@ local function Dot(parent)
 	local dot = CreateFrame('Button', nil, parent)
 	dot:SetSize(L.DOT_SIZE, L.DOT_SIZE)
 	dot:RegisterForClicks('LeftButtonUp', 'RightButtonUp')
-	local ring = Disc(dot, L.DOT_SIZE, 'ARTWORK', 0)
+	local ring = Square(dot, L.DOT_SIZE, 'ARTWORK', 0)
 	ring:SetVertexColor(unpack(C.DOT_RING))
 	ring:Hide()
-	local edge = Disc(dot, L.DOT_SIZE - 2, 'ARTWORK', 1)
+	local edge = Square(dot, L.DOT_SIZE - 2, 'ARTWORK', 1)
 	edge:SetVertexColor(unpack(C.DOT_EDGE))
-	local fill = Disc(dot, L.DOT_SIZE - 4, 'ARTWORK', 2)
+	local fill = Square(dot, L.DOT_SIZE - 4, 'ARTWORK', 2)
 	function dot:SetColor(color)
 		self.color = color
 		if color then fill:SetVertexColor(color[1], color[2], color[3], 1) end
@@ -307,14 +347,37 @@ local function Button(parent, text, onClick)
 	return button
 end
 
+local function ValueBox(parent, width, justify, tooltip)
+	local box = CreateFrame('EditBox', nil, parent)
+	box:SetSize(width, L.VALUE_HEIGHT)
+	box:SetHitRectInsets(-8, -4, -4, -2)
+	box:SetAutoFocus(false)
+	box:SetFont(BUILib.Font, 12, '')
+	box:SetJustifyH(justify)
+	box:SetTextColor(unpack(C.TEXT))
+	box.underline = Solid(box, 'ARTWORK')
+	box.underline:SetPoint('BOTTOMLEFT')
+	box.underline:SetPoint('BOTTOMRIGHT')
+	box.underline:SetHeight(1)
+	box.underline:Hide()
+	Widget.Tooltip(box, tooltip)
+	box:SetScript('OnEscapePressed', function(self) self:ClearFocus() end)
+	box:SetScript('OnEditFocusGained', function(self)
+		self.underline:SetVertexColor(Theme.GetAccent())
+		self.underline:Show()
+		self:HighlightText()
+	end)
+	return box
+end
+
 local function Slider(parent, spec)
 	local row = CreateFrame('Frame', nil, parent)
 	row:SetSize(L.INNER, L.SLIDER_HEIGHT)
 	row.spec = spec
 	row.label = Label(row, spec.label, C.TEXT, 11)
 	row.label:SetPoint('TOPLEFT')
-	row.value = Label(row, '', C.LABEL, 11)
-	row.value:SetPoint('TOPRIGHT')
+	row.value = ValueBox(row, L.VALUE_WIDTH, 'RIGHT', 'Click to type a value')
+	row.value:SetPoint('TOPRIGHT', 0, 2)
 	local track = CreateFrame('Frame', nil, row)
 	track:SetSize(L.INNER, L.TRACK_HEIGHT)
 	track:SetPoint('BOTTOMLEFT')
@@ -396,13 +459,13 @@ local function BuildPicker()
 	local ring = wheel:CreateTexture(nil, 'ARTWORK')
 	ring:SetTexture(BUILib.GetLibMedia('wheel'))
 	ring:SetAllPoints()
-	local wheelKnob = Knob(wheel)
+	ring:SetTexCoord(L.WHEEL_CROP, 1 - L.WHEEL_CROP, L.WHEEL_CROP, 1 - L.WHEEL_CROP)
+	local wheelKnob = Cross(wheel)
 
 	local center = CreateFrame('Frame', nil, wheel)
 	center:SetSize(L.CENTER_DISC, L.CENTER_DISC)
 	center:SetPoint('CENTER')
 	center:EnableMouse(true)
-	Disc(center, L.CENTER_DISC, 'ARTWORK', 0):SetVertexColor(unpack(C.DISC))
 	local swatchLabel = Label(center, 'COLOR', C.LABEL, L.SWATCH_LABEL_SIZE)
 	swatchLabel:SetPoint('CENTER', 0, 16)
 	local hexBox = BuildHexBox(center)
@@ -416,7 +479,6 @@ local function BuildPicker()
 
 	frame.h, frame.s, frame.v, frame.a = 0, 1, 1, 1
 	frame.hasOpacity = true
-	frame.mode = 'tone'
 
 	local function Current()
 		return HSVtoRGB(frame.h, frame.s, frame.v)
@@ -430,47 +492,44 @@ local function BuildPicker()
 		frame.s, frame.v = saturation, value
 	end
 
-	local function ChannelEnds(channel)
-		local low, high = { Current() }, { Current() }
-		low[channel], high[channel] = 0, 1
-		low[4], high[4] = 1, 1
-		return low, high
-	end
-
 	local function Percent(fraction) return math.floor(fraction * 100 + 0.5) .. '%' end
 	local function Byte(fraction) return tostring(math.floor(fraction * 255 + 0.5)) end
+	local function FromPercent(text) local number = tonumber(text:match('%d+%.?%d*')) return number and number / 100 end
+	local function FromByte(text) local number = tonumber(text:match('%d+')) return number and number / 255 end
 
 	local specs = {
-		{ label = 'Saturation', mode = 'tone', get = function() return frame.s end, set = function(x) frame.s = x end, text = Percent,
-			ends = function() return { HSVtoRGB(frame.h, 0, frame.v) }, { HSVtoRGB(frame.h, 1, frame.v) } end },
-		{ label = 'Brightness', mode = 'tone', get = function() return frame.v end, set = function(x) frame.v = x end, text = Percent,
+		{ label = 'Brightness', get = function() return frame.v end, set = function(x) frame.v = x end, text = Percent, parse = FromPercent,
 			ends = function() return C.BLACK, { HSVtoRGB(frame.h, frame.s, 1) } end },
-		{ label = 'Red', mode = 'rgb', channel = 1, text = Byte },
-		{ label = 'Green', mode = 'rgb', channel = 2, text = Byte },
-		{ label = 'Blue', mode = 'rgb', channel = 3, text = Byte },
-		{ label = 'Opacity', alpha = true, get = function() return frame.a end, set = function(x) frame.a = x end, text = Percent,
+		{ label = 'Opacity', alpha = true, get = function() return frame.a end, set = function(x) frame.a = x end, text = Percent, parse = FromPercent,
 			ends = function() local red, green, blue = Current() return { red, green, blue, 0 }, { red, green, blue, 1 } end },
 	}
-	for _, spec in ipairs(specs) do
-		if spec.channel then
-			spec.get = function() return (select(spec.channel, Current())) end
-			spec.set = function(x) SetChannel(spec.channel, x) end
-			spec.ends = function() return ChannelEnds(spec.channel) end
-		end
-	end
 	local sliders = {}
 	for index, spec in ipairs(specs) do sliders[index] = Slider(frame, spec) end
 
-	local adjustCaption = Caption(frame, 'Adjust')
-	local modes = {}
-	for index, mode in ipairs({ { 'tone', 'Tone' }, { 'rgb', 'RGB' } }) do
-		modes[index] = Link(frame, mode[2], function()
-			frame.mode = mode[1]
-			frame.Layout()
-			frame.Render()
-		end)
-		modes[index].mode = mode[1]
+	local function Degrees(fraction) return math.floor(fraction * 360 + 0.5) .. '°' end
+	local function FromDegrees(text) local number = tonumber(text:match('%d+%.?%d*')) return number and (number / 360) % 1 end
+	local readouts = CreateFrame('Frame', nil, frame)
+	readouts:SetSize(L.INNER, L.READOUT_HEIGHT * 2 + L.READOUT_GAP)
+	local readoutSpecs = {
+		{ label = 'H', tooltip = 'Hue, the angle around the ring. Click to type a value in degrees.', get = function() return frame.h end, set = function(x) frame.h = x end, text = Degrees, parse = FromDegrees },
+		{ label = 'S', tooltip = 'Saturation, how far the color sits from white. Click to type a percentage.', get = function() return frame.s end, set = function(x) frame.s = x end, text = Percent, parse = FromPercent },
+		{ label = 'V', tooltip = 'Value, how bright the color is. Click to type a percentage.', get = function() return frame.v end, set = function(x) frame.v = x end, text = Percent, parse = FromPercent },
+	}
+	for channel, entry in ipairs({ { 'R', 'Red' }, { 'G', 'Green' }, { 'B', 'Blue' } }) do
+		readoutSpecs[#readoutSpecs + 1] = { label = entry[1], tooltip = entry[2] .. ', 0 to 255. Click to type a value.', get = function() return (select(channel, Current())) end, set = function(x) SetChannel(channel, x) end, text = Byte, parse = FromByte }
 	end
+	local column = L.INNER / 3
+	for index, spec in ipairs(readoutSpecs) do
+		local label = Label(readouts, spec.label, C.LABEL, 11)
+		local groupWidth = label:GetStringWidth() + 6 + L.READOUT_BOX
+		local slot, row = (index - 1) % 3, math.floor((index - 1) / 3)
+		label:SetPoint('TOPLEFT', math.floor((slot + 0.5) * column - groupWidth / 2), -(row * (L.READOUT_HEIGHT + L.READOUT_GAP) + 2))
+		spec.box = ValueBox(readouts, L.READOUT_BOX, 'CENTER', spec.tooltip)
+		spec.box:SetPoint('LEFT', label, 'RIGHT', 6, 0)
+		spec.box:SetHitRectInsets(-(label:GetStringWidth() + 10), -4, -4, -2)
+	end
+
+	local adjustCaption = Caption(frame, 'Adjust')
 
 	local rule = DottedRule(frame)
 
@@ -495,11 +554,13 @@ local function BuildPicker()
 
 	local function Render(notify)
 		local red, green, blue = Current()
-		local hueRed, hueGreen, hueBlue = HSVtoRGB(frame.h, 1, 1)
 		local angle = frame.h * 2 * math.pi
+		local radius = L.WHEEL_INNER + frame.s * (L.WHEEL_OUTER - L.WHEEL_INNER)
 		wheelKnob:ClearAllPoints()
-		wheelKnob:SetPoint('CENTER', wheel, 'CENTER', math.cos(angle) * L.WHEEL_KNOB_RADIUS, math.sin(angle) * L.WHEEL_KNOB_RADIUS)
-		wheelKnob.fill:SetVertexColor(hueRed, hueGreen, hueBlue, 1)
+		wheelKnob:SetPoint('CENTER', wheel, 'CENTER', math.cos(angle) * radius, math.sin(angle) * radius)
+		for _, spec in ipairs(readoutSpecs) do
+			if not spec.box:HasFocus() then spec.box:SetText(spec.text(spec.get())) end
+		end
 		for _, slider in ipairs(sliders) do
 			if slider:IsShown() then
 				local spec = slider.spec
@@ -509,12 +570,8 @@ local function BuildPicker()
 				slider.knob:ClearAllPoints()
 				slider.knob:SetPoint('CENTER', slider.track, 'LEFT', fraction * L.INNER, 0)
 				slider.knob.fill:SetVertexColor(red, green, blue, spec.alpha and frame.a or 1)
-				slider.value:SetText(spec.text(fraction))
+				if not slider.value:HasFocus() then slider.value:SetText(spec.text(fraction)) end
 			end
-		end
-		for _, link in ipairs(modes) do
-			link.active = link.mode == frame.mode
-			link.Paint()
 		end
 		local original = frame.original
 		before.fill:SetVertexColor(original[1], original[2], original[3], original[4])
@@ -541,14 +598,31 @@ local function BuildPicker()
 	Draggable(wheel, function()
 		local dx, dy = CursorOffset(wheel)
 		frame.h = (math.atan2(dy, dx) / (2 * math.pi)) % 1
+		frame.s = math.max(0, math.min(1, (math.sqrt(dx * dx + dy * dy) - L.WHEEL_INNER) / (L.WHEEL_OUTER - L.WHEEL_INNER)))
 		Render(true)
 	end)
+	local function Typed(box, spec)
+		box:SetScript('OnEnterPressed', function(self)
+			local fraction = spec.parse(self:GetText())
+			self:ClearFocus()
+			if fraction then
+				spec.set(math.max(0, math.min(1, fraction)))
+				Render(true)
+			end
+		end)
+		box:SetScript('OnEditFocusLost', function(self)
+			self.underline:Hide()
+			Render()
+		end)
+	end
 	for _, slider in ipairs(sliders) do
 		Draggable(slider.track, function()
 			slider.spec.set(CursorFraction(slider.track))
 			Render(true)
 		end)
+		Typed(slider.value, slider.spec)
 	end
+	for _, spec in ipairs(readoutSpecs) do Typed(spec.box, spec) end
 
 	before:SetScript('OnClick', function() SetColor(unpack(frame.original)) end)
 
@@ -588,12 +662,12 @@ local function BuildPicker()
 		favorites[#favorites + 1] = { red, green, blue, frame.a }
 		RefreshSaved()
 		Render()
-	end)
+	end, true)
 	recent.link = Link(frame, 'Clear', function()
 		wipe(Recent())
 		RefreshRecent()
 		Render()
-	end)
+	end, true)
 
 	for _, dot in ipairs(classes.dots) do
 		dot:SetScript('OnClick', function(self) SetColor(self.color[1], self.color[2], self.color[3], frame.a) end)
@@ -671,23 +745,14 @@ local function BuildPicker()
 		before:SetPoint('RIGHT', after, 'LEFT', -4, 0)
 		y = y + L.TITLE_HEIGHT + L.GAP
 		Place(y, wheel, L.PAD + math.floor((L.INNER - L.WHEEL) / 2))
-		y = y + L.WHEEL + L.GAP
+		y = y + L.WHEEL + 6
+		Place(y, readouts)
+		y = y + readouts:GetHeight() + L.GAP
 		Place(y, adjustCaption)
-		local anchor
-		for index = #modes, 1, -1 do
-			local link = modes[index]
-			link:ClearAllPoints()
-			if anchor then
-				link:SetPoint('RIGHT', anchor, 'LEFT', -L.GAP, 0)
-			else
-				PlaceRight(y, link)
-			end
-			anchor = link
-		end
 		y = y + L.LABEL_HEIGHT + 6
 		for _, slider in ipairs(sliders) do
 			local spec = slider.spec
-			local shown = (spec.mode == nil or spec.mode == frame.mode) and (not spec.alpha or frame.hasOpacity)
+			local shown = not spec.alpha or frame.hasOpacity
 			slider:SetShown(shown)
 			if shown then
 				Place(y, slider)
