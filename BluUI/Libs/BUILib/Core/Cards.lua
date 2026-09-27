@@ -173,13 +173,13 @@ function Layout.CardKit(window)
 		local chip = CreateFrame('Frame', nil, parent)
 		chip:SetHeight(CHIP_HEIGHT)
 		local fill, edge = Widget.DrawCardShape(chip, 8, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
-		local function Tint(red, green, blue)
+		local function Tint(label, red, green, blue)
 			fill:SetVertexColor(red, green, blue, 0.14)
 			edge:SetVertexColor(red, green, blue, 0.5)
-			chip.label:SetTextColor(red, green, blue, 1)
+			label:SetTextColor(red, green, blue, 1)
 		end
-		chip.label = Painted(chip, 11, 'body', function()
-			if type(color) == 'string' then Tint(window:Color(color)) else Tint(color[1], color[2], color[3]) end
+		chip.label = Painted(chip, 11, 'body', function(region)
+			if type(color) == 'string' then Tint(region, window:Color(color)) else Tint(region, color[1], color[2], color[3]) end
 		end)
 		chip.label:SetPoint('CENTER')
 		function chip:SetText(newText)
@@ -187,7 +187,6 @@ function Layout.CardKit(window)
 			self:SetWidth(Widget.EvenSize(self.label:GetStringWidth() + 20))
 		end
 		chip:SetText(text)
-		window:Repaint()
 		return chip
 	end
 
