@@ -124,7 +124,10 @@ function Layout.TopNavWindow(config)
 		footerRule:SetPoint('TOPLEFT', INSET, 0)
 		footerRule:SetPoint('TOPRIGHT', -INSET, 0)
 		footerRule:SetHeight(1)
-		if config.version then window:Text(footer, 'v' .. config.version, 12, 'faint'):SetPoint('LEFT', INSET, 0) end
+		if config.version then
+			window.footerVersion = window:Text(footer, 'v' .. config.version, 12, 'faint')
+			window.footerVersion:SetPoint('LEFT', INSET, 0)
+		end
 		window.footerButtons = {}
 		local anchor
 		for index = #footerConfig, 1, -1 do
