@@ -28,5 +28,6 @@ Pages\BuffTracking.lua
 Pages\Bloodlust.lua
 Pages\Visibility.lua
 Pages\Skinning.lua
+Pages\Theme.lua
 Pages\Settings.lua
 Pages\ExportImport.lua
