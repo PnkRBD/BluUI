@@ -159,6 +159,7 @@ function Skin.Shell(frame, style, inset)
 	local fillColor = style.fill
 	local fill = frame:CreateTexture(nil, 'BACKGROUND', nil, SHELL_SUBLEVEL)
 	fill.__buiSkin = true
+	fill.ignoreInLayout = true
 	fill:SetPoint('TOPLEFT', frame, 'TOPLEFT', left, -top)
 	fill:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -right, bottom)
 	fill:SetColorTexture(fillColor[1], fillColor[2], fillColor[3], fillColor[4] or 1)
@@ -166,6 +167,7 @@ function Skin.Shell(frame, style, inset)
 	for edgeIndex = 1, 4 do
 		edges[edgeIndex] = frame:CreateTexture(nil, 'BORDER')
 		edges[edgeIndex].__buiSkin = true
+		edges[edgeIndex].ignoreInLayout = true
 	end
 	edges[1]:SetPoint('TOPLEFT', frame, 'TOPLEFT', left, -top); edges[1]:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -right, -top); edges[1]:SetHeight(1)
 	edges[2]:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', left, bottom); edges[2]:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -right, bottom); edges[2]:SetHeight(1)
