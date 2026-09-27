@@ -41,6 +41,22 @@ function BUI.GetAddonFont()
 	return BUI.C.BASE_MEDIA_PATH .. [[Fonts\gotham_narrow_ultra.ttf]]
 end
 
+function BUI.FetchFont(name)
+	return sharedMedia:Fetch('font', name, true)
+end
+
+function BUI.WindowFont()
+	local fonts = BUI.GetDB().windowTheme.fonts
+	local name = fonts and fonts.base
+	return name and BUI.FetchFont(name) or BUI.GetAddonFont()
+end
+
+function BUI.ApplyWindowFont()
+	BUI.BUILibClient.SetFont(BUI.WindowFont())
+	BUI.PageEngine.window:Repaint()
+	BUI.PageEngine.MarkPagesStale()
+end
+
 function BUI.BuildFontDropdownItems(globalOption)
 	local items = {}
 	if globalOption then

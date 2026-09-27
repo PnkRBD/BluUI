@@ -290,6 +290,7 @@ local function RefreshAllModules()
     BUI.ApplyScale()
     BUI.Scale.SyncButtons()
     BUI.PageEngine.RebuildAllPages()
+    BUI.BUILibClient.SetFont(BUI.WindowFont())
     if BUI.PageEngine.window then BUI.PageEngine.window:ApplyTheme(BUI.GetDB().windowTheme) end
 
     if on('cdm') and BUI.CDM and BUI.CDM.ApplyAllPositions then BUI.CDM.ApplyAllPositions() end
@@ -392,7 +393,53 @@ local function ApplyDefaultProfile(profile)
     return true
 end
 
+local THEME_PREFIX = "BUITHEME="
+
+local function CleanColor(value)
+    if type(value) ~= "table" then return nil end
+    for index = 1, 3 do
+        if type(value[index]) ~= "number" then return nil end
+    end
+    return { value[1], value[2], value[3], type(value[4]) == "number" and value[4] or 1 }
+end
+
+local function CleanTheme(source)
+    local theme = { mode = "dark" }
+    if type(source.dark) == "table" then
+        theme.dark = {}
+        for role, value in pairs(source.dark) do
+            if type(role) == "string" then theme.dark[role] = CleanColor(value) end
+        end
+    end
+    if type(source.fonts) == "table" then
+        theme.fonts = {}
+        for role, name in pairs(source.fonts) do
+            if type(role) == "string" and type(name) == "string" then theme.fonts[role] = name end
+        end
+    end
+    if source.edgeAccent == false then theme.edgeAccent = false end
+    return theme
+end
+
+local function ExportTheme(name, theme)
+    local serialized = LibSerialize:Serialize({ name = name, theme = CleanTheme(theme) })
+    return THEME_PREFIX .. LibDeflate:EncodeForPrint(LibDeflate:CompressDeflate(serialized))
+end
+
+local function DecodeTheme(text)
+    text = text:gsub("^%s+", ""):gsub("%s+$", "")
+    if text:sub(1, #THEME_PREFIX) ~= THEME_PREFIX then return nil, "Not a BluUI theme string" end
+    local decoded = LibDeflate:DecodeForPrint(text:sub(#THEME_PREFIX + 1))
+    local decompressed = decoded and LibDeflate:DecompressDeflate(decoded)
+    if not decompressed then return nil, "Could not read the theme string" end
+    local success, data = LibSerialize:Deserialize(decompressed)
+    if not success or type(data) ~= "table" or type(data.theme) ~= "table" then return nil, "Not a BluUI theme string" end
+    return CleanTheme(data.theme), type(data.name) == "string" and data.name or nil
+end
+
 BUI.ExportImport = {
+    ExportTheme = ExportTheme,
+    DecodeTheme = DecodeTheme,
     ExportSettings = ExportSettings,
     ImportSettings = ImportSettings,
     DecodeImportString = DecodeImportString,

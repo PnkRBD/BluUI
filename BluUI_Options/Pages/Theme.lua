@@ -2,38 +2,40 @@ local BUI = BluUI
 local BUILib = BUI.BUILibClient
 local Layout = BUILib.Layout
 local Controls = BUILib.Controls
-local Widget = BUILib.Widget
-local Theme = BUILib.Theme
+local Modals = BUILib.Modals
+local Toast = BUILib.Toast
 
 local FIRST_COLUMN = 267
 local SECOND_COLUMN = 344
 local DROPDOWN_WIDTH = 112
 local PRESET_DROPDOWN_WIDTH = 140
 local SWATCH_SIZE = 28
+local FONT_DROPDOWN_WIDTH = 200
 local OPACITY_STEPS = { 100, 98, 95, 90, 85, 80, 70, 50 }
 
-local DIRECTIONS = {
-	{ orientation = 'HORIZONTAL', label = 'Left to right' },
-	{ orientation = 'VERTICAL', label = 'Top to bottom' },
-}
-
+local DEFAULT_PAGE = Layout.DefaultColor('page', 'dark')
 local PRESETS = {
-	{ name = 'Solid', note = 'The default color, fully solid', theme = { page = { 0.04, 0.045, 0.05, 1 } } },
-	{ name = 'Glass', note = 'Default colors at 98%', theme = {} },
-	{ name = 'Black', note = 'Pure black, soft divider', theme = { page = { 0, 0, 0, 1 }, sidebarEdge = { 0.12, 0.12, 0.13, 1 } } },
-	{ name = 'Graphite', note = 'Soft grey all over', theme = { page = { 0.11, 0.115, 0.125, 1 }, sidebarEdge = { 0.17, 0.18, 0.2, 1 } } },
-	{ name = 'Forest', note = 'Dark green all over', theme = { page = { 0.03, 0.06, 0.045, 1 }, sidebarEdge = { 0.09, 0.17, 0.125, 1 } } },
-	{ name = 'Plum', note = 'Dark purple all over', theme = { page = { 0.06, 0.035, 0.075, 1 }, sidebarEdge = { 0.17, 0.1, 0.2, 1 } } },
+	{ name = 'Glass', theme = {} },
+	{ name = 'Solid', theme = { page = { DEFAULT_PAGE[1], DEFAULT_PAGE[2], DEFAULT_PAGE[3], 1 } } },
+	{ name = 'Black', theme = { page = { 0, 0, 0, 1 }, sidebarEdge = { 0.12, 0.12, 0.13, 1 } } },
+	{ name = 'Graphite', theme = { page = { 0.11, 0.115, 0.125, 1 }, sidebarEdge = { 0.17, 0.18, 0.2, 1 } } },
+	{ name = 'Forest', theme = { page = { 0.03, 0.06, 0.045, 1 }, sidebarEdge = { 0.09, 0.17, 0.125, 1 } } },
+	{ name = 'Plum', theme = { page = { 0.06, 0.035, 0.075, 1 }, sidebarEdge = { 0.17, 0.1, 0.2, 1 } } },
 }
 local PRESET_ROLES = { 'page', 'bar', 'sidebar', 'sidebarEdge' }
+local FONT_ROLES = {
+	{ role = 'title', name = 'Titles', sub = 'Bold text: headings, names and the window name' },
+	{ role = 'body', name = 'Descriptions', sub = 'Copy under titles and values in tables' },
+	{ role = 'hint', name = 'Hints', sub = 'Column headings, captions and placeholders' },
+	{ role = 'control', name = 'Controls', sub = 'Dropdowns, buttons and the search field' },
+}
 
 local COLOR_SECTIONS = {
 	{
 		title = 'Surfaces',
 		description = 'The page, the sidebar, the panels that hold each table, and the lines between rows and sections.',
-		pick = 'Pick page color',
 		roles = {
-			{ role = 'page', name = 'Page', sub = 'Behind everything in the window', gradient = true },
+			{ role = 'page', name = 'Page', sub = 'Behind everything in the window', opacity = true },
 			{ role = 'sidebar', name = 'Sidebar', sub = 'Behind the page list' },
 			{ role = 'sidebarEdge', name = 'Sidebar edge', sub = 'The line beside the page list' },
 			{ role = 'panel', name = 'Panels', sub = 'Tables and grouped settings' },
@@ -45,7 +47,6 @@ local COLOR_SECTIONS = {
 	{
 		title = 'Top bar',
 		description = 'The strip across the top that holds your portrait, the title and the close button.',
-		pick = 'Pick bar color',
 		roles = {
 			{ role = 'bar', name = 'Bar', sub = 'Fill behind the title' },
 			{ role = 'barText', name = 'Title', sub = 'The window name' },
@@ -54,7 +55,6 @@ local COLOR_SECTIONS = {
 	{
 		title = 'Text',
 		description = 'Three shades of text carry every page. Keep the shades apart so titles stand out from hints.',
-		pick = 'Pick text color',
 		roles = {
 			{ role = 'text', name = 'Text', sub = 'Titles, names and values' },
 			{ role = 'muted', name = 'Descriptions', sub = 'Copy under titles, like this' },
@@ -64,7 +64,6 @@ local COLOR_SECTIONS = {
 	{
 		title = 'Controls',
 		description = 'Dropdowns and the grey buttons. The colored buttons follow your accent color.',
-		pick = 'Pick dropdown color',
 		roles = {
 			{ role = 'control', name = 'Dropdowns', sub = 'Menus like Default and Custom' },
 			{ role = 'secondary', name = 'Buttons', sub = 'Actions like Reset' },
@@ -88,10 +87,28 @@ local function Hex(red, green, blue)
 	return ('#%02X%02X%02X'):format(math.floor(red * 255 + 0.5), math.floor(green * 255 + 0.5), math.floor(blue * 255 + 0.5))
 end
 
+local function Trim(text)
+	return (text:gsub('^%s+', ''):gsub('%s+$', ''))
+end
+
+local function ToastOptions()
+	return { style = 'bar', position = 'bottom', parent = Window().frame }
+end
+
+local function Touch()
+	Store().name = nil
+	Repaint()
+end
+
 local function Overrides(create)
 	local store, mode = Store(), Window():GetMode()
 	if create and not store[mode] then store[mode] = {} end
 	return store[mode]
+end
+
+local function HasOverrides()
+	local overrides = Overrides()
+	return (overrides ~= nil and next(overrides) ~= nil) or Store().edgeAccent ~= nil
 end
 
 local function IsCustom(role)
@@ -101,7 +118,7 @@ end
 
 local function SetRole(role, color)
 	Overrides(true)[role] = color
-	Repaint()
+	Touch()
 end
 
 local function ResetRoles(entries)
@@ -109,7 +126,7 @@ local function ResetRoles(entries)
 	if overrides then
 		for _, entry in ipairs(entries) do overrides[entry.role] = nil end
 	end
-	Repaint()
+	Touch()
 end
 
 local function PickRole(role, anchor)
@@ -121,55 +138,6 @@ local function PickRole(role, anchor)
 			SetRole(role, not cancelled and { newRed, newGreen, newBlue, newAlpha } or previous)
 		end,
 	})
-end
-
-local function Gradient()
-	local overrides = Overrides()
-	return overrides and overrides.pageGradient
-end
-
-local function DirectionLabel(orientation)
-	for _, direction in ipairs(DIRECTIONS) do
-		if direction.orientation == orientation then return direction.label end
-	end
-	return 'Off'
-end
-
-local function SetGradient(red, green, blue, alpha, orientation)
-	local current = Gradient()
-	Overrides(true).pageGradient = { red, green, blue, alpha, orientation = orientation or current and current.orientation or 'HORIZONTAL' }
-	Repaint()
-end
-
-local function ClearGradient()
-	local overrides = Overrides()
-	if overrides then overrides.pageGradient = nil end
-	Repaint()
-end
-
-local function SetGradientDirection(orientation)
-	local current = Gradient()
-	if current then
-		current.orientation = orientation
-		Repaint()
-	else
-		local red, green, blue = Theme.GetAccent()
-		SetGradient(red, green, blue, 1, orientation)
-	end
-end
-
-local function PickGradient(anchor)
-	local gradient = Gradient()
-	local red, green, blue, alpha
-	if gradient then
-		red, green, blue, alpha = gradient[1], gradient[2], gradient[3], gradient[4]
-	else
-		red, green, blue, alpha = Theme.GetAccent()
-	end
-	Controls.OpenColorPicker({ r = red, g = green, b = blue, a = alpha, hasOpacity = true, anchorTo = anchor, callback = function(newRed, newGreen, newBlue, newAlpha, cancelled)
-		if cancelled and not gradient then return end
-		SetGradient(newRed, newGreen, newBlue, newAlpha)
-	end })
 end
 
 local function Opacity()
@@ -185,7 +153,7 @@ end
 local function SetOpacity(percent)
 	local red, green, blue = Window():Color('page')
 	Overrides(true).page = { red, green, blue, percent / 100 }
-	Repaint()
+	Touch()
 end
 
 local function PresetColor(preset, role)
@@ -193,28 +161,20 @@ local function PresetColor(preset, role)
 	return color[1], color[2], color[3], color[4] or 1
 end
 
-local function SameGradient(first, second)
-	for index = 1, 4 do
-		if math.abs(first[index] - second[index]) > 0.004 then return false end
+local function PresetMatches(preset)
+	local window = Window()
+	if window:GetMode() ~= 'dark' then return false end
+	for _, role in ipairs(PRESET_ROLES) do
+		local red, green, blue, alpha = window:Color(role)
+		local wantedRed, wantedGreen, wantedBlue, wantedAlpha = PresetColor(preset, role)
+		if math.abs(red - wantedRed) + math.abs(green - wantedGreen) + math.abs(blue - wantedBlue) + math.abs(alpha - wantedAlpha) > 0.004 then return false end
 	end
-	return first.orientation == second.orientation
+	return true
 end
 
 local function ActivePreset()
-	local window = Window()
-	local gradient = Gradient()
 	for _, preset in ipairs(PRESETS) do
-		local matches = window:GetMode() == 'dark'
-		for _, role in ipairs(PRESET_ROLES) do
-			local red, green, blue, alpha = window:Color(role)
-			local wantedRed, wantedGreen, wantedBlue, wantedAlpha = PresetColor(preset, role)
-			if math.abs(red - wantedRed) + math.abs(green - wantedGreen) + math.abs(blue - wantedBlue) + math.abs(alpha - wantedAlpha) > 0.004 then
-				matches = false
-			end
-		end
-		local wanted = preset.theme.pageGradient
-		if (wanted == nil) ~= (gradient == nil) or (wanted and not SameGradient(wanted, gradient)) then matches = false end
-		if matches then return preset end
+		if PresetMatches(preset) then return preset end
 	end
 end
 
@@ -223,6 +183,7 @@ local function ApplyPreset(preset)
 	local overrides = store.dark
 	store.dark = { edge = overrides and overrides.edge }
 	for role, value in pairs(preset.theme) do store.dark[role] = CopyTable(value) end
+	store.name = preset.name
 	Window():SetMode('dark')
 end
 
@@ -230,14 +191,199 @@ local function ResetAll()
 	local store = Store()
 	store[Window():GetMode()] = nil
 	store.edgeAccent = nil
-	Repaint()
+	Touch()
+end
+
+local function FontName(role)
+	local fonts = Store().fonts
+	return fonts and fonts[role]
+end
+
+local function SetFontRole(role, name, page)
+	local store = Store()
+	store.fonts = store.fonts or {}
+	if role == 'base' and name == BUI.C.DEFAULT_FONT then name = nil end
+	store.fonts[role] = name
+	store.name = nil
+	if role == 'base' then BUI.ApplyWindowFont() else Repaint() end
+	page:Invalidate()
+end
+
+local function ResetFonts(page)
+	local store = Store()
+	store.fonts = nil
+	store.name = nil
+	BUI.ApplyWindowFont()
+	page:Invalidate()
+end
+
+local function EffectiveFont(role)
+	return FontName(role) or FontName('base') or BUI.C.DEFAULT_FONT
+end
+
+local function SavedThemes()
+	return BUI.db.global.savedThemes
+end
+
+local function FindSaved(name)
+	for index, saved in ipairs(SavedThemes()) do
+		if saved.name == name then return index, saved end
+	end
+end
+
+local function Present(value)
+	if type(value) == 'table' and next(value) == nil then return nil end
+	return value
+end
+
+local function SameTable(first, second)
+	first, second = Present(first), Present(second)
+	if type(first) ~= 'table' or type(second) ~= 'table' then return first == second end
+	for key, value in pairs(first) do
+		if key ~= 'name' and not SameTable(value, second[key]) then return false end
+	end
+	for key, value in pairs(second) do
+		if key ~= 'name' and first[key] == nil and Present(value) ~= nil then return false end
+	end
+	return true
+end
+
+local function ActiveLook()
+	local store = Store()
+	local name = store.name
+	if name then
+		for _, preset in ipairs(PRESETS) do
+			if preset.name == name and PresetMatches(preset) then return preset end
+		end
+		local _, saved = FindSaved(name)
+		if saved and SameTable(saved.theme, store) then return saved end
+	end
+	local preset = ActivePreset()
+	if preset then return preset end
+	for _, saved in ipairs(SavedThemes()) do
+		if SameTable(saved.theme, store) then return saved end
+	end
+end
+
+local function CurrentLook()
+	local theme = CopyTable(Store())
+	theme.name = nil
+	return theme
+end
+
+local function ApplySaved(saved, page)
+	local store = Store()
+	wipe(store)
+	for key, value in pairs(CopyTable(saved.theme)) do store[key] = value end
+	store.name = saved.name
+	BUI.ApplyWindowFont()
+	page:Invalidate()
+end
+
+local function Keep(name, theme, page, adopt)
+	local _, existing = FindSaved(name)
+	local function Write()
+		local saved = SavedThemes()
+		local entry = existing or {}
+		entry.name, entry.theme, entry.time = name, theme, time()
+		if not existing then saved[#saved + 1] = entry end
+		if adopt then Store().name = name end
+		page:Rebuild()
+		Toast.Success(existing and 'Theme replaced' or 'Theme saved', name, ToastOptions())
+	end
+	if not existing then return Write() end
+	Modals.Confirm({
+		title = 'Replace theme',
+		message = '"' .. name .. '" is already saved. Replace it with this look?',
+		confirmText = 'Replace',
+		onConfirm = Write,
+	})
+end
+
+local function AskName(title, message, defaultName, onName)
+	Modals.Input({
+		title = title,
+		message = message,
+		defaultText = defaultName,
+		confirmText = 'Save',
+		onConfirm = function(text)
+			local name = Trim(text)
+			if name ~= '' then onName(name) end
+		end,
+	})
+end
+
+local function SaveCurrent(page)
+	AskName('Save theme', 'Name the look you have now.', '', function(name) Keep(name, CurrentLook(), page, true) end)
+end
+
+local function ImportTheme(page)
+	Modals.Input({
+		title = 'Import theme',
+		message = 'Paste a BluUI theme string.',
+		confirmText = 'Import',
+		onConfirm = function(text)
+			local theme, detail = BUI.ExportImport.DecodeTheme(text)
+			if not theme then
+				Toast.Error('Import failed', detail, ToastOptions())
+				return
+			end
+			AskName('Name the theme', 'It goes into your saved themes, ready to apply.', detail or 'Imported', function(name) Keep(name, theme, page) end)
+		end,
+	})
+end
+
+local function ExportSaved(saved)
+	Modals.Copy({
+		title = 'Export "' .. saved.name .. '"',
+		message = 'The string is selected. Press Ctrl+C to copy it.',
+		text = BUI.ExportImport.ExportTheme(saved.name, saved.theme),
+	})
+end
+
+local function ExportCurrent()
+	local look = ActiveLook()
+	Modals.Copy({
+		title = 'Export theme',
+		message = 'The string is selected. Press Ctrl+C to copy it.',
+		text = BUI.ExportImport.ExportTheme(look and look.name or 'Theme', Store()),
+	})
+end
+
+local function ForgetSaved(index, saved, page)
+	Modals.Confirm({
+		title = 'Forget theme',
+		message = 'Remove "' .. saved.name .. '" from your saved themes?',
+		confirmText = 'Remove',
+		onConfirm = function()
+			table.remove(SavedThemes(), index)
+			page:Rebuild()
+		end,
+	})
+end
+
+local function Count(map)
+	local count = 0
+	if map then
+		for _ in pairs(map) do count = count + 1 end
+	end
+	return count
+end
+
+local function CountText(count)
+	return count > 0 and (count .. ' custom') or 'Default'
+end
+
+local function SavedColor(theme, role)
+	local color = theme.dark and theme.dark[role] or Layout.DefaultColor(role, 'dark')
+	return color[1], color[2], color[3], color[4] or 1
 end
 
 local function ColorRow(ui, section, entry)
 	ui.ColorRow(section, {
 		name = entry.name, sub = entry.sub, hexX = FIRST_COLUMN, opacityX = SECOND_COLUMN,
 		get = function() return Window():Color(entry.role) end,
-		state = function() return IsCustom(entry.role) and 'Custom' or 'Default' end,
+		custom = function() return IsCustom(entry.role) end,
 		pick = function(anchor) PickRole(entry.role, anchor) end,
 		reset = function() SetRole(entry.role, nil) end,
 		items = function(anchor)
@@ -250,7 +396,7 @@ local function ColorRow(ui, section, entry)
 	})
 end
 
-local function PresetSection(ui, parent, width)
+local function PresetSection(ui, parent, width, page)
 	local window = Window()
 	local section = ui.Section(parent, width, {
 		stacked = true,
@@ -262,69 +408,75 @@ local function PresetSection(ui, parent, width)
 	local swatch = ui.SplitSwatch(row, SWATCH_SIZE)
 	swatch:SetPoint('LEFT', ui.AVATAR_X, 0)
 	ui.RowTitle(row, 'Preset', 'A finished look for the whole window', ui.NAME_X)
-	local reset = ui.IconButton(row, 'delete', 'Back to the default colors', ResetAll, 'danger')
+	local reset = ui.IconButton(row, 'reset', 'Back to the default colors', ResetAll)
 	reset:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
 	local dropdown = ui.Dropdown(row, PRESET_DROPDOWN_WIDTH, function()
-		local active = ActivePreset()
+		local active = ActiveLook()
 		local items = {}
 		for _, preset in ipairs(PRESETS) do
 			items[#items + 1] = { text = preset.name, checked = preset == active, callback = function() ApplyPreset(preset) end }
+		end
+		local saved = SavedThemes()
+		if #saved > 0 then
+			items[#items + 1] = { title = 'Saved' }
+			for _, entry in ipairs(saved) do
+				items[#items + 1] = { text = entry.name, checked = entry == active, callback = function() ApplySaved(entry, page) end }
+			end
 		end
 		return items
 	end)
 	dropdown:SetPoint('RIGHT', reset, 'LEFT', -10, 0)
 	ui.Bind(row, function()
-		local active = ActivePreset()
+		local active = ActiveLook()
 		dropdown.label:SetText(active and active.name or 'Custom')
+		reset:SetActive(HasOverrides())
 		swatch.left:SetVertexColor(window:Color('page'))
 		swatch.right:SetVertexColor(window:Color('text'))
 	end)
 	return section
 end
 
-local function GradientSwatch(ui, row)
-	local swatch = CreateFrame('Button', nil, row)
-	swatch:SetSize(SWATCH_SIZE, SWATCH_SIZE)
-	local pieces = Widget.DrawRoundedRect(swatch, 4, { 1, 1, 1, 1 }, 'ARTWORK', 1, 0)
-	Window():Paint(Widget.DrawOutline(swatch, 4, { 1, 1, 1, 1 }, 'ARTWORK', 2, 0), 'rule')
-	swatch:SetScript('OnClick', function(self) PickGradient(self) end)
-	ui.Bind(swatch, function()
-		local from = { Window():Color('page') }
-		local gradient = Gradient()
-		Widget.PaintGradientRect(swatch, pieces, gradient and gradient.orientation or 'HORIZONTAL', from, gradient or from)
-	end)
-	return swatch
-end
-
-local function GradientRow(ui, section)
-	local row = section:AddRow('Gradient fade second color')
-	GradientSwatch(ui, row):SetPoint('LEFT', ui.AVATAR_X, 0)
-	ui.RowTitle(row, 'Gradient', 'A second color the page fades into', ui.NAME_X)
-	local hex = ui.Cell(row, '', FIRST_COLUMN)
-	local direction = ui.Cell(row, '', SECOND_COLUMN)
-	local reset = ui.IconButton(row, 'delete', 'Back to a solid fill', ClearGradient, 'danger')
-	reset:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
-	local dropdown
-	dropdown = ui.Dropdown(row, DROPDOWN_WIDTH, function()
-		local gradient = Gradient()
-		local items = { { text = 'Off', checked = gradient == nil, callback = ClearGradient } }
-		for _, entry in ipairs(DIRECTIONS) do
-			items[#items + 1] = {
-				text = entry.label,
-				checked = gradient ~= nil and gradient.orientation == entry.orientation,
-				callback = function() SetGradientDirection(entry.orientation) end,
-			}
-		end
-		items[#items + 1] = { text = 'Pick color', callback = function() PickGradient(dropdown) end }
-		return items
-	end)
-	dropdown:SetPoint('RIGHT', reset, 'LEFT', -10, 0)
-	ui.Bind(row, function()
-		local gradient = Gradient()
-		hex:SetText(gradient and Hex(gradient[1], gradient[2], gradient[3]) or '')
-		direction:SetText(gradient and DirectionLabel(gradient.orientation) or 'Solid')
-		dropdown.label:SetText(gradient and DirectionLabel(gradient.orientation) or 'Off')
-	end)
+local function SavedSection(ui, parent, width, page)
+	local section = ui.Section(parent, width, {
+		stacked = true,
+		title = 'Saved themes',
+		description = 'Keep the look you have now under a name, bring it back later, or pass it on as a string.',
+		columns = { { 'Name', ui.AVATAR_X }, { 'Colors', FIRST_COLUMN }, { 'Fonts', SECOND_COLUMN } },
+		buttons = {
+			{ text = 'Import', onClick = function() ImportTheme(page) end },
+			{ text = 'Export', icon = 'copy', onClick = ExportCurrent },
+			{ style = 'primary', text = 'Save current', icon = 'save', onClick = function() SaveCurrent(page) end },
+		},
+	})
+	local saved = SavedThemes()
+	if #saved == 0 then
+		local row = section:AddRow('nothing saved yet')
+		ui.RowTitle(row, 'Nothing saved yet', 'Save current keeps the look you have now', ui.AVATAR_X)
+	end
+	for index, entry in ipairs(saved) do
+		local row = section:AddRow(entry.name)
+		local swatch = ui.SplitSwatch(row, SWATCH_SIZE)
+		swatch:SetPoint('LEFT', ui.AVATAR_X, 0)
+		swatch.left:SetVertexColor(SavedColor(entry.theme, 'page'))
+		swatch.right:SetVertexColor(SavedColor(entry.theme, 'text'))
+		ui.RowTitle(row, entry.name, 'Saved ' .. date('%d %b %Y', entry.time), ui.NAME_X)
+		ui.Cell(row, CountText(Count(entry.theme.dark)), FIRST_COLUMN)
+		ui.Cell(row, CountText(Count(entry.theme.fonts)), SECOND_COLUMN)
+		local forget = ui.IconButton(row, 'delete', 'Forget this theme', function() ForgetSaved(index, entry, page) end, 'danger')
+		forget:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
+		local export = ui.Button(row, 'Export', 'secondary', function() ExportSaved(entry) end, 'copy')
+		export:SetPoint('RIGHT', forget, 'LEFT', -10, 0)
+		local apply = ui.Button(row, 'Apply', 'primary', function() ApplySaved(entry, page) end)
+		apply:SetPoint('RIGHT', export, 'LEFT', -10, 0)
+		local applied = ui.Status(row, 'Applied')
+		applied:SetPoint('RIGHT', export, 'LEFT', -14, 0)
+		ui.Bind(row, function()
+			local active = ActiveLook() == entry
+			apply:SetShown(not active)
+			applied:SetShown(active)
+		end)
+	end
+	return section
 end
 
 local function OpacityRow(ui, section)
@@ -332,7 +484,7 @@ local function OpacityRow(ui, section)
 	ui.IconAvatar(row, SWATCH_SIZE, 'eye'):SetPoint('LEFT', ui.AVATAR_X, 0)
 	ui.RowTitle(row, 'Opacity', 'How much of the game shows through', ui.NAME_X)
 	local value = ui.Cell(row, '', SECOND_COLUMN)
-	local reset = ui.IconButton(row, 'delete', 'Back to default', function() SetOpacity(DefaultOpacity()) end, 'danger')
+	local reset = ui.IconButton(row, 'reset', 'Back to default', function() SetOpacity(DefaultOpacity()) end)
 	reset:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
 	local dropdown = ui.Dropdown(row, DROPDOWN_WIDTH, function()
 		local items = {}
@@ -345,31 +497,70 @@ local function OpacityRow(ui, section)
 	ui.Bind(row, function()
 		value:SetText(Opacity() .. '%')
 		dropdown.label:SetText(Opacity() .. '%')
+		reset:SetActive(Opacity() ~= DefaultOpacity())
 	end)
 end
 
-local function ThemeSections(ui, _, parent, width)
+local function FontRow(ui, section, page, role, name, sub, avatar, sameAs)
+	local row = section:AddRow(name .. ' ' .. sub)
+	avatar(row):SetPoint('LEFT', ui.AVATAR_X, 0)
+	ui.RowTitle(row, name, sub, ui.NAME_X)
+	local reset = ui.IconButton(row, 'reset', sameAs and 'Back to the main font' or 'Back to the BluUI font', function() SetFontRole(role, nil, page) end)
+	reset:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
+	local dropdown = ui.Dropdown(row, FONT_DROPDOWN_WIDTH, function()
+		local current = FontName(role)
+		local items = {}
+		if sameAs then
+			items[1] = { text = sameAs, checked = current == nil, callback = function() SetFontRole(role, nil, page) end }
+		else
+			current = EffectiveFont(role)
+		end
+		for _, font in ipairs(BUI.BuildFontDropdownItems()) do
+			items[#items + 1] = { text = font.text, fontPath = font.fontPath, checked = font.value == current, callback = function() SetFontRole(role, font.value, page) end }
+		end
+		return items
+	end)
+	dropdown:SetPoint('RIGHT', reset, 'LEFT', -10, 0)
+	ui.Bind(row, function()
+		dropdown.label:SetText(EffectiveFont(role))
+		reset:SetActive(FontName(role) ~= nil)
+	end)
+end
+
+local function FontSection(ui, parent, width, page)
+	local section = ui.Section(parent, width, {
+		stacked = true,
+		title = 'Fonts',
+		description = 'Pick a font for the whole window, then give any kind of text its own face if you want.',
+		columns = { { 'Name', ui.AVATAR_X } },
+		buttons = { { text = 'Reset', icon = 'reset', onClick = function() ResetFonts(page) end } },
+	})
+	FontRow(ui, section, page, 'base', 'Font', 'Every kind of text, unless it picks its own below', function(row) return ui.IconAvatar(row, SWATCH_SIZE, 'edit') end)
+	for _, entry in ipairs(FONT_ROLES) do
+		FontRow(ui, section, page, entry.role, entry.name, entry.sub, function(row) return ui.Initials(row, SWATCH_SIZE, 'Aa', entry.role) end, 'Same as Font')
+	end
+	return section
+end
+
+local function ThemeSections(ui, _, parent, width, page)
 	local sections = {}
-	sections[#sections + 1] = PresetSection(ui, parent, width)
+	sections[#sections + 1] = PresetSection(ui, parent, width, page)
+	sections[#sections + 1] = SavedSection(ui, parent, width, page)
+	sections[#sections + 1] = FontSection(ui, parent, width, page)
 
 	for _, spec in ipairs(COLOR_SECTIONS) do
-		local section
-		section = ui.Section(parent, width, {
-		stacked = true,
+		local section = ui.Section(parent, width, {
+			stacked = true,
 			title = spec.title,
 			description = spec.description,
 			columns = { { 'Name', ui.AVATAR_X }, { 'Hex', FIRST_COLUMN }, { 'Opacity', SECOND_COLUMN } },
 			buttons = {
 				{ text = 'Reset', icon = 'reset', onClick = function() ResetRoles(spec.roles) end },
-				{ style = 'primary', text = spec.pick, onClick = function() PickRole(spec.roles[1].role, section.buttons[2]) end },
 			},
 		})
 		for _, entry in ipairs(spec.roles) do
 			ColorRow(ui, section, entry)
-			if entry.gradient then
-				GradientRow(ui, section)
-				OpacityRow(ui, section)
-			end
+			if entry.opacity then OpacityRow(ui, section) end
 		end
 		sections[#sections + 1] = section
 	end

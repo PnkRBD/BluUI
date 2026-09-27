@@ -5,18 +5,16 @@ local Controls, Layout, Modals, Widget = BUILib.Controls, BUILib.Layout, BUILib.
 local Pixel = BUI.Pixel
 
 local RAIL_GROUPS = {
-	{ title = 'Look', items = {
-		{ id = 'appearance', label = 'Appearance', icon = 'glow' },
-		{ id = 'theme', label = 'Addon Theme', icon = 'copy' },
+	{ title = 'BluUI', items = {
+		{ id = 'theme', label = 'Theme', icon = 'copy' },
+		{ id = 'modules', label = 'Modules', icon = 'modules5' },
+		{ id = 'help', label = 'Help', icon = 'question' },
 	} },
 	{ title = 'Game', items = {
+		{ id = 'appearance', label = 'Appearance', icon = 'glow' },
 		{ id = 'settings', label = 'Settings', icon = 'cog' },
 		{ id = 'skinning', label = 'Skinning', icon = 'edit' },
 		{ id = 'visibility', label = 'Visibility', icon = 'eye' },
-	} },
-	{ title = 'BluUI', items = {
-		{ id = 'modules', label = 'Modules', icon = 'modules5' },
-		{ id = 'help', label = 'Help', icon = 'question' },
 	} },
 }
 local PAGE_WIDTH = 960
@@ -54,6 +52,7 @@ end
 
 BUI.PageEngine.RegisterPage("settings", {
 	title = "Settings",
+	icon = 'cog',
 	OnBuild = function(pageFrame)
 		local db = BUI.GetDB()
 		local globalDB = BUI.db.global
@@ -927,7 +926,7 @@ BUI.PageEngine.RegisterPage("settings", {
 			placeholder = 'Search settings...',
 			rail = { groups = RAIL_GROUPS },
 			build = function(kit, shell, parent, width, item, railPage)
-				if item.id == 'theme' then return BUI.ThemePage.Sections(kit, shell, parent, width) end
+				if item.id == 'theme' then return BUI.ThemePage.Sections(kit, shell, parent, width, railPage) end
 				return { Host(parent, width, builders[item.id], railPage, adapter, TAB_INDEX[item.id]) }
 			end,
 		})
