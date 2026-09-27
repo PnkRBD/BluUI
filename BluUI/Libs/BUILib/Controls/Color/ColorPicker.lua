@@ -34,8 +34,8 @@ local L = {
 	TRACK_HEIGHT = 8,
 	TRACK_RADIUS = 4,
 	ROW_HEIGHT = 28,
-	DOT_SIZE = 14,
-	DOT_GAP = 5,
+	DOT_SIZE = 16,
+	DOT_GAP = 2,
 	DOT_COUNT = 13,
 	LABEL_HEIGHT = 14,
 	GAP = 12,
@@ -299,12 +299,12 @@ local function Dot(parent)
 	local dot = CreateFrame('Button', nil, parent)
 	dot:SetSize(L.DOT_SIZE, L.DOT_SIZE)
 	dot:RegisterForClicks('LeftButtonUp', 'RightButtonUp')
-	local ring = Square(dot, L.DOT_SIZE, 'ARTWORK', 0)
+	local ring = Square(dot, L.DOT_SIZE + 2, 'ARTWORK', 0)
 	ring:SetVertexColor(unpack(C.DOT_RING))
 	ring:Hide()
-	local edge = Square(dot, L.DOT_SIZE - 2, 'ARTWORK', 1)
+	local edge = Square(dot, L.DOT_SIZE, 'ARTWORK', 1)
 	edge:SetVertexColor(unpack(C.DOT_EDGE))
-	local fill = Square(dot, L.DOT_SIZE - 4, 'ARTWORK', 2)
+	local fill = Square(dot, L.DOT_SIZE - 2, 'ARTWORK', 2)
 	function dot:SetColor(color)
 		self.color = color
 		if color then fill:SetVertexColor(color[1], color[2], color[3], 1) end
