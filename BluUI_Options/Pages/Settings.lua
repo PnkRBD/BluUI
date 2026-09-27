@@ -7,7 +7,7 @@ local Pixel = BUI.Pixel
 local RAIL_GROUPS = {
 	{ title = 'Look', items = {
 		{ id = 'appearance', label = 'Appearance', icon = 'glow' },
-		{ id = 'theme', label = 'Theme', icon = 'copy' },
+		{ id = 'theme', label = 'Addon Theme', icon = 'copy' },
 	} },
 	{ title = 'Game', items = {
 		{ id = 'settings', label = 'Settings', icon = 'cog' },

@@ -7,6 +7,7 @@ local RAIL_GAP = 40
 local HEADER_GAP = 26
 local TOP_GAP = 24
 local BOTTOM_GAP = 24
+local STICKY_TOP = 24
 
 function Layout.RailPage(tab, shell, spec)
 	local window = shell.window
@@ -37,6 +38,15 @@ function Layout.RailPage(tab, shell, spec)
 		onSelect = function(item) page:Select(item.id) end,
 	})
 	rail.frame:SetPoint('TOPLEFT', 0, -top)
+	local scrollFrame = tab.scroll.scrollFrame
+	local function Pin()
+		local childTop, blockTop = tab.child:GetTop(), block:GetTop()
+		if not childTop or not blockTop then return end
+		local extra = scrollFrame:GetVerticalScroll() - (childTop - blockTop) - top + STICKY_TOP
+		extra = math.max(0, math.min(extra, block:GetHeight() - top - rail.height - BOTTOM_GAP))
+		rail.frame:SetPoint('TOPLEFT', 0, -(top + extra))
+	end
+	scrollFrame:HookScript('OnVerticalScroll', Pin)
 	local divider = window:Fill(block, 'rule', 'ARTWORK')
 	divider:SetPoint('TOPLEFT', railWidth + math.floor(RAIL_GAP / 2), -top)
 	divider:SetWidth(1)
@@ -71,6 +81,7 @@ function Layout.RailPage(tab, shell, spec)
 		local height = Place()
 		block:SetHeight(height)
 		block.layoutHeight = height
+		Pin()
 		BUILib.Defer(function() tab:Refresh() end)
 	end
 
