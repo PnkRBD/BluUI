@@ -290,6 +290,7 @@ local function RefreshAllModules()
     BUI.ApplyScale()
     BUI.Scale.SyncButtons()
     BUI.PageEngine.RebuildAllPages()
+    if BUI.PageEngine.window then BUI.PageEngine.window:ApplyTheme(BUI.GetDB().windowTheme) end
 
     if on('cdm') and BUI.CDM and BUI.CDM.ApplyAllPositions then BUI.CDM.ApplyAllPositions() end
     BUI.CombatLogging.Refresh()
