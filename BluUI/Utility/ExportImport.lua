@@ -292,6 +292,7 @@ local function RefreshAllModules()
     BUI.PageEngine.RebuildAllPages()
 
     if on('cdm') and BUI.CDM and BUI.CDM.ApplyAllPositions then BUI.CDM.ApplyAllPositions() end
+    BUI.CombatLogging.Refresh()
 end
 
 local function HasStringKeys(candidate)
