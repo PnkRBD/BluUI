@@ -68,5 +68,6 @@
     <Script file="Core\Rail.lua"/>
     <Script file="Core\RailPage.lua"/>
     <Script file="Core\Cards.lua"/>
+    <Script file="Core\CardsData.lua"/>
     <Script file="Core\Shell.lua"/>
 </Ui>
