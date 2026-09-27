@@ -7,7 +7,6 @@ local Widget = BUILib.Widget
 local L = {
 	WIDTH = 272,
 	PAD = 14,
-	RADIUS = 10,
 	WHEEL = 200,
 	WHEEL_INNER = 52,
 	WHEEL_CROP = 28 / 256,
@@ -28,7 +27,6 @@ local L = {
 	TITLE_SIZE = 13,
 	PILL_WIDTH = 28,
 	PILL_HEIGHT = 14,
-	PILL_RADIUS = 4,
 	SLIDER_HEIGHT = 32,
 	SLIDER_GAP = 6,
 	TRACK_HEIGHT = 8,
@@ -40,7 +38,6 @@ local L = {
 	LABEL_HEIGHT = 14,
 	GAP = 12,
 	BUTTON_WIDTH = 80,
-	BUTTON_RADIUS = 6,
 	BUTTON_GAP = 8,
 	ANCHOR_GAP = 8,
 	SCREEN_MARGIN = 8,
@@ -173,6 +170,22 @@ local function Solid(parent, layer, subLevel)
 	local texture = parent:CreateTexture(nil, layer, nil, subLevel or 0)
 	texture:SetTexture(Widget.WHITE)
 	return texture
+end
+
+local EDGES = { { 'TOPLEFT', 'TOPRIGHT', 'SetHeight' }, { 'BOTTOMLEFT', 'BOTTOMRIGHT', 'SetHeight' }, { 'TOPLEFT', 'BOTTOMLEFT', 'SetWidth' }, { 'TOPRIGHT', 'BOTTOMRIGHT', 'SetWidth' } }
+
+local function Panel(parent, fillColor, edgeColor, layer, subLevel)
+	local fill = Solid(parent, layer, subLevel)
+	fill:SetAllPoints()
+	fill:SetVertexColor(unpack(fillColor))
+	for _, side in ipairs(EDGES) do
+		local edge = Solid(parent, layer, (subLevel or 0) + 1)
+		edge:SetPoint(side[1])
+		edge:SetPoint(side[2])
+		edge[side[3]](edge, 1)
+		edge:SetVertexColor(unpack(edgeColor))
+	end
+	return fill
 end
 
 local function Disc(parent, size, layer, subLevel)
@@ -327,15 +340,17 @@ end
 local function Pill(parent)
 	local pill = CreateFrame('Button', nil, parent)
 	pill:SetSize(L.PILL_WIDTH, L.PILL_HEIGHT)
-	pill.fill = Widget.DrawCardShape(pill, L.PILL_RADIUS, C.WHITE, C.DOT_EDGE, 'ARTWORK', 0, 0)
+	pill.fill = Panel(pill, C.WHITE, C.DOT_EDGE, 'ARTWORK', 0)
 	return pill
 end
 
 local function Button(parent, text, onClick)
 	local button = CreateFrame('Button', nil, parent)
 	button:SetSize(L.BUTTON_WIDTH, L.ROW_HEIGHT)
-	button.fill = Widget.DrawCardShape(button, L.BUTTON_RADIUS, C.SECONDARY, C.CLEAR, 'BACKGROUND', 0, 0)
-	local hover = Widget.DrawCardShape(button, L.BUTTON_RADIUS, C.BUTTON_HOVER, C.CLEAR, 'BACKGROUND', 2, 0)
+	button.fill = Panel(button, C.SECONDARY, C.CLEAR, 'BACKGROUND', 0)
+	local hover = Solid(button, 'BACKGROUND', 2)
+	hover:SetAllPoints()
+	hover:SetVertexColor(unpack(C.BUTTON_HOVER))
 	hover:Hide()
 	button.label = button:CreateFontString(nil, 'OVERLAY')
 	button.label:SetFont(BUILib.Font, 12, '')
@@ -459,7 +474,7 @@ local function BuildPicker()
 	frame:SetWidth(L.WIDTH)
 	frame:EnableMouse(true)
 	frame:Hide()
-	Widget.DrawCardShape(frame, L.RADIUS, C.SURFACE, C.EDGE, 'BACKGROUND', 0, 0)
+	Panel(frame, C.SURFACE, C.EDGE, 'BACKGROUND', 0)
 
 	local title = Label(frame, 'Color', C.TEXT, L.TITLE_SIZE)
 	local after = Pill(frame)
