@@ -51,6 +51,8 @@ local function NiceCeiling(value)
 	return math.ceil(value / unit) * unit
 end
 
+Layout.CardKitExtensions = {}
+
 function Layout.CardKit(window)
 	local kit = Layout.TableKit(window)
 	local cards = { PAD = PAD, RADIUS = RADIUS, GAP = GAP }
@@ -71,20 +73,36 @@ function Layout.CardKit(window)
 		return SERIES[(index - 2) % #SERIES + 1]
 	end
 
-	local function PaintSeries(texture, index)
+	function cards.PaintSeries(texture, index)
 		if index == 1 then
 			window:Paint(texture, 'accent')
 		else
 			local color = SERIES[(index - 2) % #SERIES + 1]
-			texture:SetColorTexture(color[1], color[2], color[3], color[4])
+			texture:SetVertexColor(color[1], color[2], color[3], color[4])
 		end
 	end
+	cards.Painted = Painted
 
 	function cards.Fill(parent, index, layer, subLayer)
 		local texture = parent:CreateTexture(nil, layer or 'ARTWORK', nil, subLayer or 0)
 		texture:SetTexture(Widget.WHITE)
-		PaintSeries(texture, index)
+		cards.PaintSeries(texture, index)
 		return texture
+	end
+
+	function cards.Dot(parent, size, index, layer, subLayer)
+		local dot = parent:CreateTexture(nil, layer or 'ARTWORK', nil, subLayer or 0)
+		dot:SetTexture(BUILib.GetLibMedia('smoothdisc'))
+		dot:SetSize(size, size)
+		cards.PaintSeries(dot, index)
+		return dot
+	end
+
+	function cards.Drive(card, spec, apply)
+		if not spec.read then return false end
+		local function Update() apply(spec.read()) end
+		if spec.events then cards.Listen(card, spec.events, Update) else cards.Every(card, spec.every or 1, Update) end
+		return true
 	end
 
 	function cards.Card(parent, x, y, width, height, opts)
@@ -298,15 +316,23 @@ function Layout.CardKit(window)
 		if spec.icon then cards.Badge(card, spec.icon, 30, width - PAD - 30, 14) end
 		card.value = cards.Readout(card, PAD, 40, 34, width - PAD * 2)
 		card.note = cards.Label(card, '', PAD, 82, 11, 'muted')
+		card.note:SetWidth(width - PAD * 2)
+		card.note:SetWordWrap(false)
+		card.line = cards.Label(card, '', PAD, 100, 11, 'text')
+		card.line:SetWidth(width - PAD * 2)
+		card.line:SetWordWrap(false)
 		card.bar = cards.Bar(card, PAD, height - PAD - 6, width - PAD * 2, 6)
-		function card:Set(value, note, fraction)
+		function card:Set(value, note, fraction, line)
 			self.value:SetText(value)
 			self.note:SetText(note or '')
+			self.line:SetText(line or '')
 			self.bar:SetShown(fraction ~= nil)
 			self.bar.track:SetShown(fraction ~= nil)
 			self.bar:SetFraction(fraction)
 		end
-		card:Set(spec.value or '', spec.note, spec.fraction)
+		if not cards.Drive(card, spec, function(value, note, fraction, line) card:Set(value, note, fraction, line) end) then
+			card:Set(spec.value or '', spec.note, spec.fraction, spec.line)
+		end
 		return card
 	end
 
@@ -637,10 +663,7 @@ function Layout.CardKit(window)
 		end
 		local legendX = PAD
 		for slot = 1, series do
-			local dot = cards.Fill(card, slot, 'ARTWORK')
-			dot:SetTexture(BUILib.GetLibMedia('smoothdisc'))
-			PaintSeries(dot, slot)
-			dot:SetSize(7, 7)
+			local dot = cards.Dot(card, 7, slot)
 			dot:SetPoint('TOPLEFT', legendX, -(height - PAD - 12))
 			local text = kit.Text(card, spec.series[slot], 11, 'muted')
 			text:SetPoint('LEFT', dot, 'RIGHT', 6, 0)
@@ -1107,5 +1130,6 @@ function Layout.CardKit(window)
 		return card
 	end
 
+	for _, extend in ipairs(Layout.CardKitExtensions) do extend(cards, kit, window) end
 	return cards
 end
