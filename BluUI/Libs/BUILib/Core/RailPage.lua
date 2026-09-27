@@ -25,10 +25,9 @@ function Layout.RailPage(tab, shell, spec)
 		page:Resize()
 	end)
 	local top = y + HEADER_GAP
-	local rule = window:Fill(block, 'rule', 'ARTWORK')
+	local rule = kit.DottedRule(block)
 	rule:SetPoint('TOPLEFT', 0, -top)
 	rule:SetPoint('TOPRIGHT', 0, -top)
-	rule:SetHeight(1)
 	top = top + 1 + TOP_GAP
 
 	local rail = Layout.Rail(window, block, railWidth, {
