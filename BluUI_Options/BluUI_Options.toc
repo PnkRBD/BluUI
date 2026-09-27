@@ -29,5 +29,6 @@ Pages\Bloodlust.lua
 Pages\Visibility.lua
 Pages\Skinning.lua
 Pages\Theme.lua
+Pages\Modules.lua
 Pages\Settings.lua
 Pages\ExportImport.lua
