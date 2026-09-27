@@ -20,14 +20,37 @@ local TITLE_FONT_SIZE = 12
 local SUBTLE_FONT_SIZE = 11
 local DEFAULT_WIDTH = 230
 local MAX_WIDTH   = 360
+local MAX_ROWS    = 12
 local SHADOW_PADDING = 2
-local HIGHLIGHT_FADE_IN  = 0.08
-local HIGHLIGHT_FADE_OUT = 0.08
+local TRACK_WIDTH = 6
+local TRACK_INSET = 3
 local WHITE       = "Interface\\Buttons\\WHITE8x8"
+local STATIC_CHECK = { texture = "Interface\\RaidFrame\\ReadyCheck-Ready", color = { 1, 1, 1, 1 } }
 
 local unpack = unpack
 
 local activeMenu
+
+local function Blend(base, over)
+	local alpha = over[4] or 1
+	return { base[1] + (over[1] - base[1]) * alpha, base[2] + (over[2] - base[2]) * alpha, base[3] + (over[3] - base[3]) * alpha, 1 }
+end
+
+local function Palette(window)
+	if not window then
+		return {
+			fill = Theme.bg.dark, edge = Theme.border.light, hover = Theme.bg.hover,
+			text = Theme.text.primary, muted = Theme.text.muted, disabled = Theme.text.disabled,
+			thumb = Theme.scrollbar.thumb, check = STATIC_CHECK, font = BUILib.Font,
+		}
+	end
+	local fill = { window:Color('input') }
+	return {
+		fill = fill, edge = { window:Color('rule') }, hover = Blend(fill, { window:Color('hover') }),
+		text = { window:Color('text') }, muted = { window:Color('muted') }, disabled = { window:Color('faint') },
+		thumb = { window:Color('faint') }, check = { texture = BUILib.GetLibMedia('check'), color = { window:Color('accent') } }, font = window.font,
+	}
+end
 
 local function CloseActive()
 	if activeMenu and activeMenu:IsShown() then HideMenu(activeMenu) end
@@ -56,33 +79,17 @@ local function BuildShadow(menu)
 	end
 end
 
-local function MakeRow(menu)
-	local row = CreateFrame("Button", nil, menu)
+local function MakeRow(parent)
+	local row = CreateFrame("Button", nil, parent)
 	row:SetHeight(ROW_HEIGHT)
 
 	local highlight = row:CreateTexture(nil, "BACKGROUND")
 	highlight:SetPoint("TOPLEFT", 1, -1); highlight:SetPoint("BOTTOMRIGHT", -1, 1)
 	highlight:SetTexture(WHITE)
-	highlight:SetVertexColor(unpack(Theme.bg.hover))
-	highlight:SetAlpha(0)
+	highlight:Hide()
 	row.hl = highlight
 
-	local fadeIn = row:CreateAnimationGroup()
-	local fadeInAnimation = fadeIn:CreateAnimation("Alpha")
-	fadeInAnimation:SetDuration(HIGHLIGHT_FADE_IN); fadeInAnimation:SetFromAlpha(0); fadeInAnimation:SetToAlpha(1)
-	fadeInAnimation:SetTarget(highlight)
-	fadeIn:SetScript("OnFinished", function() highlight:SetAlpha(1) end)
-	row.fadeIn = fadeIn
-
-	local fadeOut = row:CreateAnimationGroup()
-	local fadeOutAnimation = fadeOut:CreateAnimation("Alpha")
-	fadeOutAnimation:SetDuration(HIGHLIGHT_FADE_OUT); fadeOutAnimation:SetFromAlpha(1); fadeOutAnimation:SetToAlpha(0)
-	fadeOutAnimation:SetTarget(highlight)
-	fadeOut:SetScript("OnFinished", function() highlight:SetAlpha(0) end)
-	row.fadeOut = fadeOut
-
 	local check = row:CreateTexture(nil, "OVERLAY")
-	check:SetTexture("Interface\\RaidFrame\\ReadyCheck-Ready")
 	check:SetSize(14, 14)
 	check:SetPoint("LEFT", 4 + (ICON_COLUMN_WIDTH - 14) / 2, 0)
 	check:Hide()
@@ -95,7 +102,6 @@ local function MakeRow(menu)
 	row.icon = icon
 
 	local text = row:CreateFontString(nil, "OVERLAY")
-	text:SetFont(BUILib.Font, FONT_SIZE, "")
 	text:SetJustifyH("LEFT"); text:SetJustifyV("MIDDLE")
 	text:SetWordWrap(false)
 	text:SetPoint("LEFT", 4 + ICON_COLUMN_WIDTH + TEXT_INSET, 0)
@@ -103,18 +109,19 @@ local function MakeRow(menu)
 	row.text = text
 
 	local subText = row:CreateFontString(nil, "OVERLAY")
-	subText:SetFont(BUILib.Font, SUBTLE_FONT_SIZE, "")
 	subText:SetJustifyH("RIGHT"); subText:SetJustifyV("MIDDLE")
 	subText:SetPoint("RIGHT", -TEXT_INSET, 0)
-	subText:SetTextColor(unpack(Theme.text.muted))
 	subText:Hide()
 	row.sub = subText
 
 	return row
 end
 
-local function BindRow(row, item, onSelect)
-	row.fadeIn:Stop(); row.fadeOut:Stop(); row.hl:SetAlpha(0)
+local function BindRow(row, item, onSelect, palette)
+	row.hl:Hide()
+	row.hl:SetVertexColor(unpack(palette.hover))
+	row.text:SetFont(item.fontPath or palette.font, FONT_SIZE, "")
+	row.sub:SetFont(palette.font, SUBTLE_FONT_SIZE, "")
 
 	if item.icon then
 		row.icon:SetTexture(item.icon); row.icon:Show()
@@ -122,6 +129,8 @@ local function BindRow(row, item, onSelect)
 	else
 		row.icon:Hide()
 		if item.checked then
+			row.check:SetTexture(palette.check.texture)
+			row.check:SetVertexColor(unpack(item.disabled and palette.disabled or palette.check.color))
 			row.check:SetDesaturated(item.disabled and true or false)
 			row.check:Show()
 		else
@@ -138,25 +147,19 @@ local function BindRow(row, item, onSelect)
 	end
 
 	if item.disabled then
-		row.text:SetTextColor(unpack(Theme.text.disabled))
-		row.sub:SetTextColor(unpack(Theme.text.disabled))
+		row.text:SetTextColor(unpack(palette.disabled))
+		row.sub:SetTextColor(unpack(palette.disabled))
 		row:EnableMouse(false)
 		row:SetScript("OnEnter", nil); row:SetScript("OnLeave", nil); row:SetScript("OnClick", nil)
 		return
 	end
 
 	row:EnableMouse(true)
-	row.text:SetTextColor(unpack(Theme.text.primary))
-	row.sub:SetTextColor(unpack(Theme.text.muted))
+	row.text:SetTextColor(unpack(palette.text))
+	row.sub:SetTextColor(unpack(palette.muted))
 
-	row:SetScript("OnEnter", function()
-		row.fadeOut:Stop()
-		row.fadeIn:Stop(); row.fadeIn:Play()
-	end)
-	row:SetScript("OnLeave", function()
-		row.fadeIn:Stop()
-		row.fadeOut:Stop(); row.fadeOut:Play()
-	end)
+	row:SetScript("OnEnter", function() row.hl:Show() end)
+	row:SetScript("OnLeave", function() row.hl:Hide() end)
 	row:SetScript("OnClick", function()
 		local keepOpen = false
 		if item.callback then keepOpen = item.callback(item) == true end
@@ -175,30 +178,27 @@ local function BindRow(row, item, onSelect)
 	end)
 end
 
-local function MakeTitle(menu)
-	local wrap = CreateFrame("Frame", nil, menu)
+local function MakeTitle(parent)
+	local wrap = CreateFrame("Frame", nil, parent)
 	wrap:SetHeight(TITLE_HEIGHT)
 
 	local text = wrap:CreateFontString(nil, "OVERLAY")
-	text:SetFont(BUILib.Font, TITLE_FONT_SIZE, "")
 	text:SetJustifyH("LEFT"); text:SetJustifyV("MIDDLE")
 	text:SetWordWrap(false)
 	text:SetPoint("LEFT", 4 + ICON_COLUMN_WIDTH + TEXT_INSET, 0)
 	text:SetPoint("RIGHT", -TEXT_INSET, 0)
-	text:SetTextColor(unpack(Theme.text.muted))
 	wrap.text = text
 
 	return wrap
 end
 
-local function MakeSeparator(menu)
-	local line = menu:CreateTexture(nil, "ARTWORK")
+local function MakeSeparator(parent)
+	local line = parent:CreateTexture(nil, "ARTWORK")
 	line:SetTexture(WHITE); line:SetHeight(1)
-	line:SetVertexColor(unpack(Theme.border.default))
 	return line
 end
 
-local sharedMenu
+local sharedMenu, scrollFrame, scrollChild, scrollTrack, scrollThumb, scrollLogic
 local rowPool = {}
 local titlePool = {}
 local separatorPool = {}
@@ -214,26 +214,52 @@ local function EnsureMenu()
 	menu:EnableMouse(true)
 	menu:Hide()
 	BuildShadow(menu)
+
+	scrollFrame = CreateFrame("ScrollFrame", nil, menu)
+	scrollFrame:SetPoint("TOPLEFT")
+	scrollFrame:SetPoint("BOTTOMRIGHT")
+	scrollChild = CreateFrame("Frame", nil, scrollFrame)
+	scrollFrame:SetScrollChild(scrollChild)
+
+	scrollTrack = CreateFrame("Frame", nil, menu)
+	scrollTrack:SetWidth(TRACK_WIDTH)
+	scrollTrack:SetPoint("TOPRIGHT", -TRACK_INSET, -PADDING_Y)
+	scrollTrack:SetPoint("BOTTOMRIGHT", -TRACK_INSET, PADDING_Y)
+	scrollTrack.fill = scrollTrack:CreateTexture(nil, "BACKGROUND")
+	scrollTrack.fill:SetTexture(WHITE)
+	scrollTrack.fill:SetAllPoints()
+	scrollTrack:Hide()
+	scrollThumb = CreateFrame("Frame", nil, scrollTrack)
+	scrollThumb:SetWidth(TRACK_WIDTH)
+	scrollThumb:SetPoint("TOP")
+	scrollThumb.fill = scrollThumb:CreateTexture(nil, "ARTWORK")
+	scrollThumb.fill:SetTexture(WHITE)
+	scrollThumb.fill:SetAllPoints()
+	scrollThumb:Hide()
+	scrollLogic = Widget.ScrollLogic(scrollFrame, scrollChild, scrollTrack, scrollThumb, { step = ROW_HEIGHT * 2, draggable = true })
+	menu:EnableMouseWheel(true)
+	menu:SetScript("OnMouseWheel", function(_, delta) scrollLogic.DoScroll(delta) end)
+
 	menu:SetScript("OnShow", function(self) self:Raise() end)
 	sharedMenu = menu
 	return menu
 end
 
-local function GetRow(index, menu)
+local function GetRow(index)
 	if rowPool[index] then return rowPool[index] end
-	rowPool[index] = MakeRow(menu)
+	rowPool[index] = MakeRow(scrollChild)
 	return rowPool[index]
 end
 
-local function GetTitle(index, menu)
+local function GetTitle(index)
 	if titlePool[index] then return titlePool[index] end
-	titlePool[index] = MakeTitle(menu)
+	titlePool[index] = MakeTitle(scrollChild)
 	return titlePool[index]
 end
 
-local function GetSeparator(index, menu)
+local function GetSeparator(index)
 	if separatorPool[index] then return separatorPool[index] end
-	separatorPool[index] = MakeSeparator(menu)
+	separatorPool[index] = MakeSeparator(scrollChild)
 	return separatorPool[index]
 end
 
@@ -245,8 +271,8 @@ end
 
 function Controls.ContextMenu(items, options)
 	options = options or {}
+	local palette = Palette(options.window)
 	local width = math.min(options.width or DEFAULT_WIDTH, MAX_WIDTH)
-	local innerWidth = width - PADDING_X * 2
 
 	local menu = EnsureMenu()
 	local alreadyShown = menu:IsShown() and activeMenu == menu
@@ -273,24 +299,35 @@ function Controls.ContextMenu(items, options)
 	end
 	totalHeight = totalHeight + PADDING_Y
 
-	menu:SetSize(width, totalHeight)
+	local visibleHeight = math.min(totalHeight, PADDING_Y * 2 + MAX_ROWS * ROW_HEIGHT)
+	local trackSpace = totalHeight > visibleHeight and (TRACK_WIDTH + TRACK_INSET * 2) or 0
+	local innerWidth = width - PADDING_X * 2 - trackSpace
+	menu:SetSize(width, visibleHeight)
+	scrollChild:SetSize(width, totalHeight)
+	menu:SetBackdropColor(unpack(palette.fill))
+	menu:SetBackdropBorderColor(unpack(palette.edge))
+	scrollTrack.fill:SetVertexColor(palette.edge[1], palette.edge[2], palette.edge[3], 0.5)
+	scrollThumb.fill:SetVertexColor(unpack(palette.thumb))
 
 	local rowIndex, titleIndex, separatorIndex = 0, 0, 0
 	local y = -PADDING_Y
 	for itemIndex, item in ipairs(items) do
 		if item.separator then
 			separatorIndex = separatorIndex + 1
-			local line = GetSeparator(separatorIndex, menu)
+			local line = GetSeparator(separatorIndex)
 			local separatorY = y - math.floor(SEPARATOR_HEIGHT / 2)
 			line:ClearAllPoints()
-			line:SetPoint("LEFT", menu, "TOPLEFT", PADDING_X + 4, separatorY)
-			line:SetPoint("RIGHT", menu, "TOPRIGHT", -(PADDING_X + 4), separatorY)
+			line:SetPoint("LEFT", scrollChild, "TOPLEFT", PADDING_X + 4, separatorY)
+			line:SetPoint("RIGHT", scrollChild, "TOPRIGHT", -(PADDING_X + 4 + trackSpace), separatorY)
+			line:SetVertexColor(unpack(palette.edge))
 			line:Show()
 			y = y - SEPARATOR_HEIGHT
 		elseif item.title then
 			titleIndex = titleIndex + 1
-			local wrap = GetTitle(titleIndex, menu)
+			local wrap = GetTitle(titleIndex)
 			wrap:SetWidth(innerWidth)
+			wrap.text:SetFont(palette.font, TITLE_FONT_SIZE, "")
+			wrap.text:SetTextColor(unpack(palette.muted))
 			wrap.text:SetText(CleanTitle(item.text or item.title))
 			wrap:ClearAllPoints()
 			wrap:SetPoint("TOPLEFT", PADDING_X, y)
@@ -299,15 +336,18 @@ function Controls.ContextMenu(items, options)
 			if items[itemIndex + 1] then y = y - TITLE_GAP end
 		else
 			rowIndex = rowIndex + 1
-			local row = GetRow(rowIndex, menu)
+			local row = GetRow(rowIndex)
 			row:SetWidth(innerWidth)
 			row:ClearAllPoints()
 			row:SetPoint("TOPLEFT", PADDING_X, y)
-			BindRow(row, item, options.onSelect)
+			BindRow(row, item, options.onSelect, palette)
 			row:Show()
 			y = y - ROW_HEIGHT
 		end
 	end
+	scrollLogic.Stop()
+	scrollFrame:SetVerticalScroll(0)
+	BUILib.Defer(scrollLogic.UpdateThumb)
 
 	menu:ClearAllPoints()
 	if options.anchor and not options.atCursor then
@@ -351,4 +391,3 @@ function Controls.ContextMenu(items, options)
 
 	return menu
 end
-
