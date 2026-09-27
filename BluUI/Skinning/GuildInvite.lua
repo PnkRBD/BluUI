@@ -214,7 +214,7 @@ end)
 
 Skin.RegisterSkin(SKIN_ID, {
 	name = 'Guild Invite',
-	description = 'The guild invitation prompt in the dark shell: tabard, guild name in your accent colour, achievement points and the reputation warning laid out cleanly, flat buttons, and a countdown until the invite expires.',
+	description = 'The guild invitation prompt in the dark shell: tabard, guild name in your accent color, achievement points and the reputation warning laid out cleanly, flat buttons, and a countdown until the invite expires.',
 	icon = 'Interface/Icons/INV_Shirt_GuildTabard_01',
 	test = StartPreview,
 	stopTest = StopPreview,

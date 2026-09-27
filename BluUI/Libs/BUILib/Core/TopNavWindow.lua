@@ -4,30 +4,26 @@ local Layout = BUILib.Layout
 local Widget = BUILib.Widget
 local Theme = BUILib.Theme
 
-local EDGE_ACCENT_SCALE = 0.45
-local BAR_HEIGHT = 64
+local BAR_HEIGHT = Layout.TITLE_BAR_HEIGHT
+local FOOTER_HEIGHT = Layout.FOOTER_HEIGHT
 local PAGE_WIDTH = 1040
-local BRAND_SIZE = 15
 local LINK_SIZE = 13
 local LINK_GAP = 36
-local ACTION_SIZE = 28
-local ACTION_ICON_SIZE = 12
-local ACTION_GAP = 8
-local AVATAR_SIZE = 30
-local SIDEBAR_INSET = 16
-local SIDEBAR_TOP = 24
-local FOOTER_HEIGHT = 56
+local INSET = 16
 local FOOTER_GAP = 8
-local FOOTER_DOT = 7
+local INDICATOR_SIZE = 8
+local BAR_ROLES = { bar = true, barText = true, barIcon = true }
 
-local function FooterButton(window, kit, parent, spec)
+function Layout.FlatButton(window, parent, spec)
+	local kit = Layout.TableKit(window)
 	local button = CreateFrame('Button', nil, parent)
 	window:Fill(button, 'secondary'):SetAllPoints()
 	kit.Hover(button)
 	local textX = 14
 	local dot
 	if spec.indicator or spec.roundedIndicator then
-		dot = kit.Disc(button, FOOTER_DOT, 'faint')
+		dot = kit.Fill(button, 'faint', 'OVERLAY')
+		dot:SetSize(INDICATOR_SIZE, INDICATOR_SIZE)
 		dot:SetPoint('LEFT', 12, 0)
 		textX = 26
 	end
@@ -54,102 +50,21 @@ function Layout.TopNavWindow(config)
 	local pageWidth = config.pageWidth or PAGE_WIDTH
 	local sidebarWidth = config.sidebarWidth
 
-	function window:ChromeColor(role, theme, mode)
-		if role == 'edge' and theme.edgeAccent and not (theme[mode] and theme[mode].edge) then
-			local red, green, blue = Theme.GetAccent()
-			return { red * EDGE_ACCENT_SCALE, green * EDGE_ACCENT_SCALE, blue * EDGE_ACCENT_SCALE, 1 }
-		end
+	local BaseChromeColor = window.ChromeColor
+	function window:ChromeColor(role, mode)
+		if BAR_ROLES[role] and not self:Override(role, mode) then return Theme.palettes[mode][role] end
+		return BaseChromeColor(self, role, mode)
 	end
 
-	function window:PaintChrome()
-		self:PaintFrame({ self:Color('page') }, { self:Color('edge') })
-	end
+	local bar = Layout.TitleBar(window, config).frame
 
-	local bar = CreateFrame('Frame', nil, frame)
-	bar:SetPoint('TOPLEFT', 1, -1)
-	bar:SetPoint('TOPRIGHT', -1, -1)
-	bar:SetHeight(BAR_HEIGHT)
-	window:DragWith(bar)
-	window:Fill(bar, 'bar'):SetAllPoints()
-
-	local inner = CreateFrame('Frame', nil, bar)
-	inner:SetPoint('TOPLEFT', SIDEBAR_INSET, 0)
-	inner:SetPoint('BOTTOMRIGHT', -SIDEBAR_INSET, 0)
-
-	local rule = window:Fill(inner, 'barRule', 'ARTWORK')
-	rule:SetPoint('BOTTOMLEFT')
-	rule:SetPoint('BOTTOMRIGHT')
-	rule:SetHeight(1)
-
-	local avatar = inner:CreateTexture(nil, 'ARTWORK')
-	avatar:SetSize(AVATAR_SIZE, AVATAR_SIZE)
-	avatar:SetPoint('LEFT')
-	if config.icon then
-		avatar:SetTexture(config.icon)
-	else
-		Layout.PlayerPortrait(avatar)
-	end
-	avatar:SetMask(BUILib.GetLibMedia('circle_mask'))
-
-	local brand = window:Text(inner, Widget.StripColorCodes(config.title or 'BUILib'), BRAND_SIZE, 'barText')
-	brand:SetPoint('LEFT', avatar, 'RIGHT', 10, 0)
-
-	local function ActionButton(action)
-		local button = CreateFrame('Button', nil, inner)
-		button:SetSize(ACTION_SIZE, ACTION_SIZE)
-		local disc = button:CreateTexture(nil, 'BACKGROUND')
-		disc:SetTexture(BUILib.GetLibMedia('smoothdisc'))
-		disc:SetAllPoints()
-		window:Paint(disc, 'barButton')
-		local icon = button:CreateTexture(nil, 'ARTWORK')
-		icon:SetTexture(BUILib.GetLibMedia(action.icon))
-		icon:SetSize(ACTION_ICON_SIZE, ACTION_ICON_SIZE)
-		icon:SetPoint('CENTER')
-		window:Paint(icon, 'barIcon')
-		local dynamicTip = type(action.tooltip) == 'function'
-		local function ShowTip()
-			Widget.ShowTip(button, dynamicTip and action.tooltip() or action.tooltip)
-		end
-		button:SetScript('OnEnter', function()
-			window:Paint(icon, 'barText')
-			ShowTip()
-		end)
-		button:SetScript('OnLeave', function()
-			window:Paint(icon, 'barIcon')
-			Widget.HideTip()
-		end)
-		button:SetScript('OnClick', function()
-			action.onClick()
-			if dynamicTip then ShowTip() end
-		end)
-		return button
-	end
-
-	local actions = {
-		{
-			icon = 'glow',
-			tooltip = function() return window:GetMode() == 'dark' and 'Light mode' or 'Dark mode' end,
-			onClick = function() window:SetMode(window:GetMode() == 'dark' and 'light' or 'dark') end,
-		},
-	}
-	for _, action in ipairs(config.actions or {}) do actions[#actions + 1] = action end
-	actions[#actions + 1] = { icon = 'x', tooltip = 'Close', onClick = function() frame:Hide() end }
-
-	local anchor
-	for index = #actions, 1, -1 do
-		local button = ActionButton(actions[index])
-		if anchor then
-			button:SetPoint('RIGHT', anchor, 'LEFT', -ACTION_GAP, 0)
-		else
-			button:SetPoint('RIGHT')
-		end
-		anchor = button
-	end
-
-	local links = CreateFrame('Frame', nil, inner)
+	local links = CreateFrame('Frame', nil, bar)
 	links:SetPoint('TOP')
 	links:SetPoint('BOTTOM')
 	links:SetWidth(1)
+
+	local footerConfig = config.footerButtons or {}
+	local footerHeight = #footerConfig > 0 and FOOTER_HEIGHT or 0
 
 	local sidebar
 	if sidebarWidth then
@@ -159,8 +74,8 @@ function Layout.TopNavWindow(config)
 		sidebar:SetWidth(sidebarWidth)
 		window:Fill(sidebar, 'sidebar'):SetAllPoints()
 		local edge = window:Fill(sidebar, 'sidebarEdge', 'ARTWORK')
-		edge:SetPoint('TOPRIGHT')
-		edge:SetPoint('BOTTOMRIGHT')
+		edge:SetPoint('TOPRIGHT', 0, -INSET)
+		edge:SetPoint('BOTTOMRIGHT', 0, footerHeight + INSET)
 		edge:SetWidth(1)
 		window.sidebar = sidebar
 	end
@@ -195,35 +110,30 @@ function Layout.TopNavWindow(config)
 	function window:SetNavStyle(_, navConfig)
 		self:ReleaseNav()
 		if not sidebar then return BuildLinks(navConfig) end
-		local rail, buttons = Layout.NavRail(self, sidebar, sidebarWidth - SIDEBAR_INSET * 2, navConfig)
-		rail.frame:SetPoint('TOPLEFT', SIDEBAR_INSET, -SIDEBAR_TOP)
-		self.navFrames[#self.navFrames + 1] = rail.frame
-		self:SetMinimum('nav', 0, rail.height + SIDEBAR_TOP + BAR_HEIGHT + 24)
+		local buttons, navHeight = Layout.SidebarRail(self, sidebar, sidebarWidth, navConfig)
+		self:SetMinimum('nav', 0, navHeight + BAR_HEIGHT + FOOTER_HEIGHT)
 		return buttons
 	end
 
-	local footerConfig = config.footerButtons or {}
-	local footerHeight = #footerConfig > 0 and FOOTER_HEIGHT or 0
 	if footerHeight > 0 then
 		local footer = CreateFrame('Frame', nil, frame)
 		footer:SetPoint('BOTTOMLEFT', (sidebarWidth or 0) + 1, 1)
 		footer:SetPoint('BOTTOMRIGHT', -1, 1)
 		footer:SetHeight(FOOTER_HEIGHT)
-		local rule = window:Fill(footer, 'rule', 'ARTWORK')
-		rule:SetPoint('TOPLEFT', SIDEBAR_INSET, 0)
-		rule:SetPoint('TOPRIGHT', -SIDEBAR_INSET, 0)
-		rule:SetHeight(1)
-		if config.version then window:Text(footer, 'v' .. config.version, 12, 'faint'):SetPoint('LEFT', SIDEBAR_INSET, 0) end
-		local kit = Layout.TableKit(window)
+		local footerRule = window:Fill(footer, 'rule', 'ARTWORK')
+		footerRule:SetPoint('TOPLEFT', INSET, 0)
+		footerRule:SetPoint('TOPRIGHT', -INSET, 0)
+		footerRule:SetHeight(1)
+		if config.version then window:Text(footer, 'v' .. config.version, 12, 'faint'):SetPoint('LEFT', INSET, 0) end
 		window.footerButtons = {}
 		local anchor
 		for index = #footerConfig, 1, -1 do
 			local spec = footerConfig[index]
-			local button = FooterButton(window, kit, footer, spec)
+			local button = Layout.FlatButton(window, footer, spec)
 			if anchor then
 				button:SetPoint('RIGHT', anchor, 'LEFT', -FOOTER_GAP, 0)
 			else
-				button:SetPoint('RIGHT', -SIDEBAR_INSET, 0)
+				button:SetPoint('RIGHT', -INSET, 0)
 			end
 			window.footerButtons[spec.key or spec.text] = button
 			anchor = button
@@ -236,7 +146,7 @@ function Layout.TopNavWindow(config)
 	content:SetPoint('BOTTOMRIGHT', -1, footerHeight + 1)
 	window.content = content
 
-	window:SetMinimum('page', pageWidth + 48 + (sidebarWidth or 0), BAR_HEIGHT + footerHeight + 240)
+	Layout.ReservePage(window, pageWidth, sidebarWidth or 0, footerHeight)
 	function window:SetContentMinSize(width, height)
 		self:SetMinimum('content', width + 2 + (sidebarWidth or 0), height + BAR_HEIGHT + footerHeight + 2)
 	end
