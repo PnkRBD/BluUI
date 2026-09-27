@@ -288,7 +288,7 @@ local function Keep(name, theme, page, adopt)
 		entry.name, entry.theme, entry.time = name, theme, time()
 		if not existing then saved[#saved + 1] = entry end
 		if adopt then Store().name = name end
-		page:Rebuild()
+		page:RebuildCurrent()
 		Toast.Success(existing and 'Theme replaced' or 'Theme saved', name, ToastOptions())
 	end
 	if not existing then return Write() end
@@ -357,7 +357,7 @@ local function ForgetSaved(index, saved, page)
 		confirmText = 'Remove',
 		onConfirm = function()
 			table.remove(SavedThemes(), index)
-			page:Rebuild()
+			page:RebuildCurrent()
 		end,
 	})
 end
