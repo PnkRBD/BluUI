@@ -10,12 +10,15 @@ local RAIL_WIDTH = 200
 local NAV_TOP = 22
 local NAV_PITCH = 38
 local NAV_SECTION_GAP = 8
-local FOOTER_PADDING = 12
-local FOOTER_RESERVED = 56
+local FOOTER_PADDING = 15
+local FOOTER_HEIGHT = 56
+local PAGE_MARGIN = 48
+local PAGE_MIN_HEIGHT = 240
 local FOOTER_GAP = 8
 local GRIP_SIZE = 14
 local NAV_RAIL_INSET = 12
 local PORTRAIT_SIZE = 32
+local BRAND_SIZE = 15
 local BORDER_ACCENT_SCALE = 0.45
 local GRIP_ACCENT_SCALE = 0.85
 local GRIP_IDLE_ALPHA = 0.55
@@ -25,9 +28,14 @@ local BORDER_SIDES = {
 	{ 'TOPLEFT', 'BOTTOMLEFT', 'SetWidth' },
 	{ 'TOPRIGHT', 'BOTTOMRIGHT', 'SetWidth' },
 }
+local LOOK_ROLES = { page = 'background', bar = 'titleBar', barText = 'text', barIcon = 'icon', sidebar = 'sidebar', sidebarEdge = 'divider' }
 
-local function Paint(texture, color)
-	texture:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
+Layout.TITLE_BAR_HEIGHT = TOPBAR_HEIGHT
+Layout.FOOTER_HEIGHT = FOOTER_HEIGHT
+
+function Layout.DefaultColor(role, mode)
+	local lookRole = LOOK_ROLES[role]
+	return lookRole and Theme.window[mode][lookRole] or Theme.palettes[mode][role]
 end
 
 local function TrackNavFrame(window, navFrame)
@@ -40,41 +48,48 @@ local function ClearNav(window)
 	Widget.NavResetPill(window.sidebar)
 end
 
+local function NavGroups(navConfig)
+	local groups, placed, indexOf = {}, {}, {}
+	for index, pageID in ipairs(navConfig.pageOrder) do indexOf[pageID] = index end
+	local function Item(pageID)
+		local page = navConfig.pages[pageID]
+		placed[pageID] = true
+		return { id = pageID, index = indexOf[pageID], label = Widget.StripColorCodes(page.buttonText or page.title or pageID), icon = page.icon, count = page.count, disabled = page.disabled }
+	end
+	for _, section in ipairs(navConfig.sections or {}) do
+		local items = {}
+		for _, pageID in ipairs(section.ids) do
+			local page = navConfig.pages[pageID]
+			if page and indexOf[pageID] and not page.hidden then items[#items + 1] = Item(pageID) end
+		end
+		if #items > 0 then groups[#groups + 1] = { title = Widget.StripColorCodes(section.header), items = items } end
+	end
+	local rest = {}
+	for _, pageID in ipairs(navConfig.pageOrder) do
+		if not placed[pageID] and not navConfig.pages[pageID].hidden then rest[#rest + 1] = Item(pageID) end
+	end
+	if #rest > 0 then groups[#groups + 1] = { items = rest } end
+	return groups
+end
+
 local function BuildChipRail(window, navConfig)
 	local rail = window.sidebar
-	local pages = navConfig.pages
-	local pageOrder = navConfig.pageOrder
-	local showPage = navConfig.showPage
-	local indexOf, placed, buttons = {}, {}, {}
+	local buttons = {}
 	local y = -NAV_TOP
-
-	for index, pageID in ipairs(pageOrder) do indexOf[pageID] = index end
-
-	local function PlaceChip(pageID, pageIndex)
-		local pageConfig = pages[pageID]
-		local label = Widget.StripColorCodes(pageConfig.buttonText or pageConfig.title or pageID)
-		local chip = TrackNavFrame(window, Widget.NavChip(rail, label, function() showPage(pageIndex) end))
-		if pageConfig.disabled then Widget.NavChipDisable(chip) end
-		chip:SetPoint('TOPLEFT', Widget.NAV_CHIP_X, y)
-		chip.pageIndex = pageIndex
-		buttons[pageIndex] = chip
-		placed[pageID] = true
-		y = y - NAV_PITCH
-	end
-
-	for _, section in ipairs(navConfig.sections or {}) do
-		TrackNavFrame(window, Widget.NavHeader(rail, Widget.StripColorCodes(section.header), y))
-		y = y - Widget.NAV_HEADER_HEIGHT
-		for _, pageID in ipairs(section.ids) do
-			if pages[pageID] and indexOf[pageID] then PlaceChip(pageID, indexOf[pageID]) end
+	for groupIndex, group in ipairs(NavGroups(navConfig)) do
+		if groupIndex > 1 then y = y - NAV_SECTION_GAP end
+		if group.title then
+			TrackNavFrame(window, Widget.NavHeader(rail, group.title, y))
+			y = y - Widget.NAV_HEADER_HEIGHT
 		end
-		y = y - NAV_SECTION_GAP
+		for _, item in ipairs(group.items) do
+			local chip = TrackNavFrame(window, Widget.NavChip(rail, item.label, function() navConfig.showPage(item.index) end))
+			if item.disabled then Widget.NavChipDisable(chip) end
+			chip:SetPoint('TOPLEFT', Widget.NAV_CHIP_X, y)
+			buttons[item.index] = chip
+			y = y - NAV_PITCH
+		end
 	end
-
-	for index, pageID in ipairs(pageOrder) do
-		if not placed[pageID] and not pages[pageID].hidden then PlaceChip(pageID, index) end
-	end
-
 	return buttons, 16 - y
 end
 
@@ -187,19 +202,9 @@ function Layout.WindowFrame(config)
 	resize:SetScript('OnLeave', RepaintGrip)
 	RepaintGrip()
 
-	local customBorder
-	local function PaintBorder(red, green, blue)
-		if customBorder then
-			Widget.SetRectColor(borderEdges, customBorder[1], customBorder[2], customBorder[3], customBorder[4])
-		else
-			Widget.SetRectColor(borderEdges, red * BORDER_ACCENT_SCALE, green * BORDER_ACCENT_SCALE, blue * BORDER_ACCENT_SCALE, 1)
-		end
-	end
-
-	function window:PaintFrame(background, border)
-		customBorder = border
-		Paint(backgroundTexture, background)
-		PaintBorder(Theme.GetAccent())
+	function window:PaintFrame(background, border, gradient)
+		Widget.PaintGradient(backgroundTexture, gradient and gradient.orientation or 'HORIZONTAL', background, gradient or background)
+		Widget.SetRectColor(borderEdges, border[1], border[2], border[3], border[4])
 	end
 
 	function window:GetBorderColor()
@@ -214,13 +219,32 @@ function Layout.WindowFrame(config)
 		return theme.mode or 'dark'
 	end
 
+	function window:Override(role, mode)
+		local overrides = theme[mode or self:GetMode()]
+		return overrides and overrides[role]
+	end
+
+	function window:Gradient(mode)
+		return self:Override('pageGradient', mode)
+	end
+
+	function window:ChromeColor(role, mode)
+		if role == 'edge' and theme.edgeAccent ~= false and not self:Override('edge', mode) then
+			local red, green, blue = Theme.GetAccent()
+			return { red * BORDER_ACCENT_SCALE, green * BORDER_ACCENT_SCALE, blue * BORDER_ACCENT_SCALE, 1 }
+		end
+	end
+
 	function window:Color(role, mode)
 		if role == 'accent' then return Theme.GetAccent() end
 		if role == 'onAccent' then return Theme.ReadableOn(Theme.GetAccent()) end
 		mode = mode or self:GetMode()
-		local overrides = theme[mode]
-		local color = self.ChromeColor and self:ChromeColor(role, theme, mode) or overrides and overrides[role] or Theme.palettes[mode][role]
+		local color = self:ChromeColor(role, mode) or self:Override(role, mode) or Layout.DefaultColor(role, mode)
 		return color[1], color[2], color[3], color[4] or 1
+	end
+
+	function window:PaintChrome()
+		self:PaintFrame({ self:Color('page') }, { self:Color('edge') }, self:Gradient())
 	end
 
 	local function Apply(region, role)
@@ -266,7 +290,7 @@ function Layout.WindowFrame(config)
 		for region, role in pairs(roles) do
 			if Attached(region) then Apply(region, role) else roles[region] = nil end
 		end
-		self:PaintChrome(theme)
+		self:PaintChrome()
 	end
 	Theme.RegisterAccentElement(frame, function() window:Repaint() end)
 
@@ -297,28 +321,15 @@ function Layout.WindowFrame(config)
 	return window
 end
 
-function Layout.Window(config)
-	local sidebarWidth = config.sidebarWidth or RAIL_WIDTH
-	local chromeWidth, chromeHeight = sidebarWidth + 2, TOPBAR_HEIGHT + FOOTER_RESERVED + 2
-	local footerConfig = config.footerButtons or {}
-	local window = Layout.WindowFrame(config)
-	local frame = window.frame
+function Layout.TitleBar(window, config)
+	local bar = CreateFrame('Frame', nil, window.frame)
+	bar:SetPoint('TOPLEFT', 1, -1)
+	bar:SetPoint('TOPRIGHT', -1, -1)
+	bar:SetHeight(TOPBAR_HEIGHT)
+	window:DragWith(bar)
+	window:Fill(bar, 'bar'):SetAllPoints()
 
-	function window:SetContentMinSize(width, height)
-		self:SetMinimum('content', width + chromeWidth, height + chromeHeight)
-	end
-
-	local topbar = CreateFrame('Frame', nil, frame)
-	topbar:SetPoint('TOPLEFT', 1, -1)
-	topbar:SetPoint('TOPRIGHT', -1, -1)
-	topbar:SetHeight(TOPBAR_HEIGHT)
-	window:DragWith(topbar)
-
-	local titleBarTexture = topbar:CreateTexture(nil, 'BACKGROUND')
-	titleBarTexture:SetAllPoints()
-	titleBarTexture:SetTexture(Widget.WHITE)
-
-	local portrait = topbar:CreateTexture(nil, 'ARTWORK', nil, 2)
+	local portrait = bar:CreateTexture(nil, 'ARTWORK', nil, 2)
 	portrait:SetSize(PORTRAIT_SIZE, PORTRAIT_SIZE)
 	portrait:SetPoint('LEFT', 16, 0)
 	if config.icon then
@@ -328,47 +339,70 @@ function Layout.Window(config)
 	end
 	portrait:SetMask(BUILib.GetLibMedia('circle_mask'))
 
-	local brand = topbar:CreateFontString(nil, 'OVERLAY')
-	brand:SetFont(BUILib.Font, 15, 'OUTLINE')
-	brand:SetText(Widget.StripColorCodes(config.title or 'BUILib'))
+	local brand = window:Text(bar, Widget.StripColorCodes(config.title or 'BUILib'), BRAND_SIZE, 'barText')
+	brand:SetPoint('LEFT', portrait, 'RIGHT', 12, 0)
 
-	if not config.titleSuffix then
-		brand:SetPoint('LEFT', portrait, 'RIGHT', 12, 0)
-	else
-		brand:SetPoint('BOTTOMLEFT', portrait, 'RIGHT', 12, -3)
-		local suffix = topbar:CreateFontString(nil, 'OVERLAY')
-		suffix:SetFont(BUILib.Font, 11, '')
-		suffix:SetPoint('TOPLEFT', brand, 'BOTTOMLEFT', 0, 3)
-		suffix:SetText(config.titleSuffix)
-		suffix:SetTextColor(Theme.GetAccent())
-		Theme.RegisterAccentElement(suffix, function(element, red, green, blue) element:SetTextColor(red, green, blue, 1) end)
-	end
-
-	local closeButton = Controls.Icon(topbar, {
+	local close = Controls.Icon(bar, {
 		size = 14, texture = BUILib.GetLibMedia('x'), tooltip = 'Close',
-		onClick = function() frame:Hide() end,
+		onClick = function() window.frame:Hide() end,
 	})
-	closeButton:SetPoint('RIGHT', -16, 0)
+	close:SetPoint('RIGHT', -16, 0)
+	window:Bind(Widget.Unwrap(close), function() close:SetIdleColor(window:Color('barIcon')) end)
+
+	return { frame = bar, close = close }
+end
+
+function Layout.ReservePage(window, pageWidth, sidebarWidth, footerHeight)
+	window:SetMinimum('page', pageWidth + PAGE_MARGIN + sidebarWidth, TOPBAR_HEIGHT + footerHeight + PAGE_MIN_HEIGHT)
+end
+
+function Layout.SidebarRail(window, sidebar, sidebarWidth, navConfig)
+	local rail = Layout.Rail(window, sidebar, sidebarWidth - NAV_RAIL_INSET * 2, {
+		groups = NavGroups(navConfig),
+		onSelect = function(item) navConfig.showPage(item.index) end,
+	})
+	rail.frame:SetPoint('TOPLEFT', NAV_RAIL_INSET, -NAV_TOP)
+	TrackNavFrame(window, rail.frame)
+	local buttons = {}
+	for _, entry in ipairs(rail.entries) do
+		function entry.button:SetSelected(isSelected)
+			if isSelected then rail:Select(entry.item.id) end
+		end
+		buttons[entry.item.index] = entry.button
+	end
+	return buttons, rail.height + NAV_TOP
+end
+
+function Layout.Window(config)
+	local sidebarWidth = config.sidebarWidth or RAIL_WIDTH
+	local chromeWidth, chromeHeight = sidebarWidth + 2, TOPBAR_HEIGHT + FOOTER_HEIGHT + 2
+	local footerConfig = config.footerButtons or {}
+	local window = Layout.WindowFrame(config)
+	local frame = window.frame
+
+	function window:SetContentMinSize(width, height)
+		self:SetMinimum('content', width + chromeWidth, height + chromeHeight)
+	end
+	if config.pageWidth then Layout.ReservePage(window, config.pageWidth, sidebarWidth, FOOTER_HEIGHT) end
+
+	local titleBar = Layout.TitleBar(window, config)
+	local topbar = titleBar.frame
 
 	local rail = CreateFrame('Frame', nil, frame)
 	rail:SetPoint('TOPLEFT', 1, -TOPBAR_HEIGHT - 1)
 	rail:SetPoint('BOTTOMLEFT', 1, 1)
 	rail:SetWidth(sidebarWidth)
 	window.sidebar = rail
+	window:Fill(rail, 'sidebar'):SetAllPoints()
 
-	local sidebarTexture = rail:CreateTexture(nil, 'BACKGROUND')
-	sidebarTexture:SetAllPoints()
-	sidebarTexture:SetTexture(Widget.WHITE)
-
-	local divider = rail:CreateTexture(nil, 'OVERLAY')
-	divider:SetTexture(Widget.WHITE)
+	local divider = window:Fill(rail, 'sidebarEdge', 'OVERLAY')
 	divider:SetWidth(1)
 	divider:SetPoint('TOPRIGHT')
 	divider:SetPoint('BOTTOMRIGHT', 0, 50)
 
 	local content = CreateFrame('Frame', nil, frame)
 	content:SetPoint('TOPLEFT', rail, 'TOPRIGHT', 0, 0)
-	content:SetPoint('BOTTOMRIGHT', -1, FOOTER_PADDING + BUILib.ROW_HEIGHT + 2)
+	content:SetPoint('BOTTOMRIGHT', -1, FOOTER_HEIGHT + 1)
 	window.content = content
 
 	if config.searchBox then
@@ -377,7 +411,7 @@ function Layout.Window(config)
 		searchBox:ClearAllPoints()
 		searchBox:SetPoint('LEFT', topbar, 'LEFT', sidebarWidth + 16, 0)
 		if not searchConfig.width then
-			searchBox:SetPoint('RIGHT', closeButton, 'LEFT', -16, 0)
+			searchBox:SetPoint('RIGHT', titleBar.close, 'LEFT', -16, 0)
 		end
 		local container = searchBox.frame
 		if searchConfig.onSubmit then
@@ -419,30 +453,11 @@ function Layout.Window(config)
 	versionLabel:SetPoint('BOTTOMLEFT', 18, 14)
 	versionLabel:SetText('v' .. (config.version or '1.0'))
 
-	local function Override(theme, mode, role)
-		local overrides = theme[mode]
-		return overrides and overrides[role]
-	end
-
-	function window:ChromeColor(role, theme, mode)
-		if role == 'page' then return Override(theme, mode, 'page') or Theme.window[mode].background end
-		if role == 'edge' and not Override(theme, mode, 'edge') then
-			local red, green, blue = Theme.GetAccent()
-			return { red * BORDER_ACCENT_SCALE, green * BORDER_ACCENT_SCALE, blue * BORDER_ACCENT_SCALE, 1 }
-		end
-	end
-
-	function window:PaintChrome(theme)
-		local mode = self:GetMode()
-		local look = Theme.window[mode]
-		self:PaintFrame({ self:Color('page') }, Override(theme, mode, 'edge'))
-		Paint(titleBarTexture, Override(theme, mode, 'bar') or look.titleBar)
-		Paint(sidebarTexture, Override(theme, mode, 'sidebar') or look.sidebar)
-		Paint(divider, Override(theme, mode, 'sidebarEdge') or look.divider)
-		brand:SetFont(BUILib.Font, 15, look.outline and 'OUTLINE' or '')
-		brand:SetTextColor(unpack(look.text))
+	local PaintFrameChrome = window.PaintChrome
+	function window:PaintChrome()
+		PaintFrameChrome(self)
+		local look = Theme.window[self:GetMode()]
 		versionLabel:SetTextColor(unpack(look.faint))
-		closeButton:SetIdleColor(unpack(look.icon))
 		Widget.NavSetColors(rail, look.nav)
 	end
 
@@ -450,15 +465,11 @@ function Layout.Window(config)
 		ClearNav(self)
 		local buttons, navHeight
 		if config.navStyle == 'rail' then
-			local navRail
-			navRail, buttons = Layout.NavRail(self, rail, sidebarWidth - NAV_RAIL_INSET * 2, navConfig)
-			navRail.frame:SetPoint('TOPLEFT', NAV_RAIL_INSET, -NAV_TOP)
-			TrackNavFrame(self, navRail.frame)
-			navHeight = navRail.height + NAV_TOP
+			buttons, navHeight = Layout.SidebarRail(self, rail, sidebarWidth, navConfig)
 		else
 			buttons, navHeight = BuildChipRail(self, navConfig)
 		end
-		self:SetMinimum('nav', 0, navHeight + TOPBAR_HEIGHT + FOOTER_RESERVED)
+		self:SetMinimum('nav', 0, navHeight + TOPBAR_HEIGHT + FOOTER_HEIGHT)
 		return buttons
 	end
 
