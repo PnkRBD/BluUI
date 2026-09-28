@@ -77,13 +77,13 @@ end
 local function ApplyAccent()
 	BUILib.Colors.RefreshAccent()
 	BUI.PageEngine.MarkPagesStale()
-	Window():Repaint()
 end
 
 local function SetAccent(red, green, blue)
 	local general = General()
+	local color = general.themeColor
 	general.useClassColorTheme = false
-	general.themeColor = { red, green, blue, 1 }
+	color[1], color[2], color[3], color[4] = red, green, blue, 1
 	ApplyAccent()
 end
 
