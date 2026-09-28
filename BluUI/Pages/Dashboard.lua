@@ -2018,6 +2018,7 @@ end
 BUI.PageEngine.RegisterPage("dashboard", {
     title = "Dashboard",
     buttonText = "Dashboard",
+    icon = 'dashboard',
     minContentWidth  = DASHBOARD_MIN_WIDTH,
     minContentHeight = DASHBOARD_MIN_HEIGHT,
     OnBuild = function(pageFrame) BuildDashboard(pageFrame) end,
