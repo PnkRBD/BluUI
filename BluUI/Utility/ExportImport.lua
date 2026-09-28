@@ -418,6 +418,7 @@ local function CleanTheme(source)
         end
     end
     if source.edgeAccent == false then theme.edgeAccent = false end
+    if source.separators == "solid" then theme.separators = "solid" end
     return theme
 end
 

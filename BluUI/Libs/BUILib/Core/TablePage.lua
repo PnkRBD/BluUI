@@ -500,10 +500,17 @@ function Layout.TableKit(window)
 
 	function kit.DottedRule(parent, role, layer, subLayer)
 		local rule = parent:CreateTexture(nil, layer or 'ARTWORK', nil, subLayer or 0)
-		rule:SetTexture(BUILib.GetLibMedia('dots'), 'REPEAT', 'REPEAT', 'NEAREST')
-		rule:SetHorizTile(true)
 		rule:SetHeight(1)
-		return window:Paint(rule, role or 'dots')
+		return window:Bind(rule, function(region)
+			if window:Separators() == 'solid' then
+				region:SetTexture(Widget.WHITE)
+				region:SetHorizTile(false)
+			else
+				region:SetTexture(BUILib.GetLibMedia('dots'), 'REPEAT', 'REPEAT', 'NEAREST')
+				region:SetHorizTile(true)
+			end
+			region:SetVertexColor(window:Color(role or 'dots'))
+		end)
 	end
 
 	function kit.Section(parent, width, spec)

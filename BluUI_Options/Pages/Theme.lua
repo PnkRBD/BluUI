@@ -34,6 +34,7 @@ local COLOR_SECTIONS = {
 	{
 		title = 'Surfaces',
 		description = 'The page, the sidebar, the panels and cards that hold content, and the lines between rows and sections.',
+		separators = true,
 		roles = {
 			{ role = 'page', name = 'Page', sub = 'Behind everything in the window', opacity = true },
 			{ role = 'sidebar', name = 'Sidebar', sub = 'Behind the page list' },
@@ -486,6 +487,46 @@ local function SavedSection(ui, parent, width, page)
 	return section
 end
 
+local SEPARATORS = {
+	{ value = 'dotted', text = 'Dotted' },
+	{ value = 'solid', text = 'Solid' },
+}
+
+local function SeparatorName(value)
+	for _, entry in ipairs(SEPARATORS) do
+		if entry.value == value then return entry.text end
+	end
+end
+
+local function SetSeparators(value)
+	Store().separators = value ~= 'dotted' and value or nil
+	Touch()
+end
+
+local function SeparatorRow(ui, section)
+	local row = section:AddRow('Separators dotted solid lines')
+	ui.IconAvatar(row, SWATCH_SIZE, 'more'):SetPoint('LEFT', ui.AVATAR_X, 0)
+	ui.RowTitle(row, 'Separators', 'The lines under headers, tabs and sections', ui.NAME_X)
+	local value = ui.Cell(row, '', SECOND_COLUMN)
+	local reset = ui.IconButton(row, 'reset', 'Back to dotted', function() SetSeparators('dotted') end)
+	reset:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
+	local dropdown = ui.Dropdown(row, DROPDOWN_WIDTH, function()
+		local current = Window():Separators()
+		local items = {}
+		for _, entry in ipairs(SEPARATORS) do
+			items[#items + 1] = { text = entry.text, checked = entry.value == current, callback = function() SetSeparators(entry.value) end }
+		end
+		return items
+	end)
+	dropdown:SetPoint('RIGHT', reset, 'LEFT', -10, 0)
+	ui.Bind(row, function()
+		local current = Window():Separators()
+		value:SetText(SeparatorName(current))
+		dropdown.label:SetText(SeparatorName(current))
+		reset:SetActive(current ~= 'dotted')
+	end)
+end
+
 local function OpacityRow(ui, section)
 	local row = section:AddRow('Opacity see through')
 	ui.IconAvatar(row, SWATCH_SIZE, 'eye'):SetPoint('LEFT', ui.AVATAR_X, 0)
@@ -569,6 +610,7 @@ local function ThemeSections(ui, _, parent, width, page)
 			ColorRow(ui, section, entry)
 			if entry.opacity then OpacityRow(ui, section) end
 		end
+		if spec.separators then SeparatorRow(ui, section) end
 		sections[#sections + 1] = section
 	end
 	return sections

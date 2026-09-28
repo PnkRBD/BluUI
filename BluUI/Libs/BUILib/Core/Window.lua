@@ -222,6 +222,10 @@ function Layout.WindowFrame(config)
 		return theme.mode or 'dark'
 	end
 
+	function window:Separators()
+		return theme.separators or 'dotted'
+	end
+
 	function window:Override(role, mode)
 		local overrides = theme[mode or self:GetMode()]
 		return overrides and overrides[role]
