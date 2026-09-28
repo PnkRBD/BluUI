@@ -33,12 +33,14 @@ local FONT_ROLES = {
 local COLOR_SECTIONS = {
 	{
 		title = 'Surfaces',
-		description = 'The page, the sidebar, the panels that hold each table, and the lines between rows and sections.',
+		description = 'The page, the sidebar, the panels and cards that hold content, and the lines between rows and sections.',
 		roles = {
 			{ role = 'page', name = 'Page', sub = 'Behind everything in the window', opacity = true },
 			{ role = 'sidebar', name = 'Sidebar', sub = 'Behind the page list' },
 			{ role = 'sidebarEdge', name = 'Sidebar edge', sub = 'The line beside the page list' },
 			{ role = 'panel', name = 'Panels', sub = 'Tables and grouped settings' },
+			{ role = 'card', name = 'Cards', sub = 'Dashboard, help and profile cards' },
+			{ role = 'cardEdge', name = 'Card outline', sub = 'The thin line around each card' },
 			{ role = 'rule', name = 'Lines', sub = 'Between rows and beside the rail' },
 			{ role = 'dots', name = 'Dots', sub = 'Under headers, tabs and sections' },
 			{ role = 'input', name = 'Inputs', sub = 'The search field' },

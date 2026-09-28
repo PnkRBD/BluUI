@@ -290,7 +290,7 @@ Layout.CardKitExtensions[#Layout.CardKitExtensions + 1] = function(cards, kit, w
 			local rowY = 46 + (index - 1) * CHECK_ROW
 			local ring = kit.Disc(card, 16, 'rule')
 			ring:SetPoint('TOPLEFT', PAD, -rowY)
-			local hole = kit.Disc(card, 12, 'panel', 'ARTWORK', 1)
+			local hole = kit.Disc(card, 12, 'card', 'ARTWORK', 1)
 			hole:SetPoint('CENTER', ring)
 			local tick = kit.Glyph(card, 'check', 10, 'onAccent', 'OVERLAY')
 			tick:SetPoint('CENTER', ring)
@@ -419,7 +419,7 @@ Layout.CardKitExtensions[#Layout.CardKitExtensions + 1] = function(cards, kit, w
 			holder:SetSize(PORTRAIT + 4, PORTRAIT + 4)
 			holder:SetPoint('TOPLEFT', PAD - 2 + (index - 1) * PORTRAIT_STEP, -48)
 			holder:SetFrameLevel(card:GetFrameLevel() + max - index + 1)
-			kit.Disc(holder, PORTRAIT + 4, 'panel'):SetPoint('CENTER')
+			kit.Disc(holder, PORTRAIT + 4, 'card'):SetPoint('CENTER')
 			local portrait = holder:CreateTexture(nil, 'ARTWORK', nil, 1)
 			portrait:SetSize(PORTRAIT, PORTRAIT)
 			portrait:SetPoint('CENTER')
