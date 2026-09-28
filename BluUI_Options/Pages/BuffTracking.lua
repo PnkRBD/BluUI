@@ -445,6 +445,18 @@ BUI.PageEngine.RegisterPage("buffTracking", {
         pageFrame._page = page
         local tab = page:GetTab(1)
 
+        local enable
+        enable = Layout.ModuleHeader(tab, {
+            icon = BUI.C.ICON_PATH,
+            title = 'Buff Tracking',
+            subtitle = 'Trackers for buffs you want to keep up. Turning the module on or off needs a reload.',
+            iconToggles = true,
+            enabled = BUI.IsModuleEnabled('buffTracking'),
+            onToggle = function(value)
+                BUI.ModulesPage.ConfirmReload('buffTracking', value, function() enable:SetValue(not value) end)
+            end,
+        })
+
         if isBeastMastery then
             Layout.Section(tab, 'Pack Leader')
             PackLeaderRow(tab)

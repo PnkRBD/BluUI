@@ -35,6 +35,8 @@ local SLIDER_STEP = 24
 local SLIDER_BOX = 52
 local STEP_SIGN = 12
 local TOGGLE_SIZE = 22
+local TOGGLE_GAP = 14
+local TOGGLE_INSET = 20
 local BUTTON_STYLES = {
 	primary = { fill = 'accent', text = 'onAccent', solid = true },
 	control = { fill = 'control', text = 'controlText', solid = true },
@@ -453,12 +455,31 @@ function Layout.TableKit(window)
 		return box
 	end
 
-	function kit.Header(parent, icon, title, placeholder, onSearch)
+	function kit.Toggle(parent, spec)
+		local toggle = Widget.Unwrap(Controls.IconToggle(parent, spec.get(), spec.set, { texture = BUILib.GetLibMedia(spec.icon), tooltip = spec.tooltip, size = TOGGLE_SIZE }))
+		window:Bind(toggle, function() toggle:SetValue(spec.get()) end)
+		return toggle
+	end
+
+	function kit.Header(parent, icon, title, placeholder, onSearch, toggles)
 		local badge = kit.Disc(parent, 30, 'text')
 		badge:SetPoint('TOPLEFT', 0, -2)
 		kit.Glyph(parent, icon, 14, 'page', 'OVERLAY'):SetPoint('CENTER', badge)
 		kit.Text(parent, title, 22, 'text'):SetPoint('LEFT', badge, 'RIGHT', 12, 0)
-		if onSearch then kit.Search(parent, placeholder, onSearch):SetPoint('TOPRIGHT') end
+		local search = onSearch and kit.Search(parent, placeholder, onSearch)
+		if search then search:SetPoint('TOPRIGHT') end
+		if toggles then
+			local anchor, gap = search, TOGGLE_INSET
+			for index = #toggles, 1, -1 do
+				local toggle = kit.Toggle(parent, toggles[index])
+				if anchor then
+					toggle:SetPoint('RIGHT', anchor, 'LEFT', -gap, 0)
+				else
+					toggle:SetPoint('TOPRIGHT', 0, -(SEARCH_HEIGHT - TOGGLE_SIZE) / 2)
+				end
+				anchor, gap = toggle, TOGGLE_GAP
+			end
+		end
 		return SEARCH_HEIGHT
 	end
 
@@ -525,14 +546,7 @@ function Layout.TableKit(window)
 		title:SetPoint('TOPLEFT', 0, -(pad + 2))
 
 		for _, buttonSpec in ipairs(spec.buttons or {}) do
-			local control
-			if buttonSpec.toggle then
-				control = Widget.Unwrap(Controls.IconToggle(frame, buttonSpec.get(), buttonSpec.set, { texture = BUILib.GetLibMedia(buttonSpec.icon), tooltip = buttonSpec.tooltip, size = TOGGLE_SIZE }))
-				window:Bind(control, function() control:SetValue(buttonSpec.get()) end)
-			else
-				control = kit.Button(frame, buttonSpec.text, buttonSpec.style, buttonSpec.onClick, buttonSpec.icon)
-			end
-			section.buttons[#section.buttons + 1] = control
+			section.buttons[#section.buttons + 1] = kit.Button(frame, buttonSpec.text, buttonSpec.style, buttonSpec.onClick, buttonSpec.icon)
 		end
 		if stacked then
 			for index = #section.buttons - 1, 1, -1 do
@@ -625,7 +639,7 @@ function Layout.PinnedHead(tab, window, kit, spec, block, onSearch)
 	local head = CreateFrame('Frame', nil, tab.pinned)
 	head:SetPoint('TOPLEFT')
 	head:SetSize(tab.width, 1)
-	local top = kit.Header(head, spec.icon, spec.title, spec.placeholder, onSearch) + HEADER_GAP
+	local top = kit.Header(head, spec.icon, spec.title, spec.placeholder, onSearch, spec.toggles) + HEADER_GAP
 	local rule = kit.DottedRule(head)
 	rule:SetPoint('TOPLEFT', 0, -top)
 	rule:SetPoint('TOPRIGHT', 0, -top)

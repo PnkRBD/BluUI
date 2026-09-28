@@ -1,6 +1,6 @@
 local BUI = BluUI
 local BUILib = BUI.BUILibClient
-local Toast = BUILib.Toast
+local Modals, Toast = BUILib.Modals, BUILib.Toast
 
 local STATUS_COLUMN = 344
 local NAME_WIDTH = 260
@@ -20,7 +20,7 @@ local MODULES = {
 	{ key = 'datatext', name = 'Datatext', sub = 'Datatext bars and the minimap stats', icon = 'report2' },
 	{ key = 'customBars', name = 'Custom Bars', sub = 'Your own bars for spells and items', icon = 'capsule' },
 	{ key = 'cursor', name = 'Cursor', sub = 'Cursor ring and trail', icon = 'mover' },
-	{ key = 'markers', name = 'Markers', sub = 'Raid and world markers', icon = 'add' },
+	{ key = 'markers', name = 'Markers', sub = 'Raid and world markers', icon = 'markers' },
 	{ key = 'streamerTools', name = 'Streamer Tools', sub = 'Overlays for streaming, like the GCD history', icon = 'eye' },
 	{ key = 'gemCounter', name = 'Gem Manager', sub = 'Keeps count of your gems', icon = 'check' },
 }
@@ -55,6 +55,25 @@ local function Apply(entries, enabled)
 	end
 	Window():Repaint()
 	if needsReload then Toast.Warning('Reload needed', 'Some modules only change after a /reload', ToastOptions()) end
+end
+
+local function ConfirmReload(key, enabled, revert)
+	Modals.Confirm({
+		parent = Window().frame,
+		title = 'Reload required',
+		message = enabled and 'Turning this module on needs a UI reload.' or 'Turning this module off needs a UI reload to put everything back.',
+		confirmText = 'Reload now', cancelText = 'Cancel', laterText = 'Later',
+		onConfirm = function()
+			BUI.SetModuleEnabled(key, enabled)
+			ReloadUI()
+		end,
+		onLater = function()
+			BUI.SetModuleEnabled(key, enabled)
+			pending[key] = enabled ~= booted[key] or nil
+			Window():Repaint()
+		end,
+		onCancel = revert,
+	})
 end
 
 local function StatusText(entry)
@@ -95,4 +114,4 @@ local function Sections(ui, _, parent, width)
 	return { section }
 end
 
-BUI.ModulesPage = { Sections = Sections }
+BUI.ModulesPage = { Sections = Sections, ConfirmReload = ConfirmReload }
