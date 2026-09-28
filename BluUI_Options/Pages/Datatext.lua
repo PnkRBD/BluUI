@@ -1,609 +1,561 @@
 local BUI = BluUI
-
-local BUILib = BluUI.BUILibClient
-local Controls = BUILib.Controls
-local Modals = BUILib.Modals
-local Layout = BUILib.Layout
+local BUILib = BUI.BUILibClient
+local Controls, Layout, Modals = BUILib.Controls, BUILib.Layout, BUILib.Modals
+local Datatext = BUI.Datatext
 local Pixel = BUI.Pixel
 
-local floor = math.floor
-local FONT = BUI.C.FONT_PATH
-
-local PageKit = BUILib.PageKit
-local PopRow = PageKit.PopRow
-
-local selectedText, selectedPanel
-local activeKind = 'TEXT'
-
-local function Bars() return BUI.Datatext.GetBars() end
-local function KindOf(bar) return bar.kind == 'PANEL' and 'PANEL' or 'TEXT' end
-
-local function FirstOfKind(kind)
-    for barIndex, bar in ipairs(Bars()) do
-        if KindOf(bar) == kind then return barIndex end
-    end
-end
-
-local function ValidIndex(index, kind)
-    local list = Bars()
-    if index and list[index] and KindOf(list[index]) == kind then return index end
-    return FirstOfKind(kind)
-end
-
-local function CurText()
-    selectedText = ValidIndex(selectedText, 'TEXT')
-    return selectedText and Bars()[selectedText]
-end
-
-local function CurPanel()
-    selectedPanel = ValidIndex(selectedPanel, 'PANEL')
-    return selectedPanel and Bars()[selectedPanel]
-end
-
-local function ActiveCur()
-    if activeKind == 'PANEL' then return CurPanel() end
-    return CurText()
-end
-
-local ANCHOR_POINTS = BUI.C.ANCHOR_POINT_OPTIONS_SHORT
-local STRATA_ITEMS = BUI.C.STRATA_OPTIONS
+local PAGE_WIDTH = 960
+local PREVIEW_HEIGHT = 180
+local STAGE_INSET = 12
+local PANEL_PREVIEW = 150
+local SLIDER_WIDTH = 220
+local DROPDOWN_WIDTH = 200
+local INPUT_WIDTH = 220
+local SWATCH_SIZE = 28
+local SWATCH_ROOM = 60
+local SWITCH_WIDTH = 40
+local ARROW = 22
+local ARROW_GAP = 4
+local ORDER_ROOM = SWITCH_WIDTH + 12 + ARROW * 2 + ARROW_GAP
 
 local ORIENTATIONS = {
-    { value = 'HORIZONTAL', text = 'Horizontal' },
-    { value = 'VERTICAL',   text = 'Vertical'   },
+	{ value = 'HORIZONTAL', text = 'Horizontal' },
+	{ value = 'VERTICAL', text = 'Vertical' },
 }
 
 local ALIGNMENTS = {
-    { value = 'LEFT',   text = 'Left'   },
-    { value = 'CENTER', text = 'Center' },
-    { value = 'RIGHT',  text = 'Right'  },
-    { value = 'SPREAD', text = 'Spread Evenly' },
+	{ value = 'LEFT', text = 'Left' },
+	{ value = 'CENTER', text = 'Center' },
+	{ value = 'RIGHT', text = 'Right' },
+	{ value = 'SPREAD', text = 'Spread evenly' },
 }
 
-local previewLayout = { textLeft = {}, textWidth = {}, hitLeft = {}, hitWidth = {}, lineTop = {} }
+local selectedText, selectedPanel
+local activeKind = 'TEXT'
+local preview
+local items = {}
 
-local function BuildSampleParts(cfg)
-    return BUI.Datatext.BuildSampleParts(cfg)
+local function Window()
+	return BUI.PageEngine.window
 end
 
-local function BuildDatatextPreview(parent, width, height)
-    local card, stage = BUILib.PageKit.PreviewStage(parent, { inset = Pixel.Scale(14) })
+local function Repaint()
+	Window():Repaint()
+end
 
-    local textFontString = stage:CreateFontString(nil, 'OVERLAY')
-    Pixel.ApplyFont(textFontString, 12, FONT, '')
-    textFontString:SetPoint('CENTER')
-    textFontString:SetJustifyH('CENTER')
+local function Bars()
+	return Datatext.GetBars()
+end
 
-    local panelTexture = stage:CreateTexture(nil, 'ARTWORK')
-    panelTexture:Hide()
+local function KindOf(bar)
+	return bar.kind == 'PANEL' and 'PANEL' or 'TEXT'
+end
 
-    local panelTitleFontString = stage:CreateFontString(nil, 'OVERLAY')
-    Pixel.ApplyFont(panelTitleFontString, 12, FONT, '')
-    panelTitleFontString:Hide()
+local function FirstOfKind(kind)
+	for barIndex, bar in ipairs(Bars()) do
+		if KindOf(bar) == kind then return barIndex end
+	end
+end
 
-    local cells = {}
+local function ValidIndex(index, kind)
+	local list = Bars()
+	if index and list[index] and KindOf(list[index]) == kind then return index end
+	return FirstOfKind(kind)
+end
 
-    local function HideAll()
-        textFontString:Hide()
-        panelTexture:Hide()
-        panelTitleFontString:Hide()
-        for cellIndex = 1, #cells do cells[cellIndex]:Hide() end
-    end
+local function CurText()
+	selectedText = ValidIndex(selectedText, 'TEXT')
+	return selectedText and Bars()[selectedText]
+end
 
-    function card:UpdatePreview()
-        HideAll()
+local function CurPanel()
+	selectedPanel = ValidIndex(selectedPanel, 'PANEL')
+	return selectedPanel and Bars()[selectedPanel]
+end
 
-        if activeKind == 'PANEL' then
-            local cfg = CurPanel()
-            if not cfg then
-                textFontString:SetText('|cff555555(no panels yet)|r'); textFontString:Show()
-                return
-            end
-            local backgroundColor = cfg.bgColor
-            local panelWidth = cfg.width > 0 and cfg.width or 200
-            local panelHeight = cfg.height > 0 and cfg.height or 100
-            local scale = math.min(1, 180 / math.max(panelWidth, panelHeight, 1))
-            panelTexture:SetColorTexture(backgroundColor.r, backgroundColor.g, backgroundColor.b, math.max(cfg.bgAlpha, 0.15))
-            panelTexture:ClearAllPoints()
-            panelTexture:SetPoint('CENTER', stage, 'CENTER')
-            panelTexture:SetSize(panelWidth * scale, panelHeight * scale)
-            panelTexture:Show()
-            if cfg.title and cfg.title ~= '' then
-                local fontPath = BUI.GetModuleFont(cfg)
-                Pixel.ApplyFont(panelTitleFontString, math.max(8, floor(cfg.titleSize * scale + 0.5)), fontPath, '')
-                panelTitleFontString:SetText(cfg.title)
-                local titleColor = cfg.titleColor
-                panelTitleFontString:SetTextColor(titleColor.r, titleColor.g, titleColor.b)
-                local anchor = cfg.titleAnchor
-                panelTitleFontString:ClearAllPoints()
-                panelTitleFontString:SetPoint(anchor, panelTexture, anchor, cfg.titleX * scale, cfg.titleY * scale)
-                panelTitleFontString:Show()
-            end
-            return
-        end
+local function ActiveCur()
+	if activeKind == 'PANEL' then return CurPanel() end
+	return CurText()
+end
 
-        local cfg = CurText()
-        if not cfg then
-            textFontString:SetText('|cff555555(no bars yet)|r'); textFontString:Show()
-            return
-        end
-        local fontPath = BUI.GetModuleFont(cfg)
-        Pixel.ApplyFont(textFontString, cfg.fontSize, fontPath, '')
+local function ActiveIndex()
+	if activeKind == 'PANEL' then return selectedPanel end
+	return selectedText
+end
 
-        local parts = BuildSampleParts(cfg)
-        local partCount = #parts
-        if partCount == 0 then
-            textFontString:SetText('|cff555555(no modules enabled)|r'); textFontString:Show()
-            return
-        end
+local function ActiveID()
+	local current = ActiveCur()
+	if not current then return 'general' end
+	return (activeKind == 'PANEL' and 'panel' or 'bar') .. ActiveIndex()
+end
 
-        local widths = {}
-        for partIndex = 1, partCount do
-            local fontString = cells[partIndex]
-            if not fontString then fontString = stage:CreateFontString(nil, 'OVERLAY'); cells[partIndex] = fontString end
-            Pixel.ApplyFont(fontString, cfg.fontSize, fontPath, '')
-            fontString:SetWordWrap(false)
-            fontString:SetText(parts[partIndex])
-            widths[partIndex] = fontString:GetStringWidth()
-        end
+local function RefreshPreview()
+	if preview then preview:UpdatePreview() end
+end
 
-        local Datatext = BUI.Datatext
-        local LAYOUT = Datatext.LAYOUT
-        local spacing = Pixel.Scale(cfg.spacing or 0)
-        local align = cfg.align or 'LEFT'
-        local fixedWidth = (cfg.width or 0) > 0 and math.min(Pixel.Scale(cfg.width), stage:GetWidth()) or nil
-        if cfg.orientation == 'VERTICAL' then
-            local lineHeight = Pixel.Scale(cfg.fontSize + LAYOUT.lineExtra)
-            local barWidth, barHeight = Datatext.LayoutColumn(widths, partCount, spacing, Pixel.Scale(LAYOUT.columnInset),
-                lineHeight, fixedWidth, nil, previewLayout)
-            local justify = align == 'SPREAD' and 'CENTER' or align
-            for partIndex = 1, partCount do
-                local fontString = cells[partIndex]
-                fontString:ClearAllPoints()
-                fontString:SetPoint('TOPLEFT', stage, 'CENTER', -barWidth / 2 + previewLayout.lineLeft, barHeight / 2 - previewLayout.lineTop[partIndex])
-                fontString:SetSize(previewLayout.lineWidth, lineHeight)
-                fontString:SetJustifyH(justify)
-                fontString:SetJustifyV('MIDDLE')
-                fontString:Show()
-            end
-        else
-            local barWidth = Datatext.LayoutRow(widths, partCount, spacing, Pixel.Scale(LAYOUT.rowInset), fixedWidth, align, 0, previewLayout)
-            for partIndex = 1, partCount do
-                local fontString = cells[partIndex]
-                fontString:ClearAllPoints()
-                fontString:SetPoint('LEFT', stage, 'CENTER', -barWidth / 2 + previewLayout.textLeft[partIndex], 0)
-                fontString:SetWidth(previewLayout.textWidth[partIndex])
-                fontString:SetHeight(0)
-                fontString:SetJustifyH('CENTER')
-                fontString:Show()
-            end
-        end
-    end
+local function Apply()
+	Datatext.Apply()
+	RefreshPreview()
+end
 
-    card:UpdatePreview()
-    return card
+local function RebuildPage()
+	BUILib.Defer(function() BUI.PageEngine.RefreshCurrentPage() end)
+end
+
+local function Named(entries, value)
+	for _, entry in ipairs(entries) do
+		if entry.value == value then return entry.text end
+	end
+	return value
+end
+
+local function Switch(board, label, get, set, tip)
+	board:AddSwitch(label, get, function(value)
+		set(value)
+		Apply()
+	end, tip)
+end
+
+local function Slider(ui, row, minimum, maximum, step, get, set)
+	ui.Slider(row, SLIDER_WIDTH, { min = minimum, max = maximum, step = step, get = get, set = function(value)
+		set(value)
+		Apply()
+	end }):SetPoint('RIGHT', -ui.ROW_INSET, 0)
+end
+
+local function Menu(ui, row, entries, get, set)
+	local dropdown = ui.Dropdown(row, DROPDOWN_WIDTH, function()
+		local current = get()
+		local menu = {}
+		for _, entry in ipairs(entries) do
+			menu[#menu + 1] = { text = entry.text, checked = entry.value == current, callback = function()
+				set(entry.value)
+				Apply()
+				Repaint()
+			end }
+		end
+		return menu
+	end)
+	dropdown:SetPoint('RIGHT', -ui.ROW_INSET, 0)
+	ui.Bind(row, function() dropdown.label:SetText(Named(entries, get())) end)
+end
+
+local function ColorRow(ui, board, name, sub, hasOpacity, get, set)
+	local row = board:AddRow(name, sub, SWATCH_ROOM)
+	local swatch = ui.Swatch(row, SWATCH_SIZE, function(self)
+		local red, green, blue, alpha = get()
+		Controls.OpenColorPicker({
+			r = red, g = green, b = blue, a = alpha, hasOpacity = hasOpacity, anchorTo = self,
+			callback = function(newRed, newGreen, newBlue, newAlpha, cancelled)
+				if cancelled then set(red, green, blue, alpha) else set(newRed, newGreen, newBlue, newAlpha) end
+				Apply()
+				Repaint()
+			end,
+		})
+	end)
+	swatch:SetPoint('RIGHT', -ui.ROW_INSET, 0)
+	ui.Bind(row, function()
+		local red, green, blue, alpha = get()
+		swatch.fill:SetVertexColor(red, green, blue, hasOpacity and alpha or 1)
+	end)
+end
+
+local function ColorField(config, key, hasOpacity)
+	return function()
+		local color = config[key]
+		return color.r, color.g, color.b, hasOpacity and color.a or 1
+	end, function(red, green, blue, alpha)
+		config[key] = hasOpacity and { r = red, g = green, b = blue, a = alpha } or { r = red, g = green, b = blue }
+	end
+end
+
+local function Field(config, key)
+	return function() return config[key] end, function(value) config[key] = value end
+end
+
+local function OrderArrows(ui, row, onMove)
+	local down = ui.ArrowButton(row, false, function() onMove(1) end)
+	down:SetPoint('RIGHT', -(ui.ROW_INSET + SWITCH_WIDTH + 12), 0)
+	ui.ArrowButton(row, true, function() onMove(-1) end):SetPoint('RIGHT', down, 'LEFT', -ARROW_GAP, 0)
+end
+
+local function ConfirmDelete(index)
+	local config = Bars()[index]
+	Modals.Confirm({
+		parent = Window().frame,
+		title = 'Delete ' .. config.name,
+		message = 'Delete "' .. config.name .. '"? This cannot be undone.',
+		confirmText = 'Delete', cancelText = 'Cancel',
+		onConfirm = function()
+			Datatext.DeleteBar(index)
+			if KindOf(config) == 'PANEL' then selectedPanel = nil else selectedText = nil end
+			RebuildPage()
+		end,
+	})
+end
+
+local function BuildPreview(band)
+	local stage = CreateFrame('Frame', nil, band)
+	stage:SetPoint('TOPLEFT', STAGE_INSET, -STAGE_INSET)
+	stage:SetPoint('BOTTOMRIGHT', -STAGE_INSET, STAGE_INSET)
+	stage:SetClipsChildren(true)
+
+	local note = stage:CreateFontString(nil, 'OVERLAY')
+	Pixel.ApplyFont(note, 12, BUI.C.FONT_PATH, '')
+	note:SetPoint('CENTER')
+	Window():Paint(note, 'muted')
+
+	local panelTexture = stage:CreateTexture(nil, 'ARTWORK')
+	local panelTitle = stage:CreateFontString(nil, 'OVERLAY')
+	local cells = {}
+	local layout = { textLeft = {}, textWidth = {}, hitLeft = {}, hitWidth = {}, lineTop = {} }
+
+	local function HideAll()
+		note:Hide()
+		panelTexture:Hide()
+		panelTitle:Hide()
+		for _, cell in ipairs(cells) do cell:Hide() end
+	end
+
+	local function Note(text)
+		note:SetText(text)
+		note:Show()
+	end
+
+	local function ShowPanel(config)
+		local panelWidth = config.width > 0 and config.width or 200
+		local panelHeight = config.height > 0 and config.height or 100
+		local scale = math.min(1, PANEL_PREVIEW / math.max(panelWidth, panelHeight))
+		local color = config.bgColor
+		panelTexture:SetColorTexture(color.r, color.g, color.b, math.max(config.bgAlpha, 0.15))
+		panelTexture:ClearAllPoints()
+		panelTexture:SetPoint('CENTER')
+		panelTexture:SetSize(panelWidth * scale, panelHeight * scale)
+		panelTexture:Show()
+		if config.title == '' then return end
+		Pixel.ApplyFont(panelTitle, math.max(8, math.floor(config.titleSize * scale + 0.5)), BUI.GetModuleFont(config), '')
+		panelTitle:SetText(config.title)
+		panelTitle:SetTextColor(config.titleColor.r, config.titleColor.g, config.titleColor.b)
+		panelTitle:ClearAllPoints()
+		panelTitle:SetPoint(config.titleAnchor, panelTexture, config.titleAnchor, config.titleX * scale, config.titleY * scale)
+		panelTitle:Show()
+	end
+
+	local function ShowBar(config)
+		local fontPath = BUI.GetModuleFont(config)
+		local parts = Datatext.BuildSampleParts(config)
+		local count = #parts
+		if count == 0 then return Note('No readouts turned on') end
+		local widths = {}
+		for partIndex = 1, count do
+			local cell = cells[partIndex]
+			if not cell then
+				cell = stage:CreateFontString(nil, 'OVERLAY')
+				cells[partIndex] = cell
+			end
+			Pixel.ApplyFont(cell, config.fontSize, fontPath, '')
+			cell:SetWordWrap(false)
+			cell:SetText(parts[partIndex])
+			widths[partIndex] = cell:GetStringWidth()
+		end
+		local spacing = Pixel.Scale(config.spacing)
+		local fixedWidth = config.width > 0 and math.min(Pixel.Scale(config.width), stage:GetWidth()) or nil
+		if config.orientation == 'VERTICAL' then
+			local lineHeight = Pixel.Scale(config.fontSize + Datatext.LAYOUT.lineExtra)
+			local barWidth, barHeight = Datatext.LayoutColumn(widths, count, spacing, Pixel.Scale(Datatext.LAYOUT.columnInset), lineHeight, fixedWidth, nil, layout)
+			local justify = config.align == 'SPREAD' and 'CENTER' or config.align
+			for partIndex = 1, count do
+				local cell = cells[partIndex]
+				cell:ClearAllPoints()
+				cell:SetPoint('TOPLEFT', stage, 'CENTER', -barWidth / 2 + layout.lineLeft, barHeight / 2 - layout.lineTop[partIndex])
+				cell:SetSize(layout.lineWidth, lineHeight)
+				cell:SetJustifyH(justify)
+				cell:SetJustifyV('MIDDLE')
+				cell:Show()
+			end
+		else
+			local barWidth = Datatext.LayoutRow(widths, count, spacing, Pixel.Scale(Datatext.LAYOUT.rowInset), fixedWidth, config.align, 0, layout)
+			for partIndex = 1, count do
+				local cell = cells[partIndex]
+				cell:ClearAllPoints()
+				cell:SetPoint('LEFT', stage, 'CENTER', -barWidth / 2 + layout.textLeft[partIndex], 0)
+				cell:SetWidth(layout.textWidth[partIndex])
+				cell:SetHeight(0)
+				cell:SetJustifyH('CENTER')
+				cell:Show()
+			end
+		end
+	end
+
+	function band:UpdatePreview()
+		HideAll()
+		local config = ActiveCur()
+		if not config then return Note(activeKind == 'PANEL' and 'No panels yet' or 'No bars yet') end
+		if activeKind == 'PANEL' then ShowPanel(config) else ShowBar(config) end
+	end
+
+	band:HookScript('OnShow', function(self) self:UpdatePreview() end)
+	band:UpdatePreview()
+	return band
+end
+
+local function BarBoard(ui, parent, width, config, index)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = config.name,
+		description = 'A strip of readouts. Unlock it with the eye in the header to drag it around, right-click it to lock it again.',
+		buttons = { { style = 'danger', text = 'Delete', onClick = function() ConfirmDelete(index) end } },
+	})
+	Switch(board, 'Shown', function() return config.enabled == true end, function(value)
+		config.enabled = value
+	end, 'Show this bar on screen')
+	Switch(board, 'Hide labels', function() return config.hideLabels == true end, function(value)
+		config.hideLabels = value
+	end, 'Values only, no names in front of them')
+	Menu(ui, board:AddRow('Font', 'Global unless you pick one', DROPDOWN_WIDTH), BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION), Field(config, 'font'))
+	Slider(ui, board:AddRow('Font size', nil, SLIDER_WIDTH), 8, 24, 1, Field(config, 'fontSize'))
+	Slider(ui, board:AddRow('Spacing', 'Pixels between readouts', SLIDER_WIDTH), 0, 160, 1, Field(config, 'spacing'))
+	Menu(ui, board:AddRow('Orientation', 'A row or a stack', DROPDOWN_WIDTH), ORIENTATIONS, Field(config, 'orientation'))
+	Menu(ui, board:AddRow('Align', 'Where the readouts sit in a fixed width', DROPDOWN_WIDTH), ALIGNMENTS, Field(config, 'align'))
+	ColorRow(ui, board, 'Value color', 'The numbers next to each label', true, ColorField(config, 'colorValue', true))
+	return board
+end
+
+local function PanelBoard(ui, parent, width, config, index)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = config.name,
+		description = 'A blank backdrop to tuck other frames on. Unlock it with the eye in the header to drag it around, right-click it to lock it again.',
+		buttons = { { style = 'danger', text = 'Delete', onClick = function() ConfirmDelete(index) end } },
+	})
+	Switch(board, 'Shown', function() return config.enabled == true end, function(value)
+		config.enabled = value
+	end, 'Show this panel on screen')
+	ui.Input(board:AddRow('Title', 'Optional text on the panel, empty for none', INPUT_WIDTH), INPUT_WIDTH, {
+		placeholder = 'No title',
+		get = function() return config.title end,
+		set = function(text)
+			config.title = text
+			Apply()
+		end,
+	}):SetPoint('RIGHT', -ui.ROW_INSET, 0)
+	ColorRow(ui, board, 'Title color', nil, false, ColorField(config, 'titleColor', false))
+	Menu(ui, board:AddRow('Title anchor', 'Which edge of the panel it hugs', DROPDOWN_WIDTH), BUI.C.ANCHOR_POINT_OPTIONS_SHORT, Field(config, 'titleAnchor'))
+	Slider(ui, board:AddRow('Title size', nil, SLIDER_WIDTH), 8, 32, 1, Field(config, 'titleSize'))
+	Slider(ui, board:AddRow('Title offset X', 'From its anchor', SLIDER_WIDTH), -300, 300, 1, Field(config, 'titleX'))
+	Slider(ui, board:AddRow('Title offset Y', 'From its anchor', SLIDER_WIDTH), -300, 300, 1, Field(config, 'titleY'))
+	return board
+end
+
+local function PositionBoard(ui, parent, width, config)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Position',
+		description = 'Where it sits on the screen and how it layers with other frames.',
+	})
+	Switch(board, 'Align below the minimap', function() return config.alignMinimap == true end, function(value)
+		config.alignMinimap = value
+	end, 'Hang it under the minimap instead of using the anchor and offsets')
+	if Datatext.IsPanel(config) then
+		Switch(board, 'Mirror the chat window', function() return config.mirrorChat == true end, function(value)
+			config.mirrorChat = value
+		end, 'Keep this panel sized and placed as a mirror image of the chat window')
+	end
+	Menu(ui, board:AddRow('Anchor', 'The screen corner or edge it measures from', DROPDOWN_WIDTH), BUI.C.ANCHOR_POINT_OPTIONS_SHORT,
+		function() return config.point end,
+		function(value)
+			config.point, config.relPoint = value, value
+			config.alignMinimap = false
+		end)
+	Slider(ui, board:AddRow('Horizontal offset', 'From the anchor', SLIDER_WIDTH), -1500, 1500, 1, Field(config, 'x'))
+	Slider(ui, board:AddRow('Vertical offset', 'From the anchor', SLIDER_WIDTH), -1500, 1500, 1, Field(config, 'y'))
+	Menu(ui, board:AddRow('Strata', 'Which layer of the screen it draws on', DROPDOWN_WIDTH), BUI.C.STRATA_OPTIONS, Field(config, 'strata'))
+	Slider(ui, board:AddRow('Frame level', 'Higher draws over neighbours on the same strata', SLIDER_WIDTH), 0, 100, 1, Field(config, 'frameLevel'))
+	return board
+end
+
+local function BackgroundBoard(ui, parent, width, config)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Background',
+		description = 'The backdrop behind it. Zero width or height fits the content.',
+	})
+	Switch(board, 'Border', function() return config.border == true end, function(value)
+		config.border = value
+	end, 'A one pixel line around the edge')
+	Slider(ui, board:AddRow('Opacity', 'Percent', SLIDER_WIDTH), 0, 100, 1,
+		function() return math.floor(config.bgAlpha * 100 + 0.5) end,
+		function(value) config.bgAlpha = value / 100 end)
+	ColorRow(ui, board, 'Background color', nil, false, ColorField(config, 'bgColor', false))
+	ColorRow(ui, board, 'Border color', nil, true, ColorField(config, 'borderColor', true))
+	Slider(ui, board:AddRow('Width', '0 fits the content', SLIDER_WIDTH), 0, 1200, 1, Field(config, 'width'))
+	Slider(ui, board:AddRow('Height', '0 fits the content', SLIDER_WIDTH), 0, 600, 1, Field(config, 'height'))
+	return board
+end
+
+local function ReadoutsBoard(ui, parent, width, config, page)
+	local order = Datatext.ResolveOrder(config)
+	local rows = {}
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Readouts',
+		description = 'What the bar shows, top to bottom here is left to right on the bar.',
+		buttons = {
+			{ text = 'Default order', icon = 'reset', onClick = function()
+				config.order = nil
+				Apply()
+				page:RebuildCurrent()
+			end },
+		},
+	})
+	local function Move(id, delta)
+		local position
+		for candidateIndex, candidate in ipairs(order) do
+			if candidate == id then position = candidateIndex end
+		end
+		if not order[position + delta] then return end
+		order[position], order[position + delta] = order[position + delta], order[position]
+		board:Move(rows[id], delta)
+		config.order = order
+		Apply()
+		page:Resize()
+	end
+	for _, id in ipairs(order) do
+		local entry = Datatext.Get(id)
+		local row = board:AddRow(entry.name, nil, ORDER_ROOM)
+		rows[id] = row
+		ui.Switch(row, function() return config[entry.show] == true end, function(value)
+			config[entry.show] = value
+			Apply()
+		end):SetPoint('RIGHT', -ui.ROW_INSET, 0)
+		OrderArrows(ui, row, function(delta) Move(id, delta) end)
+	end
+	return board
+end
+
+local function ReadoutSettingsBoard(ui, parent, width, config)
+	local board
+	local function GetConfig() return config end
+	for _, entry in ipairs(Datatext.List()) do
+		if entry.options then
+			board = board or ui.Board(parent, width, {
+				stacked = true,
+				title = 'Readout settings',
+				description = 'Extra choices some readouts offer.',
+			})
+			board:AddCaption(entry.name)
+			for _, option in ipairs(entry.options(GetConfig, Apply)) do
+				if option.kind == 'dropdown' then
+					Menu(ui, board:AddRow(option.label, nil, DROPDOWN_WIDTH), option.items, option.get, option.set)
+				else
+					Switch(board, option.label, function() return option.get() == true end, option.set)
+				end
+			end
+		end
+	end
+	return board
+end
+
+local function GeneralBoard(ui, parent, width)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'General',
+		description = 'Settings shared by every bar.',
+	})
+	Switch(board, 'Hide tooltips in combat', function() return BUI.GetDB().datatextHideHoversInCombat ~= false end, function(value)
+		BUI.GetDB().datatextHideHoversInCombat = value
+	end, 'No readout tooltips or hover panels while fighting')
+	Switch(board, 'Roster tooltips', function() return BUI.GetDB().datatextRosterTooltips ~= false end, function(value)
+		BUI.GetDB().datatextRosterTooltips = value
+	end, 'Member details such as keystone and score when hovering Friends and Guild rows')
+	return board
+end
+
+local function Panes(ui, _, parent, width, item, page)
+	if item.id == 'newbar' or item.id == 'newpanel' then
+		local kind = item.id == 'newpanel' and 'PANEL' or 'TEXT'
+		local index = Datatext.AddBar(kind)
+		if kind == 'PANEL' then selectedPanel = index else selectedText = index end
+		activeKind = kind
+		RebuildPage()
+		return {}
+	end
+	if item.id == 'general' then return { GeneralBoard(ui, parent, width) } end
+	local config = Bars()[item.index]
+	if item.kind == 'PANEL' then
+		return { PanelBoard(ui, parent, width, config, item.index), PositionBoard(ui, parent, width, config), BackgroundBoard(ui, parent, width, config) }
+	end
+	local sections = { BarBoard(ui, parent, width, config, item.index), PositionBoard(ui, parent, width, config), BackgroundBoard(ui, parent, width, config), ReadoutsBoard(ui, parent, width, config, page) }
+	local settings = ReadoutSettingsBoard(ui, parent, width, config)
+	if settings then sections[#sections + 1] = settings end
+	return sections
+end
+
+local function RailGroups()
+	items = {}
+	local bars, panels = {}, {}
+	for barIndex, bar in ipairs(Bars()) do
+		local kind = KindOf(bar)
+		local item = { id = (kind == 'PANEL' and 'panel' or 'bar') .. barIndex, label = bar.name, kind = kind, index = barIndex }
+		items[item.id] = item
+		local list = kind == 'PANEL' and panels or bars
+		list[#list + 1] = item
+	end
+	bars[#bars + 1] = { id = 'newbar', label = 'New bar', icon = 'add' }
+	panels[#panels + 1] = { id = 'newpanel', label = 'New panel', icon = 'add' }
+	return {
+		{ title = 'Bars', items = bars },
+		{ title = 'Panels', items = panels },
+		{ title = 'Settings', items = { { id = 'general', label = 'General', icon = 'cog' } } },
+	}
+end
+
+local function Activate(id)
+	local item = items[id]
+	if not item then return end
+	activeKind = item.kind
+	if item.kind == 'PANEL' then selectedPanel = item.index else selectedText = item.index end
 end
 
 BUI.PageEngine.RegisterPage('datatext', {
-    title = 'Datatext',
-    buttonText = 'Datatext',
-    minContentWidth  = 924,
-    minContentHeight = 600,
-    OnBuild = function(pageFrame)
-        local DASH_WIDTH     = BUILib.Layout.PAGE_CONTENT_W
-        local PREVIEW_HEIGHT  = BUILib.Layout.PAGE_PREVIEW_H
-
-        local Datatext = BUI.Datatext
-        local function RebuildPage() BUI.PageEngine.RefreshCurrentPage() end
-
-        local SyncDim, titleBar, RefreshPreview
-        local dimGrids = {}
-
-        SyncDim = function()
-            local enabled = Datatext.ModuleEnabled() and CurText() and CurText().enabled
-            for gridIndex = 1, #dimGrids do dimGrids[gridIndex]:SyncDim(enabled and true or false) end
-        end
-
-        local refreshers = {}
-        local function AddRefresh(refreshFunction) refreshers[#refreshers + 1] = refreshFunction end
-
-        local function OpenPositionPopover(button, GetConfig)
-            local isPanel = Datatext.IsPanel(GetConfig())
-            Controls.Popover({
-                anchor = button, width = 260, title = 'POSITION', height = isPanel and 298 or 258,
-                build = function(panel)
-                    local alignMinimapCheckbox
-
-                    PopRow(panel, 18, 'Anchor', Controls.Dropdown(panel, nil, ANCHOR_POINTS, GetConfig().point or 'BOTTOM', function(value)
-                        GetConfig().point = value; GetConfig().relPoint = value
-                        GetConfig().alignMinimap = false
-                        alignMinimapCheckbox:SetValue(false)
-                        Datatext.Apply()
-                    end, nil, 150))
-
-                    PopRow(panel, 58, 'X Position', Controls.CompactSlider(panel, nil, -1500, 1500, GetConfig().x, function(value)
-                        GetConfig().x = value; Datatext.Apply()
-                    end, 1, 150))
-                    PopRow(panel, 98, 'Y Position', Controls.CompactSlider(panel, nil, -1500, 1500, GetConfig().y or 0, function(value)
-                        GetConfig().y = value; Datatext.Apply()
-                    end, 1, 150))
-
-                    alignMinimapCheckbox = Controls.StampCheckbox(panel, nil, GetConfig().alignMinimap, function(value)
-                        GetConfig().alignMinimap = value
-                        Datatext.Apply()
-                    end, nil, true, nil, 'mini')
-                    PopRow(panel, 138, 'Align Below Minimap', alignMinimapCheckbox)
-
-                    local y = 178
-                    if isPanel then
-                        PopRow(panel, y, 'Mirror Chat Window', Controls.StampCheckbox(panel, nil, GetConfig().mirrorChat, function(value)
-                            GetConfig().mirrorChat = value; Datatext.Apply()
-                        end, nil, nil, 'Keep this panel sized and positioned as a mirror image of the chat window', 'mini'))
-                        y = y + 40
-                    end
-
-                    PopRow(panel, y, 'Strata', Controls.Dropdown(panel, nil, STRATA_ITEMS, GetConfig().strata or 'MEDIUM', function(value)
-                        GetConfig().strata = value; Datatext.Apply()
-                    end, nil, 150))
-                    PopRow(panel, y + 40, 'Frame Level', Controls.CompactSlider(panel, nil, 0, 100, GetConfig().frameLevel or 2, function(value)
-                        GetConfig().frameLevel = value; Datatext.Apply()
-                    end, 1, 150))
-                end,
-            })
-        end
-
-        local function OpenBackgroundPopover(button, GetConfig)
-            Controls.Popover({
-                anchor = button, width = 260, title = 'BACKGROUND & SIZE', height = 178,
-                build = function(panel)
-                    local bgSlider = Controls.CompactSlider(panel, nil, 0, 100, floor((GetConfig().bgAlpha or 0) * 100), function(value)
-                        GetConfig().bgAlpha = value / 100; Datatext.Apply(); RefreshPreview()
-                    end, 1, 150)
-                    PopRow(panel, 18, 'Opacity', bgSlider)
-                    local backgroundColor = GetConfig().bgColor or { r = 0, g = 0, b = 0 }
-                    PageKit.AttachLeft(Controls.ColorSwatch(panel, { r = backgroundColor.r, g = backgroundColor.g, b = backgroundColor.b, callback = function(red, green, blue)
-                        GetConfig().bgColor = { r = red, g = green, b = blue }; Datatext.Apply(); RefreshPreview()
-                    end, tooltip = 'Background Color' }), bgSlider)
-
-                    local borderCheckbox = Controls.StampCheckbox(panel, nil, GetConfig().border, function(value)
-                        GetConfig().border = value; Datatext.Apply()
-                    end, nil, true, nil, 'mini')
-                    PopRow(panel, 58, 'Border', borderCheckbox)
-                    local borderColor = GetConfig().borderColor or { r = 0.2, g = 0.2, b = 0.24, a = 1 }
-                    PageKit.AttachLeft(Controls.ColorSwatch(panel, { r = borderColor.r, g = borderColor.g, b = borderColor.b, a = borderColor.a, callback = function(red, green, blue, alpha)
-                        GetConfig().borderColor = { r = red, g = green, b = blue, a = alpha }; Datatext.Apply()
-                    end, tooltip = 'Border Color' }), borderCheckbox)
-
-                    PopRow(panel, 98, 'Width', Controls.CompactSlider(panel, nil, 0, 1200, GetConfig().width or 0, function(value)
-                        GetConfig().width = value; Datatext.Apply(); RefreshPreview()
-                    end, 1, 150))
-                    PopRow(panel, 138, 'Height', Controls.CompactSlider(panel, nil, 0, 600, GetConfig().height or 0, function(value)
-                        GetConfig().height = value; Datatext.Apply(); RefreshPreview()
-                    end, 1, 150))
-                end,
-            })
-        end
-
-        local function BuildSelectorRows(AddRow, kind, GetConfig, getIndex, setIndex, labels)
-            local function NewButton(row)
-                return Controls.Button(row, labels.newLabel, 100, function()
-                    setIndex(Datatext.AddBar(kind))
-                    activeKind = kind
-                    RebuildPage()
-                end)
-            end
-
-            if not GetConfig() then
-                AddRow({
-                    spanFull = true,
-                    title = labels.label,
-                    description = labels.emptyDesc,
-                    plain = true,
-                    accessoryWidth = 110,
-                    accessories = function(row)
-                        return { NewButton(row) }
-                    end,
-                })
-                return
-            end
-
-            local items = {}
-            for barIndex, bar in ipairs(Bars()) do
-                if KindOf(bar) == kind then
-                    items[#items + 1] = { value = barIndex, text = bar.name or ('#' .. barIndex) }
-                end
-            end
-            local function NameNumber(text) return tonumber(text:match('(%d+)%s*$')) end
-            table.sort(items, function(left, right)
-                local leftNumber, rightNumber = NameNumber(left.text), NameNumber(right.text)
-                if leftNumber and rightNumber and leftNumber ~= rightNumber then return leftNumber < rightNumber end
-                if (leftNumber ~= nil) ~= (rightNumber ~= nil) then return leftNumber ~= nil end
-                if left.text ~= right.text then return left.text < right.text end
-                return left.value < right.value
-            end)
-
-            AddRow({
-                spanFull = true,
-                title = labels.label,
-                description = labels.desc,
-                controlWidth = 190,
-                control = function(row)
-                    return Controls.Dropdown(row, nil, items, getIndex(), function(value)
-                        setIndex(value)
-                        RebuildPage()
-                    end, nil, 180)
-                end,
-                accessoryWidth = 200,
-                accessories = function(row)
-                    local moverButton = Controls.Icon(row, {
-                        texture = BUILib.GetLibMedia('mover'), tooltip = 'Anchor & position',
-                        onClick = function(button) OpenPositionPopover(button, GetConfig) end,
-                    })
-                    local bgCog = Controls.Icon(row, {
-                        tooltip = 'Background, border & size',
-                        onClick = function(button) OpenBackgroundPopover(button, GetConfig) end,
-                    })
-                    local deleteButton = Controls.Icon(row, {
-                        texture = BUILib.GetLibMedia('delete'), tooltip = 'Delete',
-                        onClick = function()
-                            local current = GetConfig()
-                            Modals.Confirm({
-                                parent = BUI.PageEngine.window.frame,
-                                title = 'Delete',
-                                message = 'Delete "' .. ((current and current.name) or 'this') .. '"?',
-                                confirmText = 'Delete', cancelText = 'Cancel',
-                                onConfirm = function()
-                                    Datatext.DeleteBar(getIndex())
-                                    setIndex(nil)
-                                    RebuildPage()
-                                end,
-                            })
-                        end,
-                    })
-                    return { moverButton, bgCog, deleteButton, NewButton(row) }
-                end,
-            })
-
-            local enableRow = AddRow({
-                spanFull = true,
-                title = labels.enableLabel,
-                description = labels.enableDesc,
-                checked = GetConfig().enabled and true or false,
-                callback = function(enabled)
-                    GetConfig().enabled = enabled; Datatext.Apply(); SyncDim(); RefreshPreview()
-                end,
-            })
-            AddRefresh(function() if GetConfig() then enableRow:SetValue(GetConfig().enabled) end end)
-        end
-
-        local function BuildTextTab(tab)
-            local grid
-            local function Section(title, dim)
-                if grid then grid:Flush() end
-                Layout.Section(tab, title)
-                grid = PageKit.RowGrid(tab)
-                if dim then dimGrids[#dimGrids + 1] = grid end
-            end
-            local function AddRow(config) return grid:Add(config) end
-
-            Section('Bars')
-
-            BuildSelectorRows(AddRow, 'TEXT', CurText,
-                function() return selectedText end,
-                function(barIndex) selectedText = barIndex end,
-                {
-                    label = 'Selected Bar', newLabel = 'New Bar',
-                    desc = 'Pick a bar to edit, or create a new one.',
-                    emptyDesc = 'No bars yet.',
-                    enableLabel = 'Enable Bar',
-                    enableDesc = 'Show this bar on screen.',
-                })
-
-            AddRow({
-                title = 'Hide Tooltips in Combat',
-                description = 'Suppress datatext tooltips and hover panels while fighting.',
-                checked = BUI.GetDB().datatextHideHoversInCombat ~= false,
-                callback = function(value) BUI.GetDB().datatextHideHoversInCombat = value end,
-            })
-
-            AddRow({
-                title = 'Roster Tooltips',
-                description = 'Member details (M+ score, key, click hints) when hovering Friends and Guild rows.',
-                checked = BUI.GetDB().datatextRosterTooltips ~= false,
-                callback = function(value) BUI.GetDB().datatextRosterTooltips = value end,
-            })
-
-            if CurText() then
-                Section('Style', true)
-
-                local fontDropdown
-                local fonts = BUI.BuildFontDropdownItems('GLOBAL')
-                AddRow({
-                    spanFull = true,
-                    title = 'Text Style',
-                    description = 'Font and value color, with size, spacing and orientation.',
-                    controlWidth = 170,
-                    control = function(row)
-                        fontDropdown = Controls.Dropdown(row, nil, fonts, CurText().font, function(value)
-                            CurText().font = value; Datatext.Apply(); RefreshPreview()
-                        end, nil, 160)
-                        return fontDropdown
-                    end,
-                    accessoryWidth = 64,
-                    accessories = function(row)
-                        local fontCog = Controls.Icon(row, {
-                            title = 'STYLE', tooltip = 'Size, spacing & orientation',
-                            onChange = function() RefreshPreview() end,
-                            options = {
-                                { kind = 'slider', label = 'Font Size', min = 8, max = 24, step = 1,
-                                  get = function() return CurText().fontSize end,
-                                  set = function(value) CurText().fontSize = value; Datatext.Apply() end },
-                                { kind = 'slider', label = 'Spacing (px)', min = 0, max = 160, step = 1,
-                                  get = function() return CurText().spacing or 0 end,
-                                  set = function(value) CurText().spacing = value; Datatext.Apply() end },
-                                { kind = 'dropdown', label = 'Orientation', items = ORIENTATIONS,
-                                  get = function() return CurText().orientation or 'HORIZONTAL' end,
-                                  set = function(value) CurText().orientation = value; Datatext.Apply() end },
-                                { kind = 'dropdown', label = 'Text Align', items = ALIGNMENTS,
-                                  get = function() return CurText().align or 'LEFT' end,
-                                  set = function(value) CurText().align = value; Datatext.Apply() end },
-                                { label = 'Hide Labels',
-                                  get = function() return CurText().hideLabels end,
-                                  set = function(value) CurText().hideLabels = value; Datatext.Apply() end },
-                            },
-                        })
-                        local valueColor = CurText().colorValue
-                        local swatch = Controls.ColorSwatch(row, { r = valueColor.r, g = valueColor.g, b = valueColor.b, a = valueColor.a, callback = function(red, green, blue, alpha)
-                            CurText().colorValue = {r = red, g = green, b = blue, a = alpha}; Datatext.Apply(); RefreshPreview()
-                        end, tooltip = 'Value Color' })
-                        return { fontCog, swatch }
-                    end,
-                })
-                AddRefresh(function() fontDropdown:SetValue(CurText().font) end)
-
-                Section('Modules', true)
-
-                local moduleOptions = Datatext.BuildModuleOptions(CurText, Datatext.Apply)
-
-                AddRow({
-                    spanFull = true,
-                    title = 'Display Modules',
-                    description = 'Choose which readouts show, and their order.',
-                    plain = true,
-                    accessoryWidth = 64,
-                    accessories = function(row)
-                        local modulesCog = Controls.Icon(row, {
-                            title = 'DISPLAY MODULES', tooltip = 'Choose which modules show',
-                            texture = BUILib.GetLibMedia('modules5'),
-                            options = moduleOptions, columns = 2, onChange = function() RefreshPreview() end,
-                        })
-                        local orderButton = Controls.Icon(row, {
-                            texture = BUILib.GetLibMedia('shuffle'), tooltip = 'Reorder modules',
-                            onClick = function(button)
-                                Datatext.OpenOrderPopover(button, CurText(), function() Datatext.Apply(); RefreshPreview() end)
-                            end,
-                        })
-                        return { modulesCog, orderButton }
-                    end,
-                })
-            end
-
-            grid:Flush()
-        end
-
-        local function BuildPanelsTab(tab)
-            local grid
-            local function Section(title)
-                if grid then grid:Flush() end
-                Layout.Section(tab, title)
-                grid = PageKit.RowGrid(tab)
-            end
-            local function AddRow(config) return grid:Add(config) end
-
-            Section('Panels')
-
-            BuildSelectorRows(AddRow, 'PANEL', CurPanel,
-                function() return selectedPanel end,
-                function(barIndex) selectedPanel = barIndex end,
-                {
-                    label = 'Selected Panel', newLabel = 'New Panel',
-                    desc = 'Pick a panel to edit, or create a new one.',
-                    emptyDesc = 'No panels yet.',
-                    enableLabel = 'Enable Panel',
-                    enableDesc = 'Show this panel on screen.',
-                })
-
-            if CurPanel() then
-                AddRow({
-                    spanFull = true,
-                    title = 'Panel Title',
-                    description = 'Optional text label shown on the panel.',
-                    controlWidth = 170,
-                    control = function(row)
-                        return Controls.TextBox(row, nil, CurPanel().title or '', function(text)
-                            CurPanel().title = text or ''
-                            Datatext.Apply(); RefreshPreview()
-                        end, 'Panel title text (empty = none)', 160)
-                    end,
-                    accessoryWidth = 64,
-                    accessories = function(row)
-                        local titleCog = Controls.Icon(row, {
-                            title = 'PANEL TITLE', tooltip = 'Title anchor, offsets & size',
-                            onChange = function() RefreshPreview() end,
-                            options = {
-                                { kind = 'dropdown', label = 'Anchor', items = ANCHOR_POINTS,
-                                  get = function() return CurPanel().titleAnchor or 'TOP' end,
-                                  set = function(value) CurPanel().titleAnchor = value; Datatext.Apply() end },
-                                { kind = 'slider', label = 'Offset X', min = -300, max = 300, step = 1,
-                                  get = function() return CurPanel().titleX or 0 end,
-                                  set = function(value) CurPanel().titleX = value; Datatext.Apply() end },
-                                { kind = 'slider', label = 'Offset Y', min = -300, max = 300, step = 1,
-                                  get = function() return CurPanel().titleY or 0 end,
-                                  set = function(value) CurPanel().titleY = value; Datatext.Apply() end },
-                                { kind = 'slider', label = 'Font Size', min = 8, max = 32, step = 1,
-                                  get = function() return CurPanel().titleSize or 12 end,
-                                  set = function(value) CurPanel().titleSize = value; Datatext.Apply() end },
-                            },
-                        })
-                        local titleColor = CurPanel().titleColor or { r = 1, g = 1, b = 1 }
-                        local titleSwatch = Controls.ColorSwatch(row, { r = titleColor.r, g = titleColor.g, b = titleColor.b, callback = function(red, green, blue)
-                            CurPanel().titleColor = { r = red, g = green, b = blue }
-                            Datatext.Apply(); RefreshPreview()
-                        end, tooltip = 'Title Color' })
-                        return { titleCog, titleSwatch }
-                    end,
-                })
-            end
-
-            grid:Flush()
-        end
-
-        local root, pinned
-        root, pinned, titleBar = PageKit.Scaffold(pageFrame, {
-            title = 'Datatext', titleDesc = 'Info bars with FPS, ping, gold, and more, plus blank background panels.',
-            previewH = PREVIEW_HEIGHT, watermark = BUI.Tools.GetLogo(),
-            titleEnable = { value = Datatext.ModuleEnabled(), gate = function() return BUI.IsModuleEnabled('datatext') end, onToggle = function(enabled)
-                BUI.GetDB().datatextEnabled = enabled; Datatext.Apply(); SyncDim()
-            end },
-            titleAnchor = { value = ActiveCur() and not ActiveCur().lock or false, onToggle = function(unlocked)
-                local current = ActiveCur()
-                if not current then return end
-                current.lock = not unlocked; Datatext.Apply()
-            end },
-            hostTabs = {
-                defs = {
-                    { key = 'text',   title = 'DATATEXTS', image = 'Interface\\Icons\\INV_Misc_Note_01' },
-                    { key = 'panels', title = 'PANELS',    image = 'Interface\\Icons\\INV_Box_01' },
-                },
-                defaultKey = activeKind == 'PANEL' and 'panels' or 'text',
-                onSelect = function(key)
-                    activeKind = (key == 'panels') and 'PANEL' or 'TEXT'
-                    local current = ActiveCur()
-                    titleBar.anchorToggle:SetValue(current and not current.lock or false)
-                    Datatext.SetLockToggle(titleBar.anchorToggle, activeKind == 'PANEL' and selectedPanel or selectedText)
-                    RefreshPreview()
-                end,
-                build = function(def, tab)
-                    if def.key == 'panels' then BuildPanelsTab(tab) else BuildTextTab(tab) end
-                end,
-            },
-        })
-
-        local preview = BuildDatatextPreview(pinned, DASH_WIDTH, PREVIEW_HEIGHT)
-        RefreshPreview = function() preview:UpdatePreview() end
-
-        AddRefresh(function() titleBar.enableToggle:SetValue(Datatext.ModuleEnabled()) end)
-        AddRefresh(function()
-            local current = ActiveCur()
-            titleBar.anchorToggle:SetValue(current and not current.lock or false)
-        end)
-        Datatext.SetLockToggle(titleBar.anchorToggle, activeKind == 'PANEL' and selectedPanel or selectedText)
-
-        SyncDim()
-
-        pageFrame:SetScript('OnShow', function()
-            for _, refresh in ipairs(refreshers) do refresh() end
-            SyncDim(); RefreshPreview()
-        end)
-    end,
+	title = 'Datatext',
+	buttonText = 'Datatext',
+	icon = 'report2',
+	OnBuild = function(pageFrame)
+		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
+		ActiveCur()
+		local rail
+		rail = Layout.RailPage(page:GetTab(1), { window = Window() }, {
+			icon = 'report2',
+			title = 'Datatext',
+			placeholder = 'Search datatext settings...',
+			toggles = {
+				{ icon = 'enable', tooltip = 'Turn the datatext module on or off', get = Datatext.ModuleEnabled, set = function(value)
+					BUI.GetDB().datatextEnabled = value
+					Apply()
+				end },
+				{ icon = 'eye', tooltip = 'Unlock the selected bar or panel to drag it, right-click it to lock', get = function()
+					local current = ActiveCur()
+					return current and not current.lock or false
+				end, set = function(value)
+					local current = ActiveCur()
+					if not current then return end
+					current.lock = not value
+					Datatext.Apply()
+				end },
+			},
+			preview = { height = PREVIEW_HEIGHT, build = function(band) preview = BuildPreview(band) end },
+			rail = { groups = RailGroups(), selected = ActiveID() },
+			build = Panes,
+		})
+		local Select = rail.Select
+		function rail:Select(id)
+			Activate(id)
+			Select(self, id)
+			Repaint()
+			RefreshPreview()
+		end
+		Datatext.SetLockCallback(Repaint)
+		page:AutoRefresh()
+	end,
 })
