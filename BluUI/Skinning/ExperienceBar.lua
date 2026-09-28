@@ -16,7 +16,7 @@ local BLANK = BUI.C.FALLBACK_TEXTURE
 local STAT_KEYS = { 'timeLevel', 'timeSession', 'levelingIn', 'completed' }
 
 local barFrame, xpBar, restedBar, reputationBar, xpText, reputationText
-local reputationEdgeTexture
+local reputationEdgeTexture, reputationBackground
 local statLabels = {}
 local hoverTicker
 local isActive = false
@@ -493,6 +493,10 @@ local function ApplySettings()
 	local restedColor = config.restedColor
 	restedBar:SetStatusBarColor(restedColor[1], restedColor[2], restedColor[3], 0.5)
 
+	local backgroundAlpha = config.bgOpacity / 100
+	BUI.Tools.SetColorTex(barFrame.FrameBG, 0.05, 0.05, 0.05, backgroundAlpha)
+	reputationBackground:SetColorTexture(0.05, 0.05, 0.05, backgroundAlpha)
+
 	local font = GetFont()
 	Pixel.ApplyFont(xpText, config.fontSize, font, 'OUTLINE')
 	Pixel.ApplyFont(reputationText, config.fontSize, font, 'OUTLINE')
@@ -558,7 +562,7 @@ local function CreateBars()
 	local background = barFrame:CreateTexture(nil, 'BACKGROUND')
 	background:SetPoint('TOPLEFT', edge, -edge)
 	background:SetPoint('BOTTOMRIGHT', -edge, edge)
-	BUI.Tools.SetColorTex(background, 0.05, 0.05, 0.05, 0.9)
+	BUI.Tools.SetColorTex(background, 0.05, 0.05, 0.05, config.bgOpacity / 100)
 	barFrame.FrameBG = background
 
 	Pixel.ApplyBorder(barFrame, 1, 0, 0, 0, 1)
@@ -582,9 +586,9 @@ local function CreateBars()
 	reputationBar:SetFrameLevel(barFrame:GetFrameLevel() + 2)
 	reputationBar:Hide()
 
-	local reputationBackground = reputationBar:CreateTexture(nil, 'BACKGROUND')
+	reputationBackground = reputationBar:CreateTexture(nil, 'BACKGROUND')
 	reputationBackground:SetAllPoints()
-	reputationBackground:SetColorTexture(0.05, 0.05, 0.05, 0.9)
+	reputationBackground:SetColorTexture(0.05, 0.05, 0.05, config.bgOpacity / 100)
 
 	reputationEdgeTexture = reputationBar:CreateTexture(nil, 'OVERLAY')
 	reputationEdgeTexture:SetHeight(Pixel.PixelSize(1))
@@ -856,6 +860,13 @@ Skin.RegisterSkin('experiencebar', {
 		Layout.ColorSwatch(colorsPanel, 'Rested XP Color', config.restedColor[1], config.restedColor[2], config.restedColor[3], 1, function(red, green, blue)
 			config.restedColor = { red, green, blue }; ApplySettings()
 		end)
+		local opacity = Controls.Slider(colorsPanel.child, 'Background Opacity', 0, 100, config.bgOpacity, function(value)
+			config.bgOpacity = value; ApplySettings()
+		end, 0, nil, nil, 1, colorsPanel.width)
+		local opacityAnchor, opacityY = colorsPanel:GetAnchor(14)
+		opacity:SetPoint('TOPLEFT', opacityAnchor, 'BOTTOMLEFT', 0, opacityY)
+		colorsPanel:SetLast(opacity, 0)
+		colorsPanel:AddY(14 + sliderHeight)
 		colorsPanel:Refresh()
 
 		content:Refresh()
