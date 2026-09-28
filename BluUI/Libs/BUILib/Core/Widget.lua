@@ -317,17 +317,22 @@ local function Extent(code, span, radius, corner)
 	return span - radius
 end
 
-local function Mix(from, to, fraction)
+local function Blend(color, from, to, fraction)
 	local fromAlpha, toAlpha = from[4] or 1, to[4] or 1
-	return CreateColor(
+	color:SetRGBA(
 		from[1] + (to[1] - from[1]) * fraction,
 		from[2] + (to[2] - from[2]) * fraction,
 		from[3] + (to[3] - from[3]) * fraction,
 		fromAlpha + (toAlpha - fromAlpha) * fraction)
+	return color
 end
 
 function Widget.PaintGradient(texture, orientation, from, to, startFraction, endFraction)
-	local first, second = Mix(from, to, startFraction or 0), Mix(from, to, endFraction or 1)
+	if not texture.gradientStart then
+		texture.gradientStart, texture.gradientEnd = CreateColor(0, 0, 0, 1), CreateColor(0, 0, 0, 1)
+	end
+	local first = Blend(texture.gradientStart, from, to, startFraction or 0)
+	local second = Blend(texture.gradientEnd, from, to, endFraction or 1)
 	if orientation == 'VERTICAL' then first, second = second, first end
 	texture:SetGradient(orientation, first, second)
 end

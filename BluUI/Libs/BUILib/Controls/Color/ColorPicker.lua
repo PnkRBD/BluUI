@@ -524,11 +524,20 @@ local function BuildPicker()
 	local function FromPercent(text) local number = tonumber(text:match('%d+%.?%d*')) return number and number / 100 end
 	local function FromByte(text) local number = tonumber(text:match('%d+')) return number and number / 255 end
 
+	local brightEnd, clearEnd, solidEnd = { 0, 0, 0, 1 }, { 0, 0, 0, 0 }, { 0, 0, 0, 1 }
 	local specs = {
 		{ label = 'Brightness', get = function() return frame.v end, set = function(x) frame.v = x end, text = Percent, parse = FromPercent,
-			ends = function() return C.BLACK, { HSVtoRGB(frame.h, frame.s, 1) } end },
+			ends = function()
+				brightEnd[1], brightEnd[2], brightEnd[3] = HSVtoRGB(frame.h, frame.s, 1)
+				return C.BLACK, brightEnd
+			end },
 		{ label = 'Opacity', alpha = true, get = function() return frame.a end, set = function(x) frame.a = x end, text = Percent, parse = FromPercent,
-			ends = function() local red, green, blue = Current() return { red, green, blue, 0 }, { red, green, blue, 1 } end },
+			ends = function()
+				local red, green, blue = Current()
+				clearEnd[1], clearEnd[2], clearEnd[3] = red, green, blue
+				solidEnd[1], solidEnd[2], solidEnd[3] = red, green, blue
+				return clearEnd, solidEnd
+			end },
 	}
 	local sliders = {}
 	for index, spec in ipairs(specs) do sliders[index] = Slider(frame, spec) end

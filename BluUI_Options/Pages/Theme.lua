@@ -130,12 +130,17 @@ local function ResetRoles(entries)
 end
 
 local function PickRole(role, anchor)
-	local previous = IsCustom(role) and Overrides()[role] or nil
+	local current = IsCustom(role) and Overrides()[role] or nil
+	local previous = current and CopyTable(current) or nil
 	local red, green, blue, alpha = Window():Color(role)
 	Controls.OpenColorPicker({
 		r = red, g = green, b = blue, a = alpha, hasOpacity = true, anchorTo = anchor,
 		callback = function(newRed, newGreen, newBlue, newAlpha, cancelled)
-			SetRole(role, not cancelled and { newRed, newGreen, newBlue, newAlpha } or previous)
+			if cancelled then return SetRole(role, previous) end
+			local color = Overrides(true)[role]
+			if not color then return SetRole(role, { newRed, newGreen, newBlue, newAlpha }) end
+			color[1], color[2], color[3], color[4] = newRed, newGreen, newBlue, newAlpha
+			Touch()
 		end,
 	})
 end
