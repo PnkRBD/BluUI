@@ -777,11 +777,7 @@ local function MapBoard(ui, parent, width)
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Map',
-		description = 'The square minimap: where it sits, how big it is and the frame around it. The cube turns the module on or off. The eye unlocks the real map to drag it, right-click it there to lock it again.',
-		buttons = {
-			{ toggle = true, icon = 'enable', tooltip = 'Turn the minimap module on or off, needs a reload', get = function() return Interface().minimapEnabled ~= false end, set = ConfirmModule },
-			{ toggle = true, icon = 'eye', tooltip = 'Unlock the map to drag it and its indicators, right-click it to lock', get = MinimapModule.IsUnlocked, set = MinimapModule.ToggleUnlock },
-		},
+		description = 'The square minimap: where it sits, how big it is and the frame around it. The eye in the header unlocks the real map to drag it, right-click it there to lock it again.',
 	})
 	Switch(board, 'Rotate with you', function() return Interface().rotateMinimap == true end, function(value)
 		Interface().rotateMinimap = value
@@ -1137,6 +1133,10 @@ BUI.PageEngine.RegisterPage('minimap', {
 			icon = 'minimap',
 			title = 'Minimap',
 			placeholder = 'Search minimap settings...',
+			toggles = {
+				{ icon = 'enable', tooltip = 'Turn the minimap module on or off, needs a reload', get = function() return Interface().minimapEnabled ~= false end, set = ConfirmModule },
+				{ icon = 'eye', tooltip = 'Unlock the map to drag it and its indicators, right-click it to lock', get = MinimapModule.IsUnlocked, set = MinimapModule.ToggleUnlock },
+			},
 			preview = { height = PREVIEW_HEIGHT, build = function(band) preview = BuildPreview(band) end },
 			rail = { groups = RAIL_GROUPS },
 			build = Panes,

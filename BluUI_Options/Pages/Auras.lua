@@ -588,6 +588,17 @@ BUI.PageEngine.RegisterPage('auras', {
 
 		local page = Layout.Page(pageFrame, { 'Alerts', 'GCD History' })
 		pageFrame._page = page
+		local enable
+		enable = Layout.ModuleHeader(page:GetTab(1), {
+			icon = BUI.C.ICON_PATH,
+			title = 'Weaker Auras',
+			subtitle = 'Low health, marks, crosshair and gateway alerts. Turning the module on or off needs a reload.',
+			iconToggles = true,
+			enabled = BUI.IsModuleEnabled('auras'),
+			onToggle = function(value)
+				BUI.ModulesPage.ConfirmReload('auras', value, function() enable:SetValue(not value) end)
+			end,
+		})
 		BuildAlertsTab(page:GetTab(1))
 		BUI.StreamerToolsPage.BuildGCDHistoryTab(page:GetTab(2))
 		page:AutoRefresh()
