@@ -5,7 +5,6 @@ local Layout = BUILib.Layout
 local RAIL_WIDTH = 210
 local RAIL_GAP = 40
 local RAIL_STEP = 40
-local HEADER_GAP = 26
 local BLOCK_GAP = 8
 local BOTTOM_GAP = 24
 
@@ -19,19 +18,12 @@ function Layout.RailPage(tab, shell, spec)
 	local panes = {}
 	local page = {}
 
-	local head = CreateFrame('Frame', nil, tab.pinned)
-	head:SetPoint('TOPLEFT')
-	head:SetSize(tab.width, 1)
-	local y = kit.Header(head, spec.icon, spec.title, spec.placeholder, function(text)
+	local block = CreateFrame('Frame', nil, tab.child)
+	block:SetWidth(tab.width)
+	local head, top, Align = Layout.PinnedHead(tab, window, kit, spec, block, function(text)
 		query = text
 		page:Resize()
 	end)
-	local top = y + HEADER_GAP
-	local rule = kit.DottedRule(head)
-	rule:SetPoint('TOPLEFT', 0, -top)
-	rule:SetPoint('TOPRIGHT', 0, -top)
-	top = top + 1
-	tab:SetPinnedHeight(top)
 	local contentTop = top + (tab.topPadding or Layout.DEFAULT_PADDING) + BLOCK_GAP
 
 	local railScroll = CreateFrame('ScrollFrame', nil, head)
@@ -61,18 +53,9 @@ function Layout.RailPage(tab, shell, spec)
 	divider:SetPoint('BOTTOM', tab.frame, 'BOTTOM', 0, 0)
 	divider:SetWidth(1)
 
-	local block = CreateFrame('Frame', nil, tab.child)
-	block:SetWidth(tab.width)
 	local content = CreateFrame('Frame', nil, block)
 	content:SetPoint('TOPLEFT', contentX, 0)
 	content:SetSize(contentWidth, 1)
-
-	local function Align()
-		local blockLeft, pinnedLeft = block:GetLeft(), tab.pinned:GetLeft()
-		if not blockLeft or not pinnedLeft then return end
-		head:SetPoint('TOPLEFT', math.floor(blockLeft - pinnedLeft + 0.5), 0)
-	end
-	tab.frame:HookScript('OnSizeChanged', Align)
 
 	local function Place()
 		local height = 0

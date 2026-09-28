@@ -23,6 +23,8 @@ local TAB_GAP = 40
 local BUTTON_GAP = 10
 local HEADER_GAP = 26
 local BOTTOM_GAP = 24
+local PREVIEW_GAP = 16
+local PREVIEW_RADIUS = 8
 local SEARCH_WIDTH, SEARCH_HEIGHT = 224, 34
 local SOLID_HOVER = { 1, 1, 1, 0.12 }
 local SWITCH_WIDTH, SWITCH_HEIGHT = 40, 22
@@ -32,6 +34,7 @@ local SLIDER_GAP = 6
 local SLIDER_STEP = 24
 local SLIDER_BOX = 52
 local STEP_SIGN = 12
+local TOGGLE_SIZE = 22
 local BUTTON_STYLES = {
 	primary = { fill = 'accent', text = 'onAccent', solid = true },
 	control = { fill = 'control', text = 'controlText', solid = true },
@@ -515,7 +518,14 @@ function Layout.TableKit(window)
 		title:SetPoint('TOPLEFT', 0, -(pad + 2))
 
 		for _, buttonSpec in ipairs(spec.buttons or {}) do
-			section.buttons[#section.buttons + 1] = kit.Button(frame, buttonSpec.text, buttonSpec.style, buttonSpec.onClick, buttonSpec.icon)
+			local control
+			if buttonSpec.toggle then
+				control = Widget.Unwrap(Controls.IconToggle(frame, buttonSpec.get(), buttonSpec.set, { texture = BUILib.GetLibMedia(buttonSpec.icon), tooltip = buttonSpec.tooltip, size = TOGGLE_SIZE }))
+				window:Bind(control, function() control:SetValue(buttonSpec.get()) end)
+			else
+				control = kit.Button(frame, buttonSpec.text, buttonSpec.style, buttonSpec.onClick, buttonSpec.icon)
+			end
+			section.buttons[#section.buttons + 1] = control
 		end
 		if stacked then
 			for index = #section.buttons - 1, 1, -1 do
@@ -604,6 +614,39 @@ function Layout.TableKit(window)
 	return kit
 end
 
+function Layout.PinnedHead(tab, window, kit, spec, block, onSearch)
+	local head = CreateFrame('Frame', nil, tab.pinned)
+	head:SetPoint('TOPLEFT')
+	head:SetSize(tab.width, 1)
+	local top = kit.Header(head, spec.icon, spec.title, spec.placeholder, onSearch) + HEADER_GAP
+	local rule = kit.DottedRule(head)
+	rule:SetPoint('TOPLEFT', 0, -top)
+	rule:SetPoint('TOPRIGHT', 0, -top)
+	top = top + 1
+	if spec.preview then
+		local band = CreateFrame('Frame', nil, head)
+		band:SetPoint('TOPLEFT', 0, -(top + PREVIEW_GAP))
+		band:SetSize(tab.width, spec.preview.height)
+		local fill, edge = Widget.DrawCardShape(band, PREVIEW_RADIUS, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
+		window:Paint(fill, 'card')
+		window:Paint(edge, 'cardEdge')
+		spec.preview.build(band, kit)
+		top = top + PREVIEW_GAP + spec.preview.height + PREVIEW_GAP
+		local under = kit.DottedRule(head)
+		under:SetPoint('TOPLEFT', 0, -top)
+		under:SetPoint('TOPRIGHT', 0, -top)
+		top = top + 1
+	end
+	tab:SetPinnedHeight(top)
+	local function Align()
+		local blockLeft, pinnedLeft = block:GetLeft(), tab.pinned:GetLeft()
+		if not blockLeft or not pinnedLeft then return end
+		head:SetPoint('TOPLEFT', math.floor(blockLeft - pinnedLeft + 0.5), 0)
+	end
+	tab.frame:HookScript('OnSizeChanged', Align)
+	return head, top, Align
+end
+
 function Layout.TablePage(tab, shell, spec)
 	local kit = Layout.TableKit(shell.window)
 	local block = CreateFrame('Frame', nil, tab.child)
@@ -611,6 +654,10 @@ function Layout.TablePage(tab, shell, spec)
 	local query, current, contentTop = '', 1, 0
 	local panes, labels = {}, {}
 	local Resize
+	local _, _, Align = Layout.PinnedHead(tab, shell.window, kit, spec, block, function(text)
+		query = text
+		Resize()
+	end)
 
 	local function Place()
 		local y = contentTop
@@ -618,28 +665,14 @@ function Layout.TablePage(tab, shell, spec)
 		return y + BOTTOM_GAP
 	end
 
-	local function Commit(height)
-		block:SetHeight(height)
-		block.layoutHeight = height
-	end
-
-	local y = kit.Header(block, spec.icon, spec.title, spec.placeholder, function(text)
-		query = text
-		Resize()
-	end)
 	for index, pane in ipairs(spec.tabs) do labels[index] = pane.label end
 	if #labels > 1 then
-		contentTop = kit.Tabs(block, y + HEADER_GAP, labels, function(index)
+		contentTop = kit.Tabs(block, 0, labels, function(index)
 			panes[current].frame:Hide()
 			current = index
 			panes[current].frame:Show()
 			Resize()
 		end)
-	else
-		local rule = kit.DottedRule(block)
-		rule:SetPoint('TOPLEFT', 0, -(y + HEADER_GAP))
-		rule:SetPoint('TOPRIGHT', 0, -(y + HEADER_GAP))
-		contentTop = y + HEADER_GAP + 1
 	end
 
 	for index, pane in ipairs(spec.tabs) do
@@ -649,10 +682,15 @@ function Layout.TablePage(tab, shell, spec)
 		panes[index] = { frame = frame, sections = pane.build(kit, shell, frame, tab.width) }
 	end
 
-	Commit(Place())
-	Layout.Add(tab, block, 8)
 	Resize = function()
-		Commit(Place())
-		BUILib.Defer(function() tab:Refresh() end)
+		local height = Place()
+		block:SetHeight(height)
+		block.layoutHeight = height
+		BUILib.Defer(function()
+			Align()
+			tab:Refresh()
+		end)
 	end
+	Resize()
+	Layout.Add(tab, block, 8)
 end
