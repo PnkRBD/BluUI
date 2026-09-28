@@ -488,7 +488,7 @@ local entries = {
 	{ label = "Streamer Tools", page = "settings", tab = 5, panel = "Modules" },
 	{ label = "Gem Manager", page = "settings", tab = 5, panel = "Modules" },
 
-	{ label = "Enable", page = "exportimport", tab = 1, panel = "Spec Profiles", keywords = "export import profile share spec" },
+	{ label = "Switch profile with spec", page = "exportimport", tab = 1, panel = "Spec profiles", keywords = "export import profile share spec" },
 
 	{ label = "Enable", page = "groupframes", tab = 1, panel = "Group Frames", keywords = "group party raid frames" },
 	{ label = "Hide Blizzard Frames", page = "groupframes", tab = 1, panel = "Behavior", keywords = "blizzard default frames hide" },
