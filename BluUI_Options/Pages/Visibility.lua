@@ -52,19 +52,6 @@ local function ValidatePriority(db)
 	return priority
 end
 
-local function Arrow(ui, row, up, onClick)
-	local window = Window()
-	local button = CreateFrame('Button', nil, row)
-	button:SetSize(ARROW, ARROW)
-	local glyph = ui.Glyph(button, 'dropdown', 10, 'muted')
-	glyph:SetPoint('CENTER')
-	if up then glyph:SetRotation(math.pi) end
-	button:SetScript('OnEnter', function() window:Paint(glyph, 'text') end)
-	button:SetScript('OnLeave', function() window:Paint(glyph, 'muted') end)
-	button:SetScript('OnClick', onClick)
-	return button
-end
-
 local function ModulesBoard(ui, parent, width)
 	local disabled = BUI.GetDB().general.visibilityModulesDisabled
 	local keys = Visibility.GetRegisteredKeys()
@@ -123,9 +110,9 @@ local function StateBoard(ui, parent, width, page)
 			Visibility.Update(true)
 		end }):SetPoint('RIGHT', -ui.ROW_INSET, 0)
 		if movable then
-			local down = Arrow(ui, row, false, function() Move(key, 1) end)
+			local down = ui.ArrowButton(row, false, function() Move(key, 1) end)
 			down:SetPoint('RIGHT', -(ui.ROW_INSET + SLIDER_WIDTH + 12), 0)
-			Arrow(ui, row, true, function() Move(key, -1) end):SetPoint('RIGHT', down, 'LEFT', -ARROW_GAP, 0)
+			ui.ArrowButton(row, true, function() Move(key, -1) end):SetPoint('RIGHT', down, 'LEFT', -ARROW_GAP, 0)
 		end
 	end
 	for _, key in ipairs(priority) do StateRow(key, true) end
