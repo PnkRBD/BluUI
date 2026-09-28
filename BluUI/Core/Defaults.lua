@@ -556,6 +556,7 @@ BUI.Defaults = {
 				xpColor        = { 0.8, 0.3, 1 },
 				restedColor    = { 0.25, 0.4, 0.7 },
 				showRestedXP   = true,
+				bgOpacity      = 90,
 				position       = 'BOTTOM',
 				barWidth       = 500,
 				fullWidth      = true,
