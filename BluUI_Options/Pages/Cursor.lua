@@ -216,9 +216,6 @@ local function CursorBoard(ui, parent, width)
 		title = 'Cursor',
 		description = 'Rings and cast feedback that follow the mouse. Everything here applies to the live cursor as you change it, and the preview above follows your mouse while you hover it.',
 	})
-	board:AddSwitch('Cursor rings', function() return BUI.IsModuleEnabled('cursor') end, function(value)
-		BUI.SetModuleEnabled('cursor', value)
-	end, 'The whole module')
 	board:AddSwitch('Only in combat', function() return Config().combatOnly == true end, function(value)
 		Config().combatOnly = value
 		MouseCursor.Refresh()
@@ -299,6 +296,9 @@ BUI.PageEngine.RegisterPage('cursor', {
 			icon = 'cursor',
 			title = 'Cursor',
 			placeholder = 'Search cursor settings...',
+			toggles = {
+				{ icon = 'enable', tooltip = 'Turn the cursor module on or off', get = function() return BUI.IsModuleEnabled('cursor') end, set = function(value) BUI.SetModuleEnabled('cursor', value) end },
+			},
 			preview = { height = PREVIEW_HEIGHT, build = function(band) preview = BuildPreview(band) end },
 			tabs = { { label = 'Cursor', build = Sections } },
 		})

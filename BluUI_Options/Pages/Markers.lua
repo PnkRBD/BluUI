@@ -1,198 +1,167 @@
 local BUI = BluUI
-
-local BUILib = BluUI.BUILibClient
+local BUILib = BUI.BUILibClient
 local Layout = BUILib.Layout
-local PageKit = BUILib.PageKit
 
-local function GetConfig() return BUI.GetDB().markers end
+local PAGE_WIDTH = 960
+local SLIDER_WIDTH = 220
+local DROPDOWN_WIDTH = 220
+local FREE = ''
+
+local ANCHORS = { { value = FREE, text = 'None, free on the screen' } }
+for _, frame in ipairs(BUI.AnchorFramesExcept('BUI_MarkerBar')) do
+	ANCHORS[#ANCHORS + 1] = { value = frame.tag, text = frame.desc }
+end
+
+local function Window()
+	return BUI.PageEngine.window
+end
+
+local function Config()
+	return BUI.GetDB().markers
+end
+
+local function Apply()
+	BUI.Markers.Refresh()
+end
+
+local function Anchored()
+	return Config().anchorFrame ~= FREE
+end
+
+local function Field(key)
+	return function() return Config()[key] end, function(value) Config()[key] = value end
+end
+
+local function Offset(freeKey, anchoredKey)
+	return function()
+		return Config()[Anchored() and anchoredKey or freeKey]
+	end, function(value)
+		Config()[Anchored() and anchoredKey or freeKey] = value
+	end
+end
+
+local function Named(entries, value)
+	for _, entry in ipairs(entries) do
+		if entry.value == value then return entry.text end
+	end
+	return value
+end
+
+local function Switch(board, label, get, set, tip)
+	board:AddSwitch(label, get, function(value)
+		set(value)
+		Apply()
+	end, tip)
+end
+
+local function Slider(ui, row, minimum, maximum, step, get, set)
+	ui.Slider(row, SLIDER_WIDTH, { min = minimum, max = maximum, step = step, get = get, set = function(value)
+		set(value)
+		Apply()
+	end }):SetPoint('RIGHT', -ui.ROW_INSET, 0)
+end
+
+local function Menu(ui, row, entries, get, set)
+	local dropdown = ui.Dropdown(row, DROPDOWN_WIDTH, function()
+		local current = get()
+		local items = {}
+		for _, entry in ipairs(entries) do
+			items[#items + 1] = { text = entry.text, checked = entry.value == current, callback = function()
+				set(entry.value)
+				Apply()
+				Window():Repaint()
+			end }
+		end
+		return items
+	end)
+	dropdown:SetPoint('RIGHT', -ui.ROW_INSET, 0)
+	ui.Bind(row, function() dropdown.label:SetText(Named(entries, get())) end)
+end
+
+local function BarBoard(ui, parent, width)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Marker bar',
+		description = 'Raid target and world marker tiles in a row. Click marks your target, Shift-Click places a world marker, Shift-Right-Click clears it.',
+	})
+	Switch(board, 'Only in a group', function() return Config().onlyInGroup == true end, function(value)
+		Config().onlyInGroup = value
+	end, 'Hide the bar while not in a party or raid')
+	Switch(board, 'Tooltips', function() return Config().tooltips == true end, function(value)
+		Config().tooltips = value
+	end, 'Explain each tile on mouseover')
+	Slider(ui, board:AddRow('Icon size', 'Applied after combat ends', SLIDER_WIDTH), 16, 40, 1, Field('iconSize'))
+	Slider(ui, board:AddRow('Spacing', 'Pixels between tiles', SLIDER_WIDTH), 0, 12, 1, Field('spacing'))
+	return board
+end
+
+local function PositionBoard(ui, parent, width)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Position',
+		description = 'Where the bar sits. Drag it on the screen, or hang it off another BluUI frame and nudge it from there.',
+	})
+	Switch(board, 'Match anchor width', function() return Config().matchAnchorWidth == true end, function(value)
+		Config().matchAnchorWidth = value
+	end, 'Spread the tiles to the width of the anchor frame')
+	Menu(ui, board:AddRow('Anchor to', 'Free on the screen, or attached to a frame', DROPDOWN_WIDTH), ANCHORS, Field('anchorFrame'))
+	Menu(ui, board:AddRow('Anchor side', 'Which side of that frame the bar hangs on', DROPDOWN_WIDTH), BUI.C.ANCHOR_PLACEMENT_OPTIONS, Field('anchorPoint'))
+	Slider(ui, board:AddRow('Horizontal offset', 'From the screen centre, or from the anchor frame', SLIDER_WIDTH), -1500, 1500, 1, Offset('posX', 'anchorOffsetX'))
+	Slider(ui, board:AddRow('Vertical offset', 'From the screen centre, or from the anchor frame', SLIDER_WIDTH), -1000, 1000, 1, Offset('posY', 'anchorOffsetY'))
+	return board
+end
+
+local function FadeBoard(ui, parent, width)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Opacity and fade',
+		description = 'How see-through the bar is, and whether it fades away until the mouse is over it.',
+	})
+	Switch(board, 'Fade until hovered', function() return Config().fadeEnabled == true end, function(value)
+		Config().fadeEnabled = value
+	end, 'Fade the bar out until the cursor is over it')
+	Switch(board, 'Animate the fade', function() return Config().fadeAnimated == true end, function(value)
+		Config().fadeAnimated = value
+	end, 'Ease between the two opacities instead of snapping')
+	Slider(ui, board:AddRow('Bar opacity', 'Percent', SLIDER_WIDTH), 10, 100, 1, Field('alpha'))
+	Slider(ui, board:AddRow('Faded opacity', 'Percent while the mouse is away', SLIDER_WIDTH), 0, 100, 1, Field('fadeAlpha'))
+	Slider(ui, board:AddRow('Fade time', 'Seconds', SLIDER_WIDTH), 0.05, 1, 0.05, Field('fadeDuration'))
+	return board
+end
+
+local function UtilityBoard(ui, parent, width)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Utility tiles',
+		description = 'Clear, ready check and countdown beside the markers. Click the countdown for the primary timer, Right-Click for the secondary, Shift-Click cancels it.',
+	})
+	Switch(board, 'Show utility tiles', function() return Config().showControls ~= false end, function(value)
+		Config().showControls = value
+	end, 'Clear, ready check and countdown')
+	Slider(ui, board:AddRow('Primary countdown', 'Seconds, 0 turns it off', SLIDER_WIDTH), 0, 60, 1, Field('countdownTime'))
+	Slider(ui, board:AddRow('Secondary countdown', 'Seconds, 0 turns it off', SLIDER_WIDTH), 0, 60, 1, Field('countdownTime2'))
+	return board
+end
+
+local function Sections(ui, _, parent, width)
+	return { BarBoard(ui, parent, width), PositionBoard(ui, parent, width), FadeBoard(ui, parent, width), UtilityBoard(ui, parent, width) }
+end
 
 BUI.PageEngine.RegisterPage('markers', {
-    title = 'Markers',
-    buttonText = 'Markers',
-    minContentWidth  = 924,
-    minContentHeight = 480,
-    OnBuild = function(pageFrame)
-        local DASH_WIDTH = BUILib.Layout.PAGE_CONTENT_W
-
-        local watermark = pageFrame:CreateTexture(nil, 'BACKGROUND', nil, 1)
-        watermark:SetTexture(BUI.Tools.GetLogo())
-        watermark:SetSize(520, 520)
-        watermark:SetPoint('CENTER')
-        watermark:SetVertexColor(1, 1, 1, 0.06)
-
-        local SyncDim
-        local titleHeight, titleBar = PageKit.PageTitle(pageFrame, 'Markers', DASH_WIDTH, {
-            desc = 'Raid target and world marker bar. Click marks your target, '
-                .. 'Shift-Click places a world marker, Shift-Right-Click clears it.',
-            enable = { value = BUI.IsModuleEnabled('markers'), onToggle = function(enabled)
-                BUI.SetModuleEnabled('markers', enabled); SyncDim()
-            end },
-        })
-        local contentTop = PageKit.PAD + titleHeight
-
-        local host = CreateFrame('Frame', nil, pageFrame)
-        host:SetPoint('TOPLEFT', pageFrame, 'TOPLEFT', 0, -contentTop)
-        host:SetPoint('BOTTOMRIGHT', pageFrame, 'BOTTOMRIGHT', 0, 0)
-        local page = Layout.Page(host, nil, DASH_WIDTH)
-        local tab = page:GetTab(1)
-        tab.topPadding = 0
-
-        local refreshers = {}
-        local function AddRefresh(refreshFunction) refreshers[#refreshers + 1] = refreshFunction end
-
-        local function Apply() BUI.Markers.Refresh() end
-
-        local function flatSetting(key)
-            return {
-                get = function() return GetConfig()[key] end,
-                set = function(value) GetConfig()[key] = value end,
-            }
-        end
-
-        local grids = {}
-        local grid
-        local function Section(title)
-            if grid then grid:Flush() end
-            Layout.Section(tab, title)
-            grid = PageKit.RowGrid(tab)
-            grids[#grids + 1] = grid
-        end
-
-        SyncDim = function()
-            local enabled = BUI.IsModuleEnabled('markers')
-            for gridIndex = 1, #grids do grids[gridIndex]:SyncDim(enabled) end
-        end
-
-        AddRefresh(function() titleBar.enableToggle:SetValue(BUI.IsModuleEnabled('markers')) end)
-
-        Section('General')
-
-        do
-            local onlyGroup = flatSetting('onlyInGroup')
-            local row = grid:Add({
-                title = 'Show Only In Group',
-                description = 'Hide the bar while not in a party or raid.',
-                checked = onlyGroup.get() and true or false,
-                callback = function(checked) onlyGroup.set(checked); Apply() end,
-            })
-            if row then AddRefresh(function() row:SetValue(onlyGroup.get() and true or false) end) end
-        end
-
-        do
-            local tips = flatSetting('tooltips')
-            local row = grid:Add({
-                title = 'Show Tooltips',
-                description = 'Explain each button on mouseover.',
-                checked = tips.get() and true or false,
-                callback = function(checked) tips.set(checked) end,
-            })
-            if row then AddRefresh(function() row:SetValue(tips.get() and true or false) end) end
-        end
-
-        do
-            grid:Add({
-                title = 'Position & Anchor',
-                description = 'Screen position, or anchor the bar to another BluUI frame and match its width.',
-                plain = true,
-                accessoryWidth = 36,
-                accessories = function(row)
-                    return { BUI.AlertMover(row, GetConfig(), Apply, {
-                        selfTag = 'BUI_MarkerBar',
-                        noCenter = true,
-                        matchWidth = {
-                            get = function() return GetConfig().matchAnchorWidth and true or false end,
-                            set = function(value) GetConfig().matchAnchorWidth = value; Apply() end,
-                        },
-                    }) }
-                end,
-            })
-        end
-
-        do
-            local fade = flatSetting('fadeEnabled')
-            local row = grid:Add({
-                title = 'Mouseover Fade',
-                description = 'Fade the bar out until the cursor is over it. The cog sets opacity and whether the fade is animated or instant.',
-                checked = fade.get() and true or false,
-                accessoryWidth = 36,
-                callback = function(checked) fade.set(checked and true or false); Apply() end,
-                accessories = function(row)
-                    return { PageKit.SettingsIcon(row, { title = 'FADING', tooltip = 'Opacity, animation and fade time', options = {
-                        { kind = 'slider', label = 'Bar Opacity %', min = 10, max = 100,
-                          get = flatSetting('alpha').get, set = flatSetting('alpha').set, apply = Apply },
-                        { kind = 'slider', label = 'Faded Opacity %', min = 0, max = 100,
-                          get = flatSetting('fadeAlpha').get, set = flatSetting('fadeAlpha').set, apply = Apply },
-                        { label = 'Animated',
-                          get = flatSetting('fadeAnimated').get, set = flatSetting('fadeAnimated').set, apply = Apply },
-                        { kind = 'slider', label = 'Fade Time (s)', min = 0.05, max = 1, step = 0.05,
-                          get = flatSetting('fadeDuration').get, set = flatSetting('fadeDuration').set, apply = Apply },
-                    } }) }
-                end,
-            })
-            if row then AddRefresh(function() row:SetValue(fade.get() and true or false) end) end
-        end
-
-        do
-            local size = flatSetting('iconSize')
-            local spacing = flatSetting('spacing')
-            grid:Add({
-                title = 'Bar Size',
-                description = 'Icon size and spacing. Applied after combat ends.',
-                plain = true,
-                accessoryWidth = 36,
-                accessories = function(row)
-                    return { PageKit.SizeIcon(row, { title = 'BAR SIZE', tooltip = 'Icon size and spacing', options = {
-                        { kind = 'slider', label = 'Icon Size', min = 16, max = 40,
-                          get = size.get, set = size.set, apply = Apply },
-                        { kind = 'slider', label = 'Spacing', min = 0, max = 12,
-                          get = spacing.get, set = spacing.set, apply = Apply },
-                    } }) }
-                end,
-            })
-        end
-
-        Section('Utility Buttons')
-
-        do
-            local show = flatSetting('showControls')
-            local row = grid:Add({
-                title = 'Show Utility Buttons',
-                description = 'Clear, ready check, and countdown beside the markers.',
-                checked = show.get() ~= false,
-                callback = function(checked) show.set(checked and true or false); Apply() end,
-            })
-            if row then AddRefresh(function() row:SetValue(show.get() ~= false) end) end
-        end
-
-        do
-            local primaryTime = flatSetting('countdownTime')
-            local secondaryTime = flatSetting('countdownTime2')
-            grid:Add({
-                title = 'Countdown Timers',
-                description = 'Click starts the primary countdown, Right-Click the secondary, '
-                    .. 'Shift-Click cancels.',
-                plain = true,
-                accessoryWidth = 36,
-                accessories = function(row)
-                    return { PageKit.SettingsIcon(row, { title = 'COUNTDOWN SECONDS', tooltip = 'Countdown durations', options = {
-                        { kind = 'slider', label = 'Primary', min = 0, max = 60,
-                          get = primaryTime.get, set = primaryTime.set, apply = Apply },
-                        { kind = 'slider', label = 'Secondary', min = 0, max = 60,
-                          get = secondaryTime.get, set = secondaryTime.set, apply = Apply },
-                    } }) }
-                end,
-            })
-        end
-
-        grid:Flush()
-
-        SyncDim()
-
-        pageFrame:SetScript('OnShow', function()
-            for _, refresh in ipairs(refreshers) do refresh() end
-            SyncDim()
-        end)
-
-        page:AutoRefresh()
-    end,
+	title = 'Markers',
+	buttonText = 'Markers',
+	icon = 'markers',
+	OnBuild = function(pageFrame)
+		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
+		Layout.TablePage(page:GetTab(1), { window = Window() }, {
+			icon = 'markers',
+			title = 'Markers',
+			placeholder = 'Search marker settings...',
+			toggles = {
+				{ icon = 'enable', tooltip = 'Turn the marker bar on or off', get = function() return BUI.IsModuleEnabled('markers') end, set = function(value) BUI.SetModuleEnabled('markers', value) end },
+			},
+			tabs = { { label = 'Markers', build = Sections } },
+		})
+		page:AutoRefresh()
+	end,
 })
