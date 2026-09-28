@@ -448,8 +448,8 @@ local entries = {
 	{ label = "Vehicle Exit", page = "actionbars", sidebar = "vehicle", panel = "Vehicle Exit", keywords = "vehicle exit leave taxi possess button" },
 	{ label = "Micro Menu", page = "actionbars", sidebar = "micro", panel = "Micro Menu", keywords = "micro menu buttons character spellbook bar" },
 	{ label = "Bag Bar", page = "actionbars", sidebar = "bags", panel = "Bag Bar", keywords = "bag bar backpack buttons" },
-	{ label = "TTS Volume", page = "settings", tab = 2, panel = "Voice & Sound", keywords = "tts voice speech volume loudness audio" },
-	{ label = "Alert Sound Channel", page = "settings", tab = 2, panel = "Voice & Sound", keywords = "sound channel master sfx audio alerts" },
+	{ label = "Volume", page = "settings", tab = 2, panel = "Voice and sound", keywords = "tts voice speech volume loudness audio" },
+	{ label = "Alert sound channel", page = "settings", tab = 2, panel = "Voice and sound", keywords = "sound channel master sfx audio alerts" },
 	{ label = "Faster Looting", page = "settings", tab = 2, panel = "Looting", keywords = "loot speed auto fast" },
 	{ label = "Auto-Sell Junk", page = "settings", tab = 2, panel = "Looting", keywords = "vendor sell grey trash" },
 	{ label = "Auto-Repair", page = "settings", tab = 2, panel = "Merchant", keywords = "repair gold" },
@@ -458,12 +458,12 @@ local entries = {
 	{ label = "Auto-Accept & Gossip", page = "settings", tab = 2, panel = "Questing", keywords = "quest auto accept gossip" },
 	{ label = "Auto-Complete", page = "settings", tab = 2, panel = "Questing", keywords = "quest auto complete turn in" },
 	{ label = "Skip Movies", page = "settings", tab = 2, panel = "Questing", keywords = "cinematic movie skip" },
-	{ label = "Cast on Key Down", page = "settings", tab = 2, panel = "Combat", keywords = "key down press" },
-	{ label = "Auto Keystone", page = "settings", tab = 2, panel = "Combat", keywords = "mythic keystone auto insert" },
+	{ label = "Cast on Key Down", page = "settings", tab = 2, panel = "Casting", keywords = "key down press" },
+	{ label = "Auto Keystone", page = "settings", tab = 2, panel = "Casting", keywords = "mythic keystone auto insert" },
 	{ label = "Auto Combat Log", page = "settings", tab = 2, panel = "Combat Logging", keywords = "combat log logging warcraft logs record auto" },
 	{ label = "Logging Indicator", page = "settings", tab = 2, panel = "Combat Logging", keywords = "combat log indicator recording dot" },
 	{ label = "Advanced Logging", page = "settings", tab = 2, panel = "Combat Logging", keywords = "advanced combat logging warcraft logs cvar" },
-	{ label = "Spell Queue (ms)", page = "settings", tab = 2, panel = "Combat", keywords = "spell queue window spellqueue" },
+	{ label = "Spell Queue (ms)", page = "settings", tab = 2, panel = "Casting", keywords = "spell queue window spellqueue" },
 	{ label = "Auto-Accept Party", page = "settings", tab = 2, panel = "Social" },
 	{ label = "Include Guild", page = "settings", tab = 2, panel = "Social" },
 	{ label = "Auto-Confirm Role", page = "settings", tab = 2, panel = "Social" },
@@ -472,9 +472,9 @@ local entries = {
 	{ label = "Hide Rested Zzz", page = "settings", tab = 2, panel = "Interface" },
 	{ label = "Hide Zone Text", page = "settings", tab = 2, panel = "Interface" },
 	{ label = "Hide Error Msgs", page = "settings", tab = 2, panel = "Interface", keywords = "error red text" },
-	{ label = "Apply FPS Settings", page = "settings", tab = 2, panel = "Graphical Tweaks", keywords = "fps cvar performance graphics vsync" },
-	{ label = "Restore Original", page = "settings", tab = 2, panel = "Graphical Tweaks", keywords = "cvar restore reset" },
-	{ label = "Hold to Reset Settings", page = "settings", tab = 2, panel = "Danger Zone", keywords = "reset wipe default" },
+	{ label = "FPS preset", page = "settings", tab = 2, panel = "Graphics", keywords = "fps cvar performance graphics vsync apply" },
+	{ label = "Restore", page = "settings", tab = 2, panel = "Graphics", keywords = "fps cvar restore original" },
+	{ label = "Reset BluUI", page = "settings", tab = 2, panel = "Danger zone", keywords = "reset wipe default settings" },
 	{ label = "Unit Frames", page = "settings", tab = 5, panel = "Modules", keywords = "enable disable module" },
 	{ label = "Cooldown Manager", page = "settings", tab = 5, panel = "Modules" },
 	{ label = "Cast Bars", page = "settings", tab = 5, panel = "Modules" },
@@ -620,5 +620,5 @@ SearchIndex.RegisterTabNames('cdm', { 'General', 'Essential', 'Utility', 'Buffs'
 SearchIndex.RegisterTabNames('castbars', { 'Player', 'Target', 'Focus' })
 SearchIndex.RegisterTabNames('unitframes', { 'Global', 'Reference', 'Custom Tags', 'Player', 'Target', 'ToT', 'Focus', 'Pet', 'Boss', 'Filters' })
 SearchIndex.RegisterTabNames('groupframes', { 'General', 'Party', 'Raid', 'Party Auras', 'Raid Auras', 'Filters' })
-SearchIndex.RegisterTabNames('settings', { 'Settings', 'Appearance', 'Skinning', 'Visibility', 'Modules', 'Help' })
+SearchIndex.RegisterTabNames('settings', { 'Appearance', 'Settings', 'Skinning', 'Visibility', 'Modules', 'Help', 'Theme' })
 SearchIndex.RegisterTabNames('buffTracking', { 'Tracking' })
