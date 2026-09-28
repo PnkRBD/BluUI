@@ -9,10 +9,6 @@ local DROPDOWN_WIDTH = 112
 local FONT_DROPDOWN_WIDTH = 200
 local PRESET_DROPDOWN_WIDTH = 140
 local SWATCH_SIZE = 28
-local STAGE_HEIGHT = 118
-local STAGE_PAD = 20
-local BAR_HEIGHT = 16
-local PREVIEW_GAP = 24
 
 local PALETTE = {
 	{ name = 'Magenta', color = { 0.83, 0, 0.37 } },
@@ -126,76 +122,6 @@ local function SetSmoothBars(value)
 	BUI.UnitFrames.InvalidateSettingsCache()
 	BUI.UnitFrames:Refresh()
 	Window():Repaint()
-end
-
-local function Stage(ui, parent, width)
-	local window = Window()
-	local frame = CreateFrame('Frame', nil, parent)
-	frame:SetSize(width, STAGE_HEIGHT + PREVIEW_GAP)
-	local stage = CreateFrame('Frame', nil, frame)
-	stage:SetPoint('TOPLEFT')
-	stage:SetSize(width, STAGE_HEIGHT)
-	for _, piece in ipairs(Widget.DrawRoundedRect(stage, 8, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)) do window:Paint(piece, 'input') end
-	ui.Text(stage, 'PREVIEW', 9, 'faint'):SetPoint('TOPLEFT', STAGE_PAD, -14)
-	local note = ui.Text(stage, '', 10, 'faint')
-	note:SetPoint('TOPRIGHT', -STAGE_PAD, -14)
-
-	local barWidth = math.floor((width - STAGE_PAD * 3) / 2)
-	local function Bar(x, y, fraction, label, role)
-		local track = ui.Fill(stage, 'control', 'ARTWORK')
-		track:SetPoint('TOPLEFT', x, -y)
-		track:SetSize(barWidth, BAR_HEIGHT)
-		local fill = stage:CreateTexture(nil, 'ARTWORK', nil, 1)
-		fill:SetPoint('TOPLEFT', track)
-		fill:SetSize(math.floor(barWidth * fraction), BAR_HEIGHT)
-		window:Paint(fill, role)
-		local text = stage:CreateFontString(nil, 'OVERLAY')
-		text:SetFont(window.font, 11, '')
-		text:SetPoint('LEFT', track, 'LEFT', 8, 0)
-		text:SetText(label)
-		window:Paint(text, 'text')
-		local value = stage:CreateFontString(nil, 'OVERLAY')
-		value:SetFont(window.font, 11, '')
-		value:SetPoint('RIGHT', track, 'RIGHT', -8, 0)
-		value:SetText(('%d%%'):format(fraction * 100))
-		window:Paint(value, 'text')
-		return fill, text, value
-	end
-	local health, healthText, healthValue = Bar(STAGE_PAD, 40, 0.84, 'Health', 'accent')
-	local power, powerText, powerValue = Bar(STAGE_PAD * 2 + barWidth, 40, 0.62, 'Power', 'accent')
-	local cooldown = stage:CreateFontString(nil, 'OVERLAY')
-	cooldown:SetFont(window.font, 18, '')
-	cooldown:SetPoint('TOPLEFT', STAGE_PAD, -74)
-	cooldown:SetText('12.4')
-	window:Paint(cooldown, 'text')
-	local cooldownLabel = ui.Text(stage, 'Cooldown text', 10, 'faint')
-	cooldownLabel:SetPoint('LEFT', cooldown, 'RIGHT', 10, 0)
-	local resource = stage:CreateFontString(nil, 'OVERLAY')
-	resource:SetFont(window.font, 18, '')
-	resource:SetPoint('TOPLEFT', STAGE_PAD * 2 + barWidth, -74)
-	resource:SetText('4 / 5')
-	window:Paint(resource, 'text')
-	local resourceLabel = ui.Text(stage, 'Class resources', 10, 'faint')
-	resourceLabel:SetPoint('LEFT', resource, 'RIGHT', 10, 0)
-
-	ui.Bind(stage, function()
-		local general = General()
-		local texture = BUI.GetGlobalTexture()
-		local flags = BUI.ApplySlug('OUTLINE')
-		local font = BUI.GetGlobalFont()
-		health:SetTexture(texture)
-		power:SetTexture(texture)
-		window:Paint(health, 'accent')
-		window:Paint(power, 'accent')
-		healthText:SetFont(font, 11, flags)
-		healthValue:SetFont(font, 11, flags)
-		powerText:SetFont(font, 11, flags)
-		powerValue:SetFont(font, 11, flags)
-		cooldown:SetFont(BUI.GetCDMFont(), 18, flags)
-		resource:SetFont(BUI.GetSecondaryPowerFont(), 18, flags)
-		note:SetText((general.font .. ' on ' .. general.texture):upper())
-	end)
-	return frame
 end
 
 local function AccentName()
@@ -459,7 +385,7 @@ local function ColorSection(ui, parent, width, group, card)
 end
 
 local function Sections(ui, _, parent, width)
-	local sections = { Stage(ui, parent, width) }
+	local sections = {}
 	sections[#sections + 1] = AccentSection(ui, parent, width)
 	sections[#sections + 1] = TextSection(ui, parent, width)
 	sections[#sections + 1] = BarSection(ui, parent, width)
