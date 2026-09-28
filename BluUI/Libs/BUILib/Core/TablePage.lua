@@ -25,10 +25,17 @@ local HEADER_GAP = 26
 local BOTTOM_GAP = 24
 local SEARCH_WIDTH, SEARCH_HEIGHT = 224, 34
 local SOLID_HOVER = { 1, 1, 1, 0.12 }
+local SWITCH_WIDTH, SWITCH_HEIGHT = 40, 22
+local SLIDER_KNOB = 12
+local SLIDER_TRACK = 4
+local SLIDER_GAP = 6
+local SLIDER_STEP = 24
+local SLIDER_BOX = 52
 local BUTTON_STYLES = {
 	primary = { fill = 'accent', text = 'onAccent', solid = true },
 	control = { fill = 'control', text = 'controlText', solid = true },
 	secondary = { fill = 'secondary', text = 'secondaryText' },
+	danger = { fill = 'secondary', text = 'danger' },
 }
 
 Layout.TableKitExtensions = {}
@@ -43,6 +50,7 @@ end
 
 local Section = {}
 Section.__index = Section
+Layout.TableSection = Section
 
 function Section:AddRow(search)
 	local row = CreateFrame('Frame', nil, self.panel)
@@ -73,6 +81,10 @@ function Section:Layout(y, query)
 		self.frame:Hide()
 		return y
 	end
+	return self:Place(y, panelHeight)
+end
+
+function Section:Place(y, panelHeight)
 	self.panel:SetHeight(panelHeight)
 	local height = self.pad * 2 + math.max(self.leftHeight, self.panelTop - self.pad + panelHeight) + 1
 	self.frame:ClearAllPoints()
@@ -133,6 +145,107 @@ function Layout.TableKit(window)
 
 	function kit.Fill(parent, role, layer, subLayer)
 		return window:Fill(parent, role, layer, subLayer)
+	end
+
+	function kit.Switch(parent, get, set)
+		local switch = Widget.Unwrap(Controls.SwitchToggle(parent, nil, get(), set, nil, nil, nil, SWITCH_WIDTH, SWITCH_HEIGHT))
+		local function Refresh() switch:SetValue(get()) end
+		window:Bind(switch, Refresh)
+		switch.Refresh = Refresh
+		return switch
+	end
+
+	local function Stepper(parent, glyph)
+		local button = CreateFrame('Button', nil, parent)
+		button:SetSize(SLIDER_STEP, CONTROL_HEIGHT)
+		window:Fill(button, 'secondary'):SetAllPoints()
+		Overlay(button)
+		kit.Text(button, glyph, 14, 'secondaryText'):SetPoint('CENTER', 0, 1)
+		return button
+	end
+
+	function kit.Slider(parent, width, spec)
+		local frame = CreateFrame('Frame', nil, parent)
+		frame:SetSize(width, CONTROL_HEIGHT)
+		local step = spec.step or 1
+		local decimals, unit = 0, step
+		while math.abs(unit - math.floor(unit + 0.5)) > 0.0001 and decimals < 3 do
+			unit, decimals = unit * 10, decimals + 1
+		end
+		local pattern = '%.' .. decimals .. 'f'
+		local function Snap(value)
+			return math.max(spec.min, math.min(spec.max, spec.min + math.floor((value - spec.min) / step + 0.5) * step))
+		end
+
+		local box = CreateFrame('Frame', nil, frame)
+		box:SetSize(SLIDER_BOX, CONTROL_HEIGHT)
+		box:SetPoint('RIGHT')
+		window:Fill(box, 'input'):SetAllPoints()
+		local edit = CreateFrame('EditBox', nil, box)
+		edit:SetAllPoints()
+		edit:SetAutoFocus(false)
+		edit:SetJustifyH('CENTER')
+		edit:SetMaxLetters(8)
+		edit:SetFont(window.font, 12, '')
+		window:Paint(edit, 'text')
+		window:SetFontRole(edit, 'control')
+
+		local plus = Stepper(frame, '+')
+		plus:SetPoint('RIGHT', box, 'LEFT', -SLIDER_GAP, 0)
+		local minus = Stepper(frame, '\226\136\146')
+		minus:SetPoint('LEFT')
+
+		local slider = CreateFrame('Slider', nil, frame)
+		slider:SetOrientation('HORIZONTAL')
+		slider:SetPoint('LEFT', minus, 'RIGHT', SLIDER_GAP, 0)
+		slider:SetPoint('RIGHT', plus, 'LEFT', -SLIDER_GAP, 0)
+		slider:SetHeight(CONTROL_HEIGHT)
+		slider:SetMinMaxValues(spec.min, spec.max)
+		slider:SetValueStep(step)
+		slider:SetObeyStepOnDrag(true)
+		slider:SetThumbTexture(BUILib.GetLibMedia('smoothdisc'))
+		local thumb = slider:GetThumbTexture()
+		thumb:SetSize(SLIDER_KNOB, SLIDER_KNOB)
+		thumb:SetDrawLayer('OVERLAY')
+		window:Paint(thumb, 'text')
+		local track = kit.Fill(slider, 'control', 'ARTWORK')
+		track:SetPoint('LEFT', SLIDER_KNOB / 2, 0)
+		track:SetPoint('RIGHT', -SLIDER_KNOB / 2, 0)
+		track:SetHeight(SLIDER_TRACK)
+		local fill = kit.Fill(slider, 'accent', 'ARTWORK', 1)
+		fill:SetPoint('LEFT', track)
+		fill:SetPoint('RIGHT', thumb, 'CENTER')
+		fill:SetHeight(SLIDER_TRACK)
+
+		local function Show(value)
+			edit:SetText(pattern:format(value))
+		end
+		local function Set(value)
+			value = Snap(value)
+			slider:SetValue(value)
+			spec.set(value)
+		end
+		slider:SetScript('OnValueChanged', function(_, value, userInput)
+			value = Snap(value)
+			Show(value)
+			if userInput then spec.set(value) end
+		end)
+		minus:SetScript('OnClick', function() Set(slider:GetValue() - step) end)
+		plus:SetScript('OnClick', function() Set(slider:GetValue() + step) end)
+		edit:SetScript('OnEnterPressed', function(self)
+			local typed = tonumber(self:GetText())
+			if typed then Set(typed) else Show(Snap(slider:GetValue())) end
+			self:ClearFocus()
+		end)
+		edit:SetScript('OnEscapePressed', function(self) self:ClearFocus() end)
+		edit:SetScript('OnEditFocusLost', function() Show(Snap(slider:GetValue())) end)
+		window:Bind(frame, function()
+			local value = Snap(spec.get())
+			slider:SetValue(value)
+			Show(value)
+		end)
+		frame.slider = slider
+		return frame
 	end
 
 	function kit.Button(parent, text, style, onClick, icon)

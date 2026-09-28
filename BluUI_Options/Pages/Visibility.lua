@@ -1,31 +1,38 @@
 local BUI = BluUI
 
 local BUILib = BluUI.BUILibClient
-local Controls, Layout = BUILib.Controls, BUILib.Layout
-
 local Visibility = BUI.Visibility
 
+local SLIDER_WIDTH = 220
+local ARROW = 22
+local ARROW_GAP = 4
+local CONTROL_ROOM = SLIDER_WIDTH + 12 + ARROW * 2 + ARROW_GAP
+
 local STATES = {
-	outOfCombat = { label = 'Out of Combat',   icon = 136116 },
-	combat      = { label = 'In Combat',       icon = 132349 },
-	mounted     = { label = 'Mounted',         icon = 132261 },
-	flying      = { label = 'Flying',          icon = 135943 },
-	vehicle     = { label = 'In Vehicle',      icon = 135995 },
-	inInstance  = { label = 'In Instance',     icon = 136011 },
-	dead        = { label = 'Dead',            icon = 135849 },
-	override    = { label = 'Override/Puzzle', icon = 236566 },
-	petBattle   = { label = 'Pet Battle',      icon = 631719 },
+	outOfCombat = { label = 'Out of combat', sub = 'The fallback when nothing else applies' },
+	combat = { label = 'In combat', sub = 'While you are fighting' },
+	mounted = { label = 'Mounted', sub = 'On a mount or in travel form' },
+	flying = { label = 'Flying', sub = 'In the air' },
+	vehicle = { label = 'In a vehicle', sub = 'Riding a vehicle' },
+	inInstance = { label = 'In an instance', sub = 'Dungeons, raids, arenas and battlegrounds' },
+	dead = { label = 'Dead', sub = 'Dead or a ghost' },
+	override = { label = 'Override or puzzle', sub = 'An override bar or a puzzle is up' },
+	petBattle = { label = 'Pet battle', sub = 'During a pet battle' },
 }
 
 local MODULE_LABELS = {
-	UnitFrames     = 'Unit Frames',
-	CastBars       = 'Cast Bars',
-	CDM            = 'Cooldown Manager',
-	CustomBars     = 'Custom Bars',
-	BuffTracking   = 'Buff Tracking',
-	PowerBar       = 'Power Bar',
+	UnitFrames = 'Unit Frames',
+	CastBars = 'Cast Bars',
+	CDM = 'Cooldown Manager',
+	CustomBars = 'Custom Bars',
+	BuffTracking = 'Buff Tracking',
+	PowerBar = 'Power Bar',
 	SecondaryPower = 'Secondary Power',
 }
+
+local function Window()
+	return BUI.PageEngine.window
+end
 
 local function ValidatePriority(db)
 	local priority = db.general.visibilityPriority
@@ -45,121 +52,89 @@ local function ValidatePriority(db)
 	return priority
 end
 
-BUI.VisibilityPage = {}
+local function Arrow(ui, row, up, onClick)
+	local window = Window()
+	local button = CreateFrame('Button', nil, row)
+	button:SetSize(ARROW, ARROW)
+	local glyph = ui.Glyph(button, 'dropdown', 10, 'muted')
+	glyph:SetPoint('CENTER')
+	if up then glyph:SetRotation(math.pi) end
+	button:SetScript('OnEnter', function() window:Paint(glyph, 'text') end)
+	button:SetScript('OnLeave', function() window:Paint(glyph, 'muted') end)
+	button:SetScript('OnClick', onClick)
+	return button
+end
 
-function BUI.VisibilityPage.BuildTab(tab)
-	local PageKit = BUILib.PageKit
+local function ModulesBoard(ui, parent, width)
+	local disabled = BUI.GetDB().general.visibilityModulesDisabled
+	local keys = Visibility.GetRegisteredKeys()
+	table.sort(keys, function(left, right) return (MODULE_LABELS[left] or left) < (MODULE_LABELS[right] or right) end)
+	local board = ui.Board(parent, width, { title = 'Modules', description = 'The modules that follow the state opacity below. Anything off here stays at full opacity.' })
+	for _, key in ipairs(keys) do
+		board:AddSwitch(MODULE_LABELS[key] or key, function() return not disabled[key] end, function(follows)
+			disabled[key] = not follows or nil
+			Visibility.Update(true)
+		end)
+	end
+	return board
+end
+
+local function StateBoard(ui, parent, width, page)
 	local db = BUI.GetDB()
 	local opacity = db.general.visibilityOpacity
-
-	local function UpdateAllModules()
-		BUI.Visibility.Update(true)
-	end
-
-	local disabledSet = db.general.visibilityModulesDisabled
-
-	local registered = BUI.Visibility.GetRegisteredKeys()
-	table.sort(registered, function(leftKey, rightKey)
-		return (MODULE_LABELS[leftKey] or leftKey) < (MODULE_LABELS[rightKey] or rightKey)
-	end)
-
-	local moduleItems = {}
-	local moduleSelected = {}
-	for moduleIndex = 1, #registered do
-		local moduleKey = registered[moduleIndex]
-		moduleItems[moduleIndex] = {value = moduleKey, text = MODULE_LABELS[moduleKey] or moduleKey}
-		moduleSelected[moduleKey] = not disabledSet[moduleKey]
-	end
-
-	Layout.Section(tab, 'Affected Modules')
-	local moduleGrid = PageKit.RowGrid(tab)
-
-	moduleGrid:Add({
-		spanFull = true,
-		title = 'Modules That Obey State Opacity',
-		description = 'Unchecked modules ignore visibility and stay at 100%.',
-		plain = true,
-		accessoryWidth = 270,
-		accessories = function(row)
-			return { Controls.MultiDropdown(row, nil, moduleItems, moduleSelected, function(selected)
-				for moduleIndex = 1, #registered do
-					local moduleKey = registered[moduleIndex]
-					if selected[moduleKey] then
-						disabledSet[moduleKey] = nil
-					else
-						disabledSet[moduleKey] = true
-					end
-				end
-				BUI.Visibility.Update(true)
-			end, nil, 260) }
-		end,
-	})
-	moduleGrid:Flush()
-
 	local priority = ValidatePriority(db)
-
-	Layout.Section(tab, 'State Opacity', 'Opacity per character state. Higher-priority states (earlier cards) win when several apply.')
-
-	local COLUMN_COUNT, CARD_GAP, CARD_HEIGHT = 3, 12, 78
-	local innerWidth = tab.width
-	local CARD_WIDTH = math.floor((innerWidth - (COLUMN_COUNT - 1) * CARD_GAP) / COLUMN_COUNT)
-
-	local cardGrid = Controls.DraggableCardGrid(tab.child, {
-		columns = COLUMN_COUNT, cardWidth = CARD_WIDTH, cardHeight = CARD_HEIGHT, gap = CARD_GAP,
-		onReorder = function(order)
-			local keptCount = 0
-			for index = 1, #order do
-				if order[index] ~= 'outOfCombat' then
-					keptCount = keptCount + 1
-					priority[keptCount] = order[index]
-				end
-			end
-			for index = keptCount + 1, #priority do priority[index] = nil end
-			UpdateAllModules()
-		end,
-		onValueChange = function(key, value)
-			opacity[key] = value
-			UpdateAllModules()
-		end,
+	local rows = {}
+	local board
+	board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'State opacity',
+		description = 'How see-through the modules go in each state. Higher rows win when several states apply, and out of combat is the fallback.',
+		buttons = {
+			{ text = 'Reset order', icon = 'reset', onClick = function()
+				for index, conditionKey in ipairs(Visibility.DEFAULT_PRIORITY) do priority[index] = conditionKey end
+				for index = #Visibility.DEFAULT_PRIORITY + 1, #priority do priority[index] = nil end
+				Visibility.Update(true)
+				page:Rebuild('visibility')
+			end },
+			{ style = 'primary', text = 'All to 100', onClick = function()
+				for key in pairs(STATES) do opacity[key] = 100 end
+				Visibility.Update(true)
+				Window():Repaint()
+			end },
+		},
 	})
-
-	local function AddStateCard(key)
-		local state = STATES[key]
-		cardGrid:AddCard(state.icon, state.label, key, opacity[key], 0, 100, 1, true)
+	local function Move(key, delta)
+		local index
+		for position, conditionKey in ipairs(priority) do
+			if conditionKey == key then index = position end
+		end
+		if not priority[index + delta] then return end
+		priority[index], priority[index + delta] = priority[index + delta], priority[index]
+		board:Move(rows[key], delta)
+		Visibility.Update(true)
+		page:Resize()
 	end
+	local function StateRow(key, movable)
+		local state = STATES[key]
+		local row = board:AddRow(state.label, state.sub, CONTROL_ROOM)
+		rows[key] = row
+		ui.Slider(row, SLIDER_WIDTH, { min = 0, max = 100, step = 1, get = function() return opacity[key] end, set = function(value)
+			opacity[key] = value
+			Visibility.Update(true)
+		end }):SetPoint('RIGHT', -ui.ROW_INSET, 0)
+		if movable then
+			local down = Arrow(ui, row, false, function() Move(key, 1) end)
+			down:SetPoint('RIGHT', -(ui.ROW_INSET + SLIDER_WIDTH + 12), 0)
+			Arrow(ui, row, true, function() Move(key, -1) end):SetPoint('RIGHT', down, 'LEFT', -ARROW_GAP, 0)
+		end
+	end
+	for _, key in ipairs(priority) do StateRow(key, true) end
+	StateRow('outOfCombat', false)
+	return board
+end
 
-	for index = 1, #priority do AddStateCard(priority[index]) end
-	AddStateCard('outOfCombat')
+BUI.VisibilityPage = {}
 
-	local gridFrame = cardGrid.frame
-	local cardGridHeight = gridFrame:GetHeight()
-	Layout.PositionInTab(tab, gridFrame, cardGridHeight, 10)
-
-	local reorderButton
-	local buttonDefs = {
-		{text = 'Reorder States', width = 140, callback = function()
-			local entering = not cardGrid:IsDragMode()
-			cardGrid:SetDragMode(entering)
-			reorderButton:SetText(entering and 'Done Reordering' or 'Reorder States')
-		end},
-		{text = 'Reset All to 100', width = 140, callback = function()
-			for key in pairs(STATES) do
-				opacity[key] = 100
-			end
-			cardGrid:ResetAllValues(100)
-			UpdateAllModules()
-		end},
-		{text = 'Reset Priority', width = 140, callback = function()
-			for index, conditionKey in ipairs(Visibility.DEFAULT_PRIORITY) do
-				priority[index] = conditionKey
-			end
-			for index = #Visibility.DEFAULT_PRIORITY + 1, #priority do priority[index] = nil end
-			cardGrid:ClearCards()
-			for index = 1, #priority do AddStateCard(priority[index]) end
-			AddStateCard('outOfCombat')
-			UpdateAllModules()
-		end},
-	}
-	local _, buttons = Layout.ButtonRow(tab, buttonDefs, 12)
-	reorderButton = buttons[1]
+function BUI.VisibilityPage.Sections(ui, _, parent, width, page)
+	return { ModulesBoard(ui, parent, width), StateBoard(ui, parent, width, page) }
 end

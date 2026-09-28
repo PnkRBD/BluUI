@@ -211,7 +211,7 @@ local function SetFontRole(role, name, page)
 	store.fonts[role] = name
 	store.name = nil
 	if role == 'base' then BUI.ApplyWindowFont() else Repaint() end
-	page:Invalidate()
+	page:Resize()
 end
 
 local function ResetFonts(page)
@@ -219,7 +219,7 @@ local function ResetFonts(page)
 	store.fonts = nil
 	store.name = nil
 	BUI.ApplyWindowFont()
-	page:Invalidate()
+	page:Resize()
 end
 
 local function EffectiveFont(role)
@@ -282,7 +282,7 @@ local function ApplySaved(saved, page)
 	for key, value in pairs(CopyTable(saved.theme)) do store[key] = value end
 	store.name = saved.name
 	BUI.ApplyWindowFont()
-	page:Invalidate()
+	page:Resize()
 end
 
 local function Keep(name, theme, page, adopt)

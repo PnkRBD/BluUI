@@ -15,7 +15,6 @@ local CHIP_GAP = 8
 local KEYCAP_HEIGHT = 22
 local KEY_CAPS = 3
 local KEY_ROOM = 110
-local SWITCH_WIDTH, SWITCH_HEIGHT = 40, 22
 local PROGRESS_ROW = 48
 local ROSTER_ROW = 44
 local LIST_ROW = 44
@@ -233,27 +232,6 @@ function Layout.CardKit(window)
 		return cap
 	end
 
-	function cards.Switch(parent, get, set)
-		local switch = CreateFrame('Button', nil, parent)
-		switch:SetSize(SWITCH_WIDTH, SWITCH_HEIGHT)
-		local track = Widget.DrawRoundedRect(switch, 11, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
-		local knob = kit.Disc(switch, SWITCH_HEIGHT - 6, nil, 'ARTWORK', 1)
-		local function Refresh()
-			local on = get()
-			for _, piece in ipairs(track) do window:Paint(piece, on and 'accent' or 'control') end
-			knob:ClearAllPoints()
-			knob:SetPoint(on and 'RIGHT' or 'LEFT', on and -3 or 3, 0)
-			window:Paint(knob, on and 'onAccent' or 'muted')
-		end
-		window:Bind(switch, Refresh)
-		switch:SetScript('OnClick', function()
-			set(not get())
-			Refresh()
-		end)
-		switch.Refresh = Refresh
-		return switch
-	end
-
 	function cards.Every(frame, seconds, update)
 		local ticker
 		local function Start()
@@ -463,7 +441,7 @@ function Layout.CardKit(window)
 		local height = 128
 		local card = cards.Card(parent, x, y, width, height)
 		cards.Badge(card, spec.icon, 32, PAD, PAD, true)
-		card.switch = cards.Switch(card, spec.get, spec.set)
+		card.switch = kit.Switch(card, spec.get, spec.set)
 		card.switch:SetPoint('TOPRIGHT', -PAD, -(PAD + 5))
 		cards.Label(card, spec.title, PAD, 66, 13, 'text')
 		cards.Description(card, spec.description, PAD, 86, width - PAD * 2)
@@ -480,7 +458,7 @@ function Layout.CardKit(window)
 			if index > 1 then cards.Rule(card, PAD, rowY - 8, width - PAD * 2) end
 			cards.Label(card, row.title, PAD, rowY, 12, 'text')
 			cards.Label(card, row.sub, PAD, rowY + 18, 11, 'muted')
-			local switch = cards.Switch(card, row.get, row.set)
+			local switch = kit.Switch(card, row.get, row.set)
 			switch:SetPoint('TOPRIGHT', -PAD, -(rowY + 5))
 			card.switches[index] = switch
 		end
@@ -846,8 +824,7 @@ function Layout.CardKit(window)
 		card.edge:SetAlpha(0.5)
 		cards.Title(card, spec.title, 22)
 		cards.Description(card, spec.description, PAD, 44, width - PAD * 2 - 180)
-		local button = kit.Button(card, spec.action, 'secondary', spec.onClick)
-		window:Paint(button.label, 'danger')
+		local button = kit.Button(card, spec.action, 'danger', spec.onClick)
 		button:SetPoint('RIGHT', -PAD, 0)
 		return card
 	end

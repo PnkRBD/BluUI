@@ -108,6 +108,7 @@ function Layout.RailPage(tab, shell, spec)
 	function page:Select(id)
 		local previous = current and panes[current.id]
 		if previous then previous.frame:Hide() end
+		if not current or current.id ~= id then tab.scroll:ScrollToTop() end
 		current = rail.byID[id].item
 		rail:Select(id)
 		local pane = panes[id]
@@ -119,18 +120,6 @@ function Layout.RailPage(tab, shell, spec)
 			pane.sections = spec.build(kit, shell, frame, contentWidth, current, page)
 		end
 		pane.frame:Show()
-		self:Resize()
-	end
-
-	function page:Invalidate()
-		for _, paneID in ipairs(spec.legacy or {}) do
-			local pane = panes[paneID]
-			if pane and (not current or paneID ~= current.id) then
-				pane.frame:Hide()
-				pane.frame:SetParent(nil)
-				panes[paneID] = nil
-			end
-		end
 		self:Resize()
 	end
 
