@@ -70,6 +70,7 @@
     <Script file="Core\Cards.lua"/>
     <Script file="Core\CardsData.lua"/>
     <Script file="Core\Gallery.lua"/>
+    <Script file="Core\Deck.lua"/>
     <Script file="Core\Board.lua"/>
     <Script file="Core\Shell.lua"/>
 </Ui>
