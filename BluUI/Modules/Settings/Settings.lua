@@ -664,10 +664,10 @@ Settings.checkboxSections = {
         { db = "automation", key = "autoCompleteQuests", label = "Auto-Complete", toggle = "ToggleAutoCompleteQuests" },
         { db = "interface", key = "fasterMovieSkip", label = "Skip Movies", toggle = "ToggleFasterMovieSkip" },
     }},
-    { header = "Combat", items = {
+    { header = "Casting", items = {
         { db = "automation", key = "castOnKeyDown", label = "Cast on Key Down", fn = "ToggleCastOnKeyDown", cvarInit = "ActionButtonUseKeyDown" },
         { db = "automation", key = "autoKeystone", label = "Auto Keystone", toggle = "ToggleAutoKeystone" },
-        { type = "slider", db = "automation", key = "spellQueueWindow",  label = "Spell Queue (ms)",    min = 0, max = 400, fn = "SetSpellQueueWindow", cvarInit = "SpellQueueWindow" },
+        { type = "slider", db = "automation", key = "spellQueueWindow",  label = "Spell Queue (ms)", sub = "Queue the next spell this early", min = 0, max = 400, fn = "SetSpellQueueWindow", cvarInit = "SpellQueueWindow" },
     }},
     { header = "Combat Logging", items = {
         { db = "combatLogging", key = "enabled",         label = "Auto Combat Log",   fn = "RefreshCombatLogging" },
@@ -680,7 +680,7 @@ Settings.checkboxSections = {
         { db = "combatLogging", key = "advancedLogging", label = "Advanced Logging",  fn = "RefreshCombatLogging" },
         { db = "combatLogging", key = "chatMessage",     label = "Chat Alerts",       fn = "RefreshCombatLogging" },
         { db = "combatLogging", key = "showIndicator",   label = "Logging Indicator", fn = "RefreshCombatLogging" },
-        { type = "button", label = "Indicator Position", buttonText = "Unlock / Lock", fn = "MoveCombatLogIndicator", width = 160 },
+        { type = "button", label = "Indicator Position", sub = "Unlock it, drag it into place, lock it again", buttonText = "Unlock / Lock", fn = "MoveCombatLogIndicator" },
     }},
     { header = "Target Combat Text", items = {
         { fct = true, cvar = "floatingCombatTextCombatDamage",                label = "Damage Numbers" },
@@ -689,7 +689,7 @@ Settings.checkboxSections = {
         { fct = true, cvar = "floatingCombatTextPetMeleeDamage",              label = "Pet Damage" },
         { fct = true, cvar = "floatingCombatTextCombatHealingAbsorbTarget",   label = "Healing Absorbs" },
         { fct = true, cvar = "floatingCombatTextCombatDamageDirectionalScale", label = "Directional Damage" },
-        { fct = true, type = "slider", cvar = "WorldTextScale", label = "World Text Scale", min = 0.5, max = 2.5, step = 0.1 },
+        { fct = true, type = "slider", cvar = "WorldTextScale", label = "World Text Scale", sub = "Size of the floating numbers", min = 0.5, max = 2.5, step = 0.1 },
     }},
     { header = "Social", items = {
         { db = "social", key = "autoAcceptParty", label = "Auto-Accept Party", toggle = "ToggleAutoAcceptParty" },
