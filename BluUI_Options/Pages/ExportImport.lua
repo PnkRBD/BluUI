@@ -18,6 +18,19 @@ local BOX_INSET = 10
 local SCROLL_STEP = 40
 local DIM_ALPHA = 0.4
 
+local RAIL_GROUPS = {
+    { title = 'Manage', items = {
+        { id = 'profiles', label = 'Profiles', icon = 'profile' },
+        { id = 'transfer', label = 'Export and import', icon = 'copy' },
+    } },
+    { title = 'Automation', items = {
+        { id = 'specs', label = 'Spec profiles', icon = 'shuffle' },
+    } },
+}
+local PANE_IDS = { 'profiles', 'transfer', 'specs' }
+local PANE_INDEX = {}
+for index, id in ipairs(PANE_IDS) do PANE_INDEX[id] = index end
+
 local function Window()
     return BUI.PageEngine.window
 end
@@ -589,17 +602,21 @@ local function OtherAddonsSection(ui, parent, width)
     return board
 end
 
-local function Sections(ui, shell, parent, width)
+local function Panes(ui, shell, parent, width, item)
     local sections = {}
-    sections[#sections + 1] = ui.Deck(parent, width, {
-        title = 'Profiles',
-        description = 'A profile is one complete set of BluUI settings. Every character uses one at a time.',
-        cards = ProfileCards(),
-        blank = { label = 'New profile', sub = 'Empty, or a copy of the active one', onClick = OpenNewMenu },
-    })
-    sections[#sections + 1] = SpecSection(ui, shell, parent, width)
-    sections[#sections + 1] = TransferSection(ui, shell, parent, width)
-    sections[#sections + 1] = OtherAddonsSection(ui, parent, width)
+    if item.id == 'profiles' then
+        sections[1] = ui.Deck(parent, width, {
+            title = 'Profiles',
+            description = 'A profile is one complete set of BluUI settings. Every character uses one at a time.',
+            cards = ProfileCards(),
+            blank = { label = 'New profile', sub = 'Empty, or a copy of the active one', onClick = OpenNewMenu },
+        })
+    elseif item.id == 'transfer' then
+        sections[#sections + 1] = TransferSection(ui, shell, parent, width)
+        sections[#sections + 1] = OtherAddonsSection(ui, parent, width)
+    else
+        sections[#sections + 1] = SpecSection(ui, shell, parent, width)
+    end
     return sections
 end
 
@@ -609,12 +626,25 @@ BUI.PageEngine.RegisterPage('exportimport', {
     icon = 'profile',
     OnBuild = function(pageFrame)
         local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
-        Layout.TablePage(page:GetTab(1), { window = Window() }, {
+        local adapter = { tabContents = {}, currentTab = 1 }
+        for index in ipairs(PANE_IDS) do adapter.tabContents[index] = {} end
+        local rail
+        rail = Layout.RailPage(page:GetTab(1), { window = Window() }, {
             icon = 'profile',
             title = 'Profiles',
             placeholder = 'Search profiles...',
-            tabs = { { label = 'Profiles', build = Sections } },
+            rail = { groups = RAIL_GROUPS },
+            build = Panes,
         })
+        local Select = rail.Select
+        function rail:Select(id)
+            Select(self, id)
+            adapter.currentTab = PANE_INDEX[id]
+        end
+        function adapter:SetTab(index)
+            rail:Select(PANE_IDS[index])
+        end
+        pageFrame._page = adapter
         page:AutoRefresh()
     end,
 })
