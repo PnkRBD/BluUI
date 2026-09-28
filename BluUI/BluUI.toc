@@ -168,7 +168,6 @@ Modules\StreamerTools\GCDHistory.lua
 
 Modules\Datatext\Core.lua
 Modules\Datatext\Panel.lua
-Modules\Datatext\Order.lua
 Modules\Datatext\Social.lua
 Modules\Datatext\Bars.lua
 Modules\Datatext\Datatexts\FPS.lua

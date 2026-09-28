@@ -96,10 +96,7 @@ local function LockBar(bar)
     local config = bar.getConfig()
     if not config or config.lock then return end
     config.lock = true
-    local toggle = Datatext._lockToggle
-    if toggle and toggle.SetValue and Datatext._lockToggleIndex == bar.index then
-        toggle:SetValue(false)
-    end
+    if Datatext._onLock then Datatext._onLock() end
     Datatext.Apply()
 end
 
@@ -756,7 +753,6 @@ function Datatext.Apply()
     RenderAll()
 end
 
-function Datatext.SetLockToggle(toggle, index)
-    Datatext._lockToggle = toggle
-    Datatext._lockToggleIndex = index or 1
+function Datatext.SetLockCallback(callback)
+    Datatext._onLock = callback
 end

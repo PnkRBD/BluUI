@@ -314,27 +314,6 @@ function Datatext.FormatMoney(copper, goldOnly)
     return text
 end
 
-function Datatext.BuildModuleOptions(getConfig, apply)
-    local rows = {}
-    for listIndex = 1, #registryList do
-        local entry = registryList[listIndex]
-        rows[#rows + 1] = {
-            label = entry.name,
-            get   = function() return getConfig()[entry.show] end,
-            set   = function(value) getConfig()[entry.show] = value; apply() end,
-        }
-        if entry.options then
-            local extra = entry.options(getConfig, apply)
-            for extraIndex = 1, #extra do
-                local row = extra[extraIndex]
-                row.indent = row.indent or 1
-                rows[#rows + 1] = row
-            end
-        end
-    end
-    return rows
-end
-
 function Datatext.BuildSampleParts(config)
     local valueColor = config.colorValue
     local valueHex = BUI.Hex(valueColor.r, valueColor.g, valueColor.b)

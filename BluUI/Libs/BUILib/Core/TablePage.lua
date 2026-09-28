@@ -254,6 +254,46 @@ function Layout.TableKit(window)
 		return frame
 	end
 
+	function kit.Input(parent, width, spec)
+		local box = CreateFrame('Frame', nil, parent)
+		box:SetSize(width, CONTROL_HEIGHT)
+		window:Fill(box, 'input'):SetAllPoints()
+		local edit = CreateFrame('EditBox', nil, box)
+		edit:SetPoint('LEFT', 12, 0)
+		edit:SetPoint('RIGHT', -12, 0)
+		edit:SetHeight(CONTROL_HEIGHT)
+		edit:SetAutoFocus(false)
+		edit:SetFont(window.font, 12, '')
+		window:Paint(edit, 'text')
+		window:SetFontRole(edit, 'control')
+		local hint = kit.Text(edit, spec.placeholder, 12, 'faint')
+		hint:SetPoint('LEFT')
+		local function Show()
+			local text = spec.get()
+			edit:SetText(text)
+			hint:SetShown(text == '')
+		end
+		local function Commit(self)
+			hint:SetShown(self:GetText() == '')
+			if self:GetText() ~= spec.get() then spec.set(self:GetText()) end
+		end
+		edit:SetScript('OnTextChanged', function(self) hint:SetShown(self:GetText() == '') end)
+		edit:SetScript('OnEnterPressed', function(self)
+			Commit(self)
+			self:ClearFocus()
+		end)
+		edit:SetScript('OnEscapePressed', function(self)
+			Show()
+			self:ClearFocus()
+		end)
+		edit:SetScript('OnEditFocusLost', Commit)
+		box:EnableMouse(true)
+		box:SetScript('OnMouseDown', function() edit:SetFocus() end)
+		window:Bind(box, Show)
+		box.edit = edit
+		return box
+	end
+
 	function kit.Button(parent, text, style, onClick, icon)
 		local look = BUTTON_STYLES[style or 'secondary']
 		local button = CreateFrame('Button', nil, parent)
