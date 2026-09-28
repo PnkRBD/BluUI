@@ -5,8 +5,8 @@ local Controls, Widget = BUILib.Controls, BUILib.Widget
 local SETTINGS_TAB = 1
 local FIRST_COLUMN = 267
 local SECOND_COLUMN = 344
-local DROPDOWN_WIDTH = 112
-local FONT_DROPDOWN_WIDTH = 200
+local CONTROL_WIDTH = 200
+local CONTROL_ROOM = 232
 local PRESET_DROPDOWN_WIDTH = 140
 local SWATCH_SIZE = 28
 
@@ -183,82 +183,77 @@ local function OnOff(get, set)
 	end
 end
 
+local function OptionRow(ui, section, width, spec)
+	local row = section:AddRow(spec.name .. ' ' .. spec.sub)
+	spec.avatar(row):SetPoint('LEFT', ui.AVATAR_X, 0)
+	ui.RowTitle(row, spec.name, spec.sub, ui.NAME_X, width - ui.ROW_INSET * 2 - CONTROL_ROOM - ui.NAME_X)
+	local reset = ui.IconButton(row, 'reset', spec.resetTip, spec.reset)
+	reset:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
+	local dropdown
+	dropdown = ui.Dropdown(row, CONTROL_WIDTH, function() return spec.items(dropdown) end)
+	dropdown:SetPoint('RIGHT', reset, 'LEFT', -10, 0)
+	ui.Bind(row, function()
+		dropdown.label:SetText(spec.label())
+		reset:SetActive(spec.custom())
+	end)
+	return row
+end
+
+local function FontItems(current, pick)
+	local items = {}
+	for _, font in ipairs(BUI.BuildFontDropdownItems()) do
+		items[#items + 1] = { text = font.text, fontPath = font.fontPath, checked = font.value == current, callback = function() pick(font.value) end }
+	end
+	return items
+end
+
 local function TextSection(ui, parent, width)
 	local section = ui.Section(parent, width, {
 		stacked = true,
 		title = 'Text',
 		description = 'The font every module inherits, how it renders, and the modules that use a font of their own.',
-		columns = { { 'Name', ui.AVATAR_X }, { 'Font', FIRST_COLUMN } },
+		columns = { { 'Name', ui.AVATAR_X } },
 	})
-	local fontRow = section:AddRow('Font global every module')
-	ui.Initials(fontRow, SWATCH_SIZE, 'Aa'):SetPoint('LEFT', ui.AVATAR_X, 0)
-	ui.RowTitle(fontRow, 'Font', 'Every module inherits this unless it picks its own', ui.NAME_X)
-	local fontName = ui.Cell(fontRow, '', FIRST_COLUMN, 200)
-	local fontReset = ui.IconButton(fontRow, 'reset', 'Back to the BluUI font', function() SetFont(BUI.C.DEFAULT_FONT) end)
-	fontReset:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
-	local fontMenu = ui.Dropdown(fontRow, FONT_DROPDOWN_WIDTH, function()
-		local items = {}
-		for _, font in ipairs(BUI.BuildFontDropdownItems()) do
-			items[#items + 1] = { text = font.text, fontPath = font.fontPath, checked = font.value == General().font, callback = function() SetFont(font.value) end }
-		end
-		return items
-	end)
-	fontMenu:SetPoint('RIGHT', fontReset, 'LEFT', -10, 0)
-	ui.Bind(fontRow, function()
-		fontName:SetText(General().font)
-		fontMenu.label:SetText(General().font)
-		fontReset:SetActive(General().font ~= BUI.C.DEFAULT_FONT)
-	end)
-
-	local row = section:AddRow('Slug rendering thicker outline')
-	ui.IconAvatar(row, SWATCH_SIZE, 'glow'):SetPoint('LEFT', ui.AVATAR_X, 0)
-	ui.RowTitle(row, 'Slug rendering', 'Thicker outline on every BluUI font', ui.NAME_X)
-	local slugReset = ui.IconButton(row, 'reset', 'Back to the plain outline', function()
-		General().fontSlug = false
-		RefreshAllVisuals()
-	end)
-	slugReset:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
-	local slug = ui.Dropdown(row, DROPDOWN_WIDTH, OnOff(function() return General().fontSlug == true end, function(value)
-		General().fontSlug = value
-		RefreshAllVisuals()
-	end))
-	slug:SetPoint('RIGHT', slugReset, 'LEFT', -10, 0)
-	ui.Bind(row, function()
-		slug.label:SetText(General().fontSlug == true and 'On' or 'Off')
-		slugReset:SetActive(General().fontSlug == true)
-	end)
-
-	for _, override in ipairs(FONT_OVERRIDES) do
-		local fontRow = section:AddRow(override.name .. ' ' .. override.sub)
-		ui.Initials(fontRow, SWATCH_SIZE, 'Aa'):SetPoint('LEFT', ui.AVATAR_X, 0)
-		ui.RowTitle(fontRow, override.name, override.sub, ui.NAME_X)
-		local name = ui.Cell(fontRow, '', FIRST_COLUMN, 200)
-		local reset = ui.IconButton(fontRow, 'reset', 'Back to the global font', function()
-			General()[override.key] = nil
+	OptionRow(ui, section, width, {
+		name = 'Font', sub = 'Every module inherits this unless it picks its own',
+		avatar = function(row) return ui.Initials(row, SWATCH_SIZE, 'Aa') end,
+		items = function() return FontItems(General().font, SetFont) end,
+		label = function() return General().font end,
+		custom = function() return General().font ~= BUI.C.DEFAULT_FONT end,
+		resetTip = 'Back to the BluUI font', reset = function() SetFont(BUI.C.DEFAULT_FONT) end,
+	})
+	OptionRow(ui, section, width, {
+		name = 'Slug rendering', sub = 'Thicker outline on every BluUI font',
+		avatar = function(row) return ui.IconAvatar(row, SWATCH_SIZE, 'glow') end,
+		items = OnOff(function() return General().fontSlug == true end, function(value)
+			General().fontSlug = value
 			RefreshAllVisuals()
-		end)
-		reset:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
-		local dropdown = ui.Dropdown(fontRow, FONT_DROPDOWN_WIDTH, function()
-			local current = General()[override.key]
-			local items = { { text = 'Global font', checked = current == nil, callback = function()
-				General()[override.key] = nil
-				RefreshAllVisuals()
-			end } }
-			for _, font in ipairs(BUI.BuildFontDropdownItems()) do
-				items[#items + 1] = { text = font.text, fontPath = font.fontPath, checked = font.value == current, callback = function()
-					General()[override.key] = font.value
-					RefreshAllVisuals()
-				end }
-			end
-			return items
-		end)
-		dropdown:SetPoint('RIGHT', reset, 'LEFT', -10, 0)
-		ui.Bind(fontRow, function()
-			local current = General()[override.key]
-			name:SetText(current or General().font)
-			dropdown.label:SetText(current and 'Custom' or 'Global font')
-			reset:SetActive(current ~= nil)
-		end)
+		end),
+		label = function() return General().fontSlug == true and 'On' or 'Off' end,
+		custom = function() return General().fontSlug == true end,
+		resetTip = 'Back to the plain outline', reset = function()
+			General().fontSlug = false
+			RefreshAllVisuals()
+		end,
+	})
+	for _, override in ipairs(FONT_OVERRIDES) do
+		local function Pick(name)
+			General()[override.key] = name
+			RefreshAllVisuals()
+		end
+		OptionRow(ui, section, width, {
+			name = override.name, sub = override.sub,
+			avatar = function(row) return ui.Initials(row, SWATCH_SIZE, 'Aa') end,
+			items = function()
+				local current = General()[override.key]
+				local items = FontItems(current, Pick)
+				table.insert(items, 1, { text = 'Global font', checked = current == nil, callback = function() Pick(nil) end })
+				return items
+			end,
+			label = function() return General()[override.key] or 'Global font' end,
+			custom = function() return General()[override.key] ~= nil end,
+			resetTip = 'Back to the global font', reset = function() Pick(nil) end,
+		})
 	end
 	return section
 end
@@ -268,47 +263,47 @@ local function BarSection(ui, parent, width)
 		stacked = true,
 		title = 'Bars',
 		description = 'The texture every statusbar inherits, motion, and the tint the gradient texture fades through.',
-		columns = { { 'Name', ui.AVATAR_X }, { 'Hex', FIRST_COLUMN }, { 'Opacity', SECOND_COLUMN } },
+		columns = { { 'Name', ui.AVATAR_X } },
 	})
-	local textureRow = section:AddRow('Bar texture statusbar')
-	local sample = CreateFrame('Frame', nil, textureRow)
-	sample:SetSize(SWATCH_SIZE, SWATCH_SIZE)
-	sample:SetPoint('LEFT', ui.AVATAR_X, 0)
-	local track = ui.Fill(sample, 'control', 'ARTWORK')
-	track:SetPoint('LEFT')
-	track:SetPoint('RIGHT')
-	track:SetHeight(10)
-	local bar = sample:CreateTexture(nil, 'ARTWORK', nil, 1)
-	bar:SetPoint('TOPLEFT', track)
-	bar:SetPoint('BOTTOMLEFT', track)
-	bar:SetWidth(SWATCH_SIZE - 6)
-	Window():Paint(bar, 'accent')
-	ui.RowTitle(textureRow, 'Bar texture', 'Every statusbar inherits it unless its page picks another', ui.NAME_X)
-	local textureName = ui.Cell(textureRow, '', FIRST_COLUMN, 200)
-	local textureReset = ui.IconButton(textureRow, 'reset', 'Back to the BluUI texture', function() SetTexture(BUI.C.DEFAULT_TEXTURE) end)
-	textureReset:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
-	local textureMenu = ui.Dropdown(textureRow, FONT_DROPDOWN_WIDTH, function()
-		local items = {}
-		for _, texture in ipairs(BUI.BuildTextureDropdownItems()) do
-			items[#items + 1] = { text = texture.text, checked = texture.value == General().texture, callback = function() SetTexture(texture.value) end }
-		end
-		return items
-	end)
-	textureMenu:SetPoint('RIGHT', textureReset, 'LEFT', -10, 0)
-	ui.Bind(textureRow, function()
-		bar:SetTexture(BUI.GetGlobalTexture())
-		textureName:SetText(General().texture)
-		textureMenu.label:SetText(General().texture)
-		textureReset:SetActive(General().texture ~= BUI.C.DEFAULT_TEXTURE)
-	end)
-
-	local row = section:AddRow('Smooth bars animate health and power')
-	ui.IconAvatar(row, SWATCH_SIZE, 'play'):SetPoint('LEFT', ui.AVATAR_X, 0)
-	ui.RowTitle(row, 'Smooth bars', 'Animate health and power changes on the frames', ui.NAME_X)
-	local smooth = ui.Dropdown(row, DROPDOWN_WIDTH, OnOff(function() return General().smoothBars ~= false end, SetSmoothBars))
-	smooth:SetPoint('RIGHT', -ui.ROW_INSET, 0)
-	ui.Bind(row, function() smooth.label:SetText(General().smoothBars ~= false and 'On' or 'Off') end)
-
+	local sampleBar
+	OptionRow(ui, section, width, {
+		name = 'Bar texture', sub = 'Every statusbar inherits it unless its page picks another',
+		avatar = function(row)
+			local sample = CreateFrame('Frame', nil, row)
+			sample:SetSize(SWATCH_SIZE, SWATCH_SIZE)
+			local track = ui.Fill(sample, 'control', 'ARTWORK')
+			track:SetPoint('LEFT')
+			track:SetPoint('RIGHT')
+			track:SetHeight(10)
+			sampleBar = sample:CreateTexture(nil, 'ARTWORK', nil, 1)
+			sampleBar:SetPoint('TOPLEFT', track)
+			sampleBar:SetPoint('BOTTOMLEFT', track)
+			sampleBar:SetWidth(SWATCH_SIZE - 6)
+			Window():Paint(sampleBar, 'accent')
+			return sample
+		end,
+		items = function()
+			local items = {}
+			for _, texture in ipairs(BUI.BuildTextureDropdownItems()) do
+				items[#items + 1] = { text = texture.text, checked = texture.value == General().texture, callback = function() SetTexture(texture.value) end }
+			end
+			return items
+		end,
+		label = function()
+			sampleBar:SetTexture(BUI.GetGlobalTexture())
+			return General().texture
+		end,
+		custom = function() return General().texture ~= BUI.C.DEFAULT_TEXTURE end,
+		resetTip = 'Back to the BluUI texture', reset = function() SetTexture(BUI.C.DEFAULT_TEXTURE) end,
+	})
+	OptionRow(ui, section, width, {
+		name = 'Smooth bars', sub = 'Animate health and power changes on the frames',
+		avatar = function(row) return ui.IconAvatar(row, SWATCH_SIZE, 'play') end,
+		items = OnOff(function() return General().smoothBars ~= false end, SetSmoothBars),
+		label = function() return General().smoothBars ~= false and 'On' or 'Off' end,
+		custom = function() return General().smoothBars == false end,
+		resetTip = 'Back to smooth bars', reset = function() SetSmoothBars(true) end,
+	})
 	local function PickGradient(anchor)
 		local color = General().gradientColor
 		Controls.OpenColorPicker({ r = color[1], g = color[2], b = color[3], a = color[4], hasOpacity = true, anchorTo = anchor, callback = function(red, green, blue, alpha, cancelled)
@@ -321,18 +316,29 @@ local function BarSection(ui, parent, width)
 		General().gradientColor = { 1, 1, 1, 1 }
 		RefreshAllVisuals()
 	end
-	ui.ColorRow(section, {
-		name = 'Gradient tint', sub = 'Only the ' .. BUI.C.GRADIENT_TEXTURE .. ' texture uses it', hexX = FIRST_COLUMN, opacityX = SECOND_COLUMN,
-		get = function() local color = General().gradientColor return color[1], color[2], color[3], color[4] end,
-		custom = function() local color = General().gradientColor return not (Same(color[1], color[2], color[3], { 1, 1, 1 }) and color[4] == 1) end,
-		pick = PickGradient,
-		reset = ResetGradient,
+	local tintSwatch
+	OptionRow(ui, section, width, {
+		name = 'Gradient tint', sub = 'Only the ' .. BUI.C.GRADIENT_TEXTURE .. ' texture uses it',
+		avatar = function(row)
+			tintSwatch = ui.Swatch(row, SWATCH_SIZE, function(self) PickGradient(self) end)
+			return tintSwatch
+		end,
 		items = function(anchor)
 			return {
 				{ text = 'Default', callback = ResetGradient },
 				{ text = 'Custom color', callback = function() PickGradient(anchor) end },
 			}
 		end,
+		label = function()
+			local color = General().gradientColor
+			tintSwatch.fill:SetVertexColor(color[1], color[2], color[3], color[4])
+			return Hex(color[1], color[2], color[3]) .. '  ' .. math.floor(color[4] * 100 + 0.5) .. '%'
+		end,
+		custom = function()
+			local color = General().gradientColor
+			return not (Same(color[1], color[2], color[3], { 1, 1, 1 }) and color[4] == 1)
+		end,
+		resetTip = 'Back to white', reset = ResetGradient,
 	})
 	return section
 end
