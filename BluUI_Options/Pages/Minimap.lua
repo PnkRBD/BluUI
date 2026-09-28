@@ -1,13 +1,20 @@
 local BUI = BluUI
 local BUILib = BUI.BUILibClient
-local Controls, Layout, Modals = BUILib.Controls, BUILib.Layout, BUILib.Modals
+local Controls, Layout, Modals, Widget = BUILib.Controls, BUILib.Layout, BUILib.Modals, BUILib.Widget
 local MinimapModule = BUI.Minimap
 local Datatext = BUI.Datatext
 local ButtonBar = BUI.MinimapButtonBar
+local Pixel = BUI.Pixel
 
-local floor = math.floor
+local floor, max, min, abs = math.floor, math.max, math.min, math.abs
+local format = string.format
+local FONT = BUI.C.FONT_PATH
 
 local PAGE_WIDTH = 960
+local PREVIEW_HEIGHT = 240
+local PREVIEW_MAP = 200
+local PREVIEW_TICK = 2
+local ICON_SIZE = 18
 local NAME_WIDTH = 260
 local SLIDER_WIDTH = 220
 local DROPDOWN_WIDTH = 200
@@ -62,6 +69,26 @@ local INDICATORS = {
 	{ key = 'missions', name = 'Folio', sub = 'The expansion landing page', hide = 'minimapHideGarrison' },
 }
 
+local ICON_DEFS = {
+	{ key = 'queue', name = 'Queue', icon = 'Interface\\LFGFrame\\LFG-Eye', color = { 0.35, 0.72, 1.00 } },
+	{ key = 'difficulty', name = 'Difficulty', icon = 'Interface\\Icons\\INV_Misc_Bone_Skull_02', color = { 1.00, 0.55, 0.15 } },
+	{ key = 'mail', name = 'Mail', icon = 'Interface\\Icons\\INV_Letter_15', color = { 1.00, 0.88, 0.25 } },
+	{ key = 'crafting', name = 'Crafting', icon = 'Interface\\Icons\\Trade_BlackSmithing', color = { 0.45, 0.82, 0.30 } },
+	{ key = 'missions', name = 'Folio', icon = 'Interface\\Icons\\INV_Misc_Book_09', color = { 0.65, 0.40, 0.95 } },
+}
+
+local MINIMAP_YARDS = { 466.67, 400, 333.33, 266.67, 200, 133.33 }
+local ADT_TILE = 533.3333333333333
+
+local PREVIEW_DOCK = {
+	TOPLEFT = { point = 'TOPLEFT', x = 5, y = -5, dirX = 1 },
+	TOPRIGHT = { point = 'TOPRIGHT', x = -5, y = -5, dirX = -1 },
+	BOTTOMLEFT = { point = 'BOTTOMLEFT', x = 5, y = 5, dirX = 1 },
+	BOTTOMRIGHT = { point = 'BOTTOMRIGHT', x = -5, y = 5, dirX = -1 },
+}
+
+local preview
+
 local function Window()
 	return BUI.PageEngine.window
 end
@@ -82,6 +109,10 @@ local function Repaint()
 	Window():Repaint()
 end
 
+local function RefreshPreview()
+	if preview then preview:UpdatePreview() end
+end
+
 local function Named(entries, value)
 	for _, entry in ipairs(entries) do
 		if entry.value == value then return entry.text end
@@ -89,8 +120,18 @@ local function Named(entries, value)
 	return value
 end
 
+local function Switch(board, label, get, set, tip)
+	board:AddSwitch(label, get, function(value)
+		set(value)
+		RefreshPreview()
+	end, tip)
+end
+
 local function Slider(ui, row, minimum, maximum, step, get, set)
-	ui.Slider(row, SLIDER_WIDTH, { min = minimum, max = maximum, step = step, get = get, set = set }):SetPoint('RIGHT', -ui.ROW_INSET, 0)
+	ui.Slider(row, SLIDER_WIDTH, { min = minimum, max = maximum, step = step, get = get, set = function(value)
+		set(value)
+		RefreshPreview()
+	end }):SetPoint('RIGHT', -ui.ROW_INSET, 0)
 end
 
 local function Menu(ui, row, entries, get, set)
@@ -100,6 +141,7 @@ local function Menu(ui, row, entries, get, set)
 		for _, entry in ipairs(entries) do
 			items[#items + 1] = { text = entry.text, checked = entry.value == current, callback = function()
 				set(entry.value)
+				RefreshPreview()
 				Repaint()
 			end }
 		end
@@ -121,6 +163,7 @@ local function ColorRow(ui, board, name, sub, hasOpacity, get, set)
 			r = red, g = green, b = blue, a = alpha, hasOpacity = hasOpacity, anchorTo = self,
 			callback = function(newRed, newGreen, newBlue, newAlpha, cancelled)
 				if cancelled then set(red, green, blue, alpha) else set(newRed, newGreen, newBlue, newAlpha) end
+				RefreshPreview()
 				Repaint()
 			end,
 		})
@@ -156,25 +199,601 @@ local function ConfirmModule(value)
 	})
 end
 
+local function BuildPreview(band)
+	local card = CreateFrame('Frame', nil, band)
+	card:SetAllPoints()
+	local stage = CreateFrame('Frame', nil, card)
+	stage:SetSize(PREVIEW_MAP + 8, PREVIEW_MAP + 8)
+	stage:SetPoint('CENTER')
+	stage:SetFrameLevel(card:GetFrameLevel() + 5)
+
+	local interfaceDB = Interface()
+	local minimapWidth = Minimap:GetWidth()
+	local scale = PREVIEW_MAP / minimapWidth
+	local uiScale = scale * UIParent:GetEffectiveScale() / Minimap:GetEffectiveScale()
+
+	local borderFrame = CreateFrame('Frame', nil, stage)
+	borderFrame:SetPoint('CENTER')
+	local borderBackground = borderFrame:CreateTexture(nil, 'BACKGROUND', nil, -1)
+	borderBackground:SetAllPoints()
+	borderBackground:SetColorTexture(0.12, 0.12, 0.13, 1)
+
+	local mapFrame = CreateFrame('Frame', nil, stage)
+	mapFrame:SetSize(PREVIEW_MAP, PREVIEW_MAP)
+	mapFrame:SetPoint('CENTER')
+	mapFrame:SetFrameLevel(stage:GetFrameLevel() + 2)
+	mapFrame:SetClipsChildren(true)
+	local mapBackground = mapFrame:CreateTexture(nil, 'BACKGROUND')
+	mapBackground:SetAllPoints()
+
+	local content = CreateFrame('Frame', nil, mapFrame)
+	content:SetAllPoints()
+	local overlay = CreateFrame('Frame', nil, mapFrame)
+	overlay:SetAllPoints()
+	overlay:SetFrameLevel(content:GetFrameLevel() + 1)
+
+	local vignette = overlay:CreateTexture(nil, 'ARTWORK', nil, 2)
+	vignette:SetAllPoints(mapFrame)
+	vignette:SetTexture('Interface\\FullScreenTextures\\LowHealth')
+	vignette:SetBlendMode('BLEND')
+	vignette:SetVertexColor(0, 0, 0, 0.45)
+
+	local hint = card:CreateFontString(nil, 'OVERLAY')
+	Pixel.ApplyFont(hint, 9, FONT, '')
+	hint:SetPoint('BOTTOM', card, 'BOTTOM', 0, 6)
+	hint:SetTextColor(0.42, 0.42, 0.47, 0.9)
+	hint:SetText('Drag icons and text to reposition  ·  Scroll icons to resize')
+
+	local tilePool = {}
+	local tileCache, tileCacheDir
+
+	local function DecodeTiles(dir)
+		if tileCacheDir == dir then return tileCache end
+		tileCacheDir, tileCache = dir, nil
+		local stream = dir and BUI.MinimapTiles[dir]
+		if not stream then return nil end
+		local tiles = {}
+		local tileIndex, fileDataID = 0, 0
+		for indexToken, fileToken in stream:gmatch('([^;.]+)%.([^;]+)') do
+			tileIndex = tileIndex + (indexToken:sub(1, 1) == '!' and -tonumber(indexToken:sub(2), 36) or tonumber(indexToken, 36))
+			fileDataID = fileDataID + (fileToken:sub(1, 1) == '!' and -tonumber(fileToken:sub(2), 36) or tonumber(fileToken, 36))
+			tiles[tileIndex] = fileDataID
+		end
+		tileCache = tiles
+		return tiles
+	end
+
+	local function Tile(index)
+		local tile = tilePool[index]
+		if not tile then
+			tile = content:CreateTexture(nil, 'BACKGROUND')
+			tilePool[index] = tile
+		end
+		return tile
+	end
+
+	local function ApplyMapArt()
+		local mapID = C_Map.GetBestMapForUnit('player')
+		local layer = mapID and (C_Map.GetMapArtLayers(mapID) or {})[1]
+		local textures = layer and C_Map.GetMapArtLayerTextures(mapID, 1)
+		if not (textures and #textures > 0 and layer.tileWidth and layer.tileWidth > 0) then return end
+
+		local position = C_Map.GetPlayerMapPosition(mapID, 'player')
+		local playerX = position and position.x or 0.5
+		local playerY = position and position.y or 0.5
+
+		local zoom = Minimap:GetZoom()
+		local yards = MINIMAP_YARDS[zoom + 1] or MINIMAP_YARDS[1]
+		local worldWidth, worldHeight = C_Map.GetMapWorldSize(mapID)
+		local fracX = (worldWidth and worldWidth > 0) and min(1, yards / worldWidth) or 0.25
+		local fracY = (worldHeight and worldHeight > 0) and min(1, yards / worldHeight) or 0.25
+
+		local windowWidth = fracX * layer.layerWidth
+		local windowHeight = fracY * layer.layerHeight
+		local centerX = max(windowWidth / 2, min(layer.layerWidth - windowWidth / 2, playerX * layer.layerWidth))
+		local centerY = max(windowHeight / 2, min(layer.layerHeight - windowHeight / 2, playerY * layer.layerHeight))
+		local left, top = centerX - windowWidth / 2, centerY - windowHeight / 2
+
+		local scaleX = PREVIEW_MAP / windowWidth
+		local scaleY = PREVIEW_MAP / windowHeight
+		local cols = math.ceil(layer.layerWidth / layer.tileWidth)
+		local tileCount = 0
+		for textureIndex = 1, #textures do
+			local tileX = ((textureIndex - 1) % cols) * layer.tileWidth
+			local tileY = floor((textureIndex - 1) / cols) * layer.tileHeight
+			if tileX < left + windowWidth and tileX + layer.tileWidth > left
+				and tileY < top + windowHeight and tileY + layer.tileHeight > top then
+				tileCount = tileCount + 1
+				local tile = Tile(tileCount)
+				tile:SetTexture(textures[textureIndex])
+				tile:SetVertexColor(0.75, 0.75, 0.75, 1)
+				tile:SetSize(layer.tileWidth * scaleX, layer.tileHeight * scaleY)
+				tile:ClearAllPoints()
+				tile:SetPoint('TOPLEFT', mapFrame, 'TOPLEFT', (tileX - left) * scaleX, -(tileY - top) * scaleY)
+				tile:Show()
+			end
+		end
+	end
+
+	local function ApplyMapSnapshot()
+		for tileIndex = 1, #tilePool do tilePool[tileIndex]:Hide() end
+		mapBackground:SetColorTexture(0.08, 0.08, 0.08, 1)
+
+		if _G.HybridMinimap and _G.HybridMinimap:IsShown() then
+			ApplyMapArt()
+			return
+		end
+
+		local posX, posY, _, instanceID = UnitPosition('player')
+		if not posX then return end
+		local tiles = DecodeTiles(BUI.MinimapTileDirs[instanceID])
+		if not tiles then return end
+
+		local zoom = Minimap:GetZoom()
+		local yards = MINIMAP_YARDS[zoom + 1] or MINIMAP_YARDS[1]
+		local half = yards / 2
+		local tilePixelSize = ADT_TILE * (PREVIEW_MAP / yards)
+
+		local columnFraction = 32 - (posY + half) / ADT_TILE
+		local rowFraction = 32 - (posX + half) / ADT_TILE
+		local span = yards / ADT_TILE
+
+		local tileCount = 0
+		for col = floor(columnFraction), floor(columnFraction + span) do
+			for row = floor(rowFraction), floor(rowFraction + span) do
+				local fileDataID = col >= 0 and col <= 63 and row >= 0 and row <= 63 and tiles[col * 64 + row]
+				if fileDataID then
+					tileCount = tileCount + 1
+					local tile = Tile(tileCount)
+					tile:SetTexture(fileDataID)
+					tile:SetVertexColor(1, 1, 1, 1)
+					tile:SetSize(tilePixelSize, tilePixelSize)
+					tile:ClearAllPoints()
+					tile:SetPoint('TOPLEFT', mapFrame, 'TOPLEFT', (col - columnFraction) * tilePixelSize, -(row - rowFraction) * tilePixelSize)
+					tile:Show()
+				end
+			end
+		end
+	end
+
+	local function ApplyBorder()
+		local borderWidth = max(0, interfaceDB.minimapBorderWidth) * scale
+		borderFrame:SetSize(PREVIEW_MAP + borderWidth * 2, PREVIEW_MAP + borderWidth * 2)
+	end
+
+	local function ReadPosition(key)
+		local saved = MinimapModule.GetIndicatorPosition(key)
+		if saved then return saved[1], saved[2], saved[3] end
+		return MinimapModule.GetIndicatorDefault(key)
+	end
+
+	local icons = {}
+
+	local function PlaceIcon(proxy, key)
+		local point, x, y = ReadPosition(key)
+		local iconScale = MinimapModule.GetIconScale(key)
+		proxy:ClearAllPoints()
+		proxy:SetPoint(point, mapFrame, point, x * iconScale * scale, y * iconScale * scale)
+		local size = floor(ICON_SIZE * (iconScale / 0.8))
+		proxy:SetSize(size, size)
+	end
+
+	local function RefreshIcons()
+		local anchor = PREVIEW_DOCK[MinimapModule.GetDock()]
+		if anchor then
+			local size = max(8, floor(MinimapModule.GetIconSize() * scale))
+			local step = size + 3
+			local iconIndex = 0
+			for _, def in ipairs(ICON_DEFS) do
+				local proxy = icons[def.key]
+				if def.key ~= 'difficulty' then
+					proxy:EnableMouse(false)
+					proxy:ClearAllPoints()
+					proxy:SetSize(size, size)
+					proxy:SetPoint(anchor.point, mapFrame, anchor.point, anchor.x + anchor.dirX * iconIndex * step, anchor.y)
+					iconIndex = iconIndex + 1
+				else
+					proxy:EnableMouse(true)
+					PlaceIcon(proxy, def.key)
+				end
+			end
+		else
+			for _, def in ipairs(ICON_DEFS) do
+				icons[def.key]:EnableMouse(true)
+				PlaceIcon(icons[def.key], def.key)
+			end
+		end
+	end
+
+	local function OnDragStop(proxy, key)
+		local centerX, centerY = proxy:GetCenter()
+		local mapCenterX, mapCenterY = mapFrame:GetCenter()
+		if not centerX or not mapCenterX then PlaceIcon(proxy, key) return end
+
+		local relX, relY = centerX - mapCenterX, centerY - mapCenterY
+		local half = PREVIEW_MAP / 2
+		relX = max(-half, min(half, relX))
+		relY = max(-half, min(half, relY))
+
+		proxy:ClearAllPoints()
+		proxy:SetPoint('CENTER', mapFrame, 'CENTER', relX, relY)
+
+		local iconScale = MinimapModule.GetIconScale(key)
+		MinimapModule.SaveIndicatorPosition(key, 'CENTER', relX / (scale * iconScale), relY / (scale * iconScale))
+		MinimapModule.RepositionIndicators()
+		Repaint()
+	end
+
+	for _, def in ipairs(ICON_DEFS) do
+		local proxy = CreateFrame('Button', nil, mapFrame, 'BackdropTemplate')
+		proxy:SetSize(ICON_SIZE, ICON_SIZE)
+		proxy:SetBackdrop({ bgFile = 'Interface\\Buttons\\WHITE8X8', edgeFile = 'Interface\\Buttons\\WHITE8X8', edgeSize = 1 })
+		proxy:SetBackdropColor(0.08, 0.08, 0.08, 0.95)
+		proxy:SetBackdropBorderColor(def.color[1], def.color[2], def.color[3], 0.9)
+		proxy:SetFrameLevel(mapFrame:GetFrameLevel() + 10)
+
+		local iconTexture = proxy:CreateTexture(nil, 'ARTWORK')
+		iconTexture:SetPoint('TOPLEFT', 2, -2)
+		iconTexture:SetPoint('BOTTOMRIGHT', -2, 2)
+		iconTexture:SetTexture(def.icon)
+		iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		if def.key == 'missions' then
+			local landingButton = _G.ExpansionLandingPageMinimapButton
+			local source = landingButton and (landingButton.LandingPageIcon or landingButton.Icon or (landingButton.GetNormalTexture and landingButton:GetNormalTexture()))
+			local atlas = source and source.GetAtlas and source:GetAtlas()
+			if atlas then
+				iconTexture:SetAtlas(atlas)
+				iconTexture:SetTexCoord(0, 1, 0, 1)
+			end
+		elseif def.key == 'queue' then
+			local function CopyEye(eyeFrame)
+				if not eyeFrame or not eyeFrame.GetRegions then return false end
+				for _, region in ipairs({ eyeFrame:GetRegions() }) do
+					if region.GetObjectType and region:GetObjectType() == 'Texture' then
+						local atlas = region.GetAtlas and region:GetAtlas()
+						if atlas then
+							iconTexture:SetAtlas(atlas)
+							iconTexture:SetTexCoord(0, 1, 0, 1)
+							return true
+						end
+						local texture = region.GetTexture and region:GetTexture()
+						if texture then
+							iconTexture:SetTexture(texture)
+							iconTexture:SetTexCoord(region:GetTexCoord())
+							return true
+						end
+					end
+				end
+				return false
+			end
+			local queueButton = _G.QueueStatusButton
+			if not (CopyEye(queueButton and queueButton.Eye) or CopyEye(queueButton)) then
+				iconTexture:SetTexCoord(0, 1, 0, 1)
+			end
+		end
+
+		local highlight = proxy:CreateTexture(nil, 'OVERLAY')
+		highlight:SetTexture('Interface\\Buttons\\WHITE8x8')
+		highlight:SetPoint('TOPLEFT', 1, -1)
+		highlight:SetPoint('TOPRIGHT', -1, -1)
+		highlight:SetHeight(1)
+		highlight:SetVertexColor(1, 1, 1, 0.2)
+
+		proxy:EnableMouse(true)
+		proxy:RegisterForDrag('LeftButton')
+		proxy:SetScript('OnDragStart', function(self)
+			self:SetScript('OnUpdate', function(draggedIcon)
+				local cursorX, cursorY = GetCursorPosition()
+				local mapScale = mapFrame:GetEffectiveScale()
+				cursorX, cursorY = cursorX / mapScale, cursorY / mapScale
+				local left, bottom = mapFrame:GetLeft(), mapFrame:GetBottom()
+				local right, top = mapFrame:GetRight(), mapFrame:GetTop()
+				if not left then return end
+				cursorX = max(left, min(right, cursorX))
+				cursorY = max(bottom, min(top, cursorY))
+				local snap = 8 * scale
+				local best, bestDistance
+				for _, other in pairs(icons) do
+					if other ~= draggedIcon and other:IsShown() and other:IsMouseEnabled() then
+						local otherX, otherY = other:GetCenter()
+						if otherX then
+							local distance = abs(cursorX - otherX) + abs(cursorY - otherY)
+							if not bestDistance or distance < bestDistance then best, bestDistance = other, distance end
+						end
+					end
+				end
+				if best then
+					local bestX, bestY = best:GetCenter()
+					local gap = draggedIcon:GetWidth() / 2 + best:GetWidth() / 2
+					if abs(abs(cursorX - bestX) - gap) <= snap and abs(cursorY - bestY) <= gap then
+						cursorX, cursorY = bestX + (cursorX >= bestX and gap or -gap), bestY
+					elseif abs(abs(cursorY - bestY) - gap) <= snap and abs(cursorX - bestX) <= gap then
+						cursorX, cursorY = bestX, bestY + (cursorY >= bestY and gap or -gap)
+					end
+				end
+				draggedIcon:ClearAllPoints()
+				draggedIcon:SetPoint('CENTER', UIParent, 'BOTTOMLEFT', cursorX, cursorY)
+			end)
+		end)
+		proxy:SetScript('OnDragStop', function(self)
+			self:SetScript('OnUpdate', nil)
+			OnDragStop(self, def.key)
+		end)
+
+		proxy:EnableMouseWheel(true)
+		proxy:SetScript('OnMouseWheel', function(self, delta)
+			local oldScale = MinimapModule.GetIconScale(def.key)
+			local newScale = max(0.4, min(1.6, oldScale + delta * 0.1))
+			MinimapModule.SetIconScale(def.key, newScale)
+			local point, offsetX, offsetY = ReadPosition(def.key)
+			MinimapModule.SaveIndicatorPosition(def.key, point, offsetX * oldScale / newScale, offsetY * oldScale / newScale)
+			PlaceIcon(self, def.key)
+			MinimapModule.RepositionIndicators()
+			Widget.ShowTip(self, format('%s  |  Scale: %.0f%%', def.name, newScale * 100))
+			Repaint()
+		end)
+		proxy:SetScript('OnEnter', function(self)
+			self:SetBackdropBorderColor(1, 1, 1, 1)
+			Widget.ShowTip(self, format('%s  |  Scale: %.0f%%  |  Drag to move', def.name, MinimapModule.GetIconScale(def.key) * 100))
+		end)
+		proxy:SetScript('OnLeave', function(self)
+			self:SetBackdropBorderColor(0, 0, 0, 1)
+			Widget.HideTip()
+		end)
+
+		icons[def.key] = proxy
+	end
+
+	local clockLabel = overlay:CreateFontString(nil, 'OVERLAY')
+	Pixel.ApplyFont(clockLabel, 9, FONT, '')
+	local zoneLabel = overlay:CreateFontString(nil, 'OVERLAY')
+	Pixel.ApplyFont(zoneLabel, 8, FONT, '')
+
+	local fontProbe = {}
+	local function PreviewFont(key)
+		fontProbe.font = interfaceDB[key]
+		return BUI.GetModuleFont(fontProbe)
+	end
+
+	local textDraggers = {}
+	local PlaceText
+
+	local function MakeTextDragger(name, fontString, keyX, keyY, onStop)
+		local button = CreateFrame('Button', nil, overlay)
+		button:SetFrameLevel(overlay:GetFrameLevel() + 5)
+		button:SetPoint('CENTER', fontString, 'CENTER')
+		button:RegisterForDrag('LeftButton')
+
+		local glow = button:CreateTexture(nil, 'BACKGROUND')
+		glow:SetTexture('Interface\\Buttons\\WHITE8x8')
+		glow:SetAllPoints()
+		glow:SetVertexColor(1, 1, 1, 0)
+
+		button:SetScript('OnDragStart', function(self)
+			local cursorX, cursorY = GetCursorPosition()
+			local effectiveScale = self:GetEffectiveScale()
+			self._startX, self._startY = cursorX / effectiveScale, cursorY / effectiveScale
+			self._baseX = interfaceDB[keyX]
+			self._baseY = interfaceDB[keyY]
+			self:SetScript('OnUpdate', function(dragButton)
+				local newX, newY = GetCursorPosition()
+				newX, newY = newX / effectiveScale, newY / effectiveScale
+				interfaceDB[keyX] = max(-300, min(300, floor(dragButton._baseX + (newX - dragButton._startX) / scale + 0.5)))
+				interfaceDB[keyY] = max(-300, min(300, floor(dragButton._baseY + (newY - dragButton._startY) / scale + 0.5)))
+				PlaceText()
+			end)
+		end)
+		button:SetScript('OnDragStop', function(self)
+			self:SetScript('OnUpdate', nil)
+			onStop()
+			Repaint()
+		end)
+		button:SetScript('OnEnter', function(self)
+			glow:SetVertexColor(1, 1, 1, 0.12)
+			Widget.ShowTip(self, name .. '  |  Drag to move')
+		end)
+		button:SetScript('OnLeave', function()
+			glow:SetVertexColor(1, 1, 1, 0)
+			Widget.HideTip()
+		end)
+		textDraggers[#textDraggers + 1] = { button = button, fontString = fontString }
+		return button
+	end
+
+	local clockDrag = MakeTextDragger('Clock', clockLabel, 'minimapClockX', 'minimapClockY', MinimapModule.RefreshClock)
+	local zoneDrag = MakeTextDragger('Zone name', zoneLabel, 'minimapZoneX', 'minimapZoneY', MinimapModule.RefreshZoneText)
+
+	local function SyncTextDraggers()
+		for _, entry in ipairs(textDraggers) do
+			entry.button:SetSize(max(36, entry.fontString:GetStringWidth() + 10), 14)
+		end
+		clockDrag:SetShown(clockLabel:IsShown())
+		zoneDrag:SetShown(zoneLabel:IsShown())
+	end
+
+	PlaceText = function()
+		clockLabel:SetText(date('%H:%M'))
+		zoneLabel:SetText(GetMinimapZoneText() or 'Zone Name')
+		Pixel.ApplyFont(clockLabel, 9, PreviewFont('minimapClockFont'), '')
+		Pixel.ApplyFont(zoneLabel, 8, PreviewFont('minimapZoneFont'), '')
+		clockLabel:ClearAllPoints()
+		zoneLabel:ClearAllPoints()
+		clockLabel:SetShown(interfaceDB.minimapClock ~= false)
+		zoneLabel:SetShown(interfaceDB.minimapZone ~= false)
+		clockLabel:SetPoint('TOPRIGHT', mapFrame, 'TOPRIGHT', -4 + interfaceDB.minimapClockX * scale, -4 + interfaceDB.minimapClockY * scale)
+		clockLabel:SetJustifyH('RIGHT')
+		zoneLabel:SetPoint('TOPLEFT', mapFrame, 'TOPLEFT', 4 + interfaceDB.minimapZoneX * scale, -4 + interfaceDB.minimapZoneY * scale)
+		zoneLabel:SetJustifyH('LEFT')
+		local clockColor = interfaceDB.minimapClockColor
+		clockLabel:SetTextColor(clockColor.r, clockColor.g, clockColor.b, 0.9)
+		if interfaceDB.minimapZoneColorCustom then
+			local zoneColor = interfaceDB.minimapZoneColor
+			zoneLabel:SetTextColor(zoneColor.r, zoneColor.g, zoneColor.b, 0.9)
+		else
+			zoneLabel:SetTextColor(1, 0.82, 0, 0.6)
+		end
+		SyncTextDraggers()
+	end
+
+	local DRAWER_TAB_W, DRAWER_TAB_H, DRAWER_TAB_INSET = 10, 44, 3
+	local drawerTab = CreateFrame('Frame', nil, stage, 'BackdropTemplate')
+	drawerTab:SetFrameLevel(mapFrame:GetFrameLevel() + 12)
+	Pixel.SetTemplate(drawerTab, 0.85, 0.85, 0.85, 1, 0.1, 0.1, 0.1, 1)
+	drawerTab:Hide()
+
+	local function RefreshDrawer()
+		if not interfaceDB.drawerEnabled then
+			drawerTab:Hide()
+			return
+		end
+		local side = interfaceDB.drawerSide
+		local tabWidth, tabHeight = DRAWER_TAB_W * uiScale, DRAWER_TAB_H * uiScale
+		if side == 'TOP' or side == 'BOTTOM' then tabWidth, tabHeight = tabHeight, tabWidth end
+		drawerTab:SetSize(max(2, tabWidth), max(2, tabHeight))
+		local offsetX = interfaceDB.drawerX * uiScale
+		local offsetY = interfaceDB.drawerY * uiScale
+		local inset = DRAWER_TAB_INSET * uiScale
+		drawerTab:ClearAllPoints()
+		if side == 'LEFT' then
+			drawerTab:SetPoint('CENTER', mapFrame, 'LEFT', inset + offsetX, offsetY)
+		elseif side == 'RIGHT' then
+			drawerTab:SetPoint('CENTER', mapFrame, 'RIGHT', -inset + offsetX, offsetY)
+		elseif side == 'TOP' then
+			drawerTab:SetPoint('CENTER', mapFrame, 'TOP', offsetX, -inset + offsetY)
+		else
+			drawerTab:SetPoint('CENTER', mapFrame, 'BOTTOM', offsetX, inset + offsetY)
+		end
+		drawerTab:Show()
+	end
+
+	local barHolder = CreateFrame('Frame', nil, stage)
+	barHolder:SetFrameLevel(mapFrame:GetFrameLevel() + 12)
+	barHolder:Hide()
+	local barProxies = {}
+
+	local function BarProxy(index)
+		local proxy = barProxies[index]
+		if proxy then return proxy end
+		proxy = CreateFrame('Frame', nil, barHolder, 'BackdropTemplate')
+		proxy:SetBackdrop({ bgFile = 'Interface\\Buttons\\WHITE8X8', edgeFile = 'Interface\\Buttons\\WHITE8X8', edgeSize = 1 })
+		proxy:SetBackdropBorderColor(0, 0, 0, 1)
+		proxy.icon = proxy:CreateTexture(nil, 'ARTWORK')
+		proxy.icon:SetPoint('TOPLEFT', 1, -1)
+		proxy.icon:SetPoint('BOTTOMRIGHT', -1, 1)
+		proxy.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		barProxies[index] = proxy
+		return proxy
+	end
+
+	local function RefreshButtonBar()
+		local config = interfaceDB.buttonBar
+		if not config.enabled then
+			barHolder:Hide()
+			return
+		end
+		local entries = {}
+		for _, entry in ipairs(ButtonBar.PickerEntries()) do
+			if entry.included then entries[#entries + 1] = entry end
+		end
+		local count = #entries
+		if count == 0 then
+			barHolder:Hide()
+			return
+		end
+
+		local anchor = ButtonBar.ANCHORS[config.side] or ButtonBar.ANCHORS.BOTTOM
+		local size = max(4, floor(config.size * uiScale + 0.5))
+		local spacing = floor(config.spacing * uiScale + 0.5)
+		local perLine = config.perLine > 0 and config.perLine or count
+		local lineCount = min(count, perLine)
+		local crossCount = math.ceil(count / perLine)
+		local lineExtent = lineCount * size + (lineCount - 1) * spacing
+		local crossExtent = crossCount * size + (crossCount - 1) * spacing
+		if anchor.horizontal then
+			barHolder:SetSize(max(1, lineExtent), max(1, crossExtent))
+		else
+			barHolder:SetSize(max(1, crossExtent), max(1, lineExtent))
+		end
+		local points = anchor[config.align] or anchor.CENTER
+		barHolder:ClearAllPoints()
+		local mapGap = config.gap * uiScale
+		local gapX = (config.side == 'LEFT' and -mapGap) or (config.side == 'RIGHT' and mapGap) or 0
+		local gapY = (config.side == 'TOP' and mapGap) or (config.side == 'BOTTOM' and -mapGap) or 0
+		barHolder:SetPoint(points[1], mapFrame, points[2], config.offsetX * uiScale + gapX, config.offsetY * uiScale + gapY)
+
+		local corner = (anchor.dirY == 1 and 'BOTTOM' or 'TOP') .. (anchor.dirX == -1 and 'RIGHT' or 'LEFT')
+		local step = size + spacing
+		local background = config.background
+		for index = 1, count do
+			local proxy = BarProxy(index)
+			local lineIndex = (index - 1) % perLine
+			local crossIndex = floor((index - 1) / perLine)
+			local x, y
+			if anchor.horizontal then x, y = lineIndex * step, crossIndex * step else x, y = crossIndex * step, lineIndex * step end
+			proxy:SetSize(size, size)
+			proxy:SetBackdropColor(background[1], background[2], background[3], background[4])
+			proxy:ClearAllPoints()
+			proxy:SetPoint(corner, barHolder, corner, x * anchor.dirX, y * anchor.dirY)
+			local icon = entries[index].icon
+			if icon then
+				proxy.icon:SetTexture(icon)
+				proxy.icon:Show()
+			else
+				proxy.icon:Hide()
+			end
+			proxy:Show()
+		end
+		for index = count + 1, #barProxies do barProxies[index]:Hide() end
+		barHolder:Show()
+	end
+
+	function card:UpdatePreview()
+		interfaceDB = Interface()
+		minimapWidth = Minimap:GetWidth()
+		scale = PREVIEW_MAP / minimapWidth
+		uiScale = scale * UIParent:GetEffectiveScale() / Minimap:GetEffectiveScale()
+		ApplyMapSnapshot()
+		ApplyBorder()
+		RefreshIcons()
+		PlaceText()
+		RefreshDrawer()
+		RefreshButtonBar()
+	end
+
+	local sinceTick = 0
+	card:SetScript('OnUpdate', function(self, elapsed)
+		sinceTick = sinceTick + elapsed
+		if sinceTick >= PREVIEW_TICK then
+			sinceTick = 0
+			self:UpdatePreview()
+		end
+	end)
+	card:HookScript('OnShow', function(self) self:UpdatePreview() end)
+	card:UpdatePreview()
+	return card
+end
+
 local function MapBoard(ui, parent, width)
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Map',
-		description = 'The square minimap: where it sits, how big it is and the frame around it. Unlock it to drag the map and its indicators into place on screen.',
+		description = 'The square minimap: where it sits, how big it is and the frame around it. The cube turns the module on or off. The eye unlocks the real map to drag it, right-click it there to lock it again.',
+		buttons = {
+			{ toggle = true, icon = 'enable', tooltip = 'Turn the minimap module on or off, needs a reload', get = function() return Interface().minimapEnabled ~= false end, set = ConfirmModule },
+			{ toggle = true, icon = 'eye', tooltip = 'Unlock the map to drag it and its indicators, right-click it to lock', get = MinimapModule.IsUnlocked, set = MinimapModule.ToggleUnlock },
+		},
 	})
-	board:AddSwitch('Minimap module', function() return Interface().minimapEnabled ~= false end, ConfirmModule, 'Needs a reload to turn on or off')
-	board:AddSwitch('Unlocked', MinimapModule.IsUnlocked, MinimapModule.ToggleUnlock, 'Drag the map and its indicators, right-click the map to lock')
-	board:AddSwitch('Rotate with you', function() return Interface().rotateMinimap == true end, function(value)
+	Switch(board, 'Rotate with you', function() return Interface().rotateMinimap == true end, function(value)
 		Interface().rotateMinimap = value
 		MinimapModule.ToggleRotation(value)
 	end)
-	board:AddSwitch('Hide the BluUI button', BUI.IsMinimapButtonHidden, BUI.SetMinimapButtonHidden)
+	Switch(board, 'Hide the BluUI button', BUI.IsMinimapButtonHidden, BUI.SetMinimapButtonHidden)
 	Slider(ui, board:AddRow('Scale', 'Percent of the default size', SLIDER_WIDTH), 50, 200, 1,
 		function() return Interface().minimapScale end,
-		function(value) MinimapModule.SetScale(value) end)
+		MinimapModule.SetScale)
 	Slider(ui, board:AddRow('Border width', 'Pixels around the map', SLIDER_WIDTH), 0, 10, 1,
 		function() return Interface().minimapBorderWidth end,
-		function(value) MinimapModule.SetBorderWidth(value) end)
+		MinimapModule.SetBorderWidth)
 	Slider(ui, board:AddRow('From the right edge', 'Distance from the right of the screen', SLIDER_WIDTH), 0, floor(GetScreenWidth()), 1,
 		function() return -(MinimapModule.GetPosition()) end,
 		function(value) MinimapModule.SetPositionX(-value) end)
@@ -188,7 +807,7 @@ local function IndicatorsSection(ui, parent, width)
 	local section = ui.Section(parent, width, {
 		stacked = true,
 		title = 'Indicators',
-		description = 'The small buttons that live on the map. Unlock the map to drag them, and size them here.',
+		description = 'The small buttons that live on the map. Drag them around the preview above, or unlock the real map, and size them here.',
 		columns = { { 'Indicator', ui.ROW_INSET }, { 'Shown', SHOWN_COLUMN }, { 'Size', width - ui.ROW_INSET - SLIDER_WIDTH } },
 	})
 	for _, def in ipairs(INDICATORS) do
@@ -199,6 +818,7 @@ local function IndicatorsSection(ui, parent, width)
 				Interface()[def.hide] = not value
 				MinimapModule.ApplyVisibility()
 				if def.key == 'difficulty' then MinimapModule.ToggleTextDifficulty(value and Interface().minimapTextDifficulty == true) end
+				RefreshPreview()
 			end):SetPoint('LEFT', SHOWN_COLUMN, 0)
 		else
 			ui.Cell(row, 'Always', SHOWN_COLUMN)
@@ -213,6 +833,7 @@ local function IndicatorsSection(ui, parent, width)
 		Interface().minimapTextDifficulty = value
 		MinimapModule.ToggleTextDifficulty(value)
 		MinimapModule.ApplyVisibility()
+		RefreshPreview()
 	end):SetPoint('LEFT', SHOWN_COLUMN, 0)
 	return section
 end
@@ -221,17 +842,17 @@ local function ClockBoard(ui, parent, width)
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Clock',
-		description = 'The time in the corner of the map.',
+		description = 'The time in the corner of the map. Drag it in the preview above, or nudge it here.',
 	})
-	board:AddSwitch('Clock', function() return Interface().minimapClock == true end, function(value)
+	Switch(board, 'Clock', function() return Interface().minimapClock == true end, function(value)
 		Interface().minimapClock = value
 		MinimapModule.ToggleClock(value)
 	end)
-	board:AddSwitch('24-hour', function() return Interface().minimapClock24h == true end, function(value)
+	Switch(board, '24-hour', function() return Interface().minimapClock24h == true end, function(value)
 		Interface().minimapClock24h = value
 		MinimapModule.SetClockFormat(value)
 	end)
-	board:AddSwitch('Server time', function() return Interface().minimapClockServer == true end, function(value)
+	Switch(board, 'Server time', function() return Interface().minimapClockServer == true end, function(value)
 		Interface().minimapClockServer = value
 		MinimapModule.SetClockSource(value)
 	end)
@@ -257,13 +878,13 @@ local function ZoneBoard(ui, parent, width)
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Zone name',
-		description = 'The zone you are in, at the top of the map.',
+		description = 'The zone you are in, at the top of the map. Drag it in the preview above, or nudge it here.',
 	})
-	board:AddSwitch('Zone name', function() return Interface().minimapZone == true end, function(value)
+	Switch(board, 'Zone name', function() return Interface().minimapZone == true end, function(value)
 		Interface().minimapZone = value
 		MinimapModule.ToggleZoneText(value)
 	end)
-	board:AddSwitch('Custom color', function() return Interface().minimapZoneColorCustom == true end, function(value)
+	Switch(board, 'Custom color', function() return Interface().minimapZoneColorCustom == true end, function(value)
 		Interface().minimapZoneColorCustom = value
 		MinimapModule.RefreshZoneText()
 	end, 'Off colors the name by zone type')
@@ -295,15 +916,15 @@ local function DatatextBoard(ui, parent, width)
 		title = 'Datatext bar',
 		description = 'A strip of readouts attached to the map.',
 	})
-	board:AddSwitch('Datatext bar', function() return Bar().enabled ~= false end, function(value)
+	Switch(board, 'Datatext bar', function() return Bar().enabled ~= false end, function(value)
 		Bar().enabled = value
 		Datatext.Apply()
 	end)
-	board:AddSwitch('Hide labels', function() return Bar().hideLabels == true end, function(value)
+	Switch(board, 'Hide labels', function() return Bar().hideLabels == true end, function(value)
 		Bar().hideLabels = value
 		Datatext.Apply()
 	end)
-	board:AddSwitch('Border', function() return Bar().border == true end, function(value)
+	Switch(board, 'Border', function() return Bar().border == true end, function(value)
 		Bar().border = value
 		Datatext.Apply()
 	end)
@@ -394,7 +1015,7 @@ local function DrawerBoard(ui, parent, width)
 		title = 'Addon drawer',
 		description = 'Collects addon minimap buttons behind a tab on the edge of the map.',
 	})
-	board:AddSwitch('Drawer', function() return Interface().drawerEnabled == true end, MinimapModule.ToggleDrawer)
+	Switch(board, 'Drawer', function() return Interface().drawerEnabled == true end, MinimapModule.ToggleDrawer)
 	Menu(ui, board:AddRow('Side', 'Which edge the tab sits on', DROPDOWN_WIDTH), SIDES,
 		function() return Interface().drawerSide end,
 		function(value)
@@ -419,7 +1040,7 @@ local function ButtonBarBoard(ui, parent, width)
 		title = 'Button bar',
 		description = 'Addon buttons in a tidy row beside the map instead of scattered around it.',
 	})
-	board:AddSwitch('Button bar', function() return Buttons().enabled == true end, function(value)
+	Switch(board, 'Button bar', function() return Buttons().enabled == true end, function(value)
 		Buttons().enabled = value
 		Refresh()
 	end)
@@ -479,6 +1100,7 @@ local function ButtonsBoard(ui, parent, width, page)
 		local names = {}
 		for position, candidate in ipairs(entries) do names[position] = candidate.id end
 		ButtonBar.SetOrder(names)
+		RefreshPreview()
 		page:Resize()
 	end
 	for _, entry in ipairs(entries) do
@@ -487,6 +1109,7 @@ local function ButtonsBoard(ui, parent, width, page)
 		ui.Switch(row, function() return entry.included == true end, function(value)
 			entry.included = value
 			ButtonBar.SetIncluded(entry.id, value)
+			RefreshPreview()
 		end):SetPoint('RIGHT', -ui.ROW_INSET, 0)
 		OrderArrows(ui, row, function(delta) Move(entry, delta) end)
 	end
@@ -514,6 +1137,7 @@ BUI.PageEngine.RegisterPage('minimap', {
 			icon = 'minimap',
 			title = 'Minimap',
 			placeholder = 'Search minimap settings...',
+			preview = { height = PREVIEW_HEIGHT, build = function(band) preview = BuildPreview(band) end },
 			rail = { groups = RAIL_GROUPS },
 			build = Panes,
 		})
