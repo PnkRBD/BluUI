@@ -313,6 +313,18 @@ function Layout.TableKit(window)
 		return button
 	end
 
+	function kit.ArrowButton(parent, up, onClick)
+		local button = CreateFrame('Button', nil, parent)
+		button:SetSize(22, 22)
+		local glyph = kit.Glyph(button, 'dropdown', 10, 'muted')
+		glyph:SetPoint('CENTER')
+		if up then glyph:SetRotation(math.pi) end
+		button:SetScript('OnEnter', function() window:Paint(glyph, 'text') end)
+		button:SetScript('OnLeave', function() window:Paint(glyph, 'muted') end)
+		button:SetScript('OnClick', function() onClick() end)
+		return button
+	end
+
 	function kit.Swatch(parent, size, onClick)
 		local swatch = CreateFrame(onClick and 'Button' or 'Frame', nil, parent)
 		swatch:SetSize(size, size)
