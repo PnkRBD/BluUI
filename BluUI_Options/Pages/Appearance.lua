@@ -93,11 +93,21 @@ local function UseClassColor()
 end
 
 local function PickAccent(anchor)
-	local color = General().themeColor
+	local general = General()
+	local color = general.themeColor
+	local red, green, blue = color[1], color[2], color[3]
+	local wasClass = general.useClassColorTheme == true
 	Controls.OpenColorPicker({
-		r = color[1], g = color[2], b = color[3], a = 1, hasOpacity = false, anchorTo = anchor,
-		callback = function(red, green, blue, _, cancelled)
-			if not cancelled then SetAccent(red, green, blue) end
+		r = red, g = green, b = blue, a = 1, hasOpacity = false, anchorTo = anchor,
+		callback = function(newRed, newGreen, newBlue, _, cancelled, phase)
+			if cancelled then
+				color[1], color[2], color[3] = red, green, blue
+				general.useClassColorTheme = wasClass
+			else
+				general.useClassColorTheme = false
+				color[1], color[2], color[3], color[4] = newRed, newGreen, newBlue, 1
+			end
+			if phase == 'preview' then Window():Repaint() else ApplyAccent() end
 		end,
 	})
 end
@@ -306,10 +316,14 @@ local function BarSection(ui, parent, width)
 	})
 	local function PickGradient(anchor)
 		local color = General().gradientColor
-		Controls.OpenColorPicker({ r = color[1], g = color[2], b = color[3], a = color[4], hasOpacity = true, anchorTo = anchor, callback = function(red, green, blue, alpha, cancelled)
-			if cancelled then return end
-			General().gradientColor = { red, green, blue, alpha }
-			RefreshAllVisuals()
+		local red, green, blue, alpha = color[1], color[2], color[3], color[4]
+		Controls.OpenColorPicker({ r = red, g = green, b = blue, a = alpha, hasOpacity = true, anchorTo = anchor, callback = function(newRed, newGreen, newBlue, newAlpha, cancelled, phase)
+			if cancelled then
+				color[1], color[2], color[3], color[4] = red, green, blue, alpha
+			else
+				color[1], color[2], color[3], color[4] = newRed, newGreen, newBlue, newAlpha
+			end
+			if phase == 'preview' then Window():Repaint() else RefreshAllVisuals() end
 		end })
 	end
 	local function ResetGradient()
@@ -363,10 +377,13 @@ local function ColorSection(ui, parent, width, group, card)
 		end
 		local function Pick(anchor)
 			local red, green, blue, alpha = entry.get()
-			Controls.OpenColorPicker({ r = red, g = green, b = blue, a = alpha, hasOpacity = true, anchorTo = anchor, callback = function(newRed, newGreen, newBlue, newAlpha, cancelled)
-				if cancelled then return end
-				entry.set(newRed, newGreen, newBlue, newAlpha)
-				BUI.ApplyColors()
+			Controls.OpenColorPicker({ r = red, g = green, b = blue, a = alpha, hasOpacity = true, anchorTo = anchor, callback = function(newRed, newGreen, newBlue, newAlpha, cancelled, phase)
+				if cancelled then
+					entry.set(red, green, blue, alpha)
+				else
+					entry.set(newRed, newGreen, newBlue, newAlpha)
+				end
+				if phase ~= 'preview' then BUI.ApplyColors() end
 				Window():Repaint()
 			end })
 		end
