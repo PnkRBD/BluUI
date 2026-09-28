@@ -15,7 +15,7 @@ local SECTION_PAD = 32
 local STACK_PAD = 24
 local STACK_GAP = 20
 local TABLE_HEAD = 36
-local ROW_HEIGHT = 57
+local ROW_HEIGHT = 58
 local ROW_INSET = 20
 local CONTROL_HEIGHT = 30
 local TAB_HEIGHT = 30
@@ -31,6 +31,7 @@ local SLIDER_TRACK = 4
 local SLIDER_GAP = 6
 local SLIDER_STEP = 24
 local SLIDER_BOX = 52
+local STEP_SIGN = 12
 local BUTTON_STYLES = {
 	primary = { fill = 'accent', text = 'onAccent', solid = true },
 	control = { fill = 'control', text = 'controlText', solid = true },
@@ -155,12 +156,12 @@ function Layout.TableKit(window)
 		return switch
 	end
 
-	local function Stepper(parent, glyph)
+	local function Stepper(parent, plus)
 		local button = CreateFrame('Button', nil, parent)
 		button:SetSize(SLIDER_STEP, CONTROL_HEIGHT)
 		window:Fill(button, 'secondary'):SetAllPoints()
 		Overlay(button)
-		kit.Text(button, glyph, 14, 'secondaryText'):SetPoint('CENTER', 0, 1)
+		kit.Glyph(button, plus and 'plus' or 'minus', STEP_SIGN, 'secondaryText'):SetPoint('CENTER')
 		return button
 	end
 
@@ -190,9 +191,9 @@ function Layout.TableKit(window)
 		window:Paint(edit, 'text')
 		window:SetFontRole(edit, 'control')
 
-		local plus = Stepper(frame, '+')
+		local plus = Stepper(frame, true)
 		plus:SetPoint('RIGHT', box, 'LEFT', -SLIDER_GAP, 0)
-		local minus = Stepper(frame, '\226\136\146')
+		local minus = Stepper(frame, false)
 		minus:SetPoint('LEFT')
 
 		local slider = CreateFrame('Slider', nil, frame)
