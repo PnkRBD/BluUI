@@ -7,6 +7,7 @@ local FIRST_COLUMN = 267
 local SECOND_COLUMN = 344
 local DROPDOWN_WIDTH = 112
 local FONT_DROPDOWN_WIDTH = 200
+local PRESET_DROPDOWN_WIDTH = 140
 local SWATCH_SIZE = 28
 local STAGE_HEIGHT = 118
 local STAGE_PAD = 20
@@ -197,68 +198,53 @@ local function Stage(ui, parent, width)
 	return frame
 end
 
-local function AccentGallery(ui, parent, width)
-	local tiles = {}
-	local _, classFile = UnitClass('player')
-	local classColor = RAID_CLASS_COLORS[classFile]
-	tiles[1] = {
-		label = 'Class color', sub = (UnitClass('player')),
-		build = function(content)
-			local swatch = content:CreateTexture(nil, 'ARTWORK')
-			swatch:SetTexture(Widget.WHITE)
-			swatch:SetPoint('TOPLEFT', 10, -10)
-			swatch:SetPoint('BOTTOMRIGHT', -10, 4)
-			swatch:SetVertexColor(classColor.r, classColor.g, classColor.b, 1)
-		end,
-		selected = function() return General().useClassColorTheme == true end,
-		onClick = UseClassColor,
-	}
+local function AccentName()
+	local general = General()
+	if general.useClassColorTheme == true then return 'Class color' end
 	for _, entry in ipairs(PALETTE) do
-		tiles[#tiles + 1] = {
-			label = entry.name,
-			build = function(content)
-				local swatch = content:CreateTexture(nil, 'ARTWORK')
-				swatch:SetTexture(Widget.WHITE)
-				swatch:SetPoint('TOPLEFT', 10, -10)
-				swatch:SetPoint('BOTTOMRIGHT', -10, 4)
-				swatch:SetVertexColor(entry.color[1], entry.color[2], entry.color[3], 1)
-			end,
-			selected = function()
-				local general = General()
-				return general.useClassColorTheme ~= true and Same(general.themeColor[1], general.themeColor[2], general.themeColor[3], entry.color)
-			end,
-			onClick = function() SetAccent(entry.color[1], entry.color[2], entry.color[3]) end,
-		}
+		if Same(general.themeColor[1], general.themeColor[2], general.themeColor[3], entry.color) then return entry.name end
 	end
-	tiles[#tiles + 1] = {
-		label = 'Custom', sub = 'Pick any color', search = 'custom accent color',
-		build = function(content, _, tile)
-			local swatch = content:CreateTexture(nil, 'ARTWORK')
-			swatch:SetTexture(Widget.WHITE)
-			swatch:SetPoint('TOPLEFT', 10, -10)
-			swatch:SetPoint('BOTTOMRIGHT', -10, 4)
-			tile.swatch = swatch
-			ui.Glyph(content, 'edit', 12, 'onAccent', 'OVERLAY'):SetPoint('CENTER', swatch)
-		end,
-		refresh = function(tile)
-			local color = General().themeColor
-			tile.swatch:SetVertexColor(color[1], color[2], color[3], 1)
-		end,
-		selected = function()
-			local general = General()
-			if general.useClassColorTheme == true then return false end
-			for _, entry in ipairs(PALETTE) do
-				if Same(general.themeColor[1], general.themeColor[2], general.themeColor[3], entry.color) then return false end
-			end
-			return true
-		end,
-		onClick = function(tile) PickAccent(tile) end,
-	}
-	return ui.Gallery(parent, width, {
+	return 'Custom'
+end
+
+local function AccentSection(ui, parent, width)
+	local window = Window()
+	local section = ui.Section(parent, width, {
+		stacked = true,
 		title = 'Accent',
 		description = 'The highlight color for every BluUI window, tab and control. Class color follows the character you are on.',
-		tiles = tiles,
+		columns = { { 'Name', ui.AVATAR_X }, { 'Hex', FIRST_COLUMN }, { 'Opacity', SECOND_COLUMN } },
 	})
+	local row = section:AddRow('Accent color class palette custom')
+	local swatch = ui.Swatch(row, SWATCH_SIZE, function(self) PickAccent(self) end)
+	swatch:SetPoint('LEFT', ui.AVATAR_X, 0)
+	ui.RowTitle(row, 'Accent', 'Class color, a palette pick, or any color of your own', ui.NAME_X)
+	local hex = ui.Cell(row, '', FIRST_COLUMN)
+	local opacity = ui.Cell(row, '', SECOND_COLUMN)
+	local reset = ui.IconButton(row, 'reset', 'Back to the class color', UseClassColor)
+	reset:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
+	local dropdown
+	dropdown = ui.Dropdown(row, PRESET_DROPDOWN_WIDTH, function()
+		local general = General()
+		local name = AccentName()
+		local items = { { text = 'Class color', checked = general.useClassColorTheme == true, callback = UseClassColor }, { title = 'Palette' } }
+		for _, entry in ipairs(PALETTE) do
+			items[#items + 1] = { text = entry.name, checked = name == entry.name, callback = function() SetAccent(entry.color[1], entry.color[2], entry.color[3]) end }
+		end
+		items[#items + 1] = { separator = true }
+		items[#items + 1] = { text = 'Custom color', checked = name == 'Custom', callback = function() PickAccent(dropdown) end }
+		return items
+	end)
+	dropdown:SetPoint('RIGHT', reset, 'LEFT', -10, 0)
+	ui.Bind(row, function()
+		local red, green, blue = window:Color('accent')
+		swatch.fill:SetVertexColor(red, green, blue, 1)
+		hex:SetText(Hex(red, green, blue))
+		opacity:SetText('100%')
+		dropdown.label:SetText(AccentName())
+		reset:SetActive(General().useClassColorTheme ~= true)
+	end)
+	return section
 end
 
 local function OnOff(get, set)
@@ -474,7 +460,7 @@ end
 
 local function Sections(ui, _, parent, width)
 	local sections = { Stage(ui, parent, width) }
-	sections[#sections + 1] = AccentGallery(ui, parent, width)
+	sections[#sections + 1] = AccentSection(ui, parent, width)
 	sections[#sections + 1] = TextSection(ui, parent, width)
 	sections[#sections + 1] = BarSection(ui, parent, width)
 	local cards = {}
