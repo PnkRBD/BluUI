@@ -716,7 +716,10 @@ end
 
 function MakeCard(parent, collector)
     local card = CreateFrame("Frame", nil, parent)
-    Widget.DrawCardShape(card, 8, Theme.bg.card, { 0.20, 0.22, 0.26, 0.50 }, "BACKGROUND", 0, 0)
+    local window = BUI.PageEngine.window
+    local fill, edge = Widget.DrawCardShape(card, 8, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, "BACKGROUND", 0, 0)
+    window:Paint(fill, 'card')
+    window:Paint(edge, 'cardEdge')
     collector[#collector + 1] = card
     return card
 end
