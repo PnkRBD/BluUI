@@ -18,8 +18,7 @@ local VALID_STRATA = {
 }
 
 local bars = {}
-local positionCallbacks = {}
-local lockSyncs = {}
+local onLock
 local eventsRegistered = false
 local styleVersion = 0
 local playerKey
@@ -101,20 +100,8 @@ local function GetBar(index)
     return GetSettings()[index]
 end
 
-function CustomBars.RegisterPositionCallback(index, callback)
-    positionCallbacks[index] = callback
-end
-
-function CustomBars.UnregisterPositionCallback(index)
-    positionCallbacks[index] = nil
-end
-
-function CustomBars.RegisterLockSync(index, callback)
-    lockSyncs[index] = callback
-end
-
-function CustomBars.UnregisterLockSync(index)
-    lockSyncs[index] = nil
+function CustomBars.SetLockCallback(callback)
+    onLock = callback
 end
 
 function CustomBars.GetOtherCharacters()
@@ -145,6 +132,26 @@ function CustomBars.GetBarInfoForCharacter(characterKey)
     return result
 end
 
+local UNCOPIED_KEYS = { name = true, posX = true, posY = true, customSpells = true }
+
+local function CopyBar(destination, source, spells)
+    if source then
+        for key, value in pairs(source) do
+            if not UNCOPIED_KEYS[key] then
+                if type(value) == "table" then
+                    local copy = {}
+                    for tableKey, tableValue in pairs(value) do copy[tableKey] = tableValue end
+                    destination[key] = copy
+                else
+                    destination[key] = value
+                end
+            end
+        end
+    end
+    wipe(destination.customSpells)
+    for spellIndex, spell in ipairs(spells) do destination.customSpells[spellIndex] = spell end
+end
+
 function CustomBars.CopyBarsFromCharacter(characterKey, indices)
     local spells = LoadSpellsFor(characterKey)
     if not spells then return end
@@ -163,33 +170,25 @@ function CustomBars.CopyBarsFromCharacter(characterKey, indices)
             local sourceBar = sourceBars and sourceBars[sourceIndex]
             local newIndex = #settings + 1
             CustomBars.AddBar(sourceBar and sourceBar.name or ("Imported Bar " .. sourceIndex))
-            local destinationBar = settings[newIndex]
-            if sourceBar then
-                for key, value in pairs(sourceBar) do
-                    if key ~= "name" and key ~= "posX" and key ~= "posY" and key ~= "customSpells" then
-                        if type(value) == "table" then
-                            local copy = {}
-                            for tableKey, tableValue in pairs(value) do copy[tableKey] = tableValue end
-                            destinationBar[key] = copy
-                        else
-                            destinationBar[key] = value
-                        end
-                    end
-                end
-            end
-            wipe(destinationBar.customSpells)
-            for spellIndex, spell in ipairs(list) do destinationBar.customSpells[spellIndex] = spell end
+            CopyBar(settings[newIndex], sourceBar, list)
         end
     end
     CustomBars.RefreshAllBars()
+end
+
+function CustomBars.DuplicateBar(index)
+    local source = GetBar(index)
+    local newIndex = CustomBars.AddBar(source.name .. " copy")
+    CopyBar(GetBar(newIndex), source, source.customSpells)
+    CustomBars.RefreshBar(newIndex)
+    return newIndex
 end
 
 local function LockBar(index)
     local settings = GetBar(index)
     if not settings or settings.locked then return end
     settings.locked = true
-    local sync = lockSyncs[index]
-    if sync then sync(false) end
+    if onLock then onLock() end
     CustomBars.RefreshBar(index)
 end
 
@@ -221,8 +220,6 @@ local function CreateIcon(parent, barIndex, iconIndex)
         local settings = GetBar(barIndex)
         if settings and not parent._isAnchored then
             settings.posX, settings.posY = BUI.Dragging.GetCenterOffset(parent)
-            local callback = positionCallbacks[barIndex]
-            if callback then callback(settings.posX, settings.posY) end
         end
     end)
     icon:SetScript("OnMouseUp", function(_, button)
@@ -724,8 +721,6 @@ local function CreateBar(index)
             local settings = GetBar(index)
             if not settings then return end
             settings.posX, settings.posY = x, y
-            local callback = positionCallbacks[index]
-            if callback then callback(x, y) end
         end,
         onRightClick = function() LockBar(index) end,
         showHint = true,

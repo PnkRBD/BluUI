@@ -1,1061 +1,652 @@
 local BUI = BluUI
-
-local wipe = wipe
-local Pixel = BUI.Pixel
 local BUILib = BluUI.BUILibClient
-local Controls, Layout, Modals, Widget = BUILib.Controls, BUILib.Layout, BUILib.Modals, BUILib.Widget
-local PageKit = BUILib.PageKit
-local TRINKET_SLOTS = { 13, 14 }
-local AUTO_PREFIX = 'auto:'
+local Controls, Layout, Modals = BUILib.Controls, BUILib.Layout, BUILib.Modals
+local Section = Layout.TableSection
+local CustomBars = BUI.CustomBars
 local IconEngine = BUI.IconEngine
+local Pixel = BUI.Pixel
+
+local PAGE_WIDTH = 960
+local PREVIEW_HEIGHT = 110
+local PREVIEW_INSET = 20
+local PREVIEW_ROOM = 40
+local MENU_WIDTH = 150
+local CHARACTER_WIDTH = 260
+local INPUT_WIDTH = 260
+local NAME_WIDTH = 300
+local ICON_SIZE = 24
+local GRABBER_SIZE = 12
+local GRABBER_X = 18
+local LIST_ICON_X = 42
+local LIST_NAME_X = 78
+local ERASE_SIZE = 32
+local ERASE_INSET = 18
+local TOOL_SIZE = 22
+local TOOL_GAP = 12
+local TOOLS_ROOM = ERASE_INSET + ERASE_SIZE + 3 * (TOOL_GAP + TOOL_SIZE) + TOOL_GAP
+local RESULTS_WIDTH = 280
+local DRAG_ALPHA = 0.35
+local HIDDEN_ALPHA = 0.45
 local DEFAULT_ICON = 134400
-local PRIORITY_TINT = { 1, 0.82, 0, 1 }
-local IDLE_TINT = { 0.6, 0.6, 0.6, 1 }
+local TRINKET_SLOTS = { 13, 14 }
 
-local function IsFlaskItem(itemID)
-    local _, _, _, _, _, classID, subclassID = C_Item.GetItemInfoInstant(itemID)
-    return classID == Enum.ItemClass.Consumable and subclassID == Enum.ItemConsumableSubclass.Flask
-end
-
-local function PotionDisplayLabel(itemID, storedValue)
-    local label = IsFlaskItem(itemID) and 'Flask Display' or 'Potion Display'
-    if BUI.CDM.GetPotionPrioFor(storedValue) then return label .. ' |cffffe066(custom)|r', true end
-    return label, false
-end
-
-local function IsPotionRow(rowId)
-    local itemID = type(rowId) == 'string' and tonumber(rowId:match('^item:(%d+)'))
-    if not itemID then return nil end
-    return BUI.CDM.Custom.IsPotionItem(itemID) and itemID or nil
-end
-
-local STRATA_OPTIONS = BUI.C.STRATA_OPTIONS
-local GROW_OPTIONS = { { value = 'LEFT', text = 'Left' }, { value = 'RIGHT', text = 'Right' } }
-local ROW_OPTIONS  = { { value = 'DOWN', text = 'Down' }, { value = 'UP', text = 'Up' } }
+local GROW_OPTIONS = { { value = 'LEFT', text = 'Grow left' }, { value = 'RIGHT', text = 'Grow right' } }
+local ROW_OPTIONS = { { value = 'DOWN', text = 'Down' }, { value = 'UP', text = 'Up' } }
 
 local selectedIndex = 1
+local showingImport = false
+local importCharacter
+local importSkips = {}
+local items = {}
+local preview
+local fonts
 
-local function GetBar(index)
-    return BUI.GetDB().customBars[index]
+local function Window()
+	return BUI.PageEngine.window
+end
+
+local function Repaint()
+	Window():Repaint()
+end
+
+local function Bars()
+	return BUI.GetDB().customBars
 end
 
 local function Current()
-    return GetBar(selectedIndex)
+	local list = Bars()
+	if not list[selectedIndex] then selectedIndex = math.max(1, #list) end
+	return list[selectedIndex]
 end
 
-local function RefreshCurrent()
-    BUI.CustomBars.RefreshBar(selectedIndex)
+local function Shown()
+	if showingImport then return nil end
+	return Current()
 end
 
-local function IsAutoId(rowId)
-    return type(rowId) == 'string' and rowId:sub(1, #AUTO_PREFIX) == AUTO_PREFIX
+local function RefreshPreview()
+	if preview then preview:Update() end
 end
 
-local function ExtractNumeric(rowId)
-    if type(rowId) == 'number' then return rowId end
-    local text = tostring(rowId)
-    return tonumber(text) or tonumber(text:match('%d+'))
+local function Apply()
+	CustomBars.RefreshBar(selectedIndex)
+	RefreshPreview()
 end
 
-local function ResolveIcon(stored)
-    local id, isItem = IconEngine.ExtractSpellItemID(stored)
-    if not id then return nil, nil end
-    local texture
-    if isItem then
-        texture = BUI.Lookup.GetItemInfo(id)
-    else
-        texture = BUI.Lookup.GetSpellInfo(id)
-    end
-    return texture or DEFAULT_ICON, id
+local function RebuildPage()
+	BUILib.Defer(function() BUI.PageEngine.RefreshCurrentPage() end)
+end
+
+local function RebuildPane(page)
+	BUILib.Defer(function() page:RebuildCurrent() end)
+end
+
+local function IndexOf(list, value)
+	for position, candidate in ipairs(list) do
+		if candidate == value then return position end
+	end
+end
+
+local function StoredIndex(spells, stored)
+	local key = tostring(stored)
+	for position, candidate in ipairs(spells) do
+		if tostring(candidate) == key then return position end
+	end
+end
+
+local function Option(bar, label, key, extra)
+	local option = { label = label, get = function() return bar[key] end, set = function(value) bar[key] = value end }
+	for name, value in pairs(extra or {}) do option[name] = value end
+	return option
+end
+
+local function Toggle(bar, label, key)
+	return { label = label, get = function() return bar[key] == true end, set = function(value) bar[key] = value end }
+end
+
+local function OnUnlessOff(bar, label, key)
+	return { label = label, get = function() return bar[key] ~= false end, set = function(value) bar[key] = value end }
+end
+
+local function Color(bar, label, key)
+	return {
+		kind = 'swatch', label = label, tooltip = label, opacity = true,
+		get = function()
+			local color = bar[key]
+			return color[1], color[2], color[3], color[4] or 1
+		end,
+		set = function(red, green, blue, alpha) bar[key] = { red, green, blue, alpha } end,
+	}
+end
+
+local function NameOption(bar)
+	return { label = 'Name', kind = 'input', placeholder = 'Name', get = function() return bar.name end, set = function(name)
+		if name == '' then return end
+		bar.name = name
+		RebuildPage()
+	end }
+end
+
+local function ConfirmDelete(index)
+	local bar = Bars()[index]
+	Modals.Confirm({
+		parent = Window().frame,
+		title = 'Delete ' .. bar.name,
+		message = 'Delete "' .. bar.name .. '"? Its tracked spells and items go with it.',
+		confirmText = 'Delete', cancelText = 'Cancel',
+		onConfirm = function()
+			CustomBars.DeleteBar(index)
+			selectedIndex = math.max(1, index - 1)
+			RebuildPage()
+		end,
+	})
+end
+
+local function Duplicate(index)
+	selectedIndex = CustomBars.DuplicateBar(index)
+	RebuildPage()
+end
+
+local function Describe(id, isItem)
+	local icon, name
+	if isItem then icon, name = BUI.Lookup.GetItemInfo(id) else icon, name = BUI.Lookup.GetSpellInfo(id) end
+	return icon or DEFAULT_ICON, name or ((isItem and 'Item ' or 'Spell ') .. id)
+end
+
+local function Entries(bar)
+	local list, seen = {}, {}
+	for _, stored in ipairs(bar.customSpells) do
+		local id, isItem, explicitSpell = IconEngine.ExtractSpellItemID(stored)
+		if id then
+			seen[id] = true
+			local icon, name = Describe(id, isItem)
+			list[#list + 1] = {
+				stored = stored, id = id, icon = icon, name = name, sub = (isItem and 'Item ' or 'Spell ') .. id, hideKey = id, custom = true,
+				consumable = IconEngine.ClassifyAsSpellOrItem(id, isItem, nil, explicitSpell) == 'consumable',
+				potion = isItem and BUI.CDM.Custom.IsPotionItem(id),
+			}
+		end
+	end
+	if bar.showTrinkets then
+		for slotIndex, slot in ipairs(TRINKET_SLOTS) do
+			local entry = { name = 'Trinket ' .. slotIndex, icon = DEFAULT_ICON, sub = 'Nothing equipped', hideKey = 'auto:slot:' .. slot, slot = slot }
+			local itemID = GetInventoryItemID('player', slot)
+			if itemID then
+				entry.itemID = itemID
+				entry.icon, entry.sub = Describe(itemID, true)
+			end
+			list[#list + 1] = entry
+		end
+	end
+	if bar.showRacials then
+		for _, id in ipairs(BUI.CDM.GetKnownRacialSpellIDs()) do
+			if not seen[id] then
+				local icon, name = Describe(id, false)
+				list[#list + 1] = { id = id, icon = icon, name = name, sub = 'Racial, added automatically', hideKey = 'auto:racial:' .. id }
+			end
+		end
+	end
+	return list
 end
 
 local function VisibleIcons(bar)
-    local list = {}
-    if not bar then return list end
-    local hidden = bar.hiddenIcons
-    for _, stored in ipairs(bar.customSpells) do
-        local texture, id = ResolveIcon(stored)
-        if texture and not (id and hidden[id]) then
-            list[#list + 1] = texture
-        end
-    end
-    if bar.showTrinkets then
-        for slotIndex = 1, #TRINKET_SLOTS do
-            local trinketTexture = GetInventoryItemTexture('player', TRINKET_SLOTS[slotIndex])
-            if trinketTexture then list[#list + 1] = trinketTexture end
-        end
-    end
-    return list
+	local list = {}
+	for _, entry in ipairs(Entries(bar)) do
+		local skip = bar.hiddenIcons[entry.hideKey] or (entry.slot and (not entry.itemID or bar.trinketBlacklist[entry.itemID]))
+		if not skip then list[#list + 1] = entry.icon end
+	end
+	return list
 end
 
-local function ShowImportDialog(CustomBars, onImported)
-    local characters = CustomBars.GetOtherCharacters()
-    if #characters == 0 then
-        Modals.Message({ title = "Import Bars", message = "No other characters have tracking bar data to import." })
-        return
-    end
-    local overlay, dialog, Close = Modals.CreateBase(480, 300, true)
-    Modals.CreateTitle(dialog, "Import Bars")
-
-    local selectedCharacter = characters[1]
-    local selectedBars = {}
-
-    local barMultiDropdown
-    local function RebuildBarMultiDropdown()
-        local barInfo = CustomBars.GetBarInfoForCharacter(selectedCharacter)
-        local barItems = {}
-        selectedBars = {}
-        for _, info in ipairs(barInfo) do
-            barItems[#barItems + 1] = { value = info.index, text = info.name .. "  (" .. info.count .. ")" }
-            selectedBars[info.index] = true
-        end
-        if barMultiDropdown then barMultiDropdown:SetItems(barItems, selectedBars) end
-        return barItems
-    end
-
-    local characterItems = {}
-    for _, characterKey in ipairs(characters) do
-        characterItems[#characterItems + 1] = { value = characterKey, text = characterKey }
-    end
-
-    local characterLabel = dialog:CreateFontString(nil, "OVERLAY")
-    Pixel.ApplyFont(characterLabel, BUILib.FONT_SIZE, BUILib.Font, "")
-    characterLabel:SetTextColor(0.7, 0.7, 0.7)
-    characterLabel:SetText("Character")
-    characterLabel:SetPoint("CENTER", dialog, "CENTER", 0, Pixel.Scale(55))
-
-    local characterDropdown = Controls.Dropdown(dialog, nil, characterItems, selectedCharacter, function(value)
-        selectedCharacter = value
-        RebuildBarMultiDropdown()
-    end, nil, 340)
-    local characterDropdownFrame = characterDropdown.frame
-    characterDropdownFrame:SetPoint("TOP", characterLabel, "BOTTOM", 0, Pixel.Scale(-4))
-
-    local barLabel = dialog:CreateFontString(nil, "OVERLAY")
-    Pixel.ApplyFont(barLabel, BUILib.FONT_SIZE, BUILib.Font, "")
-    barLabel:SetTextColor(0.7, 0.7, 0.7)
-    barLabel:SetText("Bars to Import")
-    barLabel:SetPoint("TOP", characterDropdownFrame, "BOTTOM", 0, Pixel.Scale(-14))
-
-    barMultiDropdown = Controls.MultiDropdown(dialog, nil, RebuildBarMultiDropdown(), selectedBars, function(map)
-        selectedBars = map
-    end, nil, 340)
-    local barMultiDropdownFrame = barMultiDropdown.frame
-    barMultiDropdownFrame:SetPoint("TOP", barLabel, "BOTTOM", 0, Pixel.Scale(-4))
-
-    Modals.LayoutButtons(dialog, {
-        { text = "Import", color = Modals.BTN_CONFIRM, width = 100,
-          onClick = function(close)
-              close()
-              local indices = {}
-              for index, isSelected in pairs(selectedBars) do
-                  if isSelected then indices[#indices + 1] = index end
-              end
-              if #indices > 0 then
-                  CustomBars.CopyBarsFromCharacter(selectedCharacter, indices)
-                  if onImported then onImported() end
-              end
-          end },
-        { text = "Cancel", color = Modals.BTN_CANCEL, width = 100 },
-    }, Close)
-
-    overlay:Show()
+local function PotionLabel(entry)
+	local _, _, _, _, _, _, subclassID = C_Item.GetItemInfoInstant(entry.id)
+	local label = subclassID == Enum.ItemConsumableSubclass.Flask and 'Flask display' or 'Potion display'
+	if BUI.CDM.GetPotionPrioFor(entry.stored) then label = label .. ', customized' end
+	return label
 end
 
-local function BuildEmptyState(pageFrame, CustomBars, rebuildPage)
-    local page = Layout.Page(pageFrame, nil)
-    local tab = page:GetTab(1)
-    local Theme = BUILib.Theme
-
-    local hero = CreateFrame("Frame", nil, tab.child)
-    hero:SetWidth(tab.width or 600)
-    hero:SetHeight(Pixel.Scale(140))
-
-    local title = hero:CreateFontString(nil, "OVERLAY")
-    Pixel.ApplyFont(title, 18, BUILib.Font, "OUTLINE")
-    title:SetPoint("TOP", hero, "TOP", 0, Pixel.Scale(-8))
-    title:SetText("No custom bars yet")
-    title:SetTextColor(unpack(Theme.text.primary))
-
-    local desc = hero:CreateFontString(nil, "OVERLAY")
-    Pixel.ApplyFont(desc, 12, BUILib.Font, "")
-    desc:SetWidth(Pixel.Scale(440))
-    desc:SetJustifyH("CENTER")
-    desc:SetPoint("TOP", title, "BOTTOM", 0, Pixel.Scale(-10))
-    desc:SetText("Custom bars track the cooldowns, trinkets, potions and buffs you care about. Build one from scratch, or import a setup from another character.")
-    desc:SetTextColor(unpack(Theme.text.muted))
-
-    local newButton = Controls.Button(hero, "Create First Bar", 150, function()
-        CustomBars.AddBar(); selectedIndex = 1; rebuildPage()
-    end, nil, true)
-    local importButton = Controls.Button(hero, "Import", 110, function()
-        ShowImportDialog(CustomBars, rebuildPage)
-    end)
-    local newButtonFrame, importButtonFrame = Widget.Unwrap(newButton), Widget.Unwrap(importButton)
-    local gap = 12
-    local newWidth, importWidth = newButtonFrame:GetWidth() or 150, importButtonFrame:GetWidth() or 110
-    local totalWidth = newWidth + gap + importWidth
-    newButtonFrame:ClearAllPoints(); newButtonFrame:SetPoint("TOP", desc, "BOTTOM", (newWidth - totalWidth) / 2, Pixel.Scale(-24))
-    importButtonFrame:ClearAllPoints(); importButtonFrame:SetPoint("LEFT", newButtonFrame, "RIGHT", gap, 0)
-
-    Layout.PositionInTab(tab, hero, 140, 90)
-    page:AutoRefresh()
+local function SettingsBoard(ui, parent, width, bar, index, page)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = bar.name,
+		description = 'A row of icons for the cooldowns, trinkets, potions and buffs you pick. Unlock it with the eye in the header to drag it, right-click it to lock it again.',
+		buttons = {
+			{ text = 'Duplicate', icon = 'copy', onClick = function() Duplicate(index) end },
+			{ text = 'Delete', style = 'danger', onClick = function() ConfirmDelete(index) end },
+		},
+	})
+	board:AddSwitch('Racials', function() return bar.showRacials == true end, function(value)
+		bar.showRacials = value
+		Apply()
+		RebuildPane(page)
+	end, 'Add the racial abilities you know')
+	board:AddSwitch('Hide when not in bags', function() return bar.hideIfNotInBags == true end, function(value)
+		bar.hideIfNotInBags = value
+		Apply()
+	end, 'Skip items you have none of')
+	board:AddSwitch('Tooltips', function() return bar.showTooltips ~= false end, function(value)
+		bar.showTooltips = value
+		Apply()
+	end, 'Show the tooltip when hovering an icon')
+	board:AddSwitch('Hide the global cooldown', function() return bar.hideGCD == true end, function(value)
+		bar.hideGCD = value
+		Apply()
+	end, 'No cooldown swipe while only the global cooldown is running')
+	board:AddTools('Trinkets', 'Add your equipped trinkets', {
+		{ tooltip = 'Which trinkets', title = 'Trinkets', options = { Toggle(bar, 'Usable trinkets only', 'trinketsUsableOnly') } },
+		{ get = function() return bar.showTrinkets == true end, set = function(value)
+			bar.showTrinkets = value
+			RebuildPane(page)
+		end },
+	}, Apply)
+	board:AddTools('Bar', 'Name, icon size, border and opacity', {
+		Color(bar, 'Border color', 'borderColor'),
+		{ tooltip = 'Name, icon size, border and opacity', title = 'Bar', options = {
+			NameOption(bar),
+			Option(bar, 'Icon size', 'iconSize', { min = 20, max = 80, step = 1 }),
+			Option(bar, 'Spacing', 'spacing', { min = -20, max = 20, step = 1 }),
+			{ label = 'Zoom %', min = 0, max = 20, step = 1, get = function() return math.floor(bar.zoom * 100 + 0.5) end, set = function(value) bar.zoom = value / 100 end },
+			Option(bar, 'Border size', 'borderSize', { min = 0, max = 5, step = 1 }),
+			Option(bar, 'Opacity %', 'barOpacity', { min = 0, max = 100, step = 1 }),
+		} },
+		BUI.PositionTool(bar, { noCenter = true }),
+	}, Apply)
+	board:AddTools('Layout', 'Grow direction, rows and layering', {
+		{ entries = GROW_OPTIONS, width = MENU_WIDTH, get = function() return bar.growDirection end, set = function(value) bar.growDirection = value end },
+		{ tooltip = 'Rows and layering', title = 'Layout', options = {
+			Option(bar, 'Row growth', 'growVertical', { entries = ROW_OPTIONS }),
+			Option(bar, 'Icons per row, 0 for one row', 'maxPerRow', { min = 0, max = 20, step = 1 }),
+			Option(bar, 'Strata', 'frameStrata', { entries = BUI.C.STRATA_OPTIONS }),
+			Option(bar, 'Frame level', 'frameLevel', { min = 0, max = 100, step = 1 }),
+		} },
+	}, Apply)
+	board:AddTools('Font', 'Cooldown and stack text on every bar', {
+		{ entries = fonts, width = MENU_WIDTH, get = function() return BUI.GetDB().general.trackingFont or BUI.C.GLOBAL_OPTION end, set = function(value)
+			BUI.GetDB().general.trackingFont = value ~= BUI.C.GLOBAL_OPTION and value or nil
+		end },
+	}, CustomBars.RefreshAllBars)
+	board:AddTools('Cooldown text', 'Time left on each icon', {
+		{ icon = 'text', tooltip = 'Size and placement', title = 'Cooldown text', options = {
+			Option(bar, 'Size', 'cooldownTextSize', { min = 8, max = 24, step = 1 }),
+			Option(bar, 'Position', 'cooldownTextPosition', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
+			Option(bar, 'Horizontal offset', 'cooldownTextOffsetX', { min = -20, max = 20, step = 1 }),
+			Option(bar, 'Vertical offset', 'cooldownTextOffsetY', { min = -20, max = 20, step = 1 }),
+		} },
+		OnUnlessOff(bar, nil, 'showCooldownText'),
+	}, Apply)
+	board:AddTools('Stack text', 'Charges and item counts', {
+		{ icon = 'text', tooltip = 'Size and placement', title = 'Stack text', options = {
+			Option(bar, 'Size', 'stackTextSize', { min = 8, max = 20, step = 1 }),
+			Option(bar, 'Position', 'stackTextPosition', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
+			Option(bar, 'Horizontal offset', 'stackTextOffsetX', { min = -20, max = 20, step = 1 }),
+			Option(bar, 'Vertical offset', 'stackTextOffsetY', { min = -20, max = 20, step = 1 }),
+		} },
+		OnUnlessOff(bar, nil, 'showStackText'),
+	}, Apply)
+	return board
 end
 
-local function BuildPreview(parent, width)
-    local card, stage = PageKit.PreviewStage(parent, { inset = 14 })
-    stage._pool = {}
+local function TrackedBoard(ui, parent, width, bar, page)
+	local spells = bar.customSpells
+	local entries = Entries(bar)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Tracked spells and items',
+		description = 'Top to bottom here is first to last on the bar. Drag a row to reorder it. Type a name, paste an ID or a link, then press Enter.',
+		columns = { { 'Spell or item', LIST_ICON_X } },
+	})
+	local function Add(id, isItem)
+		local stored = (isItem and 'item:' or 'spell:') .. id
+		if StoredIndex(spells, stored) then return end
+		spells[#spells + 1] = stored
+		Apply()
+		page:RebuildCurrent()
+	end
+	local function Search(anchor, text)
+		local hits = BUI.Lookup.SearchSpellsAndItems(text)
+		if #hits == 1 then return Add(hits[1].id, hits[1].isItem) end
+		local menu = {}
+		for _, hit in ipairs(hits) do
+			menu[#menu + 1] = { text = hit.name, icon = hit.icon, callback = function() Add(hit.id, hit.isItem) end }
+		end
+		if #menu == 0 then menu[1] = { text = 'Nothing found', disabled = true } end
+		Controls.ContextMenu(menu, { anchor = anchor, width = RESULTS_WIDTH, window = Window() })
+	end
+	local addRow = Section.AddRow(board, 'add a spell or item')
+	ui.RowTitle(addRow, 'Add a spell or item', 'Name, ID or link', LIST_ICON_X, NAME_WIDTH)
+	local box
+	box = ui.Input(addRow, INPUT_WIDTH, { placeholder = 'Search...', get = function() return '' end, set = function(text) Search(box, text) end })
+	box:SetPoint('RIGHT', -ui.ROW_INSET, 0)
 
-    local empty = stage:CreateFontString(nil, "OVERLAY")
-    Pixel.ApplyFont(empty, 13, BUILib.Font, "")
-    empty:SetPoint("CENTER")
-    empty:SetTextColor(0.5, 0.5, 0.54, 1)
-    empty:SetText("No icons on this bar yet")
-    empty:Hide()
-
-    function card:Rebuild()
-        local bar = Current()
-        for _, iconFrame in ipairs(stage._pool) do iconFrame:Hide() end
-
-        local list = VisibleIcons(bar)
-        local iconCount = #list
-        if iconCount == 0 then empty:Show() return end
-        empty:Hide()
-
-        local gap = bar.spacing
-        local stageWidth = width - 28
-        local size = bar.iconSize
-        local totalWidth = iconCount * size + (iconCount - 1) * gap
-        if totalWidth > stageWidth then
-            size = math.floor((stageWidth - (iconCount - 1) * gap) / iconCount)
-            totalWidth = iconCount * size + (iconCount - 1) * gap
-        end
-        local startX = -totalWidth / 2 + size / 2
-        local growLeft = bar.growDirection == 'LEFT'
-        local zoom = bar.zoom
-        local borderColor = bar.borderColor
-
-        for iconIndex = 1, iconCount do
-            local iconFrame = stage._pool[iconIndex]
-            if not iconFrame then
-                iconFrame = CreateFrame('Frame', nil, stage)
-                local texture = iconFrame:CreateTexture(nil, 'ARTWORK')
-                texture:SetPoint('TOPLEFT', 1, -1)
-                texture:SetPoint('BOTTOMRIGHT', -1, 1)
-                iconFrame._tex = texture
-                stage._pool[iconIndex] = iconFrame
-            end
-            iconFrame:SetSize(size, size)
-            iconFrame:ClearAllPoints()
-            iconFrame:SetPoint('CENTER', stage, 'CENTER', startX + (iconIndex - 1) * (size + gap), 0)
-            iconFrame._tex:SetTexture(list[growLeft and (iconCount - iconIndex + 1) or iconIndex])
-            iconFrame._tex:SetTexCoord(zoom, 1 - zoom, zoom, 1 - zoom)
-            Pixel.ApplyBorder(iconFrame, bar.borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4] or 1)
-            iconFrame:Show()
-        end
-    end
-
-    return card
+	local custom, rows = {}, {}
+	for _, entry in ipairs(entries) do
+		if entry.custom then custom[#custom + 1] = entry end
+	end
+	local function Move(entry, delta)
+		local position = IndexOf(custom, entry)
+		local other = custom[position + delta]
+		if not other then return end
+		local from, to = StoredIndex(spells, entry.stored), StoredIndex(spells, other.stored)
+		spells[from], spells[to] = other.stored, entry.stored
+		custom[position], custom[position + delta] = other, entry
+		board:Move(rows[entry], delta)
+		page:Resize()
+	end
+	local function RowUnder(cursorY)
+		for _, entry in ipairs(custom) do
+			local row = rows[entry]
+			local top, bottom = row:GetTop(), row:GetBottom()
+			if top and cursorY <= top and cursorY >= bottom then return entry end
+		end
+	end
+	local dragging, grabOffset, ghost
+	local function Ghost()
+		if ghost then return ghost end
+		ghost = CreateFrame('Frame', nil, board.panel)
+		ghost:SetFrameLevel(board.panel:GetFrameLevel() + 10)
+		ghost:SetWidth(board.panelWidth)
+		ui.Fill(ghost, 'control'):SetAllPoints()
+		local edge = ui.Fill(ghost, 'accent', 'ARTWORK', 1)
+		edge:SetPoint('TOPLEFT')
+		edge:SetPoint('BOTTOMLEFT')
+		edge:SetWidth(2)
+		ui.Glyph(ghost, 'grabber', GRABBER_SIZE, 'text'):SetPoint('LEFT', GRABBER_X, 0)
+		ghost.icon = ghost:CreateTexture(nil, 'ARTWORK')
+		ghost.icon:SetSize(ICON_SIZE, ICON_SIZE)
+		ghost.icon:SetPoint('LEFT', LIST_ICON_X, 0)
+		ghost.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		ghost.label = ui.Text(ghost, '', 12, 'text')
+		ghost.label:SetPoint('LEFT', LIST_NAME_X, 0)
+		ghost:Hide()
+		return ghost
+	end
+	local function Track()
+		local _, cursorY = GetCursorPosition()
+		cursorY = cursorY / board.frame:GetEffectiveScale()
+		ghost:ClearAllPoints()
+		ghost:SetPoint('TOPLEFT', board.panel, 'TOPLEFT', 0, -(board.panel:GetTop() - cursorY - grabOffset))
+		local over = RowUnder(cursorY)
+		if over and over ~= dragging then
+			Move(dragging, IndexOf(custom, over) > IndexOf(custom, dragging) and 1 or -1)
+		end
+	end
+	for _, entry in ipairs(entries) do
+		local row = Section.AddRow(board, entry.name)
+		rows[entry] = row
+		local icon = row:CreateTexture(nil, 'ARTWORK')
+		icon:SetSize(ICON_SIZE, ICON_SIZE)
+		icon:SetPoint('LEFT', LIST_ICON_X, 0)
+		icon:SetTexture(entry.icon)
+		icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		local title, subtitle = ui.RowTitle(row, entry.name, entry.sub, LIST_NAME_X, board.panelWidth - LIST_NAME_X - TOOLS_ROOM)
+		ui.Bind(row, function()
+			local hidden = bar.hiddenIcons[entry.hideKey] == true
+			icon:SetDesaturated(hidden)
+			title:SetAlpha(hidden and HIDDEN_ALPHA or 1)
+			subtitle:SetAlpha(hidden and HIDDEN_ALPHA or 1)
+		end)
+		local x = ERASE_INSET
+		local function Put(control, size)
+			control:SetPoint('RIGHT', -x, 0)
+			x = x + size + TOOL_GAP
+		end
+		if entry.custom then
+			Put(ui.IconButton(row, 'erase', 'Remove ' .. entry.name, function()
+				table.remove(spells, StoredIndex(spells, entry.stored))
+				Apply()
+				page:RebuildCurrent()
+			end, 'danger', ERASE_SIZE), ERASE_SIZE)
+		else
+			x = x + ERASE_SIZE + TOOL_GAP
+		end
+		Put(ui.Tool(row, { icon = 'eye', tooltip = 'Show on the bar', get = function() return bar.hiddenIcons[entry.hideKey] ~= true end, set = function(value)
+			bar.hiddenIcons[entry.hideKey] = not value or nil
+			Apply()
+			Repaint()
+		end }), TOOL_SIZE)
+		if entry.potion then
+			Put(ui.IconButton(row, 'order', PotionLabel(entry), function()
+				BUI.ShowCDMPotionModal(BUI.CDM, entry.id, entry.stored, bar, nil, function()
+					Apply()
+					page:RebuildCurrent()
+				end)
+			end), TOOL_SIZE)
+		end
+		local options = {}
+		if entry.consumable then
+			options[#options + 1] = { label = 'Hide when you have none', get = function() return bar.hideWhenZero ~= nil and bar.hideWhenZero[entry.id] == true end, set = function(value)
+				bar.hideWhenZero = bar.hideWhenZero or {}
+				bar.hideWhenZero[entry.id] = value or nil
+			end }
+		end
+		if entry.itemID then
+			ui.Bind(subtitle, function() subtitle:SetText(entry.sub .. (bar.trinketBlacklist[entry.itemID] and ', skipped' or '')) end)
+			options[#options + 1] = { label = 'Skip this trinket', get = function() return bar.trinketBlacklist[entry.itemID] == true end, set = function(value)
+				bar.trinketBlacklist[entry.itemID] = value or nil
+			end }
+		end
+		if #options > 0 then
+			Put(ui.Tool(row, { tooltip = entry.name .. ' options', title = entry.name, options = options }, function()
+				Apply()
+				Repaint()
+			end), TOOL_SIZE)
+		end
+		if entry.custom then
+			ui.Glyph(row, 'grabber', GRABBER_SIZE, 'faint'):SetPoint('LEFT', GRABBER_X, 0)
+			row:EnableMouse(true)
+			row:RegisterForDrag('LeftButton')
+			row:SetScript('OnDragStart', function(self)
+				local _, cursorY = GetCursorPosition()
+				dragging = entry
+				grabOffset = self:GetTop() - cursorY / board.frame:GetEffectiveScale()
+				self:SetAlpha(DRAG_ALPHA)
+				Ghost():SetHeight(self:GetHeight())
+				ghost.icon:SetTexture(entry.icon)
+				ghost.label:SetText(entry.name)
+				ghost:Show()
+				Track()
+				self:SetScript('OnUpdate', Track)
+			end)
+			row:SetScript('OnDragStop', function(self)
+				self:SetScript('OnUpdate', nil)
+				self:SetAlpha(1)
+				ghost:Hide()
+				dragging = nil
+				Apply()
+			end)
+		end
+	end
+	if #entries == 0 then
+		local empty = Section.AddRow(board, 'nothing tracked yet')
+		ui.RowTitle(empty, 'Nothing tracked yet', 'Search above to add a spell or an item', LIST_ICON_X, NAME_WIDTH)
+	end
+	return board
 end
 
-local function BuildBarDropdownItems()
-    local items = {}
-    for barIndex, bar in ipairs(BUI.GetDB().customBars) do
-        items[#items + 1] = { value = barIndex, text = bar.name or ('Bar ' .. barIndex) }
-    end
-    return items
+local function Import()
+	local skips = importSkips[importCharacter] or {}
+	local picks = {}
+	for _, info in ipairs(CustomBars.GetBarInfoForCharacter(importCharacter)) do
+		if not skips[info.index] then picks[#picks + 1] = info.index end
+	end
+	if #picks == 0 then return end
+	CustomBars.CopyBarsFromCharacter(importCharacter, picks)
+	selectedIndex = CustomBars.GetBarCount()
+	showingImport = false
+	RebuildPage()
 end
 
-local function BuildSelector(parent, width, y, callbacks)
-    local CustomBars = BUI.CustomBars
-
-    local row = CreateFrame('Frame', nil, parent)
-    row:SetSize(width, 44)
-    row:SetPoint('TOP', parent, 'TOP', 0, -y)
-
-    local divider = row:CreateTexture(nil, 'OVERLAY')
-    divider:SetColorTexture(1, 1, 1, 0.1)
-    divider:SetHeight(1)
-    divider:SetPoint('BOTTOMLEFT')
-    divider:SetPoint('BOTTOMRIGHT')
-
-    local label = row:CreateFontString(nil, 'OVERLAY')
-    label:SetFont(BUILib.Font, 12, '')
-    label:SetTextColor(0.7, 0.7, 0.74, 1)
-    label:SetText('Editing Bar')
-    label:SetPoint('LEFT', row, 'LEFT', 2, 0)
-
-    local barDropdown = Controls.Dropdown(row, nil, BuildBarDropdownItems(), selectedIndex, function(value)
-        CustomBars.UnregisterPositionCallback(selectedIndex)
-        CustomBars.UnregisterLockSync(selectedIndex)
-        selectedIndex = value
-        callbacks.onPick()
-    end, nil, 220)
-    local dropdownFrame = Widget.Unwrap(barDropdown)
-    dropdownFrame:ClearAllPoints()
-    dropdownFrame:SetPoint('LEFT', label, 'RIGHT', 10, 0)
-
-    local function Rename()
-        local bar = GetBar(selectedIndex)
-        Modals.Input({
-            title = 'Rename Bar', message = 'Enter a new name for this bar.',
-            defaultText = bar and bar.name or '', confirmText = 'Rename',
-            onConfirm = function(text)
-                local currentBar = GetBar(selectedIndex)
-                if not currentBar or not text or text == '' then return end
-                currentBar.name = text
-                callbacks.rebuildPage()
-            end,
-        })
-    end
-
-    local function Duplicate()
-        local sourceBar = GetBar(selectedIndex); if not sourceBar then return end
-        CustomBars.UnregisterPositionCallback(selectedIndex)
-        CustomBars.UnregisterLockSync(selectedIndex)
-        local newIndex = CustomBars.AddBar(sourceBar.name .. ' Copy')
-        local destinationBar = GetBar(newIndex)
-        if destinationBar then
-            for key, value in pairs(sourceBar) do
-                if key ~= 'name' and key ~= 'posX' and key ~= 'posY' and key ~= 'customSpells' then
-                    if type(value) == 'table' then
-                        destinationBar[key] = {}
-                        for tableKey, tableValue in pairs(value) do destinationBar[key][tableKey] = tableValue end
-                    else
-                        destinationBar[key] = value
-                    end
-                end
-            end
-            if sourceBar.customSpells then
-                destinationBar.customSpells = destinationBar.customSpells
-                wipe(destinationBar.customSpells)
-                for spellIndex, spell in ipairs(sourceBar.customSpells) do destinationBar.customSpells[spellIndex] = spell end
-            end
-            CustomBars.RefreshBar(newIndex)
-        end
-        selectedIndex = newIndex
-        callbacks.rebuildPage()
-    end
-
-    local function Delete()
-        local currentBar = GetBar(selectedIndex)
-        Modals.Confirm({
-            title = 'Delete Bar',
-            message = 'Delete "' .. (currentBar and currentBar.name or 'this bar') .. '"?',
-            confirmText = 'Delete', cancelText = 'Cancel',
-            onConfirm = function()
-                local index = selectedIndex
-                CustomBars.UnregisterPositionCallback(index)
-                CustomBars.UnregisterLockSync(index)
-                CustomBars.DeleteBar(index)
-                selectedIndex = math.max(1, index - 1)
-                callbacks.rebuildPage()
-            end,
-        })
-    end
-
-    local function DeleteAll()
-        Modals.Confirm({
-            title = 'Delete All Bars',
-            message = 'Delete all ' .. CustomBars.GetBarCount() .. ' tracking bars?',
-            confirmText = 'Delete All', cancelText = 'Cancel',
-            onConfirm = function()
-                for barIndex = CustomBars.GetBarCount(), 1, -1 do
-                    CustomBars.UnregisterPositionCallback(barIndex)
-                    CustomBars.UnregisterLockSync(barIndex)
-                    CustomBars.DeleteBar(barIndex)
-                end
-                selectedIndex = 1
-                callbacks.rebuildPage()
-            end,
-        })
-    end
-
-    local moreButton = Controls.Button(row, 'More', 70, function()
-        Controls.ContextMenu({
-            { text = GetBar(selectedIndex) and GetBar(selectedIndex).name or ('Bar ' .. selectedIndex), title = true },
-            { text = 'Rename',    callback = Rename },
-            { text = 'Duplicate', callback = Duplicate },
-            { separator = true },
-            { text = 'Import from Character...', callback = function()
-                ShowImportDialog(CustomBars, function() callbacks.rebuildPage() end)
-            end },
-            { separator = true },
-            { text = '|cffff6060Delete Bar|r',      callback = Delete },
-            { text = '|cffff6060Delete All Bars|r', callback = DeleteAll },
-        }, { width = 200 })
-    end)
-    local newButton = Controls.Button(row, 'New', 70, function()
-        CustomBars.UnregisterPositionCallback(selectedIndex)
-        CustomBars.UnregisterLockSync(selectedIndex)
-        selectedIndex = CustomBars.AddBar()
-        callbacks.rebuildPage()
-    end)
-    local moreButtonFrame = Widget.Unwrap(moreButton)
-    moreButtonFrame:ClearAllPoints(); moreButtonFrame:SetPoint('RIGHT', row, 'RIGHT', 0, 0)
-    local newButtonFrame = Widget.Unwrap(newButton)
-    newButtonFrame:ClearAllPoints(); newButtonFrame:SetPoint('RIGHT', moreButtonFrame, 'LEFT', -8, 0)
+local function ImportBoard(ui, parent, width, page)
+	local characters = CustomBars.GetOtherCharacters()
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Import',
+		description = 'Copy tracking bars from another character on this account. Copies keep their icons and settings and land at the center of the screen.',
+		buttons = #characters > 0 and { { text = 'Import', icon = 'copy', style = 'primary', onClick = Import } } or nil,
+	})
+	if #characters == 0 then
+		board:AddRow('Nothing to import', 'No other character on this account has tracking bars yet')
+		return board
+	end
+	if not IndexOf(characters, importCharacter) then importCharacter = characters[1] end
+	local entries = {}
+	for _, character in ipairs(characters) do entries[#entries + 1] = { value = character, text = character } end
+	board:AddTools('Character', 'Where to copy from', {
+		{ entries = entries, width = CHARACTER_WIDTH, get = function() return importCharacter end, set = function(value) importCharacter = value end },
+	}, function() page:RebuildCurrent() end)
+	local skips = importSkips[importCharacter] or {}
+	importSkips[importCharacter] = skips
+	board:AddCaption('Bars to copy')
+	for _, info in ipairs(CustomBars.GetBarInfoForCharacter(importCharacter)) do
+		board:AddSwitch(info.name .. '  (' .. info.count .. ')', function() return not skips[info.index] end, function(value)
+			skips[info.index] = not value or nil
+		end, info.count .. ' tracked spells and items')
+	end
+	return board
 end
 
-local function BuildItemsCard(grid, onItemsChanged)
-    local card = grid:AddCard({ title = 'Tracked Spells & Items', spanFull = true })
-    local list
-
-    local function BuildEntries()
-        local entries = {}
-        local settings = Current()
-        if not settings then return entries end
-        local hidden = settings.hiddenIcons
-        local seenIDs = {}
-
-        local function FormatName(displayName, hideKey, autoAdded)
-            local name = displayName or '?'
-            if autoAdded then name = name .. '  |cff44bbff[Auto Added]|r' end
-            if hideKey and hidden[hideKey] then name = name .. '  |cffff4444[Hidden]|r' end
-            return name
-        end
-
-        if settings.customSpells then
-            for _, storedValue in ipairs(settings.customSpells) do
-                local id, isItem = IconEngine.ExtractSpellItemID(storedValue)
-                if id then
-                    seenIDs[id] = true
-                    local iconTexture, displayName
-                    if isItem then
-                        iconTexture, displayName = BUI.Lookup.GetItemInfo(id)
-                        displayName = displayName or ('Item ' .. id)
-                    else
-                        iconTexture, displayName = BUI.Lookup.GetSpellInfo(id)
-                        displayName = displayName or ('Spell ' .. id)
-                    end
-                    entries[#entries + 1] = {
-                        icon = iconTexture or DEFAULT_ICON,
-                        name = FormatName(displayName, id, false),
-                        id = storedValue,
-                    }
-                end
-            end
-        end
-
-        local blacklist = settings.trinketBlacklist
-        if settings.showTrinkets then
-            for slotIndex = 1, #TRINKET_SLOTS do
-                local slot = TRINKET_SLOTS[slotIndex]
-                local itemID = GetInventoryItemID('player', slot)
-                local icon = (itemID and GetInventoryItemTexture('player', slot)) or DEFAULT_ICON
-                local rowId = AUTO_PREFIX .. 'slot:' .. slot
-                local name = FormatName('Trinket ' .. slotIndex, rowId, true)
-                if itemID and blacklist[itemID] then
-                    name = name .. '  |cffff8844[Blacklisted]|r'
-                end
-                entries[#entries + 1] = { icon = icon, name = name, id = rowId }
-            end
-        end
-
-        if settings.showRacials then
-            for _, id in ipairs(BUI.CDM.GetKnownRacialSpellIDs()) do
-                if not seenIDs[id] then
-                    local iconTexture, displayName = BUI.Lookup.GetSpellInfo(id)
-                    local rowId = AUTO_PREFIX .. 'racial:' .. id
-                    entries[#entries + 1] = {
-                        icon = iconTexture or DEFAULT_ICON,
-                        name = FormatName(displayName or ('Spell ' .. id), rowId, true),
-                        id = rowId,
-                    }
-                end
-            end
-        end
-
-        return entries
-    end
-
-    local function ResolveTrinketItemID(rowId)
-        if type(rowId) ~= 'string' then return nil end
-        local slot = tonumber(rowId:match('^auto:slot:(%d+)$'))
-        if not slot then return nil end
-        return GetInventoryItemID('player', slot)
-    end
-
-    local function RefreshList()
-        list:ClearItems()
-        for _, entry in ipairs(BuildEntries()) do
-            list:AddItem(entry.icon, entry.name, entry.id)
-        end
-        onItemsChanged()
-    end
-
-    local function AddStored(storedValue)
-        local settings = Current()
-        if not settings then return end
-        for _, existing in ipairs(settings.customSpells) do
-            if tostring(existing) == tostring(storedValue) then return end
-        end
-        settings.customSpells[#settings.customSpells + 1] = storedValue
-        RefreshCurrent()
-        RefreshList()
-    end
-
-    list = Layout.ItemList(card, {
-        hint = "Drag spell/item here, search, or paste link/ID...",
-        height = 300,
-        items = BuildEntries(),
-        orderable = true,
-        onReorder = function(newData)
-            local settings = Current()
-            if not settings then return end
-            local spells = settings.customSpells
-            wipe(spells)
-            for _, entry in ipairs(newData) do
-                if not IsAutoId(entry.id) then
-                    spells[#spells + 1] = entry.id
-                end
-            end
-            RefreshCurrent()
-            onItemsChanged()
-        end,
-        searchFunc = BUI.Lookup.SearchSpellsAndItems,
-        onAdd = function(text)
-            local id, isItem = BUI.Lookup.ParseSpellOrItemInput(text)
-            if not id then return end
-            AddStored(isItem and ("item:" .. id) or ("spell:" .. id))
-        end,
-        onSearchSelect = function(item)
-            AddStored(item.isItem and ("item:" .. item.id) or ("spell:" .. item.id))
-        end,
-        onRemove = function(row)
-            if not row.id then return end
-            if IsAutoId(row.id) then RefreshList(); return end
-            local settings = Current()
-            if not settings then return end
-            for index, stored in ipairs(settings.customSpells) do
-                if tostring(stored) == tostring(row.id) then table.remove(settings.customSpells, index); break end
-            end
-            RefreshCurrent()
-            onItemsChanged()
-        end,
-        onRowRightClick = function(rowId, row)
-            if not rowId then return end
-            local settings = Current()
-            if not settings then return end
-
-            local isAuto = IsAutoId(rowId)
-            local hideKey = isAuto and rowId or ExtractNumeric(rowId)
-            local isHidden = hideKey and settings.hiddenIcons[hideKey] or false
-
-            local items = {}
-            local title = row and row.data and row.data.name
-            if title and title ~= '' then
-                items[#items + 1] = { text = title, title = true }
-            end
-
-            items[#items + 1] = {
-                text = isHidden and 'Show on Bar' or 'Hide from Bar',
-                callback = function()
-                    local currentBar = Current()
-                    if not currentBar or not hideKey then return end
-                    currentBar.hiddenIcons[hideKey] = (not currentBar.hiddenIcons[hideKey]) and true or nil
-                    RefreshCurrent()
-                    RefreshList()
-                end,
-            }
-
-            local parsedItemID = type(rowId) == 'string' and tonumber(rowId:match('^item:(%d+)'))
-            if parsedItemID then
-                local _, _, _, equipLoc, _, itemClass = C_Item.GetItemInfoInstant(parsedItemID)
-                if itemClass ~= nil and equipLoc ~= 'INVTYPE_TRINKET' then
-                    items[#items + 1] = {
-                        text = 'Hide at 0',
-                        checked = (settings.hideWhenZero and hideKey and settings.hideWhenZero[hideKey]) and true or false,
-                        callback = function()
-                            local currentBar = Current()
-                            if not currentBar or not hideKey then return end
-                            currentBar.hideWhenZero = currentBar.hideWhenZero or {}
-                            currentBar.hideWhenZero[hideKey] = (not currentBar.hideWhenZero[hideKey]) and true or nil
-                            RefreshCurrent()
-                            RefreshList()
-                        end,
-                    }
-                end
-
-                if IsPotionRow(rowId) then
-                    items[#items + 1] = {
-                        text = PotionDisplayLabel(parsedItemID, rowId) .. '...',
-                        callback = function()
-                            local currentBar = Current()
-                            if not currentBar then return end
-                            BUI.ShowCDMPotionModal(BUI.CDM, parsedItemID, rowId, currentBar, nil, function()
-                                RefreshCurrent()
-                                RefreshList()
-                            end)
-                        end,
-                    }
-                end
-            end
-
-            local trinketItemID = isAuto and ResolveTrinketItemID(rowId) or nil
-            if trinketItemID then
-                local blacklist = settings.trinketBlacklist
-                local isBlacklisted = blacklist[trinketItemID]
-                items[#items + 1] = {
-                    text = isBlacklisted and 'Unblacklist Equipped Trinket' or 'Blacklist Equipped Trinket',
-                    callback = function()
-                        local currentBar = Current()
-                        if not currentBar then return end
-                        currentBar.trinketBlacklist[trinketItemID] = (not currentBar.trinketBlacklist[trinketItemID]) and true or nil
-                        RefreshCurrent()
-                        RefreshList()
-                    end,
-                }
-            end
-
-            if not isAuto then
-                items[#items + 1] = { separator = true }
-                items[#items + 1] = {
-                    text = '|cffff6060Remove|r',
-                    callback = function()
-                        local currentBar = Current()
-                        if not currentBar then return end
-                        for spellIndex, stored in ipairs(currentBar.customSpells) do
-                            if tostring(stored) == tostring(rowId) then
-                                table.remove(currentBar.customSpells, spellIndex)
-                                break
-                            end
-                        end
-                        RefreshCurrent()
-                        RefreshList()
-                    end,
-                }
-            end
-
-            Controls.ContextMenu(items, { width = 220 })
-        end,
-        onBindRow = function(frame, entry)
-            local settings = Current()
-            local isAuto = IsAutoId(entry.id)
-            local hideKey = isAuto and entry.id or ExtractNumeric(entry.id)
-            local isHidden = settings and hideKey and settings.hiddenIcons[hideKey] or false
-
-            if not frame._hideBtn then
-                local hideButton = CreateFrame('Button', nil, frame)
-                hideButton:SetSize(Pixel.Scale(22), Pixel.Scale(22))
-                hideButton:SetPoint('RIGHT', frame.id, 'LEFT', Pixel.Scale(-6), 0)
-                hideButton:SetFrameLevel(frame:GetFrameLevel() + 5)
-                local hideTexture = hideButton:CreateTexture(nil, 'OVERLAY')
-                hideTexture:SetAllPoints()
-                hideTexture:SetAtlas('talents-heroclass-ring-minimize-hide')
-                hideButton._tex = hideTexture
-                hideButton:SetScript('OnEnter', function(self)
-                    hideTexture:SetVertexColor(1, 1, 1, 1)
-                    Widget.ShowTip(self, self._tip or 'Hide from bar')
-                end)
-                hideButton:SetScript('OnLeave', function(self)
-                    if self._hiddenState then
-                        hideTexture:SetVertexColor(1, 0.3, 0.3, 1)
-                    else
-                        hideTexture:SetVertexColor(0.6, 0.6, 0.6, 1)
-                    end
-                    Widget.HideTip()
-                end)
-                frame._hideBtn = hideButton
-            end
-
-            frame._hideBtn._hiddenState = isHidden
-            if isHidden then
-                frame._hideBtn._tex:SetVertexColor(1, 0.3, 0.3, 1)
-                frame._hideBtn._tip = 'Show on bar'
-            else
-                frame._hideBtn._tex:SetVertexColor(0.6, 0.6, 0.6, 1)
-                frame._hideBtn._tip = 'Hide from bar'
-            end
-            frame._hideBtn:SetScript('OnClick', function()
-                local currentBar = Current()
-                if not currentBar or not hideKey then return end
-                currentBar.hiddenIcons[hideKey] = (not currentBar.hiddenIcons[hideKey]) and true or nil
-                RefreshCurrent()
-                RefreshList()
-            end)
-            frame._hideBtn:Show()
-
-            local potionItemID = not isAuto and IsPotionRow(entry.id) or nil
-            if potionItemID then
-                if not frame._potionBtn then
-                    local potionButton = CreateFrame('Button', nil, frame)
-                    potionButton:SetSize(Pixel.Scale(22), Pixel.Scale(22))
-                    potionButton:SetPoint('RIGHT', frame._hideBtn, 'LEFT', Pixel.Scale(-4), 0)
-                    potionButton:SetFrameLevel(frame:GetFrameLevel() + 5)
-                    local potionTexture = potionButton:CreateTexture(nil, 'OVERLAY')
-                    potionTexture:SetPoint('TOPLEFT', Pixel.Scale(3), -Pixel.Scale(3))
-                    potionTexture:SetPoint('BOTTOMRIGHT', -Pixel.Scale(3), Pixel.Scale(3))
-                    potionTexture:SetTexture(BUILib.GetLibMedia('order'))
-                    potionButton._tex = potionTexture
-                    potionButton:SetScript('OnEnter', function(self)
-                        potionTexture:SetVertexColor(1, 1, 1, 1)
-                        Widget.ShowTip(self, self._tip)
-                    end)
-                    potionButton:SetScript('OnLeave', function(self)
-                        potionTexture:SetVertexColor(unpack(self._tint))
-                        Widget.HideTip()
-                    end)
-                    frame._potionBtn = potionButton
-                end
-                local storedValue = entry.id
-                local label, hasPriority = PotionDisplayLabel(potionItemID, storedValue)
-                frame._potionBtn._tip = label
-                frame._potionBtn._tint = hasPriority and PRIORITY_TINT or IDLE_TINT
-                frame._potionBtn._tex:SetVertexColor(unpack(frame._potionBtn._tint))
-                frame._potionBtn:SetScript('OnClick', function()
-                    local currentBar = Current()
-                    if not currentBar then return end
-                    BUI.ShowCDMPotionModal(BUI.CDM, potionItemID, storedValue, currentBar, nil, function()
-                        RefreshCurrent()
-                        RefreshList()
-                    end)
-                end)
-                frame._potionBtn:Show()
-            elseif frame._potionBtn then
-                frame._potionBtn:Hide()
-            end
-
-            if frame.xBtn then
-                if isAuto then frame.xBtn:Hide() else frame.xBtn:Show() end
-            end
-        end,
-    })
-    card:Refresh()
-
-    return RefreshList
+local function BuildPreview(band, kit)
+	local pool = {}
+	local note = kit.Text(band, '', 12, 'muted')
+	note:SetPoint('CENTER')
+	function band:Update()
+		for _, frame in ipairs(pool) do frame:Hide() end
+		local bar = Shown()
+		local list = bar and VisibleIcons(bar) or {}
+		local count = #list
+		note:SetShown(count == 0)
+		if count == 0 then
+			if bar then
+				note:SetText('Nothing on this bar yet, add a spell or an item below')
+			elseif Current() then
+				note:SetText('Pick a bar from the rail to see it here')
+			else
+				note:SetText('Nothing here yet, start a bar from the rail or import one')
+			end
+			return
+		end
+		local gap = bar.spacing
+		local room = self:GetWidth() - PREVIEW_ROOM
+		local size = math.min(bar.iconSize, PREVIEW_HEIGHT - PREVIEW_INSET)
+		local total = count * size + (count - 1) * gap
+		if total > room then
+			size = math.floor((room - (count - 1) * gap) / count)
+			total = count * size + (count - 1) * gap
+		end
+		local startX = -total / 2 + size / 2
+		local growLeft = bar.growDirection == 'LEFT'
+		local zoom = bar.zoom
+		local border = bar.borderColor
+		for index = 1, count do
+			local frame = pool[index]
+			if not frame then
+				frame = CreateFrame('Frame', nil, self)
+				frame.texture = frame:CreateTexture(nil, 'ARTWORK')
+				frame.texture:SetPoint('TOPLEFT', 1, -1)
+				frame.texture:SetPoint('BOTTOMRIGHT', -1, 1)
+				pool[index] = frame
+			end
+			frame:SetSize(size, size)
+			frame:ClearAllPoints()
+			frame:SetPoint('CENTER', self, 'CENTER', startX + (index - 1) * (size + gap), 0)
+			frame.texture:SetTexture(list[growLeft and (count - index + 1) or index])
+			frame.texture:SetTexCoord(zoom, 1 - zoom, zoom, 1 - zoom)
+			Pixel.ApplyBorder(frame, bar.borderSize, border[1], border[2], border[3], border[4] or 1)
+			frame:Show()
+		end
+	end
+	band:HookScript('OnShow', function(self) self:Update() end)
+	return band
 end
 
-BUI.PageEngine.RegisterPage("customBars", {
-    title = "Custom Bars",
-    buttonText = "Custom Bars",
-    OnBuild = function(pageFrame)
-        local CustomBars = BUI.CustomBars
+local function Panes(ui, _, parent, width, item, page)
+	if item.id == 'new' then
+		selectedIndex = CustomBars.AddBar()
+		showingImport = false
+		RebuildPage()
+		return {}
+	end
+	if item.id == 'import' then return { ImportBoard(ui, parent, width, page) } end
+	local bar = Bars()[item.index]
+	return { SettingsBoard(ui, parent, width, bar, item.index, page), TrackedBoard(ui, parent, width, bar, page) }
+end
 
-        local function rebuildPage() BUI.PageEngine.RefreshCurrentPage() end
+local function RailGroups()
+	items = {}
+	local bars = {}
+	for index, bar in ipairs(Bars()) do
+		bars[index] = { id = 'bar' .. index, label = bar.name, index = index }
+	end
+	bars[#bars + 1] = { id = 'new', label = 'New bar', icon = 'plus' }
+	local groups = {
+		{ title = 'Settings', items = { { id = 'import', label = 'Import', icon = 'copy' } } },
+		{ title = 'Bars', items = bars },
+	}
+	for _, group in ipairs(groups) do
+		for _, item in ipairs(group.items) do items[item.id] = item end
+	end
+	return groups
+end
 
-        if CustomBars.GetBarCount() == 0 then
-            BuildEmptyState(pageFrame, CustomBars, rebuildPage)
-            return
-        end
+local function ActiveID()
+	if Shown() then return 'bar' .. selectedIndex end
+	return 'import'
+end
 
-        if selectedIndex > CustomBars.GetBarCount() then selectedIndex = CustomBars.GetBarCount() end
+local function HeaderToggle(icon, tooltip, get, set)
+	return { icon = icon, tooltip = tooltip, get = function()
+		local bar = Shown()
+		return bar ~= nil and get(bar)
+	end, set = function(value)
+		local bar = Shown()
+		if bar then
+			set(bar, value)
+			Apply()
+		end
+		Repaint()
+	end }
+end
 
-        local width = Layout.PAGE_CONTENT_W
-        local PREVIEW_HEIGHT = Layout.PAGE_PREVIEW_H
-
-        local grid, preview
-        local trinketToggle, racialToggle, hideIfEmptyToggle, tooltipToggle, hideGCDToggle, strataDropdown
-        local iconSizeSlider, spacingSlider, growDropdown, borderSwatch
-        local anchorFrameControl, anchorPointDropdown, posXSlider, posYSlider
-        local fontDropdown, showStackToggle, cooldownSizeSlider
-        local refreshList
-
-        local mark = pageFrame:CreateTexture(nil, "BACKGROUND", nil, 1)
-        mark:SetTexture(BUI.Tools.GetLogo())
-        mark:SetSize(520, 520)
-        mark:SetPoint("CENTER")
-        mark:SetVertexColor(1, 1, 1, 0.06)
-
-        local function RebuildPreview() preview:Rebuild() end
-        local function SyncDim() grid:SyncDim(Current() and Current().enabled or false) end
-
-        local titleHeight, titleBar = PageKit.PageTitle(pageFrame, 'Custom Bars', width, {
-            desc = 'Track the cooldowns, trinkets, potions and buffs you care about.',
-            enable = { value = Current() and Current().enabled or false, onToggle = function(enabled)
-                local currentBar = Current(); if not currentBar then return end
-                currentBar.enabled = enabled; RefreshCurrent(); SyncDim()
-            end },
-            anchor = { value = (Current() and not Current().locked) or false, onToggle = function(unlocked)
-                local currentBar = Current(); if not currentBar then return end
-                currentBar.locked = not unlocked; RefreshCurrent()
-            end },
-        })
-        local topY = PageKit.PAD + titleHeight
-
-        local pinned = PageKit.PreviewBand(pageFrame, width, PREVIEW_HEIGHT, topY, true)
-        local selectorTop = topY + PREVIEW_HEIGHT + PageKit.GAP
-        local SELECTOR_HEIGHT = 44
-        local contentTop = selectorTop + SELECTOR_HEIGHT + PageKit.GAP
-
-        local host = CreateFrame("Frame", nil, pageFrame)
-        host:SetPoint("TOPLEFT", pageFrame, "TOPLEFT", 0, -contentTop)
-        host:SetPoint("BOTTOMRIGHT", pageFrame, "BOTTOMRIGHT", 0, 0)
-        local page = Layout.Page(host, nil, width)
-        local tab = page:GetTab(1)
-        tab.topPadding = 0
-
-        local function SyncTitle()
-            local currentBar = Current()
-            if not currentBar then return end
-            titleBar.enableToggle:SetValue(currentBar.enabled)
-            titleBar.anchorToggle:SetValue(not currentBar.locked)
-        end
-
-        local function UpdatePositionLock(anchored)
-            posXSlider:SetLocked(anchored); posXSlider:SetLockedText(anchored and "ANCHORED" or nil)
-            posYSlider:SetLocked(anchored); posYSlider:SetLockedText(anchored and "ANCHORED" or nil)
-        end
-
-        local function RegisterSync()
-            CustomBars.RegisterPositionCallback(selectedIndex, function(x, y)
-                posXSlider:SetValue(x)
-                posYSlider:SetValue(y)
-            end)
-            CustomBars.RegisterLockSync(selectedIndex, function(unlocked)
-                titleBar.anchorToggle:SetValue(unlocked)
-            end)
-        end
-
-        local function RebindAll()
-            local currentBar = Current()
-            if not currentBar then return end
-            trinketToggle:SetValue(currentBar.showTrinkets)
-            racialToggle:SetValue(currentBar.showRacials)
-            hideIfEmptyToggle:SetValue(currentBar.hideIfNotInBags)
-            tooltipToggle:SetValue(currentBar.showTooltips ~= false)
-            hideGCDToggle:SetValue(currentBar.hideGCD or false)
-            strataDropdown:SetValue(currentBar.frameStrata or 'MEDIUM')
-            iconSizeSlider:SetValue(currentBar.iconSize)
-            spacingSlider:SetValue(currentBar.spacing)
-            growDropdown:SetValue(currentBar.growDirection)
-            local borderColor = currentBar.borderColor
-            borderSwatch:SetColor(borderColor[1], borderColor[2], borderColor[3], borderColor[4])
-            anchorFrameControl:SetValue(currentBar.anchorFrame)
-            anchorPointDropdown:SetValue(currentBar.anchorPoint)
-            posXSlider:SetValue(currentBar.posX)
-            posYSlider:SetValue(currentBar.posY)
-            UpdatePositionLock(currentBar.anchorFrame and currentBar.anchorFrame ~= "")
-            fontDropdown:SetValue(BUI.GetDB().general.trackingFont or BUI.C.GLOBAL_OPTION)
-            showStackToggle:SetValue(currentBar.showStackText ~= false)
-            cooldownSizeSlider:SetValue(currentBar.cooldownTextSize)
-            refreshList()
-            SyncDim()
-        end
-
-        preview = BuildPreview(pinned, width)
-
-        BuildSelector(pageFrame, width, selectorTop, {
-            rebuildPage = rebuildPage,
-            onPick = function()
-                RebindAll()
-                RebuildPreview()
-                SyncTitle()
-                RegisterSync()
-            end,
-        })
-
-        grid = PageKit.CardGrid(tab, { columns = 2 })
-
-        local generalCard = grid:AddCard({ title = 'General' })
-        local generalChild = generalCard.child
-        trinketToggle = Controls.StampCheckbox(generalChild, nil, false, function(value)
-            local currentBar = Current(); if not currentBar then return end
-            currentBar.showTrinkets = value; RefreshCurrent(); RebuildPreview()
-            refreshList()
-        end)
-        local trinketCog = Controls.Icon(generalChild, {
-            title = 'TRINKETS', tooltip = 'Trinket options',
-            options = {
-                { label = 'Usable Trinkets Only',
-                  get = function() return Current() and Current().trinketsUsableOnly == true end,
-                  set = function(value) local currentBar = Current(); if not currentBar then return end currentBar.trinketsUsableOnly = value; RefreshCurrent(); refreshList() end },
-            },
-        })
-        racialToggle = Controls.StampCheckbox(generalChild, nil, false, function(value)
-            local currentBar = Current(); if not currentBar then return end
-            currentBar.showRacials = value; RefreshCurrent(); RebuildPreview()
-            refreshList()
-        end)
-        hideIfEmptyToggle = Controls.StampCheckbox(generalChild, nil, false, function(value)
-            local currentBar = Current(); if not currentBar then return end
-            currentBar.hideIfNotInBags = value; RefreshCurrent()
-        end)
-        tooltipToggle = Controls.StampCheckbox(generalChild, nil, true, function(value)
-            local currentBar = Current(); if not currentBar then return end
-            currentBar.showTooltips = value; RefreshCurrent()
-        end)
-        hideGCDToggle = Controls.StampCheckbox(generalChild, nil, false, function(value)
-            local currentBar = Current(); if not currentBar then return end
-            currentBar.hideGCD = value; RefreshCurrent()
-        end)
-        strataDropdown = Controls.Dropdown(generalChild, nil, STRATA_OPTIONS, 'MEDIUM', function(value)
-            local currentBar = Current(); if not currentBar then return end
-            currentBar.frameStrata = value; RefreshCurrent()
-        end, nil, 130)
-        local strataCog = Controls.Icon(generalChild, {
-            title = 'FRAME', tooltip = 'Frame level',
-            options = {
-                { kind = 'slider', label = 'Frame Level', min = 0, max = 100, step = 1,
-                  get = function() return Current() and Current().frameLevel or 5 end,
-                  set = function(value) local currentBar = Current(); if not currentBar then return end currentBar.frameLevel = value; RefreshCurrent() end },
-            },
-        })
-        PageKit.Grid(generalCard, {
-            { label = 'Show Trinkets',      controls = { trinketToggle, trinketCog } },
-            { label = 'Show Racials',       controls = { racialToggle } },
-            { label = 'Hide If Not In Bags', controls = { hideIfEmptyToggle } },
-            { label = 'Show Tooltips',      controls = { tooltipToggle } },
-            { label = 'Hide GCD',           controls = { hideGCDToggle } },
-            { label = 'Frame Strata',       controls = { strataDropdown, strataCog } },
-        })
-
-        local layoutCard = grid:AddCard({ title = 'Layout', minHeight = generalCard.frame.layoutHeight })
-        local layoutChild = layoutCard.child
-        iconSizeSlider = Controls.CompactSlider(layoutChild, nil, 20, 80, 40, function(value)
-            local currentBar = Current(); if not currentBar then return end
-            currentBar.iconSize = value; RefreshCurrent(); RebuildPreview()
-        end, 1)
-        local iconCog = Controls.Icon(layoutChild, {
-            title = 'ICONS', tooltip = 'Zoom',
-            options = {
-                { kind = 'slider', label = 'Zoom %', min = 0, max = 20, step = 1,
-                  get = function() return (Current() and (Current().zoom or 0.08) or 0.08) * 100 end,
-                  set = function(value) local currentBar = Current(); if not currentBar then return end currentBar.zoom = value / 100; RefreshCurrent(); RebuildPreview() end },
-            },
-        })
-        spacingSlider = Controls.CompactSlider(layoutChild, nil, -20, 20, 1, function(value)
-            local currentBar = Current(); if not currentBar then return end
-            currentBar.spacing = value; RefreshCurrent(); RebuildPreview()
-        end, 1)
-        growDropdown = Controls.Dropdown(layoutChild, nil, GROW_OPTIONS, nil, function(value)
-            local currentBar = Current(); if not currentBar then return end
-            currentBar.growDirection = value; RefreshCurrent(); RebuildPreview()
-        end, nil, 120)
-        local growCog = Controls.Icon(layoutChild, {
-            title = 'GROWTH', tooltip = 'Row growth & wrapping',
-            options = {
-                { kind = 'dropdown', label = 'Row Growth', items = ROW_OPTIONS, controlWidth = 120,
-                  get = function() return Current() and Current().growVertical or 'DOWN' end,
-                  set = function(value) local currentBar = Current(); if not currentBar then return end currentBar.growVertical = value; RefreshCurrent() end },
-                { kind = 'slider', label = 'Max Per Row', min = 0, max = 20, step = 1,
-                  get = function() return Current() and Current().maxPerRow or 0 end,
-                  set = function(value) local currentBar = Current(); if not currentBar then return end currentBar.maxPerRow = value; RefreshCurrent() end },
-            },
-        })
-        local initBorder = { 0, 0, 0, 1 }
-        borderSwatch = Controls.ColorSwatch(layoutChild, { r = initBorder[1], g = initBorder[2], b = initBorder[3], a = initBorder[4], callback = function(red, green, blue, alpha)
-            local currentBar = Current(); if not currentBar then return end
-            currentBar.borderColor = { red, green, blue, alpha }; RefreshCurrent(); RebuildPreview()
-        end, tooltip = 'Border Color' })
-        local borderCog = Controls.Icon(layoutChild, {
-            title = 'BORDER', tooltip = 'Border size',
-            options = {
-                { kind = 'slider', label = 'Border Size', min = 0, max = 5, step = 1,
-                  get = function() return Current() and Current().borderSize or 1 end,
-                  set = function(value) local currentBar = Current(); if not currentBar then return end currentBar.borderSize = value; RefreshCurrent(); RebuildPreview() end },
-            },
-        })
-        PageKit.Grid(layoutCard, {
-            { label = 'Icon Size',      controls = { iconSizeSlider, iconCog }, fillFirst = true },
-            { label = 'Spacing',        controls = { spacingSlider } },
-            { label = 'Grow Direction', controls = { growDropdown, growCog } },
-            { label = 'Border Color',   controls = { borderSwatch, borderCog } },
-        })
-
-        local placementCard = grid:AddCard({ title = 'Placement', spanFull = true })
-        local placementChild = placementCard.child
-        anchorFrameControl = Controls.Frames(placementChild, nil, "", function(value)
-            local currentBar = Current(); if not currentBar then return end
-            currentBar.anchorFrame = value; RefreshCurrent()
-            UpdatePositionLock(value and value ~= "")
-        end, 200, "Search available frames", BUI.C.ANCHOR_FRAMES_WITH_MOUSE)
-        anchorPointDropdown = Controls.Dropdown(placementChild, nil, BUI.C.ANCHOR_PLACEMENT_OPTIONS, nil, function(value)
-            local currentBar = Current(); if not currentBar then return end
-            currentBar.anchorPoint = value; RefreshCurrent()
-        end, nil, 120)
-        local anchorOffsetMover = PageKit.OffsetMover(placementChild, {
-            title = 'ANCHOR OFFSET', tooltip = 'Anchor offsets',
-            labelX = 'Anchor X', labelY = 'Anchor Y', min = -200, max = 200,
-            getX = function() return Current() and Current().anchorOffsetX or 0 end,
-            setX = function(value) local currentBar = Current(); if not currentBar then return end currentBar.anchorOffsetX = value; RefreshCurrent() end,
-            getY = function() return Current() and Current().anchorOffsetY or 0 end,
-            setY = function(value) local currentBar = Current(); if not currentBar then return end currentBar.anchorOffsetY = value; RefreshCurrent() end,
-        })
-        posXSlider = Controls.CompactSlider(placementChild, nil, -1500, 1500, 0, function(value)
-            local currentBar = Current(); if not currentBar then return end
-            currentBar.posX = value; RefreshCurrent()
-        end, 1)
-        posYSlider = Controls.CompactSlider(placementChild, nil, -1000, 1000, 0, function(value)
-            local currentBar = Current(); if not currentBar then return end
-            currentBar.posY = value; RefreshCurrent()
-        end, 1)
-        PageKit.Grid(placementCard, {
-            { label = 'Anchor Frame', controls = { anchorFrameControl } },
-            { label = 'Anchor Point', controls = { anchorPointDropdown, anchorOffsetMover } },
-            { label = 'X Position',   controls = { posXSlider } },
-            { label = 'Y Position',   controls = { posYSlider } },
-        }, 2)
-
-        local textCard = grid:AddCard({ title = 'Text', spanFull = true })
-        local textChild = textCard.child
-        fontDropdown = Controls.Dropdown(textChild, nil, BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION), BUI.C.GLOBAL_OPTION, function(value)
-            BUI.GetDB().general.trackingFont = value ~= BUI.C.GLOBAL_OPTION and value or nil
-            CustomBars.RefreshAllBars()
-        end, nil, 160)
-        showStackToggle = Controls.StatusToggle(textChild, nil, true, function(value)
-            local currentBar = Current(); if not currentBar then return end
-            currentBar.showStackText = value; RefreshCurrent()
-        end)
-        local POINT_OPTIONS = BUI.C.ANCHOR_POINT_OPTIONS
-        local stackCog = Controls.Icon(textChild, {
-            title = 'STACK TEXT', tooltip = 'Stack text size, position & offset', width = 280,
-            options = {
-                { kind = 'slider', label = 'Size', min = 8, max = 20, step = 1,
-                  get = function() return Current() and Current().stackTextSize or 12 end,
-                  set = function(value) local currentBar = Current(); if not currentBar then return end currentBar.stackTextSize = value; RefreshCurrent() end },
-                { kind = 'dropdown', label = 'Position', items = POINT_OPTIONS, controlWidth = 120,
-                  get = function() return Current() and Current().stackTextPosition end,
-                  set = function(value) local currentBar = Current(); if not currentBar then return end currentBar.stackTextPosition = value; RefreshCurrent() end },
-                { kind = 'slider', label = 'X Offset', min = -20, max = 20, step = 1,
-                  get = function() return Current() and Current().stackTextOffsetX or 0 end,
-                  set = function(value) local currentBar = Current(); if not currentBar then return end currentBar.stackTextOffsetX = value; RefreshCurrent() end },
-                { kind = 'slider', label = 'Y Offset', min = -20, max = 20, step = 1,
-                  get = function() return Current() and Current().stackTextOffsetY or 0 end,
-                  set = function(value) local currentBar = Current(); if not currentBar then return end currentBar.stackTextOffsetY = value; RefreshCurrent() end },
-            },
-        })
-        cooldownSizeSlider = Controls.CompactSlider(textChild, nil, 8, 24, 14, function(value)
-            local currentBar = Current(); if not currentBar then return end
-            currentBar.cooldownTextSize = value; RefreshCurrent()
-        end, 1)
-        local cooldownCog = Controls.Icon(textChild, {
-            title = 'COOLDOWN TEXT', tooltip = 'Cooldown text position & offset', width = 280,
-            options = {
-                { kind = 'dropdown', label = 'Position', items = POINT_OPTIONS, controlWidth = 120,
-                  get = function() return Current() and Current().cooldownTextPosition end,
-                  set = function(value) local currentBar = Current(); if not currentBar then return end currentBar.cooldownTextPosition = value; RefreshCurrent() end },
-                { kind = 'slider', label = 'X Offset', min = -20, max = 20, step = 1,
-                  get = function() return Current() and Current().cooldownTextOffsetX or 0 end,
-                  set = function(value) local currentBar = Current(); if not currentBar then return end currentBar.cooldownTextOffsetX = value; RefreshCurrent() end },
-                { kind = 'slider', label = 'Y Offset', min = -20, max = 20, step = 1,
-                  get = function() return Current() and Current().cooldownTextOffsetY or 0 end,
-                  set = function(value) local currentBar = Current(); if not currentBar then return end currentBar.cooldownTextOffsetY = value; RefreshCurrent() end },
-            },
-        })
-        PageKit.Grid(textCard, {
-            { label = 'Font',          controls = { fontDropdown } },
-            { label = 'Show Stacks',   controls = { showStackToggle, stackCog } },
-            { label = 'Cooldown Size', controls = { cooldownSizeSlider, cooldownCog } },
-        }, 2)
-
-        refreshList = BuildItemsCard(grid, RebuildPreview)
-
-        RebindAll()
-        RebuildPreview()
-        SyncTitle()
-        RegisterSync()
-        page:AutoRefresh()
-
-        pageFrame:SetScript('OnShow', function()
-            RebindAll()
-            RebuildPreview()
-            SyncTitle()
-            RegisterSync()
-        end)
-    end,
-    OnHide = function()
-        BUI.CustomBars.UnregisterPositionCallback(selectedIndex)
-        BUI.CustomBars.UnregisterLockSync(selectedIndex)
-    end,
+BUI.PageEngine.RegisterPage('customBars', {
+	title = 'Custom Bars',
+	buttonText = 'Custom Bars',
+	icon = 'capsule',
+	OnBuild = function(pageFrame)
+		fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
+		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
+		local tab = page:GetTab(1)
+		Current()
+		local adapter = { tabContents = {}, currentTab = selectedIndex }
+		for index in ipairs(Bars()) do adapter.tabContents[index] = tab end
+		local rail
+		rail = Layout.RailPage(tab, { window = Window() }, {
+			icon = 'capsule',
+			title = 'Custom Bars',
+			placeholder = 'Search bar settings...',
+			tools = {
+				HeaderToggle('enable', 'Turn this bar on or off', function(bar) return bar.enabled == true end, function(bar, value) bar.enabled = value end),
+				HeaderToggle('eye', 'Unlock this bar to drag it, right-click it to lock', function(bar) return not bar.locked end, function(bar, value) bar.locked = not value end),
+			},
+			preview = { height = PREVIEW_HEIGHT, build = function(band, kit) preview = BuildPreview(band, kit) end },
+			rail = { groups = RailGroups(), selected = ActiveID() },
+			build = Panes,
+		})
+		local Select = rail.Select
+		function rail:Select(id)
+			local item = items[id]
+			showingImport = id == 'import'
+			if item.index then selectedIndex = item.index end
+			adapter.currentTab = selectedIndex
+			Select(self, id)
+			Repaint()
+			RefreshPreview()
+		end
+		function adapter:SetTab(index)
+			rail:Select(Bars()[index] and ('bar' .. index) or 'import')
+		end
+		pageFrame._page = adapter
+		RefreshPreview()
+		CustomBars.SetLockCallback(Repaint)
+		page:AutoRefresh()
+	end,
 })
