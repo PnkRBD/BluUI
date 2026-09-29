@@ -7,6 +7,7 @@ local INPUT_WIDTH = 260
 local ICON_SIZE = 24
 local NAME_WIDTH = 300
 local ERASE_INSET = 18
+local ERASE_SIZE = 20
 local RESULTS_WIDTH = 280
 
 local GROWTH = {
@@ -132,7 +133,7 @@ local function BlacklistSection(ui, parent, width)
 		ui.IconButton(spellRow, 'erase', 'Remove ' .. spell.name, function()
 			Config().blacklist[spell.id] = nil
 			RebuildPage()
-		end, 'danger'):SetPoint('RIGHT', -ERASE_INSET, 0)
+		end, 'danger', ERASE_SIZE):SetPoint('RIGHT', -ERASE_INSET, 0)
 	end
 	if #spells == 0 then
 		local empty = section:AddRow('nothing blacklisted')

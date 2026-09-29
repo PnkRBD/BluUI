@@ -15,6 +15,7 @@ local PLACE_X = 600
 local PLACE_WIDTH = 150
 local SHOWN_X = 780
 local DELETE_INSET = 18
+local ERASE_SIZE = 20
 local MARKER_WIDTH = 2
 local SAMPLE_WIDTH = PLACE_X - SAMPLE_X - 20
 local PANEL_SAMPLE = 24
@@ -282,7 +283,7 @@ local function TableRow(kit, band, config, index)
 		config.enabled = value
 		Datatext.Apply()
 	end):SetPoint('LEFT', SHOWN_X, 0)
-	kit.IconButton(row, 'erase', 'Delete ' .. config.name, function() ConfirmDelete(index) end, 'danger'):SetPoint('RIGHT', -DELETE_INSET, 0)
+	kit.IconButton(row, 'erase', 'Delete ' .. config.name, function() ConfirmDelete(index) end, 'danger', ERASE_SIZE):SetPoint('RIGHT', -DELETE_INSET, 0)
 	row:SetScript('OnClick', function() Select(index) end)
 	function row:Update()
 		marker:SetShown(selected == index)
