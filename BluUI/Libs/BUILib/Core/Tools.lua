@@ -7,14 +7,15 @@ local Widget = BUILib.Widget
 local TOOL_GAP = 12
 local GROUP_GAP = 8
 local SLOT_ORDER = { 'erase', 'switch', 'toggle', 'icon', 'button', 'menu', 'input', 'swatch' }
+local ALIGNED = { erase = true, switch = true, toggle = true }
 local MENU_WIDTH = 150
 local SWATCH_SIZE = 18
 local CONTROL_HEIGHT = 30
-local POP_WIDTH = 320
+local POP_WIDTH = 360
 local POP_PAD = 16
 local POP_ROW = 40
 local POP_TITLE = 24
-local POP_CONTROL = 170
+local POP_CONTROL = 200
 local POP_RADIUS = 8
 local POP_OFFSET = 4
 local LABEL_GAP = 16
@@ -210,7 +211,7 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 		local function Place(slots)
 			local x, used = -kit.ROW_INSET, 0
 			for _, slot in ipairs(SLOT_ORDER) do
-				local width = slots[slot]
+				local width = ALIGNED[slot] and slots[slot] or widths[slot]
 				if width then
 					local right = x
 					for position = #(groups[slot] or {}), 1, -1 do
