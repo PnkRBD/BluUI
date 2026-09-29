@@ -501,23 +501,23 @@ function Layout.TableKit(window)
 		return toggle
 	end
 
-	function kit.Header(parent, icon, title, placeholder, onSearch, toggles)
+	function kit.Header(parent, icon, title, placeholder, onSearch, tools)
 		local badge = kit.Disc(parent, 30, 'text')
 		badge:SetPoint('TOPLEFT', 0, -2)
 		kit.Glyph(parent, icon, 14, 'page', 'OVERLAY'):SetPoint('CENTER', badge)
 		kit.Text(parent, title, 22, 'text'):SetPoint('LEFT', badge, 'RIGHT', 12, 0)
 		local search = onSearch and kit.Search(parent, placeholder, onSearch)
 		if search then search:SetPoint('TOPRIGHT') end
-		if toggles then
+		if tools then
 			local anchor, gap = search, TOGGLE_INSET
-			for index = #toggles, 1, -1 do
-				local toggle = kit.Toggle(parent, toggles[index])
+			for index = #tools, 1, -1 do
+				local tool = kit.Tool(parent, tools[index])
 				if anchor then
-					toggle:SetPoint('RIGHT', anchor, 'LEFT', -gap, 0)
+					tool:SetPoint('RIGHT', anchor, 'LEFT', -gap, 0)
 				else
-					toggle:SetPoint('TOPRIGHT', 0, -(SEARCH_HEIGHT - TOGGLE_SIZE) / 2)
+					tool:SetPoint('RIGHT', parent, 'TOPRIGHT', 0, -SEARCH_HEIGHT / 2)
 				end
-				anchor, gap = toggle, TOGGLE_GAP
+				anchor, gap = tool, TOGGLE_GAP
 			end
 		end
 		return SEARCH_HEIGHT
@@ -680,7 +680,7 @@ function Layout.PinnedHead(tab, window, kit, spec, block, onSearch)
 	local head = CreateFrame('Frame', nil, tab.pinned)
 	head:SetPoint('TOPLEFT')
 	head:SetSize(tab.width, 1)
-	local top = kit.Header(head, spec.icon, spec.title, spec.placeholder, onSearch, spec.toggles) + HEADER_GAP
+	local top = kit.Header(head, spec.icon, spec.title, spec.placeholder, onSearch, spec.tools) + HEADER_GAP
 	local rule = kit.DottedRule(head)
 	rule:SetPoint('TOPLEFT', 0, -top)
 	rule:SetPoint('TOPRIGHT', 0, -top)
