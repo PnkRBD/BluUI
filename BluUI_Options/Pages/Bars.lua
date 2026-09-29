@@ -88,12 +88,37 @@ local function OnUnlessOff(settings, label, key)
 	return { label = label, get = function() return settings[key] ~= false end, set = function(value) settings[key] = value end }
 end
 
+local function TextTools(settings, unit)
+	local options = {
+		Option(settings, 'Text size', 'textSize', { min = 8, max = 24, step = 1 }),
+		Toggle(settings, 'Show timer', 'showTimer'),
+		OnUnlessOff(settings, 'Show total time', 'showTotalTime'),
+		OnUnlessOff(settings, 'Countdown', 'countdown'),
+		Toggle(settings, 'Show spell name', 'showSpellName'),
+		Toggle(settings, 'Show cast target', 'showCastTarget'),
+		{ label = 'Name length, 0 for no limit', min = 0, max = 30, step = 1, get = function() return settings.spellNameMaxLength or 0 end, set = function(value) settings.spellNameMaxLength = value > 0 and value or nil end },
+		Option(settings, 'Text strata', 'textStrata', { entries = BUI.C.STRATA_OPTIONS }),
+	}
+	local tools = { Color(settings, 'Text color', 'textColor') }
+	if unit == 'player' then
+		tools[#tools + 1] = Color(settings, 'Latency color', 'latencyColor')
+		options[#options + 1] = Toggle(settings, 'Show latency', 'showLatency')
+	end
+	tools[#tools + 1] = { entries = fonts, width = MENU_WIDTH, get = function() return settings.font or BUI.C.GLOBAL_OPTION end, set = function(value) settings.font = value end }
+	tools[#tools + 1] = { icon = 'text', tooltip = 'Size and what the bar shows', title = 'Text', options = options }
+	tools[#tools + 1] = { icon = 'mover', tooltip = 'Text offset', title = 'Text offset', options = {
+		Option(settings, 'Horizontal', 'textOffsetX', { min = -TEXT_OFFSET_RANGE, max = TEXT_OFFSET_RANGE, step = 1 }),
+		Option(settings, 'Vertical', 'textOffsetY', { min = -TEXT_OFFSET_RANGE, max = TEXT_OFFSET_RANGE, step = 1 }),
+	} }
+	return tools
+end
+
 local function BarBoard(ui, parent, width, unit)
 	local settings = Settings(unit)
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = TITLES[unit],
-		description = 'Size, colors and texture. Unlock it with the eye in the header to drag it, right-click it to lock it again.',
+		description = 'Size, colors, texture and text. Unlock it with the eye in the header to drag it, right-click it to lock it again.',
 	})
 	board:AddSwitch('Class color', function() return settings.useClassColor == true end, function(value)
 		settings.useClassColor = value
@@ -116,6 +141,7 @@ local function BarBoard(ui, parent, width, unit)
 		} },
 		BUI.PositionTool(settings),
 	}, Apply)
+	board:AddTools('Text', 'Font, color and what the bar shows', TextTools(settings, unit), Apply)
 	if unit == 'player' then
 		board:AddTools('Channel ticks', 'Tick marks on channeled casts', {
 			Color(settings, 'Tick color', 'channelTickColor'),
@@ -123,38 +149,6 @@ local function BarBoard(ui, parent, width, unit)
 			Toggle(settings, nil, 'channelTicks'),
 		}, Apply)
 	end
-	return board
-end
-
-local function TextBoard(ui, parent, width, unit)
-	local settings = Settings(unit)
-	local board = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Text',
-		description = 'The spell name and timer on the bar.',
-	})
-	local options = {
-		Option(settings, 'Text size', 'textSize', { min = 8, max = 24, step = 1 }),
-		Toggle(settings, 'Show timer', 'showTimer'),
-		OnUnlessOff(settings, 'Show total time', 'showTotalTime'),
-		OnUnlessOff(settings, 'Countdown', 'countdown'),
-		Toggle(settings, 'Show spell name', 'showSpellName'),
-		Toggle(settings, 'Show cast target', 'showCastTarget'),
-		{ label = 'Name length, 0 for no limit', min = 0, max = 30, step = 1, get = function() return settings.spellNameMaxLength or 0 end, set = function(value) settings.spellNameMaxLength = value > 0 and value or nil end },
-		Option(settings, 'Text strata', 'textStrata', { entries = BUI.C.STRATA_OPTIONS }),
-	}
-	local tools = { Color(settings, 'Text color', 'textColor') }
-	if unit == 'player' then
-		tools[#tools + 1] = Color(settings, 'Latency color', 'latencyColor')
-		options[#options + 1] = Toggle(settings, 'Show latency', 'showLatency')
-	end
-	tools[#tools + 1] = { entries = fonts, width = MENU_WIDTH, get = function() return settings.font or BUI.C.GLOBAL_OPTION end, set = function(value) settings.font = value end }
-	tools[#tools + 1] = { icon = 'text', tooltip = 'Size and what the bar shows', title = 'Text', options = options }
-	tools[#tools + 1] = { icon = 'mover', tooltip = 'Text offset', title = 'Text offset', options = {
-		Option(settings, 'Horizontal', 'textOffsetX', { min = -TEXT_OFFSET_RANGE, max = TEXT_OFFSET_RANGE, step = 1 }),
-		Option(settings, 'Vertical', 'textOffsetY', { min = -TEXT_OFFSET_RANGE, max = TEXT_OFFSET_RANGE, step = 1 }),
-	} }
-	board:AddTools('Text', 'Font, color and what the bar shows', tools, Apply)
 	return board
 end
 
@@ -307,7 +301,7 @@ end
 
 local function Panes(ui, _, parent, width, item, page)
 	local unit = item.id
-	local sections = { BarBoard(ui, parent, width, unit), TextBoard(ui, parent, width, unit) }
+	local sections = { BarBoard(ui, parent, width, unit) }
 	if unit == 'player' then
 		if BUI.Tools.PlayerCanEmpower() then sections[#sections + 1] = EmpowerBoard(ui, parent, width) end
 		sections[#sections + 1] = SpellColorsSection(ui, parent, width, page)
@@ -360,18 +354,9 @@ local function BuildPreview(band)
 		iconHost:SetSize(settings.height, settings.height)
 		iconHost:ClearAllPoints()
 		iconHost:SetPoint('RIGHT', bar, 'LEFT', -2, 0)
-		local fontPath = CastBar.GetFont(settings.font)
-		Pixel.ApplyFont(name, settings.textSize, fontPath)
-		Pixel.ApplyFont(time, settings.textSize, fontPath)
+		CastBar.StyleText(bar, name, time, settings, CastBar.GetFont(settings.font))
 		name:SetText('Bloodlust')
 		time:SetText('1.4')
-		local textColor = settings.textColor
-		name:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4] or 1)
-		time:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4] or 1)
-		name:ClearAllPoints()
-		name:SetPoint('LEFT', bar, 'LEFT', 6 + settings.textOffsetX, settings.textOffsetY)
-		time:ClearAllPoints()
-		time:SetPoint('RIGHT', bar, 'RIGHT', -6, 0)
 		name:SetShown(settings.showSpellName ~= false)
 		time:SetShown(settings.showTimer ~= false)
 	end
@@ -388,9 +373,10 @@ BUI.PageEngine.RegisterPage('castbars', {
 		fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
 		textures = BUI.BuildTextureDropdownItems(BUI.C.GLOBAL_OPTION)
 		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
-		local adapter = { tabContents = { true, true, true }, currentTab = UNIT_INDEX[selectedUnit] }
+		local tab = page:GetTab(1)
+		local adapter = { tabContents = { tab, tab, tab }, currentTab = UNIT_INDEX[selectedUnit] }
 		local rail
-		rail = Layout.RailPage(page:GetTab(1), { window = Window() }, {
+		rail = Layout.RailPage(tab, { window = Window() }, {
 			icon = 'play',
 			title = 'Cast Bars',
 			placeholder = 'Search cast bar settings...',
