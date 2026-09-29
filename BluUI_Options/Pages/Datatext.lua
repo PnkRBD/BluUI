@@ -192,53 +192,52 @@ local function BarSample(kit, cell, config)
 	local edge = cell:CreateTexture(nil, 'BACKGROUND', nil, 0)
 	local fill = cell:CreateTexture(nil, 'BACKGROUND', nil, 1)
 	local parts = {}
+	local ruler = cell:CreateFontString(nil, 'ARTWORK')
+	ruler:SetAlpha(0)
+	ruler:SetPoint('LEFT')
 	local note = kit.Text(cell, 'No datatexts turned on', 11, 'faint')
 	note:SetPoint('LEFT')
 	return function()
 		local texts = Datatext.BuildSampleParts(config)
 		local count = #texts
-		for _, part in ipairs(parts) do part:Hide() end
-		fill:Hide()
-		edge:Hide()
+		for partIndex = count + 1, #parts do parts[partIndex]:Hide() end
+		fill:SetShown(count > 0)
+		edge:SetShown(count > 0 and config.border)
 		note:SetShown(count == 0)
 		if count == 0 then return end
 		local fontPath = BUI.GetModuleFont(config)
+		Pixel.ApplyFont(ruler, config.fontSize, fontPath, '')
 		local widths = {}
 		for partIndex = 1, count do
-			local part = parts[partIndex]
-			if not part then
-				part = cell:CreateFontString(nil, 'OVERLAY')
-				part:SetWordWrap(false)
-				parts[partIndex] = part
-			end
-			Pixel.ApplyFont(part, config.fontSize, fontPath, '')
-			part:SetText(texts[partIndex])
-			widths[partIndex] = part:GetStringWidth()
+			ruler:SetText(texts[partIndex])
+			widths[partIndex] = math.ceil(ruler:GetStringWidth())
 		end
 		local fixedWidth = config.width > 0 and math.min(Pixel.Scale(config.width), SAMPLE_WIDTH) or nil
 		local barWidth = Datatext.LayoutRow(widths, count, Pixel.Scale(config.spacing), Pixel.Scale(Datatext.LAYOUT.rowInset), fixedWidth, config.align, 0, layout)
 		local barHeight = Pixel.Scale(config.fontSize + Datatext.LAYOUT.lineExtra)
 		for partIndex = 1, count do
 			local part = parts[partIndex]
+			if not part then
+				part = cell:CreateFontString(nil, 'OVERLAY')
+				part:SetWordWrap(false)
+				part:SetJustifyH('LEFT')
+				parts[partIndex] = part
+			end
+			Pixel.ApplyFont(part, config.fontSize, fontPath, '')
+			part:SetText(texts[partIndex])
 			part:ClearAllPoints()
-			part:SetPoint('LEFT', cell, 'LEFT', layout.textLeft[partIndex] + 1, 0)
-			part:SetWidth(layout.textWidth[partIndex])
-			part:SetHeight(0)
-			part:SetJustifyH('CENTER')
+			part:SetPoint('LEFT', cell, 'LEFT', math.floor(layout.textLeft[partIndex] + 1.5), 0)
+			part:SetSize(widths[partIndex] + 1, barHeight)
 			part:Show()
 		end
 		fill:ClearAllPoints()
 		fill:SetPoint('LEFT', 1, 0)
-		fill:SetSize(barWidth, barHeight)
+		fill:SetSize(math.ceil(barWidth), barHeight)
 		fill:SetColorTexture(config.bgColor.r, config.bgColor.g, config.bgColor.b, config.bgAlpha)
-		fill:Show()
-		if config.border then
-			edge:ClearAllPoints()
-			edge:SetPoint('CENTER', fill)
-			edge:SetSize(barWidth + 2, barHeight + 2)
-			edge:SetColorTexture(config.borderColor.r, config.borderColor.g, config.borderColor.b, config.borderColor.a)
-			edge:Show()
-		end
+		edge:ClearAllPoints()
+		edge:SetPoint('CENTER', fill)
+		edge:SetSize(math.ceil(barWidth) + 2, barHeight + 2)
+		edge:SetColorTexture(config.borderColor.r, config.borderColor.g, config.borderColor.b, config.borderColor.a)
 	end
 end
 
