@@ -6,7 +6,7 @@ local Widget = BUILib.Widget
 
 local TOOL_GAP = 12
 local GROUP_GAP = 8
-local SLOT_ORDER = { 'switch', 'toggle', 'icon', 'button', 'menu', 'input', 'swatch' }
+local SLOT_ORDER = { 'erase', 'switch', 'toggle', 'icon', 'button', 'menu', 'input', 'swatch' }
 local MENU_WIDTH = 150
 local SWATCH_SIZE = 18
 local CONTROL_HEIGHT = 30
@@ -46,9 +46,10 @@ local function Kind(tool)
 end
 
 local function Slot(tool)
+	if tool.slot then return tool.slot end
 	local kind = Kind(tool)
 	if kind == 'options' then return 'icon' end
-	if kind == 'custom' then return tool.slot or 'menu' end
+	if kind == 'custom' then return 'menu' end
 	return kind
 end
 
@@ -178,7 +179,7 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 			button = kit.IconButton(parent, tool.icon or 'cog', tool.tooltip, function() kit.Popover(button, tool, after) end)
 			return button
 		elseif kind == 'icon' then
-			return kit.IconButton(parent, tool.icon, tool.tooltip, tool.onClick, tool.hover)
+			return kit.IconButton(parent, tool.icon, tool.tooltip, tool.onClick, tool.hover, tool.size)
 		elseif kind == 'toggle' then
 			return kit.Toggle(parent, tool)
 		elseif kind == 'button' then

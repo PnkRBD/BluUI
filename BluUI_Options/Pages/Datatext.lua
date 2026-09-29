@@ -11,34 +11,28 @@ local FOOTER_HEIGHT = 54
 local ROW_INSET = 20
 local NAME_WIDTH = 150
 local SAMPLE_X = 190
-local PLACE_X = 600
-local PLACE_WIDTH = 150
-local SHOWN_X = 780
-local DELETE_INSET = 18
-local ERASE_SIZE = 32
+local SAMPLE_GAP = 24
 local MARKER_WIDTH = 2
-local SAMPLE_WIDTH = PLACE_X - SAMPLE_X - 20
 local PANEL_SAMPLE = 24
 local PANEL_SAMPLE_MAX = 120
 local BUTTON_GAP = 10
-local MENU_WIDTH = 160
-local INPUT_WIDTH = 220
-local SWITCH_WIDTH = 40
+local MENU_WIDTH = 150
+local ERASE_SIZE = 32
 local ARROW = 22
 local ARROW_GAP = 4
 local TOOL_GAP = 12
-local ORDER_ROOM = SWITCH_WIDTH + 12 + ARROW * 2 + ARROW_GAP
+local LIST_ROOM = ERASE_SIZE + TOOL_GAP + ARROW * 2 + ARROW_GAP
 local COG_ROOM = ARROW + TOOL_GAP
 
-local COLUMNS = { { 'Name', ROW_INSET }, { 'Sample', SAMPLE_X }, { 'Place', PLACE_X }, { 'Shown', SHOWN_X } }
+local COLUMNS = { { 'Name', ROW_INSET }, { 'Sample', SAMPLE_X } }
+
+local CENTERED = { TOP = true, CENTER = true, BOTTOM = true }
+local CENTER_POINT = { TOPLEFT = 'TOP', TOPRIGHT = 'TOP', LEFT = 'CENTER', RIGHT = 'CENTER', BOTTOMLEFT = 'BOTTOM', BOTTOMRIGHT = 'BOTTOM' }
 
 local ORIENTATIONS = {
 	{ value = 'HORIZONTAL', text = 'Horizontal' },
 	{ value = 'VERTICAL', text = 'Vertical' },
 }
-
-local CENTERED = { TOP = true, CENTER = true, BOTTOM = true }
-local CENTER_POINT = { TOPLEFT = 'TOP', TOPRIGHT = 'TOP', LEFT = 'CENTER', RIGHT = 'CENTER', BOTTOMLEFT = 'BOTTOM', BOTTOMRIGHT = 'BOTTOM' }
 
 local ALIGNMENTS = {
 	{ value = 'LEFT', text = 'Left' },
@@ -108,19 +102,6 @@ local function ConfirmDelete(index)
 	})
 end
 
-local function Named(entries, value)
-	for _, entry in ipairs(entries) do
-		if entry.value == value then return entry.text end
-	end
-	return value
-end
-
-local function PlaceText(config)
-	if config.alignMinimap then return 'Below the minimap' end
-	if config.mirrorChat and Datatext.IsPanel(config) then return 'Mirrors the chat' end
-	return Named(BUI.C.ANCHOR_POINT_OPTIONS_SHORT, config.point)
-end
-
 local function Option(config, label, key, extra)
 	local option = { label = label, get = function() return config[key] end, set = function(value) config[key] = value end }
 	for name, value in pairs(extra or {}) do option[name] = value end
@@ -140,8 +121,8 @@ local function Swatch(config, label, key, opacity)
 	}
 end
 
-local function Font(config)
-	return { entries = fonts, width = MENU_WIDTH, get = function() return config.font end, set = function(value) config.font = value end }
+local function Opacity(config)
+	return { label = 'Background opacity', min = 0, max = 100, step = 1, get = function() return math.floor(config.bgAlpha * 100 + 0.5) end, set = function(value) config.bgAlpha = value / 100 end }
 end
 
 local function PositionTool(config)
@@ -167,27 +148,49 @@ local function PositionTool(config)
 	return { icon = 'mover', tooltip = 'Position and layering', title = 'Position', options = options }
 end
 
-local function BackgroundTools(config)
-	return {
+local function BarTools(config, index)
+	local isPanel = Datatext.IsPanel(config)
+	local tools = {
+		Swatch(config, isPanel and 'Title color' or 'Value color', isPanel and 'titleColor' or 'colorValue', not isPanel),
 		Swatch(config, 'Background color', 'bgColor', false),
-		{ tooltip = 'Opacity and border', title = 'Background', options = {
-			{ label = 'Opacity', min = 0, max = 100, step = 1, get = function() return math.floor(config.bgAlpha * 100 + 0.5) end, set = function(value) config.bgAlpha = value / 100 end },
+	}
+	if isPanel then
+		tools[#tools + 1] = { kind = 'input', slot = 'menu', width = MENU_WIDTH, placeholder = 'No title', get = function() return config.title end, set = function(text) config.title = text end }
+		tools[#tools + 1] = { tooltip = 'Title, size, border and opacity', title = config.name, options = {
+			Option(config, 'Title anchor', 'titleAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS_SHORT }),
+			Option(config, 'Title size', 'titleSize', { min = 8, max = 32, step = 1 }),
+			Option(config, 'Title offset X', 'titleX', { min = -300, max = 300, step = 1 }),
+			Option(config, 'Title offset Y', 'titleY', { min = -300, max = 300, step = 1 }),
+			Option(config, 'Width', 'width', { min = 0, max = 1200, step = 1 }),
+			Option(config, 'Height', 'height', { min = 0, max = 600, step = 1 }),
+			Opacity(config),
 			Option(config, 'Border', 'border'),
 			Swatch(config, 'Border color', 'borderColor', true),
-		} },
-	}
-end
-
-local function SizeOptions(config)
-	return {
-		Option(config, 'Width', 'width', { min = 0, max = 1200, step = 1 }),
-		Option(config, 'Height', 'height', { min = 0, max = 600, step = 1 }),
-	}
+		} }
+	else
+		tools[#tools + 1] = { entries = fonts, width = MENU_WIDTH, get = function() return config.font end, set = function(value) config.font = value end }
+		tools[#tools + 1] = { tooltip = 'Text, layout, size and border', title = config.name, options = {
+			Option(config, 'Font size', 'fontSize', { min = 8, max = 24, step = 1 }),
+			Option(config, 'Hide labels', 'hideLabels'),
+			Option(config, 'Orientation', 'orientation', { entries = ORIENTATIONS }),
+			Option(config, 'Align', 'align', { entries = ALIGNMENTS }),
+			Option(config, 'Spacing', 'spacing', { min = 0, max = 160, step = 1 }),
+			Option(config, 'Width', 'width', { min = 0, max = 1200, step = 1 }),
+			Option(config, 'Height', 'height', { min = 0, max = 600, step = 1 }),
+			Opacity(config),
+			Option(config, 'Border', 'border'),
+			Swatch(config, 'Border color', 'borderColor', true),
+		} }
+	end
+	tools[#tools + 1] = PositionTool(config)
+	tools[#tools + 1] = { get = function() return config.enabled == true end, set = function(value) config.enabled = value end }
+	tools[#tools + 1] = { slot = 'erase', icon = 'erase', size = ERASE_SIZE, hover = 'danger', tooltip = 'Delete ' .. config.name, onClick = function() ConfirmDelete(index) end }
+	return tools
 end
 
 local function OrderArrows(ui, row, onMove)
 	local down = ui.ArrowButton(row, false, function() onMove(1) end)
-	down:SetPoint('RIGHT', -(ui.ROW_INSET + SWITCH_WIDTH + 12), 0)
+	down:SetPoint('RIGHT', -(ui.ROW_INSET + ERASE_SIZE + TOOL_GAP), 0)
 	ui.ArrowButton(row, true, function() onMove(-1) end):SetPoint('RIGHT', down, 'LEFT', -ARROW_GAP, 0)
 end
 
@@ -199,7 +202,7 @@ local function BarSample(kit, cell, config)
 	local ruler = cell:CreateFontString(nil, 'ARTWORK')
 	ruler:SetAlpha(0)
 	ruler:SetPoint('LEFT')
-	local note = kit.Text(cell, 'No datatexts turned on', 11, 'faint')
+	local note = kit.Text(cell, 'No datatexts on this bar', 11, 'faint')
 	note:SetPoint('LEFT')
 	return function()
 		local texts = Datatext.BuildSampleParts(config)
@@ -216,7 +219,7 @@ local function BarSample(kit, cell, config)
 			ruler:SetText(texts[partIndex])
 			widths[partIndex] = math.ceil(ruler:GetStringWidth())
 		end
-		local fixedWidth = config.width > 0 and math.min(Pixel.Scale(config.width), SAMPLE_WIDTH) or nil
+		local fixedWidth = config.width > 0 and math.min(Pixel.Scale(config.width), cell:GetWidth()) or nil
 		local barWidth = Datatext.LayoutRow(widths, count, Pixel.Scale(config.spacing), Pixel.Scale(Datatext.LAYOUT.rowInset), fixedWidth, config.align, 0, layout)
 		local barHeight = Pixel.Scale(config.fontSize + Datatext.LAYOUT.lineExtra)
 		for partIndex = 1, count do
@@ -285,22 +288,20 @@ local function TableRow(kit, band, config, index)
 	kit.RowTitle(row, config.name, isPanel and 'Panel' or 'Bar', ROW_INSET, NAME_WIDTH)
 	local cell = CreateFrame('Frame', nil, row)
 	cell:SetPoint('LEFT', SAMPLE_X, 0)
-	cell:SetSize(SAMPLE_WIDTH, ROW_HEIGHT)
+	cell:SetHeight(ROW_HEIGHT)
 	cell:SetClipsChildren(true)
 	local UpdateSample = isPanel and PanelSample(kit, cell, config) or BarSample(kit, cell, config)
-	local place = kit.Cell(row, '', PLACE_X, PLACE_WIDTH)
-	kit.Switch(row, function() return config.enabled == true end, function(value)
-		config.enabled = value
-		Datatext.Apply()
-	end):SetPoint('LEFT', SHOWN_X, 0)
-	kit.IconButton(row, 'erase', 'Delete ' .. config.name, function() ConfirmDelete(index) end, 'danger', ERASE_SIZE):SetPoint('RIGHT', -DELETE_INSET, 0)
+	local placer = kit.Tools(row, BarTools(config, index), Apply)
+	row.widths = placer.widths
 	row:SetScript('OnClick', function() Select(index) end)
+	function row:Place(slots)
+		local used = placer.Place(slots)
+		cell:SetPoint('RIGHT', -(ROW_INSET + used + SAMPLE_GAP), 0)
+	end
 	function row:Update()
 		marker:SetShown(selected == index)
-		place:SetText(PlaceText(config))
 		UpdateSample()
 	end
-	row:Update()
 	return row
 end
 
@@ -323,12 +324,20 @@ local function BuildTable(band, kit)
 		kit.Text(empty, 'Nothing here yet, add a bar or a panel below', 12, 'muted'):SetPoint('LEFT', ROW_INSET, 0)
 		y = y + ROW_HEIGHT
 	end
+	local slots = {}
 	for index, config in ipairs(list) do
 		local row = TableRow(kit, band, config, index)
 		row:SetPoint('TOPLEFT', 0, -y)
 		row:SetPoint('TOPRIGHT', 0, -y)
 		rows[index] = row
 		y = y + ROW_HEIGHT
+		for slot, width in pairs(row.widths) do
+			if not slots[slot] or width > slots[slot] then slots[slot] = width end
+		end
+	end
+	for _, row in ipairs(rows) do
+		row:Place(slots)
+		row:Update()
 	end
 	local footer = CreateFrame('Frame', nil, band)
 	footer:SetPoint('TOPLEFT', 0, -y)
@@ -343,58 +352,6 @@ local function BuildTable(band, kit)
 	kit.Button(footer, 'New panel', 'secondary', function() Create('PANEL') end, 'plus'):SetPoint('LEFT', newBar, 'RIGHT', BUTTON_GAP, 0)
 end
 
-local function BarBoard(ui, parent, width, config)
-	local board = ui.Board(parent, width, {
-		stacked = true,
-		title = config.name,
-		description = 'A strip of datatexts. Unlock it with the eye in the header to drag it around, right-click it to lock it again.',
-	})
-	board:AddTools('Text', 'Font, size and the value color', {
-		Swatch(config, 'Value color', 'colorValue', true),
-		Font(config),
-		{ tooltip = 'Size and labels', title = 'Text', options = {
-			Option(config, 'Font size', 'fontSize', { min = 8, max = 24, step = 1 }),
-			Option(config, 'Hide labels', 'hideLabels'),
-		} },
-	}, Apply)
-	board:AddTools('Layout', 'How the datatexts are arranged, zero width or height fits the text', {
-		{ tooltip = 'Orientation, spacing and size', title = 'Layout', options = {
-			Option(config, 'Orientation', 'orientation', { entries = ORIENTATIONS }),
-			Option(config, 'Align', 'align', { entries = ALIGNMENTS }),
-			Option(config, 'Spacing', 'spacing', { min = 0, max = 160, step = 1 }),
-			Option(config, 'Width', 'width', { min = 0, max = 1200, step = 1 }),
-			Option(config, 'Height', 'height', { min = 0, max = 600, step = 1 }),
-		} },
-	}, Apply)
-	board:AddTools('Position', 'Where it sits on the screen and how it layers', { PositionTool(config) }, Apply)
-	board:AddTools('Background', 'The backdrop behind it', BackgroundTools(config), Apply)
-	return board
-end
-
-local function PanelBoard(ui, parent, width, config)
-	local board = ui.Board(parent, width, {
-		stacked = true,
-		title = config.name,
-		description = 'A blank backdrop to tuck other frames on. Unlock it with the eye in the header to drag it around, right-click it to lock it again.',
-	})
-	board:AddTools('Title', 'Optional text on the panel', {
-		Swatch(config, 'Title color', 'titleColor', false),
-		{ kind = 'input', width = INPUT_WIDTH, placeholder = 'No title', get = function() return config.title end, set = function(text) config.title = text end },
-		{ tooltip = 'Anchor, size and offsets', title = 'Title', options = {
-			Option(config, 'Anchor', 'titleAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS_SHORT }),
-			Option(config, 'Size', 'titleSize', { min = 8, max = 32, step = 1 }),
-			Option(config, 'Horizontal offset', 'titleX', { min = -300, max = 300, step = 1 }),
-			Option(config, 'Vertical offset', 'titleY', { min = -300, max = 300, step = 1 }),
-		} },
-	}, Apply)
-	board:AddTools('Size', 'Width and height of the panel', {
-		{ tooltip = 'Width and height', title = 'Size', options = SizeOptions(config) },
-	}, Apply)
-	board:AddTools('Position', 'Where it sits on the screen and how it layers', { PositionTool(config) }, Apply)
-	board:AddTools('Background', 'The backdrop itself', BackgroundTools(config), Apply)
-	return board
-end
-
 local function DatatextOptions(entry, config)
 	local options = {}
 	for _, option in ipairs(entry.options(function() return config end, function() end)) do
@@ -403,13 +360,24 @@ local function DatatextOptions(entry, config)
 	return { tooltip = entry.name .. ' settings', title = entry.name, options = options }
 end
 
+local function IndexOf(list, id)
+	for position, candidate in ipairs(list) do
+		if candidate == id then return position end
+	end
+end
+
 local function DatatextsBoard(ui, parent, width, config, page)
 	local order = Datatext.ResolveOrder(config)
-	local datatextRows = {}
+	local active, off = {}, {}
+	for _, id in ipairs(order) do
+		local entry = Datatext.Get(id)
+		if config[entry.show] then active[#active + 1] = id else off[#off + 1] = entry end
+	end
+	local listRows = {}
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Datatexts',
-		description = 'What the bar shows, top to bottom here is left to right on the bar.',
+		description = 'What ' .. config.name .. ' shows, top to bottom here is left to right on the bar.',
 		buttons = {
 			{ text = 'Default order', icon = 'reset', onClick = function()
 				config.order = nil
@@ -419,29 +387,52 @@ local function DatatextsBoard(ui, parent, width, config, page)
 		},
 	})
 	local function Move(id, delta)
-		local position
-		for candidateIndex, candidate in ipairs(order) do
-			if candidate == id then position = candidateIndex end
-		end
-		if not order[position + delta] then return end
-		order[position], order[position + delta] = order[position + delta], order[position]
-		board:Move(datatextRows[id], delta)
+		local position = IndexOf(active, id)
+		local otherID = active[position + delta]
+		if not otherID then return end
+		local from, to = IndexOf(order, id), IndexOf(order, otherID)
+		order[from], order[to] = otherID, id
+		active[position], active[position + delta] = otherID, id
+		board:Move(listRows[id], delta)
 		config.order = order
 		Apply()
 		page:Resize()
 	end
-	for _, id in ipairs(order) do
+	for _, id in ipairs(active) do
 		local entry = Datatext.Get(id)
-		local row = board:AddRow(entry.name, nil, ORDER_ROOM + (entry.options and COG_ROOM or 0))
-		datatextRows[id] = row
-		ui.Switch(row, function() return config[entry.show] == true end, function(value)
-			config[entry.show] = value
+		local row = board:AddRow(entry.name, nil, LIST_ROOM + (entry.options and COG_ROOM or 0))
+		listRows[id] = row
+		ui.IconButton(row, 'erase', 'Take ' .. entry.name .. ' off the bar', function()
+			config[entry.show] = false
 			Apply()
-		end):SetPoint('RIGHT', -ui.ROW_INSET, 0)
+			RebuildPage()
+		end, 'danger', ERASE_SIZE):SetPoint('RIGHT', -ui.ROW_INSET, 0)
 		OrderArrows(ui, row, function(delta) Move(id, delta) end)
 		if entry.options then
-			ui.Tool(row, DatatextOptions(entry, config), Apply):SetPoint('RIGHT', -(ui.ROW_INSET + ORDER_ROOM + TOOL_GAP), 0)
+			ui.Tool(row, DatatextOptions(entry, config), Apply):SetPoint('RIGHT', -(ui.ROW_INSET + LIST_ROOM + TOOL_GAP), 0)
 		end
+	end
+	if #active == 0 then
+		board:AddRow('Nothing on this bar yet', 'Pick a datatext below to start it off')
+	end
+	if #off > 0 then
+		local row = board:AddRow('Add a datatext', 'It joins the end of the bar', MENU_WIDTH)
+		local dropdown = ui.Dropdown(row, MENU_WIDTH, function()
+			local items = {}
+			for _, entry in ipairs(off) do
+				items[#items + 1] = { text = entry.name, callback = function()
+					config[entry.show] = true
+					table.remove(order, IndexOf(order, entry.id))
+					order[#order + 1] = entry.id
+					config.order = order
+					Apply()
+					RebuildPage()
+				end }
+			end
+			return items
+		end)
+		dropdown:SetPoint('RIGHT', -ui.ROW_INSET, 0)
+		dropdown.label:SetText('Pick one')
 	end
 	return board
 end
@@ -464,10 +455,7 @@ end
 local function Sections(ui, _, parent, width, page)
 	local config = Current()
 	local sections = {}
-	if config and Datatext.IsPanel(config) then
-		sections[#sections + 1] = PanelBoard(ui, parent, width, config)
-	elseif config then
-		sections[#sections + 1] = BarBoard(ui, parent, width, config)
+	if config and not Datatext.IsPanel(config) then
 		sections[#sections + 1] = DatatextsBoard(ui, parent, width, config, page)
 	end
 	sections[#sections + 1] = TooltipsBoard(ui, parent, width)
