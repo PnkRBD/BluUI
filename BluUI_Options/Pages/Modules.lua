@@ -17,7 +17,7 @@ local MODULES = {
 	{ key = 'minimap', name = 'Minimap', sub = 'The square minimap and its buttons', icon = 'disc' },
 	{ key = 'auras', name = 'Auras', sub = 'Low health, marks, crosshair and gateway alerts', icon = 'glow' },
 	{ key = 'buffTracking', name = 'Buff Tracking', sub = 'Trackers for buffs you want to keep up', icon = 'pill' },
-	{ key = 'datatext', name = 'Datatext', sub = 'Datatext bars and the minimap stats', icon = 'report2' },
+	{ key = 'datatext', name = 'Datatext', sub = 'Datatext bars and the minimap stats', icon = 'text' },
 	{ key = 'customBars', name = 'Custom Bars', sub = 'Your own bars for spells and items', icon = 'capsule' },
 	{ key = 'cursor', name = 'Cursor', sub = 'Cursor ring and trail', icon = 'mover' },
 	{ key = 'markers', name = 'Markers', sub = 'Raid and world markers', icon = 'markers' },
