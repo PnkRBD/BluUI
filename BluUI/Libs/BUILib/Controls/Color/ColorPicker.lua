@@ -858,3 +858,7 @@ function Controls.OpenColorPicker(opts)
 	picker:Raise()
 	picker.fade:Play()
 end
+
+function Controls.ColorPickerIsMouseOver()
+	return picker ~= nil and picker:IsShown() and picker:IsMouseOver()
+end

@@ -72,5 +72,6 @@
     <Script file="Core\Gallery.lua"/>
     <Script file="Core\Deck.lua"/>
     <Script file="Core\Board.lua"/>
+    <Script file="Core\Tools.lua"/>
     <Script file="Core\Shell.lua"/>
 </Ui>

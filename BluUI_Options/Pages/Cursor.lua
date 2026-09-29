@@ -296,7 +296,7 @@ BUI.PageEngine.RegisterPage('cursor', {
 			icon = 'cursor',
 			title = 'Cursor',
 			placeholder = 'Search cursor settings...',
-			toggles = {
+			tools = {
 				{ icon = 'enable', tooltip = 'Turn the cursor module on or off', get = function() return BUI.IsModuleEnabled('cursor') end, set = function(value) BUI.SetModuleEnabled('cursor', value) end },
 			},
 			preview = { height = PREVIEW_HEIGHT, build = function(band) preview = BuildPreview(band) end },

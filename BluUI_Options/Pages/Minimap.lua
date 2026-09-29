@@ -1133,7 +1133,7 @@ BUI.PageEngine.RegisterPage('minimap', {
 			icon = 'minimap',
 			title = 'Minimap',
 			placeholder = 'Search minimap settings...',
-			toggles = {
+			tools = {
 				{ icon = 'enable', tooltip = 'Turn the minimap module on or off, needs a reload', get = function() return Interface().minimapEnabled ~= false end, set = ConfirmModule },
 				{ icon = 'eye', tooltip = 'Unlock the map to drag it and its indicators, right-click it to lock', get = MinimapModule.IsUnlocked, set = MinimapModule.ToggleUnlock },
 			},
