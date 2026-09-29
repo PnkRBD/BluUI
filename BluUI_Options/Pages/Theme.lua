@@ -14,10 +14,15 @@ local FONT_DROPDOWN_WIDTH = 200
 local OPACITY_STEPS = { 100, 98, 95, 90, 85, 80, 70, 50 }
 
 local DEFAULT_PAGE = Layout.DefaultColor('page', 'dark')
+local SHELL = BUI.C.PANEL_BACKDROP
+local SHELL_FILL = { SHELL[1], SHELL[2], SHELL[3], SHELL[4] }
+local SHELL_EDGE = { SHELL[5], SHELL[6], SHELL[7], SHELL[8] }
+local SHELL_TILE = { 0.03, 0.03, 0.036, 1 }
 local PRESETS = {
 	{ name = 'Glass', theme = {} },
 	{ name = 'Solid', theme = { page = { DEFAULT_PAGE[1], DEFAULT_PAGE[2], DEFAULT_PAGE[3], 1 } } },
 	{ name = 'Black', theme = { page = { 0, 0, 0, 1 }, sidebarEdge = { 0.12, 0.12, 0.13, 1 } } },
+	{ name = 'Installer', theme = { page = SHELL_FILL, sidebarEdge = SHELL_EDGE, panel = SHELL_TILE, card = SHELL_TILE, cardEdge = SHELL_EDGE } },
 	{ name = 'Graphite', theme = { page = { 0.11, 0.115, 0.125, 1 }, sidebarEdge = { 0.17, 0.18, 0.2, 1 } } },
 	{ name = 'Forest', theme = { page = { 0.03, 0.06, 0.045, 1 }, sidebarEdge = { 0.09, 0.17, 0.125, 1 } } },
 	{ name = 'Plum', theme = { page = { 0.06, 0.035, 0.075, 1 }, sidebarEdge = { 0.17, 0.1, 0.2, 1 } } },
