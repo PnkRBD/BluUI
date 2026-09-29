@@ -13,8 +13,8 @@ local DIVIDER_INSET = 40
 local TITLE_SCALE = 1.3
 local ROW_NAME_SCALE = 1.5
 local HEADER_ART_ALPHA = 0.45
-local CHEST_ALPHA = 0.35
 local DIM_ALPHA = 0.55
+local ACTIVE_EDGE = { 0.3, 0.31, 0.35, 1 }
 local TYPE_FRAME_KEYS = { 'RaidFrame', 'MythicFrame', 'PVPFrame', 'WorldFrame' }
 local ACTIVITY_CHROME = { 'Border', 'ItemGlow', 'UncollectedGlow', 'SelectedTexture' }
 
@@ -86,11 +86,7 @@ local function SkinActivity(activity)
 	local active = activity.unlocked or activity.hasRewards
 	FadeKeys(activity, ACTIVITY_CHROME)
 	Fade(activity.SelectionGlow)
-	local background = activity.Background
-	if background then
-		Fade(background)
-		background:SetAlpha(active and CHEST_ALPHA or 0)
-	end
+	Fade(activity.Background)
 	DimFrame(activity.UnselectedFrame, CARD_INSET)
 	Shell(activity, CARD_INSET)
 	Skin.TipFont(activity.Threshold, active and 'body' or 'label')
@@ -120,7 +116,8 @@ local function RefreshSelection(frame)
 	if not Enabled() or not frame.Activities then return end
 	for _, activity in ipairs(frame.Activities) do
 		local selected = activity.SelectedTexture and activity.SelectedTexture:IsShown()
-		Skin.TipShellEdges(activity, selected)
+		local active = activity.unlocked or activity.hasRewards
+		Skin.TipShellEdges(activity, selected == true or (active and ACTIVE_EDGE))
 	end
 end
 

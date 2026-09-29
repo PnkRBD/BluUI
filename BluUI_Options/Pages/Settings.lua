@@ -11,7 +11,7 @@ local RAIL_GROUPS = {
 	{ title = 'Game', items = {
 		{ id = 'appearance', label = 'Appearance', icon = 'glow' },
 		{ id = 'settings', label = 'Settings', icon = 'cog' },
-		{ id = 'skinning', label = 'Skinning', icon = 'edit' },
+		{ id = 'skinning', label = 'Skinning', icon = 'palette' },
 		{ id = 'visibility', label = 'Visibility', icon = 'eye' },
 	} },
 }

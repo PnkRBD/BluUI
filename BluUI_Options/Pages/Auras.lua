@@ -51,6 +51,10 @@ local function Font(db, key)
 	return { entries = fonts, width = MENU_WIDTH, get = function() return db[key] end, set = function(value) db[key] = value end }
 end
 
+local function TextTool(options)
+	return { icon = 'text', tooltip = 'Text', title = 'Text', options = options }
+end
+
 local function Eye(tooltip, get, set)
 	return { icon = 'eye', tooltip = tooltip, get = get, set = set }
 end
@@ -100,8 +104,8 @@ local function CombatTimerRow(board)
 	board:AddTools('Combat Timer', 'Elapsed time readout while you are in combat', {
 		ChannelColor(db, 'Text color'),
 		Font(db, 'font'),
-		{ tooltip = 'Text size', title = 'Combat timer', options = {
-			Option(db, 'Font size', 'fontSize', { min = 10, max = 40, step = 1 }),
+		TextTool({ Option(db, 'Font size', 'fontSize', { min = 10, max = 40, step = 1 }) }),
+		{ tooltip = 'Readout', title = 'Combat timer', options = {
 			Option(db, 'Milliseconds', 'showMilliseconds'),
 		} },
 		BUI.PositionTool(db, { selfTag = 'BUI_CombatTimer' }),
@@ -118,8 +122,8 @@ local function CombatMessagesRow(board)
 		ArrayColor(db, 'Enter combat', 'enterColor', true),
 		ArrayColor(db, 'Leave combat', 'leaveColor', true),
 		Font(db, 'font'),
-		{ tooltip = 'Text size and timing', title = 'Messages', options = {
-			Option(db, 'Font size', 'fontSize', { min = 10, max = 40, step = 1 }),
+		TextTool({ Option(db, 'Font size', 'fontSize', { min = 10, max = 40, step = 1 }) }),
+		{ tooltip = 'Timing', title = 'Messages', options = {
 			Option(db, 'Fade time', 'fadeTime', { min = 0.2, max = 3, step = 0.1 }),
 		} },
 		BUI.PositionTool(db, { selfTag = 'BUI_CombatMessage' }),
@@ -138,9 +142,11 @@ local function LowHpRow(board)
 	board:AddTools('Low HP Warning', 'Warning text when your health drops below the threshold', {
 		TableColor(db, 'Text color', 'lowHpColor', true),
 		Font(db, 'lowHpFont'),
-		{ tooltip = 'Text, size and threshold', title = 'Low HP warning', options = {
+		TextTool({
 			Option(db, 'Warning text', 'lowHpText', { kind = 'input', placeholder = 'Warning text' }),
 			Option(db, 'Font size', 'lowHpFontSize', { min = 10, max = 60, step = 1 }),
+		}),
+		{ tooltip = 'Threshold', title = 'Low HP warning', options = {
 			Option(db, 'Threshold %', 'lowHpThreshold', { min = 5, max = 95, step = 5 }),
 		} },
 		BUI.PositionTool(db, { selfTag = 'BUI_LowHpWarning', fields = LOW_HP_FIELDS }),
@@ -159,8 +165,8 @@ local function PetWarningsRow(board)
 	board:AddTools('Pet Warnings', 'Alerts when your pet is dead, missing, idle or low on health', {
 		TableColor(db, 'Warning color', 'warningColor', true),
 		Font(db, 'font'),
-		{ tooltip = 'Warning types and text size', title = 'Pet warnings', options = {
-			Option(db, 'Font size', 'fontSize', { min = 14, max = 48, step = 1 }),
+		TextTool({ Option(db, 'Font size', 'fontSize', { min = 14, max = 48, step = 1 }) }),
+		{ tooltip = 'Warning types', title = 'Pet warnings', options = {
 			Flag(db.petAttackWarning, 'Pet not attacking'),
 			Flag(db.petDeadWarning, 'Pet dead or missing'),
 			Flag(db.grimoireSacrificeWarning, 'Grimoire of Sacrifice'),
@@ -181,9 +187,11 @@ local function MarkWarningRow(board)
 	board:AddTools("Hunter's Mark Warning", "Callout while your target is missing Hunter's Mark, hunters only", {
 		TableColor(db, 'Text color', 'markColor', true),
 		Font(db, 'markFont'),
-		{ tooltip = 'Text, style and visibility', title = "Hunter's mark", options = {
+		TextTool({
 			Option(db, 'Warning text', 'markText', { kind = 'input', placeholder = 'Warning text' }),
 			Option(db, 'Font size', 'markFontSize', { min = 10, max = 48, step = 1 }),
+		}),
+		{ tooltip = 'Icon and visibility', title = "Hunter's mark", options = {
 			{ label = 'Spell icon', get = function() return db.markShowIcon ~= false end, set = function(value) db.markShowIcon = value end },
 			{ label = 'Pulse icon', get = function() return db.markPulse ~= false end, set = function(value) db.markPulse = value end },
 			Option(db, 'Combat only', 'markCombatOnly'),
@@ -210,9 +218,11 @@ local function GatewayRow(board)
 	board:AddTools('Gateway Alert', 'Text while a Demonic Gateway is in reach and off cooldown, needs a Gateway Control Shard on an action bar', {
 		TableColor(db, 'Text color', 'textColor', true),
 		Font(db, 'font'),
-		{ tooltip = 'Text and sound', title = 'Gateway alert', options = {
+		TextTool({
 			Option(db, 'Text', 'customText', { kind = 'input', placeholder = 'Alert text' }),
 			Option(db, 'Font size', 'textSize', { min = 10, max = 48, step = 1 }),
+		}),
+		{ tooltip = 'Sound', title = 'Gateway alert', options = {
 			{ label = 'Sound', entries = sounds, get = function() return db.sound end, set = function(value)
 				db.sound = value
 				BUI.PlaySoundByName(value)
@@ -233,7 +243,7 @@ local function BloodlustRow(board)
 	Bloodlust.onPreviewStop = Repaint
 	board:AddTools('Bloodlust', 'Tracks Bloodlust, Heroism and similar haste buffs', {
 		Font(db, 'font'),
-		{ text = 'Configure', onClick = function() BUI.PageEngine.NavigateToID('bloodlust') end },
+		{ icon = 'cog', tooltip = 'Open the Bloodlust page', onClick = function() BUI.PageEngine.NavigateToID('bloodlust') end },
 		BUI.PositionTool(db),
 		Eye('Preview the alerts', Bloodlust.IsPreviewing, function(value)
 			if value then Bloodlust.StartPreview() else Bloodlust.StopPreview() end

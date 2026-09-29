@@ -1288,9 +1288,11 @@ function Skin.SetIconEdgeItemQuality(icon, item)
 end
 
 function Skin.TipShellEdges(frame, accent)
-	if accent then
+	if accent == true then
 		local red, green, blue = BUILib.Theme.GetAccent()
 		BUILib.Skin.SetShellEdges(frame, { red, green, blue, 1 })
+	elseif accent then
+		BUILib.Skin.SetShellEdges(frame, accent)
 	else
 		BUILib.Skin.SetShellEdges(frame, PANEL_EDGE)
 	end

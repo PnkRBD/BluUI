@@ -1,560 +1,423 @@
 local BUI = BluUI
-
 local BUILib = BluUI.BUILibClient
-local Controls, Layout, Colors, Modals = BUILib.Controls, BUILib.Layout, BUILib.Colors, BUILib.Modals
+local Controls, Layout, Theme = BUILib.Controls, BUILib.Layout, BUILib.Theme
 local CastBar = BUI.CastBar
-local FONT = BUI.C.FONT_PATH
+local Pixel = BUI.Pixel
 
-local STRATA_OPTIONS = BUI.C.STRATA_OPTIONS
+local PAGE_WIDTH = 960
+local PREVIEW_HEIGHT = 110
+local PREVIEW_ROOM = 120
+local MENU_WIDTH = 160
+local ICON_SIZE = 24
+local NAME_WIDTH = 300
+local INPUT_WIDTH = 260
+local ERASE_SIZE = 32
+local ERASE_INSET = 18
+local TOOL_GAP = 12
+local RESULTS_WIDTH = 280
+local TEXT_OFFSET_RANGE = 100
 
-local previewRefresh
+local UNITS = { 'player', 'target', 'focus' }
+local UNIT_INDEX = { player = 1, target = 2, focus = 3 }
+local RAIL_GROUPS = {
+	{ title = 'Bars', items = {
+		{ id = 'player', label = 'Player' },
+		{ id = 'target', label = 'Target' },
+		{ id = 'focus', label = 'Focus' },
+	} },
+}
+local TITLES = { player = 'Player cast bar', target = 'Target cast bar', focus = 'Focus cast bar' }
+local STAGE_LAYERS = {
+	{ value = 'background', text = 'Background' },
+	{ value = 'foreground', text = 'Bar fill' },
+}
 
-local function RefreshCastBars()
-    local unitFrames = BUI.UnitFrames
-    for _, barType in ipairs({ 'player', 'target', 'focus' }) do
-        local frame = unitFrames[barType]
-        if frame then CastBar.ApplyCastbar(frame, barType) end
-    end
-    previewRefresh()
+local selectedUnit = 'player'
+local preview
+local fonts, textures
+
+local function Window()
+	return BUI.PageEngine.window
 end
 
-local function BuildCastPreview(parent, width, height)
-    local Pixel = BUI.Pixel
-    local sharedMedia = LibStub('LibSharedMedia-3.0')
-
-    local card, stage = BUILib.PageKit.PreviewStage(parent)
-
-    local bar = CreateFrame('StatusBar', nil, stage)
-    bar:SetPoint('CENTER', 0, 0)
-    bar:SetMinMaxValues(0, 1)
-    bar:SetValue(0.65)
-
-    local background = bar:CreateTexture(nil, 'BACKGROUND')
-    background:SetAllPoints()
-
-    local iconHost = CreateFrame('Frame', nil, card)
-    local icon = iconHost:CreateTexture(nil, 'ARTWORK')
-    icon:SetAllPoints()
-    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    icon:SetTexture(136048)
-
-    local nameFontString = bar:CreateFontString(nil, 'OVERLAY')
-    local timeFontString = bar:CreateFontString(nil, 'OVERLAY')
-
-    Pixel.ApplyFont(nameFontString, 12, FONT)
-    Pixel.ApplyFont(timeFontString, 12, FONT)
-    nameFontString:SetText('Bloodlust')
-    timeFontString:SetText('1.4')
-
-    local unit = 'player'
-    function card:SetUnit(newUnit) unit = newUnit; self:UpdatePreview() end
-
-    function card:UpdatePreview()
-        local settings = CastBar.GetSettings(unit)
-
-        local texturePath
-        if settings.texture and settings.texture ~= 'GLOBAL' then texturePath = sharedMedia:Fetch('statusbar', settings.texture) end
-        texturePath = texturePath or BUI.GetGlobalTexture()
-        bar:SetStatusBarTexture(texturePath)
-        background:SetTexture(texturePath)
-
-        local barWidth = math.min(settings.width, width - 120)
-        local barHeight = settings.height
-        bar:SetSize(barWidth, barHeight)
-
-        if settings.useClassColor then
-            local _, class = UnitClass('player')
-            local classColor = class and RAID_CLASS_COLORS[class]
-            if classColor then bar:SetStatusBarColor(classColor.r, classColor.g, classColor.b, 1) else bar:SetStatusBarColor(unpack(settings.barColor)) end
-        else
-            bar:SetStatusBarColor(unpack(settings.barColor))
-        end
-        local backgroundColor = settings.bgColor
-        background:SetVertexColor(backgroundColor[1], backgroundColor[2], backgroundColor[3], backgroundColor[4] or 1)
-
-        local borderColor = settings.borderColor
-        Pixel.ApplyBorder(bar, settings.borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4] or 1)
-
-        iconHost:SetShown(settings.showIcon or false)
-        iconHost:SetSize(barHeight, barHeight)
-        iconHost:ClearAllPoints()
-        iconHost:SetPoint('RIGHT', bar, 'LEFT', -2, 0)
-
-        Pixel.ApplyFont(nameFontString, settings.textSize, FONT)
-        Pixel.ApplyFont(timeFontString, settings.textSize, FONT)
-        local textColor = settings.textColor
-        nameFontString:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4] or 1)
-        timeFontString:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4] or 1)
-        nameFontString:ClearAllPoints()
-        nameFontString:SetPoint('LEFT', bar, 'LEFT', 6 + settings.textOffsetX, settings.textOffsetY)
-        timeFontString:SetPoint('RIGHT', bar, 'RIGHT', -6, 0)
-        nameFontString:SetShown(settings.showSpellName ~= false)
-        timeFontString:SetShown(settings.showTimer ~= false)
-    end
-
-    card:UpdatePreview()
-    return card
+local function Repaint()
+	Window():Repaint()
 end
 
-local function ShowCustomSpellsModal(settings)
-    local overlay, dialog, Close = Modals.CreateBase(520, 520, true)
-    local titleFontString = Modals.CreateTitle(dialog, "Custom Spell Colors")
+local relock = { SetValue = Repaint }
 
-    local function AccentColor()
-        local red, green, blue = Colors.GetAccent()
-        return { red, green, blue, 1 }
-    end
-
-    local list
-    list = Controls.SpellColorList(dialog, "Drag spell here, search, or paste link/ID...", 460, 372,
-        function(text)
-            local id = BUI.Lookup.ParseSpellInput(text)
-            if not id or settings.spellColors[id] then return end
-            settings.spellColors[id] = AccentColor()
-            local icon, name = BUI.Lookup.GetSpellInfo(id)
-            list:AddItem(icon or 134400, name or "Spell " .. id, id, settings.spellColors[id])
-        end,
-        function(rowData)
-            if rowData.id then settings.spellColors[rowData.id] = nil end
-        end,
-        function(spellId, color)
-            if spellId then settings.spellColors[spellId] = color end
-        end,
-        BUI.Lookup.SearchSpells,
-        function(item)
-            if settings.spellColors[item.id] then return end
-            settings.spellColors[item.id] = AccentColor()
-            list:AddItem(item.icon or 134400, item.name or "Spell " .. item.id, item.id, settings.spellColors[item.id])
-        end)
-    local listFrame = list.frame
-    listFrame:SetPoint("TOP", titleFontString, "BOTTOM", 0, -18)
-
-    for id, color in pairs(settings.spellColors) do
-        local icon, name = BUI.Lookup.GetSpellInfo(id)
-        list:AddItem(icon or 134400, name or "Spell " .. id, id, color)
-    end
-
-    Modals.LayoutButtons(dialog, {
-        { text = "Close", color = Modals.BTN_NEUTRAL },
-    }, Close)
-
-    overlay:Show()
+local function Settings(unit)
+	return CastBar.GetSettings(unit or selectedUnit)
 end
 
-local function BuildCastBarSettings(tab, tabId)
-    local settings = CastBar.GetSettings(tabId)
-
-    local PageKit = BUILib.PageKit
-    local apply = RefreshCastBars
-
-    local grids = {}
-    local grid
-    local function Section(title)
-        if grid then grid:Flush() end
-        Layout.Section(tab, title)
-        grid = PageKit.RowGrid(tab)
-        grids[#grids + 1] = grid
-    end
-    local function AddRow(config)
-        return grid:Add(config)
-    end
-
-    Section('Bar')
-
-    AddRow({
-        title = 'Position & Size',
-        description = 'Placement, bar width and height.',
-        plain = true,
-        accessoryWidth = 64,
-        accessories = function(row)
-            local mover = BUI.AlertMover(row, settings, apply)
-            local size = PageKit.SizeIcon(row, { title = 'BAR SIZE', options = {
-                { kind = 'slider', label = 'Width', min = 100, max = 500,
-                  get = function() return settings.width end,
-                  set = function(value) settings.width = value; apply() end },
-                { kind = 'slider', label = 'Height', min = 4, max = 50,
-                  get = function() return settings.height end,
-                  set = function(value) settings.height = value; apply() end },
-                { kind = 'slider', label = 'Border Size', min = 0, max = 5,
-                  get = function() return settings.borderSize end,
-                  set = function(value) settings.borderSize = value; apply() end },
-                { kind = 'dropdown', label = 'Bar Strata', items = STRATA_OPTIONS, controlWidth = 120,
-                  get = function() return settings.frameStrata end,
-                  set = function(value) settings.frameStrata = value; apply() end },
-            } })
-            return { mover, size }
-        end,
-    })
-
-    AddRow({
-        title = 'Texture',
-        description = 'Bar fill texture.',
-        controlWidth = 170,
-        control = function(row)
-            return Controls.Dropdown(row, nil, BUI.BuildTextureDropdownItems('GLOBAL'), settings.texture, function(value)
-                settings.texture = value; apply()
-            end, nil, 160)
-        end,
-    })
-
-    AddRow({
-        title = 'Colors',
-        description = 'Bar, border and background.',
-        plain = true,
-        accessoryWidth = 92,
-        accessories = function(row)
-            local barColor = settings.barColor
-            local barSwatch = Controls.ColorSwatch(row, { r = barColor[1], g = barColor[2], b = barColor[3], a = barColor[4],
-                tooltip = 'Bar color',
-                callback = function(red, green, blue, alpha) settings.barColor = { red, green, blue, alpha }; apply() end })
-            local borderColor = settings.borderColor
-            local borderSwatch = Controls.ColorSwatch(row, { r = borderColor[1], g = borderColor[2], b = borderColor[3], a = borderColor[4],
-                tooltip = 'Border color',
-                callback = function(red, green, blue, alpha) settings.borderColor = { red, green, blue, alpha }; apply() end })
-            local backgroundColor = settings.bgColor
-            local backgroundSwatch = Controls.ColorSwatch(row, { r = backgroundColor[1], g = backgroundColor[2], b = backgroundColor[3], a = backgroundColor[4],
-                tooltip = 'Background color',
-                callback = function(red, green, blue, alpha) settings.bgColor = { red, green, blue, alpha }; apply() end })
-            return { barSwatch, borderSwatch, backgroundSwatch }
-        end,
-    })
-
-    AddRow({
-        title = 'Use Class Color',
-        description = 'Color the bar by your class.',
-        checked = settings.useClassColor and true or false,
-        callback = function(value) settings.useClassColor = value; apply() end,
-    })
-
-    AddRow({
-        title = 'Icon',
-        description = 'Spell icon beside the bar.',
-        checked = settings.showIcon and true or false,
-        callback = function(value) settings.showIcon = value; apply() end,
-    })
-
-    if tabId == 'player' then
-        AddRow({
-            title = 'Channel Ticks',
-            description = 'Tick marks on channeled casts.',
-            checked = settings.channelTicks and true or false,
-            callback = function(value) settings.channelTicks = value; apply() end,
-            accessoryWidth = 64,
-            accessories = function(row)
-                local cog = PageKit.SettingsIcon(row, { title = 'CHANNEL TICKS', tooltip = 'Tick width', options = {
-                    { kind = 'slider', label = 'Tick Width', min = 1, max = 6,
-                      get = function() return settings.channelTickWidth end,
-                      set = function(value) settings.channelTickWidth = value; apply() end },
-                } })
-                local tickColor = settings.channelTickColor
-                local swatch = Controls.ColorSwatch(row, { r = tickColor[1], g = tickColor[2], b = tickColor[3], a = tickColor[4],
-                    tooltip = 'Tick color',
-                    callback = function(red, green, blue, alpha) settings.channelTickColor = { red, green, blue, alpha }; apply() end })
-                return { cog, swatch }
-            end,
-        })
-    end
-
-    Section('Text')
-
-    AddRow({
-        spanFull = true,
-        title = 'Text',
-        description = 'Font, color, and what the bar shows.',
-        controlWidth = 170,
-        control = function(row)
-            return Controls.Dropdown(row, nil, BUI.BuildFontDropdownItems('GLOBAL'), settings.font or BUI.C.GLOBAL_OPTION, function(val)
-                settings.font = val; apply()
-            end, nil, 160)
-        end,
-        accessoryWidth = tabId == 'player' and 130 or 100,
-        accessories = function(row)
-            local textOptions = {
-                { kind = 'slider', label = 'Text Size', min = 8, max = 24,
-                  get = function() return settings.textSize end,
-                  set = function(value) settings.textSize = value; apply() end },
-                { label = 'Show Timer',
-                  get = function() return settings.showTimer end,
-                  set = function(value) settings.showTimer = value; apply() end },
-                { label = 'Show Total Time',
-                  get = function() return settings.showTotalTime ~= false end,
-                  set = function(value) settings.showTotalTime = value; apply() end },
-                { label = 'Countdown',
-                  get = function() return settings.countdown ~= false end,
-                  set = function(value) settings.countdown = value; apply() end },
-                { label = 'Show Spell Name',
-                  get = function() return settings.showSpellName end,
-                  set = function(value) settings.showSpellName = value; apply() end },
-                { label = 'Show Cast Target',
-                  get = function() return settings.showCastTarget end,
-                  set = function(value) settings.showCastTarget = value; apply() end },
-                { kind = 'slider', label = 'Name Max Length', min = 0, max = 30,
-                  get = function() return settings.spellNameMaxLength or 0 end,
-                  set = function(value) settings.spellNameMaxLength = value > 0 and value or nil; apply() end },
-                { kind = 'dropdown', label = 'Text Strata', items = STRATA_OPTIONS, controlWidth = 120,
-                  get = function() return settings.textStrata end,
-                  set = function(value) settings.textStrata = value; apply() end },
-            }
-            if tabId == 'player' then
-                textOptions[#textOptions + 1] = { label = 'Show Latency',
-                    get = function() return settings.showLatency end,
-                    set = function(value) settings.showLatency = value; apply() end }
-            end
-            local cog = PageKit.SettingsIcon(row, { title = 'TEXT', tooltip = 'Text display options', width = 280, options = textOptions })
-            local mover = PageKit.OffsetMover(row, {
-                getX = function() return settings.textOffsetX end, setX = function(value) settings.textOffsetX = value; apply() end,
-                getY = function() return settings.textOffsetY end, setY = function(value) settings.textOffsetY = value; apply() end,
-            })
-            local textColor = settings.textColor
-            local textSwatch = Controls.ColorSwatch(row, { r = textColor[1], g = textColor[2], b = textColor[3], a = textColor[4],
-                tooltip = 'Text color',
-                callback = function(red, green, blue, alpha) settings.textColor = { red, green, blue, alpha }; apply() end })
-            local out = { cog, mover, textSwatch }
-            if tabId == 'player' then
-                local latencyColor = settings.latencyColor
-                out[#out + 1] = Controls.ColorSwatch(row, { r = latencyColor[1], g = latencyColor[2], b = latencyColor[3], a = latencyColor[4],
-                    tooltip = 'Latency color',
-                    callback = function(red, green, blue, alpha) settings.latencyColor = { red, green, blue, alpha }; apply() end })
-            end
-            return out
-        end,
-    })
-
-    if (tabId == 'target' or tabId == 'focus') and settings.interruptColor then
-        Section('Interrupts')
-
-        AddRow({
-            title = 'Cast Colors',
-            description = 'Bar color by interrupt state.',
-            plain = true,
-            accessoryWidth = 122,
-            accessories = function(row)
-                local interruptColor = settings.interruptColor
-                local interruptSwatch = Controls.ColorSwatch(row, { r = interruptColor[1], g = interruptColor[2], b = interruptColor[3], a = interruptColor[4],
-                    tooltip = 'Non-interruptible',
-                    callback = function(red, green, blue, alpha) settings.interruptColor = { red, green, blue, alpha }; apply() end })
-                local cooldownColor = settings.interruptOnCDColor
-                local cooldownSwatch = Controls.ColorSwatch(row, { r = cooldownColor[1], g = cooldownColor[2], b = cooldownColor[3], a = cooldownColor[4],
-                    tooltip = 'Interrupt on cooldown',
-                    callback = function(red, green, blue, alpha) settings.interruptOnCDColor = { red, green, blue, alpha }; apply() end })
-                local readyColor = settings.interruptReadyColor
-                local readySwatch = Controls.ColorSwatch(row, { r = readyColor[1], g = readyColor[2], b = readyColor[3], a = readyColor[4],
-                    tooltip = 'Can interrupt',
-                    callback = function(red, green, blue, alpha) settings.interruptReadyColor = { red, green, blue, alpha }; apply() end })
-                local windowColor = settings.interruptWindowColor
-                local windowSwatch = Controls.ColorSwatch(row, { r = windowColor[1], g = windowColor[2], b = windowColor[3], a = windowColor[4],
-                    tooltip = 'Interrupt soon',
-                    callback = function(red, green, blue, alpha) settings.interruptWindowColor = { red, green, blue, alpha }; apply() end })
-                return { windowSwatch, readySwatch, cooldownSwatch, interruptSwatch }
-            end,
-        })
-
-        AddRow({
-            title = 'Ready Line',
-            description = 'Line marking when your kick is back up.',
-            checked = settings.interruptTick ~= false,
-            callback = function(value) settings.interruptTick = value; apply() end,
-            accessoryWidth = 64,
-            accessories = function(row)
-                local cog = PageKit.SettingsIcon(row, { title = 'INTERRUPT LINES', tooltip = 'Line width & window', options = {
-                    { kind = 'slider', label = 'Line Width', min = 1, max = 6,
-                      get = function() return settings.interruptTickWidth end,
-                      set = function(value) settings.interruptTickWidth = value; apply() end },
-                    { label = 'Show Interrupt Window',
-                      get = function() return settings.interruptWindow ~= false end,
-                      set = function(value) settings.interruptWindow = value; apply() end },
-                } })
-                local tickColor = settings.interruptTickColor
-                local swatch = Controls.ColorSwatch(row, { r = tickColor[1], g = tickColor[2], b = tickColor[3], a = tickColor[4],
-                    tooltip = 'Ready line color',
-                    callback = function(red, green, blue, alpha) settings.interruptTickColor = { red, green, blue, alpha }; apply() end })
-                return { cog, swatch }
-            end,
-        })
-
-        AddRow({
-            spanFull = true,
-            title = 'Interrupt Voice',
-            description = 'Spoken alerts when your kick is ready, or will be before the cast ends.',
-            plain = true,
-            accessoryWidth = 140,
-            accessories = function(row)
-                local preview = Controls.GhostButton(row, 'Preview', 90, function() CastBar.PreviewInterrupt(tabId) end)
-                local cog = PageKit.SettingsIcon(row, { title = 'INTERRUPT VOICE', tooltip = 'Voice lines & timing', options = {
-                    { label = 'Kick Ready',
-                      get = function() return settings.interruptTTS == true end,
-                      set = function(value) settings.interruptTTS = value; apply() end },
-                    { kind = 'textbox', label = 'Ready Text',
-                      get = function() return settings.interruptTTSText end,
-                      set = function(value) settings.interruptTTSText = (value and value ~= '') and value or 'Kick' end },
-                    { label = 'Kick Soon',
-                      get = function() return settings.interruptTTSSoon == true end,
-                      set = function(value) settings.interruptTTSSoon = value; apply() end },
-                    { kind = 'textbox', label = 'Soon Text',
-                      get = function() return settings.interruptTTSSoonText end,
-                      set = function(value) settings.interruptTTSSoonText = (value and value ~= '') and value or 'Kick soon' end },
-                    { kind = 'slider', label = 'Soon Lead (s)', min = 1, max = 10, step = 0.5,
-                      get = function() return settings.interruptTTSSoonWindow end,
-                      set = function(value) settings.interruptTTSSoonWindow = value; apply() end },
-                } })
-                return { preview, cog }
-            end,
-        })
-    end
-
-    if tabId == 'player' then
-        if BUI.Tools.PlayerCanEmpower() then
-            Section('Empowered Casts')
-
-            AddRow({
-                title = 'Stage Pips',
-                description = 'Lines splitting the empower stages.',
-                plain = true,
-                accessoryWidth = 64,
-                accessories = function(row)
-                    local cog = PageKit.SettingsIcon(row, { title = 'STAGE PIPS', tooltip = 'Pip width & glow', options = {
-                        { kind = 'slider', label = 'Line Width', min = 1, max = 6,
-                          get = function() return settings.pipWidth end,
-                          set = function(value) settings.pipWidth = value; apply() end },
-                        { label = 'Glow',
-                          get = function() return settings.pipGlow ~= false end,
-                          set = function(value) settings.pipGlow = value; apply() end },
-                    } })
-                    local pipColor = settings.pipColor
-                    local swatch = Controls.ColorSwatch(row, { r = pipColor[1], g = pipColor[2], b = pipColor[3], a = pipColor[4],
-                        tooltip = 'Pip color',
-                        callback = function(red, green, blue, alpha) settings.pipColor = { red, green, blue, alpha }; apply() end })
-                    return { cog, swatch }
-                end,
-            })
-
-            local baseBar = settings.barColor
-            for stageIndex = 1, 4 do
-                settings.stageColors[stageIndex] = settings.stageColors[stageIndex] or { baseBar[1], baseBar[2], baseBar[3], baseBar[4] }
-            end
-
-            AddRow({
-                spanFull = true,
-                title = 'Stage Colors',
-                description = 'Tint the bar per empower stage.',
-                checked = settings.stageColorsEnabled == true,
-                callback = function(value) settings.stageColorsEnabled = value end,
-                accessoryWidth = 280,
-                accessories = function(row)
-                    local dropdown = Controls.Dropdown(row, nil, {
-                        { value = 'background', text = 'Background' },
-                        { value = 'foreground', text = 'Bar Fill' },
-                    }, (settings.stageColorBackground ~= false) and 'background' or 'foreground',
-                    function(value) settings.stageColorBackground = (value == 'background') end, nil, 140)
-                    local out = { dropdown }
-                    for stageIndex = 4, 1, -1 do
-                        local stageColor = settings.stageColors[stageIndex]
-                        out[#out + 1] = Controls.ColorSwatch(row, { r = stageColor[1], g = stageColor[2], b = stageColor[3], a = stageColor[4],
-                            tooltip = 'Stage ' .. stageIndex,
-                            callback = function(red, green, blue, alpha) settings.stageColors[stageIndex] = { red, green, blue, alpha } end })
-                    end
-                    return out
-                end,
-            })
-        end
-
-        Section('Custom Spells')
-
-        AddRow({
-            spanFull = true,
-            title = 'Custom Spell Colors',
-            description = 'Per-spell bar colors for specific casts.',
-            checked = settings.useSpellColors and true or false,
-            callback = function(value) settings.useSpellColors = value end,
-            accessoryWidth = 36,
-            accessories = function(row)
-                return { Controls.Icon(row, {
-                    tooltip = 'Edit custom spell colors',
-                    onClick = function() ShowCustomSpellsModal(settings) end,
-                }) }
-            end,
-        })
-    end
-
-    grid:Flush()
-
-    local unitGrid = {
-        SyncDim = function(_, enabled)
-            for gridIndex = 1, #grids do grids[gridIndex]:SyncDim(enabled) end
-        end,
-    }
-    unitGrid:SyncDim(settings.enabled)
-    return unitGrid
+local function RefreshPreview()
+	if preview then preview:Update() end
 end
 
-BUI.PageEngine.RegisterPage("castbars", {
-    title = "Cast Bars",
-    buttonText = "Cast Bars",
-    OnBuild = function(pageFrame)
-        local PageKit = BUILib.PageKit
-        local CONTENT_WIDTH = BUILib.Layout.PAGE_CONTENT_W
-        local PREVIEW_HEIGHT = BUILib.Layout.PAGE_PREVIEW_H
+local function Apply()
+	local unitFrames = BUI.UnitFrames
+	for _, unit in ipairs(UNITS) do
+		local frame = unitFrames[unit]
+		if frame then CastBar.ApplyCastbar(frame, unit) end
+	end
+	RefreshPreview()
+end
 
-        local selectedUnit = 'player'
-        local unitGrids = {}
-        local function GetUnitSettings(key) return CastBar.GetSettings(key) end
+local function Option(settings, label, key, extra)
+	local option = { label = label, get = function() return settings[key] end, set = function(value) settings[key] = value end }
+	for name, value in pairs(extra or {}) do option[name] = value end
+	return option
+end
 
-        local UNITS = {
-            { key = 'player', title = 'PLAYER', image = 'Interface\\Icons\\Achievement_Character_Human_Male' },
-            { key = 'target', title = 'TARGET', image = 'Interface\\Icons\\Ability_Hunter_SniperShot' },
-            { key = 'focus',  title = 'FOCUS',  image = 'Interface\\Icons\\Ability_Hunter_MasterMarksman' },
-        }
+local function Color(settings, label, key)
+	return {
+		kind = 'swatch', label = label, tooltip = label, opacity = true,
+		get = function()
+			local color = settings[key]
+			return color[1], color[2], color[3], color[4] or 1
+		end,
+		set = function(red, green, blue, alpha) settings[key] = { red, green, blue, alpha } end,
+	}
+end
 
-        local preview, titleBar
-        local function SyncTitle()
-            local unitSettings = GetUnitSettings(selectedUnit)
-            if not titleBar then return end
-            titleBar.enableToggle:SetValue(unitSettings.enabled)
-            titleBar.anchorToggle:SetValue(not unitSettings.locked)
-        end
+local function Toggle(settings, label, key)
+	return { label = label, get = function() return settings[key] == true end, set = function(value) settings[key] = value end }
+end
 
-        local root, pinned
-        root, pinned, titleBar = PageKit.Scaffold(pageFrame, {
-            title = 'Cast Bars', titleDesc = 'Player, target, and focus cast bars with anchoring, colors, and empower stages.',
-            previewH = PREVIEW_HEIGHT, watermark = BUI.Tools.GetLogo(),
+local function OnUnlessOff(settings, label, key)
+	return { label = label, get = function() return settings[key] ~= false end, set = function(value) settings[key] = value end }
+end
 
-            titleEnable = { value = GetUnitSettings('player').enabled, gate = function() return BUI.IsModuleEnabled('castBars') end, onToggle = function(value)
-                local unitSettings = GetUnitSettings(selectedUnit)
-                unitSettings.enabled = value; RefreshCastBars()
-                if unitGrids[selectedUnit] then unitGrids[selectedUnit]:SyncDim(value) end
-            end },
-            titleAnchor = { value = not GetUnitSettings('player').locked, onToggle = function(value)
-                local unitSettings = GetUnitSettings(selectedUnit)
-                unitSettings.locked = not value; RefreshCastBars()
-            end },
-            hostTabs = {
-                defs = UNITS, defaultKey = 'player',
-                onSelect = function(key)
-                    selectedUnit = key
-                    SyncTitle()
-                    if preview then preview:SetUnit(key) end
-                end,
-                build = function(def, tab) unitGrids[def.key] = BuildCastBarSettings(tab, def.key) end,
-            },
-        })
+local function BarBoard(ui, parent, width, unit)
+	local settings = Settings(unit)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = TITLES[unit],
+		description = 'Size, colors and texture. Unlock it with the eye in the header to drag it, right-click it to lock it again.',
+	})
+	board:AddSwitch('Class color', function() return settings.useClassColor == true end, function(value)
+		settings.useClassColor = value
+		Apply()
+	end, 'Color the bar by your class instead of the bar color')
+	board:AddSwitch('Spell icon', function() return settings.showIcon == true end, function(value)
+		settings.showIcon = value
+		Apply()
+	end, 'The spell icon beside the bar')
+	board:AddTools('Bar', 'Colors, texture, size and position', {
+		Color(settings, 'Bar color', 'barColor'),
+		Color(settings, 'Border color', 'borderColor'),
+		Color(settings, 'Background color', 'bgColor'),
+		{ entries = textures, width = MENU_WIDTH, get = function() return settings.texture end, set = function(value) settings.texture = value end },
+		{ tooltip = 'Size, border and layer', title = 'Bar', options = {
+			Option(settings, 'Width', 'width', { min = 100, max = 500, step = 1 }),
+			Option(settings, 'Height', 'height', { min = 4, max = 50, step = 1 }),
+			Option(settings, 'Border size', 'borderSize', { min = 0, max = 5, step = 1 }),
+			Option(settings, 'Strata', 'frameStrata', { entries = BUI.C.STRATA_OPTIONS }),
+		} },
+		BUI.PositionTool(settings),
+	}, Apply)
+	if unit == 'player' then
+		board:AddTools('Channel ticks', 'Tick marks on channeled casts', {
+			Color(settings, 'Tick color', 'channelTickColor'),
+			{ tooltip = 'Tick width', title = 'Channel ticks', options = { Option(settings, 'Tick width', 'channelTickWidth', { min = 1, max = 6, step = 1 }) } },
+			Toggle(settings, nil, 'channelTicks'),
+		}, Apply)
+	end
+	return board
+end
 
-        CastBar._lockToggles = {}
-        for _, unitType in ipairs({ 'player', 'target', 'focus' }) do
-            CastBar._lockToggles[unitType] = { SetValue = function(_, value)
-                if unitType == selectedUnit then titleBar.anchorToggle:SetValue(value) end
-            end }
-        end
+local function TextBoard(ui, parent, width, unit)
+	local settings = Settings(unit)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Text',
+		description = 'The spell name and timer on the bar.',
+	})
+	local options = {
+		Option(settings, 'Text size', 'textSize', { min = 8, max = 24, step = 1 }),
+		Toggle(settings, 'Show timer', 'showTimer'),
+		OnUnlessOff(settings, 'Show total time', 'showTotalTime'),
+		OnUnlessOff(settings, 'Countdown', 'countdown'),
+		Toggle(settings, 'Show spell name', 'showSpellName'),
+		Toggle(settings, 'Show cast target', 'showCastTarget'),
+		{ label = 'Name length, 0 for no limit', min = 0, max = 30, step = 1, get = function() return settings.spellNameMaxLength or 0 end, set = function(value) settings.spellNameMaxLength = value > 0 and value or nil end },
+		Option(settings, 'Text strata', 'textStrata', { entries = BUI.C.STRATA_OPTIONS }),
+	}
+	local tools = { Color(settings, 'Text color', 'textColor') }
+	if unit == 'player' then
+		tools[#tools + 1] = Color(settings, 'Latency color', 'latencyColor')
+		options[#options + 1] = Toggle(settings, 'Show latency', 'showLatency')
+	end
+	tools[#tools + 1] = { entries = fonts, width = MENU_WIDTH, get = function() return settings.font or BUI.C.GLOBAL_OPTION end, set = function(value) settings.font = value end }
+	tools[#tools + 1] = { icon = 'text', tooltip = 'Size and what the bar shows', title = 'Text', options = options }
+	tools[#tools + 1] = { icon = 'mover', tooltip = 'Text offset', title = 'Text offset', options = {
+		Option(settings, 'Horizontal', 'textOffsetX', { min = -TEXT_OFFSET_RANGE, max = TEXT_OFFSET_RANGE, step = 1 }),
+		Option(settings, 'Vertical', 'textOffsetY', { min = -TEXT_OFFSET_RANGE, max = TEXT_OFFSET_RANGE, step = 1 }),
+	} }
+	board:AddTools('Text', 'Font, color and what the bar shows', tools, Apply)
+	return board
+end
 
-        preview = BuildCastPreview(pinned, CONTENT_WIDTH, PREVIEW_HEIGHT)
-        previewRefresh = function() preview:UpdatePreview() end
-        preview:SetUnit('player')
+local function InterruptsBoard(ui, parent, width, unit)
+	local settings = Settings(unit)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Interrupts',
+		description = 'Color the bar by whether you can kick the cast, mark when your kick is back, and hear about it.',
+	})
+	board:AddTools('Cast colors', 'Bar color by interrupt state', {
+		Color(settings, 'Interrupt soon', 'interruptWindowColor'),
+		Color(settings, 'Can interrupt', 'interruptReadyColor'),
+		Color(settings, 'Interrupt on cooldown', 'interruptOnCDColor'),
+		Color(settings, 'Not interruptible', 'interruptColor'),
+	}, Apply)
+	board:AddTools('Ready line', 'Line marking when your kick is back up', {
+		Color(settings, 'Line color', 'interruptTickColor'),
+		{ tooltip = 'Line width and window', title = 'Ready line', options = {
+			Option(settings, 'Line width', 'interruptTickWidth', { min = 1, max = 6, step = 1 }),
+			OnUnlessOff(settings, 'Show interrupt window', 'interruptWindow'),
+		} },
+		OnUnlessOff(settings, nil, 'interruptTick'),
+	}, Apply)
+	board:AddTools('Interrupt voice', 'Spoken alerts when your kick is ready, or will be before the cast ends', {
+		{ tooltip = 'Voice lines and timing', title = 'Interrupt voice', options = {
+			Toggle(settings, 'Kick ready', 'interruptTTS'),
+			{ label = 'Ready text', kind = 'input', placeholder = 'Kick', get = function() return settings.interruptTTSText end, set = function(text) settings.interruptTTSText = text ~= '' and text or 'Kick' end },
+			Toggle(settings, 'Kick soon', 'interruptTTSSoon'),
+			{ label = 'Soon text', kind = 'input', placeholder = 'Kick soon', get = function() return settings.interruptTTSSoonText end, set = function(text) settings.interruptTTSSoonText = text ~= '' and text or 'Kick soon' end },
+			Option(settings, 'Soon lead in seconds', 'interruptTTSSoonWindow', { min = 1, max = 10, step = 0.5 }),
+		} },
+		{ icon = 'eye', tooltip = 'Preview the ready line and the voice lines', get = function() return CastBar.IsPreviewingInterrupt(unit) end, set = function(value)
+			if value then CastBar.PreviewInterrupt(unit) else CastBar.StopInterruptPreview(unit) end
+		end },
+	}, Apply)
+	return board
+end
 
-        pageFrame:SetScript('OnShow', SyncTitle)
-    end,
-    OnHide = function()
-        for _, barType in ipairs({ "player", "target", "focus" }) do
-            CastBar.StopInterruptPreview(barType)
-        end
-    end,
+local function EmpowerBoard(ui, parent, width)
+	local settings = Settings('player')
+	local base = settings.barColor
+	for stage = 1, 4 do
+		settings.stageColors[stage] = settings.stageColors[stage] or { base[1], base[2], base[3], base[4] }
+	end
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Empowered casts',
+		description = 'Stage lines and per-stage tints for empowered spells.',
+	})
+	board:AddTools('Stage pips', 'Lines splitting the empower stages', {
+		Color(settings, 'Pip color', 'pipColor'),
+		{ tooltip = 'Width and glow', title = 'Stage pips', options = {
+			Option(settings, 'Line width', 'pipWidth', { min = 1, max = 6, step = 1 }),
+			OnUnlessOff(settings, 'Glow', 'pipGlow'),
+		} },
+	}, Apply)
+	local stages = {}
+	for stage = 1, 4 do
+		stages[stage] = {
+			kind = 'swatch', tooltip = 'Stage ' .. stage, opacity = true,
+			get = function()
+				local color = settings.stageColors[stage]
+				return color[1], color[2], color[3], color[4] or 1
+			end,
+			set = function(red, green, blue, alpha) settings.stageColors[stage] = { red, green, blue, alpha } end,
+		}
+	end
+	stages[#stages + 1] = { entries = STAGE_LAYERS, width = MENU_WIDTH,
+		get = function() return settings.stageColorBackground ~= false and 'background' or 'foreground' end,
+		set = function(value) settings.stageColorBackground = value == 'background' end }
+	stages[#stages + 1] = Toggle(settings, nil, 'stageColorsEnabled')
+	board:AddTools('Stage colors', 'Tint the bar per empower stage', stages, Apply)
+	return board
+end
+
+local function SpellColorsSection(ui, parent, width, page)
+	local settings = Settings('player')
+	local section = ui.Section(parent, width, {
+		stacked = true,
+		title = 'Custom spell colors',
+		description = 'Give particular spells their own bar color. Type a name, paste an ID or a link, then press Enter.',
+		columns = { { 'Spell', ui.AVATAR_X } },
+	})
+	local function Add(spellID)
+		local red, green, blue = Theme.GetAccent()
+		settings.spellColors[spellID] = settings.spellColors[spellID] or { red, green, blue, 1 }
+		Apply()
+		page:RebuildCurrent()
+	end
+	local function Search(anchor, text)
+		local spellID = BUI.Lookup.ParseSpellInput(text)
+		if spellID then return Add(spellID) end
+		local hits = BUI.Lookup.SearchSpells(text)
+		if #hits == 1 then return Add(hits[1].id) end
+		local items = {}
+		for _, hit in ipairs(hits) do
+			items[#items + 1] = { text = hit.name, icon = hit.icon, callback = function() Add(hit.id) end }
+		end
+		if #items == 0 then items[1] = { text = 'Nothing found', disabled = true } end
+		Controls.ContextMenu(items, { anchor = anchor, width = RESULTS_WIDTH, window = Window() })
+	end
+	local toggleRow = section:AddRow('use custom spell colors')
+	ui.RowTitle(toggleRow, 'Use custom colors', 'Off keeps every cast on the bar color', ui.AVATAR_X, NAME_WIDTH)
+	ui.Switch(toggleRow, function() return settings.useSpellColors == true end, function(value)
+		settings.useSpellColors = value
+		Apply()
+	end):SetPoint('RIGHT', -ui.ROW_INSET, 0)
+	local addRow = section:AddRow('add a spell')
+	ui.RowTitle(addRow, 'Add a spell', 'Name, ID or spell link', ui.AVATAR_X, NAME_WIDTH)
+	local box
+	box = ui.Input(addRow, INPUT_WIDTH, { placeholder = 'Search...', get = function() return '' end, set = function(text) Search(box, text) end })
+	box:SetPoint('RIGHT', -ui.ROW_INSET, 0)
+	local spells = {}
+	for spellID in pairs(settings.spellColors) do
+		local icon, name = BUI.Lookup.GetSpellInfo(spellID)
+		spells[#spells + 1] = { id = spellID, icon = icon, name = name or ('Spell ' .. spellID) }
+	end
+	table.sort(spells, function(left, right) return left.name < right.name end)
+	for _, spell in ipairs(spells) do
+		local row = section:AddRow(spell.name)
+		local icon = row:CreateTexture(nil, 'ARTWORK')
+		icon:SetSize(ICON_SIZE, ICON_SIZE)
+		icon:SetPoint('LEFT', ui.AVATAR_X, 0)
+		icon:SetTexture(spell.icon)
+		icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		ui.RowTitle(row, spell.name, 'Spell ' .. spell.id, ui.NAME_X, NAME_WIDTH)
+		ui.IconButton(row, 'erase', 'Remove ' .. spell.name, function()
+			settings.spellColors[spell.id] = nil
+			Apply()
+			page:RebuildCurrent()
+		end, 'danger', ERASE_SIZE):SetPoint('RIGHT', -ERASE_INSET, 0)
+		ui.Tool(row, {
+			kind = 'swatch', tooltip = 'Bar color for ' .. spell.name, opacity = true,
+			get = function()
+				local color = settings.spellColors[spell.id]
+				return color[1], color[2], color[3], color[4] or 1
+			end,
+			set = function(red, green, blue, alpha) settings.spellColors[spell.id] = { red, green, blue, alpha } end,
+		}, Apply):SetPoint('RIGHT', -(ERASE_INSET + ERASE_SIZE + TOOL_GAP), 0)
+	end
+	return section
+end
+
+local function Panes(ui, _, parent, width, item, page)
+	local unit = item.id
+	local sections = { BarBoard(ui, parent, width, unit), TextBoard(ui, parent, width, unit) }
+	if unit == 'player' then
+		if BUI.Tools.PlayerCanEmpower() then sections[#sections + 1] = EmpowerBoard(ui, parent, width) end
+		sections[#sections + 1] = SpellColorsSection(ui, parent, width, page)
+	else
+		sections[#sections + 1] = InterruptsBoard(ui, parent, width, unit)
+	end
+	return sections
+end
+
+local function BuildPreview(band)
+	local stage = CreateFrame('Frame', nil, band)
+	stage:SetAllPoints()
+	stage:SetClipsChildren(true)
+
+	local bar = CreateFrame('StatusBar', nil, stage)
+	bar:SetPoint('CENTER')
+	bar:SetMinMaxValues(0, 1)
+	bar:SetValue(0.65)
+	local background = bar:CreateTexture(nil, 'BACKGROUND')
+	background:SetAllPoints()
+
+	local iconHost = CreateFrame('Frame', nil, stage)
+	local icon = iconHost:CreateTexture(nil, 'ARTWORK')
+	icon:SetAllPoints()
+	icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	icon:SetTexture(136048)
+
+	local name = bar:CreateFontString(nil, 'OVERLAY')
+	local time = bar:CreateFontString(nil, 'OVERLAY')
+
+	function band:Update()
+		local settings = Settings()
+		local texture = CastBar.GetTexturePath(settings.texture)
+		bar:SetStatusBarTexture(texture)
+		background:SetTexture(texture)
+		local barWidth = math.min(settings.width, PAGE_WIDTH - PREVIEW_ROOM)
+		bar:SetSize(barWidth, settings.height)
+		if settings.useClassColor then
+			local _, class = UnitClass('player')
+			local classColor = class and RAID_CLASS_COLORS[class]
+			if classColor then bar:SetStatusBarColor(classColor.r, classColor.g, classColor.b, 1) else bar:SetStatusBarColor(unpack(settings.barColor)) end
+		else
+			bar:SetStatusBarColor(unpack(settings.barColor))
+		end
+		local backgroundColor = settings.bgColor
+		background:SetVertexColor(backgroundColor[1], backgroundColor[2], backgroundColor[3], backgroundColor[4] or 1)
+		local borderColor = settings.borderColor
+		Pixel.ApplyBorder(bar, settings.borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4] or 1)
+		iconHost:SetShown(settings.showIcon == true)
+		iconHost:SetSize(settings.height, settings.height)
+		iconHost:ClearAllPoints()
+		iconHost:SetPoint('RIGHT', bar, 'LEFT', -2, 0)
+		local fontPath = CastBar.GetFont(settings.font)
+		Pixel.ApplyFont(name, settings.textSize, fontPath)
+		Pixel.ApplyFont(time, settings.textSize, fontPath)
+		name:SetText('Bloodlust')
+		time:SetText('1.4')
+		local textColor = settings.textColor
+		name:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4] or 1)
+		time:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4] or 1)
+		name:ClearAllPoints()
+		name:SetPoint('LEFT', bar, 'LEFT', 6 + settings.textOffsetX, settings.textOffsetY)
+		time:ClearAllPoints()
+		time:SetPoint('RIGHT', bar, 'RIGHT', -6, 0)
+		name:SetShown(settings.showSpellName ~= false)
+		time:SetShown(settings.showTimer ~= false)
+	end
+	band:HookScript('OnShow', function(self) self:Update() end)
+	band:Update()
+	return band
+end
+
+BUI.PageEngine.RegisterPage('castbars', {
+	title = 'Cast Bars',
+	buttonText = 'Cast Bars',
+	icon = 'play',
+	OnBuild = function(pageFrame)
+		fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
+		textures = BUI.BuildTextureDropdownItems(BUI.C.GLOBAL_OPTION)
+		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
+		local adapter = { tabContents = { true, true, true }, currentTab = UNIT_INDEX[selectedUnit] }
+		local rail
+		rail = Layout.RailPage(page:GetTab(1), { window = Window() }, {
+			icon = 'play',
+			title = 'Cast Bars',
+			placeholder = 'Search cast bar settings...',
+			tools = {
+				{ icon = 'enable', tooltip = 'Turn this cast bar on or off', get = function() return Settings().enabled == true end, set = function(value)
+					Settings().enabled = value
+					Apply()
+				end },
+				{ icon = 'eye', tooltip = 'Unlock this cast bar to drag it, right-click it to lock', get = function() return not Settings().locked end, set = function(value)
+					Settings().locked = not value
+					Apply()
+				end },
+			},
+			preview = { height = PREVIEW_HEIGHT, build = function(band) preview = BuildPreview(band) end },
+			rail = { groups = RAIL_GROUPS, selected = selectedUnit },
+			build = Panes,
+		})
+		local Select = rail.Select
+		function rail:Select(id)
+			selectedUnit = id
+			adapter.currentTab = UNIT_INDEX[id]
+			Select(self, id)
+			Repaint()
+			RefreshPreview()
+		end
+		function adapter:SetTab(index)
+			rail:Select(UNITS[index])
+		end
+		pageFrame._page = adapter
+		CastBar._lockToggles = { player = relock, target = relock, focus = relock }
+		page:AutoRefresh()
+	end,
+	OnHide = function()
+		for _, unit in ipairs(UNITS) do CastBar.StopInterruptPreview(unit) end
+	end,
 })
-

@@ -81,8 +81,10 @@ local function Sections(ui, _, parent, width)
 	})
 	display:AddTools('Text', 'Font, size, icon and position', {
 		Choice('font', fonts),
-		{ tooltip = 'Size and icon', title = 'Text', options = {
+		{ icon = 'text', tooltip = 'Size', title = 'Text', options = {
 			Option('Font size', 'fontSize', { min = 8, max = 48, step = 1 }),
+		} },
+		{ tooltip = 'Icon', title = 'Icon', options = {
 			Option('Show icon', 'showIcon'),
 			Option('Icon size', 'iconSize', { min = 12, max = 64, step = 1 }),
 		} },
@@ -97,8 +99,8 @@ local function Sections(ui, _, parent, width)
 	alerts:AddTools('Used', 'When someone pops Bloodlust', {
 		Color('usedColor'),
 		Sound('Sound', 'soundOnUsed'),
-		{ tooltip = 'Text, timing and speech', title = 'Used', options = {
-			Text('Text', 'usedFormat'),
+		{ icon = 'text', tooltip = 'Message text', title = 'Used', options = { Text('Text', 'usedFormat') } },
+		{ tooltip = 'Timing and speech', title = 'Used', options = {
 			Option('Hold seconds', 'usedHoldDuration', { min = 0.5, max = 10, step = 0.5 }),
 			Option('Flash', 'flashOnUsed'),
 			Option('Flash seconds', 'flashDuration', { min = 0.2, max = 5, step = 0.1 }),
@@ -109,8 +111,8 @@ local function Sections(ui, _, parent, width)
 	alerts:AddTools('Available', 'When Bloodlust comes off cooldown', {
 		Color('readyColor'),
 		Sound('Sound', 'soundOnReady'),
-		{ tooltip = 'Text, timing and speech', title = 'Available', options = {
-			Text('Text', 'readyFormat'),
+		{ icon = 'text', tooltip = 'Message text', title = 'Available', options = { Text('Text', 'readyFormat') } },
+		{ tooltip = 'Timing and speech', title = 'Available', options = {
 			Option('Hold seconds', 'readyHoldDuration', { min = 0.5, max = 10, step = 0.5 }),
 			Option('Keep on screen', 'showWhenReady'),
 			Option('Flash', 'flashOnReady'),
@@ -127,13 +129,13 @@ local function Sections(ui, _, parent, width)
 	})
 	countdowns:AddTools('Active', 'Timer while the buff runs', {
 		Color('activeColor'),
-		{ tooltip = 'Text', title = 'Active', options = { Text('Text', 'activeFormat') } },
+		{ icon = 'text', tooltip = 'Timer text', title = 'Active', options = { Text('Text', 'activeFormat') } },
 		Switch('showWhenActive'),
 	}, Refresh)
 	countdowns:AddTools('On cooldown', 'Timer until Bloodlust is ready, with an optional warning before', {
 		Color('cdColor'),
-		{ tooltip = 'Text and warning', title = 'On cooldown', options = {
-			Text('Text', 'cdFormat'),
+		{ icon = 'text', tooltip = 'Timer text', title = 'On cooldown', options = { Text('Text', 'cdFormat') } },
+		{ tooltip = 'Warning', title = 'On cooldown', options = {
 			Option('Warn seconds before', 'warnBeforeReady', { min = 0, max = 60, step = 1 }),
 			Sound('Warn sound', 'soundOnWarn'),
 			Option('Speak warning', 'ttsOnWarn'),
