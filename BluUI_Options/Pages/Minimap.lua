@@ -840,6 +840,10 @@ local function DatatextBoard(ui, parent, width)
 		title = 'Datatext bar',
 		description = 'A strip of datatexts attached to the map.',
 	})
+	Switch(board, 'Datatext bar', function() return Bar().enabled ~= false end, function(value)
+		Bar().enabled = value
+		Datatext.Apply()
+	end)
 	board:AddTools('Bar', 'Where it hangs on the map and how it is drawn', {
 		{ kind = 'swatch', tooltip = 'Background color',
 			get = function() local color = Bar().bgColor return color.r, color.g, color.b, 1 end,
@@ -859,7 +863,6 @@ local function DatatextBoard(ui, parent, width)
 				get = function() local color = Bar().borderColor return color.r, color.g, color.b, color.a end,
 				set = function(red, green, blue, alpha) Bar().borderColor = { r = red, g = green, b = blue, a = alpha } end },
 		} },
-		{ get = function() return Bar().enabled ~= false end, set = function(value) Bar().enabled = value end },
 	}, ApplyDatatext)
 	board:AddTools('Text', 'Font, size and the value color', {
 		{ kind = 'swatch', tooltip = 'Value color', opacity = true,
