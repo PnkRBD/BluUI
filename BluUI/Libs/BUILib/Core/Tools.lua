@@ -5,6 +5,8 @@ local Layout = BUILib.Layout
 local Widget = BUILib.Widget
 
 local TOOL_GAP = 12
+local GROUP_GAP = 8
+local SLOT_ORDER = { 'switch', 'toggle', 'icon', 'button', 'menu', 'input', 'swatch' }
 local MENU_WIDTH = 150
 local SWATCH_SIZE = 28
 local CONTROL_HEIGHT = 30
@@ -40,6 +42,12 @@ local function Kind(tool)
 	if tool.onClick then return 'icon' end
 	if tool.icon then return 'toggle' end
 	return 'switch'
+end
+
+local function Slot(tool)
+	local kind = Kind(tool)
+	if kind == 'options' then return 'icon' end
+	return kind
 end
 
 local function OverPopup(frame, anchor)
@@ -184,19 +192,34 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 	end
 
 	function kit.Tools(row, tools, after)
-		local controls, anchor, width = {}, nil, 0
-		for index = #tools, 1, -1 do
-			local control = kit.Tool(row, tools[index], after)
-			if anchor then
-				control:SetPoint('RIGHT', anchor, 'LEFT', -TOOL_GAP, 0)
-				width = width + TOOL_GAP
-			else
-				control:SetPoint('RIGHT', -kit.ROW_INSET, 0)
-			end
-			width = width + control:GetWidth()
-			anchor = control
-			controls[tools[index].key or index] = control
+		local controls, groups, widths = {}, {}, {}
+		for index, tool in ipairs(tools) do
+			local control = kit.Tool(row, tool, after)
+			controls[tool.key or index] = control
+			local slot = Slot(tool)
+			local group = groups[slot] or {}
+			groups[slot] = group
+			group[#group + 1] = control
+			widths[slot] = (widths[slot] and (widths[slot] + GROUP_GAP) or 0) + control:GetWidth()
 		end
-		return controls, width
+		local function Place(slots)
+			local x, used = -kit.ROW_INSET, 0
+			for _, slot in ipairs(SLOT_ORDER) do
+				local width = slots[slot]
+				if width then
+					local right = x
+					for position = #(groups[slot] or {}), 1, -1 do
+						local control = groups[slot][position]
+						control:ClearAllPoints()
+						control:SetPoint('RIGHT', right, 0)
+						right = right - control:GetWidth() - GROUP_GAP
+					end
+					x = x - width - TOOL_GAP
+					used = used + width + TOOL_GAP
+				end
+			end
+			return used
+		end
+		return { controls = controls, widths = widths, Place = Place }
 	end
 end

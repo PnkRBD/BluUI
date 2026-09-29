@@ -60,9 +60,18 @@ end
 function Board:AddTools(name, sub, tools, after)
 	local kit = self.kit
 	local row = Section.AddRow(self, sub and (name .. ' ' .. sub) or name)
-	local controls, width = kit.Tools(row, tools, after)
-	kit.RowTitle(row, name, sub, kit.ROW_INSET, self.panelWidth - kit.ROW_INSET * 2 - width - CONTROL_GAP)
-	row.controls = controls
+	local title, subtitle = kit.RowTitle(row, name, sub, kit.ROW_INSET)
+	local placer = kit.Tools(row, tools, after)
+	local textWidth = self.panelWidth - kit.ROW_INSET * 2 - CONTROL_GAP
+	row.tools = {
+		widths = placer.widths,
+		Place = function(slots)
+			local width = textWidth - placer.Place(slots)
+			title:SetWidth(width)
+			if subtitle then subtitle:SetWidth(width) end
+		end,
+	}
+	row.controls = placer.controls
 	return row
 end
 
@@ -96,6 +105,17 @@ function Board:Layout(y, query)
 	if shown == 0 and query ~= '' then
 		self.frame:Hide()
 		return y
+	end
+	local slots = {}
+	for _, row in ipairs(self.rows) do
+		if row.match and row.frame.tools then
+			for slot, width in pairs(row.frame.tools.widths) do
+				if not slots[slot] or width > slots[slot] then slots[slot] = width end
+			end
+		end
+	end
+	for _, row in ipairs(self.rows) do
+		if row.match and row.frame.tools then row.frame.tools.Place(slots) end
 	end
 	local height, column = PAD, 0
 	local function Break()

@@ -159,13 +159,18 @@ end
 local function BackgroundTools(config)
 	return {
 		Swatch(config, 'Background color', 'bgColor', false),
-		{ tooltip = 'Opacity, border and size', title = 'Background', options = {
+		{ tooltip = 'Opacity and border', title = 'Background', options = {
 			{ label = 'Opacity', min = 0, max = 100, step = 1, get = function() return math.floor(config.bgAlpha * 100 + 0.5) end, set = function(value) config.bgAlpha = value / 100 end },
 			Option(config, 'Border', 'border'),
 			Swatch(config, 'Border color', 'borderColor', true),
-			Option(config, 'Width', 'width', { min = 0, max = 1200, step = 1 }),
-			Option(config, 'Height', 'height', { min = 0, max = 600, step = 1 }),
 		} },
+	}
+end
+
+local function SizeOptions(config)
+	return {
+		Option(config, 'Width', 'width', { min = 0, max = 1200, step = 1 }),
+		Option(config, 'Height', 'height', { min = 0, max = 600, step = 1 }),
 	}
 end
 
@@ -333,19 +338,25 @@ local function BarBoard(ui, parent, width, config)
 		title = config.name,
 		description = 'A strip of datatexts. Unlock it with the eye in the header to drag it around, right-click it to lock it again.',
 	})
-	board:AddTools('Text', 'Font, size and how the datatexts line up', {
+	board:AddTools('Text', 'Font, size and the value color', {
 		Swatch(config, 'Value color', 'colorValue', true),
 		Font(config),
-		{ tooltip = 'Size, spacing and layout', title = 'Text', options = {
+		{ tooltip = 'Size and labels', title = 'Text', options = {
 			Option(config, 'Font size', 'fontSize', { min = 8, max = 24, step = 1 }),
-			Option(config, 'Spacing', 'spacing', { min = 0, max = 160, step = 1 }),
-			Option(config, 'Orientation', 'orientation', { entries = ORIENTATIONS }),
-			Option(config, 'Align', 'align', { entries = ALIGNMENTS }),
 			Option(config, 'Hide labels', 'hideLabels'),
 		} },
 	}, Apply)
+	board:AddTools('Layout', 'How the datatexts are arranged, zero width or height fits the text', {
+		{ tooltip = 'Orientation, spacing and size', title = 'Layout', options = {
+			Option(config, 'Orientation', 'orientation', { entries = ORIENTATIONS }),
+			Option(config, 'Align', 'align', { entries = ALIGNMENTS }),
+			Option(config, 'Spacing', 'spacing', { min = 0, max = 160, step = 1 }),
+			Option(config, 'Width', 'width', { min = 0, max = 1200, step = 1 }),
+			Option(config, 'Height', 'height', { min = 0, max = 600, step = 1 }),
+		} },
+	}, Apply)
 	board:AddTools('Position', 'Where it sits on the screen and how it layers', { PositionTool(config) }, Apply)
-	board:AddTools('Background', 'The backdrop behind it, zero width or height fits the text', BackgroundTools(config), Apply)
+	board:AddTools('Background', 'The backdrop behind it', BackgroundTools(config), Apply)
 	return board
 end
 
@@ -365,8 +376,11 @@ local function PanelBoard(ui, parent, width, config)
 			Option(config, 'Vertical offset', 'titleY', { min = -300, max = 300, step = 1 }),
 		} },
 	}, Apply)
+	board:AddTools('Size', 'Width and height of the panel', {
+		{ tooltip = 'Width and height', title = 'Size', options = SizeOptions(config) },
+	}, Apply)
 	board:AddTools('Position', 'Where it sits on the screen and how it layers', { PositionTool(config) }, Apply)
-	board:AddTools('Background', 'The backdrop itself, zero width or height fits the content', BackgroundTools(config), Apply)
+	board:AddTools('Background', 'The backdrop itself', BackgroundTools(config), Apply)
 	return board
 end
 
