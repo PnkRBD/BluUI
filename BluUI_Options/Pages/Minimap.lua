@@ -28,10 +28,10 @@ local RAIL_GROUPS = {
 	{ title = 'Map', items = {
 		{ id = 'map', label = 'Map', icon = 'minimap' },
 		{ id = 'indicators', label = 'Indicators', icon = 'eye' },
-		{ id = 'text', label = 'Clock and zone', icon = 'edit' },
+		{ id = 'text', label = 'Clock and zone', icon = 'clock' },
 	} },
 	{ title = 'Around the map', items = {
-		{ id = 'datatext', label = 'Datatext bar', icon = 'report2' },
+		{ id = 'datatext', label = 'Datatext bar', icon = 'text' },
 		{ id = 'buttons', label = 'Drawer and buttons', icon = 'modules5' },
 	} },
 }
