@@ -466,13 +466,13 @@ end
 BUI.PageEngine.RegisterPage('datatext', {
 	title = 'Datatext',
 	buttonText = 'Datatext',
-	icon = 'report2',
+	icon = 'text',
 	OnBuild = function(pageFrame)
 		fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
 		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
 		Current()
 		Layout.TablePage(page:GetTab(1), { window = Window() }, {
-			icon = 'report2',
+			icon = 'text',
 			title = 'Datatext',
 			placeholder = 'Search datatext settings...',
 			tools = {
