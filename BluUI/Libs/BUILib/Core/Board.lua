@@ -117,7 +117,8 @@ function Board:Layout(y, query)
 	for _, row in ipairs(self.rows) do
 		if row.match and row.frame.tools then row.frame.tools.Place(slots) end
 	end
-	local height, column = PAD, 0
+	local top = self.headHeight or PAD
+	local height, column = top, 0
 	local function Break()
 		if column == 0 then return end
 		height = height + CELL_HEIGHT
@@ -134,7 +135,7 @@ function Board:Layout(y, query)
 				if column == columns then Break() end
 			else
 				Break()
-				row.rule:SetShown(height > PAD)
+				row.rule:SetShown(height > top)
 				row.frame:SetPoint('TOPLEFT', 0, -height)
 				height = height + row.frame:GetHeight()
 			end
