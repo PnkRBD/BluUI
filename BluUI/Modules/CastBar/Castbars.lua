@@ -8,6 +8,21 @@ local UnitChannelInfo = UnitChannelInfo
 
 local UnpackColor = BUI.UnpackColor
 
+local TEXT_INSET = 4
+
+function CastBar.StyleText(anchor, text, time, settings, font)
+	local textColor = settings.textColor
+	local offsetY = -Pixel.Scale(settings.textOffsetY)
+	Pixel.ApplyFont(text, settings.textSize, font)
+	text:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4] or 1)
+	text:ClearAllPoints()
+	text:SetPoint('LEFT', anchor, 'LEFT', Pixel.Scale(TEXT_INSET + settings.textOffsetX), offsetY)
+	Pixel.ApplyFont(time, settings.textSize, font)
+	time:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4] or 1)
+	time:ClearAllPoints()
+	time:SetPoint('RIGHT', anchor, 'RIGHT', Pixel.Scale(settings.textOffsetX - TEXT_INSET), offsetY)
+end
+
 local function ResolveColor(castbar, settings)
 	local barColor = settings.barColor
 	if settings.useClassColor then
@@ -474,20 +489,7 @@ function CastBar.ApplyCastbar(frame, barType)
 	castbar.Icon:SetPoint('CENTER', iconFrame)
 	castbar.Icon:SetShown(settings.showIcon)
 
-	local textOffsetX = settings.textOffsetX
-	local textOffsetY = settings.textOffsetY
-
-	local textColor = settings.textColor
-
-	Pixel.ApplyFont(castbar.Text, settings.textSize, font)
-	castbar.Text:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4] or 1)
-	castbar.Text:ClearAllPoints()
-	castbar.Text:SetPoint('LEFT', castbar, 'LEFT', Pixel.Scale(4 + textOffsetX), -Pixel.Scale(textOffsetY))
-
-	Pixel.ApplyFont(castbar.Time, settings.textSize, font)
-	castbar.Time:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4] or 1)
-	castbar.Time:ClearAllPoints()
-	castbar.Time:SetPoint('RIGHT', castbar, 'RIGHT', Pixel.Scale(-4 + textOffsetX), -Pixel.Scale(textOffsetY))
+	CastBar.StyleText(castbar, castbar.Text, castbar.Time, settings, font)
 
 	CastBar.SetupTimeText(castbar, settings)
 
