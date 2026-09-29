@@ -706,6 +706,7 @@ function Layout.PinnedHead(tab, window, kit, spec, block, onSearch)
 		head:SetPoint('TOPLEFT', math.floor(blockLeft - pinnedLeft + 0.5), 0)
 	end
 	tab.frame:HookScript('OnSizeChanged', Align)
+	tab.frame:HookScript('OnShow', Align)
 	return head, top, Align
 end
 
@@ -764,5 +765,7 @@ function Layout.TablePage(tab, shell, spec)
 	end
 	Resize()
 	Layout.Add(tab, block, 8)
+	Align()
+	tab:Refresh()
 	return page
 end

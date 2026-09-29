@@ -123,5 +123,7 @@ function Layout.RailPage(tab, shell, spec)
 
 	page:Select(rail.entries[1].item.id)
 	Layout.Add(tab, block, BLOCK_GAP)
+	Align()
+	tab:Refresh()
 	return page
 end
