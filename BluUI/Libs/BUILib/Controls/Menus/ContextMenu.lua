@@ -57,6 +57,10 @@ local function CloseActive()
 	activeMenu = nil
 end
 
+function Controls.ContextMenuIsMouseOver()
+	return activeMenu ~= nil and activeMenu:IsShown() and activeMenu:IsMouseOver()
+end
+
 local function CleanTitle(title)
 	title = Widget.StripColorCodes(title or '')
 	local previous

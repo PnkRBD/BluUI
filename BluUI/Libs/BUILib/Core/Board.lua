@@ -57,6 +57,15 @@ function Board:AddRow(name, sub, room)
 	return row
 end
 
+function Board:AddTools(name, sub, tools, after)
+	local kit = self.kit
+	local row = Section.AddRow(self, sub and (name .. ' ' .. sub) or name)
+	local controls, width = kit.Tools(row, tools, after)
+	kit.RowTitle(row, name, sub, kit.ROW_INSET, self.panelWidth - kit.ROW_INSET * 2 - width - CONTROL_GAP)
+	row.controls = controls
+	return row
+end
+
 function Board:Move(frame, delta)
 	for index, row in ipairs(self.rows) do
 		if row.frame == frame then
