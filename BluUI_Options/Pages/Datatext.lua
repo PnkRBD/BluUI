@@ -478,9 +478,9 @@ local function RailGroups()
 	bars[#bars + 1] = { id = 'newbar', label = 'New bar', icon = 'plus' }
 	panels[#panels + 1] = { id = 'newpanel', label = 'New panel', icon = 'plus' }
 	return {
+		{ title = 'Settings', items = { { id = 'tooltips', label = 'Tooltips', icon = 'cog' } } },
 		{ title = 'Bars', items = bars },
 		{ title = 'Panels', items = panels },
-		{ title = 'Settings', items = { { id = 'tooltips', label = 'Tooltips', icon = 'cog' } } },
 	}
 end
 
