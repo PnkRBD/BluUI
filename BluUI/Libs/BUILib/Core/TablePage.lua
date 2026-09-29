@@ -428,12 +428,13 @@ function Layout.TableKit(window)
 		local title = kit.Text(row, name, 12, 'text', width)
 		title:SetPoint('LEFT', x, sub and 8 or 0)
 		title:SetWordWrap(false)
+		local subtitle
 		if sub then
-			local subtitle = kit.Text(row, sub, 11, 'muted', width)
+			subtitle = kit.Text(row, sub, 11, 'muted', width)
 			subtitle:SetPoint('LEFT', x, -9)
 			subtitle:SetWordWrap(false)
 		end
-		return title
+		return title, subtitle
 	end
 
 	function kit.Cell(row, text, x, width)
