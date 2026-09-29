@@ -1,6 +1,6 @@
 local BUI = BluUI
 local BUILib = BUI.BUILibClient
-local Controls, Layout, Modals = BUILib.Controls, BUILib.Layout, BUILib.Modals
+local Layout, Modals = BUILib.Layout, BUILib.Modals
 local Datatext = BUI.Datatext
 local Pixel = BUI.Pixel
 
@@ -20,15 +20,14 @@ local SAMPLE_WIDTH = PLACE_X - SAMPLE_X - 20
 local PANEL_SAMPLE = 24
 local PANEL_SAMPLE_MAX = 120
 local BUTTON_GAP = 10
-local SLIDER_WIDTH = 220
-local DROPDOWN_WIDTH = 200
+local MENU_WIDTH = 160
 local INPUT_WIDTH = 220
-local SWATCH_SIZE = 28
-local SWATCH_ROOM = 60
 local SWITCH_WIDTH = 40
 local ARROW = 22
 local ARROW_GAP = 4
+local TOOL_GAP = 12
 local ORDER_ROOM = SWITCH_WIDTH + 12 + ARROW * 2 + ARROW_GAP
+local COG_ROOM = ARROW + TOOL_GAP
 
 local COLUMNS = { { 'Name', ROW_INSET }, { 'Sample', SAMPLE_X }, { 'Place', PLACE_X }, { 'Shown', SHOWN_X } }
 
@@ -46,6 +45,7 @@ local ALIGNMENTS = {
 
 local selected
 local rows = {}
+local fonts
 
 local function Window()
 	return BUI.PageEngine.window
@@ -117,68 +117,56 @@ local function PlaceText(config)
 	return Named(BUI.C.ANCHOR_POINT_OPTIONS_SHORT, config.point)
 end
 
-local function Switch(board, label, get, set, tip)
-	board:AddSwitch(label, get, function(value)
-		set(value)
-		Apply()
-	end, tip)
+local function Option(config, label, key, extra)
+	local option = { label = label, get = function() return config[key] end, set = function(value) config[key] = value end }
+	for name, value in pairs(extra or {}) do option[name] = value end
+	return option
 end
 
-local function Slider(ui, row, minimum, maximum, step, get, set)
-	ui.Slider(row, SLIDER_WIDTH, { min = minimum, max = maximum, step = step, get = get, set = function(value)
-		set(value)
-		Apply()
-	end }):SetPoint('RIGHT', -ui.ROW_INSET, 0)
+local function Swatch(config, label, key, opacity)
+	return {
+		kind = 'swatch', label = label, tooltip = label, opacity = opacity,
+		get = function()
+			local color = config[key]
+			return color.r, color.g, color.b, opacity and color.a or 1
+		end,
+		set = function(red, green, blue, alpha)
+			config[key] = opacity and { r = red, g = green, b = blue, a = alpha } or { r = red, g = green, b = blue }
+		end,
+	}
 end
 
-local function Menu(ui, row, entries, get, set)
-	local dropdown = ui.Dropdown(row, DROPDOWN_WIDTH, function()
-		local current = get()
-		local menu = {}
-		for _, entry in ipairs(entries) do
-			menu[#menu + 1] = { text = entry.text, checked = entry.value == current, callback = function()
-				set(entry.value)
-				Apply()
-				Repaint()
-			end }
-		end
-		return menu
-	end)
-	dropdown:SetPoint('RIGHT', -ui.ROW_INSET, 0)
-	ui.Bind(row, function() dropdown.label:SetText(Named(entries, get())) end)
+local function Font(config)
+	return { entries = fonts, width = MENU_WIDTH, get = function() return config.font end, set = function(value) config.font = value end }
 end
 
-local function ColorRow(ui, board, name, sub, hasOpacity, get, set)
-	local row = board:AddRow(name, sub, SWATCH_ROOM)
-	local swatch = ui.Swatch(row, SWATCH_SIZE, function(self)
-		local red, green, blue, alpha = get()
-		Controls.OpenColorPicker({
-			r = red, g = green, b = blue, a = alpha, hasOpacity = hasOpacity, anchorTo = self,
-			callback = function(newRed, newGreen, newBlue, newAlpha, cancelled)
-				if cancelled then set(red, green, blue, alpha) else set(newRed, newGreen, newBlue, newAlpha) end
-				Apply()
-				Repaint()
-			end,
-		})
-	end)
-	swatch:SetPoint('RIGHT', -ui.ROW_INSET, 0)
-	ui.Bind(row, function()
-		local red, green, blue, alpha = get()
-		swatch.fill:SetVertexColor(red, green, blue, hasOpacity and alpha or 1)
-	end)
+local function PositionTool(config)
+	local options = {
+		{ label = 'Anchor', entries = BUI.C.ANCHOR_POINT_OPTIONS_SHORT, get = function() return config.point end, set = function(value)
+			config.point, config.relPoint = value, value
+			config.alignMinimap = false
+		end },
+		Option(config, 'Horizontal offset', 'x', { min = -1500, max = 1500, step = 1 }),
+		Option(config, 'Vertical offset', 'y', { min = -1500, max = 1500, step = 1 }),
+		Option(config, 'Align below the minimap', 'alignMinimap'),
+		Option(config, 'Strata', 'strata', { entries = BUI.C.STRATA_OPTIONS }),
+		Option(config, 'Frame level', 'frameLevel', { min = 0, max = 100, step = 1 }),
+	}
+	if Datatext.IsPanel(config) then table.insert(options, 5, Option(config, 'Mirror the chat window', 'mirrorChat')) end
+	return { icon = 'mover', tooltip = 'Position and layering', title = 'Position', options = options }
 end
 
-local function ColorField(config, key, hasOpacity)
-	return function()
-		local color = config[key]
-		return color.r, color.g, color.b, hasOpacity and color.a or 1
-	end, function(red, green, blue, alpha)
-		config[key] = hasOpacity and { r = red, g = green, b = blue, a = alpha } or { r = red, g = green, b = blue }
-	end
-end
-
-local function Field(config, key)
-	return function() return config[key] end, function(value) config[key] = value end
+local function BackgroundTools(config)
+	return {
+		Swatch(config, 'Background color', 'bgColor', false),
+		{ tooltip = 'Opacity, border and size', title = 'Background', options = {
+			{ label = 'Opacity', min = 0, max = 100, step = 1, get = function() return math.floor(config.bgAlpha * 100 + 0.5) end, set = function(value) config.bgAlpha = value / 100 end },
+			Option(config, 'Border', 'border'),
+			Swatch(config, 'Border color', 'borderColor', true),
+			Option(config, 'Width', 'width', { min = 0, max = 1200, step = 1 }),
+			Option(config, 'Height', 'height', { min = 0, max = 600, step = 1 }),
+		} },
+	}
 end
 
 local function OrderArrows(ui, row, onMove)
@@ -339,9 +327,60 @@ local function BuildTable(band, kit)
 	kit.Button(footer, 'New panel', 'secondary', function() Create('PANEL') end, 'add'):SetPoint('LEFT', newBar, 'RIGHT', BUTTON_GAP, 0)
 end
 
-local function ReadoutsBoard(ui, parent, width, config, page)
+local function BarBoard(ui, parent, width, config)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = config.name,
+		description = 'A strip of datatexts. Unlock it with the eye in the header to drag it around, right-click it to lock it again.',
+	})
+	board:AddTools('Text', 'Font, size and how the datatexts line up', {
+		Swatch(config, 'Value color', 'colorValue', true),
+		Font(config),
+		{ tooltip = 'Size, spacing and layout', title = 'Text', options = {
+			Option(config, 'Font size', 'fontSize', { min = 8, max = 24, step = 1 }),
+			Option(config, 'Spacing', 'spacing', { min = 0, max = 160, step = 1 }),
+			Option(config, 'Orientation', 'orientation', { entries = ORIENTATIONS }),
+			Option(config, 'Align', 'align', { entries = ALIGNMENTS }),
+			Option(config, 'Hide labels', 'hideLabels'),
+		} },
+	}, Apply)
+	board:AddTools('Position', 'Where it sits on the screen and how it layers', { PositionTool(config) }, Apply)
+	board:AddTools('Background', 'The backdrop behind it, zero width or height fits the text', BackgroundTools(config), Apply)
+	return board
+end
+
+local function PanelBoard(ui, parent, width, config)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = config.name,
+		description = 'A blank backdrop to tuck other frames on. Unlock it with the eye in the header to drag it around, right-click it to lock it again.',
+	})
+	board:AddTools('Title', 'Optional text on the panel', {
+		Swatch(config, 'Title color', 'titleColor', false),
+		{ kind = 'input', width = INPUT_WIDTH, placeholder = 'No title', get = function() return config.title end, set = function(text) config.title = text end },
+		{ tooltip = 'Anchor, size and offsets', title = 'Title', options = {
+			Option(config, 'Anchor', 'titleAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS_SHORT }),
+			Option(config, 'Size', 'titleSize', { min = 8, max = 32, step = 1 }),
+			Option(config, 'Horizontal offset', 'titleX', { min = -300, max = 300, step = 1 }),
+			Option(config, 'Vertical offset', 'titleY', { min = -300, max = 300, step = 1 }),
+		} },
+	}, Apply)
+	board:AddTools('Position', 'Where it sits on the screen and how it layers', { PositionTool(config) }, Apply)
+	board:AddTools('Background', 'The backdrop itself, zero width or height fits the content', BackgroundTools(config), Apply)
+	return board
+end
+
+local function DatatextOptions(entry, config)
+	local options = {}
+	for _, option in ipairs(entry.options(function() return config end, function() end)) do
+		options[#options + 1] = { label = option.label, entries = option.items, get = option.get, set = option.set }
+	end
+	return { tooltip = entry.name .. ' settings', title = entry.name, options = options }
+end
+
+local function DatatextsBoard(ui, parent, width, config, page)
 	local order = Datatext.ResolveOrder(config)
-	local readoutRows = {}
+	local datatextRows = {}
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Datatexts',
@@ -361,130 +400,24 @@ local function ReadoutsBoard(ui, parent, width, config, page)
 		end
 		if not order[position + delta] then return end
 		order[position], order[position + delta] = order[position + delta], order[position]
-		board:Move(readoutRows[id], delta)
+		board:Move(datatextRows[id], delta)
 		config.order = order
 		Apply()
 		page:Resize()
 	end
 	for _, id in ipairs(order) do
 		local entry = Datatext.Get(id)
-		local row = board:AddRow(entry.name, nil, ORDER_ROOM)
-		readoutRows[id] = row
+		local row = board:AddRow(entry.name, nil, ORDER_ROOM + (entry.options and COG_ROOM or 0))
+		datatextRows[id] = row
 		ui.Switch(row, function() return config[entry.show] == true end, function(value)
 			config[entry.show] = value
 			Apply()
 		end):SetPoint('RIGHT', -ui.ROW_INSET, 0)
 		OrderArrows(ui, row, function(delta) Move(id, delta) end)
-	end
-	return board
-end
-
-local function ReadoutSettingsBoard(ui, parent, width, config)
-	local board
-	local function GetConfig() return config end
-	for _, entry in ipairs(Datatext.List()) do
 		if entry.options then
-			board = board or ui.Board(parent, width, {
-				stacked = true,
-				title = 'Datatext settings',
-				description = 'Extra choices some datatexts offer.',
-			})
-			board:AddCaption(entry.name)
-			for _, option in ipairs(entry.options(GetConfig, Apply)) do
-				if option.kind == 'dropdown' then
-					Menu(ui, board:AddRow(option.label, nil, DROPDOWN_WIDTH), option.items, option.get, option.set)
-				else
-					Switch(board, option.label, function() return option.get() == true end, option.set)
-				end
-			end
+			ui.Tool(row, DatatextOptions(entry, config), Apply):SetPoint('RIGHT', -(ui.ROW_INSET + ORDER_ROOM + TOOL_GAP), 0)
 		end
 	end
-	return board
-end
-
-local function StyleBoard(ui, parent, width, config)
-	local board = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Text',
-		description = 'Font, size and how the datatexts line up.',
-	})
-	Switch(board, 'Hide labels', function() return config.hideLabels == true end, function(value)
-		config.hideLabels = value
-	end, 'Values only, no names in front of them')
-	Menu(ui, board:AddRow('Font', 'Global unless you pick one', DROPDOWN_WIDTH), BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION), Field(config, 'font'))
-	Slider(ui, board:AddRow('Font size', nil, SLIDER_WIDTH), 8, 24, 1, Field(config, 'fontSize'))
-	Slider(ui, board:AddRow('Spacing', 'Pixels between datatexts', SLIDER_WIDTH), 0, 160, 1, Field(config, 'spacing'))
-	Menu(ui, board:AddRow('Orientation', 'A row or a stack', DROPDOWN_WIDTH), ORIENTATIONS, Field(config, 'orientation'))
-	Menu(ui, board:AddRow('Align', 'Where the datatexts sit in a fixed width', DROPDOWN_WIDTH), ALIGNMENTS, Field(config, 'align'))
-	ColorRow(ui, board, 'Value color', 'The numbers next to each label', true, ColorField(config, 'colorValue', true))
-	return board
-end
-
-local function TitleBoard(ui, parent, width, config)
-	local board = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Title',
-		description = 'Optional text on the panel.',
-	})
-	ui.Input(board:AddRow('Text', 'Empty for no title', INPUT_WIDTH), INPUT_WIDTH, {
-		placeholder = 'No title',
-		get = function() return config.title end,
-		set = function(text)
-			config.title = text
-			Apply()
-		end,
-	}):SetPoint('RIGHT', -ui.ROW_INSET, 0)
-	ColorRow(ui, board, 'Color', nil, false, ColorField(config, 'titleColor', false))
-	Menu(ui, board:AddRow('Anchor', 'Which edge of the panel it hugs', DROPDOWN_WIDTH), BUI.C.ANCHOR_POINT_OPTIONS_SHORT, Field(config, 'titleAnchor'))
-	Slider(ui, board:AddRow('Size', 'Font size', SLIDER_WIDTH), 8, 32, 1, Field(config, 'titleSize'))
-	Slider(ui, board:AddRow('Horizontal offset', 'From its anchor', SLIDER_WIDTH), -300, 300, 1, Field(config, 'titleX'))
-	Slider(ui, board:AddRow('Vertical offset', 'From its anchor', SLIDER_WIDTH), -300, 300, 1, Field(config, 'titleY'))
-	return board
-end
-
-local function PositionBoard(ui, parent, width, config)
-	local board = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Position',
-		description = 'Where it sits on the screen and how it layers with other frames. Unlock it with the eye in the header to drag it, right-click it to lock it again.',
-	})
-	Switch(board, 'Align below the minimap', function() return config.alignMinimap == true end, function(value)
-		config.alignMinimap = value
-	end, 'Hang it under the minimap instead of using the anchor and offsets')
-	if Datatext.IsPanel(config) then
-		Switch(board, 'Mirror the chat window', function() return config.mirrorChat == true end, function(value)
-			config.mirrorChat = value
-		end, 'Keep this panel sized and placed as a mirror image of the chat window')
-	end
-	Menu(ui, board:AddRow('Anchor', 'The screen corner or edge it measures from', DROPDOWN_WIDTH), BUI.C.ANCHOR_POINT_OPTIONS_SHORT,
-		function() return config.point end,
-		function(value)
-			config.point, config.relPoint = value, value
-			config.alignMinimap = false
-		end)
-	Slider(ui, board:AddRow('Horizontal offset', 'From the anchor', SLIDER_WIDTH), -1500, 1500, 1, Field(config, 'x'))
-	Slider(ui, board:AddRow('Vertical offset', 'From the anchor', SLIDER_WIDTH), -1500, 1500, 1, Field(config, 'y'))
-	Menu(ui, board:AddRow('Strata', 'Which layer of the screen it draws on', DROPDOWN_WIDTH), BUI.C.STRATA_OPTIONS, Field(config, 'strata'))
-	Slider(ui, board:AddRow('Frame level', 'Higher draws over neighbours on the same strata', SLIDER_WIDTH), 0, 100, 1, Field(config, 'frameLevel'))
-	return board
-end
-
-local function BackgroundBoard(ui, parent, width, config)
-	local board = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Background',
-		description = 'The backdrop behind it. Zero width or height fits the content.',
-	})
-	Switch(board, 'Border', function() return config.border == true end, function(value)
-		config.border = value
-	end, 'A one pixel line around the edge')
-	Slider(ui, board:AddRow('Opacity', 'Percent', SLIDER_WIDTH), 0, 100, 1,
-		function() return math.floor(config.bgAlpha * 100 + 0.5) end,
-		function(value) config.bgAlpha = value / 100 end)
-	ColorRow(ui, board, 'Background color', nil, false, ColorField(config, 'bgColor', false))
-	ColorRow(ui, board, 'Border color', nil, true, ColorField(config, 'borderColor', true))
-	Slider(ui, board:AddRow('Width', '0 fits the content', SLIDER_WIDTH), 0, 1200, 1, Field(config, 'width'))
-	Slider(ui, board:AddRow('Height', '0 fits the content', SLIDER_WIDTH), 0, 600, 1, Field(config, 'height'))
 	return board
 end
 
@@ -494,38 +427,26 @@ local function TooltipsBoard(ui, parent, width)
 		title = 'Tooltips',
 		description = 'Shared by every bar.',
 	})
-	Switch(board, 'Hide tooltips in combat', function() return BUI.GetDB().datatextHideHoversInCombat ~= false end, function(value)
+	board:AddSwitch('Hide tooltips in combat', function() return BUI.GetDB().datatextHideHoversInCombat ~= false end, function(value)
 		BUI.GetDB().datatextHideHoversInCombat = value
 	end, 'No datatext tooltips or hover panels while fighting')
-	Switch(board, 'Roster tooltips', function() return BUI.GetDB().datatextRosterTooltips ~= false end, function(value)
+	board:AddSwitch('Roster tooltips', function() return BUI.GetDB().datatextRosterTooltips ~= false end, function(value)
 		BUI.GetDB().datatextRosterTooltips = value
 	end, 'Member details such as keystone and score when hovering Friends and Guild rows')
 	return board
 end
 
-local function Tab(label, build)
-	return { label = label, build = function(ui, _, parent, width, page) return build(ui, parent, width, page) end }
-end
-
-local function Tabs(config)
-	local tabs = {}
-	if config and not Datatext.IsPanel(config) then
-		tabs[#tabs + 1] = Tab('Datatexts', function(ui, parent, width, page)
-			local sections = { ReadoutsBoard(ui, parent, width, config, page) }
-			local settings = ReadoutSettingsBoard(ui, parent, width, config)
-			if settings then sections[#sections + 1] = settings end
-			return sections
-		end)
-		tabs[#tabs + 1] = Tab('Style', function(ui, parent, width) return { StyleBoard(ui, parent, width, config) } end)
+local function Sections(ui, _, parent, width, page)
+	local config = Current()
+	local sections = {}
+	if config and Datatext.IsPanel(config) then
+		sections[#sections + 1] = PanelBoard(ui, parent, width, config)
 	elseif config then
-		tabs[#tabs + 1] = Tab('Title', function(ui, parent, width) return { TitleBoard(ui, parent, width, config) } end)
+		sections[#sections + 1] = BarBoard(ui, parent, width, config)
+		sections[#sections + 1] = DatatextsBoard(ui, parent, width, config, page)
 	end
-	if config then
-		tabs[#tabs + 1] = Tab('Position', function(ui, parent, width) return { PositionBoard(ui, parent, width, config) } end)
-		tabs[#tabs + 1] = Tab('Background', function(ui, parent, width) return { BackgroundBoard(ui, parent, width, config) } end)
-	end
-	tabs[#tabs + 1] = Tab('Tooltips', function(ui, parent, width) return { TooltipsBoard(ui, parent, width) } end)
-	return tabs
+	sections[#sections + 1] = TooltipsBoard(ui, parent, width)
+	return sections
 end
 
 BUI.PageEngine.RegisterPage('datatext', {
@@ -533,9 +454,10 @@ BUI.PageEngine.RegisterPage('datatext', {
 	buttonText = 'Datatext',
 	icon = 'report2',
 	OnBuild = function(pageFrame)
+		fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
 		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
-		local config = Current()
-		pageFrame._page = Layout.TablePage(page:GetTab(1), { window = Window() }, {
+		Current()
+		Layout.TablePage(page:GetTab(1), { window = Window() }, {
 			icon = 'report2',
 			title = 'Datatext',
 			placeholder = 'Search datatext settings...',
@@ -555,7 +477,7 @@ BUI.PageEngine.RegisterPage('datatext', {
 				end },
 			},
 			preview = { height = TableHeight(), build = BuildTable },
-			tabs = Tabs(config),
+			tabs = { { label = 'Datatext', build = Sections } },
 		})
 		Datatext.SetLockCallback(Repaint)
 		page:AutoRefresh()
