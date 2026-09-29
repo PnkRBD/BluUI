@@ -35,6 +35,7 @@ end
 
 local function Kind(tool)
 	if tool.kind then return tool.kind end
+	if tool.build then return 'custom' end
 	if tool.options then return 'options' end
 	if tool.text then return 'button' end
 	if tool.entries then return 'menu' end
@@ -47,6 +48,7 @@ end
 local function Slot(tool)
 	local kind = Kind(tool)
 	if kind == 'options' then return 'icon' end
+	if kind == 'custom' then return tool.slot or 'menu' end
 	return kind
 end
 
@@ -169,7 +171,9 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 
 	function kit.Tool(parent, tool, after)
 		local kind = Kind(tool)
-		if kind == 'options' then
+		if kind == 'custom' then
+			return tool.build(parent)
+		elseif kind == 'options' then
 			local button
 			button = kit.IconButton(parent, tool.icon or 'cog', tool.tooltip, function() kit.Popover(button, tool, after) end)
 			return button

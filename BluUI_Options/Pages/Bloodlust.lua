@@ -5,8 +5,6 @@ local Bloodlust = BUI.Bloodlust
 
 local PAGE_WIDTH = 960
 local MENU_WIDTH = 160
-local POSITION_RANGE = 1500
-local ANCHOR_RANGE = 200
 
 local fonts, sounds
 
@@ -75,31 +73,6 @@ local function Color(key)
 	}
 end
 
-local function Position()
-	local frames = { { value = '', text = 'None, free on the screen' } }
-	for _, frame in ipairs(BUI.C.ANCHOR_FRAMES) do
-		frames[#frames + 1] = { value = frame.tag, text = frame.desc }
-	end
-	local centered = Option('Center horizontally', 'centerHorizontally')
-	local set = centered.set
-	centered.set = function(value)
-		set(value)
-		if value then Config().posX = 0 end
-	end
-	return {
-		icon = 'mover', tooltip = 'Position and anchor', title = 'Position',
-		options = {
-			Option('Horizontal', 'posX', { min = -POSITION_RANGE, max = POSITION_RANGE, step = 1 }),
-			Option('Vertical', 'posY', { min = -POSITION_RANGE, max = POSITION_RANGE, step = 1 }),
-			centered,
-			Option('Anchor to', 'anchorFrame', { entries = frames }),
-			Option('Anchor side', 'anchorPoint', { entries = BUI.C.ANCHOR_PLACEMENT_OPTIONS }),
-			Option('Anchor offset X', 'anchorOffsetX', { min = -ANCHOR_RANGE, max = ANCHOR_RANGE, step = 1 }),
-			Option('Anchor offset Y', 'anchorOffsetY', { min = -ANCHOR_RANGE, max = ANCHOR_RANGE, step = 1 }),
-		},
-	}
-end
-
 local function Sections(ui, _, parent, width)
 	local display = ui.Board(parent, width, {
 		stacked = true,
@@ -113,7 +86,7 @@ local function Sections(ui, _, parent, width)
 			Option('Show icon', 'showIcon'),
 			Option('Icon size', 'iconSize', { min = 12, max = 64, step = 1 }),
 		} },
-		Position(),
+		BUI.PositionTool(Config()),
 	}, Refresh)
 
 	local alerts = ui.Board(parent, width, {

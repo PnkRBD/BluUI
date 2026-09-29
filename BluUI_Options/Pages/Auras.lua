@@ -1,633 +1,421 @@
 local BUI = BluUI
-
 local BUILib = BluUI.BUILibClient
-local Controls, Layout = BUILib.Controls, BUILib.Layout
-local PageKit = BUILib.PageKit
+local Layout = BUILib.Layout
 
-local fonts
-local lowHpEye
-local crosshairEye
-local markWarningEye
-local bloodlustEye
+local PAGE_WIDTH = 960
+local MENU_WIDTH = 150
+local SPECS_WIDTH = 220
 
-local function ClearPreviewToggle(toggle)
-	if toggle then toggle:SetValue(false) end
+local STYLES = {
+	{ value = 'cross', text = 'Cross' },
+	{ value = 'dot', text = 'Dot' },
+}
+
+local LOW_HP_FIELDS = {
+	posX = 'lowHpPosX', posY = 'lowHpPosY',
+	anchorFrame = 'lowHpAnchorFrame', anchorPoint = 'lowHpAnchorPoint',
+	anchorOffsetX = 'lowHpAnchorOffsetX', anchorOffsetY = 'lowHpAnchorOffsetY',
+	centerHorizontally = 'lowHpCenterHorizontally',
+}
+
+local MARK_FIELDS = {
+	posX = 'markPosX', posY = 'markPosY',
+	anchorFrame = 'markAnchorFrame', anchorPoint = 'markAnchorPoint',
+	anchorOffsetX = 'markAnchorOffsetX', anchorOffsetY = 'markAnchorOffsetY',
+	centerHorizontally = 'markCenterHorizontally',
+}
+
+local fonts, sounds
+
+local function Window()
+	return BUI.PageEngine.window
 end
 
-local function AlertMover(parent, db, apply, options)
-	options = options or {}
-	local fieldMap = options.fields or {}
-	local function FieldKey(standardKey) return fieldMap[standardKey] or standardKey end
-	local function Get(standardKey) return db[FieldKey(standardKey)] end
-	local function Set(standardKey, value) db[FieldKey(standardKey)] = value end
+local function Repaint()
+	Window():Repaint()
+end
 
-	local rangeX = (options.xyRange and options.xyRange.x) or 1500
-	local rangeY = (options.xyRange and options.xyRange.y) or 1000
-	local anchorRange = options.anchorRange or 200
-	local dropdowns = options.dropdowns or {}
-	local rowCount = 6 + (options.noCenter and 0 or 1) + (options.unlock and 1 or 0) + (options.matchWidth and 1 or 0) + (options.matchHeight and 1 or 0) + #dropdowns
+local relock = { SetValue = Repaint }
 
-	return Controls.Icon(parent, {
-		texture = BUILib.GetLibMedia('mover'), tooltip = 'Position & anchor',
-		onClick = function(button)
-			local frameItems = { { value = '', text = 'None (screen position)' } }
-			local list = options.frames or (options.selfTag and BUI.AnchorFramesExcept(options.selfTag)) or BUI.C.ANCHOR_FRAMES
-			for index = 1, #list do
-				frameItems[#frameItems + 1] = { value = list[index].tag, text = list[index].desc }
-			end
-			Controls.Popover({
-				anchor = button, width = 280, title = 'POSITION', height = rowCount * 40 - 2,
-				build = function(panel)
-					local y = 18
-					local Widget = BUILib.Widget
-					local centerCheckbox, unlockCheckbox
-					local xSlider = Controls.CompactSlider(panel, nil, -rangeX, rangeX, Get('posX') or 0, function(value) Set('posX', value); apply() end, 1, 150)
-					PageKit.PopRow(panel, y, 'X Position', xSlider); y = y + 40
-					local ySlider = Controls.CompactSlider(panel, nil, -rangeY, rangeY, Get('posY') or 0, function(value) Set('posY', value); apply() end, 1, 150)
-					PageKit.PopRow(panel, y, 'Y Position', ySlider); y = y + 40
-					local function SyncAnchorLock()
-						local anchored = (Get('anchorFrame') or '') ~= ''
-						if anchored then
-							xSlider:SetLockedText('ANCHORED')
-							ySlider:SetLockedText('ANCHORED')
-						end
-						xSlider:SetLocked(anchored)
-						ySlider:SetLocked(anchored)
-						if centerCheckbox then Widget.Unwrap(centerCheckbox):SetEnabled(not anchored) end
-					end
-					if not options.noCenter then
-						centerCheckbox = Controls.StampCheckbox(panel, nil, Get('centerHorizontally'), function(value)
-							Set('centerHorizontally', value)
-							if value then Set('posX', 0); xSlider:SetValue(0) end
-							apply()
-						end, nil, true, nil, 'mini')
-						PageKit.PopRow(panel, y, 'Center Horizontally', centerCheckbox); y = y + 40
-					end
-					for _, dropdown in ipairs(dropdowns) do
-						PageKit.PopRow(panel, y, dropdown.label, Controls.Dropdown(panel, nil, dropdown.items, Get(dropdown.key) or dropdown.default, function(value)
-							Set(dropdown.key, value)
-							apply()
-						end, nil, 150)); y = y + 40
-					end
-					if options.unlock then
-						unlockCheckbox = Controls.StampCheckbox(panel, nil, options.unlock.get(), function(value)
-							options.unlock.set(value)
-						end, nil, true, nil, 'mini')
-						PageKit.PopRow(panel, y, 'Unlock (drag to move)', unlockCheckbox); y = y + 40
-					end
-					if options.matchWidth then
-						PageKit.PopRow(panel, y, 'Match Anchor Width', Controls.StampCheckbox(panel, nil, options.matchWidth.get(), function(value)
-							options.matchWidth.set(value)
-						end, nil, true, nil, 'mini')); y = y + 40
-					end
-					if options.matchHeight then
-						PageKit.PopRow(panel, y, 'Match Anchor Height', Controls.StampCheckbox(panel, nil, options.matchHeight.get(), function(value)
-							options.matchHeight.set(value)
-						end, nil, true, nil, 'mini')); y = y + 40
-					end
-					PageKit.PopRow(panel, y, 'Anchor Frame', Controls.Dropdown(panel, nil, frameItems, Get('anchorFrame') or '', function(value)
-						Set('anchorFrame', value); apply()
-						SyncAnchorLock()
-					end, nil, 150)); y = y + 40
-					SyncAnchorLock()
-					PageKit.PopRow(panel, y, 'Anchor Point', Controls.Dropdown(panel, nil, BUI.C.ANCHOR_PLACEMENT_OPTIONS, Get('anchorPoint') or 'BOTTOM', function(value)
-						Set('anchorPoint', value); apply()
-					end, nil, 150)); y = y + 40
-					PageKit.PopRow(panel, y, 'Anchor X', Controls.CompactSlider(panel, nil, -anchorRange, anchorRange, Get('anchorOffsetX') or 0, function(value) Set('anchorOffsetX', value); apply() end, 1, 150)); y = y + 40
-					PageKit.PopRow(panel, y, 'Anchor Y', Controls.CompactSlider(panel, nil, -anchorRange, anchorRange, Get('anchorOffsetY') or 0, function(value) Set('anchorOffsetY', value); apply() end, 1, 150))
-				end,
-			})
+local function Option(db, label, key, extra)
+	local option = { label = label, get = function() return db[key] end, set = function(value) db[key] = value end }
+	for name, value in pairs(extra or {}) do option[name] = value end
+	return option
+end
+
+local function Flag(holder, label)
+	return { label = label, get = function() return holder.enabled == true end, set = function(value) holder.enabled = value end }
+end
+
+local function Font(db, key)
+	return { entries = fonts, width = MENU_WIDTH, get = function() return db[key] end, set = function(value) db[key] = value end }
+end
+
+local function Eye(tooltip, get, set)
+	return { icon = 'eye', tooltip = tooltip, get = get, set = set }
+end
+
+local function Switch(db, key)
+	return { get = function() return db[key] == true end, set = function(value) db[key] = value end }
+end
+
+local function TableColor(db, label, key, opacity)
+	return {
+		kind = 'swatch', label = label, tooltip = label, opacity = opacity,
+		get = function()
+			local color = db[key]
+			return color.r, color.g, color.b, opacity and color.a or 1
 		end,
-	})
+		set = function(red, green, blue, alpha)
+			db[key] = opacity and { r = red, g = green, b = blue, a = alpha } or { r = red, g = green, b = blue }
+		end,
+	}
 end
 
-BUI.AlertMover = AlertMover
+local function ArrayColor(db, label, key, opacity)
+	return {
+		kind = 'swatch', label = label, tooltip = label, opacity = opacity,
+		get = function()
+			local color = db[key]
+			return color[1], color[2], color[3], opacity and color[4] or 1
+		end,
+		set = function(red, green, blue, alpha)
+			db[key] = opacity and { red, green, blue, alpha } or { red, green, blue }
+		end,
+	}
+end
 
-local AddRow = PageKit.AddSettingRow
-local function BuildAlertsTab(tab)
-	Layout.Section(tab, 'Alerts')
+local function ChannelColor(db, label)
+	return {
+		kind = 'swatch', label = label, tooltip = label,
+		get = function() return db.colorR, db.colorG, db.colorB, 1 end,
+		set = function(red, green, blue) db.colorR, db.colorG, db.colorB = red, green, blue end,
+	}
+end
 
-	do
-		local db = BUI.GetDB().combatTimer
-		local CombatTimer = BUI.CombatTimer
-		local function Apply() CombatTimer.ApplySettings() end
+local function CombatTimerRow(board)
+	local db = BUI.GetDB().combatTimer
+	local CombatTimer = BUI.CombatTimer
+	CombatTimer._lockToggle = relock
+	board:AddTools('Combat Timer', 'Elapsed time readout while you are in combat', {
+		ChannelColor(db, 'Text color'),
+		Font(db, 'font'),
+		{ tooltip = 'Text size', title = 'Combat timer', options = {
+			Option(db, 'Font size', 'fontSize', { min = 10, max = 40, step = 1 }),
+			Option(db, 'Milliseconds', 'showMilliseconds'),
+		} },
+		BUI.PositionTool(db, { selfTag = 'BUI_CombatTimer' }),
+		Eye('Preview, drag to move', function() return not db.locked end, function(value) CombatTimer.SetLocked(not value) end),
+		{ get = function() return db.enabled == true end, set = CombatTimer.Toggle },
+	}, CombatTimer.ApplySettings)
+end
 
-		AddRow(tab, {
-			title = 'Combat Timer',
-			description = 'Elapsed time readout while you are in combat',
-			checked = db.enabled,
-			callback = function(enabled)
-				CombatTimer.Toggle(enabled)
-			end,
-			accessoryWidth = 270,
-			accessories = function(row)
-				local eye = Controls.IconToggle(row, not db.locked, function(previewing)
-					CombatTimer.SetLocked(not previewing)
-				end, { texture = BUILib.GetLibMedia('eye'), size = 18, tooltip = 'Preview (drag to move)' })
-				CombatTimer._lockToggle = eye
-				local mover = AlertMover(row, db, Apply, {
-					selfTag = 'BUI_CombatTimer',
-					unlock = {
-						get = function() return not db.locked end,
-						set = function(unlocked) CombatTimer.SetLocked(not unlocked) end,
-					},
-				})
-				local settingsIcon = PageKit.SettingsIcon(row, {
-					title = 'COMBAT TIMER', tooltip = 'Text size', options = {
-						{ kind = 'slider', label = 'Font Size', min = 10, max = 40,
-						  get = function() return db.fontSize end,
-						  set = function(value) db.fontSize = value end, apply = Apply },
-						{ label = 'Milliseconds',
-						  get = function() return db.showMilliseconds == true end,
-						  set = function(value) db.showMilliseconds = value end, apply = Apply },
-					},
-				})
-				local fontDropdown = Controls.Dropdown(row, nil, fonts, db.font, function(value) db.font = value; Apply() end, nil, 140)
-				local swatch = Controls.ColorSwatch(row, { r = db.colorR, g = db.colorG, b = db.colorB, a = 1, callback = function(red, green, blue)
-					db.colorR, db.colorG, db.colorB = red, green, blue; Apply()
-				end, tooltip = 'Text Color' })
-				return { eye, mover, settingsIcon, fontDropdown, swatch }
-			end,
-		})
-	end
+local function CombatMessagesRow(board)
+	local db = BUI.GetDB().combatMessage
+	local CombatMessage = BUI.CombatMessage
+	CombatMessage._lockToggle = relock
+	board:AddTools('Combat Messages', 'On-screen text when combat starts and ends', {
+		ArrayColor(db, 'Enter combat', 'enterColor', true),
+		ArrayColor(db, 'Leave combat', 'leaveColor', true),
+		Font(db, 'font'),
+		{ tooltip = 'Text size and timing', title = 'Messages', options = {
+			Option(db, 'Font size', 'fontSize', { min = 10, max = 40, step = 1 }),
+			Option(db, 'Fade time', 'fadeTime', { min = 0.2, max = 3, step = 0.1 }),
+		} },
+		BUI.PositionTool(db, { selfTag = 'BUI_CombatMessage' }),
+		Eye('Preview, drag to move', function() return not db.locked end, function(value) CombatMessage.SetLocked(not value) end),
+		{ get = function() return db.enabled == true end, set = function(value)
+			db.enabled = value
+			if value then CombatMessage.Enable() else CombatMessage.Disable() end
+		end },
+	}, CombatMessage.Refresh)
+end
 
-	do
-		local db = BUI.GetDB().combatMessage
-		local CombatMessage = BUI.CombatMessage
-		local function Apply() CombatMessage.Refresh() end
-
-		AddRow(tab, {
-			title = 'Combat Messages',
-			description = 'On-screen text when combat starts and ends',
-			checked = db.enabled,
-			callback = function(enabled)
-				db.enabled = enabled
-				if enabled then CombatMessage.Enable() else CombatMessage.Disable() end
-			end,
-			accessoryWidth = 300,
-			accessories = function(row)
-				local eye = Controls.IconToggle(row, not db.locked, function(previewing)
-					CombatMessage.SetLocked(not previewing)
-				end, { texture = BUILib.GetLibMedia('eye'), size = 18, tooltip = 'Preview (drag to move)' })
-				CombatMessage._lockToggle = eye
-				local mover = AlertMover(row, db, Apply, {
-					selfTag = 'BUI_CombatMessage',
-					unlock = {
-						get = function() return not db.locked end,
-						set = function(unlocked) CombatMessage.SetLocked(not unlocked) end,
-					},
-				})
-				local settingsIcon = PageKit.SettingsIcon(row, {
-					title = 'MESSAGES', tooltip = 'Text size & timing', options = {
-						{ kind = 'slider', label = 'Font Size', min = 10, max = 40,
-						  get = function() return db.fontSize end,
-						  set = function(value) db.fontSize = value end, apply = Apply },
-						{ kind = 'slider', label = 'Fade Time', min = 0.2, max = 3, step = 0.1,
-						  get = function() return db.fadeTime end,
-						  set = function(value) db.fadeTime = value end },
-					},
-				})
-				local fontDropdown = Controls.Dropdown(row, nil, fonts, db.font, function(value) db.font = value; Apply() end, nil, 140)
-				local enterColor, leaveColor = db.enterColor, db.leaveColor
-				local leaveSwatch = Controls.ColorSwatch(row, { r = leaveColor[1], g = leaveColor[2], b = leaveColor[3], a = leaveColor[4], callback = function(red, green, blue, alpha)
-					db.leaveColor = { red, green, blue, alpha }; Apply()
-				end, tooltip = 'Leave Combat' })
-				local enterSwatch = Controls.ColorSwatch(row, { r = enterColor[1], g = enterColor[2], b = enterColor[3], a = enterColor[4], callback = function(red, green, blue, alpha)
-					db.enterColor = { red, green, blue, alpha }; Apply()
-				end, tooltip = 'Enter Combat' })
-				return { eye, mover, settingsIcon, fontDropdown, leaveSwatch, enterSwatch }
-			end,
-		})
-	end
-
-	do
-		local db = BUI.GetDB().auras
-		local function Apply() BUI.Auras.UpdateLowHp() end
-
-		AddRow(tab, {
-			title = 'Low HP Warning',
-			description = 'Warning text when your health drops below the threshold',
-			checked = db.lowHpWarning == true,
-			callback = function(enabled) db.lowHpWarning = enabled; Apply() end,
-			accessoryWidth = 270,
-			accessories = function(row)
-				local eye = Controls.IconToggle(row, db.lowHpLocked == false, function(previewing)
-					db.lowHpLocked = not previewing; Apply()
-				end, { texture = BUILib.GetLibMedia('eye'), size = 18, tooltip = 'Preview (drag to move)' })
-				lowHpEye = eye
-				BUI.Auras._lowHpLockToggle = eye
-				local mover = AlertMover(row, db, Apply, {
-					selfTag = 'BUI_LowHpWarning',
-					fields = {
-						posX               = 'lowHpPosX',          posY          = 'lowHpPosY',
-						anchorFrame        = 'lowHpAnchorFrame',   anchorPoint   = 'lowHpAnchorPoint',
-						anchorOffsetX      = 'lowHpAnchorOffsetX', anchorOffsetY = 'lowHpAnchorOffsetY',
-						centerHorizontally = 'lowHpCenterHorizontally',
-					},
-					unlock = {
-						get = function() return not db.lowHpLocked end,
-						set = function(unlocked) db.lowHpLocked = not unlocked; Apply() end,
-					},
-				})
-				local settingsIcon = PageKit.SettingsIcon(row, {
-					title = 'LOW HP WARNING', tooltip = 'Warning text, size & threshold', options = {
-						{ kind = 'textbox', label = 'Warning Text',
-						  get = function() return db.lowHpText end,
-						  set = function(value) db.lowHpText = value end, apply = Apply },
-						{ kind = 'slider', label = 'Font Size', min = 10, max = 60,
-						  get = function() return db.lowHpFontSize end,
-						  set = function(value) db.lowHpFontSize = value end, apply = Apply },
-						{ kind = 'slider', label = 'Threshold %', min = 5, max = 95, step = 5,
-						  get = function() return db.lowHpThreshold end,
-						  set = function(value) db.lowHpThreshold = value end, apply = Apply },
-					},
-				})
-				local fontDropdown = Controls.Dropdown(row, nil, fonts, db.lowHpFont, function(value) db.lowHpFont = value; Apply() end, nil, 140)
-				local lowHpColor = db.lowHpColor
-				local swatch = Controls.ColorSwatch(row, { r = lowHpColor.r, g = lowHpColor.g, b = lowHpColor.b, a = lowHpColor.a, callback = function(red, green, blue, alpha)
-					db.lowHpColor = { r = red, g = green, b = blue, a = alpha }; Apply()
-				end, tooltip = 'Text Color' })
-				return { eye, mover, settingsIcon, fontDropdown, swatch }
-			end,
-		})
-	end
-
-	do
-		local db = BUI.GetDB().auras
-		local Auras = BUI.Auras
-		local function Apply() Auras.Update() end
-
-		AddRow(tab, {
-			title = 'Pet Warnings',
-			description = 'Alerts when your pet is dead, missing, idle or low on health',
-			checked = db.petWarningsEnabled,
-			callback = function(enabled) db.petWarningsEnabled = enabled; Apply() end,
-			accessoryWidth = 270,
-			accessories = function(row)
-				local eye = Controls.IconToggle(row, not db.locked, function(previewing)
-					Auras.SetLocked(not previewing)
-				end, { texture = BUILib.GetLibMedia('eye'), size = 18, tooltip = 'Preview (drag to move)' })
-				Auras._lockToggle = eye
-				local mover = AlertMover(row, db, Apply, {
-					selfTag = 'BUI_PetWarning',
-					unlock = {
-						get = function() return not db.locked end,
-						set = function(unlocked) Auras.SetLocked(not unlocked) end,
-					},
-				})
-				local settingsIcon = Controls.Icon(row, {
-					title = 'PET WARNINGS', tooltip = 'Warning types & text size',
-					onChange = Apply,
-					options = {
-						{ kind = 'slider', label = 'Font Size', min = 14, max = 48,
-						  get = function() return db.fontSize end,
-						  set = function(value) db.fontSize = value end },
-						{ label = 'Pet Not Attacking',
-						  get = function() return db.petAttackWarning.enabled end,
-						  set = function(value) db.petAttackWarning.enabled = value end },
-						{ label = 'Pet Dead / Missing',
-						  get = function() return db.petDeadWarning.enabled end,
-						  set = function(value) db.petDeadWarning.enabled = value end },
-						{ label = 'Grimoire of Sacrifice',
-						  get = function() return db.grimoireSacrificeWarning.enabled end,
-						  set = function(value) db.grimoireSacrificeWarning.enabled = value end },
-						{ label = 'Playing Dead',
-						  get = function() return db.playDeadWarning.enabled end,
-						  set = function(value) db.playDeadWarning.enabled = value end },
-						{ label = 'Pet Low Health',
-						  get = function() return db.petHealthWarning.enabled end,
-						  set = function(value) db.petHealthWarning.enabled = value end },
-						{ kind = 'slider', label = 'Low Health %', min = 10, max = 80, step = 5, indent = 1,
-						  get = function() return db.petHealthWarning.threshold end,
-						  set = function(value) db.petHealthWarning.threshold = value end },
-					},
-				})
-				local fontDropdown = Controls.Dropdown(row, nil, fonts, db.font, function(value) db.font = value; Apply() end, nil, 140)
-				local warningColor = db.warningColor
-				local swatch = Controls.ColorSwatch(row, { r = warningColor.r, g = warningColor.g, b = warningColor.b, a = warningColor.a, callback = function(red, green, blue, alpha)
-					db.warningColor = { r = red, g = green, b = blue, a = alpha }; Apply()
-				end, tooltip = 'Warning Color' })
-				return { eye, mover, settingsIcon, fontDropdown, swatch }
-			end,
-		})
-	end
-
+local function LowHpRow(board)
 	local db = BUI.GetDB().auras
-	local function Apply() BUI.Auras.UpdateMark() end
+	local Auras = BUI.Auras
+	Auras._lowHpLockToggle = relock
+	board:AddTools('Low HP Warning', 'Warning text when your health drops below the threshold', {
+		TableColor(db, 'Text color', 'lowHpColor', true),
+		Font(db, 'lowHpFont'),
+		{ tooltip = 'Text, size and threshold', title = 'Low HP warning', options = {
+			Option(db, 'Warning text', 'lowHpText', { kind = 'input', placeholder = 'Warning text' }),
+			Option(db, 'Font size', 'lowHpFontSize', { min = 10, max = 60, step = 1 }),
+			Option(db, 'Threshold %', 'lowHpThreshold', { min = 5, max = 95, step = 5 }),
+		} },
+		BUI.PositionTool(db, { selfTag = 'BUI_LowHpWarning', fields = LOW_HP_FIELDS }),
+		Eye('Preview, drag to move', function() return db.lowHpLocked == false end, function(value)
+			db.lowHpLocked = not value
+			Auras.UpdateLowHp()
+		end),
+		Switch(db, 'lowHpWarning'),
+	}, Auras.UpdateLowHp)
+end
 
-	AddRow(tab, {
-		title = "Hunter's Mark Warning",
-		description = "Callout while your target is missing Hunter's Mark (hunters only)",
-		checked = db.markWarning == true,
-		callback = function(enabled) db.markWarning = enabled; Apply() end,
-		accessoryWidth = 270,
-		accessories = function(row)
-			local eye = Controls.IconToggle(row, db.markLocked == false, function(previewing)
-				db.markLocked = not previewing; Apply()
-			end, { texture = BUILib.GetLibMedia('eye'), size = 18, tooltip = 'Preview (drag to move)' })
-			markWarningEye = eye
-			BUI.Auras._markLockToggle = eye
-			local mover = AlertMover(row, db, Apply, {
-				selfTag = 'BUI_MarkWarning',
-				fields = {
-					posX               = 'markPosX',          posY          = 'markPosY',
-					anchorFrame        = 'markAnchorFrame',   anchorPoint   = 'markAnchorPoint',
-					anchorOffsetX      = 'markAnchorOffsetX', anchorOffsetY = 'markAnchorOffsetY',
-					centerHorizontally = 'markCenterHorizontally',
-				},
-				unlock = {
-					get = function() return db.markLocked == false end,
-					set = function(unlocked) db.markLocked = not unlocked; Apply() end,
-				},
-			})
-			local settingsIcon = PageKit.SettingsIcon(row, {
-				title = "HUNTER'S MARK", tooltip = 'Warning text, style & visibility', options = {
-					{ kind = 'textbox', label = 'Warning Text',
-					  get = function() return db.markText end,
-					  set = function(value) db.markText = value end, apply = Apply },
-					{ kind = 'slider', label = 'Font Size', min = 10, max = 48,
-					  get = function() return db.markFontSize end,
-					  set = function(value) db.markFontSize = value end, apply = Apply },
-					{ label = 'Spell Icon',
-					  get = function() return db.markShowIcon ~= false end,
-					  set = function(value) db.markShowIcon = value end, apply = Apply },
-					{ label = 'Pulse Icon',
-					  get = function() return db.markPulse ~= false end,
-					  set = function(value) db.markPulse = value end, apply = Apply },
-					{ label = 'Combat Only',
-					  get = function() return db.markCombatOnly == true end,
-					  set = function(value) db.markCombatOnly = value end, apply = Apply },
-					{ label = 'Group Only',
-					  get = function() return db.markGroupOnly == true end,
-					  set = function(value) db.markGroupOnly = value end, apply = Apply },
-					{ label = 'Hide In Town',
-					  get = function() return db.markHideInTown == true end,
-					  set = function(value) db.markHideInTown = value end, apply = Apply },
-				},
-			})
-			local fontDropdown = Controls.Dropdown(row, nil, fonts, db.markFont, function(value) db.markFont = value; Apply() end, nil, 140)
-			local markColor = db.markColor
-			local swatch = Controls.ColorSwatch(row, { r = markColor.r, g = markColor.g, b = markColor.b, a = markColor.a, callback = function(red, green, blue, alpha)
-				db.markColor = { r = red, g = green, b = blue, a = alpha }; Apply()
-			end, tooltip = 'Text Color' })
-			return { eye, mover, settingsIcon, fontDropdown, swatch }
-		end,
+local function PetWarningsRow(board)
+	local db = BUI.GetDB().auras
+	local Auras = BUI.Auras
+	Auras._lockToggle = relock
+	board:AddTools('Pet Warnings', 'Alerts when your pet is dead, missing, idle or low on health', {
+		TableColor(db, 'Warning color', 'warningColor', true),
+		Font(db, 'font'),
+		{ tooltip = 'Warning types and text size', title = 'Pet warnings', options = {
+			Option(db, 'Font size', 'fontSize', { min = 14, max = 48, step = 1 }),
+			Flag(db.petAttackWarning, 'Pet not attacking'),
+			Flag(db.petDeadWarning, 'Pet dead or missing'),
+			Flag(db.grimoireSacrificeWarning, 'Grimoire of Sacrifice'),
+			Flag(db.playDeadWarning, 'Playing dead'),
+			Flag(db.petHealthWarning, 'Pet low health'),
+			{ label = 'Low health %', min = 10, max = 80, step = 5, get = function() return db.petHealthWarning.threshold end, set = function(value) db.petHealthWarning.threshold = value end },
+		} },
+		BUI.PositionTool(db, { selfTag = 'BUI_PetWarning' }),
+		Eye('Preview, drag to move', function() return not db.locked end, function(value) Auras.SetLocked(not value) end),
+		Switch(db, 'petWarningsEnabled'),
+	}, Auras.Update)
+end
+
+local function MarkWarningRow(board)
+	local db = BUI.GetDB().auras
+	local Auras = BUI.Auras
+	Auras._markLockToggle = relock
+	board:AddTools("Hunter's Mark Warning", "Callout while your target is missing Hunter's Mark, hunters only", {
+		TableColor(db, 'Text color', 'markColor', true),
+		Font(db, 'markFont'),
+		{ tooltip = 'Text, style and visibility', title = "Hunter's mark", options = {
+			Option(db, 'Warning text', 'markText', { kind = 'input', placeholder = 'Warning text' }),
+			Option(db, 'Font size', 'markFontSize', { min = 10, max = 48, step = 1 }),
+			{ label = 'Spell icon', get = function() return db.markShowIcon ~= false end, set = function(value) db.markShowIcon = value end },
+			{ label = 'Pulse icon', get = function() return db.markPulse ~= false end, set = function(value) db.markPulse = value end },
+			Option(db, 'Combat only', 'markCombatOnly'),
+			Option(db, 'Group only', 'markGroupOnly'),
+			Option(db, 'Hide in town', 'markHideInTown'),
+		} },
+		BUI.PositionTool(db, { selfTag = 'BUI_MarkWarning', fields = MARK_FIELDS }),
+		Eye('Preview, drag to move', function() return db.markLocked == false end, function(value)
+			db.markLocked = not value
+			Auras.UpdateMark()
+		end),
+		Switch(db, 'markWarning'),
+	}, Auras.UpdateMark)
+end
+
+local function GatewayRow(board)
+	local db = BUI.GetDB().gatewayAlert
+	local Display = BUI.BuffTracking.Display
+	local function Apply()
+		local tracker = Display.GetTracker('gatewayAlert')
+		if tracker then tracker.Refresh() end
+	end
+	Display.RegisterAnchorCallback('gatewayAlert', Repaint)
+	board:AddTools('Gateway Alert', 'Text while a Demonic Gateway is in reach and off cooldown, needs a Gateway Control Shard on an action bar', {
+		TableColor(db, 'Text color', 'textColor', true),
+		Font(db, 'font'),
+		{ tooltip = 'Text and sound', title = 'Gateway alert', options = {
+			Option(db, 'Text', 'customText', { kind = 'input', placeholder = 'Alert text' }),
+			Option(db, 'Font size', 'textSize', { min = 10, max = 48, step = 1 }),
+			{ label = 'Sound', entries = sounds, get = function() return db.sound end, set = function(value)
+				db.sound = value
+				BUI.PlaySoundByName(value)
+			end },
+		} },
+		BUI.PositionTool(db, { selfTag = 'BUI_GatewayAlert' }),
+		Eye('Unlock, drag to move', function() return db.showAnchor == true end, function(value)
+			db.showAnchor = value
+			Apply()
+		end),
+		Switch(db, 'enabled'),
+	}, Apply)
+end
+
+local function BloodlustRow(board)
+	local db = BUI.GetDB().bloodlust
+	local Bloodlust = BUI.Bloodlust
+	Bloodlust.onPreviewStop = Repaint
+	board:AddTools('Bloodlust', 'Tracks Bloodlust, Heroism and similar haste buffs', {
+		Font(db, 'font'),
+		{ text = 'Configure', onClick = function() BUI.PageEngine.NavigateToID('bloodlust') end },
+		BUI.PositionTool(db),
+		Eye('Preview the alerts', Bloodlust.IsPreviewing, function(value)
+			if value then Bloodlust.StartPreview() else Bloodlust.StopPreview() end
+		end),
+		Switch(db, 'enabled'),
+	}, Bloodlust.Refresh)
+end
+
+local function AlertsBoard(ui, parent, width)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Alerts',
+		description = 'Text callouts for combat, your pet, your health and your target. The eye on a row previews it and lets you drag it, right-click the alert to lock it again.',
 	})
+	CombatTimerRow(board)
+	CombatMessagesRow(board)
+	LowHpRow(board)
+	PetWarningsRow(board)
+	MarkWarningRow(board)
+	GatewayRow(board)
+	BloodlustRow(board)
+	return board
+end
 
-	do
-		local db = BUI.GetDB().gatewayAlert
-		local function Tracker() return BUI.BuffTracking.Display.GetTracker('gatewayAlert') end
-		local function Apply() local tracker = Tracker(); if tracker then tracker.Refresh() end end
-
-		AddRow(tab, {
-			title = 'Gateway Alert',
-			description = 'Text while a Demonic Gateway is in reach and off cooldown; needs a Gateway Control Shard on an action bar',
-			checked = db.enabled,
-			callback = function(enabled) db.enabled = enabled; Apply() end,
-			accessoryWidth = 270,
-			accessories = function(row)
-				local eye = Controls.IconToggle(row, db.showAnchor, function(unlocked)
-					db.showAnchor = unlocked; Apply()
-				end, { texture = BUILib.GetLibMedia('eye'), size = 18, tooltip = 'Unlock (drag to move)' })
-				BUI.BuffTracking.Display.RegisterAnchorCallback('gatewayAlert', function(state) eye:SetValue(state) end)
-				local mover = AlertMover(row, db, Apply, { selfTag = 'BUI_GatewayAlert' })
-				local settingsIcon = PageKit.SettingsIcon(row, {
-					title = 'GATEWAY ALERT', tooltip = 'Text & sound', options = {
-						{ kind = 'textbox', label = 'Text',
-						  get = function() return db.customText end,
-						  set = function(value) db.customText = value end, apply = Apply },
-						{ kind = 'slider', label = 'Font Size', min = 10, max = 48,
-						  get = function() return db.textSize end,
-						  set = function(value) db.textSize = value end, apply = Apply },
-						{ kind = 'dropdown', label = 'Sound', items = BUI.BuildSoundDropdownItems(),
-						  get = function() return db.sound end,
-						  set = function(value) db.sound = value; BUI.PlaySoundByName(value) end },
-					},
-				})
-				local fontDropdown = Controls.Dropdown(row, nil, fonts, db.font, function(value) db.font = value; Apply() end, nil, 140)
-				local textColor = db.textColor
-				local swatch = Controls.ColorSwatch(row, { r = textColor.r, g = textColor.g, b = textColor.b, a = textColor.a, callback = function(red, green, blue, alpha)
-					db.textColor = { r = red, g = green, b = blue, a = alpha }; Apply()
-				end, tooltip = 'Text Color' })
-				return { eye, mover, settingsIcon, fontDropdown, swatch }
-			end,
-		})
-	end
-
-	do
-		local db = BUI.GetDB().bloodlust
-		local Bloodlust = BUI.Bloodlust
-		local function Apply() Bloodlust.Refresh() end
-
-		AddRow(tab, {
-			title = 'Bloodlust',
-			description = 'Tracks Bloodlust, Heroism and similar haste buffs',
-			checked = db.enabled,
-			callback = function(enabled) db.enabled = enabled; Apply() end,
-			accessoryWidth = 300,
-			accessories = function(row)
-				local eye = Controls.IconToggle(row, Bloodlust.IsPreviewing(), function(previewing)
-					if previewing then Bloodlust.StartPreview() else Bloodlust.StopPreview() end
-				end, { texture = BUILib.GetLibMedia('eye'), size = 18, tooltip = 'Preview' })
-				bloodlustEye = eye
-				local mover = AlertMover(row, db, Apply)
-				local configure = Controls.GhostButton(row, 'Configure', 100, function() BUI.PageEngine.NavigateToID('bloodlust') end, 'Open the Bloodlust page')
-				local fontDropdown = Controls.Dropdown(row, nil, fonts, db.font, function(value) db.font = value; Apply() end, nil, 140)
-				return { eye, mover, configure, fontDropdown }
-			end,
-		})
-	end
-
-	do
-		local db = BUI.GetDB().crosshair
-		local Crosshair = BUI.Crosshair
-		local function Apply() Crosshair.Refresh() end
-
-		Layout.Section(tab, 'Crosshair')
-
-		AddRow(tab, {
-			title = 'Crosshair',
-			description = 'Customizable reticle at the center of your screen',
-			checked = db.enabled,
-			callback = function(enabled) db.enabled = enabled; Apply() end,
-			accessoryWidth = 270,
-			accessories = function(row)
-				local eye = Controls.IconToggle(row, Crosshair.IsPreviewing(), function(previewing)
-					Crosshair.SetPreview(previewing)
-				end, { texture = BUILib.GetLibMedia('eye'), size = 18, tooltip = 'Preview' })
-				crosshairEye = eye
-				local mover = PageKit.PositionIcon(row, {
-					title = 'POSITION', tooltip = 'Screen offset', options = {
-						{ kind = 'slider', label = 'X Offset', min = -500, max = 500,
-						  get = function() return db.offsetX end,
-						  set = function(value) db.offsetX = value end, apply = Apply },
-						{ kind = 'slider', label = 'Y Offset', min = -500, max = 500,
-						  get = function() return db.offsetY end,
-						  set = function(value) db.offsetY = value end, apply = Apply },
-					},
-				})
-				local settingsIcon = PageKit.SettingsIcon(row, {
-					title = 'CROSSHAIR', tooltip = 'Appearance & visibility', options = {
-						{ kind = 'slider', label = 'Size', min = 5, max = 100,
-						  get = function() return db.size end,
-						  set = function(value) db.size = value end, apply = Apply },
-						{ kind = 'slider', label = 'Thickness', min = 1, max = 10,
-						  get = function() return db.thickness end,
-						  set = function(value) db.thickness = value end, apply = Apply },
-						{ kind = 'slider', label = 'Center Gap', min = 0, max = 30,
-						  get = function() return db.gap end,
-						  set = function(value) db.gap = value end, apply = Apply },
-						{ kind = 'slider', label = 'Opacity', min = 10, max = 100, step = 5,
-						  get = function() return db.alpha * 100 end,
-						  set = function(value) db.alpha = value / 100 end, apply = Apply },
-						{ label = 'Hide Out of Combat',
-						  get = function() return db.hideOutOfCombat end,
-						  set = function(value) db.hideOutOfCombat = value end, apply = Apply },
-						{ label = 'Hide in Town',
-						  get = function() return db.hideInTown end,
-						  set = function(value) db.hideInTown = value end, apply = Apply },
-						{ label = 'Range Indicator · ' .. Crosshair.RangeLabel(),
-						  get = function() return db.rangeIndicator end,
-						  set = function(value) db.rangeIndicator = value end, apply = Apply },
-						{ kind = 'swatch', label = 'In Range Color', tooltip = 'In range',
-						  get = function() return db.inRangeColor end,
-						  set = function(color) db.inRangeColor = { color[1], color[2], color[3] } end, apply = Apply },
-						{ kind = 'swatch', label = 'Out of Range Color', tooltip = 'Out of range',
-						  get = function() return db.outOfRangeColor end,
-						  set = function(color) db.outOfRangeColor = { color[1], color[2], color[3] } end, apply = Apply },
-					},
-				})
-				local styleDropdown = Controls.Dropdown(row, nil, {
-					{ value = 'cross', text = 'Cross (+)' }, { value = 'dot', text = 'Dot' },
-				}, db.style, function(value) db.style = value; Apply() end, nil, 140)
-				local swatch = Controls.ColorSwatch(row, { r = db.colorR, g = db.colorG, b = db.colorB, a = 1, callback = function(red, green, blue)
-					db.colorR, db.colorG, db.colorB = red, green, blue; Apply()
-				end, tooltip = 'Crosshair Color' })
-				return { eye, mover, settingsIcon, styleDropdown, swatch }
-			end,
-		})
-
-		local MELEE_SPEC_IDS = Crosshair.MELEE_SPEC_IDS
-
-		local specItems = {}
-		local classRows = {}
-		for classID = 1, GetNumClasses() do
-			local className, classFile = GetClassInfo(classID)
-			if className then
-				local classColor = RAID_CLASS_COLORS[classFile]
-				local colorStr = classColor and classColor.colorStr or 'ffcccccc'
-				for specIndex = 1, GetNumSpecializationsForClassID(classID) do
-					local specID, specName = GetSpecializationInfoForClassID(classID, specIndex)
-					if specID then
-						classRows[#classRows + 1] = {
-							className = className,
-							value = specID,
-							text = ('|c%s%s|r  |cff888888%s|r'):format(colorStr, specName or ('Spec ' .. specIndex), className),
-						}
-					end
+local function SpecList()
+	local specs = {}
+	for classID = 1, GetNumClasses() do
+		local className, classFile = GetClassInfo(classID)
+		if className then
+			local classColor = RAID_CLASS_COLORS[classFile]
+			local colorText = classColor and classColor.colorStr or 'ffcccccc'
+			for specIndex = 1, GetNumSpecializationsForClassID(classID) do
+				local specID, specName = GetSpecializationInfoForClassID(classID, specIndex)
+				if specID then
+					specs[#specs + 1] = { className = className, id = specID, text = ('|c%s%s|r  |cff888888%s|r'):format(colorText, specName or ('Spec ' .. specIndex), className) }
 				end
 			end
 		end
-		table.sort(classRows, function(leftRow, rightRow)
-			if leftRow.className ~= rightRow.className then return leftRow.className < rightRow.className end
-			return leftRow.text < rightRow.text
-		end)
-		for _, row in ipairs(classRows) do
-			specItems[#specItems + 1] = { value = row.value, text = row.text }
-		end
-		local specsSelected = {}
-		if db.specs then
-			for specID, selected in pairs(db.specs) do specsSelected[specID] = selected end
-		else
-			for _, item in ipairs(specItems) do specsSelected[item.value] = true end
-		end
-		local function BuildAllMap(items)
-			local map = {}
-			for _, item in ipairs(items) do
-				local specID = (type(item) == 'table') and (item.value or item[1]) or item
-				map[specID] = true
-			end
-			return map
-		end
-		local function BuildMeleeMap(items)
-			local map = {}
-			for _, item in ipairs(items) do
-				local specID = (type(item) == 'table') and (item.value or item[1]) or item
-				if MELEE_SPEC_IDS[specID] then map[specID] = true end
-			end
-			return map
-		end
-
-		local specsActions = {
-			{ text = 'Select all',   onClick = function(items, set) set(BuildAllMap(items))   end },
-			{ text = 'Deselect all', onClick = function(_, set)     set({})                   end },
-			{ text = 'Melee only',   onClick = function(items, set) set(BuildMeleeMap(items)) end },
-		}
-
-		AddRow(tab, {
-			title = 'Show for Specs',
-			description = 'Specializations the crosshair is shown for',
-			controlWidth = 272,
-			control = function(row)
-				return Controls.MultiDropdown(row, nil, specItems, specsSelected, function(map)
-					db.specs = map
-					Apply()
-				end, nil, 240, 16, { actions = specsActions })
-			end,
-		})
-
 	end
+	table.sort(specs, function(left, right)
+		if left.className ~= right.className then return left.className < right.className end
+		return left.text < right.text
+	end)
+	return specs
+end
+
+local function SpecsTool(ui, db, apply)
+	local specs = SpecList()
+	local melee = BUI.Crosshair.MELEE_SPEC_IDS
+	local function Selected()
+		if db.specs then return db.specs end
+		local all = {}
+		for _, spec in ipairs(specs) do all[spec.id] = true end
+		return all
+	end
+	local function Choose(filter)
+		local map = {}
+		for _, spec in ipairs(specs) do
+			if filter(spec.id) then map[spec.id] = true end
+		end
+		db.specs = map
+		apply()
+		Repaint()
+	end
+	local function Count()
+		local selected, count = Selected(), 0
+		for _, spec in ipairs(specs) do
+			if selected[spec.id] then count = count + 1 end
+		end
+		return count
+	end
+	return {
+		kind = 'custom',
+		build = function(parent)
+			local dropdown = ui.Dropdown(parent, SPECS_WIDTH, function()
+				local selected = Selected()
+				local items = {
+					{ text = 'Select all', callback = function() Choose(function() return true end) end },
+					{ text = 'Deselect all', callback = function() Choose(function() return false end) end },
+					{ text = 'Melee only', callback = function() Choose(function(id) return melee[id] == true end) end },
+					{ separator = true },
+				}
+				for _, spec in ipairs(specs) do
+					local item = { text = spec.text, checked = selected[spec.id] == true }
+					item.callback = function()
+						local map = CopyTable(Selected())
+						map[spec.id] = not map[spec.id] or nil
+						item.checked = map[spec.id] == true
+						db.specs = map
+						apply()
+						Repaint()
+						return true
+					end
+					items[#items + 1] = item
+				end
+				return items
+			end)
+			ui.Bind(dropdown, function()
+				local count = Count()
+				dropdown.label:SetText(count == #specs and 'All specs' or count == 0 and 'No specs' or (count .. ' specs'))
+			end)
+			return dropdown
+		end,
+	}
+end
+
+local function CrosshairBoard(ui, parent, width)
+	local db = BUI.GetDB().crosshair
+	local Crosshair = BUI.Crosshair
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Crosshair',
+		description = 'A reticle at the center of your screen, shown for the specs you pick.',
+	})
+	board:AddTools('Crosshair', 'Style, size, color and when it hides', {
+		ChannelColor(db, 'Crosshair color'),
+		{ entries = STYLES, width = MENU_WIDTH, get = function() return db.style end, set = function(value) db.style = value end },
+		{ tooltip = 'Appearance and visibility', title = 'Crosshair', options = {
+			Option(db, 'Size', 'size', { min = 5, max = 100, step = 1 }),
+			Option(db, 'Thickness', 'thickness', { min = 1, max = 10, step = 1 }),
+			Option(db, 'Center gap', 'gap', { min = 0, max = 30, step = 1 }),
+			{ label = 'Opacity', min = 10, max = 100, step = 5, get = function() return db.alpha * 100 end, set = function(value) db.alpha = value / 100 end },
+			Option(db, 'Hide out of combat', 'hideOutOfCombat'),
+			Option(db, 'Hide in town', 'hideInTown'),
+			Option(db, 'Range indicator, ' .. Crosshair.RangeLabel(), 'rangeIndicator'),
+			ArrayColor(db, 'In range color', 'inRangeColor', false),
+			ArrayColor(db, 'Out of range color', 'outOfRangeColor', false),
+		} },
+		{ icon = 'mover', tooltip = 'Screen offset', title = 'Position', options = {
+			Option(db, 'Horizontal offset', 'offsetX', { min = -500, max = 500, step = 1 }),
+			Option(db, 'Vertical offset', 'offsetY', { min = -500, max = 500, step = 1 }),
+		} },
+		Eye('Preview', Crosshair.IsPreviewing, Crosshair.SetPreview),
+		Switch(db, 'enabled'),
+	}, Crosshair.Refresh)
+	board:AddTools('Show for specs', 'Specializations the crosshair is shown for', { SpecsTool(ui, db, Crosshair.Refresh) })
+	return board
+end
+
+local function Alerts(ui, _, parent, width)
+	return { AlertsBoard(ui, parent, width), CrosshairBoard(ui, parent, width) }
 end
 
 BUI.PageEngine.RegisterPage('auras', {
 	title = '|cffFF0000Weaker|r Auras',
 	buttonText = '|cffFF0000Weaker|r Auras',
+	icon = 'glow',
 	OnBuild = function(pageFrame)
-		fonts = BUI.BuildFontDropdownItems('GLOBAL')
-		BUI.Tools.AddPageWatermark(pageFrame)
-
-		local page = Layout.Page(pageFrame, { 'Alerts', 'GCD History' })
-		pageFrame._page = page
-		local enable
-		enable = Layout.ModuleHeader(page:GetTab(1), {
-			icon = BUI.C.ICON_PATH,
-			title = 'Weaker Auras',
-			subtitle = 'Low health, marks, crosshair and gateway alerts. Turning the module on or off needs a reload.',
-			iconToggles = true,
-			enabled = BUI.IsModuleEnabled('auras'),
-			onToggle = function(value)
-				BUI.ModulesPage.ConfirmReload('auras', value, function() enable:SetValue(not value) end)
-			end,
+		fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
+		sounds = BUI.BuildSoundDropdownItems()
+		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
+		local handle = Layout.TablePage(page:GetTab(1), { window = Window() }, {
+			icon = 'glow',
+			title = '|cffFF0000Weaker|r Auras',
+			placeholder = 'Search alerts...',
+			tools = {
+				{ icon = 'enable', tooltip = 'Turn the auras module on or off, needs a reload', get = function() return BUI.IsModuleEnabled('auras') end, set = function(value)
+					BUI.ModulesPage.ConfirmReload('auras', value, Repaint)
+				end },
+			},
+			tabs = {
+				{ label = 'Alerts', build = Alerts },
+				{ label = 'GCD History', build = BUI.StreamerToolsPage.GCDHistory },
+			},
 		})
-		BuildAlertsTab(page:GetTab(1))
-		BUI.StreamerToolsPage.BuildGCDHistoryTab(page:GetTab(2))
+		pageFrame._page = handle
+		pageFrame._selectModule = function() handle:SetTab(1) end
 		page:AutoRefresh()
-
-		local MODULE_TABS = { gcdHistory = 2 }
-		pageFrame._selectModule = function(moduleId)
-			if moduleId == 'bloodlust' then BUI.PageEngine.NavigateToID('bloodlust'); return end
-			page:SetTab(MODULE_TABS[moduleId] or 1)
-		end
 	end,
 	OnHide = function()
 		local settings = BUI.GetDB().auras
-		if settings.locked then BUI.Auras.ShowPreview(false) end
-		settings.lowHpLocked = true
-		BUI.Auras.UpdateLowHp()
-		ClearPreviewToggle(lowHpEye)
+		if not settings.locked then BUI.Auras.SetLocked(true) end
+		if settings.lowHpLocked == false then
+			settings.lowHpLocked = true
+			BUI.Auras.UpdateLowHp()
+		end
 		if settings.markLocked == false then
 			settings.markLocked = true
 			BUI.Auras.UpdateMark()
 		end
-		ClearPreviewToggle(markWarningEye)
 		BUI.Crosshair.SetPreview(false)
-		ClearPreviewToggle(crosshairEye)
-		if BUI.Bloodlust.IsPreviewing() then
-			BUI.Bloodlust.StopPreview()
-		end
-		ClearPreviewToggle(bloodlustEye)
-		if not BUI.GetDB().gcdHistory.locked then
-			BUI.GCDHistory.SetLocked(true)
-		end
+		if BUI.Bloodlust.IsPreviewing() then BUI.Bloodlust.StopPreview() end
+		if not BUI.GetDB().gcdHistory.locked then BUI.GCDHistory.SetLocked(true) end
 	end,
 })
