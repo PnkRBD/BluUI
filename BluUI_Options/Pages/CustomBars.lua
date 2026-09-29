@@ -241,8 +241,8 @@ local function SettingsBoard(ui, parent, width, bar, index, page)
 	}, Apply)
 	board:AddTools('Bar', 'Name, icon size, border and opacity', {
 		Color(bar, 'Border color', 'borderColor'),
-		{ tooltip = 'Name, icon size, border and opacity', title = 'Bar', options = {
-			NameOption(bar),
+		{ icon = 'text', tooltip = 'Name', title = 'Bar', options = { NameOption(bar) } },
+		{ tooltip = 'Icon size, border and opacity', title = 'Bar', options = {
 			Option(bar, 'Icon size', 'iconSize', { min = 20, max = 80, step = 1 }),
 			Option(bar, 'Spacing', 'spacing', { min = -20, max = 20, step = 1 }),
 			{ label = 'Zoom %', min = 0, max = 20, step = 1, get = function() return math.floor(bar.zoom * 100 + 0.5) end, set = function(value) bar.zoom = value / 100 end },

@@ -586,7 +586,7 @@ function Layout.TableKit(window)
 		local stacked = spec.stacked
 		local pad = stacked and STACK_PAD or SECTION_PAD
 		local panelX = stacked and 0 or math.floor(width * PANEL_SHARE)
-		local section = setmetatable({ window = window, frame = frame, rows = {}, buttons = {}, panelWidth = width - panelX, pad = pad }, Section)
+		local section = setmetatable({ window = window, frame = frame, rows = {}, buttons = {}, panelWidth = width - panelX, pad = pad, headHeight = spec.columns and TABLE_HEAD or nil }, Section)
 
 		local title = kit.Text(frame, spec.title, 13, 'text')
 		title:SetPoint('TOPLEFT', 0, -(pad + 2))
