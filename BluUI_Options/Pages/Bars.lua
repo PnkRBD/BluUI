@@ -158,6 +158,13 @@ local function TextBoard(ui, parent, width, unit)
 	return board
 end
 
+local function PreviewEye(unit)
+	return { icon = 'eye', tooltip = 'Preview the ready line and the voice lines', get = function() return CastBar.IsPreviewingInterrupt(unit) end, set = function(value)
+		if value then CastBar.PreviewInterrupt(unit) else CastBar.StopInterruptPreview(unit) end
+		Repaint()
+	end }
+end
+
 local function InterruptsBoard(ui, parent, width, unit)
 	local settings = Settings(unit)
 	local board = ui.Board(parent, width, {
@@ -177,6 +184,7 @@ local function InterruptsBoard(ui, parent, width, unit)
 			Option(settings, 'Line width', 'interruptTickWidth', { min = 1, max = 6, step = 1 }),
 			OnUnlessOff(settings, 'Show interrupt window', 'interruptWindow'),
 		} },
+		PreviewEye(unit),
 		OnUnlessOff(settings, nil, 'interruptTick'),
 	}, Apply)
 	board:AddTools('Interrupt voice', 'Spoken alerts when your kick is ready, or will be before the cast ends', {
@@ -187,9 +195,7 @@ local function InterruptsBoard(ui, parent, width, unit)
 			{ label = 'Soon text', kind = 'input', placeholder = 'Kick soon', get = function() return settings.interruptTTSSoonText end, set = function(text) settings.interruptTTSSoonText = text ~= '' and text or 'Kick soon' end },
 			Option(settings, 'Soon lead in seconds', 'interruptTTSSoonWindow', { min = 1, max = 10, step = 0.5 }),
 		} },
-		{ icon = 'eye', tooltip = 'Preview the ready line and the voice lines', get = function() return CastBar.IsPreviewingInterrupt(unit) end, set = function(value)
-			if value then CastBar.PreviewInterrupt(unit) else CastBar.StopInterruptPreview(unit) end
-		end },
+		PreviewEye(unit),
 	}, Apply)
 	return board
 end
