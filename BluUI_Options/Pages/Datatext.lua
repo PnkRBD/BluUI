@@ -322,9 +322,9 @@ local function BuildTable(band, kit)
 	rule:SetPoint('TOPLEFT', ROW_INSET, 0)
 	rule:SetPoint('TOPRIGHT', -ROW_INSET, 0)
 	rule:SetHeight(1)
-	local newBar = kit.Button(footer, 'New bar', 'secondary', function() Create('TEXT') end, 'add')
+	local newBar = kit.Button(footer, 'New bar', 'secondary', function() Create('TEXT') end, 'plus')
 	newBar:SetPoint('LEFT', ROW_INSET, 0)
-	kit.Button(footer, 'New panel', 'secondary', function() Create('PANEL') end, 'add'):SetPoint('LEFT', newBar, 'RIGHT', BUTTON_GAP, 0)
+	kit.Button(footer, 'New panel', 'secondary', function() Create('PANEL') end, 'plus'):SetPoint('LEFT', newBar, 'RIGHT', BUTTON_GAP, 0)
 end
 
 local function BarBoard(ui, parent, width, config)
