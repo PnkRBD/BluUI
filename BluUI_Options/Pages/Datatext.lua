@@ -37,6 +37,9 @@ local ORIENTATIONS = {
 	{ value = 'VERTICAL', text = 'Vertical' },
 }
 
+local CENTERED = { TOP = true, CENTER = true, BOTTOM = true }
+local CENTER_POINT = { TOPLEFT = 'TOP', TOPRIGHT = 'TOP', LEFT = 'CENTER', RIGHT = 'CENTER', BOTTOMLEFT = 'BOTTOM', BOTTOMRIGHT = 'BOTTOM' }
+
 local ALIGNMENTS = {
 	{ value = 'LEFT', text = 'Left' },
 	{ value = 'CENTER', text = 'Center' },
@@ -149,11 +152,18 @@ local function PositionTool(config)
 		end },
 		Option(config, 'Horizontal offset', 'x', { min = -1500, max = 1500, step = 1 }),
 		Option(config, 'Vertical offset', 'y', { min = -1500, max = 1500, step = 1 }),
+		{ label = 'Center horizontally', get = function() return CENTERED[config.point] == true and config.x == 0 end, set = function(value)
+			if not value then return end
+			config.point = CENTER_POINT[config.point] or config.point
+			config.relPoint = config.point
+			config.x = 0
+			Repaint()
+		end },
 		Option(config, 'Align below the minimap', 'alignMinimap'),
 		Option(config, 'Strata', 'strata', { entries = BUI.C.STRATA_OPTIONS }),
 		Option(config, 'Frame level', 'frameLevel', { min = 0, max = 100, step = 1 }),
 	}
-	if Datatext.IsPanel(config) then table.insert(options, 5, Option(config, 'Mirror the chat window', 'mirrorChat')) end
+	if Datatext.IsPanel(config) then table.insert(options, 6, Option(config, 'Mirror the chat window', 'mirrorChat')) end
 	return { icon = 'mover', tooltip = 'Position and layering', title = 'Position', options = options }
 end
 
