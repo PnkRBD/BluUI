@@ -5,14 +5,13 @@ local Datatext = BUI.Datatext
 local Pixel = BUI.Pixel
 
 local PAGE_WIDTH = 960
-local TABLE_HEAD = 36
+local SELECT_ROW = 52
+local SELECT_WIDTH = 220
 local ROW_HEIGHT = 58
-local FOOTER_HEIGHT = 54
 local ROW_INSET = 20
 local NAME_WIDTH = 150
 local SAMPLE_X = 190
 local SAMPLE_GAP = 24
-local MARKER_WIDTH = 2
 local PANEL_SAMPLE = 24
 local PANEL_SAMPLE_MAX = 120
 local BUTTON_GAP = 10
@@ -23,8 +22,6 @@ local ARROW_GAP = 4
 local TOOL_GAP = 12
 local LIST_ROOM = ERASE_SIZE + TOOL_GAP + ARROW * 2 + ARROW_GAP
 local COG_ROOM = ARROW + TOOL_GAP
-
-local COLUMNS = { { 'Name', ROW_INSET }, { 'Sample', SAMPLE_X } }
 
 local CENTERED = { TOP = true, CENTER = true, BOTTOM = true }
 local CENTER_POINT = { TOPLEFT = 'TOP', TOPRIGHT = 'TOP', LEFT = 'CENTER', RIGHT = 'CENTER', BOTTOMLEFT = 'BOTTOM', BOTTOMRIGHT = 'BOTTOM' }
@@ -42,7 +39,7 @@ local ALIGNMENTS = {
 }
 
 local selected
-local rows = {}
+local editor
 local fonts
 
 local function Window()
@@ -63,13 +60,9 @@ local function Current()
 	return selected and list[selected]
 end
 
-local function RefreshTable()
-	for _, row in ipairs(rows) do row:Update() end
-end
-
 local function Apply()
 	Datatext.Apply()
-	RefreshTable()
+	if editor then editor:Update() end
 end
 
 local function RebuildPage()
@@ -271,19 +264,11 @@ local function PanelSample(kit, cell, config)
 	end
 end
 
-local function TableRow(kit, band, config, index)
-	local row = CreateFrame('Button', nil, band)
+local function EditorRow(kit, band, config, index)
+	local row = CreateFrame('Frame', nil, band)
+	row:SetPoint('TOPLEFT', 0, -SELECT_ROW)
+	row:SetPoint('TOPRIGHT', 0, -SELECT_ROW)
 	row:SetHeight(ROW_HEIGHT)
-	kit.Hover(row)
-	local rule = kit.Fill(row, 'rule', 'ARTWORK')
-	rule:SetPoint('TOPLEFT', ROW_INSET, 0)
-	rule:SetPoint('TOPRIGHT', -ROW_INSET, 0)
-	rule:SetHeight(1)
-	rule:SetShown(index > 1)
-	local marker = kit.Fill(row, 'accent', 'ARTWORK', 1)
-	marker:SetPoint('TOPLEFT')
-	marker:SetPoint('BOTTOMLEFT')
-	marker:SetWidth(MARKER_WIDTH)
 	local isPanel = Datatext.IsPanel(config)
 	kit.RowTitle(row, config.name, isPanel and 'Panel' or 'Bar', ROW_INSET, NAME_WIDTH)
 	local cell = CreateFrame('Frame', nil, row)
@@ -292,64 +277,62 @@ local function TableRow(kit, band, config, index)
 	cell:SetClipsChildren(true)
 	local UpdateSample = isPanel and PanelSample(kit, cell, config) or BarSample(kit, cell, config)
 	local placer = kit.Tools(row, BarTools(config, index), Apply)
-	row.widths = placer.widths
-	row:SetScript('OnClick', function() Select(index) end)
-	function row:Place(slots)
-		local used = placer.Place(slots)
-		cell:SetPoint('RIGHT', -(ROW_INSET + used + SAMPLE_GAP), 0)
-	end
-	function row:Update()
-		marker:SetShown(selected == index)
-		UpdateSample()
-	end
+	local used = placer.Place(placer.widths)
+	cell:SetPoint('RIGHT', -(ROW_INSET + used + SAMPLE_GAP), 0)
+	row.Update = UpdateSample
+	UpdateSample()
 	return row
 end
 
-local function TableHeight()
-	return TABLE_HEAD + math.max(1, #Bars()) * ROW_HEIGHT + FOOTER_HEIGHT
+local function Selector(kit, head)
+	local dropdown = kit.Dropdown(head, SELECT_WIDTH, function()
+		local items = {}
+		local function Group(title, panels)
+			local started = false
+			for index, config in ipairs(Bars()) do
+				if Datatext.IsPanel(config) == panels then
+					if not started then
+						items[#items + 1] = { title = title }
+						started = true
+					end
+					items[#items + 1] = { text = config.name, checked = index == selected, callback = function() Select(index) end }
+				end
+			end
+		end
+		Group('Bars', false)
+		Group('Panels', true)
+		return items
+	end)
+	dropdown:SetPoint('LEFT', ROW_INSET, 0)
+	dropdown.label:SetText(Current().name)
+	return dropdown
 end
 
 local function BuildTable(band, kit)
-	rows = {}
-	for _, column in ipairs(COLUMNS) do
-		kit.Text(band, column[1]:upper(), 9, 'faint'):SetPoint('TOPLEFT', column[2], -20)
-	end
-	local y = TABLE_HEAD
-	local list = Bars()
-	if #list == 0 then
-		local empty = CreateFrame('Frame', nil, band)
-		empty:SetPoint('TOPLEFT', 0, -y)
-		empty:SetPoint('TOPRIGHT', 0, -y)
-		empty:SetHeight(ROW_HEIGHT)
-		kit.Text(empty, 'Nothing here yet, add a bar or a panel below', 12, 'muted'):SetPoint('LEFT', ROW_INSET, 0)
-		y = y + ROW_HEIGHT
-	end
-	local slots = {}
-	for index, config in ipairs(list) do
-		local row = TableRow(kit, band, config, index)
-		row:SetPoint('TOPLEFT', 0, -y)
-		row:SetPoint('TOPRIGHT', 0, -y)
-		rows[index] = row
-		y = y + ROW_HEIGHT
-		for slot, width in pairs(row.widths) do
-			if not slots[slot] or width > slots[slot] then slots[slot] = width end
-		end
-	end
-	for _, row in ipairs(rows) do
-		row:Place(slots)
-		row:Update()
-	end
-	local footer = CreateFrame('Frame', nil, band)
-	footer:SetPoint('TOPLEFT', 0, -y)
-	footer:SetPoint('TOPRIGHT', 0, -y)
-	footer:SetHeight(FOOTER_HEIGHT)
-	local rule = kit.Fill(footer, 'rule', 'ARTWORK')
-	rule:SetPoint('TOPLEFT', ROW_INSET, 0)
-	rule:SetPoint('TOPRIGHT', -ROW_INSET, 0)
+	local head = CreateFrame('Frame', nil, band)
+	head:SetPoint('TOPLEFT')
+	head:SetPoint('TOPRIGHT')
+	head:SetHeight(SELECT_ROW)
+	local rule = kit.Fill(head, 'rule', 'ARTWORK')
+	rule:SetPoint('BOTTOMLEFT', ROW_INSET, 0)
+	rule:SetPoint('BOTTOMRIGHT', -ROW_INSET, 0)
 	rule:SetHeight(1)
-	local newBar = kit.Button(footer, 'New bar', 'secondary', function() Create('TEXT') end, 'plus')
-	newBar:SetPoint('LEFT', ROW_INSET, 0)
-	kit.Button(footer, 'New panel', 'secondary', function() Create('PANEL') end, 'plus'):SetPoint('LEFT', newBar, 'RIGHT', BUTTON_GAP, 0)
+	local newPanel = kit.Button(head, 'New panel', 'secondary', function() Create('PANEL') end, 'plus')
+	newPanel:SetPoint('RIGHT', -ROW_INSET, 0)
+	kit.Button(head, 'New bar', 'secondary', function() Create('TEXT') end, 'plus'):SetPoint('RIGHT', newPanel, 'LEFT', -BUTTON_GAP, 0)
+	local config = Current()
+	if config then
+		Selector(kit, head)
+		editor = EditorRow(kit, band, config, selected)
+	else
+		editor = nil
+		kit.Text(head, 'No bars or panels yet', 12, 'muted'):SetPoint('LEFT', ROW_INSET, 0)
+		kit.Text(band, 'Add a bar for datatexts, or a panel for a blank backdrop', 12, 'muted'):SetPoint('TOPLEFT', ROW_INSET, -(SELECT_ROW + ROW_HEIGHT / 2 - 6))
+	end
+end
+
+local function TableHeight()
+	return SELECT_ROW + ROW_HEIGHT
 end
 
 local function DatatextOptions(entry, config)
