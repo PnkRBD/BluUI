@@ -1,6 +1,6 @@
 local BUI = BluUI
 local BUILib = BUI.BUILibClient
-local Controls, Layout, Modals, Widget = BUILib.Controls, BUILib.Layout, BUILib.Modals, BUILib.Widget
+local Layout, Modals, Widget = BUILib.Layout, BUILib.Modals, BUILib.Widget
 local MinimapModule = BUI.Minimap
 local Datatext = BUI.Datatext
 local ButtonBar = BUI.MinimapButtonBar
@@ -17,9 +17,7 @@ local PREVIEW_TICK = 2
 local ICON_SIZE = 18
 local NAME_WIDTH = 260
 local SLIDER_WIDTH = 220
-local DROPDOWN_WIDTH = 200
-local SWATCH_SIZE = 28
-local SWATCH_ROOM = 60
+local MENU_WIDTH = 160
 local SWITCH_WIDTH = 40
 local SHOWN_COLUMN = 344
 local ARROW = 22
@@ -88,6 +86,7 @@ local PREVIEW_DOCK = {
 }
 
 local preview
+local fonts
 
 local function Window()
 	return BUI.PageEngine.window
@@ -113,13 +112,6 @@ local function RefreshPreview()
 	if preview then preview:UpdatePreview() end
 end
 
-local function Named(entries, value)
-	for _, entry in ipairs(entries) do
-		if entry.value == value then return entry.text end
-	end
-	return value
-end
-
 local function Switch(board, label, get, set, tip)
 	board:AddSwitch(label, get, function(value)
 		set(value)
@@ -132,47 +124,6 @@ local function Slider(ui, row, minimum, maximum, step, get, set)
 		set(value)
 		RefreshPreview()
 	end }):SetPoint('RIGHT', -ui.ROW_INSET, 0)
-end
-
-local function Menu(ui, row, entries, get, set)
-	local dropdown = ui.Dropdown(row, DROPDOWN_WIDTH, function()
-		local current = get()
-		local items = {}
-		for _, entry in ipairs(entries) do
-			items[#items + 1] = { text = entry.text, checked = entry.value == current, callback = function()
-				set(entry.value)
-				RefreshPreview()
-				Repaint()
-			end }
-		end
-		return items
-	end)
-	dropdown:SetPoint('RIGHT', -ui.ROW_INSET, 0)
-	ui.Bind(row, function() dropdown.label:SetText(Named(entries, get())) end)
-end
-
-local function FontMenu(ui, row, get, set)
-	Menu(ui, row, BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION), get, set)
-end
-
-local function ColorRow(ui, board, name, sub, hasOpacity, get, set)
-	local row = board:AddRow(name, sub, SWATCH_ROOM)
-	local swatch = ui.Swatch(row, SWATCH_SIZE, function(self)
-		local red, green, blue, alpha = get()
-		Controls.OpenColorPicker({
-			r = red, g = green, b = blue, a = alpha, hasOpacity = hasOpacity, anchorTo = self,
-			callback = function(newRed, newGreen, newBlue, newAlpha, cancelled)
-				if cancelled then set(red, green, blue, alpha) else set(newRed, newGreen, newBlue, newAlpha) end
-				RefreshPreview()
-				Repaint()
-			end,
-		})
-	end)
-	swatch:SetPoint('RIGHT', -ui.ROW_INSET, 0)
-	ui.Bind(row, function()
-		local red, green, blue, alpha = get()
-		swatch.fill:SetVertexColor(red, green, blue, hasOpacity and alpha or 1)
-	end)
 end
 
 local function OrderArrows(ui, row, onMove)
@@ -784,18 +735,18 @@ local function MapBoard(ui, parent, width)
 		MinimapModule.ToggleRotation(value)
 	end)
 	Switch(board, 'Hide the BluUI button', BUI.IsMinimapButtonHidden, BUI.SetMinimapButtonHidden)
-	Slider(ui, board:AddRow('Scale', 'Percent of the default size', SLIDER_WIDTH), 50, 200, 1,
-		function() return Interface().minimapScale end,
-		MinimapModule.SetScale)
-	Slider(ui, board:AddRow('Border width', 'Pixels around the map', SLIDER_WIDTH), 0, 10, 1,
-		function() return Interface().minimapBorderWidth end,
-		MinimapModule.SetBorderWidth)
-	Slider(ui, board:AddRow('From the right edge', 'Distance from the right of the screen', SLIDER_WIDTH), 0, floor(GetScreenWidth()), 1,
-		function() return -(MinimapModule.GetPosition()) end,
-		function(value) MinimapModule.SetPositionX(-value) end)
-	Slider(ui, board:AddRow('From the top edge', 'Distance from the top of the screen', SLIDER_WIDTH), 0, floor(GetScreenHeight()), 1,
-		function() local _, y = MinimapModule.GetPosition() return -y end,
-		function(value) MinimapModule.SetPositionY(-value) end)
+	board:AddTools('Size and frame', 'How big the map is and the border around it', {
+		{ tooltip = 'Scale and border', title = 'Map', options = {
+			{ label = 'Scale', min = 50, max = 200, step = 1, get = function() return Interface().minimapScale end, set = MinimapModule.SetScale },
+			{ label = 'Border width', min = 0, max = 10, step = 1, get = function() return Interface().minimapBorderWidth end, set = MinimapModule.SetBorderWidth },
+		} },
+	}, RefreshPreview)
+	board:AddTools('Position', 'Distance from the right and top edges of the screen', {
+		{ icon = 'mover', tooltip = 'Position', title = 'Position', options = {
+			{ label = 'From the right edge', min = 0, max = floor(GetScreenWidth()), step = 1, get = function() return -(MinimapModule.GetPosition()) end, set = function(value) MinimapModule.SetPositionX(-value) end },
+			{ label = 'From the top edge', min = 0, max = floor(GetScreenHeight()), step = 1, get = function() local _, y = MinimapModule.GetPosition() return -y end, set = function(value) MinimapModule.SetPositionY(-value) end },
+		} },
+	}, RefreshPreview)
 	return board
 end
 
@@ -834,76 +785,53 @@ local function IndicatorsSection(ui, parent, width)
 	return section
 end
 
-local function ClockBoard(ui, parent, width)
+local function TextBoard(ui, parent, width)
 	local board = ui.Board(parent, width, {
 		stacked = true,
-		title = 'Clock',
-		description = 'The time in the corner of the map. Drag it in the preview above, or nudge it here.',
+		title = 'Text',
+		description = 'The clock and the zone name on the map. Drag them in the preview above, or nudge them from their cogs.',
 	})
-	Switch(board, 'Clock', function() return Interface().minimapClock == true end, function(value)
-		Interface().minimapClock = value
-		MinimapModule.ToggleClock(value)
-	end)
-	Switch(board, '24-hour', function() return Interface().minimapClock24h == true end, function(value)
-		Interface().minimapClock24h = value
-		MinimapModule.SetClockFormat(value)
-	end)
-	Switch(board, 'Server time', function() return Interface().minimapClockServer == true end, function(value)
-		Interface().minimapClockServer = value
-		MinimapModule.SetClockSource(value)
-	end)
-	Slider(ui, board:AddRow('Size', 'Font size', SLIDER_WIDTH), 8, 24, 1,
-		function() return Interface().minimapClockSize end,
-		function(value) Interface().minimapClockSize = value MinimapModule.RefreshClock() end)
-	Slider(ui, board:AddRow('Horizontal offset', 'From its corner', SLIDER_WIDTH), -300, 300, 1,
-		function() return Interface().minimapClockX end,
-		function(value) Interface().minimapClockX = value MinimapModule.RefreshClock() end)
-	Slider(ui, board:AddRow('Vertical offset', 'From its corner', SLIDER_WIDTH), -300, 300, 1,
-		function() return Interface().minimapClockY end,
-		function(value) Interface().minimapClockY = value MinimapModule.RefreshClock() end)
-	FontMenu(ui, board:AddRow('Font', 'Global unless you pick one', DROPDOWN_WIDTH),
-		function() return Interface().minimapClockFont or BUI.C.GLOBAL_OPTION end,
-		function(value) Interface().minimapClockFont = value MinimapModule.RefreshClock() end)
-	ColorRow(ui, board, 'Color', 'Text color', false,
-		function() local color = Interface().minimapClockColor return color.r, color.g, color.b end,
-		function(red, green, blue) Interface().minimapClockColor = { r = red, g = green, b = blue } MinimapModule.RefreshClock() end)
+	board:AddTools('Clock', 'The time in the corner of the map', {
+		{ kind = 'swatch', tooltip = 'Text color',
+			get = function() local color = Interface().minimapClockColor return color.r, color.g, color.b, 1 end,
+			set = function(red, green, blue) Interface().minimapClockColor = { r = red, g = green, b = blue } MinimapModule.RefreshClock() end },
+		{ entries = fonts, width = MENU_WIDTH,
+			get = function() return Interface().minimapClockFont or BUI.C.GLOBAL_OPTION end,
+			set = function(value) Interface().minimapClockFont = value MinimapModule.RefreshClock() end },
+		{ tooltip = 'Format, size and offsets', title = 'Clock', options = {
+			{ label = '24-hour', get = function() return Interface().minimapClock24h == true end, set = function(value) Interface().minimapClock24h = value MinimapModule.SetClockFormat(value) end },
+			{ label = 'Server time', get = function() return Interface().minimapClockServer == true end, set = function(value) Interface().minimapClockServer = value MinimapModule.SetClockSource(value) end },
+			{ label = 'Size', min = 8, max = 24, step = 1, get = function() return Interface().minimapClockSize end, set = function(value) Interface().minimapClockSize = value MinimapModule.RefreshClock() end },
+			{ label = 'Horizontal offset', min = -300, max = 300, step = 1, get = function() return Interface().minimapClockX end, set = function(value) Interface().minimapClockX = value MinimapModule.RefreshClock() end },
+			{ label = 'Vertical offset', min = -300, max = 300, step = 1, get = function() return Interface().minimapClockY end, set = function(value) Interface().minimapClockY = value MinimapModule.RefreshClock() end },
+		} },
+		{ get = function() return Interface().minimapClock == true end, set = function(value) Interface().minimapClock = value MinimapModule.ToggleClock(value) end },
+	}, RefreshPreview)
+	board:AddTools('Zone name', 'The zone you are in, at the top of the map', {
+		{ kind = 'swatch', tooltip = 'Custom color',
+			get = function() local color = Interface().minimapZoneColor return color.r, color.g, color.b, 1 end,
+			set = function(red, green, blue)
+				Interface().minimapZoneColorCustom = true
+				Interface().minimapZoneColor = { r = red, g = green, b = blue }
+				MinimapModule.RefreshZoneText()
+			end },
+		{ entries = fonts, width = MENU_WIDTH,
+			get = function() return Interface().minimapZoneFont or BUI.C.GLOBAL_OPTION end,
+			set = function(value) Interface().minimapZoneFont = value MinimapModule.RefreshZoneText() end },
+		{ tooltip = 'Color, size and offsets', title = 'Zone name', options = {
+			{ label = 'Custom color, off colors by zone type', get = function() return Interface().minimapZoneColorCustom == true end, set = function(value) Interface().minimapZoneColorCustom = value MinimapModule.RefreshZoneText() end },
+			{ label = 'Size', min = 8, max = 24, step = 1, get = function() return Interface().minimapZoneSize end, set = function(value) Interface().minimapZoneSize = value MinimapModule.RefreshZoneText() end },
+			{ label = 'Horizontal offset', min = -300, max = 300, step = 1, get = function() return Interface().minimapZoneX end, set = function(value) Interface().minimapZoneX = value MinimapModule.RefreshZoneText() end },
+			{ label = 'Vertical offset', min = -300, max = 300, step = 1, get = function() return Interface().minimapZoneY end, set = function(value) Interface().minimapZoneY = value MinimapModule.RefreshZoneText() end },
+		} },
+		{ get = function() return Interface().minimapZone == true end, set = function(value) Interface().minimapZone = value MinimapModule.ToggleZoneText(value) end },
+	}, RefreshPreview)
 	return board
 end
 
-local function ZoneBoard(ui, parent, width)
-	local board = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Zone name',
-		description = 'The zone you are in, at the top of the map. Drag it in the preview above, or nudge it here.',
-	})
-	Switch(board, 'Zone name', function() return Interface().minimapZone == true end, function(value)
-		Interface().minimapZone = value
-		MinimapModule.ToggleZoneText(value)
-	end)
-	Switch(board, 'Custom color', function() return Interface().minimapZoneColorCustom == true end, function(value)
-		Interface().minimapZoneColorCustom = value
-		MinimapModule.RefreshZoneText()
-	end, 'Off colors the name by zone type')
-	Slider(ui, board:AddRow('Size', 'Font size', SLIDER_WIDTH), 8, 24, 1,
-		function() return Interface().minimapZoneSize end,
-		function(value) Interface().minimapZoneSize = value MinimapModule.RefreshZoneText() end)
-	Slider(ui, board:AddRow('Horizontal offset', 'From its corner', SLIDER_WIDTH), -300, 300, 1,
-		function() return Interface().minimapZoneX end,
-		function(value) Interface().minimapZoneX = value MinimapModule.RefreshZoneText() end)
-	Slider(ui, board:AddRow('Vertical offset', 'From its corner', SLIDER_WIDTH), -300, 300, 1,
-		function() return Interface().minimapZoneY end,
-		function(value) Interface().minimapZoneY = value MinimapModule.RefreshZoneText() end)
-	FontMenu(ui, board:AddRow('Font', 'Global unless you pick one', DROPDOWN_WIDTH),
-		function() return Interface().minimapZoneFont or BUI.C.GLOBAL_OPTION end,
-		function(value) Interface().minimapZoneFont = value MinimapModule.RefreshZoneText() end)
-	ColorRow(ui, board, 'Color', 'Used when custom color is on', false,
-		function() local color = Interface().minimapZoneColor return color.r, color.g, color.b end,
-		function(red, green, blue)
-			Interface().minimapZoneColorCustom = true
-			Interface().minimapZoneColor = { r = red, g = green, b = blue }
-			MinimapModule.RefreshZoneText()
-		end)
-	return board
+local function ApplyDatatext()
+	Datatext.Apply()
+	RefreshPreview()
 end
 
 local function DatatextBoard(ui, parent, width)
@@ -912,55 +840,37 @@ local function DatatextBoard(ui, parent, width)
 		title = 'Datatext bar',
 		description = 'A strip of datatexts attached to the map.',
 	})
-	Switch(board, 'Datatext bar', function() return Bar().enabled ~= false end, function(value)
-		Bar().enabled = value
-		Datatext.Apply()
-	end)
-	Switch(board, 'Hide labels', function() return Bar().hideLabels == true end, function(value)
-		Bar().hideLabels = value
-		Datatext.Apply()
-	end)
-	Switch(board, 'Border', function() return Bar().border == true end, function(value)
-		Bar().border = value
-		Datatext.Apply()
-	end)
-	Menu(ui, board:AddRow('Anchor', 'Which side of the map it hangs on', DROPDOWN_WIDTH), ANCHORS,
-		function() return Bar().anchor end,
-		function(value) Bar().anchor = value Datatext.Apply() end)
-	Slider(ui, board:AddRow('Gap from the map', nil, SLIDER_WIDTH), 0, 40, 1,
-		function() return Bar().gap end,
-		function(value) Bar().gap = value Datatext.Apply() end)
-	Slider(ui, board:AddRow('Height', nil, SLIDER_WIDTH), 10, 40, 1,
-		function() return Bar().height end,
-		function(value) Bar().height = value Datatext.Apply() end)
-	Slider(ui, board:AddRow('Spacing', 'Pixels between datatexts', SLIDER_WIDTH), 0, 40, 1,
-		function() return Bar().spacing end,
-		function(value)
-			local config = Bar()
-			config.spacing, config.spacingPx = value, true
-			Datatext.Apply()
-		end)
-	Slider(ui, board:AddRow('Spread', 'Pushes the datatexts apart to fill the bar', SLIDER_WIDTH), 0, 100, 1,
-		function() return tonumber(Bar().spread) or 0 end,
-		function(value) Bar().spread = value Datatext.Apply() end)
-	Slider(ui, board:AddRow('Background opacity', nil, SLIDER_WIDTH), 0, 100, 1,
-		function() return floor(Bar().bgAlpha * 100 + 0.5) end,
-		function(value) Bar().bgAlpha = value / 100 Datatext.Apply() end)
-	Slider(ui, board:AddRow('Font size', nil, SLIDER_WIDTH), 8, 24, 1,
-		function() return Bar().fontSize end,
-		function(value) Bar().fontSize = value Datatext.Apply() end)
-	FontMenu(ui, board:AddRow('Font', 'Global unless you pick one', DROPDOWN_WIDTH),
-		function() return Bar().font end,
-		function(value) Bar().font = value Datatext.Apply() end)
-	ColorRow(ui, board, 'Background color', nil, false,
-		function() local color = Bar().bgColor return color.r, color.g, color.b end,
-		function(red, green, blue) Bar().bgColor = { r = red, g = green, b = blue } Datatext.Apply() end)
-	ColorRow(ui, board, 'Border color', nil, true,
-		function() local color = Bar().borderColor return color.r, color.g, color.b, color.a end,
-		function(red, green, blue, alpha) Bar().borderColor = { r = red, g = green, b = blue, a = alpha } Datatext.Apply() end)
-	ColorRow(ui, board, 'Value color', 'The numbers next to each label', true,
-		function() local color = Bar().colorValue return color.r, color.g, color.b, color.a end,
-		function(red, green, blue, alpha) Bar().colorValue = { r = red, g = green, b = blue, a = alpha } Datatext.Apply() end)
+	board:AddTools('Bar', 'Where it hangs on the map and how it is drawn', {
+		{ kind = 'swatch', tooltip = 'Background color',
+			get = function() local color = Bar().bgColor return color.r, color.g, color.b, 1 end,
+			set = function(red, green, blue) Bar().bgColor = { r = red, g = green, b = blue } end },
+		{ entries = ANCHORS, width = MENU_WIDTH, get = function() return Bar().anchor end, set = function(value) Bar().anchor = value end },
+		{ tooltip = 'Gap, height, spacing and background', title = 'Bar', options = {
+			{ label = 'Gap from the map', min = 0, max = 40, step = 1, get = function() return Bar().gap end, set = function(value) Bar().gap = value end },
+			{ label = 'Height', min = 10, max = 40, step = 1, get = function() return Bar().height end, set = function(value) Bar().height = value end },
+			{ label = 'Spacing', min = 0, max = 40, step = 1, get = function() return Bar().spacing end, set = function(value)
+				local config = Bar()
+				config.spacing, config.spacingPx = value, true
+			end },
+			{ label = 'Spread', min = 0, max = 100, step = 1, get = function() return tonumber(Bar().spread) or 0 end, set = function(value) Bar().spread = value end },
+			{ label = 'Background opacity', min = 0, max = 100, step = 1, get = function() return floor(Bar().bgAlpha * 100 + 0.5) end, set = function(value) Bar().bgAlpha = value / 100 end },
+			{ label = 'Border', get = function() return Bar().border == true end, set = function(value) Bar().border = value end },
+			{ kind = 'swatch', label = 'Border color', opacity = true,
+				get = function() local color = Bar().borderColor return color.r, color.g, color.b, color.a end,
+				set = function(red, green, blue, alpha) Bar().borderColor = { r = red, g = green, b = blue, a = alpha } end },
+		} },
+		{ get = function() return Bar().enabled ~= false end, set = function(value) Bar().enabled = value end },
+	}, ApplyDatatext)
+	board:AddTools('Text', 'Font, size and the value color', {
+		{ kind = 'swatch', tooltip = 'Value color', opacity = true,
+			get = function() local color = Bar().colorValue return color.r, color.g, color.b, color.a end,
+			set = function(red, green, blue, alpha) Bar().colorValue = { r = red, g = green, b = blue, a = alpha } end },
+		{ entries = fonts, width = MENU_WIDTH, get = function() return Bar().font end, set = function(value) Bar().font = value end },
+		{ tooltip = 'Size and labels', title = 'Text', options = {
+			{ label = 'Font size', min = 8, max = 24, step = 1, get = function() return Bar().fontSize end, set = function(value) Bar().fontSize = value end },
+			{ label = 'Hide labels', get = function() return Bar().hideLabels == true end, set = function(value) Bar().hideLabels = value end },
+		} },
+	}, ApplyDatatext)
 	return board
 end
 
@@ -1005,71 +915,40 @@ local function ReadoutsBoard(ui, parent, width, page)
 	return board
 end
 
-local function DrawerBoard(ui, parent, width)
-	local board = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Addon drawer',
-		description = 'Collects addon minimap buttons behind a tab on the edge of the map.',
-	})
-	Switch(board, 'Drawer', function() return Interface().drawerEnabled == true end, MinimapModule.ToggleDrawer)
-	Menu(ui, board:AddRow('Side', 'Which edge the tab sits on', DROPDOWN_WIDTH), SIDES,
-		function() return Interface().drawerSide end,
-		function(value)
-			Interface().drawerSide = value
-			MinimapModule.SetDrawerSide(value)
-		end)
-	Slider(ui, board:AddRow('Horizontal offset', 'Nudge along the edge', SLIDER_WIDTH), -300, 300, 1,
-		function() return Interface().drawerX end,
-		function(value) Interface().drawerX = value MinimapModule.RepositionDrawer() end)
-	Slider(ui, board:AddRow('Vertical offset', 'Nudge along the edge', SLIDER_WIDTH), -300, 300, 1,
-		function() return Interface().drawerY end,
-		function(value) Interface().drawerY = value MinimapModule.RepositionDrawer() end)
-	return board
-end
-
-local function ButtonBarBoard(ui, parent, width)
-	local function Refresh()
+local function AddonButtonsBoard(ui, parent, width)
+	local function RefreshButtonBar()
 		MinimapModule.RefreshButtonBar()
+		RefreshPreview()
 	end
 	local board = ui.Board(parent, width, {
 		stacked = true,
-		title = 'Button bar',
-		description = 'Addon buttons in a tidy row beside the map instead of scattered around it.',
+		title = 'Addon buttons',
+		description = 'Tidy the buttons other addons put on the minimap: behind a drawer tab on its edge, or in a row beside it.',
 	})
-	Switch(board, 'Button bar', function() return Buttons().enabled == true end, function(value)
-		Buttons().enabled = value
-		Refresh()
-	end)
-	Menu(ui, board:AddRow('Side', 'Which edge of the map', DROPDOWN_WIDTH), SIDES,
-		function() return Buttons().side end,
-		function(value) Buttons().side = value Refresh() end)
-	Menu(ui, board:AddRow('Align', 'Along that edge', DROPDOWN_WIDTH), ALIGNS,
-		function() return Buttons().align end,
-		function(value) Buttons().align = value Refresh() end)
-	Slider(ui, board:AddRow('Icon size', nil, SLIDER_WIDTH), 12, 40, 1,
-		function() return Buttons().size end,
-		function(value) Buttons().size = value Refresh() end)
-	Slider(ui, board:AddRow('Spacing', 'Between icons', SLIDER_WIDTH), -1, 10, 1,
-		function() return Buttons().spacing end,
-		function(value) Buttons().spacing = value Refresh() end)
-	Slider(ui, board:AddRow('Gap from the map', nil, SLIDER_WIDTH), 0, 10, 1,
-		function() return Buttons().gap end,
-		function(value) Buttons().gap = value Refresh() end)
-	Slider(ui, board:AddRow('Per line', '0 keeps them on one line', SLIDER_WIDTH), 0, 20, 1,
-		function() return Buttons().perLine end,
-		function(value) Buttons().perLine = value Refresh() end)
-	Slider(ui, board:AddRow('Horizontal offset', nil, SLIDER_WIDTH), -300, 300, 1,
-		function() return Buttons().offsetX end,
-		function(value) Buttons().offsetX = value Refresh() end)
-	Slider(ui, board:AddRow('Vertical offset', nil, SLIDER_WIDTH), -300, 300, 1,
-		function() return Buttons().offsetY end,
-		function(value) Buttons().offsetY = value Refresh() end)
-	ColorRow(ui, board, 'Tile background', 'Behind every icon', true,
-		function() local color = Buttons().background return color[1], color[2], color[3], color[4] end,
-		function(red, green, blue, alpha)
-			Buttons().background = { red, green, blue, alpha }
-			Refresh()
-		end)
+	board:AddTools('Drawer', 'Collects the buttons behind a tab on the edge of the map', {
+		{ tooltip = 'Side and offsets', title = 'Drawer', options = {
+			{ label = 'Side', entries = SIDES, get = function() return Interface().drawerSide end, set = function(value) Interface().drawerSide = value MinimapModule.SetDrawerSide(value) end },
+			{ label = 'Horizontal offset', min = -300, max = 300, step = 1, get = function() return Interface().drawerX end, set = function(value) Interface().drawerX = value MinimapModule.RepositionDrawer() end },
+			{ label = 'Vertical offset', min = -300, max = 300, step = 1, get = function() return Interface().drawerY end, set = function(value) Interface().drawerY = value MinimapModule.RepositionDrawer() end },
+		} },
+		{ get = function() return Interface().drawerEnabled == true end, set = MinimapModule.ToggleDrawer },
+	}, RefreshPreview)
+	board:AddTools('Button bar', 'A tidy row of buttons beside the map', {
+		{ kind = 'swatch', tooltip = 'Tile background', opacity = true,
+			get = function() local color = Buttons().background return color[1], color[2], color[3], color[4] end,
+			set = function(red, green, blue, alpha) Buttons().background = { red, green, blue, alpha } end },
+		{ tooltip = 'Side, size and spacing', title = 'Button bar', options = {
+			{ label = 'Side', entries = SIDES, get = function() return Buttons().side end, set = function(value) Buttons().side = value end },
+			{ label = 'Align', entries = ALIGNS, get = function() return Buttons().align end, set = function(value) Buttons().align = value end },
+			{ label = 'Icon size', min = 12, max = 40, step = 1, get = function() return Buttons().size end, set = function(value) Buttons().size = value end },
+			{ label = 'Spacing', min = -1, max = 10, step = 1, get = function() return Buttons().spacing end, set = function(value) Buttons().spacing = value end },
+			{ label = 'Gap from the map', min = 0, max = 10, step = 1, get = function() return Buttons().gap end, set = function(value) Buttons().gap = value end },
+			{ label = 'Per line, 0 keeps one line', min = 0, max = 20, step = 1, get = function() return Buttons().perLine end, set = function(value) Buttons().perLine = value end },
+			{ label = 'Horizontal offset', min = -300, max = 300, step = 1, get = function() return Buttons().offsetX end, set = function(value) Buttons().offsetX = value end },
+			{ label = 'Vertical offset', min = -300, max = 300, step = 1, get = function() return Buttons().offsetY end, set = function(value) Buttons().offsetY = value end },
+		} },
+		{ get = function() return Buttons().enabled == true end, set = function(value) Buttons().enabled = value end },
+	}, RefreshButtonBar)
 	return board
 end
 
@@ -1115,9 +994,9 @@ end
 local function Panes(ui, _, parent, width, item, page)
 	if item.id == 'map' then return { MapBoard(ui, parent, width) } end
 	if item.id == 'indicators' then return { IndicatorsSection(ui, parent, width) } end
-	if item.id == 'text' then return { ClockBoard(ui, parent, width), ZoneBoard(ui, parent, width) } end
+	if item.id == 'text' then return { TextBoard(ui, parent, width) } end
 	if item.id == 'datatext' then return { DatatextBoard(ui, parent, width), ReadoutsBoard(ui, parent, width, page) } end
-	return { DrawerBoard(ui, parent, width), ButtonBarBoard(ui, parent, width), ButtonsBoard(ui, parent, width, page) }
+	return { AddonButtonsBoard(ui, parent, width), ButtonsBoard(ui, parent, width, page) }
 end
 
 BUI.PageEngine.RegisterPage('minimap', {
@@ -1125,6 +1004,7 @@ BUI.PageEngine.RegisterPage('minimap', {
 	buttonText = 'Minimap',
 	icon = 'minimap',
 	OnBuild = function(pageFrame)
+		fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
 		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
 		local adapter = { tabContents = {}, currentTab = 1 }
 		for index in ipairs(PANE_IDS) do adapter.tabContents[index] = {} end
