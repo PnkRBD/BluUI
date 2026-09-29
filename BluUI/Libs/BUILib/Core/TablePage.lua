@@ -370,29 +370,33 @@ function Layout.TableKit(window)
 		return button
 	end
 
+	local function SwatchFill(swatch, layer, subLayer)
+		local fill = swatch:CreateTexture(nil, layer, nil, subLayer)
+		fill:SetTexture(Widget.WHITE)
+		return fill
+	end
+
 	function kit.Swatch(parent, size, onClick)
 		local swatch = CreateFrame(onClick and 'Button' or 'Frame', nil, parent)
 		swatch:SetSize(size, size)
 		if onClick then swatch:SetScript('OnClick', onClick) end
-		kit.Disc(swatch, size, 'rule', 'ARTWORK', 0):SetPoint('CENTER')
-		swatch.fill = kit.Disc(swatch, size - 4, nil, 'ARTWORK', 1)
-		swatch.fill:SetPoint('CENTER')
+		kit.Fill(swatch, 'rule', 'ARTWORK', 0):SetAllPoints()
+		swatch.fill = SwatchFill(swatch, 'ARTWORK', 1)
+		swatch.fill:SetPoint('TOPLEFT', 1, -1)
+		swatch.fill:SetPoint('BOTTOMRIGHT', -1, 1)
 		return swatch
 	end
 
 	function kit.SplitSwatch(parent, size)
 		local swatch = CreateFrame('Frame', nil, parent)
 		swatch:SetSize(size, size)
-		kit.Disc(swatch, size, 'rule', 'ARTWORK', 0):SetPoint('CENTER')
-		local inner = size - 4
-		swatch.left = kit.Disc(swatch, inner, nil, 'ARTWORK', 1)
-		swatch.left:SetTexCoord(0, 0.5, 0, 1)
-		swatch.left:SetSize(inner / 2, inner)
-		swatch.left:SetPoint('RIGHT', swatch, 'CENTER')
-		swatch.right = kit.Disc(swatch, inner, nil, 'ARTWORK', 1)
-		swatch.right:SetTexCoord(0.5, 1, 0, 1)
-		swatch.right:SetSize(inner / 2, inner)
-		swatch.right:SetPoint('LEFT', swatch, 'CENTER')
+		kit.Fill(swatch, 'rule', 'ARTWORK', 0):SetAllPoints()
+		swatch.left = SwatchFill(swatch, 'ARTWORK', 1)
+		swatch.left:SetPoint('TOPLEFT', 1, -1)
+		swatch.left:SetPoint('BOTTOMRIGHT', swatch, 'BOTTOM', 0, 1)
+		swatch.right = SwatchFill(swatch, 'ARTWORK', 1)
+		swatch.right:SetPoint('TOPLEFT', swatch, 'TOP', 0, -1)
+		swatch.right:SetPoint('BOTTOMRIGHT', -1, 1)
 		return swatch
 	end
 
