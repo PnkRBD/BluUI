@@ -146,6 +146,14 @@ local function PositionTool(config)
 	return { icon = 'mover', tooltip = 'Position and layering', title = 'Position', options = options }
 end
 
+local function NameOption(config)
+	return { label = 'Name', kind = 'input', placeholder = 'Name', get = function() return config.name end, set = function(name)
+		if name == '' then return end
+		config.name = name
+		RebuildPage()
+	end }
+end
+
 local function BarTools(config, index)
 	local isPanel = Datatext.IsPanel(config)
 	local tools = {
@@ -153,12 +161,15 @@ local function BarTools(config, index)
 		Swatch(config, 'Background color', 'bgColor', false),
 	}
 	if isPanel then
-		tools[#tools + 1] = { kind = 'input', slot = 'menu', width = MENU_WIDTH, placeholder = 'No title', get = function() return config.title end, set = function(text) config.title = text end }
-		tools[#tools + 1] = { tooltip = 'Title, size, border and opacity', title = config.name, options = {
-			Option(config, 'Title anchor', 'titleAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS_SHORT }),
-			Option(config, 'Title size', 'titleSize', { min = 8, max = 32, step = 1 }),
-			Option(config, 'Title offset X', 'titleX', { min = -300, max = 300, step = 1 }),
-			Option(config, 'Title offset Y', 'titleY', { min = -300, max = 300, step = 1 }),
+		tools[#tools + 1] = { icon = 'text', tooltip = 'Name, title text and placement', title = 'Title', options = {
+			NameOption(config),
+			Option(config, 'Title', 'title', { kind = 'input', placeholder = 'No title' }),
+			Option(config, 'Anchor', 'titleAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS_SHORT }),
+			Option(config, 'Size', 'titleSize', { min = 8, max = 32, step = 1 }),
+			Option(config, 'Horizontal offset', 'titleX', { min = -300, max = 300, step = 1 }),
+			Option(config, 'Vertical offset', 'titleY', { min = -300, max = 300, step = 1 }),
+		} }
+		tools[#tools + 1] = { tooltip = 'Size and backdrop', title = 'Panel', options = {
 			Option(config, 'Width', 'width', { min = 0, max = 1200, step = 1 }),
 			Option(config, 'Height', 'height', { min = 0, max = 600, step = 1 }),
 			Opacity(config),
@@ -167,9 +178,12 @@ local function BarTools(config, index)
 		} }
 	else
 		tools[#tools + 1] = { entries = fonts, width = MENU_WIDTH, get = function() return config.font end, set = function(value) config.font = value end }
-		tools[#tools + 1] = { tooltip = 'Text, layout, size and border', title = config.name, options = {
+		tools[#tools + 1] = { icon = 'text', tooltip = 'Name, size and labels', title = 'Text', options = {
+			NameOption(config),
 			Option(config, 'Font size', 'fontSize', { min = 8, max = 24, step = 1 }),
 			Option(config, 'Hide labels', 'hideLabels'),
+		} }
+		tools[#tools + 1] = { tooltip = 'Layout, size and backdrop', title = 'Layout', options = {
 			Option(config, 'Orientation', 'orientation', { entries = ORIENTATIONS }),
 			Option(config, 'Align', 'align', { entries = ALIGNMENTS }),
 			Option(config, 'Spacing', 'spacing', { min = 0, max = 160, step = 1 }),
@@ -450,7 +464,7 @@ local function SettingsBoard(ui, parent, width, config, index)
 		description = isPanel and 'A blank backdrop to tuck other frames on. Unlock it with the eye in the header to drag it around, right-click it to lock it again.'
 			or 'A strip of datatexts. Unlock it with the eye in the header to drag it around, right-click it to lock it again.',
 	})
-	board:AddTools('Settings', isPanel and 'Colors, title, size and position' or 'Colors, font, layout and position', BarTools(config, index), Apply)
+	board:AddTools('Settings', isPanel and 'Colors, title, size and position' or 'Colors, text, layout and position', BarTools(config, index), Apply)
 	return board
 end
 

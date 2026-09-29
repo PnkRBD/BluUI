@@ -381,6 +381,10 @@ function CastBar.StopInterruptPreview(barType)
 	end
 end
 
+function CastBar.IsPreviewingInterrupt(barType)
+	return previewTickers[barType] ~= nil
+end
+
 function CastBar.PreviewInterrupt(barType)
 	if InCombatLockdown() then return end
 	CastBar.StopInterruptPreview(barType)

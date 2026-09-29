@@ -798,10 +798,12 @@ local function TextBoard(ui, parent, width)
 		{ entries = fonts, width = MENU_WIDTH,
 			get = function() return Interface().minimapClockFont or BUI.C.GLOBAL_OPTION end,
 			set = function(value) Interface().minimapClockFont = value MinimapModule.RefreshClock() end },
-		{ tooltip = 'Format, size and offsets', title = 'Clock', options = {
+		{ icon = 'text', tooltip = 'Size', title = 'Clock', options = {
+			{ label = 'Size', min = 8, max = 24, step = 1, get = function() return Interface().minimapClockSize end, set = function(value) Interface().minimapClockSize = value MinimapModule.RefreshClock() end },
+		} },
+		{ tooltip = 'Format and offsets', title = 'Clock', options = {
 			{ label = '24-hour', get = function() return Interface().minimapClock24h == true end, set = function(value) Interface().minimapClock24h = value MinimapModule.SetClockFormat(value) end },
 			{ label = 'Server time', get = function() return Interface().minimapClockServer == true end, set = function(value) Interface().minimapClockServer = value MinimapModule.SetClockSource(value) end },
-			{ label = 'Size', min = 8, max = 24, step = 1, get = function() return Interface().minimapClockSize end, set = function(value) Interface().minimapClockSize = value MinimapModule.RefreshClock() end },
 			{ label = 'Horizontal offset', min = -300, max = 300, step = 1, get = function() return Interface().minimapClockX end, set = function(value) Interface().minimapClockX = value MinimapModule.RefreshClock() end },
 			{ label = 'Vertical offset', min = -300, max = 300, step = 1, get = function() return Interface().minimapClockY end, set = function(value) Interface().minimapClockY = value MinimapModule.RefreshClock() end },
 		} },
@@ -818,9 +820,11 @@ local function TextBoard(ui, parent, width)
 		{ entries = fonts, width = MENU_WIDTH,
 			get = function() return Interface().minimapZoneFont or BUI.C.GLOBAL_OPTION end,
 			set = function(value) Interface().minimapZoneFont = value MinimapModule.RefreshZoneText() end },
-		{ tooltip = 'Color, size and offsets', title = 'Zone name', options = {
-			{ label = 'Custom color, off colors by zone type', get = function() return Interface().minimapZoneColorCustom == true end, set = function(value) Interface().minimapZoneColorCustom = value MinimapModule.RefreshZoneText() end },
+		{ icon = 'text', tooltip = 'Size', title = 'Zone name', options = {
 			{ label = 'Size', min = 8, max = 24, step = 1, get = function() return Interface().minimapZoneSize end, set = function(value) Interface().minimapZoneSize = value MinimapModule.RefreshZoneText() end },
+		} },
+		{ tooltip = 'Color and offsets', title = 'Zone name', options = {
+			{ label = 'Custom color, off colors by zone type', get = function() return Interface().minimapZoneColorCustom == true end, set = function(value) Interface().minimapZoneColorCustom = value MinimapModule.RefreshZoneText() end },
 			{ label = 'Horizontal offset', min = -300, max = 300, step = 1, get = function() return Interface().minimapZoneX end, set = function(value) Interface().minimapZoneX = value MinimapModule.RefreshZoneText() end },
 			{ label = 'Vertical offset', min = -300, max = 300, step = 1, get = function() return Interface().minimapZoneY end, set = function(value) Interface().minimapZoneY = value MinimapModule.RefreshZoneText() end },
 		} },
@@ -869,7 +873,7 @@ local function DatatextBoard(ui, parent, width)
 			get = function() local color = Bar().colorValue return color.r, color.g, color.b, color.a end,
 			set = function(red, green, blue, alpha) Bar().colorValue = { r = red, g = green, b = blue, a = alpha } end },
 		{ entries = fonts, width = MENU_WIDTH, get = function() return Bar().font end, set = function(value) Bar().font = value end },
-		{ tooltip = 'Size and labels', title = 'Text', options = {
+		{ icon = 'text', tooltip = 'Size and labels', title = 'Text', options = {
 			{ label = 'Font size', min = 8, max = 24, step = 1, get = function() return Bar().fontSize end, set = function(value) Bar().fontSize = value end },
 			{ label = 'Hide labels', get = function() return Bar().hideLabels == true end, set = function(value) Bar().hideLabels = value end },
 		} },
