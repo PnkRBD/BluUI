@@ -13,6 +13,7 @@ Pages\Minimap.lua
 Pages\Datatext.lua
 Pages\Markers.lua
 Pages\Appearance.lua
+Pages\AlertMover.lua
 Pages\Auras.lua
 Pages\ActionBars.lua
 Pages\Power.lua
