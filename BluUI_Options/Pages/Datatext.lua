@@ -282,7 +282,7 @@ local function TableRow(kit, band, config, index)
 		config.enabled = value
 		Datatext.Apply()
 	end):SetPoint('LEFT', SHOWN_X, 0)
-	kit.IconButton(row, 'delete', 'Delete ' .. config.name, function() ConfirmDelete(index) end, 'danger'):SetPoint('RIGHT', -DELETE_INSET, 0)
+	kit.IconButton(row, 'erase', 'Delete ' .. config.name, function() ConfirmDelete(index) end, 'danger'):SetPoint('RIGHT', -DELETE_INSET, 0)
 	row:SetScript('OnClick', function() Select(index) end)
 	function row:Update()
 		marker:SetShown(selected == index)
