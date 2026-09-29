@@ -121,7 +121,7 @@ function Layout.RailPage(tab, shell, spec)
 		if current and (id == nil or current.id == id) then self:Select(current.id) end
 	end
 
-	page:Select(spec.rail.selected or rail.entries[1].item.id)
+	page:Select(rail.entries[1].item.id)
 	Layout.Add(tab, block, BLOCK_GAP)
 	return page
 end
