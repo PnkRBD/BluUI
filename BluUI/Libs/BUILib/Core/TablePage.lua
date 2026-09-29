@@ -340,7 +340,7 @@ function Layout.TableKit(window)
 
 	function kit.IconButton(parent, icon, tooltip, onClick, hoverRole, size)
 		local button = CreateFrame('Button', nil, parent)
-		button:SetSize(22, 22)
+		button:SetSize(size and math.max(22, size) or 22, 22)
 		local glyph = kit.Glyph(button, icon, size or 13, 'text')
 		glyph:SetPoint('CENTER')
 		button:SetScript('OnEnter', function(self)
