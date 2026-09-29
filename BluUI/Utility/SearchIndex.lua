@@ -358,8 +358,8 @@ local entries = {
 	{ label = "Value color", page = "datatext", panel = "Style" },
 	{ label = "Position", page = "datatext", panel = "Position", keywords = "anchor x y offset strata frame level align below minimap mirror chat" },
 	{ label = "Background", page = "datatext", panel = "Background", keywords = "background opacity color border width height" },
-	{ label = "Ping source", page = "datatext", panel = "Readouts", keywords = "ping source home world" },
-	{ label = "Readouts", page = "datatext", panel = "Readouts", keywords = "fps framerate ping latency durability gold ilvl item level coords location loot spec friends guild modules order time clock" },
+	{ label = "Ping source", page = "datatext", panel = "Datatexts", keywords = "ping source home world" },
+	{ label = "Datatexts", page = "datatext", panel = "Datatexts", keywords = "fps framerate ping latency durability gold ilvl item level coords location loot spec friends guild modules order time clock" },
 
 	{ label = "Enable", page = "cursor", keywords = "cursor ring circle enable" },
 	{ label = "Cursor Size", page = "cursor", panel = "General", keywords = "cursor ring size" },

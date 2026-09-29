@@ -910,7 +910,7 @@ local function DatatextBoard(ui, parent, width)
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Datatext bar',
-		description = 'A strip of readouts attached to the map.',
+		description = 'A strip of datatexts attached to the map.',
 	})
 	Switch(board, 'Datatext bar', function() return Bar().enabled ~= false end, function(value)
 		Bar().enabled = value
@@ -933,14 +933,14 @@ local function DatatextBoard(ui, parent, width)
 	Slider(ui, board:AddRow('Height', nil, SLIDER_WIDTH), 10, 40, 1,
 		function() return Bar().height end,
 		function(value) Bar().height = value Datatext.Apply() end)
-	Slider(ui, board:AddRow('Spacing', 'Pixels between readouts', SLIDER_WIDTH), 0, 40, 1,
+	Slider(ui, board:AddRow('Spacing', 'Pixels between datatexts', SLIDER_WIDTH), 0, 40, 1,
 		function() return Bar().spacing end,
 		function(value)
 			local config = Bar()
 			config.spacing, config.spacingPx = value, true
 			Datatext.Apply()
 		end)
-	Slider(ui, board:AddRow('Spread', 'Pushes the readouts apart to fill the bar', SLIDER_WIDTH), 0, 100, 1,
+	Slider(ui, board:AddRow('Spread', 'Pushes the datatexts apart to fill the bar', SLIDER_WIDTH), 0, 100, 1,
 		function() return tonumber(Bar().spread) or 0 end,
 		function(value) Bar().spread = value Datatext.Apply() end)
 	Slider(ui, board:AddRow('Background opacity', nil, SLIDER_WIDTH), 0, 100, 1,
@@ -970,7 +970,7 @@ local function ReadoutsBoard(ui, parent, width, page)
 	local rows = {}
 	local board = ui.Board(parent, width, {
 		stacked = true,
-		title = 'Readouts',
+		title = 'Datatexts',
 		description = 'What the bar shows, top to bottom here is left to right on the bar.',
 		buttons = {
 			{ text = 'Default order', icon = 'reset', onClick = function()

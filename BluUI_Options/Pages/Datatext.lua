@@ -192,7 +192,7 @@ local function BarSample(kit, cell, config)
 	local edge = cell:CreateTexture(nil, 'BACKGROUND', nil, 0)
 	local fill = cell:CreateTexture(nil, 'BACKGROUND', nil, 1)
 	local parts = {}
-	local note = kit.Text(cell, 'No readouts turned on', 11, 'faint')
+	local note = kit.Text(cell, 'No datatexts turned on', 11, 'faint')
 	note:SetPoint('LEFT')
 	return function()
 		local texts = Datatext.BuildSampleParts(config)
@@ -345,7 +345,7 @@ local function ReadoutsBoard(ui, parent, width, config, page)
 	local readoutRows = {}
 	local board = ui.Board(parent, width, {
 		stacked = true,
-		title = 'Readouts',
+		title = 'Datatexts',
 		description = 'What the bar shows, top to bottom here is left to right on the bar.',
 		buttons = {
 			{ text = 'Default order', icon = 'reset', onClick = function()
@@ -387,8 +387,8 @@ local function ReadoutSettingsBoard(ui, parent, width, config)
 		if entry.options then
 			board = board or ui.Board(parent, width, {
 				stacked = true,
-				title = 'Readout settings',
-				description = 'Extra choices some readouts offer.',
+				title = 'Datatext settings',
+				description = 'Extra choices some datatexts offer.',
 			})
 			board:AddCaption(entry.name)
 			for _, option in ipairs(entry.options(GetConfig, Apply)) do
@@ -407,16 +407,16 @@ local function StyleBoard(ui, parent, width, config)
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Text',
-		description = 'Font, size and how the readouts line up.',
+		description = 'Font, size and how the datatexts line up.',
 	})
 	Switch(board, 'Hide labels', function() return config.hideLabels == true end, function(value)
 		config.hideLabels = value
 	end, 'Values only, no names in front of them')
 	Menu(ui, board:AddRow('Font', 'Global unless you pick one', DROPDOWN_WIDTH), BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION), Field(config, 'font'))
 	Slider(ui, board:AddRow('Font size', nil, SLIDER_WIDTH), 8, 24, 1, Field(config, 'fontSize'))
-	Slider(ui, board:AddRow('Spacing', 'Pixels between readouts', SLIDER_WIDTH), 0, 160, 1, Field(config, 'spacing'))
+	Slider(ui, board:AddRow('Spacing', 'Pixels between datatexts', SLIDER_WIDTH), 0, 160, 1, Field(config, 'spacing'))
 	Menu(ui, board:AddRow('Orientation', 'A row or a stack', DROPDOWN_WIDTH), ORIENTATIONS, Field(config, 'orientation'))
-	Menu(ui, board:AddRow('Align', 'Where the readouts sit in a fixed width', DROPDOWN_WIDTH), ALIGNMENTS, Field(config, 'align'))
+	Menu(ui, board:AddRow('Align', 'Where the datatexts sit in a fixed width', DROPDOWN_WIDTH), ALIGNMENTS, Field(config, 'align'))
 	ColorRow(ui, board, 'Value color', 'The numbers next to each label', true, ColorField(config, 'colorValue', true))
 	return board
 end
@@ -497,7 +497,7 @@ local function TooltipsBoard(ui, parent, width)
 	})
 	Switch(board, 'Hide tooltips in combat', function() return BUI.GetDB().datatextHideHoversInCombat ~= false end, function(value)
 		BUI.GetDB().datatextHideHoversInCombat = value
-	end, 'No readout tooltips or hover panels while fighting')
+	end, 'No datatext tooltips or hover panels while fighting')
 	Switch(board, 'Roster tooltips', function() return BUI.GetDB().datatextRosterTooltips ~= false end, function(value)
 		BUI.GetDB().datatextRosterTooltips = value
 	end, 'Member details such as keystone and score when hovering Friends and Guild rows')
@@ -511,7 +511,7 @@ end
 local function Tabs(config)
 	local tabs = {}
 	if config and not Datatext.IsPanel(config) then
-		tabs[#tabs + 1] = Tab('Readouts', function(ui, parent, width, page)
+		tabs[#tabs + 1] = Tab('Datatexts', function(ui, parent, width, page)
 			local sections = { ReadoutsBoard(ui, parent, width, config, page) }
 			local settings = ReadoutSettingsBoard(ui, parent, width, config)
 			if settings then sections[#sections + 1] = settings end
