@@ -535,6 +535,11 @@ function Layout.TableKit(window)
 				tab.underline:SetShown(active)
 			end
 		end
+		local function Select(index)
+			selected = index
+			Refresh()
+			onSelect(index)
+		end
 		for index, text in ipairs(labels) do
 			local tab = CreateFrame('Button', nil, parent)
 			tab.label = kit.Text(tab, text, 13, 'muted', nil, 'title')
@@ -547,16 +552,12 @@ function Layout.TableKit(window)
 			tab.underline:SetHeight(2)
 			tab:SetScript('OnEnter', Refresh)
 			tab:SetScript('OnLeave', Refresh)
-			tab:SetScript('OnClick', function()
-				selected = index
-				Refresh()
-				onSelect(index)
-			end)
+			tab:SetScript('OnClick', function() Select(index) end)
 			tabs[index] = tab
 			x = x + tab:GetWidth() + TAB_GAP
 		end
 		Refresh()
-		return y + TAB_HEIGHT + 1
+		return y + TAB_HEIGHT + 1, Select
 	end
 
 	function kit.DottedRule(parent, role, layer, subLayer)
@@ -714,7 +715,8 @@ function Layout.TablePage(tab, shell, spec)
 	block:SetWidth(tab.width)
 	local query, current, contentTop = '', 1, 0
 	local panes, labels = {}, {}
-	local Resize
+	local page = { tabContents = {}, currentTab = 1 }
+	local Resize, selectTab
 	local _, _, Align = Layout.PinnedHead(tab, shell.window, kit, spec, block, function(text)
 		query = text
 		Resize()
@@ -728,9 +730,10 @@ function Layout.TablePage(tab, shell, spec)
 
 	for index, pane in ipairs(spec.tabs) do labels[index] = pane.label end
 	if #labels > 1 then
-		contentTop = kit.Tabs(block, 0, labels, function(index)
+		contentTop, selectTab = kit.Tabs(block, 0, labels, function(index)
 			panes[current].frame:Hide()
 			current = index
+			page.currentTab = index
 			panes[current].frame:Show()
 			Resize()
 		end)
@@ -740,7 +743,8 @@ function Layout.TablePage(tab, shell, spec)
 		local frame = CreateFrame('Frame', nil, block)
 		frame:SetAllPoints()
 		frame:SetShown(index == current)
-		panes[index] = { frame = frame, sections = pane.build(kit, shell, frame, tab.width) }
+		page.tabContents[index] = true
+		panes[index] = { frame = frame, sections = pane.build(kit, shell, frame, tab.width, page) }
 	end
 
 	Resize = function()
@@ -752,6 +756,13 @@ function Layout.TablePage(tab, shell, spec)
 			tab:Refresh()
 		end)
 	end
+	function page:SetTab(index)
+		if selectTab and panes[index] then selectTab(index) end
+	end
+	function page:Resize()
+		Resize()
+	end
 	Resize()
 	Layout.Add(tab, block, 8)
+	return page
 end
