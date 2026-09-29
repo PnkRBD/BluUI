@@ -1,27 +1,25 @@
 local BUI = BluUI
 local BUILib = BUI.BUILibClient
 local Layout, Modals = BUILib.Layout, BUILib.Modals
+local Section = Layout.TableSection
 local Datatext = BUI.Datatext
 local Pixel = BUI.Pixel
 
 local PAGE_WIDTH = 960
-local SELECT_ROW = 52
-local SELECT_WIDTH = 220
-local ROW_HEIGHT = 58
-local ROW_INSET = 20
-local NAME_WIDTH = 150
-local SAMPLE_X = 190
-local SAMPLE_GAP = 24
+local SAMPLE_HEIGHT = 56
+local SAMPLE_LIMIT = PAGE_WIDTH - 40
 local PANEL_SAMPLE = 24
 local PANEL_SAMPLE_MAX = 120
-local BUTTON_GAP = 10
+local CAPTION_GAP = 10
 local MENU_WIDTH = 150
 local ERASE_SIZE = 32
-local ARROW = 22
-local ARROW_GAP = 4
 local TOOL_GAP = 12
-local LIST_ROOM = ERASE_SIZE + TOOL_GAP + ARROW * 2 + ARROW_GAP
-local COG_ROOM = ARROW + TOOL_GAP
+local LIST_ROOM = ERASE_SIZE
+local COG_ROOM = 22 + TOOL_GAP
+local GRABBER_SIZE = 12
+local LIST_ROW = 44
+local LIST_TITLE_X = 44
+local DRAG_ALPHA = 0.35
 
 local CENTERED = { TOP = true, CENTER = true, BOTTOM = true }
 local CENTER_POINT = { TOPLEFT = 'TOP', TOPRIGHT = 'TOP', LEFT = 'CENTER', RIGHT = 'CENTER', BOTTOMLEFT = 'BOTTOM', BOTTOMRIGHT = 'BOTTOM' }
@@ -39,7 +37,9 @@ local ALIGNMENTS = {
 }
 
 local selected
-local editor
+local showingTooltips = false
+local items = {}
+local preview
 local fonts
 
 local function Window()
@@ -60,23 +60,28 @@ local function Current()
 	return selected and list[selected]
 end
 
+local function IndexOf(list, value)
+	for position, candidate in ipairs(list) do
+		if candidate == value then return position end
+	end
+end
+
+local function RefreshPreview()
+	if preview then preview:Update() end
+end
+
 local function Apply()
 	Datatext.Apply()
-	if editor then editor:Update() end
+	RefreshPreview()
 end
 
 local function RebuildPage()
 	BUILib.Defer(function() BUI.PageEngine.RefreshCurrentPage() end)
 end
 
-local function Select(index)
-	if selected == index then return end
-	selected = index
-	RebuildPage()
-end
-
 local function Create(kind)
 	selected = Datatext.AddBar(kind)
+	showingTooltips = false
 	RebuildPage()
 end
 
@@ -181,21 +186,15 @@ local function BarTools(config, index)
 	return tools
 end
 
-local function OrderArrows(ui, row, onMove)
-	local down = ui.ArrowButton(row, false, function() onMove(1) end)
-	down:SetPoint('RIGHT', -(ui.ROW_INSET + ERASE_SIZE + TOOL_GAP), 0)
-	ui.ArrowButton(row, true, function() onMove(-1) end):SetPoint('RIGHT', down, 'LEFT', -ARROW_GAP, 0)
-end
-
 local function BarSample(kit, cell, config)
 	local layout = { textLeft = {}, textWidth = {}, hitLeft = {}, hitWidth = {}, lineTop = {} }
 	local edge = cell:CreateTexture(nil, 'BACKGROUND', nil, 0)
 	local fill = cell:CreateTexture(nil, 'BACKGROUND', nil, 1)
 	local parts = {}
-	local ruler = cell:CreateFontString(nil, 'ARTWORK')
-	ruler:SetAlpha(0)
-	ruler:SetPoint('LEFT')
-	local note = kit.Text(cell, 'No datatexts on this bar', 11, 'faint')
+	local sizer = cell:CreateFontString(nil, 'ARTWORK')
+	sizer:SetAlpha(0)
+	sizer:SetPoint('LEFT')
+	local note = kit.Text(cell, 'No datatexts on this bar yet', 12, 'faint')
 	note:SetPoint('LEFT')
 	return function()
 		local texts = Datatext.BuildSampleParts(config)
@@ -204,15 +203,15 @@ local function BarSample(kit, cell, config)
 		fill:SetShown(count > 0)
 		edge:SetShown(count > 0 and config.border)
 		note:SetShown(count == 0)
-		if count == 0 then return end
+		if count == 0 then return math.ceil(note:GetStringWidth()) end
 		local fontPath = BUI.GetModuleFont(config)
-		Pixel.ApplyFont(ruler, config.fontSize, fontPath, '')
+		Pixel.ApplyFont(sizer, config.fontSize, fontPath, '')
 		local widths = {}
 		for partIndex = 1, count do
-			ruler:SetText(texts[partIndex])
-			widths[partIndex] = math.ceil(ruler:GetStringWidth())
+			sizer:SetText(texts[partIndex])
+			widths[partIndex] = math.ceil(sizer:GetStringWidth())
 		end
-		local fixedWidth = config.width > 0 and math.min(Pixel.Scale(config.width), cell:GetWidth()) or nil
+		local fixedWidth = config.width > 0 and math.min(Pixel.Scale(config.width), SAMPLE_LIMIT) or nil
 		local barWidth = Datatext.LayoutRow(widths, count, Pixel.Scale(config.spacing), Pixel.Scale(Datatext.LAYOUT.rowInset), fixedWidth, config.align, 0, layout)
 		local barHeight = Pixel.Scale(config.fontSize + Datatext.LAYOUT.lineExtra)
 		for partIndex = 1, count do
@@ -238,14 +237,15 @@ local function BarSample(kit, cell, config)
 		edge:SetPoint('CENTER', fill)
 		edge:SetSize(math.ceil(barWidth) + 2, barHeight + 2)
 		edge:SetColorTexture(config.borderColor.r, config.borderColor.g, config.borderColor.b, config.borderColor.a)
+		return math.ceil(barWidth) + 2
 	end
 end
 
 local function PanelSample(kit, cell, config)
 	local edge = cell:CreateTexture(nil, 'BACKGROUND', nil, 0)
 	local fill = cell:CreateTexture(nil, 'BACKGROUND', nil, 1)
-	local caption = kit.Text(cell, '', 11, 'muted')
-	caption:SetPoint('LEFT', fill, 'RIGHT', 10, 0)
+	local caption = kit.Text(cell, '', 12, 'muted')
+	caption:SetPoint('LEFT', fill, 'RIGHT', CAPTION_GAP, 0)
 	caption:SetWordWrap(false)
 	return function()
 		local width = config.width > 0 and config.width or 200
@@ -261,78 +261,36 @@ local function PanelSample(kit, cell, config)
 		edge:SetColorTexture(config.borderColor.r, config.borderColor.g, config.borderColor.b, config.borderColor.a)
 		edge:SetShown(config.border)
 		caption:SetText(width .. ' x ' .. height .. (config.title ~= '' and ('   ' .. config.title) or ''))
+		return sampleWidth + 2 + CAPTION_GAP + math.ceil(caption:GetStringWidth())
 	end
 end
 
-local function EditorRow(kit, band, config, index)
-	local row = CreateFrame('Frame', nil, band)
-	row:SetPoint('TOPLEFT', 0, -SELECT_ROW)
-	row:SetPoint('TOPRIGHT', 0, -SELECT_ROW)
-	row:SetHeight(ROW_HEIGHT)
-	local isPanel = Datatext.IsPanel(config)
-	kit.RowTitle(row, config.name, isPanel and 'Panel' or 'Bar', ROW_INSET, NAME_WIDTH)
-	local cell = CreateFrame('Frame', nil, row)
-	cell:SetPoint('LEFT', SAMPLE_X, 0)
-	cell:SetHeight(ROW_HEIGHT)
-	cell:SetClipsChildren(true)
-	local UpdateSample = isPanel and PanelSample(kit, cell, config) or BarSample(kit, cell, config)
-	local placer = kit.Tools(row, BarTools(config, index), Apply)
-	local used = placer.Place(placer.widths)
-	cell:SetPoint('RIGHT', -(ROW_INSET + used + SAMPLE_GAP), 0)
-	row.Update = UpdateSample
-	UpdateSample()
-	return row
-end
-
-local function Selector(kit, head)
-	local dropdown = kit.Dropdown(head, SELECT_WIDTH, function()
-		local items = {}
-		local function Group(title, panels)
-			local started = false
-			for index, config in ipairs(Bars()) do
-				if Datatext.IsPanel(config) == panels then
-					if not started then
-						items[#items + 1] = { title = title }
-						started = true
-					end
-					items[#items + 1] = { text = config.name, checked = index == selected, callback = function() Select(index) end }
-				end
-			end
+local function BuildPreview(band, kit)
+	local samples = {}
+	local note = kit.Text(band, '', 12, 'muted')
+	note:SetPoint('CENTER')
+	function band:Update()
+		for _, sample in pairs(samples) do sample.cell:Hide() end
+		local config = not showingTooltips and Current() or nil
+		note:SetShown(not config)
+		if not config then
+			note:SetText(showingTooltips and 'Tooltips apply to every bar' or 'Nothing here yet, add a bar or a panel from the rail')
+			return
 		end
-		Group('Bars', false)
-		Group('Panels', true)
-		return items
-	end)
-	dropdown:SetPoint('LEFT', ROW_INSET, 0)
-	dropdown.label:SetText(Current().name)
-	return dropdown
-end
-
-local function BuildTable(band, kit)
-	local head = CreateFrame('Frame', nil, band)
-	head:SetPoint('TOPLEFT')
-	head:SetPoint('TOPRIGHT')
-	head:SetHeight(SELECT_ROW)
-	local rule = kit.Fill(head, 'rule', 'ARTWORK')
-	rule:SetPoint('BOTTOMLEFT', ROW_INSET, 0)
-	rule:SetPoint('BOTTOMRIGHT', -ROW_INSET, 0)
-	rule:SetHeight(1)
-	local newPanel = kit.Button(head, 'New panel', 'secondary', function() Create('PANEL') end, 'plus')
-	newPanel:SetPoint('RIGHT', -ROW_INSET, 0)
-	kit.Button(head, 'New bar', 'secondary', function() Create('TEXT') end, 'plus'):SetPoint('RIGHT', newPanel, 'LEFT', -BUTTON_GAP, 0)
-	local config = Current()
-	if config then
-		Selector(kit, head)
-		editor = EditorRow(kit, band, config, selected)
-	else
-		editor = nil
-		kit.Text(head, 'No bars or panels yet', 12, 'muted'):SetPoint('LEFT', ROW_INSET, 0)
-		kit.Text(band, 'Add a bar for datatexts, or a panel for a blank backdrop', 12, 'muted'):SetPoint('TOPLEFT', ROW_INSET, -(SELECT_ROW + ROW_HEIGHT / 2 - 6))
+		local sample = samples[config]
+		if not sample then
+			local cell = CreateFrame('Frame', nil, self)
+			cell:SetPoint('CENTER')
+			cell:SetSize(1, SAMPLE_HEIGHT)
+			cell:SetClipsChildren(true)
+			sample = { cell = cell, Update = Datatext.IsPanel(config) and PanelSample(kit, cell, config) or BarSample(kit, cell, config) }
+			samples[config] = sample
+		end
+		sample.cell:Show()
+		sample.cell:SetWidth(math.max(1, math.min(SAMPLE_LIMIT, sample.Update())))
 	end
-end
-
-local function TableHeight()
-	return SELECT_ROW + ROW_HEIGHT
+	band:HookScript('OnShow', function(self) self:Update() end)
+	return band
 end
 
 local function DatatextOptions(entry, config)
@@ -341,12 +299,6 @@ local function DatatextOptions(entry, config)
 		options[#options + 1] = { label = option.label, entries = option.items, get = option.get, set = option.set }
 	end
 	return { tooltip = entry.name .. ' settings', title = entry.name, options = options }
-end
-
-local function IndexOf(list, id)
-	for position, candidate in ipairs(list) do
-		if candidate == id then return position end
-	end
 end
 
 local function DatatextsBoard(ui, parent, width, config, page)
@@ -360,12 +312,12 @@ local function DatatextsBoard(ui, parent, width, config, page)
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Datatexts',
-		description = 'What ' .. config.name .. ' shows, top to bottom here is left to right on the bar.',
+		description = 'What the bar shows, top to bottom here is left to right on the bar. Drag a row to reorder it.',
 		buttons = {
 			{ text = 'Default order', icon = 'reset', onClick = function()
 				config.order = nil
 				Apply()
-				RebuildPage()
+				page:RebuildCurrent()
 			end },
 		},
 	})
@@ -378,19 +330,74 @@ local function DatatextsBoard(ui, parent, width, config, page)
 		active[position], active[position + delta] = otherID, id
 		board:Move(listRows[id], delta)
 		config.order = order
-		Apply()
 		page:Resize()
+	end
+	local function RowUnder(cursorY)
+		for _, id in ipairs(active) do
+			local row = listRows[id]
+			local top, bottom = row:GetTop(), row:GetBottom()
+			if top and cursorY <= top and cursorY >= bottom then return id end
+		end
+	end
+	local dragging, grabOffset, ghost
+	local function Ghost()
+		if ghost then return ghost end
+		ghost = CreateFrame('Frame', nil, board.panel)
+		ghost:SetFrameLevel(board.panel:GetFrameLevel() + 10)
+		ghost:SetSize(board.panelWidth, LIST_ROW)
+		ui.Fill(ghost, 'control'):SetAllPoints()
+		local bar = ui.Fill(ghost, 'accent', 'ARTWORK', 1)
+		bar:SetPoint('TOPLEFT')
+		bar:SetPoint('BOTTOMLEFT')
+		bar:SetWidth(2)
+		ui.Glyph(ghost, 'grabber', GRABBER_SIZE, 'text'):SetPoint('LEFT', ui.ROW_INSET, 0)
+		ghost.label = ui.Text(ghost, '', 12, 'text')
+		ghost.label:SetPoint('LEFT', LIST_TITLE_X, 0)
+		ghost:Hide()
+		return ghost
+	end
+	local function Track()
+		local _, cursorY = GetCursorPosition()
+		cursorY = cursorY / board.frame:GetEffectiveScale()
+		ghost:ClearAllPoints()
+		ghost:SetPoint('TOPLEFT', board.panel, 'TOPLEFT', 0, -(board.panel:GetTop() - cursorY - grabOffset))
+		local over = RowUnder(cursorY)
+		if over and over ~= dragging then
+			Move(dragging, IndexOf(active, over) > IndexOf(active, dragging) and 1 or -1)
+		end
 	end
 	for _, id in ipairs(active) do
 		local entry = Datatext.Get(id)
-		local row = board:AddRow(entry.name, nil, LIST_ROOM + (entry.options and COG_ROOM or 0))
+		local room = LIST_ROOM + (entry.options and COG_ROOM or 0)
+		local row = Section.AddRow(board, entry.name)
+		row:SetHeight(LIST_ROW)
 		listRows[id] = row
+		ui.Glyph(row, 'grabber', GRABBER_SIZE, 'faint'):SetPoint('LEFT', ui.ROW_INSET, 0)
+		ui.RowTitle(row, entry.name, nil, LIST_TITLE_X, board.panelWidth - LIST_TITLE_X - ui.ROW_INSET - room - TOOL_GAP)
+		row:EnableMouse(true)
+		row:RegisterForDrag('LeftButton')
+		row:SetScript('OnDragStart', function(self)
+			local _, cursorY = GetCursorPosition()
+			dragging = id
+			grabOffset = self:GetTop() - cursorY / board.frame:GetEffectiveScale()
+			self:SetAlpha(DRAG_ALPHA)
+			Ghost().label:SetText(entry.name)
+			ghost:Show()
+			Track()
+			self:SetScript('OnUpdate', Track)
+		end)
+		row:SetScript('OnDragStop', function(self)
+			self:SetScript('OnUpdate', nil)
+			self:SetAlpha(1)
+			ghost:Hide()
+			dragging = nil
+			Apply()
+		end)
 		ui.IconButton(row, 'erase', 'Take ' .. entry.name .. ' off the bar', function()
 			config[entry.show] = false
 			Apply()
-			RebuildPage()
+			page:RebuildCurrent()
 		end, 'danger', ERASE_SIZE):SetPoint('RIGHT', -ui.ROW_INSET, 0)
-		OrderArrows(ui, row, function(delta) Move(id, delta) end)
 		if entry.options then
 			ui.Tool(row, DatatextOptions(entry, config), Apply):SetPoint('RIGHT', -(ui.ROW_INSET + LIST_ROOM + TOOL_GAP), 0)
 		end
@@ -401,18 +408,18 @@ local function DatatextsBoard(ui, parent, width, config, page)
 	if #off > 0 then
 		local row = board:AddRow('Add a datatext', 'It joins the end of the bar', MENU_WIDTH)
 		local dropdown = ui.Dropdown(row, MENU_WIDTH, function()
-			local items = {}
+			local menu = {}
 			for _, entry in ipairs(off) do
-				items[#items + 1] = { text = entry.name, callback = function()
+				menu[#menu + 1] = { text = entry.name, callback = function()
 					config[entry.show] = true
 					table.remove(order, IndexOf(order, entry.id))
 					order[#order + 1] = entry.id
 					config.order = order
 					Apply()
-					RebuildPage()
+					page:RebuildCurrent()
 				end }
 			end
-			return items
+			return menu
 		end)
 		dropdown:SetPoint('RIGHT', -ui.ROW_INSET, 0)
 		dropdown.label:SetText('Pick one')
@@ -435,14 +442,61 @@ local function TooltipsBoard(ui, parent, width)
 	return board
 end
 
-local function Sections(ui, _, parent, width, page)
-	local config = Current()
-	local sections = {}
-	if config and not Datatext.IsPanel(config) then
-		sections[#sections + 1] = DatatextsBoard(ui, parent, width, config, page)
+local function SettingsBoard(ui, parent, width, config, index)
+	local isPanel = Datatext.IsPanel(config)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = config.name,
+		description = isPanel and 'A blank backdrop to tuck other frames on. Unlock it with the eye in the header to drag it around, right-click it to lock it again.'
+			or 'A strip of datatexts. Unlock it with the eye in the header to drag it around, right-click it to lock it again.',
+	})
+	board:AddTools('Settings', isPanel and 'Colors, title, size and position' or 'Colors, font, layout and position', BarTools(config, index), Apply)
+	return board
+end
+
+local function Panes(ui, _, parent, width, item, page)
+	if item.id == 'newbar' or item.id == 'newpanel' then
+		Create(item.id == 'newpanel' and 'PANEL' or 'TEXT')
+		return {}
 	end
-	sections[#sections + 1] = TooltipsBoard(ui, parent, width)
-	return sections
+	if item.id == 'tooltips' then return { TooltipsBoard(ui, parent, width) } end
+	local config = Bars()[item.index]
+	if item.kind == 'PANEL' then return { SettingsBoard(ui, parent, width, config, item.index) } end
+	return { SettingsBoard(ui, parent, width, config, item.index), DatatextsBoard(ui, parent, width, config, page) }
+end
+
+local function RailGroups()
+	items = {}
+	local bars, panels = {}, {}
+	for index, config in ipairs(Bars()) do
+		local kind = Datatext.IsPanel(config) and 'PANEL' or 'TEXT'
+		local item = { id = (kind == 'PANEL' and 'panel' or 'bar') .. index, label = config.name, kind = kind, index = index }
+		items[item.id] = item
+		local list = kind == 'PANEL' and panels or bars
+		list[#list + 1] = item
+	end
+	bars[#bars + 1] = { id = 'newbar', label = 'New bar', icon = 'plus' }
+	panels[#panels + 1] = { id = 'newpanel', label = 'New panel', icon = 'plus' }
+	return {
+		{ title = 'Bars', items = bars },
+		{ title = 'Panels', items = panels },
+		{ title = 'Settings', items = { { id = 'tooltips', label = 'Tooltips', icon = 'cog' } } },
+	}
+end
+
+local function ActiveID()
+	if showingTooltips or not Current() then return 'tooltips' end
+	return (Datatext.IsPanel(Current()) and 'panel' or 'bar') .. selected
+end
+
+local function Activate(id)
+	local item = items[id]
+	if item then
+		selected = item.index
+		showingTooltips = false
+	elseif id == 'tooltips' then
+		showingTooltips = true
+	end
 end
 
 BUI.PageEngine.RegisterPage('datatext', {
@@ -453,7 +507,8 @@ BUI.PageEngine.RegisterPage('datatext', {
 		fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
 		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
 		Current()
-		Layout.TablePage(page:GetTab(1), { window = Window() }, {
+		local rail
+		rail = Layout.RailPage(page:GetTab(1), { window = Window() }, {
 			icon = 'text',
 			title = 'Datatext',
 			placeholder = 'Search datatext settings...',
@@ -472,9 +527,18 @@ BUI.PageEngine.RegisterPage('datatext', {
 					Datatext.Apply()
 				end },
 			},
-			preview = { height = TableHeight(), build = BuildTable },
-			tabs = { { label = 'Datatext', build = Sections } },
+			preview = { height = SAMPLE_HEIGHT, build = function(band, kit) preview = BuildPreview(band, kit) end },
+			rail = { groups = RailGroups(), selected = ActiveID() },
+			build = Panes,
 		})
+		local Select = rail.Select
+		function rail:Select(id)
+			Activate(id)
+			Select(self, id)
+			Repaint()
+			RefreshPreview()
+		end
+		RefreshPreview()
 		Datatext.SetLockCallback(Repaint)
 		page:AutoRefresh()
 	end,
