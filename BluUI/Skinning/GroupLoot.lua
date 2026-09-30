@@ -10,6 +10,7 @@ local GROW_DOWN_SETTING = 'grouplootGrowDown'
 
 local installed = false
 local skinned = {}
+local rollFrames = {}
 
 local function Enabled()
 	return Skin.IsSkinEnabled(SKIN_ID)
@@ -41,17 +42,19 @@ local function SkinAll()
 	if not Enabled() then return end
 	local red, green, blue = BUILib.Theme.GetAccent()
 	for _, frame in pairs(_G.GroupLootContainer.rollFrames) do
-		if not skinned[frame] then
-			skinned[frame] = true
-			SkinFrame(frame)
+		if rollFrames[frame] then
+			if not skinned[frame] then
+				skinned[frame] = true
+				SkinFrame(frame)
+			end
+			local color = QualityColor(frame)
+			if color then
+				Skin.SetIconEdgeColor(frame.IconFrame.Icon, color.r, color.g, color.b)
+			else
+				Skin.SetIconEdgeColor(frame.IconFrame.Icon, 0, 0, 0)
+			end
+			frame.Timer:SetStatusBarColor(red, green, blue, 1)
 		end
-		local color = QualityColor(frame)
-		if color then
-			Skin.SetIconEdgeColor(frame.IconFrame.Icon, color.r, color.g, color.b)
-		else
-			Skin.SetIconEdgeColor(frame.IconFrame.Icon, 0, 0, 0)
-		end
-		frame.Timer:SetStatusBarColor(red, green, blue, 1)
 	end
 end
 
@@ -60,6 +63,11 @@ local Resweep = BUI.Dispatcher.New(SkinAll, 'Skin.GroupLoot')
 local function Install()
 	if installed then return end
 	installed = true
+	local index = 1
+	while _G['GroupLootFrame' .. index] do
+		rollFrames[_G['GroupLootFrame' .. index]] = true
+		index = index + 1
+	end
 	hooksecurefunc('GroupLootContainer_Update', Resweep)
 end
 
