@@ -209,7 +209,7 @@ local function Offsets(db, title, xKey, yKey, extra)
 		Option(db, 'Vertical', yKey, { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 }),
 	}
 	for _, option in ipairs(extra or {}) do options[#options + 1] = option end
-	return { icon = 'mover', tooltip = 'Text offset', title = title, options = options }
+	return { icon = 'location', tooltip = 'Text offset', title = title, options = options }
 end
 
 local function Layer(db, key)

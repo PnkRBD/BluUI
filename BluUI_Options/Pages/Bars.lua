@@ -106,7 +106,7 @@ local function TextTools(settings, unit)
 	end
 	tools[#tools + 1] = { entries = fonts, width = MENU_WIDTH, get = function() return settings.font or BUI.C.GLOBAL_OPTION end, set = function(value) settings.font = value end }
 	tools[#tools + 1] = { icon = 'text', tooltip = 'Size and what the bar shows', title = 'Text', options = options }
-	tools[#tools + 1] = { icon = 'mover', tooltip = 'Text offset', title = 'Text offset', options = {
+	tools[#tools + 1] = { icon = 'location', tooltip = 'Text offset', title = 'Text offset', options = {
 		Option(settings, 'Horizontal', 'textOffsetX', { min = -TEXT_OFFSET_RANGE, max = TEXT_OFFSET_RANGE, step = 1 }),
 		Option(settings, 'Vertical', 'textOffsetY', { min = -TEXT_OFFSET_RANGE, max = TEXT_OFFSET_RANGE, step = 1 }),
 	} }
