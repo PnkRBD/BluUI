@@ -89,6 +89,10 @@ function Widget.PinToPixels(frame)
 	frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", Widget.SnapX(left, pixel), Widget.SnapY(top, pixel))
 end
 
+function Widget.MatchScale(frame, host)
+	frame:SetScale(host:GetEffectiveScale() / frame:GetParent():GetEffectiveScale())
+end
+
 function Widget.StripColorCodes(text)
 	if type(text) ~= "string" then return tostring(text or "") end
 	return (text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
@@ -607,6 +611,7 @@ do
 	end
 
 	local function PositionTip(tooltip, owner, config)
+		Widget.MatchScale(tooltip, owner)
 		tooltip:ClearAllPoints()
 		local anchor = config and config.anchor
 		if anchor == "RIGHT" then

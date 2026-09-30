@@ -70,6 +70,7 @@ function Controls.Popover(options)
 	panel.width = width - PADDING * 2
 	if options.build then options.build(panel) end
 
+	Widget.MatchScale(frame, anchor or BUILib.GetPopupParent() or UIParent)
 	frame:ClearAllPoints()
 	if anchor then
 		frame:SetPoint(options.point or "TOPRIGHT", anchor, options.relPt or "BOTTOMRIGHT",

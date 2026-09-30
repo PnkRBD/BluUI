@@ -353,13 +353,14 @@ function Controls.ContextMenu(items, options)
 	scrollFrame:SetVerticalScroll(0)
 	BUILib.Defer(scrollLogic.UpdateThumb)
 
+	Widget.MatchScale(menu, options.anchor or (options.window and options.window.frame) or UIParent)
 	menu:ClearAllPoints()
 	if options.anchor and not options.atCursor then
 		menu:SetPoint(options.point or "TOPLEFT", options.anchor, options.relPt or "BOTTOMLEFT",
 			options.offsetX or 0, options.offsetY or -2)
 	else
 		local cursorX, cursorY = GetCursorPosition()
-		local scale = UIParent:GetEffectiveScale()
+		local scale = menu:GetEffectiveScale()
 		menu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", cursorX / scale, cursorY / scale)
 	end
 	Widget.PinToPixels(menu)

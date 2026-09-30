@@ -240,6 +240,7 @@ BUI.Defaults = {
 		layoutStyle    = 'centered',
 		navStyle       = 'default',
 		navHighlight   = 'gradient',
+		windowScale    = 100,
 		savedThemes    = {},
 	},
 	profile = {

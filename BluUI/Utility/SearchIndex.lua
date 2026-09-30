@@ -256,6 +256,7 @@ local entries = {
 	{ label = "Global Font", page = "settings", tab = 1, panel = "Fonts", keywords = "font typeface" },
 	{ label = "Slug Rendering", page = "settings", tab = 1, panel = "Fonts", keywords = "font slug outline thick" },
 	{ label = "Dispel Type Colors", page = "settings", tab = 1, panel = "Dispel Types", keywords = "dispel magic curse poison disease bleed color shared palette" },
+	{ label = "Window size", page = "settings", tab = 7, panel = "Window", keywords = "window scale size smaller bigger shrink options" },
 	{ label = "Hotkey text", page = "actionbars", sidebar = "general", panel = "Button text", keywords = "action bar keybind text size anchor color" },
 	{ label = "Count text", page = "actionbars", sidebar = "general", panel = "Button text", keywords = "action bar stack charges count text" },
 	{ label = "Macro text", page = "actionbars", sidebar = "general", panel = "Button text", keywords = "action bar macro name text" },
