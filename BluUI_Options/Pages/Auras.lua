@@ -243,6 +243,7 @@ local function BloodlustRow(board)
 	Bloodlust.onPreviewStop = Repaint
 	board:AddTools('Bloodlust', 'Tracks Bloodlust, Heroism and similar haste buffs', {
 		Font(db, 'font'),
+		TextTool({ Option(db, 'Font size', 'fontSize', { min = 8, max = 48, step = 1 }) }),
 		{ icon = 'cog', tooltip = 'Open the Bloodlust page', onClick = function() BUI.PageEngine.NavigateToID('bloodlust') end },
 		BUI.PositionTool(db),
 		Eye('Preview the alerts', Bloodlust.IsPreviewing, function(value)

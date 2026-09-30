@@ -117,7 +117,7 @@ local function UpdateVisibility()
 
     local show = db.enabled and IsSpecAllowed()
     if show and db.hideOutOfCombat and not InCombatLockdown() then show = false end
-    if show and db.hideInTown and not IsInInstance() and IsResting() then show = false end
+    if show and db.hideInTown and BUI.Tools.IsInTown() then show = false end
     if previewing then show = true end
 
     if show then

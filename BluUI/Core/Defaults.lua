@@ -1519,6 +1519,8 @@ BUI.Defaults = {
 			ttsWarnText        = 'Lust soon',
 
 			showWhenReady      = false,
+			readyHideInTown    = false,
+			readyDungeonOnly   = false,
 			readyFormat        = 'Lust Ready',
 			readyColor         = { 0.4, 1, 0.4, 1 },
 			readyHoldDuration  = 2,

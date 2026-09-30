@@ -115,6 +115,8 @@ local function Sections(ui, _, parent, width)
 		{ tooltip = 'Timing and speech', title = 'Available', options = {
 			Option('Hold seconds', 'readyHoldDuration', { min = 0.5, max = 10, step = 0.5 }),
 			Option('Keep on screen', 'showWhenReady'),
+			Option('Hide in town', 'readyHideInTown'),
+			Option('Dungeons only', 'readyDungeonOnly'),
 			Option('Flash', 'flashOnReady'),
 			Option('Flash seconds', 'flashReadyDuration', { min = 0.2, max = 5, step = 0.1 }),
 			Option('Speak', 'ttsOnReady'),

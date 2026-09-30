@@ -476,7 +476,7 @@ local function MarkConditionsMet()
     if UnitIsDeadOrGhost("player") then return false end
     if db.markCombatOnly and not InCombatLockdown() then return false end
     if db.markGroupOnly and not IsInGroup() then return false end
-    if db.markHideInTown and IsResting() and not IsInInstance() then return false end
+    if db.markHideInTown and BUI.Tools.IsInTown() then return false end
     return true
 end
 

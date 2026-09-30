@@ -1,122 +1,93 @@
 local _, BUI = ...
 local Pixel = BUI.Pixel
+local IsSecret = BUI.Tools.IsSecretValue
 
 local Bloodlust = {}
 BUI.Bloodlust = Bloodlust
 
-local SETTINGS_KEY  = 'bloodlust'
-local MODULE_KEY    = 'Bloodlust'
-local FRAME_NAME    = 'BUI_BloodlustFrame'
-local BLOODLUST     = 2825
+local MODULE_KEY = 'Bloodlust'
+local FRAME_NAME = 'BUI_BloodlustFrame'
+local BLOODLUST = 2825
+local SPELL_TEXT = 'Bloodlust'
 local TICK_INTERVAL = 0.1
-
-local LOCKOUT       = { 57723, 57724, 80354, 264689, 390435 }
-
 local BUFF_DURATION = 40
-
-local frame, text
-local wasLockedOut       = false
-local previewState       = nil
-local lastSpellName      = nil
-local usedMessageUntil   = 0
-local readyMessageUntil  = 0
-local flashAnimationGroup            = nil
-local flashGeneration           = 0
-local warnPlayed         = false
-local lastRenderedText   = nil
-local lastState, lastBucket
-local iconPrefix         = ''
-
-local noLockoutSeen      = false
-local lastFitWidth           = 0
-
-local warmupUntil        = math.huge
-local WARMUP_SECS        = 5
-local noLockoutStreak    = 0
+local DECIMALS_BELOW = 10
+local WARMUP_SECS = 5
 local STABLE_NO_LOCKOUT_TICKS = 10
+local FORCED_SCAN_INTERVAL = 1
+local FLASH_HALF_PERIOD = 0.3
+local FLASH_LOW_ALPHA = 0.25
+local PREVIEW_ACTIVE_DURATION = 5
+local PREVIEW_CD_DURATION = 3
 
-local function GetConfig() return BUI.GetDB()[SETTINGS_KEY] end
-
-local lockoutInstanceID
-
+local LOCKOUT = { 57723, 57724, 80354, 264689, 390435 }
 local LOCKOUT_SET = {}
-for spellIndex = 1, #LOCKOUT do LOCKOUT_SET[LOCKOUT[spellIndex]] = true end
+for _, spellID in ipairs(LOCKOUT) do LOCKOUT_SET[spellID] = true end
 
+local frame, text, flash
+local iconPrefix = ''
+local lastText, lastState, lastBucket
+local previewState
+local wasLockedOut = false
+local noLockoutSeen = false
+local noLockoutStreak = 0
+local warnPlayed = false
+local usedMessageUntil = 0
+local readyMessageUntil = 0
+local flashGeneration = 0
+local warmupUntil = math.huge
+local lockoutInstanceID
 local cachedLockout
 local cachedLockoutValid = false
 local nextForcedScan = 0
-local FORCED_SCAN_INTERVAL = 1
 
-local function InvalidateLockoutCache()
-	cachedLockoutValid = false
-end
+local function GetConfig() return BUI.GetDB().bloodlust end
 
 local function Sleep()
 	BUI.Scheduler.SetUpdateEnabled(MODULE_KEY, false)
 end
 
 local function Wake()
-	InvalidateLockoutCache()
+	cachedLockoutValid = false
 	BUI.Scheduler.SetUpdateEnabled(MODULE_KEY, true)
 end
 
 BUI.Tools.OnAuraQueriesUnblocked(Wake)
 
+local function TouchesLockout(instanceIDs)
+	if not instanceIDs then return false end
+	for _, instanceID in ipairs(instanceIDs) do
+		if IsSecret(instanceID) or instanceID == lockoutInstanceID then return true end
+	end
+	return false
+end
+
 local function OnPlayerAura(_, _, updateInfo)
-	local config = GetConfig()
-	if not config.enabled then return end
+	if not GetConfig().enabled then return end
 	if not updateInfo then
 		Wake()
 		return
 	end
-	local IsSecretValue = BUI.Tools.IsSecretValue
-	local full = updateInfo.isFullUpdate
-	local added = updateInfo.addedAuras
-	local removed = updateInfo.removedAuraInstanceIDs
-	local updated = updateInfo.updatedAuraInstanceIDs
-	if IsSecretValue(full) or IsSecretValue(added) or IsSecretValue(removed) or IsSecretValue(updated) or full then
+	local full, added = updateInfo.isFullUpdate, updateInfo.addedAuras
+	local removed, updated = updateInfo.removedAuraInstanceIDs, updateInfo.updatedAuraInstanceIDs
+	if IsSecret(full) or IsSecret(added) or IsSecret(removed) or IsSecret(updated) or full then
 		Wake()
 		return
 	end
 	if added then
-		for auraIndex = 1, #added do
-			local aura = added[auraIndex]
-			if IsSecretValue(aura) then
-				Wake()
-				return
-			end
-			local id = aura.spellId
-			if id and not IsSecretValue(id) and LOCKOUT_SET[id] then
+		for _, aura in ipairs(added) do
+			if IsSecret(aura) or (not IsSecret(aura.spellId) and LOCKOUT_SET[aura.spellId]) then
 				Wake()
 				return
 			end
 		end
 	end
-	if lockoutInstanceID then
-		if removed then
-			for removedIndex = 1, #removed do
-				local id = removed[removedIndex]
-				if IsSecretValue(id) or id == lockoutInstanceID then
-					Wake()
-					return
-				end
-			end
-		end
-		if updated then
-			for updatedIndex = 1, #updated do
-				local id = updated[updatedIndex]
-				if IsSecretValue(id) or id == lockoutInstanceID then
-					Wake()
-					return
-				end
-			end
-		end
-	end
+	if lockoutInstanceID and (TouchesLockout(removed) or TouchesLockout(updated)) then Wake() end
 end
 
 local function GetLockoutAura()
-	for spellIndex = 1, #LOCKOUT do
-		local aura = C_UnitAuras.GetPlayerAuraBySpellID(LOCKOUT[spellIndex])
+	for _, spellID in ipairs(LOCKOUT) do
+		local aura = C_UnitAuras.GetPlayerAuraBySpellID(spellID)
 		if aura then return aura end
 	end
 end
@@ -124,9 +95,7 @@ end
 local function GetLockoutCached(now)
 	if cachedLockoutValid and cachedLockout then
 		local expiration = cachedLockout.expirationTime
-		if expiration and not BUI.Tools.IsSecretValue(expiration) and now >= expiration then
-			cachedLockoutValid = false
-		end
+		if not IsSecret(expiration) and now >= expiration then cachedLockoutValid = false end
 	end
 	if not cachedLockoutValid or now >= nextForcedScan then
 		cachedLockout = GetLockoutAura()
@@ -137,219 +106,147 @@ local function GetLockoutCached(now)
 end
 
 local function GetActiveRemaining(lockout, now)
-	if not lockout or not lockout.expirationTime or not lockout.duration then return nil end
-	local IsSecretValue = BUI.Tools.IsSecretValue
-	if IsSecretValue(lockout.expirationTime) or IsSecretValue(lockout.duration) then
-		return nil
-	end
-	local castTime  = lockout.expirationTime - lockout.duration
-	local remaining = castTime + BUFF_DURATION - now
+	if not lockout or IsSecret(lockout.expirationTime) or IsSecret(lockout.duration) then return nil end
+	local remaining = lockout.expirationTime - lockout.duration + BUFF_DURATION - now
 	if remaining > 0 then return remaining end
-	return nil
 end
 
-local function Format(formatString, seconds, spellName)
-	formatString = (formatString or '')
-		:gsub('%[spell%]', spellName or 'Bloodlust')
-		:gsub('%[name%]',  spellName or 'Bloodlust')
-	if seconds then
-		local timeText = BUI.TimeFormat.Format(seconds, 10)
-		formatString = formatString:gsub('%[time%]', timeText)
-	else
-		formatString = formatString:gsub('%[time%]', '')
-	end
-	return formatString
+local function Format(formatString, seconds)
+	local timeText = seconds and BUI.TimeFormat.Format(seconds, DECIMALS_BELOW) or ''
+	return (formatString:gsub('%[spell%]', SPELL_TEXT):gsub('%[time%]', timeText))
 end
 
 local function Build()
 	if frame then return end
 	frame = CreateFrame('Frame', FRAME_NAME, UIParent)
 	frame:SetFrameStrata('MEDIUM')
-	frame:SetSize(Pixel.Scale(160), Pixel.Scale(28))
 	frame:Hide()
 
 	text = frame:CreateFontString(nil, 'OVERLAY')
-	text:SetJustifyH('LEFT')
+	text:SetPoint('CENTER')
+	text:SetJustifyH('CENTER')
+	text:SetWordWrap(false)
+
+	flash = text:CreateAnimationGroup()
+	flash:SetLooping('REPEAT')
+	local fadeOut = flash:CreateAnimation('Alpha')
+	fadeOut:SetFromAlpha(1)
+	fadeOut:SetToAlpha(FLASH_LOW_ALPHA)
+	fadeOut:SetDuration(FLASH_HALF_PERIOD)
+	fadeOut:SetOrder(1)
+	fadeOut:SetSmoothing('IN_OUT')
+	local fadeIn = flash:CreateAnimation('Alpha')
+	fadeIn:SetFromAlpha(FLASH_LOW_ALPHA)
+	fadeIn:SetToAlpha(1)
+	fadeIn:SetDuration(FLASH_HALF_PERIOD)
+	fadeIn:SetOrder(2)
+	fadeIn:SetSmoothing('IN_OUT')
 end
 
 local function BuildIconPrefix(config)
-	if config.showIcon == false then return '' end
-	local iconSize = config.iconSize
-	local texture = C_Spell.GetSpellTexture(BLOODLUST)
-	if not texture then return '' end
-	return ('|T%s:%d:%d:0:0:64:64:5:59:5:59|t  '):format(texture, iconSize, iconSize)
+	if not config.showIcon then return '' end
+	return ('|T%s:%d:%d:0:0:64:64:5:59:5:59|t  '):format(C_Spell.GetSpellTexture(BLOODLUST), config.iconSize, config.iconSize)
 end
 
 local function ApplyLayout()
-	local config = GetConfig()
 	Build()
-
+	local config = GetConfig()
+	local size = math.max(config.iconSize, config.fontSize + 4)
+	frame:SetSize(size, size)
 	BUI.Anchor.ApplyPosition(frame, config)
-
-	text:ClearAllPoints()
-	text:SetPoint('CENTER', frame, 'CENTER', 0, 0)
-	text:SetJustifyH('CENTER')
-
-	local font = BUI.GetModuleFont(config)
-	local outline = BUI.GetFontOutline()
-	Pixel.ApplyFont(text, config.fontSize, font, outline)
-
-	lastRenderedText, lastFitWidth = nil, 0
-	lastState, lastBucket = nil, nil
+	Pixel.ApplyFont(text, config.fontSize, BUI.GetModuleFont(config), BUI.GetFontOutline())
 	iconPrefix = BuildIconPrefix(config)
+	lastText, lastState, lastBucket = nil, nil, nil
 end
 
-local function FitFrameToContent(config)
-	local width = text:GetStringWidth()
-	local height = math.max(config.iconSize, config.fontSize + 4)
-	if math.abs(width - lastFitWidth) < 0.5 then return end
-	lastFitWidth = width
-	frame:SetSize(math.max(width, 1), height)
-end
-
-local function SetTextIfChanged(newText)
-	if newText == lastRenderedText then return false end
-	lastRenderedText = newText
-	text:SetText(newText)
-	return true
-end
-
-local function ShowState(config, state, formatString, color, remaining, spellName)
-	local bucket = remaining and BUI.TimeFormat.Bucket(remaining, 10)
+local function Show(config, state, remaining)
+	local bucket = remaining and BUI.TimeFormat.Bucket(remaining, DECIMALS_BELOW)
 	if lastState == state and lastBucket == bucket and frame:IsShown() then return end
 	lastState, lastBucket = state, bucket
-	if SetTextIfChanged(iconPrefix .. Format(formatString, remaining, spellName)) then
-		FitFrameToContent(config)
+	local newText = iconPrefix .. Format(config[state .. 'Format'], remaining)
+	if newText ~= lastText then
+		lastText = newText
+		text:SetText(newText)
 	end
+	local color = config[state .. 'Color']
 	text:SetTextColor(color[1], color[2], color[3], color[4])
 	frame:Show()
 end
 
-local function ShowCD(config, remaining)
-	ShowState(config, 'cd', config.cdFormat, config.cdColor, remaining)
-end
-
-local function ShowReady(config)
-	ShowState(config, 'ready', config.readyFormat, config.readyColor)
-end
-
-local function ShowUsed(config)
-	ShowState(config, 'used', config.usedFormat, config.usedColor, nil, lastSpellName)
-end
-
-local function ShowActive(config, remaining)
-	ShowState(config, 'active', config.activeFormat, config.activeColor, remaining)
-end
-
-local FLASH_HALF_PERIOD = 0.3
-local FLASH_LOW_ALPHA   = 0.25
-
-local function EnsureFlashAnimationGroup()
-	if flashAnimationGroup or not text then return end
-	flashAnimationGroup = text:CreateAnimationGroup()
-	flashAnimationGroup:SetLooping('REPEAT')
-	local fadeOut = flashAnimationGroup:CreateAnimation('Alpha')
-	fadeOut:SetFromAlpha(1); fadeOut:SetToAlpha(FLASH_LOW_ALPHA)
-	fadeOut:SetDuration(FLASH_HALF_PERIOD); fadeOut:SetOrder(1); fadeOut:SetSmoothing('IN_OUT')
-	local fadeIn = flashAnimationGroup:CreateAnimation('Alpha')
-	fadeIn:SetFromAlpha(FLASH_LOW_ALPHA); fadeIn:SetToAlpha(1)
-	fadeIn:SetDuration(FLASH_HALF_PERIOD); fadeIn:SetOrder(2); fadeIn:SetSmoothing('IN_OUT')
+local function KeepReadyHere(config)
+	if config.readyHideInTown and BUI.Tools.IsInTown() then return false end
+	if config.readyDungeonOnly and select(2, IsInInstance()) ~= 'party' then return false end
+	return true
 end
 
 local function StopFlash()
 	flashGeneration = flashGeneration + 1
-	if flashAnimationGroup and flashAnimationGroup:IsPlaying() then flashAnimationGroup:Stop() end
-	if text then text:SetAlpha(1) end
+	flash:Stop()
+	text:SetAlpha(1)
 end
 
-local function PlayFlash(durationSec)
-	EnsureFlashAnimationGroup()
-	if not flashAnimationGroup then return end
+local function PlayFlash(seconds)
 	flashGeneration = flashGeneration + 1
-	local myGeneration = flashGeneration
-	if flashAnimationGroup:IsPlaying() then flashAnimationGroup:Stop() end
-	flashAnimationGroup:Play()
-	C_Timer.After(durationSec, function()
-		if myGeneration == flashGeneration then StopFlash() end
+	local generation = flashGeneration
+	flash:Stop()
+	flash:Play()
+	C_Timer.After(seconds, function()
+		if generation == flashGeneration then StopFlash() end
 	end)
 end
 
-local function Speak(message)
-	if not message or message == '' then return end
-	BUI.TTS.Speak(message)
-end
-
-local function PlaySound(name)
-	BUI.PlaySoundByName(name)
-end
-
-local function FireUsedAlert(config, spellName)
-	lastSpellName = spellName
+local function FireUsedAlert(config)
 	usedMessageUntil = GetTime() + config.usedHoldDuration
-	if config.flashOnUsed then
-		PlayFlash(math.min(config.flashDuration, config.usedHoldDuration))
-	end
-	PlaySound(config.soundOnUsed)
-	if config.ttsOnUsed then
-		Speak(config.ttsUsedText:gsub('%[spell%]', spellName or 'Bloodlust'))
-	end
+	if config.flashOnUsed then PlayFlash(math.min(config.flashDuration, config.usedHoldDuration)) end
+	BUI.PlaySoundByName(config.soundOnUsed)
+	if config.ttsOnUsed then BUI.TTS.Speak((config.ttsUsedText:gsub('%[spell%]', SPELL_TEXT))) end
 end
 
 local function FireReadyAlert(config)
 	readyMessageUntil = GetTime() + config.readyHoldDuration
-	if config.flashOnReady then
-		PlayFlash(math.min(config.flashReadyDuration, config.readyHoldDuration))
-	end
-	PlaySound(config.soundOnReady)
-	if config.ttsOnReady then Speak(config.ttsReadyText) end
+	if config.flashOnReady then PlayFlash(math.min(config.flashReadyDuration, config.readyHoldDuration)) end
+	BUI.PlaySoundByName(config.soundOnReady)
+	if config.ttsOnReady then BUI.TTS.Speak(config.ttsReadyText) end
 end
 
 local function FireWarnIfDue(config, remaining)
-	if not config.warnBeforeReady or config.warnBeforeReady <= 0 then return end
-	if warnPlayed or remaining > config.warnBeforeReady then return end
-	PlaySound(config.soundOnWarn)
-	if config.ttsOnWarn then Speak(config.ttsWarnText) end
+	if warnPlayed or config.warnBeforeReady <= 0 or remaining > config.warnBeforeReady then return end
 	warnPlayed = true
+	BUI.PlaySoundByName(config.soundOnWarn)
+	if config.ttsOnWarn then BUI.TTS.Speak(config.ttsWarnText) end
 end
 
-local PREVIEW_ACTIVE_DURATION = 5
-local PREVIEW_CD_DURATION     = 3
+local function EnterPreviewPhase(phase, now)
+	previewState.phase = phase
+	previewState.startedAt = now
+end
 
 local function TickPreview(config)
-	if not frame then Build(); ApplyLayout() end
-	local now     = GetTime()
+	local now = GetTime()
 	local elapsed = now - previewState.startedAt
-	local phase   = previewState.phase
+	local phase = previewState.phase
 
 	if phase == 'used' then
 		if elapsed < config.usedHoldDuration then
-			ShowUsed(config)
+			Show(config, 'used')
 			return
 		end
-		previewState.phase = 'active'
-		previewState.startedAt = now
+		EnterPreviewPhase('active', now)
 		elapsed, phase = 0, 'active'
 	end
 
 	if phase == 'active' then
 		local remaining = PREVIEW_ACTIVE_DURATION - elapsed
 		if remaining > 0 then
-			if config.showWhenActive ~= false then
-				ShowActive(config, remaining)
-			else
-				frame:Hide()
-			end
+			if config.showWhenActive then Show(config, 'active', remaining) else frame:Hide() end
 			return
 		end
-
 		if config.showWhenCD then
-			previewState.phase = 'cd'
-			previewState.startedAt = now
+			EnterPreviewPhase('cd', now)
 			elapsed, phase = 0, 'cd'
 		else
 			FireReadyAlert(config)
-			previewState.phase = 'ready'
-			previewState.startedAt = now
+			EnterPreviewPhase('ready', now)
 			elapsed, phase = 0, 'ready'
 		end
 	end
@@ -357,26 +254,19 @@ local function TickPreview(config)
 	if phase == 'cd' then
 		local remaining = PREVIEW_CD_DURATION - elapsed
 		if remaining > 0 then
-			ShowCD(config, remaining)
+			Show(config, 'cd', remaining)
 			FireWarnIfDue(config, remaining)
 			return
 		end
 		FireReadyAlert(config)
-		previewState.phase = 'ready'
-		previewState.startedAt = now
-		elapsed, phase = 0, 'ready'
+		EnterPreviewPhase('ready', now)
+		elapsed = 0
 	end
 
-	if phase == 'ready' then
-		if elapsed < config.readyHoldDuration then
-			ShowReady(config)
-			return
-		end
-		if config.showWhenReady then
-			ShowReady(config)
-		else
-			Bloodlust.StopPreview()
-		end
+	if elapsed < config.readyHoldDuration or config.showWhenReady then
+		Show(config, 'ready')
+	else
+		Bloodlust.StopPreview()
 	end
 end
 
@@ -389,111 +279,93 @@ local function Tick()
 	end
 
 	if not config.enabled then
-		if frame then frame:Hide() end
+		frame:Hide()
 		wasLockedOut = false
-		warnPlayed   = false
+		warnPlayed = false
 		Sleep()
 		return
 	end
-	if not frame then Build(); ApplyLayout() end
 
-	local now        = GetTime()
-	local lockout    = GetLockoutCached(now)
+	local now = GetTime()
+	local lockout = GetLockoutCached(now)
 	local hasLockout = lockout ~= nil
-	local inWarmup   = now < warmupUntil
-
-	local IsSecretValue = BUI.Tools and BUI.Tools.IsSecretValue
-	local fieldsSecret = (hasLockout and IsSecretValue
-		and (IsSecretValue(lockout.expirationTime) or IsSecretValue(lockout.duration))) or false
+	local inWarmup = now < warmupUntil
 
 	if hasLockout then
 		noLockoutStreak = 0
 		local instanceID = lockout.auraInstanceID
-		if IsSecretValue and IsSecretValue(instanceID) then
-			lockoutInstanceID = nil
-		else
-			lockoutInstanceID = instanceID
-		end
+		lockoutInstanceID = not IsSecret(instanceID) and instanceID or nil
 	else
 		noLockoutStreak = noLockoutStreak + 1
 		lockoutInstanceID = nil
 	end
 
-	local activeRemaining = GetActiveRemaining(lockout, now)
-
 	if hasLockout and not wasLockedOut and noLockoutSeen and not inWarmup then
-		FireUsedAlert(config, lastSpellName or 'Bloodlust')
+		FireUsedAlert(config)
 	end
 
 	if hasLockout and now < usedMessageUntil then
-		ShowUsed(config)
+		Show(config, 'used')
 		wasLockedOut = true
 		return
 	end
 
+	local activeRemaining = GetActiveRemaining(lockout, now)
 	if activeRemaining then
-		if config.showWhenActive ~= false then
-			ShowActive(config, activeRemaining)
-		else
-			frame:Hide()
-		end
+		if config.showWhenActive then Show(config, 'active', activeRemaining) else frame:Hide() end
 		wasLockedOut = true
 		return
 	end
 
 	if hasLockout then
-		if fieldsSecret then
+		if IsSecret(lockout.expirationTime) or IsSecret(lockout.duration) then
 			wasLockedOut = true
 			return
 		end
 		local remaining = lockout.expirationTime - now
 		if remaining > 0 then
+			wasLockedOut = true
 			if config.showWhenCD then
-				ShowCD(config, remaining)
+				Show(config, 'cd', remaining)
 				FireWarnIfDue(config, remaining)
 			else
 				frame:Hide()
 				Sleep()
 			end
-			wasLockedOut = true
 			return
 		end
 	end
 
-	if not inWarmup and noLockoutStreak >= STABLE_NO_LOCKOUT_TICKS then
-		if wasLockedOut then
-			FireReadyAlert(config)
-		end
-		wasLockedOut  = false
-		warnPlayed    = false
+	local settled = not hasLockout and not inWarmup and noLockoutStreak >= STABLE_NO_LOCKOUT_TICKS
+	if settled then
+		if wasLockedOut then FireReadyAlert(config) end
+		wasLockedOut = false
+		warnPlayed = false
 		noLockoutSeen = true
 	end
 
 	if now < readyMessageUntil then
-		ShowReady(config)
+		Show(config, 'ready')
 		return
 	end
 
-	if config.showWhenReady then
-		ShowReady(config)
+	if config.showWhenReady and KeepReadyHere(config) then
+		Show(config, 'ready')
 	else
 		frame:Hide()
 	end
 
-	if not hasLockout and not inWarmup and noLockoutStreak >= STABLE_NO_LOCKOUT_TICKS then
-		Sleep()
-	end
+	if settled then Sleep() end
 end
 
 function Bloodlust.StartPreview()
-	Build(); ApplyLayout()
+	ApplyLayout()
 	StopFlash()
 	previewState = { startedAt = GetTime(), phase = 'used' }
 	warnPlayed = false
-	lastSpellName = 'Bloodlust'
 	BUI.Scheduler.SetUpdateEnabled(MODULE_KEY, true)
 	Tick()
-	FireUsedAlert(GetConfig(), lastSpellName)
+	FireUsedAlert(GetConfig())
 end
 
 function Bloodlust.StopPreview()
@@ -501,7 +373,7 @@ function Bloodlust.StopPreview()
 	previewState = nil
 	wasLockedOut = false
 	StopFlash()
-	usedMessageUntil  = 0
+	usedMessageUntil = 0
 	readyMessageUntil = 0
 	BUI.Scheduler.SetUpdateEnabled(MODULE_KEY, GetConfig().enabled)
 	Tick()
@@ -511,26 +383,18 @@ end
 function Bloodlust.IsPreviewing() return previewState ~= nil end
 
 function Bloodlust.Refresh()
-	Build()
 	ApplyLayout()
 	BUI.Scheduler.SetUpdateEnabled(MODULE_KEY, GetConfig().enabled)
 	Tick()
 end
 
 function Bloodlust.Initialize()
-	Build()
-
 	local config = GetConfig()
-	if config.usedFormat:find('%[caster%]', 1, false) then
-		config.usedFormat = '[spell] used!'
-	end
-	if config.ttsUsedText:find('%[caster%]', 1, false) then
-		config.ttsUsedText = 'Lust used'
-	end
+	if config.usedFormat:find('%[caster%]') then config.usedFormat = '[spell] used!' end
+	if config.ttsUsedText:find('%[caster%]') then config.ttsUsedText = 'Lust used' end
 	ApplyLayout()
 
 	BUI.Anchor.Follow('Bloodlust', function() return GetConfig().enabled and frame end, GetConfig)
-
 	BUI.Scheduler.RegisterUpdate(MODULE_KEY, Tick, TICK_INTERVAL, config.enabled)
 	BUI.Events:RegisterUnit('UNIT_AURA', 'player', 'Bloodlust.Wake', OnPlayerAura)
 end
@@ -539,4 +403,7 @@ BUI.Events:OnLogin('Bloodlust', Bloodlust.Initialize)
 
 BUI.Events:Register('PLAYER_ENTERING_WORLD', 'Bloodlust.Warmup', function()
 	warmupUntil = GetTime() + WARMUP_SECS
+	Wake()
 end)
+
+BUI.Events:Register('PLAYER_UPDATE_RESTING', 'Bloodlust.Resting', Wake)

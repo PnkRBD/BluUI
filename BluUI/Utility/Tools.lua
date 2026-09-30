@@ -371,6 +371,10 @@ else
     end
 end
 
+function Tools.IsInTown()
+    return IsResting() and not IsInInstance()
+end
+
 function Tools.GetUnitClassColor(unit)
     if not unit or not UnitExists(unit) then return nil end
     local _, class = UnitClass(unit)
