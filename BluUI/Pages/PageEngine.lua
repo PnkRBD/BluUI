@@ -46,7 +46,7 @@ local function CreateWindow()
 	window = Layout.TopNavWindow({
 		width        = 1240, height    = 860, title = 'BluUI',
 		icon         = BUI.C.ICON_PATH,
-		minWidth     = 1228, minHeight = 720, pageWidth = 960,
+		minWidth     = 1228, pageWidth = 960,
 		version      = BUI.Version, sidebarWidth = 220,
 		strata       = 'FULLSCREEN_DIALOG', frameLevel = 200, escapable = true,
 		globalName   = 'BluUIFrame', footerButtons = BUI.Scale.GetFooterButtons(),
