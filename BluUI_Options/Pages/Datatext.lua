@@ -12,12 +12,12 @@ local PANEL_SAMPLE = 24
 local PANEL_SAMPLE_MAX = 120
 local CAPTION_GAP = 10
 local MENU_WIDTH = 150
-local ERASE_SIZE = 32
+local ERASE_SIZE = 16
+local LABEL_ICON = 16
 local TOOL_GAP = 12
-local LIST_ROOM = ERASE_SIZE
+local LIST_ROOM = 22
 local COG_ROOM = 22 + TOOL_GAP
 local TOGGLE_ROOM = 22 + TOOL_GAP
-local LABEL_ICON = 14
 local GRABBER_SIZE = 12
 local LIST_ROW = 44
 local LIST_TITLE_X = 44
@@ -317,8 +317,8 @@ local function DatatextOptions(entry, config)
 end
 
 local function LabelToggle(entry, config, after)
-	return { icon = 'hide', iconSize = LABEL_ICON, tooltip = 'Hide "' .. entry.label .. '" and show only the value', get = function() return config[entry.hideLabel] == true end, set = function(value)
-		config[entry.hideLabel] = value or nil
+	return { icon = 'eye', iconSize = LABEL_ICON, tooltip = 'Show "' .. entry.label .. '" before the value', get = function() return not config[entry.hideLabel] end, set = function(value)
+		config[entry.hideLabel] = not value or nil
 		after()
 	end }
 end
