@@ -19,6 +19,7 @@ local DRAG_ROW = 44
 local DRAG_TITLE_X = 44
 local GRABBER_SIZE = 12
 local DRAG_ALPHA = 0.35
+local SLIDE_TIME = 0.16
 
 local Section = Layout.TableSection
 local Board = setmetatable({}, { __index = Section })
@@ -114,27 +115,78 @@ local function DragGhost(board)
 	return ghost
 end
 
+local function OffsetOf(frame)
+	local _, _, _, _, y = frame:GetPoint(1)
+	return y
+end
+
+local function PlaceAt(board, frame, y)
+	frame:ClearAllPoints()
+	frame:SetPoint('TOPLEFT', board.panel, 'TOPLEFT', 0, y)
+end
+
+local function FinishSlide(board, frame)
+	local slide = board.drag.slides[frame]
+	board.drag.slides[frame] = nil
+	PlaceAt(board, frame, slide.to)
+	if slide.done then slide.done() end
+end
+
+local function RunSlides(board, elapsed)
+	local slides = board.drag.slides
+	for frame, slide in pairs(slides) do
+		slide.elapsed = slide.elapsed + elapsed
+		if slide.elapsed >= SLIDE_TIME then
+			FinishSlide(board, frame)
+		else
+			local progress = 1 - (1 - slide.elapsed / SLIDE_TIME) ^ 3
+			PlaceAt(board, frame, slide.from + (slide.to - slide.from) * progress)
+		end
+	end
+	if not next(slides) then board.drag.animator:SetScript('OnUpdate', nil) end
+end
+
+local function Slide(board, frame, from, to, done)
+	local drag = board.drag
+	drag.slides[frame] = { from = from, to = to, elapsed = 0, done = done }
+	PlaceAt(board, frame, from)
+	drag.animator:SetScript('OnUpdate', function(_, elapsed) RunSlides(board, elapsed) end)
+end
+
+local function SlotOf(board, row)
+	local slide = board.drag.slides[row]
+	return slide and slide.to or OffsetOf(row)
+end
+
 local function TrackDrag(board)
 	local drag = board.drag
 	local _, cursorY = GetCursorPosition()
-	cursorY = cursorY / board.frame:GetEffectiveScale()
-	drag.ghost:ClearAllPoints()
-	drag.ghost:SetPoint('TOPLEFT', board.panel, 'TOPLEFT', 0, -(board.panel:GetTop() - cursorY - drag.grabOffset))
+	local panelTop = board.panel:GetTop()
+	local ghostY = cursorY / board.frame:GetEffectiveScale() + drag.grabOffset - panelTop
+	PlaceAt(board, drag.ghost, ghostY)
+	local centre = ghostY - DRAG_ROW / 2
 	local from, over
 	for index, row in ipairs(drag.rows) do
 		if row == drag.dragging then from = index end
-		local top, bottom = row:GetTop(), row:GetBottom()
-		if top and cursorY <= top and cursorY >= bottom then over = index end
+		local top = SlotOf(board, row)
+		if centre <= top and centre >= top - row:GetHeight() then over = index end
 	end
 	if not over or over == from then return end
 	local delta = over > from and 1 or -1
+	local before = {}
+	for _, row in ipairs(drag.rows) do before[row] = OffsetOf(row) end
 	drag.rows[from], drag.rows[from + delta] = drag.rows[from + delta], drag.rows[from]
 	board:Move(drag.dragging, delta)
 	drag.onMove(from, delta)
+	for _, row in ipairs(drag.rows) do
+		local target = OffsetOf(row)
+		if before[row] ~= target then Slide(board, row, before[row], target) end
+	end
 end
 
 function Board:DragList(onMove, onDrop)
-	self.drag = { rows = {}, onMove = onMove, onDrop = onDrop }
+	local animator = CreateFrame('Frame', nil, self.panel)
+	self.drag = { rows = {}, slides = {}, animator = animator, onMove = onMove, onDrop = onDrop }
 end
 
 function Board:AddDragRow(label, room)
@@ -147,11 +199,12 @@ function Board:AddDragRow(label, room)
 	row:EnableMouse(true)
 	row:RegisterForDrag('LeftButton')
 	row:SetScript('OnDragStart', function(frame)
+		local ghost = DragGhost(self)
+		if drag.slides[ghost] then FinishSlide(self, ghost) end
 		local _, cursorY = GetCursorPosition()
 		drag.dragging = frame
 		drag.grabOffset = frame:GetTop() - cursorY / self.frame:GetEffectiveScale()
 		frame:SetAlpha(DRAG_ALPHA)
-		local ghost = DragGhost(self)
 		ghost.label:SetText(label)
 		ghost:Show()
 		TrackDrag(self)
@@ -159,9 +212,12 @@ function Board:AddDragRow(label, room)
 	end)
 	row:SetScript('OnDragStop', function(frame)
 		frame:SetScript('OnUpdate', nil)
-		frame:SetAlpha(1)
-		drag.ghost:Hide()
 		drag.dragging = nil
+		local ghost = drag.ghost
+		Slide(self, ghost, OffsetOf(ghost), SlotOf(self, frame), function()
+			ghost:Hide()
+			frame:SetAlpha(1)
+		end)
 		drag.onDrop()
 	end)
 	return row
