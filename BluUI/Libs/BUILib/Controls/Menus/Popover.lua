@@ -81,8 +81,14 @@ function Controls.Popover(options)
 
 	local checkFrame = CreateFrame("Frame")
 	local armed = not (IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton"))
+	local host = anchor or BUILib.GetPopupParent()
 	checkFrame:SetScript("OnUpdate", function(self)
 		if not frame:IsShown() then self:SetScript("OnUpdate", nil); return end
+		if host and not host:IsVisible() then
+			self:SetScript("OnUpdate", nil)
+			ClosePopover()
+			return
+		end
 		local isMouseDown = IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton")
 		if not armed then
 			if not isMouseDown then armed = true end
