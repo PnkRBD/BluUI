@@ -4,6 +4,7 @@ local Layout, Modals, Widget = BUILib.Layout, BUILib.Modals, BUILib.Widget
 local MinimapModule = BUI.Minimap
 local Datatext = BUI.Datatext
 local ButtonBar = BUI.MinimapButtonBar
+local AddonButtons = BUI.AddonButtons
 local Pixel = BUI.Pixel
 
 local floor, max, min, abs = math.floor, math.max, math.min, math.abs
@@ -17,10 +18,10 @@ local PREVIEW_TICK = 2
 local ICON_SIZE = 18
 local MENU_WIDTH = 160
 local SWITCH_WIDTH = 40
-local ARROW = 22
-local ARROW_GAP = 4
-local ORDER_ROOM = SWITCH_WIDTH + 12 + ARROW * 2 + ARROW_GAP
-local LABEL_TOGGLE = 22
+local SLIDER_WIDTH = 220
+local OFF_ALPHA = 0.35
+local SIZE_MIN, SIZE_MAX, SIZE_STEP = 40, 160, 5
+local OFFSET_RANGE = 250
 
 local RAIL_GROUPS = {
 	{ title = 'Map', items = {
@@ -58,7 +59,7 @@ local ANCHORS = {
 }
 
 local INDICATORS = {
-	{ key = 'queue', name = 'Queue eye', sub = 'Dungeon, raid and PvP queue status', icon = 'Interface\\LFGFrame\\LFG-Eye', color = { 0.35, 0.72, 1.00 } },
+	{ key = 'queue', name = 'Queue eye', sub = 'Dungeon, raid and PvP queue status', hide = 'minimapHideQueue', atlas = 'groupfinder-eye-single', color = { 0.35, 0.72, 1.00 } },
 	{ key = 'difficulty', name = 'Difficulty', sub = 'The instance difficulty', hide = 'minimapHideDifficulty', icon = 'Interface\\Icons\\INV_Misc_Bone_Skull_02', color = { 1.00, 0.55, 0.15 } },
 	{ key = 'mail', name = 'Mail', sub = 'New mail waiting', hide = 'minimapHideMail', icon = 'Interface\\Icons\\INV_Letter_15', color = { 1.00, 0.88, 0.25 } },
 	{ key = 'crafting', name = 'Crafting orders', sub = 'Personal crafting orders', hide = 'minimapHideCrafting', icon = 'Interface\\Icons\\Trade_BlackSmithing', color = { 0.45, 0.82, 0.30 } },
@@ -102,24 +103,6 @@ local function Switch(board, label, get, set, tip)
 	end, tip)
 end
 
-local function Swap(list, value, delta)
-	for index, candidate in ipairs(list) do
-		if candidate == value then
-			local other = list[index + delta]
-			if not other then return false end
-			list[index], list[index + delta] = other, value
-			return true
-		end
-	end
-	return false
-end
-
-local function OrderArrows(ui, row, onMove)
-	local down = ui.ArrowButton(row, false, function() onMove(1) end)
-	down:SetPoint('RIGHT', -(ui.ROW_INSET + SWITCH_WIDTH + 12), 0)
-	ui.ArrowButton(row, true, function() onMove(-1) end):SetPoint('RIGHT', down, 'LEFT', -ARROW_GAP, 0)
-end
-
 local function ConfirmModule(value)
 	Modals.Confirm({
 		parent = Window().frame,
@@ -136,6 +119,17 @@ local function ConfirmModule(value)
 		end,
 		onCancel = Repaint,
 	})
+end
+
+local function ApplyIndicatorArt(texture, def)
+	local atlas = def.atlas or def.key == 'missions' and _G.ExpansionLandingPageMinimapButton:GetNormalTexture():GetAtlas()
+	if atlas then
+		texture:SetAtlas(atlas)
+		texture:SetTexCoord(0, 1, 0, 1)
+	else
+		texture:SetTexture(def.icon)
+		texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	end
 end
 
 local function BuildPreview(band)
@@ -306,11 +300,10 @@ local function BuildPreview(band)
 	local icons = {}
 
 	local function PlaceIcon(proxy, key)
-		local point, x, y = MinimapModule.GetIndicatorPlacement(key)
-		local iconScale = MinimapModule.GetIconScale(key)
+		local point, x, y = MinimapModule.GetIndicatorOffset(key)
 		proxy:ClearAllPoints()
-		proxy:SetPoint(point, mapFrame, point, x * iconScale * scale, y * iconScale * scale)
-		local size = floor(ICON_SIZE * (iconScale / 0.8))
+		proxy:SetPoint(point, mapFrame, point, x * scale, y * scale)
+		local size = floor(ICON_SIZE * (MinimapModule.GetIconScale(key) / 0.8))
 		proxy:SetSize(size, size)
 	end
 
@@ -354,9 +347,7 @@ local function BuildPreview(band)
 		proxy:ClearAllPoints()
 		proxy:SetPoint('CENTER', mapFrame, 'CENTER', relX, relY)
 
-		local iconScale = MinimapModule.GetIconScale(key)
-		MinimapModule.SaveIndicatorPosition(key, 'CENTER', relX / (scale * iconScale), relY / (scale * iconScale))
-		MinimapModule.RepositionIndicators()
+		MinimapModule.SetIndicatorOffset(key, 'CENTER', relX / scale, relY / scale)
 		Repaint()
 	end
 
@@ -371,42 +362,7 @@ local function BuildPreview(band)
 		local iconTexture = proxy:CreateTexture(nil, 'ARTWORK')
 		iconTexture:SetPoint('TOPLEFT', 2, -2)
 		iconTexture:SetPoint('BOTTOMRIGHT', -2, 2)
-		iconTexture:SetTexture(def.icon)
-		iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-		if def.key == 'missions' then
-			local landingButton = _G.ExpansionLandingPageMinimapButton
-			local source = landingButton and (landingButton.LandingPageIcon or landingButton.Icon or (landingButton.GetNormalTexture and landingButton:GetNormalTexture()))
-			local atlas = source and source.GetAtlas and source:GetAtlas()
-			if atlas then
-				iconTexture:SetAtlas(atlas)
-				iconTexture:SetTexCoord(0, 1, 0, 1)
-			end
-		elseif def.key == 'queue' then
-			local function CopyEye(eyeFrame)
-				if not eyeFrame then return false end
-				for _, region in ipairs({ eyeFrame:GetRegions() }) do
-					if region:IsObjectType('Texture') then
-						local atlas = region:GetAtlas()
-						if atlas then
-							iconTexture:SetAtlas(atlas)
-							iconTexture:SetTexCoord(0, 1, 0, 1)
-							return true
-						end
-						local texture = region:GetTexture()
-						if texture then
-							iconTexture:SetTexture(texture)
-							iconTexture:SetTexCoord(region:GetTexCoord())
-							return true
-						end
-					end
-				end
-				return false
-			end
-			local queueButton = _G.QueueStatusButton
-			if not (CopyEye(queueButton and queueButton.Eye) or CopyEye(queueButton)) then
-				iconTexture:SetTexCoord(0, 1, 0, 1)
-			end
-		end
+		ApplyIndicatorArt(iconTexture, def)
 
 		local highlight = proxy:CreateTexture(nil, 'OVERLAY')
 		highlight:SetTexture('Interface\\Buttons\\WHITE8x8')
@@ -458,13 +414,9 @@ local function BuildPreview(band)
 
 		proxy:EnableMouseWheel(true)
 		proxy:SetScript('OnMouseWheel', function(self, delta)
-			local oldScale = MinimapModule.GetIconScale(def.key)
-			local newScale = max(0.4, min(1.6, oldScale + delta * 0.1))
+			local newScale = max(0.4, min(1.6, MinimapModule.GetIconScale(def.key) + delta * 0.1))
 			MinimapModule.SetIconScale(def.key, newScale)
-			local point, offsetX, offsetY = MinimapModule.GetIndicatorPlacement(def.key)
-			MinimapModule.SaveIndicatorPosition(def.key, point, offsetX * oldScale / newScale, offsetY * oldScale / newScale)
 			PlaceIcon(self, def.key)
-			MinimapModule.RepositionIndicators()
 			Widget.ShowTip(self, format('%s  |  Scale: %.0f%%', def.name, newScale * 100))
 			Repaint()
 		end)
@@ -571,7 +523,7 @@ local function BuildPreview(band)
 	drawerTab:Hide()
 
 	local function RefreshDrawer()
-		if not interfaceDB.drawerEnabled then
+		if interfaceDB.addonButtons ~= 'DRAWER' then
 			drawerTab:Hide()
 			return
 		end
@@ -603,12 +555,12 @@ local function BuildPreview(band)
 
 	local function RefreshButtonBar()
 		local config = interfaceDB.buttonBar
-		if not config.enabled then
+		if interfaceDB.addonButtons ~= 'BAR' then
 			barHolder:Hide()
 			return
 		end
 		local entries = {}
-		for _, entry in ipairs(ButtonBar.PickerEntries()) do
+		for _, entry in ipairs(AddonButtons.Entries()) do
 			if entry.included then entries[#entries + 1] = entry end
 		end
 		local count = #entries
@@ -686,7 +638,7 @@ local function MapBoard(ui, parent, width)
 		} },
 	}, RefreshPreview)
 	board:AddTools('Position', 'Distance from the right and top edges of the screen', {
-		{ icon = 'mover', tooltip = 'Position', title = 'Position', options = {
+		{ icon = 'location', tooltip = 'Position', title = 'Position', options = {
 			{ label = 'From the right edge', min = 0, max = floor(GetScreenWidth()), step = 1, get = function() return -(MinimapModule.GetPosition()) end, set = function(value) MinimapModule.SetPositionX(-value) end },
 			{ label = 'From the top edge', min = 0, max = floor(GetScreenHeight()), step = 1, get = function() local _, y = MinimapModule.GetPosition() return -y end, set = function(value) MinimapModule.SetPositionY(-value) end },
 		} },
@@ -694,25 +646,53 @@ local function MapBoard(ui, parent, width)
 	return board
 end
 
+local function IndicatorChanged()
+	MinimapModule.ApplyVisibility()
+	RefreshPreview()
+	Repaint()
+end
+
+local function IndicatorOffset(def, label, vertical)
+	return { label = label, min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1,
+		get = function()
+			local _, x, y = MinimapModule.GetIndicatorOffset(def.key)
+			return floor((vertical and y or x) + 0.5)
+		end,
+		set = function(value)
+			local point, x, y = MinimapModule.GetIndicatorOffset(def.key)
+			if vertical then y = value else x = value end
+			MinimapModule.SetIndicatorOffset(def.key, point, x, y)
+		end }
+end
+
 local function IndicatorTools(def)
-	local options = {
-		{ label = 'Size', min = 40, max = 160, step = 5, get = function() return floor(MinimapModule.GetIconScale(def.key) * 100 + 0.5) end, set = function(value) MinimapModule.SetIconScale(def.key, value / 100) end },
+	local tools = {
+		{ slot = 'menu', width = SLIDER_WIDTH, min = SIZE_MIN, max = SIZE_MAX, step = SIZE_STEP,
+			get = function() return floor(MinimapModule.GetIconScale(def.key) * 100 + 0.5) end,
+			set = function(value) MinimapModule.SetIconScale(def.key, value / 100) end },
+		{ icon = 'location', tooltip = 'Anchor and offsets', title = def.name, options = {
+			{ label = 'Anchor', entries = BUI.C.ANCHOR_POINT_OPTIONS_SHORT, get = function() return (MinimapModule.GetIndicatorOffset(def.key)) end, set = function(value)
+				local _, x, y = MinimapModule.GetIndicatorOffset(def.key)
+				MinimapModule.SetIndicatorOffset(def.key, value, x, y)
+			end },
+			IndicatorOffset(def, 'Horizontal offset', false),
+			IndicatorOffset(def, 'Vertical offset', true),
+		} },
 	}
 	if def.key == 'difficulty' then
-		options[#options + 1] = { label = 'Show as letters', get = function() return Interface().minimapTextDifficulty == true end, set = function(value)
-			Interface().minimapTextDifficulty = value
-			MinimapModule.ToggleTextDifficulty(value)
-			MinimapModule.ApplyVisibility()
-		end }
+		tools[#tools + 1] = { slot = 'toggle', tooltip = 'Difficulty options', title = def.name, options = {
+			{ label = 'Show as letters', get = function() return Interface().minimapTextDifficulty == true end, set = function(value)
+				Interface().minimapTextDifficulty = value
+				MinimapModule.ToggleTextDifficulty(value and not Interface().minimapHideDifficulty)
+				IndicatorChanged()
+			end },
+		} }
 	end
-	local tools = { { icon = 'resize', tooltip = def.key == 'difficulty' and 'Size and style' or 'Size', title = def.name, options = options } }
-	if def.hide then
-		tools[2] = { get = function() return not Interface()[def.hide] end, set = function(value)
-			Interface()[def.hide] = not value
-			MinimapModule.ApplyVisibility()
-			if def.key == 'difficulty' then MinimapModule.ToggleTextDifficulty(value and Interface().minimapTextDifficulty == true) end
-		end }
-	end
+	tools[#tools + 1] = { get = function() return not Interface()[def.hide] end, set = function(value)
+		Interface()[def.hide] = not value
+		if def.key == 'difficulty' then MinimapModule.ToggleTextDifficulty(value and Interface().minimapTextDifficulty == true) end
+		IndicatorChanged()
+	end }
 	return tools
 end
 
@@ -720,10 +700,15 @@ local function IndicatorsBoard(ui, parent, width)
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Indicators',
-		description = 'The small buttons that live on the map. Drag them around the preview above, or unlock the real map.',
+		description = 'The small buttons on the map. Size and place them here, drag them on the preview above, or unlock the real map.',
 	})
 	for _, def in ipairs(INDICATORS) do
-		board:AddTools(def.name, def.sub, IndicatorTools(def), RefreshPreview)
+		local row = board:AddTools(def.name, def.sub, IndicatorTools(def), RefreshPreview, function(texture) ApplyIndicatorArt(texture, def) end)
+		ui.Bind(row.icon, function()
+			local hidden = Interface()[def.hide]
+			row.icon:SetDesaturated(hidden)
+			row.icon:SetAlpha(hidden and OFF_ALPHA or 1)
+		end)
 	end
 	return board
 end
@@ -782,151 +767,93 @@ local function ApplyDatatext()
 end
 
 local function DatatextBoard(ui, parent, width)
+	local config = Bar()
+	local tools = BUI.DatatextBarTools(config, fonts)
+	tools[#tools + 1] = { icon = 'location', tooltip = 'Where it hangs on the map', title = 'Position', options = {
+		{ label = 'Side of the map', entries = ANCHORS, get = function() return config.anchor end, set = function(value) config.anchor = value end },
+		{ label = 'Gap from the map', min = 0, max = 40, step = 1, get = function() return config.gap end, set = function(value) config.gap = value end },
+	} }
+	tools[#tools + 1] = { get = function() return config.enabled == true end, set = function(value) config.enabled = value end }
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Datatext bar',
-		description = 'A strip of datatexts attached to the map.',
+		description = 'A strip of datatexts attached to the map. It spans the side it hangs on, so width counts on the left and right, height on the top and bottom, and zero fits the text.',
 	})
-	Switch(board, 'Datatext bar', function() return Bar().enabled ~= false end, function(value)
-		Bar().enabled = value
-		Datatext.Apply()
-	end)
-	board:AddTools('Bar', 'Where it hangs on the map and how it is drawn', {
-		{ kind = 'swatch', tooltip = 'Background color',
-			get = function() local color = Bar().bgColor return color.r, color.g, color.b, 1 end,
-			set = function(red, green, blue) Bar().bgColor = { r = red, g = green, b = blue } end },
-		{ entries = ANCHORS, width = MENU_WIDTH, get = function() return Bar().anchor end, set = function(value) Bar().anchor = value end },
-		{ tooltip = 'Gap, height, spacing and background', title = 'Bar', options = {
-			{ label = 'Gap from the map', min = 0, max = 40, step = 1, get = function() return Bar().gap end, set = function(value) Bar().gap = value end },
-			{ label = 'Height', min = 10, max = 40, step = 1, get = function() return Bar().height end, set = function(value) Bar().height = value end },
-			{ label = 'Spacing', min = 0, max = 40, step = 1, get = function() return Bar().spacing end, set = function(value)
-				local config = Bar()
-				config.spacing, config.spacingPx = value, true
-			end },
-			{ label = 'Spread', min = 0, max = 100, step = 1, get = function() return tonumber(Bar().spread) or 0 end, set = function(value) Bar().spread = value end },
-			{ label = 'Background opacity', min = 0, max = 100, step = 1, get = function() return floor(Bar().bgAlpha * 100 + 0.5) end, set = function(value) Bar().bgAlpha = value / 100 end },
-			{ label = 'Border', get = function() return Bar().border == true end, set = function(value) Bar().border = value end },
-			{ kind = 'swatch', label = 'Border color', opacity = true,
-				get = function() local color = Bar().borderColor return color.r, color.g, color.b, color.a end,
-				set = function(red, green, blue, alpha) Bar().borderColor = { r = red, g = green, b = blue, a = alpha } end },
-		} },
-	}, ApplyDatatext)
-	board:AddTools('Text', 'Font, size and the value color', {
-		{ kind = 'swatch', tooltip = 'Value color', opacity = true,
-			get = function() local color = Bar().colorValue return color.r, color.g, color.b, color.a end,
-			set = function(red, green, blue, alpha) Bar().colorValue = { r = red, g = green, b = blue, a = alpha } end },
-		{ entries = fonts, width = MENU_WIDTH, get = function() return Bar().font end, set = function(value) Bar().font = value end },
-		{ icon = 'text', tooltip = 'Size', title = 'Text', options = {
-			{ label = 'Font size', min = 8, max = 24, step = 1, get = function() return Bar().fontSize end, set = function(value) Bar().fontSize = value end },
-		} },
-	}, ApplyDatatext)
-	return board
-end
-
-local function ReadoutsBoard(ui, parent, width, page)
-	local config = Bar()
-	local order = Datatext.ResolveOrder(config)
-	local rows = {}
-	local board = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Datatexts',
-		description = 'What the bar shows, top to bottom here is left to right on the bar.',
-		buttons = {
-			{ text = 'Default order', icon = 'reset', onClick = function()
-				config.order = nil
-				Datatext.Apply()
-				page:Rebuild('datatext')
-			end },
-		},
-	})
-	local function Move(id, delta)
-		if not Swap(order, id, delta) then return end
-		board:Move(rows[id], delta)
-		config.order = order
-		Datatext.Apply()
-		page:Resize()
-	end
-	for _, id in ipairs(order) do
-		local entry = Datatext.Get(id)
-		local row = board:AddRow(entry.name, nil, ORDER_ROOM + LABEL_TOGGLE + 12)
-		rows[id] = row
-		ui.Switch(row, function() return config[entry.show] == true end, function(value)
-			config[entry.show] = value
-			Datatext.Apply()
-		end):SetPoint('RIGHT', -ui.ROW_INSET, 0)
-		OrderArrows(ui, row, function(delta) Move(id, delta) end)
-		ui.Tool(row, BUI.DatatextLabelToggle(entry, config, ApplyDatatext)):SetPoint('RIGHT', -(ui.ROW_INSET + ORDER_ROOM + 12), 0)
-	end
+	board:AddTools('Settings', 'Colors, text, layout and where it sits on the map', tools, ApplyDatatext)
 	return board
 end
 
 local function AddonButtonsBoard(ui, parent, width)
-	local function RefreshButtonBar()
-		ButtonBar.Refresh()
+	local function Refresh()
+		AddonButtons.Refresh()
 		RefreshPreview()
+	end
+	local function ModeSwitch(mode)
+		return { get = function() return Interface().addonButtons == mode end, set = function(value)
+			MinimapModule.SetAddonButtons(value and mode or 'NONE')
+			Repaint()
+		end }
 	end
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Addon buttons',
-		description = 'Tidy the buttons other addons put on the minimap: behind a drawer tab on its edge, or in a row beside it.',
+		description = 'Tidy the buttons other addons put on the minimap: behind a drawer tab on its edge, or in a row beside it. Pick one or neither.',
 	})
 	board:AddTools('Drawer', 'Collects the buttons behind a tab on the edge of the map', {
-		{ tooltip = 'Side and offsets', title = 'Drawer', options = {
-			{ label = 'Side', entries = SIDES, get = function() return Interface().drawerSide end, set = function(value) Interface().drawerSide = value MinimapModule.SetDrawerSide(value) end },
-			{ label = 'Horizontal offset', min = -300, max = 300, step = 1, get = function() return Interface().drawerX end, set = function(value) Interface().drawerX = value MinimapModule.RepositionDrawer() end },
-			{ label = 'Vertical offset', min = -300, max = 300, step = 1, get = function() return Interface().drawerY end, set = function(value) Interface().drawerY = value MinimapModule.RepositionDrawer() end },
+		{ icon = 'location', tooltip = 'Side and offsets', title = 'Drawer', options = {
+			{ label = 'Side', entries = SIDES, get = function() return Interface().drawerSide end, set = function(value) Interface().drawerSide = value end },
+			{ label = 'Horizontal offset', min = -300, max = 300, step = 1, get = function() return Interface().drawerX end, set = function(value) Interface().drawerX = value end },
+			{ label = 'Vertical offset', min = -300, max = 300, step = 1, get = function() return Interface().drawerY end, set = function(value) Interface().drawerY = value end },
 		} },
-		{ get = function() return Interface().drawerEnabled == true end, set = MinimapModule.ToggleDrawer },
-	}, RefreshPreview)
+		ModeSwitch('DRAWER'),
+	}, Refresh)
 	board:AddTools('Button bar', 'A tidy row of buttons beside the map', {
 		{ kind = 'swatch', tooltip = 'Tile background', opacity = true,
 			get = function() local color = Buttons().background return color[1], color[2], color[3], color[4] end,
 			set = function(red, green, blue, alpha) Buttons().background = { red, green, blue, alpha } end },
-		{ tooltip = 'Side, size and spacing', title = 'Button bar', options = {
-			{ label = 'Side', entries = SIDES, get = function() return Buttons().side end, set = function(value) Buttons().side = value end },
-			{ label = 'Align', entries = ALIGNS, get = function() return Buttons().align end, set = function(value) Buttons().align = value end },
+		{ tooltip = 'Size and spacing', title = 'Button bar', options = {
 			{ label = 'Icon size', min = 12, max = 40, step = 1, get = function() return Buttons().size end, set = function(value) Buttons().size = value end },
 			{ label = 'Spacing', min = -1, max = 10, step = 1, get = function() return Buttons().spacing end, set = function(value) Buttons().spacing = value end },
-			{ label = 'Gap from the map', min = 0, max = 10, step = 1, get = function() return Buttons().gap end, set = function(value) Buttons().gap = value end },
 			{ label = 'Per line, 0 keeps one line', min = 0, max = 20, step = 1, get = function() return Buttons().perLine end, set = function(value) Buttons().perLine = value end },
+		} },
+		{ icon = 'location', tooltip = 'Side, align and offsets', title = 'Position', options = {
+			{ label = 'Side', entries = SIDES, get = function() return Buttons().side end, set = function(value) Buttons().side = value end },
+			{ label = 'Align', entries = ALIGNS, get = function() return Buttons().align end, set = function(value) Buttons().align = value end },
+			{ label = 'Gap from the map', min = 0, max = 10, step = 1, get = function() return Buttons().gap end, set = function(value) Buttons().gap = value end },
 			{ label = 'Horizontal offset', min = -300, max = 300, step = 1, get = function() return Buttons().offsetX end, set = function(value) Buttons().offsetX = value end },
 			{ label = 'Vertical offset', min = -300, max = 300, step = 1, get = function() return Buttons().offsetY end, set = function(value) Buttons().offsetY = value end },
 		} },
-		{ get = function() return Buttons().enabled == true end, set = function(value) Buttons().enabled = value end },
-	}, RefreshButtonBar)
+		ModeSwitch('BAR'),
+	}, Refresh)
 	return board
 end
 
 local function ButtonsBoard(ui, parent, width, page)
-	local entries = ButtonBar.PickerEntries()
+	local entries = AddonButtons.Entries()
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Buttons',
-		description = 'Which addon buttons sit on the bar, top to bottom here is first to last on the bar.',
+		description = 'Which addon buttons show, top to bottom here is first to last. Drag a row to reorder it.',
 	})
 	if #entries == 0 then
-		board:AddRow('No addon buttons yet', Buttons().enabled and 'They appear here as addons add buttons to the minimap' or 'Turn the button bar on to collect them')
+		board:AddRow('No addon buttons yet', Interface().addonButtons == 'NONE' and 'Turn on the drawer or the button bar to collect them' or 'They appear here as addons add buttons to the minimap')
 		return board
 	end
-	local rows = {}
-	local function Move(entry, delta)
-		if not Swap(entries, entry, delta) then return end
-		board:Move(rows[entry.id], delta)
-		local names = {}
-		for position, candidate in ipairs(entries) do names[position] = candidate.id end
-		ButtonBar.SetOrder(names)
-		RefreshPreview()
+	board:DragList(function(index, delta)
+		entries[index], entries[index + delta] = entries[index + delta], entries[index]
 		page:Resize()
-	end
+	end, function()
+		local names = {}
+		for position, entry in ipairs(entries) do names[position] = entry.id end
+		AddonButtons.SetOrder(names)
+		RefreshPreview()
+	end)
 	for _, entry in ipairs(entries) do
-		local row = board:AddRow(entry.label, nil, ORDER_ROOM)
-		rows[entry.id] = row
-		ui.Switch(row, function() return entry.included == true end, function(value)
+		ui.Switch(board:AddDragRow(entry.label, SWITCH_WIDTH), function() return entry.included end, function(value)
 			entry.included = value
-			ButtonBar.SetIncluded(entry.id, value)
+			AddonButtons.SetIncluded(entry.id, value)
 			RefreshPreview()
 		end):SetPoint('RIGHT', -ui.ROW_INSET, 0)
-		OrderArrows(ui, row, function(delta) Move(entry, delta) end)
 	end
 	return board
 end
@@ -935,7 +862,7 @@ local function Panes(ui, _, parent, width, item, page)
 	if item.id == 'map' then return { MapBoard(ui, parent, width) } end
 	if item.id == 'indicators' then return { IndicatorsBoard(ui, parent, width) } end
 	if item.id == 'text' then return { TextBoard(ui, parent, width) } end
-	if item.id == 'datatext' then return { DatatextBoard(ui, parent, width), ReadoutsBoard(ui, parent, width, page) } end
+	if item.id == 'datatext' then return { DatatextBoard(ui, parent, width), BUI.DatatextsBoard(ui, parent, width, Bar(), page, ApplyDatatext) } end
 	return { AddonButtonsBoard(ui, parent, width), ButtonsBoard(ui, parent, width, page) }
 end
 

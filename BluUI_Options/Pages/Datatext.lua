@@ -1,7 +1,6 @@
 local BUI = BluUI
 local BUILib = BUI.BUILibClient
 local Layout, Modals = BUILib.Layout, BUILib.Modals
-local Section = Layout.TableSection
 local Datatext = BUI.Datatext
 local Pixel = BUI.Pixel
 
@@ -18,10 +17,6 @@ local TOOL_GAP = 12
 local LIST_ROOM = ERASE_SIZE
 local COG_ROOM = 22 + TOOL_GAP
 local TOGGLE_ROOM = 22 + TOOL_GAP
-local GRABBER_SIZE = 12
-local LIST_ROW = 44
-local LIST_TITLE_X = 44
-local DRAG_ALPHA = 0.35
 
 local CENTERED = { TOP = true, CENTER = true, BOTTOM = true }
 local CENTER_POINT = { TOPLEFT = 'TOP', TOPRIGHT = 'TOP', LEFT = 'CENTER', RIGHT = 'CENTER', BOTTOMLEFT = 'BOTTOM', BOTTOMRIGHT = 'BOTTOM' }
@@ -156,35 +151,15 @@ local function NameOption(config)
 	end }
 end
 
-local function BarTools(config, index)
-	local isPanel = Datatext.IsPanel(config)
-	local tools = {
-		Swatch(config, isPanel and 'Title color' or 'Value color', isPanel and 'titleColor' or 'colorValue', not isPanel),
+local function TextBarTools(config, fontItems, nameOption)
+	local textOptions = { Option(config, 'Font size', 'fontSize', { min = 8, max = 24, step = 1 }) }
+	if nameOption then table.insert(textOptions, 1, nameOption) end
+	return {
+		Swatch(config, 'Value color', 'colorValue', true),
 		Swatch(config, 'Background color', 'bgColor', false),
-	}
-	if isPanel then
-		tools[#tools + 1] = { icon = 'text', tooltip = 'Name, title text and placement', title = 'Title', options = {
-			NameOption(config),
-			Option(config, 'Title', 'title', { kind = 'input', placeholder = 'No title' }),
-			Option(config, 'Anchor', 'titleAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS_SHORT }),
-			Option(config, 'Size', 'titleSize', { min = 8, max = 32, step = 1 }),
-			Option(config, 'Horizontal offset', 'titleX', { min = -300, max = 300, step = 1 }),
-			Option(config, 'Vertical offset', 'titleY', { min = -300, max = 300, step = 1 }),
-		} }
-		tools[#tools + 1] = { tooltip = 'Size and backdrop', title = 'Panel', options = {
-			Option(config, 'Width', 'width', { min = 0, max = 1200, step = 1 }),
-			Option(config, 'Height', 'height', { min = 0, max = 600, step = 1 }),
-			Opacity(config),
-			Option(config, 'Border', 'border'),
-			Swatch(config, 'Border color', 'borderColor', true),
-		} }
-	else
-		tools[#tools + 1] = { entries = fonts, width = MENU_WIDTH, get = function() return config.font end, set = function(value) config.font = value end }
-		tools[#tools + 1] = { icon = 'text', tooltip = 'Name and size', title = 'Text', options = {
-			NameOption(config),
-			Option(config, 'Font size', 'fontSize', { min = 8, max = 24, step = 1 }),
-		} }
-		tools[#tools + 1] = { tooltip = 'Layout, size and backdrop', title = 'Layout', options = {
+		{ entries = fontItems, width = MENU_WIDTH, get = function() return config.font end, set = function(value) config.font = value end },
+		{ icon = 'text', tooltip = nameOption and 'Name and size' or 'Size', title = 'Text', options = textOptions },
+		{ tooltip = 'Layout, size and backdrop', title = 'Layout', options = {
 			Option(config, 'Orientation', 'orientation', { entries = ORIENTATIONS }),
 			Option(config, 'Align', 'align', { entries = ALIGNMENTS }),
 			Option(config, 'Spacing', 'spacing', { min = 0, max = 160, step = 1 }),
@@ -193,7 +168,36 @@ local function BarTools(config, index)
 			Opacity(config),
 			Option(config, 'Border', 'border'),
 			Swatch(config, 'Border color', 'borderColor', true),
-		} }
+		} },
+	}
+end
+
+BUI.DatatextBarTools = TextBarTools
+
+local function BarTools(config, index)
+	local tools
+	if Datatext.IsPanel(config) then
+		tools = {
+			Swatch(config, 'Title color', 'titleColor', false),
+			Swatch(config, 'Background color', 'bgColor', false),
+			{ icon = 'text', tooltip = 'Name, title text and placement', title = 'Title', options = {
+				NameOption(config),
+				Option(config, 'Title', 'title', { kind = 'input', placeholder = 'No title' }),
+				Option(config, 'Anchor', 'titleAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS_SHORT }),
+				Option(config, 'Size', 'titleSize', { min = 8, max = 32, step = 1 }),
+				Option(config, 'Horizontal offset', 'titleX', { min = -300, max = 300, step = 1 }),
+				Option(config, 'Vertical offset', 'titleY', { min = -300, max = 300, step = 1 }),
+			} },
+			{ tooltip = 'Size and backdrop', title = 'Panel', options = {
+				Option(config, 'Width', 'width', { min = 0, max = 1200, step = 1 }),
+				Option(config, 'Height', 'height', { min = 0, max = 600, step = 1 }),
+				Opacity(config),
+				Option(config, 'Border', 'border'),
+				Swatch(config, 'Border color', 'borderColor', true),
+			} },
+		}
+	else
+		tools = TextBarTools(config, fonts, NameOption(config))
 	end
 	tools[#tools + 1] = PositionTool(config)
 	tools[#tools + 1] = { get = function() return config.enabled == true end, set = function(value) config.enabled = value end }
@@ -227,7 +231,7 @@ local function BarSample(kit, cell, config)
 			widths[partIndex] = math.ceil(sizer:GetStringWidth())
 		end
 		local fixedWidth = config.width > 0 and math.min(Pixel.Scale(config.width), SAMPLE_LIMIT) or nil
-		local barWidth = Datatext.LayoutRow(widths, count, Pixel.Scale(config.spacing), Pixel.Scale(Datatext.LAYOUT.rowInset), fixedWidth, config.align, 0, layout)
+		local barWidth = Datatext.LayoutRow(widths, count, Pixel.Scale(config.spacing), Pixel.Scale(Datatext.LAYOUT.rowInset), fixedWidth, config.align, layout)
 		local barHeight = Pixel.Scale(config.fontSize + Datatext.LAYOUT.lineExtra)
 		for partIndex = 1, count do
 			local part = parts[partIndex]
@@ -323,16 +327,13 @@ local function LabelToggle(entry, config, after)
 	end }
 end
 
-BUI.DatatextLabelToggle = LabelToggle
-
-local function DatatextsBoard(ui, parent, width, config, page)
+local function DatatextsBoard(ui, parent, width, config, page, after)
 	local order = Datatext.ResolveOrder(config)
 	local active, off = {}, {}
 	for _, id in ipairs(order) do
 		local entry = Datatext.Get(id)
 		if config[entry.show] then active[#active + 1] = id else off[#off + 1] = entry end
 	end
-	local listRows = {}
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Datatexts',
@@ -340,92 +341,31 @@ local function DatatextsBoard(ui, parent, width, config, page)
 		buttons = {
 			{ text = 'Default order', icon = 'reset', onClick = function()
 				config.order = nil
-				Apply()
+				after()
 				page:RebuildCurrent()
 			end },
 		},
 	})
-	local function Move(id, delta)
-		local position = IndexOf(active, id)
-		local otherID = active[position + delta]
-		if not otherID then return end
+	board:DragList(function(index, delta)
+		local id, otherID = active[index], active[index + delta]
 		local from, to = IndexOf(order, id), IndexOf(order, otherID)
 		order[from], order[to] = otherID, id
-		active[position], active[position + delta] = otherID, id
-		board:Move(listRows[id], delta)
+		active[index], active[index + delta] = otherID, id
 		config.order = order
 		page:Resize()
-	end
-	local function RowUnder(cursorY)
-		for _, id in ipairs(active) do
-			local row = listRows[id]
-			local top, bottom = row:GetTop(), row:GetBottom()
-			if top and cursorY <= top and cursorY >= bottom then return id end
-		end
-	end
-	local dragging, grabOffset, ghost
-	local function Ghost()
-		if ghost then return ghost end
-		ghost = CreateFrame('Frame', nil, board.panel)
-		ghost:SetFrameLevel(board.panel:GetFrameLevel() + 10)
-		ghost:SetSize(board.panelWidth, LIST_ROW)
-		ui.Fill(ghost, 'control'):SetAllPoints()
-		local bar = ui.Fill(ghost, 'accent', 'ARTWORK', 1)
-		bar:SetPoint('TOPLEFT')
-		bar:SetPoint('BOTTOMLEFT')
-		bar:SetWidth(2)
-		ui.Glyph(ghost, 'grabber', GRABBER_SIZE, 'text'):SetPoint('LEFT', ui.ROW_INSET, 0)
-		ghost.label = ui.Text(ghost, '', 12, 'text')
-		ghost.label:SetPoint('LEFT', LIST_TITLE_X, 0)
-		ghost:Hide()
-		return ghost
-	end
-	local function Track()
-		local _, cursorY = GetCursorPosition()
-		cursorY = cursorY / board.frame:GetEffectiveScale()
-		ghost:ClearAllPoints()
-		ghost:SetPoint('TOPLEFT', board.panel, 'TOPLEFT', 0, -(board.panel:GetTop() - cursorY - grabOffset))
-		local over = RowUnder(cursorY)
-		if over and over ~= dragging then
-			Move(dragging, IndexOf(active, over) > IndexOf(active, dragging) and 1 or -1)
-		end
-	end
+	end, after)
 	for _, id in ipairs(active) do
 		local entry = Datatext.Get(id)
-		local room = LIST_ROOM + TOGGLE_ROOM + (entry.options and COG_ROOM or 0)
-		local row = Section.AddRow(board, entry.name)
-		row:SetHeight(LIST_ROW)
-		listRows[id] = row
-		ui.Glyph(row, 'grabber', GRABBER_SIZE, 'faint'):SetPoint('LEFT', ui.ROW_INSET, 0)
-		ui.RowTitle(row, entry.name, nil, LIST_TITLE_X, board.panelWidth - LIST_TITLE_X - ui.ROW_INSET - room - TOOL_GAP)
-		row:EnableMouse(true)
-		row:RegisterForDrag('LeftButton')
-		row:SetScript('OnDragStart', function(self)
-			local _, cursorY = GetCursorPosition()
-			dragging = id
-			grabOffset = self:GetTop() - cursorY / board.frame:GetEffectiveScale()
-			self:SetAlpha(DRAG_ALPHA)
-			Ghost().label:SetText(entry.name)
-			ghost:Show()
-			Track()
-			self:SetScript('OnUpdate', Track)
-		end)
-		row:SetScript('OnDragStop', function(self)
-			self:SetScript('OnUpdate', nil)
-			self:SetAlpha(1)
-			ghost:Hide()
-			dragging = nil
-			Apply()
-		end)
+		local row = board:AddDragRow(entry.name, LIST_ROOM + TOGGLE_ROOM + (entry.options and COG_ROOM or 0))
 		ui.IconButton(row, 'erase', 'Take ' .. entry.name .. ' off the bar', function()
 			config[entry.show] = false
-			Apply()
+			after()
 			page:RebuildCurrent()
 		end, 'danger', ERASE_SIZE):SetPoint('RIGHT', -ui.ROW_INSET, 0)
 		local right = -(ui.ROW_INSET + LIST_ROOM + TOOL_GAP)
-		ui.Tool(row, LabelToggle(entry, config, Apply)):SetPoint('RIGHT', right, 0)
+		ui.Tool(row, LabelToggle(entry, config, after)):SetPoint('RIGHT', right, 0)
 		if entry.options then
-			ui.Tool(row, DatatextOptions(entry, config), Apply):SetPoint('RIGHT', right - TOGGLE_ROOM, 0)
+			ui.Tool(row, DatatextOptions(entry, config), after):SetPoint('RIGHT', right - TOGGLE_ROOM, 0)
 		end
 	end
 	if #active == 0 then
@@ -441,7 +381,7 @@ local function DatatextsBoard(ui, parent, width, config, page)
 					table.remove(order, IndexOf(order, entry.id))
 					order[#order + 1] = entry.id
 					config.order = order
-					Apply()
+					after()
 					page:RebuildCurrent()
 				end }
 			end
@@ -452,6 +392,8 @@ local function DatatextsBoard(ui, parent, width, config, page)
 	end
 	return board
 end
+
+BUI.DatatextsBoard = DatatextsBoard
 
 local function TooltipsBoard(ui, parent, width)
 	local board = ui.Board(parent, width, {
@@ -488,7 +430,7 @@ local function Panes(ui, _, parent, width, item, page)
 	if item.id == 'tooltips' then return { TooltipsBoard(ui, parent, width) } end
 	local config = Bars()[item.index]
 	if item.kind == 'PANEL' then return { SettingsBoard(ui, parent, width, config, item.index) } end
-	return { SettingsBoard(ui, parent, width, config, item.index), DatatextsBoard(ui, parent, width, config, page) }
+	return { SettingsBoard(ui, parent, width, config, item.index), DatatextsBoard(ui, parent, width, config, page, Apply) }
 end
 
 local function RailGroups()
