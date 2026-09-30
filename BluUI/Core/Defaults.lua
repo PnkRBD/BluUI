@@ -603,7 +603,6 @@ BUI.Defaults = {
 			showTime         = false,
 			time24           = false,
 			timeLocal        = true,
-			hideLabels       = false,
 		},
 
 		markers = {

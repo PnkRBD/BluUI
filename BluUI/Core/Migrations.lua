@@ -31,7 +31,7 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 6
+local PROFILE_MIGRATION_VERSION = 7
 local LEGACY_UNIT_KEYS = { 'player', 'target', 'targettarget', 'focus', 'focustarget', 'pet', 'boss', 'arena', 'party' }
 
 function BUI.MigrateProfile(profile)
@@ -316,6 +316,22 @@ function BUI.MigrateProfile(profile)
 			skinning.deathrecap = skinning.combatalerts
 			skinning.mirrortimers = skinning.combatalerts
 		end
+	end
+
+	if not general._datatextLabelsSplit then
+		general._datatextLabelsSplit = true
+		local entries = BUI.Datatext.List()
+		local function SplitLabels(config)
+			if type(config) ~= 'table' then return end
+			if config.hideLabels then
+				for _, entry in ipairs(entries) do config[entry.hideLabel] = true end
+			end
+			config.hideLabels = nil
+		end
+		if type(profile.datatextBars) == 'table' then
+			for _, barConfig in pairs(profile.datatextBars) do SplitLabels(barConfig) end
+		end
+		SplitLabels(profile.datatextMinimap)
 	end
 
 	general._buiMigrationVersion = PROFILE_MIGRATION_VERSION
