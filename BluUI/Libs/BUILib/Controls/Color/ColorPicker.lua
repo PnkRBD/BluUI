@@ -748,6 +748,10 @@ local function BuildPicker()
 
 	local watcher = CreateFrame('Frame', nil, frame)
 	watcher:SetScript('OnUpdate', function()
+		if frame.anchor and not frame.anchor:IsVisible() then
+			Finish()
+			return
+		end
 		local down = IsMouseButtonDown('LeftButton') or IsMouseButtonDown('RightButton')
 		if down and not frame.wasDown and not frame:IsMouseOver() then
 			if frame.anchor and frame.anchor:IsMouseOver() then

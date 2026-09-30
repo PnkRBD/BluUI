@@ -209,6 +209,10 @@ function Controls.Frames(parent, label, initial, callback, width, hint, suggesti
 	panel:SetScript("OnShow", function(self)
 		self.checkFrame = self.checkFrame or CreateFrame("Frame")
 		self.checkFrame:SetScript("OnUpdate", function(checkFrame)
+			if not button:IsVisible() then
+				ClosePanel(); checkFrame:SetScript("OnUpdate", nil)
+				return
+			end
 			if not (button:IsMouseOver() or panel:IsMouseOver()) then
 				if IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton") then
 					ClosePanel(); checkFrame:SetScript("OnUpdate", nil)
