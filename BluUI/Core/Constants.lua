@@ -15,6 +15,7 @@ BUI.C.COLOR_BRAND        = '6D00FD'
 BUI.C.CHAT_PREFIX        = '|cff' .. BUI.C.COLOR_BRAND .. 'BluUI:|r '
 BUI.C.DEFAULT_ACCENT = { 0.667, 0.831, 0.451, 1 }
 BUI.C.DEFAULT_FONT       = 'Gotham Narrow Ultra'
+BUI.C.WINDOW_FONT        = 'Expressway'
 BUI.C.DEFAULT_TEXTURE    = 'Solid'
 BUI.C.GRADIENT_TEXTURE   = 'BUI Gradient'
 BUI.C.GLOBAL_OPTION      = 'GLOBAL'

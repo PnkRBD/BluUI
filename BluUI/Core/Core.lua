@@ -193,7 +193,6 @@ function Addon:OnInitialize()
 
 	BUI.db = AceDB:New('BluUI_DB', BUI.Defaults, true)
 
-	BUI.BUILibClient.SetFont(BUI.WindowFont())
 	BUI.BUILibClient.SetCardStyle('datasheet')
 
 	if isNewChar and BUI.db.global.defaultProfile then
@@ -220,6 +219,7 @@ end
 
 function Addon:OnEnable()
 	BUI.SpecProfiles.ApplyOnLogin()
+	BUI.BUILibClient.SetFont(BUI.WindowFont())
 
 	BUI.BUILibClient.defaultWidth = BUI.C.PAGE_CONTENT_W
 	BUI.BUILibClient.bodyFont = BUI.GetGlobalFont()
