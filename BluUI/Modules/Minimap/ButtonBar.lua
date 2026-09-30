@@ -1,6 +1,7 @@
 local _, BUI = ...
 
 local Pixel = BUI.Pixel
+local Drawer = BUI.Drawer
 local WoWMinimap = _G.Minimap
 
 local ButtonBar = {}
@@ -17,8 +18,6 @@ local ANCHORS = {
 	RIGHT  = { START = { 'TOPLEFT', 'TOPRIGHT' },   CENTER = { 'LEFT', 'RIGHT' }, END = { 'BOTTOMLEFT', 'BOTTOMRIGHT' }, horizontal = false, dirX = 1,  dirY = -1 },
 }
 
-ButtonBar.ANCHORS = ANCHORS
-
 local frame
 local placed = {}
 
@@ -26,13 +25,7 @@ local function Config()
 	return BUI.GetDB().interface.buttonBar
 end
 
-local function Drawer() return BUI.Drawer end
-
-function ButtonBar.ButtonName(button)
-	return button and button.GetName and button:GetName() or nil
-end
-
-function ButtonBar.ButtonLabel(name)
+local function ButtonLabel(name)
 	return (name:gsub('^' .. LDB_PREFIX, ''))
 end
 
@@ -51,10 +44,10 @@ end
 local function SortedCaptured(config, includeExcluded)
 	local list = {}
 	local keys = {}
-	local captured = Drawer().GetButtons()
+	local captured = Drawer.GetButtons()
 	for index = 1, #captured do
 		local button = captured[index]
-		local name = ButtonBar.ButtonName(button)
+		local name = button:GetName()
 		if name and (includeExcluded or Included(config, name)) then
 			list[#list + 1] = button
 			keys[button] = OrderKey(config, name, index)
@@ -68,12 +61,12 @@ function ButtonBar.PickerEntries()
 	local config = Config()
 	local entries = {}
 	for _, button in ipairs(SortedCaptured(config, true)) do
-		local name = ButtonBar.ButtonName(button)
+		local name = button:GetName()
 		local icon = button._buiIcon
 		entries[#entries + 1] = {
 			id = name,
-			label = ButtonBar.ButtonLabel(name),
-			icon = icon and icon.GetTexture and icon:GetTexture() or nil,
+			label = ButtonLabel(name),
+			icon = icon and icon:GetTexture(),
 			included = Included(config, name),
 		}
 	end
@@ -81,9 +74,7 @@ function ButtonBar.PickerEntries()
 end
 
 function ButtonBar.SetIncluded(name, included)
-	local config = Config()
-	if not name then return end
-	config.excluded[name] = (not included) and true or nil
+	Config().excluded[name] = (not included) and true or nil
 	ButtonBar.Refresh()
 end
 
@@ -92,6 +83,37 @@ function ButtonBar.SetOrder(names)
 	wipe(config.order)
 	for index = 1, #names do config.order[index] = names[index] end
 	ButtonBar.Refresh()
+end
+
+function ButtonBar.Arrange(config, count, measure)
+	local anchor = ANCHORS[config.side]
+	local size, gap = measure(config.size), measure(config.spacing)
+	local perLine = config.perLine > 0 and config.perLine or math.max(1, count)
+	local lineCount = math.min(count, perLine)
+	local crossCount = math.ceil(count / perLine)
+	local lineExtent = math.max(1, lineCount * size + (lineCount - 1) * gap)
+	local crossExtent = math.max(1, crossCount * size + (crossCount - 1) * gap)
+	local mapGap = measure(config.gap)
+	local points = anchor[config.align]
+	local layout = {
+		size = size,
+		width = anchor.horizontal and lineExtent or crossExtent,
+		height = anchor.horizontal and crossExtent or lineExtent,
+		point = points[1],
+		relativePoint = points[2],
+		x = measure(config.offsetX) + ((config.side == 'LEFT' and -mapGap) or (config.side == 'RIGHT' and mapGap) or 0),
+		y = measure(config.offsetY) + ((config.side == 'TOP' and mapGap) or (config.side == 'BOTTOM' and -mapGap) or 0),
+		corner = (anchor.dirY == 1 and 'BOTTOM' or 'TOP') .. (anchor.dirX == -1 and 'RIGHT' or 'LEFT'),
+		slots = {},
+	}
+	local step = size + gap
+	for index = 1, count do
+		local line, cross = (index - 1) % perLine, math.floor((index - 1) / perLine)
+		local x, y = line * step, cross * step
+		if not anchor.horizontal then x, y = y, x end
+		layout.slots[index] = { x * anchor.dirX, y * anchor.dirY }
+	end
+	return layout
 end
 
 local function EnsureFrame()
@@ -105,7 +127,6 @@ end
 
 local function PlaceButton(button, size, edge, corner, x, y, background)
 	local original = button._buiOriginalFuncs
-	if not original then return end
 	local fill = button._buiBarBg
 	if not fill then
 		fill = button:CreateTexture(nil, 'BACKGROUND', nil, -8)
@@ -143,21 +164,18 @@ local function PlaceButton(button, size, edge, corner, x, y, background)
 		highlight:SetPoint('BOTTOMRIGHT', button, 'BOTTOMRIGHT', -edge, edge)
 	end
 	local border = button._buiBorder
-	if border then
-		border:ClearAllPoints()
-		border:SetAllPoints(button)
-		Pixel.ApplyBorder(border, 1, 0, 0, 0, 1)
-		border:Show()
-	end
+	border:ClearAllPoints()
+	border:SetAllPoints(button)
+	Pixel.ApplyBorder(border, 1, 0, 0, 0, 1)
+	border:Show()
 end
 
 local function ReleasePlaced(keep)
-	local drawer = Drawer()
 	for button in pairs(placed) do
 		if not keep or not keep[button] then
 			placed[button] = nil
 			if button._buiBarBg then button._buiBarBg:Hide() end
-			if drawer.IsCaptured(button) then drawer.ReturnButton(button) end
+			if Drawer.IsCaptured(button) then Drawer.ReturnButton(button) end
 		end
 	end
 end
@@ -165,51 +183,24 @@ end
 local function Layout()
 	local config = Config()
 	if not config.enabled or not frame then return end
-	local drawer = Drawer()
 	local list = SortedCaptured(config, false)
 	local keep = {}
 	for index = 1, #list do keep[list[index]] = true end
 	ReleasePlaced(keep)
 
 	local count = #list
-	local size = Pixel.Scale(config.size)
-	local gap = Pixel.Scale(config.spacing)
-	local background = config.background
-	local edge = Pixel.PixelSize(1)
-	local anchor = ANCHORS[config.side] or ANCHORS.BOTTOM
-	local perLine = config.perLine > 0 and config.perLine or math.max(1, count)
-	local lineCount = math.min(count, perLine)
-	local crossCount = count > 0 and math.ceil(count / perLine) or 0
-	local lineExtent = math.max(0, lineCount * size + (lineCount - 1) * gap)
-	local crossExtent = math.max(0, crossCount * size + (crossCount - 1) * gap)
-
-	if anchor.horizontal then
-		frame:SetSize(math.max(1, lineExtent), math.max(1, crossExtent))
-	else
-		frame:SetSize(math.max(1, crossExtent), math.max(1, lineExtent))
-	end
-	local points = anchor[config.align] or anchor.CENTER
+	local layout = ButtonBar.Arrange(config, count, Pixel.Scale)
+	frame:SetSize(layout.width, layout.height)
 	frame:ClearAllPoints()
-	local mapGap = Pixel.Scale(config.gap)
-	local gapX = (config.side == 'LEFT' and -mapGap) or (config.side == 'RIGHT' and mapGap) or 0
-	local gapY = (config.side == 'TOP' and mapGap) or (config.side == 'BOTTOM' and -mapGap) or 0
-	frame:SetPoint(points[1], WoWMinimap, points[2], Pixel.Scale(config.offsetX) + gapX, Pixel.Scale(config.offsetY) + gapY)
+	frame:SetPoint(layout.point, WoWMinimap, layout.relativePoint, layout.x, layout.y)
 
-	local corner = (anchor.dirY == 1 and 'BOTTOM' or 'TOP') .. (anchor.dirX == -1 and 'RIGHT' or 'LEFT')
-	local step = size + gap
+	local edge = Pixel.PixelSize(1)
 	for index = 1, count do
 		local button = list[index]
-		local lineIndex = (index - 1) % perLine
-		local crossIndex = math.floor((index - 1) / perLine)
-		local x, y
-		if anchor.horizontal then
-			x, y = lineIndex * step, crossIndex * step
-		else
-			x, y = crossIndex * step, lineIndex * step
-		end
-		drawer.Claim(button, 'bar')
+		local slot = layout.slots[index]
+		Drawer.Claim(button, 'bar')
 		placed[button] = true
-		PlaceButton(button, size, edge, corner, x * anchor.dirX, y * anchor.dirY, background)
+		PlaceButton(button, layout.size, edge, layout.corner, slot[1], slot[2], config.background)
 	end
 	frame:SetShown(count > 0)
 end
@@ -217,20 +208,19 @@ end
 local QueueLayout = BUI.Dispatcher.New(Layout, 'Minimap.ButtonBar')
 
 function ButtonBar.Refresh()
-	local config = Config()
-	if not config.enabled then
+	if not Config().enabled then
 		ButtonBar.Disable()
 		return
 	end
 	EnsureFrame()
-	Drawer().SetCaptureWanted(true)
+	Drawer.SetCaptureWanted(true)
 	Layout()
 end
 
 function ButtonBar.Disable()
 	ReleasePlaced(nil)
 	if frame then frame:Hide() end
-	Drawer().SetCaptureWanted(false)
+	Drawer.SetCaptureWanted(false)
 end
 
 function ButtonBar.IsEnabled()
@@ -238,7 +228,7 @@ function ButtonBar.IsEnabled()
 end
 
 BUI.Events:OnLogin('Minimap.ButtonBar', function()
-	Drawer().OnCapture('bar', function()
+	Drawer.OnCapture('bar', function()
 		if ButtonBar.IsEnabled() then QueueLayout() end
 	end)
 	Pixel.OnScaleChange('MinimapButtonBar', function()

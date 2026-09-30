@@ -153,11 +153,13 @@ BUI.GetTrackingFont       = CreateFontGetter('trackingFont')
 BUI.GetPowerFont          = CreateFontGetter('powerFont')
 BUI.GetSecondaryPowerFont = CreateFontGetter('secondaryPowerFont')
 
-function BUI.GetModuleFont(moduleSettings)
-	if not moduleSettings then return BUI.GetGlobalFont() end
-	local fontName = moduleSettings.font
+function BUI.GetFontByName(fontName)
 	if not fontName or fontName == BUI.C.GLOBAL_OPTION then return BUI.GetGlobalFont() end
 	return sharedMedia:Fetch('font', fontName) or BUI.GetGlobalFont()
+end
+
+function BUI.GetModuleFont(moduleSettings)
+	return BUI.GetFontByName(moduleSettings and moduleSettings.font)
 end
 
 function BUI.ApplySlug(flags)
