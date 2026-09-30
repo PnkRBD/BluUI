@@ -595,10 +595,10 @@ end
 
 local function HeaderToggle(icon, tooltip, get, set)
 	return { icon = icon, tooltip = tooltip, get = function()
-		local bar = Shown()
+		local bar = Current()
 		return bar ~= nil and get(bar)
 	end, set = function(value)
-		local bar = Shown()
+		local bar = Current()
 		if bar then
 			set(bar, value)
 			Apply()

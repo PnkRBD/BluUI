@@ -173,6 +173,7 @@ local function ResolveStyle(settings, isDebuff)
 	style.showCd    = GetAuraSetting(settings, isDebuff, 'debuffShowCd', 'buffShowCd', 'auraShowCd', true)
 	style.cdSize    = GetAuraSetting(settings, isDebuff, 'debuffCdSize', 'buffCdSize', 'auraCdSize', 10)
 	style.reverseSwipe = settings.auraReverseSwipe
+	style.padding = 0
 	style.showTooltips = settings.showTooltips ~= false
 	style.font = UnitFrames.GetFont()
 	return style

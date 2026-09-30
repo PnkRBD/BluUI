@@ -54,7 +54,6 @@ local function ApplySettings(frame, unitType, index)
 		borderColor = (unitType == 'pet') and settings.petBorderColor or settings.borderColor
 	end
 	Pixel.ApplyBorder(frame, borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
-	UnitFrames.ApplyTargetBorder(frame, unitSettings)
 
 	UnitFrames.ApplyHealthBarLayout(frame, scaledHeight, showPower, unitSettings.powerHeight, borderSize)
 	UnitFrames.ApplyBarTextures(frame, texture)

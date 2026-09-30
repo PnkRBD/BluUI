@@ -7,14 +7,14 @@ local PAGE_ABBREVIATIONS = {
 	markers = 'MRK',
 	auras = 'AUR', actionbars = 'ABR', power = 'PWR', cdm = 'CDM', castbars = 'CST',
 	unitframes = 'UFR', groupframes = 'GRP', customBars = 'ITM',
-	buffTracking = 'BUF', cdAnnouncer = 'CDA', settings = 'SET',
+	settings = 'SET',
 	exportimport = 'PRF',
 }
 
 local SECTIONS = {
 	{header = 'General',  ids = {'dashboard', 'cursor', 'minimap', 'datatext', 'markers', 'auras'}},
 	{header = 'Combat',   ids = {'actionbars', 'power', 'cdm', 'castbars', 'unitframes', 'groupframes'}},
-	{header = 'Tracking', ids = {'customBars', 'cdAnnouncer', 'buffTracking'}},
+	{header = 'Tracking', ids = {'customBars'}},
 	{header = 'System',   ids = {'settings', 'exportimport'}},
 }
 

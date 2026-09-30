@@ -252,6 +252,20 @@ local function BloodlustRow(board)
 	}, Bloodlust.Refresh)
 end
 
+local function CDAnnouncerRow(board)
+	local db = BUI.GetDB().cdAnnouncer
+	local CDAnnouncer = BUI.CDAnnouncer
+	CDAnnouncer.RegisterAnchorCallback(Repaint)
+	board:AddTools('Cooldown Announcer', 'Countdowns and ready alerts for the cooldowns you pick', {
+		{ icon = 'cog', tooltip = 'Open the Cooldown Announcer page', onClick = function() BUI.PageEngine.NavigateToID('cdAnnouncer') end },
+		Eye('Unlock the anchor to drag it, right-click it to lock', function() return db.showAnchor == true end, function(value)
+			db.showAnchor = value
+			CDAnnouncer.Refresh()
+		end),
+		Switch(db, 'enabled'),
+	}, CDAnnouncer.Refresh)
+end
+
 local function AlertsBoard(ui, parent, width)
 	local board = ui.Board(parent, width, {
 		stacked = true,
@@ -265,6 +279,7 @@ local function AlertsBoard(ui, parent, width)
 	MarkWarningRow(board)
 	GatewayRow(board)
 	BloodlustRow(board)
+	CDAnnouncerRow(board)
 	return board
 end
 
@@ -407,6 +422,7 @@ BUI.PageEngine.RegisterPage('auras', {
 			tabs = {
 				{ label = 'Alerts', build = Alerts },
 				{ label = 'GCD History', build = BUI.StreamerToolsPage.GCDHistory },
+				{ label = 'Class', build = BUI.BuffTrackingPage.Class },
 			},
 		})
 		pageFrame._page = handle
@@ -427,5 +443,8 @@ BUI.PageEngine.RegisterPage('auras', {
 		BUI.Crosshair.SetPreview(false)
 		if BUI.Bloodlust.IsPreviewing() then BUI.Bloodlust.StopPreview() end
 		if not BUI.GetDB().gcdHistory.locked then BUI.GCDHistory.SetLocked(true) end
+		local overlays = BUI.BuffTracking
+		if overlays.KillCommandOverlay.IsPreviewing() then overlays.KillCommandOverlay.StopPreview() end
+		if overlays.BestialWrathOverlay.IsPreviewing() then overlays.BestialWrathOverlay.StopPreview() end
 	end,
 })

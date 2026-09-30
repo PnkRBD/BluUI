@@ -39,10 +39,6 @@ function Display.RegisterAnchorCallback(settingsKey, callback)
     anchorCallbacks[settingsKey] = callback
 end
 
-function Display.UnregisterAnchorCallback(settingsKey)
-    anchorCallbacks[settingsKey] = nil
-end
-
 function Display.NotifyAnchorChanged(settingsKey, state)
     local callback = anchorCallbacks[settingsKey]
     if callback then callback(state) end

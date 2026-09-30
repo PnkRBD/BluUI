@@ -1,2090 +1,1445 @@
 local BUI = BluUI
-
 local BUILib = BluUI.BUILibClient
 local Controls, Layout, Modals = BUILib.Controls, BUILib.Layout, BUILib.Modals
 
-local POS_OPTIONS = { "TOPLEFT", "TOP", "TOPRIGHT", "LEFT", "CENTER", "RIGHT", "BOTTOMLEFT", "BOTTOM", "BOTTOMRIGHT" }
+local PAGE_WIDTH = 960
+local PREVIEW_HEIGHT = 150
+local MENU_WIDTH = 150
+local SNAPSHOT_WIDTH = 220
+local TEXT_RANGE = 30
+local KEYBIND_RANGE = 20
+local STACK_RANGE = 40
+local MOCK_WIDTH = 620
+local MOCK_HEIGHT = 140
+local MOCK_MAX_ICONS = 40
+local HOST_HEIGHT = 640
+local HOST_PAD = 8
+local WHITE = 'Interface\\Buttons\\WHITE8x8'
+local DEFAULT_ICON = 134400
+local MOCK_KEYS = { 'Q', 'E', 'R', 'F', 'T', 'G', 'Z', 'X', 'C', 'V' }
+local MOCK_BARS = {
+	{ icon = 'Interface\\Icons\\Spell_Nature_Rejuvenation', name = 'Rejuvenation', duration = '12s', fill = 0.78, stacks = '3' },
+	{ icon = 'Interface\\Icons\\Ability_Warrior_BattleShout', name = 'Battle Shout', duration = '48s', fill = 0.52 },
+	{ icon = 'Interface\\Icons\\Spell_Holy_PowerWordShield', name = 'Power Word: Shield', duration = '8s', fill = 0.24, stacks = '2' },
+}
+local POINTS = {}
+for _, point in ipairs({ 'TOPLEFT', 'TOP', 'TOPRIGHT', 'LEFT', 'CENTER', 'RIGHT', 'BOTTOMLEFT', 'BOTTOM', 'BOTTOMRIGHT' }) do
+	POINTS[#POINTS + 1] = { value = point, text = point:sub(1, 1) .. point:sub(2):lower():gsub('left', ' left'):gsub('right', ' right') }
+end
+local GROWTHS = { { value = 'DOWN', text = 'Down' }, { value = 'UP', text = 'Up' } }
+local STACK_ATTACH = { { value = 'ICON', text = 'The icon' }, { value = 'BAR', text = 'The bar' } }
+local VIEWERS = {
+	{ key = 'essential', label = 'Essential', title = 'Essential viewer', description = 'The Blizzard Essential viewer, reskinned.', keybinds = true, frame = 'BUI_EssentialCooldownViewer' },
+	{ key = 'utility', label = 'Utility', title = 'Utility viewer', description = 'Utility and defensive cooldowns from the Utility viewer.', keybinds = true, frame = 'BUI_UtilityCooldownViewer' },
+	{ key = 'buffs', label = 'Buff icons', title = 'Buff icons', description = 'Tracked buff icons from the Buff viewer.', frame = 'BUI_BuffCooldownViewer' },
+}
+local VIEWER_BY_KEY = {}
+for _, viewer in ipairs(VIEWERS) do VIEWER_BY_KEY[viewer.key] = viewer end
+local TAB_IDS = { 'general', 'essential', 'utility', 'buffs', 'buffBars', 'layouts', 'icons' }
+local TAB_INDEX = {}
+for index, id in ipairs(TAB_IDS) do TAB_INDEX[id] = index end
+local ALL_LAYOUTS = '__all__'
 
-local cdmHeaders, cdmGrids = {}, {}
+local selected = 'general'
+local snapshot
+local exportChoice = ALL_LAYOUTS
+local preview
+local fonts
+local railPage
 
-local function RefreshCDMMocks()
-    for _, header in pairs(cdmHeaders) do
-        if header.Update and header.stage and header.stage:IsVisible() then header.Update() end
-    end
+local function Window()
+	return BUI.PageEngine.window
 end
 
-local function ResolveCDMMedia(kind, key, fallback)
-    if key and key ~= '' and key ~= 'GLOBAL' then
-        local sharedMedia = LibStub('LibSharedMedia-3.0')
-        local path = sharedMedia:Fetch(kind, key, true)
-        if path then return path end
-    end
-    return fallback
+local function Repaint()
+	Window():Repaint()
 end
 
-local CDM_MOCK_KEYS = { 'Q', 'E', 'R', 'F', 'T', 'G', 'Z', 'X', 'C', 'V' }
-
-local function GetViewerSpellList(viewerKey)
-    local CDMModule = BUI.CDM
-    local list, count = CDMModule.GetTrackedIcons(viewerKey)
-    if list and count and count > 0 then
-        local results = {}
-        for iconIndex = 1, count do
-            local icon = list[iconIndex]
-            local key = CDMModule.GetSortKey(icon)
-            local info = icon.cooldownInfo
-            local spellID = info and BUI.Tools.SafeNum(info.overrideSpellID or info.spellID)
-            if not spellID and type(key) == 'number' then spellID = key end
-            local iconTexture = icon.Icon and icon.Icon.GetTexture and icon.Icon:GetTexture()
-            if iconTexture and BUI.Tools.IsSecretValue and BUI.Tools.IsSecretValue(iconTexture) then iconTexture = nil end
-            iconTexture = iconTexture or (spellID and C_Spell.GetSpellTexture(spellID))
-            if iconTexture then results[#results + 1] = { icon = iconTexture, spellID = spellID, key = key } end
-        end
-        if #results > 0 then return results end
-    end
-
-    local categoryEnum = Enum.CooldownViewerCategory
-    local GetCategorySet = C_CooldownViewer.GetCooldownViewerCategorySet
-    local GetCooldownInfo = C_CooldownViewer.GetCooldownViewerCooldownInfo
-    local category
-    if viewerKey == 'essential' then category = categoryEnum.Essential
-    elseif viewerKey == 'utility' then category = categoryEnum.Utility
-    elseif viewerKey == 'buffs' then category = categoryEnum.TrackedBuff
-    elseif viewerKey == 'buffBars' then category = categoryEnum.TrackedBar end
-    if not category then return nil end
-    local cooldownIDs = GetCategorySet(category)
-    if not cooldownIDs then return nil end
-    local results = {}
-    for idIndex = 1, #cooldownIDs do
-        local info = GetCooldownInfo(cooldownIDs[idIndex])
-        local spellID = info and (info.overrideSpellID or info.spellID)
-        if spellID then
-            local spellTexture = C_Spell.GetSpellTexture(spellID)
-            if spellTexture then results[#results + 1] = { icon = spellTexture, spellID = spellID } end
-        end
-    end
-    if #results == 0 then return nil end
-    return results
+local function DB()
+	return BUI.GetDB()
 end
 
-local function GetLiveViewerIcons(CDMModule, viewerKey, viewerSettings)
-    local icons = CDMModule.GetViewerIcons(viewerKey)
-    if #icons == 0 then return nil end
-    local hiddenSlots = viewerSettings.hiddenSlots
-    local hiddenIcons = CDMModule.GetHiddenIcons(viewerSettings)
-    local results = {}
-    for iconIndex = 1, #icons do
-        local icon = icons[iconIndex]
-        local isHidden = (hiddenSlots and hiddenSlots[iconIndex]) or CDMModule.IsIconHiddenByUser(viewerKey, hiddenIcons, icon)
-        if not isHidden then
-            local info = icon.cooldownInfo
-            local spellID = info and BUI.Tools.SafeNum(info.overrideSpellID or info.spellID)
-            local iconTexture = icon.Icon:GetTexture() or (spellID and C_Spell.GetSpellTexture(spellID))
-            local frameData = CDMModule.FrameData[icon]
-            results[#results + 1] = {
-                tex = iconTexture or 134400,
-                key = CDMModule.GetSortKey(icon),
-                spellID = spellID,
-                itemID = frameData and frameData.itemID,
-            }
-        end
-    end
-    if #results == 0 then return nil end
-    return results
+local function CDM()
+	return BUI.CDM
+end
+
+local function RefreshPreview()
+	if preview then preview:Update() end
+end
+
+local function RebuildPane(page)
+	BUILib.Defer(function() page:RebuildCurrent() end)
+end
+
+local function Media(kind, key, fallback)
+	if key and key ~= '' and key ~= BUI.C.GLOBAL_OPTION then
+		local path = LibStub('LibSharedMedia-3.0'):Fetch(kind, key, true)
+		if path then return path end
+	end
+	return fallback
+end
+
+local function Option(db, label, key, extra)
+	local option = { label = label, get = function() return db[key] end, set = function(value) db[key] = value end }
+	for name, value in pairs(extra or {}) do option[name] = value end
+	return option
+end
+
+local function Toggle(db, label, key)
+	return { label = label, get = function() return db[key] == true end, set = function(value) db[key] = value end }
+end
+
+local function OnUnlessOff(db, label, key)
+	return { label = label, get = function() return db[key] ~= false end, set = function(value) db[key] = value end }
+end
+
+local function Color(db, label, key, after)
+	return {
+		kind = 'swatch', label = label, tooltip = label, opacity = true,
+		get = function()
+			local color = db[key]
+			return color[1], color[2], color[3], color[4]
+		end,
+		set = function(red, green, blue, alpha)
+			db[key] = { red, green, blue, alpha }
+			if after then after(db[key]) end
+		end,
+	}
+end
+
+local function Menu(db, key, entries, width)
+	return { entries = entries, width = width or MENU_WIDTH, get = function() return db[key] end, set = function(value) db[key] = value end }
+end
+
+local function Eye(tooltip, get, set)
+	return { icon = 'eye', tooltip = tooltip, get = get, set = function(value)
+		set(value)
+		Repaint()
+	end }
+end
+
+local function HookRefreshers()
+	local module = CDM()
+	if module._pageMockHooked then return end
+	module._pageMockHooked = true
+	local function Wrap(owner, name)
+		local original = owner[name]
+		if not original then return end
+		owner[name] = function(...)
+			local first, second, third = original(...)
+			RefreshPreview()
+			return first, second, third
+		end
+	end
+	Wrap(module, 'RefreshSizeSettings')
+	Wrap(module, 'RefreshSkinSettings')
+	Wrap(module, 'RefreshLayoutOnly')
+	Wrap(module, 'RefreshBuffBarSkin')
+	Wrap(module, 'RefreshCooldownStyleFlags')
+	Wrap(module, 'SyncSetting')
+	Wrap(module, 'SyncSettingLayout')
+	Wrap(module.Keybinds, 'StyleViewer')
+	Wrap(module.Keybinds, 'RefreshViewer')
+end
+
+local function ViewerSpells(viewerKey)
+	local module = CDM()
+	local list, count = module.GetTrackedIcons(viewerKey)
+	if list and count and count > 0 then
+		local results = {}
+		for index = 1, count do
+			local icon = list[index]
+			local key = module.GetSortKey(icon)
+			local info = icon.cooldownInfo
+			local spellID = info and BUI.Tools.SafeNum(info.overrideSpellID or info.spellID)
+			if not spellID and type(key) == 'number' then spellID = key end
+			local texture = icon.Icon and icon.Icon.GetTexture and icon.Icon:GetTexture()
+			if texture and BUI.Tools.IsSecretValue(texture) then texture = nil end
+			texture = texture or (spellID and C_Spell.GetSpellTexture(spellID))
+			if texture then results[#results + 1] = { icon = texture, spellID = spellID, key = key } end
+		end
+		if #results > 0 then return results end
+	end
+	local categories = Enum.CooldownViewerCategory
+	local category = ({ essential = categories.Essential, utility = categories.Utility, buffs = categories.TrackedBuff, buffBars = categories.TrackedBar })[viewerKey]
+	local cooldownIDs = category and C_CooldownViewer.GetCooldownViewerCategorySet(category)
+	if not cooldownIDs then return nil end
+	local results = {}
+	for _, cooldownID in ipairs(cooldownIDs) do
+		local info = C_CooldownViewer.GetCooldownViewerCooldownInfo(cooldownID)
+		local spellID = info and (info.overrideSpellID or info.spellID)
+		local texture = spellID and C_Spell.GetSpellTexture(spellID)
+		if texture then results[#results + 1] = { icon = texture, spellID = spellID } end
+	end
+	if #results == 0 then return nil end
+	return results
+end
+
+local function LiveIcons(viewerKey, viewerSettings)
+	local module = CDM()
+	local icons = module.GetViewerIcons(viewerKey)
+	if #icons == 0 then return nil end
+	local hiddenSlots = viewerSettings.hiddenSlots
+	local hiddenIcons = module.GetHiddenIcons(viewerSettings)
+	local results = {}
+	for index, icon in ipairs(icons) do
+		local hidden = (hiddenSlots and hiddenSlots[index]) or module.IsIconHiddenByUser(viewerKey, hiddenIcons, icon)
+		if not hidden then
+			local info = icon.cooldownInfo
+			local spellID = info and BUI.Tools.SafeNum(info.overrideSpellID or info.spellID)
+			local frameData = module.FrameData[icon]
+			results[#results + 1] = {
+				tex = icon.Icon:GetTexture() or (spellID and C_Spell.GetSpellTexture(spellID)) or DEFAULT_ICON,
+				key = module.GetSortKey(icon),
+				spellID = spellID,
+				itemID = frameData and frameData.itemID,
+			}
+		end
+	end
+	if #results == 0 then return nil end
+	return results
+end
+
+local function HiddenKeyLabel(key)
+	if type(key) == 'number' then return C_Spell.GetSpellName(key) or ('Spell ' .. key) end
+	local text = tostring(key)
+	local itemID = tonumber(text:match('^item:(%d+)$'))
+	if itemID then return C_Item.GetItemNameByID(itemID) or ('Item ' .. itemID) end
+	local customID = tonumber(text:match('^custom:(%d+)$'))
+	if customID then
+		if not C_SpellBook.IsSpellKnown(customID) and C_Item.GetItemInfoInstant(customID) then
+			return C_Item.GetItemNameByID(customID) or ('Item ' .. customID)
+		end
+		return C_Spell.GetSpellName(customID) or ('Custom ' .. customID)
+	end
+	local trinketSlot = text:match('^trinket:(%d)$')
+	if trinketSlot then return 'Trinket slot ' .. trinketSlot end
+	if text:match('^racial:') then return 'Racial' end
+	return text
 end
 
 local function CreateViewerMock(stage, withKeybinds)
-    local WHITE = 'Interface\\Buttons\\WHITE8x8'
-    local holder = CreateFrame('Frame', nil, stage)
-    holder:SetPoint('CENTER')
-    local cells = {}
-    local dragState, ghost
+	local holder = CreateFrame('Frame', nil, stage)
+	holder:SetPoint('CENTER')
+	local cells = {}
+	local dragState, ghost
 
-    local function HiddenKeyLabel(key)
-        if type(key) == 'number' then
-            return C_Spell.GetSpellName(key) or ('Spell ' .. key)
-        end
-        local keyText = tostring(key)
-        local itemKeyID = tonumber(keyText:match('^item:(%d+)$'))
-        if itemKeyID then
-            return C_Item.GetItemNameByID(itemKeyID) or ('Item ' .. itemKeyID)
-        end
-        local customID = tonumber(keyText:match('^custom:(%d+)$'))
-        if customID then
-            if not C_SpellBook.IsSpellKnown(customID) and C_Item.GetItemInfoInstant(customID) then
-                return C_Item.GetItemNameByID(customID) or ('Item ' .. customID)
-            end
-            return C_Spell.GetSpellName(customID) or ('Custom ' .. customID)
-        end
-        local trinketSlot = keyText:match('^trinket:(%d)$')
-        if trinketSlot then return 'Trinket Slot ' .. trinketSlot end
-        if keyText:match('^racial:') then return 'Racial' end
-        return keyText
-    end
+	local function CellName(cell)
+		local entry = cell.entry
+		if not entry then return '' end
+		if entry.itemID then
+			local itemName = C_Item.GetItemNameByID(entry.itemID)
+			if itemName then return itemName end
+		end
+		if entry.spellID then
+			local spellName = C_Spell.GetSpellName(entry.spellID)
+			if spellName then return spellName end
+		end
+		if entry.key ~= nil then return HiddenKeyLabel(entry.key) end
+		return ''
+	end
 
-    local function CellDisplayName(cell)
-        local entry = cell._entry
-        if not entry then return '' end
-        if entry.itemID then
-            local itemName = C_Item.GetItemNameByID(entry.itemID)
-            if itemName then return itemName end
-        end
-        if entry.spellID then
-            local spellName = C_Spell.GetSpellName(entry.spellID)
-            if spellName then return spellName end
-        end
-        if entry.key ~= nil then return HiddenKeyLabel(entry.key) end
-        return ''
-    end
+	local function Relayout()
+		CDM().RefreshLayoutOnly()
+	end
 
-    local function RerenderLive()
-        BUI.CDM.RefreshLayoutOnly()
-        holder:Render(holder._viewerKey)
-    end
+	local function RestoreMenu(viewerSettings, hiddenList)
+		local items = { { title = true, text = 'Restore' } }
+		table.sort(hiddenList, function(left, right) return HiddenKeyLabel(left) < HiddenKeyLabel(right) end)
+		for _, hiddenKey in ipairs(hiddenList) do
+			items[#items + 1] = { text = HiddenKeyLabel(hiddenKey), callback = function()
+				CDM().SetHiddenIcon(viewerSettings, hiddenKey, false)
+				Relayout()
+			end }
+		end
+		if #hiddenList > 1 then
+			items[#items + 1] = { separator = true }
+			items[#items + 1] = { text = 'Restore all', callback = function()
+				for _, hiddenKey in ipairs(hiddenList) do CDM().SetHiddenIcon(viewerSettings, hiddenKey, false) end
+				Relayout()
+			end }
+		end
+		Controls.ContextMenu(items, { width = 230, window = Window() })
+	end
 
-    local function ShowUnhideMenu(viewerSettings, hiddenList)
-        local menuItems = { { title = true, text = 'Restore' } }
-        table.sort(hiddenList, function(keyA, keyB) return HiddenKeyLabel(keyA) < HiddenKeyLabel(keyB) end)
-        for _, hiddenKey in ipairs(hiddenList) do
-            menuItems[#menuItems + 1] = { text = HiddenKeyLabel(hiddenKey), callback = function()
-                BUI.CDM.SetHiddenIcon(viewerSettings, hiddenKey, false)
-                RerenderLive()
-            end }
-        end
-        if #hiddenList > 1 then
-            menuItems[#menuItems + 1] = { separator = true }
-            menuItems[#menuItems + 1] = { text = 'Restore All', callback = function()
-                for _, hiddenKey in ipairs(hiddenList) do
-                    BUI.CDM.SetHiddenIcon(viewerSettings, hiddenKey, false)
-                end
-                RerenderLive()
-            end }
-        end
-        Controls.ContextMenu(menuItems, { width = 230 })
-    end
+	local function CellMenu(cell)
+		local module = CDM()
+		local entry = cell.entry
+		if not (entry and entry.key and holder.viewerSettings) then return end
+		local viewerSettings = holder.viewerSettings
+		local name = CellName(cell)
+		local items = { { title = true, text = name ~= '' and name or 'Icon' } }
+		local spellID = entry.spellID or (type(entry.key) == 'number' and entry.key or nil)
+		if spellID then
+			local procConfig = module.GetProcConfig(spellID)
+			items[#items + 1] = { text = procConfig and 'Alert settings, active' or 'Alert settings', callback = function() BUI.ShowCDMProcModal(module, spellID, Relayout, nil, viewerSettings) end }
+			local overrides = module.GetIconOverrides(viewerSettings)
+			items[#items + 1] = { text = overrides and overrides[spellID] and 'Change the icon, custom' or 'Change the icon', callback = function() BUI.ShowCDMIconOverrideModal(module, spellID, viewerSettings, Relayout) end }
+		end
+		local potionValue, potionItemID
+		local list, count = module.GetTrackedIcons(holder.viewerKey)
+		if list and count then
+			for index = 1, count do
+				local frameData = module.FrameData[list[index]]
+				if frameData and frameData.customIcon and module.GetSortKey(list[index]) == entry.key then
+					if frameData.iconType == 'consumable' and module.Custom.IsPotionItem(frameData.itemID or frameData.customSpellID) then
+						potionValue = frameData.storedValue
+						potionItemID = frameData.itemID or frameData.customSpellID
+					end
+					break
+				end
+			end
+		end
+		if potionValue then
+			local label = 'Potion display'
+			local _, _, _, _, _, classID, subclassID = C_Item.GetItemInfoInstant(potionItemID)
+			if classID == Enum.ItemClass.Consumable and subclassID == Enum.ItemConsumableSubclass.Flask then label = 'Flask display' end
+			if module.GetPotionPrioFor(potionValue) then label = label .. ', custom' end
+			items[#items + 1] = { text = label, callback = function() BUI.ShowCDMPotionModal(module, potionItemID, potionValue, viewerSettings, holder.viewerKey, Relayout) end }
+		end
+		if holder.viewerKey ~= 'buffs' then
+			items[#items + 1] = { text = 'Show only on cooldown', checked = module.IsShowOnlyOnCD(viewerSettings, entry.key) == true, callback = function()
+				module.SetShowOnlyOnCD(viewerSettings, entry.key, not module.IsShowOnlyOnCD(viewerSettings, entry.key))
+				module.UpdateShowOnlyOnCDWatcher()
+				Relayout()
+			end }
+		end
+		items[#items + 1] = { text = '|cffff6060Remove from the viewer|r', callback = function()
+			module.SetHiddenIcon(viewerSettings, entry.key, true)
+			Relayout()
+			BUILib.Toast.Info('Icon removed', 'Click any icon and pick Restore icons to bring it back.')
+		end }
+		items[#items + 1] = { separator = true }
+		local hiddenList = {}
+		for hiddenKey, hidden in pairs(module.GetHiddenIcons(viewerSettings)) do
+			if hidden == true then hiddenList[#hiddenList + 1] = hiddenKey end
+		end
+		if #hiddenList > 0 then
+			items[#items + 1] = { text = ('Restore icons, %d'):format(#hiddenList), callback = function()
+				RestoreMenu(viewerSettings, hiddenList)
+				return true
+			end }
+		end
+		items[#items + 1] = { text = 'Manage icons', callback = function() railPage:Select('icons') end }
+		Controls.ContextMenu(items, { width = 230, window = Window() })
+	end
 
-    local function ShowCellMenu(cell)
-        local entry = cell._entry
-        if not (entry and entry.key and holder._vs) then return end
-        local viewerSettings = holder._vs
-        local name = CellDisplayName(cell)
-        local items = { { title = true, text = name ~= '' and name or 'Icon' } }
+	local function Ghost()
+		if ghost then return ghost end
+		ghost = CreateFrame('Frame', nil, UIParent)
+		ghost:SetFrameStrata(BUILib.GetPopupStrata())
+		ghost:SetFrameLevel(BUILib.GetPopupLevel() + 20)
+		ghost.texture = ghost:CreateTexture(nil, 'OVERLAY')
+		ghost.texture:SetAllPoints()
+		ghost.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		ghost:Hide()
+		return ghost
+	end
 
-        local spellID = entry.spellID or (type(entry.key) == 'number' and entry.key or nil)
-        if spellID then
-            local procConfig = BUI.CDM.GetProcConfig(spellID)
-            items[#items + 1] = { text = procConfig and 'Alert Settings... |cffffe066(active)|r' or 'Alert Settings...',
-                callback = function() BUI.ShowCDMProcModal(BUI.CDM, spellID, RerenderLive, nil, viewerSettings) end }
-        end
-        if spellID then
-            local iconOverrides = BUI.CDM.GetIconOverrides(viewerSettings)
-            items[#items + 1] = {
-                text = (iconOverrides and iconOverrides[spellID]) and 'Change Icon... |cffffe066(custom)|r' or 'Change Icon...',
-                callback = function() BUI.ShowCDMIconOverrideModal(BUI.CDM, spellID, viewerSettings, RerenderLive) end,
-            }
-        end
+	local function SlotUnderCursor()
+		local rects = holder.slotRects
+		if not rects then return nil end
+		local cursorX, cursorY = GetCursorPosition()
+		local scale = holder:GetEffectiveScale()
+		local localX = cursorX / scale - (holder:GetLeft() or 0)
+		local localY = (holder:GetTop() or 0) - cursorY / scale
+		for index, rect in ipairs(rects) do
+			if localX >= rect.x and localX <= rect.x + rect.w and localY >= rect.y and localY <= rect.y + rect.h then return index end
+		end
+	end
 
-        local potionValue, potionItemID
-        do
-            local list, count = BUI.CDM.GetTrackedIcons(holder._viewerKey)
-            if list and count then
-                for iconIndex = 1, count do
-                    local frameData = BUI.CDM.FrameData[list[iconIndex]]
-                    if frameData and frameData.customIcon and BUI.CDM.GetSortKey(list[iconIndex]) == entry.key then
-                        if frameData.iconType == 'consumable'
-                            and BUI.CDM.Custom.IsPotionItem(frameData.itemID or frameData.customSpellID) then
-                            potionValue = frameData.storedValue
-                            potionItemID = frameData.itemID or frameData.customSpellID
-                        end
-                        break
-                    end
-                end
-            end
-        end
-        if potionValue then
-            local viewerKey = holder._viewerKey
-            local currentPriority = BUI.CDM.GetPotionPrioFor(potionValue)
-            local label = 'Potion Display...'
-            if potionItemID then
-                local _, _, _, _, _, classID, subclassID = C_Item.GetItemInfoInstant(potionItemID)
-                if classID == Enum.ItemClass.Consumable and subclassID == Enum.ItemConsumableSubclass.Flask then
-                    label = 'Flask Display...'
-                end
-            end
-            items[#items + 1] = {
-                text = currentPriority and (label .. ' |cffffe066(custom)|r') or label,
-                callback = function()
-                    BUI.ShowCDMPotionModal(BUI.CDM, potionItemID, potionValue, viewerSettings, viewerKey, RerenderLive)
-                end,
-            }
-        end
-        if holder._viewerKey ~= 'buffs' then
-            items[#items + 1] = {
-                text = 'Show Only On Cooldown',
-                checked = BUI.CDM.IsShowOnlyOnCD(viewerSettings, entry.key) and true or false,
-                callback = function()
-                    local wasOn = BUI.CDM.IsShowOnlyOnCD(viewerSettings, entry.key)
-                    BUI.CDM.SetShowOnlyOnCD(viewerSettings, entry.key, not wasOn)
-                    BUI.CDM.UpdateShowOnlyOnCDWatcher()
-                    RerenderLive()
-                end,
-            }
-        end
-        items[#items + 1] = { text = '|cffff6060Remove from Viewer|r', callback = function()
-            BUI.CDM.SetHiddenIcon(viewerSettings, entry.key, true)
-            RerenderLive()
-            BUILib.Toast.Info('Icon removed', 'Right-click any icon > Restore Icons to bring it back.')
-        end }
+	local function TargetSlot(index, source, hover)
+		if index == source then return hover end
+		if source < hover then
+			if index > source and index <= hover then return index - 1 end
+		elseif source > hover then
+			if index >= hover and index < source then return index + 1 end
+		end
+		return index
+	end
 
-        items[#items + 1] = { separator = true }
+	local function BeginDrag(cell)
+		local entry = cell.entry
+		if not (entry and entry.key and holder.viewerSettings) or not IsControlKeyDown() then return end
+		dragState = { source = cell.slot, cell = cell, hover = cell.slot }
+		cell.frame:SetAlpha(0)
+		local ghostFrame = Ghost()
+		local scale = cell.frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
+		ghostFrame:SetSize(cell.frame:GetWidth() * scale, cell.frame:GetHeight() * scale)
+		ghostFrame.texture:SetTexture(entry.tex)
+		ghostFrame:Show()
+		ghostFrame:SetScript('OnUpdate', function(self, elapsed)
+			local cursorX, cursorY = GetCursorPosition()
+			local uiScale = UIParent:GetEffectiveScale()
+			self:ClearAllPoints()
+			self:SetPoint('CENTER', UIParent, 'BOTTOMLEFT', cursorX / uiScale, cursorY / uiScale)
+			local state = dragState
+			local rects = holder.slotRects
+			if not state or not rects then return end
+			local hovered = SlotUnderCursor()
+			if hovered then state.hover = hovered end
+			local lerp = math.min(1, (elapsed or 0.016) * 14)
+			for index = 1, #rects do
+				local other = cells[index]
+				if other and other.frame:IsShown() then
+					local target = rects[TargetSlot(index, state.source, state.hover)]
+					if target then
+						other.x = other.x + (target.x - other.x) * lerp
+						other.y = other.y + (target.y - other.y) * lerp
+						other.frame:ClearAllPoints()
+						other.frame:SetPoint('TOPLEFT', holder, 'TOPLEFT', other.x, -other.y)
+					end
+				end
+			end
+		end)
+	end
 
-        local hiddenList = {}
-        for hiddenKey, isHidden in pairs(BUI.CDM.GetHiddenIcons(viewerSettings)) do
-            if isHidden == true then hiddenList[#hiddenList + 1] = hiddenKey end
-        end
-        if #hiddenList > 0 then
-            items[#items + 1] = { text = ('Restore Icons (%d)...'):format(#hiddenList), callback = function()
-                ShowUnhideMenu(viewerSettings, hiddenList)
-                return true
-            end }
-        end
-        items[#items + 1] = { text = 'Manage Icons...', callback = function()
-            local configPage = BUI.PageEngine.pages.cdm
-            local pageControl = configPage.frame and configPage.frame._page
-            if pageControl and pageControl.SetTab then pageControl:SetTab(7) end
-        end }
-        Controls.ContextMenu(items, { width = 230 })
-    end
+	local function EndDrag(cell)
+		if ghost then
+			ghost:Hide()
+			ghost:SetScript('OnUpdate', nil)
+		end
+		cell.frame:SetAlpha(1)
+		local state = dragState
+		dragState = nil
+		if not state or state.cell ~= cell then return end
+		local viewerSettings, entries = holder.viewerSettings, holder.entries
+		if not (viewerSettings and entries) then return end
+		local target = state.hover
+		if not target or target == state.source or not entries[state.source] or not entries[target] then return holder:Render(holder.viewerKey) end
+		local moved = table.remove(entries, state.source)
+		table.insert(entries, target, moved)
+		local order = {}
+		for _, entry in ipairs(entries) do
+			if entry.key then order[#order + 1] = entry.key end
+		end
+		if #order == 0 then return holder:Render(holder.viewerKey) end
+		CDM().SetIconOrder(viewerSettings, order)
+		Relayout()
+	end
 
-    local function EnsureGhost()
-        if ghost then return ghost end
-        ghost = CreateFrame('Frame', nil, UIParent)
-        ghost:SetFrameStrata(BUILib.GetPopupStrata())
-        ghost:SetFrameLevel(BUILib.GetPopupLevel() + 20)
-        ghost.tex = ghost:CreateTexture(nil, 'OVERLAY')
-        ghost.tex:SetAllPoints()
-        ghost.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        ghost:Hide()
-        return ghost
-    end
+	local function Cell(index)
+		if not cells[index] then
+			local cell = {}
+			local button = CreateFrame('Button', nil, holder)
+			button:RegisterForClicks('LeftButtonUp', 'RightButtonUp')
+			button:RegisterForDrag('LeftButton')
+			cell.frame = button
+			cell.border = button:CreateTexture(nil, 'BACKGROUND')
+			cell.border:SetTexture(WHITE)
+			cell.border:SetAllPoints(button)
+			cell.icon = button:CreateTexture(nil, 'ARTWORK')
+			cell.swipe = button:CreateTexture(nil, 'ARTWORK', nil, 1)
+			cell.swipe:SetTexture(WHITE)
+			cell.cooldown = button:CreateFontString(nil, 'OVERLAY')
+			cell.stack = button:CreateFontString(nil, 'OVERLAY')
+			cell.keybind = button:CreateFontString(nil, 'OVERLAY')
+			button:SetScript('OnClick', function() CellMenu(cell) end)
+			button:SetScript('OnDragStart', function() BeginDrag(cell) end)
+			button:SetScript('OnDragStop', function() EndDrag(cell) end)
+			button:SetScript('OnEnter', function(self)
+				local entry = cell.entry
+				if not (entry and entry.key) then return end
+				local name = CellName(cell)
+				BUILib.Widget.ShowTip(self, (name ~= '' and name or 'Icon') .. '|n|cff888888Ctrl drag to reorder, click for options|r')
+			end)
+			button:SetScript('OnLeave', function() BUILib.Widget.HideTip() end)
+			cells[index] = cell
+		end
+		return cells[index]
+	end
 
-    local function SlotFromCursor()
-        local rects = holder._slotRects
-        if not rects then return nil end
-        local cursorX, cursorY = GetCursorPosition()
-        local scale = holder:GetEffectiveScale()
-        local localX = cursorX / scale - (holder:GetLeft() or 0)
-        local localY = (holder:GetTop() or 0) - cursorY / scale
-        for slotIndex = 1, #rects do
-            local rect = rects[slotIndex]
-            if localX >= rect.x and localX <= rect.x + rect.w and localY >= rect.y and localY <= rect.y + rect.h then return slotIndex end
-        end
-    end
+	function holder:Render(viewerKey)
+		local module = CDM()
+		local viewerSettings = DB().cdm[viewerKey]
+		local iconWidth = viewerSettings.iconWidth or viewerSettings.iconSize or 38
+		local iconHeight = viewerSettings.iconHeight or iconWidth
+		local spacing = viewerSettings.spacing
+		local borderSize = viewerSettings.borderSize
+		local borderColor = viewerSettings.borderColor
+		local swipeColor = viewerSettings.swipeColor
+		local font = BUI.GetGlobalFont()
 
-    local function TargetSlotFor(slotIndex, sourceSlot, hoverSlot)
-        if slotIndex == sourceSlot then return hoverSlot end
-        if sourceSlot < hoverSlot then
-            if slotIndex > sourceSlot and slotIndex <= hoverSlot then return slotIndex - 1 end
-        elseif sourceSlot > hoverSlot then
-            if slotIndex >= hoverSlot and slotIndex < sourceSlot then return slotIndex + 1 end
-        end
-        return slotIndex
-    end
+		local list = LiveIcons(viewerKey, viewerSettings)
+		if not list then
+			local spells = ViewerSpells(viewerKey)
+			if spells then
+				local hiddenIcons = module.GetHiddenIcons(viewerSettings)
+				list = {}
+				for _, spell in ipairs(spells) do
+					local key = spell.key or spell.spellID
+					local hidden = (key ~= nil and hiddenIcons[key]) or (spell.spellID and hiddenIcons[spell.spellID])
+					if not hidden then list[#list + 1] = { tex = spell.icon, spellID = spell.spellID, key = key } end
+				end
+				local order = module.GetIconOrder(viewerSettings)
+				if order and #order > 0 then
+					local rank = {}
+					for index, key in ipairs(order) do rank[key] = index end
+					table.sort(list, function(left, right)
+						local rankLeft, rankRight = rank[left.key], rank[right.key]
+						if rankLeft and rankRight then return rankLeft < rankRight end
+						if rankLeft or rankRight then return rankLeft ~= nil end
+						return tostring(left.key) < tostring(right.key)
+					end)
+				end
+				if #list == 0 then list = nil end
+			end
+		end
+		if not list then return self:Hide() end
+		local count = math.min(#list, MOCK_MAX_ICONS)
+		self.entries, self.viewerKey, self.viewerSettings = list, viewerKey, viewerSettings
+		local slotRects = {}
+		self.slotRects = slotRects
 
-    local function BeginDrag(draggedCell)
-        local entry = draggedCell._entry
-        if not (entry and entry.key and holder._vs) or not IsControlKeyDown() then return end
-        dragState = { src = draggedCell._slot, cell = draggedCell, hover = draggedCell._slot }
-        draggedCell.frame:SetAlpha(0)
-        local ghostFrame = EnsureGhost()
-        local scale = draggedCell.frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
-        ghostFrame:SetSize(draggedCell.frame:GetWidth() * scale, draggedCell.frame:GetHeight() * scale)
-        ghostFrame.tex:SetTexture(entry.tex)
-        ghostFrame:Show()
-        ghostFrame:SetScript('OnUpdate', function(self, elapsed)
-            local cursorX, cursorY = GetCursorPosition()
-            local uiScale = UIParent:GetEffectiveScale()
-            self:ClearAllPoints()
-            self:SetPoint('CENTER', UIParent, 'BOTTOMLEFT', cursorX / uiScale, cursorY / uiScale)
+		local perRow = viewerSettings.iconsPerRow > 0 and viewerSettings.iconsPerRow or count
+		local numRows, maxCols
+		if viewerKey == 'buffs' then
+			numRows, maxCols = module.RowMetrics(count, perRow)
+		else
+			numRows, maxCols = module.RowMetrics(count, perRow, viewerSettings.row2Count, viewerSettings.row3Count)
+		end
+		if numRows < 1 or maxCols < 1 then return self:Hide() end
 
-            local state = dragState
-            local rects = holder._slotRects
-            if not state or not rects then return end
-            local hoveredSlot = SlotFromCursor()
-            if hoveredSlot then state.hover = hoveredSlot end
-            local lerpFactor = math.min(1, (elapsed or 0.016) * 14)
-            for slotIndex = 1, #rects do
-                local cell = cells[slotIndex]
-                if cell and cell.frame:IsShown() then
-                    local targetRect = rects[TargetSlotFor(slotIndex, state.src, state.hover)]
-                    if targetRect then
-                        cell._px = cell._px + (targetRect.x - cell._px) * lerpFactor
-                        cell._py = cell._py + (targetRect.y - cell._py) * lerpFactor
-                        cell.frame:ClearAllPoints()
-                        cell.frame:SetPoint('TOPLEFT', holder, 'TOPLEFT', cell._px, -cell._py)
-                    end
-                end
-            end
-        end)
-    end
+		local stepX, stepY = iconWidth + spacing, iconHeight + spacing
+		local totalWidth, totalHeight
+		if viewerSettings.vertical then
+			totalWidth = numRows * iconWidth + (numRows - 1) * spacing
+			totalHeight = maxCols * iconHeight + (maxCols - 1) * spacing
+		else
+			totalWidth = maxCols * iconWidth + (maxCols - 1) * spacing
+			totalHeight = numRows * iconHeight + (numRows - 1) * spacing
+		end
+		self:SetSize(totalWidth, totalHeight)
+		self:SetScale(math.min(1, MOCK_WIDTH / totalWidth, MOCK_HEIGHT / totalHeight))
 
-    local function EndDrag(draggedCell)
-        if ghost then ghost:Hide(); ghost:SetScript('OnUpdate', nil) end
-        draggedCell.frame:SetAlpha(1)
-        local state = dragState
-        dragState = nil
-        if not state or state.cell ~= draggedCell then return end
-        local viewerSettings = holder._vs
-        local entries = holder._entries
-        if not (viewerSettings and entries) then return end
-        local target = state.hover
-        if not target or target == state.src or not entries[state.src] or not entries[target] then
-            holder:Render(holder._viewerKey)
-            return
-        end
-        local moved = table.remove(entries, state.src)
-        table.insert(entries, target, moved)
-        local order = {}
-        for _, entry in ipairs(entries) do
-            if entry.key then order[#order + 1] = entry.key end
-        end
-        if #order == 0 then holder:Render(holder._viewerKey); return end
-        BUI.CDM.SetIconOrder(viewerSettings, order)
-        RerenderLive()
-        BUILib.Toast.Success('Order saved', 'Icon order updated for this spec.')
-    end
+		local growUp = viewerSettings.rowGrowth == 'Up'
+		local iconIndex, remaining = 0, count
+		for row = 1, numRows do
+			local rowCount
+			if viewerKey == 'buffs' then
+				rowCount = module.NextRowSize(row, remaining, perRow)
+			else
+				rowCount = module.NextRowSize(row, remaining, perRow, viewerSettings.row2Count, viewerSettings.row3Count)
+			end
+			if rowCount <= 0 then break end
+			remaining = remaining - rowCount
+			local slot = growUp and (numRows - row) or (row - 1)
+			for column = 0, rowCount - 1 do
+				iconIndex = iconIndex + 1
+				local cell = Cell(iconIndex)
+				local x, y
+				if viewerSettings.vertical then
+					local columnHeight = rowCount * iconHeight + (rowCount - 1) * spacing
+					local within = growUp and (rowCount - 1 - column) or column
+					x = (row - 1) * stepX
+					y = (totalHeight - columnHeight) / 2 + within * stepY
+				else
+					local rowWidth = rowCount * iconWidth + (rowCount - 1) * spacing
+					local rowLeft = (totalWidth - rowWidth) / 2
+					if row == numRows and numRows > 1 and viewerSettings.centerLastRow == false then rowLeft = 0 end
+					x = rowLeft + column * stepX
+					y = slot * stepY
+				end
+				local button = cell.frame
+				cell.slot, cell.entry, cell.x, cell.y = iconIndex, list[iconIndex], x, y
+				slotRects[iconIndex] = { x = x, y = y, w = iconWidth, h = iconHeight }
+				button:ClearAllPoints()
+				button:SetSize(iconWidth, iconHeight)
+				button:SetPoint('TOPLEFT', self, 'TOPLEFT', x, -y)
+				button:SetAlpha(1)
+				button:Show()
+				cell.border:SetVertexColor(borderColor[1], borderColor[2], borderColor[3], borderSize > 0 and borderColor[4] or 0)
+				cell.icon:ClearAllPoints()
+				cell.icon:SetPoint('TOPLEFT', button, 'TOPLEFT', borderSize, -borderSize)
+				cell.icon:SetPoint('BOTTOMRIGHT', button, 'BOTTOMRIGHT', -borderSize, borderSize)
+				cell.icon:SetTexture(list[iconIndex].tex)
+				cell.icon:SetTexCoord(module.GetAspectTexCoords(viewerSettings.zoom, iconWidth, iconHeight, viewerSettings.keepAspectRatio))
+				cell.icon:Show()
+				cell.border:Show()
 
-    local function Cell(cellIndex)
-        if not cells[cellIndex] then
-            local cell = {}
-            local cellButton = CreateFrame('Button', nil, holder)
-            cellButton:RegisterForClicks('LeftButtonUp', 'RightButtonUp')
-            cellButton:RegisterForDrag('LeftButton')
-            cell.frame = cellButton
-            cell.border = cellButton:CreateTexture(nil, 'BACKGROUND')
-            cell.border:SetTexture(WHITE)
-            cell.border:SetAllPoints(cellButton)
-            cell.icon = cellButton:CreateTexture(nil, 'ARTWORK')
-            cell.swipe = cellButton:CreateTexture(nil, 'ARTWORK', nil, 1)
-            cell.swipe:SetTexture(WHITE)
-            cell.cd = cellButton:CreateFontString(nil, 'OVERLAY')
-            cell.stack = cellButton:CreateFontString(nil, 'OVERLAY')
-            cell.kb = cellButton:CreateFontString(nil, 'OVERLAY')
-            cellButton:SetScript('OnClick', function() ShowCellMenu(cell) end)
-            cellButton:SetScript('OnDragStart', function() BeginDrag(cell) end)
-            cellButton:SetScript('OnDragStop', function() EndDrag(cell) end)
-            cellButton:SetScript('OnEnter', function(self)
-                local entry = cell._entry
-                if not (entry and entry.key) then return end
-                local name = CellDisplayName(cell)
-                BUILib.Widget.ShowTip(self, (name ~= '' and name or 'Icon')
-                    .. '|n|cff888888Ctrl+drag to reorder - click for options|r')
-            end)
-            cellButton:SetScript('OnLeave', function() BUILib.Widget.HideTip() end)
-            cells[cellIndex] = cell
-        end
-        return cells[cellIndex]
-    end
+				if iconIndex % 3 == 2 then
+					cell.swipe:ClearAllPoints()
+					cell.swipe:SetSize(math.max(1, iconWidth - borderSize * 2), math.max(1, (iconHeight - borderSize * 2) * 0.55))
+					local edge = viewerSettings.reverseSwipe and 'TOP' or 'BOTTOM'
+					cell.swipe:SetPoint(edge, cell.icon, edge, 0, 0)
+					cell.swipe:SetVertexColor(swipeColor[1], swipeColor[2], swipeColor[3], swipeColor[4])
+					cell.swipe:Show()
+					local cooldownColor = viewerSettings.cooldownTextColor
+					BUI.Pixel.ApplyFont(cell.cooldown, viewerSettings.cooldownTextSize, font, 'OUTLINE')
+					cell.cooldown:SetText(tostring(2 + iconIndex))
+					cell.cooldown:ClearAllPoints()
+					local point = viewerSettings.cooldownTextPosition
+					local offsetY = viewerSettings.cooldownTextOffsetY
+					if point == 'CENTER' and viewerSettings.cooldownTextSize > 0 then offsetY = offsetY - module.CooldownTextCenterDrop(viewerSettings.cooldownTextSize) end
+					cell.cooldown:SetPoint(point, cell.icon, point, viewerSettings.cooldownTextOffsetX, offsetY)
+					cell.cooldown:SetTextColor(cooldownColor[1], cooldownColor[2], cooldownColor[3], cooldownColor[4])
+					cell.cooldown:Show()
+				else
+					cell.swipe:Hide()
+					cell.cooldown:Hide()
+				end
 
-    function holder:Render(viewerKey)
-        local viewerSettings = BUI.GetDB().cdm[viewerKey]
-        local CDMModule = BUI.CDM
-        if not viewerSettings then self:Hide(); return end
-        local iconWidth = viewerSettings.iconWidth or viewerSettings.iconSize or 38
-        local iconHeight = viewerSettings.iconHeight or iconWidth
-        local spacing = viewerSettings.spacing
-        local borderSize = viewerSettings.borderSize
-        local borderColor = viewerSettings.borderColor
-        local swipeColor = viewerSettings.swipeColor
-        local font = BUI.GetGlobalFont()
+				if iconIndex % 4 == 3 then
+					local stackColor = viewerSettings.textColor
+					BUI.Pixel.ApplyFont(cell.stack, viewerSettings.textSize, font, 'OUTLINE')
+					cell.stack:SetText('2')
+					cell.stack:ClearAllPoints()
+					local point = viewerSettings.textPosition
+					cell.stack:SetPoint(point, cell.icon, point, viewerSettings.textOffsetX, viewerSettings.textOffsetY)
+					cell.stack:SetTextColor(stackColor[1], stackColor[2], stackColor[3], stackColor[4])
+					cell.stack:Show()
+				else
+					cell.stack:Hide()
+				end
 
-        local list = GetLiveViewerIcons(CDMModule, viewerKey, viewerSettings)
-        if not list then
-            local spells = GetViewerSpellList(viewerKey)
-            if spells then
-                local hiddenIcons = CDMModule.GetHiddenIcons(viewerSettings)
-                list = {}
-                for spellIndex = 1, #spells do
-                    local spellID = spells[spellIndex].spellID
-                    local key = spells[spellIndex].key or spellID
-                    local isHidden = (key ~= nil and hiddenIcons[key]) or (spellID and hiddenIcons[spellID])
-                    if not isHidden then
-                        list[#list + 1] = { tex = spells[spellIndex].icon, spellID = spellID, key = key }
-                    end
-                end
-                local order = CDMModule.GetIconOrder(viewerSettings)
-                if order and #order > 0 then
-                    local rank = {}
-                    for orderIndex = 1, #order do rank[order[orderIndex]] = orderIndex end
-                    table.sort(list, function(entryA, entryB)
-                        local rankA, rankB = rank[entryA.key], rank[entryB.key]
-                        if rankA and rankB then return rankA < rankB end
-                        if rankA or rankB then return rankA ~= nil end
-                        return tostring(entryA.key) < tostring(entryB.key)
-                    end)
-                end
-                if #list == 0 then list = nil end
-            end
-        end
-        if not list then self:Hide(); return end
-        local count = math.min(#list, 40)
-        self._entries = list
-        self._viewerKey = viewerKey
-        self._vs = viewerSettings
-        local slotRects = {}
-        self._slotRects = slotRects
-
-        local perRow = viewerSettings.iconsPerRow > 0 and viewerSettings.iconsPerRow or count
-        local numRows, maxCols
-        if viewerKey == 'buffs' then
-            numRows, maxCols = CDMModule.RowMetrics(count, perRow)
-        else
-            numRows, maxCols = CDMModule.RowMetrics(count, perRow, viewerSettings.row2Count, viewerSettings.row3Count)
-        end
-        if numRows < 1 or maxCols < 1 then self:Hide(); return end
-
-        local stepX, stepY = iconWidth + spacing, iconHeight + spacing
-        local totalWidth, totalHeight
-        if viewerSettings.vertical then
-            totalWidth = numRows * iconWidth + (numRows - 1) * spacing
-            totalHeight = maxCols * iconHeight + (maxCols - 1) * spacing
-        else
-            totalWidth = maxCols * iconWidth + (maxCols - 1) * spacing
-            totalHeight = numRows * iconHeight + (numRows - 1) * spacing
-        end
-        self:SetSize(totalWidth, totalHeight)
-        self:SetScale(math.min(1, 620 / totalWidth, 150 / totalHeight))
-
-        local growUp = viewerSettings.rowGrowth == 'Up'
-        local iconIndex = 0
-        local remaining = count
-        for row = 1, numRows do
-            local rowCount
-            if viewerKey == 'buffs' then
-                rowCount = CDMModule.NextRowSize(row, remaining, perRow)
-            else
-                rowCount = CDMModule.NextRowSize(row, remaining, perRow, viewerSettings.row2Count, viewerSettings.row3Count)
-            end
-            if rowCount <= 0 then break end
-            remaining = remaining - rowCount
-            local slot = growUp and (numRows - row) or (row - 1)
-            for col = 0, rowCount - 1 do
-                iconIndex = iconIndex + 1
-                local cell = Cell(iconIndex)
-                local x, y
-                if viewerSettings.vertical then
-                    local columnHeight = rowCount * iconHeight + (rowCount - 1) * spacing
-                    local within = growUp and (rowCount - 1 - col) or col
-                    x = (row - 1) * stepX
-                    y = (totalHeight - columnHeight) / 2 + within * stepY
-                else
-                    local rowWidth = rowCount * iconWidth + (rowCount - 1) * spacing
-                    local rowLeft = (totalWidth - rowWidth) / 2
-                    if row == numRows and numRows > 1 and viewerSettings.centerLastRow == false then
-                        rowLeft = 0
-                    end
-                    x = rowLeft + col * stepX
-                    y = slot * stepY
-                end
-                local cellButton = cell.frame
-                cell._slot = iconIndex
-                cell._entry = list[iconIndex]
-                cell._px, cell._py = x, y
-                slotRects[iconIndex] = { x = x, y = y, w = iconWidth, h = iconHeight }
-                cellButton:ClearAllPoints()
-                cellButton:SetSize(iconWidth, iconHeight)
-                cellButton:SetPoint('TOPLEFT', self, 'TOPLEFT', x, -y)
-                cellButton:SetAlpha(1)
-                cellButton:Show()
-                cell.border:SetVertexColor(borderColor[1] or 0, borderColor[2] or 0, borderColor[3] or 0, borderSize > 0 and (borderColor[4] or 1) or 0)
-                cell.icon:ClearAllPoints()
-                cell.icon:SetPoint('TOPLEFT', cellButton, 'TOPLEFT', borderSize, -borderSize)
-                cell.icon:SetPoint('BOTTOMRIGHT', cellButton, 'BOTTOMRIGHT', -borderSize, borderSize)
-                local entry = list[(iconIndex - 1) % #list + 1]
-                cell.icon:SetTexture(entry.tex)
-                cell.icon:SetTexCoord(CDMModule.GetAspectTexCoords(viewerSettings.zoom, iconWidth, iconHeight, viewerSettings.keepAspectRatio))
-                cell.icon:Show(); cell.border:Show()
-
-                if iconIndex % 3 == 2 then
-                    cell.swipe:ClearAllPoints()
-                    cell.swipe:SetSize(math.max(1, iconWidth - borderSize * 2), math.max(1, (iconHeight - borderSize * 2) * 0.55))
-                    local edge = viewerSettings.reverseSwipe and 'TOP' or 'BOTTOM'
-                    cell.swipe:SetPoint(edge, cell.icon, edge, 0, 0)
-                    cell.swipe:SetVertexColor(swipeColor[1] or 0, swipeColor[2] or 0, swipeColor[3] or 0, swipeColor[4] or 0.58)
-                    cell.swipe:Show()
-                    local cooldownTextColor = viewerSettings.cooldownTextColor
-                    BUI.Pixel.ApplyFont(cell.cd, viewerSettings.cooldownTextSize, font, 'OUTLINE')
-                    cell.cd:SetText(tostring(2 + iconIndex))
-                    cell.cd:ClearAllPoints()
-                    local cooldownTextPoint = viewerSettings.cooldownTextPosition
-                    local previewOffsetY = viewerSettings.cooldownTextOffsetY
-                    if cooldownTextPoint == 'CENTER' and viewerSettings.cooldownTextSize > 0 then
-                        previewOffsetY = previewOffsetY - BUI.CDM.CooldownTextCenterDrop(viewerSettings.cooldownTextSize)
-                    end
-                    cell.cd:SetPoint(cooldownTextPoint, cell.icon, cooldownTextPoint, viewerSettings.cooldownTextOffsetX, previewOffsetY)
-                    cell.cd:SetTextColor(cooldownTextColor[1] or 1, cooldownTextColor[2] or 1, cooldownTextColor[3] or 1, cooldownTextColor[4] or 1)
-                    cell.cd:Show()
-                else
-                    cell.swipe:Hide(); cell.cd:Hide()
-                end
-
-                if iconIndex % 4 == 3 then
-                    local stackTextColor = viewerSettings.textColor
-                    BUI.Pixel.ApplyFont(cell.stack, viewerSettings.textSize, font, 'OUTLINE')
-                    cell.stack:SetText('2')
-                    cell.stack:ClearAllPoints()
-                    local stackTextPoint = viewerSettings.textPosition
-                    cell.stack:SetPoint(stackTextPoint, cell.icon, stackTextPoint, viewerSettings.textOffsetX, viewerSettings.textOffsetY)
-                    cell.stack:SetTextColor(stackTextColor[1] or 1, stackTextColor[2] or 1, stackTextColor[3] or 1, stackTextColor[4] or 1)
-                    cell.stack:Show()
-                else
-                    cell.stack:Hide()
-                end
-
-                if withKeybinds and viewerSettings.showKeybinds then
-                    local keybindColor = viewerSettings.keybindColor
-                    BUI.Pixel.ApplyFont(cell.kb, viewerSettings.keybindFontSize, ResolveCDMMedia('font', viewerSettings.keybindFont, font), 'OUTLINE')
-                    cell.kb:SetText(CDM_MOCK_KEYS[(iconIndex - 1) % #CDM_MOCK_KEYS + 1])
-                    cell.kb:ClearAllPoints()
-                    local keybindPoint = viewerSettings.keybindAnchor
-                    cell.kb:SetPoint(keybindPoint, cell.icon, keybindPoint, viewerSettings.keybindOffsetX, viewerSettings.keybindOffsetY)
-                    cell.kb:SetTextColor(keybindColor[1] or 1, keybindColor[2] or 1, keybindColor[3] or 1, keybindColor[4] or 1)
-                    cell.kb:Show()
-                else
-                    cell.kb:Hide()
-                end
-            end
-        end
-        for cellIndex = iconIndex + 1, #cells do
-            cells[cellIndex].frame:Hide()
-            cells[cellIndex]._entry = nil
-        end
-        self:Show()
-    end
-
-    return holder
+				if withKeybinds and viewerSettings.showKeybinds then
+					local keybindColor = viewerSettings.keybindColor
+					BUI.Pixel.ApplyFont(cell.keybind, viewerSettings.keybindFontSize, Media('font', viewerSettings.keybindFont, font), 'OUTLINE')
+					cell.keybind:SetText(MOCK_KEYS[(iconIndex - 1) % #MOCK_KEYS + 1])
+					cell.keybind:ClearAllPoints()
+					local point = viewerSettings.keybindAnchor
+					cell.keybind:SetPoint(point, cell.icon, point, viewerSettings.keybindOffsetX, viewerSettings.keybindOffsetY)
+					cell.keybind:SetTextColor(keybindColor[1], keybindColor[2], keybindColor[3], keybindColor[4])
+					cell.keybind:Show()
+				else
+					cell.keybind:Hide()
+				end
+			end
+		end
+		for index = iconIndex + 1, #cells do
+			cells[index].frame:Hide()
+			cells[index].entry = nil
+		end
+		self:Show()
+	end
+	return holder
 end
-
-local CDM_MOCK_BARS = {
-    { icon = 'Interface\\Icons\\Spell_Nature_Rejuvenation', name = 'Rejuvenation', dur = '12s', fill = 0.78, stacks = '3' },
-    { icon = 'Interface\\Icons\\Ability_Warrior_BattleShout', name = 'Battle Shout', dur = '48s', fill = 0.52 },
-    { icon = 'Interface\\Icons\\Spell_Holy_PowerWordShield', name = 'Power Word: Shield', dur = '8s', fill = 0.24, stacks = '2' },
-}
 
 local function CreateBuffBarMock(stage)
-    local WHITE = 'Interface\\Buttons\\WHITE8x8'
-    local holder = CreateFrame('Frame', nil, stage)
-    holder:SetPoint('CENTER')
-    local barsPool = {}
+	local holder = CreateFrame('Frame', nil, stage)
+	holder:SetPoint('CENTER')
+	local bars = {}
 
-    local function Bar(barIndex)
-        if not barsPool[barIndex] then
-            local bar = {}
-            bar.border = holder:CreateTexture(nil, 'BACKGROUND')
-            bar.border:SetTexture(WHITE)
-            bar.bg = holder:CreateTexture(nil, 'BORDER')
-            bar.bg:SetTexture(WHITE)
-            bar.fill = holder:CreateTexture(nil, 'ARTWORK')
-            bar.iconBorder = holder:CreateTexture(nil, 'BACKGROUND')
-            bar.iconBorder:SetTexture(WHITE)
-            bar.icon = holder:CreateTexture(nil, 'ARTWORK')
-            bar.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-            bar.name = holder:CreateFontString(nil, 'OVERLAY')
-            bar.dur = holder:CreateFontString(nil, 'OVERLAY')
-            bar.stacks = holder:CreateFontString(nil, 'OVERLAY', nil, 1)
-            bar.hit =CreateFrame('Button', nil, holder)
-            bar.hit:RegisterForClicks('LeftButtonUp', 'RightButtonUp')
-            bar.hit:SetScript('OnClick', function(self)
-                if not self._spellID then return end
-                local items = { { title = true, text = self._name or 'Buff Bar' } }
-                local procConfig = BUI.CDM.GetProcConfig(self._spellID)
-                items[#items + 1] = {
-                    text = procConfig and 'Settings... |cffffe066(active)|r' or 'Settings...',
-                    callback = function()
-                        BUI.ShowCDMProcModal(BUI.CDM, self._spellID, function() holder:Render() end)
-                    end,
-                }
-                items[#items + 1] = { separator = true }
-                items[#items + 1] = { text = 'Manage Icons...', callback = function()
-                    local configPage = BUI.PageEngine.pages.cdm
-                    local pageControl = configPage.frame and configPage.frame._page
-                    if pageControl and pageControl.SetTab then pageControl:SetTab(7) end
-                end }
-                Controls.ContextMenu(items, { width = 230 })
-            end)
-            bar.hit:SetScript('OnEnter', function(self)
-                if not self._spellID then return end
-                BUILib.Widget.ShowTip(self, (self._name or 'Buff Bar') .. '|n|cff888888Click for options|r')
-            end)
-            bar.hit:SetScript('OnLeave', function() BUILib.Widget.HideTip() end)
-            barsPool[barIndex] = bar
-        end
-        return barsPool[barIndex]
-    end
+	local function Bar(index)
+		if not bars[index] then
+			local bar = {}
+			bar.border = holder:CreateTexture(nil, 'BACKGROUND')
+			bar.border:SetTexture(WHITE)
+			bar.background = holder:CreateTexture(nil, 'BORDER')
+			bar.background:SetTexture(WHITE)
+			bar.fill = holder:CreateTexture(nil, 'ARTWORK')
+			bar.iconBorder = holder:CreateTexture(nil, 'BACKGROUND')
+			bar.iconBorder:SetTexture(WHITE)
+			bar.icon = holder:CreateTexture(nil, 'ARTWORK')
+			bar.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+			bar.name = holder:CreateFontString(nil, 'OVERLAY')
+			bar.duration = holder:CreateFontString(nil, 'OVERLAY')
+			bar.stacks = holder:CreateFontString(nil, 'OVERLAY', nil, 1)
+			bar.hit = CreateFrame('Button', nil, holder)
+			bar.hit:RegisterForClicks('LeftButtonUp', 'RightButtonUp')
+			bar.hit:SetScript('OnClick', function(self)
+				if not self.spellID then return end
+				local procConfig = CDM().GetProcConfig(self.spellID)
+				Controls.ContextMenu({
+					{ title = true, text = self.name or 'Buff bar' },
+					{ text = procConfig and 'Alert settings, active' or 'Alert settings', callback = function() BUI.ShowCDMProcModal(CDM(), self.spellID, function() holder:Render() end) end },
+				}, { width = 230, window = Window() })
+			end)
+			bar.hit:SetScript('OnEnter', function(self)
+				if not self.spellID then return end
+				BUILib.Widget.ShowTip(self, (self.name or 'Buff bar') .. '|n|cff888888Click for options|r')
+			end)
+			bar.hit:SetScript('OnLeave', function() BUILib.Widget.HideTip() end)
+			bars[index] = bar
+		end
+		return bars[index]
+	end
 
-    function holder:Render()
-        local config = BUI.GetDB().cdm.buffBars
-        if not config then self:Hide(); return end
-        local barWidth = config.barWidth
-        local barHeight = config.barHeight
-        local iconSize = config.iconSize
-        local showIcon = config.showIcon ~= false
-        local spacing = config.spacing
-        local borderSize = config.borderSize
-        local borderColor = config.borderColor
-        local backgroundColor = config.bgColor
-        local fillColor = config.barColor
-        if config.useClassColor then
-            local _, playerClass = UnitClass('player')
-            local classColor = playerClass and RAID_CLASS_COLORS[playerClass]
-            if classColor then fillColor = { classColor.r, classColor.g, classColor.b, 1 } end
-        end
-        local barTexture = ResolveCDMMedia('statusbar', config.texture, BUI.GetGlobalTexture())
-        local font = BUI.GetGlobalFont()
-
-        local live = GetViewerSpellList('buffBars')
-        if not live or #live == 0 then self:Hide(); return end
-        local rowHeight = math.max(barHeight, showIcon and iconSize or 0)
-        local totalWidth = barWidth + (showIcon and (iconSize + 2) or 0)
-        local barCount = math.min(#live, 3)
-        local totalHeight = barCount * rowHeight + (barCount - 1) * spacing
-        self:SetSize(totalWidth, totalHeight)
-        self:SetScale(math.min(1, 620 / totalWidth, 150 / totalHeight))
-
-        local growDirection = config.growDirection
-        for barIndex = 1, barCount do
-            local mockBar = CDM_MOCK_BARS[(barIndex - 1) % #CDM_MOCK_BARS + 1]
-            local entry = live[barIndex]
-            local iconTexture = entry.icon
-            local barName = C_Spell.GetSpellName(entry.spellID) or mockBar.name
-            local bar = Bar(barIndex)
-            local slot = growDirection == 'UP' and (barCount - barIndex + 1) or barIndex
-            local y = (slot - 1) * (rowHeight + spacing)
-            local x = 0
-            if showIcon then
-                local iconY = y + (rowHeight - iconSize) / 2
-                bar.iconBorder:ClearAllPoints()
-                bar.iconBorder:SetSize(iconSize + borderSize * 2, iconSize + borderSize * 2)
-                bar.iconBorder:SetPoint('TOPLEFT', self, 'TOPLEFT', -borderSize, -iconY + borderSize)
-                bar.iconBorder:SetVertexColor(borderColor[1] or 0, borderColor[2] or 0, borderColor[3] or 0, borderSize > 0 and (borderColor[4] or 1) or 0)
-                bar.icon:ClearAllPoints()
-                bar.icon:SetSize(iconSize, iconSize)
-                bar.icon:SetPoint('TOPLEFT', self, 'TOPLEFT', 0, -iconY)
-                bar.icon:SetTexture(iconTexture)
-                bar.icon:Show(); bar.iconBorder:Show()
-                x = iconSize + 2
-            else
-                bar.icon:Hide(); bar.iconBorder:Hide()
-            end
-            local barY = y + (rowHeight - barHeight) / 2
-            bar.border:ClearAllPoints()
-            bar.border:SetSize(barWidth + borderSize * 2, barHeight + borderSize * 2)
-            bar.border:SetPoint('TOPLEFT', self, 'TOPLEFT', x - borderSize, -barY + borderSize)
-            bar.border:SetVertexColor(borderColor[1] or 0, borderColor[2] or 0, borderColor[3] or 0, borderSize > 0 and (borderColor[4] or 1) or 0)
-            bar.bg:ClearAllPoints()
-            bar.bg:SetSize(barWidth, barHeight)
-            bar.bg:SetPoint('TOPLEFT', self, 'TOPLEFT', x, -barY)
-            bar.bg:SetVertexColor(backgroundColor[1] or 0.1, backgroundColor[2] or 0.1, backgroundColor[3] or 0.1, backgroundColor[4] or 0.85)
-            bar.fill:SetTexture(barTexture)
-            bar.fill:ClearAllPoints()
-            bar.fill:SetSize(math.max(1, barWidth * mockBar.fill), barHeight)
-            bar.fill:SetPoint('TOPLEFT', self, 'TOPLEFT', x, -barY)
-            bar.fill:SetVertexColor(fillColor[1] or 1, fillColor[2] or 0.5, fillColor[3] or 0.25, fillColor[4] or 1)
-            bar.bg:Show(); bar.fill:Show(); bar.border:Show()
-            if config.showName ~= false then
-                BUI.Pixel.ApplyFont(bar.name, config.nameSize, font)
-                bar.name:SetText(barName)
-                bar.name:ClearAllPoints()
-                bar.name:SetPoint('LEFT', bar.bg, 'LEFT', 4, 0)
-                bar.name:SetTextColor(1, 1, 1, 1)
-                bar.name:Show()
-            else
-                bar.name:Hide()
-            end
-            if config.showDuration ~= false then
-                BUI.Pixel.ApplyFont(bar.dur, config.durationSize, font)
-                bar.dur:SetText(mockBar.dur)
-                bar.dur:ClearAllPoints()
-                bar.dur:SetPoint('RIGHT', bar.bg, 'RIGHT', -4, 0)
-                bar.dur:SetTextColor(1, 1, 1, 1)
-                bar.dur:Show()
-            else
-                bar.dur:Hide()
-            end
-            if config.showStacks ~= false and mockBar.stacks then
-                local stackPoint = config.stackPoint
-                BUI.Pixel.ApplyFont(bar.stacks, config.stackSize, font, 'OUTLINE')
-                bar.stacks:SetText(mockBar.stacks)
-                bar.stacks:ClearAllPoints()
-                bar.stacks:SetPoint(stackPoint, (showIcon and config.stackAttach == 'ICON') and bar.icon or bar.bg, stackPoint, config.stackOffsetX, config.stackOffsetY)
-                bar.stacks:SetTextColor(1, 1, 1, 1)
-                bar.stacks:Show()
-            else
-                bar.stacks:Hide()
-            end
-            bar.hit._spellID = entry.spellID
-            bar.hit._name = barName
-            bar.hit:ClearAllPoints()
-            bar.hit:SetPoint('TOPLEFT', self, 'TOPLEFT', -borderSize, -y)
-            bar.hit:SetSize(totalWidth + borderSize * 2, rowHeight)
-            bar.hit:Show()
-        end
-        for barIndex = barCount + 1, #barsPool do
-            local bar = barsPool[barIndex]
-            bar.border:Hide(); bar.bg:Hide(); bar.fill:Hide()
-            bar.iconBorder:Hide(); bar.icon:Hide()
-            bar.name:Hide(); bar.dur:Hide(); bar.stacks:Hide()
-            bar.hit:Hide()
-        end
-        self:Show()
-    end
-
-    return holder
+	function holder:Render()
+		local config = DB().cdm.buffBars
+		local barWidth, barHeight, iconSize = config.barWidth, config.barHeight, config.iconSize
+		local showIcon = config.showIcon ~= false
+		local spacing, borderSize = config.spacing, config.borderSize
+		local borderColor, backgroundColor = config.borderColor, config.bgColor
+		local fillColor = config.barColor
+		if config.useClassColor then
+			local _, class = UnitClass('player')
+			local classColor = class and RAID_CLASS_COLORS[class]
+			if classColor then fillColor = { classColor.r, classColor.g, classColor.b, 1 } end
+		end
+		local barTexture = Media('statusbar', config.texture, BUI.GetGlobalTexture())
+		local font = BUI.GetGlobalFont()
+		local live = ViewerSpells('buffBars')
+		if not live or #live == 0 then return self:Hide() end
+		local rowHeight = math.max(barHeight, showIcon and iconSize or 0)
+		local totalWidth = barWidth + (showIcon and (iconSize + 2) or 0)
+		local barCount = math.min(#live, 3)
+		local totalHeight = barCount * rowHeight + (barCount - 1) * spacing
+		self:SetSize(totalWidth, totalHeight)
+		self:SetScale(math.min(1, MOCK_WIDTH / totalWidth, MOCK_HEIGHT / totalHeight))
+		for index = 1, barCount do
+			local sample = MOCK_BARS[(index - 1) % #MOCK_BARS + 1]
+			local entry = live[index]
+			local name = C_Spell.GetSpellName(entry.spellID) or sample.name
+			local bar = Bar(index)
+			local slot = config.growDirection == 'UP' and (barCount - index + 1) or index
+			local y = (slot - 1) * (rowHeight + spacing)
+			local x = 0
+			if showIcon then
+				local iconY = y + (rowHeight - iconSize) / 2
+				bar.iconBorder:ClearAllPoints()
+				bar.iconBorder:SetSize(iconSize + borderSize * 2, iconSize + borderSize * 2)
+				bar.iconBorder:SetPoint('TOPLEFT', self, 'TOPLEFT', -borderSize, -iconY + borderSize)
+				bar.iconBorder:SetVertexColor(borderColor[1], borderColor[2], borderColor[3], borderSize > 0 and borderColor[4] or 0)
+				bar.icon:ClearAllPoints()
+				bar.icon:SetSize(iconSize, iconSize)
+				bar.icon:SetPoint('TOPLEFT', self, 'TOPLEFT', 0, -iconY)
+				bar.icon:SetTexture(entry.icon)
+				bar.icon:Show()
+				bar.iconBorder:Show()
+				x = iconSize + 2
+			else
+				bar.icon:Hide()
+				bar.iconBorder:Hide()
+			end
+			local barY = y + (rowHeight - barHeight) / 2
+			bar.border:ClearAllPoints()
+			bar.border:SetSize(barWidth + borderSize * 2, barHeight + borderSize * 2)
+			bar.border:SetPoint('TOPLEFT', self, 'TOPLEFT', x - borderSize, -barY + borderSize)
+			bar.border:SetVertexColor(borderColor[1], borderColor[2], borderColor[3], borderSize > 0 and borderColor[4] or 0)
+			bar.background:ClearAllPoints()
+			bar.background:SetSize(barWidth, barHeight)
+			bar.background:SetPoint('TOPLEFT', self, 'TOPLEFT', x, -barY)
+			bar.background:SetVertexColor(backgroundColor[1], backgroundColor[2], backgroundColor[3], backgroundColor[4])
+			bar.fill:SetTexture(barTexture)
+			bar.fill:ClearAllPoints()
+			bar.fill:SetSize(math.max(1, barWidth * sample.fill), barHeight)
+			bar.fill:SetPoint('TOPLEFT', self, 'TOPLEFT', x, -barY)
+			bar.fill:SetVertexColor(fillColor[1], fillColor[2], fillColor[3], fillColor[4])
+			bar.background:Show()
+			bar.fill:Show()
+			bar.border:Show()
+			if config.showName ~= false then
+				BUI.Pixel.ApplyFont(bar.name, config.nameSize, font)
+				bar.name:SetText(name)
+				bar.name:ClearAllPoints()
+				bar.name:SetPoint('LEFT', bar.background, 'LEFT', 4, 0)
+				bar.name:SetTextColor(1, 1, 1, 1)
+				bar.name:Show()
+			else
+				bar.name:Hide()
+			end
+			if config.showDuration ~= false then
+				BUI.Pixel.ApplyFont(bar.duration, config.durationSize, font)
+				bar.duration:SetText(sample.duration)
+				bar.duration:ClearAllPoints()
+				bar.duration:SetPoint('RIGHT', bar.background, 'RIGHT', -4, 0)
+				bar.duration:SetTextColor(1, 1, 1, 1)
+				bar.duration:Show()
+			else
+				bar.duration:Hide()
+			end
+			if config.showStacks ~= false and sample.stacks then
+				local point = config.stackPoint
+				BUI.Pixel.ApplyFont(bar.stacks, config.stackSize, font, 'OUTLINE')
+				bar.stacks:SetText(sample.stacks)
+				bar.stacks:ClearAllPoints()
+				bar.stacks:SetPoint(point, (showIcon and config.stackAttach == 'ICON') and bar.icon or bar.background, point, config.stackOffsetX, config.stackOffsetY)
+				bar.stacks:SetTextColor(1, 1, 1, 1)
+				bar.stacks:Show()
+			else
+				bar.stacks:Hide()
+			end
+			bar.hit.spellID, bar.hit.name = entry.spellID, name
+			bar.hit:ClearAllPoints()
+			bar.hit:SetPoint('TOPLEFT', self, 'TOPLEFT', -borderSize, -y)
+			bar.hit:SetSize(totalWidth + borderSize * 2, rowHeight)
+			bar.hit:Show()
+		end
+		for index = barCount + 1, #bars do
+			local bar = bars[index]
+			for _, region in ipairs({ bar.border, bar.background, bar.fill, bar.iconBorder, bar.icon, bar.name, bar.duration, bar.stacks, bar.hit }) do region:Hide() end
+		end
+		self:Show()
+	end
+	return holder
 end
 
-local function InstallCDMHeader(page, tabIndex, config)
-    local PageKit = BUILib.PageKit
-    local tab = page:GetTab(tabIndex)
-    local width = page.width
-    local titleHeight, titleBar = PageKit.PageTitle(tab.pinned, config.title, width, {
-        desc = config.desc, enable = config.enable, anchor = config.anchor, button = config.button,
-    })
-    local pinnedHeight = PageKit.PAD + titleHeight
-    local header = { titleBar = titleBar }
-    if config.preview then
-        local band = PageKit.PreviewBand(tab.pinned, width, Layout.PAGE_PREVIEW_H, pinnedHeight)
-        local _, stage = PageKit.PreviewStage(band)
-        header.band, header.stage = band, stage
-        pinnedHeight = pinnedHeight + Layout.PAGE_PREVIEW_H + PageKit.GAP
-    end
-    tab:SetPinnedHeight(pinnedHeight)
-    cdmHeaders[tabIndex] = header
-    return header
+local function BuildPreview(band, kit)
+	local stage = CreateFrame('Frame', nil, band)
+	stage:SetAllPoints()
+	stage:SetClipsChildren(true)
+	local mocks = {}
+	for _, viewer in ipairs(VIEWERS) do mocks[viewer.key] = CreateViewerMock(stage, viewer.keybinds) end
+	mocks.buffBars = CreateBuffBarMock(stage)
+	local note = kit.Text(band, '', 12, 'muted')
+	note:SetPoint('CENTER')
+	function band:Update()
+		for _, mock in pairs(mocks) do mock:Hide() end
+		local mock = mocks[selected]
+		if not mock then
+			note:SetText('Pick a viewer from the rail to see it here')
+			note:Show()
+			return
+		end
+		if selected == 'buffBars' then mock:Render() else mock:Render(selected) end
+		note:SetText('Nothing tracked in this viewer yet')
+		note:SetShown(not mock:IsShown())
+	end
+	band:HookScript('OnShow', function(self) self:Update() end)
+	return band
 end
 
-local function HookCDMRefreshers(CDM)
-    if CDM._pageMockHooked then return end
-    CDM._pageMockHooked = true
-    local function Wrap(owner, name)
-        local original = owner[name]
-        if not original then return end
-        owner[name] = function(...)
-            local result1, result2, result3 = original(...)
-            RefreshCDMMocks()
-            return result1, result2, result3
-        end
-    end
-    Wrap(CDM, 'RefreshSizeSettings')
-    Wrap(CDM, 'RefreshSkinSettings')
-    Wrap(CDM, 'RefreshLayoutOnly')
-    Wrap(CDM, 'RefreshBuffBarSkin')
-    Wrap(CDM, 'RefreshCooldownStyleFlags')
-    Wrap(CDM, 'SyncSetting')
-    Wrap(CDM, 'SyncSettingLayout')
-    Wrap(CDM.Keybinds, 'StyleViewer')
-    Wrap(CDM.Keybinds, 'RefreshViewer')
+local function GeneralBoards(ui, parent, width, page)
+	local db = DB()
+	local module = CDM()
+	local cdm = db.cdm
+	local setup = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Cooldown Manager',
+		description = 'Skin, arrange and extend the Blizzard Cooldown Manager.',
+	})
+	setup:AddTools('Shortcuts', 'Blizzard Edit Mode and the full Cooldown Viewer settings panel', {
+		{ text = 'Advanced CDM', onClick = function()
+			if CooldownViewerSettings then CooldownViewerSettings:SetShown(not CooldownViewerSettings:IsShown()) end
+		end },
+		{ text = 'Edit Mode', onClick = BUI.ToggleEditMode },
+	})
+	local EditModeLock = module.EditModeLock
+	local systems = Enum.EditModeCooldownViewerSystemIndices
+	local settingsEnum = Enum.EditModeCooldownViewerSetting
+	local viewerNames = { [systems.Essential] = 'Essential', [systems.Utility] = 'Utility', [systems.BuffIcon] = 'Buff icons' }
+	if systems.BuffBar then viewerNames[systems.BuffBar] = 'Buff bars' end
+	local settingNames = { [settingsEnum.VisibleSetting] = 'Always visible', [settingsEnum.ShowTimer] = 'Show timer', [settingsEnum.HideWhenInactive] = 'Hide when inactive' }
+	local function EditModeStatus()
+		local compliance = EditModeLock.GetCompliance()
+		if not compliance.isReady then return 'Edit Mode is not loaded, reload the interface' end
+		if compliance.isPreset then return 'This is a Blizzard preset layout, make a custom one first' end
+		if compliance.isCompliant then return 'The viewers are configured' end
+		local byViewer = {}
+		for _, mismatch in ipairs(compliance.mismatches) do
+			byViewer[mismatch.systemIndex] = byViewer[mismatch.systemIndex] or {}
+			table.insert(byViewer[mismatch.systemIndex], settingNames[mismatch.setting])
+		end
+		local parts = {}
+		for _, systemIndex in ipairs({ systems.Essential, systems.Utility, systems.BuffIcon, systems.BuffBar }) do
+			if systemIndex and byViewer[systemIndex] then parts[#parts + 1] = viewerNames[systemIndex] .. ': ' .. table.concat(byViewer[systemIndex], ', ') end
+		end
+		return 'Needs fixing. ' .. table.concat(parts, '. ')
+	end
+	setup:AddTools('Edit Mode setup', EditModeStatus(), {
+		{ text = 'Apply fix', onClick = function()
+			local result = EditModeLock.ApplyRecommendedSettings()
+			local messages = {
+				applied = 'Viewers configured, reload to apply.',
+				noop = 'Nothing to change.',
+				preset = 'This is a Blizzard preset layout, make a custom one first.',
+				in_combat = 'Cannot edit in combat.',
+				not_ready = 'Edit Mode is not loaded, reload the interface.',
+			}
+			BUI.Print(messages[result] or 'Could not apply the settings.')
+			module._emStatusRefresh()
+		end },
+	})
+	module._emStatusRefresh = function()
+		if selected == 'general' then RebuildPane(page) end
+	end
+
+	local behavior = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Behavior',
+		description = 'How the viewers act and what they show.',
+	})
+	behavior:AddSwitch('Sync settings', function() return cdm.syncViewers == true end, function(value) cdm.syncViewers = value end, 'Essential, Utility and Buff icons share one set of appearance settings')
+	behavior:AddSwitch('Blizzard panel overlay', function() return cdm.showBlizzardOverlay == true end, function(value) cdm.showBlizzardOverlay = value end, 'The BluUI overlay on the Blizzard Cooldown Viewer settings panel')
+	behavior:AddSwitch('Tooltips', function() return cdm.showTooltips ~= false end, function(value) cdm.showTooltips = value end, 'Spell tooltips when hovering tracked icons')
+	behavior:AddSwitch('Buff duration', function() return cdm.showBuffDuration ~= false end, function(value)
+		cdm.showBuffDuration = value
+		module.RefreshBuffOverrideCache()
+		for cooldown in pairs(module.CDMCooldowns) do
+			module.ForceSpellCooldownIfBuffHidden(cooldown)
+			local icon = cooldown:GetParent()
+			if icon and icon.Icon then
+				if value then icon.Icon:SetDesaturation(0) else module.RefreshIconDesaturation(icon.Icon) end
+			end
+		end
+	end, 'Remaining time on tracked buff icons')
+	local function SetAllViewers(key, value)
+		cdm.essential[key], cdm.utility[key], cdm.buffs[key] = value, value, value
+		module.RefreshCooldownStyleFlags()
+	end
+	behavior:AddSwitch('Cooldown flash', function() return cdm.essential.showFlash == true end, function(value) SetAllViewers('showFlash', value) end, 'Flash when a cooldown completes')
+	behavior:AddSwitch('Cooldown edge', function() return cdm.essential.showEdge == true end, function(value) SetAllViewers('showEdge', value) end, 'Bright leading edge on the cooldown sweep')
+	behavior:AddTools('Move icons individually', 'Drag any icon out of its grid to place it freely', {
+		{ tooltip = 'Resizing and snapping', title = 'Detached icons', options = {
+			Toggle(cdm, 'Resize detached icons', 'allowIndividualResize'),
+			Toggle(cdm, 'Disable snapping', 'disableSnapping'),
+		} },
+		{ icon = 'reset', tooltip = 'Reset every icon position', onClick = function()
+			module.Detached.ClearAll('essential')
+			module.Detached.ClearAll('utility')
+			module.RefreshAll()
+		end },
+		{ get = function() return cdm.allowIndividualMove == true end, set = function(value)
+			cdm.allowIndividualMove = value
+			module.Detached.UpdateModifierWatcher()
+			module.RefreshAll()
+		end },
+	})
+	behavior:AddTools('Font', 'Timer and stack text across the Cooldown Manager', {
+		{ entries = fonts, width = MENU_WIDTH, get = function() return db.general.cdmFont or BUI.C.GLOBAL_OPTION end, set = function(value) db.general.cdmFont = value ~= BUI.C.GLOBAL_OPTION and value or nil end },
+	}, module.RefreshSkinSettings)
+
+	local effects = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Glow and highlights',
+		description = 'Procs, the assisted rotation marker and key presses.',
+	})
+	local glow = cdm.glow
+	local glowTypes = {}
+	for _, glowType in ipairs(module.GLOW_TYPES) do glowTypes[#glowTypes + 1] = { value = glowType.id, text = glowType.name } end
+	effects:AddTools('Custom glows', 'A BluUI styled glow for procs and alerts, replacing the Blizzard highlight', {
+		Color(glow, 'Glow color', 'color', module.RefreshGlowPreview),
+		Menu(glow, 'type', glowTypes),
+		{ tooltip = 'Speed, lines and thickness', title = 'Glow shape', options = {
+			Option(glow, 'Speed %', 'speed', { min = 25, max = 400, step = 25 }),
+			Option(glow, 'Lines, pixel style', 'lines', { min = 4, max = 16, step = 1 }),
+			Option(glow, 'Thickness, pixel style', 'thickness', { min = 1, max = 5, step = 1 }),
+		} },
+		Eye('Preview the glow', function() return module.glowPreview ~= nil and module.glowPreview:IsShown() end, function(value)
+			if value then module.ShowGlowPreview() else module.HideGlowPreview() end
+		end),
+		{ get = function() return glow.enabled == true end, set = function(value)
+			glow.enabled = value
+			module.RefreshSkinSettings()
+		end },
+	}, module.RefreshActiveGlows)
+	effects:AddTools('Assisted highlight', 'Color for the Blizzard assisted combat highlight', {
+		Color(cdm.assist, 'Highlight color', 'color'),
+	}, module.RefreshAssistHighlight)
+	local press = cdm.pressHighlight
+	effects:AddTools('Keypress highlight', 'Flash the icon when its key is pressed', {
+		Color(press, 'Tint color', 'tintColor'),
+		Color(press, 'Border color', 'borderColor'),
+		Menu(press, 'overlayStyle', module.PressHighlight.OVERLAY_STYLES),
+		{ tooltip = 'Border', title = 'Keypress highlight', options = { Toggle(press, 'Show the border', 'showBorder') } },
+		Toggle(press, nil, 'enabled'),
+	}, module.PressHighlight.Refresh)
+	return { setup, behavior, effects }
 end
 
-local function BuildViewerSettings(tab, viewerKey, db, CDM)
-    local PageKit = BUILib.PageKit
-    local viewerSettings = db.cdm[viewerKey]
-    local canSync = viewerKey ~= "buffs"
+local function ViewerBoards(ui, parent, width, viewer)
+	local db = DB()
+	local module = CDM()
+	local viewerKey = viewer.key
+	local viewerSettings = db.cdm[viewerKey]
+	local canSync = viewerKey ~= 'buffs'
+	local function Sync(key)
+		return function(value)
+			if canSync and module.SyncSetting(key, value) then return end
+			if module.SIZE_SETTINGS[key] then module.RefreshSizeSettings() else module.RefreshSkinSettings() end
+		end
+	end
+	local function SyncLayout(key)
+		return function(value)
+			if canSync and module.SyncSettingLayout(key, value) then return end
+			module.RefreshLayoutOnly()
+		end
+	end
+	local function Synced(label, key, extra, layout)
+		local option = Option(viewerSettings, label, key, extra)
+		local after = layout and SyncLayout(key) or Sync(key)
+		option.set = function(value)
+			viewerSettings[key] = value
+			after(value)
+		end
+		return option
+	end
+	local function SyncedToggle(label, key, layout)
+		local after = layout and SyncLayout(key) or Sync(key)
+		return { label = label, get = function() return viewerSettings[key] == true end, set = function(value)
+			viewerSettings[key] = value
+			after(value)
+		end }
+	end
+	local function SyncedColor(label, key)
+		return Color(viewerSettings, label, key, Sync(key))
+	end
 
-    local function TrySync(key, value)
-        if canSync and CDM.SyncSetting(key, value) then return end
-        if CDM.SIZE_SETTINGS[key] then
-            CDM.RefreshSizeSettings()
-        else
-            CDM.RefreshSkinSettings()
-        end
-    end
-    local function TrySyncLayout(key, value)
-        if canSync and CDM.SyncSettingLayout(key, value) then return end
-        CDM.RefreshLayoutOnly()
-    end
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = viewer.title,
+		description = viewer.description .. ' Turning the skin on or off needs a reload.',
+	})
+	local frames = {}
+	for _, entry in ipairs(BUI.C.ANCHOR_FRAMES) do
+		if entry.tag ~= viewer.frame then frames[#frames + 1] = entry end
+	end
+	local position = setmetatable({}, {
+		__index = function(_, key) return viewerSettings[key] end,
+		__newindex = function(_, key, value)
+			if key == 'centerHorizontally' then
+				Sync('centerHorizontally')(value)
+				module.OnCenterHorizontallyChanged(viewerKey, value)
+			else
+				viewerSettings[key] = value
+			end
+		end,
+	})
+	local tools = { BUI.PositionTool(position, { fields = { posX = 'positionX', posY = 'positionY' }, frames = frames }) }
+	if viewerKey == 'buffs' then
+		tools[#tools + 1] = Eye('Show a movable preview of the buff icons', function() return module.state.buffsPreview ~= nil and module.state.buffsPreview:IsShown() end, function(value)
+			if value then module.ShowBuffsPreview(viewerSettings) else module.HideBuffsPreview() end
+		end)
+	end
+	tools[#tools + 1] = { get = function() return viewerSettings.enabled == true end, set = function(value)
+		Modals.Confirm({
+			parent = Window().frame,
+			title = viewer.title .. (value and ' skin on' or ' skin off'),
+			message = 'This needs a reload of the interface to take effect.',
+			confirmText = 'Reload now', laterText = 'Later', cancelText = 'Cancel',
+			onConfirm = function()
+				viewerSettings.enabled = value
+				ReloadUI()
+			end,
+			onLater = function() viewerSettings.enabled = value end,
+			onCancel = Repaint,
+		})
+	end }
+	board:AddTools('Viewer', 'Position, preview and the skin on or off', tools, function()
+		module.ApplyPosition(viewerKey)
+		module.RefreshLayoutOnly()
+	end)
+	local rows = {
+		Synced('Row growth', 'rowGrowth', { entries = BUI.C.ROW_GROWTH_OPTIONS }, true),
+		Synced('Row 1 count', 'iconsPerRow', { min = 0, max = 20, step = 1 }, true),
+		Synced('Row 2 count', 'row2Count', { min = 0, max = 20, step = 1 }, true),
+	}
+	if canSync then
+		rows[#rows + 1] = Synced('Row 3 count', 'row3Count', { min = 0, max = 20, step = 1 }, true)
+		rows[#rows + 1] = { label = 'Center the last row', get = function() return viewerSettings.centerLastRow == true end, set = function(value)
+			viewerSettings.centerLastRow = value
+			module.RefreshLayoutOnly()
+		end }
+	end
+	rows[#rows + 1] = SyncedToggle('Vertical', 'vertical', true)
+	board:AddTools('Rows', 'Growth, counts and direction', {
+		{ tooltip = 'Growth and row counts', title = 'Icon rows', options = rows },
+	})
+	board:AddTools('Icons', 'Size, spacing and zoom', {
+		{ icon = 'resize', tooltip = 'Size, spacing and zoom', title = 'Icons', options = {
+			{ label = 'Width', min = 20, max = 100, step = 1, get = function() return viewerSettings.iconWidth or viewerSettings.iconSize or 38 end, set = function(value)
+				viewerSettings.iconWidth = value
+				Sync('iconWidth')(value)
+			end },
+			{ label = 'Height', min = 10, max = 100, step = 1, get = function() return viewerSettings.iconHeight or (viewerSettings.iconWidth or viewerSettings.iconSize or 38) * viewerSettings.aspectRatio end, set = function(value)
+				viewerSettings.iconHeight = value
+				Sync('iconHeight')(value)
+			end },
+			Synced('Spacing', 'spacing', { min = -20, max = 20, step = 1 }, true),
+			{ label = 'Zoom %', min = 0, max = 20, step = 1, get = function() return viewerSettings.zoom * 100 end, set = function(value)
+				viewerSettings.zoom = value / 100
+				Sync('zoom')(viewerSettings.zoom)
+			end },
+			{ label = 'Keep the aspect ratio', get = function() return viewerSettings.keepAspectRatio == true end, set = function(value)
+				viewerSettings.keepAspectRatio = value or nil
+				Sync('keepAspectRatio')(viewerSettings.keepAspectRatio)
+			end },
+		} },
+	})
+	board:AddTools('Border', 'Outline around each icon', {
+		SyncedColor('Border color', 'borderColor'),
+		{ tooltip = 'Thickness', title = 'Border', options = { Synced('Thickness', 'borderSize', { min = 0, max = 5, step = 1 }) } },
+	})
+	board:AddTools('Swipe', 'The cooldown sweep, reversed fills up instead of emptying', {
+		SyncedColor('Swipe color', 'swipeColor'),
+		SyncedToggle(nil, 'reverseSwipe'),
+	})
 
-    local grids = {}
-    local grid
-    local function Section(title)
-        if grid then grid:Flush() end
-        Layout.Section(tab, title)
-        grid = PageKit.RowGrid(tab)
-        grids[#grids + 1] = grid
-    end
-    local function AddRow(config)
-        return grid:Add(config)
-    end
-
-    cdmGrids[viewerKey] = {
-        SyncDim = function(_, enabled)
-            for gridIndex = 1, #grids do grids[gridIndex]:SyncDim(enabled) end
-        end,
-    }
-
-    local SELF_ANCHOR_NAMES = {
-        essential = "BUI_EssentialCooldownViewer",
-        utility = "BUI_UtilityCooldownViewer",
-        buffs = "BUI_BuffCooldownViewer",
-    }
-    local selfAnchorName = SELF_ANCHOR_NAMES[viewerKey]
-    local anchorFrameList = {}
-    for _, entry in ipairs(BUI.C.ANCHOR_FRAMES) do
-        if entry.tag ~= selfAnchorName then
-            anchorFrameList[#anchorFrameList + 1] = entry
-        end
-    end
-
-    local posDb = setmetatable({}, {
-        __index = function(_, key) return viewerSettings[key] end,
-        __newindex = function(_, key, value)
-            if key == "centerHorizontally" then
-                TrySync("centerHorizontally", value)
-                CDM.OnCenterHorizontallyChanged(viewerKey, value)
-            else
-                viewerSettings[key] = value
-            end
-        end,
-    })
-    local function ApplyPos()
-        CDM.ApplyPosition(viewerKey); CDM.RefreshLayoutOnly()
-    end
-
-    Section('Layout')
-
-    AddRow({
-        title = 'Position',
-        description = 'Screen position, or anchor to another frame.',
-        plain = true,
-        accessoryWidth = 36,
-        accessories = function(row)
-            return { BUI.AlertMover(row, posDb, ApplyPos, {
-                fields = { posX = 'positionX', posY = 'positionY' },
-                frames = anchorFrameList,
-            }) }
-        end,
-    })
-
-    local rowOptions = {
-        { kind = 'dropdown', label = 'Row Growth', items = BUI.C.ROW_GROWTH_OPTIONS,
-          get = function() return viewerSettings.rowGrowth end,
-          set = function(value) viewerSettings.rowGrowth = value; TrySyncLayout('rowGrowth', value) end },
-        { kind = 'slider', label = 'Row 1 Count', min = 0, max = 20,
-          get = function() return viewerSettings.iconsPerRow end,
-          set = function(value) viewerSettings.iconsPerRow = value; TrySyncLayout('iconsPerRow', value) end },
-        { kind = 'slider', label = 'Row 2 Count', min = 0, max = 20,
-          get = function() return viewerSettings.row2Count or 0 end,
-          set = function(value) viewerSettings.row2Count = value; TrySyncLayout('row2Count', value) end },
-    }
-    if viewerKey ~= "buffs" then
-        rowOptions[#rowOptions + 1] = { kind = 'slider', label = 'Row 3 Count', min = 0, max = 20,
-            get = function() return viewerSettings.row3Count or 0 end,
-            set = function(value) viewerSettings.row3Count = value; TrySyncLayout('row3Count', value) end }
-        rowOptions[#rowOptions + 1] = { label = 'Center Last Row',
-            get = function() return viewerSettings.centerLastRow end,
-            set = function(value) viewerSettings.centerLastRow = value; CDM.RefreshLayoutOnly() end }
-    end
-    rowOptions[#rowOptions + 1] = { label = 'Vertical',
-        get = function() return viewerSettings.vertical end,
-        set = function(value) viewerSettings.vertical = value; TrySyncLayout('vertical', value) end }
-
-    AddRow({
-        title = 'Icon Rows',
-        description = 'Growth direction and icons per row.',
-        plain = true,
-        accessoryWidth = 36,
-        accessories = function(row)
-            return { PageKit.SettingsIcon(row, { title = 'ICON ROWS', tooltip = 'Growth & row counts', options = rowOptions }) }
-        end,
-    })
-
-    Section('Appearance')
-
-    AddRow({
-        title = 'Icon Size',
-        description = 'Width, height, spacing and zoom.',
-        plain = true,
-        accessoryWidth = 36,
-        accessories = function(row)
-            return { PageKit.SizeIcon(row, { title = 'ICON SIZE', options = {
-                { kind = 'slider', label = 'Icon Width', min = 20, max = 100,
-                  get = function() return viewerSettings.iconWidth or viewerSettings.iconSize or 38 end,
-                  set = function(value) viewerSettings.iconWidth = value; TrySync('iconWidth', value) end },
-                { kind = 'slider', label = 'Icon Height', min = 10, max = 100,
-                  get = function() return viewerSettings.iconHeight or (viewerSettings.iconWidth or viewerSettings.iconSize or 38) * viewerSettings.aspectRatio end,
-                  set = function(value) viewerSettings.iconHeight = value; TrySync('iconHeight', value) end },
-                { kind = 'slider', label = 'Spacing', min = -20, max = 20,
-                  get = function() return viewerSettings.spacing end,
-                  set = function(value) viewerSettings.spacing = value; TrySyncLayout('spacing', value) end },
-                { kind = 'slider', label = 'Zoom %', min = 0, max = 20,
-                  get = function() return viewerSettings.zoom * 100 end,
-                  set = function(value) viewerSettings.zoom = value / 100; TrySync('zoom', viewerSettings.zoom) end },
-            } }) }
-        end,
-    })
-
-    AddRow({
-        title = 'Border',
-        description = 'Outline around each icon.',
-        plain = true,
-        accessoryWidth = 64,
-        accessories = function(row)
-            local cog = PageKit.SettingsIcon(row, { title = 'BORDER', tooltip = 'Border thickness', options = {
-                { kind = 'slider', label = 'Border Size', min = 0, max = 5,
-                  get = function() return viewerSettings.borderSize end,
-                  set = function(value) viewerSettings.borderSize = value; TrySync('borderSize', value) end },
-            } })
-            local borderColor = viewerSettings.borderColor
-            local swatch = Controls.ColorSwatch(row, {
-                r = borderColor[1], g = borderColor[2], b = borderColor[3], a = borderColor[4],
-                tooltip = 'Border color',
-                callback = function(red, green, blue, alpha)
-                    viewerSettings.borderColor = { red, green, blue, alpha }; TrySync('borderColor', { red, green, blue, alpha })
-                end,
-            })
-            return { cog, swatch }
-        end,
-    })
-
-    AddRow({
-        title = 'Keep Aspect Ratio',
-        description = 'Icon height follows width at its native shape.',
-        checked = viewerSettings.keepAspectRatio,
-        callback = function(value)
-            viewerSettings.keepAspectRatio = value or nil; TrySync('keepAspectRatio', viewerSettings.keepAspectRatio)
-        end,
-    })
-
-    AddRow({
-        title = 'Reverse Swipe',
-        description = 'Cooldown sweep fills up instead of emptying.',
-        checked = viewerSettings.reverseSwipe,
-        callback = function(value) viewerSettings.reverseSwipe = value; TrySync('reverseSwipe', value) end,
-        accessoryWidth = 36,
-        accessories = function(row)
-            local swipeColor = viewerSettings.swipeColor
-            return { Controls.ColorSwatch(row, {
-                r = swipeColor[1], g = swipeColor[2], b = swipeColor[3], a = swipeColor[4],
-                tooltip = 'Swipe color',
-                callback = function(red, green, blue, alpha)
-                    viewerSettings.swipeColor = { red, green, blue, alpha }; TrySync('swipeColor', { red, green, blue, alpha })
-                end,
-            }) }
-        end,
-    })
-
-    Section('Text')
-
-    AddRow({
-        title = 'Cooldown Text',
-        description = 'Remaining-time countdown on each icon.',
-        plain = true,
-        accessoryWidth = 64,
-        accessories = function(row)
-            local cog = PageKit.SettingsIcon(row, { title = 'COOLDOWN TEXT', tooltip = 'Position, size, decimals & warning color', options = {
-                { kind = 'dropdown', label = 'Position', items = POS_OPTIONS,
-                  get = function() return viewerSettings.cooldownTextPosition end,
-                  set = function(value) viewerSettings.cooldownTextPosition = value; TrySync('cooldownTextPosition', value) end },
-                { kind = 'slider', label = 'Size', min = 0, max = 30,
-                  get = function() return viewerSettings.cooldownTextSize end,
-                  set = function(value) viewerSettings.cooldownTextSize = value; TrySync('cooldownTextSize', value) end },
-                { kind = 'slider', label = 'Offset X', min = -30, max = 30,
-                  get = function() return viewerSettings.cooldownTextOffsetX end,
-                  set = function(value) viewerSettings.cooldownTextOffsetX = value; TrySync('cooldownTextOffsetX', value) end },
-                { kind = 'slider', label = 'Offset Y', min = -30, max = 30,
-                  get = function() return viewerSettings.cooldownTextOffsetY end,
-                  set = function(value) viewerSettings.cooldownTextOffsetY = value; TrySync('cooldownTextOffsetY', value) end },
-                { label = 'Show Decimals',
-                  get = function() return viewerSettings.showCooldownDecimals end,
-                  set = function(value) viewerSettings.showCooldownDecimals = value; TrySync('showCooldownDecimals', value) end },
-                { kind = 'slider', label = 'Decimal Threshold', min = 1, max = 30,
-                  get = function() return viewerSettings.cooldownDecimalThreshold end,
-                  set = function(value) viewerSettings.cooldownDecimalThreshold = value; TrySync('cooldownDecimalThreshold', value) end },
-                { kind = 'slider', label = 'Warning Seconds', min = 0, max = 10,
-                  get = function() return viewerSettings.cooldownWarnSeconds or 0 end,
-                  set = function(value) viewerSettings.cooldownWarnSeconds = value; TrySync('cooldownWarnSeconds', value) end },
-                { kind = 'swatch', label = 'Warning Color', tooltip = 'Countdown color inside the warning window',
-                  get = function() return viewerSettings.cooldownWarnColor end,
-                  set = function(value) viewerSettings.cooldownWarnColor = value; TrySync('cooldownWarnColor', value) end },
-            } })
-            local cooldownColor = viewerSettings.cooldownTextColor
-            local swatch = Controls.ColorSwatch(row, {
-                r = cooldownColor[1], g = cooldownColor[2], b = cooldownColor[3], a = cooldownColor[4],
-                tooltip = 'Cooldown text color',
-                callback = function(red, green, blue, alpha)
-                    viewerSettings.cooldownTextColor = { red, green, blue, alpha }; TrySync('cooldownTextColor', { red, green, blue, alpha })
-                end,
-            })
-            return { cog, swatch }
-        end,
-    })
-
-    AddRow({
-        title = 'Stack Text',
-        description = 'Charge and stack counts on each icon.',
-        plain = true,
-        accessoryWidth = 64,
-        accessories = function(row)
-            local cog = PageKit.SettingsIcon(row, { title = 'STACK TEXT', tooltip = 'Position & size', options = {
-                { kind = 'dropdown', label = 'Position', items = POS_OPTIONS,
-                  get = function() return viewerSettings.textPosition end,
-                  set = function(value) viewerSettings.textPosition = value; TrySync('textPosition', value) end },
-                { kind = 'slider', label = 'Size', min = 0, max = 30,
-                  get = function() return viewerSettings.textSize end,
-                  set = function(value) viewerSettings.textSize = value; TrySync('textSize', value) end },
-                { kind = 'slider', label = 'Offset X', min = -30, max = 30,
-                  get = function() return viewerSettings.textOffsetX end,
-                  set = function(value) viewerSettings.textOffsetX = value; TrySync('textOffsetX', value) end },
-                { kind = 'slider', label = 'Offset Y', min = -30, max = 30,
-                  get = function() return viewerSettings.textOffsetY end,
-                  set = function(value) viewerSettings.textOffsetY = value; TrySync('textOffsetY', value) end },
-            } })
-            local stackColor = viewerSettings.textColor
-            local swatch = Controls.ColorSwatch(row, {
-                r = stackColor[1], g = stackColor[2], b = stackColor[3], a = stackColor[4],
-                tooltip = 'Stack text color',
-                callback = function(red, green, blue, alpha)
-                    viewerSettings.textColor = { red, green, blue, alpha }; TrySync('textColor', { red, green, blue, alpha })
-                end,
-            })
-            return { cog, swatch }
-        end,
-    })
-
-    if viewerKey == "essential" or viewerKey == "utility" then
-        Section('Keybinds')
-
-        local keybindFonts = BUI.BuildFontDropdownItems("GLOBAL")
-        AddRow({
-            spanFull = true,
-            title = 'Keybind Text',
-            description = 'Key labels on each icon, read from your action bars.',
-            checked = viewerSettings.showKeybinds,
-            callback = function(value)
-                viewerSettings.showKeybinds = value; CDM.Keybinds.RefreshViewer(viewerKey)
-            end,
-            accessoryWidth = 64,
-            accessories = function(row)
-                local cog = PageKit.SettingsIcon(row, { title = 'KEYBIND TEXT', tooltip = 'Anchor, font & offset', options = {
-                    { kind = 'dropdown', label = 'Anchor', items = POS_OPTIONS,
-                      get = function() return viewerSettings.keybindAnchor end,
-                      set = function(value) viewerSettings.keybindAnchor = value; CDM.Keybinds.StyleViewer(viewerKey) end },
-                    { kind = 'dropdown', label = 'Font', items = keybindFonts,
-                      get = function() return viewerSettings.keybindFont end,
-                      set = function(value) viewerSettings.keybindFont = value; CDM.Keybinds.StyleViewer(viewerKey) end },
-                    { kind = 'slider', label = 'Font Size', min = 8, max = 24,
-                      get = function() return viewerSettings.keybindFontSize end,
-                      set = function(value) viewerSettings.keybindFontSize = value; CDM.Keybinds.StyleViewer(viewerKey) end },
-                    { kind = 'slider', label = 'Offset X', min = -20, max = 20,
-                      get = function() return viewerSettings.keybindOffsetX end,
-                      set = function(value) viewerSettings.keybindOffsetX = value; CDM.Keybinds.StyleViewer(viewerKey) end },
-                    { kind = 'slider', label = 'Offset Y', min = -20, max = 20,
-                      get = function() return viewerSettings.keybindOffsetY end,
-                      set = function(value) viewerSettings.keybindOffsetY = value; CDM.Keybinds.StyleViewer(viewerKey) end },
-                } })
-                local keybindColor = viewerSettings.keybindColor
-                local swatch = Controls.ColorSwatch(row, {
-                    r = keybindColor[1], g = keybindColor[2], b = keybindColor[3], a = keybindColor[4],
-                    tooltip = 'Keybind text color',
-                    callback = function(red, green, blue, alpha)
-                        viewerSettings.keybindColor = { red, green, blue, alpha }; CDM.Keybinds.StyleViewer(viewerKey)
-                    end,
-                })
-                return { cog, swatch }
-            end,
-        })
-    end
-
-    grid:Flush()
-    cdmGrids[viewerKey]:SyncDim(viewerSettings.enabled)
+	local text = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Text',
+		description = 'Countdown, stacks and keybinds on each icon.',
+	})
+	text:AddTools('Cooldown text', 'Remaining time on each icon', {
+		SyncedColor('Text color', 'cooldownTextColor'),
+		{ icon = 'text', tooltip = 'Position, size, decimals and the warning color', title = 'Cooldown text', options = {
+			Synced('Position', 'cooldownTextPosition', { entries = POINTS }),
+			Synced('Size', 'cooldownTextSize', { min = 0, max = 30, step = 1 }),
+			Synced('Horizontal', 'cooldownTextOffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+			Synced('Vertical', 'cooldownTextOffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+			SyncedToggle('Decimals', 'showCooldownDecimals'),
+			Synced('Decimals under seconds', 'cooldownDecimalThreshold', { min = 1, max = 30, step = 1 }),
+			{ label = 'Warning under seconds', min = 0, max = 10, step = 1, get = function() return viewerSettings.cooldownWarnSeconds or 0 end, set = function(value)
+				viewerSettings.cooldownWarnSeconds = value
+				Sync('cooldownWarnSeconds')(value)
+			end },
+			{ kind = 'swatch', label = 'Warning color', tooltip = 'Countdown color inside the warning window', opacity = true,
+				get = function()
+					local color = viewerSettings.cooldownWarnColor
+					return color[1], color[2], color[3], color[4]
+				end,
+				set = function(red, green, blue, alpha)
+					viewerSettings.cooldownWarnColor = { red, green, blue, alpha }
+					Sync('cooldownWarnColor')(viewerSettings.cooldownWarnColor)
+				end },
+		} },
+	})
+	text:AddTools('Stack text', 'Charge and stack counts on each icon', {
+		SyncedColor('Text color', 'textColor'),
+		{ icon = 'text', tooltip = 'Position and size', title = 'Stack text', options = {
+			Synced('Position', 'textPosition', { entries = POINTS }),
+			Synced('Size', 'textSize', { min = 0, max = 30, step = 1 }),
+			Synced('Horizontal', 'textOffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+			Synced('Vertical', 'textOffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+		} },
+	})
+	if viewer.keybinds then
+		local function Style() module.Keybinds.StyleViewer(viewerKey) end
+		text:AddTools('Keybind text', 'Key labels on each icon, read from your action bars', {
+			Color(viewerSettings, 'Text color', 'keybindColor'),
+			{ entries = fonts, width = MENU_WIDTH, get = function() return viewerSettings.keybindFont end, set = function(value) viewerSettings.keybindFont = value end },
+			{ icon = 'text', tooltip = 'Anchor, size and offset', title = 'Keybind text', options = {
+				Option(viewerSettings, 'Anchor', 'keybindAnchor', { entries = POINTS }),
+				Option(viewerSettings, 'Size', 'keybindFontSize', { min = 8, max = 24, step = 1 }),
+				Option(viewerSettings, 'Horizontal', 'keybindOffsetX', { min = -KEYBIND_RANGE, max = KEYBIND_RANGE, step = 1 }),
+				Option(viewerSettings, 'Vertical', 'keybindOffsetY', { min = -KEYBIND_RANGE, max = KEYBIND_RANGE, step = 1 }),
+			} },
+			{ get = function() return viewerSettings.showKeybinds == true end, set = function(value)
+				viewerSettings.showKeybinds = value
+				module.Keybinds.RefreshViewer(viewerKey)
+			end },
+		}, Style)
+	end
+	return { board, text }
 end
 
-local function BuildGeneralTab(tab, db, CDM)
-    local PageKit = BUILib.PageKit
+local function BuffBarBoards(ui, parent, width)
+	local module = CDM()
+	local config = DB().cdm.buffBars
+	local Refresh = module.RefreshBuffBarSkin
+	local function Reposition()
+		module.RepositionBuffBarRack()
+		Refresh()
+	end
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Buff bars',
+		description = 'The Blizzard buff bar viewer, reskinned as compact bars.',
+	})
+	board:AddTools('Bars', 'Position, growth, preview and the skin on or off', {
+		BUI.PositionTool(config, { fields = { posX = 'positionX', posY = 'positionY' }, matchWidth = true }),
+		Menu(config, 'growDirection', GROWTHS),
+		Eye('Show a preview of the buff bars', module.IsBuffBarPreviewShown, function(value)
+			if value then module.ShowBuffBarPreview() else module.HideBuffBarPreview() end
+		end),
+		Toggle(config, nil, 'skinEnabled'),
+	}, Reposition)
+	board:AddTools('Size', 'Width, height and spacing', {
+		{ icon = 'resize', tooltip = 'Width, height and spacing', title = 'Bars', options = {
+			Option(config, 'Width', 'barWidth', { min = 80, max = 400, step = 1 }),
+			Option(config, 'Height', 'barHeight', { min = 10, max = 50, step = 1 }),
+			Option(config, 'Spacing', 'spacing', { min = 0, max = 30, step = 1 }),
+		} },
+	}, Refresh)
+	board:AddTools('Icon', 'Buff icon beside each bar', {
+		{ icon = 'resize', tooltip = 'Size', title = 'Icon', options = { Option(config, 'Icon size', 'iconSize', { min = 12, max = 64, step = 1 }) } },
+		OnUnlessOff(config, nil, 'showIcon'),
+	}, Reposition)
+	board:AddTools('Colors', 'Bar, background and border', {
+		Color(config, 'Bar color', 'barColor'),
+		Color(config, 'Background', 'bgColor'),
+		Color(config, 'Border', 'borderColor'),
+		{ tooltip = 'Border size', title = 'Colors', options = { Option(config, 'Border size', 'borderSize', { min = 0, max = 5, step = 1 }) } },
+	}, Refresh)
+	board:AddSwitch('Class color bar', function() return config.useClassColor == true end, function(value)
+		config.useClassColor = value
+		Refresh()
+	end, 'Fill the bars with your class color')
 
-    local grid
-    local function Section(title)
-        if grid then grid:Flush() end
-        Layout.Section(tab, title)
-        grid = PageKit.RowGrid(tab)
-    end
-    local function AddRow(config)
-        return grid:Add(config)
-    end
-
-    Section('Setup')
-
-    AddRow({
-        spanFull = true,
-        title = 'Shortcuts',
-        description = "Blizzard's Edit Mode, and the full Cooldown Viewer settings panel.",
-        plain = true,
-        accessoryWidth = 250,
-        accessories = function(row)
-            local advancedButton = Controls.Button(row, 'Advanced CDM', 120, function()
-                if CooldownViewerSettings then CooldownViewerSettings:SetShown(not CooldownViewerSettings:IsShown()) end
-            end)
-            local editModeButton = Controls.Button(row, 'Edit Mode', 110, BUI.ToggleEditMode)
-
-            return { advancedButton, editModeButton }
-        end,
-    })
-
-    local EditModeLock = CDM.EditModeLock
-    do
-        local GREEN, RED, AMBER = "|cff4CD964", "|cffF24C3D", "|cffF2B800"
-        local SystemIndices  = Enum.EditModeCooldownViewerSystemIndices
-        local SettingEnum = Enum.EditModeCooldownViewerSetting
-        local VIEWER_NAME = {
-            [SystemIndices.Essential] = "Essential",
-            [SystemIndices.Utility]   = "Utility",
-            [SystemIndices.BuffIcon]  = "Buff Icons",
-        }
-        if SystemIndices.BuffBar then VIEWER_NAME[SystemIndices.BuffBar] = "Buff Bars" end
-        local SETTING_NAME = {
-            [SettingEnum.VisibleSetting]   = "Always Visible",
-            [SettingEnum.ShowTimer]        = "Show Timer",
-            [SettingEnum.HideWhenInactive] = "Hide When Inactive",
-        }
-        local VIEWER_ORDER = { SystemIndices.Essential, SystemIndices.Utility, SystemIndices.BuffIcon, SystemIndices.BuffBar }
-
-        local function EditModeStatus()
-            local compliance = EditModeLock.GetCompliance()
-            if not compliance.isReady then
-                return AMBER .. "Edit Mode not loaded, /reload.|r"
-            elseif compliance.isPreset then
-                return RED .. "Blizzard preset layout. Make a custom one.|r"
-            elseif compliance.isCompliant then
-                return GREEN .. "Viewers configured.|r"
-            end
-
-            local byViewer = {}
-            for _, mismatch in ipairs(compliance.mismatches) do
-                local list = byViewer[mismatch.systemIndex]
-                if not list then list = {}; byViewer[mismatch.systemIndex] = list end
-                list[#list + 1] = SETTING_NAME[mismatch.setting]
-            end
-            local parts = {}
-            for _, systemIndex in ipairs(VIEWER_ORDER) do
-                if systemIndex and byViewer[systemIndex] then
-                    parts[#parts + 1] = VIEWER_NAME[systemIndex] .. ": " .. table.concat(byViewer[systemIndex], ", ")
-                end
-            end
-            return RED .. "Needs fixing: " .. table.concat(parts, "   ") .. "|r"
-        end
-
-        local editModeStatusText
-        AddRow({
-            spanFull = true,
-            title = 'Edit Mode Setup',
-            description = "Viewer visibility settings BluUI needs from Blizzard's Edit Mode.",
-            plain = true,
-            accessoryWidth = 130,
-            accessories = function(row)
-                return { Controls.Button(row, 'Apply Fix', 110, function()
-                    local result = EditModeLock.ApplyRecommendedSettings()
-                    if result == 'applied' then
-                        BUI.Print('Viewers configured. /reload to apply.')
-                    elseif result == 'noop' then
-                        BUI.Print('Nothing to change.')
-                    elseif result == 'preset' then
-                        BUI.Print('Blizzard preset layout. Make a custom one.')
-                    elseif result == 'in_combat' then
-                        BUI.Print("Can't edit in combat.")
-                    elseif result == 'not_ready' then
-                        BUI.Print('Edit Mode not loaded, /reload.')
-                    else
-                        BUI.Print('Could not apply settings.')
-                    end
-                    CDM._emStatusRefresh()
-                end) }
-            end,
-            extra = function(row)
-                local statusText = row:CreateFontString(nil, 'OVERLAY')
-                statusText:SetFont(BUILib.Font, 11, '')
-                statusText:SetJustifyH('LEFT')
-                statusText:SetWordWrap(true)
-                statusText:SetSpacing(2)
-                statusText:SetWidth(tab.width - 220)
-                statusText:SetText(EditModeStatus())
-                editModeStatusText = statusText
-                return statusText
-            end,
-        })
-
-        CDM._emStatusRefresh = function()
-            editModeStatusText:SetText(EditModeStatus())
-        end
-    end
-
-    Section('Behavior')
-
-    AddRow({
-        title = 'Sync Settings',
-        description = 'Essential, Utility, and Buff Icons share one set of appearance settings.',
-        checked = db.cdm.syncViewers,
-        callback = function(value) db.cdm.syncViewers = value end,
-    })
-
-    AddRow({
-        title = 'Move Icons Individually',
-        description = 'Drag any icon out of its grid to place it freely.',
-        checked = db.cdm.allowIndividualMove,
-        callback = function(value)
-            db.cdm.allowIndividualMove = value
-            CDM.Detached.UpdateModifierWatcher()
-            CDM.RefreshAll()
-        end,
-        accessoryWidth = 60,
-        accessories = function(row)
-            local cog = PageKit.SettingsIcon(row, {
-                title = 'DETACHED ICONS', tooltip = 'Resize & snapping',
-                options = {
-                    { label = 'Resize Detached Icons',
-                      get = function() return db.cdm.allowIndividualResize end,
-                      set = function(value) db.cdm.allowIndividualResize = value end },
-                    { label = 'Disable Snapping',
-                      get = function() return db.cdm.disableSnapping end,
-                      set = function(value) db.cdm.disableSnapping = value end },
-                },
-            })
-            local reset = Controls.Icon(row, {
-                texture = BUILib.GetLibMedia('reset'),
-                tooltip = 'Reset all icon positions',
-                onClick = function()
-                    CDM.Detached.ClearAll('essential'); CDM.Detached.ClearAll('utility')
-                    CDM.RefreshAll()
-                end,
-            })
-            return { cog, reset }
-        end,
-    })
-
-    Section('Display')
-
-    AddRow({
-        title = 'Blizzard Panel Overlay',
-        description = "BluUI's overlay on Blizzard's Cooldown Viewer settings panel.",
-        checked = db.cdm.showBlizzardOverlay,
-        callback = function(value) db.cdm.showBlizzardOverlay = value end,
-    })
-
-    AddRow({
-        title = 'Tooltips',
-        description = 'Spell tooltips when hovering tracked icons.',
-        checked = db.cdm.showTooltips ~= false,
-        callback = function(value) db.cdm.showTooltips = value end,
-    })
-
-    AddRow({
-        title = 'Buff Duration',
-        description = 'Remaining time on tracked buff icons.',
-        checked = db.cdm.showBuffDuration ~= false,
-        callback = function(showDuration)
-            db.cdm.showBuffDuration = showDuration
-            CDM.RefreshBuffOverrideCache()
-            for cooldown in pairs(CDM.CDMCooldowns) do
-                CDM.ForceSpellCooldownIfBuffHidden(cooldown)
-                local icon = cooldown:GetParent()
-                if icon and icon.Icon then
-                    if showDuration then
-                        icon.Icon:SetDesaturation(0)
-                    else
-                        CDM.RefreshIconDesaturation(icon.Icon)
-                    end
-                end
-            end
-        end,
-    })
-
-    local function SetAllViewers(key, value)
-        db.cdm.essential[key] = value; db.cdm.utility[key] = value; db.cdm.buffs[key] = value
-        CDM.RefreshCooldownStyleFlags()
-    end
-
-    AddRow({
-        title = 'Cooldown Flash',
-        description = 'Flash animation when a cooldown completes.',
-        checked = db.cdm.essential.showFlash,
-        callback = function(value) SetAllViewers('showFlash', value) end,
-    })
-
-    AddRow({
-        title = 'Cooldown Edge',
-        description = 'Bright leading edge on the cooldown sweep.',
-        checked = db.cdm.essential.showEdge,
-        callback = function(value) SetAllViewers('showEdge', value) end,
-    })
-
-    AddRow({
-        title = 'Font',
-        description = 'Timer and stack text across the Cooldown Manager.',
-        controlWidth = 160,
-        control = function(row)
-            return Controls.Dropdown(row, nil, BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION), db.general.cdmFont or BUI.C.GLOBAL_OPTION, function(value)
-                db.general.cdmFont = value ~= BUI.C.GLOBAL_OPTION and value or nil; CDM.RefreshSkinSettings()
-            end, nil, 150)
-        end,
-    })
-
-    Section('Glow')
-
-    local glowSettings = db.cdm.glow
-    local glowTypeOptions = {}
-    for _, glowType in ipairs(CDM.GLOW_TYPES) do glowTypeOptions[#glowTypeOptions + 1] = { value = glowType.id, text = glowType.name } end
-
-    AddRow({
-        spanFull = true,
-        title = 'Custom Glows',
-        description = "BluUI-styled glow for procs and alerts, replacing Blizzard's highlight.",
-        checked = glowSettings.enabled,
-        callback = function(value)
-            glowSettings.enabled = value; CDM.RefreshActiveGlows(); CDM.RefreshSkinSettings()
-        end,
-        accessoryWidth = 230,
-        accessories = function(row)
-            local styleDropdown = Controls.Dropdown(row, nil, glowTypeOptions, glowSettings.type, function(value)
-                glowSettings.type = value; CDM.RefreshActiveGlows()
-            end, nil, 140)
-            local cog = PageKit.SettingsIcon(row, {
-                title = 'GLOW SHAPE', tooltip = 'Speed, lines & thickness',
-                options = {
-                    { kind = 'slider', label = 'Speed %', min = 25, max = 400, step = 25,
-                      get = function() return glowSettings.speed end,
-                      set = function(value) glowSettings.speed = value end,
-                      apply = function() CDM.RefreshActiveGlows() end },
-                    { kind = 'slider', label = 'Lines (Pixel)', min = 4, max = 16, step = 1,
-                      get = function() return glowSettings.lines end,
-                      set = function(value) glowSettings.lines = value end,
-                      apply = function() CDM.RefreshActiveGlows() end },
-                    { kind = 'slider', label = 'Thickness (Pixel)', min = 1, max = 5, step = 1,
-                      get = function() return glowSettings.thickness end,
-                      set = function(value) glowSettings.thickness = value end,
-                      apply = function() CDM.RefreshActiveGlows() end },
-                },
-            })
-            local glowColor = glowSettings.color
-            local swatch = Controls.ColorSwatch(row, {
-                r = glowColor[1], g = glowColor[2], b = glowColor[3], a = glowColor[4],
-                tooltip = 'Glow color',
-                callback = function(red, green, blue, alpha)
-                    glowSettings.color = { red, green, blue, alpha }; CDM.RefreshActiveGlows(); CDM.RefreshGlowPreview()
-                end,
-            })
-            local previewToggle = Controls.IconToggle(row, CDM.glowPreview and CDM.glowPreview:IsShown() or false, function(value)
-                if value then CDM.ShowGlowPreview() else CDM.HideGlowPreview() end
-            end, { texture = BUILib.GetLibMedia('eye'), size = 18, tooltip = 'Preview' })
-            CDM._previewBtn = previewToggle
-            return { styleDropdown, cog, swatch, previewToggle }
-        end,
-    })
-
-    Section('Highlights')
-
-    local assistSettings = db.cdm.assist
-    AddRow({
-        title = 'Assisted Highlight',
-        description = "Color for Blizzard's Assisted Combat Highlight.",
-        plain = true,
-        accessoryWidth = 30,
-        accessories = function(row)
-            local assistColor = assistSettings.color
-            return { Controls.ColorSwatch(row, {
-                r = assistColor[1], g = assistColor[2], b = assistColor[3], a = assistColor[4],
-                tooltip = 'Highlight color',
-                callback = function(red, green, blue, alpha)
-                    assistSettings.color = { red, green, blue, alpha }; CDM.RefreshAssistHighlight()
-                end,
-            }) }
-        end,
-    })
-
-    local pressHighlightSettings = db.cdm.pressHighlight
-    AddRow({
-        spanFull = true,
-        title = 'Keypress Highlight',
-        description = 'Flash the icon when its key is pressed.',
-        checked = pressHighlightSettings.enabled,
-        callback = function(value)
-            pressHighlightSettings.enabled = value; CDM.PressHighlight.Refresh()
-        end,
-        accessoryWidth = 200,
-        accessories = function(row)
-            local styleDropdown = Controls.Dropdown(row, nil, CDM.PressHighlight.OVERLAY_STYLES, pressHighlightSettings.overlayStyle, function(value)
-                pressHighlightSettings.overlayStyle = value; CDM.PressHighlight.Refresh()
-            end, nil, 140)
-            local cog = PageKit.SettingsIcon(row, {
-                title = 'KEYPRESS BORDER', tooltip = 'Border & border color',
-                options = {
-                    { label = 'Show Border',
-                      get = function() return pressHighlightSettings.showBorder end,
-                      set = function(value) pressHighlightSettings.showBorder = value end,
-                      apply = function() CDM.PressHighlight.Refresh() end,
-                      swatch = function()
-                          local borderColor = pressHighlightSettings.borderColor
-                          return { r = borderColor[1], g = borderColor[2], b = borderColor[3], a = borderColor[4],
-                              callback = function(red, green, blue, alpha)
-                                  pressHighlightSettings.borderColor = { red, green, blue, alpha }; CDM.PressHighlight.Refresh()
-                              end }
-                      end },
-                },
-            })
-            local tintColor = pressHighlightSettings.tintColor
-            local tintSwatch = Controls.ColorSwatch(row, {
-                r = tintColor[1], g = tintColor[2], b = tintColor[3], a = tintColor[4],
-                tooltip = 'Tint color',
-                callback = function(red, green, blue, alpha)
-                    pressHighlightSettings.tintColor = { red, green, blue, alpha }; CDM.PressHighlight.Refresh()
-                end,
-            })
-            return { styleDropdown, cog, tintSwatch }
-        end,
-    })
-
-    grid:Flush()
+	local text = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Text',
+		description = 'Name, duration and stacks on each bar.',
+	})
+	text:AddTools('Name', 'Buff name on each bar', {
+		{ icon = 'text', tooltip = 'Size', title = 'Name', options = { { label = 'Size', min = 6, max = 24, step = 1, get = function() return config.nameSize or 11 end, set = function(value) config.nameSize = value end } } },
+		OnUnlessOff(config, nil, 'showName'),
+	}, Refresh)
+	text:AddTools('Duration', 'Remaining time on each bar', {
+		{ icon = 'text', tooltip = 'Size', title = 'Duration', options = { { label = 'Size', min = 6, max = 24, step = 1, get = function() return config.durationSize or 11 end, set = function(value) config.durationSize = value end } } },
+		OnUnlessOff(config, nil, 'showDuration'),
+	}, Refresh)
+	text:AddTools('Stacks', 'Stack count on each bar', {
+		{ icon = 'text', tooltip = 'Placement and size', title = 'Stacks', options = {
+			Option(config, 'Attach to', 'stackAttach', { entries = STACK_ATTACH }),
+			Option(config, 'Position', 'stackPoint', { entries = POINTS }),
+			Option(config, 'Size', 'stackSize', { min = 6, max = 24, step = 1 }),
+			Option(config, 'Horizontal', 'stackOffsetX', { min = -STACK_RANGE, max = STACK_RANGE, step = 1 }),
+			Option(config, 'Vertical', 'stackOffsetY', { min = -STACK_RANGE, max = STACK_RANGE, step = 1 }),
+		} },
+		OnUnlessOff(config, nil, 'showStacks'),
+	}, Refresh)
+	return { board, text }
 end
 
-local function BuildBuffBarsTab(tab, db, CDM)
-    local PageKit = BUILib.PageKit
-    local config = db.cdm.buffBars
-    local function Refresh() CDM.RefreshBuffBarSkin() end
-    local function Reposition() CDM.RepositionBuffBarRack(); Refresh() end
+local function LayoutBoards(ui, parent, width, page)
+	local Profiles = CDM().Profiles
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Layouts',
+		description = 'Save, restore and share your Cooldown Manager setup.',
+	})
+	if not Profiles.IsAvailable() then
+		board:AddRow('Not available', 'The Blizzard Cooldown Manager layout API is missing on this game version')
+		return { board }
+	end
+	local snapshots = {}
+	for _, saved in ipairs(Profiles.GetSnapshots()) do
+		snapshots[#snapshots + 1] = { value = saved.name, text = saved.class and (saved.name .. ', ' .. saved.class) or saved.name }
+	end
+	table.sort(snapshots, function(left, right) return left.value < right.value end)
+	if not snapshot or not Profiles.FindSnapshot(snapshot) then snapshot = snapshots[1] and snapshots[1].value end
+	local function Save(name)
+		name = name:gsub('^%s+', ''):gsub('%s+$', '')
+		if name == '' then return end
+		local function Commit()
+			local ok, result = Profiles.SaveSnapshot(name)
+			if not ok then return BUI.Print(result or 'Could not save the snapshot.') end
+			snapshot = result
+			RebuildPane(page)
+		end
+		if Profiles.FindSnapshot(name) then
+			Modals.Confirm({ parent = Window().frame, title = 'Overwrite the snapshot', message = name .. ' already exists. Overwrite it with your current setup?', confirmText = 'Overwrite', cancelText = 'Cancel', onConfirm = Commit })
+		else
+			Commit()
+		end
+	end
+	board:AddTools('New snapshot', 'Save your current layouts under a name, then press Enter', {
+		{ kind = 'input', width = SNAPSHOT_WIDTH, placeholder = 'Snapshot name', get = function() return '' end, set = Save },
+	})
+	if snapshot then
+		board:AddTools('Saved snapshots', 'Apply a saved snapshot, or delete it', {
+			{ entries = snapshots, width = SNAPSHOT_WIDTH, get = function() return snapshot end, set = function(value) snapshot = value end },
+			{ text = 'Apply', onClick = function()
+				local name = snapshot
+				Modals.Confirm({
+					parent = Window().frame,
+					title = 'Apply the snapshot',
+					message = 'Replace your current Cooldown Manager layouts with ' .. name .. '? A backup snapshot of the current layouts is saved first, and a reload is needed afterwards.',
+					confirmText = 'Apply', cancelText = 'Cancel',
+					onConfirm = function()
+						local backed, backupName = Profiles.AutoBackupSnapshot()
+						local ok, err = Profiles.ApplySnapshot(name)
+						if not ok then return BUI.Print(err or 'Could not apply the snapshot.') end
+						RebuildPane(page)
+						Modals.Confirm({
+							parent = Window().frame,
+							title = 'Snapshot applied',
+							message = backed and (name .. ' is applied and the previous layouts were saved as ' .. backupName .. '. Reload now to finish?') or (name .. ' is applied. Reload now to finish?'),
+							confirmText = 'Reload', cancelText = 'Later',
+							onConfirm = ReloadUI,
+						})
+					end,
+				})
+			end },
+			{ slot = 'erase', icon = 'erase', size = 32, hover = 'danger', tooltip = 'Delete this snapshot', onClick = function()
+				local name = snapshot
+				Modals.Confirm({
+					parent = Window().frame,
+					title = 'Delete the snapshot',
+					message = 'Delete ' .. name .. '?',
+					confirmText = 'Delete', cancelText = 'Cancel',
+					onConfirm = function()
+						local ok, err = Profiles.DeleteSnapshot(name)
+						if not ok then return BUI.Print(err or 'Could not delete the snapshot.') end
+						snapshot = nil
+						RebuildPane(page)
+					end,
+				})
+			end },
+		})
+	else
+		board:AddRow('Saved snapshots', 'Nothing saved yet')
+	end
 
-    local grids = {}
-    local grid
-    local function Section(title)
-        if grid then grid:Flush() end
-        Layout.Section(tab, title)
-        grid = PageKit.RowGrid(tab)
-        grids[#grids + 1] = grid
-    end
-    local function AddRow(rowConfig)
-        return grid:Add(rowConfig)
-    end
-
-    cdmGrids.buffBars = {
-        SyncDim = function(_, enabled)
-            for gridIndex = 1, #grids do grids[gridIndex]:SyncDim(enabled) end
-        end,
-    }
-
-    Section('Layout')
-
-    AddRow({
-        title = 'Position',
-        description = 'Screen position, or anchor to another frame.',
-        plain = true,
-        accessoryWidth = 36,
-        accessories = function(row)
-            return { BUI.AlertMover(row, config, Reposition, {
-                fields = { posX = 'positionX', posY = 'positionY' },
-                anchorRange = 500,
-                matchWidth = {
-                    get = function() return config.matchAnchorWidth end,
-                    set = function(value) config.matchAnchorWidth = value; Refresh() end,
-                },
-            }) }
-        end,
-    })
-
-    AddRow({
-        title = 'Grow Direction',
-        description = 'New bars extend downward or upward.',
-        controlWidth = 130,
-        control = function(row)
-            return Controls.Dropdown(row, nil, {
-                { value = 'DOWN', text = 'Down' },
-                { value = 'UP',   text = 'Up'   },
-            }, config.growDirection, function(value)
-                config.growDirection = value; Reposition()
-            end, nil, 110)
-        end,
-    })
-
-    Section('Bars')
-
-    AddRow({
-        title = 'Bar Size',
-        description = 'Width, height and spacing.',
-        plain = true,
-        accessoryWidth = 36,
-        accessories = function(row)
-            return { PageKit.SizeIcon(row, { title = 'BAR SIZE', options = {
-                { kind = 'slider', label = 'Bar Width', min = 80, max = 400,
-                  get = function() return config.barWidth end,
-                  set = function(value) config.barWidth = value; Refresh() end },
-                { kind = 'slider', label = 'Bar Height', min = 10, max = 50,
-                  get = function() return config.barHeight end,
-                  set = function(value) config.barHeight = value; Refresh() end },
-                { kind = 'slider', label = 'Spacing', min = 0, max = 30,
-                  get = function() return config.spacing end,
-                  set = function(value) config.spacing = value; Refresh() end },
-            } }) }
-        end,
-    })
-
-    AddRow({
-        title = 'Icon',
-        description = 'Buff icon beside each bar.',
-        checked = config.showIcon ~= false,
-        callback = function(value) config.showIcon = value; Reposition() end,
-        accessoryWidth = 36,
-        accessories = function(row)
-            return { PageKit.SizeIcon(row, { title = 'ICON', options = {
-                { kind = 'slider', label = 'Icon Size', min = 12, max = 64,
-                  get = function() return config.iconSize end,
-                  set = function(value) config.iconSize = value; Refresh() end },
-            } }) }
-        end,
-    })
-
-    AddRow({
-        title = 'Class Color Bar',
-        description = 'Fill bars with your class color.',
-        checked = config.useClassColor,
-        callback = function(value) config.useClassColor = value; Refresh() end,
-        accessoryWidth = 36,
-        accessories = function(row)
-            local barColor = config.barColor
-            return { Controls.ColorSwatch(row, {
-                r = barColor[1], g = barColor[2], b = barColor[3], a = barColor[4],
-                tooltip = 'Bar color (when not class-colored)',
-                callback = function(red, green, blue, alpha)
-                    config.barColor = { red, green, blue, alpha }; Refresh()
-                end,
-            }) }
-        end,
-    })
-
-    AddRow({
-        title = 'Backdrop',
-        description = 'Border and background behind each bar.',
-        plain = true,
-        accessoryWidth = 64,
-        accessories = function(row)
-            local cog = PageKit.SettingsIcon(row, { title = 'BACKDROP', tooltip = 'Border size & color', options = {
-                { kind = 'slider', label = 'Border Size', min = 0, max = 5,
-                  get = function() return config.borderSize end,
-                  set = function(value) config.borderSize = value; Refresh() end,
-                  swatch = function()
-                      local borderColor = config.borderColor
-                      return { r = borderColor[1], g = borderColor[2], b = borderColor[3], a = borderColor[4],
-                          callback = function(red, green, blue, alpha)
-                              config.borderColor = { red, green, blue, alpha }; Refresh()
-                          end }
-                  end },
-            } })
-            local backgroundColor = config.bgColor
-            local backgroundSwatch = Controls.ColorSwatch(row, {
-                r = backgroundColor[1], g = backgroundColor[2], b = backgroundColor[3], a = backgroundColor[4],
-                tooltip = 'Background color',
-                callback = function(red, green, blue, alpha)
-                    config.bgColor = { red, green, blue, alpha }; Refresh()
-                end,
-            })
-            return { cog, backgroundSwatch }
-        end,
-    })
-
-    Section('Text')
-
-    local function TextRow(title, description, showKey, sizeKey, popoverTitle)
-        AddRow({
-            title = title,
-            description = description,
-            checked = config[showKey] ~= false,
-            callback = function(value) config[showKey] = value; Refresh() end,
-            accessoryWidth = 36,
-            accessories = function(row)
-                return { PageKit.SettingsIcon(row, { title = popoverTitle, tooltip = 'Text size', options = {
-                    { kind = 'slider', label = 'Size', min = 6, max = 24,
-                      get = function() return config[sizeKey] or 11 end,
-                      set = function(value) config[sizeKey] = value; Refresh() end },
-                } }) }
-            end,
-        })
-    end
-
-    TextRow('Name', 'Buff name on each bar.', 'showName', 'nameSize', 'NAME TEXT')
-    TextRow('Duration', 'Remaining time on each bar.', 'showDuration', 'durationSize', 'DURATION TEXT')
-
-    AddRow({
-        title = 'Stacks',
-        description = 'Stack count on each bar.',
-        checked = config.showStacks ~= false,
-        callback = function(value) config.showStacks = value; Refresh() end,
-        accessoryWidth = 36,
-        accessories = function(row)
-            return { PageKit.SettingsIcon(row, { title = 'STACK TEXT', tooltip = 'Position, size & offset', options = {
-                { kind = 'dropdown', label = 'Attach To', items = {
-                      { value = 'ICON', text = 'Icon' },
-                      { value = 'BAR',  text = 'Bar'  },
-                  },
-                  get = function() return config.stackAttach end,
-                  set = function(value) config.stackAttach = value; Refresh() end },
-                { kind = 'dropdown', label = 'Position', items = POS_OPTIONS,
-                  get = function() return config.stackPoint end,
-                  set = function(value) config.stackPoint = value; Refresh() end },
-                { kind = 'slider', label = 'Size', min = 6, max = 24,
-                  get = function() return config.stackSize end,
-                  set = function(value) config.stackSize = value; Refresh() end },
-                { kind = 'slider', label = 'Offset X', min = -40, max = 40,
-                  get = function() return config.stackOffsetX end,
-                  set = function(value) config.stackOffsetX = value; Refresh() end },
-                { kind = 'slider', label = 'Offset Y', min = -40, max = 40,
-                  get = function() return config.stackOffsetY end,
-                  set = function(value) config.stackOffsetY = value; Refresh() end },
-            } }) }
-        end,
-    })
-
-    grid:Flush()
-    cdmGrids.buffBars:SyncDim(config.skinEnabled)
+	local share = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Share',
+		description = 'Copy your setup as a string, or import one someone sent you.',
+	})
+	local exports = { { value = ALL_LAYOUTS, text = 'Everything' } }
+	for _, layout in ipairs(Profiles.GetBlizzardLayouts()) do
+		if not layout.isDefault then exports[#exports + 1] = { value = layout.id, text = 'Only ' .. layout.name } end
+	end
+	local known = false
+	for _, entry in ipairs(exports) do
+		if entry.value == exportChoice then known = true end
+	end
+	if not known then exportChoice = ALL_LAYOUTS end
+	share:AddTools('Export', 'Which layouts go into the string', {
+		{ entries = exports, width = SNAPSHOT_WIDTH, get = function() return exportChoice end, set = function(value) exportChoice = value end },
+		{ text = 'Export', onClick = function()
+			local exportString, err
+			if exportChoice == ALL_LAYOUTS then exportString, err = Profiles.ExportCurrent() else exportString, err = Profiles.ExportLayout(exportChoice) end
+			if not exportString then return BUI.Print(err or 'Could not export.') end
+			Modals.Copy({ parent = Window().frame, title = 'Layout string', text = exportString })
+		end },
+	})
+	share:AddTools('Import', 'Paste a layout string to add its layouts, or replace your whole setup with them', {
+		{ text = 'Import', onClick = function()
+			Modals.Input({
+				parent = Window().frame,
+				title = 'Import layouts',
+				message = 'Paste the layout string.',
+				confirmText = 'Next',
+				onConfirm = function(text)
+					local valid, layoutString = Profiles.IsLayoutString(text)
+					if not valid then return BUI.Print('That is not a Cooldown Manager layout string.') end
+					Modals.Confirm({
+						parent = Window().frame,
+						title = 'Import layouts',
+						message = 'Add the pasted layouts next to your current ones, or replace your whole setup with them? Replacing saves a backup snapshot first.',
+						confirmText = 'Add to mine', laterText = 'Replace everything', cancelText = 'Cancel',
+						onConfirm = function()
+							local ok, result = Profiles.ImportLayoutString(layoutString)
+							if not ok then return BUI.Print(result or 'The import failed.') end
+							RebuildPane(page)
+							Modals.Confirm({ parent = Window().frame, title = 'Layouts added', message = 'Added ' .. result .. ' layouts. Reload so everything picks them up?', confirmText = 'Reload', cancelText = 'Later', onConfirm = ReloadUI })
+						end,
+						onLater = function()
+							local backed, backupName = Profiles.AutoBackupSnapshot()
+							local ok, err = Profiles.ApplyLayoutData(layoutString)
+							if not ok then return BUI.Print(err or 'Could not apply that string.') end
+							RebuildPane(page)
+							Modals.Confirm({ parent = Window().frame, title = 'Setup replaced', message = backed and ('Done, the previous layouts were saved as ' .. backupName .. '. Reload now to finish?') or 'Done. Reload now to finish?', confirmText = 'Reload', cancelText = 'Later', onConfirm = ReloadUI })
+						end,
+					})
+				end,
+			})
+		end },
+	})
+	return { board, share }
 end
 
-local function BuildLayoutsTab(tab, CDM)
-    local Profiles = CDM.Profiles
-
-    if not Profiles.IsAvailable() then
-        Layout.Section(tab, "Layout Snapshots",
-            "Blizzard's Cooldown Manager layout API is not available on this game version.")
-        return
-    end
-
-    local PageKit = BUILib.PageKit
-    local ALL_LAYOUTS = "__all__"
-    local selectedSnapshot
-    local selectedExport = ALL_LAYOUTS
-    local nameBox, snapshotDropdown, exportDropdown, shareBox
-
-    local function SnapshotItems()
-        local items = {}
-        for _, snapshot in ipairs(Profiles.GetSnapshots()) do
-            local text = snapshot.name
-            if snapshot.class then text = text .. " |cff9d9d9d(" .. snapshot.class .. ")|r" end
-            items[#items + 1] = { value = snapshot.name, text = text }
-        end
-        table.sort(items, function(itemA, itemB) return itemA.value < itemB.value end)
-        return items
-    end
-
-    local function ExportItems()
-        local items = { { value = ALL_LAYOUTS, text = "Everything (all layouts)" } }
-        for _, layout in ipairs(Profiles.GetBlizzardLayouts()) do
-            if not layout.isDefault then
-                items[#items + 1] = { value = layout.id, text = "Only: " .. layout.name }
-            end
-        end
-        return items
-    end
-
-    local function RefreshLists()
-        local items = SnapshotItems()
-        if not selectedSnapshot or not Profiles.FindSnapshot(selectedSnapshot) then
-            selectedSnapshot = items[1] and items[1].value or nil
-        end
-        snapshotDropdown:SetItems(items)
-        snapshotDropdown:SetValue(selectedSnapshot)
-        local exportItems = ExportItems()
-        local found = false
-        for _, item in ipairs(exportItems) do
-            if item.value == selectedExport then found = true break end
-        end
-        if not found then selectedExport = ALL_LAYOUTS end
-        exportDropdown:SetItems(exportItems)
-        exportDropdown:SetValue(selectedExport)
-    end
-
-    local function DoSave(name)
-        name = (name or ""):gsub("^%s+", ""):gsub("%s+$", "")
-        if name == "" then
-            BUI.Print("Enter a name for the snapshot first.")
-            return
-        end
-        local function Commit()
-            local ok, result = Profiles.SaveSnapshot(name)
-            if ok then
-                BUI.Print("Saved snapshot: " .. result)
-                selectedSnapshot = result
-                nameBox:SetValue("")
-                RefreshLists()
-            else
-                BUI.Print(result or "Could not save snapshot.")
-            end
-        end
-        if Profiles.FindSnapshot(name) then
-            Modals.Confirm({
-                title = "Overwrite Snapshot",
-                message = "'" .. name .. "' already exists. Overwrite it with your current setup?",
-                confirmText = "Overwrite", cancelText = "Cancel", onConfirm = Commit,
-            })
-        else
-            Commit()
-        end
-    end
-
-    local function DoApply()
-        if not selectedSnapshot then return end
-        local name = selectedSnapshot
-        Modals.Confirm({
-            title = "Apply Snapshot",
-            message = "Replace your current Cooldown Manager layouts with '" .. name .. "'?\n\nA backup snapshot of your current layouts is saved first. A reload is needed afterwards.",
-            confirmText = "Apply", cancelText = "Cancel",
-            onConfirm = function()
-                local backed, backupName = Profiles.AutoBackupSnapshot()
-                local ok, err = Profiles.ApplySnapshot(name)
-                if ok then
-                    if backed then RefreshLists() end
-                    Modals.Confirm({
-                        title = "Snapshot Applied",
-                        message = backed and ("'" .. name .. "' is applied. Your previous layouts were saved as '" .. backupName .. "'.\n\nReload now to finish?") or ("'" .. name .. "' is applied. Reload now to finish?"),
-                        confirmText = "Reload Now", cancelText = "Later",
-                        onConfirm = ReloadUI,
-                    })
-                else
-                    BUI.Print(err or "Could not apply snapshot.")
-                end
-            end,
-        })
-    end
-
-    Layout.Section(tab, 'Snapshots')
-    local snapshotGrid = PageKit.RowGrid(tab)
-
-    snapshotGrid:Add({
-        spanFull = true,
-        title = 'New Snapshot',
-        description = 'Save your current Cooldown Manager layouts under a name.',
-        plain = true,
-        accessoryWidth = 320,
-        accessories = function(row)
-            nameBox = Controls.TextBox(row, nil, "", function(text) DoSave(text) end, nil, 220)
-            local saveButton = Controls.GhostButton(row, "Save", 80, function()
-                DoSave(nameBox:GetValue())
-            end)
-            return { saveButton, nameBox }
-        end,
-    })
-
-    snapshotGrid:Add({
-        spanFull = true,
-        title = 'Saved Snapshots',
-        description = 'Apply a saved snapshot, or delete it.',
-        plain = true,
-        accessoryWidth = 340,
-        accessories = function(row)
-            snapshotDropdown = Controls.Dropdown(row, nil, SnapshotItems(), selectedSnapshot, function(value) selectedSnapshot = value end, nil, 220)
-            local applyButton = Controls.GhostButton(row, "Apply", 80, DoApply)
-            local deleteButton = Controls.Icon(row, {
-                texture = BUILib.GetLibMedia('delete'),
-                tooltip = "Delete this snapshot",
-                onClick = function()
-                    if not selectedSnapshot then return end
-                    local name = selectedSnapshot
-                    Modals.Confirm({
-                        title = "Delete Snapshot", message = "Delete '" .. name .. "'?",
-                        confirmText = "Delete", cancelText = "Cancel",
-                        onConfirm = function()
-                            local ok, err = Profiles.DeleteSnapshot(name)
-                            if ok then
-                                BUI.Print("Deleted snapshot: " .. name)
-                                selectedSnapshot = nil
-                                RefreshLists()
-                            else
-                                BUI.Print(err or "Could not delete snapshot.")
-                            end
-                        end,
-                    })
-                end,
-            })
-            local deleteFrame = BUILib.Widget.Unwrap(deleteButton)
-            deleteFrame.icon:SetVertexColor(0.55, 0.5, 0.52, 1)
-            deleteFrame:HookScript('OnEnter', function() deleteFrame.icon:SetVertexColor(1, 0.35, 0.35, 1) end)
-            deleteFrame:HookScript('OnLeave', function() deleteFrame.icon:SetVertexColor(0.55, 0.5, 0.52, 1) end)
-            return { deleteButton, applyButton, snapshotDropdown }
-        end,
-    })
-    snapshotGrid:Flush()
-
-    Layout.Section(tab, 'Share')
-    local shareGrid = PageKit.RowGrid(tab)
-
-    shareGrid:Add({
-        spanFull = true,
-        title = 'Export / Import',
-        description = 'Copy your setup as a string to share, or paste one below to import.',
-        plain = true,
-        accessoryWidth = 220,
-        accessories = function(row)
-            exportDropdown = Controls.Dropdown(row, nil, ExportItems(), selectedExport, function(value) selectedExport = value end, nil, 200)
-            return { exportDropdown }
-        end,
-    })
-    shareGrid:Flush()
-
-    shareBox = Layout.TextArea(tab, nil, 160)
-    Layout.ButtonRow(tab, {
-        { text = "Export", width = 80, callback = function()
-            local exportString, err
-            if selectedExport == ALL_LAYOUTS then
-                exportString, err = Profiles.ExportCurrent()
-            else
-                exportString, err = Profiles.ExportLayout(selectedExport)
-            end
-            if not exportString then
-                BUI.Print(err or "Could not export.")
-                return
-            end
-            shareBox.editbox:SetText(exportString)
-            shareBox.editbox:SetFocus()
-            shareBox.editbox:HighlightText()
-        end },
-        { text = "Import", width = 80, callback = function()
-            local valid, layoutString = Profiles.IsLayoutString(shareBox.editbox:GetText())
-            if not valid then
-                BUI.Print("Paste a Cooldown Manager layout string first.")
-                return
-            end
-            Modals.Confirm({
-                title = "Import Layouts",
-                message = "Add the pasted layout(s) next to your current ones, or replace your whole setup with them?\n\nReplacing saves a backup snapshot of your current layouts first.",
-                confirmText = "Add to Mine", laterText = "Replace Everything", cancelText = "Cancel",
-                onConfirm = function()
-                    local ok, result = Profiles.ImportLayoutString(layoutString)
-                    if ok then
-                        BUI.Print("Added " .. result .. " layout(s) to your Cooldown Manager.")
-                        shareBox.editbox:SetText("")
-                        RefreshLists()
-                        Modals.Confirm({
-                            title = "Layouts Added",
-                            message = "Layouts imported. Reload so everything picks them up?",
-                            confirmText = "Reload Now", cancelText = "Later",
-                            onConfirm = ReloadUI,
-                        })
-                    else
-                        BUI.Print(result or "Import failed.")
-                    end
-                end,
-                onLater = function()
-                    local backed, backupName = Profiles.AutoBackupSnapshot()
-                    local ok, err = Profiles.ApplyLayoutData(layoutString)
-                    if ok then
-                        shareBox.editbox:SetText("")
-                        RefreshLists()
-                        Modals.Confirm({
-                            title = "Setup Replaced",
-                            message = backed and ("Done. Your previous layouts were saved as '" .. backupName .. "'.\n\nReload now to finish?") or "Done. Reload now to finish?",
-                            confirmText = "Reload Now", cancelText = "Later",
-                            onConfirm = ReloadUI,
-                        })
-                    else
-                        BUI.Print(err or "Could not apply that string.")
-                    end
-                end,
-            })
-        end },
-        { text = "Clear", width = 60, callback = function() shareBox.editbox:SetText("") end },
-    })
-
-    tab.frame:HookScript("OnShow", RefreshLists)
-    RefreshLists()
+local function IconManagementHost(parent, width)
+	local wrapper = CreateFrame('Frame', nil, parent)
+	wrapper:SetSize(width, HOST_HEIGHT)
+	local host = Layout.ApplyContentMixin({ frame = wrapper, child = wrapper, width = width - Layout.DEFAULT_PADDING * 2, y = 0, topPadding = 0 })
+	BUI.BuildCDMIconManagementTab(host, DB())
+	wrapper:SetScript('OnSizeChanged', nil)
+	wrapper:SetHeight(math.abs(host.y) + HOST_PAD)
+	return wrapper
 end
 
-BUI.PageEngine.RegisterPage("cdm", {
-    title = "Cooldown Manager",
-    buttonText = "CDM",
-    OnBuild = function(pageFrame)
-        local db = BUI.GetDB()
-        local CDM = BUI.CDM
+local function Panes(ui, _, parent, width, item, page)
+	if item.id == 'general' then return GeneralBoards(ui, parent, width, page) end
+	if item.id == 'buffBars' then return BuffBarBoards(ui, parent, width) end
+	if item.id == 'layouts' then return LayoutBoards(ui, parent, width, page) end
+	if item.id == 'icons' then return { IconManagementHost(parent, width) } end
+	return ViewerBoards(ui, parent, width, VIEWER_BY_KEY[item.id])
+end
 
-        if not BUI.IsModuleEnabled('cdm') then
-            local page = Layout.Page(pageFrame, nil)
-            Layout.Section(page:GetTab(1), "Cooldown Manager",
-                "Module disabled. Enable it under Settings > Modules, then reload.")
-            page:AutoRefresh()
-            return
-        end
+local RAIL_GROUPS = {
+	{ title = 'Settings', items = {
+		{ id = 'general', label = 'General', icon = 'cog' },
+		{ id = 'layouts', label = 'Layouts', icon = 'save' },
+		{ id = 'icons', label = 'Icon management', icon = 'grabber' },
+	} },
+	{ title = 'Viewers', items = {
+		{ id = 'essential', label = 'Essential' },
+		{ id = 'utility', label = 'Utility' },
+		{ id = 'buffs', label = 'Buff icons' },
+		{ id = 'buffBars', label = 'Buff bars' },
+	} },
+}
 
-        CDM.Initialize()
-
-        local page = Layout.Page(pageFrame, { "General", "Essential", "Utility", "Buffs", "Buff Bars", "Layouts", "Icon Management" })
-        pageFrame._page = page
-
-        wipe(cdmHeaders)
-        wipe(cdmGrids)
-        HookCDMRefreshers(CDM)
-
-        local mark = pageFrame:CreateTexture(nil, 'BACKGROUND', nil, 1)
-        mark:SetTexture(BUI.Tools.GetLogo())
-        mark:SetSize(520, 520)
-        mark:SetPoint('CENTER')
-        mark:SetVertexColor(1, 1, 1, 0.06)
-
-        InstallCDMHeader(page, 1, {
-            title = 'Cooldown Manager',
-            desc = "Skin, arrange and extend Blizzard's Cooldown Manager.",
-        })
-        InstallCDMHeader(page, 6, {
-            title = 'Layouts',
-            desc = 'Save, restore and share your Cooldown Manager setup.',
-        })
-        InstallCDMHeader(page, 7, {
-            title = 'Icon Management',
-            desc = 'Choose which spells appear in each viewer, and where.',
-        })
-
-        local VIEWER_HEADERS = {
-            { index = 2, key = 'essential', title = 'Essential Viewer', desc = "Blizzard's Essential viewer, reskinned.", keybinds = true },
-            { index = 3, key = 'utility',   title = 'Utility Viewer',   desc = 'Utility and defensive cooldowns from the Utility viewer.', keybinds = true },
-            { index = 4, key = 'buffs',     title = 'Buff Icons',       desc = 'Tracked buff icons from the Buff viewer.' },
-        }
-        for _, viewerDef in ipairs(VIEWER_HEADERS) do
-            local viewerSettings = db.cdm[viewerDef.key]
-            local header
-            local headerConfig = {
-                title = viewerDef.title, desc = viewerDef.desc, preview = true,
-                enable = { value = viewerSettings.enabled, tooltip = 'Enable or disable this viewer skin', onToggle = function(enabled)
-                    local gridController = cdmGrids[viewerDef.key]
-                    gridController:SyncDim(enabled)
-                    Modals.Confirm({
-                        parent = BUI.PageEngine.window.frame,
-                        title = (enabled and 'Enable ' or 'Disable ') .. viewerDef.title,
-                        message = 'This change requires a UI reload to take effect.',
-                        confirmText = 'Reload Now', cancelText = 'Cancel',
-                        laterText = 'Later',
-                        onConfirm = function() viewerSettings.enabled = enabled; ReloadUI() end,
-                        onLater = function() viewerSettings.enabled = enabled end,
-                        onCancel = function()
-                            header.titleBar.enableToggle:SetValue(not enabled)
-                            gridController:SyncDim(not enabled)
-                        end,
-                    })
-                end },
-            }
-            if viewerDef.key == 'buffs' then
-                local function EyeValue()
-                    return CDM.state.buffsPreview and CDM.state.buffsPreview:IsShown() or false
-                end
-                headerConfig.anchor = { value = EyeValue(), tooltip = 'Show a movable preview of the buff icons', onToggle = function()
-                    if EyeValue() then
-                        CDM.HideBuffsPreview()
-                    else
-                        CDM.ShowBuffsPreview(viewerSettings)
-                    end
-                    header.titleBar.anchorToggle:SetValue(EyeValue())
-                end }
-            end
-            header = InstallCDMHeader(page, viewerDef.index, headerConfig)
-            if viewerDef.key == 'buffs' then
-                CDM.state.buffsPreviewButton = { SetText = function(_, text)
-                    header.titleBar.anchorToggle:SetValue(text == 'Hide Preview')
-                end }
-            end
-            local mock = CreateViewerMock(header.stage, viewerDef.keybinds)
-            header.Update = function() mock:Render(viewerDef.key) end
-            local viewerTab = page:GetTab(viewerDef.index)
-            viewerTab.frame:HookScript('OnShow', function()
-                header.titleBar.enableToggle:SetValue(db.cdm[viewerDef.key].enabled)
-                if viewerDef.key == 'buffs' then
-                    header.titleBar.anchorToggle:SetValue(CDM.state.buffsPreview and CDM.state.buffsPreview:IsShown() or false)
-                end
-                header.Update()
-            end)
-            header.Update()
-        end
-
-        do
-            local config = db.cdm.buffBars
-            local header
-            local function BarEye()
-                return CDM.IsBuffBarPreviewShown() or false
-            end
-            header = InstallCDMHeader(page, 5, {
-                title = 'Buff Bars',
-                desc = "Blizzard's buff bar viewer, reskinned as compact bars.",
-                preview = true,
-                enable = { value = config.skinEnabled, tooltip = 'Skin the Blizzard buff bars', onToggle = function(enabled)
-                    config.skinEnabled = enabled
-                    CDM.RefreshBuffBarSkin()
-                    cdmGrids.buffBars:SyncDim(enabled)
-                end },
-                anchor = { value = BarEye(), tooltip = 'Show a preview of the buff bars', onToggle = function()
-                    if BarEye() then
-                        CDM.HideBuffBarPreview()
-                    else
-                        CDM.ShowBuffBarPreview()
-                    end
-                    header.titleBar.anchorToggle:SetValue(BarEye())
-                end },
-            })
-            local mock = CreateBuffBarMock(header.stage)
-            header.Update = function() mock:Render() end
-            local buffBarsTab = page:GetTab(5)
-            buffBarsTab.frame:HookScript('OnShow', function()
-                header.titleBar.enableToggle:SetValue(db.cdm.buffBars.skinEnabled)
-                header.titleBar.anchorToggle:SetValue(BarEye())
-                header.Update()
-            end)
-            header.Update()
-        end
-
-        if GetCVar('cooldownViewerEnabled') ~= '1' then
-            Modals.Confirm({
-                parent = BUI.PageEngine.window.frame,
-                title = 'Cooldown Manager Disabled',
-                message = 'Blizzard\'s Cooldown Manager is turned off.\n\nBluUI\'s CDM requires it. Enable and reload?',
-                confirmText = 'Enable & Reload', cancelText = 'Close',
-                laterText = 'Enable Later',
-                onConfirm = function() SetCVar('cooldownViewerEnabled', '1'); ReloadUI() end,
-                onLater = function() SetCVar('cooldownViewerEnabled', '1') end,
-            })
-        end
-
-        BuildGeneralTab(page:GetTab(1), db, CDM)
-        BuildViewerSettings(page:GetTab(2), "essential", db, CDM)
-        BuildViewerSettings(page:GetTab(3), "utility", db, CDM)
-        BuildViewerSettings(page:GetTab(4), "buffs", db, CDM)
-        BuildBuffBarsTab(page:GetTab(5), db, CDM)
-
-        BuildLayoutsTab(page:GetTab(6), CDM)
-        BUI.BuildCDMIconManagementTab(page:GetTab(7), db)
-
-        page:AutoRefresh()
-    end,
-    OnHide = function()
-        local CDM = BUI.CDM
-        if CDM.state.buffsPreview and CDM.state.buffsPreview:IsShown() then
-            CDM.HideBuffsPreview()
-        end
-        if CDM.glowPreview and CDM.glowPreview:IsShown() then
-            CDM.HideGlowPreview()
-        end
-        if CDM.IsBuffBarPreviewShown() then
-            CDM.HideBuffBarPreview()
-        end
-    end,
+BUI.PageEngine.RegisterPage('cdm', {
+	title = 'Cooldown Manager',
+	buttonText = 'CDM',
+	icon = 'wheel',
+	OnBuild = function(pageFrame)
+		fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
+		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
+		local tab = page:GetTab(1)
+		local enabled = BUI.IsModuleEnabled('cdm')
+		if enabled then
+			CDM().Initialize()
+			HookRefreshers()
+		end
+		local rail
+		rail = Layout.RailPage(tab, { window = Window() }, {
+			icon = 'wheel',
+			title = 'Cooldown Manager',
+			placeholder = 'Search cooldown manager...',
+			tools = {
+				{ icon = 'enable', tooltip = 'Turn the cooldown manager module on or off, needs a reload', get = function() return BUI.IsModuleEnabled('cdm') end, set = function(value)
+					BUI.ModulesPage.ConfirmReload('cdm', value, Repaint)
+				end },
+			},
+			preview = enabled and { height = PREVIEW_HEIGHT, build = function(band, kit) preview = BuildPreview(band, kit) end } or nil,
+			rail = { groups = enabled and RAIL_GROUPS or { { title = 'Settings', items = { { id = 'off', label = 'Module off' } } } }, selected = enabled and selected or 'off' },
+			build = function(ui, shell, parent, width, item, handle)
+				if item.id == 'off' then
+					return { ui.Board(parent, width, { stacked = true, title = 'The cooldown manager is off', description = 'Turn the module on with the cube in the header. It needs a reload.' }) }
+				end
+				return Panes(ui, shell, parent, width, item, handle)
+			end,
+		})
+		if not enabled then
+			page:AutoRefresh()
+			return
+		end
+		railPage = rail
+		local Select = rail.Select
+		function rail:Select(id)
+			selected = id
+			Select(self, id)
+			Repaint()
+			RefreshPreview()
+		end
+		local tabs = {}
+		for index = 1, #TAB_IDS do tabs[index] = tab end
+		pageFrame._page = { tabContents = tabs, currentTab = TAB_INDEX[selected], SetTab = function(_, index) rail:Select(TAB_IDS[index] or 'general') end }
+		local module = CDM()
+		module.state.buffsPreviewButton = { SetText = Repaint }
+		module._previewBtn = { SetValue = Repaint }
+		if GetCVar('cooldownViewerEnabled') ~= '1' then
+			Modals.Confirm({
+				parent = Window().frame,
+				title = 'Cooldown Manager disabled',
+				message = 'The Blizzard Cooldown Manager is turned off and BluUI needs it. Enable it and reload?',
+				confirmText = 'Enable and reload', laterText = 'Enable later', cancelText = 'Close',
+				onConfirm = function()
+					SetCVar('cooldownViewerEnabled', '1')
+					ReloadUI()
+				end,
+				onLater = function() SetCVar('cooldownViewerEnabled', '1') end,
+			})
+		end
+		RefreshPreview()
+		page:AutoRefresh()
+	end,
+	OnHide = function()
+		local module = BUI.CDM
+		if module.state.buffsPreview and module.state.buffsPreview:IsShown() then module.HideBuffsPreview() end
+		if module.glowPreview and module.glowPreview:IsShown() then module.HideGlowPreview() end
+		if module.IsBuffBarPreviewShown() then module.HideBuffBarPreview() end
+	end,
 })
 
-local function RefreshCDMPageIfOpen()
-    if BUI.PageEngine.GetCurrentPage() ~= "cdm" then return end
-    local CDM = BUI.CDM
-    if CDM._emStatusRefresh then CDM._emStatusRefresh() end
-    if not CDM._iconListRefreshers then return end
-    for _, callback in pairs(CDM._iconListRefreshers) do callback() end
+local function RefreshIfOpen()
+	if BUI.PageEngine.GetCurrentPage() ~= 'cdm' then return end
+	local module = BUI.CDM
+	if module._emStatusRefresh then module._emStatusRefresh() end
+	if not module._iconListRefreshers then return end
+	for _, callback in pairs(module._iconListRefreshers) do callback() end
 end
 
-BUI.Events:Register("PLAYER_SPECIALIZATION_CHANGED", "CDMPage", function(_, unit)
-    if unit ~= "player" then return end
-    C_Timer.After(0.3, RefreshCDMPageIfOpen)
+BUI.Events:Register('PLAYER_SPECIALIZATION_CHANGED', 'CDMPage', function(_, unit)
+	if unit ~= 'player' then return end
+	C_Timer.After(0.3, RefreshIfOpen)
 end)
-
-BUI.Events:Register("TRAIT_CONFIG_UPDATED", "CDMPage", function()
-    C_Timer.After(0.3, RefreshCDMPageIfOpen)
-end)
-
-BUI.Events:Register("COOLDOWN_VIEWER_DATA_LOADED", "CDMPage", function()
-    C_Timer.After(0.3, RefreshCDMPageIfOpen)
-end)
-
-BUI.Events:Register("EDIT_MODE_LAYOUTS_UPDATED", "CDMPage", function()
-    RefreshCDMPageIfOpen()
-end)
+BUI.Events:Register('TRAIT_CONFIG_UPDATED', 'CDMPage', function() C_Timer.After(0.3, RefreshIfOpen) end)
+BUI.Events:Register('COOLDOWN_VIEWER_DATA_LOADED', 'CDMPage', function() C_Timer.After(0.3, RefreshIfOpen) end)
+BUI.Events:Register('EDIT_MODE_LAYOUTS_UPDATED', 'CDMPage', RefreshIfOpen)

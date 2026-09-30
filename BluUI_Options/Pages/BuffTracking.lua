@@ -1,600 +1,321 @@
 local BUI = BluUI
-
-local BUILib = BluUI.BUILibClient
-local Layout, Controls = BUILib.Layout, BUILib.Controls
-local PageKit = BUILib.PageKit
-
 local BuffTracking = BUI.BuffTracking
 local Display = BuffTracking.Display
-local KillCommandOverlay = BuffTracking.KillCommandOverlay
 
-local fonts
-local registeredCallbackKeys = {}
+local MENU_WIDTH = 150
+local LABEL_RANGE = 50
+local OVERLAY_RANGE = 30
 
-local function RefreshTracker(settingsKey)
-    local tracker = Display.GetTracker(settingsKey)
-    if tracker then tracker.Refresh() end
+local DISPLAYS = {
+	{ value = 'icon', text = 'On the icon' },
+	{ value = 'screen', text = 'On screen' },
+	{ value = 'both', text = 'Both' },
+}
+local ALERT_MODES = {
+	{ value = 'flash', text = 'Flash briefly' },
+	{ value = 'stay', text = 'Stay on screen' },
+}
+
+local fonts, sounds
+
+local function Window()
+	return BUI.PageEngine.window
 end
 
-local RefreshKillCommandOverlay = KillCommandOverlay.Refresh
+local function Repaint()
+	Window():Repaint()
+end
+
+local function RefreshTracker(key)
+	local tracker = Display.GetTracker(key)
+	if tracker then tracker.Refresh() end
+end
 
 local function SpellIcon(spellID)
-    return C_Spell.GetSpellTexture(spellID)
+	return C_Spell.GetSpellTexture(spellID)
 end
 
-local AddRow = PageKit.AddSettingRow
-
-local function EyeAccessory(row, settingsKey)
-    local function GetSettings() return BUI.GetDB()[settingsKey] end
-    local anchorToggle = Controls.IconToggle(row, GetSettings().showAnchor, function(value)
-        GetSettings().showAnchor = value
-        RefreshTracker(settingsKey)
-    end, { texture = BUILib.GetLibMedia('eye'), size = 18, tooltip = 'Unlock (drag to move)' })
-    Display.RegisterAnchorCallback(settingsKey, function(state) anchorToggle:SetValue(state) end)
-    registeredCallbackKeys[settingsKey] = true
-    return anchorToggle
+local function Option(db, label, key, extra)
+	local option = { label = label, get = function() return db[key] end, set = function(value) db[key] = value end }
+	for name, value in pairs(extra or {}) do option[name] = value end
+	return option
 end
 
-local function TrackerRow(tab, settingsKey, frameName, rowDef, accessoryWidth, BuildAccessories)
-    local function GetSettings() return BUI.GetDB()[settingsKey] end
-    local function Refresh() RefreshTracker(settingsKey) end
-
-    AddRow(tab, {
-        title = rowDef.title,
-        description = rowDef.description,
-        icon = rowDef.icon,
-        checked = GetSettings().enabled,
-        callback = function(value)
-            GetSettings().enabled = value
-            Refresh()
-        end,
-        accessoryWidth = accessoryWidth,
-        accessories = function(row)
-            local anchorToggle = EyeAccessory(row, settingsKey)
-            local mover = BUI.AlertMover(row, GetSettings(), Refresh, { selfTag = frameName, noCenter = rowDef.noCenter })
-            return BuildAccessories(row, GetSettings, Refresh, anchorToggle, mover)
-        end,
-    })
+local function Toggle(db, label, key)
+	return { label = label, get = function() return db[key] == true end, set = function(value) db[key] = value end }
 end
 
-local function TextTrackerRow(tab, settingsKey, frameName, rowDef)
-    TrackerRow(tab, settingsKey, frameName, rowDef, 270, function(row, GetSettings, Refresh, anchorToggle, mover)
-        local options = {
-            { kind = 'textbox', label = rowDef.textLabel or 'Custom Text',
-              get = function() return GetSettings().customText end,
-              set = function(value) GetSettings().customText = value end, apply = Refresh },
-        }
-        if rowDef.altTextLabel then
-            options[#options + 1] = { kind = 'textbox', label = rowDef.altTextLabel,
-              get = function() return GetSettings().customTextAlt end,
-              set = function(value) GetSettings().customTextAlt = value end, apply = Refresh }
-        end
-        options[#options + 1] = { kind = 'slider', label = 'Text Size', min = 10, max = 48,
-          get = function() return GetSettings().textSize end,
-          set = function(value) GetSettings().textSize = value end, apply = Refresh }
-        if not rowDef.noSound then
-            options[#options + 1] = { kind = 'dropdown', label = 'Sound', items = BUI.BuildSoundDropdownItems(),
-              get = function() return GetSettings().sound end,
-              set = function(value) GetSettings().sound = value; BUI.PlaySoundByName(value) end }
-        end
-        if rowDef.extraOptions then
-            for _, option in ipairs(rowDef.extraOptions(GetSettings, Refresh)) do
-                options[#options + 1] = option
-            end
-        end
-
-        local settingsIcon = PageKit.SettingsIcon(row, {
-            title = rowDef.title:upper(), tooltip = rowDef.noSound and 'Text' or 'Text & sound', options = options,
-        })
-        local fontDropdown = Controls.Dropdown(row, nil, fonts, GetSettings().font, function(value)
-            GetSettings().font = value
-            Refresh()
-        end, nil, 140)
-        local textColor = GetSettings().textColor
-        local colorSwatch = Controls.ColorSwatch(row, { r = textColor.r, g = textColor.g, b = textColor.b, a = textColor.a,
-            tooltip = 'Text Color',
-            callback = function(red, green, blue, alpha)
-                GetSettings().textColor = { r = red, g = green, b = blue, a = alpha }
-                Refresh()
-            end })
-        return { anchorToggle, mover, settingsIcon, fontDropdown, colorSwatch }
-    end)
+local function Color(db, label, key, opacity)
+	return {
+		kind = 'swatch', label = label, tooltip = label, opacity = opacity,
+		get = function()
+			local color = db[key]
+			return color.r, color.g, color.b, opacity and color.a or 1
+		end,
+		set = function(red, green, blue, alpha)
+			db[key] = opacity and { r = red, g = green, b = blue, a = alpha } or { r = red, g = green, b = blue }
+		end,
+	}
 end
 
-local function StackTrackerRow(tab, settingsKey, frameName, maxStacks, rowDef)
-    TrackerRow(tab, settingsKey, frameName, rowDef, 220, function(row, GetSettings, Refresh, anchorToggle, mover)
-        local settingsIcon = PageKit.SettingsIcon(row, {
-            title = rowDef.title:upper(), tooltip = 'Display, bars & text',
-            options = {
-                { label = 'Bar Mode',
-                  get = function() return GetSettings().displayMode == 'BARS' end,
-                  set = function(value) GetSettings().displayMode = value and 'BARS' or 'TEXT' end, apply = Refresh,
-                  swatch = function()
-                      local color = GetSettings().filledColor
-                      return { r = color.r, g = color.g, b = color.b, a = color.a, tooltip = 'Filled Color',
-                          callback = function(red, green, blue, alpha) GetSettings().filledColor = { r = red, g = green, b = blue, a = alpha }; Refresh() end }
-                  end },
-                { label = 'Hide When No Stacks',
-                  get = function() return GetSettings().hideWhenEmpty end,
-                  set = function(value) GetSettings().hideWhenEmpty = value end, apply = Refresh,
-                  swatch = function()
-                      local color = GetSettings().emptyColor
-                      return { r = color.r, g = color.g, b = color.b, a = color.a, tooltip = 'Empty Color',
-                          callback = function(red, green, blue, alpha) GetSettings().emptyColor = { r = red, g = green, b = blue, a = alpha }; Refresh() end }
-                  end },
-                { label = 'Show Only in Combat',
-                  get = function() return GetSettings().showOnlyInCombat end,
-                  set = function(value) GetSettings().showOnlyInCombat = value end, apply = Refresh },
-                { label = 'Color by Stack Count',
-                  get = function() return GetSettings().colorByStacks end,
-                  set = function(value) GetSettings().colorByStacks = value end, apply = Refresh },
-                { kind = 'slider', label = 'Bar Width', min = 30, max = 200,
-                  get = function() return GetSettings().barWidth end,
-                  set = function(value) GetSettings().barWidth = value end, apply = Refresh },
-                { kind = 'slider', label = 'Bar Height', min = 4, max = 50,
-                  get = function() return GetSettings().barHeight end,
-                  set = function(value) GetSettings().barHeight = value end, apply = Refresh },
-                { kind = 'slider', label = 'Bar Spacing', min = 0, max = 20,
-                  get = function() return GetSettings().barSpacing end,
-                  set = function(value) GetSettings().barSpacing = value end, apply = Refresh },
-                { kind = 'slider', label = 'Border Thickness', min = 0, max = 4,
-                  get = function() return GetSettings().borderThickness end,
-                  set = function(value) GetSettings().borderThickness = value end, apply = Refresh,
-                  swatch = function()
-                      local color = GetSettings().borderColor
-                      return { r = color.r, g = color.g, b = color.b, a = color.a, tooltip = 'Border Color',
-                          callback = function(red, green, blue, alpha) GetSettings().borderColor = { r = red, g = green, b = blue, a = alpha }; Refresh() end }
-                  end },
-                { kind = 'slider', label = 'Text Size', min = 10, max = 48,
-                  get = function() return GetSettings().textSize end,
-                  set = function(value) GetSettings().textSize = value end, apply = Refresh },
-                { kind = 'dropdown', label = 'Font', items = fonts,
-                  get = function() return GetSettings().font end,
-                  set = function(value) GetSettings().font = value end, apply = Refresh },
-            },
-        })
-
-        local accessoryList = { anchorToggle, mover, settingsIcon }
-        for stackIndex = maxStacks, 1, -1 do
-            local colorKey = 'stack' .. stackIndex .. 'Color'
-            local color = GetSettings()[colorKey]
-            accessoryList[#accessoryList + 1] = Controls.ColorSwatch(row, { r = color.r, g = color.g, b = color.b, a = color.a,
-                tooltip = stackIndex == 1 and '1 Stack' or (stackIndex .. ' Stacks'),
-                callback = function(red, green, blue, alpha)
-                    GetSettings()[colorKey] = { r = red, g = green, b = blue, a = alpha }
-                    Refresh()
-                end })
-        end
-        return accessoryList
-    end)
+local function Font(db)
+	return { entries = fonts, width = MENU_WIDTH, get = function() return db.font end, set = function(value) db.font = value end }
 end
 
-local function SmartMisdirectRow(tab)
-    local function GetSettings() return BUI.GetDB().smartMisdirect end
-    local SmartMisdirect = BuffTracking.SmartMisdirect
-    local Refresh = SmartMisdirect.Refresh
-    local CreateMacro = SmartMisdirect.CreateMacro
-    local tankMethodItems = SmartMisdirect.TANK_METHOD_ITEMS
-
-    AddRow(tab, {
-        title = 'Smart Misdirection',
-        description = 'Bind it in Key Bindings or macro "/click BUI_SmartMisdirect LeftButton"; it aims at your override, focus, tank or pet. Right click a group member to pin it to them.',
-        icon = SpellIcon(34477),
-        checked = GetSettings().enabled,
-        callback = function(value)
-            GetSettings().enabled = value
-            Refresh()
-        end,
-        accessoryWidth = 40,
-        accessories = function(row)
-            return { PageKit.SettingsIcon(row, { title = 'SMART MISDIRECTION', tooltip = 'Target priority', width = 300, options = {
-                { kind = 'textbox', label = 'MD Override Target',
-                  get = function() return GetSettings().overrideName end,
-                  set = function(value)
-                      GetSettings().overrideName = value
-                      GetSettings().overrideRealm = ''
-                      Refresh()
-                  end },
-                { kind = 'checkbox', label = 'Use Focus',
-                  get = function() return GetSettings().useFocus end,
-                  set = function(value) GetSettings().useFocus = value; Refresh() end },
-                { kind = 'checkbox', label = 'Prefer Tank',
-                  get = function() return GetSettings().preferTank end,
-                  set = function(value) GetSettings().preferTank = value; Refresh() end },
-                { kind = 'dropdown', label = 'Tank Selection', items = tankMethodItems,
-                  get = function() return GetSettings().tankMethod end,
-                  set = function(value) GetSettings().tankMethod = value; Refresh() end },
-                { kind = 'checkbox', label = 'Fall Back To Pet',
-                  get = function() return GetSettings().fallbackPet end,
-                  set = function(value) GetSettings().fallbackPet = value; Refresh() end },
-                { kind = 'button', label = 'Macro', text = 'Create Macro', set = CreateMacro },
-            } }) }
-        end,
-    })
+local function Sound(db)
+	return { entries = sounds, width = MENU_WIDTH, get = function() return db.sound end, set = function(value)
+		db.sound = value
+		BUI.PlaySoundByName(value)
+	end }
 end
 
-local function PackLeaderRow(tab)
-    local rowDef = {
-        title = 'Pack Leader',
-        description = 'Beast cycle icon with cooldown countdown and next-beast preview',
-        icon = SpellIcon(471876),
-        noCenter = true,
-    }
-    TrackerRow(tab, 'packLeader', 'BUI_PackLeader', rowDef, 220, function(row, GetSettings, Refresh, anchorToggle, mover)
-        local sizeIcon = PageKit.SizeIcon(row, {
-            title = 'PACK LEADER', tooltip = 'Icon sizes & spacing',
-            options = {
-                { kind = 'slider', label = 'Main Icon Size', min = 16, max = 64,
-                  get = function() return GetSettings().iconSize end,
-                  set = function(value) GetSettings().iconSize = value end, apply = Refresh },
-                { kind = 'slider', label = 'Next Icon Size', min = 8, max = 64,
-                  get = function() return GetSettings().nextIconSize end,
-                  set = function(value) GetSettings().nextIconSize = value end, apply = Refresh },
-                { kind = 'slider', label = 'Spacing', min = 0, max = 16,
-                  get = function() return GetSettings().spacing end,
-                  set = function(value) GetSettings().spacing = value end, apply = Refresh },
-                { kind = 'slider', label = 'Label Size', min = 6, max = 32,
-                  get = function() return GetSettings().labelTextSize end,
-                  set = function(value) GetSettings().labelTextSize = value end, apply = Refresh },
-            },
-        })
-
-        local settingsIcon = PageKit.SettingsIcon(row, {
-            title = 'PACK LEADER', tooltip = 'Effects & labels',
-            options = {
-                { label = 'Show Only in Combat',
-                  get = function() return GetSettings().showOnlyInCombat end,
-                  set = function(value) GetSettings().showOnlyInCombat = value end, apply = Refresh },
-                { label = 'Glow When Ready',
-                  get = function() return GetSettings().glowOnReady end,
-                  set = function(value) GetSettings().glowOnReady = value end, apply = Refresh },
-                { label = 'Animate Transitions',
-                  get = function() return GetSettings().animateTransitions end,
-                  set = function(value) GetSettings().animateTransitions = value end },
-                { label = 'Show Countdown Text',
-                  get = function() return GetSettings().showCountdownText end,
-                  set = function(value) GetSettings().showCountdownText = value end, apply = Refresh },
-                { label = "Show 'Next' / 'USE!' Text",
-                  get = function() return GetSettings().showNextText end,
-                  set = function(value) GetSettings().showNextText = value end, apply = Refresh },
-                { label = 'Show Next Icon',
-                  get = function() return GetSettings().showNextIcon end,
-                  set = function(value) GetSettings().showNextIcon = value end, apply = Refresh },
-                { kind = 'slider', label = 'Top Text X', min = -50, max = 50,
-                  get = function() return GetSettings().topTextOffsetX end,
-                  set = function(value) GetSettings().topTextOffsetX = value end, apply = Refresh },
-                { kind = 'slider', label = 'Top Text Y', min = -50, max = 50,
-                  get = function() return GetSettings().topTextOffsetY end,
-                  set = function(value) GetSettings().topTextOffsetY = value end, apply = Refresh },
-                { kind = 'slider', label = 'Bottom Text X', min = -50, max = 50,
-                  get = function() return GetSettings().bottomTextOffsetX end,
-                  set = function(value) GetSettings().bottomTextOffsetX = value end, apply = Refresh },
-                { kind = 'slider', label = 'Bottom Text Y', min = -50, max = 50,
-                  get = function() return GetSettings().bottomTextOffsetY end,
-                  set = function(value) GetSettings().bottomTextOffsetY = value end, apply = Refresh },
-            },
-        })
-
-        local function BeastSwatch(beastKey, label)
-            local currentColor = GetSettings().beastColors[beastKey]
-            return Controls.ColorSwatch(row, { r = currentColor.r, g = currentColor.g, b = currentColor.b, a = 1,
-                tooltip = label,
-                callback = function(red, green, blue)
-                    GetSettings().beastColors[beastKey] = { r = red, g = green, b = blue }
-                    Refresh()
-                    RefreshKillCommandOverlay()
-                end })
-        end
-
-        return { anchorToggle, mover, sizeIcon, settingsIcon, BeastSwatch('wyvern', 'Wyvern'), BeastSwatch('bear', 'Bear'), BeastSwatch('boar', 'Boar') }
-    end)
+local function Eye(db, Refresh)
+	return { icon = 'eye', tooltip = 'Unlock to drag it, right-click it to lock', get = function() return db.showAnchor == true end, set = function(value)
+		db.showAnchor = value
+		Refresh()
+	end }
 end
 
-local function KillCommandOverlayRow(tab)
-    local function GetSettings() return BUI.GetDB().killCommandOverlay end
-    local Refresh = RefreshKillCommandOverlay
-
-    AddRow(tab, {
-        title = 'Pack Leader Overlay on KC',
-        description = 'Pack Leader countdown and beast label on the Kill Command icon',
-        icon = SpellIcon(34026),
-        checked = GetSettings().enabled,
-        callback = function(value)
-            GetSettings().enabled = value
-            Refresh()
-        end,
-        accessoryWidth = 90,
-        accessories = function(row)
-            local preview = Controls.IconToggle(row, KillCommandOverlay.IsPreviewing(), function(value)
-                if value then KillCommandOverlay.StartPreview() else KillCommandOverlay.StopPreview() end
-            end, { texture = BUILib.GetLibMedia('eye'), size = 18, tooltip = 'Preview' })
-
-            local settingsIcon = PageKit.SettingsIcon(row, {
-                title = 'PACK LEADER OVERLAY ON KC', tooltip = 'Timer & beast label',
-                options = {
-                    { label = 'Show Timer',
-                      get = function() return GetSettings().showTimer end,
-                      set = function(value) GetSettings().showTimer = value end, apply = Refresh,
-                      swatch = function()
-                          local timerColor = GetSettings().timerColor
-                          return { r = timerColor.r, g = timerColor.g, b = timerColor.b, a = 1, tooltip = 'Timer Color',
-                              callback = function(red, green, blue) GetSettings().timerColor = { r = red, g = green, b = blue }; Refresh() end }
-                      end },
-                    { label = 'Show Beast Name',
-                      get = function() return GetSettings().showBeastName end,
-                      set = function(value) GetSettings().showBeastName = value end, apply = Refresh },
-                    { label = 'Show Decimals',
-                      get = function() return GetSettings().showDecimals end,
-                      set = function(value) GetSettings().showDecimals = value end, apply = Refresh },
-                    { kind = 'slider', label = 'Decimal Threshold', min = 1, max = 10,
-                      get = function() return GetSettings().decimalThreshold end,
-                      set = function(value) GetSettings().decimalThreshold = value end, apply = Refresh },
-                    { kind = 'slider', label = 'Timer Size', min = 6, max = 72,
-                      get = function() return GetSettings().timerSize end,
-                      set = function(value) GetSettings().timerSize = value end, apply = Refresh },
-                    { kind = 'dropdown', label = 'Timer Anchor', items = BUI.C.ANCHOR_POINT_OPTIONS,
-                      get = function() return GetSettings().timerAnchor end,
-                      set = function(value) GetSettings().timerAnchor = value end, apply = Refresh },
-                    { kind = 'slider', label = 'Timer X', min = -30, max = 30,
-                      get = function() return GetSettings().timerOffsetX end,
-                      set = function(value) GetSettings().timerOffsetX = value end, apply = Refresh },
-                    { kind = 'slider', label = 'Timer Y', min = -30, max = 30,
-                      get = function() return GetSettings().timerOffsetY end,
-                      set = function(value) GetSettings().timerOffsetY = value end, apply = Refresh },
-                    { kind = 'slider', label = 'Beast Name Size', min = 6, max = 24,
-                      get = function() return GetSettings().beastSize end,
-                      set = function(value) GetSettings().beastSize = value end, apply = Refresh },
-                    { kind = 'dropdown', label = 'Beast Anchor', items = BUI.C.ANCHOR_POINT_OPTIONS,
-                      get = function() return GetSettings().beastAnchor end,
-                      set = function(value) GetSettings().beastAnchor = value end, apply = Refresh },
-                    { kind = 'slider', label = 'Beast X', min = -30, max = 30,
-                      get = function() return GetSettings().beastOffsetX end,
-                      set = function(value) GetSettings().beastOffsetX = value end, apply = Refresh },
-                    { kind = 'slider', label = 'Beast Y', min = -30, max = 30,
-                      get = function() return GetSettings().beastOffsetY end,
-                      set = function(value) GetSettings().beastOffsetY = value end, apply = Refresh },
-                },
-            })
-            return { preview, settingsIcon }
-        end,
-    })
+local function Preview(module)
+	return { icon = 'eye', tooltip = 'Preview', get = module.IsPreviewing, set = function(value)
+		if value then module.StartPreview() else module.StopPreview() end
+		Repaint()
+	end }
 end
 
-local function BestialWrathOverlayRow(tab)
-    local function GetSettings() return BUI.GetDB().bestialWrathOverlay end
-    local Refresh = BuffTracking.BestialWrathOverlay.Refresh
-
-    AddRow(tab, {
-        title = 'Bestial Wrath AoE Callout',
-        description = 'HOLD BW / SEND BW / THRASH! on the BW icon or on screen (needs Wild Thrash)',
-        icon = SpellIcon(19574),
-        checked = GetSettings().enabled,
-        callback = function(value)
-            GetSettings().enabled = value
-            Refresh()
-        end,
-        accessoryWidth = 90,
-        accessories = function(row)
-            local Overlay = BuffTracking.BestialWrathOverlay
-            local preview = Controls.IconToggle(row, Overlay.IsPreviewing(), function(value)
-                if value then Overlay.StartPreview() else Overlay.StopPreview() end
-            end, { texture = BUILib.GetLibMedia('eye'), size = 18, tooltip = 'Preview' })
-
-            local settingsIcon = PageKit.SettingsIcon(row, {
-                title = 'BESTIAL WRATH AOE CALLOUT', tooltip = 'Text & hints', width = 320,
-                options = {
-                    { kind = 'dropdown', label = 'Display', items = {
-                        { value = 'icon',   text = 'On BW Icon' },
-                        { value = 'screen', text = 'On Screen' },
-                        { value = 'both',   text = 'Both' },
-                      },
-                      get = function() return GetSettings().displayMode end,
-                      set = function(value) GetSettings().displayMode = value end, apply = Refresh },
-                    { label = 'Text To Speech',
-                      get = function() return GetSettings().tts end,
-                      set = function(value) GetSettings().tts = value end, apply = Refresh },
-                    { label = 'Speak Hold Cues',
-                      get = function() return GetSettings().ttsHold end,
-                      set = function(value) GetSettings().ttsHold = value end, apply = Refresh },
-                    { label = 'Hold Thrash Hint (BW 10-13s)',
-                      get = function() return GetSettings().showHoldThrash end,
-                      set = function(value) GetSettings().showHoldThrash = value end, apply = Refresh },
-                    { label = 'Unlock Screen Text',
-                      get = function() return GetSettings().screenLocked == false end,
-                      set = function(value) GetSettings().screenLocked = not value end, apply = Refresh },
-                    { label = 'Screen Text In Combat Only',
-                      get = function() return GetSettings().screenCombatOnly end,
-                      set = function(value) GetSettings().screenCombatOnly = value end, apply = Refresh },
-                    { kind = 'slider', label = 'Screen Size', min = 12, max = 64,
-                      get = function() return GetSettings().screenTextSize end,
-                      set = function(value) GetSettings().screenTextSize = value end, apply = Refresh },
-                    { kind = 'slider', label = 'Icon Size', min = 6, max = 32,
-                      get = function() return GetSettings().textSize end,
-                      set = function(value) GetSettings().textSize = value end, apply = Refresh },
-                    { kind = 'dropdown', label = 'Icon Anchor', items = BUI.C.ANCHOR_POINT_OPTIONS,
-                      get = function() return GetSettings().textAnchor end,
-                      set = function(value) GetSettings().textAnchor = value end, apply = Refresh },
-                    { kind = 'slider', label = 'Icon X', min = -30, max = 30,
-                      get = function() return GetSettings().textOffsetX end,
-                      set = function(value) GetSettings().textOffsetX = value end, apply = Refresh },
-                    { kind = 'slider', label = 'Icon Y', min = -30, max = 30,
-                      get = function() return GetSettings().textOffsetY end,
-                      set = function(value) GetSettings().textOffsetY = value end, apply = Refresh },
-                },
-            })
-            return { preview, settingsIcon }
-        end,
-    })
+local function TextRow(board, key, frameName, def)
+	local db = BUI.GetDB()[key]
+	local function Refresh() RefreshTracker(key) end
+	Display.RegisterAnchorCallback(key, Repaint)
+	local text = { Option(db, def.textLabel or 'Text', 'customText', { kind = 'input', placeholder = 'Text' }) }
+	if def.altTextLabel then text[#text + 1] = Option(db, def.altTextLabel, 'customTextAlt', { kind = 'input', placeholder = 'Text' }) end
+	text[#text + 1] = Option(db, 'Text size', 'textSize', { min = 10, max = 48, step = 1 })
+	local tools = {
+		Color(db, 'Text color', 'textColor', true),
+		Font(db),
+		{ icon = 'text', tooltip = 'Text and size', title = def.title, options = text },
+	}
+	if not def.noSound then tools[#tools + 1] = Sound(db) end
+	if def.options then tools[#tools + 1] = { tooltip = def.tooltip, title = def.title, options = def.options(db) } end
+	tools[#tools + 1] = BUI.PositionTool(db, { selfTag = frameName })
+	tools[#tools + 1] = Eye(db, Refresh)
+	tools[#tools + 1] = Toggle(db, nil, 'enabled')
+	board:AddTools(def.title, def.description, tools, Refresh, SpellIcon(def.spell))
 end
 
-BUI.PageEngine.RegisterPage("buffTracking", {
-    title = "Buff Tracking",
-    buttonText = "Buff Tracking",
-    OnBuild = function(pageFrame)
-        fonts = BUI.BuildFontDropdownItems('GLOBAL')
+local function StackRows(board, key, frameName, maxStacks, def)
+	local db = BUI.GetDB()[key]
+	local function Refresh() RefreshTracker(key) end
+	Display.RegisterAnchorCallback(key, Repaint)
+	local tools = {}
+	for stack = 1, maxStacks do
+		tools[#tools + 1] = Color(db, stack == 1 and '1 stack' or stack .. ' stacks', 'stack' .. stack .. 'Color', true)
+	end
+	tools[#tools + 1] = Color(db, 'Text color', 'textColor', true)
+	tools[#tools + 1] = Font(db)
+	tools[#tools + 1] = { icon = 'text', tooltip = 'Text size', title = def.title, options = { Option(db, 'Text size', 'textSize', { min = 10, max = 48, step = 1 }) } }
+	tools[#tools + 1] = BUI.PositionTool(db, { selfTag = frameName })
+	tools[#tools + 1] = Eye(db, Refresh)
+	tools[#tools + 1] = Toggle(db, nil, 'enabled')
+	board:AddTools(def.title, def.description, tools, Refresh, SpellIcon(def.spell))
+	board:AddTools('Stack bars', 'Bars instead of a number, with their size, colors and when they show', {
+		Color(db, 'Filled color', 'filledColor', true),
+		Color(db, 'Empty color', 'emptyColor', true),
+		Color(db, 'Border color', 'borderColor', true),
+		{ tooltip = 'Size and visibility', title = 'Stack bars', options = {
+			Option(db, 'Bar width', 'barWidth', { min = 30, max = 200, step = 1 }),
+			Option(db, 'Bar height', 'barHeight', { min = 4, max = 50, step = 1 }),
+			Option(db, 'Bar spacing', 'barSpacing', { min = 0, max = 20, step = 1 }),
+			Option(db, 'Border thickness', 'borderThickness', { min = 0, max = 4, step = 1 }),
+			Toggle(db, 'Hide when no stacks', 'hideWhenEmpty'),
+			Toggle(db, 'Only in combat', 'showOnlyInCombat'),
+			Toggle(db, 'Color by stack count', 'colorByStacks'),
+		} },
+		{ get = function() return db.displayMode == 'BARS' end, set = function(value) db.displayMode = value and 'BARS' or 'TEXT' end },
+	}, Refresh)
+end
 
-        local Hunter, Monk, Druid = BuffTracking.Hunter, BuffTracking.Monk, BuffTracking.Druid
+local function PackLeaderRows(board)
+	local db = BUI.GetDB().packLeader
+	local Overlay = BuffTracking.KillCommandOverlay
+	local function Refresh()
+		RefreshTracker('packLeader')
+		Overlay.Refresh()
+	end
+	Display.RegisterAnchorCallback('packLeader', Repaint)
+	local function Beast(key, label)
+		return {
+			kind = 'swatch', label = label, tooltip = label,
+			get = function()
+				local color = db.beastColors[key]
+				return color.r, color.g, color.b, 1
+			end,
+			set = function(red, green, blue) db.beastColors[key] = { r = red, g = green, b = blue } end,
+		}
+	end
+	board:AddTools('Pack Leader', 'Beast cycle icon with the cooldown countdown and the next beast', {
+		Beast('wyvern', 'Wyvern'),
+		Beast('bear', 'Bear'),
+		Beast('boar', 'Boar'),
+		{ icon = 'text', tooltip = 'Labels', title = 'Pack Leader', options = {
+			Option(db, 'Label size', 'labelTextSize', { min = 6, max = 32, step = 1 }),
+			Toggle(db, 'Countdown text', 'showCountdownText'),
+			Toggle(db, 'Next and USE! text', 'showNextText'),
+			Option(db, 'Top text horizontal', 'topTextOffsetX', { min = -LABEL_RANGE, max = LABEL_RANGE, step = 1 }),
+			Option(db, 'Top text vertical', 'topTextOffsetY', { min = -LABEL_RANGE, max = LABEL_RANGE, step = 1 }),
+			Option(db, 'Bottom text horizontal', 'bottomTextOffsetX', { min = -LABEL_RANGE, max = LABEL_RANGE, step = 1 }),
+			Option(db, 'Bottom text vertical', 'bottomTextOffsetY', { min = -LABEL_RANGE, max = LABEL_RANGE, step = 1 }),
+		} },
+		{ tooltip = 'Icons and effects', title = 'Pack Leader', options = {
+			Option(db, 'Icon size', 'iconSize', { min = 16, max = 64, step = 1 }),
+			Option(db, 'Next icon size', 'nextIconSize', { min = 8, max = 64, step = 1 }),
+			Option(db, 'Spacing', 'spacing', { min = 0, max = 16, step = 1 }),
+			Toggle(db, 'Show the next icon', 'showNextIcon'),
+			Toggle(db, 'Only in combat', 'showOnlyInCombat'),
+			Toggle(db, 'Glow when ready', 'glowOnReady'),
+			Toggle(db, 'Animate transitions', 'animateTransitions'),
+		} },
+		BUI.PositionTool(db, { selfTag = 'BUI_PackLeader', noCenter = true }),
+		Eye(db, Refresh),
+		Toggle(db, nil, 'enabled'),
+	}, Refresh, SpellIcon(471876))
+	local overlay = BUI.GetDB().killCommandOverlay
+	board:AddTools('Kill Command overlay', 'Pack Leader countdown and beast name on the Kill Command icon', {
+		Color(overlay, 'Timer color', 'timerColor', false),
+		{ icon = 'text', tooltip = 'Timer and beast name text', title = 'Kill Command overlay', options = {
+			Option(overlay, 'Timer size', 'timerSize', { min = 6, max = 72, step = 1 }),
+			Option(overlay, 'Timer anchor', 'timerAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
+			Option(overlay, 'Timer horizontal', 'timerOffsetX', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 }),
+			Option(overlay, 'Timer vertical', 'timerOffsetY', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 }),
+			Option(overlay, 'Beast name size', 'beastSize', { min = 6, max = 24, step = 1 }),
+			Option(overlay, 'Beast name anchor', 'beastAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
+			Option(overlay, 'Beast name horizontal', 'beastOffsetX', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 }),
+			Option(overlay, 'Beast name vertical', 'beastOffsetY', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 }),
+		} },
+		{ tooltip = 'What it shows', title = 'Kill Command overlay', options = {
+			Toggle(overlay, 'Timer', 'showTimer'),
+			Toggle(overlay, 'Beast name', 'showBeastName'),
+			Toggle(overlay, 'Decimals', 'showDecimals'),
+			Option(overlay, 'Decimals under seconds', 'decimalThreshold', { min = 1, max = 10, step = 1 }),
+		} },
+		Preview(Overlay),
+		Toggle(overlay, nil, 'enabled'),
+	}, Overlay.Refresh, SpellIcon(34026))
+end
 
-        local isSurvival = Hunter.IsSurvivalHunter()
-        local isMarksmanship = Hunter.IsMarksmanshipHunter()
-        local isBeastMastery = Hunter.IsBeastMastery()
-        local isMistweaver = Monk.IsMistweaver()
-        local isRestoration = Druid.IsRestoration()
+local function BestialWrathRow(board)
+	local db = BUI.GetDB().bestialWrathOverlay
+	local Overlay = BuffTracking.BestialWrathOverlay
+	board:AddTools('Bestial Wrath callout', 'HOLD BW, SEND BW and THRASH! on the icon or on screen, needs Wild Thrash', {
+		{ entries = DISPLAYS, width = MENU_WIDTH, get = function() return db.displayMode end, set = function(value) db.displayMode = value end },
+		{ icon = 'text', tooltip = 'Text sizes and placement', title = 'Bestial Wrath callout', options = {
+			Option(db, 'Size on the icon', 'textSize', { min = 6, max = 32, step = 1 }),
+			Option(db, 'Anchor on the icon', 'textAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
+			Option(db, 'Horizontal on the icon', 'textOffsetX', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 }),
+			Option(db, 'Vertical on the icon', 'textOffsetY', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 }),
+			Option(db, 'Size on screen', 'screenTextSize', { min = 12, max = 64, step = 1 }),
+		} },
+		{ tooltip = 'Speech, hints and the screen text', title = 'Bestial Wrath callout', options = {
+			Toggle(db, 'Speak the callouts', 'tts'),
+			Toggle(db, 'Speak the hold cues', 'ttsHold'),
+			Toggle(db, 'Hold Thrash hint, 10 to 13 seconds in', 'showHoldThrash'),
+			Toggle(db, 'Screen text only in combat', 'screenCombatOnly'),
+			{ label = 'Unlock the screen text to drag it', get = function() return db.screenLocked == false end, set = function(value) db.screenLocked = not value end },
+		} },
+		BUI.PositionTool(db, { noCenter = true }),
+		Preview(Overlay),
+		Toggle(db, nil, 'enabled'),
+	}, Overlay.Refresh, SpellIcon(19574))
+end
 
-        local page = Layout.Page(pageFrame, nil)
-        pageFrame._page = page
-        local tab = page:GetTab(1)
+local function SmartMisdirectRow(board)
+	local db = BUI.GetDB().smartMisdirect
+	local SmartMisdirect = BuffTracking.SmartMisdirect
+	board:AddTools('Smart Misdirection', 'One button that aims at your override, focus, tank or pet. Bind it in Key Bindings or macro /click BUI_SmartMisdirect LeftButton. Right-click a group member to pin them.', {
+		{ tooltip = 'Who it picks', title = 'Smart Misdirection', options = {
+			{ label = 'Override target', kind = 'input', placeholder = 'Name', get = function() return db.overrideName end, set = function(text)
+				db.overrideName = text
+				db.overrideRealm = ''
+			end },
+			Toggle(db, 'Use your focus', 'useFocus'),
+			Toggle(db, 'Prefer the tank', 'preferTank'),
+			Option(db, 'Which tank', 'tankMethod', { entries = SmartMisdirect.TANK_METHOD_ITEMS }),
+			Toggle(db, 'Fall back to your pet', 'fallbackPet'),
+		} },
+		{ text = 'Create macro', onClick = SmartMisdirect.CreateMacro },
+		Toggle(db, nil, 'enabled'),
+	}, SmartMisdirect.Refresh, SpellIcon(34477))
+end
 
-        local enable
-        enable = Layout.ModuleHeader(tab, {
-            icon = BUI.C.ICON_PATH,
-            title = 'Buff Tracking',
-            subtitle = 'Trackers for buffs you want to keep up. Turning the module on or off needs a reload.',
-            iconToggles = true,
-            enabled = BUI.IsModuleEnabled('buffTracking'),
-            onToggle = function(value)
-                BUI.ModulesPage.ConfirmReload('buffTracking', value, function() enable:SetValue(not value) end)
-            end,
-        })
+local function Sections(ui, _, parent, width)
+	fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
+	sounds = BUI.BuildSoundDropdownItems()
+	local Hunter, Monk, Druid = BuffTracking.Hunter, BuffTracking.Monk, BuffTracking.Druid
+	local boards = {}
+	local function Board(title, description)
+		local board = ui.Board(parent, width, { stacked = true, title = title, description = description })
+		if #boards == 0 then
+			board:AddSwitch('Buff tracking module', function() return BUI.IsModuleEnabled('buffTracking') end, function(value)
+				BUI.ModulesPage.ConfirmReload('buffTracking', value, Repaint)
+			end, 'Turning it on or off needs a reload')
+		end
+		boards[#boards + 1] = board
+		return board
+	end
+	if Hunter.IsBeastMastery() then
+		PackLeaderRows(Board('Pack Leader', 'Beast cycle helpers for Pack Leader.'))
+		local procs = Board('Procs', 'Text callouts for procs and stacks. The eye on a row lets you drag it, right-click the text to lock it again.')
+		TextRow(procs, 'hunterKillCommand', 'BUI_BuffTrackingHunterKC', { title = 'Kill Command', description = 'Text alert when Kill Command procs', spell = 34026 })
+		TextRow(procs, 'hunterCobraFang', 'BUI_BuffTrackingHunterCF', { title = 'Cobra Fang', description = 'Live tier set stack count, spent by Cobra Shot, up to 4', spell = 193455 })
+		BestialWrathRow(Board('AoE burst', 'Bestial Wrath callouts for Wild Thrash.'))
+	elseif Hunter.IsSurvivalHunter() then
+		local procs = Board('Procs', 'Stacks and text callouts. The eye on a row lets you drag it, right-click the text to lock it again.')
+		StackRows(procs, 'hunterTip', 'BUI_BuffTrackingHunterTip', 3, { title = 'Tip of the Spear', description = 'Stacks as bars or a number, up to 3', spell = 260286 })
+		TextRow(procs, 'hunterRaptorSwipe', 'BUI_BuffTrackingHunterRS', { title = 'Raptor Swipe', description = 'Text alert while Raptor Swipe is active', spell = 1273155, textLabel = 'Text', altTextLabel = 'Text without Tip stacks' })
+		TextRow(procs, 'hunterRaptorPrompt', 'BUI_BuffTrackingHunterRaptorPrompt', { title = 'Raptor Prompt', description = 'Reminder to cast Raptor Strike when nothing else is up', spell = 186270 })
+		PackLeaderRows(Board('Pack Leader', 'Beast cycle helpers for Pack Leader.'))
+	elseif Hunter.IsMarksmanshipHunter() then
+		local procs = Board('Procs', 'Text callouts for procs. The eye on a row lets you drag it, right-click the text to lock it again.')
+		TextRow(procs, 'hunterPreciseShots', 'BUI_BuffTrackingHunterPS', { title = 'Precise Shots', description = 'Text alert while Precise Shots is active', spell = 260242 })
+		TextRow(procs, 'hunterLockAndLoad', 'BUI_BuffTrackingHunterLnL', { title = 'Lock and Load', description = 'Text alert when Lock and Load procs', spell = 194594 })
+		TextRow(procs, 'hunterBulletstorm', 'BUI_BuffTrackingHunterBS', { title = 'Bulletstorm', description = 'Empowered Aimed Shots left after Rapid Fire', spell = 389019 })
+	end
+	if Hunter.IsBeastMasteryOrSurvival() or Hunter.IsMarksmanshipHunter() then
+		local utility = Board('Utility', 'Misdirection helpers.')
+		SmartMisdirectRow(utility)
+		TextRow(utility, 'misdirectAlert', 'BUI_MisdirectAlert', {
+			title = 'Misdirect alert', description = 'On-screen text naming your current Misdirection target', spell = 34477, textLabel = 'Prefix', tooltip = 'When it shows',
+			options = function(db)
+				return {
+					Option(db, 'Show', 'alertMode', { entries = ALERT_MODES }),
+					Option(db, 'Flash for seconds', 'flashSeconds', { min = 1, max = 10, step = 1 }),
+					Toggle(db, 'Flash on cast', 'flashOnCast'),
+					Toggle(db, 'Flash on target change', 'flashOnTargetChange'),
+				}
+			end,
+		})
+	end
+	if Monk.IsMistweaver() then
+		TextRow(Board('Mistweaver', 'Reminders for Mistweaver procs.'), 'monkVivaciousVivification', 'BUI_MonkVivaciousVivification', { title = 'Vivacious Vivification', description = 'Reminder when your instant Vivify is ready', spell = 392883 })
+	elseif Druid.IsRestoration() then
+		TextRow(Board('Restoration', 'Reminders for Restoration upkeep.'), 'druidLifebloom', 'BUI_DruidLifebloom', {
+			title = 'Lifebloom refresh', description = 'REFRESH when your Lifebloom on anyone in the group is about to fall off', spell = 33763, noSound = true, tooltip = 'Timing',
+			options = function(db) return { Option(db, 'Refresh at seconds left', 'refreshSeconds', { min = 1, max = 8, step = 0.5 }) } end,
+		})
+	end
+	if #boards == 0 then
+		Board('Class', 'Trackers for the buffs and procs of your spec.'):AddRow('Nothing for this spec yet', 'Hunters, Mistweaver Monks and Restoration Druids have class trackers')
+	end
+	return boards
+end
 
-        if isBeastMastery then
-            Layout.Section(tab, 'Pack Leader')
-            PackLeaderRow(tab)
-            KillCommandOverlayRow(tab)
+BUI.BuffTrackingPage = { Class = Sections }
 
-            Layout.Section(tab, 'Procs')
-            TextTrackerRow(tab, 'hunterKillCommand', 'BUI_BuffTrackingHunterKC', {
-                title = 'Kill Command',
-                description = 'Text alert when Kill Command procs',
-                icon = SpellIcon(34026),
-            })
-            TextTrackerRow(tab, 'hunterCobraFang', 'BUI_BuffTrackingHunterCF', {
-                title = 'Cobra Fang',
-                description = 'Live tier set stack count, spent by Cobra Shot (max 4)',
-                icon = SpellIcon(193455),
-            })
-
-            Layout.Section(tab, 'AoE Burst')
-            BestialWrathOverlayRow(tab)
-        elseif isSurvival then
-            Layout.Section(tab, 'Procs')
-            StackTrackerRow(tab, 'hunterTip', 'BUI_BuffTrackingHunterTip', 3, {
-                title = 'Tip of the Spear',
-                description = 'Stack bars for Tip of the Spear (max 3)',
-                icon = SpellIcon(260286),
-            })
-            TextTrackerRow(tab, 'hunterRaptorSwipe', 'BUI_BuffTrackingHunterRS', {
-                title = 'Raptor Swipe',
-                description = 'Text alert while Raptor Swipe is active',
-                icon = SpellIcon(1273155),
-                textLabel = 'Text (default)',
-                altTextLabel = 'Text (no Tip stacks)',
-            })
-            TextTrackerRow(tab, 'hunterRaptorPrompt', 'BUI_BuffTrackingHunterRaptorPrompt', {
-                title = 'Raptor Prompt',
-                description = 'Reminder to cast Raptor Strike when nothing else is up',
-                icon = SpellIcon(186270),
-            })
-            Layout.Section(tab, 'Pack Leader')
-            PackLeaderRow(tab)
-            KillCommandOverlayRow(tab)
-        elseif isMarksmanship then
-            Layout.Section(tab, 'Procs')
-            TextTrackerRow(tab, 'hunterPreciseShots', 'BUI_BuffTrackingHunterPS', {
-                title = 'Precise Shots',
-                description = 'Text alert while Precise Shots is active',
-                icon = SpellIcon(260242),
-            })
-            TextTrackerRow(tab, 'hunterLockAndLoad', 'BUI_BuffTrackingHunterLnL', {
-                title = 'Lock and Load',
-                description = 'Text alert when Lock and Load procs',
-                icon = SpellIcon(194594),
-            })
-            TextTrackerRow(tab, 'hunterBulletstorm', 'BUI_BuffTrackingHunterBS', {
-                title = 'Bulletstorm',
-                description = 'Empowered Aimed Shots remaining after Rapid Fire',
-                icon = SpellIcon(389019),
-            })
-        end
-
-        if isBeastMastery or isSurvival or isMarksmanship then
-            Layout.Section(tab, 'Utility')
-            SmartMisdirectRow(tab)
-            TextTrackerRow(tab, 'misdirectAlert', 'BUI_MisdirectAlert', {
-                title = 'Misdirect Alert',
-                description = 'On screen text naming your current Misdirection target',
-                icon = SpellIcon(34477),
-                textLabel = 'Prefix',
-                extraOptions = function(GetSettings, Refresh)
-                    return {
-                        { kind = 'dropdown', label = 'Display', items = {
-                            { value = 'flash', text = 'Flash Briefly' },
-                            { value = 'stay',  text = 'Stay On Screen' },
-                          },
-                          get = function() return GetSettings().alertMode end,
-                          set = function(value) GetSettings().alertMode = value; Refresh() end },
-                        { kind = 'slider', label = 'Flash Seconds', min = 1, max = 10,
-                          get = function() return GetSettings().flashSeconds end,
-                          set = function(value) GetSettings().flashSeconds = value end, apply = Refresh },
-                        { kind = 'checkbox', label = 'Flash On Cast',
-                          get = function() return GetSettings().flashOnCast end,
-                          set = function(value) GetSettings().flashOnCast = value end },
-                        { kind = 'checkbox', label = 'Flash On Target Change',
-                          get = function() return GetSettings().flashOnTargetChange end,
-                          set = function(value) GetSettings().flashOnTargetChange = value end },
-                    }
-                end,
-            })
-        end
-
-        if isMistweaver then
-            Layout.Section(tab, 'Mistweaver')
-            TextTrackerRow(tab, 'monkVivaciousVivification', 'BUI_MonkVivaciousVivification', {
-                title = 'Vivacious Vivification',
-                description = 'Reminder when your instant Vivify is ready',
-                icon = SpellIcon(392883),
-            })
-        elseif isRestoration then
-            Layout.Section(tab, 'Restoration')
-            TextTrackerRow(tab, 'druidLifebloom', 'BUI_DruidLifebloom', {
-                title = 'Lifebloom Refresh',
-                description = 'REFRESH when your Lifebloom on anyone in your group is about to fall off',
-                icon = SpellIcon(33763),
-                noSound = true,
-                extraOptions = function(GetSettings, Refresh)
-                    return {
-                        { kind = 'slider', label = 'Refresh At Seconds Left', min = 1, max = 8, step = 0.5,
-                          get = function() return GetSettings().refreshSeconds end,
-                          set = function(value) GetSettings().refreshSeconds = value end, apply = Refresh },
-                    }
-                end,
-            })
-        elseif not (isBeastMastery or isSurvival or isMarksmanship) then
-            Layout.Section(tab, 'Buff Tracking')
-            AddRow(tab, {
-                title = 'Not Available',
-                description = 'Buff tracking is only available for Hunter, Mistweaver Monk and Restoration Druid specs.',
-                plain = true,
-            })
-        end
-
-        page:AutoRefresh()
-    end,
-    OnHide = function()
-        if KillCommandOverlay.IsPreviewing() then KillCommandOverlay.StopPreview() end
-        if BuffTracking.BestialWrathOverlay.IsPreviewing() then BuffTracking.BestialWrathOverlay.StopPreview() end
-        for key in pairs(registeredCallbackKeys) do Display.UnregisterAnchorCallback(key) end
-        wipe(registeredCallbackKeys)
-    end,
-})
-
-BUI.Events:Register("PLAYER_SPECIALIZATION_CHANGED", "BuffTrackingPage", function(_, unit)
-    if unit ~= "player" then return end
-    C_Timer.After(0.3, function()
-        local pageConfig = BUI.PageEngine.pages.buffTracking
-        if pageConfig.frame then pageConfig.stale = true end
-        if BUI.PageEngine.GetCurrentPage() == "buffTracking" then
-            BUI.PageEngine.RefreshCurrentPage()
-        end
-    end)
+BUI.Events:Register('PLAYER_SPECIALIZATION_CHANGED', 'BuffTrackingPage', function(_, unit)
+	if unit ~= 'player' then return end
+	C_Timer.After(0.3, function()
+		local pageConfig = BUI.PageEngine.pages.auras
+		if pageConfig.frame then pageConfig.stale = true end
+		if BUI.PageEngine.GetCurrentPage() == 'auras' then BUI.PageEngine.RefreshCurrentPage() end
+	end)
 end)
