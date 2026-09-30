@@ -80,63 +80,39 @@ local function PositionText(frame, fontString, squareCorner, squareX, squareY, o
 	fontString:SetJustifyH(side)
 end
 
-local function Park(element, options)
+local function Park(element, keepParent)
 	if not element then return end
 	element:Hide()
 	element:SetAlpha(0)
-	if options and options.disableMouse and element.EnableMouse then element:EnableMouse(false) end
-	if options and options.reparent ~= false then element:SetParent(hiddenParent) end
+	if not keepParent then element:SetParent(hiddenParent) end
 end
 
 local function SuppressBlizzardChrome()
-	local reparentHidden = { reparent = true }
-	Park(_G.MinimapBorder,                       reparentHidden)
-	Park(_G.MinimapBorderTop,                    reparentHidden)
-	Park(_G.MinimapBackdrop,                     reparentHidden)
-	Park(_G.MinimapZoneText,                     reparentHidden)
-	Park(_G.MinimapZoneTextButton,               reparentHidden)
-	Park(_G.GameTimeFrame,                       reparentHidden)
-	Park(_G.TimeManagerClockButton,              reparentHidden)
-	Park(_G.MiniMapTracking,                     reparentHidden)
-	Park(_G.MiniMapTrackingButton,               reparentHidden)
-	Park(_G.AddonCompartmentFrame,               reparentHidden)
-
 	local cluster = _G.MinimapCluster
-	if cluster then
-		Park(cluster.BorderTop,        reparentHidden)
-		Park(cluster.BorderBottom,     reparentHidden)
-		Park(cluster.BorderLeft,       reparentHidden)
-		Park(cluster.BorderRight,      reparentHidden)
-		Park(cluster.ZoneTextButton,   reparentHidden)
-		Park(cluster.Tracking,         reparentHidden)
-		cluster:EnableMouse(false)
+	Park(_G.MinimapBackdrop)
+	Park(_G.MinimapZoneText)
+	Park(_G.GameTimeFrame)
+	Park(_G.TimeManagerClockButton)
+	Park(_G.AddonCompartmentFrame)
+	Park(cluster.BorderTop)
+	Park(cluster.ZoneTextButton)
+	Park(cluster.Tracking)
+	Park(WoWMinimap.ZoomHitArea)
+	cluster:EnableMouse(false)
+
+	for _, zoom in ipairs({ WoWMinimap.ZoomIn, WoWMinimap.ZoomOut }) do
+		Park(zoom, true)
+		zoom:EnableMouse(false)
 	end
 
-	local zoomOpts = { disableMouse = true, reparent = false }
-	Park(_G.MinimapZoomIn,         zoomOpts)
-	Park(_G.MinimapZoomOut,        zoomOpts)
-	Park(WoWMinimap.ZoomIn,        zoomOpts)
-	Park(WoWMinimap.ZoomOut,       zoomOpts)
-	Park(WoWMinimap.ZoomHitArea,   reparentHidden)
+	cluster.IndicatorFrame.MailFrame:SetParent(indicatorHolder)
+	cluster.IndicatorFrame.CraftingOrderFrame:SetParent(indicatorHolder)
 
-	if cluster then
-		local indicatorFrame = cluster.IndicatorFrame
-		if indicatorFrame then
-			if indicatorFrame.MailFrame then indicatorFrame.MailFrame:SetParent(indicatorHolder) end
-			if indicatorFrame.CraftingOrderFrame then indicatorFrame.CraftingOrderFrame:SetParent(indicatorHolder) end
+	local keep = { [WoWMinimap] = true, [cluster.InstanceDifficulty] = true, [_G.ExpansionLandingPageMinimapButton] = true }
+	for _, parent in ipairs({ cluster, cluster.MinimapContainer }) do
+		for _, child in pairs({ parent:GetChildren() }) do
+			if not keep[child] then Park(child, true) end
 		end
-		local difficulty = cluster.InstanceDifficulty
-		local landing = _G.ExpansionLandingPageMinimapButton
-		local function suppressChildren(parent)
-			if not parent then return end
-			for _, child in pairs({ parent:GetChildren() }) do
-				if child ~= WoWMinimap and child ~= difficulty and child ~= landing then
-					Park(child, { reparent = false })
-				end
-			end
-		end
-		suppressChildren(cluster)
-		suppressChildren(cluster.MinimapContainer)
 	end
 end
 
@@ -170,7 +146,7 @@ end
 
 local function ApplyShape()
 	WoWMinimap:SetMaskTexture(SQUARE_MASK)
-	if _G.MinimapCompassTexture then _G.MinimapCompassTexture:Hide() end
+	_G.MinimapCompassTexture:Hide()
 	WoWMinimap:SetArchBlobRingScalar(0)
 	WoWMinimap:SetArchBlobRingAlpha(0)
 	WoWMinimap:SetQuestBlobRingScalar(0)
@@ -400,18 +376,15 @@ local function UpdateDifficultyText()
 end
 
 local function GetBlizzardDifficultyFrame()
-	local cluster = _G.MinimapCluster
-	return cluster and cluster.InstanceDifficulty
+	return _G.MinimapCluster.InstanceDifficulty
 end
 
 local function GetMailFrame()
-	local cluster = _G.MinimapCluster
-	return cluster and cluster.IndicatorFrame and cluster.IndicatorFrame.MailFrame
+	return _G.MinimapCluster.IndicatorFrame.MailFrame
 end
 
 local function GetCraftingOrderFrame()
-	local cluster = _G.MinimapCluster
-	return cluster and cluster.IndicatorFrame and cluster.IndicatorFrame.CraftingOrderFrame
+	return _G.MinimapCluster.IndicatorFrame.CraftingOrderFrame
 end
 
 function Minimap.ToggleTextDifficulty(enabled)
@@ -463,7 +436,6 @@ end
 
 local function SizeQueueEye(frame, target)
 	local eye = frame.Eye
-	if not eye then return end
 	local frameWidth = frame:GetWidth()
 	local eyeWidth = eye:GetWidth()
 	if eyeWidth > frameWidth then frameWidth = eyeWidth end
@@ -472,7 +444,7 @@ local function SizeQueueEye(frame, target)
 end
 
 local function MakeDraggable(frame, key)
-	if not frame or frame._buiDragKey then return end
+	if frame._buiDragKey then return end
 	frame._buiDragKey = key
 	frame:SetMovable(true)
 	frame:RegisterForDrag('LeftButton')
@@ -506,13 +478,7 @@ local function MakeDraggable(frame, key)
 	end)
 end
 
-local function WantedIndicatorParent(frame)
-	if frame == GetMailFrame() or frame == GetCraftingOrderFrame() then return indicatorHolder end
-	return WoWMinimap
-end
-
-local function ApplyIndicatorPosition(frame, point, x, y)
-	local parent = WantedIndicatorParent(frame)
+local function ApplyIndicatorPosition(frame, parent, point, x, y)
 	if frame:GetParent() == parent and frame:GetNumPoints() == 1 then
 		local currentPoint, currentRelative, currentRelativePoint, currentX, currentY = frame:GetPoint(1)
 		if currentPoint == point and currentRelative == WoWMinimap and currentRelativePoint == point and currentX == x and currentY == y then
@@ -527,6 +493,7 @@ end
 local indicators = {
 	{
 		key = 'queue',
+		hide = 'minimapHideQueue',
 		Resolve = function() return _G.QueueStatusButton end,
 		dockable = true,
 		squareDefault = { 'BOTTOMLEFT',   5,   5 },
@@ -534,30 +501,47 @@ local indicators = {
 	},
 	{
 		key = 'difficulty',
+		hide = 'minimapHideDifficulty',
 		Resolve = GetBlizzardDifficultyFrame,
 		squareDefault = { 'BOTTOMRIGHT', -5,   5 },
 	},
 	{
 		key = 'mail',
+		hide = 'minimapHideMail',
 		Resolve = GetMailFrame,
 		dockable = true,
+		holder = true,
 		squareDefault = { 'TOPLEFT',  5, -30 },
 	},
 	{
 		key = 'crafting',
+		hide = 'minimapHideCrafting',
 		Resolve = GetCraftingOrderFrame,
 		dockable = true,
+		holder = true,
 		squareDefault = { 'TOPLEFT', 28, -30 },
 		raiseFrameLevel = true,
 	},
 	{
 		key = 'missions',
+		hide = 'minimapHideGarrison',
 		Resolve = function() return _G.ExpansionLandingPageMinimapButton end,
 		dockable = true,
 		squareDefault = { 'TOPRIGHT', -5, -30 },
 		raiseFrameLevel = true,
 	},
 }
+
+local function IndicatorHidden(indicator)
+	local interfaceDB = GetConfig()
+	if interfaceDB[indicator.hide] then return true end
+	return indicator.key == 'difficulty' and interfaceDB.minimapTextDifficulty
+end
+
+local function IndicatorParent(indicator)
+	if IndicatorHidden(indicator) then return hiddenParent end
+	return indicator.holder and indicatorHolder or WoWMinimap
+end
 
 local function FindIndicator(key)
 	for indicatorIndex = 1, #indicators do
@@ -572,16 +556,11 @@ local function IndicatorPlacement(indicator)
 	return default[1], default[2], default[3]
 end
 
-function Minimap.GetIndicatorPlacement(key)
-	return IndicatorPlacement(FindIndicator(key))
-end
-
 local function PositionIndicator(indicator)
 	local frame = indicator.Resolve()
-	if not frame then return end
 	local point, x, y = IndicatorPlacement(indicator)
-	ApplyIndicatorPosition(frame, point, x, y)
-	if frame._buiNativeW then frame:SetSize(frame._buiNativeW, frame._buiNativeH) end
+	ApplyIndicatorPosition(frame, IndicatorParent(indicator), point, x, y)
+	frame:SetSize(frame._buiNativeW, frame._buiNativeH)
 	local iconScale = GetIconScale(indicator.key)
 	if frame:GetScale() ~= iconScale then frame:SetScale(iconScale) end
 	if indicator.key == 'queue' then SizeQueueEye(frame, GetDockSize() * iconScale) end
@@ -613,9 +592,9 @@ end
 local FOLIO_BASE = 32
 local landingTamed = false
 local function TameLandingButton()
-	local button = _G.ExpansionLandingPageMinimapButton
-	if not button or landingTamed then return end
+	if landingTamed then return end
 	landingTamed = true
+	local button = _G.ExpansionLandingPageMinimapButton
 
 	local clamping = false
 	local function Clamp()
@@ -628,10 +607,10 @@ local function TameLandingButton()
 	hooksecurefunc(button, 'SetSize', Clamp)
 
 	local function Repin()
-		if IsEnabled() then Minimap.RepositionIndicators() end
+		Minimap.RepositionIndicators()
 	end
-	if button.UpdateIconForGarrison then hooksecurefunc(button, 'UpdateIconForGarrison', Repin) end
-	if button.SetLandingPageIconOffset then hooksecurefunc(button, 'SetLandingPageIconOffset', Repin) end
+	hooksecurefunc(button, 'UpdateIconForGarrison', Repin)
+	hooksecurefunc(button, 'SetLandingPageIconOffset', Repin)
 end
 
 local relayouting = false
@@ -649,8 +628,9 @@ local function LayoutDocked(anchor)
 	local dockedCount = 0
 	for _, indicator in ipairs(indicators) do
 		local frame = indicator.Resolve()
-		if indicator.dockable and frame and frame:IsShown() then
-			local parent = WantedIndicatorParent(frame)
+		local hidden = IndicatorHidden(indicator)
+		if indicator.dockable and frame:IsShown() and not hidden then
+			local parent = IndicatorParent(indicator)
 			if frame:GetParent() ~= parent then frame:SetParent(parent) end
 			frame:ClearAllPoints()
 			local offset = anchor.dirX * dockedCount * step
@@ -667,15 +647,15 @@ local function LayoutDocked(anchor)
 				SizeQueueEye(frame, size * iconScale)
 			else
 				local iconScale = GetIconScale(indicator.key)
-				local baseWidth = frame._buiNativeW or frame:GetWidth()
-				if not baseWidth or baseWidth <= 1 then baseWidth = size end
+				local baseWidth = frame._buiNativeW
+				if baseWidth <= 1 then baseWidth = size end
 				local iconFit = size * iconScale / baseWidth
 				frame:SetScale(iconFit)
 				frame:SetPoint(anchor.point, WoWMinimap, anchor.point, (anchor.x + offset) / iconFit, anchor.y / iconFit)
 			end
 			if indicator.raiseFrameLevel then frame:SetFrameLevel(WoWMinimap:GetFrameLevel() + 5) end
 			dockedCount = dockedCount + 1
-		elseif not indicator.dockable and frame then
+		elseif hidden or not indicator.dockable then
 			PositionIndicator(indicator)
 		end
 	end
@@ -688,24 +668,18 @@ local function PositionAllIndicators()
 	for indicatorIndex = 1, #indicators do
 		local indicator = indicators[indicatorIndex]
 		if not indicator.hooked then
+			indicator.hooked = true
 			local frame = indicator.Resolve()
-			if frame then
-				indicator.hooked = true
-				if not frame._buiNativeW then
-					frame._buiNativeW, frame._buiNativeH = frame:GetSize()
+			frame._buiNativeW, frame._buiNativeH = frame:GetSize()
+			HookSetPoint(frame, indicator.key, function()
+				if DOCK_ANCHORS[GetDock()] then PositionAllIndicators() else PositionIndicator(indicator) end
+			end)
+			if indicator.dockable then
+				local function RelayoutDock()
+					if not relayouting and DOCK_ANCHORS[GetDock()] then PositionAllIndicators() end
 				end
-				HookSetPoint(frame, indicator.key, function()
-					if DOCK_ANCHORS[GetDock()] then PositionAllIndicators() else PositionIndicator(indicator) end
-				end)
-				if indicator.dockable then
-					local function RelayoutDock()
-						if IsEnabled() and not relayouting and DOCK_ANCHORS[GetDock()] then
-							PositionAllIndicators()
-						end
-					end
-					frame:HookScript('OnShow', RelayoutDock)
-					frame:HookScript('OnHide', RelayoutDock)
-				end
+				frame:HookScript('OnShow', RelayoutDock)
+				frame:HookScript('OnHide', RelayoutDock)
 			end
 		end
 	end
@@ -785,39 +759,14 @@ function Minimap.ToggleRotation(enabled)
 end
 
 local function ReplayMailNotification(element)
-	if not element or not element.TryPlayMailNotification then return end
-	if not element:IsShown() then return end
-	element:TryPlayMailNotification()
-end
-
-local function SetIndicatorVisible(element, visible)
-	if not element then return end
-	if visible then
-		if element._buiForcedHide then
-			element._buiForcedHide = nil
-			element:Show()
-			ReplayMailNotification(element)
-		end
-		element:SetAlpha(1)
-		element:EnableMouse(true)
-	else
-		element:SetAlpha(0)
-		element:EnableMouse(false)
-		element:Hide()
-		element._buiForcedHide = true
-	end
+	if element:IsShown() then element:TryPlayMailNotification() end
 end
 
 function Minimap.ApplyVisibility()
-	local interfaceDB = GetConfig()
-	local blizzard = GetBlizzardDifficultyFrame()
-	if blizzard then
-		local hidden = interfaceDB.minimapTextDifficulty or interfaceDB.minimapHideDifficulty
-		SetIndicatorVisible(blizzard, not hidden)
-	end
-	SetIndicatorVisible(GetMailFrame(),                       not interfaceDB.minimapHideMail)
-	SetIndicatorVisible(GetCraftingOrderFrame(),              not interfaceDB.minimapHideCrafting)
-	SetIndicatorVisible(_G.ExpansionLandingPageMinimapButton, not interfaceDB.minimapHideGarrison)
+	local mail = GetMailFrame()
+	local mailWasHidden = mail:GetParent() == hiddenParent
+	PositionAllIndicators()
+	if mailWasHidden and mail:GetParent() ~= hiddenParent then ReplayMailNotification(mail) end
 end
 
 function Minimap.IsUnlocked()
@@ -901,30 +850,9 @@ function Minimap.ToggleUnlock(unlock)
 	end
 end
 
-local function ApplyDrawer()
-	local interfaceDB = GetConfig()
-	if interfaceDB.drawerEnabled then
-		BUI.Drawer.SetOffset(interfaceDB.drawerX, interfaceDB.drawerY)
-		BUI.Drawer.SetSide(interfaceDB.drawerSide)
-		BUI.Drawer.Enable()
-	else
-		BUI.Drawer.Disable()
-	end
-end
-
-function Minimap.ToggleDrawer(enabled)
-	GetConfig().drawerEnabled = enabled
-	ApplyDrawer()
-end
-
-function Minimap.SetDrawerSide(side)
-	GetConfig().drawerSide = side
-	BUI.Drawer.SetSide(side)
-end
-
-function Minimap.RepositionDrawer()
-	local interfaceDB = GetConfig()
-	BUI.Drawer.SetOffset(interfaceDB.drawerX, interfaceDB.drawerY)
+function Minimap.SetAddonButtons(mode)
+	GetConfig().addonButtons = mode
+	if IsEnabled() then BUI.AddonButtons.SetMode(mode) end
 end
 
 function Minimap.Enable()
@@ -946,12 +874,10 @@ function Minimap.Enable()
 
 	Minimap.ToggleClock(interfaceDB.minimapClock)
 	Minimap.ToggleZoneText(interfaceDB.minimapZone)
-	ApplyDrawer()
-	BUI.MinimapButtonBar.Refresh()
+	BUI.AddonButtons.SetMode(interfaceDB.addonButtons)
 	Minimap.ToggleTextDifficulty(interfaceDB.minimapTextDifficulty)
 
 	PositionAllIndicators()
-	Minimap.ApplyVisibility()
 	ReplayMailNotification(GetMailFrame())
 end
 
@@ -964,16 +890,30 @@ end
 
 Minimap.RepositionIndicators = PositionAllIndicators
 Minimap.GetIconScale = GetIconScale
-Minimap.SaveIndicatorPosition = SaveIndicatorPosition
 
 function Minimap.SetIconScale(key, scale)
+	local point, x, y = IndicatorPlacement(FindIndicator(key))
+	local ratio = GetIconScale(key) / scale
+	SaveIndicatorPosition(key, point, x * ratio, y * ratio)
 	GetConfig().minimapIconScale[key] = scale
 	if IsEnabled() then PositionAllIndicators() end
 end
 
-function Minimap.GetDock() return GetDock() end
+function Minimap.GetIndicatorOffset(key)
+	local point, x, y = IndicatorPlacement(FindIndicator(key))
+	local iconScale = GetIconScale(key)
+	return point, x * iconScale, y * iconScale
+end
 
-function Minimap.GetIconSize() return GetDockSize() end
+function Minimap.SetIndicatorOffset(key, point, x, y)
+	local iconScale = GetIconScale(key)
+	SaveIndicatorPosition(key, point, x / iconScale, y / iconScale)
+	if IsEnabled() then PositionAllIndicators() end
+end
+
+Minimap.GetDock = GetDock
+
+Minimap.GetIconSize = GetDockSize
 
 local initialized = false
 
@@ -994,21 +934,18 @@ function Minimap.Initialize()
 			if IsEnabled() then
 				PositionAllIndicators()
 				UpdateBackdrop()
-				Minimap.ApplyVisibility()
 			end
 		end)
 
 		Events:Register('EDIT_MODE_LAYOUTS_UPDATED', 'MinimapEditMode', function()
 			if IsEnabled() then
 				PositionAllIndicators()
-				Minimap.ApplyVisibility()
 			end
 		end)
 
 		EditModeManagerFrame:HookScript('OnHide', function()
 			if IsEnabled() then
 				PositionAllIndicators()
-				Minimap.ApplyVisibility()
 			end
 		end)
 

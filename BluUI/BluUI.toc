@@ -183,6 +183,7 @@ Modules\Datatext\Datatexts\Combat.lua
 Modules\Datatext\Datatexts\Currencies.lua
 Modules\Datatext\Datatexts\Time.lua
 Modules\Datatext\Initialize.lua
+Modules\Minimap\AddonButtons.lua
 Modules\Minimap\Drawer.lua
 Modules\Minimap\ButtonBar.lua
 Modules\Minimap\Menu.lua

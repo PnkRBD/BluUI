@@ -43,8 +43,6 @@ end
 
 local menu
 local sectionRows = {}
-local PopulateTracking
-local RefreshSubtitle
 
 local function CalendarAtlas()
 	return 'UI-HUD-Calendar-' .. tonumber(date('%d')) .. '-Up'
@@ -112,6 +110,23 @@ local function BuildSectionRow(section)
 	return row
 end
 
+local function RefreshSubtitle()
+	local parts = {}
+	local zone = GetZoneText()
+	local subZone = GetSubZoneText()
+	if zone and zone ~= '' then parts[#parts + 1] = zone end
+	if subZone and subZone ~= '' and subZone ~= zone then parts[#parts + 1] = subZone end
+
+	local activeCount = 0
+	for trackingIndex = 1, C_Minimap.GetNumTrackingTypes() do
+		local info = C_Minimap.GetTrackingInfo(trackingIndex)
+		if info and info.active then activeCount = activeCount + 1 end
+	end
+	parts[#parts + 1] = format('%d tracking active', activeCount)
+
+	menu.subtitle:SetText(table.concat(parts, '   ·   '))
+end
+
 local function RefreshSelection()
 	local buckets = CollectSections()
 	for _, section in ipairs(SECTIONS) do
@@ -162,23 +177,6 @@ end
 local function RefreshAccent()
 	local red, green, blue = BUI.GetAccentColor()
 	menu.title:SetText(format('Tracking |cff%s&|r Tools', BUI.Hex(red, green, blue)))
-end
-
-RefreshSubtitle = function()
-	local parts = {}
-	local zone = GetZoneText()
-	local subZone = GetSubZoneText()
-	if zone and zone ~= '' then parts[#parts + 1] = zone end
-	if subZone and subZone ~= '' and subZone ~= zone then parts[#parts + 1] = subZone end
-
-	local activeCount = 0
-	for trackingIndex = 1, C_Minimap.GetNumTrackingTypes() do
-		local info = C_Minimap.GetTrackingInfo(trackingIndex)
-		if info and info.active then activeCount = activeCount + 1 end
-	end
-	parts[#parts + 1] = format('%d tracking active', activeCount)
-
-	menu.subtitle:SetText(table.concat(parts, '   ·   '))
 end
 
 local function BuildMenu()
@@ -235,7 +233,7 @@ local function BuildMenu()
 	return menu
 end
 
-PopulateTracking = function()
+local function PopulateTracking()
 	local buckets = CollectSections()
 	local visibleRows = 0
 

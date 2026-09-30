@@ -15,6 +15,10 @@ local CAPTION_Y = 10
 local PLAIN_ROW = 44
 local CONTROL_GAP = 12
 local ICON_SIZE = 24
+local DRAG_ROW = 44
+local DRAG_TITLE_X = 44
+local GRABBER_SIZE = 12
+local DRAG_ALPHA = 0.35
 
 local Section = Layout.TableSection
 local Board = setmetatable({}, { __index = Section })
@@ -58,16 +62,16 @@ function Board:AddRow(name, sub, room)
 	return row
 end
 
-function Board:AddTools(name, sub, tools, after, icon)
+function Board:AddTools(name, sub, tools, after, paintIcon)
 	local kit = self.kit
 	local row = Section.AddRow(self, sub and (name .. ' ' .. sub) or name)
 	local x = kit.ROW_INSET
-	if icon then
+	if paintIcon then
 		local texture = row:CreateTexture(nil, 'ARTWORK')
 		texture:SetSize(ICON_SIZE, ICON_SIZE)
 		texture:SetPoint('LEFT', x, 0)
-		texture:SetTexture(icon)
-		texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		paintIcon(texture)
+		row.icon = texture
 		x = x + ICON_SIZE + CONTROL_GAP
 	end
 	local title, subtitle = kit.RowTitle(row, name, sub, x)
@@ -82,6 +86,79 @@ function Board:AddTools(name, sub, tools, after, icon)
 		end,
 	}
 	row.controls = placer.controls
+	return row
+end
+
+local function DragGhost(board)
+	local drag = board.drag
+	if drag.ghost then return drag.ghost end
+	local kit = board.kit
+	local ghost = CreateFrame('Frame', nil, board.panel)
+	ghost:SetFrameLevel(board.panel:GetFrameLevel() + 10)
+	ghost:SetSize(board.panelWidth, DRAG_ROW)
+	kit.Fill(ghost, 'control'):SetAllPoints()
+	local edge = kit.Fill(ghost, 'accent', 'ARTWORK', 1)
+	edge:SetPoint('TOPLEFT')
+	edge:SetPoint('BOTTOMLEFT')
+	edge:SetWidth(2)
+	kit.Glyph(ghost, 'grabber', GRABBER_SIZE, 'text'):SetPoint('LEFT', kit.ROW_INSET, 0)
+	ghost.label = kit.Text(ghost, '', 12, 'text')
+	ghost.label:SetPoint('LEFT', DRAG_TITLE_X, 0)
+	ghost:Hide()
+	drag.ghost = ghost
+	return ghost
+end
+
+local function TrackDrag(board)
+	local drag = board.drag
+	local _, cursorY = GetCursorPosition()
+	cursorY = cursorY / board.frame:GetEffectiveScale()
+	drag.ghost:ClearAllPoints()
+	drag.ghost:SetPoint('TOPLEFT', board.panel, 'TOPLEFT', 0, -(board.panel:GetTop() - cursorY - drag.grabOffset))
+	local from, over
+	for index, row in ipairs(drag.rows) do
+		if row == drag.dragging then from = index end
+		local top, bottom = row:GetTop(), row:GetBottom()
+		if top and cursorY <= top and cursorY >= bottom then over = index end
+	end
+	if not over or over == from then return end
+	local delta = over > from and 1 or -1
+	drag.rows[from], drag.rows[from + delta] = drag.rows[from + delta], drag.rows[from]
+	board:Move(drag.dragging, delta)
+	drag.onMove(from, delta)
+end
+
+function Board:DragList(onMove, onDrop)
+	self.drag = { rows = {}, onMove = onMove, onDrop = onDrop }
+end
+
+function Board:AddDragRow(label, room)
+	local kit, drag = self.kit, self.drag
+	local row = Section.AddRow(self, label)
+	row:SetHeight(DRAG_ROW)
+	drag.rows[#drag.rows + 1] = row
+	kit.Glyph(row, 'grabber', GRABBER_SIZE, 'faint'):SetPoint('LEFT', kit.ROW_INSET, 0)
+	kit.RowTitle(row, label, nil, DRAG_TITLE_X, self.panelWidth - DRAG_TITLE_X - kit.ROW_INSET - room - CONTROL_GAP)
+	row:EnableMouse(true)
+	row:RegisterForDrag('LeftButton')
+	row:SetScript('OnDragStart', function(frame)
+		local _, cursorY = GetCursorPosition()
+		drag.dragging = frame
+		drag.grabOffset = frame:GetTop() - cursorY / self.frame:GetEffectiveScale()
+		frame:SetAlpha(DRAG_ALPHA)
+		local ghost = DragGhost(self)
+		ghost.label:SetText(label)
+		ghost:Show()
+		TrackDrag(self)
+		frame:SetScript('OnUpdate', function() TrackDrag(self) end)
+	end)
+	row:SetScript('OnDragStop', function(frame)
+		frame:SetScript('OnUpdate', nil)
+		frame:SetAlpha(1)
+		drag.ghost:Hide()
+		drag.dragging = nil
+		drag.onDrop()
+	end)
 	return row
 end
 

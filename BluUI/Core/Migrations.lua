@@ -31,7 +31,7 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 7
+local PROFILE_MIGRATION_VERSION = 9
 local LEGACY_UNIT_KEYS = { 'player', 'target', 'targettarget', 'focus', 'focustarget', 'pet', 'boss', 'arena', 'party' }
 
 function BUI.MigrateProfile(profile)
@@ -332,6 +332,30 @@ function BUI.MigrateProfile(profile)
 			for _, barConfig in pairs(profile.datatextBars) do SplitLabels(barConfig) end
 		end
 		SplitLabels(profile.datatextMinimap)
+	end
+
+	if not general._minimapDatatextAligned then
+		general._minimapDatatextAligned = true
+		local minimapBar = profile.datatextMinimap
+		if type(minimapBar) == 'table' and minimapBar.spread ~= nil then
+			if minimapBar.spread == true or (tonumber(minimapBar.spread) or 0) > 0 then minimapBar.align = 'SPREAD' end
+			minimapBar.spread = nil
+		end
+	end
+
+	if not general._addonButtonsMode then
+		general._addonButtonsMode = true
+		local interface = profile.interface
+		if type(interface) == 'table' then
+			local buttonBar = interface.buttonBar
+			if type(buttonBar) == 'table' and buttonBar.enabled then
+				interface.addonButtons = 'BAR'
+			elseif interface.drawerEnabled == false then
+				interface.addonButtons = 'NONE'
+			end
+			interface.drawerEnabled = nil
+			if type(buttonBar) == 'table' then buttonBar.enabled = nil end
+		end
 	end
 
 	general._buiMigrationVersion = PROFILE_MIGRATION_VERSION
