@@ -122,7 +122,7 @@ function Layout.WindowFrame(config)
 	frame.window = window
 
 	local floorWidth = config.minWidth or 1130
-	local floorHeight = config.minHeight or 720
+	local floorHeight = config.minHeight or 0
 	local maxWidth = config.maxWidth or 1700
 	local maxHeight = config.maxHeight or 1100
 	local minimums = {}
