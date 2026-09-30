@@ -1,5 +1,4 @@
 local _, BUI = ...
-local AceHook = LibStub('AceHook-3.0')
 
 local Drawer = {}
 BUI.Drawer = Drawer
@@ -13,6 +12,7 @@ local MARGIN = 10
 local MAX_COLS = 5
 local TAB_W = 10
 local TAB_H = 44
+local TAB_INSET = 3
 local HIDE_DELAY = 0.3
 local ICON_SIZE = 22
 local ICON_CROP = 0.08
@@ -24,6 +24,13 @@ local TAB_COLOR_NORMAL      = { 0.85,  0.85, 0.85, 1 }
 local TAB_COLOR_HOVER       = { 1,     1,    1,    1 }
 local TAB_COLOR_ERROR       = { 0.937, 0.267, 0.267, 1 }
 local TAB_COLOR_ERROR_HOVER = { 1,     0.4,  0.4,  1 }
+
+local TAB_ANCHORS = {
+	LEFT   = { point = 'LEFT',   dirX = 1,  dirY = 0 },
+	RIGHT  = { point = 'RIGHT',  dirX = -1, dirY = 0 },
+	TOP    = { point = 'TOP',    dirX = 0,  dirY = -1 },
+	BOTTOM = { point = 'BOTTOM', dirX = 0,  dirY = 1 },
+}
 
 local bar, bgFrame, tab
 local buttons = {}
@@ -89,31 +96,25 @@ local function IsVertical()
 	return side == 'TOP' or side == 'BOTTOM'
 end
 
-local function ResizeTab()
-	if not tab then return end
-	local width, height = Pixel.Scale(TAB_W), Pixel.Scale(TAB_H)
-	if IsVertical() then tab:SetSize(height, width) else tab:SetSize(width, height) end
+function Drawer.TabLayout(tabSide, x, y, measure)
+	local width, height = measure(TAB_W), measure(TAB_H)
+	if tabSide == 'TOP' or tabSide == 'BOTTOM' then width, height = height, width end
+	local anchor = TAB_ANCHORS[tabSide]
+	local inset = measure(TAB_INSET)
+	return width, height, anchor.point, anchor.dirX * inset + measure(x), anchor.dirY * inset + measure(y)
 end
 
-local function PlaceTab()
+local function LayoutTab()
 	if not tab then return end
-	local scaledOffsetX, scaledOffsetY = Pixel.Scale(offsetX), Pixel.Scale(offsetY)
+	local width, height, point, x, y = Drawer.TabLayout(side, offsetX, offsetY, Pixel.Scale)
+	tab:SetSize(width, height)
 	tab:ClearAllPoints()
-	if side == 'LEFT' then
-		tab:SetPoint('CENTER', WoWMinimap, 'LEFT',   Pixel.Scale(3) + scaledOffsetX, scaledOffsetY)
-	elseif side == 'RIGHT' then
-		tab:SetPoint('CENTER', WoWMinimap, 'RIGHT',  -Pixel.Scale(3) + scaledOffsetX, scaledOffsetY)
-	elseif side == 'TOP' then
-		tab:SetPoint('CENTER', WoWMinimap, 'TOP',    scaledOffsetX, -Pixel.Scale(3) + scaledOffsetY)
-	else
-		tab:SetPoint('CENTER', WoWMinimap, 'BOTTOM', scaledOffsetX, Pixel.Scale(3) + scaledOffsetY)
-	end
+	tab:SetPoint('CENTER', WoWMinimap, point, x, y)
 end
 
 local function HasBugSackError()
 	if hasSessionError then return true end
-	local libDataBroker = LibStub('LibDataBroker-1.1')
-	local dataObject = libDataBroker:GetDataObjectByName('BugSack')
+	local dataObject = LibStub('LibDataBroker-1.1'):GetDataObjectByName('BugSack')
 	if dataObject and tonumber(dataObject.text) and tonumber(dataObject.text) > 0 then
 		hasSessionError = true
 		return true
@@ -219,7 +220,7 @@ local function ShowDrawer()
 		button:SetFrameLevel(120)
 		button:Show()
 		button:SetAlpha(1)
-		if button._buiBorder then button._buiBorder:Show() end
+		button._buiBorder:Show()
 	end
 
 	bgFrame:Show()
@@ -229,16 +230,14 @@ local function ShowDrawer()
 end
 
 function Drawer.SetSide(newSide)
-	side = newSide or 'LEFT'
-	ResizeTab()
-	PlaceTab()
+	side = newSide
+	LayoutTab()
 	if bar and bar:IsShown() then HideDrawer() end
 end
 
 function Drawer.SetOffset(x, y)
-	offsetX = x or 0
-	offsetY = y or 0
-	PlaceTab()
+	offsetX, offsetY = x, y
+	LayoutTab()
 	if bar and bar:IsShown() then HideDrawer() end
 end
 
@@ -260,12 +259,11 @@ function Drawer.Create()
 	bar:Hide()
 
 	tab = CreateFrame('Button', 'BUI_AddonDrawerTab', UIParent, 'BackdropTemplate')
-	ResizeTab()
 	tab:SetFrameStrata('MEDIUM')
 	tab:SetFrameLevel(111)
 	local color = GetTabColor(false)
 	Pixel.SetTemplate(tab, color[1], color[2], color[3], color[4], 0.1, 0.1, 0.1, 1)
-	PlaceTab()
+	LayoutTab()
 
 	tab:SetScript('OnEnter', ShowDrawer)
 	tab:SetScript('OnLeave', ScheduleHide)
@@ -276,15 +274,11 @@ function Drawer.Create()
 
 	if _G.BugGrabber then
 		HasBugSackError()
-		if EventRegistry and EventRegistry.RegisterCallback then
-			EventRegistry:RegisterCallback('BugGrabber.BugGrabbed', OnErrorCaught, Drawer)
-		end
+		EventRegistry:RegisterCallback('BugGrabber.BugGrabbed', OnErrorCaught, Drawer)
 	end
 
 	Pixel.OnScaleChange('Drawer', Drawer.Refresh)
 end
-
-local StyleDrawerButton
 
 local function FindIconTexture(button)
 	local icon = button.Icon or button.icon
@@ -302,9 +296,8 @@ local function FindIconTexture(button)
 		if region:IsObjectType('Texture') and ClassifyTexture(region) == 'content' then
 			local layer = region:GetDrawLayer()
 			if layer == 'BACKGROUND' or layer == 'ARTWORK' then
-				local name = region.GetDebugName and region:GetDebugName():lower() or ''
-				local texturePath = region.GetTexture and region:GetTexture()
-				if name:find('icon', 1, true) or (type(texturePath) == 'string' and texturePath:lower():find('icon', 1, true)) then
+				local texturePath = region:GetTexture()
+				if region:GetDebugName():lower():find('icon', 1, true) or (type(texturePath) == 'string' and texturePath:lower():find('icon', 1, true)) then
 					return region
 				end
 				local width, height = region:GetSize()
@@ -317,7 +310,6 @@ local function FindIconTexture(button)
 end
 
 local function HasClickHandler(frame)
-	if not frame.HasScript then return false end
 	if frame:HasScript('OnClick')     and frame:GetScript('OnClick')     then return true end
 	if frame:HasScript('OnMouseUp')   and frame:GetScript('OnMouseUp')   then return true end
 	if frame:HasScript('OnMouseDown') and frame:GetScript('OnMouseDown') then return true end
@@ -350,8 +342,8 @@ local function FreezeButton(button)
 		SetWidth       = button.SetWidth,
 		SetHeight      = button.SetHeight,
 	}
-	if button.SetFixedFrameStrata then button:SetFixedFrameStrata(false) end
-	if button.SetFixedFrameLevel  then button:SetFixedFrameLevel(false)  end
+	button:SetFixedFrameStrata(false)
+	button:SetFixedFrameLevel(false)
 	button.SetPoint, button.ClearAllPoints = noop, noop
 	button.SetParent, button.SetScale = noop, noop
 	button.SetSize, button.SetWidth, button.SetHeight = noop, noop, noop
@@ -360,11 +352,37 @@ end
 local function UnfreezeButton(button)
 	if not button._buiFrozen then return end
 	button._buiFrozen = nil
-	if not button._buiOriginalFuncs then return end
 	for name, originalFunc in pairs(button._buiOriginalFuncs) do
 		button[name] = originalFunc
 	end
 	button._buiOriginalFuncs = nil
+end
+
+local function StyleDrawerButton(button)
+	local buttonSize = Pixel.Scale(BUTTON_SIZE)
+	local iconSize = Pixel.Scale(ICON_SIZE)
+	button._buiOriginalFuncs.SetParent(button, bar)
+	button._buiOriginalFuncs.SetScale(button, 1)
+	button._buiOriginalFuncs.SetSize(button, buttonSize, buttonSize)
+	local iconTexture = button._buiIcon
+	if iconTexture then
+		iconTexture:ClearAllPoints()
+		iconTexture:SetPoint('CENTER')
+		iconTexture:SetSize(iconSize, iconSize)
+		iconTexture:SetTexCoord(ICON_CROP, 1 - ICON_CROP, ICON_CROP, 1 - ICON_CROP)
+		iconTexture:Show()
+	end
+	local highlight = button.GetHighlightTexture and button:GetHighlightTexture()
+	if highlight then
+		highlight:ClearAllPoints()
+		highlight:SetPoint('CENTER')
+		highlight:SetSize(iconSize, iconSize)
+	end
+	local border = button._buiBorder
+	border:ClearAllPoints()
+	border:SetPoint('CENTER')
+	border:SetSize(Pixel.Scale(ICON_BORDER_BOX), Pixel.Scale(ICON_BORDER_BOX))
+	Pixel.ApplyBorder(border, 1, 0, 0, 0, 1)
 end
 
 local function CaptureButton(button)
@@ -387,53 +405,29 @@ local function CaptureButton(button)
 	}
 
 	FreezeButton(button)
-	button._buiOriginalFuncs.SetParent(button, bar)
-	button._buiOriginalFuncs.SetSize(button, Pixel.Scale(BUTTON_SIZE), Pixel.Scale(BUTTON_SIZE))
-	button._buiOriginalFuncs.SetScale(button, 1)
 
 	local iconTexture = FindIconTexture(button)
-	local iconScaledSize = Pixel.Scale(ICON_SIZE)
 	for _, region in pairs({ button:GetRegions() }) do
 		if region:IsObjectType('Texture') and region ~= iconTexture and ClassifyTexture(region) ~= 'content' then
 			region:Hide()
 		end
 	end
-	if iconTexture then
-		if not button._buiIcon then
-			button._buiIcon = iconTexture
-			button._buiIconCoord = { iconTexture:GetTexCoord() }
-			button._buiIconW, button._buiIconH = iconTexture:GetSize()
-			button._buiIconPoints = {}
-			for pointIndex = 1, iconTexture:GetNumPoints() do button._buiIconPoints[pointIndex] = { iconTexture:GetPoint(pointIndex) } end
-		end
-		iconTexture:ClearAllPoints()
-		iconTexture:SetPoint('CENTER')
-		iconTexture:SetSize(iconScaledSize, iconScaledSize)
-		iconTexture:SetTexCoord(ICON_CROP, 1 - ICON_CROP, ICON_CROP, 1 - ICON_CROP)
-		iconTexture:Show()
+	if iconTexture and not button._buiIcon then
+		button._buiIcon = iconTexture
+		button._buiIconCoord = { iconTexture:GetTexCoord() }
+		button._buiIconW, button._buiIconH = iconTexture:GetSize()
+		button._buiIconPoints = {}
+		for pointIndex = 1, iconTexture:GetNumPoints() do button._buiIconPoints[pointIndex] = { iconTexture:GetPoint(pointIndex) } end
 	end
-
-	local highlight = button.GetHighlightTexture and button:GetHighlightTexture()
-	if highlight then
-		highlight:ClearAllPoints()
-		highlight:SetPoint('CENTER')
-		highlight:SetSize(iconScaledSize, iconScaledSize)
-	end
-
-	if not button._buiBorder then
-		local border = CreateFrame('Frame', nil, button, 'BackdropTemplate')
-		border:SetPoint('CENTER')
-		border:SetSize(Pixel.Scale(ICON_BORDER_BOX), Pixel.Scale(ICON_BORDER_BOX))
-		Pixel.ApplyBorder(border, 1, 0, 0, 0, 1)
-		button._buiBorder = border
-	end
+	button._buiBorder = button._buiBorder or CreateFrame('Frame', nil, button, 'BackdropTemplate')
+	StyleDrawerButton(button)
 
 	button:Hide()
 	buttons[#buttons + 1] = button
 
 	if not button._buiHooked then
-		AceHook.HookScript(BUI, button, 'OnEnter', CancelHide)
-		AceHook.HookScript(BUI, button, 'OnLeave', ScheduleHide)
+		button:HookScript('OnEnter', CancelHide)
+		button:HookScript('OnLeave', ScheduleHide)
 		button._buiHooked = true
 	end
 	for _, listener in pairs(captureListeners) do listener(button) end
@@ -447,40 +441,38 @@ local function ReleaseButton(button)
 	UnfreezeButton(button)
 
 	local original = button._buiOriginalState
-	if original then
-		button:SetParent(original.parent)
-		button:ClearAllPoints()
-		for _, point in ipairs(original.points) do
-			button:SetPoint(unpack(point))
-		end
-		button:SetFrameStrata(original.strata)
-		button:SetFrameLevel(original.level)
-		button:SetScale(original.scale)
-		button:SetAlpha(original.alpha)
-		button:SetSize(original.width, original.height)
-
-		for _, region in pairs({ button:GetRegions() }) do
-			if region:IsObjectType('Texture') and region ~= button._buiBorder and not region._buiBarBg then
-				region:Show()
-			end
-		end
-		if button._buiIcon then
-			local iconTexture = button._buiIcon
-			if button._buiIconCoord then iconTexture:SetTexCoord(unpack(button._buiIconCoord)) end
-			if button._buiIconW then iconTexture:SetSize(button._buiIconW, button._buiIconH) end
-			iconTexture:ClearAllPoints()
-			for _, point in ipairs(button._buiIconPoints) do iconTexture:SetPoint(unpack(point)) end
-			button._buiIcon, button._buiIconCoord, button._buiIconW, button._buiIconH, button._buiIconPoints = nil, nil, nil, nil, nil
-		end
-		local highlight = button.GetHighlightTexture and button:GetHighlightTexture()
-		if highlight then
-			highlight:ClearAllPoints()
-			highlight:SetAllPoints(button)
-		end
-		if button._buiBorder then button._buiBorder:Hide() end
-		button:Show()
-		button._buiOriginalState = nil
+	button:SetParent(original.parent)
+	button:ClearAllPoints()
+	for _, point in ipairs(original.points) do
+		button:SetPoint(unpack(point))
 	end
+	button:SetFrameStrata(original.strata)
+	button:SetFrameLevel(original.level)
+	button:SetScale(original.scale)
+	button:SetAlpha(original.alpha)
+	button:SetSize(original.width, original.height)
+
+	for _, region in pairs({ button:GetRegions() }) do
+		if region:IsObjectType('Texture') and not region._buiBarBg then
+			region:Show()
+		end
+	end
+	local iconTexture = button._buiIcon
+	if iconTexture then
+		iconTexture:SetTexCoord(unpack(button._buiIconCoord))
+		iconTexture:SetSize(button._buiIconW, button._buiIconH)
+		iconTexture:ClearAllPoints()
+		for _, point in ipairs(button._buiIconPoints) do iconTexture:SetPoint(unpack(point)) end
+		button._buiIcon, button._buiIconCoord, button._buiIconW, button._buiIconH, button._buiIconPoints = nil, nil, nil, nil, nil
+	end
+	local highlight = button.GetHighlightTexture and button:GetHighlightTexture()
+	if highlight then
+		highlight:ClearAllPoints()
+		highlight:SetAllPoints(button)
+	end
+	button._buiBorder:Hide()
+	button:Show()
+	button._buiOriginalState = nil
 
 	for buttonIndex = #buttons, 1, -1 do
 		if buttons[buttonIndex] == button then
@@ -520,9 +512,7 @@ end
 
 local function OnLibDBIconCreated(_, button)
 	if not enabled and not captureWanted then return end
-	if button and not captured[button] then
-		CaptureButton(button)
-	end
+	if not captured[button] then CaptureButton(button) end
 end
 
 function Drawer.CaptureButtons()
@@ -537,7 +527,7 @@ end
 function Drawer.Enable()
 	enabled = true
 	Drawer.Create()
-	if tab then tab:Show() end
+	tab:Show()
 	Drawer.CaptureButtons()
 end
 
@@ -550,65 +540,29 @@ function Drawer.Disable()
 	if not captureWanted then ReleaseAll() end
 end
 
-function StyleDrawerButton(button)
-	local buttonSize = Pixel.Scale(BUTTON_SIZE)
-	local iconSize = Pixel.Scale(ICON_SIZE)
-	if button._buiOriginalFuncs then
-		button._buiOriginalFuncs.SetParent(button, bar)
-		button._buiOriginalFuncs.SetScale(button, 1)
-		button._buiOriginalFuncs.SetSize(button, buttonSize, buttonSize)
-	end
-	local iconTexture = button._buiIcon or FindIconTexture(button)
-	if iconTexture then
-		iconTexture:ClearAllPoints()
-		iconTexture:SetPoint('CENTER')
-		iconTexture:SetSize(iconSize, iconSize)
-		iconTexture:SetTexCoord(ICON_CROP, 1 - ICON_CROP, ICON_CROP, 1 - ICON_CROP)
-	end
-	local highlight = button.GetHighlightTexture and button:GetHighlightTexture()
-	if highlight then
-		highlight:ClearAllPoints()
-		highlight:SetPoint('CENTER')
-		highlight:SetSize(iconSize, iconSize)
-	end
-	if button._buiBorder then
-		button._buiBorder:ClearAllPoints()
-		button._buiBorder:SetPoint('CENTER')
-		button._buiBorder:SetSize(Pixel.Scale(ICON_BORDER_BOX), Pixel.Scale(ICON_BORDER_BOX))
-		Pixel.ApplyBorder(button._buiBorder, 1, 0, 0, 0, 1)
-	end
-end
-
 function Drawer.Refresh()
 	if not enabled or not tab then return end
 
-	if bgFrame then
-		Pixel.SetTemplate(bgFrame, 0.06, 0.06, 0.06, 0.95, 0.12, 0.12, 0.12, 1)
-	end
+	Pixel.SetTemplate(bgFrame, 0.06, 0.06, 0.06, 0.95, 0.12, 0.12, 0.12, 1)
 	local color = GetTabColor(hovering)
 	Pixel.SetTemplate(tab, color[1], color[2], color[3], color[4], 0.1, 0.1, 0.1, 1)
-	ResizeTab()
+	LayoutTab()
 
 	for buttonIndex = 1, #buttons do
 		local button = buttons[buttonIndex]
 		if not claims[button] then StyleDrawerButton(button) end
 	end
 
-	if bar and bar:IsShown() then
-		ShowDrawer()
-	end
-	
+	if bar:IsShown() then ShowDrawer() end
 end
 
 function Drawer.GetButtons() return buttons end
 
 function Drawer.IsCaptured(button) return captured[button] == true end
 
-function Drawer.IsClaimed(button) return claims[button] ~= nil end
-
 function Drawer.Claim(button, owner)
 	if not captured[button] then return end
-	claims[button] = owner or nil
+	claims[button] = owner
 end
 
 function Drawer.ReturnButton(button)
@@ -629,7 +583,7 @@ function Drawer.SetCaptureWanted(wanted)
 	if enabled then return end
 	if wanted then
 		Drawer.Create()
-		if tab then tab:Hide() end
+		tab:Hide()
 		Drawer.CaptureButtons()
 	else
 		ReleaseAll()

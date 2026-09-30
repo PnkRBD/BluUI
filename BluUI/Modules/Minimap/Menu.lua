@@ -50,28 +50,9 @@ local function CalendarAtlas()
 	return 'UI-HUD-Calendar-' .. tonumber(date('%d')) .. '-Up'
 end
 
-local pendingCombatAction
-local queueRegistered = false
-
-local function QueueForCombatEnd(callback)
-	pendingCombatAction = callback
-	if not queueRegistered then
-		queueRegistered = true
-		BUI.Events:Register('PLAYER_REGEN_ENABLED', 'MinimapMenuQueue', function()
-			local queuedAction = pendingCombatAction
-			pendingCombatAction = nil
-			if queuedAction then queuedAction() end
-		end)
-	end
-end
-
 local function OpenCalendar()
-	if InCombatLockdown() then
-		BUI.Print('Calendar opens when combat ends.')
-		QueueForCombatEnd(OpenCalendar)
-		return
-	end
-	GameTimeFrame:Click()
+	if InCombatLockdown() then BUI.Print('Calendar opens when combat ends.') end
+	BUI.Events:AfterCombat(function() GameTimeFrame:Click() end, 'MinimapMenu.Calendar')
 end
 
 local function PopupOpen()
@@ -89,7 +70,7 @@ local function CollectSections()
 		local info = C_Minimap.GetTrackingInfo(trackingIndex)
 		if info and info.name and not seen[info.name] then
 			seen[info.name] = true
-			local bucket = buckets[SectionKey(info)] or buckets.tracking
+			local bucket = buckets[SectionKey(info)]
 			bucket.items[#bucket.items + 1] = { value = trackingIndex, text = DisplayName(info.name), icon = info.texture }
 			bucket.indexes[#bucket.indexes + 1] = trackingIndex
 			if info.active then bucket.selected[trackingIndex] = true end
@@ -142,9 +123,7 @@ local function RefreshSelection()
 end
 
 local function CloseDropdowns()
-	for _, row in pairs(sectionRows) do
-		if row.dropdown.CloseMenu then row.dropdown:CloseMenu() end
-	end
+	for _, row in pairs(sectionRows) do row.dropdown:CloseMenu() end
 end
 
 local toolActions = {

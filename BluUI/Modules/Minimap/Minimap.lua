@@ -40,7 +40,7 @@ local difficultyEvents = {
 	'CHALLENGE_MODE_START', 'CHALLENGE_MODE_COMPLETED',
 }
 
-local defaultIconScale = { queue = 0.8, difficulty = 0.9, mail = 0.8, crafting = 0.8 }
+local defaultIconScale = { queue = 0.8, difficulty = 0.9, mail = 0.8, crafting = 0.8, missions = 0.8 }
 
 local hiddenParent = CreateFrame('Frame')
 hiddenParent:Hide()
@@ -57,10 +57,8 @@ local function GetConfig()
 	return BUI.GetDB().interface
 end
 
-local fontProbe = {}
 local function GetTextFont(key)
-	fontProbe.font = GetConfig()[key]
-	return BUI.GetModuleFont(fontProbe)
+	return BUI.GetFontByName(GetConfig()[key])
 end
 
 local function IsEnabled()
@@ -74,7 +72,6 @@ local function RegisterEvents(key, events, handler)
 end
 
 local function PositionText(frame, fontString, squareCorner, squareX, squareY, offsetX, offsetY)
-	offsetX, offsetY = offsetX or 0, offsetY or 0
 	frame:ClearAllPoints()
 	fontString:ClearAllPoints()
 	local side = squareCorner:find('LEFT') and 'LEFT' or 'RIGHT'
@@ -153,13 +150,6 @@ local function CreateBackdrop()
 	local texture = backdropFrame:CreateTexture(nil, 'BACKGROUND')
 	texture:SetAllPoints()
 	BUI.Tools.SetColorTex(texture, 0, 0, 0, 1)
-	backdropFrame.tex = texture
-
-	local mask = backdropFrame:CreateMaskTexture()
-	mask:SetAllPoints(texture)
-	mask:SetTexture(SQUARE_MASK)
-	texture:AddMaskTexture(mask)
-	backdropFrame.mask = mask
 end
 
 local function UpdateBackdrop()
@@ -187,10 +177,6 @@ local function ApplyShape()
 	WoWMinimap:SetQuestBlobRingAlpha(0)
 
 	_G.GetMinimapShape = function() return 'SQUARE' end
-
-	if backdropFrame and backdropFrame.mask then
-		backdropFrame.mask:SetTexture(SQUARE_MASK)
-	end
 
 	local hybrid = _G.HybridMinimap
 	if hybrid and hybrid.MapCanvas and hybrid.CircleMask then
@@ -313,9 +299,7 @@ end
 
 local function UpdateZoneText()
 	if not zoneFrame or not zoneFrame:IsShown() then return end
-	local name = GetMinimapZoneText()
-	if not name then return end
-	zoneFrame.text:SetText(name)
+	zoneFrame.text:SetText(GetMinimapZoneText())
 	local config = GetConfig()
 	if config.minimapZoneColorCustom then
 		local customColor = config.minimapZoneColor
@@ -439,17 +423,6 @@ function Minimap.ToggleTextDifficulty(enabled)
 	if not difficultyFrame then CreateDifficultyText() end
 	difficultyFrame:SetShown(enabled)
 
-	local blizzard = GetBlizzardDifficultyFrame()
-	if blizzard then
-		if enabled then
-			blizzard:SetAlpha(0)
-			blizzard:Hide()
-		elseif not GetConfig().minimapHideDifficulty then
-			blizzard:SetAlpha(1)
-			blizzard:Show()
-		end
-	end
-
 	if enabled then
 		RegisterEvents('MinimapDiff', difficultyEvents, UpdateDifficultyText)
 		UpdateDifficultyText()
@@ -471,22 +444,13 @@ local function GetIndicatorPosition(key)
 end
 
 local function SaveIndicatorPosition(key, point, x, y)
-	if type(point) ~= 'string' or type(x) ~= 'number' or type(y) ~= 'number' then return end
-	local interfaceDB = GetConfig()
-	interfaceDB.minimapIconPos.square = interfaceDB.minimapIconPos.square or {}
-	interfaceDB.minimapIconPos.square[key] = { point, x, y }
+	local positions = GetConfig().minimapIconPos
+	positions.square = positions.square or {}
+	positions.square[key] = { point, x, y }
 end
 
 local function GetIconScale(key)
-	local scales = GetConfig().minimapIconScale
-	if scales and scales[key] then return scales[key] end
-	return defaultIconScale[key] or 0.8
-end
-
-local function SaveIconScale(key, scale)
-	local interfaceDB = GetConfig()
-	interfaceDB.minimapIconScale = interfaceDB.minimapIconScale or {}
-	interfaceDB.minimapIconScale[key] = scale
+	return GetConfig().minimapIconScale[key] or defaultIconScale[key]
 end
 
 local function GetDock()
@@ -547,10 +511,7 @@ local function WantedIndicatorParent(frame)
 	return WoWMinimap
 end
 
-local function ApplyIndicatorPosition(frame, key, defaultPoint, defaultX, defaultY)
-	local saved = GetIndicatorPosition(key)
-	local point, x, y = defaultPoint, defaultX, defaultY
-	if saved then point, x, y = saved[1], saved[2], saved[3] end
+local function ApplyIndicatorPosition(frame, point, x, y)
 	local parent = WantedIndicatorParent(frame)
 	if frame:GetParent() == parent and frame:GetNumPoints() == 1 then
 		local currentPoint, currentRelative, currentRelativePoint, currentX, currentY = frame:GetPoint(1)
@@ -604,41 +565,40 @@ local function FindIndicator(key)
 	end
 end
 
-function Minimap.GetIndicatorDefault(key)
-	local indicator = FindIndicator(key)
-	if not indicator then return 'CENTER', 0, 0 end
-	local coords = indicator.squareDefault
-	return coords[1], coords[2], coords[3]
+local function IndicatorPlacement(indicator)
+	local saved = GetIndicatorPosition(indicator.key)
+	if saved then return saved[1], saved[2], saved[3] end
+	local default = indicator.squareDefault
+	return default[1], default[2], default[3]
+end
+
+function Minimap.GetIndicatorPlacement(key)
+	return IndicatorPlacement(FindIndicator(key))
 end
 
 local function PositionIndicator(indicator)
 	local frame = indicator.Resolve()
 	if not frame then return end
-	local default = indicator.squareDefault
-	ApplyIndicatorPosition(frame, indicator.key, default[1], default[2], default[3])
+	local point, x, y = IndicatorPlacement(indicator)
+	ApplyIndicatorPosition(frame, point, x, y)
 	if frame._buiNativeW then frame:SetSize(frame._buiNativeW, frame._buiNativeH) end
 	local iconScale = GetIconScale(indicator.key)
 	if frame:GetScale() ~= iconScale then frame:SetScale(iconScale) end
-	if indicator.key == 'queue' then SizeQueueEye(frame, GetDockSize() * GetIconScale(indicator.key)) end
+	if indicator.key == 'queue' then SizeQueueEye(frame, GetDockSize() * iconScale) end
 	if indicator.raiseFrameLevel then
 		frame:SetFrameLevel(WoWMinimap:GetFrameLevel() + 5)
 	end
 	MakeDraggable(frame, indicator.key)
 
 	if indicator.key == 'difficulty' and difficultyFrame then
-		local saved = GetIndicatorPosition('difficulty')
-		local point, x, y = default[1], default[2], default[3]
-		if saved then point, x, y = saved[1], saved[2], saved[3] end
-		local textScale = GetIconScale('difficulty')
 		difficultyFrame:ClearAllPoints()
-		difficultyFrame:SetPoint(point, WoWMinimap, point, x * textScale, y * textScale)
+		difficultyFrame:SetPoint(point, WoWMinimap, point, x * iconScale, y * iconScale)
 	end
 end
 
 local repositionLock = {}
 
 local function HookSetPoint(frame, key, repositionCallback)
-	if not frame then return end
 	local function Reassert(self)
 		if not repositionLock[key] and IsEnabled() and not self._buiDragging then
 			repositionLock[key] = true
@@ -681,6 +641,7 @@ local DOCK_ANCHORS = {
 	BOTTOMLEFT  = { point = 'BOTTOMLEFT',  x =  6, y =  6, dirX =  1 },
 	BOTTOMRIGHT = { point = 'BOTTOMRIGHT', x = -6, y =  6, dirX = -1 },
 }
+Minimap.DOCK_ANCHORS = DOCK_ANCHORS
 
 local function LayoutDocked(anchor)
 	local size = GetDockSize()
@@ -838,10 +799,10 @@ local function SetIndicatorVisible(element, visible)
 			ReplayMailNotification(element)
 		end
 		element:SetAlpha(1)
-		if element.EnableMouse then element:EnableMouse(true) end
+		element:EnableMouse(true)
 	else
 		element:SetAlpha(0)
-		if element.EnableMouse then element:EnableMouse(false) end
+		element:EnableMouse(false)
 		element:Hide()
 		element._buiForcedHide = true
 	end
@@ -885,9 +846,7 @@ local function CreateUnlockOverlay()
 	local startX, startY, startCursorX, startCursorY = 0, 0, 0, 0
 
 	unlockOverlay:SetScript('OnDragStart', function(self)
-		local interfaceDB = GetConfig()
-		startX = interfaceDB.minimapScreenX or -20
-		startY = interfaceDB.minimapScreenY or -20
+		startX, startY = Minimap.GetPosition()
 		startCursorX, startCursorY = GetCursorPosition()
 		self.dragging = true
 	end)
@@ -917,6 +876,7 @@ local function CreateUnlockOverlay()
 		local interfaceDB = GetConfig()
 		interfaceDB.minimapScreenX = x
 		interfaceDB.minimapScreenY = y
+		Minimap.ApplyPosition()
 	end)
 
 	unlockOverlay:SetScript('OnMouseUp', function(_, button)
@@ -941,10 +901,9 @@ function Minimap.ToggleUnlock(unlock)
 	end
 end
 
-function Minimap.ToggleDrawer(enabled)
+local function ApplyDrawer()
 	local interfaceDB = GetConfig()
-	interfaceDB.drawerEnabled = enabled
-	if enabled then
+	if interfaceDB.drawerEnabled then
 		BUI.Drawer.SetOffset(interfaceDB.drawerX, interfaceDB.drawerY)
 		BUI.Drawer.SetSide(interfaceDB.drawerSide)
 		BUI.Drawer.Enable()
@@ -953,13 +912,14 @@ function Minimap.ToggleDrawer(enabled)
 	end
 end
 
+function Minimap.ToggleDrawer(enabled)
+	GetConfig().drawerEnabled = enabled
+	ApplyDrawer()
+end
+
 function Minimap.SetDrawerSide(side)
 	GetConfig().drawerSide = side
 	BUI.Drawer.SetSide(side)
-end
-
-function Minimap.RefreshButtonBar()
-	BUI.MinimapButtonBar.Refresh()
 end
 
 function Minimap.RepositionDrawer()
@@ -984,20 +944,11 @@ function Minimap.Enable()
 	Minimap.SetClockFormat(interfaceDB.minimapClock24h)
 	Minimap.SetClockSource(interfaceDB.minimapClockServer)
 
-	Minimap.ToggleClock(interfaceDB.minimapClock and true or false)
-	Minimap.ToggleZoneText(interfaceDB.minimapZone and true or false)
-
-	if interfaceDB.drawerEnabled then
-		BUI.Drawer.SetOffset(interfaceDB.drawerX, interfaceDB.drawerY)
-		BUI.Drawer.SetSide(interfaceDB.drawerSide)
-		BUI.Drawer.Enable()
-	else
-		BUI.Drawer.Disable()
-	end
-
+	Minimap.ToggleClock(interfaceDB.minimapClock)
+	Minimap.ToggleZoneText(interfaceDB.minimapZone)
+	ApplyDrawer()
 	BUI.MinimapButtonBar.Refresh()
-
-	Minimap.ToggleTextDifficulty(interfaceDB.minimapTextDifficulty and true or false)
+	Minimap.ToggleTextDifficulty(interfaceDB.minimapTextDifficulty)
 
 	PositionAllIndicators()
 	Minimap.ApplyVisibility()
@@ -1013,11 +964,10 @@ end
 
 Minimap.RepositionIndicators = PositionAllIndicators
 Minimap.GetIconScale = GetIconScale
-Minimap.GetIndicatorPosition = GetIndicatorPosition
 Minimap.SaveIndicatorPosition = SaveIndicatorPosition
 
 function Minimap.SetIconScale(key, scale)
-	SaveIconScale(key, scale)
+	GetConfig().minimapIconScale[key] = scale
 	if IsEnabled() then PositionAllIndicators() end
 end
 
@@ -1055,14 +1005,12 @@ function Minimap.Initialize()
 			end
 		end)
 
-		if EditModeManagerFrame then
-			EditModeManagerFrame:HookScript('OnHide', function()
-				if IsEnabled() then
-					PositionAllIndicators()
-					Minimap.ApplyVisibility()
-				end
-			end)
-		end
+		EditModeManagerFrame:HookScript('OnHide', function()
+			if IsEnabled() then
+				PositionAllIndicators()
+				Minimap.ApplyVisibility()
+			end
+		end)
 
 		Events:Register('DISPLAY_SIZE_CHANGED', 'MinimapResolution', function()
 			if IsEnabled() then Minimap.ApplyPosition() end
