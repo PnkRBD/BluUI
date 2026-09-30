@@ -77,9 +77,18 @@ end
 local function PlaceStacks(text, config, iconFrame, bar, showIcon)
     local point = config.stackPoint
     local target = (showIcon and config.stackAttach == "ICON") and iconFrame or bar
+    local color = config.stackColor
     text:ClearAllPoints()
     text:SetPoint(point, target, point, config.stackOffsetX, config.stackOffsetY)
+    text:SetTextColor(color[1], color[2], color[3], color[4])
     text:SetShown(config.showStacks ~= false)
+end
+
+local function PlaceDuration(text, config, bar)
+    local point = config.durationPoint
+    text:ClearAllPoints()
+    text:SetPoint(point, bar, point, config.durationOffsetX, config.durationOffsetY)
+    text:SetShown(config.showDuration ~= false)
 end
 
 local function HAlignOf(point)
@@ -265,7 +274,7 @@ local function SkinBarItem(item)
         end
         if bar.Duration then
             Pixel.ApplyFont(bar.Duration, math.max(6, config.durationSize), font)
-            bar.Duration:SetShown(config.showDuration ~= false)
+            PlaceDuration(bar.Duration, config, bar)
         end
     end
 end
@@ -484,10 +493,8 @@ local function StylePreviewFrame(frame, previewIndex, config)
     frame.Bar.Name:SetShown(config.showName ~= false)
 
     Pixel.ApplyFont(frame.Bar.Duration, math.max(6, config.durationSize), font)
-    frame.Bar.Duration:ClearAllPoints()
-    frame.Bar.Duration:SetPoint("RIGHT", frame.Bar, "RIGHT", Pixel.Scale(-4), 0)
     frame.Bar.Duration:SetText(((PREVIEW_COUNT + 1 - previewIndex) * 3) .. "s")
-    frame.Bar.Duration:SetShown(config.showDuration ~= false)
+    PlaceDuration(frame.Bar.Duration, config, frame.Bar)
 end
 
 local function PositionPreviewFrame(frame, previewIndex, config, shelf)

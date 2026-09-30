@@ -8,7 +8,7 @@ local MENU_WIDTH = 150
 local SNAPSHOT_WIDTH = 220
 local TEXT_RANGE = 30
 local KEYBIND_RANGE = 20
-local STACK_RANGE = 40
+local OFFSET_RANGE = 40
 local MOCK_WIDTH = 620
 local MOCK_HEIGHT = 140
 local MOCK_MAX_ICONS = 40
@@ -733,7 +733,7 @@ local function CreateBuffBarMock(stage)
 				BUI.Pixel.ApplyFont(bar.duration, config.durationSize, font)
 				bar.duration:SetText(sample.duration)
 				bar.duration:ClearAllPoints()
-				bar.duration:SetPoint('RIGHT', bar.background, 'RIGHT', -4, 0)
+				bar.duration:SetPoint(config.durationPoint, bar.background, config.durationPoint, config.durationOffsetX, config.durationOffsetY)
 				bar.duration:SetTextColor(1, 1, 1, 1)
 				bar.duration:Show()
 			else
@@ -745,7 +745,8 @@ local function CreateBuffBarMock(stage)
 				bar.stacks:SetText(sample.stacks)
 				bar.stacks:ClearAllPoints()
 				bar.stacks:SetPoint(point, (showIcon and config.stackAttach == 'ICON') and bar.icon or bar.background, point, config.stackOffsetX, config.stackOffsetY)
-				bar.stacks:SetTextColor(1, 1, 1, 1)
+				local stackColor = config.stackColor
+				bar.stacks:SetTextColor(stackColor[1], stackColor[2], stackColor[3], stackColor[4])
 				bar.stacks:Show()
 			else
 				bar.stacks:Hide()
@@ -1167,16 +1168,22 @@ local function BuffBarBoards(ui, parent, width)
 		OnUnlessOff(config, nil, 'showName'),
 	}, Refresh)
 	text:AddTools('Duration', 'Remaining time on each bar', {
-		{ icon = 'text', tooltip = 'Size', title = 'Duration', options = { { label = 'Size', min = 6, max = 24, step = 1, get = function() return config.durationSize or 11 end, set = function(value) config.durationSize = value end } } },
+		{ icon = 'text', tooltip = 'Placement and size', title = 'Duration', options = {
+			Option(config, 'Position', 'durationPoint', { entries = POINTS }),
+			Option(config, 'Size', 'durationSize', { min = 6, max = 24, step = 1 }),
+			Option(config, 'Horizontal', 'durationOffsetX', { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 }),
+			Option(config, 'Vertical', 'durationOffsetY', { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 }),
+		} },
 		OnUnlessOff(config, nil, 'showDuration'),
 	}, Refresh)
 	text:AddTools('Stacks', 'Stack count on each bar', {
+		Color(config, 'Stack color', 'stackColor'),
 		{ icon = 'text', tooltip = 'Placement and size', title = 'Stacks', options = {
 			Option(config, 'Attach to', 'stackAttach', { entries = STACK_ATTACH }),
 			Option(config, 'Position', 'stackPoint', { entries = POINTS }),
 			Option(config, 'Size', 'stackSize', { min = 6, max = 24, step = 1 }),
-			Option(config, 'Horizontal', 'stackOffsetX', { min = -STACK_RANGE, max = STACK_RANGE, step = 1 }),
-			Option(config, 'Vertical', 'stackOffsetY', { min = -STACK_RANGE, max = STACK_RANGE, step = 1 }),
+			Option(config, 'Horizontal', 'stackOffsetX', { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 }),
+			Option(config, 'Vertical', 'stackOffsetY', { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 }),
 		} },
 		OnUnlessOff(config, nil, 'showStacks'),
 	}, Refresh)
