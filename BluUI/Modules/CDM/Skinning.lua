@@ -576,6 +576,8 @@ function CDM.SkinIcon(icon, settings, key)
     texture:ClearAllPoints()
     texture:SetPoint("TOPLEFT", icon, "TOPLEFT", scaledEdge, -scaledEdge)
     texture:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -scaledEdge, scaledEdge)
+    texture:SetSnapToPixelGrid(false)
+    texture:SetTexelSnappingBias(0)
     texture:SetTexCoord(CDM.GetAspectTexCoords(settings.zoom, settings.iconWidth, settings.iconHeight, settings.keepAspectRatio))
 
     KillOverlays(icon)
@@ -645,6 +647,8 @@ function CDM.SkinIcon(icon, settings, key)
     if icon.OutOfRange then
         icon.OutOfRange:ClearAllPoints()
         icon.OutOfRange:SetAllPoints(texture)
+        icon.OutOfRange:SetSnapToPixelGrid(false)
+        icon.OutOfRange:SetTexelSnappingBias(0)
     end
 
     if db.cdm.glow.enabled then

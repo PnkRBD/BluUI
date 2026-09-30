@@ -48,6 +48,10 @@ local function Scaled(value, scale)
 	return floor(value * scale + 0.5)
 end
 
+local function Even(value)
+	return value + value % 2
+end
+
 local function Buttons()
 	return _G.ReadyCheckFrameYesButton, _G.ReadyCheckFrameNoButton
 end
@@ -118,7 +122,7 @@ local function LayoutPrompt()
 	text:SetWidth(0)
 	local needed = text:GetStringWidth()
 	if not needed or issecretvalue(needed) then return end
-	local width = max(Scaled(MIN_WIDTH, scale), min(floor(needed + 0.5) + paddingX * 2, Scaled(MAX_WIDTH, scale)))
+	local width = Even(max(Scaled(MIN_WIDTH, scale), min(floor(needed + 0.5) + paddingX * 2, Scaled(MAX_WIDTH, scale))))
 
 	local titleContainer = listener.TitleContainer
 	local title = titleContainer and titleContainer.TitleText
@@ -153,7 +157,7 @@ local function LayoutPrompt()
 		no:SetPoint('BOTTOMRIGHT', listener, 'BOTTOMRIGHT', -paddingX, paddingY)
 	end
 
-	local height = paddingY + titleBlock + floor(textHeight + 0.5) + rowGap + buttonHeight + paddingY
+	local height = Even(paddingY + titleBlock + floor(textHeight + 0.5) + rowGap + buttonHeight + paddingY)
 	outer:SetSize(width, height)
 end
 

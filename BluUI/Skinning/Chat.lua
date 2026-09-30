@@ -246,8 +246,22 @@ local function Kill(frame)
 	if frame.SetParent then frame:SetParent(HIDDEN_PARENT) end
 end
 
+local function NormalizeGeometry(chat)
+	local left, bottom = chat:GetLeft(), chat:GetBottom()
+	if not left or not bottom or (issecretvalue and (issecretvalue(left) or issecretvalue(bottom))) then return end
+	local pixel = PixelUtil.GetPixelToUIUnitFactor() / chat:GetEffectiveScale()
+	local width, height = chat:GetSize()
+	local restoring = chat._buiRestoringGeo
+	chat._buiRestoringGeo = true
+	chat:SetSize(BUILib.Widget.SnapX(width, pixel), BUILib.Widget.SnapX(height, pixel))
+	chat:ClearAllPoints()
+	chat:SetPoint('BOTTOMLEFT', UIParent, 'BOTTOMLEFT', BUILib.Widget.SnapX(left, pixel), BUILib.Widget.SnapY(bottom, pixel))
+	chat._buiRestoringGeo = restoring
+end
+
 local function SaveGeometry(chat)
 	if chat:GetNumPoints() > 1 then return end
+	NormalizeGeometry(chat)
 	local db = BUI.GetDB()
 	db.chatGeometry = db.chatGeometry or {}
 	local geometry = db.chatGeometry
@@ -285,6 +299,10 @@ local function RestoreGeometry()
 	if geometry.point then
 		chat:ClearAllPoints()
 		chat:SetPoint(geometry.point, UIParent, geometry.relPoint or geometry.point, geometry.x or 0, geometry.y or 0)
+		NormalizeGeometry(chat)
+		geometry.w, geometry.h = chat:GetSize()
+		local point, _, relativePoint, x, y = chat:GetPoint(1)
+		geometry.point, geometry.relPoint, geometry.x, geometry.y = point, relativePoint, x, y
 	end
 	chat._buiRestoringGeo = false
 end

@@ -402,6 +402,7 @@ local function SkinJourneyEntry(entry)
 		line:SetHeight(1)
 		local edge = Skin.PANEL_EDGE
 		FlatTexture(line, edge[1], edge[2], edge[3], edge[4])
+		BUILib.Skin.PixelLine(line, entry, false, 14, 31)
 	end
 end
 

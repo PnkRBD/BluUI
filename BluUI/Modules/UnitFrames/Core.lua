@@ -312,7 +312,7 @@ function UnitFrames.ApplyPosition(frame, unitType, index)
 		PlaceCentered(frame, Pixel.Scale(x), Pixel.Scale(y))
 	else
 		frame:ClearAllPoints()
-		frame:SetPoint(point, UIParent, relPoint, Pixel.Scale(x), Pixel.Scale(y))
+		BUI.Anchor.PlaceOnPixels(frame, point, UIParent, relPoint, Pixel.Scale(x), Pixel.Scale(y))
 	end
 end
 

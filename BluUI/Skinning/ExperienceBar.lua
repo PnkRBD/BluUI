@@ -81,7 +81,7 @@ local function ApplyBarPosition()
 			barFrame:SetPoint('BOTTOMRIGHT', UIParent, 'BOTTOMRIGHT')
 		else
 			barFrame:SetWidth(barWidth)
-			barFrame:SetPoint('BOTTOM', UIParent, 'BOTTOM')
+			BUI.Anchor.PlaceOnPixels(barFrame, 'BOTTOM', UIParent, 'BOTTOM', 0, 0)
 		end
 	elseif position == 'TOP' then
 		if fullWidth then
@@ -89,7 +89,7 @@ local function ApplyBarPosition()
 			barFrame:SetPoint('TOPRIGHT', UIParent, 'TOPRIGHT')
 		else
 			barFrame:SetWidth(barWidth)
-			barFrame:SetPoint('TOP', UIParent, 'TOP')
+			BUI.Anchor.PlaceOnPixels(barFrame, 'TOP', UIParent, 'TOP', 0, 0)
 		end
 	elseif position == 'LEFT' then
 		barFrame:SetPoint('TOPLEFT', UIParent, 'TOPLEFT')
@@ -99,7 +99,7 @@ local function ApplyBarPosition()
 		barFrame:SetPoint('BOTTOMRIGHT', UIParent, 'BOTTOMRIGHT')
 	elseif position == 'FREE' then
 		barFrame:SetWidth(barWidth)
-		barFrame:SetPoint('CENTER', UIParent, 'CENTER', config.posX or 0, config.posY or -250)
+		BUI.Anchor.PlaceOnPixels(barFrame, 'CENTER', UIParent, 'CENTER', config.posX or 0, config.posY or -250)
 	end
 
 	if barFrame.dragReady then
@@ -660,7 +660,7 @@ local function CreateBars()
 				if position == 'FREE' then
 					local delta = (total + scaledEdge * 2 - oldHeight) / 2
 					self:ClearAllPoints()
-					self:SetPoint('CENTER', UIParent, 'CENTER', config.posX or 0, (config.posY or -250) - delta)
+					BUI.Anchor.PlaceOnPixels(self, 'CENTER', UIParent, 'CENTER', config.posX or 0, (config.posY or -250) - delta)
 				end
 			end
 		end

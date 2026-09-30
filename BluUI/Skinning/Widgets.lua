@@ -76,7 +76,7 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 
 	local function ApplyScrollPct(percent)
 		local maxScroll = max(0, child:GetHeight() - scroll:GetHeight())
-		scroll:SetVerticalScroll(percent * maxScroll)
+		scroll:SetVerticalScroll(math.floor(percent * maxScroll + 0.5))
 	end
 
 	thumb:EnableMouse(true)

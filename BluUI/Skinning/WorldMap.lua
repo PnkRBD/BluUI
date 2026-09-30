@@ -82,6 +82,7 @@ local function DividerLine(frame)
 	line:SetHeight(1)
 	line:SetPoint('LEFT', frame, 'LEFT', 8, 0)
 	line:SetPoint('RIGHT', frame, 'RIGHT', -8, 0)
+	BUILib.Skin.PixelLine(line, frame, false, 8, 8)
 	frame._buiDivider = line
 end
 

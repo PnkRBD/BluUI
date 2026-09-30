@@ -271,6 +271,17 @@ local function SnapshotBlizzardPoints(target)
 	blizzardPoints[target] = snapshot
 end
 
+local function PlaceOnPixels(target, point, relativeTo, relativePoint, x, y)
+	target:SetPoint(point, relativeTo, relativePoint, x, y)
+	local left, top = target:GetLeft(), target:GetTop()
+	if not left or not top or IsSecret(left) or IsSecret(top) then return end
+	local pixel = PixelUtil.GetPixelToUIUnitFactor() / target:GetEffectiveScale()
+	local Widget = LibStub('BUILib').Widget
+	local shiftX = Widget.SnapX(left, pixel) - left
+	local shiftY = Widget.SnapY(top, pixel) - top
+	if shiftX ~= 0 or shiftY ~= 0 then target:SetPoint(point, relativeTo, relativePoint, x + shiftX, y + shiftY) end
+end
+
 local function RestoreBlizzardPoints(target)
 	local snapshot = blizzardPoints[target]
 	if not snapshot then
@@ -329,7 +340,7 @@ local function ApplySavedPosition(target)
 	local relativeTo = ResolvePath(saved.relativeTo) or UIParent
 	applying = true
 	target:ClearAllPoints()
-	target:SetPoint(saved.point, relativeTo, saved.relativePoint, saved.x, saved.y)
+	PlaceOnPixels(target, saved.point, relativeTo, saved.relativePoint, saved.x, saved.y)
 	applying = false
 
 	if IsOffScreen(target) then
@@ -344,7 +355,7 @@ local function HoldDraggedPosition(target)
 	if not held or moving[target] or IsLocked(target) or not CanTouch(target) then return end
 	applying = true
 	target:ClearAllPoints()
-	target:SetPoint(held.point, held.relativeTo, held.relativePoint, held.x, held.y)
+	PlaceOnPixels(target, held.point, held.relativeTo, held.relativePoint, held.x, held.y)
 	applying = false
 end
 

@@ -110,6 +110,7 @@ local function HoverEdges(button)
 	edges[2]:SetPoint('BOTTOMLEFT'); edges[2]:SetPoint('BOTTOMRIGHT'); edges[2]:SetHeight(1)
 	edges[3]:SetPoint('TOPLEFT'); edges[3]:SetPoint('BOTTOMLEFT'); edges[3]:SetWidth(1)
 	edges[4]:SetPoint('TOPRIGHT'); edges[4]:SetPoint('BOTTOMRIGHT'); edges[4]:SetWidth(1)
+	BUILib.Skin.AlignEdges(button, nil, edges)
 	button._buiHoverEdges = edges
 end
 
@@ -207,10 +208,17 @@ local function DividerLine(frame, vertical)
 		line:SetPoint('TOP')
 		line:SetPoint('BOTTOM')
 		line:SetWidth(1)
+		BUILib.Skin.PixelLine(line, frame, true)
 	else
 		line:SetPoint('BOTTOMLEFT', 0, TAB_BASELINE_OFFSET)
 		line:SetPoint('BOTTOMRIGHT', 0, TAB_BASELINE_OFFSET)
 		line:SetHeight(1)
+		BUILib.Skin.PixelAlign(frame, frame, function(left, right, _, bottom, pixel)
+			local offsetY = BUILib.Widget.SnapY(bottom + TAB_BASELINE_OFFSET, pixel) - bottom
+			line:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', BUILib.Widget.SnapX(left, pixel) - left, offsetY)
+			line:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', BUILib.Widget.SnapX(right, pixel) - right, offsetY)
+			line:SetHeight(pixel)
+		end)
 	end
 	frame._buiLine = line
 end

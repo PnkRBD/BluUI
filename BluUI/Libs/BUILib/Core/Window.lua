@@ -172,6 +172,9 @@ function Layout.WindowFrame(config)
 	local function StartMoving() frame:StartMoving() end
 	local function StopMoving()
 		frame:StopMovingOrSizing()
+		local pixel = PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
+		frame:SetSize(Widget.SnapX(frame:GetWidth(), pixel), Widget.SnapX(frame:GetHeight(), pixel))
+		Widget.PinToPixels(frame)
 		if config.onGeometryChanged then config.onGeometryChanged(window) end
 	end
 

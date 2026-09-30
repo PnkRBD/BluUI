@@ -113,6 +113,14 @@ local function FrameCircle(frame, host)
 	ring:SetPoint('CENTER', host, 'CENTER', CIRCLE_OFFSET_X, CIRCLE_OFFSET_Y)
 	ring:AddMaskTexture(ringMask)
 	decor[#decor + 1] = ring
+	BUILib.Skin.PixelAlign(frame, host, function(left, right, top, bottom, pixel)
+		local centerX, centerY = (left + right) / 2, (top + bottom) / 2
+		local offsetX = BUILib.Widget.SnapX(centerX + CIRCLE_OFFSET_X, pixel) - centerX
+		local offsetY = BUILib.Widget.SnapY(centerY + CIRCLE_OFFSET_Y, pixel) - centerY
+		mask:SetPoint('CENTER', host, 'CENTER', offsetX, offsetY)
+		ringMask:SetPoint('CENTER', host, 'CENTER', offsetX, offsetY)
+		ring:SetPoint('CENTER', host, 'CENTER', offsetX, offsetY)
+	end)
 end
 
 local function RefreshQuestButtonText(button)

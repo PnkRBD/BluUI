@@ -77,7 +77,15 @@ local function Apply()
 	SkinAbilityButtons(bottom)
 end
 
+local function EvenBottomFrame(frame)
+	local bottom = frame and frame.BottomFrame
+	if not bottom or InCombatLockdown() then return end
+	local width = bottom:GetWidth()
+	if width and width > 0 then bottom:SetWidth(math.ceil(width / 2) * 2) end
+end
+
 local function OnActionBarLayout(frame)
+	EvenBottomFrame(frame)
 	if skinned and Enabled() then SkinAbilityButtons(frame.BottomFrame) end
 end
 

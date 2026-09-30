@@ -16,7 +16,7 @@ function Controls.TabLineBar(parent, tabs, selected, callback, width)
 	local function LineTarget(index, button)
 		if index ~= state.selected then return 0 end
 		if button._hover then return button._w end
-		return math.max(1, button._w - SHRINK)
+		return math.max(2, Widget.EvenSize(button._w - SHRINK))
 	end
 
 	local animating = false
@@ -68,7 +68,7 @@ function Controls.TabLineBar(parent, tabs, selected, callback, width)
 		button.text:SetPoint("CENTER", 0, 2)
 		button.text:SetText(tabText)
 		button.text:SetTextColor(unpack(Theme.text.muted))
-		local textWidth = button.text:GetStringWidth() + 24
+		local textWidth = Widget.EvenSize(button.text:GetStringWidth() + 24)
 
 		if x + textWidth > width and x > 0 then
 			x = 0

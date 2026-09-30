@@ -6,6 +6,7 @@ local Theme = BUILib.Theme
 
 local select = select
 local max = math.max
+local floor = math.floor
 
 BUILib.Skin = BUILib.Skin or {}
 local Skin = BUILib.Skin
@@ -108,6 +109,127 @@ function Skin.Button(button, options)
 	button:HookScript('OnLeave', function(self) self:SetBackdropBorderColor(border[1], border[2], border[3], border[4] or 1) end)
 end
 
+local aligners = setmetatable({}, { __mode = 'k' })
+local alignQueued = false
+
+function Skin.PixelRect(region)
+	local left, right, top, bottom = region:GetLeft(), region:GetRight(), region:GetTop(), region:GetBottom()
+	if not left or not right or not top or not bottom then return nil end
+	if issecretvalue and (issecretvalue(left) or issecretvalue(right) or issecretvalue(top) or issecretvalue(bottom)) then return nil end
+	return left, right, top, bottom, PixelUtil.GetPixelToUIUnitFactor() / region:GetEffectiveScale()
+end
+
+local function Align(entry, force)
+	local left, right, top, bottom, pixel = Skin.PixelRect(entry.region)
+	if not left then return end
+	local last = entry.last
+	if not force and last[1] == left and last[2] == right and last[3] == top and last[4] == bottom and last[5] == pixel then return end
+	last[1], last[2], last[3], last[4], last[5] = left, right, top, bottom, pixel
+	entry.apply(left, right, top, bottom, pixel)
+end
+
+local function AlignHost(host)
+	local entries = aligners[host]
+	if not entries then return end
+	for entryIndex = 1, #entries do Align(entries[entryIndex]) end
+end
+
+local function AlignAll()
+	alignQueued = false
+	for host in pairs(aligners) do
+		if host:IsVisible() then AlignHost(host) end
+	end
+end
+
+function Skin.QueuePixelAlign()
+	if alignQueued then return end
+	alignQueued = true
+	C_Timer.After(0, AlignAll)
+end
+
+local function OnHostSizeChanged(host)
+	AlignHost(host)
+	Skin.QueuePixelAlign()
+end
+
+function Skin.PixelAlign(host, region, apply)
+	local entries = aligners[host]
+	if not entries then
+		entries = {}
+		aligners[host] = entries
+		host:HookScript('OnShow', AlignHost)
+		host:HookScript('OnSizeChanged', OnHostSizeChanged)
+		hooksecurefunc(host, 'SetPoint', Skin.QueuePixelAlign)
+	end
+	local entry = { region = region, apply = apply, last = {} }
+	entries[#entries + 1] = entry
+	Align(entry, true)
+	Skin.QueuePixelAlign()
+	return entry
+end
+
+function Skin.Realign(entry)
+	if entry then Align(entry, true) end
+end
+
+local scaleWatcher = CreateFrame('Frame')
+scaleWatcher:RegisterEvent('UI_SCALE_CHANGED')
+scaleWatcher:RegisterEvent('DISPLAY_SIZE_CHANGED')
+scaleWatcher:SetScript('OnEvent', Skin.QueuePixelAlign)
+
+local function AlignBox(owner, fill, top, bottom, left, right, insets, thickness)
+	return function(frameLeft, frameRight, frameTop, frameBottom, pixel)
+		local size = max(1, floor((thickness or 1) / pixel + 0.5)) * pixel
+		local offsetLeft = Widget.SnapX(frameLeft + insets.left, pixel) - frameLeft
+		local offsetRight = frameRight - Widget.SnapX(frameRight - insets.right, pixel)
+		local offsetTop = frameTop - Widget.SnapY(frameTop - insets.top + (insets.raise or 0), pixel)
+		local offsetBottom = Widget.SnapY(frameBottom + insets.bottom, pixel) - frameBottom
+		if fill then
+			fill:SetPoint('TOPLEFT', owner, 'TOPLEFT', offsetLeft, -offsetTop)
+			fill:SetPoint('BOTTOMRIGHT', owner, 'BOTTOMRIGHT', -offsetRight, offsetBottom)
+		end
+		top:SetPoint('TOPLEFT', owner, 'TOPLEFT', offsetLeft, -offsetTop); top:SetPoint('TOPRIGHT', owner, 'TOPRIGHT', -offsetRight, -offsetTop)
+		bottom:SetPoint('BOTTOMLEFT', owner, 'BOTTOMLEFT', offsetLeft, offsetBottom); bottom:SetPoint('BOTTOMRIGHT', owner, 'BOTTOMRIGHT', -offsetRight, offsetBottom)
+		left:SetPoint('TOPLEFT', owner, 'TOPLEFT', offsetLeft, -offsetTop); left:SetPoint('BOTTOMLEFT', owner, 'BOTTOMLEFT', offsetLeft, offsetBottom)
+		right:SetPoint('TOPRIGHT', owner, 'TOPRIGHT', -offsetRight, -offsetTop); right:SetPoint('BOTTOMRIGHT', owner, 'BOTTOMRIGHT', -offsetRight, offsetBottom)
+		top:SetHeight(size)
+		bottom:SetHeight(size)
+		left:SetWidth(size)
+		right:SetWidth(size)
+	end
+end
+
+local function SizeEdges(top, bottom, left, right)
+	PixelUtil.SetHeight(top, 1, 1)
+	PixelUtil.SetHeight(bottom, 1, 1)
+	PixelUtil.SetWidth(left, 1, 1)
+	PixelUtil.SetWidth(right, 1, 1)
+end
+
+local SQUARE_INSETS = { left = 0, right = 0, top = 0, bottom = 0 }
+
+function Skin.AlignEdges(host, fill, edges, insets, thickness)
+	return Skin.PixelAlign(host, host, AlignBox(host, fill, edges[1], edges[2], edges[3], edges[4], insets or SQUARE_INSETS, thickness))
+end
+
+function Skin.PixelLine(line, reference, vertical, startInset, endInset)
+	startInset, endInset = startInset or 0, endInset or 0
+	return Skin.PixelAlign(line:GetParent(), reference, function(left, right, top, bottom, pixel)
+		line:ClearAllPoints()
+		if vertical then
+			local edge = Widget.SnapX((left + right) / 2 - pixel / 2, pixel) - left
+			line:SetPoint('TOPLEFT', reference, 'TOPLEFT', edge, Widget.SnapY(top - startInset, pixel) - top)
+			line:SetPoint('BOTTOMLEFT', reference, 'BOTTOMLEFT', edge, Widget.SnapY(bottom + endInset, pixel) - bottom)
+			line:SetWidth(pixel)
+		else
+			local edge = Widget.SnapY((top + bottom) / 2 + pixel / 2, pixel) - top
+			line:SetPoint('TOPLEFT', reference, 'TOPLEFT', Widget.SnapX(left + startInset, pixel) - left, edge)
+			line:SetPoint('TOPRIGHT', reference, 'TOPRIGHT', Widget.SnapX(right - endInset, pixel) - right, edge)
+			line:SetHeight(pixel)
+		end
+	end)
+end
+
 function Skin.SquarePanel(frame, options)
 	if frame._buiSquare then return frame._buiSquare end
 	options = options or {}
@@ -122,11 +244,13 @@ function Skin.SquarePanel(frame, options)
 		return edgeTexture
 	end
 	local top, bottom, left, right = CreateEdge(), CreateEdge(), CreateEdge(), CreateEdge()
-	top:SetPoint('TOPLEFT'); top:SetPoint('TOPRIGHT'); top:SetHeight(1)
-	bottom:SetPoint('BOTTOMLEFT'); bottom:SetPoint('BOTTOMRIGHT'); bottom:SetHeight(1)
-	left:SetPoint('TOPLEFT'); left:SetPoint('BOTTOMLEFT'); left:SetWidth(1)
-	right:SetPoint('TOPRIGHT'); right:SetPoint('BOTTOMRIGHT'); right:SetWidth(1)
+	top:SetPoint('TOPLEFT'); top:SetPoint('TOPRIGHT')
+	bottom:SetPoint('BOTTOMLEFT'); bottom:SetPoint('BOTTOMRIGHT')
+	left:SetPoint('TOPLEFT'); left:SetPoint('BOTTOMLEFT')
+	right:SetPoint('TOPRIGHT'); right:SetPoint('BOTTOMRIGHT')
+	SizeEdges(top, bottom, left, right)
 	frame._buiSquare = { fill = fill, top = top, bottom = bottom, left = left, right = right }
+	Skin.PixelAlign(frame, frame, AlignBox(frame, fill, top, bottom, left, right, SQUARE_INSETS))
 	return frame._buiSquare
 end
 
@@ -153,6 +277,7 @@ function Skin.Shell(frame, style, inset)
 	if shell then
 		shell.fill:Show()
 		for edgeIndex = 1, 4 do shell.edges[edgeIndex]:Show() end
+		Skin.Realign(shell.aligner)
 		return shell
 	end
 	local left, right, top, bottom = ResolveInsets(inset)
@@ -169,13 +294,16 @@ function Skin.Shell(frame, style, inset)
 		edges[edgeIndex].__buiSkin = true
 		edges[edgeIndex].ignoreInLayout = true
 	end
-	edges[1]:SetPoint('TOPLEFT', frame, 'TOPLEFT', left, -top); edges[1]:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -right, -top); edges[1]:SetHeight(1)
-	edges[2]:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', left, bottom); edges[2]:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -right, bottom); edges[2]:SetHeight(1)
-	edges[3]:SetPoint('TOPLEFT', frame, 'TOPLEFT', left, -top); edges[3]:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', left, bottom); edges[3]:SetWidth(1)
-	edges[4]:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -right, -top); edges[4]:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -right, bottom); edges[4]:SetWidth(1)
+	edges[1]:SetPoint('TOPLEFT', frame, 'TOPLEFT', left, -top); edges[1]:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -right, -top)
+	edges[2]:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', left, bottom); edges[2]:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -right, bottom)
+	edges[3]:SetPoint('TOPLEFT', frame, 'TOPLEFT', left, -top); edges[3]:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', left, bottom)
+	edges[4]:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -right, -top); edges[4]:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -right, bottom)
+	SizeEdges(edges[1], edges[2], edges[3], edges[4])
 	Skin.SetEdgeColor(edges, style.edge)
-	shell = { fill = fill, edges = edges, inset = inset }
+	local insets = { left = left, right = right, top = top, bottom = bottom }
+	shell = { fill = fill, edges = edges, inset = inset, insets = insets }
 	frame._buiShell = shell
+	shell.aligner = Skin.PixelAlign(frame, frame, AlignBox(frame, fill, edges[1], edges[2], edges[3], edges[4], insets))
 	return shell
 end
 
@@ -242,10 +370,8 @@ end
 local function TabFuse(tab, fused)
 	local shell = tab._buiShell
 	if not shell then return end
-	local top = fused and -(TAB_INSET - TAB_FUSE) or -TAB_INSET
-	shell.fill:SetPoint('TOPLEFT', tab, 'TOPLEFT', TAB_INSET, top)
-	shell.edges[3]:SetPoint('TOPLEFT', tab, 'TOPLEFT', TAB_INSET, top)
-	shell.edges[4]:SetPoint('TOPRIGHT', tab, 'TOPRIGHT', -TAB_INSET, top)
+	shell.insets.raise = fused and TAB_FUSE or 0
+	Skin.Realign(shell.aligner)
 	shell.edges[1]:SetShown(not fused)
 end
 
@@ -319,7 +445,7 @@ function Skin.LayoutTabStrip(frame, tabs, relativePoint, offsetX, offsetY)
 			local text = tab.Text
 			if text then
 				text:SetWidth(0)
-				local textWidth = text:GetStringWidth()
+				local textWidth = math.ceil(text:GetStringWidth())
 				tab:SetWidth(textWidth + 2 * (TAB_TEXT_PADDING + TAB_INSET))
 				text:SetWidth(textWidth + 2)
 			end

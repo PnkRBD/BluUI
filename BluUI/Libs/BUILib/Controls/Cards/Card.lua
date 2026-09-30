@@ -24,7 +24,7 @@ function Controls.Card(parent, icon, title, description, width, height, clickabl
 	titleText:SetFont(BUILib.GetFont(), titleFontSize, ""); titleText:SetWidth(width - 20)
 	titleText:SetPoint("TOP", 0, -yOffset); titleText:SetText(title or "")
 	titleText:SetTextColor(1, 1, 1, 1); titleText:SetJustifyH("CENTER"); titleText:SetWordWrap(true); titleText:SetMaxLines(2)
-	card.title = titleText; yOffset = yOffset + titleText:GetStringHeight() + 2
+	card.title = titleText; yOffset = yOffset + math.ceil(titleText:GetStringHeight()) + 2
 	if description then
 		local descFontSize = width >= 180 and 12 or 10
 		local descText = content:CreateFontString(nil, "OVERLAY")
@@ -33,7 +33,7 @@ function Controls.Card(parent, icon, title, description, width, height, clickabl
 		descText:SetTextColor(unpack(Theme.text.muted)); descText:SetJustifyH("CENTER"); descText:SetWordWrap(true); descText:SetMaxLines(2)
 		card.description = descText
 	end
-	content:SetHeight(yOffset + 4)
+	content:SetHeight(Widget.EvenSize(yOffset + 4))
 	if clickable then
 		card:SetScript("OnEnter", function(self) self:SetBackdropBorderColor(Theme.GetAccent()) end)
 		card:SetScript("OnLeave", function(self) self:SetBackdropBorderColor(0.4, 0.4, 0.4, 1) end)

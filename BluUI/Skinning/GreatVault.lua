@@ -3,6 +3,7 @@ local _, BUI = ...
 local ipairs, select = ipairs, select
 
 local Skin = BUI.Skinning
+local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 
 local SKIN_ID = 'greatvault'
 local PANEL_INSET = 8
@@ -43,6 +44,7 @@ local function ReplaceDivider(texture)
 		line:SetPoint('RIGHT', texture, 'RIGHT', -DIVIDER_INSET, 0)
 		local edge = Skin.PANEL_EDGE
 		FlatTexture(line, edge[1], edge[2], edge[3], edge[4])
+		BUILib.Skin.PixelLine(line, texture, false, DIVIDER_INSET, DIVIDER_INSET)
 		texture._buiDividerLine = line
 		dividerLines[#dividerLines + 1] = line
 	end

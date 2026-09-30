@@ -31,13 +31,8 @@ local function SkinFrame(frame)
 	Fade(iconFrame.Border)
 	context.Shell(frame)
 	Skin.TipFace(frame.Name, 'body')
-	if not iconFrame._buiIconBorder then
-		Skin.CropIcon(iconFrame.Icon)
-		local border = iconFrame:CreateTexture(nil, 'BACKGROUND', nil, -1)
-		border:SetPoint('TOPLEFT', iconFrame.Icon, 'TOPLEFT', -1, 1)
-		border:SetPoint('BOTTOMRIGHT', iconFrame.Icon, 'BOTTOMRIGHT', 1, -1)
-		iconFrame._buiIconBorder = border
-	end
+	Skin.CropIcon(iconFrame.Icon)
+	Skin.TipIconFrame(iconFrame, iconFrame.Icon)
 	timer:SetStatusBarTexture(BUI.GetGlobalTexture())
 	Tools.SetColorTex(timer.Background, 0, 0, 0, 0.5)
 end
@@ -52,9 +47,9 @@ local function SkinAll()
 		end
 		local color = QualityColor(frame)
 		if color then
-			Tools.SetColorTex(frame.IconFrame._buiIconBorder, color.r, color.g, color.b, 1)
+			Skin.SetIconEdgeColor(frame.IconFrame.Icon, color.r, color.g, color.b)
 		else
-			Tools.SetColorTex(frame.IconFrame._buiIconBorder, 0, 0, 0, 1)
+			Skin.SetIconEdgeColor(frame.IconFrame.Icon, 0, 0, 0)
 		end
 		frame.Timer:SetStatusBarColor(red, green, blue, 1)
 	end

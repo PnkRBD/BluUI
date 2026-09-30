@@ -30,7 +30,9 @@ local function RestoreGeometry(shell)
 	local frame = shell.window.frame
 	frame:ClearAllPoints()
 	frame:SetPoint(geometry.point, UIParent, geometry.relativePoint, geometry.x, geometry.y)
-	frame:SetSize(geometry.width, geometry.height)
+	local pixel = PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
+	frame:SetSize(BUILib.Widget.SnapX(geometry.width, pixel), BUILib.Widget.SnapX(geometry.height, pixel))
+	BUILib.Widget.PinToPixels(frame)
 end
 
 local function SelectNav(shell, pageID)

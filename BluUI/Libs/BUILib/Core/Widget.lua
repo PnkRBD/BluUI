@@ -71,6 +71,24 @@ function Widget.EvenSize(size)
 	return math.ceil(size / 2) * 2
 end
 
+local SNAP_TOLERANCE = 0.001
+
+function Widget.SnapX(value, pixel)
+	return math.ceil(value / pixel - 0.5 - SNAP_TOLERANCE) * pixel
+end
+
+function Widget.SnapY(value, pixel)
+	return math.floor(value / pixel + 0.5 + SNAP_TOLERANCE) * pixel
+end
+
+function Widget.PinToPixels(frame)
+	local left, top = frame:GetLeft(), frame:GetTop()
+	if not left or not top or (issecretvalue and (issecretvalue(left) or issecretvalue(top))) then return end
+	local pixel = PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
+	frame:ClearAllPoints()
+	frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", Widget.SnapX(left, pixel), Widget.SnapY(top, pixel))
+end
+
 function Widget.StripColorCodes(text)
 	if type(text) ~= "string" then return tostring(text or "") end
 	return (text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
@@ -152,6 +170,13 @@ Widget.WHITE = WHITE_TEX
 
 local RING_MIN, RING_MAX = 4, 14
 
+local function PrepShapeTexture(texture)
+	if texture.SetSnapToPixelGrid then
+		texture:SetSnapToPixelGrid(false)
+		texture:SetTexelSnappingBias(0)
+	end
+end
+
 local RING_TEX_SIZE = 48
 
 function Widget.DrawRoundedRect(frame, radius, color, drawLayer, subLayer, inset, ringOnly)
@@ -172,6 +197,7 @@ function Widget.DrawRoundedRect(frame, radius, color, drawLayer, subLayer, inset
 		texture:SetTexture(texturePath)
 		if x1 then texture:SetTexCoord(x1, x2, y1, y2) end
 		texture:SetVertexColor(colorRed, colorGreen, colorBlue, colorAlpha)
+		PrepShapeTexture(texture)
 		textures[#textures + 1] = texture
 		return texture
 	end
@@ -232,6 +258,7 @@ local function ApplySlicedShape(texture, texturePath, radius, color, inset)
 		texture:SetTextureSliceMode(Enum.UITextureSliceMode.Stretched)
 	end
 	texture:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
+	PrepShapeTexture(texture)
 	texture:SetPoint("TOPLEFT", inset, -inset)
 	texture:SetPoint("BOTTOMRIGHT", -inset, inset)
 end
@@ -265,7 +292,7 @@ end
 
 function Widget.DrawCapsule(frame, color, drawLayer, subLayer, inset)
 	inset = inset or 0
-	local capWidth = (frame:GetHeight() - inset * 2) / 2
+	local capWidth = math.floor((frame:GetHeight() - inset * 2) / 2 + 0.5)
 	local texturePath = BUILib.GetLibMedia("capsule")
 	local colorRed, colorGreen, colorBlue, colorAlpha = color[1], color[2], color[3], color[4] or 1
 
@@ -292,6 +319,7 @@ function Widget.DrawCapsule(frame, color, drawLayer, subLayer, inset)
 	local textures = {left, center, right}
 	for _, texture in ipairs(textures) do
 		texture:SetVertexColor(colorRed, colorGreen, colorBlue, colorAlpha)
+		PrepShapeTexture(texture)
 	end
 	return textures
 end
@@ -590,6 +618,7 @@ do
 		else
 			tooltip:SetPoint("BOTTOM", owner, "TOP", 0, 6)
 		end
+		Widget.PinToPixels(tooltip)
 		tooltip:Raise()
 		tooltip._fadeIn:Stop(); tooltip._fadeIn:Play()
 	end
@@ -620,9 +649,9 @@ do
 		end
 
 		tooltip:SetAlpha(0); tooltip:Show()
-		local naturalWidth = math.min(tooltip.label:GetStringWidth() + PADDING_X * 2, MAX_WIDTH)
+		local naturalWidth = math.min(math.ceil(tooltip.label:GetStringWidth()) + PADDING_X * 2, MAX_WIDTH)
 		tooltip:SetWidth(naturalWidth)
-		tooltip:SetHeight(tooltip.label:GetStringHeight() + PADDING_Y * 2)
+		tooltip:SetHeight(math.ceil(tooltip.label:GetStringHeight()) + PADDING_Y * 2)
 		PositionTip(tooltip, owner, config)
 	end
 

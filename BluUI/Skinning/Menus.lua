@@ -17,6 +17,7 @@ local function SkinRow(button)
 	if button and button.divider then
 		button.divider:SetColorTexture(SEPARATOR_COLOR[1], SEPARATOR_COLOR[2], SEPARATOR_COLOR[3], SEPARATOR_COLOR[4] or 1)
 		button.divider:SetHeight(1)
+		if not button.divider._buiPixelLine then button.divider._buiPixelLine = Skin3.PixelLine(button.divider, button) end
 	end
 end
 
