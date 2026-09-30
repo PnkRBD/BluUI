@@ -166,7 +166,19 @@ function Layout.TableKit(window)
 		button:SetSize(SLIDER_STEP, CONTROL_HEIGHT)
 		window:Fill(button, 'secondary'):SetAllPoints()
 		Overlay(button)
-		kit.Glyph(button, plus and 'plus' or 'minus', STEP_SIGN, 'secondaryText'):SetPoint('CENTER')
+		local sign = kit.Glyph(button, plus and 'plus' or 'minus', STEP_SIGN, 'secondaryText')
+		sign:SetPoint('CENTER')
+		local function Rest(self)
+			sign:SetPoint('CENTER')
+			window:Paint(sign, self:IsMouseOver() and 'text' or 'secondaryText')
+		end
+		button:HookScript('OnEnter', Rest)
+		button:HookScript('OnLeave', Rest)
+		button:SetScript('OnMouseDown', function()
+			sign:SetPoint('CENTER', 0, -1)
+			window:Paint(sign, 'accent')
+		end)
+		button:SetScript('OnMouseUp', Rest)
 		return button
 	end
 
