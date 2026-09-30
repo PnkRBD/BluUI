@@ -522,11 +522,7 @@ local function ReleaseTestFrame(key)
 	local castbar = frame.Castbar
 	if castbar then
 		castbar.holdTime = 0
-		castbar._suppressAutoPreview = true
-		castbar:Hide()
-		castbar._suppressAutoPreview = nil
-		local container = castbar._container or castbar:GetParent()
-		if container and container ~= frame then container:Hide() end
+		BUI.CastBar.HideQuietly(castbar)
 	end
 	if frame.RaidTargetIndicator then frame.RaidTargetIndicator:Hide() end
 end
@@ -803,11 +799,7 @@ function UnitFrames.HideAll()
 		local castbar = frame.Castbar
 		if castbar then
 			castbar.holdTime = 0
-			castbar._suppressAutoPreview = true
-			castbar:Hide()
-			castbar._suppressAutoPreview = nil
-			local container = castbar._container or castbar:GetParent()
-			if container and container ~= frame then container:Hide() end
+			BUI.CastBar.HideQuietly(castbar)
 		end
 		if frame.RaidTargetIndicator then frame.RaidTargetIndicator:Hide() end
 		HideFakeAuras(frame, key)
