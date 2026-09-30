@@ -4,6 +4,8 @@ local Controls = BUILib.Controls
 local Layout = BUILib.Layout
 local Widget = BUILib.Widget
 
+Layout.ERASE_SIZE = 24
+
 local PANEL_SHARE = 0.385
 local LEFT_WIDTH = 300
 local LEFT_GAP = 40
