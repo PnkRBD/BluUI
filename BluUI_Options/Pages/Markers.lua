@@ -56,7 +56,7 @@ local function Sections(ui, _, parent, width)
 	Switch(board, 'Only in a group', 'onlyInGroup', 'Hide the bar while not in a party or raid')
 	Switch(board, 'Tooltips', 'tooltips', 'Explain each tile on mouseover')
 	board:AddTools('Position', 'Free on the screen, or hung off another BluUI frame', {
-		{ icon = 'mover', tooltip = 'Position and anchor', title = 'Position', options = {
+		{ icon = 'location', tooltip = 'Position and anchor', title = 'Position', options = {
 			Option('Anchor to', 'anchorFrame', { entries = ANCHORS }),
 			Option('Anchor side', 'anchorPoint', { entries = BUI.C.ANCHOR_PLACEMENT_OPTIONS }),
 			Offset('Horizontal offset', 'posX', 'anchorOffsetX', 1500),

@@ -856,7 +856,7 @@ local function TagsBoards(ui, parent, width, page)
 				Option(entry, 'Layer', 'drawLayer', { entries = LAYERS }),
 				Option(entry, 'Sublevel', 'drawSubLevel', { min = -7, max = 7, step = 1 }),
 			} },
-			{ icon = 'mover', tooltip = 'Anchor and offset', title = entry.name or ('Tag ' .. index), options = {
+			{ icon = 'location', tooltip = 'Anchor and offset', title = entry.name or ('Tag ' .. index), options = {
 				Option(entry, 'Anchor', 'point', { entries = BUI.C.ANCHOR_POINT_OPTIONS_SHORT }),
 				Option(entry, 'Horizontal', 'x', { min = -TAG_RANGE, max = TAG_RANGE, step = 1 }),
 				Option(entry, 'Vertical', 'y', { min = -TAG_RANGE, max = TAG_RANGE, step = 1 }),
@@ -916,7 +916,7 @@ end
 
 local function PositionTool(unitKey, unitSettings)
 	if not ANCHORABLE[unitKey] then
-		return { icon = 'mover', tooltip = 'Position', title = 'Position', options = {
+		return { icon = 'location', tooltip = 'Position', title = 'Position', options = {
 			{ label = 'Horizontal', min = -POSITION_RANGE_X, max = POSITION_RANGE_X, step = 1, get = function() return unitSettings.position.x end, set = function(value)
 				unitSettings.position.x, unitSettings.position.point, unitSettings.position.relPoint = value, 'CENTER', 'CENTER'
 			end },
@@ -1005,7 +1005,7 @@ local function AuraRow(board, unitKey, unitSettings, isDebuff)
 			polarity = isDebuff and 'HARMFUL' or 'HELPFUL', unitFramesOnly = true,
 			onChanged = RefreshFrames,
 		}),
-		{ icon = 'mover', tooltip = 'Anchor, growth and offset', title = title, options = layout },
+		{ icon = 'location', tooltip = 'Anchor, growth and offset', title = title, options = layout },
 		{ icon = 'resize', tooltip = 'Size, spacing and count', title = title, options = sizing },
 		{ icon = 'text', tooltip = 'Stacks, cooldown text and sorting', title = title, options = text },
 		Toggle(unitSettings, nil, isDebuff and 'showDebuffs' or 'showBuffs'),

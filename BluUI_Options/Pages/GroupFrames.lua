@@ -211,7 +211,7 @@ local function FramesBoard(ui, parent, width, key)
 	if isParty then
 		position = BUI.PositionTool(section, { selfTag = 'BUI_GroupParty', fields = PARTY_FIELDS, noCenter = true, matchWidth = true, rangeX = POSITION_RANGE, rangeY = POSITION_RANGE })
 	else
-		position = { icon = 'mover', tooltip = 'Position', title = 'Position', options = {
+		position = { icon = 'location', tooltip = 'Position', title = 'Position', options = {
 			Option(section, 'Horizontal', 'x', { min = -POSITION_RANGE, max = POSITION_RANGE, step = 1 }),
 			Option(section, 'Vertical', 'y', { min = -POSITION_RANGE, max = POSITION_RANGE, step = 1 }),
 		} }

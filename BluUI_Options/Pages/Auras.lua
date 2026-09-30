@@ -388,7 +388,7 @@ local function CrosshairBoard(ui, parent, width)
 			ArrayColor(db, 'In range color', 'inRangeColor', false),
 			ArrayColor(db, 'Out of range color', 'outOfRangeColor', false),
 		} },
-		{ icon = 'mover', tooltip = 'Screen offset', title = 'Position', options = {
+		{ icon = 'location', tooltip = 'Screen offset', title = 'Position', options = {
 			Option(db, 'Horizontal offset', 'offsetX', { min = -500, max = 500, step = 1 }),
 			Option(db, 'Vertical offset', 'offsetY', { min = -500, max = 500, step = 1 }),
 		} },

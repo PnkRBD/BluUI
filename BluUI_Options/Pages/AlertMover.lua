@@ -42,7 +42,7 @@ local function PositionTool(db, options)
 	rows[#rows + 1] = Option('Anchor offset Y', 'anchorOffsetY', { min = -ANCHOR_RANGE, max = ANCHOR_RANGE, step = 1 })
 	if options.matchWidth then rows[#rows + 1] = Option('Match anchor width', 'matchAnchorWidth') end
 	if options.matchHeight then rows[#rows + 1] = Option('Match anchor height', 'matchAnchorHeight') end
-	return { icon = 'mover', tooltip = 'Position and anchor', title = 'Position', options = rows }
+	return { icon = 'location', tooltip = 'Position and anchor', title = 'Position', options = rows }
 end
 
 BUI.PositionTool = PositionTool
