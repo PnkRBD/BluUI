@@ -215,7 +215,7 @@ end
 local function SetFontRole(role, name, page)
 	local store = Store()
 	store.fonts = store.fonts or {}
-	if role == 'base' and name == BUI.C.DEFAULT_FONT then name = nil end
+	if role == 'base' and name == BUI.C.WINDOW_FONT then name = nil end
 	store.fonts[role] = name
 	store.name = nil
 	if role == 'base' then BUI.ApplyWindowFont() else Repaint() end
@@ -231,7 +231,7 @@ local function ResetFonts(page)
 end
 
 local function EffectiveFont(role)
-	return FontName(role) or FontName('base') or BUI.C.DEFAULT_FONT
+	return FontName(role) or FontName('base') or BUI.C.WINDOW_FONT
 end
 
 local function SavedThemes()
