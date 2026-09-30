@@ -62,15 +62,20 @@ function Board:AddRow(name, sub, room)
 	return row
 end
 
-function Board:AddTools(name, sub, tools, after, paintIcon)
+function Board:AddTools(name, sub, tools, after, icon)
 	local kit = self.kit
 	local row = Section.AddRow(self, sub and (name .. ' ' .. sub) or name)
 	local x = kit.ROW_INSET
-	if paintIcon then
+	if icon then
 		local texture = row:CreateTexture(nil, 'ARTWORK')
 		texture:SetSize(ICON_SIZE, ICON_SIZE)
 		texture:SetPoint('LEFT', x, 0)
-		paintIcon(texture)
+		if type(icon) == 'function' then
+			icon(texture)
+		else
+			texture:SetTexture(icon)
+			texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		end
 		row.icon = texture
 		x = x + ICON_SIZE + CONTROL_GAP
 	end
