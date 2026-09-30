@@ -7,7 +7,7 @@ function PageKit.PositionMover(parent, config)
 	local function GetValue(key) if config.get then return config.get(key) end return config.db[key] end
 	local function SetValue(key, value) if config.set then config.set(key, value) else config.db[key] = value end end
 	return Controls.Icon(parent, {
-		texture = BUILib.GetLibMedia("mover"), tooltip = config.tooltip or "Position settings",
+		texture = BUILib.GetLibMedia("location"), tooltip = config.tooltip or "Position settings",
 		onClick = function(button)
 			Controls.Popover({
 				anchor = button, width = 260, title = "POSITION", height = config.offsets and 198 or 118,
@@ -126,7 +126,7 @@ function PageKit.SettingsIcon(parent, config)
 end
 
 function PageKit.PositionIcon(parent, config)
-	config.icon = 'mover'
+	config.icon = 'location'
 	config.tooltip = config.tooltip or 'Position settings'
 	return PageKit.OptionsIcon(parent, config)
 end
@@ -141,7 +141,7 @@ function PageKit.OffsetMover(parent, config)
 	local minOffset, maxOffset = config.min or -100, config.max or 100
 	local position = config.position
 	return Controls.Icon(parent, {
-		texture = BUILib.GetLibMedia("mover"), tooltip = config.tooltip or "Text offset from the bar",
+		texture = BUILib.GetLibMedia("location"), tooltip = config.tooltip or "Text offset from the bar",
 		onClick = function(button)
 			Controls.Popover({
 				anchor = button, width = 260, title = config.title or "TEXT OFFSET", height = position and 118 or 78,

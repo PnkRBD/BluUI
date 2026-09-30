@@ -145,7 +145,7 @@ local function PositionTool(config)
 		Option(config, 'Frame level', 'frameLevel', { min = 0, max = 100, step = 1 }),
 	}
 	if Datatext.IsPanel(config) then table.insert(options, 6, Option(config, 'Mirror the chat window', 'mirrorChat')) end
-	return { icon = 'mover', tooltip = 'Position and layering', title = 'Position', options = options }
+	return { icon = 'location', tooltip = 'Position and layering', title = 'Position', options = options }
 end
 
 local function NameOption(config)

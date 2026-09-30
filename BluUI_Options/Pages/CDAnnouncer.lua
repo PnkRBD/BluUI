@@ -308,7 +308,7 @@ local function SpellBoard(ui, parent, width, entry)
 			{ label = 'Text size', min = 6, max = 40, step = 1, get = function() return entry.iconTimeSize or math.max(8, math.floor(entry.iconSize * 0.45)) end, set = function(value) entry.iconTimeSize = value end },
 			Option(entry, 'Placement', 'iconTimeAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS_SHORT }),
 		} },
-		{ icon = 'mover', tooltip = 'Nudge', title = 'Countdown inside icon', options = {
+		{ icon = 'location', tooltip = 'Nudge', title = 'Countdown inside icon', options = {
 			Option(entry, 'Horizontal', 'iconTimeX', { min = -ICON_TIME_RANGE, max = ICON_TIME_RANGE, step = 1 }),
 			Option(entry, 'Vertical', 'iconTimeY', { min = -ICON_TIME_RANGE, max = ICON_TIME_RANGE, step = 1 }),
 		} },
@@ -355,7 +355,7 @@ local function SpellBoard(ui, parent, width, entry)
 		} },
 	}, Apply)
 	board:AddTools('Own position', 'Somewhere other than the shared anchor', {
-		{ icon = 'mover', tooltip = 'Anchor and offsets', title = 'Own position', options = {
+		{ icon = 'location', tooltip = 'Anchor and offsets', title = 'Own position', options = {
 			Option(entry, 'Anchor point', 'posAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
 			Option(entry, 'Horizontal', 'posX', { min = -POSITION_RANGE_X, max = POSITION_RANGE_X, step = 1 }),
 			Option(entry, 'Vertical', 'posY', { min = -POSITION_RANGE_Y, max = POSITION_RANGE_Y, step = 1 }),
@@ -381,7 +381,7 @@ local function AnnouncerBoard(ui, parent, width)
 		Color(cfg, 'Ready color', 'readyColor'),
 		Font(cfg),
 		{ entries = GROWTH, width = MENU_WIDTH, get = function() return cfg.growth or 'center' end, set = function(value) cfg.growth = value end },
-		{ icon = 'mover', tooltip = 'Position', title = 'Position', options = {
+		{ icon = 'location', tooltip = 'Position', title = 'Position', options = {
 			Option(cfg, 'Horizontal', 'posX', { min = -POSITION_RANGE_X, max = POSITION_RANGE_X, step = 1 }),
 			Option(cfg, 'Vertical', 'posY', { min = -POSITION_RANGE_Y, max = POSITION_RANGE_Y, step = 1 }),
 			{ label = 'Center horizontally', get = function() return cfg.centerHorizontally == true end, set = function(value)
