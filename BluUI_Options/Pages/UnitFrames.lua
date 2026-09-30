@@ -862,7 +862,7 @@ local function TagsBoards(ui, parent, width, page)
 				Option(entry, 'Vertical', 'y', { min = -TAG_RANGE, max = TAG_RANGE, step = 1 }),
 			} },
 			OnUnlessOff(entry, nil, 'enabled'),
-			{ slot = 'erase', icon = 'erase', size = 32, hover = 'danger', tooltip = 'Remove this tag', onClick = function()
+			{ slot = 'erase', icon = 'erase', size = Layout.ERASE_SIZE, hover = 'danger', tooltip = 'Remove this tag', onClick = function()
 				table.remove(unitSettings.customTags, index)
 				RefreshFrames()
 				page:RebuildCurrent()

@@ -3,7 +3,7 @@ local BUILib = BluUI.BUILibClient
 local Controls, Widget = BUILib.Controls, BUILib.Widget
 
 local INPUT_WIDTH = 260
-local ERASE_SIZE = 32
+local ERASE_SIZE = BUILib.Layout.ERASE_SIZE
 local RESULTS_WIDTH = 280
 local STRIP_ICON = 26
 local STRIP_GAP = 4

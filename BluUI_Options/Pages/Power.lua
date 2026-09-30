@@ -269,7 +269,7 @@ local function TickRow(board, db, Apply)
 		end },
 		ArrayColor(db, 'Tick color', 'tickMarkColor'),
 		{ tooltip = 'Width', title = 'Tick marks', options = { Option(db, 'Tick width', 'tickMarkWidth', { min = 1, max = 4, step = 1 }) } },
-		{ icon = 'erase', tooltip = 'Clear every tick mark', hover = 'danger', onClick = function()
+		{ icon = 'erase', size = BUILib.Layout.ERASE_SIZE, tooltip = 'Clear every tick mark', hover = 'danger', onClick = function()
 			wipe(db.tickMarks)
 			Refresh()
 		end },
