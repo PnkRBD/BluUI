@@ -176,8 +176,8 @@ local function ApplyLayout(container, style)
 	CallMethod(container, FLOW_ANCHOR, anchor)
 	local horizontal, vertical = FlowDirections(style)
 	if horizontal then CallMethod(container, FLOW_GROWTH, horizontal, vertical) end
-	local gap = Pixel.Scale(style.gap)
-	CallMethod(container, FLOW_PADDING, gap, gap, gap, gap)
+	local padding = Pixel.Scale(style.padding or style.gap)
+	CallMethod(container, FLOW_PADDING, padding, padding, padding, padding)
 	local lineSize = style.perRow * style.size + (style.perRow - 1) * style.gap + 0.4
 	CallMethod(container, FLOW_LINE_SIZE, Pixel.Scale(lineSize))
 end

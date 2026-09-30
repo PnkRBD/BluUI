@@ -61,7 +61,7 @@ local renderContext = {}
 
 local root, stack, anchorTexture, anchorTexturet
 local tooltipScanner
-local positionCallback, anchorCallback
+local anchorCallback
 local loginEpoch
 local previewActive = false
 local previewTimer
@@ -117,10 +117,7 @@ local function ClearAllActiveCooldowns()
     end
 end
 
-function CDAnnouncer.RegisterPositionCallback(callback) positionCallback = callback end
-function CDAnnouncer.UnregisterPositionCallback()   positionCallback = nil end
-function CDAnnouncer.RegisterAnchorCallback(callback)   anchorCallback = callback   end
-function CDAnnouncer.UnregisterAnchorCallback()     anchorCallback   = nil end
+function CDAnnouncer.RegisterAnchorCallback(callback) anchorCallback = callback end
 
 function CDAnnouncer.GetSpells()
     return GetSpellList()
@@ -1080,7 +1077,6 @@ function CDAnnouncer.AddSpell(input, isItem)
     local spells = CDAnnouncer.GetSpells()
     spells[#spells + 1] = entry
     CDAnnouncer.Refresh()
-    if CDAnnouncer.OpenSpellEditor then CDAnnouncer.OpenSpellEditor(entryID) end
     return true
 end
 
@@ -1288,7 +1284,6 @@ end
 local function SaveFramePosition()
     local config = GetConfig()
     BUI.Dragging.SaveCenterPosition(root, config, true)
-    if positionCallback then positionCallback(config.posX, config.posY) end
 end
 
 local function EnableDragging()

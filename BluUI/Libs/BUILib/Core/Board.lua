@@ -14,6 +14,7 @@ local CAPTION_HEIGHT = 28
 local CAPTION_Y = 10
 local PLAIN_ROW = 44
 local CONTROL_GAP = 12
+local ICON_SIZE = 24
 
 local Section = Layout.TableSection
 local Board = setmetatable({}, { __index = Section })
@@ -57,12 +58,21 @@ function Board:AddRow(name, sub, room)
 	return row
 end
 
-function Board:AddTools(name, sub, tools, after)
+function Board:AddTools(name, sub, tools, after, icon)
 	local kit = self.kit
 	local row = Section.AddRow(self, sub and (name .. ' ' .. sub) or name)
-	local title, subtitle = kit.RowTitle(row, name, sub, kit.ROW_INSET)
+	local x = kit.ROW_INSET
+	if icon then
+		local texture = row:CreateTexture(nil, 'ARTWORK')
+		texture:SetSize(ICON_SIZE, ICON_SIZE)
+		texture:SetPoint('LEFT', x, 0)
+		texture:SetTexture(icon)
+		texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		x = x + ICON_SIZE + CONTROL_GAP
+	end
+	local title, subtitle = kit.RowTitle(row, name, sub, x)
 	local placer = kit.Tools(row, tools, after)
-	local textWidth = self.panelWidth - kit.ROW_INSET * 2 - CONTROL_GAP
+	local textWidth = self.panelWidth - x - kit.ROW_INSET - CONTROL_GAP
 	row.tools = {
 		widths = placer.widths,
 		Place = function(slots)
