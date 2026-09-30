@@ -21,6 +21,8 @@ local function HideCurrentPage()
 	if not pageConfig or not pageConfig.frame or not pageConfig.frame:IsShown() then return end
 	if pageConfig.OnHide then pageConfig.OnHide(pageConfig.frame) end
 	pageConfig.frame:Hide()
+	local rail = pageConfig.frame.railPage
+	if rail then rail:Reset() end
 end
 
 local function TeardownPageContent(pageConfig)
