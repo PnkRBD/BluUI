@@ -503,6 +503,7 @@ local function LabelWithCount(settings, stacks)
     if label ~= "" then return label .. " " .. stacks end
     return stacks
 end
+Display.LabelWithCount = LabelWithCount
 
 local function AlternateTextWhenNoTip(settings, _, colorStacks)
     if colorStacks == 2 then return settings.customTextAlt end

@@ -235,6 +235,7 @@ local entries = {
 	{ label = "Precise Shots", page = "auras", tab = 3, panel = "Class", keywords = "precise shots lock and load bulletstorm marksmanship text alert" },
 	{ label = "Vivacious Vivification", page = "auras", tab = 3, panel = "Class", keywords = "mistweaver vivify instant reminder" },
 	{ label = "Lifebloom refresh", page = "auras", tab = 3, panel = "Class", keywords = "restoration druid lifebloom refresh" },
+	{ label = "Arcane Salvo", page = "auras", tab = 3, panel = "Class", keywords = "arcane mage salvo stacks barrage missiles" },
 
 	{ label = "Enable", page = "auras", tab = 2, panel = "GCD History", keywords = "gcd history streamer" },
 	{ label = "Preview", page = "auras", tab = 2, panel = "GCD History", keywords = "gcd anchor unlock drag" },

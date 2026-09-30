@@ -838,6 +838,23 @@ BUI.Defaults = {
 			sound             = 'None',
 		},
 
+		mageArcaneSalvo = {
+			enabled           = false,
+			showAnchor        = false,
+			centerHorizontally = true,
+			customText        = '',
+			posX              = 0,
+			posY              = -130,
+			anchorFrame       = '',
+			anchorPoint       = 'BOTTOM',
+			anchorOffsetX     = 0,
+			anchorOffsetY     = 0,
+			textSize          = 24,
+			font              = BUI.C.GLOBAL_OPTION,
+			textColor         = { r = 0.75, g = 0.55, b = 1.0, a = 1 },
+			sound             = 'None',
+		},
+
 		druidLifebloom = {
 			enabled           = false,
 			showAnchor        = false,
