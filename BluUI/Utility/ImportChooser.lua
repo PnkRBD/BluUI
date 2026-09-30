@@ -11,6 +11,7 @@ local pairs, type, ipairs = pairs, type, ipairs
 local GROUPS = {
 	{ header = 'Core', sections = {
 		{ key = 'general',     name = 'Theme & Fonts' },
+		{ key = 'windowTheme', name = 'Window Look' },
 		{ key = 'modules',     name = 'Module Toggles' },
 		{ key = 'interface',   name = 'Interface & Minimap' },
 		{ key = 'skinning',    name = 'Skinning' },
