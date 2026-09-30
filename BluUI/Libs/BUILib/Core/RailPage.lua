@@ -1,10 +1,12 @@
 local BUILib = LibStub("BUILib")
 if not BUILib.__loadChildren then return end
+local Controls = BUILib.Controls
 local Layout = BUILib.Layout
 
 local RAIL_WIDTH = 210
 local RAIL_GAP = 40
-local RAIL_STEP = 40
+local RAIL_SCROLL = 16
+local SCROLL_PAD = 4
 local BLOCK_GAP = 8
 local BOTTOM_GAP = 24
 
@@ -26,26 +28,18 @@ function Layout.RailPage(tab, shell, spec)
 	end)
 	local contentTop = top + (tab.topPadding or Layout.DEFAULT_PADDING) + BLOCK_GAP
 
-	local railScroll = CreateFrame('ScrollFrame', nil, head)
-	railScroll:SetPoint('TOPLEFT', 0, -contentTop)
-	railScroll:SetPoint('BOTTOM', tab.frame, 'BOTTOM', 0, 0)
-	railScroll:SetWidth(railWidth)
-	local railHost = CreateFrame('Frame', nil, railScroll)
-	railHost:SetSize(railWidth, 1)
-	railScroll:SetScrollChild(railHost)
-	local rail = Layout.Rail(window, railHost, railWidth, {
+	local railScroll = Controls.ScrollFrame(head, railWidth + SCROLL_PAD * 2, 1, 1, railWidth)
+	railScroll:ClearAllPoints()
+	railScroll:SetPoint('TOPLEFT', -SCROLL_PAD, -(contentTop - SCROLL_PAD))
+	railScroll:SetPoint('BOTTOM', tab.frame, 'BOTTOM', 0, -SCROLL_PAD)
+	local rail = Layout.Rail(window, railScroll.child, railWidth - RAIL_SCROLL, {
 		style = spec.rail.style,
 		groups = spec.rail.groups,
 		isDone = spec.rail.isDone,
 		onSelect = function(item) page:Select(item.id) end,
 	})
 	rail.frame:SetPoint('TOPLEFT')
-	railHost:SetHeight(rail.height)
-	railScroll:EnableMouseWheel(true)
-	railScroll:SetScript('OnMouseWheel', function(self, delta)
-		local range = math.max(0, rail.height - self:GetHeight())
-		self:SetVerticalScroll(math.max(0, math.min(range, self:GetVerticalScroll() - delta * RAIL_STEP)))
-	end)
+	railScroll:SetChildHeight(rail.height)
 
 	local divider = window:Fill(head, 'rule', 'ARTWORK')
 	divider:SetPoint('TOP', head, 'TOP', 0, -contentTop)

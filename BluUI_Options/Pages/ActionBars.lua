@@ -1,19 +1,15 @@
 local BUI = BluUI
-
 local BUILib = BluUI.BUILibClient
-local Controls, Layout, Modals = BUILib.Controls, BUILib.Layout, BUILib.Modals
-local PageKit = BUILib.PageKit
-local Widget = BUILib.Widget
-local Theme = BUILib.Theme
+local Layout, Modals, Theme = BUILib.Layout, BUILib.Modals, BUILib.Theme
 local Pixel = BUI.Pixel
 
-local LIST_WIDTH = 180
-local CONTENT_WIDTH = Layout.PAGE_CONTENT_W
-local DETAIL_WIDTH = CONTENT_WIDTH - LIST_WIDTH - 60
+local PAGE_WIDTH = 960
 local PREVIEW_HEIGHT = 112
 local PREVIEW_PAD = 14
 local PREVIEW_MIN_FONT = 6
 local PREVIEW_TICK = 0.5
+local MENU_WIDTH = 150
+local TEXT_RANGE = 30
 local MOCK_FILL = { 0.16, 0.17, 0.2, 1 }
 local MOCK_PLAIN_FILL = { 0.11, 0.115, 0.13, 1 }
 local MICRO_WIDTH, MICRO_HEIGHT, MICRO_COUNT, MICRO_OVERLAP = 32, 40, 13, -5
@@ -23,125 +19,379 @@ local BAG_BUTTON_NAMES = {
 }
 local STANCE_PREVIEW_FALLBACK = 3
 local EMPTY_BUTTON_DEFAULT = BUI.Defaults.profile.actionBars.emptyButtonColor
-local STRATA_ITEMS = BUI.C.STRATA_OPTIONS
 
-local ANCHOR_ITEMS = {
-	{ value = 'TOPLEFT', text = 'Top Left' },
+local ANCHORS = {
+	{ value = 'TOPLEFT', text = 'Top left' },
 	{ value = 'TOP', text = 'Top' },
-	{ value = 'TOPRIGHT', text = 'Top Right' },
+	{ value = 'TOPRIGHT', text = 'Top right' },
 	{ value = 'LEFT', text = 'Left' },
 	{ value = 'CENTER', text = 'Center' },
 	{ value = 'RIGHT', text = 'Right' },
-	{ value = 'BOTTOMLEFT', text = 'Bottom Left' },
+	{ value = 'BOTTOMLEFT', text = 'Bottom left' },
 	{ value = 'BOTTOM', text = 'Bottom' },
-	{ value = 'BOTTOMRIGHT', text = 'Bottom Right' },
+	{ value = 'BOTTOMRIGHT', text = 'Bottom right' },
 }
-
-local GROWTH_ITEMS = {
-	{ value = 'TOPLEFT', text = 'Top Left' },
-	{ value = 'TOPRIGHT', text = 'Top Right' },
-	{ value = 'BOTTOMLEFT', text = 'Bottom Left' },
-	{ value = 'BOTTOMRIGHT', text = 'Bottom Right' },
+local GROWTHS = {
+	{ value = 'TOPLEFT', text = 'Top left' },
+	{ value = 'TOPRIGHT', text = 'Top right' },
+	{ value = 'BOTTOMLEFT', text = 'Bottom left' },
+	{ value = 'BOTTOMRIGHT', text = 'Bottom right' },
 }
-
-local PICKUP_ITEMS = {
+local PICKUP_KEYS = {
 	{ value = 'SHIFT', text = 'Shift' },
 	{ value = 'CTRL', text = 'Ctrl' },
 	{ value = 'ALT', text = 'Alt' },
 	{ value = 'NONE', text = 'Never' },
 }
-
-local MODIFIER_PAGE_ITEMS = {
+local MODIFIER_PAGES = {
 	{ value = 0, text = 'Off' },
 	{ value = 2, text = 'Page 2' },
-	{ value = 3, text = 'Page 3 (Bar 4 slots)' },
-	{ value = 4, text = 'Page 4 (Bar 5 slots)' },
-	{ value = 5, text = 'Page 5 (Bar 3 slots)' },
-	{ value = 6, text = 'Page 6 (Bar 2 slots)' },
+	{ value = 3, text = 'Page 3, bar 4 slots' },
+	{ value = 4, text = 'Page 4, bar 5 slots' },
+	{ value = 5, text = 'Page 5, bar 3 slots' },
+	{ value = 6, text = 'Page 6, bar 2 slots' },
 }
-
 local MODIFIERS = {
-	{ key = 'ctrl', label = 'Ctrl Page' },
-	{ key = 'alt', label = 'Alt Page' },
-	{ key = 'shift', label = 'Shift Page' },
+	{ key = 'ctrl', label = 'Ctrl page' },
+	{ key = 'alt', label = 'Alt page' },
+	{ key = 'shift', label = 'Shift page' },
 }
-
+local GLOW_STYLES = {
+	{ value = 'proc', text = 'Proc' },
+	{ value = 'pixel', text = 'Pixel' },
+	{ value = 'autocast', text = 'Autocast' },
+	{ value = 'button', text = 'Button' },
+}
 local TEXT_KINDS = {
-	{ key = 'hotkey', title = 'Hotkey Text', desc = 'Keybind label on each button.', sizeMax = 20 },
-	{ key = 'count', title = 'Count Text', desc = 'Stack and charge counts.', sizeMax = 20 },
-	{ key = 'macro', title = 'Macro Text', desc = 'Macro and spell names along the bottom edge.', sizeMax = 16 },
+	{ key = 'hotkey', title = 'Hotkey text', description = 'Keybind label on each button', sizeMax = 20 },
+	{ key = 'count', title = 'Count text', description = 'Stack and charge counts', sizeMax = 20 },
+	{ key = 'macro', title = 'Macro text', description = 'Macro and spell names along the bottom edge', sizeMax = 16 },
 }
-
 local ACTION_BAR_ROWS = { hotkeys = true, macroText = true, cooldownText = true, hideEmpty = true, clickThrough = true }
 local CLICK_THROUGH_ROW = { clickThrough = true }
-
-local EXTRA_PAGES = {
-	{
-		key = 'pet', title = 'Pet Bar', desc = "Replaces Blizzard's pet bar. Turning it off needs a reload to bring Blizzard's back.",
-		selfTag = 'BUI_PetBar', buttons = true, maxButtons = 10, rows = { hotkeys = true, cooldownText = true, hideEmpty = true, clickThrough = true },
-	},
-	{
-		key = 'stance', title = 'Stance Bar', desc = "Replaces Blizzard's stance and form bar. Turning it off needs a reload to bring Blizzard's back.",
-		selfTag = 'BUI_StanceBar', buttons = true, maxButtons = 10, rows = { hotkeys = true, cooldownText = true, clickThrough = true },
-	},
-	{
-		key = 'vehicle', title = 'Vehicle Exit', desc = 'One button to leave a vehicle, land a taxi early, or cancel possession. Only shows when it can act.',
-		size = true, rows = CLICK_THROUGH_ROW,
-	},
-	{
-		key = 'micro', title = 'Micro Menu', desc = "Blizzard's micro buttons on a bar you control.",
-		micro = true, rows = CLICK_THROUGH_ROW,
-	},
-	{
-		key = 'bags', title = 'Bag Bar', desc = "Blizzard's bag buttons on a bar you control.",
-		scaleOnly = true, rows = CLICK_THROUGH_ROW,
-	},
-	{
-		key = 'extra', title = 'Extra Action', desc = "Blizzard's extra action and zone ability buttons on a bar you control. Turning it off needs a reload to bring Blizzard's back.",
-		scaleOnly = true, scaleDesc = 'Overall size of the extra action buttons.', rows = { clickThrough = true, blizzardArt = true },
-	},
+local EXTRA_BARS = {
+	{ key = 'pet', title = 'Pet bar', description = 'Replaces the Blizzard pet bar. Turning it off needs a reload to bring the Blizzard one back.', selfTag = 'BUI_PetBar', buttons = true, maxButtons = 10, rows = { hotkeys = true, cooldownText = true, hideEmpty = true, clickThrough = true } },
+	{ key = 'stance', title = 'Stance bar', description = 'Replaces the Blizzard stance and form bar. Turning it off needs a reload to bring the Blizzard one back.', selfTag = 'BUI_StanceBar', buttons = true, maxButtons = 10, rows = { hotkeys = true, cooldownText = true, clickThrough = true } },
+	{ key = 'vehicle', title = 'Vehicle exit', description = 'One button to leave a vehicle, land a taxi early or cancel possession. Only shows when it can act.', size = true, rows = CLICK_THROUGH_ROW },
+	{ key = 'micro', title = 'Micro menu', description = 'The Blizzard micro buttons on a bar you control.', micro = true, rows = CLICK_THROUGH_ROW },
+	{ key = 'bags', title = 'Bag bar', description = 'The Blizzard bag buttons on a bar you control.', scaleOnly = true, rows = CLICK_THROUGH_ROW },
+	{ key = 'extra', title = 'Extra action', description = 'The Blizzard extra action and zone ability buttons on a bar you control. Turning it off needs a reload to bring the Blizzard one back.', scaleOnly = true, rows = { clickThrough = true, blizzardArt = true } },
 }
+local EXTRA_BY_KEY = {}
+for _, extra in ipairs(EXTRA_BARS) do EXTRA_BY_KEY[extra.key] = extra end
 
-local AddRow = PageKit.AddSettingRow
-local GLOW_STYLE_ITEMS = {
-	{ value = 'proc',     text = 'Proc' },
-	{ value = 'pixel',    text = 'Pixel' },
-	{ value = 'autocast', text = 'Autocast' },
-	{ value = 'button',   text = 'Button' },
-}
+local selected = 'general'
+local preview
 
-local function StoreOption(store, apply, kind, label, key, extra)
-	local option = {
-		kind = kind, label = label,
-		get = function() return store[key] end,
-		set = function(value) store[key] = value; apply() end,
-	}
-	for optionKey, value in pairs(extra or {}) do option[optionKey] = value end
+local function Window()
+	return BUI.PageEngine.window
+end
+
+local function Repaint()
+	Window():Repaint()
+end
+
+local function Settings()
+	return BUI.ActionBars.GetSettings()
+end
+
+local function RefreshPreview()
+	if preview then preview:Update() end
+end
+
+local function Apply()
+	BUI.ActionBars.Refresh()
+	RefreshPreview()
+end
+
+local function SelectedKey()
+	if selected == 'general' then return nil end
+	local index = selected:match('^bar(%d+)$')
+	return index and tonumber(index) or selected
+end
+
+local function Option(db, label, key, extra)
+	local option = { label = label, get = function() return db[key] end, set = function(value) db[key] = value end }
+	for name, value in pairs(extra or {}) do option[name] = value end
 	return option
 end
 
-local function StoreSwatch(parent, store, apply, key, tooltip, hasOpacity)
-	local color = store[key]
-	return Controls.ColorSwatch(parent, {
-		r = color[1], g = color[2], b = color[3], a = color[4], hasOpacity = hasOpacity ~= false, tooltip = tooltip,
-		callback = function(red, green, blue, alpha) store[key] = { red, green, blue, alpha or 1 }; apply() end,
+local function Toggle(db, label, key)
+	return { label = label, get = function() return db[key] == true end, set = function(value) db[key] = value end }
+end
+
+local function Color(db, label, key, opacity)
+	return {
+		kind = 'swatch', label = label, tooltip = label, opacity = opacity ~= false,
+		get = function()
+			local color = db[key]
+			return color[1], color[2], color[3], color[4]
+		end,
+		set = function(red, green, blue, alpha) db[key] = { red, green, blue, alpha or 1 } end,
+	}
+end
+
+local function TextPlacement(db, title, prefix)
+	return { icon = 'mover', tooltip = 'Anchor and offset', title = title, options = {
+		Option(db, 'Anchor', prefix .. 'Anchor', { entries = ANCHORS }),
+		Option(db, 'Horizontal', prefix .. 'OffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+		Option(db, 'Vertical', prefix .. 'OffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+	} }
+end
+
+local function GeneralBoards(ui, parent, width)
+	local db = Settings()
+	local ActionBars = BUI.ActionBars
+	local text = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Button text',
+		description = 'The labels drawn on every button.',
 	})
-end
-
-local previewEyes = {}
-
-local function PreviewEye(row, key)
-	local eye = Controls.IconToggle(row, BUI.ActionBars.BarUnlocked(key), function(value)
-		BUI.ActionBars.SetBarUnlocked(key, value)
-	end, { texture = BUILib.GetLibMedia('eye'), tooltip = 'Preview and unlock this bar to drag it' })
-	previewEyes[key] = eye
-	return eye
-end
-
-local function SyncPreviewEyes()
-	for key, eye in pairs(previewEyes) do
-		eye:SetValue(BUI.ActionBars.BarUnlocked(key))
+	for _, kind in ipairs(TEXT_KINDS) do
+		text:AddTools(kind.title, kind.description, {
+			Color(db, kind.title .. ' color', kind.key .. 'Color'),
+			{ icon = 'text', tooltip = 'Size', title = kind.title, options = { Option(db, 'Size', kind.key .. 'FontSize', { min = 6, max = kind.sizeMax, step = 1 }) } },
+			TextPlacement(db, kind.title, kind.key),
+		}, Apply)
 	end
+	text:AddTools('Cooldown text', 'Countdown on a button on cooldown, each bar turns it on and sets its size', {
+		Color(db, 'Countdown color', 'cooldownColor'),
+		{ tooltip = 'Decimals and the final seconds', title = 'Cooldown text', options = {
+			Toggle(db, 'Decimals', 'showCooldownDecimals'),
+			Option(db, 'Decimals under seconds', 'cooldownDecimalThreshold', { min = 1, max = 30, step = 1 }),
+			Option(db, 'Warning under seconds', 'cooldownThreshold', { min = 0, max = 10, step = 1 }),
+			Color(db, 'Warning color', 'cooldownThresholdColor'),
+		} },
+		TextPlacement(db, 'Cooldown text', 'cooldown'),
+	}, Apply)
+	text:AddTools('Item rank', 'Crafting quality badge on potions, flasks and other ranked items', {
+		{ tooltip = 'Size', title = 'Item rank', options = { Option(db, 'Size', 'itemRankSize', { min = 8, max = 48, step = 1 }) } },
+		TextPlacement(db, 'Item rank', 'itemRank'),
+		Toggle(db, nil, 'showItemRank'),
+	}, Apply)
+
+	local look = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Buttons',
+		description = 'Borders, backgrounds and effects shared by every bar.',
+	})
+	look:AddTools('Border', 'Pixel outline around every button', {
+		Color(db, 'Border color', 'borderColor'),
+		{ tooltip = 'Thickness', title = 'Border', options = { Option(db, 'Thickness', 'borderSize', { min = 1, max = 4, step = 1 }) } },
+	}, Apply)
+	look:AddTools('Active pet ability', 'Outline on pet abilities that are autocasting or set as the active mode, follows the accent until you pick a color', {
+		{ kind = 'swatch', tooltip = 'Active pet ability color',
+			get = function()
+				local chosen = db.petActiveColor
+				if chosen then return chosen[1], chosen[2], chosen[3], 1 end
+				local red, green, blue = Theme.GetAccent()
+				return red, green, blue, 1
+			end,
+			set = function(red, green, blue) db.petActiveColor = { red, green, blue, 1 } end },
+		{ icon = 'reset', tooltip = 'Follow the accent color again', onClick = function()
+			db.petActiveColor = false
+			Apply()
+			Repaint()
+		end },
+	}, Apply)
+	look:AddTools('Cooldown swipe', 'The dark sweep that drains while a cooldown runs', {
+		Color(db, 'Swipe color', 'swipeColor'),
+	}, Apply)
+	look:AddTools('Empty buttons', 'Background behind slots with nothing in them', {
+		Color(db, 'Background color', 'emptyButtonColor'),
+		{ icon = 'reset', tooltip = 'Back to the default color', onClick = function()
+			db.emptyButtonColor = { EMPTY_BUTTON_DEFAULT[1], EMPTY_BUTTON_DEFAULT[2], EMPTY_BUTTON_DEFAULT[3], EMPTY_BUTTON_DEFAULT[4] }
+			Apply()
+			Repaint()
+		end },
+		Toggle(db, nil, 'emptyButtonBackground'),
+	}, Apply)
+	look:AddTools('Key presses', 'Flash a button while its keybind is held', {
+		Color(db, 'Flash color', 'pressColor', false),
+		{ tooltip = 'Strength', title = 'Key presses', options = { Option(db, 'Flash opacity %', 'pressOpacity', { min = 5, max = 100, step = 1 }) } },
+		Toggle(db, nil, 'showKeyPresses'),
+	}, Apply)
+	look:AddTools('Proc glow', 'Glow when a spell procs', {
+		Color(db, 'Glow tint', 'procGlowColor', false),
+		{ entries = GLOW_STYLES, width = MENU_WIDTH, get = function() return db.procGlowStyle end, set = function(value) db.procGlowStyle = value end },
+		{ tooltip = 'Speed, lines and thickness', title = 'Proc glow', options = {
+			Option(db, 'Speed %', 'procGlowSpeed', { min = 25, max = 400, step = 25 }),
+			Option(db, 'Lines, pixel style', 'procGlowLines', { min = 4, max = 16, step = 1 }),
+			Option(db, 'Thickness, pixel style', 'procGlowThickness', { min = 1, max = 5, step = 1 }),
+		} },
+		Toggle(db, nil, 'procGlow'),
+	}, Apply)
+	look:AddSwitch('Cast animation', function() return db.castAnimation == true end, function(value)
+		db.castAnimation = value
+		Apply()
+	end, 'The Blizzard fill sweep and burst while a spell casts or channels')
+	look:AddSwitch('Assisted combat', function() return db.showAssistedCombat == true end, function(value)
+		db.showAssistedCombat = value
+		Apply()
+	end, 'The Blizzard rotation helper markers on the buttons')
+	look:AddSwitch('Hide the micro menu', function() return db.microBar.hidden == true end, function(value)
+		db.microBar.hidden = value
+		Apply()
+	end, 'Remove the Blizzard micro buttons entirely instead of carrying them on the Micro menu bar')
+	look:AddSwitch('Hide the bag bar', function() return db.bagBar.hidden == true end, function(value)
+		db.bagBar.hidden = value
+		Apply()
+	end, 'Remove the Blizzard bag buttons entirely instead of carrying them on the Bag bar')
+
+	local control = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Keybinds and moving',
+		description = 'Binding keys, locking spells in place and dragging bars around.',
+	})
+	control:AddTools('Keybind mode', 'Hover any button and press a key or mouse button to bind it, Escape clears it. Also /bui keybind', {
+		{ text = 'Start', onClick = ActionBars.ToggleKeybindMode },
+	})
+	control:AddTools('Lock buttons', 'Spells only leave a button while the pick-up key is held', {
+		{ tooltip = 'Pick-up key', title = 'Lock buttons', options = { Option(db, 'Pick-up key', 'pickupKey', { entries = PICKUP_KEYS }) } },
+		Toggle(db, nil, 'lockButtons'),
+	}, Apply)
+	control:AddTools('Unlock bars', 'Drag handles on every bar. Bars snap to each other and the screen edges, hold Shift to drag freely', {
+		{ tooltip = 'Snapping', title = 'Moving bars', options = {
+			Toggle(db, 'Snap while dragging', 'snapBars'),
+			Option(db, 'Snap gap in pixels', 'snapGap', { min = 0, max = 12, step = 1 }),
+		} },
+		{ get = ActionBars.MoversUnlocked, set = ActionBars.SetMoversUnlocked },
+	})
+	return { text, look, control }
+end
+
+local function BarRows(ui, board, key, title, db, spec)
+	local ActionBars = BUI.ActionBars
+	local position = BUI.PositionTool(db, { selfTag = spec.selfTag })
+	local layering = { Option(db, 'Layer', 'frameStrata', { entries = BUI.C.STRATA_OPTIONS }) }
+	if spec.fill then table.insert(layering, 1, Option(db, 'Fill from', 'growth', { entries = GROWTHS })) end
+	board:AddTools(title, spec.description, {
+		position,
+		{ tooltip = spec.fill and 'Fill direction and layer' or 'Layer', title = title, options = layering },
+		{ icon = 'eye', tooltip = 'Preview and unlock just this bar to drag it', get = function() return ActionBars.BarUnlocked(key) end, set = function(value)
+			ActionBars.SetBarUnlocked(key, value)
+			Repaint()
+		end },
+		Toggle(db, nil, 'enabled'),
+	}, Apply)
+	if spec.buttons then
+		board:AddTools('Buttons', 'How many, how big and how they are spaced, height 0 keeps buttons square', {
+			{ tooltip = 'Count and rows', title = title, options = {
+				Option(db, 'Buttons', 'buttonCount', { min = 1, max = spec.maxButtons, step = 1 }),
+				Option(db, 'Per row', 'buttonsPerRow', { min = 1, max = spec.maxButtons, step = 1 }),
+			} },
+			{ icon = 'resize', tooltip = 'Size, spacing and scale', title = title, options = {
+				Option(db, 'Button size', 'buttonSize', { min = 20, max = 64, step = 1 }),
+				Option(db, 'Height', 'buttonHeight', { min = 0, max = 64, step = 1 }),
+				Option(db, 'Spacing', 'spacing', { min = 0, max = 16, step = 1 }),
+				Option(db, 'Scale %', 'scale', { min = 50, max = 200, step = 1 }),
+			} },
+		}, Apply)
+	elseif spec.size then
+		board:AddTools('Size', 'Button size and overall scale', {
+			{ icon = 'resize', tooltip = 'Size and scale', title = title, options = {
+				Option(db, 'Button size', 'buttonSize', { min = 24, max = 80, step = 1 }),
+				Option(db, 'Scale %', 'scale', { min = 50, max = 200, step = 1 }),
+			} },
+		}, Apply)
+	elseif spec.micro then
+		board:AddTools('Arrangement', 'Buttons per row, spacing and scale, or a vertical stack', {
+			{ icon = 'resize', tooltip = 'Rows, spacing and scale', title = title, options = {
+				Option(db, 'Per row', 'buttonsPerRow', { min = 1, max = MICRO_COUNT, step = 1 }),
+				Option(db, 'Spacing', 'spacing', { min = 0, max = 12, step = 1 }),
+				Option(db, 'Scale %', 'scale', { min = 50, max = 200, step = 1 }),
+				Toggle(db, 'Vertical', 'vertical'),
+			} },
+		}, Apply)
+	elseif spec.scaleOnly then
+		board:AddTools('Scale', 'Overall size of the buttons', {
+			{ icon = 'resize', tooltip = 'Scale', title = title, options = { Option(db, 'Scale %', 'scale', { min = 50, max = 200, step = 1 }) } },
+		}, Apply)
+	end
+	board:AddTools('Mouseover fade', 'Fade the bar out until the cursor is over it', {
+		{ tooltip = 'Opacity and timing', title = 'Mouseover fade', options = {
+			Option(db, 'Bar opacity %', 'alpha', { min = 10, max = 100, step = 1 }),
+			Option(db, 'Faded opacity %', 'fadeAlpha', { min = 0, max = 100, step = 1 }),
+			Toggle(db, 'Animated', 'fadeAnimated'),
+			Option(db, 'Fade time in seconds', 'fadeDuration', { min = 0.05, max = 1, step = 0.05 }),
+		} },
+		Toggle(db, nil, 'fadeEnabled'),
+	}, Apply)
+	if spec.paging then
+		local pages = {}
+		for _, modifier in ipairs(MODIFIERS) do
+			pages[#pages + 1] = Option(db.modifierPages, modifier.label, modifier.key, { entries = MODIFIER_PAGES })
+		end
+		board:AddTools('Page switching', spec.paging, {
+			{ tooltip = 'Pages shown while a modifier is held', title = 'Modifier pages', options = pages },
+			Toggle(db, nil, 'pagingEnabled'),
+		}, Apply)
+	end
+end
+
+local function ButtonsBoard(ui, parent, width, db, rows)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Buttons',
+		description = 'What the buttons on this bar show.',
+	})
+	local function Cell(label, key, tip)
+		board:AddSwitch(label, function() return db[key] == true end, function(value)
+			db[key] = value
+			Apply()
+		end, tip)
+	end
+	if rows.hotkeys then Cell('Hotkeys', 'showHotkey', 'Keybind labels on this bar') end
+	if rows.macroText then Cell('Macro text', 'showMacroText', 'Macro and spell names on this bar') end
+	if rows.hideEmpty then Cell('Hide empty buttons', 'hideEmptyButtons', 'Collapse slots with nothing in them') end
+	if rows.clickThrough then Cell('Click through', 'clickThrough', 'The mouse passes through this bar, keybinds still work, clicks and tooltips do not') end
+	if rows.blizzardArt then Cell('Blizzard art', 'blizzardArt', 'Keep the Blizzard decorative frame around the buttons') end
+	if rows.cooldownText then
+		board:AddTools('Cooldown text', 'Countdown numbers on this bar', {
+			{ icon = 'text', tooltip = 'Size', title = 'Cooldown text', options = { Option(db, 'Text size', 'cooldownFontSize', { min = 8, max = 24, step = 1 }) } },
+			Toggle(db, nil, 'showCooldownText'),
+		}, Apply)
+	end
+	return board
+end
+
+local function ActionBarBoards(ui, parent, width, index)
+	local db = Settings().bars[index]
+	local title = 'Bar ' .. index
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = title,
+		description = 'Its keybinds follow the matching Blizzard bar, which is hidden while this is on. Turning it off needs a reload to bring the Blizzard one back.',
+	})
+	BarRows(ui, board, index, title, db, {
+		selfTag = 'BUI_ActionBar' .. index,
+		fill = true,
+		buttons = true,
+		maxButtons = 12,
+		description = 'On or off, position, fill direction and layer',
+		paging = index == 1 and 'Vehicles, stances, possession and the page arrows swap what this bar shows' or 'Stances, possession and the modifier pages swap what this bar shows',
+	})
+	return { board, ButtonsBoard(ui, parent, width, db, ACTION_BAR_ROWS) }
+end
+
+local function ExtraBoards(ui, parent, width, extra)
+	local db = BUI.ActionBars.GetBarSettings(extra.key)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = extra.title,
+		description = extra.description,
+	})
+	BarRows(ui, board, extra.key, extra.title, db, {
+		selfTag = extra.selfTag,
+		fill = extra.buttons,
+		buttons = extra.buttons,
+		maxButtons = extra.maxButtons,
+		size = extra.size,
+		micro = extra.micro,
+		scaleOnly = extra.scaleOnly,
+		description = extra.buttons and 'On or off, position, fill direction and layer' or 'On or off, position and layer',
+	})
+	return { board, ButtonsBoard(ui, parent, width, db, extra.rows) }
 end
 
 local function MicroButtons()
@@ -175,8 +425,8 @@ local function LiveButtons(key)
 	return list
 end
 
-local function PreviewItems(key, barSettings)
-	local scale = barSettings.scale / 100
+local function PreviewItems(key, db)
+	local scale = db.scale / 100
 	local live = LiveButtons(key)
 	if key == 'micro' or key == 'bags' then
 		local items = {}
@@ -190,27 +440,23 @@ local function PreviewItems(key, barSettings)
 			if real then width, height = real:GetSize() end
 			items[index] = { real = real, width = width or fallbackWidth, height = height or fallbackHeight }
 		end
-		local perRow = key == 'micro' and barSettings.buttonsPerRow or count
-		if key == 'micro' and barSettings.vertical then perRow = 1 end
-		local spacing = key == 'micro' and (MICRO_OVERLAP + barSettings.spacing) or BAG_GAP
+		local perRow = key == 'micro' and db.buttonsPerRow or count
+		if key == 'micro' and db.vertical then perRow = 1 end
+		local spacing = key == 'micro' and (MICRO_OVERLAP + db.spacing) or BAG_GAP
 		return { items = items, perRow = perRow, spacing = spacing, scale = scale, plain = true }
 	end
-	local count = key == 'vehicle' and 1 or barSettings.buttonCount
+	local count = key == 'vehicle' and 1 or db.buttonCount
 	if key == 'stance' then
 		local forms = GetNumShapeshiftForms()
 		count = math.min(count, forms > 0 and forms or STANCE_PREVIEW_FALLBACK)
 	end
 	if live and #live > 0 then count = #live end
 	count = math.max(1, count)
-	local size = barSettings.buttonSize
 	local items = {}
 	for index = 1, count do
-		items[index] = { real = live and live[index], width = size, height = size }
+		items[index] = { real = live and live[index], width = db.buttonSize, height = db.buttonSize }
 	end
-	return {
-		items = items, perRow = barSettings.buttonsPerRow, spacing = barSettings.spacing, scale = scale,
-		hotkeys = barSettings.showHotkey, macro = barSettings.showMacroText,
-	}
+	return { items = items, perRow = db.buttonsPerRow, spacing = db.spacing, scale = scale, hotkeys = db.showHotkey, macro = db.showMacroText }
 end
 
 local function CreateMock(stage)
@@ -231,12 +477,12 @@ local function CreateMock(stage)
 	return mock
 end
 
-local function PlaceText(fontString, mock, settings, prefix, scale, text)
+local function PlaceText(fontString, mock, db, prefix, scale, text)
 	fontString:ClearAllPoints()
-	Pixel.ApplyFont(fontString, math.max(PREVIEW_MIN_FONT, settings[prefix .. 'FontSize'] * scale), BUI.GetAddonFont(), 'OUTLINE')
-	local anchor = settings[prefix .. 'Anchor']
-	fontString:SetPoint(anchor, mock, anchor, settings[prefix .. 'OffsetX'] * scale, settings[prefix .. 'OffsetY'] * scale)
-	local color = settings[prefix .. 'Color']
+	Pixel.ApplyFont(fontString, math.max(PREVIEW_MIN_FONT, db[prefix .. 'FontSize'] * scale), BUI.GetAddonFont(), 'OUTLINE')
+	local anchor = db[prefix .. 'Anchor']
+	fontString:SetPoint(anchor, mock, anchor, db[prefix .. 'OffsetX'] * scale, db[prefix .. 'OffsetY'] * scale)
+	local color = db[prefix .. 'Color']
 	fontString:SetTextColor(color[1], color[2], color[3], color[4])
 	fontString:SetText(text)
 end
@@ -275,7 +521,7 @@ local function MirrorArt(mock, real)
 	return true
 end
 
-local function MirrorItem(mock, item, spec, settings, scale)
+local function MirrorItem(mock, item, spec, db, scale)
 	local real = item.real
 	mock.hotkey:SetText('')
 	mock.count:SetText('')
@@ -305,34 +551,36 @@ local function MirrorItem(mock, item, spec, settings, scale)
 			mock.fill:SetVertexColor(unpack(MOCK_FILL))
 		end
 	end
-	if hasAction or settings.emptyButtonBackground or not real then
-		local borderColor = settings.borderColor
-		Pixel.ApplyBorder(mock, settings.borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
+	if hasAction or db.emptyButtonBackground or not real then
+		local borderColor = db.borderColor
+		Pixel.ApplyBorder(mock, db.borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
 	else
 		Pixel.HideBorder(mock)
 	end
 	if real then
-		PlaceText(mock.hotkey, mock, settings, 'hotkey', scale, TextOf(real.HotKey, spec.hotkeys))
-		PlaceText(mock.count, mock, settings, 'count', scale, TextOf(real.Count, true))
-		PlaceText(mock.macro, mock, settings, 'macro', scale, TextOf(real.Name, spec.macro))
+		PlaceText(mock.hotkey, mock, db, 'hotkey', scale, TextOf(real.HotKey, spec.hotkeys))
+		PlaceText(mock.count, mock, db, 'count', scale, TextOf(real.Count, true))
+		PlaceText(mock.macro, mock, db, 'macro', scale, TextOf(real.Name, spec.macro))
 	end
 end
 
-local function CreatePreview(tab, key)
-	local card = CreateFrame('Frame', nil, tab.child)
-	card:SetSize(tab.width, PREVIEW_HEIGHT)
-	Widget.RoundedPanel(card, 8, Theme.bg.card, Theme.border.light)
-	local stage = CreateFrame('Frame', nil, card)
+local function BuildPreview(band, kit)
+	local stage = CreateFrame('Frame', nil, band)
 	stage:SetPoint('CENTER')
 	stage:SetSize(1, 1)
-	card.stage, card.mocks, card.key, card.elapsed = stage, {}, key, 0
-	Layout.Add(tab, card, 8)
+	local mocks = {}
+	local note = kit.Text(band, 'Pick a bar from the rail to see it here', 12, 'muted')
+	note:SetPoint('CENTER')
+	local elapsed = 0
 
-	function card:Render()
-		local settings = BUI.ActionBars.GetSettings()
-		local barSettings = BUI.ActionBars.GetBarSettings(self.key)
-		if not barSettings then return end
-		local spec = PreviewItems(self.key, barSettings)
+	function band:Update()
+		local key = SelectedKey()
+		local db = key and BUI.ActionBars.GetBarSettings(key)
+		note:SetShown(not db)
+		stage:SetShown(db ~= nil)
+		if not db then return end
+		local settings = Settings()
+		local spec = PreviewItems(key, db)
 		local items = spec.items
 		local perRow = math.max(1, math.min(spec.perRow or #items, #items))
 		local rows = {}
@@ -355,569 +603,118 @@ local function CreatePreview(tab, key)
 		local available = self:GetWidth() - PREVIEW_PAD * 2
 		local fit = math.min(1, available / (totalWidth * spec.scale), (PREVIEW_HEIGHT - PREVIEW_PAD * 2) / (totalHeight * spec.scale))
 		local scale = spec.scale * fit
-		self.stage:SetSize(math.max(1, totalWidth * scale), math.max(1, totalHeight * scale))
+		stage:SetSize(math.max(1, totalWidth * scale), math.max(1, totalHeight * scale))
 		local mockIndex, y = 0, 0
 		for rowIndex, row in ipairs(rows) do
 			local x = 0
 			for _, item in ipairs(row.items) do
 				mockIndex = mockIndex + 1
-				local mock = self.mocks[mockIndex]
+				local mock = mocks[mockIndex]
 				if not mock then
-					mock = CreateMock(self.stage)
-					self.mocks[mockIndex] = mock
+					mock = CreateMock(stage)
+					mocks[mockIndex] = mock
 				end
 				local offsetY = (row.height - item.height) / 2
 				mock:SetSize(item.width * scale, item.height * scale)
 				mock:ClearAllPoints()
-				mock:SetPoint('TOPLEFT', self.stage, 'TOPLEFT', x * scale, -(y + offsetY) * scale)
+				mock:SetPoint('TOPLEFT', stage, 'TOPLEFT', x * scale, -(y + offsetY) * scale)
 				MirrorItem(mock, item, spec, settings, scale)
 				mock:Show()
 				x = x + item.width + spec.spacing
 			end
 			y = y + row.height + (rowIndex < #rows and spec.spacing or 0)
 		end
-		for index = mockIndex + 1, #self.mocks do
-			self.mocks[index]:Hide()
-		end
+		for index = mockIndex + 1, #mocks do mocks[index]:Hide() end
 	end
-
-	card:SetScript('OnUpdate', function(self, elapsed)
-		self.elapsed = self.elapsed + elapsed
-		if self.elapsed < PREVIEW_TICK then return end
-		self.elapsed = 0
-		self:Render()
+	band:SetScript('OnUpdate', function(self, delta)
+		elapsed = elapsed + delta
+		if elapsed < PREVIEW_TICK then return end
+		elapsed = 0
+		self:Update()
 	end)
-
-	card:Render()
-	return card
+	band:HookScript('OnShow', function(self) self:Update() end)
+	return band
 end
 
-local function BuildGeneral(tab, settings, Apply)
-	local function Option(kind, label, key, extra) return StoreOption(settings, Apply, kind, label, key, extra) end
-	local function Toggle(key)
-		return {
-			checked = settings[key],
-			callback = function(value) settings[key] = value; Apply() end,
-		}
-	end
-	local function Row(config, toggle)
-		if toggle then config.checked, config.callback = toggle.checked, toggle.callback end
-		return AddRow(tab, config)
-	end
-	local function PositionIcon(row, title, prefix)
-		return PageKit.PositionIcon(row, { title = title, tooltip = 'Anchor & offset', options = {
-			Option('dropdown', 'Anchor', prefix .. 'Anchor', { items = ANCHOR_ITEMS }),
-			Option('slider', 'Offset X', prefix .. 'OffsetX', { min = -30, max = 30 }),
-			Option('slider', 'Offset Y', prefix .. 'OffsetY', { min = -30, max = 30 }),
-		} })
-	end
-
-	Layout.Section(tab, 'Button Text')
-	for _, textKind in ipairs(TEXT_KINDS) do
-		Row({
-			title = textKind.title, description = textKind.desc, plain = true, accessoryWidth = 92,
-			accessories = function(row)
-				local position = PositionIcon(row, textKind.title:upper() .. ' POSITION', textKind.key)
-				local cog = PageKit.SettingsIcon(row, { title = textKind.title:upper(), tooltip = 'Size', options = {
-					Option('slider', 'Size', textKind.key .. 'FontSize', { min = 6, max = textKind.sizeMax }),
-				} })
-				return { position, cog, StoreSwatch(row, settings, Apply, textKind.key .. 'Color', textKind.title .. ' color') }
-			end,
-		})
-	end
-	Row({
-		title = 'Cooldown Text', description = 'Countdown numbers on a button on cooldown. Each bar turns them on or off and sets their size. The cog adds decimals and recolors the last few seconds.', plain = true, accessoryWidth = 96,
-		accessories = function(row)
-			local cog = PageKit.SettingsIcon(row, { title = 'COOLDOWN TEXT', tooltip = 'Decimals and the final-seconds color', options = {
-				Option(nil, 'Show Decimals', 'showCooldownDecimals'),
-				Option('slider', 'Decimal Threshold', 'cooldownDecimalThreshold', { min = 1, max = 30 }),
-				Option('slider', 'Warning Seconds', 'cooldownThreshold', { min = 0, max = 10 }),
-				Option('swatch', 'Warning Color', 'cooldownThresholdColor'),
-			} })
-			return { PositionIcon(row, 'COOLDOWN TEXT POSITION', 'cooldown'), cog, StoreSwatch(row, settings, Apply, 'cooldownColor', 'Countdown color') }
-		end,
-	})
-	Row({
-		title = 'Item Rank', description = 'Crafting quality badge on potions, flasks and other ranked items.', accessoryWidth = 64,
-		accessories = function(row)
-			local position = PositionIcon(row, 'ITEM RANK POSITION', 'itemRank')
-			local cog = PageKit.SettingsIcon(row, { title = 'ITEM RANK', tooltip = 'Badge size', options = {
-				Option('slider', 'Size', 'itemRankSize', { min = 8, max = 48 }),
-			} })
-			return { position, cog }
-		end,
-	}, Toggle('showItemRank'))
-
-	Layout.Section(tab, 'Appearance')
-	Row({
-		title = 'Border', description = 'Pixel outline around every button.', plain = true, accessoryWidth = 60,
-		accessories = function(row)
-			local cog = PageKit.SettingsIcon(row, { title = 'BORDER', tooltip = 'Border thickness', options = {
-				Option('slider', 'Border Size', 'borderSize', { min = 1, max = 4 }),
-			} })
-			return { cog, StoreSwatch(row, settings, Apply, 'borderColor', 'Border color') }
-		end,
-	})
-	Row({
-		title = 'Pet Active Border', description = 'Outline on pet abilities that are autocasting or set as the active mode. Follows the accent until you pick a color.', plain = true, accessoryWidth = 64,
-		accessories = function(row)
-			local red, green, blue = Theme.GetAccent()
-			local chosen = settings.petActiveColor
-			if chosen then red, green, blue = chosen[1], chosen[2], chosen[3] end
-			local swatch = Controls.ColorSwatch(row, {
-				r = red, g = green, b = blue, a = 1, hasOpacity = false, tooltip = 'Active pet ability border color',
-				callback = function(newRed, newGreen, newBlue) settings.petActiveColor = { newRed, newGreen, newBlue, 1 }; Apply() end,
-			})
-			local reset = Controls.Icon(row, {
-				texture = BUILib.GetLibMedia('reset'), tooltip = 'Follow the accent color',
-				onClick = function()
-					settings.petActiveColor = false
-					local accentRed, accentGreen, accentBlue = Theme.GetAccent()
-					Widget.Unwrap(swatch):SetColor(accentRed, accentGreen, accentBlue, 1)
-					Apply()
-				end,
-			})
-			return { reset, swatch }
-		end,
-	})
-	Row({
-		title = 'Cooldown Swipe', description = 'Color and opacity of the dark sweep that drains while a cooldown runs.', plain = true, accessoryWidth = 36,
-		accessories = function(row) return { StoreSwatch(row, settings, Apply, 'swipeColor', 'Swipe color & opacity') } end,
-	})
-	Row({
-		title = 'Empty Buttons', description = 'Background color and opacity behind slots with nothing in them.', accessoryWidth = 64,
-		accessories = function(row)
-			local swatch = StoreSwatch(row, settings, Apply, 'emptyButtonColor', 'Background color & opacity')
-			local reset = Controls.Icon(row, {
-				texture = BUILib.GetLibMedia('reset'), tooltip = 'Reset to default',
-				onClick = function()
-					settings.emptyButtonColor = { EMPTY_BUTTON_DEFAULT[1], EMPTY_BUTTON_DEFAULT[2], EMPTY_BUTTON_DEFAULT[3], EMPTY_BUTTON_DEFAULT[4] }
-					Widget.Unwrap(swatch):SetColor(EMPTY_BUTTON_DEFAULT[1], EMPTY_BUTTON_DEFAULT[2], EMPTY_BUTTON_DEFAULT[3], EMPTY_BUTTON_DEFAULT[4])
-					Apply()
-				end,
-			})
-			return { reset, swatch }
-		end,
-	}, Toggle('emptyButtonBackground'))
-	Row({
-		title = 'Key Presses', description = 'Flash a button while its keybind is held.', accessoryWidth = 64,
-		accessories = function(row)
-			local cog = PageKit.SettingsIcon(row, { title = 'KEY PRESSES', tooltip = 'Flash strength', options = {
-				Option('slider', 'Flash Opacity %', 'pressOpacity', { min = 5, max = 100 }),
-			} })
-			return { cog, StoreSwatch(row, settings, Apply, 'pressColor', 'Flash color', false) }
-		end,
-	}, Toggle('showKeyPresses'))
-
-	Layout.Section(tab, 'Effects')
-	Row({
-		title = 'Proc Glow', description = 'Glow when a spell procs. Pick the style, then shape and tint it.', accessoryWidth = 220,
-		accessories = function(row)
-			local styleDropdown = Controls.Dropdown(row, nil, GLOW_STYLE_ITEMS, settings.procGlowStyle, function(value)
-				settings.procGlowStyle = value; Apply()
-			end, nil, 120)
-			local cog = PageKit.SettingsIcon(row, { title = 'GLOW SHAPE', tooltip = 'Speed, lines & thickness', options = {
-				Option('slider', 'Speed %', 'procGlowSpeed', { min = 25, max = 400, step = 25 }),
-				Option('slider', 'Lines (Pixel)', 'procGlowLines', { min = 4, max = 16 }),
-				Option('slider', 'Thickness (Pixel)', 'procGlowThickness', { min = 1, max = 5 }),
-			} })
-			return { styleDropdown, cog, StoreSwatch(row, settings, Apply, 'procGlowColor', 'Glow tint', false) }
-		end,
-	}, Toggle('procGlow'))
-	Row({ title = 'Cast Animation', description = "Blizzard's fill sweep and burst while a spell casts or channels." }, Toggle('castAnimation'))
-	Row({ title = 'Assisted Combat', description = "Blizzard's rotation helper markers on the buttons." }, Toggle('showAssistedCombat'))
-
-	Layout.Section(tab, 'Blizzard')
-	Row({
-		title = 'Hide Micro Menu', description = "Remove Blizzard's micro buttons entirely instead of carrying them on the Micro Menu bar.",
-		checked = settings.microBar.hidden,
-		callback = function(value) settings.microBar.hidden = value; Apply() end,
-	})
-	Row({
-		title = 'Hide Bag Bar', description = "Remove Blizzard's bag buttons entirely instead of carrying them on the Bag Bar.",
-		checked = settings.bagBar.hidden,
-		callback = function(value) settings.bagBar.hidden = value; Apply() end,
-	})
-
-	Layout.Section(tab, 'Keybinds')
-	Row({
-		title = 'Keybind Mode', description = 'Hover any button and press a key or mouse button to bind it. Escape clears the hovered button. Also /bui keybind.',
-		plain = true, accessoryWidth = 76,
-		accessories = function(row)
-			return { Controls.Button(row, 'Start', 70, function() BUI.ActionBars.ToggleKeybindMode() end) }
-		end,
-	})
-
-	Layout.Section(tab, 'Locking & Moving')
-	Row({
-		title = 'Lock Buttons', description = 'Spells only leave a button while the pick-up key is held.', accessoryWidth = 36,
-		accessories = function(row)
-			return { PageKit.SettingsIcon(row, { title = 'LOCK BUTTONS', tooltip = 'Pick-up key', options = {
-				{ kind = 'dropdown', label = 'Pick-up Key', items = PICKUP_ITEMS,
-				  get = function() return settings.pickupKey end,
-				  set = function(value) settings.pickupKey = value; Apply() end },
-			} }) }
-		end,
-	}, Toggle('lockButtons'))
-	return Row({
-		title = 'Unlock Bars', description = 'Drag handles on every bar. Bars snap to each other and to the screen edges; hold Shift to drag freely.',
-		checked = BUI.ActionBars.MoversUnlocked(),
-		callback = function(value) BUI.ActionBars.SetMoversUnlocked(value) end,
-		accessoryWidth = 36,
-		accessories = function(row)
-			return { PageKit.SettingsIcon(row, { title = 'MOVING BARS', tooltip = 'Snapping', options = {
-				{ label = 'Snap While Dragging', get = function() return settings.snapBars end, set = function(value) settings.snapBars = value end },
-				{ kind = 'slider', label = 'Snap Gap (px)', min = 0, max = 12, get = function() return settings.snapGap end, set = function(value) settings.snapGap = value end },
-			} }) }
-		end,
-	})
+local function Panes(ui, _, parent, width, item)
+	if item.id == 'general' then return GeneralBoards(ui, parent, width) end
+	local extra = EXTRA_BY_KEY[item.id]
+	if extra then return ExtraBoards(ui, parent, width, extra) end
+	return ActionBarBoards(ui, parent, width, tonumber(item.id:match('%d+')))
 end
 
-local function BarPageKit(tab, key, title, barSettings, Apply)
-	local kit = { rows = {} }
-
-	function kit.Option(kind, label, optionKey, extra)
-		return StoreOption(barSettings, Apply, kind, label, optionKey, extra)
+local function RailGroups()
+	local bars = {}
+	for index = 1, BUI.ActionBars.BAR_COUNT do
+		bars[index] = { id = 'bar' .. index, label = 'Bar ' .. index }
 	end
-
-	function kit.Row(config)
-		local row = AddRow(tab, config)
-		kit.rows[#kit.rows + 1] = row
-		return row
-	end
-
-	function kit.ToggleRow(rowTitle, description, settingKey)
-		return kit.Row({
-			title = rowTitle, description = description,
-			checked = barSettings[settingKey],
-			callback = function(value) barSettings[settingKey] = value; Apply() end,
-		})
-	end
-
-	function kit.SyncDim()
-		for _, row in ipairs(kit.rows) do Widget.Unwrap(row):SetRowEnabled(barSettings.enabled) end
-	end
-
-	function kit.EnabledRow(description)
-		AddRow(tab, {
-			title = 'Enabled', description = description,
-			checked = barSettings.enabled,
-			callback = function(value)
-				barSettings.enabled = value
-				Apply()
-				kit.SyncDim()
-			end,
-		})
-	end
-
-	function kit.PositionRow(selfTag, includeFill)
-		kit.Row({
-			title = 'Position', plain = true, accessoryWidth = 92,
-			description = 'Screen position or anchor frame. The eye previews and unlocks just this bar; the cog holds centering' .. (includeFill and ', fill direction' or '') .. ' and strata.',
-			accessories = function(row)
-				local options = {
-					{ label = 'Center Horizontally',
-					  get = function() return barSettings.centerHorizontally end,
-					  set = function(value)
-						  barSettings.centerHorizontally = value
-						  if value then barSettings.posX = 0 end
-						  Apply()
-					  end },
-				}
-				if includeFill then options[#options + 1] = kit.Option('dropdown', 'Fill From', 'growth', { items = GROWTH_ITEMS }) end
-				options[#options + 1] = kit.Option('dropdown', 'Strata', 'frameStrata', { items = STRATA_ITEMS })
-				return {
-					PreviewEye(row, key),
-					PageKit.SettingsIcon(row, { title = 'POSITION OPTIONS', tooltip = 'Centering, fill direction & strata', options = options }),
-					BUI.AlertMover(row, barSettings, Apply, { selfTag = selfTag, noCenter = true }),
-				}
-			end,
-		})
-	end
-
-	function kit.ButtonsRow(maxButtons)
-		kit.Row({
-			title = 'Buttons', description = 'The cog sets how many buttons and how many per row; the size glyph sets how big. Height 0 keeps buttons square.', plain = true, accessoryWidth = 64,
-			accessories = function(row)
-				local cog = PageKit.SettingsIcon(row, { title = title:upper() .. ' BUTTONS', tooltip = 'Count & rows', options = {
-					kit.Option('slider', 'Buttons', 'buttonCount', { min = 1, max = maxButtons }),
-					kit.Option('slider', 'Per Row', 'buttonsPerRow', { min = 1, max = maxButtons }),
-				} })
-				local size = PageKit.SizeIcon(row, { title = title:upper() .. ' SIZE', tooltip = 'Size, spacing & scale', options = {
-					kit.Option('slider', 'Button Size', 'buttonSize', { min = 20, max = 64 }),
-					kit.Option('slider', 'Height', 'buttonHeight', { min = 0, max = 64 }),
-					kit.Option('slider', 'Spacing', 'spacing', { min = 0, max = 16 }),
-					kit.Option('slider', 'Scale %', 'scale', { min = 50, max = 200 }),
-				} })
-				return { cog, size }
-			end,
-		})
-	end
-
-	function kit.FadeRow()
-		kit.Row({
-			title = 'Mouseover Fade', description = 'Fade the bar out until the cursor is over it. The cog sets opacity and whether the fade is animated or instant.', accessoryWidth = 36,
-			checked = barSettings.fadeEnabled,
-			callback = function(value) barSettings.fadeEnabled = value; Apply() end,
-			accessories = function(row)
-				return { PageKit.SettingsIcon(row, { title = 'FADING', tooltip = 'Opacity, animation and fade time', options = {
-					kit.Option('slider', 'Bar Opacity %', 'alpha', { min = 10, max = 100 }),
-					kit.Option('slider', 'Faded Opacity %', 'fadeAlpha', { min = 0, max = 100 }),
-					{ label = 'Animated', get = function() return barSettings.fadeAnimated end, set = function(value) barSettings.fadeAnimated = value; Apply() end },
-					kit.Option('slider', 'Fade Time (s)', 'fadeDuration', { min = 0.05, max = 1, step = 0.05 }),
-				} }) }
-			end,
-		})
-	end
-
-	function kit.ButtonRows(rows)
-		if not rows then return end
-		Layout.Section(tab, 'Buttons')
-		if rows.hotkeys then kit.ToggleRow('Hotkeys', 'Keybind labels on this bar.', 'showHotkey') end
-		if rows.macroText then kit.ToggleRow('Macro Text', 'Macro and spell names on this bar.', 'showMacroText') end
-		if rows.cooldownText then
-			kit.Row({
-				title = 'Cooldown Text', description = 'Countdown numbers on this bar and their text size.',
-				checked = barSettings.showCooldownText,
-				callback = function(value) barSettings.showCooldownText = value; Apply() end,
-				accessoryWidth = 170,
-				accessories = function(row)
-					return { Controls.CompactSlider(row, nil, 8, 24, barSettings.cooldownFontSize, function(value)
-						barSettings.cooldownFontSize = value
-						Apply()
-					end, 1, 150) }
-				end,
-			})
-		end
-		if rows.hideEmpty then kit.ToggleRow('Hide Empty Buttons', 'Collapse slots with nothing in them.', 'hideEmptyButtons') end
-		if rows.clickThrough then kit.ToggleRow('Click Through', 'The mouse passes through this bar. Keybinds still work; clicks and tooltips do not.', 'clickThrough') end
-		if rows.blizzardArt then kit.ToggleRow('Blizzard Art', "Keep Blizzard's decorative frame around the buttons.", 'blizzardArt') end
-	end
-
-	return kit
+	local extras = {}
+	for _, extra in ipairs(EXTRA_BARS) do extras[#extras + 1] = { id = extra.key, label = extra.title } end
+	return {
+		{ title = 'Settings', items = { { id = 'general', label = 'General', icon = 'cog' } } },
+		{ title = 'Bars', items = bars },
+		{ title = 'Other bars', items = extras },
+	}
 end
 
-local function BuildActionBar(tab, barIndex, barSettings, Apply)
-	local kit = BarPageKit(tab, barIndex, 'Bar ' .. barIndex, barSettings, Apply)
-	local preview = CreatePreview(tab, barIndex)
-
-	Layout.Section(tab, 'Bar ' .. barIndex)
-	kit.EnabledRow("Show this bar. Its keybinds follow the matching Blizzard bar, which is hidden while this is on (reload to bring Blizzard's back).")
-
-	Layout.Section(tab, 'Layout')
-	kit.PositionRow('BUI_ActionBar' .. barIndex, true)
-	kit.ButtonsRow(12)
-	kit.FadeRow()
-
-	do
-		Layout.Section(tab, 'Paging')
-		kit.Row({
-			title = 'Page Switching', description = barIndex == 1 and 'Vehicles, stances, possession and the page arrows swap what this bar shows.' or 'Stances, possession and the modifier pages swap what this bar shows.',
-			checked = barSettings.pagingEnabled,
-			callback = function(value) barSettings.pagingEnabled = value; Apply() end,
-			accessoryWidth = 36,
-			accessories = function(row)
-				local options = {}
-				for _, modifier in ipairs(MODIFIERS) do
-					options[#options + 1] = {
-						kind = 'dropdown', label = modifier.label, items = MODIFIER_PAGE_ITEMS,
-						get = function() return barSettings.modifierPages[modifier.key] end,
-						set = function(value)
-							barSettings.modifierPages[modifier.key] = value
-							Apply()
-						end,
-					}
-				end
-				return { PageKit.SettingsIcon(row, { title = 'MODIFIER PAGES', tooltip = 'Pages shown while a modifier is held', options = options }) }
-			end,
-		})
-	end
-
-	kit.ButtonRows(ACTION_BAR_ROWS)
-	kit.SyncDim()
-	return preview
-end
-
-local function BuildExtraBar(tab, page, barSettings, Apply)
-	local kit = BarPageKit(tab, page.key, page.title, barSettings, Apply)
-	local preview = CreatePreview(tab, page.key)
-
-	Layout.Section(tab, page.title)
-	kit.EnabledRow(page.desc)
-
-	Layout.Section(tab, 'Layout')
-	kit.PositionRow(page.selfTag, page.buttons)
-	if page.buttons then
-		kit.ButtonsRow(page.maxButtons)
-	elseif page.size then
-		kit.Row({
-			title = 'Size', description = 'Button size and overall scale.', plain = true, accessoryWidth = 36,
-			accessories = function(row)
-				return { PageKit.SizeIcon(row, { title = page.title:upper(), tooltip = 'Size & scale', options = {
-					kit.Option('slider', 'Button Size', 'buttonSize', { min = 24, max = 80 }),
-					kit.Option('slider', 'Scale %', 'scale', { min = 50, max = 200 }),
-				} }) }
-			end,
-		})
-	elseif page.micro then
-		kit.Row({
-			title = 'Arrangement', description = 'Buttons per row, spacing, scale, or a vertical stack.', plain = true, accessoryWidth = 36,
-			accessories = function(row)
-				return { PageKit.SizeIcon(row, { title = 'MICRO MENU', tooltip = 'Rows, spacing & scale', options = {
-					kit.Option('slider', 'Per Row', 'buttonsPerRow', { min = 1, max = MICRO_COUNT }),
-					kit.Option('slider', 'Spacing', 'spacing', { min = 0, max = 12 }),
-					kit.Option('slider', 'Scale %', 'scale', { min = 50, max = 200 }),
-					{ label = 'Vertical', get = function() return barSettings.vertical end, set = function(value) barSettings.vertical = value; Apply() end },
-				} }) }
-			end,
-		})
-	elseif page.scaleOnly then
-		kit.Row({
-			title = 'Scale', description = page.scaleDesc or 'Overall size of the bag buttons.', plain = true, accessoryWidth = 36,
-			accessories = function(row)
-				return { PageKit.SizeIcon(row, { title = page.title:upper(), tooltip = 'Scale', options = {
-					kit.Option('slider', 'Scale %', 'scale', { min = 50, max = 200 }),
-				} }) }
-			end,
-		})
-	end
-	kit.FadeRow()
-
-	kit.ButtonRows(page.rows)
-	kit.SyncDim()
-	return preview
+local function ConfirmModule(value)
+	Modals.Confirm({
+		parent = Window().frame,
+		title = value and 'Turn on action bars' or 'Turn off action bars',
+		message = 'This needs a reload of the interface. Reload now?',
+		confirmText = 'Reload', cancelText = 'Cancel',
+		onConfirm = function()
+			BUI.SetModuleEnabled('actionBars', value)
+			ReloadUI()
+		end,
+		onCancel = Repaint,
+	})
 end
 
 BUI.PageEngine.RegisterPage('actionbars', {
 	title = 'Action Bars',
 	buttonText = 'Action Bars',
+	icon = 'dashboard',
 	OnBuild = function(pageFrame)
-		local db = BUI.GetDB()
-
-		if not BUI.IsModuleEnabled('actionBars') then
-			local page = Layout.Page(pageFrame, nil)
-			local tab = page:GetTab(1)
-			Layout.Section(tab, 'Action Bars', 'Module disabled. Enable it below, then reload.')
-			local enableButton = Controls.Button(tab.child, 'Enable Action Bars & Reload', 220, function()
-				BUI.SetModuleEnabled('actionBars', true)
-				ReloadUI()
-			end)
-			Layout.Add(tab, enableButton, 12)
+		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
+		local tab = page:GetTab(1)
+		local enabled = BUI.IsModuleEnabled('actionBars')
+		local rail
+		rail = Layout.RailPage(tab, { window = Window() }, {
+			icon = 'dashboard',
+			title = 'Action Bars',
+			placeholder = 'Search action bar settings...',
+			tools = {
+				{ icon = 'enable', tooltip = 'Turn the action bars module on or off, needs a reload', get = function() return BUI.IsModuleEnabled('actionBars') end, set = ConfirmModule },
+				{ icon = 'eye', tooltip = 'Unlock every bar to drag it, right-click a bar to lock again', get = function() return enabled and BUI.ActionBars.MoversUnlocked() end, set = function(value)
+					if enabled then BUI.ActionBars.SetMoversUnlocked(value) end
+					Repaint()
+				end },
+			},
+			preview = enabled and { height = PREVIEW_HEIGHT, build = function(band, kit) preview = BuildPreview(band, kit) end } or nil,
+			rail = { groups = enabled and RailGroups() or { { title = 'Settings', items = { { id = 'off', label = 'Module off' } } } }, selected = enabled and selected or 'off' },
+			build = function(ui, shell, parent, width, item)
+				if item.id == 'off' then
+					local board = ui.Board(parent, width, { stacked = true, title = 'Action bars are off', description = 'Turn the module on with the cube in the header. It needs a reload.' })
+					return { board }
+				end
+				return Panes(ui, shell, parent, width, item)
+			end,
+		})
+		if not enabled then
 			page:AutoRefresh()
 			return
 		end
-
-		local settings = db.actionBars
-		local currentPreview
-		local function Apply()
-			BUI.ActionBars.Refresh()
-			if currentPreview then currentPreview:Render() end
+		local Select = rail.Select
+		function rail:Select(id)
+			selected = id
+			Select(self, id)
+			Repaint()
+			RefreshPreview()
 		end
-
-		local titleBar
-		local titleHeight
-		titleHeight, titleBar = PageKit.PageTitle(pageFrame, 'Action Bars', CONTENT_WIDTH, {
-			desc = "BluUI's own action bars, replacing Blizzard's. General settings and each bar have their own page.",
-			anchor = {
-				value = BUI.ActionBars.MoversUnlocked(),
-				tooltip = 'Unlock every bar to drag it; right-click a bar to lock again',
-				onToggle = function(unlocked) BUI.ActionBars.SetMoversUnlocked(unlocked) end,
-			},
-			enable = { value = true, tooltip = 'Disable the action bars module', onToggle = function(enabled)
-				if enabled then return end
-				Modals.Confirm({
-					parent = BUI.PageEngine.window.frame,
-					title = 'Disable Action Bars',
-					message = 'This change requires a UI reload to take effect.',
-					confirmText = 'Reload Now', cancelText = 'Cancel',
-					onConfirm = function() BUI.SetModuleEnabled('actionBars', false); ReloadUI() end,
-					onCancel = function() titleBar.enableToggle:SetValue(true) end,
-				})
-			end },
-		})
-
-		local host = CreateFrame('Frame', nil, pageFrame)
-		host:SetPoint('TOP', pageFrame, 'TOP', 0, -(PageKit.PAD + titleHeight))
-		host:SetPoint('BOTTOM', pageFrame, 'BOTTOM', 0, 0)
-		host:SetWidth(CONTENT_WIDTH)
-
-		local barItems = {}
-		for barIndex = 1, BUI.ActionBars.BAR_COUNT do
-			barItems[barIndex] = { id = 'bar' .. barIndex, label = 'Bar ' .. barIndex }
-		end
-		local extraItems = {}
-		local extraByKey = {}
-		for _, page in ipairs(EXTRA_PAGES) do
-			extraItems[#extraItems + 1] = { id = page.key, label = page.title }
-			extraByKey[page.key] = page
-		end
-
-		local pages = {}
-		local unlockRow
-		local sidebar
-		sidebar = Layout.SidebarPage(host, {
-			listWidth = LIST_WIDTH,
-			contentWidth = DETAIL_WIDTH,
-			default = 'general',
-			groups = {
-				{ header = 'Settings', items = { { id = 'general', label = 'General' } } },
-				{ header = 'Bars', items = barItems },
-				{ header = 'Other Bars', items = extraItems },
-			},
-			onSelect = function(id, detailTab)
-				for _, entry in pairs(pages) do entry.wrapper:Hide() end
-				local entry = pages[id]
-				if not entry then
-					local wrapper = CreateFrame('Frame', nil, detailTab.child)
-					wrapper:SetPoint('TOPLEFT')
-					wrapper:SetWidth(detailTab.width)
-					local topAnchor = CreateFrame('Frame', nil, wrapper)
-					topAnchor:SetPoint('TOPLEFT')
-					topAnchor:SetPoint('TOPRIGHT')
-					topAnchor:SetHeight(1)
-					local tab = Layout.ApplyContentMixin({
-						child = wrapper, frame = detailTab.frame, scroll = detailTab.scroll, scrollChild = detailTab.scrollChild, width = detailTab.width,
-					})
-					tab.lastControl = topAnchor
-					local preview
-					if id == 'general' then
-						unlockRow = BuildGeneral(tab, settings, Apply)
-					elseif extraByKey[id] then
-						local page = extraByKey[id]
-						preview = BuildExtraBar(tab, page, BUI.ActionBars.GetBarSettings(page.key), Apply)
-					else
-						local barIndex = tonumber(id:match('%d+'))
-						preview = BuildActionBar(tab, barIndex, settings.bars[barIndex], Apply)
-					end
-					local height = Layout.MeasureLowestExtent(wrapper)
-					if height == 0 then height = math.abs(tab.y) end
-					wrapper:SetHeight(height + 8)
-					entry = { wrapper = wrapper, tab = tab, preview = preview }
-					pages[id] = entry
-				end
-				currentPreview = entry.preview
-				if currentPreview then currentPreview:Render() end
-				entry.wrapper:Show()
-			end,
-		})
-
-		pageFrame._selectModule = function(key)
-			sidebar:Select((key or ''):match('^[^.]+') or 'general')
-		end
-
-		local function SyncUnlockControls()
-			local unlocked = BUI.ActionBars.MoversUnlocked()
-			if unlockRow then Widget.Unwrap(unlockRow):SetValue(unlocked) end
-			titleBar.anchorToggle:SetValue(unlocked)
-		end
-		BUI.ActionBars.OnMoversChanged('ActionBarsPage', function(kind)
-			if kind == 'unlocked' then SyncUnlockControls() end
-			if kind == 'unlocked' or kind == 'barUnlocked' then SyncPreviewEyes() end
-		end)
-		pageFrame:HookScript('OnShow', function()
-			SyncUnlockControls()
-			SyncPreviewEyes()
-			if currentPreview then currentPreview:Render() end
-		end)
+		pageFrame._selectModule = function(key) rail:Select(key) end
+		BUI.ActionBars.OnMoversChanged('ActionBarsPage', Repaint)
+		RefreshPreview()
+		page:AutoRefresh()
 	end,
 })
