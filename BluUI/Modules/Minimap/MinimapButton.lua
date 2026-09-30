@@ -31,5 +31,4 @@ function BUI.SetMinimapButtonHidden(hide)
 	else
 		LibDBIcon:Show(BUI.ADDON_NAME)
 	end
-	BUI.AddonButtons.Refresh()
 end
