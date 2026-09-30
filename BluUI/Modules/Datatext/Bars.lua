@@ -209,15 +209,14 @@ local function ApplyPartFont(fontString, config, fontPath)
     Pixel.ApplyFont(fontString, config.fontSize, fontPath)
 end
 
-function Datatext.LayoutRow(widths, count, spacing, inset, fixedWidth, align, spread, out)
+function Datatext.LayoutRow(widths, count, spacing, inset, fixedWidth, align, out)
     local textLeft, textWidth, hitLeft, hitWidth = out.textLeft, out.textWidth, out.hitLeft, out.hitWidth
     local sum = 0
     for index = 1, count do sum = sum + widths[index] end
     local barWidth = fixedWidth or (sum + (count - 1) * spacing + 2 * inset)
-    local inner = barWidth - 2 * inset
 
     if fixedWidth and align == 'SPREAD' then
-        local slot = inner / count
+        local slot = (barWidth - 2 * inset) / count
         for index = 1, count do
             local left = inset + (index - 1) * slot
             local width = math.min(widths[index], slot)
@@ -227,12 +226,7 @@ function Datatext.LayoutRow(widths, count, spacing, inset, fixedWidth, align, sp
         return barWidth
     end
 
-    local gap = spacing
-    if fixedWidth and spread > 0 and count > 1 then
-        local leftover = inner - sum - (count - 1) * spacing
-        if leftover > 0 then gap = spacing + leftover * spread / (count - 1) end
-    end
-    local groupWidth = sum + (count - 1) * gap
+    local groupWidth = sum + (count - 1) * spacing
     local cursor = inset
     if fixedWidth then
         if align == 'RIGHT' then
@@ -244,10 +238,10 @@ function Datatext.LayoutRow(widths, count, spacing, inset, fixedWidth, align, sp
     for index = 1, count do
         local width = widths[index]
         textLeft[index], textWidth[index] = cursor, width
-        local left = math.max(cursor - gap / 2, 0)
-        local right = math.min(cursor + width + gap / 2, barWidth)
+        local left = math.max(cursor - spacing / 2, 0)
+        local right = math.min(cursor + width + spacing / 2, barWidth)
         hitLeft[index], hitWidth[index] = left, math.max(right - left, 1)
-        cursor = cursor + width + gap
+        cursor = cursor + width + spacing
     end
     return barWidth
 end
@@ -282,7 +276,7 @@ end
 
 local function FixedSide(anchored, setting)
     if anchored then return anchored > 0 and anchored or nil end
-    return setting and setting > 0 and Pixel.Scale(setting) or nil
+    return setting > 0 and Pixel.Scale(setting) or nil
 end
 
 local function RenderCells(bar, config)
@@ -313,7 +307,7 @@ local function RenderCells(bar, config)
     end
 
     local spacing = Pixel.Scale(config.spacing)
-    local align = config.align or 'CENTER'
+    local align = config.align
 
     if config.orientation == 'VERTICAL' then
         local lineHeight = Pixel.Scale(config.fontSize + LAYOUT.lineExtra)
@@ -351,8 +345,7 @@ local function RenderCells(bar, config)
                 textWidths[partIndex] = cellWidths[partIndex]
             end
         end
-        local spread = (tonumber(config.spread) or 0) / 100
-        local barWidth = Datatext.LayoutRow(textWidths, partTotal, spacing, Pixel.Scale(LAYOUT.rowInset), fixedWidth, align, spread, layout)
+        local barWidth = Datatext.LayoutRow(textWidths, partTotal, spacing, Pixel.Scale(LAYOUT.rowInset), fixedWidth, align, layout)
         SetBarSize(bar, barWidth, fixedHeight or Pixel.Scale(LAYOUT.rowHeight))
         for partIndex = 1, partTotal do
             local fontString = bar.partStrings[partIndex]
@@ -393,9 +386,9 @@ local function RenderBar(bar)
     local hitSignature = BuildText(config)
 
     local signature = table.concat({
-        config.orientation or 'HORIZONTAL', config.align or 'LEFT', config.width or 0, config.height or 0,
-        config.fontSize, config.spacing, tostring(config.spread or 0), fontGeneration, partCount, hitSignature,
-        bar.anchoredWidth and bar.frame:GetWidth() or 0,
+        config.orientation, config.align, config.width, config.height,
+        config.fontSize, config.spacing, fontGeneration, partCount, hitSignature,
+        bar.anchoredWidth and bar.frame:GetWidth() or 0, bar.anchoredHeight and bar.frame:GetHeight() or 0,
     }, '\1')
     for partIndex = 1, partCount do
         signature = signature .. '\2' .. (parts[partIndex]:gsub('%d', '8'))
@@ -667,14 +660,13 @@ local function BuildMinimapBar()
 
     CreateBorderEdges(frame)
 
-    minimapBar = { getConfig = GetMinimapConfig, frame = frame, hits = {}, anchoredHeight = true }
+    minimapBar = { getConfig = GetMinimapConfig, frame = frame, hits = {} }
     frame.bar = minimapBar
     frame:SetScript('OnShow', MainOnShow)
 end
 
 local function ApplyMinimapBar()
     local config = GetMinimapConfig()
-    if type(config.spread) == 'boolean' then config.spread = config.spread and 100 or 0 end
     if not config.spacingPx then
         config.spacing = (tonumber(config.spacing) or 1) * 3
         config.spacingPx = true
@@ -691,7 +683,7 @@ local function ApplyMinimapBar()
 
     local anchor = MINIMAP_ANCHORS[config.anchor] or MINIMAP_ANCHORS.BOTTOM
     minimapBar.anchoredWidth = anchor.fullWidth
-    frame:SetHeight(Pixel.Scale(config.height))
+    minimapBar.anchoredHeight = not anchor.fullWidth
     local gap = Pixel.Scale(config.gap)
     local minimapRef = _G.Minimap
     local backdrop = _G.BUI_MinimapBackdrop
