@@ -129,6 +129,7 @@ local function Check(check)
 	local label = CheckLabel(check)
 	if not label then return end
 	Face(label)
+	if label:IsAnchoringSecret() then return end
 	local point, relativeTo, relativePoint, offsetX = label:GetPoint(1)
 	if point == 'LEFT' and relativeTo == check and relativePoint == 'RIGHT' then
 		label:SetPoint('LEFT', check, 'RIGHT', offsetX, 0)

@@ -2,14 +2,13 @@ local _, BUI = ...
 
 local select = select
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 
 local SKIN_ID = 'staticpopup'
 local SCALE_KEY = 'staticpopupScale'
 local DIALOG_COUNT = 4
-local GLOW_INSET = 2
-local GLOW_THICKNESS = 2
+local GLOW_LOW_ALPHA = 0.15
+local GLOW_PULSE_SECONDS = 0.6
 local RESURRECT_DIALOGS = { RESURRECT = true, RESURRECT_NO_SICKNESS = true, RESURRECT_NO_TIMER = true }
 local BUTTON_KEYS = { 'button1', 'button2', 'button3', 'button4', 'extraButton' }
 local BUTTON_SUFFIXES = { 'Button1', 'Button2', 'Button3', 'Button4', 'ExtraButton' }
@@ -54,42 +53,35 @@ local function DialogText(dialog)
 	return Child(dialog, 'text', 'Text')
 end
 
-local function EnsureAcceptGlow(button)
-	local glow = button._buiAcceptGlow
-	if glow then return glow end
-	glow = CreateFrame('Frame', nil, button)
-	glow:SetPoint('TOPLEFT', button, 'TOPLEFT', -GLOW_INSET, GLOW_INSET)
-	glow:SetPoint('BOTTOMRIGHT', button, 'BOTTOMRIGHT', GLOW_INSET, -GLOW_INSET)
-	glow:SetFrameLevel(button:GetFrameLevel() + 2)
-	local edges = {}
-	for edgeIndex = 1, 4 do
-		edges[edgeIndex] = glow:CreateTexture(nil, 'OVERLAY')
-		edges[edgeIndex].__buiSkin = true
-	end
-	edges[1]:SetPoint('TOPLEFT'); edges[1]:SetPoint('TOPRIGHT'); edges[1]:SetHeight(GLOW_THICKNESS)
-	edges[2]:SetPoint('BOTTOMLEFT'); edges[2]:SetPoint('BOTTOMRIGHT'); edges[2]:SetHeight(GLOW_THICKNESS)
-	edges[3]:SetPoint('TOPLEFT'); edges[3]:SetPoint('BOTTOMLEFT'); edges[3]:SetWidth(GLOW_THICKNESS)
-	edges[4]:SetPoint('TOPRIGHT'); edges[4]:SetPoint('BOTTOMRIGHT'); edges[4]:SetWidth(GLOW_THICKNESS)
-	glow.edges = edges
-	local pulse = glow:CreateAnimationGroup()
+local function KeepAcceptEdges(button)
+	if button._buiAcceptPulse:IsPlaying() then Skin.TipShellEdges(button, true) end
+end
+
+local function EnsureAcceptPulse(button)
+	local pulse = button._buiAcceptPulse
+	if pulse then return pulse end
+	pulse = button:CreateAnimationGroup()
 	pulse:SetLooping('BOUNCE')
-	local fade = pulse:CreateAnimation('Alpha')
-	fade:SetFromAlpha(1)
-	fade:SetToAlpha(0.15)
-	fade:SetDuration(0.6)
-	fade:SetSmoothing('IN_OUT')
-	glow.pulse = pulse
-	glow:Hide()
-	button._buiAcceptGlow = glow
-	return glow
+	local edges = button._buiShell.edges
+	for edgeIndex = 1, 4 do
+		local fade = pulse:CreateAnimation('Alpha')
+		fade:SetTarget(edges[edgeIndex])
+		fade:SetFromAlpha(1)
+		fade:SetToAlpha(GLOW_LOW_ALPHA)
+		fade:SetDuration(GLOW_PULSE_SECONDS)
+		fade:SetSmoothing('IN_OUT')
+	end
+	button._buiAcceptPulse = pulse
+	button:HookScript('OnLeave', KeepAcceptEdges)
+	return pulse
 end
 
 local function StopAcceptGlow(dialog)
 	local button = Child(dialog, 'button1', 'Button1')
-	local glow = button and button._buiAcceptGlow
-	if not glow then return end
-	glow.pulse:Stop()
-	glow:Hide()
+	local pulse = button and button._buiAcceptPulse
+	if not pulse or not pulse:IsPlaying() then return end
+	pulse:Stop()
+	Skin.TipShellEdges(button, false)
 end
 
 local function UpdateAcceptGlow(dialog)
@@ -99,11 +91,9 @@ local function UpdateAcceptGlow(dialog)
 	end
 	local button = Child(dialog, 'button1', 'Button1')
 	if not button then return end
-	local glow = EnsureAcceptGlow(button)
-	local red, green, blue = BUILib.Theme.GetAccent()
-	for edgeIndex = 1, 4 do glow.edges[edgeIndex]:SetColorTexture(red, green, blue, 1) end
-	glow:Show()
-	if not glow.pulse:IsPlaying() then glow.pulse:Play() end
+	Skin.TipShellEdges(button, true)
+	local pulse = EnsureAcceptPulse(button)
+	if not pulse:IsPlaying() then pulse:Play() end
 end
 
 local function Apply(dialog)
