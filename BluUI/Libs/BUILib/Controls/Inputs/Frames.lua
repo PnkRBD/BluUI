@@ -158,6 +158,7 @@ function Controls.Frames(parent, label, initial, callback, width, hint, suggesti
 		local panelWidth = math_max(width, 340)
 		panel:SetWidth(panelWidth); scrollChild:SetWidth(panelWidth - 4)
 		FilterAndShow()
+		Widget.MatchScale(panel, button)
 		panel:ClearAllPoints()
 		local bottom = button:GetBottom(); local panelHeight = panel:GetHeight() or 100
 		if not bottom or bottom < panelHeight + 50 then panel:SetPoint("BOTTOMLEFT", button, "TOPLEFT", 0, 2)
