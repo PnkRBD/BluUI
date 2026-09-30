@@ -250,7 +250,7 @@ end
 local function Sections(ui, _, parent, width)
 	fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
 	sounds = BUI.BuildSoundDropdownItems()
-	local Hunter, Monk, Druid = BuffTracking.Hunter, BuffTracking.Monk, BuffTracking.Druid
+	local Hunter, Monk, Druid, Mage = BuffTracking.Hunter, BuffTracking.Monk, BuffTracking.Druid, BuffTracking.Mage
 	local boards = {}
 	local function Board(title, description)
 		local board = ui.Board(parent, width, { stacked = true, title = title, description = description })
@@ -302,9 +302,13 @@ local function Sections(ui, _, parent, width)
 			title = 'Lifebloom refresh', description = 'REFRESH when your Lifebloom on anyone in the group is about to fall off', spell = 33763, noSound = true, tooltip = 'Timing',
 			options = function(db) return { Option(db, 'Refresh at seconds left', 'refreshSeconds', { min = 1, max = 8, step = 0.5 }) } end,
 		})
+	elseif Mage.IsArcane() then
+		TextRow(Board('Arcane', 'Stack callouts for Arcane. The eye on a row lets you drag it, right-click the text to lock it again.'), 'mageArcaneSalvo', 'BUI_MageArcaneSalvo', {
+			title = 'Arcane Salvo', description = 'Live stack count, built by Arcane Missiles and spent by Arcane Barrage', spell = 1242974, textLabel = 'Label',
+		})
 	end
 	if #boards == 0 then
-		Board('Class', 'Trackers for the buffs and procs of your spec.'):AddRow('Nothing for this spec yet', 'Hunters, Mistweaver Monks and Restoration Druids have class trackers')
+		Board('Class', 'Trackers for the buffs and procs of your spec.'):AddRow('Nothing for this spec yet', 'Hunters, Mistweaver Monks, Restoration Druids and Arcane Mages have class trackers')
 	end
 	return boards
 end
