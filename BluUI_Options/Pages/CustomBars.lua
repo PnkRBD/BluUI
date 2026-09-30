@@ -34,7 +34,7 @@ local GROW_OPTIONS = { { value = 'LEFT', text = 'Grow left' }, { value = 'RIGHT'
 local ROW_OPTIONS = { { value = 'DOWN', text = 'Down' }, { value = 'UP', text = 'Up' } }
 
 local selectedIndex = 1
-local showingImport = false
+local showingImport = true
 local importCharacter
 local importSkips = {}
 local items = {}

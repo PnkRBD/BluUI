@@ -76,7 +76,7 @@ local KINDS = { primary = 'primary', secondary = 'secondary' }
 local TAB_IDS = { 'primary', 'secondary', 'stacking' }
 local TAB_INDEX = { primary = 1, secondary = 2, stacking = 3 }
 
-local selected = 'primary'
+local selected = 'scope'
 local preview
 local editConfig
 local copySource

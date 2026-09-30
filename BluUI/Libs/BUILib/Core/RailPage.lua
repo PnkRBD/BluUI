@@ -115,6 +115,11 @@ function Layout.RailPage(tab, shell, spec)
 		if current and (id == nil or current.id == id) then self:Select(current.id) end
 	end
 
+	function page:Reset()
+		self:Select(rail.entries[1].item.id)
+	end
+
+	tab.frame:GetParent().railPage = page
 	page:Select(spec.rail.selected or rail.entries[1].item.id)
 	Layout.Add(tab, block, BLOCK_GAP)
 	Align()

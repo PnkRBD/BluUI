@@ -34,7 +34,7 @@ local ALIGNMENTS = {
 }
 
 local selected
-local showingTooltips = false
+local showingTooltips = true
 local items = {}
 local preview
 local fonts
