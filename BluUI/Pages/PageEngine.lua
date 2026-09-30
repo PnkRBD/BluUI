@@ -55,6 +55,7 @@ local function CreateWindow()
 		resolveFont  = BUI.FetchFont,
 	})
 	window.frame:Hide()
+	window.frame:SetScale(BUI.db.global.windowScale / 100)
 	PageEngine.window = window
 	PageEngine.frame  = window.frame
 	BUI.Scale.SetupButtons(window, PageEngine.frame)
@@ -86,6 +87,17 @@ local function CreateWindow()
 			self:ClearFocus()
 		end
 	end)
+end
+
+function PageEngine.SetWindowScale(percent)
+	BUI.db.global.windowScale = percent
+	local frame = PageEngine.frame
+	local centerX, centerY = frame:GetCenter()
+	local ratio = frame:GetScale() * 100 / percent
+	frame:SetScale(percent / 100)
+	frame:ClearAllPoints()
+	frame:SetPoint('CENTER', UIParent, 'BOTTOMLEFT', centerX * ratio, centerY * ratio)
+	BUI.BUILibClient.Widget.PinToPixels(frame)
 end
 
 local function BuildPageContent(pageConfig)

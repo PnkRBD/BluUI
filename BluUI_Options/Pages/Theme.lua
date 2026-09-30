@@ -12,6 +12,7 @@ local PRESET_DROPDOWN_WIDTH = 140
 local SWATCH_SIZE = 28
 local FONT_DROPDOWN_WIDTH = 200
 local OPACITY_STEPS = { 100, 98, 95, 90, 85, 80, 70, 50 }
+local WINDOW_SCALE_STEPS = { 120, 110, 100, 95, 90, 85, 80, 75, 70 }
 
 local DEFAULT_PAGE = Layout.DefaultColor('page', 'dark')
 local SHELL = BUI.C.PANEL_BACKDROP
@@ -409,6 +410,42 @@ local function ColorRow(ui, section, entry)
 	})
 end
 
+local function WindowScale()
+	return BUI.db.global.windowScale
+end
+
+local function WindowSection(ui, parent, width)
+	local section = ui.Section(parent, width, {
+		stacked = true,
+		title = 'Window',
+		description = 'How big this settings window is on your screen. Every page, menu and popup scales with it.',
+		columns = { { 'Name', ui.AVATAR_X }, { 'Size', SECOND_COLUMN } },
+	})
+	local row = section:AddRow('Window size scale smaller bigger')
+	ui.IconAvatar(row, SWATCH_SIZE, 'resize'):SetPoint('LEFT', ui.AVATAR_X, 0)
+	ui.RowTitle(row, 'Size', 'Shrink or grow the whole window', ui.NAME_X)
+	local value = ui.Cell(row, '', SECOND_COLUMN)
+	local reset = ui.IconButton(row, 'reset', 'Back to full size', function() BUI.PageEngine.SetWindowScale(100) Repaint() end)
+	reset:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
+	local dropdown = ui.Dropdown(row, DROPDOWN_WIDTH, function()
+		local items = {}
+		for _, step in ipairs(WINDOW_SCALE_STEPS) do
+			items[#items + 1] = { text = step .. '%', checked = WindowScale() == step, callback = function()
+				BUI.PageEngine.SetWindowScale(step)
+				Repaint()
+			end }
+		end
+		return items
+	end)
+	dropdown:SetPoint('RIGHT', reset, 'LEFT', -10, 0)
+	ui.Bind(row, function()
+		value:SetText(WindowScale() .. '%')
+		dropdown.label:SetText(WindowScale() .. '%')
+		reset:SetActive(WindowScale() ~= 100)
+	end)
+	return section
+end
+
 local function PresetSection(ui, parent, width, page)
 	local window = Window()
 	local section = ui.Section(parent, width, {
@@ -597,6 +634,7 @@ end
 
 local function ThemeSections(ui, _, parent, width, page)
 	local sections = {}
+	sections[#sections + 1] = WindowSection(ui, parent, width)
 	sections[#sections + 1] = PresetSection(ui, parent, width, page)
 	sections[#sections + 1] = SavedSection(ui, parent, width, page)
 	sections[#sections + 1] = FontSection(ui, parent, width, page)

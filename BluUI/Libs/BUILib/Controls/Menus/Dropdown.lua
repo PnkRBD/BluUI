@@ -54,6 +54,7 @@ function Widget.DropdownMenuScaffold(parentFrame, anchorButton, menuWidth, scrol
 	menu:EnableMouseWheel(true); menu:SetScript("OnMouseWheel", function(_, delta) scrollLogic.DoScroll(delta) end)
 
 	local function PositionMenu()
+		Widget.MatchScale(menu, anchorButton)
 		menu:ClearAllPoints()
 		local bottom = anchorButton:GetBottom(); local menuHeight = menu:GetHeight() or 100
 		if not bottom or bottom < menuHeight + 50 then menu:SetPoint("BOTTOMLEFT", anchorButton, "TOPLEFT", 0, 2)
