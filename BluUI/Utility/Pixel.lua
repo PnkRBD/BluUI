@@ -81,6 +81,46 @@ function Pixel.PixelSizeFor(frame, pixels)
     return Pixel.ClampBorder(pixels) * perfectScale / frame:GetEffectiveScale()
 end
 
+local function KillSnap(object)
+    if type(object) ~= "table" or rawget(object, "_noSnap") then return end
+    if object.IsForbidden and object:IsForbidden() then return end
+
+    local target = object.SetSnapToPixelGrid and object or (object.GetStatusBarTexture and object:GetStatusBarTexture())
+    if type(target) ~= "table" or not target.SetSnapToPixelGrid or rawget(target, "_noSnap") then return end
+
+    target:SetSnapToPixelGrid(false)
+    target:SetTexelSnappingBias(0)
+    target._noSnap = true
+end
+
+local function RearmSnap(object, enabled)
+    if not enabled then return end
+    if type(object) ~= "table" or not rawget(object, "_noSnap") then return end
+    if object.IsForbidden and object:IsForbidden() then return end
+    object._noSnap = nil
+end
+
+local SNAP_HOOKS = {
+    SetAtlas = KillSnap,
+    SetColorTexture = KillSnap,
+    SetSnapToPixelGrid = RearmSnap,
+    SetStatusBarTexture = KillSnap,
+    SetTexture = KillSnap,
+}
+
+local function HookSnapMethods(widget)
+    local prototype = widget and getmetatable(widget)
+    prototype = prototype and prototype.__index
+    if type(prototype) ~= "table" or rawget(prototype, "_snapHooked") then return end
+    prototype._snapHooked = true
+
+    for method, handler in pairs(SNAP_HOOKS) do
+        if prototype[method] then
+            _G.hooksecurefunc(prototype, method, handler)
+        end
+    end
+end
+
 local function GiveBackdrop(frame)
     if frame.SetBackdrop then return end
     for key, value in pairs(BackdropTemplateMixin) do
@@ -272,6 +312,11 @@ GrantSnapMixins(probeFrame:CreateTexture())
 GrantSnapMixins(probeFrame:CreateMaskTexture())
 GrantSnapMixins(probeFrame:CreateFontString())
 
+HookSnapMethods(probeFrame)
+HookSnapMethods(probeFrame:CreateTexture())
+HookSnapMethods(probeFrame:CreateMaskTexture())
+HookSnapMethods(probeFrame:CreateLine())
+HookSnapMethods(CreateFrame("StatusBar"))
 
 function BUI.RefreshAllFonts()
     for fontString, fontData in pairs(fontRegistry) do

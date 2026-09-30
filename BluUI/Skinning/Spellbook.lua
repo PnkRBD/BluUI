@@ -3,6 +3,7 @@ local _, BUI = ...
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
+local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 
 local SKIN_ID = 'spellbook'
 local MAIN_ART = { 'Bg', 'TopTileStreaks' }
@@ -91,6 +92,7 @@ local function ReplaceDivider(texture)
 	line:SetPoint('RIGHT', texture, 'RIGHT', 0, 0)
 	local edge = Skin.PANEL_EDGE
 	FlatTexture(line, edge[1], edge[2], edge[3], edge[4])
+	BUILib.Skin.PixelLine(line, texture, false, DIVIDER_INSET, 0)
 	texture._buiDividerLine = line
 end
 

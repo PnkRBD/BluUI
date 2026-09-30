@@ -695,6 +695,8 @@ local function CreateIconFrame(parent, borderSize, borderColor, zoom)
     local scaledEdge = Pixel.Scale(frame._edgeThickness)
     texture:SetPoint("TOPLEFT", frame, "TOPLEFT", scaledEdge, -scaledEdge)
     texture:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -scaledEdge, scaledEdge)
+    texture:SetSnapToPixelGrid(false)
+    texture:SetTexelSnappingBias(0)
     texture:SetTexCoord(frame._zoom, 1 - frame._zoom, frame._zoom, 1 - frame._zoom)
     frame.Icon = texture
 

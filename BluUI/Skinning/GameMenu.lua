@@ -83,6 +83,7 @@ local function SkinButton(button, accentAlways)
 		edges[2]:SetPoint('BOTTOMLEFT', fill, 'BOTTOMLEFT'); edges[2]:SetPoint('BOTTOMRIGHT', fill, 'BOTTOMRIGHT'); edges[2]:SetHeight(1)
 		edges[3]:SetPoint('TOPLEFT', fill, 'TOPLEFT'); edges[3]:SetPoint('BOTTOMLEFT', fill, 'BOTTOMLEFT'); edges[3]:SetWidth(1)
 		edges[4]:SetPoint('TOPRIGHT', fill, 'TOPRIGHT'); edges[4]:SetPoint('BOTTOMRIGHT', fill, 'BOTTOMRIGHT'); edges[4]:SetWidth(1)
+		Skin3.AlignEdges(button, fill, edges, { left = SKIN_INSET_X, right = SKIN_INSET_X, top = SKIN_INSET, bottom = SKIN_INSET })
 		button._edges = edges
 	end
 	EnsureHover(button)

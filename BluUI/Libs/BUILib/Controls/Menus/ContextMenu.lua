@@ -321,8 +321,8 @@ function Controls.ContextMenu(items, options)
 			local line = GetSeparator(separatorIndex)
 			local separatorY = y - math.floor(SEPARATOR_HEIGHT / 2)
 			line:ClearAllPoints()
-			line:SetPoint("LEFT", scrollChild, "TOPLEFT", PADDING_X + 4, separatorY)
-			line:SetPoint("RIGHT", scrollChild, "TOPRIGHT", -(PADDING_X + 4 + trackSpace), separatorY)
+			line:SetPoint("BOTTOMLEFT", scrollChild, "TOPLEFT", PADDING_X + 4, separatorY)
+			line:SetPoint("BOTTOMRIGHT", scrollChild, "TOPRIGHT", -(PADDING_X + 4 + trackSpace), separatorY)
 			line:SetVertexColor(unpack(palette.edge))
 			line:Show()
 			y = y - SEPARATOR_HEIGHT
@@ -362,6 +362,7 @@ function Controls.ContextMenu(items, options)
 		local scale = UIParent:GetEffectiveScale()
 		menu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", cursorX / scale, cursorY / scale)
 	end
+	Widget.PinToPixels(menu)
 
 	if not checkFrame then checkFrame = CreateFrame("Frame") end
 	local armed = not (IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton"))

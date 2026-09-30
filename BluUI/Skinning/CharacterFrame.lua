@@ -327,7 +327,7 @@ local function SlotAnchor(info)
     elseif info.col == 'right' then
         return RIGHT_X, TOP_Y - (info.row - 1) * (SLOT_SIZE + SLOT_GAP)
     end
-    local centerX = MODEL_X + MODEL_WIDTH / 2
+    local centerX = MODEL_X + math.floor(MODEL_WIDTH / 2)
     local x = centerX - SLOT_SIZE - SLOT_GAP / 2 + (info.row - 1) * (SLOT_SIZE + SLOT_GAP)
     return x, TOP_Y - MODEL_HEIGHT
 end
@@ -1273,14 +1273,14 @@ local function CreateSectionHeader(parent, title, color)
 
     local leftBar = header:CreateTexture(nil, 'ARTWORK')
     leftBar:SetHeight(Pixel.PixelSize(1))
-    leftBar:SetPoint('LEFT', header, 'LEFT', 0, 0)
-    leftBar:SetPoint('RIGHT', text, 'LEFT', Pixel.Scale(-6), 0)
+    leftBar:SetPoint('BOTTOMLEFT', header, 'LEFT', 0, 0)
+    leftBar:SetPoint('BOTTOMRIGHT', text, 'LEFT', Pixel.Scale(-6), 0)
     leftBar:SetColorTexture(color[1], color[2], color[3], 0.8)
 
     local rightBar = header:CreateTexture(nil, 'ARTWORK')
     rightBar:SetHeight(Pixel.PixelSize(1))
-    rightBar:SetPoint('LEFT', text, 'RIGHT', Pixel.Scale(6), 0)
-    rightBar:SetPoint('RIGHT', header, 'RIGHT', 0, 0)
+    rightBar:SetPoint('BOTTOMLEFT', text, 'RIGHT', Pixel.Scale(6), 0)
+    rightBar:SetPoint('BOTTOMRIGHT', header, 'RIGHT', 0, 0)
     rightBar:SetColorTexture(color[1], color[2], color[3], 0.8)
 
     header.text = text
@@ -2199,6 +2199,7 @@ local function BuildModelBackground(parent)
     edges[2]:SetPoint('BOTTOMLEFT'); edges[2]:SetPoint('BOTTOMRIGHT'); edges[2]:SetHeight(1)
     edges[3]:SetPoint('TOPLEFT'); edges[3]:SetPoint('BOTTOMLEFT'); edges[3]:SetWidth(1)
     edges[4]:SetPoint('TOPRIGHT'); edges[4]:SetPoint('BOTTOMRIGHT'); edges[4]:SetWidth(1)
+    BUILib.Skin.AlignEdges(art, nil, edges)
 
     local path, fileName = RaceBackgroundPath()
     for index = 1, 4 do art.pieces[index]:SetTexture(path .. index) end

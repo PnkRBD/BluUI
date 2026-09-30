@@ -25,10 +25,10 @@ function Controls.InfoBox(parent, text, infoType, width)
 	fontString:SetFont(BUILib.GetFont(), 11, ""); fontString:SetPoint("TOPLEFT", 3 + padding, -padding); fontString:SetWidth(width - 3 - padding * 2)
 	fontString:SetText(text or ""); fontString:SetTextColor(textColor[1], textColor[2], textColor[3], 1)
 	fontString:SetJustifyH("LEFT"); fontString:SetWordWrap(true); fontString:SetSpacing(2)
-	local boxHeight = fontString:GetStringHeight() + padding * 2
+	local boxHeight = math.ceil(fontString:GetStringHeight()) + padding * 2
 	boxFrame:SetHeight(boxHeight); boxFrame.text = fontString; boxFrame.strip = strip; boxFrame.layoutHeight = boxHeight
 	function boxFrame:SetText(newText)
-		fontString:SetText(newText); local updatedHeight = fontString:GetStringHeight() + padding * 2
+		fontString:SetText(newText); local updatedHeight = math.ceil(fontString:GetStringHeight()) + padding * 2
 		boxFrame:SetHeight(updatedHeight); boxFrame.layoutHeight = updatedHeight
 	end
 	return box

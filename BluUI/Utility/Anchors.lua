@@ -219,11 +219,49 @@ function Anchor.ModePos(db, isText)
     })
 end
 
+local OFFSET_TOLERANCE = 0.01
+
+local function PlaceIntent(frame)
+    local intent = frame._pixelIntent
+    frame:SetPoint(intent.point, intent.relativeTo, intent.relativePoint, intent.x, intent.y)
+    intent.placedX, intent.placedY = intent.x, intent.y
+    local left, top = frame:GetLeft(), frame:GetTop()
+    if not left or not top or (issecretvalue and (issecretvalue(left) or issecretvalue(top))) then return end
+    local pixel = PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
+    local Widget = LibStub("BUILib").Widget
+    local shiftX = Widget.SnapX(left, pixel) - left
+    local shiftY = Widget.SnapY(top, pixel) - top
+    if shiftX == 0 and shiftY == 0 then return end
+    intent.placedX, intent.placedY = intent.x + shiftX, intent.y + shiftY
+    frame:SetPoint(intent.point, intent.relativeTo, intent.relativePoint, intent.placedX, intent.placedY)
+end
+
+local function OnPlacedSizeChanged(frame)
+    local intent = frame._pixelIntent
+    if not intent or frame:GetNumPoints() ~= 1 then return end
+    if InCombatLockdown() and frame:IsProtected() then return end
+    local point, relativeTo, _, x, y = frame:GetPoint(1)
+    if point ~= intent.point or relativeTo ~= intent.relativeTo
+        or math.abs(x - intent.placedX) > OFFSET_TOLERANCE or math.abs(y - intent.placedY) > OFFSET_TOLERANCE then
+        frame._pixelIntent = nil
+        return
+    end
+    PlaceIntent(frame)
+end
+
+function Anchor.PlaceOnPixels(frame, point, relativeTo, relativePoint, x, y)
+    frame._pixelIntent = { point = point, relativeTo = relativeTo, relativePoint = relativePoint, x = x or 0, y = y or 0 }
+    if not frame._pixelHooked then
+        frame._pixelHooked = true
+        frame:HookScript("OnSizeChanged", OnPlacedSizeChanged)
+    end
+    PlaceIntent(frame)
+end
+
 function Anchor.SetCentered(frame, posX, posY)
     if not frame then return end
-    local Scale = BUI.Pixel.Scale
     frame:ClearAllPoints()
-    frame:SetPoint("CENTER", UIParent, "CENTER", Scale(posX or 0), Scale(posY or 0))
+    Anchor.PlaceOnPixels(frame, "CENTER", UIParent, "CENTER", posX, posY)
 end
 
 function Anchor.ApplyPosition(frame, settings)
@@ -241,6 +279,7 @@ function Anchor.ApplyPosition(frame, settings)
     ClearMouseFollow(frame)
 
     frame:ClearAllPoints()
+    frame._pixelIntent = nil
     local anchorTarget = BUI.ResolveAnchorFrame(settings.anchorFrame, settings.anchorPoint)
     if anchorTarget == frame then anchorTarget = nil end
 
@@ -305,13 +344,13 @@ function Anchor.ApplyPosition(frame, settings)
                     end
                 end
 
-                frame:SetPoint(framePoint, UIParent, "BOTTOMLEFT", anchorX + offsetX, anchorY + offsetY)
+                Anchor.PlaceOnPixels(frame, framePoint, UIParent, "BOTTOMLEFT", anchorX + offsetX, anchorY + offsetY)
                 frame._anchorTarget = anchorTarget
                 frame._isAnchored = true
                 return anchorTarget
             end
         end
-        frame:SetPoint(framePoint, anchorTarget, anchorPoint, offsetX, offsetY)
+        Anchor.PlaceOnPixels(frame, framePoint, anchorTarget, anchorPoint, offsetX, offsetY)
         frame._anchorTarget = anchorTarget
         frame._isAnchored = true
         return anchorTarget
@@ -396,11 +435,11 @@ function Anchor.SaveDrop(frame, settings)
     local x, y = BUI.Dragging.GetCenterOffset(frame)
     local anchorX, anchorY = Anchor.SaveDragOffsets(frame, settings)
     if anchorX then
-        settings.anchorOffsetX = math.floor(anchorX)
-        settings.anchorOffsetY = math.floor(anchorY)
+        settings.anchorOffsetX = BUI.Round(anchorX)
+        settings.anchorOffsetY = BUI.Round(anchorY)
     else
-        settings.posX = settings.centerHorizontally and 0 or math.floor(x)
-        settings.posY = math.floor(y)
+        settings.posX = settings.centerHorizontally and 0 or BUI.Round(x)
+        settings.posY = BUI.Round(y)
     end
     Anchor.ApplyPosition(frame, settings)
 end
