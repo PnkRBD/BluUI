@@ -268,8 +268,7 @@ local function Sorted(withExcluded)
 	for index = 1, #buttons do
 		local button = buttons[index]
 		local name = button:GetName()
-		local hiddenByOwner = button.dataObject and button.db and button.db.hide
-		if not hiddenByOwner and (withExcluded or not (name and config.excluded[name])) then
+		if withExcluded or not (name and config.excluded[name]) then
 			list[#list + 1] = button
 			keys[button] = name and OrderKey(config.order, name, index) or UNORDERED_BASE + index
 		end
