@@ -7,7 +7,7 @@ local INPUT_WIDTH = 260
 local ICON_SIZE = 24
 local NAME_WIDTH = 300
 local ERASE_INSET = 18
-local ERASE_SIZE = 32
+local ERASE_SIZE = BUILib.Layout.ERASE_SIZE
 local RESULTS_WIDTH = 280
 
 local GROWTH = {

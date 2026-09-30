@@ -1250,7 +1250,7 @@ local function LayoutBoards(ui, parent, width, page)
 					end,
 				})
 			end },
-			{ slot = 'erase', icon = 'erase', size = 32, hover = 'danger', tooltip = 'Delete this snapshot', onClick = function()
+			{ slot = 'erase', icon = 'erase', size = BUILib.Layout.ERASE_SIZE, hover = 'danger', tooltip = 'Delete this snapshot', onClick = function()
 				local name = snapshot
 				Modals.Confirm({
 					parent = Window().frame,
