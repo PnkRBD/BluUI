@@ -204,15 +204,15 @@ function Skin.ApplyBackdrop(frame, bgColor, borderColor)
 	frame:SetBackdropBorderColor(unpack(borderColor or Colors.border.default))
 end
 
+local function PinFrame(frame)
+	if InCombatLockdown() and frame:IsProtected() then return end
+	BUILib.Widget.PinToPixels(frame)
+end
+
 function Skin.SavePosition(frame, dbKey)
 	local db = BUI.GetDB()
 	if not db.framePositions then db.framePositions = {} end
-	local point, _, relativePoint, x, y = frame:GetPoint(1)
-	if type(point) == 'string' and type(x) == 'number' and type(y) == 'number'
-		and not (issecretvalue and (issecretvalue(x) or issecretvalue(y))) then
-		db.framePositions[dbKey] = { point = point, relPoint = relativePoint or point, x = x, y = y }
-		return
-	end
+	PinFrame(frame)
 	local left, top = frame:GetLeft(), frame:GetTop()
 	if type(left) ~= 'number' or type(top) ~= 'number' then return end
 	if issecretvalue and (issecretvalue(left) or issecretvalue(top)) then return end
@@ -241,6 +241,7 @@ function Skin.RestorePosition(frame, dbKey)
 	if not point then return false end
 	frame:ClearAllPoints()
 	frame:SetPoint(point, UIParent, relativePoint, x, y)
+	PinFrame(frame)
 	return true
 end
 
@@ -304,6 +305,7 @@ function Skin.HomePosition(frame, dbKey, point, x, y, follow)
 		point = point or 'CENTER'
 		frame:SetPoint(point, UIParent, point, x or 0, y or 0)
 	end
+	PinFrame(frame)
 end
 
 function Skin.MakeDraggable(frame, dbKey, point, x, y, follow)
@@ -458,10 +460,11 @@ function Skin.TipTitleLine(frame, scale)
 		line:SetHeight(1)
 		frame._buiTipLine = line
 	end
-	local offsetY = -(TIP_PADDING_Y + TIP_TITLE_BLOCK - 6) * scale
+	local offsetX = math.floor(TIP_PADDING_X * scale + 0.5)
+	local offsetY = -math.floor((TIP_PADDING_Y + TIP_TITLE_BLOCK - 6) * scale + 0.5)
 	line:ClearAllPoints()
-	line:SetPoint('TOPLEFT', frame, 'TOPLEFT', TIP_PADDING_X * scale, offsetY)
-	line:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -TIP_PADDING_X * scale, offsetY)
+	line:SetPoint('TOPLEFT', frame, 'TOPLEFT', offsetX, offsetY)
+	line:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -offsetX, offsetY)
 	line:Show()
 	return line
 end
@@ -667,6 +670,8 @@ end
 local function PlaceEntry(entry, left, top)
 	local frame = entry.frame
 	local _, _, scale = FrameExtent(frame)
+	local pixel = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
+	left, top = BUILib.Widget.SnapX(left, pixel), BUILib.Widget.SnapY(top, pixel)
 	entry.left, entry.top = left, top
 	placingEntry = true
 	frame:ClearAllPoints()
@@ -999,7 +1004,7 @@ function Skin.TipArrow(frame, centered, rotation)
 		arrow = frame:CreateTexture(nil, 'OVERLAY')
 		arrow.__buiSkin = true
 		arrow:SetTexture(BUILib.GetLibMedia('dropdown'))
-		arrow:SetSize(11, 11)
+		arrow:SetSize(12, 12)
 		if centered then
 			arrow:SetPoint('CENTER', frame, 'CENTER', 0, 0)
 		else
@@ -1221,6 +1226,20 @@ local function LayoutIconEdges(edges, icon, thickness)
 	edges[4]:SetPoint('TOPLEFT', icon, 'TOPRIGHT', 0, thickness); edges[4]:SetPoint('BOTTOMLEFT', icon, 'BOTTOMRIGHT', 0, -thickness); edges[4]:SetWidth(thickness)
 end
 
+local function IconEdgeAligner(edges, icon, state)
+	return function(left, right, top, bottom, pixel)
+		local size = math.max(1, math.floor(state.thickness / pixel + 0.5)) * pixel
+		local innerLeft = BUILib.Widget.SnapX(left, pixel) - left
+		local innerRight = BUILib.Widget.SnapX(right, pixel) - right
+		local innerTop = BUILib.Widget.SnapY(top, pixel) - top
+		local innerBottom = BUILib.Widget.SnapY(bottom, pixel) - bottom
+		edges[1]:SetPoint('BOTTOMLEFT', icon, 'TOPLEFT', innerLeft - size, innerTop); edges[1]:SetPoint('BOTTOMRIGHT', icon, 'TOPRIGHT', innerRight + size, innerTop); edges[1]:SetHeight(size)
+		edges[2]:SetPoint('TOPLEFT', icon, 'BOTTOMLEFT', innerLeft - size, innerBottom); edges[2]:SetPoint('TOPRIGHT', icon, 'BOTTOMRIGHT', innerRight + size, innerBottom); edges[2]:SetHeight(size)
+		edges[3]:SetPoint('TOPRIGHT', icon, 'TOPLEFT', innerLeft, innerTop + size); edges[3]:SetPoint('BOTTOMRIGHT', icon, 'BOTTOMLEFT', innerLeft, innerBottom - size); edges[3]:SetWidth(size)
+		edges[4]:SetPoint('TOPLEFT', icon, 'TOPRIGHT', innerRight, innerTop + size); edges[4]:SetPoint('BOTTOMLEFT', icon, 'BOTTOMRIGHT', innerRight, innerBottom - size); edges[4]:SetWidth(size)
+	end
+end
+
 function Skin.TipIconFrame(parent, icon, thickness)
 	if not icon or icon._buiIconFrame then return end
 	local edges = {}
@@ -1228,9 +1247,12 @@ function Skin.TipIconFrame(parent, icon, thickness)
 		edges[edgeIndex] = parent:CreateTexture(nil, 'OVERLAY')
 		edges[edgeIndex].__buiSkin = true
 	end
-	LayoutIconEdges(edges, icon, thickness or 1)
+	local state = { thickness = thickness or 1 }
+	LayoutIconEdges(edges, icon, state.thickness)
 	BUILib.Skin.SetEdgeColor(edges, PANEL_EDGE)
 	icon._buiIconFrame = edges
+	state.aligner = BUILib.Skin.PixelAlign(parent, icon, IconEdgeAligner(edges, icon, state))
+	icon._buiIconState = state
 end
 
 function Skin.SetIconEdgeThickness(icon, thickness)
@@ -1241,7 +1263,10 @@ function Skin.SetIconEdgeThickness(icon, thickness)
 		return
 	end
 	for edgeIndex = 1, 4 do edges[edgeIndex]:Show() end
+	local state = icon._buiIconState
+	state.thickness = thickness
 	LayoutIconEdges(edges, icon, thickness)
+	BUILib.Skin.Realign(state.aligner)
 end
 
 local iconEdgeColor = { 0, 0, 0, 1 }

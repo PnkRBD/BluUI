@@ -1561,6 +1561,7 @@ Scenario.FitStageBackdrop = function(stageBlock, backdrop)
 	end
 	local height = stageBlock:GetHeight()
 	if lowest then height = math.min(height, top - lowest + Scenario.stageBackdropPad) end
+	height = math.floor(height + 0.5)
 	if backdrop._buiStageHeight == height then return true end
 	backdrop._buiStageHeight = height
 	local inset = Scenario.headerBackdropInset

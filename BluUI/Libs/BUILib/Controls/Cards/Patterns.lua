@@ -199,7 +199,7 @@ function Controls.HeroCard(parent, config)
 		statusLabel:SetText(config.statusText)
 		statusLabel:SetPoint("CENTER", 0, 0)
 		statusLabel:SetTextColor(statusColor[1], statusColor[2], statusColor[3], 1)
-		statusBadge:SetWidth((statusLabel:GetStringWidth() or 30) + 18)
+		statusBadge:SetWidth(Widget.EvenSize((statusLabel:GetStringWidth() or 30) + 18))
 		statusFrame = statusBadge
 	end
 
@@ -209,7 +209,7 @@ function Controls.HeroCard(parent, config)
 		statusLabel:SetText(text or "")
 		statusLabel:SetTextColor(statusColor[1], statusColor[2], statusColor[3], 1)
 		Widget.SetRectColor(statusOuter, statusColor[1], statusColor[2], statusColor[3], 0.9)
-		statusFrame:SetWidth((statusLabel:GetStringWidth() or 30) + 18)
+		statusFrame:SetWidth(Widget.EvenSize((statusLabel:GetStringWidth() or 30) + 18))
 	end
 
 	if config.subtitle and not compact then

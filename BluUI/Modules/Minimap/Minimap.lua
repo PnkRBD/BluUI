@@ -786,7 +786,7 @@ function Minimap.ApplyPosition()
 
 	Pixel.SetScale(WoWMinimap, scale)
 	WoWMinimap:ClearAllPoints()
-	WoWMinimap:SetPoint('TOPRIGHT', UIParent, 'TOPRIGHT', x, y)
+	BUI.Anchor.PlaceOnPixels(WoWMinimap, 'TOPRIGHT', UIParent, 'TOPRIGHT', x, y)
 	UpdateBackdrop()
 end
 
