@@ -23,6 +23,7 @@ local SHOWN_COLUMN = 344
 local ARROW = 22
 local ARROW_GAP = 4
 local ORDER_ROOM = SWITCH_WIDTH + 12 + ARROW * 2 + ARROW_GAP
+local LABEL_TOGGLE = 22
 
 local RAIL_GROUPS = {
 	{ title = 'Map', items = {
@@ -873,9 +874,8 @@ local function DatatextBoard(ui, parent, width)
 			get = function() local color = Bar().colorValue return color.r, color.g, color.b, color.a end,
 			set = function(red, green, blue, alpha) Bar().colorValue = { r = red, g = green, b = blue, a = alpha } end },
 		{ entries = fonts, width = MENU_WIDTH, get = function() return Bar().font end, set = function(value) Bar().font = value end },
-		{ icon = 'text', tooltip = 'Size and labels', title = 'Text', options = {
+		{ icon = 'text', tooltip = 'Size', title = 'Text', options = {
 			{ label = 'Font size', min = 8, max = 24, step = 1, get = function() return Bar().fontSize end, set = function(value) Bar().fontSize = value end },
-			{ label = 'Hide labels', get = function() return Bar().hideLabels == true end, set = function(value) Bar().hideLabels = value end },
 		} },
 	}, ApplyDatatext)
 	return board
@@ -911,13 +911,14 @@ local function ReadoutsBoard(ui, parent, width, page)
 	end
 	for _, id in ipairs(order) do
 		local entry = Datatext.Get(id)
-		local row = board:AddRow(entry.name, nil, ORDER_ROOM)
+		local row = board:AddRow(entry.name, nil, ORDER_ROOM + LABEL_TOGGLE + 12)
 		rows[id] = row
 		ui.Switch(row, function() return config[entry.show] == true end, function(value)
 			config[entry.show] = value
 			Datatext.Apply()
 		end):SetPoint('RIGHT', -ui.ROW_INSET, 0)
 		OrderArrows(ui, row, function(delta) Move(id, delta) end)
+		ui.Tool(row, BUI.DatatextLabelToggle(entry, config, ApplyDatatext)):SetPoint('RIGHT', -(ui.ROW_INSET + ORDER_ROOM + 12), 0)
 	end
 	return board
 end

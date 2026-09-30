@@ -16,6 +16,8 @@ local ERASE_SIZE = 32
 local TOOL_GAP = 12
 local LIST_ROOM = ERASE_SIZE
 local COG_ROOM = 22 + TOOL_GAP
+local TOGGLE_ROOM = 22 + TOOL_GAP
+local LABEL_ICON = 14
 local GRABBER_SIZE = 12
 local LIST_ROW = 44
 local LIST_TITLE_X = 44
@@ -178,10 +180,9 @@ local function BarTools(config, index)
 		} }
 	else
 		tools[#tools + 1] = { entries = fonts, width = MENU_WIDTH, get = function() return config.font end, set = function(value) config.font = value end }
-		tools[#tools + 1] = { icon = 'text', tooltip = 'Name, size and labels', title = 'Text', options = {
+		tools[#tools + 1] = { icon = 'text', tooltip = 'Name and size', title = 'Text', options = {
 			NameOption(config),
 			Option(config, 'Font size', 'fontSize', { min = 8, max = 24, step = 1 }),
-			Option(config, 'Hide labels', 'hideLabels'),
 		} }
 		tools[#tools + 1] = { tooltip = 'Layout, size and backdrop', title = 'Layout', options = {
 			Option(config, 'Orientation', 'orientation', { entries = ORIENTATIONS }),
@@ -315,6 +316,15 @@ local function DatatextOptions(entry, config)
 	return { tooltip = entry.name .. ' settings', title = entry.name, options = options }
 end
 
+local function LabelToggle(entry, config, after)
+	return { icon = 'hide', iconSize = LABEL_ICON, tooltip = 'Hide "' .. entry.label .. '" and show only the value', get = function() return config[entry.hideLabel] == true end, set = function(value)
+		config[entry.hideLabel] = value or nil
+		after()
+	end }
+end
+
+BUI.DatatextLabelToggle = LabelToggle
+
 local function DatatextsBoard(ui, parent, width, config, page)
 	local order = Datatext.ResolveOrder(config)
 	local active, off = {}, {}
@@ -382,7 +392,7 @@ local function DatatextsBoard(ui, parent, width, config, page)
 	end
 	for _, id in ipairs(active) do
 		local entry = Datatext.Get(id)
-		local room = LIST_ROOM + (entry.options and COG_ROOM or 0)
+		local room = LIST_ROOM + TOGGLE_ROOM + (entry.options and COG_ROOM or 0)
 		local row = Section.AddRow(board, entry.name)
 		row:SetHeight(LIST_ROW)
 		listRows[id] = row
@@ -412,8 +422,10 @@ local function DatatextsBoard(ui, parent, width, config, page)
 			Apply()
 			page:RebuildCurrent()
 		end, 'danger', ERASE_SIZE):SetPoint('RIGHT', -ui.ROW_INSET, 0)
+		local right = -(ui.ROW_INSET + LIST_ROOM + TOOL_GAP)
+		ui.Tool(row, LabelToggle(entry, config, Apply)):SetPoint('RIGHT', right, 0)
 		if entry.options then
-			ui.Tool(row, DatatextOptions(entry, config), Apply):SetPoint('RIGHT', -(ui.ROW_INSET + LIST_ROOM + TOOL_GAP), 0)
+			ui.Tool(row, DatatextOptions(entry, config), Apply):SetPoint('RIGHT', right - TOGGLE_ROOM, 0)
 		end
 	end
 	if #active == 0 then

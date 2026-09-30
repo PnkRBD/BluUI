@@ -507,7 +507,7 @@ function Layout.TableKit(window)
 	end
 
 	function kit.Toggle(parent, spec)
-		local toggle = Widget.Unwrap(Controls.IconToggle(parent, spec.get(), spec.set, { texture = BUILib.GetLibMedia(spec.icon), tooltip = spec.tooltip, size = TOGGLE_SIZE }))
+		local toggle = Widget.Unwrap(Controls.IconToggle(parent, spec.get(), spec.set, { texture = BUILib.GetLibMedia(spec.icon), tooltip = spec.tooltip, size = TOGGLE_SIZE, iconSize = spec.iconSize }))
 		window:Bind(toggle, function() toggle:SetValue(spec.get()) end)
 		return toggle
 	end

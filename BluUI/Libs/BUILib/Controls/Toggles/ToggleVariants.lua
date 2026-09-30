@@ -150,7 +150,12 @@ function Controls.IconToggle(parent, checked, callback, options)
 	local disabled = false
 
 	local icon = button:CreateTexture(nil, "ARTWORK")
-	icon:SetAllPoints()
+	if options.iconSize then
+		icon:SetSize(options.iconSize, options.iconSize)
+		icon:SetPoint("CENTER")
+	else
+		icon:SetAllPoints()
+	end
 	icon:SetTexture(options.texture or BUILib.GetLibMedia("mover"))
 
 	local function Render()

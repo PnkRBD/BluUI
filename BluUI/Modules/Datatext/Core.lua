@@ -42,7 +42,6 @@ local BAR_DEFAULTS = {
     relPoint     = 'BOTTOM',
     x            = 0,
     y            = 0,
-    hideLabels   = false,
 }
 Datatext.BAR_DEFAULTS = BAR_DEFAULTS
 
@@ -219,6 +218,7 @@ function Datatext.Register(id, entry)
     entry.show = entry.show or ('show_' .. id)
     entry.label = entry.label or (entry.name .. ':')
     entry.labelText = WHITE .. entry.label .. RESET .. ' '
+    entry.hideLabel = 'hideLabel_' .. id
     entry.key = 'Datatext.' .. id
     entry.interactive = (entry.OnClick or entry.OnEnter) and true or false
     entry.active = false
@@ -240,7 +240,7 @@ function Datatext.Get(id) return registry[id] end
 function Datatext.List() return registryList end
 
 function Datatext.Label(config, entry)
-    if config.hideLabels then return '' end
+    if config[entry.hideLabel] then return '' end
     return entry.labelText
 end
 
@@ -323,7 +323,7 @@ function Datatext.BuildSampleParts(config)
     for orderIndex = 1, #order do
         local entry = registry[order[orderIndex]]
         if entry and config[entry.show] then
-            local label = config.hideLabels and '' or entry.labelText
+            local label = Datatext.Label(config, entry)
             local text
             if entry.sample then
                 text = entry.sample(config, label, colorize)
