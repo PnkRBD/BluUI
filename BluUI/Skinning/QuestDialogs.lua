@@ -462,10 +462,10 @@ local function ApplyItemText()
 	StylePageHtml()
 end
 
-local function Apply()
-	ApplyQuest()
-	ApplyGossip()
-	ApplyItemText()
+local function ApplyShown()
+	if _G.QuestFrame:IsShown() then ApplyQuest() end
+	if _G.GossipFrame:IsShown() then ApplyGossip() end
+	if _G.ItemTextFrame:IsShown() then ApplyItemText() end
 end
 
 local function HookQuest(frame)
@@ -500,14 +500,13 @@ local function Install()
 	HookQuest(quest)
 	HookGossip(gossip)
 	HookItemText(itemText)
-	if quest:IsShown() then ApplyQuest() end
-	if gossip:IsShown() then ApplyGossip() end
-	if itemText:IsShown() then ApplyItemText() end
 end
 
 local function TryInstall()
 	Install()
-	if installed then BUI.Events:Unregister('ADDON_LOADED', 'Skin.QuestDialogs') end
+	if not installed then return end
+	BUI.Events:Unregister('ADDON_LOADED', 'Skin.QuestDialogs')
+	ApplyShown()
 end
 
 local function Deactivate()
@@ -515,16 +514,15 @@ local function Deactivate()
 	questSkinned = false
 	gossipSkinned = false
 	itemTextSkinned = false
-	BUI.Print('Quest Dialogs skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)
 	if enabled then
 		Install()
-		if not installed then
-			BUI.Events:Register('ADDON_LOADED', 'Skin.QuestDialogs', TryInstall)
+		if installed then
+			ApplyShown()
 		else
-			Apply()
+			BUI.Events:Register('ADDON_LOADED', 'Skin.QuestDialogs', TryInstall)
 		end
 	else
 		Deactivate()

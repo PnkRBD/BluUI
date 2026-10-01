@@ -740,6 +740,25 @@ local function HasLiveButtons(container)
 	return false
 end
 
+local nest = {}
+local worldReady = false
+
+local HatchNext
+HatchNext = BUI.Dispatcher.New(function()
+	local container = table.remove(nest, 1)
+	if not container then return end
+	local config = container._buiLastConfig
+	EnsureRuleGroups(container, unpack(config, 1, 6))
+	container._buiHatched = true
+	if container._buiUnit and container.UpdateAllAuras then container:UpdateAllAuras() end
+	if nest[1] then HatchNext() end
+end, 'AuraEngine.Hatch')
+
+BUI.Events:Once('PLAYER_ENTERING_WORLD', 'AuraEngine.Hatch', function()
+	worldReady = true
+	if nest[1] then HatchNext() end
+end)
+
 ConfigureContainer = function(container, args, forced)
 	local style = args[1]
 	container._buiLastConfig = args
@@ -760,7 +779,13 @@ ConfigureContainer = function(container, args, forced)
 	end
 
 	ApplyLayout(container, style)
-	EnsureRuleGroups(container, style, args[2], args[3], args[4], args[5], args[6])
+	if container._buiHatched or (worldReady and not nest[1]) then
+		EnsureRuleGroups(container, style, args[2], args[3], args[4], args[5], args[6])
+		container._buiHatched = true
+	elseif not container._buiNested then
+		container._buiNested = true
+		nest[#nest + 1] = container
+	end
 	container._buiGUID = nil
 	if regenerated and container._buiUnit and container.UpdateAllAuras then container:UpdateAllAuras() end
 

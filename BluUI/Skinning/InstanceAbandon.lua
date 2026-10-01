@@ -152,7 +152,6 @@ local function Deactivate()
 	fill:SetHeight(BLIZZARD_FILL_HEIGHT)
 	fill:SetAtlas(BLIZZARD_FILL_ATLAS)
 	fill:SetVertexColor(1, 1, 1)
-	BUI.Print('Abandon vote skin disabled. /reload for a full visual reset.')
 end
 
 StaticPopupDialogs[PREVIEW_DIALOG] = {

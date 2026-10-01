@@ -316,7 +316,6 @@ local function Deactivate()
 	for button in pairs(skinnedButtons) do RestoreButton(button) end
 	if frame.BUIButton then frame.BUIButton:Hide() end
 	if frame._buiDim then frame._buiDim:Hide() end
-	BUI.Print('Game Menu skin disabled. Reopen the menu to restore the Blizzard layout; /reload for a full visual reset.')
 end
 
 local function Activate()

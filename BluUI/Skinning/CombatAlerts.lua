@@ -73,20 +73,21 @@ end
 
 Skin.OnToggle(RECAP_ID, function(enabled)
 	if enabled then
-		local frame = _G.DeathRecapFrame
-		if frame then frame._buiDeathRecap = nil end
 		ApplyDeathRecap()
 	else
 		recapContext.Restore()
+		local frame = _G.DeathRecapFrame
+		if frame then frame._buiDeathRecap = nil end
 	end
 end)
 
 Skin.OnToggle(MIRROR_ID, function(enabled)
 	if enabled then
-		for index = 1, #mirrorTimers do mirrorTimers[index]._buiMirrorTimer = nil end
 		ApplyMirrorTimers()
 	else
 		mirrorContext.Restore()
+		for index = 1, #mirrorTimers do mirrorTimers[index]._buiMirrorTimer = nil end
+		wipe(mirrorTimers)
 	end
 end)
 

@@ -105,7 +105,6 @@ local function Deactivate()
 	if not skinned then return end
 	context.Restore()
 	skinned = false
-	BUI.Print('In-Game Shop skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

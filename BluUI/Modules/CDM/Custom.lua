@@ -360,47 +360,62 @@ local spellToItemID = {}
 local spellToItemCount = {}
 local cacheValid = false
 local bagItemCounts = {}
-local bagItemToSpell = {}
+local itemUseSpell = {}
 
-local itemFamily = {}
 local familyData = {}
 local familyKeyMemo = {}
 local familyMembersCache = {}
 local pendingItems = {}
 local itemLoadFrame
 local function GetFamilyKey(id)
+    local memo = familyKeyMemo[id]
+    if memo ~= nil then return memo or nil end
     local _, _, _, _, _, itemClass, itemSubclass = C_Item.GetItemInfoInstant(id)
-    if itemClass == Enum.ItemClass.Consumable
-    and (itemSubclass == Enum.ItemConsumableSubclass.Potion
-      or itemSubclass == Enum.ItemConsumableSubclass.Flask) then
-        local itemName = C_Item.GetItemInfo(id)
-        if itemName then
-            return itemName:gsub("|[AT][^|]-|[at]", ""):match("^(.-)%s*$") or itemName
-        end
-        C_Item.RequestLoadItemDataByID(id)
-        pendingItems[id] = true
-        if not itemLoadFrame then
-            itemLoadFrame = true
-            BUI.Events:Register('ITEM_DATA_LOAD_RESULT', 'CDM.Custom.ItemLoad', function(event, itemID, success)
-                if pendingItems[itemID] then
-                    pendingItems[itemID] = nil
-                    if success then
-                        cacheValid = false
-                        CDM.Custom.Refresh()
-                        BUI.CustomBars.RefreshAllBars()
-                    end
-                end
-            end)
-        end
+    if itemClass ~= Enum.ItemClass.Consumable
+    or (itemSubclass ~= Enum.ItemConsumableSubclass.Potion
+    and itemSubclass ~= Enum.ItemConsumableSubclass.Flask) then
+        familyKeyMemo[id] = false
+        return nil
     end
+    local itemName = C_Item.GetItemInfo(id)
+    if itemName then
+        local key = itemName:gsub("|[AT][^|]-|[at]", ""):match("^(.-)%s*$") or itemName
+        familyKeyMemo[id] = key
+        return key
+    end
+    C_Item.RequestLoadItemDataByID(id)
+    pendingItems[id] = true
+    if not itemLoadFrame then
+        itemLoadFrame = true
+        BUI.Events:Register('ITEM_DATA_LOAD_RESULT', 'CDM.Custom.ItemLoad', function(event, itemID, success)
+            if pendingItems[itemID] then
+                pendingItems[itemID] = nil
+                if success then
+                    cacheValid = false
+                    CDM.Custom.Refresh()
+                    BUI.CustomBars.RefreshAllBars()
+                end
+            end
+        end)
+    end
+end
+
+local function ItemUseSpell(id)
+    local spellID = itemUseSpell[id]
+    if spellID ~= nil then return spellID end
+    local _, found = GetItemSpell(id)
+    if found then
+        itemUseSpell[id] = found
+    elseif C_Item.IsItemDataCachedByID(id) then
+        itemUseSpell[id] = false
+    end
+    return found
 end
 
 local function RebuildBagCache()
     wipe(spellToItemID)
     wipe(spellToItemCount)
     wipe(bagItemCounts)
-    wipe(bagItemToSpell)
-    wipe(itemFamily)
     wipe(familyData)
     wipe(familyMembersCache)
 
@@ -408,31 +423,20 @@ local function RebuildBagCache()
         for slotIndex = 1, C_Container.GetContainerNumSlots(bagIndex) do
             local slot = C_Container.GetContainerItemInfo(bagIndex, slotIndex)
             if slot and slot.itemID then
-                local id = slot.itemID
-                bagItemCounts[id] = (bagItemCounts[id] or 0) + slot.stackCount
-
-                if not bagItemToSpell[id] then
-                    local _, spellID = GetItemSpell(id)
-                    if spellID then bagItemToSpell[id] = spellID end
-                end
-
-                if not itemFamily[id] then
-                    itemFamily[id] = GetFamilyKey(id)
-                end
+                bagItemCounts[slot.itemID] = (bagItemCounts[slot.itemID] or 0) + slot.stackCount
             end
         end
     end
 
-    for id, itemSpellID in pairs(bagItemToSpell) do
-        if (bagItemCounts[id] or 0) > 0 then
+    for id, itemCount in pairs(bagItemCounts) do
+        local itemSpellID = ItemUseSpell(id)
+        if itemSpellID then
             spellToItemID[itemSpellID] = id
-            spellToItemCount[itemSpellID] = bagItemCounts[id]
+            spellToItemCount[itemSpellID] = itemCount
         end
-    end
 
-    for id, familyKey in pairs(itemFamily) do
-        local itemCount = bagItemCounts[id] or 0
-        if itemCount > 0 then
+        local familyKey = GetFamilyKey(id)
+        if familyKey then
             local family = familyData[familyKey]
             if not family then
                 family = { sum = 0, icon = id, breakdown = {} }
@@ -454,8 +458,7 @@ end
 
 local function AggregateCount(id)
     if not cacheValid then RebuildBagCache() end
-    local familyKey = itemFamily[id]
-    if not familyKey then familyKey = GetFamilyKey(id) end
+    local familyKey = GetFamilyKey(id)
     if familyKey then
         local family = familyData[familyKey]
         if family then return family.sum, family.icon, family.breakdown end
@@ -511,11 +514,7 @@ local function AggregateCountPrio(id, prio)
         end
     end
 
-    local baseKey = itemFamily[id] or familyKeyMemo[id]
-    if baseKey == nil then
-        baseKey = GetFamilyKey(id)
-        if baseKey then familyKeyMemo[id] = baseKey end
-    end
+    local baseKey = GetFamilyKey(id)
     local members = baseKey and FamilyMembersFor(baseKey)
     if members then
         for memberID, memberCount in pairs(members) do
@@ -570,7 +569,7 @@ local function GetPotionVersions(itemID)
         versions[#versions + 1] = { id = id, count = bagItemCounts[id] or 0, quality = ItemQuality(id) }
     end
 
-    local baseKey = itemFamily[itemID] or GetFamilyKey(itemID)
+    local baseKey = GetFamilyKey(itemID)
     if not baseKey then
         pending = { itemID }
     else
@@ -1307,6 +1306,7 @@ local function SetupIcon(icon, storedValue, viewerKey, index)
     frameData.trinketSlot = trinketSlot
     frameData.racialSlot = racialSlot
     frameData.iconType = nil
+    frameData._availChecked = nil
     local config = BUI.GetDB().cdm[viewerKey]
     frameData._activeChoiceID = CDM.GetChoiceNodes(config)[spellID]
     frameData.potionPrio = CDM.GetPotionPrioFor(storedValue)
@@ -1624,24 +1624,18 @@ local function UpdateTrackedBuffIcons()
     UpdateTrackedBuffOtherViewers()
 end
 
-local function InvalidateIconTypes()
-    ForEachIcon(nil, function(_, frameData)
-        if frameData then
-            frameData.iconType = nil
-            frameData.trackedBuff = nil
-
-            if frameData.isItemByPrefix then frameData._availChecked = nil end
-        end
-    end)
-end
-
 local RebuildManualSpellMap
+local builtSpellToItem = {}
 
 local function DoRefresh()
     RefreshViewer("essential")
     RefreshViewer("utility")
     RefreshViewer("buffs")
     RebuildManualSpellMap()
+    wipe(builtSpellToItem)
+    for spellID, itemID in pairs(spellToItemID) do
+        builtSpellToItem[spellID] = itemID
+    end
 end
 
 local function UpdateIconUsable(icon)
@@ -1770,38 +1764,22 @@ local function QueueDispatch()
 end
 
 local bagPending = false
-local prevSpellToItem = {}
-
-local function SnapshotSpellItemMap()
-    wipe(prevSpellToItem)
-    for spellID, itemID in pairs(spellToItemID) do
-        prevSpellToItem[spellID] = itemID
-    end
-end
 
 local function SpellItemMapChanged()
     for spellID, itemID in pairs(spellToItemID) do
-        if prevSpellToItem[spellID] ~= itemID then
-            SnapshotSpellItemMap()
-            return true
-        end
+        if builtSpellToItem[spellID] ~= itemID then return true end
     end
-    for spellID in pairs(prevSpellToItem) do
-        if spellToItemID[spellID] == nil then
-            SnapshotSpellItemMap()
-            return true
-        end
+    for spellID in pairs(builtSpellToItem) do
+        if spellToItemID[spellID] == nil then return true end
     end
     return false
 end
 
 local function FlushBagUpdate()
     bagPending = false
-    InvalidateCache()
     RebuildBagCache()
 
     if SpellItemMapChanged() then
-        InvalidateIconTypes()
         DoRefresh()
         UpdateAllCooldowns()
         CDM.SetUpdatePending(true)

@@ -192,7 +192,6 @@ end
 local function Deactivate()
 	context.Restore()
 	wipe(skinned)
-	BUI.Print('Loot Rolls skin disabled. /reload for a full visual reset.')
 end
 
 local function AnchorHooks(reapply)

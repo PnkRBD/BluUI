@@ -136,7 +136,6 @@ local function Deactivate()
 	context.Restore()
 	skinned = false
 	if _G.SideDressUpFrame then _G.SideDressUpFrame._buiSideSkinned = nil end
-	BUI.Print('Dressing Room skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

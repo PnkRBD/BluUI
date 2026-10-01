@@ -105,6 +105,7 @@ end
 function BUI.ApplyScale()
 	local newScale = BUI.AppliedUIScale()
 	BUI.Events:AfterCombat(function()
+		if BUI.ApproxEqual(UIParent:GetScale(), newScale, 0.000001) then return end
 		BUI._applyingScale = true
 		UIParent:SetScale(newScale)
 		BUI._applyingScale = false
@@ -271,11 +272,8 @@ function Addon:OnEnable()
 		if not BUI.ApproxEqual(scaleBefore, UIParent:GetScale()) then
 			BUI.ExportImport.RefreshAllModules()
 		else
-			if BUI.UnitFrames and BUI.IsModuleEnabled('unitFrames') then
-				BUI.UnitFrames.InvalidateFilterCache()
-				BUI.UnitFrames:Refresh()
-			end
-			BUI.Skinning.RefreshAll()
+			if BUI.UnitFrames and BUI.IsModuleEnabled('unitFrames') then BUI.UnitFrames.RefreshAnchoredFrames() end
+			BUI.Skinning.RefreshAllStaggered()
 		end
 		if BUI.IsModuleEnabled('cdm') then BUI.QueueStartupCheck(BUI.CDM.CheckDisabled) end
 		BUI.QueueStartupCheck(BUI.CheckPlatynatorPrompt)

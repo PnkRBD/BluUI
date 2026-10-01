@@ -118,7 +118,7 @@ local function RegisterTrackerEvents()
     BUI.Events:RegisterUnit("UNIT_AURA", "player", "BuffTrackingAura", UpdateAllTrackers)
     BUI.Events:RegisterUnit("UNIT_SPELLCAST_SUCCEEDED", "player", "BuffTrackingCast", UpdateAllTrackers)
     BUI.Events:Register("SPELL_UPDATE_CHARGES", "BuffTrackingCharges", UpdateAllTrackers)
-    BUI.Events:Register("PLAYER_SPECIALIZATION_CHANGED", "BuffTrackingDisplay", RecheckAllActive)
+    BUI.Events:RegisterUnit("PLAYER_SPECIALIZATION_CHANGED", "player", "BuffTrackingDisplay", RecheckAllActive)
     BUI.Visibility.Register("BuffTracking", Display.UpdateOpacity, true)
 end
 

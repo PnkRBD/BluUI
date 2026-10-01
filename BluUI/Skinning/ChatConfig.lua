@@ -427,15 +427,39 @@ end
 
 local function Deactivate()
 	context.Restore()
-	BUI.Print('Chat Settings skin disabled. /reload for a full visual reset.')
+end
+
+local pendingChecks, pendingSwatches = {}, {}
+
+local function SkinEntries(frame)
+	if not Enabled() then return end
+	if pendingChecks[frame] then
+		pendingChecks[frame] = nil
+		ForEachNumbered(FrameName(frame) .. 'Checkbox', CheckEntry)
+	end
+	if pendingSwatches[frame] then
+		pendingSwatches[frame] = nil
+		ForEachNumbered(FrameName(frame) .. 'Swatch', SwatchRow)
+	end
+end
+
+local function QueueEntries(frame, pending)
+	if not Enabled() then return end
+	pending[frame] = true
+	if frame:IsVisible() then
+		SkinEntries(frame)
+	elseif not frame._buiEntriesHook then
+		frame._buiEntriesHook = true
+		frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.ChatConfig entries reskin', SkinEntries))
+	end
 end
 
 local function OnCheckboxesCreated(frame)
-	if Enabled() then ForEachNumbered(FrameName(frame) .. 'Checkbox', CheckEntry) end
+	QueueEntries(frame, pendingChecks)
 end
 
 local function OnSwatchesCreated(frame)
-	if Enabled() then ForEachNumbered(FrameName(frame) .. 'Swatch', SwatchRow) end
+	QueueEntries(frame, pendingSwatches)
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

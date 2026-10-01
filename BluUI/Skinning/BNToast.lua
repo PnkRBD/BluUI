@@ -67,7 +67,6 @@ local function Deactivate()
 		frame._buiToast = nil
 	end
 	wipe(skinnedToasts)
-	BUI.Print('Battle.net toast skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

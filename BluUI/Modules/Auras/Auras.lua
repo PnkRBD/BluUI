@@ -265,7 +265,7 @@ local function OnSpecChanged()
 end
 
 WireEvents = function()
-    BUI.Events:Register("PLAYER_SPECIALIZATION_CHANGED", "Auras", OnSpecChanged)
+    BUI.Events:RegisterUnit("PLAYER_SPECIALIZATION_CHANGED", "player", "Auras", OnSpecChanged)
     BUI.Events:Register("PLAYER_TALENT_UPDATE",          "Auras", OnSpecChanged)
     if eventsWired then
         SyncPetTriggers()
