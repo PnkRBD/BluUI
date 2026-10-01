@@ -246,8 +246,8 @@ local function EnsureSample(entry)
 	sample:SetFrameLevel(anchor:GetFrameLevel() + 1)
 	sample:EnableMouse(true)
 	sample:RegisterForDrag('LeftButton')
-	sample:SetScript('OnDragStart', SampleDragStart)
-	sample:SetScript('OnDragStop', SampleDragStop)
+	sample:SetScript('OnDragStart', BUI.Profiler.Script('Skin.ToastAnchors sample OnDragStart', SampleDragStart))
+	sample:SetScript('OnDragStop', BUI.Profiler.Script('Skin.ToastAnchors sample OnDragStop', SampleDragStop))
 	sample:Hide()
 	entry.sampleFrame = sample
 	PointSample(entry)
@@ -267,8 +267,8 @@ local function CreateAnchor(entry)
 	anchor:SetClampedToScreen(true)
 	anchor:EnableMouse(false)
 	anchor:RegisterForDrag('LeftButton')
-	anchor:SetScript('OnDragStart', OnDragStart)
-	anchor:SetScript('OnDragStop', OnDragStop)
+	anchor:SetScript('OnDragStart', BUI.Profiler.Script('Skin.ToastAnchors anchor OnDragStart', OnDragStart))
+	anchor:SetScript('OnDragStop', BUI.Profiler.Script('Skin.ToastAnchors anchor OnDragStop', OnDragStop))
 
 	local caption = CreateFrame('Frame', nil, anchor)
 	caption:SetAllPoints(anchor)
@@ -294,9 +294,9 @@ local function CreateAnchor(entry)
 		local buttonText = button:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
 		buttonText:SetPoint('CENTER')
 		buttonText:SetText(text)
-		button:SetScript('OnClick', onClick)
-		button:SetScript('OnEnter', function() buttonText:SetTextColor(1, 0.82, 0) end)
-		button:SetScript('OnLeave', function() buttonText:SetTextColor(1, 1, 1) end)
+		button:SetScript('OnClick', BUI.Profiler.Script('Skin.ToastAnchors button OnClick', onClick))
+		button:SetScript('OnEnter', BUI.Profiler.Script('Skin.ToastAnchors button OnEnter', function() buttonText:SetTextColor(1, 0.82, 0) end))
+		button:SetScript('OnLeave', BUI.Profiler.Script('Skin.ToastAnchors button OnLeave', function() buttonText:SetTextColor(1, 1, 1) end))
 		return button
 	end
 	local reset = CaptionButton('RESET', nil, function() ResetEntry(entry) end)
@@ -341,6 +341,10 @@ end
 
 function ToastAnchors.IsUnlocked(key)
 	return entries[key].unlocked == true
+end
+
+function ToastAnchors.IsPositioned(key)
+	return Config(entries[key]).positioned == true
 end
 
 function ToastAnchors.Refresh(key)
