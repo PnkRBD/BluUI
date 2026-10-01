@@ -362,7 +362,7 @@ local function CreateMock(stage)
 			icon.border = mock:CreateTexture(nil, 'OVERLAY', nil, 1)
 			icon.border:SetTexture(WHITE)
 			icon.texture = mock:CreateTexture(nil, 'OVERLAY', nil, 2)
-			icon.texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+			icon.texture:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 			auraIcons[index] = icon
 		end
 		return auraIcons[index]
@@ -540,9 +540,9 @@ local function CreateMock(stage)
 				local column = (auraIndex - 1) % perRow
 				local x = growX == 'LEFT' and (gridWidth - size - column * (size + gap)) or (column * (size + gap))
 				local y = growY == 'UP' and (gridHeight - size - row * (size + gap)) or (row * (size + gap))
-				icon.border:SetSize(size + 2, size + 2)
+				icon.border:SetSize(size, size)
 				icon.border:ClearAllPoints()
-				icon.border:SetPoint('TOPLEFT', self, 'TOPLEFT', gridLeft + x - 1, -(gridTop + y - 1))
+				icon.border:SetPoint('TOPLEFT', self, 'TOPLEFT', gridLeft + x, -(gridTop + y))
 				if typed then
 					local dispelColor = MOCK_DISPEL_COLORS[(auraIndex - 1) % #MOCK_DISPEL_COLORS + 1]
 					icon.border:SetVertexColor(dispelColor[1], dispelColor[2], dispelColor[3], 1)
@@ -552,9 +552,10 @@ local function CreateMock(stage)
 					icon.border:SetVertexColor(0, 0, 0, 1)
 				end
 				icon.texture:SetTexture(icons[(auraIndex - 1) % #icons + 1])
-				icon.texture:SetSize(size, size)
+				local edge = Pixel.PixelSizeFor(self, 1)
 				icon.texture:ClearAllPoints()
-				icon.texture:SetPoint('CENTER', icon.border, 'CENTER', 0, 0)
+				icon.texture:SetPoint('TOPLEFT', icon.border, 'TOPLEFT', edge, -edge)
+				icon.texture:SetPoint('BOTTOMRIGHT', icon.border, 'BOTTOMRIGHT', -edge, edge)
 				icon.border:Show()
 				icon.texture:Show()
 			end
