@@ -731,7 +731,7 @@ function CDM.NotifyDependents()
     end
 
     if CDM.state.initComplete and (anySize or anyPos) then
-        CDM.NotifyUnitFrames()
+        CDM.NotifyAnchoredFrames()
     end
 
     if anySize or anyOffset or anyPos then
@@ -745,7 +745,7 @@ function CDM.RefreshLayoutOnly()
     CDM.LayoutAllViewers()
     CDM.NotifyDependents()
     if CDM.state.initComplete then
-        CDM.NotifyUnitFrames()
+        CDM.NotifyAnchoredFrames()
     end
     CDM.RefreshBuffsPreview()
     CDM.SetupBuffCentering()

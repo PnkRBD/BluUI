@@ -530,8 +530,9 @@ function CDM.RowMetrics(count, perRow, row2Count, row3Count)
     return numRows, maxCols
 end
 
-function CDM.NotifyUnitFrames()
+function CDM.NotifyAnchoredFrames()
     BUI.UnitFrames.RefreshAnchoredFrames()
+    BUI.GroupFrames.RefreshPartyAnchor()
 end
 
 local tostring = tostring
