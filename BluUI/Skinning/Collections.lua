@@ -321,7 +321,6 @@ end
 local function Deactivate()
 	context.Restore()
 	skinned = false
-	BUI.Print('Collections skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

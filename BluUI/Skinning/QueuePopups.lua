@@ -276,13 +276,11 @@ end
 local function Deactivate()
 	for _, group in pairs(groups) do StopGroup(group) end
 	context.Restore()
-	BUI.Print('Queue Popups skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)
 	if enabled then
-		Install()
-		SkinPopups()
+		if installed then SkinPopups() else Install() end
 	else
 		Deactivate()
 	end

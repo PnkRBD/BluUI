@@ -278,7 +278,7 @@ local function StartEvents()
     BUI.Events:RegisterUnit("UNIT_DISPLAYPOWER", "player", "Power", function() OnStyleEvent("UNIT_DISPLAYPOWER") end)
     BUI.Events:RegisterUnit("UNIT_POWER_FREQUENT", "player", "PowerLive", OnLivePower)
     BUI.Events:Register("PLAYER_ENTERING_WORLD", "Power", OnStyleEvent)
-    BUI.Events:Register("PLAYER_SPECIALIZATION_CHANGED", "Power", OnStyleEvent)
+    BUI.Events:RegisterUnit("PLAYER_SPECIALIZATION_CHANGED", "player", "Power", OnStyleEvent)
     BUI.Events:Register("UPDATE_SHAPESHIFT_FORM", "Power", OnStyleEvent)
     BUI.Events:Register("UPDATE_SHAPESHIFT_FORMS", "Power", OnStyleEvent)
 end

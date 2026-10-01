@@ -2007,7 +2007,6 @@ local function Deactivate()
 	ManageHidden(_G.ChatFrameToggleVoiceMuteButton, false)
 	Skin.CollapseChatTab(_G.ChatFrame2Tab, false)
 	ApplyTimestampCVar()
-	BUI.Print('Chat skin disabled. Type /reload to fully restore the default chat frame.')
 end
 
 local function Reactivate()

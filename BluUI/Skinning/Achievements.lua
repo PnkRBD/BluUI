@@ -718,7 +718,6 @@ local function Deactivate()
 	local frame = _G.AchievementFrame
 	if frame then frame.HeaderDetails.Back:SetAlpha(1) end
 	skinned = false
-	BUI.Print('Achievements skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

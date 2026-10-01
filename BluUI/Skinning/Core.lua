@@ -116,8 +116,9 @@ function Skin.SeedSkinStates()
 	skinDB.lossofcontrol = nil
 end
 
-function Skin.SetSkinEnabled(id, enabled)
-	enabled = enabled and true or false
+local RELOAD_HINT = ' /reload for a full visual reset.'
+
+local function ApplySkinState(id, enabled)
 	GetSkinDB()[id] = enabled
 	ClearNew(GetSkinDB(), id)
 	local list = toggleCallbacks[id]
@@ -126,11 +127,17 @@ function Skin.SetSkinEnabled(id, enabled)
 	end
 end
 
+function Skin.SetSkinEnabled(id, enabled)
+	enabled = enabled and true or false
+	ApplySkinState(id, enabled)
+	if not enabled then BUI.Print(skinRegistry[id].name .. ' skin disabled.' .. RELOAD_HINT) end
+end
+
 function Skin.SetAllSkinsEnabled(enabled)
-	for _, id in ipairs(skinOrder) do
-		Skin.SetSkinEnabled(id, enabled)
-	end
+	enabled = enabled and true or false
+	for _, id in ipairs(skinOrder) do ApplySkinState(id, enabled) end
 	ClearNew(GetSkinDB())
+	if not enabled then BUI.Print('All skins disabled.' .. RELOAD_HINT) end
 end
 
 function Skin.WriteSkinsEnabled(enabledByID)
@@ -139,14 +146,50 @@ function Skin.WriteSkinsEnabled(enabledByID)
 	ClearNew(skinDB)
 end
 
-function Skin.RefreshAll()
-	for _, id in ipairs(skinOrder) do
-		local list = toggleCallbacks[id]
-		if list then
-			local effective = Skin.IsSkinEnabled(id)
-			for _, callback in ipairs(list) do callback(effective) end
+local function RunToggles(id)
+	local list = toggleCallbacks[id]
+	if not list then return end
+	local effective = Skin.IsSkinEnabled(id)
+	for _, callback in ipairs(list) do callback(effective) end
+end
+
+local function RefreshSkin(id)
+	BUI.Profiler.Run(BUI.Profiler.Label('Skin.Refresh', id), RunToggles, id)
+end
+
+local STAGGER_BUDGET_MS = 4
+local staggerQueue, staggerCursor = {}, 1
+local staggerDriver = CreateFrame('Frame')
+staggerDriver:Hide()
+
+local function ClearStagger()
+	wipe(staggerQueue)
+	staggerCursor = 1
+	staggerDriver:Hide()
+end
+
+staggerDriver:SetScript('OnUpdate', function()
+	local start = debugprofilestop()
+	repeat
+		local id = staggerQueue[staggerCursor]
+		if not id then
+			ClearStagger()
+			return
 		end
-	end
+		staggerCursor = staggerCursor + 1
+		RefreshSkin(id)
+	until debugprofilestop() - start > STAGGER_BUDGET_MS
+end)
+
+function Skin.RefreshAll()
+	ClearStagger()
+	for _, id in ipairs(skinOrder) do RefreshSkin(id) end
+end
+
+function Skin.RefreshAllStaggered()
+	ClearStagger()
+	for index, id in ipairs(skinOrder) do staggerQueue[index] = id end
+	staggerDriver:Show()
 end
 
 function Skin.Toggle()

@@ -543,7 +543,7 @@ BUI.Anchor.Follow('BuffTrackingBWO', function()
 end, GetConfig)
 
 local QueueRefresh = BUI.Dispatcher.New(BestialWrathOverlay.Refresh, 'BWO.Refresh')
-BUI.Events:Register('PLAYER_SPECIALIZATION_CHANGED', 'BuffTrackingBWO', QueueRefresh)
+BUI.Events:RegisterUnit('PLAYER_SPECIALIZATION_CHANGED', 'player', 'BuffTrackingBWO', QueueRefresh)
 BUI.Events:Register('TRAIT_CONFIG_UPDATED', 'BuffTrackingBWO', QueueRefresh)
 BUI.Events:Register('PLAYER_ENTERING_WORLD', 'BuffTrackingBWO', QueueRefresh)
 BUI.Events:Register('COOLDOWN_VIEWER_DATA_LOADED', 'BuffTrackingBWO', QueueRefresh)

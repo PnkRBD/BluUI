@@ -269,17 +269,11 @@ local function Style(self, unit)
 
 	local absorb = CreateFrame('StatusBar', nil, absorbClip)
 	absorb:SetFrameLevel(absorbClip:GetFrameLevel() + 1)
-	UnitFrames.ApplyAbsorbVisual(absorb, UnitFrames.BuildAbsorbCfg(settings))
-	UnitFrames.AnchorAbsorb(absorb, health, healthTexture, settings.shieldDirection)
 	self.Absorb = absorb
-	absorb:SetShown(settings.shieldEnabled ~= false)
 
 	local healAbsorb = CreateFrame('StatusBar', nil, absorbClip)
 	healAbsorb:SetFrameLevel(absorbClip:GetFrameLevel() + 1)
-	UnitFrames.ApplyHealAbsorbVisual(healAbsorb, UnitFrames.BuildHealAbsorbCfg(settings))
-	UnitFrames.AnchorAbsorb(healAbsorb, health, healthTexture, settings.healAbsorbDirection)
 	self.HealAbsorb = healAbsorb
-	healAbsorb:SetShown(settings.healAbsorbEnabled ~= false)
 	self.AbsorbBars = { Damage = absorb, Heal = healAbsorb }
 
 	local power = CreateFrame('StatusBar', nil, self)
@@ -428,11 +422,8 @@ local function Style(self, unit)
 	levelText:Hide()
 	self.LevelText = levelText
 
-	UnitFrames.TagFontStrings(self)
-
 	if unitType == 'player' or unitType == 'target' or unitType == 'focus' or unitType == 'boss' or unitType == 'targettarget' then
 		UnitFrames.CreateAuraElements(self, unitType)
-		UnitFrames.ApplyAuraPositions(self, unitType)
 	end
 
 	if unitType == 'boss' then

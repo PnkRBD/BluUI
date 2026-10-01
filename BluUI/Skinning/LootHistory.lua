@@ -218,7 +218,6 @@ local function Deactivate()
 		if frame.NineSlice then frame.NineSlice:SetAlpha(1) end
 		Skin.HideTipShell(frame)
 	end
-	BUI.Print('Loot history skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

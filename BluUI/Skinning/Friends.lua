@@ -700,7 +700,6 @@ local function Deactivate()
 	context.Restore()
 	skinned = false
 	artStale = true
-	BUI.Print('Contacts skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

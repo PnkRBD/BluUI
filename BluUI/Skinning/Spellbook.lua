@@ -408,7 +408,6 @@ local function Deactivate()
 	for texture in pairs(dimmed) do texture:SetAlpha(1) end
 	wipe(dimmed)
 	skinned = false
-	BUI.Print('Spellbook skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

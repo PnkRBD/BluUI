@@ -880,7 +880,6 @@ local function Deactivate()
 	context.Restore()
 	SetOwnedShown(false)
 	frameSkinned, bookSkinned, customerSkinned = false, false, false
-	BUI.Print('Professions skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

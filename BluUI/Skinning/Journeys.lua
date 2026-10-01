@@ -574,7 +574,6 @@ local function Deactivate()
 		for _, tab in ipairs(sideTabs) do Skin.ResetSideTab(tab) end
 	end
 	skinned = false
-	BUI.Print('Journeys skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

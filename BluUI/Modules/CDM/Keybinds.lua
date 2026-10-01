@@ -724,7 +724,8 @@ eventFrame:SetScript("OnUpdate", BUI.Profiler.Wrap("CDM.Keybinds refresh", funct
         needsRetry = false
 
         BUI.Profiler.After("CDM.Keybinds refresh retry", 0.1, function()
-            DoRefresh(true)
+            pendingFull = true
+            Keybinds.ScheduleRebuild()
         end)
     end
 end))
