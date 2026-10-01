@@ -728,6 +728,10 @@ local function ApplyMinimapBar()
     frame:Show()
 end
 
+function Datatext.AnchorMinimapBar()
+    if Datatext._initialized then ApplyMinimapBar() end
+end
+
 function Datatext.Apply()
     if not Datatext._initialized then return end
     fontGeneration = fontGeneration + 1

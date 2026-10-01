@@ -131,20 +131,27 @@ local function CreateBackdrop()
 	BUI.Tools.SetColorTex(texture, 0, 0, 0, 1)
 end
 
+local backdropAnnounced
+
 local function UpdateBackdrop()
 	if not backdropFrame then return end
 
 	local borderWidth = GetConfig().minimapBorderWidth
 	if borderWidth <= 0 then
 		backdropFrame:Hide()
-		return
+	else
+		local padding = Pixel.Scale(borderWidth)
+		backdropFrame:ClearAllPoints()
+		backdropFrame:SetPoint('TOPLEFT',     WoWMinimap, 'TOPLEFT',     -padding,  padding)
+		backdropFrame:SetPoint('BOTTOMRIGHT', WoWMinimap, 'BOTTOMRIGHT',  padding, -padding)
+		backdropFrame:Show()
 	end
 
-	local padding = Pixel.Scale(borderWidth)
-	backdropFrame:ClearAllPoints()
-	backdropFrame:SetPoint('TOPLEFT',     WoWMinimap, 'TOPLEFT',     -padding,  padding)
-	backdropFrame:SetPoint('BOTTOMRIGHT', WoWMinimap, 'BOTTOMRIGHT',  padding, -padding)
-	backdropFrame:Show()
+	local shown = backdropFrame:IsShown()
+	if shown ~= backdropAnnounced then
+		backdropAnnounced = shown
+		BUI.Datatext.AnchorMinimapBar()
+	end
 end
 
 local function ApplyShape()
