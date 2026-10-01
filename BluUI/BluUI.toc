@@ -34,6 +34,7 @@ Data\DefaultProfile.lua
 Data\MinimapTiles.lua
 Data\Portals.lua
 Utility\Profiler.lua
+Utility\LaunchTrace.lua
 Core\Core.lua
 Core\Startup.lua
 Core\Commands.lua
