@@ -220,6 +220,8 @@ end
 
 function Addon:OnEnable()
 	BUI.SpecProfiles.ApplyOnLogin()
+	BUI.Pixel.Sync()
+	BUI.ApplyScale()
 	BUI.BUILibClient.SetFont(BUI.WindowFont())
 
 	BUI.BUILibClient.defaultWidth = BUI.C.PAGE_CONTENT_W
