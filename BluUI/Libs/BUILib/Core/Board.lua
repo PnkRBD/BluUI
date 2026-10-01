@@ -21,6 +21,8 @@ local GRABBER_SIZE = 12
 local DRAG_ALPHA = 0.35
 local SLIDE_TIME = 0.16
 
+Layout.DRAG_TITLE_X = DRAG_TITLE_X
+
 local Section = Layout.TableSection
 local Board = setmetatable({}, { __index = Section })
 Board.__index = Board
@@ -108,11 +110,18 @@ local function DragGhost(board)
 	edge:SetPoint('BOTTOMLEFT')
 	edge:SetWidth(2)
 	kit.Glyph(ghost, 'grabber', GRABBER_SIZE, 'text'):SetPoint('LEFT', kit.ROW_INSET, 0)
+	ghost.icon = ghost:CreateTexture(nil, 'ARTWORK')
+	ghost.icon:SetSize(ICON_SIZE, ICON_SIZE)
+	ghost.icon:SetPoint('LEFT', DRAG_TITLE_X, 0)
+	ghost.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 	ghost.label = kit.Text(ghost, '', 12, 'text')
-	ghost.label:SetPoint('LEFT', DRAG_TITLE_X, 0)
 	ghost:Hide()
 	drag.ghost = ghost
 	return ghost
+end
+
+local function DragTextX(icon)
+	return icon and (DRAG_TITLE_X + ICON_SIZE + CONTROL_GAP) or DRAG_TITLE_X
 end
 
 local function OffsetOf(frame)
@@ -189,13 +198,21 @@ function Board:DragList(onMove, onDrop)
 	self.drag = { rows = {}, slides = {}, animator = animator, onMove = onMove, onDrop = onDrop }
 end
 
-function Board:AddDragRow(label, room)
+function Board:AddDragRow(label, room, sub, icon)
 	local kit, drag = self.kit, self.drag
-	local row = Section.AddRow(self, label)
+	local row = Section.AddRow(self, sub and (label .. ' ' .. sub) or label)
 	row:SetHeight(DRAG_ROW)
 	drag.rows[#drag.rows + 1] = row
 	kit.Glyph(row, 'grabber', GRABBER_SIZE, 'faint'):SetPoint('LEFT', kit.ROW_INSET, 0)
-	kit.RowTitle(row, label, nil, DRAG_TITLE_X, self.panelWidth - DRAG_TITLE_X - kit.ROW_INSET - room - CONTROL_GAP)
+	local textX = DragTextX(icon)
+	if icon then
+		row.icon = row:CreateTexture(nil, 'ARTWORK')
+		row.icon:SetSize(ICON_SIZE, ICON_SIZE)
+		row.icon:SetPoint('LEFT', DRAG_TITLE_X, 0)
+		row.icon:SetTexture(icon)
+		row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	end
+	local title, subtitle = kit.RowTitle(row, label, sub, textX, self.panelWidth - textX - kit.ROW_INSET - room - CONTROL_GAP)
 	row:EnableMouse(true)
 	row:RegisterForDrag('LeftButton')
 	row:SetScript('OnDragStart', function(frame)
@@ -205,6 +222,10 @@ function Board:AddDragRow(label, room)
 		drag.dragging = frame
 		drag.grabOffset = frame:GetTop() - cursorY / self.frame:GetEffectiveScale()
 		frame:SetAlpha(DRAG_ALPHA)
+		ghost.icon:SetShown(icon ~= nil)
+		if icon then ghost.icon:SetTexture(icon) end
+		ghost.label:ClearAllPoints()
+		ghost.label:SetPoint('LEFT', textX, 0)
 		ghost.label:SetText(label)
 		ghost:Show()
 		TrackDrag(self)
@@ -220,7 +241,7 @@ function Board:AddDragRow(label, room)
 		end)
 		drag.onDrop()
 	end)
-	return row
+	return row, title, subtitle
 end
 
 function Board:Move(frame, delta)

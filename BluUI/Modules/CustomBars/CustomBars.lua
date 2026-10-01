@@ -343,131 +343,177 @@ end
 
 local seenScratch = {}
 local racialScratch = {}
+local placedScratch = {}
+local knownScratch = {}
+local customScratch = {}
+local SLOT_KEYS = {}
+for _, slot in ipairs(TRINKET_SLOTS) do SLOT_KEYS[slot] = "auto:slot:" .. slot end
+local racialKeys = {}
+
+local function RacialKey(spellID)
+    local key = racialKeys[spellID]
+    if not key then
+        key = "auto:racial:" .. spellID
+        racialKeys[spellID] = key
+    end
+    return key
+end
+
+local function AutoToken(stored)
+    if type(stored) ~= "string" or stored:sub(1, 5) ~= "auto:" then return end
+    local slot = tonumber(stored:match("^auto:slot:(%d+)$"))
+    if slot and SLOT_KEYS[slot] then return "slot", slot end
+    local racial = tonumber(stored:match("^auto:racial:(%d+)$"))
+    if racial then return "racial", racial end
+end
+
+function CustomBars.SlotKey(slot)
+    return SLOT_KEYS[slot]
+end
+
+CustomBars.RacialKey = RacialKey
+
+function CustomBars.ForEachIcon(settings, visit)
+    local spells = settings.customSpells
+    local placed, known, custom = wipe(placedScratch), wipe(knownScratch), wipe(customScratch)
+    for _, stored in ipairs(spells) do
+        if AutoToken(stored) then
+            placed[stored] = true
+        else
+            local id, isItem = IconEngine.ExtractSpellItemID(stored)
+            if id and not isItem then custom[id] = true end
+        end
+    end
+    if settings.showTrinkets then
+        for _, slot in ipairs(TRINKET_SLOTS) do
+            if not placed[SLOT_KEYS[slot]] then visit("slot", slot) end
+        end
+    end
+    if settings.showRacials then
+        for _, spellID in ipairs(BUI.CDM.GetKnownRacialSpellIDs(racialScratch)) do
+            known[spellID] = true
+            if not placed[RacialKey(spellID)] and not custom[spellID] then visit("racial", spellID) end
+        end
+    end
+    for _, stored in ipairs(spells) do
+        local kind, value = AutoToken(stored)
+        if kind == "slot" then
+            if settings.showTrinkets then visit("slot", value) end
+        elseif kind == "racial" then
+            if known[value] and not custom[value] then visit("racial", value) end
+        else
+            visit("custom", stored)
+        end
+    end
+end
+
+local collectSettings, collectOut, collectCount
+
+local function Collect(entry)
+    collectCount = collectCount + 1
+    collectOut[collectCount] = entry
+    seenScratch[entry.id] = true
+end
+
+local function CollectSlot(slot)
+    local settings = collectSettings
+    local itemID = GetInventoryItemID("player", slot)
+    local hideKey = SLOT_KEYS[slot]
+    local hidden, blacklist = settings.hiddenIcons, settings.trinketBlacklist
+    if not itemID or (hidden and hidden[hideKey]) or (blacklist and blacklist[itemID]) then return end
+    if settings.trinketsUsableOnly == true and C_Item.GetItemSpell(itemID) == nil then return end
+    local entry = AcquireEntry()
+    entry.id = itemID
+    entry.itemID = itemID
+    entry.icon = GetInventoryItemTexture("player", slot)
+    entry.slot = slot
+    entry.iconType = "trinket"
+    entry.hiddenKey = hideKey
+    Collect(entry)
+end
+
+local function CollectRacial(spellID)
+    local hideKey = RacialKey(spellID)
+    local hidden = collectSettings.hiddenIcons
+    if seenScratch[spellID] or (hidden and hidden[hideKey]) then return end
+    local info = C_Spell.GetSpellInfo(spellID)
+    if not info then return end
+    local charges = C_Spell.GetSpellCharges(spellID)
+    local entry = AcquireEntry()
+    entry.id = spellID
+    entry.icon = info.iconID
+    entry.iconType = "spell"
+    entry.hiddenKey = hideKey
+    entry.hasCharges = charges ~= nil and (charges.maxCharges or 0) > 1
+    if entry.hasCharges then entry.cnt = C_Spell.GetSpellDisplayCount(spellID) end
+    Collect(entry)
+end
+
+local function CollectCustom(stored)
+    local settings = collectSettings
+    local hidden = settings.hiddenIcons
+    local entryID, isItem, isExplicitSpell = IconEngine.ExtractSpellItemID(stored)
+    if not entryID or (hidden and hidden[entryID]) then return end
+    local iconType, itemID = IconEngine.ClassifyAsSpellOrItem(entryID, isItem, nil, isExplicitSpell)
+    if iconType == "spell" then
+        if seenScratch[entryID] then return end
+        if BUI.CDM.IsRacialSpell(entryID) and not C_SpellBook.IsSpellKnown(entryID) then return end
+        local info = C_Spell.GetSpellInfo(entryID)
+        if not info then return end
+        local charges = C_Spell.GetSpellCharges(entryID)
+        local entry = AcquireEntry()
+        entry.id = entryID
+        entry.icon = info.iconID
+        entry.iconType = "spell"
+        entry.hasCharges = charges ~= nil and (charges.maxCharges or 0) > 1
+        if entry.hasCharges then entry.cnt = C_Spell.GetSpellDisplayCount(entryID) end
+        Collect(entry)
+    elseif iconType == "trinket" then
+        local checkID = itemID or entryID
+        if seenScratch[checkID] then return end
+        local entry = AcquireEntry()
+        entry.id = checkID
+        entry.itemID = checkID
+        entry.icon = C_Item.GetItemIconByID(checkID) or 134400
+        entry.iconType = "trinket"
+        Collect(entry)
+    elseif iconType == "consumable" then
+        local checkID = itemID or entryID
+        if seenScratch[checkID] then return end
+        local priority = BUI.CDM.GetPotionPrioFor(stored)
+        local bagCount, bestID = ConsumableCount(checkID, priority)
+        if (bagCount or 0) <= 0 then
+            if settings.hideWhenZero and settings.hideWhenZero[entryID] then return end
+            if settings.hideIfNotInBags and not IsEquippedItem(checkID) then return end
+        end
+        local entry = AcquireEntry()
+        entry.id = checkID
+        entry.itemID = checkID
+        entry.icon = C_Item.GetItemIconByID(bestID or checkID) or 134400
+        entry.iconType = "consumable"
+        entry.cnt = bagCount or 0
+        entry.prio = priority
+        Collect(entry)
+    end
+end
+
+local function CollectVisit(kind, value)
+    if kind == "slot" then
+        CollectSlot(value)
+    elseif kind == "racial" then
+        CollectRacial(value)
+    else
+        CollectCustom(value)
+    end
+end
 
 local function CollectItems(settings, outEntries)
     poolCursor = 0
     wipe(outEntries)
     wipe(seenScratch)
-    local count = 0
-    local hidden = settings.hiddenIcons
-    local seen = seenScratch
-
-    local blacklist = settings.trinketBlacklist
-    if settings.showTrinkets then
-        local usableOnly = settings.trinketsUsableOnly == true
-        for slotIndex = 1, #TRINKET_SLOTS do
-            local slot = TRINKET_SLOTS[slotIndex]
-            local itemID = GetInventoryItemID("player", slot)
-            local hideKey = "auto:slot:" .. slot
-            local slotHidden = hidden and hidden[hideKey]
-            local itemBlacklisted = blacklist and itemID and blacklist[itemID]
-
-            local passive = usableOnly and itemID and (C_Item.GetItemSpell(itemID) == nil)
-            if itemID and not slotHidden and not itemBlacklisted and not passive then
-                local entry = AcquireEntry()
-                entry.id = itemID
-                entry.itemID = itemID
-                entry.icon = GetInventoryItemTexture("player", slot)
-                entry.slot = slot
-                entry.iconType = "trinket"
-                entry.hiddenKey = hideKey
-                count = count + 1
-                outEntries[count] = entry
-                seen[itemID] = true
-            end
-        end
-    end
-
-    if settings.showRacials then
-        local racials = BUI.CDM.GetKnownRacialSpellIDs(racialScratch)
-        for racialIndex = 1, #racials do
-            local racialSpellID = racials[racialIndex]
-            local hideKey = "auto:racial:" .. racialSpellID
-            if not seen[racialSpellID] and not (hidden and hidden[hideKey]) then
-                local info = C_Spell.GetSpellInfo(racialSpellID)
-                if info then
-                    local charges = C_Spell.GetSpellCharges(racialSpellID)
-                    local entry = AcquireEntry()
-                    entry.id = racialSpellID
-                    entry.icon = info.iconID
-                    entry.iconType = "spell"
-                    entry.hiddenKey = hideKey
-                    entry.hasCharges = charges ~= nil and (charges.maxCharges or 0) > 1
-                    if entry.hasCharges then
-                        entry.cnt = C_Spell.GetSpellDisplayCount(racialSpellID)
-                    end
-                    count = count + 1
-                    outEntries[count] = entry
-                    seen[racialSpellID] = true
-                end
-            end
-        end
-    end
-
-    local customSpells = settings.customSpells
-    if customSpells then
-        for _, stored in ipairs(customSpells) do
-            local entryID, isItem, isExplicitSpell = IconEngine.ExtractSpellItemID(stored)
-            if entryID and not (hidden and hidden[entryID]) then
-                local iconType, itemID = IconEngine.ClassifyAsSpellOrItem(entryID, isItem, nil, isExplicitSpell)
-                if iconType == "spell" then
-                    local info = C_Spell.GetSpellInfo(entryID)
-                    local isUnusableRacial = BUI.CDM.IsRacialSpell(entryID)
-                        and not C_SpellBook.IsSpellKnown(entryID)
-                    if info and not seen[entryID] and not isUnusableRacial then
-                        local charges = C_Spell.GetSpellCharges(entryID)
-                        local entry = AcquireEntry()
-                        entry.id = entryID
-                        entry.icon = info.iconID
-                        entry.iconType = "spell"
-                        entry.hasCharges = charges ~= nil and (charges.maxCharges or 0) > 1
-                        if entry.hasCharges then
-                            entry.cnt = C_Spell.GetSpellDisplayCount(entryID)
-                        end
-                        count = count + 1
-                        outEntries[count] = entry
-                        seen[entryID] = true
-                    end
-                elseif iconType == "trinket" then
-                    local checkID = itemID or entryID
-                    if not seen[checkID] then
-                        local entry = AcquireEntry()
-                        entry.id = checkID
-                        entry.itemID = checkID
-                        entry.icon = C_Item.GetItemIconByID(checkID) or 134400
-                        entry.iconType = "trinket"
-                        count = count + 1
-                        outEntries[count] = entry
-                        seen[checkID] = true
-                    end
-                elseif iconType == "consumable" then
-                    local checkID = itemID or entryID
-                    if not seen[checkID] then
-                        local priority
-                        priority = BUI.CDM.GetPotionPrioFor(stored)
-                        local bagCount, bestID = ConsumableCount(checkID, priority)
-                        local empty = (bagCount or 0) <= 0
-                        local hideAtZero = settings.hideWhenZero and settings.hideWhenZero[entryID] and empty
-                        local hideNoBags = settings.hideIfNotInBags and empty and not IsEquippedItem(checkID)
-                        if not hideAtZero and not hideNoBags then
-                            local entry = AcquireEntry()
-                            entry.id = checkID
-                            entry.itemID = checkID
-                            entry.icon = C_Item.GetItemIconByID(bestID or checkID) or 134400
-                            entry.iconType = "consumable"
-                            entry.cnt = bagCount or 0
-                            entry.prio = priority
-                            count = count + 1
-                            outEntries[count] = entry
-                            seen[checkID] = true
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    return count
+    collectSettings, collectOut, collectCount = settings, outEntries, 0
+    CustomBars.ForEachIcon(settings, CollectVisit)
+    return collectCount
 end
 
 local positionConfig = {}
