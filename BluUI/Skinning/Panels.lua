@@ -52,14 +52,6 @@ local WINDOWS = {
 		frames = { 'PerksProgramFrame' },
 	},
 	{
-		id = 'catalogshop',
-		legacy = 'shop',
-		name = 'In-Game Shop',
-		description = 'The Blizzard shop browser.',
-		icon = 'Interface/Icons/INV_Misc_Coin_02',
-		frames = { 'CatalogShopFrame' },
-	},
-	{
 		id = 'pvpmatch',
 		name = 'PvP Scoreboard',
 		description = 'The end-of-match results window and the in-match scoreboard.',
