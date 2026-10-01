@@ -130,10 +130,17 @@ function GroupFrames.SpawnParty()
 		"oUF-initialConfigFunction", GroupFrames.ConfigSnippet(partySettings.width, partySettings.height)
 	)
 	GroupFrames.SetHeaderVisibility(header, VisibilityFor(partySettings))
-	PositionHeader(header, partySettings)
 	GroupFrames.headers.party = header
+	GroupFrames.RefreshPartyAnchor()
 	GroupFrames.ApplyPartyRaidMode()
 	GroupFrames.PrecreateParty()
+end
+
+function GroupFrames.RefreshPartyAnchor()
+	local header = GroupFrames.headers.party
+	if not header or InCombatLockdown() then return end
+	WatchAnchorTarget(PositionHeader(header, GroupFrames.GetDB().party))
+	SyncAnchorWidth()
 end
 
 function GroupFrames.SetPartyEnabled(enabled)
