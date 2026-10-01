@@ -504,8 +504,8 @@ local function CreateItemHeader(parent)
 	slotLabel:SetTextColor(0.5, 0.5, 0.5)
 	row.slotText = slotLabel
 
-	row:SetScript('OnEnter', HeaderEnter)
-	row:SetScript('OnLeave', HeaderLeave)
+	row:SetScript('OnEnter', BUI.Profiler.Script('GemCounter.GemCounter row OnEnter', HeaderEnter))
+	row:SetScript('OnLeave', BUI.Profiler.Script('GemCounter.GemCounter row OnLeave', HeaderLeave))
 	return row
 end
 
@@ -529,9 +529,9 @@ local function CreateSocketRow(parent)
 	nameLabel:SetWordWrap(false)
 	row.nameText = nameLabel
 
-	row:SetScript('OnEnter', SocketEnter)
-	row:SetScript('OnLeave', SocketLeave)
-	row:SetScript('OnClick', SocketClick)
+	row:SetScript('OnEnter', BUI.Profiler.Script('GemCounter.GemCounter row OnEnter 2', SocketEnter))
+	row:SetScript('OnLeave', BUI.Profiler.Script('GemCounter.GemCounter row OnLeave 2', SocketLeave))
+	row:SetScript('OnClick', BUI.Profiler.Script('GemCounter.GemCounter row OnClick', SocketClick))
 	return row
 end
 
@@ -562,12 +562,12 @@ local function CreateGemRow(parent)
 
 	nameLabel:SetPoint('RIGHT', countText, 'LEFT', Pixel.Scale(-4), 0)
 
-	row:SetScript('OnEnter', GemEnter)
-	row:SetScript('OnLeave', GemLeave)
-	row:SetScript('OnClick', GemClick)
+	row:SetScript('OnEnter', BUI.Profiler.Script('GemCounter.GemCounter row OnEnter 3', GemEnter))
+	row:SetScript('OnLeave', BUI.Profiler.Script('GemCounter.GemCounter row OnLeave 3', GemLeave))
+	row:SetScript('OnClick', BUI.Profiler.Script('GemCounter.GemCounter row OnClick 2', GemClick))
 	row:RegisterForDrag('LeftButton')
-	row:SetScript('OnDragStart', GemDragStart)
-	row:SetScript('OnDragStop', StopGemDrag)
+	row:SetScript('OnDragStart', BUI.Profiler.Script('GemCounter.GemCounter row OnDragStart', GemDragStart))
+	row:SetScript('OnDragStop', BUI.Profiler.Script('GemCounter.GemCounter row OnDragStop', StopGemDrag))
 	return row
 end
 
@@ -588,8 +588,8 @@ local function CreateGemIcon(parent)
 	frame.count = countText
 
 	frame:EnableMouse(true)
-	frame:SetScript('OnEnter', StripIconEnter)
-	frame:SetScript('OnLeave', Widget.HideTip)
+	frame:SetScript('OnEnter', BUI.Profiler.Script('GemCounter.GemCounter frame OnEnter', StripIconEnter))
+	frame:SetScript('OnLeave', BUI.Profiler.Script('GemCounter.GemCounter frame OnLeave', Widget.HideTip))
 	return frame
 end
 
@@ -959,17 +959,17 @@ local function BuildFallbackButton()
 	iconTexture:SnapPoint('TOPLEFT', 3, -3)
 	iconTexture:SnapPoint('BOTTOMRIGHT', -3, 3)
 
-	fallbackButton:SetScript('OnEnter', function(self)
+	fallbackButton:SetScript('OnEnter', BUI.Profiler.Script('GemCounter.GemCounter fallbackButton OnEnter', function(self)
 		self:SetBackdropBorderColor(Colors.GetAccent())
 		GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 		GameTooltip:SetText('Gem Manager', 1, 1, 1)
 		GameTooltip:Show()
-	end)
-	fallbackButton:SetScript('OnLeave', function(self)
+	end))
+	fallbackButton:SetScript('OnLeave', BUI.Profiler.Script('GemCounter.GemCounter fallbackButton OnLeave', function(self)
 		self:SetBackdropBorderColor(0.2, 0.2, 0.22, 1)
 		GameTooltip:Hide()
-	end)
-	fallbackButton:SetScript('OnClick', BUI.GemCounter.Toggle)
+	end))
+	fallbackButton:SetScript('OnClick', BUI.Profiler.Script('GemCounter.GemCounter fallbackButton OnClick', BUI.GemCounter.Toggle))
 end
 
 local function OnInventoryChanged()

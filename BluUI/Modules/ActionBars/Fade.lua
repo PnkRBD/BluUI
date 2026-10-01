@@ -161,8 +161,8 @@ local function HookHoverFrame(frame, bar)
 	frame._buiFadeBar = bar
 	if frame._buiFadeHooked then return end
 	frame._buiFadeHooked = true
-	frame:HookScript('OnEnter', OnFrameEnter)
-	frame:HookScript('OnLeave', OnFrameLeave)
+	frame:HookScript('OnEnter', BUI.Profiler.Wrap('ActionBars.Fade frame OnEnter', OnFrameEnter))
+	frame:HookScript('OnLeave', BUI.Profiler.Wrap('ActionBars.Fade frame OnLeave', OnFrameLeave))
 end
 
 function ActionBars.HookFadeFrames(bar, frames)
@@ -175,8 +175,8 @@ end
 local function HookFlyoutButton(button)
 	if button._buiFadeHooked then return end
 	button._buiFadeHooked = true
-	button:HookScript('OnEnter', OnFlyoutButtonEnter)
-	button:HookScript('OnLeave', OnFlyoutButtonLeave)
+	button:HookScript('OnEnter', BUI.Profiler.Wrap('ActionBars.Fade button OnEnter', OnFlyoutButtonEnter))
+	button:HookScript('OnLeave', BUI.Profiler.Wrap('ActionBars.Fade button OnLeave', OnFlyoutButtonLeave))
 	local handler = LibActionButton.flyoutHandler
 	if handler and not handler._buiFadeHooked then
 		handler._buiFadeHooked = true

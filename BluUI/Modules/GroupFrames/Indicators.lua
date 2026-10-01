@@ -283,14 +283,14 @@ function GroupFrames.BuildSelection(frame, unit)
 	selection:Hide()
 	frame.Selection = selection
 
-	frame:HookScript("OnEnter", function(self)
+	frame:HookScript("OnEnter", BUI.Profiler.Wrap('GroupFrames.Indicators frame OnEnter', function(self)
 		self._isMouseover = true
 		UpdateSelection(self)
-	end)
-	frame:HookScript("OnLeave", function(self)
+	end))
+	frame:HookScript("OnLeave", BUI.Profiler.Wrap('GroupFrames.Indicators frame OnLeave', function(self)
 		self._isMouseover = false
 		UpdateSelection(self)
-	end)
+	end))
 end
 
 GroupFrames.RefreshSelection = UpdateSelection

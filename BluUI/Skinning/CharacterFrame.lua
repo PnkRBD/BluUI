@@ -434,17 +434,17 @@ local function StyleSlotButton(button)
         icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     end
 
-    button:HookScript('OnEnter', function(self)
+    button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.CharacterFrame button OnEnter 2', function(self)
         self:SetBackdropBorderColor(Colors.GetAccent())
-    end)
-    button:HookScript('OnLeave', function(self)
+    end))
+    button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.CharacterFrame button OnLeave 2', function(self)
         local color = self._buiQualityColor
         if color then
             self:SetBackdropBorderColor(color[1], color[2], color[3], 1)
         else
             self:SetBackdropBorderColor(IDLE_BORDER[1], IDLE_BORDER[2], IDLE_BORDER[3], 1)
         end
-    end)
+    end))
 end
 
 local function CreateGemFrame(button)
@@ -457,13 +457,13 @@ local function CreateGemFrame(button)
     gem.icon:SetPoint('TOPLEFT', 1, -1)
     gem.icon:SetPoint('BOTTOMRIGHT', -1, 1)
     gem:EnableMouse(true)
-    gem:SetScript('OnEnter', function(self)
+    gem:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame gem OnEnter', function(self)
         if not self.link then return end
         GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
         GameTooltip:SetHyperlink(self.link)
         GameTooltip:Show()
-    end)
-    gem:SetScript('OnLeave', function() GameTooltip:Hide() end)
+    end))
+    gem:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame gem OnLeave', function() GameTooltip:Hide() end))
     gem:Hide()
     return gem
 end
@@ -642,15 +642,15 @@ local function BagPopupCell(index)
     Pixel.ApplyFont(cell.level, LIST_SIZE, FONT, 'OUTLINE')
     cell.level:SetPoint('BOTTOMRIGHT', Pixel.Scale(-3), Pixel.Scale(2))
     cell.level:SetTextColor(1, 1, 1, 1)
-    cell:SetScript('OnEnter', function(self)
+    cell:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame cell OnEnter', function(self)
         self.hover:Show()
         if not self.entry then return end
         GameTooltip:SetOwner(self, self.tipAnchor or 'ANCHOR_RIGHT')
         GameTooltip:SetHyperlink(self.entry.link)
         GameTooltip:Show()
-    end)
-    cell:SetScript('OnLeave', function(self) self.hover:Hide(); GameTooltip:Hide() end)
-    cell:SetScript('OnClick', function(self) EquipBagItem(self.entry, self.slotName) end)
+    end))
+    cell:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame cell OnLeave', function(self) self.hover:Hide(); GameTooltip:Hide() end))
+    cell:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame cell OnClick', function(self) EquipBagItem(self.entry, self.slotName) end))
     bagPopup.rows[index] = cell
     return cell
 end
@@ -750,7 +750,7 @@ local function BuildSlotLabels(button, info)
     labels.enchantHover:SetSize(Pixel.Scale(ENCHANT_NAME_W), Pixel.Scale(14))
     labels.enchantHover:SetPoint(inner, button, outer, gapX, -lineY)
     labels.enchantHover:EnableMouse(true)
-    labels.enchantHover:SetScript('OnEnter', function(self)
+    labels.enchantHover:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame enchantHover OnEnter', function(self)
         GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
         if self.slot and GetInventoryItemLink('player', self.slot) then
             GameTooltip:SetInventoryItem('player', self.slot)
@@ -761,8 +761,8 @@ local function BuildSlotLabels(button, info)
             return
         end
         GameTooltip:Show()
-    end)
-    labels.enchantHover:SetScript('OnLeave', function() GameTooltip:Hide() end)
+    end))
+    labels.enchantHover:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame enchantHover OnLeave', function() GameTooltip:Hide() end))
     labels.enchantHover:Hide()
 
     labels.bagArrow = CreateFrame('Button', nil, overlay)
@@ -783,14 +783,14 @@ local function BuildSlotLabels(button, info)
     arrow:SetVertexColor(accentRed, accentGreen, accentBlue, 1)
     labels.bagArrow.arrow = arrow
     labels.bagArrow.plate = arrowBg
-    labels.bagArrow:SetScript('OnEnter', function(self)
+    labels.bagArrow:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame bagArrow OnEnter', function(self)
         GameTooltip:SetOwner(self, popupSide == 'RIGHT' and 'ANCHOR_RIGHT' or 'ANCHOR_LEFT')
         GameTooltip:SetText((self.count or 0) > 0 and string.format('%d in bags for this slot', self.count) or 'Nothing in bags for this slot', 1, 1, 1)
         if (self.count or 0) > 0 then GameTooltip:AddLine('Click to pick one to equip.', 0.7, 0.7, 0.7) end
         GameTooltip:Show()
-    end)
-    labels.bagArrow:SetScript('OnLeave', function() GameTooltip:Hide() end)
-    labels.bagArrow:SetScript('OnClick', function() ToggleBagPopup(labels) end)
+    end))
+    labels.bagArrow:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame bagArrow OnLeave', function() GameTooltip:Hide() end))
+    labels.bagArrow:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame bagArrow OnClick', function() ToggleBagPopup(labels) end))
     labels.bagArrow:Hide()
 
     local contextOverlay = button.ItemContextOverlay
@@ -1248,16 +1248,16 @@ local function CreateStatRow(parent)
         end
     end)
 
-    row:SetScript('OnEnter', function(self)
+    row:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame row OnEnter', function(self)
         self.detailed = IsControlKeyDown() and true or false
         BuildTooltip(self)
         if self.stat and self.stat.ratingID then self:SetScript('OnUpdate', WatchModifier) end
-    end)
+    end))
 
-    row:SetScript('OnLeave', function(self)
+    row:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame row OnLeave', function(self)
         self:SetScript('OnUpdate', nil)
         GameTooltip:Hide()
-    end)
+    end))
     return row
 end
 
@@ -1300,10 +1300,10 @@ local function BuildSection(parent, definition)
     section.header = CreateSectionHeader(section.container, definition.title, SECTION_COLORS[definition.title])
     section.header:SetPoint('TOPLEFT')
     section.header:SetPoint('TOPRIGHT')
-    section.header:SetScript('OnClick', function()
+    section.header:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame header OnClick', function()
         section.collapsed = not section.collapsed
         LayoutSections()
-    end)
+    end))
     return section
 end
 
@@ -1374,8 +1374,8 @@ local function CreateListRow(parent, width)
     row.text:SetJustifyH('LEFT')
     row.text:SetWordWrap(false)
     row.text:SetTextColor(1, 1, 1, 1)
-    row:SetScript('OnEnter', function(self) self.hover:Show() end)
-    row:SetScript('OnLeave', function(self) self.hover:Hide() end)
+    row:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame row OnEnter 2', function(self) self.hover:Show() end))
+    row:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame row OnLeave 2', function(self) self.hover:Hide() end))
     return row
 end
 
@@ -1408,9 +1408,9 @@ local function CreateTab(parent, label, onClick)
     tab.underline:SetPoint('BOTTOMLEFT', Pixel.Scale(6), 0)
     tab.underline:SetPoint('BOTTOMRIGHT', Pixel.Scale(-6), 0)
     tab.underline:Hide()
-    tab:SetScript('OnEnter', function(self) if not self.active then self.text:SetTextColor(1, 1, 1, 1) end end)
-    tab:SetScript('OnLeave', function(self) if not self.active then self.text:SetTextColor(1, 1, 1, 0.6) end end)
-    tab:SetScript('OnClick', onClick)
+    tab:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame tab OnEnter', function(self) if not self.active then self.text:SetTextColor(1, 1, 1, 1) end end))
+    tab:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame tab OnLeave', function(self) if not self.active then self.text:SetTextColor(1, 1, 1, 0.6) end end))
+    tab:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame tab OnClick', onClick))
     return tab
 end
 
@@ -1464,12 +1464,12 @@ local function BuildTitlesPane(parent)
     hint:SetPoint('LEFT', Pixel.Scale(6), 0)
     hint:SetText('Search titles')
     hint:SetTextColor(0.6, 0.6, 0.6, 0.7)
-    search:SetScript('OnEscapePressed', function(self) self:SetText(''); self:ClearFocus() end)
-    search:SetScript('OnEnterPressed', function(self) self:ClearFocus() end)
-    search:SetScript('OnTextChanged', function(self)
+    search:SetScript('OnEscapePressed', BUI.Profiler.Script('Skin.CharacterFrame search OnEscapePressed', function(self) self:SetText(''); self:ClearFocus() end))
+    search:SetScript('OnEnterPressed', BUI.Profiler.Script('Skin.CharacterFrame search OnEnterPressed', function(self) self:ClearFocus() end))
+    search:SetScript('OnTextChanged', BUI.Profiler.Script('Skin.CharacterFrame search OnTextChanged', function(self)
         hint:SetShown(self:GetText() == '')
         RefreshTitles()
-    end)
+    end))
     pane.search = search
 
     local rowWidth = STATS_W - SIDEBAR_INSET * 2 - SCROLLBAR_W - LIST_RIGHT_PAD
@@ -1511,10 +1511,10 @@ RefreshTitles = function()
             local row = pane.rows[visible]
             if not row then
                 row = CreateListRow(pane.scroll.child, pane.rowWidth)
-                row:SetScript('OnClick', function(self)
+                row:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame row OnClick', function(self)
                     SetCurrentTitle(self.titleIndex)
                     for _, other in ipairs(pane.rows) do SetRowSelected(other, other.titleIndex == self.titleIndex) end
-                end)
+                end))
                 pane.rows[visible] = row
             end
             row.titleIndex = entry.index
@@ -1698,14 +1698,14 @@ function SET.CreateCell(parent)
     cell.icon:SetPoint('TOPLEFT', 1, -1)
     cell.icon:SetPoint('BOTTOMRIGHT', -1, 1)
     cell.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    cell:SetScript('OnEnter', function(self)
+    cell:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame cell OnEnter 2', function(self)
         if not self.itemID then return end
         GameTooltip:SetOwner(self, 'ANCHOR_LEFT')
         GameTooltip:SetItemByID(self.itemID)
         if self.missing then GameTooltip:AddLine('Not in your bags', 1, 0.4, 0.4) end
         GameTooltip:Show()
-    end)
-    cell:SetScript('OnLeave', function() GameTooltip:Hide() end)
+    end))
+    cell:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame cell OnLeave 2', function() GameTooltip:Hide() end))
     return cell
 end
 
@@ -1741,13 +1741,13 @@ function SET.CreateRow(pane)
     row.status:SetWordWrap(false)
 
     row:RegisterForClicks('LeftButtonUp', 'RightButtonUp')
-    row:SetScript('OnClick', function(self, mouseButton)
+    row:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame row OnClick 2', function(self, mouseButton)
         selectedSetID = self.setID
         RefreshSets()
         if mouseButton == 'RightButton' then ShowSetMenu(self) end
-    end)
-    row:SetScript('OnDoubleClick', function(self) EquipSet(self.setID) end)
-    row:SetScript('OnEnter', function(self)
+    end))
+    row:SetScript('OnDoubleClick', BUI.Profiler.Script('Skin.CharacterFrame row OnDoubleClick', function(self) EquipSet(self.setID) end))
+    row:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame row OnEnter 3', function(self)
         self.hover:Show()
         local missing = MissingSetItems(self.setID)
         GameTooltip:SetOwner(self, 'ANCHOR_LEFT')
@@ -1761,8 +1761,8 @@ function SET.CreateRow(pane)
         GameTooltip:AddLine(' ')
         GameTooltip:AddLine('Double-click to equip, right-click for spec binding.', 0.6, 0.6, 0.6)
         GameTooltip:Show()
-    end)
-    row:SetScript('OnLeave', function(self) self.hover:Hide(); GameTooltip:Hide() end)
+    end))
+    row:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame row OnLeave 3', function(self) self.hover:Hide(); GameTooltip:Hide() end))
     return row
 end
 
@@ -1979,7 +1979,7 @@ local function BuildStatsPane(parent)
     local ilvlHit = CreateFrame('Button', nil, pane)
     ilvlHit:SetPoint('TOPLEFT', pane.ilvl, 'TOPLEFT', 0, 0)
     ilvlHit:SetPoint('BOTTOMRIGHT', pane.ilvl, 'BOTTOMRIGHT', 0, 0)
-    ilvlHit:SetScript('OnEnter', function(self)
+    ilvlHit:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame ilvlHit OnEnter', function(self)
         local info = pane.ilvlInfo
         local rows = {
             { left = 'Equipped', right = ('%.2f'):format(info.equipped), rightColor = { 1, 1, 1 } },
@@ -1987,8 +1987,8 @@ local function BuildStatsPane(parent)
         }
         if info.pvp > 0 then rows[#rows + 1] = { left = 'PvP', right = ('%.2f'):format(info.pvp), rightColor = { 0, 0.8, 0.4 } } end
         Widget.ShowTipRows(self, 'Item Level', rows, { anchor = 'BOTTOM' })
-    end)
-    ilvlHit:SetScript('OnLeave', function() Widget.HideTip() end)
+    end))
+    ilvlHit:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame ilvlHit OnLeave', function() Widget.HideTip() end))
     pane.ilvlHit = ilvlHit
 
     pane.score = pane:CreateFontString(nil, 'OVERLAY')
@@ -2018,15 +2018,15 @@ local function BuildStatsPane(parent)
     lootSpec.text:SetJustifyH('RIGHT')
     lootSpec.text:SetPoint('TOPRIGHT')
     lootSpec.text:SetTextColor(INFO_COLOR[1], INFO_COLOR[2], INFO_COLOR[3], 1)
-    lootSpec:SetScript('OnClick', function(self) LootSpec.OpenMenu(self) end)
-    lootSpec:SetScript('OnEnter', function(self)
+    lootSpec:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame lootSpec OnClick', function(self) LootSpec.OpenMenu(self) end))
+    lootSpec:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame lootSpec OnEnter', function(self)
         self.text:SetTextColor(1, 1, 1, 1)
         Widget.ShowTip(self, 'Click to change your loot specialization', { anchor = 'LEFT' })
-    end)
-    lootSpec:SetScript('OnLeave', function(self)
+    end))
+    lootSpec:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame lootSpec OnLeave', function(self)
         self.text:SetTextColor(INFO_COLOR[1], INFO_COLOR[2], INFO_COLOR[3], 1)
         Widget.HideTip()
-    end)
+    end))
     pane.lootSpec = lootSpec
 
     local headerHeight = TAB_ROW_HEIGHT + 8 + math.max(BIG_ILVL_SIZE, stackHeight) + 12
@@ -2147,17 +2147,17 @@ local function MakeToggleButton(parent, options)
         texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     end
 
-    button:SetScript('OnEnter', function(self)
+    button:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame button OnEnter', function(self)
         self:SetBackdropBorderColor(Colors.GetAccent())
         GameTooltip:SetOwner(self, 'ANCHOR_TOP')
         GameTooltip:SetText(options.title, 1, 1, 1)
         GameTooltip:Show()
-    end)
-    button:SetScript('OnLeave', function(self)
+    end))
+    button:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame button OnLeave', function(self)
         self:SetBackdropBorderColor(unpack(TOGGLE_BORDER))
         GameTooltip:Hide()
-    end)
-    button:SetScript('OnClick', options.onClick)
+    end))
+    button:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame button OnClick', options.onClick))
     return button
 end
 
@@ -2225,7 +2225,7 @@ local function BuildModel(parent)
     playerModel.facing = 0
     playerModel.scale = 1.0
 
-    playerModel:SetScript('OnMouseDown', function(self, button)
+    playerModel:SetScript('OnMouseDown', BUI.Profiler.Script('Skin.CharacterFrame playerModel OnMouseDown', function(self, button)
         if button == 'LeftButton' then
             self.dragStartX = GetCursorPosition()
             self.dragStartFacing = self.facing
@@ -2236,8 +2236,8 @@ local function BuildModel(parent)
             self:SetCamDistanceScale(1.0)
             self:SetPosition(0, 0, 0)
         end
-    end)
-    playerModel:SetScript('OnMouseUp', function(self) self.dragStartX = nil end)
+    end))
+    playerModel:SetScript('OnMouseUp', BUI.Profiler.Script('Skin.CharacterFrame playerModel OnMouseUp', function(self) self.dragStartX = nil end))
     playerModel:SetScript('OnHide', BUI.Profiler.Wrap('Skin.CharacterFrame model hide', function(self) self.dragStartX = nil end))
     playerModel:SetScript('OnUpdate', BUI.Profiler.Wrap('Skin.CharacterFrame model spin', function(self)
         if not self.dragStartX then return end
@@ -2245,12 +2245,12 @@ local function BuildModel(parent)
         self.facing = (self.dragStartFacing or 0) + (cursorX - self.dragStartX) / 60
         self:SetFacing(self.facing)
     end))
-    playerModel:SetScript('OnMouseWheel', function(self, delta)
+    playerModel:SetScript('OnMouseWheel', BUI.Profiler.Script('Skin.CharacterFrame playerModel OnMouseWheel', function(self, delta)
         local newScale = self.scale + (delta > 0 and -0.1 or 0.1)
         if newScale < 0.4 then newScale = 0.4 elseif newScale > 2.0 then newScale = 2.0 end
         self.scale = newScale
         self:SetCamDistanceScale(newScale)
-    end)
+    end))
     return playerModel
 end
 
@@ -2373,8 +2373,8 @@ local function BuildFrame()
     end
     frame:EnableMouse(true)
     frame:RegisterForDrag('LeftButton')
-    frame:SetScript('OnDragStart', BeginSheetDrag)
-    frame:SetScript('OnDragStop', EndSheetDrag)
+    frame:SetScript('OnDragStart', BUI.Profiler.Script('Skin.CharacterFrame frame OnDragStart', BeginSheetDrag))
+    frame:SetScript('OnDragStop', BUI.Profiler.Script('Skin.CharacterFrame frame OnDragStop', EndSheetDrag))
     frame:HookScript('OnHide', BUI.Profiler.Wrap('Skin.CharacterFrame sheet hide', function() if dragger:IsShown() then EndSheetDrag() end end))
     PaintAmbience(frame)
     ApplyBackground()
@@ -2387,8 +2387,8 @@ local function BuildFrame()
     end)
     titleBar:EnableMouse(true)
     titleBar:RegisterForDrag('LeftButton')
-    titleBar:SetScript('OnDragStart', BeginSheetDrag)
-    titleBar:SetScript('OnDragStop', EndSheetDrag)
+    titleBar:SetScript('OnDragStart', BUI.Profiler.Script('Skin.CharacterFrame titleBar OnDragStart', BeginSheetDrag))
+    titleBar:SetScript('OnDragStop', BUI.Profiler.Script('Skin.CharacterFrame titleBar OnDragStop', EndSheetDrag))
 
     frame.titleText:ClearAllPoints()
     frame.titleText:SetPoint('TOPLEFT', titleBar, 'TOPLEFT', Pixel.Scale(14), Pixel.Scale(-HEADER.TOP_PAD))

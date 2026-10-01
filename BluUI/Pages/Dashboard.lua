@@ -1280,14 +1280,14 @@ local function BuildDashboard(canvas)
         card:SetMovable(true)
         card:EnableMouse(true)
         card:RegisterForDrag("LeftButton")
-        card:SetScript("OnDragStart", function(self)
+        card:SetScript("OnDragStart", BUI.Profiler.Script('Pages.Dashboard card OnDragStart', function(self)
             if activeSlideIn then FinalizeSlideIn(activeSlideIn); activeSlideIn = nil end
             self:SetAlpha(0.7)
             self:Raise()
             self:StartMoving()
             self:SetScript("OnUpdate", ClampDuringDrag)
-        end)
-        card:SetScript("OnDragStop", function(self)
+        end))
+        card:SetScript("OnDragStop", BUI.Profiler.Script('Pages.Dashboard card OnDragStop', function(self)
             self:SetScript("OnUpdate", nil)
             self:StopMovingOrSizing()
             self:SetAlpha(1)
@@ -1305,7 +1305,7 @@ local function BuildDashboard(canvas)
             end
             MoveToSlot(self, slotForCard[self])
             SaveLayout()
-        end)
+        end))
     end
 
     local TOP_COLUMN_COUNT = 4
@@ -1374,14 +1374,14 @@ local function BuildDashboard(canvas)
         card:SetMovable(true)
         card:EnableMouse(true)
         card:RegisterForDrag("LeftButton")
-        card:SetScript("OnDragStart", function(self)
+        card:SetScript("OnDragStart", BUI.Profiler.Script('Pages.Dashboard card OnDragStart 2', function(self)
             if activeSlideIn then FinalizeSlideIn(activeSlideIn); activeSlideIn = nil end
             self:SetAlpha(0.7)
             self:Raise()
             self:StartMoving()
             self:SetScript("OnUpdate", ClampDuringDrag)
-        end)
-        card:SetScript("OnDragStop", function(self)
+        end))
+        card:SetScript("OnDragStop", BUI.Profiler.Script('Pages.Dashboard card OnDragStop 2', function(self)
             self:SetScript("OnUpdate", nil)
             self:StopMovingOrSizing()
             self:SetAlpha(1)
@@ -1395,7 +1395,7 @@ local function BuildDashboard(canvas)
                 if occupant and occupant ~= entry then savedColumns[occupant.id] = fromColumn end
             end
             PlaceTopBand()
-        end)
+        end))
     end
 
     local function BuildTile(cardID, defaultColumn, options)
@@ -1453,7 +1453,7 @@ local function BuildDashboard(canvas)
     end)
     RefreshWeeklyMplus()
 
-    weeklyTile:HookScript("OnEnter", function(self)
+    weeklyTile:HookScript("OnEnter", BUI.Profiler.Wrap('Pages.Dashboard weeklyTile OnEnter', function(self)
         local rows = {}
         for _, entry in ipairs(WeeklyMplusHistoryEntries()) do
             rows[#rows + 1] = { left = entry.label, right = tostring(entry.count) }
@@ -1464,8 +1464,8 @@ local function BuildDashboard(canvas)
             rows[#rows + 1] = { left = "This season", right = tostring(#seasonRuns), rightColor = { 1, 0.82, 0 } }
         end
         BUILib.Widget.ShowTipRows(self, "Weekly M+ Runs", rows, { anchor = "RIGHT" })
-    end)
-    weeklyTile:HookScript("OnLeave", function() BUILib.Widget.HideTip() end)
+    end))
+    weeklyTile:HookScript("OnLeave", BUI.Profiler.Wrap('Pages.Dashboard weeklyTile OnLeave', function() BUILib.Widget.HideTip() end))
 
     local function RefreshTiles()
         for _, refresher in ipairs(tileRefreshers) do refresher.fs:SetText(refresher.fn()) end
@@ -2009,7 +2009,7 @@ local function BuildDashboard(canvas)
             x = x + buttonFrame:GetWidth() + gap
         end
     end
-    cogButton:SetScript("OnClick", OpenLayoutSettings)
+    cogButton:SetScript("OnClick", BUI.Profiler.Script('Pages.Dashboard cogButton OnClick', OpenLayoutSettings))
 
     ApplyCardVisibility()
     return dashboard

@@ -620,14 +620,14 @@ local function ApplySecureClicks(frame)
 end
 
 local function HookTooltip(frame)
-	frame:HookScript("OnEnter", function(self)
+	frame:HookScript("OnEnter", BUI.Profiler.Wrap('GroupFrames.Style frame OnEnter', function(self)
 		local settings = GroupFrames.SettingsForFrame(self)
 		if not settings.showUnitTooltips or not self.unit or not UnitExists(self.unit) then return end
 		if GetMouseFoci()[1] ~= self then return end
 		GameTooltip_SetDefaultAnchor(GameTooltip, self)
 		GameTooltip:SetUnit(self.unit)
-	end)
-	frame:HookScript("OnLeave", function() GameTooltip:Hide() end)
+	end))
+	frame:HookScript("OnLeave", BUI.Profiler.Wrap('GroupFrames.Style frame OnLeave', function() GameTooltip:Hide() end))
 end
 
 local function GroupFrameStyle(frame, unit)
@@ -671,5 +671,5 @@ end
 
 BUI.oUF:RegisterInitCallback(function(frame)
 	if frame.style ~= GroupFrames.STYLE_NAME then return end
-	frame:HookScript("OnAttributeChanged", OnAttributeChanged)
+	frame:HookScript("OnAttributeChanged", BUI.Profiler.Wrap('GroupFrames.Style frame OnAttributeChanged', OnAttributeChanged))
 end)

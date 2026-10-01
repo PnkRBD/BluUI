@@ -111,10 +111,10 @@ function CDM.ShowBuffsPreview(buffsSettings)
     previewFrame:RegisterForDrag("LeftButton")
     previewFrame:SetClampedToScreen(true)
 
-    previewFrame:SetScript("OnDragStart", function(self)
+    previewFrame:SetScript("OnDragStart", BUI.Profiler.Script('CDM.Preview previewFrame OnDragStart', function(self)
         if not self._anchorLocked then self:StartMoving() end
-    end)
-    previewFrame:SetScript("OnDragStop", function(self)
+    end))
+    previewFrame:SetScript("OnDragStop", BUI.Profiler.Script('CDM.Preview previewFrame OnDragStop', function(self)
         self:StopMovingOrSizing()
         if self._anchorLocked then return end
         local centerX, centerY = self:GetCenter()
@@ -126,14 +126,14 @@ function CDM.ShowBuffsPreview(buffsSettings)
         end
         db.positionY = y
         CDM.RefreshAll()
-    end)
+    end))
 
-    previewFrame:SetScript("OnMouseUp", function(self, mouseButton)
+    previewFrame:SetScript("OnMouseUp", BUI.Profiler.Script('CDM.Preview previewFrame OnMouseUp', function(self, mouseButton)
         if mouseButton == "RightButton" then
             self:Hide()
             if state.buffsPreviewButton then state.buffsPreviewButton:SetText("Show Preview") end
         end
-    end)
+    end))
 
     local title = previewFrame:CreateFontString(nil, "OVERLAY")
     Pixel.ApplyFont(title, 11, BUI.GetGlobalFont())

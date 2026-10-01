@@ -302,7 +302,7 @@ function Menu.Setup()
 	BuildMenu()
 	local minimap = _G.Minimap
 	local originalOnMouseUp = minimap:GetScript('OnMouseUp')
-	minimap:SetScript('OnMouseUp', function(self, button, ...)
+	minimap:SetScript('OnMouseUp', BUI.Profiler.Script('Minimap.Menu minimap OnMouseUp', function(self, button, ...)
 		if button == 'RightButton' then
 			Menu.Show()
 		elseif button == 'MiddleButton' then
@@ -310,5 +310,5 @@ function Menu.Setup()
 		elseif originalOnMouseUp then
 			originalOnMouseUp(self, button, ...)
 		end
-	end)
+	end))
 end

@@ -280,9 +280,9 @@ local function ShowChooser(importData, currentDB, onConfirm, onCancel)
 		label:SetPoint('LEFT')
 		button:SetWidth(label:GetStringWidth() + 4)
 		button:SetPoint('LEFT', selectionRow, 'LEFT', xOffset, 0)
-		button:SetScript('OnEnter', function() label:SetTextColor(1, 1, 1, 1) end)
-		button:SetScript('OnLeave', function() label:SetTextColor(accentRed, accentGreen, accentBlue, 1) end)
-		button:SetScript('OnClick', onClick)
+		button:SetScript('OnEnter', BUI.Profiler.Script('ImportChooser button OnEnter', function() label:SetTextColor(1, 1, 1, 1) end))
+		button:SetScript('OnLeave', BUI.Profiler.Script('ImportChooser button OnLeave', function() label:SetTextColor(accentRed, accentGreen, accentBlue, 1) end))
+		button:SetScript('OnClick', BUI.Profiler.Script('ImportChooser button OnClick', onClick))
 		return button
 	end
 
@@ -328,14 +328,14 @@ local function ShowChooser(importData, currentDB, onConfirm, onCancel)
 				badge:SetTextColor(1, 0.8, 0.2, 1)
 
 				if changedKeys and #changedKeys > 0 then
-					frame:SetScript('OnEnter', function(self)
+					frame:SetScript('OnEnter', BUI.Profiler.Script('ImportChooser frame OnEnter', function(self)
 						GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
 						GameTooltip:AddLine(section.name .. ' changes', 1, 0.8, 0.2)
 						for _, changedKey in ipairs(changedKeys) do
 							GameTooltip:AddLine('  ' .. changedKey, 0.8, 0.8, 0.8)
 						end
 						GameTooltip:Show()
-					end)
+					end))
 					frame:SetScript('OnLeave', GameTooltip_Hide)
 				end
 			else

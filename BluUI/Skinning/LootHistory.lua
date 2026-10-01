@@ -136,8 +136,8 @@ local function SkinClose(frame)
 	glyph:SetSize(12, 12)
 	glyph:SetPoint('CENTER', close, 'CENTER', 0, 0)
 	glyph:SetVertexColor(0.75, 0.75, 0.8, 1)
-	close:HookScript('OnEnter', function() glyph:SetVertexColor(1, 1, 1, 1) end)
-	close:HookScript('OnLeave', function() glyph:SetVertexColor(0.75, 0.75, 0.8, 1) end)
+	close:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.LootHistory close OnEnter', function() glyph:SetVertexColor(1, 1, 1, 1) end))
+	close:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.LootHistory close OnLeave', function() glyph:SetVertexColor(0.75, 0.75, 0.8, 1) end))
 end
 
 local function SkinDropdown(dropdown)

@@ -429,8 +429,8 @@ local function OnHandleMouseUp(handle, button)
 end
 
 local function InstallHandleHooks(handle)
-	if handle:HasScript('OnMouseDown') then handle:HookScript('OnMouseDown', OnHandleMouseDown) end
-	if handle:HasScript('OnMouseUp') then handle:HookScript('OnMouseUp', OnHandleMouseUp) end
+	if handle:HasScript('OnMouseDown') then handle:HookScript('OnMouseDown', BUI.Profiler.Wrap('MoveFrames.MoveFrames handle OnMouseDown', OnHandleMouseDown)) end
+	if handle:HasScript('OnMouseUp') then handle:HookScript('OnMouseUp', BUI.Profiler.Wrap('MoveFrames.MoveFrames handle OnMouseUp', OnHandleMouseUp)) end
 end
 
 local function HookFrame(path, rootPath)
@@ -459,9 +459,9 @@ local function HookFrame(path, rootPath)
 		if scriptName ~= 'OnMouseDown' and scriptName ~= 'OnMouseUp' then return end
 		rehooking = true
 		if scriptName == 'OnMouseDown' then
-			handle:HookScript('OnMouseDown', OnHandleMouseDown)
+			handle:HookScript('OnMouseDown', BUI.Profiler.Wrap('MoveFrames.MoveFrames handle OnMouseDown 2', OnHandleMouseDown))
 		else
-			handle:HookScript('OnMouseUp', OnHandleMouseUp)
+			handle:HookScript('OnMouseUp', BUI.Profiler.Wrap('MoveFrames.MoveFrames handle OnMouseUp 2', OnHandleMouseUp))
 		end
 		rehooking = false
 	end)
