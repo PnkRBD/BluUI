@@ -148,8 +148,8 @@ local function Build(frame)
 	local right = frame.RightFeature
 	FrameCircle(frame, right)
 	local questButton = right.StartQuestButton
-	questButton:HookScript('OnEnter', RefreshQuestButtonText)
-	questButton:HookScript('OnLeave', RefreshQuestButtonText)
+	questButton:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.SplashFrame questButton OnEnter', RefreshQuestButtonText))
+	questButton:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.SplashFrame questButton OnLeave', RefreshQuestButtonText))
 end
 
 local function SkinFrame(frame)

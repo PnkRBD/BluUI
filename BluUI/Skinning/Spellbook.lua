@@ -183,10 +183,10 @@ local function SkinSpellBook(book)
 	if book._buiSweepHooked then return end
 	book._buiSweepHooked = true
 	if book.SetTab then Hook(book, 'SetTab', QueuePageSweep) end
-	book:HookScript('OnShow', QueuePageSweep)
-	if paged then paged:HookScript('OnMouseWheel', QueuePageSweep) end
-	if paging and paging.PrevPageButton then paging.PrevPageButton:HookScript('OnClick', QueuePageSweep) end
-	if paging and paging.NextPageButton then paging.NextPageButton:HookScript('OnClick', QueuePageSweep) end
+	book:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Spellbook book OnShow', QueuePageSweep))
+	if paged then paged:HookScript('OnMouseWheel', BUI.Profiler.Wrap('Skin.Spellbook paged OnMouseWheel', QueuePageSweep)) end
+	if paging and paging.PrevPageButton then paging.PrevPageButton:HookScript('OnClick', BUI.Profiler.Wrap('Skin.Spellbook PrevPageButton OnClick', QueuePageSweep)) end
+	if paging and paging.NextPageButton then paging.NextPageButton:HookScript('OnClick', BUI.Profiler.Wrap('Skin.Spellbook NextPageButton OnClick', QueuePageSweep)) end
 end
 
 local function SkinCurrencyDisplay(display)

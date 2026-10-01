@@ -251,17 +251,17 @@ local function CreateRow(parent, index)
     name:SetWordWrap(false)
     row.nameText = name
 
-    row:SetScript('OnEnter', function(self)
+    row:SetScript('OnEnter', BUI.Profiler.Script('PortalManager.PortalManager row OnEnter', function(self)
         self:SetBackdropBorderColor(Colors.GetAccent())
         GameTooltip:SetOwner(self, 'ANCHOR_NONE')
         GameTooltip:SetPoint('TOPRIGHT', self, 'TOPLEFT', -6, 0)
         GameTooltip:SetSpellByID(self._spellID)
         GameTooltip:Show()
-    end)
-    row:SetScript('OnLeave', function(self)
+    end))
+    row:SetScript('OnLeave', BUI.Profiler.Script('PortalManager.PortalManager row OnLeave', function(self)
         self:SetBackdropBorderColor(0.13, 0.13, 0.15, 1)
         GameTooltip:Hide()
-    end)
+    end))
     return row
 end
 

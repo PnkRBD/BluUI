@@ -356,7 +356,7 @@ local function EnsureOverlay(icon, key)
     overlay:SetFrameLevel(icon:GetFrameLevel() + 10)
     overlay:RegisterForClicks("AnyDown")
 
-    overlay:SetScript("OnMouseDown", function(self, button)
+    overlay:SetScript("OnMouseDown", BUI.Profiler.Script('CDM.Detached overlay OnMouseDown', function(self, button)
         if not IsIndividualMoveEnabled() then return end
         if InCombatLockdown() then return end
 
@@ -371,13 +371,13 @@ local function EnsureOverlay(icon, key)
                 CDM.SetUpdatePending(true)
             end
         end
-    end)
+    end))
 
     overlay:EnableMouseWheel(true)
-    overlay:SetScript("OnMouseWheel", function(_, delta)
+    overlay:SetScript("OnMouseWheel", BUI.Profiler.Script('CDM.Detached overlay OnMouseWheel', function(_, delta)
         if not IsControlKeyDown() then return end
         ResizeDetachedIcon(icon, key, delta)
-    end)
+    end))
 
     overlay:EnableMouse(true)
     if not iconFrameData then iconFrameData = GetFrameData(icon) end

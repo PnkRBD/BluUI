@@ -454,13 +454,13 @@ local function MakeDraggable(frame, key)
 	frame:SetMovable(true)
 	frame:RegisterForDrag('LeftButton')
 
-	frame:HookScript('OnDragStart', function(self)
+	frame:HookScript('OnDragStart', BUI.Profiler.Wrap('Minimap.Minimap frame OnDragStart', function(self)
 		if not IsControlKeyDown() then return end
 		self:StartMoving()
 		self._buiDragging = true
-	end)
+	end))
 
-	frame:HookScript('OnDragStop', function(self)
+	frame:HookScript('OnDragStop', BUI.Profiler.Wrap('Minimap.Minimap frame OnDragStop', function(self)
 		if not self._buiDragging then return end
 		self:StopMovingOrSizing()
 		self._buiDragging = false
@@ -480,7 +480,7 @@ local function MakeDraggable(frame, key)
 		SaveIndicatorPosition(self._buiDragKey, 'CENTER', offsetX, offsetY)
 		self:ClearAllPoints()
 		self:SetPoint('CENTER', WoWMinimap, 'CENTER', offsetX, offsetY)
-	end)
+	end))
 end
 
 local function ApplyIndicatorPosition(frame, parent, point, x, y)
@@ -712,7 +712,7 @@ end
 
 local function EnableScrollZoom()
 	WoWMinimap:EnableMouseWheel(true)
-	WoWMinimap:SetScript('OnMouseWheel', OnMouseWheel)
+	WoWMinimap:SetScript('OnMouseWheel', BUI.Profiler.Script('Minimap.Minimap WoWMinimap OnMouseWheel', OnMouseWheel))
 end
 
 local DEFAULT_SCREEN_OFFSET = -20
@@ -799,11 +799,11 @@ local function CreateUnlockOverlay()
 
 	local startX, startY, startCursorX, startCursorY = 0, 0, 0, 0
 
-	unlockOverlay:SetScript('OnDragStart', function(self)
+	unlockOverlay:SetScript('OnDragStart', BUI.Profiler.Script('Minimap.Minimap unlockOverlay OnDragStart', function(self)
 		startX, startY = Minimap.GetPosition()
 		startCursorX, startCursorY = GetCursorPosition()
 		self.dragging = true
-	end)
+	end))
 
 	unlockOverlay:SetScript('OnUpdate', Wrap('Minimap.Minimap unlock drag', function(self)
 		if not self.dragging then return end
@@ -824,21 +824,21 @@ local function CreateUnlockOverlay()
 		UpdateBackdrop()
 	end))
 
-	unlockOverlay:SetScript('OnDragStop', function(self)
+	unlockOverlay:SetScript('OnDragStop', BUI.Profiler.Script('Minimap.Minimap unlockOverlay OnDragStop', function(self)
 		self.dragging = false
 		local _, _, _, x, y = WoWMinimap:GetPoint()
 		local interfaceDB = GetConfig()
 		interfaceDB.minimapScreenX = x
 		interfaceDB.minimapScreenY = y
 		Minimap.ApplyPosition()
-	end)
+	end))
 
-	unlockOverlay:SetScript('OnMouseUp', function(_, button)
+	unlockOverlay:SetScript('OnMouseUp', BUI.Profiler.Script('Minimap.Minimap unlockOverlay OnMouseUp', function(_, button)
 		if button == 'RightButton' then
 			Minimap.ToggleUnlock(false)
 			if lockReleaseCallback then lockReleaseCallback() end
 		end
-	end)
+	end))
 end
 
 function Minimap.ToggleUnlock(unlock)

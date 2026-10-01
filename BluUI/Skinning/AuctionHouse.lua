@@ -73,8 +73,8 @@ local function SkinIconButton(button)
 	if not button._buiIconButton then
 		button._buiIconButton = true
 		FadeStateTextures(button)
-		button:HookScript('OnEnter', IconButtonEnter)
-		button:HookScript('OnLeave', IconButtonLeave)
+		button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.AuctionHouse button OnEnter', IconButtonEnter))
+		button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.AuctionHouse button OnLeave', IconButtonLeave))
 	end
 	Shell(button)
 end

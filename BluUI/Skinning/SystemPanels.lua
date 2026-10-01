@@ -279,8 +279,8 @@ local function SkinMinimalTab(tab)
 	if not tab._buiTabHook then
 		tab._buiTabHook = true
 		Hook(tab, 'OnSelected', RefreshMinimalTab)
-		tab:HookScript('OnEnter', OnTabHover)
-		tab:HookScript('OnLeave', OnTabHover)
+		tab:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.SystemPanels tab OnEnter', OnTabHover))
+		tab:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.SystemPanels tab OnLeave', OnTabHover))
 	end
 	RefreshMinimalTab(tab)
 end
@@ -302,7 +302,7 @@ local function StyleRowButton(row)
 			Shell(button)
 			Skin.TipArrow(button, false, ARROW_EXPANDED)
 			Skin.TipFont(button.Text, 'title')
-			button:HookScript('OnClick', OnSectionToggle)
+			button:HookScript('OnClick', BUI.Profiler.Wrap('Skin.SystemPanels button OnClick', OnSectionToggle))
 		end
 		FadeAgain(button.Left)
 		FadeAgain(button.Right)

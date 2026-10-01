@@ -318,14 +318,14 @@ function Skin.MakeDraggable(frame, dbKey, point, x, y, follow)
 	frame:SetClampedToScreen(true)
 	frame:EnableMouse(true)
 	frame:RegisterForDrag('LeftButton')
-	frame:SetScript('OnDragStart', function(self)
+	frame:SetScript('OnDragStart', BUI.Profiler.Script('Skin.Core frame OnDragStart', function(self)
 		self._buiDragged = true
 		self:StartMoving()
-	end)
-	frame:SetScript('OnDragStop', function(self)
+	end))
+	frame:SetScript('OnDragStop', BUI.Profiler.Script('Skin.Core frame OnDragStop', function(self)
 		self:StopMovingOrSizing()
 		if dbKey and Skin.PositionMode() == 'remember' then Skin.SavePosition(self, dbKey) end
-	end)
+	end))
 	local function Home() Skin.HomePosition(frame, dbKey, point, x, y, follow) end
 	local function WantsHome() return Skin.PositionMode() ~= 'session' or not frame._buiDragged end
 
@@ -545,8 +545,8 @@ function Skin.TipButton(button, scale)
 	if not button._buiTipButton then
 		button._buiTipButton = true
 		BUILib.Skin.StripButton(button)
-		button:HookScript('OnEnter', TipButtonEnter)
-		button:HookScript('OnLeave', TipButtonLeave)
+		button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Core button OnEnter', TipButtonEnter))
+		button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Core button OnLeave', TipButtonLeave))
 	end
 	Skin.TipShell(button)
 	Skin.TipButtonFonts(button, scale)
@@ -929,8 +929,8 @@ local function ScrollStepper(button, rotation)
 	if not button or button._buiTipArrow then return end
 	local arrow = Skin.TipArrow(button, true, rotation)
 	arrow:SetSize(SCROLL_ARROW_SIZE, SCROLL_ARROW_SIZE)
-	button:HookScript('OnEnter', ArrowEnter)
-	button:HookScript('OnLeave', ArrowLeave)
+	button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Core button OnEnter 2', ArrowEnter))
+	button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Core button OnLeave 2', ArrowLeave))
 end
 
 local function FadeStepperArt(button)
@@ -962,10 +962,10 @@ function Skin.TipScrollBar(scrollBar, keepThumb)
 	fill:SetPoint('BOTTOMRIGHT', thumb, 'BOTTOMRIGHT', -1, 0)
 	thumb._buiThumbFill = fill
 	ThumbFill(thumb, SCROLL_THUMB_REST)
-	thumb:HookScript('OnEnter', ThumbEnter)
-	thumb:HookScript('OnLeave', ThumbLeave)
-	thumb:HookScript('OnMouseDown', ThumbDown)
-	thumb:HookScript('OnMouseUp', ThumbUp)
+	thumb:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Core thumb OnEnter', ThumbEnter))
+	thumb:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Core thumb OnLeave', ThumbLeave))
+	thumb:HookScript('OnMouseDown', BUI.Profiler.Wrap('Skin.Core thumb OnMouseDown', ThumbDown))
+	thumb:HookScript('OnMouseUp', BUI.Profiler.Wrap('Skin.Core thumb OnMouseUp', ThumbUp))
 end
 
 local EDIT_BOX_ART = {
@@ -1060,8 +1060,8 @@ function Skin.TipClose(button)
 	glyph:SetPoint('CENTER', button, 'CENTER', 0, 0)
 	glyph:SetVertexColor(CLOSE_IDLE[1], CLOSE_IDLE[2], CLOSE_IDLE[3], CLOSE_IDLE[4])
 	button._buiCloseGlyph = glyph
-	button:HookScript('OnEnter', CloseEnter)
-	button:HookScript('OnLeave', CloseLeave)
+	button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Core button OnEnter 3', CloseEnter))
+	button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Core button OnLeave 3', CloseLeave))
 end
 
 local STATE_TEXTURE_GETTERS = { 'GetNormalTexture', 'GetPushedTexture', 'GetHighlightTexture', 'GetDisabledTexture' }
@@ -1112,8 +1112,8 @@ function Skin.TipCheckBox(check, inset)
 	FadeStateTextures(check)
 	Skin.TipCheckGlyph(check, false)
 	Skin.TipFace(check.Text or (check.GetFontString and check:GetFontString()), 'body')
-	check:HookScript('OnEnter', TipButtonEnter)
-	check:HookScript('OnLeave', TipButtonLeave)
+	check:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Core check OnEnter', TipButtonEnter))
+	check:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Core check OnLeave', TipButtonLeave))
 end
 
 local BACKDROP_BUTTON_ART = { 'Left', 'Middle', 'Right', 'LeftDisabled', 'MiddleDisabled', 'RightDisabled' }
@@ -1139,8 +1139,8 @@ function Skin.TipBackdropButton(button, scale)
 			if texture and texture.SetAlpha then texture:SetAlpha(0) end
 		end
 		Skin.ApplyBackdrop(button, PANEL_FILL, PANEL_EDGE)
-		button:HookScript('OnEnter', BackdropButtonEnter)
-		button:HookScript('OnLeave', BackdropButtonLeave)
+		button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Core button OnEnter 4', BackdropButtonEnter))
+		button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Core button OnLeave 4', BackdropButtonLeave))
 	end
 	Skin.TipButtonFonts(button, scale)
 end
@@ -1641,8 +1641,8 @@ function Skin.TipPageButton(button, direction)
 	local arrow = Skin.TipArrow(button, true, PAGE_ROTATION[direction] or 0)
 	arrow:SetSize(PAGE_ARROW_SIZE, PAGE_ARROW_SIZE)
 	PageArrowLeave(button)
-	button:HookScript('OnEnter', PageArrowEnter)
-	button:HookScript('OnLeave', PageArrowLeave)
+	button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Core button OnEnter 5', PageArrowEnter))
+	button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Core button OnLeave 5', PageArrowLeave))
 	Skin.RefreshPageButton(button)
 end
 
@@ -1656,7 +1656,7 @@ function Skin.TipNavArrow(button)
 	if not button or button._buiPageArrow then return end
 	button.Art:SetAlpha(0)
 	Skin.TipPageButton(button, 'down')
-	button:HookScript('OnEnter', MuteNavArrowArt)
+	button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Core button OnEnter 6', MuteNavArrowArt))
 end
 
 function Skin.SetPageButtonSkinned(button, skinned)

@@ -161,25 +161,25 @@ local function CreateRow(parent)
     name:SetWordWrap(false)
     row.nameText = name
 
-    row:SetScript('OnEnter', function(self)
+    row:SetScript('OnEnter', BUI.Profiler.Script('CurrencyManager.CurrencyManager row OnEnter', function(self)
         self:SetBackdropBorderColor(Colors.GetAccent())
         GameTooltip:SetOwner(self, 'ANCHOR_NONE')
         GameTooltip:SetPoint('TOPRIGHT', self, 'TOPLEFT', -6, 0)
         GameTooltip:SetCurrencyToken(self._listIndex)
         GameTooltip:Show()
-    end)
-    row:SetScript('OnLeave', function(self)
+    end))
+    row:SetScript('OnLeave', BUI.Profiler.Script('CurrencyManager.CurrencyManager row OnLeave', function(self)
         self:SetBackdropBorderColor(0.13, 0.13, 0.15, 1)
         GameTooltip:Hide()
-    end)
-    row:SetScript('OnClick', function(self, mouseButton)
+    end))
+    row:SetScript('OnClick', BUI.Profiler.Script('CurrencyManager.CurrencyManager row OnClick', function(self, mouseButton)
         GameTooltip:Hide()
         if mouseButton == 'RightButton' then
             ShowRowMenu(self)
         elseif self._isTransferable then
             OpenWarbandTransfer(self._currencyID)
         end
-    end)
+    end))
 
     return row
 end
@@ -237,13 +237,13 @@ local function BuildPanel()
         end
     end
     PaintHideButton()
-    hideButton:SetScript('OnEnter', function() hideText:SetAlpha(0.85) end)
-    hideButton:SetScript('OnLeave', function() hideText:SetAlpha(1) end)
-    hideButton:SetScript('OnClick', function()
+    hideButton:SetScript('OnEnter', BUI.Profiler.Script('CurrencyManager.CurrencyManager hideButton OnEnter', function() hideText:SetAlpha(0.85) end))
+    hideButton:SetScript('OnLeave', BUI.Profiler.Script('CurrencyManager.CurrencyManager hideButton OnLeave', function() hideText:SetAlpha(1) end))
+    hideButton:SetScript('OnClick', BUI.Profiler.Script('CurrencyManager.CurrencyManager hideButton OnClick', function()
         hideUnused = not hideUnused
         PaintHideButton()
         RefreshContent()
-    end)
+    end))
 
     local moneyText = moneyHeader:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(moneyText, 12, FONT, '')

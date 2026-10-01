@@ -262,25 +262,25 @@ local function CreateOverlay(bar)
 		hint:SetText(ActionBars.GetBarSettings(bar.key).centerHorizontally and CENTERED_HINT or HINT_TEXT)
 	end
 
-	overlay:SetScript('OnEnter', function(self)
+	overlay:SetScript('OnEnter', BUI.Profiler.Script('ActionBars.Movers overlay OnEnter', function(self)
 		self:Paint(true)
 		self.hint:Show()
-	end)
-	overlay:SetScript('OnLeave', function(self)
+	end))
+	overlay:SetScript('OnLeave', BUI.Profiler.Script('ActionBars.Movers overlay OnLeave', function(self)
 		if state.dragging == bar then return end
 		self:Paint(false)
 		self.hint:Hide()
-	end)
-	overlay:SetScript('OnMouseUp', function(_, button)
+	end))
+	overlay:SetScript('OnMouseUp', BUI.Profiler.Script('ActionBars.Movers overlay OnMouseUp', function(_, button)
 		if button ~= 'RightButton' or state.dragging then return end
 		if state.bars[bar.key] and not state.unlocked then
 			ActionBars.SetBarUnlocked(bar.key, false)
 		else
 			ActionBars.SetMoversUnlocked(false)
 		end
-	end)
-	overlay:SetScript('OnDragStart', function(self) BeginDrag(bar, self) end)
-	overlay:SetScript('OnDragStop', function(self) EndDrag(bar, self) end)
+	end))
+	overlay:SetScript('OnDragStart', BUI.Profiler.Script('ActionBars.Movers overlay OnDragStart', function(self) BeginDrag(bar, self) end))
+	overlay:SetScript('OnDragStop', BUI.Profiler.Script('ActionBars.Movers overlay OnDragStop', function(self) EndDrag(bar, self) end))
 	overlay:Paint(false)
 	overlay:RefreshHint()
 	bar.mover = overlay

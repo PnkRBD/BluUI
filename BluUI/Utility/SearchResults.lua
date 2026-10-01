@@ -72,12 +72,12 @@ function SearchResults.Show(results, anchor)
 		if result.panel then crumb = crumb .. ' > ' .. result.panel end
 		row._crumb:SetText(crumb)
 		row._label:SetText(result.label)
-		row:SetScript('OnClick', function()
+		row:SetScript('OnClick', BUI.Profiler.Script('SearchResults row OnClick', function()
 			SearchResults.Hide()
 			SearchResults.NavigateTo(result)
 			local searchBox = BUI.PageEngine and BUI.PageEngine.searchBox
 			if searchBox then searchBox:SetValue(''); searchBox.frame.editbox:ClearFocus() end
-		end)
+		end))
 		row:Show()
 	end
 	for rowIndex = activeCount + 1, #rows do rows[rowIndex]:Hide() end

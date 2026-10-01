@@ -110,7 +110,7 @@ local function EnsureBUIButton(frame)
 	fontString:SetPoint('CENTER')
 	fontString:SetText('BluUI')
 	button:SetFontString(fontString)
-	button:SetScript('OnClick', OnBUIClick)
+	button:SetScript('OnClick', BUI.Profiler.Script('Skin.GameMenu button OnClick', OnBUIClick))
 	frame.BUIButton = button
 	return button
 end
@@ -244,7 +244,7 @@ local function EnsureDim(frame)
 
 	dim:EnableMouse(true)
 	dim:EnableMouseWheel(true)
-	dim:SetScript('OnMouseWheel', function() end)
+	dim:SetScript('OnMouseWheel', BUI.Profiler.Script('Skin.GameMenu dim OnMouseWheel', function() end))
 	local texture = dim:CreateTexture(nil, 'BACKGROUND')
 	texture:SetAllPoints(dim)
 	texture:SetColorTexture(0, 0, 0, 0.6)

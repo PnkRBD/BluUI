@@ -112,28 +112,28 @@ local function CreateRow(parent)
 	row.trainBtn = Skin.SmallButton(row, 50, ROW_HEIGHT - 6, 'Train')
 	row.trainBtn:SetPoint('RIGHT', Pixel.Scale(-4), 0)
 	row.trainBtn:SetFrameLevel(row:GetFrameLevel() + 5)
-	row.trainBtn:SetScript('OnClick', function(self)
+	row.trainBtn:SetScript('OnClick', BUI.Profiler.Script('Skin.Trainer trainBtn OnClick', function(self)
 		local index = self:GetParent().serviceIndex
 		if index then
 			BuyTrainerService(index)
 			After('Skin.Trainer list refresh', 0.1, RefreshContent)
 		end
-	end)
+	end))
 
 	Pixel.ApplyFont(row.priceText, 11, FONT, '')
 
-	row:SetScript('OnEnter', function(self)
+	row:SetScript('OnEnter', BUI.Profiler.Script('Skin.Trainer row OnEnter', function(self)
 		self:SetBackdropBorderColor(Colors.GetAccent())
 		if self.serviceIndex then
 			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 			GameTooltip:SetTrainerService(self.serviceIndex)
 			GameTooltip:Show()
 		end
-	end)
-	row:SetScript('OnLeave', function(self)
+	end))
+	row:SetScript('OnLeave', BUI.Profiler.Script('Skin.Trainer row OnLeave', function(self)
 		self:SetBackdropBorderColor(unpack(Colors.border.dark))
 		GameTooltip:Hide()
-	end)
+	end))
 
 	return row
 end

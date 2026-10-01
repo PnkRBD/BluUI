@@ -252,14 +252,14 @@ local function CreateIconLabel(parent, fontSize)
 	frame.qtyText:SetPoint('LEFT', frame.icon, 'RIGHT', Pixel.Scale(2), 0)
 	frame.qtyText:SetTextColor(0.8, 0.8, 0.8, 1)
 
-	frame:SetScript('OnEnter', function(self)
+	frame:SetScript('OnEnter', BUI.Profiler.Script('Skin.Merchant frame OnEnter', function(self)
 		if self.link then
 			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 			GameTooltip:SetHyperlink(self.link)
 			GameTooltip:Show()
 		end
-	end)
-	frame:SetScript('OnLeave', function() GameTooltip:Hide() end)
+	end))
+	frame:SetScript('OnLeave', BUI.Profiler.Script('Skin.Merchant frame OnLeave', function() GameTooltip:Hide() end))
 	return frame
 end
 
@@ -379,7 +379,7 @@ local function CreateBuyRow(parent)
 
 	row.qty = 0
 
-	buyButton:SetScript('OnClick', function()
+	buyButton:SetScript('OnClick', BUI.Profiler.Script('Skin.Merchant buyButton OnClick', function()
 		if not row.merchantIdx or not row.canAfford then return end
 		local stepperFrame = Widget.Unwrap(row.stepper)
 		if stepperFrame.valueBox and stepperFrame.valueBox:HasFocus() then stepperFrame.valueBox:ClearFocus() end
@@ -399,9 +399,9 @@ local function CreateBuyRow(parent)
 			if remaining > 0 then After('Skin.Merchant buy step', 0.2, BuyOne) end
 		end
 		BuyOne()
-	end)
+	end))
 
-	row:HookScript('OnClick', function(self)
+	row:HookScript('OnClick', BUI.Profiler.Wrap('Skin.Merchant row OnClick', function(self)
 		if not self.merchantIdx then return end
 		if IsModifiedClick('DRESSUP') then
 			local link = GetMerchantItemLink(self.merchantIdx)
@@ -409,15 +409,15 @@ local function CreateBuyRow(parent)
 		elseif IsModifiedClick('CHATLINK') then
 			ChatEdit_InsertLink(GetMerchantItemLink(self.merchantIdx))
 		end
-	end)
+	end))
 
-	row:HookScript('OnEnter', function(self)
+	row:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Merchant row OnEnter', function(self)
 		if self.merchantIdx then
 			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 			GameTooltip:SetMerchantItem(self.merchantIdx)
 			GameTooltip:Show()
 		end
-	end)
+	end))
 
 	return row
 end
@@ -428,11 +428,11 @@ local function CreateBuybackRow(parent)
 
 	local buybackButton = Skin.SmallButton(row, 62, 22, 'Buyback')
 	buybackButton:SetPoint('RIGHT', row, 'RIGHT', Pixel.Scale(-8), 0)
-	buybackButton:SetScript('OnClick', function()
+	buybackButton:SetScript('OnClick', BUI.Profiler.Script('Skin.Merchant buybackButton OnClick', function()
 		if row.buybackIdx then BuybackItem(row.buybackIdx) end
-	end)
+	end))
 
-	row:HookScript('OnClick', function(self)
+	row:HookScript('OnClick', BUI.Profiler.Wrap('Skin.Merchant row OnClick 2', function(self)
 		if not self.buybackIdx then return end
 		local link = GetBuybackItemLink(self.buybackIdx)
 		if not link then return end
@@ -441,15 +441,15 @@ local function CreateBuybackRow(parent)
 		elseif IsModifiedClick('CHATLINK') then
 			ChatEdit_InsertLink(link)
 		end
-	end)
+	end))
 
-	row:HookScript('OnEnter', function(self)
+	row:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Merchant row OnEnter 2', function(self)
 		if self.buybackIdx then
 			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 			GameTooltip:SetBuybackItem(self.buybackIdx)
 			GameTooltip:Show()
 		end
-	end)
+	end))
 
 	return row
 end
