@@ -1453,6 +1453,8 @@ function Skin.LayoutSideTabs(host, tabs, topOffset)
 	end
 end
 
+local TEXT_BOX_PAD = 6
+
 function Skin.NewContext(enabled)
 	local fadedArt, shelled = {}, {}
 	local context = { enabled = enabled }
@@ -1535,7 +1537,16 @@ function Skin.NewContext(enabled)
 		end
 		FadeRegions(frame)
 		Shell(frame)
-		if frame.EditBox and frame.EditBox.SetFont then EditBox(frame.EditBox) end
+		local editBox = frame.EditBox
+		if not (editBox and editBox.SetFont) then return end
+		Skin.TipFace(editBox, 'body')
+		editBox:SetTextInsets(TEXT_BOX_PAD, TEXT_BOX_PAD, TEXT_BOX_PAD, TEXT_BOX_PAD)
+		local instructions = editBox.Instructions
+		if instructions then
+			instructions:ClearAllPoints()
+			instructions:SetPoint('TOPLEFT', editBox, 'TOPLEFT', TEXT_BOX_PAD, -TEXT_BOX_PAD)
+			instructions:SetPoint('TOPRIGHT', editBox, 'TOPRIGHT', -TEXT_BOX_PAD, -TEXT_BOX_PAD)
+		end
 	end
 
 	local function ScrollBar(scrollBar, keepThumb)

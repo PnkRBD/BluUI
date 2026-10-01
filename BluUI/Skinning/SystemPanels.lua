@@ -19,6 +19,11 @@ local BINDING_SELECTED_ALPHA = 0.3
 local SLIDER_TRACK_HEIGHT = 2
 local CHECK_INSET = 4
 local LARGE_CHECK_INSET = 6
+local LAYOUT_NAME_INSET = { left = -5, right = -5, top = 6, bottom = 6 }
+local IMPORT_NAME_INSET = { right = -10, top = 6, bottom = 6 }
+local NAME_TEXT_PAD = 6
+local NAME_LOCKED_HINT = 'Paste a valid layout string first'
+local LABEL_GAP = 4
 local ARROW_EXPANDED = 0
 local ARROW_COLLAPSED = math.pi / 2
 local CATEGORY_ACTIVE_ATLAS = 'Options_List_Active'
@@ -494,6 +499,17 @@ local function SkinSystemDialog(dialog)
 	SweepSystemDialog(dialog)
 end
 
+local function SyncNameBoxState(nameBox)
+	local hint = nameBox._buiLockHint
+	if hint then hint:SetShown(Enabled() and not nameBox:IsEnabled()) end
+end
+
+local function AlignLabel(label, box, inset)
+	if not (label and box) then return end
+	label:ClearAllPoints()
+	label:SetPoint('BOTTOMLEFT', box, 'TOPLEFT', inset and inset.left or 0, LABEL_GAP - (inset and inset.top or 0))
+end
+
 local function SkinLayoutDialog(dialog)
 	if not dialog or not Enabled() then return end
 	FadeArt(dialog.Border)
@@ -505,7 +521,26 @@ local function SkinLayoutDialog(dialog)
 		TextBox(importBox)
 		ScrollBar(importBox.ScrollBar)
 	end
-	EditBox(dialog.LayoutNameEditBox)
+	local nameBox = dialog.LayoutNameEditBox
+	local nameInset = importBox and IMPORT_NAME_INSET or LAYOUT_NAME_INSET
+	EditBox(nameBox, nameInset)
+	if nameBox then
+		local textPad = NAME_TEXT_PAD + (nameInset.left or 0)
+		nameBox:SetTextInsets(textPad, NAME_TEXT_PAD, 0, 0)
+		if importBox and not nameBox._buiLockHint then
+			local instructions = importBox.EditBox.Instructions
+			local hint = nameBox:CreateFontString(nil, 'OVERLAY')
+			hint:SetFontObject(instructions:GetFontObject())
+			hint:SetTextColor(instructions:GetTextColor())
+			hint:SetPoint('LEFT', nameBox, 'LEFT', textPad, 0)
+			hint:SetText(NAME_LOCKED_HINT)
+			nameBox._buiLockHint = hint
+			Hook(nameBox, 'SetEnabled', SyncNameBoxState)
+		end
+		SyncNameBoxState(nameBox)
+	end
+	AlignLabel(dialog.EditBoxLabel, importBox)
+	AlignLabel(dialog.NameEditBoxLabel, nameBox, nameInset)
 	StyleLabeledCheck(dialog.CharacterSpecificLayoutCheckButton, LARGE_CHECK_INSET)
 	Button(dialog.AcceptButton)
 	Button(dialog.CancelButton)
@@ -729,6 +764,8 @@ local function Install()
 		HookDialog(_G.EditModeUnsavedChangesDialog, SkinUnsavedDialog)
 		if editMode:IsShown() then ApplyEditMode() end
 	end
+	HookDialog(_G.CooldownViewerLayoutDialog, SkinLayoutDialog)
+	HookDialog(_G.CooldownViewerImportLayoutDialog, SkinLayoutDialog)
 	local addonList = _G.AddonList
 	if addonList then
 		addonList:HookScript('OnShow', Wrap('Skin.SystemPanels addons reskin', ApplyAddonList))
