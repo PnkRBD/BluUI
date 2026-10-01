@@ -142,6 +142,13 @@ function Keystone.Sync()
 	QueueRefresh()
 end
 
+local function StyleKeystoneText(text, health, config, settings)
+	config.outline = ""
+	GroupFrames.ApplyTextSettings(text, health, config, GroupFrames.ResolveFont(settings.font))
+	local color = config.color
+	text:SetTextColor(color[1], color[2], color[3], color[4] or 1)
+end
+
 function GroupFrames.BuildKeystone(frame, unit)
 	local settings = GroupFrames.SettingsForFrame(frame)
 	local config = settings.keystone
@@ -151,9 +158,8 @@ function GroupFrames.BuildKeystone(frame, unit)
 	holder:SetAllPoints()
 	holder:SetFrameLevel(frame.Health:GetFrameLevel() + 6)
 
-	config.outline = ""
 	local text = holder:CreateFontString(nil, "OVERLAY")
-	GroupFrames.ApplyTextSettings(text, frame.Health, config, GroupFrames.ResolveFont(settings.font))
+	StyleKeystoneText(text, frame.Health, config, settings)
 	text:Hide()
 	frame.KeystoneText = text
 end
@@ -166,10 +172,7 @@ function GroupFrames.ApplyKeystoneToChild(child, settings)
 		text:Hide()
 		return
 	end
-	config.outline = ""
-	GroupFrames.ApplyTextSettings(text, child.Health, config, GroupFrames.ResolveFont(settings.font))
-	local color = config.color
-	text:SetTextColor(color[1], color[2], color[3], color[4] or 1)
+	StyleKeystoneText(text, child.Health, config, settings)
 	Keystone.Update(child)
 end
 
