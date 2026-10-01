@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.Transmog')
+
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
@@ -102,7 +104,7 @@ local function Apply()
 			SkinToggles(preview)
 			Button(preview.ClearAllPendingButton)
 			if preview.SetupSlots then
-				hooksecurefunc(preview, 'SetupSlots', function(self) SweepSlots(self) end)
+				Hook(preview, 'SetupSlots', function(self) SweepSlots(self) end)
 			end
 		end
 
@@ -128,7 +130,7 @@ local function Install()
 	local frame = _G.TransmogFrame
 	if not frame then return end
 	installed = true
-	frame:HookScript('OnShow', Apply)
+	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Transmog frame reskin', Apply))
 	if frame:IsShown() then Apply() end
 end
 

@@ -27,7 +27,7 @@ Datatext.Register('guild', {
         if IsInGuild() then C_GuildInfo.GuildRoster() end
     end,
     OnEvent = function()
-        if Read() then Datatext.Refresh() end
+        if Read() then Datatext.Refresh('guild') end
         Datatext.RefreshOpenSocialPanel()
     end,
     build = function(config, valueHex, self)

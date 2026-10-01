@@ -2,8 +2,6 @@ local _, BUI = ...
 
 local GroupFrames = BUI.GroupFrames
 
-local UnregisterUnitWatch = UnregisterUnitWatch
-local RegisterUnitWatch   = RegisterUnitWatch
 local AbbreviateNumbers   = AbbreviateNumbers
 local InCombatLockdown    = InCombatLockdown
 
@@ -118,7 +116,7 @@ local function PreviewText(formatString, decoy)
 	end))
 end
 
-local LIVE_ELEMENTS = { "Health", "Power", "BluHpTextDirect" }
+local LIVE_ELEMENTS = { "Health", "AbsorbBars", "Power", "BluHpTextDirect" }
 
 local function DisableLiveElements(child)
 	for elementIndex = 1, #LIVE_ELEMENTS do
@@ -209,7 +207,6 @@ local function ForceChild(child, slotIndex, headerIndex)
 	local entering = not child._preview
 	if entering then
 		child._preview = true
-		UnregisterUnitWatch(child)
 		child:EnableMouse(false)
 		if not child:GetAttribute("unit") then
 			child._previewSavedUnit = child.unit
@@ -239,7 +236,6 @@ local function UnforceChild(child)
 	child._previewRole  = nil
 	child._previewClass = nil
 	child._previewDecoy = nil
-	child._txtClass     = nil
 	if not child._preview then return end
 	child._preview = nil
 	child:EnableMouse(true)
@@ -251,11 +247,13 @@ local function UnforceChild(child)
 		child._previewSavedUnit = nil
 		child._previewSavedRawUnit = nil
 	end
-	RegisterUnitWatch(child)
 	GroupFrames.RewireAuraEvents(child, child.unit)
 
 	if not child:IsElementEnabled("Health") then
 		child:EnableElement("Health", child:GetAttribute("oUF-guessUnit"))
+	end
+	if not child:IsElementEnabled("AbsorbBars") then
+		child:EnableElement("AbsorbBars", child:GetAttribute("oUF-guessUnit"))
 	end
 
 	local settings = GroupFrames.SettingsForFrame(child)

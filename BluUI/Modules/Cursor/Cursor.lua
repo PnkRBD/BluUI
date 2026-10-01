@@ -54,7 +54,7 @@ local function CreateSlot(parent)
     slot.cd:SetDrawEdge(false)
     slot.cd:SetDrawBling(false)
     slot.cd:SetHideCountdownNumbers(true)
-    slot.cd:SetScript('OnCooldownDone', function() slot.cd:Hide() end)
+    slot.cd:SetScript('OnCooldownDone', BUI.Profiler.Wrap('Cursor.Cursor cooldown done', function() slot.cd:Hide() end))
     slot.cd:Hide()
 
     return slot
@@ -156,7 +156,7 @@ end
 local MENU_CHECK_INTERVAL = 0.1
 local menuCheckElapsed = 0
 
-local function FollowCursor(_, elapsed)
+local FollowCursor = BUI.Profiler.Wrap('Cursor.Cursor follow', function(_, elapsed)
     local cursorX, cursorY = GetCursorPosition()
     if cursorX ~= lastX or cursorY ~= lastY then
         lastX, lastY = cursorX, cursorY
@@ -172,7 +172,7 @@ local function FollowCursor(_, elapsed)
             cursorFrame:SetAlpha(overMenu and 0 or 1)
         end
     end
-end
+end)
 
 local function SyncMenuHiding()
     hideOverMenus = GetConfig().hideOverMenus and true or false
@@ -260,8 +260,8 @@ local function Build()
         slots[name] = CreateSlot(cursorFrame)
     end
 
-    cursorFrame:SetScript('OnShow', WireCursor)
-    cursorFrame:SetScript('OnHide', UnwireCursor)
+    cursorFrame:SetScript('OnShow', BUI.Profiler.Wrap('Cursor.Cursor wire', WireCursor))
+    cursorFrame:SetScript('OnHide', BUI.Profiler.Wrap('Cursor.Cursor unwire', UnwireCursor))
 end
 
 local function ShowCursor()

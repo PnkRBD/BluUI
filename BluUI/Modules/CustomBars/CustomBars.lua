@@ -511,7 +511,7 @@ local function PositionBar(bar, settings)
         end
         if not frame._hintSizeTimer then
             frame._hintSizeTimer = true
-            C_Timer.After(0, function()
+            BUI.Profiler.After("CustomBars.CustomBars hint width", 0, function()
                 frame._hintSizeTimer = nil
                 if frame.dragHint and frame.dragHint:IsShown() then
                     frame.dragHint:SetWidth(Pixel.Scale(frame.dragHint.text:GetStringWidth() + 16))
@@ -758,6 +758,14 @@ function CustomBars.RefreshAllBars()
     CustomBars.RefreshHotEventRegistration()
 end
 
+local function RepositionAnchoredBars()
+    local settings = GetSettings()
+    for index, bar in pairs(bars) do
+        local barSettings = settings[index]
+        if barSettings and barSettings.anchorFrame ~= "" then PositionBar(bar, barSettings) end
+    end
+end
+
 function CustomBars.UpdateOpacity()
     local settings = GetSettings()
     local globalOpacity = BUI.Visibility.GetContextualOpacity("CustomBars") / 100
@@ -891,7 +899,7 @@ local function ScheduleCooldownRefresh()
     if not cooldownDispatchFrame then
         cooldownDispatchFrame = CreateFrame("Frame", "BUI_CustomBarsFlush")
         cooldownDispatchFrame:Hide()
-        cooldownDispatchFrame:SetScript("OnUpdate", FlushCooldownDispatch)
+        cooldownDispatchFrame:SetScript("OnUpdate", BUI.Profiler.Wrap("CustomBars.CustomBars cooldown flush", FlushCooldownDispatch))
     end
     cooldownDispatchFrame:Show()
 end
@@ -900,13 +908,6 @@ local function OnHotEvent()
     ScheduleCooldownRefresh()
 end
 
-local OnEvent = BUI.Dispatcher.NewDelayed(function()
-    BUI.CDM.Custom.InvalidateBagCache()
-    CustomBars.RefreshAllBars()
-end, 0.1)
-
-local hotEventsRegistered = false
-
 local function HasEnabledBar()
     local settings = GetSettings()
     for barIndex = 1, #settings do
@@ -914,6 +915,13 @@ local function HasEnabledBar()
     end
     return false
 end
+
+local OnEvent = BUI.Dispatcher.NewDelayed(function()
+    if HasEnabledBar() then BUI.CDM.Custom.InvalidateStaleBagCache() end
+    CustomBars.RefreshAllBars()
+end, 0.1, 'Custom bars bag refresh')
+
+local hotEventsRegistered = false
 
 function CustomBars.RefreshHotEventRegistration()
     if not eventsRegistered then return end
@@ -947,7 +955,7 @@ function CustomBars.Enable()
     BUI.Visibility.Register("CustomBars", CustomBars.UpdateOpacity, true)
 
     Pixel.OnScaleChange("CustomBars", CustomBars.RefreshAllBars)
-    BUI.Anchor.RegisterCallback("CustomBars", CustomBars.RefreshAllBars)
+    BUI.Anchor.RegisterCallback("CustomBars", RepositionAnchoredBars)
 
     CustomBars.RefreshAllBars()
 end

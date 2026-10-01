@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('CDM.Keybinds')
+
 local _G = _G
 local wipe, type = wipe, type
 local tonumber = tonumber
@@ -42,6 +44,7 @@ local BAR_COMMANDS = {
 }
 
 local mainBarSlots
+local mappedFollowsForms, mappedLivePage
 
 local function CurrentOverridePage()
     if HasOverrideActionBar() then
@@ -53,6 +56,14 @@ local function CurrentOverridePage()
     if HasTempShapeshiftActionBar() then
         return GetTempShapeshiftBarIndex()
     end
+    return nil
+end
+
+local function LivePage()
+    local livePage = CurrentOverridePage()
+    if livePage then return livePage end
+    local page = GetActionBarPage()
+    if type(page) == "number" and page > 1 then return page end
     return nil
 end
 
@@ -71,16 +82,13 @@ end
 
 local function BuildMainBarSlots()
     local target = {}
-    if MainBarFollowsForms() then
+    mappedFollowsForms = MainBarFollowsForms()
+    mappedLivePage = mappedFollowsForms and LivePage() or nil
+    if mappedFollowsForms then
         for index = 1, #STABLE_MAIN_PAGES do
             MapWholePage(target, STABLE_MAIN_PAGES[index])
         end
-        local livePage = CurrentOverridePage()
-        if not livePage then
-            local page = GetActionBarPage()
-            if type(page) == "number" and page > 1 then livePage = page end
-        end
-        if livePage then MapWholePage(target, livePage) end
+        if mappedLivePage then MapWholePage(target, mappedLivePage) end
     else
         MapWholePage(target, 1)
     end
@@ -92,6 +100,13 @@ local function MainBarIndexForSlot(slot)
         mainBarSlots = BuildMainBarSlots()
     end
     return mainBarSlots[slot]
+end
+
+local function MainBarMappingStale()
+    if not mainBarSlots then return false end
+    local followsForms = MainBarFollowsForms()
+    if followsForms ~= mappedFollowsForms then return true end
+    return followsForms and LivePage() ~= mappedLivePage
 end
 
 local function BindingForSlot(slot)
@@ -116,17 +131,18 @@ local function KeybindForSlot(slot)
 end
 
 local function ShortestFromSlots(slots)
-    local bestFormatted, bestRaw, bestLength
+    local bestFormatted, bestRaw, bestLength, bestSlot
     for slotIndex = 1, #slots do
-        local formatted, raw = KeybindForSlot(slots[slotIndex])
+        local slot = slots[slotIndex]
+        local formatted, raw = KeybindForSlot(slot)
         if formatted then
             local length = #formatted
             if not bestFormatted or length < bestLength then
-                bestFormatted, bestRaw, bestLength = formatted, raw, length
+                bestFormatted, bestRaw, bestLength, bestSlot = formatted, raw, length, slot
             end
         end
     end
-    return bestFormatted, bestRaw
+    return bestFormatted, bestRaw, bestSlot
 end
 
 local function SpellName(spellID)
@@ -215,62 +231,124 @@ end
 
 local formattedCache = {}
 local rawCache = {}
+local entrySlot = {}
 local cacheSize = 0
 local MAX_CACHE_SIZE = 2048
 local macroByName
 local itemSlotMap
+local macroSlots = {}
+local itemSlots = {}
+local pendingSlots = {}
 local macroMapBuilt = false
 local itemMapBuilt = false
 local generation = 0
 local appliedGeneration = -1
 
-local function InvalidateAll()
-    wipe(formattedCache)
-    wipe(rawCache)
-    cacheSize = 0
+local function ForgetMacroMap()
     macroByName = nil
     macroMapBuilt = false
+    wipe(macroSlots)
+end
+
+local function ForgetItemMap()
     itemSlotMap = nil
     itemMapBuilt = false
+    wipe(itemSlots)
+end
+
+local function WipeEntries()
+    wipe(formattedCache)
+    wipe(rawCache)
+    wipe(entrySlot)
+    cacheSize = 0
+end
+
+local function InvalidateAll()
+    WipeEntries()
+    ForgetMacroMap()
+    ForgetItemMap()
     mainBarSlots = nil
     generation = generation + 1
 end
 
 local function InvalidateBindings()
-    wipe(formattedCache)
-    wipe(rawCache)
-    cacheSize = 0
-    macroByName = nil
-    macroMapBuilt = false
+    WipeEntries()
+    ForgetMacroMap()
     generation = generation + 1
 end
 
-local function CacheOne(id, formatted, raw)
-    if not id or formattedCache[id] then return end
-    if cacheSize >= MAX_CACHE_SIZE then
-        wipe(formattedCache)
-        wipe(rawCache)
-        cacheSize = 0
+local function ForgetEntry(id)
+    formattedCache[id] = nil
+    rawCache[id] = nil
+    entrySlot[id] = nil
+end
+
+local function ForgetSpellVariants(spellID)
+    local variant1, variant2, variant3 = SpellVariants(spellID)
+    ForgetEntry(variant1)
+    if variant2 then ForgetEntry(variant2) end
+    if variant3 then ForgetEntry(variant3) end
+end
+
+local function InvalidateChangedSlots()
+    if MainBarMappingStale() then return false end
+    local anyBound = false
+    for slot in pairs(pendingSlots) do
+        local actionType, actionID
+        if HasAction(slot) then actionType, actionID = GetActionInfo(slot) end
+        if itemSlots[slot] or actionType == "item" then ForgetItemMap() end
+        if KeybindForSlot(slot) then
+            anyBound = true
+            for id, owner in pairs(entrySlot) do
+                if owner == slot then ForgetEntry(id) end
+            end
+            if macroSlots[slot] then ForgetMacroMap() end
+            if actionType == "spell" and actionID then
+                ForgetSpellVariants(actionID)
+            elseif actionType == "item" and actionID then
+                ForgetEntry(actionID)
+                local _, itemSpellID = GetItemSpell(actionID)
+                if itemSpellID then ForgetSpellVariants(itemSpellID) end
+            elseif actionType then
+                return false
+            end
+        end
     end
+    if anyBound then
+        for id, formatted in pairs(formattedCache) do
+            if formatted == false then
+                formattedCache[id] = nil
+                rawCache[id] = nil
+            end
+        end
+        generation = generation + 1
+    end
+    return true
+end
+
+local function CacheOne(id, formatted, raw, slot)
+    if not id or formattedCache[id] then return end
+    if cacheSize >= MAX_CACHE_SIZE then WipeEntries() end
     formattedCache[id] = formatted
     rawCache[id] = raw
+    entrySlot[id] = slot
     cacheSize = cacheSize + 1
 end
 
-local function CacheForVariants(id1, id2, id3, formatted, raw)
-    CacheOne(id1, formatted, raw)
-    CacheOne(id2, formatted, raw)
-    CacheOne(id3, formatted, raw)
+local function CacheForVariants(id1, id2, id3, formatted, raw, slot)
+    CacheOne(id1, formatted, raw, slot)
+    CacheOne(id2, formatted, raw, slot)
+    CacheOne(id3, formatted, raw, slot)
 end
 
-local function IndexMacroSpell(spellID, formatted, raw)
+local function IndexMacroSpell(spellID, formatted, raw, slot)
     local variant1, variant2, variant3 = SpellVariants(spellID)
-    CacheForVariants(variant1, variant2, variant3, formatted, raw)
+    CacheForVariants(variant1, variant2, variant3, formatted, raw, slot)
     local name = SpellName(spellID)
     if name then
         local lower = name:lower()
         if not macroByName[lower] then
-            macroByName[lower] = { formatted, raw }
+            macroByName[lower] = { formatted, raw, slot }
         end
     end
 end
@@ -282,13 +360,14 @@ local function IndexMacroSlot(slot, actionID, formatted, raw)
     local result = GetMacroSpell(macroIndex)
     if result then
         local spellID = type(result) == "number" and result or SpellIDFromName(result)
-        if spellID then IndexMacroSpell(spellID, formatted, raw) end
+        if spellID then IndexMacroSpell(spellID, formatted, raw, slot) end
     end
 
     local _, _, macroItemID = GetMacroItem(macroIndex)
     if macroItemID and formattedCache[macroItemID] == nil then
         formattedCache[macroItemID] = formatted
         rawCache[macroItemID] = raw
+        entrySlot[macroItemID] = slot
     end
 
     local body = GetMacroBodySafe(macroIndex)
@@ -298,11 +377,11 @@ local function IndexMacroSlot(slot, actionID, formatted, raw)
             local spellText = names[nameIndex]
             local lower = spellText:lower()
             if not macroByName[lower] then
-                macroByName[lower] = { formatted, raw }
+                macroByName[lower] = { formatted, raw, slot }
             end
             local spellID = SpellIDFromName(spellText)
             if spellID and formattedCache[spellID] == nil then
-                IndexMacroSpell(spellID, formatted, raw)
+                IndexMacroSpell(spellID, formatted, raw, slot)
             end
         end
     end
@@ -327,12 +406,14 @@ local function BuildFallbackMaps()
                         itemSlotMap[actionID] = list
                     end
                     list[#list + 1] = slot
+                    itemSlots[slot] = true
                 end
 
             elseif actionType == "macro" and actionID then
                 if needMacros then
                     local formatted, raw = KeybindForSlot(slot)
                     if formatted then
+                        macroSlots[slot] = true
                         IndexMacroSlot(slot, actionID, formatted, raw)
                     end
                 end
@@ -355,9 +436,9 @@ local function LookupSpell(spellID)
     for _, variantID in ipairs(variants) do
         local slots = C_ActionBar.FindSpellActionButtons(variantID)
         if slots and #slots > 0 then
-            local formatted, raw = ShortestFromSlots(slots)
+            local formatted, raw, slot = ShortestFromSlots(slots)
             if formatted then
-                CacheForVariants(variant1, variant2, variant3, formatted, raw)
+                CacheForVariants(variant1, variant2, variant3, formatted, raw, slot)
                 return formatted, raw
             end
         end
@@ -375,7 +456,7 @@ local function LookupSpell(spellID)
         if name then
             local entry = macroByName[name:lower()]
             if entry then
-                CacheForVariants(variant1, variant2, variant3, entry[1], entry[2])
+                CacheForVariants(variant1, variant2, variant3, entry[1], entry[2], entry[3])
                 return entry[1], entry[2]
             end
         end
@@ -400,6 +481,7 @@ local function LookupItem(itemID)
         if formatted then
             formattedCache[itemID] = formatted
             rawCache[itemID] = raw
+            entrySlot[itemID] = entrySlot[itemSpellID]
             return formatted, raw
         end
     end
@@ -413,10 +495,11 @@ local function LookupItem(itemID)
 
     local slots = itemSlotMap[itemID]
     if slots then
-        local formatted, raw = ShortestFromSlots(slots)
+        local formatted, raw, slot = ShortestFromSlots(slots)
         if formatted then
             formattedCache[itemID] = formatted
             rawCache[itemID] = raw
+            entrySlot[itemID] = slot
             return formatted, raw
         end
     end
@@ -441,8 +524,7 @@ local function ResolveIconIDs(icon)
     return itemID, customID, overrideID, spellID
 end
 
-local function LookupForIcon(icon)
-    local itemID, customID, overrideID, spellID = ResolveIconIDs(icon)
+local function LookupForIDs(itemID, customID, overrideID, spellID)
     if itemID then return LookupItem(itemID) end
     if customID then return LookupSpell(customID) end
     if overrideID then
@@ -453,9 +535,8 @@ local function LookupForIcon(icon)
     return nil, nil
 end
 
-local function FindKeybindForIcon(icon)
-    local formatted = LookupForIcon(icon)
-    return formatted
+local function LookupForIcon(icon)
+    return LookupForIDs(ResolveIconIDs(icon))
 end
 
 local function GetKeybindFont(config)
@@ -508,16 +589,25 @@ local function ApplyViewer(viewerKey)
         if not config or not config.showKeybinds then
             if frameData.keybindText then frameData.keybindText:Hide() end
             frameData.keybind = nil
+            frameData.keybindGeneration = nil
         else
-            local keybind = FindKeybindForIcon(icon)
-            frameData.keybind = keybind
+            local itemID, customID, overrideID, spellID = ResolveIconIDs(icon)
+            if frameData.keybindGeneration ~= generation or frameData.keybindItemID ~= itemID or frameData.keybindCustomID ~= customID
+                or frameData.keybindOverrideID ~= overrideID or frameData.keybindSpellID ~= spellID then
+                frameData.keybindGeneration = generation
+                frameData.keybindItemID, frameData.keybindCustomID = itemID, customID
+                frameData.keybindOverrideID, frameData.keybindSpellID = overrideID, spellID
 
-            if keybind then
-                local fontString = GetOrCreateKeybindText(icon, config, db)
-                fontString:SetText(keybind)
-                fontString:Show()
-            elseif frameData.keybindText then
-                frameData.keybindText:Hide()
+                local keybind = LookupForIDs(itemID, customID, overrideID, spellID)
+                frameData.keybind = keybind
+
+                if keybind then
+                    local fontString = GetOrCreateKeybindText(icon, config, db)
+                    fontString:SetText(keybind)
+                    fontString:Show()
+                elseif frameData.keybindText then
+                    frameData.keybindText:Hide()
+                end
             end
         end
     end
@@ -556,6 +646,8 @@ local function AnyConsumerActive()
 end
 
 local function DoRefresh(full, bindingsStale)
+    if not full and next(pendingSlots) and not InvalidateChangedSlots() then full = true end
+    wipe(pendingSlots)
     if full then
         InvalidateAll()
     elseif bindingsStale then
@@ -619,7 +711,7 @@ end
 local eventFrame = CreateFrame("Frame", "BUI_CDMKeybindFlush")
 eventFrame:Hide()
 
-eventFrame:SetScript("OnUpdate", function(self)
+eventFrame:SetScript("OnUpdate", BUI.Profiler.Wrap("CDM.Keybinds refresh", function(self)
     self:Hide()
     dirty = false
     local full = pendingFull
@@ -631,11 +723,11 @@ eventFrame:SetScript("OnUpdate", function(self)
     if needsRetry then
         needsRetry = false
 
-        C_Timer.After(0.1, function()
+        BUI.Profiler.After("CDM.Keybinds refresh retry", 0.1, function()
             DoRefresh(true)
         end)
     end
-end)
+end))
 
 function Keybinds.ScheduleRebuild()
     if not active then return end
@@ -652,13 +744,13 @@ local function EnsureHooks()
     for key, viewerName in pairs(CDM.VIEWERS) do
         local viewer = key ~= 'buffs' and _G[viewerName]
         if viewer and viewer.RefreshLayout then
-            hooksecurefunc(viewer, "RefreshLayout", Keybinds.ScheduleRebuild)
+            Hook(viewer, "RefreshLayout", Keybinds.ScheduleRebuild)
             hookedViewer = true
         end
     end
 
     if not hookedViewer then return end
-    hooksecurefunc(CDM, "NotifyDependents", Keybinds.Apply)
+    Hook(CDM, "NotifyDependents", Keybinds.Apply)
     hooksInstalled = true
 end
 
@@ -677,9 +769,11 @@ local function BonusPageIsNew()
     return true
 end
 
-local function OnMappingEvent(event)
+local function OnMappingEvent(event, slot)
     if event == "UPDATE_BINDINGS" then
         pendingBindings = true
+    elseif event == "ACTIONBAR_SLOT_CHANGED" and type(slot) == "number" and slot > 0 then
+        pendingSlots[slot] = true
     elseif event == "UPDATE_BONUS_ACTIONBAR" then
         if not BonusPageIsNew() then return end
         pendingFull = true

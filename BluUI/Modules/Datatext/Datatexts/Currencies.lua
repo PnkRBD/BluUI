@@ -32,7 +32,7 @@ Datatext.Register('currency', {
     events = { 'CURRENCY_DISPLAY_UPDATE', 'PLAYER_ENTERING_WORLD' },
     OnActivate = Read,
     OnEvent = function()
-        if Read() then Datatext.Refresh() end
+        if Read() then Datatext.Refresh('currency') end
     end,
     build = function(config, valueHex, self)
         local label = Datatext.Label(config, self)

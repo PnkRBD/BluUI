@@ -5,6 +5,7 @@ local GetCursorPosition = GetCursorPosition
 
 local Pixel = BUI.Pixel
 local Skin = BUI.Skinning
+local Wrap = BUI.Profiler.Wrap
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Widget = BUILib.Widget
 local Controls = BUILib.Controls
@@ -83,9 +84,9 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 	thumb:RegisterForDrag('LeftButton')
 	thumb:SetScript('OnDragStart', function(self) self.dragging = true end)
 	thumb:SetScript('OnDragStop', function(self) self.dragging = false end)
-	thumb:SetScript('OnUpdate', function(self)
+	thumb:SetScript('OnUpdate', Wrap('Skin.Widgets scroll drag', function(self)
 		if self.dragging then ApplyScrollPct(CursorToScrollPct()) end
-	end)
+	end))
 	thumb:SetScript('OnEnter', function() SetColorTex(thumbTex, unpack(THUMB_HOVER)) end)
 	thumb:SetScript('OnLeave', function() SetColorTex(thumbTex, unpack(THUMB_IDLE)) end)
 	track:EnableMouse(true)
@@ -100,11 +101,11 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 		self:SetVerticalScroll(min(maxScroll, max(0, currentScroll - delta * rowHeight * 2)))
 	end)
 
-	scroll:SetScript('OnSizeChanged', function(_, width)
+	scroll:SetScript('OnSizeChanged', Wrap('Skin.Widgets scroll resize', function(_, width)
 		if width and width > 0 then child:SetWidth(width) end
-	end)
+	end))
 
-	scroll:SetScript('OnScrollRangeChanged', function(self, _, yMax)
+	scroll:SetScript('OnScrollRangeChanged', Wrap('Skin.Widgets scroll range', function(self, _, yMax)
 		yMax = yMax or 0
 		if yMax <= 0 then
 			thumb:Hide()
@@ -116,14 +117,14 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 			scroll:SetPoint('BOTTOMRIGHT', Pixel.Scale(-padding - 8), Pixel.Scale(padding))
 			thumb:SetHeight(max(20, track:GetHeight() * (self:GetHeight() / (self:GetHeight() + yMax))))
 		end
-	end)
+	end))
 
-	scroll:SetScript('OnVerticalScroll', function(self, offset)
+	scroll:SetScript('OnVerticalScroll', Wrap('Skin.Widgets scroll thumb', function(self, offset)
 		local yMax = max(0, child:GetHeight() - self:GetHeight())
 		if yMax <= 0 then return end
 		thumb:ClearAllPoints()
 		thumb:SetPoint('TOP', track, 'TOP', 0, -(offset / yMax) * (track:GetHeight() - thumb:GetHeight()))
-	end)
+	end))
 
 	return scroll, child
 end
@@ -314,21 +315,22 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 	end)
 
 	local grace = 0
-	menu:SetScript('OnShow', function(menuFrame)
-		grace = 0
-		menuFrame:SetScript('OnUpdate', function(updatingMenu, elapsed)
-			if dropdown:IsMouseOver() or updatingMenu:IsMouseOver() then
-				grace = 0
-			else
-				grace = grace + elapsed
-				if grace > 0.3 then
-					updatingMenu:Hide()
-					SetArrowOpen(false)
-					dropdown:SetBackdropBorderColor(unpack(idleBorder))
-				end
+	local autoClose = Wrap('Skin.Widgets menu autoclose', function(updatingMenu, elapsed)
+		if dropdown:IsMouseOver() or updatingMenu:IsMouseOver() then
+			grace = 0
+		else
+			grace = grace + elapsed
+			if grace > 0.3 then
+				updatingMenu:Hide()
+				SetArrowOpen(false)
+				dropdown:SetBackdropBorderColor(unpack(idleBorder))
 			end
-		end)
+		end
 	end)
+	menu:SetScript('OnShow', Wrap('Skin.Widgets menu open', function(menuFrame)
+		grace = 0
+		menuFrame:SetScript('OnUpdate', autoClose)
+	end))
 	menu:SetScript('OnHide', function(menuFrame) menuFrame:SetScript('OnUpdate', nil) end)
 	return dropdown
 end

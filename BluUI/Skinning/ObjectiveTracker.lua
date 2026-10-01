@@ -3,7 +3,9 @@ local _, BUI = ...
 local pairs = pairs
 local ipairs = ipairs
 local select = select
-local hooksecurefunc = hooksecurefunc
+local Hook = BUI.Profiler.Hooker('Skin.ObjectiveTracker')
+local Wrap = BUI.Profiler.Wrap
+local After = BUI.Profiler.After
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Theme = BUILib.Theme
@@ -265,7 +267,7 @@ local function SyncTrackerCardShown()
 end
 
 local function SyncTrackerCardSoon()
-	C_Timer.After(0, SyncTrackerCardShown)
+	After('Skin.ObjectiveTracker card sync', 0, SyncTrackerCardShown)
 end
 
 local function EnsureTrackerCard()
@@ -277,22 +279,23 @@ local function EnsureTrackerCard()
 		trackerCard:SetFrameStrata('LOW')
 		trackerCard:SetFrameLevel(0)
 		Skin3.Backdrop(trackerCard, { bg = Theme.bg.dark, border = Theme.border.light })
-		trackerCard:HookScript('OnSizeChanged', Skin.TrackerClamp)
+		trackerCard:HookScript('OnSizeChanged', Wrap('Skin.ObjectiveTracker tracker clamp', Skin.TrackerClamp))
 
-		if trackerFrame.SetCollapsed then hooksecurefunc(trackerFrame, 'SetCollapsed', UpdateCardAnchors) end
+		local syncShown = Wrap('Skin.ObjectiveTracker card sync', SyncTrackerCardShown)
+		if trackerFrame.SetCollapsed then Hook(trackerFrame, 'SetCollapsed', UpdateCardAnchors) end
 		if nineSlice then
 			nineSlice:SetAlpha(0)
-			hooksecurefunc(nineSlice, 'SetAlpha', function(self, alpha)
+			Hook(nineSlice, 'SetAlpha', function(self, alpha)
 				if IsEnabled() and alpha ~= 0 then self:SetAlpha(0) end
 			end)
-			nineSlice:HookScript('OnShow', SyncTrackerCardShown)
-			nineSlice:HookScript('OnHide', SyncTrackerCardShown)
-			hooksecurefunc(nineSlice, 'SetPoint', UpdateCardAnchors)
+			nineSlice:HookScript('OnShow', syncShown)
+			nineSlice:HookScript('OnHide', syncShown)
+			Hook(nineSlice, 'SetPoint', UpdateCardAnchors)
 		end
-		trackerFrame:HookScript('OnHide', SyncTrackerCardShown)
-		trackerFrame:HookScript('OnShow', SyncTrackerCardShown)
-		if trackerFrame.SetRolesets then hooksecurefunc(trackerFrame, 'SetRolesets', SyncTrackerCardSoon) end
-		hooksecurefunc(trackerFrame, 'SetAlpha', function(_, alpha)
+		trackerFrame:HookScript('OnHide', syncShown)
+		trackerFrame:HookScript('OnShow', syncShown)
+		if trackerFrame.SetRolesets then Hook(trackerFrame, 'SetRolesets', SyncTrackerCardSoon) end
+		Hook(trackerFrame, 'SetAlpha', function(_, alpha)
 			local fadedOut = not issecretvalue(alpha) and alpha == 0 and not Skin.trackerStashScale
 			if fadedOut == (Skin.trackerFadedOut or false) then return end
 			Skin.trackerFadedOut = fadedOut or nil
@@ -964,7 +967,7 @@ local function RefreshQuestCache()
 	if chime then BUI.PlaySoundByName(GetSettings().completionSound) end
 end
 
-local queueQuestCacheRefresh = BUI.Dispatcher.NewDelayed(RefreshQuestCache, 0.3)
+local queueQuestCacheRefresh = BUI.Dispatcher.NewDelayed(RefreshQuestCache, 0.3, 'Quest cache refresh')
 
 local flashQuestID
 
@@ -986,12 +989,12 @@ local function FlashProgressBlock()
 	for _, line in pairs(targetBlock.usedLines) do
 		if line.Text then line.Text:SetTextColor(flashRed, flashGreen, flashBlue, 1) end
 	end
-	C_Timer.After(FLASH_SECONDS, function()
+	After('Skin.ObjectiveTracker flash restore', FLASH_SECONDS, function()
 		if IsEnabled() then OnUpdateHighlight(targetBlock) end
 	end)
 end
 
-local queueProgressFlash = BUI.Dispatcher.NewDelayed(FlashProgressBlock, 0.15)
+local queueProgressFlash = BUI.Dispatcher.NewDelayed(FlashProgressBlock, 0.15, 'Quest progress flash')
 
 local function OnQuestProgress(_, questID)
 	if not IsEnabled() or not questID then return end
@@ -1098,7 +1101,7 @@ function Skin.TrackerDecorateHeader(trackerFrame)
 	if not header.__buiDecorated then
 		header.__buiDecorated = true
 		Skin.TrackerHeaderControls(header, header.MinimizeButton)
-		hooksecurefunc(trackerFrame, 'Init', Skin.TrackerDecorateHeader)
+		Hook(trackerFrame, 'Init', Skin.TrackerDecorateHeader)
 	end
 	local enabled = IsEnabled()
 	local text = header.Text
@@ -1155,11 +1158,11 @@ local function HideBlizzardTexture(texture)
 
 	texture:SetTexture(nil)
 	texture:SetAlpha(0)
-	hooksecurefunc(texture, 'SetAtlas', ReassertHidden)
-	hooksecurefunc(texture, 'SetTexture', ReassertHidden)
-	hooksecurefunc(texture, 'SetShown', ReassertHidden)
-	hooksecurefunc(texture, 'Show', ReassertHidden)
-	hooksecurefunc(texture, 'SetAlpha', ReassertHidden)
+	Hook(texture, 'SetAtlas', ReassertHidden)
+	Hook(texture, 'SetTexture', ReassertHidden)
+	Hook(texture, 'SetShown', ReassertHidden)
+	Hook(texture, 'Show', ReassertHidden)
+	Hook(texture, 'SetAlpha', ReassertHidden)
 end
 
 local function HideFrameTextures(frame)
@@ -1206,7 +1209,7 @@ local function SkinMinimizeButton(header)
 	end)
 
 	SetCollapsedGlyph(header, header.isCollapsed)
-	if header.SetCollapsed then hooksecurefunc(header, 'SetCollapsed', SetCollapsedGlyph) end
+	if header.SetCollapsed then Hook(header, 'SetCollapsed', SetCollapsedGlyph) end
 end
 
 local function SkinHeader(header)
@@ -1258,9 +1261,9 @@ local function SkinBar(bar)
 	end)
 	local backdrop = Skin3.ChildBackdrop(bar, { bg = Theme.bg.dark, border = Theme.border.default })
 	skinnedBars[bar] = backdrop
-	bar:HookScript('OnShow', function(self)
+	bar:HookScript('OnShow', Wrap('Skin.ObjectiveTracker bar backdrop', function(self)
 		backdrop:SetShown(IsEnabled() and self:IsShown())
-	end)
+	end))
 	backdrop:SetShown(IsEnabled() and bar:IsShown())
 
 	local label = bar.Label
@@ -1292,10 +1295,10 @@ local function SkinStageBlock()
 	HideBlizzardTexture(stageBlock.GlowTexture)
 
 	skinnedBars[stageBlock] = Skin3.ChildBackdrop(stageBlock, { bg = Theme.bg.light, border = Theme.border.light })
-	stageBlock:HookScript('OnShow', Scenario.SyncStageBackdrop)
-	stageBlock:HookScript('OnHide', Scenario.SyncStageBackdrop)
-	hooksecurefunc(stageBlock, 'UpdateWidgetRegistration', Scenario.SyncStageBackdrop)
-	hooksecurefunc(stageBlock, 'SetupStageTransition', Scenario.SyncStageBackdrop)
+	stageBlock:HookScript('OnShow', Wrap('Skin.ObjectiveTracker stage backdrop', Scenario.SyncStageBackdrop))
+	stageBlock:HookScript('OnHide', Wrap('Skin.ObjectiveTracker stage backdrop', Scenario.SyncStageBackdrop))
+	Hook(stageBlock, 'UpdateWidgetRegistration', Scenario.SyncStageBackdrop)
+	Hook(stageBlock, 'SetupStageTransition', Scenario.SyncStageBackdrop)
 	Scenario.SyncStageBackdrop(stageBlock)
 
 	ApplySkinFont(stageBlock.Stage, 'header')
@@ -1359,8 +1362,8 @@ local function SkinCheck(check)
 	if not check or check.__buiSkinned then return end
 	check.__buiSkinned = true
 	ApplyCheckTexture(check)
-	hooksecurefunc(check, 'SetAtlas', ApplyCheckTexture)
-	hooksecurefunc(check, 'SetTexture', ApplyCheckTexture)
+	Hook(check, 'SetAtlas', ApplyCheckTexture)
+	Hook(check, 'SetTexture', ApplyCheckTexture)
 	Theme.RegisterAccentElement(check, function(element, red, green, blue)
 		element:SetVertexColor(red, green, blue, 1)
 	end)
@@ -1420,7 +1423,7 @@ local function OnAddBlock(_, block)
 	end
 	if not block.__buiPoiAnchorHook and block.AddPOIButton then
 		block.__buiPoiAnchorHook = true
-		hooksecurefunc(block, 'AddPOIButton', function(self)
+		Hook(block, 'AddPOIButton', function(self)
 			if not IsEnabled() then return end
 			local button = self.poiButton
 			if button and self.HeaderText then
@@ -1437,8 +1440,8 @@ local function OnAddBlock(_, block)
 	end
 	if not block.__buiColorHook then
 		block.__buiColorHook = true
-		if block.SetStringText then hooksecurefunc(block, 'SetStringText', OnSetStringText) end
-		if block.UpdateHighlight then hooksecurefunc(block, 'UpdateHighlight', OnUpdateHighlight) end
+		if block.SetStringText then Hook(block, 'SetStringText', OnSetStringText) end
+		if block.UpdateHighlight then Hook(block, 'UpdateHighlight', OnUpdateHighlight) end
 	end
 	OnUpdateHighlight(block)
 end
@@ -1507,7 +1510,7 @@ Scenario.ApplyHeader = function(widget)
 			skinnedBars[widget] = backdrop
 		end
 		if not Scenario.FitHeaderBackdrop(widget, backdrop) then
-			C_Timer.After(0, function() Scenario.FitHeaderBackdrop(widget, backdrop) end)
+			After('Skin.ObjectiveTracker header fit', 0, function() Scenario.FitHeaderBackdrop(widget, backdrop) end)
 		end
 		ApplySkinFont(widget.HeaderText, 'title')
 		widget.HeaderText:SetTextColor(Skin.TrackerColorRGB('title'))
@@ -1524,7 +1527,7 @@ end
 
 Scenario.TrackHeader = function(widget)
 	if Scenario.headers[widget] or not widget.Frame or not widget.HeaderText then return end
-	hooksecurefunc(widget, 'Setup', Scenario.ApplyHeader)
+	Hook(widget, 'Setup', Scenario.ApplyHeader)
 	Scenario.ApplyHeader(widget)
 end
 
@@ -1541,7 +1544,7 @@ Scenario.InstallHeaderHooks = function()
 	Scenario.headerHooked = true
 	for _, mixinName in ipairs(Scenario.headerMixins) do
 		local mixin = _G[mixinName]
-		if mixin then hooksecurefunc(mixin, 'Setup', Scenario.ApplyHeader) end
+		if mixin then Hook(mixin, 'Setup', Scenario.ApplyHeader) end
 	end
 end
 
@@ -1583,7 +1586,7 @@ Scenario.SyncStageBackdrop = function(stageBlock)
 	local shown = IsEnabled() and stageBlock:IsShown() and not stageBlock.widgetSetID
 	backdrop:SetShown(shown)
 	if shown and not Scenario.FitStageBackdrop(stageBlock, backdrop) then
-		C_Timer.After(0, function()
+		After('Skin.ObjectiveTracker stage fit', 0, function()
 			if backdrop:IsShown() then Scenario.FitStageBackdrop(stageBlock, backdrop) end
 		end)
 	end
@@ -1610,7 +1613,7 @@ local function Install()
 		if trackerFrame.NineSlice then HideFrameTextures(trackerFrame.NineSlice) end
 		if not hookedTrackers[trackerFrame] then
 			hookedTrackers[trackerFrame] = true
-			hooksecurefunc(trackerFrame, 'UpdateClampOffsets', Skin.TrackerClamp)
+			Hook(trackerFrame, 'UpdateClampOffsets', Skin.TrackerClamp)
 		end
 	end
 
@@ -1620,10 +1623,10 @@ local function Install()
 			if tracker.Header then SkinHeader(tracker.Header) end
 			if not hookedTrackers[tracker] then
 				hookedTrackers[tracker] = true
-				if tracker.AddBlock then hooksecurefunc(tracker, 'AddBlock', OnAddBlock) end
-				if tracker.GetProgressBar then hooksecurefunc(tracker, 'GetProgressBar', OnGetProgressBar) end
-				if tracker.GetTimerBar then hooksecurefunc(tracker, 'GetTimerBar', OnGetTimerBar) end
-				if tracker.OnBlockHeaderLeave then hooksecurefunc(tracker, 'OnBlockHeaderLeave', HideQuestTip) end
+				if tracker.AddBlock then Hook(tracker, 'AddBlock', OnAddBlock) end
+				if tracker.GetProgressBar then Hook(tracker, 'GetProgressBar', OnGetProgressBar) end
+				if tracker.GetTimerBar then Hook(tracker, 'GetTimerBar', OnGetTimerBar) end
+				if tracker.OnBlockHeaderLeave then Hook(tracker, 'OnBlockHeaderLeave', HideQuestTip) end
 			end
 		end
 	end

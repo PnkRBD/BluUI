@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Wrap = BUI.Profiler.Wrap
+
 local GroupFrames = BUI.GroupFrames
 local Util   = GroupFrames.Util
 local Pixel  = BUI.Pixel
@@ -148,7 +150,7 @@ local debugprofilestop = debugprofilestop
 
 local updateDriver = CreateFrame("Frame", "BUI_GroupAuraFlush")
 updateDriver:Hide()
-updateDriver:SetScript("OnUpdate", function(self)
+updateDriver:SetScript("OnUpdate", Wrap("GroupFrames.Auras flush", function(self)
 	local startTime = debugprofilestop()
 	for frame in pairs(dirtyFrames) do
 		dirtyFrames[frame] = nil
@@ -156,24 +158,24 @@ updateDriver:SetScript("OnUpdate", function(self)
 		if debugprofilestop() - startTime > AURA_FLUSH_BUDGET_MS then return end
 	end
 	if next(dirtyFrames) == nil then self:Hide() end
-end)
+end))
 
 function GroupFrames.MarkAurasDirty(frame)
 	dirtyFrames[frame] = true
 	updateDriver:Show()
 end
 
+function GroupFrames.SyncLifeState(frame, dead, offline)
+	if frame._bluWasDead == dead and frame._bluWasOffline == offline then return end
+	frame._bluWasDead, frame._bluWasOffline = dead, offline
+	GroupFrames.NudgePrivateAuras(frame)
+end
+
 function GroupFrames.RefreshFrameAuras(frame)
 	local unit = frame.unit
 	if not unit then return end
 	GroupFrames.UpdateDispelBorder(frame, unit)
-
-	local dead = UnitIsDeadOrGhost(unit) and true or false
-	local offline = not UnitIsConnected(unit)
-	if frame._bluWasDead ~= dead or frame._bluWasOffline ~= offline then
-		frame._bluWasDead, frame._bluWasOffline = dead, offline
-		GroupFrames.NudgePrivateAuras(frame)
-	end
+	GroupFrames.SyncLifeState(frame, UnitIsDeadOrGhost(unit) and true or false, not UnitIsConnected(unit))
 end
 
 local function ResetFrameAuras(frame, unit)
@@ -182,7 +184,7 @@ local function ResetFrameAuras(frame, unit)
 	BindAllKinds(frame, unit)
 end
 
-local UNIT_AURA_EVENTS = { "UNIT_AURA", "UNIT_FLAGS", "UNIT_PHASE", "UNIT_CONNECTION" }
+local UNIT_AURA_EVENTS = Engine.Available and { "UNIT_AURA" } or { "UNIT_AURA", "UNIT_FLAGS", "UNIT_PHASE", "UNIT_CONNECTION" }
 
 local function RegisterAuraUnitEvents(watcher, unit)
 	for eventIndex = 1, #UNIT_AURA_EVENTS do
@@ -234,7 +236,7 @@ end
 
 local warnedNoEngine = false
 
-function GroupFrames.BuildAuraContainers(frame, unit)
+local function BuildAuraContainers(frame)
 	local settings = GroupFrames.SettingsForFrame(frame)
 
 	if not Engine.Available and not warnedNoEngine then
@@ -252,7 +254,7 @@ function GroupFrames.BuildAuraContainers(frame, unit)
 	if not watcher then
 		watcher = CreateFrame("Frame", nil, frame)
 		frame._auraWatcher = watcher
-		watcher:SetScript("OnEvent", function(_, event, _, updateInfo)
+		watcher:SetScript("OnEvent", Wrap("GroupFrames.Auras aura event", function(_, event, _, updateInfo)
 			if event == "UNIT_AURA" then
 				RecordAddedAuras(updateInfo)
 				if AuraUpdateRelevant(frame, updateInfo) then GroupFrames.MarkAurasDirty(frame) end
@@ -260,23 +262,11 @@ function GroupFrames.BuildAuraContainers(frame, unit)
 			end
 			if event == "PLAYER_ENTERING_WORLD" then ResetFrameAuras(frame, frame.unit) end
 			GroupFrames.MarkAurasDirty(frame)
-		end)
+		end))
 		watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
 	end
 	frame._bluLastUnit = frame.unit or frame:GetAttribute("unit")
 	RegisterAuraUnitEvents(watcher, frame._bluLastUnit)
-
-	if not frame._bluUnitHookInstalled then
-		frame._bluUnitHookInstalled = true
-		frame:HookScript("OnAttributeChanged", function(self, name, value)
-			if name == "unit" and value ~= self._bluLastUnit then
-				self._bluLastUnit = value
-				ResetFrameAuras(self, value)
-				RegisterAuraUnitEvents(self._auraWatcher, value)
-				GroupFrames.MarkAurasDirty(self)
-			end
-		end)
-	end
 
 	BindAllKinds(frame, frame.unit)
 	GroupFrames.MarkAurasDirty(frame)
@@ -327,39 +317,46 @@ local function reflowAuraVisibility(frame)
 end
 GroupFrames.ReflowAuraVisibility = reflowAuraVisibility
 
-local REACHABILITY_EVENTS = {
-	"UNIT_CONNECTION", "UNIT_PHASE", "UNIT_FACTION", "UNIT_IN_RANGE_UPDATE", "UNIT_DISTANCE_CHECK_UPDATE",
-}
+local REACHABILITY_EVENTS = {}
+for _, event in ipairs({ "UNIT_CONNECTION", "UNIT_PHASE", "UNIT_FACTION", "UNIT_IN_RANGE_UPDATE", "UNIT_DISTANCE_CHECK_UPDATE" }) do
+	if C_EventUtils.IsEventValid(event) then REACHABILITY_EVENTS[#REACHABILITY_EVENTS + 1] = event end
+end
 
-function GroupFrames.AttachReachabilityHooks(frame)
-	local sink = CreateFrame("Frame", nil, frame)
-	sink:SetScript("OnEvent", function(_, _, eventUnit)
-		if eventUnit == frame.unit then reflowAuraVisibility(frame) end
-	end)
-	for _, event in ipairs(REACHABILITY_EVENTS) do
-		if C_EventUtils.IsEventValid(event) then sink:RegisterEvent(event) end
+local ReflowOnEvent = Wrap("GroupFrames.Auras reachability event", reflowAuraVisibility)
+local ReflowOnShow  = Wrap("GroupFrames.Auras show reflow", reflowAuraVisibility)
+
+local function AttachReachabilityHooks(frame)
+	for eventIndex = 1, #REACHABILITY_EVENTS do
+		frame:RegisterEvent(REACHABILITY_EVENTS[eventIndex], ReflowOnEvent)
 	end
-	frame:HookScript("OnShow", reflowAuraVisibility)
+	frame:HookScript("OnShow", ReflowOnShow)
+	frame._bluAurasVisible = nil
 	reflowAuraVisibility(frame)
 end
 
 local REACHABILITY_SWEEP_SECONDS = 1
 local reachabilityTicker
 
-local function SyncReachabilitySweep()
-	local wanted = IsInGroup()
+local function SweepIfVisible(child)
+	if child:IsVisible() then reflowAuraVisibility(child) end
+end
+
+local SweepReachability = Wrap("GroupFrames.Auras reachability sweep", function()
+	GroupFrames.EachChild(SweepIfVisible)
+end)
+
+function GroupFrames.SyncReachabilitySweep()
+	local wanted = GroupFrames.IsActive() and GroupFrames.GetDB().enabled and IsInGroup()
 	if wanted and not reachabilityTicker then
-		reachabilityTicker = C_Timer.NewTicker(REACHABILITY_SWEEP_SECONDS, function()
-			GroupFrames.EachChild(reflowAuraVisibility)
-		end)
+		reachabilityTicker = C_Timer.NewTicker(REACHABILITY_SWEEP_SECONDS, SweepReachability)
 	elseif not wanted and reachabilityTicker then
 		reachabilityTicker:Cancel()
 		reachabilityTicker = nil
 	end
 end
 
-BUI.Events:Register("GROUP_ROSTER_UPDATE", "GroupFrames.ReachabilitySweep", SyncReachabilitySweep)
-BUI.Events:Register("PLAYER_ENTERING_WORLD", "GroupFrames.ReachabilitySweep", SyncReachabilitySweep)
+BUI.Events:Register("GROUP_ROSTER_UPDATE", "GroupFrames.ReachabilitySweep", GroupFrames.SyncReachabilitySweep)
+BUI.Events:Register("PLAYER_ENTERING_WORLD", "GroupFrames.ReachabilitySweep", GroupFrames.SyncReachabilitySweep)
 
 local function ApplyAurasToChild(child)
 	if not child._auraWatcher then return end
@@ -378,20 +375,58 @@ function GroupFrames.RefreshAuras(section)
 	if section ~= "party" then GroupFrames.EachRaidChild(ApplyAurasToChild) end
 end
 
-function GroupFrames.FinishChildAuraSetup(child)
-	if child._auraWatcher or not child:GetAttribute("unit") or not GroupFrames.CanBuildChildren() then return end
-	GroupFrames.BuildAuraContainers(child, child.unit)
-	GroupFrames.AttachReachabilityHooks(child)
+local function FinishChildAuraSetup(child)
+	if child._auraWatcher or not child:GetAttribute("unit") then return end
+	BuildAuraContainers(child)
+	AttachReachabilityHooks(child)
+end
+
+local pendingSetup = {}
+local SETUP_BUDGET_MS = 4
+
+local setupDriver = CreateFrame("Frame")
+setupDriver:Hide()
+setupDriver:SetScript("OnUpdate", Wrap("GroupFrames.Auras staggered setup", function(self)
+	if not GroupFrames.CanBuildChildren() then
+		self:Hide()
+		return
+	end
+	local startTime = debugprofilestop()
+	for child in pairs(pendingSetup) do
+		pendingSetup[child] = nil
+		FinishChildAuraSetup(child)
+		if debugprofilestop() - startTime > SETUP_BUDGET_MS then return end
+	end
+	self:Hide()
+end))
+
+function GroupFrames.QueueChildAuraSetup(child)
+	if child._auraWatcher or not child:GetAttribute("unit") then return end
+	pendingSetup[child] = true
+	setupDriver:Show()
+end
+
+function GroupFrames.RebindAuraUnit(frame, unit)
+	local watcher = frame._auraWatcher
+	if not watcher then
+		GroupFrames.QueueChildAuraSetup(frame)
+		return
+	end
+	if unit == frame._bluLastUnit then return end
+	frame._bluLastUnit = unit
+	ResetFrameAuras(frame, unit)
+	RegisterAuraUnitEvents(watcher, unit)
+	GroupFrames.MarkAurasDirty(frame)
 end
 
 local function FinishPendingChildren()
 	GroupFrames.EachChild(function(child)
-		GroupFrames.FinishChildAuraSetup(child)
+		GroupFrames.QueueChildAuraSetup(child)
 		if child.unit then GroupFrames.MarkAurasDirty(child) end
 	end)
 end
 
-BUI.Tools.OnAuraQueriesUnblocked(FinishPendingChildren)
+BUI.Tools.OnAuraQueriesUnblocked(FinishPendingChildren, 'Group frame auras')
 BUI.Events:Register("PLAYER_REGEN_ENABLED", "GroupFrames.FinishChildren", function()
 	BUI.Events:AfterCombatSettled(FinishPendingChildren, "GroupFrames.FinishChildren")
 end)

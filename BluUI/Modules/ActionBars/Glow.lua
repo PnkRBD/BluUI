@@ -69,15 +69,22 @@ local function SpellOverlayed(spellID)
 	return Plain(IsSpellOverlayed(spellID)) == true
 end
 
-local function ButtonOverlayed(button)
-	if SpellOverlayed(button:GetSpellId()) then return true end
+local pendingSpells = {}
+local pendingAll = false
+
+local function SpellPending(spellID)
+	spellID = Plain(spellID)
+	return spellID ~= nil and pendingSpells[spellID] == true
+end
+
+local function AnyButtonSpell(button, test)
+	if test(button:GetSpellId()) then return true end
 	if button._state_type ~= 'action' or not button._state_action then return false end
 	local actionType, actionID = GetActionInfo(button._state_action)
 	if actionType ~= 'flyout' or not actionID then return false end
 	local _, _, slotCount = GetFlyoutInfo(actionID)
 	for slotIndex = 1, (slotCount or 0) do
-		local flyoutSpellID = GetFlyoutSlotInfo(actionID, slotIndex)
-		if SpellOverlayed(flyoutSpellID) then return true end
+		if test(GetFlyoutSlotInfo(actionID, slotIndex)) then return true end
 	end
 	return false
 end
@@ -87,22 +94,32 @@ function ActionBars.SyncProcGlow(button)
 		HideGlow(button)
 		return
 	end
-	if ButtonOverlayed(button) then ShowGlow(button) else HideGlow(button) end
-end
-
-local function SyncAllProcGlow()
-	ActionBars.ForEachButton(ActionBars.SyncProcGlow)
+	if AnyButtonSpell(button, SpellOverlayed) then ShowGlow(button) else HideGlow(button) end
 end
 
 function ActionBars.RefreshProcGlow()
 	ActionBars.ForEachButton(HideGlow)
-	SyncAllProcGlow()
+	ActionBars.ForEachButton(ActionBars.SyncProcGlow)
 end
 
-local QueueSync = BUI.Dispatcher.New(SyncAllProcGlow, EVENT_KEY)
+local function SyncPendingButton(button)
+	if pendingAll or AnyButtonSpell(button, SpellPending) then ActionBars.SyncProcGlow(button) end
+end
 
-BUI.Events:Register('SPELL_ACTIVATION_OVERLAY_GLOW_SHOW', EVENT_KEY .. '.Show', QueueSync)
-BUI.Events:Register('SPELL_ACTIVATION_OVERLAY_GLOW_HIDE', EVENT_KEY .. '.Hide', QueueSync)
+local QueueSync = BUI.Dispatcher.New(function()
+	ActionBars.ForEachButton(SyncPendingButton)
+	wipe(pendingSpells)
+	pendingAll = false
+end, EVENT_KEY)
+
+local function OnOverlayGlowChanged(_, spellID)
+	spellID = Plain(spellID)
+	if spellID then pendingSpells[spellID] = true else pendingAll = true end
+	QueueSync()
+end
+
+BUI.Events:Register('SPELL_ACTIVATION_OVERLAY_GLOW_SHOW', EVENT_KEY .. '.Show', OnOverlayGlowChanged)
+BUI.Events:Register('SPELL_ACTIVATION_OVERLAY_GLOW_HIDE', EVENT_KEY .. '.Hide', OnOverlayGlowChanged)
 
 LibActionButton.RegisterCallback(glowOwner, 'OnButtonUpdate', function(_, button)
 	if not button._buiBar then return end

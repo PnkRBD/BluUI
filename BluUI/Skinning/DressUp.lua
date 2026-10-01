@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.DressUp')
+
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
@@ -118,10 +120,10 @@ local function Install()
 	local frame = _G.DressUpFrame
 	if not frame then return end
 	installed = true
-	frame:HookScript('OnShow', Apply)
-	if _G.SideDressUpFrame then _G.SideDressUpFrame:HookScript('OnShow', ApplySide) end
+	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.DressUp frame reskin', Apply))
+	if _G.SideDressUpFrame then _G.SideDressUpFrame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.DressUp side reskin', ApplySide)) end
 	local slotMixin = _G.DressUpCustomSetDetailsSlotMixin
-	if slotMixin and slotMixin.SetDetails then hooksecurefunc(slotMixin, 'SetDetails', OnSlotDetails) end
+	if slotMixin and slotMixin.SetDetails then Hook(slotMixin, 'SetDetails', OnSlotDetails) end
 	if frame:IsShown() then Apply() end
 end
 

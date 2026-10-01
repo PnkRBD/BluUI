@@ -7,10 +7,11 @@ local BUTTON_COUNT = ActionBars.STANCE_BUTTON_COUNT
 local COMMAND = 'SHAPESHIFTBUTTON'
 local VISIBILITY = '[petbattle][vehicleui][overridebar][possessbar] hide; show'
 local EVENT_KEY = 'ActionBars.StanceBar'
-local VISUAL_EVENTS = { 'UPDATE_SHAPESHIFT_FORM', 'UPDATE_SHAPESHIFT_USABLE', 'PLAYER_ENTERING_WORLD' }
+local VISUAL_EVENTS = { 'UPDATE_SHAPESHIFT_USABLE', 'PLAYER_ENTERING_WORLD' }
 local UNUSABLE_TINT = 0.4
 
 local bar
+local paintedForm, paintedFormID
 
 local function OnEnter(button)
 	if not button._hasAction then return end
@@ -60,6 +61,7 @@ end
 
 local function UpdateVisuals()
 	if not bar then return end
+	paintedForm, paintedFormID = GetShapeshiftForm(), GetShapeshiftFormID()
 	local formCount = GetNumShapeshiftForms()
 	for index, button in ipairs(bar.buttons) do
 		if index <= formCount then UpdateButton(button, index) end
@@ -67,6 +69,11 @@ local function UpdateVisuals()
 end
 
 local QueueVisuals = BUI.Dispatcher.New(UpdateVisuals, EVENT_KEY)
+
+local function OnFormChanged()
+	if GetShapeshiftForm() == paintedForm and GetShapeshiftFormID() == paintedFormID then return end
+	QueueVisuals()
+end
 
 local function UpdateCooldowns()
 	if not bar then return end
@@ -80,6 +87,7 @@ local function RegisterEvents()
 	for _, event in ipairs(VISUAL_EVENTS) do
 		BUI.Events:Register(event, EVENT_KEY, QueueVisuals)
 	end
+	BUI.Events:Register('UPDATE_SHAPESHIFT_FORM', EVENT_KEY, OnFormChanged)
 	BUI.Events:Register('UPDATE_SHAPESHIFT_COOLDOWN', EVENT_KEY .. '.Cooldown', UpdateCooldowns)
 	BUI.Events:Register('UPDATE_SHAPESHIFT_FORMS', EVENT_KEY .. '.Forms', function()
 		ActionBars.RunSecure('StanceForms', ActionBars.RefreshStanceBar)

@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Wrap = BUI.Profiler.Wrap
+
 local GroupFrames    = BUI.GroupFrames
 local Util  = GroupFrames.Util
 local Pixel = BUI.Pixel
@@ -69,6 +71,15 @@ local ROLE_ICON_ROLES = {
 	tankhealer = { TANK = true, HEALER = true },
 }
 
+local LEADER_ATLAS    = "UI-HUD-UnitFrame-Player-Group-LeaderIcon"
+local ASSISTANT_ATLAS = "UI-HUD-UnitFrame-Party-PortraitOn-Icon-Assist"
+
+local function ShowAtlas(element, atlas, useAtlasSize)
+	if element:IsShown() and element:GetAtlas() == atlas then return end
+	element:SetAtlas(atlas, useAtlasSize)
+	element:Show()
+end
+
 local function RoleOverride(self)
 	local element = self.GroupRoleIndicator
 	if element._previewOn then return end
@@ -76,7 +87,7 @@ local function RoleOverride(self)
 	local atlas = role and ROLE_ATLAS[role]
 	local allowedRoles  = ROLE_ICON_ROLES[GroupFrames.SettingsForFrame(self).roleIconFilter or "all"]
 	if atlas and (not allowedRoles or allowedRoles[role]) then
-		element:SetAtlas(atlas); element:Show()
+		ShowAtlas(element, atlas)
 	else
 		element:Hide()
 	end
@@ -88,16 +99,14 @@ local function LeaderOverride(self)
 	if self._preview then
 		local decoy = self._previewDecoy
 		if decoy and decoy.leader then
-			element:SetAtlas("UI-HUD-UnitFrame-Player-Group-LeaderIcon", element.useAtlasSize)
-			element:Show()
+			ShowAtlas(element, LEADER_ATLAS, element.useAtlasSize)
 		else
 			element:Hide()
 		end
 		return
 	end
 	if self.unit and UnitInParty(self.unit) and UnitIsGroupLeader(self.unit) then
-		element:SetAtlas("UI-HUD-UnitFrame-Player-Group-LeaderIcon", element.useAtlasSize)
-		element:Show()
+		ShowAtlas(element, LEADER_ATLAS, element.useAtlasSize)
 	else
 		element:Hide()
 	end
@@ -108,8 +117,7 @@ local function AssistantOverride(self)
 	if element._previewOn then return end
 	if self._preview then element:Hide(); return end
 	if self.unit and UnitInParty(self.unit) and UnitIsGroupAssistant(self.unit) and not UnitIsGroupLeader(self.unit) then
-		element:SetAtlas("UI-HUD-UnitFrame-Party-PortraitOn-Icon-Assist", element.useAtlasSize)
-		element:Show()
+		ShowAtlas(element, ASSISTANT_ATLAS, element.useAtlasSize)
 	else
 		element:Hide()
 	end
@@ -126,10 +134,10 @@ local function WirePlayerReadyCheck(frame, texture)
 			texture:Hide()
 		end
 	end
-	watcher:SetScript("OnEvent", function(_, event)
+	watcher:SetScript("OnEvent", Wrap("GroupFrames.Indicators ready check", function(_, event)
 		if event == "READY_CHECK_FINISHED" then
 			if hideTimer then hideTimer:Cancel() end
-			hideTimer = C_Timer.NewTimer(10, function()
+			hideTimer = BUI.Profiler.NewTimer("GroupFrames.Indicators ready hide", 10, function()
 				hideTimer = nil
 				texture:Hide()
 			end)
@@ -137,7 +145,7 @@ local function WirePlayerReadyCheck(frame, texture)
 			if hideTimer then hideTimer:Cancel(); hideTimer = nil end
 			ApplyReadyStatus()
 		end
-	end)
+	end))
 	watcher:RegisterEvent("READY_CHECK")
 	watcher:RegisterEvent("READY_CHECK_CONFIRM")
 	watcher:RegisterEvent("READY_CHECK_FINISHED")
@@ -242,15 +250,19 @@ function GroupFrames.ReapplyIndicatorPreviews()
 	for kind in pairs(previewActive) do GroupFrames.PreviewIndicator(kind, true) end
 end
 
+local targetedFrames = {}
+
 local function UpdateSelection(frame)
 	local selection = frame.Selection
 	if not selection then return end
+	targetedFrames[frame] = nil
 	local unit = frame.unit
 	if not unit then selection:Hide(); return end
 	local settings = GroupFrames.SettingsForFrame(frame)
 	local border
 	if UnitIsUnit("target", unit) and settings.targetBorder.enabled then
 		border = settings.targetBorder
+		targetedFrames[frame] = true
 	elseif frame._isMouseover and settings.mouseoverBorder.enabled then
 		border = settings.mouseoverBorder
 	end
@@ -283,14 +295,29 @@ end
 
 GroupFrames.RefreshSelection = UpdateSelection
 
+local previouslyTargeted = {}
+
+local function SelectIfTarget(child)
+	if child.unit and UnitIsUnit("target", child.unit) then UpdateSelection(child) end
+end
+
+local function TargetInGroup()
+	return UnitPlayerOrPetInRaid("target") or UnitPlayerOrPetInParty("target") or UnitIsUnit("target", "player")
+end
+
 local selectionWatcher
 function GroupFrames.HookSelection()
 	if selectionWatcher then return end
 	selectionWatcher = CreateFrame("Frame")
 	selectionWatcher:RegisterEvent("PLAYER_TARGET_CHANGED")
-	selectionWatcher:SetScript("OnEvent", function()
-		GroupFrames.EachChild(UpdateSelection)
-	end)
+	selectionWatcher:SetScript("OnEvent", Wrap("GroupFrames.Indicators target change", function()
+		for frame in pairs(targetedFrames) do previouslyTargeted[#previouslyTargeted + 1] = frame end
+		for index = #previouslyTargeted, 1, -1 do
+			UpdateSelection(previouslyTargeted[index])
+			previouslyTargeted[index] = nil
+		end
+		if TargetInGroup() then GroupFrames.EachChild(SelectIfTarget) end
+	end))
 end
 
 BUI.oUF:RegisterInitCallback(function(frame)

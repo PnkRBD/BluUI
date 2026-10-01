@@ -201,16 +201,16 @@ local function EnsureFlyStateDriver()
 	if not FlyingMatters() then return end
 	if InCombatLockdown() then return end
 	flyStateFrame = CreateFrame('Frame', 'BUI_FlyStateDriver')
-	flyStateFrame:SetScript('OnAttributeChanged', function(_, attributeName)
+	flyStateFrame:SetScript('OnAttributeChanged', BUI.Profiler.Wrap('Utility.Visibility fly state', function(_, attributeName)
 		if attributeName == 'state-buiflying' then Visibility.Update() end
-	end)
+	end))
 	RegisterStateDriver(flyStateFrame, 'buiflying', '[flying] fly; [mounted] mounted; ground')
 end
 
 local function OnVisibilityEvent(event)
 	if event == 'PLAYER_ENTERING_WORLD' then
 		forceInstant = true
-		C_Timer.After(1, function() forceInstant = false end)
+		BUI.Profiler.After('Utility.Visibility instant reset', 1, function() forceInstant = false end)
 	end
 
 	Visibility.Update(forceInstant or event == 'PLAYER_ENTERING_WORLD')

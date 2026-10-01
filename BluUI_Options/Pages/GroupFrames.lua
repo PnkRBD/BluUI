@@ -199,8 +199,14 @@ end
 local function FramesBoard(ui, parent, width, key)
 	local section = Config()[key]
 	local isParty = key == 'party'
-	local function Refresh() GroupFrames().Refresh(key) end
-	local Colors = GroupFrames().RefreshColors
+	local function Refresh()
+		GroupFrames().Refresh(key)
+		if not isParty then BUI.UnitFrames.RefreshLifeVisuals() end
+	end
+	local function Colors()
+		GroupFrames().RefreshColors()
+		if not isParty then BUI.UnitFrames.RefreshLifeVisuals() end
+	end
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = isParty and 'Party frames' or 'Raid frames',

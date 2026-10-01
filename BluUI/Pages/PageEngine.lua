@@ -60,9 +60,10 @@ local function CreateWindow()
 	window.frame:SetScale(BUI.db.global.windowScale / 100)
 	PageEngine.window = window
 	PageEngine.frame  = window.frame
+	BUI.Tools.AddPageWatermark(window.content)
 	BUI.Scale.SetupButtons(window, PageEngine.frame)
 
-	window.frame:HookScript('OnHide', HideCurrentPage)
+	window.frame:HookScript('OnHide', BUI.Profiler.Wrap('Pages.PageEngine window hidden', HideCurrentPage))
 
 	local buttonFrame = window.footerLeftmost
 	local searchBox = Controls.SearchBox(buttonFrame:GetParent(), 'Search...', function(query)

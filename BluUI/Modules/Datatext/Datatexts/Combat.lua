@@ -57,7 +57,7 @@ local function BeginPull()
     combatStart = GetTime()
     combatLast = 0
     combatText = '00:00'
-    Datatext.Refresh()
+    Datatext.Refresh('combat')
 end
 
 local function FinalizePull()
@@ -76,7 +76,7 @@ local function OnCombatEnd()
     if not combatActive then return end
     combatEndToken = combatEndToken + 1
     local token = combatEndToken
-    C_Timer.After(COMBAT_END_GRACE, function()
+    BUI.Profiler.After('Datatext.Combat combat end', COMBAT_END_GRACE, function()
         if combatEndToken == token and not UnitAffectingCombat('player') then
             FinalizePull()
         end
@@ -160,7 +160,7 @@ Datatext.Register('combat', {
         local text = FormatSeconds(combatLast)
         if text ~= combatText then
             combatText = text
-            Datatext.Refresh()
+            Datatext.Refresh('combat')
         end
     end,
     build = function(config, valueHex, self)

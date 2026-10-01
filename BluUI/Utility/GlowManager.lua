@@ -66,7 +66,7 @@ end
 
 function GlowManager.ScheduleDeferred(frameData, delay, callback)
     GlowManager.CancelDeferred(frameData)
-    frameData._glowTimer = C_Timer.NewTimer(delay, function()
+    frameData._glowTimer = BUI.Profiler.NewTimer('Utility.GlowManager deferred glow', delay, function()
         frameData._glowTimer = nil
         callback()
     end)

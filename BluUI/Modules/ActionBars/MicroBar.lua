@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('ActionBars.MicroBar')
+
 local ActionBars = BUI.ActionBars
 
 local BLIZZARD_PADDING = -5
@@ -124,11 +126,11 @@ local function OnBlizzardMove()
 end
 
 local function InstallHooks()
-	hooksecurefunc(MicroMenu, 'Layout', OnBlizzardLayout)
-	hooksecurefunc(MicroMenu, 'ResetMicroMenuPosition', OnBlizzardMove)
-	hooksecurefunc(MicroMenu, 'OverrideMicroMenuPosition', OnBlizzardMove)
-	hooksecurefunc(MicroMenu, 'SetNormalScale', OnBlizzardMove)
-	hooksecurefunc('MicroMenuBar_ClearFullScreenFrame', OnBlizzardMove)
+	Hook(MicroMenu, 'Layout', OnBlizzardLayout)
+	Hook(MicroMenu, 'ResetMicroMenuPosition', OnBlizzardMove)
+	Hook(MicroMenu, 'OverrideMicroMenuPosition', OnBlizzardMove)
+	Hook(MicroMenu, 'SetNormalScale', OnBlizzardMove)
+	Hook('MicroMenuBar_ClearFullScreenFrame', OnBlizzardMove)
 end
 
 microBar = ActionBars.NewBlizzardBar({

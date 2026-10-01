@@ -1,5 +1,6 @@
 local _, BUI = ...
 local Pixel = BUI.Pixel
+local After = BUI.Profiler.After
 
 local BUILib = BluUI.BUILibClient
 local Theme = BUILib.Theme
@@ -105,13 +106,13 @@ function SearchResults.NavigateTo(result)
 
 	pageEngine.ShowPage(pageIndex)
 
-	C_Timer.After(0, function()
+	After('Utility.SearchResults navigate', 0, function()
 		local pageOptions = pageEngine.pages[result.page]
 		if not pageOptions or not pageOptions.frame then return end
 
 		if result.sidebar and pageOptions.frame._selectModule then
 			pageOptions.frame._selectModule(result.sidebar)
-			C_Timer.After(0.15, function()
+			After('Utility.SearchResults highlight setting', 0.15, function()
 				SearchResults.HighlightSetting(pageOptions.frame, result)
 			end)
 			return
@@ -126,7 +127,7 @@ function SearchResults.NavigateTo(result)
 				if tab.scroll.UpdateScroll then tab.scroll:UpdateScroll() end
 			end
 		end
-		C_Timer.After(0.15, function()
+		After('Utility.SearchResults highlight setting', 0.15, function()
 			SearchResults.HighlightSetting(pageOptions.frame, result)
 		end)
 	end)
@@ -180,7 +181,7 @@ function SearchResults.HighlightSetting(pageFrame, result)
 				local elapsedTime = 0
 				if SearchResults._scrollAnim then SearchResults._scrollAnim:SetScript('OnUpdate', nil) end
 				if not SearchResults._scrollAnim then SearchResults._scrollAnim = CreateFrame('Frame') end
-				SearchResults._scrollAnim:SetScript('OnUpdate', function(self, deltaTime)
+				SearchResults._scrollAnim:SetScript('OnUpdate', BUI.Profiler.Wrap('Utility.SearchResults scroll anim', function(self, deltaTime)
 					elapsedTime = elapsedTime + deltaTime
 					local progress = math.min(elapsedTime / 0.3, 1)
 					progress = 1 - (1 - progress) * (1 - progress)
@@ -191,7 +192,7 @@ function SearchResults.HighlightSetting(pageFrame, result)
 						if scrollParent and scrollParent.UpdateScroll then scrollParent:UpdateScroll() end
 						self:SetScript('OnUpdate', nil)
 					end
-				end)
+				end))
 			end
 		end
 	end
@@ -217,7 +218,7 @@ function SearchResults.HighlightSetting(pageFrame, result)
 
 	local elapsed = 0
 	if not SearchResults._pulseAnim then SearchResults._pulseAnim = CreateFrame('Frame') end
-	SearchResults._pulseAnim:SetScript('OnUpdate', function(self, deltaTime)
+	SearchResults._pulseAnim:SetScript('OnUpdate', BUI.Profiler.Wrap('Utility.SearchResults pulse anim', function(self, deltaTime)
 		elapsed = elapsed + deltaTime
 		if elapsed < 4 then
 			bar:SetAlpha(0.4 + 0.2 * math.sin(elapsed * 8))
@@ -228,7 +229,7 @@ function SearchResults.HighlightSetting(pageFrame, result)
 			target:SetTextColor(originalRed, originalGreen, originalBlue)
 			self:SetScript('OnUpdate', nil)
 		end
-	end)
+	end))
 
 	SearchResults._highlight = { bar = bar, target = target, origR = originalRed, origG = originalGreen, origB = originalBlue }
 end

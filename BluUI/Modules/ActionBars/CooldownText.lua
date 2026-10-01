@@ -12,8 +12,10 @@ function ActionBars.StyleCooldownText(button, cooldown)
 	cooldown:SetHideCountdownNumbers(not barSettings.showCooldownText)
 	local region = BUI.Tools.CooldownFontString(cooldown)
 	if not region then return end
+	local fontReset = Pixel.ApplyFont(region, barSettings.cooldownFontSize, BUI.GetAddonFont(), 'OUTLINE')
+	if cooldown._buiTextStyled and not fontReset then return end
+	cooldown._buiTextStyled = true
 	local settings = ActionBars.GetSettings()
-	Pixel.ApplyFont(region, barSettings.cooldownFontSize, BUI.GetAddonFont(), 'OUTLINE')
 	local color = settings.cooldownColor
 	region:SetTextColor(color[1], color[2], color[3], color[4])
 	local threshold = settings.cooldownThreshold
@@ -32,7 +34,11 @@ function ActionBars.StyleCooldownText(button, cooldown)
 end
 
 local function RefreshButtonCooldownText(button)
-	if button.cooldown then ActionBars.StyleCooldownText(button, button.cooldown) end
+	local cooldown = button.cooldown
+	if not cooldown then return end
+	cooldown._buiTextStyled = nil
+	cooldown._buiSwipeApplied = nil
+	ActionBars.StyleCooldownText(button, cooldown)
 end
 
 function ActionBars.RefreshCooldownText()

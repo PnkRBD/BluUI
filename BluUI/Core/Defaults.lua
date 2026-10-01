@@ -448,6 +448,7 @@ BUI.Defaults = {
 			staticpopupScale = 1,
 			grouploot = true,
 			grouplootGrowDown = false,
+			inspectScale = 100,
 			loothistory = true,
 			friends = true,
 			groupfinder = true,

@@ -113,7 +113,7 @@ function PackLeader.Create()
         fade:SetToAlpha(0)
         fade:SetDuration(0.45)
         fade:SetSmoothing('OUT')
-        pip.flashAnimation:SetScript('OnFinished', function() pip.flash:SetAlpha(0) end)
+        pip.flashAnimation:SetScript('OnFinished', BUI.Profiler.Wrap('BuffTracking.PackLeader flash done', function() pip.flash:SetAlpha(0) end))
     end
 
     local function PlayFlash(pip, red, green, blue)

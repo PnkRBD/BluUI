@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.Menus')
+
 local next = next
 local pairs = pairs
 local wipe = wipe
@@ -57,7 +59,7 @@ local function SkinFrame(frame)
 	pendingMenus[frame] = true
 	if flushScheduled then return end
 	flushScheduled = true
-	C_Timer.After(0, FlushPending)
+	BUI.Profiler.After('Skin.Menus pending flush', 0, FlushPending)
 end
 
 local function SkinAttachments(compositor)
@@ -83,10 +85,10 @@ local function Install()
 	if not _G.Menu or not _G.Menu.GetManager then return end
 	local manager = _G.Menu.GetManager()
 	if not manager then return end
-	hooksecurefunc(manager, 'OpenMenu', OnMenuOpen)
-	hooksecurefunc(manager, 'OpenContextMenu', OnMenuOpen)
+	Hook(manager, 'OpenMenu', OnMenuOpen)
+	Hook(manager, 'OpenContextMenu', OnMenuOpen)
 	if _G.CompositorMixin and _G.CompositorMixin.AttachTexture then
-		hooksecurefunc(_G.CompositorMixin, 'AttachTexture', SkinAttachments)
+		Hook(_G.CompositorMixin, 'AttachTexture', SkinAttachments)
 	end
 end
 

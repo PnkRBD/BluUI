@@ -133,15 +133,16 @@ function CDM.SetupBlizzardOverlay()
             anchored = true
         end
     end
+    local PollTickTimed = BUI.Profiler.Wrap("CDM.Overlay tab poll", PollTick)
 
-    CooldownViewerSettings:HookScript("OnShow", function()
+    CooldownViewerSettings:HookScript("OnShow", BUI.Profiler.Wrap("CDM.Overlay settings show", function()
         cachedDB = BUI.GetDB()
         PollTick()
         if not pollTicker and not tabsHooked then
-            pollTicker = C_Timer.NewTicker(1.0, PollTick)
+            pollTicker = C_Timer.NewTicker(1.0, PollTickTimed)
         end
-    end)
-    CooldownViewerSettings:HookScript("OnHide", function()
+    end))
+    CooldownViewerSettings:HookScript("OnHide", BUI.Profiler.Wrap("CDM.Overlay settings hide", function()
         overlay:Hide()
         dismissed = false
         cachedDB = nil
@@ -150,13 +151,13 @@ function CDM.SetupBlizzardOverlay()
             pollTicker:Cancel()
             pollTicker = nil
         end
-    end)
+    end))
 
     if CooldownViewerSettings:IsShown() then
         cachedDB = BUI.GetDB()
         PollTick()
         if not pollTicker and not tabsHooked then
-            pollTicker = C_Timer.NewTicker(1.0, PollTick)
+            pollTicker = C_Timer.NewTicker(1.0, PollTickTimed)
         end
     end
 end

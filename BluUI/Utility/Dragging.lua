@@ -24,7 +24,7 @@ function Dragging.GetCenterOffset(frame)
     return Scale(frameX - parentX), Scale(frameY - parentY)
 end
 
-local function OnDragUpdate(self)
+local OnDragUpdate = BUI.Profiler.Wrap("Utility.Dragging drag update", function(self)
     if not self.dragActive then return end
 
     if self.dragLockHorizontal and self._dragLockedX then
@@ -44,7 +44,7 @@ local function OnDragUpdate(self)
         end
         self.dragOnDragging(offsetX, offsetY)
     end
-end
+end)
 
 local function OnDragStart(self)
     local locked = self.dragLocked
@@ -157,7 +157,7 @@ local function CreateHintUI(parent, options)
     label:SetText(options.hintText or HintText)
     hint.text = label
 
-    C_Timer.After(0, function()
+    BUI.Profiler.After("Utility.Dragging hint size", 0, function()
         if hint:IsShown() then hint:SnapSize(label:GetStringWidth() + 16, 20) end
     end)
     hint:SnapSize(120, 20)
@@ -246,14 +246,14 @@ function Dragging.SaveCenterPosition(frame, config, honorCenter)
     return config.posX, config.posY
 end
 
-local function CenterDragOnUpdate(frame)
+local CenterDragOnUpdate = BUI.Profiler.Wrap("Utility.Dragging center drag", function(frame)
     local _, centerY = frame:GetCenter()
     local _, uiCenterY = UIParent:GetCenter()
     if centerY and uiCenterY then
         frame:ClearAllPoints()
         frame:SetPoint("CENTER", UIParent, "CENTER", 0, BUI.Round(centerY - uiCenterY))
     end
-end
+end)
 
 function Dragging.EnableAnchorDrag(frame, options)
     frame:EnableMouse(true)

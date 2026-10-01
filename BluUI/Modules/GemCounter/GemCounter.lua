@@ -1,6 +1,7 @@
 local _, BUI = ...
 local PoolGet, PoolHideFrom = BUI.Tools.PoolGet, BUI.Tools.PoolHideFrom
 local Pixel = BUI.Pixel
+local After = BUI.Profiler.After
 
 local BUILib = BluUI.BUILibClient
 local Widget   = BUILib.Widget
@@ -178,7 +179,7 @@ local function StartGemDrag(itemID, icon)
 		ghostTexture:SetAllPoints()
 		BUI.Skinning.CropIcon(ghostTexture)
 		dragGhost.tex = ghostTexture
-		dragGhost:SetScript('OnUpdate', FollowCursor)
+		dragGhost:SetScript('OnUpdate', BUI.Profiler.Wrap('GemCounter.GemCounter follow cursor', FollowCursor))
 	end
 	dragGhost.tex:SetTexture(icon)
 	dragGemID = itemID
@@ -342,7 +343,7 @@ end
 
 local function AcceptAndClose()
 	C_ItemSocketInfo.AcceptSockets()
-	C_Timer.After(0.2, CloseSocketInfo)
+	After('GemCounter.GemCounter close socket', 0.2, CloseSocketInfo)
 end
 
 local function SocketCurrentGroup()
@@ -356,7 +357,7 @@ local function SocketCurrentGroup()
 		end
 	end
 	if clicked then
-		C_Timer.After(0.2, AcceptAndClose)
+		After('GemCounter.GemCounter accept sockets', 0.2, AcceptAndClose)
 	else
 		C_ItemSocketInfo.CloseSocketInfo()
 	end
@@ -365,7 +366,7 @@ end
 local function OnSocketInfoUpdate()
 	if not applying or applyStep ~= 'open' then return end
 	applyStep = 'socket'
-	C_Timer.After(0.1, SocketCurrentGroup)
+	After('GemCounter.GemCounter socket group', 0.1, SocketCurrentGroup)
 end
 
 local function ProcessNextItem()
@@ -376,7 +377,7 @@ local function ProcessNextItem()
 		applyStep  = nil
 		applyQueue = nil
 		ClearAllPending()
-		C_Timer.After(0.5, RefreshContent)
+		After('GemCounter.GemCounter apply refresh', 0.5, RefreshContent)
 		return
 	end
 	SocketInventoryItem(applyQueue[applyIndex].slotID)
@@ -385,7 +386,7 @@ end
 local function OnSocketInfoClose()
 	if not applying or applyStep ~= 'socket' then return end
 	applyStep = 'next'
-	C_Timer.After(0.3, ProcessNextItem)
+	After('GemCounter.GemCounter next item', 0.3, ProcessNextItem)
 end
 
 local function BeginApply()
@@ -918,7 +919,7 @@ RefreshContent = function()
 	Redraw()
 end
 
-local ThrottledRefresh = BUI.Dispatcher.NewDelayed(RefreshContent, 0.3)
+local ThrottledRefresh = BUI.Dispatcher.NewDelayed(RefreshContent, 0.3, 'Gem counter refresh')
 
 slide = BUI.SlidePanel.New({
 	skin = 'gemcounter',
@@ -976,7 +977,7 @@ local function OnInventoryChanged()
 end
 
 BUI.Events:OnLogin('GemCounter', function()
-	CharacterFrame:HookScript('OnHide', OnCharacterHide)
+	CharacterFrame:HookScript('OnHide', BUI.Profiler.Wrap('GemCounter.GemCounter character hide', OnCharacterHide))
 	BuildFallbackButton()
 	UpdateFallbackButton()
 

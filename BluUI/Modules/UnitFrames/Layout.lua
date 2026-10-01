@@ -10,10 +10,39 @@ local UnitIsConnected = UnitIsConnected
 local UnitIsDead = UnitIsDead
 local UnitIsDeadOrGhost = UnitIsDeadOrGhost
 local UnitIsGhost = UnitIsGhost
+local UnitPowerType = UnitPowerType
+
+local HEALTH_VALUE_EVENTS = {
+	UNIT_HEALTH = true,
+	UNIT_MAXHEALTH = true,
+	UNIT_HEAL_PREDICTION = true,
+	UNIT_ABSORB_AMOUNT_CHANGED = true,
+	UNIT_HEAL_ABSORB_AMOUNT_CHANGED = true,
+	UNIT_MAX_HEALTH_MODIFIERS_CHANGED = true,
+}
+
+local POWER_VALUE_EVENTS = {
+	UNIT_POWER_FREQUENT = true,
+	UNIT_MAXPOWER = true,
+}
+
+local STATUS_NAMES = { offline = 'Offline', ghost = 'Ghost', dead = 'Dead' }
+
+local function DeadBackgroundColor(frame)
+	local state = frame._statusState
+	if state ~= 'dead' and state ~= 'ghost' then return end
+	local raidSettings = BUI.GroupFrames.GetDB().raid
+	if raidSettings.deadBackground then return raidSettings.deadBackgroundColor end
+end
 
 local function HealthUpdateColor(self, event, unit)
-	if not unit or self.unit ~= unit then return end
+	if HEALTH_VALUE_EVENTS[event] or not unit or self.unit ~= unit then return end
 	local element = self.Health
+	local deadColor = DeadBackgroundColor(self)
+	if deadColor then
+		element:SetStatusBarColor(deadColor[1], deadColor[2], deadColor[3], deadColor[4] or 1)
+		return
+	end
 	local settings = UnitFrames.GetSettings()
 
 	local red, green, blue
@@ -35,13 +64,21 @@ local function HealthUpdateColor(self, event, unit)
 	end
 end
 
-local function PowerPostUpdateColor(element, unit, color)
-	local frame = element:GetParent()
+local function PowerUpdateColor(self, event, unit)
+	if POWER_VALUE_EVENTS[event] or self.__unit ~= unit then return end
+	local element = self.Power
 	local settings = UnitFrames.GetSettings()
-	if color and not settings.useClassColorPowerBar then return end
-	local unitSettings = UnitFrames.GetUnitSettings(frame._unitType)
-	local red, green, blue, alpha = UnitFrames.GetPowerColor(unit, settings, unitSettings)
-	element:SetStatusBarColor(red, green, blue, alpha)
+	if element.colorPower and not settings.useClassColorPowerBar then
+		local powerColors = self.colors.power
+		local powerType, powerToken, altRed = UnitPowerType(unit)
+		local tokenColor = powerColors[powerToken]
+		if tokenColor or not altRed then
+			element:SetStatusBarColor((tokenColor or powerColors[powerType] or powerColors.MANA):GetRGB())
+			return
+		end
+	end
+	local unitSettings = UnitFrames.GetUnitSettings(self._unitType)
+	element:SetStatusBarColor(UnitFrames.GetPowerColor(unit, settings, unitSettings))
 end
 
 local function UpdateNameColor(frame, event, unit)
@@ -53,56 +90,79 @@ local function UpdateNameColor(frame, event, unit)
 	frame.Name:SetTextColor(red, green, blue)
 end
 
-local function UpdateStatusText(self, unit)
-	if not self.StatusText then return end
-	local state
-	if not unit or not UnitExists(unit) then
-		state = nil
-	elseif not UnitIsConnected(unit) then
-		state = 'offline'
-	elseif UnitIsGhost(unit) then
-		state = 'ghost'
-	elseif UnitIsDead(unit) then
-		state = 'dead'
+local function LifeState(unit)
+	if not unit or not UnitExists(unit) then return end
+	if not UnitIsConnected(unit) then return 'offline' end
+	if UnitIsGhost(unit) then return 'ghost' end
+	if UnitIsDead(unit) then return 'dead' end
+end
+
+local function PaintDeadBackground(frame)
+	if frame._isPreview then return end
+	local deadColor = DeadBackgroundColor(frame)
+	if not deadColor and not frame._deadPainted then return end
+	frame._deadPainted = deadColor ~= nil
+	local settings = UnitFrames.GetSettings()
+	local backgroundColor = deadColor or (frame._unitType == 'pet' and settings.petBgColor or settings.bgColor)
+	local deficitColor = deadColor or settings.bgColor
+	BUI.Tools.SetColorTex(frame.FrameBG, backgroundColor[1], backgroundColor[2], backgroundColor[3], settings.transparentHealth and 0 or (backgroundColor[4] or 1))
+	BUI.Tools.SetColorTex(frame.Health.Deficit, deficitColor[1], deficitColor[2], deficitColor[3], deficitColor[4] or 1)
+	HealthUpdateColor(frame, nil, frame.unit)
+end
+
+local function UpdateHealthTextShown(frame)
+	if frame._statusState then
+		frame.HealthText:Hide()
+		return
 	end
-	if state == self._statusState then return end
+	local show = UnitFrames.GetUnitSettings(frame._unitType).showHealthText
+	if show == nil then show = UnitFrames.GetSettings().showHealthText ~= false end
+	frame.HealthText:SetShown(show)
+end
+
+local function ApplyStatusText(frame)
+	local status = STATUS_NAMES[frame._statusState]
+	if not status then
+		frame.StatusText:Hide()
+		return
+	end
+	local color = BUI.GroupFrames.GetDB().raid.statusText.colors[status]
+	frame.StatusText:SetText(status:upper())
+	frame.StatusText:SetTextColor(color[1], color[2], color[3])
+	frame.StatusText:Show()
+end
+
+local function ApplyLifeVisuals(frame)
+	ApplyStatusText(frame)
+	UpdateHealthTextShown(frame)
+	PaintDeadBackground(frame)
+end
+
+local function UpdateLifeState(self, unit)
+	local state = LifeState(unit)
+	if state == self._statusState then return false end
 	self._statusState = state
-	if state == 'offline' then
-		self.StatusText:SetText('OFFLINE')
-		self.StatusText:SetTextColor(1, 1, 1)
-		self.StatusText:Show()
-	elseif state == 'ghost' then
-		self.StatusText:SetText('GHOST')
-		self.StatusText:SetTextColor(1, 1, 1)
-		self.StatusText:Show()
-	elseif state == 'dead' then
-		self.StatusText:SetText('DEAD')
-		self.StatusText:SetTextColor(0.8, 0.2, 0.2)
-		self.StatusText:Show()
-	else
-		self.StatusText:Hide()
-	end
+	ApplyLifeVisuals(self)
+	return true
 end
 
 local function HealthPostUpdate(element, unit)
-	if UnitIsDeadOrGhost(unit) then
+	local deadOrGhost = UnitIsDeadOrGhost(unit)
+	if deadOrGhost then
 		element:SetMinMaxValues(0, 1)
 		element:SetValue(0)
 	elseif unit == 'player' and not UnitIsConnected(unit) then
 		element:SetValue(element.cur or 0, element.smoothing)
 	end
 	local frame = element.__owner
-	UpdateStatusText(frame, unit)
-	if frame.HealthText then
-		if frame.StatusText and frame.StatusText:IsShown() then
-			frame.HealthText:Hide()
-		else
-			local settings = UnitFrames.GetSettings()
-			local unitSettings = UnitFrames.GetUnitSettings(frame._unitType)
-			local show = unitSettings and unitSettings.showHealthText
-			if show == nil then show = settings.showHealthText ~= false end
-			frame.HealthText:SetShown(show)
-		end
+	if deadOrGhost or frame._statusState then UpdateLifeState(frame, unit) end
+end
+
+local function OnUnitFlags(self, event)
+	if UpdateLifeState(self, self.unit) then
+		self.Health:ForceUpdate()
+	else
+		HealthUpdateColor(self, event, self.unit)
 	end
 end
 
@@ -111,7 +171,14 @@ local function FramePostUpdate(self)
 	if not unit or not UnitExists(unit) then return end
 	UpdateNameColor(self, nil, unit)
 	UnitFrames.UpdateLevelTextVisibility(self, self._unitType)
-	UpdateStatusText(self, unit)
+	UnitFrames.FollowDebuffHighlightUnit(self)
+	if not UpdateLifeState(self, unit) then ApplyLifeVisuals(self) end
+end
+
+function UnitFrames.RefreshLifeVisuals()
+	for _, frame in ipairs(oUF.objects) do
+		if frame.style == 'BluUI' and not frame._isPreview then ApplyLifeVisuals(frame) end
+	end
 end
 
 local function SetupTooltip(frame)
@@ -205,24 +272,15 @@ local function Style(self, unit)
 	UnitFrames.ApplyAbsorbVisual(absorb, UnitFrames.BuildAbsorbCfg(settings))
 	UnitFrames.AnchorAbsorb(absorb, health, healthTexture, settings.shieldDirection)
 	self.Absorb = absorb
-	health.damageAbsorbClampMode = Enum.UnitDamageAbsorbClampMode and Enum.UnitDamageAbsorbClampMode.MaximumHealth
-	if settings.shieldEnabled ~= false then
-		health.DamageAbsorb = absorb
-	else
-		absorb:Hide()
-	end
+	absorb:SetShown(settings.shieldEnabled ~= false)
 
 	local healAbsorb = CreateFrame('StatusBar', nil, absorbClip)
 	healAbsorb:SetFrameLevel(absorbClip:GetFrameLevel() + 1)
 	UnitFrames.ApplyHealAbsorbVisual(healAbsorb, UnitFrames.BuildHealAbsorbCfg(settings))
 	UnitFrames.AnchorAbsorb(healAbsorb, health, healthTexture, settings.healAbsorbDirection)
 	self.HealAbsorb = healAbsorb
-	health.healAbsorbClampMode = Enum.UnitHealAbsorbClampMode and Enum.UnitHealAbsorbClampMode.MaximumHealth
-	if settings.healAbsorbEnabled ~= false then
-		health.HealAbsorb = healAbsorb
-	else
-		healAbsorb:Hide()
-	end
+	healAbsorb:SetShown(settings.healAbsorbEnabled ~= false)
+	self.AbsorbBars = { Damage = absorb, Heal = healAbsorb }
 
 	local power = CreateFrame('StatusBar', nil, self)
 	power:SetStatusBarTexture(texture)
@@ -242,7 +300,7 @@ local function Style(self, unit)
 	power.frequentUpdates = true
 	power.colorPower = settings.classColorPower
 	power.smoothing = BUI.GetDB().general.smoothBars and Enum.StatusBarInterpolation.ExponentialEaseOut or nil
-	power.PostUpdateColor = PowerPostUpdateColor
+	power.UpdateColor = PowerUpdateColor
 	self.Power = power
 
 	local powerBG = self:CreateTexture(nil, 'BACKGROUND', nil, -7)
@@ -386,14 +444,10 @@ local function Style(self, unit)
 	end
 
 	self.PostUpdate = FramePostUpdate
-	self:RegisterEvent('UNIT_FLAGS', function(unitFrame)
-		if unitFrame.Health and unitFrame.Health.ForceUpdate then unitFrame.Health:ForceUpdate() else UpdateStatusText(unitFrame, unitFrame.unit) end
-	end)
-	if unitType == 'player' then
-		self:RegisterEvent('PLAYER_ALIVE',   function(unitFrame) UpdateStatusText(unitFrame, unitFrame.unit) end, true)
-		self:RegisterEvent('PLAYER_UNGHOST', function(unitFrame) UpdateStatusText(unitFrame, unitFrame.unit) end, true)
-		self:RegisterEvent('PLAYER_DEAD',    function(unitFrame) UpdateStatusText(unitFrame, unitFrame.unit) end, true)
-	end
+	self:RegisterEvent('UNIT_FLAGS', OnUnitFlags)
+	self:RegisterEvent('UNIT_CONNECTION', OnUnitFlags)
+	self:RegisterEvent('UNIT_FACTION', HealthUpdateColor)
+	self:RegisterEvent('UNIT_FACTION', PowerUpdateColor)
 
 	SetupTooltip(self)
 

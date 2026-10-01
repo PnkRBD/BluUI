@@ -706,9 +706,9 @@ local listener
 
 local MIN_VISIBLE = 0.05
 local MAX_HOLD = 2.0
+local HELD_POLL_INTERVAL = 0.25
 
-local pollFrame = CreateFrame('Frame')
-pollFrame:Hide()
+local pollQueued = false
 
 local function RefreshActive()
     local currentModifiers = GetModifierMask()
@@ -746,6 +746,11 @@ local function RefreshActive()
     end
 end
 
+local function IsInputDown(keyName)
+    local mouseButton = mouseButtonForKey[keyName]
+    return mouseButton and IsMouseButtonDown(mouseButton) or IsKeyDown(keyName)
+end
+
 local function VerifyHeld()
     local now = GetTime()
     local released = false
@@ -754,20 +759,33 @@ local function VerifyHeld()
         if elapsed >= MAX_HOLD then
             heldKeys[keyName] = nil
             released = true
-        elseif elapsed >= MIN_VISIBLE then
-            local mouseButton = mouseButtonForKey[keyName]
-            local isDown = mouseButton and IsMouseButtonDown(mouseButton) or IsKeyDown(keyName)
-            if not isDown then
-                heldKeys[keyName] = nil
-                released = true
-            end
+        elseif elapsed >= MIN_VISIBLE and not IsInputDown(keyName) then
+            heldKeys[keyName] = nil
+            released = true
         end
     end
     if released then RefreshActive() end
-    if not next(heldKeys) then pollFrame:Hide() end
 end
 
-pollFrame:SetScript('OnUpdate', VerifyHeld)
+local QueueHeldPoll
+
+local function PollHeld()
+    pollQueued = false
+    VerifyHeld()
+    if next(heldKeys) then QueueHeldPoll() end
+end
+
+QueueHeldPoll = function()
+    if pollQueued then return end
+    pollQueued = true
+    BUI.Profiler.After('CDM.PressHighlight held poll', HELD_POLL_INTERVAL, PollHeld)
+end
+
+local function ReleaseTap(keyName, pressedAt)
+    if heldKeys[keyName] ~= pressedAt or IsInputDown(keyName) then return end
+    heldKeys[keyName] = nil
+    RefreshActive()
+end
 
 local function OnInputDown(keyName)
     if not running then return end
@@ -777,13 +795,19 @@ local function OnInputDown(keyName)
     if not bindingsByKey[keyName] then return end
     heldKeys[keyName] = GetTime()
     RefreshActive()
-    pollFrame:Show()
+    QueueHeldPoll()
 end
 
 local function OnInputUp(keyName)
     local pressedAt = heldKeys[keyName]
     if not pressedAt then return end
-    if GetTime() - pressedAt < MIN_VISIBLE then return end
+    local elapsed = GetTime() - pressedAt
+    if elapsed < MIN_VISIBLE then
+        BUI.Profiler.After('CDM.PressHighlight tap release', MIN_VISIBLE - elapsed, function()
+            ReleaseTap(keyName, pressedAt)
+        end)
+        return
+    end
     heldKeys[keyName] = nil
     RefreshActive()
 end
@@ -800,7 +824,6 @@ local function StopInput()
     BUI.Events:Unregister('GLOBAL_MOUSE_UP', 'CDM.PressHL')
     BUI.Events:Unregister('MODIFIER_STATE_CHANGED', 'CDM.PressHL')
     BUI.Events:Unregister('PLAYER_DEAD', 'CDM.PressHL')
-    pollFrame:Hide()
     wipe(heldKeys)
     UnhighlightAll()
 end

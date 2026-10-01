@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.Spellbook')
+
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
@@ -160,7 +162,7 @@ local function SkinSearchPreview(container)
 	container._buiPreview = true
 	FadeArt(container)
 	Shell(container)
-	container:HookScript('OnShow', StyleSearchPreview)
+	container:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Spellbook search preview', StyleSearchPreview))
 	StyleSearchPreview(container)
 end
 
@@ -180,7 +182,7 @@ local function SkinSpellBook(book)
 	end
 	if book._buiSweepHooked then return end
 	book._buiSweepHooked = true
-	if book.SetTab then hooksecurefunc(book, 'SetTab', QueuePageSweep) end
+	if book.SetTab then Hook(book, 'SetTab', QueuePageSweep) end
 	book:HookScript('OnShow', QueuePageSweep)
 	if paged then paged:HookScript('OnMouseWheel', QueuePageSweep) end
 	if paging and paging.PrevPageButton then paging.PrevPageButton:HookScript('OnClick', QueuePageSweep) end
@@ -378,7 +380,7 @@ local function Apply()
 end
 
 local function HookMixin(mixin, method, callback)
-	if mixin and mixin[method] then hooksecurefunc(mixin, method, callback) end
+	if mixin and mixin[method] then Hook(mixin, method, callback) end
 end
 
 local function Install()
@@ -386,7 +388,7 @@ local function Install()
 	local frame = _G.PlayerSpellsFrame
 	if not frame then return end
 	installed = true
-	frame:HookScript('OnShow', Apply)
+	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Spellbook frame reskin', Apply))
 	HookMixin(_G.SpellBookItemMixin, 'UpdateVisuals', StyleSpellItem)
 	HookMixin(_G.SpellBookItemMixin, 'OnIconEnter', StyleSpellItem)
 	HookMixin(_G.SpellBookItemMixin, 'OnIconLeave', StyleSpellItem)

@@ -164,7 +164,7 @@ local function RowForSpell(spellID)
     return nil
 end
 
-castDriver:SetScript('OnUpdate', function()
+castDriver:SetScript('OnUpdate', BUI.Profiler.Wrap('PortalManager.PortalManager cast fill', function()
     if not castingSpellID or not panel:IsVisible() then
         StopCastFill()
         return
@@ -172,7 +172,7 @@ castDriver:SetScript('OnUpdate', function()
     if not castingRow then return end
     local progress = math.min(1, (GetTime() - castStart) / (castEnd - castStart))
     castingRow.castFill:SetWidth(math.max(1, (castingRow:GetWidth() - Pixel.Scale(2)) * progress))
-end)
+end))
 
 local function StartCastFill(spellID)
     local row = RowForSpell(spellID)
@@ -323,7 +323,7 @@ local function BuildPanel()
     scrollArea:SetPoint('BOTTOMRIGHT', Pixel.Scale(-8), Pixel.Scale(12))
     panel.scroll, panel.child = BUI.Skinning.CreateScrollArea(scrollArea, ROW_H, 4)
 
-    panel:HookScript('OnHide', StopCastFill)
+    panel:HookScript('OnHide', BUI.Profiler.Wrap('PortalManager.PortalManager panel hidden', StopCastFill))
 end
 
 local function SortedEntries(entries)
@@ -447,7 +447,7 @@ RefreshContent = function()
     panel.scroll:SetVerticalScroll(0)
 end
 
-local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3)
+local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3, 'Portal refresh')
 
 slide = BUI.SlidePanel.New({
     skin = 'portalManager',
@@ -482,7 +482,7 @@ local function OnCastEnd()
 end
 
 BUI.Events:OnLogin('PortalManager', function()
-    CharacterFrame:HookScript('OnHide', function() slide.Close(true) end)
+    CharacterFrame:HookScript('OnHide', BUI.Profiler.Wrap('PortalManager.PortalManager character hide', function() slide.Close(true) end))
 
     BUI.Events:Register('SPELL_UPDATE_COOLDOWN',       'PortalManager', OnPortalEvent)
     BUI.Events:Register('SPELLS_CHANGED',              'PortalManager', OnPortalEvent)

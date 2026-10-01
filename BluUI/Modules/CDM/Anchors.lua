@@ -10,6 +10,7 @@ local Pixel = BUI.Pixel
 local LibEMO = LibStub("LibEditModeOverride-1.0")
 CDM.Anchors = {}
 local Anchors = CDM.Anchors
+local anchorPlacements = {}
 
 local ANCHOR_NAMES = {
     essential = "BUI_EssentialCooldownViewer",
@@ -20,6 +21,19 @@ local ANCHOR_NAMES = {
 local function PlaceContainerTopLeft(frame, x, y)
     local width = frame._layoutW or frame:GetWidth() or 0
     local height = frame._layoutH or frame:GetHeight() or 0
+    local parentCenterX, parentCenterY = UIParent:GetCenter()
+    local pixel = Pixel.PixelSize(1)
+    local placed = frame._placedTopLeft
+    if placed and placed.x == x and placed.y == y and placed.width == width and placed.height == height
+        and placed.parentX == parentCenterX and placed.parentY == parentCenterY and placed.pixel == pixel then
+        return
+    end
+    if not placed then
+        placed = {}
+        frame._placedTopLeft = placed
+    end
+    placed.x, placed.y, placed.width, placed.height = x, y, width, height
+    placed.parentX, placed.parentY, placed.pixel = parentCenterX, parentCenterY, pixel
     frame:ClearAllPoints()
     if width <= 0 or height <= 0 then
         frame:SetPoint("CENTER", UIParent, "CENTER", x, y)
@@ -27,7 +41,6 @@ local function PlaceContainerTopLeft(frame, x, y)
         frame._snappedCenterY = y
         return
     end
-    local parentCenterX, parentCenterY = UIParent:GetCenter()
     local halfWidth, halfHeight = width / 2, height / 2
     local leftOffset = Pixel.Snap(parentCenterX + x - halfWidth) - parentCenterX
     local topOffset = Pixel.Snap(parentCenterY + y + halfHeight) - parentCenterY
@@ -104,12 +117,17 @@ function CDM.ApplyAnchorPosition(key)
             return
         end
         if target then
-            BUI.Anchor.ApplyPosition(anchor, {
-                anchorFrame = settings.anchorFrame,
-                anchorPoint = settings.anchorPoint,
-                anchorOffsetX = settings.anchorOffsetX,
-                anchorOffsetY = settings.anchorOffsetY,
-            })
+            local placement = anchorPlacements[key]
+            if not placement then
+                placement = {}
+                anchorPlacements[key] = placement
+            end
+            placement.anchorFrame = settings.anchorFrame
+            placement.anchorPoint = settings.anchorPoint
+            placement.anchorOffsetX = settings.anchorOffsetX
+            placement.anchorOffsetY = settings.anchorOffsetY
+            anchor._placedTopLeft = nil
+            BUI.Anchor.ApplyPosition(anchor, placement)
             anchor._everAnchored = true
             return
         end

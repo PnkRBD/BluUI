@@ -84,7 +84,7 @@ Datatext.Register('time', {
         end
     end,
     OnUpdate = function()
-        if ReadClock() then Datatext.Refresh() end
+        if ReadClock() then Datatext.Refresh('time') end
     end,
     build = function(config, valueHex, self)
         local hour, minute = localHour, localMinute

@@ -18,7 +18,7 @@ Datatext.Register('ilvl', {
     events = { 'PLAYER_AVG_ITEM_LEVEL_UPDATE', 'PLAYER_EQUIPMENT_CHANGED', 'PLAYER_ENTERING_WORLD' },
     OnActivate = Read,
     OnEvent = function()
-        if Read() then Datatext.Refresh() end
+        if Read() then Datatext.Refresh('ilvl') end
     end,
     build = function(config, valueHex, self)
         return Datatext.Label(config, self) .. Datatext.Colored(equippedLevel, valueHex)

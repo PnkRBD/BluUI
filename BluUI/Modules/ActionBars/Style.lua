@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('ActionBars.Style')
+
 local ActionBars = BUI.ActionBars
 local Pixel = BUI.Pixel
 local LibActionButton = LibStub('LibActionButton-1.0-BluUI')
@@ -57,29 +59,32 @@ ActionBars.FlattenStateTexture = FlattenStateTexture
 function ActionBars.FitButtonOverlays(button)
 	local width = button:GetWidth()
 	if width == 0 then return end
+	local highlight = button.HighlightTexture
+	if highlight then highlight:ClearAllPoints(); highlight:SetAllPoints(button) end
+	local checked = button.CheckedTexture
+	if checked then checked:ClearAllPoints(); checked:SetAllPoints(button) end
 	local showAssistedCombat = ActionBars.GetSettings().showAssistedCombat
-	local assistScale = width / 45
 	local rotationFrame = button.AssistedCombatRotationFrame
+	local highlightFrame = button.AssistedCombatHighlightFrame
+	local alert = button.SpellActivationAlert
+	if highlightFrame and not showAssistedCombat then highlightFrame:Hide() end
+	if button._buiFitWidth == width and button._buiFitAssist == showAssistedCombat and button._buiFitRotation == rotationFrame
+		and button._buiFitHighlight == highlightFrame and button._buiFitAlert == alert then return end
+	button._buiFitWidth, button._buiFitAssist = width, showAssistedCombat
+	button._buiFitRotation, button._buiFitHighlight, button._buiFitAlert = rotationFrame, highlightFrame, alert
+	local assistScale = width / 45
 	if rotationFrame then
 		rotationFrame:SetScale(assistScale)
 		rotationFrame:ClearAllPoints()
 		rotationFrame:SetPoint('CENTER', button, 'CENTER', 0, 0)
 		rotationFrame:SetAlpha(showAssistedCombat and 1 or 0)
 	end
-	local highlightFrame = button.AssistedCombatHighlightFrame
-	if highlightFrame then
-		highlightFrame:SetScale(assistScale)
-		if not showAssistedCombat then highlightFrame:Hide() end
-	end
-	if button.SpellActivationAlert then button.SpellActivationAlert:SetScale(assistScale) end
+	if highlightFrame then highlightFrame:SetScale(assistScale) end
+	if alert then alert:SetScale(assistScale) end
 	for _, key in ipairs(CAST_FRAME_KEYS) do
 		local castFrame = button[key]
 		if castFrame then castFrame:SetScale(assistScale) end
 	end
-	local highlight = button.HighlightTexture
-	if highlight then highlight:ClearAllPoints(); highlight:SetAllPoints(button) end
-	local checked = button.CheckedTexture
-	if checked then checked:ClearAllPoints(); checked:SetAllPoints(button) end
 end
 
 function ActionBars.FitAllButtonOverlays()
@@ -145,11 +150,12 @@ local function SwipeAllowed(cooldown)
 end
 
 local function ApplyCooldownStyle(cooldown)
-	if reassertingCooldown then return end
+	if reassertingCooldown or (cooldown._buiSwipeApplied and cooldown._buiTextStyled) then return end
 	reassertingCooldown = true
 	if SwipeAllowed(cooldown) then
 		local color = ActionBars.GetSettings().swipeColor
 		cooldown:SetSwipeColor(color[1], color[2], color[3], color[4])
+		cooldown._buiSwipeApplied = true
 	end
 	local button = cooldown:GetParent()
 	if button then ActionBars.StyleCooldownText(button, cooldown) end
@@ -157,17 +163,21 @@ local function ApplyCooldownStyle(cooldown)
 end
 
 local function OnSwipeColorSet(cooldown, red, _, _, alpha)
-	if reassertingCooldown or alpha == 0 or (red or 0) > 0 then return end
+	if reassertingCooldown then return end
+	cooldown._buiSwipeApplied = nil
+	if alpha == 0 or (red or 0) > 0 then return end
 	ApplyCooldownStyle(cooldown)
 end
 
 function ActionBars.StyleCooldown(cooldown)
 	if not cooldown._buiStyleHooked then
 		cooldown._buiStyleHooked = true
-		hooksecurefunc(cooldown, 'SetSwipeColor', OnSwipeColorSet)
-		hooksecurefunc(cooldown, 'SetCooldown', ApplyCooldownStyle)
-		hooksecurefunc(cooldown, 'SetCooldownFromDurationObject', ApplyCooldownStyle)
+		Hook(cooldown, 'SetSwipeColor', OnSwipeColorSet)
+		Hook(cooldown, 'SetCooldown', ApplyCooldownStyle)
+		Hook(cooldown, 'SetCooldownFromDurationObject', ApplyCooldownStyle)
 	end
+	cooldown._buiTextStyled = nil
+	cooldown._buiSwipeApplied = nil
 	ApplyCooldownStyle(cooldown)
 end
 
@@ -186,8 +196,15 @@ function ActionBars.SyncEmptyButtonColor(button)
 		button._buiEmptyFill = fill
 	end
 	local red, green, blue, alpha = ActionBars.EmptyButtonColor()
-	fill:SetColorTexture(red, green, blue, alpha)
-	fill:SetShown(not button:HasAction())
+	if fill._buiRed ~= red or fill._buiGreen ~= green or fill._buiBlue ~= blue or fill._buiAlpha ~= alpha then
+		fill._buiRed, fill._buiGreen, fill._buiBlue, fill._buiAlpha = red, green, blue, alpha
+		fill:SetColorTexture(red, green, blue, alpha)
+	end
+	local empty = not button:HasAction()
+	if fill._buiShown ~= empty then
+		fill._buiShown = empty
+		fill:SetShown(empty)
+	end
 	local slotBackground = button.SlotBackground
 	if slotBackground then
 		slotBackground:SetAlpha(0)

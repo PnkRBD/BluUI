@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.AlertFrames')
+
 local Skin = BUI.Skinning
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Layout = BUILib.Layout
@@ -70,7 +72,7 @@ local function Install()
 	local alertFrame = _G.AlertFrame
 	if not alertFrame or not alertFrame.UpdateAnchors then return end
 	installed = true
-	hooksecurefunc(alertFrame, 'UpdateAnchors', SweepAlerts)
+	Hook(alertFrame, 'UpdateAnchors', SweepAlerts)
 	SweepAlerts()
 end
 
@@ -92,7 +94,7 @@ Skin.ToastAnchors.Register({
 	end,
 	hooks = function(reapply)
 		local alertFrame = _G.AlertFrame
-		if alertFrame and alertFrame.UpdateAnchors then hooksecurefunc(alertFrame, 'UpdateAnchors', reapply) end
+		if alertFrame and alertFrame.UpdateAnchors then Hook(alertFrame, 'UpdateAnchors', reapply) end
 	end,
 })
 

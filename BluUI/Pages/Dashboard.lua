@@ -787,7 +787,7 @@ function PlayCardSlideIn(cards, parent)
     local state  = { ticker = ticker, cards = visibleCards, snapshots = snapshots }
     activeSlideIn = state
 
-    ticker:SetScript("OnUpdate", function(self)
+    ticker:SetScript("OnUpdate", BUI.Profiler.Wrap("Pages.Dashboard card slide", function(self)
         local now = GetTime()
         local allDone = true
         for cardIndex, card in ipairs(visibleCards) do
@@ -813,7 +813,7 @@ function PlayCardSlideIn(cards, parent)
             self:Hide()
             if activeSlideIn == state then activeSlideIn = nil end
         end
-    end)
+    end))
 end
 
 function ClearRows(card)
@@ -1119,7 +1119,6 @@ local function BuildDashboard(canvas)
     local accentRed, accentGreen, accentBlue = Theme.GetAccent()
 
     Theme.RegisterAccentElement(canvas, function(_, red, green, blue) accentRed, accentGreen, accentBlue = red, green, blue end)
-    BUI.Tools.AddPageWatermark(canvas)
 
     local scroll = Controls.ScrollFrame(canvas)
     local scrollContainer = Widget.Unwrap(scroll)
@@ -1134,7 +1133,7 @@ local function BuildDashboard(canvas)
     end
     SyncChildWidth()
     BUILib.Defer(SyncChildWidth)
-    innerScrollFrame:HookScript("OnSizeChanged", SyncChildWidth)
+    innerScrollFrame:HookScript("OnSizeChanged", BUI.Profiler.Wrap("Pages.Dashboard sync width", SyncChildWidth))
     scrollContainer:SetChildHeight(Layout.DASH_H + Layout.PAD * 2)
 
     local dashboard = CreateFrame("Frame", nil, scrollChild)
@@ -1233,7 +1232,7 @@ local function BuildDashboard(canvas)
         return bestSlot
     end
 
-    local function ClampDuringDrag(card)
+    local ClampDuringDrag = BUI.Profiler.Wrap("Pages.Dashboard clamp drag", function(card)
         local dashLeft, dashRight   = dashboard:GetLeft(), dashboard:GetRight()
         local dashTop, dashBottom = dashboard:GetTop(),  dashboard:GetBottom()
         local cardLeft, cardRight  = card:GetLeft(),      card:GetRight()
@@ -1246,7 +1245,7 @@ local function BuildDashboard(canvas)
             local point, relativeTo, relativePoint, x, y = card:GetPoint(1)
             if point then card:ClearAllPoints(); card:SetPoint(point, relativeTo, relativePoint, x + shiftX, y + shiftY) end
         end
-    end
+    end)
 
     local function FindFreeSlotInRow(rowName)
         for slotIndex, slot in ipairs(SLOTS) do
@@ -1827,22 +1826,23 @@ local function BuildDashboard(canvas)
 
     local slowTickCount = 0
     local refreshTicker
+    local RefreshTick = BUI.Profiler.Wrap("Pages.Dashboard refresh tick", function()
+        if not dashboard:IsVisible() then
+            refreshTicker:Cancel()
+            refreshTicker = nil
+            return
+        end
+        RefreshTiles()
+        slowTickCount = slowTickCount + 1
+        if slowTickCount >= 30 then
+            slowTickCount = 0
+            RefreshDungeons(); RefreshVault(); RefreshWeeklyMplus()
+            RefreshRaidProgress(); RefreshCrests(); RefreshAlts()
+        end
+    end)
     local function StartRefreshTicker()
         if refreshTicker then return end
-        refreshTicker = C_Timer.NewTicker(1, function()
-            if not dashboard:IsVisible() then
-                refreshTicker:Cancel()
-                refreshTicker = nil
-                return
-            end
-            RefreshTiles()
-            slowTickCount = slowTickCount + 1
-            if slowTickCount >= 30 then
-                slowTickCount = 0
-                RefreshDungeons(); RefreshVault(); RefreshWeeklyMplus()
-                RefreshRaidProgress(); RefreshCrests(); RefreshAlts()
-            end
-        end)
+        refreshTicker = C_Timer.NewTicker(1, RefreshTick)
     end
     StartRefreshTicker()
 
@@ -1854,7 +1854,7 @@ local function BuildDashboard(canvas)
     canvas:RegisterEvent("UPDATE_INSTANCE_INFO")
     canvas:RegisterEvent("BOSS_KILL")
     canvas:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
-    canvas:SetScript("OnEvent", function(_, event)
+    canvas:SetScript("OnEvent", BUI.Profiler.Wrap("Pages.Dashboard canvas event", function(_, event)
         if not canvas:IsVisible() then return end
         if event == "PLAYER_EQUIPMENT_CHANGED" or event == "PLAYER_AVG_ITEM_LEVEL_UPDATE" then
             RefreshTiles()
@@ -1867,16 +1867,16 @@ local function BuildDashboard(canvas)
         elseif event == "CURRENCY_DISPLAY_UPDATE" then
             RefreshCrests()
         end
-    end)
+    end))
 
-    canvas:HookScript("OnShow", function()
+    canvas:HookScript("OnShow", BUI.Profiler.Wrap("Pages.Dashboard canvas shown", function()
         RefreshTiles()
         RefreshDungeons(); RefreshVault(); RefreshWeeklyMplus()
         RequestRaidInfo()
         RefreshRaidProgress(); RefreshCrests(); RefreshAlts()
         slowTickCount = 0
         StartRefreshTicker()
-    end)
+    end))
 
     local LAYOUT_GROUPS = {
         { key = "tiles", title = "TOP TILES" },

@@ -1,4 +1,5 @@
 local ADDON_NAME, BUI = ...
+local After = BUI.Profiler.After
 
 BluUI = BUI
 BUI.ADDON_NAME = ADDON_NAME
@@ -13,7 +14,7 @@ function BUI.CanWriteEditModeLayout()
 end
 
 function BUI.CloseEditModeWriteWindow()
-	C_Timer.After(EDIT_MODE_WRITE_WINDOW, function() editModeWriteWindowOpen = false end)
+	After('Core.Core edit mode window', EDIT_MODE_WRITE_WINDOW, function() editModeWriteWindowOpen = false end)
 end
 
 local LibEMO = LibStub('LibEditModeOverride-1.0')
@@ -165,23 +166,23 @@ function Addon:OnInitialize()
 		BluUI_DB.__adoptedLegacySettings_v2 = true
 		if forcedAdopt == 'disableAfter' then
 			C_AddOns.DisableAddOn('AzortharionUI')
-			C_Timer.After(1, function()
+			After('Core.Core adopt reload', 1, function()
 				BUI.Print('Profiles copied, reloading.')
-				C_Timer.After(1.5, ReloadUI)
+				After('Core.Core reload', 1.5, ReloadUI)
 			end)
 		else
-			C_Timer.After(1, function()
+			After('Core.Core adopt notice', 1, function()
 				BUI.Print('Copied your AzortharionUI profiles.')
 			end)
 		end
 	elseif forcedAdopt then
-		C_Timer.After(1, function()
+		After('Core.Core adopt failed', 1, function()
 			BUI.Print('AzortharionUI did not load. Enable it and retry.')
 		end)
 	elseif type(AzortharionUI_DB) == 'table'
 		and not (BluUI_DB and (BluUI_DB.__adoptedLegacySettings_v2 or BluUI_DB.__azorImportDeclined)) then
 		BUI.Events:Once('PLAYER_ENTERING_WORLD', 'AzorImportPrompt', function()
-			C_Timer.After(2, PromptAzorImport)
+			After('Core.Core import prompt', 2, PromptAzorImport)
 		end)
 	end
 
@@ -228,7 +229,7 @@ function Addon:OnEnable()
 	if BUI.IsModuleEnabled('unitFrames') then BUI.UnitFrames:Initialize() end
 	if BUI.IsModuleEnabled('groupFrames') then BUI.GroupFrames.Initialize() end
 	if BUI.IsModuleEnabled('cdm') then BUI.CDM.Initialize() end
-	if BUI.IsModuleEnabled('castBars') then C_Timer.After(0.1, BUI.CastBar.RefreshAll) end
+	if BUI.IsModuleEnabled('castBars') then After('Core.Core castbar refresh', 0.1, BUI.CastBar.RefreshAll) end
 
 	if BUI.db.global.layoutStyle then
 		BUI.BUILibClient.Layout.SetStyle(BUI.db.global.layoutStyle)

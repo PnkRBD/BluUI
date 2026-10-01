@@ -8,7 +8,6 @@ local C_Spell = C_Spell
 local UnitIsDeadOrGhost = UnitIsDeadOrGhost
 local UnitCastingInfo = UnitCastingInfo
 local UnitChannelInfo = UnitChannelInfo
-local UnitAffectingCombat = UnitAffectingCombat
 
 local Pixel = BUI.Pixel
 BUI.CDM = {}
@@ -336,11 +335,24 @@ function CDM.GetKnownRacialSpellIDs(out)
     return out
 end
 
-local _racialScratch = {}
+local knownRacials = {}
+local knownRacialsValid = false
+
+local function InvalidateKnownRacials()
+    knownRacialsValid = false
+end
+
+BUI.Events:Register("SPELLS_CHANGED", "CDM.KnownRacials", InvalidateKnownRacials)
+BUI.Events:Register("PLAYER_TALENT_UPDATE", "CDM.KnownRacials", InvalidateKnownRacials)
+BUI.Events:Register("PLAYER_SPECIALIZATION_CHANGED", "CDM.KnownRacials", InvalidateKnownRacials)
+
 function CDM.ResolveRacialSlot(slot)
     slot = slot or 1
-    CDM.GetKnownRacialSpellIDs(_racialScratch)
-    return _racialScratch[slot]
+    if not knownRacialsValid then
+        CDM.GetKnownRacialSpellIDs(knownRacials)
+        knownRacialsValid = true
+    end
+    return knownRacials[slot]
 end
 
 BUI.IconEngine._isRacialSpell = CDM.IsRacialSpell
@@ -523,8 +535,6 @@ function CDM.NotifyUnitFrames()
 end
 
 local tostring = tostring
-local GetSpecialization = GetSpecialization
-local GetSpecializationInfo = GetSpecializationInfo
 local C_CooldownViewer = C_CooldownViewer
 
 local cachedBuildKey

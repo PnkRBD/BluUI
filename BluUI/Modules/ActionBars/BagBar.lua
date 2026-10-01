@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('ActionBars.BagBar')
+
 local ActionBars = BUI.ActionBars
 
 local EVENT_KEY = 'ActionBars.BagBar'
@@ -79,13 +81,14 @@ local function OnBlizzardLayout()
 end
 
 local function InstallHooks()
-	hooksecurefunc(BagsBar, 'ApplySystemAnchor', OnBlizzardAnchor)
-	hooksecurefunc(BagsBar, 'Layout', OnBlizzardLayout)
-	hooksecurefunc(BagsBar, 'UpdateSystemSettingSize', OnBlizzardLayout)
+	Hook(BagsBar, 'ApplySystemAnchor', OnBlizzardAnchor)
+	Hook(BagsBar, 'Layout', OnBlizzardLayout)
+	Hook(BagsBar, 'UpdateSystemSettingSize', OnBlizzardLayout)
+	local onSlotLayout = BUI.Profiler.Wrap('ActionBars.BagBar slot layout', OnBlizzardLayout)
 	for _, name in ipairs(SLOT_NAMES) do
 		local slot = _G[name]
-		slot:HookScript('OnShow', OnBlizzardLayout)
-		slot:HookScript('OnHide', OnBlizzardLayout)
+		slot:HookScript('OnShow', onSlotLayout)
+		slot:HookScript('OnHide', onSlotLayout)
 	end
 end
 

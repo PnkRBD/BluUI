@@ -52,7 +52,21 @@ local function Wake()
 	BUI.Scheduler.SetUpdateEnabled(MODULE_KEY, true)
 end
 
-BUI.Tools.OnAuraQueriesUnblocked(Wake)
+local countdownWakePending = false
+
+local function CountdownWake()
+	countdownWakePending = false
+	Wake()
+end
+
+local function SleepUntilNextSecond(remaining)
+	Sleep()
+	if countdownWakePending then return end
+	countdownWakePending = true
+	BUI.Profiler.After('Bloodlust.Bloodlust countdown wake', remaining % 1, CountdownWake)
+end
+
+BUI.Tools.OnAuraQueriesUnblocked(Wake, 'Bloodlust')
 
 local function TouchesLockout(instanceIDs)
 	if not instanceIDs then return false end
@@ -190,7 +204,7 @@ local function PlayFlash(seconds)
 	local generation = flashGeneration
 	flash:Stop()
 	flash:Play()
-	C_Timer.After(seconds, function()
+	BUI.Profiler.After('Bloodlust.Bloodlust flash stop', seconds, function()
 		if generation == flashGeneration then StopFlash() end
 	end)
 end
@@ -328,6 +342,7 @@ local function Tick()
 			if config.showWhenCD then
 				Show(config, 'cd', remaining)
 				FireWarnIfDue(config, remaining)
+				if remaining > DECIMALS_BELOW then SleepUntilNextSecond(remaining) end
 			else
 				frame:Hide()
 				Sleep()

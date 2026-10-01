@@ -191,7 +191,7 @@ do
 		end
 		queued = true
 		queuedSection = section
-		C_Timer.After(0, function()
+		BUI.Profiler.After("GroupFrames.Core refresh", 0, function()
 			local pendingSection = queuedSection
 			queued, queuedSection = false, nil
 			GroupFrames.InvalidateLargeRaidSettings()
