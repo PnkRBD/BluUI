@@ -207,15 +207,9 @@ local function RefreshAllModules()
     if on('cdm') and BUI.CDM then
         if BUI.CDM.RefreshAll then BUI.CDM.RefreshAll(true) end
         if BUI.CDM.RefreshAssistHighlight then BUI.CDM.RefreshAssistHighlight() end
-    end
-
-    if on('castBars') and BUI.CastBar then
-        BUI.Profiler.After("Utility.ExportImport castbar refresh", 0.05, function()
-            for _, unit in ipairs({ "Player", "Target", "Focus", "Boss" }) do
-                local bar = BUI.CastBar[unit]
-                if bar and bar.Refresh then bar:Refresh() end
-            end
-        end)
+        BUI.CDM.PressHighlight.Refresh()
+        BUI.CDM.RefreshProcMsgWatcher()
+        BUI.CDM.Detached.UpdateModifierWatcher()
     end
 
     if BUI.Power then
