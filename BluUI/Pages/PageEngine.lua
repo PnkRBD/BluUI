@@ -228,8 +228,15 @@ local function RestorePageTab(tabIndex)
 end
 
 function PageEngine.MarkPagesStale()
+	local current = GetCurrentPageConfig()
 	for _, pageConfig in pairs(PageEngine.pages) do
-		if pageConfig.frame then pageConfig.stale = true end
+		if pageConfig.frame then
+			if pageConfig == current and pageConfig.frame:IsVisible() then
+				pageConfig.stale = true
+			else
+				TeardownPageContent(pageConfig)
+			end
+		end
 	end
 end
 
