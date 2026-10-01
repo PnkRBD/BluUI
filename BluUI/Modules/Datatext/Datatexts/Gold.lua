@@ -59,7 +59,7 @@ Datatext.Register('gold', {
     end,
     OnActivate = Read,
     OnEvent = function()
-        if Read() then Datatext.Refresh() end
+        if Read() then Datatext.Refresh('gold') end
     end,
     build = function(config, valueHex, self)
         return Datatext.Label(config, self) .. Datatext.Colored(BreakUpLargeNumbers(math.floor(money / 10000)), valueHex)

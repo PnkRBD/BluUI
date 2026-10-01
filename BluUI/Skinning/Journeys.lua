@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.Journeys')
+
 local ipairs = ipairs
 local pairs = pairs
 
@@ -204,8 +206,8 @@ local function OnBossButton(button)
 		selected:SetAllPoints(button)
 		selected:Hide()
 		button._buiBossSelected = selected
-		hooksecurefunc(button, 'LockHighlight', OnBossSelected)
-		hooksecurefunc(button, 'UnlockHighlight', OnBossUnselected)
+		Hook(button, 'LockHighlight', OnBossSelected)
+		Hook(button, 'UnlockHighlight', OnBossUnselected)
 	end
 	AccentTexture(button._buiBossSelected, BOSS_SELECTED_ALPHA)
 	button._buiBossSelected:SetShown(_G.EncounterJournal.encounterID == button.encounterID)
@@ -444,7 +446,7 @@ local function SkinActivityRow(row)
 		Skin.TipFace(textContainer.NameText, 'title')
 		Skin.TipFace(textContainer.ConditionsText, 'label')
 		if textContainer.UpdateTextColor then
-			hooksecurefunc(textContainer, 'UpdateTextColor', OnActivityTextColor)
+			Hook(textContainer, 'UpdateTextColor', OnActivityTextColor)
 		end
 	end
 end
@@ -525,11 +527,11 @@ local function Apply()
 end
 
 local function HookMixin(mixin, method, callback)
-	if mixin and mixin[method] then hooksecurefunc(mixin, method, callback) end
+	if mixin and mixin[method] then Hook(mixin, method, callback) end
 end
 
 local function HookGlobal(name, callback)
-	if _G[name] then hooksecurefunc(name, callback) end
+	if _G[name] then Hook(name, callback) end
 end
 
 local function HookRows()
@@ -556,7 +558,7 @@ local function Install()
 	local frame = _G.EncounterJournal
 	if not frame then return end
 	installed = true
-	frame:HookScript('OnShow', Apply)
+	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Journeys frame reskin', Apply))
 	HookRows()
 	if frame:IsShown() then Apply() end
 end

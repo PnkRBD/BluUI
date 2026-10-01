@@ -35,7 +35,17 @@ function ClassPowers.GetPlayerClass()
 end
 
 function ClassPowers.GetSpecID()
+    if specID then return specID end
     return ClassPowers.UpdateSpecID()
+end
+
+local POWER_TOKENS = {}
+for name, powerType in pairs(Enum.PowerType) do
+    POWER_TOKENS[powerType] = name:gsub("(%l)(%u)", "%1_%2"):upper()
+end
+
+function ClassPowers.PowerToken(powerType)
+    return POWER_TOKENS[powerType]
 end
 
 local PrimaryOverrides = {

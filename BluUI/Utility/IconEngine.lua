@@ -32,7 +32,7 @@ IconEngine.SetColor = SetColor
 
 local function ScheduleExpiry(cooldown, remaining, callback)
 	if cooldown._expiryTimer then cooldown._expiryTimer:Cancel() end
-	cooldown._expiryTimer = C_Timer.NewTimer(remaining + 0.1, function()
+	cooldown._expiryTimer = BUI.Profiler.NewTimer('Utility.IconEngine cooldown expiry', remaining + 0.1, function()
 		cooldown._expiryTimer = nil
 		callback()
 	end)

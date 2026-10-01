@@ -32,7 +32,7 @@ function BUI.CheckPlatynatorPrompt(done)
 	if global.platynatorDismissedDate == bundledDate then done(); return end
 
 	local overlay, dialog, close = Modals.CreateBase(440, 170, false)
-	overlay:HookScript('OnHide', done)
+	overlay:HookScript('OnHide', BUI.Profiler.Wrap('Core.Startup prompt closed', done))
 
 	Modals.CreateTitle(dialog, 'Platynator Detected')
 	Modals.CreateMessage(dialog,

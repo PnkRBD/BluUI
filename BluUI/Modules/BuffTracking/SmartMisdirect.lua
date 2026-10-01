@@ -202,11 +202,11 @@ local function RefreshAlert(shouldFlash)
 	UIFrameFadeIn(frame, FADE_IN_SECONDS, 0, 1)
 
 	local holdSeconds = settings.flashSeconds
-	C_Timer.After(holdSeconds, function()
+	BUI.Profiler.After('BuffTracking.SmartMisdirect flash fade', holdSeconds, function()
 		if flashToken ~= token then return end
 		UIFrameFadeOut(frame, FADE_OUT_SECONDS, frame:GetAlpha(), 0)
 	end)
-	C_Timer.After(holdSeconds + FADE_OUT_SECONDS, function()
+	BUI.Profiler.After('BuffTracking.SmartMisdirect flash end', holdSeconds + FADE_OUT_SECONDS, function()
 		if flashToken ~= token then return end
 		UIFrameFadeRemoveFrame(frame)
 		flashShowing = false
@@ -257,8 +257,8 @@ local function ApplyTarget()
 end
 
 local DispatchApply = BUI.Dispatcher.New(ApplyTarget, 'SmartMisdirect.Apply')
-local DispatchApplySoon = BUI.Dispatcher.NewDelayed(ApplyTarget, 2)
-local DispatchApplyLate = BUI.Dispatcher.NewDelayed(ApplyTarget, 5)
+local DispatchApplySoon = BUI.Dispatcher.NewDelayed(ApplyTarget, 2, 'Misdirect apply soon')
+local DispatchApplyLate = BUI.Dispatcher.NewDelayed(ApplyTarget, 5, 'Misdirect apply late')
 
 local function DispatchApplyStaggered()
 	DispatchApply()

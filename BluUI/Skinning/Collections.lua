@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.Collections')
+
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -244,7 +246,7 @@ local function SkinWardrobe(frame)
 		SkinBackgroundFrame(items)
 		SkinPaging(items.PagingFrame)
 		Dropdown(items.WeaponDropdown)
-		if items.UpdateItems then hooksecurefunc(items, 'UpdateItems', function(collection) if Enabled() then RefreshPaging(collection.PagingFrame) end end) end
+		if items.UpdateItems then Hook(items, 'UpdateItems', function(collection) if Enabled() then RefreshPaging(collection.PagingFrame) end end) end
 	end
 	local sets = frame.SetsCollectionFrame
 	if sets then
@@ -292,13 +294,13 @@ local function Apply()
 end
 
 local function HookRows()
-	hooksecurefunc('MountJournal_InitMountButton', OnMountRow)
-	hooksecurefunc('PetJournal_InitPetButton', OnPetRow)
-	hooksecurefunc('ToySpellButton_UpdateButton', OnToyButton)
-	if _G.HeirloomsJournal and _G.HeirloomsJournal.UpdateButton then hooksecurefunc(_G.HeirloomsJournal, 'UpdateButton', OnHeirloomButton) end
+	Hook('MountJournal_InitMountButton', OnMountRow)
+	Hook('PetJournal_InitPetButton', OnPetRow)
+	Hook('ToySpellButton_UpdateButton', OnToyButton)
+	if _G.HeirloomsJournal and _G.HeirloomsJournal.UpdateButton then Hook(_G.HeirloomsJournal, 'UpdateButton', OnHeirloomButton) end
 	local setsMixin = _G.WardrobeSetsScrollFrameButtonMixin
-	if setsMixin and setsMixin.Init then hooksecurefunc(setsMixin, 'Init', OnSetsRow) end
-	hooksecurefunc('PanelTemplates_UpdateTabs', OnTabsUpdated)
+	if setsMixin and setsMixin.Init then Hook(setsMixin, 'Init', OnSetsRow) end
+	Hook('PanelTemplates_UpdateTabs', OnTabsUpdated)
 end
 
 local function Install()
@@ -306,7 +308,7 @@ local function Install()
 	local frame = _G.CollectionsJournal
 	if not frame then return end
 	installed = true
-	frame:HookScript('OnShow', Apply)
+	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Collections frame reskin', Apply))
 	HookRows()
 	if frame:IsShown() then Apply() end
 end

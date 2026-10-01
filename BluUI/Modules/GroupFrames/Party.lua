@@ -1,12 +1,12 @@
 local _, BUI = ...
 
-local oUF    = BUI.oUF
 local GroupFrames     = BUI.GroupFrames
 local Anchor = GroupFrames.Anchor
 
-local UIParent         = UIParent
-local InCombatLockdown = InCombatLockdown
-local Scale            = BUI.Pixel.Scale
+local UIParent           = UIParent
+local InCombatLockdown   = InCombatLockdown
+local Scale              = BUI.Pixel.Scale
+local SetHeaderAttribute = GroupFrames.SetHeaderAttribute
 
 local function ResolveAnchorTarget(partySettings)
 	if partySettings.anchorFrame == "" then return nil end
@@ -61,9 +61,9 @@ local function WatchAnchorTarget(target)
 	watchedTarget = target
 	if target and not target._bluFramesPartyHook then
 		target._bluFramesPartyHook = true
-		target:HookScript("OnSizeChanged", function(self)
+		target:HookScript("OnSizeChanged", BUI.Profiler.Wrap("GroupFrames.Party anchor resize", function(self)
 			if watchedTarget == self then SyncAnchorWidth() end
-		end)
+		end))
 	end
 end
 
@@ -76,18 +76,18 @@ end
 local function ShowInRaid(partySettings) return partySettings.raidGroup ~= "off" end
 
 local function VisibilityFor(partySettings)
-	if not partySettings.enabled then return "custom hide" end
-	if GroupFrames.IsPartyPreviewShown() then return "custom show" end
-	local list = "party"
-	if ShowInRaid(partySettings) then list = list .. ",raid" end
-	if partySettings.showSolo and partySettings.showPlayer then list = "solo," .. list end
-	return list
+	if not partySettings.enabled then return "hide" end
+	if GroupFrames.IsPartyPreviewShown() then return "show" end
+	local condition = "[group:party,nogroup:raid] show;"
+	if ShowInRaid(partySettings) then condition = condition .. "[group:raid] show;" end
+	if partySettings.showSolo and partySettings.showPlayer then condition = "[@player,exists,nogroup:party] show;" .. condition end
+	return condition .. "hide"
 end
 
 function GroupFrames.ApplyPartyVisibility()
 	local header = GroupFrames.headers.party
 	if not header then return end
-	header:SetVisibility(VisibilityFor(GroupFrames.GetDB().party))
+	GroupFrames.SetHeaderVisibility(header, VisibilityFor(GroupFrames.GetDB().party))
 end
 
 function GroupFrames.PrecreateParty()
@@ -100,15 +100,13 @@ end
 function GroupFrames.ApplyPartyRaidMode()
 	local header = GroupFrames.headers.party
 	if not header then return end
-	if InCombatLockdown() then GroupFrames.AfterCombat(GroupFrames.ApplyPartyRaidMode, "GF.PartyRaidMode"); return end
 	local partySettings = GroupFrames.GetDB().party
-	if IsInRaid() and ShowInRaid(partySettings) then
-		header:SetAttribute("showRaid",    true)
-		header:SetAttribute("groupFilter", partySettings.raidGroup)
-	else
-		header:SetAttribute("showRaid",    false)
-		header:SetAttribute("groupFilter", nil)
-	end
+	local showRaid = IsInRaid() and ShowInRaid(partySettings)
+	local groupFilter = showRaid and partySettings.raidGroup or nil
+	if header:GetAttribute("showRaid") == showRaid and header:GetAttribute("groupFilter") == groupFilter then return end
+	if InCombatLockdown() then GroupFrames.AfterCombat(GroupFrames.ApplyPartyRaidMode, "GF.PartyRaidMode"); return end
+	SetHeaderAttribute(header, "showRaid",    showRaid)
+	SetHeaderAttribute(header, "groupFilter", groupFilter)
 end
 
 function GroupFrames.SpawnParty()
@@ -116,9 +114,8 @@ function GroupFrames.SpawnParty()
 	local partySettings = GroupFrames.GetDB().party
 
 	local gap = Scale(partySettings.spacing)
-	local header = oUF:SpawnHeader(
+	local header = GroupFrames.SpawnHeader(
 		GroupFrames.FRAME_PREFIX .. "Party",
-		nil,
 		"showParty",   true,
 		"showPlayer",  partySettings.showPlayer == true,
 		"showSolo",    (partySettings.showSolo and partySettings.showPlayer) == true,
@@ -132,7 +129,7 @@ function GroupFrames.SpawnParty()
 		"unitsPerColumn", 5,
 		"oUF-initialConfigFunction", GroupFrames.ConfigSnippet(partySettings.width, partySettings.height)
 	)
-	header:SetVisibility(VisibilityFor(partySettings))
+	GroupFrames.SetHeaderVisibility(header, VisibilityFor(partySettings))
 	PositionHeader(header, partySettings)
 	GroupFrames.headers.party = header
 	GroupFrames.ApplyPartyRaidMode()
@@ -142,7 +139,7 @@ end
 function GroupFrames.SetPartyEnabled(enabled)
 	local header = GroupFrames.headers.party
 	if not header then return end
-	header:SetVisibility(enabled and VisibilityFor(GroupFrames.GetDB().party) or "custom hide")
+	GroupFrames.SetHeaderVisibility(header, enabled and VisibilityFor(GroupFrames.GetDB().party) or "hide")
 end
 
 function GroupFrames.RefreshParty()
@@ -155,16 +152,16 @@ function GroupFrames.RefreshParty()
 	local effectiveWidth = AnchorWidth(partySettings, target) or partySettings.width
 
 	local gap = Scale(partySettings.spacing)
-	header:SetAttribute("oUF-initialConfigFunction", GroupFrames.ConfigSnippet(effectiveWidth, partySettings.height))
-	header:SetAttribute("point",      partySettings.vertical and "TOP" or "LEFT")
-	header:SetAttribute("xOffset",    partySettings.vertical and 0 or gap)
-	header:SetAttribute("yOffset",    partySettings.vertical and -gap or 0)
-	header:SetAttribute("showPlayer", partySettings.showPlayer == true)
-	header:SetAttribute("showSolo",   (partySettings.showSolo and partySettings.showPlayer) == true)
+	SetHeaderAttribute(header, "oUF-initialConfigFunction", GroupFrames.ConfigSnippet(effectiveWidth, partySettings.height))
+	SetHeaderAttribute(header, "point",      partySettings.vertical and "TOP" or "LEFT")
+	SetHeaderAttribute(header, "xOffset",    partySettings.vertical and 0 or gap)
+	SetHeaderAttribute(header, "yOffset",    partySettings.vertical and -gap or 0)
+	SetHeaderAttribute(header, "showPlayer", partySettings.showPlayer == true)
+	SetHeaderAttribute(header, "showSolo",   (partySettings.showSolo and partySettings.showPlayer) == true)
 	GroupFrames.ApplyPartyRaidMode()
-	header:SetAttribute("groupBy",    partySettings.sortBy)
-	header:SetAttribute("groupingOrder", SortOrderFor(partySettings))
-	header:SetVisibility(VisibilityFor(partySettings))
+	SetHeaderAttribute(header, "groupBy",    partySettings.sortBy)
+	SetHeaderAttribute(header, "groupingOrder", SortOrderFor(partySettings))
+	GroupFrames.SetHeaderVisibility(header, VisibilityFor(partySettings))
 
 	if not InCombatLockdown() then
 		GroupFrames.EachPartyChild(function(child) child:ClearAllPoints() end)
@@ -184,4 +181,5 @@ function GroupFrames.RefreshParty()
 	GroupFrames.PrecreateParty()
 	GroupFrames.EachPartyChild(function(child) GroupFrames.ApplyChildAll(child, partySettings, geometry) end)
 	GroupFrames.SyncPreviewChildren()
+	GroupFrames.Keystone.Sync()
 end

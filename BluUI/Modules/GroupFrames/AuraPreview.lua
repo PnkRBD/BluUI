@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('GroupFrames.AuraPreview')
+
 local GroupFrames = BUI.GroupFrames
 local Pixel = BUI.Pixel
 
@@ -202,7 +204,7 @@ end
 
 local function ReapplyLater()
 	if next(active) == nil then return end
-	C_Timer.After(0, GroupFrames.ReapplyAuraPreviews)
+	BUI.Profiler.After('GroupFrames.AuraPreview reapply', 0, GroupFrames.ReapplyAuraPreviews)
 end
 
-hooksecurefunc(GroupFrames, 'RefreshAuras', ReapplyLater)
+Hook(GroupFrames, 'RefreshAuras', ReapplyLater)

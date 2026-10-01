@@ -15,7 +15,7 @@ local function BossPostCastStart(castbar, unit)
 	if not settings.enabled then return end
 	castbar._interrupted = nil
 	castbar._container:Show()
-	CastBar.TrackInterrupts(castbar, settings, ResolveBossColor(castbar, settings))
+	CastBar.TrackInterrupts(castbar, settings, ResolveBossColor(castbar, settings), unit)
 	CastBar.TruncateSpellName(castbar, settings)
 	CastBar.ApplyCastTarget(castbar, settings, unit)
 	castbar.Text:SetShown(settings.showSpellName)
@@ -25,8 +25,7 @@ end
 local function BossPostCastInterruptible(castbar)
 	local settings = CastBar.GetSettings('boss')
 	if not settings.enabled then return end
-	CastBar.ApplyInterruptColor(castbar, ResolveBossColor(castbar, settings), settings)
-	CastBar.SetupInterruptTick(castbar, settings)
+	CastBar.RefreshInterruptible(castbar, ResolveBossColor(castbar, settings), settings)
 end
 
 local function BossPostCastInterrupted(castbar)
@@ -73,8 +72,8 @@ function CastBar.CreateBossCastbar(frame)
 	castbar._container = container
 	castbar._iconFrame = iconFrame
 
-	castbar:HookScript('OnShow', function() container:Show() end)
-	castbar:HookScript('OnHide', function() container:Hide() end)
+	castbar:HookScript('OnShow', BUI.Profiler.Wrap('CastBar.Boss castbar show', function() container:Show() end))
+	castbar:HookScript('OnHide', BUI.Profiler.Wrap('CastBar.Boss castbar hide', function() container:Hide() end))
 	castbar.PostCastStart = BossPostCastStart
 	castbar.PostCastStop = CastBar.HideInterruptOverlays
 	castbar.PostCastInterrupted = BossPostCastInterrupted
@@ -102,9 +101,9 @@ function CastBar.ApplyBossCastbar(frame, index)
 	if frame:GetWidth() == 0 then
 		if not frame._castbarSizeHooked then
 			frame._castbarSizeHooked = true
-			frame:HookScript('OnSizeChanged', function(self)
+			frame:HookScript('OnSizeChanged', BUI.Profiler.Wrap('CastBar.Boss size wait', function(self)
 				if self:GetWidth() > 0 then CastBar.ApplyBossCastbar(self) end
-			end)
+			end))
 		end
 		return
 	end

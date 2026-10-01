@@ -50,14 +50,14 @@ local function StopCountdown()
 	if countdown then countdown:SetText('') end
 end
 
-local function TickCountdown()
+local TickCountdown = BUI.Profiler.Wrap('Skin.GuildInvite countdown tick', function()
 	local remaining = INVITE_SECONDS - Frame().elapsed
 	if remaining <= 0 then
 		StopCountdown()
 		return
 	end
 	BUILib.Skin.SetCountdownText(countdown, floor(remaining + 0.5))
-end
+end)
 
 local function StartCountdown()
 	StopCountdown()
@@ -148,9 +148,9 @@ local function Apply()
 		Skin.TipFont(countdown, 'body')
 		countdown:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -Skin.TIP_PADDING_X, -Skin.TIP_PADDING_Y)
 		countdown:SetJustifyH('RIGHT')
-		frame:HookScript('OnShow', OnShow)
-		frame:HookScript('OnHide', StopCountdown)
-		frame:HookScript('OnEvent', OnEvent)
+		frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GuildInvite invite layout', OnShow))
+		frame:HookScript('OnHide', BUI.Profiler.Wrap('Skin.GuildInvite countdown stop', StopCountdown))
+		frame:HookScript('OnEvent', BUI.Profiler.Wrap('Skin.GuildInvite invite event', OnEvent))
 	end
 	title:Show()
 	countdown:Show()

@@ -7,6 +7,7 @@ local Colors = BUILib.Colors
 local FONT = BUILib.Font or STANDARD_TEXT_FONT
 local Skin = BUI.Skinning
 local Pixel = BUI.Pixel
+local After = BUI.Profiler.After
 
 local TAB_BUY, TAB_BUYBACK, TAB_BULK = 1, 2, 3
 local ROW_HEIGHT = 40
@@ -131,7 +132,7 @@ local function SellJunkNext()
 			local info = C_Container.GetContainerItemInfo(bag, slot)
 			if info and info.quality == 0 and not info.hasNoValue and info.itemID then
 				C_Container.UseContainerItem(bag, slot)
-				C_Timer.After(0.2, SellJunkNext)
+				After('Skin.Merchant junk sell', 0.2, SellJunkNext)
 				return
 			end
 		end
@@ -395,7 +396,7 @@ local function CreateBuyRow(parent)
 			if not merchantFrame or not merchantFrame:IsShown() then return end
 			remaining = remaining - 1
 			BuyMerchantItem(row.merchantIdx, 1)
-			if remaining > 0 then C_Timer.After(0.2, BuyOne) end
+			if remaining > 0 then After('Skin.Merchant buy step', 0.2, BuyOne) end
 		end
 		BuyOne()
 	end)
@@ -622,7 +623,7 @@ local function BuildFrame()
 			queueIndex = queueIndex + 1
 			if queue[queueIndex] then
 				BuyMerchantItem(queue[queueIndex].idx, queue[queueIndex].qty)
-				C_Timer.After(0.2, BuyNext)
+				After('Skin.Merchant bulk buy', 0.2, BuyNext)
 			end
 		end
 		BuyNext()
@@ -640,7 +641,7 @@ local function BuildFrame()
 			if previousCount and numItems >= previousCount then return end
 			previousCount = numItems
 			BuybackItem(numItems)
-			C_Timer.After(0.2, BuybackNext)
+			After('Skin.Merchant buyback step', 0.2, BuybackNext)
 		end
 		BuybackNext()
 	end)
@@ -723,7 +724,7 @@ RefreshContent = function()
 			return
 		end
 		local previous = scroll:GetVerticalScroll()
-		C_Timer.After(0, function()
+		After('Skin.Merchant scroll restore', 0, function()
 			local maxScroll = math.max(0, scroll:GetScrollChild():GetHeight() - scroll:GetHeight())
 			scroll:SetVerticalScroll(math.min(previous, maxScroll))
 		end)
@@ -783,9 +784,9 @@ local function OnMerchantEvent(event)
 			Skin.SuppressBlizzardFrame(MerchantFrame)
 			if not MerchantFrame._buiReassertHooked then
 				MerchantFrame._buiReassertHooked = true
-				MerchantFrame:HookScript('OnShow', function(self)
+				MerchantFrame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Merchant blizzard suppress', function(self)
 					if merchantFrame and merchantFrame:IsShown() and Skin.IsSkinEnabled('merchant') then Skin.SuppressBlizzardFrame(self) end
-				end)
+				end))
 			end
 		end
 		activeTab = TAB_BUY
@@ -802,7 +803,7 @@ local function OnMerchantEvent(event)
 		BUI.Events:Register('BAG_UPDATE', 'Skinning.Merchant.Live', OnMerchantEvent)
 		BUI.Events:Register('PLAYER_MONEY', 'Skinning.Merchant.Live', OnMerchantEvent)
 		BUI.Events:Register('CURRENCY_DISPLAY_UPDATE', 'Skinning.Merchant.Live', OnMerchantEvent)
-		C_Timer.After(0, RefreshContent)
+		After('Skin.Merchant page reskin', 0, RefreshContent)
 	elseif event == 'MERCHANT_CLOSED' then
 		sellJunkActive = false
 		BUI.Events:UnregisterAll('Skinning.Merchant.Live')
@@ -815,7 +816,7 @@ local function OnMerchantEvent(event)
 		ClearRowData()
 	elseif merchantFrame and merchantFrame:IsShown() and not merchantFrame.pendingRefresh then
 		merchantFrame.pendingRefresh = true
-		C_Timer.After(0.1, function()
+		After('Skin.Merchant live refresh', 0.1, function()
 			merchantFrame.pendingRefresh = false
 			RefreshContent()
 		end)

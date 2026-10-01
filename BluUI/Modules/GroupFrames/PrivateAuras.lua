@@ -115,14 +115,13 @@ local function EnsureContainer(frame)
 	container.slots = {}
 	container.handles = {}
 	frame.BluPrivateAuras = container
-
-	if not frame._bluPaUnitHook then
-		frame._bluPaUnitHook = true
-		frame:HookScript("OnAttributeChanged", function(self, name)
-			if name == "unit" then RefreshAnchors(self) end
-		end)
-	end
 	return container
+end
+
+function GroupFrames.RebindPrivateAuras(frame, unit)
+	local container = frame.BluPrivateAuras
+	if not container or unit == container._regUnit then return end
+	RefreshAnchors(frame)
 end
 
 function GroupFrames.ApplyPrivateAuras(frame)

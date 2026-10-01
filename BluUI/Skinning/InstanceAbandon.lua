@@ -1,5 +1,8 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.InstanceAbandon')
+local Wrap = BUI.Profiler.Wrap
+
 local ipairs = ipairs
 local floor = math.floor
 
@@ -47,14 +50,14 @@ local function StopCountdown()
 	if countdown then countdown:SetText('') end
 end
 
-local function TickCountdown()
+local TickCountdown = Wrap('Skin.InstanceAbandon countdown tick', function()
 	local remaining = Dialog().timeleft
 	if not remaining or remaining <= 0 then
 		StopCountdown()
 		return
 	end
 	BUILib.Skin.SetCountdownText(countdown, floor(remaining + 0.5))
-end
+end)
 
 local function StartCountdown()
 	StopCountdown()
@@ -118,10 +121,10 @@ local function Apply()
 		track:SetPoint('RIGHT', dialog.ProgressBarBorder, 'RIGHT', -FILL_INSET, 0)
 		track:SetHeight(BAR_HEIGHT)
 		track:SetColorTexture(0, 0, 0, TRACK_ALPHA)
-		dialog:HookScript('OnShow', OnShow)
-		dialog:HookScript('OnHide', StopCountdown)
-		hooksecurefunc(Votes(), 'Refresh', OnRefresh)
-		hooksecurefunc('StaticPopup_SetProgressBarTime', OnProgressBarTime)
+		dialog:HookScript('OnShow', Wrap('Skin.InstanceAbandon dialog layout', OnShow))
+		dialog:HookScript('OnHide', Wrap('Skin.InstanceAbandon countdown stop', StopCountdown))
+		Hook(Votes(), 'Refresh', OnRefresh)
+		Hook('StaticPopup_SetProgressBarTime', OnProgressBarTime)
 	end
 	Fade(dialog.BG)
 	Fade(dialog.ProgressBarBorder)

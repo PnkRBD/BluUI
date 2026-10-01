@@ -3,14 +3,19 @@ local _, BUI = ...
 BUI.Power = {}
 local Power = BUI.Power
 
+local ClassPowers = BUI.ClassPowers
+
 local VALID = { profile = true, class = true, spec = true }
 
-local specKey, classKey
+local specKey, specKeyID, classKey
 
 local function SpecKey()
-    local specID = PlayerUtil.GetCurrentSpecID()
-    if specID then specKey = 'spec:' .. specID end
-    return specKey or nil
+    local specID = ClassPowers.GetSpecID()
+    if specID and specID ~= specKeyID then
+        specKeyID = specID
+        specKey = 'spec:' .. specID
+    end
+    return specKey
 end
 
 local function ClassKey()
@@ -21,14 +26,20 @@ local function ClassKey()
     return classKey or nil
 end
 
-function Power.GetScope()
-    local scope = BUI.GetDB().powerScope
+local function ScopeOf(profile)
+    local scope = profile.powerScope
     return VALID[scope] and scope or 'spec'
 end
 
+function Power.GetScope()
+    return ScopeOf(BUI.GetDB())
+end
+
 local function EnsureVariant(profile, key)
-    profile.powerVariants = profile.powerVariants or {}
-    local variant = profile.powerVariants[key]
+    local variants = profile.powerVariants
+    local variant = variants and variants[key]
+    if variant and variant.powerBar and variant.secondaryPower then return variant end
+    profile.powerVariants = variants or {}
     if not variant then
         variant = {
             powerBar = BUI.Tools.DeepCopy(profile.powerBar),
@@ -43,7 +54,7 @@ local function EnsureVariant(profile, key)
 end
 
 local function Resolve(profile)
-    local scope = Power.GetScope()
+    local scope = ScopeOf(profile)
     if scope == 'profile' then return profile.powerBar, profile.secondaryPower end
     local key = (scope == 'spec') and SpecKey() or ClassKey()
     if not key then return profile.powerBar, profile.secondaryPower end
@@ -138,6 +149,7 @@ end
 BUI.Events:OnLogin('PowerScope', function()
     BUI.Events:Register('PLAYER_SPECIALIZATION_CHANGED', 'PowerScope', function(_, unit)
         if unit and unit ~= 'player' then return end
+        ClassPowers.UpdateSpecID()
         if Power.GetScope() == 'spec' then Power.ReapplyAll() end
     end)
 end)

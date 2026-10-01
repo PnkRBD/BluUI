@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.GameMenu')
+
 local CreateFrame = CreateFrame
 local InCombatLockdown = InCombatLockdown
 local HideUIPanel = HideUIPanel
@@ -196,7 +198,7 @@ local function HideNewTags(frame)
 				if tagParent and tagParent ~= frame and not tagParent._buiNewHidden then
 					tagParent._buiNewHidden = true
 					tagParent:Hide()
-					hooksecurefunc(tagParent, 'Show', function(shownFrame) if Skin.IsSkinEnabled('gameMenu') then shownFrame:Hide() end end)
+					Hook(tagParent, 'Show', function(shownFrame) if Skin.IsSkinEnabled('gameMenu') then shownFrame:Hide() end end)
 				end
 			end
 		end
@@ -265,10 +267,10 @@ local function Install()
 	HideBlizzArt(frame)
 	EnsureDim(frame)
 
-	if frame.Layout then hooksecurefunc(frame, 'Layout', Refresh) end
-	if frame.InitButtons then hooksecurefunc(frame, 'InitButtons', Refresh) end
+	if frame.Layout then Hook(frame, 'Layout', Refresh) end
+	if frame.InitButtons then Hook(frame, 'InitButtons', Refresh) end
 
-	frame:HookScript('OnShow', function(self)
+	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GameMenu menu reskin', function(self)
 		if not Skin.IsSkinEnabled('gameMenu') then return end
 		HideBlizzArt(self)
 		Refresh(self)
@@ -278,10 +280,10 @@ local function Install()
 			dim:SetFrameLevel(max(0, self:GetFrameLevel() - 1))
 			dim:Show()
 		end
-	end)
-	frame:HookScript('OnHide', function(self)
+	end))
+	frame:HookScript('OnHide', BUI.Profiler.Wrap('Skin.GameMenu dim hide', function(self)
 		if self._buiDim then self._buiDim:Hide() end
-	end)
+	end))
 
 	Refresh(frame)
 end

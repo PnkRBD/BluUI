@@ -52,7 +52,7 @@ function CDM.CheckDisabled(done)
 	end
 	if not anyCDMViewerEnabled or C_CVar.GetCVarBool(COOLDOWN_VIEWER_CVAR) then done() return end
 
-	C_Timer.After(LAYOUT_SETTLE_SECONDS, function()
+	BUI.Profiler.After('CDM.Checks disabled prompt', LAYOUT_SETTLE_SECONDS, function()
 		if C_CVar.GetCVarBool(COOLDOWN_VIEWER_CVAR) then done() return end
 		Modals.Confirm({
 			title       = 'Cooldown Manager Disabled',
@@ -121,7 +121,7 @@ function CDM.CheckUtilityPrompt(done)
 					title       = 'Open Cooldown Manager',
 					desc        = 'Move the spells from the Utility section into Essential, where the Essential Viewer shows them.',
 					onClick     = function()
-						C_Timer.After(0, function()
+						BUI.Profiler.After('CDM.Checks open settings', 0, function()
 							if CooldownViewerSettings then CooldownViewerSettings:SetShown(true) end
 						end)
 					end,
@@ -145,6 +145,6 @@ function CDM.CheckUtilityPrompt(done)
 	end
 	if not finished then
 		BUI.Events:Register('COOLDOWN_VIEWER_DATA_LOADED', 'CDM.UtilityCheck', Evaluate)
-		C_Timer.After(20, Finish)
+		BUI.Profiler.After('CDM.Checks utility timeout', 20, Finish)
 	end
 end

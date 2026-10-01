@@ -607,14 +607,14 @@ local function EnsureBagPopup()
     bagPopup.title:SetPoint('TOPLEFT', Pixel.Scale(8), Pixel.Scale(-6))
     bagPopup.title:SetTextColor(LABEL_COLOR[1], LABEL_COLOR[2], LABEL_COLOR[3], 1)
     bagPopup.rows = {}
-    bagPopup:SetScript('OnUpdate', function(self, elapsed)
+    bagPopup:SetScript('OnUpdate', BUI.Profiler.Wrap('Skin.CharacterFrame bag popup', function(self, elapsed)
         if self:IsMouseOver() or (self.owner and self.owner:IsMouseOver()) then
             self.away = 0
             return
         end
         self.away = (self.away or 0) + elapsed
         if self.away > BAG.POPUP_LINGER then self:Hide() end
-    end)
+    end))
     bagPopup:Hide()
     return bagPopup
 end
@@ -795,10 +795,11 @@ local function BuildSlotLabels(button, info)
 
     local contextOverlay = button.ItemContextOverlay
     if contextOverlay then
+        local Hook = BUI.Profiler.Hooker('Skin.CharacterFrame')
         local function Sync() Skin.SyncSlotGemDim(labels) end
-        hooksecurefunc(contextOverlay, 'Show', Sync)
-        hooksecurefunc(contextOverlay, 'Hide', Sync)
-        hooksecurefunc(contextOverlay, 'SetShown', Sync)
+        Hook(contextOverlay, 'Show', Sync)
+        Hook(contextOverlay, 'Hide', Sync)
+        Hook(contextOverlay, 'SetShown', Sync)
     end
 
     return labels
@@ -919,7 +920,7 @@ local function PlaceSlotButtons()
         end
     end
 
-    C_Timer.After(0, function()
+    BUI.Profiler.After('Skin.CharacterFrame slot decorations', 0, function()
         for _, info in ipairs(SLOTS) do
             local button = _G['Character' .. info.id]
             if button and button._buiStyled then HideBlizzardDecorations(button) end
@@ -1239,13 +1240,13 @@ local function CreateStatRow(parent)
         GameTooltip:Show()
     end
 
-    local WatchModifier = function(self)
+    local WatchModifier = BUI.Profiler.Wrap('Skin.CharacterFrame stat modifier', function(self)
         local held = IsControlKeyDown() and true or false
         if held ~= self.detailed then
             self.detailed = held
             BuildTooltip(self)
         end
-    end
+    end)
 
     row:SetScript('OnEnter', function(self)
         self.detailed = IsControlKeyDown() and true or false
@@ -2237,13 +2238,13 @@ local function BuildModel(parent)
         end
     end)
     playerModel:SetScript('OnMouseUp', function(self) self.dragStartX = nil end)
-    playerModel:SetScript('OnHide', function(self) self.dragStartX = nil end)
-    playerModel:SetScript('OnUpdate', function(self)
+    playerModel:SetScript('OnHide', BUI.Profiler.Wrap('Skin.CharacterFrame model hide', function(self) self.dragStartX = nil end))
+    playerModel:SetScript('OnUpdate', BUI.Profiler.Wrap('Skin.CharacterFrame model spin', function(self)
         if not self.dragStartX then return end
         local cursorX = GetCursorPosition()
         self.facing = (self.dragStartFacing or 0) + (cursorX - self.dragStartX) / 60
         self:SetFacing(self.facing)
-    end)
+    end))
     playerModel:SetScript('OnMouseWheel', function(self, delta)
         local newScale = self.scale + (delta > 0 and -0.1 or 0.1)
         if newScale < 0.4 then newScale = 0.4 elseif newScale > 2.0 then newScale = 2.0 end
@@ -2354,7 +2355,7 @@ local function BuildFrame()
         if not left or not top then return end
         local cursorX, cursorY = GetCursorPosition()
         local grabX, grabY = cursorX / scale - left, cursorY / scale - top
-        dragger:SetScript('OnUpdate', function()
+        dragger:SetScript('OnUpdate', BUI.Profiler.Wrap('Skin.CharacterFrame sheet drag', function()
             local x, y = GetCursorPosition()
             local screenWidth, screenHeight = UIParent:GetWidth(), UIParent:GetHeight()
             local width, height = frame:GetWidth(), frame:GetHeight()
@@ -2362,7 +2363,7 @@ local function BuildFrame()
             local newTop = math.min(math.max(y / scale - grabY, height), screenHeight)
             frame:ClearAllPoints()
             frame:SetPoint('TOPLEFT', UIParent, 'BOTTOMLEFT', newLeft, newTop)
-        end)
+        end))
         dragger:Show()
     end
     local function EndSheetDrag()
@@ -2374,7 +2375,7 @@ local function BuildFrame()
     frame:RegisterForDrag('LeftButton')
     frame:SetScript('OnDragStart', BeginSheetDrag)
     frame:SetScript('OnDragStop', EndSheetDrag)
-    frame:HookScript('OnHide', function() if dragger:IsShown() then EndSheetDrag() end end)
+    frame:HookScript('OnHide', BUI.Profiler.Wrap('Skin.CharacterFrame sheet hide', function() if dragger:IsShown() then EndSheetDrag() end end))
     PaintAmbience(frame)
     ApplyBackground()
     Placement.Home()
@@ -2516,7 +2517,7 @@ local function ApplySkin()
             end
         end
     end
-    C_Timer.After(0, function()
+    BUI.Profiler.After('Skin.CharacterFrame show sheet', 0, function()
         if CharacterFrame and CharacterFrame:IsShown() then ShowSkin() end
     end)
 end
@@ -2527,13 +2528,13 @@ end
 
 BUI.Events:Register('PLAYER_LOGIN', 'Skinning.CharacterFrame', function()
     if not CharacterFrame or HasConflictingCharSheet() then return end
-    CharacterFrame:HookScript('OnShow', ApplySkin)
-    CharacterFrame:HookScript('OnHide', function()
+    CharacterFrame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.CharacterFrame frame reskin', ApplySkin))
+    CharacterFrame:HookScript('OnHide', BUI.Profiler.Wrap('Skin.CharacterFrame frame restore', function()
         HideSkin()
         if Skin.IsSkinEnabled('characterFrame') then
             Skin.RestoreBlizzardFrame(CharacterFrame)
         end
-    end)
+    end))
 end)
 
 local pendingRefresh = {}
@@ -2541,7 +2542,7 @@ local pendingRefresh = {}
 local function QueueRefresh(key, callback)
     if pendingRefresh[key] then return end
     pendingRefresh[key] = true
-    C_Timer.After(0, function()
+    BUI.Profiler.After('Skin.CharacterFrame queued refresh', 0, function()
         pendingRefresh[key] = nil
         if IsOpen() then callback() end
     end)

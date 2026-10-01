@@ -30,7 +30,7 @@ Datatext.Register('coords', {
     name = 'Coordinates', show = 'showCoords', label = 'XY:',
     interval = 0.5,
     OnUpdate = function()
-        if Read() then Datatext.Refresh() end
+        if Read() then Datatext.Refresh('coords') end
     end,
     build = function(config, valueHex, self)
         return Datatext.Label(config, self) .. Datatext.Colored(coordX, valueHex) .. ', ' .. Datatext.Colored(coordY, valueHex)

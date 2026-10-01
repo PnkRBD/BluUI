@@ -187,7 +187,8 @@ end
 local function DirectHpEnable(self)
 	local element = self.HpTextDirect
 	if not element then return end
-	if not GroupFrames.IsDirectHpFormat(GroupFrames.SettingsForFrame(self).hpText.format) then return end
+	local settings = GroupFrames.SettingsForFrame(self)
+	if not settings.showHpText or not GroupFrames.IsDirectHpFormat(settings.hpText.format) then return end
 	element.__owner = self
 	element.ForceUpdate = DirectHpForceUpdate
 	self:RegisterEvent("UNIT_HEALTH", DirectHpPath)

@@ -81,12 +81,17 @@ function Pixel.PixelSizeFor(frame, pixels)
     return Pixel.ClampBorder(pixels) * perfectScale / frame:GetEffectiveScale()
 end
 
+local Profiler = BUI.Profiler
+
 local function KillSnap(object)
     if type(object) ~= "table" or rawget(object, "_noSnap") then return end
     if object.IsForbidden and object:IsForbidden() then return end
 
-    local target = object.SetSnapToPixelGrid and object or (object.GetStatusBarTexture and object:GetStatusBarTexture())
-    if type(target) ~= "table" or not target.SetSnapToPixelGrid or rawget(target, "_noSnap") then return end
+    local snapsItself = object.SetSnapToPixelGrid ~= nil
+    local target = snapsItself and object or (object.GetStatusBarTexture and object:GetStatusBarTexture())
+    if type(target) ~= "table" or not target.SetSnapToPixelGrid then return end
+    if not snapsItself then object._noSnap = true end
+    if rawget(target, "_noSnap") then return end
 
     target:SetSnapToPixelGrid(false)
     target:SetTexelSnappingBias(0)
@@ -98,14 +103,18 @@ local function RearmSnap(object, enabled)
     if type(object) ~= "table" or not rawget(object, "_noSnap") then return end
     if object.IsForbidden and object:IsForbidden() then return end
     object._noSnap = nil
+    local parent = object:GetParent()
+    if parent and rawget(parent, "_noSnap") then parent._noSnap = nil end
 end
 
+local TimedKillSnap = Profiler.Wrap("Pixel texture snap hook", KillSnap)
+
 local SNAP_HOOKS = {
-    SetAtlas = KillSnap,
-    SetColorTexture = KillSnap,
-    SetSnapToPixelGrid = RearmSnap,
-    SetStatusBarTexture = KillSnap,
-    SetTexture = KillSnap,
+    SetAtlas = TimedKillSnap,
+    SetColorTexture = TimedKillSnap,
+    SetSnapToPixelGrid = Profiler.Wrap("Pixel texture snap rearm", RearmSnap),
+    SetStatusBarTexture = TimedKillSnap,
+    SetTexture = TimedKillSnap,
 }
 
 local function HookSnapMethods(widget)
@@ -129,7 +138,7 @@ local function GiveBackdrop(frame)
         end
     end
     if frame.OnBackdropSizeChanged then
-        frame:HookScript("OnSizeChanged", frame.OnBackdropSizeChanged)
+        frame:HookScript("OnSizeChanged", Profiler.Wrap("Pixel backdrop resize", frame.OnBackdropSizeChanged))
     end
 end
 
@@ -279,6 +288,8 @@ function Pixel.ApplyFont(fontString, size, fontPath, flags)
         fontRegistry[fontString] = { font, size, outline }
     end
     local applied = BUI.ApplySlug(outline)
+    local currentFont, currentSize, currentFlags = fontString:GetFont()
+    if currentFont == font and currentSize == size and currentFlags == applied then return false end
 
     if not fontString:SetFont(font, size, applied) then
         fontString:SetFont(BUI.C.BLIZZARD_FONT, size, applied)
@@ -286,6 +297,7 @@ function Pixel.ApplyFont(fontString, size, fontPath, flags)
 
     fontString:SetShadowColor(0, 0, 0, 0)
     fontString:SetShadowOffset(0, 0)
+    return true
 end
 
 local function GrantSnapMixins(widget)
@@ -333,7 +345,7 @@ end
 
 local function OnGXRestarted()
     OnScaleChanged()
-    C_Timer.After(0, OnScaleChanged)
+    Profiler.After("Pixel scale change", 0, OnScaleChanged)
 end
 
 BUI.Events:Register('UI_SCALE_CHANGED', 'Pixel', OnScaleChanged)

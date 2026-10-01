@@ -413,10 +413,29 @@ local function RenderAll()
     if minimapBar then RenderBar(minimapBar) end
 end
 
-local DispatchRender = BUI.Dispatcher.New(RenderAll, 'Datatext.Render')
+local changedEntries = {}
 
-function Datatext.Refresh()
-    if Datatext._initialized then DispatchRender() end
+local function ShowsChanged(bar)
+    local config = bar.getConfig()
+    if not config then return false end
+    for id in pairs(changedEntries) do
+        if config[registry[id].show] then return true end
+    end
+    return false
+end
+
+local DispatchRender = BUI.Dispatcher.New(function()
+    for _, bar in pairs(bars) do
+        if ShowsChanged(bar) then RenderBar(bar) end
+    end
+    if minimapBar and ShowsChanged(minimapBar) then RenderBar(minimapBar) end
+    wipe(changedEntries)
+end, 'Datatext.Render')
+
+function Datatext.Refresh(id)
+    if not Datatext._initialized then return end
+    changedEntries[id] = true
+    DispatchRender()
 end
 
 local function SetEntryActive(entry, active)
@@ -469,9 +488,9 @@ local function MainOnMouseUp(self, mouseButton)
     end
 end
 
-local function MainOnShow(self)
+local MainOnShow = BUI.Profiler.Wrap('Datatext.Bars bar shown', function(self)
     if self.bar._pendingRender then RenderBar(self.bar) end
-end
+end)
 
 local EDGE_POINTS = {
     { 'TOPLEFT', 'TOPRIGHT', true },

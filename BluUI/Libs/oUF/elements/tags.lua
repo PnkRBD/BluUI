@@ -611,7 +611,7 @@ eventFrame:SetScript('OnEvent', function(_, event, unit)
 
 	local unitless = unitlessEvents[event]
 	for fs in next, strings do
-		if(fs:IsVisible() and (unitless or fs.__owner.__unit == unit or (fs.extraUnits and fs.extraUnits[unit]))) then
+		if((unitless or fs.__owner.__unit == unit or (fs.extraUnits and fs.extraUnits[unit])) and fs:IsVisible()) then
 			queueTagUpdate(fs)
 		end
 	end

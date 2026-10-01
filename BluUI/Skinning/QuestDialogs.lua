@@ -1,5 +1,8 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.QuestDialogs')
+local Wrap = BUI.Profiler.Wrap
+
 local ipairs, pairs = ipairs, pairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -466,24 +469,24 @@ local function Apply()
 end
 
 local function HookQuest(frame)
-	frame:HookScript('OnShow', ApplyQuest)
-	hooksecurefunc('QuestInfo_Display', OnQuestInfoDisplay)
-	hooksecurefunc('QuestInfo_ShowRewards', OnQuestInfoRewards)
-	hooksecurefunc('QuestFrame_SetTextColor', OnPanelText)
-	hooksecurefunc('QuestFrame_SetTitleTextColor', OnPanelText)
-	hooksecurefunc('QuestFrameGreetingPanel_OnShow', OnGreetingShown)
-	hooksecurefunc('QuestFrameProgressItems_Update', OnProgressItems)
-	hooksecurefunc('SetItemButtonQuality', OnItemButtonQuality)
+	frame:HookScript('OnShow', Wrap('Skin.QuestDialogs quest reskin', ApplyQuest))
+	Hook('QuestInfo_Display', OnQuestInfoDisplay)
+	Hook('QuestInfo_ShowRewards', OnQuestInfoRewards)
+	Hook('QuestFrame_SetTextColor', OnPanelText)
+	Hook('QuestFrame_SetTitleTextColor', OnPanelText)
+	Hook('QuestFrameGreetingPanel_OnShow', OnGreetingShown)
+	Hook('QuestFrameProgressItems_Update', OnProgressItems)
+	Hook('SetItemButtonQuality', OnItemButtonQuality)
 end
 
 local function HookGossip(frame)
-	frame:HookScript('OnShow', ApplyGossip)
-	hooksecurefunc(frame, 'Update', OnGossipUpdated)
+	frame:HookScript('OnShow', Wrap('Skin.QuestDialogs gossip reskin', ApplyGossip))
+	Hook(frame, 'Update', OnGossipUpdated)
 end
 
 local function HookItemText(frame)
-	frame:HookScript('OnShow', ApplyItemText)
-	hooksecurefunc('ItemTextFrame_OnEvent', OnItemTextEvent)
+	frame:HookScript('OnShow', Wrap('Skin.QuestDialogs text reskin', ApplyItemText))
+	Hook('ItemTextFrame_OnEvent', OnItemTextEvent)
 end
 
 local function Install()

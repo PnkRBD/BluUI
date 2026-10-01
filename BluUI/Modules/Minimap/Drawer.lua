@@ -99,7 +99,7 @@ end
 local function ScheduleHide()
 	if not active then return end
 	CancelHide()
-	hideTimer = C_Timer.NewTimer(HIDE_DELAY, HideDrawer)
+	hideTimer = BUI.Profiler.NewTimer('Minimap.Drawer hide drawer', HIDE_DELAY, HideDrawer)
 end
 
 local function AnchorToTab(target)
@@ -211,7 +211,7 @@ local function Create()
 	if _G.BugGrabber then
 		local dataObject = LibStub('LibDataBroker-1.1'):GetDataObjectByName('BugSack')
 		hasSessionError = dataObject and (tonumber(dataObject.text) or 0) > 0 or false
-		EventRegistry:RegisterCallback('BugGrabber.BugGrabbed', OnErrorCaught, Drawer)
+		EventRegistry:RegisterCallback('BugGrabber.BugGrabbed', BUI.Profiler.Wrap('Minimap.Drawer error caught', OnErrorCaught), Drawer)
 	end
 end
 

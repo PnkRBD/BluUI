@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('WorldMap.ZoneLabels')
+
 local Pixel = BUI.Pixel
 
 BUI.WorldMapLabels = {}
@@ -110,10 +112,10 @@ local OnCanvasScaleChanged = BUI.Dispatcher.New(Update, 'WorldMapLabels.Rescale'
 
 BUI.Events:OnLogin('WorldMapLabels', function()
     if not WorldMapFrame then return end
-    hooksecurefunc(WorldMapFrame, 'OnMapChanged', Update)
-    WorldMapFrame:HookScript('OnShow', Update)
+    Hook(WorldMapFrame, 'OnMapChanged', Update)
+    WorldMapFrame:HookScript('OnShow', BUI.Profiler.Wrap('WorldMap.ZoneLabels map shown', Update))
     local scroll = WorldMapFrame.ScrollContainer
     if scroll and scroll.SetCanvasScale then
-        hooksecurefunc(scroll, 'SetCanvasScale', OnCanvasScaleChanged)
+        Hook(scroll, 'SetCanvasScale', OnCanvasScaleChanged)
     end
 end)

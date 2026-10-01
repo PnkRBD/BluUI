@@ -31,7 +31,7 @@ Datatext.Register('ping', {
     interval = 1,
     defaults = { pingSource = 'world' },
     OnUpdate = function()
-        if Read() then Datatext.Refresh() end
+        if Read() then Datatext.Refresh('ping') end
     end,
     build = function(config, valueHex, self)
         local label = Datatext.Label(config, self)

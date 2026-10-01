@@ -3,6 +3,7 @@ local Pixel = BUI.Pixel
 
 local CastBar = BUI.CastBar
 
+local UnitCanAttack = UnitCanAttack
 local UnitClass = UnitClass
 local UnitExists = UnitExists
 local EvaluateColorValueFromBoolean = C_CurveUtil.EvaluateColorValueFromBoolean
@@ -26,10 +27,18 @@ local candidateInterrupts = CLASS_INTERRUPTS[select(2, UnitClass('player'))]
 local interruptSpells = {}
 for _, spellID in ipairs(candidateInterrupts) do interruptSpells[spellID] = true end
 local knownInterrupts = {}
+local kickCooldowns = {}
 local interruptReadyAt = 0
 
-local function KickReady(spellID)
-	local cooldown = C_Spell.GetSpellCooldownDuration(spellID)
+local function SampleKickCooldowns()
+	wipe(kickCooldowns)
+	for index, spellID in ipairs(knownInterrupts) do
+		kickCooldowns[index] = C_Spell.GetSpellCooldownDuration(spellID)
+	end
+	return kickCooldowns
+end
+
+local function KickReady(cooldown)
 	return not cooldown or cooldown:IsZero()
 end
 
@@ -42,9 +51,10 @@ local function RefreshKnownInterrupts()
 	end
 end
 
-for _, event in ipairs({ 'PLAYER_LOGIN', 'SPELLS_CHANGED', 'UNIT_PET', 'PET_BAR_UPDATE' }) do
+for _, event in ipairs({ 'PLAYER_LOGIN', 'SPELLS_CHANGED', 'PET_BAR_UPDATE' }) do
 	BUI.Events:Register(event, 'CB.InterruptCache', RefreshKnownInterrupts)
 end
+BUI.Events:RegisterUnit('UNIT_PET', 'player', 'CB.InterruptCache', RefreshKnownInterrupts)
 
 BUI.Events:RegisterUnit('UNIT_SPELLCAST_SUCCEEDED', { 'player', 'pet' }, 'CB.InterruptClock', function(_, _, _, spellID)
 	if not interruptSpells[spellID] then return end
@@ -120,70 +130,96 @@ function CastBar.HideInterruptOverlays(castbar)
 	if not next(trackedCastbars) then StopInterruptPoller() end
 end
 
-function CastBar.ApplyInterruptColor(castbar, barColor, settings)
+local function StyleInterruptOverlays(castbar, barColor, settings)
 	local barTexture = castbar:GetStatusBarTexture()
 	local texturePath = barTexture:GetTexture()
+	if castbar._intStyleTex == texturePath and castbar._intStyleCount == #knownInterrupts then return end
+	castbar._intStyleTex = texturePath
+	castbar._intStyleCount = #knownInterrupts
 
-	if castbar._intStyleTex ~= texturePath or castbar._intStyleCount ~= #knownInterrupts then
-		castbar._intStyleTex = texturePath
-		castbar._intStyleCount = #knownInterrupts
+	local baseColor = #knownInterrupts > 0 and settings.interruptOnCDColor or barColor
+	castbar:SetStatusBarColor(baseColor[1], baseColor[2], baseColor[3], baseColor[4] or 1)
 
-		local baseColor = #knownInterrupts > 0 and settings.interruptOnCDColor or barColor
-		castbar:SetStatusBarColor(baseColor[1], baseColor[2], baseColor[3], baseColor[4] or 1)
-
-		local readyColor = settings.interruptReadyColor
-		castbar._readyOverlays = castbar._readyOverlays or {}
-		for index = 1, #knownInterrupts do
-			local overlay = castbar._readyOverlays[index]
-			if not overlay then
-				overlay = castbar:CreateTexture(nil, 'ARTWORK', nil, 2)
-				castbar._readyOverlays[index] = overlay
-			end
-			overlay:SetTexture(texturePath)
-			overlay:SetVertexColor(readyColor[1], readyColor[2], readyColor[3], readyColor[4] or 1)
-			overlay:SetAllPoints(barTexture)
+	local readyColor = settings.interruptReadyColor
+	castbar._readyOverlays = castbar._readyOverlays or {}
+	castbar._readyShown = castbar._readyShown or {}
+	wipe(castbar._readyShown)
+	for index = 1, #knownInterrupts do
+		local overlay = castbar._readyOverlays[index]
+		if not overlay then
+			overlay = castbar:CreateTexture(nil, 'ARTWORK', nil, 2)
+			castbar._readyOverlays[index] = overlay
 		end
-		for index = #knownInterrupts + 1, #castbar._readyOverlays do
-			castbar._readyOverlays[index]:SetAlpha(0)
-		end
-
-		local interruptColor = settings.interruptColor
-		castbar._niOverlay = castbar._niOverlay or castbar:CreateTexture(nil, 'ARTWORK', nil, 4)
-		castbar._niOverlay:SetTexture(texturePath)
-		castbar._niOverlay:SetVertexColor(interruptColor[1], interruptColor[2], interruptColor[3], interruptColor[4] or 1)
-		castbar._niOverlay:SetAllPoints(barTexture)
+		overlay:SetTexture(texturePath)
+		overlay:SetVertexColor(readyColor[1], readyColor[2], readyColor[3], readyColor[4] or 1)
+		overlay:SetAllPoints(barTexture)
+	end
+	for index = #knownInterrupts + 1, #castbar._readyOverlays do
+		castbar._readyOverlays[index]:SetAlpha(0)
 	end
 
-	for index, spellID in ipairs(knownInterrupts) do
-		castbar._readyOverlays[index]:SetAlphaFromBoolean(KickReady(spellID), 1, 0)
+	local interruptColor = settings.interruptColor
+	castbar._niOverlay = castbar._niOverlay or castbar:CreateTexture(nil, 'ARTWORK', nil, 4)
+	castbar._niOverlay:SetTexture(texturePath)
+	castbar._niOverlay:SetVertexColor(interruptColor[1], interruptColor[2], interruptColor[3], interruptColor[4] or 1)
+	castbar._niOverlay:SetAllPoints(barTexture)
+end
+
+local function PaintKickReady(castbar, cooldowns)
+	local shown = castbar._readyShown
+	for index = 1, #knownInterrupts do
+		local ready = KickReady(cooldowns[index])
+		if IsSecret(ready) then
+			shown[index] = nil
+			castbar._readyOverlays[index]:SetAlphaFromBoolean(ready, 1, 0)
+		elseif shown[index] ~= ready then
+			shown[index] = ready
+			castbar._readyOverlays[index]:SetAlphaFromBoolean(ready, 1, 0)
+		end
 	end
+end
+
+local function PaintInterruptColor(castbar, barColor, settings, cooldowns)
+	StyleInterruptOverlays(castbar, barColor, settings)
+	PaintKickReady(castbar, cooldowns)
 	castbar._niOverlay:SetAlphaFromBoolean(castbar.notInterruptible, 1, 0)
 end
 
-local function RefreshInterruptTick(castbar)
-	if not castbar._intTickActive or castbar._intPreview then return end
-	local tick, zone = castbar._intTick, castbar._intZone
+local function ShowTickParts(castbar, tickShown, zoneShown)
+	if castbar._intTickShown == tickShown and castbar._intZoneShown == zoneShown then return end
+	castbar._intTickShown, castbar._intZoneShown = tickShown, zoneShown
+	castbar._intTick:SetShown(tickShown)
+	castbar._intZone:SetShown(zoneShown)
+end
 
-	local kickCooldown = C_Spell.GetSpellCooldownDuration(knownInterrupts[1])
+local function RefreshInterruptTick(castbar, cooldowns)
+	if not castbar._intTickActive or castbar._intPreview then return end
+
+	local kickCooldown = cooldowns[1]
 	if not kickCooldown then
-		tick:Hide()
-		zone:Hide()
+		ShowTickParts(castbar, false, false)
 		return
 	end
 
+	local settings = castbar._intSettings
+	ShowTickParts(castbar, settings.interruptTick and true or false, settings.interruptWindow and true or false)
+
 	local interruptibleAlpha = EvaluateColorValueFromBoolean(castbar.notInterruptible, 0, 1)
 	local alpha = EvaluateColorValueFromBoolean(kickCooldown:IsZero(), 0, interruptibleAlpha)
+	local secretAlpha = IsSecret(alpha)
+	if not secretAlpha and alpha == 0 and castbar._intAlpha == 0 then return end
+
 	castbar._intPos:SetValue(castbar:GetTimerDuration():GetElapsedDuration())
 	castbar._intBar:SetValue(kickCooldown:GetRemainingDuration())
 
-	local settings = castbar._intSettings
-	tick:SetShown(settings.interruptTick)
-	zone:SetShown(settings.interruptWindow)
-	tick:SetAlpha(alpha)
-	zone:SetAlpha(alpha)
+	if secretAlpha or castbar._intAlpha ~= alpha then
+		castbar._intAlpha = not secretAlpha and alpha or nil
+		castbar._intTick:SetAlpha(alpha)
+		castbar._intZone:SetAlpha(alpha)
+	end
 end
 
-function CastBar.SetupInterruptTick(castbar, settings)
+local function SetupInterruptTick(castbar, settings)
 	local duration = castbar:GetTimerDuration()
 	local width = castbar:GetWidth()
 	if not (settings.interruptTick or settings.interruptWindow) or #knownInterrupts == 0 or width <= 0 or not duration then
@@ -234,17 +270,18 @@ function CastBar.SetupInterruptTick(castbar, settings)
 	positioner:Show()
 	marker:Show()
 	castbar._intTickActive = true
-	RefreshInterruptTick(castbar)
+	castbar._intTickShown, castbar._intZoneShown, castbar._intAlpha = nil, nil, nil
+	RefreshInterruptTick(castbar, SampleKickCooldowns())
 end
 
-function CastBar.CheckInterruptTTS(castbar)
+local function CheckInterruptTTS(castbar, cooldowns)
 	local settings = castbar._intSettings
 	if not settings.interruptTTS and not settings.interruptTTSSoon then return end
 	if castbar._ttsAnnounced or castbar._interrupted or #knownInterrupts == 0 then return end
 	local notInterruptible = castbar.notInterruptible
 	if not IsSecret(notInterruptible) and notInterruptible then return end
 
-	local ready = KickReady(knownInterrupts[1])
+	local ready = KickReady(cooldowns[1])
 	if not IsSecret(ready) and ready then
 		castbar._ttsAnnounced = true
 		if settings.interruptTTS then BUI.TTS.Speak(settings.interruptTTSText) end
@@ -257,31 +294,51 @@ function CastBar.CheckInterruptTTS(castbar)
 	end
 end
 
-function CastBar.TrackInterrupts(castbar, settings, barColor)
+local function CanInterruptUnit(unit)
+	local attackable = UnitCanAttack('player', unit)
+	return IsSecret(attackable) or attackable
+end
+
+function CastBar.TrackInterrupts(castbar, settings, barColor, unit)
+	castbar._intHostile = CanInterruptUnit(unit)
+	if not castbar._intHostile then
+		CastBar.HideInterruptOverlays(castbar)
+		castbar:SetStatusBarColor(barColor[1], barColor[2], barColor[3], barColor[4] or 1)
+		return
+	end
 	castbar._intBarColor = barColor
 	castbar._intSettings = settings
 	castbar._ttsAnnounced = nil
 	castbar._ttsSoonAnnounced = nil
 	if not castbar._intHideHooked then
 		castbar._intHideHooked = true
-		castbar:HookScript('OnHide', CastBar.HideInterruptOverlays)
+		castbar:HookScript('OnHide', BUI.Profiler.Wrap('CastBar.Core interrupt hide', CastBar.HideInterruptOverlays))
 	end
 	trackedCastbars[castbar] = true
 	if not interruptTicker then interruptTicker = C_Timer.NewTicker(0.1, CheckInterruptCooldowns) end
-	CastBar.ApplyInterruptColor(castbar, barColor, settings)
-	CastBar.SetupInterruptTick(castbar, settings)
-	CastBar.CheckInterruptTTS(castbar)
+	local cooldowns = SampleKickCooldowns()
+	PaintInterruptColor(castbar, barColor, settings, cooldowns)
+	SetupInterruptTick(castbar, settings)
+	CheckInterruptTTS(castbar, cooldowns)
+end
+
+function CastBar.RefreshInterruptible(castbar, barColor, settings)
+	if not castbar._intHostile then return end
+	PaintInterruptColor(castbar, barColor, settings, SampleKickCooldowns())
+	SetupInterruptTick(castbar, settings)
 end
 
 CheckInterruptCooldowns = BUI.Dispatcher.New(function()
 	if #knownInterrupts == 0 then return end
+	local cooldowns = SampleKickCooldowns()
 	for castbar in pairs(trackedCastbars) do
 		if not castbar:IsShown() then
 			trackedCastbars[castbar] = nil
 		elseif not castbar._interrupted then
-			CastBar.ApplyInterruptColor(castbar, castbar._intBarColor, castbar._intSettings)
-			RefreshInterruptTick(castbar)
-			CastBar.CheckInterruptTTS(castbar)
+			StyleInterruptOverlays(castbar, castbar._intBarColor, castbar._intSettings)
+			PaintKickReady(castbar, cooldowns)
+			RefreshInterruptTick(castbar, cooldowns)
+			CheckInterruptTTS(castbar, cooldowns)
 		end
 	end
 	if not next(trackedCastbars) then StopInterruptPoller() end
@@ -359,7 +416,7 @@ function CastBar.PreviewInterrupt(barType)
 	local onCooldownColor, readyColor = settings.interruptOnCDColor, settings.interruptReadyColor
 	local elapsed = 0
 	local spokeSoon, spokeReady = false, false
-	local ticker = C_Timer.NewTicker(PREVIEW_STEP, function()
+	local ticker = C_Timer.NewTicker(PREVIEW_STEP, BUI.Profiler.Wrap('CastBar.Core interrupt preview', function()
 		elapsed = elapsed + PREVIEW_STEP
 		local progress = elapsed / PREVIEW_SECONDS
 		if progress >= 1 then
@@ -390,42 +447,8 @@ function CastBar.PreviewInterrupt(barType)
 				BUI.TTS.Speak(settings.interruptTTSText)
 			end
 		end
-	end)
+	end))
 	previewTickers[barType] = { ticker = ticker, castbar = castbar, parent = parent, strata = strata, frame = frame }
-end
-
-local function UpdateEmpoweredStageColor(castbar)
-	if not castbar.empowering then return end
-	local settings = castbar._empoweredSettings
-	if not settings or not settings.stageColorsEnabled then return end
-	if settings.stageColorBackground ~= false then return end
-
-	local stageColors = settings.stageColors
-	if not stageColors or not next(stageColors) then return end
-
-	local pipFractions = castbar._pipFractions
-	if not pipFractions then return end
-
-	local durationObj = castbar:GetTimerDuration()
-	if not durationObj then return end
-	local elapsed = durationObj:GetElapsedDuration()
-	local total = durationObj:GetTotalDuration()
-	if not elapsed or not total or total <= 0 then return end
-
-	local currentStage = 1
-	for i, frac in ipairs(pipFractions) do
-		if elapsed / total >= frac then currentStage = i + 1 end
-	end
-	local numStages = castbar._numStages or #pipFractions
-	if currentStage > numStages then currentStage = numStages end
-
-	if currentStage ~= castbar._lastStage then
-		castbar._lastStage = currentStage
-		local stageColor = stageColors[currentStage]
-		if stageColor then
-			castbar:SetStatusBarColor(stageColor[1], stageColor[2], stageColor[3], stageColor[4] or 1)
-		end
-	end
 end
 
 local function TimeTextHandler(self, duration)
@@ -435,12 +458,10 @@ local function TimeTextHandler(self, duration)
 		local total = duration:GetTotalDuration()
 		if total then
 			self.Time:SetFormattedText('%.1f / %.1f', display, total)
-			UpdateEmpoweredStageColor(self)
 			return
 		end
 	end
 	self.Time:SetFormattedText('%.1f', display)
-	UpdateEmpoweredStageColor(self)
 end
 
 function CastBar.SetupTimeText(castbar, settings)

@@ -1,5 +1,8 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.SystemPanels')
+local Wrap = BUI.Profiler.Wrap
+
 local pairs = pairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -115,8 +118,9 @@ local function StyleStepper(button, direction)
 	if not button._buiStepper then
 		button._buiStepper = true
 		Skin.TipPageButton(button, direction)
-		button:HookScript('OnEnable', Skin.RefreshPageButton)
-		button:HookScript('OnDisable', Skin.RefreshPageButton)
+		local refresh = Wrap('Skin.SystemPanels stepper state', Skin.RefreshPageButton)
+		button:HookScript('OnEnable', refresh)
+		button:HookScript('OnDisable', refresh)
 	end
 	FadeRegions(button)
 end
@@ -203,7 +207,7 @@ local function StyleCategoryRow(button)
 		if not button._buiCategoryRow then
 			button._buiCategoryRow = true
 			Skin.TipPageButton(button.Toggle, 'down')
-			hooksecurefunc(button, 'UpdateStateInternal', OnCategoryState)
+			Hook(button, 'UpdateStateInternal', OnCategoryState)
 		end
 		FadeButtonStates(button.Toggle)
 		SetArrowRotation(button.Toggle, CategoryExpanded(button))
@@ -274,7 +278,7 @@ local function SkinMinimalTab(tab)
 	Tab(tab, false)
 	if not tab._buiTabHook then
 		tab._buiTabHook = true
-		hooksecurefunc(tab, 'OnSelected', RefreshMinimalTab)
+		Hook(tab, 'OnSelected', RefreshMinimalTab)
 		tab:HookScript('OnEnter', OnTabHover)
 		tab:HookScript('OnLeave', OnTabHover)
 	end
@@ -328,7 +332,7 @@ local function StyleRowText(row)
 	if not text then return end
 	if not row._buiTextHook then
 		row._buiTextHook = true
-		if row.DisplayEnabled then hooksecurefunc(row, 'DisplayEnabled', OnRowDisplayEnabled) end
+		if row.DisplayEnabled then Hook(row, 'DisplayEnabled', OnRowDisplayEnabled) end
 	end
 	OnRowDisplayEnabled(row, RowTextEnabled(row))
 end
@@ -681,7 +685,7 @@ local function ApplyQuickKeybind()
 end
 
 local function HookDialog(frame, callback)
-	if frame then frame:HookScript('OnShow', callback) end
+	if frame then frame:HookScript('OnShow', Wrap('Skin.SystemPanels dialog reskin', callback)) end
 end
 
 local function InstallMacro()
@@ -689,7 +693,7 @@ local function InstallMacro()
 	local frame = _G.MacroFrame
 	if not frame then return end
 	macroInstalled = true
-	frame:HookScript('OnShow', ApplyMacro)
+	frame:HookScript('OnShow', Wrap('Skin.SystemPanels macro reskin', ApplyMacro))
 	HookDialog(_G.MacroPopupFrame, SkinIconPopup)
 	if frame:IsShown() then ApplyMacro() end
 end
@@ -699,7 +703,7 @@ local function InstallQuickKeybind()
 	local frame = _G.QuickKeybindFrame
 	if not frame then return end
 	quickKeybindInstalled = true
-	frame:HookScript('OnShow', ApplyQuickKeybind)
+	frame:HookScript('OnShow', Wrap('Skin.SystemPanels keybind reskin', ApplyQuickKeybind))
 	if frame:IsShown() then ApplyQuickKeybind() end
 end
 
@@ -708,16 +712,16 @@ local function Install()
 	local settings = _G.SettingsPanel
 	if not settings then return end
 	installed = true
-	settings:HookScript('OnShow', ApplySettings)
+	settings:HookScript('OnShow', Wrap('Skin.SystemPanels settings reskin', ApplySettings))
 	if settings:IsShown() then ApplySettings() end
 	local editMode = _G.EditModeManagerFrame
 	if editMode then
-		editMode:HookScript('OnShow', ApplyEditMode)
+		editMode:HookScript('OnShow', Wrap('Skin.SystemPanels edit mode reskin', ApplyEditMode))
 		local systemDialog = _G.EditModeSystemSettingsDialog
 		if systemDialog then
-			systemDialog:HookScript('OnShow', SkinSystemDialog)
-			hooksecurefunc(systemDialog, 'UpdateSettings', SweepSystemDialog)
-			hooksecurefunc(systemDialog, 'UpdateExtraButtons', SweepSystemDialog)
+			systemDialog:HookScript('OnShow', Wrap('Skin.SystemPanels system dialog reskin', SkinSystemDialog))
+			Hook(systemDialog, 'UpdateSettings', SweepSystemDialog)
+			Hook(systemDialog, 'UpdateExtraButtons', SweepSystemDialog)
 		end
 		HookDialog(_G.EditModeLayoutDialog, SkinLayoutDialog)
 		HookDialog(_G.EditModeImportLayoutDialog, SkinLayoutDialog)
@@ -727,8 +731,8 @@ local function Install()
 	end
 	local addonList = _G.AddonList
 	if addonList then
-		addonList:HookScript('OnShow', ApplyAddonList)
-		if _G.AddonList_InitAddon then hooksecurefunc('AddonList_InitAddon', OnAddonEntry) end
+		addonList:HookScript('OnShow', Wrap('Skin.SystemPanels addons reskin', ApplyAddonList))
+		if _G.AddonList_InitAddon then Hook('AddonList_InitAddon', OnAddonEntry) end
 		HookDialog(_G.AddonDialog, SkinAddonDialog)
 		if addonList:IsShown() then ApplyAddonList() end
 	end

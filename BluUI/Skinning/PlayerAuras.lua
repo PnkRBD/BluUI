@@ -2,7 +2,7 @@ local _, BUI = ...
 
 local ipairs = ipairs
 local wipe = wipe
-local hooksecurefunc = hooksecurefunc
+local Hook = BUI.Profiler.Hooker('Skin.PlayerAuras')
 local min = math.min
 local IsSecret = _G.issecretvalue or function() return false end
 
@@ -39,7 +39,7 @@ local function Settings()
 end
 
 local context = Skin.NewContext(Enabled)
-local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
+local FadeRegions, FadeKeys = context.FadeRegions, context.FadeKeys
 
 local function KeepTexture(texture)
 	if texture then texture.__buiSkin = true end
@@ -69,8 +69,16 @@ end
 
 local function AnchorText(fontString, icon, anchor, offsetX, offsetY, scale)
 	if not fontString or not icon then return end
+	local textX, textY = Pixel.Scale(offsetX) / scale, Pixel.Scale(offsetY) / scale
 	fontString:ClearAllPoints()
-	fontString:SetPoint(anchor, icon, anchor, Pixel.Scale(offsetX) / scale, Pixel.Scale(offsetY) / scale)
+	fontString:SetPoint(anchor, icon, anchor, textX, textY)
+	fontString._buiAnchor, fontString._buiAnchorX, fontString._buiAnchorY = anchor, textX, textY
+end
+
+local function TextAnchoredAt(fontString, anchor, offsetX, offsetY, scale)
+	return fontString._buiAnchor == anchor
+		and fontString._buiAnchorX == Pixel.Scale(offsetX) / scale
+		and fontString._buiAnchorY == Pixel.Scale(offsetY) / scale
 end
 
 local function StyleText(fontString, icon, size, anchor, offsetX, offsetY, settings, scale)
@@ -102,7 +110,10 @@ local function InsetIcon(button, inset)
 	local icon = button.Icon
 	local base = button._buiAuraIconWidth
 	if not icon or not base or IsSecret(base) or IsSecret(button._buiAuraIconHeight) then return end
-	icon:SetSize(base - inset * 2, button._buiAuraIconHeight - inset * 2)
+	if button._buiIconInset ~= inset then
+		icon:SetSize(base - inset * 2, button._buiAuraIconHeight - inset * 2)
+		button._buiIconInset = inset
+	end
 	local point = icon:GetPoint(1)
 	if point ~= nil and not IsSecret(point) then
 		button._buiIconPoint = point
@@ -134,14 +145,16 @@ local function StyleButton(button)
 	RefreshButton(button)
 end
 
-local function RepairLayout(container)
+local function RepairLayout(container, auras, skipDisabled)
 	local settings = Settings()
 	local scale = ContainerScale(container)
-	for _, button in ipairs(skinnedButtons) do
-		if button:GetParent() == container then
+	for _, button in ipairs(auras) do
+		if button._buiAura and (not skipDisabled or button.hasValidInfo or button.isExample) then
 			InsetIcon(button, BorderInset(button, scale))
 			AnchorText(button.Duration, button.Icon, settings.timerAnchor, settings.timerOffsetX, settings.timerOffsetY, scale)
-			AnchorText(button.Count, button.Icon, settings.stackAnchor, settings.stackOffsetX, settings.stackOffsetY, scale)
+			if not TextAnchoredAt(button.Count, settings.stackAnchor, settings.stackOffsetX, settings.stackOffsetY, scale) then
+				AnchorText(button.Count, button.Icon, settings.stackAnchor, settings.stackOffsetX, settings.stackOffsetY, scale)
+			end
 		end
 	end
 end
@@ -167,25 +180,18 @@ local function SkinButton(button)
 	StyleButton(button)
 end
 
-local function SweepContainer(container)
-	if not container or not container.GetChildren then return end
-	for _, child in ipairs({ container:GetChildren() }) do
-		if child.Icon then
-			SkinButton(child)
-			RefreshButton(child)
+local function SweepFrame(frame)
+	for _, button in ipairs(frame.auraFrames) do
+		if not button.isAuraAnchor then
+			SkinButton(button)
+			if button:IsShown() then RefreshButton(button) end
 		end
 	end
 end
 
-local function SweepFrame(frame)
-	if not frame then return end
-	SweepContainer(frame.AuraContainer or frame)
-end
-
 local function Sweep()
 	if not Enabled() then return end
-	SweepFrame(_G.BuffFrame)
-	SweepFrame(_G.DebuffFrame)
+	ForEachAuraFrame(SweepFrame)
 end
 
 local DispatchSweep = BUI.Dispatcher.New(Sweep, 'Skin.PlayerAuras')
@@ -198,9 +204,9 @@ end
 local function HookAuraFrame(frame)
 	if frame._buiAuraHooked then return end
 	frame._buiAuraHooked = true
-	hooksecurefunc(frame.AuraContainer, 'UpdateGridLayout', function(container)
+	Hook(frame.AuraContainer, 'UpdateGridLayout', function(container, auras, doNotAnchorDisabledFrames)
 		if not Enabled() then return end
-		RepairLayout(container)
+		RepairLayout(container, auras, doNotAnchorDisabledFrames)
 	end)
 end
 
@@ -228,6 +234,7 @@ end
 local function Deactivate()
 	for _, button in ipairs(skinnedButtons) do
 		button._buiAura = nil
+		button._buiIconInset = nil
 		if button.Icon then
 			button.Icon:SetTexCoord(0, 1, 0, 1)
 			Skin.SetIconEdgeThickness(button.Icon, 0)

@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.ItemUpgrade')
+
 local ipairs, pairs = ipairs, pairs
 
 local Skin = BUI.Skinning
@@ -180,14 +182,14 @@ local function Install()
 	local frame = _G.ItemUpgradeFrame
 	if not frame then return end
 	installed = true
-	frame:HookScript('OnShow', Apply)
-	hooksecurefunc(frame, 'UpdateUpgradeItemInfo', OnItemInfoUpdated)
-	hooksecurefunc(frame, 'PopulatePreviewFrames', OnPreviewFramesPopulated)
-	if frame.ItemInfo then hooksecurefunc(frame.ItemInfo, 'Setup', OnItemInfoSetup) end
+	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.ItemUpgrade frame reskin', Apply))
+	Hook(frame, 'UpdateUpgradeItemInfo', OnItemInfoUpdated)
+	Hook(frame, 'PopulatePreviewFrames', OnPreviewFramesPopulated)
+	if frame.ItemInfo then Hook(frame.ItemInfo, 'Setup', OnItemInfoSetup) end
 	for _, key in ipairs(PREVIEW_KEYS) do
 		local preview = frame[key]
 		if preview and preview.GeneratePreviewTooltip then
-			hooksecurefunc(preview, 'GeneratePreviewTooltip', OnPreviewGenerated)
+			Hook(preview, 'GeneratePreviewTooltip', OnPreviewGenerated)
 		end
 	end
 	if frame:IsShown() then Apply() end

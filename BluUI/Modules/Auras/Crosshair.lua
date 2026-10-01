@@ -28,8 +28,16 @@ Crosshair.MELEE_SPEC_IDS = {
     [71]  = true, [72]  = true, [73]  = true,
 }
 
+local cachedSpecID
+
+local function CurrentSpecID()
+    if not crosshairFrame then return PlayerUtil.GetCurrentSpecID() end
+    if not cachedSpecID then cachedSpecID = PlayerUtil.GetCurrentSpecID() end
+    return cachedSpecID
+end
+
 function Crosshair.IsMeleeSpec()
-    local specID = PlayerUtil.GetCurrentSpecID()
+    local specID = CurrentSpecID()
     return specID ~= nil and Crosshair.MELEE_SPEC_IDS[specID] == true
 end
 
@@ -102,12 +110,13 @@ local function UpdateColor()
         PaintAll(db.colorR, db.colorG, db.colorB, alpha)
     end
 end
+local UpdateColorTimed = BUI.Profiler.Wrap("Auras.Crosshair range check", UpdateColor)
 
 local function IsSpecAllowed()
     local db = GetDB()
     if not db.specs then return true end
     if not next(db.specs) then return false end
-    local specID = PlayerUtil.GetCurrentSpecID()
+    local specID = CurrentSpecID()
     if not specID then return true end
     return db.specs[specID] == true
 end
@@ -199,6 +208,7 @@ local function Build()
     BUI.Events:Register("PLAYER_UPDATE_RESTING",         "Crosshair", UpdateVisibility)
     BUI.Events:Register("ZONE_CHANGED_NEW_AREA",         "Crosshair", UpdateVisibility)
     BUI.Events:Register("PLAYER_SPECIALIZATION_CHANGED", "Crosshair", function()
+        cachedSpecID = nil
         InvalidateRangedLimit()
         UpdateVisibility()
     end)
@@ -220,7 +230,7 @@ end
 
 local function StartRangeTicker()
     if not rangeTicker then
-        rangeTicker = C_Timer.NewTicker(RANGE_TICK, UpdateColor)
+        rangeTicker = C_Timer.NewTicker(RANGE_TICK, UpdateColorTimed)
     end
 end
 

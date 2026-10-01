@@ -21,13 +21,22 @@ local queueFrame
 local RestyleMembers
 local IsActive
 local PositionStack
-local lastLayoutSignature
+local lastLayout = {}
+local layoutKnown = false
 local relaying = false
 
 local lastFullHeight, lastCollapsedHeight = 0, 0
 local transientEdge
 
 local function FrameFor(key) return _G[FRAME_NAMES[key]] end
+
+local function Tenths(value) return math.floor(value * 10 + 0.5) end
+
+local function SetLayoutValue(key, value)
+    if lastLayout[key] == value then return false end
+    lastLayout[key] = value
+    return true
+end
 
 local function CastbarSettings()
     return BUI.CastBar.GetSettings('player')
@@ -184,19 +193,23 @@ local function MemberVisualWidth(key)
     return width
 end
 
-local function OnMemberVisibility()
-    if not Container.IsEnabled() then return end
+local OnMemberVisibility = BUI.Profiler.Wrap('Power.Container member visibility', function(frame)
+    local settings = Container.GetDB()
+    if not settings.enabled then return end
+    local key = hooked[frame]
+    if not settings.attached[key] or (key == 'castbar' and settings.castbarMode == 'hold') then return end
     if relaying then Container.QueueRelayout() else Container.Relayout() end
-end
+end)
 
-local function HookMembers()
+local function HookMembers(settings)
     for keyIndex = 1, #MEMBER_KEYS do
-        local frame = FrameFor(MEMBER_KEYS[keyIndex])
-        if frame and not hooked[frame] then
-            hooked[frame] = true
+        local key = MEMBER_KEYS[keyIndex]
+        local frame = FrameFor(key)
+        if frame and not hooked[frame] and (key ~= 'castbar' or settings.attached.castbar) then
+            hooked[frame] = key
             frame:HookScript('OnShow', OnMemberVisibility)
             frame:HookScript('OnHide', OnMemberVisibility)
-            frame:HookScript('OnSizeChanged', function() Container.QueueRelayout() end)
+            frame:HookScript('OnSizeChanged', BUI.Profiler.Wrap('Power.Container member resize', function() Container.QueueRelayout() end))
         end
     end
 end
@@ -286,7 +299,7 @@ function Container.Relayout()
     end
     relaying = true
     EnsureStackFrame()
-    HookMembers()
+    HookMembers(settings)
 
     local gap = Pixel.Scale(settings.gap or 0)
     wipe(layoutY)
@@ -318,25 +331,25 @@ function Container.Relayout()
         Container.PlaceMember(FrameFor(key))
     end
 
-    local signature = ('%.1f:%.1f'):format(width, y)
+    local changed = not layoutKnown
+    layoutKnown = true
+    changed = SetLayoutValue('width', Tenths(width)) or changed
+    changed = SetLayoutValue('height', Tenths(y)) or changed
     for _, key in ipairs(settings.order) do
-        signature = signature .. ':' .. key .. '=' .. (layoutY[key] and ('%.1f'):format(layoutY[key]) or 'x')
+        changed = SetLayoutValue(key, layoutY[key] and Tenths(layoutY[key]) or false) or changed
     end
     relaying = false
-    if signature ~= lastLayoutSignature then
-        lastLayoutSignature = signature
-        BUI.Anchor.OnAnchorSizeChanged()
-    end
+    if changed then BUI.Anchor.OnAnchorSizeChanged() end
 end
 
 function Container.QueueRelayout()
     if not queueFrame then
         queueFrame = CreateFrame('Frame')
         queueFrame:Hide()
-        queueFrame:SetScript('OnUpdate', function(self)
+        queueFrame:SetScript('OnUpdate', BUI.Profiler.Wrap('Power.Container relayout', function(self)
             self:Hide()
             Container.Relayout()
-        end)
+        end))
     end
     queueFrame:Show()
 end
@@ -364,7 +377,7 @@ end
 
 function Container.SetEnabled(on)
     local settings = Container.GetDB()
-    lastLayoutSignature = nil
+    layoutKnown = false
     if on then
         if BUI.Power.Stack.IsEnabled() then
             BUI.Power.Stack.SetEnabled(false)
@@ -449,15 +462,21 @@ BUI.Events:OnLogin('StackLab', function()
             Container.QueueRelayout()
         end
     end
+    local requestedFormID
     BUI.Events:Register('PLAYER_SPECIALIZATION_CHANGED', 'StackLab', function(_, unit)
         if unit and unit ~= 'player' then return end
         RequestRelayout()
     end)
-    BUI.Events:Register('UPDATE_SHAPESHIFT_FORM', 'StackLab', RequestRelayout)
+    BUI.Events:Register('UPDATE_SHAPESHIFT_FORM', 'StackLab', function()
+        local formID = GetShapeshiftFormID()
+        if formID == requestedFormID then return end
+        requestedFormID = formID
+        RequestRelayout()
+    end)
     BUI.Events:Register('UPDATE_SHAPESHIFT_FORMS', 'StackLab', RequestRelayout)
     BUI.Events:RegisterUnit('UNIT_DISPLAYPOWER', 'player', 'StackLab', RequestRelayout)
 
-    C_Timer.After(0.3, function()
+    BUI.Profiler.After('Power.Container stack setup', 0.3, function()
         MigrateClassicStack()
         if Container.IsEnabled() then Container.ApplyAll() end
     end)

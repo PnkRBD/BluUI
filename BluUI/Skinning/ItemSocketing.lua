@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.ItemSocketing')
+
 local ipairs = ipairs
 local select = select
 
@@ -87,7 +89,7 @@ local function Apply()
 		end
 
 		if _G.ItemSocketingFrame_Update then
-			hooksecurefunc('ItemSocketingFrame_Update', Apply)
+			Hook('ItemSocketingFrame_Update', Apply)
 		end
 	end
 
@@ -104,7 +106,7 @@ local function Install()
 	local frame = _G.ItemSocketingFrame
 	if not frame then return end
 	installed = true
-	frame:HookScript('OnShow', Apply)
+	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.ItemSocketing frame reskin', Apply))
 	if frame:IsShown() then Apply() end
 end
 

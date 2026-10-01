@@ -69,7 +69,7 @@ Datatext.Register('lootSpec', {
     OnActivate = Read,
     OnEvent = function(event, unit)
         if event == 'PLAYER_SPECIALIZATION_CHANGED' and unit and unit ~= 'player' then return end
-        if Read() then Datatext.Refresh() end
+        if Read() then Datatext.Refresh('lootSpec') end
     end,
     build = function(config, valueHex, self)
         return Datatext.Label(config, self) .. Datatext.Colored(lootSpecName, valueHex)

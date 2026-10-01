@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.GroupLoot')
+
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 local Tools = BUI.Tools
@@ -68,7 +70,7 @@ local function Install()
 		rollFrames[_G['GroupLootFrame' .. index]] = true
 		index = index + 1
 	end
-	hooksecurefunc('GroupLootContainer_Update', Resweep)
+	Hook('GroupLootContainer_Update', Resweep)
 end
 
 local function Deactivate()
@@ -78,8 +80,8 @@ local function Deactivate()
 end
 
 local function AnchorHooks(reapply)
-	hooksecurefunc('GroupLootContainer_Update', reapply)
-	hooksecurefunc(AlertFrame, 'UpdateAnchors', reapply)
+	Hook('GroupLootContainer_Update', reapply)
+	Hook(AlertFrame, 'UpdateAnchors', reapply)
 end
 
 local function GrowPoint()

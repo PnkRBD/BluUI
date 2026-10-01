@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('CDM.ProcMenu')
+
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
 
@@ -148,7 +150,7 @@ local function ResolveEntry(spellID)
 	end
 end
 
-watcher:SetScript('OnEvent', function(_, event, spellID)
+watcher:SetScript('OnEvent', BUI.Profiler.Wrap('CDM.ProcMenu proc event', function(_, event, spellID)
 	if not spellID or IsSecret(spellID) then return end
 	if event == 'SPELL_ACTIVATION_OVERLAY_GLOW_HIDE' then
 		RemoveActive(spellID)
@@ -173,7 +175,7 @@ watcher:SetScript('OnEvent', function(_, event, spellID)
 	if entry.sound then
 		PlaySound(entry.sound, 'Master')
 	end
-end)
+end))
 
 local appearWatchEnabled = false
 local appearActive = {}
@@ -227,7 +229,7 @@ local function StartAppearGlow(key, icon, entry)
 		if untilThreshold <= 0 then
 			AppearGlowNow(icon, entry)
 		else
-			appearTimers[icon] = C_Timer.NewTimer(untilThreshold, function()
+			appearTimers[icon] = BUI.Profiler.NewTimer('CDM.ProcMenu appear glow on', untilThreshold, function()
 				appearTimers[icon] = nil
 				if IsAppearIconLive(key, icon) and icon:IsShown() then
 					AppearGlowNow(icon, entry)
@@ -237,7 +239,7 @@ local function StartAppearGlow(key, icon, entry)
 	elseif mode == 'above' then
 		AppearGlowNow(icon, entry)
 		if untilThreshold > 0 then
-			appearTimers[icon] = C_Timer.NewTimer(untilThreshold, function()
+			appearTimers[icon] = BUI.Profiler.NewTimer('CDM.ProcMenu appear glow off', untilThreshold, function()
 				appearTimers[icon] = nil
 				if IsAppearIconLive(key, icon) then
 					CDM.StopProcGlow(icon)
@@ -695,14 +697,14 @@ HookBarViewer = function()
 	local function Wake()
 		if appearWatchEnabled then QueueAppearScan() end
 	end
-	if viewer.OnAcquireItemFrame then hooksecurefunc(viewer, 'OnAcquireItemFrame', Wake) end
-	if viewer.RefreshLayout then hooksecurefunc(viewer, 'RefreshLayout', Wake) end
+	if viewer.OnAcquireItemFrame then Hook(viewer, 'OnAcquireItemFrame', Wake) end
+	if viewer.RefreshLayout then Hook(viewer, 'RefreshLayout', Wake) end
 end
 
 local auraWatcher = CreateFrame('Frame')
-auraWatcher:SetScript('OnEvent', function()
+auraWatcher:SetScript('OnEvent', BUI.Profiler.Wrap('CDM.ProcMenu aura watch', function()
 	if appearWatchEnabled then QueueAppearScan() end
-end)
+end))
 
 local trackHooked
 

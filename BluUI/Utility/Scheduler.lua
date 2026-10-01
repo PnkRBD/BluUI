@@ -2,6 +2,7 @@ local _, BUI = ...
 local GetTime = GetTime
 local C_Timer_After = C_Timer.After
 local huge = math.huge
+local Profiler = BUI.Profiler
 
 BUI.Scheduler = {}
 local Scheduler = BUI.Scheduler
@@ -54,15 +55,17 @@ local function RecalcNextDue()
     nextDue = earliest
 end
 
+local function OnWake()
+    wakeScheduled = false
+    if activeCount > 0 and not loading then frame:Show() end
+end
+
 local function ScheduleWake()
     if wakeScheduled or activeCount <= 0 then return end
     local delay = nextDue - GetTime()
     if delay < 0 then delay = 0 end
     wakeScheduled = true
-    C_Timer_After(delay, function()
-        wakeScheduled = false
-        if activeCount > 0 and not loading then frame:Show() end
-    end)
+    C_Timer_After(delay, OnWake)
 end
 
 local function Refresh()
@@ -86,7 +89,7 @@ frame:SetScript('OnUpdate', function()
         if entry.active then
             if now >= entry.due then
                 entry.due = now + entry.interval
-                entry.fn()
+                Profiler.Run(entry.label, entry.fn)
             end
             if entry.due < earliest then
                 earliest = entry.due
@@ -110,6 +113,7 @@ function Scheduler.RegisterUpdate(name, callback, interval, active)
     local enabled = active ~= false
     registry[name] = {
         name     = name,
+        label    = 'Update ' .. name,
         fn       = callback,
         interval = interval or 0.1,
         due      = GetTime(),

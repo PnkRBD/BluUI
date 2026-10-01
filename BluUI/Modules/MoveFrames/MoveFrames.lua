@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('MoveFrames.MoveFrames')
+
 local Events = BUI.Events
 
 local MoveFrames = {}
@@ -391,15 +393,15 @@ local function AutoResetIfDragged(target)
 	RestoreBlizzardPoints(target)
 end
 
-local function OnTargetHide(target)
+local OnTargetHide = BUI.Profiler.Wrap('MoveFrames.MoveFrames target hidden', function(target)
 	StopDrag(target)
 	AutoResetIfDragged(target)
-end
+end)
 
-local function OnTargetShow(target)
+local OnTargetShow = BUI.Profiler.Wrap('MoveFrames.MoveFrames target shown', function(target)
 	AutoResetIfDragged(target)
 	HoldDraggedPosition(target)
-end
+end)
 
 local function OnHandleMouseDown(handle, button)
 	if button ~= 'LeftButton' or not MoveFrames.IsActive() then return end
@@ -452,7 +454,7 @@ local function HookFrame(path, rootPath)
 	InstallHandleHooks(handle)
 
 	local rehooking = false
-	hooksecurefunc(handle, 'SetScript', function(self, scriptName)
+	Hook(handle, 'SetScript', function(self, scriptName)
 		if rehooking or self ~= handle then return end
 		if scriptName ~= 'OnMouseDown' and scriptName ~= 'OnMouseUp' then return end
 		rehooking = true
@@ -469,7 +471,7 @@ local function HookFrame(path, rootPath)
 		target:SetMovable(true)
 		target:SetClampedToScreen(true)
 		SnapshotBlizzardPoints(target)
-		hooksecurefunc(target, 'SetPoint', OnTargetSetPoint)
+		Hook(target, 'SetPoint', OnTargetSetPoint)
 		target:HookScript('OnHide', OnTargetHide)
 		target:HookScript('OnShow', OnTargetShow)
 		ApplySavedPosition(target)

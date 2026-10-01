@@ -17,7 +17,7 @@ Datatext.Register('fps', {
     name = 'FPS', show = 'showFPS', label = 'FPS:',
     interval = 1,
     OnUpdate = function()
-        if Read() then Datatext.Refresh() end
+        if Read() then Datatext.Refresh('fps') end
     end,
     build = function(config, valueHex, self)
         if fps <= 30 then

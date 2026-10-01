@@ -108,14 +108,17 @@ end
 
 local function StartGapWatch(bar)
 	if bar.gapWatch then return end
-	bar.gapWatch = C_Timer.NewTicker(GAP_INTERVAL, function()
-		if (bar.hoverCount or 0) > 0 then
-			StopGapWatch(bar)
-		elseif not CursorOverBar(bar) then
-			StopGapWatch(bar)
-			SetHovered(bar, false)
-		end
-	end)
+	if not bar.gapCheck then
+		bar.gapCheck = BUI.Profiler.Wrap('ActionBars.Fade gap watch', function()
+			if (bar.hoverCount or 0) > 0 then
+				StopGapWatch(bar)
+			elseif not CursorOverBar(bar) then
+				StopGapWatch(bar)
+				SetHovered(bar, false)
+			end
+		end)
+	end
+	bar.gapWatch = C_Timer.NewTicker(GAP_INTERVAL, bar.gapCheck)
 end
 
 local function Enter(bar)
@@ -130,7 +133,7 @@ local function Leave(bar)
 	bar.hoverCount = math.max(0, (bar.hoverCount or 0) - 1)
 	if bar.hoverCount > 0 or bar.leavePending then return end
 	bar.leavePending = true
-	C_Timer.After(0, function()
+	BUI.Profiler.After('ActionBars.Fade leave check', 0, function()
 		bar.leavePending = nil
 		if bar.hoverCount > 0 then return end
 		if CursorOverBar(bar) then
@@ -177,7 +180,7 @@ local function HookFlyoutButton(button)
 	local handler = LibActionButton.flyoutHandler
 	if handler and not handler._buiFadeHooked then
 		handler._buiFadeHooked = true
-		handler:HookScript('OnHide', OnFlyoutHidden)
+		handler:HookScript('OnHide', BUI.Profiler.Wrap('ActionBars.Fade flyout hide', OnFlyoutHidden))
 	end
 end
 
@@ -192,7 +195,7 @@ end
 local function EnsureHooks(bar)
 	local header = bar.header
 	if not header._buiFadeHooked then
-		header:HookScript('OnShow', OnHeaderShown)
+		header:HookScript('OnShow', BUI.Profiler.Wrap('ActionBars.Fade header show', OnHeaderShown))
 	end
 	HookHoverFrame(header, bar)
 	for _, button in ipairs(bar.buttons) do HookHoverFrame(button, bar) end

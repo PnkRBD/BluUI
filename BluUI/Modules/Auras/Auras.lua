@@ -154,23 +154,23 @@ hideHealthWarning = function()
     if healthFrame then healthFrame:Hide() end
 end
 
-CheckPet = function()
-    if previewing then return end
-    hideHealthWarning()
+local checkedPetDead = false
 
+local function EvaluatePet()
     local db = GetDB()
     if not db.petWarningsEnabled or not HasPetSpec() then
         HidePetWarning()
-        return
+        return false
     end
 
     if UnitIsDead("player") or UnitIsGhost("player") or IsMounted() or UnitInVehicle("player") then
         HidePetWarning()
-        return
+        return false
     end
 
     local petExists = UnitExists("pet")
     local petDead   = petExists and UnitIsDead("pet")
+    checkedPetDead = petDead
 
     if playerClass == "HUNTER" then
         if petExists then petWasDead = petDead and true or false end
@@ -184,7 +184,7 @@ CheckPet = function()
         else
             HidePetWarning()
         end
-        return
+        return false
     end
 
     if HasPlayDead() then
@@ -193,20 +193,12 @@ CheckPet = function()
         else
             HidePetWarning()
         end
-        return
+        return false
     end
 
     if db.petDeadWarning.enabled and (not petExists or petDead) then
         Warn(petDead and (playerClass == "HUNTER" and "***REVIVE PET***" or "***DEAD PET***") or "***SUMMON PET***")
-        return
-    end
-
-    if db.petHealthWarning.enabled and petExists and not petDead then
-        if not healthFrame then
-            BuildHealthWarning()
-            StyleWarningFrame(healthFrame)
-        end
-        UpdateHealthAlpha()
+        return false
     end
 
     if db.petAttackWarning.enabled
@@ -220,10 +212,10 @@ CheckPet = function()
             local elapsed = now - petNoTargetSince
             if elapsed >= ATTACK_GRACE then
                 Warn("***PET NOT ATTACKING***")
-                return
+                return false
             elseif not attackRecheckPending then
                 attackRecheckPending = true
-                C_Timer.After(ATTACK_GRACE - elapsed + 0.05, function()
+                BUI.Profiler.After("Auras.Auras attack recheck", ATTACK_GRACE - elapsed + 0.05, function()
                     attackRecheckPending = false
                     ScheduleCheck()
                 end)
@@ -234,25 +226,58 @@ CheckPet = function()
     end
 
     HidePetWarning()
+
+    if not (db.petHealthWarning.enabled and petExists and not petDead) then return false end
+    if not healthFrame then
+        BuildHealthWarning()
+        StyleWarningFrame(healthFrame)
+    end
+    UpdateHealthAlpha()
+    return true
 end
 
-local function OnSpecChanged()
-    InvalidatePetSpec()
-    CheckPet()
+CheckPet = function()
+    if previewing then return end
+    if not EvaluatePet() then hideHealthWarning() end
+end
+
+local function OnPetHealth()
+    if (UnitExists("pet") and UnitIsDead("pet")) ~= checkedPetDead then ScheduleCheck() end
+end
+
+local function SyncPetTriggers()
+    local db = GetDB()
+    BUI.Events:RegisterUnit("UNIT_HEALTH", "pet", "Auras", db.petHealthWarning.enabled and ScheduleCheck or OnPetHealth)
+    if db.petAttackWarning.enabled then
+        BUI.Events:RegisterUnit("UNIT_TARGET", "pet", "Auras", ScheduleCheck)
+    else
+        BUI.Events:Unregister("UNIT_TARGET", "Auras")
+    end
 end
 
 local eventsWired = false
+local WireEvents
 
-local function WireEvents()
-    if eventsWired then return end
+local function OnSpecChanged()
+    InvalidatePetSpec()
+    WireEvents()
+    CheckPet()
+end
+
+WireEvents = function()
+    BUI.Events:Register("PLAYER_SPECIALIZATION_CHANGED", "Auras", OnSpecChanged)
+    BUI.Events:Register("PLAYER_TALENT_UPDATE",          "Auras", OnSpecChanged)
+    if eventsWired then
+        SyncPetTriggers()
+        return
+    end
     if not HasPetSpec() then return end
     eventsWired = true
 
-    BUI.Events:RegisterUnit("UNIT_AURA",   "player", "Auras", ScheduleCheck)
-    BUI.Events:RegisterUnit("UNIT_AURA",   "pet",    "Auras", ScheduleCheck)
+    if playerClass == "WARLOCK" then BUI.Events:RegisterUnit("UNIT_AURA", "player", "Auras", ScheduleCheck) end
+    if playerClass == "HUNTER" then BUI.Events:RegisterUnit("UNIT_AURA", "pet", "Auras", ScheduleCheck) end
     BUI.Events:RegisterUnit("UNIT_FLAGS",  "pet",    "Auras", ScheduleCheck)
-    BUI.Events:RegisterUnit("UNIT_HEALTH", "pet",    "Auras", ScheduleCheck)
-    BUI.Events:RegisterUnit("UNIT_TARGET", "pet",    "Auras", ScheduleCheck)
+    SyncPetTriggers()
     BUI.Events:RegisterUnit("UNIT_PET",    "player", "Auras", ScheduleCheck)
     BUI.Events:RegisterUnit("UNIT_ENTERED_VEHICLE", "player", "Auras", ScheduleCheck)
     BUI.Events:RegisterUnit("UNIT_EXITED_VEHICLE",  "player", "Auras", ScheduleCheck)
@@ -265,8 +290,6 @@ local function WireEvents()
     BUI.Events:RegisterUnit("UNIT_PET",                  "player", "Auras.PlayDeadCache", function() CachePlayDeadSlot(); ScheduleCheck() end)
     BUI.Events:Register("PET_BAR_UPDATE",                "Auras", function() CachePlayDeadSlot(); ScheduleCheck() end)
     BUI.Events:Register("PLAYER_MOUNT_DISPLAY_CHANGED",  "Auras", ScheduleCheck)
-    BUI.Events:Register("PLAYER_SPECIALIZATION_CHANGED", "Auras", OnSpecChanged)
-    BUI.Events:Register("PLAYER_TALENT_UPDATE",          "Auras", OnSpecChanged)
 
     CachePlayDeadSlot()
 end
@@ -521,7 +544,10 @@ local function RefreshMarkShown()
     markPanel:SetShown(MarkTargetNeedsCallout())
 end
 
+local markTargetDead
+
 local function RefreshMarkTarget()
+    markTargetDead = UnitIsDeadOrGhost("target")
     if markRuntimeOn then
         markContainer:UpdateAllAuras()
     end
@@ -529,6 +555,13 @@ local function RefreshMarkTarget()
 end
 
 local RefreshMarkShownDispatch = BUI.Dispatcher.New(RefreshMarkShown, "Auras.MarkCheck")
+
+local function OnMarkTargetHealth()
+    local dead = UnitIsDeadOrGhost("target")
+    if dead == markTargetDead then return end
+    markTargetDead = dead
+    RefreshMarkShownDispatch()
+end
 
 local function HideMarkButton(button)
     button:SetAlpha(0)
@@ -657,7 +690,7 @@ local function WireMarkEvents()
     BUI.Events:Register("PLAYER_ENTERING_WORLD", "MarkWarning", RefreshMarkTarget)
     BUI.Events:RegisterUnit("UNIT_FACTION", "target", "MarkWarning", RefreshMarkShownDispatch)
     BUI.Events:RegisterUnit("UNIT_TARGETABLE_CHANGED", "target", "MarkWarning", RefreshMarkShownDispatch)
-    BUI.Events:RegisterUnit("UNIT_HEALTH", "target", "MarkWarning", RefreshMarkShownDispatch)
+    BUI.Events:RegisterUnit("UNIT_HEALTH", "target", "MarkWarning", OnMarkTargetHealth)
     BUI.Events:Register("PLAYER_REGEN_DISABLED", "MarkWarning", RefreshMarkShownDispatch)
     BUI.Events:Register("PLAYER_REGEN_ENABLED", "MarkWarning", RefreshMarkShownDispatch)
     BUI.Events:Register("PLAYER_UPDATE_RESTING", "MarkWarning", RefreshMarkShownDispatch)

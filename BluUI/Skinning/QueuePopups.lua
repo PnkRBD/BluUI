@@ -62,7 +62,7 @@ local function EnsureGroup(name)
 	local group = groups[name]
 	if group then return group end
 	group = { texts = {} }
-	group.tick = function() TickGroup(group) end
+	group.tick = BUI.Profiler.Wrap('Skin.QueuePopups countdown tick', function() TickGroup(group) end)
 	groups[name] = group
 	return group
 end
@@ -268,8 +268,8 @@ local function Install()
 	BUI.Events:Register('LFG_PROPOSAL_SUCCEEDED', EVENT_KEY, OnProposalEnded)
 	local pvpReady = _G.PVPReadyDialog
 	if pvpReady then
-		pvpReady:HookScript('OnShow', OnPvpReadyShow)
-		pvpReady:HookScript('OnHide', OnPvpReadyHide)
+		pvpReady:HookScript('OnShow', BUI.Profiler.Wrap('Skin.QueuePopups pvp countdown', OnPvpReadyShow))
+		pvpReady:HookScript('OnHide', BUI.Profiler.Wrap('Skin.QueuePopups pvp stop', OnPvpReadyHide))
 	end
 end
 

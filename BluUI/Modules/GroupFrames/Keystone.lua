@@ -102,7 +102,7 @@ end
 local function QueueRefresh()
 	if refreshQueued then return end
 	refreshQueued = true
-	C_Timer.After(0, RefreshAll)
+	BUI.Profiler.After("GroupFrames.Keystone refresh", 0, RefreshAll)
 end
 
 local function Receive(level, mapID, _, sender)
@@ -127,6 +127,19 @@ end
 
 local function RequestKeys()
 	Library().Request("PARTY")
+end
+
+local function KeysWanted()
+	if not GroupFrames.IsActive() or not GroupFrames.GetDB().enabled then return false end
+	local partySettings = GroupFrames.GetDB().party
+	if not partySettings.enabled or not partySettings.showKeystone then return false end
+	return not IsInRaid() or partySettings.raidGroup ~= "off"
+end
+
+function Keystone.Sync()
+	if not KeysWanted() then return end
+	RequestKeys()
+	QueueRefresh()
 end
 
 function GroupFrames.BuildKeystone(frame, unit)
@@ -178,16 +191,12 @@ BUI.Events:Register("ZONE_CHANGED_NEW_AREA", "GroupFramesKeystone", function()
 	SetRunState(ReadRunState())
 end)
 
-BUI.Events:Register("GROUP_ROSTER_UPDATE", "GroupFramesKeystone", function()
-	RequestKeys()
-	QueueRefresh()
-end)
+BUI.Events:Register("GROUP_ROSTER_UPDATE", "GroupFramesKeystone", Keystone.Sync)
 
 BUI.Events:Register("CHALLENGE_MODE_MAPS_UPDATE", "GroupFramesKeystone", QueueRefresh)
 
 BUI.Events:Register("PLAYER_ENTERING_WORLD", "GroupFramesKeystone", function()
 	SetRunState(ReadRunState())
 	C_MythicPlus.RequestMapInfo()
-	RequestKeys()
-	QueueRefresh()
+	Keystone.Sync()
 end)

@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.SplashFrame')
+
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -176,8 +178,8 @@ local function Install()
 	local frame = _G.SplashFrame
 	if not frame then return end
 	installed = true
-	frame:HookScript('OnShow', Apply)
-	hooksecurefunc(frame, 'SetupFrame', Apply)
+	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.SplashFrame frame reskin', Apply))
+	Hook(frame, 'SetupFrame', Apply)
 	if frame:IsShown() then Apply() end
 end
 

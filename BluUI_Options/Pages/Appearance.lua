@@ -134,6 +134,44 @@ local function SetSmoothBars(value)
 	Window():Repaint()
 end
 
+local function RaidFrames()
+	return BUI.GroupFrames.GetDB().raid
+end
+
+local function ApplyDeadBackground()
+	BUI.GroupFrames.RefreshColors()
+	BUI.UnitFrames.RefreshLifeVisuals()
+	Window():Repaint()
+end
+
+local function SetDeadBackground(value)
+	RaidFrames().deadBackground = value
+	ApplyDeadBackground()
+end
+
+local function ResetDeadColor()
+	RaidFrames().deadBackgroundColor = CopyTable(BUI.Defaults.profile.groupFrames.raid.deadBackgroundColor)
+	ApplyDeadBackground()
+end
+
+local function PickDeadColor(anchor)
+	local color = RaidFrames().deadBackgroundColor
+	local red, green, blue, alpha = color[1], color[2], color[3], color[4]
+	Controls.OpenColorPicker({ r = red, g = green, b = blue, a = alpha, hasOpacity = true, anchorTo = anchor, callback = function(newRed, newGreen, newBlue, newAlpha, cancelled, phase)
+		if cancelled then
+			color[1], color[2], color[3], color[4] = red, green, blue, alpha
+		else
+			color[1], color[2], color[3], color[4] = newRed, newGreen, newBlue, newAlpha
+		end
+		if phase == 'preview' then Window():Repaint() else ApplyDeadBackground() end
+	end })
+end
+
+local function DeadColorCustom()
+	local color, default = RaidFrames().deadBackgroundColor, BUI.Defaults.profile.groupFrames.raid.deadBackgroundColor
+	return not (Same(color[1], color[2], color[3], default) and math.abs(color[4] - default[4]) < 0.01)
+end
+
 local function AccentName()
 	local general = General()
 	if general.useClassColorTheme == true then return 'Class color' end
@@ -272,7 +310,7 @@ local function BarSection(ui, parent, width)
 	local section = ui.Section(parent, width, {
 		stacked = true,
 		title = 'Bars',
-		description = 'The texture every statusbar inherits, motion, and the tint the gradient texture fades through.',
+		description = 'The texture every statusbar inherits, motion, the tint the gradient texture fades through, and the dead color raid and unit frames share.',
 		columns = { { 'Name', ui.AVATAR_X } },
 	})
 	local sampleBar
@@ -353,6 +391,37 @@ local function BarSection(ui, parent, width)
 			return not (Same(color[1], color[2], color[3], { 1, 1, 1 }) and color[4] == 1)
 		end,
 		resetTip = 'Back to white', reset = ResetGradient,
+	})
+	local deadSwatch
+	OptionRow(ui, section, width, {
+		name = 'Dead background', sub = 'Raid frames and unit frames turn this color when the unit is dead',
+		avatar = function(row)
+			deadSwatch = ui.Swatch(row, SWATCH_SIZE, function(self) PickDeadColor(self) end)
+			return deadSwatch
+		end,
+		items = function(anchor)
+			local on = RaidFrames().deadBackground ~= false
+			local custom = DeadColorCustom()
+			return {
+				{ text = 'On', checked = on, callback = function() SetDeadBackground(true) end },
+				{ text = 'Off', checked = not on, callback = function() SetDeadBackground(false) end },
+				{ title = 'Color' },
+				{ text = 'Default', checked = not custom, callback = ResetDeadColor },
+				{ text = 'Custom color', checked = custom, callback = function() PickDeadColor(anchor) end },
+			}
+		end,
+		label = function()
+			local color = RaidFrames().deadBackgroundColor
+			deadSwatch.fill:SetVertexColor(color[1], color[2], color[3], color[4])
+			if RaidFrames().deadBackground == false then return 'Off' end
+			return Hex(color[1], color[2], color[3]) .. '  ' .. math.floor(color[4] * 100 + 0.5) .. '%'
+		end,
+		custom = function() return RaidFrames().deadBackground == false or DeadColorCustom() end,
+		resetTip = 'Back to the default red',
+		reset = function()
+			RaidFrames().deadBackground = true
+			ResetDeadColor()
+		end,
 	})
 	return section
 end

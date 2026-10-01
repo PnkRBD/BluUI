@@ -46,7 +46,7 @@ function CDM.Initialize()
         CDM.UpdateShowOnlyOnCDWatcher()
         CDM.UpdateHideWhenZeroWatcher()
         CDM.NotifyUnitFrames()
-        C_Timer.After(0, function()
+        BUI.Profiler.After("CDM.Initialize settle", 0, function()
             CDM.state.settling = nil
             CDM.MarkAllDirty()
         end)
@@ -96,15 +96,15 @@ function CDM.Initialize()
     else
         retryFrame = CreateFrame("Frame")
         retryFrame:RegisterEvent("COOLDOWN_VIEWER_DATA_LOADED")
-        retryFrame:SetScript("OnEvent", function(self, event)
+        retryFrame:SetScript("OnEvent", BUI.Profiler.Wrap("CDM.Initialize viewer retry", function(self, event)
             if TryHookAll() then FinishInit() end
-        end)
+        end))
     end
 
     if EditModeManagerFrame then
-        local function MarkDirtySoon()
-            C_Timer.After(0, CDM.MarkAllDirty)
-        end
+        local MarkDirtySoon = BUI.Profiler.Wrap("CDM.Initialize edit mode toggle", function()
+            BUI.Profiler.After("CDM.Initialize edit mode dirty", 0, CDM.MarkAllDirty)
+        end)
         EditModeManagerFrame:HookScript("OnShow", MarkDirtySoon)
         EditModeManagerFrame:HookScript("OnHide", MarkDirtySoon)
     end

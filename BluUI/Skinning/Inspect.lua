@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.Inspect')
+
 local ipairs = ipairs
 local floor = math.floor
 local max = math.max
@@ -58,10 +60,13 @@ local EMPTY_SOCKET_ATLAS = {
 	EMPTY_SOCKET_HYDRAULIC  = 'socket-hydraulic',
 	EMPTY_SOCKET_COGWHEEL   = 'socket-cogwheel',
 }
-local TOTAL_LEVEL_SIZE = 24
+local READOUT_SIZE = 24
+local READOUT_INSET_X = 8
+local READOUT_TOP = -20
+local READOUT_REACH_X = 110
+local READOUT_BOTTOM = -67
 local TOTAL_LEVEL_COLOR = { 1, 0.82, 0, 1 }
-local TOTAL_LEVEL_BOX = { -8, -20, -110, -67 }
-local TOTAL_LEVEL_FALLBACK = { -30, -10 }
+local SCALE_SETTING = 'inspectScale'
 local ENCHANT_SIZE = 9
 local ENCHANT_NAME_W = 100
 local ENCHANT_HOVER_H = 14
@@ -99,7 +104,7 @@ local HONOR_LEVEL_SCALE = 1.2
 local installed = false
 local skinned = false
 local slotButtons = {}
-local totalLevelText
+local totalLevelText, ratingText
 local overlay
 
 local function Enabled()
@@ -277,34 +282,45 @@ local function FadeSlotArt(button)
 	end
 end
 
-local function CreateTotalLevelText()
+local function CreateReadout(side)
 	local text = overlay:CreateFontString(nil, 'OVERLAY', nil, 7)
-	text:SetFont(BUILib.Font, TOTAL_LEVEL_SIZE, 'OUTLINE')
-	text:SetTextColor(TOTAL_LEVEL_COLOR[1], TOTAL_LEVEL_COLOR[2], TOTAL_LEVEL_COLOR[3], TOTAL_LEVEL_COLOR[4])
+	text:SetFont(BUILib.Font, READOUT_SIZE, 'OUTLINE')
 	text:SetShadowColor(0, 0, 0, 0)
-	text:SetJustifyH('RIGHT')
+	text:SetJustifyH(side)
 	text:SetJustifyV('MIDDLE')
-	local anchor = _G.InspectPaperDollItemsFrame
-	if anchor then
-		text:SetPoint('TOPRIGHT', anchor, 'TOPRIGHT', TOTAL_LEVEL_BOX[1], TOTAL_LEVEL_BOX[2])
-		text:SetPoint('BOTTOMLEFT', anchor, 'TOPRIGHT', TOTAL_LEVEL_BOX[3], TOTAL_LEVEL_BOX[4])
-	else
-		text:SetPoint('TOPRIGHT', _G.InspectFrame, 'TOPRIGHT', TOTAL_LEVEL_FALLBACK[1], TOTAL_LEVEL_FALLBACK[2])
-	end
+	local anchor, corner = _G.InspectPaperDollItemsFrame, 'TOP' .. side
+	local sign = side == 'RIGHT' and -1 or 1
+	text:SetPoint(corner, anchor, corner, sign * READOUT_INSET_X, READOUT_TOP)
+	text:SetPoint(side == 'RIGHT' and 'BOTTOMLEFT' or 'BOTTOMRIGHT', anchor, corner, sign * READOUT_REACH_X, READOUT_BOTTOM)
 	return text
 end
 
 local function UpdateTotalLevel()
 	if not totalLevelText then return end
-	local frame = _G.InspectFrame
-	local unit = frame and frame.unit
-	local query = C_PaperDollInfo and C_PaperDollInfo.GetInspectItemLevel
-	local level = unit and query and query(unit)
+	local unit = _G.InspectFrame.unit
+	local level = unit and C_PaperDollInfo.GetInspectItemLevel(unit)
 	if level and not IsSecretValue(level) and level > 0 then
 		totalLevelText:SetText(floor(level + 0.5))
 	else
 		totalLevelText:SetText('')
 	end
+end
+
+local function UpdateRating()
+	if not ratingText then return end
+	local unit = _G.InspectFrame.unit
+	local summary = unit and C_PlayerInfo.GetPlayerMythicPlusRatingSummary(unit)
+	local score = summary and summary.currentSeasonScore
+	if score and not IsSecretValue(score) and score > 0 then
+		ratingText:SetText(floor(score))
+		ratingText:SetTextColor(C_ChallengeMode.GetDungeonScoreRarityColor(score):GetRGB())
+	else
+		ratingText:SetText('')
+	end
+end
+
+local function ApplyScale()
+	_G.InspectFrame:SetScale(BUI.GetDB().skinning[SCALE_SETTING] / 100)
 end
 
 local function ColorSlotEdges(button)
@@ -522,7 +538,11 @@ local function SkinPaperDoll(paperDoll)
 	overlay = overlay or CreateFrame('Frame', nil, paperDoll)
 	overlay:SetAllPoints()
 	overlay:SetFrameLevel(paperDoll:GetFrameLevel() + OVERLAY_LEVEL_BUMP)
-	if not totalLevelText then totalLevelText = CreateTotalLevelText() end
+	if not totalLevelText then
+		totalLevelText = CreateReadout('RIGHT')
+		totalLevelText:SetTextColor(TOTAL_LEVEL_COLOR[1], TOTAL_LEVEL_COLOR[2], TOTAL_LEVEL_COLOR[3], TOTAL_LEVEL_COLOR[4])
+		ratingText = CreateReadout('LEFT')
+	end
 	Body(_G.InspectLevelText)
 	Button(paperDoll.ViewButton)
 	SkinModel(_G.InspectModelFrame)
@@ -612,7 +632,10 @@ local function ShowSlotLabels(shown)
 			end
 		end
 	end
-	if totalLevelText then totalLevelText:SetShown(shown) end
+	if totalLevelText then
+		totalLevelText:SetShown(shown)
+		ratingText:SetShown(shown)
+	end
 end
 
 local function Apply()
@@ -628,6 +651,8 @@ local function Apply()
 	ShowSlotLabels(true)
 	for _, button in ipairs(slotButtons) do RefreshSlot(button) end
 	UpdateTotalLevel()
+	UpdateRating()
+	ApplyScale()
 	Skin.RefreshTabStrip(frame)
 end
 
@@ -636,12 +661,13 @@ local function Install()
 	local frame = _G.InspectFrame
 	if not frame then return end
 	installed = true
-	frame:HookScript('OnShow', Apply)
-	hooksecurefunc('InspectPaperDollItemSlotButton_Update', RefreshSlot)
+	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Inspect frame reskin', Apply))
+	Hook('InspectPaperDollItemSlotButton_Update', RefreshSlot)
 	BUI.Events:Register('INSPECT_READY', 'Skin.InspectLevels', function()
 		if not Enabled() or not skinned then return end
 		for _, button in ipairs(slotButtons) do RefreshSlot(button) end
 		UpdateTotalLevel()
+		UpdateRating()
 		Skin.RefreshTabStrip(_G.InspectFrame)
 	end)
 	if frame:IsShown() then Apply() end
@@ -655,6 +681,7 @@ end
 local function Deactivate()
 	context.Restore()
 	ShowSlotLabels(false)
+	if installed then _G.InspectFrame:SetScale(1) end
 	skinned = false
 	BUI.Print('Inspect skin disabled. /reload for a full visual reset.')
 end
@@ -674,8 +701,21 @@ end)
 
 Skin.RegisterSkin(SKIN_ID, {
 	name = 'Inspect',
-	description = 'The inspect window: dark shell, house tabs, framed equipment slots with quality edges and item levels, flat PvP ratings and guild panel. Preview needs an inspectable target.',
+	description = 'The inspect window: dark shell, house tabs, framed equipment slots with quality edges and item levels, their M+ rating, flat PvP ratings and guild panel. Preview needs an inspectable target.',
 	icon = 'Interface/Icons/INV_Misc_Spyglass_03',
+	buildSettings = function(content)
+		local skinDB = BUI.GetDB().skinning
+		local card = BUILib.Layout.SettingsCard(content, { title = 'Size' })
+		Skin.TipCardSlider(card, {
+			label = 'Scale %', min = 80, max = 150, step = 5, value = skinDB[SCALE_SETTING],
+			tooltip = 'How big the inspect window is. 100 is the game size.',
+			callback = function(value)
+				skinDB[SCALE_SETTING] = value
+				if installed then ApplyScale() end
+			end,
+		})
+		card:Refresh()
+	end,
 })
 
 BUI.Events:Once('PLAYER_LOGIN', 'Skin.InspectInstall', function()

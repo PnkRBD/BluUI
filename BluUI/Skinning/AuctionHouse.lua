@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.AuctionHouse')
+
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -121,7 +123,7 @@ local function SkinAlignedControl(control)
 	SkinMoneyInput(control.MoneyInputFrame)
 	Dropdown(control.Dropdown)
 	if control.PerItemPostfix then Skin.TipFont(control.PerItemPostfix, 'label') end
-	if control.SetLabelColor then hooksecurefunc(control, 'SetLabelColor', RecolorAlignedLabels) end
+	if control.SetLabelColor then Hook(control, 'SetLabelColor', RecolorAlignedLabels) end
 end
 
 local function SkinBidFrame(frame)
@@ -372,12 +374,12 @@ local function Apply()
 end
 
 local function HookRows()
-	hooksecurefunc('AuctionHouseFilterButton_SetUp', OnCategoryButton)
-	hooksecurefunc(_G.AuctionHouseItemListLineMixin, 'Populate', OnRowPopulated)
-	hooksecurefunc(_G.TableBuilderMixin, 'ArrangeCells', OnCellsArranged)
-	hooksecurefunc(_G.AuctionHouseTableHeaderStringMixin, 'Init', OnHeaderInit)
-	hooksecurefunc(_G.AuctionHouseAuctionsSummaryLineMixin, 'Init', OnSummaryLine)
-	hooksecurefunc('PanelTemplates_UpdateTabs', OnTabsUpdated)
+	Hook('AuctionHouseFilterButton_SetUp', OnCategoryButton)
+	Hook(_G.AuctionHouseItemListLineMixin, 'Populate', OnRowPopulated)
+	Hook(_G.TableBuilderMixin, 'ArrangeCells', OnCellsArranged)
+	Hook(_G.AuctionHouseTableHeaderStringMixin, 'Init', OnHeaderInit)
+	Hook(_G.AuctionHouseAuctionsSummaryLineMixin, 'Init', OnSummaryLine)
+	Hook('PanelTemplates_UpdateTabs', OnTabsUpdated)
 end
 
 local function Install()
@@ -385,7 +387,7 @@ local function Install()
 	local frame = _G.AuctionHouseFrame
 	if not frame then return end
 	installed = true
-	frame:HookScript('OnShow', Apply)
+	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.AuctionHouse frame reskin', Apply))
 	HookRows()
 	if frame:IsShown() then Apply() end
 end

@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.CooldownManager')
+
 local Skin = BUI.Skinning
 
 local SKIN_ID = 'cooldownmanager'
@@ -121,7 +123,7 @@ local function SkinTabSystem(tabSystem)
 	end
 	if not tabSystem._buiCdmTabs then
 		tabSystem._buiCdmTabs = true
-		hooksecurefunc(tabSystem, 'SetTab', RefreshTabSystem)
+		Hook(tabSystem, 'SetTab', RefreshTabSystem)
 	end
 	RefreshTabSystem(tabSystem)
 end
@@ -138,9 +140,9 @@ local function SkinTab(tab)
 	if tab._buiCdmMirror then return end
 	tab._buiCdmMirror = true
 	local function Mirror() MirrorTab(tab, selected) end
-	hooksecurefunc(selected, 'Show', Mirror)
-	hooksecurefunc(selected, 'Hide', Mirror)
-	hooksecurefunc(selected, 'SetShown', Mirror)
+	Hook(selected, 'Show', Mirror)
+	Hook(selected, 'Hide', Mirror)
+	Hook(selected, 'SetShown', Mirror)
 end
 
 local function Classify(frame, child)
@@ -216,7 +218,7 @@ local function Apply()
 	SkinMainFrame(frame)
 	if not frame._buiCdmHooked then
 		frame._buiCdmHooked = true
-		frame:HookScript('OnShow', OnShow)
+		frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.CooldownManager chrome reskin', OnShow))
 	end
 end
 

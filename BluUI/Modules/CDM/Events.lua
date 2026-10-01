@@ -86,6 +86,7 @@ local cdPollTicker
 local CheckCDWatchList
 
 local QueueCDCheck = BUI.Dispatcher.New(function() CheckCDWatchList() end, 'CDM.CDWatch')
+local PollCDWatchList = BUI.Profiler.Wrap('CDM.Events cd poll', function() CheckCDWatchList() end)
 
 local function UpdateCDPollTicker()
     local needed = false
@@ -98,7 +99,7 @@ local function UpdateCDPollTicker()
         end
     end
     if needed and not cdPollTicker then
-        cdPollTicker = C_Timer.NewTicker(0.5, function() CheckCDWatchList() end)
+        cdPollTicker = C_Timer.NewTicker(0.5, PollCDWatchList)
     elseif not needed and cdPollTicker then
         cdPollTicker:Cancel()
         cdPollTicker = nil
@@ -293,7 +294,7 @@ local function RefreshCDExpectation(spellID)
     cdExpectedEnd[spellID] = endTime
     cdEstimatedEnd[spellID] = nil
     CancelCDEndTimer(spellID)
-    cdEndTimers[spellID] = C_Timer.NewTimer(endTime - now + CD_END_GRACE, function() OnCDEndReached(spellID) end)
+    cdEndTimers[spellID] = BUI.Profiler.NewTimer('CDM.Events cd end', endTime - now + CD_END_GRACE, function() OnCDEndReached(spellID) end)
 end
 
 CheckCDWatchList = function()
@@ -331,7 +332,7 @@ CheckCDWatchList = function()
             if endTime and endTime > now and itemExpectedEnd[itemID] ~= endTime then
                 itemExpectedEnd[itemID] = endTime
                 if itemEndTimers[itemID] then itemEndTimers[itemID]:Cancel() end
-                itemEndTimers[itemID] = C_Timer.NewTimer(endTime - now + 0.1, function()
+                itemEndTimers[itemID] = BUI.Profiler.NewTimer('CDM.Events item cd end', endTime - now + 0.1, function()
                     itemEndTimers[itemID] = nil
                     itemExpectedEnd[itemID] = nil
                     QueueCDCheck()
@@ -373,7 +374,7 @@ local function MarkWatchedSpellActive(targetID, castSpellID)
             cdExpectedEnd[targetID] = start + duration
             cdEstimatedEnd[targetID] = nil
             CancelCDEndTimer(targetID)
-            cdEndTimers[targetID] = C_Timer.NewTimer(start + duration - now + CD_END_GRACE, function() OnCDEndReached(targetID) end)
+            cdEndTimers[targetID] = BUI.Profiler.NewTimer('CDM.Events cd end', start + duration - now + CD_END_GRACE, function() OnCDEndReached(targetID) end)
         end
         return
     end
@@ -391,7 +392,7 @@ local function MarkWatchedSpellActive(targetID, castSpellID)
         cdExpectedEnd[targetID] = endTime
         cdEstimatedEnd[targetID] = estimated
         CancelCDEndTimer(targetID)
-        cdEndTimers[targetID] = C_Timer.NewTimer(endTime - now + CD_END_GRACE, function() OnCDEndReached(targetID) end)
+        cdEndTimers[targetID] = BUI.Profiler.NewTimer('CDM.Events cd end', endTime - now + CD_END_GRACE, function() OnCDEndReached(targetID) end)
     end
     if cdWatchedSpells[targetID] == true then return end
     cdWatchedSpells[targetID] = true
@@ -473,10 +474,10 @@ function CDM.OnIconCooldownDone(icon)
     QueueCDCheck()
 end
 
-function CDM.OnCooldownWidgetDone(cooldown)
+CDM.OnCooldownWidgetDone = BUI.Profiler.Wrap('CDM.Events cooldown done', function(cooldown)
     local icon = cooldown and cooldown:GetParent()
     if icon then CDM.OnIconCooldownDone(icon) end
-end
+end)
 
 local function ForEachHideWhenZeroViewer(callback)
     local db = BUI.GetDB()
@@ -494,8 +495,12 @@ local function ForEachHideWhenZeroViewer(callback)
     return any
 end
 
+local function RelayoutIfZeroChanged(key)
+    if CDM.HideWhenZeroChanged(key) then CDM.MarkLayoutDirty(key) end
+end
+
 local function OnHideWhenZeroEvent()
-    ForEachHideWhenZeroViewer(function(key) CDM.MarkLayoutDirty(key) end)
+    ForEachHideWhenZeroViewer(RelayoutIfZeroChanged)
 end
 
 local hideWhenZeroRegistered = false
@@ -514,28 +519,41 @@ end
 
 local layoutRefreshing = false
 local layoutRefreshPending = false
+local layoutRefreshForced = false
 local layoutHooksDone = false
 local RequestLayoutRefresh
+
+local function DeferLayoutRefresh(force)
+    layoutRefreshPending = true
+    if force then layoutRefreshForced = true end
+end
+
+local function FlushPendingLayoutRefresh()
+    if not layoutRefreshPending then return end
+    local force = layoutRefreshForced
+    layoutRefreshPending = false
+    layoutRefreshForced = false
+    RequestLayoutRefresh(force)
+end
 
 local function DoLayoutRefresh()
     layoutRefreshing = true
     CDM.RefreshAll(true)
-    C_Timer.After(0.2, function()
+    BUI.Profiler.After('CDM.Events layout settle', 0.2, function()
         layoutRefreshing = false
-        if layoutRefreshPending then
-            layoutRefreshPending = false
-            RequestLayoutRefresh()
-        end
+        FlushPendingLayoutRefresh()
     end)
 end
 
 local lastActiveLayout
 
 RequestLayoutRefresh = function(force)
-    if layoutRefreshing then layoutRefreshPending = true; return end
-    if InCombatLockdown() then layoutRefreshPending = true; return end
     local managerFrame = _G.EditModeManagerFrame
-    if managerFrame and managerFrame:IsShown() then layoutRefreshPending = true; return end
+    local editing = managerFrame and managerFrame:IsShown()
+    if layoutRefreshing or editing or InCombatLockdown() then
+        DeferLayoutRefresh(force or editing)
+        return
+    end
     if not force then
         local layouts = C_EditMode.GetLayouts()
         local active = layouts and layouts.activeLayout
@@ -545,14 +563,8 @@ RequestLayoutRefresh = function(force)
         end
     end
     layoutRefreshPending = false
-    C_Timer.After(0, DoLayoutRefresh)
-end
-
-local function FlushPendingLayoutRefresh()
-    if layoutRefreshPending then
-        layoutRefreshPending = false
-        RequestLayoutRefresh(true)
-    end
+    layoutRefreshForced = false
+    BUI.Profiler.After('CDM.Events layout refresh', 0, DoLayoutRefresh)
 end
 
 function CDM.RegisterEvents()
@@ -562,6 +574,6 @@ function CDM.RegisterEvents()
     BUI.Events:Register("PLAYER_REGEN_ENABLED", "CDM.LayoutPending", function() BUI.Events:AfterCombatSettled(FlushPendingLayoutRefresh, "CDM.LayoutPending") end)
     if not layoutHooksDone and _G.EditModeManagerFrame then
         layoutHooksDone = true
-        _G.EditModeManagerFrame:HookScript("OnHide", FlushPendingLayoutRefresh)
+        _G.EditModeManagerFrame:HookScript("OnHide", BUI.Profiler.Wrap('CDM.Events edit mode hide', FlushPendingLayoutRefresh))
     end
 end

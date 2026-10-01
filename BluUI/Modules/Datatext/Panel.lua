@@ -32,7 +32,7 @@ local function Reveal(panel)
     panel.introFade:Play()
 end
 
-local function OnUpdate(self, elapsed)
+local OnUpdate = BUI.Profiler.Wrap('Datatext.Panel hover check', function(self, elapsed)
     self._accumulated = (self._accumulated or 0) + elapsed
     if self._accumulated < 0.1 then return end
     local accumulated = self._accumulated
@@ -53,7 +53,7 @@ local function OnUpdate(self, elapsed)
         self._outTime = (self._outTime or 0) + accumulated
         if self._outTime > 0.5 then FadeOut(self) end
     end
-end
+end)
 
 function Datatext.CreateHoverPanel(name, width)
     local panel = CreateFrame('Frame', name, UIParent, 'BackdropTemplate')
@@ -73,12 +73,12 @@ function Datatext.CreateHoverPanel(name, width)
     panel.introFade = panel:CreateAnimationGroup()
     local fade = panel.introFade:CreateAnimation('Alpha')
     fade:SetFromAlpha(0); fade:SetToAlpha(1); fade:SetDuration(0.12); fade:SetSmoothing('OUT')
-    panel.introFade:SetScript('OnFinished', function() panel:SetAlpha(1) end)
+    panel.introFade:SetScript('OnFinished', BUI.Profiler.Wrap('Datatext.Panel intro finished', function() panel:SetAlpha(1) end))
 
     panel.outroFade = panel:CreateAnimationGroup()
     local outro = panel.outroFade:CreateAnimation('Alpha')
     outro:SetFromAlpha(1); outro:SetToAlpha(0); outro:SetDuration(0.22); outro:SetSmoothing('IN')
-    panel.outroFade:SetScript('OnFinished', function() panel._fadingOut = false; panel:Hide() end)
+    panel.outroFade:SetScript('OnFinished', BUI.Profiler.Wrap('Datatext.Panel outro finished', function() panel._fadingOut = false; panel:Hide() end))
 
     panel.Reveal, panel.FadeOut, panel.ForceHide = Reveal, FadeOut, ForceHide
     panel:SetScript('OnUpdate', OnUpdate)

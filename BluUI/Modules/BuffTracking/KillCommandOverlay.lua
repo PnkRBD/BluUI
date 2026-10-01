@@ -56,9 +56,9 @@ local function GetCachedIcon()
         cachedIcon = nil
         cacheDirty = true
     end
-    if cacheDirty or not cachedIcon then
+    if cacheDirty then
         cachedIcon = ResolveKillCommandIcon()
-        cacheDirty = cachedIcon == nil
+        cacheDirty = false
     end
     return cachedIcon
 end
@@ -158,10 +158,13 @@ local function EnsureLiveTimer(entry, config, wanted)
 end
 
 local function ClearOverlay()
+    if overlay.cleared then return end
+    overlay.cleared = true
     overlay.cooldown:Clear()
     overlay.cooldown:Hide()
     overlay.beastText:SetText('')
     overlay.beastText:Hide()
+    overlay.beastId, overlay.beastPhase = nil, nil
     overlay.lastPreviewPhase = nil
 end
 
@@ -256,6 +259,7 @@ local function Tick()
     local phase, beast, remaining = GetPreviewState(Hunter)
     local isPreview = phase ~= nil
     if not isPreview then
+        Hunter.Update()
         phase = Hunter.GetPackLeaderPhase()
         if phase == 'off' then
             SoftIdle()
@@ -274,6 +278,7 @@ local function Tick()
 
     local entry = EnsureOverlay(icon)
     entry.frame:Show()
+    entry.cleared = false
 
     ApplyTimerLayout(entry, icon, config)
     ApplyBeastLayout(entry, icon, config)
@@ -345,7 +350,7 @@ end
 
 local function Sync()
     local live = Tick()
-    if GetConfig().enabled or previewActive then
+    if previewActive or (GetConfig().enabled and GetHunter().IsPackLeaderActive()) then
         ArmWake()
     else
         DisarmWake()
@@ -357,7 +362,7 @@ local function Sync()
     end
 end
 
-SyncWrapped = Sync
+SyncWrapped = BUI.Profiler.Wrap('BuffTracking.KillCommandOverlay tick', Sync)
 QueueTick = BUI.Dispatcher.New(Sync, 'KCO.Tick')
 
 function KillCommandOverlay.Refresh()

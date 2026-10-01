@@ -41,28 +41,22 @@ function UnitFrames.ApplyBackgroundColors(frame, bgColor, powerBgColor)
 	end
 end
 
-local function ApplyAbsorbBar(frame, bar, healthKey, direction, enabled)
+local function ApplyAbsorbBar(frame, bar, direction, enabled)
 	if not frame.Health then return end
 	UnitFrames.AnchorAbsorb(bar, frame.Health, frame.Health:GetStatusBarTexture(), direction)
-	if enabled then
-		frame.Health[healthKey] = bar
-		bar:Show()
-	else
-		frame.Health[healthKey] = nil
-		bar:Hide()
-	end
+	bar:SetShown(enabled)
 end
 
 function UnitFrames.ApplyAbsorbStyles(frame, settings)
 	if not frame.Absorb then return end
 	UnitFrames.ApplyAbsorbVisual(frame.Absorb, UnitFrames.BuildAbsorbCfg(settings))
-	ApplyAbsorbBar(frame, frame.Absorb, 'DamageAbsorb', settings.shieldDirection, settings.shieldEnabled ~= false)
+	ApplyAbsorbBar(frame, frame.Absorb, settings.shieldDirection, settings.shieldEnabled ~= false)
 end
 
 function UnitFrames.ApplyHealAbsorbStyles(frame, settings)
 	if not frame.HealAbsorb then return end
 	UnitFrames.ApplyHealAbsorbVisual(frame.HealAbsorb, UnitFrames.BuildHealAbsorbCfg(settings))
-	ApplyAbsorbBar(frame, frame.HealAbsorb, 'HealAbsorb', settings.healAbsorbDirection, settings.healAbsorbEnabled ~= false)
+	ApplyAbsorbBar(frame, frame.HealAbsorb, settings.healAbsorbDirection, settings.healAbsorbEnabled ~= false)
 end
 
 function UnitFrames.ApplyHealthBarLayout(frame, height, showPower, powerHeight, borderSize)
@@ -125,6 +119,16 @@ function UnitFrames.ApplyTextPosition(textElement, parent, position, offsetX, of
 	textElement:SetJustifyH(justify)
 end
 
+function UnitFrames.FitNameWidth(frame)
+	local nameParent = frame.TextOverlay or frame.Health
+	if nameParent then
+		local parentWidth = nameParent:GetWidth()
+		if parentWidth and parentWidth > 0 then
+			frame.Name:SetWidth(parentWidth - 8)
+		end
+	end
+end
+
 function UnitFrames.ApplyTextStyles(frame, width, settings, unitSettings, unit)
 	local font = UnitFrames.GetFont()
 	local function PositiveOr(value, fallback) return (type(value) == 'number' and value > 0) and value or fallback end
@@ -143,13 +147,7 @@ function UnitFrames.ApplyTextStyles(frame, width, settings, unitSettings, unit)
 		UnitFrames.ApplyTextPosition(frame.Name, frame.TextOverlay or frame.Health,
 			unitSettings.namePosition, unitSettings.nameOffsetX, unitSettings.nameOffsetY)
 
-		local nameParent = frame.TextOverlay or frame.Health
-		if nameParent then
-			local parentWidth = nameParent:GetWidth()
-			if parentWidth and parentWidth > 0 then
-				frame.Name:SetWidth(parentWidth - 8)
-			end
-		end
+		UnitFrames.FitNameWidth(frame)
 
 		if unitSettings.classColorName and UnitExists(unit) then
 			local red, green, blue = UnitFrames.GetNameColor(unit, unitSettings)

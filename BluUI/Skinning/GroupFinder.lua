@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.GroupFinder')
+
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -611,7 +613,7 @@ local function SkinConquestBar(bar)
 	reward:SetPoint('LEFT', bar, 'RIGHT')
 	if bar._buiConquestHooked then return end
 	bar._buiConquestHooked = true
-	hooksecurefunc(bar, 'Update', RefreshConquestBar)
+	Hook(bar, 'Update', RefreshConquestBar)
 end
 
 local function SkinQueuePanel(panel)
@@ -682,11 +684,11 @@ local function SkinPvp()
 	end
 	if pvpHooked then return end
 	pvpHooked = true
-	if _G.HonorFrameSpecificList_Update then hooksecurefunc('HonorFrameSpecificList_Update', OnHonorListUpdated) end
-	if _G.PVPQueueFrame_SelectButton then hooksecurefunc('PVPQueueFrame_SelectButton', OnPvpSelection) end
+	if _G.HonorFrameSpecificList_Update then Hook('HonorFrameSpecificList_Update', OnHonorListUpdated) end
+	if _G.PVPQueueFrame_SelectButton then Hook('PVPQueueFrame_SelectButton', OnPvpSelection) end
 	local trainingMixin = _G.PVPSpecificTrainingGroundButtonMixin
 	if trainingMixin and trainingMixin.Initialize then
-		hooksecurefunc(trainingMixin, 'Initialize', function(button) if Enabled() then SkinSpecificRow(button) end end)
+		Hook(trainingMixin, 'Initialize', function(button) if Enabled() then SkinSpecificRow(button) end end)
 	end
 end
 
@@ -757,10 +759,10 @@ local function SkinChallenges()
 	if keystone and keystone:IsShown() then SkinKeystoneFrame(keystone) end
 	if challengesHooked then return end
 	challengesHooked = true
-	if frame.Update then hooksecurefunc(frame, 'Update', OnChallengesUpdated) end
+	if frame.Update then Hook(frame, 'Update', OnChallengesUpdated) end
 	if keystone then
-		keystone:HookScript('OnShow', SkinKeystoneFrame)
-		if keystone.Reset then hooksecurefunc(keystone, 'Reset', RefadeKeystoneArt) end
+		keystone:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GroupFinder keystone reskin', SkinKeystoneFrame))
+		if keystone.Reset then Hook(keystone, 'Reset', RefadeKeystoneArt) end
 	end
 end
 
@@ -823,13 +825,13 @@ local function OnAddonLoaded(first, second)
 end
 
 local function HookRows()
-	hooksecurefunc('LFGRewardsFrame_SetItemButton', OnRewardItem)
-	hooksecurefunc('LFGDungeonListButton_SetDungeon', OnDungeonRow)
-	hooksecurefunc('GroupFinderFrame_SelectGroupButton', OnGroupSelection)
-	if _G.LFGListCategorySelection_AddButton then hooksecurefunc('LFGListCategorySelection_AddButton', OnCategoryButton) end
-	if _G.LFGListSearchEntry_Update then hooksecurefunc('LFGListSearchEntry_Update', OnSearchEntry) end
-	if _G.LFGListApplicationViewer_UpdateApplicant then hooksecurefunc('LFGListApplicationViewer_UpdateApplicant', OnApplicant) end
-	if _G.LFGListSearchPanel_UpdateAutoComplete then hooksecurefunc('LFGListSearchPanel_UpdateAutoComplete', OnAutoComplete) end
+	Hook('LFGRewardsFrame_SetItemButton', OnRewardItem)
+	Hook('LFGDungeonListButton_SetDungeon', OnDungeonRow)
+	Hook('GroupFinderFrame_SelectGroupButton', OnGroupSelection)
+	if _G.LFGListCategorySelection_AddButton then Hook('LFGListCategorySelection_AddButton', OnCategoryButton) end
+	if _G.LFGListSearchEntry_Update then Hook('LFGListSearchEntry_Update', OnSearchEntry) end
+	if _G.LFGListApplicationViewer_UpdateApplicant then Hook('LFGListApplicationViewer_UpdateApplicant', OnApplicant) end
+	if _G.LFGListSearchPanel_UpdateAutoComplete then Hook('LFGListSearchPanel_UpdateAutoComplete', OnAutoComplete) end
 end
 
 local function Install()
@@ -837,7 +839,7 @@ local function Install()
 	local frame = _G.PVEFrame
 	if not frame then return end
 	installed = true
-	frame:HookScript('OnShow', Apply)
+	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GroupFinder frame reskin', Apply))
 	HookRows()
 	BUI.Events:Register('ADDON_LOADED', 'Skin.GroupFinder', OnAddonLoaded)
 	if frame:IsShown() then Apply() end

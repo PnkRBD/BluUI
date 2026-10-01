@@ -125,11 +125,13 @@ end
 local function Install()
 	if installed then return end
 	installed = true
+	local onShow = BUI.Profiler.Wrap('Skin.StaticPopup popup reskin', Apply)
+	local onHide = BUI.Profiler.Wrap('Skin.StaticPopup glow stop', StopAcceptGlow)
 	for dialogIndex = 1, DIALOG_COUNT do
 		local dialog = _G['StaticPopup' .. dialogIndex]
 		if dialog then
-			dialog:HookScript('OnShow', Apply)
-			dialog:HookScript('OnHide', StopAcceptGlow)
+			dialog:HookScript('OnShow', onShow)
+			dialog:HookScript('OnHide', onHide)
 		end
 	end
 	ApplyShown()

@@ -120,8 +120,10 @@ end
 
 local function UpdatePips(castbar)
 	for _, pip in ipairs(castbar.Pips) do pip:Hide() end
+	castbar._pipFractions = nil
+	if castbar._barType ~= 'player' then return end
 
-	local numStages = select(10, UnitChannelInfo('player'))
+	local _, _, _, startMS, endMS, _, _, _, _, numStages = UnitChannelInfo('player')
 	if not numStages or numStages < 2 then return end
 
 	local boundaries = {}
@@ -130,7 +132,9 @@ local function UpdatePips(castbar)
 		stageTotal = stageTotal + GetUnitEmpowerStageDuration('player', stage - 1)
 		boundaries[stage] = stageTotal
 	end
-	local fullDuration = (castbar.endTime - castbar.startTime) * 1000
+	local fullDuration = endMS + GetUnitEmpowerHoldAtMaxTime('player') - startMS
+	castbar._empowerStart = startMS / 1000
+	castbar._empowerEnd = (startMS + fullDuration) / 1000
 	local barWidth = castbar:GetWidth()
 
 	for index = 1, numStages - 1 do
@@ -158,6 +162,47 @@ local function UpdatePips(castbar)
 	end
 end
 
+local function CancelStageColors(castbar)
+	if not castbar._stageTimer then return end
+	castbar._stageTimer:Cancel()
+	castbar._stageTimer = nil
+end
+
+local function EmpoweredStageAt(castbar, now)
+	local startTime = castbar._empowerStart
+	local span = castbar._empowerEnd - startTime
+	local stage = 1
+	for index, fraction in ipairs(castbar._pipFractions) do
+		if now >= startTime + fraction * span then stage = index + 1 end
+	end
+	if stage > castbar._numStages then stage = castbar._numStages end
+	return stage
+end
+
+local function PaintEmpoweredStage(castbar)
+	castbar._stageTimer = nil
+	if not castbar._pipFractions or castbar._interrupted then return end
+	local now = GetTime()
+	local stage = EmpoweredStageAt(castbar, now)
+	if stage ~= castbar._lastStage then
+		castbar._lastStage = stage
+		local stageColor = castbar._empoweredSettings.stageColors[stage]
+		if stageColor then castbar:SetStatusBarColor(stageColor[1], stageColor[2], stageColor[3], stageColor[4] or 1) end
+	end
+	if stage < castbar._numStages then
+		local startTime = castbar._empowerStart
+		local nextStageAt = startTime + castbar._pipFractions[stage] * (castbar._empowerEnd - startTime)
+		castbar._stageTimer = BUI.Profiler.NewTimer('CastBar.Castbars empower stage', nextStageAt - now, function() PaintEmpoweredStage(castbar) end)
+	end
+end
+
+local function StartStageColors(castbar, settings)
+	CancelStageColors(castbar)
+	if not (castbar._pipFractions and settings.stageColorsEnabled) then return end
+	if settings.stageColorBackground ~= false or not next(settings.stageColors) then return end
+	PaintEmpoweredStage(castbar)
+end
+
 local function PostCastStart(castbar, unit)
 	local settings = CastBar.GetSettings(castbar._barType)
 	castbar._empoweredSettings = settings
@@ -168,8 +213,9 @@ local function PostCastStart(castbar, unit)
 	local barColor = ResolveColor(castbar, settings)
 	if castbar._barType == 'player' then
 		castbar:SetStatusBarColor(barColor[1], barColor[2], barColor[3], barColor[4] or 1)
+		StartStageColors(castbar, settings)
 	else
-		CastBar.TrackInterrupts(castbar, settings, barColor)
+		CastBar.TrackInterrupts(castbar, settings, barColor, unit)
 	end
 
 	CastBar.TruncateSpellName(castbar, settings)
@@ -183,8 +229,7 @@ end
 local function PostCastInterruptible(castbar)
 	local settings = CastBar.GetSettings(castbar._barType)
 	if not settings.enabled or castbar._barType == 'player' then return end
-	CastBar.ApplyInterruptColor(castbar, ResolveColor(castbar, settings), settings)
-	CastBar.SetupInterruptTick(castbar, settings)
+	CastBar.RefreshInterruptible(castbar, ResolveColor(castbar, settings), settings)
 end
 
 local function PostCastFail(castbar)
@@ -273,7 +318,8 @@ function CastBar.CreateCastbar(frame, barType)
 	castbar.PostCastInterruptible = PostCastInterruptible
 	castbar.UpdatePips = UpdatePips
 
-	castbar:HookScript('OnHide', function(self)
+	castbar:HookScript('OnHide', BUI.Profiler.Wrap('CastBar.Castbars castbar hide', function(self)
+		CancelStageColors(self)
 		self._pipFractions = nil
 		self._lastStage = nil
 		self._empoweredSettings = nil
@@ -281,7 +327,7 @@ function CastBar.CreateCastbar(frame, barType)
 		CastBar.HideChannelTicks(self)
 		if self._suppressAutoPreview then return end
 		container:Hide()
-	end)
+	end))
 
 	local function SaveDragPosition(x, y)
 		local settings = CastBar.GetSettings(barType)
@@ -349,9 +395,14 @@ local function LayoutContainer(container, settings)
 	end
 end
 
+local function AnchorMoved(container, settings)
+	return BUI.UnitFrames.AnchorGeometryChanged(container, BUI.ResolveAnchorFrame(settings.anchorFrame, settings.anchorPoint))
+end
+
 function CastBar.RepositionCastbar(frame, barType)
 	local settings = CastBar.GetSettings(barType)
-	if settings.enabled then LayoutContainer(frame.Castbar._container, settings) end
+	local container = frame.Castbar._container
+	if settings.enabled and AnchorMoved(container, settings) then LayoutContainer(container, settings) end
 end
 
 function CastBar.ApplyCastbar(frame, barType)
@@ -368,6 +419,7 @@ function CastBar.ApplyCastbar(frame, barType)
 	local edge = Pixel.Scale(settings.borderSize)
 	local gap = Pixel.PixelSize(1)
 
+	AnchorMoved(container, settings)
 	LayoutContainer(container, settings)
 
 	local backgroundRed, backgroundGreen, backgroundBlue, backgroundAlpha = UnpackColor(settings.bgColor, 0.1, 0.1, 0.1, 0.8)

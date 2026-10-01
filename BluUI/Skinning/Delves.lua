@@ -76,7 +76,7 @@ end
 local function SkinWindow(frame)
 	if not frame or frame._buiDelves or frame:IsForbidden() then return end
 	frame._buiDelves = true
-	skinnedWindows[#skinnedWindows + 1] = frame
+	skinnedWindows[frame] = true
 
 	for index = 1, #CHROME_FRAMES do FadeRegions(frame[CHROME_FRAMES[index]]) end
 	Shell(frame)
@@ -94,8 +94,11 @@ local function SkinWindow(frame)
 	if rewards then
 		FadeRegions(rewards)
 		if rewards.ScrollBox then Skin.SweepScrollBox(rewards.ScrollBox, SkinReward) end
-		frame:HookScript('OnShow', FitCover)
-		if not FitCover(frame) then C_Timer.After(0, function() FitCover(frame) end) end
+		if not frame._buiDelvesFit then
+			frame._buiDelvesFit = true
+			frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Delves cover fit', FitCover))
+		end
+		if not FitCover(frame) then BUI.Profiler.After('Skin.Delves cover fit', 0, function() FitCover(frame) end) end
 	end
 	Skin.TipFaceTree(frame, FONT_DEPTH)
 end
@@ -108,7 +111,7 @@ end
 Skin.OnToggle(SKIN_ID, function(enabled)
 	context.Restore()
 	if enabled then
-		for index = 1, #skinnedWindows do skinnedWindows[index]._buiDelves = nil end
+		for frame in pairs(skinnedWindows) do frame._buiDelves = nil end
 		Apply()
 	end
 end)

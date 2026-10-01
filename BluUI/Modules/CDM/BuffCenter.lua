@@ -19,6 +19,10 @@ local lastSnapCount = 0
 local lastWidth, lastHeight, lastSpacing, lastVertical
 local lastAnchorWidth, lastAnchorHeight, lastAlpha, lastGrowUp
 local forceLayout = false
+local snapLayout = {}
+local snapOrder = {}
+local snapCustomOrder = false
+local snapKeyed = false
 
 local prefilteredIcons
 local prefilteredCount = 0
@@ -27,13 +31,39 @@ local function SortByLayout(iconA, iconB)
 	return (iconA.layoutIndex or 0) < (iconB.layoutIndex or 0)
 end
 
+local function OrderPosition(icon)
+	return orderLookup[CDM.GetSortKey(icon) or 0] or 999999
+end
+
 local function SortByCustomOrder(iconA, iconB)
-	local idA = CDM.GetSortKey(iconA) or 0
-	local idB = CDM.GetSortKey(iconB) or 0
-	local posA = orderLookup[idA] or 999999
-	local posB = orderLookup[idB] or 999999
+	local posA = OrderPosition(iconA)
+	local posB = OrderPosition(iconB)
 	if posA ~= posB then return posA < posB end
 	return (iconA.layoutIndex or 0) < (iconB.layoutIndex or 0)
+end
+
+local function SnapshotUnchanged(count, anchor, skinVersion, customOrder)
+	if customOrder ~= snapCustomOrder then return false end
+	for iconIndex = 1, count do
+		local icon = visible[iconIndex]
+		if snapLayout[icon] ~= (icon.layoutIndex or 0) then return false end
+		if customOrder and snapOrder[icon] ~= OrderPosition(icon) then return false end
+		local frameData = FrameData[icon]
+		if not frameData or frameData.parked or frameData.anchor ~= anchor or frameData.skinVer ~= skinVersion then return false end
+	end
+	return true
+end
+
+local function RecordSnapshotKeys(count, customOrder)
+	wipe(snapLayout)
+	wipe(snapOrder)
+	for iconIndex = 1, count do
+		local icon = visible[iconIndex]
+		snapLayout[icon] = icon.layoutIndex or 0
+		if customOrder then snapOrder[icon] = OrderPosition(icon) end
+	end
+	snapCustomOrder = customOrder
+	snapKeyed = true
 end
 
 local function CollectVisible(viewer)
@@ -81,7 +111,8 @@ local function PlaceIconCentered(icon, anchor, x, y, alpha)
 	local top = -Pixel.Snap(anchorHeight / 2 - y - height / 2)
 	frameData.locking = true
 	frameData.anchor = anchor
-	if frameData.parked or frameData.posCornerX ~= left or frameData.posCornerY ~= top then
+	local wasParked = frameData.parked
+	if wasParked or frameData.posCornerX ~= left or frameData.posCornerY ~= top then
 		frameData.selfPoint = 'TOPLEFT'
 		frameData.relPoint = 'TOPLEFT'
 		frameData.posCornerX = left
@@ -94,6 +125,7 @@ local function PlaceIconCentered(icon, anchor, x, y, alpha)
 	frameData.parked = nil
 	icon:SetAlpha(alpha)
 	frameData.locking = false
+	if wasParked then CDM.ResumeProcGlow(icon, frameData) end
 end
 
 local function PlaceRow(list, iconCount, anchor, vertical, growUp, stepX, stepY, alpha)
@@ -160,21 +192,27 @@ local function CenterNow()
 	local growUp = settings.rowGrowth == "Up"
 	local skinVersion = CDM.state.skinVersion
 
+	local inputsSame = not forceLayout and visibleCount == lastSnapCount
+		and scaledWidth == lastWidth and scaledHeight == lastHeight and spacing == lastSpacing and vertical == lastVertical
+		and anchorWidth == lastAnchorWidth and anchorHeight == lastAnchorHeight and alpha == lastAlpha and growUp == lastGrowUp
+
 	if not usedPrefiltered then
 		local savedOrder = CDM.GetIconOrder(settings)
-		if savedOrder and #savedOrder > 0 then
+		local customOrder = savedOrder and #savedOrder > 0 or false
+		if customOrder then
 			wipe(orderLookup)
 			for orderIndex, id in ipairs(savedOrder) do orderLookup[id] = orderIndex end
-			sort(visible, SortByCustomOrder)
-			wipe(orderLookup)
-		else
-			sort(visible, SortByLayout)
 		end
+		if inputsSame and snapKeyed and SnapshotUnchanged(visibleCount, anchor, skinVersion, customOrder) then
+			wipe(orderLookup)
+			return
+		end
+		sort(visible, customOrder and SortByCustomOrder or SortByLayout)
+		RecordSnapshotKeys(visibleCount, customOrder)
+		wipe(orderLookup)
 	end
 
-	if not forceLayout and visibleCount == lastSnapCount
-		and scaledWidth == lastWidth and scaledHeight == lastHeight and spacing == lastSpacing and vertical == lastVertical
-		and anchorWidth == lastAnchorWidth and anchorHeight == lastAnchorHeight and alpha == lastAlpha and growUp == lastGrowUp then
+	if inputsSame then
 		local same = true
 		for iconIndex = 1, visibleCount do
 			local icon = visible[iconIndex]
@@ -220,6 +258,7 @@ local function CenterNow()
 	for iconIndex = 1, visibleCount do lastSnap[iconIndex] = visible[iconIndex] end
 	for staleIndex = visibleCount + 1, #lastSnap do lastSnap[staleIndex] = nil end
 	lastSnapCount = visibleCount
+	if usedPrefiltered then snapKeyed = false end
 	lastWidth = scaledWidth
 	lastHeight = scaledHeight
 	lastSpacing = spacing
@@ -234,10 +273,10 @@ local function ScheduleCenter()
 	if not active then return end
 	if not pendingFrame then
 		pendingFrame = CreateFrame("Frame", "BUI_CDMBuffCenterFlush")
-		pendingFrame:SetScript("OnUpdate", function(self)
+		pendingFrame:SetScript("OnUpdate", BUI.Profiler.Wrap("CDM.BuffCenter flush", function(self)
 			self:Hide()
 			CenterNow()
-		end)
+		end))
 	end
 	pendingFrame:Show()
 end

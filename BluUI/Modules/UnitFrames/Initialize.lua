@@ -20,6 +20,13 @@ local function GetUnitOptions(unitType)
 	return UNIT_OPTIONS[unitType]
 end
 
+local function ShowPower(unitType, unitSettings)
+	if GetUnitOptions(unitType).showPowerDefault == false then
+		return unitSettings.showPower == true
+	end
+	return unitSettings.showPower ~= false
+end
+
 local function ApplySettings(frame, unitType, index)
 	if not frame then return end
 
@@ -40,12 +47,7 @@ local function ApplySettings(frame, unitType, index)
 	frame:SetSize(Pixel.Scale(width), scaledHeight)
 	UnitFrames.ApplyPosition(frame, unitType, index)
 
-	local showPower
-	if unitOptions.showPowerDefault == false then
-		showPower = unitSettings.showPower == true
-	else
-		showPower = unitSettings.showPower ~= false
-	end
+	local showPower = ShowPower(unitType, unitSettings)
 
 	local borderColor
 	if unitOptions.hasCombatBorder and unitSettings.combatBorder and InCombatLockdown() then
@@ -236,8 +238,8 @@ function UnitFrames:Refresh()
 
 	for _, unitType in ipairs(CORE_UNITS) do
 		RefreshFrame(self[unitType], unitType)
-		UnitFrames.UpdateDebuffHighlight(self[unitType], unitType)
 	end
+	UnitFrames.UpdateDebuffHighlight(self.player)
 
 	local bossUnitSettings = UnitFrames.GetUnitSettings('boss')
 	local bossEnabled = bossUnitSettings.enabled ~= false
@@ -271,6 +273,15 @@ end
 
 local ANCHORABLE_UNITS = {'player', 'target', 'focus', 'pet', 'targettarget'}
 
+local function ApplyAnchoredHeight(frame, unitType, unitSettings)
+	local scaledHeight = BUI.Anchor.GetAnchorHeight(unitSettings) or Pixel.Scale(unitSettings.height)
+	frame:SetSize(Pixel.Scale(unitSettings.width), scaledHeight)
+	UnitFrames.ApplyPosition(frame, unitType)
+	UnitFrames.ApplyHealthBarLayout(frame, scaledHeight, ShowPower(unitType, unitSettings), unitSettings.powerHeight, UnitFrames.GetSettings().borderSize)
+	UnitFrames.FitNameWidth(frame)
+	if frame.Castbar then BUI.CastBar.RepositionCastbar(frame, unitType) end
+end
+
 function UnitFrames.RefreshAnchoredFrames()
 	if InCombatLockdown() then return end
 
@@ -278,9 +289,9 @@ function UnitFrames.RefreshAnchoredFrames()
 		local unitFrame = UnitFrames[unitType]
 		if unitFrame then
 			local unitSettings = UnitFrames.GetUnitSettings(unitType)
-			if unitSettings.anchorFrame ~= '' then
+			if unitSettings.anchorFrame ~= '' and UnitFrames.AnchorGeometryChanged(unitFrame, BUI.ResolveAnchorFrame(unitSettings.anchorFrame), BUI.Anchor.GetAnchorHeight(unitSettings)) then
 				if unitSettings.matchAnchorHeight then
-					ApplySettings(unitFrame, unitType)
+					ApplyAnchoredHeight(unitFrame, unitType, unitSettings)
 				else
 					UnitFrames.ApplyPosition(unitFrame, unitType)
 				end

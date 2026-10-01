@@ -20,7 +20,7 @@ local Shell, Close, Title = context.Shell, context.Close, context.Title
 local function SkinWindow(frame)
 	if not frame or frame._buiTravel or frame:IsForbidden() then return end
 	frame._buiTravel = true
-	skinnedWindows[#skinnedWindows + 1] = frame
+	skinnedWindows[frame] = true
 	FadeArt(frame)
 	FadeKeys(frame, ART_KEYS)
 	Fade(frame.portrait)
@@ -44,7 +44,7 @@ end
 
 Skin.OnToggle(SKIN_ID, function(enabled)
 	if enabled then
-		for index = 1, #skinnedWindows do skinnedWindows[index]._buiTravel = nil end
+		for frame in pairs(skinnedWindows) do frame._buiTravel = nil end
 		Apply()
 	else
 		context.Restore()

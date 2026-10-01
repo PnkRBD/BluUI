@@ -160,7 +160,7 @@ local function MakeHero(parent)
 		model:SetUnit('player')
 		model:SetFacing(0.35)
 		model:SetAnimation(WAVE_ANIMATION)
-		C_Timer.After(WAVE_SECONDS, function()
+		BUI.Profiler.After('Installer.Installer hero wave', WAVE_SECONDS, function()
 			if host:IsVisible() then model:SetAnimation(0) end
 		end)
 	end
@@ -295,7 +295,7 @@ local function BuildScale(frame)
 		if value < SCALE_MIN then value = SCALE_MIN elseif value > SCALE_MAX then value = SCALE_MAX end
 		BUI.GetDB().uiScale.scale = value
 		BUI.ApplyScale()
-		C_Timer.After(0.05, Refresh)
+		BUI.Profiler.After('Installer.Installer scale refresh', 0.05, Refresh)
 	end
 
 	local pendingScale
@@ -1280,11 +1280,11 @@ local function BuildWizard(onClosed)
 		BUI.Print('Setup closed. Run it anytime with |cff' .. BUI.C.COLOR_PINK .. '/bui install|r.')
 	end
 
-	overlay:HookScript('OnHide', function()
+	overlay:HookScript('OnHide', BUI.Profiler.Wrap('Installer.Installer wizard closed', function()
 		if wizardInstance.suspended then return end
 		wizard = nil
 		if onClosed then onClosed() end
-	end)
+	end))
 
 	return wizardInstance
 end

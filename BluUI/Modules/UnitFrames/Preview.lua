@@ -497,7 +497,7 @@ local function QueueAfterCombat(unitType)
 	if unitType then pendingHides[unitType] = true else pendingHideAll = true end
 	if not regenWatcher then
 		regenWatcher = CreateFrame('Frame')
-		regenWatcher:SetScript('OnEvent', function(self)
+		regenWatcher:SetScript('OnEvent', BUI.Profiler.Wrap('UnitFrames.Preview combat hide', function(self)
 			self:UnregisterAllEvents()
 			local doAll = pendingHideAll
 			pendingHideAll = false
@@ -506,7 +506,7 @@ local function QueueAfterCombat(unitType)
 				pendingHides[unitType] = nil
 				UnitFrames.HidePreview(unitType)
 			end
-		end)
+		end))
 	end
 	regenWatcher:RegisterEvent('PLAYER_REGEN_ENABLED')
 end
@@ -685,7 +685,7 @@ local function ShowEmbeddedCastbar(frame)
 	if container and container ~= frame then container:Show() end
 end
 
-local function OnAnimUpdate(_, elapsed)
+local OnAnimUpdate = BUI.Profiler.Wrap('UnitFrames.Preview test animation', function(_, elapsed)
 	for _, entry in pairs(animEntries) do
 		local frame = entry.frame
 		entry.ht = (entry.ht or 0) + elapsed
@@ -713,7 +713,7 @@ local function OnAnimUpdate(_, elapsed)
 			end
 		end
 	end
-end
+end)
 
 function UnitFrames.ShowAll()
 	if InCombatLockdown() then BUI.Print('Cannot show test mode during combat.') return end

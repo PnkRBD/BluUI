@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.PetBattle')
+
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -93,7 +95,7 @@ local function Install()
 	if installed or not Enabled() then return end
 	if not _G.PetBattleFrame then return end
 	installed = true
-	hooksecurefunc('PetBattleFrame_UpdateActionBarLayout', OnActionBarLayout)
+	Hook('PetBattleFrame_UpdateActionBarLayout', OnActionBarLayout)
 	Apply()
 end
 

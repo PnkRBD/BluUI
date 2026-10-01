@@ -62,7 +62,7 @@ local function OpenWarbandTransfer(currencyID, isRetry)
     if not C_CurrencyInfo.IsAccountCharacterCurrencyDataReady() then
         C_CurrencyInfo.RequestCurrencyDataForAccountCharacters()
         if not isRetry then
-            C_Timer.After(0.5, function() OpenWarbandTransfer(currencyID, true) end)
+            BUI.Profiler.After('CurrencyManager.CurrencyManager transfer retry', 0.5, function() OpenWarbandTransfer(currencyID, true) end)
         end
         return
     end
@@ -73,10 +73,10 @@ local function OpenWarbandTransfer(currencyID, isRetry)
     end
     if not transferMenuHooked then
         transferMenuHooked = true
-        CurrencyTransferMenu:HookScript('OnShow', PositionTransferMenu)
+        CurrencyTransferMenu:HookScript('OnShow', BUI.Profiler.Wrap('CurrencyManager.CurrencyManager transfer menu shown', PositionTransferMenu))
     end
     CurrencyTransferMenu:TriggerEvent(CurrencyTransferMenuMixin.Event.CurrencyTransferRequested, currencyID)
-    C_Timer.After(0, PositionTransferMenu)
+    BUI.Profiler.After('CurrencyManager.CurrencyManager transfer menu position', 0, PositionTransferMenu)
 end
 
 local function ShowRowMenu(row)
@@ -365,7 +365,7 @@ RefreshContent = function()
     panel.emptyText:SetText(searchText ~= '' and 'No matching currencies.' or 'No currencies.')
 end
 
-local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3)
+local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3, 'Currency refresh')
 
 slide = BUI.SlidePanel.New({
     skin = 'currencyManager',
@@ -392,7 +392,7 @@ local function OnCurrencyEvent()
 end
 
 BUI.Events:OnLogin('CurrencyManager', function()
-    CharacterFrame:HookScript('OnHide', function() slide.Close(true) end)
+    CharacterFrame:HookScript('OnHide', BUI.Profiler.Wrap('CurrencyManager.CurrencyManager character hide', function() slide.Close(true) end))
 
     BUI.Events:Register('CURRENCY_DISPLAY_UPDATE', 'CurrencyManager', OnCurrencyEvent)
     BUI.Events:Register('PLAYER_MONEY',            'CurrencyManager', OnCurrencyEvent)

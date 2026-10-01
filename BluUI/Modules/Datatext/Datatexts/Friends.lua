@@ -19,7 +19,7 @@ Datatext.Register('friends', {
         'BN_CONNECTED', 'BN_DISCONNECTED', 'GROUP_ROSTER_UPDATE', 'PLAYER_ENTERING_WORLD' },
     OnActivate = Read,
     OnEvent = function()
-        if Read() then Datatext.Refresh() end
+        if Read() then Datatext.Refresh('friends') end
         Datatext.RefreshOpenSocialPanel()
     end,
     build = function(config, valueHex, self)

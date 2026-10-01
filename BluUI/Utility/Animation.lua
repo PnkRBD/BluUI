@@ -19,7 +19,7 @@ local PropertyHandlers = {
 
 local OnUpdate
 
-OnUpdate = function(self)
+OnUpdate = BUI.Profiler.Wrap('Utility.Animation tick', function(self)
 	local now = GetTime()
 	for frame, properties in pairs(activeAnimations) do
 		local anyActive = false
@@ -49,7 +49,7 @@ OnUpdate = function(self)
 		animationCount = 0
 		self:SetScript('OnUpdate', nil)
 	end
-end
+end)
 
 local function EnsureUpdateFrame()
 	if not updateFrame then updateFrame = CreateFrame('Frame') end

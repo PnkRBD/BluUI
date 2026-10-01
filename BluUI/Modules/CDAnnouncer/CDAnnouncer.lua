@@ -1188,7 +1188,7 @@ local function StartPreview(spellID, mode, duration)
     BUI.Scheduler.SetUpdateEnabled(MODULE_KEY, true)
 
     if previewTimer then previewTimer:Cancel() end
-    previewTimer = C_Timer.NewTimer(lifetime, function()
+    previewTimer = BUI.Profiler.NewTimer('CDAnnouncer.CDAnnouncer preview end', lifetime, function()
         previewActive = false
         previewTimer  = nil
         local current = state[spellID]

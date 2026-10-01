@@ -170,7 +170,7 @@ end
 
 local EndDrag
 
-local function DragUpdate(overlay)
+local DragUpdate = BUI.Profiler.Wrap('ActionBars.Movers drag update', function(overlay)
 	local bar = state.dragging
 	if not bar then
 		overlay:SetScript('OnUpdate', nil)
@@ -191,7 +191,7 @@ local function DragUpdate(overlay)
 	ShowGuides(snapX, snapY)
 	local uiCenterX, uiCenterY = UIParent:GetCenter()
 	overlay.hint:SetText(('%d, %d%s'):format(centerX - uiCenterX, centerY - uiCenterY, (snapX or snapY) and '   snapped' or ''))
-end
+end)
 
 local function BeginDrag(bar, overlay)
 	if InCombatLockdown() or state.dragging then return end
@@ -367,16 +367,16 @@ local function HookEditMode()
 	local manager = EditModeManagerFrame
 	if editModeHooked or not manager then return end
 	editModeHooked = true
-	manager:HookScript('OnShow', function()
+	manager:HookScript('OnShow', BUI.Profiler.Wrap('ActionBars.Movers edit mode show', function()
 		if not BUI.IsModuleEnabled('actionBars') or state.unlocked then return end
 		state.editMode = true
 		ActionBars.SetMoversUnlocked(true)
-	end)
-	manager:HookScript('OnHide', function()
+	end))
+	manager:HookScript('OnHide', BUI.Profiler.Wrap('ActionBars.Movers edit mode hide', function()
 		if not state.editMode then return end
 		state.editMode = false
 		ActionBars.SetMoversUnlocked(false)
-	end)
+	end))
 	if manager:IsShown() and BUI.IsModuleEnabled('actionBars') and not state.unlocked then
 		state.editMode = true
 		ActionBars.SetMoversUnlocked(true)

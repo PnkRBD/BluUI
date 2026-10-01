@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('WorldMap.InstancePins')
+
 local Pixel = BUI.Pixel
 
 BUI.WorldMapInstancePins = {}
@@ -142,10 +144,10 @@ local OnCanvasScaleChanged = BUI.Dispatcher.New(Update, 'WorldMapPins.Rescale')
 
 BUI.Events:OnLogin('WorldMapInstancePins', function()
     if not WorldMapFrame then return end
-    hooksecurefunc(WorldMapFrame, 'OnMapChanged', Update)
-    WorldMapFrame:HookScript('OnShow', Update)
+    Hook(WorldMapFrame, 'OnMapChanged', Update)
+    WorldMapFrame:HookScript('OnShow', BUI.Profiler.Wrap('WorldMap.InstancePins map shown', Update))
     local scroll = WorldMapFrame.ScrollContainer
     if scroll and scroll.SetCanvasScale then
-        hooksecurefunc(scroll, 'SetCanvasScale', OnCanvasScaleChanged)
+        Hook(scroll, 'SetCanvasScale', OnCanvasScaleChanged)
     end
 end)

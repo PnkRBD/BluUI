@@ -26,12 +26,37 @@ local function Colorize(text, minYards, maxYards)
     return color .. text .. '|r'
 end
 
+local bracketTexts, openTexts = {}, {}
+
+local function BracketText(minYards, maxYards)
+    local byMax = bracketTexts[minYards]
+    if not byMax then
+        byMax = {}
+        bracketTexts[minYards] = byMax
+    end
+    local text = byMax[maxYards]
+    if not text then
+        text = Colorize(minYards .. '-' .. maxYards, minYards, maxYards)
+        byMax[maxYards] = text
+    end
+    return text
+end
+
+local function OpenText(minYards)
+    local text = openTexts[minYards]
+    if not text then
+        text = Colorize(minYards .. '+', minYards, nil)
+        openTexts[minYards] = text
+    end
+    return text
+end
+
 function Range.DisplayText(unit)
     if not unit or not UnitExists(unit) then return '' end
     if UnitIsUnit(unit, 'player') then return '' end
     local minYards, maxYards = Range.SpellBracket(unit)
     if minYards == nil then return '' end
-    if maxYards then return Colorize(minYards .. '-' .. maxYards, minYards, maxYards) end
-    if minYards > 0 then return Colorize(minYards .. '+', minYards, nil) end
+    if maxYards then return BracketText(minYards, maxYards) end
+    if minYards > 0 then return OpenText(minYards) end
     return ''
 end

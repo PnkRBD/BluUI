@@ -1,5 +1,8 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.Achievements')
+local Wrap = BUI.Profiler.Wrap
+
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -132,7 +135,7 @@ local function AutoHideScrollBar(scrollBar)
 	if not scrollBar._buiAutoHide then
 		scrollBar._buiAutoHide = true
 		autoHiddenBars[#autoHiddenBars + 1] = scrollBar
-		hooksecurefunc(scrollBar, 'Update', FitScrollBar)
+		Hook(scrollBar, 'Update', FitScrollBar)
 	end
 	FitScrollBar(scrollBar)
 end
@@ -159,9 +162,10 @@ local function BuildMeter(bar, gutter)
 	meter:SetPoint('BOTTOMLEFT', bar, 'BOTTOMLEFT', METER_INSET, METER_INSET)
 	bar._buiMeter = meter
 	bar._buiGutter = gutter
-	bar:HookScript('OnValueChanged', LayoutMeter)
-	bar:HookScript('OnMinMaxChanged', LayoutMeter)
-	bar:HookScript('OnSizeChanged', LayoutMeter)
+	local layout = Wrap('Skin.Achievements meter layout', LayoutMeter)
+	bar:HookScript('OnValueChanged', layout)
+	bar:HookScript('OnMinMaxChanged', layout)
+	bar:HookScript('OnSizeChanged', layout)
 end
 
 local function MeterText(fontString)
@@ -678,7 +682,7 @@ local function Apply()
 end
 
 local function HookMixin(mixin, method, callback)
-	if mixin and mixin[method] then hooksecurefunc(mixin, method, callback) end
+	if mixin and mixin[method] then Hook(mixin, method, callback) end
 end
 
 local function Install()
@@ -686,7 +690,7 @@ local function Install()
 	local frame = _G.AchievementFrame
 	if not frame then return end
 	installed = true
-	frame:HookScript('OnShow', Apply)
+	frame:HookScript('OnShow', Wrap('Skin.Achievements frame reskin', Apply))
 	HookMixin(_G.AchievementCategoryTemplateMixin, 'Init', OnCategoryRow)
 	HookMixin(_G.AchievementCategoryTemplateMixin, 'UpdateSelectionState', OnCategorySelection)
 	HookMixin(_G.AchievementTemplateMixin, 'Init', OnAchievementRow)
@@ -696,10 +700,10 @@ local function Install()
 	HookMixin(_G.AchievementComparisonTemplateMixin, 'Init', OnComparisonRow)
 	HookMixin(_G.AchivementComparisonStatMixin, 'Init', OnStatRow)
 	HookMixin(_G.AchievementFullSearchResultsButtonMixin, 'Init', OnSearchResultRow)
-	hooksecurefunc('AchievementFrameSummary_UpdateAchievements', OnSummaryUpdated)
-	hooksecurefunc('AchievementFrame_UpdateTabs', RefreshTabs)
-	hooksecurefunc('AchievementFrame_RefreshBackButton', RefreshBackButton)
-	hooksecurefunc('AchievementFrame_RefreshView', OnRefreshView)
+	Hook('AchievementFrameSummary_UpdateAchievements', OnSummaryUpdated)
+	Hook('AchievementFrame_UpdateTabs', RefreshTabs)
+	Hook('AchievementFrame_RefreshBackButton', RefreshBackButton)
+	Hook('AchievementFrame_RefreshView', OnRefreshView)
 	if frame:IsShown() then Apply() end
 end
 

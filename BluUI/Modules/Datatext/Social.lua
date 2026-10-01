@@ -696,7 +696,7 @@ local DispatchGuildRefresh = BUI.Dispatcher.NewDelayed(function()
             break
         end
     end
-end, 0.4)
+end, 0.4, 'Guild list refresh')
 
 local function RefreshGuildSoon()
     if not (socialPanel and socialPanel:IsShown() and socialPanel.kind == 'guild') then return end
@@ -707,7 +707,7 @@ local DispatchSocialRefresh = BUI.Dispatcher.NewDelayed(function()
     if not (socialPanel and socialPanel:IsShown()) then return end
     socialPanel.data = (socialPanel.kind == 'guild') and GatherGuild() or GatherFriends()
     RenderSocial()
-end, 0.4)
+end, 0.4, 'Social list refresh')
 
 local function RefreshOpenSocialPanel()
     if not (socialPanel and socialPanel:IsShown()) then return end
@@ -831,12 +831,12 @@ local function BuildSocialPanel()
             panel:FadeOut()
         end
     end
-    panel:SetScript('OnShow', function()
+    panel:SetScript('OnShow', BUI.Profiler.Wrap('Datatext.Social panel shown', function()
         pressedOutside = false
         BUI.Events:Register('GLOBAL_MOUSE_DOWN', 'Datatext.Social', OnGlobalMouse)
         BUI.Events:Register('GLOBAL_MOUSE_UP',   'Datatext.Social', OnGlobalMouse)
-    end)
-    panel:SetScript('OnHide', function() BUI.Events:UnregisterAll('Datatext.Social') end)
+    end))
+    panel:SetScript('OnHide', BUI.Profiler.Wrap('Datatext.Social panel hidden', function() BUI.Events:UnregisterAll('Datatext.Social') end))
 
     socialPanel = panel
 end

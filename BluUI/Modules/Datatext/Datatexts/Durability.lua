@@ -42,7 +42,7 @@ Datatext.Register('durability', {
     OnActivate = Read,
     OnEvent = function()
         Read()
-        Datatext.Refresh()
+        Datatext.Refresh('durability')
     end,
     build = function(config, valueHex, self)
         local percent = math.floor(lowest)

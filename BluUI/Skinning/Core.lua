@@ -1,5 +1,8 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.Core')
+local Wrap = BUI.Profiler.Wrap
+
 BUI.Skinning = {}
 local Skin = BUI.Skinning
 
@@ -331,29 +334,29 @@ function Skin.MakeDraggable(frame, dbKey, point, x, y, follow)
 		local panel = follow and ResolvePanel(follow)
 		if not panel or panel == hookedPanel or not panel.HookScript then return panel end
 		hookedPanel = panel
-		panel:HookScript('OnShow', function()
+		panel:HookScript('OnShow', Wrap('Skin.Core follow panel', function()
 			if frame:IsShown() and WantsHome() then Home() end
-		end)
+		end))
 		return panel
 	end
 
-	frame:HookScript('OnShow', function(self)
+	frame:HookScript('OnShow', Wrap('Skin.Core frame home', function(self)
 		if follow then Skin.ReservePanelSlot(follow, self:GetWidth(), self:GetHeight()) end
 		local panel = WatchPanel()
 		if WantsHome() then Home() end
 		if follow and not (panel and panel:IsShown()) then
-			C_Timer.After(0, function()
+			BUI.Profiler.After('Skin.Core late home', 0, function()
 				local latePanel = WatchPanel()
 				if latePanel and latePanel:IsShown() and self:IsShown() and WantsHome() then Home() end
 			end)
 		end
-	end)
-	frame:HookScript('OnHide', function(self)
+	end))
+	frame:HookScript('OnHide', Wrap('Skin.Core frame reset', function(self)
 		if Skin.PositionMode() == 'reset' then
 			Home()
 			self._buiDragged = false
 		end
-	end)
+	end))
 	Home()
 end
 
@@ -617,8 +620,8 @@ local function EnsureShowcase()
 	Skin.TipFont(hint, 'body', 1.8)
 	hint:SetPoint('TOP', title, 'BOTTOM', 0, -8)
 	hint:SetText('Press Escape to close the showcase')
-	showcase:SetScript('OnHide', function() if showcaseActive then Skin.StopTest() end end)
-	showcase:SetScript('OnUpdate', ShowcaseOnUpdate)
+	showcase:SetScript('OnHide', Wrap('Skin.Core showcase close', function() if showcaseActive then Skin.StopTest() end end))
+	showcase:SetScript('OnUpdate', Wrap('Skin.Core showcase update', ShowcaseOnUpdate))
 	return showcase
 end
 
@@ -645,9 +648,9 @@ end
 local function WatchShowcaseFrame(frame)
 	if frame.__buiShowcaseWatched then return end
 	frame.__buiShowcaseWatched = true
-	frame:HookScript('OnHide', OnShowcaseFrameHidden)
-	hooksecurefunc(frame, 'SetPoint', OnEntrySetPoint)
-	hooksecurefunc(frame, 'StartMoving', OnEntryStartMoving)
+	frame:HookScript('OnHide', Wrap('Skin.Core showcase hidden', OnShowcaseFrameHidden))
+	Hook(frame, 'SetPoint', OnEntrySetPoint)
+	Hook(frame, 'StartMoving', OnEntryStartMoving)
 end
 
 local function RestorePlacement(entry)
@@ -1359,7 +1362,7 @@ function Skin.SideTab(context, tab, options)
 				if options.crop then Skin.CropIcon(icon) end
 				if options.iconWidth then icon:SetSize(options.iconWidth, options.iconHeight or options.iconWidth) end
 				CenterSideTabIcon(icon)
-				hooksecurefunc(icon, 'SetPoint', CenterSideTabIcon)
+				Hook(icon, 'SetPoint', CenterSideTabIcon)
 			end
 		end
 		if tab.IconOverlay then tab.IconOverlay.__buiSkin = true end
@@ -1554,10 +1557,10 @@ end
 local function InstallTabHooks()
 	if tabHooksInstalled then return end
 	tabHooksInstalled = true
-	hooksecurefunc('PanelTemplates_UpdateTabs', OnTabsChanged)
-	hooksecurefunc('PanelTemplates_ShowTab', OnTabsChanged)
-	hooksecurefunc('PanelTemplates_HideTab', OnTabsChanged)
-	hooksecurefunc('PanelTemplates_TabResize', OnTabResized)
+	Hook('PanelTemplates_UpdateTabs', OnTabsChanged)
+	Hook('PanelTemplates_ShowTab', OnTabsChanged)
+	Hook('PanelTemplates_HideTab', OnTabsChanged)
+	Hook('PanelTemplates_TabResize', OnTabResized)
 end
 
 function Skin.RegisterTabStrip(frame, tabs, context)
@@ -1592,8 +1595,8 @@ end
 function Skin.RegisterTabSystem(tabSystem, context, panel)
 	if not tabSystem or tabSystems[tabSystem] then return end
 	tabSystems[tabSystem] = { context = context, panel = panel }
-	hooksecurefunc(tabSystem, 'SetTabVisuallySelected', OnTabSystemChanged)
-	hooksecurefunc(tabSystem, 'Layout', OnTabSystemChanged)
+	Hook(tabSystem, 'SetTabVisuallySelected', OnTabSystemChanged)
+	Hook(tabSystem, 'Layout', OnTabSystemChanged)
 	Skin.RefreshTabSystem(tabSystem)
 end
 
@@ -1679,7 +1682,7 @@ function Skin.SweepScrollBox(scrollBox, callback)
 	if not scrollBox or scrollBox._buiSweep then return end
 	scrollBox._buiSweep = true
 	local function Sweep(box) Skin.ForEachScrollFrame(box, callback) end
-	hooksecurefunc(scrollBox, 'Update', Sweep)
+	Hook(scrollBox, 'Update', Sweep)
 	Sweep(scrollBox)
 end
 
@@ -1726,7 +1729,7 @@ function Skin.TipIconSelector(context, selector)
 	Skin.SweepScrollBox(selector.ScrollBox, Skin.TipIconButton)
 	if selector.UpdateAllSelectedTextures and not selector._buiSelectionHook then
 		selector._buiSelectionHook = true
-		hooksecurefunc(selector, 'UpdateAllSelectedTextures', function(host)
+		Hook(selector, 'UpdateAllSelectedTextures', function(host)
 			if context.enabled() then Skin.SweepIconSelector(host) end
 		end)
 	end

@@ -20,6 +20,7 @@ local running = false
 local built = false
 
 local MIN_VISIBLE = 0.05
+local POLL_INTERVAL = 0.1
 
 local MOUSE_KEY = {
 	LeftButton = 'BUTTON1', RightButton = 'BUTTON2', MiddleButton = 'BUTTON3',
@@ -118,29 +119,39 @@ end
 
 local pollFrame = CreateFrame('Frame')
 pollFrame:Hide()
+local nextPollAt = 0
 
 local function VerifyHeld()
 	local now = GetTime()
+	if now < nextPollAt then return end
+	nextPollAt = now + POLL_INTERVAL
+	local released = false
 	for keyName, pressedAt in pairs(heldKeys) do
 		if now - pressedAt >= MIN_VISIBLE then
 			local mouseIndex = MOUSE_BUTTON_INDEX[keyName]
 			local isDown = mouseIndex and IsMouseButtonDown(mouseIndex) or (not mouseIndex and IsKeyDown(keyName))
-			if not isDown then heldKeys[keyName] = nil end
+			if not isDown then
+				heldKeys[keyName] = nil
+				released = true
+			end
 		end
 	end
-	RefreshPressed()
+	if released then RefreshPressed() end
 	if not next(heldKeys) then pollFrame:Hide() end
 end
 
-pollFrame:SetScript('OnUpdate', VerifyHeld)
+pollFrame:SetScript('OnUpdate', BUI.Profiler.Wrap('ActionBars.KeyPress held poll', VerifyHeld))
 
 local function OnInputDown(keyName)
 	if not running then return end
 	if GetCurrentKeyBoardFocus() then return end
 	if not built then RebuildBindings() end
 	if not bindingsByKey[keyName] then return end
-	heldKeys[keyName] = GetTime()
+	local now = GetTime()
+	heldKeys[keyName] = now
 	RefreshPressed()
+	if pollFrame:IsShown() then return end
+	nextPollAt = now + MIN_VISIBLE
 	pollFrame:Show()
 end
 

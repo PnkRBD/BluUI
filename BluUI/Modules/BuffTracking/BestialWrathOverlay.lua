@@ -81,13 +81,22 @@ local function WantsCue(config, cue)
 end
 
 local iconCache = {}
+local Wake
+
+local OnIconVisibility = BUI.Profiler.Wrap('BuffTracking.BestialWrathOverlay icon visibility', function() Wake() end)
 
 local function IconFor(spellID)
     local CDM = BUI.CDM
     local icon = iconCache[spellID]
+    if icon == false then return nil end
     if icon and CDM.IconMatchesSpell(icon, spellID) then return icon end
     icon = CDM.FindIconForSpell(spellID, true)
-    iconCache[spellID] = icon
+    iconCache[spellID] = icon or false
+    if icon and not icon._buiBWOHooked then
+        icon._buiBWOHooked = true
+        icon:HookScript('OnShow', OnIconVisibility)
+        icon:HookScript('OnHide', OnIconVisibility)
+    end
     return icon
 end
 
@@ -135,6 +144,23 @@ local function CalloutTexts(callout)
     return callout.sendText, callout.holdText, callout.thrashText, callout.holdThrashText
 end
 
+local function SetLayerShown(region, shown)
+    if region._buiShown == shown then return end
+    region._buiShown = shown
+    region:SetShown(shown)
+end
+
+local function SetLayerAlpha(region, alpha)
+    if issecretvalue(alpha) then
+        region._buiAlpha = nil
+    elseif region._buiAlpha == alpha then
+        return
+    else
+        region._buiAlpha = alpha
+    end
+    region:SetAlpha(alpha)
+end
+
 local function StyleCallout(callout, size, anchor, offsetX, offsetY)
     local font = BUI.GetGlobalFont()
     for index = 1, 4 do
@@ -152,28 +178,28 @@ local function SetSendLabel(callout, label)
 end
 
 local function RenderHoldThrash(callout)
-    callout.thrashReadyLayer:Show()
-    callout.thrashReadyLayer:SetAlpha(Evaluate(wtDuration, READY_SOON_CURVE, 1))
-    callout.thrashHoldLayer:SetAlpha(Evaluate(bwDuration, HOLD_THRASH_CURVE, 0))
+    SetLayerShown(callout.thrashReadyLayer, true)
+    SetLayerAlpha(callout.thrashReadyLayer, Evaluate(wtDuration, READY_SOON_CURVE, 1))
+    SetLayerAlpha(callout.thrashHoldLayer, Evaluate(bwDuration, HOLD_THRASH_CURVE, 0))
 end
 
 local function RenderCallout(callout, now, cleaveUp, showHoldThrash)
     if now < thrashPromptUntil then
-        callout.thrashText:Show()
-        callout.readyLayer:Hide()
-        callout.thrashReadyLayer:Hide()
+        SetLayerShown(callout.thrashText, true)
+        SetLayerShown(callout.readyLayer, false)
+        SetLayerShown(callout.thrashReadyLayer, false)
         return
     end
-    callout.thrashText:Hide()
-    callout.readyLayer:Show()
+    SetLayerShown(callout.thrashText, false)
+    SetLayerShown(callout.readyLayer, true)
     SetSendLabel(callout, cleaveUp and 'SEND BW' or 'THRASH FIRST')
-    callout.readyLayer:SetAlpha(Evaluate(bwDuration, READY_SOON_CURVE, 1))
-    callout.sendLayer:SetAlpha(Evaluate(wtDuration, READY_SOON_CURVE, 1))
-    callout.holdLayer:SetAlpha(Evaluate(wtDuration, NOT_READY_CURVE, 0))
+    SetLayerAlpha(callout.readyLayer, Evaluate(bwDuration, READY_SOON_CURVE, 1))
+    SetLayerAlpha(callout.sendLayer, Evaluate(wtDuration, READY_SOON_CURVE, 1))
+    SetLayerAlpha(callout.holdLayer, Evaluate(wtDuration, NOT_READY_CURVE, 0))
     if showHoldThrash then
         RenderHoldThrash(callout)
     else
-        callout.thrashReadyLayer:Hide()
+        SetLayerShown(callout.thrashReadyLayer, false)
     end
 end
 
@@ -188,8 +214,8 @@ local function BuildIconCallouts()
     local thrashRoot = CreateFrame('Frame', nil, UIParent)
     thrashRoot:Hide()
     thrashCallout = NewCallout(thrashRoot, 'HOLD')
-    thrashCallout.readyLayer:Hide()
-    thrashCallout.thrashText:Hide()
+    SetLayerShown(thrashCallout.readyLayer, false)
+    SetLayerShown(thrashCallout.thrashText, false)
 end
 
 local function BuildScreenCallout()
@@ -284,20 +310,20 @@ local previewActive = false
 local previewPhase
 
 local function RenderPreview(callout, phase, withHoldThrash)
-    callout.thrashText:SetShown(phase == 'thrash')
+    SetLayerShown(callout.thrashText, phase == 'thrash')
     local bwPhase = phase == 'hold' or phase == 'send'
-    callout.readyLayer:SetShown(bwPhase)
+    SetLayerShown(callout.readyLayer, bwPhase)
     if bwPhase then
         SetSendLabel(callout, 'SEND BW')
-        callout.readyLayer:SetAlpha(1)
-        callout.sendLayer:SetAlpha(phase == 'send' and 1 or 0)
-        callout.holdLayer:SetAlpha(phase == 'hold' and 1 or 0)
+        SetLayerAlpha(callout.readyLayer, 1)
+        SetLayerAlpha(callout.sendLayer, phase == 'send' and 1 or 0)
+        SetLayerAlpha(callout.holdLayer, phase == 'hold' and 1 or 0)
     end
     local holdThrash = withHoldThrash and phase == 'holdThrash'
-    callout.thrashReadyLayer:SetShown(holdThrash)
+    SetLayerShown(callout.thrashReadyLayer, holdThrash)
     if holdThrash then
-        callout.thrashReadyLayer:SetAlpha(1)
-        callout.thrashHoldLayer:SetAlpha(1)
+        SetLayerAlpha(callout.thrashReadyLayer, 1)
+        SetLayerAlpha(callout.thrashHoldLayer, 1)
     end
 end
 
@@ -366,6 +392,13 @@ local function TickLive(config, now)
     bwDuration, wtDuration = nil, nil
 end
 
+local function Settled(now)
+    if InCombatLockdown() or now < thrashPromptUntil or now < lastThrashAt + BEAST_CLEAVE_SECONDS then return false end
+    return ReadRemaining(BESTIAL_WRATH, now) == 0 and ReadRemaining(WILD_THRASH, now) == 0
+end
+
+local Sleep
+
 local function Tick()
     local config = GetConfig()
     local now = GetTime()
@@ -373,16 +406,47 @@ local function Tick()
         TickPreview(config, now)
     elseif config.enabled and IsActive() then
         TickLive(config, now)
+        if Settled(now) then Sleep() end
     else
         HideAll()
     end
 end
+local TickTimed = BUI.Profiler.Wrap('BuffTracking.BestialWrathOverlay tick', Tick)
 
 local ticker
+local sleeping = false
 
 local function StopTicker()
     if ticker then ticker:Cancel() end
     ticker = nil
+end
+
+local function ClearSleep()
+    if not sleeping then return end
+    sleeping = false
+    BUI.Events:UnregisterAll('BuffTrackingBWO.Sleep')
+end
+
+local function StartTicker()
+    ClearSleep()
+    if not ticker then ticker = C_Timer.NewTicker(TICK_SECONDS, TickTimed) end
+end
+
+Wake = function()
+    if sleeping then StartTicker() end
+end
+
+local function OnSleepCooldown()
+    local now = GetTime()
+    if ReadRemaining(BESTIAL_WRATH, now) ~= 0 or ReadRemaining(WILD_THRASH, now) ~= 0 then Wake() end
+end
+
+Sleep = function()
+    StopTicker()
+    if sleeping then return end
+    sleeping = true
+    BUI.Events:Register('PLAYER_REGEN_DISABLED', 'BuffTrackingBWO.Sleep', Wake)
+    BUI.Events:Register('SPELL_UPDATE_COOLDOWN', 'BuffTrackingBWO.Sleep', OnSleepCooldown)
 end
 
 local function OnSpellCast(_, _, _, spellID)
@@ -394,9 +458,11 @@ local function OnSpellCast(_, _, _, spellID)
             lastCue = 'thrash'
             Speak('thrash')
         end
+        Wake()
     elseif WILD_THRASH_IDS[spellID] then
         lastThrashAt = GetTime()
         thrashPromptUntil = 0
+        Wake()
     end
 end
 
@@ -438,10 +504,11 @@ function BestialWrathOverlay.Refresh()
         if WantsIcon(config) then BuildIconCallouts() end
         if WantsScreen(config) then BuildScreenCallout() end
         StyleAll(config)
-        if not ticker then ticker = C_Timer.NewTicker(TICK_SECONDS, Tick) end
+        StartTicker()
         Tick()
     else
         StopTicker()
+        ClearSleep()
         HideAll()
     end
 end
@@ -461,7 +528,9 @@ function BestialWrathOverlay.IsPreviewing() return previewActive end
 local function Initialize()
     if not GetHunter().PlayerIsHunter then return end
     BUI.CDM.OnTrackedIconsChanged(function(viewerKey)
-        if viewerKey ~= 'buffs' then MarkIconsDirty() end
+        if viewerKey == 'buffs' then return end
+        MarkIconsDirty()
+        Wake()
     end)
     BestialWrathOverlay.Refresh()
 end

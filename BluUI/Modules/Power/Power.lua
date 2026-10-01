@@ -5,9 +5,11 @@ local PrimaryPower = BUI.Power.Primary
 local Pixel = BUI.Pixel
 local ClassPowers = BUI.ClassPowers
 local Shared = BUI.Power.Shared
+local SafeNum = BUI.Tools.SafeNum
 
 local frame, text, barContainer, bar, barText, barTexture
 local lowPowerCurve
+local livePowerType, livePower, liveMax
 
 local function GetDB() return BUI.Power.GetPrimaryDB() end
 local function ShouldShow() local db = GetDB() return db.enabled and db.source ~= "none" and BUI.IsModuleEnabled("power") end
@@ -44,6 +46,7 @@ local function UpdateDisplay()
     local resolvedPowerType = isMana and Enum.PowerType.Mana or powerType
     local currentPower = UnitPower("player", resolvedPowerType)
     local maxPower = UnitPowerMax("player", resolvedPowerType)
+    livePowerType = resolvedPowerType
 
     if db.barMode then
         text:Hide()
@@ -85,6 +88,14 @@ local function UpdateDisplay()
     text:Show()
 end
 
+local function OnLivePower(_, _, powerToken)
+    if powerToken ~= ClassPowers.PowerToken(livePowerType) then return end
+    local current, max = SafeNum(UnitPower("player", livePowerType)), SafeNum(UnitPowerMax("player", livePowerType))
+    if current and max and current == livePower and max == liveMax then return end
+    livePower, liveMax = current, max
+    UpdateDisplay()
+end
+
 local function Position()
     if not frame then return end
     local db = GetDB()
@@ -92,9 +103,14 @@ local function Position()
     BUI.Anchor.ApplyPosition(frame, BUI.Anchor.ModePos(db, not db.barMode))
 end
 
+local styledPowerType, styledAnchorWidth
+
 local function Style()
     if not frame then return end
     local db = GetDB()
+    livePower = nil
+    styledPowerType = ClassPowers.GetPrimaryPowerType()
+    styledAnchorWidth = BUI.Anchor.GetAnchorWidth(frame, db)
     frame:SetFrameStrata(db.barMode and 'LOW' or (db.frameStrata or 'MEDIUM'))
     if frame.textOverlay then frame.textOverlay:SetFrameStrata(db.textStrata or 'MEDIUM') end
     local font = BUI.GetPowerFont()
@@ -173,11 +189,11 @@ local function Build()
     frame:SetFrameStrata("MEDIUM")
     frame:Hide()
     frame:EnableMouse(true)
-    local function NotifyAnchorChange()
+    local NotifyAnchorChange = BUI.Profiler.Wrap("Power.Power anchor notify", function()
         if not BUI.Power.Stack.IsEnabled() then
             BUI.Anchor.OnAnchorSizeChanged()
         end
-    end
+    end)
     frame:HookScript("OnShow", NotifyAnchorChange)
     frame:HookScript("OnHide", NotifyAnchorChange)
 
@@ -195,6 +211,7 @@ local function Build()
     bar:SetValue(0)
 
     bar._predict = BUI.PowerPrediction.Attach(bar, {
+        active = false,
         enabled = function() return GetDB().showPrediction ~= false end,
         powerType = function() return (ClassPowers.GetPrimaryPowerType()) end,
     })
@@ -229,8 +246,13 @@ end
 
 local eventsStarted, opacityStarted = false, false
 local loginSettleArmed = false
+local styledFormID
+local RESTYLE_ONLY_ON_TYPE_CHANGE = { UNIT_DISPLAYPOWER = true, UPDATE_SHAPESHIFT_FORM = true, UPDATE_SHAPESHIFT_FORMS = true }
 
 local function OnStyleEvent(event)
+    local formID = GetShapeshiftFormID()
+    if event == "UPDATE_SHAPESHIFT_FORM" and formID == styledFormID then return end
+    styledFormID = formID
     if event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_SPECIALIZATION_CHANGED" then
         ClassPowers.UpdateSpecID()
     end
@@ -242,7 +264,7 @@ local function OnStyleEvent(event)
             OnStyleEvent("AURA_SETTLE")
         end)
     end
-    Style()
+    if not RESTYLE_ONLY_ON_TYPE_CHANGE[event] or ClassPowers.GetPrimaryPowerType() ~= styledPowerType then Style() end
     UpdateDisplay()
     if frame then
         if not ShouldShow() or ClassPowers.IsPrimaryHiddenForForm() then frame:Hide() else frame:Show() end
@@ -252,9 +274,9 @@ end
 local function StartEvents()
     if eventsStarted then return end
     eventsStarted = true
-    BUI.Events:RegisterUnit("UNIT_MAXPOWER", "player", "Power", function() Style() UpdateDisplay() end)
+    BUI.Events:RegisterUnit("UNIT_MAXPOWER", "player", "Power", UpdateDisplay)
     BUI.Events:RegisterUnit("UNIT_DISPLAYPOWER", "player", "Power", function() OnStyleEvent("UNIT_DISPLAYPOWER") end)
-    BUI.Events:RegisterUnit("UNIT_POWER_FREQUENT", "player", "PowerLive", UpdateDisplay)
+    BUI.Events:RegisterUnit("UNIT_POWER_FREQUENT", "player", "PowerLive", OnLivePower)
     BUI.Events:Register("PLAYER_ENTERING_WORLD", "Power", OnStyleEvent)
     BUI.Events:Register("PLAYER_SPECIALIZATION_CHANGED", "Power", OnStyleEvent)
     BUI.Events:Register("UPDATE_SHAPESHIFT_FORM", "Power", OnStyleEvent)
@@ -285,26 +307,32 @@ end
 local function Shutdown()
     StopEvents()
     StopOpacityEvents()
-    if frame then frame:Hide() end
+    if frame then
+        frame:Hide()
+        BUI.PowerPrediction.SetActive(bar._predict, false)
+    end
 end
 
 local function Activate()
     Build()
     StartEvents()
     StartOpacityEvents()
+    styledFormID = GetShapeshiftFormID()
     Position()
     Style()
     UpdateDisplay()
     UpdateOpacity()
-    BUI.Dragging.SetLocked(frame, GetDB().locked)
+    local db = GetDB()
+    BUI.PowerPrediction.SetActive(bar._predict, db.barMode and db.showPrediction ~= false)
+    BUI.Dragging.SetLocked(frame, db.locked)
     if ClassPowers.IsPrimaryHiddenForForm() then frame:Hide() else frame:Show() end
 end
 
 local function OnAnchorSizeChanged()
-    if Shared.ShouldReanchor(frame, GetDB()) then
-        Position()
-        Style()
-    end
+    local db = GetDB()
+    if not Shared.ShouldReanchor(frame, db) then return end
+    Position()
+    if BUI.Anchor.GetAnchorWidth(frame, db) ~= styledAnchorWidth then Style() end
 end
 
 function PrimaryPower.Initialize()

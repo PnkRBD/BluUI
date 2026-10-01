@@ -1,7 +1,7 @@
 ## Interface: 120100
 ## Title: |cff6D00FDBluUI|r
 ## Author: Blu
-## Version: 4.0.5
+## Version: 5.0.0
 ## Category: BluUI
 ## SavedVariables: BluUI_DB
 ## IconTexture: Interface\AddOns\BluUI\Media\Icon\logo_small
@@ -33,6 +33,7 @@ Data\PlatynatorProfile.lua
 Data\DefaultProfile.lua
 Data\MinimapTiles.lua
 Data\Portals.lua
+Utility\Profiler.lua
 Core\Core.lua
 Core\Startup.lua
 Core\Commands.lua
@@ -77,6 +78,7 @@ Modules\UnitFrames\Core.lua
 Modules\UnitFrames\Tags.lua
 Modules\UnitFrames\Layout.lua
 Modules\UnitFrames\Elements.lua
+Modules\UnitFrames\AbsorbBars.lua
 Modules\UnitFrames\Auras.lua
 Modules\UnitFrames\Preview.lua
 Modules\UnitFrames\Initialize.lua

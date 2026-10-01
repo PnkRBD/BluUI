@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('GroupFrames.BlizzardHide')
+
 local GroupFrames = BUI.GroupFrames
 
 local InCombatLockdown = InCombatLockdown
@@ -71,9 +73,9 @@ local compactHookInstalled = false
 local function installCompactHook()
 	if compactHookInstalled or not _G.CompactUnitFrame_UpdateUnitEvents then return end
 	compactHookInstalled = true
-	hooksecurefunc("CompactUnitFrame_UpdateUnitEvents", stripCompactUnitEvents)
-	hooksecurefunc("CompactUnitFrame_SetUpFrame", markCompactSetup)
-	hooksecurefunc("CompactUnitFrame_SetUnit", silenceCompactUnit)
+	Hook("CompactUnitFrame_UpdateUnitEvents", stripCompactUnitEvents)
+	Hook("CompactUnitFrame_SetUpFrame", markCompactSetup)
+	Hook("CompactUnitFrame_SetUnit", silenceCompactUnit)
 end
 
 local partyHidden = false

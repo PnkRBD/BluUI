@@ -240,10 +240,10 @@ local function EngineCreateAuraElements(frame, unitType)
 	frame.BuffContainer._buiScope = 'unit'
 	auraFrames[#auraFrames + 1] = { frame = frame, unitType = unitType }
 	if unitType == 'targettarget' then
-		frame:HookScript('OnShow', function(shownFrame)
+		frame:HookScript('OnShow', BUI.Profiler.Wrap('UnitFrames.Auras targettarget show', function(shownFrame)
 			BindUnit(shownFrame, true)
 			EnsureEventlessTicker()
-		end)
+		end))
 	end
 end
 
@@ -283,33 +283,35 @@ end
 
 local function PokeFrames(matchTypes, rebind)
 	for _, entry in ipairs(auraFrames) do
-		if matchTypes[entry.unitType] and entry.frame.unit and UnitExists(entry.frame.unit) then
-			BindUnit(entry.frame, rebind)
+		local frame = entry.frame
+		if matchTypes[entry.unitType] and frame:IsEnabled() and frame.unit and UnitExists(frame.unit) then
+			BindUnit(frame, rebind)
 		end
 	end
 end
 
 local eventlessTicker
+local PollEventlessUnits = BUI.Profiler.Wrap('UnitFrames.Auras eventless poll', function()
+	local active = false
+	for _, entry in ipairs(auraFrames) do
+		if entry.unitType == 'targettarget' and entry.frame:IsVisible() then
+			active = true
+			BindUnit(entry.frame)
+		end
+	end
+	if not active and eventlessTicker then
+		eventlessTicker:Cancel()
+		eventlessTicker = nil
+	end
+end)
 function EnsureEventlessTicker()
 	if eventlessTicker then return end
-	local hasTargetOfTarget = false
 	for _, entry in ipairs(auraFrames) do
-		if entry.unitType == 'targettarget' then hasTargetOfTarget = true; break end
+		if entry.unitType == 'targettarget' and entry.frame:IsVisible() then
+			eventlessTicker = C_Timer.NewTicker(0.5, PollEventlessUnits)
+			return
+		end
 	end
-	if not hasTargetOfTarget then return end
-	eventlessTicker = C_Timer.NewTicker(0.5, function()
-		local active = false
-		for _, entry in ipairs(auraFrames) do
-			if entry.unitType == 'targettarget' and entry.frame:IsVisible() then
-				active = true
-				BindUnit(entry.frame)
-			end
-		end
-		if not active and eventlessTicker then
-			eventlessTicker:Cancel()
-			eventlessTicker = nil
-		end
-	end)
 end
 
 if ENGINE_OK then
