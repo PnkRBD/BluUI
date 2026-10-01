@@ -128,7 +128,10 @@ end
 local function FlushAnchorCallbacks(self)
     if self._armTime == GetTime() then return end
     self:Hide()
-    for _, callback in pairs(anchorCallbacks) do callback() end
+    local Profiler = BUI.Profiler
+    for key, callback in pairs(anchorCallbacks) do
+        Profiler.Run(Profiler.Label('Anchor moved', key), callback)
+    end
 end
 
 function Anchor.OnAnchorSizeChanged()
@@ -176,14 +179,14 @@ local function ApplyMouseAnchor(frame, settings)
     frame._isAnchored = true
 
     follower:Show()
-    follower:SetScript("OnUpdate", function(self)
+    follower:SetScript("OnUpdate", BUI.Profiler.Wrap("Utility.Anchors mouse follow", function(self)
         local x, y = GetCursorPosition()
         if x == self._lastX and y == self._lastY then return end
         self._lastX, self._lastY = x, y
         local effectiveScale = UIParent:GetEffectiveScale()
 
         frame:SetPoint(framePoint, UIParent, "BOTTOMLEFT", x / effectiveScale + offsetX, y / effectiveScale + offsetY)
-    end)
+    end))
 end
 
 local MODE_POS_KEYS = {
@@ -192,7 +195,9 @@ local MODE_POS_KEYS = {
     matchAnchorWidth = true, matchAnchorHeight = true,
 }
 local function PrefixedKey(prefix, key) return prefix .. key:sub(1, 1):upper() .. key:sub(2) end
-local function modePosKey(key) return PrefixedKey('text', key) end
+
+local TEXT_POS_KEYS = {}
+for key in pairs(MODE_POS_KEYS) do TEXT_POS_KEYS[key] = PrefixedKey('text', key) end
 
 function Anchor.PrefixedSettings(getDB, prefix)
     local fields = {}
@@ -203,20 +208,27 @@ function Anchor.PrefixedSettings(getDB, prefix)
     })
 end
 
+local modePosProxies = setmetatable({}, { __mode = 'kv' })
+
 function Anchor.ModePos(db, isText)
     if not isText then return db end
-    return setmetatable({}, {
+    local proxy = modePosProxies[db]
+    if proxy then return proxy end
+    proxy = setmetatable({}, {
         __index = function(_, key)
-            if MODE_POS_KEYS[key] then
-                local value = db[modePosKey(key)]
+            local textKey = TEXT_POS_KEYS[key]
+            if textKey then
+                local value = db[textKey]
                 if value ~= nil then return value end
             end
             return db[key]
         end,
         __newindex = function(_, key, value)
-            db[MODE_POS_KEYS[key] and modePosKey(key) or key] = value
+            db[TEXT_POS_KEYS[key] or key] = value
         end,
     })
+    modePosProxies[db] = proxy
+    return proxy
 end
 
 local OFFSET_TOLERANCE = 0.01
@@ -236,7 +248,7 @@ local function PlaceIntent(frame)
     frame:SetPoint(intent.point, intent.relativeTo, intent.relativePoint, intent.placedX, intent.placedY)
 end
 
-local function OnPlacedSizeChanged(frame)
+local OnPlacedSizeChanged = BUI.Profiler.Wrap("Utility.Anchors placed resize", function(frame)
     local intent = frame._pixelIntent
     if not intent or frame:GetNumPoints() ~= 1 then return end
     if InCombatLockdown() and frame:IsProtected() then return end
@@ -247,14 +259,17 @@ local function OnPlacedSizeChanged(frame)
         return
     end
     PlaceIntent(frame)
-end
+end)
 
 function Anchor.PlaceOnPixels(frame, point, relativeTo, relativePoint, x, y)
-    frame._pixelIntent = { point = point, relativeTo = relativeTo, relativePoint = relativePoint, x = x or 0, y = y or 0 }
-    if not frame._pixelHooked then
-        frame._pixelHooked = true
+    local intent = frame._pixelSlot
+    if not intent then
+        intent = {}
+        frame._pixelSlot = intent
         frame:HookScript("OnSizeChanged", OnPlacedSizeChanged)
     end
+    intent.point, intent.relativeTo, intent.relativePoint, intent.x, intent.y = point, relativeTo, relativePoint, x or 0, y or 0
+    frame._pixelIntent = intent
     PlaceIntent(frame)
 end
 

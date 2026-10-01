@@ -11,6 +11,7 @@ local frame, text
 local PointBars = {}
 local BarDisplay
 local chargedScratch = {}
+local liveCurrent, liveMax
 
 local function GetDB() return BUI.Power.GetSecondaryDB() end
 local function GetFont() return BUI.GetSecondaryPowerFont() end
@@ -127,6 +128,7 @@ local Configs = {
     },
     {
         id = "mwStacks", label = "Maelstrom Weapon", classes = { "SHAMAN" }, mode = "point", prefix = "mwStacks", max = 10,
+        trigger = "aura",
         check = ClassPowers.IsEnhancement,
         getValue = function()
             return BUI.Tools.GetAuraStacks('player', 344179) or 0, 10
@@ -378,22 +380,25 @@ local function RefreshRuneState()
     return true
 end
 
-local function PaintRune(pointBar, info, db, colorR, colorG, colorB)
+local function RuneProgress(pointBar, info, now)
+    local remaining = (info.start + info.dur) - now
+    pointBar.bar:SetValue(math.max(0, math.min(1, 1 - remaining / info.dur)))
+    if pointBar.runeText then pointBar.cdText:SetFormattedText("%.1f", math.max(0, remaining)) end
+end
+
+local function PaintRune(pointBar, info, now, db, colorR, colorG, colorB)
+    pointBar.runeReady = info.ready
+    local cdText = pointBar.cdText
     if info.ready then
         pointBar.bar:SetValue(1)
         pointBar.bar:SetStatusBarColor(colorR, colorG, colorB)
-        if pointBar.cdText then pointBar.cdText:Hide() end
+        if cdText then cdText:Hide() end
         return
     end
-    local remaining = (info.start + info.dur) - GetTime()
-    pointBar.bar:SetValue(math.max(0, math.min(1, 1 - remaining / info.dur)))
     pointBar.bar:SetStatusBarColor(db.runeRechargingColorR, db.runeRechargingColorG, db.runeRechargingColorB)
-    if pointBar.cdText and db.showRuneCooldown then
-        pointBar.cdText:SetFormattedText("%.1f", math.max(0, remaining))
-        pointBar.cdText:Show()
-    elseif pointBar.cdText then
-        pointBar.cdText:Hide()
-    end
+    pointBar.runeText = cdText and db.showRuneCooldown
+    if cdText then cdText:SetShown(pointBar.runeText) end
+    RuneProgress(pointBar, info, now)
 end
 
 local function UpdatePointDisplay(config)
@@ -476,7 +481,11 @@ local function UpdatePointDisplay(config)
         end
     end
 
-    if config.id == "runes" and not RefreshRuneState() then return end
+    local runeNow
+    if config.id == "runes" then
+        if not RefreshRuneState() then return end
+        runeNow = GetTime()
+    end
 
     local destroFull, destroFragments
     if IsDestroShard(config) then destroFull, destroFragments = GetDestroShardsRaw() end
@@ -485,8 +494,8 @@ local function UpdatePointDisplay(config)
         if not PointBars[pointIndex] then PointBars[pointIndex] = CreatePointBar(frame, config) end
         local pointBar = PointBars[pointIndex]
 
-        if config.id == "runes" then
-            PaintRune(pointBar, runeOrder[pointIndex], db, colorR, colorG, colorB)
+        if runeNow then
+            PaintRune(pointBar, runeOrder[pointIndex], runeNow, db, colorR, colorG, colorB)
         elseif destroFull then
             local fullShards, fragments = destroFull, destroFragments
             if pointIndex <= fullShards then
@@ -653,14 +662,22 @@ function SecondaryPower.GetResourceColor(config)
     return ResourceColor(config)
 end
 
-local function StylePointBars(config)
-    local db = GetDB()
-    local prefix = config.prefix
+local styledPointMax, styledAnchorWidth
 
+local function PointMax(config)
     local _, max
     if config.getValue then _, max = config.getValue() else max = UnitPowerMax("player", config.power) end
     max = SafeNum(max) or config.max or 1
     if max == 0 then max = config.max or 1 end
+    return max
+end
+
+local function StylePointBars(config)
+    local db = GetDB()
+    local prefix = config.prefix
+
+    local max = PointMax(config)
+    styledPointMax = max
 
     if Setting(prefix, "NumberOnly") then
         HideAllBars()
@@ -730,6 +747,7 @@ local function StylePointBars(config)
         pointBar.bar:SetPoint("TOPLEFT", pointBar.container, "TOPLEFT", edge, -edge)
         pointBar.bar:SetPoint("BOTTOMRIGHT", pointBar.container, "BOTTOMRIGHT", -edge, edge)
         pointBar.bar:SetStatusBarTexture(texture)
+        pointBar.runeReady = nil
 
         if pointBar.cdText then
             Pixel.ApplyFont(pointBar.cdText, db.runeCooldownSize, GetFont())
@@ -870,6 +888,8 @@ local function Style()
     if not text then return end
     local db = GetDB()
     local config = activeConfig
+    liveCurrent = nil
+    styledAnchorWidth = BUI.Anchor.GetAnchorWidth(frame, db)
     if config then
         if config.mode == "point" then StylePointBars(config) else StyleBarDisplay(config) end
     end
@@ -906,11 +926,11 @@ local function Build()
     frame:SetFrameStrata("LOW")
     frame:Hide()
     frame:EnableMouse(true)
-    local function NotifyAnchorChange()
+    local NotifyAnchorChange = BUI.Profiler.Wrap("Power.Secondary anchor notify", function()
         if not BUI.Power.Stack.IsEnabled() then
             BUI.Anchor.OnAnchorSizeChanged()
         end
-    end
+    end)
     frame:HookScript("OnShow", NotifyAnchorChange)
     frame:HookScript("OnHide", NotifyAnchorChange)
 
@@ -945,7 +965,24 @@ end
 
 local lifecycleStarted, powerEventsStarted, tickerRunning, opacityStarted = false, false, false, false
 
+local function ConfigChanged()
+    return GetDisplayConfig() ~= activeConfig
+end
+
+local function OnMaxPower()
+    if activeConfig and activeConfig.mode == "point" and PointMax(activeConfig) ~= styledPointMax then Style() end
+    Update()
+end
+
+local checkedFormID
+
 local function OnLifecycleEvent(event)
+    if event == "UPDATE_SHAPESHIFT_FORM" then
+        local formID = GetShapeshiftFormID()
+        if formID == checkedFormID then return end
+        checkedFormID = formID
+    end
+    if (event == "UPDATE_SHAPESHIFT_FORM" or event == "UPDATE_SHAPESHIFT_FORMS") and not ConfigChanged() then return end
     if event ~= "UPDATE_SHAPESHIFT_FORM" and event ~= "UPDATE_SHAPESHIFT_FORMS" and event ~= "PLAYER_ENTERING_WORLD" then
         editPreviewId = nil
     end
@@ -962,13 +999,15 @@ local function StartLifecycleEvents()
     BUI.Events:Register("UPDATE_SHAPESHIFT_FORM", label, OnLifecycleEvent)
     BUI.Events:Register("UPDATE_SHAPESHIFT_FORMS", label, OnLifecycleEvent)
     BUI.Events:Register("ACTIVE_TALENT_GROUP_CHANGED", label, OnLifecycleEvent)
-    BUI.Events:RegisterUnit("UNIT_DISPLAYPOWER", "player", label, function() SecondaryPower.Apply() end)
+    BUI.Events:RegisterUnit("UNIT_DISPLAYPOWER", "player", label, function()
+        if ConfigChanged() then SecondaryPower.Apply() end
+    end)
 end
 
 local function StartPowerEvents()
     if powerEventsStarted then return end
     powerEventsStarted = true
-    BUI.Events:RegisterUnit("UNIT_MAXPOWER", "player", "SecondaryPower", function() Style(); Update() end)
+    BUI.Events:RegisterUnit("UNIT_MAXPOWER", "player", "SecondaryPower", OnMaxPower)
 end
 
 local function StopPowerEvents()
@@ -985,8 +1024,26 @@ local function StopTicker()
     tickerRunning = false
 end
 
+local function TickRunes()
+    if not RefreshRuneState() then return end
+    local now = GetTime()
+    local db, colorR, colorG, colorB
+    for slot = 1, #runeOrder do
+        local pointBar, info = PointBars[slot], runeOrder[slot]
+        if pointBar.runeReady ~= info.ready then
+            if not db then
+                db = GetDB()
+                colorR, colorG, colorB = ResourceColor(activeConfig)
+            end
+            PaintRune(pointBar, info, now, db, colorR, colorG, colorB)
+        elseif not info.ready then
+            RuneProgress(pointBar, info, now)
+        end
+    end
+end
+
 local function TickerTick()
-    Update()
+    TickRunes()
     if not runesRecharging then StopTicker() end
 end
 
@@ -1013,8 +1070,15 @@ local function OnAuraEvent()
     Update()
 end
 
-local function OnLivePowerEvent()
+local function OnLivePowerEvent(event, _, powerToken)
     if not activeConfig or activeConfig.trigger then return end
+    if event == "UNIT_POWER_FREQUENT" then
+        local power = activeConfig.power
+        if powerToken ~= ClassPowers.PowerToken(power) then return end
+        local current, max = SafeNum(UnitPower("player", power, true)), SafeNum(UnitPowerMax("player", power, true))
+        if current and max and current == liveCurrent and max == liveMax then return end
+        liveCurrent, liveMax = current, max
+    end
     Update()
 end
 
@@ -1066,10 +1130,10 @@ local function Activate()
 end
 
 local function OnAnchorSizeChanged()
-    if Shared.ShouldReanchor(frame, GetDB()) then
-        Position()
-        Style()
-    end
+    local db = GetDB()
+    if not Shared.ShouldReanchor(frame, db) then return end
+    Position()
+    if BUI.Anchor.GetAnchorWidth(frame, db) ~= styledAnchorWidth then Style() end
 end
 
 function SecondaryPower.Initialize()

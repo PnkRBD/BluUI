@@ -37,8 +37,10 @@ function BUI.GetGlobalFont()
 	return sharedMedia:Fetch('font', fontName) or BUI.C.FONT_PATH
 end
 
+local ADDON_FONT = BUI.C.BASE_MEDIA_PATH .. [[Fonts\gotham_narrow_ultra.ttf]]
+
 function BUI.GetAddonFont()
-	return BUI.C.BASE_MEDIA_PATH .. [[Fonts\gotham_narrow_ultra.ttf]]
+	return ADDON_FONT
 end
 
 function BUI.FetchFont(name)

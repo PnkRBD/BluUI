@@ -2,11 +2,42 @@ local _, BUI = ...
 
 local GroupFrames = BUI.GroupFrames
 
+local CreateFrame         = CreateFrame
+local UIParent            = UIParent
+local RegisterStateDriver = RegisterStateDriver
+
 function GroupFrames.ConfigSnippet(width, height)
 	return ([[
 		self:SetWidth(%s)
 		self:SetHeight(%s)
+		UnregisterUnitWatch(self)
+		self:SetAttribute("statehidden", nil)
 	]]):format(BUI.Pixel.Scale(width), BUI.Pixel.Scale(height))
+end
+
+function GroupFrames.SpawnHeader(name, ...)
+	local holder = CreateFrame("Frame", name .. "Holder", UIParent, "SecureFrameTemplate")
+	holder:SetAllPoints()
+	holder:Hide()
+	local header = BUI.oUF:SpawnHeader(name, nil, ...)
+	local level = header:GetFrameLevel()
+	header:SetParent(holder)
+	header:SetFrameLevel(level)
+	header:Show()
+	header._bluHolder = holder
+	return header
+end
+
+function GroupFrames.SetHeaderVisibility(header, condition)
+	local holder = header._bluHolder
+	if holder._bluVisibility == condition then return end
+	holder._bluVisibility = condition
+	RegisterStateDriver(holder, "visibility", condition)
+end
+
+function GroupFrames.SetHeaderAttribute(header, name, value)
+	if header:GetAttribute(name) == value then return end
+	header:SetAttribute(name, value)
 end
 
 function GroupFrames.SettingsForUnit(unit)
@@ -61,13 +92,17 @@ end
 
 function GroupFrames.ForEachHeaderChild(header, callback)
 	if not header then return end
-	local childIndex = 1
-	while true do
-		local child = header:GetAttribute("child" .. childIndex)
-		if not child then return end
-		callback(child)
-		childIndex = childIndex + 1
+	local children = header._bluChildren
+	if not children then
+		children = {}
+		header._bluChildren = children
 	end
+	local newChild = header:GetAttribute("child" .. (#children + 1))
+	while newChild do
+		children[#children + 1] = newChild
+		newChild = header:GetAttribute("child" .. (#children + 1))
+	end
+	for childIndex = 1, #children do callback(children[childIndex]) end
 end
 
 function GroupFrames.EachPartyChild(callback) GroupFrames.ForEachHeaderChild(GroupFrames.headers.party, callback) end
@@ -96,11 +131,12 @@ end
 
 function GroupFrames.PrecreateHeaderChildren(header, wantedCount)
 	if not header or (header._bluPrebuilt or 0) >= wantedCount then return end
-	local wasShown = header:IsShown()
+	local holder = header._bluHolder
+	local wasShown = holder:IsShown()
 	header:SetAttribute("startingIndex", 1 - wantedCount)
-	header:Show()
+	holder:Show()
 	header:SetAttribute("startingIndex", 1)
-	if not wasShown then header:Hide() end
+	if not wasShown then holder:Hide() end
 	if header:GetAttribute("child" .. wantedCount) then
 		header._bluPrebuilt = wantedCount
 	end
@@ -143,11 +179,7 @@ function GroupFrames.RefreshAll(section)
 	GroupFrames.RefreshAuras(section)
 end
 
-local rosterForce = false
-
 local function RosterSweep()
-	local force = rosterForce
-	rosterForce = false
 	if GroupFrames.GetDB().hideBlizzardFrames ~= false then
 		GroupFrames.HideBlizzardParty()
 		GroupFrames.HideBlizzardRaid()
@@ -161,16 +193,19 @@ local function RosterSweep()
 	local inCombat = InCombatLockdown()
 	local IsSecret = GroupFrames.Util.IsSecret
 	GroupFrames.EachChild(function(child)
+		if not child._preview and not child:GetAttribute("unit") then
+			child._bluRosterUnit, child._bluRosterGUID = nil, nil
+			return
+		end
 		local unit = child.unit
 		local guid = unit and UnitGUID(unit) or false
-		if guid and IsSecret(guid) then guid = nil end
+		if guid and IsSecret(guid) then guid = child._bluRosterGUID end
 		local role = unit and UnitGroupRolesAssigned(unit) or ""
 		if IsSecret(role) then role = "" end
-		local changed = force or guid == nil
-			or child._bluRosterGUID ~= guid or child._bluRosterRole ~= role
-		child._bluRosterGUID, child._bluRosterRole = guid, role
+		local changed = child._bluRosterUnit ~= unit or child._bluRosterGUID ~= guid or child._bluRosterRole ~= role
+		child._bluRosterUnit, child._bluRosterGUID, child._bluRosterRole = unit, guid, role
 
-		GroupFrames.FinishChildAuraSetup(child)
+		GroupFrames.QueueChildAuraSetup(child)
 		local settings = GroupFrames.SettingsForFrame(child)
 		if changed then
 			if inCombat then
@@ -185,22 +220,17 @@ local function RosterSweep()
 			end
 			GroupFrames.ApplyTextColors(child, settings)
 			GroupFrames.ApplyPrivateAuras(child)
+			GroupFrames.MarkAurasDirty(child)
 		elseif not child._bluRosterGeom and not inCombat then
 			GroupFrames.ApplyGeometry(child, settings)
 			child._bluRosterGeom = true
 		end
 		GroupFrames.ReflowAuraVisibility(child)
-		GroupFrames.MarkAurasDirty(child)
 		GroupFrames.RepaintPreviewChild(child)
 	end)
 end
 
 local DispatchRosterSweep = BUI.Dispatcher.New(RosterSweep, 'GroupFrames.RosterSweep')
-
-local function QueueRosterSweep(force)
-	if force then rosterForce = true end
-	DispatchRosterSweep()
-end
 
 function GroupFrames.RefreshColors()
 	local db = GroupFrames.GetDB()
@@ -237,19 +267,20 @@ function GroupFrames.Setup()
 		rosterWatcher:RegisterEvent("PARTY_MEMBER_DISABLE")
 		rosterWatcher:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 		rosterWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
-		rosterWatcher:SetScript("OnEvent", function(_, event)
+		rosterWatcher:SetScript("OnEvent", BUI.Profiler.Wrap("GroupFrames.Engine roster event", function(_, event)
 			if event == "PLAYER_REGEN_ENABLED" then
-				BUI.Events:AfterCombatSettled(function() QueueRosterSweep(false) end, "GF.RosterSweep")
+				BUI.Events:AfterCombatSettled(DispatchRosterSweep, "GF.RosterSweep")
 				return
 			end
-			QueueRosterSweep(event == "PLAYER_ENTERING_WORLD")
-		end)
+			DispatchRosterSweep()
+		end))
 		BUI.Tools.OnAuraQueriesUnblocked(function()
 			GroupFrames.PrecreateParty()
 			GroupFrames.PrecreateRaid()
 			GroupFrames.SyncPreviewChildren()
-		end)
+		end, 'Group frame precreate')
 	end
+	GroupFrames.SyncReachabilitySweep()
 end
 
 function GroupFrames.SetFramesEnabled(enabled)
@@ -259,4 +290,5 @@ function GroupFrames.SetFramesEnabled(enabled)
 	end
 	GroupFrames.SetPartyEnabled(enabled)
 	GroupFrames.SetRaidEnabled(enabled)
+	GroupFrames.SyncReachabilitySweep()
 end

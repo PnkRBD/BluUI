@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Wrap = BUI.Profiler.Wrap
+
 local Pixel = BUI.Pixel
 local UnitFrames = BUI.UnitFrames
 local Tools = BUI.Tools
@@ -546,10 +548,10 @@ RegisterDirectTag('combattime', 'combattime', function()
 	return combatTimerText or ''
 end)
 
-local function UpdateRestingTags()
+local UpdateRestingTags = Wrap('UnitFrames.Tags resting', function()
 	restingIndex = restingIndex % #restingFrames + 1
 	UpdateDirectGroup('resting')
-end
+end)
 
 local function StartRestingAnimation()
 	if restingTicker then return end
@@ -589,11 +591,11 @@ do
 	for partyIndex = 1, 4 do GROUP_WATCH_UNITS[#GROUP_WATCH_UNITS + 1] = 'party' .. partyIndex end
 	for raidIndex = 1, 40 do GROUP_WATCH_UNITS[#GROUP_WATCH_UNITS + 1] = 'raid' .. raidIndex end
 
-	local function UpdateCombatTimerTags()
+	local UpdateCombatTimerTags = Wrap('UnitFrames.Tags combat timer', function()
 		if directGroups.combattime.count == 0 then return end
 		combatTimerText = FormatCombatTime(GetTime() - combatStartTime)
 		UpdateDirectGroup('combattime')
-	end
+	end)
 
 	local StopWatchingGroup
 
@@ -648,7 +650,7 @@ do
 	end
 
 	local function OnPlayerLeftCombat()
-		if IsInGroup() and IsGroupInCombat() then
+		if combatTicker and IsInGroup() and IsGroupInCombat() then
 			StartWatchingGroup()
 		else
 			FinalizeStop()

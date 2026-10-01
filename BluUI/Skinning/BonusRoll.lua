@@ -1,5 +1,8 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.BonusRoll')
+local Wrap = BUI.Profiler.Wrap
+
 
 local Skin = BUI.Skinning
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -114,7 +117,7 @@ local function StopHold(button, completed)
 		SetHint(button, 'hidden')
 	elseif wasHolding then
 		SetHint(button, 'warn')
-		C_Timer.After(HINT_WARN_SECONDS, function() RefreshHint(button) end)
+		BUI.Profiler.After('Skin.BonusRoll hint reset', HINT_WARN_SECONDS, function() RefreshHint(button) end)
 	else
 		SetHint(button, 'idle')
 	end
@@ -125,7 +128,7 @@ local function CompleteRoll(button)
 	button:SetEnabled(false)
 end
 
-local function OnHoldUpdate(button, elapsed)
+local OnHoldUpdate = Wrap('Skin.BonusRoll hold update', function(button, elapsed)
 	holdElapsed = holdElapsed + elapsed
 	local remaining = HOLD_SECONDS - holdElapsed
 	local sweep = HoldSweep(button)
@@ -134,7 +137,7 @@ local function OnHoldUpdate(button, elapsed)
 		StopHold(button, true)
 		CompleteRoll(button)
 	end
-end
+end)
 
 local function OnRollMouseDown(button, mouseButton)
 	if mouseButton ~= 'LeftButton' or not button:IsEnabled() or not HoldEnabled() then return end
@@ -192,8 +195,8 @@ local function SkinRollButton(button)
 	button:HookScript('OnMouseDown', OnRollMouseDown)
 	button:HookScript('OnMouseUp', OnRollMouseUp)
 	button:HookScript('OnEnter', OnRollEnter)
-	button:HookScript('OnHide', OnRollHide)
-	button:HookScript('OnShow', RefreshHint)
+	button:HookScript('OnHide', Wrap('Skin.BonusRoll roll hide', OnRollHide))
+	button:HookScript('OnShow', Wrap('Skin.BonusRoll hint refresh', RefreshHint))
 	RefreshHint(button)
 end
 
@@ -235,9 +238,9 @@ local function Deactivate()
 end
 
 local function AnchorHooks(reapply)
-	if _G.UIParent_ManageFramePositions then hooksecurefunc('UIParent_ManageFramePositions', reapply) end
+	if _G.UIParent_ManageFramePositions then Hook('UIParent_ManageFramePositions', reapply) end
 	local alertFrame = _G.AlertFrame
-	if alertFrame and alertFrame.UpdateAnchors then hooksecurefunc(alertFrame, 'UpdateAnchors', reapply) end
+	if alertFrame and alertFrame.UpdateAnchors then Hook(alertFrame, 'UpdateAnchors', reapply) end
 end
 
 Skin.ToastAnchors.Register({

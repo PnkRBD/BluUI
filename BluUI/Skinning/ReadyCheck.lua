@@ -1,5 +1,8 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.ReadyCheck')
+local Wrap = BUI.Profiler.Wrap
+
 local select, max, min, floor = select, math.max, math.min, math.floor
 local GetTime = GetTime
 
@@ -76,7 +79,7 @@ local function StopCountdown()
 	if countdownText then countdownText:SetText('') end
 end
 
-local function CountdownTick()
+local CountdownTick = Wrap('Skin.ReadyCheck countdown tick', function()
 	if not countdownText or not countdownExpiry then
 		StopCountdown()
 		return
@@ -87,7 +90,7 @@ local function CountdownTick()
 		return
 	end
 	BUILib.Skin.SetCountdownText(countdownText, floor(remaining + 0.5), BUILib.Skin.COUNTDOWN_GREEN_COLOR)
-end
+end)
 
 local function StartCountdown(timeLeft)
 	StopCountdown()
@@ -101,7 +104,7 @@ local function EnsureCountdown(listener)
 	if countdownText then return countdownText end
 	countdownText = listener:CreateFontString(nil, 'OVERLAY')
 	countdownText:SetJustifyH('RIGHT')
-	listener:HookScript('OnHide', StopCountdown)
+	listener:HookScript('OnHide', Wrap('Skin.ReadyCheck countdown stop', StopCountdown))
 	return countdownText
 end
 
@@ -180,8 +183,8 @@ local function Apply()
 		if listener.PortraitContainer then listener.PortraitContainer:Hide() end
 		local text = _G.ReadyCheckFrameText
 		if text then
-			hooksecurefunc(text, 'SetText', OnPromptText)
-			hooksecurefunc(text, 'SetFormattedText', OnPromptText)
+			Hook(text, 'SetText', OnPromptText)
+			Hook(text, 'SetFormattedText', OnPromptText)
 		end
 		EnsureCountdown(listener)
 	end
@@ -212,7 +215,7 @@ local function Install()
 	local listener = _G.ReadyCheckListenerFrame
 	if not listener then return end
 	installed = true
-	listener:HookScript('OnShow', Apply)
+	listener:HookScript('OnShow', Wrap('Skin.ReadyCheck prompt reskin', Apply))
 	BUI.Events:Register('READY_CHECK', 'Skin.ReadyCheck', OnReadyCheck)
 	BUI.Events:Register('READY_CHECK_FINISHED', 'Skin.ReadyCheck', StopCountdown)
 	if listener:IsShown() then Apply() end

@@ -77,6 +77,100 @@ local function BuildBackdrop(frame, unit)
 	Pixel.SetTemplate(frame, red, green, blue, alpha, borderColor[1], borderColor[2], borderColor[3], borderColor[4], 1)
 end
 
+local function CatchUpHealth(frame, _, eventUnit)
+	if eventUnit ~= frame.unit and eventUnit ~= frame.realUnit then return end
+	if not frame:IsElementEnabled("Health") then return end
+	local health = frame.Health
+	local dead = (not health._inOffline and UnitIsDeadOrGhost(frame.unit)) and true or false
+	if health._inDead == dead then return end
+	health:ForceUpdate()
+	if frame:IsElementEnabled("AbsorbBars") then frame.AbsorbBars:ForceUpdate() end
+end
+
+local function SyncUnitClass(frame)
+	local class = Util.FrameClass(frame, frame.unit)
+	if frame._bluClass == class then return end
+	frame._bluClass = class
+	GroupFrames.ApplyTextColors(frame, GroupFrames.SettingsForFrame(frame))
+end
+
+local function PaintHealth(self, updatedUnit, offline)
+	local owner = self.__owner
+	local live = not owner._preview and updatedUnit
+	offline = (live and offline) and true or false
+	local deadOrGhost = (live and UnitIsDeadOrGhost(updatedUnit)) and true or false
+	if live then GroupFrames.SyncLifeState(owner, deadOrGhost, offline) end
+	local dead = deadOrGhost and not offline
+	local class = owner._bluClass
+	local dispel = owner._dispelColor
+	local hasDispel = (dispel and dispel.r ~= nil and dispel.g ~= nil and dispel.b ~= nil) and true or false
+	local dispelRed = hasDispel and dispel.r or false
+	local dispelGreen = hasDispel and dispel.g or false
+	local dispelBlue = hasDispel and dispel.b or false
+	local hasSecretValue = hasDispel and (IsSecret(dispelRed) or IsSecret(dispelGreen) or IsSecret(dispelBlue)) or false
+
+	if not hasSecretValue then
+		if self._inOffline == offline and self._inDead == dead and self._inClass == class
+			and self._inDR == dispelRed and self._inDG == dispelGreen and self._inDB == dispelBlue then
+			return
+		end
+		self._inOffline, self._inDead, self._inClass = offline, dead, class
+		self._inDR, self._inDG, self._inDB = dispelRed, dispelGreen, dispelBlue
+	else
+		self._inOffline, self._inDead = nil, dead
+	end
+
+	local ownerSettings = GroupFrames.SettingsForFrame(owner)
+	local deadColor = (dead and ownerSettings.deadBackground) and ownerSettings.deadBackgroundColor or false
+	local tintBar = (hasDispel and ownerSettings.dispelBorder and ownerSettings.dispelBorder.tintBar) and true or false
+	local transparent = ownerSettings.transparentHealth and true or false
+	local alpha = HealthAlphaFor(ownerSettings)
+
+	local backgroundRed, backgroundGreen, backgroundBlue
+	if offline then backgroundRed, backgroundGreen, backgroundBlue = 0.5, 0.5, 0.5
+	else backgroundRed, backgroundGreen, backgroundBlue = PickHealthColor(ownerSettings, updatedUnit, owner) end
+
+	local red, green, blue = backgroundRed, backgroundGreen, backgroundBlue
+	if tintBar and not offline then red, green, blue = dispelRed, dispelGreen, dispelBlue end
+	if deadColor then red, green, blue = deadColor[1], deadColor[2], deadColor[3] end
+
+	if offline then self:SetValue(0) end
+	self:SetStatusBarColor(red, green, blue, deadColor and (deadColor[4] or 1) or alpha)
+
+	local backgroundAlpha = transparent and 0 or 1
+	if deadColor then
+		self.bg:SetVertexColor(deadColor[1], deadColor[2], deadColor[3], transparent and 0 or (deadColor[4] or 1))
+	else
+		self.bg:SetVertexColor(backgroundRed * self.bg.multiplier, backgroundGreen * self.bg.multiplier, backgroundBlue * self.bg.multiplier, backgroundAlpha)
+	end
+
+	local barTexture = self:GetStatusBarTexture()
+	if barTexture then barTexture:SetDesaturated(offline) end
+	if self.Deficit then
+		self.Deficit:SetShown(transparent)
+		local deficitColor = deadColor or ownerSettings.bgColor
+		self.Deficit:SetVertexColor(deficitColor[1], deficitColor[2], deficitColor[3], deficitColor[4] or 1)
+	end
+	GroupFrames.ReflowAuraVisibility(owner)
+end
+
+local function PostUpdateHealthColor(self, updatedUnit)
+	PaintHealth(self, updatedUnit, updatedUnit and not UnitIsConnected(updatedUnit))
+end
+
+local HEALTH_TICK_EVENTS = { UNIT_HEALTH = true, UNIT_MAXHEALTH = true }
+
+local function UpdateHealthColor(frame, event, unit)
+	if not unit or frame.__unit ~= unit then return end
+	local health = frame.Health
+	local offline = health._inOffline
+	if HEALTH_TICK_EVENTS[event] and offline ~= nil then
+		PaintHealth(health, unit, offline)
+	else
+		PostUpdateHealthColor(health, unit)
+	end
+end
+
 local function BuildHealth(frame, unit)
 	local settings  = GroupFrames.SettingsForFrame(frame)
 	local texture = ResolveTexture(settings.statusbarTexture)
@@ -107,73 +201,12 @@ local function BuildHealth(frame, unit)
 	deficit:Hide()
 	healthBar.Deficit = deficit
 
-	healthBar.PostUpdateColor = function(self, updatedUnit)
-		local owner = self.__owner
-		local isPreview = owner and owner._preview
-		local offline = (not isPreview and updatedUnit and not UnitIsConnected(updatedUnit)) and true or false
-		local dead = (not isPreview and updatedUnit and not offline and UnitIsDeadOrGhost(updatedUnit)) and true or false
-		local class = Util.FrameClass(owner, updatedUnit)
-		local dispel = owner and owner._dispelColor
-		local hasDispel = (dispel and dispel.r ~= nil and dispel.g ~= nil and dispel.b ~= nil) and true or false
-		local dispelRed = hasDispel and dispel.r or false
-		local dispelGreen = hasDispel and dispel.g or false
-		local dispelBlue = hasDispel and dispel.b or false
-		local hasSecretValue = hasDispel and (IsSecret(dispelRed) or IsSecret(dispelGreen) or IsSecret(dispelBlue)) or false
-
-		if not hasSecretValue then
-			if self._inOffline == offline and self._inDead == dead and self._inClass == class
-				and self._inDR == dispelRed and self._inDG == dispelGreen and self._inDB == dispelBlue then
-				return
-			end
-			self._inOffline, self._inDead, self._inClass = offline, dead, class
-			self._inDR, self._inDG, self._inDB = dispelRed, dispelGreen, dispelBlue
-		else
-			self._inOffline = nil
-		end
-
-		local ownerSettings = GroupFrames.SettingsForFrame(owner)
-		local deadColor = (dead and ownerSettings.deadBackground) and ownerSettings.deadBackgroundColor or false
-		local tintBar = (hasDispel and ownerSettings.dispelBorder and ownerSettings.dispelBorder.tintBar) and true or false
-		local transparent = ownerSettings.transparentHealth and true or false
-		local alpha = HealthAlphaFor(ownerSettings)
-
-		local backgroundRed, backgroundGreen, backgroundBlue
-		if offline then backgroundRed, backgroundGreen, backgroundBlue = 0.5, 0.5, 0.5
-		else backgroundRed, backgroundGreen, backgroundBlue = PickHealthColor(ownerSettings, updatedUnit, owner) end
-
-		local red, green, blue = backgroundRed, backgroundGreen, backgroundBlue
-		if tintBar and not offline then red, green, blue = dispelRed, dispelGreen, dispelBlue end
-		if deadColor then red, green, blue = deadColor[1], deadColor[2], deadColor[3] end
-
-		if offline then self:SetValue(0) end
-		self:SetStatusBarColor(red, green, blue, deadColor and (deadColor[4] or 1) or alpha)
-
-		local backgroundAlpha = transparent and 0 or 1
-		if deadColor then
-			self.bg:SetVertexColor(deadColor[1], deadColor[2], deadColor[3], transparent and 0 or (deadColor[4] or 1))
-		else
-			self.bg:SetVertexColor(backgroundRed * self.bg.multiplier, backgroundGreen * self.bg.multiplier, backgroundBlue * self.bg.multiplier, backgroundAlpha)
-		end
-
-		local barTexture = self:GetStatusBarTexture()
-		if barTexture then barTexture:SetDesaturated(offline) end
-		if self.Deficit then
-			self.Deficit:SetShown(transparent)
-			local deficitColor = deadColor or ownerSettings.bgColor
-			self.Deficit:SetVertexColor(deficitColor[1], deficitColor[2], deficitColor[3], deficitColor[4] or 1)
-		end
-		GroupFrames.ReflowAuraVisibility(owner)
-	end
-
-	healthBar.PostUpdate = function(self, updatedUnit)
-		local owner = self.__owner
-		local class = Util.FrameClass(owner, updatedUnit)
-		if owner._txtClass == class then return end
-		owner._txtClass = class
-		GroupFrames.ApplyTextColors(owner, GroupFrames.SettingsForFrame(owner))
-	end
+	healthBar.PostUpdateColor = PostUpdateHealthColor
+	healthBar.UpdateColor = UpdateHealthColor
 
 	frame.Health = healthBar
+	frame:RegisterEvent("UNIT_FLAGS", CatchUpHealth)
+	frame:RegisterEvent("PLAYER_FLAGS_CHANGED", CatchUpHealth, true)
 end
 
 local function AnchorAbsorb(absorb, health, direction)
@@ -241,8 +274,6 @@ local function BuildAbsorb(frame, unit)
 	GroupFrames.ApplyAbsorbVisual(absorb, absorbSettings)
 	AnchorAbsorb(absorb, frame.Health, absorbSettings.direction)
 
-	frame.Health.DamageAbsorb = absorb
-	frame.Health.damageAbsorbClampMode = Enum.UnitDamageAbsorbClampMode and Enum.UnitDamageAbsorbClampMode.MaximumHealth
 	frame.Absorb = absorb
 
 	local healAbsorb = CreateFrame("StatusBar", nil, clip)
@@ -250,31 +281,24 @@ local function BuildAbsorb(frame, unit)
 	GroupFrames.ApplyAbsorbVisual(healAbsorb, settings.healAbsorb)
 	AnchorAbsorb(healAbsorb, frame.Health, settings.healAbsorb.direction)
 
-	frame.Health.healAbsorbClampMode = Enum.UnitHealAbsorbClampMode and Enum.UnitHealAbsorbClampMode.MaximumHealth
+	healAbsorb:SetShown(settings.healAbsorb.enabled ~= false)
 	frame.HealAbsorb = healAbsorb
-	if settings.healAbsorb.enabled ~= false then
-		frame.Health.HealAbsorb = healAbsorb
-	else
-		healAbsorb:Hide()
-	end
+	frame.AbsorbBars = { Damage = absorb, Heal = healAbsorb }
 end
 
 function GroupFrames.ApplyAbsorbToChild(child, settings)
-	if not child.Absorb then return end
-	local absorbSettings = settings.absorb
+	local bars = child.AbsorbBars
+	if not bars then return end
+	local absorbSettings, healSettings = settings.absorb, settings.healAbsorb
 	GroupFrames.ApplyAbsorbVisual(child.Absorb, absorbSettings)
 	AnchorAbsorb(child.Absorb, child.Health, absorbSettings.direction)
 	child.Absorb:SetShown(absorbSettings.enabled)
-	if child.HealAbsorb then
-		GroupFrames.ApplyAbsorbVisual(child.HealAbsorb, settings.healAbsorb)
-		AnchorAbsorb(child.HealAbsorb, child.Health, settings.healAbsorb.direction)
-		if settings.healAbsorb.enabled ~= false then
-			child.Health.HealAbsorb = child.HealAbsorb
-		else
-			child.Health.HealAbsorb = nil
-			child.HealAbsorb:Hide()
-		end
-	end
+
+	GroupFrames.ApplyAbsorbVisual(child.HealAbsorb, healSettings)
+	AnchorAbsorb(child.HealAbsorb, child.Health, healSettings.direction)
+	child.HealAbsorb:SetShown(healSettings.enabled ~= false)
+
+	if child.unit and child:IsElementEnabled("AbsorbBars") then bars:ForceUpdate() end
 end
 
 local function PowerRoleAllowed(healerOnly, frame)
@@ -315,11 +339,25 @@ end
 GroupFrames.ApplyTextSettings = ApplyText
 GroupFrames.ResolveFont = ResolveFont
 
-local function ReTag(frame, fontString, tag)
-	if not fontString then return end
+local function ReTag(frame, fontString, tag, shown)
 	frame:Untag(fontString)
-	if frame._preview then return end
+	if frame._preview or not shown then return end
 	frame:Tag(fontString, tag)
+end
+
+local function PowerTextShown(settings, frame)
+	return settings.showPwrText and PowerRoleAllowed(settings.healerOnlyPower, frame)
+end
+
+local function SyncPowerTag(frame, shown)
+	local powerText = frame.PowerText
+	if shown and not frame._preview then
+		if powerText.UpdateTag then return end
+		frame:Tag(powerText, GroupFrames.SettingsForFrame(frame).pwrText.format)
+		if UnitExists(frame.unit) then powerText:UpdateTag() end
+	elseif powerText.UpdateTag then
+		frame:Untag(powerText)
+	end
 end
 
 local function ApplyTextColor(fontString, useClass, customColor, unit, frame)
@@ -351,7 +389,7 @@ function GroupFrames.ReTagHp(child, settings)
 	local hpText = child.HpText
 	if not hpText then return end
 	local format = settings.hpText.format
-	if GroupFrames.IsDirectHpFormat(format) then
+	if settings.showHpText and GroupFrames.IsDirectHpFormat(format) then
 		child:Untag(hpText)
 		if child._preview then return end
 		if not child:IsElementEnabled("BluHpTextDirect") then
@@ -363,7 +401,7 @@ function GroupFrames.ReTagHp(child, settings)
 	if child:IsElementEnabled("BluHpTextDirect") then
 		child:DisableElement("BluHpTextDirect")
 	end
-	ReTag(child, hpText, InjectAbsorbColor(format, settings.absorbColor))
+	ReTag(child, hpText, InjectAbsorbColor(format, settings.absorbColor), settings.showHpText)
 end
 
 function GroupFrames.ApplyTextToChild(child, settings)
@@ -371,7 +409,7 @@ function GroupFrames.ApplyTextToChild(child, settings)
 
 	if child.NameText then
 		ApplyText(child.NameText, child.Health, settings.name, fontFile)
-		ReTag(child, child.NameText, NAME_TAG)
+		ReTag(child, child.NameText, NAME_TAG, settings.showName)
 		child.NameText:SetShown(settings.showName)
 	end
 	if child.HpText then
@@ -381,13 +419,14 @@ function GroupFrames.ApplyTextToChild(child, settings)
 	end
 	if child.StatusText then
 		ApplyText(child.StatusText, child.Health, settings.statusText, fontFile)
-		ReTag(child, child.StatusText, STATUS_TAG)
+		ReTag(child, child.StatusText, STATUS_TAG, settings.showStatusText)
 		child.StatusText:SetShown(settings.showStatusText)
 	end
 	if child.PowerText then
+		local shown = PowerTextShown(settings, child)
 		ApplyText(child.PowerText, child, settings.pwrText, fontFile)
-		ReTag(child, child.PowerText, settings.pwrText.format)
-		child.PowerText:SetShown(settings.showPwrText and PowerRoleAllowed(settings.healerOnlyPower, child))
+		ReTag(child, child.PowerText, settings.pwrText.format, shown)
+		child.PowerText:SetShown(shown)
 	end
 
 	GroupFrames.ApplyTextColors(child, settings)
@@ -405,25 +444,24 @@ local function BuildText(frame, unit)
 	local name = textLayer:CreateFontString(nil, "OVERLAY")
 	ApplyText(name, frame.Health, settings.name, fontFile)
 	frame.NameText = name
-	frame:Tag(name, NAME_TAG)
+	if settings.showName then frame:Tag(name, NAME_TAG) end
 
 	local hpText = textLayer:CreateFontString(nil, "OVERLAY")
 	ApplyText(hpText, frame.Health, settings.hpText, fontFile)
 	frame.HpText = hpText
 	frame.HpTextDirect = hpText
-	if not GroupFrames.IsDirectHpFormat(settings.hpText.format) then
+	if settings.showHpText and not GroupFrames.IsDirectHpFormat(settings.hpText.format) then
 		frame:Tag(hpText, InjectAbsorbColor(settings.hpText.format, settings.absorbColor))
 	end
 
 	local statusText = textLayer:CreateFontString(nil, "OVERLAY")
 	ApplyText(statusText, frame.Health, settings.statusText, fontFile)
 	frame.StatusText = statusText
-	frame:Tag(statusText, STATUS_TAG)
+	if settings.showStatusText then frame:Tag(statusText, STATUS_TAG) end
 
 	local pwrText = textLayer:CreateFontString(nil, "OVERLAY")
 	ApplyText(pwrText, frame, settings.pwrText, fontFile)
 	frame.PowerText = pwrText
-	frame:Tag(pwrText, settings.pwrText.format)
 
 	GroupFrames.ApplyTextColors(frame, settings)
 
@@ -477,7 +515,9 @@ function GroupFrames.ApplyGeometry(frame, settings)
 	end
 
 	if frame.PowerText then
-		frame.PowerText:SetShown(settings.showPwrText and PowerRoleAllowed(settings.healerOnlyPower, frame))
+		local shown = PowerTextShown(settings, frame)
+		SyncPowerTag(frame, shown)
+		frame.PowerText:SetShown(shown)
 	end
 	if frame.NameText then frame.NameText:SetShown(settings.showName)  end
 	if frame.HpText   then frame.HpText:SetShown(settings.showHpText) end
@@ -591,11 +631,11 @@ local function HookTooltip(frame)
 end
 
 local function GroupFrameStyle(frame, unit)
-	C_Timer.After(0, function() ApplySecureClicks(frame) end)
-	frame:HookScript("OnShow", function(self)
+	BUI.Profiler.After("GroupFrames.Style secure clicks", 0, function() ApplySecureClicks(frame) end)
+	frame:HookScript("OnShow", BUI.Profiler.Wrap("GroupFrames.Style show clicks", function(self)
 		if self._bluClicksMode == GroupFrames.GetDB().clickMode and self:GetFrameStrata() == "LOW" then return end
-		C_Timer.After(0, function() ApplySecureClicks(self) end)
-	end)
+		BUI.Profiler.After("GroupFrames.Style secure clicks", 0, function() ApplySecureClicks(self) end)
+	end))
 
 	HookTooltip(frame)
 
@@ -610,15 +650,26 @@ local function GroupFrameStyle(frame, unit)
 	GroupFrames.BuildKeystone(frame, unit)
 
 	GroupFrames.ApplyGeometry(frame, GroupFrames.SettingsForFrame(frame))
-	if frame:GetAttribute("unit") then
-		GroupFrames.BuildAuraContainers(frame, unit)
-		GroupFrames.AttachReachabilityHooks(frame)
-	else
-		frame:HookScript("OnAttributeChanged", function(self, name, value)
-			if name ~= "unit" or not value or self._auraWatcher then return end
-			C_Timer.After(0, function() GroupFrames.FinishChildAuraSetup(self) end)
-		end)
-	end
+	frame.PreUpdate = SyncUnitClass
 end
 
 GroupFrames.Style = GroupFrameStyle
+
+local UnitChanged = BUI.Profiler.Wrap("GroupFrames.Style unit change", function(frame, unit)
+	if unit then
+		SyncUnitClass(frame)
+		PostUpdateHealthColor(frame.Health, frame.unit)
+	end
+	GroupFrames.RebindAuraUnit(frame, unit)
+	GroupFrames.RebindPrivateAuras(frame, unit)
+end)
+
+local function OnAttributeChanged(frame, name, value)
+	if name ~= "unit" then return end
+	UnitChanged(frame, value)
+end
+
+BUI.oUF:RegisterInitCallback(function(frame)
+	if frame.style ~= GroupFrames.STYLE_NAME then return end
+	frame:HookScript("OnAttributeChanged", OnAttributeChanged)
+end)

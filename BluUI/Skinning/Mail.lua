@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.Mail')
+
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -261,11 +263,11 @@ local function Install()
 	local frame = _G.MailFrame
 	if not frame then return end
 	installed = true
-	frame:HookScript('OnShow', Apply)
-	_G.OpenMailFrame:HookScript('OnShow', Apply)
-	hooksecurefunc('InboxFrame_Update', OnInboxUpdated)
-	hooksecurefunc('OpenMail_Update', OnOpenMailUpdated)
-	hooksecurefunc('SendMailFrame_Update', OnSendMailUpdated)
+	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Mail frame reskin', Apply))
+	_G.OpenMailFrame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Mail letter reskin', Apply))
+	Hook('InboxFrame_Update', OnInboxUpdated)
+	Hook('OpenMail_Update', OnOpenMailUpdated)
+	Hook('SendMailFrame_Update', OnSendMailUpdated)
 	if frame:IsShown() then Apply() end
 end
 

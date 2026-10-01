@@ -4,7 +4,14 @@ local PowerPrediction = {}
 BUI.PowerPrediction = PowerPrediction
 
 local instances = {}
+local instanceForBar = {}
 local listenersStarted = false
+
+local CAST_EVENTS = {
+    'UNIT_SPELLCAST_START', 'UNIT_SPELLCAST_STOP', 'UNIT_SPELLCAST_FAILED', 'UNIT_SPELLCAST_SUCCEEDED',
+    'UNIT_SPELLCAST_INTERRUPTED', 'UNIT_SPELLCAST_CHANNEL_START', 'UNIT_SPELLCAST_CHANNEL_STOP',
+    'UNIT_SPELLCAST_DELAYED', 'UNIT_SPELLCAST_CHANNEL_UPDATE',
+}
 
 local function ApplyAnchors(instance)
     local predict = instance.bar
@@ -13,6 +20,7 @@ local function ApplyAnchors(instance)
     predict:SetPoint('TOP',    parent, 'TOP',    0, 0)
     predict:SetPoint('BOTTOM', parent, 'BOTTOM', 0, 0)
     local parentTexture = parent:GetStatusBarTexture()
+    instance.anchorTexture = parentTexture
     if parentTexture then
         predict:SetPoint('RIGHT', parentTexture, 'RIGHT')
     else
@@ -37,7 +45,7 @@ local function UpdateInstance(instance)
     local enabled = not instance.enabled or instance.enabled()
     if not enabled then instance.bar:Hide(); return end
 
-    ApplyAnchors(instance)
+    if instance.anchorTexture ~= instance.parent:GetStatusBarTexture() then ApplyAnchors(instance) end
 
     local _, _, _, _, _, _, _, _, spellID = UnitCastingInfo('player')
     if not spellID then
@@ -71,26 +79,41 @@ local function UpdateInstance(instance)
 end
 
 local function UpdateAll()
-    for _, instance in ipairs(instances) do UpdateInstance(instance) end
+    for _, instance in ipairs(instances) do
+        if instance.active then UpdateInstance(instance) end
+    end
 end
 
-local function StartListeners()
-    if listenersStarted then return end
-    listenersStarted = true
-    BUI.Events:RegisterUnit('UNIT_SPELLCAST_START',         'player', 'PowerPredict', UpdateAll)
-    BUI.Events:RegisterUnit('UNIT_SPELLCAST_STOP',          'player', 'PowerPredict', UpdateAll)
-    BUI.Events:RegisterUnit('UNIT_SPELLCAST_FAILED',        'player', 'PowerPredict', UpdateAll)
-    BUI.Events:RegisterUnit('UNIT_SPELLCAST_SUCCEEDED',     'player', 'PowerPredict', UpdateAll)
-    BUI.Events:RegisterUnit('UNIT_SPELLCAST_INTERRUPTED',   'player', 'PowerPredict', UpdateAll)
-    BUI.Events:RegisterUnit('UNIT_SPELLCAST_CHANNEL_START', 'player', 'PowerPredict', UpdateAll)
-    BUI.Events:RegisterUnit('UNIT_SPELLCAST_CHANNEL_STOP',  'player', 'PowerPredict', UpdateAll)
-    BUI.Events:RegisterUnit('UNIT_SPELLCAST_DELAYED',       'player', 'PowerPredict', UpdateAll)
-    BUI.Events:RegisterUnit('UNIT_SPELLCAST_CHANNEL_UPDATE','player', 'PowerPredict', UpdateAll)
+local function SyncListeners()
+    local wanted = false
+    for _, instance in ipairs(instances) do
+        if instance.active then
+            wanted = true
+            break
+        end
+    end
+    if wanted == listenersStarted then return end
+    listenersStarted = wanted
+    if not wanted then
+        BUI.Events:UnregisterAll('PowerPredict')
+        return
+    end
+    for _, event in ipairs(CAST_EVENTS) do
+        BUI.Events:RegisterUnit(event, 'player', 'PowerPredict', UpdateAll)
+    end
+end
+
+function PowerPrediction.SetActive(predict, active)
+    local instance = instanceForBar[predict]
+    active = active and true or false
+    if instance.active == active then return end
+    instance.active = active
+    if not active then predict:Hide() end
+    SyncListeners()
 end
 
 function PowerPrediction.Attach(parentBar, options)
     options = options or {}
-    StartListeners()
 
     local predict = CreateFrame('StatusBar', nil, parentBar)
     predict:SetReverseFill(true)
@@ -105,12 +128,15 @@ function PowerPrediction.Attach(parentBar, options)
         optsTexture = options.texture,
         enabled     = options.enabled,
         powerType   = options.powerType,
+        active      = options.active ~= false,
     }
     instances[#instances + 1] = instance
+    instanceForBar[predict] = instance
+    SyncListeners()
 
     ApplyAnchors(instance)
 
-    parentBar:HookScript('OnSizeChanged', function() ApplyAnchors(instance) end)
+    parentBar:HookScript('OnSizeChanged', BUI.Profiler.Wrap('Utility.PowerPrediction bar resized', function() ApplyAnchors(instance) end))
 
     return predict
 end

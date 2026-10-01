@@ -267,6 +267,43 @@ local function PlaceCentered(frame, x, y)
 	BUI.Anchor.SetCentered(frame, x, y)
 end
 
+local ANCHOR_LAYOUT_FIELDS = {
+	'_topEdgeOffset', '_bottomEdgeOffset', '_row1CenterOffsetX', '_topRowCenterOffsetX', '_bottomRowCenterOffsetX',
+	'_topRowCenterOffsetY', '_topRowW', '_bottomRowW', '_row1W', '_layoutW', '_castbarIconWidth', '_cachedScaledH',
+}
+local ANCHOR_GEOMETRY_SLOTS = #ANCHOR_LAYOUT_FIELDS + 5
+local ANCHOR_EXTRA_SLOT = ANCHOR_GEOMETRY_SLOTS + 1
+local anchorProbe = {}
+
+function UnitFrames.AnchorGeometryChanged(holder, target, extra)
+	anchorProbe[1] = target
+	if target then
+		anchorProbe[2], anchorProbe[3] = target:GetLeft(), target:GetBottom()
+		anchorProbe[4], anchorProbe[5] = target:GetSize()
+		for fieldIndex = 1, #ANCHOR_LAYOUT_FIELDS do
+			anchorProbe[fieldIndex + 5] = target[ANCHOR_LAYOUT_FIELDS[fieldIndex]]
+		end
+	else
+		for slot = 2, ANCHOR_GEOMETRY_SLOTS do anchorProbe[slot] = nil end
+	end
+	anchorProbe[ANCHOR_EXTRA_SLOT] = extra
+
+	local signature = holder._anchorSignature
+	if not signature then
+		signature = {}
+		holder._anchorSignature = signature
+	end
+	local changed = false
+	for slot = 1, ANCHOR_EXTRA_SLOT do
+		local value = anchorProbe[slot]
+		if signature[slot] ~= value then
+			signature[slot] = value
+			changed = true
+		end
+	end
+	return changed
+end
+
 function UnitFrames.ApplyPosition(frame, unitType, index)
 	local unitSettings = UnitFrames.GetUnitSettings(unitType)
 
@@ -274,6 +311,7 @@ function UnitFrames.ApplyPosition(frame, unitType, index)
 	   or unitType == 'player' or unitType == 'target' then
 		local anchorFrameName = unitSettings.anchorFrame
 		local anchorTarget = BUI.ResolveAnchorFrame(anchorFrameName)
+		UnitFrames.AnchorGeometryChanged(frame, anchorTarget, BUI.Anchor.GetAnchorHeight(unitSettings))
 		if anchorTarget then
 			local anchorSettings = {
 				anchorFrame = anchorFrameName,
@@ -374,6 +412,7 @@ end
 
 do
 	local GetDebuffDataByIndex = C_UnitAuras.GetDebuffDataByIndex
+	local Engine = BUI.AuraEngine
 
 	local DISPEL_BADGE_ATLAS = {
 		Magic   = 'RaidFrame-Icon-DebuffMagic',
@@ -443,7 +482,7 @@ do
 		return list
 	end
 
-	local selfCleanseTypes, selfCleanseSignature = {}, nil
+	local selfCleanseTypes, selfCleanseSignature, selfCleanseKeys = {}, nil, ''
 	function GetSelfCleanseTypes()
 		local signature = (C_SpellBook.IsSpellKnown(EMERGENCY_SALVE_SPELL_ID) and 1 or 0) + (C_SpellBook.IsSpellKnown(457574) and 2 or 0)
 		if signature ~= selfCleanseSignature then
@@ -452,8 +491,9 @@ do
 			for _, callout in ipairs(BuildCleanseCallouts()) do
 				for _, dispelType in ipairs(callout.types) do selfCleanseTypes[dispelType] = true end
 			end
+			selfCleanseKeys = Engine.SortedKeys(selfCleanseTypes)
 		end
-		return selfCleanseTypes
+		return selfCleanseTypes, selfCleanseKeys
 	end
 
 	local function IsCleanseReady(spellID)
@@ -466,11 +506,10 @@ do
 		return not active
 	end
 
-	local Engine = BUI.AuraEngine
 	UnitFrames.DispelViaEngine = Engine.Available and true or false
 
 	local HL_TYPES = { 'Magic', 'Curse', 'Disease', 'Poison', 'Bleed' }
-	local TYPE_ICON_SIZE, TYPE_ICON_GAP = 28, 6
+	local TYPE_ICON_GAP = 6
 	function UnitFrames.DispelTypeColor(typeName)
 		return Engine.DispelColorRGB(typeName)
 	end
@@ -591,39 +630,47 @@ do
 		end
 	end
 
-	local function TypeRowFingerprint(unitSettings)
-		local covered = ''
-		if unitSettings.debuffHighlightClassFilter ~= false then
-			covered = Engine.SortedKeys(GetSelfCleanseTypes())
-		end
+	local HIGHLIGHT_SETTING_INPUTS = 10
+	local HIGHLIGHT_INPUT_COUNT = HIGHLIGHT_SETTING_INPUTS + #HL_TYPES * 3
+	local highlightInputs = {}
+
+	local function GatherHighlightInputs(unitSettings)
 		local settings = UnitFrames.GetSettings()
-		local parts = {
-			unitSettings.debuffHighlightClassFilter ~= false and 1 or 0,
-			unitSettings.debuffHighlightBadgeSize,
-			unitSettings.debuffHighlightBadgeOffsetX,
-			unitSettings.debuffHighlightBadgeOffsetY,
-			settings.dispelRecolor and 1 or 0,
-			settings.dispelBlend and 1 or 0,
-			settings.dispelOpacity,
-			unitSettings.debuffHighlightBorder and 1 or 0,
-			unitSettings.debuffHighlightBar and 1 or 0,
-			covered,
-		}
+		local classFilter = unitSettings.debuffHighlightClassFilter ~= false
+		highlightInputs[1] = classFilter
+		highlightInputs[2] = unitSettings.debuffHighlightBadgeSize
+		highlightInputs[3] = unitSettings.debuffHighlightBadgeOffsetX
+		highlightInputs[4] = unitSettings.debuffHighlightBadgeOffsetY
+		highlightInputs[5] = settings.dispelRecolor and true or false
+		highlightInputs[6] = settings.dispelBlend and true or false
+		highlightInputs[7] = settings.dispelOpacity
+		highlightInputs[8] = unitSettings.debuffHighlightBorder and true or false
+		highlightInputs[9] = unitSettings.debuffHighlightBar and true or false
+		highlightInputs[10] = classFilter and select(2, GetSelfCleanseTypes()) or ''
 		for typeIndex = 1, #HL_TYPES do
-			local red, green, blue = UnitFrames.DispelTypeColor(HL_TYPES[typeIndex])
-			parts[#parts + 1] = ('%.2f,%.2f,%.2f'):format(red, green, blue)
+			local slot = HIGHLIGHT_SETTING_INPUTS + (typeIndex - 1) * 3
+			highlightInputs[slot + 1], highlightInputs[slot + 2], highlightInputs[slot + 3] = UnitFrames.DispelTypeColor(HL_TYPES[typeIndex])
 		end
-		return table.concat(parts, '|')
 	end
 
-	local currentTypeRowFingerprint
+	local function HighlightInputsChanged(snapshot)
+		local changed = false
+		for inputIndex = 1, HIGHLIGHT_INPUT_COUNT do
+			local value = highlightInputs[inputIndex]
+			if snapshot[inputIndex] ~= value then
+				snapshot[inputIndex] = value
+				changed = true
+			end
+		end
+		return changed
+	end
 
-	local function ConfigureTypeRow(unitSettings, wanted)
+	local function ConfigureTypeRow(wanted)
 		if not wanted then
 			if typeRowContainer then
 				typeRowContainer:Hide()
 				Engine.BindUnit(typeRowContainer, nil)
-				currentTypeRowFingerprint = nil
+				wipe(typeRowContainer._highlightInputs)
 			end
 			return
 		end
@@ -632,10 +679,9 @@ do
 			typeRowContainer = Engine.NewContainer(host, true, 1)
 			typeRowContainer:SetPoint('CENTER', host, 'CENTER')
 			typeRowContainer._rowGroups = {}
+			typeRowContainer._highlightInputs = {}
 		end
-		local fingerprint = TypeRowFingerprint(unitSettings)
-		if fingerprint ~= currentTypeRowFingerprint then
-			currentTypeRowFingerprint = fingerprint
+		if HighlightInputsChanged(typeRowContainer._highlightInputs) then
 			PlaceTypeRowHost()
 			local size = TypeRowIconSize()
 			Engine.ApplyFlowLayout(typeRowContainer, {
@@ -781,13 +827,13 @@ do
 		end
 	end
 
-	local function ConfigureFrameColors(frame, unitSettings, wanted)
+	local function ConfigureFrameColors(frame, wanted)
 		local container = frame._dispelFrameHL
 		if not wanted then
 			if container then
 				container:Hide()
 				Engine.BindUnit(container, nil)
-				frame._dispelFrameFP = nil
+				wipe(container._highlightInputs)
 			end
 			return
 		end
@@ -795,11 +841,10 @@ do
 			container = Engine.NewContainer(frame.Health, true, 3)
 			container:SetPoint('TOPLEFT', frame, 'TOPLEFT')
 			container._fgGroups = {}
+			container._highlightInputs = {}
 			frame._dispelFrameHL = container
 		end
-		local fingerprint = TypeRowFingerprint(unitSettings)
-		if fingerprint ~= frame._dispelFrameFP then
-			frame._dispelFrameFP = fingerprint
+		if HighlightInputsChanged(container._highlightInputs) then
 			EnsureFrameGroups(container, frame)
 			RestyleFrameKits(frame)
 		end
@@ -1028,7 +1073,7 @@ do
 		end
 	end
 
-	local QueueCalloutReadiness = BUI.Dispatcher.NewDelayed(ApplyCalloutReadiness, 0.25)
+	local QueueCalloutReadiness = BUI.Dispatcher.NewDelayed(ApplyCalloutReadiness, 0.25, 'Callout readiness')
 
 	local calloutEventsOn
 	local function StartCalloutEvents()
@@ -1095,7 +1140,7 @@ do
 	end
 
 	local function ConfigureCallouts(wanted)
-		local signature = Engine.SortedKeys(GetSelfCleanseTypes())
+		local _, signature = GetSelfCleanseTypes()
 		if calloutTalentSignature and signature ~= calloutTalentSignature then ResetCallouts() end
 		calloutTalentSignature = signature
 
@@ -1129,71 +1174,63 @@ do
 		BUI.Events:Register('PLAYER_ENTERING_WORLD', 'UF.DispelCallout.Repaint', DrainCalloutRepaint)
 	end
 
-	function UnitFrames.UpdateDebuffHighlight(frame, unitType)
-		if not frame or not frame.Health then return end
-		if unitType ~= 'player' then return end
-		local unit = frame.unit or unitType
-		local unitSettings = UnitFrames.GetUnitSettings(unitType)
+	function UnitFrames.UpdateDebuffHighlight(frame)
+		if not frame then return end
+		local unitSettings = UnitFrames.GetUnitSettings('player')
 
 		if UnitFrames.DispelViaEngine then
-			ConfigureTypeRow(unitSettings, unitSettings.debuffHighlightBadge ~= false)
+			local badgeWanted = unitSettings.debuffHighlightBadge ~= false
+			local frameColorsWanted = (unitSettings.debuffHighlightBorder or unitSettings.debuffHighlightBar) and true or false
+			if badgeWanted or frameColorsWanted then GatherHighlightInputs(unitSettings) end
+			ConfigureTypeRow(badgeWanted)
 			ConfigureCallouts(unitSettings.debuffHighlightTypeText and true or false)
-			ConfigureFrameColors(frame, unitSettings,
-				(unitSettings.debuffHighlightBorder or unitSettings.debuffHighlightBar) and true or false)
+			ConfigureFrameColors(frame, frameColorsWanted)
+			return
 		end
 
-		RefreshFeignSalveSet(unit)
+		RefreshFeignSalveSet(frame.unit or 'player')
 		if feignSignature ~= frame._feignSig then
 			frame._feignSig = feignSignature
 			if frame.Debuffs and frame.Debuffs.ForceUpdate then frame.Debuffs:ForceUpdate() end
 		end
 	end
 
-	local SCAN_UNITS = {'player', 'target', 'focus'}
-	local function ScanAllUnits()
-		for _, unitType in ipairs(SCAN_UNITS) do
-			local unitFrame = UnitFrames[unitType]
-			if unitFrame then UnitFrames.UpdateDebuffHighlight(unitFrame, unitType) end
+	function UnitFrames.FollowDebuffHighlightUnit(frame)
+		local container = frame._dispelFrameHL
+		if container and container._buiUnit and container._buiUnit ~= frame.unit then
+			Engine.BindUnit(container, frame.unit)
 		end
 	end
 
-	BUI.Tools.OnAuraQueriesUnblocked(ScanAllUnits)
+	local function ScanPlayer()
+		UnitFrames.UpdateDebuffHighlight(UnitFrames.player)
+	end
 
-	local dirtyUnits = {}
-	local flushPending = false
-	local flushFrame = CreateFrame('Frame')
-	flushFrame:Hide()
-	flushFrame:SetScript('OnUpdate', function(self)
-		self:Hide()
-		flushPending = false
-		for unit in pairs(dirtyUnits) do
-			local unitFrame = UnitFrames[unit]
-			if unitFrame then UnitFrames.UpdateDebuffHighlight(unitFrame, unit) end
-		end
-		wipe(dirtyUnits)
-	end)
-	local function OnAura(event, unit, updateInfo)
-		if updateInfo then
-			local full = updateInfo.isFullUpdate
-			local added = updateInfo.addedAuras
-			local removed = updateInfo.removedAuraInstanceIDs
-			if not (issecretvalue(full) or issecretvalue(added) or issecretvalue(removed))
-				and not full and not added and not removed then
-				return
+	BUI.Tools.OnAuraQueriesUnblocked(ScanPlayer, 'Unit frame debuff highlight')
+	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'UF.DebuffHighlight.Scan', ScanPlayer)
+
+	if UnitFrames.DispelViaEngine then
+		BUI.Events:OnTalentBurst('UF.DebuffHighlight', ScanPlayer)
+	else
+		local flushFrame = CreateFrame('Frame')
+		flushFrame:Hide()
+		flushFrame:SetScript('OnUpdate', BUI.Profiler.Wrap('UnitFrames.Core debuff highlight', function(self)
+			self:Hide()
+			ScanPlayer()
+		end))
+		BUI.Events:RegisterUnit('UNIT_AURA', 'player', 'UF.DebuffHighlight', function(_, _, updateInfo)
+			if updateInfo then
+				local full = updateInfo.isFullUpdate
+				local added = updateInfo.addedAuras
+				local removed = updateInfo.removedAuraInstanceIDs
+				if not (issecretvalue(full) or issecretvalue(added) or issecretvalue(removed))
+					and not full and not added and not removed then
+					return
+				end
 			end
-		end
-		if not UnitFrames[unit] then return end
-		dirtyUnits[unit] = true
-		if not flushPending then
-			flushPending = true
 			flushFrame:Show()
-		end
+		end)
 	end
-	BUI.Events:RegisterUnit('UNIT_AURA', {'player', 'target'}, 'UF.DebuffHighlight', OnAura)
-	BUI.Events:RegisterUnit('UNIT_AURA', 'focus', 'UF.DebuffHighlight.Focus', OnAura)
-	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'UF.DebuffHighlight.Scan', function() ScanAllUnits() end)
-	BUI.Events:Register('PLAYER_TARGET_CHANGED', 'UF.DebuffHighlight.Scan.Target', function() ScanAllUnits() end)
-	BUI.Events:Register('PLAYER_FOCUS_CHANGED', 'UF.DebuffHighlight.Scan.Focus', function() ScanAllUnits() end)
 end
 
 do

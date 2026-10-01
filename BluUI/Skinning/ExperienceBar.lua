@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.ExperienceBar')
+
 local floor, format, max, min = math.floor, string.format, math.max, math.min
 local GetTime = GetTime
 
@@ -520,8 +522,8 @@ local function SuppressBlizzard()
 			Skin.SuppressBlizzardFrame(frame)
 			if not frame._buiReassertHooked then
 				frame._buiReassertHooked = true
-				frame:HookScript('OnShow', function(self) if isActive then Skin.SuppressBlizzardFrame(self) end end)
-				hooksecurefunc(frame, 'SetAlpha', function(self, alpha)
+				frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.ExperienceBar blizzard suppress', function(self) if isActive then Skin.SuppressBlizzardFrame(self) end end))
+				Hook(frame, 'SetAlpha', function(self, alpha)
 					if isActive and alpha ~= 0 and not self._buiReasserting then
 						self._buiReasserting = true
 						self:SetAlpha(0)
@@ -619,12 +621,12 @@ local function CreateBars()
 	hoverTicker = CreateFrame('Frame')
 	hoverTicker:Hide()
 	local tickElapsed = 0
-	hoverTicker:SetScript('OnUpdate', function(_, elapsed)
+	hoverTicker:SetScript('OnUpdate', BUI.Profiler.Wrap('Skin.ExperienceBar hover stats', function(_, elapsed)
 		tickElapsed = tickElapsed + elapsed
 		if tickElapsed < 0.5 then return end
 		tickElapsed = 0
 		UpdateHoverStats()
-	end)
+	end))
 
 	barFrame:EnableMouse(true)
 	barFrame:SetScript('OnEnter', function(self)

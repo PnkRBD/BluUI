@@ -98,9 +98,9 @@ local function BuildJourneyPanel()
 
     journeyPanel.lines = {}
 
-    journeyPanel:HookScript('OnHide', function()
+    journeyPanel:HookScript('OnHide', BUI.Profiler.Wrap('ReputationManager.ReputationManager journey hidden', function()
         BUI.Events:Unregister('GLOBAL_MOUSE_DOWN', 'RepManager.Journey')
-    end)
+    end))
 end
 
 local function GetJourneyLine(index)
@@ -584,7 +584,7 @@ RefreshContent = function()
     panel.emptyText:SetText(searchText ~= '' and 'No matching factions.' or 'No factions tracked.')
 end
 
-local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3)
+local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3, 'Reputation refresh')
 
 slide = BUI.SlidePanel.New({
     skin = 'reputationManager',
@@ -609,7 +609,7 @@ local function OnRepEvent()
 end
 
 BUI.Events:OnLogin('ReputationManager', function()
-    CharacterFrame:HookScript('OnHide', function() slide.Close(true) end)
+    CharacterFrame:HookScript('OnHide', BUI.Profiler.Wrap('ReputationManager.ReputationManager character hide', function() slide.Close(true) end))
 
     BUI.Events:Register('UPDATE_FACTION',                    'ReputationManager', OnRepEvent)
     BUI.Events:Register('MAJOR_FACTION_UNLOCKED',            'ReputationManager', OnRepEvent)

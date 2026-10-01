@@ -1,5 +1,8 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.Guild')
+local Wrap = BUI.Profiler.Wrap
+
 local ipairs, pairs = ipairs, pairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -256,7 +259,7 @@ local function SkinListEntry(entry)
 		FrameIcon(entry, entry.Icon)
 		Face(entry.Name)
 		for _, method in ipairs(LIST_ENTRY_METHODS) do
-			if entry[method] then hooksecurefunc(entry, method, RestyleListEntry) end
+			if entry[method] then Hook(entry, method, RestyleListEntry) end
 		end
 	end
 	RestyleListEntry(entry)
@@ -291,7 +294,7 @@ local function SkinColumnDisplay(columnDisplay)
 	if not columnDisplay or columnDisplay._buiColumns then return end
 	columnDisplay._buiColumns = true
 	FadeRegions(columnDisplay)
-	if columnDisplay.LayoutColumns then hooksecurefunc(columnDisplay, 'LayoutColumns', SkinColumnHeaders) end
+	if columnDisplay.LayoutColumns then Hook(columnDisplay, 'LayoutColumns', SkinColumnHeaders) end
 	SkinColumnHeaders(columnDisplay)
 end
 
@@ -327,7 +330,7 @@ local function SkinMemberList(memberList)
 		watermarkFrame:SetShown(false)
 		if memberList.UpdateWatermark and not memberList._buiWatermarkHooked then
 			memberList._buiWatermarkHooked = true
-			hooksecurefunc(memberList, 'UpdateWatermark', HideWatermark)
+			Hook(memberList, 'UpdateWatermark', HideWatermark)
 		end
 	end
 	Label(memberList.MemberCount)
@@ -619,7 +622,7 @@ local function SkinNotificationDialog(dialog)
 	end
 	if dialog.Refresh and not dialog._buiRefreshHooked then
 		dialog._buiRefreshHooked = true
-		hooksecurefunc(dialog, 'Refresh', SkinNotificationEntries)
+		Hook(dialog, 'Refresh', SkinNotificationEntries)
 	end
 	SkinNotificationEntries(dialog)
 end
@@ -773,7 +776,7 @@ local function SkinRequestToJoin(request)
 	SkinMessageInput(request.MessageFrame, 'MessageScroll')
 	Button(request.Apply)
 	Button(request.Cancel)
-	if request.Initialize then hooksecurefunc(request, 'Initialize', SkinRequestSpecs) end
+	if request.Initialize then Hook(request, 'Initialize', SkinRequestSpecs) end
 	SkinRequestSpecs(request)
 end
 
@@ -828,7 +831,7 @@ local function SkinGuildCards(cards)
 	Skin.TipPageButton(cards.NextPage, 'next')
 	if cards.RefreshLayout and not cards._buiLayoutHooked then
 		cards._buiLayoutHooked = true
-		hooksecurefunc(cards, 'RefreshLayout', RefreshCardPager)
+		Hook(cards, 'RefreshLayout', RefreshCardPager)
 	end
 	local spinner = cards.SearchingSpinner
 	if spinner then Title(spinner.Label) end
@@ -889,7 +892,7 @@ local function SkinFinder(finder)
 	for _, key in ipairs(FINDER_TAB_KEYS) do
 		local tab = finder[key]
 		SkinSideTab(tab, OnFinderTab)
-		if tab and tab.SetTab then hooksecurefunc(tab, 'SetTab', OnFinderTab) end
+		if tab and tab.SetTab then Hook(tab, 'SetTab', OnFinderTab) end
 	end
 end
 
@@ -934,7 +937,7 @@ local function SkinMainFrame(frame)
 	for _, key in ipairs(SIDE_TAB_KEYS) do SkinSideTab(frame[key], RefreshSideTabs) end
 	if frame.UpdateCommunitiesTabs and not frame._buiTabsHooked then
 		frame._buiTabsHooked = true
-		hooksecurefunc(frame, 'UpdateCommunitiesTabs', RefreshSideTabs)
+		Hook(frame, 'UpdateCommunitiesTabs', RefreshSideTabs)
 	end
 	Dropdown(frame.StreamDropdown)
 	Dropdown(frame.GuildMemberListDropdown)
@@ -1284,7 +1287,7 @@ local function InstallCommunities()
 	local frame = _G.CommunitiesFrame
 	if not frame then return end
 	communitiesInstalled = true
-	frame:HookScript('OnShow', ApplyCommunities)
+	frame:HookScript('OnShow', Wrap('Skin.Guild communities reskin', ApplyCommunities))
 	if frame:IsShown() then ApplyCommunities() end
 end
 
@@ -1293,9 +1296,9 @@ local function InstallGuildBank()
 	local frame = _G.GuildBankFrame
 	if not frame then return end
 	bankInstalled = true
-	frame:HookScript('OnShow', ApplyGuildBank)
-	if frame.Update then hooksecurefunc(frame, 'Update', RefreshBankSlots) end
-	if frame.UpdateTabs then hooksecurefunc(frame, 'UpdateTabs', RefreshBankTabs) end
+	frame:HookScript('OnShow', Wrap('Skin.Guild bank reskin', ApplyGuildBank))
+	if frame.Update then Hook(frame, 'Update', RefreshBankSlots) end
+	if frame.UpdateTabs then Hook(frame, 'UpdateTabs', RefreshBankTabs) end
 	if frame:IsShown() then ApplyGuildBank() end
 end
 
@@ -1304,10 +1307,10 @@ local function InstallGuildControl()
 	local frame = _G.GuildControlUI
 	if not frame then return end
 	controlInstalled = true
-	frame:HookScript('OnShow', ApplyGuildControl)
-	hooksecurefunc('GuildControlUI_RankOrder_Update', SkinRankRows)
-	hooksecurefunc('GuildControlUI_BankTabPermissions_Update', SkinBankPermissionRows)
-	hooksecurefunc('GuildControlUI_Discord_Update', SkinDiscordPanels)
+	frame:HookScript('OnShow', Wrap('Skin.Guild control reskin', ApplyGuildControl))
+	Hook('GuildControlUI_RankOrder_Update', SkinRankRows)
+	Hook('GuildControlUI_BankTabPermissions_Update', SkinBankPermissionRows)
+	Hook('GuildControlUI_Discord_Update', SkinDiscordPanels)
 	if frame:IsShown() then ApplyGuildControl() end
 end
 

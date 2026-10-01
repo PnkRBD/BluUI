@@ -209,7 +209,7 @@ local function RefreshAllModules()
     end
 
     if on('castBars') and BUI.CastBar then
-        C_Timer.After(0.05, function()
+        BUI.Profiler.After("Utility.ExportImport castbar refresh", 0.05, function()
             for _, unit in ipairs({ "Player", "Target", "Focus", "Boss" }) do
                 local bar = BUI.CastBar[unit]
                 if bar and bar.Refresh then bar:Refresh() end
@@ -610,7 +610,7 @@ function BUIG:Import(importString)
             }
         })
         if modalOverlay then
-            modalOverlay:HookScript("OnHide", function() importPending = false end)
+            modalOverlay:HookScript("OnHide", BUI.Profiler.Wrap("Utility.ExportImport import closed", function() importPending = false end))
         end
         return "pending", profileKey
     end

@@ -324,7 +324,7 @@ local function Install(entry)
 	SnapshotPoints(entry, frame)
 	CreateAnchor(entry)
 	local function Reapply() Apply(entry) end
-	frame:HookScript('OnShow', Reapply)
+	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.ToastAnchors anchor reapply', Reapply))
 	entry.hooks(Reapply)
 	Apply(entry)
 end

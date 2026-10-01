@@ -67,6 +67,7 @@ function Display.EnableDragging(tracker, GetConfig)
         onRightClick = function()
             GetConfig().showAnchor = false
             tracker.DisableDragging()
+            tracker.RecheckActive()
             Display.NotifyAnchorChanged(tracker.settingsKey, false)
         end,
     })
@@ -83,6 +84,42 @@ function Display.DisableDragging(tracker)
 
     if frame.anchor     then frame.anchor:Hide()     end
     if frame.anchorText then frame.anchorText:Hide() end
+end
+
+local function TrackerLive(tracker)
+    local settings = BUI.GetDB()[tracker.settingsKey]
+    return settings.showAnchor or (settings.enabled and tracker.isActive())
+end
+
+local UpdateAllTrackers = BUI.Dispatcher.New(function()
+    for _, tracker in pairs(trackers) do
+        if TrackerLive(tracker) then tracker.Update() end
+    end
+end, 'BuffTracking.Trackers')
+
+local RecheckAllActive = BUI.Dispatcher.New(function()
+    for _, tracker in pairs(trackers) do
+        tracker.RecheckActive()
+    end
+end, 'BuffTracking.RecheckActive')
+
+local function OnCombat(event)
+    inCombat = (event == "PLAYER_REGEN_DISABLED")
+    UpdateAllTrackers()
+end
+
+local eventsRegistered = false
+
+local function RegisterTrackerEvents()
+    if eventsRegistered then return end
+    eventsRegistered = true
+    BUI.Events:Register("PLAYER_REGEN_DISABLED", "BuffTrackingDisplay", OnCombat)
+    BUI.Events:Register("PLAYER_REGEN_ENABLED",  "BuffTrackingDisplay", OnCombat)
+    BUI.Events:RegisterUnit("UNIT_AURA", "player", "BuffTrackingAura", UpdateAllTrackers)
+    BUI.Events:RegisterUnit("UNIT_SPELLCAST_SUCCEEDED", "player", "BuffTrackingCast", UpdateAllTrackers)
+    BUI.Events:Register("SPELL_UPDATE_CHARGES", "BuffTrackingCharges", UpdateAllTrackers)
+    BUI.Events:Register("PLAYER_SPECIALIZATION_CHANGED", "BuffTrackingDisplay", RecheckAllActive)
+    BUI.Visibility.Register("BuffTracking", Display.UpdateOpacity, true)
 end
 
 local function GetStackColor(stacks, settings)
@@ -478,24 +515,8 @@ function Display.CreateTracker(config)
     end
 
     trackers[config.settingsKey] = tracker
+    RegisterTrackerEvents()
     return tracker
-end
-
-local UpdateAllTrackers = BUI.Dispatcher.New(function()
-    for _, tracker in pairs(trackers) do
-        tracker.Update()
-    end
-end, 'BuffTracking.Trackers')
-
-local RecheckAllActive = BUI.Dispatcher.New(function()
-    for _, tracker in pairs(trackers) do
-        tracker.RecheckActive()
-    end
-end, 'BuffTracking.RecheckActive')
-
-local function OnCombat(event)
-    inCombat = (event == "PLAYER_REGEN_DISABLED")
-    UpdateAllTrackers()
 end
 
 local function LabelWithCount(settings, stacks)
@@ -554,11 +575,3 @@ BUI.Events:OnLogin("BuffTrackingDisplay", function()
     CreateModuleTracker(BUI.BuffTracking.SmartMisdirect)
     RecheckAllActive()
 end, "buffTracking")
-
-BUI.Events:Register("PLAYER_REGEN_DISABLED", "BuffTrackingDisplay", OnCombat)
-BUI.Events:Register("PLAYER_REGEN_ENABLED",  "BuffTrackingDisplay", OnCombat)
-BUI.Events:RegisterUnit("UNIT_AURA", "player", "BuffTrackingAura", UpdateAllTrackers)
-BUI.Events:RegisterUnit("UNIT_SPELLCAST_SUCCEEDED", "player", "BuffTrackingCast", UpdateAllTrackers)
-BUI.Events:Register("SPELL_UPDATE_CHARGES", "BuffTrackingCharges", UpdateAllTrackers)
-BUI.Events:Register("PLAYER_SPECIALIZATION_CHANGED", "BuffTrackingDisplay", RecheckAllActive)
-BUI.Visibility.Register("BuffTracking", Display.UpdateOpacity, true)

@@ -1,13 +1,14 @@
 local _, BUI = ...
 
-local oUF = BUI.oUF
 local GroupFrames = BUI.GroupFrames
 
-local UIParent         = UIParent
-local InCombatLockdown = InCombatLockdown
-local GetInstanceInfo  = GetInstanceInfo
-local floor, ceil      = math.floor, math.ceil
-local Scale            = BUI.Pixel.Scale
+local UIParent            = UIParent
+local InCombatLockdown    = InCombatLockdown
+local GetInstanceInfo     = GetInstanceInfo
+local floor, ceil         = math.floor, math.ceil
+local Scale               = BUI.Pixel.Scale
+local SetHeaderAttribute  = GroupFrames.SetHeaderAttribute
+local SetHeaderVisibility = GroupFrames.SetHeaderVisibility
 
 local RAID_GROUP_SIZE = 5
 
@@ -70,18 +71,9 @@ end
 function GroupFrames.ApplyRaidRoleFilter()
 	if not GroupFrames.headers.raid then return end
 	GroupFrames.AfterCombat(function()
-		local function ApplyGroupFilter(header, groups)
-			header:SetAttribute("roleFilter",      nil)
-			header:SetAttribute("strictFiltering", nil)
-			header:SetAttribute("groupFilter",     groups)
-		end
-		for groupIndex, header in ipairs(GroupFrames.headers.raid) do ApplyGroupFilter(header, tostring(groupIndex)) end
-		if GroupFrames.headers.raidLarge then
-			for groupIndex, header in ipairs(GroupFrames.headers.raidLarge) do ApplyGroupFilter(header, tostring(groupIndex)) end
-		end
 		local shownGroups = ShownGroupFilter()
-		if GroupFrames.headers.raidWide then ApplyGroupFilter(GroupFrames.headers.raidWide, shownGroups) end
-		if GroupFrames.headers.raidLargeWide then ApplyGroupFilter(GroupFrames.headers.raidLargeWide, shownGroups) end
+		if GroupFrames.headers.raidWide then SetHeaderAttribute(GroupFrames.headers.raidWide, "groupFilter", shownGroups) end
+		if GroupFrames.headers.raidLargeWide then SetHeaderAttribute(GroupFrames.headers.raidLargeWide, "groupFilter", shownGroups) end
 		GroupFrames.ApplyRaidVisibility()
 	end, "GF.RoleFilter")
 end
@@ -95,49 +87,50 @@ local function BankCondition(bank)
 	local largeConfig = LargeRaidConfig()
 	if bank == "large" then
 		if not largeConfig then return nil end
-		return ("custom [group:raid,@raid%d,exists] show; hide"):format(largeConfig.threshold)
+		return ("[group:raid,@raid%d,exists] show; hide"):format(largeConfig.threshold)
 	end
 	if largeConfig then
-		return ("custom [@raid%d,exists] hide; [group:raid] show; hide"):format(largeConfig.threshold)
+		return ("[@raid%d,exists] hide; [group:raid] show; hide"):format(largeConfig.threshold)
 	end
-	return "raid"
+	return "[group:raid] show;hide"
 end
 
 local function GroupVisibility(bank, groupIndex)
 	local raidSettings = GroupFrames.GetDB().raid
-	if not raidSettings.enabled then return "custom hide" end
-	if UsesWideLayout(raidSettings) then return "custom hide" end
-	if groupIndex > maxAllowedGroups then return "custom hide" end
+	if not raidSettings.enabled then return "hide" end
+	if UsesWideLayout(raidSettings) then return "hide" end
+	if groupIndex > maxAllowedGroups then return "hide" end
 	if GroupFrames.IsRaidPreviewShown() then
-		return bank == "base" and "custom show" or "custom hide"
+		return bank == "base" and "show" or "hide"
 	end
-	return BankCondition(bank) or "custom hide"
+	return BankCondition(bank) or "hide"
 end
 
 local function WideVisibility(bank)
 	local raidSettings = GroupFrames.GetDB().raid
-	if not raidSettings.enabled or not UsesWideLayout(raidSettings) then return "custom hide" end
+	if not raidSettings.enabled or not UsesWideLayout(raidSettings) then return "hide" end
 	if GroupFrames.IsRaidPreviewShown() then
-		return bank == "base" and "custom show" or "custom hide"
+		return bank == "base" and "show" or "hide"
 	end
-	return BankCondition(bank) or "custom hide"
+	return BankCondition(bank) or "hide"
 end
 
 function GroupFrames.ApplyRaidVisibility()
 	if not GroupFrames.headers.raid then return end
 	for groupIndex, header in ipairs(GroupFrames.headers.raid) do
-		header:SetVisibility(GroupVisibility("base", groupIndex))
+		SetHeaderVisibility(header, GroupVisibility("base", groupIndex))
 	end
 	if GroupFrames.headers.raidLarge then
 		for groupIndex, header in ipairs(GroupFrames.headers.raidLarge) do
-			header:SetVisibility(GroupVisibility("large", groupIndex))
+			SetHeaderVisibility(header, GroupVisibility("large", groupIndex))
 		end
 	end
-	if GroupFrames.headers.raidWide then GroupFrames.headers.raidWide:SetVisibility(WideVisibility("base")) end
-	if GroupFrames.headers.raidLargeWide then GroupFrames.headers.raidLargeWide:SetVisibility(WideVisibility("large")) end
+	if GroupFrames.headers.raidWide then SetHeaderVisibility(GroupFrames.headers.raidWide, WideVisibility("base")) end
+	if GroupFrames.headers.raidLargeWide then SetHeaderVisibility(GroupFrames.headers.raidLargeWide, WideVisibility("large")) end
 end
 
 local PRECREATE_STAGGER = 0.05
+local PRECREATE_BATCH = 5
 local precreateTicker
 
 local function PendingPrecreate()
@@ -151,13 +144,13 @@ local function PendingPrecreate()
 		return pending
 	end
 	for groupIndex, header in ipairs(GroupFrames.headers.raid) do
-		if GroupVisibility("base", groupIndex) ~= "custom hide" then
+		if GroupVisibility("base", groupIndex) ~= "hide" then
 			pending[#pending + 1] = { header, RAID_GROUP_SIZE }
 		end
 	end
 	if LargeRaidConfig() and GroupFrames.headers.raidLarge then
 		for groupIndex, header in ipairs(GroupFrames.headers.raidLarge) do
-			if GroupVisibility("large", groupIndex) ~= "custom hide" then
+			if GroupVisibility("large", groupIndex) ~= "hide" then
 				pending[#pending + 1] = { header, RAID_GROUP_SIZE }
 			end
 		end
@@ -170,32 +163,30 @@ local function StopPrecreateStagger()
 end
 
 local function PrecreateStep()
-	if not GroupFrames.CanBuildChildren() then return end
+	if not GroupFrames.CanBuildChildren() then
+		StopPrecreateStagger()
+		return false
+	end
 	local pending = PendingPrecreate()
 	for index = 1, #pending do
 		local header, wanted = pending[index][1], pending[index][2]
-		if header and (header._bluPrebuilt or 0) < wanted then
-			GroupFrames.PrecreateHeaderChildren(header, wanted)
-			return
+		local built = header and header._bluPrebuilt or 0
+		if header and built < wanted then
+			GroupFrames.PrecreateHeaderChildren(header, math.min(wanted, built + PRECREATE_BATCH))
+			return true
 		end
 	end
 	StopPrecreateStagger()
+	return false
 end
+local PrecreateStepTimed = BUI.Profiler.Wrap("GroupFrames.Raid precreate step", PrecreateStep)
 
 function GroupFrames.PrecreateRaid()
 	if not GroupFrames.headers.raid or not GroupFrames.CanBuildChildren() then return end
 	local raidSettings = GroupFrames.GetDB().raid
 	if not raidSettings.enabled then return end
-	if IsInRaid() or GroupFrames.IsRaidPreviewShown() then
-		StopPrecreateStagger()
-		local pending = PendingPrecreate()
-		for index = 1, #pending do
-			GroupFrames.PrecreateHeaderChildren(pending[index][1], pending[index][2])
-		end
-		return
-	end
-	if precreateTicker then return end
-	precreateTicker = C_Timer.NewTicker(PRECREATE_STAGGER, PrecreateStep)
+	if precreateTicker or not PrecreateStep() then return end
+	precreateTicker = C_Timer.NewTicker(PRECREATE_STAGGER, PrecreateStepTimed)
 end
 
 function GroupFrames.UpdateInstanceClamp()
@@ -211,12 +202,7 @@ function GroupFrames.UpdateInstanceClamp()
 	end
 	if maxGroups == maxAllowedGroups then return end
 	maxAllowedGroups = maxGroups
-	if GroupFrames.headers.raid then
-		GroupFrames.AfterCombat(function()
-			GroupFrames.ApplyRaidVisibility()
-			GroupFrames.ApplyRaidRoleFilter()
-		end, "GF.RaidVisibility")
-	end
+	GroupFrames.ApplyRaidRoleFilter()
 end
 
 local function SpawnGroupBank(bank, raidSettings)
@@ -224,9 +210,8 @@ local function SpawnGroupBank(bank, raidSettings)
 	local memberPoint, memberX, memberY = MemberAttrs(raidSettings)
 	local groups = {}
 	for groupIndex = 1, 8 do
-		local header = oUF:SpawnHeader(
+		local header = GroupFrames.SpawnHeader(
 			GroupFrames.FRAME_PREFIX .. suffix .. groupIndex,
-			nil,
 			"showRaid",      true,
 			"showPlayer",    true,
 			"showSolo",      false,
@@ -240,7 +225,7 @@ local function SpawnGroupBank(bank, raidSettings)
 			"yOffset",       memberY,
 			"oUF-initialConfigFunction", GroupFrames.ConfigSnippet(raidSettings.width, raidSettings.height)
 		)
-		header:SetVisibility(GroupVisibility(bank, groupIndex))
+		SetHeaderVisibility(header, GroupVisibility(bank, groupIndex))
 		PlaceGroup(header, groupIndex, raidSettings)
 		groups[groupIndex] = header
 	end
@@ -265,27 +250,26 @@ local function ConfigureWide(header, bank, raidSettings)
 	local memberPoint, memberX, memberY = MemberAttrs(raidSettings)
 	local unitsPerColumn = math.max(1, math.min(40, base.wideUnitsPerColumn))
 	local groupBy, order, sortMethod = WideSortAttrs(base)
-	header:SetAttribute("oUF-initialConfigFunction", GroupFrames.ConfigSnippet(raidSettings.width, raidSettings.height))
-	header:SetAttribute("point",             memberPoint)
-	header:SetAttribute("xOffset",           memberX)
-	header:SetAttribute("yOffset",           memberY)
-	header:SetAttribute("unitsPerColumn",    unitsPerColumn)
-	header:SetAttribute("maxColumns",        ceil(40 / unitsPerColumn))
-	header:SetAttribute("columnSpacing",     Scale(raidSettings.groupSpacing))
-	header:SetAttribute("columnAnchorPoint", WideColumnAnchor(raidSettings))
-	header:SetAttribute("groupBy",           groupBy)
-	header:SetAttribute("groupingOrder",     order)
-	header:SetAttribute("sortMethod",        sortMethod)
+	SetHeaderAttribute(header, "oUF-initialConfigFunction", GroupFrames.ConfigSnippet(raidSettings.width, raidSettings.height))
+	SetHeaderAttribute(header, "point",             memberPoint)
+	SetHeaderAttribute(header, "xOffset",           memberX)
+	SetHeaderAttribute(header, "yOffset",           memberY)
+	SetHeaderAttribute(header, "unitsPerColumn",    unitsPerColumn)
+	SetHeaderAttribute(header, "maxColumns",        ceil(40 / unitsPerColumn))
+	SetHeaderAttribute(header, "columnSpacing",     Scale(raidSettings.groupSpacing))
+	SetHeaderAttribute(header, "columnAnchorPoint", WideColumnAnchor(raidSettings))
+	SetHeaderAttribute(header, "groupBy",           groupBy)
+	SetHeaderAttribute(header, "groupingOrder",     order)
+	SetHeaderAttribute(header, "sortMethod",        sortMethod)
 	header:ClearAllPoints()
 	header:SetPoint(raidSettings.point, UIParent, raidSettings.relPoint, Scale(raidSettings.x), Scale(raidSettings.y))
-	header:SetVisibility(WideVisibility(bank))
+	SetHeaderVisibility(header, WideVisibility(bank))
 end
 
 local function SpawnWide(bank, raidSettings)
 	local name = GroupFrames.FRAME_PREFIX .. (bank == "large" and "RaidLWide" or "RaidWide")
-	local header = oUF:SpawnHeader(
+	local header = GroupFrames.SpawnHeader(
 		name,
-		nil,
 		"showRaid",    true,
 		"showPlayer",  true,
 		"showSolo",    false,
@@ -338,7 +322,7 @@ function GroupFrames.SetRaidEnabled(enabled)
 		return
 	end
 	for _, header in ipairs(AllHeaders()) do
-		header:SetVisibility("custom hide")
+		SetHeaderVisibility(header, "hide")
 	end
 end
 
@@ -351,12 +335,12 @@ end
 local function RefreshBank(bank, groups, wideHeader, raidSettings)
 	local memberPoint, memberX, memberY = MemberAttrs(raidSettings)
 	for groupIndex, header in ipairs(groups) do
-		header:SetAttribute("oUF-initialConfigFunction", GroupFrames.ConfigSnippet(raidSettings.width, raidSettings.height))
-		header:SetAttribute("point",   memberPoint)
-		header:SetAttribute("xOffset", memberX)
-		header:SetAttribute("yOffset", memberY)
+		SetHeaderAttribute(header, "oUF-initialConfigFunction", GroupFrames.ConfigSnippet(raidSettings.width, raidSettings.height))
+		SetHeaderAttribute(header, "point",   memberPoint)
+		SetHeaderAttribute(header, "xOffset", memberX)
+		SetHeaderAttribute(header, "yOffset", memberY)
 		PlaceGroup(header, groupIndex, raidSettings)
-		header:SetVisibility(GroupVisibility(bank, groupIndex))
+		SetHeaderVisibility(header, GroupVisibility(bank, groupIndex))
 		ReflowHeader(header, raidSettings)
 	end
 	if wideHeader then

@@ -328,18 +328,32 @@ if C_Secrets and C_Secrets.HasSecretRestrictions() then
         'ZONE_CHANGED_NEW_AREA', 'CVAR_UPDATE',
     }
 
+    local Profiler = BUI.Profiler
     local wakeSubscribers = {}
+    local wakeLabels = {}
+    local wakeCursor = 0
+    local wakeDriver = CreateFrame('Frame')
+    wakeDriver:Hide()
 
-    function Tools.OnAuraQueriesUnblocked(callback)
-        if type(callback) ~= 'function' then return end
+    function Tools.OnAuraQueriesUnblocked(callback, label)
         wakeSubscribers[#wakeSubscribers + 1] = callback
+        wakeLabels[#wakeLabels + 1] = label
     end
+
+    wakeDriver:SetScript('OnUpdate', function(self)
+        wakeCursor = wakeCursor + 1
+        local callback = wakeSubscribers[wakeCursor]
+        if not callback or Tools.ShouldAurasBeSecret() or Tools.AuraQueriesBlocked() then
+            self:Hide()
+            return
+        end
+        Profiler.Run(Profiler.Label('Aura wake', wakeLabels[wakeCursor]), xpcall, callback, geterrorhandler())
+    end)
 
     local function RunWakeNow()
         if Tools.ShouldAurasBeSecret() or Tools.AuraQueriesBlocked() then return end
-        for subscriberIndex = 1, #wakeSubscribers do
-            xpcall(wakeSubscribers[subscriberIndex], geterrorhandler())
-        end
+        wakeCursor = 0
+        wakeDriver:Show()
     end
 
     local function RunWakeSubscribers(event, cvarName)

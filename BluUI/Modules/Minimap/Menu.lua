@@ -201,18 +201,18 @@ local function BuildMenu()
 			menu:Hide()
 		end
 	end
-	menu:SetScript('OnShow', function()
+	menu:SetScript('OnShow', BUI.Profiler.Wrap('Minimap.Menu menu shown', function()
 		pressedOutside = false
 		BUI.Events:Register('GLOBAL_MOUSE_DOWN', 'Minimap.Menu', OnGlobalMouse)
 		BUI.Events:Register('GLOBAL_MOUSE_UP',   'Minimap.Menu', OnGlobalMouse)
 		BUI.Events:Register('MINIMAP_UPDATE_TRACKING', 'Minimap.Menu', function()
 			if menu:IsShown() then RefreshSelection() end
 		end)
-	end)
-	menu:SetScript('OnHide', function()
+	end))
+	menu:SetScript('OnHide', BUI.Profiler.Wrap('Minimap.Menu menu hidden', function()
 		BUI.Events:UnregisterAll('Minimap.Menu')
 		CloseDropdowns()
-	end)
+	end))
 
 	menu.title = menu:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(menu.title, TITLE_SIZE, BUI.GetGlobalFont(), '')

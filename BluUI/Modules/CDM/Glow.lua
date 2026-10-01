@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('CDM.Glow')
+
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
 
@@ -158,6 +160,7 @@ function CDM.StartProcGlow(icon, perIconGlow)
 	if frameData.glowActive then
 		DispatchStop(icon, frameData.glowType)
 	end
+	frameData.procGlow = nil
 
 	CDM.HideBlizzardGlow(icon)
 
@@ -192,6 +195,20 @@ function CDM.StopProcGlow(icon)
 	frameData.glowActive = nil
 	frameData.glowType   = nil
 	frameData.glowColor  = nil
+	frameData.procGlow   = nil
+end
+
+local function StartBlizzardProc(icon, frameData)
+	CDM.HideBlizzardGlow(icon)
+	if frameData.hidden or frameData.parked then return end
+	CDM.StartProcGlow(icon)
+	frameData.procGlow = frameData.glowActive
+end
+
+function CDM.ResumeProcGlow(icon, frameData)
+	if not frameData.procPending or frameData.glowActive or frameData.hidden or frameData.parked then return end
+	if not ReadGlowDB().enabled then return end
+	StartBlizzardProc(icon, frameData)
 end
 
 do
@@ -201,11 +218,13 @@ do
 		local frameData = FrameData[icon]
 		if not frameData or not frameData.glowActive then return end
 
+		local wasProcGlow = frameData.procGlow
 		CDM.StopProcGlow(icon)
 
 		if glowsEnabled then
 			CDM.HideBlizzardGlow(icon)
 			CDM.StartProcGlow(icon)
+			frameData.procGlow = wasProcGlow and frameData.glowActive
 		else
 			CDM.ShowBlizzardGlow(icon)
 		end
@@ -254,36 +273,38 @@ function CDM.SetupGlowHooks()
 		local pendingHide = {}
 		local hideDrainer = CreateFrame('Frame')
 		hideDrainer:Hide()
-		hideDrainer:SetScript('OnUpdate', function(self)
+		hideDrainer:SetScript('OnUpdate', BUI.Profiler.Wrap('CDM.Glow hide drain', function(self)
 			self:Hide()
 			for icon in pairs(pendingHide) do
 				pendingHide[icon] = nil
 				CDM.StopProcGlow(icon)
 			end
-		end)
+		end))
 
 		if ActionButtonSpellAlertManager.ShowAlert then
-			hooksecurefunc(ActionButtonSpellAlertManager, 'ShowAlert', function(_, frame)
+			Hook(ActionButtonSpellAlertManager, 'ShowAlert', function(_, frame)
 				local icon = ResolveViewerIcon(frame)
 				if not icon then return end
+				local frameData = GetFrameData(icon)
+				frameData.procPending = true
 				if not ReadGlowDB().enabled then return end
 
 				pendingHide[icon] = nil
 
-				local frameData = FrameData[icon]
-				if frameData and frameData.glowActive then return end
+				if frameData.glowActive then return end
 
-				CDM.HideBlizzardGlow(icon)
-				CDM.StartProcGlow(icon)
+				StartBlizzardProc(icon, frameData)
 			end)
 		end
 
 		if ActionButtonSpellAlertManager.HideAlert then
-			hooksecurefunc(ActionButtonSpellAlertManager, 'HideAlert', function(_, frame)
+			Hook(ActionButtonSpellAlertManager, 'HideAlert', function(_, frame)
 				local icon = ResolveViewerIcon(frame)
 				if not icon then return end
 				local frameData = FrameData[icon]
-				if not frameData or not frameData.glowActive then return end
+				if not frameData then return end
+				frameData.procPending = nil
+				if not frameData.glowActive then return end
 				pendingHide[icon] = true
 				hideDrainer:Show()
 			end)
@@ -291,21 +312,23 @@ function CDM.SetupGlowHooks()
 	end
 
 	if ActionButton_ShowOverlayGlow then
-		hooksecurefunc('ActionButton_ShowOverlayGlow', function(button)
+		Hook('ActionButton_ShowOverlayGlow', function(button)
 			local icon = ResolveViewerIcon(button)
 			if not icon then return end
+			local frameData = GetFrameData(icon)
+			frameData.procPending = true
 			if not ReadGlowDB().enabled then return end
-			local frameData = FrameData[icon]
-			if frameData and frameData.glowActive then return end
-			CDM.HideBlizzardGlow(icon)
-			CDM.StartProcGlow(icon)
+			if frameData.glowActive then return end
+			StartBlizzardProc(icon, frameData)
 		end)
 	end
 
 	if ActionButton_HideOverlayGlow then
-		hooksecurefunc('ActionButton_HideOverlayGlow', function(button)
+		Hook('ActionButton_HideOverlayGlow', function(button)
 			local icon = ResolveViewerIcon(button)
 			if not icon then return end
+			local frameData = FrameData[icon]
+			if frameData then frameData.procPending = nil end
 			CDM.StopProcGlow(icon)
 		end)
 	end

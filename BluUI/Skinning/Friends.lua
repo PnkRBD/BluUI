@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.Friends')
+
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -550,7 +552,7 @@ local function SkinRecruit()
 		Button(rewards.ClaimLegacyRewardsButton)
 		if not rewards._buiRewardsHook and rewards.UpdateRewards then
 			rewards._buiRewardsHook = true
-			hooksecurefunc(rewards, 'UpdateRewards', SkinRewards)
+			Hook(rewards, 'UpdateRewards', SkinRewards)
 		end
 		SkinRewards(rewards)
 	end
@@ -652,22 +654,22 @@ local function RowHook(callback)
 end
 
 local function HookRows()
-	hooksecurefunc('FriendsFrame_UpdateFriendButton', RowHook(SkinFriendRow))
-	hooksecurefunc('FriendsFrame_UpdateFriendInviteButton', RowHook(SkinInviteRow))
-	hooksecurefunc('FriendsFrame_UpdateFriendInviteHeaderButton', RowHook(SkinInviteHeader))
-	if _G.WhoList_InitButton then hooksecurefunc('WhoList_InitButton', RowHook(SkinWhoRow)) end
-	if _G.IgnoreList_InitButton then hooksecurefunc('IgnoreList_InitButton', RowHook(SkinIgnoreRow)) end
-	if _G.RaidInfoFrame_Update then hooksecurefunc('RaidInfoFrame_Update', OnRaidInfoUpdated) end
+	Hook('FriendsFrame_UpdateFriendButton', RowHook(SkinFriendRow))
+	Hook('FriendsFrame_UpdateFriendInviteButton', RowHook(SkinInviteRow))
+	Hook('FriendsFrame_UpdateFriendInviteHeaderButton', RowHook(SkinInviteHeader))
+	if _G.WhoList_InitButton then Hook('WhoList_InitButton', RowHook(SkinWhoRow)) end
+	if _G.IgnoreList_InitButton then Hook('IgnoreList_InitButton', RowHook(SkinIgnoreRow)) end
+	if _G.RaidInfoFrame_Update then Hook('RaidInfoFrame_Update', OnRaidInfoUpdated) end
 	local quickJoinMixin = _G.QuickJoinButtonMixin
-	if quickJoinMixin and quickJoinMixin.Init then hooksecurefunc(quickJoinMixin, 'Init', RowHook(SkinQuickJoinRow)) end
+	if quickJoinMixin and quickJoinMixin.Init then Hook(quickJoinMixin, 'Init', RowHook(SkinQuickJoinRow)) end
 	local recentAllyMixin = _G.RecentAlliesEntryMixin
-	if recentAllyMixin and recentAllyMixin.Initialize then hooksecurefunc(recentAllyMixin, 'Initialize', RowHook(SkinRecentAllyRow)) end
+	if recentAllyMixin and recentAllyMixin.Initialize then Hook(recentAllyMixin, 'Initialize', RowHook(SkinRecentAllyRow)) end
 	local friendsFriendsMixin = _G.FriendsFriendsButtonMixin
-	if friendsFriendsMixin and friendsFriendsMixin.Init then hooksecurefunc(friendsFriendsMixin, 'Init', RowHook(SkinFriendsFriendsRow)) end
+	if friendsFriendsMixin and friendsFriendsMixin.Init then Hook(friendsFriendsMixin, 'Init', RowHook(SkinFriendsFriendsRow)) end
 end
 
 local function HookDialog(frame, callback)
-	if frame then frame:HookScript('OnShow', callback) end
+	if frame then frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Friends dialog reskin', callback)) end
 end
 
 local function HookDialogs()
@@ -682,8 +684,8 @@ local function Install()
 	local frame = _G.FriendsFrame
 	if not frame then return end
 	installed = true
-	frame:HookScript('OnShow', Apply)
-	hooksecurefunc('FriendsFrame_Update', OnFriendsUpdated)
+	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Friends frame reskin', Apply))
+	Hook('FriendsFrame_Update', OnFriendsUpdated)
 	HookRows()
 	HookDialogs()
 	if frame:IsShown() then Apply() end

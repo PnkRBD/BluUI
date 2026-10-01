@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.LootHistory')
+
 local select, pcall = select, pcall
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -94,7 +96,7 @@ local function SkinRow(row)
 	if not row or row:IsForbidden() or not Enabled() then return end
 	if row._buiLootRow then return end
 	row._buiLootRow = true
-	if row.SetTooltip then hooksecurefunc(row, 'SetTooltip', ShowAllRolls) end
+	if row.SetTooltip then Hook(row, 'SetTooltip', ShowAllRolls) end
 	if row.BackgroundArtFrame then FadeTextures(row.BackgroundArtFrame) end
 	FadeKeys(row, ROW_ART_KEYS)
 	local item = row.Item
@@ -117,7 +119,7 @@ local function SkinRows(frame)
 	pcall(box.ForEachFrame, box, SkinRow)
 	if not box._buiRowHook and box.Update then
 		box._buiRowHook = true
-		hooksecurefunc(box, 'Update', function(scrollBox)
+		Hook(box, 'Update', function(scrollBox)
 			pcall(scrollBox.ForEachFrame, scrollBox, SkinRow)
 		end)
 	end
@@ -200,7 +202,7 @@ local function Install()
 	local frame = Frame()
 	if not frame then return end
 	installed = true
-	frame:HookScript('OnShow', Apply)
+	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.LootHistory frame reskin', Apply))
 	if frame:IsShown() then Apply() end
 end
 

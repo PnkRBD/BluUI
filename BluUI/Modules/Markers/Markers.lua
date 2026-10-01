@@ -69,7 +69,7 @@ local function UpdateIndicators()
 end
 
 local function ScheduleIndicatorUpdate()
-    C_Timer.After(0.2, UpdateIndicators)
+    BUI.Profiler.After('Markers.Markers update indicators', 0.2, UpdateIndicators)
 end
 
 local function UpdateUsability()
@@ -147,7 +147,7 @@ end
 local function QueueHoverCheck()
     if hoverPending or not built or not GetConfig().fadeEnabled then return end
     hoverPending = true
-    C_Timer.After(0, EvaluateHover)
+    BUI.Profiler.After('Markers.Markers hover check', 0, EvaluateHover)
 end
 
 local function EnsureHoverHooks()

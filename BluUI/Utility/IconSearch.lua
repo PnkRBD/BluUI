@@ -26,7 +26,7 @@ local function Finish()
     wipe(listeners)
 end
 
-local function ScanChunk()
+local ScanChunk = BUI.Profiler.Wrap('Utility.IconSearch scan chunk', function()
     local deadline = debugprofilestop() + CHUNK_BUDGET_MS
     while scanID < MAX_SPELL_ID do
         scanID = scanID + 1
@@ -51,7 +51,7 @@ local function ScanChunk()
         if scanID % 128 == 0 and debugprofilestop() > deadline then return end
     end
     Finish()
-end
+end)
 
 function IconSearch.Ready()
     return ready

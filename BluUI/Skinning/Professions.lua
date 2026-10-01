@@ -1,6 +1,8 @@
 local _, BUI = ...
 
-local ipairs, pairs, xpcall, geterrorhandler, hooksecurefunc = ipairs, pairs, xpcall, geterrorhandler, hooksecurefunc
+local ipairs, pairs, xpcall, geterrorhandler = ipairs, pairs, xpcall, geterrorhandler
+local SecureHook = BUI.Profiler.Hooker('Skin.Professions')
+local Wrap = BUI.Profiler.Wrap
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
@@ -82,7 +84,7 @@ local function Guard(handler)
 end
 
 local function Hook(target, method, handler)
-	hooksecurefunc(target, method, Guard(handler))
+	SecureHook(target, method, Guard(handler))
 end
 
 local function Own(texture)
@@ -152,8 +154,9 @@ local function SkinDialog(dialog)
 end
 
 local function TrackArrowState(arrow)
-	arrow:HookScript('OnEnable', Skin.RefreshPageButton)
-	arrow:HookScript('OnDisable', Skin.RefreshPageButton)
+	local refresh = Wrap('Skin.Professions arrow state', Skin.RefreshPageButton)
+	arrow:HookScript('OnEnable', refresh)
+	arrow:HookScript('OnDisable', refresh)
 end
 
 local function SkinSpinner(spinner)
@@ -837,7 +840,7 @@ local function InstallFrame()
 	frameInstalled = true
 	InstallTemplates()
 	Hook(ProfessionsCraftingOutputLogElementMixin, 'Init', OnOutputEntry)
-	frame:HookScript('OnShow', Guard(ApplyFrame))
+	frame:HookScript('OnShow', Wrap('Skin.Professions frame reskin', Guard(ApplyFrame)))
 	Safely(ApplyFrame)
 end
 
@@ -845,7 +848,7 @@ local function InstallBook()
 	local frame = _G.ProfessionsBookFrame
 	if bookInstalled or not frame then return end
 	bookInstalled = true
-	frame:HookScript('OnShow', Guard(ApplyBook))
+	frame:HookScript('OnShow', Wrap('Skin.Professions book reskin', Guard(ApplyBook)))
 	Safely(ApplyBook)
 end
 
@@ -854,7 +857,7 @@ local function InstallCustomer()
 	if customerInstalled or not frame then return end
 	customerInstalled = true
 	InstallTemplates()
-	frame:HookScript('OnShow', Guard(ApplyCustomer))
+	frame:HookScript('OnShow', Wrap('Skin.Professions orders reskin', Guard(ApplyCustomer)))
 	Safely(ApplyCustomer)
 end
 

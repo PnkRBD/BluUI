@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.ChatConfig')
+
 local Skin = BUI.Skinning
 
 local SKIN_ID = 'chatpanels'
@@ -389,7 +391,7 @@ local function SweepAll()
 		if frame then
 			if not frame._buiChatShowHook then
 				frame._buiChatShowHook = true
-				frame:HookScript('OnShow', SkinWindow)
+				frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.ChatConfig window reskin', SkinWindow))
 			end
 			if frame:IsShown() then SkinWindow(frame) end
 		end
@@ -452,13 +454,13 @@ Skin.RegisterSkin(SKIN_ID, {
 	stopTest = StopTest,
 })
 
-hooksecurefunc('ChatConfig_CreateCheckboxes', OnCheckboxesCreated)
-hooksecurefunc('ChatConfig_CreateTieredCheckboxes', OnCheckboxesCreated)
-hooksecurefunc('ChatConfig_CreateColorSwatches', OnSwatchesCreated)
-hooksecurefunc('TextToSpeechFrame_CreateCheckboxes', OnCheckboxesCreated)
-hooksecurefunc('ChatConfig_UpdateCombatTabs', RefreshCombatTabs)
-hooksecurefunc(ChatConfigFrame.ChatTabManager, 'UpdateSelection', RefreshWindowTabs)
-hooksecurefunc(ChatConfigFrame.ChatTabManager, 'UpdateWidth', RefreshWindowTabs)
+Hook('ChatConfig_CreateCheckboxes', OnCheckboxesCreated)
+Hook('ChatConfig_CreateTieredCheckboxes', OnCheckboxesCreated)
+Hook('ChatConfig_CreateColorSwatches', OnSwatchesCreated)
+Hook('TextToSpeechFrame_CreateCheckboxes', OnCheckboxesCreated)
+Hook('ChatConfig_UpdateCombatTabs', RefreshCombatTabs)
+Hook(ChatConfigFrame.ChatTabManager, 'UpdateSelection', RefreshWindowTabs)
+Hook(ChatConfigFrame.ChatTabManager, 'UpdateWidth', RefreshWindowTabs)
 
 BUI.Events:Register('ADDON_LOADED', 'Skin.ChatConfig', SweepAll)
 BUI.Events:Once('PLAYER_LOGIN', 'Skin.ChatConfig', SweepAll)

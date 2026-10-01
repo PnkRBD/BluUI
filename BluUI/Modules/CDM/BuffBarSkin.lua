@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('CDM.BuffBarSkin')
+
 local _G = _G
 local ipairs = ipairs
 local UnitClass = UnitClass
@@ -12,6 +14,10 @@ local skinnedItems = setmetatable({}, { __mode = "k" })
 local previewShelf
 local restacking = false
 local positioning = false
+local fitting = false
+local viewerMoved = true
+local placedAnchor, placedAnchorPoint, placedOffsetX, placedOffsetY
+local placedGrowDirection, placedCentered, placedPositionX, placedPositionY
 local anchorRetryScheduled
 
 local BAR_ATLAS_PREFIX = "UI-HUD-CoolDownManager"
@@ -120,21 +126,37 @@ end
 
 local anchorRetries = 0
 
+local function ViewerPlacementCurrent(anchor, config)
+    return not viewerMoved and anchor == placedAnchor and config.anchorPoint == placedAnchorPoint
+        and config.anchorOffsetX == placedOffsetX and config.anchorOffsetY == placedOffsetY
+        and config.growDirection == placedGrowDirection and config.centerHorizontally == placedCentered
+        and config.positionX == placedPositionX and config.positionY == placedPositionY
+end
+
 local function PositionViewer()
     local viewer = _G.BuffBarCooldownViewer
     local config = GetSettings()
     if not viewer or not config.skinEnabled then return end
 
-    positioning = true
-    local resolved = ApplyAnchor(viewer, config)
-    positioning = false
+    local anchor = config.anchorFrame ~= "" and BUI.ResolveAnchorFrame(config.anchorFrame, config.anchorPoint)
+    local resolved = anchor and true or false
+    if not ViewerPlacementCurrent(anchor, config) then
+        positioning = true
+        resolved = ApplyAnchor(viewer, config)
+        positioning = false
+        viewerMoved = false
+        placedAnchor, placedAnchorPoint = anchor, config.anchorPoint
+        placedOffsetX, placedOffsetY = config.anchorOffsetX, config.anchorOffsetY
+        placedGrowDirection, placedCentered = config.growDirection, config.centerHorizontally
+        placedPositionX, placedPositionY = config.positionX, config.positionY
+    end
 
     if resolved then
         anchorRetries = 0
     elseif config.anchorFrame ~= "" and not anchorRetryScheduled and anchorRetries < 5 then
         anchorRetries = anchorRetries + 1
         anchorRetryScheduled = true
-        C_Timer.After(1, function()
+        BUI.Profiler.After("CDM.BuffBarSkin anchor retry", 1, function()
             anchorRetryScheduled = nil
             PositionViewer()
         end)
@@ -149,6 +171,31 @@ end)
 local ScheduleReposition = BUI.Dispatcher.New(PositionViewer, 'CDM.BuffBarReposition')
 
 local HookItemVisibility
+
+local function FitBarItem(item, config)
+    local showIcon = config.showIcon ~= false
+    local iconSize = config.iconSize
+    local barHeight = config.barHeight
+    local barWidth = GetEffectiveBarWidth(config)
+    fitting = true
+    item:SetSize((showIcon and (iconSize + ICON_GAP) or 0) + barWidth, math.max(showIcon and iconSize or 0, barHeight))
+    fitting = false
+
+    local iconFrame = item.Icon
+    if iconFrame then iconFrame:SetShown(showIcon) end
+
+    local bar = item.Bar
+    if not bar then return end
+    bar:ClearAllPoints()
+    if showIcon and iconFrame then
+        bar:SetPoint("LEFT", iconFrame, "RIGHT", ICON_GAP, 0)
+    else
+        bar:SetPoint("LEFT", item, "LEFT", 0, 0)
+    end
+    bar:SetSize(barWidth, barHeight)
+    if bar.Name then bar.Name:SetShown(config.showName ~= false) end
+    if bar.Duration then PlaceDuration(bar.Duration, config, bar) end
+end
 
 local function SkinBarItem(item)
     if not item then return end
@@ -166,19 +213,15 @@ local function SkinBarItem(item)
     local backgroundColor = config.bgColor
     local showIcon = config.showIcon ~= false
     local iconSize = config.iconSize
-    local barHeight = config.barHeight
-    local barWidth = GetEffectiveBarWidth(config)
-    local itemWidth = (showIcon and (iconSize + ICON_GAP) or 0) + barWidth
-    local itemHeight = math.max(showIcon and iconSize or 0, barHeight)
-    item:SetSize(itemWidth, itemHeight)
+    FitBarItem(item, config)
 
     if item.PandemicIcon then
         item.PandemicIcon:Hide()
         if not item._buiPandemicHooked then
             item._buiPandemicHooked = true
-            hooksecurefunc(item.PandemicIcon, "Show", function(self) self:Hide() end)
+            Hook(item.PandemicIcon, "Show", function(self) self:Hide() end)
             if item.ShowPandemicStateFrame then
-                hooksecurefunc(item, "ShowPandemicStateFrame", function(self)
+                Hook(item, "ShowPandemicStateFrame", function(self)
                     if self.PandemicIcon then self.PandemicIcon:Hide() end
                 end)
             end
@@ -188,7 +231,7 @@ local function SkinBarItem(item)
         item.CooldownFlash:Hide()
         if not item._buiCdFlashHooked then
             item._buiCdFlashHooked = true
-            hooksecurefunc(item.CooldownFlash, "Show", function(self)
+            Hook(item.CooldownFlash, "Show", function(self)
                 self:Hide()
                 if self.FlashAnim then self.FlashAnim:Stop() end
             end)
@@ -198,37 +241,27 @@ local function SkinBarItem(item)
         item.DebuffBorder:Hide()
         if not item._buiDebuffBorderHooked then
             item._buiDebuffBorderHooked = true
-            hooksecurefunc(item.DebuffBorder, "Show", function(self) self:Hide() end)
+            Hook(item.DebuffBorder, "Show", function(self) self:Hide() end)
         end
     end
 
     local iconFrame = item.Icon
-    if iconFrame then
-        iconFrame:SetShown(showIcon)
-        if showIcon then
-            iconFrame:SetSize(iconSize, iconSize)
-            StripCDMAtlases(iconFrame)
-            local inner = iconFrame.Icon
-            if inner then
-                RemoveMasks(inner)
-                if inner.SetTexCoord then inner:SetTexCoord(0.08, 0.92, 0.08, 0.92) end
-                inner:ClearAllPoints()
-                inner:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", 1, -1)
-                inner:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", -1, 1)
-            end
-            Pixel.ApplyBorder(iconFrame, borderSize, border[1], border[2], border[3], border[4] or 1)
+    if iconFrame and showIcon then
+        iconFrame:SetSize(iconSize, iconSize)
+        StripCDMAtlases(iconFrame)
+        local inner = iconFrame.Icon
+        if inner then
+            RemoveMasks(inner)
+            if inner.SetTexCoord then inner:SetTexCoord(0.08, 0.92, 0.08, 0.92) end
+            inner:ClearAllPoints()
+            inner:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", 1, -1)
+            inner:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", -1, 1)
         end
+        Pixel.ApplyBorder(iconFrame, borderSize, border[1], border[2], border[3], border[4] or 1)
     end
 
     local bar = item.Bar
     if bar then
-        bar:ClearAllPoints()
-        if showIcon and iconFrame then
-            bar:SetPoint("LEFT", iconFrame, "RIGHT", ICON_GAP, 0)
-        else
-            bar:SetPoint("LEFT", item, "LEFT", 0, 0)
-        end
-        bar:SetSize(barWidth, barHeight)
         bar:SetStatusBarTexture(texture)
         bar:SetStatusBarColor(GetBarColor(config))
 
@@ -244,7 +277,7 @@ local function SkinBarItem(item)
             bar.Pip:SetAlpha(0)
             if not bar._buiPipHooked then
                 bar._buiPipHooked = true
-                hooksecurefunc(bar.Pip, "Show", function(self) self:Hide(); self:SetAlpha(0) end)
+                Hook(bar.Pip, "Show", function(self) self:Hide(); self:SetAlpha(0) end)
             end
         end
         if bar.Spark then bar.Spark:Hide() end
@@ -270,11 +303,9 @@ local function SkinBarItem(item)
 
         if bar.Name then
             Pixel.ApplyFont(bar.Name, math.max(6, config.nameSize), font)
-            bar.Name:SetShown(config.showName ~= false)
         end
         if bar.Duration then
             Pixel.ApplyFont(bar.Duration, math.max(6, config.durationSize), font)
-            PlaceDuration(bar.Duration, config, bar)
         end
     end
 end
@@ -328,16 +359,20 @@ end
 
 local ScheduleReflow = BUI.Dispatcher.New(RestackItems, 'CDM.BuffBarReflow')
 
+local function ReflowUnlessFitting()
+    if not fitting then ScheduleReflow() end
+end
+
 HookItemVisibility = function(item)
     if item._buiVisHooked then return end
     item._buiVisHooked = true
-    hooksecurefunc(item, "Show", ScheduleReflow)
-    hooksecurefunc(item, "Hide", ScheduleReflow)
-    hooksecurefunc(item, "SetShown", ScheduleReflow)
-    hooksecurefunc(item, "SetSize", ScheduleReflow)
-    hooksecurefunc(item, "SetWidth", ScheduleReflow)
-    hooksecurefunc(item, "SetHeight", ScheduleReflow)
-    hooksecurefunc(item, "SetPoint", function()
+    Hook(item, "Show", ScheduleReflow)
+    Hook(item, "Hide", ScheduleReflow)
+    Hook(item, "SetShown", ScheduleReflow)
+    Hook(item, "SetSize", ReflowUnlessFitting)
+    Hook(item, "SetWidth", ReflowUnlessFitting)
+    Hook(item, "SetHeight", ReflowUnlessFitting)
+    Hook(item, "SetPoint", function()
         if not restacking then ScheduleReflow() end
     end)
 end
@@ -362,7 +397,21 @@ function CDM.RefreshBuffBarSkin()
     if CDM.IsBuffBarPreviewShown() then CDM.ShowBuffBarPreview() end
 end
 
-local ScheduleReskin = BUI.Dispatcher.New(function() CDM.RefreshBuffBarSkin() end, 'CDM.BuffBarReskin')
+local function RefitActiveItems()
+    local viewer = _G.BuffBarCooldownViewer
+    local config = GetSettings()
+    if not config.skinEnabled then return end
+    for item in viewer.itemFramePool:EnumerateActive() do
+        if skinnedItems[item] then
+            FitBarItem(item, config)
+        else
+            SkinBarItem(item)
+        end
+    end
+    RestackItems(viewer)
+end
+
+local ScheduleRefit = BUI.Dispatcher.New(RefitActiveItems, 'CDM.BuffBarRefit')
 
 local function HookBuffBarViewer()
     if hooked then return true end
@@ -373,15 +422,16 @@ local function HookBuffBarViewer()
     SkinAllActive(viewer)
     PositionViewer()
 
-    hooksecurefunc(viewer, "OnAcquireItemFrame", function(self, item)
+    Hook(viewer, "OnAcquireItemFrame", function(self, item)
         SkinBarItem(item)
         ScheduleReflow()
     end)
     if viewer.RefreshLayout then
-        hooksecurefunc(viewer, "RefreshLayout", ScheduleReskin)
+        Hook(viewer, "RefreshLayout", ScheduleRefit)
     end
-    hooksecurefunc(viewer, "SetPoint", function()
+    Hook(viewer, "SetPoint", function()
         if positioning then return end
+        viewerMoved = true
         if GetSettings().skinEnabled then ScheduleReposition() end
     end)
 
@@ -393,12 +443,12 @@ function CDM.InitBuffBarSkin()
     local watcher = CreateFrame("Frame")
     watcher:RegisterEvent("COOLDOWN_VIEWER_DATA_LOADED")
     watcher:RegisterEvent("PLAYER_LOGIN")
-    watcher:SetScript("OnEvent", function(self)
+    watcher:SetScript("OnEvent", BUI.Profiler.Wrap("CDM.BuffBarSkin viewer watch", function(self)
         if HookBuffBarViewer() then
             self:UnregisterAllEvents()
             self:SetScript("OnEvent", nil)
         end
-    end)
+    end))
 end
 
 local PREVIEW_COUNT = 5

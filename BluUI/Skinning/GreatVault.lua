@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.GreatVault')
+
 local ipairs, select = ipairs, select
 
 local Skin = BUI.Skinning
@@ -97,7 +99,7 @@ local function SkinActivity(activity)
 	if itemFrame then
 		if not activity._buiActivity then
 			activity._buiActivity = true
-			hooksecurefunc(itemFrame, 'SetDisplayedItem', StyleItemFrame)
+			Hook(itemFrame, 'SetDisplayedItem', StyleItemFrame)
 		end
 		StyleItemFrame(itemFrame)
 	end
@@ -190,7 +192,7 @@ local function SkinConfirm(confirm)
 	if not confirm then return end
 	if not confirm._buiConfirm then
 		confirm._buiConfirm = true
-		hooksecurefunc(confirm, 'RefreshRewards', RefreshConfirm)
+		Hook(confirm, 'RefreshRewards', RefreshConfirm)
 	end
 	RefreshConfirm(confirm)
 end
@@ -256,14 +258,14 @@ local function Install()
 	local frame = _G.WeeklyRewardsFrame
 	if not frame then return end
 	installed = true
-	frame:HookScript('OnShow', Apply)
-	hooksecurefunc(frame, 'Refresh', OnRefresh)
-	hooksecurefunc(frame, 'UpdateSelection', OnSelection)
-	hooksecurefunc(frame, 'SetUpActivity', OnSetUpActivity)
-	hooksecurefunc(frame, 'UpdateOverlay', OnOverlay)
-	hooksecurefunc(frame, 'SelectReward', OnSelectReward)
+	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GreatVault frame reskin', Apply))
+	Hook(frame, 'Refresh', OnRefresh)
+	Hook(frame, 'UpdateSelection', OnSelection)
+	Hook(frame, 'SetUpActivity', OnSetUpActivity)
+	Hook(frame, 'UpdateOverlay', OnOverlay)
+	Hook(frame, 'SelectReward', OnSelectReward)
 	local warning = _G.WeeklyRewardExpirationWarningDialog
-	if warning then warning:HookScript('OnShow', SkinWarning) end
+	if warning then warning:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GreatVault warning reskin', SkinWarning)) end
 	if frame:IsShown() then Apply() end
 end
 

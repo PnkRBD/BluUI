@@ -7,6 +7,7 @@ local Colors = BUILib.Colors
 local FONT = BUILib.Font or STANDARD_TEXT_FONT
 local Skin = BUI.Skinning
 local Pixel = BUI.Pixel
+local After = BUI.Profiler.After
 
 local FRAME_WIDTH = 480
 local FRAME_HEIGHT = 560
@@ -115,7 +116,7 @@ local function CreateRow(parent)
 		local index = self:GetParent().serviceIndex
 		if index then
 			BuyTrainerService(index)
-			C_Timer.After(0.1, RefreshContent)
+			After('Skin.Trainer list refresh', 0.1, RefreshContent)
 		end
 	end)
 
@@ -231,7 +232,7 @@ local function TrainAll()
 		queueIndex = queueIndex + 1
 		if queue[queueIndex] then
 			BuyTrainerService(queue[queueIndex])
-			C_Timer.After(BUY_DELAY, BuyNext)
+			After('Skin.Trainer train all', BUY_DELAY, BuyNext)
 		end
 	end
 	BuyNext()
@@ -353,7 +354,7 @@ local function SuppressBlizzardTrainer()
 	if not blizzHooked then
 		WithBlizzTrainer(function(blizzardFrame)
 			blizzHooked = true
-			blizzardFrame:HookScript('OnShow', function() if isOpen then HideBlizzardTrainer() end end)
+			blizzardFrame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Trainer blizzard suppress', function() if isOpen then HideBlizzardTrainer() end end))
 		end)
 	end
 	HideBlizzardTrainer()
@@ -379,7 +380,7 @@ local function OpenTrainer()
 	trainerFrame:Show()
 
 	SuppressBlizzardTrainer()
-	C_Timer.After(0, function()
+	After('Skin.Trainer page reskin', 0, function()
 		if not isOpen then return end
 		SuppressBlizzardTrainer()
 		RefreshContent()

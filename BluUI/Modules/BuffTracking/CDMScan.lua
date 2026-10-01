@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('BuffTracking.CDMScan')
+
 local GetCooldownInfo = C_CooldownViewer.GetCooldownViewerCooldownInfo
 local GetCategorySet  = C_CooldownViewer.GetCooldownViewerCategorySet
 local issecretvalue = issecretvalue
@@ -35,10 +37,13 @@ local function HookCDMViewers()
         if viewer and not hookedViewers[viewer] then
             hookedViewers[viewer] = true
             if viewer.OnAcquireItemFrame then
-                hooksecurefunc(viewer, 'OnAcquireItemFrame', MarkFrameMapStale)
+                Hook(viewer, 'OnAcquireItemFrame', MarkFrameMapStale)
             end
             if viewer.RefreshLayout then
-                hooksecurefunc(viewer, 'RefreshLayout', MarkFrameMapStale)
+                Hook(viewer, 'RefreshLayout', MarkFrameMapStale)
+            end
+            if viewer.RefreshData then
+                Hook(viewer, 'RefreshData', MarkFrameMapStale)
             end
         end
     end
@@ -77,8 +82,6 @@ local function CDMFrameForCooldownID(targetID)
     if frameMapStale then RebuildFrameMap() end
     return framesByCooldownID[targetID]
 end
-
-BUI.Events:RegisterUnit('UNIT_AURA', 'player', 'BuffTrackingCDMScan', MarkFrameMapStale)
 
 function BUI.BuffTracking.NewCDMScan(trackedSpellIDs, onRebuilt)
     local scanner = {}

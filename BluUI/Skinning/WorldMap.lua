@@ -1,5 +1,7 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.WorldMap')
+
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
@@ -229,7 +231,7 @@ local function RefreshSideTabs(questLog)
 	for _, tab in ipairs(SideTabs(questLog)) do
 		local fresh = not tab._buiSideTab
 		Skin.SideTab(context, tab)
-		if fresh then hooksecurefunc(tab, 'SetChecked', OnTabChecked) end
+		if fresh then Hook(tab, 'SetChecked', OnTabChecked) end
 		Skin.SetSideTabSelected(tab, IsTabSelected(questLog, tab))
 	end
 	Skin.LayoutSideTabs(questLog, sideTabs, SIDE_TAB_TOP_OFFSET)
@@ -483,11 +485,11 @@ local function Install()
 	local map = _G.WorldMapFrame
 	if not map then return end
 	installed = true
-	map:HookScript('OnShow', Apply)
-	hooksecurefunc('NavBar_AddButton', OnNavButtonAdded)
-	hooksecurefunc('QuestLogQuests_Update', OnQuestLogUpdated)
-	hooksecurefunc('QuestInfo_Display', OnQuestInfoDisplayed)
-	hooksecurefunc(_G.QuestMapFrame, 'ValidateTabs', OnTabsValidated)
+	map:HookScript('OnShow', BUI.Profiler.Wrap('Skin.WorldMap map reskin', Apply))
+	Hook('NavBar_AddButton', OnNavButtonAdded)
+	Hook('QuestLogQuests_Update', OnQuestLogUpdated)
+	Hook('QuestInfo_Display', OnQuestInfoDisplayed)
+	Hook(_G.QuestMapFrame, 'ValidateTabs', OnTabsValidated)
 	if map:IsShown() then Apply() end
 end
 

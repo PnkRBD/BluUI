@@ -213,7 +213,7 @@ local function GetDragFrame()
     DragFrame:SetFrameStrata("TOOLTIP")
     DragFrame:SetSize(Pixel.Scale(50), Pixel.Scale(50))
     DragFrame:Hide()
-    DragFrame:SetScript("OnUpdate", DragFrameOnUpdate)
+    DragFrame:SetScript("OnUpdate", BUI.Profiler.Wrap("CDM.Detached drag update", DragFrameOnUpdate))
     return DragFrame
 end
 
@@ -502,10 +502,12 @@ function Detached.PlaceIcon(icon, key, iconWidth, iconHeight, settings)
     icon:ClearAllPoints()
     icon:SetPoint("TOPLEFT", UIParent, "CENTER", cornerX, cornerY)
 
+    local wasParked = iconData.parked
     iconData.parked = nil
     icon:SetAlpha(CDM.GetContextualOpacity(key) / 100)
 
     iconData.locking = false
+    if wasParked then CDM.ResumeProcGlow(icon, iconData) end
 
     return true
 end

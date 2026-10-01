@@ -9,6 +9,33 @@ local function CenterWindow()
 	BUI.Print('Window centered.')
 end
 
+local function ShowProfile()
+	local lines, preview = BUI.Profiler.Report()
+	for index = 1, preview do print(lines[index]) end
+	BUI.BUILibClient.Modals.Copy({
+		title = 'Profile report',
+		message = 'The full report is selected. Press Ctrl+C to copy it.',
+		text = table.concat(lines, ' || '),
+	})
+end
+
+local function ProfileCommand(option)
+	local Profiler = BUI.Profiler
+	if option == 'login' then
+		BUI.db.global.profileNextLogin = true
+		ReloadUI()
+	elseif option == 'report' then
+		ShowProfile()
+	elseif Profiler.active then
+		Profiler.Stop()
+		BUI.Print('Profiling stopped.')
+		ShowProfile()
+	else
+		Profiler.Start()
+		BUI.Print('Profiling started. Play as normal, then type /bui profile again for the report.')
+	end
+end
+
 local function PrintHelp()
 	local function line(command, description)
 		print('  |cff' .. BUI.C.COLOR_BRAND .. command .. '|r  ' .. description)
@@ -20,6 +47,9 @@ local function PrintHelp()
 	line('/bui install', 'run the setup wizard')
 	line('/bui keybind', 'toggle action bar keybind mode (hover a button, press a key)')
 	line('/bui currency <id>', 'print the cap fields the game reports for a currency (3418 = Nebulous Voidcore)')
+	line('/bui profile', 'start or stop timing BluUI, the report opens when you stop')
+	line('/bui profile report', 'show the timings so far without stopping')
+	line('/bui profile login', 'reload and time everything from login onwards')
 	line('/cdm', "toggle Blizzard's Cooldown Viewer settings")
 	line('/rl', 'reload the UI')
 	line('/edit', "open Blizzard's Edit Mode")
@@ -44,6 +74,8 @@ SlashCmdList['BUI'] = function(message)
 		if id then BUI.Currency.Dump(id) else BUI.Print('Usage: /bui currency <currency id>') end
 	elseif command == 'keybind' or command == 'kb' then
 		BUI.ActionBars.ToggleKeybindMode()
+	elseif command == 'profile' then
+		ProfileCommand(rest:lower())
 	else
 		BUI.PageEngine.Toggle()
 	end
@@ -55,7 +87,7 @@ SlashCmdList['BUICDM'] = function()
 		BUI.Print('CooldownViewerSettings panel not found.')
 		return
 	end
-	C_Timer.After(0, function()
+	BUI.Profiler.After('Core.Commands toggle cdm', 0, function()
 		CooldownViewerSettings:SetShown(not CooldownViewerSettings:IsShown())
 	end)
 end

@@ -1,5 +1,8 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('StreamerTools.GCDHistory')
+local Wrap = BUI.Profiler.Wrap
+
 BUI.GCDHistory = {}
 local GCDHistory = BUI.GCDHistory
 local Pixel = BUI.Pixel
@@ -168,7 +171,7 @@ end
 
 local fadeDriver = CreateFrame('Frame')
 fadeDriver:Hide()
-fadeDriver:SetScript('OnUpdate', function(_, deltaTime)
+fadeDriver:SetScript('OnUpdate', Wrap('StreamerTools.GCDHistory fade', function(_, deltaTime)
     local alive = false
     for fadeIndex = #fading, 1, -1 do
         local fadeFrame = fading[fadeIndex]
@@ -182,7 +185,7 @@ fadeDriver:SetScript('OnUpdate', function(_, deltaTime)
         end
     end
     if not alive then fadeDriver:Hide() end
-end)
+end))
 
 local function GetActiveCastGap(settings)
     if not settings.showActiveCast or not activeCast then return 0 end
@@ -238,7 +241,7 @@ local function BuildActiveCast()
     activeCast.cd:SetSwipeColor(0, 0, 0, 0.6)
 
     if activeCast.cd.CooldownFlash then
-        hooksecurefunc(activeCast.cd.CooldownFlash, 'Show', function(self)
+        Hook(activeCast.cd.CooldownFlash, 'Show', function(self)
             self:Hide()
             if self.FlashAnim then self.FlashAnim:Stop() end
         end)
@@ -253,7 +256,7 @@ local BOUNCE_UP    = 0.08
 local BOUNCE_DOWN  = 0.12
 local BOUNCE_TOTAL = BOUNCE_UP + BOUNCE_DOWN
 
-local function BounceOnUpdate(self, deltaTime)
+local BounceOnUpdate = Wrap('StreamerTools.GCDHistory bounce', function(self, deltaTime)
     local elapsed = (self._bounceElapsed or 0) + deltaTime
     if elapsed >= BOUNCE_TOTAL then
         self:SetScale(1)
@@ -268,7 +271,7 @@ local function BounceOnUpdate(self, deltaTime)
         local progress = (elapsed - BOUNCE_UP) / BOUNCE_DOWN
         self:SetScale(BOUNCE_PEAK + (1 - BOUNCE_PEAK) * progress * progress)
     end
-end
+end)
 
 local function PlayBounce(frame)
     frame._bounceElapsed = 0
