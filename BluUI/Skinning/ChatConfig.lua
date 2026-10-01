@@ -161,8 +161,8 @@ local function Swatch(swatch)
 	fill:ClearAllPoints()
 	fill:SetPoint('TOPLEFT', swatch, 'TOPLEFT', SWATCH_INSET, -SWATCH_INSET)
 	fill:SetPoint('BOTTOMRIGHT', swatch, 'BOTTOMRIGHT', -SWATCH_INSET, SWATCH_INSET)
-	swatch:HookScript('OnEnter', SwatchEnter)
-	swatch:HookScript('OnLeave', SwatchLeave)
+	swatch:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.ChatConfig swatch OnEnter', SwatchEnter))
+	swatch:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.ChatConfig swatch OnLeave', SwatchLeave))
 end
 
 local function CheckRow(row)

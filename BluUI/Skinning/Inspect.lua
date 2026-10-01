@@ -349,8 +349,8 @@ local function CreateGemFrame()
 	gem.icon:SetPoint('TOPLEFT', 1, -1)
 	gem.icon:SetPoint('BOTTOMRIGHT', -1, 1)
 	gem:EnableMouse(true)
-	gem:SetScript('OnEnter', GemTooltip)
-	gem:SetScript('OnLeave', function() GameTooltip:Hide() end)
+	gem:SetScript('OnEnter', BUI.Profiler.Script('Skin.Inspect gem OnEnter', GemTooltip))
+	gem:SetScript('OnLeave', BUI.Profiler.Script('Skin.Inspect gem OnLeave', function() GameTooltip:Hide() end))
 	gem:Hide()
 	return gem
 end
@@ -430,8 +430,8 @@ local function CreateSlotLabels(button, info)
 	labels.hover:SetPoint(inner, button, outer, offsetX, -LABEL_LINE_Y)
 	labels.hover:EnableMouse(true)
 	labels.hover.anchor = outer == 'RIGHT' and 'ANCHOR_RIGHT' or 'ANCHOR_LEFT'
-	labels.hover:SetScript('OnEnter', EnchantTooltip)
-	labels.hover:SetScript('OnLeave', function() GameTooltip:Hide() end)
+	labels.hover:SetScript('OnEnter', BUI.Profiler.Script('Skin.Inspect hover OnEnter', EnchantTooltip))
+	labels.hover:SetScript('OnLeave', BUI.Profiler.Script('Skin.Inspect hover OnLeave', function() GameTooltip:Hide() end))
 	labels.hover:Hide()
 
 	return labels

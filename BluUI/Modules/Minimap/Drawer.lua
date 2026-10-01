@@ -136,8 +136,8 @@ local function StyleButton(button)
 	border:Show()
 	if not button._buiDrawerHooked then
 		button._buiDrawerHooked = true
-		button:HookScript('OnEnter', CancelHide)
-		button:HookScript('OnLeave', ScheduleHide)
+		button:HookScript('OnEnter', BUI.Profiler.Wrap('Minimap.Drawer button OnEnter', CancelHide))
+		button:HookScript('OnLeave', BUI.Profiler.Wrap('Minimap.Drawer button OnLeave', ScheduleHide))
 	end
 end
 
@@ -201,12 +201,12 @@ local function Create()
 	tab:SetFrameStrata('MEDIUM')
 	tab:SetFrameLevel(111)
 
-	tab:SetScript('OnEnter', ShowDrawer)
-	tab:SetScript('OnLeave', ScheduleHide)
-	bar:SetScript('OnEnter', CancelHide)
-	bar:SetScript('OnLeave', ScheduleHide)
-	bgFrame:SetScript('OnEnter', CancelHide)
-	bgFrame:SetScript('OnLeave', ScheduleHide)
+	tab:SetScript('OnEnter', BUI.Profiler.Script('Minimap.Drawer tab OnEnter', ShowDrawer))
+	tab:SetScript('OnLeave', BUI.Profiler.Script('Minimap.Drawer tab OnLeave', ScheduleHide))
+	bar:SetScript('OnEnter', BUI.Profiler.Script('Minimap.Drawer bar OnEnter', CancelHide))
+	bar:SetScript('OnLeave', BUI.Profiler.Script('Minimap.Drawer bar OnLeave', ScheduleHide))
+	bgFrame:SetScript('OnEnter', BUI.Profiler.Script('Minimap.Drawer bgFrame OnEnter', CancelHide))
+	bgFrame:SetScript('OnLeave', BUI.Profiler.Script('Minimap.Drawer bgFrame OnLeave', ScheduleHide))
 
 	if _G.BugGrabber then
 		local dataObject = LibStub('LibDataBroker-1.1'):GetDataObjectByName('BugSack')

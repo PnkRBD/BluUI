@@ -229,7 +229,7 @@ local function SkinSideTab(tab, onClick)
 	tab._buiGuildTab = true
 	Skin.SideTab(context, tab, SIDE_TAB_OPTIONS)
 	skinnedSideTabs[#skinnedSideTabs + 1] = tab
-	tab:HookScript('OnClick', onClick)
+	tab:HookScript('OnClick', BUI.Profiler.Wrap('Skin.Guild tab OnClick', onClick))
 	RefreshTabSelected(tab)
 end
 

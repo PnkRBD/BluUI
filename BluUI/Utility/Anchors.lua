@@ -138,7 +138,7 @@ function Anchor.OnAnchorSizeChanged()
     if not flushFrame then
         flushFrame = CreateFrame("Frame", "BUI_AnchorFlush")
         flushFrame:Hide()
-        flushFrame:SetScript("OnUpdate", FlushAnchorCallbacks)
+        flushFrame:SetScript("OnUpdate", BUI.Profiler.Script('Anchors flushFrame OnUpdate', FlushAnchorCallbacks))
     end
     flushFrame._armTime = GetTime()
     flushFrame:Show()

@@ -72,7 +72,7 @@ local function EnsureAcceptPulse(button)
 		fade:SetSmoothing('IN_OUT')
 	end
 	button._buiAcceptPulse = pulse
-	button:HookScript('OnLeave', KeepAcceptEdges)
+	button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.StaticPopup button OnLeave', KeepAcceptEdges))
 	return pulse
 end
 

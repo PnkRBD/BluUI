@@ -386,7 +386,7 @@ local function MakeInitializer(container, groupInfo)
 		local capturable = not container._buiNoCapture
 		if capturable then
 			captureButtons[button] = container
-			button:HookScript('OnMouseDown', OnButtonMouseDown)
+			button:HookScript('OnMouseDown', BUI.Profiler.Wrap('AuraContainerEngine button OnMouseDown', OnButtonMouseDown))
 		end
 		if button.SetMouseClickEnabled then
 			button:SetMouseClickEnabled(capturable and captureArmed or false)

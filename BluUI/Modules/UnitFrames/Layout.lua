@@ -182,17 +182,17 @@ function UnitFrames.RefreshLifeVisuals()
 end
 
 local function SetupTooltip(frame)
-	frame:HookScript('OnEnter', function(self)
+	frame:HookScript('OnEnter', BUI.Profiler.Wrap('UnitFrames.Layout frame OnEnter', function(self)
 		if not self.unit or GetMouseFoci()[1] ~= self then return end
 		local settings = UnitFrames.GetSettings()
 		if settings and settings.showTooltips ~= false then
 			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 			GameTooltip:SetUnit(self.unit)
 		end
-	end)
-	frame:HookScript('OnLeave', function()
+	end))
+	frame:HookScript('OnLeave', BUI.Profiler.Wrap('UnitFrames.Layout frame OnLeave', function()
 		GameTooltip:Hide()
-	end)
+	end))
 end
 
 local function Style(self, unit)

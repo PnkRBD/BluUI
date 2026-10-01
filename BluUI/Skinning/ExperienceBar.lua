@@ -629,7 +629,7 @@ local function CreateBars()
 	end))
 
 	barFrame:EnableMouse(true)
-	barFrame:SetScript('OnEnter', function(self)
+	barFrame:SetScript('OnEnter', BUI.Profiler.Script('Skin.ExperienceBar barFrame OnEnter', function(self)
 		local config = GetConfig()
 		local hover = config.hoverHeight
 		local position = config.position or 'BOTTOM'
@@ -669,16 +669,16 @@ local function CreateBars()
 
 		UpdateHoverStats()
 		hoverTicker:Show()
-	end)
+	end))
 
-	barFrame:SetScript('OnLeave', function()
+	barFrame:SetScript('OnLeave', BUI.Profiler.Script('Skin.ExperienceBar barFrame OnLeave', function()
 		xpText:Hide()
 		reputationText:Hide()
 		HideHoverStats()
 		hoverTicker:Hide()
 		LayoutBars()
 		ApplyBarPosition()
-	end)
+	end))
 
 	Dragging.MakeDraggable(barFrame, {
 		isLocked = function()

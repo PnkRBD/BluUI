@@ -726,7 +726,7 @@ function CDM.SkinIcon(icon, settings, key)
     if not iconFrameData then iconFrameData = GetFrameData(icon) end
     if not iconFrameData.customIcon and not iconFrameData.tooltipHooked then
         iconFrameData.tooltipHooked = true
-        icon:HookScript("OnEnter", OnBlizzardIconEnter)
+        icon:HookScript("OnEnter", BUI.Profiler.Wrap('CDM.Skinning icon OnEnter', OnBlizzardIconEnter))
     end
 
     iconFrameData.viewerKey = key

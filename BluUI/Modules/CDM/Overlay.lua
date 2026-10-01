@@ -46,13 +46,13 @@ function CDM.SetupBlizzardOverlay()
     buttonText:SetText("Dismiss")
     buttonText:SetTextColor(1, 1, 1)
 
-    dismissButton:SetScript("OnEnter", function(self) self:SetBackdropColor(0.2, 0.0, 0.3, 1) end)
-    dismissButton:SetScript("OnLeave", function(self) self:SetBackdropColor(0.12, 0.0, 0.18, 0.95) end)
+    dismissButton:SetScript("OnEnter", BUI.Profiler.Script('CDM.Overlay dismissButton OnEnter', function(self) self:SetBackdropColor(0.2, 0.0, 0.3, 1) end))
+    dismissButton:SetScript("OnLeave", BUI.Profiler.Script('CDM.Overlay dismissButton OnLeave', function(self) self:SetBackdropColor(0.12, 0.0, 0.18, 0.95) end))
     local dismissed = false
-    dismissButton:SetScript("OnClick", function()
+    dismissButton:SetScript("OnClick", BUI.Profiler.Script('CDM.Overlay dismissButton OnClick', function()
         dismissed = true
         overlay:Hide()
-    end)
+    end))
 
     local onSpellsTab = true
     local PollTick
@@ -67,16 +67,16 @@ function CDM.SetupBlizzardOverlay()
                 local tabText = child:GetText()
                 if tabText then
                     if tabText:find("Spell") or tabText:find("Cooldown") then
-                        child:HookScript("OnClick", function()
+                        child:HookScript("OnClick", BUI.Profiler.Wrap('CDM.Overlay child OnClick', function()
                             onSpellsTab = true
                             if PollTick then PollTick() end
-                        end)
+                        end))
                         hookedAny = true
                     elseif tabText:find("Aura") or tabText:find("Buff") then
-                        child:HookScript("OnClick", function()
+                        child:HookScript("OnClick", BUI.Profiler.Wrap('CDM.Overlay child OnClick 2', function()
                             onSpellsTab = false
                             if PollTick then PollTick() end
-                        end)
+                        end))
                         hookedAny = true
                     end
                 end

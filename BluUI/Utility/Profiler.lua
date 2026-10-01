@@ -54,8 +54,18 @@ local GLOWS = {
 	{ start = 'ButtonGlow_Start', label = 'Glow button', prefix = '_ButtonGlow' },
 }
 
+local FILE_LOAD_LABEL = 'Loading BluUI files'
+local fileLoadStart = debugprofilestop()
+
+local ALERT_MS = 100
+local ALERT_GAP = 30
+
 local stats, frameSpent, lastSpent, hitches, labels, baseline, libraryOwners = {}, {}, {}, {}, {}, {}, {}
-local frameTotal, lastTotal, depth = 0, 0, 0
+local noted, lastNoted, unseen = {}, {}, {}
+local scriptWrappers = setmetatable({}, { __mode = 'kv' })
+local frameTotal, lastTotal, depth, watchDepth, notedTotal = 0, 0, 0, 0, 0
+local lastAlertAt = 0
+local seenOver, unseenCount = GetAddOnMetric(addonName, Metric.CountTimeOver50Ms), 0
 local namedTotal, actualTotal, ticks = 0, 0, 0
 local startedAt, stoppedAt = 0, 0
 local overheadPerCall = 0
@@ -119,8 +129,21 @@ local function Run(label, callback, ...)
 	return Close(label, debugprofilestop(), callback(...))
 end
 
+local function Settle(label, start, ...)
+	watchDepth = watchDepth - 1
+	local elapsed = debugprofilestop() - start
+	noted[label] = (noted[label] or 0) + elapsed
+	if watchDepth == 0 then notedTotal = notedTotal + elapsed end
+	return ...
+end
+
+local function Watch(label, callback, ...)
+	watchDepth = watchDepth + 1
+	return Settle(label, debugprofilestop(), callback(...))
+end
+
 function Profiler.Run(label, callback, ...)
-	if not Profiler.active then return callback(...) end
+	if not Profiler.active then return Watch(label, callback, ...) end
 	return Run(label, callback, ...)
 end
 
@@ -147,18 +170,53 @@ local function RecordSpike(game, addons, actual)
 	spikeCount = spikeCount + 1
 	spikes[#spikes + 1] = {
 		at = GetTime(), game = game, addons = addons, actual = actual, context = SpikeContext(), heaviest = HeaviestAddOns(),
-		top = Profiler.active and TopOf(Combined(lastSpent, frameSpent), TOP_IN_FRAME) or nil,
+		top = TopOf(Profiler.active and Combined(lastSpent, frameSpent) or Combined(lastNoted, noted), TOP_IN_FRAME),
 	}
 	if #spikes > SPIKE_KEEP then remove(spikes, 1) end
 end
 
+local function RecordUnseen(count)
+	unseenCount = unseenCount + count
+	local work = Profiler.active and Combined(frameSpent, noted) or noted
+	local named = notedTotal + (Profiler.active and frameTotal or 0)
+	unseen[#unseen + 1] = { at = GetTime(), count = count, named = named, context = SpikeContext(), top = TopOf(work, TOP_IN_FRAME) }
+	if #unseen > SPIKE_KEEP then remove(unseen, 1) end
+end
+
+local function TopParts(top)
+	local parts = {}
+	for _, item in ipairs(top) do parts[#parts + 1] = format('%s %.0f', item.label, item.value) end
+	return concat(parts, '; ')
+end
+
+local function AlertSpike(actual)
+	local global = BUI.db and BUI.db.global
+	if not (global and global.profileAlerts) or loadingScreen then return end
+	local now = GetTime()
+	if now - lastAlertAt < ALERT_GAP or now - loadedAt < STARTUP_WINDOW then return end
+	lastAlertAt = now
+	local top = spikes[#spikes].top
+	BUI.Print(format('a frame took %.0fms in BluUI (%s)%s. /bui profile report for more.',
+		actual, SpikeContext(), #top > 0 and ': ' .. TopParts(top) or ', nothing named'))
+end
+
 local driver = CreateFrame('Frame')
 driver:SetScript('OnUpdate', function()
-	depth = 0
+	depth, watchDepth = 0, 0
 	local actual = GetAddOnMetric(addonName, Metric.LastTime)
 	local addons = GetOverallMetric(Metric.LastTime)
 	local game = GetApplicationMetric(Metric.LastTime)
-	if actual >= SPIKE_MS or addons >= SPIKE_MS or game >= GAME_SPIKE_MS then RecordSpike(game, addons, actual) end
+	local over = GetAddOnMetric(addonName, Metric.CountTimeOver50Ms)
+	local missed = over - seenOver - (actual >= SPIKE_MS and 1 or 0)
+	seenOver = over
+	if missed > 0 then RecordUnseen(missed) end
+	if actual >= SPIKE_MS or addons >= SPIKE_MS or game >= GAME_SPIKE_MS then
+		RecordSpike(game, addons, actual)
+		if actual >= ALERT_MS then AlertSpike(actual) end
+	end
+	lastNoted, noted = noted, lastNoted
+	wipe(noted)
+	notedTotal = 0
 	if not Profiler.active then return end
 	actualTotal = actualTotal + actual
 	ticks = ticks + 1
@@ -178,9 +236,26 @@ end)
 
 function Profiler.Wrap(label, callback)
 	return function(...)
+		if not Profiler.active then return Watch(label, callback, ...) end
+		return Run(label, callback, ...)
+	end
+end
+
+function Profiler.Hot(label, callback)
+	return function(...)
 		if not Profiler.active then return callback(...) end
 		return Run(label, callback, ...)
 	end
+end
+
+function Profiler.Script(label, callback)
+	if callback == nil then return nil end
+	local wrapper = scriptWrappers[callback]
+	if not wrapper then
+		wrapper = Profiler.Wrap(label, callback)
+		scriptWrappers[callback] = wrapper
+	end
+	return wrapper
 end
 
 local hookers = {}
@@ -201,11 +276,11 @@ function Profiler.Hooker(group)
 end
 
 function Profiler.After(label, delay, callback)
-	C_Timer.After(delay, Profiler.active and Profiler.Wrap(label, callback) or callback)
+	C_Timer.After(delay, Profiler.Wrap(label, callback))
 end
 
 function Profiler.NewTimer(label, delay, callback)
-	return C_Timer.NewTimer(delay, Profiler.active and Profiler.Wrap(label, callback) or callback)
+	return C_Timer.NewTimer(delay, Profiler.Wrap(label, callback))
 end
 
 local function LibraryOwner(entry)
@@ -290,8 +365,7 @@ local function HookOUF(methods)
 	hooksecurefunc(methods, 'Tag', OnTag)
 	local updateAll = methods.UpdateAllElements
 	methods.UpdateAllElements = function(self, event)
-		if not Profiler.active then return updateAll(self, event) end
-		return Run(Profiler.Label(StyleLabel(self), 'full update'), updateAll, self, event)
+		return Profiler.Run(Profiler.Label(StyleLabel(self), 'full update'), updateAll, self, event)
 	end
 end
 
@@ -305,8 +379,7 @@ local function TimeUnitFrame(object)
 	local onEvent = object:GetScript('OnEvent')
 	if onEvent then
 		object:SetScript('OnEvent', function(self, event, ...)
-			if not Profiler.active then return onEvent(self, event, ...) end
-			return Run(Profiler.Label(style, event), onEvent, self, event, ...)
+			return Profiler.Run(Profiler.Label(style, event), onEvent, self, event, ...)
 		end)
 	end
 	local castbar = object.Castbar
@@ -401,9 +474,7 @@ local function Areas()
 end
 
 local function HitchLine(hitch)
-	local parts = {}
-	for _, item in ipairs(hitch.top) do parts[#parts + 1] = format('%s %.0f', item.label, item.value) end
-	return format('  +%.0fs: %.0fms, %.0f named. %s', hitch.at - startedAt, hitch.actual, hitch.named, concat(parts, '; '))
+	return format('  +%.0fs: %.0fms, %.0f named. %s', hitch.at - startedAt, hitch.actual, hitch.named, TopParts(hitch.top))
 end
 
 local function Clock(seconds)
@@ -414,10 +485,24 @@ end
 local function SpikeLine(spike)
 	local line = format('  %s after reload: game %.0fms, all addons %.0fms, BluUI %.0fms (%s). Heaviest: %s',
 		Clock(spike.at - loadedAt), spike.game, spike.addons, spike.actual, spike.context, spike.heaviest)
-	if not spike.top then return line end
-	local parts = {}
-	for _, item in ipairs(spike.top) do parts[#parts + 1] = format('%s %.0f', item.label, item.value) end
-	return line .. '. BluUI handlers: ' .. concat(parts, '; ')
+	if #spike.top == 0 then return line end
+	return line .. '. BluUI handlers: ' .. TopParts(spike.top)
+end
+
+local function UnseenLine(entry)
+	local line = format('  %s after reload: %d %s (%s), %.0fms of BluUI work named',
+		Clock(entry.at - loadedAt), entry.count, entry.count == 1 and 'frame' or 'frames', entry.context, entry.named)
+	if #entry.top == 0 then return line end
+	return line .. ': ' .. TopParts(entry.top)
+end
+
+local function AddUnseenSpikes(lines)
+	lines[#lines + 1] = format('Blizzard counts BluUI frames since load over 50ms: %d, over 100ms: %d. %d of the over-50ms frames came while BluUI could not watch frame by frame (login, loading screens). Biggest:',
+		GetAddOnMetric(addonName, Metric.CountTimeOver50Ms), GetAddOnMetric(addonName, Metric.CountTimeOver100Ms), unseenCount)
+	local biggest = {}
+	for index, entry in ipairs(unseen) do biggest[index] = entry end
+	sort(biggest, function(left, right) return left.named > right.named end)
+	for index = 1, math.min(TOP_SPIKES, #biggest) do lines[#lines + 1] = UnseenLine(biggest[index]) end
 end
 
 local function AddSessionSpikes(lines)
@@ -428,15 +513,31 @@ local function AddSessionSpikes(lines)
 	for index = 1, math.min(TOP_SPIKES, #biggest) do lines[#lines + 1] = SpikeLine(biggest[index]) end
 end
 
+local function Share(metric)
+	local mine, game = GetAddOnMetric(addonName, metric), GetApplicationMetric(metric)
+	return mine, game > 0 and mine / game * 100 or 0
+end
+
+local function BlizzardLine()
+	local counts = {}
+	for _, counter in ipairs(COUNTERS) do counts[#counts + 1] = format('%s %d', counter.label, GetAddOnMetric(addonName, counter.metric)) end
+	local recent, recentShare = Share(Metric.RecentAverageTime)
+	local session, sessionShare = Share(Metric.SessionAverageTime)
+	local encounter, encounterShare = Share(Metric.EncounterAverageTime)
+	return format("Blizzard's numbers for BluUI, the same ones addon managers show: now %.2fms a frame (%.2f%% of the game), since load %.2fms (%.2f%%), last boss %.2fms (%.2f%%), worst frame %.0fms. Frames over %s since load.",
+		recent, recentShare, session, sessionShare, encounter, encounterShare, GetAddOnMetric(addonName, Metric.PeakTime), concat(counts, ', '))
+end
+
 function Profiler.Report()
 	if startedAt == 0 then
-		local lines = {}
+		local lines = { BlizzardLine() }
 		AddSessionSpikes(lines)
+		AddUnseenSpikes(lines)
 		lines[#lines + 1] = 'No profile run yet. Type /bui profile to start one.'
 		return lines, #lines
 	end
 	local now = Profiler.active and GetTime() or stoppedAt
-	local lines = {}
+	local lines = { BlizzardLine() }
 	local overCounts = {}
 	for _, counter in ipairs(COUNTERS) do
 		overCounts[#overCounts + 1] = format('%s %d', counter.label, GetAddOnMetric(addonName, counter.metric) - baseline[counter.label])
@@ -452,6 +553,7 @@ function Profiler.Report()
 	end
 	lines[#lines + 1] = 'Since reload, ms a frame: ' .. AddOnComparison(Metric.SessionAverageTime)
 	AddSessionSpikes(lines)
+	AddUnseenSpikes(lines)
 	local areas, members = Areas()
 	local areaParts = {}
 	for _, item in ipairs(areas) do areaParts[#areaParts + 1] = format('%s %.0fms', item.label, item.value) end
@@ -496,7 +598,11 @@ local loadWatcher = CreateFrame('Frame')
 loadWatcher:RegisterEvent('ADDON_LOADED')
 loadWatcher:SetScript('OnEvent', function(self, _, loaded)
 	if loaded ~= addonName then return end
+	local loading = debugprofilestop() - fileLoadStart
+	noted[FILE_LOAD_LABEL] = loading
+	notedTotal = notedTotal + loading
 	self:UnregisterEvent('ADDON_LOADED')
+	TimeUnitFrames()
 	local saved = _G.BluUI_DB
 	local global = saved and saved.global
 	if global and global.profileNextLogin then
@@ -504,4 +610,12 @@ loadWatcher:SetScript('OnEvent', function(self, _, loaded)
 		Profiler.Start()
 		loginPending = true
 	end
+end)
+
+local logoutWatcher = CreateFrame('Frame')
+logoutWatcher:RegisterEvent('PLAYER_LOGOUT')
+logoutWatcher:SetScript('OnEvent', function()
+	local global = BUI.db and BUI.db.global
+	if not global then return end
+	global.profileLog = { saved = date('%Y-%m-%d %H:%M'), zone = GetRealZoneText(), lines = (Profiler.Report()) }
 end)

@@ -272,7 +272,7 @@ local function ResetManualBuffOverlay(icon, frameData)
     end
     frameData._manualGlowActive = nil
     local cooldown = icon and icon.Cooldown
-    if cooldown then cooldown:SetScript("OnCooldownDone", CDM.OnCooldownWidgetDone) end
+    if cooldown then cooldown:SetScript("OnCooldownDone", BUI.Profiler.Script('CDM.Custom cooldown OnCooldownDone', CDM.OnCooldownWidgetDone)) end
 end
 
 local function ReleaseIcon(icon)
@@ -725,7 +725,7 @@ local function CreateIconFrame(parent, borderSize, borderColor, zoom)
     cooldown:SetDrawBling(false)
     cooldown:SetDrawSwipe(true)
     cooldown:SetHideCountdownNumbers(true)
-    cooldown:SetScript("OnCooldownDone", CDM.OnCooldownWidgetDone)
+    cooldown:SetScript("OnCooldownDone", BUI.Profiler.Script('CDM.Custom cooldown OnCooldownDone 2', CDM.OnCooldownWidgetDone))
     frame.Cooldown = cooldown
 
     function frame:Update(newBorderSize, newBorderColor, newZoom)
@@ -756,7 +756,7 @@ local function CreateIconFrame(parent, borderSize, borderColor, zoom)
     tooltipOverlay:SetFrameLevel(frame:GetFrameLevel() + 5)
     tooltipOverlay:EnableMouse(true)
     frame._tooltipOverlay = tooltipOverlay
-    tooltipOverlay:SetScript("OnEnter", function()
+    tooltipOverlay:SetScript("OnEnter", BUI.Profiler.Script('CDM.Custom tooltipOverlay OnEnter', function()
         local frameData = FrameData[frame]
         if not frameData or frameData.hidden then return end
         local db = BUI.GetDB()
@@ -771,10 +771,10 @@ local function CreateIconFrame(parent, borderSize, borderColor, zoom)
             GameTooltip:SetSpellByID(spellID)
         end
         GameTooltip:Show()
-    end)
-    tooltipOverlay:SetScript("OnLeave", function()
+    end))
+    tooltipOverlay:SetScript("OnLeave", BUI.Profiler.Script('CDM.Custom tooltipOverlay OnLeave', function()
         GameTooltip:Hide()
-    end)
+    end))
 
     local frameData = GetFrameData(frame)
     frameData.customIcon = true
@@ -859,7 +859,7 @@ CleanupManualBuff = function(icon, frameData, caller)
     frameData._manualGlowActive = nil
     local cooldown = icon.Cooldown
     if cooldown then
-        cooldown:SetScript("OnCooldownDone", CDM.OnCooldownWidgetDone)
+        cooldown:SetScript("OnCooldownDone", BUI.Profiler.Script('CDM.Custom cooldown OnCooldownDone 3', CDM.OnCooldownWidgetDone))
         cooldown:Clear()
     end
     GlowManager.CancelDeferred(frameData)

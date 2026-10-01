@@ -192,9 +192,9 @@ local function SkinRollButton(button)
 	end
 	if button._buiRoll then return end
 	button._buiRoll = true
-	button:HookScript('OnMouseDown', OnRollMouseDown)
-	button:HookScript('OnMouseUp', OnRollMouseUp)
-	button:HookScript('OnEnter', OnRollEnter)
+	button:HookScript('OnMouseDown', BUI.Profiler.Wrap('Skin.BonusRoll button OnMouseDown', OnRollMouseDown))
+	button:HookScript('OnMouseUp', BUI.Profiler.Wrap('Skin.BonusRoll button OnMouseUp', OnRollMouseUp))
+	button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.BonusRoll button OnEnter', OnRollEnter))
 	button:HookScript('OnHide', Wrap('Skin.BonusRoll roll hide', OnRollHide))
 	button:HookScript('OnShow', Wrap('Skin.BonusRoll hint refresh', RefreshHint))
 	RefreshHint(button)

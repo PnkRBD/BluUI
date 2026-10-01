@@ -8,10 +8,6 @@ BUI.Events = Events
 local Profiler = BUI.Profiler
 
 local function Call(group, key, callback, ...)
-    if not Profiler.active then
-        xpcall(callback, geterrorhandler(), ...)
-        return
-    end
     Profiler.Run(Profiler.Label(group, key), xpcall, callback, geterrorhandler(), ...)
 end
 

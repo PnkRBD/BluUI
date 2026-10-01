@@ -839,8 +839,8 @@ local function StartInput()
         listener = CreateFrame('Frame', nil, UIParent)
         listener:EnableKeyboard(true)
         listener:SetPropagateKeyboardInput(true)
-        listener:SetScript('OnKeyDown', function(_, key) OnInputDown(key) end)
-        listener:SetScript('OnKeyUp', function(_, key) OnInputUp(key) end)
+        listener:SetScript('OnKeyDown', BUI.Profiler.Script('CDM.PressHighlight listener OnKeyDown', function(_, key) OnInputDown(key) end))
+        listener:SetScript('OnKeyUp', BUI.Profiler.Script('CDM.PressHighlight listener OnKeyUp', function(_, key) OnInputUp(key) end))
     end
     listener:Show()
     for _, event in ipairs(KEY_CACHE_EVENTS) do BUI.Events:Register(event, 'CDM.PressHL.Keys', WipeKeyCache) end

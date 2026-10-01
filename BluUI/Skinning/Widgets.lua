@@ -26,8 +26,8 @@ function Skin.SmallButton(parent, width, height, label)
 	text:SetText(label)
 	text:SetTextColor(0.9, 0.9, 0.9, 1)
 
-	button:HookScript('OnEnter', function(self) self:SetBackdropBorderColor(Colors.GetAccent()) end)
-	button:HookScript('OnLeave', function(self) self:SetBackdropBorderColor(unpack(Colors.border.default)) end)
+	button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Widgets button OnEnter', function(self) self:SetBackdropBorderColor(Colors.GetAccent()) end))
+	button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Widgets button OnLeave', function(self) self:SetBackdropBorderColor(unpack(Colors.border.default)) end))
 	return button
 end
 
@@ -82,24 +82,24 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 
 	thumb:EnableMouse(true)
 	thumb:RegisterForDrag('LeftButton')
-	thumb:SetScript('OnDragStart', function(self) self.dragging = true end)
-	thumb:SetScript('OnDragStop', function(self) self.dragging = false end)
+	thumb:SetScript('OnDragStart', BUI.Profiler.Script('Skin.Widgets thumb OnDragStart', function(self) self.dragging = true end))
+	thumb:SetScript('OnDragStop', BUI.Profiler.Script('Skin.Widgets thumb OnDragStop', function(self) self.dragging = false end))
 	thumb:SetScript('OnUpdate', Wrap('Skin.Widgets scroll drag', function(self)
 		if self.dragging then ApplyScrollPct(CursorToScrollPct()) end
 	end))
-	thumb:SetScript('OnEnter', function() SetColorTex(thumbTex, unpack(THUMB_HOVER)) end)
-	thumb:SetScript('OnLeave', function() SetColorTex(thumbTex, unpack(THUMB_IDLE)) end)
+	thumb:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets thumb OnEnter', function() SetColorTex(thumbTex, unpack(THUMB_HOVER)) end))
+	thumb:SetScript('OnLeave', BUI.Profiler.Script('Skin.Widgets thumb OnLeave', function() SetColorTex(thumbTex, unpack(THUMB_IDLE)) end))
 	track:EnableMouse(true)
-	track:SetScript('OnMouseDown', function(_, button)
+	track:SetScript('OnMouseDown', BUI.Profiler.Script('Skin.Widgets track OnMouseDown', function(_, button)
 		if button == 'LeftButton' then ApplyScrollPct(CursorToScrollPct()) end
-	end)
+	end))
 
 	scroll:EnableMouseWheel(true)
-	scroll:SetScript('OnMouseWheel', function(self, delta)
+	scroll:SetScript('OnMouseWheel', BUI.Profiler.Script('Skin.Widgets scroll OnMouseWheel', function(self, delta)
 		local currentScroll = self:GetVerticalScroll()
 		local maxScroll = max(0, child:GetHeight() - self:GetHeight())
 		self:SetVerticalScroll(min(maxScroll, max(0, currentScroll - delta * rowHeight * 2)))
-	end)
+	end))
 
 	scroll:SetScript('OnSizeChanged', Wrap('Skin.Widgets scroll resize', function(_, width)
 		if width and width > 0 then child:SetWidth(width) end
@@ -149,20 +149,20 @@ function Skin.CreateSearchBox(parent, width, callback)
 	Pixel.ApplyFont(editBox, 11, FONT, '')
 	editBox:SetTextColor(0.9, 0.9, 0.9, 1)
 	editBox:SetAutoFocus(false)
-	editBox:SetScript('OnTextChanged', function(self, userInput)
+	editBox:SetScript('OnTextChanged', BUI.Profiler.Script('Skin.Widgets editBox OnTextChanged', function(self, userInput)
 		if not userInput then return end
 		local text = self:GetText():lower()
 		hint:SetShown(text == '')
 		callback(text)
-	end)
-	editBox:SetScript('OnEscapePressed', function(self) self:SetText(''); self:ClearFocus() end)
+	end))
+	editBox:SetScript('OnEscapePressed', BUI.Profiler.Script('Skin.Widgets editBox OnEscapePressed', function(self) self:SetText(''); self:ClearFocus() end))
 	local function showAccent() container:SetBackdropBorderColor(Colors.GetAccent()) end
 	local function showIdle() container:SetBackdropBorderColor(unpack(idleBorder)) end
 
-	container:SetScript('OnEnter', showAccent)
-	container:SetScript('OnLeave', function() if not editBox:HasFocus() then showIdle() end end)
-	editBox:SetScript('OnEditFocusGained', showAccent)
-	editBox:SetScript('OnEditFocusLost', showIdle)
+	container:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets container OnEnter', showAccent))
+	container:SetScript('OnLeave', BUI.Profiler.Script('Skin.Widgets container OnLeave', function() if not editBox:HasFocus() then showIdle() end end))
+	editBox:SetScript('OnEditFocusGained', BUI.Profiler.Script('Skin.Widgets editBox OnEditFocusGained', showAccent))
+	editBox:SetScript('OnEditFocusLost', BUI.Profiler.Script('Skin.Widgets editBox OnEditFocusLost', showIdle))
 
 	container.editBox = editBox
 	container.hint = hint
@@ -224,11 +224,11 @@ function Skin.CreateListRow(parent, height, iconSize)
 	row.priceText:SetPoint('LEFT', row.iconBorder, 'RIGHT', Pixel.Scale(8), Pixel.Scale(-8))
 	row.priceText:SetTextColor(0.65, 0.65, 0.65, 1)
 
-	row:SetScript('OnEnter', function(self) self:SetBackdropBorderColor(Colors.GetAccent()) end)
-	row:SetScript('OnLeave', function(self)
+	row:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets row OnEnter', function(self) self:SetBackdropBorderColor(Colors.GetAccent()) end))
+	row:SetScript('OnLeave', BUI.Profiler.Script('Skin.Widgets row OnLeave', function(self)
 		self:SetBackdropBorderColor(unpack(Colors.border.dark))
 		GameTooltip:Hide()
-	end)
+	end))
 
 	return row
 end
@@ -290,17 +290,17 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 		highlight:SetAllPoints()
 		SetColorTex(highlight, 1, 1, 1, 0.06)
 
-		row:SetScript('OnClick', function()
+		row:SetScript('OnClick', BUI.Profiler.Script('Skin.Widgets row OnClick', function()
 			label:SetText(item.label)
 			menu:Hide()
 			SetArrowOpen(false)
 			onSelect(item)
-		end)
+		end))
 	end
 	menu:SetHeight(Pixel.Scale(#items * rowHeight + 4))
 
 	dropdown:EnableMouse(true)
-	dropdown:SetScript('OnMouseDown', function()
+	dropdown:SetScript('OnMouseDown', BUI.Profiler.Script('Skin.Widgets dropdown OnMouseDown', function()
 		if menu:IsShown() then
 			menu:Hide()
 			SetArrowOpen(false)
@@ -308,11 +308,11 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 			menu:Show()
 			SetArrowOpen(true)
 		end
-	end)
-	dropdown:SetScript('OnEnter', function(self) self:SetBackdropBorderColor(Colors.GetAccent()) end)
-	dropdown:SetScript('OnLeave', function(self)
+	end))
+	dropdown:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets dropdown OnEnter', function(self) self:SetBackdropBorderColor(Colors.GetAccent()) end))
+	dropdown:SetScript('OnLeave', BUI.Profiler.Script('Skin.Widgets dropdown OnLeave', function(self)
 		if not menu:IsShown() then self:SetBackdropBorderColor(unpack(idleBorder)) end
-	end)
+	end))
 
 	local grace = 0
 	local autoClose = Wrap('Skin.Widgets menu autoclose', function(updatingMenu, elapsed)
@@ -331,7 +331,7 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 		grace = 0
 		menuFrame:SetScript('OnUpdate', autoClose)
 	end))
-	menu:SetScript('OnHide', function(menuFrame) menuFrame:SetScript('OnUpdate', nil) end)
+	menu:SetScript('OnHide', BUI.Profiler.Script('Skin.Widgets menu OnHide', function(menuFrame) menuFrame:SetScript('OnUpdate', nil) end))
 	return dropdown
 end
 

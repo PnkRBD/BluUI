@@ -387,7 +387,7 @@ local function CreateRow(parent)
     bar:SetPoint('TOPLEFT', barBg, 'TOPLEFT', 0, 0)
     row.bar = bar
 
-    row:SetScript('OnEnter', function(self)
+    row:SetScript('OnEnter', BUI.Profiler.Script('ReputationManager.ReputationManager row OnEnter', function(self)
         self:SetBackdropBorderColor(Colors.GetAccent())
         GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
         GameTooltip:SetText(self._name, 1, 1, 1)
@@ -403,12 +403,12 @@ local function CreateRow(parent)
         GameTooltip:AddLine(' ')
         GameTooltip:AddLine('|cff888888Right-click for options|r', 0.7, 0.7, 0.7)
         GameTooltip:Show()
-    end)
-    row:SetScript('OnLeave', function(self)
+    end))
+    row:SetScript('OnLeave', BUI.Profiler.Script('ReputationManager.ReputationManager row OnLeave', function(self)
         self:SetBackdropBorderColor(0.13, 0.13, 0.15, 1)
         GameTooltip:Hide()
-    end)
-    row:SetScript('OnClick', function(self) ShowRowMenu(self) end)
+    end))
+    row:SetScript('OnClick', BUI.Profiler.Script('ReputationManager.ReputationManager row OnClick', function(self) ShowRowMenu(self) end))
     return row
 end
 

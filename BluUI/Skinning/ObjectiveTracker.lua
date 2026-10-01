@@ -466,10 +466,10 @@ function QuestItem.Ensure()
 	highlight:SetColorTexture(1, 1, 1, 0.22)
 
 	Pixel.ApplyBorder(button, 1, Theme.border.light[1], Theme.border.light[2], Theme.border.light[3], 1)
-	button:SetScript('OnEnter', QuestItem.OnEnter)
+	button:SetScript('OnEnter', BUI.Profiler.Script('Skin.ObjectiveTracker button OnEnter', QuestItem.OnEnter))
 	button:SetScript('OnLeave', GameTooltip_Hide)
-	button:SetScript('OnDragStart', QuestItem.OnDragStart)
-	button:SetScript('OnDragStop', QuestItem.OnDragStop)
+	button:SetScript('OnDragStart', BUI.Profiler.Script('Skin.ObjectiveTracker button OnDragStart', QuestItem.OnDragStart))
+	button:SetScript('OnDragStop', BUI.Profiler.Script('Skin.ObjectiveTracker button OnDragStop', QuestItem.OnDragStop))
 	QuestItem.button = button
 end
 
@@ -1079,13 +1079,13 @@ function Skin.TrackerHeaderControls(parent, anchor)
 	filterGlyph:SetSize(Pixel.Scale(GLYPH_SIZE + 2), Pixel.Scale(GLYPH_SIZE + 2))
 	headerFilter = filterButton
 	headerFilter.glyph = filterGlyph
-	filterButton:SetScript('OnEnter', function()
+	filterButton:SetScript('OnEnter', BUI.Profiler.Script('Skin.ObjectiveTracker filterButton OnEnter', function()
 		filterGlyph:SetVertexColor(1, 1, 1, 1)
-	end)
-	filterButton:SetScript('OnLeave', function()
+	end))
+	filterButton:SetScript('OnLeave', BUI.Profiler.Script('Skin.ObjectiveTracker filterButton OnLeave', function()
 		QuestFilter.UpdateTint()
-	end)
-	filterButton:SetScript('OnClick', QuestFilter.ShowMenu)
+	end))
+	filterButton:SetScript('OnClick', BUI.Profiler.Script('Skin.ObjectiveTracker filterButton OnClick', QuestFilter.ShowMenu))
 	QuestFilter.UpdateTint()
 
 	headerCounts = parent:CreateFontString(nil, 'ARTWORK')
@@ -1201,12 +1201,12 @@ local function SkinMinimizeButton(header)
 	end
 	PaintGlyph(Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3])
 
-	button:HookScript('OnEnter', function()
+	button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.ObjectiveTracker button OnEnter 2', function()
 		if IsEnabled() then PaintGlyph(1, 1, 1) end
-	end)
-	button:HookScript('OnLeave', function()
+	end))
+	button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.ObjectiveTracker button OnLeave', function()
 		PaintGlyph(Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3])
-	end)
+	end))
 
 	SetCollapsedGlyph(header, header.isCollapsed)
 	if header.SetCollapsed then Hook(header, 'SetCollapsed', SetCollapsedGlyph) end
@@ -1434,9 +1434,9 @@ local function OnAddBlock(_, block)
 	end
 	if not block.__buiMenuHook then
 		block.__buiMenuHook = true
-		block:HookScript('OnMouseDown', function(self)
+		block:HookScript('OnMouseDown', BUI.Profiler.Wrap('Skin.ObjectiveTracker block OnMouseDown', function(self)
 			pendingMenuQuestID = self.poiQuestID or self.id
-		end)
+		end))
 	end
 	if not block.__buiColorHook then
 		block.__buiColorHook = true

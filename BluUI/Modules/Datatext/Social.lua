@@ -499,7 +499,7 @@ local function GetSocialRow(rowIndex)
             row.cols[columnIndex] = fontString
         end
 
-        row:SetScript('OnEnter', function(self)
+        row:SetScript('OnEnter', BUI.Profiler.Script('Datatext.Social row OnEnter', function(self)
             self.highlight:Show()
             local member = self.member
             if not member then return end
@@ -539,9 +539,9 @@ local function GetSocialRow(rowIndex)
                 GameTooltip:AddLine('Right-Click  |cffffffffInvite|r', 1, 0.82, 0)
             end
             GameTooltip:Show()
-        end)
-        row:SetScript('OnLeave', function(self) self.highlight:Hide(); GameTooltip:Hide() end)
-        row:SetScript('OnClick', function(self, mouseButton)
+        end))
+        row:SetScript('OnLeave', BUI.Profiler.Script('Datatext.Social row OnLeave', function(self) self.highlight:Hide(); GameTooltip:Hide() end))
+        row:SetScript('OnClick', BUI.Profiler.Script('Datatext.Social row OnClick', function(self, mouseButton)
             if self.headerKey then
                 local collapsedSections = BUI.GetDB().socialCollapsedSections
                 collapsedSections[self.headerKey] = not collapsedSections[self.headerKey] or nil
@@ -553,7 +553,7 @@ local function GetSocialRow(rowIndex)
             if mouseButton == 'RightButton' then InviteMember(self.member)
             elseif IsShiftKeyDown() then WhoMember(self.member)
             else WhisperMember(self.member) end
-        end)
+        end))
 
         socialRows[rowIndex] = row
     end
@@ -760,15 +760,15 @@ local function BuildSocialPanel()
     advancedLabel:SetText('Advanced')
     advancedLabel:SetPoint('RIGHT', advancedBox, 'LEFT', -Pixel.Scale(5), 0)
     panel.advancedToggle:SetWidth(Pixel.Scale(19) + advancedLabel:GetStringWidth())
-    panel.advancedToggle:SetScript('OnEnter', function() advancedLabel:SetTextColor(0.95, 0.95, 1) end)
-    panel.advancedToggle:SetScript('OnLeave', function() advancedLabel:SetTextColor(0.55, 0.55, 0.60) end)
-    panel.advancedToggle:SetScript('OnClick', function()
+    panel.advancedToggle:SetScript('OnEnter', BUI.Profiler.Script('Datatext.Social advancedToggle OnEnter', function() advancedLabel:SetTextColor(0.95, 0.95, 1) end))
+    panel.advancedToggle:SetScript('OnLeave', BUI.Profiler.Script('Datatext.Social advancedToggle OnLeave', function() advancedLabel:SetTextColor(0.55, 0.55, 0.60) end))
+    panel.advancedToggle:SetScript('OnClick', BUI.Profiler.Script('Datatext.Social advancedToggle OnClick', function()
         local profile = BUI.GetDB()
         profile.socialAdvancedView = not profile.socialAdvancedView
         panel.advancedCheck:SetShown(profile.socialAdvancedView == true)
         RenderSocial()
         panel.scroll:UpdateScroll()
-    end)
+    end))
 
     local scroll = Controls.ScrollFrame(panel, Pixel.Scale(initialContainerWidth), Pixel.Scale(SOCIAL_MAX_ROWS * SOCIAL_ROW_HEIGHT + 4), nil, Pixel.Scale(initialChildWidth))
     local scrollWidget = scroll.frame or scroll
@@ -796,9 +796,9 @@ local function BuildSocialPanel()
         headerButton.arrow:SetSize(Pixel.Scale(8), Pixel.Scale(8))
         headerButton.arrow:SetPoint('LEFT', headerButton.label, 'RIGHT', Pixel.Scale(1), 0)
         headerButton.arrow:Hide()
-        headerButton:SetScript('OnEnter', function(self) self.label:SetTextColor(0.95, 0.95, 1) end)
-        headerButton:SetScript('OnLeave', function(self) self.label:SetTextColor(0.55, 0.55, 0.60) end)
-        headerButton:SetScript('OnClick', function(self)
+        headerButton:SetScript('OnEnter', BUI.Profiler.Script('Datatext.Social headerButton OnEnter', function(self) self.label:SetTextColor(0.95, 0.95, 1) end))
+        headerButton:SetScript('OnLeave', BUI.Profiler.Script('Datatext.Social headerButton OnLeave', function(self) self.label:SetTextColor(0.55, 0.55, 0.60) end))
+        headerButton:SetScript('OnClick', BUI.Profiler.Script('Datatext.Social headerButton OnClick', function(self)
             local openPanel = socialPanel
             if not openPanel.data then return end
             if openPanel.sortCol == self.col then
@@ -809,7 +809,7 @@ local function BuildSocialPanel()
             GetSortState()[openPanel.kind] = { col = openPanel.sortCol, dir = openPanel.sortDir }
             RenderSocial()
             openPanel.scroll:ScrollToTop()
-        end)
+        end))
         panel.header[columnIndex] = headerButton
     end
     panel.headerLine = panel:CreateTexture(nil, 'ARTWORK')

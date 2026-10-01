@@ -209,24 +209,24 @@ local function CreateIcon(parent, barIndex, iconIndex)
     icon:EnableMouse(true)
     icon:RegisterForDrag("LeftButton")
 
-    icon:SetScript("OnDragStart", function()
+    icon:SetScript("OnDragStart", BUI.Profiler.Script('CustomBars.CustomBars icon OnDragStart', function()
         if IsDragBlocked(barIndex) then return end
         parent.dragActive = true
         parent:StartMoving()
-    end)
-    icon:SetScript("OnDragStop", function()
+    end))
+    icon:SetScript("OnDragStop", BUI.Profiler.Script('CustomBars.CustomBars icon OnDragStop', function()
         parent:StopMovingOrSizing()
         parent.dragActive = false
         local settings = GetBar(barIndex)
         if settings and not parent._isAnchored then
             settings.posX, settings.posY = BUI.Dragging.GetCenterOffset(parent)
         end
-    end)
-    icon:SetScript("OnMouseUp", function(_, button)
+    end))
+    icon:SetScript("OnMouseUp", BUI.Profiler.Script('CustomBars.CustomBars icon OnMouseUp', function(_, button)
         if button == "RightButton" and not parent.dragActive then
             LockBar(barIndex)
         end
-    end)
+    end))
 
     icon.tex = icon:CreateTexture(nil, "ARTWORK")
     icon.tex:SetAllPoints()
@@ -249,7 +249,7 @@ local function CreateIcon(parent, barIndex, iconIndex)
     overlay:EnableMouse(false)
     icon._tooltipOverlay = overlay
 
-    icon:SetScript("OnEnter", function()
+    icon:SetScript("OnEnter", BUI.Profiler.Script('CustomBars.CustomBars icon OnEnter', function()
         local settings = GetBar(barIndex)
         if not settings or settings.showTooltips == false then return end
         if not icon.itemID or not icon.iconType then return end
@@ -260,8 +260,8 @@ local function CreateIcon(parent, barIndex, iconIndex)
             GameTooltip:SetItemByID(icon.itemID)
         end
         GameTooltip:Show()
-    end)
-    icon:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end))
+    icon:SetScript("OnLeave", BUI.Profiler.Script('CustomBars.CustomBars icon OnLeave', function() GameTooltip:Hide() end))
     icon.stack = overlay:CreateFontString(nil, "OVERLAY")
     Pixel.ApplyFont(icon.stack, 12, BUI.GetTrackingFont())
 

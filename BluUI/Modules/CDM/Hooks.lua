@@ -158,7 +158,7 @@ function CDM.HookIconFrame(icon, key)
     frameData.posHooked = true
     frameData.viewerKey = key
     if key ~= 'buffs' and icon.Cooldown and not frameData.customIcon then
-        icon.Cooldown:HookScript('OnCooldownDone', CDM.OnCooldownWidgetDone)
+        icon.Cooldown:HookScript('OnCooldownDone', BUI.Profiler.Wrap('CDM.Hooks Cooldown OnCooldownDone', CDM.OnCooldownWidgetDone))
     end
 
     Hook(icon, "SetPoint", OnIconSetPoint)

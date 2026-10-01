@@ -26,6 +26,10 @@ local function ProfileCommand(option)
 		ReloadUI()
 	elseif option == 'report' then
 		ShowProfile()
+	elseif option == 'alerts' then
+		local global = BUI.db.global
+		global.profileAlerts = not global.profileAlerts or nil
+		BUI.Print(global.profileAlerts and 'Slow frame alerts on. BluUI will say in chat when it takes 100ms or more in a frame.' or 'Slow frame alerts off.')
 	elseif Profiler.active then
 		Profiler.Stop()
 		BUI.Print('Profiling stopped.')
@@ -50,6 +54,7 @@ local function PrintHelp()
 	line('/bui profile', 'start or stop timing BluUI, the report opens when you stop')
 	line('/bui profile report', 'show the timings so far without stopping')
 	line('/bui profile login', 'reload and time everything from login onwards')
+	line('/bui profile alerts', 'say in chat whenever BluUI takes 100ms or more in one frame')
 	line('/cdm', "toggle Blizzard's Cooldown Viewer settings")
 	line('/rl', 'reload the UI')
 	line('/edit', "open Blizzard's Edit Mode")
@@ -59,7 +64,7 @@ end
 SLASH_BUI1 = '/bui'
 SLASH_BUI2 = '/blu'
 SLASH_BUI3 = '/bluui'
-SlashCmdList['BUI'] = function(message)
+SlashCmdList['BUI'] = BUI.Profiler.Wrap('Core.Commands /bui', function(message)
 	local command, rest = message:match('^%s*(%S*)%s*(.-)%s*$')
 	command = command:lower()
 
@@ -79,7 +84,7 @@ SlashCmdList['BUI'] = function(message)
 	else
 		BUI.PageEngine.Toggle()
 	end
-end
+end)
 
 SLASH_BUICDM1 = '/cdm'
 SlashCmdList['BUICDM'] = function()

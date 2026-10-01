@@ -67,7 +67,7 @@ local function MakeButton(parent, text, width, onClick)
 	button:SetSize(width, BUTTON_HEIGHT)
 	Skin().TipButton(button)
 	button:SetText(text)
-	button:SetScript('OnClick', onClick)
+	button:SetScript('OnClick', BUI.Profiler.Script('Installer.Installer button OnClick', onClick))
 	return button
 end
 
@@ -79,8 +79,8 @@ end
 
 local function MakeStepButton(parent, text, width, onClick)
 	local button = MakeButton(parent, text, width, onClick)
-	button:HookScript('OnEnter', function(self) BUILib.Skin.SetShellFill(self, CHOICE_HOVER_FILL) end)
-	button:HookScript('OnLeave', function(self) BUILib.Skin.SetShellFill(self, PanelFill()) end)
+	button:HookScript('OnEnter', BUI.Profiler.Wrap('Installer.Installer button OnEnter', function(self) BUILib.Skin.SetShellFill(self, CHOICE_HOVER_FILL) end))
+	button:HookScript('OnLeave', BUI.Profiler.Wrap('Installer.Installer button OnLeave', function(self) BUILib.Skin.SetShellFill(self, PanelFill()) end))
 	return button
 end
 
@@ -111,9 +111,9 @@ local function MakeChoice(parent, width, height, onClick)
 			end
 		end
 	end
-	choice:SetScript('OnEnter', function(self) self:Paint(true) end)
-	choice:SetScript('OnLeave', function(self) self:Paint(false) end)
-	choice:SetScript('OnClick', onClick)
+	choice:SetScript('OnEnter', BUI.Profiler.Script('Installer.Installer choice OnEnter', function(self) self:Paint(true) end))
+	choice:SetScript('OnLeave', BUI.Profiler.Script('Installer.Installer choice OnLeave', function(self) self:Paint(false) end))
+	choice:SetScript('OnClick', BUI.Profiler.Script('Installer.Installer choice OnClick', onClick))
 	return choice
 end
 
@@ -470,12 +470,12 @@ local function MakePickerRow(list, id, name, width, onToggle)
 	mark:SetPoint('BOTTOMRIGHT', -PICKER_CHECK_INSET, PICKER_CHECK_INSET)
 	local label = MakeText(row, 11, name, TEXT_BODY)
 	label:SetPoint('LEFT', box, 'RIGHT', 8, 0)
-	row:SetScript('OnEnter', function() hover:Show() end)
-	row:SetScript('OnLeave', function() hover:Hide() end)
-	row:SetScript('OnClick', function()
+	row:SetScript('OnEnter', BUI.Profiler.Script('Installer.Installer row OnEnter', function() hover:Show() end))
+	row:SetScript('OnLeave', BUI.Profiler.Script('Installer.Installer row OnLeave', function() hover:Hide() end))
+	row:SetScript('OnClick', BUI.Profiler.Script('Installer.Installer row OnClick', function()
 		skinSelection[id] = not skinSelection[id]
 		onToggle()
-	end)
+	end))
 	function row:Paint()
 		local selected = skinSelection[id] == true
 		mark:SetShown(selected)
@@ -523,7 +523,7 @@ local function MakePicker(frame, onToggle)
 		rows[#rows + 1] = row
 	end
 
-	picker:SetScript('OnClick', function() list:SetShown(not list:IsShown()) end)
+	picker:SetScript('OnClick', BUI.Profiler.Script('Installer.Installer picker OnClick', function() list:SetShown(not list:IsShown()) end))
 	function picker:Paint()
 		local selectedCount, total = SelectionCounts()
 		if selectedCount == total then
@@ -712,9 +712,9 @@ local function MakeTextureRow(list, width, onSelect)
 	label:SetPoint('RIGHT', -6, 0)
 	label:SetJustifyH('LEFT')
 	label:SetWordWrap(false)
-	row:SetScript('OnEnter', function() hover:Show() end)
-	row:SetScript('OnLeave', function() hover:Hide() end)
-	row:SetScript('OnClick', function(self) if self.value then onSelect(self.value) end end)
+	row:SetScript('OnEnter', BUI.Profiler.Script('Installer.Installer row OnEnter 2', function() hover:Show() end))
+	row:SetScript('OnLeave', BUI.Profiler.Script('Installer.Installer row OnLeave 2', function() hover:Hide() end))
+	row:SetScript('OnClick', BUI.Profiler.Script('Installer.Installer row OnClick 2', function(self) if self.value then onSelect(self.value) end end))
 	function row:Bind(item, selected)
 		self.value = item and item.value
 		self:SetShown(item ~= nil)
@@ -779,11 +779,11 @@ local function MakeTexturePicker(frame, getValue, onSelect)
 			row:Bind(item, item ~= nil and item.value == current)
 		end
 	end
-	list:SetScript('OnMouseWheel', function(_, delta)
+	list:SetScript('OnMouseWheel', BUI.Profiler.Script('Installer.Installer list OnMouseWheel', function(_, delta)
 		offset = math.max(0, math.min(MaxOffset(), offset - delta * TEXTURE_COLUMNS * TEXTURE_SCROLL_ROWS))
 		BindRows()
-	end)
-	picker:SetScript('OnClick', function()
+	end))
+	picker:SetScript('OnClick', BUI.Profiler.Script('Installer.Installer picker OnClick 2', function()
 		if list:IsShown() then
 			list:Hide()
 			return
@@ -799,7 +799,7 @@ local function MakeTexturePicker(frame, getValue, onSelect)
 		end
 		BindRows()
 		list:Show()
-	end)
+	end))
 	function picker:Paint()
 		local current = getValue()
 		PaintSwatch(swatch, current)
@@ -965,14 +965,14 @@ local function BuildTheme(frame)
 	end
 
 	for _, tile in ipairs(tiles) do
-		tile:HookScript('OnEnter', function(self) StylePreview(self.style.uf) end)
-		tile:HookScript('OnLeave', function() StylePreview(CurrentUnitFrames()) end)
-		tile:SetScript('OnClick', function(self)
+		tile:HookScript('OnEnter', BUI.Profiler.Wrap('Installer.Installer tile OnEnter', function(self) StylePreview(self.style.uf) end))
+		tile:HookScript('OnLeave', BUI.Profiler.Wrap('Installer.Installer tile OnLeave', function() StylePreview(CurrentUnitFrames()) end))
+		tile:SetScript('OnClick', BUI.Profiler.Script('Installer.Installer tile OnClick', function(self)
 			ApplyFrameStyle(self.style)
 			PaintStyles()
 			SyncSliders()
 			StylePreview(CurrentUnitFrames())
-		end)
+		end))
 	end
 
 	local accentLabel = MakeText(frame, 12, 'Accent', TEXT_BODY)
@@ -1019,12 +1019,12 @@ local function BuildTheme(frame)
 		swatch.mark:SetTexture(BUILib.GetLibMedia('check'))
 		swatch.mark:SetVertexColor(0, 0, 0, 0.85)
 		Widget.Tooltip(swatch, accent.class and 'Your class color, always' or accent.name)
-		swatch:SetScript('OnClick', function(self)
+		swatch:SetScript('OnClick', BUI.Profiler.Script('Installer.Installer swatch OnClick', function(self)
 			ApplyAccentChoice(self.accent)
 			RefreshAddonAccent()
 			if wizard then wizard:ApplyAccent() end
 			PaintAccents()
-		end)
+		end))
 		swatches[#swatches + 1] = swatch
 	end
 
@@ -1149,7 +1149,7 @@ local function BuildWizard(onClosed)
 	exitButton:SetSize(22, 22)
 	exitButton:SetPoint('TOPRIGHT', -12, -10)
 	Skin().TipClose(exitButton)
-	exitButton:SetScript('OnClick', function() wizardInstance:Exit() end)
+	exitButton:SetScript('OnClick', BUI.Profiler.Script('Installer.Installer exitButton OnClick', function() wizardInstance:Exit() end))
 	Widget.Tooltip(exitButton, 'Exit setup')
 	local headerLine = card:CreateTexture(nil, 'BORDER')
 	headerLine:SetPoint('TOPLEFT', 1, -42)
@@ -1165,14 +1165,14 @@ local function BuildWizard(onClosed)
 	end
 	wizardInstance.Close = Close
 
-	overlay:SetScript('OnKeyDown', function(self, key)
+	overlay:SetScript('OnKeyDown', BUI.Profiler.Script('Installer.Installer overlay OnKeyDown', function(self, key)
 		if key == 'ESCAPE' then
 			self:SetPropagateKeyboardInput(false)
 			Close()
 		else
 			self:SetPropagateKeyboardInput(true)
 		end
-	end)
+	end))
 
 	wizardInstance.frames = {}
 	for stepIndex, step in ipairs(STEPS) do
@@ -1190,8 +1190,8 @@ local function BuildWizard(onClosed)
 			if stepFrame.ClosePopups then stepFrame.ClosePopups() end
 		end
 	end
-	overlay:SetScript('OnMouseDown', ClosePopups)
-	card:SetScript('OnMouseDown', ClosePopups)
+	overlay:SetScript('OnMouseDown', BUI.Profiler.Script('Installer.Installer overlay OnMouseDown', ClosePopups))
+	card:SetScript('OnMouseDown', BUI.Profiler.Script('Installer.Installer card OnMouseDown', ClosePopups))
 
 	local nextButton = MakeStepButton(card, 'Get Started', NEXT_MIN_WIDTH, function() wizardInstance:Next() end)
 	nextButton:SetPoint('BOTTOMRIGHT', -20, 16)

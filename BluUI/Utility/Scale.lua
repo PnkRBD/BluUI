@@ -116,9 +116,9 @@ function Scale.SetupButtons(window, parent)
         if button then
             buttons[preset.key] = button
             if preset.key == "Custom" then
-                button:SetScript("OnClick", function() ShowCustomDialog(parent) end)
+                button:SetScript("OnClick", BUI.Profiler.Script('Scale button OnClick', function() ShowCustomDialog(parent) end))
             else
-                button:SetScript("OnClick", function() Apply(preset.value) end)
+                button:SetScript("OnClick", BUI.Profiler.Script('Scale button OnClick 2', function() Apply(preset.value) end))
             end
         end
     end

@@ -138,8 +138,8 @@ local function SetHitDrag(hit, enabled)
     hit._dragEnabled = enabled
     if enabled then
         hit:RegisterForDrag('LeftButton')
-        hit:SetScript('OnDragStart', HitOnDragStart)
-        hit:SetScript('OnDragStop', HitOnDragStop)
+        hit:SetScript('OnDragStart', BUI.Profiler.Script('Datatext.Bars hit OnDragStart', HitOnDragStart))
+        hit:SetScript('OnDragStop', BUI.Profiler.Script('Datatext.Bars hit OnDragStop', HitOnDragStop))
     else
         hit:RegisterForDrag()
         hit:SetScript('OnDragStart', nil)
@@ -186,9 +186,9 @@ local function GetHit(bar, entry)
         hit:SetFrameLevel(bar.frame:GetFrameLevel() + 10)
         hit:EnableMouse(true)
         hit:RegisterForClicks('LeftButtonUp', 'RightButtonUp')
-        hit:SetScript('OnClick', HitOnClick)
-        hit:SetScript('OnEnter', HitOnEnter)
-        hit:SetScript('OnLeave', HitOnLeave)
+        hit:SetScript('OnClick', BUI.Profiler.Script('Datatext.Bars hit OnClick', HitOnClick))
+        hit:SetScript('OnEnter', BUI.Profiler.Script('Datatext.Bars hit OnEnter', HitOnEnter))
+        hit:SetScript('OnLeave', BUI.Profiler.Script('Datatext.Bars hit OnLeave', HitOnLeave))
         hit.isDatatextHit = true
         hit.bar = bar
         hit:Hide()
@@ -549,7 +549,7 @@ local function CreateMainBarObject(frameName, configProvider)
     local bar = { getConfig = configProvider, frame = frame, hits = {} }
     frame.bar = bar
 
-    frame:SetScript('OnMouseUp', MainOnMouseUp)
+    frame:SetScript('OnMouseUp', BUI.Profiler.Script('Datatext.Bars frame OnMouseUp', MainOnMouseUp))
     frame:SetScript('OnShow', MainOnShow)
     return bar
 end
@@ -615,8 +615,8 @@ local function ApplyMainBar(bar)
         frame.bg:SetShown(bgAlpha > 0)
         frame.hint:Hide()
     else
-        frame:SetScript('OnDragStart', MainOnDragStart)
-        frame:SetScript('OnDragStop', MainOnDragStop)
+        frame:SetScript('OnDragStart', BUI.Profiler.Script('Datatext.Bars frame OnDragStart', MainOnDragStart))
+        frame:SetScript('OnDragStop', BUI.Profiler.Script('Datatext.Bars frame OnDragStop', MainOnDragStop))
         BUI.Tools.SetColorTex(frame.bg, backgroundColor.r, backgroundColor.g, backgroundColor.b, math.max(bgAlpha, 0.5))
         frame.bg:Show()
         frame.hint:Show()
