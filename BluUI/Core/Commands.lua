@@ -54,6 +54,8 @@ local function PrintHelp()
 	line('/bui profile report', 'show the timings so far without stopping')
 	line('/bui profile login', 'reload and time everything from login onwards')
 	line('/bui profile alerts', 'say in chat whenever BluUI takes 100ms or more in one frame')
+	line('/bui trace', 'reload and record everything BluUI runs in the first 20 seconds, then show it')
+	line('/bui trace show', 'show the last launch trace again')
 	line('/cdm', "toggle Blizzard's Cooldown Viewer settings")
 	line('/rl', 'reload the UI')
 	line('/edit', "open Blizzard's Edit Mode")
@@ -77,6 +79,8 @@ SlashCmdList['BUI'] = BUI.Profiler.Wrap('Core.Commands /bui', function(message)
 		BUI.ActionBars.ToggleKeybindMode()
 	elseif command == 'profile' then
 		ProfileCommand(rest:lower())
+	elseif command == 'trace' then
+		if rest:lower() == 'show' then BUI.LaunchTrace.Show() else BUI.LaunchTrace.Start() end
 	else
 		BUI.PageEngine.Toggle()
 	end

@@ -118,28 +118,52 @@ local function Record(label, elapsed)
 	namedTotal = namedTotal + elapsed
 end
 
-local function Close(label, start, ...)
+local running, runningDepth = {}, 0
+local tracer
+
+local function Enter(label)
+	local mine = runningDepth + 1
+	runningDepth = mine
+	running[mine] = label
+	return mine
+end
+
+local function Leave(label, start, elapsed, mine)
+	runningDepth = mine - 1
+	if tracer then tracer(label, start, elapsed, mine, running[mine - 1]) end
+end
+
+local function Close(label, start, mine, ...)
 	depth = depth - 1
-	Record(label, debugprofilestop() - start)
+	local elapsed = debugprofilestop() - start
+	Record(label, elapsed)
+	Leave(label, start, elapsed, mine)
 	return ...
 end
 
 local function Run(label, callback, ...)
 	depth = depth + 1
-	return Close(label, debugprofilestop(), callback(...))
+	local mine = Enter(label)
+	return Close(label, debugprofilestop(), mine, callback(...))
 end
 
-local function Settle(label, start, ...)
+local function Settle(label, start, mine, ...)
 	watchDepth = watchDepth - 1
 	local elapsed = debugprofilestop() - start
 	noted[label] = (noted[label] or 0) + elapsed
 	if watchDepth == 0 then notedTotal = notedTotal + elapsed end
+	Leave(label, start, elapsed, mine)
 	return ...
 end
 
 local function Watch(label, callback, ...)
 	watchDepth = watchDepth + 1
-	return Settle(label, debugprofilestop(), callback(...))
+	local mine = Enter(label)
+	return Settle(label, debugprofilestop(), mine, callback(...))
+end
+
+function Profiler.SetTracer(callback)
+	tracer = callback
 end
 
 function Profiler.Run(label, callback, ...)
