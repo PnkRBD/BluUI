@@ -118,7 +118,6 @@ end
 local function Deactivate()
 	context.Restore()
 	skinned = false
-	BUI.Print('Item Socketing skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

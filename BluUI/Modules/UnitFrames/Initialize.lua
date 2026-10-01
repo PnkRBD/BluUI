@@ -207,6 +207,8 @@ function UnitFrames:Initialize()
 		BUI.Events:Register('PLAYER_ALIVE', 'UF.LifeState', OnLifeStateChanged)
 		BUI.Events:Register('PLAYER_UNGHOST', 'UF.LifeState', OnLifeStateChanged)
 		BUI.Events:Register('PLAYER_DEAD', 'UF.LifeState', OnLifeStateChanged)
+
+		self:Refresh()
 	end)
 
 	Pixel.OnScaleChange('UnitFrames', function() UnitFrames:Refresh() end)

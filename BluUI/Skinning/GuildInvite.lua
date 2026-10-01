@@ -180,7 +180,6 @@ local function Deactivate()
 		title:Hide()
 		countdown:Hide()
 	end
-	BUI.Print('Guild invite skin disabled. /reload for a full visual reset.')
 end
 
 local function StartPreview()

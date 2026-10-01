@@ -619,11 +619,9 @@ end
 
 if ENGINE_OK then
 	UnitFrames.CreateAuraElements = EngineCreateAuraElements
-	UnitFrames.ApplyAuraPositions = EngineApplyAuraPositions
 	UnitFrames.RefreshAuraLayout = EngineRefreshAuraLayout
 else
 	UnitFrames.CreateAuraElements = LegacyCreateAuraElements
-	UnitFrames.ApplyAuraPositions = LegacyApplyAuraPositions
 	UnitFrames.RefreshAuraLayout = LegacyRefreshAuraLayout
 end
 

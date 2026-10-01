@@ -2583,7 +2583,6 @@ Skin.OnToggle('characterFrame', function(enabled)
             Skin.RestoreBlizzardFrame(CharacterFrame)
             Skin.ReleasePanelSlot(CharacterFrame)
         end
-        BUI.Print('Character sheet skin disabled. /reload for a full visual reset.')
     elseif CharacterFrame and CharacterFrame:IsShown() then
         ApplySkin()
     end

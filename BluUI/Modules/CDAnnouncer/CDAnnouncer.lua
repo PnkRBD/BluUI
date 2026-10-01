@@ -1103,13 +1103,6 @@ function CDAnnouncer.DuplicateSpell(sourceID, input, isItem)
     return entryID
 end
 
-function CDAnnouncer.RefreshSpellDuration(spellID)
-    local entry = CDAnnouncer.FindEntry(tonumber(spellID))
-    if not entry then return end
-    entry.duration = CDAnnouncer.ResolveCooldownSeconds(entry.spellID, entry.kind)
-    CDAnnouncer.Refresh()
-end
-
 function CDAnnouncer.RemoveSpell(spellID)
     spellID = tonumber(spellID)
     local _, index = CDAnnouncer.FindEntry(spellID)

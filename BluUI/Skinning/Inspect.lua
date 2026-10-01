@@ -683,7 +683,6 @@ local function Deactivate()
 	ShowSlotLabels(false)
 	if installed then _G.InspectFrame:SetScale(1) end
 	skinned = false
-	BUI.Print('Inspect skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

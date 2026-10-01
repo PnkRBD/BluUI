@@ -855,7 +855,6 @@ local function Deactivate()
 	skinned = false
 	pvpSkinned = false
 	challengesSkinned = false
-	BUI.Print('Group Finder skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

@@ -100,11 +100,12 @@ Skin.ToastAnchors.Register({
 
 Skin.OnToggle(SKIN_ID, function(enabled)
 	if enabled then
-		for index = 1, #skinnedAlerts do skinnedAlerts[index]._buiAlert = nil end
 		Install()
 		SweepAlerts()
 	else
 		context.Restore()
+		for index = 1, #skinnedAlerts do skinnedAlerts[index]._buiAlert = nil end
+		wipe(skinnedAlerts)
 	end
 end)
 

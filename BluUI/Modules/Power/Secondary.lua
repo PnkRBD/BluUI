@@ -994,7 +994,7 @@ local function StartLifecycleEvents()
     lifecycleStarted = true
     local label = "SecondaryPowerLifecycle"
     BUI.Events:Register("PLAYER_ENTERING_WORLD", label, OnLifecycleEvent)
-    BUI.Events:Register("PLAYER_SPECIALIZATION_CHANGED", label, OnLifecycleEvent)
+    BUI.Events:RegisterUnit("PLAYER_SPECIALIZATION_CHANGED", "player", label, OnLifecycleEvent)
     BUI.Events:Register("PLAYER_TALENT_UPDATE", label, OnLifecycleEvent)
     BUI.Events:Register("UPDATE_SHAPESHIFT_FORM", label, OnLifecycleEvent)
     BUI.Events:Register("UPDATE_SHAPESHIFT_FORMS", label, OnLifecycleEvent)

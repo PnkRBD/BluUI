@@ -212,5 +212,5 @@ end
 BUI.Events:Register('PLAYER_ENTERING_WORLD', 'TrueStats', TrueStats.Refresh)
 BUI.Events:Register('PLAYER_LEVEL_UP', 'TrueStats', TrueStats.Refresh)
 BUI.Events:Register('COMBAT_RATING_UPDATE', 'TrueStats', TrueStats.Refresh)
-BUI.Events:Register('PLAYER_SPECIALIZATION_CHANGED', 'TrueStats', TrueStats.Refresh)
+BUI.Events:RegisterUnit('PLAYER_SPECIALIZATION_CHANGED', 'player', 'TrueStats', TrueStats.Refresh)
 BUI.Events:Register('PLAYER_REGEN_ENABLED', 'TrueStats', TrueStats.Refresh)

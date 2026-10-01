@@ -230,7 +230,12 @@ local function Deactivate()
 	Skin.ForEachScrollFrame(scrollBox, function(element) element._buiCdmCategory = nil end)
 	local frame = _G.CooldownViewerSettings
 	if frame then frame._buiCdmSkin = nil end
-	BUI.Print('Cooldown Manager skin disabled. /reload for a full visual reset.')
+end
+
+local function TryInstall()
+	if not _G.CooldownViewerSettings then return end
+	BUI.Events:Unregister('ADDON_LOADED', 'Skin.CooldownManager')
+	Apply()
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)
@@ -247,5 +252,5 @@ Skin.RegisterSkin(SKIN_ID, {
 	icon = 'Interface/Icons/INV_Misc_PocketWatch_01',
 })
 
-BUI.Events:Register('ADDON_LOADED', 'Skin.CooldownManager', Apply)
+BUI.Events:Register('ADDON_LOADED', 'Skin.CooldownManager', TryInstall)
 BUI.Events:Once('PLAYER_LOGIN', 'Skin.CooldownManager', Apply)

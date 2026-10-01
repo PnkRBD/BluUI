@@ -756,7 +756,6 @@ end
 local function Deactivate()
 	context.Restore()
 	wipe(skinnedWindows)
-	BUI.Print('Settings & Editors skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

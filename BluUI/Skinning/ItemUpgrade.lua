@@ -204,7 +204,6 @@ local function Deactivate()
 	context.Restore()
 	for _, plate in pairs(plates) do plate:Hide() end
 	skinned = false
-	BUI.Print('Item Upgrade skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

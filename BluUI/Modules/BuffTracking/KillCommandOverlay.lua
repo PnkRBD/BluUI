@@ -419,7 +419,7 @@ local function DirtyAndRefresh()
     QueueRefresh()
 end
 
-BUI.Events:Register('PLAYER_SPECIALIZATION_CHANGED', 'BuffTrackingKCO', DirtyAndRefresh)
+BUI.Events:RegisterUnit('PLAYER_SPECIALIZATION_CHANGED', 'player', 'BuffTrackingKCO', DirtyAndRefresh)
 BUI.Events:Register('TRAIT_CONFIG_UPDATED', 'BuffTrackingKCO', DirtyAndRefresh)
 BUI.Events:Register('PLAYER_ENTERING_WORLD', 'BuffTrackingKCO', DirtyAndRefresh)
 BUI.Events:Register('PLAYER_REGEN_DISABLED', 'BuffTrackingKCO', MarkCacheDirty)

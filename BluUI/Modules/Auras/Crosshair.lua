@@ -207,7 +207,7 @@ local function Build()
     BUI.Events:Register("PLAYER_REGEN_DISABLED",         "Crosshair", UpdateVisibility)
     BUI.Events:Register("PLAYER_UPDATE_RESTING",         "Crosshair", UpdateVisibility)
     BUI.Events:Register("ZONE_CHANGED_NEW_AREA",         "Crosshair", UpdateVisibility)
-    BUI.Events:Register("PLAYER_SPECIALIZATION_CHANGED", "Crosshair", function()
+    BUI.Events:RegisterUnit("PLAYER_SPECIALIZATION_CHANGED", "player", "Crosshair", function()
         cachedSpecID = nil
         InvalidateRangedLimit()
         UpdateVisibility()

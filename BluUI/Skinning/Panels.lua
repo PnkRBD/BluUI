@@ -209,10 +209,11 @@ for index = 1, #WINDOWS do
 	entry.context = Skin.NewContext(entry.enabled)
 	Skin.OnToggle(entry.id, function(enabled)
 		if enabled then
-			for frameIndex = 1, #entry.skinned do entry.skinned[frameIndex]._buiPanelSkin = nil end
 			TrySkin(entry)
 		else
 			entry.context.Restore()
+			for frameIndex = 1, #entry.skinned do entry.skinned[frameIndex]._buiPanelSkin = nil end
+			wipe(entry.skinned)
 		end
 	end)
 	Skin.RegisterSkin(entry.id, {

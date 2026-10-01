@@ -191,7 +191,6 @@ end
 local function Deactivate()
 	context.Restore()
 	SetDecorShown(false)
-	BUI.Print("What's New skin disabled. /reload for a full visual reset.")
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

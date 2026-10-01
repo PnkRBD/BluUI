@@ -1326,22 +1326,26 @@ local function TryInstall()
 	if installed then BUI.Events:Unregister('ADDON_LOADED', 'Skin.Guild') end
 end
 
+local function ApplyIfShown(frameName, apply)
+	local frame = _G[frameName]
+	if frame and frame:IsShown() then apply() end
+end
+
 local function Deactivate()
 	context.Restore()
 	for _, tab in ipairs(skinnedSideTabs) do Skin.ResetSideTab(tab) end
 	communitiesSkinned = false
 	bankSkinned = false
 	controlSkinned = false
-	BUI.Print('Guild & Communities skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)
 	if enabled then
 		Install()
 		if not installed then BUI.Events:Register('ADDON_LOADED', 'Skin.Guild', TryInstall) end
-		ApplyCommunities()
-		ApplyGuildBank()
-		ApplyGuildControl()
+		ApplyIfShown('CommunitiesFrame', ApplyCommunities)
+		ApplyIfShown('GuildBankFrame', ApplyGuildBank)
+		ApplyIfShown('GuildControlUI', ApplyGuildControl)
 	else
 		Deactivate()
 	end

@@ -344,7 +344,7 @@ end
 
 BUI.Events:Register("SPELLS_CHANGED", "CDM.KnownRacials", InvalidateKnownRacials)
 BUI.Events:Register("PLAYER_TALENT_UPDATE", "CDM.KnownRacials", InvalidateKnownRacials)
-BUI.Events:Register("PLAYER_SPECIALIZATION_CHANGED", "CDM.KnownRacials", InvalidateKnownRacials)
+BUI.Events:RegisterUnit("PLAYER_SPECIALIZATION_CHANGED", "player", "CDM.KnownRacials", InvalidateKnownRacials)
 
 function CDM.ResolveRacialSlot(slot)
     slot = slot or 1

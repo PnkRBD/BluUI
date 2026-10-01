@@ -148,7 +148,6 @@ local function Deactivate()
 			Skin.HideTipShell(dialog)
 		end
 	end
-	BUI.Print('Popup skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

@@ -278,7 +278,6 @@ local function Deactivate()
 	context.Restore()
 	for _, line in ipairs(dividerLines) do line:Hide() end
 	skinned = false
-	BUI.Print('Great Vault skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

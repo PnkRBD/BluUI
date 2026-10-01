@@ -229,7 +229,6 @@ local function Deactivate()
 	if listener.PortraitContainer then listener.PortraitContainer:Show() end
 	Skin.HideTipShell(listener)
 	if listener._buiTipLine then listener._buiTipLine:Hide() end
-	BUI.Print('Ready Check skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)

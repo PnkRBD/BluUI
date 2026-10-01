@@ -107,9 +107,12 @@ end
 
 local function Deactivate()
 	context.Restore()
-	for _, button in ipairs(skinnedButtons) do Pixel.HideBorder(button) end
+	for _, button in ipairs(skinnedButtons) do
+		Pixel.HideBorder(button)
+		button._buiPetSkin = nil
+	end
+	wipe(skinnedButtons)
 	skinned = false
-	BUI.Print('Pet battle skin disabled. /reload for a full visual reset.')
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)
@@ -118,8 +121,6 @@ Skin.OnToggle(SKIN_ID, function(enabled)
 		if not installed then
 			BUI.Events:Register('ADDON_LOADED', 'Skin.PetBattle', TryInstall)
 		else
-			for _, button in ipairs(skinnedButtons) do button._buiPetSkin = nil end
-			wipe(skinnedButtons)
 			Apply()
 		end
 	else
