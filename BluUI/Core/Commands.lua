@@ -50,7 +50,6 @@ local function PrintHelp()
 	line('/bui ?', 'this help')
 	line('/bui install', 'run the setup wizard')
 	line('/bui keybind', 'toggle action bar keybind mode (hover a button, press a key)')
-	line('/bui currency <id>', 'print the cap fields the game reports for a currency (3418 = Nebulous Voidcore)')
 	line('/bui profile', 'start or stop timing BluUI, the report opens when you stop')
 	line('/bui profile report', 'show the timings so far without stopping')
 	line('/bui profile login', 'reload and time everything from login onwards')
@@ -74,9 +73,6 @@ SlashCmdList['BUI'] = BUI.Profiler.Wrap('Core.Commands /bui', function(message)
 		CenterWindow()
 	elseif command == 'install' then
 		BUI.Installer.Open()
-	elseif command == 'currency' then
-		local id = tonumber(rest)
-		if id then BUI.Currency.Dump(id) else BUI.Print('Usage: /bui currency <currency id>') end
 	elseif command == 'keybind' or command == 'kb' then
 		BUI.ActionBars.ToggleKeybindMode()
 	elseif command == 'profile' then
