@@ -145,6 +145,12 @@ local function CenterEntry(entry)
 	Apply(entry)
 end
 
+local function CloseEntry(entry)
+	ToastAnchors.SetUnlocked(entry.key, false)
+	local window = BUI.PageEngine.window
+	if window then window:Repaint() end
+end
+
 local function SampleShell(parent, width, height)
 	local frame = CreateFrame('Frame', nil, parent)
 	frame:SetSize(width, height)
@@ -199,17 +205,6 @@ function SAMPLES.toast(parent)
 	return frame
 end
 
-function SAMPLES.roll(parent)
-	local frame = SampleShell(parent, 300, 56)
-	local icon = SampleIcon(frame, 40, 8)
-	SampleText(frame, 'title', 'Sample Item', 'TOPLEFT', icon, 'TOPRIGHT', 10, -2)
-	local pass = SampleButton(frame, 'Pass', 52, 'BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -8, 8)
-	local greed = SampleButton(frame, 'Greed', 56, 'RIGHT', pass, 'LEFT', -4, 0)
-	SampleButton(frame, 'Need', 52, 'RIGHT', greed, 'LEFT', -4, 0)
-	SampleTimer(frame, 0.65)
-	return frame
-end
-
 function SAMPLES.bonus(parent)
 	local frame = SampleShell(parent, 300, 72)
 	local icon = SampleIcon(frame, 44, 10)
@@ -241,7 +236,8 @@ end
 local function EnsureSample(entry)
 	if entry.sampleFrame then return entry.sampleFrame end
 	local anchor = entry.anchor
-	local sample = SAMPLES[entry.sample](anchor)
+	local build = type(entry.sample) == 'function' and entry.sample or SAMPLES[entry.sample]
+	local sample = build(anchor)
 	sample._buiAnchor = anchor
 	sample:SetFrameLevel(anchor:GetFrameLevel() + 1)
 	sample:EnableMouse(true)
@@ -286,11 +282,7 @@ local function CreateAnchor(entry)
 	local function CaptionButton(text, anchorTo, onClick)
 		local button = CreateFrame('Button', nil, caption)
 		button:SetSize(CAPTION_BUTTON_WIDTH, ANCHOR_HEIGHT)
-		if anchorTo then
-			button:SetPoint('RIGHT', anchorTo, 'LEFT', -2, 0)
-		else
-			button:SetPoint('RIGHT', caption, 'RIGHT', -2, 0)
-		end
+		button:SetPoint('RIGHT', anchorTo, 'LEFT', -2, 0)
 		local buttonText = button:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
 		buttonText:SetPoint('CENTER')
 		buttonText:SetText(text)
@@ -299,7 +291,12 @@ local function CreateAnchor(entry)
 		button:SetScript('OnLeave', BUI.Profiler.Script('Skin.ToastAnchors button OnLeave', function() buttonText:SetTextColor(1, 1, 1) end))
 		return button
 	end
-	local reset = CaptionButton('RESET', nil, function() ResetEntry(entry) end)
+	local close = CreateFrame('Button', nil, caption)
+	close:SetSize(ANCHOR_HEIGHT, ANCHOR_HEIGHT)
+	close:SetPoint('RIGHT', caption, 'RIGHT', -2, 0)
+	Skin.TipClose(close)
+	close:SetScript('OnClick', BUI.Profiler.Script('Skin.ToastAnchors close OnClick', function() CloseEntry(entry) end))
+	local reset = CaptionButton('RESET', close, function() ResetEntry(entry) end)
 	CaptionButton('CENTER', reset, function() CenterEntry(entry) end)
 
 	anchor:Hide()
