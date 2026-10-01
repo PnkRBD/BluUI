@@ -447,12 +447,12 @@ function Layout.TableKit(window)
 
 	function kit.RowTitle(row, name, sub, x, width)
 		local title = kit.Text(row, name, 12, 'text', width)
-		title:SetPoint('LEFT', x, sub and 8 or 0)
+		title:SetPoint('LEFT', x, sub and 9 or 0)
 		title:SetWordWrap(false)
 		local subtitle
 		if sub then
 			subtitle = kit.Text(row, sub, 11, 'muted', width)
-			subtitle:SetPoint('LEFT', x, -9)
+			subtitle:SetPoint('LEFT', x, -10)
 			subtitle:SetWordWrap(false)
 		end
 		return title, subtitle
