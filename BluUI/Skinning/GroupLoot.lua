@@ -2,13 +2,25 @@ local _, BUI = ...
 
 local Hook = BUI.Profiler.Hooker('Skin.GroupLoot')
 
+local ipairs = ipairs
+
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 local Tools = BUI.Tools
 local Layout = BUILib.Layout
 
 local SKIN_ID = 'grouploot'
+local ANCHOR_KEY = 'lootrolls'
 local GROW_DOWN_SETTING = 'grouplootGrowDown'
+local ROLL_WIDTH, ROLL_HEIGHT = 300, 48
+local ROLL_STEP = ROLL_HEIGHT + 6
+local ROLL_INSET = 8
+local CONTENT_LIFT = 2
+local ICON_SIZE = 32
+local BUTTON_SIZE = 26
+local BUTTON_GAP = 4
+local TEXT_GAP = 8
+local TIMER_HEIGHT = 3
 
 local installed = false
 local skinned = {}
@@ -27,17 +39,51 @@ local function QualityColor(frame)
 	return ITEM_QUALITY_COLORS[quality]
 end
 
+local function RaiseTimer(frame)
+	if Enabled() then frame.Timer:SetFrameLevel(frame:GetFrameLevel() + 1) end
+end
+
+local function LayoutFrame(frame)
+	frame:SetSize(ROLL_WIDTH, ROLL_HEIGHT)
+	local iconFrame = frame.IconFrame
+	iconFrame:SetSize(ICON_SIZE, ICON_SIZE)
+	iconFrame:ClearAllPoints()
+	iconFrame:SetPoint('LEFT', frame, 'LEFT', ROLL_INSET, CONTENT_LIFT)
+	iconFrame.Icon:SetAllPoints(iconFrame)
+	for _, button in ipairs(frame.LootButtons) do button:SetSize(BUTTON_SIZE, BUTTON_SIZE) end
+	local pass, greed, need = frame.PassButton, frame.GreedButton, frame.NeedButton
+	pass:ClearAllPoints()
+	pass:SetPoint('RIGHT', frame, 'RIGHT', -ROLL_INSET, CONTENT_LIFT)
+	greed:ClearAllPoints()
+	greed:SetPoint('RIGHT', pass, 'LEFT', -BUTTON_GAP, 0)
+	need:ClearAllPoints()
+	need:SetPoint('RIGHT', greed, 'LEFT', -BUTTON_GAP, 0)
+	local name = frame.Name
+	name:ClearAllPoints()
+	name:SetPoint('LEFT', iconFrame, 'RIGHT', TEXT_GAP, 0)
+	name:SetPoint('RIGHT', need, 'LEFT', -TEXT_GAP, 0)
+	name:SetWordWrap(false)
+	local timer = frame.Timer
+	timer:ClearAllPoints()
+	timer:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', 1, 1)
+	timer:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -1, 1)
+	timer:SetHeight(TIMER_HEIGHT)
+end
+
 local function SkinFrame(frame)
 	local iconFrame, timer = frame.IconFrame, frame.Timer
 	Fade(frame.Background)
 	Fade(frame.Border)
 	Fade(iconFrame.Border)
+	LayoutFrame(frame)
 	context.Shell(frame)
 	Skin.TipFace(frame.Name, 'body')
 	Skin.CropIcon(iconFrame.Icon)
 	Skin.TipIconFrame(iconFrame, iconFrame.Icon)
 	timer:SetStatusBarTexture(BUI.GetGlobalTexture())
 	Tools.SetColorTex(timer.Background, 0, 0, 0, 0.5)
+	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GroupLoot frame OnShow', RaiseTimer))
+	RaiseTimer(frame)
 end
 
 local function SkinAll()
@@ -62,6 +108,25 @@ end
 
 local Resweep = BUI.Dispatcher.New(SkinAll, 'Skin.GroupLoot')
 
+local function StackRolls(container, point)
+	local direction = point == 'TOP' and -1 or 1
+	local offset = 0
+	for index = 1, container.maxIndex do
+		local frame = container.rollFrames[index]
+		local size = (frame and not rollFrames[frame]) and container.reservedSize or ROLL_STEP
+		if frame then
+			frame:ClearAllPoints()
+			frame:SetPoint('CENTER', container, point, 0, direction * (offset + size / 2))
+		end
+		offset = offset + size
+	end
+end
+
+local function Restack(container)
+	if not Enabled() or Skin.ToastAnchors.IsPositioned(ANCHOR_KEY) then return end
+	StackRolls(container, 'BOTTOM')
+end
+
 local function Install()
 	if installed then return end
 	installed = true
@@ -71,6 +136,7 @@ local function Install()
 		index = index + 1
 	end
 	Hook('GroupLootContainer_Update', Resweep)
+	Hook('GroupLootContainer_Update', Restack)
 end
 
 local function Deactivate()
@@ -90,20 +156,13 @@ end
 
 local function PlaceRolls(container, anchor)
 	local point = GrowPoint()
-	local step = point == 'TOP' and -container.reservedSize or container.reservedSize
 	container:ClearAllPoints()
 	container:SetPoint(point, anchor, point, 0, 0)
-	for index = 1, container.maxIndex do
-		local frame = container.rollFrames[index]
-		if frame then
-			frame:ClearAllPoints()
-			frame:SetPoint('CENTER', container, point, 0, step * (index - 0.5))
-		end
-	end
+	StackRolls(container, point)
 end
 
 Skin.ToastAnchors.Register({
-	key = 'lootrolls',
+	key = ANCHOR_KEY,
 	label = 'LOOT ROLLS',
 	point = GrowPoint,
 	sample = 'roll',
@@ -135,12 +194,12 @@ Skin.RegisterSkin(SKIN_ID, {
 			tooltip = 'Stack new rolls below the first one. Takes effect once the roll window has been moved with the unlock eye.',
 		}, skinDB[GROW_DOWN_SETTING], function(value)
 			skinDB[GROW_DOWN_SETTING] = value
-			Skin.ToastAnchors.Refresh('lootrolls')
+			Skin.ToastAnchors.Refresh(ANCHOR_KEY)
 		end)
 	end,
 	unlock = {
 		tooltip = 'Unlock position. Drag the roll popup window, then click again to lock.',
-		get = function() return Skin.ToastAnchors.IsUnlocked('lootrolls') end,
-		set = function(value) Skin.ToastAnchors.SetUnlocked('lootrolls', value) end,
+		get = function() return Skin.ToastAnchors.IsUnlocked(ANCHOR_KEY) end,
+		set = function(value) Skin.ToastAnchors.SetUnlocked(ANCHOR_KEY, value) end,
 	},
 })
