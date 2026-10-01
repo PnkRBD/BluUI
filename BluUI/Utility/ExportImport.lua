@@ -78,6 +78,7 @@ local ImportCompanionKeys = {
     secondaryPower = { "powerScope", "powerVariants" },
     datatextBars = { "datatextBarsInit", "datatextEnabled", "datatextMinimap" },
     datatext = { "datatextEnabled", "datatextMinimap", "datatextHideHoversInCombat", "datatextRosterTooltips" },
+    skinning = { "chatGeometry" },
     social = { "socialShowBattleTag", "socialAdvancedView", "socialCollapsedSections", "datatextSortState", "guildTooltipScore", "guildTooltipRanks" },
 }
 
