@@ -14,18 +14,13 @@ local MENU_WIDTH = 150
 local CHARACTER_WIDTH = 260
 local INPUT_WIDTH = 260
 local NAME_WIDTH = 300
-local ICON_SIZE = 24
-local GRABBER_SIZE = 12
-local GRABBER_X = 18
-local LIST_ICON_X = 42
-local LIST_NAME_X = 78
+local LIST_ICON_X = Layout.DRAG_TITLE_X
 local ERASE_SIZE = BUILib.Layout.ERASE_SIZE
 local ERASE_INSET = 18
 local TOOL_SIZE = 22
 local TOOL_GAP = 12
 local TOOLS_ROOM = ERASE_INSET + ERASE_SIZE + 3 * (TOOL_GAP + TOOL_SIZE) + TOOL_GAP
 local RESULTS_WIDTH = 280
-local DRAG_ALPHA = 0.35
 local HIDDEN_ALPHA = 0.45
 local DEFAULT_ICON = 134400
 local TRINKET_SLOTS = { 13, 14 }
@@ -154,39 +149,45 @@ local function Describe(id, isItem)
 end
 
 local function Entries(bar)
-	local list, seen = {}, {}
-	for _, stored in ipairs(bar.customSpells) do
-		local id, isItem, explicitSpell = IconEngine.ExtractSpellItemID(stored)
-		if id then
-			seen[id] = true
-			local icon, name = Describe(id, isItem)
-			list[#list + 1] = {
-				stored = stored, id = id, icon = icon, name = name, sub = (isItem and 'Item ' or 'Spell ') .. id, hideKey = id, custom = true,
-				consumable = IconEngine.ClassifyAsSpellOrItem(id, isItem, nil, explicitSpell) == 'consumable',
-				potion = isItem and BUI.CDM.Custom.IsPotionItem(id),
-			}
-		end
-	end
-	if bar.showTrinkets then
-		for slotIndex, slot in ipairs(TRINKET_SLOTS) do
-			local entry = { name = 'Trinket ' .. slotIndex, icon = DEFAULT_ICON, sub = 'Nothing equipped', hideKey = 'auto:slot:' .. slot, slot = slot }
-			local itemID = GetInventoryItemID('player', slot)
+	local list = {}
+	CustomBars.ForEachIcon(bar, function(kind, value)
+		if kind == 'slot' then
+			local entry = { name = 'Trinket ' .. IndexOf(TRINKET_SLOTS, value), icon = DEFAULT_ICON, sub = 'Nothing equipped', hideKey = CustomBars.SlotKey(value), slot = value }
+			local itemID = GetInventoryItemID('player', value)
 			if itemID then
 				entry.itemID = itemID
 				entry.icon, entry.sub = Describe(itemID, true)
 			end
 			list[#list + 1] = entry
+		elseif kind == 'racial' then
+			local icon, name = Describe(value, false)
+			list[#list + 1] = { id = value, icon = icon, name = name, sub = 'Racial, added automatically', hideKey = CustomBars.RacialKey(value) }
+		else
+			local id, isItem, explicitSpell = IconEngine.ExtractSpellItemID(value)
+			if not id then return end
+			local icon, name = Describe(id, isItem)
+			list[#list + 1] = {
+				stored = value, id = id, icon = icon, name = name, sub = (isItem and 'Item ' or 'Spell ') .. id, hideKey = id, custom = true,
+				consumable = IconEngine.ClassifyAsSpellOrItem(id, isItem, nil, explicitSpell) == 'consumable',
+				potion = isItem and BUI.CDM.Custom.IsPotionItem(id),
+			}
 		end
-	end
-	if bar.showRacials then
-		for _, id in ipairs(BUI.CDM.GetKnownRacialSpellIDs()) do
-			if not seen[id] then
-				local icon, name = Describe(id, false)
-				list[#list + 1] = { id = id, icon = icon, name = name, sub = 'Racial, added automatically', hideKey = 'auto:racial:' .. id }
-			end
-		end
-	end
+	end)
 	return list
+end
+
+local function SaveOrder(spells, entries)
+	local order, listed = {}, {}
+	for _, entry in ipairs(entries) do
+		local key = entry.custom and entry.stored or entry.hideKey
+		order[#order + 1] = key
+		listed[key] = true
+	end
+	for _, stored in ipairs(spells) do
+		if not listed[stored] then order[#order + 1] = stored end
+	end
+	wipe(spells)
+	for position, key in ipairs(order) do spells[position] = key end
 end
 
 local function VisibleIcons(bar)
@@ -318,67 +319,16 @@ local function TrackedBoard(ui, parent, width, bar, page)
 	box = ui.Input(addRow, INPUT_WIDTH, { placeholder = 'Search...', get = function() return '' end, set = function(text) Search(box, text) end })
 	box:SetPoint('RIGHT', -ui.ROW_INSET, 0)
 
-	local custom, rows = {}, {}
-	for _, entry in ipairs(entries) do
-		if entry.custom then custom[#custom + 1] = entry end
-	end
-	local function Move(entry, delta)
-		local position = IndexOf(custom, entry)
-		local other = custom[position + delta]
-		if not other then return end
-		local from, to = StoredIndex(spells, entry.stored), StoredIndex(spells, other.stored)
-		spells[from], spells[to] = other.stored, entry.stored
-		custom[position], custom[position + delta] = other, entry
-		board:Move(rows[entry], delta)
+	board:DragList(function(index, delta)
+		entries[index], entries[index + delta] = entries[index + delta], entries[index]
 		page:Resize()
-	end
-	local function RowUnder(cursorY)
-		for _, entry in ipairs(custom) do
-			local row = rows[entry]
-			local top, bottom = row:GetTop(), row:GetBottom()
-			if top and cursorY <= top and cursorY >= bottom then return entry end
-		end
-	end
-	local dragging, grabOffset, ghost
-	local function Ghost()
-		if ghost then return ghost end
-		ghost = CreateFrame('Frame', nil, board.panel)
-		ghost:SetFrameLevel(board.panel:GetFrameLevel() + 10)
-		ghost:SetWidth(board.panelWidth)
-		ui.Fill(ghost, 'control'):SetAllPoints()
-		local edge = ui.Fill(ghost, 'accent', 'ARTWORK', 1)
-		edge:SetPoint('TOPLEFT')
-		edge:SetPoint('BOTTOMLEFT')
-		edge:SetWidth(2)
-		ui.Glyph(ghost, 'grabber', GRABBER_SIZE, 'text'):SetPoint('LEFT', GRABBER_X, 0)
-		ghost.icon = ghost:CreateTexture(nil, 'ARTWORK')
-		ghost.icon:SetSize(ICON_SIZE, ICON_SIZE)
-		ghost.icon:SetPoint('LEFT', LIST_ICON_X, 0)
-		ghost.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-		ghost.label = ui.Text(ghost, '', 12, 'text')
-		ghost.label:SetPoint('LEFT', LIST_NAME_X, 0)
-		ghost:Hide()
-		return ghost
-	end
-	local function Track()
-		local _, cursorY = GetCursorPosition()
-		cursorY = cursorY / board.frame:GetEffectiveScale()
-		ghost:ClearAllPoints()
-		ghost:SetPoint('TOPLEFT', board.panel, 'TOPLEFT', 0, -(board.panel:GetTop() - cursorY - grabOffset))
-		local over = RowUnder(cursorY)
-		if over and over ~= dragging then
-			Move(dragging, IndexOf(custom, over) > IndexOf(custom, dragging) and 1 or -1)
-		end
-	end
+	end, function()
+		SaveOrder(spells, entries)
+		Apply()
+	end)
 	for _, entry in ipairs(entries) do
-		local row = Section.AddRow(board, entry.name)
-		rows[entry] = row
-		local icon = row:CreateTexture(nil, 'ARTWORK')
-		icon:SetSize(ICON_SIZE, ICON_SIZE)
-		icon:SetPoint('LEFT', LIST_ICON_X, 0)
-		icon:SetTexture(entry.icon)
-		icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-		local title, subtitle = ui.RowTitle(row, entry.name, entry.sub, LIST_NAME_X, board.panelWidth - LIST_NAME_X - TOOLS_ROOM)
+		local row, title, subtitle = board:AddDragRow(entry.name, TOOLS_ROOM, entry.sub, entry.icon)
+		local icon = row.icon
 		ui.Bind(row, function()
 			local hidden = bar.hiddenIcons[entry.hideKey] == true
 			icon:SetDesaturated(hidden)
@@ -405,7 +355,7 @@ local function TrackedBoard(ui, parent, width, bar, page)
 			Repaint()
 		end }), TOOL_SIZE)
 		if entry.potion then
-			Put(ui.IconButton(row, 'order', PotionLabel(entry), function()
+			Put(ui.IconButton(row, 'edit', PotionLabel(entry), function()
 				BUI.ShowCDMPotionModal(BUI.CDM, entry.id, entry.stored, bar, nil, function()
 					Apply()
 					page:RebuildCurrent()
@@ -430,30 +380,6 @@ local function TrackedBoard(ui, parent, width, bar, page)
 				Apply()
 				Repaint()
 			end), TOOL_SIZE)
-		end
-		if entry.custom then
-			ui.Glyph(row, 'grabber', GRABBER_SIZE, 'faint'):SetPoint('LEFT', GRABBER_X, 0)
-			row:EnableMouse(true)
-			row:RegisterForDrag('LeftButton')
-			row:SetScript('OnDragStart', function(self)
-				local _, cursorY = GetCursorPosition()
-				dragging = entry
-				grabOffset = self:GetTop() - cursorY / board.frame:GetEffectiveScale()
-				self:SetAlpha(DRAG_ALPHA)
-				Ghost():SetHeight(self:GetHeight())
-				ghost.icon:SetTexture(entry.icon)
-				ghost.label:SetText(entry.name)
-				ghost:Show()
-				Track()
-				self:SetScript('OnUpdate', Track)
-			end)
-			row:SetScript('OnDragStop', function(self)
-				self:SetScript('OnUpdate', nil)
-				self:SetAlpha(1)
-				ghost:Hide()
-				dragging = nil
-				Apply()
-			end)
 		end
 	end
 	if #entries == 0 then
