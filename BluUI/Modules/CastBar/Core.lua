@@ -315,7 +315,7 @@ function CastBar.TrackInterrupts(castbar, settings, barColor, unit)
 		castbar:HookScript('OnHide', BUI.Profiler.Wrap('CastBar.Core interrupt hide', CastBar.HideInterruptOverlays))
 	end
 	trackedCastbars[castbar] = true
-	if not interruptTicker then interruptTicker = C_Timer.NewTicker(0.1, CheckInterruptCooldowns) end
+	if not interruptTicker then interruptTicker = C_Timer.NewTicker(0.1, BUI.Profiler.Wrap('CastBar.Core ticker', CheckInterruptCooldowns)) end
 	local cooldowns = SampleKickCooldowns()
 	PaintInterruptColor(castbar, barColor, settings, cooldowns)
 	SetupInterruptTick(castbar, settings)
@@ -506,7 +506,7 @@ local CHANNEL_TICKS = {
 	[198013] = 10,
 	[212084] = 10,
 	[120360] = 15,
-	[257044] = 10,
+	[257044] = 7,
 	[113656] = 4,
 	[117952] = 4,
 	[115175] = 8,
@@ -535,7 +535,22 @@ function CastBar.ApplyCastTarget(castbar, settings, unit)
 	castbar.Text:SetFormattedText('%s > %s', current, name)
 end
 
+local function PlaceChannelTicks(castbar)
+	local ticks = castbar._chanTickCount
+	if not ticks then return end
+	local width = castbar:GetWidth()
+	for index = 1, ticks - 1 do
+		local tick = castbar._chanTicks[index]
+		local x = width * (index / ticks)
+		tick:ClearAllPoints()
+		tick:SetPoint('TOP', castbar, 'TOPLEFT', x, 0)
+		tick:SetPoint('BOTTOM', castbar, 'BOTTOMLEFT', x, 0)
+		tick:SetShown(width > 0)
+	end
+end
+
 function CastBar.HideChannelTicks(castbar)
+	castbar._chanTickCount = nil
 	if not castbar._chanTicks then return end
 	for _, tick in ipairs(castbar._chanTicks) do tick:Hide() end
 end
@@ -543,13 +558,13 @@ end
 function CastBar.UpdateChannelTicks(castbar, settings)
 	local spellID = castbar.spellID
 	local ticks = settings.channelTicks and castbar.channeling and not IsSecret(spellID) and CHANNEL_TICKS[spellID]
-	local width = castbar:GetWidth()
-	if not ticks or width <= 0 then
-		CastBar.HideChannelTicks(castbar)
-		return
-	end
+	CastBar.HideChannelTicks(castbar)
+	if not ticks then return end
 
-	castbar._chanTicks = castbar._chanTicks or {}
+	if not castbar._chanTicks then
+		castbar._chanTicks = {}
+		castbar:HookScript('OnSizeChanged', BUI.Profiler.Wrap('CastBar.Core castbar OnSizeChanged', PlaceChannelTicks))
+	end
 	local color = settings.channelTickColor
 	local tickWidth = Pixel.PixelSize(settings.channelTickWidth)
 	for index = 1, ticks - 1 do
@@ -558,17 +573,11 @@ function CastBar.UpdateChannelTicks(castbar, settings)
 			tick = castbar:CreateTexture(nil, 'OVERLAY', nil, 3)
 			castbar._chanTicks[index] = tick
 		end
-		local x = width * (index / ticks)
 		tick:SetColorTexture(color[1], color[2], color[3], color[4] or 0.85)
 		tick:SetWidth(tickWidth)
-		tick:ClearAllPoints()
-		tick:SetPoint('TOP', castbar, 'TOPLEFT', x, 0)
-		tick:SetPoint('BOTTOM', castbar, 'BOTTOMLEFT', x, 0)
-		tick:Show()
 	end
-	for index = ticks, #castbar._chanTicks do
-		castbar._chanTicks[index]:Hide()
-	end
+	castbar._chanTickCount = ticks
+	PlaceChannelTicks(castbar)
 end
 
 function CastBar.TruncateSpellName(castbar, settings)
