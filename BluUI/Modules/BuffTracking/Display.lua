@@ -291,7 +291,6 @@ function Display.CreateTracker(config)
     local showingAuraPath = false
 
     local auraDriver
-    local auraTextSettings
     local auraStamp
     local auraLabelWidth, auraDigitWidth = 0, 0
     local auraLabelOffset = 0
@@ -299,7 +298,7 @@ function Display.CreateTracker(config)
     local measureText
 
     local function StyleAuraText(text, button)
-        local settings = auraTextSettings
+        local settings = GetSettings()
         local textColor = settings.textColor
         Pixel.ApplyFont(text, settings.textSize, BUI.GetModuleFont(settings), BUI.GetFontOutline())
         if not config.stackDriver then
@@ -355,7 +354,6 @@ function Display.CreateTracker(config)
     local function RefreshAuraStyle()
         if not config.auraSpellSet then return end
         local settings = GetSettings()
-        auraTextSettings = settings
         auraStamp = AuraTextStamp(settings)
         if config.stackDriver then
             auraLabelWidth, auraDigitWidth = MeasureLabel(settings)
@@ -374,7 +372,7 @@ function Display.CreateTracker(config)
         if not auraDriver then auraDriver = Engine.NewAuraDriver(tracker.frame) end
         if not auraStamp then RefreshAuraStyle() end
 
-        local sizePixels = auraTextSettings.textSize * 2
+        local sizePixels = GetSettings().textSize * 2
         local widthPixels = sizePixels
         local shift = 0
         if config.stackDriver then

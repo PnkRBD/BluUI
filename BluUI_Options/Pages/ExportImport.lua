@@ -185,12 +185,8 @@ local function CreateProfile(name, copyFrom, switchToIt)
     BUI.MigrateProfile(BUI.GetDB())
     if not switchToIt and previous ~= name then aceDB:SetProfile(previous) end
     BUI._suppressProfileCallback = nil
-    if switchToIt then
-        BUI.ExportImport.RefreshAllModules()
-        RebuildAllPages()
-    else
-        RebuildPage()
-    end
+    BUI.ExportImport.RefreshAllModules()
+    RebuildAllPages()
 end
 
 local function RenameProfile(oldName, newName)
@@ -208,7 +204,8 @@ local function RenameProfile(oldName, newName)
     RepointReferences(oldName, newName, affected)
     BUI._suppressProfileCallback = nil
     Notify('Renamed to "' .. newName .. '"', 'Was "' .. oldName .. '"')
-    RebuildPage()
+    BUI.ExportImport.RefreshAllModules()
+    RebuildAllPages()
 end
 
 local function DeleteProfile(name)
