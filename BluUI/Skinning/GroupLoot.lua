@@ -13,7 +13,8 @@ local SKIN_ID = 'grouploot'
 local ANCHOR_KEY = 'lootrolls'
 local GROW_DOWN_SETTING = 'grouplootGrowDown'
 local ROLL_WIDTH, ROLL_HEIGHT = 300, 48
-local ROLL_STEP = ROLL_HEIGHT + 6
+local ROLL_GAP = 1
+local ROLL_STEP = ROLL_HEIGHT + ROLL_GAP
 local ROLL_INSET = 8
 local CONTENT_LIFT = 2
 local ICON_SIZE = 32
@@ -21,6 +22,11 @@ local BUTTON_SIZE = 26
 local BUTTON_GAP = 4
 local TEXT_GAP = 8
 local TIMER_HEIGHT = 3
+local EXAMPLES = {
+	{ name = 'Example Epic Sword', icon = 'Interface/Icons/INV_Sword_04', quality = 4, need = true, timeLeft = 0.8 },
+	{ name = 'Example Rare Helm', icon = 'Interface/Icons/INV_Helmet_25', quality = 3, need = true, transmog = true, timeLeft = 0.55 },
+	{ name = 'Example Rare Trinket', icon = 'Interface/Icons/INV_Misc_Gem_01', quality = 3, need = false, timeLeft = 0.3 },
+}
 
 local installed = false
 local skinned = {}
@@ -108,12 +114,56 @@ end
 
 local Resweep = BUI.Dispatcher.New(SkinAll, 'Skin.GroupLoot')
 
+local function SetRollButton(button, enabled)
+	if enabled then
+		GroupLootFrame_EnableLootButton(button)
+	else
+		GroupLootFrame_DisableLootButton(button)
+	end
+end
+
+local function BuildExample(parent, spec)
+	local frame = CreateFrame('Frame', nil, parent, 'GroupLootFrameTemplate')
+	frame:SetParent(parent)
+	EventRegistry:UnregisterFrameEventAndCallback('OPEN_MASTER_LOOT_LIST', frame)
+	frame:UnregisterAllEvents()
+	for _, script in ipairs({ 'OnShow', 'OnHide', 'OnEvent', 'OnUpdate' }) do frame:SetScript(script, nil) end
+	frame.IconFrame:EnableMouse(false)
+	for _, button in ipairs(frame.LootButtons) do button:EnableMouse(false) end
+	SkinFrame(frame)
+	local color = ITEM_QUALITY_COLORS[spec.quality]
+	frame.IconFrame.Icon:SetTexture(spec.icon)
+	Skin.SetIconEdgeColor(frame.IconFrame.Icon, color.r, color.g, color.b)
+	frame.Name:SetText(spec.name)
+	frame.Name:SetVertexColor(color.r, color.g, color.b)
+	SetRollButton(frame.NeedButton, spec.need)
+	frame.TransmogButton:SetShown(spec.transmog == true)
+	frame.GreedButton:SetShown(not spec.transmog)
+	local red, green, blue = BUILib.Theme.GetAccent()
+	frame.Timer:SetStatusBarColor(red, green, blue, 1)
+	frame.Timer:SetMinMaxValues(0, 1)
+	frame.Timer:SetValue(spec.timeLeft)
+	frame:Show()
+	return frame
+end
+
+local function BuildExampleStack(anchor)
+	local holder = CreateFrame('Frame', nil, anchor)
+	holder:SetSize(ROLL_WIDTH, #EXAMPLES * ROLL_STEP - ROLL_GAP)
+	for index, spec in ipairs(EXAMPLES) do
+		local frame = BuildExample(holder, spec)
+		frame:ClearAllPoints()
+		frame:SetPoint('TOP', holder, 'TOP', 0, -(index - 1) * ROLL_STEP)
+	end
+	return holder
+end
+
 local function StackRolls(container, point)
 	local direction = point == 'TOP' and -1 or 1
 	local offset = 0
 	for index = 1, container.maxIndex do
 		local frame = container.rollFrames[index]
-		local size = (frame and not rollFrames[frame]) and container.reservedSize or ROLL_STEP
+		local size = (Enabled() and (not frame or rollFrames[frame])) and ROLL_STEP or container.reservedSize
 		if frame then
 			frame:ClearAllPoints()
 			frame:SetPoint('CENTER', container, point, 0, direction * (offset + size / 2))
@@ -165,7 +215,7 @@ Skin.ToastAnchors.Register({
 	key = ANCHOR_KEY,
 	label = 'LOOT ROLLS',
 	point = GrowPoint,
-	sample = 'roll',
+	sample = BuildExampleStack,
 	followFrame = true,
 	defaultY = 260,
 	frame = function() return _G.GroupLootContainer end,
