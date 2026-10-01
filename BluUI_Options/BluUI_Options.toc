@@ -35,3 +35,4 @@ Pages\Modules.lua
 Pages\Help.lua
 Pages\Settings.lua
 Pages\ExportImport.lua
+LaunchTrace.lua

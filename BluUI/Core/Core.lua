@@ -158,6 +158,7 @@ local function PromptAzorImport()
 end
 
 function Addon:OnInitialize()
+	BUI.LaunchTrace.Begin(self)
 	local forcedAdopt = BluUI_DB and BluUI_DB.__forceAdoptOnLoad
 	if BluUI_DB then BluUI_DB.__forceAdoptOnLoad = nil end
 
