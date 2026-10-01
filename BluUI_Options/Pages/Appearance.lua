@@ -3,8 +3,8 @@ local BUILib = BUI.BUILibClient
 local Controls, Widget = BUILib.Controls, BUILib.Widget
 
 local SETTINGS_TAB = 1
-local FIRST_COLUMN = 267
-local SECOND_COLUMN = 344
+local FIRST_COLUMN = 370
+local SECOND_COLUMN = 450
 local CONTROL_WIDTH = 200
 local CONTROL_ROOM = 232
 local PRESET_DROPDOWN_WIDTH = 140

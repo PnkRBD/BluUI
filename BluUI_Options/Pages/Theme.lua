@@ -5,8 +5,10 @@ local Controls = BUILib.Controls
 local Modals = BUILib.Modals
 local Toast = BUILib.Toast
 
-local FIRST_COLUMN = 267
-local SECOND_COLUMN = 344
+local FIRST_COLUMN = 370
+local SECOND_COLUMN = 450
+local COLORS_COLUMN = 267
+local FONTS_COLUMN = 344
 local DROPDOWN_WIDTH = 112
 local PRESET_DROPDOWN_WIDTH = 140
 local SWATCH_SIZE = 28
@@ -491,7 +493,7 @@ local function SavedSection(ui, parent, width, page)
 		stacked = true,
 		title = 'Saved themes',
 		description = 'Keep the look you have now under a name, bring it back later, or pass it on as a string.',
-		columns = { { 'Name', ui.AVATAR_X }, { 'Colors', FIRST_COLUMN }, { 'Fonts', SECOND_COLUMN } },
+		columns = { { 'Name', ui.AVATAR_X }, { 'Colors', COLORS_COLUMN }, { 'Fonts', FONTS_COLUMN } },
 		buttons = {
 			{ text = 'Import', onClick = function() ImportTheme(page) end },
 			{ text = 'Export', icon = 'copy', onClick = ExportCurrent },
@@ -510,8 +512,8 @@ local function SavedSection(ui, parent, width, page)
 		swatch.left:SetVertexColor(SavedColor(entry.theme, 'page'))
 		swatch.right:SetVertexColor(SavedColor(entry.theme, 'text'))
 		ui.RowTitle(row, entry.name, 'Saved ' .. date('%d %b %Y', entry.time), ui.NAME_X)
-		ui.Cell(row, CountText(Count(entry.theme.dark)), FIRST_COLUMN)
-		ui.Cell(row, CountText(Count(entry.theme.fonts)), SECOND_COLUMN)
+		ui.Cell(row, CountText(Count(entry.theme.dark)), COLORS_COLUMN)
+		ui.Cell(row, CountText(Count(entry.theme.fonts)), FONTS_COLUMN)
 		local forget = ui.IconButton(row, 'delete', 'Forget this theme', function() ForgetSaved(index, entry, page) end, 'danger')
 		forget:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
 		local export = ui.Button(row, 'Export', 'secondary', function() ExportSaved(entry) end, 'copy')
