@@ -39,6 +39,49 @@ function Layout.DefaultColor(role, mode)
 	return lookRole and Theme.window[mode][lookRole] or Theme.palettes[mode][role]
 end
 
+function Layout.ThemeOverride(theme, role, mode)
+	local overrides = theme[mode or theme.mode or 'dark']
+	return overrides and overrides[role]
+end
+
+function Layout.ThemeChromeColor(theme, role, mode)
+	if role == 'edge' and theme.edgeAccent ~= false and not Layout.ThemeOverride(theme, 'edge', mode) then
+		local red, green, blue = Theme.GetAccent()
+		return { red * BORDER_ACCENT_SCALE, green * BORDER_ACCENT_SCALE, blue * BORDER_ACCENT_SCALE, 1 }
+	end
+end
+
+function Layout.ThemeColor(theme, role, mode)
+	if role == 'accent' then return Theme.GetAccent() end
+	if role == 'onAccent' then return Theme.ReadableOn(Theme.GetAccent()) end
+	mode = mode or theme.mode or 'dark'
+	local color = Layout.ThemeChromeColor(theme, role, mode) or Layout.ThemeOverride(theme, role, mode) or Layout.DefaultColor(role, mode)
+	return color[1], color[2], color[3], color[4] or 1
+end
+
+function Layout.ThemeFontPath(theme, fontRole, resolveFont, fallback)
+	local fonts = theme.fonts
+	local name = fonts and (fonts[fontRole] or fonts.base)
+	return name and resolveFont(name) or fallback
+end
+
+function Layout.FrameChrome(frame)
+	local edges = {}
+	for index, side in ipairs(BORDER_SIDES) do
+		local edge = frame:CreateTexture(nil, 'BACKGROUND', nil, 0)
+		edge:SetTexture(Widget.WHITE)
+		edge:SetPoint(side[1])
+		edge:SetPoint(side[2])
+		edge[side[3]](edge, 1)
+		edges[index] = edge
+	end
+	local background = frame:CreateTexture(nil, 'BACKGROUND', nil, 1)
+	background:SetPoint('TOPLEFT', 1, -1)
+	background:SetPoint('BOTTOMRIGHT', -1, 1)
+	background:SetTexture(Widget.WHITE)
+	return edges, background
+end
+
 local function TrackNavFrame(window, navFrame)
 	window.navFrames[#window.navFrames + 1] = navFrame
 	return navFrame
@@ -154,20 +197,7 @@ function Layout.WindowFrame(config)
 	frame.__bui3client = BUILib.GetActiveClient()
 	BUILib.SetPopupParent(frame)
 
-	local borderEdges = {}
-	for index, side in ipairs(BORDER_SIDES) do
-		local edge = frame:CreateTexture(nil, 'BACKGROUND', nil, 0)
-		edge:SetTexture(Widget.WHITE)
-		edge:SetPoint(side[1])
-		edge:SetPoint(side[2])
-		edge[side[3]](edge, 1)
-		borderEdges[index] = edge
-	end
-
-	local backgroundTexture = frame:CreateTexture(nil, 'BACKGROUND', nil, 1)
-	backgroundTexture:SetPoint('TOPLEFT', 1, -1)
-	backgroundTexture:SetPoint('BOTTOMRIGHT', -1, 1)
-	backgroundTexture:SetTexture(Widget.WHITE)
+	local borderEdges, backgroundTexture = Layout.FrameChrome(frame)
 
 	local function StartMoving() frame:StartMoving() end
 	local function StopMoving()
@@ -230,21 +260,15 @@ function Layout.WindowFrame(config)
 	end
 
 	function window:Override(role, mode)
-		local overrides = theme[mode or self:GetMode()]
-		return overrides and overrides[role]
+		return Layout.ThemeOverride(theme, role, mode or self:GetMode())
 	end
 
 	function window:FontPath(fontRole)
-		local fonts = theme.fonts
-		local name = fonts and (fonts[fontRole] or fonts.base)
-		return name and config.resolveFont(name) or self.font
+		return Layout.ThemeFontPath(theme, fontRole, config.resolveFont, self.font)
 	end
 
 	function window:ChromeColor(role, mode)
-		if role == 'edge' and theme.edgeAccent ~= false and not self:Override('edge', mode) then
-			local red, green, blue = Theme.GetAccent()
-			return { red * BORDER_ACCENT_SCALE, green * BORDER_ACCENT_SCALE, blue * BORDER_ACCENT_SCALE, 1 }
-		end
+		return Layout.ThemeChromeColor(theme, role, mode or self:GetMode())
 	end
 
 	function window:Color(role, mode)

@@ -52,6 +52,14 @@ function BUI.WindowFont()
 	return fonts and fonts.base and BUI.FetchFont(fonts.base) or BUI.FetchFont(BUI.C.WINDOW_FONT)
 end
 
+function BUI.ThemeColor(role)
+	return BUI.BUILibClient.Layout.ThemeColor(BUI.GetDB().windowTheme, role)
+end
+
+function BUI.ThemeFontPath(fontRole)
+	return BUI.BUILibClient.Layout.ThemeFontPath(BUI.GetDB().windowTheme, fontRole, BUI.FetchFont, BUI.WindowFont())
+end
+
 sharedMedia.RegisterCallback(BUI, 'LibSharedMedia_Registered', function(_, mediaType, name)
 	if mediaType ~= 'font' or not BUI.db then return end
 	local fonts = BUI.GetDB().windowTheme.fonts
