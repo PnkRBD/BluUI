@@ -38,6 +38,10 @@ function Pixel.OnScaleChange(id, callback)
     listeners[id] = callback
 end
 
+function Pixel.Sync()
+    Recompute()
+end
+
 local function pixelsFor(value)
     return value / gridUnit
 end
@@ -107,12 +111,12 @@ local function RearmSnap(object, enabled)
     if parent and rawget(parent, "_noSnap") then parent._noSnap = nil end
 end
 
-local TimedKillSnap = Profiler.Wrap("Pixel texture snap hook", KillSnap)
+local TimedKillSnap = Profiler.Hot("Pixel texture snap hook", KillSnap)
 
 local SNAP_HOOKS = {
     SetAtlas = TimedKillSnap,
     SetColorTexture = TimedKillSnap,
-    SetSnapToPixelGrid = Profiler.Wrap("Pixel texture snap rearm", RearmSnap),
+    SetSnapToPixelGrid = Profiler.Hot("Pixel texture snap rearm", RearmSnap),
     SetStatusBarTexture = TimedKillSnap,
     SetTexture = TimedKillSnap,
 }
@@ -351,6 +355,6 @@ end
 BUI.Events:Register('UI_SCALE_CHANGED', 'Pixel', OnScaleChanged)
 BUI.Events:Register('DISPLAY_SIZE_CHANGED', 'Pixel', OnScaleChanged)
 BUI.Events:Register('GX_RESTARTED', 'Pixel', OnGXRestarted)
-hooksecurefunc(UIParent, "SetScale", OnScaleChanged)
+hooksecurefunc(UIParent, "SetScale", BUI.Profiler.Wrap('Pixel hook SetScale', OnScaleChanged))
 
 Recompute()
