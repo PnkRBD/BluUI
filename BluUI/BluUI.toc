@@ -237,6 +237,7 @@ Skinning\Delves.lua
 Skinning\Travel.lua
 Skinning\CombatAlerts.lua
 Skinning\Panels.lua
+Skinning\CatalogShop.lua
 Skinning\ChatConfig.lua
 Skinning\Inspect.lua
 Skinning\Trade.lua
