@@ -89,11 +89,14 @@ local function ArrayColor(db, label, key, opacity)
 	}
 end
 
-local function ChannelColor(db, label)
+local function ChannelColor(db, label, alphaKey)
 	return {
-		kind = 'swatch', label = label, tooltip = label,
-		get = function() return db.colorR, db.colorG, db.colorB, 1 end,
-		set = function(red, green, blue) db.colorR, db.colorG, db.colorB = red, green, blue end,
+		kind = 'swatch', label = label, tooltip = label, opacity = alphaKey ~= nil,
+		get = function() return db.colorR, db.colorG, db.colorB, alphaKey and db[alphaKey] or 1 end,
+		set = function(red, green, blue, alpha)
+			db.colorR, db.colorG, db.colorB = red, green, blue
+			if alphaKey then db[alphaKey] = alpha end
+		end,
 	}
 end
 
@@ -375,13 +378,12 @@ local function CrosshairBoard(ui, parent, width)
 		description = 'A reticle at the center of your screen, shown for the specs you pick.',
 	})
 	board:AddTools('Crosshair', 'Style, size, color and when it hides', {
-		ChannelColor(db, 'Crosshair color'),
+		ChannelColor(db, 'Crosshair color', 'alpha'),
 		{ entries = STYLES, width = MENU_WIDTH, get = function() return db.style end, set = function(value) db.style = value end },
 		{ tooltip = 'Appearance and visibility', title = 'Crosshair', options = {
 			Option(db, 'Size', 'size', { min = 5, max = 100, step = 1 }),
 			Option(db, 'Thickness', 'thickness', { min = 1, max = 10, step = 1 }),
 			Option(db, 'Center gap', 'gap', { min = 0, max = 30, step = 1 }),
-			{ label = 'Opacity', min = 10, max = 100, step = 5, get = function() return db.alpha * 100 end, set = function(value) db.alpha = value / 100 end },
 			Option(db, 'Hide out of combat', 'hideOutOfCombat'),
 			Option(db, 'Hide in town', 'hideInTown'),
 			Option(db, 'Range indicator, ' .. Crosshair.RangeLabel(), 'rangeIndicator'),
