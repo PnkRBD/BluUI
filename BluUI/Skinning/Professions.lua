@@ -60,6 +60,7 @@ local SPELL_BUTTON_SIZE = 40
 local SECONDARY_TEXT_WIDTH = 120
 
 local frameInstalled, bookInstalled, customerInstalled, templatesInstalled = false, false, false, false
+local waitingForWidth = false
 local frameSkinned, bookSkinned, bookLaidOut, customerSkinned = false, false, false, false
 local owned = {}
 
@@ -819,21 +820,21 @@ end
 
 local function ApplyFrame()
 	local frame = _G.ProfessionsFrame
-	if frameSkinned or not frame or frame:IsForbidden() or not Enabled() then return end
+	if frameSkinned or not frame or frame:IsForbidden() or not frame:IsShown() or not Enabled() then return end
 	SkinProfessionsFrame(frame)
 	frameSkinned = true
 end
 
 local function ApplyBook()
 	local frame = _G.ProfessionsBookFrame
-	if bookSkinned or not frame or frame:IsForbidden() or not Enabled() then return end
+	if bookSkinned or not frame or frame:IsForbidden() or not frame:IsShown() or not Enabled() then return end
 	SkinBook(frame)
 	bookSkinned = true
 end
 
 local function ApplyCustomer()
 	local frame = _G.ProfessionsCustomerOrdersFrame
-	if customerSkinned or not frame or frame:IsForbidden() or not Enabled() then return end
+	if customerSkinned or not frame or frame:IsForbidden() or not frame:IsShown() or not Enabled() then return end
 	SkinCustomerFrame(frame)
 	customerSkinned = true
 end
@@ -850,12 +851,30 @@ local function InstallTemplates()
 	Hook(ProfessionsCrafterTableHeaderStringMixin, 'Init', OnHeaderInit)
 end
 
+local function RevealOnceSized(frame)
+	if not waitingForWidth then return end
+	waitingForWidth = false
+	frame:SetAlpha(1)
+end
+
+local function HideUntilSized(frame)
+	if frame.currentPageWidth then
+		RevealOnceSized(frame)
+		return
+	end
+	waitingForWidth = true
+	frame:SetAlpha(0)
+end
+
 local function InstallFrame()
 	local frame = _G.ProfessionsFrame
 	if frameInstalled or not frame then return end
 	frameInstalled = true
 	InstallTemplates()
 	Hook(ProfessionsCraftingOutputLogElementMixin, 'Init', OnOutputEntry)
+	frame:HookScript('OnShow', Wrap('Skin.Professions hide until sized', Guard(HideUntilSized)))
+	SecureHook(frame, 'SetTab', RevealOnceSized)
+	SecureHook(frame, 'ApplyDesiredWidth', RevealOnceSized)
 	frame:HookScript('OnShow', Wrap('Skin.Professions frame reskin', Guard(ApplyFrame)))
 	Safely(ApplyFrame)
 end
