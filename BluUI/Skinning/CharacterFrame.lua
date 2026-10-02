@@ -2335,15 +2335,16 @@ local function BuildFrame()
     if frame then return true end
     if not CharacterFrame or not _G.CharacterHeadSlot then return false end
 
-    frame = Widget.New(UIParent, 'Frame', nil, {
+    frame = Widget.New(CharacterFrame, 'Frame', nil, {
         bg = Colors.bg.dark,
         border = Colors.border.light,
         size = { FRAME_WIDTH, FRAME_HEIGHT },
     }).frame
+    frame:SetIgnoreParentAlpha(true)
+    frame.__buiKeepMouse = true
     frame:SetPoint('CENTER')
     frame:SetFrameStrata('HIGH')
     frame:SetFrameLevel(FRAME_LEVEL)
-    frame:Hide()
 
     local dragger = CreateFrame('Frame', nil, frame)
     dragger:Hide()
@@ -2478,20 +2479,19 @@ local function ShowSkin()
     if not BuildFrame() then return end
     UpdateSubtitle()
     Placement.OnShow()
-    frame:Show()
+    if not frame:IsShown() then frame:Show() end
     if model then model.facing, model.scale = 0, 1.0 end
     RefreshModel()
     RefreshAll()
 end
 
 local function HideSkin()
-    if frame then frame:Hide() end
     Placement.OnHide()
     if bagPopup then bagPopup:Hide() end
 end
 
 local function IsOpen()
-    return frame ~= nil and frame:IsShown()
+    return frame ~= nil and frame:IsVisible()
 end
 
 local function ApplySkin()
@@ -2500,7 +2500,7 @@ local function ApplySkin()
         BUI.Print('Character sheet opens after combat.')
         return
     end
-    Skin.SuppressBlizzardFrame(CharacterFrame)
+    if not CharacterFrame._buiSuppressActive then Skin.SuppressBlizzardFrame(CharacterFrame) end
     if CharacterModelScene then
         CharacterModelScene:SetAlpha(0)
         CharacterModelScene:EnableMouse(false)
@@ -2529,12 +2529,7 @@ end
 BUI.Events:Register('PLAYER_LOGIN', 'Skinning.CharacterFrame', function()
     if not CharacterFrame or HasConflictingCharSheet() then return end
     CharacterFrame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.CharacterFrame frame reskin', ApplySkin))
-    CharacterFrame:HookScript('OnHide', BUI.Profiler.Wrap('Skin.CharacterFrame frame restore', function()
-        HideSkin()
-        if Skin.IsSkinEnabled('characterFrame') then
-            Skin.RestoreBlizzardFrame(CharacterFrame)
-        end
-    end))
+    CharacterFrame:HookScript('OnHide', BUI.Profiler.Wrap('Skin.CharacterFrame frame restore', HideSkin))
 end)
 
 local pendingRefresh = {}
@@ -2579,6 +2574,7 @@ BUI.Events:Register('BAG_UPDATE_DELAYED', 'Skinning.CharacterFrame', function() 
 Skin.OnToggle('characterFrame', function(enabled)
     if not enabled then
         HideSkin()
+        if frame then frame:Hide() end
         if CharacterFrame then
             Skin.RestoreBlizzardFrame(CharacterFrame)
             Skin.ReleasePanelSlot(CharacterFrame)
