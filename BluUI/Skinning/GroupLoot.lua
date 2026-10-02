@@ -172,11 +172,6 @@ local function StackRolls(container, point)
 	end
 end
 
-local function Restack(container)
-	if not Enabled() or Skin.ToastAnchors.IsPositioned(ANCHOR_KEY) then return end
-	StackRolls(container, 'BOTTOM')
-end
-
 local function Install()
 	if installed then return end
 	installed = true
@@ -186,7 +181,6 @@ local function Install()
 		index = index + 1
 	end
 	Hook('GroupLootContainer_Update', Resweep)
-	Hook('GroupLootContainer_Update', Restack)
 end
 
 local function Deactivate()
@@ -195,8 +189,7 @@ local function Deactivate()
 end
 
 local function AnchorHooks(reapply)
-	Hook('GroupLootContainer_Update', reapply)
-	Hook(AlertFrame, 'UpdateAnchors', reapply)
+	Hook(BottomManagedFrameContainer, 'Layout', reapply)
 end
 
 local function GrowPoint()
@@ -204,6 +197,7 @@ local function GrowPoint()
 end
 
 local function PlaceRolls(container, anchor)
+	if not container:IsShown() then return end
 	local point = GrowPoint()
 	container:ClearAllPoints()
 	container:SetPoint(point, anchor, point, 0, 0)
@@ -215,7 +209,7 @@ Skin.ToastAnchors.Register({
 	label = 'LOOT ROLLS',
 	point = GrowPoint,
 	sample = BuildExampleStack,
-	followFrame = true,
+	pinned = true,
 	defaultY = 260,
 	frame = function() return _G.GroupLootContainer end,
 	apply = PlaceRolls,
@@ -240,7 +234,7 @@ Skin.RegisterSkin(SKIN_ID, {
 		local panel = Layout.SettingsCard(content, { title = 'Layout' })
 		Layout.Toggle(panel, {
 			label = 'Grow downwards',
-			tooltip = 'Stack new rolls below the first one. Takes effect once the roll window has been moved with the unlock eye.',
+			tooltip = 'Stack new rolls below the first one.',
 		}, skinDB[GROW_DOWN_SETTING], function(value)
 			skinDB[GROW_DOWN_SETTING] = value
 			Skin.ToastAnchors.Refresh(ANCHOR_KEY)
