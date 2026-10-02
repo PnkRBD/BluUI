@@ -8,9 +8,6 @@ local MENU_WIDTH = 150
 local WIDE_MENU = 200
 local TEXT_RANGE = 100
 local ICON_RANGE = 80
-local ICON_SIZE_MAX = 48
-local GROW_X = { TOPLEFT = 1, LEFT = 1, BOTTOMLEFT = 1, TOPRIGHT = -1, RIGHT = -1, BOTTOMRIGHT = -1 }
-local GROW_Y = { BOTTOMLEFT = 1, BOTTOM = 1, BOTTOMRIGHT = 1, TOPLEFT = -1, TOP = -1, TOPRIGHT = -1 }
 local AURA_RANGE = 200
 local POSITION_RANGE = 2000
 local PARTY_FIELDS = { posX = 'x', posY = 'y' }
@@ -143,18 +140,6 @@ end
 local function Option(db, label, key, extra)
 	local option = { label = label, get = function() return db[key] end, set = function(value) db[key] = value end }
 	for name, value in pairs(extra or {}) do option[name] = value end
-	return option
-end
-
-local function SizeInPlace(settings, spec)
-	local option = Option(settings, 'Size', 'size', spec)
-	option.set = function(size)
-		local shift = (size - settings.size) / 2
-		settings.offsetX = settings.offsetX - (GROW_X[settings.anchor] or 0) * shift
-		settings.offsetY = settings.offsetY - (GROW_Y[settings.anchor] or 0) * shift
-		settings.size = size
-		Repaint()
-	end
 	return option
 end
 
@@ -407,14 +392,10 @@ local function FramesBoard(ui, parent, width, key)
 	})
 	for _, indicator in ipairs(INDICATORS) do
 		local settings = section[indicator.key]
-		local sizeStep = GroupFrames().IndicatorSizeStep(indicator.kind)
-		local sizeOption = sizeStep
-			and SizeInPlace(settings, { min = sizeStep, max = math.floor(ICON_SIZE_MAX / sizeStep) * sizeStep, step = sizeStep })
-			or Option(settings, 'Size', 'size', { min = 6, max = ICON_SIZE_MAX, step = 1 })
 		indicators:AddTools(indicator.label, nil, {
 			Menu(settings, 'anchor', BUI.C.ANCHOR_POINT_OPTIONS),
 			{ tooltip = 'Size and offset', title = indicator.label, options = {
-				sizeOption,
+				Option(settings, 'Size', 'size', { min = 6, max = 48, step = 1 }),
 				Option(settings, 'Horizontal', 'offsetX', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
 				Option(settings, 'Vertical', 'offsetY', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
 			} },
