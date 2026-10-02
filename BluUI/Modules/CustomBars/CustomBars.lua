@@ -516,6 +516,14 @@ local function CollectItems(settings, outEntries)
     return collectCount
 end
 
+local shownBuffer = {}
+
+function CustomBars.ShownIcons(settings)
+    local icons = {}
+    for index = 1, CollectItems(settings, shownBuffer) do icons[index] = shownBuffer[index].icon end
+    return icons
+end
+
 local positionConfig = {}
 local function PositionBar(bar, settings)
     local frame = bar.frame
