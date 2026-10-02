@@ -399,6 +399,7 @@ BUI.Defaults = {
 			minimapHideGarrison    = false,
 			minimapHideDifficulty  = false,
 			minimapTextDifficulty  = false,
+			minimapTextDifficultyAlign = 'RIGHT',
 			minimapIconPos = {},
 			minimapIconScale = {},
 			minimapClockFont = BUI.C.GLOBAL_OPTION,

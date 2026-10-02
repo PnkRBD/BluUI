@@ -59,11 +59,16 @@ local ANCHORS = {
 }
 
 local INDICATORS = {
-	{ key = 'queue', name = 'Queue eye', sub = 'Dungeon, raid and PvP queue status', hide = 'minimapHideQueue', atlas = 'groupfinder-eye-single', color = { 0.35, 0.72, 1.00 } },
-	{ key = 'difficulty', name = 'Difficulty', sub = 'The instance difficulty', hide = 'minimapHideDifficulty', icon = 'Interface\\Icons\\INV_Misc_Bone_Skull_02', color = { 1.00, 0.55, 0.15 } },
-	{ key = 'mail', name = 'Mail', sub = 'New mail waiting', hide = 'minimapHideMail', icon = 'Interface\\Icons\\INV_Letter_15', color = { 1.00, 0.88, 0.25 } },
-	{ key = 'crafting', name = 'Crafting orders', sub = 'Personal crafting orders', hide = 'minimapHideCrafting', icon = 'Interface\\Icons\\Trade_BlackSmithing', color = { 0.45, 0.82, 0.30 } },
-	{ key = 'missions', name = 'Folio', sub = 'The expansion landing page', hide = 'minimapHideGarrison', icon = 'Interface\\Icons\\INV_Misc_Book_09', color = { 0.65, 0.40, 0.95 } },
+	{ key = 'queue', name = 'Queue eye', sub = 'Dungeon, raid and PvP queue status', hide = 'minimapHideQueue' },
+	{ key = 'difficulty', name = 'Difficulty', sub = 'The instance difficulty', hide = 'minimapHideDifficulty' },
+	{ key = 'mail', name = 'Mail', sub = 'New mail waiting', hide = 'minimapHideMail' },
+	{ key = 'crafting', name = 'Crafting orders', sub = 'Personal crafting orders', hide = 'minimapHideCrafting' },
+	{ key = 'missions', name = 'Folio', sub = 'The expansion landing page', hide = 'minimapHideGarrison' },
+}
+
+local TEXT_ALIGNS = {
+	{ value = 'LEFT', text = 'Left' },
+	{ value = 'RIGHT', text = 'Right' },
 }
 
 local MINIMAP_YARDS = { 466.67, 400, 333.33, 266.67, 200, 133.33 }
@@ -119,17 +124,6 @@ local function ConfirmModule(value)
 		end,
 		onCancel = Repaint,
 	})
-end
-
-local function ApplyIndicatorArt(texture, def)
-	local atlas = def.atlas or def.key == 'missions' and _G.ExpansionLandingPageMinimapButton:GetNormalTexture():GetAtlas()
-	if atlas then
-		texture:SetAtlas(atlas)
-		texture:SetTexCoord(0, 1, 0, 1)
-	else
-		texture:SetTexture(def.icon)
-		texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-	end
 end
 
 local function BuildPreview(band)
@@ -356,13 +350,14 @@ local function BuildPreview(band)
 		proxy:SetSize(ICON_SIZE, ICON_SIZE)
 		proxy:SetBackdrop({ bgFile = 'Interface\\Buttons\\WHITE8X8', edgeFile = 'Interface\\Buttons\\WHITE8X8', edgeSize = 1 })
 		proxy:SetBackdropColor(0.08, 0.08, 0.08, 0.95)
-		proxy:SetBackdropBorderColor(def.color[1], def.color[2], def.color[3], 0.9)
+		local color = MinimapModule.GetIndicatorColor(def.key)
+		proxy:SetBackdropBorderColor(color[1], color[2], color[3], 0.9)
 		proxy:SetFrameLevel(mapFrame:GetFrameLevel() + 10)
 
 		local iconTexture = proxy:CreateTexture(nil, 'ARTWORK')
 		iconTexture:SetPoint('TOPLEFT', 2, -2)
 		iconTexture:SetPoint('BOTTOMRIGHT', -2, 2)
-		ApplyIndicatorArt(iconTexture, def)
+		MinimapModule.ApplyIndicatorArt(iconTexture, def.key)
 
 		local highlight = proxy:CreateTexture(nil, 'OVERLAY')
 		highlight:SetTexture('Interface\\Buttons\\WHITE8x8')
@@ -686,8 +681,18 @@ local function IndicatorTools(def)
 				MinimapModule.ToggleTextDifficulty(value and not Interface().minimapHideDifficulty)
 				IndicatorChanged()
 			end },
+			{ label = 'Text align', entries = TEXT_ALIGNS, get = function() return Interface().minimapTextDifficultyAlign end, set = function(value)
+				Interface().minimapTextDifficultyAlign = value
+				IndicatorChanged()
+			end },
 		} }
 	end
+	tools[#tools + 1] = { icon = 'eye', tooltip = 'Show it on the real map to drag it into place',
+		get = function() return MinimapModule.IsIndicatorPreviewing(def.key) end,
+		set = function(value)
+			MinimapModule.PreviewIndicator(def.key, value)
+			Repaint()
+		end }
 	tools[#tools + 1] = { get = function() return not Interface()[def.hide] end, set = function(value)
 		Interface()[def.hide] = not value
 		if def.key == 'difficulty' then MinimapModule.ToggleTextDifficulty(value and Interface().minimapTextDifficulty == true) end
@@ -700,10 +705,10 @@ local function IndicatorsBoard(ui, parent, width)
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Indicators',
-		description = 'The small buttons on the map. Size and place them here, drag them on the preview above, or unlock the real map.',
+		description = 'The small buttons on the map. Size and place them here, drag them on the preview above, or use an eye to show one on the real map and drag it there.',
 	})
 	for _, def in ipairs(INDICATORS) do
-		local row = board:AddTools(def.name, def.sub, IndicatorTools(def), RefreshPreview, function(texture) ApplyIndicatorArt(texture, def) end)
+		local row = board:AddTools(def.name, def.sub, IndicatorTools(def), RefreshPreview, function(texture) MinimapModule.ApplyIndicatorArt(texture, def.key) end)
 		ui.Bind(row.icon, function()
 			local hidden = Interface()[def.hide]
 			row.icon:SetDesaturated(hidden)
@@ -898,6 +903,11 @@ BUI.PageEngine.RegisterPage('minimap', {
 		end
 		pageFrame._page = adapter
 		MinimapModule.SetLockReleaseCallback(Repaint)
+		MinimapModule.SetIndicatorMovedCallback(function()
+			RefreshPreview()
+			Repaint()
+		end)
 		page:AutoRefresh()
 	end,
+	OnHide = MinimapModule.ClearIndicatorPreviews,
 })
