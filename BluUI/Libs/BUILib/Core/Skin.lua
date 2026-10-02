@@ -340,6 +340,7 @@ local TAB_DEFAULTS = {
 local tabStyleCount = 0
 
 Skin.TAB_INSET = TAB_INSET
+Skin.TAB_STRIP_OVERLAP = TAB_STRIP_OVERLAP
 
 local function TabFont(name, size, color)
 	local font = CreateFont(name)
