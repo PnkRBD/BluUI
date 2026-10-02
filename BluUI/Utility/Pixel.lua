@@ -88,7 +88,7 @@ end
 local Profiler = BUI.Profiler
 
 local function KillSnap(object)
-    if type(object) ~= "table" or rawget(object, "_noSnap") then return end
+    if type(object) ~= "table" or rawget(object, "_noSnap") or rawget(object, "_keepSnap") then return end
     if object.IsForbidden and object:IsForbidden() then return end
 
     local snapsItself = object.SetSnapToPixelGrid ~= nil
@@ -100,6 +100,11 @@ local function KillSnap(object)
     target:SetSnapToPixelGrid(false)
     target:SetTexelSnappingBias(0)
     target._noSnap = true
+end
+
+function Pixel.KeepSnap(texture)
+    texture._keepSnap = true
+    texture:SetSnapToPixelGrid(true)
 end
 
 local function RearmSnap(object, enabled)
