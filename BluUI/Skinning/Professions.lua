@@ -59,7 +59,10 @@ local SPELL_LABEL_WIDTH = 100
 local SPELL_BUTTON_SIZE = 40
 local SECONDARY_TEXT_WIDTH = 120
 
+local UNSIZED_WIDTH = 1
+
 local frameInstalled, bookInstalled, customerInstalled, templatesInstalled = false, false, false, false
+local waitingForWidth = false
 local frameSkinned, bookSkinned, bookLaidOut, customerSkinned = false, false, false, false
 local owned = {}
 
@@ -834,12 +837,26 @@ local function InstallTemplates()
 	Hook(ProfessionsCrafterTableHeaderStringMixin, 'Init', OnHeaderInit)
 end
 
+local function HideUntilSized(frame)
+	if frame:GetWidth() > UNSIZED_WIDTH then return end
+	waitingForWidth = true
+	frame:SetAlpha(0)
+end
+
+local function RevealOnceSized(frame, width)
+	if not waitingForWidth or width <= UNSIZED_WIDTH then return end
+	waitingForWidth = false
+	frame:SetAlpha(1)
+end
+
 local function InstallFrame()
 	local frame = _G.ProfessionsFrame
 	if frameInstalled or not frame then return end
 	frameInstalled = true
 	InstallTemplates()
 	Hook(ProfessionsCraftingOutputLogElementMixin, 'Init', OnOutputEntry)
+	frame:HookScript('OnShow', Wrap('Skin.Professions hide until sized', Guard(HideUntilSized)))
+	frame:HookScript('OnSizeChanged', Wrap('Skin.Professions reveal once sized', RevealOnceSized))
 	frame:HookScript('OnShow', Wrap('Skin.Professions frame reskin', Guard(ApplyFrame)))
 	Safely(ApplyFrame)
 end
