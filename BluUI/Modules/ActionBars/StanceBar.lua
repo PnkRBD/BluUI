@@ -123,8 +123,9 @@ function ActionBars.RefreshStanceBar()
 		button._formattedHotkey = nil
 		ActionBars.ApplyHotkeyText(button)
 	end
-	ActionBars.LayoutBar(bar, formCount)
-	ActionBars.SetBarContentHidden(bar, formCount == 0)
+	local shownCount = math.min(formCount, barSettings.buttonCount)
+	ActionBars.LayoutBar(bar, shownCount)
+	ActionBars.SetBarContentHidden(bar, shownCount == 0)
 	ActionBars.ApplyBarMouse(bar)
 	ActionBars.PositionBar(bar)
 	ActionBars.SetBarActive(bar, true)
