@@ -85,6 +85,8 @@ local TAB_FILL_SELECTED_ALPHA = 0.14
 local TAB_FILL_IDLE_ALPHA = 0.28
 local TAB_HOVER_ALPHA = 0.05
 local TAB_PULSE_HALF_PERIOD = math.pi / 5
+local BUTTON_IDLE = { 0.65, 0.65, 0.7 }
+local auxPainters = {}
 local chatPanel, panelSquare, sizer, fader, copyWindow, mover
 local UpdateMover, UpdateSizer, ApplyMsgFontSize
 local skinnedTabs = {}
@@ -1064,6 +1066,14 @@ local function UpdateCornerButtons()
 	if chat._buiCog then chat._buiCog:SetAlpha(alpha) end
 	if chat._buiLock then chat._buiLock:SetAlpha(alpha) end
 	if chat._buiCopy and ShowCopyButton() then chat._buiCopy:SetAlpha(alpha) end
+	for button, paint in pairs(auxPainters) do
+		if button:IsMouseOver() then
+			local red, green, blue = theme.GetAccent()
+			paint(red, green, blue, alpha)
+		else
+			paint(BUTTON_IDLE[1], BUTTON_IDLE[2], BUTTON_IDLE[3], alpha)
+		end
+	end
 end
 
 local function MakeCornerButton(chat, mediaKey, fallbackTexture)
@@ -1075,7 +1085,7 @@ local function MakeCornerButton(chat, mediaKey, fallbackTexture)
 	local texture = button:CreateTexture(nil, 'ARTWORK')
 	texture:SetAllPoints()
 	texture:SetTexture(BUILib.GetLibMedia(mediaKey) or fallbackTexture)
-	texture:SetVertexColor(0.65, 0.65, 0.7, 1)
+	texture:SetVertexColor(BUTTON_IDLE[1], BUTTON_IDLE[2], BUTTON_IDLE[3], 1)
 	button._tex = texture
 	button:SetScript('OnEnter', BUI.Profiler.Script('Skin.Chat button OnEnter', function()
 		texture:SetVertexColor(theme.GetAccent())
@@ -1084,7 +1094,7 @@ local function MakeCornerButton(chat, mediaKey, fallbackTexture)
 		UpdateCornerButtons()
 	end))
 	button:SetScript('OnLeave', BUI.Profiler.Script('Skin.Chat button OnLeave', function()
-		texture:SetVertexColor(0.65, 0.65, 0.7, 1)
+		texture:SetVertexColor(BUTTON_IDLE[1], BUTTON_IDLE[2], BUTTON_IDLE[3], 1)
 		UpdateCornerButtons()
 	end))
 	return button
@@ -1168,7 +1178,7 @@ local function SkinPanel()
 		elseif lock._lockedTint then
 			lock._tex:SetVertexColor(red * 0.75, green * 0.75, blue * 0.75, 1)
 		else
-			lock._tex:SetVertexColor(0.65, 0.65, 0.7, 1)
+			lock._tex:SetVertexColor(BUTTON_IDLE[1], BUTTON_IDLE[2], BUTTON_IDLE[3], 1)
 		end
 	end
 	local function UpdateLockIcon()
@@ -1656,22 +1666,164 @@ function ApplyMsgFontSize()
 	for frameIndex = 1, #skinnedFrames do SetFontSafe(skinnedFrames[frameIndex], font, size, flags) end
 end
 
-local function PlaceAuxButton(button, previous, gap)
-	if not button then return previous end
-	button._buiOrigParent = button._buiOrigParent or button:GetParent()
-	button:SetParent(chatPanel)
-	button:SetFrameLevel(chatPanel:GetFrameLevel() + 10)
-	button:ClearAllPoints()
-	button:SetPoint('TOP', previous, 'BOTTOM', 0, -(gap or 3))
-	button:SetSize(16, 16)
-	if button.UpdateVisibleState then button:UpdateVisibleState() end
-	return button
-end
+local PlaceAuxButton, RestoreAuxButton
 
-local function RestoreAuxButton(button)
-	if button and button._buiOrigParent then
-		button:SetParent(button._buiOrigParent)
-		button._buiOrigParent = nil
+do
+	local AUX_GLYPH_SIZE = 12
+	local AUX_COUNT_SIZE = 9
+	local MENU_GLYPH = 'more'
+	local FRIENDS_ATLAS = 'socialqueuing-icon-group'
+	local VOICE_BUTTON_NAMES = { ChatFrameChannelButton = true, ChatFrameToggleVoiceDeafenButton = true, ChatFrameToggleVoiceMuteButton = true }
+	local FRIENDS_ART = { FriendsButton = 'quickjoin-button-friendslist-up', QueueButton = 'quickjoin-button-quickjoin-up', FlashingLayer = 'quickjoin-button-quickjoin-up' }
+	local FRIENDS_COUNTS = { 'FriendCount', 'QueueCount' }
+
+	local function SetArtAlpha(alpha, ...)
+		for index = 1, select('#', ...) do
+			local texture = select(index, ...)
+			if texture then texture:SetAlpha(alpha) end
+		end
+	end
+
+	local function ButtonArt(button)
+		return button:GetNormalTexture(), button:GetPushedTexture(), button:GetDisabledTexture(), button:GetHighlightTexture()
+	end
+
+	local function Glyph(button)
+		local glyph = button._buiGlyph
+		if not glyph then
+			glyph = button:CreateTexture(nil, 'OVERLAY')
+			glyph:SetSize(AUX_GLYPH_SIZE, AUX_GLYPH_SIZE)
+			button._buiGlyph = glyph
+		end
+		glyph:Show()
+		return glyph
+	end
+
+	local function BlankFriendsArt(button)
+		for key in pairs(FRIENDS_ART) do button[key]:SetTexture(nil) end
+	end
+
+	local function SkinMenuButton(button)
+		SetArtAlpha(0, ButtonArt(button))
+		local glyph = Glyph(button)
+		glyph:SetTexture(BUILib.GetLibMedia(MENU_GLYPH))
+		glyph:SetPoint('CENTER')
+		return function(red, green, blue, alpha)
+			glyph:SetVertexColor(red, green, blue, 1)
+			button:SetAlpha(alpha)
+		end
+	end
+
+	local function SkinVoiceButton(button)
+		SetArtAlpha(0, ButtonArt(button))
+		button.Icon:SetDesaturated(true)
+		if not button._buiVoiceHook then
+			button._buiVoiceHook = true
+			local function HideHighlight(self)
+				if auxPainters[self] then SetArtAlpha(0, self:GetHighlightTexture()) end
+			end
+			Hook(button, 'SetHighlight', HideHighlight)
+			Hook(button, 'UpdateHighlight', HideHighlight)
+		end
+		return function(red, green, blue, alpha)
+			button.Icon:SetVertexColor(red, green, blue, 1)
+			button:SetAlpha(alpha)
+		end
+	end
+
+	local function SkinFriendsButton(button)
+		BlankFriendsArt(button)
+		local glyph = Glyph(button)
+		glyph:SetAtlas(FRIENDS_ATLAS)
+		local info = C_Texture.GetAtlasInfo(FRIENDS_ATLAS)
+		glyph:SetSize(AUX_GLYPH_SIZE * info.width / info.height, AUX_GLYPH_SIZE)
+		glyph:SetDesaturated(true)
+		glyph:SetPoint('TOP')
+		for _, key in ipairs(FRIENDS_COUNTS) do
+			local count = button[key]
+			count:ClearAllPoints()
+			count:SetPoint('TOP', glyph, 'BOTTOM', 0, -1)
+			SetFontSafe(count, ResolveFont(), AUX_COUNT_SIZE, 'OUTLINE')
+		end
+		if not button._buiFriendsHook then
+			button._buiFriendsHook = true
+			local function KeepBlank(self)
+				if auxPainters[self] then BlankFriendsArt(self) end
+			end
+			button:HookScript('OnMouseDown', Wrap('Skin.Chat friends art', KeepBlank))
+			button:HookScript('OnMouseUp', Wrap('Skin.Chat friends art', KeepBlank))
+		end
+		return function(red, green, blue, alpha)
+			glyph:SetVertexColor(red, green, blue, alpha)
+			for _, key in ipairs(FRIENDS_COUNTS) do button[key]:SetTextColor(red, green, blue, alpha) end
+		end
+	end
+
+	local function SkinAuxButton(button)
+		local name = button:GetName()
+		if name == 'ChatFrameMenuButton' then return SkinMenuButton(button) end
+		if name == 'QuickJoinToastButton' then return SkinFriendsButton(button) end
+		if VOICE_BUTTON_NAMES[name] then return SkinVoiceButton(button) end
+	end
+
+	local function HookAuxHover(button)
+		if button._buiAuxHover then return end
+		button._buiAuxHover = true
+		button:HookScript('OnEnter', Wrap('Skin.Chat aux OnEnter', function(self)
+			if not auxPainters[self] then return end
+			fadeState.lastActive = GetTime()
+			StartFader()
+			UpdateCornerButtons()
+		end))
+		button:HookScript('OnLeave', Wrap('Skin.Chat aux OnLeave', function(self)
+			if auxPainters[self] then UpdateCornerButtons() end
+		end))
+	end
+
+	local function UnskinAuxButton(button)
+		if not auxPainters[button] then return end
+		auxPainters[button] = nil
+		button:SetAlpha(1)
+		SetArtAlpha(1, ButtonArt(button))
+		if button._buiGlyph then button._buiGlyph:Hide() end
+		if VOICE_BUTTON_NAMES[button:GetName()] then
+			button.Icon:SetDesaturated(false)
+			button.Icon:SetVertexColor(1, 1, 1, 1)
+		elseif button == _G.QuickJoinToastButton then
+			for key, atlas in pairs(FRIENDS_ART) do button[key]:SetAtlas(atlas) end
+			for _, key in ipairs(FRIENDS_COUNTS) do
+				local count = button[key]
+				count:SetFontObject(_G.GameFontHighlightSmall)
+				count:SetTextColor(1, 1, 1, 1)
+				count:ClearAllPoints()
+				count:SetPoint('BOTTOM', button, 'BOTTOM', 0, 4)
+			end
+		end
+	end
+
+	function PlaceAuxButton(button, previous, gap)
+		if not button then return previous end
+		button._buiOrigParent = button._buiOrigParent or button:GetParent()
+		button:SetParent(chatPanel)
+		button:SetFrameLevel(chatPanel:GetFrameLevel() + 10)
+		button:ClearAllPoints()
+		button:SetPoint('TOP', previous, 'BOTTOM', 0, -(gap or 3))
+		button:SetSize(16, 16)
+		if button.UpdateVisibleState then button:UpdateVisibleState() end
+		if not auxPainters[button] then
+			auxPainters[button] = SkinAuxButton(button)
+			HookAuxHover(button)
+		end
+		return button
+	end
+
+	function RestoreAuxButton(button)
+		if not button then return end
+		UnskinAuxButton(button)
+		if button._buiOrigParent then
+			button:SetParent(button._buiOrigParent)
+			button._buiOrigParent = nil
+		end
 	end
 end
 
@@ -1692,6 +1844,7 @@ local function RepositionAuxButtons()
 		previous = PlaceAuxButton(_G.ChatFrameMenuButton, previous, 8)
 		previous = PlaceAuxButton(_G.QuickJoinToastButton, previous)
 	end
+	UpdateCornerButtons()
 end
 
 local function ApplyTimestampCVar()
