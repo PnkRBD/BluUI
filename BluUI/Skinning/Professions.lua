@@ -59,10 +59,7 @@ local SPELL_LABEL_WIDTH = 100
 local SPELL_BUTTON_SIZE = 40
 local SECONDARY_TEXT_WIDTH = 120
 
-local UNSIZED_WIDTH = 1
-
 local frameInstalled, bookInstalled, customerInstalled, templatesInstalled = false, false, false, false
-local waitingForWidth = false
 local frameSkinned, bookSkinned, bookLaidOut, customerSkinned = false, false, false, false
 local owned = {}
 
@@ -558,12 +555,28 @@ local function SkinOrderView(view)
 	end
 end
 
+local function ShowSelectedTab(tabSystem)
+	for _, tab in ipairs(tabSystem.tabs) do Skin.TipTabSelected(tab, tab.isSelected == true) end
+end
+
+local function SkinTabSystem(tabSystem, frame)
+	for _, tab in ipairs(tabSystem.tabs) do Tab(tab, true) end
+	ShowSelectedTab(tabSystem)
+	if not tabSystem._buiTabHook then
+		tabSystem._buiTabHook = true
+		Hook(tabSystem, 'SetTabVisuallySelected', ShowSelectedTab)
+	end
+	tabSystem.spacing = BUILib.Skin.TAB_STRIP_OVERLAP
+	tabSystem:MarkDirty()
+	tabSystem:ClearAllPoints()
+	tabSystem:SetPoint('TOPLEFT', frame, 'BOTTOMLEFT', -BUILib.Skin.TAB_INSET, BUILib.Skin.TAB_INSET)
+end
+
 local function SkinProfessionsFrame(frame)
 	SkinPanel(frame)
 	Skin.TipPageButton(frame.MaximizeMinimize.MaximizeButton, 'expand')
 	Skin.TipPageButton(frame.MaximizeMinimize.MinimizeButton, 'condense')
-	Skin.RegisterTabSystem(frame.TabSystem, context, frame)
-	Skin.RefreshTabSystem(frame.TabSystem)
+	SkinTabSystem(frame.TabSystem, frame)
 	SkinCraftingPage(frame.CraftingPage)
 	SkinSpecPage(frame.SpecPage)
 	SkinOrderBrowse(frame.OrdersPage.BrowseFrame)
@@ -837,26 +850,12 @@ local function InstallTemplates()
 	Hook(ProfessionsCrafterTableHeaderStringMixin, 'Init', OnHeaderInit)
 end
 
-local function HideUntilSized(frame)
-	if frame:GetWidth() > UNSIZED_WIDTH then return end
-	waitingForWidth = true
-	frame:SetAlpha(0)
-end
-
-local function RevealOnceSized(frame, width)
-	if not waitingForWidth or width <= UNSIZED_WIDTH then return end
-	waitingForWidth = false
-	frame:SetAlpha(1)
-end
-
 local function InstallFrame()
 	local frame = _G.ProfessionsFrame
 	if frameInstalled or not frame then return end
 	frameInstalled = true
 	InstallTemplates()
 	Hook(ProfessionsCraftingOutputLogElementMixin, 'Init', OnOutputEntry)
-	frame:HookScript('OnShow', Wrap('Skin.Professions hide until sized', Guard(HideUntilSized)))
-	frame:HookScript('OnSizeChanged', Wrap('Skin.Professions reveal once sized', RevealOnceSized))
 	frame:HookScript('OnShow', Wrap('Skin.Professions frame reskin', Guard(ApplyFrame)))
 	Safely(ApplyFrame)
 end
