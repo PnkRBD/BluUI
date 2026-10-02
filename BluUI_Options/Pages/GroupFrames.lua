@@ -8,6 +8,7 @@ local MENU_WIDTH = 150
 local WIDE_MENU = 200
 local TEXT_RANGE = 100
 local ICON_RANGE = 80
+local ICON_SIZE_MAX = 48
 local AURA_RANGE = 200
 local POSITION_RANGE = 2000
 local PARTY_FIELDS = { posX = 'x', posY = 'y' }
@@ -392,10 +393,13 @@ local function FramesBoard(ui, parent, width, key)
 	})
 	for _, indicator in ipairs(INDICATORS) do
 		local settings = section[indicator.key]
+		local sizeStep = GroupFrames().IndicatorSizeStep(indicator.kind)
+		local sizeSpec = sizeStep and { min = sizeStep, max = math.floor(ICON_SIZE_MAX / sizeStep) * sizeStep, step = sizeStep }
+			or { min = 6, max = ICON_SIZE_MAX, step = 1 }
 		indicators:AddTools(indicator.label, nil, {
 			Menu(settings, 'anchor', BUI.C.ANCHOR_POINT_OPTIONS),
 			{ tooltip = 'Size and offset', title = indicator.label, options = {
-				Option(settings, 'Size', 'size', { min = 6, max = 48, step = 1 }),
+				Option(settings, 'Size', 'size', sizeSpec),
 				Option(settings, 'Horizontal', 'offsetX', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
 				Option(settings, 'Vertical', 'offsetY', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
 			} },
