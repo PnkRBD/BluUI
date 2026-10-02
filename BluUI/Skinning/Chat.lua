@@ -1669,10 +1669,9 @@ end
 local PlaceAuxButton, RestoreAuxButton
 
 do
-	local AUX_GLYPH_SIZE = 12
-	local AUX_COUNT_SIZE = 9
+	local AUX_BUTTON_SIZE = 14
 	local MENU_GLYPH = 'more'
-	local FRIENDS_ATLAS = 'socialqueuing-icon-group'
+	local FRIENDS_GLYPH = 'profile'
 	local VOICE_BUTTON_NAMES = { ChatFrameChannelButton = true, ChatFrameToggleVoiceDeafenButton = true, ChatFrameToggleVoiceMuteButton = true }
 	local FRIENDS_ART = { FriendsButton = 'quickjoin-button-friendslist-up', QueueButton = 'quickjoin-button-quickjoin-up', FlashingLayer = 'quickjoin-button-quickjoin-up' }
 	local FRIENDS_COUNTS = { 'FriendCount', 'QueueCount' }
@@ -1688,26 +1687,30 @@ do
 		return button:GetNormalTexture(), button:GetPushedTexture(), button:GetDisabledTexture(), button:GetHighlightTexture()
 	end
 
+	local function FillButton(texture)
+		texture:ClearAllPoints()
+		texture:SetAllPoints()
+	end
+
 	local function Glyph(button)
 		local glyph = button._buiGlyph
 		if not glyph then
 			glyph = button:CreateTexture(nil, 'OVERLAY')
-			glyph:SetSize(AUX_GLYPH_SIZE, AUX_GLYPH_SIZE)
 			button._buiGlyph = glyph
 		end
+		FillButton(glyph)
 		glyph:Show()
 		return glyph
 	end
 
-	local function BlankFriendsArt(button)
-		for key in pairs(FRIENDS_ART) do button[key]:SetTexture(nil) end
+	local function KeepFriendsArtBlank(texture)
+		if auxPainters[_G.QuickJoinToastButton] then texture:SetTexture(nil) end
 	end
 
 	local function SkinMenuButton(button)
 		SetArtAlpha(0, ButtonArt(button))
 		local glyph = Glyph(button)
 		glyph:SetTexture(BUILib.GetLibMedia(MENU_GLYPH))
-		glyph:SetPoint('CENTER')
 		return function(red, green, blue, alpha)
 			glyph:SetVertexColor(red, green, blue, 1)
 			button:SetAlpha(alpha)
@@ -1717,6 +1720,7 @@ do
 	local function SkinVoiceButton(button)
 		SetArtAlpha(0, ButtonArt(button))
 		button.Icon:SetDesaturated(true)
+		FillButton(button.Icon)
 		if not button._buiVoiceHook then
 			button._buiVoiceHook = true
 			local function HideHighlight(self)
@@ -1732,30 +1736,19 @@ do
 	end
 
 	local function SkinFriendsButton(button)
-		BlankFriendsArt(button)
-		local glyph = Glyph(button)
-		glyph:SetAtlas(FRIENDS_ATLAS)
-		local info = C_Texture.GetAtlasInfo(FRIENDS_ATLAS)
-		glyph:SetSize(AUX_GLYPH_SIZE * info.width / info.height, AUX_GLYPH_SIZE)
-		glyph:SetDesaturated(true)
-		glyph:SetPoint('TOP')
-		for _, key in ipairs(FRIENDS_COUNTS) do
-			local count = button[key]
-			count:ClearAllPoints()
-			count:SetPoint('TOP', glyph, 'BOTTOM', 0, -1)
-			SetFontSafe(count, ResolveFont(), AUX_COUNT_SIZE, 'OUTLINE')
-		end
-		if not button._buiFriendsHook then
-			button._buiFriendsHook = true
-			local function KeepBlank(self)
-				if auxPainters[self] then BlankFriendsArt(self) end
+		for key in pairs(FRIENDS_ART) do
+			local texture = button[key]
+			texture:SetTexture(nil)
+			if not texture._buiBlankHook then
+				texture._buiBlankHook = true
+				Hook(texture, 'SetAtlas', KeepFriendsArtBlank)
 			end
-			button:HookScript('OnMouseDown', Wrap('Skin.Chat friends art', KeepBlank))
-			button:HookScript('OnMouseUp', Wrap('Skin.Chat friends art', KeepBlank))
 		end
+		for _, key in ipairs(FRIENDS_COUNTS) do button[key]:Hide() end
+		local glyph = Glyph(button)
+		glyph:SetTexture(BUILib.GetLibMedia(FRIENDS_GLYPH))
 		return function(red, green, blue, alpha)
 			glyph:SetVertexColor(red, green, blue, alpha)
-			for _, key in ipairs(FRIENDS_COUNTS) do button[key]:SetTextColor(red, green, blue, alpha) end
 		end
 	end
 
@@ -1789,15 +1782,12 @@ do
 		if VOICE_BUTTON_NAMES[button:GetName()] then
 			button.Icon:SetDesaturated(false)
 			button.Icon:SetVertexColor(1, 1, 1, 1)
+			button.Icon:ClearAllPoints()
+			button.Icon:SetPoint('CENTER')
+			button.Icon:SetSize(button.fixedIconWidth, button.fixedIconHeight)
 		elseif button == _G.QuickJoinToastButton then
 			for key, atlas in pairs(FRIENDS_ART) do button[key]:SetAtlas(atlas) end
-			for _, key in ipairs(FRIENDS_COUNTS) do
-				local count = button[key]
-				count:SetFontObject(_G.GameFontHighlightSmall)
-				count:SetTextColor(1, 1, 1, 1)
-				count:ClearAllPoints()
-				count:SetPoint('BOTTOM', button, 'BOTTOM', 0, 4)
-			end
+			for _, key in ipairs(FRIENDS_COUNTS) do button[key]:Show() end
 		end
 	end
 
@@ -1807,8 +1797,8 @@ do
 		button:SetParent(chatPanel)
 		button:SetFrameLevel(chatPanel:GetFrameLevel() + 10)
 		button:ClearAllPoints()
-		button:SetPoint('TOP', previous, 'BOTTOM', 0, -(gap or 3))
-		button:SetSize(16, 16)
+		button:SetPoint('TOP', previous, 'BOTTOM', 0, -(gap or 5))
+		button:SetSize(AUX_BUTTON_SIZE, AUX_BUTTON_SIZE)
 		if button.UpdateVisibleState then button:UpdateVisibleState() end
 		if not auxPainters[button] then
 			auxPainters[button] = SkinAuxButton(button)
