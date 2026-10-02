@@ -83,7 +83,7 @@ local function LayoutHolder(holder, kind, parent, layout)
 	local rowGap = Pixel.Scale(layout.rowSpacing or layout.spacing or 0)
 	local perRow = math.max(1, layout.perRow or 1)
 	local spells = SAMPLE_SPELLS[kind]
-	local count = math.max(1, math.min(layout.max or #spells, #spells))
+	local count = math.max(1, layout.max)
 	local growX, growY = Growth(layout.anchorPoint, layout.growDirection)
 	local corner = (growY == 'UP' and 'BOTTOM' or 'TOP') .. (growX == 'RIGHT' and 'LEFT' or 'RIGHT')
 	local directionX = growX == 'RIGHT' and 1 or -1
@@ -104,15 +104,16 @@ local function LayoutHolder(holder, kind, parent, layout)
 		icon:SetSize(size, size)
 		icon:ClearAllPoints()
 		icon:SetPoint(corner, holder, corner, column * (size + gap) * directionX, row * (size + rowGap) * directionY)
-		icon.texture:SetTexture(SpellIcon(spells[index]))
-		local dispelType = dispel and dispel[index]
+		local sample = (index - 1) % #spells + 1
+		icon.texture:SetTexture(SpellIcon(spells[sample]))
+		local dispelType = dispel and dispel[sample]
 		if dispelType then
 			local red, green, blue = BUI.AuraEngine.DispelColorRGB(dispelType)
 			Pixel.SetBorderColor(icon, red, green, blue, 1)
 		else
 			Pixel.SetBorderColor(icon, 0, 0, 0, 1)
 		end
-		local stack = stacks and stacks[index]
+		local stack = stacks and stacks[sample]
 		if stack then
 			Pixel.ApplyFont(icon.count, layout.stackSize or 10, STANDARD_TEXT_FONT, 'OUTLINE')
 			icon.count:SetText(stack)
