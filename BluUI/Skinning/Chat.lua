@@ -13,8 +13,6 @@ local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local theme = BUILib.Theme
 local Skin3 = BUILib.Skin
 local Skin = BUI.Skinning
-local Controls = BUILib.Controls
-local PageKit = BUILib.PageKit
 local sharedMedia = LibStub and LibStub('LibSharedMedia-3.0', true)
 local GLOBAL_OPTION = (BUI.C and BUI.C.GLOBAL_OPTION) or 'GLOBAL'
 
@@ -2279,353 +2277,207 @@ Skin.RegisterSkin('chat', {
 	icon = 'Interface\\Icons\\UI_Chat',
 	settingsWidth = 846,
 	settingsHeight = 600,
-	buildSettings = function(content)
+	buildBoards = function(ui, parent, width, content)
 		local config = GetConfig()
-		local pageKit = PageKit
 
-		local GAP = pageKit.GAP
-		local fullWidth = content.width
-		local TALL, SHORT, TALLER = pageKit.CardHeight(5), pageKit.CardHeight(4), pageKit.CardHeight(6)
-
-		local root = CreateFrame('Frame', nil, content.child)
-		root:SetPoint('TOPLEFT', 0, -8)
-		root:SetSize(content.width, TALL + GAP + SHORT + GAP + SHORT + GAP + TALLER)
-
-		local function MakeCard(title, x, y, width, height)
-			local cardWidget = Controls.SettingsCard(root, { title = title, width = width })
-			local card = cardWidget.frame
-			card:SetSize(width, height)
-			card:SetPoint('TOPLEFT', x, -y)
-			card:SetFrameLevel((root:GetFrameLevel() or 0) + 5)
-			return card
+		local function Store(key)
+			return function(value) config[key] = value end
 		end
-
-		local chatCard = MakeCard('CHAT', 0, 0, fullWidth, TALL)
-		local tabsCard = MakeCard('TABS', 0, TALL + GAP, fullWidth, SHORT)
-		local messagesCard  = MakeCard('MESSAGES', 0, TALL + GAP + SHORT + GAP, fullWidth, SHORT)
-		local behaviorCard  = MakeCard('BEHAVIOR', 0, TALL + GAP + SHORT + GAP + SHORT + GAP, fullWidth, TALLER)
-
-		local fontCog = pageKit.SettingsIcon(chatCard, {
-			title = 'FONT', tooltip = 'Font sizes, outline & shadow', options = {
-				{ kind = 'slider', label = 'Message Size', min = 8, max = 22,
-				  get = function() return config.fontSize or 14 end,
-				  set = function(value) config.fontSize = value end, apply = ApplyMsgFontSize },
-				{ kind = 'slider', label = 'Edit Box Size', min = 8, max = 22,
-				  get = function() return config.editFontSize or 13 end,
-				  set = function(value) config.editFontSize = value end, apply = ApplySettings },
-				{ kind = 'dropdown', label = 'Outline', items = FLAG_OPTIONS,
-				  get = function() return config.fontFlags or '' end,
-				  set = function(value) config.fontFlags = value end,
-				  apply = function() ApplySettings(); ApplyMsgFontSize() end },
-				{ label = 'Font Shadow',
-				  get = function() return config.fontShadow == true end,
-				  set = function(value) config.fontShadow = value end, apply = ApplySettings },
-			},
-		})
-		local fontDropdown = Controls.Dropdown(chatCard, nil, BUI.BuildFontDropdownItems(GLOBAL_OPTION), config.font or GLOBAL_OPTION, function(value)
-			config.font = value; ApplySettings(); ApplyMsgFontSize()
-		end, nil, 140)
-		pageKit.Row(chatCard, 38, 'Font', fontCog)
-		pageKit.AttachLeft(fontDropdown, fontCog)
-
-		local backgroundCog = pageKit.SettingsIcon(chatCard, {
-			title = 'BACKGROUND', tooltip = 'Background opacity', options = {
-				{ kind = 'slider', label = 'Opacity', min = 0, max = 100,
-				  get = function() return floor((config.bgAlpha or DEFAULTS.bgAlpha) * 100 + 0.5) end,
-				  set = function(value) config.bgAlpha = value / 100 end, apply = ApplySettings },
-			},
-		})
-		local backgroundDropdown = Controls.Dropdown(chatCard, nil, BuildTextureItems(), config.bgTexture or 'SOLID', function(value)
-			config.bgTexture = value; ApplySettings()
-		end, nil, 140)
-		local backgroundColor = config.bgColor or DEFAULTS.bgColor
-		local backgroundSwatch = Controls.ColorSwatch(chatCard, { r = backgroundColor[1], g = backgroundColor[2], b = backgroundColor[3], hasOpacity = false, callback = function(red, green, blue)
-			config.bgColor = { red, green, blue }; ApplySettings()
-		end, tooltip = 'Background Color' })
-		pageKit.Row(chatCard, 78, 'Background', backgroundCog)
-		pageKit.AttachLeft(backgroundDropdown, backgroundCog)
-		pageKit.AttachLeft(backgroundSwatch, backgroundDropdown)
-
-		local borderCog = pageKit.SettingsIcon(chatCard, {
-			title = 'BORDER', tooltip = 'Border thickness', options = {
-				{ kind = 'slider', label = 'Thickness', min = 1, max = 4,
-				  get = function() return config.borderThickness or 1 end,
-				  set = function(value) config.borderThickness = value end, apply = ApplySettings },
-			},
-		})
-		local borderColor = config.borderColor or DEFAULTS.borderColor
-		local borderSwatch = Controls.ColorSwatch(chatCard, { r = borderColor[1], g = borderColor[2], b = borderColor[3], hasOpacity = false, callback = function(red, green, blue)
-			config.borderColor = { red, green, blue }; ApplySettings()
-		end, tooltip = 'Border Color' })
-		local borderToggle = Controls.SwitchToggle(chatCard, nil, config.showBorder ~= false, function(value)
-			config.showBorder = value; ApplySettings()
-		end)
-		pageKit.Row(chatCard, 118, 'Border', borderCog)
-		pageKit.AttachLeft(borderSwatch, borderCog)
-		pageKit.AttachLeft(borderToggle, borderSwatch)
+		local function Slider(label, key, read, low, high, step)
+			return { label = label, min = low, max = high, step = step or 1, get = read, set = Store(key) }
+		end
+		local function Percent(label, key, read, low)
+			return { label = label, min = low, max = 100, step = 1, get = function() return floor(read() * 100 + 0.5) end, set = function(value) config[key] = value / 100 end }
+		end
+		local function Check(label, key, read)
+			return { label = label, get = read, set = Store(key) }
+		end
+		local function Choice(label, key, entries, read)
+			return { label = label, entries = entries, get = read, set = Store(key) }
+		end
+		local function Color(tooltip, key, read)
+			return { kind = 'swatch', tooltip = tooltip, get = function()
+				local red, green, blue = read()
+				return red, green, blue, 1
+			end, set = function(red, green, blue) config[key] = { red, green, blue } end }
+		end
+		local function Cog(tooltip, title, options, icon)
+			return { icon = icon, tooltip = tooltip, title = title, options = options }
+		end
+		local function Switch(read, key)
+			return { get = read, set = Store(key) }
+		end
 
 		local function ChatGeo()
 			local chatFrame = _G.ChatFrame1
-			local width, height = chatFrame:GetSize()
-			return chatFrame, floor((width or 400) + 0.5), floor((height or 200) + 0.5), floor((chatFrame:GetLeft() or 0) + 0.5), floor((chatFrame:GetBottom() or 0) + 0.5)
+			local frameWidth, frameHeight = chatFrame:GetSize()
+			return chatFrame, floor(frameWidth + 0.5), floor(frameHeight + 0.5), floor(chatFrame:GetLeft() + 0.5), floor(chatFrame:GetBottom() + 0.5)
 		end
 		local function SetGeo(part, value)
 			if InCombatLockdown() then return end
-			local chatFrame, width, height, x, y = ChatGeo()
-			if part == 'w' then width = value elseif part == 'h' then height = value elseif part == 'x' then x = value else y = value end
-			chatFrame:SetSize(width, height)
+			local chatFrame, frameWidth, frameHeight, x, y = ChatGeo()
+			if part == 'w' then frameWidth = value elseif part == 'h' then frameHeight = value elseif part == 'x' then x = value else y = value end
+			chatFrame:SetSize(frameWidth, frameHeight)
 			chatFrame:ClearAllPoints()
 			chatFrame:SetPoint('BOTTOMLEFT', UIParent, 'BOTTOMLEFT', x, y)
 			SaveGeometry(chatFrame)
-			if chatFrame.SetClampRectInsets then chatFrame:SetClampRectInsets(0, 0, 0, 0) end
-			AnchorPanel(); PositionScrollBar(chatFrame); PositionEditBox(chatFrame)
-			UpdateMover(); UpdateSizer()
+			chatFrame:SetClampRectInsets(0, 0, 0, 0)
+			AnchorPanel()
+			PositionScrollBar(chatFrame)
+			PositionEditBox(chatFrame)
+			UpdateMover()
+			UpdateSizer()
+		end
+		local GEO_INDEX = { w = 2, h = 3, x = 4, y = 5 }
+		local function Geo(part, label, low, high)
+			return { label = label, min = low, max = high, step = 1, get = function() return (select(GEO_INDEX[part], ChatGeo())) end, set = function(value) SetGeo(part, value) end }
 		end
 		local screenWidth, screenHeight = floor(GetScreenWidth()), floor(GetScreenHeight())
-		local posIcon = pageKit.PositionIcon(chatCard, {
-			title = 'POSITION', tooltip = 'Position on screen', options = {
-				{ kind = 'slider', label = 'X (from left)', min = 0, max = screenWidth,
-				  get = function() local _, _, _, x = ChatGeo(); return x end,
-				  set = function(value) SetGeo('x', value) end },
-				{ kind = 'slider', label = 'Y (from bottom)', min = 0, max = screenHeight,
-				  get = function() local _, _, _, _, y = ChatGeo(); return y end,
-				  set = function(value) SetGeo('y', value) end },
-			},
-		})
-		local sizeIcon = pageKit.SizeIcon(chatCard, {
-			title = 'SIZE', tooltip = 'Size & padding', options = {
-				{ kind = 'slider', label = 'Width', min = 200, max = max(screenWidth, 400),
-				  get = function() local _, width = ChatGeo(); return width end,
-				  set = function(value) SetGeo('w', value) end },
-				{ kind = 'slider', label = 'Height', min = 80, max = max(screenHeight, 200),
-				  get = function() local _, _, height = ChatGeo(); return height end,
-				  set = function(value) SetGeo('h', value) end },
-				{ kind = 'slider', label = 'Side Padding', min = 0, max = 20,
-				  get = function() return config.insetX or 5 end,
-				  set = function(value) config.insetX = value end, apply = ApplySettings },
-				{ kind = 'slider', label = 'Top Bar Height', min = 12, max = 40,
-				  get = function() return config.insetTop or DEFAULTS.insetTop end,
-				  set = function(value) config.insetTop = value end, apply = ApplySettings },
-				{ kind = 'slider', label = 'Bottom Padding', min = 0, max = 20,
-				  get = function() return config.insetBottom or 5 end,
-				  set = function(value) config.insetBottom = value end, apply = ApplySettings },
-			},
-		})
-		local moveCog = pageKit.SettingsIcon(chatCard, {
-			title = 'MOVING', tooltip = 'Moving & resizing', options = {
-				{ label = 'Lock Frame',
-				  get = function() return config.locked == true end,
-				  set = function(value) config.locked = value end,
-				  apply = function() UpdateMover(); UpdateSizer() end },
-				{ label = 'Drag Top Bar to Move',
-				  get = function() return config.dragToMove ~= false end,
-				  set = function(value) config.dragToMove = value end, apply = UpdateMover },
-				{ label = 'Show Resize Grip',
-				  get = function() return config.showSizer ~= false end,
-				  set = function(value) config.showSizer = value end, apply = UpdateSizer },
-			},
-		})
-		pageKit.Row(chatCard, 158, 'Position & Size', posIcon)
-		pageKit.AttachLeft(sizeIcon, posIcon)
-		pageKit.AttachLeft(moveCog, sizeIcon)
 
-		local editBoxCog = pageKit.SettingsIcon(chatCard, {
-			title = 'EDIT BOX', tooltip = 'Edit box height', options = {
-				{ kind = 'slider', label = 'Height', min = 16, max = 40,
-				  get = function() return config.editboxHeight or 22 end,
-				  set = function(value) config.editboxHeight = value end, apply = ApplySettings },
-			},
-		})
-		local editBoxDropdown = Controls.Dropdown(chatCard, nil, EDITBOX_OPTIONS, EditBoxPos(), function(value)
-			config.editboxPosition = value; ApplySettings()
-		end, nil, 140)
-		pageKit.Row(chatCard, 198, 'Edit Box', editBoxCog)
-		pageKit.AttachLeft(editBoxDropdown, editBoxCog)
-
-		local tabTextCog = pageKit.SettingsIcon(tabsCard, {
-			title = 'TAB TEXT', tooltip = 'Tab font & names', options = {
-				{ kind = 'slider', label = 'Font Size', min = 8, max = 18,
-				  get = function() return config.tabFontSize or 12 end,
-				  set = function(value) config.tabFontSize = value end, apply = ApplySettings },
-				{ kind = 'dropdown', label = 'Outline', items = FLAG_OPTIONS,
-				  get = function() return config.tabFontFlags or '' end,
-				  set = function(value) config.tabFontFlags = value end, apply = ApplySettings },
-				{ label = 'Uppercase Names',
-				  get = function() return config.tabUppercase == true end,
-				  set = function(value) config.tabUppercase = value end, apply = ApplySettings },
-				{ label = 'Hide Combat Log Tab',
-				  get = function() return config.hideLogTab == true end,
-				  set = function(value) config.hideLogTab = value end, apply = ApplySettings },
-			},
-		})
-		local styleDropdown = Controls.Dropdown(tabsCard, nil, TAB_STYLE_OPTIONS, config.tabStyle or DEFAULTS.tabStyle, function(value)
-			config.tabStyle = value; ApplySettings()
-		end, nil, 110)
-		pageKit.Row(tabsCard, 38, 'Tab Text', tabTextCog)
-		pageKit.AttachLeft(styleDropdown, tabTextCog)
-
-		local accentToggle
-		local selectedColor = config.selectedColor or { 1, 1, 1 }
-		local activeSwatch = Controls.ColorSwatch(tabsCard, { r = selectedColor[1], g = selectedColor[2], b = selectedColor[3], hasOpacity = false, callback = function(red, green, blue)
-			config.selectedColor = { red, green, blue }
-			config.selectedUseAccent = false
-			if accentToggle and accentToggle.SetValue then accentToggle:SetValue(false) end
+		local chat = ui.Board(parent, width, { stacked = true, title = 'Chat', description = 'The panel behind the chat dock: font, background, border, size and the edit box.' })
+		chat:AddTools('Font', 'Typeface, message and edit box size, outline and shadow', {
+			Choice(nil, 'font', BUI.BuildFontDropdownItems(GLOBAL_OPTION), function() return config.font or GLOBAL_OPTION end),
+			Cog('Sizes, outline and shadow', 'Font', {
+				Slider('Message size', 'fontSize', MsgFontSize, 8, 22),
+				Slider('Edit box size', 'editFontSize', EditFontSize, 8, 22),
+				Choice('Outline', 'fontFlags', FLAG_OPTIONS, MsgFlags),
+				Check('Shadow', 'fontShadow', FontShadow),
+			}),
+		}, function()
 			ApplySettings()
-		end, tooltip = 'Active Tab Accent (turns off theme accent)' })
-		local inactiveColor = config.inactiveColor or DEFAULTS.inactiveColor
-		local inactiveSwatch = Controls.ColorSwatch(tabsCard, { r = inactiveColor[1], g = inactiveColor[2], b = inactiveColor[3], hasOpacity = false, callback = function(red, green, blue)
-			config.inactiveColor = { red, green, blue }; ApplySettings()
-		end, tooltip = 'Inactive Tab Color' })
-		accentToggle = Controls.SwitchToggle(tabsCard, nil, config.selectedUseAccent ~= false, function(value)
-			config.selectedUseAccent = value; ApplySettings()
-		end, nil, nil, 'Use the theme accent for the active tab')
-		pageKit.Row(tabsCard, 78, 'Tab Colors', inactiveSwatch)
-		pageKit.AttachLeft(activeSwatch, inactiveSwatch)
-		pageKit.AttachLeft(accentToggle, activeSwatch)
-
-		local tabOpacityCog = pageKit.SettingsIcon(tabsCard, {
-			title = 'TAB OPACITY', tooltip = 'Tab opacity', options = {
-				{ kind = 'slider', label = 'Selected Tab', min = 10, max = 100,
-				  get = function() return floor((config.selectedAlpha or 1) * 100 + 0.5) end,
-				  set = function(value) config.selectedAlpha = value / 100 end, apply = ApplySettings },
-				{ kind = 'slider', label = 'Background Tabs', min = 0, max = 100,
-				  get = function() return floor((config.dockedAlpha or 0.6) * 100 + 0.5) end,
-				  set = function(value) config.dockedAlpha = value / 100 end, apply = ApplySettings },
-			},
-		})
-		pageKit.Row(tabsCard, 118, 'Opacity', tabOpacityCog)
-
-		local flashColor = config.flashColor or DEFAULTS.flashColor
-		local flashSwatch = Controls.ColorSwatch(tabsCard, { r = flashColor[1], g = flashColor[2], b = flashColor[3], hasOpacity = false, callback = function(red, green, blue)
-			config.flashColor = { red, green, blue }; ApplySettings()
-		end, tooltip = 'Flash Color' })
-		local flashToggle = Controls.SwitchToggle(tabsCard, nil, config.tabFlash ~= false, function(value)
-			config.tabFlash = value; ApplySettings()
+			ApplyMsgFontSize()
 		end)
-		pageKit.Row(tabsCard, 158, 'Flash on Message', flashSwatch)
-		pageKit.AttachLeft(flashToggle, flashSwatch)
-
-		local stampCog = pageKit.SettingsIcon(messagesCard, {
-			title = 'TIMESTAMPS', tooltip = 'Timestamp format', options = {
-				{ kind = 'dropdown', label = 'Format', items = TIMESTAMP_OPTIONS,
-				  get = function() return config.timestampFormat or '%H:%M' end,
-				  set = function(value) config.timestampFormat = value end },
-			},
-		})
-		local timestampColor = config.timestampColor or DEFAULTS.timestampColor
-		local stampSwatch = Controls.ColorSwatch(messagesCard, { r = timestampColor[1], g = timestampColor[2], b = timestampColor[3], hasOpacity = false, callback = function(red, green, blue)
-			config.timestampColor = { red, green, blue }
-		end, tooltip = 'Timestamp Color' })
-		local stampToggle = Controls.SwitchToggle(messagesCard, nil, config.timestamps == true, function(value)
-			config.timestamps = value; ApplySettings()
-		end)
-		pageKit.Row(messagesCard, 38, 'Timestamps', stampCog)
-		pageKit.AttachLeft(stampSwatch, stampCog)
-		pageKit.AttachLeft(stampToggle, stampSwatch)
-
-		local linksCog = pageKit.SettingsIcon(messagesCard, {
-			title = 'LINKS', tooltip = 'Link behavior', options = {
-				{ label = 'Tooltip on Hover',
-				  get = function() return config.hoverTooltips ~= false end,
-				  set = function(value) config.hoverTooltips = value end },
-			},
-		})
-		local urlColor = config.urlColor or DEFAULTS.urlColor
-		local urlSwatch = Controls.ColorSwatch(messagesCard, { r = urlColor[1], g = urlColor[2], b = urlColor[3], hasOpacity = false, callback = function(red, green, blue)
-			config.urlColor = { red, green, blue }
-		end, tooltip = 'Link Color' })
-		local urlToggle = Controls.SwitchToggle(messagesCard, nil, config.urlCopy ~= false, function(value)
-			config.urlCopy = value
-		end)
-		pageKit.Row(messagesCard, 78, 'Clickable Links', linksCog)
-		pageKit.AttachLeft(urlSwatch, linksCog)
-		pageKit.AttachLeft(urlToggle, urlSwatch)
-
-		local channelCog = pageKit.SettingsIcon(messagesCard, {
-			title = 'CHANNELS', tooltip = 'Channel display', options = {
-				{ label = 'Hide Channel Numbers',
-				  get = function() return config.hideChannelNumbers == true end,
-				  set = function(value) config.hideChannelNumbers = value end },
-				{ label = 'Abbreviate Names',
-				  get = function() return config.abbreviateChannels == true end,
-				  set = function(value) config.abbreviateChannels = value end },
-			},
-		})
-		pageKit.Row(messagesCard, 118, 'Channels', channelCog)
-
-		local scrollCog = pageKit.SettingsIcon(messagesCard, {
-			title = 'SCROLLING', tooltip = 'Scroll speed', options = {
-				{ kind = 'slider', label = 'Lines per Scroll', min = 1, max = 10,
-				  get = function() return config.scrollLines or 3 end,
-				  set = function(value) config.scrollLines = value end },
-			},
-		})
-		pageKit.Row(messagesCard, 158, 'Scrolling', scrollCog)
-
-		local messageFadeCog = pageKit.SettingsIcon(behaviorCard, {
-			title = 'MESSAGE FADE', tooltip = 'Fade timing', options = {
-				{ kind = 'slider', label = 'Visible Time (sec)', min = 10, max = 300, step = 5,
-				  get = function() return config.msgFadeTime or 120 end,
-				  set = function(value) config.msgFadeTime = value end, apply = ApplySettings },
-			},
-		})
-		local messageFadeToggle = Controls.SwitchToggle(behaviorCard, nil, config.msgFade == true, function(value)
-			config.msgFade = value; ApplySettings()
-		end)
-		pageKit.Row(behaviorCard, 38, 'Fade Old Messages', messageFadeCog)
-		pageKit.AttachLeft(messageFadeToggle, messageFadeCog)
-
-		local hoverFadeCog = pageKit.SettingsIcon(behaviorCard, {
-			title = 'HOVER FADE', tooltip = 'Fade delay', options = {
-				{ kind = 'slider', label = 'Delay (sec)', min = 0, max = 10,
-				  get = function() return config.fadeDelay or 2 end,
-				  set = function(value) config.fadeDelay = value end },
-			},
-		})
-		local hoverFadeToggle = Controls.SwitchToggle(behaviorCard, nil, config.mouseoverFade == true, function(value)
-			config.mouseoverFade = value
-			if value then StartFader() else StopFader() end
-		end)
-		pageKit.Row(behaviorCard, 78, 'Fade When Not Hovered', hoverFadeCog)
-		pageKit.AttachLeft(hoverFadeToggle, hoverFadeCog)
-
-		local clearButton = Controls.Button(behaviorCard, 'Clear', 84, function()
-			wipe(GetHistory())
-		end, 'Clear saved input history')
-		local historyToggle = Controls.SwitchToggle(behaviorCard, nil, config.editHistory ~= false, function(value)
-			config.editHistory = value
-		end)
-		pageKit.Row(behaviorCard, 118, 'Input History', clearButton)
-		pageKit.AttachLeft(historyToggle, clearButton)
-
-		local buttonsCog = pageKit.SettingsIcon(behaviorCard, {
-			title = 'BUTTONS', tooltip = 'Chat buttons', options = {
-				{ label = 'Hide Menu & Social',
-				  get = function() return config.hideButtons ~= false end,
-				  set = function(value) config.hideButtons = value end, apply = ApplySettings },
-				{ label = 'Hide Voice Buttons',
-				  get = function() return config.hideVoiceButtons ~= false end,
-				  set = function(value) config.hideVoiceButtons = value end, apply = ApplySettings },
-				{ label = 'Show Copy-Chat Button',
-				  get = function() return config.showCopyButton ~= false end,
-				  set = function(value) config.showCopyButton = value end, apply = UpdateCopyButton },
-			},
-		})
-		pageKit.Row(behaviorCard, 158, 'Buttons', buttonsCog)
-
-		local resetButton = Controls.Button(behaviorCard, 'Reset', 84, function()
-			ResetToDefaults()
-			content.Rebuild()
-		end, 'Restore all chat settings to defaults')
-		pageKit.Row(behaviorCard, 198, 'Restore Defaults', resetButton)
-
-		local hideChatToggle = Controls.SwitchToggle(behaviorCard, nil, config.chatHidden == true, function(value)
-			config.chatHidden = value
-			ApplyChatHidden()
+		chat:AddTools('Background', 'Color, opacity and texture behind the messages', {
+			{ kind = 'swatch', tooltip = 'Background color and opacity', opacity = true, get = BGColor, set = function(red, green, blue, alpha)
+				config.bgColor = { red, green, blue }
+				config.bgAlpha = alpha
+			end },
+			Choice(nil, 'bgTexture', BuildTextureItems(), BGTexture),
+		}, ApplySettings)
+		chat:AddTools('Border', 'The edge around the panel', {
+			Color('Border color', 'borderColor', ColorReader('borderColor')),
+			Cog('Thickness', 'Border', { Slider('Thickness', 'borderThickness', BorderThickness, 1, 4) }),
+			Switch(function() return config.showBorder ~= false end, 'showBorder'),
+		}, ApplySettings)
+		chat:AddTools('Position and size', 'Where the panel sits, its size and padding, and how it moves', {
+			Cog('Position on screen', 'Position', {
+				Geo('x', 'From the left', 0, screenWidth),
+				Geo('y', 'From the bottom', 0, screenHeight),
+			}, 'location'),
+			Cog('Size and padding', 'Size', {
+				Geo('w', 'Width', 200, max(screenWidth, 400)),
+				Geo('h', 'Height', 80, max(screenHeight, 200)),
+				Slider('Side padding', 'insetX', InsetX, 0, 20),
+				Slider('Top bar height', 'insetTop', InsetTop, 12, 40),
+				Slider('Bottom padding', 'insetBottom', InsetBottom, 0, 20),
+			}, 'resize'),
+			Cog('Moving and resizing', 'Moving', {
+				Check('Lock the frame', 'locked', Locked),
+				Check('Drag the top bar to move', 'dragToMove', DragToMove),
+				Check('Show the resize grip', 'showSizer', SizerEnabled),
+			}),
+		}, function()
 			ApplySettings()
+			UpdateMover()
+			UpdateSizer()
 		end)
-		pageKit.Row(behaviorCard, 238, 'Hide Chat Completely', hideChatToggle)
+		chat:AddTools('Edit box', 'Where you type, and how tall it is', {
+			Choice(nil, 'editboxPosition', EDITBOX_OPTIONS, EditBoxPos),
+			Cog('Height', 'Edit box', { Slider('Height', 'editboxHeight', EditBoxHeight, 16, 40) }),
+		}, ApplySettings)
 
-		content:Refresh()
+		local tabs = ui.Board(parent, width, { stacked = true, title = 'Tabs', description = 'The chat tabs along the top of the panel.' })
+		tabs:AddTools('Tab text', 'Style, font size, outline and names', {
+			Choice(nil, 'tabStyle', TAB_STYLE_OPTIONS, StrReader('tabStyle')),
+			Cog('Font and names', 'Tab text', {
+				Slider('Font size', 'tabFontSize', TabFontSize, 8, 18),
+				Choice('Outline', 'tabFontFlags', FLAG_OPTIONS, TabFlags),
+				Check('Uppercase names', 'tabUppercase', TabUppercase),
+				Check('Hide the combat log tab', 'hideLogTab', HideLogTab),
+			}),
+		}, ApplySettings)
+		tabs:AddTools('Tab colors', 'Background tabs, the active tab, or the theme accent for the active tab', {
+			Color('Background tabs', 'inactiveColor', InactiveColor),
+			{ kind = 'swatch', tooltip = 'Active tab, turns off the theme accent', get = function()
+				local red, green, blue = SelectedColor()
+				return red, green, blue, 1
+			end, set = function(red, green, blue)
+				config.selectedColor = { red, green, blue }
+				config.selectedUseAccent = false
+			end },
+			Switch(function() return config.selectedUseAccent ~= false end, 'selectedUseAccent'),
+		}, ApplySettings)
+		tabs:AddTools('Tab opacity', 'How see-through the active and background tabs are', {
+			Cog('Opacity', 'Tab opacity', {
+				Percent('Active tab', 'selectedAlpha', SelectedAlpha, 10),
+				Percent('Background tabs', 'dockedAlpha', DockedAlpha, 0),
+			}),
+		}, ApplySettings)
+		tabs:AddTools('Flash on message', 'Pulse a background tab when a message arrives', {
+			Color('Flash color', 'flashColor', FlashColor),
+			Switch(TabFlash, 'tabFlash'),
+		}, ApplySettings)
+
+		local messages = ui.Board(parent, width, { stacked = true, title = 'Messages', description = 'How each line of chat reads.' })
+		messages:AddTools('Timestamps', 'The time in front of each line', {
+			Color('Timestamp color', 'timestampColor', ColorReader('timestampColor')),
+			Cog('Format', 'Timestamps', { Choice('Format', 'timestampFormat', TIMESTAMP_OPTIONS, StrReader('timestampFormat')) }),
+			Switch(BoolReader('timestamps'), 'timestamps'),
+		}, ApplySettings)
+		messages:AddTools('Clickable links', 'Turn web addresses into links you can copy', {
+			Color('Link color', 'urlColor', ColorReader('urlColor')),
+			Cog('Links', 'Links', { Check('Tooltips when hovering links', 'hoverTooltips', BoolReader('hoverTooltips', true)) }),
+			Switch(BoolReader('urlCopy', true), 'urlCopy'),
+		})
+		messages:AddTools('Channels', 'Channel names in front of messages', {
+			Cog('Channel names', 'Channels', {
+				Check('Hide channel numbers', 'hideChannelNumbers', BoolReader('hideChannelNumbers')),
+				Check('Abbreviate names', 'abbreviateChannels', BoolReader('abbreviateChannels')),
+			}),
+		})
+		messages:AddTools('Scrolling', 'Lines moved per mouse wheel step', {
+			Cog('Scroll speed', 'Scrolling', { Slider('Lines per scroll', 'scrollLines', ScrollLines, 1, 10) }),
+		})
+
+		local behavior = ui.Board(parent, width, { stacked = true, title = 'Behavior', description = 'Fading, input history, the side buttons and resets.' })
+		behavior:AddTools('Fade old messages', 'Messages fade out after a while', {
+			Cog('Fade timing', 'Message fade', { Slider('Visible for (sec)', 'msgFadeTime', MsgFadeTime, 10, 300, 5) }),
+			Switch(MsgFade, 'msgFade'),
+		}, ApplySettings)
+		behavior:AddTools('Fade when not hovered', 'The chat fades until the cursor is over it', {
+			Cog('Fade delay', 'Hover fade', { Slider('Delay (sec)', 'fadeDelay', FadeDelay, 0, 10) }),
+			{ get = FadeEnabled, set = function(value)
+				config.mouseoverFade = value
+				if value then StartFader() else StopFader() end
+			end },
+		})
+		behavior:AddTools('Input history', 'Up and down arrows step through what you typed', {
+			{ text = 'Clear', onClick = function() wipe(GetHistory()) end },
+			Switch(EditHistory, 'editHistory'),
+		})
+		behavior:AddTools('Side buttons', 'The buttons down the side of the chat', {
+			Cog('Side buttons', 'Buttons', {
+				Check('Hide the menu and social buttons', 'hideButtons', HideButtons),
+				Check('Hide the voice buttons', 'hideVoiceButtons', HideVoiceButtons),
+				Check('Show the copy chat button', 'showCopyButton', ShowCopyButton),
+			}),
+		}, function()
+			ApplySettings()
+			UpdateCopyButton()
+		end)
+		behavior:AddTools('Hide chat completely', 'Hide every chat window and tab', {
+			{ get = function() return config.chatHidden == true end, set = function(value)
+				config.chatHidden = value
+				ApplyChatHidden()
+			end },
+		}, ApplySettings)
+		behavior:AddTools('Restore defaults', 'Put every chat setting back to how it started', {
+			{ text = 'Reset', onClick = function()
+				ResetToDefaults()
+				content.Rebuild()
+			end },
+		})
+
+		return { chat, tabs, messages, behavior }
 	end,
 })
