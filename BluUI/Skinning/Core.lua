@@ -213,11 +213,13 @@ function Skin.SuppressBlizzardFrame(frame)
 
 	local function DisableMouseTree(parent, depth)
 		for _, child in pairs({ parent:GetChildren() }) do
-			if child.IsMouseEnabled then
-				frame._buiSavedChildMouse[child] = child:IsMouseEnabled()
+			if not child.__buiKeepMouse then
+				if child.IsMouseEnabled then
+					frame._buiSavedChildMouse[child] = child:IsMouseEnabled()
+				end
+				if child.EnableMouse then child:EnableMouse(false) end
+				if depth > 1 then DisableMouseTree(child, depth - 1) end
 			end
-			if child.EnableMouse then child:EnableMouse(false) end
-			if depth > 1 then DisableMouseTree(child, depth - 1) end
 		end
 	end
 	DisableMouseTree(frame, SUPPRESS_MOUSE_DEPTH)
