@@ -101,7 +101,7 @@ local function PlaceAnchor(entry)
 end
 
 local function Apply(entry)
-	if not Config(entry).positioned then return end
+	if not entry.pinned and not Config(entry).positioned then return end
 	local frame, anchor = entry.target, entry.anchor
 	if InCombatLockdown() and frame:IsProtected() then return end
 	if entry.apply then
@@ -129,8 +129,9 @@ end
 
 local function ResetEntry(entry)
 	Config(entry).positioned = false
-	RestorePoints(entry)
+	if not entry.pinned then RestorePoints(entry) end
 	PlaceAnchor(entry)
+	Apply(entry)
 end
 
 local function CenterEntry(entry)
@@ -318,7 +319,7 @@ local function Install(entry)
 	local frame = entry.frame()
 	if not frame then return end
 	entry.target = frame
-	SnapshotPoints(entry, frame)
+	if not entry.pinned then SnapshotPoints(entry, frame) end
 	CreateAnchor(entry)
 	local function Reapply() Apply(entry) end
 	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.ToastAnchors anchor reapply', Reapply))
@@ -338,10 +339,6 @@ end
 
 function ToastAnchors.IsUnlocked(key)
 	return entries[key].unlocked == true
-end
-
-function ToastAnchors.IsPositioned(key)
-	return Config(entries[key]).positioned == true
 end
 
 function ToastAnchors.Refresh(key)
