@@ -201,10 +201,16 @@ local function OpenSkinSettings(id, info, parentOverride, savedScroll)
 		return totals
 	end
 
+	local function CountBoardRows(boards)
+		local totals = { sections = #boards, fields = 0 }
+		for _, board in ipairs(boards) do totals.fields = totals.fields + #board.rows end
+		return totals
+	end
+
 	function content:Refresh()
 		if self._isRefreshing then return end
 		self._isRefreshing = true
-		local totals = CountFields(self.child, { sections = 0, fields = 0 })
+		local totals = self.boards and CountBoardRows(self.boards) or CountFields(self.child, { sections = 0, fields = 0 })
 		summary:SetText(('%d %s · %d %s'):format(totals.sections, totals.sections == 1 and 'section' or 'sections', totals.fields, totals.fields == 1 and 'field' or 'fields'))
 		local contentHeight = self:GetContentHeight()
 		local top = self.child:GetTop()
@@ -234,9 +240,21 @@ local function OpenSkinSettings(id, info, parentOverride, savedScroll)
 	content.overlay = overlay
 	content.dialog = panel
 
-	local previousStyle = BUILib.SetCardStyle('datasheet')
-	info.buildSettings(content, tabIndex)
-	BUILib.SetCardStyle(previousStyle)
+	if info.buildBoards then
+		local host = CreateFrame('Frame', nil, contentWrapper)
+		host:SetPoint('TOPLEFT', Pixel.Scale(PADDING), 0)
+		local hostWidth = Pixel.Scale(contentWidth - PADDING * 2)
+		host:SetWidth(hostWidth)
+		content.boards = info.buildBoards(BUILib.Layout.TableKit(BUI.PageEngine.window), host, hostWidth, content)
+		local y = 0
+		for _, board in ipairs(content.boards) do y = board:Layout(y, '') end
+		host:SetHeight(y)
+		content.y = -y
+	else
+		local previousStyle = BUILib.SetCardStyle('datasheet')
+		info.buildSettings(content, tabIndex)
+		BUILib.SetCardStyle(previousStyle)
+	end
 	overlay:Show()
 	C_Timer.After(0, function()
 		if not overlay:IsShown() then return end
@@ -253,7 +271,10 @@ BUI.SkinningPage = {}
 
 function BUI.SkinningPage.OpenSkinSettings(id)
 	local info = BUI.Skinning.GetSkinRegistry()[id]
-	if info and info.buildSettings then
+	if info.buildBoards then
+		BUI.PageEngine.Show()
+		if BUI.PageEngine.window then OpenSkinSettings(id, info) end
+	elseif info.buildSettings then
 		OpenSkinSettings(id, info, UIParent)
 	end
 end
@@ -361,7 +382,7 @@ local function SkinsBoard(ui, parent, width)
 	for _, id in ipairs(order) do
 		local info = registry[id]
 		local tag
-		local icons = (info.unlock and 1 or 0) + (info.buildSettings and 1 or 0)
+		local icons = (info.unlock and 1 or 0) + ((info.buildSettings or info.buildBoards) and 1 or 0)
 		local _, cell = board:AddSwitch(info.name, function() return Skin.IsSkinEnabled(id) end, function(enabled)
 			Skin.SetSkinEnabled(id, enabled)
 			if tag then tag:Hide() end
@@ -372,7 +393,7 @@ local function SkinsBoard(ui, parent, width)
 			tag:SetPoint('LEFT', cell.label, 'LEFT', math.ceil(cell.label:GetStringWidth()) + 6, 0)
 		end
 		local anchor
-		if info.buildSettings then
+		if info.buildSettings or info.buildBoards then
 			anchor = CellIcon(ui, cell, 'cog', 'Settings', function() OpenSkinSettings(id, info) end)
 			anchor:SetPoint('RIGHT', -4, 0)
 		end
