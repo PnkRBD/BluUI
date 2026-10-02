@@ -116,8 +116,18 @@ local function Swatch(config, label, key, opacity)
 	}
 end
 
-local function Opacity(config)
-	return { label = 'Background opacity', min = 0, max = 100, step = 1, get = function() return math.floor(config.bgAlpha * 100 + 0.5) end, set = function(value) config.bgAlpha = value / 100 end }
+local function BackgroundSwatch(config)
+	return {
+		kind = 'swatch', label = 'Background color', tooltip = 'Background color', opacity = true,
+		get = function()
+			local color = config.bgColor
+			return color.r, color.g, color.b, config.bgAlpha
+		end,
+		set = function(red, green, blue, alpha)
+			config.bgColor = { r = red, g = green, b = blue }
+			config.bgAlpha = alpha
+		end,
+	}
 end
 
 local function PositionTool(config)
@@ -156,7 +166,7 @@ local function TextBarTools(config, fontItems, nameOption)
 	if nameOption then table.insert(textOptions, 1, nameOption) end
 	return {
 		Swatch(config, 'Value color', 'colorValue', true),
-		Swatch(config, 'Background color', 'bgColor', false),
+		BackgroundSwatch(config),
 		{ entries = fontItems, width = MENU_WIDTH, get = function() return config.font end, set = function(value) config.font = value end },
 		{ icon = 'text', tooltip = nameOption and 'Name and size' or 'Size', title = 'Text', options = textOptions },
 		{ tooltip = 'Layout, size and backdrop', title = 'Layout', options = {
@@ -165,7 +175,6 @@ local function TextBarTools(config, fontItems, nameOption)
 			Option(config, 'Spacing', 'spacing', { min = 0, max = 160, step = 1 }),
 			Option(config, 'Width', 'width', { min = 0, max = 1200, step = 1 }),
 			Option(config, 'Height', 'height', { min = 0, max = 600, step = 1 }),
-			Opacity(config),
 			Option(config, 'Border', 'border'),
 			Swatch(config, 'Border color', 'borderColor', true),
 		} },
@@ -179,7 +188,7 @@ local function BarTools(config, index)
 	if Datatext.IsPanel(config) then
 		tools = {
 			Swatch(config, 'Title color', 'titleColor', false),
-			Swatch(config, 'Background color', 'bgColor', false),
+			BackgroundSwatch(config),
 			{ icon = 'text', tooltip = 'Name, title text and placement', title = 'Title', options = {
 				NameOption(config),
 				Option(config, 'Title', 'title', { kind = 'input', placeholder = 'No title' }),
@@ -191,7 +200,6 @@ local function BarTools(config, index)
 			{ tooltip = 'Size and backdrop', title = 'Panel', options = {
 				Option(config, 'Width', 'width', { min = 0, max = 1200, step = 1 }),
 				Option(config, 'Height', 'height', { min = 0, max = 600, step = 1 }),
-				Opacity(config),
 				Option(config, 'Border', 'border'),
 				Swatch(config, 'Border color', 'borderColor', true),
 			} },

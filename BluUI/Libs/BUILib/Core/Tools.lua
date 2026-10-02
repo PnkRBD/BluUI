@@ -124,9 +124,9 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 			kit.Text(frame, spec.title:upper(), 9, 'faint'):SetPoint('TOPLEFT', POP_PAD, -y)
 			y = y + POP_TITLE
 		end
+		local rows = {}
 		for _, option in ipairs(spec.options) do
 			local row = CreateFrame('Frame', nil, frame)
-			row:SetSize(width - POP_PAD * 2, POP_ROW)
 			row:SetPoint('TOPLEFT', POP_PAD, -y)
 			local control = kit.Tool(row, option, after)
 			control:SetPoint('RIGHT')
@@ -135,8 +135,11 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 			label:SetPoint('RIGHT', control, 'LEFT', -LABEL_GAP, 0)
 			label:SetJustifyH('LEFT')
 			label:SetWordWrap(false)
+			width = math.max(width, math.ceil(label:GetUnboundedStringWidth()) + LABEL_GAP + control:GetWidth() + POP_PAD * 2)
+			rows[#rows + 1] = row
 			y = y + POP_ROW
 		end
+		for _, row in ipairs(rows) do row:SetSize(width - POP_PAD * 2, POP_ROW) end
 		frame:SetSize(width, y - (POP_ROW - CONTROL_HEIGHT) / 2 + POP_PAD)
 		local watcher = CreateFrame('Frame')
 		frame:SetScript('OnShow', function(self)
