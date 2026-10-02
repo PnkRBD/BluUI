@@ -137,7 +137,9 @@ local function Sections(ui, _, parent, width)
 	countdowns:AddTools('On cooldown', 'Timer until Bloodlust is ready, with an optional warning before', {
 		Color('cdColor'),
 		{ icon = 'text', tooltip = 'Timer text', title = 'On cooldown', options = { Text('Text', 'cdFormat') } },
-		{ tooltip = 'Warning', title = 'On cooldown', options = {
+		{ tooltip = 'Where it shows and the warning', title = 'On cooldown', options = {
+			Option('Hide in town', 'cdHideInTown'),
+			Option('Dungeons only', 'cdDungeonOnly'),
 			Option('Warn seconds before', 'warnBeforeReady', { min = 0, max = 60, step = 1 }),
 			Sound('Warn sound', 'soundOnWarn'),
 			Option('Speak warning', 'ttsOnWarn'),
