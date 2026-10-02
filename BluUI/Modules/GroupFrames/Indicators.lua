@@ -40,50 +40,41 @@ local function MakeIndicator(frame, config, elementName)
 	texture:SetAllPoints()
 	texture:SetShown(config.enabled)
 	texture._elementName = elementName
-	texture._boxPixels = config.size
 	return texture
 end
 
-local function Spans(size, skip)
-	return { { 0, skip }, { skip + 1, size } }
+local function Cuts(texels, skip, length)
+	local cut = Pixel.Scale(length * skip / (texels - 1))
+	return { { 0, cut, 0, skip }, { cut, length, skip + 1, texels } }
 end
 
-local function FitTrimmed(texture, info, multiple)
+local function FitTrimmed(texture, info)
 	local holder = texture:GetParent()
-	local left = -math.floor((info.width - 1) * multiple / 2)
-	local top = math.floor((info.height - 1) * multiple / 2)
-	local piece, y = 0, 0
-	for _, rowSpan in ipairs(Spans(info.height, TRIM_ROW)) do
-		local rows = rowSpan[2] - rowSpan[1]
-		local x = 0
-		for _, columnSpan in ipairs(Spans(info.width, TRIM_COLUMN)) do
-			local columns = columnSpan[2] - columnSpan[1]
+	local size = holder:GetWidth()
+	local piece = 0
+	for _, row in ipairs(Cuts(info.height, TRIM_ROW, size)) do
+		for _, column in ipairs(Cuts(info.width, TRIM_COLUMN, size)) do
 			local slice = piece == 0 and texture or texture._slices[piece]
 			if slice ~= texture then slice:SetAtlas(texture._atlas, nil, PIXEL_FILTER) end
-			slice:SetTexCoord(columnSpan[1] / info.width, columnSpan[2] / info.width, rowSpan[1] / info.height, rowSpan[2] / info.height)
-			slice:SetSize(Pixel.Scale(columns * multiple), Pixel.Scale(rows * multiple))
+			slice:SetTexCoord(column[3] / info.width, column[4] / info.width, row[3] / info.height, row[4] / info.height)
 			slice:ClearAllPoints()
-			slice:SetPoint("TOPLEFT", holder, "CENTER", Pixel.Scale(left + x * multiple), Pixel.Scale(top - y * multiple))
-			piece, x = piece + 1, x + columns
+			slice:SetPoint("TOPLEFT", holder, "TOPLEFT", column[1], -row[1])
+			slice:SetPoint("BOTTOMRIGHT", holder, "TOPLEFT", column[2], -row[2])
+			piece = piece + 1
 		end
-		y = y + rows
 	end
 end
 
 local function FitAtlas(texture)
 	local atlas = texture._atlas
-	local info = atlas and C_Texture.GetAtlasInfo(atlas)
-	if not info then return end
-	local multiple = math.max(1, math.floor(texture._boxPixels / info.width + 0.5))
 	local slices = texture._slices
-	local trimmed = slices ~= nil and atlas:lower() == TRIMMED_ATLAS
+	local trimmed = slices ~= nil and atlas ~= nil and atlas:lower() == TRIMMED_ATLAS
 	texture:ClearAllPoints()
 	if trimmed then
-		FitTrimmed(texture, info, multiple)
+		FitTrimmed(texture, C_Texture.GetAtlasInfo(atlas))
 	else
 		texture:SetTexCoord(0, 1, 0, 1)
-		texture:SetPoint("CENTER")
-		texture:SetSize(Pixel.Scale(info.width * multiple), Pixel.Scale(info.height * multiple))
+		texture:SetAllPoints()
 	end
 	if slices then
 		for _, slice in ipairs(slices) do slice:SetShown(trimmed and texture:IsShown()) end
@@ -106,8 +97,7 @@ local function ApplyIndicator(texture, config)
 	holder:SetSize(Pixel.Scale(config.size), Pixel.Scale(config.size))
 	holder:ClearAllPoints()
 	holder:SetPoint(config.anchor, frame, config.anchor, Pixel.Scale(config.offsetX), Pixel.Scale(config.offsetY))
-	texture._boxPixels = config.size
-	if texture._crisp then FitAtlas(texture) end
+	if texture._slices then FitAtlas(texture) end
 
 	if texture._previewOn then return end
 
@@ -230,8 +220,6 @@ function GroupFrames.BuildIndicators(frame, unit)
 	frame.GroupRoleIndicator.Override = RoleOverride
 	frame.LeaderIndicator.Override    = LeaderOverride
 	frame.AssistantIndicator.Override = AssistantOverride
-	frame.GroupRoleIndicator._crisp   = true
-	frame.LeaderIndicator._crisp      = true
 	local slices = {}
 	for index = 1, 3 do
 		local slice = frame.GroupRoleIndicator:GetParent():CreateTexture(nil, "OVERLAY")
@@ -278,13 +266,6 @@ local INDICATOR_PREVIEW = {
 	combat     = { atlas   = "UI-HUD-UnitFrame-Player-CombatIcon" },
 }
 
-local SIZE_STEP_ATLAS = { role = ROLE_ATLAS.TANK, leader = LEADER_ATLAS }
-
-function GroupFrames.IndicatorSizeStep(kind)
-	local atlas = SIZE_STEP_ATLAS[kind]
-	return atlas and C_Texture.GetAtlasInfo(atlas).width
-end
-
 local previewActive = {}
 
 local function RestoreElementAsset(child, texture)
@@ -309,7 +290,7 @@ function GroupFrames.PreviewIndicator(kind, enabled)
 			if previewData.atlas then
 				texture:SetAtlas(previewData.atlas, nil, previewData.filter)
 				texture._atlas = previewData.atlas
-				if texture._crisp then FitAtlas(texture) end
+				if texture._slices then FitAtlas(texture) end
 			elseif previewData.raidTarget then
 				texture:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
 				SetRaidTargetIconTexture(texture, previewData.raidTarget)
