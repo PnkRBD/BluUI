@@ -187,9 +187,9 @@ local function Show(config, state, remaining)
 	frame:Show()
 end
 
-local function KeepReadyHere(config)
-	if config.readyHideInTown and BUI.Tools.IsInTown() then return false end
-	if config.readyDungeonOnly and select(2, IsInInstance()) ~= 'party' then return false end
+local function ShownHere(hideInTown, dungeonOnly)
+	if hideInTown and BUI.Tools.IsInTown() then return false end
+	if dungeonOnly and select(2, IsInInstance()) ~= 'party' then return false end
 	return true
 end
 
@@ -339,7 +339,7 @@ local function Tick()
 		local remaining = lockout.expirationTime - now
 		if remaining > 0 then
 			wasLockedOut = true
-			if config.showWhenCD then
+			if config.showWhenCD and ShownHere(config.cdHideInTown, config.cdDungeonOnly) then
 				Show(config, 'cd', remaining)
 				FireWarnIfDue(config, remaining)
 				if remaining > DECIMALS_BELOW then SleepUntilNextSecond(remaining) end
@@ -364,7 +364,7 @@ local function Tick()
 		return
 	end
 
-	if config.showWhenReady and KeepReadyHere(config) then
+	if config.showWhenReady and ShownHere(config.readyHideInTown, config.readyDungeonOnly) then
 		Show(config, 'ready')
 	else
 		frame:Hide()

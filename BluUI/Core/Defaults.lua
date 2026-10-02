@@ -1539,6 +1539,8 @@ BUI.Defaults = {
 			activeColor        = { 0.4, 1, 0.4, 1 },
 
 			showWhenCD         = false,
+			cdHideInTown       = false,
+			cdDungeonOnly      = false,
 			cdFormat           = 'Lust [time]',
 			cdColor            = { 1, 0.55, 0.4, 1 },
 			warnBeforeReady    = 0,
