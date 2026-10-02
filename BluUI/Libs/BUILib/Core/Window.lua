@@ -332,7 +332,7 @@ function Layout.WindowFrame(config)
 
 	local function Attached(region)
 		local parent = region:GetParent()
-		while parent and parent ~= frame do parent = parent:GetParent() end
+		while parent and parent ~= frame do parent = parent._paintOwner or parent:GetParent() end
 		return parent == frame
 	end
 
