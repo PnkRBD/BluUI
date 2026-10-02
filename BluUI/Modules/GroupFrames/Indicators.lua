@@ -135,7 +135,7 @@ local ROLE_ICON_ROLES = {
 }
 
 local LEADER_ATLAS    = "UI-HUD-UnitFrame-Player-Group-LeaderIcon"
-local ASSISTANT_ATLAS = "UI-HUD-UnitFrame-Party-PortraitOn-Icon-Assist"
+local ASSISTANT_TEXTURE = "Interface\\GroupFrame\\UI-Group-AssistantIcon"
 
 local function ShowAtlas(element, atlas, useAtlasSize)
 	if element:IsShown() and element._atlas == atlas then return end
@@ -182,7 +182,8 @@ local function AssistantOverride(self)
 	if element._previewOn then return end
 	if self._preview then element:Hide(); return end
 	if self.unit and UnitInParty(self.unit) and UnitIsGroupAssistant(self.unit) and not UnitIsGroupLeader(self.unit) then
-		ShowAtlas(element, ASSISTANT_ATLAS, element.useAtlasSize)
+		element:SetTexture(ASSISTANT_TEXTURE, nil, nil, PIXEL_FILTER)
+		element:Show()
 	else
 		element:Hide()
 	end
@@ -231,7 +232,6 @@ function GroupFrames.BuildIndicators(frame, unit)
 	frame.AssistantIndicator.Override = AssistantOverride
 	frame.GroupRoleIndicator._crisp   = true
 	frame.LeaderIndicator._crisp      = true
-	frame.AssistantIndicator._crisp   = true
 	local slices = {}
 	for index = 1, 3 do
 		local slice = frame.GroupRoleIndicator:GetParent():CreateTexture(nil, "OVERLAY")
@@ -269,14 +269,21 @@ local INDICATOR_FIELD = {
 }
 
 local INDICATOR_PREVIEW = {
-	role       = { atlas   = "UI-LFG-RoleIcon-Tank-Micro-Raid", filter = PIXEL_FILTER },
-	leader     = { atlas   = "UI-HUD-UnitFrame-Player-Group-LeaderIcon", filter = PIXEL_FILTER },
-	assistant  = { texture = "Interface\\GroupFrame\\UI-Group-AssistantIcon", filter = PIXEL_FILTER },
+	role       = { atlas   = ROLE_ATLAS.TANK, filter = PIXEL_FILTER },
+	leader     = { atlas   = LEADER_ATLAS, filter = PIXEL_FILTER },
+	assistant  = { texture = ASSISTANT_TEXTURE, filter = PIXEL_FILTER },
 	raidTarget = { raidTarget = 8 },
 	resurrect  = { atlas   = "RaidFrame-Icon-Rez" },
 	readyCheck = { atlas   = "UI-LFG-ReadyMark-Raid" },
 	combat     = { atlas   = "UI-HUD-UnitFrame-Player-CombatIcon" },
 }
+
+local SIZE_STEP_ATLAS = { role = ROLE_ATLAS.TANK, leader = LEADER_ATLAS }
+
+function GroupFrames.IndicatorSizeStep(kind)
+	local atlas = SIZE_STEP_ATLAS[kind]
+	return atlas and C_Texture.GetAtlasInfo(atlas).width
+end
 
 local previewActive = {}
 
