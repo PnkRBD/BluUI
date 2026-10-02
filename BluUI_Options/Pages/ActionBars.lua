@@ -71,7 +71,7 @@ local ACTION_BAR_ROWS = { hotkeys = true, macroText = true, cooldownText = true,
 local CLICK_THROUGH_ROW = { clickThrough = true }
 local EXTRA_BARS = {
 	{ key = 'pet', title = 'Pet bar', description = 'Replaces the Blizzard pet bar. Turning it off needs a reload to bring the Blizzard one back.', selfTag = 'BUI_PetBar', buttons = true, maxButtons = 10, rows = { hotkeys = true, cooldownText = true, hideEmpty = true, clickThrough = true } },
-	{ key = 'stance', title = 'Stance bar', description = 'Replaces the Blizzard stance and form bar. Turning it off needs a reload to bring the Blizzard one back.', selfTag = 'BUI_StanceBar', buttons = true, maxButtons = 10, rows = { hotkeys = true, cooldownText = true, clickThrough = true } },
+	{ key = 'stance', title = 'Stance bar', description = 'Replaces the Blizzard stance and form bar. Turning it off needs a reload to bring the Blizzard one back.', selfTag = 'BUI_StanceBar', buttons = true, maxButtons = 10, countLabel = 'Max buttons, one per stance', rows = { hotkeys = true, cooldownText = true, clickThrough = true } },
 	{ key = 'vehicle', title = 'Vehicle exit', description = 'One button to leave a vehicle, land a taxi early or cancel possession. Only shows when it can act.', size = true, rows = CLICK_THROUGH_ROW },
 	{ key = 'micro', title = 'Micro menu', description = 'The Blizzard micro buttons on a bar you control.', micro = true, rows = CLICK_THROUGH_ROW },
 	{ key = 'bags', title = 'Bag bar', description = 'The Blizzard bag buttons on a bar you control.', scaleOnly = true, rows = CLICK_THROUGH_ROW },
@@ -277,7 +277,7 @@ local function BarRows(ui, board, key, title, db, spec)
 	if spec.buttons then
 		board:AddTools('Buttons', 'How many, how big and how they are spaced, height 0 keeps buttons square', {
 			{ tooltip = 'Count and rows', title = title, options = {
-				Option(db, 'Buttons', 'buttonCount', { min = 1, max = spec.maxButtons, step = 1 }),
+				Option(db, spec.countLabel or 'Buttons', 'buttonCount', { min = 1, max = spec.maxButtons, step = 1 }),
 				Option(db, 'Per row', 'buttonsPerRow', { min = 1, max = spec.maxButtons, step = 1 }),
 			} },
 			{ icon = 'resize', tooltip = 'Size, spacing and scale', title = title, options = {
