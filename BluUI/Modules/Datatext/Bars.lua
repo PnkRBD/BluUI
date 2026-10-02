@@ -664,6 +664,7 @@ local MINIMAP_ANCHORS = {
     INSIDE_BOTTOM = { selfPoint = 'BOTTOM', minimapPoint = 'BOTTOM', fullWidth = true, offsetX = 0, offsetY =  1 },
     INSIDE_TOP    = { selfPoint = 'TOP',    minimapPoint = 'TOP',    fullWidth = true, offsetX = 0, offsetY = -1 },
 }
+Datatext.MINIMAP_ANCHORS = MINIMAP_ANCHORS
 
 local function BuildMinimapBar()
     if minimapBar then return end
