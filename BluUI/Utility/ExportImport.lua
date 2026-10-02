@@ -288,7 +288,10 @@ local function RefreshAllModules()
     BUI.BUILibClient.SetFont(BUI.WindowFont())
     if BUI.PageEngine.window then BUI.PageEngine.window:ApplyTheme(BUI.GetDB().windowTheme) end
 
-    if on('cdm') and BUI.CDM and BUI.CDM.ApplyAllPositions then BUI.CDM.ApplyAllPositions() end
+    if on('cdm') and BUI.CDM and BUI.CDM.ApplyAllPositions then
+        BUI.CDM.ApplyAllPositions()
+        BUI.CDM.NotifyDependents()
+    end
     BUI.CombatLogging.Refresh()
 end
 

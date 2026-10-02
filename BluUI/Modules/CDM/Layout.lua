@@ -717,9 +717,11 @@ function CDM.NotifyDependents()
                 anchor._lastBottomRowW = anchor._bottomRowW
                 anySize = true
             end
-            if anchor._lastTopOffset ~= anchor._topEdgeOffset or anchor._lastBottomOffset ~= anchor._bottomEdgeOffset then
+            if anchor._lastTopOffset ~= anchor._topEdgeOffset or anchor._lastBottomOffset ~= anchor._bottomEdgeOffset
+                or anchor._lastRow1Offset ~= anchor._row1CenterOffsetX then
                 anchor._lastTopOffset = anchor._topEdgeOffset
                 anchor._lastBottomOffset = anchor._bottomEdgeOffset
+                anchor._lastRow1Offset = anchor._row1CenterOffsetX
                 anyOffset = true
             end
 
@@ -730,7 +732,7 @@ function CDM.NotifyDependents()
         end
     end
 
-    if CDM.state.initComplete and (anySize or anyPos) then
+    if CDM.state.initComplete and (anySize or anyOffset or anyPos) then
         CDM.NotifyAnchoredFrames()
     end
 
