@@ -44,6 +44,8 @@ local difficultyEvents = {
 }
 
 local defaultIconScale = { queue = 0.8, difficulty = 0.9, mail = 0.8, crafting = 0.8, missions = 0.8 }
+local FOLIO_BASE = 32
+local PREVIEW_DIFFICULTY = 'M+10'
 
 local hiddenParent = CreateFrame('Frame')
 hiddenParent:Hide()
@@ -54,7 +56,8 @@ indicatorHolder:SetSize(1, 1)
 local backdropFrame, clockFrame, zoneFrame, difficultyFrame, unlockOverlay
 local clockTicker, alignmentTimer
 local clockUse24h, clockUseServerTime = false, false
-local lockReleaseCallback
+local lockReleaseCallback, indicatorMovedCallback
+local ghosts, previewing = {}, {}
 
 local function GetConfig()
 	return BUI.GetDB().interface
@@ -349,35 +352,36 @@ local function CreateDifficultyText()
 	difficultyFrame = CreateFrame('Frame', 'BUI_MinimapDifficulty', WoWMinimap)
 	difficultyFrame:SetSize(Pixel.Scale(60), Pixel.Scale(16))
 	difficultyFrame:SetFrameLevel(WoWMinimap:GetFrameLevel() + 10)
-	difficultyFrame:SetPoint('BOTTOMRIGHT', WoWMinimap, 'BOTTOMRIGHT', Pixel.Scale(-5), Pixel.Scale(5))
 	difficultyFrame.text = difficultyFrame:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(difficultyFrame.text, 12, BUI.GetGlobalFont())
-	difficultyFrame.text:SetPoint('RIGHT')
-	difficultyFrame.text:SetJustifyH('RIGHT')
 	difficultyFrame:Hide()
+end
+
+local function LettersActive()
+	local config = GetConfig()
+	return config.minimapTextDifficulty and not config.minimapHideDifficulty
+end
+
+local function DifficultyLabel()
+	local _, instanceType, difficultyID, _, maxPlayers = GetInstanceInfo()
+	if not instanceType or instanceType == 'none' or instanceType == '' then return nil end
+	local prefix = GetDifficultyPrefix(difficultyID)
+	if not prefix then return nil end
+	if difficultyID == 8 then
+		local level = C_ChallengeMode.GetActiveKeystoneInfo()
+		return (level and level > 0) and string.format('%s%d', prefix, level) or prefix, prefix
+	end
+	if maxPlayers and maxPlayers > 5 then return string.format('%s%d', prefix, maxPlayers), prefix end
+	return prefix, prefix
 end
 
 local function UpdateDifficultyText()
 	if not difficultyFrame then return end
-	local _, instanceType, difficultyID, _, maxPlayers = GetInstanceInfo()
-	if not instanceType or instanceType == 'none' or instanceType == '' then
+	local label, prefix = DifficultyLabel()
+	if previewing.difficulty then label, prefix = PREVIEW_DIFFICULTY, 'M+' end
+	if not label then
 		difficultyFrame:Hide()
 		return
-	end
-	local prefix = GetDifficultyPrefix(difficultyID)
-	if not prefix then
-		difficultyFrame:Hide()
-		return
-	end
-
-	local label
-	if difficultyID == 8 then
-		local level = C_ChallengeMode.GetActiveKeystoneInfo()
-		label = (level and level > 0) and string.format('%s%d', prefix, level) or prefix
-	elseif maxPlayers and maxPlayers > 5 then
-		label = string.format('%s%d', prefix, maxPlayers)
-	else
-		label = prefix
 	end
 
 	local color = prefixColors[prefix] or DEFAULT_GOLD
@@ -455,6 +459,24 @@ local function SizeQueueEye(frame, target)
 	eye:SetScale(target / (frameWidth * frame:GetScale()))
 end
 
+local function SaveDraggedPosition(frame, key)
+	local frameCenterX, frameCenterY = frame:GetCenter()
+	local minimapCenterX, minimapCenterY = WoWMinimap:GetCenter()
+	if not frameCenterX or not minimapCenterX then return end
+
+	local relativeScale = frame:GetEffectiveScale() / WoWMinimap:GetEffectiveScale()
+	local relativeX = (frameCenterX * relativeScale) - minimapCenterX
+	local relativeY = (frameCenterY * relativeScale) - minimapCenterY
+	local halfWidth, halfHeight = WoWMinimap:GetWidth() / 2, WoWMinimap:GetHeight() / 2
+	if relativeX < -halfWidth then relativeX = -halfWidth elseif relativeX > halfWidth then relativeX = halfWidth end
+	if relativeY < -halfHeight then relativeY = -halfHeight elseif relativeY > halfHeight then relativeY = halfHeight end
+	local offsetX, offsetY = relativeX / relativeScale, relativeY / relativeScale
+
+	SaveIndicatorPosition(key, 'CENTER', offsetX, offsetY)
+	if indicatorMovedCallback then indicatorMovedCallback() end
+	return offsetX, offsetY
+end
+
 local function MakeDraggable(frame, key)
 	if frame._buiDragKey then return end
 	frame._buiDragKey = key
@@ -471,20 +493,8 @@ local function MakeDraggable(frame, key)
 		if not self._buiDragging then return end
 		self:StopMovingOrSizing()
 		self._buiDragging = false
-
-		local frameCenterX, frameCenterY = self:GetCenter()
-		local minimapCenterX, minimapCenterY = WoWMinimap:GetCenter()
-		if not frameCenterX or not minimapCenterX then return end
-
-		local relativeScale = self:GetEffectiveScale() / WoWMinimap:GetEffectiveScale()
-		local relativeX = (frameCenterX * relativeScale) - minimapCenterX
-		local relativeY = (frameCenterY * relativeScale) - minimapCenterY
-		local halfWidth, halfHeight = WoWMinimap:GetWidth() / 2, WoWMinimap:GetHeight() / 2
-		if relativeX < -halfWidth then relativeX = -halfWidth elseif relativeX > halfWidth then relativeX = halfWidth end
-		if relativeY < -halfHeight then relativeY = -halfHeight elseif relativeY > halfHeight then relativeY = halfHeight end
-		local offsetX, offsetY = relativeX / relativeScale, relativeY / relativeScale
-
-		SaveIndicatorPosition(self._buiDragKey, 'CENTER', offsetX, offsetY)
+		local offsetX, offsetY = SaveDraggedPosition(self, self._buiDragKey)
+		if not offsetX then return end
 		self:ClearAllPoints()
 		self:SetPoint('CENTER', WoWMinimap, 'CENTER', offsetX, offsetY)
 	end))
@@ -510,12 +520,16 @@ local indicators = {
 		dockable = true,
 		squareDefault = { 'BOTTOMLEFT',   5,   5 },
 		raiseFrameLevel = true,
+		atlas = 'groupfinder-eye-single',
+		color = { 0.35, 0.72, 1.00 },
 	},
 	{
 		key = 'difficulty',
 		hide = 'minimapHideDifficulty',
 		Resolve = GetBlizzardDifficultyFrame,
 		squareDefault = { 'BOTTOMRIGHT', -5,   5 },
+		icon = 'Interface\\Icons\\INV_Misc_Bone_Skull_02',
+		color = { 1.00, 0.55, 0.15 },
 	},
 	{
 		key = 'mail',
@@ -524,6 +538,8 @@ local indicators = {
 		dockable = true,
 		holder = true,
 		squareDefault = { 'TOPLEFT',  5, -30 },
+		icon = 'Interface\\Icons\\INV_Letter_15',
+		color = { 1.00, 0.88, 0.25 },
 	},
 	{
 		key = 'crafting',
@@ -533,6 +549,8 @@ local indicators = {
 		holder = true,
 		squareDefault = { 'TOPLEFT', 28, -30 },
 		raiseFrameLevel = true,
+		icon = 'Interface\\Icons\\Trade_BlackSmithing',
+		color = { 0.45, 0.82, 0.30 },
 	},
 	{
 		key = 'missions',
@@ -541,6 +559,8 @@ local indicators = {
 		dockable = true,
 		squareDefault = { 'TOPRIGHT', -5, -30 },
 		raiseFrameLevel = true,
+		icon = 'Interface\\Icons\\INV_Misc_Book_09',
+		color = { 0.65, 0.40, 0.95 },
 	},
 }
 
@@ -568,6 +588,109 @@ local function IndicatorPlacement(indicator)
 	return default[1], default[2], default[3]
 end
 
+function Minimap.ApplyIndicatorArt(texture, key)
+	local indicator = FindIndicator(key)
+	local atlas = indicator.atlas or key == 'missions' and _G.ExpansionLandingPageMinimapButton:GetNormalTexture():GetAtlas()
+	if atlas then
+		texture:SetAtlas(atlas)
+		texture:SetTexCoord(0, 1, 0, 1)
+	else
+		texture:SetTexture(indicator.icon)
+		texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	end
+end
+
+function Minimap.GetIndicatorColor(key)
+	return FindIndicator(key).color
+end
+
+local function GhostFootprint(indicator)
+	if indicator.key == 'missions' then return FOLIO_BASE, FOLIO_BASE end
+	local frame = indicator.Resolve()
+	local width, height = frame._buiNativeW, frame._buiNativeH
+	if width <= 1 or height <= 1 then
+		local size = GetDockSize()
+		return size, size
+	end
+	return width, height
+end
+
+local function CopyArt(ghost, source, layer, sublevel)
+	local texture = ghost:CreateTexture(nil, layer, nil, sublevel)
+	texture:SetAtlas(source:GetAtlas(), true)
+	return texture
+end
+
+local GHOST_ART = {
+	queue = function(ghost)
+		ghost.eye = CopyArt(ghost, _G.QueueStatusButton.Eye.texture, 'ARTWORK')
+		ghost.eye:SetPoint('CENTER')
+	end,
+	mail = function(ghost)
+		CopyArt(ghost, GetMailFrame().MailIcon, 'ARTWORK'):SetPoint('CENTER')
+	end,
+	crafting = function(ghost)
+		CopyArt(ghost, _G.MiniMapCraftingOrderIcon, 'ARTWORK'):SetPoint('CENTER')
+	end,
+	difficulty = function(ghost)
+		local banner = GetBlizzardDifficultyFrame().Default
+		CopyArt(ghost, banner.Background, 'BACKGROUND'):SetPoint('CENTER')
+		CopyArt(ghost, banner.Border, 'ARTWORK'):SetPoint('CENTER')
+		CopyArt(ghost, banner.MythicTexture, 'ARTWORK', 1):SetPoint('TOP', -0.5, -4)
+	end,
+	missions = function(ghost)
+		CopyArt(ghost, _G.ExpansionLandingPageMinimapButton:GetNormalTexture(), 'ARTWORK'):SetAllPoints()
+	end,
+}
+
+local function OnGhostDragStop(ghost)
+	ghost:StopMovingOrSizing()
+	SaveDraggedPosition(ghost, ghost._buiKey)
+	Minimap.RepositionIndicators()
+end
+
+local function CreateGhost(indicator)
+	local ghost = CreateFrame('Frame', nil, WoWMinimap)
+	ghost._buiKey = indicator.key
+	ghost:SetFrameLevel(WoWMinimap:GetFrameLevel() + 20)
+	ghost:SetMovable(true)
+	ghost:EnableMouse(true)
+	ghost:RegisterForDrag('LeftButton')
+	GHOST_ART[indicator.key](ghost)
+	ghost:SetScript('OnDragStart', BUI.Profiler.Script('Minimap.Minimap preview OnDragStart', function(self) self:StartMoving() end))
+	ghost:SetScript('OnDragStop', BUI.Profiler.Script('Minimap.Minimap preview OnDragStop', OnGhostDragStop))
+	ghost:Hide()
+	return ghost
+end
+
+local function PlaceGhost(indicator, point, x, y)
+	local ghost = ghosts[indicator.key]
+	if not ghost then return end
+	local shown = previewing[indicator.key] and not (indicator.key == 'difficulty' and LettersActive())
+	ghost:SetShown(shown == true)
+	if not shown then return end
+	local width, height = GhostFootprint(indicator)
+	ghost:SetScale(GetIconScale(indicator.key))
+	ghost:SetSize(width, height)
+	ghost:ClearAllPoints()
+	ghost:SetPoint(point, WoWMinimap, point, x, y)
+	if ghost.eye then
+		local eyeWidth = indicator.Resolve().Eye:GetWidth()
+		local size = eyeWidth * GetDockSize() / math.max(width, eyeWidth)
+		ghost.eye:SetSize(size, size)
+	end
+end
+
+local function PlaceDifficultyText(point, x, y)
+	local align = GetConfig().minimapTextDifficultyAlign
+	local vertical = point:match('^TOP') or point:match('^BOTTOM') or ''
+	difficultyFrame:ClearAllPoints()
+	difficultyFrame:SetPoint(vertical .. align, WoWMinimap, point, x, y)
+	difficultyFrame.text:ClearAllPoints()
+	difficultyFrame.text:SetPoint(align)
+	difficultyFrame.text:SetJustifyH(align)
+end
+
 local function PositionIndicator(indicator)
 	local frame = indicator.Resolve()
 	local point, x, y = IndicatorPlacement(indicator)
@@ -580,10 +703,10 @@ local function PositionIndicator(indicator)
 		frame:SetFrameLevel(WoWMinimap:GetFrameLevel() + 5)
 	end
 	MakeDraggable(frame, indicator.key)
+	PlaceGhost(indicator, point, x, y)
 
 	if indicator.key == 'difficulty' and difficultyFrame then
-		difficultyFrame:ClearAllPoints()
-		difficultyFrame:SetPoint(point, WoWMinimap, point, x * iconScale, y * iconScale)
+		PlaceDifficultyText(point, x * iconScale, y * iconScale)
 	end
 end
 
@@ -601,7 +724,6 @@ local function HookSetPoint(frame, key, repositionCallback)
 	Hook(frame, 'SetScale', Reassert)
 end
 
-local FOLIO_BASE = 32
 local landingTamed = false
 local function TameLandingButton()
 	if landingTamed then return end
@@ -887,7 +1009,7 @@ function Minimap.Enable()
 	Minimap.ToggleClock(interfaceDB.minimapClock)
 	Minimap.ToggleZoneText(interfaceDB.minimapZone)
 	BUI.AddonButtons.SetMode(interfaceDB.addonButtons)
-	Minimap.ToggleTextDifficulty(interfaceDB.minimapTextDifficulty)
+	Minimap.ToggleTextDifficulty(LettersActive())
 
 	PositionAllIndicators()
 	ReplayMailNotification(GetMailFrame())
@@ -921,6 +1043,26 @@ function Minimap.SetIndicatorOffset(key, point, x, y)
 	local iconScale = GetIconScale(key)
 	SaveIndicatorPosition(key, point, x / iconScale, y / iconScale)
 	if IsEnabled() then PositionAllIndicators() end
+end
+
+function Minimap.PreviewIndicator(key, enabled)
+	previewing[key] = enabled or nil
+	if enabled and not ghosts[key] then ghosts[key] = CreateGhost(FindIndicator(key)) end
+	if not enabled and ghosts[key] then ghosts[key]:Hide() end
+	if key == 'difficulty' and LettersActive() then UpdateDifficultyText() end
+	if IsEnabled() then PositionAllIndicators() end
+end
+
+function Minimap.IsIndicatorPreviewing(key)
+	return previewing[key] == true
+end
+
+function Minimap.ClearIndicatorPreviews()
+	for key in pairs(previewing) do Minimap.PreviewIndicator(key, false) end
+end
+
+function Minimap.SetIndicatorMovedCallback(callback)
+	indicatorMovedCallback = callback
 end
 
 Minimap.GetDock = GetDock
