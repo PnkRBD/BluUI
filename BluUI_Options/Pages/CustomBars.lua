@@ -190,15 +190,6 @@ local function SaveOrder(spells, entries)
 	for position, key in ipairs(order) do spells[position] = key end
 end
 
-local function VisibleIcons(bar)
-	local list = {}
-	for _, entry in ipairs(Entries(bar)) do
-		local skip = bar.hiddenIcons[entry.hideKey] or (entry.slot and (not entry.itemID or bar.trinketBlacklist[entry.itemID]))
-		if not skip then list[#list + 1] = entry.icon end
-	end
-	return list
-end
-
 local function PotionLabel(entry)
 	local _, _, _, _, _, _, subclassID = C_Item.GetItemInfoInstant(entry.id)
 	local label = subclassID == Enum.ItemConsumableSubclass.Flask and 'Flask display' or 'Potion display'
@@ -438,11 +429,13 @@ local function BuildPreview(band, kit)
 	function band:Update()
 		for _, frame in ipairs(pool) do frame:Hide() end
 		local bar = Shown()
-		local list = bar and VisibleIcons(bar) or {}
+		local list = bar and CustomBars.ShownIcons(bar) or {}
 		local count = #list
 		note:SetShown(count == 0)
 		if count == 0 then
-			if bar then
+			if bar and #Entries(bar) > 0 then
+				note:SetText('Nothing on this bar shows for this character right now')
+			elseif bar then
 				note:SetText('Nothing on this bar yet, add a spell or an item below')
 			elseif Current() then
 				note:SetText('Pick a bar from the rail to see it here')
