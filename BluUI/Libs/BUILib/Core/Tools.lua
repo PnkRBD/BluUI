@@ -108,6 +108,7 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 
 	local function BuildPopover(anchor, spec, after)
 		local frame = CreateFrame('Frame', nil, window.frame)
+		frame._paintOwner = anchor
 		frame:SetFrameStrata(BUILib.GetPopupStrata())
 		frame:SetFrameLevel(BUILib.GetPopupLevel())
 		frame:SetClampedToScreen(true)
