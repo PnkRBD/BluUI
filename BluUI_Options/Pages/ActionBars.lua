@@ -17,7 +17,6 @@ local BAG_SIZE, BAG_COUNT, BAG_GAP = 30, 6, 4
 local BAG_BUTTON_NAMES = {
 	'MainMenuBarBackpackButton', 'CharacterBag0Slot', 'CharacterBag1Slot', 'CharacterBag2Slot', 'CharacterBag3Slot', 'CharacterReagentBag0Slot',
 }
-local STANCE_PREVIEW_FALLBACK = 3
 local EMPTY_BUTTON_DEFAULT = BUI.Defaults.profile.actionBars.emptyButtonColor
 
 local ANCHORS = {
@@ -386,6 +385,7 @@ local function ExtraBoards(ui, parent, width, extra)
 		fill = extra.buttons,
 		buttons = extra.buttons,
 		maxButtons = extra.maxButtons,
+		countLabel = extra.countLabel,
 		size = extra.size,
 		micro = extra.micro,
 		scaleOnly = extra.scaleOnly,
@@ -448,7 +448,7 @@ local function PreviewItems(key, db)
 	local count = key == 'vehicle' and 1 or db.buttonCount
 	if key == 'stance' then
 		local forms = GetNumShapeshiftForms()
-		count = math.min(count, forms > 0 and forms or STANCE_PREVIEW_FALLBACK)
+		if forms > 0 then count = math.min(count, forms) end
 	end
 	if live and #live > 0 then count = #live end
 	count = math.max(1, count)
