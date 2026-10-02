@@ -12,7 +12,7 @@ local format = string.format
 local FONT = BUI.C.FONT_PATH
 
 local PAGE_WIDTH = 960
-local PREVIEW_HEIGHT = 240
+local PREVIEW_HEIGHT = 264
 local PREVIEW_MAP = 200
 local PREVIEW_TICK = 2
 local ICON_SIZE = 18
@@ -590,6 +590,94 @@ local function BuildPreview(band)
 		barHolder:Show()
 	end
 
+	local textBar = CreateFrame('Frame', nil, stage)
+	textBar:SetFrameLevel(mapFrame:GetFrameLevel() + 10)
+	textBar:Hide()
+	local textBarFill = textBar:CreateTexture(nil, 'BACKGROUND')
+	textBarFill:SetAllPoints()
+	local textSizer = textBar:CreateFontString(nil, 'ARTWORK')
+	textSizer:SetAlpha(0)
+	local textParts, textWidths = {}, {}
+	local textLayout = { textLeft = {}, textWidth = {}, hitLeft = {}, hitWidth = {}, lineTop = {} }
+
+	local function TextPart(index)
+		local part = textParts[index]
+		if not part then
+			part = textBar:CreateFontString(nil, 'OVERLAY')
+			part:SetWordWrap(false)
+			part:SetJustifyV('MIDDLE')
+			textParts[index] = part
+		end
+		return part
+	end
+
+	local function RefreshTextBar()
+		local config = Bar()
+		local texts = Datatext.ModuleEnabled() and config.enabled and Datatext.BuildSampleParts(config) or {}
+		local count = #texts
+		for index = count + 1, #textParts do textParts[index]:Hide() end
+		stage:ClearAllPoints()
+		if count == 0 then
+			stage:SetPoint('CENTER')
+			textBar:Hide()
+			return
+		end
+
+		local layout = Datatext.LAYOUT
+		local anchor = Datatext.MINIMAP_ANCHORS[config.anchor] or Datatext.MINIMAP_ANCHORS.BOTTOM
+		local side = borderFrame:GetWidth()
+		local fontPath = BUI.GetModuleFont(config)
+		local fontSize = max(6, floor(config.fontSize * scale + 0.5))
+		Pixel.ApplyFont(textSizer, fontSize, fontPath)
+		for index = 1, count do
+			textSizer:SetText(texts[index])
+			textWidths[index] = math.ceil(textSizer:GetStringWidth())
+		end
+
+		local fixedWidth = anchor.fullWidth and side or (config.width > 0 and config.width * scale or nil)
+		local fixedHeight = not anchor.fullWidth and side or (config.height > 0 and config.height * scale or nil)
+		local spacing = config.spacing * scale
+		local lineHeight = (config.fontSize + layout.lineExtra) * scale
+		local vertical = config.orientation == 'VERTICAL'
+		local width, height
+		if vertical then
+			width, height = Datatext.LayoutColumn(textWidths, count, spacing, layout.columnInset * scale, lineHeight, fixedWidth, fixedHeight, textLayout)
+		else
+			width = Datatext.LayoutRow(textWidths, count, spacing, layout.rowInset * scale, fixedWidth, config.align, textLayout)
+			height = fixedHeight or layout.rowHeight * scale
+		end
+
+		local justify = config.align == 'SPREAD' and 'CENTER' or config.align
+		for index = 1, count do
+			local part = TextPart(index)
+			Pixel.ApplyFont(part, fontSize, fontPath)
+			part:SetText(texts[index])
+			part:ClearAllPoints()
+			if vertical then
+				part:SetPoint('TOPLEFT', textBar, 'TOPLEFT', textLayout.lineLeft, -textLayout.lineTop[index])
+				part:SetSize(textLayout.lineWidth, lineHeight)
+				part:SetJustifyH(justify)
+			else
+				part:SetPoint('LEFT', textBar, 'LEFT', floor(textLayout.textLeft[index] + 0.5), 0)
+				part:SetSize(textWidths[index] + 1, height)
+				part:SetJustifyH('LEFT')
+			end
+			part:Show()
+		end
+
+		local gap = config.gap * scale
+		local inside = config.anchor == 'INSIDE_TOP' or config.anchor == 'INSIDE_BOTTOM'
+		local shift = inside and 0 or -0.5
+		stage:SetPoint('CENTER', card, 'CENTER', shift * anchor.offsetX * (width + gap), shift * anchor.offsetY * (height + gap))
+		textBar:SetSize(width, height)
+		textBar:ClearAllPoints()
+		textBar:SetPoint(anchor.selfPoint, borderFrame, anchor.minimapPoint, anchor.offsetX * gap, anchor.offsetY * gap)
+		local background, border = config.bgColor, config.borderColor
+		textBarFill:SetColorTexture(background.r, background.g, background.b, config.bgAlpha)
+		Pixel.ApplyBorder(textBar, 1, border.r, border.g, border.b, config.border and border.a or 0)
+		textBar:Show()
+	end
+
 	function card:UpdatePreview()
 		interfaceDB = Interface()
 		scale = PREVIEW_MAP / Minimap:GetWidth()
@@ -600,6 +688,7 @@ local function BuildPreview(band)
 		PlaceText()
 		RefreshDrawer()
 		RefreshButtonBar()
+		RefreshTextBar()
 	end
 
 	local sinceTick = 0
