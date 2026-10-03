@@ -9,7 +9,7 @@ local voiceCache
 local resolvedCache = {}
 
 local function Voices()
-    if not voiceCache then
+    if not voiceCache or #voiceCache == 0 then
         voiceCache = C_VoiceChat.GetTtsVoices() or {}
     end
     return voiceCache

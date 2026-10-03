@@ -4,14 +4,12 @@ local Display = {}
 BUI.BuffTracking.Display = Display
 
 local Pixel = BUI.Pixel
-local GetTime = GetTime
 local pairs, ipairs = pairs, ipairs
 
 local trackers = {}
 local inCombat = false
 
 local STACK_COLOR_KEYS = { "stack1Color", "stack2Color", "stack3Color" }
-local SOUND_COOLDOWN_SECONDS = 2
 
 local anchorCallbacks = {}
 
@@ -155,15 +153,6 @@ function Display.CreateTracker(config)
     }
 
     local function GetSettings() return BUI.GetDB()[tracker.settingsKey] end
-
-    local lastSoundAt = 0
-
-    local function Announce(settings)
-        local now = GetTime()
-        if now - lastSoundAt < SOUND_COOLDOWN_SECONDS then return end
-        lastSoundAt = now
-        Display.Announce(settings)
-    end
 
     local function BuildMainFrame()
         if tracker.frame then return end
@@ -445,7 +434,7 @@ function Display.CreateTracker(config)
             if stacks == 0 then
                 lastStacks = -1
             else
-                if lastStacks == -1 then Announce(settings) end
+                if lastStacks == -1 then Display.Announce(settings) end
                 lastStacks = stacks
             end
             return
@@ -471,7 +460,7 @@ function Display.CreateTracker(config)
         if tracker.getColorStacks then colorStacks = tracker.getColorStacks() end
 
         if stacks ~= lastStacks or colorStacks ~= lastColorStacks or layoutDirty then
-            if lastStacks == -1 and stacks > 0 and not config.previewTextOnly then Announce(settings) end
+            if lastStacks == -1 and stacks > 0 and not config.previewTextOnly then Display.Announce(settings) end
 
             local restyle = layoutDirty
             lastStacks = stacks
