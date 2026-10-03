@@ -13,6 +13,7 @@ function ActionBars.NewBlizzardBar(spec)
 		Retake = spec.retake,
 		Release = spec.release,
 		InstallHooks = spec.installHooks,
+		BlockedBy = spec.blockedBy,
 		applying = false,
 		hooked = false,
 		hideHooked = false,
@@ -23,13 +24,17 @@ function BlizzardBar:Settings()
 	return ActionBars.GetBarSettings(self.key)
 end
 
+function BlizzardBar:Blocked()
+	return self.BlockedBy ~= nil and self.BlockedBy() ~= nil
+end
+
 function BlizzardBar:Hidden()
-	return self:Settings().hidden and BUI.IsModuleEnabled('actionBars')
+	return self:Settings().hidden and BUI.IsModuleEnabled('actionBars') and not self:Blocked()
 end
 
 function BlizzardBar:Enabled()
 	local barSettings = self:Settings()
-	return barSettings.enabled and not barSettings.hidden and BUI.IsModuleEnabled('actionBars')
+	return barSettings.enabled and not barSettings.hidden and BUI.IsModuleEnabled('actionBars') and not self:Blocked()
 end
 
 function BlizzardBar:Owned()
