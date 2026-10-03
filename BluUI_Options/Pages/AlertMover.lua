@@ -36,7 +36,7 @@ local function PositionTool(db, options)
 		end
 		rows[#rows + 1] = centered
 	end
-	rows[#rows + 1] = Option('Anchor to', 'anchorFrame', { entries = frames })
+	rows[#rows + 1] = Option('Anchor to', 'anchorFrame', { entries = frames, separator = true })
 	rows[#rows + 1] = Option('Anchor side', 'anchorPoint', { entries = BUI.C.ANCHOR_PLACEMENT_OPTIONS })
 	rows[#rows + 1] = Option('Anchor offset X', 'anchorOffsetX', { min = -ANCHOR_RANGE, max = ANCHOR_RANGE, step = 1 })
 	rows[#rows + 1] = Option('Anchor offset Y', 'anchorOffsetY', { min = -ANCHOR_RANGE, max = ANCHOR_RANGE, step = 1 })

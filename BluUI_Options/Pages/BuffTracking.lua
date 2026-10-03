@@ -233,9 +233,9 @@ local function PackLeader(board)
 			cycle:AddTools('Labels', 'Size and placement of the countdown and the next beast', {
 				TextTool('Labels', {
 					Option(db, 'Label size', 'labelTextSize', { min = 6, max = 32, step = 1 }),
-					Option(db, 'Top text horizontal', 'topTextOffsetX', { min = -LABEL_RANGE, max = LABEL_RANGE, step = 1 }),
+					Option(db, 'Top text horizontal', 'topTextOffsetX', { min = -LABEL_RANGE, max = LABEL_RANGE, step = 1, separator = true }),
 					Option(db, 'Top text vertical', 'topTextOffsetY', { min = -LABEL_RANGE, max = LABEL_RANGE, step = 1 }),
-					Option(db, 'Bottom text horizontal', 'bottomTextOffsetX', { min = -LABEL_RANGE, max = LABEL_RANGE, step = 1 }),
+					Option(db, 'Bottom text horizontal', 'bottomTextOffsetX', { min = -LABEL_RANGE, max = LABEL_RANGE, step = 1, separator = true }),
 					Option(db, 'Bottom text vertical', 'bottomTextOffsetY', { min = -LABEL_RANGE, max = LABEL_RANGE, step = 1 }),
 				}),
 			}, Refresh)
@@ -264,7 +264,7 @@ local function PackLeader(board)
 					Option(db, 'Timer anchor', 'timerAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
 					Option(db, 'Timer horizontal', 'timerOffsetX', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 }),
 					Option(db, 'Timer vertical', 'timerOffsetY', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 }),
-					Option(db, 'Decimals under seconds', 'decimalThreshold', { min = 1, max = 10, step = 1 }),
+					Option(db, 'Decimals under seconds', 'decimalThreshold', { min = 1, max = 10, step = 1, separator = true }),
 				}),
 			}, Refresh)
 			overlay:AddTools('Beast name', 'Size and where it sits on the icon', {
@@ -301,7 +301,7 @@ local function BestialWrath(board)
 					Option(db, 'Anchor on the icon', 'textAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
 					Option(db, 'Horizontal on the icon', 'textOffsetX', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 }),
 					Option(db, 'Vertical on the icon', 'textOffsetY', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 }),
-					Option(db, 'Size on screen', 'screenTextSize', { min = 12, max = 64, step = 1 }),
+					Option(db, 'Size on screen', 'screenTextSize', { min = 12, max = 64, step = 1, separator = true }),
 				}),
 				BUI.PositionTool(db, { noCenter = true }),
 			}, Refresh)

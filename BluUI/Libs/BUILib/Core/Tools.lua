@@ -13,7 +13,8 @@ local SWATCH_SIZE = 18
 local CONTROL_HEIGHT = 30
 local POP_WIDTH = 360
 local POP_PAD = 16
-local POP_ROW = 48
+local POP_ROW = 40
+local POP_GROUP = 12
 local POP_TITLE = 24
 local POP_CONTROL = 200
 local POP_RADIUS = 8
@@ -127,14 +128,16 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 			y = y + POP_TITLE
 		end
 		local rows = {}
-		for index, option in ipairs(spec.options) do
+		for _, option in ipairs(spec.options) do
+			if option.separator then
+				y = y + POP_GROUP / 2
+				local rule = kit.DottedRule(frame)
+				rule:SetPoint('TOPLEFT', POP_PAD, -y)
+				rule:SetPoint('TOPRIGHT', -POP_PAD, -y)
+				y = y + POP_GROUP / 2
+			end
 			local row = CreateFrame('Frame', nil, frame)
 			row:SetPoint('TOPLEFT', POP_PAD, -y)
-			if index > 1 then
-				local rule = kit.DottedRule(row)
-				rule:SetPoint('TOPLEFT')
-				rule:SetPoint('TOPRIGHT')
-			end
 			local control = kit.Tool(row, option, after)
 			control:SetPoint('RIGHT')
 			local label = kit.Text(row, option.label, 12, 'text')
