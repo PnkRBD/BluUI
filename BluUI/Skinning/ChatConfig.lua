@@ -14,12 +14,14 @@ local BACKDROP_KEYS = { 'Center', 'TopEdge', 'BottomEdge', 'LeftEdge', 'RightEdg
 local CLOSE_KEYS = { 'CloseButton', 'ClosePanelButton', 'CloseDialogButton', 'closeButton' }
 local BUTTON_KEYS = { 'OkayButton', 'OkButton', 'OKButton', 'CancelButton', 'DefaultButton', 'DefaultsButton', 'RedockButton', 'NewButton', 'SettingsButton', 'ResetButton', 'SaveButton', 'DeleteButton' }
 local SCROLL_LIST_KEYS = { 'ChannelList', 'ChannelRoster' }
+local INSET_KEYS = { 'LeftInset', 'RightInset' }
 local LIST_POOLS = { 'headerButtonPool', 'textChannelButtonPool', 'voiceChannelButtonPool', 'communityChannelButtonPool' }
 local CONFIG_PANELS = { 'ChatConfigCategoryFrame', 'ChatConfigBackgroundFrame', 'ChatConfigCombatSettingsFilters' }
 local PANEL_INSET = Skin.TIP_TAB_INSET
 local FOOTER_GAP = 4
 local LIST_INSET_PAD = 5
 local LIST_LEFT = 7
+local LIST_EDGE = 1
 local ROSTER_SCROLL_GAP = 26
 local TAB_ROW_OFFSET = 2
 local CATEGORY_BUTTON_COUNT = 7
@@ -325,9 +327,19 @@ local function SkinChannelLists(frame)
 end
 
 local function AlignChannelFrame(frame)
+	for index = 1, #INSET_KEYS do
+		local inset = frame[INSET_KEYS[index]]
+		inset._buiDeepSkip = true
+		FadeRegions(inset)
+		FadeKeys(inset, BACKDROP_KEYS)
+	end
 	local lift = PANEL_INSET + frame.NewButton:GetHeight() + FOOTER_GAP + LIST_INSET_PAD
 	frame.ChannelList:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', LIST_LEFT, lift)
+	frame.ChannelRoster:ClearAllPoints()
+	frame.ChannelRoster:SetPoint('TOPLEFT', frame.ChannelList, 'TOPRIGHT', ROSTER_SCROLL_GAP, 0)
 	frame.ChannelRoster:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -ROSTER_SCROLL_GAP, lift)
+	Shell(frame.ChannelList, -LIST_EDGE)
+	Shell(frame.ChannelRoster, -LIST_EDGE)
 	frame.NewButton:ClearAllPoints()
 	frame.NewButton:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', PANEL_INSET, PANEL_INSET)
 	frame.SettingsButton:ClearAllPoints()
@@ -416,12 +428,12 @@ local function SkinWindow(frame)
 		end
 	end
 	SkinChannelLists(frame)
+	if frame == ChannelFrame then AlignChannelFrame(frame) end
 	Skin.TipFaceTree(frame, FONT_DEPTH)
 	DeepSkin(frame, MAX_DEPTH, isConfig)
 	Skin.HideHelpButtons(frame)
 	WindowTitle(frame)
 	if isConfig then SkinConfigWindow(frame) end
-	if frame == ChannelFrame then AlignChannelFrame(frame) end
 end
 
 local function SweepAll()

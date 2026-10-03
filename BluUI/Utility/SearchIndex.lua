@@ -200,6 +200,11 @@ local entries = {
 	{ label = "Ping source", page = "datatext", panel = "Datatexts", keywords = "ping source home world" },
 	{ label = "Datatexts", page = "datatext", panel = "Datatexts", keywords = "fps framerate ping latency durability gold ilvl item level coords location loot spec friends guild modules order time clock" },
 
+	{ label = "Enable", page = "chat", keywords = "chat skin enable" },
+	{ label = "Panel", page = "chat", panel = "Panel", keywords = "chat font background border edit box position size padding lock move resize" },
+	{ label = "Tabs", page = "chat", panel = "Tabs", keywords = "chat tabs style font uppercase combat log color opacity flash" },
+	{ label = "Messages", page = "chat", panel = "Messages", keywords = "chat timestamps links channel abbreviate fade history copy voice buttons hide scroll" },
+
 	{ label = "Enable", page = "cursor", keywords = "cursor ring circle enable" },
 	{ label = "Cursor Size", page = "cursor", panel = "General", keywords = "cursor ring size" },
 	{ label = "Show Only In Combat", page = "cursor", panel = "General" },
