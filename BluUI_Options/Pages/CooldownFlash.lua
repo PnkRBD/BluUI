@@ -134,7 +134,7 @@ BUI.PageEngine.RegisterPage('cooldownFlash', {
 			placeholder = 'Search cooldown flash...',
 			tools = {
 				{ text = 'Back to alerts', onClick = function() BUI.PageEngine.NavigateToID('auras') end },
-				{ icon = 'enable', tooltip = 'Turn cooldown flashes on or off', get = function() return db.enabled == true end, set = function(value)
+				{ icon = 'enable', hint = false, tooltip = 'Turn cooldown flashes on or off', get = function() return db.enabled == true end, set = function(value)
 					db.enabled = value
 					CooldownFlash.Refresh()
 				end },
