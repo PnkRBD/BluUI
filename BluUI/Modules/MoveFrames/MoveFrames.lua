@@ -181,6 +181,11 @@ local NEVER_REMEMBER = {
 	BonusRollFrame = true,
 	PlayerChoiceFrame = true,
 }
+local ALWAYS_REMEMBER = {
+	BattleNetInviteFrame = true, BNToastFrame = true, LFDRoleCheckPopup = true, LFGInvitePopup = true, LFGListInviteDialog = true,
+	LFGDungeonReadyDialog = true, LFGDungeonReadyStatus = true, LossOfControlFrame = true, PVPReadyDialog = true,
+	QuickJoinRoleSelectionFrame = true, ReadyCheckFrame = true, RolePollPopup = true,
+}
 
 local OFFSCREEN_MARGIN = 4
 
@@ -218,6 +223,10 @@ end
 function MoveFrames.IsActive()
 	if MoveFrames.blockedBy then return false end
 	return GetConfig().enabled ~= false
+end
+
+local function Remembers(path)
+	return ALWAYS_REMEMBER[path] == true or GetConfig().positionMode == 'remember'
 end
 
 local function IsSecret(value)
@@ -307,7 +316,7 @@ end
 local function SavePosition(target)
 	local config = GetConfig()
 	local path = framePath[target]
-	if config.positionMode ~= 'remember' or not path or NEVER_REMEMBER[path] then return end
+	if not path or NEVER_REMEMBER[path] or not Remembers(path) then return end
 
 	if IsOffScreen(target) then
 		config.positions[path] = nil
@@ -334,9 +343,10 @@ end
 
 local function ApplySavedPosition(target)
 	local config = GetConfig()
-	if not MoveFrames.IsActive() or config.positionMode ~= 'remember' then return end
+	if not MoveFrames.IsActive() then return end
 	local path = framePath[target]
-	local saved = path and config.positions[path]
+	if not path or not Remembers(path) then return end
+	local saved = config.positions[path]
 	if not saved or moving[target] or IsLocked(target) or not CanTouch(target) then return end
 
 	local relativeTo = ResolvePath(saved.relativeTo) or UIParent
@@ -387,7 +397,7 @@ end
 
 local function AutoResetIfDragged(target)
 	local config = GetConfig()
-	if config.positionMode ~= 'reset' or not dragged[target] then return end
+	if config.positionMode ~= 'reset' or not dragged[target] or ALWAYS_REMEMBER[framePath[target]] then return end
 
 	heldPoints[target] = nil
 	RestoreBlizzardPoints(target)
