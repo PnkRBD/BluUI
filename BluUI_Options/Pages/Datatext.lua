@@ -160,24 +160,24 @@ local function NameOption(config)
 end
 
 local function TextBarTools(config, fontItems, nameOption)
-	local textOptions = { Option(config, 'Font size', 'fontSize', { min = 8, max = 24, step = 1 }) }
+	local textOptions = {
+		Option(config, 'Font size', 'fontSize', { min = 8, max = 24, step = 1, separator = nameOption ~= nil }),
+		Option(config, 'Spacing', 'spacing', { min = 0, max = 160, step = 1 }),
+		Option(config, 'Orientation', 'orientation', { entries = ORIENTATIONS, separator = true }),
+		Option(config, 'Align', 'align', { entries = ALIGNMENTS }),
+	}
 	if nameOption then table.insert(textOptions, 1, nameOption) end
 	return {
 		Swatch(config, 'Value color', 'colorValue', true),
 		BackgroundSwatch(config),
 		{ entries = fontItems, width = MENU_WIDTH, get = function() return config.font end, set = function(value) config.font = value end },
-		{ icon = 'text', tooltip = nameOption and 'Name and size' or 'Size', title = 'Text', options = textOptions },
-		{ tooltip = 'Layout, size and backdrop', title = 'Layout', options = {
-			Option(config, 'Orientation', 'orientation', { entries = ORIENTATIONS }),
-			Option(config, 'Align', 'align', { entries = ALIGNMENTS }),
-			Option(config, 'Spacing', 'spacing', { min = 0, max = 160, step = 1 }),
+		{ icon = 'text', tooltip = nameOption and 'Name, size and flow' or 'Size and flow', title = 'Text', options = textOptions },
+		{ tooltip = 'Size, border and behavior', title = 'Bar', options = {
 			Option(config, 'Width', 'width', { min = 0, max = 1200, step = 1 }),
 			Option(config, 'Height', 'height', { min = 0, max = 600, step = 1 }),
-			Option(config, 'Border', 'border'),
+			Option(config, 'Border', 'border', { separator = true }),
 			Swatch(config, 'Border color', 'borderColor', true),
-		} },
-		{ tooltip = 'Mouseover and tooltips', title = 'Behavior', options = {
-			Option(config, 'Only on mouseover', 'mouseover'),
+			Option(config, 'Only on mouseover', 'mouseover', { separator = true }),
 			Option(config, 'Hide tooltips in combat', 'hideHoversInCombat'),
 			Option(config, 'Roster tooltips', 'rosterTooltips'),
 		} },
@@ -203,9 +203,9 @@ local function BarTools(config, index)
 			{ tooltip = 'Size and backdrop', title = 'Panel', options = {
 				Option(config, 'Width', 'width', { min = 0, max = 1200, step = 1 }),
 				Option(config, 'Height', 'height', { min = 0, max = 600, step = 1 }),
-				Option(config, 'Border', 'border'),
+				Option(config, 'Border', 'border', { separator = true }),
 				Swatch(config, 'Border color', 'borderColor', true),
-				Option(config, 'Only on mouseover', 'mouseover'),
+				Option(config, 'Only on mouseover', 'mouseover', { separator = true }),
 			} },
 		}
 	else
