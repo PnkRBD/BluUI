@@ -174,7 +174,7 @@ local entries = {
 
 	{ label = "Enable", page = "minimap", keywords = "minimap map" },
 	{ label = "Show Anchor", page = "minimap", keywords = "anchor mover unlock position" },
-	{ label = "Scale", page = "minimap", panel = "Appearance", keywords = "scale size position mover" },
+	{ label = "Size in pixels", page = "minimap", panel = "Appearance", keywords = "scale size pixels position mover" },
 	{ label = "Border Width", page = "minimap", panel = "Appearance", keywords = "border width position mover" },
 	{ label = "Indicators", page = "minimap", panel = "Appearance", keywords = "difficulty mail crafting orders garrison mission indicators shape cog" },
 	{ label = "24-Hour Format", page = "minimap", panel = "Appearance" },

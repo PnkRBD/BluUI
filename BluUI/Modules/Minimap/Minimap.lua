@@ -675,17 +675,21 @@ local function PlaceGhost(indicator, point, x, y)
 	ghost:ClearAllPoints()
 	ghost:SetPoint(point, WoWMinimap, point, x, y)
 	if ghost.eye then
-		local eyeWidth = indicator.Resolve().Eye:GetWidth()
-		local size = eyeWidth * GetDockSize() / math.max(width, eyeWidth)
+		local eye = indicator.Resolve().Eye
+		local size = eye:GetWidth() * eye:GetScale()
 		ghost.eye:SetSize(size, size)
 	end
 end
 
-local function PlaceDifficultyText(point, x, y)
+local function PlaceDifficultyText(frame, point, x, y)
 	local align = GetConfig().minimapTextDifficultyAlign
-	local vertical = point:match('^TOP') or point:match('^BOTTOM') or ''
+	local iconScale = GetIconScale('difficulty')
+	local width, height = frame._buiNativeW * iconScale, frame._buiNativeH * iconScale
+	local left = point:find('LEFT') and x or point:find('RIGHT') and (x - width) or (x - width / 2)
+	local bottom = point:find('BOTTOM') and y or point:find('TOP') and (y - height) or (y - height / 2)
+	local edge = align == 'LEFT' and left or align == 'RIGHT' and (left + width) or (left + width / 2)
 	difficultyFrame:ClearAllPoints()
-	difficultyFrame:SetPoint(vertical .. align, WoWMinimap, point, x, y)
+	difficultyFrame:SetPoint(align, WoWMinimap, point, edge, bottom + height / 2)
 	difficultyFrame.text:ClearAllPoints()
 	difficultyFrame.text:SetPoint(align)
 	difficultyFrame.text:SetJustifyH(align)
@@ -706,7 +710,7 @@ local function PositionIndicator(indicator)
 	PlaceGhost(indicator, point, x, y)
 
 	if indicator.key == 'difficulty' and difficultyFrame then
-		PlaceDifficultyText(point, x * iconScale, y * iconScale)
+		PlaceDifficultyText(frame, point, x * iconScale, y * iconScale)
 	end
 end
 
@@ -862,6 +866,14 @@ end
 function Minimap.SetScale(percent)
 	GetConfig().minimapScale = percent
 	Minimap.ApplyPosition()
+end
+
+function Minimap.GetSizePixels()
+	return BUI.Round(WoWMinimap:GetWidth() / Pixel.PixelSizeFor(WoWMinimap, 1))
+end
+
+function Minimap.SetSizePixels(pixels)
+	Minimap.SetScale(pixels * Pixel.PixelSizeFor(WoWMinimap:GetParent(), 1) / WoWMinimap:GetWidth() * 100)
 end
 
 function Minimap.SetPositionX(x)
