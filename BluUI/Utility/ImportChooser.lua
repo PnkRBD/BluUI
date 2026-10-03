@@ -33,6 +33,7 @@ local GROUPS = {
 		{ key = 'auras',           name = 'Warning Auras' },
 		{ key = 'auraFilters',     name = 'Aura Filters' },
 		{ key = 'cdAnnouncer',     name = 'CD Announcer' },
+		{ key = 'cooldownFlash',   name = 'Cooldown Flash' },
 		{ key = 'bloodlust',       name = 'Bloodlust Tracker' },
 		{ key = 'gatewayAlert',    name = 'Gateway Alert' },
 	}},

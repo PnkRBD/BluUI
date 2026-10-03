@@ -270,6 +270,20 @@ local function CDAnnouncerRow(board)
 	}, CDAnnouncer.Refresh)
 end
 
+local function CooldownFlashRow(board)
+	local db = BUI.GetDB().cooldownFlash
+	local CooldownFlash = BUI.CooldownFlash
+	CooldownFlash.RegisterAnchorCallback(Repaint)
+	board:AddTools('Cooldown Flash', 'Spell icons that flash on screen when they come off cooldown, saved per spec', {
+		{ icon = 'cog', tooltip = 'Open the Cooldown Flash page', onClick = function() BUI.PageEngine.NavigateToID('cooldownFlash') end },
+		Eye('Unlock to drag the icons, right-click them to lock', function() return db.showAnchor == true end, function(value)
+			db.showAnchor = value
+			CooldownFlash.Refresh()
+		end),
+		Switch(db, 'enabled'),
+	}, CooldownFlash.Refresh)
+end
+
 local function AlertsBoard(ui, parent, width)
 	local board = ui.Board(parent, width, {
 		stacked = true,
@@ -284,6 +298,7 @@ local function AlertsBoard(ui, parent, width)
 	GatewayRow(board)
 	BloodlustRow(board)
 	CDAnnouncerRow(board)
+	CooldownFlashRow(board)
 	return board
 end
 
