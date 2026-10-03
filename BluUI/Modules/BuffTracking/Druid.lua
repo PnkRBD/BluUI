@@ -9,8 +9,10 @@ local CLEARCASTING_KEY   = 'druidClearcasting'
 local CLEARCASTING_FRAME = 'BUI_DruidClearcasting'
 local LIFEBLOOM    = 33763
 local UNDERGROWTH  = 392301
+local FLOURISH     = 197721
 local LIFEBLOOM_SECONDS = 15
 local PANDEMIC_SECONDS  = 4.5
+local FLOURISH_SECONDS  = 6
 local FERAL        = 2
 local RESTORATION  = 4
 local CLEARCASTING_BY_SPEC = { [FERAL] = 135700, [RESTORATION] = 16870 }
@@ -144,12 +146,14 @@ local function OnEnteringWorld()
 end
 
 local lifeblooms = {}
+local castTargets = {}
 
 local function ClearLifeblooms()
     for index = #lifeblooms, 1, -1 do
         lifeblooms[index].timer:Cancel()
         lifeblooms[index] = nil
     end
+    wipe(castTargets)
 end
 
 local function RemoveLifebloom(entry)
@@ -173,23 +177,56 @@ local function SoonestLifebloom()
     return soonest
 end
 
-local function OnLifebloomCast(_, _, _, spellID)
-    if spellID ~= LIFEBLOOM or not isRestoration then return end
+local function LifebloomOn(target)
+    for _, entry in ipairs(lifeblooms) do
+        if entry.target == target then return entry end
+    end
+end
+
+local function Schedule(entry, settings)
+    if entry.timer then entry.timer:Cancel() end
+    entry.timer = BUI.Profiler.NewTimer('BuffTracking.Druid lifebloom refresh', math.max(entry.expires - settings.soundSeconds - GetTime(), 0), function() AnnounceRefresh(entry) end)
+end
+
+local function OnLifebloomSent(_, _, target, castGUID, spellID)
+    if spellID == LIFEBLOOM and not issecretvalue(target) then castTargets[castGUID] = target end
+end
+
+local function OnLifebloomCast(castGUID, settings)
+    local target = castTargets[castGUID]
+    castTargets[castGUID] = nil
+    local now = GetTime()
+    local limit = IsPlayerSpell(UNDERGROWTH) and 2 or 1
+    local refreshed = target and LifebloomOn(target)
+    local soonest = SoonestLifebloom()
+    local replaced = refreshed or (soonest and (#lifeblooms >= limit or (not target and soonest.expires - now <= settings.refreshSeconds)) and soonest)
+    local carried = 0
+    if replaced then
+        if refreshed then carried = math.min(math.max(replaced.expires - now, 0), PANDEMIC_SECONDS) end
+        replaced.timer:Cancel()
+        RemoveLifebloom(replaced)
+    end
+    local entry = { target = target, expires = now + LIFEBLOOM_SECONDS + carried }
+    Schedule(entry, settings)
+    lifeblooms[#lifeblooms + 1] = entry
+end
+
+local function OnFlourish(settings)
+    for _, entry in ipairs(lifeblooms) do
+        entry.expires = entry.expires + FLOURISH_SECONDS
+        Schedule(entry, settings)
+    end
+end
+
+local function OnPlayerCast(_, _, castGUID, spellID)
+    if not isRestoration then return end
     local settings = GetSettings()
     if not settings.enabled then return end
-    local now = GetTime()
-    local soonest = SoonestLifebloom()
-    local limit = IsPlayerSpell(UNDERGROWTH) and 2 or 1
-    local refreshing = soonest and (#lifeblooms >= limit or soonest.expires - now <= settings.refreshSeconds)
-    local carried = 0
-    if refreshing then
-        carried = math.min(math.max(soonest.expires - now, 0), PANDEMIC_SECONDS)
-        soonest.timer:Cancel()
-        RemoveLifebloom(soonest)
+    if spellID == LIFEBLOOM then
+        OnLifebloomCast(castGUID, settings)
+    elseif spellID == FLOURISH then
+        OnFlourish(settings)
     end
-    local entry = { expires = now + LIFEBLOOM_SECONDS + carried }
-    entry.timer = BUI.Profiler.NewTimer('BuffTracking.Druid lifebloom refresh', math.max(entry.expires - settings.soundSeconds - now, 0), function() AnnounceRefresh(entry) end)
-    lifeblooms[#lifeblooms + 1] = entry
 end
 
 local function OnSpecChanged(_, unit)
@@ -226,7 +263,8 @@ function Druid.Initialize()
     BUI.Events:Register('PLAYER_ENTERING_WORLD', 'BuffTrackingDruid', OnEnteringWorld)
     BUI.Events:Register('PLAYER_REGEN_ENABLED', 'BuffTrackingDruid', ApplyPendingStyles)
     BUI.Events:Register('PLAYER_SPECIALIZATION_CHANGED', 'BuffTrackingDruid', OnSpecChanged)
-    BUI.Events:RegisterUnit('UNIT_SPELLCAST_SUCCEEDED', 'player', 'BuffTrackingDruid', OnLifebloomCast)
+    BUI.Events:RegisterUnit('UNIT_SPELLCAST_SENT', 'player', 'BuffTrackingDruid', OnLifebloomSent)
+    BUI.Events:RegisterUnit('UNIT_SPELLCAST_SUCCEEDED', 'player', 'BuffTrackingDruid', OnPlayerCast)
 end
 
 BUI.Events:OnLogin('BuffTrackingDruid', Druid.Initialize, 'buffTracking')
