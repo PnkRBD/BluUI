@@ -4,7 +4,8 @@ local Layout = BUILib.Layout
 local Widget = BUILib.Widget
 local Modals = BUILib.Modals
 
-local CARD_HEIGHT = 420
+local CARD_MIN_HEIGHT = 420
+local PAGE_OVERHEAD = 130
 local BODY_Y = 42
 local BOX_Y = 92
 local BOX_PAD = 12
@@ -162,10 +163,11 @@ local function Sections(ui, _, parent, width)
 	local window = Window()
 	local cards = Layout.CardKit(window)
 	local pad = cards.PAD
+	local cardHeight = math.max(CARD_MIN_HEIGHT, window.content:GetHeight() - PAGE_OVERHEAD)
 	local host = CreateFrame('Frame', nil, parent)
-	host:SetSize(width, CARD_HEIGHT)
+	host:SetSize(width, cardHeight)
 
-	local card = cards.Card(host, 0, 0, width, CARD_HEIGHT)
+	local card = cards.Card(host, 0, 0, width, cardHeight)
 	cards.Title(card, 'Report')
 	cards.Description(card, 'Gathers your character, client, settings, addon list and frame positions. Nothing leaves your computer until you paste it with what happened.', pad, BODY_Y, width - pad * 2)
 
