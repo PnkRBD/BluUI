@@ -7,6 +7,8 @@ local PAD = 10
 local CELL_INSET = 8
 local CELL_HEIGHT = 36
 local MIN_CELL = 190
+local STACKED_COLUMNS = 2
+local SIDE_COLUMNS = 3
 local SWITCH_X = 12
 local LABEL_X = 62
 local LABEL_INSET = 6
@@ -48,6 +50,7 @@ function Board:AddSwitch(label, get, set, tip, room)
 	cell.label:SetPoint('LEFT', LABEL_X, 0)
 	cell.label:SetPoint('RIGHT', -(LABEL_INSET + (room or 0)), 0)
 	cell.label:SetWordWrap(false)
+	cell.room = room or 0
 	cell:SetScript('OnClick', function() switch.toggle:Click() end)
 	if tip then
 		cell:HookScript('OnEnter', function(self) Widget.ShowTip(self, tip) end)
@@ -256,7 +259,13 @@ end
 
 function Board:Layout(y, query)
 	self:Measure()
-	local columns = math.max(1, math.floor((self.panelWidth - CELL_INSET * 2) / MIN_CELL))
+	local widest = MIN_CELL
+	for _, row in ipairs(self.rows) do
+		if row.kind == 'cell' then
+			widest = math.max(widest, LABEL_X + math.ceil(row.frame.label:GetUnboundedStringWidth()) + LABEL_INSET + row.frame.room)
+		end
+	end
+	local columns = math.min(self.stacked and STACKED_COLUMNS or SIDE_COLUMNS, math.max(1, math.floor((self.panelWidth - CELL_INSET * 2) / widest)))
 	local cellWidth = math.floor((self.panelWidth - CELL_INSET * 2) / columns)
 	local shown, group = 0
 	for _, row in ipairs(self.rows) do
@@ -318,6 +327,7 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit)
 	function kit.Board(parent, width, spec)
 		local board = setmetatable(kit.Section(parent, width, spec), Board)
 		board.kit = kit
+		board.stacked = spec.stacked == true
 		return board
 	end
 end
