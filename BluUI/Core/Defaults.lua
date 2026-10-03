@@ -1568,6 +1568,24 @@ BUI.Defaults = {
 			charSpells         = {},
 		},
 
+		cooldownFlash = {
+			enabled            = false,
+			showAnchor         = false,
+			centerHorizontally = true,
+			posX               = 0,
+			posY               = -220,
+			anchorFrame        = '',
+			anchorPoint        = 'BOTTOM',
+			anchorOffsetX      = 0,
+			anchorOffsetY      = 0,
+			iconSize           = 48,
+			spacing            = 6,
+			holdSeconds        = 2.5,
+			glow               = 'proc',
+			sound              = 'None',
+			specs              = {},
+		},
+
 		bloodlust = {
 			enabled            = false,
 			posX               = 0,
