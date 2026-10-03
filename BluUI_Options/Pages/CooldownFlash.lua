@@ -1,13 +1,11 @@
 local BUI = BluUI
 local BUILib = BUI.BUILibClient
 local Layout = BUILib.Layout
-local Controls = BUILib.Controls
 local CooldownFlash = BUI.CooldownFlash
 
 local PAGE_WIDTH = 960
 local MENU_WIDTH = 150
 local INPUT_WIDTH = 220
-local RESULTS_WIDTH = 260
 local ERASE_INSET = 18
 local TOOL_SIZE = 22
 local TOOL_GAP = 12
@@ -70,26 +68,10 @@ local function SpellsBoard(ui, parent, width, page)
 		title = 'Spells',
 		description = ('Saved for %s. They flash in this order, drag a row to reorder it. Type a name, paste an ID or a link, then press Enter.'):format(CooldownFlash.ListLabel()),
 	})
-	local function Add(spellID)
-		if CooldownFlash.AddSpell(spellID) then RebuildPage() end
-	end
-	local function Search(anchor, text)
-		local hits = {}
-		for _, hit in ipairs(BUI.Lookup.SearchSpellsAndItems(text)) do
-			if not hit.isItem then hits[#hits + 1] = hit end
-		end
-		if #hits == 1 then return Add(hits[1].id) end
-		local menu = {}
-		for _, hit in ipairs(hits) do
-			menu[#menu + 1] = { text = hit.name, icon = hit.icon, callback = function() Add(hit.id) end }
-		end
-		if #menu == 0 then menu[1] = { text = 'Nothing found', disabled = true } end
-		Controls.ContextMenu(menu, { anchor = anchor, width = RESULTS_WIDTH, window = Window() })
-	end
 	local addRow = board:AddRow('Add a spell', 'Name, ID or link', INPUT_WIDTH)
-	local box
-	box = ui.Input(addRow, INPUT_WIDTH, { placeholder = 'Search...', get = function() return '' end, set = function(text) Search(box, text) end })
-	box:SetPoint('RIGHT', -ui.ROW_INSET, 0)
+	BUI.SpellSearch(ui, addRow, INPUT_WIDTH, { spellsOnly = true, onPick = function(hit)
+		if CooldownFlash.AddSpell(hit.id) then RebuildPage() end
+	end }):SetPoint('RIGHT', -ui.ROW_INSET, 0)
 
 	board:DragList(function(index, delta)
 		entries[index], entries[index + delta] = entries[index + delta], entries[index]
