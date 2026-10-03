@@ -14,6 +14,7 @@ local BACKDROP_KEYS = { 'Center', 'TopEdge', 'BottomEdge', 'LeftEdge', 'RightEdg
 local CLOSE_KEYS = { 'CloseButton', 'ClosePanelButton', 'CloseDialogButton', 'closeButton' }
 local BUTTON_KEYS = { 'OkayButton', 'OkButton', 'OKButton', 'CancelButton', 'DefaultButton', 'DefaultsButton', 'RedockButton', 'NewButton', 'SettingsButton', 'ResetButton', 'SaveButton', 'DeleteButton' }
 local SCROLL_LIST_KEYS = { 'ChannelList', 'ChannelRoster' }
+local LIST_POOLS = { 'headerButtonPool', 'textChannelButtonPool', 'voiceChannelButtonPool', 'communityChannelButtonPool' }
 local CONFIG_PANELS = { 'ChatConfigCategoryFrame', 'ChatConfigBackgroundFrame', 'ChatConfigCombatSettingsFilters' }
 local PANEL_INSET = Skin.TIP_TAB_INSET
 local FOOTER_GAP = 4
@@ -291,14 +292,34 @@ local function SkinRow(row)
 	end
 end
 
+local function SkinPooledRows(list)
+	if not Enabled() then return end
+	for index = 1, #LIST_POOLS do
+		local pool = list[LIST_POOLS[index]]
+		if pool then
+			for row in pool:EnumerateActive() do SkinRow(row) end
+		end
+	end
+end
+
 local function SkinChannelLists(frame)
 	for index = 1, #SCROLL_LIST_KEYS do
 		local list = frame[SCROLL_LIST_KEYS[index]]
 		if list then
 			ScrollBar(list.ScrollBar)
 			if list.ScrollBar then list.ScrollBar._buiDeepSkip = true end
-			list.ScrollBox._buiDeepSkip = true
-			Skin.SweepScrollBox(list.ScrollBox, SkinRow)
+			if list.ScrollBox then
+				list.ScrollBox._buiDeepSkip = true
+				Skin.SweepScrollBox(list.ScrollBox, SkinRow)
+			end
+			if list.Child then
+				list.Child._buiDeepSkip = true
+				if not list._buiRowsHook then
+					list._buiRowsHook = true
+					Hook(list, 'Update', SkinPooledRows)
+				end
+				SkinPooledRows(list)
+			end
 		end
 	end
 end
