@@ -537,7 +537,12 @@ function Layout.TableKit(window)
 		if tools then
 			local anchor, gap = search, TOGGLE_INSET
 			for index = #tools, 1, -1 do
-				local tool = kit.Tool(parent, tools[index])
+				local spec = tools[index]
+				local tool = kit.Tool(parent, spec)
+				if spec.icon == 'enable' and spec.get then
+					local hint = BUILib.PageKit.HintArrow(tool, { label = 'Enable' })
+					window:Bind(hint, function() hint:SetShown(not spec.get()) end)
+				end
 				if anchor then
 					tool:SetPoint('RIGHT', anchor, 'LEFT', -gap, 0)
 				else
