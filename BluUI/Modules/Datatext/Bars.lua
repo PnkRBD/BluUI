@@ -35,8 +35,8 @@ local function MirroredChatRect()
     if not chatFrame or not chatFrame:IsShown() or not chatFrame:GetLeft() then chatFrame = _G.ChatFrame1 end
     if not chatFrame or not chatFrame:GetLeft() then return end
     local scale = chatFrame:GetEffectiveScale() / UIParent:GetEffectiveScale()
-    return -BUI.Round(chatFrame:GetLeft() * scale), BUI.Round(chatFrame:GetBottom() * scale),
-        BUI.Round(chatFrame:GetWidth() * scale), BUI.Round(chatFrame:GetHeight() * scale)
+    return -Pixel.Scale(chatFrame:GetLeft() * scale), Pixel.Scale(chatFrame:GetBottom() * scale),
+        Pixel.Scale(chatFrame:GetWidth() * scale), Pixel.Scale(chatFrame:GetHeight() * scale)
 end
 
 local function ColorHex(config)

@@ -277,7 +277,7 @@ local function GetBorderRing(icon)
     ring:SetFrameLevel(icon:GetFrameLevel() + 3)
     ring:SetPoint('TOPLEFT', Pixel.Scale(-1), Pixel.Scale(1))
     ring:SetPoint('BOTTOMRIGHT', Pixel.Scale(1), Pixel.Scale(-1))
-    ring:SetBackdrop({ edgeFile = BUI.C.FALLBACK_TEXTURE, edgeSize = 1 })
+    Pixel.ApplyBorder(ring, 1)
     ring:Hide()
     frameData._pressBorder = ring
     return ring

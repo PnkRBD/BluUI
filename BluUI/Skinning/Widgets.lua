@@ -7,11 +7,9 @@ local Pixel = BUI.Pixel
 local Skin = BUI.Skinning
 local Wrap = BUI.Profiler.Wrap
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
-local Widget = BUILib.Widget
 local Controls = BUILib.Controls
 local Colors = BUILib.Colors
 local FONT = BUILib.Font or STANDARD_TEXT_FONT
-local BACKDROP = Widget.BACKDROP
 
 local SetColorTex = BUI.Tools.SetColorTex
 
@@ -132,10 +130,8 @@ end
 function Skin.CreateSearchBox(parent, width, callback)
 	local container = CreateFrame('Frame', nil, parent, 'BackdropTemplate')
 	container:SetSize(Pixel.Scale(width), Pixel.Scale(24))
-	container:SetBackdrop(BACKDROP)
-	container:SetBackdropColor(unpack(Colors.bg.input or Colors.bg.medium))
 	local idleBorder = Colors.border.input or Colors.border.default
-	container:SetBackdropBorderColor(unpack(idleBorder))
+	Skin.ApplyBackdrop(container, Colors.bg.input or Colors.bg.medium, idleBorder)
 
 	local hint = container:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(hint, 11, FONT, '')
@@ -196,17 +192,13 @@ function Skin.CreateListRow(parent, height, iconSize)
 
 	local row = CreateFrame('Button', nil, parent, 'BackdropTemplate')
 	row:SetHeight(Pixel.Scale(height))
-	row:SetBackdrop(BACKDROP)
-	row:SetBackdropColor(unpack(Colors.bg.medium))
-	row:SetBackdropBorderColor(unpack(Colors.border.dark))
+	Skin.ApplyBackdrop(row, Colors.bg.medium, Colors.border.dark)
 	row:EnableMouse(true)
 
 	row.iconBorder = CreateFrame('Frame', nil, row, 'BackdropTemplate')
 	row.iconBorder:SetSize(Pixel.Scale(iconSize + 2), Pixel.Scale(iconSize + 2))
 	row.iconBorder:SetPoint('LEFT', Pixel.Scale(4), 0)
-	row.iconBorder:SetBackdrop(BACKDROP)
-	row.iconBorder:SetBackdropColor(0, 0, 0, 1)
-	row.iconBorder:SetBackdropBorderColor(0.15, 0.15, 0.15, 1)
+	Pixel.SetTemplate(row.iconBorder, 0, 0, 0, 1, 0.15, 0.15, 0.15, 1, 1)
 
 	row.icon = row.iconBorder:CreateTexture(nil, 'ARTWORK')
 	row.icon:SetSize(Pixel.Scale(iconSize), Pixel.Scale(iconSize))
@@ -243,10 +235,8 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 
 	local dropdown = CreateFrame('Frame', nil, parent, 'BackdropTemplate')
 	dropdown:SetSize(Pixel.Scale(width), Pixel.Scale(24))
-	dropdown:SetBackdrop(BACKDROP)
-	dropdown:SetBackdropColor(unpack(Colors.bg.input or Colors.bg.medium))
 	local idleBorder = Colors.border.input or Colors.border.default
-	dropdown:SetBackdropBorderColor(unpack(idleBorder))
+	Skin.ApplyBackdrop(dropdown, Colors.bg.input or Colors.bg.medium, idleBorder)
 
 	local label = dropdown:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(label, 11, FONT, '')
@@ -267,9 +257,7 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 	menu:SetFrameStrata('FULLSCREEN_DIALOG')
 	menu:SetPoint('TOPLEFT', dropdown, 'BOTTOMLEFT', 0, Pixel.Scale(-2))
 	menu:SetWidth(Pixel.Scale(width))
-	menu:SetBackdrop(BACKDROP)
-	menu:SetBackdropColor(0.04, 0.045, 0.05, 0.98)
-	menu:SetBackdropBorderColor(unpack(Colors.border.default))
+	Skin.ApplyBackdrop(menu, { 0.04, 0.045, 0.05, 0.98 }, Colors.border.default)
 	menu:Hide()
 
 	local rowHeight = 22

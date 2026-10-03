@@ -6,20 +6,13 @@ local UIParent = UIParent
 local STANDARD_TEXT_FONT = STANDARD_TEXT_FONT
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
-local BLANK = BUI.C.FALLBACK_TEXTURE
 
 function CDM.SetupBlizzardOverlay()
     if not CooldownViewerSettings then return end
 
     local overlay = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
     overlay:SetFrameStrata("TOOLTIP")
-    overlay:SetBackdrop({
-        bgFile = BLANK,
-        edgeFile = BLANK,
-        edgeSize = 1,
-    })
-    overlay:SetBackdropColor(0.05, 0.0, 0.1, 0.92)
-    overlay:SetBackdropBorderColor(0.43, 0, 0.99, 0.8)
+    Pixel.SetTemplate(overlay, 0.05, 0.0, 0.1, 0.92, 0.43, 0, 0.99, 0.8, 1)
     overlay:EnableMouse(true)
     overlay:Hide()
 

@@ -8,7 +8,6 @@ local Skin = BUI.Skinning
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Colors = BUILib.Colors
-local BACKDROP = BUILib.Widget.BACKDROP
 
 local toggleCallbacks = {}
 local skinRegistry = {}
@@ -246,10 +245,8 @@ function Skin.RestoreBlizzardFrame(frame)
 end
 
 function Skin.ApplyBackdrop(frame, bgColor, borderColor)
-	if not frame.SetBackdrop then Mixin(frame, BackdropTemplateMixin) end
-	frame:SetBackdrop(BACKDROP)
-	frame:SetBackdropColor(unpack(bgColor or Colors.bg.dark))
-	frame:SetBackdropBorderColor(unpack(borderColor or Colors.border.default))
+	local background, border = bgColor or Colors.bg.dark, borderColor or Colors.border.default
+	BUI.Pixel.SetTemplate(frame, background[1], background[2], background[3], background[4], border[1], border[2], border[3], border[4], 1)
 end
 
 local function PinFrame(frame)
@@ -718,7 +715,7 @@ end
 local function PlaceEntry(entry, left, top)
 	local frame = entry.frame
 	local _, _, scale = FrameExtent(frame)
-	local pixel = PixelUtil.GetPixelToUIUnitFactor() / UIParent:GetEffectiveScale()
+	local pixel = BUI.Pixel.PixelSizeFor(UIParent, 1)
 	left, top = BUILib.Widget.SnapX(left, pixel), BUILib.Widget.SnapY(top, pixel)
 	entry.left, entry.top = left, top
 	placingEntry = true

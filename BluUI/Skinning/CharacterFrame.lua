@@ -410,13 +410,7 @@ local function StyleSlotButton(button)
     local existing = {}
     for regionIndex = 1, button:GetNumRegions() do existing[select(regionIndex, button:GetRegions())] = true end
 
-    button:SetBackdrop({
-        bgFile   = 'Interface\\Buttons\\WHITE8x8',
-        edgeFile = 'Interface\\Buttons\\WHITE8x8',
-        edgeSize = 1,
-    })
-    button:SetBackdropColor(SLOT_BG[1], SLOT_BG[2], SLOT_BG[3], 1)
-    button:SetBackdropBorderColor(IDLE_BORDER[1], IDLE_BORDER[2], IDLE_BORDER[3], 1)
+    Pixel.SetTemplate(button, SLOT_BG[1], SLOT_BG[2], SLOT_BG[3], 1, IDLE_BORDER[1], IDLE_BORDER[2], IDLE_BORDER[3], 1, 1)
 
     for regionIndex = 1, button:GetNumRegions() do
         local region = select(regionIndex, button:GetRegions())
@@ -451,8 +445,7 @@ local function CreateGemFrame(button)
     local gem = CreateFrame('Frame', nil, overlay, 'BackdropTemplate')
     gem:SetSize(Pixel.Scale(GEM_SIZE), Pixel.Scale(GEM_SIZE))
     gem:SetFrameLevel(button:GetFrameLevel() + 6)
-    gem:SetBackdrop({ bgFile = 'Interface\\Buttons\\WHITE8x8', edgeFile = 'Interface\\Buttons\\WHITE8x8', edgeSize = 1 })
-    gem:SetBackdropColor(0, 0, 0, 1)
+    Pixel.SetTemplate(gem, 0, 0, 0, 1)
     gem.icon = gem:CreateTexture(nil, 'ARTWORK')
     gem.icon:SetPoint('TOPLEFT', 1, -1)
     gem.icon:SetPoint('BOTTOMRIGHT', -1, 1)
@@ -599,9 +592,7 @@ local function EnsureBagPopup()
     bagPopup:SetClampedToScreen(true)
     bagPopup:EnableMouse(true)
     bagPopup:SetWidth(Pixel.Scale(BAG.POPUP_W))
-    bagPopup:SetBackdrop({ bgFile = 'Interface\\Buttons\\WHITE8x8', edgeFile = 'Interface\\Buttons\\WHITE8x8', edgeSize = 1 })
-    bagPopup:SetBackdropColor(0.04, 0.04, 0.05, 0.98)
-    bagPopup:SetBackdropBorderColor(TOGGLE_BORDER[1], TOGGLE_BORDER[2], TOGGLE_BORDER[3], 1)
+    Pixel.SetTemplate(bagPopup, 0.04, 0.04, 0.05, 0.98, TOGGLE_BORDER[1], TOGGLE_BORDER[2], TOGGLE_BORDER[3], 1, 1)
     bagPopup.title = bagPopup:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(bagPopup.title, LIST_SIZE, FONT, '')
     bagPopup.title:SetPoint('TOPLEFT', Pixel.Scale(8), Pixel.Scale(-6))
@@ -2128,13 +2119,7 @@ local function MakeToggleButton(parent, options)
     local button = CreateFrame('Button', nil, parent, 'BackdropTemplate')
     button:SetSize(Pixel.Scale(28), Pixel.Scale(28))
     button:SetFrameLevel(parent:GetFrameLevel() + 5)
-    button:SetBackdrop({
-        bgFile   = 'Interface\\Buttons\\WHITE8x8',
-        edgeFile = 'Interface\\Buttons\\WHITE8x8',
-        edgeSize = 1,
-    })
-    button:SetBackdropColor(SLOT_BG[1], SLOT_BG[2], SLOT_BG[3], 1)
-    button:SetBackdropBorderColor(unpack(TOGGLE_BORDER))
+    Pixel.SetTemplate(button, SLOT_BG[1], SLOT_BG[2], SLOT_BG[3], 1, TOGGLE_BORDER[1], TOGGLE_BORDER[2], TOGGLE_BORDER[3], 1, 1)
 
     local inset = options.inset or 2
     local texture = button:CreateTexture(nil, 'ARTWORK')
