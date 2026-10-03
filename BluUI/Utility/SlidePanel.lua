@@ -3,6 +3,7 @@ local _, BUI = ...
 BUI.SlidePanel = {}
 
 local SLIDE_DURATION = 0.22
+local STRATA_BELOW = { MEDIUM = 'LOW', HIGH = 'MEDIUM', DIALOG = 'HIGH', FULLSCREEN = 'DIALOG', FULLSCREEN_DIALOG = 'FULLSCREEN' }
 
 local panels = {}
 
@@ -61,6 +62,7 @@ function BUI.SlidePanel.New(options)
         local panel = options.panel()
         if not panel then return end
         panel.isBluUIWindow = true
+        panel:SetFrameStrata(STRATA_BELOW[Anchor():GetFrameStrata()])
         SetOffset(hiddenX)
         panel:Show()
         if options.onOpen then options.onOpen() end
