@@ -326,7 +326,7 @@ local function FramesBoard(ui, parent, width)
 	end
 	local config = MoveFrames.GetConfig()
 	board:AddSwitch('Movable frames', function() return config.enabled end, function(enabled) MoveFrames.SetEnabled(enabled) end, 'Drag Blizzard windows by clicking and holding on them.')
-	local mode = board:AddRow('After a move', 'What happens to a window once you let go', DROPDOWN_WIDTH)
+	local mode = board:AddRow('After a move', 'What happens to a window once you let go, toasts and popups always keep their spot', DROPDOWN_WIDTH)
 	local dropdown = ui.Dropdown(mode, DROPDOWN_WIDTH, function()
 		local items = {}
 		for _, entry in ipairs(POSITION_MODES) do
