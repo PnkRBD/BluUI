@@ -73,7 +73,7 @@ local EXTRA_BARS = {
 	{ key = 'stance', title = 'Stance bar', description = 'Replaces the Blizzard stance and form bar. Turning it off needs a reload to bring the Blizzard one back.', selfTag = 'BUI_StanceBar', buttons = true, maxButtons = 10, countLabel = 'Max buttons, one per stance', rows = { hotkeys = true, cooldownText = true, clickThrough = true } },
 	{ key = 'vehicle', title = 'Vehicle exit', description = 'One button to leave a vehicle, land a taxi early or cancel possession. Only shows when it can act.', size = true, rows = CLICK_THROUGH_ROW },
 	{ key = 'micro', title = 'Micro menu', description = 'The Blizzard micro buttons on a bar you control.', micro = true, rows = CLICK_THROUGH_ROW },
-	{ key = 'bags', title = 'Bag bar', description = 'The Blizzard bag buttons on a bar you control.', scaleOnly = true, rows = CLICK_THROUGH_ROW },
+	{ key = 'bags', title = 'Bag bar', description = 'The Blizzard bag buttons on a bar you control.', scaleOnly = true, rows = { clickThrough = true, singleBag = true } },
 	{ key = 'extra', title = 'Extra action', description = 'The Blizzard extra action and zone ability buttons on a bar you control. Turning it off needs a reload to bring the Blizzard one back.', scaleOnly = true, rows = { clickThrough = true, blizzardArt = true } },
 }
 local EXTRA_BY_KEY = {}
@@ -344,6 +344,7 @@ local function ButtonsBoard(ui, parent, width, db, rows)
 	if rows.macroText then Cell('Macro text', 'showMacroText', 'Macro and spell names on this bar') end
 	if rows.hideEmpty then Cell('Hide empty buttons', 'hideEmptyButtons', 'Collapse slots with nothing in them') end
 	if rows.clickThrough then Cell('Click through', 'clickThrough', 'The mouse passes through this bar, keybinds still work, clicks and tooltips do not') end
+	if rows.singleBag then Cell('Single bag', 'singleBag', 'Only the backpack button, it still opens every bag') end
 	if rows.blizzardArt then Cell('Blizzard art', 'blizzardArt', 'Keep the Blizzard decorative frame around the buttons') end
 	if rows.cooldownText then
 		board:AddTools('Cooldown text', 'Countdown numbers on this bar', {
@@ -391,6 +392,8 @@ local function ExtraBoards(ui, parent, width, extra)
 		scaleOnly = extra.scaleOnly,
 		description = extra.buttons and 'On or off, position, fill direction and layer' or 'On or off, position and layer',
 	})
+	local blocker = extra.key == 'bags' and BUI.ActionBars.BagBarBlockedBy()
+	if blocker then board:AddRow(blocker .. ' is loaded', 'It owns the bag buttons, so this bar leaves them alone') end
 	return { board, ButtonsBoard(ui, parent, width, db, extra.rows) }
 end
 
