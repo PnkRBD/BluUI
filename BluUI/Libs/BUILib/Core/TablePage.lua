@@ -539,7 +539,7 @@ function Layout.TableKit(window)
 			for index = #tools, 1, -1 do
 				local spec = tools[index]
 				local tool = kit.Tool(parent, spec)
-				if spec.icon == 'enable' and spec.get then
+				if spec.icon == 'enable' and spec.get and spec.hint ~= false then
 					local hint = BUILib.PageKit.HintArrow(tool, { label = 'Enable' })
 					window:Bind(hint, function() hint:SetShown(not spec.get()) end)
 				end
