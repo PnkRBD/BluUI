@@ -17,6 +17,9 @@ local SCROLL_LIST_KEYS = { 'ChannelList', 'ChannelRoster' }
 local CONFIG_PANELS = { 'ChatConfigCategoryFrame', 'ChatConfigBackgroundFrame', 'ChatConfigCombatSettingsFilters' }
 local PANEL_INSET = Skin.TIP_TAB_INSET
 local FOOTER_GAP = 4
+local LIST_INSET_PAD = 5
+local LIST_LEFT = 7
+local ROSTER_SCROLL_GAP = 26
 local TAB_ROW_OFFSET = 2
 local CATEGORY_BUTTON_COUNT = 7
 local CATEGORY_BUTTON_HEIGHT = 20
@@ -282,6 +285,10 @@ local function SkinRow(row)
 	if not Enabled() or row._buiRow then return end
 	row._buiRow = true
 	Skin.TipFaceTree(row, 2)
+	if row.GetNormalTexture then
+		Fade(row:GetNormalTexture())
+		Skin.RowHighlight(row)
+	end
 end
 
 local function SkinChannelLists(frame)
@@ -290,9 +297,20 @@ local function SkinChannelLists(frame)
 		if list then
 			ScrollBar(list.ScrollBar)
 			if list.ScrollBar then list.ScrollBar._buiDeepSkip = true end
+			list.ScrollBox._buiDeepSkip = true
 			Skin.SweepScrollBox(list.ScrollBox, SkinRow)
 		end
 	end
+end
+
+local function AlignChannelFrame(frame)
+	local lift = PANEL_INSET + frame.NewButton:GetHeight() + FOOTER_GAP + LIST_INSET_PAD
+	frame.ChannelList:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', LIST_LEFT, lift)
+	frame.ChannelRoster:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -ROSTER_SCROLL_GAP, lift)
+	frame.NewButton:ClearAllPoints()
+	frame.NewButton:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', PANEL_INSET, PANEL_INSET)
+	frame.SettingsButton:ClearAllPoints()
+	frame.SettingsButton:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -PANEL_INSET, PANEL_INSET)
 end
 
 local function StyleTab(tab, selected)
@@ -382,6 +400,7 @@ local function SkinWindow(frame)
 	Skin.HideHelpButtons(frame)
 	WindowTitle(frame)
 	if isConfig then SkinConfigWindow(frame) end
+	if frame == ChannelFrame then AlignChannelFrame(frame) end
 end
 
 local function SweepAll()
