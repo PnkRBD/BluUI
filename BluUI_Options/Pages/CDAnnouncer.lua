@@ -715,7 +715,7 @@ BUI.PageEngine.RegisterPage('cdAnnouncer', {
 			placeholder = 'Search announcer settings...',
 			tools = {
 				{ text = 'Back to alerts', onClick = function() BUI.PageEngine.NavigateToID('auras') end },
-				{ icon = 'enable', tooltip = 'Turn the announcer on or off', get = function() return cfg.enabled == true end, set = function(value)
+				{ icon = 'enable', hint = false, tooltip = 'Turn the announcer on or off', get = function() return cfg.enabled == true end, set = function(value)
 					cfg.enabled = value
 					Apply()
 				end },
