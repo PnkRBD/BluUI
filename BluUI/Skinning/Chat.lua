@@ -13,8 +13,8 @@ local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local theme = BUILib.Theme
 local Skin3 = BUILib.Skin
 local Skin = BUI.Skinning
-local sharedMedia = LibStub and LibStub('LibSharedMedia-3.0', true)
-local GLOBAL_OPTION = (BUI.C and BUI.C.GLOBAL_OPTION) or 'GLOBAL'
+local sharedMedia = LibStub('LibSharedMedia-3.0')
+local GLOBAL_OPTION = BUI.C.GLOBAL_OPTION
 
 local SIZER_IDLE_ALPHA = 0.55
 local HISTORY_CAP = 64
@@ -49,23 +49,6 @@ local CHANNEL_ABBR = {
 	['General'] = 'Gen', ['Trade'] = 'Trade', ['Services'] = 'Svc',
 }
 
-local DEFAULTS = {
-	bgColor = { 0.06, 0.06, 0.06 }, bgAlpha = 0.82, bgTexture = 'SOLID',
-	showBorder = true, borderColor = { 0, 0, 0 }, borderThickness = 1,
-	insetX = 5, insetTop = 30, insetBottom = 5,
-	font = GLOBAL_OPTION, fontSize = 14, fontFlags = '', editFontSize = 13, fontShadow = false,
-	tabFontSize = 12, tabFontFlags = '', tabUppercase = false, tabStyle = 'UNDERLINE',
-	selectedUseAccent = true, selectedColor = { 1, 1, 1 }, inactiveColor = { 0.82, 0.82, 0.85 },
-	selectedAlpha = 1, dockedAlpha = 0.6, tabFlash = true, flashColor = { 1, 0.6, 0.1 }, hideLogTab = false,
-	timestamps = false, timestampFormat = '%H:%M', timestampColor = { 0.6, 0.6, 0.6 },
-	hideChannelNumbers = false, abbreviateChannels = false, scrollLines = 3,
-	urlCopy = true, urlColor = { 0, 0.66, 1 }, hoverTooltips = true,
-	editboxPosition = 'BOTTOM', editboxHeight = 22, editHistory = true, dragToMove = true, msgFade = false, msgFadeTime = 120,
-	mouseoverFade = false, fadeDelay = 2, showSizer = true, sizerGrow = 'UP',
-	hideButtons = true, hideVoiceButtons = true, showCopyButton = true,
-	locked = false,
-}
-
 local HOVER_LINK_TYPES = {
 	item = true, spell = true, enchant = true, talent = true,
 	quest = true, achievement = true, currency = true, keystone = true,
@@ -91,12 +74,12 @@ local skinnedTabs = {}
 local skinnedFrames = {}
 local fadeState = { alpha = 1, lastActive = 0 }
 local StartFader, StopFader
+local installed = false
 local TARGET_TELL_COMMANDS = { ['/t '] = true }
 local TAB_STRATA = 'MEDIUM'
 local TAB_LEVEL_LIFT = 10
 
 local function LiftTab(tab, level)
-	if not tab then return end
 	tab:SetFrameStrata(TAB_STRATA)
 	tab:SetFrameLevel(level)
 end
@@ -104,116 +87,94 @@ end
 local function Enabled() return Skin.IsSkinEnabled('chat') end
 
 local function GetConfig()
-	local db = BUI.GetDB()
-	local skinning = db and db.skinning
-	if not skinning then return nil end
-	if not skinning.chatSettings then skinning.chatSettings = {} end
-	return skinning.chatSettings
+	return BUI.GetDB().skinning.chatSettings
+end
+
+local function Reader(key)
+	return function() return GetConfig()[key] end
+end
+
+local function ColorReader(key)
+	return function()
+		local color = GetConfig()[key]
+		return color[1], color[2], color[3]
+	end
 end
 
 local function BGColor()
 	local config = GetConfig()
-	local color = (config and config.bgColor) or DEFAULTS.bgColor
-	return color[1], color[2], color[3], (config and config.bgAlpha) or DEFAULTS.bgAlpha
+	local color = config.bgColor
+	return color[1], color[2], color[3], config.bgAlpha
+end
+
+local function EditBoxBGColor()
+	local red, green, blue = BGColor()
+	return red, green, blue, 1
 end
 
 local function BorderColor()
 	local config = GetConfig()
-	if config and config.showBorder == false then return 0, 0, 0, 0 end
-	local color = (config and config.borderColor) or DEFAULTS.borderColor
-	return color[1], color[2], color[3], 1
-end
-
-local function EditBoxBGColor()
-	local config = GetConfig()
-	local color = (config and config.bgColor) or DEFAULTS.bgColor
+	if not config.showBorder then return 0, 0, 0, 0 end
+	local color = config.borderColor
 	return color[1], color[2], color[3], 1
 end
 
 local function SelectedColor()
 	local config = GetConfig()
-	if not config or config.selectedUseAccent ~= false then return theme.GetAccent() end
-	local color = config.selectedColor or { 1, 1, 1 }
+	if config.selectedUseAccent then return theme.GetAccent() end
+	local color = config.selectedColor
 	return color[1], color[2], color[3]
 end
 
-local function ColorReader(key)
-	return function()
-		local config = GetConfig()
-		local color = (config and config[key]) or DEFAULTS[key]
-		return color[1], color[2], color[3]
-	end
-end
 local InactiveColor = ColorReader('inactiveColor')
 local FlashColor = ColorReader('flashColor')
 
 local function ResolveFont()
-	local config = GetConfig()
-	local name = config and config.font
-	if not name or name == GLOBAL_OPTION then
-		return (BUI.GetGlobalFont and BUI.GetGlobalFont()) or BUILib.Font
-	end
-	return (sharedMedia and sharedMedia:Fetch('font', name)) or (BUI.GetGlobalFont and BUI.GetGlobalFont()) or BUILib.Font
+	local name = GetConfig().font
+	if name == GLOBAL_OPTION then return BUI.GetGlobalFont() end
+	return sharedMedia:Fetch('font', name, true) or BUI.GetGlobalFont()
 end
 
-local function NumReader(key)
-	return function() local config = GetConfig(); return (config and config[key]) or DEFAULTS[key] end
-end
-local function StrReader(key)
-	return function() local config = GetConfig(); return (config and config[key]) or DEFAULTS[key] end
-end
-local function BoolReader(key, defaultTrue)
-	if defaultTrue then
-		return function() local config = GetConfig(); return not config or config[key] ~= false end
-	end
-	return function() local config = GetConfig(); return config and config[key] end
-end
+local MsgFontSize = Reader('fontSize')
+local EditFontSize = Reader('editFontSize')
+local TabFontSize = Reader('tabFontSize')
+local SelectedAlpha = Reader('selectedAlpha')
+local DockedAlpha = Reader('dockedAlpha')
+local BorderThickness = Reader('borderThickness')
+local InsetX = Reader('insetX')
+local InsetTop = Reader('insetTop')
+local InsetBottom = Reader('insetBottom')
+local EditBoxHeight = Reader('editboxHeight')
+local ScrollLines = Reader('scrollLines')
+local MsgFadeTime = Reader('msgFadeTime')
+local FadeDelay = Reader('fadeDelay')
 
-local MsgFontSize = NumReader('fontSize')
-local EditFontSize = NumReader('editFontSize')
-local TabFontSize = NumReader('tabFontSize')
-local SelectedAlpha = NumReader('selectedAlpha')
-local DockedAlpha = NumReader('dockedAlpha')
-local BorderThickness = NumReader('borderThickness')
-local InsetX = NumReader('insetX')
-local InsetTop = NumReader('insetTop')
-local InsetBottom = NumReader('insetBottom')
-local EditBoxHeight = NumReader('editboxHeight')
-local ScrollLines = NumReader('scrollLines')
-local MsgFadeTime = NumReader('msgFadeTime')
-local FadeDelay = NumReader('fadeDelay')
+local BGTexture = Reader('bgTexture')
+local TabStyle = Reader('tabStyle')
+local MsgFlags = Reader('fontFlags')
+local TabFlags = Reader('tabFontFlags')
 
-local BGTexture = StrReader('bgTexture')
+local FontShadow = Reader('fontShadow')
+local TabUppercase = Reader('tabUppercase')
+local TabFlash = Reader('tabFlash')
+local HideLogTab = Reader('hideLogTab')
+local EditHistory = Reader('editHistory')
+local DragToMove = Reader('dragToMove')
+local MsgFade = Reader('msgFade')
+local FadeEnabled = Reader('mouseoverFade')
+local SizerEnabled = Reader('showSizer')
+local HideButtons = Reader('hideButtons')
+local HideVoiceButtons = Reader('hideVoiceButtons')
+local ShowCopyButton = Reader('showCopyButton')
+local Locked = Reader('locked')
 
-local FontShadow = BoolReader('fontShadow')
-local TabUppercase = BoolReader('tabUppercase')
-local TabFlash = BoolReader('tabFlash', true)
-local HideLogTab = BoolReader('hideLogTab')
-local EditHistory = BoolReader('editHistory', true)
-local DragToMove = BoolReader('dragToMove', true)
-local MsgFade = BoolReader('msgFade')
-local FadeEnabled = BoolReader('mouseoverFade')
-local SizerEnabled = BoolReader('showSizer', true)
-local HideButtons = BoolReader('hideButtons', true)
-local HideVoiceButtons = BoolReader('hideVoiceButtons', true)
-local ShowCopyButton = BoolReader('showCopyButton', true)
-local Locked = BoolReader('locked')
-
-local function MsgFlags() local config = GetConfig(); return (config and config.fontFlags) or '' end
-local function TabFlags() local config = GetConfig(); return (config and config.tabFontFlags) or '' end
 local function EditBoxPos()
-	local config = GetConfig()
-	local position = (config and config.editboxPosition) or DEFAULTS.editboxPosition
+	local position = GetConfig().editboxPosition
 	if position == 'BELOW' then return 'BOTTOM' elseif position == 'ABOVE' then return 'TOP' end
 	return position
 end
 
-local function SetFontSafe(fontString, font, size, flags)
-	if fontString and font then fontString:SetFont(font, size, flags or '') end
-end
-
 local function ApplyShadow(fontObject)
-	if not fontObject or not fontObject.SetShadowColor then return end
 	if FontShadow() then
 		fontObject:SetShadowColor(0, 0, 0, 1); fontObject:SetShadowOffset(1, -1)
 	else
@@ -221,39 +182,47 @@ local function ApplyShadow(fontObject)
 	end
 end
 
-local function HideTexture(texture)
-	if not texture then return end
-	if texture.SetTexture then texture:SetTexture(nil) end
-	if texture.SetAtlas then texture:SetAtlas(nil) end
-	if texture.SetAlpha then texture:SetAlpha(0) end
+local function ApplyChatFont(chatFrame, size)
+	chatFrame:SetFont(ResolveFont(), size or MsgFontSize(), MsgFlags())
 end
 
+local function HideTexture(texture)
+	if not texture then return end
+	texture:SetTexture(nil)
+	texture:SetAtlas(nil)
+	texture:SetAlpha(0)
+end
+
+local function StayHidden(frame, flag, shouldHide)
+	if frame[flag] then return end
+	frame[flag] = true
+	local function Reassert(shownFrame) if shouldHide(shownFrame) then shownFrame:Hide() end end
+	Hook(frame, 'Show', Reassert)
+	Hook(frame, 'SetShown', function(shownFrame, shown) if shown then Reassert(shownFrame) end end)
+end
+
+local function Always() return true end
+local function WantsHidden(frame) return frame._buiWantHidden end
+
 local function ManageHidden(frame, shouldHide)
-	if not frame then return end
-	if not frame._buiManageHook then
-		frame._buiManageHook = true
-		Hook(frame, 'Show', function(shownFrame) if shownFrame._buiWantHidden then shownFrame:Hide() end end)
-		Hook(frame, 'SetShown', function(shownFrame, shown) if shown and shownFrame._buiWantHidden then shownFrame:Hide() end end)
-	end
+	StayHidden(frame, '_buiManageHook', WantsHidden)
 	frame._buiWantHidden = shouldHide
 	if shouldHide then frame:Hide() else frame:Show() end
 end
 
 local HIDDEN_PARENT = CreateFrame('Frame')
 HIDDEN_PARENT:Hide()
-local function KillShow(frame) frame:Hide() end
 local function Kill(frame)
 	if not frame or frame._buiKilled then return end
-	frame._buiKilled = true
-	if frame.UnregisterAllEvents then frame:UnregisterAllEvents() end
+	frame:UnregisterAllEvents()
 	frame:Hide()
-	Hook(frame, 'Show', KillShow)
-	if frame.SetParent then frame:SetParent(HIDDEN_PARENT) end
+	StayHidden(frame, '_buiKilled', Always)
+	frame:SetParent(HIDDEN_PARENT)
 end
 
 local function NormalizeGeometry(chat)
 	local left, bottom = chat:GetLeft(), chat:GetBottom()
-	if not left or not bottom or (issecretvalue and (issecretvalue(left) or issecretvalue(bottom))) then return end
+	if not left or not bottom or issecretvalue(left) or issecretvalue(bottom) then return end
 	local pixel = BUI.Pixel.PixelSizeFor(chat, 1)
 	local width, height = chat:GetSize()
 	local restoring = chat._buiRestoringGeo
@@ -264,23 +233,25 @@ local function NormalizeGeometry(chat)
 	chat._buiRestoringGeo = restoring
 end
 
+local function RecordGeometry(chat, geometry)
+	geometry.w, geometry.h = chat:GetSize()
+	local point, _, relativePoint, x, y = chat:GetPoint(1)
+	geometry.point, geometry.relPoint, geometry.x, geometry.y = point, relativePoint, x, y
+end
+
 local function SaveGeometry(chat)
 	if chat:GetNumPoints() > 1 then return end
 	NormalizeGeometry(chat)
 	local db = BUI.GetDB()
 	db.chatGeometry = db.chatGeometry or {}
-	local geometry = db.chatGeometry
-	geometry.w, geometry.h = chat:GetSize()
-	local point, _, relativePoint, x, y = chat:GetPoint(1)
-	geometry.point, geometry.relPoint, geometry.x, geometry.y = point, relativePoint, x, y
-	if _G.FCF_SavePositionAndDimensions then _G.FCF_SavePositionAndDimensions(chat) end
-	if chat.SetClampRectInsets then chat:SetClampRectInsets(0, 0, 0, 0) end
-	if BUI.Datatext and BUI.Datatext.Apply then BUI.Datatext.Apply() end
+	RecordGeometry(chat, db.chatGeometry)
+	FCF_SavePositionAndDimensions(chat)
+	chat:SetClampRectInsets(0, 0, 0, 0)
+	BUI.Datatext.Apply()
 end
 
 local function GeometryMatches()
-	local chat = _G.ChatFrame1
-	if not chat then return true end
+	local chat = ChatFrame1
 	local geometry = BUI.GetDB().chatGeometry
 	if not geometry or not geometry.w then return true end
 	if chat:GetNumPoints() ~= 1 then return false end
@@ -288,61 +259,50 @@ local function GeometryMatches()
 	if point ~= geometry.point or relativePoint ~= (geometry.relPoint or geometry.point) or relativeTo ~= UIParent then return false end
 	local width, height = chat:GetSize()
 	return math.abs(width - geometry.w) < 0.5 and math.abs(height - geometry.h) < 0.5
-		and math.abs((x or 0) - (geometry.x or 0)) < 0.5 and math.abs((y or 0) - (geometry.y or 0)) < 0.5
+		and math.abs(x - (geometry.x or 0)) < 0.5 and math.abs(y - (geometry.y or 0)) < 0.5
 end
 
 local function RestoreGeometry()
-	local chat = _G.ChatFrame1
-	if not chat then return end
+	local chat = ChatFrame1
 	chat._buiRestoringGeo = true
-	if chat.SetClampRectInsets then chat:SetClampRectInsets(0, 0, 0, 0) end
+	chat:SetClampRectInsets(0, 0, 0, 0)
 	local geometry = BUI.GetDB().chatGeometry
 	if not geometry or not geometry.w then chat._buiRestoringGeo = false return end
 	chat:SetUserPlaced(true)
-	if chat.SetClampRectInsets then chat:SetClampRectInsets(0, 0, 0, 0) end
 	chat:SetSize(geometry.w, geometry.h)
 	if geometry.point then
 		chat:ClearAllPoints()
 		chat:SetPoint(geometry.point, UIParent, geometry.relPoint or geometry.point, geometry.x or 0, geometry.y or 0)
 		NormalizeGeometry(chat)
-		geometry.w, geometry.h = chat:GetSize()
-		local point, _, relativePoint, x, y = chat:GetPoint(1)
-		geometry.point, geometry.relPoint, geometry.x, geometry.y = point, relativePoint, x, y
+		RecordGeometry(chat, geometry)
 	end
 	chat._buiRestoringGeo = false
 end
 
 local function NormalizeDock()
-	local dock = _G.GeneralDockManager
-	if not dock then return end
-	local chat = _G.ChatFrame1
+	local dock, chat = GeneralDockManager, ChatFrame1
 	local height = InsetTop()
-	if chat then
-		dock:ClearAllPoints()
-		dock:SetPoint('BOTTOMLEFT', chat, 'TOPLEFT', 0, 0)
-		dock:SetPoint('BOTTOMRIGHT', chat, 'TOPRIGHT', 0, 0)
-	end
+	dock:ClearAllPoints()
+	dock:SetPoint('BOTTOMLEFT', chat, 'TOPLEFT', 0, 0)
+	dock:SetPoint('BOTTOMRIGHT', chat, 'TOPRIGHT', 0, 0)
 	dock:SetHeight(height)
-	local level = ((chat and chat:GetFrameLevel()) or 5) + TAB_LEVEL_LIFT
+	local level = chat:GetFrameLevel() + TAB_LEVEL_LIFT
 	dock:SetFrameStrata(TAB_STRATA)
 	dock:SetFrameLevel(level)
-	local scrollFrame, scrollChild = _G.GeneralDockManagerScrollFrame, _G.GeneralDockManagerScrollFrameChild
-	if scrollFrame then
-		scrollFrame:SetHeight(height)
-		scrollFrame:SetFrameStrata(TAB_STRATA)
-		scrollFrame:SetFrameLevel(level + 1)
-	end
-	if scrollChild then
-		scrollChild:SetHeight(height)
-		scrollChild:SetFrameStrata(TAB_STRATA)
-		scrollChild:SetFrameLevel(level + 2)
-	end
+	local scrollFrame = dock.scrollFrame
+	scrollFrame:SetHeight(height)
+	scrollFrame:SetFrameStrata(TAB_STRATA)
+	scrollFrame:SetFrameLevel(level + 1)
+	local scrollChild = scrollFrame.child
+	scrollChild:SetHeight(height)
+	scrollChild:SetFrameStrata(TAB_STRATA)
+	scrollChild:SetFrameLevel(level + 2)
 	for tabIndex = 1, #skinnedTabs do LiftTab(skinnedTabs[tabIndex], level + 3) end
 end
 
-_G.StaticPopupDialogs['BUI_CHAT_URL'] = {
+StaticPopupDialogs['BUI_CHAT_URL'] = {
 	text = 'Press Ctrl+C to copy the link:',
-	button1 = _G.CLOSE or 'Close',
+	button1 = CLOSE,
 	hasEditBox = true,
 	editBoxWidth = 350,
 	timeout = 0,
@@ -351,14 +311,14 @@ _G.StaticPopupDialogs['BUI_CHAT_URL'] = {
 	preferredIndex = 3,
 	OnShow = function(self, data)
 		local editBox = self.editBox or (self.GetEditBox and self:GetEditBox())
-		if editBox then editBox:SetText(data or ''); editBox:SetFocus(); editBox:HighlightText() end
+		if editBox then editBox:SetText(data); editBox:SetFocus(); editBox:HighlightText() end
 	end,
 	EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
 	EditBoxOnEnterPressed = function(self) self:GetParent():Hide() end,
 }
 
 local function ShowURLPopup(url)
-	_G.StaticPopup_Show('BUI_CHAT_URL', nil, nil, url)
+	StaticPopup_Show('BUI_CHAT_URL', nil, nil, url)
 end
 
 local urlRefHooked
@@ -384,7 +344,7 @@ end
 
 local function LinkifyURLs(text, config)
 	if not (find(text, '://', 1, true) or find(text, 'www.', 1, true) or find(text, '/', 1, true)) then return text end
-	local color = (config and config.urlColor) or DEFAULTS.urlColor
+	local color = config.urlColor
 	local wrap = '|cff' .. BUI.Hex(color[1], color[2], color[3]) .. '|Hurl:%1|h[%1]|h|r'
 	if not find(text, '|', 1, true) then return LinkifyPlain(text, wrap) end
 
@@ -423,10 +383,10 @@ local function LinkifyURLs(text, config)
 end
 
 local function ProcessChannels(text, config)
-	if config and config.hideChannelNumbers then
+	if config.hideChannelNumbers then
 		text = gsub(text, '(%[)%d+%.%s*', '%1')
 	end
-	if config and config.abbreviateChannels then
+	if config.abbreviateChannels then
 		text = gsub(text, '%[(%d*%.?%s*)([%a]+)%s*%-%s*[^%]]-%]', '[%1%2]')
 		for fullName, abbreviation in pairs(CHANNEL_ABBR) do
 			text = gsub(text, '(%[%d*%.?%s*)' .. fullName .. '%]', '%1' .. abbreviation .. ']')
@@ -454,17 +414,16 @@ local function HookAddMessage(frame)
 	if frame._buiAddMessage then return end
 	frame._buiAddMessage = true
 	Hook(frame, 'AddMessage', function(self, text)
-		if Enabled() and self ~= _G.ChatFrame2 and type(text) == 'string' and not issecretvalue(text) and text ~= '' then
-			local buffer = self.historyBuffer
-			local entry = buffer and buffer.GetEntryAtIndex and buffer:GetEntryAtIndex(1)
+		if Enabled() and self ~= ChatFrame2 and type(text) == 'string' and not issecretvalue(text) and text ~= '' then
+			local entry = self.historyBuffer:GetEntryAtIndex(1)
 			if entry and entry.message == text then
 				local config = GetConfig()
 				local newText = ProcessChannels(text, config)
-				if not config or config.urlCopy ~= false then newText = LinkifyURLs(newText, config) end
-				if config and config.timestamps then
-					local stampFormat = config.timestampFormat or DEFAULTS.timestampFormat
+				if config.urlCopy then newText = LinkifyURLs(newText, config) end
+				if config.timestamps then
+					local stampFormat = config.timestampFormat
 					if ValidStampFormat(stampFormat) then
-						local stampColor = config.timestampColor or DEFAULTS.timestampColor
+						local stampColor = config.timestampColor
 						newText = '|cff' .. BUI.Hex(stampColor[1], stampColor[2], stampColor[3]) .. date(stampFormat) .. '|r ' .. newText
 					end
 				end
@@ -488,6 +447,72 @@ local function StripEscapes(text)
 	return text
 end
 
+local function Clamp01(value)
+	if value < 0 then return 0 elseif value > 1 then return 1 end
+	return value
+end
+
+local function CreateScrollBar(parent, label, model)
+	local bar = CreateFrame('Frame', nil, parent)
+	bar:SetWidth(4)
+	local track = bar:CreateTexture(nil, 'ARTWORK')
+	track:SetAllPoints()
+	track:SetColorTexture(1, 1, 1, 0.05)
+
+	local thumb = CreateFrame('Frame', nil, bar)
+	thumb:SetPoint('LEFT'); thumb:SetPoint('RIGHT'); thumb:SetPoint('TOP')
+	thumb:SetHeight(20)
+	thumb:EnableMouse(true)
+	thumb:RegisterForDrag('LeftButton')
+	local thumbTexture = thumb:CreateTexture(nil, 'OVERLAY')
+	thumbTexture:SetAllPoints()
+	local function ThumbColor(accent)
+		if accent or model.accentIdle then
+			thumbTexture:SetColorTexture(theme.GetAccent())
+		else
+			thumbTexture:SetColorTexture(0.65, 0.65, 0.7, 1)
+		end
+		thumbTexture:SetAlpha(accent and 0.9 or 0.55)
+	end
+	ThumbColor(false)
+
+	local function PlaceThumb(fraction, usable)
+		thumb:ClearAllPoints()
+		thumb:SetPoint('LEFT'); thumb:SetPoint('RIGHT')
+		thumb:SetPoint('TOP', bar, 'TOP', 0, -fraction * usable)
+	end
+
+	local function Update()
+		local trackHeight = bar:GetHeight()
+		local unchanged = model.Unchanged and model.Unchanged(trackHeight)
+		if unchanged and not thumb._drag then return end
+		if trackHeight <= 1 then thumb:Hide() return end
+		local ratio, fraction = model.Read()
+		if not ratio then thumb:Hide() return end
+		thumb:Show()
+		local thumbHeight = max(model.minThumb, min(trackHeight, trackHeight * ratio))
+		thumb:SetHeight(thumbHeight)
+		if not thumb._drag then PlaceThumb(fraction, trackHeight - thumbHeight) end
+	end
+	bar._update = Update
+
+	thumb:SetScript('OnEnter', BUI.Profiler.Script(label .. ' thumb OnEnter', function() ThumbColor(true) end))
+	thumb:SetScript('OnLeave', BUI.Profiler.Script(label .. ' thumb OnLeave', function() if not thumb._drag then ThumbColor(false) end end))
+	thumb:SetScript('OnDragStart', BUI.Profiler.Script(label .. ' thumb OnDragStart', function(self) self._drag = true; ThumbColor(true) end))
+	thumb:SetScript('OnDragStop', BUI.Profiler.Script(label .. ' thumb OnDragStop', function(self) self._drag = false; ThumbColor(false); Update() end))
+	thumb:SetScript('OnUpdate', Wrap(label, function(self)
+		if not self._drag then return end
+		local trackHeight, thumbHeight = bar:GetHeight(), self:GetHeight()
+		local usable = trackHeight - thumbHeight
+		if usable <= 0 then return end
+		local _, cursorY = GetCursorPosition()
+		local fraction = Clamp01((bar:GetTop() - cursorY / bar:GetEffectiveScale() - thumbHeight / 2) / usable)
+		model.Seek(fraction)
+		PlaceThumb(fraction, usable)
+	end))
+	return bar
+end
+
 local function GetCopyWindow()
 	if copyWindow then return copyWindow end
 	local window = CreateFrame('Frame', 'BUI_ChatCopy', UIParent)
@@ -500,11 +525,11 @@ local function GetCopyWindow()
 	window:SetScript('OnDragStart', BUI.Profiler.Script('Skin.Chat window OnDragStart', window.StartMoving))
 	window:SetScript('OnDragStop', BUI.Profiler.Script('Skin.Chat window OnDragStop', window.StopMovingOrSizing))
 	window:Hide()
-	if _G.UISpecialFrames then table.insert(_G.UISpecialFrames, 'BUI_ChatCopy') end
+	table.insert(UISpecialFrames, 'BUI_ChatCopy')
 	Skin3.Backdrop(window, { bg = { 0.05, 0.05, 0.05, 0.96 }, border = { 0, 0, 0, 1 } })
 
 	local title = window:CreateFontString(nil, 'OVERLAY')
-	SetFontSafe(title, BUILib.Font, 14, '')
+	title:SetFont(BUILib.Font, 14, '')
 	title:SetPoint('TOPLEFT', 14, -12)
 	title:SetText('Copy Chat')
 	title:SetTextColor(1, 1, 1)
@@ -513,7 +538,7 @@ local function GetCopyWindow()
 	close:SetSize(22, 22)
 	close:SetPoint('TOPRIGHT', -6, -6)
 	local closeGlyph = close:CreateFontString(nil, 'OVERLAY')
-	SetFontSafe(closeGlyph, BUILib.Font, 18, '')
+	closeGlyph:SetFont(BUILib.Font, 18, '')
 	closeGlyph:SetPoint('CENTER')
 	closeGlyph:SetText('×')
 	closeGlyph:SetTextColor(0.7, 0.7, 0.7)
@@ -530,15 +555,11 @@ local function GetCopyWindow()
 	editBox:SetMultiLine(true)
 	editBox:SetMaxLetters(0)
 	editBox:SetAutoFocus(false)
-	editBox:SetFontObject(_G.ChatFontNormal)
+	editBox:SetFontObject(ChatFontNormal)
 	editBox:SetWidth(540)
 	editBox:SetScript('OnEscapePressed', BUI.Profiler.Script('Skin.Chat editBox OnEscapePressed', function() window:Hide() end))
-	if _G.ScrollingEdit_OnTextChanged then
-		editBox:SetScript('OnTextChanged', BUI.Profiler.Script('Skin.Chat editBox OnTextChanged', function(self) _G.ScrollingEdit_OnTextChanged(self, self:GetParent()) end))
-	end
-	if _G.ScrollingEdit_OnCursorChanged then
-		editBox:SetScript('OnCursorChanged', _G.ScrollingEdit_OnCursorChanged)
-	end
+	editBox:SetScript('OnTextChanged', BUI.Profiler.Script('Skin.Chat editBox OnTextChanged', function(self) ScrollingEdit_OnTextChanged(self, self:GetParent()) end))
+	editBox:SetScript('OnCursorChanged', ScrollingEdit_OnCursorChanged)
 	scroll:SetScrollChild(editBox)
 	window.editBox = editBox
 
@@ -564,7 +585,7 @@ local function GetCopyWindow()
 		if now - clicks[#clicks] < 0.5 then
 			local triple = clicks[#clicks] - clicks[#clicks - 1] < 0.5
 			local cursorPosition = self:GetCursorPosition()
-			local text = self:GetText() or ''
+			local text = self:GetText()
 			local startPos, endPos
 			if triple then
 				startPos, endPos = Expand(text, cursorPosition, '\n')
@@ -580,65 +601,28 @@ local function GetCopyWindow()
 		if #clicks > 3 then tremove(clicks, 1) end
 	end))
 
-	local bar = CreateFrame('Frame', nil, window)
-	bar:SetWidth(4)
+	local bar = CreateScrollBar(window, 'Skin.Chat copy scrollbar', {
+		minThumb = 20,
+		accentIdle = true,
+		Read = function()
+			local range = scroll:GetVerticalScrollRange()
+			if range <= 1 then return end
+			local viewHeight = scroll:GetHeight()
+			return viewHeight / (viewHeight + range), Clamp01(scroll:GetVerticalScroll() / range)
+		end,
+		Seek = function(fraction)
+			scroll:SetVerticalScroll(fraction * scroll:GetVerticalScrollRange())
+		end,
+	})
 	bar:SetPoint('TOPLEFT', scroll, 'TOPRIGHT', 6, 0)
 	bar:SetPoint('BOTTOMLEFT', scroll, 'BOTTOMRIGHT', 6, 0)
-	local track = bar:CreateTexture(nil, 'ARTWORK')
-	track:SetAllPoints()
-	track:SetColorTexture(1, 1, 1, 0.05)
-	local thumb = CreateFrame('Frame', nil, bar)
-	thumb:SetPoint('LEFT'); thumb:SetPoint('RIGHT'); thumb:SetPoint('TOP')
-	thumb:SetHeight(20)
-	thumb:EnableMouse(true)
-	thumb:RegisterForDrag('LeftButton')
-	local thumbTexture = thumb:CreateTexture(nil, 'OVERLAY')
-	thumbTexture:SetAllPoints()
-	thumbTexture:SetColorTexture(theme.GetAccent())
-	thumbTexture:SetAlpha(0.55)
+	window._bar = bar
 
-	local function UpdateCopyBar()
-		local range = scroll:GetVerticalScrollRange() or 0
-		local trackHeight = bar:GetHeight() or 0
-		if range <= 1 or trackHeight <= 1 then thumb:Hide(); return end
-		thumb:Show()
-		local viewHeight = scroll:GetHeight() or 1
-		local thumbHeight = max(20, min(trackHeight, trackHeight * (viewHeight / (viewHeight + range))))
-		thumb:SetHeight(thumbHeight)
-		if not thumb._drag then
-			local fraction = min(1, max(0, (scroll:GetVerticalScroll() or 0) / range))
-			thumb:ClearAllPoints()
-			thumb:SetPoint('LEFT'); thumb:SetPoint('RIGHT')
-			thumb:SetPoint('TOP', bar, 'TOP', 0, -fraction * (trackHeight - thumbHeight))
-		end
-	end
-	window._updateBar = UpdateCopyBar
-
-	scroll:SetScript('OnScrollRangeChanged', Wrap('Skin.Chat copy bar', UpdateCopyBar))
-	scroll:SetScript('OnVerticalScroll', Wrap('Skin.Chat copy bar', UpdateCopyBar))
+	scroll:SetScript('OnScrollRangeChanged', Wrap('Skin.Chat copy bar', bar._update))
+	scroll:SetScript('OnVerticalScroll', Wrap('Skin.Chat copy bar', bar._update))
 	scroll:SetScript('OnMouseWheel', BUI.Profiler.Script('Skin.Chat scroll OnMouseWheel', function(self, delta)
-		local range = self:GetVerticalScrollRange() or 0
-		self:SetVerticalScroll(min(max(0, (self:GetVerticalScroll() or 0) - delta * 40), range))
-	end))
-
-	thumb:SetScript('OnEnter', BUI.Profiler.Script('Skin.Chat thumb OnEnter', function() thumbTexture:SetAlpha(0.9) end))
-	thumb:SetScript('OnLeave', BUI.Profiler.Script('Skin.Chat thumb OnLeave', function() if not thumb._drag then thumbTexture:SetAlpha(0.55) end end))
-	thumb:SetScript('OnDragStart', BUI.Profiler.Script('Skin.Chat thumb OnDragStart', function(self) self._drag = true; thumbTexture:SetAlpha(0.9) end))
-	thumb:SetScript('OnDragStop', BUI.Profiler.Script('Skin.Chat thumb OnDragStop', function(self) self._drag = false; thumbTexture:SetAlpha(0.55); UpdateCopyBar() end))
-	thumb:SetScript('OnUpdate', Wrap('Skin.Chat copy scrollbar', function(self)
-		if not self._drag then return end
-		local trackHeight = bar:GetHeight() or 0
-		local thumbHeight = self:GetHeight() or 20
-		local usable = trackHeight - thumbHeight
-		if usable <= 0 then return end
-		local scale = bar:GetEffectiveScale()
-		local _, cursorY = GetCursorPosition()
-		local relativeY = (bar:GetTop() or 0) - cursorY / scale - thumbHeight / 2
-		local fraction = min(1, max(0, relativeY / usable))
-		scroll:SetVerticalScroll(fraction * (scroll:GetVerticalScrollRange() or 0))
-		self:ClearAllPoints()
-		self:SetPoint('LEFT'); self:SetPoint('RIGHT')
-		self:SetPoint('TOP', bar, 'TOP', 0, -fraction * usable)
+		local range = self:GetVerticalScrollRange()
+		self:SetVerticalScroll(min(max(0, self:GetVerticalScroll() - delta * 40), range))
 	end))
 
 	copyWindow = window
@@ -646,16 +630,13 @@ local function GetCopyWindow()
 end
 
 local function CopyChat(frame)
-	frame = frame or _G.ChatFrame1
-	if not frame or not frame.GetNumMessages then return end
 	local lines = {}
 	for messageIndex = 1, frame:GetNumMessages() do
-		local info = frame:GetMessageInfo(messageIndex)
-		local message = type(info) == 'table' and info.message or info
+		local message, red, green, blue = frame:GetMessageInfo(messageIndex)
 		if type(message) == 'string' and not issecretvalue(message) and message ~= '' then
 			message = StripEscapes(message)
-			if type(info) == 'table' and type(info.r) == 'number' and type(info.g) == 'number' and type(info.b) == 'number' then
-				message = '|cff' .. BUI.Hex(info.r, info.g, info.b) .. message .. '|r'
+			if type(red) == 'number' and type(green) == 'number' and type(blue) == 'number' then
+				message = '|cff' .. BUI.Hex(red, green, blue) .. message .. '|r'
 			end
 			lines[#lines + 1] = message
 		end
@@ -666,7 +647,7 @@ local function CopyChat(frame)
 	window.editBox:SetCursorPosition(0)
 	window.editBox:HighlightText()
 	window.editBox:SetFocus()
-	if window._updateBar then After('Skin.Chat copy bar', 0, window._updateBar) end
+	After('Skin.Chat copy bar', 0, window._bar._update)
 end
 
 local function GetHistory()
@@ -686,42 +667,34 @@ local function PushHistory(text)
 end
 
 local function SetupEditHistory(editBox)
-	if not editBox or editBox._buiHist then return end
+	if editBox._buiHist then return end
 	editBox._buiHist = true
-	if editBox.SetAltArrowKeyMode then editBox:SetAltArrowKeyMode(false) end
-
-	if editBox.AddHistoryLine then
-		Hook(editBox, 'AddHistoryLine', function(self, text)
-			if not (Enabled() and EditHistory()) then return end
-			PushHistory(text)
-			self._histIdx = nil
-		end)
-	end
+	editBox:SetAltArrowKeyMode(false)
 
 	editBox:HookScript('OnKeyDown', BUI.Profiler.Wrap('Skin.Chat editBox OnKeyDown', function(self, key)
-		if C_ChatInfo and C_ChatInfo.InChatMessagingLockdown and C_ChatInfo.InChatMessagingLockdown() then return end
+		if C_ChatInfo.InChatMessagingLockdown() then return end
 		if not (Enabled() and EditHistory()) then return end
 		local history = GetHistory()
 		local historyCount = #history
 		if historyCount == 0 then return end
 		if key == 'UP' then
 			if self._histIdx == nil then
-				self._histTop = self:GetText() or ''
+				self._histTop = self:GetText()
 				self._histIdx = historyCount
 			elseif self._histIdx > 1 then
 				self._histIdx = self._histIdx - 1
 			else
 				return
 			end
-			self:SetText(history[self._histIdx] or '')
+			self:SetText(history[self._histIdx])
 		elseif key == 'DOWN' then
 			if self._histIdx == nil then return end
 			if self._histIdx < historyCount then
 				self._histIdx = self._histIdx + 1
-				self:SetText(history[self._histIdx] or '')
+				self:SetText(history[self._histIdx])
 			else
 				self._histIdx = nil
-				self:SetText(self._histTop or '')
+				self:SetText(self._histTop)
 			end
 		end
 	end))
@@ -731,72 +704,51 @@ end
 
 local historyHooked
 local function HookHistoryCapture()
-	if historyHooked or not _G.ChatEdit_SendText then return end
+	if historyHooked then return end
 	historyHooked = true
 	Hook('ChatEdit_SendText', function(editBox, addHistory)
 		if not (addHistory and Enabled() and EditHistory()) then return end
-		if editBox and editBox.GetText then
-			local text = editBox:GetText()
-			if issecretvalue(text) then return end
-			if strtrim then text = strtrim(text) end
-			PushHistory(text)
-		end
+		local text = editBox:GetText()
+		if issecretvalue(text) then return end
+		editBox._histIdx = nil
+		PushHistory(strtrim(text))
 	end)
 end
 
 local function IsTabSelected(tab)
-	local dock = _G.GeneralDockManager
-	return dock and dock.selected == tab._buiChat
-end
-
-local function SetTabTextColor(text, red, green, blue)
-	text:SetTextColor(red, green, blue)
-end
-
-local function TabStyle()
-	local config = GetConfig()
-	return (config and config.tabStyle) or DEFAULTS.tabStyle
+	return GeneralDockManager.selected == tab._buiChat
 end
 
 local function ApplyTabColor(tab, selected)
-	local text = tab and tab._buiText
-	if not text then return end
+	local text = tab._buiText
 	local style = TabStyle()
 	local red, green, blue = SelectedColor()
 	if selected then
-		if style == 'TEXT' then SetTabTextColor(text, red, green, blue) else SetTabTextColor(text, 1, 1, 1) end
+		if style == 'TEXT' then text:SetTextColor(red, green, blue) else text:SetTextColor(1, 1, 1) end
 	else
-		SetTabTextColor(text, InactiveColor())
+		text:SetTextColor(InactiveColor())
 	end
 	local showLine = selected and style ~= 'TEXT'
-	if tab._buiLine then
-		tab._buiLine:SetColorTexture(red, green, blue, 1)
-		tab._buiLine:SetShown(showLine)
-	end
-	if tab._buiGlow then
-		tab._buiGlow:SetGradient('VERTICAL', CreateColor(red, green, blue, TAB_GLOW_ALPHA), CreateColor(red, green, blue, 0))
-		tab._buiGlow:SetShown(showLine)
-	end
-	if tab._buiFill then
-		if style == 'FILL' then
-			if selected then
-				tab._buiFill:SetColorTexture(red, green, blue, TAB_FILL_SELECTED_ALPHA)
-			else
-				tab._buiFill:SetColorTexture(0, 0, 0, TAB_FILL_IDLE_ALPHA)
-			end
-			tab._buiFill:Show()
+	tab._buiLine:SetColorTexture(red, green, blue, 1)
+	tab._buiLine:SetShown(showLine)
+	tab._buiGlow:SetGradient('VERTICAL', CreateColor(red, green, blue, TAB_GLOW_ALPHA), CreateColor(red, green, blue, 0))
+	tab._buiGlow:SetShown(showLine)
+	if style == 'FILL' then
+		if selected then
+			tab._buiFill:SetColorTexture(red, green, blue, TAB_FILL_SELECTED_ALPHA)
 		else
-			tab._buiFill:Hide()
+			tab._buiFill:SetColorTexture(0, 0, 0, TAB_FILL_IDLE_ALPHA)
 		end
+		tab._buiFill:Show()
+	else
+		tab._buiFill:Hide()
 	end
 end
 
 local function DesiredTabAlpha(tab)
 	if tab._buiCollapsed then return 0 end
 	local chat = tab._buiChat
-	if not chat then return fadeState.alpha end
-	local selected = _G.GeneralDockManager and _G.GeneralDockManager.selected
-	local base = (not chat.isDocked or chat == selected or tab._buiPulse) and SelectedAlpha() or DockedAlpha()
+	local base = (not chat.isDocked or chat == GeneralDockManager.selected or tab._buiPulse) and SelectedAlpha() or DockedAlpha()
 	return base * fadeState.alpha
 end
 
@@ -804,7 +756,7 @@ local function ApplyTabAlpha(tab)
 	tab:SetAlpha(DesiredTabAlpha(tab), true)
 end
 
-function Skin.CollapseChatTab(tab, collapsed)
+local function CollapseChatTab(tab, collapsed)
 	if not tab then return end
 	collapsed = collapsed and true or false
 	if tab._buiCollapsed == collapsed then return end
@@ -812,8 +764,7 @@ function Skin.CollapseChatTab(tab, collapsed)
 	tab:EnableMouse(not collapsed)
 	if collapsed then tab:SetWidth(1) end
 	ApplyTabAlpha(tab)
-	local dock = _G.GeneralDockManager
-	if dock and _G.FCFDock_UpdateTabs then _G.FCFDock_UpdateTabs(dock, true) end
+	FCFDock_UpdateTabs(GeneralDockManager, true)
 end
 
 local function TabAlphaHook(tab, _, skip)
@@ -823,21 +774,20 @@ local function TabAlphaHook(tab, _, skip)
 end
 
 local function BlankTabTexture(texture)
-	if not texture or texture._buiOwned or not texture.SetTexture then return end
+	if not texture or texture._buiOwned then return end
 	texture:SetTexture(nil)
-	if texture.SetAtlas then texture:SetAtlas(nil) end
+	texture:SetAtlas(nil)
 	texture:SetAlpha(0)
 end
 
 local function StripTabRegions(tab)
-	if not tab.GetRegions then return end
 	for regionIndex = 1, select('#', tab:GetRegions()) do
 		local region = select(regionIndex, tab:GetRegions())
-		if region ~= tab._buiText and region.IsObjectType and region:IsObjectType('Texture') then
+		if region ~= tab._buiText and region:IsObjectType('Texture') then
 			BlankTabTexture(region)
 		end
 	end
-	if tab.GetHighlightTexture then BlankTabTexture(tab:GetHighlightTexture()) end
+	BlankTabTexture(tab:GetHighlightTexture())
 end
 
 local function EnsureTabArt(tab)
@@ -873,21 +823,19 @@ local function EnsureTabArt(tab)
 end
 
 local function StyleTab(tab)
-	if not tab or not tab._buiText then return end
 	local text = tab._buiText
 	StripTabRegions(tab)
 	EnsureTabArt(tab)
 	tab:SetHeight(InsetTop())
-	SetFontSafe(text, ResolveFont(), TabFontSize(), TabFlags())
-	if text.SetWordWrap then text:SetWordWrap(false) end
-	if text.SetJustifyH then text:SetJustifyH('CENTER') end
+	text:SetFont(ResolveFont(), TabFontSize(), TabFlags())
+	text:SetWordWrap(false)
+	text:SetJustifyH('CENTER')
 	local chat = tab._buiChat
-	if TabUppercase() and not (chat and chat.isTemporary) then
-		local tabText = text:GetText()
-		if tabText and not issecretvalue(tabText) then
-			local uppercased = upper(tabText)
-			if uppercased ~= tabText then text:SetText(uppercased) end
-		end
+	local tabText = text:GetText()
+	if tabText and not issecretvalue(tabText) then
+		if text._buiName == nil or upper(text._buiName) ~= tabText then text._buiName = tabText end
+		local wanted = (TabUppercase() and not chat.isTemporary) and upper(text._buiName) or text._buiName
+		if wanted ~= tabText then text:SetText(wanted) end
 	end
 	text:ClearAllPoints()
 	text:SetPoint('CENTER', tab, 'CENTER', 0, 0)
@@ -898,29 +846,27 @@ local function StyleTab(tab)
 end
 
 local function TabOf(chatFrame)
-	if not chatFrame then return nil end
-	return chatFrame.tab or (chatFrame.GetName and _G[chatFrame:GetName() .. 'Tab'])
+	return chatFrame.tab or _G[chatFrame:GetName() .. 'Tab']
+end
+
+local function EditBoxOf(chatFrame)
+	return chatFrame.editBox or _G[chatFrame:GetName() .. 'EditBox']
 end
 
 local function AlignDockTabs(dock)
 	if not Enabled() then return end
-	if not dock or dock ~= _G.GeneralDockManager then return end
+	if dock ~= GeneralDockManager then return end
 	if not dock:IsVisible() then return end
-	if not dock.isDirty and dock:GetScript('OnUpdate') and dock.scrollFrame and dock.scrollFrame:GetRight() and _G.FCFDock_SetDirty then
-		_G.FCFDock_SetDirty(dock)
-	end
-	local frames = dock.DOCKED_CHAT_FRAMES
-	if not frames then return end
-	for _, chatFrame in ipairs(frames) do
+	for _, chatFrame in ipairs(dock.DOCKED_CHAT_FRAMES) do
 		local tab = TabOf(chatFrame)
-		if tab and tab._buiChat then
+		if tab._buiChat then
 			local point, relativeTo, relativePoint, x, y = tab:GetPoint(1)
 			if point == 'LEFT' and y and y ~= 0 then
-				tab:SetPoint(point, relativeTo, relativePoint, x or 0, 0)
+				tab:SetPoint(point, relativeTo, relativePoint, x, 0)
 			end
 			if tab._buiCollapsed then
 				tab:SetWidth(1)
-			elseif tab._buiText then
+			else
 				tab._buiText:SetWidth(max(1, tab:GetWidth() - TAB_TEXT_PAD * 2))
 			end
 		end
@@ -929,15 +875,14 @@ end
 
 local function RefreshTabs()
 	for tabIndex = 1, #skinnedTabs do StyleTab(skinnedTabs[tabIndex]) end
-	local dock = _G.GeneralDockManager
-	if dock and _G.FCFDock_UpdateTabs then _G.FCFDock_UpdateTabs(dock, true) end
+	FCFDock_UpdateTabs(GeneralDockManager, true)
 end
 
 local function SkinTab(tab, chat)
-	if not tab or tab._buiChatSkin then return end
+	if tab._buiChatSkin then return end
 	tab._buiChatSkin = true
 	tab._buiChat = chat
-	tab._buiText = tab.Text or (tab.GetName and _G[tab:GetName() .. 'Text'])
+	tab._buiText = tab.Text or _G[tab:GetName() .. 'Text']
 	skinnedTabs[#skinnedTabs + 1] = tab
 	tab:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Chat tab OnEnter', function()
 		if Enabled() then StartFader() end
@@ -945,13 +890,11 @@ local function SkinTab(tab, chat)
 	StyleTab(tab)
 	Hook(tab, 'SetAlpha', TabAlphaHook)
 	ApplyTabAlpha(tab)
-	local dock = _G.GeneralDockManager
-	LiftTab(tab, ((dock and dock:GetFrameLevel()) or 5) + 3)
+	LiftTab(tab, GeneralDockManager:GetFrameLevel() + 3)
 end
 
 local function PositionEditBox(chat)
-	local editBox = chat and (chat.editBox or _G[chat:GetName() .. 'EditBox'])
-	if not editBox then return end
+	local editBox = EditBoxOf(chat)
 	local position = EditBoxPos()
 	editBox:ClearAllPoints()
 	if position == 'TOP' then
@@ -971,25 +914,31 @@ local function PositionEditBox(chat)
 	editBox:SetClampedToScreen(true)
 end
 
+local function StyleEditBox(editBox)
+	editBox:SetFont(ResolveFont(), EditFontSize(), '')
+	editBox:SetTextColor(1, 1, 1)
+	ApplyShadow(editBox)
+	editBox:SetBackdropColor(EditBoxBGColor())
+	editBox:SetBackdropBorderColor(BorderColor())
+end
+
 local function SkinEditBox(editBox, chat)
-	if not editBox then return end
 	editBox._buiChat = chat
 	SetupEditHistory(editBox)
 	if editBox._buiChatSkin then PositionEditBox(chat); return end
 	editBox._buiChatSkin = true
 
 	local editBoxName = editBox:GetName()
-	HideTexture(editBoxName and _G[editBoxName .. 'Left'])
-	HideTexture(editBoxName and _G[editBoxName .. 'Mid'])
-	HideTexture(editBoxName and _G[editBoxName .. 'Right'])
+	HideTexture(_G[editBoxName .. 'Left'])
+	HideTexture(_G[editBoxName .. 'Mid'])
+	HideTexture(_G[editBoxName .. 'Right'])
 	HideTexture(editBox.focusLeft)
 	HideTexture(editBox.focusRight)
 	HideTexture(editBox.focusMid)
 
-	Skin3.Backdrop(editBox, { bg = { EditBoxBGColor() }, border = { BorderColor() } })
+	Skin3.Backdrop(editBox)
 	editBox:SetTextInsets(8, 8, 2, 2)
-	SetFontSafe(editBox, ResolveFont(), EditFontSize(), '')
-	editBox:SetTextColor(1, 1, 1)
+	StyleEditBox(editBox)
 	PositionEditBox(chat)
 
 	editBox:HookScript('OnShow', Wrap('Skin.Chat editbox position', function(self) PositionEditBox(self._buiChat) end))
@@ -999,15 +948,14 @@ end
 
 local function AnchorPanel()
 	if not chatPanel then return end
-	local chat = _G.ChatFrame1
-	if not chat then return end
+	local chat = ChatFrame1
 	chatPanel:ClearAllPoints()
 	chatPanel:SetPoint('BOTTOMLEFT', chat, 'BOTTOMLEFT', -InsetX(), -InsetBottom())
 	chatPanel:SetPoint('TOPRIGHT', chat, 'TOPRIGHT', InsetX() + SCROLL_GUTTER, InsetTop())
 end
 
 local function ApplyTopStrip()
-	if not chatPanel or not chatPanel._strip then return end
+	if not chatPanel then return end
 	local thickness = BorderThickness()
 	local strip = chatPanel._strip
 	strip:ClearAllPoints()
@@ -1017,7 +965,7 @@ local function ApplyTopStrip()
 end
 
 local function ApplyRightStrip()
-	if not chatPanel or not chatPanel._vstrip then return end
+	if not chatPanel then return end
 	local thickness = BorderThickness()
 	local verticalStrip = chatPanel._vstrip
 	verticalStrip:ClearAllPoints()
@@ -1025,19 +973,17 @@ local function ApplyRightStrip()
 	verticalStrip:SetPoint('TOPRIGHT', chatPanel, 'TOPRIGHT', -thickness, -(InsetTop() + thickness))
 	verticalStrip:SetPoint('BOTTOMRIGHT', chatPanel, 'BOTTOMRIGHT', -thickness, thickness)
 	local gutter = chatPanel._gutter
-	if gutter then
-		gutter:ClearAllPoints()
-		gutter:SetWidth(SCROLL_GUTTER)
-		gutter:SetPoint('TOPRIGHT', chatPanel, 'TOPRIGHT', -thickness, -(InsetTop() + thickness))
-		gutter:SetPoint('BOTTOMRIGHT', chatPanel, 'BOTTOMRIGHT', -thickness, thickness)
-	end
+	gutter:ClearAllPoints()
+	gutter:SetWidth(SCROLL_GUTTER)
+	gutter:SetPoint('TOPRIGHT', chatPanel, 'TOPRIGHT', -thickness, -(InsetTop() + thickness))
+	gutter:SetPoint('BOTTOMRIGHT', chatPanel, 'BOTTOMRIGHT', -thickness, thickness)
 end
 
 local function ApplyPanelFill()
 	if not panelSquare then return end
 	local red, green, blue, alpha = BGColor()
 	local textureName = BGTexture()
-	local path = (textureName and textureName ~= 'SOLID' and sharedMedia) and sharedMedia:Fetch('statusbar', textureName) or nil
+	local path = textureName ~= 'SOLID' and sharedMedia:Fetch('statusbar', textureName) or nil
 	if path then
 		panelSquare.fill:SetTexture(path)
 		panelSquare.fill:SetVertexColor(red, green, blue, alpha)
@@ -1056,8 +1002,7 @@ local function ApplyBorder()
 end
 
 local function UpdateCornerButtons()
-	local chat = _G.ChatFrame1
-	if not chat then return end
+	local chat = ChatFrame1
 	local gutter = chatPanel and chatPanel._gutter
 	local hovered = gutter and gutter:IsMouseOver()
 	local alpha = (hovered and 1 or 0.25) * (FadeEnabled() and fadeState.alpha or 1)
@@ -1074,7 +1019,13 @@ local function UpdateCornerButtons()
 	end
 end
 
-local function MakeCornerButton(chat, mediaKey, fallbackTexture)
+local function TouchFader()
+	fadeState.lastActive = GetTime()
+	StartFader()
+	UpdateCornerButtons()
+end
+
+local function MakeCornerButton(chat, mediaKey)
 	local button = CreateFrame('Button', nil, UIParent)
 	button:SetFrameStrata('MEDIUM')
 	button:SetSize(14, 14)
@@ -1082,14 +1033,12 @@ local function MakeCornerButton(chat, mediaKey, fallbackTexture)
 	button:SetAlpha(0.25)
 	local texture = button:CreateTexture(nil, 'ARTWORK')
 	texture:SetAllPoints()
-	texture:SetTexture(BUILib.GetLibMedia(mediaKey) or fallbackTexture)
+	texture:SetTexture(BUILib.GetLibMedia(mediaKey))
 	texture:SetVertexColor(BUTTON_IDLE[1], BUTTON_IDLE[2], BUTTON_IDLE[3], 1)
 	button._tex = texture
 	button:SetScript('OnEnter', BUI.Profiler.Script('Skin.Chat button OnEnter', function()
 		texture:SetVertexColor(theme.GetAccent())
-		fadeState.lastActive = GetTime()
-		StartFader()
-		UpdateCornerButtons()
+		TouchFader()
 	end))
 	button:SetScript('OnLeave', BUI.Profiler.Script('Skin.Chat button OnLeave', function()
 		texture:SetVertexColor(BUTTON_IDLE[1], BUTTON_IDLE[2], BUTTON_IDLE[3], 1)
@@ -1099,23 +1048,21 @@ local function MakeCornerButton(chat, mediaKey, fallbackTexture)
 end
 
 local function UpdateCopyButton()
-	local chat = _G.ChatFrame1
-	if not chat or not chat._buiCopy then return end
-	if ShowCopyButton() then chat._buiCopy:Show() else chat._buiCopy:Hide() end
+	local copy = ChatFrame1._buiCopy
+	if not copy then return end
+	if ShowCopyButton() then copy:Show() else copy:Hide() end
 end
 
 local function SkinPanel()
-	local chat = _G.ChatFrame1
-	if not chat or chatPanel then return end
+	if chatPanel then return end
+	local chat = ChatFrame1
 
 	local panel = CreateFrame('Frame', 'BUI_ChatPanel', UIParent)
 	panel:SetFrameStrata('BACKGROUND')
 	panel:SetFrameLevel(max(0, chat:GetFrameLevel() - 1))
 	chatPanel = panel
 	AnchorPanel()
-	After('Skin.Chat datatext apply', 0, function()
-		if BUI.Datatext and BUI.Datatext.Apply then BUI.Datatext.Apply() end
-	end)
+	After('Skin.Chat datatext apply', 0, BUI.Datatext.Apply)
 	panelSquare = Skin3.SquarePanel(panel, { bg = { BGColor() }, border = { BorderColor() } })
 
 	local strip = panel:CreateTexture(nil, 'BORDER')
@@ -1129,15 +1076,13 @@ local function SkinPanel()
 
 	local gutter = CreateFrame('Frame', nil, panel)
 	gutter:SetFrameStrata('BACKGROUND')
-	gutter:SetFrameLevel((panel:GetFrameLevel() or 0) + 1)
+	gutter:SetFrameLevel(panel:GetFrameLevel() + 1)
 	gutter:EnableMouse(true)
-	if gutter.SetPropagateMouseClicks then gutter:SetPropagateMouseClicks(true) end
+	gutter:SetPropagateMouseClicks(true)
 	panel._gutter = gutter
 	gutter:SetScript('OnEnter', BUI.Profiler.Script('Skin.Chat gutter OnEnter', function()
 		if not Enabled() then return end
-		fadeState.lastActive = GetTime()
-		StartFader()
-		UpdateCornerButtons()
+		TouchFader()
 	end))
 	gutter:SetScript('OnLeave', BUI.Profiler.Script('Skin.Chat gutter OnLeave', function()
 		if not Enabled() then return end
@@ -1145,31 +1090,31 @@ local function SkinPanel()
 	end))
 	ApplyRightStrip()
 
-	local cog = MakeCornerButton(chat, 'cog', 'Interface\\Buttons\\UI-OptionsButton')
+	local cog = MakeCornerButton(chat, 'cog')
 	cog:SetPoint('TOP', verticalStrip, 'TOP', 0, -3)
 	cog:SetScript('OnClick', BUI.Profiler.Script('Skin.Chat cog OnClick', function()
-		if BUI.PageEngine.EnsureLoaded() and BUI.SkinningPage and BUI.SkinningPage.OpenSkinSettings then
-			BUI.SkinningPage.OpenSkinSettings('chat')
+		if BUI.PageEngine.EnsureLoaded() then
+			BUI.PageEngine.Show()
+			BUI.PageEngine.NavigateToID('chat')
 		end
 	end))
 	chat._buiCog = cog
 
-	local copy = MakeCornerButton(chat, 'copy', 'Interface\\BUTTONS\\UI-GuildButton-PublicNote-Up')
+	local copy = MakeCornerButton(chat, 'copy')
 	copy:SetPoint('TOP', cog, 'BOTTOM', 0, -5)
 	copy:SetScript('OnClick', BUI.Profiler.Script('Skin.Chat copy OnClick', function()
 		local win = GetCopyWindow()
 		if win:IsShown() then
 			win:Hide()
 		else
-			CopyChat((_G.GeneralDockManager and _G.GeneralDockManager.selected) or _G.ChatFrame1)
+			CopyChat(GeneralDockManager.selected or ChatFrame1)
 		end
 	end))
 	chat._buiCopy = copy
 
-	local lock = MakeCornerButton(chat, 'lock', 'Interface\\Buttons\\LockButton-Locked-Up')
+	local lock = MakeCornerButton(chat, 'lock')
 	lock:SetPoint('TOP', copy, 'BOTTOM', 0, -5)
 	local function PaintLock(hovered)
-		if not lock._tex then return end
 		local red, green, blue = theme.GetAccent()
 		if hovered then
 			lock._tex:SetVertexColor(red, green, blue, 1)
@@ -1183,20 +1128,17 @@ local function SkinPanel()
 		lock._lockedTint = Locked() and true or false
 		PaintLock(lock:IsMouseOver())
 	end
+	lock.Refresh = UpdateLockIcon
 	lock:SetScript('OnEnter', BUI.Profiler.Script('Skin.Chat lock OnEnter', function()
 		PaintLock(true)
-		fadeState.lastActive = GetTime()
-		StartFader()
-		UpdateCornerButtons()
+		TouchFader()
 	end))
 	lock:SetScript('OnLeave', BUI.Profiler.Script('Skin.Chat lock OnLeave', function()
 		PaintLock(false)
 		UpdateCornerButtons()
 	end))
 	lock:SetScript('OnClick', BUI.Profiler.Script('Skin.Chat lock OnClick', function()
-		local config = GetConfig()
-		if not config then return end
-		config.locked = not Locked()
+		GetConfig().locked = not Locked()
 		UpdateLockIcon()
 		UpdateMover()
 		UpdateSizer()
@@ -1207,8 +1149,7 @@ end
 
 local function PositionMover()
 	if not mover then return end
-	local chat = _G.ChatFrame1
-	if not chat then return end
+	local chat = ChatFrame1
 	mover:ClearAllPoints()
 	mover:SetPoint('TOPLEFT', chat, 'TOPLEFT', -InsetX(), InsetTop())
 	mover:SetPoint('BOTTOMRIGHT', chat, 'TOPRIGHT', InsetX(), 0)
@@ -1221,11 +1162,11 @@ function UpdateMover()
 end
 
 local function CreateMover()
-	local chat = _G.ChatFrame1
-	if not chat or mover or not chatPanel then return end
+	if mover then return end
+	local chat = ChatFrame1
 	mover = CreateFrame('Frame', 'BUI_ChatMover', chatPanel)
 	mover:SetFrameStrata('BACKGROUND')
-	mover:SetFrameLevel((chatPanel:GetFrameLevel() or 0) + 2)
+	mover:SetFrameLevel(chatPanel:GetFrameLevel() + 2)
 	mover:RegisterForDrag('LeftButton')
 	local highlight = mover:CreateTexture(nil, 'ARTWORK')
 	highlight:SetAllPoints()
@@ -1235,8 +1176,8 @@ local function CreateMover()
 	mover:SetScript('OnEnter', BUI.Profiler.Script('Skin.Chat mover OnEnter', function(self) self._hl:SetAlpha(0.18) end))
 	mover:SetScript('OnLeave', BUI.Profiler.Script('Skin.Chat mover OnLeave', function(self) self._hl:SetAlpha(0) end))
 	mover:SetScript('OnDragStart', BUI.Profiler.Script('Skin.Chat mover OnDragStart', function()
-		if InCombatLockdown and InCombatLockdown() then return end
-		if chat.SetClampRectInsets then chat:SetClampRectInsets(0, 0, 0, 0) end
+		if InCombatLockdown() then return end
+		chat:SetClampRectInsets(0, 0, 0, 0)
 		chat:SetMovable(true)
 		chat:StartMoving()
 	end))
@@ -1248,12 +1189,12 @@ local function CreateMover()
 end
 
 local function PositionSizer()
-	if not sizer or not chatPanel then return end
+	if not sizer then return end
 	local thickness = BorderThickness()
 	sizer:ClearAllPoints()
 	sizer:SetPoint('TOPRIGHT', chatPanel, 'TOPRIGHT', -thickness - 1, -thickness - 1)
 	sizer._handle = 'TOPRIGHT'
-	if sizer._grip then sizer._grip:SetTexCoord(0, 1, 1, 0) end
+	sizer._grip:SetTexCoord(0, 1, 1, 0)
 end
 
 function UpdateSizer()
@@ -1263,8 +1204,8 @@ function UpdateSizer()
 end
 
 local function CreateSizer()
-	local chat = _G.ChatFrame1
-	if not chat or sizer then return end
+	if sizer then return end
+	local chat = ChatFrame1
 	sizer = CreateFrame('Frame', 'BUI_ChatSizer', UIParent)
 	sizer:SetFrameStrata('MEDIUM')
 	sizer:SetSize(16, 16)
@@ -1289,10 +1230,10 @@ local function CreateSizer()
 	sizer:SetScript('OnEnter', BUI.Profiler.Script('Skin.Chat sizer OnEnter', function(self) self:SetAlpha(1); GripColor(true) end))
 	sizer:SetScript('OnLeave', BUI.Profiler.Script('Skin.Chat sizer OnLeave', function(self) self:SetAlpha(SIZER_IDLE_ALPHA); GripColor(false) end))
 	sizer:SetScript('OnMouseDown', BUI.Profiler.Script('Skin.Chat sizer OnMouseDown', function(self)
-		if InCombatLockdown and InCombatLockdown() then return end
-		if chat.SetClampRectInsets then chat:SetClampRectInsets(0, 0, 0, 0) end
+		if InCombatLockdown() then return end
+		chat:SetClampRectInsets(0, 0, 0, 0)
 		chat:SetResizable(true)
-		chat:StartSizing(self._handle or 'BOTTOMRIGHT')
+		chat:StartSizing(self._handle)
 	end))
 	sizer:SetScript('OnMouseUp', BUI.Profiler.Script('Skin.Chat sizer OnMouseUp', function()
 		chat:StopMovingOrSizing()
@@ -1301,11 +1242,10 @@ local function CreateSizer()
 	UpdateSizer()
 end
 
-function Skin.ChatMaxScrollOffset(chat)
-	local buffer = chat.historyBuffer
-	local count = (chat.GetNumMessages and chat:GetNumMessages()) or 0
-	if not (buffer and buffer.GetEntryAtIndex) or count <= 1 then return 0 end
-	local frameHeight = chat:GetHeight() or 0
+local function ChatMaxScrollOffset(chat)
+	local count = chat:GetNumMessages()
+	if count <= 1 then return 0 end
+	local frameHeight = chat:GetHeight()
 	if frameHeight <= 0 then return count - 1 end
 	local measure = chat._buiMeasure
 	if not measure then
@@ -1314,11 +1254,11 @@ function Skin.ChatMaxScrollOffset(chat)
 		measure:SetNonSpaceWrap(true)
 		chat._buiMeasure = measure
 	end
-	local font, size, flags = chat:GetFont()
-	if font then measure:SetFont(font, size, flags or '') end
-	measure:SetWidth(chat:GetWidth() or 0)
-	local lineHeight = max(1, measure:GetLineHeight() or 1)
-	local spacing = measure:GetSpacing() or 0
+	measure:SetFont(chat:GetFont())
+	measure:SetWidth(chat:GetWidth())
+	local lineHeight = max(1, measure:GetLineHeight())
+	local spacing = measure:GetSpacing()
+	local buffer = chat.historyBuffer
 	local filled = 0
 	for messageIndex = count, 1, -1 do
 		local entry = buffer:GetEntryAtIndex(messageIndex)
@@ -1344,13 +1284,11 @@ local function SetupScroll(frame)
 		end
 		if IsControlKeyDown() then
 			local config = GetConfig()
-			if config then
-				local currentSize = config.fontSize or DEFAULTS.fontSize
-				local newSize = min(22, max(8, currentSize + (delta > 0 and 1 or -1)))
-				if newSize ~= currentSize then
-					config.fontSize = newSize
-					ApplyMsgFontSize()
-				end
+			local currentSize = config.fontSize
+			local newSize = min(22, max(8, currentSize + (delta > 0 and 1 or -1)))
+			if newSize ~= currentSize then
+				config.fontSize = newSize
+				ApplyMsgFontSize()
 			end
 			return
 		end
@@ -1365,8 +1303,8 @@ local function SetupScroll(frame)
 			end
 		end
 		if delta > 0 then
-			local maxOffset = Skin.ChatMaxScrollOffset(self)
-			if (self:GetScrollOffset() or 0) > maxOffset then self:SetScrollOffset(maxOffset) end
+			local maxOffset = ChatMaxScrollOffset(self)
+			if self:GetScrollOffset() > maxOffset then self:SetScrollOffset(maxOffset) end
 		end
 		if FadeEnabled() then fadeState.lastActive = GetTime(); StartFader() end
 	end))
@@ -1375,8 +1313,8 @@ local function SetupScroll(frame)
 	frame:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Chat frame OnEnter', function()
 		if Enabled() then StartFader() end
 	end))
-	local editBox = frame.editBox or _G[frame:GetName() .. 'EditBox']
-	if editBox and not editBox._buiFadeHook then
+	local editBox = EditBoxOf(frame)
+	if not editBox._buiFadeHook then
 		editBox._buiFadeHook = true
 		editBox:HookScript('OnEditFocusGained', BUI.Profiler.Wrap('Skin.Chat editBox OnEditFocusGained 2', function()
 			if not Enabled() then return end
@@ -1393,18 +1331,17 @@ local function SetupScroll(frame)
 			self:SetText('/w ' .. name .. ' ')
 		end))
 	end
-	if frame.SetMouseClickEnabled then frame:SetMouseClickEnabled(true) end
-	if frame.SetMouseMotionEnabled then frame:SetMouseMotionEnabled(true) end
-	if frame.SetHyperlinksEnabled then frame:SetHyperlinksEnabled(true) end
-	if _G.ChatFrame_OnHyperlinkShow and frame:GetScript('OnHyperlinkClick') ~= _G.ChatFrame_OnHyperlinkShow then
-		frame:SetScript('OnHyperlinkClick', _G.ChatFrame_OnHyperlinkShow)
+	frame:SetMouseClickEnabled(true)
+	frame:SetMouseMotionEnabled(true)
+	frame:SetHyperlinksEnabled(true)
+	if frame:GetScript('OnHyperlinkClick') ~= ChatFrame_OnHyperlinkShow then
+		frame:SetScript('OnHyperlinkClick', ChatFrame_OnHyperlinkShow)
 	end
 	if not frame._buiLinkHover then
 		frame._buiLinkHover = true
 		frame:HookScript('OnHyperlinkEnter', BUI.Profiler.Wrap('Skin.Chat frame OnHyperlinkEnter', function(self, link)
 			if not Enabled() then return end
-			local config = GetConfig()
-			if config and config.hoverTooltips == false then return end
+			if not GetConfig().hoverTooltips then return end
 			if issecretvalue(link) or type(link) ~= 'string' then return end
 			local linkType = link:match('^([^:]+)')
 			if not HOVER_LINK_TYPES[linkType] then return end
@@ -1418,49 +1355,16 @@ local function SetupScroll(frame)
 	end
 end
 
-local function Clamp01(value)
-	if value < 0 then return 0 elseif value > 1 then return 1 end
-	return value
-end
-
 local function ScrollMetrics(chat)
-	local messageCount = chat:GetNumMessages() or 0
+	local messageCount = chat:GetNumMessages()
 	local _, fontSize = chat:GetFont()
-	local spacing = (chat.GetSpacing and chat:GetSpacing()) or 0
-	local lineHeight = max(1, (fontSize or 14) + spacing)
-	local visible = max(1, floor((chat:GetHeight() or lineHeight) / lineHeight))
-	return messageCount, visible, Skin.ChatMaxScrollOffset(chat)
-end
-
-local function UpdateChatScrollBar(chat)
-	local scrollBar = chat._buiSB
-	if not scrollBar then return end
-	local thumb = scrollBar._thumb
-	local offset = chat:GetScrollOffset() or 0
-	local messageCount = chat:GetNumMessages() or 0
-	local trackHeight = scrollBar:GetHeight() or 0
-	if not thumb._drag and offset == scrollBar._lo and messageCount == scrollBar._ln and trackHeight == scrollBar._lh then return end
-	scrollBar._lo, scrollBar._ln, scrollBar._lh = offset, messageCount, trackHeight
-	local _, visible, maxOffset = ScrollMetrics(chat)
-	if maxOffset <= 0 or trackHeight <= 1 then
-		thumb:Hide()
-		return
-	end
-	thumb:Show()
-	local thumbHeight = max(16, min(trackHeight, trackHeight * (visible / messageCount)))
-	thumb:SetHeight(thumbHeight)
-	if not thumb._drag then
-		local positionFraction = Clamp01(1 - (offset / maxOffset))
-		thumb:ClearAllPoints()
-		thumb:SetPoint('LEFT')
-		thumb:SetPoint('RIGHT')
-		thumb:SetPoint('TOP', scrollBar, 'TOP', 0, -positionFraction * (trackHeight - thumbHeight))
-	end
+	local lineHeight = max(1, fontSize + chat:GetSpacing())
+	local visible = max(1, floor(chat:GetHeight() / lineHeight))
+	return messageCount, visible, ChatMaxScrollOffset(chat)
 end
 
 local function PositionScrollBar(chat)
 	local scrollBar = chat._buiSB
-	if not scrollBar then return end
 	local thickness = BorderThickness()
 	local offsetX = InsetX() + SCROLL_GUTTER - thickness - BAR_WIDTH - 4
 	scrollBar:ClearAllPoints()
@@ -1470,60 +1374,32 @@ end
 
 local function CreateChatScrollBar(chat)
 	if chat._buiSB then return end
-	local scrollBar = CreateFrame('Frame', nil, chat)
-	scrollBar:SetWidth(4)
+	local lastOffset, lastCount, lastHeight
+	local scrollBar = CreateScrollBar(chat, 'Skin.Chat scrollbar', {
+		minThumb = 16,
+		Unchanged = function(trackHeight)
+			local offset, messageCount = chat:GetScrollOffset(), chat:GetNumMessages()
+			if offset == lastOffset and messageCount == lastCount and trackHeight == lastHeight then return true end
+			lastOffset, lastCount, lastHeight = offset, messageCount, trackHeight
+			return false
+		end,
+		Read = function()
+			local messageCount, visible, maxOffset = ScrollMetrics(chat)
+			if maxOffset <= 0 then return end
+			return visible / messageCount, Clamp01(1 - chat:GetScrollOffset() / maxOffset)
+		end,
+		Seek = function(fraction)
+			local _, _, maxOffset = ScrollMetrics(chat)
+			chat:SetScrollOffset(floor((1 - fraction) * maxOffset + 0.5))
+		end,
+	})
 	scrollBar:SetFrameLevel(chat:GetFrameLevel() + 6)
-
-	local track = scrollBar:CreateTexture(nil, 'ARTWORK')
-	track:SetAllPoints()
-	track:SetColorTexture(1, 1, 1, 0.05)
-
-	local thumb = CreateFrame('Frame', nil, scrollBar)
-	thumb:SetPoint('LEFT'); thumb:SetPoint('RIGHT'); thumb:SetPoint('TOP')
-	thumb:SetHeight(20)
-	thumb:EnableMouse(true)
-	thumb:RegisterForDrag('LeftButton')
-	local thumbTexture = thumb:CreateTexture(nil, 'OVERLAY')
-	thumbTexture:SetAllPoints()
-	local function ThumbColor(accent)
-		if accent then
-			thumbTexture:SetColorTexture(theme.GetAccent())
-			thumbTexture:SetAlpha(0.9)
-		else
-			thumbTexture:SetColorTexture(0.65, 0.65, 0.7, 1)
-			thumbTexture:SetAlpha(0.55)
-		end
-	end
-	ThumbColor(false)
-	scrollBar._thumb, scrollBar._track, scrollBar._tt = thumb, track, thumbTexture
 	chat._buiSB = scrollBar
 	PositionScrollBar(chat)
 
-	thumb:SetScript('OnEnter', BUI.Profiler.Script('Skin.Chat thumb OnEnter 2', function() ThumbColor(true) end))
-	thumb:SetScript('OnLeave', BUI.Profiler.Script('Skin.Chat thumb OnLeave 2', function() if not thumb._drag then ThumbColor(false) end end))
-	thumb:SetScript('OnDragStart', BUI.Profiler.Script('Skin.Chat thumb OnDragStart 2', function(self) self._drag = true; ThumbColor(true) end))
-	thumb:SetScript('OnDragStop', BUI.Profiler.Script('Skin.Chat thumb OnDragStop 2', function(self) self._drag = false; ThumbColor(false) end))
-	thumb:SetScript('OnUpdate', Wrap('Skin.Chat scrollbar', function(self)
-		if not self._drag then return end
-		local trackHeight = scrollBar:GetHeight() or 0
-		local thumbHeight = self:GetHeight() or 16
-		local usable = trackHeight - thumbHeight
-		if usable <= 0 then return end
-		local scale = scrollBar:GetEffectiveScale()
-		local _, cursorY = GetCursorPosition()
-		local relativeY = (scrollBar:GetTop() or 0) - cursorY / scale - thumbHeight / 2
-		local positionFraction = min(1, max(0, relativeY / usable))
-		local _, _, maxOffset = ScrollMetrics(chat)
-		chat:SetScrollOffset(floor((1 - positionFraction) * maxOffset + 0.5))
-		self:ClearAllPoints()
-		self:SetPoint('TOP', scrollBar, 'TOP', 0, -positionFraction * usable)
-		self:SetPoint('LEFT'); self:SetPoint('RIGHT')
-	end))
-
-	local function Update() UpdateChatScrollBar(chat) end
-	scrollBar._update = Update
+	local Update = scrollBar._update
 	for _, methodName in ipairs({ 'SetScrollOffset', 'ScrollUp', 'ScrollDown', 'ScrollToTop', 'ScrollToBottom', 'PageUp', 'PageDown' }) do
-		if chat[methodName] then Hook(chat, methodName, Update) end
+		Hook(chat, methodName, Update)
 	end
 	chat:HookScript('OnSizeChanged', Wrap('Skin.Chat scrollbar resize', Update))
 	Update()
@@ -1535,8 +1411,8 @@ local function IsChatHovered()
 	for frameIndex = 1, #skinnedFrames do
 		local chatFrame = skinnedFrames[frameIndex]
 		if chatFrame:IsShown() and chatFrame:IsMouseOver() then return true end
-		local editBox = chatFrame.editBox or _G[chatFrame:GetName() .. 'EditBox']
-		if editBox and editBox:IsShown() and (editBox:HasFocus() or editBox:IsMouseOver()) then return true end
+		local editBox = EditBoxOf(chatFrame)
+		if editBox:IsShown() and (editBox:HasFocus() or editBox:IsMouseOver()) then return true end
 	end
 	for tabIndex = 1, #skinnedTabs do
 		local tab = skinnedTabs[tabIndex]
@@ -1618,7 +1494,6 @@ local function TrackFrame(chat)
 end
 
 local function SkinChatFrame(chat)
-	if not chat then return end
 	local name = chat:GetName()
 	TrackFrame(chat)
 	HookAddMessage(chat)
@@ -1630,41 +1505,31 @@ local function SkinChatFrame(chat)
 		Skin3.StripTextures(chat)
 		if chat.Background then
 			chat.Background:Hide()
-			Hook(chat.Background, 'Show', KillShow)
+			StayHidden(chat.Background, '_buiKilled', Always)
 		end
-		if chat.SetClampRectInsets then chat:SetClampRectInsets(0, 0, 0, 0) end
-		local config = GetConfig()
-		local _, size = chat:GetFont()
-		SetFontSafe(chat, ResolveFont(), (config and config.fontSize) or size or DEFAULTS.fontSize, MsgFlags())
+		chat:SetClampRectInsets(0, 0, 0, 0)
+		ApplyChatFont(chat)
 	end
 
 	HideTexture(_G[name .. 'ThumbTexture'])
-	HideTexture(_G[name .. 'EditBoxLeft'])
-	HideTexture(_G[name .. 'EditBoxMid'])
-	HideTexture(_G[name .. 'EditBoxRight'])
 	Kill(chat.ScrollBar)
-	Kill(_G[name .. 'ScrollBar'])
 	Kill(chat.ScrollToBottomButton)
-	Kill(_G[name .. 'ScrollToBottomButton'])
-	ManageHidden(_G[name .. 'ButtonFrame'], true)
+	ManageHidden(chat.buttonFrame, true)
 
-	SkinTab(_G[name .. 'Tab'], chat)
-	SkinEditBox(chat.editBox or _G[name .. 'EditBox'], chat)
+	SkinTab(TabOf(chat), chat)
+	SkinEditBox(EditBoxOf(chat), chat)
 end
 
 local function SkinAllChatFrames()
-	for _, frameName in ipairs(_G.CHAT_FRAMES or {}) do
-		local chat = _G[frameName]
-		if chat then SkinChatFrame(chat) end
-	end
+	for _, frameName in ipairs(CHAT_FRAMES) do SkinChatFrame(_G[frameName]) end
 end
 
 function ApplyMsgFontSize()
-	local font, size, flags = ResolveFont(), MsgFontSize(), MsgFlags()
-	for frameIndex = 1, #skinnedFrames do SetFontSafe(skinnedFrames[frameIndex], font, size, flags) end
+	for frameIndex = 1, #skinnedFrames do ApplyChatFont(skinnedFrames[frameIndex]) end
 end
 
-local PlaceAuxButton, RestoreAuxButton
+local PlaceAuxButton, RestoreAuxButton, RepositionAuxButtons
+local RepositionAuxLater = BUI.Dispatcher.New(function() RepositionAuxButtons() end, 'Skin.Chat aux buttons')
 
 do
 	local AUX_BUTTON_SIZE = 14
@@ -1702,7 +1567,7 @@ do
 	end
 
 	local function KeepFriendsArtBlank(texture)
-		if auxPainters[_G.QuickJoinToastButton] then texture:SetTexture(nil) end
+		if auxPainters[QuickJoinToastButton] then texture:SetTexture(nil) end
 	end
 
 	local function SkinMenuButton(button)
@@ -1762,9 +1627,7 @@ do
 		button._buiAuxHover = true
 		button:HookScript('OnEnter', Wrap('Skin.Chat aux OnEnter', function(self)
 			if not auxPainters[self] then return end
-			fadeState.lastActive = GetTime()
-			StartFader()
-			UpdateCornerButtons()
+			TouchFader()
 		end))
 		button:HookScript('OnLeave', Wrap('Skin.Chat aux OnLeave', function(self)
 			if auxPainters[self] then UpdateCornerButtons() end
@@ -1783,14 +1646,13 @@ do
 			button.Icon:ClearAllPoints()
 			button.Icon:SetPoint('CENTER')
 			button.Icon:SetSize(button.fixedIconWidth, button.fixedIconHeight)
-		elseif button == _G.QuickJoinToastButton then
+		elseif button == QuickJoinToastButton then
 			for key, atlas in pairs(FRIENDS_ART) do button[key]:SetAtlas(atlas) end
 			for _, key in ipairs(FRIENDS_COUNTS) do button[key]:Show() end
 		end
 	end
 
 	function PlaceAuxButton(button, previous, gap)
-		if not button then return previous end
 		button._buiOrigParent = button._buiOrigParent or button:GetParent()
 		button:SetParent(chatPanel)
 		button:SetFrameLevel(chatPanel:GetFrameLevel() + 10)
@@ -1802,11 +1664,15 @@ do
 			auxPainters[button] = SkinAuxButton(button)
 			HookAuxHover(button)
 		end
-		return button
+		if not button._buiAuxRelayout then
+			button._buiAuxRelayout = true
+			button:HookScript('OnShow', RepositionAuxLater)
+			button:HookScript('OnHide', RepositionAuxLater)
+		end
+		return button:IsShown() and button or previous
 	end
 
 	function RestoreAuxButton(button)
-		if not button then return end
 		UnskinAuxButton(button)
 		if button._buiOrigParent then
 			button:SetParent(button._buiOrigParent)
@@ -1815,46 +1681,31 @@ do
 	end
 end
 
-local function RepositionAuxButtons()
-	if not chatPanel then return end
-	local chat = _G.ChatFrame1
-	if not chat then return end
-	local anchor = chat._buiLock or chat._buiCopy or chat._buiCog
-	if not anchor then return end
-
-	local previous = anchor
+function RepositionAuxButtons()
+	if not Enabled() or not chatPanel then return end
+	local previous = ChatFrame1._buiLock
 	if not HideVoiceButtons() then
-		previous = PlaceAuxButton(_G.ChatFrameChannelButton, previous, 8)
-		previous = PlaceAuxButton(_G.ChatFrameToggleVoiceDeafenButton, previous)
-		previous = PlaceAuxButton(_G.ChatFrameToggleVoiceMuteButton, previous)
+		previous = PlaceAuxButton(ChatFrameChannelButton, previous, 8)
+		previous = PlaceAuxButton(ChatFrameToggleVoiceDeafenButton, previous)
+		previous = PlaceAuxButton(ChatFrameToggleVoiceMuteButton, previous)
 	end
 	if not HideButtons() then
-		previous = PlaceAuxButton(_G.ChatFrameMenuButton, previous, 8)
-		previous = PlaceAuxButton(_G.QuickJoinToastButton, previous)
+		previous = PlaceAuxButton(ChatFrameMenuButton, previous, 8)
+		previous = PlaceAuxButton(QuickJoinToastButton, previous)
 	end
 	UpdateCornerButtons()
 end
 
 local function ApplyTimestampCVar()
 	local config = GetConfig()
-	if not config then return end
 	if Enabled() and config.timestamps then
-		local currentValue = _G.GetCVar('showTimestamps')
+		local currentValue = GetCVar('showTimestamps')
 		if currentValue and currentValue ~= 'none' then config.blizzTimestamps = currentValue end
-		_G.SetCVar('showTimestamps', 'none')
+		SetCVar('showTimestamps', 'none')
 	elseif config.blizzTimestamps then
-		_G.SetCVar('showTimestamps', config.blizzTimestamps)
+		SetCVar('showTimestamps', config.blizzTimestamps)
 		config.blizzTimestamps = nil
 	end
-end
-
-local function FrameShowsWhispers(chatFrame)
-	if not chatFrame then return false end
-	if chatFrame.isTemporary then
-		local chatType = chatFrame.chatType
-		return chatType == 'WHISPER' or chatType == 'BN_WHISPER' or chatType == 'BN_CONVERSATION'
-	end
-	return (_G.ChatFrame_ContainsMessageGroup and _G.ChatFrame_ContainsMessageGroup(chatFrame, 'WHISPER')) or false
 end
 
 local function PulseText(tab)
@@ -1876,20 +1727,19 @@ local function PulseText(tab)
 end
 
 local function StopTabPulse(tab)
-	if not tab or not tab._buiPulse then return end
+	if not tab._buiPulse then return end
 	tab._buiPulse.fade:Stop()
 	tab._buiPulse:Hide()
 	tab._buiPulse = nil
-	if tab._buiText then ApplyTabColor(tab, IsTabSelected(tab)) end
+	ApplyTabColor(tab, IsTabSelected(tab))
 	ApplyTabAlpha(tab)
 end
 
 local function StartTabPulse(tab)
-	if not tab or not tab._buiText or tab._buiPulse or IsTabSelected(tab) then return end
+	if tab._buiPulse or IsTabSelected(tab) then return end
 	local text = tab._buiText
 	local overlay = PulseText(tab)
-	local font, size, flags = text:GetFont()
-	if font then overlay:SetFont(font, size, flags) end
+	overlay:SetFont(text:GetFont())
 	overlay:SetShadowOffset(text:GetShadowOffset())
 	overlay:SetShadowColor(text:GetShadowColor())
 	overlay:SetJustifyH(text:GetJustifyH())
@@ -1913,19 +1763,8 @@ local function RefreshTabPulses()
 	end
 end
 
-local function FlashWhisperTabs()
-	if not (Enabled() and TabFlash()) then return end
-	local selected = _G.GeneralDockManager and _G.GeneralDockManager.selected
-	for tabIndex = 1, #skinnedTabs do
-		local tab = skinnedTabs[tabIndex]
-		if tab._buiChat and tab._buiChat ~= selected and FrameShowsWhispers(tab._buiChat) then
-			StartTabPulse(tab)
-		end
-	end
-end
-
 local function ApplySettings()
-	if not Enabled() then return end
+	if not installed or not Enabled() then return end
 
 	AnchorPanel()
 	ApplyPanelFill()
@@ -1935,38 +1774,25 @@ local function ApplySettings()
 	NormalizeDock()
 	ApplyTimestampCVar()
 
-	local font, flags = ResolveFont(), MsgFlags()
-	local config = GetConfig()
-	local configSize = config and config.fontSize
 	for frameIndex = 1, #skinnedFrames do
 		local chatFrame = skinnedFrames[frameIndex]
-		local _, curSize = chatFrame:GetFont()
-		SetFontSafe(chatFrame, font, configSize or curSize or DEFAULTS.fontSize, flags)
+		ApplyChatFont(chatFrame)
 		ApplyShadow(chatFrame)
-		if chatFrame.SetClampRectInsets then chatFrame:SetClampRectInsets(0, 0, 0, 0) end
-		if chatFrame.SetFading then chatFrame:SetFading(MsgFade() and true or false) end
-		if chatFrame.SetTimeVisible then chatFrame:SetTimeVisible(MsgFadeTime()) end
+		chatFrame:SetClampRectInsets(0, 0, 0, 0)
+		chatFrame:SetFading(MsgFade())
+		chatFrame:SetTimeVisible(MsgFadeTime())
 		PositionEditBox(chatFrame)
 		PositionScrollBar(chatFrame)
-		if chatFrame._buiSB and chatFrame._buiSB._update then chatFrame._buiSB._update() end
-		local editBox = chatFrame.editBox or _G[chatFrame:GetName() .. 'EditBox']
-		if editBox then
-			SetFontSafe(editBox, font, EditFontSize(), '')
-			editBox:SetTextColor(1, 1, 1)
-			ApplyShadow(editBox)
-			if editBox.SetBackdropColor then
-				editBox:SetBackdropColor(EditBoxBGColor())
-				editBox:SetBackdropBorderColor(BorderColor())
-			end
-		end
+		chatFrame._buiSB._update()
+		StyleEditBox(EditBoxOf(chatFrame))
 	end
 
-	ManageHidden(_G.ChatFrameMenuButton, HideButtons())
-	ManageHidden(_G.QuickJoinToastButton, HideButtons())
-	ManageHidden(_G.ChatFrameChannelButton, HideVoiceButtons())
-	ManageHidden(_G.ChatFrameToggleVoiceDeafenButton, HideVoiceButtons())
-	ManageHidden(_G.ChatFrameToggleVoiceMuteButton, HideVoiceButtons())
-	Skin.CollapseChatTab(_G.ChatFrame2Tab, HideLogTab())
+	ManageHidden(ChatFrameMenuButton, HideButtons())
+	ManageHidden(QuickJoinToastButton, HideButtons())
+	ManageHidden(ChatFrameChannelButton, HideVoiceButtons())
+	ManageHidden(ChatFrameToggleVoiceDeafenButton, HideVoiceButtons())
+	ManageHidden(ChatFrameToggleVoiceMuteButton, HideVoiceButtons())
+	CollapseChatTab(ChatFrame2Tab, HideLogTab())
 	RefreshTabs()
 	RefreshTabPulses()
 
@@ -1975,6 +1801,7 @@ local function ApplySettings()
 	UpdateCopyButton()
 	UpdateMover()
 	UpdateSizer()
+	ChatFrame1._buiLock.Refresh()
 
 	if FadeEnabled() then StartFader() else StopFader() end
 end
@@ -1984,7 +1811,6 @@ local function Refresh()
 	SkinPanel()
 	CreateMover()
 	CreateSizer()
-	NormalizeDock()
 	HookURLRef()
 	HookHistoryCapture()
 	SkinAllChatFrames()
@@ -1993,7 +1819,59 @@ local function Refresh()
 	After('Skin.Chat restore layout', 0.5, RestoreGeometry)
 end
 
-local installed = false
+local chatHiddenActive = false
+local chatPreviouslyShown = {}
+local chatHideHooksInstalled = false
+
+local CHAT_HIDE_EXTRAS = {
+	'GeneralDockManager', 'QuickJoinToastButton', 'ChatFrameMenuButton',
+	'ChatFrameChannelButton', 'TextToSpeechButtonFrame', 'CombatLogQuickButtonFrame_Custom',
+}
+
+local function CollectChatHideTargets()
+	local targets = {}
+	for _, frameName in ipairs(CHAT_FRAMES) do
+		local frame = _G[frameName]
+		targets[#targets + 1] = frame
+		targets[#targets + 1] = TabOf(frame)
+		targets[#targets + 1] = frame.buttonFrame
+	end
+	for _, extraName in ipairs(CHAT_HIDE_EXTRAS) do
+		local extra = _G[extraName]
+		if extra then targets[#targets + 1] = extra end
+	end
+	return targets
+end
+
+local function ChatHiddenWanted(frame)
+	return chatHiddenActive and Enabled() and frame:IsShown()
+end
+
+local function ApplyChatHidden()
+	local hidden = GetConfig().chatHidden and Enabled()
+	chatHiddenActive = hidden
+	local targets = CollectChatHideTargets()
+	if hidden then
+		if not chatHideHooksInstalled then
+			chatHideHooksInstalled = true
+			Hook('ChatEdit_ActivateChat', function(editBox)
+				if chatHiddenActive then ChatEdit_DeactivateChat(editBox) end
+			end)
+		end
+		for _, frame in ipairs(targets) do
+			StayHidden(frame, '_buiChatHideHook', ChatHiddenWanted)
+			if frame:IsShown() then chatPreviouslyShown[frame] = true end
+			frame:Hide()
+		end
+	else
+		for _, frame in ipairs(targets) do
+			if chatPreviouslyShown[frame] then frame:Show() end
+		end
+		wipe(chatPreviouslyShown)
+		FCF_DockUpdate()
+	end
+end
+
 local conflictWarned = false
 local function Install()
 	if not Enabled() or installed then return end
@@ -2009,64 +1887,39 @@ local function Install()
 	installed = true
 	Refresh()
 
-	if _G.FCF_OpenTemporaryWindow then
-		Hook('FCF_OpenTemporaryWindow', function()
-			After('Skin.Chat temp window', 0, function()
-				if not Enabled() then return end
-				SkinAllChatFrames()
-				RefreshTabs()
-			end)
-		end)
-	end
+	Hook('FCFTab_UpdateColors', function(tab, selected)
+		if not Enabled() or not tab._buiChat then return end
+		if selected == nil then selected = IsTabSelected(tab) end
+		if selected then StopTabPulse(tab) end
+		ApplyTabColor(tab, selected)
+		ApplyTabAlpha(tab)
+	end)
 
-	if _G.FCFTab_UpdateColors then
-		Hook('FCFTab_UpdateColors', function(tab, selected)
-			if not Enabled() or not tab or not tab._buiChat then return end
-			if selected == nil then selected = IsTabSelected(tab) end
-			if selected then StopTabPulse(tab) end
-			ApplyTabColor(tab, selected)
-			ApplyTabAlpha(tab)
-		end)
-	end
+	Hook('FCFDock_UpdateTabs', AlignDockTabs)
 
-	if _G.FCFDock_UpdateTabs then
-		Hook('FCFDock_UpdateTabs', AlignDockTabs)
-	end
+	Hook('FCF_StartAlertFlash', function(chatFrame)
+		if not (Enabled() and TabFlash()) then return end
+		local tab = TabOf(chatFrame)
+		if tab._buiChat then StartTabPulse(tab) end
+	end)
 
-	if _G.FCF_StartAlertFlash then
-		Hook('FCF_StartAlertFlash', function(chatFrame)
-			if not (Enabled() and TabFlash()) then return end
-			local tab = chatFrame and (chatFrame.tab or _G[chatFrame:GetName() .. 'Tab'])
-			if tab and tab._buiChat then StartTabPulse(tab) end
-		end)
-	end
+	Hook('FCF_StopAlertFlash', function(chatFrame)
+		StopTabPulse(TabOf(chatFrame))
+	end)
 
-	if _G.FCF_StopAlertFlash then
-		Hook('FCF_StopAlertFlash', function(chatFrame)
-			local tab = chatFrame and (chatFrame.tab or _G[chatFrame:GetName() .. 'Tab'])
-			if tab then StopTabPulse(tab) end
-		end)
-	end
+	Hook('FCF_SetChatWindowFontSize', function(_, chat, size)
+		if not Enabled() then return end
+		chat = chat or FCF_GetCurrentChatFrame()
+		if not chat then return end
+		if size then GetConfig().fontSize = size end
+		local _, curSize = chat:GetFont()
+		ApplyChatFont(chat, size or curSize)
+	end)
 
-	if _G.FCF_SetChatWindowFontSize then
-		Hook('FCF_SetChatWindowFontSize', function(_, chat, size)
-			if not Enabled() then return end
-			chat = chat or (_G.FCF_GetCurrentChatFrame and _G.FCF_GetCurrentChatFrame())
-			if chat then
-				local config = GetConfig()
-				if config and config.fontSize and size then config.fontSize = size end
-				local _, curSize = chat:GetFont()
-				SetFontSafe(chat, ResolveFont(), size or curSize or MsgFontSize(), MsgFlags())
-			end
-		end)
-	end
-
-	if _G.FCF_RestorePositionAndDimensions then
-		Hook('FCF_RestorePositionAndDimensions', function(chat)
-			if not Enabled() then return end
-			if chat == _G.ChatFrame1 then RestoreGeometry(); NormalizeDock() end
-		end)
-	end
+	Hook('FCF_RestorePositionAndDimensions', function(chat)
+		if not Enabled() then return end
+		if chat == ChatFrame1 then RestoreGeometry(); NormalizeDock() end
+	end)
 
 	local geometryReassertPending = false
 	local function ReassertGeometry()
@@ -2078,11 +1931,9 @@ local function Install()
 			RestoreGeometry()
 			NormalizeDock()
 			AnchorPanel()
-			local chat = _G.ChatFrame1
-			if chat then
-				PositionEditBox(chat)
-				PositionScrollBar(chat)
-			end
+			local chat = ChatFrame1
+			PositionEditBox(chat)
+			PositionScrollBar(chat)
 			UpdateMover()
 			UpdateSizer()
 		end)
@@ -2090,77 +1941,74 @@ local function Install()
 	BUI.Events:Register('EDIT_MODE_LAYOUTS_UPDATED', 'Skinning.Chat', ReassertGeometry)
 	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'Skinning.Chat', ReassertGeometry)
 
-	local chat1 = _G.ChatFrame1
-	if chat1 and not chat1._buiGeoHook then
-		chat1._buiGeoHook = true
-		local function OnExternalMove()
-			if chat1._buiRestoringGeo then return end
-			ReassertGeometry()
-		end
-		Hook(chat1, 'SetPoint', OnExternalMove)
-		Hook(chat1, 'SetSize', OnExternalMove)
-		Hook(chat1, 'SetWidth', OnExternalMove)
-		Hook(chat1, 'SetHeight', OnExternalMove)
+	local chat1 = ChatFrame1
+	local function OnExternalMove()
+		if chat1._buiRestoringGeo then return end
+		ReassertGeometry()
 	end
-
-	BUI.Events:Register('CHAT_MSG_WHISPER', 'Skinning.Chat', FlashWhisperTabs)
-	BUI.Events:Register('CHAT_MSG_BN_WHISPER', 'Skinning.Chat', FlashWhisperTabs)
+	Hook(chat1, 'SetPoint', OnExternalMove)
+	Hook(chat1, 'SetSize', OnExternalMove)
+	Hook(chat1, 'SetWidth', OnExternalMove)
+	Hook(chat1, 'SetHeight', OnExternalMove)
 end
+
+Hook('FCF_OpenTemporaryWindow', function()
+	if chatHiddenActive then ApplyChatHidden() end
+	if not installed then return end
+	After('Skin.Chat temp window', 0, function()
+		if not Enabled() then return end
+		SkinAllChatFrames()
+		RefreshTabs()
+	end)
+end)
 
 BUI.Events:OnLogin('Skinning.Chat', Install)
 
 local function Deactivate()
-	if chatPanel then chatPanel:Hide() end
-	if mover then mover:Hide() end
-	if sizer then sizer:Hide() end
+	chatPanel:Hide()
+	mover:Hide()
+	sizer:Hide()
 	StopFader()
 	fadeState.alpha = 1
-	local chat = _G.ChatFrame1
-	if chat then
-		if chat._buiCog then chat._buiCog:Hide() end
-		if chat._buiCopy then chat._buiCopy:Hide() end
-		if chat._buiLock then chat._buiLock:Hide() end
-	end
+	local chat = ChatFrame1
+	chat._buiCog:Hide()
+	chat._buiCopy:Hide()
+	chat._buiLock:Hide()
 	for frameIndex = 1, #skinnedFrames do
 		local chatFrame = skinnedFrames[frameIndex]
 		chatFrame:SetAlpha(1)
-		if chatFrame._buiSB then chatFrame._buiSB:Hide() end
-		ManageHidden(_G[chatFrame:GetName() .. 'ButtonFrame'], false)
+		chatFrame._buiSB:Hide()
+		ManageHidden(chatFrame.buttonFrame, false)
 	end
 	for tabIndex = 1, #skinnedTabs do
 		local tab = skinnedTabs[tabIndex]
 		StopTabPulse(tab)
 		tab:SetAlpha(1, true)
-		if tab._buiLine then tab._buiLine:Hide() end
-		if tab._buiGlow then tab._buiGlow:Hide() end
-		if tab._buiFill then tab._buiFill:Hide() end
-		if tab._buiText then SetTabTextColor(tab._buiText, 1, 0.82, 0) end
+		tab._buiLine:Hide()
+		tab._buiGlow:Hide()
+		tab._buiFill:Hide()
+		tab._buiText:SetTextColor(1, 0.82, 0)
 	end
-	RestoreAuxButton(_G.ChatFrameMenuButton)
-	RestoreAuxButton(_G.QuickJoinToastButton)
-	RestoreAuxButton(_G.ChatFrameChannelButton)
-	RestoreAuxButton(_G.ChatFrameToggleVoiceDeafenButton)
-	RestoreAuxButton(_G.ChatFrameToggleVoiceMuteButton)
-	ManageHidden(_G.ChatFrameMenuButton, false)
-	ManageHidden(_G.QuickJoinToastButton, false)
-	ManageHidden(_G.ChatFrameChannelButton, false)
-	ManageHidden(_G.ChatFrameToggleVoiceDeafenButton, false)
-	ManageHidden(_G.ChatFrameToggleVoiceMuteButton, false)
-	Skin.CollapseChatTab(_G.ChatFrame2Tab, false)
+	RestoreAuxButton(ChatFrameMenuButton)
+	RestoreAuxButton(QuickJoinToastButton)
+	RestoreAuxButton(ChatFrameChannelButton)
+	RestoreAuxButton(ChatFrameToggleVoiceDeafenButton)
+	RestoreAuxButton(ChatFrameToggleVoiceMuteButton)
+	ManageHidden(ChatFrameMenuButton, false)
+	ManageHidden(QuickJoinToastButton, false)
+	ManageHidden(ChatFrameChannelButton, false)
+	ManageHidden(ChatFrameToggleVoiceDeafenButton, false)
+	ManageHidden(ChatFrameToggleVoiceMuteButton, false)
+	CollapseChatTab(ChatFrame2Tab, false)
 	ApplyTimestampCVar()
 end
 
 local function Reactivate()
-	if chatPanel then chatPanel:Show() end
-	local chat = _G.ChatFrame1
-	if chat then
-		if chat._buiCog then chat._buiCog:Show() end
-		if chat._buiLock then chat._buiLock:Show() end
-	end
-	for frameIndex = 1, #skinnedFrames do
-		local scrollBar = skinnedFrames[frameIndex]._buiSB
-		if scrollBar then scrollBar:Show() end
-	end
+	chatPanel:Show()
+	local chat = ChatFrame1
+	chat._buiCog:Show()
+	chat._buiLock:Show()
+	for frameIndex = 1, #skinnedFrames do skinnedFrames[frameIndex]._buiSB:Show() end
 	Refresh()
 end
 
@@ -2170,21 +2018,22 @@ Skin.OnToggle('chat', function(enabled)
 	elseif installed then
 		Deactivate()
 	end
+	if not enabled and chatHiddenActive then ApplyChatHidden() end
+end)
+
+BUI.Events:OnLogin('Skinning.ChatHidden', function()
+	if GetConfig().chatHidden then ApplyChatHidden() end
 end)
 
 local function BuildTextureItems()
 	local items = { { value = 'SOLID', text = 'Solid Color' } }
-	if sharedMedia then
-		local list = sharedMedia:List('statusbar')
-		for _, name in ipairs(list) do items[#items + 1] = { value = name, text = name } end
-	end
+	for _, name in ipairs(sharedMedia:List('statusbar')) do items[#items + 1] = { value = name, text = name } end
 	return items
 end
 
 local function ResetToDefaults()
 	local config = GetConfig()
-	if not config then return end
-	for key, value in pairs(DEFAULTS) do
+	for key, value in pairs(BUI.Defaults.profile.skinning.chatSettings) do
 		if type(value) == 'table' then
 			local copiedTable = {}
 			for valueIndex = 1, #value do copiedTable[valueIndex] = value[valueIndex] end
@@ -2194,90 +2043,15 @@ local function ResetToDefaults()
 		end
 	end
 	ApplySettings()
-	ApplyMsgFontSize()
 end
-
-local chatHiddenActive = false
-local chatHideHooked = {}
-local chatPreviouslyShown = {}
-local chatHideHooksInstalled = false
-
-local CHAT_HIDE_EXTRAS = {
-	'GeneralDockManager', 'QuickJoinToastButton', 'ChatFrameMenuButton',
-	'ChatFrameChannelButton', 'TextToSpeechButtonFrame', 'CombatLogQuickButtonFrame_Custom',
-}
-
-local function CollectChatHideTargets()
-	local targets = {}
-	for _, frameName in ipairs(_G.CHAT_FRAMES or {}) do
-		local frame = _G[frameName]
-		if frame then
-			targets[#targets + 1] = frame
-			local tab = _G[frameName .. 'Tab']
-			if tab then targets[#targets + 1] = tab end
-			if frame.buttonFrame then targets[#targets + 1] = frame.buttonFrame end
-		end
-	end
-	for _, extraName in ipairs(CHAT_HIDE_EXTRAS) do
-		local extra = _G[extraName]
-		if extra then targets[#targets + 1] = extra end
-	end
-	return targets
-end
-
-local function ReassertChatHidden(frame)
-	if chatHiddenActive and Enabled() and frame:IsShown() then frame:Hide() end
-end
-
-local function ApplyChatHidden()
-	local config = GetConfig()
-	local hidden = config.chatHidden == true and Enabled()
-	chatHiddenActive = hidden
-	local targets = CollectChatHideTargets()
-	if hidden then
-		if not chatHideHooksInstalled then
-			chatHideHooksInstalled = true
-			Hook('ChatEdit_ActivateChat', function(editBox)
-				if chatHiddenActive and editBox and _G.ChatEdit_DeactivateChat then _G.ChatEdit_DeactivateChat(editBox) end
-			end)
-			Hook('FCF_OpenTemporaryWindow', function()
-				if chatHiddenActive then ApplyChatHidden() end
-			end)
-		end
-		for _, frame in ipairs(targets) do
-			if not chatHideHooked[frame] then
-				chatHideHooked[frame] = true
-				Hook(frame, 'Show', ReassertChatHidden)
-				Hook(frame, 'SetShown', ReassertChatHidden)
-			end
-			if frame:IsShown() then chatPreviouslyShown[frame] = true end
-			frame:Hide()
-		end
-	else
-		for _, frame in ipairs(targets) do
-			if chatPreviouslyShown[frame] then frame:Show() end
-		end
-		wipe(chatPreviouslyShown)
-		if _G.FCF_DockUpdate then _G.FCF_DockUpdate() end
-	end
-end
-
-Skin.OnToggle('chat', function(enabled)
-	if not enabled and chatHiddenActive then ApplyChatHidden() end
-end)
-Skin.ApplyChatHidden = ApplyChatHidden
-
-BUI.Events:OnLogin('Skinning.ChatHidden', function()
-	if GetConfig().chatHidden == true then ApplyChatHidden() end
-end)
 
 Skin.RegisterSkin('chat', {
 	name = 'Chat',
 	description = 'Dark panel behind the chat dock, with timestamps, copy chat, abbreviations, and fading.',
 	icon = 'Interface\\Icons\\UI_Chat',
-	settingsWidth = 846,
-	settingsHeight = 600,
-	buildBoards = function(ui, parent, width, content)
+	page = 'chat',
+	reset = ResetToDefaults,
+	buildBoards = function(ui, parent, width)
 		local config = GetConfig()
 
 		local function Store(key)
@@ -2309,7 +2083,7 @@ Skin.RegisterSkin('chat', {
 		end
 
 		local function ChatGeo()
-			local chatFrame = _G.ChatFrame1
+			local chatFrame = ChatFrame1
 			local frameWidth, frameHeight = chatFrame:GetSize()
 			return chatFrame, floor(frameWidth + 0.5), floor(frameHeight + 0.5), floor(chatFrame:GetLeft() + 0.5), floor(chatFrame:GetBottom() + 0.5)
 		end
@@ -2321,12 +2095,6 @@ Skin.RegisterSkin('chat', {
 			chatFrame:ClearAllPoints()
 			chatFrame:SetPoint('BOTTOMLEFT', UIParent, 'BOTTOMLEFT', x, y)
 			SaveGeometry(chatFrame)
-			chatFrame:SetClampRectInsets(0, 0, 0, 0)
-			AnchorPanel()
-			PositionScrollBar(chatFrame)
-			PositionEditBox(chatFrame)
-			UpdateMover()
-			UpdateSizer()
 		end
 		local GEO_INDEX = { w = 2, h = 3, x = 4, y = 5 }
 		local function Geo(part, label, low, high)
@@ -2334,32 +2102,40 @@ Skin.RegisterSkin('chat', {
 		end
 		local screenWidth, screenHeight = floor(GetScreenWidth()), floor(GetScreenHeight())
 
-		local chat = ui.Board(parent, width, { stacked = true, title = 'Chat', description = 'The panel behind the chat dock: font, background, border, size and the edit box.' })
-		chat:AddTools('Font', 'Typeface, message and edit box size, outline and shadow', {
-			Choice(nil, 'font', BUI.BuildFontDropdownItems(GLOBAL_OPTION), function() return config.font or GLOBAL_OPTION end),
+		local function Applied(key)
+			return function(value)
+				config[key] = value
+				ApplySettings()
+			end
+		end
+
+		local panel = ui.Board(parent, width, { stacked = true, title = 'Panel', description = 'The panel behind the chat dock: font, background, border, edit box and where it sits.' })
+		panel:AddTools('Font', 'Typeface, message and edit box size, outline and shadow', {
+			Choice(nil, 'font', BUI.BuildFontDropdownItems(GLOBAL_OPTION), function() return config.font end),
 			Cog('Sizes, outline and shadow', 'Font', {
 				Slider('Message size', 'fontSize', MsgFontSize, 8, 22),
 				Slider('Edit box size', 'editFontSize', EditFontSize, 8, 22),
 				Choice('Outline', 'fontFlags', FLAG_OPTIONS, MsgFlags),
 				Check('Shadow', 'fontShadow', FontShadow),
 			}),
-		}, function()
-			ApplySettings()
-			ApplyMsgFontSize()
-		end)
-		chat:AddTools('Background', 'Color, opacity and texture behind the messages', {
+		}, ApplySettings)
+		panel:AddTools('Background', 'Color, opacity and texture behind the messages', {
 			{ kind = 'swatch', tooltip = 'Background color and opacity', opacity = true, get = BGColor, set = function(red, green, blue, alpha)
 				config.bgColor = { red, green, blue }
 				config.bgAlpha = alpha
 			end },
 			Choice(nil, 'bgTexture', BuildTextureItems(), BGTexture),
 		}, ApplySettings)
-		chat:AddTools('Border', 'The edge around the panel', {
+		panel:AddTools('Border', 'The edge around the panel', {
 			Color('Border color', 'borderColor', ColorReader('borderColor')),
 			Cog('Thickness', 'Border', { Slider('Thickness', 'borderThickness', BorderThickness, 1, 4) }),
-			Switch(function() return config.showBorder ~= false end, 'showBorder'),
+			Switch(function() return config.showBorder end, 'showBorder'),
 		}, ApplySettings)
-		chat:AddTools('Position and size', 'Where the panel sits, its size and padding, and how it moves', {
+		panel:AddTools('Edit box', 'Where you type, and how tall it is', {
+			Choice(nil, 'editboxPosition', EDITBOX_OPTIONS, EditBoxPos),
+			Cog('Height', 'Edit box', { Slider('Height', 'editboxHeight', EditBoxHeight, 16, 40) }),
+		}, ApplySettings)
+		panel:AddTools('Layout', 'Where the panel sits, its size and padding, and how it moves', {
 			Cog('Position on screen', 'Position', {
 				Geo('x', 'From the left', 0, screenWidth),
 				Geo('y', 'From the bottom', 0, screenHeight),
@@ -2376,27 +2152,19 @@ Skin.RegisterSkin('chat', {
 				Check('Drag the top bar to move', 'dragToMove', DragToMove),
 				Check('Show the resize grip', 'showSizer', SizerEnabled),
 			}),
-		}, function()
-			ApplySettings()
-			UpdateMover()
-			UpdateSizer()
-		end)
-		chat:AddTools('Edit box', 'Where you type, and how tall it is', {
-			Choice(nil, 'editboxPosition', EDITBOX_OPTIONS, EditBoxPos),
-			Cog('Height', 'Edit box', { Slider('Height', 'editboxHeight', EditBoxHeight, 16, 40) }),
 		}, ApplySettings)
 
 		local tabs = ui.Board(parent, width, { stacked = true, title = 'Tabs', description = 'The chat tabs along the top of the panel.' })
-		tabs:AddTools('Tab text', 'Style, font size, outline and names', {
-			Choice(nil, 'tabStyle', TAB_STYLE_OPTIONS, StrReader('tabStyle')),
-			Cog('Font and names', 'Tab text', {
+		tabs:AddTools('Style', 'Tab look, font and names', {
+			Choice(nil, 'tabStyle', TAB_STYLE_OPTIONS, TabStyle),
+			Cog('Font and names', 'Tabs', {
 				Slider('Font size', 'tabFontSize', TabFontSize, 8, 18),
 				Choice('Outline', 'tabFontFlags', FLAG_OPTIONS, TabFlags),
 				Check('Uppercase names', 'tabUppercase', TabUppercase),
 				Check('Hide the combat log tab', 'hideLogTab', HideLogTab),
 			}),
 		}, ApplySettings)
-		tabs:AddTools('Tab colors', 'Background tabs, the active tab, or the theme accent for the active tab', {
+		tabs:AddTools('Colors', 'Background tabs, the active tab and how see-through they are', {
 			Color('Background tabs', 'inactiveColor', InactiveColor),
 			{ kind = 'swatch', tooltip = 'Active tab, turns off the theme accent', get = function()
 				local red, green, blue = SelectedColor()
@@ -2405,79 +2173,48 @@ Skin.RegisterSkin('chat', {
 				config.selectedColor = { red, green, blue }
 				config.selectedUseAccent = false
 			end },
-			Switch(function() return config.selectedUseAccent ~= false end, 'selectedUseAccent'),
-		}, ApplySettings)
-		tabs:AddTools('Tab opacity', 'How see-through the active and background tabs are', {
 			Cog('Opacity', 'Tab opacity', {
 				Percent('Active tab', 'selectedAlpha', SelectedAlpha, 10),
 				Percent('Background tabs', 'dockedAlpha', DockedAlpha, 0),
 			}),
+			Switch(function() return config.selectedUseAccent end, 'selectedUseAccent'),
 		}, ApplySettings)
 		tabs:AddTools('Flash on message', 'Pulse a background tab when a message arrives', {
 			Color('Flash color', 'flashColor', FlashColor),
 			Switch(TabFlash, 'tabFlash'),
 		}, ApplySettings)
 
-		local messages = ui.Board(parent, width, { stacked = true, title = 'Messages', description = 'How each line of chat reads.' })
-		messages:AddTools('Timestamps', 'The time in front of each line', {
+		local messages = ui.Board(parent, width, { stacked = true, title = 'Messages', description = 'What each line shows, fading, history and the side buttons.' })
+		messages:AddSwitch('Timestamps', Reader('timestamps'), Applied('timestamps'), 'The time in front of each line')
+		messages:AddSwitch('Clickable links', Reader('urlCopy'), Store('urlCopy'), 'Turn web addresses into links you can copy')
+		messages:AddSwitch('Link tooltips', Reader('hoverTooltips'), Store('hoverTooltips'), 'Tooltips when hovering links')
+		messages:AddSwitch('Hide channel numbers', Reader('hideChannelNumbers'), Store('hideChannelNumbers'))
+		messages:AddSwitch('Abbreviate channel names', Reader('abbreviateChannels'), Store('abbreviateChannels'))
+		messages:AddSwitch('Fade old messages', MsgFade, Applied('msgFade'), 'Messages fade out after a while')
+		messages:AddSwitch('Fade when not hovered', FadeEnabled, function(value)
+			config.mouseoverFade = value
+			if value then StartFader() else StopFader() end
+		end, 'The chat fades until the cursor is over it')
+		messages:AddSwitch('Input history', EditHistory, Store('editHistory'), 'Up and down arrows step through what you typed')
+		messages:AddSwitch('Copy chat button', ShowCopyButton, Applied('showCopyButton'))
+		messages:AddSwitch('Hide menu and social buttons', HideButtons, Applied('hideButtons'))
+		messages:AddSwitch('Hide voice buttons', HideVoiceButtons, Applied('hideVoiceButtons'))
+		messages:AddSwitch('Hide chat completely', function() return config.chatHidden end, function(value)
+			config.chatHidden = value
+			ApplyChatHidden()
+		end, 'Hide every chat window and tab')
+		messages:AddTools('Details', 'Timestamp and link colors, timestamp format, scroll speed and fade timing', {
 			Color('Timestamp color', 'timestampColor', ColorReader('timestampColor')),
-			Cog('Format', 'Timestamps', { Choice('Format', 'timestampFormat', TIMESTAMP_OPTIONS, StrReader('timestampFormat')) }),
-			Switch(BoolReader('timestamps'), 'timestamps'),
-		}, ApplySettings)
-		messages:AddTools('Clickable links', 'Turn web addresses into links you can copy', {
 			Color('Link color', 'urlColor', ColorReader('urlColor')),
-			Cog('Links', 'Links', { Check('Tooltips when hovering links', 'hoverTooltips', BoolReader('hoverTooltips', true)) }),
-			Switch(BoolReader('urlCopy', true), 'urlCopy'),
-		})
-		messages:AddTools('Channels', 'Channel names in front of messages', {
-			Cog('Channel names', 'Channels', {
-				Check('Hide channel numbers', 'hideChannelNumbers', BoolReader('hideChannelNumbers')),
-				Check('Abbreviate names', 'abbreviateChannels', BoolReader('abbreviateChannels')),
+			Cog('Format, scrolling and fade timing', 'Details', {
+				Choice('Timestamp format', 'timestampFormat', TIMESTAMP_OPTIONS, Reader('timestampFormat')),
+				Slider('Lines per scroll', 'scrollLines', ScrollLines, 1, 10, 1),
+				{ label = 'Messages visible for (sec)', min = 10, max = 300, step = 5, separator = true, get = MsgFadeTime, set = Store('msgFadeTime') },
+				Slider('Hover fade delay (sec)', 'fadeDelay', FadeDelay, 0, 10),
 			}),
-		})
-		messages:AddTools('Scrolling', 'Lines moved per mouse wheel step', {
-			Cog('Scroll speed', 'Scrolling', { Slider('Lines per scroll', 'scrollLines', ScrollLines, 1, 10) }),
-		})
-
-		local behavior = ui.Board(parent, width, { stacked = true, title = 'Behavior', description = 'Fading, input history, the side buttons and resets.' })
-		behavior:AddTools('Fade old messages', 'Messages fade out after a while', {
-			Cog('Fade timing', 'Message fade', { Slider('Visible for (sec)', 'msgFadeTime', MsgFadeTime, 10, 300, 5) }),
-			Switch(MsgFade, 'msgFade'),
+			{ text = 'Clear history', onClick = function() wipe(GetHistory()) end },
 		}, ApplySettings)
-		behavior:AddTools('Fade when not hovered', 'The chat fades until the cursor is over it', {
-			Cog('Fade delay', 'Hover fade', { Slider('Delay (sec)', 'fadeDelay', FadeDelay, 0, 10) }),
-			{ get = FadeEnabled, set = function(value)
-				config.mouseoverFade = value
-				if value then StartFader() else StopFader() end
-			end },
-		})
-		behavior:AddTools('Input history', 'Up and down arrows step through what you typed', {
-			{ text = 'Clear', onClick = function() wipe(GetHistory()) end },
-			Switch(EditHistory, 'editHistory'),
-		})
-		behavior:AddTools('Side buttons', 'The buttons down the side of the chat', {
-			Cog('Side buttons', 'Buttons', {
-				Check('Hide the menu and social buttons', 'hideButtons', HideButtons),
-				Check('Hide the voice buttons', 'hideVoiceButtons', HideVoiceButtons),
-				Check('Show the copy chat button', 'showCopyButton', ShowCopyButton),
-			}),
-		}, function()
-			ApplySettings()
-			UpdateCopyButton()
-		end)
-		behavior:AddTools('Hide chat completely', 'Hide every chat window and tab', {
-			{ get = function() return config.chatHidden == true end, set = function(value)
-				config.chatHidden = value
-				ApplyChatHidden()
-			end },
-		}, ApplySettings)
-		behavior:AddTools('Restore defaults', 'Put every chat setting back to how it started', {
-			{ text = 'Reset', onClick = function()
-				ResetToDefaults()
-				content.Rebuild()
-			end },
-		})
 
-		return { chat, tabs, messages, behavior }
+		return { panel, tabs, messages }
 	end,
 })
