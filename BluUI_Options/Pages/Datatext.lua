@@ -34,7 +34,6 @@ local ALIGNMENTS = {
 }
 
 local selected
-local showingTooltips = true
 local items = {}
 local preview
 local fonts
@@ -78,7 +77,6 @@ end
 
 local function Create(kind)
 	selected = Datatext.AddBar(kind)
-	showingTooltips = false
 	RebuildPage()
 end
 
@@ -178,6 +176,11 @@ local function TextBarTools(config, fontItems, nameOption)
 			Option(config, 'Border', 'border'),
 			Swatch(config, 'Border color', 'borderColor', true),
 		} },
+		{ tooltip = 'Mouseover and tooltips', title = 'Behavior', options = {
+			Option(config, 'Only on mouseover', 'mouseover'),
+			Option(config, 'Hide tooltips in combat', 'hideHoversInCombat'),
+			Option(config, 'Roster tooltips', 'rosterTooltips'),
+		} },
 	}
 end
 
@@ -202,6 +205,7 @@ local function BarTools(config, index)
 				Option(config, 'Height', 'height', { min = 0, max = 600, step = 1 }),
 				Option(config, 'Border', 'border'),
 				Swatch(config, 'Border color', 'borderColor', true),
+				Option(config, 'Only on mouseover', 'mouseover'),
 			} },
 		}
 	else
@@ -298,10 +302,10 @@ local function BuildPreview(band, kit)
 	note:SetPoint('CENTER')
 	function band:Update()
 		for _, sample in pairs(samples) do sample.cell:Hide() end
-		local config = not showingTooltips and Current() or nil
+		local config = Current()
 		note:SetShown(not config)
 		if not config then
-			note:SetText(showingTooltips and 'Tooltips apply to every bar' or 'Nothing here yet, add a bar or a panel from the rail')
+			note:SetText('Nothing here yet, add a bar or a panel from the rail')
 			return
 		end
 		local sample = samples[config]
@@ -403,21 +407,6 @@ end
 
 BUI.DatatextsBoard = DatatextsBoard
 
-local function TooltipsBoard(ui, parent, width)
-	local board = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Tooltips',
-		description = 'Shared by every bar.',
-	})
-	board:AddSwitch('Hide tooltips in combat', function() return BUI.GetDB().datatextHideHoversInCombat ~= false end, function(value)
-		BUI.GetDB().datatextHideHoversInCombat = value
-	end, 'No datatext tooltips or hover panels while fighting')
-	board:AddSwitch('Roster tooltips', function() return BUI.GetDB().datatextRosterTooltips ~= false end, function(value)
-		BUI.GetDB().datatextRosterTooltips = value
-	end, 'Member details such as keystone and score when hovering Friends and Guild rows')
-	return board
-end
-
 local function SettingsBoard(ui, parent, width, config, index)
 	local isPanel = Datatext.IsPanel(config)
 	local board = ui.Board(parent, width, {
@@ -426,7 +415,7 @@ local function SettingsBoard(ui, parent, width, config, index)
 		description = isPanel and 'A blank backdrop to tuck other frames on. Unlock it with the eye in the header to drag it around, right-click it to lock it again.'
 			or 'A strip of datatexts. Unlock it with the eye in the header to drag it around, right-click it to lock it again.',
 	})
-	board:AddTools('Settings', isPanel and 'Colors, title, size and position' or 'Colors, text, layout and position', BarTools(config, index), Apply)
+	board:AddTools('Settings', isPanel and 'Colors, title, size and position' or 'Colors, text, layout, behavior and position', BarTools(config, index), Apply)
 	return board
 end
 
@@ -435,7 +424,6 @@ local function Panes(ui, _, parent, width, item, page)
 		Create(item.id == 'newpanel' and 'PANEL' or 'TEXT')
 		return {}
 	end
-	if item.id == 'tooltips' then return { TooltipsBoard(ui, parent, width) } end
 	local config = Bars()[item.index]
 	if item.kind == 'PANEL' then return { SettingsBoard(ui, parent, width, config, item.index) } end
 	return { SettingsBoard(ui, parent, width, config, item.index), DatatextsBoard(ui, parent, width, config, page, Apply) }
@@ -454,25 +442,20 @@ local function RailGroups()
 	bars[#bars + 1] = { id = 'newbar', label = 'New bar', icon = 'plus' }
 	panels[#panels + 1] = { id = 'newpanel', label = 'New panel', icon = 'plus' }
 	return {
-		{ title = 'Settings', items = { { id = 'tooltips', label = 'Tooltips', icon = 'cog' } } },
 		{ title = 'Bars', items = bars },
 		{ title = 'Panels', items = panels },
 	}
 end
 
 local function ActiveID()
-	if showingTooltips or not Current() then return 'tooltips' end
-	return (Datatext.IsPanel(Current()) and 'panel' or 'bar') .. selected
+	local current = Current()
+	if not current then return 'newbar' end
+	return (Datatext.IsPanel(current) and 'panel' or 'bar') .. selected
 end
 
 local function Activate(id)
 	local item = items[id]
-	if item then
-		selected = item.index
-		showingTooltips = false
-	elseif id == 'tooltips' then
-		showingTooltips = true
-	end
+	if item then selected = item.index end
 end
 
 BUI.PageEngine.RegisterPage('datatext', {

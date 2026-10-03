@@ -503,7 +503,7 @@ local function GetSocialRow(rowIndex)
             self.highlight:Show()
             local member = self.member
             if not member then return end
-            if BUI.GetDB().datatextRosterTooltips == false then return end
+            if not socialPanel.anchor.bar.getConfig().rosterTooltips then return end
             GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
             GameTooltip:ClearLines()
             local classColor = member.classFile and RAID_CLASS_COLORS[member.classFile]
