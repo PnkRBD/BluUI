@@ -190,13 +190,7 @@ local function CreateRow(parent, index)
     row:SetHeight(Pixel.Scale(ROW_H))
     row:SetPoint('TOPLEFT', 0, Pixel.Scale(-(index - 1) * (ROW_H + ROW_GAP)))
     row:SetPoint('RIGHT', parent, 'RIGHT', Pixel.Scale(-2), 0)
-    row:SetBackdrop({
-        bgFile = 'Interface\\Buttons\\WHITE8x8',
-        edgeFile = 'Interface\\Buttons\\WHITE8x8',
-        edgeSize = 1,
-    })
-    row:SetBackdropColor(0.07, 0.07, 0.08, 0.6)
-    row:SetBackdropBorderColor(0.13, 0.13, 0.15, 1)
+    Pixel.SetTemplate(row, 0.07, 0.07, 0.08, 0.6, 0.13, 0.13, 0.15, 1, 1)
     row:RegisterForClicks('LeftButtonUp')
     row:SetAttribute('type', 'spell')
     row:SetAttribute('useOnKeyDown', false)

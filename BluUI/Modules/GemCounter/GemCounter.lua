@@ -28,8 +28,6 @@ local MAX_GEM_FIELDS = 4
 local QUALITY_HEADER_HEIGHT = 22
 local STRIP_ICON_GAP = 28
 local STRIP_MAX_ICONS = 14
-local BLANK          = BUI.C.FALLBACK_TEXTURE
-local ICON_BACKDROP  = { bgFile = BLANK, edgeFile = BLANK, edgeSize = 1, insets = { left = 1, right = 1, top = 1, bottom = 1 } }
 
 local SLOT_NAMES = {
 	[1]  = 'Head',       [2]  = 'Neck',      [3]  = 'Shoulder',  [5]  = 'Chest',
@@ -93,8 +91,7 @@ end
 local function MakeIconFrame(parent, frameSize, iconSize)
 	local iconFrame = CreateFrame('Frame', nil, parent, 'BackdropTemplate')
 	iconFrame:SetSize(Pixel.Scale(frameSize), Pixel.Scale(frameSize))
-	iconFrame:SetBackdrop(ICON_BACKDROP)
-	iconFrame:SetBackdropColor(0, 0, 0, 1)
+	Pixel.SetTemplate(iconFrame, 0, 0, 0, 1)
 	local icon = iconFrame:CreateTexture(nil, 'ARTWORK')
 	icon:SetSize(Pixel.Scale(iconSize), Pixel.Scale(iconSize))
 	icon:SetPoint('CENTER')
@@ -106,9 +103,7 @@ end
 local function MakeRowButton(parent, height, backgroundColor, border)
 	local row = CreateFrame('Button', nil, parent, 'BackdropTemplate')
 	row:SetHeight(height)
-	row:SetBackdrop(Widget.BACKDROP)
-	row:SetBackdropColor(backgroundColor[1], backgroundColor[2], backgroundColor[3], backgroundColor[4])
-	row:SetBackdropBorderColor(border[1], border[2], border[3], border[4])
+	Pixel.SetTemplate(row, backgroundColor[1], backgroundColor[2], backgroundColor[3], backgroundColor[4], border[1], border[2], border[3], border[4], 1)
 	row:EnableMouse(true)
 	return row
 end
@@ -949,9 +944,7 @@ local function BuildFallbackButton()
 	fallbackButton = CreateFrame('Button', nil, CharacterFrame, 'BackdropTemplate')
 	fallbackButton:SetSize(28, 28)
 	fallbackButton:SetFrameLevel(CharacterFrame:GetFrameLevel() + 5)
-	fallbackButton:SetBackdrop(Widget.BACKDROP)
-	fallbackButton:SetBackdropColor(0.05, 0.05, 0.06, 1)
-	fallbackButton:SetBackdropBorderColor(0.2, 0.2, 0.22, 1)
+	Pixel.SetTemplate(fallbackButton, 0.05, 0.05, 0.06, 1, 0.2, 0.2, 0.22, 1, 1)
 	fallbackButton:SetPoint('TOPLEFT', CharacterFrame, 'TOPRIGHT', 4, -36)
 
 	local iconTexture = fallbackButton:CreateTexture(nil, 'ARTWORK')

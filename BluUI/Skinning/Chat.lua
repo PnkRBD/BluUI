@@ -254,7 +254,7 @@ end
 local function NormalizeGeometry(chat)
 	local left, bottom = chat:GetLeft(), chat:GetBottom()
 	if not left or not bottom or (issecretvalue and (issecretvalue(left) or issecretvalue(bottom))) then return end
-	local pixel = PixelUtil.GetPixelToUIUnitFactor() / chat:GetEffectiveScale()
+	local pixel = BUI.Pixel.PixelSizeFor(chat, 1)
 	local width, height = chat:GetSize()
 	local restoring = chat._buiRestoringGeo
 	chat._buiRestoringGeo = true

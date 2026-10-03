@@ -334,13 +334,7 @@ local function CreateRow(parent)
     local row = CreateFrame('Button', nil, parent, 'BackdropTemplate')
     row:SetHeight(Pixel.Scale(ROW_H))
     row:RegisterForClicks('RightButtonUp')
-    row:SetBackdrop({
-        bgFile = 'Interface\\Buttons\\WHITE8x8',
-        edgeFile = 'Interface\\Buttons\\WHITE8x8',
-        edgeSize = 1,
-    })
-    row:SetBackdropColor(0.07, 0.07, 0.08, 0.6)
-    row:SetBackdropBorderColor(0.13, 0.13, 0.15, 1)
+    Pixel.SetTemplate(row, 0.07, 0.07, 0.08, 0.6, 0.13, 0.13, 0.15, 1, 1)
 
     local watched = row:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(watched, 11, FONT, 'OUTLINE')
