@@ -17,7 +17,8 @@ local VERBS = {
 	Initialize = true, Init = true, Enable = true, Activate = true, Setup = true, Refresh = true, Rebuild = true,
 	Apply = true, Reapply = true, Style = true, Restyle = true, Position = true, Layout = true, Relayout = true,
 	Install = true, Build = true, Create = true, Spawn = true, Sweep = true, Skin = true, Toggle = true,
-	Precreate = true, Restore = true, Sync = true,
+	Precreate = true, Restore = true, Sync = true, Register = true, Hook = true, Place = true, Ensure = true,
+	Make = true, Anchor = true, Migrate = true, Rebind = true, Start = true, Mark = true, Invalidate = true, Track = true,
 }
 local SKIP = {
 	Profiler = true, LaunchTrace = true, Events = true, Pixel = true, BUILibClient = true, oUF = true,

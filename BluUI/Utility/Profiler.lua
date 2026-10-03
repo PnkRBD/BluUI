@@ -41,9 +41,9 @@ local AREA_ALIASES = {
 }
 local TOP_AREAS = 8
 local TOP_IN_AREA = 5
+local ACTION_LIBRARY = 'LibActionButton-1.0-BluUI'
 local SHARED_LIBRARIES = {
 	{ major = 'LibCustomGlow-1.0', probe = 'PixelGlow_Start' },
-	{ major = 'LibActionButton-1.0', probe = 'CreateButton' },
 	{ major = 'LibRangeCheck-3.0', probe = 'GetRange' },
 	{ major = 'LibSharedMedia-3.0', probe = 'Fetch' },
 	{ major = 'LibKeyBound-1.0', probe = 'Toggle' },
@@ -318,12 +318,22 @@ local function LibraryOwner(entry)
 	return owner
 end
 
-local function TimeGlow(frame, label)
-	if not frame or not Profiler.active then return end
-	local update = frame:GetScript('OnUpdate')
-	if not update or update == frame._bluTimedUpdate then return end
-	frame._bluTimedUpdate = Profiler.Wrap(label, update)
-	frame:SetScript('OnUpdate', frame._bluTimedUpdate)
+local function TimeScript(frame, script, label)
+	if not frame then return end
+	local handler = frame:GetScript(script)
+	local key = '_bluTimed' .. script
+	if not handler or handler == frame[key] then return end
+	frame[key] = Profiler.Wrap(label, handler)
+	frame:SetScript(script, frame[key])
+end
+
+local function TimeEvents(frame, group)
+	local onEvent = frame:GetScript('OnEvent')
+	if not onEvent or onEvent == frame._bluTimedEvents then return end
+	frame._bluTimedEvents = function(self, event, ...)
+		return Profiler.Run(Profiler.Label(group, event), onEvent, self, event, ...)
+	end
+	frame:SetScript('OnEvent', frame._bluTimedEvents)
 end
 
 local glowsWatched = false
@@ -337,8 +347,9 @@ local function WatchGlows()
 	for _, glow in ipairs(GLOWS) do
 		local keyArg, prefix, label = glow.keyArg, glow.prefix, glow.label
 		hooksecurefunc(glowLibrary, glow.start, function(target, ...)
+			if not Profiler.active then return end
 			local key = keyArg and select(keyArg - 1, ...)
-			TimeGlow(target[prefix .. (keyArg and (key or '') or '')], label)
+			TimeScript(target[prefix .. (keyArg and (key or '') or '')], 'OnUpdate', label)
 		end)
 	end
 end
@@ -425,6 +436,20 @@ local function TimeUnitFrames()
 	if InCombatLockdown() then BUI.Events:AfterCombat(TimeUnitFrames, 'Profiler.UnitFrames') end
 end
 
+local actionButtonsHooked = false
+
+local function TimeActionButtons()
+	local library = LibStub(ACTION_LIBRARY, true)
+	if not library then return end
+	if not actionButtonsHooked then
+		actionButtonsHooked = true
+		hooksecurefunc(library, 'CreateButton', TimeActionButtons)
+	end
+	TimeEvents(library.eventFrame, 'ActionBars.Library')
+	TimeScript(library.eventFrame, 'OnUpdate', 'ActionBars.Library range and flash')
+	TimeScript(library.cooldownPassFrame, 'OnUpdate', 'ActionBars.Library cooldown pass')
+end
+
 local function Calibrate()
 	local probe = function() end
 	local start = debugprofilestop()
@@ -445,6 +470,7 @@ function Profiler.Start()
 	Profiler.active = true
 	WatchGlows()
 	TimeUnitFrames()
+	TimeActionButtons()
 end
 
 function Profiler.Stop()
@@ -627,6 +653,7 @@ loadWatcher:SetScript('OnEvent', function(self, _, loaded)
 	notedTotal = notedTotal + loading
 	self:UnregisterEvent('ADDON_LOADED')
 	TimeUnitFrames()
+	TimeActionButtons()
 	local saved = _G.BluUI_DB
 	local global = saved and saved.global
 	if global and global.profileNextLogin then

@@ -188,7 +188,7 @@ local function OnLifebloomCast(_, _, _, spellID)
         RemoveLifebloom(soonest)
     end
     local entry = { expires = now + LIFEBLOOM_SECONDS + carried }
-    entry.timer = C_Timer.NewTimer(math.max(entry.expires - settings.soundSeconds - now, 0), function() AnnounceRefresh(entry) end)
+    entry.timer = BUI.Profiler.NewTimer('BuffTracking.Druid lifebloom refresh', math.max(entry.expires - settings.soundSeconds - now, 0), function() AnnounceRefresh(entry) end)
     lifeblooms[#lifeblooms + 1] = entry
 end
 
