@@ -527,10 +527,30 @@ function Layout.TableKit(window)
 		return toggle
 	end
 
-	function kit.Header(parent, icon, title, placeholder, onSearch, tools)
-		local badge = kit.Disc(parent, 30, 'text')
+	function kit.Header(parent, icon, title, placeholder, onSearch, tools, back)
+		local badge
+		if back then
+			badge = CreateFrame('Button', nil, parent)
+			badge:SetSize(30, 30)
+			local disc = kit.Disc(badge, 30, 'text')
+			disc:SetAllPoints()
+			local chevron = kit.Glyph(badge, 'dropdown', 12, 'page', 'OVERLAY')
+			chevron:SetTexCoord(0, 1, 1, 1, 0, 0, 1, 0)
+			chevron:SetPoint('CENTER', -1, 0)
+			badge:SetScript('OnEnter', function(self)
+				window:Paint(disc, 'accent')
+				Widget.ShowTip(self, 'Back to ' .. back.label)
+			end)
+			badge:SetScript('OnLeave', function()
+				window:Paint(disc, 'text')
+				Widget.HideTip()
+			end)
+			badge:SetScript('OnClick', back.onClick)
+		else
+			badge = kit.Disc(parent, 30, 'text')
+			kit.Glyph(parent, icon, 14, 'page', 'OVERLAY'):SetPoint('CENTER', badge)
+		end
 		badge:SetPoint('TOPLEFT', 0, -2)
-		kit.Glyph(parent, icon, 14, 'page', 'OVERLAY'):SetPoint('CENTER', badge)
 		kit.Text(parent, title, 22, 'text'):SetPoint('LEFT', badge, 'RIGHT', 12, 0)
 		local search = onSearch and kit.Search(parent, placeholder, onSearch)
 		if search then search:SetPoint('TOPRIGHT') end
@@ -711,7 +731,7 @@ function Layout.PinnedHead(tab, window, kit, spec, block, onSearch)
 	local head = CreateFrame('Frame', nil, tab.pinned)
 	head:SetPoint('TOPLEFT')
 	head:SetSize(tab.width, 1)
-	local top = kit.Header(head, spec.icon, spec.title, spec.placeholder, onSearch, spec.tools) + HEADER_GAP
+	local top = kit.Header(head, spec.icon, spec.title, spec.placeholder, onSearch, spec.tools, spec.back) + HEADER_GAP
 	local rule = kit.DottedRule(head)
 	rule:SetPoint('TOPLEFT', 0, -top)
 	rule:SetPoint('TOPRIGHT', 0, -top)
