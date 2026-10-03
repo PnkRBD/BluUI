@@ -189,7 +189,7 @@ local entries = {
 	{ label = "Bars", page = "datatext", panel = "Bars and panels", keywords = "bar select new add delete second multiple bars shown sample" },
 	{ label = "Panels", page = "datatext", panel = "Bars and panels", keywords = "panel blank background square empty new add delete resize shown" },
 	{ label = "Title", page = "datatext", panel = "Bars and panels", keywords = "panel title text label anchor offset size color header" },
-	{ label = "Behavior", page = "datatext", panel = "Bars and panels", keywords = "only on mouseover hide bar fade hover show tooltip combat latency friends guild roster member mplus score rank rio disable" },
+	{ label = "Mouseover and tooltips", page = "datatext", panel = "Bars and panels", keywords = "only on mouseover hide bar fade hover show tooltip combat latency friends guild roster member mplus score rank rio disable behavior" },
 	{ label = "Font", page = "datatext", panel = "Bars and panels" },
 	{ label = "Font size", page = "datatext", panel = "Bars and panels", keywords = "font size" },
 	{ label = "Spacing", page = "datatext", panel = "Bars and panels", keywords = "spacing gap" },
