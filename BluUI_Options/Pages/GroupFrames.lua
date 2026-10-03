@@ -633,7 +633,11 @@ BUI.PageEngine.RegisterPage('groupframes', {
 			rail = { groups = enabled and RAIL_GROUPS or { { title = 'Settings', items = { { id = 'off', label = 'Module off' } } } }, selected = enabled and selected or 'off' },
 			build = function(ui, shell, parent, width, item, handle)
 				if item.id == 'off' then
-					return { ui.Board(parent, width, { stacked = true, title = 'Group frames are off', description = 'Turn the module on under Settings, Modules, then reload to use party and raid frames.' }) }
+					local board = ui.Board(parent, width, { stacked = true, title = 'Group frames are off', description = 'The Blizzard party and raid frames stay while this is off.' })
+					board:AddSwitch('Group frames module', function() return BUI.IsModuleEnabled('groupFrames') end, function(value)
+						BUI.ModulesPage.ConfirmReload('groupFrames', value, Repaint)
+					end, 'Turning it on needs a reload')
+					return { board }
 				end
 				return Panes(ui, shell, parent, width, item, handle)
 			end,
