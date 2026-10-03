@@ -13,7 +13,7 @@ local SWATCH_SIZE = 18
 local CONTROL_HEIGHT = 30
 local POP_WIDTH = 360
 local POP_PAD = 16
-local POP_ROW = 40
+local POP_ROW = 48
 local POP_TITLE = 24
 local POP_CONTROL = 200
 local POP_RADIUS = 8
@@ -113,6 +113,8 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 		frame:SetFrameLevel(BUILib.GetPopupLevel())
 		frame:SetClampedToScreen(true)
 		frame:EnableMouse(true)
+		frame:EnableMouseWheel(true)
+		frame:SetScript('OnMouseWheel', function() end)
 		frame:SetPoint('TOPRIGHT', anchor, 'BOTTOMRIGHT', 0, -POP_OFFSET)
 		frame:Hide()
 		local fill, edge = Widget.DrawCardShape(frame, POP_RADIUS, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
@@ -125,9 +127,14 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 			y = y + POP_TITLE
 		end
 		local rows = {}
-		for _, option in ipairs(spec.options) do
+		for index, option in ipairs(spec.options) do
 			local row = CreateFrame('Frame', nil, frame)
 			row:SetPoint('TOPLEFT', POP_PAD, -y)
+			if index > 1 then
+				local rule = kit.DottedRule(row)
+				rule:SetPoint('TOPLEFT')
+				rule:SetPoint('TOPRIGHT')
+			end
 			local control = kit.Tool(row, option, after)
 			control:SetPoint('RIGHT')
 			local label = kit.Text(row, option.label, 12, 'text')
