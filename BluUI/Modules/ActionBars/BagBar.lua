@@ -10,9 +10,57 @@ local SLOT_NAMES = {
 	'CharacterReagentBag0Slot', 'BagBarExpandToggle',
 }
 local RELEASE_INSET = 4
+local BAG_BUTTON_NAMES = {
+	'MainMenuBarBackpackButton', 'CharacterBag0Slot', 'CharacterBag1Slot', 'CharacterBag2Slot', 'CharacterBag3Slot',
+	'CharacterReagentBag0Slot',
+}
+local MASKED_REGIONS = { 'icon', 'searchOverlay', 'ItemContextOverlay' }
+local COUNT_SIZE = 12
 
 local bagBar
 local QueueRetake, QueueMeasure
+local bagButtonsSkinned = false
+
+local function StyleBagState(button)
+	button:GetNormalTexture():SetAlpha(0)
+	button:GetPushedTexture():SetAlpha(0)
+	local highlight = button:GetHighlightTexture()
+	highlight:SetBlendMode('BLEND')
+	highlight:SetAlpha(1)
+	ActionBars.FlattenStateTexture(highlight, 1, 1, 1, 0.15)
+	ActionBars.FlattenStateTexture(button.SlotHighlightTexture, 1, 1, 1, 0.3)
+end
+
+local function ShowFreeSlots(button)
+	button.Count:SetText(button.freeSlots)
+end
+
+local function SkinBagButton(button, settings)
+	for _, key in ipairs(MASKED_REGIONS) do
+		local region = button[key]
+		if region then region:RemoveMaskTexture(button.CircleMask) end
+	end
+	button.icon:ClearAllPoints()
+	button.icon:SetAllPoints()
+	ActionBars.ApplyIconCrop(button)
+	StyleBagState(button)
+	Hook(button, 'UpdateTextures', StyleBagState)
+	local borderColor = settings.borderColor
+	BUI.Pixel.ApplyBorder(button, settings.borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
+	BUI.Pixel.ApplyFont(button.Count, COUNT_SIZE, BUI.GetGlobalFont(), 'OUTLINE')
+end
+
+local function SkinBagButtons()
+	if bagButtonsSkinned then return end
+	bagButtonsSkinned = true
+	local settings = ActionBars.GetSettings()
+	for _, name in ipairs(BAG_BUTTON_NAMES) do SkinBagButton(_G[name], settings) end
+	local backpack = MainMenuBarBackpackButton
+	backpack.Count:ClearAllPoints()
+	backpack.Count:SetPoint('BOTTOM', backpack, 'BOTTOM', 0, 2)
+	Hook(backpack, 'UpdateFreeSlots', ShowFreeSlots)
+	ShowFreeSlots(backpack)
+end
 
 local function VisibleBounds()
 	local left, right, top, bottom
@@ -50,6 +98,7 @@ local function Retake(self)
 	local header = self.bar.header
 	local barSettings = self:Settings()
 	self:Apply(function()
+		SkinBagButtons()
 		BagsBar:SetParent(header)
 		BagsBar:ClearAllPoints()
 		BagsBar:SetPoint('TOPLEFT', header, 'TOPLEFT', 0, 0)
