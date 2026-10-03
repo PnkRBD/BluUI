@@ -239,7 +239,7 @@ local function PlaceIntent(frame)
     intent.placedX, intent.placedY = intent.x, intent.y
     local left, top = frame:GetLeft(), frame:GetTop()
     if not left or not top or (issecretvalue and (issecretvalue(left) or issecretvalue(top))) then return end
-    local pixel = PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
+    local pixel = BUI.Pixel.PixelSizeFor(frame, 1)
     local Widget = LibStub("BUILib").Widget
     local shiftX = Widget.SnapX(left, pixel) - left
     local shiftY = Widget.SnapY(top, pixel) - top

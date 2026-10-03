@@ -114,25 +114,13 @@ end
 local function CreateRow(parent)
     local row = CreateFrame('Button', nil, parent, 'BackdropTemplate')
     row:SetHeight(Pixel.Scale(ROW_H))
-    row:SetBackdrop({
-        bgFile = 'Interface\\Buttons\\WHITE8x8',
-        edgeFile = 'Interface\\Buttons\\WHITE8x8',
-        edgeSize = 1,
-    })
-    row:SetBackdropColor(0.07, 0.07, 0.08, 0.6)
-    row:SetBackdropBorderColor(0.13, 0.13, 0.15, 1)
+    Pixel.SetTemplate(row, 0.07, 0.07, 0.08, 0.6, 0.13, 0.13, 0.15, 1, 1)
     row:RegisterForClicks('LeftButtonUp', 'RightButtonUp')
 
     local iconBackground = CreateFrame('Frame', nil, row, 'BackdropTemplate')
     iconBackground:SetSize(Pixel.Scale(ICON_SIZE + 2), Pixel.Scale(ICON_SIZE + 2))
     iconBackground:SetPoint('LEFT', Pixel.Scale(4), 0)
-    iconBackground:SetBackdrop({
-        bgFile = 'Interface\\Buttons\\WHITE8x8',
-        edgeFile = 'Interface\\Buttons\\WHITE8x8',
-        edgeSize = 1,
-    })
-    iconBackground:SetBackdropColor(0, 0, 0, 1)
-    iconBackground:SetBackdropBorderColor(0.18, 0.18, 0.2, 1)
+    Pixel.SetTemplate(iconBackground, 0, 0, 0, 1, 0.18, 0.18, 0.2, 1, 1)
 
     local icon = iconBackground:CreateTexture(nil, 'ARTWORK')
     icon:SetSize(Pixel.Scale(ICON_SIZE), Pixel.Scale(ICON_SIZE))
@@ -208,13 +196,7 @@ local function BuildPanel()
     moneyHeader:SetPoint('TOPLEFT', Pixel.Scale(12), Pixel.Scale(-78))
     moneyHeader:SetPoint('TOPRIGHT', Pixel.Scale(-12), Pixel.Scale(-78))
     moneyHeader:SetHeight(Pixel.Scale(28))
-    moneyHeader:SetBackdrop({
-        bgFile = 'Interface\\Buttons\\WHITE8x8',
-        edgeFile = 'Interface\\Buttons\\WHITE8x8',
-        edgeSize = 1,
-    })
-    moneyHeader:SetBackdropColor(0.08, 0.08, 0.1, 0.7)
-    moneyHeader:SetBackdropBorderColor(0.18, 0.18, 0.2, 1)
+    Pixel.SetTemplate(moneyHeader, 0.08, 0.08, 0.1, 0.7, 0.18, 0.18, 0.2, 1, 1)
 
     local walletLabel = moneyHeader:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(walletLabel, 11, FONT, '')

@@ -441,13 +441,7 @@ do
 			holder:SetPoint('BOTTOMLEFT', anchor, 'TOPLEFT', -outsetLeft, outsetTop + gap)
 			holder:SetPoint('BOTTOMRIGHT', anchor, 'TOPRIGHT', outsetRight, outsetTop + gap)
 		end
-		holder:SetBackdrop({
-			bgFile = BUI.C.FALLBACK_TEXTURE,
-			edgeFile = BUI.C.FALLBACK_TEXTURE,
-			edgeSize = 1,
-		})
-		holder:SetBackdropColor(Theme.bg.dark[1], Theme.bg.dark[2], Theme.bg.dark[3], Theme.bg.dark[4])
-		holder:SetBackdropBorderColor(Theme.border.light[1], Theme.border.light[2], Theme.border.light[3], 1)
+		Pixel.SetTemplate(holder, Theme.bg.dark[1], Theme.bg.dark[2], Theme.bg.dark[3], Theme.bg.dark[4], Theme.border.light[1], Theme.border.light[2], Theme.border.light[3], 1, 1)
 		BUI.Skinning.RegisterTrackerPanel(holder)
 		holder:SetShown(BUI.Skinning.IsSkinEnabled('questoverlay'))
 
