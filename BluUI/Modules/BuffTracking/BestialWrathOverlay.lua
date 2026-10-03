@@ -11,11 +11,11 @@ local WILD_THRASH = 1264359
 local WILD_THRASH_IDS = { [1264359] = true, [1264355] = true }
 local WILD_THRASH_COOLDOWN = 8
 local BEAST_CLEAVE_SECONDS = 10
+local BESTIAL_WRATH_SECONDS = 15
 local THRASH_PROMPT_SECONDS = 2
+local AOE_MEMORY_SECONDS = 20
 local READY_WINDOW = 1.6
-local SETUP_LEAD = 2
-local THRASH_FIRST_UNTIL = BEAST_CLEAVE_SECONDS - SETUP_LEAD
-local HOLD_THRASH_UNTIL = 13
+local HOLD_STEP = 0.25
 local TICK_SECONDS = 0.1
 local PREVIEW_PHASES = { 'hold', 'send', 'thrash', 'thrashFirst', 'holdThrash' }
 local PREVIEW_PHASE_SECONDS = 1.5
@@ -25,10 +25,13 @@ local HOLD_COLOR   = { 1, 0.3, 0.3 }
 local SEND_COLOR   = { 0.35, 1, 0.45 }
 local THRASH_COLOR = { 1, 0.82, 0 }
 
+local SCREEN_LABELS = { holdThrash = 'HOLD THRASH', thrashFirst = 'THRASH', thrashNow = 'THRASH!' }
+local ICON_LABELS = { holdThrash = 'HOLD', thrashFirst = 'GO', thrashNow = 'GO' }
+
 local CUE_SPEECH = {
     hold        = 'Hold',
     send        = 'Send',
-    thrashFirst = 'Thrash first',
+    thrashFirst = 'Thrash',
     thrash      = 'Thrash',
     holdThrash  = 'Hold thrash',
 }
@@ -45,9 +48,20 @@ local StepCurve = BUI.Tools.StepCurve
 local READY_SOON_CURVE = StepCurve(0, 1, READY_WINDOW, 0)
 local NOT_READY_CURVE  = StepCurve(0, 0, READY_WINDOW, 1)
 local THRASH_FIRST_CURVE = StepCurve(0, 0, READY_WINDOW, 1)
-THRASH_FIRST_CURVE:AddPoint(THRASH_FIRST_UNTIL, 0)
-local HOLD_THRASH_CURVE = StepCurve(0, 0, THRASH_FIRST_UNTIL, 1)
-HOLD_THRASH_CURVE:AddPoint(HOLD_THRASH_UNTIL, 0)
+THRASH_FIRST_CURVE:AddPoint(BEAST_CLEAVE_SECONDS, 0)
+
+local holdCurves = {}
+
+local function HoldCurve(cleaveRemaining)
+    local steps = math.ceil(cleaveRemaining / HOLD_STEP)
+    local curve = holdCurves[steps]
+    if not curve then
+        curve = StepCurve(0, 0, READY_WINDOW, 1)
+        curve:AddPoint(steps * HOLD_STEP, 0)
+        holdCurves[steps] = curve
+    end
+    return curve
+end
 
 local function GetConfig() return BUI.GetDB()[SETTINGS_KEY] end
 local function GetHunter() return BUI.BuffTracking.Hunter end
@@ -56,8 +70,9 @@ local function WantsIcon(config) return config.displayMode ~= 'screen' end
 local function WantsScreen(config) return config.displayMode ~= 'icon' end
 
 local lastThrashAt = -math.huge
-local thrashPromptUntil = 0
+local lastWrathAt = -math.huge
 local bwDuration, wtDuration
+local live = {}
 
 local function Evaluate(duration, curve, readyValue)
     if not duration then return readyValue end
@@ -123,13 +138,14 @@ local function NewText(parent, label, color)
     return fontString
 end
 
-local function NewCallout(root, holdThrashLabel, thrashFirstLabel)
+local function NewCallout(root, labels)
     local readyLayer = NewLayer(root)
     local sendLayer = NewLayer(readyLayer)
     local holdLayer = NewLayer(readyLayer)
     local thrashReadyLayer = NewLayer(root)
     local thrashHoldLayer = NewLayer(thrashReadyLayer)
     local thrashFirstLayer = NewLayer(thrashReadyLayer)
+    local thrashNowLayer = NewLayer(thrashReadyLayer)
     return {
         root             = root,
         readyLayer       = readyLayer,
@@ -138,16 +154,17 @@ local function NewCallout(root, holdThrashLabel, thrashFirstLabel)
         thrashReadyLayer = thrashReadyLayer,
         thrashHoldLayer  = thrashHoldLayer,
         thrashFirstLayer = thrashFirstLayer,
+        thrashNowLayer   = thrashNowLayer,
         sendText         = NewText(sendLayer, 'SEND BW', SEND_COLOR),
         holdText         = NewText(holdLayer, 'HOLD BW', HOLD_COLOR),
-        thrashText       = NewText(root, 'THRASH!', THRASH_COLOR),
-        holdThrashText   = NewText(thrashHoldLayer, holdThrashLabel, HOLD_COLOR),
-        thrashFirstText  = NewText(thrashFirstLayer, thrashFirstLabel, THRASH_COLOR),
+        holdThrashText   = NewText(thrashHoldLayer, labels.holdThrash, HOLD_COLOR),
+        thrashFirstText  = NewText(thrashFirstLayer, labels.thrashFirst, THRASH_COLOR),
+        thrashNowText    = NewText(thrashNowLayer, labels.thrashNow, THRASH_COLOR),
     }
 end
 
 local function CalloutTexts(callout)
-    return callout.sendText, callout.holdText, callout.thrashText, callout.holdThrashText, callout.thrashFirstText
+    return callout.sendText, callout.holdText, callout.holdThrashText, callout.thrashFirstText, callout.thrashNowText
 end
 
 local function SetLayerShown(region, shown)
@@ -177,37 +194,33 @@ local function StyleCallout(callout, size, anchor, offsetX, offsetY)
     end
 end
 
-local function SetSendLabel(callout, label)
-    if callout.sendLabel == label then return end
-    callout.sendLabel = label
-    callout.sendText:SetText(label)
+local function SetHoldLabel(callout, wtRemaining)
+    local label = wtRemaining and wtRemaining >= READY_WINDOW and ('HOLD BW %ds'):format(math.ceil(wtRemaining)) or 'HOLD BW'
+    if callout.holdLabel == label then return end
+    callout.holdLabel = label
+    callout.holdText:SetText(label)
 end
 
-local function RenderThrashCues(callout, cleaveUp, showHoldThrash)
-    SetLayerShown(callout.thrashReadyLayer, true)
-    SetLayerAlpha(callout.thrashReadyLayer, Evaluate(wtDuration, READY_SOON_CURVE, 1))
-    SetLayerAlpha(callout.thrashHoldLayer, showHoldThrash and Evaluate(bwDuration, HOLD_THRASH_CURVE, 0) or 0)
-    SetLayerAlpha(callout.thrashFirstLayer, cleaveUp and 0 or Evaluate(bwDuration, THRASH_FIRST_CURVE, 0))
-end
-
-local function RenderCallout(callout, now, cleaveUp, thrashCues, showHoldThrash)
-    if now < thrashPromptUntil then
-        SetLayerShown(callout.thrashText, true)
-        SetLayerShown(callout.readyLayer, false)
-        SetLayerShown(callout.thrashReadyLayer, false)
-        return
-    end
-    SetLayerShown(callout.thrashText, false)
+local function RenderWrathCues(callout)
     SetLayerShown(callout.readyLayer, true)
-    SetSendLabel(callout, cleaveUp and 'SEND BW' or 'THRASH FIRST')
+    SetHoldLabel(callout, live.wtRemaining)
     SetLayerAlpha(callout.readyLayer, Evaluate(bwDuration, READY_SOON_CURVE, 1))
     SetLayerAlpha(callout.sendLayer, Evaluate(wtDuration, READY_SOON_CURVE, 1))
     SetLayerAlpha(callout.holdLayer, Evaluate(wtDuration, NOT_READY_CURVE, 0))
-    if thrashCues then
-        RenderThrashCues(callout, cleaveUp, showHoldThrash)
-    else
-        SetLayerShown(callout.thrashReadyLayer, false)
-    end
+end
+
+local function RenderThrashCues(callout)
+    SetLayerShown(callout.thrashReadyLayer, true)
+    SetLayerAlpha(callout.thrashReadyLayer, Evaluate(wtDuration, READY_SOON_CURVE, 1))
+    SetLayerAlpha(callout.thrashNowLayer, live.thrashNow and 1 or 0)
+    SetLayerAlpha(callout.thrashFirstLayer, (live.inWrath or live.cleaveRemaining > 0) and 0 or Evaluate(bwDuration, THRASH_FIRST_CURVE, 0))
+    local holding = live.showHoldThrash and not live.inWrath and live.cleaveRemaining > READY_WINDOW
+    SetLayerAlpha(callout.thrashHoldLayer, holding and Evaluate(bwDuration, HoldCurve(live.cleaveRemaining), 0) or 0)
+end
+
+local function RenderCallout(callout, wrathCues, thrashCues)
+    if wrathCues then RenderWrathCues(callout) else SetLayerShown(callout.readyLayer, false) end
+    if thrashCues then RenderThrashCues(callout) else SetLayerShown(callout.thrashReadyLayer, false) end
 end
 
 local bwCallout, thrashCallout, screenCallout
@@ -216,13 +229,11 @@ local function BuildIconCallouts()
     if bwCallout then return end
     local bwRoot = CreateFrame('Frame', nil, UIParent)
     bwRoot:Hide()
-    bwCallout = NewCallout(bwRoot, 'HOLD', 'GO')
+    bwCallout = NewCallout(bwRoot, ICON_LABELS)
 
     local thrashRoot = CreateFrame('Frame', nil, UIParent)
     thrashRoot:Hide()
-    thrashCallout = NewCallout(thrashRoot, 'HOLD', 'GO')
-    SetLayerShown(thrashCallout.readyLayer, false)
-    SetLayerShown(thrashCallout.thrashText, false)
+    thrashCallout = NewCallout(thrashRoot, ICON_LABELS)
 end
 
 local function BuildScreenCallout()
@@ -232,7 +243,7 @@ local function BuildScreenCallout()
     root:SetFrameStrata('HIGH')
     root:SetFrameLevel(98)
     root:Hide()
-    screenCallout = NewCallout(root, 'HOLD THRASH', 'THRASH FIRST')
+    screenCallout = NewCallout(root, SCREEN_LABELS)
 
     BUI.Dragging.MakeAnchoredAlert(root, {
         settings = GetConfig,
@@ -281,59 +292,59 @@ local function IsActive()
     return Hunter.PlayerIsHunter and Hunter.IsBeastMastery() and IsSpellKnown(WILD_THRASH) == true
 end
 
-local lastCue
-
-local function LiveCue(now, cleaveUp, showHoldThrash)
-    if now < thrashPromptUntil then return 'thrash' end
-    local bwRemaining = ReadRemaining(BESTIAL_WRATH, now)
-    if not bwRemaining then return nil end
-    local bwReady = bwRemaining < READY_WINDOW
-    local setupWindow = not cleaveUp and not bwReady and bwRemaining < THRASH_FIRST_UNTIL
-    local inHoldBand = showHoldThrash and bwRemaining >= THRASH_FIRST_UNTIL and bwRemaining < HOLD_THRASH_UNTIL
-    if not bwReady and not setupWindow and not inHoldBand then return 'idle' end
-    local wtRemaining = ReadRemaining(WILD_THRASH, now)
-    if not wtRemaining then
-        wtRemaining = lastThrashAt + WILD_THRASH_COOLDOWN - now
-    end
-    local thrashReady = wtRemaining < READY_WINDOW
-    if bwReady then
-        if not thrashReady then return 'hold' end
-        return cleaveUp and 'send' or 'thrashFirst'
-    end
-    if not thrashReady then return 'idle' end
-    return setupWindow and 'thrashFirst' or 'holdThrash'
+local function ReadTimeline(config, now)
+    live.cleaveRemaining = lastThrashAt + BEAST_CLEAVE_SECONDS - now
+    live.inWrath = now < lastWrathAt + BESTIAL_WRATH_SECONDS
+    live.thrashNow = live.inWrath and (now < lastThrashAt + AOE_MEMORY_SECONDS or now < lastWrathAt + THRASH_PROMPT_SECONDS)
+    live.showHoldThrash = config.showHoldThrash
+    live.wtRemaining = ReadRemaining(WILD_THRASH, now)
 end
 
-local function UpdateVoice(config, now, cleaveUp)
+local lastCue
+
+local function LiveCue(now)
+    local bwRemaining = ReadRemaining(BESTIAL_WRATH, now)
+    if not bwRemaining then return nil end
+    local wtRemaining = live.wtRemaining or (lastThrashAt + WILD_THRASH_COOLDOWN - now)
+    local thrashReady = wtRemaining < READY_WINDOW
+    if live.inWrath then return (thrashReady and live.thrashNow) and 'thrash' or 'idle' end
+    if bwRemaining < READY_WINDOW then return thrashReady and 'send' or 'hold' end
+    if not thrashReady or bwRemaining >= BEAST_CLEAVE_SECONDS then return 'idle' end
+    if live.cleaveRemaining <= 0 then return 'thrashFirst' end
+    if live.showHoldThrash and bwRemaining < live.cleaveRemaining then return 'holdThrash' end
+    return 'idle'
+end
+
+local function UpdateVoice(config, now)
     if not config.tts or not InCombatLockdown() then
         lastCue = nil
         return
     end
-    local cue = LiveCue(now, cleaveUp, config.showHoldThrash)
+    local cue = LiveCue(now)
     if not cue or cue == lastCue then return end
     lastCue = cue
-    if WantsCue(config, cue) and cue ~= 'idle' and cue ~= 'thrash' then Speak(cue) end
+    if WantsCue(config, cue) and cue ~= 'idle' then Speak(cue) end
 end
 
 local previewActive = false
 local previewPhase
 
-local function RenderPreview(callout, phase, withHoldThrash)
-    SetLayerShown(callout.thrashText, phase == 'thrash')
-    local bwPhase = phase == 'hold' or phase == 'send'
-    SetLayerShown(callout.readyLayer, bwPhase)
-    if bwPhase then
-        SetSendLabel(callout, 'SEND BW')
+local function RenderPreview(callout, phase, withThrash)
+    local wrathPhase = phase == 'hold' or phase == 'send'
+    SetLayerShown(callout.readyLayer, wrathPhase)
+    if wrathPhase then
+        SetHoldLabel(callout, phase == 'hold' and 3 or nil)
         SetLayerAlpha(callout.readyLayer, 1)
         SetLayerAlpha(callout.sendLayer, phase == 'send' and 1 or 0)
         SetLayerAlpha(callout.holdLayer, phase == 'hold' and 1 or 0)
     end
-    local thrashPhase = withHoldThrash and (phase == 'holdThrash' or phase == 'thrashFirst')
+    local thrashPhase = withThrash and (phase == 'thrash' or phase == 'thrashFirst' or phase == 'holdThrash')
     SetLayerShown(callout.thrashReadyLayer, thrashPhase)
     if thrashPhase then
         SetLayerAlpha(callout.thrashReadyLayer, 1)
-        SetLayerAlpha(callout.thrashHoldLayer, phase == 'holdThrash' and 1 or 0)
+        SetLayerAlpha(callout.thrashNowLayer, phase == 'thrash' and 1 or 0)
         SetLayerAlpha(callout.thrashFirstLayer, phase == 'thrashFirst' and 1 or 0)
+        SetLayerAlpha(callout.thrashHoldLayer, phase == 'holdThrash' and 1 or 0)
     end
 end
 
@@ -347,11 +358,8 @@ local function TickPreview(config, now)
     if WantsIcon(config) then
         BuildIconCallouts()
         if ShowOnIcon(bwCallout, BESTIAL_WRATH) then RenderPreview(bwCallout, phase, false) end
-        if (phase == 'holdThrash' or phase == 'thrashFirst') and ShowOnIcon(thrashCallout, WILD_THRASH) then
-            RenderPreview(thrashCallout, phase, true)
-        else
-            thrashCallout.root:Hide()
-        end
+        if ShowOnIcon(thrashCallout, WILD_THRASH) then RenderPreview(thrashCallout, phase, true) end
+        SetLayerShown(thrashCallout.readyLayer, false)
     else
         HideIconCallouts()
     end
@@ -366,8 +374,8 @@ local function TickPreview(config, now)
 end
 
 local function TickLive(config, now)
-    local cleaveUp = now < lastThrashAt + BEAST_CLEAVE_SECONDS
-    UpdateVoice(config, now, cleaveUp)
+    ReadTimeline(config, now)
+    UpdateVoice(config, now)
 
     local wantsIcon, wantsScreen = WantsIcon(config), WantsScreen(config)
     local screenHidden = wantsScreen and config.screenCombatOnly and config.screenLocked ~= false and not InCombatLockdown()
@@ -381,12 +389,8 @@ local function TickLive(config, now)
 
     if wantsIcon then
         BuildIconCallouts()
-        if ShowOnIcon(bwCallout, BESTIAL_WRATH) then RenderCallout(bwCallout, now, cleaveUp, false, false) end
-        if now >= thrashPromptUntil and ShowOnIcon(thrashCallout, WILD_THRASH) then
-            RenderThrashCues(thrashCallout, cleaveUp, config.showHoldThrash)
-        else
-            thrashCallout.root:Hide()
-        end
+        if ShowOnIcon(bwCallout, BESTIAL_WRATH) then RenderCallout(bwCallout, true, false) end
+        if ShowOnIcon(thrashCallout, WILD_THRASH) then RenderCallout(thrashCallout, false, true) end
     else
         HideIconCallouts()
     end
@@ -394,7 +398,7 @@ local function TickLive(config, now)
     if wantsScreen and not screenHidden then
         BuildScreenCallout()
         screenCallout.root:Show()
-        RenderCallout(screenCallout, now, cleaveUp, true, config.showHoldThrash)
+        RenderCallout(screenCallout, true, true)
     elseif screenCallout then
         screenCallout.root:Hide()
     end
@@ -403,7 +407,7 @@ local function TickLive(config, now)
 end
 
 local function Settled(now)
-    if InCombatLockdown() or now < thrashPromptUntil or now < lastThrashAt + BEAST_CLEAVE_SECONDS then return false end
+    if InCombatLockdown() or now < lastThrashAt + BEAST_CLEAVE_SECONDS or now < lastWrathAt + BESTIAL_WRATH_SECONDS then return false end
     return ReadRemaining(BESTIAL_WRATH, now) == 0 and ReadRemaining(WILD_THRASH, now) == 0
 end
 
@@ -462,7 +466,7 @@ end
 local function OnSpellCast(_, _, _, spellID)
     if issecretvalue(spellID) then return end
     if spellID == BESTIAL_WRATH then
-        thrashPromptUntil = GetTime() + THRASH_PROMPT_SECONDS
+        lastWrathAt = GetTime()
         local config = GetConfig()
         if WantsCue(config, 'thrash') then
             lastCue = 'thrash'
@@ -471,7 +475,6 @@ local function OnSpellCast(_, _, _, spellID)
         Wake()
     elseif WILD_THRASH_IDS[spellID] then
         lastThrashAt = GetTime()
-        thrashPromptUntil = 0
         Wake()
     end
 end
@@ -507,10 +510,10 @@ function BestialWrathOverlay.Refresh()
     if not GetHunter().PlayerIsHunter then return end
     MarkIconsDirty()
     local config = GetConfig()
-    local live = config.enabled and IsActive()
+    local isLive = config.enabled and IsActive()
     lastCue, previewPhase = nil, nil
-    SetCastWatch(live)
-    if live or previewActive then
+    SetCastWatch(isLive)
+    if isLive or previewActive then
         if WantsIcon(config) then BuildIconCallouts() end
         if WantsScreen(config) then BuildScreenCallout() end
         StyleAll(config)

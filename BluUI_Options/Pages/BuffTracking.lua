@@ -288,7 +288,7 @@ local function BestialWrath(board)
 			local callout = Board('Bestial Wrath callout', 'HOLD BW, SEND BW and THRASH! on the icon or on screen.')
 			Switch(callout, db, 'Speak the callouts', 'tts', Refresh)
 			Switch(callout, db, 'Speak the hold cues', 'ttsHold', Refresh)
-			Switch(callout, db, 'Hold Thrash hint, 8 to 13 seconds before Bestial Wrath', 'showHoldThrash', Refresh)
+			Switch(callout, db, 'Hold Thrash hint when Bestial Wrath will be ready before Beast Cleave ends', 'showHoldThrash', Refresh)
 			Switch(callout, db, 'Screen text only in combat', 'screenCombatOnly', Refresh)
 			callout:AddSwitch('Unlock the screen text to drag it', function() return db.screenLocked == false end, function(value)
 				db.screenLocked = not value
