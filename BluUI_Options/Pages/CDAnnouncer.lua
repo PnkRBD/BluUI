@@ -1,6 +1,6 @@
 local BUI = BluUI
 local BUILib = BluUI.BUILibClient
-local Controls, Layout, Modals = BUILib.Controls, BUILib.Layout, BUILib.Modals
+local Layout, Modals = BUILib.Layout, BUILib.Modals
 local Section = Layout.TableSection
 local CDAnnouncer = BUI.CDAnnouncer
 local Pixel = BUI.Pixel
@@ -20,7 +20,6 @@ local LIST_ROOM = 190
 local ERASE_SIZE = BUILib.Layout.ERASE_SIZE
 local ERASE_INSET = 18
 local TOOL_GAP = 12
-local RESULTS_WIDTH = 280
 local DRAG_ALPHA = 0.35
 local DEFAULT_ICON = 134400
 local LOOP_SECONDS = 7
@@ -407,21 +406,9 @@ local function CooldownsBoard(ui, parent, width, page)
 		selectedID = id
 		RebuildPage()
 	end
-	local function Search(anchor, text)
-		local hits = BUI.Lookup.SearchSpellsAndItems(text)
-		if #hits == 1 then return Add(hits[1].id, hits[1].isItem) end
-		local menu = {}
-		for _, hit in ipairs(hits) do
-			menu[#menu + 1] = { text = hit.name, icon = hit.icon, callback = function() Add(hit.id, hit.isItem) end }
-		end
-		if #menu == 0 then menu[1] = { text = 'Nothing found', disabled = true } end
-		Controls.ContextMenu(menu, { anchor = anchor, width = RESULTS_WIDTH, window = Window() })
-	end
 	local addRow = Section.AddRow(board, 'add a cooldown')
 	ui.RowTitle(addRow, 'Add a cooldown', 'Name, ID or link', LIST_ICON_X, NAME_WIDTH)
-	local box
-	box = ui.Input(addRow, INPUT_WIDTH, { placeholder = 'Search...', get = function() return '' end, set = function(text) Search(box, text) end })
-	box:SetPoint('RIGHT', -ui.ROW_INSET, 0)
+	BUI.SpellSearch(ui, addRow, INPUT_WIDTH, { onPick = function(hit) Add(hit.id, hit.isItem) end }):SetPoint('RIGHT', -ui.ROW_INSET, 0)
 
 	local rows = {}
 	local function IndexOf(entry)
