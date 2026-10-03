@@ -377,6 +377,7 @@ local function TimeTag(object, fontString)
 end
 
 local function TimeTagsIn(object, frame)
+	if frame:IsForbidden() then return end
 	for _, region in ipairs({ frame:GetRegions() }) do
 		if region.__owner == object then TimeTag(object, region) end
 	end
