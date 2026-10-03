@@ -70,6 +70,7 @@ local GROUPS = {
 		{ key = 'bestialWrathOverlay',        name = 'Bestial Wrath AoE Callout' },
 		{ key = 'monkVivaciousVivification',  name = 'Monk Vivacious Vivification' },
 		{ key = 'druidLifebloom',             name = 'Druid Lifebloom Refresh' },
+		{ key = 'druidClearcasting',          name = 'Druid Clearcasting' },
 		{ key = 'mageArcaneSalvo',            name = 'Mage Arcane Salvo' },
 	}},
 	{ header = 'Layout', sections = {

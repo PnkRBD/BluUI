@@ -20,6 +20,16 @@ function Display.GetTracker(settingsKey) return trackers[settingsKey] end
 function Display.IsInCombat() return inCombat end
 function Display.AlwaysActive() return true end
 
+local function SpokenText(settings)
+    if settings.ttsText:match("%S") then return settings.ttsText end
+    return settings.customText
+end
+
+function Display.Announce(settings)
+    BUI.PlaySoundByName(settings.sound)
+    if settings.tts then BUI.TTS.Speak(SpokenText(settings)) end
+end
+
 function Display.RefreshAll()
     for _, tracker in pairs(trackers) do
         tracker.Refresh()
@@ -148,11 +158,11 @@ function Display.CreateTracker(config)
 
     local lastSoundAt = 0
 
-    local function PlaySound(settings)
+    local function Announce(settings)
         local now = GetTime()
         if now - lastSoundAt < SOUND_COOLDOWN_SECONDS then return end
         lastSoundAt = now
-        BUI.PlaySoundByName(settings.sound)
+        Display.Announce(settings)
     end
 
     local function BuildMainFrame()
@@ -404,6 +414,10 @@ function Display.CreateTracker(config)
         auraLayoutDirty = true
     end
 
+    local function ShowFrame(settings, forceShow)
+        tracker.frame:SetShown(forceShow or not config.textOnly or settings.showText)
+    end
+
     function tracker.Update()
         if not tracker.frame then HideAndReset(); return end
 
@@ -420,7 +434,7 @@ function Display.CreateTracker(config)
         local stacks = tracker.getStacks()
 
         if not forceShow and SyncAuraText(true) then
-            tracker.frame:Show()
+            ShowFrame(settings, forceShow)
             if not showingAuraPath or auraLayoutDirty then
                 showingAuraPath = true
                 auraLayoutDirty = false
@@ -431,7 +445,7 @@ function Display.CreateTracker(config)
             if stacks == 0 then
                 lastStacks = -1
             else
-                if lastStacks == -1 then PlaySound(settings) end
+                if lastStacks == -1 then Announce(settings) end
                 lastStacks = stacks
             end
             return
@@ -452,12 +466,12 @@ function Display.CreateTracker(config)
             end
         end
 
-        tracker.frame:Show()
+        ShowFrame(settings, forceShow)
         local colorStacks = stacks
         if tracker.getColorStacks then colorStacks = tracker.getColorStacks() end
 
         if stacks ~= lastStacks or colorStacks ~= lastColorStacks or layoutDirty then
-            if lastStacks == -1 and stacks > 0 and not config.previewTextOnly then PlaySound(settings) end
+            if lastStacks == -1 and stacks > 0 and not config.previewTextOnly then Announce(settings) end
 
             local restyle = layoutDirty
             lastStacks = stacks
