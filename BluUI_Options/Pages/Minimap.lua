@@ -148,7 +148,7 @@ local function BuildPreview(band)
 	borderFrame:SetPoint('CENTER')
 	local borderBackground = borderFrame:CreateTexture(nil, 'BACKGROUND', nil, -1)
 	borderBackground:SetAllPoints()
-	borderBackground:SetColorTexture(0.12, 0.12, 0.13, 1)
+	borderBackground:SetColorTexture(0, 0, 0, 1)
 
 	local mapFrame = CreateFrame('Frame', nil, stage)
 	mapFrame:SetSize(PREVIEW_MAP, PREVIEW_MAP)
@@ -287,7 +287,7 @@ local function BuildPreview(band)
 	end
 
 	local function ApplyBorder()
-		local borderWidth = max(0, interfaceDB.minimapBorderWidth) * scale
+		local borderWidth = PreviewPixels(max(0, interfaceDB.minimapBorderWidth))
 		borderFrame:SetSize(PREVIEW_MAP + borderWidth * 2, PREVIEW_MAP + borderWidth * 2)
 	end
 
@@ -665,7 +665,7 @@ local function BuildPreview(band)
 			part:Show()
 		end
 
-		local gap = config.gap * scale
+		local gap = PreviewPixels(config.gap)
 		local inside = config.anchor == 'INSIDE_TOP' or config.anchor == 'INSIDE_BOTTOM'
 		local shift = inside and 0 or -0.5
 		stage:SetPoint('CENTER', card, 'CENTER', shift * anchor.offsetX * (width + gap), shift * anchor.offsetY * (height + gap))
@@ -716,8 +716,8 @@ local function MapBoard(ui, parent, width)
 	end)
 	Switch(board, 'Hide the BluUI button', BUI.IsMinimapButtonHidden, BUI.SetMinimapButtonHidden)
 	board:AddTools('Size and frame', 'How big the map is and the border around it', {
-		{ tooltip = 'Scale and border', title = 'Map', options = {
-			{ label = 'Scale', min = 50, max = 200, step = 1, get = function() return Interface().minimapScale end, set = MinimapModule.SetScale },
+		{ tooltip = 'Size and border', title = 'Map', options = {
+			{ label = 'Size in pixels', min = 100, max = 600, step = 1, get = MinimapModule.GetSizePixels, set = MinimapModule.SetSizePixels },
 			{ label = 'Border width', min = 0, max = 10, step = 1, get = function() return Interface().minimapBorderWidth end, set = MinimapModule.SetBorderWidth },
 		} },
 	}, RefreshPreview)
