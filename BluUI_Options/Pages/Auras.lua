@@ -225,7 +225,7 @@ local function GatewayRow(board)
 			Option(db, 'Text', 'customText', { kind = 'input', placeholder = 'Alert text' }),
 			Option(db, 'Font size', 'textSize', { min = 10, max = 48, step = 1 }),
 		}),
-		{ tooltip = 'Sound', title = 'Gateway alert', options = {
+		{ icon = 'sound', tooltip = 'Sound', title = 'Gateway alert', options = {
 			{ label = 'Sound', entries = sounds, get = function() return db.sound end, set = function(value)
 				db.sound = value
 				BUI.PlaySoundByName(value)
