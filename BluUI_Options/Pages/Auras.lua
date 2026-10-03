@@ -274,8 +274,9 @@ local function CooldownFlashRow(board)
 	local db = BUI.GetDB().cooldownFlash
 	local CooldownFlash = BUI.CooldownFlash
 	CooldownFlash.RegisterAnchorCallback(Repaint)
-	board:AddTools('Cooldown Flash', 'Spell icons that flash on screen when they come off cooldown, saved per spec', {
+	board:AddTools('Cooldown Flash', 'Spell icons that flash on screen when a cooldown is ready or a CDM buff falls off, saved per spec', {
 		{ icon = 'cog', tooltip = 'Open the Cooldown Flash page', onClick = function() BUI.PageEngine.NavigateToID('cooldownFlash') end },
+		BUI.PositionTool(db, { selfTag = 'BUI_CooldownFlash' }),
 		Eye('Unlock to drag the icons, right-click them to lock', function() return db.showAnchor == true end, function(value)
 			db.showAnchor = value
 			CooldownFlash.Refresh()

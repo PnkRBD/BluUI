@@ -247,6 +247,23 @@ function Board:AddDragRow(label, room, sub, icon)
 	return row, title, subtitle
 end
 
+function Board:AddDragTools(label, sub, icon, tools, after)
+	local kit = self.kit
+	local row, title, subtitle = self:AddDragRow(label, 0, sub, icon)
+	local placer = kit.Tools(row, tools, after)
+	local textWidth = self.panelWidth - DragTextX(icon) - kit.ROW_INSET - CONTROL_GAP
+	row.tools = {
+		widths = placer.widths,
+		Place = function(slots)
+			local width = textWidth - placer.Place(slots)
+			title:SetWidth(width)
+			if subtitle then subtitle:SetWidth(width) end
+		end,
+	}
+	row.controls = placer.controls
+	return row
+end
+
 function Board:Move(frame, delta)
 	for index, row in ipairs(self.rows) do
 		if row.frame == frame then
