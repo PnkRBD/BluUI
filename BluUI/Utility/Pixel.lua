@@ -82,6 +82,19 @@ function Pixel.PixelSizeFor(frame, pixels)
     return Pixel.ClampBorder(pixels) * perfectScale / frame:GetEffectiveScale()
 end
 
+local function RoundLayout(object)
+    if not object.SetRoundLayoutToNearestPixel or rawget(object, '_roundsLayout') then return end
+    object._roundsLayout = true
+    object:SetRoundLayoutToNearestPixel(true)
+end
+
+function Pixel.RoundLayout(frame)
+    if not frame.SetRoundLayoutToNearestPixel or frame:IsForbidden() or frame:GetObjectType() == 'AuraContainer' then return end
+    RoundLayout(frame)
+    for _, region in ipairs({ frame:GetRegions() }) do RoundLayout(region) end
+    for _, child in ipairs({ frame:GetChildren() }) do Pixel.RoundLayout(child) end
+end
+
 local Profiler = BUI.Profiler
 
 local function KillSnap(object)
@@ -137,6 +150,7 @@ local function HookSnapMethods(widget)
 end
 
 local function GiveBackdrop(frame)
+    RoundLayout(frame)
     if frame.SetBackdrop then return end
     for key, value in pairs(BackdropTemplateMixin) do
         if type(value) == "function" then
@@ -285,6 +299,7 @@ function Pixel.ApplyFont(fontString, size, fontPath, flags)
     if not fontString then return end
     if type(size) ~= "number" or size <= 0 then return end
 
+    RoundLayout(fontString)
     local font = fontPath or BUI.GetGlobalFont()
     local outline = flags or BUI.GetFontOutline()
     local entry = fontRegistry[fontString]
@@ -310,9 +325,11 @@ local function GrantSnapMixins(widget)
     local prototype = getmetatable(widget).__index
     if rawget(prototype, "SnapSize") then return end
     prototype.SnapSize = function(self, width, height)
+        RoundLayout(self)
         self:SetSize(gridSnap(width), gridSnap(height or width))
     end
     prototype.SnapPoint = function(self, point, arg2, arg3, arg4, arg5, ...)
+        RoundLayout(self)
         if not arg2 then arg2 = self:GetParent() end
         if type(arg2) == "number" then arg2 = gridSnap(arg2) end
         if type(arg3) == "number" then arg3 = gridSnap(arg3) end
