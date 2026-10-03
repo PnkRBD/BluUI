@@ -706,6 +706,7 @@ BUI.Defaults = {
 
 		hunterCobraFang = {
 			enabled           = false,
+			showText          = true,
 			showAnchor        = false,
 			centerHorizontally = true,
 			customText        = '',
@@ -719,10 +720,13 @@ BUI.Defaults = {
 			font              = BUI.C.GLOBAL_OPTION,
 			textColor         = { r = 0.35, g = 0.95, b = 0.3, a = 1 },
 			sound             = 'None',
+			tts               = false,
+			ttsText           = '',
 		},
 
 		hunterPreciseShots = {
 			enabled           = false,
+			showText          = true,
 			showAnchor        = false,
 			centerHorizontally = true,
 			customText        = 'PS',
@@ -736,10 +740,13 @@ BUI.Defaults = {
 			font              = BUI.C.GLOBAL_OPTION,
 			textColor         = { r = 0.2, g = 0.6, b = 1.0, a = 1 },
 			sound             = 'None',
+			tts               = false,
+			ttsText           = '',
 		},
 
 		hunterBulletstorm = {
 			enabled           = false,
+			showText          = true,
 			showAnchor        = false,
 			centerHorizontally = true,
 			customText        = 'AiS',
@@ -753,10 +760,13 @@ BUI.Defaults = {
 			font              = BUI.C.GLOBAL_OPTION,
 			textColor         = { r = 1.0, g = 0.72, b = 0.2, a = 1 },
 			sound             = 'None',
+			tts               = false,
+			ttsText           = '',
 		},
 
 		hunterLockAndLoad = {
 			enabled           = false,
+			showText          = true,
 			showAnchor        = false,
 			centerHorizontally = true,
 			customText        = 'LnL',
@@ -770,10 +780,13 @@ BUI.Defaults = {
 			font              = BUI.C.GLOBAL_OPTION,
 			textColor         = { r = 1.0, g = 0.85, b = 0.2, a = 1 },
 			sound             = 'None',
+			tts               = false,
+			ttsText           = '',
 		},
 
 		hunterKillCommand = {
 			enabled           = false,
+			showText          = true,
 			showAnchor        = false,
 			centerHorizontally = true,
 			customText        = 'KC',
@@ -787,10 +800,13 @@ BUI.Defaults = {
 			font              = BUI.C.GLOBAL_OPTION,
 			textColor         = { r = 1.0, g = 0.4, b = 0.2, a = 1 },
 			sound             = 'None',
+			tts               = false,
+			ttsText           = '',
 		},
 
 		hunterRaptorSwipe = {
 			enabled           = false,
+			showText          = true,
 			showAnchor        = false,
 			centerHorizontally = true,
 			customText        = 'RS',
@@ -805,10 +821,13 @@ BUI.Defaults = {
 			font              = BUI.C.GLOBAL_OPTION,
 			textColor         = { r = 0.95, g = 0.6, b = 0.2, a = 1 },
 			sound             = 'None',
+			tts               = false,
+			ttsText           = '',
 		},
 
 		hunterRaptorPrompt = {
 			enabled           = false,
+			showText          = true,
 			showAnchor        = false,
 			centerHorizontally = true,
 			customText        = 'RAPTOR',
@@ -822,10 +841,13 @@ BUI.Defaults = {
 			font              = BUI.C.GLOBAL_OPTION,
 			textColor         = { r = 1.0, g = 0.85, b = 0.2, a = 1 },
 			sound             = 'None',
+			tts               = false,
+			ttsText           = '',
 		},
 
 		monkVivaciousVivification = {
 			enabled           = false,
+			showText          = true,
 			showAnchor        = false,
 			centerHorizontally = true,
 			customText        = 'VIVIFY!',
@@ -839,10 +861,13 @@ BUI.Defaults = {
 			font              = BUI.C.GLOBAL_OPTION,
 			textColor         = { r = 0.55, g = 0.9, b = 1.0, a = 1 },
 			sound             = 'None',
+			tts               = false,
+			ttsText           = '',
 		},
 
 		mageArcaneSalvo = {
 			enabled           = false,
+			showText          = true,
 			showAnchor        = false,
 			centerHorizontally = true,
 			customText        = '',
@@ -856,14 +881,18 @@ BUI.Defaults = {
 			font              = BUI.C.GLOBAL_OPTION,
 			textColor         = { r = 0.75, g = 0.55, b = 1.0, a = 1 },
 			sound             = 'None',
+			tts               = false,
+			ttsText           = '',
 		},
 
 		druidLifebloom = {
 			enabled           = false,
+			showText          = true,
 			showAnchor        = false,
 			centerHorizontally = true,
 			customText        = 'REFRESH',
 			refreshSeconds    = 4.5,
+			soundSeconds      = 4.5,
 			posX              = 0,
 			posY              = -100,
 			anchorFrame       = '',
@@ -873,6 +902,29 @@ BUI.Defaults = {
 			textSize          = 22,
 			font              = BUI.C.GLOBAL_OPTION,
 			textColor         = { r = 0.4, g = 1.0, b = 0.4, a = 1 },
+			sound             = 'None',
+			tts               = false,
+			ttsText           = '',
+		},
+
+		druidClearcasting = {
+			enabled           = false,
+			showText          = true,
+			showAnchor        = false,
+			centerHorizontally = true,
+			customText        = 'CLEARCASTING',
+			posX              = 0,
+			posY              = -130,
+			anchorFrame       = '',
+			anchorPoint       = 'BOTTOM',
+			anchorOffsetX     = 0,
+			anchorOffsetY     = 0,
+			textSize          = 22,
+			font              = BUI.C.GLOBAL_OPTION,
+			textColor         = { r = 0.55, g = 0.8, b = 1.0, a = 1 },
+			sound             = 'None',
+			tts               = false,
+			ttsText           = '',
 		},
 
 		petAlert = {
@@ -955,6 +1007,7 @@ BUI.Defaults = {
 
 		misdirectAlert = {
 			enabled            = false,
+			showText           = true,
 			alertMode          = 'flash',
 			flashSeconds       = 2,
 			flashOnCast        = true,
@@ -972,6 +1025,8 @@ BUI.Defaults = {
 			font               = BUI.C.GLOBAL_OPTION,
 			textColor          = { r = 0.3, g = 0.9, b = 1, a = 1 },
 			sound              = 'None',
+			tts                = false,
+			ttsText            = '',
 		},
 
 		packLeader = {
