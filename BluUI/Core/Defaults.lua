@@ -1578,11 +1578,6 @@ BUI.Defaults = {
 			anchorPoint        = 'BOTTOM',
 			anchorOffsetX      = 0,
 			anchorOffsetY      = 0,
-			iconSize           = 48,
-			spacing            = 6,
-			holdSeconds        = 2.5,
-			glow               = 'proc',
-			sound              = 'None',
 			specs              = {},
 		},
 

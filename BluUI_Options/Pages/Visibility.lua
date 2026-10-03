@@ -26,6 +26,8 @@ local MODULE_LABELS = {
 	CDM = 'Cooldown Manager',
 	CustomBars = 'Custom Bars',
 	BuffTracking = 'Buff Tracking',
+	CDAnnouncer = 'CD Announcer',
+	CooldownFlash = 'Cooldown Flash',
 	PowerBar = 'Power Bar',
 	SecondaryPower = 'Secondary Power',
 }
