@@ -16,10 +16,28 @@ local BAG_BUTTON_NAMES = {
 }
 local MASKED_REGIONS = { 'icon', 'searchOverlay', 'ItemContextOverlay' }
 local COUNT_SIZE = 12
+local BLOCKING_ADDON = 'ElvUI'
+local EXPAND_CVAR = 'expandBagBar'
 
 local bagBar
 local QueueRetake, QueueMeasure
 local bagButtonsSkinned = false
+local singleApplied = false
+
+function ActionBars.BagBarBlockedBy()
+	return C_AddOns.IsAddOnLoaded(BLOCKING_ADDON) and BLOCKING_ADDON or nil
+end
+
+local function ApplySingleBag(barSettings)
+	local single = barSettings.singleBag == true
+	if single then
+		C_CVar.SetCVar(EXPAND_CVAR, '0')
+	elseif singleApplied then
+		C_CVar.SetCVar(EXPAND_CVAR, '1')
+	end
+	singleApplied = single
+	BagBarExpandToggle:SetShown(not single)
+end
 
 local function StyleBagState(button)
 	button:GetNormalTexture():SetAlpha(0)
@@ -80,6 +98,7 @@ end
 
 local function Measure(self)
 	if not self:Owned() or not self:Enabled() then return end
+	if self:Settings().singleBag then BagBarExpandToggle:Hide() end
 	local left, right, top, bottom = VisibleBounds()
 	local barLeft, barTop = BagsBar:GetLeft(), BagsBar:GetTop()
 	if not left or not barLeft then return end
@@ -99,6 +118,7 @@ local function Retake(self)
 	local barSettings = self:Settings()
 	self:Apply(function()
 		SkinBagButtons()
+		ApplySingleBag(barSettings)
 		BagsBar:SetParent(header)
 		BagsBar:ClearAllPoints()
 		BagsBar:SetPoint('TOPLEFT', header, 'TOPLEFT', 0, 0)
@@ -116,6 +136,11 @@ local function Retake(self)
 end
 
 local function Release()
+	if singleApplied then
+		singleApplied = false
+		C_CVar.SetCVar(EXPAND_CVAR, '1')
+		BagBarExpandToggle:Show()
+	end
 	BagsBar:SetParent(UIParent)
 	BagsBar:ClearAllPoints()
 	BagsBar:SetPoint('BOTTOMRIGHT', UIParent, 'BOTTOMRIGHT', -RELEASE_INSET, RELEASE_INSET)
@@ -148,6 +173,7 @@ bagBar = ActionBars.NewBlizzardBar({
 	retake = Retake,
 	release = Release,
 	installHooks = InstallHooks,
+	blockedBy = ActionBars.BagBarBlockedBy,
 })
 QueueRetake = BUI.Dispatcher.New(function() Retake(bagBar) end, EVENT_KEY .. '.Retake')
 QueueMeasure = BUI.Dispatcher.New(function() Measure(bagBar) end, EVENT_KEY .. '.Measure')

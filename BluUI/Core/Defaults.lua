@@ -292,7 +292,7 @@ BUI.Defaults = {
 			stanceBar = Merge(ActionBarBase, { enabled = true, buttonCount = 10, buttonsPerRow = 10, buttonSize = 28, posY = 210, centerHorizontally = true }),
 			vehicleBar = Merge(ActionBarBase, { enabled = true, buttonCount = 1, buttonsPerRow = 1, buttonSize = 40, posX = 320, posY = 60 }),
 			microBar = Merge(ActionBarBase, { enabled = true, hidden = false, buttonsPerRow = 13, spacing = 0, vertical = false, posX = 420, posY = -380 }),
-			bagBar = Merge(ActionBarBase, { enabled = true, hidden = false, posX = 620, posY = -380 }),
+			bagBar = Merge(ActionBarBase, { enabled = true, hidden = false, singleBag = false, posX = 620, posY = -380 }),
 			extraBar = Merge(ActionBarBase, { enabled = true, hidden = false, buttonCount = 1, buttonsPerRow = 1, buttonSize = 52, posX = 0, posY = -250, blizzardArt = false }),
 			cooldownColor  = { 1, 1, 1, 1 },
 			cooldownAnchor = 'CENTER',
