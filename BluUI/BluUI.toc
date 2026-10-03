@@ -197,6 +197,7 @@ Modules\Cursor\Cursor.lua
 Modules\Markers\Markers.lua
 Modules\CustomBars\CustomBars.lua
 Modules\CDAnnouncer\CDAnnouncer.lua
+Modules\CooldownFlash\CooldownFlash.lua
 Modules\Settings\Settings.lua
 Modules\CombatLogging\CombatLogging.lua
 Modules\GemCounter\GemCounter.lua

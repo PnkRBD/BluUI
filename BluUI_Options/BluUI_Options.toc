@@ -22,6 +22,7 @@ Pages\CDMIconManagement.lua
 Pages\CDM.lua
 Pages\CustomBars.lua
 Pages\CDAnnouncer.lua
+Pages\CooldownFlash.lua
 Pages\Bars.lua
 Pages\UnitFrames.lua
 Pages\GroupFrames.lua
