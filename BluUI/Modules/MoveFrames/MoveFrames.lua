@@ -537,6 +537,47 @@ function MoveFrames.OnFrameRestored(frame)
 	end
 end
 
+local function DescribePoint(point, relativeTo, relativePoint, x, y)
+	if not point then return 'no points' end
+	local name = relativeTo and relativeTo.GetName and relativeTo:GetName() or (relativeTo and 'unnamed' or 'parent')
+	if IsSecret(x) or IsSecret(y) then return ('%s to %s %s (secret)'):format(point, name, relativePoint) end
+	return ('%s to %s %s %.1f %.1f'):format(point, name, relativePoint, x, y)
+end
+
+function MoveFrames.Report()
+	local config = GetConfig()
+	local hooked, paths = 0, {}
+	for target in pairs(hookedRoot) do
+		hooked = hooked + 1
+		local path = framePath[target]
+		if config.positions[path] or heldPoints[target] or dragged[target] then paths[#paths + 1] = path end
+	end
+	local lines = {
+		('Mode %s, active %s, blocked by %s, hooked frames %d, applying %s'):format(
+			config.positionMode, tostring(MoveFrames.IsActive()), tostring(MoveFrames.blockedBy), hooked, tostring(applying)),
+	}
+	for path in pairs(config.positions) do
+		if not ResolvePath(path) then paths[#paths + 1] = path .. ' (not hooked)' end
+	end
+	table.sort(paths)
+	for _, path in ipairs(paths) do
+		local target = ResolvePath(path)
+		if target then
+			lines[#lines + 1] = ('%s: %s, shown %s, parent %s, movable %s, user placed %s, drag script %s, moving %s'):format(
+				path, DescribePoint(target:GetPoint(1)), tostring(target:IsShown()),
+				target:GetParent() and (target:GetParent():GetName() or 'unnamed') or 'none',
+				tostring(target:IsMovable()), tostring(target:IsUserPlaced()), tostring(target:GetScript('OnDragStart') ~= nil), tostring(moving[target] == true))
+			local saved = config.positions[path]
+			if saved then lines[#lines + 1] = ('  saved %s to %s %s %.1f %.1f'):format(saved.point, saved.relativeTo, saved.relativePoint, saved.x, saved.y) end
+			local held = heldPoints[target]
+			if held then lines[#lines + 1] = '  held ' .. DescribePoint(held.point, held.relativeTo, held.relativePoint, held.x, held.y) end
+		else
+			lines[#lines + 1] = path
+		end
+	end
+	return lines
+end
+
 function MoveFrames.SetEnabled(enabled)
 	local config = GetConfig()
 	config.enabled = enabled and true or false
