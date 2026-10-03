@@ -277,7 +277,7 @@ local function PlaceOnPixels(target, point, relativeTo, relativePoint, x, y)
 	target:SetPoint(point, relativeTo, relativePoint, x, y)
 	local left, top = target:GetLeft(), target:GetTop()
 	if not left or not top or IsSecret(left) or IsSecret(top) then return end
-	local pixel = PixelUtil.GetPixelToUIUnitFactor() / target:GetEffectiveScale()
+	local pixel = BUI.Pixel.PixelSizeFor(target, 1)
 	local Widget = LibStub('BUILib').Widget
 	local shiftX = Widget.SnapX(left, pixel) - left
 	local shiftY = Widget.SnapY(top, pixel) - top
@@ -403,7 +403,7 @@ local OnTargetShow = BUI.Profiler.Wrap('MoveFrames.MoveFrames target shown', fun
 	HoldDraggedPosition(target)
 end)
 
-local function OnHandleMouseDown(handle, button)
+local function OnHandleDragStart(handle, button)
 	if button ~= 'LeftButton' or not MoveFrames.IsActive() then return end
 	local target = dragTarget[handle]
 	if not target or moving[target] or IsLocked(target) then return end
@@ -416,8 +416,7 @@ local function OnHandleMouseDown(handle, button)
 	moving[target] = true
 end
 
-local function OnHandleMouseUp(handle, button)
-	if button ~= 'LeftButton' then return end
+local function OnHandleDragStop(handle)
 	local target = dragTarget[handle]
 	if not target or not moving[target] then return end
 	StopDrag(target)
@@ -429,8 +428,9 @@ local function OnHandleMouseUp(handle, button)
 end
 
 local function InstallHandleHooks(handle)
-	if handle:HasScript('OnMouseDown') then handle:HookScript('OnMouseDown', BUI.Profiler.Wrap('MoveFrames.MoveFrames handle OnMouseDown', OnHandleMouseDown)) end
-	if handle:HasScript('OnMouseUp') then handle:HookScript('OnMouseUp', BUI.Profiler.Wrap('MoveFrames.MoveFrames handle OnMouseUp', OnHandleMouseUp)) end
+	if not handle:GetScript('OnDragStart') then handle:RegisterForDrag('LeftButton') end
+	handle:HookScript('OnDragStart', BUI.Profiler.Wrap('MoveFrames.MoveFrames handle OnDragStart', OnHandleDragStart))
+	handle:HookScript('OnDragStop', BUI.Profiler.Wrap('MoveFrames.MoveFrames handle OnDragStop', OnHandleDragStop))
 end
 
 local function HookFrame(path, rootPath)
@@ -456,12 +456,12 @@ local function HookFrame(path, rootPath)
 	local rehooking = false
 	Hook(handle, 'SetScript', function(self, scriptName)
 		if rehooking or self ~= handle then return end
-		if scriptName ~= 'OnMouseDown' and scriptName ~= 'OnMouseUp' then return end
+		if scriptName ~= 'OnDragStart' and scriptName ~= 'OnDragStop' then return end
 		rehooking = true
-		if scriptName == 'OnMouseDown' then
-			handle:HookScript('OnMouseDown', BUI.Profiler.Wrap('MoveFrames.MoveFrames handle OnMouseDown 2', OnHandleMouseDown))
+		if scriptName == 'OnDragStart' then
+			handle:HookScript('OnDragStart', BUI.Profiler.Wrap('MoveFrames.MoveFrames handle OnDragStart 2', OnHandleDragStart))
 		else
-			handle:HookScript('OnMouseUp', BUI.Profiler.Wrap('MoveFrames.MoveFrames handle OnMouseUp 2', OnHandleMouseUp))
+			handle:HookScript('OnDragStop', BUI.Profiler.Wrap('MoveFrames.MoveFrames handle OnDragStop 2', OnHandleDragStop))
 		end
 		rehooking = false
 	end)
