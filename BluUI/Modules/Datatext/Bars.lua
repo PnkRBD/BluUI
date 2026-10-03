@@ -16,9 +16,12 @@ local LAYOUT = {
     lineExtra   = 4,
 }
 Datatext.LAYOUT = LAYOUT
+local MOUSEOVER_INTERVAL = 0.1
+local MOUSEOVER_FADE = 0.2
 
 local bars = {}
 local minimapBar
+local mouseoverBars = {}
 local measureFontString, measureFontSize, measureFontPath
 
 local parts, partEntries, partCount = {}, {}, 0
@@ -162,7 +165,7 @@ local function HitOnClick(self, mouseButton)
 end
 
 local function HitOnEnter(self)
-    if Datatext.HoversBlocked() then return end
+    if Datatext.HoversBlocked(self.bar.getConfig()) then return end
     local entry = self.entry
     if not entry.OnEnter then return end
     if entry._profOnEnter == nil or entry._profOnEnterRaw ~= entry.OnEnter then
@@ -733,6 +736,43 @@ function Datatext.AnchorMinimapBar()
     if Datatext._initialized then ApplyMinimapBar() end
 end
 
+local function TooltipOnBar(bar)
+    local owner = GameTooltip:IsShown() and GameTooltip:GetOwner()
+    return owner and owner.bar == bar
+end
+
+local function BarRevealed(bar)
+    return bar.dragging or BarUnlocked(bar) or bar.frame:IsMouseOver() or TooltipOnBar(bar) or Datatext.AnyHoverShown()
+end
+
+local function MouseoverTick()
+    for index = 1, #mouseoverBars do
+        local bar = mouseoverBars[index]
+        local target = BarRevealed(bar) and 1 or 0
+        if bar.alphaTarget ~= target then
+            bar.alphaTarget = target
+            BUI.Animation.To(bar.frame, 'alpha', target, MOUSEOVER_FADE)
+        end
+    end
+end
+
+local function TrackMouseover(bar)
+    local config = bar.getConfig()
+    if config and config.mouseover and bar.frame:IsShown() then
+        mouseoverBars[#mouseoverBars + 1] = bar
+    elseif bar.alphaTarget then
+        bar.alphaTarget = nil
+        BUI.Animation.To(bar.frame, 'alpha', 1, 0)
+    end
+end
+
+local function SyncMouseover()
+    wipe(mouseoverBars)
+    for _, bar in pairs(bars) do TrackMouseover(bar) end
+    if minimapBar then TrackMouseover(minimapBar) end
+    BUI.Scheduler.RegisterUpdate('Datatext.Mouseover', MouseoverTick, MOUSEOVER_INTERVAL, #mouseoverBars > 0)
+end
+
 function Datatext.Apply()
     if not Datatext._initialized then return end
     fontGeneration = fontGeneration + 1
@@ -767,6 +807,7 @@ function Datatext.Apply()
     for _, bar in pairs(bars) do bar._renderSig = nil end
     if minimapBar then minimapBar._renderSig = nil end
     RenderAll()
+    SyncMouseover()
 end
 
 function Datatext.SetLockCallback(callback)

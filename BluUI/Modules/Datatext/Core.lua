@@ -33,6 +33,9 @@ local BAR_DEFAULTS = {
     titleSize    = 12,
     titleColor   = { r = 1, g = 1, b = 1 },
     lock         = false,
+    mouseover    = false,
+    hideHoversInCombat = true,
+    rosterTooltips = true,
     strata       = 'MEDIUM',
     frameLevel   = 2,
     mirrorChat   = false,
@@ -122,6 +125,15 @@ function Datatext.MigrateBars()
             config.y = config.offsetBottom
         end
     end
+    if profile.datatextHideHoversInCombat == false or profile.datatextRosterTooltips == false then
+        local hideHovers, roster = profile.datatextHideHoversInCombat ~= false, profile.datatextRosterTooltips ~= false
+        for barIndex = 1, #list do
+            list[barIndex].hideHoversInCombat, list[barIndex].rosterTooltips = hideHovers, roster
+        end
+        local minimap = GetMinimapConfig()
+        minimap.hideHoversInCombat, minimap.rosterTooltips = hideHovers, roster
+    end
+    profile.datatextHideHoversInCombat, profile.datatextRosterTooltips = nil, nil
 end
 
 local function KindPrefix(kind)
@@ -278,8 +290,8 @@ function Datatext.Tooltip(hit)
     return GameTooltip
 end
 
-function Datatext.HoversBlocked()
-    if InCombatLockdown() and BUI.GetDB().datatextHideHoversInCombat ~= false then return true end
+function Datatext.HoversBlocked(config)
+    if InCombatLockdown() and config.hideHoversInCombat then return true end
     local menu = _G.BUI_MinimapMenu
     return menu and menu:IsShown() or false
 end
