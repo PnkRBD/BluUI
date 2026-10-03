@@ -16,10 +16,7 @@ local function Recompute()
     local _, pixels = GetPhysicalScreenSize()
     if not pixels or pixels <= 0 then return false end
     local newPerfect = VIRTUAL_HEIGHT / pixels
-
-    local active = BUI.AppliedUIScale()
-
-    local newGrid = newPerfect / active
+    local newGrid = newPerfect / UIParent:GetScale()
     if pixels == screenPixels and newGrid == gridUnit then return false end
 
     screenPixels = pixels
@@ -60,9 +57,9 @@ local function gridSnap(value)
     if unit ~= unit or unit == huge or unit == -huge or unit <= 0 then
         return BUI.Round(value)
     end
-    if unit == 1 then return value end
-    local step = unit > 1 and unit or -unit
-    return value - value % (value < 0 and step or -step)
+    local pixels = value / unit
+    if pixels < 0 then return -floor(-pixels + 0.5) * unit end
+    return floor(pixels + 0.5) * unit
 end
 
 Pixel.Scale = gridSnap
