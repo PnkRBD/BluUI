@@ -575,8 +575,6 @@ BUI.Defaults = {
 		},
 
 		datatextEnabled = true,
-		datatextHideHoversInCombat = true,
-		datatextRosterTooltips = true,
 		datatextBarsInit = false,
 
 		datatextBars = {},
@@ -597,6 +595,9 @@ BUI.Defaults = {
 			bgColor        = { r = 0, g = 0, b = 0 },
 			border         = false,
 			borderColor    = { r = 0.2, g = 0.2, b = 0.24, a = 1 },
+			mouseover      = false,
+			hideHoversInCombat = true,
+			rosterTooltips = true,
 			showFPS          = true,
 			showPing         = true,
 			pingSource       = 'world',

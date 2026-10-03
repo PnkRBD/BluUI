@@ -100,6 +100,20 @@ function Datatext.PlacePanelAtCursor(panel)
     end
 end
 
+function Datatext.AnyHoverShown()
+    for panelIndex = 1, #hoverPanels do
+        if hoverPanels[panelIndex]:IsShown() then return true end
+    end
+    return false
+end
+
+function Datatext.HideHoversInCombat()
+    for panelIndex = 1, #hoverPanels do
+        local panel = hoverPanels[panelIndex]
+        if panel:IsShown() and panel.anchor.bar.getConfig().hideHoversInCombat then ForceHide(panel) end
+    end
+end
+
 function Datatext.HideAllHovers()
     for panelIndex = 1, #hoverPanels do ForceHide(hoverPanels[panelIndex]) end
     local owner = GameTooltip:GetOwner()
