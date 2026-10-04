@@ -49,8 +49,12 @@ local ABSORB_DIRECTIONS = {
 local DISPEL_MODES = {
 	{ value = 'off', text = 'Off' },
 	{ value = 'border', text = 'Color the border' },
-	{ value = 'bar', text = 'Tint the health bar' },
+	{ value = 'bar', text = 'Tint the whole bar' },
+	{ value = 'top', text = 'Tint the top half' },
+	{ value = 'bottom', text = 'Tint the bottom half' },
+	{ value = 'strip', text = 'Strip along the bottom' },
 }
+local TINT_MODES = { bar = true, top = true, bottom = true, strip = true }
 local DISPEL_SOURCES = {
 	{ value = 'mine', text = 'Dispellable by me' },
 	{ value = 'all', text = 'All magic, curse, disease and poison' },
@@ -477,11 +481,12 @@ local function AurasBoards(ui, parent, width, key)
 	local function Badges() GroupFrames().RestyleAllDispelBadges() end
 	dispels:AddTools('Dispel highlight', 'How the frame reacts', {
 		{ entries = DISPEL_MODES, width = MENU_WIDTH, get = function()
-			if border.tintBar then return 'bar' end
+			if border.tintBar then return border.tintStyle end
 			return border.enabled and 'border' or 'off'
 		end, set = function(value)
 			border.enabled = value == 'border'
-			border.tintBar = value == 'bar'
+			border.tintBar = TINT_MODES[value] == true
+			if border.tintBar then border.tintStyle = value end
 		end },
 		{ tooltip = 'Trigger and badge icon', title = 'Dispel highlight', options = {
 			Option(border, 'Trigger', 'source', { entries = DISPEL_SOURCES }),
