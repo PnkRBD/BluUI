@@ -37,7 +37,6 @@ local activeTab = TAB_BUY
 local activeTypeFilter
 local searchText = ''
 local merchantFrame
-local sellJunkActive = false
 local listReset = true
 
 local buyItems = {}
@@ -46,25 +45,8 @@ local buyRows = {}
 local buybackRows = {}
 local bulkRows = {}
 local visibleCurrencies = {}
-local currencySeen = {}
 
 local RefreshContent
-
-local function QueryMerchantItem(index)
-	local info = C_MerchantFrame.GetItemInfo(index)
-	if info then return info end
-	local name, texture, price, stackCount, numAvailable, isUsable, extendedCost = GetMerchantItemInfo(index)
-	if not name then return nil end
-	return {
-		name = name,
-		texture = texture,
-		price = price or 0,
-		stackCount = stackCount or 1,
-		numAvailable = numAvailable or -1,
-		isUsable = isUsable,
-		hasExtendedCost = extendedCost,
-	}
-end
 
 local function GetItemClass(merchantIndex)
 	local itemID = GetMerchantItemID(merchantIndex)
@@ -106,45 +88,8 @@ local function CanAffordMerchantItem(merchantIndex, goldPrice, hasExtendedCost)
 	return true
 end
 
-local function GetSellPrice(itemID)
-	if not itemID then return 0 end
-	return select(11, C_Item.GetItemInfo(itemID)) or 0
-end
-
-local function GetJunkValue()
-	local total = 0
-	for bag = 0, 4 do
-		for slot = 1, C_Container.GetContainerNumSlots(bag) do
-			local info = C_Container.GetContainerItemInfo(bag, slot)
-			if info and info.quality == 0 and not info.hasNoValue and info.itemID then
-				local price = GetSellPrice(info.itemID)
-				if price > 0 then total = total + price * (info.stackCount or 1) end
-			end
-		end
-	end
-	return total
-end
-
-local function SellJunkNext()
-	if not sellJunkActive then return end
-	for bag = 0, 4 do
-		for slot = 1, C_Container.GetContainerNumSlots(bag) do
-			local info = C_Container.GetContainerItemInfo(bag, slot)
-			if info and info.quality == 0 and not info.hasNoValue and info.itemID then
-				C_Container.UseContainerItem(bag, slot)
-				After('Skin.Merchant junk sell', 0.2, SellJunkNext)
-				return
-			end
-		end
-	end
-	sellJunkActive = false
-	RefreshContent()
-end
-
 local function SellJunk()
-	if sellJunkActive then return end
-	sellJunkActive = true
-	SellJunkNext()
+	C_MerchantFrame.SellAllJunkItems()
 end
 
 local scanTip = CreateFrame('GameTooltip', 'BUIMerchantScanTip', nil, 'GameTooltipTemplate')
@@ -167,7 +112,7 @@ end
 local function ScanBuyItems()
 	local count = 0
 	for merchantIndex = 1, GetMerchantNumItems() do
-		local info = QueryMerchantItem(merchantIndex)
+		local info = C_MerchantFrame.GetItemInfo(merchantIndex)
 		if info and info.name then
 			local classID, subclassID = GetItemClass(merchantIndex)
 			if PassesTypeFilter(classID, subclassID) and PassesSearch(info.name) then
@@ -180,9 +125,10 @@ local function ScanBuyItems()
 				entry.price = info.price or 0
 				entry.stackCount = info.stackCount or 1
 				entry.numAvailable = info.numAvailable or -1
-				entry.canAfford = CanAffordMerchantItem(merchantIndex, info.price, info.hasExtendedCost)
+				entry.soldOut = info.numAvailable == 0
+				entry.canAfford = not entry.soldOut and CanAffordMerchantItem(merchantIndex, info.price, info.hasExtendedCost)
 				entry.isUsable = info.isUsable ~= false
-				entry.statusText = (info.isUsable == false) and ScanMerchantItemStatus(merchantIndex) or nil
+				entry.statusText = entry.soldOut and 'Sold out' or (info.isUsable == false) and ScanMerchantItemStatus(merchantIndex) or nil
 				entry.extendedCost = info.hasExtendedCost
 				entry.qualityR, entry.qualityG, entry.qualityB = Skin.QualityColor(GetMerchantItemID(merchantIndex))
 			end
@@ -213,28 +159,16 @@ local function ScanBuybackItems()
 end
 
 local function CollectVisibleCurrencies()
-	wipe(currencySeen)
-	local count = 0
-	for merchantIndex = 1, GetMerchantNumItems() do
-		local numCosts = GetMerchantItemCostInfo(merchantIndex)
-		for costIndex = 1, numCosts or 0 do
-			local texture, _, link = GetMerchantItemCostItem(merchantIndex, costIndex)
-			if link then
-				local currencyID = tonumber(link:match('currency:(%d+)'))
-				if currencyID and not currencySeen[currencyID] then
-					currencySeen[currencyID] = true
-					count = count + 1
-					local entry = visibleCurrencies[count] or {}
-					visibleCurrencies[count] = entry
-					entry.id = currencyID
-					entry.texture = texture
-					entry.link = link
-				end
-			end
-		end
+	local ids = C_MerchantFrame.GetMerchantCurrencies()
+	table.sort(ids)
+	for index, currencyID in ipairs(ids) do
+		local entry = visibleCurrencies[index] or {}
+		visibleCurrencies[index] = entry
+		entry.id = currencyID
+		entry.texture = C_CurrencyInfo.GetCurrencyInfo(currencyID).iconFileID
+		entry.link = C_CurrencyInfo.GetCurrencyLink(currencyID)
 	end
-	for currencyIndex = count + 1, #visibleCurrencies do visibleCurrencies[currencyIndex] = nil end
-	table.sort(visibleCurrencies, function(leftCurrency, rightCurrency) return leftCurrency.id < rightCurrency.id end)
+	for index = #ids + 1, #visibleCurrencies do visibleCurrencies[index] = nil end
 end
 
 local function CreateIconLabel(parent, fontSize)
@@ -526,13 +460,13 @@ local function BuildLootFilterItems()
 	local numSpecs = GetNumSpecializations()
 	for specIndex = 1, numSpecs do
 		local _, name = GetSpecializationInfo(specIndex)
-		if name then items[#items + 1] = { label = name, filterIndex = specIndex } end
+		if name then items[#items + 1] = { label = name, filterIndex = LE_LOOT_FILTER_SPEC1 + specIndex - 1 } end
 	end
 	if numSpecs > 0 then
-		items[#items + 1] = { label = 'All Specs', filterIndex = numSpecs + 1 }
+		items[#items + 1] = { label = ALL_SPECS, filterIndex = LE_LOOT_FILTER_CLASS }
 	end
-	items[#items + 1] = { label = 'BoE Only', filterIndex = numSpecs + 2 }
-	items[#items + 1] = { label = 'All', filterIndex = LE_LOOT_FILTER_ALL }
+	items[#items + 1] = { label = ITEM_BIND_ON_EQUIP, filterIndex = LE_LOOT_FILTER_BOE }
+	items[#items + 1] = { label = ALL, filterIndex = LE_LOOT_FILTER_ALL }
 	return items
 end
 
@@ -592,7 +526,7 @@ local function BuildFrame()
 			RefreshContent()
 		end, 140)
 		lootDropdown:SetPoint('LEFT', filterDropdown, 'RIGHT', Pixel.Scale(6), 0)
-		lootDropdown.label:SetText('All')
+		lootDropdown.label:SetText(ALL)
 		frame.lootFilterDD = lootDropdown
 	end
 
@@ -675,13 +609,22 @@ local function BuildFrame()
 end
 
 local function UpdateRepairState(targetFrame)
-	local canRepair = CanMerchantRepair()
-	local showRepair = canRepair and activeTab == TAB_BUY
-	local showGuild = showRepair and IsInGuild() and CanGuildBankRepair and CanGuildBankRepair()
+	local showRepair = CanMerchantRepair() and activeTab == TAB_BUY
+	local showGuild = showRepair and IsInGuild() and CanGuildBankRepair()
 	targetFrame.repairAll:SetShown(showRepair)
 	targetFrame.guildRepair:SetShown(showGuild)
+	if showRepair then
+		local cost, needsRepair = GetRepairAllCost()
+		local repairAll = Widget.Unwrap(targetFrame.repairAll)
+		repairAll:SetText(needsRepair and ('Repair All  ' .. GetCoinTextureString(cost)) or 'Repair All')
+		repairAll:SetEnabled(needsRepair and GetMoney() >= cost)
+		if showGuild then
+			local allowance = GetGuildBankWithdrawMoney()
+			Widget.Unwrap(targetFrame.guildRepair):SetEnabled(needsRepair and (allowance < 0 or allowance >= cost))
+		end
+	end
 
-	local showJunk = GetJunkValue() > 0
+	local showJunk = C_MerchantFrame.IsSellAllJunkEnabled() and C_MerchantFrame.GetNumJunkItems() > 0
 	targetFrame.sellJunk:SetShown(showJunk)
 	if not showJunk then return end
 
@@ -797,7 +740,7 @@ local function OnMerchantEvent(event)
 		activeTypeFilter = nil
 		merchantFrame:Show()
 		if merchantFrame.lootFilterDD then
-			merchantFrame.lootFilterDD.label:SetText('All')
+			merchantFrame.lootFilterDD.label:SetText(ALL)
 			SetMerchantFilter(LE_LOOT_FILTER_ALL)
 		end
 		BUI.Events:Register('BAG_UPDATE', 'Skinning.Merchant.Live', OnMerchantEvent)
@@ -805,14 +748,12 @@ local function OnMerchantEvent(event)
 		BUI.Events:Register('CURRENCY_DISPLAY_UPDATE', 'Skinning.Merchant.Live', OnMerchantEvent)
 		After('Skin.Merchant page reskin', 0, RefreshContent)
 	elseif event == 'MERCHANT_CLOSED' then
-		sellJunkActive = false
 		BUI.Events:UnregisterAll('Skinning.Merchant.Live')
 		if merchantFrame then merchantFrame:Hide() end
 		if MerchantFrame then Skin.RestoreBlizzardFrame(MerchantFrame) end
 		wipe(buyItems)
 		wipe(buybackItems)
 		wipe(visibleCurrencies)
-		wipe(currencySeen)
 		ClearRowData()
 	elseif merchantFrame and merchantFrame:IsShown() and not merchantFrame.pendingRefresh then
 		merchantFrame.pendingRefresh = true
