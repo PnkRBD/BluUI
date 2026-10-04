@@ -1,259 +1,246 @@
 local _, BUI = ...
-local Pixel = BUI.Pixel
 
-local BUILib = BluUI.BUILibClient
-local Controls = BUILib.Controls
-local Modals = BUILib.Modals
-local Widget = BUILib.Widget
-local Theme = BUILib.Theme
-local font
+local BUILib = BUI.BUILibClient
+local Layout, Widget = BUILib.Layout, BUILib.Widget
 
+local PAGE_WIDTH = 960
+local LEFT_WIDTH = 580
+local GAP = 12
+local HEADER_HEIGHT = 50
+local TABS_GAP = 14
+local CARD_RADIUS = 8
+local INSET_RADIUS = 6
+local PAD = 16
+local BOTTOM_PAD = 12
+local TITLE_Y = 20
+local ACCENT_WIDTH, ACCENT_HEIGHT = 3, 16
+local TITLE_GAP = 10
+local CONTENT_TOP = 40
+local TABLE_TOP = 40
+local TABLE_ROWS_TOP = 56
+local STRIP_HEIGHT = 60
+local STAT_ICON = 26
+local STAT_TEXT_X = 56
+local STAT_KICKER_Y = 12
+local VALUE_GAP = 10
+local DIVIDER_INSET = 14
+local TILE_HEIGHT = 80
+local TILE_GAP = 12
+local COLUMN_LABEL_Y = 4
+local COLUMNS_TOP = 48
+local STATUS_MARK = 12
+local MARK_GAP = 6
+local CHECK_MARK = 12
+local VAULT_SIDE = 170
+local LINK_GAP = 8
+local SIDE_TEXT_Y = 5
+local LINK_INSET = 12
+local LINK_HEIGHT = 20
+local CHEVRON_SIZE = 10
+local CHEVRON_INSET = 14
+local BAR_HEIGHT = 8
+local BAR_RADIUS = 4
+local RAID_ROWS_TOP = 42
+local RAID_ROW = 26
+local RAID_LABEL = 70
+local RAID_COUNT = 60
+local KEY_ROW = 26
+local KEY_ROWS = 8
+local DUNGEON_ICON = 16
+local ICON_GAP = 10
+local CURRENCY_ROW = 28
+local CURRENCY_ICON = 18
+local CURRENCY_ROWS = 12
+local GROUP_RULE = 9
+local CHAR_ROW = 26
+local CHAR_ROWS = 20
+local CLASS_ICON = 16
+local SESSION_TICK = 30
 local SESSION_RESET_GAP = 120
+local SNAPSHOT_DELAY = 2
+local CURRENCY_RESCAN = 30
+local KEYSTONE_ITEM = 180653
+local WHITE = { 1, 1, 1, 1 }
+local POINT_RIGHT = { 1, 0, 0, 0, 1, 1, 0, 1 }
+local ICON_CROP = { 0.08, 0.92, 0.08, 0.92 }
 
-local CARD_DEFINITIONS = {
-    { id = "stat_ilvl",    label = "Item Level",      group = "tiles" },
-    { id = "stat_mscore",  label = "M+ Score",        group = "tiles" },
-    { id = "weeklyMplus",  label = "Weekly M+ Runs",  group = "tiles" },
-    { id = "stat_session", label = "Session",         group = "tiles" },
-    { id = "dungeons",     label = "Recent Dungeons",   group = "cards" },
-    { id = "vault",        label = "Great Vault",       group = "cards" },
-    { id = "raidprog",     label = "Raid Progress",     group = "cards" },
-    { id = "crests",       label = "Crests",            group = "cards" },
-    { id = "alts",         label = "Alt Overview",      group = "cards" },
+local KEY_COLUMNS = { key = 0.47, time = 0.66, under = 0.82 }
+local CHAR_COLUMNS = { ilvl = 0.25, score = 0.375, key = 0.505, vault = 0.685, seen = 0.84 }
+
+local RAID_DIFFICULTIES = {
+    { label = 'Normal', short = 'N', color = { 0.35, 0.85, 0.35 } },
+    { label = 'Heroic', short = 'H', color = { 0.25, 0.6, 1 } },
+    { label = 'Mythic', short = 'M', color = { 0.7, 0.4, 0.95 } },
 }
 
-local GetDashboardDB, IsCardVisible
-local Session, ItemLevel, MythicPlusScore, Duration, TimeDelta, Score, KeyLevel
-local SpecName, WeeklyResetSeconds
-local OwnedKeystone, VaultBuckets, WeeklyMplusCount, MapTimeLimit, RunSeconds
-local RaiderIORunSeconds, RaiderIORuns, BlizzardRuns, ResolveBlizzardUpgrades, KeyTierColor
-local ClearRows, MakeCard, MakeCardHeader, MakeDungeonRow, MakeEmptyRow
-local PlayCardSlideIn
-local SeasonCurrencyList, VaultSlotLabel, RaidProgress, FormatAgo
-local SnapshotCurrentChar, MakeVaultTypeRow, MakeRaidRow, MakeAltRow, MakeCrestRow
+local CARDS = {
+    { id = 'stat_mscore', label = 'M+ score' },
+    { id = 'stat_ilvl', label = 'Item level' },
+    { id = 'weeklyMplus', label = 'Weekly M+' },
+    { id = 'stat_session', label = 'Session' },
+    { id = 'vault', label = 'Great Vault', separator = true },
+    { id = 'raidprog', label = 'Raid progress' },
+    { id = 'dungeons', label = 'Best keys' },
+    { id = 'crests', label = 'Currencies' },
+}
 
-function GetDashboardDB()
-    local db = BUI.GetDB()
-    db.dashboard = db.dashboard or {}
-    return db.dashboard
-end
-
-function IsCardVisible(cardID)
-    local visibility = GetDashboardDB().cardVisibility
-    if visibility and visibility[cardID] ~= nil then return visibility[cardID] end
-    return true
-end
+local VaultType = Enum.WeeklyRewardChestThresholdType
+local RAID_DIFFICULTY_NAMES = { [17] = 'LFR', [14] = 'Normal', [15] = 'Heroic', [16] = 'Mythic' }
 
 local sessionStart
 
-local function InitSession()
-    local globalDB = BUI.db and BUI.db.global
-    if not globalDB then return end
-    globalDB.session = globalDB.session or {}
-    local now = time()
-    if not globalDB.session.start or (globalDB.session.lastSeen and (now - globalDB.session.lastSeen) > SESSION_RESET_GAP) then
-        globalDB.session.start = now
-    end
-    sessionStart = globalDB.session.start
+local function DashboardDB()
+    return BUI.GetDB().dashboard
 end
 
-BUI.Events:Once("PLAYER_ENTERING_WORLD", "Dashboard.SessionInit", InitSession)
+local function CardShown(id)
+    return DashboardDB().cardVisibility[id] ~= false
+end
 
-BUI.Events:Register("PLAYER_LOGOUT", "Dashboard.SessionSave", function()
-    local globalDB = BUI.db and BUI.db.global
-    if not globalDB then return end
-    globalDB.session = globalDB.session or {}
-    globalDB.session.lastSeen = time()
-end)
+local function CharacterKey()
+    return UnitName('player') .. '-' .. GetRealmName()
+end
 
-function Session()
-    if not sessionStart then return "0m" end
+local function SessionText()
     local elapsed = time() - sessionStart
-    local hours = math.floor(elapsed / 3600)
-    local minutes = math.floor((elapsed % 3600) / 60)
-    if hours > 0 then return ("%dh %02dm"):format(hours, minutes) end
-    return ("%dm"):format(minutes)
+    local hours, minutes = math.floor(elapsed / 3600), math.floor(elapsed % 3600 / 60)
+    if hours > 0 then return ('%dh %02dm'):format(hours, minutes) end
+    return ('%dm'):format(minutes)
 end
 
-function ItemLevel()
-    local overall, equipped = GetAverageItemLevel()
-    return ("%d / %d"):format(math.floor((equipped or 0) + 0.5), math.floor((overall or 0) + 0.5))
+local function Clock(seconds)
+    seconds = math.floor(seconds + 0.5)
+    return ('%d:%02d'):format(math.floor(seconds / 60), seconds % 60)
 end
 
-function MythicPlusScore()
-    local score = C_ChallengeMode.GetOverallDungeonScore()
-    if not score then return "0" end
-    local roundedScore = math.floor(score)
-    local color = C_ChallengeMode.GetDungeonScoreRarityColor(roundedScore)
-    if color then
-        return ("|cff%02x%02x%02x%d|r"):format(
-            math.floor(color.r * 255), math.floor(color.g * 255), math.floor(color.b * 255), roundedScore)
-    end
-    return tostring(roundedScore)
+local function ColorOf(color)
+    if color then return color.r, color.g, color.b end
+    return 1, 1, 1
 end
 
-function Duration(seconds)
-    if not seconds or seconds <= 0 then return "" end
-    return string.format("%d:%02d", math.floor(seconds / 60), math.floor(seconds % 60))
-end
-
-function TimeDelta(actualSeconds, limitSeconds)
-    if not actualSeconds or actualSeconds <= 0 or not limitSeconds or limitSeconds <= 0 then return "" end
-    local difference = math.floor(limitSeconds - actualSeconds + 0.5)
-    local sign = difference >= 0 and "-" or "+"
-    difference = math.abs(difference)
-    return string.format("(%s%d:%02d)", sign, math.floor(difference / 60), difference % 60)
-end
-
-function Score(score)
-    if not score or score <= 0 then return "" end
-    return tostring(math.floor(score + 0.5))
-end
-
-function KeyLevel(level, upgrades)
-    if not level or level <= 0 then return "" end
-    local upgradeCount = math.max(0, upgrades or 0)
-    if upgradeCount <= 0 then return tostring(level) end
-    return string.rep("+", upgradeCount) .. tostring(level)
-end
-
-function SpecName()
+local function SpecLine()
+    local className = UnitClass('player')
     local specIndex = GetSpecialization()
-    if not specIndex then return "" end
-    local _, name = GetSpecializationInfo(specIndex)
-    return name or ""
+    local specName = specIndex and select(2, GetSpecializationInfo(specIndex))
+    return (specName and (specName .. ' ' .. className) or className) .. '  ·  ' .. GetRealmName()
 end
 
-function WeeklyResetSeconds()
-    return C_DateAndTime.GetSecondsUntilWeeklyReset()
-end
-
-function OwnedKeystone()
+local function OwnedKeystone()
     local level = C_MythicPlus.GetOwnedKeystoneLevel()
     local mapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
-    if not level or level == 0 or not mapID then return nil end
-    local name = C_ChallengeMode.GetMapUIInfo(mapID)
-    return level, name or ("map " .. mapID)
+    if not level or level == 0 or not mapID then return end
+    return level, (C_ChallengeMode.GetMapUIInfo(mapID))
 end
 
-local function CountUnlocked(activities)
-    local unlockedCount = 0
-    for _, activity in ipairs(activities or {}) do
-        if activity.progress and activity.threshold and activity.progress >= activity.threshold then unlockedCount = unlockedCount + 1 end
-    end
-    return unlockedCount
+local function VaultActivities(thresholdType)
+    local activities = C_WeeklyRewards.GetActivities(thresholdType)
+    table.sort(activities, function(left, right) return left.index < right.index end)
+    return activities
 end
 
-function VaultBuckets()
-    local RewardThresholdType = Enum.WeeklyRewardChestThresholdType
-    return
-        { CountUnlocked(C_WeeklyRewards.GetActivities(RewardThresholdType.Raid)),       3 },
-        { CountUnlocked(C_WeeklyRewards.GetActivities(RewardThresholdType.Activities)), 3 },
-        { CountUnlocked(C_WeeklyRewards.GetActivities(RewardThresholdType.World)),      3 }
+local function Unlocked(activity)
+    return activity.progress >= activity.threshold
 end
 
-function WeeklyMplusCount()
-    local RewardThresholdType = Enum.WeeklyRewardChestThresholdType
-    local activities = C_WeeklyRewards.GetActivities(RewardThresholdType.Activities) or {}
+local function UnlockedCount(activities)
     local count = 0
     for _, activity in ipairs(activities) do
-        if activity.progress and activity.progress > count then count = activity.progress end
+        if Unlocked(activity) then count = count + 1 end
     end
     return count
 end
 
-local PVP_CURRENCY_IDS = {}
-do
-    local currencyConstants = Constants and Constants.CurrencyConsts
-    if currencyConstants then
-        for _, constantName in ipairs({ "CONQUEST_CURRENCY_ID", "HONOR_CURRENCY_ID", "CLASSIC_HONOR_CURRENCY_ID", "ACCOUNT_WIDE_HONOR_CURRENCY_ID" }) do
-            local currencyID = currencyConstants[constantName]
-            if type(currencyID) == "number" then PVP_CURRENCY_IDS[currencyID] = true end
-        end
+local function RewardLink(activity)
+    return (C_WeeklyRewards.GetExampleRewardItemHyperlinks(activity.id))
+end
+
+local function RewardItemLevel(activity)
+    local link = RewardLink(activity)
+    return link and C_Item.GetDetailedItemLevelInfo(link)
+end
+
+local function VaultSlotLabel(activity)
+    if activity.type == VaultType.Raid then return RAID_DIFFICULTY_NAMES[activity.level] or GetDifficultyInfo(activity.level) end
+    if activity.type == VaultType.Activities then return '+' .. activity.level end
+    return 'Tier ' .. activity.level
+end
+
+local function WeeklyMplusCount()
+    local count = 0
+    for _, activity in ipairs(C_WeeklyRewards.GetActivities(VaultType.Activities)) do
+        count = math.max(count, activity.progress)
     end
-    PVP_CURRENCY_IDS[1602] = true
-    PVP_CURRENCY_IDS[1792] = true
+    return count
 end
 
-local function IsPvPCurrencyHeader(headerName)
-    if type(headerName) ~= "string" then return false end
-    return headerName == PLAYER_V_PLAYER or headerName == PVP or headerName == PVP_LABEL_PVP
+local PVP_CURRENCY_IDS = { [1602] = true, [1792] = true }
+if Constants.CurrencyConsts then
+    for _, constantName in ipairs({ 'CONQUEST_CURRENCY_ID', 'HONOR_CURRENCY_ID', 'CLASSIC_HONOR_CURRENCY_ID', 'ACCOUNT_WIDE_HONOR_CURRENCY_ID' }) do
+        local currencyID = Constants.CurrencyConsts[constantName]
+        if currencyID then PVP_CURRENCY_IDS[currencyID] = true end
+    end
 end
 
-local function IsUpgradeCrestName(currencyName)
-    return type(currencyName) == "string" and currencyName:lower():find("crest", 1, true) ~= nil
+local CREST_TIER_ORDER = { 'veteran', 'champion', 'hero', 'myth' }
+local TRACKED_CURRENCY_PATTERNS = { 'manaflux' }
+local HIDDEN_CURRENCY_PATTERNS = { 'adventurer', 'voidlight marl' }
+
+local function IsPvPHeader(name)
+    return name == PLAYER_V_PLAYER or name == PVP or name == PVP_LABEL_PVP
 end
 
-local CREST_TIER_ORDER = { "veteran", "champion", "hero", "myth" }
-local function CrestTier(currencyName)
-    local loweredName = type(currencyName) == "string" and currencyName:lower() or ""
-    for tierIndex, tierName in ipairs(CREST_TIER_ORDER) do
-        if loweredName:find(tierName, 1, true) then return tierIndex end
+local function CrestTier(name)
+    local lowered = name:lower()
+    for tier, tierName in ipairs(CREST_TIER_ORDER) do
+        if lowered:find(tierName, 1, true) then return tier end
     end
     return #CREST_TIER_ORDER + 1
 end
 
-local CREST_ROW_PITCH   = 20
-local CREST_ROW_LIMIT   = 12
-local CREST_ROWS_HEIGHT = 168
-
-local TRACKED_CURRENCY_PATTERNS = { "manaflux" }
-local HIDDEN_CURRENCY_PATTERNS  = { "adventurer", "voidlight marl" }
-
-local function MatchesCurrencyPattern(currencyName, namePatterns)
-    if type(currencyName) ~= "string" then return false end
-    local loweredName = currencyName:lower()
-    for _, namePattern in ipairs(namePatterns) do
-        if loweredName:find(namePattern, 1, true) then return true end
+local function MatchesAny(name, patterns)
+    local lowered = name:lower()
+    for _, pattern in ipairs(patterns) do
+        if lowered:find(pattern, 1, true) then return true end
     end
     return false
 end
 
-local seasonCurrencyIDs
+local seasonCurrencies
 local lastCurrencyScan = 0
 
 local function DiscoverSeasonCurrencies()
-    if GetTime() - lastCurrencyScan < 30 then return seasonCurrencyIDs end
+    if GetTime() - lastCurrencyScan < CURRENCY_RESCAN then return end
     lastCurrencyScan = GetTime()
     local expanded = {}
-    local expandIndex = 1
-    while expandIndex <= C_CurrencyInfo.GetCurrencyListSize() do
-        local listInfo = C_CurrencyInfo.GetCurrencyListInfo(expandIndex)
-        if listInfo and listInfo.isHeader and not listInfo.isHeaderExpanded then
-            C_CurrencyInfo.ExpandCurrencyList(expandIndex, true)
-            expanded[listInfo.name or ""] = true
+    local index = 1
+    while index <= C_CurrencyInfo.GetCurrencyListSize() do
+        local info = C_CurrencyInfo.GetCurrencyListInfo(index)
+        if info.isHeader and not info.isHeaderExpanded then
+            C_CurrencyInfo.ExpandCurrencyList(index, true)
+            expanded[info.name] = true
         end
-        expandIndex = expandIndex + 1
+        index = index + 1
     end
 
-    local seasonCapped, extras, seen = {}, {}, {}
-    local headerCount, inPvPCategory = 0, false
-    for entryIndex = 1, C_CurrencyInfo.GetCurrencyListSize() do
-        local listInfo = C_CurrencyInfo.GetCurrencyListInfo(entryIndex)
-        if listInfo then
-            if listInfo.isHeader then
-                headerCount = headerCount + 1
-                inPvPCategory = IsPvPCurrencyHeader(listInfo.name)
-            elseif not inPvPCategory then
-                local link = C_CurrencyInfo.GetCurrencyListLink(entryIndex)
-                local currencyID = link and tonumber(link:match("currency:(%d+)"))
-                if currencyID and not seen[currencyID] and not PVP_CURRENCY_IDS[currencyID] then
-                    local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(currencyID)
-                    if currencyInfo and not MatchesCurrencyPattern(currencyInfo.name, HIDDEN_CURRENCY_PATTERNS) then
-                        local isSeasonCapped = currencyInfo.useTotalEarnedForMaxQty and (currencyInfo.maxQuantity or 0) > 0
-                        if headerCount == 1 or MatchesCurrencyPattern(currencyInfo.name, TRACKED_CURRENCY_PATTERNS) then
-                            seen[currencyID] = true
-                            extras[#extras + 1] = currencyID
-                        elseif isSeasonCapped then
-                            seen[currencyID] = true
-                            seasonCapped[#seasonCapped + 1] = {
-                                id             = currencyID,
-                                quality        = currencyInfo.quality or 0,
-                                tier           = CrestTier(currencyInfo.name),
-                                name           = currencyInfo.name or "",
-                                isUpgradeCrest = IsUpgradeCrestName(currencyInfo.name),
-                            }
-                        end
+    local capped, extras, seen = {}, {}, {}
+    local headerCount, inPvP = 0, false
+    for entry = 1, C_CurrencyInfo.GetCurrencyListSize() do
+        local listInfo = C_CurrencyInfo.GetCurrencyListInfo(entry)
+        if listInfo.isHeader then
+            headerCount = headerCount + 1
+            inPvP = IsPvPHeader(listInfo.name)
+        elseif not inPvP then
+            local link = C_CurrencyInfo.GetCurrencyListLink(entry)
+            local currencyID = link and tonumber(link:match('currency:(%d+)'))
+            if currencyID and not seen[currencyID] and not PVP_CURRENCY_IDS[currencyID] then
+                local info = C_CurrencyInfo.GetCurrencyInfo(currencyID)
+                if info and not MatchesAny(info.name, HIDDEN_CURRENCY_PATTERNS) then
+                    if headerCount == 1 or MatchesAny(info.name, TRACKED_CURRENCY_PATTERNS) then
+                        seen[currencyID] = true
+                        extras[#extras + 1] = currencyID
+                    elseif info.useTotalEarnedForMaxQty and info.maxQuantity > 0 then
+                        seen[currencyID] = true
+                        capped[#capped + 1] = { id = currencyID, quality = info.quality, tier = CrestTier(info.name), name = info.name, crest = info.name:lower():find('crest', 1, true) ~= nil }
                     end
                 end
             end
@@ -261,156 +248,113 @@ local function DiscoverSeasonCurrencies()
     end
 
     local crests = {}
-    for _, candidate in ipairs(seasonCapped) do
-        if candidate.isUpgradeCrest then crests[#crests + 1] = candidate end
+    for _, candidate in ipairs(capped) do
+        if candidate.crest then crests[#crests + 1] = candidate end
     end
-    if #crests == 0 then crests = seasonCapped end
-
-    table.sort(crests, function(leftCrest, rightCrest)
-        if leftCrest.tier ~= rightCrest.tier then return leftCrest.tier < rightCrest.tier end
-        if leftCrest.quality ~= rightCrest.quality then return leftCrest.quality < rightCrest.quality end
-        return leftCrest.name < rightCrest.name
+    if #crests == 0 then crests = capped end
+    table.sort(crests, function(left, right)
+        if left.tier ~= right.tier then return left.tier < right.tier end
+        if left.quality ~= right.quality then return left.quality < right.quality end
+        return left.name < right.name
     end)
-    local currencyIDs = {}
-    for _, crest in ipairs(crests) do currencyIDs[#currencyIDs + 1] = crest.id end
-    for _, currencyID in ipairs(extras) do currencyIDs[#currencyIDs + 1] = currencyID end
 
-    local collapseIndex = 1
-    while collapseIndex <= C_CurrencyInfo.GetCurrencyListSize() do
-        local listInfo = C_CurrencyInfo.GetCurrencyListInfo(collapseIndex)
-        if listInfo and listInfo.isHeader and listInfo.isHeaderExpanded and expanded[listInfo.name or ""] then
-            C_CurrencyInfo.ExpandCurrencyList(collapseIndex, false)
-        end
-        collapseIndex = collapseIndex + 1
+    index = 1
+    while index <= C_CurrencyInfo.GetCurrencyListSize() do
+        local info = C_CurrencyInfo.GetCurrencyListInfo(index)
+        if info.isHeader and info.isHeaderExpanded and expanded[info.name] then C_CurrencyInfo.ExpandCurrencyList(index, false) end
+        index = index + 1
     end
 
-    if #currencyIDs > 0 then seasonCurrencyIDs = currencyIDs end
-    return seasonCurrencyIDs
+    if #crests + #extras == 0 then return end
+    local crestIDs = {}
+    for _, crest in ipairs(crests) do crestIDs[#crestIDs + 1] = crest.id end
+    seasonCurrencies = { crests = crestIDs, extras = extras }
 end
 
-function SeasonCurrencyList()
-    local currencyIDs = seasonCurrencyIDs or DiscoverSeasonCurrencies()
-    if not currencyIDs then return nil end
-    local currencies = {}
-    for _, currencyID in ipairs(currencyIDs) do
-        local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(currencyID)
-        if currencyInfo and currencyInfo.name then
-            currencies[#currencies + 1] = {
-                name        = currencyInfo.name,
-                icon        = currencyInfo.iconFileID,
-                quantity    = currencyInfo.quantity or 0,
-                totalEarned = currencyInfo.totalEarned or 0,
-                max         = BUI.Currency.Cap(currencyID, currencyInfo),
-                seasonCap   = currencyInfo.useTotalEarnedForMaxQty and (currencyInfo.maxQuantity or 0) > 0,
-                quality     = currencyInfo.quality,
-            }
+local function CurrencyRows(ids, rows, crest)
+    for _, currencyID in ipairs(ids) do
+        local info = C_CurrencyInfo.GetCurrencyInfo(currencyID)
+        if info then
+            rows[#rows + 1] = { name = info.name, icon = info.iconFileID, quantity = info.quantity, max = BUI.Currency.Cap(currencyID, info), crest = crest }
         end
     end
-    if #currencies == 0 then return nil end
-    return currencies
 end
 
-local RAID_DIFFICULTY_SHORT = { [17] = "LFR", [14] = "Normal", [15] = "Heroic", [16] = "Mythic" }
-
-function VaultSlotLabel(activity)
-    local RewardThresholdType = Enum.WeeklyRewardChestThresholdType
-    if activity.type == RewardThresholdType.Raid then
-        local name = RAID_DIFFICULTY_SHORT[activity.level]
-        if not name then name = GetDifficultyInfo(activity.level) end
-        return name or ("D" .. tostring(activity.level))
-    elseif activity.type == RewardThresholdType.Activities then
-        return "+" .. activity.level
-    end
-    return "Tier " .. activity.level
-end
-
-local function VaultRewardItemLevel(activity)
-    if not activity.id then return nil end
-    local firstLink, secondLink = C_WeeklyRewards.GetExampleRewardItemHyperlinks(activity.id)
-    local link = firstLink or secondLink
-    if not link then return nil end
-    local itemLevel = C_Item.GetDetailedItemLevelInfo(link)
-    if itemLevel and itemLevel > 0 then return itemLevel end
-    return nil
-end
-
-local function SortedVaultActivities(thresholdType)
-    local activities = C_WeeklyRewards.GetActivities(thresholdType) or {}
-    table.sort(activities, function(leftActivity, rightActivity) return (leftActivity.index or 0) < (rightActivity.index or 0) end)
-    return activities
+local function SeasonCurrencies()
+    if not seasonCurrencies then DiscoverSeasonCurrencies() end
+    if not seasonCurrencies then return {} end
+    local rows = {}
+    CurrencyRows(seasonCurrencies.crests, rows, true)
+    CurrencyRows(seasonCurrencies.extras, rows, false)
+    return rows
 end
 
 local function SameRaidName(firstName, secondName)
     if not firstName or not secondName then return false end
-    firstName = firstName:lower():gsub("^the%s+", "")
-    secondName = secondName:lower():gsub("^the%s+", "")
+    firstName = firstName:lower():gsub('^the%s+', '')
+    secondName = secondName:lower():gsub('^the%s+', '')
     return firstName == secondName or firstName:find(secondName, 1, true) ~= nil or secondName:find(firstName, 1, true) ~= nil
 end
 
-local ejBossCache = {}
-local function EJBossNames(raidName, instanceMapIDs)
+local bossNameCache = {}
+local function EncounterBossNames(raidName, instanceMapIDs)
     local cacheKey = raidName or (instanceMapIDs and instanceMapIDs[1])
     if cacheKey == nil then return nil end
-    if ejBossCache[cacheKey] then return ejBossCache[cacheKey] end
-    pcall(C_AddOns.LoadAddOn, "Blizzard_EncounterJournal")
-    local wantedMapIDs = {}
-    for _, mapID in ipairs(instanceMapIDs or {}) do wantedMapIDs[mapID] = true end
-    local ok, names = pcall(function()
-        for tier = EJ_GetNumTiers(), 1, -1 do
-            EJ_SelectTier(tier)
-            local instanceIndex = 1
-            while true do
-                local journalInstanceID, instanceName, _, _, _, _, _, _, _, _, instanceMapID = EJ_GetInstanceByIndex(instanceIndex, true)
-                if not journalInstanceID then break end
-                if (instanceMapID and wantedMapIDs[instanceMapID]) or SameRaidName(instanceName, raidName) then
-                    EJ_SelectInstance(journalInstanceID)
-                    local bossNames, bossIndex = {}, 1
-                    while true do
-                        local bossName = EJ_GetEncounterInfoByIndex(bossIndex, journalInstanceID)
-                        if not bossName then break end
-                        bossNames[bossIndex] = bossName
-                        bossIndex = bossIndex + 1
-                    end
-                    if #bossNames > 0 then return bossNames end
+    if bossNameCache[cacheKey] then return bossNameCache[cacheKey] end
+    C_AddOns.LoadAddOn('Blizzard_EncounterJournal')
+    local wanted = {}
+    for _, mapID in ipairs(instanceMapIDs or {}) do wanted[mapID] = true end
+    for tier = EJ_GetNumTiers(), 1, -1 do
+        EJ_SelectTier(tier)
+        local instanceIndex = 1
+        while true do
+            local journalID, instanceName, _, _, _, _, _, _, _, _, instanceMapID = EJ_GetInstanceByIndex(instanceIndex, true)
+            if not journalID then break end
+            if (instanceMapID and wanted[instanceMapID]) or SameRaidName(instanceName, raidName) then
+                EJ_SelectInstance(journalID)
+                local names, bossIndex = {}, 1
+                while true do
+                    local bossName = EJ_GetEncounterInfoByIndex(bossIndex, journalID)
+                    if not bossName then break end
+                    names[bossIndex] = bossName
+                    bossIndex = bossIndex + 1
                 end
-                instanceIndex = instanceIndex + 1
+                if #names > 0 then
+                    bossNameCache[cacheKey] = names
+                    return names
+                end
             end
+            instanceIndex = instanceIndex + 1
         end
-    end)
-    if ok and type(names) == "table" and #names > 0 then
-        ejBossCache[cacheKey] = names
-        return names
     end
-    return nil
 end
 
 local function RaiderIORaidProgress()
-    if type(RaiderIO) ~= "table" or type(RaiderIO.GetProfile) ~= "function" then return nil end
-    local profile = RaiderIO.GetProfile("player")
-    if type(profile) ~= "table" then profile = RaiderIO.GetProfile(UnitName("player"), GetRealmName()) end
-    local raidProfile = type(profile) == "table" and profile.raidProfile
-    if type(raidProfile) ~= "table" then return nil end
+    if type(RaiderIO) ~= 'table' or type(RaiderIO.GetProfile) ~= 'function' then return nil end
+    local profile = RaiderIO.GetProfile('player')
+    if type(profile) ~= 'table' then profile = RaiderIO.GetProfile(UnitName('player'), GetRealmName()) end
+    local raidProfile = type(profile) == 'table' and profile.raidProfile
+    if type(raidProfile) ~= 'table' then return nil end
     local progressList = raidProfile.progress or raidProfile.sortedProgress or raidProfile.raidProgress
-    if type(progressList) ~= "table" or #progressList == 0 then return nil end
+    if type(progressList) ~= 'table' or #progressList == 0 then return nil end
 
     local raidsByName, orderedRaids = {}, {}
     for _, entry in ipairs(progressList) do
-        local raid  = entry.raid or entry.currentRaid
-        local raidName = (type(raid) == "table" and (raid.name or raid.shortName)) or entry.raidName
-        local difficulty  = tonumber(entry.difficulty or entry.diff)
+        local raid = entry.raid or entry.currentRaid
+        local raidName = (type(raid) == 'table' and (raid.name or raid.shortName)) or entry.raidName
+        local difficulty = tonumber(entry.difficulty or entry.diff)
         local kills = entry.killsPerBoss or entry.kills
-        if raidName and difficulty and difficulty >= 1 and difficulty <= 3 and type(kills) == "table" then
+        if raidName and difficulty and difficulty >= 1 and difficulty <= 3 and type(kills) == 'table' then
             local raidEntry = raidsByName[raidName]
             if not raidEntry then
-                raidEntry = { name = raidName, bossCount = 0, diffs = {}, source = "rio" }
+                raidEntry = { name = raidName, bossCount = 0, diffs = {}, source = 'rio' }
                 raidsByName[raidName] = raidEntry
                 orderedRaids[#orderedRaids + 1] = raidEntry
             end
-            local bossCount = (type(raid) == "table" and raid.bossCount) or #kills
+            local bossCount = (type(raid) == 'table' and raid.bossCount) or #kills
             if bossCount > raidEntry.bossCount then raidEntry.bossCount = bossCount end
-            if not raidEntry.instanceMapIDs and type(raid) == "table" then
-                raidEntry.instanceMapIDs = raid.instance_map_ids
-                    or (raid.instance_map_id and { raid.instance_map_id })
+            if not raidEntry.instanceMapIDs and type(raid) == 'table' then
+                raidEntry.instanceMapIDs = raid.instance_map_ids or (raid.instance_map_id and { raid.instance_map_id })
             end
             local killed = 0
             for _, killCount in ipairs(kills) do
@@ -421,7 +365,7 @@ local function RaiderIORaidProgress()
     end
     if #orderedRaids == 0 then return nil end
     local topRaid = orderedRaids[1]
-    topRaid.bosses = EJBossNames(topRaid.name, topRaid.instanceMapIDs)
+    topRaid.bosses = EncounterBossNames(topRaid.name, topRaid.instanceMapIDs)
     return topRaid
 end
 
@@ -435,1592 +379,984 @@ local function LockoutRaidProgress()
         if isRaid and (locked or extended) and difficultyKey then
             local raidEntry = raidsByName[name]
             if not raidEntry then
-                raidEntry = { name = name, bossCount = 0, bosses = {}, diffs = {}, source = "lockout" }
+                raidEntry = { name = name, bossCount = 0, bosses = {}, diffs = {}, source = 'lockout' }
                 raidsByName[name] = raidEntry
                 orderedRaids[#orderedRaids + 1] = raidEntry
             end
-            if (encounterCount or 0) > raidEntry.bossCount then raidEntry.bossCount = encounterCount end
+            if encounterCount > raidEntry.bossCount then raidEntry.bossCount = encounterCount end
             local kills = {}
-            for encounterIndex = 1, encounterCount or 0 do
+            for encounterIndex = 1, encounterCount do
                 local bossName, _, isKilled = GetSavedInstanceEncounterInfo(instanceIndex, encounterIndex)
                 kills[encounterIndex] = isKilled and 1 or 0
                 if bossName and not raidEntry.bosses[encounterIndex] then raidEntry.bosses[encounterIndex] = bossName end
             end
-            raidEntry.diffs[difficultyKey] = { killed = encounterProgress or 0, kills = kills }
+            raidEntry.diffs[difficultyKey] = { killed = encounterProgress, kills = kills }
         end
     end
     if #orderedRaids == 0 then return nil end
-    table.sort(orderedRaids, function(leftRaid, rightRaid)
+    table.sort(orderedRaids, function(left, right)
         local leftKills, rightKills = 0, 0
-        for _, difficultyInfo in pairs(leftRaid.diffs) do leftKills = leftKills + difficultyInfo.killed end
-        for _, difficultyInfo in pairs(rightRaid.diffs) do rightKills = rightKills + difficultyInfo.killed end
+        for _, info in pairs(left.diffs) do leftKills = leftKills + info.killed end
+        for _, info in pairs(right.diffs) do rightKills = rightKills + info.killed end
         return leftKills > rightKills
     end)
     return orderedRaids[1]
 end
 
-function RaidProgress()
-    local raiderIOProgress = RaiderIORaidProgress()
-    if not raiderIOProgress then return LockoutRaidProgress() end
-    local lockoutProgress = LockoutRaidProgress()
-    if not (lockoutProgress and SameRaidName(lockoutProgress.name, raiderIOProgress.name)) then return raiderIOProgress end
+local function RaidProgress()
+    local rio = RaiderIORaidProgress()
+    local lockout = LockoutRaidProgress()
+    if not rio then return lockout end
+    if not (lockout and SameRaidName(lockout.name, rio.name)) then return rio end
 
-    if not raiderIOProgress.bosses and lockoutProgress.bosses and lockoutProgress.bosses[1] then
-        raiderIOProgress.bosses = lockoutProgress.bosses
-    end
-    if lockoutProgress.bossCount > raiderIOProgress.bossCount then
-        raiderIOProgress.bossCount = lockoutProgress.bossCount
-    end
+    if not rio.bosses and lockout.bosses[1] then rio.bosses = lockout.bosses end
+    if lockout.bossCount > rio.bossCount then rio.bossCount = lockout.bossCount end
 
     local bossIndexByName = {}
-    for bossIndex, bossName in ipairs(raiderIOProgress.bosses or {}) do bossIndexByName[bossName] = bossIndex end
+    for bossIndex, bossName in ipairs(rio.bosses or {}) do bossIndexByName[bossName] = bossIndex end
 
-    for difficultyKey, lockoutInfo in pairs(lockoutProgress.diffs) do
-        local rioInfo = raiderIOProgress.diffs[difficultyKey]
+    for difficultyKey, lockoutInfo in pairs(lockout.diffs) do
+        local rioInfo = rio.diffs[difficultyKey]
         if not rioInfo then
             rioInfo = { killed = 0, kills = {} }
-            raiderIOProgress.diffs[difficultyKey] = rioInfo
+            rio.diffs[difficultyKey] = rioInfo
         end
-        local mergedKills = {}
-        for bossIndex = 1, raiderIOProgress.bossCount do mergedKills[bossIndex] = tonumber(rioInfo.kills[bossIndex]) or 0 end
-        for lockoutIndex, lockoutKill in ipairs(lockoutInfo.kills) do
-            if lockoutKill > 0 then
-                local bossName = lockoutProgress.bosses[lockoutIndex]
+        local merged = {}
+        for bossIndex = 1, rio.bossCount do merged[bossIndex] = tonumber(rioInfo.kills[bossIndex]) or 0 end
+        for lockoutIndex, kill in ipairs(lockoutInfo.kills) do
+            if kill > 0 then
+                local bossName = lockout.bosses[lockoutIndex]
                 local mergedIndex = (bossName and bossIndexByName[bossName]) or lockoutIndex
-                if (mergedKills[mergedIndex] or 0) < 1 then mergedKills[mergedIndex] = 1 end
+                if (merged[mergedIndex] or 0) < 1 then merged[mergedIndex] = 1 end
             end
         end
-        rioInfo.kills = mergedKills
-        local killedCount = 0
-        for bossIndex = 1, raiderIOProgress.bossCount do
-            if mergedKills[bossIndex] > 0 then killedCount = killedCount + 1 end
+        rioInfo.kills = merged
+        local killed = 0
+        for bossIndex = 1, rio.bossCount do
+            if merged[bossIndex] > 0 then killed = killed + 1 end
         end
-        rioInfo.killed = killedCount
+        rioInfo.killed = killed
     end
-    return raiderIOProgress
+    return rio
 end
 
-function FormatAgo(seconds)
-    seconds = math.max(0, seconds or 0)
-    if seconds < 90 then return "now" end
-    if seconds < 3600 then return ("%dm ago"):format(math.floor(seconds / 60)) end
-    if seconds < 86400 then return ("%dh ago"):format(math.floor(seconds / 3600)) end
-    return ("%dd ago"):format(math.floor(seconds / 86400))
+local function FormatAgo(seconds)
+    seconds = math.max(0, seconds)
+    if seconds < 90 then return 'Now' end
+    if seconds < 3600 then return ('%dm ago'):format(math.floor(seconds / 60)) end
+    if seconds < 86400 then return ('%dh ago'):format(math.floor(seconds / 3600)) end
+    return ('%dd ago'):format(math.floor(seconds / 86400))
 end
 
-local function AltCharKey()
-    return (UnitName("player") or "?") .. "-" .. (GetRealmName() or "?")
-end
-
-function SnapshotCurrentChar()
-    local globalDB = BUI.db and BUI.db.global
-    if not globalDB then return end
-    globalDB.altOverview = globalDB.altOverview or {}
+local function SnapshotCurrentChar()
+    local store = BUI.db.global.altOverview
+    local key = CharacterKey()
+    local previous = store[key]
     local _, equipped = GetAverageItemLevel()
+    local itemLevel = math.floor(equipped + 0.5)
+    if itemLevel == 0 and previous then itemLevel = previous.ilvl end
     local keyLevel, keyMap = OwnedKeystone()
-    local raidBucket, dungeonBucket, worldBucket = VaultBuckets()
-    local _, classFile = UnitClass("player")
-    globalDB.altOverview[AltCharKey()] = {
-        name     = UnitName("player"),
-        realm    = GetRealmName(),
-        class    = classFile,
-        ilvl     = math.floor((equipped or 0) + 0.5),
-        score    = math.floor((C_ChallengeMode.GetOverallDungeonScore() or 0) + 0.5),
+    local _, classFile = UnitClass('player')
+    store[key] = {
+        name = UnitName('player'),
+        realm = GetRealmName(),
+        class = classFile,
+        ilvl = itemLevel,
+        score = math.floor(C_ChallengeMode.GetOverallDungeonScore() + 0.5),
         keyLevel = keyLevel,
-        keyMap   = keyMap,
-        vault    = { raidBucket[1], dungeonBucket[1], worldBucket[1] },
+        keyMap = keyMap,
+        vault = { UnlockedCount(VaultActivities(VaultType.Raid)), UnlockedCount(VaultActivities(VaultType.Activities)), UnlockedCount(VaultActivities(VaultType.World)) },
         lastSeen = time(),
     }
 end
 
-BUI.Events:Register("PLAYER_LOGOUT", "Dashboard.AltSnapshot", SnapshotCurrentChar)
-
-local function WeeklyResetTime()
-    local secondsUntilReset = C_DateAndTime.GetSecondsUntilWeeklyReset()
-    if not secondsUntilReset then return nil end
-    return math.floor((time() + secondsUntilReset) / 3600 + 0.5) * 3600
+local QueueSnapshot = BUI.Dispatcher.NewDelayed(SnapshotCurrentChar, SNAPSHOT_DELAY, 'Dashboard.Snapshot')
+for _, event in ipairs({ 'PLAYER_AVG_ITEM_LEVEL_UPDATE', 'WEEKLY_REWARDS_UPDATE', 'CHALLENGE_MODE_COMPLETED', 'CHALLENGE_MODE_MAPS_UPDATE' }) do
+    BUI.Events:Register(event, 'Dashboard.Snapshot', QueueSnapshot)
 end
 
-local function WeeklyMplusHistory()
-    local globalDB = BUI.db and BUI.db.global
-    if not globalDB then return nil end
-    globalDB.weeklyMplusHistory = globalDB.weeklyMplusHistory or {}
-    local charHistory = globalDB.weeklyMplusHistory[AltCharKey()]
-    if not charHistory then
-        charHistory = {}
-        globalDB.weeklyMplusHistory[AltCharKey()] = charHistory
-    end
-    return charHistory
+BUI.Events:Once('PLAYER_ENTERING_WORLD', 'Dashboard.SessionInit', function()
+    local session = BUI.db.global.session
+    local now = time()
+    if not session.start or (session.lastSeen and now - session.lastSeen > SESSION_RESET_GAP) then session.start = now end
+    sessionStart = session.start
+    C_MythicPlus.RequestMapInfo()
+    QueueSnapshot()
+end)
+
+BUI.Events:Register('PLAYER_LOGOUT', 'Dashboard.Logout', function()
+    local now = time()
+    BUI.db.global.session.lastSeen = now
+    local entry = BUI.db.global.altOverview[CharacterKey()]
+    if entry then entry.lastSeen = now end
+end)
+
+local function WeeklyResetTime()
+    return math.floor((time() + C_DateAndTime.GetSecondsUntilWeeklyReset()) / 3600 + 0.5) * 3600
+end
+
+local function WeeklyHistory()
+    local store = BUI.db.global.weeklyMplusHistory
+    local key = CharacterKey()
+    store[key] = store[key] or {}
+    return store[key]
 end
 
 local function RecordWeeklyMplus(count)
     local resetTime = WeeklyResetTime()
-    local charHistory = WeeklyMplusHistory()
-    if not (resetTime and charHistory) then return end
-    if count > (charHistory[resetTime] or -1) then charHistory[resetTime] = count end
+    local history = WeeklyHistory()
+    if count > (history[resetTime] or -1) then history[resetTime] = count end
     local resetTimes = {}
-    for storedTime in pairs(charHistory) do resetTimes[#resetTimes + 1] = storedTime end
+    for storedTime in pairs(history) do resetTimes[#resetTimes + 1] = storedTime end
     if #resetTimes > 8 then
-        table.sort(resetTimes, function(leftTime, rightTime) return leftTime > rightTime end)
-        for index = 9, #resetTimes do charHistory[resetTimes[index]] = nil end
+        table.sort(resetTimes, function(left, right) return left > right end)
+        for index = 9, #resetTimes do history[resetTimes[index]] = nil end
     end
 end
 
-local function WeeklyMplusHistoryEntries()
-    local charHistory = WeeklyMplusHistory()
-    if not charHistory then return {} end
+local function WeeklyHistoryRows()
+    local history = WeeklyHistory()
     local resetTimes = {}
-    for storedTime in pairs(charHistory) do resetTimes[#resetTimes + 1] = storedTime end
-    table.sort(resetTimes, function(leftTime, rightTime) return leftTime > rightTime end)
+    for storedTime in pairs(history) do resetTimes[#resetTimes + 1] = storedTime end
+    table.sort(resetTimes, function(left, right) return left > right end)
     local currentReset = WeeklyResetTime()
-    local entries = {}
+    local rows = {}
     for index, resetTime in ipairs(resetTimes) do
-        local label = (resetTime == currentReset) and "This week" or date("Week of %b %d", resetTime - 7 * 86400)
-        entries[index] = { label = label, count = charHistory[resetTime] }
+        rows[index] = { left = resetTime == currentReset and 'This week' or date('Week of %b %d', resetTime - 7 * 86400), right = tostring(history[resetTime]) }
     end
-    return entries
+    return rows
 end
 
-local mapTimeLimits = {}
-function MapTimeLimit(mapID)
-    if not mapID then return nil end
-    if mapTimeLimits[mapID] then return mapTimeLimits[mapID] end
-    local _, _, timeLimit = C_ChallengeMode.GetMapUIInfo(mapID)
-    mapTimeLimits[mapID] = timeLimit
-    return timeLimit
-end
-
-function RunSeconds(run)
-    return run.durationSec or (run.durationMS and run.durationMS / 1000) or 0
-end
-
-function ResolveBlizzardUpgrades(run)
-    local upgrades = tonumber(run.keystoneUpgradeLevels)
-            or tonumber(run.numKeystoneUpgrades)
-            or tonumber(run.upgrades)
-            or tonumber(run.chests)
-    if upgrades then return upgrades end
-    local duration = RunSeconds(run)
-    local timeLimit = MapTimeLimit(run.mapChallengeModeID)
-    if run.completed and timeLimit and duration > 0 and duration <= timeLimit then
-        if duration <= timeLimit * 0.6 then return 3
-        elseif duration <= timeLimit * 0.8 then return 2
-        else return 1 end
-    end
-    return 0
-end
-
-function RaiderIORunSeconds(run)
-    if type(run.clearTimeMS) == "number" and run.clearTimeMS > 0 then return run.clearTimeMS / 1000 end
-    if type(run.durationSec) == "number" and run.durationSec > 0 then return run.durationSec end
-    local fractionalTime = tonumber(run.fractionalTime)
-    if fractionalTime and fractionalTime > 60 then return fractionalTime end
-    return 0
-end
-
-local function GetRaiderIOProfile()
-    if type(RaiderIO) ~= "table" or type(RaiderIO.GetProfile) ~= "function" then return nil end
-    local profile = RaiderIO.GetProfile("player")
-    if type(profile) ~= "table" then
-        profile = RaiderIO.GetProfile(UnitName("player"), GetRealmName())
-    end
-    if type(profile) ~= "table" then return nil end
-    return profile
-end
-
-function RaiderIORuns()
-    local profile = GetRaiderIOProfile()
-    if not profile then return nil end
-    local keystoneProfile = profile.mythicKeystoneProfile or profile.keystoneProfile
-    if type(keystoneProfile) ~= "table" then return nil end
-
-    local function PickMapID(dungeon)
-        if type(dungeon) ~= "table" then return nil end
-        return dungeon.keystone_instance or dungeon.instance_map_id or dungeon.mapChallengeModeID or dungeon.challengeMapID
-    end
-
+local function SeasonBestRuns()
     local runs = {}
-    local sortedDungeons = keystoneProfile.sortedDungeons
-    if type(sortedDungeons) == "table" and #sortedDungeons > 0 then
-        for _, entry in ipairs(sortedDungeons) do
-            local dungeon = entry.dungeon or entry
-            runs[#runs + 1] = {
-                mapName        = (dungeon and (dungeon.name or dungeon.shortNameLocale or dungeon.shortName)) or entry.name or "Unknown",
-                mapID          = PickMapID(dungeon) or entry.mapChallengeModeID,
-                level          = entry.level or entry.bestLevel or 0,
-                upgrades       = entry.upgrades or entry.chests or 0,
-                fractionalTime = entry.fractionalTime,
-                clearTimeMS    = entry.clearTimeMS or entry.bestTimeMS or entry.durationMS,
-                score          = entry.score,
-            }
-        end
-    elseif type(keystoneProfile.dungeons) == "table" then
-        for dungeonIndex, entry in ipairs(keystoneProfile.dungeons) do
-            local mapName, dungeon
-            if type(RaiderIO.GetDungeonByID) == "function" then
-                dungeon = RaiderIO.GetDungeonByID(dungeonIndex)
-                if dungeon then mapName = dungeon.name or dungeon.shortNameLocale or dungeon.shortName end
-            end
-            runs[#runs + 1] = {
-                mapName        = mapName or ("Dungeon " .. dungeonIndex),
-                mapID          = PickMapID(dungeon) or entry.mapChallengeModeID,
-                level          = entry.level or 0,
-                upgrades       = entry.chests or entry.upgrades or 0,
-                fractionalTime = entry.fractionalTime,
-                clearTimeMS    = entry.clearTimeMS or entry.bestTimeMS or entry.durationMS,
-                score          = (keystoneProfile.dungeonScores and keystoneProfile.dungeonScores[dungeonIndex]) or entry.score,
-            }
+    for _, mapID in ipairs(C_ChallengeMode.GetMapTable()) do
+        local intime, overtime = C_MythicPlus.GetSeasonBestForMap(mapID)
+        local best = intime
+        if overtime and (not best or overtime.dungeonScore > best.dungeonScore) then best = overtime end
+        if best then
+            local name, _, timeLimit, icon = C_ChallengeMode.GetMapUIInfo(mapID)
+            runs[#runs + 1] = { name = name, icon = icon, level = best.level, duration = best.durationSec, limit = timeLimit, score = best.dungeonScore }
         end
     end
-
-    if #runs == 0 then return nil end
-    table.sort(runs, function(leftRun, rightRun)
-        local leftScore, rightScore = leftRun.score or 0, rightRun.score or 0
-        if leftScore ~= rightScore then return leftScore > rightScore end
-        return (leftRun.level or 0) > (rightRun.level or 0)
+    table.sort(runs, function(left, right)
+        if left.level ~= right.level then return left.level > right.level end
+        return left.score > right.score
     end)
-    return runs, keystoneProfile
-end
-
-function BlizzardRuns()
-    local rawRuns = C_MythicPlus.GetRunHistory(true, true) or {}
-    table.sort(rawRuns, function(leftRun, rightRun) return (leftRun.startTime or 0) > (rightRun.startTime or 0) end)
-    local runs = {}
-    for _, run in ipairs(rawRuns) do
-        runs[#runs + 1] = {
-            mapName     = C_ChallengeMode.GetMapUIInfo(run.mapChallengeModeID) or "Unknown",
-            mapID       = run.mapChallengeModeID,
-            level       = run.level or 0,
-            completed   = run.completed,
-            upgrades    = ResolveBlizzardUpgrades(run),
-            durationSec = RunSeconds(run),
-            startTime   = run.startTime,
-            score       = run.runScore or run.score,
-        }
-    end
     return runs
 end
 
-function KeyTierColor(level, score)
-    if type(RaiderIO) == "table" and type(RaiderIO.GetScoreColor) == "function" and score and score > 0 then
-        local red, green, blue = RaiderIO.GetScoreColor(score)
-        if red and green and blue then return red, green, blue end
+local function SeasonSummary()
+    local best, timed, total = 0, 0, 0
+    for _, run in ipairs(C_MythicPlus.GetRunHistory(true, true, true)) do
+        total = total + 1
+        if run.completed and run.durationSec <= (select(3, C_ChallengeMode.GetMapUIInfo(run.mapChallengeModeID))) then
+            timed = timed + 1
+            best = math.max(best, run.level)
+        end
     end
-    if level >= 14 then return 1.00, 0.45, 0.85 end
-    if level >= 12 then return 1.00, 0.60, 0.20 end
-    if level >= 10 then return 0.75, 0.50, 1.00 end
-    if level >=  8 then return 0.40, 0.70, 1.00 end
-    if level >=  5 then return 0.40, 0.95, 0.40 end
-    return 0.65, 0.65, 0.70
-end
-
-function MakeCard(parent, collector)
-    local card = CreateFrame("Frame", nil, parent)
-    local window = BUI.PageEngine.window
-    local fill, edge = Widget.DrawCardShape(card, 8, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, "BACKGROUND", 0, 0)
-    window:Paint(fill, 'card')
-    window:Paint(edge, 'cardEdge')
-    collector[#collector + 1] = card
-    return card
-end
-
-function MakeCardHeader(card, title, accentRed, accentGreen, accentBlue)
-    local accent = card:CreateTexture(nil, "OVERLAY")
-    accent:SetTexture(Widget.WHITE); accent:SetVertexColor(accentRed, accentGreen, accentBlue, 1)
-    accent:SetSize(Pixel.Scale(2), Pixel.Scale(14)); accent:SetPoint("TOPLEFT", Pixel.Scale(14), Pixel.Scale(-14))
-
-    Theme.RegisterAccentElement(accent, function(element, red, green, blue) element:SetVertexColor(red, green, blue, 1) end)
-    local fontString = card:CreateFontString(nil, "OVERLAY")
-    Pixel.ApplyFont(fontString, 13, font, "OUTLINE")
-    fontString:SetPoint("LEFT", accent, "RIGHT", Pixel.Scale(8), 0)
-    fontString:SetText(title)
-    fontString:SetTextColor(1, 1, 1, 1)
-    return fontString
+    return best, timed, total
 end
 
 local activeSlideIn
 
-local function FinalizeSlideIn(state)
-    state.ticker:SetScript("OnUpdate", nil)
-    state.ticker:Hide()
-    for cardIndex, card in ipairs(state.cards) do
-        local snapshot = state.snapshots[cardIndex]
-        card:ClearAllPoints()
-        card:SetPoint(snapshot.p, snapshot.rel, snapshot.rp, snapshot.x, snapshot.y)
+local function FinishSlideIn(state)
+    state.ticker:SetScript('OnUpdate', nil)
+    for index, card in ipairs(state.cards) do
+        local anchor = state.anchors[index]
+        card:SetPoint(anchor[1], anchor[2], anchor[3], anchor[4], anchor[5])
         card:SetAlpha(1)
     end
 end
 
-function PlayCardSlideIn(cards, parent)
-    if not cards or #cards == 0 then return end
-
-    if activeSlideIn then
-        FinalizeSlideIn(activeSlideIn)
-        activeSlideIn = nil
-    end
-
-    local STAGGER  = 0.045
-    local DURATION = 0.38
-    local OFFSET_Y = -18
-
-    local visibleCards, snapshots = {}, {}
+local function SlideIn(cards, ticker)
+    if activeSlideIn then FinishSlideIn(activeSlideIn) end
+    local STAGGER, DURATION, OFFSET = 0.045, 0.38, -18
+    local shown, anchors = {}, {}
     for _, card in ipairs(cards) do
         if card:IsShown() then
-            local point, relativeTo, relativePoint, x, y = card:GetPoint(1)
-            if point then
-                local index = #visibleCards + 1
-                visibleCards[index]   = card
-                snapshots[index] = { p = point, rel = relativeTo, rp = relativePoint, x = x or 0, y = y or 0 }
-                card:ClearAllPoints()
-                card:SetPoint(point, relativeTo, relativePoint, x or 0, (y or 0) + OFFSET_Y)
-                card:SetAlpha(0)
-            end
+            local point, relative, relativePoint, x, y = card:GetPoint(1)
+            shown[#shown + 1] = card
+            anchors[#anchors + 1] = { point, relative, relativePoint, x, y }
+            card:SetPoint(point, relative, relativePoint, x, y + OFFSET)
+            card:SetAlpha(0)
         end
     end
-    if #visibleCards == 0 then return end
-
-    local start  = GetTime()
-    local floor  = math.floor
-    parent._slideTicker = parent._slideTicker or CreateFrame("Frame", nil, parent)
-    local ticker = parent._slideTicker
-    ticker:Show()
-    local state  = { ticker = ticker, cards = visibleCards, snapshots = snapshots }
+    if #shown == 0 then return end
+    local start = GetTime()
+    local state = { ticker = ticker, cards = shown, anchors = anchors }
     activeSlideIn = state
-
-    ticker:SetScript("OnUpdate", BUI.Profiler.Wrap("Pages.Dashboard card slide", function(self)
-        local now = GetTime()
-        local allDone = true
-        for cardIndex, card in ipairs(visibleCards) do
-            local snapshot = snapshots[cardIndex]
-            local progress = (now - start - (cardIndex - 1) * STAGGER) / DURATION
-            if progress < 0 then
-                allDone = false
-            elseif progress < 1 then
-                allDone = false
-                local eased = 1 - (1 - progress) ^ 3
-                local offsetY = floor(snapshot.y + OFFSET_Y * (1 - eased) + 0.5)
-                card:ClearAllPoints()
-                card:SetPoint(snapshot.p, snapshot.rel, snapshot.rp, snapshot.x, offsetY)
+    ticker:SetScript('OnUpdate', BUI.Profiler.Hot('Pages.Dashboard card slide', function(self)
+        local now, done = GetTime(), true
+        for index, card in ipairs(shown) do
+            local anchor = anchors[index]
+            local progress = (now - start - (index - 1) * STAGGER) / DURATION
+            if progress < 1 then
+                done = false
+                local eased = progress <= 0 and 0 or 1 - (1 - progress) ^ 3
+                card:SetPoint(anchor[1], anchor[2], anchor[3], anchor[4], math.floor(anchor[5] + OFFSET * (1 - eased) + 0.5))
                 card:SetAlpha(eased)
-            else
-                card:ClearAllPoints()
-                card:SetPoint(snapshot.p, snapshot.rel, snapshot.rp, snapshot.x, snapshot.y)
-                card:SetAlpha(1)
             end
         end
-        if allDone then
-            self:SetScript("OnUpdate", nil)
-            self:Hide()
+        if done then
+            FinishSlideIn(state)
             if activeSlideIn == state then activeSlideIn = nil end
         end
     end))
 end
 
-function ClearRows(card)
-    if card._rows then
-        card._rowPool = card._rowPool or {}
-        for _, row in ipairs(card._rows) do
-            row:Hide()
-            if row._rowKind then
-                card._rowPool[row._rowKind] = card._rowPool[row._rowKind] or {}
-                table.insert(card._rowPool[row._rowKind], row)
-            else
-                row:SetParent(nil)
-            end
-        end
-    end
-    card._rows = {}
+local window, kit, block
+
+local function Tint(region, red, green, blue)
+    window:Paint(region, function(target) target:SetTextColor(red, green, blue) end)
 end
 
-local function AcquireRow(card, kind)
-    local pool = card._rowPool and card._rowPool[kind]
-    if pool and #pool > 0 then
-        return table.remove(pool)
+local function Card(title)
+    local card = CreateFrame('Frame', nil, block)
+    local fill, edge = Widget.DrawCardShape(card, CARD_RADIUS, WHITE, WHITE, 'BACKGROUND', 0, 0)
+    window:Paint(fill, 'card')
+    window:Paint(edge, 'cardEdge')
+    if title then
+        local bar = kit.Fill(card, 'accent', 'ARTWORK')
+        bar:SetSize(ACCENT_WIDTH, ACCENT_HEIGHT)
+        bar:SetPoint('TOPLEFT', PAD, -TITLE_Y + ACCENT_HEIGHT / 2)
+        card.title = kit.Text(card, title, 14, 'text')
+        card.title:SetPoint('LEFT', bar, 'RIGHT', TITLE_GAP, 0)
     end
+    return card
 end
 
-function MakeEmptyRow(card, message)
-    local empty = AcquireRow(card, "empty")
-    if not empty then
-        empty = CreateFrame("Frame", nil, card)
-        empty._rowKind = "empty"
-        empty._fs = empty:CreateFontString(nil, "OVERLAY")
-        Pixel.ApplyFont(empty._fs, 11, font, "")
-    end
-    empty:SetHeight(Pixel.Scale(18))
-    empty:ClearAllPoints()
-    empty:SetPoint("TOPLEFT",  card, "TOPLEFT",  Pixel.Scale(14), Pixel.Scale(-42))
-    empty:SetPoint("TOPRIGHT", card, "TOPRIGHT", Pixel.Scale(-14), Pixel.Scale(-42))
-    local fontString = empty._fs
-    fontString:ClearAllPoints(); fontString:SetPoint("LEFT", 0, 0)
-    fontString:SetTextColor(0.5, 0.5, 0.55, 1); fontString:SetText(message)
-    empty:Show()
-    return empty
+local function Inset(parent, frameType)
+    local frame = CreateFrame(frameType or 'Frame', nil, parent)
+    window:Paint(Widget.DrawOutline(frame, INSET_RADIUS, WHITE, 'BACKGROUND', 1), 'cardEdge')
+    return frame
 end
 
-local TIME_WIDTH, SCORE_WIDTH, LEVEL_WIDTH, COLUMN_GAP = 92, 38, 44, 8
+local function Chevron(parent)
+    local glyph = kit.Glyph(parent, 'dropdown', CHEVRON_SIZE, 'muted')
+    glyph:SetTexCoord(unpack(POINT_RIGHT))
+    return glyph
+end
 
-function MakeDungeonRow(card, rowIndex, yBase, width)
-    local row = AcquireRow(card, "dungeon")
-    if not row then
-        row = CreateFrame("Frame", nil, card)
-        row._rowKind = "dungeon"
+local function Empty(card, text)
+    local label = kit.Text(card, text, 12, 'muted')
+    label:SetPoint('TOPLEFT', PAD, -CONTENT_TOP)
+    label:Hide()
+    return label
+end
 
-        local timeFontString = row:CreateFontString(nil, "OVERLAY")
-        Pixel.ApplyFont(timeFontString, 11, font, "")
-        timeFontString:SetPoint("TOPRIGHT", 0, 0); timeFontString:SetPoint("BOTTOMRIGHT", 0, 0)
-        timeFontString:SetWidth(Pixel.Scale(TIME_WIDTH)); timeFontString:SetJustifyH("RIGHT")
+local function Rule(parent)
+    local rule = kit.Fill(parent, 'cardEdge', 'ARTWORK')
+    rule:SetHeight(1)
+    return rule
+end
 
-        local levelFontString = row:CreateFontString(nil, "OVERLAY")
-        Pixel.ApplyFont(levelFontString, 11, font, "")
-        levelFontString:SetPoint("TOPRIGHT", timeFontString, "TOPLEFT", Pixel.Scale(-COLUMN_GAP), 0)
-        levelFontString:SetPoint("BOTTOMRIGHT", timeFontString, "BOTTOMLEFT", Pixel.Scale(-COLUMN_GAP), 0)
-        levelFontString:SetWidth(Pixel.Scale(LEVEL_WIDTH)); levelFontString:SetJustifyH("RIGHT")
+local function Tip(owner, title, rows)
+    Widget.ShowTipRows(owner, title, rows, { anchor = 'RIGHT' })
+end
 
-        local scoreFontString = row:CreateFontString(nil, "OVERLAY")
-        Pixel.ApplyFont(scoreFontString, 11, font, "")
-        scoreFontString:SetPoint("TOPRIGHT", levelFontString, "TOPLEFT", Pixel.Scale(-COLUMN_GAP), 0)
-        scoreFontString:SetPoint("BOTTOMRIGHT", levelFontString, "BOTTOMLEFT", Pixel.Scale(-COLUMN_GAP), 0)
-        scoreFontString:SetWidth(Pixel.Scale(SCORE_WIDTH)); scoreFontString:SetJustifyH("RIGHT")
+local function Dash(region)
+    region:SetText('—')
+    window:Paint(region, 'faint')
+end
 
-        local leftFontString = row:CreateFontString(nil, "OVERLAY")
-        Pixel.ApplyFont(leftFontString, 11, font, "")
-        leftFontString:SetPoint("LEFT", 0, 0); leftFontString:SetPoint("RIGHT", scoreFontString, "LEFT", Pixel.Scale(-COLUMN_GAP), 0)
-        leftFontString:SetJustifyH("LEFT"); leftFontString:SetWordWrap(false)
+local function Place(region, y)
+    region:ClearAllPoints()
+    region:SetPoint('TOPLEFT', PAD, -y)
+    region:SetPoint('TOPRIGHT', -PAD, -y)
+end
 
-        row._time, row._lvl, row._score, row._left = timeFontString, levelFontString, scoreFontString, leftFontString
-    end
-    row:SetSize(Pixel.Scale(width - 32), Pixel.Scale(18))
-    row:ClearAllPoints()
-    row:SetPoint("TOPLEFT", Pixel.Scale(16), Pixel.Scale(-yBase - (rowIndex - 1) * 18))
-    row:Show()
+local function Hover(button, chevron, tip)
+    button:SetScript('OnEnter', function(self)
+        window:Paint(chevron, 'text')
+        Tip(self, tip())
+    end)
+    button:SetScript('OnLeave', function()
+        window:Paint(chevron, 'muted')
+        Widget.HideTip()
+    end)
+end
+
+local function SideRow(parent, label, tip)
+    local row = Inset(parent, 'Button')
+    local title = kit.Text(row, label, 12, 'text')
+    title:SetPoint('TOPLEFT', LINK_INSET, -SIDE_TEXT_Y)
+    row.value = kit.Text(row, '', 11, 'muted')
+    row.value:SetPoint('TOPLEFT', title, 'BOTTOMLEFT', 0, -2)
+    local chevron = Chevron(row)
+    chevron:SetPoint('RIGHT', -CHEVRON_INSET, 0)
+    Hover(row, chevron, tip)
     return row
 end
 
-local VAULT_LABEL_WIDTH, VAULT_CHIP_GAP = 64, 8
-local VAULT_CHIP_HEIGHT   = 44
-local VAULT_ILVL_HEIGHT   = 18
-local VAULT_SUB_HEIGHT    = 11
-local VAULT_STACK_GAP     = 1
-local VAULT_CHIP_PADDING  = math.floor((VAULT_CHIP_HEIGHT - VAULT_ILVL_HEIGHT - VAULT_STACK_GAP - VAULT_SUB_HEIGHT) / 2)
+local function HeaderLink(card, label, tip)
+    local link = CreateFrame('Button', nil, card)
+    link:SetHeight(LINK_HEIGHT)
+    link:SetPoint('RIGHT', card, 'TOPRIGHT', -PAD, -TITLE_Y)
+    local chevron = Chevron(link)
+    chevron:SetPoint('RIGHT')
+    local text = kit.Text(link, label, 12, 'muted')
+    text:SetPoint('RIGHT', chevron, 'LEFT', -LINK_GAP, 0)
+    window:Bind(link, function() link:SetWidth(math.ceil(text:GetStringWidth()) + LINK_GAP + CHEVRON_SIZE) end)
+    Hover(link, chevron, tip)
+    return link
+end
 
-function MakeVaultTypeRow(card, rowIndex, label, activities, width, accentRed, accentGreen, accentBlue)
-    local row = AcquireRow(card, "vaultslots")
-    if not row then
-        row = CreateFrame("Frame", nil, card)
-        row._rowKind = "vaultslots"
-        row._name = row:CreateFontString(nil, "OVERLAY")
-        Pixel.ApplyFont(row._name, 11, font, "")
-        row._name:SetPoint("LEFT", 0, 0)
-        row._name:SetJustifyH("LEFT")
-        row._chips = {}
+local function TableHead(card, columns)
+    local heads = {}
+    for _, column in ipairs(columns) do
+        heads[#heads + 1] = { label = kit.Text(card, column[1], 11, 'faint'), x = column[2] }
     end
-    local innerWidth = width - 28
-    local chipWidth = math.floor((innerWidth - VAULT_LABEL_WIDTH - VAULT_CHIP_GAP * 2) / 3)
-    row:SetHeight(Pixel.Scale(VAULT_CHIP_HEIGHT))
-    row:ClearAllPoints()
-    row:SetPoint("TOPLEFT",  card, "TOPLEFT",  Pixel.Scale(14), Pixel.Scale(-38 - (rowIndex - 1) * 50))
-    row:SetPoint("TOPRIGHT", card, "TOPRIGHT", Pixel.Scale(-14), Pixel.Scale(-38 - (rowIndex - 1) * 50))
+    return heads
+end
 
-    row._name:SetText(label)
-    row._name:SetTextColor(0.85, 0.85, 0.88, 1)
+local function PlaceHead(heads, width)
+    local inner = width - PAD * 2
+    for _, head in ipairs(heads) do
+        head.label:ClearAllPoints()
+        head.label:SetPoint('TOPLEFT', PAD + inner * head.x, -TABLE_TOP)
+    end
+end
 
+local function BuildHeader(onCards)
+    local greeting = kit.Text(block, 'Welcome back, ' .. UnitName('player'), 22, 'text')
+    greeting:SetPoint('TOPLEFT')
+    local specLine = kit.Text(block, '', 13, 'muted')
+    specLine:SetPoint('TOPLEFT', greeting, 'BOTTOMLEFT', 0, -2)
+    local options = {}
+    for _, entry in ipairs(CARDS) do
+        options[#options + 1] = {
+            label = entry.label, separator = entry.separator,
+            get = function() return CardShown(entry.id) end,
+            set = function(value) DashboardDB().cardVisibility[entry.id] = value end,
+        }
+    end
+    kit.Tool(block, { icon = 'cog', tooltip = 'Choose cards', title = 'Cards', options = options }, onCards):SetPoint('TOPRIGHT', 0, -4)
+    return { Refresh = function() specLine:SetText(SpecLine()) end }
+end
+
+local function BuildStats()
+    local strip = Card()
+    strip.cells = {}
+    local function Stat(id, kicker)
+        local cell = CreateFrame('Frame', nil, strip)
+        cell.id = id
+        cell.icon = cell:CreateTexture(nil, 'ARTWORK')
+        cell.icon:SetSize(STAT_ICON, STAT_ICON)
+        cell.icon:SetPoint('LEFT', PAD, 0)
+        cell.kicker = kit.Text(cell, kicker, 10, 'muted')
+        cell.kicker:SetPoint('TOPLEFT', STAT_TEXT_X, -STAT_KICKER_Y)
+        cell.value = kit.Text(cell, '', 26, 'text')
+        cell.value:SetPoint('TOPLEFT', cell.kicker, 'BOTTOMLEFT', 0, -4)
+        cell.sub = kit.Text(cell, '', 12, 'muted')
+        cell.sub:SetPoint('BOTTOMLEFT', cell.value, 'BOTTOMRIGHT', VALUE_GAP, 3)
+        cell.divider = kit.Fill(cell, 'cardEdge', 'ARTWORK')
+        cell.divider:SetPoint('TOPLEFT', 0, -DIVIDER_INSET)
+        cell.divider:SetPoint('BOTTOMLEFT', 0, DIVIDER_INSET)
+        cell.divider:SetWidth(1)
+        strip.cells[#strip.cells + 1] = cell
+        return cell
+    end
+
+    local score = Stat('stat_mscore', 'M+ SCORE')
+    score.icon:SetTexture(C_Item.GetItemIconByID(KEYSTONE_ITEM))
+    score.icon:SetTexCoord(unpack(ICON_CROP))
+    score.sub:SetText('This season')
+    local level = Stat('stat_ilvl', 'ITEM LEVEL')
+    level.icon:SetTexCoord(unpack(ICON_CROP))
+    level.icon:SetDesaturated(true)
+    local weekly = Stat('weeklyMplus', 'WEEKLY M+')
+    weekly.icon:SetTexture(BUILib.GetLibMedia('reload'))
+    window:Paint(weekly.icon, 'muted')
+    weekly.sub:SetText('Runs completed')
+    weekly:EnableMouse(true)
+    weekly:SetScript('OnEnter', function(self)
+        local rows = WeeklyHistoryRows()
+        rows[#rows + 1] = { space = true }
+        rows[#rows + 1] = { left = 'This season', right = tostring(#C_MythicPlus.GetRunHistory(true, false, true)) }
+        Tip(self, 'Weekly M+ runs', rows)
+    end)
+    weekly:SetScript('OnLeave', Widget.HideTip)
+    local session = Stat('stat_session', 'SESSION')
+    session.icon:SetTexture(BUILib.GetLibMedia('clock'))
+    window:Paint(session.icon, 'muted')
+
+    function strip.RefreshSession()
+        session.value:SetText(SessionText())
+    end
+
+    function strip.Refresh()
+        local rating = math.floor(C_ChallengeMode.GetOverallDungeonScore())
+        local red, green, blue = ColorOf(C_ChallengeMode.GetDungeonScoreRarityColor(rating))
+        score.value:SetText(rating)
+        Tint(score.value, red, green, blue)
+        Tint(score.kicker, red, green, blue)
+        local overall, equipped = GetAverageItemLevel()
+        level.value:SetText(math.floor(equipped + 0.5))
+        level.sub:SetText(math.floor(overall + 0.5) .. ' overall')
+        level.icon:SetTexture(GetInventoryItemTexture('player', INVSLOT_HEAD))
+        local runs = WeeklyMplusCount()
+        RecordWeeklyMplus(runs)
+        weekly.value:SetText(runs)
+        strip.RefreshSession()
+    end
+
+    function strip:Layout(width, shown)
+        local cellWidth = width / #shown
+        for index, cell in ipairs(shown) do
+            cell:ClearAllPoints()
+            cell:SetPoint('TOPLEFT', (index - 1) * cellWidth, 0)
+            cell:SetSize(cellWidth, STRIP_HEIGHT)
+            cell.divider:SetShown(index > 1)
+        end
+    end
+    return strip
+end
+
+local function SlotRows(thresholdType, noun)
+    local rows = {}
+    for _, activity in ipairs(VaultActivities(thresholdType)) do
+        local open = Unlocked(activity)
+        local itemLevel = open and RewardItemLevel(activity)
+        rows[#rows + 1] = {
+            left = ('%d %s'):format(activity.threshold, noun),
+            right = open and ((VaultSlotLabel(activity) or '') .. (itemLevel and ('  ' .. itemLevel) or '')) or ('%d / %d'):format(activity.progress, activity.threshold),
+        }
+    end
+    return rows
+end
+
+local function SlotSummary(row, thresholdType, noun)
+    local activities = VaultActivities(thresholdType)
+    local last = activities[#activities]
+    row.value:SetText(last and ('%d / %d %s'):format(math.min(last.progress, last.threshold), last.threshold, noun) or '')
+end
+
+local function BuildVault()
+    local vault = Card('Great Vault')
+    vault.id = 'vault'
+    kit.Text(vault, 'ITEM LEVEL', 10, 'faint'):SetPoint('TOPLEFT', vault.title, 'BOTTOMLEFT', 0, -3)
+    local status = kit.Text(vault, '', 12, 'muted')
+    status:SetPoint('RIGHT', vault, 'TOPRIGHT', -PAD, -TITLE_Y)
+    local statusMark = kit.Glyph(vault, 'check', STATUS_MARK, 'positive')
+    statusMark:SetPoint('RIGHT', status, 'LEFT', -MARK_GAP, 0)
+
+    local columns = {}
     for slot = 1, 3 do
-        local chip = row._chips[slot]
-        if not chip then
-            chip = CreateFrame("Frame", nil, row)
-            Widget.DrawRoundedRect(chip, 5, { 0.05, 0.06, 0.08, 0.90 }, "BACKGROUND", 0, 0)
-            chip._ilvl = chip:CreateFontString(nil, "OVERLAY")
-            Pixel.ApplyFont(chip._ilvl, 16, font, "")
-            chip._ilvl:SetHeight(Pixel.Scale(VAULT_ILVL_HEIGHT))
-            chip._ilvl:SetJustifyV("MIDDLE")
-            chip._ilvl:SetPoint("TOP", chip, "TOP", 0, Pixel.Scale(-VAULT_CHIP_PADDING))
-            chip._sub = chip:CreateFontString(nil, "OVERLAY")
-            Pixel.ApplyFont(chip._sub, 9, font, "")
-            chip._sub:SetHeight(Pixel.Scale(VAULT_SUB_HEIGHT))
-            chip._sub:SetJustifyV("MIDDLE")
-            chip._sub:SetPoint("TOP", chip, "TOP", 0, Pixel.Scale(-VAULT_CHIP_PADDING - VAULT_ILVL_HEIGHT - VAULT_STACK_GAP))
-            row._chips[slot] = chip
+        local column = CreateFrame('Frame', nil, vault)
+        column.label = kit.Text(column, '', 12, 'muted')
+        column.label:SetPoint('TOP', 0, -COLUMN_LABEL_Y)
+        column.value = kit.Text(column, '', 28, 'text')
+        column.value:SetPoint('TOP', column.label, 'BOTTOM', 0, -2)
+        column.progress = kit.Text(column, '', 12, 'muted')
+        column.mark = kit.Glyph(column, 'check', CHECK_MARK, 'accent')
+        column.mark:SetPoint('RIGHT', column.progress, 'LEFT', -MARK_GAP, 0)
+        if slot > 1 then
+            local divider = kit.Fill(column, 'cardEdge', 'ARTWORK')
+            divider:SetPoint('TOPLEFT', 0, -DIVIDER_INSET)
+            divider:SetPoint('BOTTOMLEFT', 0, DIVIDER_INSET)
+            divider:SetWidth(1)
         end
-        chip:SetSize(Pixel.Scale(chipWidth), Pixel.Scale(VAULT_CHIP_HEIGHT))
-        chip:ClearAllPoints()
-        chip:SetPoint("TOPRIGHT", row, "TOPRIGHT",
-            -Pixel.Scale((3 - slot) * (chipWidth + VAULT_CHIP_GAP)), 0)
-
-        local activity = activities[slot]
-        if activity then
-            local threshold = activity.threshold or 0
-            local progress  = math.min(activity.progress or 0, threshold)
-            local unlocked  = threshold > 0 and progress >= threshold
-            if unlocked then
-                local itemLevel = VaultRewardItemLevel(activity)
-                chip._ilvl:SetText(itemLevel and tostring(itemLevel) or "...")
-                chip._ilvl:SetTextColor(0.97, 0.97, 0.97, 1)
-                chip._sub:SetText(("%s · %d/%d"):format(VaultSlotLabel(activity), progress, threshold))
-                chip._sub:SetTextColor(accentRed, accentGreen, accentBlue, 1)
-            else
-                chip._ilvl:SetText("—")
-                chip._ilvl:SetTextColor(0.45, 0.45, 0.5, 1)
-                chip._sub:SetText(("%d/%d"):format(progress, threshold))
-                chip._sub:SetTextColor(0.5, 0.5, 0.55, 1)
-            end
-            chip:Show()
-        else
-            chip:Hide()
-        end
+        columns[slot] = column
     end
-    row:Show()
-    return row
-end
-
-local RAID_DIFFICULTY_COLORS = {
-    [1] = { 0.35, 0.85, 0.35 },
-    [2] = { 0.25, 0.60, 1.00 },
-    [3] = { 0.70, 0.40, 0.95 },
-}
-local RAID_COLUMN_WIDTH = 36
-
-function MakeRaidRow(card, rowIndex, yBase)
-    local row = AcquireRow(card, "raid")
-    if not row then
-        row = CreateFrame("Frame", nil, card)
-        row._rowKind = "raid"
-        row._cols = {}
-        local previousColumn
-        for difficultyIndex = 3, 1, -1 do
-            local fontString = row:CreateFontString(nil, "OVERLAY")
-            Pixel.ApplyFont(fontString, 10, font, "")
-            fontString:SetWidth(Pixel.Scale(RAID_COLUMN_WIDTH))
-            fontString:SetJustifyH("RIGHT")
-            if previousColumn then fontString:SetPoint("RIGHT", previousColumn, "LEFT", 0, 0)
-            else fontString:SetPoint("RIGHT", 0, 0) end
-            row._cols[difficultyIndex] = fontString
-            previousColumn = fontString
-        end
-        row._left = row:CreateFontString(nil, "OVERLAY")
-        Pixel.ApplyFont(row._left, 11, font, "")
-        row._left:SetPoint("LEFT", 0, 0)
-        row._left:SetPoint("RIGHT", row._cols[1], "LEFT", Pixel.Scale(-8), 0)
-        row._left:SetJustifyH("LEFT")
-        row._left:SetWordWrap(false)
-    end
-    row:SetHeight(Pixel.Scale(17))
-    row:ClearAllPoints()
-    row:SetPoint("TOPLEFT",  card, "TOPLEFT",  Pixel.Scale(14), Pixel.Scale(-yBase - (rowIndex - 1) * 18))
-    row:SetPoint("TOPRIGHT", card, "TOPRIGHT", Pixel.Scale(-14), Pixel.Scale(-yBase - (rowIndex - 1) * 18))
-    row:Show()
-    return row
-end
-
-function MakeCrestRow(card, rowIndex, name, value, icon, qualityRed, qualityGreen, qualityBlue, rowPitch)
-    local row = AcquireRow(card, "crest")
-    if not row then
-        row = CreateFrame("Frame", nil, card)
-        row._rowKind = "crest"
-        row._icon = row:CreateTexture(nil, "OVERLAY")
-        row._icon:SetSize(Pixel.Scale(14), Pixel.Scale(14))
-        row._icon:SetPoint("LEFT", 0, 0)
-        row._icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        row._right = row:CreateFontString(nil, "OVERLAY")
-        Pixel.ApplyFont(row._right, 11, font, "")
-        row._right:SetPoint("RIGHT", 0, 0)
-        row._left = row:CreateFontString(nil, "OVERLAY")
-        Pixel.ApplyFont(row._left, 11, font, "")
-        row._left:SetPoint("LEFT", Pixel.Scale(22), 0)
-        row._left:SetJustifyH("LEFT")
-        row._left:SetWordWrap(false)
-    end
-    local pitch = rowPitch or CREST_ROW_PITCH
-    local rowTop = -34 - (rowIndex - 1) * pitch
-    row:SetHeight(Pixel.Scale(math.min(18, pitch - 1)))
-    row:ClearAllPoints()
-    row:SetPoint("TOPLEFT",  card, "TOPLEFT",  Pixel.Scale(14), Pixel.Scale(rowTop))
-    row:SetPoint("TOPRIGHT", card, "TOPRIGHT", Pixel.Scale(-14), Pixel.Scale(rowTop))
-    row._left:SetPoint("RIGHT", row._right, "LEFT", Pixel.Scale(-8), 0)
-
-    if icon then row._icon:SetTexture(icon); row._icon:Show()
-    else row._icon:Hide() end
-    row._left:SetText(name)
-    row._left:SetTextColor(qualityRed or 0.92, qualityGreen or 0.92, qualityBlue or 0.92, 1)
-    row._right:SetText(value)
-    row._right:SetTextColor(0.6, 0.6, 0.65, 1)
-    row:Show()
-    return row
-end
-
-local ALT_COLUMNS = {
-    { key = "_seen",  w = 64,  x = 0   },
-    { key = "_vault", w = 104, x = 68  },
-    { key = "_key",   w = 170, x = 176 },
-    { key = "_score", w = 56,  x = 350 },
-    { key = "_ilvl",  w = 56,  x = 410 },
-}
-
-function MakeAltRow(card, rowIndex, yBase)
-    local row = AcquireRow(card, "alt")
-    if not row then
-        row = CreateFrame("Frame", nil, card)
-        row._rowKind = "alt"
-        for _, column in ipairs(ALT_COLUMNS) do
-            local fontString = row:CreateFontString(nil, "OVERLAY")
-            Pixel.ApplyFont(fontString, 10, font, "")
-            fontString:SetWidth(Pixel.Scale(column.w))
-            fontString:SetJustifyH("RIGHT")
-            fontString:SetPoint("RIGHT", -Pixel.Scale(column.x), 0)
-            fontString:SetWordWrap(false)
-            row[column.key] = fontString
-        end
-        row._name = row:CreateFontString(nil, "OVERLAY")
-        Pixel.ApplyFont(row._name, 11, font, "")
-        row._name:SetPoint("LEFT", 0, 0)
-        row._name:SetPoint("RIGHT", row._ilvl, "LEFT", Pixel.Scale(-10), 0)
-        row._name:SetJustifyH("LEFT")
-        row._name:SetWordWrap(false)
-    end
-    row:SetHeight(Pixel.Scale(18))
-    row:ClearAllPoints()
-    row:SetPoint("TOPLEFT",  card, "TOPLEFT",  Pixel.Scale(14), Pixel.Scale(-yBase - (rowIndex - 1) * 18))
-    row:SetPoint("TOPRIGHT", card, "TOPRIGHT", Pixel.Scale(-14), Pixel.Scale(-yBase - (rowIndex - 1) * 18))
-    row:Show()
-    return row
-end
-
-local Layout = {
-    PAD       = 16,
-    TILE_W    = 192,
-    TILE_H    = 70,
-    TILE_GAP  = 12,
-    TILES_TOP = -58,
-    COL_H     = 206,
-    WIDE_H    = 150,
-}
-Layout.DASH_W   = Layout.TILE_W * 4 + Layout.TILE_GAP * 3
-Layout.COL_TOP  = Layout.TILES_TOP - Layout.TILE_H - 12
-Layout.COL_W    = Layout.TILE_W * 2 + Layout.TILE_GAP
-Layout.COL2_TOP = Layout.COL_TOP  - Layout.COL_H - 12
-Layout.WIDE_TOP = Layout.COL2_TOP - Layout.COL_H - 12
-Layout.DASH_H   = -Layout.WIDE_TOP + Layout.WIDE_H
-
-local SLOTS = {
-    { row = "mid",  x = 0,                              y = Layout.COL_TOP,  w = Layout.COL_W,  h = Layout.COL_H  },
-    { row = "mid",  x = Layout.COL_W + Layout.TILE_GAP, y = Layout.COL_TOP,  w = Layout.COL_W,  h = Layout.COL_H  },
-    { row = "mid2", x = 0,                              y = Layout.COL2_TOP, w = Layout.COL_W,  h = Layout.COL_H  },
-    { row = "mid2", x = Layout.COL_W + Layout.TILE_GAP, y = Layout.COL2_TOP, w = Layout.COL_W,  h = Layout.COL_H  },
-    { row = "wide", x = 0,                              y = Layout.WIDE_TOP, w = Layout.DASH_W, h = Layout.WIDE_H },
-}
-
-local DASHBOARD_MIN_WIDTH = 924
-local DASHBOARD_MIN_HEIGHT = 600
-
-local cardsByPage = setmetatable({}, { __mode = "k" })
-
-local function BuildDashboard(canvas)
-    font = BUILib.Font
-    local accentRed, accentGreen, accentBlue = Theme.GetAccent()
-
-    Theme.RegisterAccentElement(canvas, function(_, red, green, blue) accentRed, accentGreen, accentBlue = red, green, blue end)
-
-    local scroll = Controls.ScrollFrame(canvas)
-    local scrollContainer = Widget.Unwrap(scroll)
-    local scrollChild = scrollContainer.child
-    local innerScrollFrame = scrollContainer.scrollFrame
-
-    scrollChild:ClearAllPoints()
-    scrollChild:SetPoint("TOPLEFT", innerScrollFrame, "TOPLEFT", 0, 0)
-    local function SyncChildWidth()
-        local width = innerScrollFrame:GetWidth()
-        if width and width > 0 then scrollChild:SetWidth(width) end
-    end
-    SyncChildWidth()
-    BUILib.Defer(SyncChildWidth)
-    innerScrollFrame:HookScript("OnSizeChanged", BUI.Profiler.Wrap("Pages.Dashboard sync width", SyncChildWidth))
-    scrollContainer:SetChildHeight(Layout.DASH_H + Layout.PAD * 2)
-
-    local dashboard = CreateFrame("Frame", nil, scrollChild)
-    dashboard:SetSize(Pixel.Scale(Layout.DASH_W), Pixel.Scale(Layout.DASH_H))
-    dashboard:SetPoint("TOP", scrollChild, "TOP", 0, Pixel.Scale(-Layout.PAD))
-
-    local dashboardCards = {}
-    cardsByPage[canvas] = dashboardCards
-
-    local greeting = dashboard:CreateFontString(nil, "OVERLAY")
-    Pixel.ApplyFont(greeting, 22, font, "")
-    greeting:SetPoint("TOPLEFT", 0, 0)
-    greeting:SetText("Welcome back, " .. UnitName("player"))
-    greeting:SetTextColor(1, 1, 1, 1)
-
-    local cogButton = Widget.Unwrap(Controls.Icon(dashboard, { size = 14 }))
-    cogButton:SetPoint("LEFT", greeting, "RIGHT", Pixel.Scale(8), Pixel.Scale(1))
-
-    local className, classFile = UnitClass("player")
-    local localizedClass = LOCALIZED_CLASS_NAMES_MALE[classFile] or className or ""
-    local realmName = GetRealmName() or ""
-    local zone = GetZoneText() or ""
-    local subParts = {}
-    if localizedClass ~= "" then subParts[#subParts + 1] = localizedClass end
-    local spec = SpecName(); if spec ~= "" then subParts[#subParts + 1] = spec end
-    subParts[#subParts + 1] = "iLvl " .. ItemLevel()
-    if realmName ~= "" then subParts[#subParts + 1] = realmName end
-    if zone ~= "" then subParts[#subParts + 1] = zone end
-    local subtitle = dashboard:CreateFontString(nil, "OVERLAY")
-    Pixel.ApplyFont(subtitle, 11, font, "")
-    subtitle:SetPoint("TOPLEFT", greeting, "BOTTOMLEFT", 0, Pixel.Scale(-6))
-    subtitle:SetText(table.concat(subParts, "   ·   "))
-    subtitle:SetTextColor(0.55, 0.55, 0.6, 1)
-
-    local refreshByCard, dirtyCards = {}, {}
-    local function CardRefresher(card, refreshFunction)
-        local function run()
-            if card:IsVisible() then
-                dirtyCards[card] = nil
-                refreshFunction()
-            else
-                dirtyCards[card] = true
-            end
-        end
-        refreshByCard[card] = run
-        return run
-    end
-
-    local PlaceTopBand
-
-    local function ApplyCardVisibility()
-        for _, card in ipairs(dashboardCards) do
-            if card._id and not IsCardVisible(card._id) then card:Hide() else card:Show() end
-        end
-        PlaceTopBand()
-        for card in pairs(dirtyCards) do
-            local run = refreshByCard[card]
-            if run and card:IsVisible() then run() end
-        end
-    end
-
-    local cardForSlot, slotForCard = {}, {}
-
-    local function GetLayoutDB()
-        local db = GetDashboardDB()
-        db.layout = db.layout or {}
-        return db.layout
-    end
-
-    local function MoveToSlot(card, slotIndex)
-        local slot = SLOTS[slotIndex]
-        card:ClearAllPoints()
-        card:SetPoint("TOPLEFT", dashboard, "TOPLEFT", Pixel.Scale(slot.x), Pixel.Scale(slot.y))
-    end
-
-    local function SaveLayout()
-        local db = GetLayoutDB()
-        for card, slotIndex in pairs(slotForCard) do
-            if card._id then db[card._id] = slotIndex end
-        end
-    end
-
-    local function FindClosestSlot(card, fromSlot)
-        local centerX = (card:GetLeft() or 0) + card:GetWidth() / 2 - (dashboard:GetLeft() or 0)
-        local centerY = (card:GetTop()  or 0) - card:GetHeight() / 2 - (dashboard:GetTop() or 0)
-        local row = SLOTS[fromSlot].row
-        local bestSlot, bestDistance = fromSlot, math.huge
-        for slotIndex, slot in ipairs(SLOTS) do
-            if slot.row == row then
-                local slotCenterX = slot.x + slot.w / 2
-                local slotCenterY = slot.y - slot.h / 2
-                local distance = (slotCenterX - centerX) * (slotCenterX - centerX) + (slotCenterY - centerY) * (slotCenterY - centerY)
-                if distance < bestDistance then bestDistance, bestSlot = distance, slotIndex end
-            end
-        end
-        return bestSlot
-    end
-
-    local ClampDuringDrag = BUI.Profiler.Wrap("Pages.Dashboard clamp drag", function(card)
-        local dashLeft, dashRight   = dashboard:GetLeft(), dashboard:GetRight()
-        local dashTop, dashBottom = dashboard:GetTop(),  dashboard:GetBottom()
-        local cardLeft, cardRight  = card:GetLeft(),      card:GetRight()
-        local cardTop, cardBottom  = card:GetTop(),       card:GetBottom()
-        if not (dashLeft and dashRight and dashTop and dashBottom and cardLeft and cardRight and cardTop and cardBottom) then return end
-        local shiftX, shiftY = 0, 0
-        if cardLeft < dashLeft then shiftX = dashLeft - cardLeft elseif cardRight > dashRight then shiftX = dashRight - cardRight end
-        if cardTop > dashTop then shiftY = dashTop - cardTop elseif cardBottom < dashBottom then shiftY = dashBottom - cardBottom end
-        if shiftX ~= 0 or shiftY ~= 0 then
-            local point, relativeTo, relativePoint, x, y = card:GetPoint(1)
-            if point then card:ClearAllPoints(); card:SetPoint(point, relativeTo, relativePoint, x + shiftX, y + shiftY) end
-        end
-    end)
-
-    local function FindFreeSlotInRow(rowName)
-        for slotIndex, slot in ipairs(SLOTS) do
-            if slot.row == rowName and not cardForSlot[slotIndex] then return slotIndex end
-        end
-        return nil
-    end
-
-    local function MakeDraggable(card, cardID, defaultSlot)
-        card._id = cardID
-
-        if not IsCardVisible(cardID) then
-            card:Hide()
-            return
-        end
-
-        local defaultRow = SLOTS[defaultSlot].row
-        local savedSlot  = GetLayoutDB()[cardID]
-        local targetSlot = savedSlot
-        if not targetSlot
-           or not SLOTS[targetSlot]
-           or SLOTS[targetSlot].row ~= defaultRow
-           or cardForSlot[targetSlot] then
-            targetSlot = (not cardForSlot[defaultSlot]) and defaultSlot or FindFreeSlotInRow(defaultRow)
-        end
-        if not targetSlot then card:Hide(); return end
-
-        cardForSlot[targetSlot] = card
-        slotForCard[card]   = targetSlot
-        MoveToSlot(card, targetSlot)
-
-        card:SetMovable(true)
-        card:EnableMouse(true)
-        card:RegisterForDrag("LeftButton")
-        card:SetScript("OnDragStart", BUI.Profiler.Script('Pages.Dashboard card OnDragStart', function(self)
-            if activeSlideIn then FinalizeSlideIn(activeSlideIn); activeSlideIn = nil end
-            self:SetAlpha(0.7)
-            self:Raise()
-            self:StartMoving()
-            self:SetScript("OnUpdate", ClampDuringDrag)
-        end))
-        card:SetScript("OnDragStop", BUI.Profiler.Script('Pages.Dashboard card OnDragStop', function(self)
-            self:SetScript("OnUpdate", nil)
-            self:StopMovingOrSizing()
-            self:SetAlpha(1)
-            local fromSlot = slotForCard[self]
-            local toSlot   = FindClosestSlot(self, fromSlot)
-            if toSlot ~= fromSlot then
-                local occupant = cardForSlot[toSlot]
-                cardForSlot[fromSlot] = occupant
-                if occupant and occupant ~= self then
-                    slotForCard[occupant] = fromSlot
-                    MoveToSlot(occupant, fromSlot)
-                end
-                cardForSlot[toSlot] = self
-                slotForCard[self]   = toSlot
-            end
-            MoveToSlot(self, slotForCard[self])
-            SaveLayout()
-        end))
-    end
-
-    local TOP_COLUMN_COUNT = 4
-    local topEntries = {}
-    local topEntryByCard = {}
-    local entryAtColumn = {}
-
-    local function GetTopColumns()
-        local db = GetDashboardDB()
-        db.topCols = db.topCols or {}
-        return db.topCols
-    end
-
-    local function MoveToColumn(card, column)
-        card:ClearAllPoints()
-        card:SetPoint("TOPLEFT", dashboard, "TOPLEFT", Pixel.Scale(column * (Layout.TILE_W + Layout.TILE_GAP)), Pixel.Scale(Layout.TILES_TOP))
-    end
-
-    function PlaceTopBand()
-        local savedColumns = GetTopColumns()
-        local visibleEntries = {}
-        for _, entry in ipairs(topEntries) do
-            if entry.card:IsShown() then visibleEntries[#visibleEntries + 1] = entry end
-        end
-        table.sort(visibleEntries, function(leftEntry, rightEntry) return leftEntry.defaultCol < rightEntry.defaultCol end)
-        for column in pairs(entryAtColumn) do entryAtColumn[column] = nil end
-        for _, entry in ipairs(visibleEntries) do
-            local column = savedColumns[entry.id]
-            if type(column) ~= "number" or column < 0 or column >= TOP_COLUMN_COUNT or entryAtColumn[column] then column = nil end
-            if not column then
-                for offset = 0, TOP_COLUMN_COUNT - 1 do
-                    local candidateColumn = (entry.defaultCol + offset) % TOP_COLUMN_COUNT
-                    if not entryAtColumn[candidateColumn] then column = candidateColumn; break end
-                end
-            end
-            if column then
-                entryAtColumn[column] = entry
-                entry.col = column
-                MoveToColumn(entry.card, column)
-            end
-        end
-    end
-
-    local function NearestColumn(card)
-        local dashLeft = dashboard:GetLeft()
-        local cardLeft = card:GetLeft()
-        if not dashLeft or not cardLeft then return nil end
-        local centerX = cardLeft + card:GetWidth() / 2 - dashLeft
-        local stride = Pixel.Scale(Layout.TILE_W + Layout.TILE_GAP)
-        if stride <= 0 then return nil end
-        local column = math.floor((centerX - Pixel.Scale(Layout.TILE_W) / 2) / stride + 0.5)
-        if column < 0 then column = 0 elseif column >= TOP_COLUMN_COUNT then column = TOP_COLUMN_COUNT - 1 end
-        return column
-    end
-
-    local function MakeTopDraggable(card, cardID, defaultColumn)
-        card._id = cardID
-        if not IsCardVisible(cardID) then
-            card:Hide()
-            return
-        end
-        local entry = { card = card, id = cardID, defaultCol = defaultColumn }
-        topEntries[#topEntries + 1] = entry
-        topEntryByCard[card] = entry
-
-        card:SetMovable(true)
-        card:EnableMouse(true)
-        card:RegisterForDrag("LeftButton")
-        card:SetScript("OnDragStart", BUI.Profiler.Script('Pages.Dashboard card OnDragStart 2', function(self)
-            if activeSlideIn then FinalizeSlideIn(activeSlideIn); activeSlideIn = nil end
-            self:SetAlpha(0.7)
-            self:Raise()
-            self:StartMoving()
-            self:SetScript("OnUpdate", ClampDuringDrag)
-        end))
-        card:SetScript("OnDragStop", BUI.Profiler.Script('Pages.Dashboard card OnDragStop 2', function(self)
-            self:SetScript("OnUpdate", nil)
-            self:StopMovingOrSizing()
-            self:SetAlpha(1)
-            local entry = topEntryByCard[self]
-            local toColumn = NearestColumn(self)
-            local fromColumn = entry.col
-            if toColumn ~= nil and fromColumn ~= nil and toColumn ~= fromColumn then
-                local savedColumns = GetTopColumns()
-                local occupant = entryAtColumn[toColumn]
-                savedColumns[entry.id] = toColumn
-                if occupant and occupant ~= entry then savedColumns[occupant.id] = fromColumn end
-            end
-            PlaceTopBand()
-        end))
-    end
-
-    local function BuildTile(cardID, defaultColumn, options)
-        local tile = MakeCard(dashboard, dashboardCards)
-        tile:SetSize(Pixel.Scale(Layout.TILE_W), Pixel.Scale(Layout.TILE_H))
-        MakeTopDraggable(tile, cardID, defaultColumn)
-
-        if options.header then
-            MakeCardHeader(tile, options.header, accentRed, accentGreen, accentBlue)
-        else
-            local kickerFontString = tile:CreateFontString(nil, "OVERLAY")
-            Pixel.ApplyFont(kickerFontString, 10, font, "")
-            kickerFontString:SetPoint("TOPLEFT", Pixel.Scale(16), Pixel.Scale(-14))
-            kickerFontString:SetText(options.kicker)
-            kickerFontString:SetTextColor(accentRed * 0.85, accentGreen * 0.85, accentBlue * 0.85, 1)
-        end
-
-        local valueFontString = tile:CreateFontString(nil, "OVERLAY")
-        Pixel.ApplyFont(valueFontString, 24, font, "")
-        valueFontString:SetPoint("LEFT", Pixel.Scale(16), Pixel.Scale(-6))
-        valueFontString:SetTextColor(0.95, 0.95, 0.95, 1)
-
-        local subFontString = tile:CreateFontString(nil, "OVERLAY")
-        Pixel.ApplyFont(subFontString, 10, font, "")
-        subFontString:SetPoint("TOPLEFT", valueFontString, "BOTTOMLEFT", 0, Pixel.Scale(-2))
-        subFontString:SetTextColor(0.45, 0.45, 0.5, 1)
-
-        return tile, valueFontString, subFontString
-    end
-
-    local STATS = {
-        { id = "stat_ilvl",    col = 0, kicker = "ITEM LEVEL", sub = "equipped / overall", valueFn = ItemLevel       },
-        { id = "stat_mscore",  col = 1, kicker = "M+ SCORE",   sub = "this season",        valueFn = MythicPlusScore },
-        { id = "stat_session", col = 3, kicker = "SESSION",    sub = "this run",           valueFn = Session         },
-    }
-    local tileRefreshers = {}
-    for _, stat in ipairs(STATS) do
-        local _, valueFontString, subFontString = BuildTile(stat.id, stat.col, { kicker = stat.kicker })
-        valueFontString:SetText(stat.valueFn())
-        subFontString:SetText(stat.sub)
-        tileRefreshers[#tileRefreshers + 1] = { fs = valueFontString, fn = stat.valueFn }
-    end
-
-    local weeklyTile, weeklyCountFontString, weeklySubFontString = BuildTile("weeklyMplus", 2, { header = "WEEKLY M+" })
-    weeklySubFontString:SetText("runs")
-
-    local weeklyHover = weeklyTile:CreateTexture(nil, "HIGHLIGHT")
-    weeklyHover:SetAllPoints()
-    BUI.Tools.SetColorTex(weeklyHover, 1, 1, 1, 0.04)
-
-    local RefreshWeeklyMplus = CardRefresher(weeklyTile, function()
-        local runCount = WeeklyMplusCount()
-        RecordWeeklyMplus(runCount)
-        weeklyCountFontString:SetText(tostring(runCount))
-    end)
-    RefreshWeeklyMplus()
-
-    weeklyTile:HookScript("OnEnter", BUI.Profiler.Wrap('Pages.Dashboard weeklyTile OnEnter', function(self)
-        local rows = {}
-        for _, entry in ipairs(WeeklyMplusHistoryEntries()) do
-            rows[#rows + 1] = { left = entry.label, right = tostring(entry.count) }
-        end
-        local seasonRuns = C_MythicPlus.GetRunHistory(true, false)
-        if type(seasonRuns) == "table" then
-            rows[#rows + 1] = { space = true }
-            rows[#rows + 1] = { left = "This season", right = tostring(#seasonRuns), rightColor = { 1, 0.82, 0 } }
-        end
-        BUILib.Widget.ShowTipRows(self, "Weekly M+ Runs", rows, { anchor = "RIGHT" })
-    end))
-    weeklyTile:HookScript("OnLeave", BUI.Profiler.Wrap('Pages.Dashboard weeklyTile OnLeave', function() BUILib.Widget.HideTip() end))
-
-    local function RefreshTiles()
-        for _, refresher in ipairs(tileRefreshers) do refresher.fs:SetText(refresher.fn()) end
-    end
-
-    local dungeons = MakeCard(dashboard, dashboardCards)
-    dungeons:SetSize(Pixel.Scale(Layout.COL_W), Pixel.Scale(Layout.COL_H))
-    MakeDraggable(dungeons, "dungeons", 1)
-    local dungeonsHeader = MakeCardHeader(dungeons, "RECENT DUNGEONS", accentRed, accentGreen, accentBlue)
-
-    local dungeonsSummary = dungeons:CreateFontString(nil, "OVERLAY")
-    Pixel.ApplyFont(dungeonsSummary, 10, font, "")
-    dungeonsSummary:SetPoint("TOPLEFT", Pixel.Scale(16), Pixel.Scale(-36))
-    dungeonsSummary:SetPoint("TOPRIGHT", Pixel.Scale(-16), Pixel.Scale(-36))
-    dungeonsSummary:SetJustifyH("LEFT")
-    dungeonsSummary:SetTextColor(0.65, 0.65, 0.7, 1)
-    dungeonsSummary:Hide()
-
-    local dungeonsSignature
-    local RefreshDungeons = CardRefresher(dungeons, function()
-        local raiderIORuns, raiderIOKeystoneProfile = RaiderIORuns()
-        local blizzardRuns = BlizzardRuns()
-        local runs = raiderIORuns or blizzardRuns
-        local usingRaiderIO  = raiderIORuns ~= nil
-
-        local bestLevel, timedCount, totalRuns = 0, 0, #blizzardRuns
-        if usingRaiderIO then
-            local bestTimeByMapKey = {}
-            for _, run in ipairs(blizzardRuns) do
-                if run.mapID and run.completed and (run.durationSec or 0) > 0 then
-                    local key = run.mapID .. ":" .. (run.level or 0)
-                    if not bestTimeByMapKey[key] or run.durationSec < bestTimeByMapKey[key] then bestTimeByMapKey[key] = run.durationSec end
-                end
-                if run.completed and (run.upgrades or 0) > 0 then
-                    timedCount = timedCount + 1
-                    if (run.level or 0) > bestLevel then bestLevel = run.level end
-                end
-            end
-            for _, run in ipairs(runs) do
-                if not run.clearTimeMS and run.mapID and run.level then
-                    local duration = bestTimeByMapKey[run.mapID .. ":" .. run.level]
-                    if duration then run.durationSec = duration end
-                end
-            end
-        end
-
-        local currentScore  = (raiderIOKeystoneProfile and raiderIOKeystoneProfile.currentScore)  or 0
-        local previousScore = (raiderIOKeystoneProfile and raiderIOKeystoneProfile.previousScore) or 0
-
-        local signatureParts = { usingRaiderIO and 1 or 0, currentScore, previousScore, bestLevel, timedCount, totalRuns, #runs }
-        for runIndex = 1, math.min(#runs, 8) do
-            local run = runs[runIndex]
-            signatureParts[#signatureParts + 1] = table.concat({
-                run.mapName or "", run.level or 0, run.upgrades or 0,
-                math.floor((usingRaiderIO and RaiderIORunSeconds(run) or run.durationSec) or 0),
-                run.score or 0, run.completed and 1 or 0,
-            }, ":")
-        end
-        local signature = table.concat(signatureParts, "|")
-        if signature == dungeonsSignature then return end
-        dungeonsSignature = signature
-
-        ClearRows(dungeons)
-        dungeonsHeader:SetText(usingRaiderIO and "BEST KEYS (RaiderIO)" or "RECENT DUNGEONS")
-
-        if usingRaiderIO then
-            local previousText = previousScore > 0 and ("  ·  Prev |cff888888" .. previousScore .. "|r") or ""
-            dungeonsSummary:SetText(string.format(
-                "Score |cffffffff%d|r%s  ·  Best |cffffffff+%d|r  ·  Timed |cffffffff%d/%d|r",
-                currentScore, previousText, bestLevel, timedCount, totalRuns))
-            dungeonsSummary:Show()
-        else
-            dungeonsSummary:Hide()
-        end
-
-        if #runs == 0 then
-            dungeons._rows[#dungeons._rows + 1] = MakeEmptyRow(dungeons, "No recent dungeon runs.")
-            return
-        end
-
-        local rowYBase = usingRaiderIO and 50 or 36
-        for runIndex = 1, math.min(#runs, 8) do
-            local run = runs[runIndex]
-            local row = MakeDungeonRow(dungeons, runIndex, rowYBase, Layout.COL_W)
-
-            local timed   = (run.upgrades or 0) > 0
-            local untimed = (usingRaiderIO and (run.level or 0) <= 0) or (not usingRaiderIO and not run.completed)
-            local levelRed, levelGreen, levelBlue
-            if untimed then
-                levelRed, levelGreen, levelBlue = (usingRaiderIO and 0.5 or 0.85), (usingRaiderIO and 0.5 or 0.5), (usingRaiderIO and 0.55 or 0.5)
-            elseif timed then
-                levelRed, levelGreen, levelBlue = KeyTierColor(run.level or 0, run.score)
-            else
-                levelRed, levelGreen, levelBlue = 0.95, 0.7, 0.4
-            end
-
-            local actualSeconds = usingRaiderIO and RaiderIORunSeconds(run) or run.durationSec
-            local limitSeconds  = run.mapID and MapTimeLimit(run.mapID) or nil
-            local deltaText  = (timed and not untimed) and TimeDelta(actualSeconds, limitSeconds) or ""
-            local timeText   = Duration(actualSeconds)
-            local levelText    = (usingRaiderIO and (run.level or 0) <= 0) and "no run" or KeyLevel(run.level, run.upgrades)
-            if not usingRaiderIO and not run.completed then levelText = levelText .. "*" end
-            local scoreText  = (not untimed) and Score(run.score) or ""
-
-            if deltaText ~= "" then
-                row._time:SetText(timeText .. " |cff5cd47b" .. deltaText .. "|r")
-            else
-                row._time:SetText(timeText)
-            end
-            row._time:SetTextColor(0.55, 0.55, 0.6, 1)
-
-            row._lvl:SetText(levelText)
-            if untimed then row._lvl:SetTextColor(0.6, 0.6, 0.65, 1)
-            else row._lvl:SetTextColor(levelRed, levelGreen, levelBlue, 1) end
-
-            row._score:SetText(scoreText)
-            row._score:SetTextColor(0.55, 0.85, 0.55, 1)
-
-            row._left:SetText(run.mapName or "")
-            row._left:SetTextColor(0.95, 0.95, 0.97, 1)
-
-            dungeons._rows[#dungeons._rows + 1] = row
-        end
-    end)
-
-    C_MythicPlus.RequestMapInfo()
-    RefreshDungeons()
-
-    local vaultCard = MakeCard(dashboard, dashboardCards)
-    vaultCard:SetSize(Pixel.Scale(Layout.COL_W), Pixel.Scale(Layout.COL_H))
-    MakeDraggable(vaultCard, "vault", 2)
-    MakeCardHeader(vaultCard, "GREAT VAULT", accentRed, accentGreen, accentBlue)
-
-    local vaultHint = vaultCard:CreateFontString(nil, "OVERLAY")
-    Pixel.ApplyFont(vaultHint, 10, font, "")
-    vaultHint:SetPoint("BOTTOMLEFT", Pixel.Scale(14), Pixel.Scale(10))
-    vaultHint:SetTextColor(0.5, 0.5, 0.55, 1)
-
-    local RefreshVault
-    local vaultItemWaiting = false
-    local function QueueVaultItemLoad(link)
-        if vaultItemWaiting then return end
-        local ok, item = pcall(Item.CreateFromItemLink, Item, link)
-        if ok and item and not item:IsItemEmpty() then
-            vaultItemWaiting = true
-            item:ContinueOnItemLoad(function()
-                vaultItemWaiting = false
-                if RefreshVault then RefreshVault() end
-            end)
-        end
-    end
-
-    RefreshVault = CardRefresher(vaultCard, function()
-        ClearRows(vaultCard)
-        local RewardThresholdType = Enum.WeeklyRewardChestThresholdType
-        local sections = {
-            { label = "Raids",    acts = SortedVaultActivities(RewardThresholdType.Raid)       },
-            { label = "Dungeons", acts = SortedVaultActivities(RewardThresholdType.Activities) },
-            { label = "World",    acts = SortedVaultActivities(RewardThresholdType.World)      },
-        }
-        local pendingLink
-        for sectionIndex, section in ipairs(sections) do
-            vaultCard._rows[#vaultCard._rows + 1] = MakeVaultTypeRow(vaultCard, sectionIndex, section.label, section.acts, Layout.COL_W, accentRed, accentGreen, accentBlue)
-            if not pendingLink then
-                for _, activity in ipairs(section.acts) do
-                    if (activity.progress or 0) >= (activity.threshold or math.huge) and not VaultRewardItemLevel(activity) and activity.id then
-                        pendingLink = C_WeeklyRewards.GetExampleRewardItemHyperlinks(activity.id)
-                        if pendingLink then break end
-                    end
-                end
-            end
-        end
-
-        local nextLocked
-        for _, activity in ipairs(sections[2].acts) do
-            if (activity.progress or 0) < (activity.threshold or 0) then nextLocked = activity break end
-        end
-        if nextLocked then
-            local need = (nextLocked.threshold or 0) - (nextLocked.progress or 0)
-            vaultHint:SetText(("%d more M+ %s the next slot"):format(need, need == 1 and "run unlocks" or "runs unlock"))
-        elseif #sections[2].acts > 0 then
-            vaultHint:SetText("All dungeon slots unlocked")
-        else
-            vaultHint:SetText("")
-        end
-
-        if pendingLink then QueueVaultItemLoad(pendingLink) end
-    end)
-    RefreshVault()
-
-    local raidCard = MakeCard(dashboard, dashboardCards)
-    raidCard:SetSize(Pixel.Scale(Layout.COL_W), Pixel.Scale(Layout.COL_H))
-    MakeDraggable(raidCard, "raidprog", 3)
-    local raidHeader = MakeCardHeader(raidCard, "RAID PROGRESS", accentRed, accentGreen, accentBlue)
-
-    local raidSummary = raidCard:CreateFontString(nil, "OVERLAY")
-    Pixel.ApplyFont(raidSummary, 10, font, "")
-    raidSummary:SetPoint("TOPLEFT", Pixel.Scale(16), Pixel.Scale(-36))
-    raidSummary:SetPoint("TOPRIGHT", Pixel.Scale(-16), Pixel.Scale(-36))
-    raidSummary:SetJustifyH("LEFT")
-    raidSummary:SetTextColor(0.65, 0.65, 0.7, 1)
-
-    local RAID_DIFFICULTY_LABEL = { "N", "H", "M" }
-    local RefreshRaidProgress = CardRefresher(raidCard, function()
-        ClearRows(raidCard)
-        local raid = RaidProgress()
-        if not raid or raid.bossCount == 0 then
-            raidHeader:SetText("RAID PROGRESS")
-            raidSummary:SetText("")
-            raidCard._rows[#raidCard._rows + 1] = MakeEmptyRow(raidCard, "No raid data yet.")
-            return
-        end
-        raidHeader:SetText((raid.name or "RAID"):upper())
-
-        local parts = {}
-        for difficultyIndex = 1, 3 do
-            local info = raid.diffs[difficultyIndex]
-            local difficultyColor = RAID_DIFFICULTY_COLORS[difficultyIndex]
-            parts[#parts + 1] = ("|cff%02x%02x%02x%s %d/%d|r"):format(
-                math.floor(difficultyColor[1] * 255), math.floor(difficultyColor[2] * 255), math.floor(difficultyColor[3] * 255),
-                RAID_DIFFICULTY_LABEL[difficultyIndex], (info and info.killed) or 0, raid.bossCount)
-        end
-        raidSummary:SetText(table.concat(parts, "    ")
-            .. (raid.source == "lockout" and "    |cff888888this week|r" or ""))
-
-        for bossIndex = 1, math.min(raid.bossCount, 8) do
-            local row = MakeRaidRow(raidCard, bossIndex, 54)
-            row._left:SetText((raid.bosses and raid.bosses[bossIndex]) or ("Boss " .. bossIndex))
-            row._left:SetTextColor(0.92, 0.92, 0.94, 1)
-            for difficultyIndex = 1, 3 do
-                local info  = raid.diffs[difficultyIndex]
-                local kills = info and info.kills and tonumber(info.kills[bossIndex]) or 0
-                local difficultyColor  = RAID_DIFFICULTY_COLORS[difficultyIndex]
-                local fontString = row._cols[difficultyIndex]
-                if raid.source == "lockout" then
-                    fontString:SetText(kills > 0 and "+" or "-")
-                else
-                    fontString:SetText(tostring(kills))
-                end
-                if kills > 0 then fontString:SetTextColor(difficultyColor[1], difficultyColor[2], difficultyColor[3], 1)
-                else fontString:SetTextColor(0.4, 0.42, 0.46, 1) end
-            end
-            raidCard._rows[#raidCard._rows + 1] = row
-        end
-    end)
-    RequestRaidInfo()
-    RefreshRaidProgress()
-
-    local crestCard = MakeCard(dashboard, dashboardCards)
-    crestCard:SetSize(Pixel.Scale(Layout.COL_W), Pixel.Scale(Layout.COL_H))
-    MakeDraggable(crestCard, "crests", 4)
-    MakeCardHeader(crestCard, "CRESTS", accentRed, accentGreen, accentBlue)
-
-    local RefreshCrests = CardRefresher(crestCard, function()
-        ClearRows(crestCard)
-        local currencies = SeasonCurrencyList()
-        if not currencies then
-            crestCard._rows[#crestCard._rows + 1] = MakeEmptyRow(crestCard, "No crests found yet.")
-            return
-        end
-        local rowCount = math.min(#currencies, CREST_ROW_LIMIT)
-        local rowPitch = math.min(CREST_ROW_PITCH, math.floor(CREST_ROWS_HEIGHT / math.max(rowCount, 1)))
-        for currencyIndex = 1, rowCount do
-            local currency = currencies[currencyIndex]
-            local value
-            if currency.max > 0 then
-                value = ("%d/%d"):format(currency.quantity, currency.max)
-            else
-                value = tostring(currency.quantity)
-            end
-            local qualityColor = currency.quality and ITEM_QUALITY_COLORS[currency.quality]
-            crestCard._rows[#crestCard._rows + 1] = MakeCrestRow(crestCard, currencyIndex, currency.name, value, currency.icon,
-                qualityColor and qualityColor.r, qualityColor and qualityColor.g, qualityColor and qualityColor.b, rowPitch)
-        end
-    end)
-    RefreshCrests()
-
-    local altCard = MakeCard(dashboard, dashboardCards)
-    altCard:SetSize(Pixel.Scale(Layout.DASH_W), Pixel.Scale(Layout.WIDE_H))
-    MakeDraggable(altCard, "alts", 5)
-    MakeCardHeader(altCard, "ALT OVERVIEW", accentRed, accentGreen, accentBlue)
-
-    local RefreshAlts = CardRefresher(altCard, function()
-        SnapshotCurrentChar()
-        ClearRows(altCard)
-        local globalDB = BUI.db and BUI.db.global
-        local store = globalDB and globalDB.altOverview
-        if not store or not next(store) then
-            altCard._rows[#altCard._rows + 1] = MakeEmptyRow(altCard, "No characters recorded yet.")
-            return
-        end
-
-        local characters = {}
-        for _, character in pairs(store) do characters[#characters + 1] = character end
-        table.sort(characters, function(leftCharacter, rightCharacter)
-            if (leftCharacter.score or 0) ~= (rightCharacter.score or 0) then return (leftCharacter.score or 0) > (rightCharacter.score or 0) end
-            return (leftCharacter.ilvl or 0) > (rightCharacter.ilvl or 0)
+    local raids = SideRow(vault, 'Raids', function() return 'Raid slots', SlotRows(VaultType.Raid, 'bosses') end)
+    local world = SideRow(vault, 'World', function() return 'World slots', SlotRows(VaultType.World, 'activities') end)
+
+    local waiting = false
+    local function WaitForItem(link)
+        if waiting then return end
+        local item = Item:CreateFromItemLink(link)
+        if item:IsItemEmpty() then return end
+        waiting = true
+        item:ContinueOnItemLoad(function()
+            waiting = false
+            vault.Refresh()
         end)
-
-        local headerRow = MakeAltRow(altCard, 1, 34)
-        headerRow._name:SetText("CHARACTER")
-        headerRow._ilvl:SetText("ILVL")
-        headerRow._score:SetText("SCORE")
-        headerRow._key:SetText("KEYSTONE")
-        headerRow._vault:SetText("VAULT R·D·W")
-        headerRow._seen:SetText("SEEN")
-        for _, fontString in ipairs({ headerRow._name, headerRow._ilvl, headerRow._score, headerRow._key, headerRow._vault, headerRow._seen }) do
-            fontString:SetTextColor(0.5, 0.5, 0.55, 1)
-        end
-        altCard._rows[#altCard._rows + 1] = headerRow
-
-        local now = time()
-        local lastReset = now + WeeklyResetSeconds() - 7 * 86400
-        local myName, myRealm = UnitName("player"), GetRealmName()
-        for characterIndex = 1, math.min(#characters, 5) do
-            local character = characters[characterIndex]
-            local row = MakeAltRow(altCard, characterIndex + 1, 34)
-            local isMe = (character.name == myName and character.realm == myRealm)
-
-            local nameText = character.name or "?"
-            if character.realm and character.realm ~= myRealm then nameText = nameText .. "-" .. character.realm end
-            row._name:SetText(nameText)
-            local classColor = character.class and RAID_CLASS_COLORS[character.class]
-            if classColor then row._name:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
-            else row._name:SetTextColor(0.92, 0.92, 0.92, 1) end
-
-            row._ilvl:SetText(tostring(character.ilvl or 0))
-            row._ilvl:SetTextColor(0.88, 0.88, 0.9, 1)
-
-            local score = character.score or 0
-            local scoreColor = C_ChallengeMode.GetDungeonScoreRarityColor(score)
-            row._score:SetText(tostring(score))
-            if scoreColor then row._score:SetTextColor(scoreColor.r, scoreColor.g, scoreColor.b, 1)
-            else row._score:SetTextColor(0.7, 0.7, 0.75, 1) end
-
-            local fresh = (character.lastSeen or 0) >= lastReset or isMe
-            if fresh and character.keyLevel then
-                row._key:SetText(("+%d %s"):format(character.keyLevel, character.keyMap or "?"))
-                row._key:SetTextColor(0.85, 0.85, 0.9, 1)
-            else
-                row._key:SetText("-")
-                row._key:SetTextColor(0.45, 0.45, 0.5, 1)
-            end
-            if fresh and character.vault then
-                row._vault:SetText(("%d·%d·%d"):format(character.vault[1] or 0, character.vault[2] or 0, character.vault[3] or 0))
-                row._vault:SetTextColor(0.75, 0.75, 0.8, 1)
-            else
-                row._vault:SetText("-")
-                row._vault:SetTextColor(0.45, 0.45, 0.5, 1)
-            end
-
-            row._seen:SetText(isMe and "now" or FormatAgo(now - (character.lastSeen or now)))
-            row._seen:SetTextColor(0.5, 0.5, 0.55, 1)
-            altCard._rows[#altCard._rows + 1] = row
-        end
-    end)
-    RefreshAlts()
-
-    local slowTickCount = 0
-    local refreshTicker
-    local RefreshTick = BUI.Profiler.Wrap("Pages.Dashboard refresh tick", function()
-        if not dashboard:IsVisible() then
-            refreshTicker:Cancel()
-            refreshTicker = nil
-            return
-        end
-        RefreshTiles()
-        slowTickCount = slowTickCount + 1
-        if slowTickCount >= 30 then
-            slowTickCount = 0
-            RefreshDungeons(); RefreshVault(); RefreshWeeklyMplus()
-            RefreshRaidProgress(); RefreshCrests(); RefreshAlts()
-        end
-    end)
-    local function StartRefreshTicker()
-        if refreshTicker then return end
-        refreshTicker = C_Timer.NewTicker(1, RefreshTick)
     end
-    StartRefreshTicker()
 
-    canvas:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-    canvas:RegisterEvent("PLAYER_AVG_ITEM_LEVEL_UPDATE")
-    canvas:RegisterEvent("CHALLENGE_MODE_COMPLETED")
-    canvas:RegisterEvent("CHALLENGE_MODE_MAPS_UPDATE")
-    canvas:RegisterEvent("WEEKLY_REWARDS_UPDATE")
-    canvas:RegisterEvent("UPDATE_INSTANCE_INFO")
-    canvas:RegisterEvent("BOSS_KILL")
-    canvas:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
-    canvas:SetScript("OnEvent", BUI.Profiler.Wrap("Pages.Dashboard canvas event", function(_, event)
-        if not canvas:IsVisible() then return end
-        if event == "PLAYER_EQUIPMENT_CHANGED" or event == "PLAYER_AVG_ITEM_LEVEL_UPDATE" then
-            RefreshTiles()
-        elseif event == "CHALLENGE_MODE_COMPLETED" or event == "CHALLENGE_MODE_MAPS_UPDATE" then
-            RefreshTiles(); RefreshDungeons(); RefreshWeeklyMplus()
-        elseif event == "WEEKLY_REWARDS_UPDATE" then
-            RefreshVault()
-        elseif event == "UPDATE_INSTANCE_INFO" or event == "BOSS_KILL" then
-            RefreshRaidProgress()
-        elseif event == "CURRENCY_DISPLAY_UPDATE" then
-            RefreshCrests()
-        end
-    end))
-
-    canvas:HookScript("OnShow", BUI.Profiler.Wrap("Pages.Dashboard canvas shown", function()
-        RefreshTiles()
-        RefreshDungeons(); RefreshVault(); RefreshWeeklyMplus()
-        RequestRaidInfo()
-        RefreshRaidProgress(); RefreshCrests(); RefreshAlts()
-        slowTickCount = 0
-        StartRefreshTicker()
-    end))
-
-    local LAYOUT_GROUPS = {
-        { key = "tiles", title = "TOP TILES" },
-        { key = "cards", title = "CARDS"    },
-    }
-
-    local function OpenLayoutSettings()
-        local groups = { tiles = {}, cards = {} }
-        for _, cardInfo in ipairs(CARD_DEFINITIONS) do
-            local groupList = groups[cardInfo.group]
-            groupList[#groupList + 1] = cardInfo
-        end
-        local maxRows = 0
-        for _, groupList in pairs(groups) do
-            if #groupList > maxRows then maxRows = #groupList end
-        end
-
-        local sidePadding    = 30
-        local columnWidth       = 168
-        local columnGap     = 16
-        local columnHeaderHeight = 18
-        local rowHeight       = 28
-        local topPadding     = 92
-        local bottomPadding     = 66
-        local columnCount    = #LAYOUT_GROUPS
-        local modalWidth     = sidePadding * 2 + columnWidth * columnCount + columnGap * (columnCount - 1)
-        local modalHeight     = topPadding + columnHeaderHeight + maxRows * rowHeight + bottomPadding
-
-        local overlay, CloseModal = Modals.Custom({
-            title     = "Dashboard Layout",
-            width     = modalWidth,
-            height    = modalHeight,
-            message   = "Pick which cards show. Drag them around to reorder within a row.",
-            showClose = false,
-        })
-        local dialog = overlay.dialog or overlay
-
-        if dialog.message then
-            dialog.message:ClearAllPoints()
-            dialog.message:SetPoint("TOP",   dialog, "TOP",   0, Pixel.Scale(-52))
-            dialog.message:SetPoint("LEFT",  dialog, "LEFT",  Pixel.Scale(20), 0)
-            dialog.message:SetPoint("RIGHT", dialog, "RIGHT", Pixel.Scale(-20), 0)
-        end
-
-        local divider = dialog:CreateTexture(nil, "OVERLAY")
-        divider:SetTexture(Widget.WHITE); divider:SetVertexColor(1, 1, 1, 0.05)
-        divider:SetHeight(Pixel.PixelSize(1))
-        divider:SetPoint("TOPLEFT",  dialog, "TOPLEFT",  Pixel.Scale(sidePadding), Pixel.Scale(-(topPadding - 14)))
-        divider:SetPoint("TOPRIGHT", dialog, "TOPRIGHT", Pixel.Scale(-sidePadding), Pixel.Scale(-(topPadding - 14)))
-
-        local db = GetDashboardDB()
-        db.cardVisibility = db.cardVisibility or {}
-
-        local appliers = {}
-
-        for columnIndex, group in ipairs(LAYOUT_GROUPS) do
-            local columnX = sidePadding + (columnIndex - 1) * (columnWidth + columnGap)
-
-            local header = dialog:CreateFontString(nil, "OVERLAY")
-            Pixel.ApplyFont(header, 10, font, "OUTLINE")
-            header:SetPoint("TOPLEFT", dialog, "TOPLEFT", Pixel.Scale(columnX + 4), Pixel.Scale(-topPadding))
-            header:SetText(group.title)
-            header:SetTextColor(1, 1, 1, 1)
-
-            local headerRule = dialog:CreateTexture(nil, "OVERLAY")
-            headerRule:SetTexture(Widget.WHITE)
-            headerRule:SetVertexColor(accentRed, accentGreen, accentBlue, 0.25)
-            headerRule:SetHeight(Pixel.PixelSize(1))
-            headerRule:SetWidth(Pixel.Scale(columnWidth - 12))
-            headerRule:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, Pixel.Scale(-3))
-
-            for rowIndex, cardInfo in ipairs(groups[group.key]) do
-                local row = CreateFrame("Frame", nil, dialog)
-                row:SetSize(Pixel.Scale(columnWidth), Pixel.Scale(rowHeight))
-                row:SetPoint("TOPLEFT", dialog, "TOPLEFT", Pixel.Scale(columnX), Pixel.Scale(-topPadding - columnHeaderHeight - (rowIndex - 1) * rowHeight))
-
-                local checked = IsCardVisible(cardInfo.id)
-
-                local dot = row:CreateTexture(nil, "OVERLAY")
-                dot:SetTexture(Widget.WHITE)
-                dot:SetVertexColor(accentRed, accentGreen, accentBlue, checked and 1 or 0.22)
-                dot:SetSize(Pixel.Scale(4), Pixel.Scale(4)); dot:SetPoint("LEFT", Pixel.Scale(4), 0)
-
-                local label = row:CreateFontString(nil, "OVERLAY")
-                Pixel.ApplyFont(label, 12, font, "")
-                label:SetPoint("LEFT", Pixel.Scale(16), 0)
-                label:SetText(cardInfo.label)
-                local function PaintLabel(isOn)
-                    local shade = isOn and 0.95 or 0.5
-                    label:SetTextColor(shade, shade, isOn and 0.97 or 0.5, 1)
+    function vault.Refresh()
+        local dungeons = VaultActivities(VaultType.Activities)
+        local need
+        for slot, column in ipairs(columns) do
+            local activity = dungeons[slot]
+            column:SetShown(activity ~= nil)
+            if activity then
+                local open = Unlocked(activity)
+                column.label:SetText(activity.threshold == 1 and '1 run' or (activity.threshold .. ' runs'))
+                column.progress:SetText(('%d / %d'):format(math.min(activity.progress, activity.threshold), activity.threshold))
+                column.progress:SetPoint('TOP', column.value, 'BOTTOM', open and (CHECK_MARK + MARK_GAP) / 2 or 0, -4)
+                column.mark:SetShown(open)
+                if open then
+                    local itemLevel = RewardItemLevel(activity)
+                    column.value:SetText(itemLevel or '...')
+                    window:Paint(column.value, 'text')
+                    if not itemLevel then
+                        local link = RewardLink(activity)
+                        if link then WaitForItem(link) end
+                    end
+                else
+                    need = need or (activity.threshold - activity.progress)
+                    Dash(column.value)
                 end
-                PaintLabel(checked)
-
-                local toggle
-                local function Apply(isVisible)
-                    db.cardVisibility[cardInfo.id] = isVisible
-                    dot:SetVertexColor(accentRed, accentGreen, accentBlue, isVisible and 1 or 0.22)
-                    PaintLabel(isVisible)
-                    if toggle then toggle:SetValue(isVisible) end
-                end
-                appliers[#appliers + 1] = Apply
-
-                toggle = Controls.StampCheckbox(row, nil, checked, function(isVisible)
-                    Apply(isVisible)
-                    BUI.PageEngine.RefreshCurrentPage()
-                end, nil, true, nil, "mini")
-                local toggleFrame = toggle.frame or toggle
-                toggleFrame:ClearAllPoints(); toggleFrame:SetParent(row); toggleFrame:SetPoint("RIGHT", Pixel.Scale(-8), 0)
             end
         end
-
-        local function FlipAll(value)
-            for _, apply in ipairs(appliers) do apply(value) end
-            BUI.PageEngine.RefreshCurrentPage()
+        statusMark:SetShown(#dungeons > 0 and not need)
+        if need then
+            status:SetText(need == 1 and '1 more run' or (need .. ' more runs'))
+        else
+            status:SetText(#dungeons > 0 and 'All unlocked' or '')
         end
-
-        local gap = 10
-        local buttons = {
-            Controls.Button(dialog, "Select all",   110, function() FlipAll(true)  end, { radius = 6 }),
-            Controls.Button(dialog, "Unselect all", 110, function() FlipAll(false) end, { radius = 6 }),
-            Controls.Button(dialog, "Close",        110, function() CloseModal()   end, { radius = 6 }),
-        }
-        local totalWidth = -gap
-        for _, button in ipairs(buttons) do totalWidth = totalWidth + (button.frame or button):GetWidth() + gap end
-        local x = -totalWidth / 2
-        for _, button in ipairs(buttons) do
-            local buttonFrame = button.frame or button
-            buttonFrame:ClearAllPoints()
-            buttonFrame:SetPoint("BOTTOM", dialog, "BOTTOM", x + buttonFrame:GetWidth() / 2, Pixel.Scale(16))
-            x = x + buttonFrame:GetWidth() + gap
-        end
+        SlotSummary(raids, VaultType.Raid, 'bosses')
+        SlotSummary(world, VaultType.World, 'activities')
     end
-    cogButton:SetScript("OnClick", BUI.Profiler.Script('Pages.Dashboard cogButton OnClick', OpenLayoutSettings))
 
-    ApplyCardVisibility()
-    return dashboard
+    function vault:Layout(width)
+        local columnWidth = (width - PAD * 2 - VAULT_SIDE - TILE_GAP) / 3
+        for slot, column in ipairs(columns) do
+            column:ClearAllPoints()
+            column:SetPoint('TOPLEFT', PAD + (slot - 1) * columnWidth, -COLUMNS_TOP)
+            column:SetSize(columnWidth, TILE_HEIGHT)
+        end
+        local rowHeight = (TILE_HEIGHT - LINK_GAP) / 2
+        for index, row in ipairs({ raids, world }) do
+            row:ClearAllPoints()
+            row:SetPoint('TOPLEFT', width - PAD - VAULT_SIDE, -(COLUMNS_TOP + (index - 1) * (rowHeight + LINK_GAP)))
+            row:SetSize(VAULT_SIDE, rowHeight)
+        end
+        return COLUMNS_TOP + TILE_HEIGHT + BOTTOM_PAD
+    end
+    return vault
 end
 
-BUI.PageEngine.RegisterPage("dashboard", {
-    title = "Dashboard",
-    buttonText = "Dashboard",
+local function BossRows(raid)
+    local rows = {}
+    for bossIndex = 1, raid.bossCount do
+        local marks = {}
+        for key, difficulty in ipairs(RAID_DIFFICULTIES) do
+            local info = raid.diffs[key]
+            local killed = info and (tonumber(info.kills[bossIndex]) or 0) > 0
+            local red, green, blue = unpack(difficulty.color)
+            marks[#marks + 1] = killed and ('|cff%02x%02x%02x%s|r'):format(math.floor(red * 255), math.floor(green * 255), math.floor(blue * 255), difficulty.short) or ('|cff555a62%s|r'):format(difficulty.short)
+        end
+        rows[#rows + 1] = { left = (raid.bosses and raid.bosses[bossIndex]) or ('Boss ' .. bossIndex), right = table.concat(marks, ' ') }
+    end
+    return rows
+end
+
+local function BuildRaid()
+    local raid = Card('Raid progress')
+    raid.id = 'raidprog'
+    local current
+    local bosses = HeaderLink(raid, 'Bosses', function() return current.name, BossRows(current) end)
+    local name = kit.Text(raid, '', 12, 'muted')
+    name:SetPoint('LEFT', raid.title, 'RIGHT', TITLE_GAP, 0)
+    name:SetPoint('RIGHT', bosses, 'LEFT', -TITLE_GAP, 0)
+    name:SetWordWrap(false)
+    local empty = Empty(raid, 'No raid data yet.')
+    local bars = {}
+    for index, difficulty in ipairs(RAID_DIFFICULTIES) do
+        local row = CreateFrame('Frame', nil, raid)
+        row:SetHeight(RAID_ROW)
+        kit.Text(row, difficulty.label, 12, 'text'):SetPoint('LEFT')
+        row.track = CreateFrame('Frame', nil, row)
+        row.track:SetHeight(BAR_HEIGHT)
+        row.track:SetPoint('LEFT', RAID_LABEL, 0)
+        row.track:SetPoint('RIGHT', -RAID_COUNT, 0)
+        local trackFill, trackEdge = Widget.DrawCardShape(row.track, BAR_RADIUS, WHITE, WHITE, 'ARTWORK', 0, 0)
+        window:Paint(trackFill, 'control')
+        window:Paint(trackEdge, 'control')
+        row.fill = CreateFrame('Frame', nil, row.track)
+        row.fill:SetPoint('TOPLEFT')
+        row.fill:SetPoint('BOTTOMLEFT')
+        local barFill, barEdge = Widget.DrawCardShape(row.fill, BAR_RADIUS, WHITE, WHITE, 'ARTWORK', 2, 0)
+        local red, green, blue = unpack(difficulty.color)
+        barFill:SetVertexColor(red, green, blue, 1)
+        barEdge:SetVertexColor(red, green, blue, 1)
+        row.count = kit.Text(row, '', 12, 'muted')
+        row.count:SetPoint('RIGHT')
+        row.fraction = 0
+        bars[index] = row
+    end
+
+    function raid.Refresh()
+        current = RaidProgress()
+        local hasRaid = current ~= nil and current.bossCount > 0
+        empty:SetShown(not hasRaid)
+        name:SetShown(hasRaid)
+        bosses:SetShown(hasRaid)
+        for key, row in ipairs(bars) do
+            row:SetShown(hasRaid)
+            if hasRaid then
+                local info = current.diffs[key]
+                local killed = info and info.killed or 0
+                row.count:SetText(('%d / %d'):format(killed, current.bossCount))
+                row.fraction = killed / current.bossCount
+                if killed > 0 then Tint(row.count, unpack(RAID_DIFFICULTIES[key].color)) else window:Paint(row.count, 'muted') end
+            end
+        end
+        if hasRaid then name:SetText(current.name .. (current.source == 'lockout' and '  ·  this week' or '')) end
+    end
+
+    function raid:Layout(width)
+        local trackWidth = width - PAD * 2 - RAID_LABEL - RAID_COUNT
+        local y = RAID_ROWS_TOP
+        for _, row in ipairs(bars) do
+            Place(row, y)
+            row.fill:SetWidth(math.max(BAR_HEIGHT, trackWidth * row.fraction))
+            row.fill:SetShown(row.fraction > 0)
+            y = y + RAID_ROW
+        end
+        return y + BOTTOM_PAD
+    end
+    return raid
+end
+
+local function BuildKeys()
+    local keys = Card('Best keys')
+    keys.id = 'dungeons'
+    kit.Text(keys, 'This season', 12, 'muted'):SetPoint('LEFT', keys.title, 'RIGHT', TITLE_GAP + 4, 0)
+    local summary = kit.Text(keys, '', 12, 'muted')
+    summary:SetPoint('RIGHT', keys, 'TOPRIGHT', -PAD, -TITLE_Y)
+    local empty = Empty(keys, 'No timed keys this season yet.')
+    local heads = TableHead(keys, { { 'Dungeon', 0 }, { 'Key', KEY_COLUMNS.key }, { 'Time', KEY_COLUMNS.time }, { 'Under time', KEY_COLUMNS.under } })
+    local rows = {}
+    for index = 1, KEY_ROWS do
+        local row = CreateFrame('Frame', nil, keys)
+        row:SetHeight(KEY_ROW)
+        row.rule = Rule(row)
+        row.rule:SetPoint('TOPLEFT')
+        row.rule:SetPoint('TOPRIGHT')
+        row.rule:SetShown(index > 1)
+        row.icon = row:CreateTexture(nil, 'ARTWORK')
+        row.icon:SetSize(DUNGEON_ICON, DUNGEON_ICON)
+        row.icon:SetPoint('LEFT')
+        row.icon:SetTexCoord(unpack(ICON_CROP))
+        row.name = kit.Text(row, '', 12, 'text')
+        row.name:SetPoint('LEFT', DUNGEON_ICON + ICON_GAP, 0)
+        row.name:SetWordWrap(false)
+        row.key = kit.Text(row, '', 12, 'text')
+        row.time = kit.Text(row, '', 12, 'text')
+        row.under = kit.Text(row, '', 12, 'text')
+        rows[index] = row
+    end
+
+    function keys.Refresh()
+        local runs = SeasonBestRuns()
+        empty:SetShown(#runs == 0)
+        for _, head in ipairs(heads) do head.label:SetShown(#runs > 0) end
+        for index, row in ipairs(rows) do
+            local run = runs[index]
+            row:SetShown(run ~= nil)
+            if run then
+                row.icon:SetTexture(run.icon)
+                row.name:SetText(run.name)
+                row.key:SetText('+' .. run.level)
+                Tint(row.key, ColorOf(C_ChallengeMode.GetKeystoneLevelRarityColor(run.level)))
+                row.time:SetText(Clock(run.duration))
+                local spare = run.limit - run.duration
+                row.under:SetText(spare >= 0 and Clock(spare) or ('+' .. Clock(-spare)))
+                if spare >= 0 then Tint(row.under, 0.36, 0.83, 0.48) else window:Paint(row.under, 'danger') end
+            end
+        end
+        local best, timed, total = SeasonSummary()
+        summary:SetText(total > 0 and ('Best +%d  ·  Timed %d/%d'):format(best, timed, total) or '')
+    end
+
+    function keys:Layout(width)
+        local inner = width - PAD * 2
+        PlaceHead(heads, width)
+        local y = TABLE_ROWS_TOP
+        for _, row in ipairs(rows) do
+            Place(row, y)
+            row.name:SetWidth(inner * KEY_COLUMNS.key - DUNGEON_ICON - ICON_GAP * 2)
+            row.key:SetPoint('LEFT', inner * KEY_COLUMNS.key, 0)
+            row.time:SetPoint('LEFT', inner * KEY_COLUMNS.time, 0)
+            row.under:SetPoint('LEFT', inner * KEY_COLUMNS.under, 0)
+            y = y + KEY_ROW
+        end
+        return y + BOTTOM_PAD
+    end
+    return keys
+end
+
+local function BuildCurrencies()
+    local currencies = Card('Currencies')
+    currencies.id = 'crests'
+    local empty = Empty(currencies, 'No season currencies found yet.')
+    local rule = Rule(currencies)
+    local rows = {}
+    for index = 1, CURRENCY_ROWS do
+        local row = CreateFrame('Frame', nil, currencies)
+        row:SetHeight(CURRENCY_ROW)
+        row.icon = row:CreateTexture(nil, 'ARTWORK')
+        row.icon:SetSize(CURRENCY_ICON, CURRENCY_ICON)
+        row.icon:SetPoint('LEFT')
+        row.icon:SetTexCoord(unpack(ICON_CROP))
+        row.value = kit.Text(row, '', 12, 'text')
+        row.value:SetPoint('RIGHT')
+        row.name = kit.Text(row, '', 12, 'text')
+        row.name:SetPoint('LEFT', CURRENCY_ICON + ICON_GAP, 0)
+        row.name:SetPoint('RIGHT', row.value, 'LEFT', -ICON_GAP, 0)
+        row.name:SetWordWrap(false)
+        rows[index] = row
+    end
+    local data = {}
+
+    function currencies.Refresh()
+        data = SeasonCurrencies()
+        empty:SetShown(#data == 0)
+        for index, row in ipairs(rows) do
+            local currency = data[index]
+            row:SetShown(currency ~= nil)
+            if currency then
+                row.icon:SetTexture(currency.icon)
+                row.name:SetText(currency.name)
+                row.value:SetText(currency.max > 0 and ('%d / %d'):format(currency.quantity, currency.max) or currency.quantity)
+            end
+        end
+    end
+
+    function currencies:Layout()
+        local y = TABLE_TOP - 4
+        local previousCrest = false
+        rule:Hide()
+        for index = 1, math.min(#data, CURRENCY_ROWS) do
+            local currency = data[index]
+            if previousCrest and not currency.crest then
+                Place(rule, y + GROUP_RULE / 2)
+                rule:Show()
+                y = y + GROUP_RULE
+            end
+            previousCrest = currency.crest
+            Place(rows[index], y)
+            y = y + CURRENCY_ROW
+        end
+        return y + BOTTOM_PAD
+    end
+    return currencies
+end
+
+local function SortedCharacters(me)
+    local list = {}
+    for key, character in pairs(BUI.db.global.altOverview) do list[#list + 1] = { key = key, data = character } end
+    table.sort(list, function(left, right)
+        if (left.key == me) ~= (right.key == me) then return left.key == me end
+        return left.data.lastSeen > right.data.lastSeen
+    end)
+    return list
+end
+
+local function FillCharacterRow(row, character, isMe, now, lastReset)
+    row.highlight:SetShown(isMe)
+    row.icon:SetAtlas('classicon-' .. character.class:lower())
+    row.name:SetText(character.realm ~= GetRealmName() and (character.name .. '-' .. character.realm) or character.name)
+    Tint(row.name, ColorOf(RAID_CLASS_COLORS[character.class]))
+    if character.ilvl > 0 then
+        row.ilvl:SetText(character.ilvl)
+        window:Paint(row.ilvl, 'text')
+    else
+        Dash(row.ilvl)
+    end
+    row.score:SetText(character.score)
+    Tint(row.score, ColorOf(C_ChallengeMode.GetDungeonScoreRarityColor(character.score)))
+    local fresh = isMe or character.lastSeen >= lastReset
+    if fresh and character.keyLevel then
+        row.key:SetText(('+%d %s'):format(character.keyLevel, character.keyMap))
+        window:Paint(row.key, 'text')
+    else
+        Dash(row.key)
+    end
+    if fresh then
+        row.vault:SetText(('%d / %d / %d'):format(character.vault[1], character.vault[2], character.vault[3]))
+        window:Paint(row.vault, 'text')
+    else
+        Dash(row.vault)
+    end
+    row.seen:SetText(isMe and 'Now' or FormatAgo(now - character.lastSeen))
+    window:Paint(row.seen, 'muted')
+end
+
+local function BuildCharacters()
+    local characters = Card('Characters')
+    local count = kit.Text(characters, '', 12, 'muted')
+    count:SetPoint('LEFT', characters.title, 'RIGHT', TITLE_GAP + 4, 0)
+    local heads = TableHead(characters, {
+        { 'Character', 0 }, { 'Item level', CHAR_COLUMNS.ilvl }, { 'M+ score', CHAR_COLUMNS.score },
+        { 'Keystone', CHAR_COLUMNS.key }, { 'Vault', CHAR_COLUMNS.vault }, { 'Last seen', CHAR_COLUMNS.seen },
+    })
+    local rows = {}
+    for index = 1, CHAR_ROWS do
+        local row = CreateFrame('Frame', nil, characters)
+        row:SetHeight(CHAR_ROW)
+        row.highlight = kit.Fill(row, 'hover', 'BACKGROUND')
+        row.highlight:SetAllPoints()
+        row.icon = row:CreateTexture(nil, 'ARTWORK')
+        row.icon:SetSize(CLASS_ICON, CLASS_ICON)
+        row.icon:SetPoint('LEFT', 4, 0)
+        row.name = kit.Text(row, '', 12, 'text')
+        row.name:SetPoint('LEFT', CLASS_ICON + ICON_GAP + 4, 0)
+        row.name:SetWordWrap(false)
+        for field in pairs(CHAR_COLUMNS) do
+            row[field] = kit.Text(row, '', 12, 'text')
+            row[field]:SetWordWrap(false)
+        end
+        rows[index] = row
+    end
+    local total = 0
+
+    function characters.Refresh()
+        SnapshotCurrentChar()
+        local me = CharacterKey()
+        local list = SortedCharacters(me)
+        total = #list
+        count:SetText(total == 1 and '1 character' or (total .. ' characters'))
+        local now = time()
+        local lastReset = now + C_DateAndTime.GetSecondsUntilWeeklyReset() - 7 * 86400
+        for index, row in ipairs(rows) do
+            local entry = list[index]
+            row:SetShown(entry ~= nil)
+            if entry then FillCharacterRow(row, entry.data, entry.key == me, now, lastReset) end
+        end
+    end
+
+    function characters:Layout(width)
+        local inner = width - PAD * 2
+        PlaceHead(heads, width)
+        local y = TABLE_ROWS_TOP
+        for index = 1, math.min(total, CHAR_ROWS) do
+            local row = rows[index]
+            Place(row, y)
+            row.name:SetWidth(inner * CHAR_COLUMNS.ilvl - CLASS_ICON - ICON_GAP * 2)
+            for field, fraction in pairs(CHAR_COLUMNS) do row[field]:SetPoint('LEFT', inner * fraction, 0) end
+            y = y + CHAR_ROW
+        end
+        return y + BOTTOM_PAD
+    end
+    return characters
+end
+
+local function BuildDashboard(pageFrame)
+    window = BUI.PageEngine.window
+    kit = Layout.TableKit(window)
+    local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
+    local tab = page:GetTab(1)
+    block = CreateFrame('Frame', nil, tab.child)
+    block:SetWidth(PAGE_WIDTH)
+
+    local Relayout
+    local header = BuildHeader(function() Relayout() end)
+    local strip = BuildStats()
+    local vault, raid, keys, currencies, characters = BuildVault(), BuildRaid(), BuildKeys(), BuildCurrencies(), BuildCharacters()
+    local cards = { strip, vault, raid, keys, currencies, characters }
+    local panes = {
+        { cards = { strip, vault, raid, keys, currencies }, strip = true, rows = { { vault, raid }, { keys, currencies } } },
+        { cards = { characters }, rows = { { characters } } },
+    }
+    local selected = 1
+    local slideTicker = CreateFrame('Frame', nil, block)
+
+    local function PlaceStrip(y)
+        local shown = {}
+        for _, cell in ipairs(strip.cells) do
+            cell:SetShown(CardShown(cell.id))
+            if cell:IsShown() then shown[#shown + 1] = cell end
+        end
+        strip:SetShown(#shown > 0)
+        if #shown == 0 then return y end
+        strip:ClearAllPoints()
+        strip:SetPoint('TOPLEFT', 0, -y)
+        strip:SetSize(PAGE_WIDTH, STRIP_HEIGHT)
+        strip:Layout(PAGE_WIDTH, shown)
+        return y + STRIP_HEIGHT + GAP
+    end
+
+    local function PlaceRows(rows, y)
+        for _, row in ipairs(rows) do
+            local shown = {}
+            for _, card in ipairs(row) do
+                card:SetShown(not card.id or CardShown(card.id))
+                if card:IsShown() then shown[#shown + 1] = card end
+            end
+            if #shown > 0 then
+                local widths = #shown == 2 and { LEFT_WIDTH, PAGE_WIDTH - LEFT_WIDTH - GAP } or { PAGE_WIDTH }
+                local height = 0
+                for index, card in ipairs(shown) do height = math.max(height, card:Layout(widths[index])) end
+                local x = 0
+                for index, card in ipairs(shown) do
+                    card:ClearAllPoints()
+                    card:SetPoint('TOPLEFT', x, -y)
+                    card:SetSize(widths[index], height)
+                    x = x + widths[index] + GAP
+                end
+                y = y + height + GAP
+            end
+        end
+        return y
+    end
+
+    SnapshotCurrentChar()
+    local characterCount = 0
+    for _ in pairs(BUI.db.global.altOverview) do characterCount = characterCount + 1 end
+    local contentTop = kit.Tabs(block, HEADER_HEIGHT, { 'Overview', 'Characters (' .. characterCount .. ')' }, function(index)
+        selected = index
+        Relayout()
+        SlideIn(panes[index].cards, slideTicker)
+    end) + TABS_GAP
+
+    Relayout = function()
+        for _, card in ipairs(cards) do card:Hide() end
+        local pane = panes[selected]
+        local y = contentTop
+        if pane.strip then y = PlaceStrip(y) end
+        y = PlaceRows(pane.rows, y)
+        block:SetHeight(y)
+        block.layoutHeight = y
+        BUILib.Defer(function() tab:Refresh() end)
+    end
+
+    local function Both(first, second) return function() first() second() end end
+    local handlers = {
+        PLAYER_EQUIPMENT_CHANGED = strip.Refresh,
+        PLAYER_AVG_ITEM_LEVEL_UPDATE = strip.Refresh,
+        PLAYER_SPECIALIZATION_CHANGED = header.Refresh,
+        CHALLENGE_MODE_COMPLETED = Both(strip.Refresh, keys.Refresh),
+        CHALLENGE_MODE_MAPS_UPDATE = Both(strip.Refresh, keys.Refresh),
+        WEEKLY_REWARDS_UPDATE = Both(strip.Refresh, vault.Refresh),
+        UPDATE_INSTANCE_INFO = raid.Refresh,
+        BOSS_KILL = raid.Refresh,
+        CURRENCY_DISPLAY_UPDATE = currencies.Refresh,
+    }
+    for event in pairs(handlers) do block:RegisterEvent(event) end
+    block:SetScript('OnEvent', BUI.Profiler.Wrap('Pages.Dashboard event', function(self, event)
+        if not self:IsVisible() then return end
+        handlers[event]()
+        Relayout()
+    end))
+
+    local sessionTicker
+    block:SetScript('OnShow', function()
+        C_MythicPlus.RequestMapInfo()
+        RequestRaidInfo()
+        header.Refresh()
+        for _, card in ipairs(cards) do card.Refresh() end
+        Relayout()
+        sessionTicker = sessionTicker or C_Timer.NewTicker(SESSION_TICK, strip.RefreshSession)
+        SlideIn(panes[selected].cards, slideTicker)
+    end)
+    block:SetScript('OnHide', function()
+        if sessionTicker then
+            sessionTicker:Cancel()
+            sessionTicker = nil
+        end
+    end)
+
+    Relayout()
+    Layout.Add(tab, block, -Layout.DEFAULT_PADDING)
+    page:AutoRefresh()
+end
+
+BUI.PageEngine.RegisterPage('dashboard', {
+    title = 'Dashboard',
+    buttonText = 'Dashboard',
     icon = 'dashboard',
-    minContentWidth  = DASHBOARD_MIN_WIDTH,
-    minContentHeight = DASHBOARD_MIN_HEIGHT,
-    OnBuild = function(pageFrame) BuildDashboard(pageFrame) end,
-    OnShow  = function(pageFrame) PlayCardSlideIn(cardsByPage[pageFrame], pageFrame) end,
+    OnBuild = BuildDashboard,
 })

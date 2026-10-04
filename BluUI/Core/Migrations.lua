@@ -31,7 +31,7 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 9
+local PROFILE_MIGRATION_VERSION = 10
 local LEGACY_UNIT_KEYS = { 'player', 'target', 'targettarget', 'focus', 'focustarget', 'pet', 'boss', 'arena', 'party' }
 
 function BUI.MigrateProfile(profile)
@@ -356,6 +356,12 @@ function BUI.MigrateProfile(profile)
 			interface.drawerEnabled = nil
 			if type(buttonBar) == 'table' then buttonBar.enabled = nil end
 		end
+	end
+
+	if not general._dashboardLayoutFixed then
+		general._dashboardLayoutFixed = true
+		local dashboard = profile.dashboard
+		if type(dashboard) == 'table' then dashboard.layout, dashboard.topCols = nil, nil end
 	end
 
 	general._buiMigrationVersion = PROFILE_MIGRATION_VERSION

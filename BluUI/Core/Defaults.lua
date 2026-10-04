@@ -243,6 +243,9 @@ BUI.Defaults = {
 		navHighlight   = 'gradient',
 		windowScale    = 100,
 		savedThemes    = {},
+		session        = {},
+		altOverview    = {},
+		weeklyMplusHistory = {},
 	},
 	profile = {
 		general = {
@@ -639,6 +642,10 @@ BUI.Defaults = {
 			fadeAlpha      = 0,
 			fadeAnimated   = true,
 			fadeDuration   = 0.2,
+		},
+
+		dashboard = {
+			cardVisibility = {},
 		},
 
 		cursor = {
@@ -1913,6 +1920,8 @@ BUI.NilDefaultKeys = {
 BUI.DeprecatedKeys = {
 	['socialFavoritesOnly']     = true,
 	['weeklyMplusHistoryView']  = true,
+	['dashboard.layout']        = true,
+	['dashboard.topCols']       = true,
 
 	['powerBar.opacity']        = true,
 	['secondaryPower.opacity']  = true,
