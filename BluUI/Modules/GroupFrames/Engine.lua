@@ -147,6 +147,7 @@ function GroupFrames.ApplyChildAll(child, settings, geometry)
 	GroupFrames.ApplyFrameColors(child, settings, child.unit)
 	GroupFrames.ApplyBarTextures(child, settings)
 	GroupFrames.ApplyAbsorbToChild(child, settings)
+	GroupFrames.RestyleDispelHighlight(child)
 	GroupFrames.ApplyTextToChild(child, settings)
 	GroupFrames.ApplyIndicatorsToChild(child, settings)
 	GroupFrames.ApplyKeystoneToChild(child, settings)
@@ -162,6 +163,7 @@ end
 function GroupFrames.RecolorChild(child, settings)
 	GroupFrames.ApplyFrameColors(child, settings, child.unit)
 	GroupFrames.ApplyAbsorbToChild(child, settings)
+	GroupFrames.RestyleDispelHighlight(child)
 	if child.unit and child.Health and child.Health.PostUpdateColor then
 		child.Health.PostUpdateColor(child.Health, child.unit)
 	end

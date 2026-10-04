@@ -71,15 +71,34 @@ local function AnchorEdges(kit, frame)
 	right:SetPoint("BOTTOMLEFT", frame, "BOTTOMRIGHT", -edgeThickness, edgeThickness)
 end
 
+local function OverlappingAbsorb(frame)
+	local settings = GroupFrames.SettingsForFrame(frame)
+	if frame.Absorb and settings.absorb.direction == "left" then return frame.Absorb end
+	if frame.HealAbsorb and settings.healAbsorb.enabled ~= false and settings.healAbsorb.direction == "left" then return frame.HealAbsorb end
+end
+
+local TINT_STRIP_PIXELS = 3
+
 local function AnchorFill(kit, frame)
-	local healthTexture = frame.Health and frame.Health:GetStatusBarTexture()
+	local healthTexture = frame.Health:GetStatusBarTexture()
+	local style = GroupFrames.SettingsForFrame(frame).dispelBorder.tintStyle
+	local absorb = OverlappingAbsorb(frame)
+	local rightEdge, rightSide = healthTexture, "RIGHT"
+	if absorb then rightEdge, rightSide = absorb:GetStatusBarTexture(), "LEFT" end
 	local fill = kit.fill
 	fill:ClearAllPoints()
-	if healthTexture then
+	if style == "top" then
 		fill:SetPoint("TOPLEFT", healthTexture, "TOPLEFT")
-		fill:SetPoint("BOTTOMRIGHT", healthTexture, "BOTTOMRIGHT")
+		fill:SetPoint("BOTTOMRIGHT", rightEdge, rightSide)
+	elseif style == "bottom" then
+		fill:SetPoint("TOPLEFT", healthTexture, "LEFT")
+		fill:SetPoint("BOTTOMRIGHT", rightEdge, "BOTTOM" .. rightSide)
+	elseif style == "strip" then
+		fill:SetPoint("TOPLEFT", healthTexture, "BOTTOMLEFT", 0, Pixel.Scale(TINT_STRIP_PIXELS))
+		fill:SetPoint("BOTTOMRIGHT", rightEdge, "BOTTOM" .. rightSide)
 	else
-		fill:SetAllPoints(frame.Health)
+		fill:SetPoint("TOPLEFT", healthTexture, "TOPLEFT")
+		fill:SetPoint("BOTTOMRIGHT", rightEdge, "BOTTOM" .. rightSide)
 	end
 end
 
