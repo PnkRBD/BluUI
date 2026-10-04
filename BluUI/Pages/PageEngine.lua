@@ -2,6 +2,7 @@ local _, BUI = ...
 local Pixel = BUI.Pixel
 local Layout = BUI.BUILibClient.Layout
 local Controls = BUI.BUILibClient.Controls
+local WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT = 1228, 750
 
 local PageEngine = {
 	pages        = {},
@@ -46,9 +47,9 @@ local function CreateWindow()
 
 	local window
 	window = Layout.TopNavWindow({
-		width        = 1240, height    = 860, title = 'BluUI',
+		width        = WINDOW_MIN_WIDTH, height = WINDOW_MIN_HEIGHT, title = 'BluUI',
 		icon         = BUI.C.ICON_PATH,
-		minWidth     = 1228, pageWidth = 960,
+		minWidth     = WINDOW_MIN_WIDTH, minHeight = WINDOW_MIN_HEIGHT, pageWidth = 960,
 		version      = BUI.Version, sidebarWidth = 220,
 		strata       = 'FULLSCREEN_DIALOG', frameLevel = 200, escapable = true,
 		globalName   = 'BluUIFrame', footerButtons = BUI.Scale.GetFooterButtons(),
