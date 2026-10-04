@@ -1,3 +1,4 @@
+-- Pixel perfect code used with permission from Simpy @ ElvUI. If you have questions, please PM pinkrbd on Discord!
 local _, BUI = ...
 local Pixel = {}
 BUI.Pixel = Pixel
