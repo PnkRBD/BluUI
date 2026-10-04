@@ -206,8 +206,10 @@ local entries = {
 	{ label = "Messages", page = "chat", panel = "Messages", keywords = "chat timestamps links channel abbreviate fade history copy voice buttons hide scroll" },
 
 	{ label = "Enable", page = "cursor", keywords = "cursor ring circle enable" },
-	{ label = "Cursor Size", page = "cursor", panel = "General", keywords = "cursor ring size" },
-	{ label = "Show Only In Combat", page = "cursor", panel = "General" },
+	{ label = "Cursor size", page = "cursor", panel = "General", keywords = "cursor ring size diameter" },
+	{ label = "Only in combat", page = "cursor", panel = "Visibility", keywords = "cursor combat hide show" },
+	{ label = "Hide over BluUI windows", page = "cursor", panel = "Visibility", keywords = "cursor menu window hide" },
+	{ label = "Rings", page = "cursor", panel = "Rings", keywords = "cursor ring main inner outer behavior color size offset layer click gcd cast" },
 
 	{ label = "Enable", page = "customBars", tab = 1, keywords = "tracking custom bar item on off" },
 	{ label = "Unlock", page = "customBars", tab = 1, keywords = "anchor mover unlock lock drag position eye" },

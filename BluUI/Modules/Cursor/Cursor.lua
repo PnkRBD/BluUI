@@ -26,13 +26,8 @@ local function GetConfig()
     return BUI.GetDB().cursor
 end
 
-local function SafeNumber(value)
-    return Tools.SafeNum(value) or 0
-end
-
-local function SlotDiameter(slotConfig)
-    local config = GetConfig()
-    return math.max(MIN_DIAMETER, config.size + slotConfig.offset)
+function MouseCursor.SlotDiameter(slotConfig)
+    return Pixel.Scale(math.max(MIN_DIAMETER, GetConfig().size + slotConfig.offset))
 end
 
 local function CreateSlot(parent)
@@ -60,28 +55,24 @@ local function CreateSlot(parent)
     return slot
 end
 
-local function ApplySlot(name)
+local function StyleSlot(name)
     local slot = slots[name]
     local slotConfig = GetConfig().slots[name]
-
     slot.holder:SetFrameLevel(cursorFrame:GetFrameLevel() + slotConfig.zOrder)
-
-    local diameter = Pixel.Scale(SlotDiameter(slotConfig))
+    local diameter = MouseCursor.SlotDiameter(slotConfig)
     slot.tex:SetSize(diameter, diameter)
     slot.tex:SetVertexColor(slotConfig.colorR, slotConfig.colorG, slotConfig.colorB, slotConfig.alpha)
     slot.cd:SetSize(diameter, diameter)
     slot.cd:SetSwipeColor(slotConfig.colorR, slotConfig.colorG, slotConfig.colorB, slotConfig.alpha)
+end
 
-    slot.tex:Hide()
-    slot.cd:Hide()
-
+local function ApplySlot(name)
+    StyleSlot(name)
+    local slot = slots[name]
+    local slotConfig = GetConfig().slots[name]
     slot.kind = (slotConfig.enabled and slotConfig.kind) or 'none'
-
-    if slot.kind == 'static' then
-        slot.tex:Show()
-    elseif slot.kind == 'click' and clicking then
-        slot.tex:Show()
-    end
+    slot.tex:SetShown(slot.kind == 'static' or (slot.kind == 'click' and clicking))
+    slot.cd:Hide()
 end
 
 local function HasSlotKind(kind)
@@ -94,8 +85,8 @@ end
 local function UpdateGCDSlots()
     local info = C_Spell.GetSpellCooldown(GCD_SPELL)
     if not info then return end
-    local startTime, duration = SafeNumber(info.startTime), SafeNumber(info.duration)
-    if startTime <= 0 or duration <= 0 then return end
+    local startTime, duration = Tools.SafeNum(info.startTime), Tools.SafeNum(info.duration)
+    if not startTime or not duration or startTime <= 0 or duration <= 0 then return end
 
     for _, name in ipairs(SLOT_NAMES) do
         local slot = slots[name]
@@ -103,6 +94,13 @@ local function UpdateGCDSlots()
             slot.cd:SetCooldown(startTime, duration)
             slot.cd:Show()
         end
+    end
+end
+
+local function HideCastOnSlots()
+    for _, name in ipairs(SLOT_NAMES) do
+        local slot = slots[name]
+        if slot.kind == 'cast' then slot.cd:Hide() end
     end
 end
 
@@ -115,10 +113,7 @@ local function ShowCastOnSlots()
     end
 
     if not startMilliseconds or not endMilliseconds then
-        for _, name in ipairs(SLOT_NAMES) do
-            local slot = slots[name]
-            if slot.kind == 'cast' then slot.cd:Hide() end
-        end
+        HideCastOnSlots()
         return
     end
 
@@ -136,17 +131,10 @@ local function ShowCastOnSlots()
     end
 end
 
-local function HideCastOnSlots()
-    for _, name in ipairs(SLOT_NAMES) do
-        local slot = slots[name]
-        if slot.kind == 'cast' then slot.cd:Hide() end
-    end
-end
-
 local function OverOwnWindow()
     local focus = GetMouseFoci()[1]
     while focus and focus ~= UIParent and focus ~= WorldFrame do
-        if focus.IsForbidden and focus:IsForbidden() then return false end
+        if focus:IsForbidden() then return false end
         if focus.isBluUIWindow then return true end
         focus = focus:GetParent()
     end
@@ -156,7 +144,7 @@ end
 local MENU_CHECK_INTERVAL = 0.1
 local menuCheckElapsed = 0
 
-local FollowCursor = BUI.Profiler.Wrap('Cursor.Cursor follow', function(_, elapsed)
+local FollowCursor = BUI.Profiler.Hot('Cursor.Cursor follow', function(_, elapsed)
     local cursorX, cursorY = GetCursorPosition()
     if cursorX ~= lastX or cursorY ~= lastY then
         lastX, lastY = cursorX, cursorY
@@ -175,30 +163,23 @@ local FollowCursor = BUI.Profiler.Wrap('Cursor.Cursor follow', function(_, elaps
 end)
 
 local function SyncMenuHiding()
-    hideOverMenus = GetConfig().hideOverMenus and true or false
+    hideOverMenus = GetConfig().hideOverMenus == true
     if not hideOverMenus and hiddenOverMenu then
         hiddenOverMenu = false
         cursorFrame:SetAlpha(1)
     end
 end
 
-local function OnMouseDown()
-    if not enabled then return end
-    clicking = true
+local function SetClicking(down)
+    clicking = down
     for _, name in ipairs(SLOT_NAMES) do
         local slot = slots[name]
-        if slot.kind == 'click' then slot.tex:Show() end
+        if slot.kind == 'click' then slot.tex:SetShown(down) end
     end
 end
 
-local function OnMouseUp()
-    if not enabled then return end
-    clicking = false
-    for _, name in ipairs(SLOT_NAMES) do
-        local slot = slots[name]
-        if slot.kind == 'click' then slot.tex:Hide() end
-    end
-end
+local function OnMouseDown() SetClicking(true) end
+local function OnMouseUp() SetClicking(false) end
 
 local QueueGCDUpdate = BUI.Dispatcher.New(UpdateGCDSlots, 'Cursor.GCD')
 
@@ -335,24 +316,21 @@ function MouseCursor.Apply()
     end
 end
 
+function MouseCursor.Restyle()
+    if not cursorFrame then return end
+    for _, name in ipairs(SLOT_NAMES) do StyleSlot(name) end
+end
+
+local function SyncScale()
+    screenScale = UIParent:GetEffectiveScale()
+    lastX, lastY = nil, nil
+end
+Pixel.OnScaleChange('Cursor', SyncScale)
+
 function MouseCursor.Initialize()
-    local function SyncScale()
-        screenScale = UIParent:GetEffectiveScale()
-        lastX, lastY = nil, nil
-    end
     SyncScale()
-    BUI.Pixel.OnScaleChange('Cursor', SyncScale)
-    Events:Register('UI_SCALE_CHANGED',     'Cursor:Scale', SyncScale)
-    Events:Register('DISPLAY_SIZE_CHANGED', 'Cursor:Scale', SyncScale)
     MouseCursor.Refresh()
 end
 
 Events:OnLogin('Cursor', MouseCursor.Initialize, 'cursor')
-
-BUI.RegisterModuleControl('cursor', function(enabled)
-    if enabled then
-        MouseCursor.Initialize()
-    else
-        MouseCursor.Refresh()
-    end
-end)
+BUI.RegisterModuleControl('cursor', MouseCursor.Initialize)
