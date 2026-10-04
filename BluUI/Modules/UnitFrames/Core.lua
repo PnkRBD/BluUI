@@ -699,14 +699,35 @@ do
 	local frameKits = setmetatable({}, { __mode = 'k' })
 	local framePending = {}
 
+	local TINT_STRIP_PIXELS = 3
+
+	local function OverlappingAbsorb(frame)
+		local settings = UnitFrames.GetSettings()
+		if frame.Absorb and settings.shieldEnabled ~= false and settings.shieldDirection == 'left' then return frame.Absorb end
+		if frame.HealAbsorb and settings.healAbsorbEnabled ~= false and settings.healAbsorbDirection == 'left' then return frame.HealAbsorb end
+	end
+
 	local function AnchorDispelFill(fill, frame)
-		local healthTexture = frame.Health and frame.Health:GetStatusBarTexture()
+		local healthTexture = frame.Health:GetStatusBarTexture()
+		local style = UnitFrames.GetUnitSettings('player').debuffHighlightStyle
+		local absorb = OverlappingAbsorb(frame)
+		local rightEdge, rightSide = healthTexture, 'RIGHT'
+		if absorb then rightEdge, rightSide = absorb:GetStatusBarTexture(), 'LEFT' end
 		fill:ClearAllPoints()
-		if healthTexture then
+		fill:SetTexture((style == 'top' or style == 'bottom') and BUI.C.FADE_TEXTURE or WHITE8X8)
+		fill:SetTexCoord(0, 1, style == 'bottom' and 1 or 0, style == 'bottom' and 0 or 1)
+		if style == 'top' then
 			fill:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
-			fill:SetPoint('BOTTOMRIGHT', healthTexture, 'BOTTOMRIGHT')
+			fill:SetPoint('BOTTOMRIGHT', rightEdge, rightSide)
+		elseif style == 'bottom' then
+			fill:SetPoint('TOPLEFT', healthTexture, 'LEFT')
+			fill:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
+		elseif style == 'strip' then
+			fill:SetPoint('TOPLEFT', healthTexture, 'BOTTOMLEFT', 0, Pixel.Scale(TINT_STRIP_PIXELS))
+			fill:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
 		else
-			fill:SetAllPoints(frame.Health)
+			fill:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
+			fill:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
 		end
 	end
 
@@ -944,6 +965,29 @@ do
 		previewPin = nil
 		HidePreview()
 	end
+
+	local DISPEL_PREVIEW_SECONDS = 1.5
+	local previewTicker, previewCycle = nil, 0
+
+	local StepDispelPreview = BUI.Profiler.Wrap('UnitFrames dispel preview', function()
+		previewCycle = previewCycle % #HL_TYPES + 1
+		UnitFrames.PinDispelPreview(HL_TYPES[previewCycle])
+	end)
+
+	function UnitFrames.StopDispelPreview()
+		if previewTicker then previewTicker:Cancel() end
+		previewTicker = nil
+		UnitFrames.UnpinDispelPreview()
+	end
+
+	function UnitFrames.StartDispelPreview()
+		UnitFrames.StopDispelPreview()
+		previewCycle = 0
+		StepDispelPreview()
+		previewTicker = C_Timer.NewTicker(DISPEL_PREVIEW_SECONDS, StepDispelPreview)
+	end
+
+	function UnitFrames.IsDispelPreviewing() return previewTicker ~= nil end
 
 	local CALLOUT_ICON, CALLOUT_FONT, CALLOUT_PAD = 46, 24, 6
 

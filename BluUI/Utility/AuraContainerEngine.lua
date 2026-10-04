@@ -565,6 +565,7 @@ function Engine.NewContainer(parent, isDebuff, levelOffset)
 	local container = CreateFrame('AuraContainer', nil, parent, 'CustomAuraContainerTemplate')
 	container:SetFrameLevel(parent:GetFrameLevel() + (levelOffset or 10))
 	container:SetSize(1, 1)
+	container._buiAuraContainer = true
 	container._buiIsDebuff = isDebuff
 	container._buiGroups = {}
 	container._buiButtons = {}

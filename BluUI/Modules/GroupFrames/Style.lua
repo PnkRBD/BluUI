@@ -122,7 +122,8 @@ local function PaintHealth(self, updatedUnit, offline)
 
 	local ownerSettings = GroupFrames.SettingsForFrame(owner)
 	local deadColor = (dead and ownerSettings.deadBackground) and ownerSettings.deadBackgroundColor or false
-	local tintBar = (hasDispel and ownerSettings.dispelBorder and ownerSettings.dispelBorder.tintBar) and true or false
+	local _, wantTint = GroupFrames.DispelLook(ownerSettings)
+	local tintBar = (hasDispel and wantTint) and true or false
 	local transparent = ownerSettings.transparentHealth and true or false
 	local alpha = HealthAlphaFor(ownerSettings)
 

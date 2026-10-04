@@ -7,6 +7,7 @@ BUI.C.FONT_PATH     = [[Interface\AddOns\BluUI\Media\Fonts\gotham_narrow_ultra.t
 BUI.C.BLIZZARD_FONT = [[Fonts\FRIZQT__.TTF]]
 BUI.C.ICON_PATH = [[Interface\AddOns\BluUI\Media\Icon\logo_small]]
 BUI.C.FALLBACK_TEXTURE    = [[Interface\Buttons\WHITE8X8]]
+BUI.C.FADE_TEXTURE        = BUI.C.MEDIA_PATH .. 'bui_fade.tga'
 BUI.C.CURSOR_RING_TEXTURE = [[Interface\AddOns\BluUI\Media\Textures\cursor_ring.tga]]
 BUI.C.RAID_ICON_TEXTURE   = [[Interface\TargetingFrame\UI-RaidTargetingIcons]]
 BUI.C.PANEL_BACKDROP = { 0.045, 0.045, 0.055, 0.97, 0.145, 0.145, 0.175, 1 }

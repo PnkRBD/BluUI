@@ -66,8 +66,12 @@ local ABSORB_DIRECTIONS = {
 local DISPEL_MODES = {
 	{ value = 'off', text = 'Off' },
 	{ value = 'border', text = 'Frame border' },
-	{ value = 'bar', text = 'Health bar' },
+	{ value = 'bar', text = 'Tint the whole bar' },
+	{ value = 'top', text = 'Tint the top half' },
+	{ value = 'bottom', text = 'Tint the bottom half' },
+	{ value = 'strip', text = 'Strip along the bottom' },
 }
+local TINT_MODES = { bar = true, top = true, bottom = true, strip = true }
 local DISPEL_SOURCES = {
 	{ value = 'mine', text = 'Dispellable by me' },
 	{ value = 'all', text = 'All dispel types' },
@@ -717,25 +721,34 @@ local function AppearanceBoards(ui, parent, width)
 	local function RefreshDispel()
 		RefreshFrames()
 		module.RefreshDispelPreview()
+		BUI.GroupFrames.Refresh('party')
+		BUI.GroupFrames.Refresh('raid')
+	end
+	local function DispelPreviewEye()
+		return Eye('Cycle the dispel colors on your frame', module.IsDispelPreviewing, function(value)
+			if value then module.StartDispelPreview() else module.StopDispelPreview() end
+		end)
 	end
 	local dispel = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Dispels',
 		description = 'Color your own frame when a dispellable debuff lands.',
 	})
-	dispel:AddTools('Dispel highlight', 'How the player frame reacts', {
+	dispel:AddTools('Dispel highlight', 'How the player frame reacts, party and raid follow it unless they say otherwise', {
 		{ entries = DISPEL_MODES, width = MENU_WIDTH, get = function()
 			if player.debuffHighlightBorder then return 'border' end
-			if player.debuffHighlightBar then return 'bar' end
+			if player.debuffHighlightBar then return player.debuffHighlightStyle end
 			return 'off'
 		end, set = function(value)
 			player.debuffHighlightBorder = value == 'border'
-			player.debuffHighlightBar = value == 'bar'
+			player.debuffHighlightBar = TINT_MODES[value] == true
+			if player.debuffHighlightBar then player.debuffHighlightStyle = value end
 		end },
 		{ tooltip = 'Source and strength', title = 'Dispel highlight', options = {
 			{ label = 'Show', entries = DISPEL_SOURCES, get = function() return player.debuffHighlightClassFilter ~= false and 'mine' or 'all' end, set = function(value) player.debuffHighlightClassFilter = value == 'mine' end },
 			Option(settings, 'Bar tint opacity %', 'dispelOpacity', { min = 0, max = 100, step = 5 }),
 		} },
+		DispelPreviewEye(),
 	}, RefreshDispel)
 	dispel:AddTools('Type icons', 'A row of debuff type icons above your character', {
 		{ tooltip = 'Size and position', title = 'Type icons', options = {
@@ -743,6 +756,7 @@ local function AppearanceBoards(ui, parent, width)
 			Option(player, 'Horizontal', 'debuffHighlightBadgeOffsetX', { min = -BADGE_RANGE_X, max = BADGE_RANGE_X, step = 1 }),
 			Option(player, 'Vertical', 'debuffHighlightBadgeOffsetY', { min = -BADGE_RANGE_Y, max = BADGE_RANGE_Y, step = 1 }),
 		} },
+		DispelPreviewEye(),
 		OnUnlessOff(player, nil, 'debuffHighlightBadge'),
 	}, RefreshDispel)
 	dispel:AddSwitch('Cleanse callouts', function() return player.debuffHighlightTypeText == true end, function(value)
@@ -1298,6 +1312,6 @@ BUI.PageEngine.RegisterPage('unitframes', {
 	OnHide = function()
 		BUI.UnitFrames.LockAllPreviews()
 		BUI.CastBar.StopInterruptPreview('boss')
-		BUI.UnitFrames.UnpinDispelPreview()
+		BUI.UnitFrames.StopDispelPreview()
 	end,
 })
