@@ -86,6 +86,7 @@ Theme.palettes = {
 		secondaryText = {0.82, 0.84, 0.87, 1},
 		hover         = {1, 1, 1, 0.05},
 		danger        = {0.94, 0.42, 0.42, 1},
+		positive      = {0.3, 0.84, 0.52, 1},
 	},
 	light = {
 		edge          = {0.78, 0.8, 0.83, 1},
@@ -108,6 +109,7 @@ Theme.palettes = {
 		secondaryText = {0.36, 0.42, 0.5, 1},
 		hover         = {0, 0, 0, 0.04},
 		danger        = {0.84, 0.24, 0.24, 1},
+		positive      = {0.13, 0.62, 0.34, 1},
 	},
 }
 

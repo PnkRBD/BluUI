@@ -22,6 +22,7 @@ local ROW_INSET = 20
 local CONTROL_HEIGHT = 30
 local TAB_HEIGHT = 30
 local TAB_GAP = 40
+local TABS_MARGIN = 8
 local BUTTON_GAP = 10
 local HEADER_GAP = 26
 local BOTTOM_GAP = 24
@@ -36,6 +37,7 @@ local SLIDER_TRACK = 4
 local SLIDER_GAP = 6
 local SLIDER_STEP = 20
 local SLIDER_BOX = 52
+local PLAIN_GAP = 16
 local STEP_SIGN = 12
 local TOGGLE_SIZE = 22
 local TOGGLE_GAP = 14
@@ -52,6 +54,7 @@ Layout.TableKitExtensions = {}
 local function Hex(red, green, blue)
 	return ('#%02X%02X%02X'):format(math.floor(red * 255 + 0.5), math.floor(green * 255 + 0.5), math.floor(blue * 255 + 0.5))
 end
+Layout.HexColor = Hex
 
 local function Percent(alpha)
 	return ('%d%%'):format(math.floor(alpha * 100 + 0.5))
@@ -211,15 +214,20 @@ function Layout.TableKit(window)
 		window:Paint(edit, 'text')
 		window:SetFontRole(edit, 'control')
 
-		local plus = Stepper(frame, true)
-		plus:SetPoint('RIGHT', box, 'LEFT', -SLIDER_GAP, 0)
-		local minus = Stepper(frame, false)
-		minus:SetPoint('LEFT')
-
 		local slider = CreateFrame('Slider', nil, frame)
 		slider:SetOrientation('HORIZONTAL')
-		slider:SetPoint('LEFT', minus, 'RIGHT', SLIDER_GAP, 0)
-		slider:SetPoint('RIGHT', plus, 'LEFT', -SLIDER_GAP, 0)
+		local minus, plus
+		if spec.plain then
+			slider:SetPoint('LEFT')
+			slider:SetPoint('RIGHT', box, 'LEFT', -PLAIN_GAP, 0)
+		else
+			plus = Stepper(frame, true)
+			plus:SetPoint('RIGHT', box, 'LEFT', -SLIDER_GAP, 0)
+			minus = Stepper(frame, false)
+			minus:SetPoint('LEFT')
+			slider:SetPoint('LEFT', minus, 'RIGHT', SLIDER_GAP, 0)
+			slider:SetPoint('RIGHT', plus, 'LEFT', -SLIDER_GAP, 0)
+		end
 		slider:SetHeight(CONTROL_HEIGHT)
 		slider:SetMinMaxValues(spec.min, spec.max)
 		slider:SetValueStep(step)
@@ -239,7 +247,7 @@ function Layout.TableKit(window)
 		fill:SetHeight(SLIDER_TRACK)
 
 		local function Show(value)
-			edit:SetText(pattern:format(value))
+			edit:SetText(((spec.signed and value > 0) and '+' or '') .. pattern:format(value))
 		end
 		local function Set(value)
 			value = Snap(value)
@@ -251,8 +259,10 @@ function Layout.TableKit(window)
 			Show(value)
 			if userInput then spec.set(value) end
 		end)
-		minus:SetScript('OnClick', function() Set(slider:GetValue() - step) end)
-		plus:SetScript('OnClick', function() Set(slider:GetValue() + step) end)
+		if minus then
+			minus:SetScript('OnClick', function() Set(slider:GetValue() - step) end)
+			plus:SetScript('OnClick', function() Set(slider:GetValue() + step) end)
+		end
 		edit:SetScript('OnEnterPressed', function(self)
 			local typed = tonumber(self:GetText())
 			if typed then Set(typed) else Show(Snap(slider:GetValue())) end
@@ -350,7 +360,7 @@ function Layout.TableKit(window)
 		label:SetWordWrap(false)
 		kit.Glyph(button, 'dropdown', 9, 'controlText'):SetPoint('RIGHT', -12, 0)
 		button:SetScript('OnClick', function(self)
-			Controls.ContextMenu(items(), { anchor = self, width = math.max(width, 170), offsetY = -4, window = window })
+			Controls.ContextMenu(items(), { anchor = self, width = math.max(self:GetWidth(), 170), offsetY = -4, window = window })
 		end)
 		button.label = label
 		return button
@@ -522,7 +532,10 @@ function Layout.TableKit(window)
 	end
 
 	function kit.Toggle(parent, spec)
-		local toggle = Widget.Unwrap(Controls.IconToggle(parent, spec.get(), spec.set, { texture = BUILib.GetLibMedia(spec.icon), tooltip = spec.tooltip, size = TOGGLE_SIZE, iconSize = spec.iconSize }))
+		local toggle = Widget.Unwrap(Controls.IconToggle(parent, spec.get(), function(value)
+			spec.set(value)
+			window:Repaint()
+		end, { texture = BUILib.GetLibMedia(spec.icon), tooltip = spec.tooltip, size = TOGGLE_SIZE, iconSize = spec.iconSize }))
 		window:Bind(toggle, function() toggle:SetValue(spec.get()) end)
 		return toggle
 	end
@@ -560,7 +573,7 @@ function Layout.TableKit(window)
 				local spec = tools[index]
 				local tool = kit.Tool(parent, spec)
 				if spec.icon == 'enable' and spec.get and spec.hint ~= false then
-					local hint = BUILib.PageKit.HintArrow(tool, { label = 'Enable' })
+					local hint = BUILib.PageKit.HintArrow(tool, 'Enable')
 					window:Bind(hint, function() hint:SetShown(not spec.get()) end)
 				end
 				if anchor then
@@ -751,6 +764,10 @@ function Layout.PinnedHead(tab, window, kit, spec, block, onSearch)
 		top = top + 1
 	end
 	tab:SetPinnedHeight(top)
+	return head, top, Layout.AlignPinned(tab, head, block)
+end
+
+function Layout.AlignPinned(tab, head, block)
 	local function Align()
 		local blockLeft, pinnedLeft = block:GetLeft(), tab.pinned:GetLeft()
 		if not blockLeft or not pinnedLeft then return end
@@ -758,7 +775,7 @@ function Layout.PinnedHead(tab, window, kit, spec, block, onSearch)
 	end
 	tab.frame:HookScript('OnSizeChanged', Align)
 	tab.frame:HookScript('OnShow', Align)
-	return head, top, Align
+	return Align
 end
 
 function Layout.TablePage(tab, shell, spec)
@@ -815,7 +832,7 @@ function Layout.TablePage(tab, shell, spec)
 		Resize()
 	end
 	Resize()
-	Layout.Add(tab, block, 8)
+	Layout.Add(tab, block, selectTab and TABS_MARGIN or -Layout.DEFAULT_PADDING)
 	Align()
 	tab:Refresh()
 	return page

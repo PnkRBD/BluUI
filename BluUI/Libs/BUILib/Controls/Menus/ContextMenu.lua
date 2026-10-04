@@ -7,48 +7,52 @@ local Widget = BUILib.Widget
 local ShowMenu = Widget.ShowMenuAnimated
 local HideMenu = Widget.HideMenuAnimated
 
-local PADDING_X   = 4
-local PADDING_Y   = 4
-local ROW_HEIGHT  = 26
+local PADDING_X   = 6
+local PADDING_Y   = 6
+local ROW_HEIGHT  = 28
 local TITLE_HEIGHT = 24
 local TITLE_GAP   = 1
-local SEPARATOR_HEIGHT = 9
-local ICON_COLUMN_WIDTH = 20
+local SEPARATOR_HEIGHT = 11
+local SEPARATOR_INSET = 8
+local ICON_SIZE   = 14
+local ICON_COLUMN = 22
 local TEXT_INSET  = 10
+local CHECK_SIZE  = 12
+local CHECK_GAP   = 8
 local FONT_SIZE   = 12
-local TITLE_FONT_SIZE = 12
+local TITLE_FONT_SIZE = 11
 local SUBTLE_FONT_SIZE = 11
 local DEFAULT_WIDTH = 230
 local MAX_WIDTH   = 360
 local MAX_ROWS    = 12
-local SHADOW_PADDING = 2
-local TRACK_WIDTH = 6
-local TRACK_INSET = 3
+local MENU_RADIUS = 8
+local ROW_RADIUS  = 6
+local SELECTED_ALPHA = 0.12
+local TRACK_WIDTH = 4
+local TRACK_INSET = 4
+local SHADOWS     = { { inset = -2, radius = 10, alpha = 0.3 }, { inset = -6, radius = 14, alpha = 0.12 } }
 local WHITE       = "Interface\\Buttons\\WHITE8x8"
+local SOLID       = { 1, 1, 1, 1 }
+local CLEAR       = { 0, 0, 0, 0 }
 local STATIC_CHECK = { texture = "Interface\\RaidFrame\\ReadyCheck-Ready", color = { 1, 1, 1, 1 } }
 
 local unpack = unpack
 
 local activeMenu
 
-local function Blend(base, over)
-	local alpha = over[4] or 1
-	return { base[1] + (over[1] - base[1]) * alpha, base[2] + (over[2] - base[2]) * alpha, base[3] + (over[3] - base[3]) * alpha, 1 }
-end
-
 local function Palette(window)
 	if not window then
 		return {
-			fill = Theme.bg.dark, edge = Theme.border.light, hover = Theme.bg.hover,
+			fill = Theme.bg.dark, edge = Theme.border.light, hover = Theme.bg.hover, selected = { 1, 1, 1, SELECTED_ALPHA },
 			text = Theme.text.primary, muted = Theme.text.muted, disabled = Theme.text.disabled,
 			thumb = Theme.scrollbar.thumb, check = STATIC_CHECK, font = BUILib.Font,
 		}
 	end
-	local fill = { window:Color('input') }
+	local red, green, blue = window:Color('accent')
 	return {
-		fill = fill, edge = { window:Color('rule') }, hover = Blend(fill, { window:Color('hover') }),
+		fill = { window:Color('card') }, edge = { window:Color('cardEdge') }, hover = { window:Color('input') }, selected = { red, green, blue, SELECTED_ALPHA },
 		text = { window:Color('text') }, muted = { window:Color('muted') }, disabled = { window:Color('faint') },
-		thumb = { window:Color('faint') }, check = { texture = BUILib.GetLibMedia('check'), color = { window:Color('accent') } }, font = window:FontPath('control'),
+		thumb = { window:Color('faint') }, check = { texture = BUILib.GetLibMedia('check'), color = { red, green, blue, 1 } }, font = window:FontPath('control'),
 	}
 end
 
@@ -72,83 +76,73 @@ local function CleanTitle(title)
 	return title
 end
 
-local function BuildShadow(menu)
-	for layerIndex, layerAlpha in ipairs({0.10, 0.06}) do
-		local shadow = menu:CreateTexture(nil, "BACKGROUND", nil, -8 + layerIndex)
-		shadow:SetTexture(WHITE)
-		shadow:SetVertexColor(0, 0, 0, layerAlpha)
-		local inset = SHADOW_PADDING - layerIndex + 1
-		shadow:SetPoint("TOPLEFT", menu, "TOPLEFT", -inset, inset)
-		shadow:SetPoint("BOTTOMRIGHT", menu, "BOTTOMRIGHT", inset, -inset)
-	end
-end
-
 local function MakeRow(parent)
 	local row = CreateFrame("Button", nil, parent)
 	row:SetHeight(ROW_HEIGHT)
+	row.hl = Widget.DrawCardShape(row, ROW_RADIUS, SOLID, CLEAR, "BACKGROUND", 0, 0)
+	row.hl:Hide()
 
-	local highlight = row:CreateTexture(nil, "BACKGROUND")
-	highlight:SetPoint("TOPLEFT", 1, -1); highlight:SetPoint("BOTTOMRIGHT", -1, 1)
-	highlight:SetTexture(WHITE)
-	highlight:Hide()
-	row.hl = highlight
+	row.icon = row:CreateTexture(nil, "ARTWORK")
+	row.icon:SetSize(ICON_SIZE, ICON_SIZE)
+	row.icon:SetPoint("LEFT", TEXT_INSET, 0)
+	row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	row.icon:Hide()
 
-	local check = row:CreateTexture(nil, "OVERLAY")
-	check:SetSize(14, 14)
-	check:SetPoint("LEFT", 4 + (ICON_COLUMN_WIDTH - 14) / 2, 0)
-	check:Hide()
-	row.check = check
+	row.check = row:CreateTexture(nil, "OVERLAY")
+	row.check:SetSize(CHECK_SIZE, CHECK_SIZE)
+	row.check:SetPoint("RIGHT", -TEXT_INSET, 0)
+	row.check:Hide()
 
-	local icon = row:CreateTexture(nil, "ARTWORK")
-	icon:SetSize(14, 14)
-	icon:SetPoint("LEFT", 4 + (ICON_COLUMN_WIDTH - 14) / 2, 0)
-	icon:SetTexCoord(0.08, 0.92, 0.08, 0.92); icon:Hide()
-	row.icon = icon
+	row.sub = row:CreateFontString(nil, "OVERLAY")
+	row.sub:SetJustifyH("RIGHT")
+	row.sub:SetPoint("RIGHT", -(TEXT_INSET + CHECK_SIZE + CHECK_GAP), 0)
+	row.sub:Hide()
 
-	local text = row:CreateFontString(nil, "OVERLAY")
-	text:SetJustifyH("LEFT"); text:SetJustifyV("MIDDLE")
-	text:SetWordWrap(false)
-	text:SetPoint("LEFT", 4 + ICON_COLUMN_WIDTH + TEXT_INSET, 0)
-	text:SetPoint("RIGHT", -TEXT_INSET, 0)
-	row.text = text
-
-	local subText = row:CreateFontString(nil, "OVERLAY")
-	subText:SetJustifyH("RIGHT"); subText:SetJustifyV("MIDDLE")
-	subText:SetPoint("RIGHT", -TEXT_INSET, 0)
-	subText:Hide()
-	row.sub = subText
-
+	row.text = row:CreateFontString(nil, "OVERLAY")
+	row.text:SetJustifyH("LEFT")
+	row.text:SetWordWrap(false)
+	row.text:SetPoint("RIGHT", -(TEXT_INSET + CHECK_SIZE + CHECK_GAP), 0)
 	return row
 end
 
-local function BindRow(row, item, onSelect, palette)
-	row.hl:Hide()
-	row.hl:SetVertexColor(unpack(palette.hover))
+local function PaintRow(row, palette, hovered)
+	if hovered then
+		row.hl:SetVertexColor(unpack(palette.hover))
+		row.hl:Show()
+	elseif row.selected then
+		row.hl:SetVertexColor(unpack(palette.selected))
+		row.hl:Show()
+	else
+		row.hl:Hide()
+	end
+end
+
+local function ShowCheck(row, item, palette)
+	row.selected = item.checked == true
+	row.check:SetShown(row.selected)
+	if row.selected then
+		row.check:SetTexture(palette.check.texture)
+		row.check:SetVertexColor(unpack(item.disabled and palette.disabled or palette.check.color))
+		row.check:SetDesaturated(item.disabled and true or false)
+	end
+end
+
+local function ShowSub(row, item)
+	local hasSub = item.sub ~= nil and item.sub ~= ""
+	row.sub:SetShown(hasSub)
+	if hasSub then row.sub:SetText(item.sub) end
+end
+
+local function BindRow(row, item, onSelect, palette, textX)
 	row.text:SetFont(item.fontPath or palette.font, FONT_SIZE, "")
 	row.sub:SetFont(palette.font, SUBTLE_FONT_SIZE, "")
-
-	if item.icon then
-		row.icon:SetTexture(item.icon); row.icon:Show()
-		row.check:Hide()
-	else
-		row.icon:Hide()
-		if item.checked then
-			row.check:SetTexture(palette.check.texture)
-			row.check:SetVertexColor(unpack(item.disabled and palette.disabled or palette.check.color))
-			row.check:SetDesaturated(item.disabled and true or false)
-			row.check:Show()
-		else
-			row.check:Hide()
-		end
-	end
-
+	row.text:SetPoint("LEFT", textX, 0)
 	row.text:SetText(item.text or "")
-
-	if item.sub and item.sub ~= "" then
-		row.sub:SetText(item.sub); row.sub:Show()
-	else
-		row.sub:Hide()
-	end
+	row.icon:SetShown(item.icon ~= nil)
+	if item.icon then row.icon:SetTexture(item.icon) end
+	ShowCheck(row, item, palette)
+	ShowSub(row, item)
+	PaintRow(row, palette, false)
 
 	if item.disabled then
 		row.text:SetTextColor(unpack(palette.disabled))
@@ -161,9 +155,8 @@ local function BindRow(row, item, onSelect, palette)
 	row:EnableMouse(true)
 	row.text:SetTextColor(unpack(palette.text))
 	row.sub:SetTextColor(unpack(palette.muted))
-
-	row:SetScript("OnEnter", function() row.hl:Show() end)
-	row:SetScript("OnLeave", function() row.hl:Hide() end)
+	row:SetScript("OnEnter", function() PaintRow(row, palette, true) end)
+	row:SetScript("OnLeave", function() PaintRow(row, palette, false) end)
 	row:SetScript("OnClick", function()
 		local keepOpen = false
 		if item.callback then keepOpen = item.callback(item) == true end
@@ -172,37 +165,30 @@ local function BindRow(row, item, onSelect, palette)
 			CloseActive()
 			return
 		end
-		if not item.icon then row.check:SetShown(item.checked and true or false) end
-		if item.sub and item.sub ~= "" then
-			row.sub:SetText(item.sub)
-			row.sub:Show()
-		else
-			row.sub:Hide()
-		end
+		ShowCheck(row, item, palette)
+		ShowSub(row, item)
+		PaintRow(row, palette, row:IsMouseOver())
 	end)
 end
 
 local function MakeTitle(parent)
 	local wrap = CreateFrame("Frame", nil, parent)
 	wrap:SetHeight(TITLE_HEIGHT)
-
-	local text = wrap:CreateFontString(nil, "OVERLAY")
-	text:SetJustifyH("LEFT"); text:SetJustifyV("MIDDLE")
-	text:SetWordWrap(false)
-	text:SetPoint("LEFT", 4 + ICON_COLUMN_WIDTH + TEXT_INSET, 0)
-	text:SetPoint("RIGHT", -TEXT_INSET, 0)
-	wrap.text = text
-
+	wrap.text = wrap:CreateFontString(nil, "OVERLAY")
+	wrap.text:SetJustifyH("LEFT")
+	wrap.text:SetWordWrap(false)
+	wrap.text:SetPoint("RIGHT", -TEXT_INSET, 0)
 	return wrap
 end
 
 local function MakeSeparator(parent)
 	local line = parent:CreateTexture(nil, "ARTWORK")
-	line:SetTexture(WHITE); line:SetHeight(1)
+	line:SetTexture(WHITE)
+	line:SetHeight(1)
 	return line
 end
 
-local sharedMenu, scrollFrame, scrollChild, scrollTrack, scrollThumb, scrollLogic
+local sharedMenu, menuFill, menuEdge, scrollFrame, scrollChild, scrollTrack, scrollThumb, scrollLogic
 local rowPool = {}
 local titlePool = {}
 local separatorPool = {}
@@ -210,14 +196,16 @@ local checkFrame
 
 local function EnsureMenu()
 	if sharedMenu then return sharedMenu end
-	local menuWidget = Widget.New({frame = UIParent}, "Frame", nil, {bg = Theme.bg.dark, border = Theme.border.light})
-	local menu = menuWidget.frame
+	local menu = CreateFrame("Frame", nil, UIParent)
 	menu:SetFrameStrata(BUILib.GetPopupStrata())
 	menu:SetFrameLevel(BUILib.GetPopupLevel() + 50)
 	menu:SetClampedToScreen(true)
 	menu:EnableMouse(true)
 	menu:Hide()
-	BuildShadow(menu)
+	for index, shadow in ipairs(SHADOWS) do
+		Widget.DrawCardShape(menu, shadow.radius, { 0, 0, 0, shadow.alpha }, CLEAR, "BACKGROUND", -8 + index, shadow.inset)
+	end
+	menuFill, menuEdge = Widget.DrawCardShape(menu, MENU_RADIUS, SOLID, SOLID, "BACKGROUND", 0, 0)
 
 	scrollFrame = CreateFrame("ScrollFrame", nil, menu)
 	scrollFrame:SetPoint("TOPLEFT")
@@ -289,7 +277,7 @@ function Controls.ContextMenu(items, options)
 	end
 	HidePools()
 
-	local totalHeight = PADDING_Y
+	local totalHeight, hasIcons = PADDING_Y, false
 	for itemIndex, item in ipairs(items) do
 		if item.separator then
 			totalHeight = totalHeight + SEPARATOR_HEIGHT
@@ -299,17 +287,19 @@ function Controls.ContextMenu(items, options)
 			if nextItem and not nextItem.separator then totalHeight = totalHeight + TITLE_GAP end
 		else
 			totalHeight = totalHeight + ROW_HEIGHT
+			if item.icon then hasIcons = true end
 		end
 	end
 	totalHeight = totalHeight + PADDING_Y
+	local textX = hasIcons and (TEXT_INSET + ICON_COLUMN) or TEXT_INSET
 
 	local visibleHeight = math.min(totalHeight, PADDING_Y * 2 + MAX_ROWS * ROW_HEIGHT)
 	local trackSpace = totalHeight > visibleHeight and (TRACK_WIDTH + TRACK_INSET * 2) or 0
 	local innerWidth = width - PADDING_X * 2 - trackSpace
 	menu:SetSize(width, visibleHeight)
 	scrollChild:SetSize(width, totalHeight)
-	menu:SetBackdropColor(unpack(palette.fill))
-	menu:SetBackdropBorderColor(unpack(palette.edge))
+	menuFill:SetVertexColor(unpack(palette.fill))
+	menuEdge:SetVertexColor(unpack(palette.edge))
 	scrollTrack.fill:SetVertexColor(palette.edge[1], palette.edge[2], palette.edge[3], 0.5)
 	scrollThumb.fill:SetVertexColor(unpack(palette.thumb))
 
@@ -321,8 +311,8 @@ function Controls.ContextMenu(items, options)
 			local line = GetSeparator(separatorIndex)
 			local separatorY = y - math.floor(SEPARATOR_HEIGHT / 2)
 			line:ClearAllPoints()
-			line:SetPoint("BOTTOMLEFT", scrollChild, "TOPLEFT", PADDING_X + 4, separatorY)
-			line:SetPoint("BOTTOMRIGHT", scrollChild, "TOPRIGHT", -(PADDING_X + 4 + trackSpace), separatorY)
+			line:SetPoint("BOTTOMLEFT", scrollChild, "TOPLEFT", PADDING_X + SEPARATOR_INSET, separatorY)
+			line:SetPoint("BOTTOMRIGHT", scrollChild, "TOPRIGHT", -(PADDING_X + SEPARATOR_INSET + trackSpace), separatorY)
 			line:SetVertexColor(unpack(palette.edge))
 			line:Show()
 			y = y - SEPARATOR_HEIGHT
@@ -332,6 +322,7 @@ function Controls.ContextMenu(items, options)
 			wrap:SetWidth(innerWidth)
 			wrap.text:SetFont(palette.font, TITLE_FONT_SIZE, "")
 			wrap.text:SetTextColor(unpack(palette.muted))
+			wrap.text:SetPoint("LEFT", textX, 0)
 			wrap.text:SetText(CleanTitle(item.text or item.title))
 			wrap:ClearAllPoints()
 			wrap:SetPoint("TOPLEFT", PADDING_X, y)
@@ -344,7 +335,7 @@ function Controls.ContextMenu(items, options)
 			row:SetWidth(innerWidth)
 			row:ClearAllPoints()
 			row:SetPoint("TOPLEFT", PADDING_X, y)
-			BindRow(row, item, options.onSelect, palette)
+			BindRow(row, item, options.onSelect, palette, textX)
 			row:Show()
 			y = y - ROW_HEIGHT
 		end

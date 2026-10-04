@@ -93,7 +93,12 @@ function Controls.Toggle(parent, label, checked, callback, indentLevel, enabled,
 	Theme.RegisterAccentElement(container, function() Render() end)
 
 	function container:GetValue() return state.enabled end
-	function container:SetValue(value) state.enabled = value; Snap() end
+	function container:SetValue(value)
+		value = value and true or false
+		if value == state.enabled then return end
+		state.enabled = value
+		Snap()
+	end
 	function container:SetEnabled(isEnabled) state.disabled = not isEnabled; Snap() end
 	container.toggle = track; container.label = labelFontString; container.description = descriptionFontString
 	return Widget.Wrap(container)

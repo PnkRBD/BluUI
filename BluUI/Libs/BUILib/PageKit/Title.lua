@@ -77,7 +77,7 @@ function PageKit.PageTitle(pageFrame, text, width, options)
 		holder.enableToggle = toggle
 
 		local toggleFrame = Widget.Unwrap(toggle)
-		hint = PageKit.HintArrow(toggleFrame, { label = "Enable" })
+		hint = PageKit.HintArrow(toggleFrame, "Enable")
 		hint:SetShown(not options.enable.value and Allowed())
 		holder.enableHint = hint
 

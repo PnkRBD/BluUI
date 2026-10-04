@@ -11,6 +11,9 @@ PageKit.TAB_H   = 88
 PageKit.TAB_GAP = 12
 
 local SHEET_ROW_PITCH, SHEET_ROW_TOP = 32, 8
+local HINT_WIDTH, HINT_HEIGHT = 48, 24
+local HINT_TIP_X, HINT_DROP = 39, 3
+local HINT_TAIL_X, HINT_TAIL_Y = -1, 19
 
 function PageKit.CardHeight(rows)
 	if BUILib.IsDatasheet() then return SHEET_ROW_TOP * 2 + rows * SHEET_ROW_PITCH end
@@ -68,25 +71,19 @@ function PageKit.AttachLeft(control, target, gap)
 	return control
 end
 
-function PageKit.HintArrow(target, config)
-	config = config or {}
-	local size = config.size or 40
+function PageKit.HintArrow(target, label)
 	local hint = CreateFrame("Frame", nil, target:GetParent())
-	hint:SetSize(size, size)
-	hint:SetPoint("TOPRIGHT", target, "BOTTOMRIGHT", config.offsetX or 2, config.offsetY or -6)
+	hint:SetSize(HINT_WIDTH, HINT_HEIGHT)
+	hint:SetPoint("TOPLEFT", target, "BOTTOM", -HINT_TIP_X, -HINT_DROP)
 	local arrowTexture = hint:CreateTexture(nil, "OVERLAY")
 	arrowTexture:SetAllPoints()
 	arrowTexture:SetTexture(BUILib.GetLibMedia("arrow"))
 	arrowTexture:SetVertexColor(1, 1, 1, 0.9)
-	hint.arrow = arrowTexture
-	if config.label then
-		local labelText = hint:CreateFontString(nil, "OVERLAY")
-		labelText:SetFont(BUILib.Font, 13, "")
-		labelText:SetPoint("RIGHT", hint, "BOTTOMLEFT", -4, 4)
-		labelText:SetTextColor(1, 1, 1, 0.9)
-		labelText:SetText(config.label)
-		hint.label = labelText
-	end
+	local labelText = hint:CreateFontString(nil, "OVERLAY")
+	labelText:SetFont(BUILib.Font, 13, "")
+	labelText:SetPoint("RIGHT", hint, "TOPLEFT", HINT_TAIL_X, -HINT_TAIL_Y)
+	labelText:SetTextColor(1, 1, 1, 0.9)
+	labelText:SetText(label)
 	return hint
 end
 
