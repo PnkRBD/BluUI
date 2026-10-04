@@ -273,9 +273,11 @@ local function TopCard(kit, parent)
 	local visibility = kit.Select(row, {
 		icon = 'eye',
 		label = 'Visibility',
+		stretch = true,
 		value = function() return Config().combatOnly and 'In combat only' or 'Always shown' end,
 		items = VisibilityItems,
 	})
+	visibility:SetPoint('RIGHT')
 	function row:Measure(width)
 		local half = math.floor(width / 2)
 		slider:SetWidth(half - SIZE_LABEL - TOP_GAP)
