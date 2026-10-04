@@ -66,8 +66,12 @@ local function gridSnap(value)
     return value - value % (value < 0 and step or -step)
 end
 
+local function nearestPixel(value)
+    return floor(value / gridUnit + 0.5) * gridUnit
+end
+
 Pixel.Scale = gridSnap
-Pixel.Snap = gridSnap
+Pixel.Snap = nearestPixel
 
 function Pixel.ScaleEven(value)
     if value == 0 then return 0 end
