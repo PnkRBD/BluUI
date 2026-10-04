@@ -10,6 +10,10 @@ local CLEARCASTING_FRAME = 'BUI_DruidClearcasting'
 local LIFEBLOOM    = 33763
 local UNDERGROWTH  = 392301
 local FLOURISH     = 197721
+local OVERGROWTH   = 203651
+local NATURES_SWIFTNESS = 132158
+local REGROWTH     = 8936
+local SWIFTNESS_SPENDERS = { [REGROWTH] = true, [20484] = true, [339] = true }
 local LIFEBLOOM_SECONDS = 15
 local PANDEMIC_SECONDS  = 4.5
 local FLOURISH_SECONDS  = 6
@@ -147,6 +151,7 @@ end
 
 local lifeblooms = {}
 local castTargets = {}
+local swiftnessArmed = false
 
 local function ClearLifeblooms()
     for index = #lifeblooms, 1, -1 do
@@ -154,6 +159,7 @@ local function ClearLifeblooms()
         lifeblooms[index] = nil
     end
     wipe(castTargets)
+    swiftnessArmed = false
 end
 
 local function RemoveLifebloom(entry)
@@ -188,13 +194,11 @@ local function Schedule(entry, settings)
     entry.timer = BUI.Profiler.NewTimer('BuffTracking.Druid lifebloom refresh', math.max(entry.expires - settings.soundSeconds - GetTime(), 0), function() AnnounceRefresh(entry) end)
 end
 
-local function OnLifebloomSent(_, _, target, castGUID, spellID)
-    if spellID == LIFEBLOOM and not issecretvalue(target) then castTargets[castGUID] = target end
+local function OnCastSent(_, _, target, castGUID, spellID)
+    if (spellID == LIFEBLOOM or spellID == REGROWTH) and not issecretvalue(target) then castTargets[castGUID] = target end
 end
 
-local function OnLifebloomCast(castGUID, settings)
-    local target = castTargets[castGUID]
-    castTargets[castGUID] = nil
+local function OnLifebloomCast(target, settings)
     local now = GetTime()
     local limit = IsPlayerSpell(UNDERGROWTH) and 2 or 1
     local refreshed = target and LifebloomOn(target)
@@ -219,13 +223,20 @@ local function OnFlourish(settings)
 end
 
 local function OnPlayerCast(_, _, castGUID, spellID)
+    local target = castTargets[castGUID]
+    castTargets[castGUID] = nil
     if not isRestoration then return end
     local settings = GetSettings()
     if not settings.enabled then return end
     if spellID == LIFEBLOOM then
-        OnLifebloomCast(castGUID, settings)
+        OnLifebloomCast(target, settings)
     elseif spellID == FLOURISH then
         OnFlourish(settings)
+    elseif spellID == NATURES_SWIFTNESS then
+        swiftnessArmed = true
+    elseif swiftnessArmed and SWIFTNESS_SPENDERS[spellID] then
+        swiftnessArmed = false
+        if spellID == REGROWTH and IsPlayerSpell(OVERGROWTH) then OnLifebloomCast(target, settings) end
     end
 end
 
@@ -263,7 +274,7 @@ function Druid.Initialize()
     BUI.Events:Register('PLAYER_ENTERING_WORLD', 'BuffTrackingDruid', OnEnteringWorld)
     BUI.Events:Register('PLAYER_REGEN_ENABLED', 'BuffTrackingDruid', ApplyPendingStyles)
     BUI.Events:Register('PLAYER_SPECIALIZATION_CHANGED', 'BuffTrackingDruid', OnSpecChanged)
-    BUI.Events:RegisterUnit('UNIT_SPELLCAST_SENT', 'player', 'BuffTrackingDruid', OnLifebloomSent)
+    BUI.Events:RegisterUnit('UNIT_SPELLCAST_SENT', 'player', 'BuffTrackingDruid', OnCastSent)
     BUI.Events:RegisterUnit('UNIT_SPELLCAST_SUCCEEDED', 'player', 'BuffTrackingDruid', OnPlayerCast)
 end
 
