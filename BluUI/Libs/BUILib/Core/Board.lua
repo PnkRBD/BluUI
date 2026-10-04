@@ -12,6 +12,7 @@ local SIDE_COLUMNS = 3
 local SWITCH_X = 12
 local LABEL_X = 62
 local LABEL_INSET = 6
+local PACK_GAP = 24
 local CAPTION_HEIGHT = 28
 local CAPTION_Y = 10
 local PLAIN_ROW = 44
@@ -274,16 +275,33 @@ function Board:Move(frame, delta)
 	end
 end
 
-function Board:Layout(y, query)
-	self:Measure()
-	local widest = MIN_CELL
-	for _, row in ipairs(self.rows) do
+local function CellWidth(cell)
+	return LABEL_X + math.ceil(cell.label:GetUnboundedStringWidth()) + LABEL_INSET + cell.room
+end
+
+local function Packs(board, room)
+	local run = 0
+	for _, row in ipairs(board.rows) do
 		if row.kind == 'cell' then
-			widest = math.max(widest, LABEL_X + math.ceil(row.frame.label:GetUnboundedStringWidth()) + LABEL_INSET + row.frame.room)
+			run = run + (run > 0 and PACK_GAP or 0) + CellWidth(row.frame)
+			if run > room then return false end
+		else
+			run = 0
 		end
 	end
-	local columns = math.min(self.stacked and STACKED_COLUMNS or SIDE_COLUMNS, math.max(1, math.floor((self.panelWidth - CELL_INSET * 2) / widest)))
-	local cellWidth = math.floor((self.panelWidth - CELL_INSET * 2) / columns)
+	return true
+end
+
+function Board:Layout(y, query)
+	self:Measure()
+	local room = self.panelWidth - CELL_INSET * 2
+	local packed = Packs(self, room)
+	local widest = MIN_CELL
+	for _, row in ipairs(self.rows) do
+		if row.kind == 'cell' then widest = math.max(widest, CellWidth(row.frame)) end
+	end
+	local columns = math.min(self.stacked and STACKED_COLUMNS or SIDE_COLUMNS, math.max(1, math.floor(room / widest)))
+	local cellWidth = math.floor(room / columns)
 	local shown, group = 0
 	for _, row in ipairs(self.rows) do
 		if row.kind == 'caption' then
@@ -313,21 +331,22 @@ function Board:Layout(y, query)
 		if row.match and row.frame.tools then row.frame.tools.Place(slots) end
 	end
 	local top = self.headHeight or PAD
-	local height, column = top, 0
+	local height, column, x = top, 0, CELL_INSET
 	local function Break()
 		if column == 0 then return end
 		height = height + CELL_HEIGHT
-		column = 0
+		column, x = 0, CELL_INSET
 	end
 	for _, row in ipairs(self.rows) do
 		row.frame:SetShown(row.match)
 		if row.match then
 			row.frame:ClearAllPoints()
 			if row.kind == 'cell' then
-				row.frame:SetPoint('TOPLEFT', CELL_INSET + column * cellWidth, -height)
-				row.frame:SetWidth(cellWidth)
-				column = column + 1
-				if column == columns then Break() end
+				local width = packed and CellWidth(row.frame) or cellWidth
+				row.frame:SetPoint('TOPLEFT', x, -height)
+				row.frame:SetWidth(width)
+				column, x = column + 1, x + width + (packed and PACK_GAP or 0)
+				if not packed and column == columns then Break() end
 			else
 				Break()
 				row.rule:SetShown(height > top)

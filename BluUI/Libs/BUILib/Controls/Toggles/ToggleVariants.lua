@@ -41,7 +41,12 @@ function Widget.AttachToggle(container, state, progressRef, render, snap, clickF
 	Theme.RegisterAccentElement(container, function() render() end)
 
 	function container:GetValue() return state.enabled end
-	function container:SetValue(value) state.enabled = value; snap() end
+	function container:SetValue(value)
+		value = value and true or false
+		if value == state.enabled then return end
+		state.enabled = value
+		snap()
+	end
 	function container:SetEnabled(isEnabled) state.disabled = not isEnabled; snap() end
 	container.toggle = clickFrame
 	container.label = labelFontString
