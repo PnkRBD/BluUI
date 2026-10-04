@@ -479,17 +479,28 @@ local function AurasBoards(ui, parent, width, key)
 	})
 	local border, badge = section.dispelBorder, section.dispelBadge
 	local function Badges() GroupFrames().RestyleAllDispelBadges() end
-	dispels:AddTools('Dispel highlight', 'How the frame reacts', {
+	dispels:AddTools('Dispel highlight', 'How the frame reacts, following the player frame unless told otherwise', {
 		{ entries = DISPEL_MODES, width = MENU_WIDTH, get = function()
-			if border.tintBar then return border.tintStyle end
-			return border.enabled and 'border' or 'off'
+			local wantBorder, wantTint, style = GroupFrames().DispelLook(section)
+			if wantTint then return style end
+			return wantBorder and 'border' or 'off'
 		end, set = function(value)
+			if border.matchPlayer then
+				local player = BUI.GetDB().unitFrames.player
+				player.debuffHighlightBorder = value == 'border'
+				player.debuffHighlightBar = TINT_MODES[value] == true
+				if player.debuffHighlightBar then player.debuffHighlightStyle = value end
+				BUI.UnitFrames.InvalidateSettingsCache()
+				BUI.UnitFrames:Refresh()
+				return
+			end
 			border.enabled = value == 'border'
 			border.tintBar = TINT_MODES[value] == true
 			if border.tintBar then border.tintStyle = value end
 		end },
 		{ tooltip = 'Trigger and badge icon', title = 'Dispel highlight', options = {
-			Option(border, 'Trigger', 'source', { entries = DISPEL_SOURCES }),
+			Toggle(border, 'Match the player frame', 'matchPlayer'),
+			Option(border, 'Trigger', 'source', { entries = DISPEL_SOURCES, separator = true }),
 			Toggle(border, 'Dispel icon', 'showBadge'),
 			Option(badge, 'Icon size', 'size', { min = 10, max = 48, step = 1 }),
 			Option(badge, 'Icon anchor', 'anchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),

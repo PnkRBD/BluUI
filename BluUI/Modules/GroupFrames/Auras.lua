@@ -248,7 +248,7 @@ local function BuildAuraContainers(frame)
 		ApplyKind(frame, settings, KIND_LIST[kindIndex])
 	end
 	if GroupFrames.DispelViaEngine then GroupFrames.ConfigureDispelHighlight(frame) end
-	frame.dispelBorderEnabled = settings.dispelBorder.enabled
+	frame.dispelBorderEnabled = (GroupFrames.DispelLook(settings))
 
 	local watcher = frame._auraWatcher
 	if not watcher then
@@ -273,7 +273,7 @@ local function BuildAuraContainers(frame)
 end
 
 function GroupFrames.RefreshDispelBorder(frame, settings)
-	frame.dispelBorderEnabled = settings.dispelBorder.enabled
+	frame.dispelBorderEnabled = (GroupFrames.DispelLook(settings))
 	if GroupFrames.DispelViaEngine then
 		if frame._auraWatcher then GroupFrames.ConfigureDispelHighlight(frame) end
 		return

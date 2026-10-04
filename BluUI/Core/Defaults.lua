@@ -194,6 +194,7 @@ local UnitFrameBase = {
 
 	debuffHighlightBorder       = true,
 	debuffHighlightBar          = false,
+	debuffHighlightStyle        = 'bar',
 	debuffHighlightClassFilter  = true,
 	debuffHighlightTypeText     = false,
 	debuffHighlightBadge        = true,
