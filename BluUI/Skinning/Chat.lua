@@ -1921,6 +1921,8 @@ local function Install()
 		if chat == ChatFrame1 then RestoreGeometry(); NormalizeDock() end
 	end)
 
+	Hook(ChatAlertFrame, 'UpdateAnchors', RepositionAuxLater)
+
 	local geometryReassertPending = false
 	local function ReassertGeometry()
 		if geometryReassertPending or not Enabled() then return end
