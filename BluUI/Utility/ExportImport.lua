@@ -95,6 +95,25 @@ local function RestoreMigrationMarkers(profile, data)
     for key, value in pairs(data._migrations) do profile.general[key] = value end
 end
 
+local function FindSavedTheme(name)
+    for _, saved in ipairs(BUI.db.global.savedThemes) do
+        if saved.name == name then return saved end
+    end
+end
+
+local function ActiveSavedTheme(db)
+    local name = db.windowTheme.name
+    local saved = name and FindSavedTheme(name)
+    if saved then return { name = name, theme = DeepCopyClean(saved.theme) } end
+end
+
+local function AdoptSavedTheme(entry)
+    if type(entry) ~= "table" or type(entry.name) ~= "string" or type(entry.theme) ~= "table" then return end
+    if FindSavedTheme(entry.name) then return end
+    local saved = BUI.db.global.savedThemes
+    saved[#saved + 1] = { name = entry.name, theme = DeepCopyClean(entry.theme), time = time() }
+end
+
 local function ApplyImportData(db, data, selectedKeys)
     MigrateLegacyKeysInUnitFrames(data)
     local keySet
@@ -120,6 +139,7 @@ local function ApplyImportData(db, data, selectedKeys)
     if (not keySet or keySet.customBars) and data.customBars and BUI.CustomBars and BUI.CustomBars.AdoptProfileSpells then
         BUI.CustomBars.AdoptProfileSpells()
     end
+    if not keySet or keySet.windowTheme then AdoptSavedTheme(data._savedTheme) end
 end
 
 local function SerializeProfile(db, profileName)
@@ -132,6 +152,7 @@ local function SerializeProfile(db, profileName)
     MigrateLegacyKeysInUnitFrames(exportData)
     CompletePartialArrays(exportData, BUI.Defaults.profile)
     exportData._migrations = MigrationMarkers(db.general)
+    exportData._savedTheme = ActiveSavedTheme(db)
     local Profiles = BUI.CDM and BUI.CDM.Profiles
     if Profiles and Profiles.ExportCurrent then
         exportData._cdmLayoutData = Profiles.ExportCurrent()
