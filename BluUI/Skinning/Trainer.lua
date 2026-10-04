@@ -47,48 +47,40 @@ local services = {}
 local rows = {}
 local isOpen = false
 
-local scanTip = CreateFrame('GameTooltip', 'BUITrainerScanTip', nil, 'GameTooltipTemplate')
-scanTip:SetOwner(WorldFrame, 'ANCHOR_NONE')
-
-local function ScanRequirements(serviceIndex)
-	scanTip:ClearLines()
-	scanTip:SetTrainerService(serviceIndex)
-	local requirements
-	for lineIndex = 2, scanTip:NumLines() do
-		local leftText = _G['BUITrainerScanTipTextLeft' .. lineIndex]
-		local text = leftText and leftText:GetText()
-		if text then
-			local isRequires = text:find('^Requires') ~= nil
-			if isRequires then
-				requirements = text
-			else
-
-				local red, green, blue = leftText:GetTextColor()
-				if red > 0.9 and green < 0.2 and blue < 0.2 then
-					requirements = requirements and (requirements .. ', ' .. text) or text
-				end
-			end
-		end
+local function Requirements(serviceIndex, requiredLevel)
+	local unmet = {}
+	if requiredLevel and requiredLevel > UnitLevel('player') then unmet[#unmet + 1] = TRAINER_REQ_LEVEL:format(requiredLevel) end
+	local skill, rank, hasSkill = GetTrainerServiceSkillReq(serviceIndex)
+	if skill and not hasSkill then unmet[#unmet + 1] = TRAINER_REQ_SKILL_RANK:format(skill, rank) end
+	for abilityIndex = 1, GetTrainerServiceNumAbilityReq(serviceIndex) do
+		local ability, hasAbility = GetTrainerServiceAbilityReq(serviceIndex, abilityIndex)
+		if ability and not hasAbility then unmet[#unmet + 1] = TRAINER_REQ_ABILITY:format(ability) end
 	end
-	return requirements
+	if #unmet > 0 then return table.concat(unmet, ', ') end
 end
 
 local function ScanServices()
 	wipe(services)
 	for serviceIndex = 1, GetNumTrainerServices() do
-		local name, category = GetTrainerServiceInfo(serviceIndex)
+		local name, category, icon, requiredLevel = GetTrainerServiceInfo(serviceIndex)
 		if name then
 			if not VALID_CATEGORIES[category] then category = 'unavailable' end
 			services[#services + 1] = {
 				index = serviceIndex,
 				name = name,
-				reqs = ScanRequirements(serviceIndex),
+				reqs = Requirements(serviceIndex, requiredLevel),
 				category = category,
 				cost = GetTrainerServiceCost(serviceIndex) or 0,
-				icon = GetTrainerServiceIcon(serviceIndex),
+				icon = icon,
 			}
 		end
 	end
+end
+
+local function ShowEveryService()
+	SetTrainerServiceTypeFilter('available', true)
+	SetTrainerServiceTypeFilter('unavailable', true)
+	SetTrainerServiceTypeFilter('used', true)
 end
 
 local function PassesFilter(service)
@@ -307,7 +299,12 @@ RefreshContent = function()
 
 	ScanServices()
 	local shown = PopulateRows(trainerFrame.child)
-	trainerFrame.countText:SetText(shown .. '/' .. #services)
+	local count = shown .. '/' .. #services
+	if IsTradeskillTrainer() then
+		local rank, maxRank = GetTrainerTradeskillRankValues()
+		if maxRank > 0 then count = count .. '  ·  ' .. TRAINER_REQ_SKILL_RANK:format(rank, maxRank) end
+	end
+	trainerFrame.countText:SetText(count)
 	trainerFrame.scroll:SetVerticalScroll(0)
 
 	trainerFrame.emptyText:SetShown(shown == 0)
@@ -373,6 +370,7 @@ local function OpenTrainer()
 	EnsureBlizzTrainer()
 	BuildFrame()
 	isOpen = true
+	ShowEveryService()
 	activeFilter = FILTER_AVAILABLE
 	trainerFrame.filterDD.label:SetText('Available')
 	searchText = ''
@@ -390,6 +388,7 @@ end
 local function CloseTrainerSkin()
 	isOpen = false
 	if trainerFrame then trainerFrame:Hide() end
+	SetTrainerServiceTypeFilter('used', false)
 	RestoreBlizzard()
 	wipe(services)
 	for _, row in ipairs(rows) do row.serviceIndex = nil end
@@ -413,14 +412,16 @@ local function OnTrainerEvent(event, addonName)
 			SuppressBlizzardTrainer()
 			RefreshContent()
 		end
-	elseif event == 'PLAYER_MONEY' then
-		if isOpen then RefreshContent() end
+	elseif isOpen then
+		RefreshContent()
 	end
 end
 
 BUI.Events:Register('TRAINER_SHOW', 'Skinning.Trainer', OnTrainerEvent)
 BUI.Events:Register('TRAINER_CLOSED', 'Skinning.Trainer', OnTrainerEvent)
 BUI.Events:Register('TRAINER_UPDATE', 'Skinning.Trainer', OnTrainerEvent)
+BUI.Events:Register('TRAINER_SERVICE_INFO_NAME_UPDATE', 'Skinning.Trainer', OnTrainerEvent)
+BUI.Events:Register('TRAINER_DESCRIPTION_UPDATE', 'Skinning.Trainer', OnTrainerEvent)
 BUI.Events:Register('ADDON_LOADED', 'Skinning.Trainer', OnTrainerEvent)
 
 Skin.OnToggle('trainer', function(enabled)
