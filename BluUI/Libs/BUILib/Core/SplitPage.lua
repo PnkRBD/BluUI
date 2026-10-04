@@ -255,9 +255,14 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 		local value = kit.Text(button, '', 12, 'text')
 		value:SetPoint('LEFT', divider, 'RIGHT', SELECT_GAP, 0)
 		local chevron = kit.Glyph(button, 'dropdown', SELECT_CHEVRON, 'muted')
-		chevron:SetPoint('LEFT', value, 'RIGHT', SELECT_CHEVRON_GAP, 0)
+		if spec.stretch then
+			chevron:SetPoint('RIGHT', -SELECT_PAD, 0)
+		else
+			chevron:SetPoint('LEFT', value, 'RIGHT', SELECT_CHEVRON_GAP, 0)
+		end
 		window:Bind(button, function()
 			value:SetText(spec.value())
+			if spec.stretch then return end
 			button:SetWidth(math.ceil(x + label:GetStringWidth() + SELECT_GAP * 2 + 1 + value:GetStringWidth() + SELECT_CHEVRON_GAP + SELECT_CHEVRON + SELECT_PAD))
 		end)
 		button:SetScript('OnEnter', function()
