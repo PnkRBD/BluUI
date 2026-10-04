@@ -7,6 +7,7 @@ local UIParent = UIParent
 
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
+local Widget = LibStub("BUILib").Widget
 local LibEMO = LibStub("LibEditModeOverride-1.0")
 CDM.Anchors = {}
 local Anchors = CDM.Anchors
@@ -42,8 +43,8 @@ local function PlaceContainerTopLeft(frame, x, y)
         return
     end
     local halfWidth, halfHeight = width / 2, height / 2
-    local leftOffset = Pixel.Snap(parentCenterX + x - halfWidth) - parentCenterX
-    local topOffset = Pixel.Snap(parentCenterY + y + halfHeight) - parentCenterY
+    local leftOffset = Widget.SnapX(parentCenterX + x - halfWidth, pixel) - parentCenterX
+    local topOffset = Widget.SnapY(parentCenterY + y + halfHeight, pixel) - parentCenterY
     frame:SetPoint("TOPLEFT", UIParent, "CENTER", leftOffset, topOffset)
 
     frame._snappedCenterX = leftOffset + halfWidth
