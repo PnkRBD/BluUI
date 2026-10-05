@@ -396,6 +396,9 @@ function CDM.ApplyIconPositions(key)
     local hideWhenZero = key ~= 'buffs' and CDM.GetHideWhenZero(settings) or nil
     local Custom = CDM.Custom
 
+    local cap = CDM.RowCapacity(settings, key ~= "buffs")
+    local gridSeen = 0
+
     for iconIndex = 1, #allIcons do
         local icon = allIcons[iconIndex]
         local shouldHide = false
@@ -440,6 +443,14 @@ function CDM.ApplyIconPositions(key)
                         shouldHide = true
                     end
                 end
+            end
+        end
+
+        if not shouldHide and cap then
+            local stableID = CDM.GetStableSpellID(icon)
+            if not (stableID and CDM.IsIconDetached(settings, stableID)) then
+                gridSeen = gridSeen + 1
+                if gridSeen > cap then shouldHide = true end
             end
         end
 

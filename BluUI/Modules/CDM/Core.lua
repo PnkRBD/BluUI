@@ -530,6 +530,20 @@ function CDM.RowMetrics(count, perRow, row2Count, row3Count)
     return numRows, maxCols
 end
 
+function CDM.RowCapacity(settings, hasThirdRow)
+    if not settings.capRows then return nil end
+    local perRow = settings.iconsPerRow
+    if perRow <= 0 then return nil end
+    local total = perRow
+    local row2Count = settings.row2Count or 0
+    if row2Count > 0 then
+        total = total + row2Count
+        local row3Count = hasThirdRow and settings.row3Count or 0
+        if row3Count > 0 then total = total + row3Count end
+    end
+    return total
+end
+
 function CDM.NotifyAnchoredFrames()
     BUI.UnitFrames.RefreshAnchoredFrames()
     BUI.GroupFrames.RefreshPartyAnchor()
