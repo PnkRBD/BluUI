@@ -65,13 +65,11 @@ local ABSORB_DIRECTIONS = {
 }
 local DISPEL_MODES = {
 	{ value = 'off', text = 'Off' },
-	{ value = 'border', text = 'Frame border' },
 	{ value = 'bar', text = 'Tint the whole bar' },
-	{ value = 'top', text = 'Tint the top half' },
-	{ value = 'bottom', text = 'Tint the bottom half' },
-	{ value = 'strip', text = 'Strip along the bottom' },
+	{ value = 'top', text = 'Fade from the top' },
+	{ value = 'bottom', text = 'Fade from the bottom' },
 }
-local TINT_MODES = { bar = true, top = true, bottom = true, strip = true }
+local TINT_MODES = { bar = true, top = true, bottom = true }
 local DISPEL_SOURCES = {
 	{ value = 'mine', text = 'Dispellable by me' },
 	{ value = 'all', text = 'All dispel types' },
@@ -736,17 +734,17 @@ local function AppearanceBoards(ui, parent, width)
 	})
 	dispel:AddTools('Dispel highlight', 'How the player frame reacts, party and raid follow it unless they say otherwise', {
 		{ entries = DISPEL_MODES, width = MENU_WIDTH, get = function()
-			if player.debuffHighlightBorder then return 'border' end
 			if player.debuffHighlightBar then return player.debuffHighlightStyle end
 			return 'off'
 		end, set = function(value)
-			player.debuffHighlightBorder = value == 'border'
 			player.debuffHighlightBar = TINT_MODES[value] == true
 			if player.debuffHighlightBar then player.debuffHighlightStyle = value end
 		end },
 		{ tooltip = 'Source and strength', title = 'Dispel highlight', options = {
 			{ label = 'Show', entries = DISPEL_SOURCES, get = function() return player.debuffHighlightClassFilter ~= false and 'mine' or 'all' end, set = function(value) player.debuffHighlightClassFilter = value == 'mine' end },
 			Option(settings, 'Bar tint opacity %', 'dispelOpacity', { min = 0, max = 100, step = 5 }),
+			Option(settings, 'Fade: colour at the middle %', 'dispelFadeMiddle', { min = 0, max = 100, step = 5, separator = true }),
+			Option(settings, 'Fade: colour at the far edge %', 'dispelFadeFar', { min = 0, max = 100, step = 5 }),
 		} },
 		DispelPreviewEye(),
 	}, RefreshDispel)

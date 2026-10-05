@@ -630,7 +630,7 @@ do
 		end
 	end
 
-	local HIGHLIGHT_SETTING_INPUTS = 10
+	local HIGHLIGHT_SETTING_INPUTS = 12
 	local HIGHLIGHT_INPUT_COUNT = HIGHLIGHT_SETTING_INPUTS + #HL_TYPES * 3
 	local highlightInputs = {}
 
@@ -644,9 +644,11 @@ do
 		highlightInputs[5] = settings.dispelRecolor and true or false
 		highlightInputs[6] = settings.dispelBlend and true or false
 		highlightInputs[7] = settings.dispelOpacity
-		highlightInputs[8] = unitSettings.debuffHighlightBorder and true or false
-		highlightInputs[9] = unitSettings.debuffHighlightBar and true or false
-		highlightInputs[10] = classFilter and select(2, GetSelfCleanseTypes()) or ''
+		highlightInputs[8] = unitSettings.debuffHighlightBar and true or false
+		highlightInputs[9] = unitSettings.debuffHighlightStyle
+		highlightInputs[10] = settings.dispelFadeMiddle
+		highlightInputs[11] = settings.dispelFadeFar
+		highlightInputs[12] = classFilter and select(2, GetSelfCleanseTypes()) or ''
 		for typeIndex = 1, #HL_TYPES do
 			local slot = HIGHLIGHT_SETTING_INPUTS + (typeIndex - 1) * 3
 			highlightInputs[slot + 1], highlightInputs[slot + 2], highlightInputs[slot + 3] = UnitFrames.DispelTypeColor(HL_TYPES[typeIndex])
@@ -696,10 +698,9 @@ do
 	end
 
 	local WHITE8X8 = [[Interface\Buttons\WHITE8X8]]
+	local FADE_TEXTURE = BUI.C.FADE_TEXTURE
 	local frameKits = setmetatable({}, { __mode = 'k' })
 	local framePending = {}
-
-	local TINT_STRIP_PIXELS = 3
 
 	local function OverlappingAbsorb(frame)
 		local settings = UnitFrames.GetSettings()
@@ -707,28 +708,54 @@ do
 		if frame.HealAbsorb and settings.healAbsorbEnabled ~= false and settings.healAbsorbDirection == 'left' then return frame.HealAbsorb end
 	end
 
-	local function AnchorDispelFill(fill, frame)
+	local function PrepFillTexture(texture, asset, blend, alpha)
+		texture:ClearAllPoints()
+		texture:SetTexture(asset)
+		texture:SetBlendMode(blend)
+		texture:SetAlpha(alpha)
+	end
+
+	function UnitFrames.StyleDispelFill(fill, fade, style, healthTexture, rightEdge, rightSide, alpha)
+		local settings = UnitFrames.GetSettings()
+		local blend = settings.dispelBlend and 'ADD' or 'BLEND'
+		local half = style == 'top' or style == 'bottom'
+		PrepFillTexture(fill, half and FADE_TEXTURE or WHITE8X8, blend, alpha)
+		PrepFillTexture(fade, FADE_TEXTURE, blend, alpha)
+		if not half then
+			fill:SetTexCoord(0, 1, 0, 1)
+			fill:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
+			fill:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
+			fade:SetTexCoord(0, 1, 1, 1)
+			fade:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
+			fade:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
+			return
+		end
+		local middle = settings.dispelFadeMiddle / 100
+		local far = math.min(settings.dispelFadeFar / 100, middle)
+		if style == 'bottom' then
+			fill:SetPoint('TOPLEFT', healthTexture, 'LEFT')
+			fill:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
+			fill:SetTexCoord(0, 1, 1 - middle, 0)
+			fade:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
+			fade:SetPoint('BOTTOMRIGHT', rightEdge, rightSide)
+			fade:SetTexCoord(0, 1, 1 - far, 1 - middle)
+		else
+			fill:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
+			fill:SetPoint('BOTTOMRIGHT', rightEdge, rightSide)
+			fill:SetTexCoord(0, 1, 0, 1 - middle)
+			fade:SetPoint('TOPLEFT', healthTexture, 'LEFT')
+			fade:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
+			fade:SetTexCoord(0, 1, 1 - middle, 1 - far)
+		end
+	end
+
+	local function AnchorDispelFill(kit, frame, alpha)
 		local healthTexture = frame.Health:GetStatusBarTexture()
 		local style = UnitFrames.GetUnitSettings('player').debuffHighlightStyle
 		local absorb = OverlappingAbsorb(frame)
 		local rightEdge, rightSide = healthTexture, 'RIGHT'
 		if absorb then rightEdge, rightSide = absorb:GetStatusBarTexture(), 'LEFT' end
-		fill:ClearAllPoints()
-		fill:SetTexture((style == 'top' or style == 'bottom') and BUI.C.FADE_TEXTURE or WHITE8X8)
-		fill:SetTexCoord(0, 1, style == 'bottom' and 1 or 0, style == 'bottom' and 0 or 1)
-		if style == 'top' then
-			fill:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
-			fill:SetPoint('BOTTOMRIGHT', rightEdge, rightSide)
-		elseif style == 'bottom' then
-			fill:SetPoint('TOPLEFT', healthTexture, 'LEFT')
-			fill:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
-		elseif style == 'strip' then
-			fill:SetPoint('TOPLEFT', healthTexture, 'BOTTOMLEFT', 0, Pixel.Scale(TINT_STRIP_PIXELS))
-			fill:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
-		else
-			fill:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
-			fill:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
-		end
+		UnitFrames.StyleDispelFill(kit.fill, kit.fade, style, healthTexture, rightEdge, rightSide, alpha)
 	end
 
 	local function AnchorFrameEdges(edges, to)
@@ -747,28 +774,16 @@ do
 		edges[4]:SetPoint('BOTTOMLEFT', to, 'BOTTOMRIGHT', -thickness, thickness)
 	end
 
-	local function PaintDispelVisual(frame, edges, fill, typeName, forceOn)
-		AnchorDispelFill(fill, frame)
-		local unitSettings = UnitFrames.GetUnitSettings('player')
-		local settings = UnitFrames.GetSettings()
-		local blend = settings.dispelBlend
-		local fillAlpha = settings.dispelOpacity / 100
+	local function PaintDispelVisual(frame, kit, typeName, forceOn)
+		local wantFill = forceOn or UnitFrames.GetUnitSettings('player').debuffHighlightBar
+		AnchorDispelFill(kit, frame, wantFill and UnitFrames.GetSettings().dispelOpacity / 100 or 0)
 		local red, green, blue = UnitFrames.DispelTypeColor(typeName)
-		AnchorFrameEdges(edges, frame)
-		local wantBorder = forceOn or unitSettings.debuffHighlightBorder
-		local wantFill = forceOn or unitSettings.debuffHighlightBar
-		local edgeAlpha = wantBorder and (blend and 0.6 or 1) or 0
-		for edgeIndex = 1, 4 do
-			edges[edgeIndex]:SetVertexColor(red, green, blue)
-			edges[edgeIndex]:SetAlpha(edgeAlpha)
-		end
-		fill:SetVertexColor(red, green, blue)
-		fill:SetBlendMode(blend and 'ADD' or 'BLEND')
-		fill:SetAlpha(wantFill and fillAlpha or 0)
+		kit.fill:SetVertexColor(red, green, blue)
+		kit.fade:SetVertexColor(red, green, blue)
 	end
 
 	local function StyleFrameKit(frame, kit)
-		PaintDispelVisual(frame, kit.edges, kit.fill, kit.typeName, false)
+		PaintDispelVisual(frame, kit, kit.typeName, false)
 	end
 
 	local function RestyleFrameKits(frame)
@@ -791,16 +806,11 @@ do
 
 	local function FrameInitializer(frame, typeName, priority)
 		return function(button)
-			local kit = { typeName = typeName, edges = {} }
-			for edgeIndex = 1, 4 do
-				local edge = button:CreateTexture(nil, 'OVERLAY', nil, priority)
-				edge:SetTexture(WHITE8X8)
-				kit.edges[edgeIndex] = edge
-			end
-			local fill = button:CreateTexture(nil, 'ARTWORK', nil, priority)
-			fill:SetTexture(WHITE8X8)
-			AnchorDispelFill(fill, frame)
-			kit.fill = fill
+			local kit = {
+				typeName = typeName,
+				fill = button:CreateTexture(nil, 'ARTWORK', nil, priority),
+				fade = button:CreateTexture(nil, 'ARTWORK', nil, priority),
+			}
 			local kits = frameKits[frame]
 			if not kits then kits = {}; frameKits[frame] = kits end
 			kits[#kits + 1] = kit
@@ -891,15 +901,9 @@ do
 		host:SetFrameLevel(frame.Health:GetFrameLevel() + 4)
 		host:EnableMouse(false)
 		host:Hide()
-		local kit = { frame = frame, host = host, edges = {} }
-		for edgeIndex = 1, 4 do
-			local edge = host:CreateTexture(nil, 'OVERLAY', nil, 6)
-			edge:SetTexture(WHITE8X8)
-			kit.edges[edgeIndex] = edge
-		end
+		local kit = { frame = frame, host = host }
 		kit.fill = host:CreateTexture(nil, 'ARTWORK', nil, 6)
-		kit.fill:SetTexture(WHITE8X8)
-		AnchorDispelFill(kit.fill, frame)
+		kit.fade = host:CreateTexture(nil, 'ARTWORK', nil, 6)
 		previewKit = kit
 		return kit
 	end
@@ -931,7 +935,7 @@ do
 
 		local kit = EnsurePreviewKit()
 		if kit then
-			PaintDispelVisual(kit.frame, kit.edges, kit.fill, HL_TYPES[active], true)
+			PaintDispelVisual(kit.frame, kit, HL_TYPES[active], true)
 			kit.host:Show()
 		end
 
@@ -1224,7 +1228,7 @@ do
 
 		if UnitFrames.DispelViaEngine then
 			local badgeWanted = unitSettings.debuffHighlightBadge ~= false
-			local frameColorsWanted = (unitSettings.debuffHighlightBorder or unitSettings.debuffHighlightBar) and true or false
+			local frameColorsWanted = unitSettings.debuffHighlightBar and true or false
 			if badgeWanted or frameColorsWanted then GatherHighlightInputs(unitSettings) end
 			ConfigureTypeRow(badgeWanted)
 			ConfigureCallouts(unitSettings.debuffHighlightTypeText and true or false)
