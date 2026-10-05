@@ -165,7 +165,7 @@ BUI.PageEngine.RegisterPage('bloodlust', {
 			placeholder = 'Search Bloodlust settings...',
 			back = { label = 'alerts', onClick = function() BUI.PageEngine.NavigateToID('auras') end },
 			tools = {
-				{ icon = 'enable', hint = false, tooltip = 'Turn Bloodlust tracking on or off', get = function() return Config().enabled == true end, set = function(value)
+				{ icon = 'enable', tooltip = 'Turn Bloodlust tracking on or off', get = function() return Config().enabled == true end, set = function(value)
 					Config().enabled = value
 					Refresh()
 				end },

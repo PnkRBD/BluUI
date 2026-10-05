@@ -42,6 +42,7 @@ local STEP_SIGN = 12
 local TOGGLE_SIZE = 22
 local TOGGLE_GAP = 14
 local TOGGLE_INSET = 20
+local ENABLE_GAP = 12
 local BUTTON_STYLES = {
 	primary = { fill = 'accent', text = 'onAccent', solid = true },
 	control = { fill = 'control', text = 'controlText', solid = true },
@@ -563,17 +564,24 @@ function Layout.TableKit(window)
 			local anchor, gap = search, TOGGLE_INSET
 			for index = #tools, 1, -1 do
 				local spec = tools[index]
-				local tool = kit.Tool(parent, spec)
-				if spec.icon == 'enable' and spec.get and spec.hint ~= false then
-					local hint = BUILib.PageKit.HintArrow(tool, 'Enable')
-					window:Bind(hint, function() hint:SetShown(not spec.get()) end)
+				local tool, leftmost
+				if spec.icon == 'enable' then
+					tool = kit.Switch(parent, spec.get, function(value)
+						spec.set(value)
+						window:Repaint()
+					end)
+					leftmost = kit.Text(parent, 'Enabled', 13, 'text')
+					leftmost:SetPoint('RIGHT', tool, 'LEFT', -ENABLE_GAP, 0)
+				else
+					tool = kit.Tool(parent, spec)
+					leftmost = tool
 				end
 				if anchor then
 					tool:SetPoint('RIGHT', anchor, 'LEFT', -gap, 0)
 				else
 					tool:SetPoint('RIGHT', parent, 'TOPRIGHT', 0, -SEARCH_HEIGHT / 2)
 				end
-				anchor, gap = tool, TOGGLE_GAP
+				anchor, gap = leftmost, TOGGLE_GAP
 			end
 		end
 		return SEARCH_HEIGHT
