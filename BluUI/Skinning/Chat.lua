@@ -498,10 +498,7 @@ local function CreateScrollBar(parent, label, model)
 
 	thumb:SetScript('OnEnter', BUI.Profiler.Script(label .. ' thumb OnEnter', function() ThumbColor(true) end))
 	thumb:SetScript('OnLeave', BUI.Profiler.Script(label .. ' thumb OnLeave', function() if not thumb._drag then ThumbColor(false) end end))
-	thumb:SetScript('OnDragStart', BUI.Profiler.Script(label .. ' thumb OnDragStart', function(self) self._drag = true; ThumbColor(true) end))
-	thumb:SetScript('OnDragStop', BUI.Profiler.Script(label .. ' thumb OnDragStop', function(self) self._drag = false; ThumbColor(false); Update() end))
-	thumb:SetScript('OnUpdate', Wrap(label, function(self)
-		if not self._drag then return end
+	local Drag = Wrap(label, function(self)
 		local trackHeight, thumbHeight = bar:GetHeight(), self:GetHeight()
 		local usable = trackHeight - thumbHeight
 		if usable <= 0 then return end
@@ -509,6 +506,17 @@ local function CreateScrollBar(parent, label, model)
 		local fraction = Clamp01((bar:GetTop() - cursorY / bar:GetEffectiveScale() - thumbHeight / 2) / usable)
 		model.Seek(fraction)
 		PlaceThumb(fraction, usable)
+	end)
+	thumb:SetScript('OnDragStart', BUI.Profiler.Script(label .. ' thumb OnDragStart', function(self)
+		self._drag = true
+		ThumbColor(true)
+		self:SetScript('OnUpdate', Drag)
+	end))
+	thumb:SetScript('OnDragStop', BUI.Profiler.Script(label .. ' thumb OnDragStop', function(self)
+		self._drag = false
+		self:SetScript('OnUpdate', nil)
+		ThumbColor(false)
+		Update()
 	end))
 	return bar
 end
@@ -753,7 +761,8 @@ local function DesiredTabAlpha(tab)
 end
 
 local function ApplyTabAlpha(tab)
-	tab:SetAlpha(DesiredTabAlpha(tab), true)
+	local alpha = DesiredTabAlpha(tab)
+	if tab:GetAlpha() ~= alpha then tab:SetAlpha(alpha, true) end
 end
 
 local function CollapseChatTab(tab, collapsed)
@@ -865,9 +874,13 @@ local function AlignDockTabs(dock)
 				tab:SetPoint(point, relativeTo, relativePoint, x, 0)
 			end
 			if tab._buiCollapsed then
-				tab:SetWidth(1)
+				if tab:GetWidth() ~= 1 then tab:SetWidth(1) end
 			else
-				tab._buiText:SetWidth(max(1, tab:GetWidth() - TAB_TEXT_PAD * 2))
+				local width = max(1, tab:GetWidth() - TAB_TEXT_PAD * 2)
+				if tab._buiTextWidth ~= width then
+					tab._buiTextWidth = width
+					tab._buiText:SetWidth(width)
+				end
 			end
 		end
 	end
