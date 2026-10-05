@@ -23,6 +23,8 @@ local LIST_INSET_PAD = 5
 local LIST_LEFT = 7
 local LIST_EDGE = 1
 local ROSTER_SCROLL_GAP = 26
+local ROSTER_TITLE_X = 2
+local ROSTER_TITLE_GAP = 6
 local TAB_ROW_OFFSET = 2
 local CATEGORY_BUTTON_COUNT = 7
 local CATEGORY_BUTTON_HEIGHT = 20
@@ -341,9 +343,15 @@ local function AlignChannelFrame(frame)
 	Shell(frame.ChannelList, -LIST_EDGE)
 	Shell(frame.ChannelRoster, -LIST_EDGE)
 	frame.NewButton:ClearAllPoints()
-	frame.NewButton:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', PANEL_INSET, PANEL_INSET)
+	frame.NewButton:SetPoint('BOTTOM', frame, 'BOTTOM', 0, PANEL_INSET)
+	frame.NewButton:SetPoint('LEFT', frame.ChannelList, 'LEFT', -LIST_EDGE, 0)
 	frame.SettingsButton:ClearAllPoints()
-	frame.SettingsButton:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -PANEL_INSET, PANEL_INSET)
+	frame.SettingsButton:SetPoint('BOTTOM', frame, 'BOTTOM', 0, PANEL_INSET)
+	frame.SettingsButton:SetPoint('RIGHT', frame.ChannelRoster, 'RIGHT', LIST_EDGE, 0)
+	local roster = frame.ChannelRoster
+	roster.ChannelName:ClearAllPoints()
+	roster.ChannelName:SetPoint('BOTTOMLEFT', roster, 'TOPLEFT', ROSTER_TITLE_X, ROSTER_TITLE_GAP)
+	roster.ChannelName:SetPoint('BOTTOMRIGHT', roster, 'TOPRIGHT', 0, ROSTER_TITLE_GAP)
 end
 
 local function StyleTab(tab, selected)
