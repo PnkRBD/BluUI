@@ -271,7 +271,6 @@ Modules\BuffTracking\PackLeader.lua
 Modules\BuffTracking\PetAlert.lua
 Modules\BuffTracking\SmartMisdirect.lua
 Modules\BuffTracking\KillCommandOverlay.lua
-Modules\BuffTracking\BestialWrathOverlay.lua
 
 Modules\Bloodlust\Bloodlust.lua
 

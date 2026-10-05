@@ -464,6 +464,5 @@ BUI.PageEngine.RegisterPage('auras', {
 		if not BUI.GetDB().gcdHistory.locked then BUI.GCDHistory.SetLocked(true) end
 		local overlays = BUI.BuffTracking
 		if overlays.KillCommandOverlay.IsPreviewing() then overlays.KillCommandOverlay.StopPreview() end
-		if overlays.BestialWrathOverlay.IsPreviewing() then overlays.BestialWrathOverlay.StopPreview() end
 	end,
 })

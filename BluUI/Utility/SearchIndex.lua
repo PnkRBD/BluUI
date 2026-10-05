@@ -233,7 +233,6 @@ local entries = {
 	{ label = "Add a spell", page = "cooldownFlash", tab = 1, panel = "Spells", keywords = "cooldown flash spell add remove reorder per spec size color glow text sound tts opacity position" },
 	{ label = "Pack Leader", page = "auras", tab = 3, panel = "Class", keywords = "pack leader beast cycle wyvern bear boar hunter" },
 	{ label = "Kill Command overlay", page = "auras", tab = 3, panel = "Class", keywords = "kill command overlay timer beast name" },
-	{ label = "Bestial Wrath callout", page = "auras", tab = 3, panel = "Class", keywords = "bestial wrath hold send thrash callout tts" },
 	{ label = "Tip of the Spear", page = "auras", tab = 3, panel = "Class", keywords = "tip spear stacks bars survival width height spacing border filled empty color" },
 	{ label = "Smart Misdirection", page = "auras", tab = 3, panel = "Class", keywords = "misdirect smart tank focus pet macro" },
 	{ label = "Misdirect alert", page = "auras", tab = 3, panel = "Class", keywords = "misdirection target text alert" },
