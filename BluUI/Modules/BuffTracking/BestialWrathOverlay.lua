@@ -33,7 +33,7 @@ local ICON_LABELS = { holdThrash = 'HOLD', thrashFirst = 'GO', thrashNow = 'GO' 
 local CUE_SPEECH = {
     hold        = 'Hold',
     send        = 'Send',
-    thrashFirst = 'Thrash',
+    thrashFirst = 'Thrash first',
     thrash      = 'Thrash',
     holdThrash  = 'Hold thrash',
 }
@@ -212,9 +212,16 @@ local function SetHoldLabel(callout, wtRemaining)
     callout.holdText:SetText(label)
 end
 
+local function SetSendLabel(callout, label)
+    if callout.sendLabel == label then return end
+    callout.sendLabel = label
+    callout.sendText:SetText(label)
+end
+
 local function RenderWrathCues(callout)
     SetLayerShown(callout.readyLayer, true)
     SetHoldLabel(callout, live.wtRemaining)
+    SetSendLabel(callout, live.cleaveRemaining > 0 and 'SEND BW' or 'THRASH FIRST')
     SetLayerAlpha(callout.readyLayer, Evaluate(bwDuration, READY_SOON_CURVE, 1))
     SetLayerAlpha(callout.sendLayer, Evaluate(wtDuration, READY_SOON_CURVE, 1))
     SetLayerAlpha(callout.holdLayer, Evaluate(wtDuration, NOT_READY_CURVE, 0))
@@ -320,7 +327,10 @@ local function LiveCue(now)
     local wtRemaining = live.wtRemaining or (lastThrashAt + WILD_THRASH_COOLDOWN - now)
     local thrashReady = wtRemaining < READY_WINDOW
     if live.inWrath then return (thrashReady and live.thrashNow) and 'thrash' or 'idle' end
-    if bwRemaining < READY_WINDOW then return thrashReady and 'send' or 'hold' end
+    if bwRemaining < READY_WINDOW then
+        if not thrashReady then return 'hold' end
+        return live.cleaveRemaining > 0 and 'send' or 'thrashFirst'
+    end
     local wasted = bwRemaining >= THRASH_LEAD_SECONDS and bwRemaining < THRASH_LEAD_SECONDS + WILD_THRASH_COOLDOWN
     if live.showHoldThrash and live.thrashSoon and (bwRemaining < live.cleaveRemaining or wasted) then return 'holdThrash' end
     if thrashReady and live.cleaveRemaining <= 0 and bwRemaining < THRASH_LEAD_SECONDS then return 'thrashFirst' end
@@ -346,6 +356,7 @@ local function RenderPreview(callout, phase, withThrash)
     SetLayerShown(callout.readyLayer, wrathPhase)
     if wrathPhase then
         SetHoldLabel(callout, phase == 'hold' and 3 or nil)
+        SetSendLabel(callout, 'SEND BW')
         SetLayerAlpha(callout.readyLayer, 1)
         SetLayerAlpha(callout.sendLayer, phase == 'send' and 1 or 0)
         SetLayerAlpha(callout.holdLayer, phase == 'hold' and 1 or 0)
