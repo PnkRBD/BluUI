@@ -39,6 +39,8 @@ local DANGER_VALUE_SIZE = 30
 local DANGER_NOTE_Y = 84
 local DANGER_BUTTON_Y = 16
 local DANGER_HEAD_GAP = 16
+local ACCOUNT_MACRO_SLOTS = 120
+local CHARACTER_MACRO_SLOTS = 18
 
 local BOARDS = {
 	combat = { title = 'Combat', description = 'The numbers that float up over your target, casting feel, the keystone slot and how early the next spell queues.', headers = { 'Target Combat Text', 'Casting' } },
@@ -496,7 +498,7 @@ end
 local function DeleteCharacterMacros()
 	Confirm('Delete Character Macros', 'This will delete ALL character-specific macros on this toon. This cannot be undone.', 'Delete', function()
 		local _, characterMacroCount = GetNumMacros()
-		for macroIndex = MAX_ACCOUNT_MACROS + characterMacroCount, MAX_ACCOUNT_MACROS + 1, -1 do
+		for macroIndex = ACCOUNT_MACRO_SLOTS + characterMacroCount, ACCOUNT_MACRO_SLOTS + 1, -1 do
 			DeleteMacro(macroIndex)
 		end
 		BUI.Print(('Deleted %d character macro(s).'):format(characterMacroCount))
@@ -662,7 +664,7 @@ local DANGER_CARDS = {
 		events = { 'UPDATE_MACROS' },
 		read = function()
 			local _, count = GetNumMacros()
-			return count, 'of ' .. MAX_CHARACTER_MACROS .. ' slots on this character'
+			return count, 'of ' .. CHARACTER_MACRO_SLOTS .. ' slots on this character'
 		end,
 		buttons = { { text = 'Delete character macros', onClick = DeleteCharacterMacros } },
 	},
@@ -671,7 +673,7 @@ local DANGER_CARDS = {
 		events = { 'UPDATE_MACROS' },
 		read = function()
 			local count = GetNumMacros()
-			return count, 'of ' .. MAX_ACCOUNT_MACROS .. ' account wide slots'
+			return count, 'of ' .. ACCOUNT_MACRO_SLOTS .. ' account wide slots'
 		end,
 		buttons = { { text = 'Delete general macros', onClick = DeleteGeneralMacros } },
 	},
