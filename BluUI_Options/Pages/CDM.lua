@@ -1016,8 +1016,9 @@ local function ViewerBoards(ui, parent, width, viewer)
 		Synced('Row 1 count', 'iconsPerRow', { min = 0, max = 20, step = 1 }, true),
 		Synced('Row 2 count', 'row2Count', { min = 0, max = 20, step = 1 }, true),
 	}
+	if canSync then rows[#rows + 1] = Synced('Row 3 count', 'row3Count', { min = 0, max = 20, step = 1 }, true) end
+	rows[#rows + 1] = SyncedToggle('Hide icons past the last row', 'capRows', true)
 	if canSync then
-		rows[#rows + 1] = Synced('Row 3 count', 'row3Count', { min = 0, max = 20, step = 1 }, true)
 		rows[#rows + 1] = { label = 'Center the last row', get = function() return viewerSettings.centerLastRow == true end, set = function(value)
 			viewerSettings.centerLastRow = value
 			module.RefreshLayoutOnly()

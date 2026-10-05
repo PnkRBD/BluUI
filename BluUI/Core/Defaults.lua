@@ -104,6 +104,7 @@ local CdmViewerBase = {
 	row3Count             = 0,
 	rowGrowth             = 'Down',
 	centerLastRow         = true,
+	capRows               = false,
 	vertical              = false,
 	borderSize            = 1,
 	borderColor           = { 0, 0, 0, 1 },
