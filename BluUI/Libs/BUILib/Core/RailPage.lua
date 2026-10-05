@@ -9,6 +9,8 @@ local RAIL_SCROLL = 16
 local SCROLL_PAD = 4
 local BLOCK_GAP = 8
 local BOTTOM_GAP = 24
+local DISABLED_ALPHA = 0.35
+local BLOCKER_LEVEL = 20
 
 function Layout.RailPage(tab, shell, spec)
 	local window = shell.window
@@ -121,6 +123,16 @@ function Layout.RailPage(tab, shell, spec)
 
 	tab.frame:GetParent().railPage = page
 	page:Select(spec.rail.selected or rail.entries[1].item.id)
+	if spec.disabled then
+		railScroll:SetAlpha(DISABLED_ALPHA)
+		block:SetAlpha(DISABLED_ALPHA)
+		local blocker = CreateFrame('Frame', nil, head)
+		blocker:SetPoint('TOPLEFT', head, 'TOPLEFT', -SCROLL_PAD, -(contentTop - SCROLL_PAD))
+		blocker:SetPoint('BOTTOMRIGHT', tab.frame, 'BOTTOMRIGHT')
+		blocker:SetFrameLevel(railScroll:GetFrameLevel() + BLOCKER_LEVEL)
+		blocker:EnableMouse(true)
+		blocker:EnableMouseWheel(true)
+	end
 	Layout.Add(tab, block, BLOCK_GAP)
 	Align()
 	tab:Refresh()

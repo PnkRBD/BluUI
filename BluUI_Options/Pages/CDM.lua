@@ -1386,17 +1386,9 @@ BUI.PageEngine.RegisterPage('cdm', {
 				end },
 			},
 			preview = enabled and { height = PREVIEW_HEIGHT, build = function(band, kit) preview = BuildPreview(band, kit) end } or nil,
-			rail = { groups = enabled and RAIL_GROUPS or { { title = 'Settings', items = { { id = 'off', label = 'Module off' } } } }, selected = enabled and selected or 'off' },
-			build = function(ui, shell, parent, width, item, handle)
-				if item.id == 'off' then
-					local board = ui.Board(parent, width, { stacked = true, title = 'The cooldown manager is off', description = 'The Blizzard cooldown viewer runs untouched while this is off.' })
-					board:AddSwitch('Cooldown manager module', function() return BUI.IsModuleEnabled('cdm') end, function(value)
-						BUI.ModulesPage.ConfirmReload('cdm', value, Repaint)
-					end, 'Turning it on needs a reload')
-					return { board }
-				end
-				return Panes(ui, shell, parent, width, item, handle)
-			end,
+			rail = { groups = RAIL_GROUPS, selected = selected },
+			disabled = not enabled,
+			build = Panes,
 		})
 		if not enabled then
 			page:AutoRefresh()

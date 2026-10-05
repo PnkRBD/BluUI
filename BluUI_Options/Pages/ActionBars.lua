@@ -695,15 +695,9 @@ BUI.PageEngine.RegisterPage('actionbars', {
 				end },
 			},
 			preview = enabled and { height = PREVIEW_HEIGHT, build = function(band, kit) preview = BuildPreview(band, kit) end } or nil,
-			rail = { groups = enabled and RailGroups() or { { title = 'Settings', items = { { id = 'off', label = 'Module off' } } } }, selected = enabled and selected or 'off' },
-			build = function(ui, shell, parent, width, item)
-				if item.id == 'off' then
-					local board = ui.Board(parent, width, { stacked = true, title = 'Action bars are off', description = 'BluUI leaves the Blizzard bars alone while this is off.' })
-					board:AddSwitch('Action bars module', function() return BUI.IsModuleEnabled('actionBars') end, ConfirmModule, 'Turning it on needs a reload')
-					return { board }
-				end
-				return Panes(ui, shell, parent, width, item)
-			end,
+			rail = { groups = RailGroups(), selected = selected },
+			disabled = not enabled,
+			build = Panes,
 		})
 		if not enabled then
 			page:AutoRefresh()

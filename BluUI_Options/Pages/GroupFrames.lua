@@ -135,10 +135,6 @@ local function Config()
 	return BUI.GetDB().groupFrames
 end
 
-local function RebuildPage()
-	BUILib.Defer(function() BUI.PageEngine.RefreshCurrentPage() end)
-end
-
 local function Option(db, label, key, extra)
 	local option = { label = label, get = function() return db[key] end, set = function(value) db[key] = value end }
 	for name, value in pairs(extra or {}) do option[name] = value end
@@ -147,10 +143,6 @@ end
 
 local function Toggle(db, label, key)
 	return { label = label, get = function() return db[key] == true end, set = function(value) db[key] = value end }
-end
-
-local function OnUnlessOff(db, label, key)
-	return { label = label, get = function() return db[key] ~= false end, set = function(value) db[key] = value end }
 end
 
 local function Color(db, label, key)
@@ -628,7 +620,7 @@ BUI.PageEngine.RegisterPage('groupframes', {
 			placeholder = 'Search group frame settings...',
 			tools = {
 				{ icon = 'enable', tooltip = 'Turn the group frames on or off', get = function() return enabled and Config().enabled == true end, set = function(value)
-					if not enabled then return Repaint() end
+					if not enabled then return BUI.ModulesPage.ConfirmReload('groupFrames', value, Repaint) end
 					Config().enabled = value
 					GroupFrames().SetEnabledLive(value)
 					if value then return end
@@ -641,17 +633,9 @@ BUI.PageEngine.RegisterPage('groupframes', {
 					})
 				end },
 			},
-			rail = { groups = enabled and RAIL_GROUPS or { { title = 'Settings', items = { { id = 'off', label = 'Module off' } } } }, selected = enabled and selected or 'off' },
-			build = function(ui, shell, parent, width, item, handle)
-				if item.id == 'off' then
-					local board = ui.Board(parent, width, { stacked = true, title = 'Group frames are off', description = 'The Blizzard party and raid frames stay while this is off.' })
-					board:AddSwitch('Group frames module', function() return BUI.IsModuleEnabled('groupFrames') end, function(value)
-						BUI.ModulesPage.ConfirmReload('groupFrames', value, Repaint)
-					end, 'Turning it on needs a reload')
-					return { board }
-				end
-				return Panes(ui, shell, parent, width, item, handle)
-			end,
+			rail = { groups = RAIL_GROUPS, selected = selected },
+			disabled = not enabled,
+			build = Panes,
 		})
 		if not enabled then
 			page:AutoRefresh()
