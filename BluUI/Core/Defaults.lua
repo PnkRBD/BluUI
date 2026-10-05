@@ -645,6 +645,7 @@ BUI.Defaults = {
 
 		dashboard = {
 			cardVisibility = {},
+			vaultOpen      = 'dungeons',
 		},
 
 		cursor = {

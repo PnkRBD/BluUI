@@ -2,6 +2,7 @@ local _, BUI = ...
 
 local BUILib = BUI.BUILibClient
 local Layout, Widget = BUILib.Layout, BUILib.Widget
+local Pixel = BUI.Pixel
 
 local PAGE_WIDTH = 960
 local LEFT_WIDTH = 580
@@ -26,14 +27,42 @@ local VALUE_GAP = 10
 local DIVIDER_INSET = 14
 local STATUS_MARK = 12
 local MARK_GAP = 6
-local VAULT_LABEL = 80
+local VAULT_LABEL = 96
+local VAULT_LABEL_X = 10
+local VAULT_ICON = 14
 local VAULT_TILE = 46
+local VAULT_BIG = 100
 local VAULT_TILE_GAP = 8
-local VAULT_ROW_GAP = 6
+local VAULT_ROW_GAP = 8
 local VAULT_VALUE_Y = 8
-local RAID_BOSS_ROW = 21
-local RAID_BOSS_ROWS = 10
-local RAID_CELL = 46
+local VAULT_SLOT_PAD = 10
+local VAULT_SLOT_ICON = 40
+local VAULT_VALUE_SIZE = 26
+local VAULT_VALUE_BOX = 20
+local VAULT_KICKER_SIZE = 10
+local VAULT_TEXT_GAP = 0
+local VAULT_TEXT_TOP = 10
+local VAULT_FOOT = 24
+local VAULT_SHADE_TOP, VAULT_SHADE_BOTTOM = 0.12, 0.9
+local VAULT_PILL_HEIGHT = 18
+local VAULT_PILL_RADIUS = 6
+local VAULT_PILL_PAD = 8
+local VAULT_PILL_GAP = 6
+local VAULT_PILL_FILL = 0.7
+local VAULT_CHIP = 164
+local VAULT_FOLD = 0.18
+local CHEVRON = 10
+local LINK_HEIGHT = 20
+local LINK_GAP = 6
+local RAID_ROW = 54
+local RAID_ROW_GAP = 8
+local RAID_BAR = 3
+local RAID_INSET = 10
+local RAID_TEXT_X = 16
+local RAID_DOT = 14
+local RAID_DOT_MARK = 8
+local RAID_DOT_GAP = 4
+local RAID_MAX_DOTS = 14
 local TWO_UPGRADES, THREE_UPGRADES = 0.8, 0.6
 local KEY_ROW = 26
 local KEY_ROWS = 8
@@ -52,6 +81,7 @@ local SNAPSHOT_DELAY = 2
 local CURRENCY_RESCAN = 30
 local KEYSTONE_ITEM = 180653
 local WHITE = { 1, 1, 1, 1 }
+local POINT_RIGHT = { 1, 0, 0, 0, 1, 1, 0, 1 }
 local ICON_CROP = { 0.08, 0.92, 0.08, 0.92 }
 
 local KEY_COLUMNS = { key = 0.47, time = 0.66, under = 0.82 }
@@ -77,9 +107,9 @@ local CARDS = {
 local VaultType = Enum.WeeklyRewardChestThresholdType
 local RAID_DIFFICULTY_NAMES = { [17] = 'LFR', [14] = 'Normal', [15] = 'Heroic', [16] = 'Mythic' }
 local VAULT_ROWS = {
-    { type = VaultType.Raid, label = 'Raids' },
-    { type = VaultType.Activities, label = 'Dungeons' },
-    { type = VaultType.World, label = 'World' },
+    { key = 'raid', type = VaultType.Raid, label = 'Raid', icon = 'markers', atlas = 'evergreen-weeklyrewards-category-raids', slot = 'raid', one = 'boss', many = 'bosses' },
+    { key = 'dungeons', type = VaultType.Activities, label = 'Dungeons', icon = 'dashboard', atlas = 'evergreen-weeklyrewards-category-dungeons', slot = 'dungeon', one = 'run', many = 'runs' },
+    { key = 'world', type = VaultType.World, label = 'World', icon = 'location', atlas = 'evergreen-weeklyrewards-category-world', slot = 'world', one = 'activity', many = 'activities' },
 }
 
 local sessionStart
@@ -158,6 +188,29 @@ local function VaultSlotLabel(activity)
     if activity.type == VaultType.Raid then return RAID_DIFFICULTY_NAMES[activity.level] or GetDifficultyInfo(activity.level) end
     if activity.type == VaultType.Activities then return '+' .. activity.level end
     return 'Tier ' .. activity.level
+end
+
+local function Plural(count, one, many)
+    return count .. ' ' .. (count == 1 and one or many)
+end
+
+local function NextLocked(activities)
+    for _, activity in ipairs(activities) do
+        if not Unlocked(activity) then return activity end
+    end
+end
+
+local function WeeklyRunsByLevel()
+    local runs = C_MythicPlus.GetRunHistory(false, true)
+    table.sort(runs, function(left, right) return left.level > right.level end)
+    return runs
+end
+
+local function SlotIcon(spec, activity, runs)
+    if spec.type ~= VaultType.Activities or not Unlocked(activity) then return nil end
+    local run = runs[activity.threshold]
+    if not run then return nil end
+    return (select(4, C_ChallengeMode.GetMapUIInfo(run.mapChallengeModeID)))
 end
 
 local function WeeklyMplusCount()
@@ -626,6 +679,25 @@ local function Tint(region, red, green, blue)
     window:Paint(region, function(target) target:SetTextColor(red, green, blue) end)
 end
 
+local function Tinted(role, alpha)
+    return function(region)
+        local red, green, blue = window:Color(role)
+        region:SetVertexColor(red, green, blue, alpha)
+    end
+end
+
+local PillFill = Tinted('card', VAULT_PILL_FILL)
+
+local function PaintFoot(foot)
+    local tile = foot.tile
+    foot:SetTextColor(window:Color(tile.footLabel and 'muted' or 'faint'))
+    if tile.footLabel then
+        foot:SetText(('|cff%s%s|r  ·  %s'):format(BUI.Hex(window:Color('accent')), tile.footLabel, tile.footRest))
+    else
+        foot:SetText(tile.footRest or '')
+    end
+end
+
 local function Card(title)
     local card = CreateFrame('Frame', nil, block)
     local fill, edge = Widget.DrawCardShape(card, CARD_RADIUS, WHITE, WHITE, 'BACKGROUND', 0, 0)
@@ -661,7 +733,7 @@ local function Rule(parent)
 end
 
 local function Tip(owner, title, rows)
-    Widget.ShowTipRows(owner, title, rows, { anchor = 'RIGHT' })
+    Widget.ShowTipRows(owner, title, rows, { anchor = 'RIGHT', window = window })
 end
 
 local function Dash(region)
@@ -792,25 +864,164 @@ local function VaultTile(parent)
     tile.value:SetPoint('TOP', 0, -VAULT_VALUE_Y)
     tile.sub = kit.Text(tile, '', 10, 'muted')
     tile.sub:SetPoint('TOP', tile.value, 'BOTTOM', 0, -3)
+    tile.sub.tile = tile
+    window:Bind(tile.sub, PaintFoot)
     return tile
 end
 
-local function BuildVault()
+local function VaultSlot(parent, atlas)
+    local tile = Inset(parent)
+    local art = tile:CreateTexture(nil, 'BACKGROUND', nil, -2)
+    art:SetPoint('TOPLEFT', 2, -2)
+    art:SetPoint('BOTTOMRIGHT', -2, 2)
+    art:SetAtlas(atlas)
+    local shade, shadeEdge = Widget.DrawCardShape(tile, INSET_RADIUS, WHITE, WHITE, 'BACKGROUND', -1, 1)
+    shadeEdge:Hide()
+    window:Paint(shade, function(texture)
+        local red, green, blue = window:Color('card')
+        texture:SetGradient('VERTICAL', CreateColor(red, green, blue, VAULT_SHADE_BOTTOM), CreateColor(red, green, blue, VAULT_SHADE_TOP))
+    end)
+
+    local iconFrame = CreateFrame('Frame', nil, tile)
+    iconFrame:SetSize(VAULT_SLOT_ICON, VAULT_SLOT_ICON)
+    iconFrame:SetPoint('TOPLEFT', VAULT_SLOT_PAD, -VAULT_SLOT_PAD)
+    local edge = Pixel.PixelSize(1)
+    tile.icon = iconFrame:CreateTexture(nil, 'ARTWORK')
+    tile.icon:SetPoint('TOPLEFT', edge, -edge)
+    tile.icon:SetPoint('BOTTOMRIGHT', -edge, edge)
+    tile.icon:SetTexCoord(unpack(ICON_CROP))
+    Pixel.ApplyBorder(iconFrame, 1, 0, 0, 0, 1)
+    tile.iconFrame = iconFrame
+
+    local block = CreateFrame('Frame', nil, tile)
+    block:SetSize(1, VAULT_VALUE_BOX + VAULT_TEXT_GAP + VAULT_KICKER_SIZE)
+    tile.value = kit.Text(block, '', VAULT_VALUE_SIZE, 'text', nil, 'title')
+    tile.value:SetHeight(VAULT_VALUE_BOX)
+    tile.value:SetPoint('TOPLEFT')
+    tile.kicker = kit.Text(block, 'Item level', VAULT_KICKER_SIZE, 'muted', nil, 'hint')
+    tile.kicker:SetHeight(VAULT_KICKER_SIZE)
+    tile.kicker:SetPoint('TOPLEFT', tile.value, 'BOTTOMLEFT', 1, -VAULT_TEXT_GAP)
+    tile.block = block
+
+    local pill = CreateFrame('Frame', nil, tile)
+    pill:SetHeight(VAULT_PILL_HEIGHT)
+    pill:SetPoint('BOTTOMRIGHT', -VAULT_SLOT_PAD, VAULT_FOOT + VAULT_PILL_GAP)
+    local pillFill, pillEdge = Widget.DrawCardShape(pill, VAULT_PILL_RADIUS, WHITE, WHITE, 'BACKGROUND', 0, 0)
+    pillEdge:Hide()
+    window:Paint(pillFill, PillFill)
+    tile.mark = kit.Glyph(pill, 'check', STATUS_MARK, 'positive')
+    tile.mark:SetPoint('LEFT', VAULT_PILL_PAD, 0)
+    tile.state = kit.Text(pill, '', 11, 'positive')
+    tile.pill = pill
+
+    local rule = Rule(tile)
+    rule:SetPoint('BOTTOMLEFT', 1, VAULT_FOOT)
+    rule:SetPoint('BOTTOMRIGHT', -1, VAULT_FOOT)
+    tile.foot = kit.Text(tile, '', 12, 'muted')
+    tile.foot:SetPoint('CENTER', tile, 'BOTTOM', 0, VAULT_FOOT / 2)
+    tile.foot.tile = tile
+    window:Bind(tile.foot, PaintFoot)
+    return tile
+end
+
+local function VaultChip(parent)
+    local chip = Inset(parent)
+    chip.kicker = kit.Text(chip, '', 10, 'faint')
+    chip.kicker:SetPoint('TOPLEFT', VAULT_SLOT_PAD, -VAULT_VALUE_Y)
+    chip.text = kit.Text(chip, '', 12, 'text')
+    chip.text:SetPoint('TOPLEFT', chip.kicker, 'BOTTOMLEFT', 0, -2)
+    local chevron = kit.Glyph(chip, 'dropdown', CHEVRON, 'muted')
+    chevron:SetTexCoord(unpack(POINT_RIGHT))
+    chevron:SetPoint('RIGHT', -VAULT_SLOT_PAD, 0)
+    return chip
+end
+
+local function BuildVault(onChange)
     local vault = Card('Great Vault')
     vault.id = 'vault'
     local status = kit.Text(vault, '', 12, 'muted')
     status:SetPoint('RIGHT', vault, 'TOPRIGHT', -PAD, -TITLE_Y)
+    local statusKicker = kit.Text(vault, '', 10, 'faint')
+    statusKicker:SetPoint('RIGHT', status, 'LEFT', -VAULT_VALUE_Y, 0)
     local statusMark = kit.Glyph(vault, 'check', STATUS_MARK, 'positive')
-    statusMark:SetPoint('RIGHT', status, 'LEFT', -MARK_GAP, 0)
+    statusMark:SetPoint('RIGHT', statusKicker, 'LEFT', -MARK_GAP, 0)
 
     local rows = {}
+    local fold = CreateFrame('Frame', nil, vault)
+    fold.vaultFold = true
+    local folding
+
+    local function SetAlphas(regions, alpha)
+        for _, region in ipairs(regions) do region:SetAlpha(alpha) end
+    end
+
+    local function FinishFold()
+        if not folding then return end
+        fold:SetScript('OnUpdate', nil)
+        for _, row in ipairs({ folding.opening, folding.closing }) do
+            row.foldHeight = nil
+            SetAlphas(row.big, 1)
+            SetAlphas(row.small, 1)
+            SetAlphas(row.chrome, 1)
+        end
+        folding = nil
+    end
+
+    local function StartFold(opening, closing)
+        FinishFold()
+        folding = { start = GetTime(), opening = opening, closing = closing }
+        SetAlphas(opening.big, 0)
+        SetAlphas(closing.small, 0)
+        SetAlphas(closing.chrome, 0)
+        fold:SetScript('OnUpdate', BUI.Profiler.Hot('Pages.Dashboard vault fold', function()
+            local progress = (GetTime() - folding.start) / VAULT_FOLD
+            if progress >= 1 then
+                FinishFold()
+                onChange()
+                return
+            end
+            local eased = 1 - (1 - progress) ^ 3
+            local span = (VAULT_BIG - VAULT_TILE) * eased
+            opening.foldHeight = math.floor(VAULT_TILE + span + 0.5)
+            closing.foldHeight = math.floor(VAULT_BIG - span + 0.5)
+            SetAlphas(opening.big, eased)
+            SetAlphas(closing.small, eased)
+            SetAlphas(closing.chrome, eased)
+            onChange()
+        end))
+    end
+
     for index, spec in ipairs(VAULT_ROWS) do
-        local row = CreateFrame('Frame', nil, vault)
-        row:SetHeight(VAULT_TILE)
-        row.type = spec.type
-        kit.Text(row, spec.label, 12, 'text'):SetPoint('LEFT')
-        row.tiles = {}
-        for slot = 1, 3 do row.tiles[slot] = VaultTile(row) end
+        local row = CreateFrame('Button', nil, vault)
+        row.spec = spec
+        row:SetClipsChildren(true)
+        row.hover = kit.Fill(row, 'hover', 'BACKGROUND')
+        row.hover:SetAllPoints()
+        row.hover:Hide()
+        row.icon = kit.Glyph(row, spec.icon, VAULT_ICON, 'muted')
+        row.icon:SetPoint('LEFT', VAULT_LABEL_X, 0)
+        row.label = kit.Text(row, spec.label:upper(), 11, 'muted')
+        row.label:SetPoint('LEFT', row.icon, 'RIGHT', VAULT_VALUE_Y, 0)
+        row.small, row.big = {}, {}
+        for slot = 1, 3 do
+            row.small[slot] = VaultTile(row)
+            row.big[slot] = VaultSlot(row, spec.atlas)
+        end
+        row.chip = VaultChip(row)
+        row.chrome = { row.icon, row.label, row.chip }
+        row:SetScript('OnClick', function(self)
+            if self.open then return end
+            local closing
+            for _, other in ipairs(rows) do
+                if other.open then closing = other end
+            end
+            DashboardDB().vaultOpen = spec.key
+            vault.Refresh()
+            if closing then StartFold(self, closing) end
+            onChange()
+        end)
+        row:SetScript('OnEnter', function(self) self.hover:SetShown(not self.open) end)
+        row:SetScript('OnLeave', function(self) self.hover:Hide() end)
         rows[index] = row
     end
 
@@ -827,63 +1038,135 @@ local function BuildVault()
     end
 
     local function FillTile(tile, activity)
-        tile:SetShown(activity ~= nil)
-        if not activity then return end
-        local progress = ('%d/%d'):format(math.min(activity.progress, activity.threshold), activity.threshold)
-        if not Unlocked(activity) then
+        local open = Unlocked(activity)
+        local itemLevel = open and RewardItemLevel(activity)
+        if open then
+            tile.value:SetText(itemLevel or '...')
+            window:Paint(tile.value, 'text')
+        else
             Dash(tile.value)
-            tile.sub:SetText(progress)
-            window:Paint(tile.sub, 'faint')
-            return
         end
-        local itemLevel = RewardItemLevel(activity)
-        tile.value:SetText(itemLevel or '...')
-        window:Paint(tile.value, 'text')
-        tile.sub:SetText(VaultSlotLabel(activity) .. '  ·  ' .. progress)
-        window:Paint(tile.sub, 'accent')
-        if not itemLevel then
+        tile.footLabel = open and VaultSlotLabel(activity) or nil
+        tile.footRest = ('%d/%d'):format(math.min(activity.progress, activity.threshold), activity.threshold)
+        PaintFoot(tile.sub)
+        if open and not itemLevel then
+            local link = RewardLink(activity)
+            if link then WaitForItem(link) end
+        end
+    end
+
+    local runs
+    local function FillSlot(tile, spec, activity)
+        local icon = SlotIcon(spec, activity, runs)
+        tile.icon:SetTexture(icon)
+        tile.iconFrame:SetShown(icon ~= nil)
+        tile.block:ClearAllPoints()
+        if icon then
+            tile.block:SetPoint('TOPLEFT', tile.iconFrame, 'TOPRIGHT', VAULT_SLOT_PAD, -VAULT_TEXT_TOP)
+        else
+            tile.block:SetPoint('TOPLEFT', VAULT_SLOT_PAD, -VAULT_SLOT_PAD)
+        end
+        local progress = ('%d / %d %s'):format(math.min(activity.progress, activity.threshold), activity.threshold, spec.many)
+        local open = Unlocked(activity)
+        local itemLevel = open and RewardItemLevel(activity)
+        if open then
+            tile.value:SetText(itemLevel or '...')
+            window:Paint(tile.value, 'text')
+        else
+            Dash(tile.value)
+        end
+        tile.state:SetText(open and 'Unlocked' or 'Locked')
+        window:Paint(tile.state, open and 'positive' or 'faint')
+        tile.mark:SetShown(open)
+        local markWidth = open and (STATUS_MARK + MARK_GAP) or 0
+        tile.state:ClearAllPoints()
+        tile.state:SetPoint('LEFT', VAULT_PILL_PAD + markWidth, 0)
+        tile.pill:SetWidth(VAULT_PILL_PAD * 2 + markWidth + math.ceil(tile.state:GetStringWidth()))
+        tile.footLabel = open and VaultSlotLabel(activity) or nil
+        tile.footRest = progress
+        PaintFoot(tile.foot)
+        if open and not itemLevel then
             local link = RewardLink(activity)
             if link then WaitForItem(link) end
         end
     end
 
     function vault.Refresh()
-        local dungeons = {}
+        runs = WeeklyRunsByLevel()
+        local openKey = DashboardDB().vaultOpen
+        local openRow
         for _, row in ipairs(rows) do
-            local activities = VaultActivities(row.type)
-            if row.type == VaultType.Activities then dungeons = activities end
-            for slot, tile in ipairs(row.tiles) do FillTile(tile, activities[slot]) end
-        end
-        local need
-        for _, activity in ipairs(dungeons) do
-            if not Unlocked(activity) then
-                need = activity.threshold - activity.progress
-                break
+            local spec = row.spec
+            local activities = VaultActivities(spec.type)
+            row.activities = activities
+            row.open = spec.key == openKey
+            if row.open then openRow = row end
+            row.icon:SetShown(not row.open)
+            row.label:SetShown(not row.open)
+            for slot = 1, 3 do
+                local activity = activities[slot]
+                row.small[slot]:SetShown(not row.open and activity ~= nil)
+                row.big[slot]:SetShown(row.open and activity ~= nil)
+                if activity then
+                    if row.open then FillSlot(row.big[slot], spec, activity) else FillTile(row.small[slot], activity) end
+                end
+            end
+            local nextSlot = not row.open and NextLocked(activities)
+            row.chipShown = nextSlot and nextSlot.progress > 0 or false
+            row.chip:SetShown(row.chipShown)
+            if row.chipShown then
+                row.chip.kicker:SetText('Next ' .. spec.slot .. ' slot:')
+                row.chip.text:SetText(Plural(nextSlot.threshold - nextSlot.progress, 'more ' .. spec.one, 'more ' .. spec.many))
             end
         end
-        statusMark:SetShown(#dungeons > 0 and not need)
-        if need then
-            status:SetText(need == 1 and '1 more run for the next slot' or (need .. ' more runs for the next slot'))
-        else
-            status:SetText(#dungeons > 0 and 'All unlocked' or '')
-        end
+        local activities = openRow and openRow.activities or {}
+        local unlocked = UnlockedCount(activities)
+        local complete = #activities > 0 and unlocked == #activities
+        statusKicker:SetText(openRow and openRow.spec.label:upper() or '')
+        status:SetText(#activities > 0 and ('%d / %d unlocked'):format(unlocked, #activities) or '')
+        window:Paint(status, complete and 'positive' or 'muted')
+        statusMark:SetShown(complete)
     end
 
     function vault:Layout(width)
-        local tileWidth = (width - PAD * 2 - VAULT_LABEL - VAULT_TILE_GAP * 2) / 3
+        local inner = width - PAD * 2
         local y = CONTENT_TOP
         for _, row in ipairs(rows) do
+            local tileHeight = row.open and VAULT_BIG or VAULT_TILE
+            local height = row.foldHeight or tileHeight
             Place(row, y)
-            for slot, tile in ipairs(row.tiles) do
+            row:SetHeight(height)
+            local left = row.open and 0 or VAULT_LABEL
+            local chipWidth = row.chipShown and (VAULT_CHIP + VAULT_TILE_GAP) or 0
+            local tileWidth = math.floor((inner - left - chipWidth - VAULT_TILE_GAP * 2) / 3)
+            for slot, tile in ipairs(row.open and row.big or row.small) do
                 tile:ClearAllPoints()
-                tile:SetPoint('TOPLEFT', VAULT_LABEL + (slot - 1) * (tileWidth + VAULT_TILE_GAP), 0)
-                tile:SetSize(tileWidth, VAULT_TILE)
+                tile:SetPoint('TOPLEFT', left + (slot - 1) * (tileWidth + VAULT_TILE_GAP), 0)
+                tile:SetSize(tileWidth, tileHeight)
             end
-            y = y + VAULT_TILE + VAULT_ROW_GAP
+            row.chip:ClearAllPoints()
+            row.chip:SetPoint('TOPRIGHT')
+            row.chip:SetSize(VAULT_CHIP, VAULT_TILE)
+            y = y + height + VAULT_ROW_GAP
         end
         return y - VAULT_ROW_GAP + BOTTOM_PAD
     end
     return vault
+end
+
+local function BossRows(raid)
+    local rows = {}
+    for bossIndex = 1, raid.bossCount do
+        local marks = {}
+        for key, difficulty in ipairs(RAID_DIFFICULTIES) do
+            local info = raid.diffs[key]
+            local killed = info and (tonumber(info.kills[bossIndex]) or 0) > 0
+            local red, green, blue = unpack(difficulty.color)
+            marks[#marks + 1] = killed and ('|cff%02x%02x%02x%s|r'):format(math.floor(red * 255), math.floor(green * 255), math.floor(blue * 255), difficulty.short) or ('|cff555a62%s|r'):format(difficulty.short)
+        end
+        rows[#rows + 1] = { left = (raid.bosses and raid.bosses[bossIndex]) or ('Boss ' .. bossIndex), right = table.concat(marks, ' ') }
+    end
+    return rows
 end
 
 local function BuildRaid()
@@ -895,69 +1178,90 @@ local function BuildRaid()
     name:SetJustifyH('LEFT')
     name:SetWordWrap(false)
     local empty = Empty(raid, 'No raid data yet.')
-    local columns = #RAID_DIFFICULTIES
-    local heads = {}
-    for key in ipairs(RAID_DIFFICULTIES) do heads[key] = kit.Text(raid, '', 11, 'faint') end
+    local current
     local rows = {}
-    for index = 1, RAID_BOSS_ROWS do
-        local row = CreateFrame('Frame', nil, raid)
-        row:SetHeight(RAID_BOSS_ROW)
-        row.name = kit.Text(row, '', 12, 'text')
-        row.name:SetPoint('LEFT')
-        row.name:SetPoint('RIGHT', -RAID_CELL * columns, 0)
-        row.name:SetJustifyH('LEFT')
-        row.name:SetWordWrap(false)
-        row.cells = {}
-        for key in ipairs(RAID_DIFFICULTIES) do
-            row.cells[key] = kit.Text(row, '', 12, 'text')
-            row.cells[key]:SetPoint('RIGHT', -RAID_CELL * (columns - key), 0)
+    for key, difficulty in ipairs(RAID_DIFFICULTIES) do
+        local row = Inset(raid)
+        row:SetHeight(RAID_ROW)
+        local red, green, blue = unpack(difficulty.color)
+        local bar = row:CreateTexture(nil, 'ARTWORK')
+        bar:SetColorTexture(red, green, blue, 1)
+        bar:SetWidth(RAID_BAR)
+        bar:SetPoint('TOPLEFT', 1, -RAID_INSET)
+        bar:SetPoint('BOTTOMLEFT', 1, RAID_INSET)
+        kit.Text(row, difficulty.label, 13, 'text'):SetPoint('TOPLEFT', RAID_TEXT_X, -RAID_INSET)
+        row.count = kit.Text(row, '', 11, 'muted')
+        row.count:SetPoint('BOTTOMLEFT', RAID_TEXT_X, RAID_INSET)
+        row.clear = kit.Text(row, 'Clear', 11, 'positive')
+        row.clear:SetPoint('TOPRIGHT', -(RAID_TEXT_X + STATUS_MARK + MARK_GAP), -RAID_INSET)
+        row.clearMark = kit.Glyph(row, 'check', STATUS_MARK, 'positive')
+        row.clearMark:SetPoint('LEFT', row.clear, 'RIGHT', MARK_GAP, 0)
+        row.dots = {}
+        for dot = 1, RAID_MAX_DOTS do
+            local disc = kit.Disc(row, RAID_DOT, 'control', 'ARTWORK', 1)
+            local mark = kit.Glyph(row, 'check', RAID_DOT_MARK, 'text', 'OVERLAY')
+            mark:SetPoint('CENTER', disc)
+            row.dots[dot] = { disc = disc, mark = mark }
         end
-        rows[index] = row
+        rows[key] = row
     end
+    local link = CreateFrame('Button', nil, raid)
+    link:SetHeight(LINK_HEIGHT)
+    local chevron = kit.Glyph(link, 'dropdown', CHEVRON, 'accent')
+    chevron:SetTexCoord(unpack(POINT_RIGHT))
+    chevron:SetPoint('RIGHT')
+    local linkText = kit.Text(link, 'View bosses', 12, 'accent')
+    linkText:SetPoint('RIGHT', chevron, 'LEFT', -LINK_GAP, 0)
+    window:Bind(link, function() link:SetWidth(math.ceil(linkText:GetStringWidth()) + LINK_GAP + CHEVRON) end)
+    link:SetScript('OnEnter', function(self) Tip(self, current.name, BossRows(current)) end)
+    link:SetScript('OnLeave', Widget.HideTip)
     local bossCount = 0
 
-    local function Count(region, count, key)
-        if count > 0 then Tint(region, unpack(RAID_DIFFICULTIES[key].color)) else window:Paint(region, 'faint') end
-    end
-
     function raid.Refresh()
-        local current = RaidProgress()
+        current = RaidProgress()
         bossCount = current and current.bossCount or 0
         empty:SetShown(bossCount == 0)
         name:SetShown(bossCount > 0)
+        link:SetShown(bossCount > 0)
         if bossCount > 0 then name:SetText(current.name .. (current.source == 'lockout' and '  ·  this week' or '')) end
-        for key, difficulty in ipairs(RAID_DIFFICULTIES) do
+        local shown = math.min(bossCount, RAID_MAX_DOTS)
+        for key, row in ipairs(rows) do
+            row:SetShown(bossCount > 0)
             local info = current and current.diffs[key]
             local killed = info and info.killed or 0
-            heads[key]:SetShown(bossCount > 0)
-            heads[key]:SetText(('%s %d/%d'):format(difficulty.short, killed, bossCount))
-            Count(heads[key], killed, key)
-        end
-        for bossIndex, row in ipairs(rows) do
-            row:SetShown(bossIndex <= bossCount)
-            if bossIndex <= bossCount then
-                row.name:SetText(current.bosses and current.bosses[bossIndex] or ('Boss ' .. bossIndex))
-                for key, cell in ipairs(row.cells) do
-                    local info = current.diffs[key]
-                    local kills = info and tonumber(info.kills[bossIndex]) or 0
-                    cell:SetText(kills)
-                    Count(cell, kills, key)
+            row.count:SetText(('%d / %d bosses'):format(killed, bossCount))
+            local clear = bossCount > 0 and killed >= bossCount
+            row.clear:SetShown(clear)
+            row.clearMark:SetShown(clear)
+            local red, green, blue = unpack(RAID_DIFFICULTIES[key].color)
+            for dot, pieces in ipairs(row.dots) do
+                local visible = dot <= shown
+                local dead = visible and info ~= nil and (tonumber(info.kills[dot]) or 0) > 0
+                pieces.disc:SetShown(visible)
+                pieces.mark:SetShown(dead)
+                if visible then
+                    pieces.disc:ClearAllPoints()
+                    pieces.disc:SetPoint('BOTTOMRIGHT', -(RAID_TEXT_X + (shown - dot) * (RAID_DOT + RAID_DOT_GAP)), RAID_INSET)
+                    if dead then
+                        window:Paint(pieces.disc, function(disc) disc:SetVertexColor(red, green, blue) end)
+                    else
+                        window:Paint(pieces.disc, 'control')
+                    end
                 end
             end
         end
     end
 
     function raid:Layout()
-        for key, head in ipairs(heads) do
-            head:ClearAllPoints()
-            head:SetPoint('TOPRIGHT', -(PAD + RAID_CELL * (columns - key)), -TABLE_TOP)
+        local y = CONTENT_TOP
+        if bossCount == 0 then return y + LINK_HEIGHT + BOTTOM_PAD end
+        for _, row in ipairs(rows) do
+            Place(row, y)
+            y = y + RAID_ROW + RAID_ROW_GAP
         end
-        local y = TABLE_ROWS_TOP
-        for index = 1, math.min(bossCount, RAID_BOSS_ROWS) do
-            Place(rows[index], y)
-            y = y + RAID_BOSS_ROW
-        end
-        return y + BOTTOM_PAD
+        link:ClearAllPoints()
+        link:SetPoint('TOPRIGHT', -PAD, -y)
+        return y + LINK_HEIGHT + BOTTOM_PAD
     end
     return raid
 end
@@ -1207,7 +1511,7 @@ local function BuildDashboard(pageFrame)
     local Relayout
     local header = BuildHeader(function() Relayout() end)
     local strip = BuildStats()
-    local vault, raid, keys, currencies, characters = BuildVault(), BuildRaid(), BuildKeys(), BuildCurrencies(), BuildCharacters()
+    local vault, raid, keys, currencies, characters = BuildVault(function() Relayout() end), BuildRaid(), BuildKeys(), BuildCurrencies(), BuildCharacters()
     local cards = { strip, vault, raid, keys, currencies, characters }
     local panes = {
         { cards = { strip, vault, raid, keys, currencies }, strip = true, rows = { { vault, raid }, { keys, currencies } } },

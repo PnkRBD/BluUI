@@ -2,7 +2,7 @@ local _, BUI = ...
 local Pixel = BUI.Pixel
 local Layout = BUI.BUILibClient.Layout
 local Controls = BUI.BUILibClient.Controls
-local WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT = 1228, 750
+local WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT = 1228, 848
 
 local PageEngine = {
 	pages        = {},
