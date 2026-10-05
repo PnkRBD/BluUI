@@ -112,7 +112,7 @@ local function CommonSettings(sizes)
 			growDirection = "RIGHT", anchorPoint = "CENTER", relativePoint = "CENTER",
 		}),
 		dispelBorder = {
-			enabled = true, tintBar = false, tintStyle = "bar", matchPlayer = true, source = "mine", showBadge = true,
+			tintBar = true, tintStyle = "bar", matchPlayer = true, source = "mine", showBadge = true,
 		},
 		privateAuras = {
 			enabled = true, size = sizes.paSize, num = 1,

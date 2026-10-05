@@ -46,39 +46,17 @@ function GroupFrames.DispelLook(settings)
 	local border = settings.dispelBorder
 	if border.matchPlayer then
 		local player = BUI.UnitFrames.GetUnitSettings("player")
-		return player.debuffHighlightBorder == true, player.debuffHighlightBar == true, player.debuffHighlightStyle
+		return player.debuffHighlightBar == true, player.debuffHighlightStyle
 	end
-	return border.enabled == true, border.tintBar == true, border.tintStyle
+	return border.tintBar == true, border.tintStyle
 end
 
 function GroupFrames.DispelHighlightWanted(settings)
-	local wantBorder, wantTint = GroupFrames.DispelLook(settings)
-	return wantBorder or wantTint or settings.dispelBorder.showBadge ~= false
+	return GroupFrames.DispelLook(settings) or settings.dispelBorder.showBadge ~= false
 end
 
 local frameKits = setmetatable({}, { __mode = "k" })
 local highlightRestyleQueue = {}
-
-local function EdgeSize()
-	return Pixel.Scale(Pixel.ClampBorder(1))
-end
-
-local function AnchorEdges(kit, frame)
-	local edgeThickness = EdgeSize()
-	local top, bottom, left, right = kit.edges[1], kit.edges[2], kit.edges[3], kit.edges[4]
-	top:ClearAllPoints()
-	top:SetPoint("TOPLEFT", frame, "TOPLEFT")
-	top:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", 0, -edgeThickness)
-	bottom:ClearAllPoints()
-	bottom:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT")
-	bottom:SetPoint("TOPRIGHT", frame, "BOTTOMRIGHT", 0, edgeThickness)
-	left:ClearAllPoints()
-	left:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -edgeThickness)
-	left:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", edgeThickness, edgeThickness)
-	right:ClearAllPoints()
-	right:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, -edgeThickness)
-	right:SetPoint("BOTTOMLEFT", frame, "BOTTOMRIGHT", -edgeThickness, edgeThickness)
-end
 
 local function OverlappingAbsorb(frame)
 	local settings = GroupFrames.SettingsForFrame(frame)
@@ -86,46 +64,19 @@ local function OverlappingAbsorb(frame)
 	if frame.HealAbsorb and settings.healAbsorb.enabled ~= false and settings.healAbsorb.direction == "left" then return frame.HealAbsorb end
 end
 
-local TINT_STRIP_PIXELS = 3
-
-local function AnchorFill(kit, frame)
+local function AnchorFill(kit, frame, alpha)
 	local healthTexture = frame.Health:GetStatusBarTexture()
-	local _, _, style = GroupFrames.DispelLook(GroupFrames.SettingsForFrame(frame))
+	local _, style = GroupFrames.DispelLook(GroupFrames.SettingsForFrame(frame))
 	local absorb = OverlappingAbsorb(frame)
 	local rightEdge, rightSide = healthTexture, "RIGHT"
 	if absorb then rightEdge, rightSide = absorb:GetStatusBarTexture(), "LEFT" end
-	local fill = kit.fill
-	fill:ClearAllPoints()
-	fill:SetTexture((style == "top" or style == "bottom") and BUI.C.FADE_TEXTURE or WHITE8X8)
-	fill:SetTexCoord(0, 1, style == "bottom" and 1 or 0, style == "bottom" and 0 or 1)
-	if style == "top" then
-		fill:SetPoint("TOPLEFT", healthTexture, "TOPLEFT")
-		fill:SetPoint("BOTTOMRIGHT", rightEdge, rightSide)
-	elseif style == "bottom" then
-		fill:SetPoint("TOPLEFT", healthTexture, "LEFT")
-		fill:SetPoint("BOTTOMRIGHT", rightEdge, "BOTTOM" .. rightSide)
-	elseif style == "strip" then
-		fill:SetPoint("TOPLEFT", healthTexture, "BOTTOMLEFT", 0, Pixel.Scale(TINT_STRIP_PIXELS))
-		fill:SetPoint("BOTTOMRIGHT", rightEdge, "BOTTOM" .. rightSide)
-	else
-		fill:SetPoint("TOPLEFT", healthTexture, "TOPLEFT")
-		fill:SetPoint("BOTTOMRIGHT", rightEdge, "BOTTOM" .. rightSide)
-	end
+	BUI.UnitFrames.StyleDispelFill(kit.fill, kit.fade, style, healthTexture, rightEdge, rightSide, alpha)
 end
 
-local function BuildHighlightKit(host, frame)
-	local kit = { edges = {} }
-	for edgeIndex = 1, 4 do
-		local edge = host:CreateTexture(nil, "OVERLAY", nil, 5)
-		edge:SetTexture(WHITE8X8)
-		kit.edges[edgeIndex] = edge
-	end
-	AnchorEdges(kit, frame)
-
-	local fill = host:CreateTexture(nil, "OVERLAY", nil, 1)
-	fill:SetTexture(WHITE8X8)
-	kit.fill = fill
-	AnchorFill(kit, frame)
+local function BuildHighlightKit(host)
+	local kit = {}
+	kit.fill = host:CreateTexture(nil, "OVERLAY", nil, 1)
+	kit.fade = host:CreateTexture(nil, "OVERLAY", nil, 1)
 
 	local badge = host:CreateTexture(nil, "OVERLAY", nil, 7)
 	badge:SetTexture(WHITE8X8)
@@ -148,57 +99,54 @@ local function DispelTextureOptions()
 	return tintOptions, badgeOptions
 end
 
-local function KitSignature(wantBorder, wantTint, wantBadge, badgeSettings)
-	return (wantBorder and "b" or "") .. (wantTint and "t" or "") .. (wantBadge and "i" or "")
-		.. "#" .. EdgeSize() .. "#" .. badgeSettings.size .. badgeSettings.anchor .. badgeSettings.offsetX .. "," .. badgeSettings.offsetY
+local function KitSignature(wantTint, wantBadge, badgeSettings)
+	return (wantTint and "t" or "") .. (wantBadge and "i" or "")
+		.. "#" .. badgeSettings.size .. badgeSettings.anchor .. badgeSettings.offsetX .. "," .. badgeSettings.offsetY
 end
 
-local function RegisterKitTextures(kit, wantBorder, wantTint, wantBadge, badgeSettings)
+local function RegisterKitTextures(kit, wantTint, wantBadge, badgeSettings)
 	local button = kit.button
 	if not button.AddDispelTypeTexture then return end
-	local signature = KitSignature(wantBorder, wantTint, wantBadge, badgeSettings)
+	local signature = KitSignature(wantTint, wantBadge, badgeSettings)
 	if kit.signature == signature then return end
 	if kit.signature and button.ClearDispelTypeTextures then button:ClearDispelTypeTextures() end
 	kit.signature = signature
-	for edgeIndex = 1, 4 do
-		if not wantBorder then kit.edges[edgeIndex]:Hide() end
+	if not wantTint then
+		kit.fill:Hide()
+		kit.fade:Hide()
 	end
-	if not wantTint then kit.fill:Hide() end
 	if not wantBadge then kit.badge:Hide() end
 	local tint, badge = DispelTextureOptions()
-	if wantBorder then
-		for edgeIndex = 1, 4 do button:AddDispelTypeTexture(kit.edges[edgeIndex], tint) end
+	if wantTint then
+		button:AddDispelTypeTexture(kit.fill, tint)
+		button:AddDispelTypeTexture(kit.fade, tint)
 	end
-	if wantTint then button:AddDispelTypeTexture(kit.fill, tint) end
 	if wantBadge then button:AddDispelTypeTexture(kit.badge, badge) end
 end
 
 local function StyleHighlightKit(frame, kit)
 	local settings = GroupFrames.SettingsForFrame(frame)
 	local badgeSettings = settings.dispelBadge
-	local wantBorder, wantTint = GroupFrames.DispelLook(settings)
+	local wantTint = GroupFrames.DispelLook(settings)
 	local wantBadge = settings.dispelBorder.showBadge ~= false
 
-	AnchorEdges(kit, frame)
-	AnchorFill(kit, frame)
+	local opacity = BUI.UnitFrames.GetSettings().dispelOpacity / 100
+	AnchorFill(kit, frame, (kit.button or wantTint) and opacity or 0)
 	local badge = kit.badge
 	badge:SetSize(Pixel.Scale(badgeSettings.size), Pixel.Scale(badgeSettings.size))
 	badge:ClearAllPoints()
 	badge:SetPoint(badgeSettings.anchor, frame.Health, badgeSettings.anchor, Pixel.Scale(badgeSettings.offsetX), Pixel.Scale(badgeSettings.offsetY))
 
 	if kit.button then
-		RegisterKitTextures(kit, wantBorder, wantTint, wantBadge, badgeSettings)
+		RegisterKitTextures(kit, wantTint, wantBadge, badgeSettings)
 		return
 	end
-	local edgeAlpha = wantBorder and 1 or 0
-	for edgeIndex = 1, 4 do kit.edges[edgeIndex]:SetAlpha(edgeAlpha) end
-	kit.fill:SetAlpha(wantTint and 1 or 0)
 	badge:SetAlpha(wantBadge and 1 or 0)
 end
 
 local function HighlightInitializer(frame)
 	return function(button)
-		local kit = BuildHighlightKit(button, frame)
+		local kit = BuildHighlightKit(button)
 		kit.button = button
 		local kits = frameKits[frame]
 		if not kits then kits = {}; frameKits[frame] = kits end
@@ -432,11 +380,6 @@ local function RepaintHealth(frame, unit)
 	end
 end
 
-local function RestoreFrameBorder(frame)
-	local borderColor = GroupFrames.SettingsForFrame(frame).borderColor
-	frame:SetBackdropBorderColor(borderColor[1], borderColor[2], borderColor[3], borderColor[4])
-end
-
 function GroupFrames.ApplyDispelBadgeIcons(badge, unit, auraInstanceID)
 	if not badge or not badge.icons or not auraInstanceID then return end
 	local curves = GetIconCurves()
@@ -473,7 +416,6 @@ function GroupFrames.UpdateDispelBorder(frame, unit)
 		HideDispelTextures(frame)
 		if frame._dispelColor then
 			frame._dispelColor = nil
-			RestoreFrameBorder(frame)
 		end
 		return
 	end
@@ -484,20 +426,18 @@ function GroupFrames.UpdateDispelBorder(frame, unit)
 		HideDispelTextures(frame)
 		if frame._dispelColor then
 			frame._dispelColor = nil
-			RestoreFrameBorder(frame)
 			RepaintHealth(frame, unit)
 		end
 		return
 	end
 
-	local wantBorder, wantTint = GroupFrames.DispelLook(settings)
+	local wantTint = GroupFrames.DispelLook(settings)
 	local wantBadge = borderSettings.showBadge ~= false
 
-	if not wantBorder and not wantBadge and not wantTint then
+	if not wantBadge and not wantTint then
 		if frame._dispelColor then
 			HideDispelTextures(frame)
 			frame._dispelColor = nil
-			RestoreFrameBorder(frame)
 			RepaintHealth(frame, unit)
 		end
 		return
@@ -508,11 +448,6 @@ function GroupFrames.UpdateDispelBorder(frame, unit)
 	local colorObj, auraInstanceID = FindDispelColor(unit, borderSettings.source)
 	if colorObj then
 		frame._dispelColor = colorObj
-		if wantBorder then
-			frame:SetBackdropBorderColor(colorObj:GetRGBA())
-		else
-			RestoreFrameBorder(frame)
-		end
 		EnsureDispelTextures(frame)
 		if wantBadge and auraInstanceID then
 			GroupFrames.ApplyDispelBadgeIcons(frame.DispelBadge, unit, auraInstanceID)
@@ -524,7 +459,6 @@ function GroupFrames.UpdateDispelBorder(frame, unit)
 	elseif frame._dispelColor then
 		HideDispelTextures(frame)
 		frame._dispelColor = nil
-		RestoreFrameBorder(frame)
 		RepaintHealth(frame, unit)
 	end
 end
@@ -536,7 +470,7 @@ local function EnsurePreviewKit(frame)
 	host:SetFrameLevel(frame.Health:GetFrameLevel() + 3)
 	host:EnableMouse(false)
 	host:Hide()
-	previewKit = { host = host, kit = BuildHighlightKit(host, frame) }
+	previewKit = { host = host, kit = BuildHighlightKit(host) }
 	frame._dispelPreviewKit = previewKit
 	return previewKit
 end
@@ -545,8 +479,8 @@ local function PaintPreviewKit(frame, previewKit, typeName)
 	StyleHighlightKit(frame, previewKit.kit)
 	local dispelRGB = DISPEL_RGB[typeName]
 	local kit = previewKit.kit
-	for edgeIndex = 1, 4 do kit.edges[edgeIndex]:SetVertexColor(dispelRGB.r, dispelRGB.g, dispelRGB.b) end
 	kit.fill:SetVertexColor(dispelRGB.r, dispelRGB.g, dispelRGB.b)
+	kit.fade:SetVertexColor(dispelRGB.r, dispelRGB.g, dispelRGB.b)
 	local atlas = DISPEL_BADGE_ATLAS[(typeName == "Enrage") and "Bleed" or typeName]
 	if atlas then
 		kit.badge:SetAtlas(atlas)
@@ -578,7 +512,6 @@ local function ApplyDispelPreview(frame, dispelName)
 		frame._dispelPreview = nil
 		HideDispelTextures(frame)
 		frame._dispelColor = nil
-		RestoreFrameBorder(frame)
 		RepaintHealth(frame, frame.unit)
 		return true
 	end
@@ -587,17 +520,10 @@ local function ApplyDispelPreview(frame, dispelName)
 	if not dispelRGB then return false, "unknown type: " .. tostring(dispelName) end
 	local color = CreateColor(dispelRGB.r, dispelRGB.g, dispelRGB.b, 1)
 
-	local settings = GroupFrames.SettingsForFrame(frame)
-	local wantBorder = GroupFrames.DispelLook(settings)
-	local wantBadge = settings.dispelBorder.showBadge ~= false
+	local wantBadge = GroupFrames.SettingsForFrame(frame).dispelBorder.showBadge ~= false
 
 	frame._dispelPreview = true
 	frame._dispelColor = color
-	if wantBorder then
-		frame:SetBackdropBorderColor(color:GetRGBA())
-	else
-		RestoreFrameBorder(frame)
-	end
 	EnsureDispelTextures(frame)
 	if wantBadge then
 		GroupFrames.ApplyDispelBadgePreview(frame.DispelBadge, dispelName)

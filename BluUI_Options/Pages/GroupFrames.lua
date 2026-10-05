@@ -48,13 +48,11 @@ local ABSORB_DIRECTIONS = {
 }
 local DISPEL_MODES = {
 	{ value = 'off', text = 'Off' },
-	{ value = 'border', text = 'Color the border' },
 	{ value = 'bar', text = 'Tint the whole bar' },
-	{ value = 'top', text = 'Tint the top half' },
-	{ value = 'bottom', text = 'Tint the bottom half' },
-	{ value = 'strip', text = 'Strip along the bottom' },
+	{ value = 'top', text = 'Fade from the top' },
+	{ value = 'bottom', text = 'Fade from the bottom' },
 }
-local TINT_MODES = { bar = true, top = true, bottom = true, strip = true }
+local TINT_MODES = { bar = true, top = true, bottom = true }
 local DISPEL_SOURCES = {
 	{ value = 'mine', text = 'Dispellable by me' },
 	{ value = 'all', text = 'All magic, curse, disease and poison' },
@@ -481,20 +479,17 @@ local function AurasBoards(ui, parent, width, key)
 	local function Badges() GroupFrames().RestyleAllDispelBadges() end
 	dispels:AddTools('Dispel highlight', 'How the frame reacts, following the player frame unless told otherwise', {
 		{ entries = DISPEL_MODES, width = MENU_WIDTH, get = function()
-			local wantBorder, wantTint, style = GroupFrames().DispelLook(section)
-			if wantTint then return style end
-			return wantBorder and 'border' or 'off'
+			local wantTint, style = GroupFrames().DispelLook(section)
+			return wantTint and style or 'off'
 		end, set = function(value)
 			if border.matchPlayer then
 				local player = BUI.GetDB().unitFrames.player
-				player.debuffHighlightBorder = value == 'border'
 				player.debuffHighlightBar = TINT_MODES[value] == true
 				if player.debuffHighlightBar then player.debuffHighlightStyle = value end
 				BUI.UnitFrames.InvalidateSettingsCache()
 				BUI.UnitFrames:Refresh()
 				return
 			end
-			border.enabled = value == 'border'
 			border.tintBar = TINT_MODES[value] == true
 			if border.tintBar then border.tintStyle = value end
 		end },

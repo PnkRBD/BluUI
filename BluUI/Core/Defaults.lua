@@ -192,8 +192,7 @@ local UnitFrameBase = {
 	powerPrediction           = false,
 	powerPredictionColor      = { 1, 1, 1, 0.35 },
 
-	debuffHighlightBorder       = true,
-	debuffHighlightBar          = false,
+	debuffHighlightBar          = true,
 	debuffHighlightStyle        = 'bar',
 	debuffHighlightClassFilter  = true,
 	debuffHighlightTypeText     = false,
@@ -1675,6 +1674,8 @@ BUI.Defaults = {
 			dispelRecolor         = true,
 			dispelBlend           = false,
 			dispelOpacity         = 100,
+			dispelFadeMiddle      = 70,
+			dispelFadeFar         = 40,
 			transparentHealth     = false,
 			healthBarAlpha        = 0.35,
 			classColorHealth      = true,
@@ -2058,6 +2059,15 @@ BUI.DeprecatedKeys = {
 	['unitFrames.targettarget.healthBarAlpha']     = true,
 	['unitFrames.targettarget.healthColor']        = true,
 	['unitFrames.targettarget.transparentHealth']  = true,
+	['unitFrames.player.debuffHighlightBorder']       = true,
+	['unitFrames.target.debuffHighlightBorder']       = true,
+	['unitFrames.targettarget.debuffHighlightBorder'] = true,
+	['unitFrames.focus.debuffHighlightBorder']        = true,
+	['unitFrames.focustarget.debuffHighlightBorder']  = true,
+	['unitFrames.pet.debuffHighlightBorder']          = true,
+	['unitFrames.boss.debuffHighlightBorder']         = true,
+	['groupFrames.party.dispelBorder.enabled']        = true,
+	['groupFrames.raid.dispelBorder.enabled']         = true,
 }
 
 BUI.LiveOverrideKeys = {

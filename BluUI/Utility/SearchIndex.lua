@@ -10,7 +10,7 @@ local entries = {
 	{ label = "Health bar", page = "unitframes", tab = 1, panel = "Appearance", keywords = "health color background border class color transparent" },
 	{ label = "Damage absorb", page = "unitframes", tab = 1, panel = "Appearance", keywords = "absorb shield heal absorb texture direction preview" },
 	{ label = "Power bar", page = "unitframes", tab = 1, panel = "Appearance", keywords = "power color resource type class reaction" },
-	{ label = "Dispel highlight", page = "unitframes", tab = 1, panel = "Appearance", keywords = "dispel debuff highlight border bar type icons cleanse callouts recolor blend colors" },
+	{ label = "Dispel highlight", page = "unitframes", tab = 1, panel = "Appearance", keywords = "dispel debuff highlight bar tint type icons cleanse callouts recolor blend colors" },
 	{ label = "Name tag", page = "unitframes", tab = 1, panel = "Appearance", keywords = "default tags name health power format reset" },
 	{ label = "Raid icon", page = "unitframes", tab = 1, panel = "Appearance", keywords = "raid marker leader icon indicators position size" },
 	{ label = "Custom tags", page = "unitframes", tab = 3, panel = "Tags", keywords = "custom tag text element font layer anchor" },
@@ -352,10 +352,10 @@ local entries = {
 	{ label = "Large raid layout", page = "groupframes", tab = 3, panel = "Raid", keywords = "large raid size threshold groups per row spacing" },
 	{ label = "Buffs", page = "groupframes", tab = 4, panel = "Party auras", keywords = "party aura buff debuff defensive crowd control icons rules" },
 	{ label = "Private auras", page = "groupframes", tab = 4, panel = "Party auras", keywords = "private aura raid boss" },
-	{ label = "Dispel highlight", page = "groupframes", tab = 4, panel = "Party auras", keywords = "dispel debuff highlight border badge magic curse poison disease" },
+	{ label = "Dispel highlight", page = "groupframes", tab = 4, panel = "Party auras", keywords = "dispel debuff highlight tint badge magic curse poison disease" },
 	{ label = "Dispel type colors", page = "groupframes", tab = 4, panel = "Party auras", keywords = "dispel color magic curse poison disease bleed shared palette" },
 	{ label = "Buffs", page = "groupframes", tab = 5, panel = "Raid auras", keywords = "raid aura buff debuff defensive crowd control icons rules" },
-	{ label = "Dispel highlight", page = "groupframes", tab = 5, panel = "Raid auras", keywords = "raid dispel highlight border badge" },
+	{ label = "Dispel highlight", page = "groupframes", tab = 5, panel = "Raid auras", keywords = "raid dispel highlight tint badge" },
 	{ label = "Debuff blacklist", page = "groupframes", tab = 6, panel = "Filters", keywords = "blacklist filter debuff buff hide spell recently seen built-in share" },
 }
 

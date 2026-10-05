@@ -31,7 +31,7 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 10
+local PROFILE_MIGRATION_VERSION = 11
 local LEGACY_UNIT_KEYS = { 'player', 'target', 'targettarget', 'focus', 'focustarget', 'pet', 'boss', 'arena', 'party' }
 
 function BUI.MigrateProfile(profile)
@@ -72,8 +72,7 @@ function BUI.MigrateProfile(profile)
 		for _, unitKey in ipairs(LEGACY_UNIT_KEYS) do
 			local unitTable = profile.unitFrames[unitKey]
 			if type(unitTable) == 'table' then
-				unitTable.debuffHighlightBorder = true
-				unitTable.debuffHighlightBar = false
+				unitTable.debuffHighlightBar = true
 				unitTable.debuffHighlightBadge = true
 				unitTable.debuffHighlightClassFilter = true
 				for _, deadKey in ipairs(deadKeys) do unitTable[deadKey] = nil end
@@ -362,6 +361,31 @@ function BUI.MigrateProfile(profile)
 		general._dashboardLayoutFixed = true
 		local dashboard = profile.dashboard
 		if type(dashboard) == 'table' then dashboard.layout, dashboard.topCols = nil, nil end
+	end
+
+	if not general._dispelBorderDropped then
+		general._dispelBorderDropped = true
+		if type(profile.unitFrames) == 'table' then
+			for _, unitKey in ipairs(LEGACY_UNIT_KEYS) do
+				local unitTable = profile.unitFrames[unitKey]
+				if type(unitTable) == 'table' then
+					if unitTable.debuffHighlightBorder == false and rawget(unitTable, 'debuffHighlightBar') == nil then unitTable.debuffHighlightBar = false end
+					unitTable.debuffHighlightBorder = nil
+					if unitTable.debuffHighlightStyle == 'strip' then unitTable.debuffHighlightStyle = 'bar' end
+				end
+			end
+		end
+		if type(profile.groupFrames) == 'table' then
+			for _, sectionKey in ipairs({ 'party', 'raid' }) do
+				local section = profile.groupFrames[sectionKey]
+				local border = type(section) == 'table' and section.dispelBorder
+				if type(border) == 'table' then
+					if border.enabled == false and rawget(border, 'tintBar') == nil then border.tintBar = false end
+					border.enabled = nil
+					if border.tintStyle == 'strip' then border.tintStyle = 'bar' end
+				end
+			end
+		end
 	end
 
 	general._buiMigrationVersion = PROFILE_MIGRATION_VERSION
