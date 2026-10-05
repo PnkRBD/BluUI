@@ -13,4 +13,4 @@ Copy the `BluUI` and `BluUI_Options` folders into `World of Warcraft\_retail_\In
 
 ## License
 
-All rights reserved. See [LICENSE](BluUI/LICENSE). Libraries in `BluUI/Libs` keep their own licenses.
+All rights reserved. See [LICENSE](LICENSE). Libraries in `BluUI/Libs` keep their own licenses.
