@@ -61,7 +61,6 @@ function BUI.SlidePanel.New(options)
         if not options.panel() then options.build() end
         local panel = options.panel()
         if not panel then return end
-        panel.isBluUIWindow = true
         panel:SetFrameStrata(STRATA_BELOW[Anchor():GetFrameStrata()])
         SetOffset(hiddenX)
         panel:Show()

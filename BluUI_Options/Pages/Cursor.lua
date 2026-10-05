@@ -1,49 +1,35 @@
 local BUI = BluUI
 local BUILib = BUI.BUILibClient
-local Controls, Layout, Modals = BUILib.Controls, BUILib.Layout, BUILib.Modals
+local Layout, Modals = BUILib.Layout, BUILib.Modals
 local MouseCursor = BUI.MouseCursor
 local RING_TEXTURE = BUI.C.CURSOR_RING_TEXTURE
 
 local PAGE_WIDTH = 960
-local SLIDER_WIDTH = 200
-local DROPDOWN_WIDTH = 200
-local TOP_ROW = 50
-local TOP_GAP = 20
-local TOP_DIVIDER_INSET = 10
-local SIZE_LABEL = 100
-local COLOR_SIZE = 26
-local HEX_WIDTH = 88
-local HEX_GAP = 8
+local MENU_WIDTH = 170
+local SLIDER_WIDTH = 240
 local POINTER_SIZE = 18
 local POINTER_TIP_X, POINTER_TIP_Y = 5, 2
 local GCD_DURATION = 1.2
 local CAST_DURATION = 1.8
-local DISABLED_ALPHA = 0.3
-local TILE_RING = 46
-local EDITOR_HEAD = 58
-local EDITOR_ICON = 30
-local EDITOR_TEXT_X = 14
 
 local RINGS = {
-	{ key = 'main', name = 'Main ring', short = 'Main', about = 'Your primary cursor outline' },
-	{ key = 'inner', name = 'Inner ring', short = 'Inner', about = 'Sits inside the main ring' },
-	{ key = 'outer', name = 'Outer ring', short = 'Outer', about = 'Sits outside the main ring' },
+	{ key = 'main', name = 'Main ring', about = 'Your primary cursor outline' },
+	{ key = 'inner', name = 'Inner ring', about = 'Sits inside the main ring' },
+	{ key = 'outer', name = 'Outer ring', about = 'Sits outside the main ring' },
 }
-local RING_BY_KEY = {}
-for _, ring in ipairs(RINGS) do RING_BY_KEY[ring.key] = ring end
 
 local function Scene(label, name)
 	return { label = label, texture = BUI.C.MEDIA_PATH .. 'cursor_preview_' .. name .. '.tga', aspect = 1 }
 end
 
 local BACKGROUNDS = {
+	{ label = 'Dark' },
 	Scene('Jungle ruins', 'jungle'),
 	Scene('Molten', 'molten'),
 	Scene('Fel', 'fel'),
 	Scene('Silvermoon', 'silvermoon'),
 	Scene('Garden', 'garden'),
 	Scene('Void', 'void'),
-	{ label = 'Dark' },
 }
 
 local BEHAVIORS = {
@@ -53,9 +39,6 @@ local BEHAVIORS = {
 	{ value = 'cast', text = 'Cast progress' },
 }
 
-local opened = {}
-local arts = {}
-local selected = 'main'
 local preview
 
 local function Window()
@@ -64,10 +47,6 @@ end
 
 local function Config()
 	return BUI.GetDB().cursor
-end
-
-local function Slot()
-	return Config().slots[selected]
 end
 
 local function Restyle()
@@ -79,36 +58,6 @@ local function Changed()
 	MouseCursor.Apply()
 	preview:UpdateRing()
 	Window():Repaint()
-end
-
-local function BehaviorName(kind)
-	for _, behavior in ipairs(BEHAVIORS) do
-		if behavior.value == kind then return behavior.text end
-	end
-end
-
-local function ParseHex(text)
-	local digits = text:match('^%s*#?(%x%x%x%x%x%x)%s*$')
-	if not digits then return end
-	return tonumber(digits:sub(1, 2), 16) / 255, tonumber(digits:sub(3, 4), 16) / 255, tonumber(digits:sub(5, 6), 16) / 255
-end
-
-local function PickColor(Slot, anchor, sync)
-	local slot = Slot()
-	local red, green, blue, alpha = slot.colorR, slot.colorG, slot.colorB, slot.alpha
-	Controls.OpenColorPicker({
-		r = red, g = green, b = blue, a = alpha, hasOpacity = true, anchorTo = anchor,
-		callback = function(newRed, newGreen, newBlue, newAlpha, cancelled)
-			local current = Slot()
-			if cancelled then
-				current.colorR, current.colorG, current.colorB, current.alpha = red, green, blue, alpha
-			else
-				current.colorR, current.colorG, current.colorB, current.alpha = newRed, newGreen, newBlue, newAlpha
-			end
-			Restyle()
-			sync()
-		end,
-	})
 end
 
 local function Reset()
@@ -235,191 +184,99 @@ local function SetCombatOnly(value)
 end
 
 local function VisibilityItems()
-	local config = Config()
+	local combatOnly = Config().combatOnly
 	return {
-		{ text = 'Always shown', checked = not config.combatOnly, callback = function() SetCombatOnly(false) end },
-		{ text = 'In combat only', checked = config.combatOnly, callback = function() SetCombatOnly(true) end },
-		{ separator = true },
-		{ text = 'Hide over BluUI windows', checked = config.hideOverMenus, callback = function(item)
-			config.hideOverMenus = not config.hideOverMenus
-			item.checked = config.hideOverMenus
-			Changed()
-			return true
-		end },
+		{ text = 'Always shown', checked = not combatOnly, callback = function() SetCombatOnly(false) end },
+		{ text = 'In combat only', checked = combatOnly, callback = function() SetCombatOnly(true) end },
 	}
 end
 
-local function RingSummary(slot)
-	return slot.enabled and BehaviorName(slot.kind) or 'Off'
-end
-
-local function TopCard(kit, parent)
-	local card = kit.Card(parent)
-	local row = CreateFrame('Frame', nil, card)
-	row:SetHeight(TOP_ROW)
-	row.search = 'cursor size visibility combat hide over bluui windows'
-	kit.Text(row, 'Cursor size', 12, 'text'):SetPoint('LEFT')
-	local slider = kit.Slider(row, SLIDER_WIDTH, {
-		plain = true, min = 8, max = 160, step = 1,
-		get = function() return Config().size end,
+local function SizeOption(label, store, key, min, max)
+	return {
+		label = label, min = min, max = max, step = 1,
+		get = function() return store()[key] end,
 		set = function(value)
-			Config().size = value
+			store()[key] = value
 			Restyle()
 		end,
-	})
-	slider:SetPoint('LEFT', SIZE_LABEL, 0)
-	local divider = kit.Fill(row, 'cardEdge', 'ARTWORK')
-	divider:SetSize(1, TOP_ROW - TOP_DIVIDER_INSET * 2)
-	local visibility = kit.Select(row, {
-		icon = 'eye',
-		label = 'Visibility',
-		stretch = true,
-		value = function() return Config().combatOnly and 'In combat only' or 'Always shown' end,
-		items = VisibilityItems,
-	})
-	visibility:SetPoint('RIGHT')
-	function row:Measure(width)
-		local half = math.floor(width / 2)
-		slider:SetWidth(half - SIZE_LABEL - TOP_GAP)
-		divider:SetPoint('LEFT', half, 0)
-		visibility:SetPoint('LEFT', half + TOP_GAP, 0)
-		return TOP_ROW
-	end
-	card:Add(row)
-	return card
+	}
 end
 
-local function RingArt(kit, ring)
-	return function(holder)
-		local band = holder:CreateTexture(nil, 'ARTWORK')
-		band:SetTexture(RING_TEXTURE)
-		band:SetSize(TILE_RING, TILE_RING)
-		band:SetPoint('CENTER')
-		local function Update()
-			local slot = Config().slots[ring.key]
-			band:SetVertexColor(slot.colorR, slot.colorG, slot.colorB, slot.enabled and 1 or DISABLED_ALPHA)
-		end
-		arts[ring.key] = Update
-		kit.Bind(holder, Update)
-	end
-end
-
-local function RingPicker(kit, parent)
-	local items = {}
-	for _, ring in ipairs(RINGS) do
-		items[#items + 1] = { key = ring.key, title = ring.short, sub = function() return RingSummary(Config().slots[ring.key]) end, art = RingArt(kit, ring) }
-	end
-	return kit.Tiles(parent, {
-		items = items,
-		search = 'rings main inner outer',
-		selected = function() return selected end,
-		onSelect = function(key)
-			selected = key
-			Window():Repaint()
-		end,
+local function RingRow(board, ring)
+	local function slot() return Config().slots[ring.key] end
+	board:AddTools(ring.name, ring.about, {
+		{ entries = BEHAVIORS, width = MENU_WIDTH, get = function() return slot().kind end, set = function(value)
+			slot().kind = value
+			Changed()
+		end },
+		{ kind = 'swatch', opacity = true, tooltip = 'Ring colour', get = function()
+			local current = slot()
+			return current.colorR, current.colorG, current.colorB, current.alpha
+		end, set = function(red, green, blue, alpha)
+			local current = slot()
+			current.colorR, current.colorG, current.colorB, current.alpha = red, green, blue, alpha
+			Restyle()
+		end },
+		{ tooltip = 'Size and layer', title = ring.name, options = {
+			SizeOption('Size offset', slot, 'offset', -40, 80),
+			SizeOption('Layer', slot, 'zOrder', 1, 10),
+		} },
+		{ get = function() return slot().enabled == true end, set = function(value)
+			slot().enabled = value
+			Changed()
+		end },
 	})
 end
 
-local function ColorField(kit, parent, sync)
-	local field = CreateFrame('Frame', nil, parent)
-	field:SetSize(COLOR_SIZE + HEX_GAP + HEX_WIDTH, COLOR_SIZE)
-	field.swatch = kit.RoundSwatch(field, COLOR_SIZE, function(self) PickColor(Slot, self, sync) end)
-	field.swatch:SetPoint('LEFT')
-	field.hex = kit.Input(field, HEX_WIDTH, {
-		placeholder = '#FFFFFF',
-		get = function()
-			local slot = Slot()
-			return Layout.HexColor(slot.colorR, slot.colorG, slot.colorB)
-		end,
-		set = function(text)
-			local red, green, blue = ParseHex(text)
-			if red then
-				local slot = Slot()
-				slot.colorR, slot.colorG, slot.colorB = red, green, blue
+local function CursorBoard(kit, parent, width)
+	local board = kit.Board(parent, width, {
+		stacked = true,
+		title = 'Cursor',
+		description = 'Rings that follow the mouse. The size sets the main ring; the inner and outer rings sit relative to it.',
+	})
+	board:AddTools('Cursor size', 'Diameter of the main ring in pixels', {
+		{ build = function(parent)
+			return kit.Slider(parent, SLIDER_WIDTH, { min = 8, max = 160, step = 1, get = function() return Config().size end, set = function(value)
+				Config().size = value
 				Restyle()
-			end
-			sync()
-		end,
+			end })
+		end },
 	})
-	field.hex:SetPoint('LEFT', field.swatch, 'RIGHT', HEX_GAP, 0)
-	return field
+	board:AddTools('Show the rings', 'Always, or only while in combat', {
+		{ build = function(parent)
+			return kit.Select(parent, {
+				icon = 'eye',
+				label = 'Visibility',
+				value = function() return Config().combatOnly and 'In combat only' or 'Always shown' end,
+				items = VisibilityItems,
+			})
+		end },
+	})
+	return board
 end
 
-local function RingEditor(kit, parent)
-	local card = kit.Card(parent)
-	local head = CreateFrame('Frame', nil, card)
-	head:SetHeight(EDITOR_HEAD)
-	head.search = 'ring enable'
-	local icon = head:CreateTexture(nil, 'ARTWORK')
-	icon:SetTexture(RING_TEXTURE)
-	icon:SetSize(EDITOR_ICON, EDITOR_ICON)
-	icon:SetPoint('LEFT')
-	local title = kit.Text(head, '', 14, 'text')
-	title:SetPoint('BOTTOMLEFT', icon, 'RIGHT', EDITOR_TEXT_X, 1)
-	local about = kit.Text(head, '', 12, 'muted')
-	about:SetPoint('TOPLEFT', icon, 'RIGHT', EDITOR_TEXT_X, -3)
-	kit.Switch(head, function() return Slot().enabled end, function(value)
-		Slot().enabled = value
-		Changed()
-	end):SetPoint('RIGHT')
-	card:Add(head)
-	card:AddRule()
+local function RingsBoard(kit, parent, width)
+	local board = kit.Board(parent, width, {
+		stacked = true,
+		title = 'Rings',
+		description = 'Main, inner and outer. Each ring has its own behavior, colour, size and layer.',
+	})
+	for _, ring in ipairs(RINGS) do RingRow(board, ring) end
+	return board
+end
 
-	local behavior = kit.Dropdown(card, DROPDOWN_WIDTH, function()
-		local current = Slot().kind
-		local items = {}
-		for _, entry in ipairs(BEHAVIORS) do
-			items[#items + 1] = { text = entry.text, checked = entry.value == current, callback = function()
-				Slot().kind = entry.value
-				Changed()
-			end }
-		end
-		return items
-	end)
-	card:AddField('Behavior', behavior, true)
-
-	local color
-	local function Sync()
-		local slot, ring = Slot(), RING_BY_KEY[selected]
-		title:SetText(ring.name)
-		about:SetText(ring.about)
-		icon:SetVertexColor(slot.colorR, slot.colorG, slot.colorB, slot.enabled and 1 or DISABLED_ALPHA)
-		color.swatch.fill:SetVertexColor(slot.colorR, slot.colorG, slot.colorB, slot.alpha)
-		color.hex.edit:SetText(Layout.HexColor(slot.colorR, slot.colorG, slot.colorB))
-		behavior.label:SetText(BehaviorName(slot.kind))
-		arts[selected]()
+local function BoardItem(kit, parent, width, build)
+	local item = CreateFrame('Frame', nil, parent)
+	local board = build(kit, item, width)
+	local query = ''
+	function item:Filter(text)
+		query = text
+		return board:Layout(0, query) > 0
 	end
-	color = ColorField(kit, card, Sync)
-	card:AddField('Color', color)
-	card:AddField('Size offset', kit.Slider(card, SLIDER_WIDTH, {
-		plain = true, signed = true, min = -40, max = 80, step = 1,
-		get = function() return Slot().offset end,
-		set = function(value)
-			Slot().offset = value
-			Restyle()
-		end,
-	}), true)
-	card:AddRule()
-	local fineTune = card:Add(kit.Fold(card, {
-		title = 'Fine-tune', icon = 'cog', chevron = 'right',
-		open = opened.fineTune,
-		onToggle = function(open) opened.fineTune = open end,
-	}))
-	fineTune.body:AddField('Layer', kit.Slider(fineTune.body, SLIDER_WIDTH, {
-		plain = true, min = 1, max = 10, step = 1,
-		get = function() return Slot().zOrder end,
-		set = function(value)
-			Slot().zOrder = value
-			Restyle()
-		end,
-	}), true)
-
-	kit.Bind(card, Sync)
-	return card
-end
-
-local function Build(kit, parent)
-	return { RingPicker(kit, parent), RingEditor(kit, parent) }
+	function item:Measure()
+		return board:Layout(0, query)
+	end
+	return item
 end
 
 BUI.PageEngine.RegisterPage('cursor', {
@@ -434,8 +291,9 @@ BUI.PageEngine.RegisterPage('cursor', {
 			subtitle = 'Appearance and feedback',
 			placeholder = 'Search cursor settings...',
 			enable = { get = function() return BUI.IsModuleEnabled('cursor') end, set = function(value) BUI.SetModuleEnabled('cursor', value) end },
-			top = TopCard,
-			build = Build,
+			build = function(kit, main, width)
+				return { BoardItem(kit, main, width, CursorBoard), BoardItem(kit, main, width, RingsBoard) }
+			end,
 			preview = {
 				title = 'Live preview',
 				caption = 'Move and click here to try it',

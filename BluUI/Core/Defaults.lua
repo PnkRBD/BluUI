@@ -651,7 +651,6 @@ BUI.Defaults = {
 		cursor = {
 			enabled    = false,
 			combatOnly = false,
-			hideOverMenus = false,
 			size       = 50,
 			slots = {
 				inner = {
@@ -1940,6 +1939,7 @@ BUI.DeprecatedKeys = {
 	['cdm.utility.opacity']           = true,
 
 	['cursor.hideDuringCinematic'] = true,
+	['cursor.hideOverMenus']       = true,
 	['cursor.hideOnMouselook']     = true,
 	['cursor.perButtonColor']      = true,
 	['cursor.pulseDuration']       = true,

@@ -111,7 +111,6 @@ function Modals.CreateBase(width, height, bounded, parent)
 	local anchorParent = bounded and parent or UIParent
 
 	local overlay = CreateFrame("Frame", nil, anchorParent, "BackdropTemplate")
-	overlay.isBluUIWindow = true
 
 	if bounded and parent then
 		overlay:SetAllPoints(parent)
