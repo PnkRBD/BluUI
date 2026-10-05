@@ -272,7 +272,6 @@ local function PublishEdgeOffsets(anchor, totalHeight, scaledHeight, topY, botto
     local topCorner = IconCornerTop(totalHeight, scaledHeight, topY)
     anchor._topEdgeOffset = topCorner
     anchor._bottomEdgeOffset = totalHeight - IconCornerTop(totalHeight, scaledHeight, bottomY) - scaledHeight
-    anchor._topRowCenterOffsetY = Pixel.Snap(totalHeight / 2 - topCorner - scaledHeight / 2)
 end
 
 local function ResolveIconIDs(icon, iconFrameData)
@@ -383,7 +382,6 @@ function CDM.ApplyIconPositions(key)
         anchor._row1CenterOffsetX = 0
         anchor._topRowCenterOffsetX = 0
         anchor._bottomRowCenterOffsetX = 0
-        anchor._topRowCenterOffsetY = 0
         anchor._topEdgeOffset, anchor._bottomEdgeOffset = 0, 0
         anchor:Hide()
         return
@@ -611,8 +609,9 @@ function CDM.ApplyIconPositions(key)
         totalHeight = numRows * scaledHeight + (numRows - 1) * scaledSpacing
     end
 
-    anchor:SetSize(totalWidth, totalHeight)
-    anchor._layoutW, anchor._layoutH = totalWidth, totalHeight
+    local boxHeight = vertical and totalHeight or scaledHeight
+    anchor:SetSize(totalWidth, boxHeight)
+    anchor._layoutW, anchor._layoutH = totalWidth, boxHeight
 
     local row1Count = CDM.NextRowSize(1, count, perRow)
     anchor._row1W = RowWidthOf(row1Count, scaledWidth, scaledSpacing)
@@ -646,7 +645,7 @@ function CDM.ApplyIconPositions(key)
     else
         topRowY, bottomRowY = 0, -(numRows - 1) * stepY
     end
-    PublishEdgeOffsets(anchor, totalHeight, scaledHeight, topRowY, bottomRowY)
+    PublishEdgeOffsets(anchor, boxHeight, scaledHeight, topRowY, bottomRowY)
 
     if key ~= "buffs" then
         if vertical then
@@ -696,7 +695,7 @@ function CDM.ApplyIconPositions(key)
             else
                 rowLeft = RowLeftCorner(totalWidth, rowWidth)
             end
-            local rowTop = IconCornerTop(totalHeight, scaledHeight, (row - 1) * stepY * yDirection)
+            local rowTop = IconCornerTop(boxHeight, scaledHeight, (row - 1) * stepY * yDirection)
             for col = 0, rowCount - 1 do
                 if iconIndex > count then break end
                 PlaceIcon(icons[iconIndex], key, anchor, rowLeft + col * stepX, rowTop, settings, opacity)

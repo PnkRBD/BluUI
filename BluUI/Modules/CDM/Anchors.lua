@@ -99,7 +99,6 @@ function CDM.CreateAnchor(key)
     frame._topEdgeOffset = 0
     frame._bottomEdgeOffset = 0
     frame._row1CenterOffsetX = 0
-    frame._topRowCenterOffsetY = 0
     Anchors[key] = frame
     return frame
 end

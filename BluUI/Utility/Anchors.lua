@@ -346,14 +346,9 @@ function Anchor.ApplyPosition(frame, settings)
                     if rowCenterOffsetX then anchorX = anchorX + rowCenterOffsetX end
                 end
 
-                if anchorTarget._topRowCenterOffsetY
-                    and (anchorPoint == "LEFT" or anchorPoint == "RIGHT" or anchorPoint == "CENTER") then
-                    anchorY = anchorY + anchorTarget._topRowCenterOffsetY
-                end
-
-                if anchorTarget._topRowW and (anchorPoint == "LEFT" or anchorPoint == "RIGHT") then
+                if anchorTarget._row1W and (anchorPoint == "LEFT" or anchorPoint == "RIGHT") then
                     local frameWidth = anchorTarget._layoutW or anchorTarget:GetWidth() or 0
-                    local inset = (frameWidth - anchorTarget._topRowW) / 2
+                    local inset = (frameWidth - anchorTarget._row1W) / 2
                     if inset > 0 then
                         anchorX = anchorPoint == "LEFT" and (anchorX + inset) or (anchorX - inset)
                     end

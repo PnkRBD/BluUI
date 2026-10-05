@@ -269,7 +269,7 @@ end
 
 local ANCHOR_LAYOUT_FIELDS = {
 	'_topEdgeOffset', '_bottomEdgeOffset', '_row1CenterOffsetX', '_topRowCenterOffsetX', '_bottomRowCenterOffsetX',
-	'_topRowCenterOffsetY', '_topRowW', '_bottomRowW', '_row1W', '_layoutW', '_castbarIconWidth', '_cachedScaledH',
+	'_topRowW', '_bottomRowW', '_row1W', '_layoutW', '_castbarIconWidth', '_cachedScaledH',
 }
 local ANCHOR_GEOMETRY_SLOTS = #ANCHOR_LAYOUT_FIELDS + 5
 local ANCHOR_EXTRA_SLOT = ANCHOR_GEOMETRY_SLOTS + 1
