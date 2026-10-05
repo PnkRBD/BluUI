@@ -10,20 +10,19 @@ local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local SKIN_ID = 'greatvault'
 local PANEL_INSET = 8
 local SELECT_BUTTON_ROOM = 14
-local CARD_INSET = 2
 local CONCESSION_INSET = 2
 local DIVIDER_INSET = 40
 local TITLE_SCALE = 1.3
 local ROW_NAME_SCALE = 1.5
 local HEADER_ART_ALPHA = 0.45
 local DIM_ALPHA = 0.55
-local ACTIVE_EDGE = { 0.3, 0.31, 0.35, 1 }
+local SLOT_EDGE_PIXELS = 3
 local TYPE_FRAME_KEYS = { 'RaidFrame', 'MythicFrame', 'PVPFrame', 'WorldFrame' }
-local ACTIVITY_CHROME = { 'Border', 'ItemGlow', 'UncollectedGlow', 'SelectedTexture' }
 
 local installed = false
 local skinned = false
 local dividerLines = {}
+local slotEdges = {}
 
 local function Enabled()
 	return Skin.IsSkinEnabled(SKIN_ID)
@@ -86,23 +85,41 @@ local function StyleItemFrame(itemFrame)
 	Face(itemFrame.Name)
 end
 
+local function BlackEdges(activity)
+	local edges = activity._buiEdges
+	if not edges then
+		edges = {}
+		local thickness = BUI.Pixel.PixelSizeFor(activity, SLOT_EDGE_PIXELS)
+		for edgeIndex = 1, 4 do
+			local edge = activity:CreateTexture(nil, 'OVERLAY', nil, 7)
+			edge.__buiSkin = true
+			FlatTexture(edge, 0, 0, 0, 1)
+			edges[edgeIndex] = edge
+			slotEdges[#slotEdges + 1] = edge
+		end
+		edges[1]:SetPoint('TOPLEFT')
+		edges[1]:SetPoint('BOTTOMRIGHT', activity, 'TOPRIGHT', 0, -thickness)
+		edges[2]:SetPoint('BOTTOMLEFT')
+		edges[2]:SetPoint('TOPRIGHT', activity, 'BOTTOMRIGHT', 0, thickness)
+		edges[3]:SetPoint('TOPLEFT', 0, -thickness)
+		edges[3]:SetPoint('BOTTOMRIGHT', activity, 'BOTTOMLEFT', thickness, thickness)
+		edges[4]:SetPoint('TOPRIGHT', 0, -thickness)
+		edges[4]:SetPoint('BOTTOMLEFT', activity, 'BOTTOMRIGHT', -thickness, thickness)
+		activity._buiEdges = edges
+	end
+	for edgeIndex = 1, 4 do edges[edgeIndex]:Show() end
+end
+
 local function SkinActivity(activity)
 	local active = activity.unlocked or activity.hasRewards
-	FadeKeys(activity, ACTIVITY_CHROME)
-	Fade(activity.SelectionGlow)
-	Fade(activity.Background)
-	DimFrame(activity.UnselectedFrame, CARD_INSET)
-	Shell(activity, CARD_INSET)
 	Skin.TipFont(activity.Threshold, active and 'body' or 'label')
 	Skin.TipFont(activity.Progress, active and 'body' or 'label')
-	local itemFrame = activity.ItemFrame
-	if itemFrame then
-		if not activity._buiActivity then
-			activity._buiActivity = true
-			Hook(itemFrame, 'SetDisplayedItem', StyleItemFrame)
-		end
-		StyleItemFrame(itemFrame)
+	BlackEdges(activity)
+	if not activity._buiActivity then
+		activity._buiActivity = true
+		Hook(activity.ItemFrame, 'SetDisplayedItem', StyleItemFrame)
 	end
+	StyleItemFrame(activity.ItemFrame)
 end
 
 local function SkinConcession(concession)
@@ -116,15 +133,6 @@ local function SkinConcession(concession)
 	Skin.TipFont(rewards.Text, concession.unlocked and 'body' or 'label')
 end
 
-local function RefreshSelection(frame)
-	if not Enabled() or not frame.Activities then return end
-	for _, activity in ipairs(frame.Activities) do
-		local selected = activity.SelectedTexture and activity.SelectedTexture:IsShown()
-		local active = activity.unlocked or activity.hasRewards
-		Skin.TipShellEdges(activity, selected == true or (active and ACTIVE_EDGE))
-	end
-end
-
 local function RefreshActivities(frame)
 	if not Enabled() or not frame.Activities then return end
 	for _, activity in ipairs(frame.Activities) do
@@ -134,7 +142,6 @@ local function RefreshActivities(frame)
 			SkinActivity(activity)
 		end
 	end
-	RefreshSelection(frame)
 end
 
 local function SkinTypeFrame(typeFrame)
@@ -200,7 +207,6 @@ end
 local function SkinMainFrame(frame)
 	Fade(frame.Background)
 	Fade(frame.BorderShadow)
-	Fade(frame.ModelScene)
 	ReplaceDivider(frame.Divider1)
 	ReplaceDivider(frame.Divider2)
 	FadeRegions(frame.BorderContainer)
@@ -235,10 +241,6 @@ local function OnRefresh(frame)
 	if skinned then RefreshActivities(frame) end
 end
 
-local function OnSelection(frame)
-	if skinned then RefreshSelection(frame) end
-end
-
 local function OnSetUpActivity(frame, typeFrame)
 	if not skinned or not Enabled() then return end
 	SkinTypeFrame(typeFrame)
@@ -260,7 +262,6 @@ local function Install()
 	installed = true
 	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GreatVault frame reskin', Apply))
 	Hook(frame, 'Refresh', OnRefresh)
-	Hook(frame, 'UpdateSelection', OnSelection)
 	Hook(frame, 'SetUpActivity', OnSetUpActivity)
 	Hook(frame, 'UpdateOverlay', OnOverlay)
 	Hook(frame, 'SelectReward', OnSelectReward)
@@ -277,6 +278,7 @@ end
 local function Deactivate()
 	context.Restore()
 	for _, line in ipairs(dividerLines) do line:Hide() end
+	for _, edge in ipairs(slotEdges) do edge:Hide() end
 	skinned = false
 end
 
@@ -295,6 +297,6 @@ end)
 
 Skin.RegisterSkin(SKIN_ID, {
 	name = 'Great Vault',
-	description = 'The Great Vault window: dark shell, faded gold chrome, house row titles and progress text, framed reward icons and accent-edged selection.',
+	description = 'The Great Vault window: dark shell, faded gold chrome, house row titles and progress text, framed reward icons. Reward slots keep their own art.',
 	icon = 'Interface/Icons/INV_Box_01',
 })
