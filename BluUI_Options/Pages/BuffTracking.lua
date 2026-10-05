@@ -393,7 +393,7 @@ BUI.PageEngine.RegisterPage('classAlert', {
 		local db = BUI.GetDB()[current.key]
 		local Refresh = Refresher(current)
 		local tools = {
-			{ icon = 'enable', hint = false, tooltip = 'Turn it on or off', get = function() return db.enabled == true end, set = function(value)
+			{ icon = 'enable', tooltip = 'Turn it on or off', get = function() return db.enabled == true end, set = function(value)
 				db.enabled = value
 				Refresh()
 			end },
