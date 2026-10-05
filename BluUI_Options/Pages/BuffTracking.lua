@@ -8,11 +8,6 @@ local PAGE_WIDTH = 960
 local LABEL_RANGE = 50
 local OVERLAY_RANGE = 30
 
-local DISPLAYS = {
-	{ value = 'icon', text = 'On the icon' },
-	{ value = 'screen', text = 'On screen' },
-	{ value = 'both', text = 'Both' },
-}
 local ALERT_MODES = {
 	{ value = 'flash', text = 'Flash briefly' },
 	{ value = 'stay', text = 'Stay on screen' },
@@ -279,36 +274,6 @@ local function PackLeader(board)
 	})
 end
 
-local function BestialWrath(board)
-	local Overlay = BuffTracking.BestialWrathOverlay
-	Alert(board, {
-		key = 'bestialWrathOverlay', title = 'Bestial Wrath callout', description = 'HOLD BW, SEND BW and THRASH! on the icon or on screen, needs Wild Thrash', spell = 19574,
-		refresh = Overlay.Refresh, eye = Preview(Overlay),
-		build = function(db, Board, Refresh)
-			local callout = Board('Bestial Wrath callout', 'HOLD BW, SEND BW and THRASH! on the icon or on screen.')
-			Switch(callout, db, 'Speak the callouts', 'tts', Refresh)
-			Switch(callout, db, 'Speak the hold cues', 'ttsHold', Refresh)
-			Switch(callout, db, 'Hold Thrash hint when a Thrash now would not be back in time for Bestial Wrath', 'showHoldThrash', Refresh)
-			Switch(callout, db, 'Screen text only in combat', 'screenCombatOnly', Refresh)
-			callout:AddSwitch('Unlock the screen text to drag it', function() return db.screenLocked == false end, function(value)
-				db.screenLocked = not value
-				Refresh()
-			end)
-			callout:AddTools('Text', 'Where it shows, how big it is and where the screen text sits', {
-				Option(db, 'Show', 'displayMode', { entries = DISPLAYS }),
-				TextTool('Text', {
-					Option(db, 'Size on the icon', 'textSize', { min = 6, max = 32, step = 1 }),
-					Option(db, 'Anchor on the icon', 'textAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
-					Option(db, 'Horizontal on the icon', 'textOffsetX', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 }),
-					Option(db, 'Vertical on the icon', 'textOffsetY', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 }),
-					Option(db, 'Size on screen', 'screenTextSize', { min = 12, max = 64, step = 1, separator = true }),
-				}),
-				BUI.PositionTool(db, { noCenter = true }),
-			}, Refresh)
-		end,
-	})
-end
-
 local function SmartMisdirect(board)
 	local SmartMisdirect = BuffTracking.SmartMisdirect
 	Alert(board, {
@@ -352,7 +317,6 @@ local function Sections(ui, _, parent, width)
 		local procs = Board('Procs', 'Text callouts for procs and stacks. The eye on a row lets you drag it, right-click the text to lock it again.')
 		TextAlert(procs, { key = 'hunterKillCommand', frame = 'BUI_BuffTrackingHunterKC', title = 'Kill Command', description = 'Text alert when Kill Command procs', spell = 34026 })
 		TextAlert(procs, { key = 'hunterCobraFang', frame = 'BUI_BuffTrackingHunterCF', title = 'Cobra Fang', description = 'Live tier set stack count, spent by Cobra Shot, up to 4', spell = 193455 })
-		BestialWrath(Board('AoE burst', 'Bestial Wrath callouts for Wild Thrash.'))
 	elseif Hunter.IsSurvivalHunter() then
 		local procs = Board('Procs', 'Stacks and text callouts. The eye on a row lets you drag it, right-click the text to lock it again.')
 		StackAlert(procs, { key = 'hunterTip', frame = 'BUI_BuffTrackingHunterTip', stacks = 3, title = 'Tip of the Spear', description = 'Stacks as bars or a number, up to 3', spell = 260286 })
