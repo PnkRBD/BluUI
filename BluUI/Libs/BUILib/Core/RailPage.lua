@@ -92,9 +92,9 @@ function Layout.RailPage(tab, shell, spec)
 		if not pane then
 			local frame = CreateFrame('Frame', nil, content)
 			frame:SetAllPoints()
-			pane = { frame = frame }
+			frame:Hide()
+			pane = { frame = frame, sections = spec.build(kit, shell, frame, contentWidth, current, page) }
 			panes[id] = pane
-			pane.sections = spec.build(kit, shell, frame, contentWidth, current, page)
 		end
 		pane.frame:Show()
 		self:Resize()
