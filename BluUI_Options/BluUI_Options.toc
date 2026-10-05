@@ -13,6 +13,7 @@ Pages\Minimap.lua
 Pages\Datatext.lua
 Pages\Chat.lua
 Pages\Markers.lua
+Pages\QualityOfLife.lua
 Pages\Appearance.lua
 Pages\AlertMover.lua
 Pages\SpellSearch.lua
