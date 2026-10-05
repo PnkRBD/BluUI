@@ -573,21 +573,7 @@ do
 		tip:SetClampedToScreen(true)
 		tip:SetSize(MAX_WIDTH, 30)
 
-		local background = tip:CreateTexture(nil, "BACKGROUND", nil, -8)
-		background:SetAllPoints()
-		background:SetColorTexture(unpack(getTheme().bg.dark))
-
-		for _, info in ipairs({
-			{"TOPLEFT", "TOPRIGHT", true},
-			{"BOTTOMLEFT", "BOTTOMRIGHT", true},
-			{"TOPLEFT", "BOTTOMLEFT", false},
-			{"TOPRIGHT", "BOTTOMRIGHT", false},
-		}) do
-			local edge = tip:CreateTexture(nil, "BORDER")
-			edge:SetColorTexture(unpack(getTheme().border.light))
-			edge:SetPoint(info[1]); edge:SetPoint(info[2])
-			if info[3] then edge:SetHeight(1) else edge:SetWidth(1) end
-		end
+		tip.fill, tip.edge = Widget.DrawCardShape(tip, TIP_RADIUS, getTheme().bg.card, getTheme().border.light, "BACKGROUND", -8, 0)
 
 		tip.label = tip:CreateFontString(nil, "OVERLAY")
 		tip.label:SetFont(BUILib.Font, 11, "")
@@ -610,7 +596,19 @@ do
 		return tip
 	end
 
+	local function StyleTip(tooltip, window)
+		if window then
+			Widget.SetShapeColor(tooltip.fill, window:Color("card"))
+			Widget.SetShapeColor(tooltip.edge, window:Color("cardEdge"))
+		else
+			local theme = getTheme()
+			Widget.SetShapeColor(tooltip.fill, unpack(theme.bg.card))
+			Widget.SetShapeColor(tooltip.edge, unpack(theme.border.light))
+		end
+	end
+
 	local function PositionTip(tooltip, owner, config)
+		StyleTip(tooltip, config and config.window)
 		Widget.MatchScale(tooltip, owner)
 		tooltip:ClearAllPoints()
 		local anchor = config and config.anchor
