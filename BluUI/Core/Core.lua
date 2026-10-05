@@ -124,8 +124,8 @@ function BUI:OnProfileChanged(event)
 
 	BUI.MigrateProfile(BUI.GetDB())
 	BUI.Skinning.SeedSkinStates()
-	BUI.ExportImport.RefreshAllModules()
 	BUI.PageEngine.RebuildAllPages()
+	BUI.ExportImport.RefreshAllModules()
 end
 
 local function AdoptOldDB(legacyDatabase)

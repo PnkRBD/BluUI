@@ -1717,6 +1717,12 @@ BUI.Defaults = {
 				powerTextSize     = 11,
 				combatBorder      = true,
 				customName        = '',
+				auraIconSize      = 22,
+				auraSpacing       = 2,
+				maxDebuffs        = 8,
+				maxBuffs          = 8,
+				debuffsPerRow     = 8,
+				buffsPerRow       = 8,
 				position          = { point = 'CENTER', relPoint = 'CENTER', x = -290, y = -195 },
 			}),
 
