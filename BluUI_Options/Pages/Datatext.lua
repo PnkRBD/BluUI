@@ -471,6 +471,7 @@ BUI.PageEngine.RegisterPage('datatext', {
 			icon = 'text',
 			title = 'Datatext',
 			placeholder = 'Search datatext settings...',
+			disabled = function() return not Datatext.ModuleEnabled() end,
 			tools = {
 				{ icon = 'enable', tooltip = 'Turn the datatext module on or off', get = Datatext.ModuleEnabled, set = function(value)
 					BUI.GetDB().datatextEnabled = value

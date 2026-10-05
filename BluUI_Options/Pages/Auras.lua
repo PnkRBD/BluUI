@@ -429,10 +429,12 @@ BUI.PageEngine.RegisterPage('auras', {
 		fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
 		sounds = BUI.BuildSoundDropdownItems()
 		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
+		local enabled = BUI.IsModuleEnabled('auras')
 		local handle = Layout.TablePage(page:GetTab(1), { window = Window() }, {
 			icon = 'glow',
 			title = '|cffFF0000Weaker|r Auras',
 			placeholder = 'Search alerts...',
+			disabled = function() return not enabled end,
 			tools = {
 				{ icon = 'enable', tooltip = 'Turn the auras module on or off, needs a reload', get = function() return BUI.IsModuleEnabled('auras') end, set = function(value)
 					BUI.ModulesPage.ConfirmReload('auras', value, Repaint)

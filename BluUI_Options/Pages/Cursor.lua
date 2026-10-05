@@ -290,6 +290,7 @@ BUI.PageEngine.RegisterPage('cursor', {
 			title = 'Cursor',
 			subtitle = 'Appearance and feedback',
 			placeholder = 'Search cursor settings...',
+			disabled = function() return not BUI.IsModuleEnabled('cursor') end,
 			enable = { get = function() return BUI.IsModuleEnabled('cursor') end, set = function(value) BUI.SetModuleEnabled('cursor', value) end },
 			build = function(kit, main, width)
 				return { BoardItem(kit, main, width, CursorBoard), BoardItem(kit, main, width, RingsBoard) }

@@ -29,6 +29,8 @@ local BOTTOM_GAP = 24
 local PREVIEW_GAP = 16
 local PREVIEW_RADIUS = 8
 local DOT_TILE = 16
+local DISABLED_ALPHA = 0.35
+local BLOCKER_LEVEL = 20
 local SEARCH_WIDTH, SEARCH_HEIGHT = 224, 34
 local SOLID_HOVER = { 1, 1, 1, 0.12 }
 Layout.SOLID_HOVER = SOLID_HOVER
@@ -773,6 +775,19 @@ function Layout.PinnedHead(tab, window, kit, spec, block, onSearch)
 	return head, top, Layout.AlignPinned(tab, head, block)
 end
 
+function Layout.DisableWhen(window, isDisabled, parent, dims)
+	local blocker = CreateFrame('Frame', nil, parent)
+	blocker:SetFrameLevel(parent:GetFrameLevel() + BLOCKER_LEVEL)
+	blocker:EnableMouse(true)
+	blocker:EnableMouseWheel(true)
+	window:Bind(blocker, function()
+		local dimmed = isDisabled()
+		blocker:SetShown(dimmed)
+		for _, frame in ipairs(dims) do frame:SetAlpha(dimmed and DISABLED_ALPHA or 1) end
+	end)
+	return blocker
+end
+
 function Layout.AlignPinned(tab, head, block)
 	local function Align()
 		local blockLeft, pinnedLeft = block:GetLeft(), tab.pinned:GetLeft()
@@ -821,6 +836,7 @@ function Layout.TablePage(tab, shell, spec)
 		page.tabContents[index] = true
 		panes[index] = { frame = frame, sections = pane.build(kit, shell, frame, tab.width, page) }
 	end
+	if spec.disabled then Layout.DisableWhen(shell.window, spec.disabled, block, { block }):SetAllPoints() end
 
 	Resize = function()
 		local height = Place()

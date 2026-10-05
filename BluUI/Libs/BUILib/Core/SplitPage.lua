@@ -317,6 +317,7 @@ function Layout.SplitPage(tab, shell, spec)
 	local main = kit.Stack(CreateFrame('Frame', nil, block), 0, 0, 0, 0, BLOCK_GAP)
 	for _, item in ipairs(spec.build(kit, main, mainWidth)) do main:Add(item) end
 	local preview = PreviewCard(kit, window, block, mainWidth + COLUMN_GAP, SIDE_WIDTH, spec.preview)
+	if spec.disabled then Layout.DisableWhen(window, spec.disabled, block, { block }):SetAllPoints() end
 
 	local query = ''
 	local head = CreateFrame('Frame', nil, tab.pinned)
