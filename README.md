@@ -14,3 +14,7 @@ Copy the `BluUI` and `BluUI_Options` folders into `World of Warcraft\_retail_\In
 ## License
 
 All rights reserved. See [LICENSE](LICENSE). Libraries in `BluUI/Libs` keep their own licenses.
+
+## Thanks
+
+Pixel perfect code is used with permission from Simpy at ElvUI. Thank you.
