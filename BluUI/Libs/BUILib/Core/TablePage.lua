@@ -37,7 +37,6 @@ local SLIDER_TRACK = 4
 local SLIDER_GAP = 6
 local SLIDER_STEP = 20
 local SLIDER_BOX = 52
-local PLAIN_GAP = 16
 local STEP_SIGN = 12
 local TOGGLE_SIZE = 22
 local TOGGLE_GAP = 14
@@ -216,18 +215,12 @@ function Layout.TableKit(window)
 
 		local slider = CreateFrame('Slider', nil, frame)
 		slider:SetOrientation('HORIZONTAL')
-		local minus, plus
-		if spec.plain then
-			slider:SetPoint('LEFT')
-			slider:SetPoint('RIGHT', box, 'LEFT', -PLAIN_GAP, 0)
-		else
-			plus = Stepper(frame, true)
-			plus:SetPoint('RIGHT', box, 'LEFT', -SLIDER_GAP, 0)
-			minus = Stepper(frame, false)
-			minus:SetPoint('LEFT')
-			slider:SetPoint('LEFT', minus, 'RIGHT', SLIDER_GAP, 0)
-			slider:SetPoint('RIGHT', plus, 'LEFT', -SLIDER_GAP, 0)
-		end
+		local plus = Stepper(frame, true)
+		plus:SetPoint('RIGHT', box, 'LEFT', -SLIDER_GAP, 0)
+		local minus = Stepper(frame, false)
+		minus:SetPoint('LEFT')
+		slider:SetPoint('LEFT', minus, 'RIGHT', SLIDER_GAP, 0)
+		slider:SetPoint('RIGHT', plus, 'LEFT', -SLIDER_GAP, 0)
 		slider:SetHeight(CONTROL_HEIGHT)
 		slider:SetMinMaxValues(spec.min, spec.max)
 		slider:SetValueStep(step)
@@ -247,7 +240,7 @@ function Layout.TableKit(window)
 		fill:SetHeight(SLIDER_TRACK)
 
 		local function Show(value)
-			edit:SetText(((spec.signed and value > 0) and '+' or '') .. pattern:format(value))
+			edit:SetText(pattern:format(value))
 		end
 		local function Set(value)
 			value = Snap(value)
@@ -259,10 +252,8 @@ function Layout.TableKit(window)
 			Show(value)
 			if userInput then spec.set(value) end
 		end)
-		if minus then
-			minus:SetScript('OnClick', function() Set(slider:GetValue() - step) end)
-			plus:SetScript('OnClick', function() Set(slider:GetValue() + step) end)
-		end
+		minus:SetScript('OnClick', function() Set(slider:GetValue() - step) end)
+		plus:SetScript('OnClick', function() Set(slider:GetValue() + step) end)
 		edit:SetScript('OnEnterPressed', function(self)
 			local typed = tonumber(self:GetText())
 			if typed then Set(typed) else Show(Snap(slider:GetValue())) end

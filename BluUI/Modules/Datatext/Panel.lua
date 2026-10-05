@@ -57,7 +57,6 @@ end)
 
 function Datatext.CreateHoverPanel(name, width)
     local panel = CreateFrame('Frame', name, UIParent, 'BackdropTemplate')
-    panel.isBluUIWindow = true
     panel:SetWidth(Pixel.Scale(width))
     panel:SetFrameStrata('DIALOG')
     panel:SetFrameLevel(200)

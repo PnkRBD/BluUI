@@ -470,7 +470,6 @@ local lastClosedAnchor, lastClosedTime
 
 local function BuildPicker()
 	local frame = CreateFrame('Frame', 'BUILibColorPicker', UIParent)
-	frame.isBluUIWindow = true
 	frame:SetWidth(L.WIDTH)
 	frame:EnableMouse(true)
 	frame:Hide()

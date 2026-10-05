@@ -20,25 +20,6 @@ local SEARCH_GAP = 20
 local CARD_RADIUS = 8
 local INSET_RADIUS = 6
 local CARD_PAD = 16
-local CARD_GAP = 6
-local CARD_BOTTOM = 12
-local ROW = 40
-local FOLD_HEAD = 40
-local CHEVRON = 10
-local CHEVRON_GAP = 12
-local RULE_SPACE = 17
-local LABEL_COLUMN = 150
-local SWATCH_RADIUS = 4
-local FOLD_ICON = 14
-local PICK_HEIGHT = 112
-local PICK_GAP = 12
-local PICK_ART = 56
-local PICK_ART_Y = 12
-local PICK_TEXT_GAP = 6
-local PICK_CHECK = 16
-local PICK_MARK = 10
-local PICK_CHECK_INSET = 8
-local PICK_TINT_ALPHA = 0.1
 local SELECT_HEIGHT = 34
 local SELECT_PAD = 12
 local SELECT_ICON = 14
@@ -47,6 +28,7 @@ local SELECT_DIVIDER_INSET = 8
 local SELECT_CHEVRON = 9
 local SELECT_CHEVRON_GAP = 8
 local SELECT_MENU_WIDTH = 220
+local QUARTER_TURN = math.pi / 2
 local LIVE_DOT = 7
 local LIVE_Y = 22
 local LIVE_GAP = 10
@@ -69,9 +51,6 @@ local SCROLL_INSET = 8
 local FILL_MARGIN = 16
 local LINK_HEIGHT = 20
 local WHITE = { 1, 1, 1, 1 }
-local CLEAR = { 0, 0, 0, 0 }
-local FOLD_DURATION = 0.18
-local QUARTER_TURN = math.pi / 2
 
 local Stack = {}
 
@@ -121,123 +100,11 @@ local function AccentTint(alpha)
 end
 
 Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window)
-	local function Shape(frame)
-		local fill, edge = Widget.DrawCardShape(frame, CARD_RADIUS, WHITE, WHITE, 'BACKGROUND', 0, 0)
-		window:Paint(fill, 'card')
-		window:Paint(edge, 'cardEdge')
-	end
-
-	local function Row(stack, label)
-		local row = CreateFrame('Frame', nil, stack)
-		row:SetHeight(ROW)
-		kit.Text(row, label, 12, 'text'):SetPoint('LEFT')
-		row.search = label:lower()
-		return stack:Add(row)
-	end
-
-	local function AddField(stack, label, control, stretch)
-		local row = Row(stack, label)
-		control:SetParent(row)
-		control:ClearAllPoints()
-		control:SetPoint('LEFT', LABEL_COLUMN, 0)
-		if stretch then
-			function row:Measure(width)
-				control:SetWidth(width - LABEL_COLUMN)
-				return ROW
-			end
-		end
-		return row
-	end
-
-	local function AddRule(stack)
-		local holder = CreateFrame('Frame', nil, stack)
-		holder:SetHeight(RULE_SPACE)
-		local line = kit.Fill(holder, 'cardEdge', 'ARTWORK')
-		line:SetPoint('LEFT')
-		line:SetPoint('RIGHT')
-		line:SetHeight(1)
-		return stack:Add(holder)
-	end
-
-	local function Stacked(frame, left, top, right, bottom, gap)
+	function kit.Stack(frame, left, top, right, bottom, gap)
 		Mixin(frame, Stack)
 		frame.items = {}
 		frame.left, frame.top, frame.right, frame.bottom, frame.gap = left, top, right, bottom, gap
-		frame.AddField, frame.AddRule = AddField, AddRule
 		return frame
-	end
-	kit.Stack = Stacked
-
-	function kit.Card(parent)
-		local card = CreateFrame('Frame', nil, parent)
-		Shape(card)
-		return Stacked(card, CARD_PAD, CARD_GAP, CARD_PAD, CARD_BOTTOM, CARD_GAP)
-	end
-
-	function kit.Fold(parent, spec)
-		local fold = CreateFrame('Frame', nil, parent)
-		local head = CreateFrame('Button', nil, fold)
-		head:SetPoint('TOPLEFT')
-		head:SetPoint('TOPRIGHT')
-		head:SetHeight(FOLD_HEAD)
-		local chevron = kit.Glyph(head, 'dropdown', CHEVRON, 'muted')
-		chevron:SetPoint('RIGHT')
-		local titleX = 0
-		if spec.icon then
-			kit.Glyph(head, spec.icon, FOLD_ICON, 'muted'):SetPoint('LEFT')
-			titleX = FOLD_ICON + CHEVRON_GAP
-		end
-		kit.Text(head, spec.title, 12, 'text'):SetPoint('LEFT', titleX, 0)
-		local body = Stacked(CreateFrame('Frame', nil, fold), 0, 0, 0, 0, 0)
-		fold.head, fold.body = head, body
-		fold.open = spec.open == true
-		fold.progress = fold.open and 1 or 0
-		fold.search = spec.title:lower()
-		fold:SetClipsChildren(true)
-
-		local function Animate(self)
-			local motion = self.motion
-			local elapsed = (GetTime() - motion.start) / FOLD_DURATION
-			if elapsed >= 1 then
-				self.progress = motion.to
-				self.motion = nil
-				self:SetScript('OnUpdate', nil)
-			else
-				self.progress = motion.from + (motion.to - motion.from) * (1 - (1 - elapsed) ^ 3)
-			end
-			kit.Relayout()
-		end
-
-		head:SetScript('OnEnter', function() window:Paint(chevron, 'text') end)
-		head:SetScript('OnLeave', function() window:Paint(chevron, 'muted') end)
-		head:SetScript('OnClick', function()
-			fold.open = not (fold.open or fold.forced)
-			fold.forced = false
-			if spec.onToggle then spec.onToggle(fold.open) end
-			fold.motion = { from = fold.progress, to = fold.open and 1 or 0, start = GetTime() }
-			fold:SetScript('OnUpdate', Animate)
-		end)
-
-		function fold:Filter(query, forced)
-			local any = body:Filter(query, forced)
-			self.forced = query ~= '' and any and not forced
-			return any
-		end
-
-		function fold:Measure(width)
-			if not self.motion then self.progress = (self.open or self.forced) and 1 or 0 end
-			local progress = self.progress
-			chevron:SetRotation((1 - progress) * QUARTER_TURN)
-			body:SetShown(progress > 0)
-			if progress == 0 then return FOLD_HEAD end
-			body:SetAlpha(progress)
-			local height = body:Measure(width)
-			body:ClearAllPoints()
-			body:SetPoint('TOPLEFT', 0, -FOLD_HEAD)
-			body:SetSize(width, height)
-			return FOLD_HEAD + math.floor(height * progress + 0.5)
-		end
-		return fold
 	end
 
 	function kit.Select(parent, spec)
@@ -281,76 +148,6 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 			})
 		end)
 		return button
-	end
-
-	function kit.Tiles(parent, spec)
-		local group = CreateFrame('Frame', nil, parent)
-		group:SetHeight(PICK_HEIGHT)
-		group.search = spec.search
-		local tiles = {}
-		local function Paint()
-			local selected = spec.selected()
-			for _, tile in ipairs(tiles) do
-				local active = tile.item.key == selected
-				tile.tint:SetShown(active)
-				window:Paint(tile.edge, active and 'accent' or (tile:IsMouseOver() and 'faint' or 'cardEdge'))
-				tile.check:SetShown(active)
-				tile.mark:SetShown(active)
-				tile.radio:SetShown(not active)
-				tile.hole:SetShown(not active)
-				tile.sub:SetText(tile.item.sub())
-			end
-		end
-		for index, item in ipairs(spec.items) do
-			local tile = CreateFrame('Button', nil, group)
-			tile.item = item
-			local fill
-			fill, tile.edge = Widget.DrawCardShape(tile, CARD_RADIUS, WHITE, WHITE, 'BACKGROUND', 0, 0)
-			window:Paint(fill, 'card')
-			tile.tint = Widget.DrawCardShape(tile, CARD_RADIUS, WHITE, CLEAR, 'BACKGROUND', 2, 0)
-			window:Paint(tile.tint, AccentTint(PICK_TINT_ALPHA))
-			local art = CreateFrame('Frame', nil, tile)
-			art:SetSize(PICK_ART, PICK_ART)
-			art:SetPoint('TOP', 0, -PICK_ART_Y)
-			item.art(art)
-			local title = kit.Text(tile, item.title, 13, 'text')
-			title:SetPoint('TOP', art, 'BOTTOM', 0, -PICK_TEXT_GAP)
-			tile.sub = kit.Text(tile, '', 11, 'muted')
-			tile.sub:SetPoint('TOP', title, 'BOTTOM', 0, -2)
-			tile.radio = kit.Disc(tile, PICK_CHECK, 'faint', 'ARTWORK', 1)
-			tile.radio:SetPoint('TOPRIGHT', -PICK_CHECK_INSET, -PICK_CHECK_INSET)
-			tile.hole = kit.Disc(tile, PICK_CHECK - 3, 'card', 'ARTWORK', 2)
-			tile.hole:SetPoint('CENTER', tile.radio)
-			tile.check = kit.Disc(tile, PICK_CHECK, 'accent', 'ARTWORK', 2)
-			tile.check:SetPoint('CENTER', tile.radio)
-			tile.mark = kit.Glyph(tile, 'check', PICK_MARK, 'onAccent', 'OVERLAY')
-			tile.mark:SetPoint('CENTER', tile.radio)
-			tile:SetScript('OnClick', function() spec.onSelect(item.key) end)
-			tile:SetScript('OnEnter', Paint)
-			tile:SetScript('OnLeave', Paint)
-			tiles[index] = tile
-		end
-		window:Bind(group, Paint)
-		function group:Measure(width)
-			local tileWidth = (width - PICK_GAP * (#tiles - 1)) / #tiles
-			for index, tile in ipairs(tiles) do
-				tile:ClearAllPoints()
-				tile:SetPoint('TOPLEFT', (index - 1) * (tileWidth + PICK_GAP), 0)
-				tile:SetSize(tileWidth, PICK_HEIGHT)
-			end
-			return PICK_HEIGHT
-		end
-		return group
-	end
-
-	function kit.RoundSwatch(parent, size, onClick)
-		local swatch = CreateFrame('Button', nil, parent)
-		swatch:SetSize(size, size)
-		local fill, edge = Widget.DrawCardShape(swatch, SWATCH_RADIUS, WHITE, WHITE, 'ARTWORK', 0, 0)
-		window:Paint(edge, 'cardEdge')
-		swatch.fill = fill
-		swatch:SetScript('OnClick', onClick)
-		return swatch
 	end
 end
 
@@ -517,11 +314,8 @@ function Layout.SplitPage(tab, shell, spec)
 	local block = CreateFrame('Frame', nil, tab.child)
 	block:SetWidth(width)
 
-	local band = kit.Stack(CreateFrame('Frame', nil, block), 0, 0, 0, 0, 0)
-	band:SetPoint('TOPLEFT')
-	if spec.top then band:Add(spec.top(kit, band)) end
 	local main = kit.Stack(CreateFrame('Frame', nil, block), 0, 0, 0, 0, BLOCK_GAP)
-	for _, item in ipairs(spec.build(kit, main)) do main:Add(item) end
+	for _, item in ipairs(spec.build(kit, main, mainWidth)) do main:Add(item) end
 	local preview = PreviewCard(kit, window, block, mainWidth + COLUMN_GAP, SIDE_WIDTH, spec.preview)
 
 	local query = ''
@@ -531,7 +325,6 @@ function Layout.SplitPage(tab, shell, spec)
 	Header(kit, window, head, spec, function(text)
 		if text == query then return end
 		query = text
-		band:Filter(query)
 		main:Filter(query)
 		kit.Relayout()
 	end)
@@ -546,22 +339,17 @@ function Layout.SplitPage(tab, shell, spec)
 	end
 
 	local function Resize()
-		local bandHeight = band:Measure(width)
-		band:SetSize(width, bandHeight)
-		local top = bandHeight > 0 and (bandHeight + BLOCK_GAP) or 0
 		local height = main:Measure(mainWidth)
-		local viewport = tab.frame:GetHeight() - HEAD_HEIGHT - HEAD_GAP - SCROLL_INSET - FILL_MARGIN - top
+		local viewport = tab.frame:GetHeight() - HEAD_HEIGHT - HEAD_GAP - SCROLL_INSET - FILL_MARGIN
 		local columns = math.max(height, PREVIEW_MIN, viewport)
 		local last = LastShown(main)
 		if last and columns > height then last:SetHeight(last:GetHeight() + columns - height) end
 		main:ClearAllPoints()
-		main:SetPoint('TOPLEFT', 0, -top)
+		main:SetPoint('TOPLEFT')
 		main:SetSize(mainWidth, columns)
-		preview:SetPoint('TOPLEFT', mainWidth + COLUMN_GAP, -top)
 		preview:SetHeight(columns)
-		local total = top + columns
-		block:SetHeight(total)
-		block.layoutHeight = total
+		block:SetHeight(columns)
+		block.layoutHeight = columns
 		BUILib.Defer(function()
 			Align()
 			tab:Refresh()

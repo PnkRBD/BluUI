@@ -277,7 +277,6 @@ local function BuildMenu()
 
 	menu = CreateFrame('Frame', 'BUI_MinimapMenu', UIParent)
 	menu.edges, menu.background = Layout.FrameChrome(menu)
-	menu.isBluUIWindow = true
 	menu:SetSize(Pixel.Scale(MENU_W), Pixel.Scale(200))
 	menu:SetFrameStrata('DIALOG')
 	menu:SetFrameLevel(100)

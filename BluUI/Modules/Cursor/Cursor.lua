@@ -20,7 +20,6 @@ local slots = {}
 local enabled, clicking = false, false
 local screenScale = 1
 local lastX, lastY
-local hideOverMenus, hiddenOverMenu = false, false
 
 local function GetConfig()
     return BUI.GetDB().cursor
@@ -131,44 +130,13 @@ local function ShowCastOnSlots()
     end
 end
 
-local function OverOwnWindow()
-    local focus = GetMouseFoci()[1]
-    while focus and focus ~= UIParent and focus ~= WorldFrame do
-        if focus:IsForbidden() then return false end
-        if focus.isBluUIWindow then return true end
-        focus = focus:GetParent()
-    end
-    return false
-end
-
-local MENU_CHECK_INTERVAL = 0.1
-local menuCheckElapsed = 0
-
-local FollowCursor = BUI.Profiler.Hot('Cursor.Cursor follow', function(_, elapsed)
+local FollowCursor = BUI.Profiler.Hot('Cursor.Cursor follow', function()
     local cursorX, cursorY = GetCursorPosition()
     if cursorX ~= lastX or cursorY ~= lastY then
         lastX, lastY = cursorX, cursorY
         cursorFrame:SetPoint('CENTER', UIParent, 'BOTTOMLEFT', cursorX / screenScale, cursorY / screenScale)
     end
-    if hideOverMenus then
-        menuCheckElapsed = menuCheckElapsed + elapsed
-        if menuCheckElapsed < MENU_CHECK_INTERVAL then return end
-        menuCheckElapsed = 0
-        local overMenu = OverOwnWindow()
-        if overMenu ~= hiddenOverMenu then
-            hiddenOverMenu = overMenu
-            cursorFrame:SetAlpha(overMenu and 0 or 1)
-        end
-    end
 end)
-
-local function SyncMenuHiding()
-    hideOverMenus = GetConfig().hideOverMenus == true
-    if not hideOverMenus and hiddenOverMenu then
-        hiddenOverMenu = false
-        cursorFrame:SetAlpha(1)
-    end
-end
 
 local function SetClicking(down)
     clicking = down
@@ -203,7 +171,6 @@ end
 
 local function WireCursor()
     enabled = true
-    SyncMenuHiding()
     lastX, lastY = nil, nil
     cursorFrame:SetScript('OnUpdate', FollowCursor)
     for _, name in ipairs(SLOT_NAMES) do ApplySlot(name) end
@@ -308,7 +275,6 @@ end
 function MouseCursor.Apply()
     if not cursorFrame then return end
     for _, name in ipairs(SLOT_NAMES) do ApplySlot(name) end
-    SyncMenuHiding()
     ConfigureKindEvents()
     if enabled then
         UpdateGCDSlots()

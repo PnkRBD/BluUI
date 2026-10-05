@@ -152,7 +152,6 @@ function Layout.WindowFrame(config)
 	local window = { navFrames = {} }
 
 	local frame = CreateFrame('Frame', nil, UIParent)
-	frame.isBluUIWindow = true
 	frame:SetSize(config.width or 1100, config.height or 720)
 	frame:SetPoint('CENTER')
 	frame:SetFrameStrata(config.strata or 'HIGH')

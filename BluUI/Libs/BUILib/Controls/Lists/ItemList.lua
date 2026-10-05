@@ -68,7 +68,6 @@ Controls.ShowDragDropPicker = ShowDragDropPicker
 
 local function CreateAutocomplete(editBox, searchFunc, onSelect, anchor)
 	local dropdown = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
-	dropdown.isBluUIWindow = true
 	dropdown:SetFrameStrata(BUILib.GetPopupStrata()); dropdown:SetFrameLevel(BUILib.GetPopupLevel())
 	dropdown:SetBackdrop(Widget.BACKDROP); dropdown:SetBackdropColor(0.12, 0.12, 0.12, 0.98)
 	dropdown:SetBackdropBorderColor(0.4, 0.4, 0.4, 1); dropdown:Hide()

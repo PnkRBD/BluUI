@@ -46,7 +46,6 @@ function Widget.New(parent, frameType, template, config)
 	config = config or {}
 	local parentFrame = type(parent) == "table" and parent.frame or parent
 	local frame = CreateFrame(frameType or "Frame", nil, parentFrame, template or "BackdropTemplate")
-	if parentFrame == UIParent then frame.isBluUIWindow = true end
 	local self = setmetatable({}, WidgetMetatable)
 	self.frame = frame
 	self._enabled = true
@@ -565,6 +564,7 @@ end
 do
 	local tip
 	local MAX_WIDTH, PADDING_X, PADDING_Y = 260, 10, 8
+	local TIP_RADIUS = 6
 
 	local function AcquireTip()
 		if tip then return tip end

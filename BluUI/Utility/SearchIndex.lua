@@ -208,7 +208,6 @@ local entries = {
 	{ label = "Enable", page = "cursor", keywords = "cursor ring circle enable" },
 	{ label = "Cursor size", page = "cursor", panel = "General", keywords = "cursor ring size diameter" },
 	{ label = "Only in combat", page = "cursor", panel = "Visibility", keywords = "cursor combat hide show" },
-	{ label = "Hide over BluUI windows", page = "cursor", panel = "Visibility", keywords = "cursor menu window hide" },
 	{ label = "Rings", page = "cursor", panel = "Rings", keywords = "cursor ring main inner outer behavior color size offset layer click gcd cast" },
 
 	{ label = "Enable", page = "customBars", tab = 1, keywords = "tracking custom bar item on off" },
