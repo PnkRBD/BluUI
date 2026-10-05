@@ -696,7 +696,7 @@ BUI.PageEngine.RegisterPage('actionbars', {
 			},
 			preview = enabled and { height = PREVIEW_HEIGHT, build = function(band, kit) preview = BuildPreview(band, kit) end } or nil,
 			rail = { groups = RailGroups(), selected = selected },
-			disabled = not enabled,
+			disabled = function() return not enabled end,
 			build = Panes,
 		})
 		if not enabled then

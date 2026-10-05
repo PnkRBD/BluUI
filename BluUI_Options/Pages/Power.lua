@@ -1378,11 +1378,13 @@ BUI.PageEngine.RegisterPage('power', {
 		fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
 		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
 		local tab = page:GetTab(1)
+		local enabled = BUI.IsModuleEnabled('power')
 		local rail
 		rail = Layout.RailPage(tab, { window = Window() }, {
 			icon = 'power',
 			title = 'Power',
 			placeholder = 'Search power settings...',
+			disabled = function() return not enabled end,
 			tools = {
 				{ icon = 'enable', tooltip = 'Turn the power module on or off, needs a reload', get = function() return BUI.IsModuleEnabled('power') end, set = function(value)
 					BUI.ModulesPage.ConfirmReload('power', value, Repaint)

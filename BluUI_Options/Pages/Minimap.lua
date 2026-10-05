@@ -969,11 +969,13 @@ BUI.PageEngine.RegisterPage('minimap', {
 		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
 		local adapter = { tabContents = {}, currentTab = 1 }
 		for index in ipairs(PANE_IDS) do adapter.tabContents[index] = {} end
+		local enabled = Interface().minimapEnabled ~= false
 		local rail
 		rail = Layout.RailPage(page:GetTab(1), { window = Window() }, {
 			icon = 'minimap',
 			title = 'Minimap',
 			placeholder = 'Search minimap settings...',
+			disabled = function() return not enabled end,
 			tools = {
 				{ icon = 'enable', tooltip = 'Turn the minimap module on or off, needs a reload', get = function() return Interface().minimapEnabled ~= false end, set = ConfirmModule },
 				{ icon = 'eye', tooltip = 'Unlock the map to drag it and its indicators, right-click it to lock', get = MinimapModule.IsUnlocked, set = MinimapModule.ToggleUnlock },

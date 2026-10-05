@@ -380,6 +380,7 @@ BUI.PageEngine.RegisterPage('castbars', {
 			icon = 'play',
 			title = 'Cast Bars',
 			placeholder = 'Search cast bar settings...',
+			disabled = function() return Settings().enabled ~= true end,
 			tools = {
 				{ icon = 'enable', tooltip = 'Turn this cast bar on or off', get = function() return Settings().enabled == true end, set = function(value)
 					Settings().enabled = value

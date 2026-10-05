@@ -99,6 +99,7 @@ BUI.PageEngine.RegisterPage('markers', {
 			icon = 'markers',
 			title = 'Markers',
 			placeholder = 'Search marker settings...',
+			disabled = function() return not BUI.IsModuleEnabled('markers') end,
 			tools = {
 				{ icon = 'enable', tooltip = 'Turn the marker bar on or off', get = function() return BUI.IsModuleEnabled('markers') end, set = function(value) BUI.SetModuleEnabled('markers', value) end },
 			},

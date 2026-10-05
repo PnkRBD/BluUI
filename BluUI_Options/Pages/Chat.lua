@@ -34,6 +34,7 @@ BUI.PageEngine.RegisterPage('chat', {
 			icon = 'chat',
 			title = 'Chat',
 			placeholder = 'Search chat settings...',
+			disabled = function() return not Skin.IsSkinEnabled('chat') end,
 			back = { label = 'skins', onClick = function() BUI.PageEngine.NavigateToID('settings') end },
 			tools = {
 				{ text = 'Reset', onClick = function()

@@ -1263,11 +1263,13 @@ BUI.PageEngine.RegisterPage('unitframes', {
 		local module = UnitFrames()
 		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
 		local tab = page:GetTab(1)
+		local enabled = settings.enabled == true
 		local rail
 		rail = Layout.RailPage(tab, { window = Window() }, {
 			icon = 'profile',
 			title = 'Unit Frames',
 			placeholder = 'Search unit frame settings...',
+			disabled = function() return not enabled end,
 			tools = {
 				{ text = 'Test mode', onClick = function()
 					module.TestMode.Toggle()

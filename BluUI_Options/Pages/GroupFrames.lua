@@ -634,7 +634,7 @@ BUI.PageEngine.RegisterPage('groupframes', {
 				end },
 			},
 			rail = { groups = RAIL_GROUPS, selected = selected },
-			disabled = not enabled,
+			disabled = function() return not enabled or Config().enabled ~= true end,
 			build = Panes,
 		})
 		if not enabled then
