@@ -48,7 +48,9 @@ local GetTime = GetTime
 local StepCurve = BUI.Tools.StepCurve
 
 local READY_SOON_CURVE = StepCurve(0, 1, READY_WINDOW, 0)
-local NOT_READY_CURVE  = StepCurve(0, 0, READY_WINDOW, 1)
+local SEND_WINDOW = READY_WINDOW * 2
+local SEND_CURVE = StepCurve(0, 1, SEND_WINDOW, 0)
+local HOLD_CURVE = StepCurve(0, 0, SEND_WINDOW, 1)
 local THRASH_FIRST_CURVE = StepCurve(0, 0, READY_WINDOW, 1)
 THRASH_FIRST_CURVE:AddPoint(THRASH_LEAD_SECONDS, 0)
 
@@ -222,9 +224,19 @@ local function RenderWrathCues(callout)
     SetLayerShown(callout.readyLayer, true)
     SetHoldLabel(callout, live.wtRemaining)
     SetSendLabel(callout, live.cleaveRemaining > 0 and 'SEND BW' or 'THRASH FIRST')
-    SetLayerAlpha(callout.readyLayer, Evaluate(bwDuration, READY_SOON_CURVE, 1))
-    SetLayerAlpha(callout.sendLayer, Evaluate(wtDuration, READY_SOON_CURVE, 1))
-    SetLayerAlpha(callout.holdLayer, Evaluate(wtDuration, NOT_READY_CURVE, 0))
+    local bwRemaining, wtRemaining = live.bwRemaining, live.wtRemaining
+    if live.inWrath then
+        SetLayerAlpha(callout.readyLayer, 0)
+    elseif bwRemaining and wtRemaining then
+        local hold = wtRemaining >= bwRemaining + READY_WINDOW
+        SetLayerAlpha(callout.readyLayer, bwRemaining < READY_WINDOW and 1 or 0)
+        SetLayerAlpha(callout.sendLayer, hold and 0 or 1)
+        SetLayerAlpha(callout.holdLayer, hold and 1 or 0)
+    else
+        SetLayerAlpha(callout.readyLayer, Evaluate(bwDuration, READY_SOON_CURVE, 1))
+        SetLayerAlpha(callout.sendLayer, Evaluate(wtDuration, SEND_CURVE, 1))
+        SetLayerAlpha(callout.holdLayer, Evaluate(wtDuration, HOLD_CURVE, 0))
+    end
 end
 
 local function RenderThrashCues(callout)
@@ -316,19 +328,20 @@ local function ReadTimeline(config, now)
     live.thrashNow = live.inWrath and (now < lastThrashAt + AOE_MEMORY_SECONDS or now < lastWrathAt + THRASH_PROMPT_SECONDS)
     live.showHoldThrash = config.showHoldThrash
     live.wtRemaining = ReadRemaining(WILD_THRASH, now)
+    live.bwRemaining = ReadRemaining(BESTIAL_WRATH, now)
     live.thrashSoon = (live.wtRemaining or (lastThrashAt + WILD_THRASH_COOLDOWN - now)) < THRASH_SOON_SECONDS
 end
 
 local lastCue
 
 local function LiveCue(now)
-    local bwRemaining = ReadRemaining(BESTIAL_WRATH, now)
+    local bwRemaining = live.bwRemaining
     if not bwRemaining then return nil end
     local wtRemaining = live.wtRemaining or (lastThrashAt + WILD_THRASH_COOLDOWN - now)
     local thrashReady = wtRemaining < READY_WINDOW
     if live.inWrath then return (thrashReady and live.thrashNow) and 'thrash' or 'idle' end
     if bwRemaining < READY_WINDOW then
-        if not thrashReady then return 'hold' end
+        if wtRemaining >= bwRemaining + READY_WINDOW then return 'hold' end
         return live.cleaveRemaining > 0 and 'send' or 'thrashFirst'
     end
     local wasted = bwRemaining >= THRASH_LEAD_SECONDS and bwRemaining < THRASH_LEAD_SECONDS + WILD_THRASH_COOLDOWN
