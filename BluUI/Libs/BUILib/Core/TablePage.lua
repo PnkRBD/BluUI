@@ -28,6 +28,7 @@ local HEADER_GAP = 26
 local BOTTOM_GAP = 24
 local PREVIEW_GAP = 16
 local PREVIEW_RADIUS = 8
+local DOT_TILE = 16
 local SEARCH_WIDTH, SEARCH_HEIGHT = 224, 34
 local SOLID_HOVER = { 1, 1, 1, 0.12 }
 Layout.SOLID_HOVER = SOLID_HOVER
@@ -747,6 +748,12 @@ function Layout.PinnedHead(tab, window, kit, spec, block, onSearch)
 		local fill, edge = Widget.DrawCardShape(band, PREVIEW_RADIUS, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
 		window:Paint(fill, 'card')
 		window:Paint(edge, 'cardEdge')
+		local dots = band:CreateTexture(nil, 'BACKGROUND', nil, 1)
+		dots:SetTexture(BUILib.GetLibMedia('dotgrid'), 'REPEAT', 'REPEAT')
+		dots:SetPoint('TOPLEFT', PREVIEW_RADIUS, -PREVIEW_RADIUS)
+		dots:SetPoint('BOTTOMRIGHT', -PREVIEW_RADIUS, PREVIEW_RADIUS)
+		dots:SetTexCoord(0, (tab.width - PREVIEW_RADIUS * 2) / DOT_TILE, 0, (spec.preview.height - PREVIEW_RADIUS * 2) / DOT_TILE)
+		window:Paint(dots, 'dots')
 		spec.preview.build(band, kit)
 		top = top + PREVIEW_GAP + spec.preview.height + PREVIEW_GAP
 		local under = kit.DottedRule(head)
