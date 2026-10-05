@@ -2,7 +2,7 @@
 ## Title: |cff6D00FDBluUI|r Options
 ## Notes: Settings window for BluUI. Loaded on demand when the window opens.
 ## Author: Blu
-## Version: 5.1.0
+## Version: 5.2.0
 ## Category: BluUI
 ## Dependencies: BluUI
 ## LoadOnDemand: 1
