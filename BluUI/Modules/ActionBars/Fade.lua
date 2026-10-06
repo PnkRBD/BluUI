@@ -21,50 +21,50 @@ local function FadeSeconds(barSettings)
 	return barSettings.fadeDuration
 end
 
+local function StopFader(fader)
+	fader.playing = false
+	fader.header:SetScript('OnUpdate', nil)
+end
+
 local function Fader(bar)
 	local fader = bar.fader
 	if fader then return fader end
-	local group = bar.header:CreateAnimationGroup()
-	group:SetToFinalAlpha(true)
-	local alpha = group:CreateAnimation('Alpha')
-	alpha:SetSmoothing('IN_OUT')
-	fader = { group = group, alpha = alpha, from = 1, to = 1 }
+	local header = bar.header
+	fader = { header = header, from = 1, to = 1, start = 0, duration = 0, playing = false }
+	fader.tick = BUI.Profiler.Script('ActionBars.Fade tween', function()
+		local progress = (GetTime() - fader.start) / fader.duration
+		if progress >= 1 then
+			header:SetAlpha(fader.to)
+			StopFader(fader)
+			return
+		end
+		local eased = progress * progress * (3 - 2 * progress)
+		header:SetAlpha(fader.from + (fader.to - fader.from) * eased)
+	end)
 	bar.fader = fader
 	return fader
-end
-
-local function VisibleAlpha(bar)
-	local fader = bar.fader
-	if fader and fader.group:IsPlaying() then
-		return fader.from + (fader.to - fader.from) * fader.alpha:GetSmoothProgress()
-	end
-	return bar.header:GetAlpha()
 end
 
 local function AtTarget(bar, target)
 	if bar.fadeTarget ~= target then return false end
 	local fader = bar.fader
-	if fader and fader.group:IsPlaying() and bar.header:IsShown() then return true end
+	if fader and fader.playing and bar.header:IsShown() then return true end
 	return math.abs(bar.header:GetAlpha() - target) < SETTLE
 end
 
 local function SetAlphaTarget(bar, target, seconds)
 	if AtTarget(bar, target) then return end
-	local current = VisibleAlpha(bar)
-	bar.fadeTarget = target
-	if bar.fader then bar.fader.group:Stop() end
 	local header = bar.header
+	local current = header:GetAlpha()
+	bar.fadeTarget = target
+	if bar.fader then StopFader(bar.fader) end
 	if seconds <= 0 or math.abs(current - target) < SETTLE then
 		header:SetAlpha(target)
 		return
 	end
-	header:SetAlpha(current)
 	local fader = Fader(bar)
-	fader.from, fader.to = current, target
-	fader.alpha:SetFromAlpha(current)
-	fader.alpha:SetToAlpha(target)
-	fader.alpha:SetDuration(seconds)
-	fader.group:Play()
+	fader.from, fader.to, fader.start, fader.duration, fader.playing = current, target, GetTime(), seconds, true
+	header:SetScript('OnUpdate', fader.tick)
 end
 
 local function ApplyBar(bar)
@@ -249,7 +249,7 @@ function ActionBars.SetBarContentHidden(bar, hidden)
 	if bar.contentHidden == hidden then return end
 	bar.contentHidden = hidden
 	ActionBars.ApplyBarMouse(bar)
-	if bar.fader then bar.fader.group:Stop() end
+	if bar.fader then StopFader(bar.fader) end
 	bar.fadeTarget = nil
 	local barSettings = ActionBars.GetBarSettings(bar.key)
 	if barSettings and barSettings.enabled then
