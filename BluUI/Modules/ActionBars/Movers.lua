@@ -12,6 +12,8 @@ local CENTERED_HINT = 'centered  ·  drag up or down'
 local HINT_GAP = 2
 local LABEL_SIZE = 18
 local HINT_SIZE = 11
+local LABEL_MIN_SIZE = 8
+local LABEL_PAD = 6
 local HINT_COLOR = { 0.85, 0.85, 0.85 }
 local MOVER_COLOR = { 0.3, 0.62, 1 }
 local SAVE_PRECISION = 1000
@@ -227,6 +229,21 @@ EndDrag = function(bar, overlay)
 	for _, listener in pairs(listeners) do listener('position', bar.key) end
 end
 
+local function PixelSpan(region)
+	local scale = region:GetEffectiveScale()
+	return region:GetWidth() * scale, region:GetHeight() * scale
+end
+
+local function FitFont(fontString, size, maxWidth, maxHeight)
+	while true do
+		Pixel.ApplyFont(fontString, size, BUI.C.FONT_PATH, 'OUTLINE')
+		local width, height = fontString:GetStringWidth() * fontString:GetEffectiveScale(), fontString:GetStringHeight() * fontString:GetEffectiveScale()
+		if width <= maxWidth and height <= maxHeight then return true end
+		if size <= LABEL_MIN_SIZE then return false end
+		size = size - 1
+	end
+end
+
 local function CreateOverlay(bar)
 	local header = bar.header
 	local overlay = CreateFrame('Frame', nil, header)
@@ -252,6 +269,22 @@ local function CreateOverlay(bar)
 	hint:SetTextColor(HINT_COLOR[1], HINT_COLOR[2], HINT_COLOR[3], 1)
 	hint:Hide()
 	overlay.fill, overlay.label, overlay.hint = fill, label, hint
+	function overlay:Fit()
+		local width, height = PixelSpan(header)
+		width, height = width - LABEL_PAD, height - LABEL_PAD
+		if width <= 0 or height <= 0 then return end
+		label:SetShown(FitFont(label, LABEL_SIZE, width, height))
+		self.hintFits = FitFont(hint, HINT_SIZE, width, height)
+		if not self.hintFits then hint:Hide() end
+	end
+	function overlay:Lift()
+		local level = header:GetFrameLevel()
+		for _, child in ipairs({ header:GetChildren() }) do
+			if child ~= self then level = math.max(level, child:GetFrameLevel()) end
+		end
+		self:SetFrameLevel(level + OVERLAY_LEVEL)
+	end
+	overlay:SetScript('OnSizeChanged', BUI.Profiler.Script('ActionBars.Movers overlay OnSizeChanged', overlay.Fit))
 
 	function overlay:Paint(active)
 		local red, green, blue = MOVER_COLOR[1], MOVER_COLOR[2], MOVER_COLOR[3]
@@ -264,12 +297,18 @@ local function CreateOverlay(bar)
 
 	overlay:SetScript('OnEnter', BUI.Profiler.Script('ActionBars.Movers overlay OnEnter', function(self)
 		self:Paint(true)
-		self.hint:Show()
+		if self.hintFits then self.hint:Show() end
+		if not self.label:IsShown() then
+			GameTooltip:SetOwner(self, 'ANCHOR_TOP')
+			GameTooltip:SetText(bar.label)
+			GameTooltip:Show()
+		end
 	end))
 	overlay:SetScript('OnLeave', BUI.Profiler.Script('ActionBars.Movers overlay OnLeave', function(self)
 		if state.dragging == bar then return end
 		self:Paint(false)
 		self.hint:Hide()
+		if GameTooltip:GetOwner() == self then GameTooltip:Hide() end
 	end))
 	overlay:SetScript('OnMouseUp', BUI.Profiler.Script('ActionBars.Movers overlay OnMouseUp', function(_, button)
 		if button ~= 'RightButton' or state.dragging then return end
@@ -314,6 +353,8 @@ function ActionBars.RefreshMovers()
 		if visible then
 			overlay:Paint(false)
 			overlay:RefreshHint()
+			overlay:Lift()
+			overlay:Fit()
 			overlay:Show()
 			anyShown = true
 		else
