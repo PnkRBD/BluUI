@@ -226,7 +226,6 @@ local function ForceChild(child, slotIndex, headerIndex)
 
 	if entering then
 		GroupFrames.RewireAuraEvents(child, child.unit)
-		GroupFrames.ApplyPrivateAuras(child)
 	end
 
 	GroupFrames.RepaintPreviewChild(child)
@@ -262,7 +261,6 @@ local function UnforceChild(child)
 	GroupFrames.ApplyAbsorbToChild(child, settings)
 	GroupFrames.ApplyTextToChild(child, settings)
 
-	GroupFrames.ApplyPrivateAuras(child)
 	if child.unit then child:UpdateAllElements("BluPreview") end
 end
 

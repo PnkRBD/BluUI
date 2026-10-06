@@ -105,12 +105,6 @@ local function CommonSettings(sizes)
 		dispelBorder = {
 			tintBar = true, tintStyle = "bar", matchPlayer = true, source = "mine", showBadge = true,
 		},
-		privateAuras = {
-			enabled = true, size = sizes.paSize, num = 1,
-			anchorPoint = "CENTER", relativePoint = "CENTER",
-			offsetX = 0, offsetY = 0, spacing = 2,
-			growDirection = "RIGHT", showTimer = true,
-		},
 	}
 end
 
@@ -123,7 +117,6 @@ local PARTY = CommonSettings({
 	combatIcon = 18, badgeSize = 28, iconY = 22,
 	smallAura = 22, auraGap = 2, buffMax = 6, debuffMax = 8, buffsOn = true, debuffsOn = true,
 	bigDefSize = 28, bigDefOX = 4, ccSize = 24, ccMax = 4,
-	paSize = 30,
 })
 MergeTable(PARTY, {
 	enabled     = true,
@@ -167,7 +160,6 @@ local RAID = CommonSettings({
 	combatIcon = 16, badgeSize = 22, iconY = 18,
 	smallAura = 18, auraGap = 1, buffMax = 4, debuffMax = 6, buffsOn = false, debuffsOn = false,
 	bigDefSize = 24, bigDefOX = 2, ccSize = 20, ccMax = 3,
-	paSize = 24,
 	showAuraTooltips = true,
 })
 MergeTable(RAID, {

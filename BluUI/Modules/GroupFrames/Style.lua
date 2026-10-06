@@ -662,7 +662,6 @@ local UnitChanged = BUI.Profiler.Wrap("GroupFrames.Style unit change", function(
 		PostUpdateHealthColor(frame.Health, frame.unit)
 	end
 	GroupFrames.RebindAuraUnit(frame, unit)
-	GroupFrames.RebindPrivateAuras(frame, unit)
 end)
 
 local function OnAttributeChanged(frame, name, value)
