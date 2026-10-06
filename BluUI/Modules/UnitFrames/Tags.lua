@@ -119,6 +119,12 @@ function UnitFrames.RefreshAbbreviationSetting()
 	useDecimalAbbreviations = db and db.general and db.general.showDecimalAbbreviations or false
 end
 
+local function StatusText(status)
+	local color = UnitFrames.GetSettings().statusColors[status]
+	if not color then return status:upper() end
+	return '|cff' .. BUI.Hex(color[1], color[2], color[3]) .. status:upper() .. '|r'
+end
+
 local function Abbreviate(number)
 	if not number then return '0' end
 	if useDecimalAbbreviations then
@@ -376,19 +382,19 @@ local Handlers = {
 		return ''
 	end,
 	['status'] = function(unit)
-		if not UnitIsConnected(unit) then return 'Offline'
-		elseif UnitIsGhost(unit) then return 'Ghost'
-		elseif UnitIsDead(unit) then return 'Dead' end
+		if not UnitIsConnected(unit) then return StatusText('Offline')
+		elseif UnitIsGhost(unit) then return StatusText('Ghost')
+		elseif UnitIsDead(unit) then return StatusText('Dead') end
 		return ''
 	end,
 	['dead'] = function(unit)
-		if UnitIsGhost(unit) then return 'Ghost' end
-		if UnitIsDead(unit) then return 'Dead' end
+		if UnitIsGhost(unit) then return StatusText('Ghost') end
+		if UnitIsDead(unit) then return StatusText('Dead') end
 		return ''
 	end,
-	['offline'] = function(unit) return not UnitIsConnected(unit) and 'Offline' or '' end,
-	['afk'] = function(unit) return UnitIsAFK(unit) and 'AFK' or '' end,
-	['dnd'] = function(unit) return UnitIsDND(unit) and 'DND' or '' end,
+	['offline'] = function(unit) return not UnitIsConnected(unit) and StatusText('Offline') or '' end,
+	['afk'] = function(unit) return UnitIsAFK(unit) and StatusText('AFK') or '' end,
+	['dnd'] = function(unit) return UnitIsDND(unit) and StatusText('DND') or '' end,
 
 	['resting'] = function() return IsResting() and restingFrames[restingIndex] or '' end,
 	['combat'] = function(unit) return UnitAffectingCombat(unit) and '|TInterface\\AddOns\\BluUI\\Media\\Textures\\combat:14:14|t' or '' end,
@@ -744,6 +750,7 @@ function UnitFrames.TagFontStrings(frame)
 	if frame.HealthText then frame:Untag(frame.HealthText); frame.HealthText._tagString = nil end
 	if frame.PowerText then frame:Untag(frame.PowerText); frame.PowerText._tagString = nil end
 	if frame.LevelText then frame:Untag(frame.LevelText); frame.LevelText._tagString = nil end
+	if frame.StatusText then frame:Untag(frame.StatusText); frame.StatusText._tagString = nil end
 
 	if frame.Name then
 		if (unitType == 'player' or unitType == 'pet') and unitSettings.customName and unitSettings.customName ~= '' then
@@ -757,6 +764,9 @@ function UnitFrames.TagFontStrings(frame)
 	end
 	if frame.PowerText then
 		applyTag(frame.PowerText, resolve(unitSettings.powerFormat, settings.powerFormat, '[perpp]%'))
+	end
+	if frame.StatusText then
+		applyTag(frame.StatusText, resolve(unitSettings.statusFormat, settings.statusFormat, '[status]'))
 	end
 	if frame.LevelText then
 		local levelFormat = settings.levelFormat

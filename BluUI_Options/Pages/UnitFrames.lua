@@ -9,6 +9,9 @@ local PREVIEW_HEIGHT = 150
 local MENU_WIDTH = 150
 local TAG_WIDTH = 300
 local COPY_WIDTH = 170
+local TAB_STRIP_GAP = 12
+local SAMPLE_X = 290
+local COPY_GAP = 12
 local NAME_WIDTH = 200
 local TEXT_RANGE = 50
 local AURA_RANGE = 500
@@ -37,8 +40,9 @@ local UNIT_BY_KEY = {}
 for _, unit in ipairs(UNITS) do UNIT_BY_KEY[unit.key] = unit end
 local AURA_UNITS = { player = true, target = true, focus = true, targettarget = true, boss = true }
 local ANCHORABLE = { player = true, target = true, focus = true, pet = true, targettarget = true }
-local TAB_IDS = { 'appearance', 'tags', 'tags', 'player', 'target', 'targettarget', 'focus', 'pet', 'boss', 'filters' }
-local TAB_INDEX = { appearance = 1, tags = 2, player = 4, target = 5, targettarget = 6, focus = 7, pet = 8, boss = 9, filters = 10 }
+local TAB_IDS = { 'appearance', 'tags', 'tags', 'player', 'target', 'targettarget', 'focus', 'pet', 'boss', 'filters', 'general', 'party', 'raid', 'partyAuras', 'raidAuras', 'groupFilters' }
+local TAB_INDEX = { appearance = 1, tags = 2, player = 4, target = 5, targettarget = 6, focus = 7, pet = 8, boss = 9, filters = 10, general = 11, party = 12, raid = 13, partyAuras = 14, raidAuras = 15, groupFilters = 16 }
+local GROUP_PANE = {}
 local TAG_UNITS = {
 	{ value = 'player', text = 'Player' },
 	{ value = 'target', text = 'Target' },
@@ -146,10 +150,11 @@ local MOCK_BUFF_ICONS = {
 	'Interface\\Icons\\Spell_Nature_ProtectionformNature', 'Interface\\Icons\\INV_Potion_167',
 }
 local MOCK_DISPEL_COLORS = { { 0.2, 0.6, 1.0 }, { 0.6, 0.0, 1.0 }, { 0.0, 0.6, 0.0 }, { 0.8, 0.0, 0.0 } }
-local DEFAULT_TAGS = { name = '[name]', health = '[hp:short] • [perhp]%', power = '[perpp]%' }
+local DEFAULT_TAGS = { name = '[name]', health = '[hp:short] • [perhp]%', power = '[perpp]%', status = '[status]' }
 
 local selected = 'appearance'
 local tagUnit = 'player'
+local tagsTab = 1
 local preview
 local fonts, textures
 
@@ -173,10 +178,6 @@ local function RefreshPreview()
 	if preview then preview:Update() end
 end
 
-local function RebuildPage()
-	BUILib.Defer(function() BUI.PageEngine.RefreshCurrentPage() end)
-end
-
 local function RebuildPane(page)
 	BUILib.Defer(function() page:RebuildCurrent() end)
 end
@@ -197,6 +198,16 @@ end
 
 local function Option(db, label, key, extra)
 	local option = { label = label, get = function() return db[key] end, set = function(value) db[key] = value end }
+	for name, value in pairs(extra or {}) do option[name] = value end
+	return option
+end
+
+local function Inherit(unitSettings, label, key, extra)
+	local option = { label = label, get = function()
+		local value = unitSettings[key]
+		if value == nil then value = Settings()[key] end
+		return value
+	end, set = function(value) unitSettings[key] = value end }
 	for name, value in pairs(extra or {}) do option[name] = value end
 	return option
 end
@@ -489,17 +500,24 @@ local function CreateMock(stage)
 			fontString:Show()
 		end
 
-		local nameColor
-		if unitSettings.classColorName and classColor then
-			nameColor = { classColor.r, classColor.g, classColor.b, 1 }
-		elseif unitKey == 'target' or unitKey == 'boss' then
-			nameColor = unitSettings.hostileNameColor
-		else
-			nameColor = unitSettings.friendlyNameColor
+		local function Text(key)
+			local value = unitSettings[key]
+			if value == nil then value = settings[key] end
+			return value
 		end
-		PlaceText(nameText, ResolveShow(unitSettings.showName, settings.showName), unitSettings.nameFormat, settings.nameFormat, unitSettings.nameTextSize, unitSettings.namePosition, unitSettings.nameOffsetX, unitSettings.nameOffsetY, healthZone, nameColor)
-		PlaceText(healthText, ResolveShow(unitSettings.showHealthText, settings.showHealthText), unitSettings.healthFormat, settings.healthFormat, unitSettings.healthTextSize, unitSettings.healthPosition, unitSettings.healthOffsetX, unitSettings.healthOffsetY, healthZone, { 1, 1, 1, 1 })
-		PlaceText(powerText, powerHeight > 0 and ResolveShow(unitSettings.showPowerText, settings.showPowerText, false), unitSettings.powerFormat, settings.powerFormat, unitSettings.powerTextSize, unitSettings.powerPosition, unitSettings.powerOffsetX, unitSettings.powerOffsetY, powerBackground, { 1, 1, 1, 1 })
+		local nameColor = settings.nameColor
+		if unitSettings.classColorName then
+			if classColor then
+				nameColor = { classColor.r, classColor.g, classColor.b, 1 }
+			elseif unitKey == 'target' or unitKey == 'boss' then
+				nameColor = unitSettings.hostileNameColor
+			else
+				nameColor = unitSettings.friendlyNameColor
+			end
+		end
+		PlaceText(nameText, ResolveShow(unitSettings.showName, settings.showName), unitSettings.nameFormat, settings.nameFormat, Text('nameTextSize'), Text('namePosition'), Text('nameOffsetX'), Text('nameOffsetY'), healthZone, nameColor)
+		PlaceText(healthText, ResolveShow(unitSettings.showHealthText, settings.showHealthText), unitSettings.healthFormat, settings.healthFormat, Text('healthTextSize'), Text('healthPosition'), Text('healthOffsetX'), Text('healthOffsetY'), healthZone, settings.healthTextColor)
+		PlaceText(powerText, powerHeight > 0 and ResolveShow(unitSettings.showPowerText, settings.showPowerText, false), unitSettings.powerFormat, settings.powerFormat, Text('powerTextSize'), Text('powerPosition'), Text('powerOffsetX'), Text('powerOffsetY'), powerBackground, settings.powerTextColor)
 
 		local tagIndex = 0
 		for _, entry in ipairs(unitSettings.customTags) do
@@ -628,7 +646,13 @@ local function BuildPreview(band, kit)
 	return band
 end
 
-local function AppearanceBoards(ui, parent, width)
+local function ClearOverrides(unitSettings, prefix)
+	for _, suffix in ipairs({ 'Position', 'TextSize', 'OffsetX', 'OffsetY' }) do unitSettings[prefix .. suffix] = nil end
+	RefreshFrames()
+	Repaint()
+end
+
+local function AppearanceBoards(ui, parent, width, page)
 	local settings = Settings()
 	local module = UnitFrames()
 	local general = ui.Board(parent, width, {
@@ -640,29 +664,33 @@ local function AppearanceBoards(ui, parent, width)
 		Menu(settings, 'texture', textures, MENU_WIDTH),
 		Menu(settings, 'font', fonts, MENU_WIDTH),
 	}, RefreshFrames)
-	general:AddSwitch('Tooltips', function() return settings.showTooltips ~= false end, function(value) settings.showTooltips = value end, 'Unit tooltip on mouseover')
-	general:AddSwitch('Click to target', function() return settings.clickToTarget ~= false end, function(value)
-		settings.clickToTarget = value
-		module.ApplyClickToTarget()
-	end, 'Clicking a frame targets its unit')
-	general:AddSwitch('Decimal abbreviations', function() return BUI.GetDB().general.showDecimalAbbreviations == true end, function(value)
-		BUI.GetDB().general.showDecimalAbbreviations = value
-		module.RefreshAbbreviationSetting()
-		module.InvalidateTagCache()
-		RefreshFrames()
-	end, 'Abbreviate numbers with one decimal, 7.5K')
-	general:AddSwitch('Sync target and pet to the player', function() return settings.syncPlayerTarget == true end, function(value)
-		settings.syncPlayerTarget = value
+	general:AddTools('Behavior', 'Tooltips, click to target and number format', {
+		{ tooltip = 'Behavior options', title = 'Behavior', options = {
+			{ label = 'Unit tooltip on mouseover', get = function() return settings.showTooltips ~= false end, set = function(value) settings.showTooltips = value end },
+			{ label = 'Clicking a frame targets its unit', get = function() return settings.clickToTarget ~= false end, set = function(value)
+				settings.clickToTarget = value
+				module.ApplyClickToTarget()
+			end },
+			{ label = 'Abbreviate numbers with one decimal, 7.5K', get = function() return BUI.GetDB().general.showDecimalAbbreviations == true end, set = function(value)
+				BUI.GetDB().general.showDecimalAbbreviations = value
+				module.RefreshAbbreviationSetting()
+				module.InvalidateTagCache()
+			end },
+		} },
+	}, RefreshFrames)
+	local function SyncChanged()
 		ApplySync()
 		RefreshFrames()
-		RebuildPage()
-	end, 'Target and pet copy the player frame look')
-	general:AddSwitch('Keep the pet independent', function() return settings.excludePetFromSync == true end, function(value)
-		settings.excludePetFromSync = value
-		ApplySync()
-		RefreshFrames()
-		RebuildPage()
-	end, 'Leave the pet frame out of the sync')
+		RefreshPreview()
+		page:Rebuild('target')
+		page:Rebuild('pet')
+	end
+	general:AddTools('Sync target and pet to the player', 'Target and pet copy the player frame look', {
+		{ tooltip = 'Sync options', title = 'Sync', options = {
+			{ label = 'Keep the pet independent', get = function() return settings.excludePetFromSync == true end, set = function(value) settings.excludePetFromSync = value end },
+		} },
+		{ get = function() return settings.syncPlayerTarget == true end, set = function(value) settings.syncPlayerTarget = value end },
+	}, SyncChanged)
 
 	local health = ui.Board(parent, width, {
 		stacked = true,
@@ -745,6 +773,7 @@ local function AppearanceBoards(ui, parent, width)
 			Option(settings, 'Bar tint opacity %', 'dispelOpacity', { min = 0, max = 100, step = 5 }),
 			Option(settings, 'Fade: colour at the middle %', 'dispelFadeMiddle', { min = 0, max = 100, step = 5, separator = true }),
 			Option(settings, 'Fade: colour at the far edge %', 'dispelFadeFar', { min = 0, max = 100, step = 5 }),
+			Option(settings, 'Fade: darkness at the far edge %', 'dispelFadeDark', { min = 0, max = 100, step = 5 }),
 		} },
 		DispelPreviewEye(),
 	}, RefreshDispel)
@@ -788,22 +817,6 @@ local function AppearanceBoards(ui, parent, width)
 	end
 	dispel:AddTools('Type colors', 'Shared with the party and raid frames', swatches, RefreshDispel)
 
-	local tags = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Default tags',
-		description = 'Text formats every frame falls back on. A frame can override each one on its own pane.',
-	})
-	tags:AddTools('Name tag', nil, { TagInput(settings, 'nameFormat', DEFAULT_TAGS.name) }, RefreshFrames)
-	tags:AddTools('Health tag', nil, { TagInput(settings, 'healthFormat', DEFAULT_TAGS.health) }, RefreshFrames)
-	tags:AddTools('Power tag', nil, { TagInput(settings, 'powerFormat', DEFAULT_TAGS.power) }, RefreshFrames)
-	tags:AddTools('Reset tags', 'Restore the default name, health and power tags', {
-		{ text = 'Reset', onClick = function()
-			settings.nameFormat, settings.healthFormat, settings.powerFormat = DEFAULT_TAGS.name, DEFAULT_TAGS.health, DEFAULT_TAGS.power
-			RefreshFrames()
-			Repaint()
-		end },
-	})
-
 	local indicators = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Indicators',
@@ -827,25 +840,23 @@ local function AppearanceBoards(ui, parent, width)
 		} },
 		OnUnlessOff(settings, nil, 'leaderIconEnabled'),
 	}, RefreshFrames)
-	return { general, health, dispel, tags, indicators }
+	return { general, health, dispel, indicators }
 end
 
-local function TagsBoards(ui, parent, width, page)
+local function CustomTagsBoard(ui, parent, width, page)
 	local settings = Settings()
 	local unitSettings = settings[tagUnit]
 	local custom = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Custom tags',
 		description = 'Extra text elements driven by tags, attached to one frame. The preview above shows them in place.',
-		buttons = {
-			{ text = 'New tag', icon = 'plus', onClick = function()
-				unitSettings.customTags[#unitSettings.customTags + 1] = { name = 'Tag ' .. (#unitSettings.customTags + 1), tag = '[name]', point = 'CENTER', x = 0, y = 0, fontSize = 12, color = { 1, 1, 1, 1 }, enabled = true, drawLayer = 'OVERLAY', drawSubLevel = 0 }
-				RefreshFrames()
-				page:RebuildCurrent()
-			end },
-		},
 	})
 	custom:AddTools('Frame', 'Which frame these tags belong to', {
+		{ text = 'New tag', icon = 'plus', onClick = function()
+			unitSettings.customTags[#unitSettings.customTags + 1] = { name = 'Tag ' .. (#unitSettings.customTags + 1), tag = '[name]', point = 'CENTER', x = 0, y = 0, fontSize = 12, color = { 1, 1, 1, 1 }, enabled = true, drawLayer = 'OVERLAY', drawSubLevel = 0 }
+			RefreshFrames()
+			page:RebuildCurrent()
+		end },
 		{ entries = TAG_UNITS, width = MENU_WIDTH, get = function() return tagUnit end, set = function(value)
 			tagUnit = value
 			RefreshPreview()
@@ -876,30 +887,110 @@ local function TagsBoards(ui, parent, width, page)
 			} },
 			OnUnlessOff(entry, nil, 'enabled'),
 			{ slot = 'erase', icon = 'erase', size = Layout.ERASE_SIZE, hover = 'danger', tooltip = 'Remove this tag', onClick = function()
-				table.remove(unitSettings.customTags, index)
-				RefreshFrames()
-				page:RebuildCurrent()
+				Modals.Confirm({
+					parent = Window().frame,
+					title = 'Remove ' .. (entry.name or ('Tag ' .. index)),
+					message = 'Remove this tag from the frame? There is no undo.',
+					confirmText = 'Remove', cancelText = 'Cancel',
+					onConfirm = function()
+						table.remove(unitSettings.customTags, index)
+						RefreshFrames()
+						page:RebuildCurrent()
+					end,
+				})
 			end },
 		}, RefreshFrames)
 	end
 	if #unitSettings.customTags == 0 then custom:AddRow('No custom tags yet', 'Use New tag to add one to this frame') end
+	return custom
+end
 
+local function ReferenceBoard(ui, parent, width)
+	local tagX = width - COPY_WIDTH - ui.ROW_INSET
 	local reference = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Tag reference',
-		description = 'Every text tag with a sample. Click a box and press Ctrl+C to copy it.',
+		description = 'Every text tag with a sample. Search by name or tag, then click a box and press Ctrl+C to copy it.',
+		columns = { { 'Name', ui.ROW_INSET }, { 'Sample', SAMPLE_X }, { 'Tag', tagX } },
 	})
 	for _, group in ipairs(TAG_GROUPS) do
 		reference:AddCaption(group)
 		for _, tag in ipairs(TAGS) do
 			if tag.group == group then
-				reference:AddTools(tag.description, tag.example, {
-					{ kind = 'input', width = COPY_WIDTH, placeholder = tag.tag, get = function() return tag.tag end, set = function() end },
-				})
+				local row = reference:AddRow(tag.description, nil, width - SAMPLE_X, tag.description .. ' ' .. tag.example .. ' ' .. tag.tag)
+				ui.Cell(row, tag.example, SAMPLE_X, tagX - SAMPLE_X - COPY_GAP)
+				ui.Input(row, COPY_WIDTH, { placeholder = tag.tag, get = function() return tag.tag end, set = function() end }):SetPoint('LEFT', tagX, 0)
 			end
 		end
 	end
-	return { custom, reference }
+	return reference
+end
+
+
+local function DefaultTagsBoard(ui, parent, width)
+	local settings = Settings()
+	local tags = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Default tags',
+		description = 'Format, color, size and position every frame falls back on. A frame overrides only what it changes on its own pane.',
+	})
+	local function Row(label, sub, swatches, prefix, placeholder, sizeMax, after)
+		local tools = {}
+		for _, swatch in ipairs(swatches) do tools[#tools + 1] = swatch end
+		tools[#tools + 1] = { icon = 'text', tooltip = 'Text size', title = label, options = {
+			Option(settings, 'Text size', prefix .. 'TextSize', { min = 8, max = sizeMax, step = 1 }),
+		} }
+		tools[#tools + 1] = { icon = 'location', tooltip = 'Position and offset', title = label, options = {
+			Option(settings, 'Position', prefix .. 'Position', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
+			Option(settings, 'Horizontal', prefix .. 'OffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+			Option(settings, 'Vertical', prefix .. 'OffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+		} }
+		tools[#tools + 1] = TagInput(settings, prefix .. 'Format', placeholder)
+		tags:AddTools(label, sub, tools, after)
+	end
+	local function RefreshStatus()
+		RefreshFrames()
+		BUI.UnitFrames.RefreshLifeVisuals()
+		BUI.GroupFrames.RefreshAll()
+	end
+	local statusSwatches = {}
+	for _, statusName in ipairs({ 'Dead', 'Ghost', 'Offline', 'AFK', 'DND' }) do
+		statusSwatches[#statusSwatches + 1] = {
+			kind = 'swatch', tooltip = statusName, opacity = true,
+			get = function()
+				local color = settings.statusColors[statusName]
+				return color[1], color[2], color[3], color[4] or 1
+			end,
+			set = function(red, green, blue, alpha) settings.statusColors[statusName] = { red, green, blue, alpha } end,
+		}
+	end
+	Row('Name tag', 'Unit name on the health bar', { Color(settings, 'Text color', 'nameColor') }, 'name', DEFAULT_TAGS.name, 20, RefreshFrames)
+	Row('Health tag', 'Health value on the bar', { Color(settings, 'Text color', 'healthTextColor') }, 'health', DEFAULT_TAGS.health, 20, RefreshFrames)
+	Row('Power tag', 'Resource value on the power bar', { Color(settings, 'Text color', 'powerTextColor') }, 'power', DEFAULT_TAGS.power, 20, RefreshFrames)
+	Row('Status tag', 'Dead, Ghost, Offline, AFK and DND', statusSwatches, 'status', DEFAULT_TAGS.status, 24, RefreshStatus)
+	tags:AddTools('Reset tags', 'Restore the default name, health, power and status tags', {
+		{ text = 'Reset', onClick = function()
+			settings.nameFormat, settings.healthFormat, settings.powerFormat, settings.statusFormat = DEFAULT_TAGS.name, DEFAULT_TAGS.health, DEFAULT_TAGS.power, DEFAULT_TAGS.status
+			RefreshFrames()
+			Repaint()
+		end },
+	})
+	return tags
+end
+
+local function TagsBoards(ui, parent, width, page)
+	local strip = CreateFrame('Frame', nil, parent)
+	strip:SetWidth(width)
+	local top, select = ui.Tabs(strip, 0, { 'Reference sheet', 'Default tags', 'Custom tags' }, function(index)
+		if index == tagsTab then return end
+		tagsTab = index
+		page:RebuildCurrent()
+	end)
+	strip:SetHeight(top + TAB_STRIP_GAP)
+	select(tagsTab)
+	if tagsTab == 1 then return { strip, ReferenceBoard(ui, parent, width) } end
+	if tagsTab == 2 then return { strip, DefaultTagsBoard(ui, parent, width) } end
+	return { strip, CustomTagsBoard(ui, parent, width, page) }
 end
 
 local function FiltersBoards(ui, parent, width, page)
@@ -1169,18 +1260,19 @@ local function UnitBoards(ui, parent, width, unit)
 	local text = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Text',
-		description = 'Name, health and power texts. Tags left empty fall back to the defaults on Appearance.',
+		description = 'Name, health, status and power texts. Anything left alone follows the Default tags on the Tags pane.',
 	})
 	text:AddTools('Name', 'Unit name on the health bar', {
 		Color(unitSettings, 'Friendly', 'friendlyNameColor'),
 		Color(unitSettings, 'Neutral', 'neutralNameColor'),
 		Color(unitSettings, 'Hostile', 'hostileNameColor'),
+		{ icon = 'reset', tooltip = 'Back to the shared defaults', onClick = function() ClearOverrides(unitSettings, 'name') end },
 		{ icon = 'text', tooltip = 'Color, position and size', title = 'Name', options = {
 			Toggle(unitSettings, 'Class or reaction color', 'classColorName'),
-			Option(unitSettings, 'Position', 'namePosition', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
-			Option(unitSettings, 'Text size', 'nameTextSize', { min = 8, max = 20, step = 1 }),
-			Option(unitSettings, 'Horizontal', 'nameOffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-			Option(unitSettings, 'Vertical', 'nameOffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+			Inherit(unitSettings, 'Position', 'namePosition', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
+			Inherit(unitSettings, 'Text size', 'nameTextSize', { min = 8, max = 20, step = 1 }),
+			Inherit(unitSettings, 'Horizontal', 'nameOffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+			Inherit(unitSettings, 'Vertical', 'nameOffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
 		} },
 		{ get = function() return ResolveShow(unitSettings.showName, settings.showName) end, set = function(value) unitSettings.showName = value end },
 	}, RefreshFrames)
@@ -1191,25 +1283,38 @@ local function UnitBoards(ui, parent, width, unit)
 		}, RefreshFrames)
 	end
 	text:AddTools('Health text', 'Health value on the bar', {
+		{ icon = 'reset', tooltip = 'Back to the shared defaults', onClick = function() ClearOverrides(unitSettings, 'health') end },
 		{ icon = 'text', tooltip = 'Position and size', title = 'Health text', options = {
-			Option(unitSettings, 'Position', 'healthPosition', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
-			Option(unitSettings, 'Text size', 'healthTextSize', { min = 8, max = 20, step = 1 }),
-			Option(unitSettings, 'Horizontal', 'healthOffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-			Option(unitSettings, 'Vertical', 'healthOffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+			Inherit(unitSettings, 'Position', 'healthPosition', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
+			Inherit(unitSettings, 'Text size', 'healthTextSize', { min = 8, max = 20, step = 1 }),
+			Inherit(unitSettings, 'Horizontal', 'healthOffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+			Inherit(unitSettings, 'Vertical', 'healthOffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
 		} },
 		{ get = function() return ResolveShow(unitSettings.showHealthText, settings.showHealthText) end, set = function(value) unitSettings.showHealthText = value end },
 	}, RefreshFrames)
+	text:AddTools('Status text', 'Dead, Ghost or Offline over the bar', {
+		{ icon = 'reset', tooltip = 'Back to the shared defaults', onClick = function() ClearOverrides(unitSettings, 'status') end },
+		{ icon = 'text', tooltip = 'Position and size', title = 'Status text', options = {
+			Inherit(unitSettings, 'Position', 'statusPosition', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
+			Inherit(unitSettings, 'Text size', 'statusTextSize', { min = 8, max = 24, step = 1 }),
+			Inherit(unitSettings, 'Horizontal', 'statusOffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+			Inherit(unitSettings, 'Vertical', 'statusOffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+		} },
+		{ get = function() return unitSettings.showStatusText ~= false end, set = function(value) unitSettings.showStatusText = value end },
+	}, RefreshFrames)
+	text:AddTools('Status tag', 'Tag override for this frame', { TagInput(unitSettings, 'statusFormat', DEFAULT_TAGS.status) }, RefreshFrames)
 	text:AddTools('Health tag', 'Tag override for this frame', { TagInput(unitSettings, 'healthFormat', DEFAULT_TAGS.health) }, RefreshFrames)
 	text:AddTools('Power bar', 'Resource bar under the health bar', {
 		{ icon = 'resize', tooltip = 'Height', title = 'Power bar', options = { Option(unitSettings, 'Bar height', 'powerHeight', { min = 1, max = 20, step = 1 }) } },
 		Toggle(unitSettings, nil, 'showPower'),
 	}, RefreshFrames)
 	text:AddTools('Power text', 'Resource value on the power bar', {
+		{ icon = 'reset', tooltip = 'Back to the shared defaults', onClick = function() ClearOverrides(unitSettings, 'power') end },
 		{ icon = 'text', tooltip = 'Position and size', title = 'Power text', options = {
-			Option(unitSettings, 'Position', 'powerPosition', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
-			Option(unitSettings, 'Text size', 'powerTextSize', { min = 8, max = 20, step = 1 }),
-			Option(unitSettings, 'Horizontal', 'powerOffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-			Option(unitSettings, 'Vertical', 'powerOffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+			Inherit(unitSettings, 'Position', 'powerPosition', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
+			Inherit(unitSettings, 'Text size', 'powerTextSize', { min = 8, max = 20, step = 1 }),
+			Inherit(unitSettings, 'Horizontal', 'powerOffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+			Inherit(unitSettings, 'Vertical', 'powerOffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
 		} },
 		{ get = function() return ResolveShow(unitSettings.showPowerText, settings.showPowerText, false) end, set = function(value) unitSettings.showPowerText = value end },
 	}, RefreshFrames)
@@ -1232,8 +1337,9 @@ local function UnitBoards(ui, parent, width, unit)
 	return boards
 end
 
-local function Panes(ui, _, parent, width, item, page)
-	if item.id == 'appearance' then return AppearanceBoards(ui, parent, width) end
+local function Panes(ui, shell, parent, width, item, page)
+	if GROUP_PANE[item.id] then return BUI.GroupFramesPage.Build(ui, shell, parent, width, item, page) end
+	if item.id == 'appearance' then return AppearanceBoards(ui, parent, width, page) end
 	if item.id == 'tags' then return TagsBoards(ui, parent, width, page) end
 	if item.id == 'filters' then return FiltersBoards(ui, parent, width, page) end
 	return UnitBoards(ui, parent, width, UNIT_BY_KEY[item.id])
@@ -1248,7 +1354,8 @@ local function RailGroups()
 			{ id = 'tags', label = 'Tags', icon = 'text' },
 			{ id = 'filters', label = 'Filters', icon = 'x' },
 		} },
-		{ title = 'Frames', items = frames },
+		{ title = 'Units', items = frames },
+		{ title = 'Groups', items = BUI.GroupFramesPage.items },
 	}
 end
 
@@ -1259,6 +1366,8 @@ BUI.PageEngine.RegisterPage('unitframes', {
 	OnBuild = function(pageFrame)
 		fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
 		textures = BUI.BuildTextureDropdownItems(BUI.C.GLOBAL_OPTION)
+		BUI.GroupFramesPage.Init()
+		for _, item in ipairs(BUI.GroupFramesPage.items) do GROUP_PANE[item.id] = true end
 		local settings = Settings()
 		local module = UnitFrames()
 		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
@@ -1268,8 +1377,8 @@ BUI.PageEngine.RegisterPage('unitframes', {
 		rail = Layout.RailPage(tab, { window = Window() }, {
 			icon = 'profile',
 			title = 'Unit Frames',
-			placeholder = 'Search unit frame settings...',
-			disabled = function() return not enabled end,
+			placeholder = 'Search frame settings...',
+			disabled = function(item) return not enabled or (GROUP_PANE[item.id] and not BUI.GroupFramesPage.IsOn()) end,
 			tools = {
 				{ text = 'Test mode', onClick = function()
 					module.TestMode.Toggle()
@@ -1277,7 +1386,7 @@ BUI.PageEngine.RegisterPage('unitframes', {
 						Modals.Message({ parent = Window().frame, title = 'Test mode', message = 'Every frame is shown with sample data. Type /buitest to close it.', buttonText = 'Got it' })
 					end
 				end },
-				{ icon = 'enable', tooltip = 'Turn the unit frames on or off, needs a reload', get = function() return settings.enabled == true end, set = function(value)
+				{ icon = 'enable', label = 'Unit frames', tooltip = 'Turn the unit frames on or off, needs a reload', get = function() return settings.enabled == true end, set = function(value)
 					settings.enabled = value
 					Modals.Confirm({
 						parent = Window().frame,
@@ -1287,6 +1396,7 @@ BUI.PageEngine.RegisterPage('unitframes', {
 						onConfirm = ReloadUI,
 					})
 				end },
+				BUI.GroupFramesPage.EnableTool(),
 			},
 			preview = { height = PREVIEW_HEIGHT, build = function(band, kit) preview = BuildPreview(band, kit) end },
 			rail = { groups = RailGroups(), selected = selected },
@@ -1311,6 +1421,7 @@ BUI.PageEngine.RegisterPage('unitframes', {
 	end,
 	OnHide = function()
 		BUI.UnitFrames.LockAllPreviews()
+		BUI.GroupFrames.CloseAllPreviews()
 		BUI.CastBar.StopInterruptPreview('boss')
 		BUI.UnitFrames.StopDispelPreview()
 	end,

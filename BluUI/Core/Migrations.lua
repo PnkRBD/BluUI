@@ -31,7 +31,7 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 11
+local PROFILE_MIGRATION_VERSION = 14
 local LEGACY_UNIT_KEYS = { 'player', 'target', 'targettarget', 'focus', 'focustarget', 'pet', 'boss', 'arena', 'party' }
 
 function BUI.MigrateProfile(profile)
@@ -383,6 +383,66 @@ function BUI.MigrateProfile(profile)
 					if border.enabled == false and rawget(border, 'tintBar') == nil then border.tintBar = false end
 					border.enabled = nil
 					if border.tintStyle == 'strip' then border.tintStyle = 'bar' end
+				end
+			end
+		end
+	end
+
+	if not general._statusColorsShared then
+		general._statusColorsShared = true
+		local groupFrames = type(profile.groupFrames) == 'table' and profile.groupFrames
+		local raid = groupFrames and type(groupFrames.raid) == 'table' and groupFrames.raid
+		local raidColors = raid and type(raid.statusText) == 'table' and rawget(raid.statusText, 'colors')
+		if type(raidColors) == 'table' then
+			if type(profile.unitFrames) ~= 'table' then profile.unitFrames = {} end
+			local shared = rawget(profile.unitFrames, 'statusColors') or {}
+			profile.unitFrames.statusColors = shared
+			for status, color in pairs(raidColors) do shared[status] = CopyTable(color) end
+		end
+		for _, sectionKey in ipairs({ 'party', 'raid' }) do
+			local section = groupFrames and type(groupFrames[sectionKey]) == 'table' and groupFrames[sectionKey]
+			if section and type(section.statusText) == 'table' then section.statusText.colors = nil end
+		end
+	end
+
+	if not general._customTagFields then
+		general._customTagFields = true
+		local unitFrames = type(profile.unitFrames) == 'table' and profile.unitFrames or {}
+		for _, unit in pairs(unitFrames) do
+			local tags = type(unit) == 'table' and rawget(unit, 'customTags')
+			for _, entry in ipairs(type(tags) == 'table' and tags or {}) do
+				if type(entry) == 'table' then
+					if entry.point == nil then entry.point = 'CENTER' end
+					if entry.x == nil then entry.x = 0 end
+					if entry.y == nil then entry.y = 0 end
+					if entry.fontSize == nil then entry.fontSize = 12 end
+					if entry.color == nil then entry.color = { 1, 1, 1, 1 } end
+					if entry.drawLayer == nil then entry.drawLayer = 'OVERLAY' end
+					if entry.drawSubLevel == nil then entry.drawSubLevel = 0 end
+				end
+			end
+		end
+	end
+
+	if not general._textDefaultsShared then
+		general._textDefaultsShared = true
+		local unitFrames = type(profile.unitFrames) == 'table' and profile.unitFrames or {}
+		local sizes = {
+			player = { nameTextSize = 12, healthTextSize = 12, powerTextSize = 11 },
+			target = { nameTextSize = 12, healthTextSize = 12, powerTextSize = 10 },
+			targettarget = { nameTextSize = 10, healthTextSize = 10, powerTextSize = 8 },
+			focus = { nameTextSize = 11, healthTextSize = 11, powerTextSize = 9 },
+			focustarget = { nameTextSize = 10, healthTextSize = 10, powerTextSize = 8 },
+			pet = { nameTextSize = 10, healthTextSize = 10, powerTextSize = 8 },
+			boss = { nameTextSize = 11, healthTextSize = 10, powerTextSize = 9 },
+		}
+		local stash = rawget(unitFrames, '_syncStash')
+		for unitKey, old in pairs(sizes) do
+			local unit = unitFrames[unitKey]
+			if type(unit) == 'table' then
+				local source = (type(stash) == 'table' and stash[unitKey]) and sizes.player or old
+				for key, value in pairs(source) do
+					if rawget(unit, key) == nil then unit[key] = value end
 				end
 			end
 		end

@@ -61,9 +61,9 @@ function Board:AddSwitch(label, get, set, tip, room)
 	return switch, cell
 end
 
-function Board:AddRow(name, sub, room)
+function Board:AddRow(name, sub, room, search)
 	local kit = self.kit
-	local row = Section.AddRow(self, sub and (name .. ' ' .. sub) or name)
+	local row = Section.AddRow(self, search or (sub and (name .. ' ' .. sub) or name))
 	if not sub then row:SetHeight(PLAIN_ROW) end
 	kit.RowTitle(row, name, sub, kit.ROW_INSET, room and (self.panelWidth - kit.ROW_INSET * 2 - room - CONTROL_GAP))
 	return row

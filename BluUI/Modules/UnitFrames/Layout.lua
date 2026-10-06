@@ -26,7 +26,6 @@ local POWER_VALUE_EVENTS = {
 	UNIT_MAXPOWER = true,
 }
 
-local STATUS_NAMES = { offline = 'Offline', ghost = 'Ghost', dead = 'Dead' }
 
 local function DeadBackgroundColor(frame)
 	local state = frame._statusState
@@ -121,21 +120,19 @@ local function UpdateHealthTextShown(frame)
 end
 
 local function ApplyStatusText(frame)
-	local status = STATUS_NAMES[frame._statusState]
-	if not status then
-		frame.StatusText:Hide()
-		return
-	end
-	local color = BUI.GroupFrames.GetDB().raid.statusText.colors[status]
-	frame.StatusText:SetText(status:upper())
-	frame.StatusText:SetTextColor(color[1], color[2], color[3])
-	frame.StatusText:Show()
+	frame.StatusText:SetShown(UnitFrames.GetUnitSettings(frame._unitType).showStatusText ~= false)
 end
 
 local function ApplyLifeVisuals(frame)
 	ApplyStatusText(frame)
 	UpdateHealthTextShown(frame)
 	PaintDeadBackground(frame)
+end
+
+function UnitFrames.RefreshStatusText(frame)
+	if not frame.StatusText then return end
+	ApplyStatusText(frame)
+	if frame.StatusText.UpdateTag then frame.StatusText:UpdateTag() end
 end
 
 local function UpdateLifeState(self, unit)
@@ -335,9 +332,9 @@ local function Style(self, unit)
 
 	local function PositiveOr(value, fallback) return (type(value) == 'number' and value > 0) and value or fallback end
 	local textSize = PositiveOr(unitSettings.textSize, 12)
-	local nameTextSize = PositiveOr(unitSettings.nameTextSize, textSize)
-	local healthTextSize = PositiveOr(unitSettings.healthTextSize, textSize)
-	local powerTextSize = PositiveOr(unitSettings.powerTextSize, textSize - 2)
+	local nameTextSize = PositiveOr(UnitFrames.TextSetting(unitSettings, 'nameTextSize'), textSize)
+	local healthTextSize = PositiveOr(UnitFrames.TextSetting(unitSettings, 'healthTextSize'), textSize)
+	local powerTextSize = PositiveOr(UnitFrames.TextSetting(unitSettings, 'powerTextSize'), textSize - 2)
 
 	local name = overlay:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(name, nameTextSize, font)
@@ -353,7 +350,7 @@ local function Style(self, unit)
 	self.HealthText = healthText
 
 	local statusText = overlay:CreateFontString(nil, 'OVERLAY')
-	Pixel.ApplyFont(statusText, textSize + 2, font)
+	Pixel.ApplyFont(statusText, PositiveOr(UnitFrames.TextSetting(unitSettings, 'statusTextSize'), textSize + 2), font)
 	statusText:SetPoint('CENTER', health, 'CENTER', 0, 0)
 	statusText:Hide()
 	self.StatusText = statusText
