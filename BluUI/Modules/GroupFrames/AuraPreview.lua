@@ -13,7 +13,6 @@ local SAMPLE_SPELLS = {
 	debuffs      = { 589, 980, 703 },
 	bigDef       = { 642 },
 	crowdControl = { 5782, 118 },
-	privateAuras = { 8122, 33786, 605, 1776 },
 }
 local SAMPLE_STACKS = {
 	buffs   = { 3, nil, 2 },
@@ -134,21 +133,6 @@ local function ApplyContainerSample(child, kind, settings)
 	LayoutHolder(holder, kind, child, config)
 end
 
-local function ApplyPrivateSample(child, settings)
-	local config = settings.privateAuras
-	if not config then return end
-	local host = child.Health or child
-	local holder = Holder(child, 'privateAuras', host, GroupFrames.Layers.privateAura + 1)
-	local vertical = config.growDirection == 'UP' or config.growDirection == 'DOWN'
-	local count = math.max(1, config.num)
-	LayoutHolder(holder, 'privateAuras', host, {
-		size = config.size, spacing = config.spacing, rowSpacing = config.spacing,
-		perRow = vertical and 1 or count, max = count,
-		anchorPoint = config.anchorPoint, relativePoint = config.relativePoint,
-		growDirection = config.growDirection, offsetX = config.offsetX, offsetY = config.offsetY,
-	})
-end
-
 local function ClearSample(child, kind, settings)
 	local holder = child._buiAuraSamples and child._buiAuraSamples[kind]
 	if holder then holder:Hide() end
@@ -157,8 +141,6 @@ end
 local function ApplySample(child, kind, settings)
 	if CONTAINER_KINDS[kind] then
 		ApplyContainerSample(child, kind, settings)
-	elseif kind == 'privateAuras' then
-		ApplyPrivateSample(child, settings)
 	end
 end
 

@@ -151,7 +151,6 @@ function GroupFrames.ApplyChildAll(child, settings, geometry)
 	GroupFrames.ApplyTextToChild(child, settings)
 	GroupFrames.ApplyIndicatorsToChild(child, settings)
 	GroupFrames.ApplyKeystoneToChild(child, settings)
-	GroupFrames.ApplyPrivateAuras(child)
 	GroupFrames.RefreshSelection(child)
 	if child.unit then
 		if child.Health and child:IsElementEnabled("Health") then child.Health:ForceUpdate() end
@@ -221,7 +220,6 @@ local function RosterSweep()
 				child.Power:ForceUpdate()
 			end
 			GroupFrames.ApplyTextColors(child, settings)
-			GroupFrames.ApplyPrivateAuras(child)
 			GroupFrames.MarkAurasDirty(child)
 		elseif not child._bluRosterGeom and not inCombat then
 			GroupFrames.ApplyGeometry(child, settings)

@@ -416,7 +416,7 @@ local function AurasBoards(ui, parent, width, key)
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = key == 'party' and 'Party auras' or 'Raid auras',
-		description = 'Buffs, debuffs, defensives, crowd control and private auras on each member. The eye shows sample icons on the frames.',
+		description = 'Buffs, debuffs, defensives and crowd control on each member. The eye shows sample icons on the frames.',
 	})
 	for _, container in ipairs(CONTAINERS) do
 		local settings = section[container.key]
@@ -443,20 +443,6 @@ local function AurasBoards(ui, parent, width, key)
 			Toggle(settings, nil, 'enabled'),
 		}, Refresh)
 	end
-	local private = section.privateAuras
-	board:AddTools('Private auras', 'Boss mechanics only you are allowed to see', {
-		{ tooltip = 'Count, size and placement', title = 'Private auras', options = {
-			Option(private, 'Count', 'num', { min = 1, max = 4, step = 1 }),
-			Option(private, 'Icon size', 'size', { min = 12, max = 48, step = 1 }),
-			Toggle(private, 'Timer', 'showTimer'),
-			Option(private, 'Grow', 'growDirection', { entries = GROWTHS }),
-			Placement(private),
-			Option(private, 'Horizontal', 'offsetX', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
-			Option(private, 'Vertical', 'offsetY', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
-		} },
-		Eye('Show sample icons where private auras appear', function() return GroupFrames().IsAuraPreviewing(key, 'privateAuras') end, function(value) GroupFrames().PreviewAuraKind(key, 'privateAuras', value) end),
-		Toggle(private, nil, 'enabled'),
-	}, Refresh)
 
 	local dispels = ui.Board(parent, width, {
 		stacked = true,

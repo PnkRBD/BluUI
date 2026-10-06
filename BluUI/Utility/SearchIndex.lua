@@ -350,7 +350,6 @@ local entries = {
 	{ label = "Large raid layout", page = "unitframes", tab = 12, panel = "Raid", keywords = "large raid size threshold groups per row spacing" },
 	{ label = "Power bar", page = "unitframes", tab = 12, panel = "Raid", keywords = "raid power bar show hide height healer mana" },
 	{ label = "Buffs", page = "unitframes", tab = 13, panel = "Party auras", keywords = "party aura buff debuff defensive crowd control icons rules" },
-	{ label = "Private auras", page = "unitframes", tab = 13, panel = "Party auras", keywords = "private aura raid boss" },
 	{ label = "Dispel highlight", page = "unitframes", tab = 13, panel = "Party auras", keywords = "dispel debuff highlight tint badge magic curse poison disease" },
 	{ label = "Dispel type colors", page = "unitframes", tab = 13, panel = "Party auras", keywords = "dispel color magic curse poison disease bleed shared palette" },
 	{ label = "Buffs", page = "unitframes", tab = 14, panel = "Raid auras", keywords = "raid aura buff debuff defensive crowd control icons rules" },

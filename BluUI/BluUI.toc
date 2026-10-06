@@ -94,7 +94,6 @@ Modules\GroupFrames\Style.lua
 Modules\GroupFrames\Indicators.lua
 Modules\GroupFrames\Auras.lua
 Modules\GroupFrames\Dispel.lua
-Modules\GroupFrames\PrivateAuras.lua
 Modules\GroupFrames\Keystone.lua
 Modules\GroupFrames\BlizzardHide.lua
 Modules\GroupFrames\Party.lua

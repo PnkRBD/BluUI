@@ -168,7 +168,6 @@ end
 function GroupFrames.SyncLifeState(frame, dead, offline)
 	if frame._bluWasDead == dead and frame._bluWasOffline == offline then return end
 	frame._bluWasDead, frame._bluWasOffline = dead, offline
-	GroupFrames.NudgePrivateAuras(frame)
 end
 
 function GroupFrames.RefreshFrameAuras(frame)

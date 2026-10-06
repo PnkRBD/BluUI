@@ -12,7 +12,6 @@ GroupFrames.Layers = {
 	auras       = 10,
 	selection   = 20,
 	indicators  = 25,
-	privateAura = 30,
 }
 
 function GroupFrames.Print(message)
