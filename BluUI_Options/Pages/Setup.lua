@@ -152,6 +152,45 @@ local function CommitProfile()
 	WriteLook(BUI.GetDB(), edited, themeVisited, scaleVisited)
 end
 
+local function KeptProfiles()
+	local keep = { Default = true }
+	keep[BUI.GetAceDB():GetCurrentProfile()] = true
+	for _, profileName in pairs(BUI.db.sv.profileKeys or {}) do keep[profileName] = true end
+	for _, character in pairs(BUI.db.sv.char or {}) do
+		local store = type(character) == 'table' and character.specProfiles
+		local map = type(store) == 'table' and store.map
+		if type(map) == 'table' then
+			for _, profileName in pairs(map) do keep[profileName] = true end
+		end
+	end
+	return keep
+end
+
+local function CharacterNames()
+	local names = {}
+	for charKey in pairs(BUI.db.sv.profileKeys or {}) do
+		local name = charKey:match('^(.-) %- ')
+		if name then names[name] = true end
+	end
+	return names
+end
+
+local function RemoveLeftoverProfiles()
+	local aceDB = BUI.GetAceDB()
+	local keep, characters, removed = KeptProfiles(), CharacterNames(), {}
+	for _, name in pairs(aceDB:GetProfiles()) do
+		local base = name:match('^(.-) %d+$') or name
+		if not keep[name] and (characters[base] or name == BLU_PROFILE) then
+			aceDB:DeleteProfile(name, true)
+			removed[#removed + 1] = name
+		end
+	end
+	if #removed > 0 then
+		table.sort(removed)
+		BUI.Print('Setup removed profiles an unfinished setup left behind: ' .. table.concat(removed, ', ') .. '.')
+	end
+end
+
 local function RestoreOpeningLook()
 	if finishing or not lookSnapshot or pendingProfile == openingProfile then return end
 	BUI.Events:AfterCombat(function()
@@ -938,6 +977,7 @@ BUI.OptionsWindow.New('setup', {
 	icon = 'check',
 	globalName = 'BluUISetupFrame',
 	onOpen = function(shell)
+		RemoveLeftoverProfiles()
 		SeedSelection()
 		barsChoice, barsVisited = 'ours', false
 		openingProfile = BUI.GetAceDB():GetCurrentProfile()
