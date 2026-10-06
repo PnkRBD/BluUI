@@ -88,7 +88,6 @@ local function BuildCombatPanel()
     local panel = Datatext.CreateHoverPanel('BUI_DatatextCombat', PANEL_WIDTH)
     local font = Datatext.PanelFont()
     panel.title:SetText('RECENT PULLS')
-    panel.title:SetTextColor(0.55, 0.55, 0.60)
 
     local TIME_X = PANEL_WIDTH - 52
     panel.rows = {}
@@ -100,24 +99,31 @@ local function BuildCombatPanel()
         name:SetWidth(Pixel.Scale(TIME_X - 18))
         name:SetWordWrap(false)
         name:SetJustifyH('LEFT')
-        name:SetTextColor(0.78, 0.78, 0.82)
         local time = panel:CreateFontString(nil, 'OVERLAY')
         Pixel.ApplyFont(time, 11, font)
         time:SetPoint('TOPLEFT', Pixel.Scale(TIME_X), rowTop)
         time:SetJustifyH('LEFT')
-        time:SetTextColor(0.9, 0.9, 0.95)
         panel.rows[pullIndex] = { name = name, time = time }
     end
 
     panel.empty = panel:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(panel.empty, 11, font)
     panel.empty:SetPoint('TOPLEFT', Pixel.Scale(12), Pixel.Scale(-34))
-    panel.empty:SetText('|cff777777No pulls recorded|r')
+    panel.empty:SetText('No pulls recorded')
 
     panel.hint = panel:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(panel.hint, 10, font)
     panel.hint:SetPoint('BOTTOMLEFT', Pixel.Scale(10), Pixel.Scale(7))
-    panel.hint:SetText('|cffffd200Ctrl+Right-Click|r Clear')
+
+    function panel:PaintTheme()
+        for _, row in ipairs(self.rows) do
+            row.name:SetTextColor(BUI.ThemeColor('muted'))
+            row.time:SetTextColor(BUI.ThemeColor('text'))
+        end
+        self.empty:SetTextColor(BUI.ThemeColor('muted'))
+        self.hint:SetTextColor(BUI.ThemeColor('muted'))
+        self.hint:SetText('|cff' .. BUI.Hex(BUI.ThemeColor('accent')) .. 'Ctrl+Right-Click|r Clear')
+    end
 
     combatPanel = panel
 end

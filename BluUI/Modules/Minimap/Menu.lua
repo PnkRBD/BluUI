@@ -35,6 +35,7 @@ local TOOL_ICON     = 15
 local TOOL_ICON_GAP = 7
 local DOT_SIZE      = 5
 local DOT_INSET     = 5
+local CARD_RADIUS   = 8
 local ICON_MARKUP   = '|T%s:14:14:0:0|t  %s'
 
 local SECTIONS = {
@@ -249,8 +250,8 @@ local function BuildToolPane()
 end
 
 local function Repaint()
-	menu.background:SetVertexColor(BUI.ThemeColor('page'))
-	Widget.SetRectColor(menu.edges, BUI.ThemeColor('edge'))
+	menu.fill:SetVertexColor(BUI.ThemeColor('card'))
+	menu.edge:SetVertexColor(BUI.ThemeColor('cardEdge'))
 
 	PaintText(menu.title, 'text', 'title', TITLE_SIZE)
 	PaintText(menu.subtitle, 'muted', 'body', SUBTITLE_SIZE)
@@ -263,11 +264,11 @@ local function Repaint()
 	end
 
 	for _, row in ipairs(menu._toolRows) do
-		row.fill:SetColorTexture(BUI.ThemeColor('control'))
-		PaintText(row.label, 'controlText', 'control', CONTROL_SIZE)
+		row.fill:SetColorTexture(BUI.ThemeColor('secondary'))
+		PaintText(row.label, 'secondaryText', 'control', CONTROL_SIZE)
 		row.label:SetText(row.action.label)
 		if row.action.tint then
-			row.icon:SetVertexColor(BUI.ThemeColor('controlText'))
+			row.icon:SetVertexColor(BUI.ThemeColor('secondaryText'))
 		end
 	end
 end
@@ -276,7 +277,7 @@ local function BuildMenu()
 	if menu then return menu end
 
 	menu = CreateFrame('Frame', 'BUI_MinimapMenu', UIParent)
-	menu.edges, menu.background = Layout.FrameChrome(menu)
+	menu.fill, menu.edge = Widget.DrawCardShape(menu, CARD_RADIUS, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
 	menu:SetSize(Pixel.Scale(MENU_W), Pixel.Scale(200))
 	menu:SetFrameStrata('DIALOG')
 	menu:SetFrameLevel(100)
