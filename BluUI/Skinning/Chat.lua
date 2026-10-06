@@ -317,17 +317,10 @@ StaticPopupDialogs['BUI_CHAT_URL'] = {
 	EditBoxOnEnterPressed = function(self) self:GetParent():Hide() end,
 }
 
-local function ShowURLPopup(url)
-	StaticPopup_Show('BUI_CHAT_URL', nil, nil, url)
-end
-
-local urlRefHooked
-local function HookURLRef()
-	if urlRefHooked then return end
-	urlRefHooked = true
-	Hook('SetItemRef', function(link)
-		local kind, value = link:match('^(%a+):(.+)$')
-		if kind == 'url' and value then ShowURLPopup(value) end
+local function RegisterURLHandler()
+	if LinkUtil.IsLinkHandlerRegistered('url') then return end
+	LinkUtil.RegisterLinkHandler('url', function(link)
+		StaticPopup_Show('BUI_CHAT_URL', nil, nil, link:sub(5))
 	end)
 end
 
@@ -1347,9 +1340,6 @@ local function SetupScroll(frame)
 	frame:SetMouseClickEnabled(true)
 	frame:SetMouseMotionEnabled(true)
 	frame:SetHyperlinksEnabled(true)
-	if frame:GetScript('OnHyperlinkClick') ~= ChatFrame_OnHyperlinkShow then
-		frame:SetScript('OnHyperlinkClick', ChatFrame_OnHyperlinkShow)
-	end
 	if not frame._buiLinkHover then
 		frame._buiLinkHover = true
 		frame:HookScript('OnHyperlinkEnter', BUI.Profiler.Wrap('Skin.Chat frame OnHyperlinkEnter', function(self, link)
@@ -1824,7 +1814,7 @@ local function Refresh()
 	SkinPanel()
 	CreateMover()
 	CreateSizer()
-	HookURLRef()
+	RegisterURLHandler()
 	HookHistoryCapture()
 	SkinAllChatFrames()
 	ApplySettings()
