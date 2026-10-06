@@ -54,6 +54,7 @@ local function Slot(tool)
 	if kind == 'custom' then return 'menu' end
 	return kind
 end
+Layout.ToolSlot = Slot
 
 local function OverPopup(frame, anchor)
 	return frame:IsMouseOver() or anchor:IsMouseOver() or Controls.ContextMenuIsMouseOver() or Controls.ColorPickerIsMouseOver()
@@ -206,7 +207,7 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 		elseif kind == 'slider' then
 			return kit.Slider(parent, tool.width or POP_CONTROL, { min = tool.min, max = tool.max, step = tool.step, get = tool.get, set = Changed(tool, after) })
 		elseif kind == 'input' then
-			return kit.Input(parent, tool.width or POP_CONTROL, { placeholder = tool.placeholder, get = tool.get, set = Changed(tool, after) })
+			return kit.Input(parent, tool.width or POP_CONTROL, { placeholder = tool.placeholder, square = tool.square, get = tool.get, set = Changed(tool, after) })
 		end
 		return kit.Switch(parent, tool.get, Changed(tool, after))
 	end

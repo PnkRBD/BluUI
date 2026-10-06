@@ -83,7 +83,7 @@ end
 
 function Section:Layout(y, query)
 	self:Measure()
-	local shown, panelHeight = 0, TABLE_HEAD
+	local shown, panelHeight = 0, self.headHeight or TABLE_HEAD
 	for _, row in ipairs(self.rows) do
 		local match = query == '' or row.search:find(query, 1, true) ~= nil
 		row.frame:SetShown(match)
@@ -277,12 +277,34 @@ function Layout.TableKit(window)
 		return frame
 	end
 
+	function kit.Box(frame, fillRole, edgeRole)
+		window:Fill(frame, fillRole, 'BACKGROUND', 0):SetAllPoints()
+		local edges = {}
+		for index = 1, 4 do edges[index] = window:Fill(frame, edgeRole, 'BACKGROUND', 1) end
+		edges[1]:SetPoint('TOPLEFT')
+		edges[1]:SetPoint('TOPRIGHT')
+		edges[1]:SetHeight(1)
+		edges[2]:SetPoint('BOTTOMLEFT')
+		edges[2]:SetPoint('BOTTOMRIGHT')
+		edges[2]:SetHeight(1)
+		edges[3]:SetPoint('TOPLEFT')
+		edges[3]:SetPoint('BOTTOMLEFT')
+		edges[3]:SetWidth(1)
+		edges[4]:SetPoint('TOPRIGHT')
+		edges[4]:SetPoint('BOTTOMRIGHT')
+		edges[4]:SetWidth(1)
+	end
+
 	function kit.Input(parent, width, spec)
 		local box = CreateFrame('Frame', nil, parent)
 		box:SetSize(width, CONTROL_HEIGHT)
-		local fill, edge = Widget.DrawCardShape(box, INPUT_RADIUS, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
-		window:Paint(fill, 'textbox')
-		window:Paint(edge, 'inputEdge')
+		if spec.square then
+			kit.Box(box, 'textbox', 'inputEdge')
+		else
+			local fill, edge = Widget.DrawCardShape(box, INPUT_RADIUS, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
+			window:Paint(fill, 'textbox')
+			window:Paint(edge, 'inputEdge')
+		end
 		local edit = CreateFrame('EditBox', nil, box)
 		edit:SetPoint('LEFT', 12, 0)
 		edit:SetPoint('RIGHT', -12, 0)
@@ -302,6 +324,7 @@ function Layout.TableKit(window)
 			hint:SetShown(text == '')
 		end
 		local function Commit(self)
+			self:HighlightText(0, 0)
 			hint:SetShown(self:GetText() == '')
 			if self:GetText() ~= spec.get() then spec.set(self:GetText()) end
 		end
@@ -366,17 +389,17 @@ function Layout.TableKit(window)
 		return button
 	end
 
-	function kit.IconButton(parent, icon, tooltip, onClick, hoverRole, size)
+	function kit.IconButton(parent, icon, tooltip, onClick, hoverRole, size, idleRole)
 		local button = CreateFrame('Button', nil, parent)
 		button:SetSize(size and math.max(22, size) or 22, 22)
-		local glyph = kit.Glyph(button, icon, size or 14, 'text')
+		local glyph = kit.Glyph(button, icon, size or 14, idleRole or 'text')
 		glyph:SetPoint('CENTER')
 		button:SetScript('OnEnter', function(self)
 			window:Paint(glyph, hoverRole or 'accent')
 			Widget.ShowTip(self, tooltip)
 		end)
 		button:SetScript('OnLeave', function()
-			window:Paint(glyph, 'text')
+			window:Paint(glyph, idleRole or 'text')
 			Widget.HideTip()
 		end)
 		button:SetScript('OnClick', function() onClick() end)
@@ -646,6 +669,26 @@ function Layout.TableKit(window)
 		end)
 	end
 
+	function kit.DotGrid(parent, width, height, role, layer, subLayer)
+		local dots = parent:CreateTexture(nil, layer or 'BACKGROUND', nil, subLayer or 1)
+		dots:SetTexture(BUILib.GetLibMedia('dotgrid'), 'REPEAT', 'REPEAT')
+		dots:SetTexCoord(0, width / DOT_TILE, 0, height / DOT_TILE)
+		window:Paint(dots, role or 'dots')
+		return dots
+	end
+
+	function kit.PreviewBand(parent, width, height)
+		local band = CreateFrame('Frame', nil, parent)
+		band:SetSize(width, height)
+		local fill, edge = Widget.DrawCardShape(band, PREVIEW_RADIUS, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
+		window:Paint(fill, 'card')
+		window:Paint(edge, 'cardEdge')
+		local dots = kit.DotGrid(band, width - PREVIEW_RADIUS * 2, height - PREVIEW_RADIUS * 2)
+		dots:SetPoint('TOPLEFT', PREVIEW_RADIUS, -PREVIEW_RADIUS)
+		dots:SetPoint('BOTTOMRIGHT', -PREVIEW_RADIUS, PREVIEW_RADIUS)
+		return band
+	end
+
 	function kit.Section(parent, width, spec)
 		local frame = CreateFrame('Frame', nil, parent)
 		frame:SetWidth(width)
@@ -763,18 +806,8 @@ function Layout.PinnedHead(tab, window, kit, spec, block, onSearch)
 	rule:SetPoint('TOPRIGHT', 0, -top)
 	top = top + 1
 	if spec.preview then
-		local band = CreateFrame('Frame', nil, head)
+		local band = kit.PreviewBand(head, tab.width, spec.preview.height)
 		band:SetPoint('TOPLEFT', 0, -(top + PREVIEW_GAP))
-		band:SetSize(tab.width, spec.preview.height)
-		local fill, edge = Widget.DrawCardShape(band, PREVIEW_RADIUS, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
-		window:Paint(fill, 'card')
-		window:Paint(edge, 'cardEdge')
-		local dots = band:CreateTexture(nil, 'BACKGROUND', nil, 1)
-		dots:SetTexture(BUILib.GetLibMedia('dotgrid'), 'REPEAT', 'REPEAT')
-		dots:SetPoint('TOPLEFT', PREVIEW_RADIUS, -PREVIEW_RADIUS)
-		dots:SetPoint('BOTTOMRIGHT', -PREVIEW_RADIUS, PREVIEW_RADIUS)
-		dots:SetTexCoord(0, (tab.width - PREVIEW_RADIUS * 2) / DOT_TILE, 0, (spec.preview.height - PREVIEW_RADIUS * 2) / DOT_TILE)
-		window:Paint(dots, 'dots')
 		spec.preview.build(band, kit)
 		top = top + PREVIEW_GAP + spec.preview.height + PREVIEW_GAP
 		local under = kit.DottedRule(head)

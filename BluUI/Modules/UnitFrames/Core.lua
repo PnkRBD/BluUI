@@ -18,21 +18,27 @@ BUI.UnitFrames = UnitFrames
 UnitFrames.UNIT_CONFIG = {
 	player = {
 		width = 271, height = 41, textSize = 12, showPower = true,
+		showPowerDefault = true, hasCombatBorder = true, hasAuras = true,
 	},
 	target = {
 		width = 271, height = 41, textSize = 12, showPower = true,
+		showPowerDefault = true, hasAuras = true,
 	},
 	targettarget = {
 		width = 110, height = 30, textSize = 10, showPower = false,
+		showPowerDefault = false, hasAuras = true,
 	},
 	focus = {
 		width = 186, height = 80, textSize = 10, showPower = true,
+		showPowerDefault = true, hasAuras = true,
 	},
 	pet = {
 		width = 105, height = 41, textSize = 10, showPower = true,
+		showPowerDefault = false,
 	},
 	boss = {
 		width = 180, height = 40, textSize = 11, showPower = true,
+		showPowerDefault = false, hasAuras = true,
 		spacing = 2,
 	},
 }
@@ -731,9 +737,15 @@ do
 		PrepFillTexture(fade, FADE_TEXTURE, blend, alpha)
 		PrepFillTexture(shade, FADE_TEXTURE, 'BLEND', (half and alpha > 0) and settings.dispelFadeDark / 100 or 0)
 		shade:SetVertexColor(0, 0, 0)
-		shade:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
-		shade:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
-		if style == 'top' then shade:SetTexCoord(0, 1, 1, 0) else shade:SetTexCoord(0, 1, 0, 1) end
+		if style == 'top' then
+			shade:SetPoint('TOPLEFT', healthTexture, 'LEFT')
+			shade:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
+			shade:SetTexCoord(0, 1, 1, 0)
+		else
+			shade:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
+			shade:SetPoint('BOTTOMRIGHT', rightEdge, rightSide)
+			shade:SetTexCoord(0, 1, 0, 1)
+		end
 		if not half then
 			fill:SetTexCoord(0, 1, 0, 1)
 			fill:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')

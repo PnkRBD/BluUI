@@ -131,12 +131,10 @@ end
 
 function UnitFrames.ApplyTextStyles(frame, width, settings, unitSettings, unit)
 	local font = UnitFrames.GetFont()
-	local function PositiveOr(value, fallback) return (type(value) == 'number' and value > 0) and value or fallback end
 	local function Text(key) return UnitFrames.TextSetting(unitSettings, key) end
-	local textSize = PositiveOr(unitSettings.textSize, 12)
-	local nameTextSize = PositiveOr(Text('nameTextSize'), textSize)
-	local healthTextSize = PositiveOr(Text('healthTextSize'), textSize)
-	local powerTextSize = PositiveOr(Text('powerTextSize'), textSize - 2)
+	local nameTextSize = Text('nameTextSize')
+	local healthTextSize = Text('healthTextSize')
+	local powerTextSize = Text('powerTextSize')
 
 	if frame.Name then
 		Pixel.ApplyFont(frame.Name, nameTextSize, font)
@@ -172,7 +170,7 @@ function UnitFrames.ApplyTextStyles(frame, width, settings, unitSettings, unit)
 	end
 
 	if frame.StatusText then
-		Pixel.ApplyFont(frame.StatusText, PositiveOr(Text('statusTextSize'), textSize + 2), font)
+		Pixel.ApplyFont(frame.StatusText, Text('statusTextSize'), font)
 		UnitFrames.ApplyTextPosition(frame.StatusText, frame.TextOverlay or frame.Health,
 			Text('statusPosition'), Text('statusOffsetX'), Text('statusOffsetY'))
 		UnitFrames.RefreshStatusText(frame)

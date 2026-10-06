@@ -9,10 +9,12 @@ local PREVIEW_HEIGHT = 150
 local MENU_WIDTH = 150
 local WIDE_MENU = 200
 local TAG_WIDTH = 300
-local COPY_WIDTH = 170
 local TAB_STRIP_GAP = 12
-local SAMPLE_X = 290
-local COPY_GAP = 12
+local LINE_WIDTH = 40
+local DEFAULT_ROW = 40
+local SETTING_COLUMNS = { { 'Setting', 'name', 130 }, { 'Shows', 'sub' }, { 'Options', 'icon', 70, 'CENTER' }, { 'Enabled', 'switch', 70, 'CENTER' } }
+local BAR_COLUMNS = { { 'Setting', 'name', 130 }, { 'Shows', 'sub' }, { 'Colors', 'swatch', 100 }, { 'Options', 'icon', 60, 'CENTER' }, { 'Preview', 'toggle', 60, 'CENTER' }, { 'Enabled', 'switch', 70, 'CENTER' } }
+local DISPEL_COLUMNS = { { 'Setting', 'name', 130 }, { 'Shows', 'sub' }, { 'Colors', 'swatch', 140 }, { 'Options', 'icon', 60, 'CENTER' }, { 'Preview', 'toggle', 60, 'CENTER' }, { 'Enabled', 'switch', 70, 'CENTER' } }
 local NAME_WIDTH = 200
 local TEXT_RANGE = 50
 local AURA_RANGE = 500
@@ -22,12 +24,11 @@ local ICON_RANGE = 50
 local TAG_RANGE = 200
 local POSITION_RANGE_X = 4000
 local POSITION_RANGE_Y = 3000
-local MOCK_GAP = 18
-local MOCK_PAIR_WIDTH = 340
-local MOCK_WIDTH = 620
-local MOCK_BOSS_HEIGHT = 72
-local WHITE = 'Interface\\Buttons\\WHITE8x8'
-local RAID_ICON = 'Interface\\TargetingFrame\\UI-RaidTargetingIcon_8'
+local PREVIEW_GAP = 18
+local PREVIEW_PAIR_WIDTH = 340
+local PREVIEW_WIDTH = 620
+local PREVIEW_FRAME_HEIGHT = 80
+local PREVIEW_BOSS_HEIGHT = 72
 
 local UNITS = {
 	{ key = 'player', label = 'Player', title = 'Player frame', description = 'Position, texts, indicators and auras for your own frame.' },
@@ -39,10 +40,9 @@ local UNITS = {
 }
 local UNIT_BY_KEY = {}
 for _, unit in ipairs(UNITS) do UNIT_BY_KEY[unit.key] = unit end
-local AURA_UNITS = { player = true, target = true, focus = true, targettarget = true, boss = true }
 local ANCHORABLE = { player = true, target = true, focus = true, pet = true, targettarget = true }
-local TAB_IDS = { 'appearance', 'tags', 'tags', 'player', 'target', 'targettarget', 'focus', 'pet', 'boss', 'filters', 'general', 'party', 'raid', 'partyAuras', 'raidAuras', 'groupFilters' }
-local TAB_INDEX = { appearance = 1, tags = 2, player = 4, target = 5, targettarget = 6, focus = 7, pet = 8, boss = 9, filters = 10, general = 11, party = 12, raid = 13, partyAuras = 14, raidAuras = 15, groupFilters = 16 }
+local TAB_IDS = { 'appearance', 'tags', 'player', 'target', 'targettarget', 'focus', 'pet', 'boss', 'filters', 'general', 'party', 'raid', 'partyAuras', 'raidAuras', 'groupFilters' }
+local TAB_INDEX = { appearance = 1, tags = 2, player = 3, target = 4, targettarget = 5, focus = 6, pet = 7, boss = 8, filters = 9, general = 10, party = 11, raid = 12, partyAuras = 13, raidAuras = 14, groupFilters = 15 }
 local GROUP_PANE = {}
 local TAG_UNITS = {
 	{ value = 'player', text = 'Player' },
@@ -138,17 +138,6 @@ local TAGS = {
 	{ group = 'Other', tag = '[group]', description = 'Raid group', example = '3' },
 }
 local TAG_GROUPS = { 'Names', 'Health', 'Power', 'Mana', 'Player', 'Creature', 'Status', 'Live', 'Other' }
-local MOCK_DEBUFF_ICONS = {
-	'Interface\\Icons\\Spell_Shadow_ShadowWordPain', 'Interface\\Icons\\Spell_Fire_Immolation', 'Interface\\Icons\\Ability_Rogue_Rupture',
-	'Interface\\Icons\\Spell_Shadow_CurseOfSargeras', 'Interface\\Icons\\Spell_Frost_FrostNova', 'Interface\\Icons\\Ability_Warrior_Sunder',
-	'Interface\\Icons\\Spell_Shadow_AbominationExplosion', 'Interface\\Icons\\Spell_Nature_CorrosiveBreath',
-}
-local MOCK_BUFF_ICONS = {
-	'Interface\\Icons\\Spell_Nature_Rejuvenation', 'Interface\\Icons\\Spell_Holy_PowerWordShield', 'Interface\\Icons\\Spell_Holy_Renew',
-	'Interface\\Icons\\Ability_Warrior_BattleShout', 'Interface\\Icons\\Spell_Nature_LightningShield', 'Interface\\Icons\\Spell_Holy_DevotionAura',
-	'Interface\\Icons\\Spell_Nature_ProtectionformNature', 'Interface\\Icons\\INV_Potion_167',
-}
-local MOCK_DISPEL_COLORS = { { 0.2, 0.6, 1.0 }, { 0.6, 0.0, 1.0 }, { 0.0, 0.6, 0.0 }, { 0.8, 0.0, 0.0 } }
 local DEFAULT_TAGS = { name = '[name]', health = '[hp:short] • [perhp]%', power = '[perpp]%', status = '[status]' }
 
 local selected = 'appearance'
@@ -185,14 +174,6 @@ local function ResolveShow(specific, fallback, defaultOn)
 	if specific ~= nil then return specific == true end
 	if defaultOn == false then return fallback == true end
 	return fallback ~= false
-end
-
-local function Media(kind, key, fallback)
-	if key and key ~= '' and key ~= BUI.C.GLOBAL_OPTION then
-		local path = LibStub('LibSharedMedia-3.0'):Fetch(kind, key, true)
-		if path then return path end
-	end
-	return fallback
 end
 
 local function Option(db, label, key, extra)
@@ -245,8 +226,22 @@ local function Eye(tooltip, get, set)
 	end }
 end
 
-local function PreviewEye(unitKey)
-	return Eye('Show a movable preview of this frame in the world', function() return UnitFrames().IsPreviewShown(unitKey) end, function() UnitFrames().TogglePreview(unitKey) end)
+local function PreviewEye(unitKey, spotlight)
+	local function Lit()
+		local module = UnitFrames()
+		return module.IsPreviewShown(unitKey) and (spotlight == nil or module.GetPreviewSpotlight() == spotlight)
+	end
+	return Eye('Show a movable preview of this frame in the world', Lit, function(value)
+		local module = UnitFrames()
+		if value then
+			module.SetPreviewSpotlight(spotlight)
+			if module.IsPreviewShown(unitKey) then module.UpdatePreviews() else module.ShowPreview(unitKey) end
+		else
+			module.SetPreviewSpotlight(nil)
+			module.HidePreview(unitKey)
+		end
+		RefreshPreview()
+	end)
 end
 
 local function MirrorKeys(source, destination)
@@ -288,338 +283,59 @@ local function PropagatePlayer()
 	if IsDriven('pet') then MirrorKeys(settings.player, settings.pet) end
 end
 
-local function RefreshFrames()
+local RefreshFrames = BUI.Dispatcher.NewDelayed(function()
 	PropagatePlayer()
 	local module = UnitFrames()
 	module.InvalidateSettingsCache()
 	module:Refresh()
 	module.UpdatePreviews()
 	RefreshPreview()
-end
+end, 0.1, 'Unit frames refresh')
 
 local function RefreshAuras()
 	PropagatePlayer()
 	local module = UnitFrames()
 	module.InvalidateSettingsCache()
-	for _, unitKey in ipairs({ 'player', 'target', 'focus' }) do
-		if module[unitKey] then module.RefreshAuraLayout(module[unitKey], unitKey) end
-	end
-	for index = 1, 5 do
-		local boss = module['boss' .. index]
-		if boss then module.RefreshAuraLayout(boss, 'boss') end
-	end
-	local previews = module._previewFrames
-	if previews then
-		for _, unitKey in ipairs({ 'player', 'target', 'focus', 'targettarget', 'pet' }) do
-			local frame = previews[unitKey]
-			if frame and frame:IsShown() then module.UpdatePreviewAurasOnly(frame, unitKey) end
-		end
-		if previews.boss then
-			for index = 1, 5 do
-				local boss = module['boss' .. index]
-				if boss and boss:IsShown() then module.UpdatePreviewAurasOnly(boss, 'boss', index) end
+	for _, unit in ipairs(UNITS) do
+		if module.GetUnitConfig(unit.key).hasAuras then
+			if unit.key == 'boss' then
+				for index = 1, 5 do
+					local boss = module['boss' .. index]
+					if boss then module.RefreshAuraLayout(boss, 'boss') end
+				end
+			elseif module[unit.key] then
+				module.RefreshAuraLayout(module[unit.key], unit.key)
 			end
 		end
 	end
+	module.UpdatePreviews()
 	RefreshPreview()
 end
 
 local function RefreshFilters()
-	local module = UnitFrames()
-	module.InvalidateFilterCache()
-	if module.targettarget then module.RefreshAuraLayout(module.targettarget, 'targettarget') end
-	if module.pet then module.RefreshAuraLayout(module.pet, 'pet') end
+	UnitFrames().InvalidateFilterCache()
 	RefreshAuras()
-end
-
-local function MockPointX(point, width)
-	if point:find('LEFT') then return 0 end
-	if point:find('RIGHT') then return width end
-	return width / 2
-end
-
-local function MockPointY(point, height)
-	if point:find('TOP') then return 0 end
-	if point:find('BOTTOM') then return height end
-	return height / 2
-end
-
-local function CreateMock(stage)
-	local mock = CreateFrame('Frame', nil, stage)
-	mock:SetPoint('CENTER')
-	local border = mock:CreateTexture(nil, 'BACKGROUND', nil, 0)
-	border:SetTexture(WHITE)
-	border:SetAllPoints()
-	local background = mock:CreateTexture(nil, 'BACKGROUND', nil, 1)
-	background:SetTexture(WHITE)
-	background:SetPoint('TOPLEFT', 1, -1)
-	background:SetPoint('BOTTOMRIGHT', -1, 1)
-	local health = mock:CreateTexture(nil, 'ARTWORK', nil, 0)
-	local healthZone = CreateFrame('Frame', nil, mock)
-	local absorb = mock:CreateTexture(nil, 'ARTWORK', nil, 1)
-	absorb:SetTexture(WHITE)
-	local powerBackground = mock:CreateTexture(nil, 'ARTWORK', nil, 0)
-	powerBackground:SetTexture(WHITE)
-	local power = mock:CreateTexture(nil, 'ARTWORK', nil, 1)
-	local nameText = mock:CreateFontString(nil, 'OVERLAY')
-	local healthText = mock:CreateFontString(nil, 'OVERLAY')
-	local powerText = mock:CreateFontString(nil, 'OVERLAY')
-	local raidIcon = mock:CreateTexture(nil, 'OVERLAY')
-	raidIcon:SetTexture(RAID_ICON)
-	local customTexts, auraIcons = {}, {}
-
-	local function AuraIcon(index)
-		if not auraIcons[index] then
-			local icon = {}
-			icon.border = mock:CreateTexture(nil, 'OVERLAY', nil, 1)
-			icon.border:SetTexture(WHITE)
-			icon.texture = mock:CreateTexture(nil, 'OVERLAY', nil, 2)
-			icon.texture:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-			auraIcons[index] = icon
-		end
-		return auraIcons[index]
-	end
-
-	function mock:SetOffset(x, y)
-		local scale = self:GetScale()
-		self:ClearAllPoints()
-		self:SetPoint('CENTER', stage, 'CENTER', x / scale, y / scale)
-	end
-
-	function mock:Render(unitKey, maxWidth, maxHeight)
-		local settings = Settings()
-		local unitSettings = settings[unitKey]
-		local isPet = unitKey == 'pet'
-		local width, height = unitSettings.width, unitSettings.height
-		local Parse = UnitFrames().ParsePreviewTags
-		local texture = Media('statusbar', settings.texture, BUI.GetGlobalTexture())
-		local font = Media('font', settings.font, BUI.GetGlobalFont())
-
-		local showDebuffs = unitSettings.showDebuffs == true
-		local showBuffs = unitSettings.showBuffs == true
-		local auraPadding = 0
-		if showDebuffs then
-			local count = math.min(unitSettings.maxDebuffs, 16)
-			local perRow = math.max(1, math.min(unitSettings.debuffsPerRow or unitSettings.maxDebuffs, count))
-			local rows = math.ceil(count / perRow)
-			local size = unitSettings.debuffIconSize or unitSettings.auraIconSize
-			local gap = unitSettings.debuffSpacing or unitSettings.auraSpacing
-			auraPadding = math.max(auraPadding, rows * size + (rows - 1) * gap + 8)
-		end
-		if showBuffs then
-			local count = math.min(unitSettings.maxBuffs, 16)
-			local perRow = math.max(1, math.min(unitSettings.buffsPerRow or unitSettings.maxBuffs, count))
-			local rows = math.ceil(count / perRow)
-			local size = unitSettings.buffIconSize or unitSettings.auraIconSize
-			local gap = unitSettings.buffSpacing or unitSettings.auraSpacing
-			auraPadding = math.max(auraPadding, rows * size + (rows - 1) * gap + 8)
-		end
-		local scale = math.min(1, maxWidth / width, maxHeight / (height + auraPadding * 2))
-		self:SetScale(scale)
-		self:SetSize(width, height)
-
-		local borderColor = isPet and settings.petBorderColor or settings.borderColor
-		border:SetVertexColor(borderColor[1], borderColor[2], borderColor[3], borderColor[4])
-		local backgroundColor = isPet and settings.petBgColor or settings.bgColor
-		background:SetVertexColor(backgroundColor[1], backgroundColor[2], backgroundColor[3], backgroundColor[4])
-
-		local powerHeight = unitSettings.showPower and math.min(unitSettings.powerHeight, height - 6) or 0
-		local innerWidth = width - 2
-		local innerHeight = height - 2 - powerHeight - (powerHeight > 0 and 1 or 0)
-		local _, class = UnitClass('player')
-		local classColor = class and RAID_CLASS_COLORS[class]
-		local healthRed, healthGreen, healthBlue = 0.2, 0.8, 0.2
-		if settings.classColorHealth and classColor then
-			healthRed, healthGreen, healthBlue = classColor.r, classColor.g, classColor.b
-		else
-			local color = isPet and settings.petHealthColor or settings.healthColor
-			healthRed, healthGreen, healthBlue = color[1], color[2], color[3]
-		end
-		health:SetTexture(texture)
-		health:ClearAllPoints()
-		health:SetPoint('TOPLEFT', 1, -1)
-		health:SetSize(innerWidth * 0.72, innerHeight)
-		health:SetVertexColor(healthRed, healthGreen, healthBlue, settings.transparentHealth and settings.healthBarAlpha or 1)
-		healthZone:ClearAllPoints()
-		healthZone:SetPoint('TOPLEFT', 1, -1)
-		healthZone:SetSize(innerWidth, innerHeight)
-
-		if settings.shieldEnabled ~= false then
-			local shield = settings.shieldColor
-			absorb:ClearAllPoints()
-			absorb:SetPoint('TOPLEFT', health, 'TOPRIGHT', 0, 0)
-			absorb:SetSize(innerWidth * 0.1, innerHeight)
-			absorb:SetVertexColor(shield[1], shield[2], shield[3], shield[4])
-			absorb:Show()
-		else
-			absorb:Hide()
-		end
-
-		if powerHeight > 0 then
-			local powerRed, powerGreen, powerBlue
-			if isPet then
-				local color = settings.petPowerColor
-				powerRed, powerGreen, powerBlue = color[1], color[2], color[3]
-			elseif settings.classColorPower then
-				powerRed, powerGreen, powerBlue = 0.25, 0.5, 1
-			elseif settings.useClassColorPowerBar and classColor then
-				powerRed, powerGreen, powerBlue = classColor.r, classColor.g, classColor.b
-			else
-				local color = settings.powerColor
-				powerRed, powerGreen, powerBlue = color[1], color[2], color[3]
-			end
-			local powerBackgroundColor = isPet and settings.petPowerBgColor or settings.powerBgColor or backgroundColor
-			powerBackground:ClearAllPoints()
-			powerBackground:SetPoint('BOTTOMLEFT', 1, 1)
-			powerBackground:SetPoint('BOTTOMRIGHT', -1, 1)
-			powerBackground:SetHeight(powerHeight)
-			powerBackground:SetVertexColor(powerBackgroundColor[1], powerBackgroundColor[2], powerBackgroundColor[3], powerBackgroundColor[4])
-			power:SetTexture(texture)
-			power:ClearAllPoints()
-			power:SetPoint('BOTTOMLEFT', 1, 1)
-			power:SetSize(innerWidth * 0.6, powerHeight)
-			power:SetVertexColor(powerRed, powerGreen, powerBlue, 1)
-			powerBackground:Show()
-			power:Show()
-		else
-			powerBackground:Hide()
-			power:Hide()
-		end
-
-		local function PlaceText(fontString, show, format, fallback, size, position, offsetX, offsetY, region, color)
-			if not show then return fontString:Hide() end
-			Pixel.ApplyFont(fontString, size, font)
-			local text = format and format ~= '' and format or fallback
-			fontString:SetText(Parse and Parse(text) or text)
-			fontString:ClearAllPoints()
-			local insetX = position:find('LEFT') and 4 or position:find('RIGHT') and -4 or 0
-			local insetY = position:find('TOP') and -1 or position:find('BOTTOM') and 1 or 0
-			fontString:SetPoint(position, region, position, insetX + offsetX, insetY + offsetY)
-			fontString:SetTextColor(color[1], color[2], color[3], color[4] or 1)
-			fontString:Show()
-		end
-
-		local function Text(key)
-			local value = unitSettings[key]
-			if value == nil then value = settings[key] end
-			return value
-		end
-		local nameColor = settings.nameColor
-		if unitSettings.classColorName then
-			if classColor then
-				nameColor = { classColor.r, classColor.g, classColor.b, 1 }
-			elseif unitKey == 'target' or unitKey == 'boss' then
-				nameColor = unitSettings.hostileNameColor
-			else
-				nameColor = unitSettings.friendlyNameColor
-			end
-		end
-		PlaceText(nameText, ResolveShow(unitSettings.showName, settings.showName), unitSettings.nameFormat, settings.nameFormat, Text('nameTextSize'), Text('namePosition'), Text('nameOffsetX'), Text('nameOffsetY'), healthZone, nameColor)
-		PlaceText(healthText, ResolveShow(unitSettings.showHealthText, settings.showHealthText), unitSettings.healthFormat, settings.healthFormat, Text('healthTextSize'), Text('healthPosition'), Text('healthOffsetX'), Text('healthOffsetY'), healthZone, settings.healthTextColor)
-		PlaceText(powerText, powerHeight > 0 and ResolveShow(unitSettings.showPowerText, settings.showPowerText, false), unitSettings.powerFormat, settings.powerFormat, Text('powerTextSize'), Text('powerPosition'), Text('powerOffsetX'), Text('powerOffsetY'), powerBackground, settings.powerTextColor)
-
-		local tagIndex = 0
-		for _, entry in ipairs(unitSettings.customTags) do
-			if entry.tag and entry.tag ~= '' and entry.enabled ~= false then
-				tagIndex = tagIndex + 1
-				local fontString = customTexts[tagIndex]
-				if not fontString then
-					fontString = mock:CreateFontString(nil, 'OVERLAY')
-					customTexts[tagIndex] = fontString
-				end
-				Pixel.ApplyFont(fontString, entry.fontSize or 12, Media('font', entry.font, font))
-				fontString:SetDrawLayer(entry.drawLayer or 'OVERLAY', entry.drawSubLevel or 0)
-				fontString:ClearAllPoints()
-				local point = entry.point or 'CENTER'
-				fontString:SetPoint(point, self, point, entry.x or 0, entry.y or 0)
-				local color = entry.color
-				if color then fontString:SetTextColor(color[1], color[2], color[3], color[4] or 1) else fontString:SetTextColor(1, 1, 1, 1) end
-				fontString:SetText(Parse and Parse(entry.tag) or entry.tag)
-				fontString:Show()
-			end
-		end
-		for index = tagIndex + 1, #customTexts do customTexts[index]:Hide() end
-
-		local used = 0
-		local function AuraGrid(icons, count, perRow, size, gap, growX, growY, framePoint, offsetX, offsetY, typed)
-			count = math.min(count, 16)
-			perRow = math.max(1, math.min(perRow, count))
-			local rows = math.ceil(count / perRow)
-			local gridWidth = perRow * size + (perRow - 1) * gap
-			local gridHeight = rows * size + (rows - 1) * gap
-			local selfPoint = (growY == 'UP' and 'BOTTOM' or 'TOP') .. (growX == 'RIGHT' and 'LEFT' or 'RIGHT')
-			local anchorX = MockPointX(framePoint, width) + offsetX
-			local anchorY = MockPointY(framePoint, height) - offsetY
-			local gridLeft = anchorX - MockPointX(selfPoint, gridWidth)
-			local gridTop = anchorY - MockPointY(selfPoint, gridHeight)
-			for auraIndex = 1, count do
-				used = used + 1
-				local icon = AuraIcon(used)
-				local row = math.floor((auraIndex - 1) / perRow)
-				local column = (auraIndex - 1) % perRow
-				local x = growX == 'LEFT' and (gridWidth - size - column * (size + gap)) or (column * (size + gap))
-				local y = growY == 'UP' and (gridHeight - size - row * (size + gap)) or (row * (size + gap))
-				icon.border:SetSize(size, size)
-				icon.border:ClearAllPoints()
-				icon.border:SetPoint('TOPLEFT', self, 'TOPLEFT', gridLeft + x, -(gridTop + y))
-				if typed then
-					local dispelColor = MOCK_DISPEL_COLORS[(auraIndex - 1) % #MOCK_DISPEL_COLORS + 1]
-					icon.border:SetVertexColor(dispelColor[1], dispelColor[2], dispelColor[3], 1)
-				elseif icons == MOCK_DEBUFF_ICONS then
-					icon.border:SetVertexColor(0.8, 0, 0, 1)
-				else
-					icon.border:SetVertexColor(0, 0, 0, 1)
-				end
-				icon.texture:SetTexture(icons[(auraIndex - 1) % #icons + 1])
-				local edge = Pixel.PixelSizeFor(self, 1)
-				icon.texture:ClearAllPoints()
-				icon.texture:SetPoint('TOPLEFT', icon.border, 'TOPLEFT', edge, -edge)
-				icon.texture:SetPoint('BOTTOMRIGHT', icon.border, 'BOTTOMRIGHT', -edge, edge)
-				icon.border:Show()
-				icon.texture:Show()
-			end
-		end
-		if showDebuffs then
-			AuraGrid(MOCK_DEBUFF_ICONS, unitSettings.maxDebuffs, unitSettings.debuffsPerRow or unitSettings.maxDebuffs, unitSettings.debuffIconSize or unitSettings.auraIconSize, unitSettings.debuffSpacing or unitSettings.auraSpacing, unitSettings.debuffGrowthX, unitSettings.debuffGrowthY, unitSettings.debuffAnchorPoint, unitSettings.debuffOffsetX, unitSettings.debuffOffsetY, unitSettings.showDebuffType ~= false)
-		end
-		if showBuffs then
-			AuraGrid(MOCK_BUFF_ICONS, unitSettings.maxBuffs, unitSettings.buffsPerRow or unitSettings.maxBuffs, unitSettings.buffIconSize or unitSettings.auraIconSize, unitSettings.buffSpacing or unitSettings.auraSpacing, unitSettings.buffGrowthX or 'RIGHT', unitSettings.buffGrowthY or 'DOWN', unitSettings.buffAnchorPoint or 'BOTTOMLEFT', unitSettings.buffOffsetX or 0, unitSettings.buffOffsetY or -4, false)
-		end
-		for index = used + 1, #auraIcons do
-			auraIcons[index].border:Hide()
-			auraIcons[index].texture:Hide()
-		end
-
-		if settings.raidIconMode ~= 'off' and not unitSettings.hideRaidIcon then
-			raidIcon:SetSize(settings.raidIconSize, settings.raidIconSize)
-			raidIcon:ClearAllPoints()
-			raidIcon:SetPoint('CENTER', self, settings.raidIconPosition, settings.raidIconOffsetX, settings.raidIconOffsetY)
-			raidIcon:Show()
-		else
-			raidIcon:Hide()
-		end
-		self:Show()
-		return width * scale, height * scale
-	end
-	return mock
 end
 
 local function BuildPreview(band, kit)
 	local stage = CreateFrame('Frame', nil, band)
 	stage:SetAllPoints()
 	stage:SetClipsChildren(true)
-	local mocks = { CreateMock(stage), CreateMock(stage) }
 	local captions = { kit.Text(stage, 'PLAYER', 9, 'faint'), kit.Text(stage, 'TARGET', 9, 'faint') }
+	local notice = kit.Text(stage, 'Preview after combat', 12, 'muted')
+	notice:SetPoint('CENTER')
+	notice:Hide()
 	local captionY = -(PREVIEW_HEIGHT / 2) + 16
 	function band:Update()
-		for _, mock in ipairs(mocks) do mock:Hide() end
+		local module = UnitFrames()
+		local combat = InCombatLockdown()
+		notice:SetShown(combat)
+		if combat then return end
+		module.ClearStage(stage)
 		for _, caption in ipairs(captions) do caption:Hide() end
 		if selected == 'appearance' or selected == 'filters' then
-			local playerWidth = mocks[1]:Render('player', MOCK_PAIR_WIDTH, PREVIEW_HEIGHT - 22)
-			local targetWidth = mocks[2]:Render('target', MOCK_PAIR_WIDTH, PREVIEW_HEIGHT - 22)
-			local playerX, targetX = -(playerWidth / 2 + MOCK_GAP), targetWidth / 2 + MOCK_GAP
-			mocks[1]:SetOffset(playerX, 0)
-			mocks[2]:SetOffset(targetX, 0)
+			local playerX, targetX = module.StagePair(stage, kit, PREVIEW_PAIR_WIDTH, PREVIEW_FRAME_HEIGHT, PREVIEW_GAP)
+			if not playerX then return end
 			for index, x in ipairs({ playerX, targetX }) do
 				captions[index]:ClearAllPoints()
 				captions[index]:SetPoint('CENTER', stage, 'CENTER', x, captionY)
@@ -629,17 +345,18 @@ local function BuildPreview(band, kit)
 		end
 		local unitKey = selected == 'tags' and tagUnit or selected
 		if unitKey == 'boss' then
-			local _, mockHeight = mocks[1]:Render('boss', MOCK_WIDTH, MOCK_BOSS_HEIGHT)
-			mocks[2]:Render('boss', MOCK_WIDTH, MOCK_BOSS_HEIGHT)
+			local first, _, firstHeight = module.StageInto(stage, kit, 'boss', 1, PREVIEW_WIDTH, PREVIEW_BOSS_HEIGHT)
+			local second = module.StageInto(stage, kit, 'boss', 2, PREVIEW_WIDTH, PREVIEW_BOSS_HEIGHT)
+			if not first or not second then return end
 			local boss = Settings().boss
-			local offset = (mockHeight + boss.spacing * mocks[1]:GetScale()) / 2
+			local offset = (firstHeight + boss.spacing * first:GetScale()) / 2
 			local top = boss.growthDirection == 'DOWN' and offset or -offset
-			mocks[1]:SetOffset(0, top)
-			mocks[2]:SetOffset(0, -top)
+			module.PlaceStaged(first, stage, 0, top)
+			module.PlaceStaged(second, stage, 0, -top)
 			return
 		end
-		mocks[1]:Render(unitKey, MOCK_WIDTH, PREVIEW_HEIGHT)
-		mocks[1]:SetOffset(0, 0)
+		local frame = module.StageInto(stage, kit, unitKey, nil, PREVIEW_WIDTH, PREVIEW_FRAME_HEIGHT)
+		if frame then module.PlaceStaged(frame, stage, 0, 0) end
 	end
 	band:HookScript('OnShow', function(self) self:Update() end)
 	return band
@@ -670,7 +387,7 @@ end
 
 local function ResetTool(ui, tooltip, isChanged, reset)
 	return { slot = 'icon', build = function(parent)
-		local button = ui.IconButton(parent, 'reset', tooltip, reset)
+		local button = ui.IconButton(parent, 'redo', tooltip, reset, 'text', 16, 'accent')
 		ui.Bind(button, function() button:SetShown(isChanged()) end)
 		return button
 	end }
@@ -680,21 +397,32 @@ local function DropUnitPanes(page)
 	for _, unit in ipairs(UNITS) do page:Rebuild(unit.key) end
 end
 
+local function ToolGrid(ui, parent, width, title, description, columns)
+	local fixed = 0
+	for _, column in ipairs(columns) do fixed = fixed + (column[3] or 0) end
+	local specs = {}
+	for index, column in ipairs(columns) do
+		specs[index] = { title = column[1], slot = column[2], width = column[3] or (width - fixed), align = column[4] }
+	end
+	return ui.Grid(parent, width, { title = title, description = description, rowHeight = DEFAULT_ROW, columns = specs })
+end
+
 local function AppearanceBoards(ui, parent, width, page)
 	local settings = Settings()
 	local module = UnitFrames()
-	local general = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Frames',
-		description = 'Texture, font and behavior shared by every unit frame.',
-	})
-	general:AddTools('Look', 'Bar texture and font for names, health and power', {
+	local function SyncChanged()
+		ApplySync()
+		RefreshFrames()
+		RefreshPreview()
+		page:Rebuild('target')
+		page:Rebuild('pet')
+	end
+	local health = ToolGrid(ui, parent, width, 'Frames', 'Texture, font, behavior, bar colors and absorbs. The eye shows a movable preview of the player frame.', BAR_COLUMNS)
+	health:AddTools('Look and behavior', 'Texture, font, tooltips, targeting and sync', {
 		{ icon = 'text', tooltip = 'Texture and font', title = 'Look', options = {
 			Option(settings, 'Bar texture', 'texture', { entries = textures, width = WIDE_MENU }),
 			Option(settings, 'Font', 'font', { entries = fonts, width = WIDE_MENU }),
 		} },
-	}, RefreshFrames)
-	general:AddTools('Behavior', 'Tooltips, click to target and number format', {
 		{ tooltip = 'Behavior options', title = 'Behavior', options = {
 			{ label = 'Unit tooltip on mouseover', get = function() return settings.showTooltips ~= false end, set = function(value) settings.showTooltips = value end },
 			{ label = 'Clicking a frame targets its unit', get = function() return settings.clickToTarget ~= false end, set = function(value)
@@ -706,27 +434,10 @@ local function AppearanceBoards(ui, parent, width, page)
 				module.RefreshAbbreviationSetting()
 				module.InvalidateTagCache()
 			end },
-		} },
-	}, RefreshFrames)
-	local function SyncChanged()
-		ApplySync()
-		RefreshFrames()
-		RefreshPreview()
-		page:Rebuild('target')
-		page:Rebuild('pet')
-	end
-	general:AddTools('Sync target and pet to the player', 'Target and pet copy the player frame look', {
-		{ tooltip = 'Sync options', title = 'Sync', options = {
+			{ label = 'Target and pet copy the player frame look', get = function() return settings.syncPlayerTarget == true end, set = function(value) settings.syncPlayerTarget = value end, separator = true },
 			{ label = 'Keep the pet independent', get = function() return settings.excludePetFromSync == true end, set = function(value) settings.excludePetFromSync = value end },
 		} },
-		{ get = function() return settings.syncPlayerTarget == true end, set = function(value) settings.syncPlayerTarget = value end },
 	}, SyncChanged)
-
-	local health = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Health and power',
-		description = 'Bar colors and absorbs. The eye shows a movable preview of the player frame.',
-	})
 	health:AddTools('Health bar', 'Health, background and border colors', {
 		Color(settings, 'Health', 'healthColor'),
 		Color(settings, 'Background', 'bgColor'),
@@ -747,7 +458,7 @@ local function AppearanceBoards(ui, parent, width, page)
 			Option(settings, 'Texture', 'shieldOverlay', { entries = ABSORB_TEXTURES }),
 			Option(settings, 'Direction', 'shieldDirection', { entries = ABSORB_DIRECTIONS }),
 		} },
-		PreviewEye('player'),
+		PreviewEye('player', 'absorb'),
 		OnUnlessOff(settings, nil, 'shieldEnabled'),
 	}, RefreshFrames)
 	health:AddTools('Heal absorb', 'Heal absorb overlay on the health bar', {
@@ -756,7 +467,7 @@ local function AppearanceBoards(ui, parent, width, page)
 			Option(settings, 'Texture', 'healAbsorbOverlay', { entries = ABSORB_TEXTURES }),
 			Option(settings, 'Direction', 'healAbsorbDirection', { entries = ABSORB_DIRECTIONS }),
 		} },
-		PreviewEye('player'),
+		PreviewEye('player', 'healAbsorb'),
 		OnUnlessOff(settings, nil, 'healAbsorbEnabled'),
 	}, RefreshFrames)
 	health:AddTools('Power bar', 'Power fill and background colors', {
@@ -780,12 +491,8 @@ local function AppearanceBoards(ui, parent, width, page)
 			if value then module.StartDispelPreview() else module.StopDispelPreview() end
 		end)
 	end
-	local dispel = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Dispels',
-		description = 'Color your own frame when a dispellable debuff lands.',
-	})
-	dispel:AddTools('Dispel highlight', 'How the player frame reacts, party and raid follow it unless they say otherwise', {
+	local dispel = ToolGrid(ui, parent, width, 'Dispels', 'Color your own frame when a dispellable debuff lands.', DISPEL_COLUMNS)
+	dispel:AddTools('Dispel highlight', 'How your frame reacts to a dispellable debuff', {
 		{ tooltip = 'Style, source and strength', title = 'Dispel highlight', options = {
 			Option(player, 'Style', 'debuffHighlightStyle', { entries = DISPEL_STYLES }),
 			{ label = 'Show', entries = DISPEL_SOURCES, get = function() return player.debuffHighlightClassFilter ~= false and 'mine' or 'all' end, set = function(value) player.debuffHighlightClassFilter = value == 'mine' end },
@@ -828,11 +535,7 @@ local function AppearanceBoards(ui, parent, width, page)
 	end
 	dispel:AddTools('Type colors', 'Shared with the party and raid frames', swatches, RefreshDispel)
 
-	local indicators = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Indicators',
-		description = 'Icons layered on every frame.',
-	})
+	local indicators = ToolGrid(ui, parent, width, 'Indicators', 'Icons layered on every frame.', SETTING_COLUMNS)
 	indicators:AddTools('Raid icon', 'Raid target marker on each frame', {
 		{ tooltip = 'Position and size', title = 'Raid icon', options = {
 			Option(settings, 'Position', 'raidIconPosition', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
@@ -851,7 +554,7 @@ local function AppearanceBoards(ui, parent, width, page)
 		} },
 		OnUnlessOff(settings, nil, 'leaderIconEnabled'),
 	}, RefreshFrames)
-	return { general, health, dispel, indicators }
+	return { health, dispel, indicators }
 end
 
 local function CustomTagsBoard(ui, parent, width, page)
@@ -917,35 +620,8 @@ local function CustomTagsBoard(ui, parent, width, page)
 	return custom
 end
 
-local function ReferenceBoard(ui, parent, width)
-	local tagX = width - COPY_WIDTH - ui.ROW_INSET
-	local reference = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Tag reference',
-		description = 'Every text tag with a sample. Search by name or tag, then click a box and press Ctrl+C to copy it.',
-		columns = { { 'Name', ui.ROW_INSET }, { 'Sample', SAMPLE_X }, { 'Tag', tagX } },
-	})
-	for _, group in ipairs(TAG_GROUPS) do
-		reference:AddCaption(group)
-		for _, tag in ipairs(TAGS) do
-			if tag.group == group then
-				local row = reference:AddRow(tag.description, nil, width - SAMPLE_X, tag.description .. ' ' .. tag.example .. ' ' .. tag.tag)
-				ui.Cell(row, tag.example, SAMPLE_X, tagX - SAMPLE_X - COPY_GAP)
-				ui.Input(row, COPY_WIDTH, { placeholder = tag.tag, get = function() return tag.tag end, set = function() end }):SetPoint('LEFT', tagX, 0)
-			end
-		end
-	end
-	return reference
-end
-
-
-
 local DEFAULT_COLOR_KEY = { name = 'nameColor', health = 'healthTextColor', power = 'powerTextColor' }
-local DEFAULT_FORMAT_WIDTH = 240
-local DEFAULT_COLOR_WIDTH = 140
-local DEFAULT_SLOT = 30
-local DEFAULT_GAP = 12
-local SWATCH_STEP = 24
+local DEFAULT_TAG_COLUMNS = { { 'Tag', 'name', 80 }, { 'Shows', 'sub', 140 }, { 'Color', 'swatch', 136 }, { 'Format', 'input', 200 }, { 'Placement', 'icon', 80, 'CENTER' }, { '', 'reset', nil, 'CENTER' } }
 
 local function Factory()
 	return BUI.Defaults.profile.unitFrames
@@ -982,22 +658,38 @@ local function ResetDefaultRow(settings, prefix)
 	end
 end
 
+local function ReferenceBoard(ui, parent, width)
+	local nameWidth, sampleWidth = math.floor(width * 0.36), math.floor(width * 0.30)
+	local reference = ui.Grid(parent, width, {
+		title = 'Tag reference',
+		description = 'Every text tag with a sample. Search by name or tag, then click a tag and press Ctrl+C to copy it.',
+		columns = {
+			{ title = '#', width = LINE_WIDTH, align = 'RIGHT' },
+			{ title = 'Name', width = nameWidth },
+			{ title = 'Sample', width = sampleWidth },
+			{ title = 'Tag' },
+		},
+	})
+	local line = 0
+	for _, group in ipairs(TAG_GROUPS) do
+		reference:AddGroup(group)
+		for _, tag in ipairs(TAGS) do
+			if tag.group == group then
+				line = line + 1
+				reference:AddLine({ { text = tostring(line), role = 'faint' }, tag.description, { text = tag.example, role = 'muted' }, { copy = tag.tag } }, tag.description .. ' ' .. tag.example .. ' ' .. tag.tag)
+			end
+		end
+	end
+	return reference
+end
+
 local function DefaultTagsBoard(ui, parent, width, page)
 	local settings = Settings()
-	local resetX = width - ui.ROW_INSET - 22
-	local positionX = resetX - DEFAULT_SLOT
-	local sizeX = positionX - DEFAULT_SLOT
-	local formatX = sizeX - DEFAULT_GAP - DEFAULT_FORMAT_WIDTH
-	local colorX = formatX - DEFAULT_COLOR_WIDTH
-	local tags = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Default tags',
-		description = 'Format, color, size and position every frame falls back on. Type in a format box to change it. A frame overrides only what it changes on its own pane.',
-		columns = { { 'Tag', ui.ROW_INSET }, { 'Color', colorX }, { 'Format', formatX }, { 'Placement', sizeX } },
-	})
+	local grid = ToolGrid(ui, parent, width, 'Default tags', 'Format, color, size and position every frame falls back on. Type in a format box to change it. A frame overrides only what it changes on its own pane.', DEFAULT_TAG_COLUMNS)
 	local function Changed()
 		RefreshFrames()
 		DropUnitPanes(page)
+		Repaint()
 	end
 	local function RefreshStatus()
 		Changed()
@@ -1015,33 +707,33 @@ local function DefaultTagsBoard(ui, parent, width, page)
 			set = function(red, green, blue, alpha) settings.statusColors[statusName] = { red, green, blue, alpha } end,
 		}
 	end
-	local function Row(label, sub, swatches, prefix, placeholder, sizeMax, after)
-		local row = tags:AddRow(label, sub, width - colorX - ui.ROW_INSET)
-		local x = colorX
-		for _, swatch in ipairs(swatches) do
-			ui.Tool(row, swatch, after):SetPoint('LEFT', x, 0)
-			x = x + SWATCH_STEP
-		end
-		ui.Tool(row, TagInput(settings, prefix .. 'Format', placeholder, DEFAULT_FORMAT_WIDTH), after):SetPoint('LEFT', formatX, 0)
-		ui.Tool(row, { icon = 'text', tooltip = 'Text size', title = label, options = {
+	local function Row(label, shows, swatches, prefix, placeholder, sizeMax, after)
+		local tools = {}
+		for _, swatch in ipairs(swatches) do tools[#tools + 1] = swatch end
+		local input = TagInput(settings, prefix .. 'Format', placeholder)
+		input.square = true
+		tools[#tools + 1] = input
+		tools[#tools + 1] = { icon = 'text', tooltip = 'Text size', title = label, options = {
 			Option(settings, 'Text size', prefix .. 'TextSize', { min = 8, max = sizeMax, step = 1 }),
-		} }, after):SetPoint('LEFT', sizeX, 0)
-		ui.Tool(row, { icon = 'location', tooltip = 'Position and offset', title = label, options = {
+		} }
+		tools[#tools + 1] = { icon = 'location', tooltip = 'Position and offset', title = label, options = {
 			Option(settings, 'Position', prefix .. 'Position', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
 			Option(settings, 'Horizontal', prefix .. 'OffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
 			Option(settings, 'Vertical', prefix .. 'OffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-		} }, after):SetPoint('LEFT', positionX, 0)
-		ui.Tool(row, ResetTool(ui, 'Changed from the factory default, click to restore it', function() return DefaultRowChanged(settings, prefix) end, function()
+		} }
+		local reset = ResetTool(ui, 'Changed from the factory default, click to restore it', function() return DefaultRowChanged(settings, prefix) end, function()
 			ResetDefaultRow(settings, prefix)
 			after()
-			Repaint()
-		end)):SetPoint('LEFT', resetX, 0)
+		end)
+		reset.slot = 'reset'
+		tools[#tools + 1] = reset
+		grid:AddTools(label, shows, tools, after)
 	end
-	Row('Name tag', 'Unit name on the health bar', { Color(settings, 'Text color', 'nameColor') }, 'name', DEFAULT_TAGS.name, 20, Changed)
-	Row('Health tag', 'Health value on the bar', { Color(settings, 'Text color', 'healthTextColor') }, 'health', DEFAULT_TAGS.health, 20, Changed)
-	Row('Power tag', 'Resource value on the power bar', { Color(settings, 'Text color', 'powerTextColor') }, 'power', DEFAULT_TAGS.power, 20, Changed)
-	Row('Status tag', 'Dead, Ghost, Offline, AFK and DND', statusSwatches, 'status', DEFAULT_TAGS.status, 24, RefreshStatus)
-	return tags
+	Row('Name', 'Unit name on the health bar', { Color(settings, 'Text color', 'nameColor') }, 'name', DEFAULT_TAGS.name, 20, Changed)
+	Row('Health', 'Health value on the bar', { Color(settings, 'Text color', 'healthTextColor') }, 'health', DEFAULT_TAGS.health, 20, Changed)
+	Row('Power', 'Resource value on the power bar', { Color(settings, 'Text color', 'powerTextColor') }, 'power', DEFAULT_TAGS.power, 20, Changed)
+	Row('Status', 'Dead, Ghost, Offline, AFK and DND', statusSwatches, 'status', DEFAULT_TAGS.status, 24, RefreshStatus)
+	return grid
 end
 
 local function TagsBoards(ui, parent, width, page)
@@ -1198,10 +890,7 @@ local function BossBoards(ui, parent, width)
 	local CastBar = BUI.CastBar
 	local castbar = CastBar.GetSettings('boss')
 	if castbar then
-		local function Refresh()
-			RefreshFrames()
-			if UnitFrames().IsPreviewShown('boss') then UnitFrames().ShowBossCastbarPreview() end
-		end
+		local Refresh = RefreshFrames
 		local board = ui.Board(parent, width, {
 			stacked = true,
 			title = 'Cast bar',
@@ -1387,7 +1076,7 @@ local function UnitBoards(ui, parent, width, unit)
 	text:AddTools('Power tag', 'Tag override for this frame', { TagInput(unitSettings, 'powerFormat', DefaultFormat('powerFormat', DEFAULT_TAGS.power)) }, RefreshFrames)
 
 	local boards = { board, text }
-	if AURA_UNITS[unitKey] then
+	if UnitFrames().GetUnitConfig(unitKey).hasAuras then
 		local auras = ui.Board(parent, width, {
 			stacked = true,
 			title = 'Auras',
@@ -1478,10 +1167,7 @@ BUI.PageEngine.RegisterPage('unitframes', {
 		local tabs = {}
 		for index = 1, #TAB_IDS do tabs[index] = tab end
 		pageFrame._page = { tabContents = tabs, currentTab = TAB_INDEX[selected], SetTab = function(_, index) rail:Select(TAB_IDS[index] or 'appearance') end }
-		for _, unit in ipairs(UNITS) do
-			module._previewButtons[unit.key] = { SetText = Repaint }
-			module.RegisterPositionCallback(unit.key, RefreshPreview)
-		end
+		module.SetPreviewListener(Repaint)
 		RefreshPreview()
 		page:AutoRefresh()
 	end,

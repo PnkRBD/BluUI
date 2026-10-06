@@ -179,6 +179,8 @@ local function ResolveStyle(settings, isDebuff)
 	return style
 end
 
+UnitFrames.ResolveAuraStyle = ResolveStyle
+
 local auraFrames = {}
 
 local function BuildCandidates(isDebuff)
