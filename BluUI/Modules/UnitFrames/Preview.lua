@@ -118,6 +118,15 @@ local function SetFakeCustomTags(frame, healthPercent, powerPercent)
 	end
 end
 
+local function ShowSampleStatus(frame, unitSettings)
+	local label = frame.StatusText
+	if not label then return end
+	if unitSettings.showStatusText == false then label:Hide() return end
+	local color = UnitFrames.GetSettings().statusColors.Dead
+	label:SetText('|cff' .. BUI.Hex(color[1], color[2], color[3]) .. 'DEAD|r')
+	label:Show()
+end
+
 local function SetFakeData(frame, unitType, index)
 	local healthPercent = max(20, min(95, unitType == 'boss' and (95 - index * 8) or 75))
 	local powerPercent = max(10, min(95, unitType == 'boss' and (100 - index * 7) or 60))
@@ -174,6 +183,8 @@ local function SetFakeData(frame, unitType, index)
 		frame.Absorb:SetValue(15)
 		frame.Absorb:Show()
 	end
+
+	ShowSampleStatus(frame, unitSettings)
 end
 
 local function MakeIcon(parent)
@@ -255,9 +266,9 @@ local function ShowFakeAuras(frame, unitType, index)
 	local unitSettings = UnitFrames.GetUnitSettings(unitType)
 	local font = UnitFrames.GetFont()
 	local debuffSize, debuffGap = unitSettings.debuffIconSize or unitSettings.auraIconSize or 22, unitSettings.debuffSpacing or unitSettings.auraSpacing or 2
-	local debuffCount = unitSettings.showDebuffs and min(unitSettings.maxDebuffs or 6, 4) or 0
+	local debuffCount = unitSettings.showDebuffs and (unitSettings.maxDebuffs or 6) or 0
 	local buffSize, buffGap = unitSettings.buffIconSize or unitSettings.auraIconSize or 22, unitSettings.buffSpacing or unitSettings.auraSpacing or 2
-	local buffCount = unitSettings.showBuffs and min(unitSettings.maxBuffs or 4, 3) or 0
+	local buffCount = unitSettings.showBuffs and (unitSettings.maxBuffs or 4) or 0
 
 	BuildIcons(cached.debuffs, cached.dH, debuffCount, debuffSize, function(icon, iconIndex)
 		icon.Icon:SetTexture(Pick(ICONS, iconIndex))
@@ -400,6 +411,7 @@ local function HideUnit(frame, unitType, index)
 	HideFakeAuras(frame, unitType, index)
 	Thaw(frame)
 	if frame.Absorb then frame.Absorb:Hide() end
+	UnitFrames.RefreshStatusText(frame)
 	local settings = UnitFrames.GetSettings()
 	local borderColor = (unitType == 'pet') and settings.petBorderColor or settings.borderColor
 	Pixel.SetBorderColor(frame, borderColor[1], borderColor[2], borderColor[3], borderColor[4])

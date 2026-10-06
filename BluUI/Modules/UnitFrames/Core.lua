@@ -146,6 +146,12 @@ function UnitFrames.GetSettings()
 	return settingsCache
 end
 
+function UnitFrames.TextSetting(unitSettings, key)
+	local value = unitSettings[key]
+	if value == nil then value = UnitFrames.GetSettings()[key] end
+	return value
+end
+
 function UnitFrames.GetUnitSettings(unitType)
 	if unitCache[unitType] then return unitCache[unitType] end
 	local settings = UnitFrames.GetSettings()
@@ -260,7 +266,8 @@ function UnitFrames.GetNameColor(unit, unitSettings)
 			if reactionColor then return reactionColor[1], reactionColor[2], reactionColor[3] end
 		end
 	end
-	return 1, 1, 1
+	local color = UnitFrames.GetSettings().nameColor
+	return color[1], color[2], color[3]
 end
 
 local function PlaceCentered(frame, x, y)
@@ -715,12 +722,18 @@ do
 		texture:SetAlpha(alpha)
 	end
 
-	function UnitFrames.StyleDispelFill(fill, fade, style, healthTexture, rightEdge, rightSide, alpha)
+	function UnitFrames.StyleDispelFill(kit, style, healthTexture, rightEdge, rightSide, alpha)
 		local settings = UnitFrames.GetSettings()
 		local blend = settings.dispelBlend and 'ADD' or 'BLEND'
 		local half = style == 'top' or style == 'bottom'
+		local fill, fade, shade = kit.fill, kit.fade, kit.shade
 		PrepFillTexture(fill, half and FADE_TEXTURE or WHITE8X8, blend, alpha)
 		PrepFillTexture(fade, FADE_TEXTURE, blend, alpha)
+		PrepFillTexture(shade, FADE_TEXTURE, 'BLEND', (half and alpha > 0) and settings.dispelFadeDark / 100 or 0)
+		shade:SetVertexColor(0, 0, 0)
+		shade:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
+		shade:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
+		if style == 'top' then shade:SetTexCoord(0, 1, 1, 0) else shade:SetTexCoord(0, 1, 0, 1) end
 		if not half then
 			fill:SetTexCoord(0, 1, 0, 1)
 			fill:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
@@ -755,7 +768,7 @@ do
 		local absorb = OverlappingAbsorb(frame)
 		local rightEdge, rightSide = healthTexture, 'RIGHT'
 		if absorb then rightEdge, rightSide = absorb:GetStatusBarTexture(), 'LEFT' end
-		UnitFrames.StyleDispelFill(kit.fill, kit.fade, style, healthTexture, rightEdge, rightSide, alpha)
+		UnitFrames.StyleDispelFill(kit, style, healthTexture, rightEdge, rightSide, alpha)
 	end
 
 	local function AnchorFrameEdges(edges, to)
@@ -810,6 +823,7 @@ do
 				typeName = typeName,
 				fill = button:CreateTexture(nil, 'ARTWORK', nil, priority),
 				fade = button:CreateTexture(nil, 'ARTWORK', nil, priority),
+				shade = button:CreateTexture(nil, 'ARTWORK', nil, priority),
 			}
 			local kits = frameKits[frame]
 			if not kits then kits = {}; frameKits[frame] = kits end
@@ -904,6 +918,7 @@ do
 		local kit = { frame = frame, host = host }
 		kit.fill = host:CreateTexture(nil, 'ARTWORK', nil, 6)
 		kit.fade = host:CreateTexture(nil, 'ARTWORK', nil, 6)
+		kit.shade = host:CreateTexture(nil, 'ARTWORK', nil, 6)
 		previewKit = kit
 		return kit
 	end

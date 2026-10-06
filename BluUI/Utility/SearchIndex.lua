@@ -5,13 +5,14 @@ local SearchIndex = BUI.SearchIndex
 
 local entries = {
 	{ label = "Look", page = "unitframes", tab = 1, panel = "Appearance", keywords = "unit frame texture font statusbar enable test mode" },
-	{ label = "Tooltips", page = "unitframes", tab = 1, panel = "Appearance", keywords = "tooltip click to target decimal abbreviations" },
+	{ label = "Behavior", page = "unitframes", tab = 1, panel = "Appearance", keywords = "tooltip click to target decimal abbreviations number format" },
 	{ label = "Sync target and pet to the player", page = "unitframes", tab = 1, panel = "Appearance", keywords = "sync copy player target pet look" },
+	{ label = "Status tag", page = "unitframes", tab = 2, panel = "Tags", keywords = "dead ghost offline afk dnd status color shared party raid size position" },
 	{ label = "Health bar", page = "unitframes", tab = 1, panel = "Appearance", keywords = "health color background border class color transparent" },
 	{ label = "Damage absorb", page = "unitframes", tab = 1, panel = "Appearance", keywords = "absorb shield heal absorb texture direction preview" },
 	{ label = "Power bar", page = "unitframes", tab = 1, panel = "Appearance", keywords = "power color resource type class reaction" },
-	{ label = "Dispel highlight", page = "unitframes", tab = 1, panel = "Appearance", keywords = "dispel debuff highlight bar tint type icons cleanse callouts recolor blend colors" },
-	{ label = "Name tag", page = "unitframes", tab = 1, panel = "Appearance", keywords = "default tags name health power format reset" },
+	{ label = "Dispel highlight", page = "unitframes", tab = 1, panel = "Appearance", keywords = "dispel debuff highlight bar tint fade dark black type icons cleanse callouts recolor blend colors" },
+	{ label = "Default tags", page = "unitframes", tab = 2, panel = "Tags", keywords = "default tags name health power status format reset color size position offset" },
 	{ label = "Raid icon", page = "unitframes", tab = 1, panel = "Appearance", keywords = "raid marker leader icon indicators position size" },
 	{ label = "Custom tags", page = "unitframes", tab = 3, panel = "Tags", keywords = "custom tag text element font layer anchor" },
 	{ label = "Tag reference", page = "unitframes", tab = 2, panel = "Tags", keywords = "tag list reference copy" },
@@ -327,34 +328,34 @@ local entries = {
 
 	{ label = "Switch profile with spec", page = "exportimport", tab = 1, panel = "Spec profiles", keywords = "export import profile share spec" },
 
-	{ label = "Hide the Blizzard frames", page = "groupframes", tab = 1, panel = "Group frames", keywords = "blizzard default frames hide group party raid enable" },
-	{ label = "Click casting", page = "groupframes", tab = 1, panel = "Group frames", keywords = "click cast mouse clique" },
-	{ label = "Fade out of range", page = "groupframes", tab = 1, panel = "Group frames", keywords = "range fade alpha distance offline" },
-	{ label = "Party frames", page = "groupframes", tab = 2, panel = "Party", keywords = "party frames position anchor preview enable" },
-	{ label = "Sorting", page = "groupframes", tab = 2, panel = "Party", keywords = "sort role class order party slot" },
-	{ label = "Visibility", page = "groupframes", tab = 2, panel = "Party", keywords = "self solo raid group show" },
-	{ label = "Frames", page = "groupframes", tab = 2, panel = "Party", keywords = "width height spacing power bar texture vertical healer mana" },
-	{ label = "Health and colors", page = "groupframes", tab = 2, panel = "Appearance", keywords = "class color health border background transparent dead opacity" },
-	{ label = "Damage absorb", page = "groupframes", tab = 2, panel = "Appearance", keywords = "absorb shield heal texture direction" },
-	{ label = "Target border", page = "groupframes", tab = 2, panel = "Appearance", keywords = "target mouseover border highlight" },
-	{ label = "Font", page = "groupframes", tab = 2, panel = "Text", keywords = "font name text" },
-	{ label = "Name", page = "groupframes", tab = 2, panel = "Text", keywords = "name length truncate letters max" },
-	{ label = "Health text", page = "groupframes", tab = 2, panel = "Text", keywords = "health percent text format absorb" },
-	{ label = "Power text", page = "groupframes", tab = 2, panel = "Text", keywords = "power mana text" },
-	{ label = "Status text", page = "groupframes", tab = 2, panel = "Text", keywords = "dead ghost offline afk dnd status color" },
-	{ label = "Mythic+ key", page = "groupframes", tab = 2, panel = "Text", keywords = "keystone mythic plus key party" },
-	{ label = "Role icon", page = "groupframes", tab = 2, panel = "Indicators", keywords = "role leader raid marker resurrect ready check combat icon" },
-	{ label = "Unit tooltips", page = "groupframes", tab = 2, panel = "Tooltips", keywords = "tooltip aura buff debuff" },
-	{ label = "Raid frames", page = "groupframes", tab = 3, panel = "Raid", keywords = "raid frames position preview enable" },
-	{ label = "Role icons", page = "groupframes", tab = 3, panel = "Raid", keywords = "raid role icon tank healer" },
-	{ label = "Large raid layout", page = "groupframes", tab = 3, panel = "Raid", keywords = "large raid size threshold groups per row spacing" },
-	{ label = "Buffs", page = "groupframes", tab = 4, panel = "Party auras", keywords = "party aura buff debuff defensive crowd control icons rules" },
-	{ label = "Private auras", page = "groupframes", tab = 4, panel = "Party auras", keywords = "private aura raid boss" },
-	{ label = "Dispel highlight", page = "groupframes", tab = 4, panel = "Party auras", keywords = "dispel debuff highlight tint badge magic curse poison disease" },
-	{ label = "Dispel type colors", page = "groupframes", tab = 4, panel = "Party auras", keywords = "dispel color magic curse poison disease bleed shared palette" },
-	{ label = "Buffs", page = "groupframes", tab = 5, panel = "Raid auras", keywords = "raid aura buff debuff defensive crowd control icons rules" },
-	{ label = "Dispel highlight", page = "groupframes", tab = 5, panel = "Raid auras", keywords = "raid dispel highlight tint badge" },
-	{ label = "Debuff blacklist", page = "groupframes", tab = 6, panel = "Filters", keywords = "blacklist filter debuff buff hide spell recently seen built-in share" },
+	{ label = "Hide the Blizzard frames", page = "unitframes", tab = 11, panel = "Group frames", keywords = "blizzard default frames hide group party raid enable" },
+	{ label = "Click casting", page = "unitframes", tab = 11, panel = "Group frames", keywords = "click cast mouse clique" },
+	{ label = "Fade out of range", page = "unitframes", tab = 11, panel = "Group frames", keywords = "range fade alpha distance offline" },
+	{ label = "Party frames", page = "unitframes", tab = 12, panel = "Party", keywords = "party frames position anchor preview enable" },
+	{ label = "Sorting", page = "unitframes", tab = 12, panel = "Party", keywords = "sort role class order party slot" },
+	{ label = "Visibility", page = "unitframes", tab = 12, panel = "Party", keywords = "self solo raid group show" },
+	{ label = "Frames", page = "unitframes", tab = 12, panel = "Party", keywords = "width height spacing power bar texture vertical healer mana" },
+	{ label = "Health and colors", page = "unitframes", tab = 12, panel = "Appearance", keywords = "class color health border background transparent dead opacity" },
+	{ label = "Damage absorb", page = "unitframes", tab = 12, panel = "Appearance", keywords = "absorb shield heal texture direction" },
+	{ label = "Target border", page = "unitframes", tab = 12, panel = "Appearance", keywords = "target mouseover border highlight" },
+	{ label = "Font", page = "unitframes", tab = 12, panel = "Text", keywords = "font name text" },
+	{ label = "Name", page = "unitframes", tab = 12, panel = "Text", keywords = "name length truncate letters max" },
+	{ label = "Health text", page = "unitframes", tab = 12, panel = "Text", keywords = "health percent text format absorb" },
+	{ label = "Power text", page = "unitframes", tab = 12, panel = "Text", keywords = "power mana text" },
+	{ label = "Status text", page = "unitframes", tab = 12, panel = "Text", keywords = "dead ghost offline afk dnd status" },
+	{ label = "Mythic+ key", page = "unitframes", tab = 12, panel = "Text", keywords = "keystone mythic plus key party" },
+	{ label = "Role icon", page = "unitframes", tab = 12, panel = "Indicators", keywords = "role leader raid marker resurrect ready check combat icon" },
+	{ label = "Unit tooltips", page = "unitframes", tab = 12, panel = "Tooltips", keywords = "tooltip aura buff debuff" },
+	{ label = "Raid frames", page = "unitframes", tab = 13, panel = "Raid", keywords = "raid frames position preview enable" },
+	{ label = "Role icons", page = "unitframes", tab = 13, panel = "Raid", keywords = "raid role icon tank healer" },
+	{ label = "Large raid layout", page = "unitframes", tab = 13, panel = "Raid", keywords = "large raid size threshold groups per row spacing" },
+	{ label = "Buffs", page = "unitframes", tab = 14, panel = "Party auras", keywords = "party aura buff debuff defensive crowd control icons rules" },
+	{ label = "Private auras", page = "unitframes", tab = 14, panel = "Party auras", keywords = "private aura raid boss" },
+	{ label = "Dispel highlight", page = "unitframes", tab = 14, panel = "Party auras", keywords = "dispel debuff highlight tint badge magic curse poison disease" },
+	{ label = "Dispel type colors", page = "unitframes", tab = 14, panel = "Party auras", keywords = "dispel color magic curse poison disease bleed shared palette" },
+	{ label = "Buffs", page = "unitframes", tab = 15, panel = "Raid auras", keywords = "raid aura buff debuff defensive crowd control icons rules" },
+	{ label = "Dispel highlight", page = "unitframes", tab = 15, panel = "Raid auras", keywords = "raid dispel highlight tint badge" },
+	{ label = "Debuff blacklist", page = "unitframes", tab = 16, panel = "Filters", keywords = "blacklist filter debuff buff hide spell recently seen built-in share" },
 }
 
 local pageTitles = {}
@@ -432,7 +433,6 @@ SearchIndex.RegisterTabNames('auras', { 'Alerts', 'GCD History', 'Class' })
 SearchIndex.RegisterTabNames('power', { 'Primary', 'Secondary', 'Stacking' })
 SearchIndex.RegisterTabNames('cdm', { 'General', 'Essential', 'Utility', 'Buff icons', 'Buff bars', 'Layouts', 'Icon management' })
 SearchIndex.RegisterTabNames('castbars', { 'Player', 'Target', 'Focus' })
-SearchIndex.RegisterTabNames('unitframes', { 'Appearance', 'Tags', 'Tags', 'Player', 'Target', 'Target of target', 'Focus', 'Pet', 'Boss', 'Filters' })
-SearchIndex.RegisterTabNames('groupframes', { 'General', 'Party', 'Raid', 'Party auras', 'Raid auras', 'Filters' })
+SearchIndex.RegisterTabNames('unitframes', { 'Appearance', 'Tags', 'Tags', 'Player', 'Target', 'Target of target', 'Focus', 'Pet', 'Boss', 'Filters', 'Groups', 'Party', 'Raid', 'Party auras', 'Raid auras', 'Group filters' })
 SearchIndex.RegisterTabNames('settings', { 'Appearance', 'Sound', 'Skinning', 'Visibility', 'Modules', 'Help', 'Theme' })
 SearchIndex.RegisterTabNames('qol', { 'Combat', 'Interface', 'Automation', 'Graphics', 'Danger zone' })

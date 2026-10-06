@@ -56,9 +56,7 @@ end
 Methods["blu:status"] = function(unit)
 	local status = HealthStatus(unit)
 	if not status then return "" end
-	local settings = GroupFrames.SettingsForUnit(unit)
-	local colors = settings and settings.statusText and settings.statusText.colors
-	local color = colors and colors[status]
+	local color = BUI.UnitFrames.GetSettings().statusColors[status]
 	if color then return ("|cff%02x%02x%02x%s|r"):format(color[1] * 255, color[2] * 255, color[3] * 255, status:upper()) end
 	return status:upper()
 end

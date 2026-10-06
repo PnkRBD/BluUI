@@ -132,10 +132,11 @@ end
 function UnitFrames.ApplyTextStyles(frame, width, settings, unitSettings, unit)
 	local font = UnitFrames.GetFont()
 	local function PositiveOr(value, fallback) return (type(value) == 'number' and value > 0) and value or fallback end
+	local function Text(key) return UnitFrames.TextSetting(unitSettings, key) end
 	local textSize = PositiveOr(unitSettings.textSize, 12)
-	local nameTextSize = PositiveOr(unitSettings.nameTextSize, textSize)
-	local healthTextSize = PositiveOr(unitSettings.healthTextSize, textSize)
-	local powerTextSize = PositiveOr(unitSettings.powerTextSize, textSize - 2)
+	local nameTextSize = PositiveOr(Text('nameTextSize'), textSize)
+	local healthTextSize = PositiveOr(Text('healthTextSize'), textSize)
+	local powerTextSize = PositiveOr(Text('powerTextSize'), textSize - 2)
 
 	if frame.Name then
 		Pixel.ApplyFont(frame.Name, nameTextSize, font)
@@ -145,7 +146,7 @@ function UnitFrames.ApplyTextStyles(frame, width, settings, unitSettings, unit)
 		frame.Name:SetShown(showName)
 
 		UnitFrames.ApplyTextPosition(frame.Name, frame.TextOverlay or frame.Health,
-			unitSettings.namePosition, unitSettings.nameOffsetX, unitSettings.nameOffsetY)
+			Text('namePosition'), Text('nameOffsetX'), Text('nameOffsetY'))
 
 		UnitFrames.FitNameWidth(frame)
 
@@ -153,14 +154,17 @@ function UnitFrames.ApplyTextStyles(frame, width, settings, unitSettings, unit)
 			local red, green, blue = UnitFrames.GetNameColor(unit, unitSettings)
 			frame.Name:SetTextColor(red, green, blue)
 		else
-			frame.Name:SetTextColor(1, 1, 1)
+			local color = settings.nameColor
+			frame.Name:SetTextColor(color[1], color[2], color[3])
 		end
 	end
 
 	if frame.HealthText then
 		Pixel.ApplyFont(frame.HealthText, healthTextSize, font)
+		local color = settings.healthTextColor
+		frame.HealthText:SetTextColor(color[1], color[2], color[3])
 		UnitFrames.ApplyTextPosition(frame.HealthText, frame.TextOverlay or frame.Health,
-			unitSettings.healthPosition, unitSettings.healthOffsetX, unitSettings.healthOffsetY)
+			Text('healthPosition'), Text('healthOffsetX'), Text('healthOffsetY'))
 
 		local showHealthText = unitSettings.showHealthText
 		if showHealthText == nil then showHealthText = settings.showHealthText ~= false end
@@ -168,13 +172,18 @@ function UnitFrames.ApplyTextStyles(frame, width, settings, unitSettings, unit)
 	end
 
 	if frame.StatusText then
-		Pixel.ApplyFont(frame.StatusText, textSize + 2, font)
+		Pixel.ApplyFont(frame.StatusText, PositiveOr(Text('statusTextSize'), textSize + 2), font)
+		UnitFrames.ApplyTextPosition(frame.StatusText, frame.TextOverlay or frame.Health,
+			Text('statusPosition'), Text('statusOffsetX'), Text('statusOffsetY'))
+		UnitFrames.RefreshStatusText(frame)
 	end
 
 	if frame.PowerText then
 		Pixel.ApplyFont(frame.PowerText, powerTextSize, font)
+		local color = settings.powerTextColor
+		frame.PowerText:SetTextColor(color[1], color[2], color[3])
 		UnitFrames.ApplyTextPosition(frame.PowerText, frame.Power,
-			unitSettings.powerPosition, unitSettings.powerOffsetX, unitSettings.powerOffsetY)
+			Text('powerPosition'), Text('powerOffsetX'), Text('powerOffsetY'))
 	end
 end
 

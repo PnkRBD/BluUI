@@ -505,6 +505,7 @@ local function EnsureRuleGroups(container, style, rules, baseFilter, candidates,
 	for fingerprint, info in pairs(container._buiGroups) do
 		if not wanted[fingerprint] and info.active then
 			info.active = false
+			info.max = 0
 			if container.SetAuraGroupMaxFrameCount then
 				container:SetAuraGroupMaxFrameCount(info.key, 0)
 			end
@@ -527,11 +528,10 @@ local function EnsureRuleGroups(container, style, rules, baseFilter, candidates,
 		}
 		local info = container._buiGroups[fingerprint]
 		if info then
-			if not info.active then
-				info.active = true
-				if container.SetAuraGroupMaxFrameCount then
-					container:SetAuraGroupMaxFrameCount(info.key, style.max)
-				end
+			info.active = true
+			if info.max ~= style.max and container.SetAuraGroupMaxFrameCount then
+				info.max = style.max
+				container:SetAuraGroupMaxFrameCount(info.key, style.max)
 			end
 			if container.SetAuraGroupLayout then
 				container:SetAuraGroupLayout(info.key, layout)
@@ -542,7 +542,7 @@ local function EnsureRuleGroups(container, style, rules, baseFilter, candidates,
 		else
 			container._buiGroupSeq = (container._buiGroupSeq or 0) + 1
 			local key = 'bui' .. container._buiGroupSeq
-			local groupInfo = { key = key, active = true }
+			local groupInfo = { key = key, active = true, max = style.max }
 			local groupOptions = {
 				maxFrameCount = style.max,
 				initializeFrame = MakeInitializer(container, groupInfo),

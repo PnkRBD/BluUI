@@ -31,18 +31,9 @@ local function AuraContainer(options)
 	}
 end
 
-local STATUS_COLORS = {
-	Offline = { 1, 1, 1, 1 },
-	Dead    = { 1, 1, 1, 1 },
-	Ghost   = { 1, 1, 1, 1 },
-	AFK     = { 1, 1, 1, 1 },
-	DND     = { 1, 1, 1, 1 },
-}
-
 local function CommonSettings(sizes)
 	local statusText = TextDefaults(sizes.statusSize, "CENTER", 0, 0)
 	statusText.format = nil
-	statusText.colors = CopyTable(STATUS_COLORS)
 
 	return {
 		useClassColor        = true,
