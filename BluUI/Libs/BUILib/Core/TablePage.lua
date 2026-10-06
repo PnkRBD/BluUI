@@ -17,6 +17,8 @@ local SECTION_PAD = 32
 local STACK_PAD = 24
 local STACK_GAP = 20
 local TABLE_HEAD = 36
+local COLUMN_FONT = 11
+local COLUMN_Y = 12
 local ROW_HEIGHT = 58
 local ROW_INSET = 20
 local CONTROL_HEIGHT = 30
@@ -28,6 +30,7 @@ local HEADER_GAP = 26
 local BOTTOM_GAP = 24
 local PREVIEW_GAP = 16
 local PREVIEW_RADIUS = 8
+local INPUT_RADIUS = 4
 local DOT_TILE = 16
 local DISABLED_ALPHA = 0.35
 local BLOCKER_LEVEL = 20
@@ -277,7 +280,9 @@ function Layout.TableKit(window)
 	function kit.Input(parent, width, spec)
 		local box = CreateFrame('Frame', nil, parent)
 		box:SetSize(width, CONTROL_HEIGHT)
-		window:Fill(box, 'input'):SetAllPoints()
+		local fill, edge = Widget.DrawCardShape(box, INPUT_RADIUS, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
+		window:Paint(fill, 'textbox')
+		window:Paint(edge, 'inputEdge')
 		local edit = CreateFrame('EditBox', nil, box)
 		edit:SetPoint('LEFT', 12, 0)
 		edit:SetPoint('RIGHT', -12, 0)
@@ -704,8 +709,14 @@ function Layout.TableKit(window)
 			panel:SetPoint('TOPLEFT', panelX, -self.panelTop)
 		end
 		section:Measure()
-		for _, column in ipairs(spec.columns or {}) do
-			kit.Text(panel, column[1]:upper(), 9, 'faint'):SetPoint('TOPLEFT', column[2], -20)
+		if spec.columns then
+			for _, column in ipairs(spec.columns) do
+				kit.Text(panel, column[1]:upper(), COLUMN_FONT, 'text', nil, 'title'):SetPoint('TOPLEFT', column[2], -COLUMN_Y)
+			end
+			local underline = window:Fill(panel, 'rule', 'ARTWORK')
+			underline:SetPoint('TOPLEFT', ROW_INSET, -(TABLE_HEAD - 1))
+			underline:SetPoint('TOPRIGHT', -ROW_INSET, -(TABLE_HEAD - 1))
+			underline:SetHeight(1)
 		end
 
 		local rule = kit.DottedRule(frame)
