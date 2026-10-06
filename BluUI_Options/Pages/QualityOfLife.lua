@@ -11,7 +11,7 @@ local RAIL_GROUPS = {
 	} },
 	{ title = 'System', items = {
 		{ id = 'graphics', label = 'Graphics', icon = 'checker' },
-		{ id = 'danger', label = 'Danger zone', icon = 'delete' },
+		{ id = 'danger', label = 'Danger zone', icon = 'skull' },
 	} },
 }
 local TAB_IDS = { 'combat', 'interface', 'automation', 'graphics', 'danger' }
