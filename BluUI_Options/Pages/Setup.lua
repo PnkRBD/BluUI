@@ -93,6 +93,74 @@ local done = {}
 local skinSelection = {}
 local barsChoice, barsVisited = 'ours', false
 local NeedsBarsStep
+local openingProfile, pendingProfile, pendingNew, lookSnapshot
+local themeVisited, scaleVisited, finishing = false, false, false
+local UNIT_LOOK_KEYS = { 'transparentHealth', 'healthBarAlpha', 'classColorHealth', 'classColorPower', 'bgColor', 'healthColor', 'shieldColor', 'healAbsorbColor' }
+local GROUP_LOOK_KEYS = { 'transparentHealth', 'healthOpacity', 'useClassColor', 'healthColor', 'bgColor' }
+local GROUP_LOOK_NESTED = { 'absorb', 'healAbsorb' }
+local GROUP_UNITS = { 'party', 'raid' }
+
+local function CopyValue(value)
+	if type(value) == 'table' then return CopyTable(value) end
+	return value
+end
+
+local function CaptureLook(profile)
+	local look = { unitFrames = {}, groups = {}, scale = profile.uiScale and profile.uiScale.scale }
+	for _, key in ipairs(UNIT_LOOK_KEYS) do look.unitFrames[key] = CopyValue(profile.unitFrames[key]) end
+	for _, unit in ipairs(GROUP_UNITS) do
+		local section, saved = profile.groupFrames[unit], {}
+		for _, key in ipairs(GROUP_LOOK_KEYS) do saved[key] = CopyValue(section[key]) end
+		for _, group in ipairs(GROUP_LOOK_NESTED) do saved[group] = CopyValue(section[group] and section[group].color) end
+		look.groups[unit] = saved
+	end
+	return look
+end
+
+local function WriteLook(profile, look, withTheme, withScale)
+	if withTheme then
+		for _, key in ipairs(UNIT_LOOK_KEYS) do profile.unitFrames[key] = CopyValue(look.unitFrames[key]) end
+		for _, unit in ipairs(GROUP_UNITS) do
+			local section, saved = profile.groupFrames[unit], look.groups[unit]
+			for _, key in ipairs(GROUP_LOOK_KEYS) do section[key] = CopyValue(saved[key]) end
+			for _, group in ipairs(GROUP_LOOK_NESTED) do
+				if section[group] then section[group].color = CopyValue(saved[group]) end
+			end
+		end
+	end
+	if withScale and look.scale ~= nil then profile.uiScale.scale = look.scale end
+end
+
+local function ProfileExists(name)
+	for _, existing in pairs(BUI.GetAceDB():GetProfiles()) do
+		if existing == name then return true end
+	end
+	return false
+end
+
+local function CommitProfile()
+	local aceDB = BUI.GetAceDB()
+	if not pendingProfile or pendingProfile == aceDB:GetCurrentProfile() then return end
+	local edited = CaptureLook(BUI.GetDB())
+	if lookSnapshot then WriteLook(BUI.GetDB(), lookSnapshot, true, true) end
+	local existed = ProfileExists(pendingProfile)
+	BUI._suppressProfileCallback = true
+	aceDB:SetProfile(pendingProfile)
+	if not existed then BUI.ExportImport.ApplyDefaultProfile(BUI.GetDB()) end
+	BUI.MigrateProfile(BUI.GetDB())
+	BUI._suppressProfileCallback = nil
+	WriteLook(BUI.GetDB(), edited, themeVisited, scaleVisited)
+end
+
+local function RestoreOpeningLook()
+	if finishing or not lookSnapshot or pendingProfile == openingProfile then return end
+	BUI.Events:AfterCombat(function()
+		WriteLook(BUI.GetDB(), lookSnapshot, true, true)
+		BUI.ApplyScale()
+		BUI.Scale.SyncButtons()
+		BUI.ExportImport.RefreshAllModules()
+	end, 'Setup.RestoreOpeningLook')
+end
 
 local function Skin()
 	return BUI.Skinning
@@ -187,6 +255,7 @@ local function ApplyScale(value)
 end
 
 local function Scale(kit, shell, parent, width, _, page)
+	scaleVisited = true
 	local frame = Block(parent, width)
 	local y = Heading(kit, frame, 'Interface scale', 'A pixel-perfect scale keeps every line sharp instead of smeared across half a pixel. Drag for a custom value, it applies when you let go.', width)
 	local window = shell.window
@@ -367,22 +436,18 @@ local function FreshProfileName()
 	return name
 end
 
-local function UseProfile(page, name)
-	BUI.Events:AfterCombat(function()
-		local aceDB = BUI.GetAceDB()
-		if aceDB:GetCurrentProfile() ~= name then aceDB:SetProfile(name) end
-		SeedSelection()
-		page:Rebuild()
-	end, 'Setup.UseProfile')
+local function PickProfile(page, name, isNew)
+	pendingProfile, pendingNew = name, isNew
+	page:Rebuild('profile')
 end
 
 local function Profile(kit, _, parent, width, _, page)
 	local frame = Block(parent, width)
 	local y = Heading(kit, frame, 'Pick a profile', "A profile is one full set of BluUI settings. Start from Blu's, keep the one you're on, or make your own. The next steps change whichever one you pick.", width)
-	local current = BUI.GetAceDB():GetCurrentProfile()
+	local current = openingProfile
 	local tiles = { { name = BLU_PROFILE, title = BLU_PROFILE, note = "Bluhu's profile, ready to play", logo = true } }
 	if current ~= BLU_PROFILE then tiles[#tiles + 1] = { name = current, title = current, note = ProfileUsers(current) } end
-	local fresh = FreshProfileName()
+	local fresh = pendingNew and pendingProfile or FreshProfileName()
 	tiles[#tiles + 1] = { name = fresh, title = 'Make your own', note = ('A new profile called %s, starting from the defaults'):format(fresh), create = true }
 
 	local tileWidth = math.floor((width - TILE_GAP * (PROFILE_COLUMNS - 1)) / PROFILE_COLUMNS)
@@ -390,7 +455,7 @@ local function Profile(kit, _, parent, width, _, page)
 	for index, tile in ipairs(tiles) do
 		local column, row = (index - 1) % PROFILE_COLUMNS, math.floor((index - 1) / PROFILE_COLUMNS)
 		local card = Choice(kit, frame, column * (tileWidth + TILE_GAP), y + row * (PROFILE_TILE_HEIGHT + TILE_GAP), tileWidth, PROFILE_TILE_HEIGHT,
-			not tile.create and tile.name == current, function() UseProfile(page, tile.name) end)
+			(tile.create and pendingNew) or (not tile.create and not pendingNew and tile.name == pendingProfile), function() PickProfile(page, tile.name, tile.create == true) end)
 		local avatar
 		if tile.logo then
 			avatar = card:CreateTexture(nil, 'ARTWORK')
@@ -411,7 +476,7 @@ local function Profile(kit, _, parent, width, _, page)
 	local rows = math.ceil(#tiles / PROFILE_COLUMNS)
 	y = y + rows * PROFILE_TILE_HEIGHT + (rows - 1) * TILE_GAP + FOOTER_GAP
 	return { Footer(kit, frame, y, function() Back(page, 'welcome') end, { text = 'Next', onClick = function()
-		if current ~= BLU_PROFILE then return Go(page, 'scale') end
+		if pendingProfile ~= BLU_PROFILE then return Go(page, 'scale') end
 		done.profile = true
 		Show(page, NeedsBarsStep() and 'bars' or 'finish')
 	end }) }
@@ -463,6 +528,7 @@ local function StyleSwatch(kit, tile, style)
 end
 
 local function Theme(kit, _, parent, width, _, page)
+	themeVisited = true
 	local module = UnitFrames()
 	local frame = Block(parent, width)
 	local y = Heading(kit, frame, 'Unit frames', 'Pick a look. It applies live and the frames below are the real thing, so judge it on those.', width)
@@ -779,7 +845,7 @@ local function Bars(kit, _, parent, width, _, page)
 	end
 	local rows = math.ceil(#options / columns)
 	y = y + rows * BARS_TILE_HEIGHT + (rows - 1) * TILE_GAP + FOOTER_GAP
-	return { Footer(kit, frame, y, function() Back(page, BUI.GetAceDB():GetCurrentProfile() == BLU_PROFILE and 'profile' or 'theme') end, { text = 'Next', onClick = function() Go(page, 'finish') end }) }
+	return { Footer(kit, frame, y, function() Back(page, pendingProfile == BLU_PROFILE and 'profile' or 'theme') end, { text = 'Next', onClick = function() Go(page, 'finish') end }) }
 end
 
 local function SummaryCard(kit, window, frame, x, y, width, spec)
@@ -821,7 +887,13 @@ local function Finish(kit, shell, parent, width, _, page)
 	local scale = UIParent:GetScale()
 	local perfect = BUI.ApproxEqual(scale, BUI.ClampedUIScale())
 	local screenWidth, screenHeight = GetPhysicalScreenSize()
-	local profileName = BUI.GetAceDB():GetCurrentProfile()
+	local profileName = pendingProfile
+	local profileStatus = ProfileUsers(profileName)
+	if pendingNew then
+		profileStatus = 'A new profile, made when you finish'
+	elseif not ProfileExists(profileName) then
+		profileStatus = "Bluhu's profile, added when you finish"
+	end
 	local skinsValue, skinsStatus
 	if selectedCount == total then
 		skinsValue, skinsStatus = 'All', ('Every one of the %d Blizzard windows gets the dark look'):format(total)
@@ -832,7 +904,7 @@ local function Finish(kit, shell, parent, width, _, page)
 	end
 	local barsValue, barsStatus = BarsSummary()
 	local cards = {
-		{ step = 'profile', icon = 'profile', label = 'Profile', value = profileName, status = ProfileUsers(profileName) },
+		{ step = 'profile', icon = 'profile', label = 'Profile', value = profileName, status = profileStatus },
 		{ step = 'scale', icon = 'resize', label = 'Scale', value = ('%.3f'):format(scale),
 			status = (perfect and 'Pixel-perfect for %d x %d' or 'Off the pixel grid for %d x %d'):format(screenWidth, screenHeight) },
 		{ step = 'skins', icon = 'eye', label = 'Skins', value = skinsValue, status = skinsStatus },
@@ -850,10 +922,14 @@ local function Finish(kit, shell, parent, width, _, page)
 	y = y + rows * SUMMARY_CARD_HEIGHT + (rows - 1) * TILE_GAP + FOOTER_GAP
 	frame:SetScript('OnShow', function() Confetti(shell.window.frame) end)
 	return { Footer(kit, frame, y, function() Back(page, (profileName ~= BLU_PROFILE or NeedsBarsStep()) and 'bars' or 'profile') end, { text = 'Finish and reload', onClick = function()
-		Skin().WriteSkinsEnabled(skinSelection)
-		ApplyBars()
-		BUI.Print('Setup complete. Open settings anytime with |cff' .. BUI.C.COLOR_PINK .. '/bui|r.')
-		ReloadUI()
+		BUI.Events:AfterCombat(function()
+			finishing = true
+			CommitProfile()
+			Skin().WriteSkinsEnabled(skinSelection)
+			ApplyBars()
+			BUI.Print('Setup complete. Open settings anytime with |cff' .. BUI.C.COLOR_PINK .. '/bui|r.')
+			ReloadUI()
+		end, 'Setup.Finish')
 	end }) }
 end
 
@@ -868,10 +944,15 @@ BUI.OptionsWindow.New('setup', {
 	onOpen = function(shell)
 		SeedSelection()
 		barsChoice, barsVisited = 'ours', false
+		openingProfile = BUI.GetAceDB():GetCurrentProfile()
+		pendingProfile, pendingNew = openingProfile, false
+		themeVisited, scaleVisited, finishing = false, false, false
+		lookSnapshot = CaptureLook(BUI.GetDB())
 		wipe(done)
 		shell:RebuildPage('setup')
 	end,
 	onClosed = function()
+		RestoreOpeningLook()
 		BUI.Print('Setup closed. Run it anytime with |cff' .. BUI.C.COLOR_PINK .. '/bui install|r.')
 	end,
 	build = function(tab, shell)
