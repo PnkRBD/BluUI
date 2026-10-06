@@ -153,16 +153,29 @@ local function OnUnlessOff(db, label, key)
 	return { label = label, get = function() return db[key] ~= false end, set = function(value) db[key] = value end }
 end
 
-local function Channels(db, prefix, label, alpha)
+local function Channels(db, prefix, label, alpha, fallback)
 	return {
 		kind = 'swatch', label = label, tooltip = label, opacity = alpha,
-		get = function() return db[prefix .. 'R'], db[prefix .. 'G'], db[prefix .. 'B'], alpha and db[prefix .. 'A'] or 1 end,
+		get = function()
+			local red, green, blue, opacity = db[prefix .. 'R'], db[prefix .. 'G'], db[prefix .. 'B'], db[prefix .. 'A']
+			if red == nil or green == nil or blue == nil then
+				local fallbackRed, fallbackGreen, fallbackBlue, fallbackAlpha = 1, 1, 1, 1
+				if fallback then fallbackRed, fallbackGreen, fallbackBlue, fallbackAlpha = fallback() end
+				red, green, blue = red or fallbackRed, green or fallbackGreen, blue or fallbackBlue
+				opacity = opacity or fallbackAlpha
+			end
+			return red, green, blue, alpha and (opacity or 1) or 1
+		end,
 		set = function(red, green, blue, opacity)
 			db[prefix .. 'R'], db[prefix .. 'G'], db[prefix .. 'B'] = red, green, blue
 			if alpha then db[prefix .. 'A'] = opacity end
 		end,
 	}
 end
+
+local BAR_BACKGROUND, POINT_BACKGROUND = 0.1, 0.15
+local function BarBackground() return BAR_BACKGROUND, BAR_BACKGROUND, BAR_BACKGROUND, 1 end
+local function PointBackground() return POINT_BACKGROUND, POINT_BACKGROUND, POINT_BACKGROUND, 1 end
 
 local function ArrayColor(db, label, key)
 	return {
@@ -481,7 +494,7 @@ local function SecondaryBoards(ui, parent, width, page)
 		elseif isBar then
 			board:AddTools('Bar', 'Colors and size', {
 				ResourceColor(db, config, 'Bar color'),
-				Channels(db, prefix .. 'BgColor', 'Background', true),
+				Channels(db, prefix .. 'BgColor', 'Background', true, BarBackground),
 				{ tooltip = 'Size', title = 'Bar', options = {
 					Option(db, 'Width', prefix .. 'BarWidth', { min = 50, max = 400, step = 1 }),
 					Option(db, 'Height', prefix .. 'BarHeight', { min = 4, max = 40, step = 1 }),
@@ -491,7 +504,7 @@ local function SecondaryBoards(ui, parent, width, page)
 		else
 			local style = {
 				ResourceColor(db, config, 'Active color'),
-				Channels(db, prefix .. 'BgColor', 'Background', true),
+				Channels(db, prefix .. 'BgColor', 'Background', true, PointBackground),
 			}
 			if prefix == 'combo' then table.insert(style, 2, Channels(db, 'comboChargedColor', 'Charged')) end
 			style[#style + 1] = { tooltip = 'Size and spacing', title = 'Segments', options = {
@@ -563,7 +576,7 @@ local function SecondaryBoards(ui, parent, width, page)
 		if textOnly then
 			ClassColorCell()
 			board:AddTools('Text', 'Size, color and font of the number', {
-				Channels(db, prefix .. 'TextColor', 'Text color'),
+				Channels(db, prefix .. 'TextColor', 'Text color', nil, function() return Secondary.GetBarColor(config) end),
 				FontMenu('secondaryPowerFont'),
 				TextIcon('Text', {
 					Toggle(db, 'Show the percent', prefix .. 'ShowPercent'),
