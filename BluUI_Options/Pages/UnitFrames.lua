@@ -7,6 +7,7 @@ local AuraLists = BUI.AuraLists
 local PAGE_WIDTH = 960
 local PREVIEW_HEIGHT = 150
 local MENU_WIDTH = 150
+local WIDE_MENU = 200
 local TAG_WIDTH = 300
 local COPY_WIDTH = 170
 local TAB_STRIP_GAP = 12
@@ -67,13 +68,11 @@ local ABSORB_DIRECTIONS = {
 	{ value = 'left', text = 'Reverse into health' },
 	{ value = 'edge', text = 'From the bar edge' },
 }
-local DISPEL_MODES = {
-	{ value = 'off', text = 'Off' },
+local DISPEL_STYLES = {
 	{ value = 'bar', text = 'Tint the whole bar' },
 	{ value = 'top', text = 'Fade from the top' },
 	{ value = 'bottom', text = 'Fade from the bottom' },
 }
-local TINT_MODES = { bar = true, top = true, bottom = true }
 local DISPEL_SOURCES = {
 	{ value = 'mine', text = 'Dispellable by me' },
 	{ value = 'all', text = 'All dispel types' },
@@ -235,8 +234,8 @@ local function Menu(db, key, entries, width)
 	return { entries = entries, width = width or MENU_WIDTH, get = function() return db[key] end, set = function(value) db[key] = value end }
 end
 
-local function TagInput(db, key, placeholder)
-	return { kind = 'input', width = TAG_WIDTH, placeholder = placeholder, get = function() return db[key] or '' end, set = function(text) db[key] = text ~= '' and text or nil end }
+local function TagInput(db, key, placeholder, width)
+	return { kind = 'input', width = width or TAG_WIDTH, placeholder = placeholder, get = function() return db[key] or '' end, set = function(text) db[key] = text ~= '' and text or nil end }
 end
 
 local function Eye(tooltip, get, set)
@@ -646,10 +645,39 @@ local function BuildPreview(band, kit)
 	return band
 end
 
+local OVERRIDE_SUFFIXES = { 'Position', 'TextSize', 'OffsetX', 'OffsetY' }
+
+local function HasOverrides(unitSettings, prefix)
+	local settings = Settings()
+	for _, suffix in ipairs(OVERRIDE_SUFFIXES) do
+		local value = unitSettings[prefix .. suffix]
+		if value ~= nil and value ~= settings[prefix .. suffix] then return true end
+	end
+	return false
+end
+
 local function ClearOverrides(unitSettings, prefix)
-	for _, suffix in ipairs({ 'Position', 'TextSize', 'OffsetX', 'OffsetY' }) do unitSettings[prefix .. suffix] = nil end
+	for _, suffix in ipairs(OVERRIDE_SUFFIXES) do unitSettings[prefix .. suffix] = nil end
 	RefreshFrames()
 	Repaint()
+end
+
+local function DefaultFormat(key, fallback)
+	local value = Settings()[key]
+	if value ~= nil and value ~= '' then return value end
+	return fallback
+end
+
+local function ResetTool(ui, tooltip, isChanged, reset)
+	return { slot = 'icon', build = function(parent)
+		local button = ui.IconButton(parent, 'reset', tooltip, reset)
+		ui.Bind(button, function() button:SetShown(isChanged()) end)
+		return button
+	end }
+end
+
+local function DropUnitPanes(page)
+	for _, unit in ipairs(UNITS) do page:Rebuild(unit.key) end
 end
 
 local function AppearanceBoards(ui, parent, width, page)
@@ -661,8 +689,10 @@ local function AppearanceBoards(ui, parent, width, page)
 		description = 'Texture, font and behavior shared by every unit frame.',
 	})
 	general:AddTools('Look', 'Bar texture and font for names, health and power', {
-		Menu(settings, 'texture', textures, MENU_WIDTH),
-		Menu(settings, 'font', fonts, MENU_WIDTH),
+		{ icon = 'text', tooltip = 'Texture and font', title = 'Look', options = {
+			Option(settings, 'Bar texture', 'texture', { entries = textures, width = WIDE_MENU }),
+			Option(settings, 'Font', 'font', { entries = fonts, width = WIDE_MENU }),
+		} },
 	}, RefreshFrames)
 	general:AddTools('Behavior', 'Tooltips, click to target and number format', {
 		{ tooltip = 'Behavior options', title = 'Behavior', options = {
@@ -701,11 +731,10 @@ local function AppearanceBoards(ui, parent, width, page)
 		Color(settings, 'Health', 'healthColor'),
 		Color(settings, 'Background', 'bgColor'),
 		Color(settings, 'Border', 'borderColor'),
+		{ tooltip = 'Health bar options', title = 'Health bar', options = {
+			{ label = 'Fill with the class color', get = function() return settings.classColorHealth == true end, set = function(value) settings.classColorHealth = value end },
+		} },
 	}, RefreshFrames)
-	health:AddSwitch('Class color health', function() return settings.classColorHealth == true end, function(value)
-		settings.classColorHealth = value
-		RefreshFrames()
-	end, 'Fill health bars with the class color')
 	health:AddTools('Transparent health', 'See through health fill', {
 		{ tooltip = 'Fill opacity', title = 'Transparent health', options = {
 			{ label = 'Fill opacity %', min = 0, max = 100, step = 5, get = function() return math.floor(settings.healthBarAlpha * 100) end, set = function(value) settings.healthBarAlpha = value / 100 end },
@@ -733,15 +762,11 @@ local function AppearanceBoards(ui, parent, width, page)
 	health:AddTools('Power bar', 'Power fill and background colors', {
 		Color(settings, 'Power', 'powerColor'),
 		Color(settings, 'Background', 'powerBgColor'),
+		{ tooltip = 'Power bar options', title = 'Power bar', options = {
+			{ label = 'Color by resource type, mana blue, energy yellow', get = function() return settings.classColorPower == true end, set = function(value) settings.classColorPower = value end },
+			{ label = 'Color by class or reaction', get = function() return settings.useClassColorPowerBar == true end, set = function(value) settings.useClassColorPowerBar = value end },
+		} },
 	}, RefreshFrames)
-	health:AddSwitch('Color by resource type', function() return settings.classColorPower == true end, function(value)
-		settings.classColorPower = value
-		RefreshFrames()
-	end, 'Mana blue, energy yellow and so on')
-	health:AddSwitch('Color by class or reaction', function() return settings.useClassColorPowerBar == true end, function(value)
-		settings.useClassColorPowerBar = value
-		RefreshFrames()
-	end, 'The power bar takes the class color')
 
 	local player = settings.player
 	local function RefreshDispel()
@@ -761,43 +786,29 @@ local function AppearanceBoards(ui, parent, width, page)
 		description = 'Color your own frame when a dispellable debuff lands.',
 	})
 	dispel:AddTools('Dispel highlight', 'How the player frame reacts, party and raid follow it unless they say otherwise', {
-		{ entries = DISPEL_MODES, width = MENU_WIDTH, get = function()
-			if player.debuffHighlightBar then return player.debuffHighlightStyle end
-			return 'off'
-		end, set = function(value)
-			player.debuffHighlightBar = TINT_MODES[value] == true
-			if player.debuffHighlightBar then player.debuffHighlightStyle = value end
-		end },
-		{ tooltip = 'Source and strength', title = 'Dispel highlight', options = {
+		{ tooltip = 'Style, source and strength', title = 'Dispel highlight', options = {
+			Option(player, 'Style', 'debuffHighlightStyle', { entries = DISPEL_STYLES }),
 			{ label = 'Show', entries = DISPEL_SOURCES, get = function() return player.debuffHighlightClassFilter ~= false and 'mine' or 'all' end, set = function(value) player.debuffHighlightClassFilter = value == 'mine' end },
 			Option(settings, 'Bar tint opacity %', 'dispelOpacity', { min = 0, max = 100, step = 5 }),
 			Option(settings, 'Fade: colour at the middle %', 'dispelFadeMiddle', { min = 0, max = 100, step = 5, separator = true }),
 			Option(settings, 'Fade: colour at the far edge %', 'dispelFadeFar', { min = 0, max = 100, step = 5 }),
 			Option(settings, 'Fade: darkness at the far edge %', 'dispelFadeDark', { min = 0, max = 100, step = 5 }),
+			{ label = 'Blend multiple types instead of showing the top one', get = function() return settings.dispelBlend == true end, set = function(value) settings.dispelBlend = value end, separator = true },
 		} },
 		DispelPreviewEye(),
+		Toggle(player, nil, 'debuffHighlightBar'),
 	}, RefreshDispel)
 	dispel:AddTools('Type icons', 'A row of debuff type icons above your character', {
-		{ tooltip = 'Size and position', title = 'Type icons', options = {
+		{ tooltip = 'Size, position and prompts', title = 'Type icons', options = {
 			Option(player, 'Size', 'debuffHighlightBadgeSize', { min = 10, max = 48, step = 1 }),
 			Option(player, 'Horizontal', 'debuffHighlightBadgeOffsetX', { min = -BADGE_RANGE_X, max = BADGE_RANGE_X, step = 1 }),
 			Option(player, 'Vertical', 'debuffHighlightBadgeOffsetY', { min = -BADGE_RANGE_Y, max = BADGE_RANGE_Y, step = 1 }),
+			{ label = 'Cleanse callouts, FD, TURT and SF prompts', get = function() return player.debuffHighlightTypeText == true end, set = function(value) player.debuffHighlightTypeText = value end, separator = true },
+			{ label = 'Recolor the Blizzard debuff icons to match', get = function() return settings.dispelRecolor == true end, set = function(value) settings.dispelRecolor = value end },
 		} },
 		DispelPreviewEye(),
 		OnUnlessOff(player, nil, 'debuffHighlightBadge'),
 	}, RefreshDispel)
-	dispel:AddSwitch('Cleanse callouts', function() return player.debuffHighlightTypeText == true end, function(value)
-		player.debuffHighlightTypeText = value
-		RefreshDispel()
-	end, 'FD, TURT and SF prompts when you can clear it yourself')
-	dispel:AddSwitch('Recolor type icons', function() return settings.dispelRecolor == true end, function(value)
-		settings.dispelRecolor = value
-		RefreshDispel()
-	end, 'Tint the Blizzard debuff icons to match your colors')
-	dispel:AddSwitch('Blend multiple types', function() return settings.dispelBlend == true end, function(value)
-		settings.dispelBlend = value
-		RefreshDispel()
-	end, 'With two debuffs up, mix both colors instead of showing the higher priority one')
 	local store = BUI.Colors.GetStore()
 	local swatches = {
 		{ icon = 'reset', tooltip = 'Back to the default colors', onClick = function()
@@ -852,6 +863,7 @@ local function CustomTagsBoard(ui, parent, width, page)
 		description = 'Extra text elements driven by tags, attached to one frame. The preview above shows them in place.',
 	})
 	custom:AddTools('Frame', 'Which frame these tags belong to', {
+		loose = true,
 		{ text = 'New tag', icon = 'plus', onClick = function()
 			unitSettings.customTags[#unitSettings.customTags + 1] = { name = 'Tag ' .. (#unitSettings.customTags + 1), tag = '[name]', point = 'CENTER', x = 0, y = 0, fontSize = 12, color = { 1, 1, 1, 1 }, enabled = true, drawLayer = 'OVERLAY', drawSubLevel = 0 }
 			RefreshFrames()
@@ -927,29 +939,68 @@ local function ReferenceBoard(ui, parent, width)
 end
 
 
-local function DefaultTagsBoard(ui, parent, width)
+
+local DEFAULT_COLOR_KEY = { name = 'nameColor', health = 'healthTextColor', power = 'powerTextColor' }
+local DEFAULT_FORMAT_WIDTH = 240
+local DEFAULT_COLOR_WIDTH = 140
+local DEFAULT_SLOT = 30
+local DEFAULT_GAP = 12
+local SWATCH_STEP = 24
+
+local function Factory()
+	return BUI.Defaults.profile.unitFrames
+end
+
+local function SameColor(a, b)
+	return a[1] == b[1] and a[2] == b[2] and a[3] == b[3] and (a[4] or 1) == (b[4] or 1)
+end
+
+local function DefaultRowChanged(settings, prefix)
+	local factory = Factory()
+	for _, suffix in ipairs(OVERRIDE_SUFFIXES) do
+		if settings[prefix .. suffix] ~= factory[prefix .. suffix] then return true end
+	end
+	local format = settings[prefix .. 'Format']
+	if format and format ~= '' and format ~= factory[prefix .. 'Format'] then return true end
+	local colorKey = DEFAULT_COLOR_KEY[prefix]
+	if colorKey then return not SameColor(settings[colorKey], factory[colorKey]) end
+	for status, color in pairs(factory.statusColors) do
+		if not SameColor(settings.statusColors[status], color) then return true end
+	end
+	return false
+end
+
+local function ResetDefaultRow(settings, prefix)
+	local factory = Factory()
+	for _, suffix in ipairs(OVERRIDE_SUFFIXES) do settings[prefix .. suffix] = factory[prefix .. suffix] end
+	settings[prefix .. 'Format'] = factory[prefix .. 'Format']
+	local colorKey = DEFAULT_COLOR_KEY[prefix]
+	if colorKey then
+		settings[colorKey] = CopyTable(factory[colorKey])
+	else
+		for status, color in pairs(factory.statusColors) do settings.statusColors[status] = CopyTable(color) end
+	end
+end
+
+local function DefaultTagsBoard(ui, parent, width, page)
 	local settings = Settings()
+	local resetX = width - ui.ROW_INSET - 22
+	local positionX = resetX - DEFAULT_SLOT
+	local sizeX = positionX - DEFAULT_SLOT
+	local formatX = sizeX - DEFAULT_GAP - DEFAULT_FORMAT_WIDTH
+	local colorX = formatX - DEFAULT_COLOR_WIDTH
 	local tags = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Default tags',
-		description = 'Format, color, size and position every frame falls back on. A frame overrides only what it changes on its own pane.',
+		description = 'Format, color, size and position every frame falls back on. Type in a format box to change it. A frame overrides only what it changes on its own pane.',
+		columns = { { 'Tag', ui.ROW_INSET }, { 'Color', colorX }, { 'Format', formatX }, { 'Placement', sizeX } },
 	})
-	local function Row(label, sub, swatches, prefix, placeholder, sizeMax, after)
-		local tools = {}
-		for _, swatch in ipairs(swatches) do tools[#tools + 1] = swatch end
-		tools[#tools + 1] = { icon = 'text', tooltip = 'Text size', title = label, options = {
-			Option(settings, 'Text size', prefix .. 'TextSize', { min = 8, max = sizeMax, step = 1 }),
-		} }
-		tools[#tools + 1] = { icon = 'location', tooltip = 'Position and offset', title = label, options = {
-			Option(settings, 'Position', prefix .. 'Position', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
-			Option(settings, 'Horizontal', prefix .. 'OffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-			Option(settings, 'Vertical', prefix .. 'OffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-		} }
-		tools[#tools + 1] = TagInput(settings, prefix .. 'Format', placeholder)
-		tags:AddTools(label, sub, tools, after)
+	local function Changed()
+		RefreshFrames()
+		DropUnitPanes(page)
 	end
 	local function RefreshStatus()
-		RefreshFrames()
+		Changed()
 		BUI.UnitFrames.RefreshLifeVisuals()
 		BUI.GroupFrames.RefreshAll()
 	end
@@ -964,17 +1015,32 @@ local function DefaultTagsBoard(ui, parent, width)
 			set = function(red, green, blue, alpha) settings.statusColors[statusName] = { red, green, blue, alpha } end,
 		}
 	end
-	Row('Name tag', 'Unit name on the health bar', { Color(settings, 'Text color', 'nameColor') }, 'name', DEFAULT_TAGS.name, 20, RefreshFrames)
-	Row('Health tag', 'Health value on the bar', { Color(settings, 'Text color', 'healthTextColor') }, 'health', DEFAULT_TAGS.health, 20, RefreshFrames)
-	Row('Power tag', 'Resource value on the power bar', { Color(settings, 'Text color', 'powerTextColor') }, 'power', DEFAULT_TAGS.power, 20, RefreshFrames)
-	Row('Status tag', 'Dead, Ghost, Offline, AFK and DND', statusSwatches, 'status', DEFAULT_TAGS.status, 24, RefreshStatus)
-	tags:AddTools('Reset tags', 'Restore the default name, health, power and status tags', {
-		{ text = 'Reset', onClick = function()
-			settings.nameFormat, settings.healthFormat, settings.powerFormat, settings.statusFormat = DEFAULT_TAGS.name, DEFAULT_TAGS.health, DEFAULT_TAGS.power, DEFAULT_TAGS.status
-			RefreshFrames()
+	local function Row(label, sub, swatches, prefix, placeholder, sizeMax, after)
+		local row = tags:AddRow(label, sub, width - colorX - ui.ROW_INSET)
+		local x = colorX
+		for _, swatch in ipairs(swatches) do
+			ui.Tool(row, swatch, after):SetPoint('LEFT', x, 0)
+			x = x + SWATCH_STEP
+		end
+		ui.Tool(row, TagInput(settings, prefix .. 'Format', placeholder, DEFAULT_FORMAT_WIDTH), after):SetPoint('LEFT', formatX, 0)
+		ui.Tool(row, { icon = 'text', tooltip = 'Text size', title = label, options = {
+			Option(settings, 'Text size', prefix .. 'TextSize', { min = 8, max = sizeMax, step = 1 }),
+		} }, after):SetPoint('LEFT', sizeX, 0)
+		ui.Tool(row, { icon = 'location', tooltip = 'Position and offset', title = label, options = {
+			Option(settings, 'Position', prefix .. 'Position', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
+			Option(settings, 'Horizontal', prefix .. 'OffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+			Option(settings, 'Vertical', prefix .. 'OffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+		} }, after):SetPoint('LEFT', positionX, 0)
+		ui.Tool(row, ResetTool(ui, 'Changed from the factory default, click to restore it', function() return DefaultRowChanged(settings, prefix) end, function()
+			ResetDefaultRow(settings, prefix)
+			after()
 			Repaint()
-		end },
-	})
+		end)):SetPoint('LEFT', resetX, 0)
+	end
+	Row('Name tag', 'Unit name on the health bar', { Color(settings, 'Text color', 'nameColor') }, 'name', DEFAULT_TAGS.name, 20, Changed)
+	Row('Health tag', 'Health value on the bar', { Color(settings, 'Text color', 'healthTextColor') }, 'health', DEFAULT_TAGS.health, 20, Changed)
+	Row('Power tag', 'Resource value on the power bar', { Color(settings, 'Text color', 'powerTextColor') }, 'power', DEFAULT_TAGS.power, 20, Changed)
+	Row('Status tag', 'Dead, Ghost, Offline, AFK and DND', statusSwatches, 'status', DEFAULT_TAGS.status, 24, RefreshStatus)
 	return tags
 end
 
@@ -989,7 +1055,7 @@ local function TagsBoards(ui, parent, width, page)
 	strip:SetHeight(top + TAB_STRIP_GAP)
 	select(tagsTab)
 	if tagsTab == 1 then return { strip, ReferenceBoard(ui, parent, width) } end
-	if tagsTab == 2 then return { strip, DefaultTagsBoard(ui, parent, width) } end
+	if tagsTab == 2 then return { strip, DefaultTagsBoard(ui, parent, width, page) } end
 	return { strip, CustomTagsBoard(ui, parent, width, page) }
 end
 
@@ -1266,7 +1332,7 @@ local function UnitBoards(ui, parent, width, unit)
 		Color(unitSettings, 'Friendly', 'friendlyNameColor'),
 		Color(unitSettings, 'Neutral', 'neutralNameColor'),
 		Color(unitSettings, 'Hostile', 'hostileNameColor'),
-		{ icon = 'reset', tooltip = 'Back to the shared defaults', onClick = function() ClearOverrides(unitSettings, 'name') end },
+		ResetTool(ui, 'This frame overrides the default size or position, click to follow the defaults again', function() return HasOverrides(unitSettings, 'name') end, function() ClearOverrides(unitSettings, 'name') end),
 		{ icon = 'text', tooltip = 'Color, position and size', title = 'Name', options = {
 			Toggle(unitSettings, 'Class or reaction color', 'classColorName'),
 			Inherit(unitSettings, 'Position', 'namePosition', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
@@ -1276,14 +1342,14 @@ local function UnitBoards(ui, parent, width, unit)
 		} },
 		{ get = function() return ResolveShow(unitSettings.showName, settings.showName) end, set = function(value) unitSettings.showName = value end },
 	}, RefreshFrames)
-	text:AddTools('Name tag', 'Tag override for this frame', { TagInput(unitSettings, 'nameFormat', DEFAULT_TAGS.name) }, RefreshFrames)
+	text:AddTools('Name tag', 'Tag override for this frame', { TagInput(unitSettings, 'nameFormat', DefaultFormat('nameFormat', DEFAULT_TAGS.name)) }, RefreshFrames)
 	if unitKey == 'player' or unitKey == 'pet' then
 		text:AddTools('Custom name', 'Shown instead of the real name', {
 			{ kind = 'input', width = NAME_WIDTH, placeholder = 'Real name', get = function() return unitSettings.customName or '' end, set = function(value) unitSettings.customName = value end },
 		}, RefreshFrames)
 	end
 	text:AddTools('Health text', 'Health value on the bar', {
-		{ icon = 'reset', tooltip = 'Back to the shared defaults', onClick = function() ClearOverrides(unitSettings, 'health') end },
+		ResetTool(ui, 'This frame overrides the default size or position, click to follow the defaults again', function() return HasOverrides(unitSettings, 'health') end, function() ClearOverrides(unitSettings, 'health') end),
 		{ icon = 'text', tooltip = 'Position and size', title = 'Health text', options = {
 			Inherit(unitSettings, 'Position', 'healthPosition', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
 			Inherit(unitSettings, 'Text size', 'healthTextSize', { min = 8, max = 20, step = 1 }),
@@ -1293,7 +1359,7 @@ local function UnitBoards(ui, parent, width, unit)
 		{ get = function() return ResolveShow(unitSettings.showHealthText, settings.showHealthText) end, set = function(value) unitSettings.showHealthText = value end },
 	}, RefreshFrames)
 	text:AddTools('Status text', 'Dead, Ghost or Offline over the bar', {
-		{ icon = 'reset', tooltip = 'Back to the shared defaults', onClick = function() ClearOverrides(unitSettings, 'status') end },
+		ResetTool(ui, 'This frame overrides the default size or position, click to follow the defaults again', function() return HasOverrides(unitSettings, 'status') end, function() ClearOverrides(unitSettings, 'status') end),
 		{ icon = 'text', tooltip = 'Position and size', title = 'Status text', options = {
 			Inherit(unitSettings, 'Position', 'statusPosition', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
 			Inherit(unitSettings, 'Text size', 'statusTextSize', { min = 8, max = 24, step = 1 }),
@@ -1302,14 +1368,14 @@ local function UnitBoards(ui, parent, width, unit)
 		} },
 		{ get = function() return unitSettings.showStatusText ~= false end, set = function(value) unitSettings.showStatusText = value end },
 	}, RefreshFrames)
-	text:AddTools('Status tag', 'Tag override for this frame', { TagInput(unitSettings, 'statusFormat', DEFAULT_TAGS.status) }, RefreshFrames)
-	text:AddTools('Health tag', 'Tag override for this frame', { TagInput(unitSettings, 'healthFormat', DEFAULT_TAGS.health) }, RefreshFrames)
+	text:AddTools('Status tag', 'Tag override for this frame', { TagInput(unitSettings, 'statusFormat', DefaultFormat('statusFormat', DEFAULT_TAGS.status)) }, RefreshFrames)
+	text:AddTools('Health tag', 'Tag override for this frame', { TagInput(unitSettings, 'healthFormat', DefaultFormat('healthFormat', DEFAULT_TAGS.health)) }, RefreshFrames)
 	text:AddTools('Power bar', 'Resource bar under the health bar', {
 		{ icon = 'resize', tooltip = 'Height', title = 'Power bar', options = { Option(unitSettings, 'Bar height', 'powerHeight', { min = 1, max = 20, step = 1 }) } },
 		Toggle(unitSettings, nil, 'showPower'),
 	}, RefreshFrames)
 	text:AddTools('Power text', 'Resource value on the power bar', {
-		{ icon = 'reset', tooltip = 'Back to the shared defaults', onClick = function() ClearOverrides(unitSettings, 'power') end },
+		ResetTool(ui, 'This frame overrides the default size or position, click to follow the defaults again', function() return HasOverrides(unitSettings, 'power') end, function() ClearOverrides(unitSettings, 'power') end),
 		{ icon = 'text', tooltip = 'Position and size', title = 'Power text', options = {
 			Inherit(unitSettings, 'Position', 'powerPosition', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
 			Inherit(unitSettings, 'Text size', 'powerTextSize', { min = 8, max = 20, step = 1 }),
@@ -1318,7 +1384,7 @@ local function UnitBoards(ui, parent, width, unit)
 		} },
 		{ get = function() return ResolveShow(unitSettings.showPowerText, settings.showPowerText, false) end, set = function(value) unitSettings.showPowerText = value end },
 	}, RefreshFrames)
-	text:AddTools('Power tag', 'Tag override for this frame', { TagInput(unitSettings, 'powerFormat', DEFAULT_TAGS.power) }, RefreshFrames)
+	text:AddTools('Power tag', 'Tag override for this frame', { TagInput(unitSettings, 'powerFormat', DefaultFormat('powerFormat', DEFAULT_TAGS.power)) }, RefreshFrames)
 
 	local boards = { board, text }
 	if AURA_UNITS[unitKey] then

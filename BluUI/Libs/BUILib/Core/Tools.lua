@@ -222,10 +222,11 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 			group[#group + 1] = control
 			widths[slot] = (widths[slot] and (widths[slot] + GROUP_GAP) or 0) + control:GetWidth()
 		end
+		local loose = tools.loose
 		local function Place(slots)
 			local x, used = -kit.ROW_INSET, 0
 			for _, slot in ipairs(SLOT_ORDER) do
-				local width = ALIGNED[slot] and slots[slot] or widths[slot]
+				local width = (ALIGNED[slot] and not loose) and slots[slot] or widths[slot]
 				if width then
 					local right = x
 					for position = #(groups[slot] or {}), 1, -1 do
