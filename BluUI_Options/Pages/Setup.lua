@@ -7,6 +7,7 @@ local TILE_GAP = 16
 local TILE_PAD = 20
 local FOOTER_HEIGHT = 30
 local FOOTER_GAP = 28
+local STEP_HEIGHT = 580
 local LINE_HEIGHT = 32
 local READOUT_SIZE = 48
 local SLIDER_WIDTH = 360
@@ -28,6 +29,38 @@ local BAND_GAP = 18
 local ABSORB_X = 408
 local ABSORB_GAP = 150
 local ABSORB_SWATCH_Y = 6
+local BLU_PROFILE = 'Blu'
+local PROFILE_COLUMNS = 3
+local PROFILE_TILE_HEIGHT = 124
+local PROFILE_AVATAR = 32
+local SUMMARY_COLUMNS = 2
+local SUMMARY_CARD_HEIGHT = 148
+local SUMMARY_AVATAR = 28
+local SUMMARY_READOUT = 40
+local CARD_RADIUS = 8
+local FIRST_LETTER = '[%z\1-\127\194-\244][\128-\191]*'
+local CONFETTI_COUNT = 480
+local CONFETTI_RAIN_DRIFT = 140
+local CONFETTI_RAIN_PUSH = 220
+local CONFETTI_RAIN_STAGGER = 1.2
+local CONFETTI_RAIN_ABOVE = 60
+local CONFETTI_GRAVITY = 1100
+local CONFETTI_DRAG = 3
+local CONFETTI_SPEED_MIN, CONFETTI_SPEED_MAX = 2200, 3400
+local CONFETTI_ANGLE_MIN, CONFETTI_ANGLE_MAX = math.rad(45), math.rad(85)
+local CONFETTI_ACCENT_SHARE = 0.2
+local CONFETTI_LIFE_MIN, CONFETTI_LIFE_MAX = 3.4, 4.6
+local CONFETTI_FADE = 1
+local CONFETTI_STAGGER = 0.35
+local CONFETTI_CANNON_X = 0.06
+local CONFETTI_WIDTH_MIN, CONFETTI_WIDTH_RANGE = 7, 5
+local CONFETTI_HEIGHT_MIN, CONFETTI_HEIGHT_RANGE = 12, 8
+local CONFETTI_SWAY = 14
+local CONFETTI_LEVEL = 500
+local CONFETTI_COLORS = {
+	{ 1, 0.84, 0.25 }, { 0.3, 0.84, 0.52 }, { 0.94, 0.42, 0.42 },
+	{ 0.35, 0.62, 1 }, { 1, 1, 1 }, { 0.95, 0.5, 0.85 },
+}
 local REFRESH_DELAY = 0.15
 local STAGE_OPTIONS = { bare = true, absorbs = 'both' }
 local BLIZZARD_BACKDROP = {
@@ -36,14 +69,9 @@ local BLIZZARD_BACKDROP = {
 	tile = true, tileEdge = true, tileSize = 16, edgeSize = 16,
 	insets = { left = 4, right = 4, top = 4, bottom = 4 },
 }
-local EDGES = {
-	{ 'TOPLEFT', 'TOPRIGHT', 'SetHeight' },
-	{ 'BOTTOMLEFT', 'BOTTOMRIGHT', 'SetHeight' },
-	{ 'TOPLEFT', 'BOTTOMLEFT', 'SetWidth' },
-	{ 'TOPRIGHT', 'BOTTOMRIGHT', 'SetWidth' },
-}
 local STEPS = {
 	{ id = 'welcome', label = 'Welcome', sub = 'What this does' },
+	{ id = 'profile', label = 'Profile', sub = 'Start from one' },
 	{ id = 'scale', label = 'Scale', sub = 'Sharp on your monitor' },
 	{ id = 'skins', label = 'Skins', sub = 'Blizzard windows, but dark' },
 	{ id = 'theme', label = 'Theme', sub = 'Your bars, your colors' },
@@ -97,9 +125,10 @@ local function Heading(kit, frame, title, text, width)
 	return PAD + 2 + kit.Height(titleText) + 8 + kit.Height(body) + PAD
 end
 
-local function Footer(kit, frame, y, back, forward)
+local function Footer(kit, frame, y, back, forward, above)
+	frame:SetHeight(math.max(y + FOOTER_HEIGHT + PAD + 1, STEP_HEIGHT - (above or 0)))
 	local anchor = kit.Button(frame, forward.text, 'primary', forward.onClick)
-	anchor:SetPoint('TOPRIGHT', 0, -y)
+	anchor:SetPoint('BOTTOMRIGHT', 0, PAD + 1)
 	if back then
 		local button = kit.Button(frame, 'Back', 'secondary', back)
 		button:SetPoint('RIGHT', anchor, 'LEFT', -10, 0)
@@ -107,38 +136,18 @@ local function Footer(kit, frame, y, back, forward)
 	local rule = kit.DottedRule(frame)
 	rule:SetPoint('BOTTOMLEFT')
 	rule:SetPoint('BOTTOMRIGHT')
-	frame:SetHeight(y + FOOTER_HEIGHT + PAD + 1)
 	return frame
 end
 
 local function Choice(kit, parent, x, y, width, height, selected, onClick)
-	local tile = CreateFrame('Button', nil, parent)
-	tile:SetPoint('TOPLEFT', x, -y)
-	tile:SetSize(width, height)
-	kit.Fill(tile, 'panel'):SetAllPoints()
-	for _, side in ipairs(EDGES) do
-		local edge = kit.Fill(tile, selected and 'accent' or 'rule', 'BACKGROUND', 2)
-		edge:SetPoint(side[1])
-		edge:SetPoint(side[2])
-		edge[side[3]](edge, selected and 2 or 1)
-	end
-	kit.Hover(tile)
-	tile:SetScript('OnClick', onClick)
-	local ring = kit.Disc(tile, 16, selected and 'accent' or 'faint')
-	ring:SetPoint('TOPRIGHT', -14, -14)
-	if selected then
-		kit.Glyph(tile, 'check', 9, 'onAccent', 'OVERLAY'):SetPoint('CENTER', ring)
-	else
-		kit.Disc(tile, 13, 'panel', 'ARTWORK', 1):SetPoint('CENTER', ring)
-	end
-	return tile
+	return kit.ChoiceCard(parent, x, y, width, height, selected, onClick)
 end
 
 local function Welcome(kit, _, parent, width, _, page)
 	local frame = Block(parent, width)
 	local y = Heading(kit, frame, ('Hey %s.'):format(UnitName('player')),
-		'Four quick picks and you are back in the game. Everything applies as you go and nothing is permanent, so change your mind later in settings.', width - HERO_WIDTH - PAD)
-	local lines = { 'Pick a scale that is sharp on your screen', 'Decide if Blizzard windows get the dark look', 'Pick how your unit frames look', 'Check the summary and reload' }
+		'Five quick picks and you are back in the game. Everything applies as you go and nothing is permanent, so change your mind later in settings.', width - HERO_WIDTH - PAD)
+	local lines = { "Start from Blu's profile, one of yours, or your own",'Pick a scale that is sharp on your screen', 'Decide if Blizzard windows get the dark look', 'Pick how your unit frames look', 'Check the summary and reload' }
 	for index, line in ipairs(lines) do
 		local disc = kit.Disc(frame, 20, 'secondary')
 		disc:SetPoint('TOPLEFT', 0, -y)
@@ -155,7 +164,7 @@ local function Welcome(kit, _, parent, width, _, page)
 	BUI.Profiler.After('Setup hero wave', WAVE_SECONDS, function()
 		if hero:IsVisible() then hero:SetAnimation(0) end
 	end)
-	return { Footer(kit, frame, math.max(y, PAD + HERO_HEIGHT) + 12, nil, { text = 'Start', onClick = function() Go(page, 'scale') end }) }
+	return { Footer(kit, frame, math.max(y, PAD + HERO_HEIGHT) + 12, nil, { text = 'Start', onClick = function() Go(page, 'profile') end }) }
 end
 
 local function ApplyScale(value)
@@ -217,7 +226,7 @@ local function Scale(kit, shell, parent, width, _, page)
 		kit.Text(tile, ('%.3f'):format(value), 11, 'faint'):SetPoint('TOPLEFT', TILE_PAD, -56)
 	end
 	y = y + SCALE_TILE_HEIGHT + FOOTER_GAP
-	return { Footer(kit, frame, y, function() Back(page, 'welcome') end, { text = 'Next', onClick = function() Go(page, 'skins') end }) }
+	return { Footer(kit, frame, y, function() Back(page, 'profile') end, { text = 'Next', onClick = function() Go(page, 'skins') end }) }
 end
 
 local function SkinOrder()
@@ -228,7 +237,7 @@ end
 local function SeedSelection()
 	wipe(skinSelection)
 	local _, order = SkinOrder()
-	for _, id in ipairs(order) do skinSelection[id] = Skin().IsSkinEnabled(id) end
+	for _, id in ipairs(order) do skinSelection[id] = true end
 end
 
 local function SelectionCounts()
@@ -305,6 +314,87 @@ local function BlizzardMock(parent)
 		status:SetText(rowIndex == 1 and 'Online' or 'Away')
 	end)
 	return mock
+end
+
+local function ProfileUsers(name)
+	local myKey = BUI.db.keys.char
+	local count, mine = 0, false
+	for charKey, value in pairs(BUI.db.sv.profileKeys or {}) do
+		if value == name then
+			count = count + 1
+			if charKey == myKey then mine = true end
+		end
+	end
+	if mine then return count == 1 and 'This character only' or ('This character and %d more'):format(count - 1) end
+	if count == 0 then return 'Not used by any character yet' end
+	return ('Used by %d character%s'):format(count, count == 1 and '' or 's')
+end
+
+local function Initials(name)
+	local letters = {}
+	for word in name:gmatch('%S+') do
+		letters[#letters + 1] = (word:match(FIRST_LETTER) or ''):upper()
+		if #letters == 2 then break end
+	end
+	return table.concat(letters)
+end
+
+local function FreshProfileName()
+	local taken = {}
+	for _, name in pairs(BUI.GetAceDB():GetProfiles()) do taken[name] = true end
+	local base = UnitName('player')
+	local name, suffix = base, 1
+	while taken[name] do
+		suffix = suffix + 1
+		name = ('%s %d'):format(base, suffix)
+	end
+	return name
+end
+
+local function UseProfile(page, name)
+	BUI.Events:AfterCombat(function()
+		local aceDB = BUI.GetAceDB()
+		if aceDB:GetCurrentProfile() ~= name then aceDB:SetProfile(name) end
+		SeedSelection()
+		page:Rebuild()
+	end, 'Setup.UseProfile')
+end
+
+local function Profile(kit, _, parent, width, _, page)
+	local frame = Block(parent, width)
+	local y = Heading(kit, frame, 'Pick a profile', "A profile is one full set of BluUI settings. Start from Blu's, keep the one you're on, or make your own. The next steps change whichever one you pick.", width)
+	local current = BUI.GetAceDB():GetCurrentProfile()
+	local tiles = { { name = BLU_PROFILE, title = BLU_PROFILE, note = "Bluhu's profile, ready to play", logo = true } }
+	if current ~= BLU_PROFILE then tiles[#tiles + 1] = { name = current, title = current, note = ProfileUsers(current) } end
+	local fresh = FreshProfileName()
+	tiles[#tiles + 1] = { name = fresh, title = 'Make your own', note = ('A new profile called %s, starting from the defaults'):format(fresh), create = true }
+
+	local tileWidth = math.floor((width - TILE_GAP * (PROFILE_COLUMNS - 1)) / PROFILE_COLUMNS)
+	local textWidth = tileWidth - TILE_PAD * 2
+	for index, tile in ipairs(tiles) do
+		local column, row = (index - 1) % PROFILE_COLUMNS, math.floor((index - 1) / PROFILE_COLUMNS)
+		local card = Choice(kit, frame, column * (tileWidth + TILE_GAP), y + row * (PROFILE_TILE_HEIGHT + TILE_GAP), tileWidth, PROFILE_TILE_HEIGHT,
+			not tile.create and tile.name == current, function() UseProfile(page, tile.name) end)
+		local avatar
+		if tile.logo then
+			avatar = card:CreateTexture(nil, 'ARTWORK')
+			avatar:SetTexture(BUI.C.ICON_PATH)
+			avatar:SetSize(PROFILE_AVATAR, PROFILE_AVATAR)
+		elseif tile.create then
+			avatar = kit.IconAvatar(card, PROFILE_AVATAR, 'plus')
+		else
+			avatar = kit.Initials(card, PROFILE_AVATAR, Initials(tile.name))
+		end
+		avatar:SetPoint('TOPLEFT', TILE_PAD, -TILE_PAD)
+		local title = kit.Text(card, tile.title, 13, 'text', textWidth)
+		title:SetWordWrap(false)
+		title:SetPoint('TOPLEFT', TILE_PAD, -(TILE_PAD + PROFILE_AVATAR + 14))
+		local note = kit.Text(card, tile.note, 11, 'muted', textWidth)
+		note:SetPoint('TOPLEFT', title, 'BOTTOMLEFT', 0, -6)
+	end
+	local rows = math.ceil(#tiles / PROFILE_COLUMNS)
+	y = y + rows * PROFILE_TILE_HEIGHT + (rows - 1) * TILE_GAP + FOOTER_GAP
+	return { Footer(kit, frame, y, function() Back(page, 'welcome') end, { text = 'Next', onClick = function() Go(page, 'scale') end }) }
 end
 
 local function Skins(kit, _, parent, width, _, page)
@@ -437,40 +527,170 @@ local function Theme(kit, _, parent, width, _, page)
 	return { Footer(kit, frame, y, function() Back(page, 'skins') end, { text = 'Next', onClick = function() Go(page, 'finish') end }) }
 end
 
-local function Finish(kit, _, parent, width, _, page)
+local function ConfettiLayer(host)
+	if host.confetti then return host.confetti end
+	local layer = CreateFrame('Frame', nil, host)
+	layer:SetAllPoints()
+	layer:SetFrameLevel(host:GetFrameLevel() + CONFETTI_LEVEL)
+	layer:SetClipsChildren(true)
+	layer.pieces = {}
+	for index = 1, CONFETTI_COUNT do
+		local texture = layer:CreateTexture(nil, 'OVERLAY')
+		texture:SetTexture(BUILib.Widget.WHITE)
+		texture:Hide()
+		layer.pieces[index] = { texture = texture }
+	end
+	layer:SetScript('OnUpdate', function(self, elapsed)
+		self.clock = self.clock + elapsed
+		local drag = math.exp(-CONFETTI_DRAG * elapsed)
+		local live = false
+		for _, piece in ipairs(self.pieces) do
+			local age = self.clock - piece.delay
+			local texture = piece.texture
+			if age >= piece.life then
+				texture:Hide()
+			elseif age >= 0 then
+				live = true
+				piece.vx = piece.vx * drag
+				piece.vy = (piece.vy - CONFETTI_GRAVITY * elapsed) * drag
+				piece.x = piece.x + piece.vx * elapsed
+				piece.y = piece.y + piece.vy * elapsed
+				piece.spin = piece.spin + piece.spinRate * elapsed
+				local flip = math.abs(math.cos(piece.phase + age * piece.flipRate))
+				texture:SetSize(piece.width * math.max(0.15, flip), piece.height)
+				texture:SetRotation(piece.spin)
+				texture:ClearAllPoints()
+				texture:SetPoint('CENTER', self, 'BOTTOMLEFT', piece.x + math.sin(piece.phase + age * 3) * CONFETTI_SWAY * math.min(1, age), piece.y)
+				texture:SetAlpha(math.min(1, (piece.life - age) / CONFETTI_FADE))
+				texture:Show()
+			else
+				live = true
+			end
+		end
+		if not live then
+			self:Hide()
+		end
+	end)
+	layer:Hide()
+	host.confetti = layer
+	return layer
+end
+
+local function Confetti(host)
+	local layer = ConfettiLayer(host)
+	local width, height = layer:GetWidth(), layer:GetHeight()
+	local red, green, blue = BUILib.Theme.GetAccent()
+	for index, piece in ipairs(layer.pieces) do
+		local source = index % 3
+		piece.delay = math.random() * CONFETTI_STAGGER
+		if source == 0 then
+			piece.x = math.random() * width
+			piece.y = height + math.random() * CONFETTI_RAIN_ABOVE
+			piece.vx = (math.random() - 0.5) * 2 * CONFETTI_RAIN_DRIFT
+			piece.vy = -math.random() * CONFETTI_RAIN_PUSH
+			piece.delay = math.random() * CONFETTI_RAIN_STAGGER
+		else
+			local left = source == 1
+			local angle = CONFETTI_ANGLE_MIN + math.random() * (CONFETTI_ANGLE_MAX - CONFETTI_ANGLE_MIN)
+			local speed = CONFETTI_SPEED_MIN + math.random() * (CONFETTI_SPEED_MAX - CONFETTI_SPEED_MIN)
+			piece.x = left and width * CONFETTI_CANNON_X or width * (1 - CONFETTI_CANNON_X)
+			piece.y = 0
+			piece.vx = math.cos(angle) * speed * (left and 1 or -1)
+			piece.vy = math.sin(angle) * speed
+		end
+		piece.life = CONFETTI_LIFE_MIN + math.random() * (CONFETTI_LIFE_MAX - CONFETTI_LIFE_MIN)
+		piece.width = CONFETTI_WIDTH_MIN + math.random() * CONFETTI_WIDTH_RANGE
+		piece.height = CONFETTI_HEIGHT_MIN + math.random() * CONFETTI_HEIGHT_RANGE
+		piece.spin = math.random() * math.pi * 2
+		piece.spinRate = (math.random() - 0.5) * 12
+		piece.phase = math.random() * math.pi * 2
+		piece.flipRate = 4 + math.random() * 6
+		local color = math.random() < CONFETTI_ACCENT_SHARE and { red, green, blue } or CONFETTI_COLORS[math.random(#CONFETTI_COLORS)]
+		piece.texture:SetVertexColor(color[1], color[2], color[3])
+		piece.texture:Hide()
+	end
+	layer.clock = 0
+	layer:Show()
+end
+
+local function SummaryCard(kit, window, frame, x, y, width, spec)
+	local card = CreateFrame('Button', nil, frame)
+	card:SetPoint('TOPLEFT', x, -y)
+	card:SetSize(width, SUMMARY_CARD_HEIGHT)
+	local fill, edge = BUILib.Widget.DrawCardShape(card, CARD_RADIUS, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
+	window:Paint(fill, 'card')
+	window:Paint(edge, 'cardEdge')
+	local avatar = kit.IconAvatar(card, SUMMARY_AVATAR, spec.icon)
+	avatar:SetPoint('TOPLEFT', TILE_PAD, -TILE_PAD)
+	kit.Text(card, spec.label, 12, 'muted'):SetPoint('LEFT', avatar, 'RIGHT', 10, 0)
+	local change = kit.Text(card, 'Change', 11, 'faint')
+	change:SetPoint('RIGHT', card, 'TOPRIGHT', -TILE_PAD, -(TILE_PAD + SUMMARY_AVATAR / 2))
+	local textWidth = width - TILE_PAD * 2
+	local value = kit.Text(card, spec.value, SUMMARY_READOUT, 'text', textWidth)
+	value:SetWordWrap(false)
+	value:SetPoint('TOPLEFT', TILE_PAD, -(TILE_PAD + SUMMARY_AVATAR + 14))
+	local status = kit.Text(card, spec.status, 11, 'muted', textWidth)
+	status:SetWordWrap(false)
+	status:SetPoint('TOPLEFT', value, 'BOTTOMLEFT', 0, -6)
+	card:SetScript('OnEnter', function()
+		window:Paint(edge, 'faint')
+		window:Paint(change, 'accent')
+	end)
+	card:SetScript('OnLeave', function()
+		window:Paint(edge, 'cardEdge')
+		window:Paint(change, 'faint')
+	end)
+	card:SetScript('OnClick', spec.onClick)
+	return card
+end
+
+local function Finish(kit, shell, parent, width, _, page)
+	local frame = Block(parent, width)
+	local y = Heading(kit, frame, "You're all set", 'Here is what you picked. Click a card to change it, or finish to reload and keep it.', width)
 	local selectedCount, total = SelectionCounts()
 	local style = BUI.Installer.AppliedStyle()
-	local summary = kit.Section(parent, width, {
-		stacked = true,
-		title = 'Summary',
-		description = 'What you picked. Go back to change anything, or finish to reload and keep it.',
-		columns = { { 'Setting', kit.NAME_X }, { 'Value', math.floor(width * 0.5) } },
-	})
 	local scale = UIParent:GetScale()
-	local rows = {
-		{ 'Scale', ('%.3f%s'):format(scale, BUI.ApproxEqual(scale, BUI.ClampedUIScale()) and ', pixel-perfect' or ''), 'resize' },
-		{ 'Skins', selectedCount == total and ('All %d windows'):format(total) or selectedCount == 0 and 'None' or ('%d of %d windows'):format(selectedCount, total), 'eye' },
-		{ 'Unit frames', style and (style.name .. (BUI.Installer.MatchesGroupFrames() and ', also party and raid' or '')) or 'Unchanged', 'profile' },
-	}
-	for _, entry in ipairs(rows) do
-		local row = summary:AddRow(entry[1] .. ' ' .. entry[2])
-		kit.IconAvatar(row, 28, entry[3]):SetPoint('LEFT', kit.AVATAR_X, 0)
-		kit.RowTitle(row, entry[1], nil, kit.NAME_X)
-		kit.Cell(row, entry[2], math.floor(width * 0.5))
+	local perfect = BUI.ApproxEqual(scale, BUI.ClampedUIScale())
+	local screenWidth, screenHeight = GetPhysicalScreenSize()
+	local profileName = BUI.GetAceDB():GetCurrentProfile()
+	local skinsValue, skinsStatus
+	if selectedCount == total then
+		skinsValue, skinsStatus = 'All', ('Every one of the %d Blizzard windows gets the dark look'):format(total)
+	elseif selectedCount == 0 then
+		skinsValue, skinsStatus = 'Off', "Blizzard windows keep Blizzard's look"
+	else
+		skinsValue, skinsStatus = ('%d of %d'):format(selectedCount, total), 'Blizzard windows get the dark look'
 	end
-	local frame = Block(parent, width)
-	return { summary, Footer(kit, frame, PAD, function() Back(page, 'theme') end, { text = 'Finish and reload', onClick = function()
+	local cards = {
+		{ step = 'profile', icon = 'profile', label = 'Profile', value = profileName, status = ProfileUsers(profileName) },
+		{ step = 'scale', icon = 'resize', label = 'Scale', value = ('%.3f'):format(scale),
+			status = (perfect and 'Pixel-perfect for %d x %d' or 'Off the pixel grid for %d x %d'):format(screenWidth, screenHeight) },
+		{ step = 'skins', icon = 'eye', label = 'Skins', value = skinsValue, status = skinsStatus },
+		{ step = 'theme', icon = 'layout', label = 'Unit frames', value = style and style.name or 'Unchanged',
+			status = style and (BUI.Installer.MatchesGroupFrames() and 'Party and raid frames match' or 'Party and raid frames keep their own look') or 'Pick a look on the Theme step' },
+	}
+	local cardWidth = math.floor((width - TILE_GAP * (SUMMARY_COLUMNS - 1)) / SUMMARY_COLUMNS)
+	for index, spec in ipairs(cards) do
+		local column, row = (index - 1) % SUMMARY_COLUMNS, math.floor((index - 1) / SUMMARY_COLUMNS)
+		spec.onClick = function() Back(page, spec.step) end
+		SummaryCard(kit, shell.window, frame, column * (cardWidth + TILE_GAP), y + row * (SUMMARY_CARD_HEIGHT + TILE_GAP), cardWidth, spec)
+	end
+	local rows = math.ceil(#cards / SUMMARY_COLUMNS)
+	y = y + rows * SUMMARY_CARD_HEIGHT + (rows - 1) * TILE_GAP + FOOTER_GAP
+	frame:SetScript('OnShow', function() Confetti(shell.window.frame) end)
+	return { Footer(kit, frame, y, function() Back(page, 'theme') end, { text = 'Finish and reload', onClick = function()
 		Skin().WriteSkinsEnabled(skinSelection)
 		BUI.Print('Setup complete. Open settings anytime with |cff' .. BUI.C.COLOR_PINK .. '/bui|r.')
 		ReloadUI()
 	end }) }
 end
 
-local BUILDERS = { welcome = Welcome, scale = Scale, skins = Skins, theme = Theme, finish = Finish }
+local BUILDERS = { welcome = Welcome, profile = Profile, scale = Scale, skins = Skins, theme = Theme, finish = Finish }
 
 BUI.OptionsWindow.New('setup', {
 	title = 'Setup BluUI',
 	brand = false,
+	modal = true,
 	icon = 'check',
 	globalName = 'BluUISetupFrame',
 	onOpen = function(shell)
