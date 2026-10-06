@@ -572,7 +572,7 @@ function Layout.TableKit(window)
 						spec.set(value)
 						window:Repaint()
 					end)
-					leftmost = kit.Text(parent, 'Enabled', 13, 'text')
+					leftmost = kit.Text(parent, spec.label or 'Enabled', 13, 'text')
 					leftmost:SetPoint('RIGHT', tool, 'LEFT', -ENABLE_GAP, 0)
 				else
 					tool = kit.Tool(parent, spec)

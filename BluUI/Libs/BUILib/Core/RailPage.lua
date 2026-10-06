@@ -122,8 +122,8 @@ function Layout.RailPage(tab, shell, spec)
 	tab.frame:GetParent().railPage = page
 	page:Select(spec.rail.selected or rail.entries[1].item.id)
 	if spec.disabled then
-		local blocker = Layout.DisableWhen(window, spec.disabled, head, { railScroll, block })
-		blocker:SetPoint('TOPLEFT', head, 'TOPLEFT', -SCROLL_PAD, -(contentTop - SCROLL_PAD))
+		local blocker = Layout.DisableWhen(window, function() return spec.disabled(current) end, head, { block })
+		blocker:SetPoint('TOPLEFT', head, 'TOPLEFT', railWidth + math.floor(RAIL_GAP / 2) + 1, -(contentTop - SCROLL_PAD))
 		blocker:SetPoint('BOTTOMRIGHT', tab.frame, 'BOTTOMRIGHT')
 	end
 	Layout.Add(tab, block, BLOCK_GAP)
