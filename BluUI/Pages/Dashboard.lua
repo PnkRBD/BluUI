@@ -43,7 +43,8 @@ local VAULT_KICKER_SIZE = 10
 local VAULT_TEXT_GAP = 0
 local VAULT_TEXT_TOP = 10
 local VAULT_FOOT = 24
-local VAULT_SHADE_TOP, VAULT_SHADE_BOTTOM = 0.12, 0.9
+local VAULT_SHADE_TOP, VAULT_SHADE_BOTTOM = 0, 0.6
+local VAULT_SHADE_LIGHT = 0.5
 local VAULT_PILL_HEIGHT = 18
 local VAULT_PILL_RADIUS = 6
 local VAULT_PILL_PAD = 8
@@ -690,7 +691,7 @@ local PillFill = Tinted('card', VAULT_PILL_FILL)
 
 local function PaintFoot(foot)
     local tile = foot.tile
-    foot:SetTextColor(window:Color(tile.footLabel and 'muted' or 'faint'))
+    foot:SetTextColor(window:Color('text'))
     if tile.footLabel then
         foot:SetText(('|cff%s%s|r  ·  %s'):format(BUI.Hex(window:Color('accent')), tile.footLabel, tile.footRest))
     else
@@ -738,7 +739,7 @@ end
 
 local function Dash(region)
     region:SetText('—')
-    window:Paint(region, 'faint')
+    window:Paint(region, 'muted')
 end
 
 local function Place(region, y)
@@ -862,7 +863,7 @@ local function VaultTile(parent)
     local tile = Inset(parent)
     tile.value = kit.Text(tile, '', 16, 'text')
     tile.value:SetPoint('TOP', 0, -VAULT_VALUE_Y)
-    tile.sub = kit.Text(tile, '', 10, 'muted')
+    tile.sub = kit.Text(tile, '', 10, 'text')
     tile.sub:SetPoint('TOP', tile.value, 'BOTTOM', 0, -3)
     tile.sub.tile = tile
     window:Bind(tile.sub, PaintFoot)
@@ -879,6 +880,7 @@ local function VaultSlot(parent, atlas)
     shadeEdge:Hide()
     window:Paint(shade, function(texture)
         local red, green, blue = window:Color('card')
+        if (red + green + blue) / 3 < VAULT_SHADE_LIGHT then red, green, blue = 0, 0, 0 end
         texture:SetGradient('VERTICAL', CreateColor(red, green, blue, VAULT_SHADE_BOTTOM), CreateColor(red, green, blue, VAULT_SHADE_TOP))
     end)
 
@@ -898,7 +900,7 @@ local function VaultSlot(parent, atlas)
     tile.value = kit.Text(block, '', VAULT_VALUE_SIZE, 'text', nil, 'title')
     tile.value:SetHeight(VAULT_VALUE_BOX)
     tile.value:SetPoint('TOPLEFT')
-    tile.kicker = kit.Text(block, 'Item level', VAULT_KICKER_SIZE, 'muted', nil, 'hint')
+    tile.kicker = kit.Text(block, 'Item level', VAULT_KICKER_SIZE, 'text', nil, 'hint')
     tile.kicker:SetHeight(VAULT_KICKER_SIZE)
     tile.kicker:SetPoint('TOPLEFT', tile.value, 'BOTTOMLEFT', 1, -VAULT_TEXT_GAP)
     tile.block = block
@@ -917,7 +919,7 @@ local function VaultSlot(parent, atlas)
     local rule = Rule(tile)
     rule:SetPoint('BOTTOMLEFT', 1, VAULT_FOOT)
     rule:SetPoint('BOTTOMRIGHT', -1, VAULT_FOOT)
-    tile.foot = kit.Text(tile, '', 12, 'muted')
+    tile.foot = kit.Text(tile, '', 12, 'text')
     tile.foot:SetPoint('CENTER', tile, 'BOTTOM', 0, VAULT_FOOT / 2)
     tile.foot.tile = tile
     window:Bind(tile.foot, PaintFoot)
@@ -926,11 +928,11 @@ end
 
 local function VaultChip(parent)
     local chip = Inset(parent)
-    chip.kicker = kit.Text(chip, '', 10, 'faint')
+    chip.kicker = kit.Text(chip, '', 10, 'text')
     chip.kicker:SetPoint('TOPLEFT', VAULT_SLOT_PAD, -VAULT_VALUE_Y)
     chip.text = kit.Text(chip, '', 12, 'text')
     chip.text:SetPoint('TOPLEFT', chip.kicker, 'BOTTOMLEFT', 0, -2)
-    local chevron = kit.Glyph(chip, 'dropdown', CHEVRON, 'muted')
+    local chevron = kit.Glyph(chip, 'dropdown', CHEVRON, 'text')
     chevron:SetTexCoord(unpack(POINT_RIGHT))
     chevron:SetPoint('RIGHT', -VAULT_SLOT_PAD, 0)
     return chip
@@ -939,9 +941,9 @@ end
 local function BuildVault(onChange)
     local vault = Card('Great Vault')
     vault.id = 'vault'
-    local status = kit.Text(vault, '', 12, 'muted')
+    local status = kit.Text(vault, '', 12, 'text')
     status:SetPoint('RIGHT', vault, 'TOPRIGHT', -PAD, -TITLE_Y)
-    local statusKicker = kit.Text(vault, '', 10, 'faint')
+    local statusKicker = kit.Text(vault, '', 10, 'text')
     statusKicker:SetPoint('RIGHT', status, 'LEFT', -VAULT_VALUE_Y, 0)
     local statusMark = kit.Glyph(vault, 'check', STATUS_MARK, 'positive')
     statusMark:SetPoint('RIGHT', statusKicker, 'LEFT', -MARK_GAP, 0)
@@ -998,9 +1000,9 @@ local function BuildVault(onChange)
         row.hover = kit.Fill(row, 'hover', 'BACKGROUND')
         row.hover:SetAllPoints()
         row.hover:Hide()
-        row.icon = kit.Glyph(row, spec.icon, VAULT_ICON, 'muted')
+        row.icon = kit.Glyph(row, spec.icon, VAULT_ICON, 'text')
         row.icon:SetPoint('LEFT', VAULT_LABEL_X, 0)
-        row.label = kit.Text(row, spec.label:upper(), 11, 'muted')
+        row.label = kit.Text(row, spec.label:upper(), 11, 'text')
         row.label:SetPoint('LEFT', row.icon, 'RIGHT', VAULT_VALUE_Y, 0)
         row.small, row.big = {}, {}
         for slot = 1, 3 do
@@ -1044,7 +1046,8 @@ local function BuildVault(onChange)
             tile.value:SetText(itemLevel or '...')
             window:Paint(tile.value, 'text')
         else
-            Dash(tile.value)
+            tile.value:SetText('—')
+            window:Paint(tile.value, 'text')
         end
         tile.footLabel = open and VaultSlotLabel(activity) or nil
         tile.footRest = ('%d/%d'):format(math.min(activity.progress, activity.threshold), activity.threshold)
@@ -1073,10 +1076,11 @@ local function BuildVault(onChange)
             tile.value:SetText(itemLevel or '...')
             window:Paint(tile.value, 'text')
         else
-            Dash(tile.value)
+            tile.value:SetText('—')
+            window:Paint(tile.value, 'text')
         end
         tile.state:SetText(open and 'Unlocked' or 'Locked')
-        window:Paint(tile.state, open and 'positive' or 'faint')
+        window:Paint(tile.state, open and 'positive' or 'text')
         tile.mark:SetShown(open)
         local markWidth = open and (STATUS_MARK + MARK_GAP) or 0
         tile.state:ClearAllPoints()
@@ -1124,7 +1128,7 @@ local function BuildVault(onChange)
         local complete = #activities > 0 and unlocked == #activities
         statusKicker:SetText(openRow and openRow.spec.label:upper() or '')
         status:SetText(#activities > 0 and ('%d / %d unlocked'):format(unlocked, #activities) or '')
-        window:Paint(status, complete and 'positive' or 'muted')
+        window:Paint(status, complete and 'positive' or 'text')
         statusMark:SetShown(complete)
     end
 
