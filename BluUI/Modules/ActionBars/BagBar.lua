@@ -57,7 +57,7 @@ local function ShowBackpackIcon(button)
 end
 
 local function CloseToggleGap()
-	if BagBarExpandToggle:IsShown() then return end
+	if BagBarExpandToggle:IsShown() or MainMenuBarBackpackButton:GetParent() ~= BagsBar then return end
 	local point, relativePoint, offsetX, offsetY = BagsBar:GetBagButtonAnchorPoints()
 	for _, button in MainMenuBarBagManager:EnumerateBagButtons() do
 		if button:IsShown() and button ~= MainMenuBarBackpackButton then
