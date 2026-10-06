@@ -658,7 +658,9 @@ local function GetHistory()
 end
 
 local function PushHistory(text)
-	if type(text) ~= 'string' or issecretvalue(text) or text == '' then return end
+	if type(text) ~= 'string' or issecretvalue(text) then return end
+	text = strtrim(text)
+	if text == '' then return end
 	local command = text:match('^(/%S+)')
 	if command and IsSecureCmd(command) then return end
 	local history = GetHistory()
@@ -701,18 +703,11 @@ local function SetupEditHistory(editBox)
 	end))
 
 	editBox:HookScript('OnEditFocusLost', BUI.Profiler.Wrap('Skin.Chat editBox OnEditFocusLost', function(self) self._histIdx = nil end))
-end
 
-local historyHooked
-local function HookHistoryCapture()
-	if historyHooked then return end
-	historyHooked = true
-	Hook('ChatEdit_SendText', function(editBox, addHistory)
-		if not (addHistory and Enabled() and EditHistory()) then return end
-		local text = editBox:GetText()
-		if issecretvalue(text) then return end
-		editBox._histIdx = nil
-		PushHistory(strtrim(text))
+	Hook(editBox, 'AddHistoryLine', function(self, line)
+		if not (Enabled() and EditHistory()) then return end
+		self._histIdx = nil
+		PushHistory(line)
 	end)
 end
 
@@ -1812,7 +1807,6 @@ local function Refresh()
 	CreateMover()
 	CreateSizer()
 	RegisterURLHandler()
-	HookHistoryCapture()
 	SkinAllChatFrames()
 	ApplySettings()
 	RestoreGeometry()
