@@ -348,21 +348,32 @@ function Layout.TableKit(window)
 		return box
 	end
 
-	function kit.Button(parent, text, style, onClick, icon)
+	function kit.Button(parent, text, style, onClick, icon, active)
 		local look = BUTTON_STYLES[style or 'secondary']
 		local button = CreateFrame('Button', nil, parent)
-		window:Fill(button, look.fill):SetAllPoints()
+		local fill = window:Fill(button, look.fill)
+		fill:SetAllPoints()
 		Overlay(button, look.solid)
-		local textX = 14
 		if icon then
 			button.glyph = kit.Glyph(button, icon, 12, look.text)
 			button.glyph:SetPoint('LEFT', 12, 0)
-			textX = 32
 		end
 		local label = kit.Text(button, text, 12, look.text)
-		label:SetPoint('LEFT', textX, 0)
 		button:SetHeight(CONTROL_HEIGHT)
 		local function Measure()
+			local lit = true
+			if active then
+				lit = active() == true
+				look = BUTTON_STYLES[lit and 'primary' or 'secondary']
+				window:Paint(fill, look.fill)
+			end
+			local textX = 14
+			if button.glyph then
+				button.glyph:SetShown(lit)
+				window:Paint(button.glyph, look.text)
+				if lit then textX = 32 end
+			end
+			label:SetPoint('LEFT', textX, 0)
 			window:Paint(label, look.text)
 			button:SetWidth(Widget.EvenSize(textX + label:GetStringWidth() + 14))
 		end
@@ -725,7 +736,7 @@ function Layout.TableKit(window)
 		title:SetPoint('TOPLEFT', 0, -(pad + 2))
 
 		for _, buttonSpec in ipairs(spec.buttons or {}) do
-			section.buttons[#section.buttons + 1] = kit.Button(frame, buttonSpec.text, buttonSpec.style, buttonSpec.onClick, buttonSpec.icon)
+			section.buttons[#section.buttons + 1] = kit.Button(frame, buttonSpec.text, buttonSpec.style, buttonSpec.onClick, buttonSpec.icon, buttonSpec.active)
 		end
 		if stacked then
 			for index = #section.buttons - 1, 1, -1 do
