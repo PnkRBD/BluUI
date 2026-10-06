@@ -22,7 +22,7 @@ function Layout.RailPage(tab, shell, spec)
 
 	local block = CreateFrame('Frame', nil, tab.child)
 	block:SetWidth(tab.width)
-	local head, top, Align = Layout.PinnedHead(tab, window, kit, spec, block, function(text)
+	local head, top, Align = Layout.PinnedHead(tab, window, kit, spec, block, spec.placeholder and function(text)
 		query = text
 		page:Resize()
 	end)

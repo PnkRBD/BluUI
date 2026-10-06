@@ -8,6 +8,7 @@
 ## LoadOnDemand: 1
 ## IconTexture: Interface\AddOns\BluUI\Media\Icon\logo_small
 
+Windows.lua
 Pages\Cursor.lua
 Pages\Minimap.lua
 Pages\Datatext.lua
@@ -39,4 +40,5 @@ Pages\Modules.lua
 Pages\Help.lua
 Pages\Settings.lua
 Pages\ExportImport.lua
+Pages\Setup.lua
 LaunchTrace.lua
