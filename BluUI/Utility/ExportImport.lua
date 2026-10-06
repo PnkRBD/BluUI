@@ -396,6 +396,19 @@ local function GetDefaultProfileData()
     return defaultProfileData or nil
 end
 
+local factoryProfile
+
+local function FactoryProfile()
+    if not factoryProfile then
+        factoryProfile = {}
+        for key, value in pairs(GetDefaultProfileData() or {}) do
+            if type(key) == 'string' and not key:match('^_') then factoryProfile[key] = DeepCopy(value) end
+        end
+        MergeDefaults(factoryProfile, BUI.Defaults.profile)
+    end
+    return factoryProfile
+end
+
 local function ApplyDefaultProfile(profile)
     local data = GetDefaultProfileData()
     if not data or type(profile) ~= 'table' then return false end
@@ -467,6 +480,7 @@ BUI.ExportImport = {
     ClassifyData = ClassifyData,
     MergeDefaults = MergeDefaults,
     ApplyDefaultProfile = ApplyDefaultProfile,
+    FactoryProfile = FactoryProfile,
     CompanionKeys = ImportCompanionKeys,
 }
 
