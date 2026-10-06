@@ -79,6 +79,8 @@ SlashCmdList['BUI'] = BUI.Profiler.Wrap('Core.Commands /bui', function(message)
 		BUI.ActionBars.ToggleKeybindMode()
 	elseif command == 'profile' then
 		ProfileCommand(rest:lower())
+	elseif command == 'bags' then
+		BUI.ActionBars.DumpBagBar()
 	elseif command == 'trace' then
 		if rest:lower() == 'show' then BUI.LaunchTrace.Show() else BUI.LaunchTrace.Start() end
 	else
