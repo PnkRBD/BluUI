@@ -76,6 +76,13 @@ local function ConfirmReload(key, enabled, revert)
 	})
 end
 
+local function AllModules(enabled)
+	for _, entry in ipairs(MODULES) do
+		if (Modules()[entry.key] and true or false) ~= enabled then return false end
+	end
+	return true
+end
+
 local function StatusText(entry)
 	local text = Modules()[entry.key] and 'On' or 'Off'
 	if pending[entry.key] then return text .. ' after reload' end
@@ -89,8 +96,8 @@ local function Sections(ui, _, parent, width)
 		description = 'Turn parts of BluUI on or off. Some only change after a /reload.',
 		columns = { { 'Module', ui.AVATAR_X }, { 'Status', STATUS_COLUMN } },
 		buttons = {
-			{ text = 'All off', onClick = function() Apply(MODULES, false) end },
-			{ style = 'primary', text = 'All on', icon = 'check', onClick = function() Apply(MODULES, true) end },
+			{ text = 'All off', icon = 'check', active = function() return AllModules(false) end, onClick = function() Apply(MODULES, false) end },
+			{ text = 'All on', icon = 'check', active = function() return AllModules(true) end, onClick = function() Apply(MODULES, true) end },
 		},
 	})
 	for _, entry in ipairs(MODULES) do

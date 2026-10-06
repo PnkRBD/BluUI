@@ -367,6 +367,13 @@ local function ConfirmReload(info)
 end
 BUI.SkinningPage.ConfirmReload = ConfirmReload
 
+local function AllSkins(order, enabled)
+	for _, id in ipairs(order) do
+		if (BUI.Skinning.IsSkinEnabled(id) and true or false) ~= enabled then return false end
+	end
+	return true
+end
+
 local function SkinsBoard(ui, parent, width)
 	local Skin = BUI.Skinning
 	local registry, order = Skin.GetSkinRegistry()
@@ -375,11 +382,11 @@ local function SkinsBoard(ui, parent, width)
 		title = 'Skins',
 		description = 'Hover a name for what it covers. Skins added in an update start off and are marked new.',
 		buttons = {
-			{ text = 'All off', onClick = function()
+			{ text = 'All off', icon = 'check', active = function() return AllSkins(order, false) end, onClick = function()
 				Skin.SetAllSkinsEnabled(false)
 				Window():Repaint()
 			end },
-			{ style = 'primary', text = 'All on', icon = 'check', onClick = function()
+			{ text = 'All on', icon = 'check', active = function() return AllSkins(order, true) end, onClick = function()
 				Skin.SetAllSkinsEnabled(true)
 				Window():Repaint()
 			end },
@@ -391,6 +398,7 @@ local function SkinsBoard(ui, parent, width)
 		local icons = (info.unlock and 1 or 0) + ((info.window or info.page or info.buildSettings or info.buildBoards) and 1 or 0)
 		local _, cell = board:AddSwitch(info.name, function() return Skin.IsSkinEnabled(id) end, function(enabled)
 			Skin.SetSkinEnabled(id, enabled)
+			Window():Repaint()
 			if tag then tag:Hide() end
 			if not enabled and RELOAD_SKINS[id] then ConfirmReload(info) end
 		end, info.description, icons * ICON_ROOM)
