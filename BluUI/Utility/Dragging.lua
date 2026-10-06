@@ -217,6 +217,24 @@ function Dragging.MakeDraggable(frame, options)
     end
 end
 
+function Dragging.Release(frame)
+    frame:SetScript("OnDragStart", nil)
+    frame:SetScript("OnDragStop", nil)
+    frame:SetScript("OnMouseUp", nil)
+    frame:SetScript("OnUpdate", nil)
+    frame:SetMovable(false)
+    frame:RegisterForDrag()
+    if frame.dragHint then frame.dragHint:Hide() end
+    if frame.dragUnlockBg then frame.dragUnlockBg:Hide() end
+    frame.dragActive = nil
+    frame.dragLocked = nil
+    frame.dragOnPosition = nil
+    frame.dragOnDragging = nil
+    frame.dragOnRightClick = nil
+    frame.dragIsLockedFn = nil
+    frame.RefreshDragState = nil
+end
+
 function Dragging.MakeAnchoredAlert(frame, options)
     Dragging.MakeDraggable(frame, {
         showHint = true,

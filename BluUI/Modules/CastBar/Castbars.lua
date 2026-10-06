@@ -467,17 +467,7 @@ function CastBar.ApplyCastbar(frame, barType)
 
 	frame:EnableElement('Castbar', frame.unit)
 
-	if BUI.UnitFrames.IsShowAllActive() and frame._testCastActive then
-		castbar.holdTime = 1e9
-		castbar:SetMinMaxValues(0, 100)
-		castbar:SetValue(frame._testCastValue or 0)
-		castbar:Show()
-		castbar.Text:SetText('Test Cast')
-		castbar.Text:Show()
-		castbar.Time:Show()
-		container:Show()
-		return
-	end
+	if BUI.UnitFrames.PaintSampleCast(frame) then return end
 
 	local casting = castbar.casting or castbar.channeling or castbar.empowering
 	if not settings.locked and not casting then

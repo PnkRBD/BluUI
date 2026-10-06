@@ -1,6 +1,7 @@
 local _, BUI = ...
 
 local oUF = BUI.oUF
+local UnitFrames = BUI.UnitFrames
 local UnitGetDetailedHealPrediction = UnitGetDetailedHealPrediction
 local CreateUnitHealPredictionCalculator = CreateUnitHealPredictionCalculator
 
@@ -10,6 +11,10 @@ local function Fit(bars)
 	local width = bars.__owner.Health:GetWidth()
 	bars.Damage:SetWidth(width)
 	bars.Heal:SetWidth(width)
+end
+
+function UnitFrames.FitAbsorbBars(frame)
+	Fit(frame.AbsorbBars)
 end
 
 local function Fill(bar, maxHealth, amount)

@@ -7,21 +7,8 @@ local Pixel = BUI.Pixel
 local InCombatLockdown = InCombatLockdown
 local UnitHasVehiclePlayerFrameUI = UnitHasVehiclePlayerFrameUI
 
-local UNIT_OPTIONS = {
-	player       = {showPowerDefault = true,  hasCombatBorder = true, hasAuras = true},
-	target       = {showPowerDefault = true,  hasAuras = true},
-	targettarget = {showPowerDefault = false, hasAuras = true},
-	focus        = {showPowerDefault = true,  hasAuras = true},
-	pet          = {showPowerDefault = false},
-	boss         = {showPowerDefault = false, hasAuras = true},
-}
-
-local function GetUnitOptions(unitType)
-	return UNIT_OPTIONS[unitType]
-end
-
 local function ShowPower(unitType, unitSettings)
-	if GetUnitOptions(unitType).showPowerDefault == false then
+	if UnitFrames.GetUnitConfig(unitType).showPowerDefault == false then
 		return unitSettings.showPower == true
 	end
 	return unitSettings.showPower ~= false
@@ -32,7 +19,7 @@ local function ApplySettings(frame, unitType, index)
 
 	frame._transparentHealth = nil
 
-	local unitOptions = GetUnitOptions(unitType)
+	local unitConfig = UnitFrames.GetUnitConfig(unitType)
 	local settings = UnitFrames.GetSettings()
 	local unitSettings = UnitFrames.GetUnitSettings(unitType)
 	local texture = UnitFrames.GetTexture()
@@ -45,12 +32,12 @@ local function ApplySettings(frame, unitType, index)
 	local borderSize = settings.borderSize
 
 	frame:SetSize(Pixel.Scale(width), scaledHeight)
-	UnitFrames.ApplyPosition(frame, unitType, index)
+	if not frame._stage then UnitFrames.ApplyPosition(frame, unitType, index) end
 
 	local showPower = ShowPower(unitType, unitSettings)
 
 	local borderColor
-	if unitOptions.hasCombatBorder and unitSettings.combatBorder and InCombatLockdown() then
+	if unitConfig.hasCombatBorder and unitSettings.combatBorder and InCombatLockdown() then
 		borderColor = unitSettings.combatBorderColor
 	else
 		borderColor = (unitType == 'pet') and settings.petBorderColor or settings.borderColor
@@ -128,7 +115,7 @@ local function ApplySettings(frame, unitType, index)
 	if not frame._isPreview then
 		UnitFrames.TagFontStrings(frame)
 
-		if unitOptions.hasAuras then
+		if unitConfig.hasAuras then
 			UnitFrames.RefreshAuraLayout(frame, unitType)
 		end
 

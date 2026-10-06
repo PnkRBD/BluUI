@@ -2,46 +2,29 @@ local _, BUI = ...
 
 local UnitFrames = BUI.UnitFrames
 local Pixel = BUI.Pixel
+local Engine = BUI.AuraEngine
 
 local ceil, floor, max, min, random = math.ceil, math.floor, math.max, math.min, math.random
-local ipairs, pairs, tostring, unpack, wipe = ipairs, pairs, tostring, unpack, wipe
+local ipairs, pairs, tostring, unpack = ipairs, pairs, tostring, unpack
 
 local CreateFrame = CreateFrame
 local InCombatLockdown = InCombatLockdown
-
 local RAID_CLASS_COLORS = RAID_CLASS_COLORS
-
 local RegisterUnitWatch = RegisterUnitWatch
-local UIParent = UIParent
 local UnregisterUnitWatch = UnregisterUnitWatch
 
 local GetAccent = BUI.BUILibClient.Colors.GetAccent
 
-local STACK_POSITIONS = {
-	TOPLEFT     = { 'TOPLEFT', 1, -1 },
-	TOP         = { 'TOP', 0, -1 },
-	TOPRIGHT    = { 'TOPRIGHT', -1, -1 },
-	LEFT        = { 'LEFT', 1, 0 },
-	CENTER      = { 'CENTER', 0, 0 },
-	RIGHT       = { 'RIGHT', -1, 0 },
-	BOTTOMLEFT  = { 'BOTTOMLEFT', 1, 1 },
-	BOTTOM      = { 'BOTTOM', 0, 1 },
-	BOTTOMRIGHT = { 'BOTTOMRIGHT', -1, 1 },
-}
-
 local active = {}
-local hintLabels = {}
 local auraCache = {}
 local savedWatch = {}
-local positionCallbacks = {}
-local animEntries = {}
+local sampleCasts = {}
 local testFrames = {}
-
+local stageFrames = {}
+local listener
+local spotlight
 local animFrame
 local testActive = false
-
-UnitFrames._previewFrames = {}
-UnitFrames._previewButtons = {}
 
 local ALL_UNITS = {'player', 'target', 'targettarget', 'focus', 'pet', 'boss'}
 local CLASS_TOKENS = {'WARRIOR', 'PRIEST', 'MAGE', 'ROGUE', 'SHAMAN', 'DRUID', 'PALADIN', 'HUNTER', 'WARLOCK', 'DEATHKNIGHT'}
@@ -54,15 +37,29 @@ local ICONS = {
 	'Interface\\Icons\\spell_frost_frostbolt02',
 	'Interface\\Icons\\spell_nature_lightningshield',
 }
-local DEBUFF_TYPES = {'Magic', 'Curse', 'Poison', 'Disease', nil, nil}
+local DEBUFF_TYPES = {'Magic', 'Curse', 'Poison', 'Disease'}
 local CAST_ICONS = {136243, 136235, 136168, 136175}
-local TAG_FIELDS = {'Name', 'HealthText', 'PowerText', 'LevelText'}
+local TAG_FIELDS = {'Name', 'HealthText', 'PowerText', 'LevelText', 'StatusText'}
+local LIVE_ELEMENTS = {'Health', 'Power', 'AbsorbBars'}
+local RAID_MARKER_COORDS = {
+	{0, 0.25, 0, 0.25}, {0.25, 0.5, 0, 0.25}, {0.5, 0.75, 0, 0.25}, {0.75, 1, 0, 0.25},
+	{0, 0.25, 0.25, 0.5}, {0.25, 0.5, 0.25, 0.5}, {0.5, 0.75, 0.25, 0.5}, {0.75, 1, 0.25, 0.5},
+}
+local STAGE_DOT_TILE = 16
+local SAMPLE_HEALTH, SAMPLE_POWER = 75, 60
+local SAMPLE_ABSORB, SAMPLE_HEAL_ABSORB = 15, 10
+local CAST_SPEED = 25
 
 local function Pick(list, index) return list[((index - 1) % #list) + 1] end
 
 local function ClassColor(index)
 	local classColor = RAID_CLASS_COLORS[Pick(CLASS_TOKENS, index)]
 	return classColor.r, classColor.g, classColor.b
+end
+
+local function SampleClassColor(frame, unitType, classIndex)
+	if unitType == 'player' or frame._stage then return BUI.Tools.GetUnitClassColor('player') end
+	return ClassColor(classIndex)
 end
 
 local function GetFrame(unitType, index)
@@ -74,40 +71,52 @@ local function WatchKey(unitType, index)
 	return unitType == 'boss' and ('boss' .. index) or unitType
 end
 
-local function UntagAll(frame)
-	for _, key in ipairs(TAG_FIELDS) do
-		if frame[key] then frame:Untag(frame[key]) end
-	end
+local function Notify()
+	if listener then listener() end
 end
 
 local function Freeze(frame)
 	if not frame._isPreview then frame._savedUnit = frame.unit end
 	frame._isPreview = true
 	frame.unit = nil
-	UntagAll(frame)
+	for _, key in ipairs(TAG_FIELDS) do frame:Untag(frame[key]) end
+	local healthShown, powerShown = frame.Health:IsShown(), frame.Power:IsShown()
+	for _, element in ipairs(LIVE_ELEMENTS) do frame:PauseElement(element) end
+	frame.Health:SetShown(healthShown)
+	frame.Power:SetShown(powerShown)
 end
 
 local function Thaw(frame)
 	frame._isPreview = nil
 	frame._previewIndex = nil
+	frame._previewSample = nil
 	frame.unit = frame._savedUnit
 	frame._savedUnit = nil
+	for _, element in ipairs(LIVE_ELEMENTS) do frame:ResumeElement(element) end
 	UnitFrames.TagFontStrings(frame)
 	if frame.unit then frame:UpdateAllElements('PreviewEnd') end
 end
 
+local function HealthAlpha(settings)
+	return settings.transparentHealth and settings.healthBarAlpha or 1
+end
+
+local function Format(unitSettings, settings, key)
+	local format = unitSettings[key]
+	if format and format ~= '' then return format end
+	return settings[key]
+end
+
 local function SetTagText(frame, key, unitSettings, settings, formatKey, healthPercent, powerPercent)
 	local fontString = frame[key]
-	if not fontString or (key ~= 'Name' and not fontString:IsShown()) then return end
-	local format = unitSettings[formatKey] or settings[formatKey]
-	fontString:SetText(UnitFrames.ParsePreviewTags(format, healthPercent, powerPercent))
+	if not fontString:IsShown() then return end
+	fontString:SetText(UnitFrames.ParsePreviewTags(Format(unitSettings, settings, formatKey), healthPercent, powerPercent))
 end
 
 local function SetFakeCustomTags(frame, healthPercent, powerPercent)
 	UnitFrames.ApplyCustomTags(frame)
 	local tags = frame._customTags
-	local entries = UnitFrames.GetUnitSettings(frame._unitType).customTags
-	for tagIndex, entry in ipairs(entries) do
+	for tagIndex, entry in ipairs(UnitFrames.GetUnitSettings(frame._unitType).customTags) do
 		local fontString = tags[tagIndex]
 		if fontString then
 			frame:Untag(fontString)
@@ -118,238 +127,321 @@ local function SetFakeCustomTags(frame, healthPercent, powerPercent)
 	end
 end
 
-local function ShowSampleStatus(frame, unitSettings)
-	local label = frame.StatusText
-	if not label then return end
-	if unitSettings.showStatusText == false then label:Hide() return end
-	local color = UnitFrames.GetSettings().statusColors.Dead
-	label:SetText('|cff' .. BUI.Hex(color[1], color[2], color[3]) .. 'DEAD|r')
-	label:Show()
+local function SampleNameColor(frame, unitType, unitSettings, classIndex)
+	if unitSettings.classColorName then
+		if unitType == 'boss' then
+			local hostile = unitSettings.hostileNameColor
+			return hostile[1], hostile[2], hostile[3]
+		elseif unitType ~= 'pet' then
+			return SampleClassColor(frame, unitType, classIndex)
+		end
+	end
+	local color = UnitFrames.GetSettings().nameColor
+	return color[1], color[2], color[3]
 end
 
-local function SetFakeData(frame, unitType, index)
-	local healthPercent = max(20, min(95, unitType == 'boss' and (95 - index * 8) or 75))
-	local powerPercent = max(10, min(95, unitType == 'boss' and (100 - index * 7) or 60))
+local function SetFakeData(frame, unitType, index, sample, absorbs)
 	frame._previewIndex = index
-
+	frame._previewSample = sample
+	absorbs = absorbs or spotlight
+	local healthPercent = sample and sample.hp or (unitType == 'boss' and (95 - index * 8) or SAMPLE_HEALTH)
+	local powerPercent = sample and sample.pp or (unitType == 'boss' and (100 - index * 7) or SAMPLE_POWER)
+	local classIndex = sample and sample.classIndex or index
 	local settings = UnitFrames.GetSettings()
-	local settingsUnitType = unitType == 'boss' and 'boss' or unitType
-	local unitSettings = UnitFrames.GetUnitSettings(settingsUnitType)
+	local unitSettings = UnitFrames.GetUnitSettings(unitType)
+	local colorUnit = unitType == 'pet' and 'pet' or 'player'
 
-	if frame.Health then
-		frame.Health:SetMinMaxValues(0, 100)
-		frame.Health:SetValue(healthPercent)
-		local healthRed, healthGreen, healthBlue
-		if settings.classColorHealth then
-			healthRed, healthGreen, healthBlue = ClassColor(index)
-		else
-			healthRed, healthGreen, healthBlue = UnitFrames.GetHealthColor('player', settings)
-		end
-		frame.Health:SetStatusBarColor(healthRed, healthGreen, healthBlue)
+	frame.Health:SetMinMaxValues(0, 100)
+	frame.Health:SetValue(healthPercent)
+	local red, green, blue
+	if settings.classColorHealth and unitType ~= 'pet' then
+		red, green, blue = SampleClassColor(frame, unitType, classIndex)
+	else
+		red, green, blue = UnitFrames.GetHealthColor(colorUnit, settings)
 	end
+	frame.Health:SetStatusBarColor(red, green, blue, HealthAlpha(settings))
 
-	if frame.Power and frame.Power:IsShown() then
+	if frame.Power:IsShown() then
 		frame.Power:SetMinMaxValues(0, 100)
 		frame.Power:SetValue(powerPercent)
-		frame.Power:SetStatusBarColor(UnitFrames.GetPowerColor('player', settings, unitSettings))
+		if settings.useClassColorPowerBar and unitType ~= 'pet' then
+			red, green, blue = SampleClassColor(frame, unitType, classIndex)
+		else
+			red, green, blue = UnitFrames.GetPowerColor(colorUnit, settings, unitSettings)
+		end
+		frame.Power:SetStatusBarColor(red, green, blue)
 	end
 
-	if frame.Name then
-		local name
-		if (unitType == 'player' or unitType == 'pet') and unitSettings.customName and unitSettings.customName ~= '' then
-			name = unitSettings.customName
-		else
-			local format = unitSettings.nameFormat or settings.nameFormat
-			name = UnitFrames.ParsePreviewTags(format, healthPercent, powerPercent)
-		end
-		frame.Name:SetText(name)
-		local useClassColor = unitSettings.classColorName
-		if unitType == 'boss' or unitType == 'pet' then useClassColor = useClassColor ~= false end
-		if useClassColor then frame.Name:SetTextColor(ClassColor(index)) else frame.Name:SetTextColor(1, 1, 1) end
+	if sample and sample.name then
+		frame.Name:SetText(sample.name)
+	elseif (unitType == 'player' or unitType == 'pet') and unitSettings.customName and unitSettings.customName ~= '' then
+		frame.Name:SetText(unitSettings.customName)
+	else
+		frame.Name:SetText(UnitFrames.ParsePreviewTags(Format(unitSettings, settings, 'nameFormat'), healthPercent, powerPercent))
 	end
+	frame.Name:SetTextColor(SampleNameColor(frame, unitType, unitSettings, classIndex))
 
 	SetTagText(frame, 'HealthText', unitSettings, settings, 'healthFormat', healthPercent, powerPercent)
 	SetTagText(frame, 'PowerText', unitSettings, settings, 'powerFormat', healthPercent, powerPercent)
 	SetTagText(frame, 'LevelText', unitSettings, settings, 'levelFormat', healthPercent, powerPercent)
 	SetFakeCustomTags(frame, healthPercent, powerPercent)
 
-	if frame.Absorb and frame.Health then
-		UnitFrames.ApplyAbsorbVisual(frame.Absorb, UnitFrames.BuildAbsorbCfg(settings))
-		frame.Absorb:SetReverseFill(true)
-		frame.Absorb:ClearAllPoints()
-		local healthTexture = frame.Health:GetStatusBarTexture()
-		if healthTexture then frame.Absorb:SetAllPoints(healthTexture) end
-		frame.Absorb:SetMinMaxValues(0, 100)
-		frame.Absorb:SetValue(15)
-		frame.Absorb:Show()
-	end
+	UnitFrames.FitAbsorbBars(frame)
+	frame.Absorb:SetMinMaxValues(0, 100)
+	frame.Absorb:SetValue(absorbs == 'healAbsorb' and 0 or SAMPLE_ABSORB)
+	frame.HealAbsorb:SetMinMaxValues(0, 100)
+	frame.HealAbsorb:SetValue((absorbs == 'healAbsorb' or absorbs == 'both') and SAMPLE_HEAL_ABSORB or 0)
+end
 
-	ShowSampleStatus(frame, unitSettings)
+function UnitFrames.SetPreviewSpotlight(kind)
+	spotlight = kind
+end
+
+function UnitFrames.GetPreviewSpotlight()
+	return spotlight
 end
 
 local function MakeIcon(parent)
-	local iconFrame = CreateFrame('Frame', nil, parent, 'BackdropTemplate')
-	Pixel.ApplyBorder(iconFrame, 1, 0, 0, 0, 1)
+	local icon = CreateFrame('Frame', nil, parent, 'BackdropTemplate')
+	Pixel.ApplyBorder(icon, 1, 0, 0, 0, 1)
 	local inset = Pixel.PixelSize(1)
-	iconFrame.Icon = iconFrame:CreateTexture(nil, 'ARTWORK')
-	iconFrame.Icon:SetPoint('TOPLEFT', inset, -inset)
-	iconFrame.Icon:SetPoint('BOTTOMRIGHT', -inset, inset)
-	iconFrame.Icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-	local overlay = CreateFrame('Frame', nil, iconFrame)
+	icon.Icon = icon:CreateTexture(nil, 'ARTWORK')
+	icon.Icon:SetPoint('TOPLEFT', inset, -inset)
+	icon.Icon:SetPoint('BOTTOMRIGHT', -inset, inset)
+	icon.Icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+	local overlay = CreateFrame('Frame', nil, icon)
 	overlay:SetAllPoints()
-	overlay:SetFrameLevel(iconFrame:GetFrameLevel() + 20)
-	local font = UnitFrames.GetFont()
-	iconFrame.stacks = overlay:CreateFontString(nil, 'OVERLAY')
-	Pixel.ApplyFont(iconFrame.stacks, 10, font)
-	iconFrame.stacks:SetPoint('BOTTOMRIGHT', 0, 0)
-	iconFrame.cd = overlay:CreateFontString(nil, 'OVERLAY')
-	Pixel.ApplyFont(iconFrame.cd, 10, font)
-	iconFrame.cd:SetPoint('CENTER', 0, 0)
-	return iconFrame
+	overlay:SetFrameLevel(icon:GetFrameLevel() + 20)
+	icon.stacks = overlay:CreateFontString(nil, 'OVERLAY')
+	icon.cd = overlay:CreateFontString(nil, 'OVERLAY')
+	icon.cd:SetPoint('CENTER')
+	return icon
 end
 
-local function LayoutGrid(holder, icons, count, size, gap, perRow, growX, growY, anchorPoint, offsetX, offsetY, parent)
+local function StyleIconText(icon, style)
+	Pixel.ApplyFont(icon.stacks, style.stackSize, style.font)
+	Pixel.ApplyFont(icon.cd, style.cdSize, style.font)
+	local stackAnchor = Engine.StackAnchors[style.stackPos]
+	icon.stacks:ClearAllPoints()
+	icon.stacks:SetPoint(stackAnchor[1], icon, stackAnchor[1], stackAnchor[2], stackAnchor[3])
+	icon.stacks:SetShown(style.showStack)
+	icon.cd:SetShown(style.showCd)
+end
+
+local function BuildIcons(list, holder, count, size, setup)
+	for iconIndex = 1, max(#list, count) do
+		local icon = list[iconIndex]
+		if iconIndex > count then
+			icon:Hide()
+		else
+			if not icon then
+				icon = MakeIcon(holder)
+				list[iconIndex] = icon
+			end
+			icon:SnapSize(size)
+			setup(icon, iconIndex)
+			icon:Show()
+		end
+	end
+end
+
+local function LayoutGrid(holder, icons, count, style, parent)
 	if count == 0 then holder:Hide() return end
-	local verticalPoint = growY == 'UP' and 'BOTTOM' or 'TOP'
-	local horizontalPoint = growX == 'RIGHT' and 'LEFT' or 'RIGHT'
-	local from = verticalPoint .. horizontalPoint
+	local size, gap, perRow = style.size, style.gap, style.perRow
+	local from = Engine.GrowthToAnchor(style.growX, style.growY)
+	local verticalPoint = style.growY == 'UP' and 'BOTTOM' or 'TOP'
+	local horizontalPoint = style.growX == 'RIGHT' and 'LEFT' or 'RIGHT'
 	holder:ClearAllPoints()
-	holder:SetPoint(from, parent, anchorPoint, Pixel.Scale(offsetX), Pixel.Scale(offsetY))
+	holder:SetPoint(from, parent, style.anchorTo, Pixel.Scale(style.offsetX), Pixel.Scale(style.offsetY))
 	local rows = ceil(count / perRow)
 	holder:SnapSize(perRow * size + (perRow - 1) * gap, rows * size + (rows - 1) * gap)
 	holder:Show()
 	for iconIndex = 1, count do
-		icons[iconIndex]:ClearAllPoints()
-		local col, row = (iconIndex - 1) % perRow, floor((iconIndex - 1) / perRow)
-		if col == 0 then
-			if row == 0 then
-				icons[iconIndex]:SetPoint(from, holder, from, 0, 0)
-			else
-				local above = icons[((row - 1) * perRow) + 1]
-				icons[iconIndex]:SetPoint(verticalPoint, above, verticalPoint == 'BOTTOM' and 'TOP' or 'BOTTOM', 0, growY == 'UP' and gap or -gap)
-			end
+		local icon = icons[iconIndex]
+		local column, row = (iconIndex - 1) % perRow, floor((iconIndex - 1) / perRow)
+		icon:ClearAllPoints()
+		if column > 0 then
+			icon:SetPoint(horizontalPoint, icons[iconIndex - 1], horizontalPoint == 'LEFT' and 'RIGHT' or 'LEFT', style.growX == 'RIGHT' and gap or -gap, 0)
+		elseif row > 0 then
+			icon:SetPoint(verticalPoint, icons[(row - 1) * perRow + 1], verticalPoint == 'BOTTOM' and 'TOP' or 'BOTTOM', 0, style.growY == 'UP' and gap or -gap)
 		else
-			local previousIcon = icons[iconIndex - 1]
-			icons[iconIndex]:SetPoint(horizontalPoint, previousIcon, horizontalPoint == 'LEFT' and 'RIGHT' or 'LEFT', growX == 'RIGHT' and gap or -gap, 0)
+			icon:SetPoint(from, holder, from)
 		end
 	end
 end
 
-local function BuildIcons(list, holder, count, size, setupCallback)
-	for iconIndex = 1, max(6, count) do
-		if not list[iconIndex] then list[iconIndex] = MakeIcon(holder) end
-		list[iconIndex]:SnapSize(size)
-		if iconIndex <= count then setupCallback(list[iconIndex], iconIndex) list[iconIndex]:Show() else list[iconIndex]:Hide() end
-	end
-end
-
-local function ShowFakeAuras(frame, unitType, index)
-	if unitType ~= 'player' and unitType ~= 'target' and unitType ~= 'focus' and unitType ~= 'boss' and unitType ~= 'targettarget' then return end
-
-	local cacheKey = unitType == 'boss' and ('boss' .. (index or 1)) or unitType
-
+local function HideAuraElements(frame)
 	if frame.Debuffs then frame.Debuffs:Hide() end
 	if frame.Buffs then frame.Buffs:Hide() end
 	if frame.DebuffContainer then frame.DebuffContainer:Hide() end
 	if frame.BuffContainer then frame.BuffContainer:Hide() end
+end
 
-	local cached = auraCache[cacheKey]
-	if not cached then
-		cached = { debuffs = {}, buffs = {}, dH = CreateFrame('Frame', nil, frame), bH = CreateFrame('Frame', nil, frame) }
-		cached.dH:SetFrameLevel(frame:GetFrameLevel() + 15)
-		cached.bH:SetFrameLevel(frame:GetFrameLevel() + 15)
-		auraCache[cacheKey] = cached
+local function HideStageAuras(frame)
+	HideAuraElements(frame)
+	local cached = auraCache[frame]
+	if cached then
+		cached.debuffHolder:Hide()
+		cached.buffHolder:Hide()
 	end
-	cached.dH:SetParent(frame)
-	cached.bH:SetParent(frame)
+end
+
+local function ShowFakeAuras(frame, unitType)
+	if not UnitFrames.GetUnitConfig(unitType).hasAuras then return end
+	HideAuraElements(frame)
+
+	local cached = auraCache[frame]
+	if not cached then
+		cached = { debuffs = {}, buffs = {}, debuffHolder = CreateFrame('Frame', nil, frame), buffHolder = CreateFrame('Frame', nil, frame) }
+		cached.debuffHolder:SetFrameLevel(frame:GetFrameLevel() + 15)
+		cached.buffHolder:SetFrameLevel(frame:GetFrameLevel() + 15)
+		auraCache[frame] = cached
+	end
 
 	local unitSettings = UnitFrames.GetUnitSettings(unitType)
-	local font = UnitFrames.GetFont()
-	local debuffSize, debuffGap = unitSettings.debuffIconSize or unitSettings.auraIconSize or 22, unitSettings.debuffSpacing or unitSettings.auraSpacing or 2
-	local debuffCount = unitSettings.showDebuffs and (unitSettings.maxDebuffs or 6) or 0
-	local buffSize, buffGap = unitSettings.buffIconSize or unitSettings.auraIconSize or 22, unitSettings.buffSpacing or unitSettings.auraSpacing or 2
-	local buffCount = unitSettings.showBuffs and (unitSettings.maxBuffs or 4) or 0
+	local debuffStyle = UnitFrames.ResolveAuraStyle(unitSettings, true)
+	local buffStyle = UnitFrames.ResolveAuraStyle(unitSettings, false)
+	local debuffCount = debuffStyle.shown and debuffStyle.max or 0
+	local buffCount = buffStyle.shown and buffStyle.max or 0
 
-	BuildIcons(cached.debuffs, cached.dH, debuffCount, debuffSize, function(icon, iconIndex)
+	BuildIcons(cached.debuffs, cached.debuffHolder, debuffCount, debuffStyle.size, function(icon, iconIndex)
 		icon.Icon:SetTexture(Pick(ICONS, iconIndex))
-		local debuffType = DEBUFF_TYPES[iconIndex]
-		local debuffRed, debuffGreen, debuffBlue
-		if debuffType and unitSettings.showDebuffType ~= false then debuffRed, debuffGreen, debuffBlue = UnitFrames.DispelTypeColor(debuffType) end
-		if debuffRed then Pixel.SetBorderColor(icon, debuffRed, debuffGreen, debuffBlue, 1)
-		else Pixel.SetBorderColor(icon, 0.8, 0, 0, 1) end
+		local debuffType = debuffStyle.showDispelType and DEBUFF_TYPES[iconIndex]
+		if debuffType then
+			local red, green, blue = UnitFrames.DispelTypeColor(debuffType)
+			Pixel.SetBorderColor(icon, red, green, blue, 1)
+		else
+			Pixel.SetBorderColor(icon, unpack(debuffStyle.baseColor))
+		end
+		StyleIconText(icon, debuffStyle)
 		icon.stacks:SetText(iconIndex > 2 and tostring(iconIndex) or '')
-		Pixel.ApplyFont(icon.stacks, unitSettings.debuffStackSize or unitSettings.auraStackSize or 10, font)
-		local debuffPosition = STACK_POSITIONS[unitSettings.debuffStackPos or 'BOTTOMRIGHT'] or STACK_POSITIONS.BOTTOMRIGHT
-		icon.stacks:ClearAllPoints()
-		icon.stacks:SetPoint(debuffPosition[1], icon, debuffPosition[1], debuffPosition[2], debuffPosition[3])
 		icon.cd:SetText(tostring(10 + iconIndex))
-		Pixel.ApplyFont(icon.cd, unitSettings.debuffCdSize or unitSettings.auraCdSize or 10, font)
 	end)
 
-	BuildIcons(cached.buffs, cached.bH, buffCount, buffSize, function(icon, iconIndex)
+	BuildIcons(cached.buffs, cached.buffHolder, buffCount, buffStyle.size, function(icon, iconIndex)
 		icon.Icon:SetTexture(Pick(ICONS, iconIndex + 2))
-		Pixel.SetBorderColor(icon, 0, 0, 0, 1)
+		Pixel.SetBorderColor(icon, unpack(buffStyle.baseColor))
+		StyleIconText(icon, buffStyle)
 		icon.stacks:SetText('')
-		local buffPosition = STACK_POSITIONS[unitSettings.buffStackPos or 'BOTTOMRIGHT'] or STACK_POSITIONS.BOTTOMRIGHT
-		icon.stacks:ClearAllPoints()
-		icon.stacks:SetPoint(buffPosition[1], icon, buffPosition[1], buffPosition[2], buffPosition[3])
 		icon.cd:SetText(tostring(30 + iconIndex * 5))
-		Pixel.ApplyFont(icon.cd, unitSettings.buffCdSize or unitSettings.auraCdSize or 10, font)
 	end)
 
-	local debuffGrowthX = unitSettings.debuffGrowthX
-	local debuffGrowthY = unitSettings.debuffGrowthY
-	local debuffAnchor = unitSettings.debuffAnchorPoint
-	LayoutGrid(cached.dH, cached.debuffs, debuffCount, debuffSize, debuffGap, unitSettings.debuffsPerRow or 8,
-		debuffGrowthX, debuffGrowthY, debuffAnchor, unitSettings.debuffOffsetX, unitSettings.debuffOffsetY, frame)
-
-	local buffGrowthX = unitSettings.buffGrowthX or 'RIGHT'
-	local buffGrowthY = unitSettings.buffGrowthY or 'DOWN'
-	local buffAnchor = unitSettings.buffAnchorPoint or 'BOTTOMLEFT'
-	LayoutGrid(cached.bH, cached.buffs, buffCount, buffSize, buffGap, unitSettings.buffsPerRow or 8,
-		buffGrowthX, buffGrowthY, buffAnchor, unitSettings.buffOffsetX or 0, unitSettings.buffOffsetY or 0, frame)
+	LayoutGrid(cached.debuffHolder, cached.debuffs, debuffCount, debuffStyle, frame)
+	LayoutGrid(cached.buffHolder, cached.buffs, buffCount, buffStyle, frame)
 end
 
-local function HideFakeAuras(frame, unitType, index)
-	local cacheKey = unitType == 'boss' and ('boss' .. (index or 1)) or unitType
-	local cached = auraCache[cacheKey]
-	if cached then cached.dH:Hide() cached.bH:Hide() end
+local function RestoreContainer(container)
+	if not container then return end
+	container:Show()
+	if container.UpdateAllAuras then container:UpdateAllAuras() end
+end
+
+local function HideFakeAuras(frame)
+	local cached = auraCache[frame]
+	if cached then
+		cached.debuffHolder:Hide()
+		cached.buffHolder:Hide()
+	end
 	if frame.Debuffs then frame.Debuffs:Show() end
 	if frame.Buffs then frame.Buffs:Show() end
-	for _, key in ipairs({ 'DebuffContainer', 'BuffContainer' }) do
-		local container = frame[key]
-		if container then
-			container:Show()
-			if container.UpdateAllAuras then container:UpdateAllAuras() end
-		end
+	RestoreContainer(frame.DebuffContainer)
+	RestoreContainer(frame.BuffContainer)
+end
+
+local function PaintSampleCast(frame)
+	local sample = sampleCasts[frame]
+	if not sample then return false end
+	local castbar = frame.Castbar
+	local showIcon = BUI.CastBar.GetSettings(sample.barType).showIcon
+	castbar.holdTime = 1e9
+	castbar:SetMinMaxValues(0, 100)
+	castbar:SetValue(sample.value)
+	castbar.Text:SetText(Pick(NAMES, sample.index) .. '\'s Wrath')
+	castbar.Text:Show()
+	castbar.Time:SetFormattedText('%.1f', sample.value / CAST_SPEED)
+	castbar.Time:Show()
+	castbar.Icon:SetTexture(Pick(CAST_ICONS, sample.index))
+	castbar.Icon:SetShown(showIcon)
+	castbar._iconFrame:SetShown(showIcon)
+	castbar:Show()
+	castbar._container:Show()
+	return true
+end
+
+UnitFrames.PaintSampleCast = PaintSampleCast
+
+local function ShowSampleCast(frame, barType, index)
+	if not frame.Castbar or not BUI.CastBar.GetSettings(barType).enabled then return end
+	sampleCasts[frame] = { barType = barType, index = index, value = 30 + index * 12 }
+	PaintSampleCast(frame)
+end
+
+local function HideSampleCast(frame)
+	if not sampleCasts[frame] then return end
+	sampleCasts[frame] = nil
+	frame.Castbar.holdTime = 0
+	BUI.CastBar.HideQuietly(frame.Castbar)
+end
+
+local function ShowUnit(frame, unitType, index, sample)
+	local key = WatchKey(unitType, index)
+	if key ~= 'player' then
+		UnregisterUnitWatch(frame)
+		savedWatch[key] = true
+	end
+	Freeze(frame)
+	UnitFrames.ApplySettings(frame, unitType, index)
+	SetFakeData(frame, unitType, index or 1, sample)
+	ShowFakeAuras(frame, unitType)
+	frame:Show()
+	Pixel.SetBorderColor(frame, GetAccent())
+end
+
+local function HideUnit(frame, unitType, index)
+	HideSampleCast(frame)
+	HideFakeAuras(frame)
+	Thaw(frame)
+	local key = WatchKey(unitType, index)
+	if savedWatch[key] then
+		RegisterUnitWatch(frame)
+		savedWatch[key] = nil
 	end
 end
 
-local function ShowHint(frame, unitType)
-	if hintLabels[unitType] then hintLabels[unitType]:Show() return end
-	local hintLabel = frame:CreateFontString(nil, 'OVERLAY')
-	Pixel.ApplyFont(hintLabel, 11, BUI.GetGlobalFont())
-	hintLabel:SetPoint('BOTTOM', frame, 'TOP', 0, Pixel.Scale(5))
-	hintLabel:SetText('Drag to Reposition | Right-Click to Lock')
-	hintLabel:SetTextColor(1, 1, 1, 1)
-	hintLabels[unitType] = hintLabel
+local function ReleaseTestFrame(key)
+	local entry = testFrames[key]
+	if not entry then return end
+	testFrames[key] = nil
+	entry.frame.RaidTargetIndicator:Hide()
 end
 
-local function HideHint(unitType) if hintLabels[unitType] then hintLabels[unitType]:Hide() end end
+local function ReleaseTestEntries(unitType)
+	if unitType == 'boss' then
+		for bossIndex = 1, 5 do ReleaseTestFrame('boss' .. bossIndex) end
+	else
+		ReleaseTestFrame(unitType)
+	end
+end
+
+local function SavePosition(unitType, x, y)
+	local position = UnitFrames.GetUnitSettings(unitType).position
+	position.x, position.y = BUI.Round(x), BUI.Round(y)
+	return position
+end
+
+local function LockPreview(unitType)
+	UnitFrames.HidePreview(unitType)
+	BUI.Print(unitType:sub(1, 1):upper() .. unitType:sub(2) .. ' preview hidden.')
+end
 
 local function SetupDrag(frame, unitType)
 	BUI.Dragging.MakeDraggable(frame, {
 		snapCenter = true,
-		isLocked = function()
-			if BUI.ResolveAnchorFrame(UnitFrames.GetUnitSettings(unitType).anchorFrame) then return true end
-			return false
-		end,
+		showHint = true,
+		skipClickThrough = true,
+		isLocked = function() return BUI.ResolveAnchorFrame(UnitFrames.GetUnitSettings(unitType).anchorFrame) ~= nil end,
 		onDragging = function(x, y)
-			x, y = BUI.Round(x), BUI.Round(y)
-			local db = BUI.GetDB()
-			db.unitFrames[unitType].position.x = x
-			db.unitFrames[unitType].position.y = y
-			if positionCallbacks[unitType] then positionCallbacks[unitType](x, y) end
+			SavePosition(unitType, x, y)
 			if unitType == 'boss' then
 				for bossIndex = 2, 5 do
 					local bossFrame = UnitFrames['boss' .. bossIndex]
@@ -358,228 +450,139 @@ local function SetupDrag(frame, unitType)
 			end
 		end,
 		onPositionChanged = function(x, y)
-			x, y = BUI.Round(x), BUI.Round(y)
-			local db = BUI.GetDB()
-			db.unitFrames[unitType].position.x = x
-			db.unitFrames[unitType].position.y = y
-			db.unitFrames[unitType].position.point = 'CENTER'
-			db.unitFrames[unitType].position.relPoint = 'CENTER'
-			if positionCallbacks[unitType] then positionCallbacks[unitType](x, y) end
-			frame:ClearAllPoints()
-			frame:SetPoint('CENTER', UIParent, 'CENTER', x, y)
-			UnitFrames.InvalidateSettingsCache()
+			local position = SavePosition(unitType, x, y)
+			position.point, position.relPoint = 'CENTER', 'CENTER'
 			UnitFrames:Refresh()
 			UnitFrames.UpdatePreviews()
+			Notify()
 		end,
-		onRightClick = function() UnitFrames.LockPreview(unitType) end,
+		onRightClick = function() LockPreview(unitType) end,
 	})
 end
 
-local function TeardownDrag(frame)
-	if not frame then return end
-	frame:SetScript('OnDragStart', nil)
-	frame:SetScript('OnDragStop', nil)
-	frame:SetScript('OnMouseUp', nil)
-	frame:SetScript('OnUpdate', nil)
-	frame:SetMovable(false)
-	frame.dragActive = nil
-	frame.dragLocked = nil
-	frame.dragOnPosition = nil
-	frame.dragOnDragging = nil
-	frame.dragOnRightClick = nil
-	frame.RefreshDragState = nil
-end
-
-local function ShowUnit(frame, unitType, index)
+function UnitFrames.StageFrame(unitType, index, parent, options)
 	local key = WatchKey(unitType, index)
-	if key ~= 'player' then
+	local frame = stageFrames[key]
+	if not frame then
+		if InCombatLockdown() then return nil end
+		BUI.oUF:SetActiveStyle('BluUIStage')
+		frame = BUI.oUF:Spawn(index and (unitType .. index) or unitType, 'BUI_Stage_' .. key)
+		BUI.oUF:SetActiveStyle('BluUI')
 		UnregisterUnitWatch(frame)
-		savedWatch[key] = true
+		frame:EnableMouse(false)
+		stageFrames[key] = frame
 	end
+	frame:SetParent(parent)
+	frame:SetFrameStrata(parent:GetFrameStrata())
+	frame:SetFrameLevel(parent:GetFrameLevel() + 2)
 	Freeze(frame)
-	UnitFrames.ApplySettings(frame, unitType == 'boss' and 'boss' or unitType, index)
-	SetFakeData(frame, unitType == 'boss' and 'boss' or unitType, index or 1)
-	ShowFakeAuras(frame, unitType, index)
+	UnitFrames.ApplySettings(frame, unitType, index)
+	SetFakeData(frame, unitType, index or 1, nil, options and options.absorbs)
+	if options and options.bare then HideStageAuras(frame) else ShowFakeAuras(frame, unitType) end
 	frame:Show()
-	Pixel.SetBorderColor(frame, GetAccent())
+	return frame
 end
 
-local function HideUnit(frame, unitType, index)
-	if unitType ~= 'boss' then
-		TeardownDrag(frame)
+local staged = setmetatable({}, { __mode = 'k' })
+local stagePlates = setmetatable({}, { __mode = 'k' })
+
+function UnitFrames.ClearStage(stage)
+	for _, frame in ipairs(staged[stage] or {}) do
+		frame:Hide()
+		local plate = stagePlates[stage][frame]
+		plate:Hide()
+		plate.dots:Hide()
 	end
-	HideFakeAuras(frame, unitType, index)
-	Thaw(frame)
-	if frame.Absorb then frame.Absorb:Hide() end
-	UnitFrames.RefreshStatusText(frame)
-	local settings = UnitFrames.GetSettings()
-	local borderColor = (unitType == 'pet') and settings.petBorderColor or settings.borderColor
-	Pixel.SetBorderColor(frame, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
-	local key = WatchKey(unitType, index)
-	if savedWatch[key] then
-		RegisterUnitWatch(frame)
-		savedWatch[key] = nil
-	end
+	staged[stage] = {}
 end
 
-function UnitFrames.RegisterPositionCallback(unitType, callback) positionCallbacks[unitType] = callback end
-function UnitFrames.UnregisterPositionCallback(unitType) positionCallbacks[unitType] = nil end
-
-local bossCastbarPreviewActive = false
-
-function UnitFrames.ShowBossCastbarPreview()
-	local settings = BUI.CastBar.GetSettings('boss')
-	if not settings or not settings.enabled then return end
-
-	for bossIndex = 1, 5 do
-		local bossFrame = UnitFrames['boss' .. bossIndex]
-		if bossFrame then
-			BUI.CastBar.ApplyBossCastbar(bossFrame, bossIndex)
-			local castbar = bossFrame.Castbar
-			local container = bossFrame._castbarContainer
-			if castbar and container then
-				castbar:SetMinMaxValues(0, 100)
-				castbar:SetValue(30 + bossIndex * 12)
-				local barColor = settings.barColor
-				if settings.useIndividualColors and settings.bossColors then
-					barColor = settings.bossColors[bossIndex] or barColor
-				end
-				castbar:SetStatusBarColor(barColor[1], barColor[2], barColor[3], barColor[4] or 1)
-				if castbar.Text then castbar.Text:SetText(Pick(NAMES, bossIndex) .. '\'s Wrath') castbar.Text:Show() end
-				if castbar.Time then castbar.Time:SetFormattedText('%.1f', 1.2 + bossIndex * 0.3) castbar.Time:Show() end
-				if castbar.Icon then castbar.Icon:SetTexture(CAST_ICONS[((bossIndex - 1) % #CAST_ICONS) + 1]) castbar.Icon:Show() end
-
-				castbar.holdTime = 1e9
-				castbar:Show()
-				container:Show()
-			end
-		end
+function UnitFrames.StageInto(stage, kit, unitType, index, maxWidth, maxHeight, options)
+	local frame = UnitFrames.StageFrame(unitType, index, stage, options)
+	if not frame then return nil end
+	local scale = min(1, maxWidth / frame:GetWidth(), maxHeight / frame:GetHeight())
+	frame:SetScale(scale)
+	local width, height = frame:GetWidth() * scale, frame:GetHeight() * scale
+	local plates = stagePlates[stage] or {}
+	stagePlates[stage] = plates
+	local plate = plates[frame]
+	if not plate then
+		plate = kit.Fill(stage, 'control', 'BACKGROUND')
+		plate:SetPoint('TOPLEFT', frame, 'TOPLEFT')
+		plate:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT')
+		plate.dots = kit.DotGrid(stage, width, height, 'muted')
+		plate.dots:SetAllPoints(plate)
+		plates[frame] = plate
 	end
-	bossCastbarPreviewActive = true
+	plate.dots:SetTexCoord(0, width / STAGE_DOT_TILE, 0, height / STAGE_DOT_TILE)
+	plate:Show()
+	plate.dots:Show()
+	local list = staged[stage] or {}
+	staged[stage] = list
+	list[#list + 1] = frame
+	return frame, width, height
 end
 
-function UnitFrames.HideBossCastbarPreview()
-	if not bossCastbarPreviewActive then return end
-	bossCastbarPreviewActive = false
-	for bossIndex = 1, 5 do
-		local bossFrame = UnitFrames['boss' .. bossIndex]
-		if bossFrame and bossFrame.Castbar then
-			bossFrame.Castbar.holdTime = 0
-			bossFrame.Castbar:Hide()
-			if bossFrame._castbarContainer then bossFrame._castbarContainer:Hide() end
-		end
-	end
+function UnitFrames.PlaceStaged(frame, stage, x, y)
+	local scale = frame:GetScale()
+	frame:ClearAllPoints()
+	frame:SetPoint('CENTER', stage, 'CENTER', x / scale, y / scale)
+end
+
+function UnitFrames.StagePair(stage, kit, maxWidth, maxHeight, gap, options)
+	local player, playerWidth = UnitFrames.StageInto(stage, kit, 'player', nil, maxWidth, maxHeight, options)
+	local target, targetWidth = UnitFrames.StageInto(stage, kit, 'target', nil, maxWidth, maxHeight, options)
+	if not player or not target then return nil end
+	local playerX, targetX = -(playerWidth / 2 + gap), targetWidth / 2 + gap
+	UnitFrames.PlaceStaged(player, stage, playerX, 0)
+	UnitFrames.PlaceStaged(target, stage, targetX, 0)
+	return playerX, targetX
+end
+
+function UnitFrames.SetPreviewListener(callback)
+	listener = callback
 end
 
 function UnitFrames.ShowPreview(unitType)
 	if InCombatLockdown() then BUI.Print('Cannot preview during combat.') return end
 	if active[unitType] then return end
-	active[unitType] = true
-
+	local anchor = GetFrame(unitType)
+	if not anchor then return end
+	active[unitType] = 'preview'
 	if unitType == 'boss' then
 		for bossIndex = 1, 5 do
 			local bossFrame = GetFrame('boss', bossIndex)
-			if bossFrame then ShowUnit(bossFrame, 'boss', bossIndex) end
-		end
-		local anchor = UnitFrames['boss1']
-		if not anchor then active[unitType] = nil return end
-		SetupDrag(anchor, 'boss')
-		ShowHint(anchor, 'boss')
-		UnitFrames._previewFrames['boss'] = anchor
-		UnitFrames.ShowBossCastbarPreview()
-	else
-		local frame = GetFrame(unitType)
-		if not frame then active[unitType] = nil return end
-		ShowUnit(frame, unitType)
-		SetupDrag(frame, unitType)
-		ShowHint(frame, unitType)
-		UnitFrames._previewFrames[unitType] = frame
-	end
-
-	local button = UnitFrames._previewButtons[unitType]
-	if button and button.SetText then button:SetText('Hide Preview') end
-	BUI.Print('' .. unitType .. ' preview shown, right-click hides it.')
-end
-
-local pendingHides = {}
-local pendingHideAll = false
-local regenWatcher
-
-local function QueueAfterCombat(unitType)
-	if unitType then pendingHides[unitType] = true else pendingHideAll = true end
-	if not regenWatcher then
-		regenWatcher = CreateFrame('Frame')
-		regenWatcher:SetScript('OnEvent', BUI.Profiler.Wrap('UnitFrames.Preview combat hide', function(self)
-			self:UnregisterAllEvents()
-			local doAll = pendingHideAll
-			pendingHideAll = false
-			if doAll then UnitFrames.HideAll() end
-			for unitType in pairs(pendingHides) do
-				pendingHides[unitType] = nil
-				UnitFrames.HidePreview(unitType)
+			if bossFrame then
+				ShowUnit(bossFrame, 'boss', bossIndex)
+				ShowSampleCast(bossFrame, 'boss', bossIndex)
 			end
-		end))
-	end
-	regenWatcher:RegisterEvent('PLAYER_REGEN_ENABLED')
-end
-
-local function ReleaseTestFrame(key)
-	local frame = testFrames[key]
-	animEntries[key] = nil
-	testFrames[key] = nil
-	if not frame then return end
-	frame._testCastActive = nil
-	frame._testCastValue = nil
-	frame._testCastIcon = nil
-	local castbar = frame.Castbar
-	if castbar then
-		castbar.holdTime = 0
-		BUI.CastBar.HideQuietly(castbar)
-	end
-	if frame.RaidTargetIndicator then frame.RaidTargetIndicator:Hide() end
-end
-
-local function ReleaseTestEntries(unitType)
-	if not testActive then return end
-	if unitType == 'boss' then
-		for bossIndex = 1, 5 do ReleaseTestFrame('boss' .. bossIndex) end
+		end
 	else
-		ReleaseTestFrame(unitType)
+		ShowUnit(anchor, unitType)
 	end
+	SetupDrag(anchor, unitType)
+	Notify()
+	BUI.Print(unitType .. ' preview shown, right-click hides it.')
 end
 
 function UnitFrames.HidePreview(unitType)
 	if not active[unitType] then return end
 	if InCombatLockdown() then
-		QueueAfterCombat(unitType)
+		BUI.Events:AfterCombat(function() UnitFrames.HidePreview(unitType) end, 'UF.Preview.Hide.' .. unitType)
 		return
 	end
 	active[unitType] = nil
 	ReleaseTestEntries(unitType)
-
+	BUI.Dragging.Release(GetFrame(unitType))
 	if unitType == 'boss' then
-		TeardownDrag(UnitFrames['boss1'])
-		HideHint('boss')
-		UnitFrames.HideBossCastbarPreview()
 		for bossIndex = 1, 5 do
 			local bossFrame = GetFrame('boss', bossIndex)
 			if bossFrame then HideUnit(bossFrame, 'boss', bossIndex) end
 		end
 	else
-		HideHint(unitType)
-		local frame = GetFrame(unitType)
-		if frame then HideUnit(frame, unitType) end
+		HideUnit(GetFrame(unitType), unitType)
 	end
-
-	UnitFrames._previewFrames[unitType] = nil
 	UnitFrames:Refresh()
-	local button = UnitFrames._previewButtons[unitType]
-	if button and button.SetText then button:SetText('Show Preview') end
-end
-
-function UnitFrames.LockPreview(unitType)
-	UnitFrames.HidePreview(unitType)
-	BUI.Print('' .. unitType:sub(1, 1):upper() .. unitType:sub(2) .. ' preview hidden.')
+	Notify()
 end
 
 function UnitFrames.TogglePreview(unitType)
@@ -587,259 +590,117 @@ function UnitFrames.TogglePreview(unitType)
 end
 
 function UnitFrames.IsPreviewShown(unitType)
-	return active[unitType] == true
+	return active[unitType] == 'preview'
 end
 
 function UnitFrames.UpdatePreviews()
 	for unitType in pairs(active) do
-		if unitType == 'boss' then
-			for bossIndex = 1, 5 do
-				local bossFrame = GetFrame('boss', bossIndex)
-				if bossFrame then
-					SetFakeData(bossFrame, 'boss', bossIndex)
-					ShowFakeAuras(bossFrame, 'boss', bossIndex)
-					Pixel.SetBorderColor(bossFrame, GetAccent())
-				end
-			end
-			if bossCastbarPreviewActive then UnitFrames.ShowBossCastbarPreview() end
-		else
-			local frame = GetFrame(unitType)
+		local count = unitType == 'boss' and 5 or 1
+		for frameIndex = 1, count do
+			local bossIndex = unitType == 'boss' and frameIndex or nil
+			local frame = GetFrame(unitType, bossIndex)
 			if frame then
-				SetFakeData(frame, unitType, frame._previewIndex or 1)
-				ShowFakeAuras(frame, unitType, frame._previewIndex)
+				SetFakeData(frame, unitType, frame._previewIndex, frame._previewSample)
+				ShowFakeAuras(frame, unitType)
 				Pixel.SetBorderColor(frame, GetAccent())
+				PaintSampleCast(frame)
 			end
 		end
 	end
 end
 
 function UnitFrames.LockAllPreviews()
-	local list = {}
-	for unitType in pairs(active) do list[#list + 1] = unitType end
-	for _, unitType in ipairs(list) do UnitFrames.HidePreview(unitType) end
+	for unitType, kind in pairs(active) do
+		if kind == 'preview' then UnitFrames.HidePreview(unitType) end
+	end
 end
 
-function UnitFrames.UpdatePreviewAurasOnly(frame, unitType, index)
-	if active[unitType] then ShowFakeAuras(frame, unitType, index) end
-end
-
-local RAID_MARKER_COORDS = {
-	{0, 0.25, 0, 0.25}, {0.25, 0.5, 0, 0.25}, {0.5, 0.75, 0, 0.25}, {0.75, 1, 0, 0.25},
-	{0, 0.25, 0.25, 0.5}, {0.25, 0.5, 0.25, 0.5}, {0.5, 0.75, 0.25, 0.5}, {0.75, 1, 0.25, 0.5},
-}
-local function TestData(index)
-	local healthPercent = 0.95 - (index * 0.08)
-	if healthPercent < 0.15 then healthPercent = 0.15 + (index * 0.05) end
-	return {
-		name = Pick(NAMES, index),
-		class = Pick(CLASS_TOKENS, index),
-		hp = healthPercent,
-		pp = 1 - (index * 0.07),
-		marker = index <= 8 and index or nil,
-	}
-end
-
-local function ApplyTestVisuals(frame, data, showCast)
-	if frame.Health then
-		frame.Health:SetMinMaxValues(0, 100)
-		frame.Health:SetValue(data.hp * 100)
-		local classColor = RAID_CLASS_COLORS[data.class]
-		if classColor then
-			frame.Health:SetStatusBarColor(classColor.r, classColor.g, classColor.b)
+local function Animate(_, elapsed)
+	local settings = UnitFrames.GetSettings()
+	for _, entry in pairs(testFrames) do
+		local frame, sample = entry.frame, entry.sample
+		local unitSettings = UnitFrames.GetUnitSettings(entry.unitType)
+		entry.healthTimer = entry.healthTimer + elapsed
+		if entry.healthTimer > entry.healthWait then
+			entry.healthTimer = 0
+			entry.healthWait = 0.4 + random() * 0.8
+			sample.hp = floor(max(15, min(95, sample.hp + (random() < 0.7 and -(5 + random() * 15) or (3 + random() * 7)))))
+			frame.Health:SetValue(sample.hp)
+			SetTagText(frame, 'HealthText', unitSettings, settings, 'healthFormat', sample.hp, sample.pp)
+		end
+		entry.powerTimer = entry.powerTimer + elapsed
+		if entry.powerTimer > entry.powerWait then
+			entry.powerTimer = 0
+			entry.powerWait = 0.3 + random() * 0.5
+			sample.pp = floor(max(5, min(95, sample.pp + (random() < 0.5 and -(10 + random() * 20) or (5 + random() * 15)))))
+			if frame.Power:IsShown() then frame.Power:SetValue(sample.pp) end
+			SetTagText(frame, 'PowerText', unitSettings, settings, 'powerFormat', sample.hp, sample.pp)
+		end
+		local cast = sampleCasts[frame]
+		if cast then
+			cast.value = (cast.value + elapsed * CAST_SPEED) % 100
+			frame.Castbar:SetValue(cast.value)
+			frame.Castbar.Time:SetFormattedText('%.1f', cast.value / CAST_SPEED)
 		end
 	end
-	if frame.Power and frame.Power:IsShown() then
-		frame.Power:SetMinMaxValues(0, 100)
-		frame.Power:SetValue(max(0, data.pp * 100))
-	end
-	if frame.Name then
-		frame.Name:SetText(data.name)
-		local classColor = RAID_CLASS_COLORS[data.class]
-		if classColor then frame.Name:SetTextColor(classColor.r, classColor.g, classColor.b) end
-	end
-	if frame.HealthText then frame.HealthText:SetText(floor(data.hp * 100) .. '%') end
-	SetFakeCustomTags(frame, floor(data.hp * 100), floor(data.pp * 100))
-	if frame.RaidTargetIndicator and data.marker then
-		frame.RaidTargetIndicator:SetTexture(BUI.C.RAID_ICON_TEXTURE)
-		frame.RaidTargetIndicator:SetTexCoord(unpack(RAID_MARKER_COORDS[data.marker]))
-		frame.RaidTargetIndicator:Show()
-	elseif frame.RaidTargetIndicator then
-		frame.RaidTargetIndicator:Hide()
-	end
-	if showCast then
-		frame._testCastActive = true
-		frame._testCastValue = 0
-		frame._testCastIcon = CAST_ICONS[((data.marker or 1) % #CAST_ICONS) + 1]
-	end
 end
 
-local function ShowEmbeddedCastbar(frame)
-	if not frame or not frame._testCastActive then return end
-	local castbar = frame.Castbar
-	if not castbar then return end
-
-	local barType = castbar._barType
-	local castbarSettings = barType and BUI.CastBar.GetSettings(barType)
-	local showIcon = castbarSettings and castbarSettings.showIcon
-
-	castbar.holdTime = 1e9
-	castbar:SetMinMaxValues(0, 100)
-	castbar:SetValue(0)
-	castbar:Show()
-	if castbar.Text then castbar.Text:SetText('Test Cast') castbar.Text:Show() end
-	if castbar.Icon then
-		castbar.Icon:SetTexture(frame._testCastIcon or 136243)
-		castbar.Icon:SetShown(showIcon ~= false)
-	end
-	if castbar._iconFrame then castbar._iconFrame:SetShown(showIcon ~= false) end
-	if castbar.Time then castbar.Time:SetText('0.0') castbar.Time:Show() end
-	local container = castbar._container or castbar:GetParent()
-	if container and container ~= frame then container:Show() end
-end
-
-local OnAnimUpdate = BUI.Profiler.Wrap('UnitFrames.Preview test animation', function(_, elapsed)
-	for _, entry in pairs(animEntries) do
-		local frame = entry.frame
-		entry.ht = (entry.ht or 0) + elapsed
-		if entry.ht > (entry.hn or 0.5) then
-			entry.ht = 0
-			entry.hn = 0.4 + random() * 0.8
-			entry.hp = max(0.15, min(0.95, entry.hp + (random() < 0.7 and -(0.05 + random() * 0.15) or (0.03 + random() * 0.07))))
-			if frame.Health then frame.Health:SetValue(entry.hp * 100) end
-			if frame.HealthText then frame.HealthText:SetText(floor(entry.hp * 100) .. '%') end
-		end
-		entry.pt = (entry.pt or 0) + elapsed
-		if entry.pt > (entry.pn or 0.6) then
-			entry.pt = 0
-			entry.pn = 0.3 + random() * 0.5
-			entry.pp = max(0.05, min(0.95, entry.pp + (random() < 0.5 and -(0.1 + random() * 0.2) or (0.05 + random() * 0.15))))
-			if frame.Power and frame.Power:IsShown() then frame.Power:SetValue(entry.pp * 100) end
-		end
-		if frame._testCastActive then
-			frame._testCastValue = (frame._testCastValue or 0) + elapsed * 25
-			if frame._testCastValue > 100 then frame._testCastValue = 0 end
-			local castbar = frame.Castbar
-			if castbar and castbar:IsShown() then
-				castbar:SetValue(frame._testCastValue)
-				if castbar.Time then castbar.Time:SetFormattedText('%.1f', frame._testCastValue / 25) end
-			end
-		end
-	end
-end)
-
-function UnitFrames.ShowAll()
+local function ShowAll()
 	if InCombatLockdown() then BUI.Print('Cannot show test mode during combat.') return end
 	if testActive then return end
 	testActive = true
-	wipe(animEntries)
-	wipe(testFrames)
-	UnitFrames.InvalidateSettingsCache()
-
 	local index = 0
 	for _, unitType in ipairs(ALL_UNITS) do
-		local unitSettings = UnitFrames.GetUnitSettings(unitType == 'boss' and 'boss' or unitType)
-		if not active[unitType] and unitSettings.enabled ~= false then
-			if unitType == 'boss' then
-				local found = false
-				for bossIndex = 1, 5 do
-					local bossFrame = GetFrame('boss', bossIndex)
-					if bossFrame then
-						found = true
-						index = index + 1
-						local data = TestData(index)
-						ShowUnit(bossFrame, 'boss', bossIndex)
-						ApplyTestVisuals(bossFrame, data, true)
-						ShowEmbeddedCastbar(bossFrame)
-						testFrames['boss' .. bossIndex] = bossFrame
-						animEntries['boss' .. bossIndex] = { frame = bossFrame, hp = data.hp, pp = data.pp }
-					end
-				end
-				if found then active[unitType] = true end
-			else
-				local frame = GetFrame(unitType)
+		if not active[unitType] and UnitFrames.GetUnitSettings(unitType).enabled ~= false then
+			local count = unitType == 'boss' and 5 or 1
+			for frameIndex = 1, count do
+				local bossIndex = unitType == 'boss' and frameIndex or nil
+				local frame = GetFrame(unitType, bossIndex)
 				if frame then
 					index = index + 1
-					local data = TestData(index)
-					local showCast = unitType == 'player' or unitType == 'target' or unitType == 'focus'
-					if unitType ~= 'player' then UnregisterUnitWatch(frame) savedWatch[unitType] = true end
-					Freeze(frame)
-					frame:Show()
-					ApplyTestVisuals(frame, data, showCast)
-					if showCast then ShowEmbeddedCastbar(frame) end
-					testFrames[unitType] = frame
-					animEntries[unitType] = { frame = frame, hp = data.hp, pp = data.pp }
-					active[unitType] = true
+					active[unitType] = 'test'
+					local sample = { hp = max(15, 95 - index * 8), pp = max(5, 100 - index * 7), name = Pick(NAMES, index), classIndex = index }
+					ShowUnit(frame, unitType, bossIndex, sample)
+					if index <= 8 then
+						frame.RaidTargetIndicator:SetTexture(BUI.C.RAID_ICON_TEXTURE)
+						frame.RaidTargetIndicator:SetTexCoord(unpack(RAID_MARKER_COORDS[index]))
+						frame.RaidTargetIndicator:Show()
+					end
+					ShowSampleCast(frame, unitType, index)
+					testFrames[WatchKey(unitType, bossIndex)] = {
+						frame = frame, unitType = unitType, index = bossIndex, sample = sample,
+						healthTimer = 0, healthWait = 0.5, powerTimer = 0, powerWait = 0.6,
+					}
 				end
 			end
 		end
 	end
-
-	for bossIndex = 1, 5 do
-		local bossFrame = UnitFrames['boss' .. bossIndex]
-		if bossFrame and bossFrame.Castbar then
-			BUI.CastBar.ApplyBossCastbar(bossFrame, bossIndex)
-		end
+	if not animFrame then
+		animFrame = CreateFrame('Frame')
+		animFrame:SetScript('OnUpdate', BUI.Profiler.Wrap('UnitFrames.Preview test animation', Animate))
 	end
-
-	for _, unitType in ipairs({ 'player', 'target', 'focus' }) do
-		local frame = testFrames[unitType]
-		if frame and frame.Castbar then
-			BUI.CastBar.ApplyCastbar(frame, unitType)
-		end
-	end
-
-	if not animFrame then animFrame = CreateFrame('Frame') end
-	animFrame:SetScript('OnUpdate', OnAnimUpdate)
+	animFrame:Show()
 	BUI.Print('Test mode |cff00ff00enabled|r. Type |cff' .. BUI.C.COLOR_PINK .. '/buitest|r to disable.')
 end
 
-function UnitFrames.HideAll()
+local function HideAll()
 	if not testActive then return end
 	if InCombatLockdown() then
-		QueueAfterCombat()
+		BUI.Events:AfterCombat(HideAll, 'UF.Preview.HideAll')
 		return
 	end
 	testActive = false
-
-	if animFrame then animFrame:SetScript('OnUpdate', nil) end
-	wipe(animEntries)
-
-	for key, frame in pairs(testFrames) do
-		frame._testCastActive = nil
-		frame._testCastValue = nil
-		frame._testCastIcon = nil
-		local castbar = frame.Castbar
-		if castbar then
-			castbar.holdTime = 0
-			BUI.CastBar.HideQuietly(castbar)
-		end
-		if frame.RaidTargetIndicator then frame.RaidTargetIndicator:Hide() end
-		HideFakeAuras(frame, key)
-		Thaw(frame)
-		if savedWatch[key] then
-			RegisterUnitWatch(frame)
-			savedWatch[key] = nil
-		end
+	animFrame:Hide()
+	for key, entry in pairs(testFrames) do
+		active[entry.unitType] = nil
+		HideUnit(entry.frame, entry.unitType, entry.index)
+		ReleaseTestFrame(key)
 	end
-
-	for key in pairs(testFrames) do
-		local unitType = key:match('^boss') and 'boss' or key
-		active[unitType] = nil
-		UnitFrames._previewFrames[unitType] = nil
-	end
-	wipe(testFrames)
 	UnitFrames:Refresh()
-
 	BUI.Print('Test mode |cffff6600disabled|r.')
 end
 
-function UnitFrames.ToggleShowAll()
-	if testActive then UnitFrames.HideAll() else UnitFrames.ShowAll() end
-end
-
-function UnitFrames.IsShowAllActive()
-	return testActive
-end
-
-UnitFrames.TestMode = { Toggle = UnitFrames.ToggleShowAll, IsActive = UnitFrames.IsShowAllActive }
-
+UnitFrames.TestMode = {
+	Toggle = function() if testActive then HideAll() else ShowAll() end end,
+	IsActive = function() return testActive end,
+}

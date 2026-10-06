@@ -367,3 +367,143 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit)
 		return board
 	end
 end
+
+local GRID_HEAD = 32
+local GRID_ROW = 34
+local GRID_GROUP = 24
+local GRID_PAD = 10
+local GRID_BOX = 26
+local GRID_GAP = 8
+
+local Grid = setmetatable({}, { __index = Section })
+Grid.__index = Grid
+
+local function FullRule(grid)
+	local rule = grid.rows[#grid.rows].rule
+	rule:ClearAllPoints()
+	rule:SetPoint('TOPLEFT')
+	rule:SetPoint('TOPRIGHT')
+end
+
+function Grid:AddGroup(label)
+	local row = Section.AddRow(self, '')
+	row:SetHeight(GRID_GROUP)
+	self.window:Fill(row, 'gridGroup', 'BACKGROUND', 1):SetAllPoints()
+	self.kit.Text(row, label:upper(), 10, 'muted', nil, 'title'):SetPoint('LEFT', GRID_PAD, 0)
+	FullRule(self)
+	return row
+end
+
+function Grid:AddTools(name, sub, tools, after)
+	local kit = self.kit
+	local groups = {}
+	for _, tool in ipairs(tools) do
+		local slot = Layout.ToolSlot(tool)
+		groups[slot] = groups[slot] or {}
+		table.insert(groups[slot], tool)
+	end
+	local cells = {}
+	for index, column in ipairs(self.columns) do
+		if column.slot == 'name' then
+			cells[index] = name
+		elseif column.slot == 'sub' then
+			cells[index] = { text = sub or '', role = 'muted' }
+		else
+			local slotTools = groups[column.slot]
+			cells[index] = { build = function(row, x, cellWidth)
+				if not slotTools then return end
+				local controls, total = {}, -GRID_GAP
+				for _, tool in ipairs(slotTools) do
+					local control = kit.Tool(row, tool, after)
+					if Layout.ToolSlot(tool) == 'input' then control:SetWidth(cellWidth) end
+					controls[#controls + 1] = control
+					total = total + control:GetWidth() + GRID_GAP
+				end
+				local cursor = column.align == 'CENTER' and x + math.floor((cellWidth - total) / 2) or x
+				for _, control in ipairs(controls) do
+					control:SetPoint('LEFT', cursor, 0)
+					cursor = cursor + control:GetWidth() + GRID_GAP
+				end
+			end }
+		end
+	end
+	return self:AddLine(cells, name .. ' ' .. (sub or ''))
+end
+
+function Grid:AddLine(cells, search)
+	local kit, window = self.kit, self.window
+	local row = Section.AddRow(self, search)
+	row:SetHeight(self.rowHeight)
+	for index, cell in ipairs(cells) do
+		local column = self.columns[index]
+		local inner = column.width - GRID_PAD * 2
+		if type(cell) == 'table' and cell.build then
+			cell.build(row, column.x + GRID_PAD, inner)
+		elseif type(cell) == 'table' and cell.copy then
+			local box = CreateFrame('Frame', nil, row)
+			box:SetSize(inner, GRID_BOX)
+			box:SetPoint('LEFT', column.x + GRID_PAD, 0)
+			kit.Box(box, 'textbox', 'inputEdge')
+			local edit = CreateFrame('EditBox', nil, box)
+			edit:SetPoint('LEFT', GRID_PAD, 0)
+			edit:SetPoint('RIGHT', -GRID_PAD, 0)
+			edit:SetHeight(GRID_BOX)
+			edit:SetAutoFocus(false)
+			edit:SetFont(window.font, 12, '')
+			window:Paint(edit, 'text')
+			window:SetFontRole(edit, 'control')
+			edit:SetText(cell.copy)
+			edit:SetScript('OnTextChanged', function(self, userInput) if userInput then self:SetText(cell.copy) end end)
+			edit:SetScript('OnEnterPressed', function(self) self:ClearFocus() end)
+			edit:SetScript('OnEscapePressed', function(self) self:ClearFocus() end)
+			edit:SetScript('OnEditFocusGained', function(self) self:HighlightText() end)
+			edit:SetScript('OnEditFocusLost', function(self) self:HighlightText(0, 0) end)
+			box:EnableMouse(true)
+			box:SetScript('OnMouseDown', function() edit:SetFocus() end)
+		else
+			local value = type(cell) == 'table' and cell.text or cell
+			local label = kit.Text(row, value, 12, type(cell) == 'table' and cell.role or 'text', inner)
+			label:SetPoint('LEFT', column.x + GRID_PAD, 0)
+			label:SetJustifyH(column.align or 'LEFT')
+			label:SetWordWrap(false)
+		end
+	end
+	FullRule(self)
+	return row
+end
+
+Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window)
+	function kit.Grid(parent, width, spec)
+		local grid = setmetatable(kit.Section(parent, width, { stacked = true, title = spec.title, description = spec.description }), Grid)
+		grid.kit = kit
+		grid.headHeight = GRID_HEAD
+		grid.rowHeight = spec.rowHeight or GRID_ROW
+		local panel = grid.panel
+		local head = window:Fill(panel, 'gridHead', 'BACKGROUND', 1)
+		head:SetPoint('TOPLEFT')
+		head:SetPoint('TOPRIGHT')
+		head:SetHeight(GRID_HEAD)
+		local underline = window:Fill(panel, 'rule', 'ARTWORK')
+		underline:SetPoint('TOPLEFT', 0, -(GRID_HEAD - 1))
+		underline:SetPoint('TOPRIGHT', 0, -(GRID_HEAD - 1))
+		underline:SetHeight(1)
+		grid.columns = {}
+		local x = 0
+		for index, column in ipairs(spec.columns) do
+			local columnWidth = column.width or (width - x)
+			grid.columns[index] = { x = x, width = columnWidth, align = column.align, slot = column.slot }
+			local title = kit.Text(panel, column.title, 12, 'text', columnWidth - GRID_PAD * 2, 'title')
+			title:SetPoint('LEFT', panel, 'TOPLEFT', x + GRID_PAD, -GRID_HEAD / 2)
+			title:SetJustifyH(column.align or 'LEFT')
+			title:SetWordWrap(false)
+			if index > 1 then
+				local divider = window:Fill(panel, 'rule', 'ARTWORK')
+				divider:SetPoint('TOPLEFT', x, 0)
+				divider:SetPoint('BOTTOMLEFT', x, 0)
+				divider:SetWidth(1)
+			end
+			x = x + columnWidth
+		end
+		return grid
+	end
+end

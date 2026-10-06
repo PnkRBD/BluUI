@@ -269,7 +269,7 @@ local function Style(self, unit)
 	self.Absorb = absorb
 
 	local healAbsorb = CreateFrame('StatusBar', nil, absorbClip)
-	healAbsorb:SetFrameLevel(absorbClip:GetFrameLevel() + 1)
+	healAbsorb:SetFrameLevel(absorbClip:GetFrameLevel() + 2)
 	self.HealAbsorb = healAbsorb
 	self.AbsorbBars = { Damage = absorb, Heal = healAbsorb }
 
@@ -330,11 +330,9 @@ local function Style(self, unit)
 	overlay:EnableMouse(false)
 	self.TextOverlay = overlay
 
-	local function PositiveOr(value, fallback) return (type(value) == 'number' and value > 0) and value or fallback end
-	local textSize = PositiveOr(unitSettings.textSize, 12)
-	local nameTextSize = PositiveOr(UnitFrames.TextSetting(unitSettings, 'nameTextSize'), textSize)
-	local healthTextSize = PositiveOr(UnitFrames.TextSetting(unitSettings, 'healthTextSize'), textSize)
-	local powerTextSize = PositiveOr(UnitFrames.TextSetting(unitSettings, 'powerTextSize'), textSize - 2)
+	local nameTextSize = UnitFrames.TextSetting(unitSettings, 'nameTextSize')
+	local healthTextSize = UnitFrames.TextSetting(unitSettings, 'healthTextSize')
+	local powerTextSize = UnitFrames.TextSetting(unitSettings, 'powerTextSize')
 
 	local name = overlay:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(name, nameTextSize, font)
@@ -350,7 +348,7 @@ local function Style(self, unit)
 	self.HealthText = healthText
 
 	local statusText = overlay:CreateFontString(nil, 'OVERLAY')
-	Pixel.ApplyFont(statusText, PositiveOr(UnitFrames.TextSetting(unitSettings, 'statusTextSize'), textSize + 2), font)
+	Pixel.ApplyFont(statusText, UnitFrames.TextSetting(unitSettings, 'statusTextSize'), font)
 	statusText:SetPoint('CENTER', health, 'CENTER', 0, 0)
 	statusText:Hide()
 	self.StatusText = statusText
@@ -419,15 +417,15 @@ local function Style(self, unit)
 	levelText:Hide()
 	self.LevelText = levelText
 
-	if unitType == 'player' or unitType == 'target' or unitType == 'focus' or unitType == 'boss' or unitType == 'targettarget' then
+	if config.hasAuras then
 		UnitFrames.CreateAuraElements(self, unitType)
 	end
 
-	if unitType == 'boss' then
+	if unitType == 'boss' and not self._stage then
 		BUI.CastBar.CreateBossCastbar(self)
 	end
 
-	if unitType == 'player' or unitType == 'target' or unitType == 'focus' then
+	if (unitType == 'player' or unitType == 'target' or unitType == 'focus') and not self._stage then
 		BUI.CastBar.CreateCastbar(self, unitType)
 	end
 
@@ -450,5 +448,11 @@ local function Style(self, unit)
 	)
 end
 
+local function StageStyle(self, unit)
+	self._stage = true
+	Style(self, unit)
+end
+
 oUF:RegisterStyle('BluUI', Style)
+oUF:RegisterStyle('BluUIStage', StageStyle)
 oUF:SetActiveStyle('BluUI')

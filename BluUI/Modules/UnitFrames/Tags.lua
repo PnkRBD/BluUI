@@ -133,66 +133,6 @@ local function Abbreviate(number)
 	return AbbreviateNumbers(number)
 end
 
-local ALL = {player = true, target = true, targettarget = true, focus = true, pet = true, boss = true}
-local PLAYER_ONLY = {player = true}
-local NO_PET = {player = true, target = true, targettarget = true, focus = true, boss = true}
-local PLAYERS = {player = true, target = true, targettarget = true, focus = true}
-local HOSTILE = {target = true, targettarget = true, focus = true, boss = true}
-local TARGETABLE = {player = true, target = true, targettarget = true, focus = true, pet = true, boss = true}
-local CREATURES = {target = true, targettarget = true, focus = true, pet = true, boss = true}
-
-local TagMeta = {
-	['hp']             = {u = ALL,        d = 'Current HP or Dead'},
-	['hp:short']       = {u = ALL,        d = 'HP abbreviated or Dead'},
-	['maxhp']          = {u = ALL,        d = 'Max HP'},
-	['maxhp:short']    = {u = ALL,        d = 'Max HP abbreviated'},
-	['perhp']          = {u = ALL,        d = 'HP percent'},
-	['pp']             = {u = ALL,        d = 'Current power'},
-	['pp:short']       = {u = ALL,        d = 'Power abbreviated'},
-	['maxpp']          = {u = ALL,        d = 'Max power'},
-	['maxpp:short']    = {u = ALL,        d = 'Max power abbreviated'},
-	['perpp']          = {u = ALL,        d = 'Power percent'},
-	['mana']           = {u = ALL,        d = 'Current mana'},
-	['mana:short']     = {u = ALL,        d = 'Mana abbreviated'},
-	['maxmana']        = {u = ALL,        d = 'Max mana'},
-	['maxmana:short']  = {u = ALL,        d = 'Max mana abbreviated'},
-	['permana']        = {u = ALL,        d = 'Mana percent'},
-	['powertype']      = {u = ALL,        d = 'Power type name'},
-	['absorbs']        = {u = ALL,        d = 'Absorb shield amount'},
-	['hpabsorb']       = {u = ALL,        d = 'HP plus absorb shield'},
-	['hpabsorb:short'] = {u = ALL,        d = 'HP plus absorb (abbreviated)'},
-	['name']           = {u = ALL,        d = 'Unit name'},
-	['name:short']     = {u = ALL,        d = 'Name truncated (10 chars)'},
-	['level']          = {u = ALL,        d = 'Unit level'},
-	['class']          = {u = PLAYERS,    d = 'Class uppercase'},
-	['classname']      = {u = PLAYERS,    d = 'Class name'},
-	['race']           = {u = PLAYERS,    d = 'Race'},
-	['classification'] = {u = HOSTILE,    d = 'Elite/Rare/Boss'},
-	['status']         = {u = ALL,        d = 'Dead/Ghost/Offline'},
-	['dead']           = {u = ALL,        d = 'Dead indicator'},
-	['offline']        = {u = NO_PET,     d = 'Offline indicator'},
-	['afk']            = {u = NO_PET,     d = 'AFK indicator'},
-	['dnd']            = {u = NO_PET,     d = 'DND indicator'},
-	['resting']        = {u = PLAYER_ONLY,d = 'Resting indicator'},
-	['combat']         = {u = ALL,        d = 'In combat indicator'},
-	['combattime']     = {u = PLAYER_ONLY,d = 'Combat duration timer'},
-	['creature']       = {u = CREATURES,  d = 'Pet family or creature type'},
-	['creaturefamily'] = {u = CREATURES,  d = 'Pet family'},
-	['creaturetype']   = {u = CREATURES,  d = 'Creature type'},
-	['server']         = {u = ALL,        d = 'Server name'},
-	['target']         = {u = TARGETABLE, d = "Target's name"},
-	['name:target']    = {u = TARGETABLE, d = 'Name > Target'},
-	['group']          = {u = ALL,        d = 'Raid group number'},
-	['itemlevel']      = {u = NO_PET,     d = 'Item level'},
-	['spec']           = {u = PLAYERS,    d = 'Specialization name'},
-	['title']          = {u = PLAYERS,    d = 'Player title'},
-	['difficulty']     = {u = PLAYER_ONLY,d = 'Instance difficulty'},
-	['role']           = {u = NO_PET,     d = 'Role icon (tank/healer/dps)'},
-	['role:text']      = {u = NO_PET,     d = 'Role text (Tank/Healer/DPS)'},
-	['threat']         = {u = PLAYER_ONLY,d = 'Threat % on target'},
-	['range']          = {u = HOSTILE,    d = 'Distance estimate in yards'},
-}
-
 local TagEvents = {
 	['hp']             = 'UNIT_HEALTH UNIT_MAXHEALTH UNIT_CONNECTION',
 	['hp:short']       = 'UNIT_HEALTH UNIT_MAXHEALTH UNIT_CONNECTION',
@@ -833,15 +773,6 @@ function UnitFrames.ApplyCustomTags(frame)
 			fontString:Show()
 		end
 	end
-end
-
-function UnitFrames.IsTagValidForUnit(tagName, unitType)
-	local base = tagName:match('^name:short%d+$') and 'name:short'
-		or tagName:match('^name%d*:target') and 'name:target'
-		or tagName
-	local meta = TagMeta[base]
-	if not meta then return true end
-	return meta.u[unitType] == true
 end
 
 local PreviewCache = {}
