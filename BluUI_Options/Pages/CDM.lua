@@ -1351,7 +1351,7 @@ end
 local RAIL_GROUPS = {
 	{ title = 'Settings', items = {
 		{ id = 'general', label = 'General', icon = 'cog' },
-		{ id = 'layouts', label = 'Layouts', icon = 'save' },
+		{ id = 'layouts', label = 'Layouts', icon = 'layout' },
 		{ id = 'icons', label = 'Icon management', icon = 'grabber' },
 	} },
 	{ title = 'Viewers', items = {
