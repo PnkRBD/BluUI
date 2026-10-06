@@ -39,7 +39,7 @@ local function OpenSkinSettings(id, info, parentOverride, savedScroll)
 	overlay:EnableMouse(true)
 	overlay:EnableKeyboard(true)
 
-	local panel = Widget.New(overlay, 'Frame', nil, {bg = Colors.bg.dark, border = Colors.border.default, size = {PANEL_WIDTH, PANEL_HEIGHT}}).frame
+	local panel = Widget.New(overlay, 'Frame', nil, {bg = { BUI.ThemeColor('page') }, border = { BUI.ThemeColor('edge') }, size = {PANEL_WIDTH, PANEL_HEIGHT}}).frame
 	panel:SetPoint('CENTER', overlay, 'CENTER', 0, 0)
 	panel:SetFrameLevel(overlay:GetFrameLevel() + 5)
 	panel:SetClampedToScreen(true)
@@ -92,7 +92,7 @@ local function OpenSkinSettings(id, info, parentOverride, savedScroll)
 	headerRule:SetHeight(Pixel.PixelSize(1))
 	headerRule:SetPoint('TOPLEFT', 0, Pixel.Scale(-(TITLE_HEIGHT - 2)))
 	headerRule:SetPoint('TOPRIGHT', 0, Pixel.Scale(-(TITLE_HEIGHT - 2)))
-	BUI.Tools.SetColorTex(headerRule, unpack(Colors.border.default))
+	BUI.Tools.SetColorTex(headerRule, BUI.ThemeColor('cardEdge'))
 
 	if tabs then
 		local tabBar = Controls.TabLineBar(panel, tabs, tabIndex, function(index)
@@ -117,7 +117,7 @@ local function OpenSkinSettings(id, info, parentOverride, savedScroll)
 	footerRule:SetHeight(Pixel.PixelSize(1))
 	footerRule:SetPoint('BOTTOMLEFT', 0, Pixel.Scale(FOOTER_HEIGHT))
 	footerRule:SetPoint('BOTTOMRIGHT', 0, Pixel.Scale(FOOTER_HEIGHT))
-	BUI.Tools.SetColorTex(footerRule, unpack(Colors.border.default))
+	BUI.Tools.SetColorTex(footerRule, BUI.ThemeColor('cardEdge'))
 
 	local summary = panel:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(summary, 10, NARROW_FONT, '')
