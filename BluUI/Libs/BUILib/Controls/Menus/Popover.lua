@@ -44,7 +44,7 @@ function Controls.Popover(options)
 	local totalHeight     = contentTop + height + PADDING
 
 	local frameWidget = Widget.New({ frame = UIParent }, "Frame", nil, {
-		bg = Theme.bg.dark, border = Theme.border.light, size = { width, totalHeight },
+		bg = options.bg or Theme.bg.dark, border = options.border or Theme.border.light, size = { width, totalHeight },
 	})
 	local frame = frameWidget.frame
 	frame:SetFrameStrata(BUILib.GetPopupStrata())

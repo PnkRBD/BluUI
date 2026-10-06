@@ -243,6 +243,7 @@ function BUI.AuraRuleEditor(parent, options)
 		end
 		Controls.Popover({
 			anchor = button, width = 320, height = 254, title = 'PRIORITY RULES, TOP WINS',
+			bg = { Window():Color('page') }, border = { Window():Color('edge') },
 			build = function(panel)
 				local list
 				local function Fill()
