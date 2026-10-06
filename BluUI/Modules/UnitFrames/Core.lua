@@ -58,7 +58,7 @@ local FILL_TEXTURES = {
 	Solid = WHITE_TEX,
 }
 local OVERLAY_TEXTURES = {
-	Stripes = [[Interface\RaidFrame\Shield-Overlay]],
+	Stripes = BUI.C.MEDIA_PATH .. 'stripes.tga',
 }
 
 local function ResolveAbsorbTexture(config, default)

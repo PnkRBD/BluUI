@@ -17,7 +17,7 @@ local FILL_TEXTURES = {
 	Solid = "Interface\\AddOns\\BluUI\\Media\\Textures\\solid.tga",
 }
 local OVERLAY_TEXTURES = {
-	Stripes = "Interface\\RaidFrame\\Shield-Overlay",
+	Stripes = BUI.C.MEDIA_PATH .. 'stripes.tga',
 }
 
 local NAME_TAG   = "[blu:name]"
@@ -278,7 +278,7 @@ local function BuildAbsorb(frame, unit)
 	frame.Absorb = absorb
 
 	local healAbsorb = CreateFrame("StatusBar", nil, clip)
-	healAbsorb:SetFrameLevel(clip:GetFrameLevel() + 1)
+	healAbsorb:SetFrameLevel(clip:GetFrameLevel() + 2)
 	GroupFrames.ApplyAbsorbVisual(healAbsorb, settings.healAbsorb)
 	AnchorAbsorb(healAbsorb, frame.Health, settings.healAbsorb.direction)
 
