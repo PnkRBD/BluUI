@@ -273,9 +273,6 @@ local function FramesBoard(ui, parent, width, key)
 		Option(section, 'Width', 'width', { min = 50, max = 300, step = 1 }),
 		Option(section, 'Height', 'height', { min = 18, max = 80, step = 1 }),
 		Option(section, 'Frame spacing', 'spacing', { min = 0, max = 40, step = 1 }),
-		Toggle(section, 'Power bars', 'showPower'),
-		Option(section, 'Power height', 'powerHeight', { min = 0, max = 16, step = 1 }),
-		Toggle(section, 'Mana on healers only', 'healerOnlyPower'),
 	}
 	if not isParty then
 		sizing[#sizing + 1] = Option(section, 'Group spacing', 'groupSpacing', { min = 0, max = 40, step = 1 })
@@ -283,9 +280,16 @@ local function FramesBoard(ui, parent, width, key)
 	end
 	sizing[#sizing + 1] = Toggle(section, 'Vertical layout', 'vertical')
 	if not isParty then sizing[#sizing + 1] = Toggle(section, 'Grow upward', 'growUp') end
-	board:AddTools('Frames', 'Texture, size, spacing and power bars', {
+	board:AddTools('Frames', 'Texture, size and spacing', {
 		Menu(section, 'statusbarTexture', textures, WIDE_MENU),
-		{ tooltip = 'Size, spacing and power bars', title = 'Frames', options = sizing },
+		{ tooltip = 'Size and spacing', title = 'Frames', options = sizing },
+	}, Refresh)
+	board:AddTools('Power bar', 'Resource bar under the health bar', {
+		{ icon = 'resize', tooltip = 'Height and healer-only mana', title = 'Power bar', options = {
+			Option(section, 'Bar height', 'powerHeight', { min = 0, max = 16, step = 1 }),
+			Toggle(section, 'Mana on healers only', 'healerOnlyPower'),
+		} },
+		Toggle(section, nil, 'showPower'),
 	}, Refresh)
 
 	local look = ui.Board(parent, width, {
