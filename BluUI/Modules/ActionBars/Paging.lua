@@ -74,3 +74,4 @@ end
 function ActionBars.RefreshPaging()
 	for barIndex = 1, #ActionBars.COMMAND_FOR_BAR do RefreshBarPaging(barIndex) end
 end
+ActionBars.RefreshBarPaging = RefreshBarPaging

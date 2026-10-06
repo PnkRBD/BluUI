@@ -221,20 +221,27 @@ local function SyncHeaderMotion(bar, barSettings)
 	header:SetMouseMotionEnabled(wanted)
 end
 
-function ActionBars.RefreshFade()
-	for _, bar in pairs(ActionBars.bars) do
-		EnsureHooks(bar)
-		local barSettings = ActionBars.GetBarSettings(bar.key)
-		SyncHeaderMotion(bar, barSettings)
-		if barSettings.enabled then
-			if barSettings.fadeEnabled then
-				bar.hovered = CursorOverBar(bar)
-			else
-				StopGapWatch(bar)
-			end
-			SetAlphaTarget(bar, TargetAlpha(bar, barSettings), FadeSeconds(barSettings))
+local function RefreshBarFade(bar)
+	EnsureHooks(bar)
+	local barSettings = ActionBars.GetBarSettings(bar.key)
+	SyncHeaderMotion(bar, barSettings)
+	if barSettings.enabled then
+		if barSettings.fadeEnabled then
+			bar.hovered = CursorOverBar(bar)
+		else
+			StopGapWatch(bar)
 		end
+		SetAlphaTarget(bar, TargetAlpha(bar, barSettings), FadeSeconds(barSettings))
 	end
+end
+
+function ActionBars.RefreshBarFade(key)
+	local bar = ActionBars.bars[key]
+	if bar then RefreshBarFade(bar) end
+end
+
+function ActionBars.RefreshFade()
+	for _, bar in pairs(ActionBars.bars) do RefreshBarFade(bar) end
 end
 
 function ActionBars.SetBarContentHidden(bar, hidden)

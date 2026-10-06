@@ -44,3 +44,9 @@ end
 function ActionBars.RefreshCooldownText()
 	ActionBars.ForEachButton(RefreshButtonCooldownText)
 end
+
+function ActionBars.RefreshBarCooldownText(key)
+	local bar = ActionBars.bars[key]
+	if not bar then return end
+	for _, button in ipairs(bar.buttons) do RefreshButtonCooldownText(button) end
+end
