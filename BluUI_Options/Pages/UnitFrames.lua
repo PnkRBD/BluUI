@@ -13,6 +13,8 @@ local TAB_STRIP_GAP = 12
 local LINE_WIDTH = 40
 local DEFAULT_ROW = 40
 local RESET_COLUMN = { '', 'reset', 42, 'CENTER' }
+local FRAME_COLUMNS = { { 'Setting', 'name', 130 }, { 'Shows', 'sub' }, { 'Colors', 'swatch', 140 }, { 'Options', 'icon', 110, 'CENTER' }, RESET_COLUMN, { 'Preview', 'toggle', 50, 'CENTER' }, { 'Enabled', 'switch', 70, 'CENTER' } }
+local TEXT_COLUMNS = { { 'Text', 'name', 110 }, { 'Tag', 'input' }, { 'Colors', 'swatch', 100 }, { 'Options', 'icon', 60, 'CENTER' }, RESET_COLUMN, { 'Enabled', 'switch', 70, 'CENTER' } }
 local SETTING_COLUMNS = { { 'Setting', 'name', 130 }, { 'Shows', 'sub' }, { 'Options', 'icon', 70, 'CENTER' }, RESET_COLUMN, { 'Enabled', 'switch', 70, 'CENTER' } }
 local BAR_COLUMNS = { { 'Setting', 'name', 130 }, { 'Shows', 'sub' }, { 'Colors', 'swatch', 100 }, { 'Options', 'icon', 60, 'CENTER' }, RESET_COLUMN, { 'Preview', 'toggle', 50, 'CENTER' }, { 'Enabled', 'switch', 70, 'CENTER' } }
 local DISPEL_COLUMNS = { { 'Setting', 'name', 130 }, { 'Shows', 'sub' }, { 'Colors', 'swatch', 140 }, { 'Options', 'icon', 60, 'CENTER' }, RESET_COLUMN, { 'Preview', 'toggle', 50, 'CENTER' }, { 'Enabled', 'switch', 70, 'CENTER' } }
@@ -1046,28 +1048,24 @@ local function UnitBoards(ui, parent, width, unit)
 	local unitSettings = settings[unitKey]
 	local description = unit.description
 	if IsDriven(unitKey) then description = description .. ' This frame copies the player frame, turn off the sync on Appearance to edit it on its own.' end
-	local board = ui.Board(parent, width, {
-		stacked = true,
-		title = unit.title,
-		description = description,
-	})
+	local board = ToolGrid(ui, parent, width, unit.title, description, FRAME_COLUMNS)
 	board:AddTools('Frame', 'Position, size, preview and on or off', {
 		PositionTool(unitKey, unitSettings),
 		{ icon = 'resize', tooltip = 'Width and height', title = unit.title, options = {
 			Option(unitSettings, 'Width', 'width', { min = 50, max = 1500, step = 1 }),
 			Option(unitSettings, 'Height', 'height', { min = 1, max = 500, step = 1 }),
 		} },
+		{ tooltip = 'Raid icon and level', title = unit.title, options = {
+			Toggle(unitSettings, 'Hide the raid icon', 'hideRaidIcon'),
+			Toggle(unitSettings, 'Hide the level', 'hideLevel'),
+		} },
 		PreviewEye(unitKey),
 		OnUnlessOff(unitSettings, nil, 'enabled'),
 	}, RefreshFrames)
-	board:AddSwitch('Hide the raid icon', function() return unitSettings.hideRaidIcon == true end, function(value)
-		unitSettings.hideRaidIcon = value
-		RefreshFrames()
-	end, 'No raid marker on this frame')
-	board:AddSwitch('Hide the level', function() return unitSettings.hideLevel == true end, function(value)
-		unitSettings.hideLevel = value
-		RefreshFrames()
-	end, 'No level text on this frame')
+	board:AddTools('Power bar', 'Resource bar under the health bar', {
+		{ icon = 'resize', tooltip = 'Height', title = 'Power bar', options = { Option(unitSettings, 'Bar height', 'powerHeight', { min = 1, max = 20, step = 1 }) } },
+		Toggle(unitSettings, nil, 'showPower'),
+	}, RefreshFrames)
 	if unitKey == 'player' then
 		board:AddTools('Power prediction', 'Preview the power cost of your cast', {
 			Color(unitSettings, 'Prediction color', 'powerPredictionColor'),
@@ -1092,68 +1090,51 @@ local function UnitBoards(ui, parent, width, unit)
 		}, RefreshFrames)
 	end
 
-	local text = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Text',
-		description = 'Name, health, status and power texts. Anything left alone follows the Default tags on the Tags pane.',
-	})
+	local text = ToolGrid(ui, parent, width, 'Text', 'Name, health, status and power texts. Type a tag to override the default for this frame, leave it empty to follow the Tags pane.', TEXT_COLUMNS)
+	local function FollowDefaults(prefix)
+		local reset = ResetTool(ui, 'This frame overrides the default size or position, click to follow the defaults again', function() return HasOverrides(unitSettings, prefix) end, function() ClearOverrides(unitSettings, prefix) end)
+		reset.slot = 'reset'
+		return reset
+	end
+	local function Placement(prefix, title, sizeMax, extra)
+		local options = extra or {}
+		options[#options + 1] = Inherit(unitSettings, 'Position', prefix .. 'Position', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS, separator = #options > 0 })
+		options[#options + 1] = Inherit(unitSettings, 'Text size', prefix .. 'TextSize', { min = 8, max = sizeMax, step = 1 })
+		options[#options + 1] = Inherit(unitSettings, 'Horizontal', prefix .. 'OffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 })
+		options[#options + 1] = Inherit(unitSettings, 'Vertical', prefix .. 'OffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 })
+		return { icon = 'text', tooltip = 'Position and size', title = title, options = options }
+	end
+	local nameExtras = { Toggle(unitSettings, 'Class or reaction color', 'classColorName') }
+	if unitKey == 'player' or unitKey == 'pet' then
+		nameExtras[#nameExtras + 1] = { kind = 'input', label = 'Custom name', width = NAME_WIDTH, placeholder = 'Real name', get = function() return unitSettings.customName or '' end, set = function(value) unitSettings.customName = value end }
+	end
 	text:AddTools('Name', 'Unit name on the health bar', {
+		TagInput(unitSettings, 'nameFormat', DefaultFormat('nameFormat', DEFAULT_TAGS.name)),
 		Color(unitSettings, 'Friendly', 'friendlyNameColor'),
 		Color(unitSettings, 'Neutral', 'neutralNameColor'),
 		Color(unitSettings, 'Hostile', 'hostileNameColor'),
-		ResetTool(ui, 'This frame overrides the default size or position, click to follow the defaults again', function() return HasOverrides(unitSettings, 'name') end, function() ClearOverrides(unitSettings, 'name') end),
-		{ icon = 'text', tooltip = 'Color, position and size', title = 'Name', options = {
-			Toggle(unitSettings, 'Class or reaction color', 'classColorName'),
-			Inherit(unitSettings, 'Position', 'namePosition', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
-			Inherit(unitSettings, 'Text size', 'nameTextSize', { min = 8, max = 20, step = 1 }),
-			Inherit(unitSettings, 'Horizontal', 'nameOffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-			Inherit(unitSettings, 'Vertical', 'nameOffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-		} },
+		Placement('name', 'Name', 20, nameExtras),
+		FollowDefaults('name'),
 		{ get = function() return ResolveShow(unitSettings.showName, settings.showName) end, set = function(value) unitSettings.showName = value end },
 	}, RefreshFrames)
-	text:AddTools('Name tag', 'Tag override for this frame', { TagInput(unitSettings, 'nameFormat', DefaultFormat('nameFormat', DEFAULT_TAGS.name)) }, RefreshFrames)
-	if unitKey == 'player' or unitKey == 'pet' then
-		text:AddTools('Custom name', 'Shown instead of the real name', {
-			{ kind = 'input', width = NAME_WIDTH, placeholder = 'Real name', get = function() return unitSettings.customName or '' end, set = function(value) unitSettings.customName = value end },
-		}, RefreshFrames)
-	end
-	text:AddTools('Health text', 'Health value on the bar', {
-		ResetTool(ui, 'This frame overrides the default size or position, click to follow the defaults again', function() return HasOverrides(unitSettings, 'health') end, function() ClearOverrides(unitSettings, 'health') end),
-		{ icon = 'text', tooltip = 'Position and size', title = 'Health text', options = {
-			Inherit(unitSettings, 'Position', 'healthPosition', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
-			Inherit(unitSettings, 'Text size', 'healthTextSize', { min = 8, max = 20, step = 1 }),
-			Inherit(unitSettings, 'Horizontal', 'healthOffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-			Inherit(unitSettings, 'Vertical', 'healthOffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-		} },
+	text:AddTools('Health', 'Health value on the bar', {
+		TagInput(unitSettings, 'healthFormat', DefaultFormat('healthFormat', DEFAULT_TAGS.health)),
+		Placement('health', 'Health text', 20),
+		FollowDefaults('health'),
 		{ get = function() return ResolveShow(unitSettings.showHealthText, settings.showHealthText) end, set = function(value) unitSettings.showHealthText = value end },
 	}, RefreshFrames)
-	text:AddTools('Status text', 'Dead, Ghost or Offline over the bar', {
-		ResetTool(ui, 'This frame overrides the default size or position, click to follow the defaults again', function() return HasOverrides(unitSettings, 'status') end, function() ClearOverrides(unitSettings, 'status') end),
-		{ icon = 'text', tooltip = 'Position and size', title = 'Status text', options = {
-			Inherit(unitSettings, 'Position', 'statusPosition', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
-			Inherit(unitSettings, 'Text size', 'statusTextSize', { min = 8, max = 24, step = 1 }),
-			Inherit(unitSettings, 'Horizontal', 'statusOffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-			Inherit(unitSettings, 'Vertical', 'statusOffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-		} },
+	text:AddTools('Status', 'Dead, Ghost or Offline over the bar', {
+		TagInput(unitSettings, 'statusFormat', DefaultFormat('statusFormat', DEFAULT_TAGS.status)),
+		Placement('status', 'Status text', 24),
+		FollowDefaults('status'),
 		{ get = function() return unitSettings.showStatusText ~= false end, set = function(value) unitSettings.showStatusText = value end },
 	}, RefreshFrames)
-	text:AddTools('Status tag', 'Tag override for this frame', { TagInput(unitSettings, 'statusFormat', DefaultFormat('statusFormat', DEFAULT_TAGS.status)) }, RefreshFrames)
-	text:AddTools('Health tag', 'Tag override for this frame', { TagInput(unitSettings, 'healthFormat', DefaultFormat('healthFormat', DEFAULT_TAGS.health)) }, RefreshFrames)
-	text:AddTools('Power bar', 'Resource bar under the health bar', {
-		{ icon = 'resize', tooltip = 'Height', title = 'Power bar', options = { Option(unitSettings, 'Bar height', 'powerHeight', { min = 1, max = 20, step = 1 }) } },
-		Toggle(unitSettings, nil, 'showPower'),
-	}, RefreshFrames)
-	text:AddTools('Power text', 'Resource value on the power bar', {
-		ResetTool(ui, 'This frame overrides the default size or position, click to follow the defaults again', function() return HasOverrides(unitSettings, 'power') end, function() ClearOverrides(unitSettings, 'power') end),
-		{ icon = 'text', tooltip = 'Position and size', title = 'Power text', options = {
-			Inherit(unitSettings, 'Position', 'powerPosition', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
-			Inherit(unitSettings, 'Text size', 'powerTextSize', { min = 8, max = 20, step = 1 }),
-			Inherit(unitSettings, 'Horizontal', 'powerOffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-			Inherit(unitSettings, 'Vertical', 'powerOffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-		} },
+	text:AddTools('Power', 'Resource value on the power bar', {
+		TagInput(unitSettings, 'powerFormat', DefaultFormat('powerFormat', DEFAULT_TAGS.power)),
+		Placement('power', 'Power text', 20),
+		FollowDefaults('power'),
 		{ get = function() return ResolveShow(unitSettings.showPowerText, settings.showPowerText, false) end, set = function(value) unitSettings.showPowerText = value end },
 	}, RefreshFrames)
-	text:AddTools('Power tag', 'Tag override for this frame', { TagInput(unitSettings, 'powerFormat', DefaultFormat('powerFormat', DEFAULT_TAGS.power)) }, RefreshFrames)
 
 	local boards = { board, text }
 	if UnitFrames().GetUnitConfig(unitKey).hasAuras then

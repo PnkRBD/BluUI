@@ -17,7 +17,7 @@ local entries = {
 	{ label = "Frame", page = "unitframes", tab = 3, panel = "Player frame", keywords = "player frame position anchor size width height preview enable" },
 	{ label = "Power prediction", page = "unitframes", tab = 3, panel = "Player frame", keywords = "power prediction combat border aggro border" },
 	{ label = "Name", page = "unitframes", tab = 3, panel = "Player frame", keywords = "name text color position size friendly hostile" },
-	{ label = "Health text", page = "unitframes", tab = 3, panel = "Player frame", keywords = "health text power text power bar tag position size" },
+	{ label = "Health", page = "unitframes", tab = 3, panel = "Text", keywords = "health text power text name status tag position size custom name" },
 	{ label = "Debuffs", page = "unitframes", tab = 3, panel = "Player frame", keywords = "debuffs buffs auras icons rules size growth anchor stacks cooldown" },
 	{ label = "Frame", page = "unitframes", tab = 4, panel = "Target frame", keywords = "target frame position size auras" },
 	{ label = "Frame", page = "unitframes", tab = 5, panel = "Target of target", keywords = "target of target frame position size" },
