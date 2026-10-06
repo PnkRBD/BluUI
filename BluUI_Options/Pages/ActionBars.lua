@@ -98,9 +98,22 @@ local function RefreshPreview()
 	if preview then preview:Update() end
 end
 
-local function Apply()
+local Apply = BUI.Dispatcher.NewDelayed(function()
 	BUI.ActionBars.Refresh()
 	RefreshPreview()
+end, 0.15, 'Action bars page apply')
+
+local applyByKey = {}
+local function ApplyFor(key)
+	local apply = applyByKey[key]
+	if not apply then
+		apply = BUI.Dispatcher.NewDelayed(function()
+			BUI.ActionBars.RefreshOnly(key)
+			RefreshPreview()
+		end, 0.15, 'Action bars page apply ' .. key)
+		applyByKey[key] = apply
+	end
+	return apply
 end
 
 local function SelectedKey()
@@ -260,6 +273,7 @@ local function GeneralBoards(ui, parent, width)
 end
 
 local function BarRows(ui, board, key, title, db, spec)
+	local apply = ApplyFor(key)
 	local ActionBars = BUI.ActionBars
 	local position = BUI.PositionTool(db, { selfTag = spec.selfTag })
 	local layering = { Option(db, 'Layer', 'frameStrata', { entries = BUI.C.STRATA_OPTIONS }) }
@@ -272,7 +286,7 @@ local function BarRows(ui, board, key, title, db, spec)
 			Repaint()
 		end },
 		Toggle(db, nil, 'enabled'),
-	}, Apply)
+	}, apply)
 	if spec.buttons then
 		board:AddTools('Buttons', 'How many, how big and how they are spaced, height 0 keeps buttons square', {
 			{ tooltip = 'Count and rows', title = title, options = {
@@ -285,14 +299,14 @@ local function BarRows(ui, board, key, title, db, spec)
 				Option(db, 'Spacing', 'spacing', { min = 0, max = 16, step = 1 }),
 				Option(db, 'Scale %', 'scale', { min = 50, max = 200, step = 1 }),
 			} },
-		}, Apply)
+		}, apply)
 	elseif spec.size then
 		board:AddTools('Size', 'Button size and overall scale', {
 			{ icon = 'resize', tooltip = 'Size and scale', title = title, options = {
 				Option(db, 'Button size', 'buttonSize', { min = 24, max = 80, step = 1 }),
 				Option(db, 'Scale %', 'scale', { min = 50, max = 200, step = 1 }),
 			} },
-		}, Apply)
+		}, apply)
 	elseif spec.micro then
 		board:AddTools('Arrangement', 'Buttons per row, spacing and scale, or a vertical stack', {
 			{ icon = 'resize', tooltip = 'Rows, spacing and scale', title = title, options = {
@@ -301,11 +315,11 @@ local function BarRows(ui, board, key, title, db, spec)
 				Option(db, 'Scale %', 'scale', { min = 50, max = 200, step = 1 }),
 				Toggle(db, 'Vertical', 'vertical'),
 			} },
-		}, Apply)
+		}, apply)
 	elseif spec.scaleOnly then
 		board:AddTools('Scale', 'Overall size of the buttons', {
 			{ icon = 'resize', tooltip = 'Scale', title = title, options = { Option(db, 'Scale %', 'scale', { min = 50, max = 200, step = 1 }) } },
-		}, Apply)
+		}, apply)
 	end
 	board:AddTools('Mouseover fade', 'Fade the bar out until the cursor is over it', {
 		{ tooltip = 'Opacity and timing', title = 'Mouseover fade', options = {
@@ -315,7 +329,7 @@ local function BarRows(ui, board, key, title, db, spec)
 			Option(db, 'Fade time in seconds', 'fadeDuration', { min = 0.05, max = 1, step = 0.05 }),
 		} },
 		Toggle(db, nil, 'fadeEnabled'),
-	}, Apply)
+	}, apply)
 	if spec.paging then
 		local pages = {}
 		for _, modifier in ipairs(MODIFIERS) do
@@ -324,11 +338,12 @@ local function BarRows(ui, board, key, title, db, spec)
 		board:AddTools('Page switching', spec.paging, {
 			{ tooltip = 'Pages shown while a modifier is held', title = 'Modifier pages', options = pages },
 			Toggle(db, nil, 'pagingEnabled'),
-		}, Apply)
+		}, apply)
 	end
 end
 
-local function ButtonsBoard(ui, parent, width, db, rows)
+local function ButtonsBoard(ui, parent, width, key, db, rows)
+	local apply = ApplyFor(key)
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Buttons',
@@ -337,7 +352,7 @@ local function ButtonsBoard(ui, parent, width, db, rows)
 	local function Cell(label, key, tip)
 		board:AddSwitch(label, function() return db[key] == true end, function(value)
 			db[key] = value
-			Apply()
+			apply()
 		end, tip)
 	end
 	if rows.hotkeys then Cell('Hotkeys', 'showHotkey', 'Keybind labels on this bar') end
@@ -350,7 +365,7 @@ local function ButtonsBoard(ui, parent, width, db, rows)
 		board:AddTools('Cooldown text', 'Countdown numbers on this bar', {
 			{ icon = 'text', tooltip = 'Size', title = 'Cooldown text', options = { Option(db, 'Text size', 'cooldownFontSize', { min = 8, max = 24, step = 1 }) } },
 			Toggle(db, nil, 'showCooldownText'),
-		}, Apply)
+		}, apply)
 	end
 	return board
 end
@@ -371,7 +386,7 @@ local function ActionBarBoards(ui, parent, width, index)
 		description = 'On or off, position, fill direction and layer',
 		paging = index == 1 and 'Vehicles, stances, possession and the page arrows swap what this bar shows' or 'Stances, possession and the modifier pages swap what this bar shows',
 	})
-	return { board, ButtonsBoard(ui, parent, width, db, ACTION_BAR_ROWS) }
+	return { board, ButtonsBoard(ui, parent, width, index, db, ACTION_BAR_ROWS) }
 end
 
 local function ExtraBoards(ui, parent, width, extra)
@@ -392,7 +407,7 @@ local function ExtraBoards(ui, parent, width, extra)
 		scaleOnly = extra.scaleOnly,
 		description = extra.buttons and 'On or off, position, fill direction and layer' or 'On or off, position and layer',
 	})
-	return { board, ButtonsBoard(ui, parent, width, db, extra.rows) }
+	return { board, ButtonsBoard(ui, parent, width, extra.key, db, extra.rows) }
 end
 
 local function MicroButtons()

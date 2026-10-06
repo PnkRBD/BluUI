@@ -110,25 +110,33 @@ function ActionBars.BuildBar(barIndex)
 	return bar
 end
 
+local function RefreshOneBar(barIndex)
+	local barSettings = ActionBars.GetBarSettings(barIndex)
+	local bar = ActionBars.bars[barIndex]
+	if barSettings and barSettings.enabled then
+		if bar then
+			ActionBars.ApplyButtonConfig(bar)
+			ActionBars.LayoutBar(bar)
+			ActionBars.PositionBar(bar)
+		else
+			bar = ActionBars.BuildBar(barIndex)
+		end
+		ActionBars.ApplyBarMouse(bar)
+		ActionBars.SetBarActive(bar, true)
+	elseif bar then
+		ActionBars.SetBarActive(bar, false)
+	end
+end
+
+function ActionBars.RefreshBar(barIndex)
+	RefreshOneBar(barIndex)
+	ActionBars.RefreshFlyoutButtons()
+	BUI.Anchor.OnAnchorSizeChanged()
+end
+
 function ActionBars.RefreshAllBars()
 	ActionBars.ApplyPickupKey()
-	for barIndex = 1, ActionBars.BAR_COUNT do
-		local barSettings = ActionBars.GetBarSettings(barIndex)
-		local bar = ActionBars.bars[barIndex]
-		if barSettings and barSettings.enabled then
-			if bar then
-				ActionBars.ApplyButtonConfig(bar)
-				ActionBars.LayoutBar(bar)
-				ActionBars.PositionBar(bar)
-			else
-				bar = ActionBars.BuildBar(barIndex)
-			end
-			ActionBars.ApplyBarMouse(bar)
-			ActionBars.SetBarActive(bar, true)
-		elseif bar then
-			ActionBars.SetBarActive(bar, false)
-		end
-	end
+	for barIndex = 1, ActionBars.BAR_COUNT do RefreshOneBar(barIndex) end
 	ActionBars.RefreshFlyoutButtons()
 	BUI.Anchor.OnAnchorSizeChanged()
 end
