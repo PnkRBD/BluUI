@@ -36,6 +36,8 @@ local PROFILE_AVATAR = 32
 local SUMMARY_COLUMNS = 3
 local BARS_TILE_HEIGHT = 124
 local BAR_ADDONS = { 'Bartender4', 'Dominos', 'Neuron', 'RazerNaga' }
+local OTHER_UI = { 'ElvUI', 'EllesmereUI', 'Tukui', 'Baganator', 'Bagnon', 'AdiBags', 'ArkInventory', 'BetterBags' }
+local SUITE_PREFIX = '^EllesmereUI'
 local SUMMARY_CARD_HEIGHT = 148
 local SUMMARY_AVATAR = 28
 local SUMMARY_READOUT = 40
@@ -89,6 +91,7 @@ local SCALE_PRESETS = {
 local done = {}
 local skinSelection = {}
 local barsChoice, barsVisited = 'ours', false
+local NeedsBarsStep
 
 local function Skin()
 	return BUI.Skinning
@@ -406,7 +409,7 @@ local function Profile(kit, _, parent, width, _, page)
 	return { Footer(kit, frame, y, function() Back(page, 'welcome') end, { text = 'Next', onClick = function()
 		if current ~= BLU_PROFILE then return Go(page, 'scale') end
 		done.profile = true
-		Show(page, 'finish')
+		Show(page, NeedsBarsStep() and 'bars' or 'finish')
 	end }) }
 end
 
@@ -639,64 +642,117 @@ local function RivalBars()
 		if C_AddOns.IsAddOnLoaded(name) then found[#found + 1] = { name = name, label = name } end
 	end
 	if ElvUIBars() then found[#found + 1] = { name = 'ElvUI', label = "ElvUI's action bars", suite = true } end
+	for index = 1, C_AddOns.GetNumAddOns() do
+		local name = C_AddOns.GetAddOnInfo(index)
+		if name and name:match(SUITE_PREFIX) and name:lower():find('actionbar', 1, true) and C_AddOns.IsAddOnLoaded(name) then
+			found[#found + 1] = { name = name, label = "EllesmereUI's action bars" }
+		end
+	end
 	return found
 end
 
-local function JoinNames(rivals, field)
-	local names = {}
-	for _, rival in ipairs(rivals) do names[#names + 1] = rival[field] end
+local function OtherUI()
+	local found, seen = {}, {}
+	for _, rival in ipairs(RivalBars()) do seen[rival.name] = true end
+	for _, name in ipairs(OTHER_UI) do
+		if not seen[name] and C_AddOns.IsAddOnLoaded(name) then
+			found[#found + 1] = name
+			seen[name] = true
+		end
+	end
+	if not seen.EllesmereUI then
+		for index = 1, C_AddOns.GetNumAddOns() do
+			local name = C_AddOns.GetAddOnInfo(index)
+			if name and name:match(SUITE_PREFIX) and not seen[name] and C_AddOns.IsAddOnLoaded(name) then
+				found[#found + 1] = 'EllesmereUI'
+				break
+			end
+		end
+	end
+	return found
+end
+
+NeedsBarsStep = function()
+	return #RivalBars() > 0 or #OtherUI() > 0
+end
+
+local function JoinNames(names)
 	if #names == 0 then return nil end
 	if #names == 1 then return names[1] end
 	return table.concat(names, ', ', 1, #names - 1) .. ' and ' .. names[#names]
 end
 
+local function BarOptions()
+	local rivals = RivalBars()
+	local options = { { key = 'ours', title = "Use BluUI's bars", value = 'BluUI', logo = true } }
+	for _, rival in ipairs(rivals) do
+		options[#options + 1] = { key = rival.name, title = 'Use ' .. rival.label, value = rival.name, rival = rival.name }
+	end
+	if #rivals == 0 then options[#options + 1] = { key = 'blizzard', title = "Keep Blizzard's bars", value = 'Blizzard' } end
+	for _, option in ipairs(options) do
+		local off = {}
+		if option.key ~= 'ours' then off[1] = "BluUI's bars" end
+		for _, rival in ipairs(rivals) do
+			if rival.name ~= option.key then off[#off + 1] = rival.label end
+		end
+		option.note = #off > 0 and ('Turns off %s'):format(JoinNames(off)) or "Replaces Blizzard's action bars"
+	end
+	return options, rivals
+end
+
 local function ApplyBars()
 	if not barsVisited then return end
-	local ours = barsChoice == 'ours'
-	BUI.GetDB().modules.actionBars = ours
-	if not ours then return end
+	BUI.GetDB().modules.actionBars = barsChoice == 'ours'
 	local character = UnitName('player')
 	for _, rival in ipairs(RivalBars()) do
-		if rival.suite then
-			local bars = ElvUIBars()
-			if bars then bars.enable = false end
-		else
-			C_AddOns.DisableAddOn(rival.name, character)
+		if rival.name ~= barsChoice then
+			if rival.suite then
+				local bars = ElvUIBars()
+				if bars then bars.enable = false end
+			else
+				C_AddOns.DisableAddOn(rival.name, character)
+			end
 		end
 	end
 	if C_AddOns.SaveAddOns then C_AddOns.SaveAddOns() end
 end
 
 local function BarsSummary()
-	local rivals = JoinNames(RivalBars(), 'name')
 	if not barsVisited then
 		return BUI.GetDB().modules.actionBars ~= false and 'BluUI' or 'Off', 'From the profile'
 	end
-	if barsChoice == 'ours' then
-		return 'BluUI', rivals and ('%s turns off on this character'):format(JoinNames(RivalBars(), 'label')) or "Replacing Blizzard's bars"
+	for _, option in ipairs((BarOptions())) do
+		if option.key == barsChoice then return option.value, option.note end
 	end
-	return rivals or 'Blizzard', "BluUI's bars stay off"
+	return 'BluUI', "Replaces Blizzard's action bars"
 end
 
 local function Bars(kit, _, parent, width, _, page)
 	barsVisited = true
-	local rivals = RivalBars()
-	local rivalNames = JoinNames(rivals, 'name')
+	local options, rivals = BarOptions()
+	local picked = false
+	for _, option in ipairs(options) do
+		if option.key == barsChoice then picked = true end
+	end
+	if not picked then barsChoice = 'ours' end
+	local rivalNames = {}
+	for _, rival in ipairs(rivals) do rivalNames[#rivalNames + 1] = rival.name end
 	local frame = Block(parent, width)
 	local intro = 'BluUI can run your action bars, with paging, fading, movers and keybinds in one place.'
-	if rivalNames then
-		intro = intro .. (' We found %s. Two bar addons fight over the same buttons, so pick one.'):format(rivalNames)
+	if #rivalNames > 0 then
+		intro = intro .. (' We found %s. Bar addons fight over the same buttons, so pick one and the others get turned off.'):format(JoinNames(rivalNames))
+	end
+	local others = OtherUI()
+	if #others > 0 then
+		intro = intro .. (' %s %s on whichever you pick.'):format(JoinNames(others), #others == 1 and "doesn't run your action bars, so it stays" or "don't run your action bars, so they stay")
 	end
 	local y = Heading(kit, frame, 'Action bars', intro, width)
-	local options = {
-		{ key = 'ours', title = "Use BluUI's bars", logo = true,
-			note = rivalNames and ('Turns %s off on this character'):format(JoinNames(rivals, 'label')) or "Replaces Blizzard's action bars" },
-		{ key = 'theirs', title = rivalNames and ('Keep %s'):format(rivalNames) or "Keep Blizzard's bars", note = "BluUI's bars stay off", rival = rivalNames },
-	}
-	local tileWidth = math.floor((width - TILE_GAP) / 2)
+	local columns = math.min(#options, PROFILE_COLUMNS)
+	local tileWidth = math.floor((width - TILE_GAP * (columns - 1)) / columns)
 	local textWidth = tileWidth - TILE_PAD * 2
 	for index, option in ipairs(options) do
-		local card = Choice(kit, frame, (index - 1) * (tileWidth + TILE_GAP), y, tileWidth, BARS_TILE_HEIGHT, barsChoice == option.key, function()
+		local column, row = (index - 1) % columns, math.floor((index - 1) / columns)
+		local card = Choice(kit, frame, column * (tileWidth + TILE_GAP), y + row * (BARS_TILE_HEIGHT + TILE_GAP), tileWidth, BARS_TILE_HEIGHT, barsChoice == option.key, function()
 			barsChoice = option.key
 			page:Rebuild('bars')
 		end)
@@ -717,8 +773,9 @@ local function Bars(kit, _, parent, width, _, page)
 		local note = kit.Text(card, option.note, 11, 'muted', textWidth)
 		note:SetPoint('TOPLEFT', title, 'BOTTOMLEFT', 0, -6)
 	end
-	y = y + BARS_TILE_HEIGHT + FOOTER_GAP
-	return { Footer(kit, frame, y, function() Back(page, 'theme') end, { text = 'Next', onClick = function() Go(page, 'finish') end }) }
+	local rows = math.ceil(#options / columns)
+	y = y + rows * BARS_TILE_HEIGHT + (rows - 1) * TILE_GAP + FOOTER_GAP
+	return { Footer(kit, frame, y, function() Back(page, BUI.GetAceDB():GetCurrentProfile() == BLU_PROFILE and 'profile' or 'theme') end, { text = 'Next', onClick = function() Go(page, 'finish') end }) }
 end
 
 local function SummaryCard(kit, window, frame, x, y, width, spec)
@@ -788,7 +845,7 @@ local function Finish(kit, shell, parent, width, _, page)
 	local rows = math.ceil(#cards / SUMMARY_COLUMNS)
 	y = y + rows * SUMMARY_CARD_HEIGHT + (rows - 1) * TILE_GAP + FOOTER_GAP
 	frame:SetScript('OnShow', function() Confetti(shell.window.frame) end)
-	return { Footer(kit, frame, y, function() Back(page, profileName == BLU_PROFILE and 'profile' or 'bars') end, { text = 'Finish and reload', onClick = function()
+	return { Footer(kit, frame, y, function() Back(page, (profileName ~= BLU_PROFILE or NeedsBarsStep()) and 'bars' or 'profile') end, { text = 'Finish and reload', onClick = function()
 		Skin().WriteSkinsEnabled(skinSelection)
 		ApplyBars()
 		BUI.Print('Setup complete. Open settings anytime with |cff' .. BUI.C.COLOR_PINK .. '/bui|r.')
