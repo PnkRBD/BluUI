@@ -120,8 +120,8 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 		frame:SetPoint('TOPRIGHT', anchor, 'BOTTOMRIGHT', 0, -POP_OFFSET)
 		frame:Hide()
 		local fill, edge = Widget.DrawCardShape(frame, POP_RADIUS, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
-		window:Paint(fill, 'card')
-		window:Paint(edge, 'cardEdge')
+		window:Paint(fill, 'page')
+		window:Paint(edge, 'edge')
 		local width = spec.width or POP_WIDTH
 		local y = POP_PAD
 		if spec.title then

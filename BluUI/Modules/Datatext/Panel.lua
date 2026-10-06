@@ -26,8 +26,8 @@ local function ForceHide(panel)
 end
 
 local function PaintPanel(panel)
-    panel.fill:SetVertexColor(BUI.ThemeColor('card'))
-    panel.edge:SetVertexColor(BUI.ThemeColor('cardEdge'))
+    panel.fill:SetVertexColor(BUI.ThemeColor('page'))
+    panel.edge:SetVertexColor(BUI.ThemeColor('edge'))
     panel.title:SetTextColor(BUI.ThemeColor('text'))
     if panel.PaintTheme then panel:PaintTheme() end
 end
