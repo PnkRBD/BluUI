@@ -17,14 +17,9 @@ local BOX_INSET = 10
 local SECTION_PAD = 24
 local HEADER_GAP = 8
 local CARDS_GAP = 20
-local CARD_GAP = 16
 local CARD_RADIUS = 8
 local CARD_PAD = 16
-local CARD_TEXT_GAP = 6
-local CARD_BOX_GAP = 12
 local READOUT_GAP = 10
-local FOOTER_GAP = 14
-local FOOTER_Y = 16
 local BUTTON_GAP = 10
 local CONTROL_HEIGHT = 30
 local SCROLL_STEP = 40
@@ -499,78 +494,49 @@ local function ScrollBox(ui, shell, parent, hintText)
     return box
 end
 
-local function TransferCard(ui, shell, parent, width, spec)
-    local window = shell.window
-    local Widget = BUILib.Widget
-    local card = CreateFrame('Frame', nil, parent)
-    card:SetWidth(width)
-    local fill, edge = Widget.DrawCardShape(card, CARD_RADIUS, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
-    window:Paint(fill, 'card')
-    window:Paint(edge, 'cardEdge')
-
-    local title = ui.Text(card, spec.title, 14, 'text')
-    title:SetPoint('TOPLEFT', CARD_PAD, -CARD_PAD)
-    local description = ui.Text(card, spec.description, 11, 'muted', width - CARD_PAD * 2)
-    description:SetSpacing(3)
-    description:SetPoint('TOPLEFT', title, 'BOTTOMLEFT', 0, -CARD_TEXT_GAP)
-    local boxTop = CARD_PAD + ui.Height(title) + CARD_TEXT_GAP + ui.Height(description) + CARD_BOX_GAP
-
-    local box = ScrollBox(ui, shell, card, spec.hint)
-    box:SetPoint('TOPLEFT', CARD_PAD, -boxTop)
-    box:SetPoint('TOPRIGHT', -CARD_PAD, -boxTop)
-
-    local readoutTop = boxTop + BOX_HEIGHT + READOUT_GAP
-    local readout = ui.Text(card, spec.readout, 11, 'faint')
-    readout:SetWordWrap(false)
-    readout:SetPoint('TOPLEFT', CARD_PAD, -readoutTop)
-    readout:SetPoint('TOPRIGHT', -CARD_PAD, -readoutTop)
-
-    local previous
-    for index = #spec.buttons, 1, -1 do
-        local buttonSpec = spec.buttons[index]
-        local button = ui.Button(card, buttonSpec.text, buttonSpec.style, buttonSpec.onClick, buttonSpec.icon)
-        if previous then
-            button:SetPoint('RIGHT', previous, 'LEFT', -BUTTON_GAP, 0)
-        else
-            button:SetPoint('BOTTOMRIGHT', -CARD_PAD, FOOTER_Y)
-        end
-        previous = button
-    end
-
-    card:SetHeight(readoutTop + ui.Height(readout) + FOOTER_GAP + CONTROL_HEIGHT + FOOTER_Y)
-    return {
-        frame = card,
-        edit = box.edit,
-        SetReadout = function(text, role)
-            readout:SetText(text)
-            window:Paint(readout, role)
-        end,
-    }
-end
-
-local function SummarizeImport(text)
-    if Trim(text) == '' then return 'Nothing pasted yet', 'faint' end
+local function SummarizeBox(text)
+    if Trim(text) == '' then return 'Nothing here yet', 'faint' end
     local data = BUI.ExportImport.DecodeImportString(text)
     if not data then return 'Not a BluUI profile string', 'faint' end
     local sections = 0
     for key in pairs(data) do
         if type(key) == 'string' and not key:match('^_') then sections = sections + 1 end
     end
-    return ('Profile "%s" from v%s, %s'):format(tostring(data._profileName or '?'), tostring(data._version or '?'), Plural(sections, 'section')), 'text'
+    return ('Profile "%s" from v%s, %s, press Import to choose what to take'):format(tostring(data._profileName or '?'), tostring(data._version or '?'), Plural(sections, 'section')), 'text'
 end
 
 local function TransferSection(ui, shell, parent, width)
+    local window = shell.window
+    local Widget = BUILib.Widget
     local block = CreateFrame('Frame', nil, parent)
     block:SetWidth(width)
     local title = ui.Text(block, 'Export and import', 13, 'text')
     title:SetPoint('TOPLEFT', 0, -(SECTION_PAD + 2))
-    local description = ui.Text(block, 'Profiles travel as text. Export the active profile to hand it to someone, or paste a string to bring one in and pick the sections you want before anything changes.', 12, 'muted', width)
+    local description = ui.Text(block, 'Profiles travel as text. Export writes the active profile into the box, ready for Ctrl+C. Paste a string into the same box and Import lets you pick which sections to take before anything changes.', 12, 'muted', width)
     description:SetSpacing(4)
     description:SetPoint('TOPLEFT', title, 'BOTTOMLEFT', 0, -HEADER_GAP)
     local top = SECTION_PAD + 2 + ui.Height(title) + HEADER_GAP + ui.Height(description) + CARDS_GAP
-    local cardWidth = math.floor((width - CARD_GAP) / 2)
 
-    local exportCard, importCard
+    local card = CreateFrame('Frame', nil, block)
+    card:SetPoint('TOPLEFT', 0, -top)
+    card:SetWidth(width)
+    local fill, edge = Widget.DrawCardShape(card, CARD_RADIUS, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
+    window:Paint(fill, 'card')
+    window:Paint(edge, 'cardEdge')
+
+    local box = ScrollBox(ui, shell, card, 'Paste a profile string here, or press Export.')
+    box:SetPoint('TOPLEFT', CARD_PAD, -CARD_PAD)
+    box:SetPoint('TOPRIGHT', -CARD_PAD, -CARD_PAD)
+    local edit = box.edit
+
+    local readout = ui.Text(card, 'Nothing here yet', 11, 'faint')
+    readout:SetWordWrap(false)
+    readout:SetJustifyH('LEFT')
+    local function SetReadout(text, role)
+        readout:SetText(text)
+        window:Paint(readout, role)
+    end
+
     local showingListing = false
 
     local function DoImport(importString, forceOverwrite)
@@ -589,72 +555,71 @@ local function TransferSection(ui, shell, parent, width)
         end
     end
 
-    exportCard = TransferCard(ui, shell, block, cardWidth, {
-        title = 'Export',
-        description = 'Writes the active profile as text. Copy it with Ctrl+C and send it anywhere.',
-        hint = 'Press Export to fill this box.',
-        readout = 'Nothing exported yet',
-        buttons = { { text = 'Export', style = 'primary', icon = 'copy', onClick = function()
+    local buttons = {
+        { text = 'Clear', onClick = function() edit:SetText('') end },
+        { text = 'Inspect', onClick = function()
+            local text, errorMessage = BUI.ImportInspector.Inspect(edit:GetText())
+            if not text then
+                Warn('Could not read that string', errorMessage or 'It is not a BluUI profile string.')
+                return
+            end
+            showingListing = true
+            edit:SetText(text)
+            edit:SetCursorPosition(0)
+            SetReadout('Readable listing, paste the string again to import it', 'faint')
+            ReclaimScratch()
+        end },
+        { text = 'Import', style = 'control', onClick = function()
+            local importString = edit:GetText()
+            if Trim(importString) == '' then
+                Warn('Nothing to import', 'Paste a profile string into the box first.')
+                return
+            end
+            DoImport(importString, false)
+            ReclaimScratch()
+        end },
+        { text = 'Export', style = 'primary', icon = 'copy', onClick = function()
             local exportString, profileName = BUI.ExportImport.ExportSettings()
             if not exportString then
                 Warn('Export failed', profileName or 'Profile data not found.')
                 return
             end
-            local edit = exportCard.edit
             edit:SetText(exportString)
             edit:SetCursorPosition(0)
             edit:SetFocus()
             edit:HighlightText()
-            exportCard.SetReadout(('%s, %.1f KB'):format(profileName, #exportString / 1024), 'text')
+            SetReadout(('Exported "%s", %.1f KB, press Ctrl+C to copy it'):format(profileName, #exportString / 1024), 'text')
             ReclaimScratch()
             Notify('Exported "' .. profileName .. '"', 'Press Ctrl+C to copy it')
-        end } },
-    })
-    exportCard.frame:SetPoint('TOPLEFT', 0, -top)
+        end },
+    }
+    local previous
+    for index = #buttons, 1, -1 do
+        local spec = buttons[index]
+        local button = ui.Button(card, spec.text, spec.style, spec.onClick, spec.icon)
+        if previous then
+            button:SetPoint('RIGHT', previous, 'LEFT', -BUTTON_GAP, 0)
+        else
+            button:SetPoint('TOPRIGHT', box, 'BOTTOMRIGHT', 0, -READOUT_GAP)
+        end
+        previous = button
+    end
+    readout:SetPoint('TOPLEFT', box, 'BOTTOMLEFT', 0, -READOUT_GAP)
+    readout:SetPoint('BOTTOMRIGHT', previous, 'BOTTOMLEFT', -BUTTON_GAP, 0)
 
-    importCard = TransferCard(ui, shell, block, cardWidth, {
-        title = 'Import',
-        description = 'Paste a profile string. Nothing changes until you pick which sections to take.',
-        hint = 'Paste a profile string here.',
-        readout = 'Nothing pasted yet',
-        buttons = {
-            { text = 'Clear', onClick = function() importCard.edit:SetText('') end },
-            { text = 'Inspect', onClick = function()
-                local text, errorMessage = BUI.ImportInspector.Inspect(importCard.edit:GetText())
-                if not text then
-                    Warn('Could not read that string', errorMessage or 'It is not a BluUI profile string.')
-                    return
-                end
-                showingListing = true
-                importCard.edit:SetText(text)
-                importCard.edit:SetCursorPosition(0)
-                importCard.SetReadout('Readable listing, paste the string again to import it', 'faint')
-                ReclaimScratch()
-            end },
-            { text = 'Import', style = 'primary', onClick = function()
-                local importString = importCard.edit:GetText()
-                if Trim(importString) == '' then
-                    Warn('Nothing to import', 'Paste a profile string into the box first.')
-                    return
-                end
-                DoImport(importString, false)
-                ReclaimScratch()
-            end },
-        },
-    })
-    importCard.frame:SetPoint('TOPLEFT', cardWidth + CARD_GAP, -top)
-    importCard.edit:HookScript('OnTextChanged', function(self)
+    edit:HookScript('OnTextChanged', function(self)
         if showingListing then
             showingListing = false
             return
         end
-        importCard.SetReadout(SummarizeImport(self:GetText()))
+        SetReadout(SummarizeBox(self:GetText()))
     end)
 
+    card:SetHeight(CARD_PAD + BOX_HEIGHT + READOUT_GAP + CONTROL_HEIGHT + CARD_PAD)
     local rule = ui.DottedRule(block)
     rule:SetPoint('BOTTOMLEFT')
     rule:SetPoint('BOTTOMRIGHT')
-    block:SetHeight(top + math.max(exportCard.frame:GetHeight(), importCard.frame:GetHeight()) + SECTION_PAD + 1)
+    block:SetHeight(top + card:GetHeight() + SECTION_PAD + 1)
     return block
 end
 
