@@ -808,13 +808,9 @@ local function Bars(kit, _, parent, width, _, page)
 	local rivalNames = {}
 	for _, rival in ipairs(rivals) do rivalNames[#rivalNames + 1] = rival.name end
 	local frame = Block(parent, width)
-	local intro = 'BluUI can run your action bars, with paging, fading, movers and keybinds in one place.'
+	local intro = "Want BluUI to handle your action bars, or keep Blizzard's?"
 	if #rivalNames > 0 then
-		intro = intro .. (' We found %s. Bar addons fight over the same buttons, so pick one and the others get turned off.'):format(JoinNames(rivalNames))
-	end
-	local others = OtherUI()
-	if #others > 0 then
-		intro = intro .. (' %s %s on whichever you pick.'):format(JoinNames(others), #others == 1 and "doesn't run your action bars, so it stays" or "don't run your action bars, so they stay")
+		intro = "Our action bars don't get along with other bar addons. Pick the one you want and we'll switch the rest off."
 	end
 	local y = Heading(kit, frame, 'Action bars', intro, width)
 	local columns = math.min(#options, PROFILE_COLUMNS)
