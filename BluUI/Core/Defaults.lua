@@ -229,6 +229,7 @@ BUI.Defaults = {
 		navStyle       = 'default',
 		navHighlight   = 'gradient',
 		windowScale    = 100,
+		installerMatchGroups = true,
 		savedThemes    = {},
 		session        = {},
 		altOverview    = {},

@@ -271,7 +271,9 @@ BUI.SkinningPage = {}
 
 function BUI.SkinningPage.OpenSkinSettings(id)
 	local info = BUI.Skinning.GetSkinRegistry()[id]
-	if info.page then
+	if info.window then
+		BUI.OptionsWindow.Open(info.window)
+	elseif info.page then
 		BUI.PageEngine.Show()
 		BUI.PageEngine.NavigateToID(info.page)
 	elseif info.buildBoards then
@@ -386,7 +388,7 @@ local function SkinsBoard(ui, parent, width)
 	for _, id in ipairs(order) do
 		local info = registry[id]
 		local tag
-		local icons = (info.unlock and 1 or 0) + ((info.page or info.buildSettings or info.buildBoards) and 1 or 0)
+		local icons = (info.unlock and 1 or 0) + ((info.window or info.page or info.buildSettings or info.buildBoards) and 1 or 0)
 		local _, cell = board:AddSwitch(info.name, function() return Skin.IsSkinEnabled(id) end, function(enabled)
 			Skin.SetSkinEnabled(id, enabled)
 			if tag then tag:Hide() end
@@ -397,7 +399,10 @@ local function SkinsBoard(ui, parent, width)
 			tag:SetPoint('LEFT', cell.label, 'LEFT', math.ceil(cell.label:GetStringWidth()) + 6, 0)
 		end
 		local anchor
-		if info.page then
+		if info.window then
+			anchor = CellIcon(ui, cell, 'cog', 'Settings', function() BUI.OptionsWindow.Open(info.window) end)
+			anchor:SetPoint('RIGHT', -4, 0)
+		elseif info.page then
 			anchor = CellIcon(ui, cell, 'cog', 'Settings', function() BUI.PageEngine.NavigateToID(info.page) end)
 			anchor:SetPoint('RIGHT', -4, 0)
 		elseif info.buildSettings or info.buildBoards then

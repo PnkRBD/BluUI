@@ -157,7 +157,7 @@ function Layout.WindowFrame(config)
 	frame:SetFrameStrata(config.strata or 'HIGH')
 	if config.frameLevel then frame:SetFrameLevel(config.frameLevel) end
 	frame:SetMovable(true)
-	frame:SetResizable(true)
+	frame:SetResizable(config.resizable ~= false)
 	frame:EnableMouse(true)
 	frame:SetClampedToScreen(config.clampedToScreen ~= false)
 	window.frame = frame
@@ -214,27 +214,29 @@ function Layout.WindowFrame(config)
 		region:HookScript('OnDragStop', StopMoving)
 	end
 
-	local resize = CreateFrame('Button', nil, frame)
-	resize:SetSize(GRIP_SIZE, GRIP_SIZE)
-	resize:SetPoint('BOTTOMRIGHT', -3, 3)
-	resize:SetFrameLevel(frame:GetFrameLevel() + 10)
-	local grip = resize:CreateTexture(nil, 'OVERLAY')
-	grip:SetTexture(BUILib.GetLibMedia('grabber'))
-	grip:SetAllPoints()
-	local function PaintGrip(red, green, blue)
-		if resize:IsMouseOver() then
-			grip:SetVertexColor(red, green, blue, 1)
-		else
-			grip:SetVertexColor(red * GRIP_ACCENT_SCALE, green * GRIP_ACCENT_SCALE, blue * GRIP_ACCENT_SCALE, GRIP_IDLE_ALPHA)
+	if config.resizable ~= false then
+		local resize = CreateFrame('Button', nil, frame)
+		resize:SetSize(GRIP_SIZE, GRIP_SIZE)
+		resize:SetPoint('BOTTOMRIGHT', -3, 3)
+		resize:SetFrameLevel(frame:GetFrameLevel() + 10)
+		local grip = resize:CreateTexture(nil, 'OVERLAY')
+		grip:SetTexture(BUILib.GetLibMedia('grabber'))
+		grip:SetAllPoints()
+		local function PaintGrip(red, green, blue)
+			if resize:IsMouseOver() then
+				grip:SetVertexColor(red, green, blue, 1)
+			else
+				grip:SetVertexColor(red * GRIP_ACCENT_SCALE, green * GRIP_ACCENT_SCALE, blue * GRIP_ACCENT_SCALE, GRIP_IDLE_ALPHA)
+			end
 		end
+		local function RepaintGrip() PaintGrip(Theme.GetAccent()) end
+		Theme.RegisterAccentElement(grip, function(_, red, green, blue) PaintGrip(red, green, blue) end)
+		resize:SetScript('OnMouseDown', function() frame:StartSizing('BOTTOMRIGHT') end)
+		resize:SetScript('OnMouseUp', StopMoving)
+		resize:SetScript('OnEnter', RepaintGrip)
+		resize:SetScript('OnLeave', RepaintGrip)
+		RepaintGrip()
 	end
-	local function RepaintGrip() PaintGrip(Theme.GetAccent()) end
-	Theme.RegisterAccentElement(grip, function(_, red, green, blue) PaintGrip(red, green, blue) end)
-	resize:SetScript('OnMouseDown', function() frame:StartSizing('BOTTOMRIGHT') end)
-	resize:SetScript('OnMouseUp', StopMoving)
-	resize:SetScript('OnEnter', RepaintGrip)
-	resize:SetScript('OnLeave', RepaintGrip)
-	RepaintGrip()
 
 	function window:PaintFrame(background, border)
 		backgroundTexture:SetVertexColor(background[1], background[2], background[3], background[4])
@@ -378,18 +380,20 @@ function Layout.TitleBar(window, config)
 	window:DragWith(bar)
 	window:Fill(bar, 'bar'):SetAllPoints()
 
-	local portrait = bar:CreateTexture(nil, 'ARTWORK', nil, 2)
-	portrait:SetSize(PORTRAIT_SIZE, PORTRAIT_SIZE)
-	portrait:SetPoint('LEFT', 16, 0)
-	if config.icon then
-		portrait:SetTexture(config.icon)
-	else
-		Layout.PlayerPortrait(portrait)
-	end
-	portrait:SetMask(BUILib.GetLibMedia('circle_mask'))
+	if config.brand ~= false then
+		local portrait = bar:CreateTexture(nil, 'ARTWORK', nil, 2)
+		portrait:SetSize(PORTRAIT_SIZE, PORTRAIT_SIZE)
+		portrait:SetPoint('LEFT', 16, 0)
+		if config.icon then
+			portrait:SetTexture(config.icon)
+		else
+			Layout.PlayerPortrait(portrait)
+		end
+		portrait:SetMask(BUILib.GetLibMedia('circle_mask'))
 
-	local brand = window:Text(bar, Widget.StripColorCodes(config.title or 'BUILib'), BRAND_SIZE, 'barText')
-	brand:SetPoint('LEFT', portrait, 'RIGHT', 12, 0)
+		local brand = window:Text(bar, Widget.StripColorCodes(config.title or 'BUILib'), BRAND_SIZE, 'barText')
+		brand:SetPoint('LEFT', portrait, 'RIGHT', 12, 0)
+	end
 
 	local close = Controls.Icon(bar, {
 		size = 14, texture = BUILib.GetLibMedia('x'), tooltip = 'Close',
