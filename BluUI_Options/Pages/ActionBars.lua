@@ -392,8 +392,6 @@ local function ExtraBoards(ui, parent, width, extra)
 		scaleOnly = extra.scaleOnly,
 		description = extra.buttons and 'On or off, position, fill direction and layer' or 'On or off, position and layer',
 	})
-	local blocker = extra.key == 'bags' and BUI.ActionBars.BagBarBlockedBy()
-	if blocker then board:AddRow(blocker .. ' is loaded', 'It owns the bag buttons, so this bar leaves them alone') end
 	return { board, ButtonsBoard(ui, parent, width, db, extra.rows) }
 end
 
