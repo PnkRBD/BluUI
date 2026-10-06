@@ -30,6 +30,9 @@ local HEADER_GAP = 26
 local BOTTOM_GAP = 24
 local PREVIEW_GAP = 16
 local PREVIEW_RADIUS = 8
+local CHOICE_RING = 16
+local CHOICE_RING_INSET = 14
+local CHOICE_CHECK = 9
 local INPUT_RADIUS = 4
 local DOT_TILE = 16
 local DISABLED_ALPHA = 0.35
@@ -687,6 +690,27 @@ function Layout.TableKit(window)
 		dots:SetPoint('TOPLEFT', PREVIEW_RADIUS, -PREVIEW_RADIUS)
 		dots:SetPoint('BOTTOMRIGHT', -PREVIEW_RADIUS, PREVIEW_RADIUS)
 		return band
+	end
+
+	function kit.ChoiceCard(parent, x, y, width, height, selected, onClick)
+		local card = CreateFrame('Button', nil, parent)
+		card:SetPoint('TOPLEFT', x, -y)
+		card:SetSize(width, height)
+		local fill, edge = Widget.DrawCardShape(card, PREVIEW_RADIUS, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
+		window:Paint(fill, 'card')
+		local edgeRole = selected and 'accent' or 'cardEdge'
+		window:Paint(edge, edgeRole)
+		card:SetScript('OnEnter', function() if not selected then window:Paint(edge, 'faint') end end)
+		card:SetScript('OnLeave', function() window:Paint(edge, edgeRole) end)
+		card:SetScript('OnClick', onClick)
+		local ring = kit.Disc(card, CHOICE_RING, selected and 'accent' or 'faint')
+		ring:SetPoint('TOPRIGHT', -CHOICE_RING_INSET, -CHOICE_RING_INSET)
+		if selected then
+			kit.Glyph(card, 'check', CHOICE_CHECK, 'onAccent', 'OVERLAY'):SetPoint('CENTER', ring)
+		else
+			kit.Disc(card, CHOICE_RING - 3, 'card', 'ARTWORK', 1):SetPoint('CENTER', ring)
+		end
+		return card
 	end
 
 	function kit.Section(parent, width, spec)
