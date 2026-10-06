@@ -33,7 +33,9 @@ local BLU_PROFILE = 'Blu'
 local PROFILE_COLUMNS = 3
 local PROFILE_TILE_HEIGHT = 124
 local PROFILE_AVATAR = 32
-local SUMMARY_COLUMNS = 2
+local SUMMARY_COLUMNS = 3
+local BARS_TILE_HEIGHT = 124
+local BAR_ADDONS = { 'Bartender4', 'Dominos', 'Neuron', 'RazerNaga' }
 local SUMMARY_CARD_HEIGHT = 148
 local SUMMARY_AVATAR = 28
 local SUMMARY_READOUT = 40
@@ -75,6 +77,7 @@ local STEPS = {
 	{ id = 'scale', label = 'Scale', sub = 'Sharp on your monitor' },
 	{ id = 'skins', label = 'Skins', sub = 'Blizzard windows, but dark' },
 	{ id = 'theme', label = 'Theme', sub = 'Your bars, your colors' },
+	{ id = 'bars', label = 'Action bars', sub = 'Ours or yours' },
 	{ id = 'finish', label = 'Finish', sub = 'Check and reload' },
 }
 local SCALE_PRESETS = {
@@ -85,6 +88,7 @@ local SCALE_PRESETS = {
 
 local done = {}
 local skinSelection = {}
+local barsChoice, barsVisited = 'ours', false
 
 local function Skin()
 	return BUI.Skinning
@@ -151,8 +155,8 @@ end
 local function Welcome(kit, _, parent, width, _, page)
 	local frame = Block(parent, width)
 	local y = Heading(kit, frame, ('Hey %s.'):format(UnitName('player')),
-		'Five quick picks and you are back in the game. Everything applies as you go and nothing is permanent, so change your mind later in settings.', width - HERO_WIDTH - PAD)
-	local lines = { "Start from Blu's profile, one of yours, or your own",'Pick a scale that is sharp on your screen', 'Decide if Blizzard windows get the dark look', 'Pick how your unit frames look', 'Check the summary and reload' }
+		'A few quick picks and you are back in the game. Everything applies as you go and nothing is permanent, so change your mind later in settings.', width - HERO_WIDTH - PAD)
+	local lines = { "Start from Blu's profile, one of yours, or your own", 'Pick a scale that is sharp on your screen', 'Decide if Blizzard windows get the dark look', 'Pick how your unit frames look', 'Choose who runs your action bars', 'Check the summary and reload' }
 	for index, line in ipairs(lines) do
 		local disc = kit.Disc(frame, 20, 'secondary')
 		disc:SetPoint('TOPLEFT', 0, -y)
@@ -533,7 +537,7 @@ local function Theme(kit, _, parent, width, _, page)
 	AbsorbSwatch(ABSORB_X, 'Damage absorb', 'shieldColor')
 	AbsorbSwatch(ABSORB_X + ABSORB_GAP, 'Heal absorb', 'healAbsorbColor')
 	y = y + 22 + FOOTER_HEIGHT + FOOTER_GAP
-	return { Footer(kit, frame, y, function() Back(page, 'skins') end, { text = 'Next', onClick = function() Go(page, 'finish') end }) }
+	return { Footer(kit, frame, y, function() Back(page, 'skins') end, { text = 'Next', onClick = function() Go(page, 'bars') end }) }
 end
 
 local function ConfettiLayer(host)
@@ -622,6 +626,101 @@ local function Confetti(host)
 	layer:Show()
 end
 
+local function ElvUIBars()
+	local engine = C_AddOns.IsAddOnLoaded('ElvUI') and ElvUI and ElvUI[1]
+	local private = type(engine) == 'table' and engine.private
+	local bars = type(private) == 'table' and private.actionbar
+	if type(bars) == 'table' and bars.enable ~= false then return bars end
+end
+
+local function RivalBars()
+	local found = {}
+	for _, name in ipairs(BAR_ADDONS) do
+		if C_AddOns.IsAddOnLoaded(name) then found[#found + 1] = { name = name, label = name } end
+	end
+	if ElvUIBars() then found[#found + 1] = { name = 'ElvUI', label = "ElvUI's action bars", suite = true } end
+	return found
+end
+
+local function JoinNames(rivals, field)
+	local names = {}
+	for _, rival in ipairs(rivals) do names[#names + 1] = rival[field] end
+	if #names == 0 then return nil end
+	if #names == 1 then return names[1] end
+	return table.concat(names, ', ', 1, #names - 1) .. ' and ' .. names[#names]
+end
+
+local function ApplyBars()
+	if not barsVisited then return end
+	local ours = barsChoice == 'ours'
+	BUI.GetDB().modules.actionBars = ours
+	if not ours then return end
+	local character = UnitName('player')
+	for _, rival in ipairs(RivalBars()) do
+		if rival.suite then
+			local bars = ElvUIBars()
+			if bars then bars.enable = false end
+		else
+			C_AddOns.DisableAddOn(rival.name, character)
+		end
+	end
+	if C_AddOns.SaveAddOns then C_AddOns.SaveAddOns() end
+end
+
+local function BarsSummary()
+	local rivals = JoinNames(RivalBars(), 'name')
+	if not barsVisited then
+		return BUI.GetDB().modules.actionBars ~= false and 'BluUI' or 'Off', 'From the profile'
+	end
+	if barsChoice == 'ours' then
+		return 'BluUI', rivals and ('%s turns off on this character'):format(JoinNames(RivalBars(), 'label')) or "Replacing Blizzard's bars"
+	end
+	return rivals or 'Blizzard', "BluUI's bars stay off"
+end
+
+local function Bars(kit, _, parent, width, _, page)
+	barsVisited = true
+	local rivals = RivalBars()
+	local rivalNames = JoinNames(rivals, 'name')
+	local frame = Block(parent, width)
+	local intro = 'BluUI can run your action bars, with paging, fading, movers and keybinds in one place.'
+	if rivalNames then
+		intro = intro .. (' We found %s. Two bar addons fight over the same buttons, so pick one.'):format(rivalNames)
+	end
+	local y = Heading(kit, frame, 'Action bars', intro, width)
+	local options = {
+		{ key = 'ours', title = "Use BluUI's bars", logo = true,
+			note = rivalNames and ('Turns %s off on this character'):format(JoinNames(rivals, 'label')) or "Replaces Blizzard's action bars" },
+		{ key = 'theirs', title = rivalNames and ('Keep %s'):format(rivalNames) or "Keep Blizzard's bars", note = "BluUI's bars stay off", rival = rivalNames },
+	}
+	local tileWidth = math.floor((width - TILE_GAP) / 2)
+	local textWidth = tileWidth - TILE_PAD * 2
+	for index, option in ipairs(options) do
+		local card = Choice(kit, frame, (index - 1) * (tileWidth + TILE_GAP), y, tileWidth, BARS_TILE_HEIGHT, barsChoice == option.key, function()
+			barsChoice = option.key
+			page:Rebuild('bars')
+		end)
+		local avatar
+		if option.logo then
+			avatar = card:CreateTexture(nil, 'ARTWORK')
+			avatar:SetTexture(BUI.C.ICON_PATH)
+			avatar:SetSize(PROFILE_AVATAR, PROFILE_AVATAR)
+		elseif option.rival then
+			avatar = kit.Initials(card, PROFILE_AVATAR, Initials(option.rival))
+		else
+			avatar = kit.IconAvatar(card, PROFILE_AVATAR, 'order')
+		end
+		avatar:SetPoint('TOPLEFT', TILE_PAD, -TILE_PAD)
+		local title = kit.Text(card, option.title, 13, 'text', textWidth)
+		title:SetWordWrap(false)
+		title:SetPoint('TOPLEFT', TILE_PAD, -(TILE_PAD + PROFILE_AVATAR + 14))
+		local note = kit.Text(card, option.note, 11, 'muted', textWidth)
+		note:SetPoint('TOPLEFT', title, 'BOTTOMLEFT', 0, -6)
+	end
+	y = y + BARS_TILE_HEIGHT + FOOTER_GAP
+	return { Footer(kit, frame, y, function() Back(page, 'theme') end, { text = 'Next', onClick = function() Go(page, 'finish') end }) }
+end
+
 local function SummaryCard(kit, window, frame, x, y, width, spec)
 	local card = CreateFrame('Button', nil, frame)
 	card:SetPoint('TOPLEFT', x, -y)
@@ -670,6 +769,7 @@ local function Finish(kit, shell, parent, width, _, page)
 	else
 		skinsValue, skinsStatus = ('%d of %d'):format(selectedCount, total), 'Blizzard windows get the dark look'
 	end
+	local barsValue, barsStatus = BarsSummary()
 	local cards = {
 		{ step = 'profile', icon = 'profile', label = 'Profile', value = profileName, status = ProfileUsers(profileName) },
 		{ step = 'scale', icon = 'resize', label = 'Scale', value = ('%.3f'):format(scale),
@@ -677,6 +777,7 @@ local function Finish(kit, shell, parent, width, _, page)
 		{ step = 'skins', icon = 'eye', label = 'Skins', value = skinsValue, status = skinsStatus },
 		{ step = 'theme', icon = 'layout', label = 'Unit frames', value = style and style.name or 'Unchanged',
 			status = style and (BUI.Installer.MatchesGroupFrames() and 'Party and raid frames match' or 'Party and raid frames keep their own look') or 'Pick a look on the Theme step' },
+		{ step = 'bars', icon = 'order', label = 'Action bars', value = barsValue, status = barsStatus },
 	}
 	local cardWidth = math.floor((width - TILE_GAP * (SUMMARY_COLUMNS - 1)) / SUMMARY_COLUMNS)
 	for index, spec in ipairs(cards) do
@@ -687,14 +788,15 @@ local function Finish(kit, shell, parent, width, _, page)
 	local rows = math.ceil(#cards / SUMMARY_COLUMNS)
 	y = y + rows * SUMMARY_CARD_HEIGHT + (rows - 1) * TILE_GAP + FOOTER_GAP
 	frame:SetScript('OnShow', function() Confetti(shell.window.frame) end)
-	return { Footer(kit, frame, y, function() Back(page, 'theme') end, { text = 'Finish and reload', onClick = function()
+	return { Footer(kit, frame, y, function() Back(page, profileName == BLU_PROFILE and 'profile' or 'bars') end, { text = 'Finish and reload', onClick = function()
 		Skin().WriteSkinsEnabled(skinSelection)
+		ApplyBars()
 		BUI.Print('Setup complete. Open settings anytime with |cff' .. BUI.C.COLOR_PINK .. '/bui|r.')
 		ReloadUI()
 	end }) }
 end
 
-local BUILDERS = { welcome = Welcome, profile = Profile, scale = Scale, skins = Skins, theme = Theme, finish = Finish }
+local BUILDERS = { welcome = Welcome, profile = Profile, scale = Scale, skins = Skins, theme = Theme, bars = Bars, finish = Finish }
 
 BUI.OptionsWindow.New('setup', {
 	title = 'Setup BluUI',
@@ -704,6 +806,7 @@ BUI.OptionsWindow.New('setup', {
 	globalName = 'BluUISetupFrame',
 	onOpen = function(shell)
 		SeedSelection()
+		barsChoice, barsVisited = 'ours', false
 		wipe(done)
 		shell:RebuildPage('setup')
 	end,
