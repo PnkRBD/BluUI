@@ -1926,6 +1926,7 @@ BUI.DeprecatedKeys = {
 	['groupFrames.party.statusText.colors'] = true,
 	['groupFrames.party.privateAuras'] = true,
 	['groupFrames.raid.privateAuras'] = true,
+	['actionBars.bagBar.clickThrough'] = true,
 	['groupFrames.raid.statusText.colors']  = true,
 	['unitFrames.textSize']              = true,
 	['unitFrames.player.textSize']       = true,

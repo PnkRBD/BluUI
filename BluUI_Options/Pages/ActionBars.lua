@@ -67,14 +67,14 @@ local TEXT_KINDS = {
 	{ key = 'macro', title = 'Macro text', description = 'Macro and spell names along the bottom edge', sizeMax = 16 },
 }
 local ACTION_BAR_ROWS = { hotkeys = true, macroText = true, cooldownText = true, hideEmpty = true, clickThrough = true }
-local CLICK_THROUGH_ROW = { clickThrough = true }
+local CLICK_THROUGH = { { key = 'clickThrough', label = 'Click through' } }
 local EXTRA_BARS = {
 	{ key = 'pet', title = 'Pet bar', description = 'Replaces the Blizzard pet bar. Turning it off needs a reload to bring the Blizzard one back.', selfTag = 'BUI_PetBar', buttons = true, maxButtons = 10, rows = { hotkeys = true, cooldownText = true, hideEmpty = true, clickThrough = true } },
 	{ key = 'stance', title = 'Stance bar', description = 'Replaces the Blizzard stance and form bar. Turning it off needs a reload to bring the Blizzard one back.', selfTag = 'BUI_StanceBar', buttons = true, maxButtons = 10, countLabel = 'Max buttons, one per stance', rows = { hotkeys = true, cooldownText = true, clickThrough = true } },
-	{ key = 'vehicle', title = 'Vehicle exit', description = 'One button to leave a vehicle, land a taxi early or cancel possession. Only shows when it can act.', size = true, rows = CLICK_THROUGH_ROW },
-	{ key = 'micro', title = 'Micro menu', description = 'The Blizzard micro buttons on a bar you control.', micro = true, rows = CLICK_THROUGH_ROW },
-	{ key = 'bags', title = 'Bag bar', description = 'The Blizzard bag buttons on a bar you control.', scaleOnly = true, rows = { clickThrough = true, singleBag = true } },
-	{ key = 'extra', title = 'Extra action', description = 'The Blizzard extra action and zone ability buttons on a bar you control. Turning it off needs a reload to bring the Blizzard one back.', scaleOnly = true, rows = { clickThrough = true, blizzardArt = true } },
+	{ key = 'vehicle', title = 'Vehicle exit', description = 'One button to leave a vehicle, land a taxi early or cancel possession. Only shows when it can act.', size = true, toggles = CLICK_THROUGH, cogTooltip = 'Layer and click through' },
+	{ key = 'micro', title = 'Micro menu', description = 'The Blizzard micro buttons on a bar you control.', micro = true, toggles = CLICK_THROUGH, cogTooltip = 'Layer and click through' },
+	{ key = 'bags', title = 'Bag bar', description = 'The Blizzard bag buttons on a bar you control.', scaleOnly = true, toggles = { { key = 'singleBag', label = 'Single bag' } }, cogTooltip = 'Layer and single bag' },
+	{ key = 'extra', title = 'Extra action', description = 'The Blizzard extra action and zone ability buttons on a bar you control. Turning it off needs a reload to bring the Blizzard one back.', scaleOnly = true, toggles = { { key = 'clickThrough', label = 'Click through' }, { key = 'blizzardArt', label = 'Blizzard art' } }, cogTooltip = 'Layer, click through and Blizzard art' },
 }
 local EXTRA_BY_KEY = {}
 for _, extra in ipairs(EXTRA_BARS) do EXTRA_BY_KEY[extra.key] = extra end
@@ -278,15 +278,20 @@ local function BarRows(ui, board, key, title, db, spec)
 	local position = BUI.PositionTool(db, { selfTag = spec.selfTag })
 	local layering = { Option(db, 'Layer', 'frameStrata', { entries = BUI.C.STRATA_OPTIONS }) }
 	if spec.fill then table.insert(layering, 1, Option(db, 'Fill from', 'growth', { entries = GROWTHS })) end
-	board:AddTools(title, spec.description, {
-		position,
-		{ tooltip = spec.fill and 'Fill direction and layer' or 'Layer', title = title, options = layering },
-		{ icon = 'eye', tooltip = 'Preview and unlock just this bar to drag it', get = function() return ActionBars.BarUnlocked(key) end, set = function(value)
-			ActionBars.SetBarUnlocked(key, value)
-			Repaint()
-		end },
-		Toggle(db, nil, 'enabled'),
-	}, apply)
+	if spec.toggles then
+		for _, toggle in ipairs(spec.toggles) do layering[#layering + 1] = Toggle(db, toggle.label, toggle.key) end
+	end
+	local tools = { position }
+	if spec.scaleOnly then
+		tools[#tools + 1] = { icon = 'resize', tooltip = 'Scale', title = title, options = { Option(db, 'Scale %', 'scale', { min = 50, max = 200, step = 1 }) } }
+	end
+	tools[#tools + 1] = { tooltip = spec.cogTooltip or (spec.fill and 'Fill direction and layer' or 'Layer'), title = title, options = layering }
+	tools[#tools + 1] = { icon = 'eye', tooltip = 'Preview and unlock just this bar to drag it', get = function() return ActionBars.BarUnlocked(key) end, set = function(value)
+		ActionBars.SetBarUnlocked(key, value)
+		Repaint()
+	end }
+	tools[#tools + 1] = Toggle(db, nil, 'enabled')
+	board:AddTools(title, spec.description, tools, apply)
 	if spec.buttons then
 		board:AddTools('Buttons', 'How many, how big and how they are spaced, height 0 keeps buttons square', {
 			{ tooltip = 'Count and rows', title = title, options = {
@@ -315,10 +320,6 @@ local function BarRows(ui, board, key, title, db, spec)
 				Option(db, 'Scale %', 'scale', { min = 50, max = 200, step = 1 }),
 				Toggle(db, 'Vertical', 'vertical'),
 			} },
-		}, apply)
-	elseif spec.scaleOnly then
-		board:AddTools('Scale', 'Overall size of the buttons', {
-			{ icon = 'resize', tooltip = 'Scale', title = title, options = { Option(db, 'Scale %', 'scale', { min = 50, max = 200, step = 1 }) } },
 		}, apply)
 	end
 	board:AddTools('Mouseover fade', 'Fade the bar out until the cursor is over it', {
@@ -359,8 +360,6 @@ local function ButtonsBoard(ui, parent, width, key, db, rows)
 	if rows.macroText then Cell('Macro text', 'showMacroText', 'Macro and spell names on this bar') end
 	if rows.hideEmpty then Cell('Hide empty buttons', 'hideEmptyButtons', 'Collapse slots with nothing in them') end
 	if rows.clickThrough then Cell('Click through', 'clickThrough', 'The mouse passes through this bar, keybinds still work, clicks and tooltips do not') end
-	if rows.singleBag then Cell('Single bag', 'singleBag', 'Only the backpack button, it still opens every bag') end
-	if rows.blizzardArt then Cell('Blizzard art', 'blizzardArt', 'Keep the Blizzard decorative frame around the buttons') end
 	if rows.cooldownText then
 		board:AddTools('Cooldown text', 'Countdown numbers on this bar', {
 			{ icon = 'text', tooltip = 'Size', title = 'Cooldown text', options = { Option(db, 'Text size', 'cooldownFontSize', { min = 8, max = 24, step = 1 }) } },
@@ -405,8 +404,11 @@ local function ExtraBoards(ui, parent, width, extra)
 		size = extra.size,
 		micro = extra.micro,
 		scaleOnly = extra.scaleOnly,
-		description = extra.buttons and 'On or off, position, fill direction and layer' or 'On or off, position and layer',
+		toggles = extra.toggles,
+		cogTooltip = extra.cogTooltip,
+		description = extra.scaleOnly and 'On or off, position, scale and layer' or extra.buttons and 'On or off, position, fill direction and layer' or 'On or off, position and layer',
 	})
+	if not extra.rows then return { board } end
 	return { board, ButtonsBoard(ui, parent, width, extra.key, db, extra.rows) }
 end
 
@@ -422,8 +424,8 @@ end
 
 local function BagButtons()
 	local list = {}
-	for _, name in ipairs(BAG_BUTTON_NAMES) do
-		local button = _G[name]
+	for index = #BAG_BUTTON_NAMES, 1, -1 do
+		local button = _G[BAG_BUTTON_NAMES[index]]
 		if button and button:IsShown() then list[#list + 1] = button end
 	end
 	return list
