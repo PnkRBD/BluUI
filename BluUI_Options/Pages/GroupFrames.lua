@@ -1,9 +1,8 @@
 local BUI = BluUI
 local BUILib = BluUI.BUILibClient
-local Layout, Modals = BUILib.Layout, BUILib.Modals
+local Modals = BUILib.Modals
 local AuraLists = BUI.AuraLists
 
-local PAGE_WIDTH = 960
 local MENU_WIDTH = 150
 local WIDE_MENU = 200
 local TEXT_RANGE = 100
@@ -102,7 +101,6 @@ local INDICATORS = {
 	{ key = 'readyCheckIcon', kind = 'readyCheck', label = 'Ready check' },
 	{ key = 'combatIcon', kind = 'combat', label = 'Combat' },
 }
-local STATUSES = { 'DND', 'AFK', 'Offline', 'Ghost', 'Dead' }
 local DISPEL_TYPES = { 'Bleed', 'Poison', 'Disease', 'Curse', 'Magic' }
 local CONTAINERS = {
 	{ key = 'buffs', title = 'Buffs', description = 'Helpful auras on each member' },
@@ -112,12 +110,7 @@ local CONTAINERS = {
 }
 local POLARITY = { buffs = 'HELPFUL', bigDef = 'HELPFUL', debuffs = 'HARMFUL', crowdControl = 'HARMFUL' }
 local SECTION_OF = { party = 'party', partyAuras = 'party', raid = 'raid', raidAuras = 'raid' }
-local TAB_IDS = { 'general', 'party', 'raid', 'partyAuras', 'raidAuras', 'filters' }
-local TAB_INDEX = {}
-for index, id in ipairs(TAB_IDS) do TAB_INDEX[id] = index end
-
-local selected = 'general'
-local fonts, textures
+local fonts, textures, moduleLoaded
 
 local function Window()
 	return BUI.PageEngine.window
@@ -365,10 +358,9 @@ local function FramesBoard(ui, parent, width, key)
 		Colors()
 	end)
 	local statusTools = {}
-	for _, status in ipairs(STATUSES) do statusTools[#statusTools + 1] = Color(section.statusText.colors, status, status) end
 	statusTools[#statusTools + 1] = TextOptions(section.statusText)
 	statusTools[#statusTools + 1] = Toggle(section, nil, 'showStatusText')
-	text:AddTools('Status text', 'Dead, ghost, offline, AFK and DND labels', statusTools, Refresh)
+	text:AddTools('Status text', 'Dead, ghost, offline, AFK and DND labels. The colors live on the Unit Frames Appearance pane.', statusTools, Refresh)
 	if isParty then
 		local keystone = TextOptions(section.keystone)
 		table.remove(keystone.options, 2)
@@ -583,74 +575,48 @@ end
 
 local function Panes(ui, _, parent, width, item, page)
 	if item.id == 'general' then return GeneralBoards(ui, parent, width) end
-	if item.id == 'filters' then return FiltersBoards(ui, parent, width, page) end
+	if item.id == 'groupFilters' then return FiltersBoards(ui, parent, width, page) end
 	if item.id == 'partyAuras' or item.id == 'raidAuras' then return AurasBoards(ui, parent, width, SECTION_OF[item.id]) end
 	return FramesBoard(ui, parent, width, item.id)
 end
 
-local RAIL_GROUPS = {
-	{ title = 'Settings', items = {
-		{ id = 'general', label = 'General', icon = 'cog' },
-		{ id = 'filters', label = 'Filters', icon = 'x' },
-	} },
-	{ title = 'Party', items = {
-		{ id = 'party', label = 'Frames' },
-		{ id = 'partyAuras', label = 'Auras' },
-	} },
-	{ title = 'Raid', items = {
-		{ id = 'raid', label = 'Frames' },
-		{ id = 'raidAuras', label = 'Auras' },
-	} },
+local ITEMS = {
+	{ id = 'general', label = 'General', icon = 'cog' },
+	{ id = 'groupFilters', label = 'Filters', icon = 'x' },
+	{ id = 'party', label = 'Party' },
+	{ id = 'partyAuras', label = 'Party auras' },
+	{ id = 'raid', label = 'Raid' },
+	{ id = 'raidAuras', label = 'Raid auras' },
 }
 
-BUI.PageEngine.RegisterPage('groupframes', {
-	title = 'Group Frames',
-	buttonText = 'Group Frames',
-	icon = 'modules5',
-	OnBuild = function(pageFrame)
+local function IsOn()
+	return moduleLoaded and Config().enabled == true
+end
+
+local function EnableTool()
+	return { icon = 'enable', label = 'Group frames', tooltip = 'Turn the group frames on or off', get = IsOn, set = function(value)
+		if not moduleLoaded then return BUI.ModulesPage.ConfirmReload('groupFrames', value, Repaint) end
+		Config().enabled = value
+		GroupFrames().SetEnabledLive(value)
+		if value then return end
+		Modals.Confirm({
+			parent = Window().frame,
+			title = 'Group frames off',
+			message = 'The frames are hidden now, but the Blizzard party and raid frames only come back after a reload. Reload now?',
+			confirmText = 'Reload', cancelText = 'Later',
+			onConfirm = ReloadUI,
+		})
+	end }
+end
+
+BUI.GroupFramesPage = {
+	items = ITEMS,
+	IsOn = IsOn,
+	EnableTool = EnableTool,
+	Build = Panes,
+	Init = function()
+		moduleLoaded = BUI.IsModuleEnabled('groupFrames')
 		fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
 		textures = BUI.BuildTextureDropdownItems(BUI.C.GLOBAL_OPTION)
-		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
-		local tab = page:GetTab(1)
-		local enabled = BUI.IsModuleEnabled('groupFrames')
-		local rail
-		rail = Layout.RailPage(tab, { window = Window() }, {
-			icon = 'modules5',
-			title = 'Group Frames',
-			placeholder = 'Search group frame settings...',
-			tools = {
-				{ icon = 'enable', tooltip = 'Turn the group frames on or off', get = function() return enabled and Config().enabled == true end, set = function(value)
-					if not enabled then return BUI.ModulesPage.ConfirmReload('groupFrames', value, Repaint) end
-					Config().enabled = value
-					GroupFrames().SetEnabledLive(value)
-					if value then return end
-					Modals.Confirm({
-						parent = Window().frame,
-						title = 'Group frames off',
-						message = 'The frames are hidden now, but the Blizzard party and raid frames only come back after a reload. Reload now?',
-						confirmText = 'Reload', cancelText = 'Later',
-						onConfirm = ReloadUI,
-					})
-				end },
-			},
-			rail = { groups = RAIL_GROUPS, selected = selected },
-			disabled = function() return not enabled or Config().enabled ~= true end,
-			build = Panes,
-		})
-		if not enabled then
-			page:AutoRefresh()
-			return
-		end
-		local Select = rail.Select
-		function rail:Select(id)
-			selected = id
-			Select(self, id)
-			Repaint()
-		end
-		pageFrame._page = { tabContents = { tab, tab, tab, tab, tab, tab }, currentTab = TAB_INDEX[selected], SetTab = function(_, index) rail:Select(TAB_IDS[index] or 'general') end }
-		page:AutoRefresh()
 	end,
-	OnHide = function()
-		BUI.GroupFrames.CloseAllPreviews()
-	end,
-})
+}
