@@ -419,7 +419,8 @@ function Grid:AddTools(name, sub, tools, after)
 					controls[#controls + 1] = control
 					total = total + control:GetWidth() + GRID_GAP
 				end
-				local cursor = column.align == 'CENTER' and x + math.floor((cellWidth - total) / 2) or x
+				local cursor = x
+				if column.align == 'CENTER' then cursor = x + math.floor((cellWidth - total) / 2) elseif column.align == 'RIGHT' then cursor = x + cellWidth - total end
 				for _, control in ipairs(controls) do
 					control:SetPoint('LEFT', cursor, 0)
 					cursor = cursor + control:GetWidth() + GRID_GAP
@@ -503,10 +504,11 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 		local x = 0
 		for index, column in ipairs(spec.columns) do
 			local columnWidth = column.width or (width - x)
-			grid.columns[index] = { x = x, width = columnWidth, align = column.align, slot = column.slot }
+			local align = column.align or (column.slot == 'swatch' and 'RIGHT' or nil)
+			grid.columns[index] = { x = x, width = columnWidth, align = align, slot = column.slot }
 			local title = kit.Text(panel, column.title, 12, 'text', columnWidth - GRID_PAD * 2, 'title')
 			title:SetPoint('LEFT', panel, 'TOPLEFT', x + GRID_PAD, -GRID_HEAD / 2)
-			title:SetJustifyH(column.align or 'LEFT')
+			title:SetJustifyH(align or 'LEFT')
 			title:SetWordWrap(false)
 			if index > 1 then
 				local divider = window:Fill(panel, 'rule', 'ARTWORK')
