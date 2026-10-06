@@ -69,6 +69,7 @@ function BlizzardBar:EnsureBar()
 			header = ActionBars.CreateHeader(self.headerName, false),
 			buttons = {},
 		})
+		self.bar.MouseFrames = function() return { self.Frame():GetChildren() } end
 	end
 	return self.bar
 end
@@ -119,5 +120,5 @@ function BlizzardBar:Refresh()
 	self.Retake(self)
 	self:MuteSelection(true)
 	self:SyncHover()
-	ActionBars.ApplyBarMouse(self.bar, { frame:GetChildren() })
+	ActionBars.ApplyBarMouse(self.bar)
 end

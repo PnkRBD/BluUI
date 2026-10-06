@@ -353,7 +353,7 @@ function ActionBars.ApplyBarMouse(bar, frames)
 	end
 	bar.mouseState = state
 	bar.mouseEnabled = clicks
-	for _, frame in ipairs(frames or bar.buttons) do
+	for _, frame in ipairs(frames or (bar.MouseFrames and bar.MouseFrames()) or bar.buttons) do
 		frame:SetMouseClickEnabled(clicks)
 		frame:SetMouseMotionEnabled(motion)
 	end
