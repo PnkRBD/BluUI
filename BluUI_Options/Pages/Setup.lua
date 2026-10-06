@@ -100,10 +100,15 @@ local function Index(id)
 	end
 end
 
+local function Show(page, id)
+	if id == 'finish' then page:Rebuild('finish') end
+	page:Select(id)
+end
+
 local function Go(page, id)
 	local index = Index(id)
 	if index > 1 then done[STEPS[index - 1].id] = true end
-	page:Select(id)
+	Show(page, id)
 end
 
 local function Back(page, id)
@@ -394,7 +399,11 @@ local function Profile(kit, _, parent, width, _, page)
 	end
 	local rows = math.ceil(#tiles / PROFILE_COLUMNS)
 	y = y + rows * PROFILE_TILE_HEIGHT + (rows - 1) * TILE_GAP + FOOTER_GAP
-	return { Footer(kit, frame, y, function() Back(page, 'welcome') end, { text = 'Next', onClick = function() Go(page, 'scale') end }) }
+	return { Footer(kit, frame, y, function() Back(page, 'welcome') end, { text = 'Next', onClick = function()
+		if current ~= BLU_PROFILE then return Go(page, 'scale') end
+		done.profile = true
+		Show(page, 'finish')
+	end }) }
 end
 
 local function Skins(kit, _, parent, width, _, page)
