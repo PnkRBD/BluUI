@@ -600,35 +600,20 @@ local function AppearanceBoards(ui, parent, width, page)
 		DispelPreviewEye(),
 		Toggle(player, nil, 'debuffHighlightBar'),
 	}, RefreshDispel)
-	dispel:AddTools('Type icons', 'A row of debuff type icons above your character', {
-		{ tooltip = 'Size, position and prompts', title = 'Type icons', options = {
-			Option(player, 'Size', 'debuffHighlightBadgeSize', { min = 10, max = 48, step = 1 }),
-			Option(player, 'Horizontal', 'debuffHighlightBadgeOffsetX', { min = -BADGE_RANGE_X, max = BADGE_RANGE_X, step = 1 }),
-			Option(player, 'Vertical', 'debuffHighlightBadgeOffsetY', { min = -BADGE_RANGE_Y, max = BADGE_RANGE_Y, step = 1 }),
-			{ label = 'Cleanse callouts, FD, TURT and SF prompts', get = function() return player.debuffHighlightTypeText == true end, set = function(value) player.debuffHighlightTypeText = value end, separator = true },
-			{ label = 'Recolor the Blizzard debuff icons to match', get = function() return settings.dispelRecolor == true end, set = function(value) settings.dispelRecolor = value end },
-		} },
-		DispelPreviewEye(),
-		OnUnlessOff(player, nil, 'debuffHighlightBadge'),
-	}, RefreshDispel)
-	local store = BUI.Colors.GetStore()
-	local swatches = {
-		{ icon = 'reset', tooltip = 'Back to the default colors', onClick = function()
-			BUI.Colors.ResetGroup('Dispel Types')
-			BUI.ApplyColors()
-			RefreshDispel()
-			Repaint()
-		end },
-	}
+	local typeIcons = {}
 	for _, typeName in ipairs(DISPEL_TYPES) do
-		local stored = store[BUI.AuraEngine.DispelColorKey(typeName)]
-		swatches[#swatches + 1] = {
-			kind = 'swatch', tooltip = typeName, opacity = true,
-			get = function() return stored.r, stored.g, stored.b, stored.a end,
-			set = function(red, green, blue, alpha) stored.r, stored.g, stored.b, stored.a = red, green, blue, alpha end,
-		}
+		typeIcons[#typeIcons + 1] = StoreColor(BUI.AuraEngine.DispelColorKey(typeName), typeName .. ', shared with the party and raid frames')
 	end
-	dispel:AddTools('Type colors', 'Shared with the party and raid frames', swatches, RefreshDispel)
+	typeIcons[#typeIcons + 1] = { tooltip = 'Size, position and prompts', title = 'Type icons', options = {
+		Option(player, 'Size', 'debuffHighlightBadgeSize', { min = 10, max = 48, step = 1 }),
+		Option(player, 'Horizontal', 'debuffHighlightBadgeOffsetX', { min = -BADGE_RANGE_X, max = BADGE_RANGE_X, step = 1 }),
+		Option(player, 'Vertical', 'debuffHighlightBadgeOffsetY', { min = -BADGE_RANGE_Y, max = BADGE_RANGE_Y, step = 1 }),
+		Toggle(player, 'Cleanse callouts, FD, TURT and SF prompts', 'debuffHighlightTypeText', { separator = true }),
+		Toggle(settings, 'Recolor the Blizzard debuff icons to match', 'dispelRecolor'),
+	} }
+	typeIcons[#typeIcons + 1] = DispelPreviewEye()
+	typeIcons[#typeIcons + 1] = OnUnlessOff(player, nil, 'debuffHighlightBadge')
+	dispel:AddTools('Type icons', 'Debuff type icons above the frame, one color each', typeIcons, RefreshDispel)
 
 	local indicators = ToolGrid(ui, parent, width, 'Indicators', 'Icons layered on every frame.', SETTING_COLUMNS)
 	indicators:AddTools('Raid icon', 'Raid target marker on each frame', {
