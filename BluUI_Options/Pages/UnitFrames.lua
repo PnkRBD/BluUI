@@ -34,12 +34,12 @@ local PREVIEW_FRAME_HEIGHT = 80
 local PREVIEW_BOSS_HEIGHT = 72
 
 local UNITS = {
-	{ key = 'player', label = 'Player', title = 'Player frame', description = 'Position, texts, indicators and auras for your own frame.' },
-	{ key = 'target', label = 'Target', title = 'Target frame', description = 'Layout and auras for your current target.' },
-	{ key = 'targettarget', label = 'Target of target', title = 'Target of target', description = 'Compact frame showing what your target is targeting.' },
-	{ key = 'focus', label = 'Focus', title = 'Focus frame', description = 'Layout and auras for your focus.' },
-	{ key = 'pet', label = 'Pet', title = 'Pet frame', description = 'Layout and colors for your pet.' },
-	{ key = 'boss', label = 'Boss', title = 'Boss frames', description = 'Up to five stacked frames for boss encounters.' },
+	{ key = 'player', label = 'Player', icon = 'profile', title = 'Player frame', description = 'Position, texts, indicators and auras for your own frame.' },
+	{ key = 'target', label = 'Target', icon = 'crosshair', title = 'Target frame', description = 'Layout and auras for your current target.' },
+	{ key = 'targettarget', label = 'Target of target', icon = 'targettarget', title = 'Target of target', description = 'Compact frame showing what your target is targeting.' },
+	{ key = 'focus', label = 'Focus', icon = 'viewfinder', title = 'Focus frame', description = 'Layout and auras for your focus.' },
+	{ key = 'pet', label = 'Pet', icon = 'paw', title = 'Pet frame', description = 'Layout and colors for your pet.' },
+	{ key = 'boss', label = 'Boss', icon = 'skull', title = 'Boss frames', description = 'Up to five stacked frames for boss encounters.' },
 }
 local UNIT_BY_KEY = {}
 for _, unit in ipairs(UNITS) do UNIT_BY_KEY[unit.key] = unit end
@@ -1163,7 +1163,7 @@ end
 
 local function RailGroups()
 	local frames = {}
-	for _, unit in ipairs(UNITS) do frames[#frames + 1] = { id = unit.key, label = unit.label } end
+	for _, unit in ipairs(UNITS) do frames[#frames + 1] = { id = unit.key, label = unit.label, icon = unit.icon } end
 	return {
 		{ title = 'Settings', items = {
 			{ id = 'appearance', label = 'Appearance', icon = 'cog' },
