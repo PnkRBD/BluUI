@@ -87,6 +87,7 @@ local function SkinBagButton(button, settings)
 	end
 	button.icon:ClearAllPoints()
 	button.icon:SetAllPoints()
+	button.icon:SetDrawLayer('BACKGROUND')
 	ActionBars.ApplyIconCrop(button)
 	StyleBagState(button)
 	Hook(button, 'UpdateTextures', StyleBagState)
