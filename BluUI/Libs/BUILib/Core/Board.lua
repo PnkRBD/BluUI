@@ -405,9 +405,9 @@ function Grid:AddTools(name, sub, tools, after)
 	local cells = {}
 	for index, column in ipairs(self.columns) do
 		if column.slot == 'name' then
-			cells[index] = name
+			cells[index] = { text = name, tip = sub }
 		elseif column.slot == 'sub' then
-			cells[index] = { text = sub or '', role = 'muted' }
+			cells[index] = { text = sub or '', role = 'muted', tip = sub }
 		else
 			local slotTools = groups[column.slot]
 			cells[index] = { build = function(row, x, cellWidth)
@@ -466,6 +466,18 @@ function Grid:AddLine(cells, search)
 			label:SetPoint('LEFT', column.x + GRID_PAD, 0)
 			label:SetJustifyH(column.align or 'LEFT')
 			label:SetWordWrap(false)
+			local hover = CreateFrame('Frame', nil, row)
+			hover:SetPoint('TOPLEFT', column.x, 0)
+			hover:SetPoint('BOTTOMLEFT', column.x, 0)
+			hover:SetWidth(column.width)
+			hover:EnableMouse(true)
+			local tip = type(cell) == 'table' and cell.tip
+			hover:SetScript('OnEnter', function(self)
+				local text = tip
+				if not text and label:IsTruncated() then text = value end
+				if text then Widget.ShowTip(self, text) end
+			end)
+			hover:SetScript('OnLeave', Widget.HideTip)
 		end
 	end
 	FullRule(self)
