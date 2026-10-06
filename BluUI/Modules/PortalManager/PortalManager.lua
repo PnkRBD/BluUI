@@ -49,6 +49,24 @@ local function ResolveSpellID(entry)
     return entry.spellID
 end
 
+local function FindEntry(name)
+    for _, season in ipairs(BUI.PortalData.seasons) do
+        for _, entry in ipairs(season.dungeons) do
+            if entry.name == name then return entry end
+        end
+    end
+    for _, entries in pairs(BUI.PortalData.expansions) do
+        for _, entry in ipairs(entries) do
+            if entry.name == name then return entry end
+        end
+    end
+end
+
+function BUI.PortalManager.TeleportSpell(name)
+    local entry = FindEntry(name)
+    return entry and ResolveSpellID(entry)
+end
+
 local function AnyEntryExists(entries)
     for _, entry in ipairs(entries) do
         if C_Spell.DoesSpellExist(ResolveSpellID(entry)) then return true end
