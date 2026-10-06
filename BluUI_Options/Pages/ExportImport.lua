@@ -29,12 +29,13 @@ local RAIL_GROUPS = {
     { title = 'Manage', items = {
         { id = 'profiles', label = 'Profiles', icon = 'profile' },
         { id = 'transfer', label = 'Export and import', icon = 'copy' },
+        { id = 'addons', label = 'Addons', icon = 'modules5' },
     } },
     { title = 'Automation', items = {
         { id = 'specs', label = 'Spec profiles', icon = 'shuffle' },
     } },
 }
-local PANE_IDS = { 'profiles', 'transfer', 'specs' }
+local PANE_IDS = { 'profiles', 'transfer', 'addons', 'specs' }
 local PANE_INDEX = {}
 for index, id in ipairs(PANE_IDS) do PANE_INDEX[id] = index end
 
@@ -628,7 +629,6 @@ local function OtherAddonsSection(ui, parent, width)
     local azorPending = type(AzortharionUI_DB) == 'table'
         or (BluUI_DB.__azorImportDeclined and not (BluUI_DB.__adoptedLegacySettings or BluUI_DB.__adoptedLegacySettings_v2))
     local platynator = Platynator and Platynator.API and Platynator.API.ImportString
-    if not azorInstalled and not azorPending and not platynator then return nil end
 
     local board = ui.Board(parent, width, {
         stacked = true,
@@ -654,6 +654,7 @@ local function OtherAddonsSection(ui, parent, width)
     if platynator then
         Action('Platynator nameplates', 'Adds the BluUI profile to Platynator. Updated ' .. BUI.PlatynatorProfileDate .. '.', 'Import', BUI.ImportPlatynatorProfile)
     end
+    if not azorInstalled and not azorPending and not platynator then board:AddRow('Nothing to bring across', 'This fills in when a supported addon is installed') end
     return board
 end
 
@@ -668,7 +669,8 @@ local function Panes(ui, shell, parent, width, item)
         })
     elseif item.id == 'transfer' then
         sections[#sections + 1] = TransferSection(ui, shell, parent, width)
-        sections[#sections + 1] = OtherAddonsSection(ui, parent, width)
+    elseif item.id == 'addons' then
+        sections[1] = OtherAddonsSection(ui, parent, width)
     else
         sections[#sections + 1] = SpecSection(ui, shell, parent, width)
     end
