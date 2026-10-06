@@ -17,39 +17,12 @@ local BAG_BUTTON_NAMES = {
 local MASKED_REGIONS = { 'icon', 'searchOverlay', 'ItemContextOverlay' }
 local COUNT_SIZE = 12
 local BACKPACK_ICON = 133633
-local BLOCKING_ADDON = 'ElvUI'
 local EXPAND_CVAR = 'expandBagBar'
 
 local bagBar
 local QueueRetake, QueueMeasure
 local bagButtonsSkinned = false
 local singleApplied = false
-local toggleWidth, toggleHeight
-
-local recheckQueued = false
-
-local function BlockingSettings()
-	local addon = ElvUI and ElvUI[1]
-	return addon and addon.private
-end
-
-local function QueueRecheck()
-	if recheckQueued then return end
-	recheckQueued = true
-	BUI.Events:Once('PLAYER_ENTERING_WORLD', EVENT_KEY .. '.Recheck', function() bagBar:Refresh() end)
-end
-
-function ActionBars.BagBarBlockedBy()
-	if not C_AddOns.IsAddOnLoaded(BLOCKING_ADDON) then return nil end
-	local settings = BlockingSettings()
-	if not settings then
-		QueueRecheck()
-		return BLOCKING_ADDON
-	end
-	local bags, bars = settings.bags, settings.actionbar
-	if (bags and bags.bagBar) or (bars and bars.enable) then return BLOCKING_ADDON end
-	return nil
-end
 
 local function ApplySingleBag(barSettings)
 	local single = barSettings.singleBag == true
@@ -218,7 +191,6 @@ bagBar = ActionBars.NewBlizzardBar({
 	retake = Retake,
 	release = Release,
 	installHooks = InstallHooks,
-	blockedBy = ActionBars.BagBarBlockedBy,
 })
 QueueRetake = BUI.Dispatcher.New(function() Retake(bagBar) end, EVENT_KEY .. '.Retake')
 QueueMeasure = BUI.Dispatcher.New(function() Measure(bagBar) end, EVENT_KEY .. '.Measure')
