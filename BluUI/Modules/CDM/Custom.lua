@@ -12,9 +12,9 @@ local CreateFrame = CreateFrame
 local C_Spell = C_Spell
 local C_Container = C_Container
 local C_Item = C_Item
-local GetItemSpell = GetItemSpell
+local GetItemSpell = C_Item.GetItemSpell
 local IsSpellKnown = C_SpellBook.IsSpellKnown
-local IsEquippedItem = IsEquippedItem
+local IsEquippedItem = C_Item.IsEquippedItem
 
 local STANDARD_TEXT_FONT = STANDARD_TEXT_FONT
 

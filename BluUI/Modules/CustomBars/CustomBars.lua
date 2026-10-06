@@ -484,7 +484,7 @@ local function CollectCustom(stored)
         local bagCount, bestID = ConsumableCount(checkID, priority)
         if (bagCount or 0) <= 0 then
             if settings.hideWhenZero and settings.hideWhenZero[entryID] then return end
-            if settings.hideIfNotInBags and not IsEquippedItem(checkID) then return end
+            if settings.hideIfNotInBags and not C_Item.IsEquippedItem(checkID) then return end
         end
         local entry = AcquireEntry()
         entry.id = checkID
@@ -639,7 +639,7 @@ local function UpdateBar(index)
             end
         elseif entry.iconType == "trinket" then
             if icon._trinketSpellID == nil then
-                local _, spellID = GetItemSpell(entry.id)
+                local _, spellID = C_Item.GetItemSpell(entry.id)
                 icon._trinketSpellID = spellID or false
             end
             IconEngine.ApplyTrinketVisual(icon.tex, icon.cd, entry.id, icon._trinketSpellID or nil, bar.expiryCb, icon.stack)

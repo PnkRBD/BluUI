@@ -182,7 +182,7 @@ end
 local function CanHaveEnchant(info, link)
 	if info.enchant == 'weapon' then
 		if not link then return false end
-		local _, _, _, _, _, classID = GetItemInfoInstant(link)
+		local _, _, _, _, _, classID = C_Item.GetItemInfoInstant(link)
 		return classID == Enum.ItemClass.Weapon
 	end
 	return info.enchant == true
@@ -246,7 +246,7 @@ local function ReadSockets(link)
 		local _, gemLink = C_Item.GetItemGem(link, gemIndex)
 		if gemLink then
 			gemLinks[#gemLinks + 1] = gemLink
-			local icon = C_Item.GetItemIconByID(gemLink) or (GetItemInfoInstant and select(5, GetItemInfoInstant(gemLink)))
+			local icon = C_Item.GetItemIconByID(gemLink) or select(5, C_Item.GetItemInfoInstant(gemLink))
 			entries[#entries + 1] = { icon = icon or QUESTION_MARK_ICON }
 		end
 	end
