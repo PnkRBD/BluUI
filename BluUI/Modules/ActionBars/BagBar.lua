@@ -16,6 +16,7 @@ local BAG_BUTTON_NAMES = {
 }
 local MASKED_REGIONS = { 'icon', 'searchOverlay', 'ItemContextOverlay' }
 local COUNT_SIZE = 12
+local BACKPACK_ICON = 133633
 local BLOCKING_ADDON = 'ElvUI'
 local EXPAND_CVAR = 'expandBagBar'
 
@@ -23,9 +24,31 @@ local bagBar
 local QueueRetake, QueueMeasure
 local bagButtonsSkinned = false
 local singleApplied = false
+local toggleWidth, toggleHeight
+
+local recheckQueued = false
+
+local function BlockingSettings()
+	local addon = ElvUI and ElvUI[1]
+	return addon and addon.private
+end
+
+local function QueueRecheck()
+	if recheckQueued then return end
+	recheckQueued = true
+	BUI.Events:Once('PLAYER_ENTERING_WORLD', EVENT_KEY .. '.Recheck', function() bagBar:Refresh() end)
+end
 
 function ActionBars.BagBarBlockedBy()
-	return C_AddOns.IsAddOnLoaded(BLOCKING_ADDON) and BLOCKING_ADDON or nil
+	if not C_AddOns.IsAddOnLoaded(BLOCKING_ADDON) then return nil end
+	local settings = BlockingSettings()
+	if not settings then
+		QueueRecheck()
+		return BLOCKING_ADDON
+	end
+	local bags, bars = settings.bags, settings.actionbar
+	if (bags and bags.bagBar) or (bars and bars.enable) then return BLOCKING_ADDON end
+	return nil
 end
 
 local function ApplySingleBag(barSettings)
@@ -36,7 +59,6 @@ local function ApplySingleBag(barSettings)
 		C_CVar.SetCVar(EXPAND_CVAR, '1')
 	end
 	singleApplied = single
-	BagBarExpandToggle:SetShown(not single)
 end
 
 local function StyleBagState(button)
@@ -51,6 +73,27 @@ end
 
 local function ShowFreeSlots(button)
 	button.Count:SetText(button.freeSlots)
+end
+
+local function ShowBackpackIcon(button)
+	button.icon:SetTexture(BACKPACK_ICON)
+	button.icon:Show()
+end
+
+local function HideExpandToggle()
+	if toggleWidth then return end
+	toggleWidth, toggleHeight = BagsBar.bagBarExpandToggleInitialWidth, BagsBar.bagBarExpandToggleInitialHeight
+	BagsBar.bagBarExpandToggleInitialWidth, BagsBar.bagBarExpandToggleInitialHeight = 0, 0
+	BagBarExpandToggle:Hide()
+	BagsBar:Layout()
+end
+
+local function RestoreExpandToggle()
+	if not toggleWidth then return end
+	BagsBar.bagBarExpandToggleInitialWidth, BagsBar.bagBarExpandToggleInitialHeight = toggleWidth, toggleHeight
+	toggleWidth, toggleHeight = nil, nil
+	BagBarExpandToggle:Show()
+	BagsBar:Layout()
 end
 
 local function SkinBagButton(button, settings)
@@ -77,6 +120,8 @@ local function SkinBagButtons()
 	backpack.Count:ClearAllPoints()
 	backpack.Count:SetPoint('BOTTOM', backpack, 'BOTTOM', 0, 2)
 	Hook(backpack, 'UpdateFreeSlots', ShowFreeSlots)
+	Hook(backpack, 'SetItemButtonTexture', ShowBackpackIcon)
+	ShowBackpackIcon(backpack)
 	ShowFreeSlots(backpack)
 end
 
@@ -98,7 +143,6 @@ end
 
 local function Measure(self)
 	if not self:Owned() or not self:Enabled() then return end
-	if self:Settings().singleBag then BagBarExpandToggle:Hide() end
 	local left, right, top, bottom = VisibleBounds()
 	local barLeft, barTop = BagsBar:GetLeft(), BagsBar:GetTop()
 	if not left or not barLeft then return end
@@ -119,6 +163,7 @@ local function Retake(self)
 	self:Apply(function()
 		SkinBagButtons()
 		ApplySingleBag(barSettings)
+		HideExpandToggle()
 		BagsBar:SetParent(header)
 		BagsBar:ClearAllPoints()
 		BagsBar:SetPoint('TOPLEFT', header, 'TOPLEFT', 0, 0)
@@ -136,10 +181,10 @@ local function Retake(self)
 end
 
 local function Release()
+	RestoreExpandToggle()
 	if singleApplied then
 		singleApplied = false
 		C_CVar.SetCVar(EXPAND_CVAR, '1')
-		BagBarExpandToggle:Show()
 	end
 	BagsBar:SetParent(UIParent)
 	BagsBar:ClearAllPoints()
