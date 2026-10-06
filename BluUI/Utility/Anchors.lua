@@ -276,7 +276,8 @@ end
 function Anchor.SetCentered(frame, posX, posY)
     if not frame then return end
     frame:ClearAllPoints()
-    Anchor.PlaceOnPixels(frame, "CENTER", UIParent, "CENTER", posX, posY)
+    local scale = frame:GetScale()
+    Anchor.PlaceOnPixels(frame, "CENTER", UIParent, "CENTER", posX / scale, posY / scale)
 end
 
 function Anchor.ApplyPosition(frame, settings)
