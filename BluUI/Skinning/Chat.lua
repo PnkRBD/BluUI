@@ -1094,7 +1094,9 @@ local function SkinPanel()
 	local cog = MakeCornerButton(chat, 'cog')
 	cog:SetPoint('TOP', verticalStrip, 'TOP', 0, -3)
 	cog:SetScript('OnClick', BUI.Profiler.Script('Skin.Chat cog OnClick', function()
-		if BUI.PageEngine.EnsureLoaded() then BUI.OptionsWindow.Open('chat') end
+		if not BUI.PageEngine.EnsureLoaded() then return end
+		BUI.PageEngine.Show()
+		BUI.PageEngine.NavigateToID('chat')
 	end))
 	chat._buiCog = cog
 
@@ -2045,7 +2047,7 @@ Skin.RegisterSkin('chat', {
 	name = 'Chat',
 	description = 'Dark panel behind the chat dock, with timestamps, copy chat, abbreviations, and fading.',
 	icon = 'Interface\\Icons\\UI_Chat',
-	window = 'chat',
+	page = 'chat',
 	reset = ResetToDefaults,
 	buildBoards = function(ui, parent, width)
 		local config = GetConfig()
