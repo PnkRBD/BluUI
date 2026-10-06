@@ -32,6 +32,9 @@ local function ApplySingleBag(barSettings)
 		C_CVar.SetCVar(EXPAND_CVAR, '1')
 	end
 	singleApplied = single
+	MainMenuBarBagManager:SetExpandBar(not single)
+	CharacterReagentBag0Slot:SetShown(not single)
+	BagsBar:Layout()
 end
 
 local function StyleBagState(button)
@@ -53,18 +56,26 @@ local function ShowBackpackIcon(button)
 	button.icon:Show()
 end
 
+local function CloseToggleGap()
+	if BagBarExpandToggle:IsShown() then return end
+	local point, relativePoint, offsetX, offsetY = BagsBar:GetBagButtonAnchorPoints()
+	for _, button in MainMenuBarBagManager:EnumerateBagButtons() do
+		if button:IsShown() and button ~= MainMenuBarBackpackButton then
+			button:ClearAllPoints()
+			button:SetPoint(point, MainMenuBarBackpackButton, relativePoint, offsetX, offsetY)
+			return
+		end
+	end
+end
+
 local function HideExpandToggle()
-	if toggleWidth then return end
-	toggleWidth, toggleHeight = BagsBar.bagBarExpandToggleInitialWidth, BagsBar.bagBarExpandToggleInitialHeight
-	BagsBar.bagBarExpandToggleInitialWidth, BagsBar.bagBarExpandToggleInitialHeight = 0, 0
+	if not BagBarExpandToggle:IsShown() then return end
 	BagBarExpandToggle:Hide()
 	BagsBar:Layout()
 end
 
 local function RestoreExpandToggle()
-	if not toggleWidth then return end
-	BagsBar.bagBarExpandToggleInitialWidth, BagsBar.bagBarExpandToggleInitialHeight = toggleWidth, toggleHeight
-	toggleWidth, toggleHeight = nil, nil
+	if BagBarExpandToggle:IsShown() then return end
 	BagBarExpandToggle:Show()
 	BagsBar:Layout()
 end
@@ -154,11 +165,13 @@ local function Retake(self)
 end
 
 local function Release()
-	RestoreExpandToggle()
 	if singleApplied then
 		singleApplied = false
 		C_CVar.SetCVar(EXPAND_CVAR, '1')
+		MainMenuBarBagManager:SetExpandBar(true)
+		CharacterReagentBag0Slot:Show()
 	end
+	RestoreExpandToggle()
 	BagsBar:SetParent(UIParent)
 	BagsBar:ClearAllPoints()
 	BagsBar:SetPoint('BOTTOMRIGHT', UIParent, 'BOTTOMRIGHT', -RELEASE_INSET, RELEASE_INSET)
@@ -172,9 +185,14 @@ local function OnBlizzardLayout()
 	if bagBar:Active() then QueueMeasure() end
 end
 
+local function AfterBlizzardLayout()
+	CloseToggleGap()
+	OnBlizzardLayout()
+end
+
 local function InstallHooks()
 	Hook(BagsBar, 'ApplySystemAnchor', OnBlizzardAnchor)
-	Hook(BagsBar, 'Layout', OnBlizzardLayout)
+	Hook(BagsBar, 'Layout', AfterBlizzardLayout)
 	Hook(BagsBar, 'UpdateSystemSettingSize', OnBlizzardLayout)
 	local onSlotLayout = BUI.Profiler.Wrap('ActionBars.BagBar slot layout', OnBlizzardLayout)
 	for _, name in ipairs(SLOT_NAMES) do
