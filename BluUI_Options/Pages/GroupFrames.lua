@@ -573,10 +573,10 @@ end
 local ITEMS = {
 	{ id = 'general', label = 'General', icon = 'cog' },
 	{ id = 'groupFilters', label = 'Filters', icon = 'x' },
-	{ id = 'party', label = 'Party' },
-	{ id = 'partyAuras', label = 'Party auras' },
-	{ id = 'raid', label = 'Raid' },
-	{ id = 'raidAuras', label = 'Raid auras' },
+	{ id = 'party', label = 'Party', icon = 'party' },
+	{ id = 'partyAuras', label = 'Party auras', icon = 'glow' },
+	{ id = 'raid', label = 'Raid', icon = 'raid' },
+	{ id = 'raidAuras', label = 'Raid auras', icon = 'glow' },
 }
 
 local function IsOn()
