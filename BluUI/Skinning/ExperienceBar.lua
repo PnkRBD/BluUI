@@ -22,6 +22,7 @@ local reputationEdgeTexture, reputationBackground
 local statLabels = {}
 local hoverTicker
 local isActive = false
+local moversUnlocked = false
 
 local sessionOnlineTime = 0
 local sessionLoginTime = 0
@@ -433,10 +434,10 @@ local function LayoutBars()
 			reputationEdgeTexture:Hide()
 		end
 
-		if totalWidth == 0 then
+		if totalWidth == 0 and not moversUnlocked then
 			barFrame:Hide()
 		else
-			barFrame:SetWidth(totalWidth + scaledEdge * 2)
+			barFrame:SetWidth(math.max(totalWidth, barHeight) + scaledEdge * 2)
 			barFrame:Show()
 		end
 	else
@@ -475,10 +476,10 @@ local function LayoutBars()
 			reputationEdgeTexture:Hide()
 		end
 
-		if totalHeight == 0 then
+		if totalHeight == 0 and not moversUnlocked then
 			barFrame:Hide()
 		else
-			barFrame:SetHeight(totalHeight + scaledEdge * 2)
+			barFrame:SetHeight(math.max(totalHeight, barHeight) + scaledEdge * 2)
 			barFrame:Show()
 		end
 	end
@@ -768,6 +769,14 @@ local function Disable()
 end
 
 BUI.Events:OnLogin('Skinning.XPBar.Init', function()
+	BUI.ActionBars.OnMoversChanged('experienceBar', function(kind, unlocked)
+		if kind ~= 'unlocked' then return end
+		moversUnlocked = unlocked
+		if not (isActive and barFrame) then return end
+		LayoutBars()
+		local config = GetConfig()
+		Dragging.SetLocked(barFrame, config.position ~= 'FREE' or (not unlocked and config.locked ~= false))
+	end)
 	if Skin.IsSkinEnabled('experiencebar') then Enable() end
 end)
 
