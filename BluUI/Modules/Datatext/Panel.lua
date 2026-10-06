@@ -2,6 +2,9 @@ local _, BUI = ...
 
 local Datatext = BUI.Datatext
 local Pixel = BUI.Pixel
+local Widget = BUI.BUILibClient.Widget
+
+local CARD_RADIUS = 8
 
 local hoverPanels = {}
 
@@ -22,7 +25,15 @@ local function ForceHide(panel)
     panel:Hide()
 end
 
+local function PaintPanel(panel)
+    panel.fill:SetVertexColor(BUI.ThemeColor('card'))
+    panel.edge:SetVertexColor(BUI.ThemeColor('cardEdge'))
+    panel.title:SetTextColor(BUI.ThemeColor('text'))
+    if panel.PaintTheme then panel:PaintTheme() end
+end
+
 local function Reveal(panel)
+    PaintPanel(panel)
     panel._outTime = 0
     panel._fadingOut = false
     panel.outroFade:Stop()
@@ -56,12 +67,12 @@ local OnUpdate = BUI.Profiler.Wrap('Datatext.Panel hover check', function(self, 
 end)
 
 function Datatext.CreateHoverPanel(name, width)
-    local panel = CreateFrame('Frame', name, UIParent, 'BackdropTemplate')
+    local panel = CreateFrame('Frame', name, UIParent)
     panel:SetWidth(Pixel.Scale(width))
     panel:SetFrameStrata('DIALOG')
     panel:SetFrameLevel(200)
     panel:SetClampedToScreen(true)
-    Pixel.SetTemplate(panel, unpack(BUI.C.PANEL_BACKDROP))
+    panel.fill, panel.edge = Widget.DrawCardShape(panel, CARD_RADIUS, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
     panel:EnableMouse(true)
     panel:Hide()
 
