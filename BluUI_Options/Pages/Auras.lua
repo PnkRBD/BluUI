@@ -152,6 +152,18 @@ local function KeystoneReminderRow(board)
 	}, KeystoneReminder.Refresh)
 end
 
+local function PrivateWarningRow(board)
+	local db = BUI.GetDB().privateWarning
+	local PrivateWarning = BUI.Auras.PrivateWarning
+	PrivateWarning.SetLockListener(Repaint)
+	board:AddTools('Private raid warning', "Blizzard's warning text for boss mechanics only you can see, placed and scaled by BluUI", {
+		BUI.PositionTool(db),
+		{ icon = 'resize', tooltip = 'Scale', title = 'Private raid warning', options = { Option(db, 'Scale', 'scale', { min = 50, max = 200, step = 5 }) } },
+		Eye('Preview, drag to move', function() return not db.locked end, function(value) PrivateWarning.SetLocked(not value) end),
+		Switch(db, 'enabled'),
+	}, PrivateWarning.Refresh)
+end
+
 local function LowHpRow(board)
 	local db = BUI.GetDB().auras
 	local Auras = BUI.Auras
@@ -308,6 +320,7 @@ local function AlertsBoard(ui, parent, width)
 	CombatTimerRow(board)
 	CombatMessagesRow(board)
 	KeystoneReminderRow(board)
+	PrivateWarningRow(board)
 	LowHpRow(board)
 	PetWarningsRow(board)
 	MarkWarningRow(board)

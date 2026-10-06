@@ -1507,6 +1507,19 @@ BUI.Defaults = {
 			anchorOffsetY      = 0,
 		},
 
+		privateWarning = {
+			enabled            = false,
+			locked             = true,
+			scale              = 100,
+			posX               = 0,
+			posY               = 250,
+			centerHorizontally = true,
+			anchorFrame        = "",
+			anchorPoint        = "BOTTOM",
+			anchorOffsetX      = 0,
+			anchorOffsetY      = 0,
+		},
+
 		combatTimer = {
 			enabled            = false,
 			locked             = true,
