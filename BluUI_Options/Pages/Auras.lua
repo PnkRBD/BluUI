@@ -138,6 +138,20 @@ local function CombatMessagesRow(board)
 	}, CombatMessage.Refresh)
 end
 
+local function KeystoneReminderRow(board)
+	local db = BUI.GetDB().keystoneReminder
+	local KeystoneReminder = BUI.Auras.KeystoneReminder
+	KeystoneReminder.SetLockListener(Repaint)
+	board:AddTools('Keystone Reminder', 'Card with the dungeon, your role and its portal when you join a Mythic+ group, gone once you are inside or leave', {
+		BUI.PositionTool(db, { selfTag = 'BUI_KeystoneReminder' }),
+		Eye('Preview, drag to move', function() return not db.locked end, function(value) KeystoneReminder.SetLocked(not value) end),
+		{ get = function() return db.enabled == true end, set = function(value)
+			db.enabled = value
+			if value then KeystoneReminder.Enable() else KeystoneReminder.Disable() end
+		end },
+	}, KeystoneReminder.Refresh)
+end
+
 local function LowHpRow(board)
 	local db = BUI.GetDB().auras
 	local Auras = BUI.Auras
@@ -293,6 +307,7 @@ local function AlertsBoard(ui, parent, width)
 	})
 	CombatTimerRow(board)
 	CombatMessagesRow(board)
+	KeystoneReminderRow(board)
 	LowHpRow(board)
 	PetWarningsRow(board)
 	MarkWarningRow(board)

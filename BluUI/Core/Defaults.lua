@@ -1494,6 +1494,18 @@ BUI.Defaults = {
 			fadeTime           = 0.8,
 		},
 
+		keystoneReminder = {
+			enabled            = true,
+			locked             = true,
+			posX               = 0,
+			posY               = -200,
+			centerHorizontally = false,
+			anchorFrame        = "",
+			anchorPoint        = "BOTTOM",
+			anchorOffsetX      = 0,
+			anchorOffsetY      = 0,
+		},
+
 		combatTimer = {
 			enabled            = false,
 			locked             = true,

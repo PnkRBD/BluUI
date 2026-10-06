@@ -167,6 +167,7 @@ Modules\Auras\CombatTimer.lua
 Modules\Auras\CombatMessage.lua
 Modules\Auras\Crosshair.lua
 Modules\Auras\GatewayAlert.lua
+Modules\Auras\KeystoneReminder.lua
 
 Modules\StreamerTools\GCDHistory.lua
 
