@@ -158,7 +158,7 @@ local RAID = CommonSettings({
 	nameOX = 3,
 	smallIcon = 16, markerIcon = 26, rezIcon = 24, readyIcon = 22,
 	combatIcon = 16, badgeSize = 22, iconY = 18,
-	smallAura = 18, auraGap = 1, buffMax = 4, debuffMax = 6, buffsOn = false, debuffsOn = false,
+	smallAura = 18, auraGap = 1, buffMax = 4, debuffMax = 6, buffsOn = true, debuffsOn = false,
 	bigDefSize = 24, bigDefOX = 2, ccSize = 20, ccMax = 3,
 	showAuraTooltips = true,
 })
