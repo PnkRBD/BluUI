@@ -31,8 +31,21 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 14
+local PROFILE_MIGRATION_VERSION = 15
 local LEGACY_UNIT_KEYS = { 'player', 'target', 'targettarget', 'focus', 'focustarget', 'pet', 'boss', 'arena', 'party' }
+local HEALING_RULE = 'mineRaidCombat'
+
+local function PutHealingBuffsFirst(container, key, stockRule)
+	local rules = container[key]
+	if type(rules) ~= 'table' or #rules == 0 or (#rules == 1 and rules[1] == stockRule) then
+		container[key] = { HEALING_RULE }
+		return
+	end
+	for _, rule in ipairs(rules) do
+		if rule == HEALING_RULE then return end
+	end
+	table.insert(rules, 1, HEALING_RULE)
+end
 
 function BUI.MigrateProfile(profile)
 	profile.general = profile.general or {}
@@ -446,6 +459,17 @@ function BUI.MigrateProfile(profile)
 				end
 			end
 		end
+	end
+
+	if not general._healingBuffsDefault then
+		general._healingBuffsDefault = true
+		if type(profile.unitFrames) ~= 'table' then profile.unitFrames = {} end
+		if type(profile.unitFrames.player) ~= 'table' then profile.unitFrames.player = {} end
+		PutHealingBuffsFirst(profile.unitFrames.player, 'buffRules', 'allHelpful')
+		if type(profile.groupFrames) ~= 'table' then profile.groupFrames = {} end
+		if type(profile.groupFrames.raid) ~= 'table' then profile.groupFrames.raid = {} end
+		if type(profile.groupFrames.raid.buffs) ~= 'table' then profile.groupFrames.raid.buffs = {} end
+		PutHealingBuffsFirst(profile.groupFrames.raid.buffs, 'rules', 'raidRelevant')
 	end
 
 	general._buiMigrationVersion = PROFILE_MIGRATION_VERSION
