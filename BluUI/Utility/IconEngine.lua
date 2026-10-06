@@ -3,7 +3,7 @@ local _, BUI = ...
 local tonumber, type = tonumber, type
 local C_Item = C_Item
 local C_SpellBook = C_SpellBook
-local IsEquippedItem = IsEquippedItem
+local IsEquippedItem = C_Item.IsEquippedItem
 local GetInventoryItemTexture = GetInventoryItemTexture
 local UnitIsDeadOrGhost = UnitIsDeadOrGhost
 

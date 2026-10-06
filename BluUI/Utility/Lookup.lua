@@ -60,7 +60,7 @@ end
 local function FetchItemIcon(itemID)
     local name, _, _, _, _, _, _, _, _, icon = C_Item.GetItemInfo(itemID)
     if not name then
-        local _, _, _, _, instantIcon = GetItemInfoInstant(itemID)
+        local _, _, _, _, instantIcon = C_Item.GetItemInfoInstant(itemID)
         icon = instantIcon
         C_Item.RequestLoadItemDataByID(itemID)
     end
@@ -98,7 +98,7 @@ function Lookup.ParseSpellInput(input)
     if extractedSpellID then return extractedSpellID end
     local itemID = ExtractItemID(input)
     if itemID then
-        local _, spellID = GetItemSpell(itemID)
+        local _, spellID = C_Item.GetItemSpell(itemID)
         if spellID then return spellID end
     end
     local info = C_Spell.GetSpellInfo(input)

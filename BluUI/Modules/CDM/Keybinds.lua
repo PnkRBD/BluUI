@@ -18,7 +18,7 @@ local GetMacroSpell = GetMacroSpell
 local GetMacroItem = GetMacroItem
 local GetMacroIndexByName = GetMacroIndexByName
 local GetActionText = GetActionText
-local GetItemSpell = GetItemSpell
+local GetItemSpell = C_Item.GetItemSpell
 local C_Spell = C_Spell
 local C_ActionBar = C_ActionBar
 

@@ -274,7 +274,7 @@ local function ReadSockets(link)
         local _, gemLink = C_Item.GetItemGem(link, gemIndex)
         if gemLink then
             gemLinks[#gemLinks + 1] = gemLink
-            local icon = C_Item.GetItemIconByID(gemLink) or (GetItemInfoInstant and select(5, GetItemInfoInstant(gemLink)))
+            local icon = C_Item.GetItemIconByID(gemLink) or select(5, C_Item.GetItemInfoInstant(gemLink))
             entries[#entries + 1] = { icon = icon or QUESTION_MARK_ICON }
         end
     end
@@ -315,7 +315,7 @@ end
 local function CanHaveEnchant(info, link)
     if info.enchant == 'weapon' then
         if not link then return false end
-        local _, _, _, _, _, classID = GetItemInfoInstant(link)
+        local _, _, _, _, _, classID = C_Item.GetItemInfoInstant(link)
         return classID == Enum.ItemClass.Weapon
     end
     return info.enchant == true
@@ -502,7 +502,7 @@ local function ScanBagsManually()
             local info = C_Container.GetContainerItemInfo(bag, slot)
             local link = info and info.hyperlink
             if link and info.itemID then
-                local _, _, _, equipLoc, icon = GetItemInfoInstant(info.itemID)
+                local _, _, _, equipLoc, icon = C_Item.GetItemInfoInstant(info.itemID)
                 local targets = EQUIP_LOC_SLOTS[equipLoc]
                 if targets then
                     local level = 0
@@ -556,7 +556,7 @@ local function ScanBags()
                 end
                 list[#list + 1] = {
                     location = location, slotID = slotID, bag = bag, slot = slot, link = link, level = level,
-                    icon = select(5, GetItemInfoInstant(itemID)), quality = C_Item.GetItemQualityByID(link) or 1,
+                    icon = select(5, C_Item.GetItemInfoInstant(itemID)), quality = C_Item.GetItemQualityByID(link) or 1,
                     name = link:match('%[(.-)%]') or '?',
                 }
             end
