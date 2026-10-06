@@ -42,6 +42,7 @@ local UNIT_BY_KEY = {}
 for _, unit in ipairs(UNITS) do UNIT_BY_KEY[unit.key] = unit end
 local ANCHORABLE = { player = true, target = true, focus = true, pet = true, targettarget = true }
 local TAB_IDS = { 'appearance', 'tags', 'player', 'target', 'targettarget', 'focus', 'pet', 'boss', 'filters', 'general', 'party', 'raid', 'partyAuras', 'raidAuras', 'groupFilters' }
+local GROUP_TABS = { general = true, party = true, raid = true, partyAuras = true, raidAuras = true, groupFilters = true }
 local TAB_INDEX = { appearance = 1, tags = 2, player = 3, target = 4, targettarget = 5, focus = 6, pet = 7, boss = 8, filters = 9, general = 10, party = 11, raid = 12, partyAuras = 13, raidAuras = 14, groupFilters = 15 }
 local GROUP_PANE = {}
 local TAG_UNITS = {
@@ -325,14 +326,19 @@ local function BuildPreview(band, kit)
 	local notice = kit.Text(stage, 'Preview after combat', 12, 'muted')
 	notice:SetPoint('CENTER')
 	notice:Hide()
+	local groupNote = kit.Text(stage, 'Party and raid frames preview in the world, use the eye on their rows', 12, 'muted')
+	groupNote:SetPoint('CENTER')
+	groupNote:Hide()
 	local captionY = -(PREVIEW_HEIGHT / 2) + 16
 	function band:Update()
 		local module = UnitFrames()
 		local combat = InCombatLockdown()
 		notice:SetShown(combat)
+		groupNote:SetShown(not combat and GROUP_TABS[selected] == true)
 		if combat then return end
 		module.ClearStage(stage)
 		for _, caption in ipairs(captions) do caption:Hide() end
+		if GROUP_TABS[selected] then return end
 		if selected == 'appearance' or selected == 'filters' then
 			local playerX, targetX = module.StagePair(stage, kit, PREVIEW_PAIR_WIDTH, PREVIEW_FRAME_HEIGHT, PREVIEW_GAP)
 			if not playerX then return end
