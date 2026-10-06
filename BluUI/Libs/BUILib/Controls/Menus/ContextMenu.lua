@@ -50,7 +50,7 @@ local function Palette(window)
 	end
 	local red, green, blue = window:Color('accent')
 	return {
-		fill = { window:Color('card') }, edge = { window:Color('cardEdge') }, hover = { window:Color('input') }, selected = { red, green, blue, SELECTED_ALPHA },
+		fill = { window:Color('page') }, edge = { window:Color('edge') }, hover = { window:Color('input') }, selected = { red, green, blue, SELECTED_ALPHA },
 		text = { window:Color('text') }, muted = { window:Color('muted') }, disabled = { window:Color('faint') },
 		thumb = { window:Color('faint') }, check = { texture = BUILib.GetLibMedia('check'), color = { red, green, blue, 1 } }, font = window:FontPath('control'),
 	}

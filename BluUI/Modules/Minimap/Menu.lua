@@ -250,8 +250,8 @@ local function BuildToolPane()
 end
 
 local function Repaint()
-	menu.fill:SetVertexColor(BUI.ThemeColor('card'))
-	menu.edge:SetVertexColor(BUI.ThemeColor('cardEdge'))
+	menu.fill:SetVertexColor(BUI.ThemeColor('page'))
+	menu.edge:SetVertexColor(BUI.ThemeColor('edge'))
 
 	PaintText(menu.title, 'text', 'title', TITLE_SIZE)
 	PaintText(menu.subtitle, 'muted', 'body', SUBTITLE_SIZE)
