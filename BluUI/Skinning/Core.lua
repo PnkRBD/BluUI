@@ -64,7 +64,7 @@ for _, id in ipairs({
 	'cooldownmanager', 'delves', 'dressup', 'friends', 'greatvault', 'groupfinder', 'grouploot', 'guild', 'inspect',
 	'instanceabandon', 'itemsocketing', 'itemupgrade', 'journeys', 'loothistory', 'lootwindow', 'mail', 'playerauras',
 	'professions', 'questdialogs', 'queuepopups', 'readycheck', 'spellbook', 'splash', 'staticpopup', 'systempanels',
-	'trade', 'transmog', 'travel', 'worldmap', 'characterFrame', 'chat', 'experiencebar', 'gameMenu', 'menus',
+	'trade', 'transmog', 'travel', 'worldmap', 'characterFrame', 'chat', 'gameMenu', 'menus',
 	'merchant', 'objectivetracker', 'trainer', 'petstable', 'playerchoice', 'pvpmatch', 'renown', 'keybinds',
 	'currencytransfer', 'housing', 'tradingpost', 'catalogshop', 'landingpage', 'barbershop', 'iteminteraction',
 	'clock', 'tabard', 'petition', 'help', 'talkinghead', 'guildregistrar', 'bnetToast', 'petBattle',
