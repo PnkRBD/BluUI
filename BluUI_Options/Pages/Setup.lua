@@ -38,6 +38,7 @@ local BARS_TILE_HEIGHT = 124
 local BAR_ADDONS = { 'Bartender4', 'Dominos', 'Neuron', 'RazerNaga' }
 local OTHER_UI = { 'ElvUI', 'EllesmereUI', 'Tukui', 'Baganator', 'Bagnon', 'AdiBags', 'ArkInventory', 'BetterBags' }
 local SUITE_PREFIX = '^EllesmereUI'
+local SKINS_OFF_BY_DEFAULT = { experiencebar = true }
 local SUMMARY_CARD_HEIGHT = 148
 local SUMMARY_AVATAR = 28
 local SUMMARY_READOUT = 40
@@ -249,21 +250,24 @@ end
 local function SeedSelection()
 	wipe(skinSelection)
 	local _, order = SkinOrder()
-	for _, id in ipairs(order) do skinSelection[id] = true end
+	for _, id in ipairs(order) do skinSelection[id] = not SKINS_OFF_BY_DEFAULT[id] end
 end
 
 local function SelectionCounts()
 	local _, order = SkinOrder()
-	local count = 0
+	local count, total = 0, 0
 	for _, id in ipairs(order) do
-		if skinSelection[id] then count = count + 1 end
+		if not SKINS_OFF_BY_DEFAULT[id] then
+			total = total + 1
+			if skinSelection[id] then count = count + 1 end
+		end
 	end
-	return count, #order
+	return count, total
 end
 
 local function ChooseAll(enabled)
 	local _, order = SkinOrder()
-	for _, id in ipairs(order) do skinSelection[id] = enabled end
+	for _, id in ipairs(order) do skinSelection[id] = enabled and not SKINS_OFF_BY_DEFAULT[id] end
 end
 
 local function MockRows(mock, makeRow)
