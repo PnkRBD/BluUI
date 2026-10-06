@@ -139,7 +139,7 @@ local function BarBoard(ui, parent, width, unit)
 			Option(settings, 'Border size', 'borderSize', { min = 0, max = 5, step = 1 }),
 			Option(settings, 'Strata', 'frameStrata', { entries = BUI.C.STRATA_OPTIONS }),
 		} },
-		BUI.PositionTool(settings),
+		BUI.PositionTool(settings, { matchWidth = true }),
 	}, Apply)
 	board:AddTools('Text', 'Font, color and what the bar shows', TextTools(settings, unit), Apply)
 	if unit == 'player' then
