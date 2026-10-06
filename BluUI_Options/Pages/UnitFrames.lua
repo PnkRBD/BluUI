@@ -12,9 +12,10 @@ local TAG_WIDTH = 300
 local TAB_STRIP_GAP = 12
 local LINE_WIDTH = 40
 local DEFAULT_ROW = 40
-local SETTING_COLUMNS = { { 'Setting', 'name', 130 }, { 'Shows', 'sub' }, { 'Options', 'icon', 70, 'CENTER' }, { 'Enabled', 'switch', 70, 'CENTER' } }
-local BAR_COLUMNS = { { 'Setting', 'name', 130 }, { 'Shows', 'sub' }, { 'Colors', 'swatch', 100 }, { 'Options', 'icon', 60, 'CENTER' }, { 'Preview', 'toggle', 60, 'CENTER' }, { 'Enabled', 'switch', 70, 'CENTER' } }
-local DISPEL_COLUMNS = { { 'Setting', 'name', 130 }, { 'Shows', 'sub' }, { 'Colors', 'swatch', 140 }, { 'Options', 'icon', 60, 'CENTER' }, { 'Preview', 'toggle', 60, 'CENTER' }, { 'Enabled', 'switch', 70, 'CENTER' } }
+local RESET_COLUMN = { '', 'reset', 42, 'CENTER' }
+local SETTING_COLUMNS = { { 'Setting', 'name', 130 }, { 'Shows', 'sub' }, { 'Options', 'icon', 70, 'CENTER' }, RESET_COLUMN, { 'Enabled', 'switch', 70, 'CENTER' } }
+local BAR_COLUMNS = { { 'Setting', 'name', 130 }, { 'Shows', 'sub' }, { 'Colors', 'swatch', 100 }, { 'Options', 'icon', 60, 'CENTER' }, RESET_COLUMN, { 'Preview', 'toggle', 50, 'CENTER' }, { 'Enabled', 'switch', 70, 'CENTER' } }
+local DISPEL_COLUMNS = { { 'Setting', 'name', 130 }, { 'Shows', 'sub' }, { 'Colors', 'swatch', 140 }, { 'Options', 'icon', 60, 'CENTER' }, RESET_COLUMN, { 'Preview', 'toggle', 50, 'CENTER' }, { 'Enabled', 'switch', 70, 'CENTER' } }
 local NAME_WIDTH = 200
 local TEXT_RANGE = 50
 local AURA_RANGE = 500
@@ -177,10 +178,51 @@ local function ResolveShow(specific, fallback, defaultOn)
 	return fallback ~= false
 end
 
-local function Option(db, label, key, extra)
-	local option = { label = label, get = function() return db[key] end, set = function(value) db[key] = value end }
+local factoryOf = setmetatable({}, { __mode = 'k' })
+local NO_FACTORY = {}
+
+local function MapFactory(live, factory)
+	factoryOf[live] = factory
+	for key, value in pairs(factory) do
+		local child = live[key]
+		if type(value) == 'table' and type(child) == 'table' and not factoryOf[child] then MapFactory(child, value) end
+	end
+end
+
+local function FactoryFor(db)
+	if factoryOf[db] == nil then
+		MapFactory(BUI.GetDB(), BUI.ExportImport.FactoryProfile())
+		if factoryOf[db] == nil then factoryOf[db] = false end
+	end
+	return factoryOf[db] or NO_FACTORY
+end
+
+local READERS = {
+	on = function(value) return value == true end,
+	off = function(value) return value ~= false end,
+}
+
+local function Setting(db, label, key, shape, extra)
+	local read = READERS[shape]
+	local option = { label = label }
+	option.get = function()
+		if read then return read(db[key]) end
+		return db[key]
+	end
+	option.set = function(value)
+		db[key] = value
+		if option.onChange then option.onChange() end
+	end
+	option.default = function()
+		if read then return read(FactoryFor(db)[key]) end
+		return FactoryFor(db)[key]
+	end
 	for name, value in pairs(extra or {}) do option[name] = value end
 	return option
+end
+
+local function Option(db, label, key, extra)
+	return Setting(db, label, key, nil, extra)
 end
 
 local function Inherit(unitSettings, label, key, extra)
@@ -193,12 +235,12 @@ local function Inherit(unitSettings, label, key, extra)
 	return option
 end
 
-local function Toggle(db, label, key)
-	return { label = label, get = function() return db[key] == true end, set = function(value) db[key] = value end }
+local function Toggle(db, label, key, extra)
+	return Setting(db, label, key, 'on', extra)
 end
 
-local function OnUnlessOff(db, label, key)
-	return { label = label, get = function() return db[key] ~= false end, set = function(value) db[key] = value end }
+local function OnUnlessOff(db, label, key, extra)
+	return Setting(db, label, key, 'off', extra)
 end
 
 local function Color(db, label, key)
@@ -209,11 +251,31 @@ local function Color(db, label, key)
 			return color[1], color[2], color[3], color[4] or 1
 		end,
 		set = function(red, green, blue, alpha) db[key] = { red, green, blue, alpha } end,
+		default = function()
+			local color = FactoryFor(db)[key]
+			if color then return color[1], color[2], color[3], color[4] or 1 end
+		end,
+	}
+end
+
+local function StoreColor(key, tooltip)
+	local stored = BUI.Colors.GetStore()[key]
+	return {
+		kind = 'swatch', tooltip = tooltip, opacity = true,
+		get = function() return stored.r, stored.g, stored.b, stored.a end,
+		set = function(red, green, blue, alpha) stored.r, stored.g, stored.b, stored.a = red, green, blue, alpha end,
+		default = function()
+			for _, group in ipairs(BUI.Colors.GROUPS) do
+				for _, entry in ipairs(group.colors) do
+					if entry.key == key then return entry.def[1], entry.def[2], entry.def[3], entry.def[4] or 1 end
+				end
+			end
+		end,
 	}
 end
 
 local function Menu(db, key, entries, width)
-	return { entries = entries, width = width or MENU_WIDTH, get = function() return db[key] end, set = function(value) db[key] = value end }
+	return { entries = entries, width = width or MENU_WIDTH, get = function() return db[key] end, set = function(value) db[key] = value end, default = function() return FactoryFor(db)[key] end }
 end
 
 local function TagInput(db, key, placeholder, width)
@@ -399,6 +461,32 @@ local function ResetTool(ui, tooltip, isChanged, reset)
 	end }
 end
 
+local function RowReset(ui, tools, after)
+	local entries = {}
+	for _, tool in ipairs(tools) do
+		if tool.slot == 'reset' then return tools end
+		for _, option in ipairs(tool.options or { tool }) do
+			if option.default then entries[#entries + 1] = option end
+		end
+	end
+	if #entries == 0 then return tools end
+	local reset = ResetTool(ui, 'Changed from the factory default, click to restore it', function()
+		for _, option in ipairs(entries) do
+			local a1, a2, a3, a4 = option.get()
+			local d1, d2, d3, d4 = option.default()
+			if a1 ~= d1 or a2 ~= d2 or a3 ~= d3 or a4 ~= d4 then return true end
+		end
+		return false
+	end, function()
+		for _, option in ipairs(entries) do option.set(option.default()) end
+		if after then after() end
+		Repaint()
+	end)
+	reset.slot = 'reset'
+	tools[#tools + 1] = reset
+	return tools
+end
+
 local function DropUnitPanes(page)
 	for _, unit in ipairs(UNITS) do page:Rebuild(unit.key) end
 end
@@ -410,7 +498,12 @@ local function ToolGrid(ui, parent, width, title, description, columns)
 	for index, column in ipairs(columns) do
 		specs[index] = { title = column[1], slot = column[2], width = column[3] or (width - fixed), align = column[4] }
 	end
-	return ui.Grid(parent, width, { title = title, description = description, rowHeight = DEFAULT_ROW, columns = specs })
+	local grid = ui.Grid(parent, width, { title = title, description = description, rowHeight = DEFAULT_ROW, columns = specs })
+	local AddTools = grid.AddTools
+	function grid:AddTools(name, sub, tools, after)
+		return AddTools(self, name, sub, RowReset(ui, tools, after), after)
+	end
+	return grid
 end
 
 local function AppearanceBoards(ui, parent, width, page)
@@ -430,18 +523,14 @@ local function AppearanceBoards(ui, parent, width, page)
 			Option(settings, 'Font', 'font', { entries = fonts, width = WIDE_MENU }),
 		} },
 		{ tooltip = 'Behavior options', title = 'Behavior', options = {
-			{ label = 'Unit tooltip on mouseover', get = function() return settings.showTooltips ~= false end, set = function(value) settings.showTooltips = value end },
-			{ label = 'Clicking a frame targets its unit', get = function() return settings.clickToTarget ~= false end, set = function(value)
-				settings.clickToTarget = value
-				module.ApplyClickToTarget()
-			end },
-			{ label = 'Abbreviate numbers with one decimal, 7.5K', get = function() return BUI.GetDB().general.showDecimalAbbreviations == true end, set = function(value)
-				BUI.GetDB().general.showDecimalAbbreviations = value
+			OnUnlessOff(settings, 'Unit tooltip on mouseover', 'showTooltips'),
+			OnUnlessOff(settings, 'Clicking a frame targets its unit', 'clickToTarget', { onChange = function() module.ApplyClickToTarget() end }),
+			Toggle(BUI.GetDB().general, 'Abbreviate numbers with one decimal, 7.5K', 'showDecimalAbbreviations', { onChange = function()
 				module.RefreshAbbreviationSetting()
 				module.InvalidateTagCache()
-			end },
-			{ label = 'Target and pet copy the player frame look', get = function() return settings.syncPlayerTarget == true end, set = function(value) settings.syncPlayerTarget = value end, separator = true },
-			{ label = 'Keep the pet independent', get = function() return settings.excludePetFromSync == true end, set = function(value) settings.excludePetFromSync = value end },
+			end }),
+			Toggle(settings, 'Target and pet copy the player frame look', 'syncPlayerTarget', { separator = true }),
+			Toggle(settings, 'Keep the pet independent', 'excludePetFromSync'),
 		} },
 	}, SyncChanged)
 	health:AddTools('Health bar', 'Health, background and border colors', {
@@ -449,12 +538,12 @@ local function AppearanceBoards(ui, parent, width, page)
 		Color(settings, 'Background', 'bgColor'),
 		Color(settings, 'Border', 'borderColor'),
 		{ tooltip = 'Health bar options', title = 'Health bar', options = {
-			{ label = 'Fill with the class color', get = function() return settings.classColorHealth == true end, set = function(value) settings.classColorHealth = value end },
+			Toggle(settings, 'Fill with the class color', 'classColorHealth'),
 		} },
 	}, RefreshFrames)
 	health:AddTools('Transparent health', 'See through health fill', {
 		{ tooltip = 'Fill opacity', title = 'Transparent health', options = {
-			{ label = 'Fill opacity %', min = 0, max = 100, step = 5, get = function() return math.floor(settings.healthBarAlpha * 100) end, set = function(value) settings.healthBarAlpha = value / 100 end },
+			{ label = 'Fill opacity %', min = 0, max = 100, step = 5, get = function() return math.floor(settings.healthBarAlpha * 100) end, set = function(value) settings.healthBarAlpha = value / 100 end, default = function() return math.floor(FactoryFor(settings).healthBarAlpha * 100) end },
 		} },
 		Toggle(settings, nil, 'transparentHealth'),
 	}, RefreshFrames)
@@ -480,8 +569,8 @@ local function AppearanceBoards(ui, parent, width, page)
 		Color(settings, 'Power', 'powerColor'),
 		Color(settings, 'Background', 'powerBgColor'),
 		{ tooltip = 'Power bar options', title = 'Power bar', options = {
-			{ label = 'Color by resource type, mana blue, energy yellow', get = function() return settings.classColorPower == true end, set = function(value) settings.classColorPower = value end },
-			{ label = 'Color by class or reaction', get = function() return settings.useClassColorPowerBar == true end, set = function(value) settings.useClassColorPowerBar = value end },
+			Toggle(settings, 'Color by resource type, mana blue, energy yellow', 'classColorPower'),
+			Toggle(settings, 'Color by class or reaction', 'useClassColorPowerBar'),
 		} },
 	}, RefreshFrames)
 
@@ -498,15 +587,15 @@ local function AppearanceBoards(ui, parent, width, page)
 		end)
 	end
 	local dispel = ToolGrid(ui, parent, width, 'Dispels', 'Color your own frame when a dispellable debuff lands.', DISPEL_COLUMNS)
-	dispel:AddTools('Dispel highlight', 'How your frame reacts to a dispellable debuff', {
+	dispel:AddTools('Dispel highlight', 'Frame reaction to a dispellable debuff', {
 		{ tooltip = 'Style, source and strength', title = 'Dispel highlight', options = {
 			Option(player, 'Style', 'debuffHighlightStyle', { entries = DISPEL_STYLES }),
-			{ label = 'Show', entries = DISPEL_SOURCES, get = function() return player.debuffHighlightClassFilter ~= false and 'mine' or 'all' end, set = function(value) player.debuffHighlightClassFilter = value == 'mine' end },
+			{ label = 'Show', entries = DISPEL_SOURCES, get = function() return player.debuffHighlightClassFilter ~= false and 'mine' or 'all' end, set = function(value) player.debuffHighlightClassFilter = value == 'mine' end, default = function() return FactoryFor(player).debuffHighlightClassFilter ~= false and 'mine' or 'all' end },
 			Option(settings, 'Bar tint opacity %', 'dispelOpacity', { min = 0, max = 100, step = 5 }),
 			Option(settings, 'Fade: colour at the middle %', 'dispelFadeMiddle', { min = 0, max = 100, step = 5, separator = true }),
 			Option(settings, 'Fade: colour at the far edge %', 'dispelFadeFar', { min = 0, max = 100, step = 5 }),
 			Option(settings, 'Fade: darkness at the far edge %', 'dispelFadeDark', { min = 0, max = 100, step = 5 }),
-			{ label = 'Blend multiple types instead of showing the top one', get = function() return settings.dispelBlend == true end, set = function(value) settings.dispelBlend = value end, separator = true },
+			Toggle(settings, 'Blend multiple types instead of showing the top one', 'dispelBlend', { separator = true }),
 		} },
 		DispelPreviewEye(),
 		Toggle(player, nil, 'debuffHighlightBar'),
@@ -549,7 +638,7 @@ local function AppearanceBoards(ui, parent, width, page)
 			Option(settings, 'Horizontal', 'raidIconOffsetX', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
 			Option(settings, 'Vertical', 'raidIconOffsetY', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
 		} },
-		{ get = function() return settings.raidIconMode ~= 'off' end, set = function(value) settings.raidIconMode = value and 'icon' or 'off' end },
+		{ get = function() return settings.raidIconMode ~= 'off' end, set = function(value) settings.raidIconMode = value and 'icon' or 'off' end, default = function() return FactoryFor(settings).raidIconMode ~= 'off' end },
 	}, RefreshFrames)
 	indicators:AddTools('Leader icon', 'Leader and assist crown on the frames', {
 		{ tooltip = 'Position and size', title = 'Leader icon', options = {
@@ -630,7 +719,7 @@ local DEFAULT_COLOR_KEY = { name = 'nameColor', health = 'healthTextColor', powe
 local DEFAULT_TAG_COLUMNS = { { 'Tag', 'name', 80 }, { 'Shows', 'sub', 140 }, { 'Color', 'swatch', 136 }, { 'Format', 'input', 200 }, { 'Placement', 'icon', 80, 'CENTER' }, { '', 'reset', nil, 'CENTER' } }
 
 local function Factory()
-	return BUI.Defaults.profile.unitFrames
+	return FactoryFor(Settings())
 end
 
 local function SameColor(a, b)
