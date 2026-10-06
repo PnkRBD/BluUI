@@ -8,7 +8,6 @@ local RESULTS_WIDTH = 280
 local STRIP_ICON = 26
 local STRIP_GAP = 4
 local STRIP_MAX = 12
-local RULES_WIDTH = 130
 local DEFAULT_ICON = 134400
 local ENEMIES_ONLY_TIP = 'Blizzard does not let addons hide this debuff on you or your group, so it only hides on enemies.'
 
@@ -235,8 +234,9 @@ end
 
 function BUI.AuraRuleEditor(parent, options)
 	local AuraRules = BUI.AuraRules
+	local kit = BUILib.Layout.TableKit(Window())
 	local button
-	button = Controls.Button(parent, 'Priority rules', RULES_WIDTH, function()
+	button = kit.Button(parent, 'Priority rules', 'secondary', function()
 		local rules = options.getRules()
 		local function Push()
 			if options.onChanged then options.onChanged() end
@@ -284,7 +284,10 @@ function BUI.AuraRuleEditor(parent, options)
 				addFrame:SetPoint('TOPLEFT', 0, 0)
 			end,
 		})
-	end, options.tooltip or 'Pick which auras show here, the top rule claims icon slots first')
+	end)
+	local tip = options.tooltip or 'Pick which auras show here, the top rule claims icon slots first'
+	button:HookScript('OnEnter', function(self) Widget.ShowTip(self, tip) end)
+	button:HookScript('OnLeave', Widget.HideTip)
 	return button
 end
 
