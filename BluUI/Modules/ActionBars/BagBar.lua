@@ -217,25 +217,3 @@ QueueMeasure = BUI.Dispatcher.New(function() Measure(bagBar) end, EVENT_KEY .. '
 function ActionBars.RefreshBagBar()
 	bagBar:Refresh()
 end
-
-local function DescribeFrame(frame)
-	local point, relativeTo, relativePoint, x, y = frame:GetPoint(1)
-	local parent = frame:GetParent()
-	return ('%s shown=%s alpha=%.2f size=%.1fx%.1f scale=%.2f eff=%.2f left=%.1f top=%.1f level=%d parent=%s at %s %s %s %.1f %.1f'):format(
-		frame:GetName() or '?', tostring(frame:IsShown()), frame:GetAlpha(), frame:GetWidth(), frame:GetHeight(), frame:GetScale(), frame:GetEffectiveScale(), frame:GetLeft() or 0, frame:GetTop() or 0, frame:GetFrameLevel(),
-		parent and (parent:GetName() or '(unnamed)') or 'none', tostring(point), relativeTo and (relativeTo:GetName() or '(unnamed)') or 'nil', tostring(relativePoint), x or 0, y or 0)
-end
-
-function ActionBars.DumpBagBar()
-	local settings = bagBar:Settings()
-	BUI.Print(('bag bar enabled=%s singleBag=%s scale=%s owned=%s active=%s applying=%s expandBar=%s auto=%s cvar=%s'):format(
-		tostring(settings.enabled), tostring(settings.singleBag), tostring(settings.scale), tostring(bagBar:Owned()), tostring(bagBar:Active()), tostring(bagBar.applying),
-		tostring(MainMenuBarBagManager.expandBar), tostring(MainMenuBarBagManager.expandBarAuto), tostring(C_CVar.GetCVar(EXPAND_CVAR))))
-	if bagBar.bar then BUI.Print(DescribeFrame(bagBar.bar.header)) end
-	BUI.Print(DescribeFrame(BagsBar))
-	for _, name in ipairs(SLOT_NAMES) do
-		local slot = _G[name]
-		BUI.Print(DescribeFrame(slot))
-		if slot.icon then BUI.Print(('   icon shown=%s size=%.1fx%.1f border=%s'):format(tostring(slot.icon:IsShown()), slot.icon:GetWidth(), slot.icon:GetHeight(), tostring(slot.backdropInfo ~= nil))) end
-	end
-end
