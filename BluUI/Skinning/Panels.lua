@@ -13,38 +13,44 @@ local MODEL_CONTROL_KEYS = { 'zoomInButton', 'zoomOutButton', 'rotateLeftButton'
 local MODEL_CONTROL_INSET = 4
 local SLIDER_TEXT_KEYS = { 'LeftText', 'RightText', 'TopText', 'MinText', 'MaxText' }
 
-local function SkinCustomizeRow(row)
+local function SkinStepper(button, direction, context)
+	if not button then return end
+	Skin.TipStepper(button, direction)
+	context.FadeRegions(button)
+end
+
+local function SkinCustomizeRow(row, context)
 	if row._buiCustomizeRow then return end
 	row._buiCustomizeRow = true
-	Skin.TipFace(row.Label, 'body')
+	context.Face(row.Label)
 	if row.Dropdown then
 		local details = row.Dropdown.SelectionDetails
 		Skin.TipDropdown(row.Dropdown, nil, true)
-		Skin.TipFace(details.SelectionName, 'body')
-		Skin.TipFace(details.SelectionNumber, 'body')
-		Skin.TipFace(details.SelectionNumberBG, 'body')
-		Skin.TipStepper(row.DecrementButton, 'previous')
-		Skin.TipStepper(row.IncrementButton, 'next')
+		Skin.TipFont(details.SelectionName, 'body')
+		Skin.TipFont(details.SelectionNumber, 'body')
+		context.Fade(details.SelectionNumberBG)
+		SkinStepper(row.DecrementButton, 'previous', context)
+		SkinStepper(row.IncrementButton, 'next', context)
 	elseif row.Slider then
 		Skin.TipSliderTrack(row.Slider)
-		Skin.TipStepper(row.Back, 'previous')
-		Skin.TipStepper(row.Forward, 'next')
-		for index = 1, #SLIDER_TEXT_KEYS do Skin.TipFace(row[SLIDER_TEXT_KEYS[index]], 'body') end
+		SkinStepper(row.Back, 'previous', context)
+		SkinStepper(row.Forward, 'next', context)
+		for index = 1, #SLIDER_TEXT_KEYS do context.Face(row[SLIDER_TEXT_KEYS[index]]) end
 	elseif row.Button then
 		Skin.TipCheckBox(row.Button)
 	end
 end
 
-local function SkinCustomizeOptions(customize)
-	for _, row in ipairs({ customize.Options:GetChildren() }) do SkinCustomizeRow(row) end
+local function SkinCustomizeOptions(customize, context)
+	for _, row in ipairs({ customize.Options:GetChildren() }) do SkinCustomizeRow(row, context) end
 end
 
-local function SkinBarberShop()
+local function SkinBarberShop(_, context)
 	local customize = CharCustomizeFrame
 	if not customize or customize._buiCustomizeHooked then return end
 	customize._buiCustomizeHooked = true
-	Hook(customize, 'UpdateOptionButtons', SkinCustomizeOptions)
-	SkinCustomizeOptions(customize)
+	Hook(customize, 'UpdateOptionButtons', function() SkinCustomizeOptions(customize, context) end)
+	SkinCustomizeOptions(customize, context)
 end
 
 local function SkinHousingPreview(frame, context)
