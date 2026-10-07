@@ -178,6 +178,7 @@ local itemMap = {}
 
 local trinketSlotIcons = {}
 local spellCooldownPending = false
+local changedCooldownSpells = {}
 local itemCooldownPending = false
 local auraPending = false
 local usablePending = false
@@ -1684,53 +1685,64 @@ local function UpdateRelevantBuffIcons()
     end
 end
 
-local RunBuffScanFull = UpdateTrackedBuffIcons
-local RunBuffScanRelevant = UpdateRelevantBuffIcons
+local RunBuffScanFull = Wrap("CDM.Custom buff scan", UpdateTrackedBuffIcons)
+local RunBuffScanRelevant = Wrap("CDM.Custom changed buff scan", UpdateRelevantBuffIcons)
 
-local RunWalkIconUpdate = UpdateIcon
-
-local function FlushCooldownWalk(watchMap, itemsOnly)
-    for _, iconSet in pairs(watchMap) do
-        for icon in pairs(iconSet) do
-            local frameData = FrameData[icon]
-            if not flushSeen[icon] and (not itemsOnly or (frameData and frameData.itemID)) then
-                flushSeen[icon] = true
-                if not frameData or not frameData.hidden then
-                    RunWalkIconUpdate(icon)
-                end
+local function WalkIconSet(iconSet, itemsOnly)
+    for icon in pairs(iconSet) do
+        local frameData = FrameData[icon]
+        if not flushSeen[icon] and (not itemsOnly or (frameData and frameData.itemID)) then
+            flushSeen[icon] = true
+            if not frameData or not frameData.hidden then
+                UpdateIcon(icon)
             end
         end
     end
 end
 
-local function FlushUsableWalk()
-    for spellID, iconSet in pairs(spellMap) do
+local RunSpellWalk = Wrap("CDM.Custom spell walk", function()
+    for _, iconSet in pairs(spellMap) do WalkIconSet(iconSet) end
+end)
+
+local RunChangedSpellWalk = Wrap("CDM.Custom changed spell walk", function()
+    for spellID in pairs(changedCooldownSpells) do
+        local iconSet = spellMap[spellID]
+        if iconSet then WalkIconSet(iconSet) end
+    end
+end)
+
+local RunItemWalk = Wrap("CDM.Custom item walk", function()
+    for _, iconSet in pairs(itemMap) do WalkIconSet(iconSet) end
+    for _, iconSet in pairs(spellMap) do WalkIconSet(iconSet, true) end
+end)
+
+local RunUsableWalk = Wrap("CDM.Custom usable walk", function()
+    for _, iconSet in pairs(spellMap) do
         for icon in pairs(iconSet) do
             UpdateIconUsable(icon)
         end
     end
-end
-
-local RunFlushCooldownWalk = FlushCooldownWalk
-local RunFlushUsableWalk = FlushUsableWalk
+end)
 
 local function FlushDispatch()
-    if spellCooldownPending or itemCooldownPending then
+    if spellCooldownPending or itemCooldownPending or next(changedCooldownSpells) then
         wipe(flushSeen)
         if spellCooldownPending then
             spellCooldownPending = false
-            RunFlushCooldownWalk(spellMap)
+            RunSpellWalk()
             usablePending = false
+        elseif next(changedCooldownSpells) then
+            RunChangedSpellWalk()
         end
+        wipe(changedCooldownSpells)
         if itemCooldownPending then
             itemCooldownPending = false
-            RunFlushCooldownWalk(itemMap)
-            RunFlushCooldownWalk(spellMap, true)
+            RunItemWalk()
         end
     end
     if usablePending then
         usablePending = false
-        RunFlushUsableWalk()
+        RunUsableWalk()
     end
     if auraPending then
         auraPending = false
@@ -1834,6 +1846,13 @@ local function OnSpellCastSucceeded(spellID)
     end
 end
 
+local GLOBAL_RECOVERY_CATEGORY = Constants.SpellCooldownConsts.GLOBAL_RECOVERY_CATEGORY
+
+local function IsAllCooldownsUpdate(spellID, baseSpellID, startRecoveryCategory)
+    if issecretvalue(spellID) or issecretvalue(baseSpellID) or issecretvalue(startRecoveryCategory) then return true end
+    return spellID == nil or startRecoveryCategory == GLOBAL_RECOVERY_CATEGORY
+end
+
 local hotEventsRegistered = false
 local itemEventsRegistered = false
 
@@ -1841,9 +1860,14 @@ local function RegisterHotEvents()
     if hotEventsRegistered then return end
     hotEventsRegistered = true
     needsFullBuffScan = true
-    BUI.Events:Register("SPELL_UPDATE_COOLDOWN", "CDM.Custom.Hot", function()
+    BUI.Events:Register("SPELL_UPDATE_COOLDOWN", "CDM.Custom.Hot", function(_, spellID, baseSpellID, _, startRecoveryCategory)
         if not next(spellMap) then return end
-        spellCooldownPending = true
+        if IsAllCooldownsUpdate(spellID, baseSpellID, startRecoveryCategory) then
+            spellCooldownPending = true
+        else
+            changedCooldownSpells[spellID] = true
+            if baseSpellID then changedCooldownSpells[baseSpellID] = true end
+        end
         QueueDispatch()
     end)
     BUI.Events:Register("SPELL_UPDATE_CHARGES", "CDM.Custom.Charges", function()
