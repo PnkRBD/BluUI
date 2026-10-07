@@ -95,20 +95,23 @@ defaultFormatter:SetDefaultAbbreviation(Enum.SecondsFormatterAbbreviation.OneLet
 defaultFormatter:SetMinInterval(Enum.SecondsFormatterInterval.Seconds)
 defaultFormatter:SetMillisecondsThreshold(60)
 
+local function clearState(state)
+	state.casting = nil
+	state.channeling = nil
+	state.empowering = nil
+	state.delay = nil
+	state.holdTime = nil
+	state.notInterruptible = nil
+	state.spellID = nil
+	state.spellName = nil
+	state.castID = nil
+	state.startTime = nil
+	state.endTime = nil
+end
+
 local function resetState(element)
 	if(not (element.timeToHold ~= nil and STATE[element].holdTime and STATE[element].holdTime > 0)) then
-		local state = STATE[element]
-		state.casting = nil
-		state.channeling = nil
-		state.empowering = nil
-		state.delay = nil
-		state.holdTime = nil
-		state.notInterruptible = nil
-		state.spellID = nil
-		state.spellName = nil
-		state.castID = nil
-		state.startTime = nil
-		state.endTime = nil
+		clearState(STATE[element])
 	end
 
 	for _, pip in next, element.Pips do
@@ -225,6 +228,10 @@ local function CastStart(self, event, unit)
 	end
 
 	if(not name or (isTradeSkill and element.hideTradeSkills)) then
+		STATE[element].casting = nil
+		STATE[element].channeling = nil
+		STATE[element].empowering = nil
+
 		-- don't cancel hold time when we swap targets
 		if(not (event == 'PLAYER_TARGET_CHANGED' and STATE[element].holdTime and STATE[element].holdTime > 0)) then
 			element:Hide()
@@ -673,6 +680,7 @@ local function Enable(self, unit)
 		element.ForceUpdate = ForceUpdate
 
 		STATE[element] = element
+		clearState(element)
 
 		if(not element.smoothing) then
 			element.smoothing = Enum.StatusBarInterpolation.Immediate
