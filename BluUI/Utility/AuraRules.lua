@@ -70,6 +70,7 @@ AuraRules.CATALOG = {
 		id = 'mineRaidCombat', polarity = 'HELPFUL', label = 'My Healing Buffs',
 		desc = 'Buffs you cast that raid frames track (HoTs, externals, absorbs). Hides procs, food and flasks.',
 		engineFilter = 'HELPFUL|PLAYER|RAID_IN_COMBAT',
+		engineExcludeTogether = { 'PLAYER', 'RAID_IN_COMBAT' },
 		icon = 136041,
 	},
 	{
