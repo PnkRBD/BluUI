@@ -5,6 +5,7 @@ local Wrap = BUI.Profiler.Wrap
 local GroupFrames    = BUI.GroupFrames
 local Util  = GroupFrames.Util
 local Pixel = BUI.Pixel
+local SafeBool = BUI.Tools.SafeBool
 
 local CreateFrame            = CreateFrame
 local UnitIsUnit             = UnitIsUnit
@@ -160,7 +161,7 @@ local function LeaderOverride(self)
 		end
 		return
 	end
-	if self.unit and UnitInParty(self.unit) and UnitIsGroupLeader(self.unit) then
+	if self.unit and UnitInParty(self.unit) and SafeBool(UnitIsGroupLeader(self.unit)) then
 		ShowAtlas(element, LEADER_ATLAS, element.useAtlasSize)
 	else
 		element:Hide()
@@ -171,7 +172,7 @@ local function AssistantOverride(self)
 	local element = self.AssistantIndicator
 	if element._previewOn then return end
 	if self._preview then element:Hide(); return end
-	if self.unit and UnitInParty(self.unit) and UnitIsGroupAssistant(self.unit) and not UnitIsGroupLeader(self.unit) then
+	if self.unit and UnitInParty(self.unit) and SafeBool(UnitIsGroupAssistant(self.unit)) and not SafeBool(UnitIsGroupLeader(self.unit)) then
 		element:SetTexture(ASSISTANT_TEXTURE, nil, nil, PIXEL_FILTER)
 		element:Show()
 	else
