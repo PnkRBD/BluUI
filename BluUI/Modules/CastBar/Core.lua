@@ -518,7 +518,7 @@ function CastBar.ApplyCastTarget(castbar, settings, unit)
 	local targetUnit = unit .. 'target'
 	if not UnitExists(targetUnit) then return end
 	local name
-	if UnitIsUnit(targetUnit, 'player') then
+	if C_Secrets.CanCompareUnitTokens(targetUnit, 'player') and UnitIsUnit(targetUnit, 'player') then
 		name = '|cffff2020YOU|r'
 	else
 		name = UnitName(targetUnit)
