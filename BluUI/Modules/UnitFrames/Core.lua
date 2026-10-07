@@ -397,20 +397,34 @@ function UnitFrames.UpdateOpacity(instant)
 	end
 end
 
+local AGGRO_THICKNESS, AGGRO_LEVEL = 2, 15
+
+local function UpdateAggroOutline(frame, unitType, unitSettings, inCombat)
+	local outline = frame.AggroOutline
+	if not unitSettings.aggroBorder then
+		if outline then outline:Empty() end
+		return
+	end
+	if not outline then
+		outline = BUI.Tools.AggroOutline(frame, AGGRO_LEVEL)
+		frame.AggroOutline = outline
+	end
+	local color = unitSettings.aggroBorderColor
+	outline:SetLook(color[1], color[2], color[3], color[4], AGGRO_THICKNESS)
+	if inCombat then
+		outline:TrackThreat(frame.unit or unitType)
+	else
+		outline:Empty()
+	end
+end
+
 function UnitFrames.UpdateCombatBorder(frame, unitType, inCombat)
 	if not frame then return end
 	local settings = UnitFrames.GetSettings()
 	local unitSettings = UnitFrames.GetUnitSettings(unitType)
 	local borderColor
 
-	if unitSettings.aggroBorder and inCombat then
-		local unit = frame.unit or unitType
-		local threat = UnitThreatSituation(unit)
-		if threat and threat >= 2 then
-			borderColor = unitSettings.aggroBorderColor
-		end
-	end
-	if not borderColor and unitSettings.combatBorder and inCombat then
+	if unitSettings.combatBorder and inCombat then
 		borderColor = unitSettings.combatBorderColor
 	end
 	if not borderColor then
@@ -421,6 +435,7 @@ function UnitFrames.UpdateCombatBorder(frame, unitType, inCombat)
 	if frame.PowerBorder then
 		SetColorTex(frame.PowerBorder, borderColor[1], borderColor[2], borderColor[3], borderColor[4] or 1)
 	end
+	UpdateAggroOutline(frame, unitType, unitSettings, inCombat)
 end
 
 do
