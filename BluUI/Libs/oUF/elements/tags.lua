@@ -588,7 +588,7 @@ local function flushPendingStrings()
 		pendingStrings[i] = nil
 		fs.__tagPending = nil
 		if(fs.UpdateTag and fs:IsVisible()) then
-			fs:UpdateTag()
+			xpcall(fs.UpdateTag, nierror, fs)
 		end
 	end
 end
