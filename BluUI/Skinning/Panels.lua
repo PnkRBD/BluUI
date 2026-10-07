@@ -114,6 +114,7 @@ local WINDOWS = {
 		description = 'The barber shop appearance window.',
 		icon = 'Interface/Icons/INV_Misc_Comb_01',
 		frames = { 'BarberShopFrame' },
+		fullscreen = true,
 	},
 	{
 		id = 'iteminteraction',
@@ -179,16 +180,18 @@ local function SkinWindow(entry, frame)
 	entry.skinned[#entry.skinned + 1] = frame
 
 	local context = entry.context
-	context.FadeArt(frame)
-	context.FadeKeys(frame, ART_KEYS)
-	context.Shell(frame)
+	if not entry.fullscreen then
+		context.FadeArt(frame)
+		context.FadeKeys(frame, ART_KEYS)
+		context.Shell(frame)
+	end
 	for index = 1, #CLOSE_KEYS do context.Close(frame[CLOSE_KEYS[index]]) end
 	for index = 1, #SCROLL_KEYS do context.ScrollBar(frame[SCROLL_KEYS[index]]) end
 	for index = 1, #BUTTON_KEYS do context.Button(frame[BUTTON_KEYS[index]]) end
 	for index = 1, #DROPDOWN_KEYS do context.Dropdown(frame[DROPDOWN_KEYS[index]]) end
 	if entry.extra then entry.extra(frame, context) end
 	Skin.HideHelpButtons(frame)
-	Skin.TipFaceTree(frame, FONT_DEPTH)
+	if not entry.fullscreen then Skin.TipFaceTree(frame, FONT_DEPTH) end
 end
 
 local function TrySkin(entry)
