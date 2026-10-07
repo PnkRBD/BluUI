@@ -1699,6 +1699,42 @@ function Skin.TipPageButton(button, direction)
 	Skin.RefreshPageButton(button)
 end
 
+local RefreshStepper = BUI.Profiler.Wrap('Skin.Core stepper state', Skin.RefreshPageButton)
+
+function Skin.TipStepper(button, direction)
+	if not button or button._buiStepper then return end
+	button._buiStepper = true
+	Skin.TipPageButton(button, direction)
+	button:HookScript('OnEnable', RefreshStepper)
+	button:HookScript('OnDisable', RefreshStepper)
+end
+
+local SLIDER_TRACK_HEIGHT = 2
+
+function Skin.TipSliderTrack(slider)
+	if not slider or slider._buiTrack then return end
+	local thumb = slider.Thumb or (slider.GetThumbTexture and slider:GetThumbTexture())
+	for regionIndex = 1, select('#', slider:GetRegions()) do
+		local region = select(regionIndex, slider:GetRegions())
+		if region ~= thumb and region.IsObjectType and region:IsObjectType('Texture') and not region.__buiSkin then region:SetAlpha(0) end
+	end
+	local track = slider:CreateTexture(nil, 'BACKGROUND')
+	track.__buiSkin = true
+	track:SetHeight(SLIDER_TRACK_HEIGHT)
+	track:SetPoint('LEFT', slider, 'LEFT', 0, 0)
+	track:SetPoint('RIGHT', slider, 'RIGHT', 0, 0)
+	Skin.FlatTexture(track, PANEL_EDGE[1], PANEL_EDGE[2], PANEL_EDGE[3], PANEL_EDGE[4])
+	if thumb then
+		local fill = slider:CreateTexture(nil, 'BACKGROUND', nil, 1)
+		fill.__buiSkin = true
+		fill:SetHeight(SLIDER_TRACK_HEIGHT)
+		fill:SetPoint('LEFT', track, 'LEFT', 0, 0)
+		fill:SetPoint('RIGHT', thumb, 'CENTER', 0, 0)
+		Skin.AccentTexture(fill, 1)
+	end
+	slider._buiTrack = track
+end
+
 local function MuteNavArrowArt(button)
 	if not button._buiTipArrow:IsShown() then return end
 	button.NormalTexture:SetAlpha(0)
