@@ -40,6 +40,7 @@ local AREA_ALIASES = {
 	['Group frame'] = 'GroupFrames', ['Unit frame'] = 'UnitFrames', GF = 'GroupFrames', UF = 'UnitFrames',
 	CB = 'CastBar', Skin = 'Skins', Skinning = 'Skins', Glow = 'Glows',
 }
+local TOP_GLOW_OWNERS = 5
 local TOP_AREAS = 8
 local TOP_IN_AREA = 5
 local ACTION_LIBRARY = 'LibActionButton-1.0-BluUI'
@@ -50,9 +51,9 @@ local SHARED_LIBRARIES = {
 	{ major = 'LibKeyBound-1.0', probe = 'Toggle' },
 }
 local GLOWS = {
-	{ start = 'PixelGlow_Start', label = 'Glow pixel', keyArg = 10, prefix = '_PixelGlow' },
-	{ start = 'AutoCastGlow_Start', label = 'Glow autocast', keyArg = 8, prefix = '_AutoCastGlow' },
-	{ start = 'ButtonGlow_Start', label = 'Glow button', prefix = '_ButtonGlow' },
+	{ start = 'PixelGlow_Start', label = 'Glow pixel', keyArg = 10, prefix = '_PixelGlow', pool = 'GlowFramePool' },
+	{ start = 'AutoCastGlow_Start', label = 'Glow autocast', keyArg = 8, prefix = '_AutoCastGlow', pool = 'GlowFramePool' },
+	{ start = 'ButtonGlow_Start', label = 'Glow button', prefix = '_ButtonGlow', pool = 'ButtonGlowPool' },
 }
 
 local FILE_LOAD_LABEL = 'Loading BluUI files'
@@ -238,7 +239,6 @@ local function WatchSpikes(actual)
 		RecordSpike(game, addons, actual)
 		if actual >= ALERT_MS then AlertSpike(actual) end
 	end
-	lastNoted, noted = noted, lastNoted
 end
 
 local driver = CreateFrame('Frame')
@@ -251,6 +251,7 @@ driver:SetScript('OnUpdate', function(_, elapsed)
 		actual = actual or GetAddOnMetric(addonName, Metric.LastTime)
 		WatchSpikes(actual)
 	end
+	lastNoted, noted = noted, lastNoted
 	wipe(noted)
 	notedTotal = 0
 	if not active then return end
@@ -268,8 +269,8 @@ driver:SetScript('OnUpdate', function(_, elapsed)
 	lastSpent, frameSpent = frameSpent, lastSpent
 	wipe(frameSpent)
 	lastTotal, frameTotal = frameTotal, 0
-end)
 	driverTotal = driverTotal + debugprofilestop() - driverStart
+end)
 
 function Profiler.Wrap(label, callback)
 	return function(...)
@@ -350,13 +351,27 @@ local function TimeEvents(frame, group)
 end
 
 local glowsWatched = false
+local glowLibrary
+
+local function EachRunningGlow(callback)
+	if not glowLibrary then return end
+	for _, glow in ipairs(GLOWS) do
+		for frame in glowLibrary[glow.pool]:EnumerateActive() do
+			if not frame.name or frame.name:find(glow.prefix, 1, true) == 1 then callback(frame, glow) end
+		end
+	end
+end
+
+local function TimeRunningGlow(frame, glow)
+	TimeScript(frame, 'OnUpdate', glow.label)
+end
 
 local function WatchGlows()
 	if glowsWatched then return end
 	glowsWatched = true
 	for _, entry in ipairs(SHARED_LIBRARIES) do LibraryOwner(entry) end
 	if libraryOwners['LibCustomGlow-1.0'] ~= addonName then return end
-	local glowLibrary = LibStub('LibCustomGlow-1.0')
+	glowLibrary = LibStub('LibCustomGlow-1.0')
 	for _, glow in ipairs(GLOWS) do
 		local keyArg, prefix, label = glow.keyArg, glow.prefix, glow.label
 		hooksecurefunc(glowLibrary, glow.start, function(target, ...)
@@ -483,6 +498,7 @@ function Profiler.Start()
 	for _, counter in ipairs(COUNTERS) do baseline[counter.label] = GetAddOnMetric(addonName, counter.metric) end
 	Profiler.active = true
 	WatchGlows()
+	EachRunningGlow(TimeRunningGlow)
 	TimeUnitFrames()
 	TimeActionButtons()
 end
@@ -513,6 +529,18 @@ local function SharedLibraryLine()
 	end
 	return format('Shared libraries running BluUI\'s copy, so every addon\'s use of them counts as BluUI: %s. Running another addon\'s copy, so BluUI\'s use counts there: %s.',
 		#billedHere > 0 and concat(billedHere, ', ') or 'none', #billedElsewhere > 0 and concat(billedElsewhere, ', ') or 'none')
+end
+
+local function RunningGlowsLine()
+	if not glowLibrary then return nil end
+	local count, owners = 0, {}
+	EachRunningGlow(function(frame)
+		count = count + 1
+		local name = frame:GetParent():GetDebugName()
+		if #owners < TOP_GLOW_OWNERS and not issecretvalue(name) then owners[#owners + 1] = name end
+	end)
+	if count == 0 then return 'Glows on screen now: none.' end
+	return format('Glows on screen now: %d, on %s.', count, concat(owners, ', '))
 end
 
 local function AreaOf(label)
@@ -560,6 +588,10 @@ local function UnseenLine(entry)
 	return line .. ': ' .. TopParts(entry.top)
 end
 
+local function SinceLoad(metric)
+	return GetAddOnMetric(addonName, metric) - loadCounts[metric]
+end
+
 local function AddUnseenSpikes(lines)
 	lines[#lines + 1] = format('Blizzard counts BluUI frames since reload over 50ms: %d, over 100ms: %d. %d of the over-50ms frames came while BluUI could not watch frame by frame (login, loading screens)%s',
 		SinceLoad(Metric.CountTimeOver50Ms), SinceLoad(Metric.CountTimeOver100Ms), unseenCount, #unseen > 0 and '. Biggest:' or '.')
@@ -599,10 +631,6 @@ function Profiler.Report()
 		AddUnseenSpikes(lines)
 		lines[#lines + 1] = 'No profile run yet. Type /bui profile to start one.'
 		return lines, #lines
-local function SinceLoad(metric)
-	return GetAddOnMetric(addonName, metric) - loadCounts[metric]
-end
-
 	end
 	local now = Profiler.active and GetTime() or stoppedAt
 	local lines = { BlizzardLine() }
@@ -613,9 +641,14 @@ end
 	local calls = 0
 	for _, stat in pairs(stats) do calls = calls + stat.calls end
 	lines[#lines + 1] = format('BluUI profile over %.0fs. Ticks over %s', now - startedAt, concat(overCounts, ', '))
-	lines[#lines + 1] = format('BluUI used %.0fms over %d frames (%.2fms a frame). Named below: %.0fms (%.0f%%). Timing itself cost about %.0fms of that.',
-		actualTotal, ticks, actualTotal / max(ticks, 1), namedTotal, actualTotal > 0 and namedTotal / actualTotal * 100 or 0, calls * overheadPerCall)
+	local function PercentOfActual(spent) return actualTotal > 0 and spent / actualTotal * 100 or 0 end
+	local timing = calls * overheadPerCall
+	local unexplained = max(0, actualTotal - namedTotal - timing - driverTotal)
+	lines[#lines + 1] = format("BluUI used %.0fms over %d frames (%.2fms a frame). Named below: %.0fms (%.0f%%). Timing itself cost about %.0fms of that, and the profiler's own per-frame bookkeeping %.0fms. Left unexplained: %.0fms (%.0f%%).",
+		actualTotal, ticks, actualTotal / max(ticks, 1), namedTotal, PercentOfActual(namedTotal), timing, driverTotal, unexplained, PercentOfActual(unexplained))
 	lines[#lines + 1] = SharedLibraryLine()
+	local glowsLine = RunningGlowsLine()
+	if glowsLine then lines[#lines + 1] = glowsLine end
 	if GetAddOnMetric(addonName, Metric.EncounterAverageTime) > 0 then
 		lines[#lines + 1] = 'Last boss, ms a frame: ' .. AddOnComparison(Metric.EncounterAverageTime)
 	end
