@@ -111,14 +111,6 @@ local SORT_CHOICES = {
 	{ key = 'name',       enumKey = 'Name',               label = 'Spell Name' },
 }
 
-local function DefaultSortDirection()
-	local enum = AuraContainerSortDirection
-	if type(enum) ~= 'table' then return nil end
-	if enum.Ascending ~= nil then return enum.Ascending end
-	if enum.Descending ~= nil then return enum.Descending end
-	for _, value in pairs(enum) do return value end
-end
-
 function Engine.ResolveSortMethod(key)
 	for choiceIndex = 1, #SORT_CHOICES do
 		local choice = SORT_CHOICES[choiceIndex]
@@ -476,7 +468,7 @@ local function EnsureRuleGroups(container, sets)
 		end
 	end
 
-	local sortDirection = DefaultSortDirection()
+	local sortDirection = AuraContainerSortDirection.Normal
 
 	for fingerprint, spec in pairs(wanted) do
 		local style = spec.style
