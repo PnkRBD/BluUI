@@ -12,7 +12,7 @@ Windows.lua
 Pages\Cursor.lua
 Pages\Minimap.lua
 Pages\Datatext.lua
-Pages\Chat.lua
+Pages\SkinPages.lua
 Pages\Markers.lua
 Pages\QualityOfLife.lua
 Pages\Appearance.lua
