@@ -61,7 +61,7 @@ local function SkinSlot(button)
 		Skin.TipIconFrame(button, icon)
 	end
 	FlatTexture(button:GetHighlightTexture(), 1, 1, 1, SLOT_HOVER_ALPHA)
-	Face(button.Count)
+	Skin.TipCount(button.Count)
 	RefreshSlot(button)
 end
 

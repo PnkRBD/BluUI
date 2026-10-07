@@ -1027,7 +1027,7 @@ local function SkinBankTab(tab)
 	FlatHighlight(button)
 	CropIcon(button.IconTexture)
 	Shell(button, BANK_TAB_INSET)
-	Face(button.Count)
+	Skin.TipCount(button.Count)
 end
 
 local function RefreshBankTabs(frame)

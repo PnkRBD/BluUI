@@ -122,7 +122,7 @@ local function SkinAttachment(button)
 	Fade(button.IconOverlay)
 	CropIcon(button.icon)
 	Skin.TipIconFrame(button, button.icon)
-	Body(button.Count)
+	Skin.TipCount(button.Count)
 end
 
 local function SkinSendAttachment(button)
@@ -132,7 +132,7 @@ local function SkinSendAttachment(button)
 		FadeLayer(button, 'BACKGROUND')
 		Fade(button.IconOverlay)
 		Fade(button.IconOverlay2)
-		Body(button.Count)
+		Skin.TipCount(button.Count)
 		Skin.TipIconFrame(button, button)
 	end
 	CropIcon(button.icon or button:GetNormalTexture())

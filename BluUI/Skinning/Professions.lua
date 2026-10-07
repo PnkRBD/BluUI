@@ -187,7 +187,7 @@ local function SkinSlotButton(button)
 	Fade(button.SlotBackground)
 	CropIcon(button.Icon)
 	Skin.TipIconFrame(button, button.Icon)
-	Skin.TipFace(button.Count, 'body')
+	Skin.TipCount(button.Count)
 end
 
 local function SkinNoteEditBox(scrolling)
