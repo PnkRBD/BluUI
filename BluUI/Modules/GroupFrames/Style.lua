@@ -592,6 +592,43 @@ local function BuildRangeFade(frame, unit)
 	frame:RegisterEvent("UNIT_FLAGS", RangeOverride)
 end
 
+local function TankOrHealer()
+	local spec = GetSpecialization()
+	local role = spec and GetSpecializationRole(spec)
+	return role == "TANK" or role == "HEALER"
+end
+
+local function UpdateAggro(frame, _, unit)
+	if unit and unit ~= frame.unit then return end
+	local outline = frame.ThreatIndicator
+	if outline.wanted and frame.unit then
+		outline:TrackThreat(frame.unit)
+	else
+		outline:Empty()
+	end
+end
+
+local function BuildAggro(frame)
+	local outline = BUI.Tools.AggroOutline(frame, GroupFrames.Layers.aggro)
+	outline.Override = UpdateAggro
+	frame.ThreatIndicator = outline
+end
+
+function GroupFrames.ApplyAggroToChild(child, settings)
+	local aggro = settings.aggroBorder
+	local color = aggro.color
+	local outline = child.ThreatIndicator
+	outline:SetLook(color[1], color[2], color[3], color[4], aggro.thickness)
+	outline.wanted = aggro.enabled and (not aggro.tankOrHealerOnly or TankOrHealer())
+	UpdateAggro(child)
+end
+
+local function RefreshAggro()
+	GroupFrames.EachChild(function(child) GroupFrames.ApplyAggroToChild(child, GroupFrames.SettingsForFrame(child)) end)
+end
+
+BUI.Events:RegisterUnit("PLAYER_SPECIALIZATION_CHANGED", "player", "GroupFrames.Aggro", RefreshAggro)
+
 function GroupFrames.RefreshRange()
 	local rangeSettings = GroupFrames.GetDB().range
 	local function ApplyToChild(child)
@@ -659,6 +696,7 @@ local function GroupFrameStyle(frame, unit)
 	BuildAbsorb(frame, unit)
 	GroupFrames.BuildIndicators(frame, unit)
 	GroupFrames.BuildSelection(frame, unit)
+	BuildAggro(frame)
 	BuildRangeFade(frame, unit)
 	GroupFrames.BuildKeystone(frame, unit)
 
@@ -684,5 +722,7 @@ BUI.oUF:RegisterInitCallback(function(frame)
 	if frame.style ~= GroupFrames.STYLE_NAME then return end
 	frame:HookScript("OnAttributeChanged", BUI.Profiler.Wrap('GroupFrames.Style frame OnAttributeChanged', OnAttributeChanged))
 	frame:HookScript("OnShow", ShowClicks)
-	GroupFrames.ApplyGeometry(frame, GroupFrames.SettingsForFrame(frame))
+	local settings = GroupFrames.SettingsForFrame(frame)
+	GroupFrames.ApplyGeometry(frame, settings)
+	GroupFrames.ApplyAggroToChild(frame, settings)
 end)

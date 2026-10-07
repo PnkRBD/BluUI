@@ -72,6 +72,7 @@ local function CommonSettings(sizes)
 
 		targetBorder    = { enabled = true, color = { 1, 1, 0, 1 },   thickness = 2 },
 		mouseoverBorder = { enabled = true, color = { 1, 1, 1, 0.7 }, thickness = 2 },
+		aggroBorder     = { enabled = false, color = { 1, 0.15, 0.15, 1 }, thickness = 2, tankOrHealerOnly = false },
 
 		roleIcon       = IconDefaults(sizes.smallIcon,  "TOP",     0, sizes.iconY, true),
 		leaderIcon     = IconDefaults(sizes.smallIcon,  "TOPLEFT", 0, sizes.iconY, true),

@@ -10,6 +10,7 @@ GroupFrames.headers = {}
 
 GroupFrames.Layers = {
 	auras       = 10,
+	aggro       = 18,
 	selection   = 20,
 	indicators  = 25,
 }
