@@ -330,15 +330,17 @@ local function FramesBoard(ui, parent, width, key)
 			Toggle(settings, nil, 'enabled'),
 		}, Colors)
 	end
-	local aggro = section.aggroBorder
-	look:AddTools('Aggro border', 'Outline on members the enemies are hitting', {
-		Color(aggro, 'Border color', 'color'),
-		{ tooltip = 'Thickness and who sees it', title = 'Aggro border', options = {
-			Option(aggro, 'Thickness', 'thickness', { min = 1, max = 6, step = 1 }),
-			Toggle(aggro, 'Only as tank or healer', 'tankOrHealerOnly'),
-		} },
-		Toggle(aggro, nil, 'enabled'),
-	}, Colors)
+	if isParty then
+		local aggro = section.aggroBorder
+		look:AddTools('Aggro border', 'Outline on members the enemies are hitting', {
+			Color(aggro, 'Border color', 'color'),
+			{ tooltip = 'Thickness and who sees it', title = 'Aggro border', options = {
+				Option(aggro, 'Thickness', 'thickness', { min = 1, max = 6, step = 1 }),
+				Toggle(aggro, 'Only as tank or healer', 'tankOrHealerOnly'),
+			} },
+			Toggle(aggro, nil, 'enabled'),
+		}, Colors)
+	end
 
 	local text = ui.Board(parent, width, {
 		stacked = true,

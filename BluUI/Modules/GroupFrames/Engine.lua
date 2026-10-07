@@ -84,6 +84,8 @@ local function SectionForFrame(frame)
 	return section
 end
 
+GroupFrames.SectionForFrame = SectionForFrame
+
 function GroupFrames.SettingsForFrame(frame)
 	local section = SectionForFrame(frame)
 	if section == "raidLarge" then return GroupFrames.LargeRaidSettings() end
