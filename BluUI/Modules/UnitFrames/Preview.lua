@@ -76,7 +76,6 @@ local function Notify()
 end
 
 local function Freeze(frame)
-	if not frame._isPreview then frame._savedUnit = frame.unit end
 	frame._isPreview = true
 	frame.unit = nil
 	for _, key in ipairs(TAG_FIELDS) do frame:Untag(frame[key]) end
@@ -90,8 +89,7 @@ local function Thaw(frame)
 	frame._isPreview = nil
 	frame._previewIndex = nil
 	frame._previewSample = nil
-	frame.unit = frame._savedUnit
-	frame._savedUnit = nil
+	frame.unit = frame.__unit
 	for _, element in ipairs(LIVE_ELEMENTS) do frame:ResumeElement(element) end
 	UnitFrames.TagFontStrings(frame)
 	if frame.unit then frame:UpdateAllElements('PreviewEnd') end
