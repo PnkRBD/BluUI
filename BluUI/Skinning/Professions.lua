@@ -46,18 +46,20 @@ local CATEGORY_TITLE_SCALE = 12 / 11
 local TAB_BASELINE_OFFSET = 8
 local BOOK_TITLE_SCALE = 1.25
 local BOOK_SUBTITLE_SCALE = 1.1
-local BOOK_CARD_WIDTH = 437
-local BOOK_COLUMN_X = 56
-local BOOK_TOP_Y = -67
+local BOOK_CARD_WIDTH, BOOK_CARD_HEIGHT = 510, 82
+local BOOK_COLUMN_X = 20
+local BOOK_TOP_Y = -52
 local PRIMARY_CARD_COUNT = 2
-local PRIMARY_CARD_HEIGHT, SECONDARY_CARD_HEIGHT = 88, 64
-local BOOK_CARD_GAP, BOOK_GROUP_GAP = 10, 18
+local BOOK_CARD_GAP, BOOK_GROUP_GAP = 8, 16
 local BOOK_CARD_PADDING = 10
-local BOOK_ICON_SIZE, BOOK_ICON_GAP = 64, 12
-local BOOK_BAR_WIDTH, BOOK_BAR_HEIGHT = 100, 14
-local SPELL_LABEL_WIDTH = 100
+local BOOK_ICON_SIZE, BOOK_ICON_GAP = 40, 10
+local BOOK_BAR_HEIGHT = 14
+local UNLEARN_GAP = 8
 local SPELL_BUTTON_SIZE = 40
-local SECONDARY_TEXT_WIDTH = 120
+local SPELL_LABEL_GAP, SPELL_LABEL_WIDTH = 5, 100
+local SPELL_SLOT_GAP = 12
+local SPELL_SLOT_WIDTH = SPELL_BUTTON_SIZE + SPELL_LABEL_GAP + SPELL_LABEL_WIDTH
+local BOOK_TEXT_RIGHT = BOOK_CARD_WIDTH - BOOK_CARD_PADDING * 2 - SPELL_SLOT_WIDTH * 2 - SPELL_SLOT_GAP
 
 local frameInstalled, bookInstalled, customerInstalled, templatesInstalled = false, false, false, false
 local waitingForWidth = false
@@ -743,46 +745,35 @@ local function PlaceSpellButton(button, point, relativeTo, relativePoint, x, y)
 	button:SetPoint(point, relativeTo, relativePoint, x, y)
 end
 
-local function LayoutPrimaryCard(row)
-	local textX = BOOK_CARD_PADDING + BOOK_ICON_SIZE + BOOK_ICON_GAP
+local function LayoutPrimaryIdentity(row)
 	local border = _G[row:GetName() .. 'IconBorder']
 	border:ClearAllPoints()
 	border:SetSize(BOOK_ICON_SIZE, BOOK_ICON_SIZE)
-	border:SetPoint('LEFT', row, 'LEFT', BOOK_CARD_PADDING, 0)
-	row.professionName:ClearAllPoints()
-	row.professionName:SetPoint('TOPLEFT', row, 'TOPLEFT', textX, -BOOK_CARD_PADDING)
+	border:SetPoint('TOPLEFT', row, 'TOPLEFT', BOOK_CARD_PADDING, -BOOK_CARD_PADDING)
 	row.specialization:ClearAllPoints()
 	row.specialization:SetPoint('TOPLEFT', row.professionName, 'BOTTOMLEFT', 0, -2)
-	row.rank:ClearAllPoints()
-	row.rank:SetPoint('TOPLEFT', row.specialization, 'BOTTOMLEFT', 0, -4)
-	local bar = row.statusBar
-	bar:ClearAllPoints()
-	bar:SetSize(BOOK_BAR_WIDTH, BOOK_BAR_HEIGHT)
-	bar:SetPoint('BOTTOMLEFT', row, 'BOTTOMLEFT', textX, BOOK_CARD_PADDING)
 	row.UnlearnButton:ClearAllPoints()
-	row.UnlearnButton:SetPoint('LEFT', bar, 'RIGHT', 8, 0)
-	row.missingHeader:ClearAllPoints()
-	row.missingHeader:SetPoint('TOPLEFT', row, 'TOPLEFT', textX, -BOOK_CARD_PADDING - 4)
-	PlaceSpellButton(row.SpellButton2, 'TOPRIGHT', row, 'TOPRIGHT', -(SPELL_LABEL_WIDTH + BOOK_CARD_PADDING), -4)
-	PlaceSpellButton(row.SpellButton1, 'TOPLEFT', row.SpellButton2, 'BOTTOMLEFT', 0, 0)
+	row.UnlearnButton:SetPoint('LEFT', row.professionName, 'RIGHT', UNLEARN_GAP, 0)
 end
 
-local function LayoutSecondaryCard(row)
+local function LayoutBookCard(row, primary)
+	local textX = primary and (BOOK_CARD_PADDING + BOOK_ICON_SIZE + BOOK_ICON_GAP) or BOOK_CARD_PADDING
+	if primary then LayoutPrimaryIdentity(row) end
 	row.professionName:ClearAllPoints()
-	row.professionName:SetPoint('TOPLEFT', row, 'TOPLEFT', BOOK_CARD_PADDING, -BOOK_CARD_PADDING)
+	row.professionName:SetPoint('TOPLEFT', row, 'TOPLEFT', textX, -BOOK_CARD_PADDING)
 	row.rank:ClearAllPoints()
-	row.rank:SetWidth(SECONDARY_TEXT_WIDTH)
+	row.rank:SetPoint('TOPLEFT', primary and row.specialization or row.professionName, 'BOTTOMLEFT', 0, -2)
+	row.rank:SetWidth(BOOK_TEXT_RIGHT - textX)
 	row.rank:SetWordWrap(false)
-	row.rank:SetPoint('TOPLEFT', row.professionName, 'BOTTOMLEFT', 0, -2)
+	row.missingHeader:ClearAllPoints()
+	row.missingHeader:SetPoint('TOPLEFT', row, 'TOPLEFT', textX, -BOOK_CARD_PADDING)
 	local bar = row.statusBar
 	bar:ClearAllPoints()
-	bar:SetSize(BOOK_BAR_WIDTH, BOOK_BAR_HEIGHT)
+	bar:SetHeight(BOOK_BAR_HEIGHT)
 	bar:SetPoint('BOTTOMLEFT', row, 'BOTTOMLEFT', BOOK_CARD_PADDING, BOOK_CARD_PADDING)
-	row.missingHeader:ClearAllPoints()
-	row.missingHeader:SetPoint('TOPLEFT', row, 'TOPLEFT', BOOK_CARD_PADDING, -BOOK_CARD_PADDING)
-	local buttonY = -math.floor((SECONDARY_CARD_HEIGHT - SPELL_BUTTON_SIZE) / 2)
-	PlaceSpellButton(row.SpellButton1, 'TOPRIGHT', row, 'TOPRIGHT', -(SPELL_LABEL_WIDTH + BOOK_CARD_PADDING), buttonY)
-	PlaceSpellButton(row.SpellButton2, 'TOPRIGHT', row.SpellButton1, 'TOPLEFT', -(SPELL_LABEL_WIDTH + BOOK_CARD_PADDING), 0)
+	bar:SetPoint('BOTTOMRIGHT', row, 'BOTTOMRIGHT', -BOOK_CARD_PADDING, BOOK_CARD_PADDING)
+	PlaceSpellButton(row.SpellButton1, 'TOPRIGHT', row, 'TOPRIGHT', -(BOOK_CARD_PADDING + SPELL_LABEL_GAP + SPELL_LABEL_WIDTH), -BOOK_CARD_PADDING)
+	PlaceSpellButton(row.SpellButton2, 'TOPRIGHT', row.SpellButton1, 'TOPLEFT', -(SPELL_LABEL_GAP + SPELL_LABEL_WIDTH + SPELL_SLOT_GAP), 0)
 end
 
 local function LayoutBookCards(frame)
@@ -790,15 +781,14 @@ local function LayoutBookCards(frame)
 	local previous
 	for index, name in ipairs(BOOK_ROW_NAMES) do
 		local row = _G[name]
-		local primary = index <= PRIMARY_CARD_COUNT
-		row:SetSize(BOOK_CARD_WIDTH, primary and PRIMARY_CARD_HEIGHT or SECONDARY_CARD_HEIGHT)
+		row:SetSize(BOOK_CARD_WIDTH, BOOK_CARD_HEIGHT)
 		row:ClearAllPoints()
 		if previous then
 			row:SetPoint('TOPLEFT', previous, 'BOTTOMLEFT', 0, -(index == PRIMARY_CARD_COUNT + 1 and BOOK_GROUP_GAP or BOOK_CARD_GAP))
 		else
 			row:SetPoint('TOPLEFT', frame, 'TOPLEFT', BOOK_COLUMN_X, BOOK_TOP_Y)
 		end
-		if primary then LayoutPrimaryCard(row) else LayoutSecondaryCard(row) end
+		LayoutBookCard(row, index <= PRIMARY_CARD_COUNT)
 		local rankText = row.statusBar.rankText
 		rankText:ClearAllPoints()
 		rankText:SetPoint('CENTER', row.statusBar, 'CENTER', 0, 0)
