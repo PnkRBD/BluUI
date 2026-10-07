@@ -65,8 +65,10 @@ local noted, lastNoted, unseen = {}, {}, {}
 local scriptWrappers = setmetatable({}, { __mode = 'kv' })
 local frameTotal, lastTotal, depth, watchDepth, notedTotal = 0, 0, 0, 0, 0
 local lastAlertAt = 0
-local seenOver, unseenCount = GetAddOnMetric(addonName, Metric.CountTimeOver50Ms), 0
-local namedTotal, actualTotal, ticks = 0, 0, 0
+local loadCounts = {}
+for _, counter in ipairs(COUNTERS) do loadCounts[counter.metric] = GetAddOnMetric(addonName, counter.metric) end
+local seenOver, unseenCount = loadCounts[Metric.CountTimeOver50Ms], 0
+local namedTotal, actualTotal, ticks, driverTotal = 0, 0, 0, 0
 local startedAt, stoppedAt = 0, 0
 local overheadPerCall = 0
 local loginPending = false
@@ -548,8 +550,8 @@ local function UnseenLine(entry)
 end
 
 local function AddUnseenSpikes(lines)
-	lines[#lines + 1] = format('Blizzard counts BluUI frames since load over 50ms: %d, over 100ms: %d. %d of the over-50ms frames came while BluUI could not watch frame by frame (login, loading screens). Biggest:',
-		GetAddOnMetric(addonName, Metric.CountTimeOver50Ms), GetAddOnMetric(addonName, Metric.CountTimeOver100Ms), unseenCount)
+	lines[#lines + 1] = format('Blizzard counts BluUI frames since reload over 50ms: %d, over 100ms: %d. %d of the over-50ms frames came while BluUI could not watch frame by frame (login, loading screens)%s',
+		SinceLoad(Metric.CountTimeOver50Ms), SinceLoad(Metric.CountTimeOver100Ms), unseenCount, #unseen > 0 and '. Biggest:' or '.')
 	local biggest = {}
 	for index, entry in ipairs(unseen) do biggest[index] = entry end
 	sort(biggest, function(left, right) return left.named > right.named end)
@@ -571,11 +573,11 @@ end
 
 local function BlizzardLine()
 	local counts = {}
-	for _, counter in ipairs(COUNTERS) do counts[#counts + 1] = format('%s %d', counter.label, GetAddOnMetric(addonName, counter.metric)) end
+	for _, counter in ipairs(COUNTERS) do counts[#counts + 1] = format('%s %d', counter.label, SinceLoad(counter.metric)) end
 	local recent, recentShare = Share(Metric.RecentAverageTime)
 	local session, sessionShare = Share(Metric.SessionAverageTime)
 	local encounter, encounterShare = Share(Metric.EncounterAverageTime)
-	return format("Blizzard's numbers for BluUI, the same ones addon managers show: now %.2fms a frame (%.2f%% of the game), since load %.2fms (%.2f%%), last boss %.2fms (%.2f%%), worst frame %.0fms. Frames over %s since load.",
+	return format("Blizzard's numbers for BluUI, the same ones addon managers show: now %.2fms a frame (%.2f%% of the game), since login %.2fms (%.2f%%), last boss %.2fms (%.2f%%), worst frame since login %.0fms. Frames over %s since reload.",
 		recent, recentShare, session, sessionShare, encounter, encounterShare, GetAddOnMetric(addonName, Metric.PeakTime), concat(counts, ', '))
 end
 
@@ -586,6 +588,10 @@ function Profiler.Report()
 		AddUnseenSpikes(lines)
 		lines[#lines + 1] = 'No profile run yet. Type /bui profile to start one.'
 		return lines, #lines
+local function SinceLoad(metric)
+	return GetAddOnMetric(addonName, metric) - loadCounts[metric]
+end
+
 	end
 	local now = Profiler.active and GetTime() or stoppedAt
 	local lines = { BlizzardLine() }
@@ -602,7 +608,7 @@ function Profiler.Report()
 	if GetAddOnMetric(addonName, Metric.EncounterAverageTime) > 0 then
 		lines[#lines + 1] = 'Last boss, ms a frame: ' .. AddOnComparison(Metric.EncounterAverageTime)
 	end
-	lines[#lines + 1] = 'Since reload, ms a frame: ' .. AddOnComparison(Metric.SessionAverageTime)
+	lines[#lines + 1] = 'Since login, ms a frame: ' .. AddOnComparison(Metric.SessionAverageTime)
 	AddSessionSpikes(lines)
 	AddUnseenSpikes(lines)
 	local areas, members = Areas()
