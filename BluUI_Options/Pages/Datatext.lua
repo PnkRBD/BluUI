@@ -358,6 +358,25 @@ local function DatatextsBoard(ui, parent, width, config, page, after)
 			end },
 		},
 	})
+	if #off > 0 then
+		local row = board:AddRow('Add a datatext', 'It joins the end of the bar', MENU_WIDTH)
+		local dropdown = ui.Dropdown(row, MENU_WIDTH, function()
+			local menu = {}
+			for _, entry in ipairs(off) do
+				menu[#menu + 1] = { text = entry.name, callback = function()
+					config[entry.show] = true
+					table.remove(order, IndexOf(order, entry.id))
+					order[#order + 1] = entry.id
+					config.order = order
+					after()
+					page:RebuildCurrent()
+				end }
+			end
+			return menu
+		end)
+		dropdown:SetPoint('RIGHT', -ui.ROW_INSET, 0)
+		dropdown.label:SetText('Pick one')
+	end
 	board:DragList(function(index, delta)
 		local id, otherID = active[index], active[index + delta]
 		local from, to = IndexOf(order, id), IndexOf(order, otherID)
@@ -381,26 +400,7 @@ local function DatatextsBoard(ui, parent, width, config, page, after)
 		end
 	end
 	if #active == 0 then
-		board:AddRow('Nothing on this bar yet', 'Pick a datatext below to start it off')
-	end
-	if #off > 0 then
-		local row = board:AddRow('Add a datatext', 'It joins the end of the bar', MENU_WIDTH)
-		local dropdown = ui.Dropdown(row, MENU_WIDTH, function()
-			local menu = {}
-			for _, entry in ipairs(off) do
-				menu[#menu + 1] = { text = entry.name, callback = function()
-					config[entry.show] = true
-					table.remove(order, IndexOf(order, entry.id))
-					order[#order + 1] = entry.id
-					config.order = order
-					after()
-					page:RebuildCurrent()
-				end }
-			end
-			return menu
-		end)
-		dropdown:SetPoint('RIGHT', -ui.ROW_INSET, 0)
-		dropdown.label:SetText('Pick one')
+		board:AddRow('Nothing on this bar yet', 'Pick a datatext above to start it off')
 	end
 	return board
 end
