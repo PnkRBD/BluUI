@@ -63,6 +63,7 @@ local RAID_TEXT_X = 16
 local RAID_DOT = 14
 local RAID_DOT_MARK = 8
 local RAID_DOT_GAP = 4
+local RAID_TICK = { 0.06, 0.06, 0.08 }
 local RAID_MAX_DOTS = 14
 local TWO_UPGRADES, THREE_UPGRADES = 0.8, 0.6
 local KEY_ROW = 26
@@ -701,6 +702,10 @@ end
 
 local PillFill = Tinted('card', VAULT_PILL_FILL)
 
+local function PaintTick(mark)
+    mark:SetVertexColor(RAID_TICK[1], RAID_TICK[2], RAID_TICK[3])
+end
+
 local function PaintFoot(foot)
     local tile = foot.tile
     foot:SetTextColor(window:Color('text'))
@@ -1215,7 +1220,7 @@ local function BuildRaid()
         row.dots = {}
         for dot = 1, RAID_MAX_DOTS do
             local disc = kit.Disc(row, RAID_DOT, 'control', 'ARTWORK', 1)
-            local mark = kit.Glyph(row, 'check', RAID_DOT_MARK, 'text', 'OVERLAY')
+            local mark = kit.Glyph(row, 'check', RAID_DOT_MARK, PaintTick, 'OVERLAY')
             mark:SetPoint('CENTER', disc)
             row.dots[dot] = { disc = disc, mark = mark }
         end
