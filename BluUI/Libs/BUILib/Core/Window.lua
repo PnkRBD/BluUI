@@ -198,8 +198,25 @@ function Layout.WindowFrame(config)
 
 	local borderEdges, backgroundTexture = Layout.FrameChrome(frame)
 
-	local function StartMoving() frame:StartMoving() end
+	local dragDriver = CreateFrame('Frame', nil, frame)
+	local dragCursorX, dragCursorY, dragLeft, dragTop
+	local function FollowCursor()
+		local cursorX, cursorY = GetCursorPosition()
+		local scale = frame:GetEffectiveScale()
+		local pixel = PixelUtil.GetPixelToUIUnitFactor() / scale
+		local left = dragLeft + (cursorX - dragCursorX) / scale
+		local top = dragTop + (cursorY - dragCursorY) / scale
+		frame:ClearAllPoints()
+		frame:SetPoint('TOPLEFT', UIParent, 'BOTTOMLEFT', Widget.SnapX(left, pixel), Widget.SnapY(top, pixel))
+	end
+	local function StartMoving()
+		dragLeft, dragTop = frame:GetLeft(), frame:GetTop()
+		if not dragLeft or not dragTop then return end
+		dragCursorX, dragCursorY = GetCursorPosition()
+		dragDriver:SetScript('OnUpdate', FollowCursor)
+	end
 	local function StopMoving()
+		dragDriver:SetScript('OnUpdate', nil)
 		frame:StopMovingOrSizing()
 		local pixel = PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
 		frame:SetSize(Widget.SnapX(frame:GetWidth(), pixel), Widget.SnapX(frame:GetHeight(), pixel))
