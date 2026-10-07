@@ -610,7 +610,7 @@ local function FontSection(ui, parent, width, page)
 		columns = { { 'Name', ui.AVATAR_X } },
 		buttons = { { text = 'Reset', icon = 'reset', onClick = function() ResetFonts(page) end } },
 	})
-	FontRow(ui, section, page, 'base', 'Font', 'Every kind of text, unless it picks its own below', function(row) return ui.IconAvatar(row, SWATCH_SIZE, 'edit') end)
+	FontRow(ui, section, page, 'base', 'Font', 'Every kind of text, unless it picks its own below', function(row) return ui.IconAvatar(row, SWATCH_SIZE, 'text') end)
 	for _, entry in ipairs(FONT_ROLES) do
 		FontRow(ui, section, page, entry.role, entry.name, entry.sub, function(row) return ui.Initials(row, SWATCH_SIZE, 'Aa', entry.role) end, 'Same as Font')
 	end
