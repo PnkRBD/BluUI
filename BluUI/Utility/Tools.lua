@@ -222,6 +222,51 @@ function Tools.ThresholdAlphaCurve(threshold)
     return curve
 end
 
+local AGGRO_EDGES = {
+    { 'TOPLEFT', 'TOPRIGHT', 'HORIZONTAL' },
+    { 'BOTTOMLEFT', 'BOTTOMRIGHT', 'HORIZONTAL' },
+    { 'TOPLEFT', 'BOTTOMLEFT', 'VERTICAL' },
+    { 'TOPRIGHT', 'BOTTOMRIGHT', 'VERTICAL' },
+}
+local AGGRO_MIN_STATUS, AGGRO_TANKING_STATUS = 1, 2
+local AggroOutline = {}
+
+function AggroOutline:SetLook(red, green, blue, alpha, thickness)
+    local size = BUI.Pixel.Scale(thickness)
+    for _, edge in ipairs(self.edges) do
+        edge:SetStatusBarColor(red, green, blue, alpha)
+        if edge:GetOrientation() == 'VERTICAL' then edge:SetWidth(size) else edge:SetHeight(size) end
+    end
+end
+
+function AggroOutline:TrackThreat(unit)
+    local status = UnitThreatSituation(unit)
+    if not issecretvalue(status) and status == nil then status = 0 end
+    for _, edge in ipairs(self.edges) do edge:SetValue(status) end
+end
+
+function AggroOutline:Empty()
+    for _, edge in ipairs(self.edges) do edge:SetValue(0) end
+end
+
+function Tools.AggroOutline(parent, levelOffset)
+    local outline = CreateFrame('Frame', nil, parent)
+    outline:SetAllPoints()
+    outline:SetFrameLevel(parent:GetFrameLevel() + levelOffset)
+    outline.edges = {}
+    for index, spec in ipairs(AGGRO_EDGES) do
+        local edge = CreateFrame('StatusBar', nil, outline)
+        edge:SetPoint(spec[1])
+        edge:SetPoint(spec[2])
+        edge:SetOrientation(spec[3])
+        edge:SetStatusBarTexture('Interface\\Buttons\\WHITE8x8')
+        edge:SetMinMaxValues(AGGRO_MIN_STATUS, AGGRO_TANKING_STATUS)
+        edge:SetValue(0)
+        outline.edges[index] = edge
+    end
+    return Mixin(outline, AggroOutline)
+end
+
 function Tools.IsSpellOnCooldown(spellID)
     if Tools.IsChargeSpell(spellID) then
         local chargeInfo = C_Spell.GetSpellCharges(spellID)
