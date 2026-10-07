@@ -404,7 +404,7 @@ function Display.CreateTracker(config)
     end
 
     local function ShowFrame(settings, forceShow)
-        tracker.frame:SetShown(forceShow or not config.textOnly or settings.showText)
+        tracker.frame:SetShown(forceShow or not config.textOnly or settings.showText ~= false)
     end
 
     function tracker.Update()
