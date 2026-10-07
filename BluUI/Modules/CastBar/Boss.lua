@@ -76,6 +76,7 @@ function CastBar.CreateBossCastbar(frame)
 	castbar:HookScript('OnHide', BUI.Profiler.Wrap('CastBar.Boss castbar hide', function() container:Hide() end))
 	castbar.PostCastStart = BossPostCastStart
 	castbar.PostCastStop = CastBar.HideInterruptOverlays
+	castbar.PostCastFail = CastBar.HideInterruptOverlays
 	castbar.PostCastInterrupted = BossPostCastInterrupted
 	castbar.PostCastInterruptible = BossPostCastInterruptible
 
