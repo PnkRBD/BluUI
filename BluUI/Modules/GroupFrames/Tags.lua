@@ -97,9 +97,8 @@ Methods["blu:hpmissing"] = function(unit)
 		local missingHealth = UnitHealthMissing(unit)
 		if missingHealth == nil then return "" end
 		if IsSecret(missingHealth) then
-			if C_StringUtil.TruncateWhenZero(missingHealth) == "" then
-				return ""
-			end
+			local text = C_StringUtil.TruncateWhenZero(missingHealth)
+			if IsSecret(text) or text == "" then return text end
 			return Abbreviate(missingHealth)
 		end
 		if missingHealth <= 0 then return "" end
@@ -203,6 +202,3 @@ local function DirectHpDisable(self)
 end
 
 oUF:AddElement("BluHpTextDirect", DirectHpPath, DirectHpEnable, DirectHpDisable)
-for _, tagName in ipairs({ "blu:status", "blu:hp", "blu:hpmax", "blu:hppct", "blu:hpmissing", "blu:absorb", "blu:pwr", "blu:pwrmax", "blu:pwrpct", "blu:name" }) do
-	Methods[tagName] = Methods[tagName]
-end
