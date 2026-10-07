@@ -181,6 +181,29 @@ end
 
 UnitFrames.ResolveAuraStyle = ResolveStyle
 
+local function FlowEdge(style)
+	return (style.growY == 'UP' and 'TOP' or 'BOTTOM') .. (style.growX == 'RIGHT' and 'LEFT' or 'RIGHT')
+end
+
+function UnitFrames.ResolveAuraFlow(unitSettings, debuffStyle, buffStyle)
+	local flow = unitSettings.auraFlow
+	local follower, leader
+	if flow == 'debuffsAfterBuffs' then
+		follower, leader = debuffStyle, buffStyle
+	elseif flow == 'buffsAfterDebuffs' then
+		follower, leader = buffStyle, debuffStyle
+	end
+	if not (follower and leader.shown) then return end
+	follower.growX, follower.growY = leader.growX, leader.growY
+	return follower, leader
+end
+
+function UnitFrames.AttachAuraFlow(follower, leader, followerFrame, leaderFrame)
+	local gap = leader.growY == 'UP' and leader.gap or -leader.gap
+	followerFrame:ClearAllPoints()
+	followerFrame:SetPoint(GrowthToAnchor(follower.growX, follower.growY), leaderFrame, FlowEdge(leader), 0, Pixel.Scale(gap))
+end
+
 local auraFrames = {}
 
 local function BuildCandidates(isDebuff)
@@ -254,30 +277,38 @@ BUI.oUF:RegisterInitCallback(function(frame)
 	if targetTargetFrames[frame] then frame:HookScript('OnShow', TargetTargetShown) end
 end)
 
-local function ApplyContainer(frame, container, style, rules)
-	local anchor = GrowthToAnchor(style.growX, style.growY)
-	container:ClearAllPoints()
-	container:SetPoint(anchor, frame, style.anchorTo, Pixel.Scale(style.offsetX), Pixel.Scale(style.offsetY))
+local function ApplyContainer(container, style, rules)
 	container:SetShown(style.shown)
-
 	local isDebuff = container._buiIsDebuff
 	local baseFilter = isDebuff and DEBUFF_FILTER or BUFF_FILTER
 	local candidates, candidatesFingerprint = BuildCandidates(isDebuff)
 	Engine.Configure(container, style, rules, baseFilter, candidates, candidatesFingerprint)
 end
 
+local function PlaceContainer(frame, container, style)
+	container:ClearAllPoints()
+	container:SetPoint(GrowthToAnchor(style.growX, style.growY), frame, style.anchorTo, Pixel.Scale(style.offsetX), Pixel.Scale(style.offsetY))
+end
+
 local function EngineApplyAuraPositions(frame, unitType)
 	local unitSettings = UnitFrames.GetUnitSettings(unitType)
 	MigrateDebuffSettings(unitSettings, unitType)
 
-	if frame.DebuffContainer then
-		local style = ResolveStyle(unitSettings, true)
-		ApplyContainer(frame, frame.DebuffContainer, style, UnitRules(unitSettings, true))
-	end
+	local debuffs, buffs = frame.DebuffContainer, frame.BuffContainer
+	local debuffStyle = ResolveStyle(unitSettings, true)
+	local buffStyle = ResolveStyle(unitSettings, false)
+	local follower, leader = UnitFrames.ResolveAuraFlow(unitSettings, debuffStyle, buffStyle)
+	ApplyContainer(debuffs, debuffStyle, UnitRules(unitSettings, true))
+	ApplyContainer(buffs, buffStyle, UnitRules(unitSettings, false))
 
-	if frame.BuffContainer then
-		local style = ResolveStyle(unitSettings, false)
-		ApplyContainer(frame, frame.BuffContainer, style, UnitRules(unitSettings, false))
+	local followerContainer = follower == debuffStyle and debuffs or buffs
+	if follower and next(followerContainer._buiGroups) then
+		local leaderContainer = followerContainer == debuffs and buffs or debuffs
+		PlaceContainer(frame, leaderContainer, leader)
+		UnitFrames.AttachAuraFlow(follower, leader, followerContainer, leaderContainer)
+	else
+		PlaceContainer(frame, debuffs, debuffStyle)
+		PlaceContainer(frame, buffs, buffStyle)
 	end
 
 	BindUnit(frame)

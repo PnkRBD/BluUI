@@ -299,6 +299,7 @@ local function ShowFakeAuras(frame, unitType)
 	local unitSettings = UnitFrames.GetUnitSettings(unitType)
 	local debuffStyle = UnitFrames.ResolveAuraStyle(unitSettings, true)
 	local buffStyle = UnitFrames.ResolveAuraStyle(unitSettings, false)
+	local follower, leader = UnitFrames.ResolveAuraFlow(unitSettings, debuffStyle, buffStyle)
 	local debuffCount = debuffStyle.shown and debuffStyle.max or 0
 	local buffCount = buffStyle.shown and buffStyle.max or 0
 
@@ -326,6 +327,11 @@ local function ShowFakeAuras(frame, unitType)
 
 	LayoutGrid(cached.debuffHolder, cached.debuffs, debuffCount, debuffStyle, frame)
 	LayoutGrid(cached.buffHolder, cached.buffs, buffCount, buffStyle, frame)
+	if follower then
+		local followerHolder = follower == debuffStyle and cached.debuffHolder or cached.buffHolder
+		local leaderHolder = followerHolder == cached.debuffHolder and cached.buffHolder or cached.debuffHolder
+		UnitFrames.AttachAuraFlow(follower, leader, followerHolder, leaderHolder)
+	end
 end
 
 local function RestoreContainer(container)

@@ -212,6 +212,7 @@ local UnitAuraBase = {
 	auraStackSize  = 10,
 	auraCdSize     = 10,
 	showDebuffType = true,
+	auraFlow       = 'separate',
 }
 
 local UnitBuffBase = Merge(UnitAuraBase, {
