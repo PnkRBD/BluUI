@@ -114,6 +114,38 @@ local function AdoptSavedTheme(entry)
     saved[#saved + 1] = { name = entry.name, theme = DeepCopyClean(entry.theme), time = time() }
 end
 
+local IMPORTED_THEME_NAME = "%s (imported)"
+
+local function IsCustomLook(look)
+    for key, value in pairs(look) do
+        if key ~= "name" and key ~= "mode" and (type(value) ~= "table" or next(value) ~= nil) then return true end
+    end
+    return false
+end
+
+local function UniqueThemeName(base)
+    local name, copy = base, 1
+    while FindSavedTheme(name) do
+        copy = copy + 1
+        name = ("%s %d"):format(base, copy)
+    end
+    return name
+end
+
+local function KeepImportedLook(look, profileName)
+    if look.name or not IsCustomLook(look) then return end
+    local saved = BUI.db.global.savedThemes
+    for _, entry in ipairs(saved) do
+        if BUI.SameThemeLook(entry.theme, look) then
+            look.name = entry.name
+            return
+        end
+    end
+    local name = UniqueThemeName(IMPORTED_THEME_NAME:format(profileName or "Profile"))
+    saved[#saved + 1] = { name = name, theme = DeepCopyClean(look), time = time() }
+    look.name = name
+end
+
 local function ApplyImportData(db, data, selectedKeys)
     MigrateLegacyKeysInUnitFrames(data)
     local keySet
@@ -139,7 +171,10 @@ local function ApplyImportData(db, data, selectedKeys)
     if (not keySet or keySet.customBars) and data.customBars and BUI.CustomBars and BUI.CustomBars.AdoptProfileSpells then
         BUI.CustomBars.AdoptProfileSpells()
     end
-    if not keySet or keySet.windowTheme then AdoptSavedTheme(data._savedTheme) end
+    if not keySet or keySet.windowTheme then
+        AdoptSavedTheme(data._savedTheme)
+        KeepImportedLook(db.windowTheme, data._profileName)
+    end
 end
 
 local function SerializeProfile(db, profileName)
