@@ -443,63 +443,42 @@ for tag, handler in pairs(Handlers) do
 	oUF.Tags.Events['bui:' .. tag] = TagEvents[tag]
 end
 
-local directTagRegistry = {}
-local directGroups = {}
+local directGroups = {
+	resting = { fontStrings = {}, count = 0 },
+	combattime = { fontStrings = {}, count = 0 },
+}
+local taggedStrings = {}
 local directCacheDirty = true
-
-local function RegisterDirectTag(tagName, group, getText)
-	directTagRegistry[tagName] = { group = group, getText = getText }
-	if not directGroups[group] then
-		directGroups[group] = { fontStrings = {}, count = 0, getText = getText }
-	end
-end
 
 local function CacheDirectFontStrings()
 	if not directCacheDirty then return end
 	directCacheDirty = false
 
 	for _, groupData in pairs(directGroups) do
+		wipe(groupData.fontStrings)
 		groupData.count = 0
 	end
 
-	for _, frameObject in next, oUF.objects do
-		if frameObject.unit == 'player' and frameObject.__tags then
-			for fontString in next, frameObject.__tags do
-				if fontString._tagString then
-					for tagName, registration in pairs(directTagRegistry) do
-						if fontString._tagString:find(tagName) then
-							local groupData = directGroups[registration.group]
-							groupData.count = groupData.count + 1
-							groupData.fontStrings[groupData.count] = fontString
-						end
-					end
+	for fontString, frame in pairs(taggedStrings) do
+		local tagString = frame.unit == 'player' and fontString.UpdateTag and fontString._tagString
+		if tagString then
+			for tagName, groupData in pairs(directGroups) do
+				if tagString:find(tagName, 1, true) then
+					groupData.count = groupData.count + 1
+					groupData.fontStrings[groupData.count] = fontString
 				end
 			end
 		end
-	end
-
-	for _, groupData in pairs(directGroups) do
-		for fontStringIndex = groupData.count + 1, #groupData.fontStrings do groupData.fontStrings[fontStringIndex] = nil end
 	end
 end
 
 local function UpdateDirectGroup(group)
 	local groupData = directGroups[group]
-	if not groupData or groupData.count == 0 then return end
-	local text = groupData.getText()
 	for fontStringIndex = 1, groupData.count do
 		local fontString = groupData.fontStrings[fontStringIndex]
-		if fontString:IsVisible() then fontString:SetText(text) end
+		if fontString.UpdateTag and fontString:IsVisible() then fontString:UpdateTag() end
 	end
 end
-
-RegisterDirectTag('resting', 'resting', function()
-	return IsResting() and restingFrames[restingIndex] or ''
-end)
-
-RegisterDirectTag('combattime', 'combattime', function()
-	return combatTimerText or ''
-end)
 
 local UpdateRestingTags = Wrap('UnitFrames.Tags resting', function()
 	restingIndex = restingIndex % #restingFrames + 1
@@ -689,6 +668,7 @@ function UnitFrames.TagFontStrings(frame)
 	local function applyTag(fontString, formatString)
 		local converted = UnitFrames.ConvertTagFormat(formatString)
 		fontString._tagString = converted
+		taggedStrings[fontString] = frame
 		fontString.frequentUpdates = converted:find('%[bui:range%]') and 0.25 or nil
 		frame:Tag(fontString, converted)
 	end
@@ -775,6 +755,7 @@ function UnitFrames.ApplyCustomTags(frame)
 
 			local convertedTag = UnitFrames.ConvertTagFormat(entry.tag)
 			fontString._tagString = convertedTag
+			taggedStrings[fontString] = frame
 			fontString.frequentUpdates = convertedTag:find('%[bui:range%]') and 0.25 or nil
 			frame:Tag(fontString, convertedTag)
 			fontString:Show()
