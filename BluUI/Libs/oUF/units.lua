@@ -235,16 +235,19 @@ function oUF:HandleEventlessUnit(object)
 	table.insert(eventlessTimerObjects[timer], object)
 
 	createOnUpdate(timer)
+end
 
-	if(not object.__eventlessWakeHooked) then
-		object.__eventlessWakeHooked = true
-		object:HookScript('OnShow', function()
-			for _, pump in next, onUpdates do
-				pump:Show()
-			end
-		end)
+local function wakePumps()
+	for _, pump in next, onUpdates do
+		pump:Show()
 	end
 end
+
+oUF:RegisterInitCallback(function(object)
+	if(eventlessObjects[object]) then
+		object:HookScript('OnShow', wakePumps)
+	end
+end)
 
 --[[ Units: frame:IsEventless()
 Returns whether the unit frame is considered eventless or not.
