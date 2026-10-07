@@ -22,6 +22,7 @@ local TOP_ADDONS = 5
 local CALIBRATION_CALLS = 2000
 local SPIKE_MS = 50
 local GAME_SPIKE_MS = 50
+local SPIKE_GATE_SECONDS = math.min(SPIKE_MS, GAME_SPIKE_MS) / 1000
 local TOP_SPIKE_ADDONS = 3
 local SPIKE_KEEP = 60
 local TOP_SPIKES = 6
@@ -226,10 +227,7 @@ local function AlertSpike(actual)
 		actual, SpikeContext(), #top > 0 and ': ' .. TopParts(top) or ', nothing named'))
 end
 
-local driver = CreateFrame('Frame')
-driver:SetScript('OnUpdate', function()
-	depth, watchDepth = 0, 0
-	local actual = GetAddOnMetric(addonName, Metric.LastTime)
+local function WatchSpikes(actual)
 	local addons = GetOverallMetric(Metric.LastTime)
 	local game = GetApplicationMetric(Metric.LastTime)
 	local over = GetAddOnMetric(addonName, Metric.CountTimeOver50Ms)
@@ -241,9 +239,21 @@ driver:SetScript('OnUpdate', function()
 		if actual >= ALERT_MS then AlertSpike(actual) end
 	end
 	lastNoted, noted = noted, lastNoted
+end
+
+local driver = CreateFrame('Frame')
+driver:SetScript('OnUpdate', function(_, elapsed)
+	local driverStart = debugprofilestop()
+	depth, watchDepth = 0, 0
+	local active = Profiler.active
+	local actual = active and GetAddOnMetric(addonName, Metric.LastTime)
+	if elapsed >= SPIKE_GATE_SECONDS then
+		actual = actual or GetAddOnMetric(addonName, Metric.LastTime)
+		WatchSpikes(actual)
+	end
 	wipe(noted)
 	notedTotal = 0
-	if not Profiler.active then return end
+	if not active then return end
 	actualTotal = actualTotal + actual
 	ticks = ticks + 1
 	if loginPending then
@@ -259,6 +269,7 @@ driver:SetScript('OnUpdate', function()
 	wipe(frameSpent)
 	lastTotal, frameTotal = frameTotal, 0
 end)
+	driverTotal = driverTotal + debugprofilestop() - driverStart
 
 function Profiler.Wrap(label, callback)
 	return function(...)
@@ -467,7 +478,7 @@ function Profiler.Start()
 	wipe(lastSpent)
 	wipe(hitches)
 	frameTotal, lastTotal, depth = 0, 0, 0
-	namedTotal, actualTotal, ticks = 0, 0, 0
+	namedTotal, actualTotal, ticks, driverTotal = 0, 0, 0, 0
 	startedAt = GetTime()
 	for _, counter in ipairs(COUNTERS) do baseline[counter.label] = GetAddOnMetric(addonName, counter.metric) end
 	Profiler.active = true
