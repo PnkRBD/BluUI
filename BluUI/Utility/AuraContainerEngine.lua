@@ -148,7 +148,8 @@ local buttonData = setmetatable({}, { __mode = 'k' })
 local restyleQueue = {}
 
 local captureButtons = setmetatable({}, { __mode = 'k' })
-local captureArmed = false
+local armedButton
+local disarmPending = false
 
 local function CaptureSpell(container, buttonInfo)
 	local unit = container._buiUnit
@@ -182,18 +183,41 @@ local function OnButtonMouseDown(button, mouseButton)
 	if container and buttonInfo then CaptureSpell(container, buttonInfo) end
 end
 
-local function SetCaptureArmed(armed)
-	if armed == captureArmed then return end
-	if BUI.Tools.ShouldAurasBeSecret() then return end
-	captureArmed = armed
+local function DisarmCapture()
+	if not armedButton then return end
+	if BUI.Tools.ShouldAurasBeSecret() then
+		disarmPending = true
+		return
+	end
+	armedButton:SetMouseClickEnabled(false)
+	armedButton = nil
+	disarmPending = false
+end
+
+local function ArmCapture()
+	if InCombatLockdown() or BUI.Tools.ShouldAurasBeSecret() then return end
+	local pointed
 	for button in pairs(captureButtons) do
-		button:SetMouseClickEnabled(armed)
+		if button:IsVisible() and button:IsMouseOver() then
+			pointed = button
+			break
+		end
+	end
+	if pointed == armedButton then return end
+	DisarmCapture()
+	if pointed then
+		pointed:SetMouseClickEnabled(true)
+		armedButton = pointed
 	end
 end
 
 local function OnModifierChanged(key, down)
 	if key ~= 'LSHIFT' and key ~= 'RSHIFT' then return end
-	SetCaptureArmed(down == 1 and not InCombatLockdown())
+	if down == 1 then ArmCapture() else DisarmCapture() end
+end
+
+local function FinishPendingDisarm()
+	if disarmPending then DisarmCapture() end
 end
 
 local function ApplyCooldownFont(cooldown, size, font, flags)
@@ -339,7 +363,7 @@ local function MakeInitializer(container, groupInfo)
 
 		captureButtons[button] = container
 		button:HookScript('OnMouseDown', BUI.Profiler.Wrap('AuraContainerEngine button OnMouseDown', OnButtonMouseDown))
-		button:SetMouseClickEnabled(captureArmed)
+		button:SetMouseClickEnabled(false)
 
 		buttonInfo.created = true
 	end
@@ -790,9 +814,5 @@ end
 BUI.Events:Register('PLAYER_REGEN_ENABLED', 'AuraEngine.RestyleDrain', function() BUI.Events:AfterCombatSettled(DrainRestyleQueue, 'AuraEngine.RestyleDrain') end)
 BUI.Events:Register('PLAYER_ENTERING_WORLD', 'AuraEngine.RestyleDrain', DrainRestyleQueue)
 BUI.Events:Register('MODIFIER_STATE_CHANGED', 'AuraEngine.Capture', OnModifierChanged)
-BUI.Events:Register('PLAYER_REGEN_DISABLED', 'AuraEngine.Capture', function()
-	SetCaptureArmed(false)
-end)
-BUI.Events:Register('PLAYER_REGEN_ENABLED', 'AuraEngine.Capture', function()
-	SetCaptureArmed(IsShiftKeyDown())
-end)
+BUI.Events:Register('PLAYER_REGEN_DISABLED', 'AuraEngine.Capture', DisarmCapture)
+BUI.Tools.OnAuraQueriesUnblocked(FinishPendingDisarm, 'Aura blacklist capture')
