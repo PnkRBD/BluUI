@@ -211,9 +211,7 @@ local function Style(self, unit)
 	self:SetSize(width, height)
 	self:SetFrameStrata('LOW')
 	self:RegisterForClicks('AnyUp')
-	if settings.clickToTarget ~= false then
-		self:SetAttribute('*type1*', 'target')
-	end
+	self:SetAttribute('*type1', settings.clickToTarget ~= false and 'target' or nil)
 
 	local bgColor = isPet and settings.petBgColor or settings.bgColor
 	local healthColor = isPet and settings.petHealthColor or settings.healthColor

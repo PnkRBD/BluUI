@@ -172,7 +172,7 @@ function UnitFrames.ApplyClickToTarget()
 	local enabled = UnitFrames.GetSettings().clickToTarget ~= false
 	BUI.Events:AfterCombat(function()
 		for _, frame in ipairs(oUF.objects) do
-			frame:SetAttribute('*type1*', enabled and 'target' or nil)
+			if frame.style == 'BluUI' then frame:SetAttribute('*type1', enabled and 'target' or nil) end
 		end
 	end, 'UF.ClickToTarget')
 end
