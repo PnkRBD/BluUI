@@ -2010,10 +2010,12 @@ BUI.Events:Register("PLAYER_ENTERING_WORLD", "CDM.Custom.PEW", function()
     end)
 end)
 
-BUI.Events:Register("PLAYER_EQUIPMENT_CHANGED", "CDM.Custom.Equip", function()
+local RefreshAfterEquip = BUI.Dispatcher.New(function()
     DoRefresh()
     CDM.UpdateShowOnlyOnCDWatcher()
-end)
+end, "CDM.Custom.Equip")
+
+BUI.Events:Register("PLAYER_EQUIPMENT_CHANGED", "CDM.Custom.Equip", RefreshAfterEquip)
 
 BUI.Events:Register("TRAIT_CONFIG_UPDATED", "CDM.Custom.Traits", function(event, arg1)
     local activeID = C_ClassTalents.GetActiveConfigID()
