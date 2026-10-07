@@ -912,6 +912,13 @@ function Skin.TipFace(fontString, kind, scale)
 	fontString:SetShadowOffset(0, 0)
 end
 
+function Skin.TipCount(fontString)
+	if not fontString then return end
+	fontString:SetFont(BUILib.Font, TIP_BODY_SIZE, 'OUTLINE')
+	fontString:SetShadowColor(0, 0, 0, 1)
+	fontString:SetShadowOffset(1, -1)
+end
+
 function Skin.FadeTree(frame, keep, depth)
 	if not frame or frame:IsForbidden() then return end
 	depth = depth or 0

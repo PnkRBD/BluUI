@@ -180,7 +180,7 @@ local function RefreshConfirm(confirm)
 		Fade(itemFrame.IconBorder)
 		QualityEdges(itemFrame, itemFrame.Icon, itemFrame.itemHyperlink)
 		Face(itemFrame.Name)
-		Face(itemFrame.Count)
+		Skin.TipCount(itemFrame.Count)
 	end
 	local alsoItems = confirm.AlsoItemsFrame
 	if alsoItems then

@@ -92,7 +92,7 @@ local function SkinItemButton(button)
 	Fade(button.IconOverlay)
 	CropIcon(button.icon)
 	Skin.TipIconFrame(button, button.icon)
-	Body(button.Count)
+	Skin.TipCount(button.Count)
 end
 
 local function SkinItemDisplay(display)

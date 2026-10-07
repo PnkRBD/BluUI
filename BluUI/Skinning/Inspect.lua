@@ -521,7 +521,7 @@ local function SkinSlot(button, info)
 		highlight:SetBlendMode('BLEND')
 		RowHighlight(button, SLOT_HOVER_ALPHA)
 	end
-	Face(button.Count)
+	Skin.TipCount(button.Count)
 	button._buiLabels = CreateSlotLabels(button, button._buiInfo)
 	RefreshSlot(button)
 end

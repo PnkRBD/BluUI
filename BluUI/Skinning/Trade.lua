@@ -53,7 +53,7 @@ local function SkinItemButton(button)
 		Skin.TipIconFrame(button, icon)
 	end
 	FlatTexture(button:GetHighlightTexture(), 1, 1, 1, ICON_HOVER_ALPHA)
-	Body(button.Count)
+	Skin.TipCount(button.Count)
 	RefreshItemEdges(button)
 end
 

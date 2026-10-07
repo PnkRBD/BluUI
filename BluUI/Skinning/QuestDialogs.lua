@@ -137,7 +137,7 @@ local function SkinRewardIcon(button)
 	CropIcon(button.Icon)
 	Skin.TipIconFrame(button, button.Icon)
 	Face(button.Name)
-	Face(button.Count)
+	Skin.TipCount(button.Count)
 end
 
 local function RefreshQualityEdge(button)
@@ -356,7 +356,7 @@ local function SkinAdventureReward(reward)
 	CropIcon(reward.Icon)
 	Skin.TipIconFrame(reward, reward.Icon)
 	Face(reward.Name)
-	Face(reward.Count)
+	Skin.TipCount(reward.Count)
 end
 
 local function RefreshAdventureRewards(dialog)
