@@ -30,6 +30,7 @@ function CastBar.StyleText(anchor, text, time, settings, font)
 end
 
 function CastBar.HideQuietly(castbar)
+	castbar.holdTime = nil
 	castbar._suppressAutoPreview = true
 	castbar:Hide()
 	castbar._container:Hide()
