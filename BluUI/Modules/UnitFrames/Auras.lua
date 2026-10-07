@@ -181,10 +181,6 @@ end
 
 UnitFrames.ResolveAuraStyle = ResolveStyle
 
-local function FlowEdge(style)
-	return (style.growY == 'UP' and 'TOP' or 'BOTTOM') .. (style.growX == 'RIGHT' and 'LEFT' or 'RIGHT')
-end
-
 function UnitFrames.ResolveAuraFlow(unitSettings, debuffStyle, buffStyle)
 	local flow = unitSettings.auraFlow
 	local follower, leader
@@ -193,16 +189,10 @@ function UnitFrames.ResolveAuraFlow(unitSettings, debuffStyle, buffStyle)
 	elseif flow == 'buffsAfterDebuffs' then
 		follower, leader = buffStyle, debuffStyle
 	end
-	if not (follower and leader.shown) then return end
-	follower.growX, follower.growY = leader.growX, leader.growY
+	if not (follower and follower.shown and leader.shown) then return end
 	return follower, leader
 end
 
-function UnitFrames.AttachAuraFlow(follower, leader, followerFrame, leaderFrame)
-	local gap = leader.growY == 'UP' and leader.gap or -leader.gap
-	followerFrame:ClearAllPoints()
-	followerFrame:SetPoint(GrowthToAnchor(follower.growX, follower.growY), leaderFrame, FlowEdge(leader), 0, Pixel.Scale(gap))
-end
 
 local auraFrames = {}
 
@@ -277,12 +267,16 @@ BUI.oUF:RegisterInitCallback(function(frame)
 	if targetTargetFrames[frame] then frame:HookScript('OnShow', TargetTargetShown) end
 end)
 
-local function ApplyContainer(container, style, rules)
-	container:SetShown(style.shown)
-	local isDebuff = container._buiIsDebuff
-	local baseFilter = isDebuff and DEBUFF_FILTER or BUFF_FILTER
+local NO_RULES = {}
+
+local function AuraSet(unitSettings, style, isDebuff)
 	local candidates, candidatesFingerprint = BuildCandidates(isDebuff)
-	Engine.Configure(container, style, rules, baseFilter, candidates, candidatesFingerprint)
+	return { style, UnitRules(unitSettings, isDebuff), isDebuff and DEBUFF_FILTER or BUFF_FILTER, candidates, candidatesFingerprint }
+end
+
+local function ApplyContainer(container, unitSettings, style)
+	container:SetShown(style.shown)
+	Engine.ConfigureSets(container, { AuraSet(unitSettings, style, container._buiIsDebuff) })
 end
 
 local function PlaceContainer(frame, container, style)
@@ -298,15 +292,18 @@ local function EngineApplyAuraPositions(frame, unitType)
 	local debuffStyle = ResolveStyle(unitSettings, true)
 	local buffStyle = ResolveStyle(unitSettings, false)
 	local follower, leader = UnitFrames.ResolveAuraFlow(unitSettings, debuffStyle, buffStyle)
-	ApplyContainer(debuffs, debuffStyle, UnitRules(unitSettings, true))
-	ApplyContainer(buffs, buffStyle, UnitRules(unitSettings, false))
-
-	local followerContainer = follower == debuffStyle and debuffs or buffs
-	if follower and next(followerContainer._buiGroups) then
-		local leaderContainer = followerContainer == debuffs and buffs or debuffs
-		PlaceContainer(frame, leaderContainer, leader)
-		UnitFrames.AttachAuraFlow(follower, leader, followerContainer, leaderContainer)
+	if follower then
+		local leaderIsDebuff = leader == debuffStyle
+		local host = leaderIsDebuff and debuffs or buffs
+		local idle = leaderIsDebuff and buffs or debuffs
+		host:Show()
+		Engine.ConfigureSets(host, { AuraSet(unitSettings, leader, leaderIsDebuff), AuraSet(unitSettings, follower, not leaderIsDebuff) })
+		idle:Hide()
+		Engine.Configure(idle, follower, NO_RULES, idle._buiIsDebuff and DEBUFF_FILTER or BUFF_FILTER)
+		PlaceContainer(frame, host, leader)
 	else
+		ApplyContainer(debuffs, unitSettings, debuffStyle)
+		ApplyContainer(buffs, unitSettings, buffStyle)
 		PlaceContainer(frame, debuffs, debuffStyle)
 		PlaceContainer(frame, buffs, buffStyle)
 	end

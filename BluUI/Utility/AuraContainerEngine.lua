@@ -198,8 +198,9 @@ local function CaptureSpell(container, buttonInfo)
 	if InCombatLockdown() or BUI.Tools.ShouldAurasBeSecret() or BUI.Tools.AuraQueriesBlocked() then return end
 	local fileID = buttonInfo.icon and buttonInfo.icon:GetTexture()
 	if type(fileID) ~= 'number' then return end
-	local polarity = container._buiIsDebuff and 'HARMFUL' or 'HELPFUL'
-	local filter = container._buiIsDebuff and 'HARMFUL|INCLUDE_NAME_PLATE_ONLY' or 'HELPFUL'
+	local harmful = buttonInfo.group.harmful
+	local polarity = harmful and 'HARMFUL' or 'HELPFUL'
+	local filter = harmful and 'HARMFUL|INCLUDE_NAME_PLATE_ONLY' or 'HELPFUL'
 	local auras = C_UnitAuras.GetUnitAuras(unit, filter, 40, 0, 0)
 	if not auras then return end
 	for auraIndex = 1, #auras do
@@ -300,8 +301,8 @@ end
 
 local function AttemptRestyle(container, button)
 	local buttonInfo = buttonData[button]
-	local style = container._buiStyle
-	if not buttonInfo or not style then return end
+	if not buttonInfo then return end
+	local style = buttonInfo.group.style
 	if Retired(buttonInfo) then
 		restyleQueue[button] = nil
 		return
@@ -376,7 +377,7 @@ local function MakeInitializer(container, groupInfo)
 		if button.SetDurationCooldown then button:SetDurationCooldown(cooldown) end
 		if button.SetApplicationCount then button:SetApplicationCount(count, {}) end
 
-		if container._buiStyle and container._buiStyle.showDispelType and button.AddDispelTypeTexture then
+		if groupInfo.style.showDispelType and button.AddDispelTypeTexture then
 			local dispelOptions = { showWhenHarmful = true }
 			local styleEnum = Enum.CustomAuraButtonDispelTypeTextureStyle
 			if styleEnum and styleEnum.PreserveAsset then dispelOptions.style = styleEnum.PreserveAsset end
@@ -404,17 +405,22 @@ local function HasFilterToken(filter, token)
 	return ('|' .. filter .. '|'):find('|' .. token .. '|', 1, true) ~= nil
 end
 
-local function EnsureRuleGroups(container, style, rules, baseFilter, candidates, candidateFingerprint, excludeSuffix)
-	local wanted = scratchWanted
-	wipe(wanted)
+local SET_LAYOUT_STRIDE = 100
 
-	local fingerprintTail = candidateFingerprint or ''
+local function CollectRuleGroups(wanted, container, setIndex, style, rules, baseFilter, candidates, candidateFingerprint, excludeSuffix)
+	local fingerprintTail = setIndex .. '/' .. (candidateFingerprint or '')
 	if excludeSuffix then fingerprintTail = fingerprintTail .. '~' .. excludeSuffix end
 	if (container._buiGeneration or 0) > 0 then fingerprintTail = fingerprintTail .. '@' .. container._buiGeneration end
+	local layoutBase = (setIndex - 1) * SET_LAYOUT_STRIDE
+	local harmful = HasFilterToken(baseFilter, 'HARMFUL')
+
+	local function Want(fingerprint, index, filter, cand, pinned)
+		wanted[fingerprint] = { index = layoutBase + index, filter = filter, cand = cand, pinned = pinned, set = setIndex, style = style, harmful = harmful }
+	end
 
 	local pinIDs = candidates and candidates.pinSpellIDs
 	if pinIDs then
-		wanted['pin#' .. fingerprintTail] = { index = 0, filter = baseFilter, cand = { includeSpellIDs = pinIDs }, pinned = true }
+		Want('pin#' .. fingerprintTail, 0, baseFilter, { includeSpellIDs = pinIDs }, true)
 		local rest = {}
 		for key, value in pairs(candidates) do
 			if key ~= 'pinSpellIDs' then rest[key] = value end
@@ -423,7 +429,7 @@ local function EnsureRuleGroups(container, style, rules, baseFilter, candidates,
 	end
 
 	if candidates and candidates.includeSpellIDs then
-		wanted['wl#' .. fingerprintTail] = { index = 1, filter = baseFilter, cand = candidates }
+		Want('wl#' .. fingerprintTail, 1, baseFilter, candidates)
 	else
 		local claimedTokens, claimedFlagNames, claimedFlagValues
 		local keepNameplateOnly = HasFilterToken(baseFilter, NAMEPLATE_ONLY_TOKEN)
@@ -473,11 +479,7 @@ local function EnsureRuleGroups(container, style, rules, baseFilter, candidates,
 						end
 					end
 				end
-				wanted[rule.id .. cascade .. '#' .. fingerprintTail] = {
-					index = ruleIndex,
-					filter = filter,
-					cand = candidateFilters,
-				}
+				Want(rule.id .. cascade .. '#' .. fingerprintTail, ruleIndex, filter, candidateFilters)
 				if rule.engineExcludeToken then
 					claimedTokens = claimedTokens or {}
 					claimedTokens[#claimedTokens + 1] = rule.engineExcludeToken
@@ -498,8 +500,16 @@ local function EnsureRuleGroups(container, style, rules, baseFilter, candidates,
 
 	if excludeSuffix then
 		for _, spec in pairs(wanted) do
-			if not spec.pinned then spec.filter = spec.filter .. '|' .. excludeSuffix end
+			if spec.set == setIndex and not spec.pinned then spec.filter = spec.filter .. '|' .. excludeSuffix end
 		end
+	end
+end
+
+local function EnsureRuleGroups(container, sets)
+	local wanted = scratchWanted
+	wipe(wanted)
+	for setIndex, args in ipairs(sets) do
+		CollectRuleGroups(wanted, container, setIndex, unpack(args, 1, 6))
 	end
 
 	for fingerprint, info in pairs(container._buiGroups) do
@@ -514,13 +524,13 @@ local function EnsureRuleGroups(container, style, rules, baseFilter, candidates,
 
 	if not container.AddAuraGroup then return end
 
-	local sortMethod = style.sortMethod
-	if sortMethod == nil and AuraContainerSortMethod then
-		sortMethod = AuraContainerSortMethod.Default
-	end
+	local defaultSort = AuraContainerSortMethod and AuraContainerSortMethod.Default
 	local sortDirection = DefaultSortDirection()
 
 	for fingerprint, spec in pairs(wanted) do
+		local style = spec.style
+		local sortMethod = style.sortMethod
+		if sortMethod == nil then sortMethod = defaultSort end
 		local layout = {
 			elementWidth = style.size, elementHeight = style.size,
 			elementSpacing = style.gap, lineSpacing = style.rowGap or style.gap,
@@ -529,6 +539,7 @@ local function EnsureRuleGroups(container, style, rules, baseFilter, candidates,
 		local info = container._buiGroups[fingerprint]
 		if info then
 			info.active = true
+			info.style = style
 			if info.max ~= style.max and container.SetAuraGroupMaxFrameCount then
 				info.max = style.max
 				container:SetAuraGroupMaxFrameCount(info.key, style.max)
@@ -542,7 +553,7 @@ local function EnsureRuleGroups(container, style, rules, baseFilter, candidates,
 		else
 			container._buiGroupSeq = (container._buiGroupSeq or 0) + 1
 			local key = 'bui' .. container._buiGroupSeq
-			local groupInfo = { key = key, active = true, max = style.max }
+			local groupInfo = { key = key, active = true, max = style.max, style = style, harmful = spec.harmful }
 			local groupOptions = {
 				maxFrameCount = style.max,
 				initializeFrame = MakeInitializer(container, groupInfo),
@@ -748,8 +759,7 @@ local HatchNext
 HatchNext = BUI.Dispatcher.New(function()
 	local container = table.remove(nest, 1)
 	if not container then return end
-	local config = container._buiLastConfig
-	EnsureRuleGroups(container, unpack(config, 1, 6))
+	EnsureRuleGroups(container, container._buiLastConfig)
 	container._buiHatched = true
 	if container._buiUnit and container.UpdateAllAuras then container:UpdateAllAuras() end
 	if nest[1] then HatchNext() end
@@ -760,13 +770,17 @@ BUI.Events:Once('PLAYER_ENTERING_WORLD', 'AuraEngine.Hatch', function()
 	if nest[1] then HatchNext() end
 end)
 
-ConfigureContainer = function(container, args, forced)
-	local style = args[1]
-	container._buiLastConfig = args
-	local signature = StyleSignature(style)
+local function SetsSignature(sets)
+	local parts = {}
+	for index, args in ipairs(sets) do parts[index] = StyleSignature(args[1]) end
+	return table.concat(parts, '||')
+end
+
+ConfigureContainer = function(container, sets, forced)
+	container._buiLastConfig = sets
+	local signature = SetsSignature(sets)
 	local styleChanged = forced or signature ~= container._buiStyleSig
 	container._buiStyleSig = signature
-	container._buiStyle = style
 	container._buiStyleStamp = container._buiStyleStamp + 1
 
 	local regenerated = false
@@ -779,9 +793,9 @@ ConfigureContainer = function(container, args, forced)
 		end
 	end
 
-	ApplyLayout(container, style)
+	ApplyLayout(container, sets[1][1])
 	if container._buiHatched or (worldReady and not nest[1]) then
-		EnsureRuleGroups(container, style, args[2], args[3], args[4], args[5], args[6])
+		EnsureRuleGroups(container, sets)
 		container._buiHatched = true
 	elseif not container._buiNested then
 		container._buiNested = true
@@ -796,7 +810,11 @@ ConfigureContainer = function(container, args, forced)
 end
 
 function Engine.Configure(container, style, rules, baseFilter, candidates, candidateFingerprint, excludeSuffix)
-	ConfigureContainer(container, { style, rules, baseFilter, candidates, candidateFingerprint, excludeSuffix }, false)
+	ConfigureContainer(container, { { style, rules, baseFilter, candidates, candidateFingerprint, excludeSuffix } }, false)
+end
+
+function Engine.ConfigureSets(container, sets)
+	ConfigureContainer(container, sets, false)
 end
 
 function Engine.BindUnit(container, unit)
