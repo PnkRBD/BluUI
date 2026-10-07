@@ -203,6 +203,10 @@ local entries = {
 	{ label = "Panel", page = "chat", panel = "Panel", keywords = "chat font background border edit box position size padding lock move resize" },
 	{ label = "Tabs", page = "chat", panel = "Tabs", keywords = "chat tabs style font uppercase combat log color opacity flash" },
 	{ label = "Messages", page = "chat", panel = "Messages", keywords = "chat timestamps links channel abbreviate fade history copy voice buttons hide scroll" },
+	{ label = "Enable", page = "objectivetracker", keywords = "objective tracker quest skin enable" },
+	{ label = "Text", page = "objectivetracker", panel = "Text", keywords = "objective tracker quest font size outline single line wrap colors title hover objective completed ready time left" },
+	{ label = "Panel", page = "objectivetracker", panel = "Panel", keywords = "objective tracker quest background texture tint opacity border separator lines" },
+	{ label = "Quests", page = "objectivetracker", panel = "Quests", keywords = "objective tracker quest header icons dashes tooltips completion messages sound hide item button key" },
 
 	{ label = "Enable", page = "cursor", keywords = "cursor ring circle enable" },
 	{ label = "Cursor size", page = "cursor", panel = "General", keywords = "cursor ring size diameter" },

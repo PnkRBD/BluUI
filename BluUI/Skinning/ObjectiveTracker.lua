@@ -11,7 +11,6 @@ local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Theme = BUILib.Theme
 local Skin3 = BUILib.Skin
 local Controls = BUILib.Controls
-local PageKit = BUILib.PageKit
 local LibWidget = BUILib.Widget
 local FONT = BUILib.Font or STANDARD_TEXT_FONT
 local Skin = BUI.Skinning
@@ -41,6 +40,8 @@ local GLYPH_SIZE        = 10
 local BAR_LABEL_SIZE    = 11
 local HEADER_TEXT_INSET = 11
 local MINIMIZE_SIZE     = 15
+local KEY_TOOL_WIDTH    = 120
+local MODIFIER_KEYS     = { LSHIFT = true, RSHIFT = true, LCTRL = true, RCTRL = true, LALT = true, RALT = true, LMETA = true, RMETA = true }
 local BAR_ICON_SIZE     = 20
 local CARD_PAD_LEFT     = 22
 local CARD_PAD_RIGHT    = 10
@@ -543,6 +544,48 @@ function QuestItem.Update()
 	button.count:SetText(charges and charges > 1 and charges or '')
 	button.hotkey:SetText(wantBinding and BUI.Keybinds.Format(key) or '')
 	QuestItem.UpdateCooldown()
+end
+
+local function PressedKey(key)
+	return (IsAltKeyDown() and 'ALT-' or '') .. (IsControlKeyDown() and 'CTRL-' or '') .. (IsShiftKeyDown() and 'SHIFT-' or '') .. key
+end
+
+function QuestItem.KeyTool(ui)
+	return { kind = 'custom', build = function(row)
+		local settings = GetSettings()
+		local holder = CreateFrame('Frame', nil, row)
+		local listening = false
+		local button
+		local function Label()
+			if listening then return 'Press a key' end
+			local key = settings.questItemKey
+			if not key or key == 'NONE' then return 'Set key' end
+			return BUI.Keybinds.Format(key)
+		end
+		local function Listen(on)
+			listening = on
+			holder:EnableKeyboard(on)
+			button:SetText(Label())
+		end
+		button = ui.Button(holder, Label(), 'secondary', function()
+			if InCombatLockdown() then return end
+			Listen(not listening)
+		end)
+		button:SetPoint('RIGHT')
+		button:HookScript('OnEnter', function(self) LibWidget.ShowTip(self, 'Click, then press a key. Escape clears it.') end)
+		button:HookScript('OnLeave', LibWidget.HideTip)
+		holder:SetSize(KEY_TOOL_WIDTH, button:GetHeight())
+		holder:SetScript('OnKeyDown', function(_, key)
+			if MODIFIER_KEYS[key] then return end
+			settings.questItemKey = key == 'ESCAPE' and 'NONE' or PressedKey(key)
+			Listen(false)
+			QuestItem.Update()
+		end)
+		holder:SetScript('OnHide', function()
+			if listening then Listen(false) end
+		end)
+		return holder
+	end }
 end
 
 function QuestInfo.AddWowheadButton(rootDescription, kind, id)
@@ -1711,199 +1754,117 @@ Skin.RegisterSkin('objectivetracker', {
 	name = 'Objective Tracker',
 	description = 'Tooltip-style dark cards behind each tracker section, clean library fonts on quest text, accent-marked headers, flat progress bars, and square quest item icons. The OBJECTIVES header carries quest counts and track presets. Move and size the tracker in Edit Mode.',
 	icon = 'Interface\\Icons\\INV_Misc_Book_07',
-	settingsWidth = 430,
-	settingsHeight = 1400,
-	buildSettings = function(content)
+	page = 'objectivetracker',
+	buildBoards = function(ui, parent, width)
 		local settings = GetSettings()
-		local pageKit = PageKit
-		local GAP = pageKit.GAP
-		local width = content.width
 
-		local textHeight = pageKit.CardHeight(3)
-		local colorsHeight = pageKit.CardHeight(7)
-		local panelHeight = pageKit.CardHeight(10)
-		local behaviorHeight = pageKit.CardHeight(2)
-		local positionHeight = pageKit.CardHeight(1)
-		local behaviorTop = textHeight + GAP + colorsHeight + GAP + panelHeight + GAP
-		local positionTop = behaviorTop + behaviorHeight + GAP
-
-		local root = CreateFrame('Frame', nil, content.child)
-		root:SetPoint('TOPLEFT', 0, -8)
-		root:SetSize(width, positionTop + positionHeight)
-
-		local function MakeCard(title, y, height)
-			local cardWidget = Controls.SettingsCard(root, { title = title, width = width })
-			local card = cardWidget.frame
-			card:SetSize(width, height)
-			card:SetPoint('TOPLEFT', 0, -y)
-			card:SetFrameLevel((root:GetFrameLevel() or 0) + 5)
-			return card
+		local function OnByDefault(key)
+			return function() return settings[key] ~= false end
+		end
+		local function OffByDefault(key)
+			return function() return settings[key] == true end
+		end
+		local function Store(key, apply)
+			return function(value)
+				settings[key] = value
+				if apply then apply() end
+			end
+		end
+		local function TrackerSwatch(label, key)
+			return { kind = 'swatch', label = label, get = function() return Skin.TrackerColorRGB(key) end, set = function(red, green, blue)
+				settings.colors[key] = { red, green, blue }
+			end }
+		end
+		local function TextureTint()
+			local tint = settings.cardTextureColor or CARD_TEXTURE_TINT
+			return tint[1], tint[2], tint[3], 1
+		end
+		local function BorderColor()
+			local color = settings.cardBorderColor or Theme.border.light
+			return color[1], color[2], color[3], color[4] or 1
+		end
+		local function ApplyLines()
+			ApplyCardStyle()
+			Skin.ApplyTrackerSeparators()
+		end
+		local function ResetItemButton()
+			local positions = BUI.GetDB().framePositions
+			if positions then positions[QuestItem.POSITION_KEY] = nil end
+			if QuestItem.button then QuestItem.button.placedVisible = nil end
+			QuestItem.Update()
 		end
 
-		local textCard = MakeCard('TEXT', 0, textHeight)
-		local colorsCard = MakeCard('COLORS', textHeight + GAP, colorsHeight)
-		local panelCard = MakeCard('PANEL', textHeight + GAP + colorsHeight + GAP, panelHeight)
-		local behaviorCard = MakeCard('BEHAVIOR', behaviorTop, behaviorHeight)
-		local positionCard = MakeCard('POSITION', positionTop, positionHeight)
-
-		local fontCog = pageKit.SettingsIcon(textCard, {
-			title = 'TEXT', tooltip = 'Size & outline', options = {
-				{ kind = 'slider', label = 'Font Size', min = 8, max = 16,
-				  get = function() return settings.fontSize or DEFAULT_FONT_SIZE end,
-				  set = function(value) settings.fontSize = value end, apply = ApplyTextSettings },
-				{ label = 'Outlined Text',
-				  get = function() return settings.fontOutline == true end,
-				  set = function(value) settings.fontOutline = value end, apply = ApplyTextSettings },
-			},
-		})
 		local fontItems = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
 		table.insert(fontItems, 1, { value = LIBRARY_FONT_OPTION, text = 'Tooltip Font' })
-		local fontDropdown = Controls.Dropdown(textCard, nil, fontItems, settings.font or LIBRARY_FONT_OPTION, function(value)
-			settings.font = value
-			ApplyTextSettings()
-		end, nil, 150)
-		pageKit.Row(textCard, 38, 'Font', fontCog)
-		pageKit.AttachLeft(fontDropdown, fontCog)
-
-		local singleLineToggle = Controls.SwitchToggle(textCard, nil, settings.singleLineTitles ~= false, function(value)
-			settings.singleLineTitles = value
-			ApplyTitleWrap()
-		end)
-		pageKit.Row(textCard, 78, 'Single-line Titles', singleLineToggle)
-
-		local singleLineObjectivesToggle = Controls.SwitchToggle(textCard, nil, settings.singleLineObjectives ~= false, function(value)
-			settings.singleLineObjectives = value
-			ApplyTitleWrap()
-		end)
-		pageKit.Row(textCard, 118, 'Single-line Objectives', singleLineObjectivesToggle)
-
-		local customColorsToggle = Controls.SwitchToggle(colorsCard, nil, settings.customColors ~= false, function(value)
-			settings.customColors = value
-			Skin.ApplyTrackerColors()
-		end)
-		pageKit.Row(colorsCard, 38, 'Custom Colors', customColorsToggle)
-
-		local function ColorRow(y, label, key)
-			local color = Skin.TrackerColor(key)
-			local swatch = Controls.ColorSwatch(colorsCard, { r = color[1], g = color[2], b = color[3], a = 1, hasOpacity = false, callback = function(red, green, blue)
-				settings.colors = settings.colors or {}
-				settings.colors[key] = { red, green, blue }
-				Skin.ApplyTrackerColors()
-			end })
-			pageKit.Row(colorsCard, y, label, swatch)
-		end
-		ColorRow(78, 'Quest Title', 'title')
-		ColorRow(118, 'Title Hover', 'hover')
-		ColorRow(158, 'Objective', 'objective')
-		ColorRow(198, 'Completed Objective', 'completed')
-		ColorRow(238, 'Ready to Turn In', 'ready')
-		ColorRow(278, 'Time Left', 'timeLeft')
-
-		local backgroundCog = pageKit.SettingsIcon(panelCard, {
-			title = 'PANEL', tooltip = 'Background', options = {
-				{ kind = 'slider', label = 'Opacity', min = 0, max = 100,
-				  get = function() return settings.cardOpacity or DEFAULT_CARD_OPACITY end,
-				  set = function(value) settings.cardOpacity = value end, apply = ApplyCardStyle },
-				{ label = 'Border',
-				  get = function() return settings.cardBorder ~= false end,
-				  set = function(value) settings.cardBorder = value end, apply = ApplyCardStyle,
-				  swatch = function()
-					  local borderColor = settings.cardBorderColor or Theme.border.light
-					  return { r = borderColor[1], g = borderColor[2], b = borderColor[3], a = borderColor[4] or 1,
-						  callback = function(red, green, blue, alpha)
-							  settings.cardBorderColor = { red, green, blue, alpha }
-							  ApplyCardStyle()
-						  end }
-				  end },
-			},
-		})
-		pageKit.Row(panelCard, 38, 'Background', backgroundCog)
-
 		local textureItems = BUI.BuildTextureDropdownItems()
 		table.insert(textureItems, 1, { value = FLAT_TEXTURE_OPTION, text = 'Flat' })
-		local textureDropdown = Controls.Dropdown(panelCard, nil, textureItems, settings.cardTexture or FLAT_TEXTURE_OPTION, function(value)
-			settings.cardTexture = value
-			ApplyCardStyle()
-		end, nil, 150)
-		pageKit.Row(panelCard, 78, 'Texture', textureDropdown)
-		local textureTint = settings.cardTextureColor or CARD_TEXTURE_TINT
-		local textureSwatch = Controls.ColorSwatch(panelCard, { r = textureTint[1], g = textureTint[2], b = textureTint[3], a = 1, hasOpacity = false, callback = function(red, green, blue)
-			settings.cardTextureColor = { red, green, blue }
-			ApplyCardStyle()
-		end })
-		pageKit.AttachLeft(textureSwatch, textureDropdown)
 
-		local separatorRed, separatorGreen, separatorBlue, separatorAlpha = Skin.TrackerSeparatorColor()
-		local separatorSwatch = Controls.ColorSwatch(panelCard, { r = separatorRed, g = separatorGreen, b = separatorBlue, a = separatorAlpha, callback = function(red, green, blue, alpha)
-			settings.separatorColor = { red, green, blue, alpha }
-			Skin.ApplyTrackerSeparators()
-		end })
-		pageKit.Row(panelCard, 358, 'Separator Color', separatorSwatch)
+		local text = ui.Board(parent, width, { stacked = true, title = 'Text', description = 'The font on quest titles and objectives, and the colors they use.' })
+		text:AddTools('Font', 'Typeface, size, outline and line wrapping', {
+			{ entries = fontItems, get = function() return settings.font end, set = Store('font') },
+			{ icon = 'text', tooltip = 'Size, outline and wrapping', title = 'Font', options = {
+				{ label = 'Size', min = 8, max = 16, step = 1, get = function() return settings.fontSize end, set = Store('fontSize') },
+				{ label = 'Outlined text', get = OffByDefault('fontOutline'), set = Store('fontOutline') },
+				{ label = 'Single-line titles', separator = true, get = OnByDefault('singleLineTitles'), set = Store('singleLineTitles', ApplyTitleWrap) },
+				{ label = 'Single-line objectives', get = OnByDefault('singleLineObjectives'), set = Store('singleLineObjectives', ApplyTitleWrap) },
+			} },
+		}, ApplyTextSettings)
+		text:AddTools('Colors', "Your own colors for quests and objectives, off keeps Blizzard's", {
+			{ icon = 'palette', tooltip = 'Pick the colors', title = 'Colors', options = {
+				TrackerSwatch('Quest title', 'title'),
+				TrackerSwatch('Title on hover', 'hover'),
+				TrackerSwatch('Objective', 'objective'),
+				TrackerSwatch('Completed objective', 'completed'),
+				TrackerSwatch('Ready to turn in', 'ready'),
+				TrackerSwatch('Time left', 'timeLeft'),
+			} },
+			{ get = OnByDefault('customColors'), set = Store('customColors') },
+		}, Skin.ApplyTrackerColors)
 
-		local hideTrackerToggle = Controls.SwitchToggle(panelCard, nil, settings.trackerHidden == true, function(value)
-			settings.trackerHidden = value
-			ApplyTrackerHidden()
-		end)
-		pageKit.Row(panelCard, 398, 'Hide Tracker Completely', hideTrackerToggle)
+		local panel = ui.Board(parent, width, { stacked = true, title = 'Panel', description = 'The dark card behind each tracker section and the lines inside it.' })
+		panel:AddTools('Background', 'Texture, tint and opacity', {
+			{ kind = 'swatch', tooltip = 'Texture tint', get = TextureTint, set = function(red, green, blue)
+				settings.cardTextureColor = { red, green, blue }
+			end },
+			{ entries = textureItems, get = function() return settings.cardTexture end, set = Store('cardTexture') },
+			{ tooltip = 'Opacity', title = 'Background', options = {
+				{ label = 'Opacity', min = 0, max = 100, step = 1, get = function() return settings.cardOpacity end, set = Store('cardOpacity') },
+			} },
+		}, ApplyCardStyle)
+		panel:AddTools('Lines', 'Border and separator colors, the switch shows the border', {
+			{ kind = 'swatch', tooltip = 'Border color', opacity = true, get = BorderColor, set = function(red, green, blue, alpha)
+				settings.cardBorderColor = { red, green, blue, alpha }
+			end },
+			{ kind = 'swatch', tooltip = 'Separator color', opacity = true, get = Skin.TrackerSeparatorColor, set = function(red, green, blue, alpha)
+				settings.separatorColor = { red, green, blue, alpha }
+			end },
+			{ get = OnByDefault('cardBorder'), set = Store('cardBorder') },
+		}, ApplyLines)
 
-		local questIconsToggle = Controls.SwitchToggle(panelCard, nil, settings.showQuestIcons == true, function(value)
-			settings.showQuestIcons = value
-			ApplyPoiVisibility()
-		end)
-		pageKit.Row(panelCard, 118, 'Quest Type Icons', questIconsToggle)
-
-		local dashesToggle = Controls.SwitchToggle(panelCard, nil, settings.showDashes == true, function(value)
-			settings.showDashes = value
-			ApplyDashAlpha()
-		end)
-		pageKit.Row(panelCard, 158, 'Objective Dashes', dashesToggle)
-
-		local chimeDropdown = Controls.Dropdown(panelCard, nil, BUI.BuildSoundDropdownItems(), settings.completionSound or 'None', function(value)
-			settings.completionSound = value
-			BUI.PlaySoundByName(value)
-		end, nil, 150)
-		pageKit.Row(panelCard, 198, 'Completion Sound', chimeDropdown)
-
-		local itemKeybind = Controls.Keybind(panelCard, nil, settings.questItemKey or 'NONE', function(value)
-			settings.questItemKey = value
-			QuestItem.Update()
-		end, 190)
-		pageKit.Row(panelCard, 238, 'Quest Item Key', itemKeybind)
-
-		local tooltipToggle = Controls.SwitchToggle(panelCard, nil, settings.questTooltip ~= false, function(value)
-			settings.questTooltip = value
-		end)
-		pageKit.Row(panelCard, 278, 'Quest Tooltip', tooltipToggle)
-
-		local headerRowToggle = Controls.SwitchToggle(panelCard, nil, settings.showHeaderRow ~= false, function(value)
+		local quests = ui.Board(parent, width, { stacked = true, title = 'Quests', description = 'What the tracker shows and how it tells you about progress.' })
+		quests:AddSwitch('Objectives header', OnByDefault('showHeaderRow'), function(value)
 			settings.showHeaderRow = value
 			if value == false then
 				settings.trackerTrackSpec = nil
 				QuestFilter.UpdateTint()
 			end
 			ApplyHeaderRowVisibility()
-		end)
-		pageKit.Row(panelCard, 318, 'Objectives Header', headerRowToggle)
+		end, 'Quest counts and track presets above the list')
+		quests:AddSwitch('Quest type icons', OffByDefault('showQuestIcons'), Store('showQuestIcons', ApplyPoiVisibility))
+		quests:AddSwitch('Objective dashes', OffByDefault('showDashes'), Store('showDashes', ApplyDashAlpha), 'A dash in front of each objective')
+		quests:AddSwitch('Quest tooltips', OnByDefault('questTooltip'), Store('questTooltip'), 'Quest details when you hover a quest')
+		quests:AddSwitch('Completion messages', OffByDefault('completionMessage'), Store('completionMessage'), 'Say on screen when an objective or quest is done')
+		quests:AddSwitch('Hide the tracker', OffByDefault('trackerHidden'), Store('trackerHidden', ApplyTrackerHidden), 'Hide the objective tracker completely')
+		quests:AddTools('Completion sound', 'Plays when a quest is ready to turn in', {
+			{ entries = BUI.BuildSoundDropdownItems(), get = function() return settings.completionSound or 'None' end, set = Store('completionSound') },
+			{ icon = 'play', tooltip = 'Hear it', onClick = function() BUI.PlaySoundByName(settings.completionSound) end },
+		})
+		quests:AddTools('Quest item', "A key for your closest quest's item, the switch adds a button you can drag", {
+			QuestItem.KeyTool(ui),
+			{ icon = 'reset', tooltip = 'Put the button back where it started', onClick = ResetItemButton },
+			{ get = OffByDefault('showQuestItemButton'), set = Store('showQuestItemButton') },
+		}, QuestItem.Update)
 
-		local resetItemButton = Controls.Button(positionCard, 'Reset', 84, function()
-			local positions = BUI.GetDB().framePositions
-			if positions then positions[QuestItem.POSITION_KEY] = nil end
-			if QuestItem.button then QuestItem.button.placedVisible = nil end
-			QuestItem.Update()
-		end)
-		pageKit.Row(positionCard, 38, 'Reset Item Button', resetItemButton)
-
-		local itemButtonToggle = Controls.SwitchToggle(behaviorCard, nil, settings.showQuestItemButton == true, function(value)
-			settings.showQuestItemButton = value
-			QuestItem.Update()
-		end)
-		pageKit.Row(behaviorCard, 38, 'Quest Item Button', itemButtonToggle)
-
-		local completionMessageToggle = Controls.SwitchToggle(behaviorCard, nil, settings.completionMessage == true, function(value)
-			settings.completionMessage = value
-		end)
-		pageKit.Row(behaviorCard, 78, 'Completion Messages', completionMessageToggle)
-
-		content:Refresh()
+		return { text, panel, quests }
 	end,
 })
