@@ -173,7 +173,7 @@ local TagEvents = {
 	['afk']            = 'PLAYER_FLAGS_CHANGED',
 	['dnd']            = 'PLAYER_FLAGS_CHANGED',
 	['resting']        = 'PLAYER_UPDATE_RESTING',
-	['combat']         = 'PLAYER_REGEN_ENABLED PLAYER_REGEN_DISABLED',
+	['combat']         = 'UNIT_FLAGS PLAYER_REGEN_ENABLED PLAYER_REGEN_DISABLED',
 	['combattime']     = 'PLAYER_REGEN_ENABLED PLAYER_REGEN_DISABLED',
 	['creature']       = 'UNIT_NAME_UPDATE',
 	['creaturefamily'] = 'UNIT_NAME_UPDATE',
@@ -182,7 +182,7 @@ local TagEvents = {
 	['target']         = 'UNIT_TARGET UNIT_NAME_UPDATE',
 	['name:target']    = 'UNIT_TARGET UNIT_NAME_UPDATE',
 	['group']          = 'GROUP_ROSTER_UPDATE',
-	['itemlevel']      = 'INSPECT_READY UNIT_NAME_UPDATE',
+	['itemlevel']      = 'INSPECT_READY PLAYER_AVG_ITEM_LEVEL_UPDATE UNIT_NAME_UPDATE',
 	['spec']           = 'PLAYER_SPECIALIZATION_CHANGED UNIT_NAME_UPDATE',
 	['title']          = 'UNIT_NAME_UPDATE',
 	['difficulty']     = 'PLAYER_DIFFICULTY_CHANGED ZONE_CHANGED_NEW_AREA',
@@ -433,6 +433,10 @@ local Handlers = {
 		return ''
 	end,
 }
+
+for _, event in ipairs({ 'INSPECT_READY', 'PLAYER_AVG_ITEM_LEVEL_UPDATE', 'PLAYER_DIFFICULTY_CHANGED', 'ZONE_CHANGED_NEW_AREA', 'PLAYER_ROLES_ASSIGNED', 'UNIT_THREAT_LIST_UPDATE' }) do
+	oUF.Tags.SharedEvents[event] = true
+end
 
 for tag, handler in pairs(Handlers) do
 	oUF.Tags.Methods['bui:' .. tag] = handler
