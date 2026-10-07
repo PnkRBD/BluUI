@@ -74,25 +74,27 @@ function Skin.ChildBackdrop(frame, options)
 	if not backdrop then
 		options = options or {}
 		local inset = options.inset or 1
-		local parent = frame:GetParent() or UIParent
+		local parent = options.inside and frame or frame:GetParent() or UIParent
 		backdrop = Widget.New(parent, 'Frame', nil, { bg = options.bg or Theme.bg.dark, border = options.border or Theme.border.light }).frame
 		backdrop:SetScript('OnSizeChanged', nil)
 		backdrop:SetPoint('TOPLEFT', frame, 'TOPLEFT', inset, -inset)
 		backdrop:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -inset, inset)
+		backdrop._buiLevelOffset = options.inside and 0 or -1
 		frame._buiBackdrop = backdrop
 		frame:HookScript('OnHide', function() backdrop:Hide() end)
 	end
+	local offset = backdrop._buiLevelOffset
 	local strata, level = frame:GetFrameStrata(), frame:GetFrameLevel()
 	if issecretvalue and (issecretvalue(strata) or issecretvalue(level)) then
 		C_Timer.After(0, function()
 			local resolvedStrata, resolvedLevel = frame:GetFrameStrata(), frame:GetFrameLevel()
 			if issecretvalue(resolvedStrata) or issecretvalue(resolvedLevel) then return end
 			backdrop:SetFrameStrata(resolvedStrata)
-			backdrop:SetFrameLevel(max(0, resolvedLevel - 1))
+			backdrop:SetFrameLevel(max(0, resolvedLevel + offset))
 		end)
 	else
 		backdrop:SetFrameStrata(strata)
-		backdrop:SetFrameLevel(max(0, level - 1))
+		backdrop:SetFrameLevel(max(0, level + offset))
 	end
 	backdrop:Show()
 	return backdrop
