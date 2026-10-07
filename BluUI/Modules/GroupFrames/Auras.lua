@@ -213,21 +213,6 @@ local function ListHasEntries(list)
 	return first ~= nil
 end
 
-local function RecordAddedAuras(info)
-	if not info then return end
-	local added = info.addedAuras
-	if not CanAccess(added) or not added then return end
-	for auraIndex = 1, #added do
-		local aura = added[auraIndex]
-		if CanAccess(aura) and aura then
-			local spellID, helpful = aura.spellId, aura.isHelpful
-			if CanAccess(spellID) and CanAccess(helpful) and type(spellID) == "number" then
-				BUI.AuraBlacklist.RecordAura(spellID, helpful and "HELPFUL" or "HARMFUL")
-			end
-		end
-	end
-end
-
 local function AuraUpdateRelevant(frame, info)
 	local unit = frame.unit
 	if not unit then return false end
@@ -253,7 +238,6 @@ local function BuildAuraContainers(frame)
 		frame._auraWatcher = watcher
 		watcher:SetScript("OnEvent", Wrap("GroupFrames.Auras aura event", function(_, event, _, updateInfo)
 			if event == "UNIT_AURA" then
-				RecordAddedAuras(updateInfo)
 				if AuraUpdateRelevant(frame, updateInfo) then GroupFrames.MarkAurasDirty(frame) end
 				return
 			end

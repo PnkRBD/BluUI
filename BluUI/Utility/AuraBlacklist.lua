@@ -184,14 +184,42 @@ local function RecentStore(polarity)
 	return recent and recent[POL_KEY[polarity]]
 end
 
-function AuraBlacklist.RecordAura(spellID, polarity)
-	if type(spellID) ~= 'number' then return end
-	local list = RecentStore(polarity)
-	if not list or list[1] == spellID then return end
+local UNIT_SCAN = { 'player', 'pet', 'target', 'targettarget', 'focus', 'boss1', 'boss2', 'boss3', 'boss4', 'boss5' }
+
+local function ScanUnits(scope)
+	if scope ~= 'group' then return UNIT_SCAN end
+	local units = { 'player' }
+	local prefix, count = 'party', GetNumSubgroupMembers()
+	if IsInRaid() then prefix, count = 'raid', GetNumGroupMembers() end
+	for memberIndex = 1, count do units[#units + 1] = prefix .. memberIndex end
+	return units
+end
+
+local function RecordAura(list, spellID)
 	for listIndex = #list, 1, -1 do
 		if list[listIndex] == spellID then table.remove(list, listIndex) end
 	end
 	table.insert(list, 1, spellID)
+end
+
+function AuraBlacklist.RecordUnitAuras(scope, polarity)
+	local list = RecentStore(polarity)
+	if not list or BUI.Tools.ShouldAurasBeSecret() or BUI.Tools.AuraQueriesBlocked() then return end
+	local filter = polarity == 'HARMFUL' and 'HARMFUL|INCLUDE_NAME_PLATE_ONLY' or 'HELPFUL'
+	local seen, found = {}, {}
+	for _, unit in ipairs(ScanUnits(scope)) do
+		local auras = UnitExists(unit) and C_UnitAuras.GetUnitAuras(unit, filter, 40, 0, 0)
+		if auras then
+			for auraIndex = 1, #auras do
+				local spellID = auras[auraIndex].spellId
+				if canaccessvalue(spellID) and type(spellID) == 'number' and not seen[spellID] then
+					seen[spellID] = true
+					found[#found + 1] = spellID
+				end
+			end
+		end
+	end
+	for foundIndex = #found, 1, -1 do RecordAura(list, found[foundIndex]) end
 	for listIndex = #list, RECENT_CAP + 1, -1 do list[listIndex] = nil end
 end
 

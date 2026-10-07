@@ -134,6 +134,7 @@ function AuraLists.Blacklist(ui, parent, width, page, options)
 		Changed()
 	end
 	AddRow(ui, board, Add)
+	AB.RecordUnitAuras(scope, polarity)
 	if AB.RecentEntries(scope, polarity)[1] then
 		board:AddTools('Recently seen', 'Click one to blacklist it', { Strip(ui, function() return AB.RecentEntries(scope, polarity) end, 'Click to blacklist', Add) })
 	end
