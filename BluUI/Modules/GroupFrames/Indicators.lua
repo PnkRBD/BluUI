@@ -138,7 +138,7 @@ end
 
 local function RoleOverride(self)
 	local element = self.GroupRoleIndicator
-	if element._previewOn then return end
+	if element._previewOn or not self:IsElementEnabled("GroupRoleIndicator") then return end
 	local role  = Util.FrameRole(self)
 	local atlas = role and ROLE_ATLAS[role]
 	local allowedRoles  = ROLE_ICON_ROLES[GroupFrames.SettingsForFrame(self).roleIconFilter or "all"]
