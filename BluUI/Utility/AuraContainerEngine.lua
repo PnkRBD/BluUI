@@ -415,6 +415,33 @@ local function FilterClaimed(filter, claimedTokens)
 	return false
 end
 
+local function SplitAround(filters, tokens)
+	local split = {}
+	for filterIndex = 1, #filters do
+		local filter = filters[filterIndex]
+		local excluded = false
+		for tokenIndex = 1, #tokens do
+			if HasFilterToken(filter, '!' .. tokens[tokenIndex]) then
+				excluded = true
+				break
+			end
+		end
+		if excluded then
+			split[#split + 1] = filter
+		else
+			local prefix = filter
+			for tokenIndex = 1, #tokens do
+				local token = tokens[tokenIndex]
+				if not HasFilterToken(prefix, token) then
+					split[#split + 1] = prefix .. '|!' .. token
+					prefix = prefix .. '|' .. token
+				end
+			end
+		end
+	end
+	return split
+end
+
 local function CollectRuleGroups(wanted, container, setIndex, style, rules, baseFilter, candidates, candidateFingerprint, excludeSuffix)
 	local harmful = HasFilterToken(baseFilter, 'HARMFUL')
 	local slotPrefix = harmful and 'D' or 'B'
@@ -448,7 +475,7 @@ local function CollectRuleGroups(wanted, container, setIndex, style, rules, base
 		return
 	end
 
-	local claimedTokens, claimedFlagNames, claimedFlagValues
+	local claimedTokens, claimedSets, claimedFlagNames, claimedFlagValues
 	local keepNameplateOnly = HasFilterToken(baseFilter, NAMEPLATE_ONLY_TOKEN)
 	for ruleIndex = 1, #rules do
 		local rule = AR.BY_ID[rules[ruleIndex]]
@@ -483,10 +510,21 @@ local function CollectRuleGroups(wanted, container, setIndex, style, rules, base
 					if not HasFilterToken(filter, '!' .. token) then filter = filter .. '|!' .. token end
 				end
 			end
-			Want(Suffixed(filter), candidateFilters, rule.id .. flagCascade .. '/' .. candidateSig)
+			local filters = { filter }
+			if claimedSets then
+				for claimIndex = 1, #claimedSets do filters = SplitAround(filters, claimedSets[claimIndex]) end
+			end
+			local candSig = rule.id .. flagCascade .. '/' .. candidateSig
+			for filterIndex = 1, #filters do
+				Want(Suffixed(filters[filterIndex]), candidateFilters, candSig)
+			end
 			if rule.engineExcludeToken then
 				claimedTokens = claimedTokens or {}
 				claimedTokens[#claimedTokens + 1] = rule.engineExcludeToken
+			end
+			if rule.engineExcludeTogether then
+				claimedSets = claimedSets or {}
+				claimedSets[#claimedSets + 1] = rule.engineExcludeTogether
 			end
 			if rule.engineCandidates then
 				for flag, value in pairs(rule.engineCandidates) do
