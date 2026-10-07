@@ -47,11 +47,16 @@ local TITLE_FRAME_ART = { 'FrameLeft', 'FrameCenter', 'FrameRight' }
 local FRIENDSHIP_ART = { 'BarBorder', 'BarRingBackground', 'BarCircle', 'Notch1', 'Notch2', 'Notch3', 'Notch4' }
 local MODEL_SCENE_ART = { 'ModelBackground', 'ModelNameDivider', 'ModelNameBackground', 'ShadowOverlay', 'Border', 'TopBarBg' }
 local GOSSIP_MEASURE_KEYS = { 'greetingTextFrame', 'titleOptionButton', 'availableQuestButton', 'activeQuestButton' }
+local ADVENTURE_ADDON = 'Blizzard_AdventureMap'
+local ADVENTURE_ART = { 'Background', 'Rewards' }
+local ADVENTURE_BODY_KEYS = { 'DescriptionText', 'ObjectivesText' }
 
 local installed = false
 local questSkinned = false
 local gossipSkinned = false
 local itemTextSkinned = false
+local adventureInstalled = false
+local adventureSkinned = false
 local questPanelTexts = {}
 local questInfoParents = {}
 
@@ -345,6 +350,34 @@ local function SkinQuestFrame(frame)
 	SkinModelScene(_G.QuestModelScene)
 end
 
+local function SkinAdventureReward(reward)
+	Fade(reward.ItemNameBG)
+	Fade(reward.Overlay)
+	CropIcon(reward.Icon)
+	Skin.TipIconFrame(reward, reward.Icon)
+	Face(reward.Name)
+	Face(reward.Count)
+end
+
+local function RefreshAdventureRewards(dialog)
+	for reward in dialog.rewardPool:EnumerateActive() do SkinAdventureReward(reward) end
+end
+
+local function SkinAdventureDialog(dialog)
+	FadeKeys(dialog, ADVENTURE_ART)
+	Shell(dialog)
+	Close(dialog.CloseButton)
+	Button(dialog.AcceptButton)
+	Button(dialog.DeclineButton)
+	ScrollBar(dialog.Details.ScrollBar)
+	local child = dialog.Details.Child
+	Skin.TipFont(child.TitleHeader, 'title', QUEST_TITLE_SCALE)
+	Skin.TipFont(child.ObjectivesHeader, 'title', SECTION_TITLE_SCALE)
+	for _, key in ipairs(ADVENTURE_BODY_KEYS) do Body(child[key]) end
+	Skin.TipFont(dialog.RewardsHeader, 'title', SECTION_TITLE_SCALE)
+	SkinModelScene(_G.QuestModelScene)
+end
+
 local function SkinGossipRow(row)
 	if row.GreetingText then
 		row.GreetingText:SetFixedColor(true)
@@ -462,6 +495,42 @@ local function ApplyItemText()
 	StylePageHtml()
 end
 
+local function ApplyAdventure()
+	if not Enabled() then return end
+	local dialog = _G.AdventureMapQuestChoiceDialog
+	if not adventureSkinned then
+		adventureSkinned = true
+		SkinAdventureDialog(dialog)
+	end
+	RefreshAdventureRewards(dialog)
+end
+
+local function OnAdventureRewards(dialog)
+	if Enabled() and adventureSkinned then RefreshAdventureRewards(dialog) end
+end
+
+local function InstallAdventure()
+	adventureInstalled = true
+	Hook(_G.AdventureMapQuestChoiceDialog, 'RefreshRewards', OnAdventureRewards)
+	ApplyAdventure()
+end
+
+local function OnAdventureLoaded(_, addonName)
+	if addonName ~= ADVENTURE_ADDON then return end
+	BUI.Events:Unregister('ADDON_LOADED', 'Skin.QuestDialogs.AdventureMap')
+	InstallAdventure()
+end
+
+local function WatchAdventureMap()
+	if adventureInstalled then
+		ApplyAdventure()
+	elseif _G.AdventureMapQuestChoiceDialog then
+		InstallAdventure()
+	else
+		BUI.Events:Register('ADDON_LOADED', 'Skin.QuestDialogs.AdventureMap', OnAdventureLoaded)
+	end
+end
+
 local function ApplyShown()
 	if _G.QuestFrame:IsShown() then ApplyQuest() end
 	if _G.GossipFrame:IsShown() then ApplyGossip() end
@@ -514,6 +583,7 @@ local function Deactivate()
 	questSkinned = false
 	gossipSkinned = false
 	itemTextSkinned = false
+	adventureSkinned = false
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)
@@ -524,6 +594,7 @@ Skin.OnToggle(SKIN_ID, function(enabled)
 		else
 			BUI.Events:Register('ADDON_LOADED', 'Skin.QuestDialogs', TryInstall)
 		end
+		WatchAdventureMap()
 	else
 		Deactivate()
 	end
@@ -531,6 +602,6 @@ end)
 
 Skin.RegisterSkin(SKIN_ID, {
 	name = 'Quest Dialogs',
-	description = 'NPC quest offers, turn-ins, gossip menus and readable books: dark shells, house text on the parchment, framed reward icons and house buttons. Only visible while talking to an NPC or reading an object, so there is no preview.',
+	description = 'NPC quest offers, turn-ins, gossip menus, readable books and the quest offers on the Prey scouting map: dark shells, house text on the parchment, framed reward icons and house buttons. Only visible while talking to an NPC or reading an object, so there is no preview.',
 	icon = 'Interface/QuestFrame/UI-QuestLog-BookIcon',
 })
