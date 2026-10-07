@@ -40,7 +40,8 @@ local function ApplySkin(frame)
 	if not frame or frame:IsForbidden() then return end
 	if not Skin.IsSkinEnabled('menus') then return end
 	Skin3.StripTextures(frame)
-	menuBackdrops[frame] = Skin3.ChildBackdrop(frame, { bg = MENU_BG, border = theme.border.light })
+	frame._buiBackdrop = frame._buiBackdrop or menuBackdrops[frame]
+	menuBackdrops[frame] = Skin3.ChildBackdrop(frame, { bg = MENU_BG, border = theme.border.light, inside = true })
 	SkinTree(frame, 0)
 end
 
@@ -73,10 +74,13 @@ local function SkinAttachments(compositor)
 	end
 end
 
+local watchedDescriptions = setmetatable({}, { __mode = 'k' })
+
 local function OnMenuOpen(manager, _, menuDescription)
 	local menu = manager.GetOpenMenu and manager:GetOpenMenu()
 	if menu then SkinFrame(menu) end
-	if menuDescription and menuDescription.AddMenuAcquiredCallback then
+	if menuDescription and menuDescription.AddMenuAcquiredCallback and not watchedDescriptions[menuDescription] then
+		watchedDescriptions[menuDescription] = true
 		menuDescription:AddMenuAcquiredCallback(SkinFrame)
 	end
 end
