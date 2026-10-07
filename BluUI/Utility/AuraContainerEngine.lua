@@ -10,6 +10,9 @@ local floor = math.floor
 
 local CreateFrame      = CreateFrame
 local UnitGUID         = UnitGUID
+local UnitExists       = UnitExists
+local UnitCanAssist    = UnitCanAssist
+local UnitIsPlayerControlledOrGroupMember = UnitIsPlayerControlledOrGroupMember
 local GetTime          = GetTime
 local InCombatLockdown = InCombatLockdown
 local IsShiftKeyDown   = IsShiftKeyDown
@@ -379,6 +382,31 @@ end
 
 local SET_LAYOUT_STRIDE = 100
 
+local function IdentityFiltersApply(unit, harmful)
+	if not unit or not UnitExists(unit) then return false end
+	if not harmful then
+		local member = UnitIsPlayerControlledOrGroupMember(unit)
+		if CanAccess(member) and member then return true end
+	end
+	local canAssist = UnitCanAssist('player', unit, true, true)
+	if not CanAccess(canAssist) then return false end
+	if harmful then return not canAssist end
+	return canAssist and true or false
+end
+
+local function SyncGatedGroups(container)
+	local unit = container._buiUnit
+	for _, info in pairs(container._buiGroups) do
+		if info.active and info.gated then
+			local max = IdentityFiltersApply(unit, info.harmful) and info.style.max or 0
+			if info.max ~= max then
+				info.max = max
+				container:SetAuraGroupMaxFrameCount(info.key, max)
+			end
+		end
+	end
+end
+
 local function FilterClaimed(filter, claimedTokens)
 	if not claimedTokens then return false end
 	for tokenIndex = 1, #claimedTokens do
@@ -395,10 +423,10 @@ local function CollectRuleGroups(wanted, container, setIndex, style, rules, base
 	local candidateSig = candidateFingerprint or ''
 	local position = 0
 
-	local function Want(filter, cand, candSig)
+	local function Want(filter, cand, candSig, gated)
 		local layoutIndex = layoutBase + position
 		position = position + 1
-		wanted[slotPrefix .. layoutIndex .. slotSuffix] = { index = layoutIndex, filter = filter, cand = cand, candSig = candSig, style = style, harmful = harmful }
+		wanted[slotPrefix .. layoutIndex .. slotSuffix] = { index = layoutIndex, filter = filter, cand = cand, candSig = candSig, gated = gated, style = style, harmful = harmful }
 	end
 
 	local function Suffixed(filter)
@@ -407,7 +435,7 @@ local function CollectRuleGroups(wanted, container, setIndex, style, rules, base
 
 	local pinIDs = candidates and candidates.pinSpellIDs
 	if pinIDs then
-		Want(baseFilter, { includeSpellIDs = pinIDs }, 'pin/' .. candidateSig)
+		Want(baseFilter, { includeSpellIDs = pinIDs }, 'pin/' .. candidateSig, true)
 		local rest = {}
 		for key, value in pairs(candidates) do
 			if key ~= 'pinSpellIDs' then rest[key] = value end
@@ -416,7 +444,7 @@ local function CollectRuleGroups(wanted, container, setIndex, style, rules, base
 	end
 
 	if candidates and candidates.includeSpellIDs then
-		Want(Suffixed(baseFilter), candidates, 'only/' .. candidateSig)
+		Want(Suffixed(baseFilter), candidates, 'only/' .. candidateSig, true)
 		return
 	end
 
@@ -493,7 +521,7 @@ local function EnsureRuleGroups(container, sets)
 
 	for slot, spec in pairs(wanted) do
 		local style = spec.style
-		local max = style.max
+		local max = spec.gated and 0 or style.max
 		local layout = {
 			elementWidth = style.size, elementHeight = style.size,
 			elementSpacing = style.gap, lineSpacing = style.rowGap or style.gap,
@@ -503,6 +531,7 @@ local function EnsureRuleGroups(container, sets)
 		if info then
 			info.active = true
 			info.style = style
+			info.gated = spec.gated
 			if info.filter ~= spec.filter then
 				info.filter = spec.filter
 				container:SetAuraGroupFilterString(info.key, spec.filter)
@@ -511,7 +540,7 @@ local function EnsureRuleGroups(container, sets)
 				info.candSig = spec.candSig
 				container:SetAuraGroupCandidateFilters(info.key, spec.cand)
 			end
-			if info.max ~= max then
+			if not spec.gated and info.max ~= max then
 				info.max = max
 				container:SetAuraGroupMaxFrameCount(info.key, max)
 			end
@@ -521,7 +550,7 @@ local function EnsureRuleGroups(container, sets)
 			container._buiGroupSeq = (container._buiGroupSeq or 0) + 1
 			info = {
 				key = 'bui' .. container._buiGroupSeq, active = true, max = max, style = style,
-				harmful = spec.harmful, filter = spec.filter, candSig = spec.candSig,
+				harmful = spec.harmful, gated = spec.gated, filter = spec.filter, candSig = spec.candSig,
 			}
 			container:AddAuraGroup(info.key, spec.filter, {
 				maxFrameCount = max,
@@ -534,6 +563,8 @@ local function EnsureRuleGroups(container, sets)
 			container._buiGroups[slot] = info
 		end
 	end
+
+	SyncGatedGroups(container)
 end
 
 function Engine.NewContainer(parent, isDebuff, levelOffset)
@@ -802,6 +833,7 @@ function Engine.BindUnit(container, unit)
 		if guid ~= container._buiGUID then changed = true end
 		container._buiGUID = guid
 	end
+	SyncGatedGroups(container)
 	if changed then container:UpdateAllAuras() end
 end
 
