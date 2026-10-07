@@ -913,8 +913,10 @@ end
 
 local AURA_FLOWS = {
 	{ value = 'separate', text = 'Separate' },
-	{ value = 'debuffsAfterBuffs', text = 'Debuffs after buffs' },
-	{ value = 'buffsAfterDebuffs', text = 'Buffs after debuffs' },
+	{ value = 'debuffsOnBuffs', text = 'Debuffs on buffs' },
+	{ value = 'buffsOnDebuffs', text = 'Buffs on debuffs' },
+	{ value = 'debuffsAfterBuffs', text = 'Debuffs after buffs, same row' },
+	{ value = 'buffsAfterDebuffs', text = 'Buffs after debuffs, same row' },
 }
 
 local function AuraRow(board, unitKey, unitSettings, isDebuff)
@@ -1151,8 +1153,8 @@ local function UnitBoards(ui, parent, width, unit)
 		})
 		AuraRow(auras, unitKey, unitSettings, true)
 		AuraRow(auras, unitKey, unitSettings, false)
-		auras:AddTools('Flow', 'Let one set of icons pick up right where the other ends, it follows their direction', {
-			Menu(unitSettings, 'auraFlow', AURA_FLOWS, 200),
+		auras:AddTools('Flow', 'The first set keeps its position, the other stacks on it or carries on in the same row', {
+			Menu(unitSettings, 'auraFlow', AURA_FLOWS, 230),
 		}, RefreshFrames)
 		boards[#boards + 1] = auras
 	end
