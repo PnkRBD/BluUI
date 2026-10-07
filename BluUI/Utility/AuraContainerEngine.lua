@@ -379,20 +379,35 @@ end
 
 local SET_LAYOUT_STRIDE = 100
 
-local function CollectRuleGroups(wanted, container, setIndex, style, rules, baseFilter, candidates, candidateFingerprint, excludeSuffix)
-	local fingerprintTail = setIndex .. '/' .. (candidateFingerprint or '')
-	if excludeSuffix then fingerprintTail = fingerprintTail .. '~' .. excludeSuffix end
-	if (container._buiGeneration or 0) > 0 then fingerprintTail = fingerprintTail .. '@' .. container._buiGeneration end
-	local layoutBase = (setIndex - 1) * SET_LAYOUT_STRIDE
-	local harmful = HasFilterToken(baseFilter, 'HARMFUL')
+local function FilterClaimed(filter, claimedTokens)
+	if not claimedTokens then return false end
+	for tokenIndex = 1, #claimedTokens do
+		if HasFilterToken(filter, claimedTokens[tokenIndex]) then return true end
+	end
+	return false
+end
 
-	local function Want(fingerprint, index, filter, cand, pinned)
-		wanted[fingerprint] = { index = layoutBase + index, filter = filter, cand = cand, pinned = pinned, set = setIndex, style = style, harmful = harmful }
+local function CollectRuleGroups(wanted, container, setIndex, style, rules, baseFilter, candidates, candidateFingerprint, excludeSuffix)
+	local harmful = HasFilterToken(baseFilter, 'HARMFUL')
+	local slotPrefix = harmful and 'D' or 'B'
+	local slotSuffix = (container._buiGeneration or 0) > 0 and ('@' .. container._buiGeneration) or ''
+	local layoutBase = (setIndex - 1) * SET_LAYOUT_STRIDE
+	local candidateSig = candidateFingerprint or ''
+	local position = 0
+
+	local function Want(filter, cand, candSig)
+		local layoutIndex = layoutBase + position
+		position = position + 1
+		wanted[slotPrefix .. layoutIndex .. slotSuffix] = { index = layoutIndex, filter = filter, cand = cand, candSig = candSig, style = style, harmful = harmful }
+	end
+
+	local function Suffixed(filter)
+		return excludeSuffix and (filter .. '|' .. excludeSuffix) or filter
 	end
 
 	local pinIDs = candidates and candidates.pinSpellIDs
 	if pinIDs then
-		Want('pin#' .. fingerprintTail, 0, baseFilter, { includeSpellIDs = pinIDs }, true)
+		Want(baseFilter, { includeSpellIDs = pinIDs }, 'pin/' .. candidateSig)
 		local rest = {}
 		for key, value in pairs(candidates) do
 			if key ~= 'pinSpellIDs' then rest[key] = value end
@@ -401,78 +416,60 @@ local function CollectRuleGroups(wanted, container, setIndex, style, rules, base
 	end
 
 	if candidates and candidates.includeSpellIDs then
-		Want('wl#' .. fingerprintTail, 1, baseFilter, candidates)
-	else
-		local claimedTokens, claimedFlagNames, claimedFlagValues
-		local keepNameplateOnly = HasFilterToken(baseFilter, NAMEPLATE_ONLY_TOKEN)
-		for ruleIndex = 1, #rules do
-			local rule = AR.BY_ID[rules[ruleIndex]]
-			local ruleFilter = rule and (rule.engineFilter or baseFilter)
-			local alreadyClaimed = false
-			if claimedTokens and ruleFilter then
-				for tokenIndex = 1, #claimedTokens do
-					if HasFilterToken(ruleFilter, claimedTokens[tokenIndex]) then
-						alreadyClaimed = true
-						break
-					end
-				end
-			end
-			if rule and not alreadyClaimed then
-				local cascade = ''
-				local candidateFilters = candidates
-				if rule.engineCandidates or claimedFlagNames then
-					candidateFilters = {}
-					if candidates then
-						for key, value in pairs(candidates) do candidateFilters[key] = value end
-					end
-					if claimedFlagNames then
-						for flagIndex = 1, #claimedFlagNames do
-							local flag = claimedFlagNames[flagIndex]
-							if rule.engineCandidates == nil or rule.engineCandidates[flag] == nil then
-								candidateFilters[flag] = not claimedFlagValues[flag]
-								cascade = cascade .. '~' .. flag
-							end
-						end
-					end
-					if rule.engineCandidates then
-						for key, value in pairs(rule.engineCandidates) do candidateFilters[key] = value end
-					end
-				end
-				local filter = ruleFilter
-				if keepNameplateOnly and not HasFilterToken(filter, NAMEPLATE_ONLY_TOKEN) then
-					filter = filter .. '|' .. NAMEPLATE_ONLY_TOKEN
-				end
-				if claimedTokens then
-					for tokenIndex = 1, #claimedTokens do
-						local token = claimedTokens[tokenIndex]
-						if not HasFilterToken(filter, '!' .. token) then
-							filter = filter .. '|!' .. token
-							cascade = cascade .. '!' .. token
-						end
-					end
-				end
-				Want(rule.id .. cascade .. '#' .. fingerprintTail, ruleIndex, filter, candidateFilters)
-				if rule.engineExcludeToken then
-					claimedTokens = claimedTokens or {}
-					claimedTokens[#claimedTokens + 1] = rule.engineExcludeToken
-				end
-				if rule.engineCandidates then
-					for flag, value in pairs(rule.engineCandidates) do
-						if type(value) == 'boolean' and (claimedFlagValues == nil or claimedFlagValues[flag] == nil) then
-							claimedFlagNames = claimedFlagNames or {}
-							claimedFlagValues = claimedFlagValues or {}
-							claimedFlagNames[#claimedFlagNames + 1] = flag
-							claimedFlagValues[flag] = value
-						end
-					end
-				end
-			end
-		end
+		Want(Suffixed(baseFilter), candidates, 'only/' .. candidateSig)
+		return
 	end
 
-	if excludeSuffix then
-		for _, spec in pairs(wanted) do
-			if spec.set == setIndex and not spec.pinned then spec.filter = spec.filter .. '|' .. excludeSuffix end
+	local claimedTokens, claimedFlagNames, claimedFlagValues
+	local keepNameplateOnly = HasFilterToken(baseFilter, NAMEPLATE_ONLY_TOKEN)
+	for ruleIndex = 1, #rules do
+		local rule = AR.BY_ID[rules[ruleIndex]]
+		if rule and not FilterClaimed(rule.engineFilter or baseFilter, claimedTokens) then
+			local flagCascade = ''
+			local candidateFilters = candidates
+			if rule.engineCandidates or claimedFlagNames then
+				candidateFilters = {}
+				if candidates then
+					for key, value in pairs(candidates) do candidateFilters[key] = value end
+				end
+				if claimedFlagNames then
+					for flagIndex = 1, #claimedFlagNames do
+						local flag = claimedFlagNames[flagIndex]
+						if rule.engineCandidates == nil or rule.engineCandidates[flag] == nil then
+							candidateFilters[flag] = not claimedFlagValues[flag]
+							flagCascade = flagCascade .. '~' .. flag
+						end
+					end
+				end
+				if rule.engineCandidates then
+					for key, value in pairs(rule.engineCandidates) do candidateFilters[key] = value end
+				end
+			end
+			local filter = rule.engineFilter or baseFilter
+			if keepNameplateOnly and not HasFilterToken(filter, NAMEPLATE_ONLY_TOKEN) then
+				filter = filter .. '|' .. NAMEPLATE_ONLY_TOKEN
+			end
+			if claimedTokens then
+				for tokenIndex = 1, #claimedTokens do
+					local token = claimedTokens[tokenIndex]
+					if not HasFilterToken(filter, '!' .. token) then filter = filter .. '|!' .. token end
+				end
+			end
+			Want(Suffixed(filter), candidateFilters, rule.id .. flagCascade .. '/' .. candidateSig)
+			if rule.engineExcludeToken then
+				claimedTokens = claimedTokens or {}
+				claimedTokens[#claimedTokens + 1] = rule.engineExcludeToken
+			end
+			if rule.engineCandidates then
+				for flag, value in pairs(rule.engineCandidates) do
+					if type(value) == 'boolean' and (claimedFlagValues == nil or claimedFlagValues[flag] == nil) then
+						claimedFlagNames = claimedFlagNames or {}
+						claimedFlagValues = claimedFlagValues or {}
+						claimedFlagNames[#claimedFlagNames + 1] = flag
+						claimedFlagValues[flag] = value
+					end
+				end
+			end
 		end
 	end
 end
@@ -484,8 +481,8 @@ local function EnsureRuleGroups(container, sets)
 		CollectRuleGroups(wanted, container, setIndex, unpack(args, 1, 6))
 	end
 
-	for fingerprint, info in pairs(container._buiGroups) do
-		if not wanted[fingerprint] and info.active then
+	for slot, info in pairs(container._buiGroups) do
+		if not wanted[slot] and info.active then
 			info.active = false
 			info.max = 0
 			container:SetAuraGroupMaxFrameCount(info.key, 0)
@@ -494,36 +491,47 @@ local function EnsureRuleGroups(container, sets)
 
 	local sortDirection = AuraContainerSortDirection.Normal
 
-	for fingerprint, spec in pairs(wanted) do
+	for slot, spec in pairs(wanted) do
 		local style = spec.style
+		local max = style.max
 		local layout = {
 			elementWidth = style.size, elementHeight = style.size,
 			elementSpacing = style.gap, lineSpacing = style.rowGap or style.gap,
 			layoutIndex = spec.index,
 		}
-		local info = container._buiGroups[fingerprint]
+		local info = container._buiGroups[slot]
 		if info then
 			info.active = true
 			info.style = style
-			if info.max ~= style.max then
-				info.max = style.max
-				container:SetAuraGroupMaxFrameCount(info.key, style.max)
+			if info.filter ~= spec.filter then
+				info.filter = spec.filter
+				container:SetAuraGroupFilterString(info.key, spec.filter)
+			end
+			if info.candSig ~= spec.candSig then
+				info.candSig = spec.candSig
+				container:SetAuraGroupCandidateFilters(info.key, spec.cand)
+			end
+			if info.max ~= max then
+				info.max = max
+				container:SetAuraGroupMaxFrameCount(info.key, max)
 			end
 			container:SetAuraGroupLayout(info.key, layout)
 			container:SetAuraGroupSortMethod(info.key, style.sortMethod, sortDirection)
 		else
 			container._buiGroupSeq = (container._buiGroupSeq or 0) + 1
-			local key = 'bui' .. container._buiGroupSeq
-			local groupInfo = { key = key, active = true, max = style.max, style = style, harmful = spec.harmful }
-			container:AddAuraGroup(key, spec.filter, {
-				maxFrameCount = style.max,
-				initializeFrame = MakeInitializer(container, groupInfo),
+			info = {
+				key = 'bui' .. container._buiGroupSeq, active = true, max = max, style = style,
+				harmful = spec.harmful, filter = spec.filter, candSig = spec.candSig,
+			}
+			container:AddAuraGroup(info.key, spec.filter, {
+				maxFrameCount = max,
+				initializeFrame = MakeInitializer(container, info),
 				candidateFilters = spec.cand,
 				layout = layout,
 				sortMethod = style.sortMethod,
 				sortDirection = sortDirection,
 			})
-			container._buiGroups[fingerprint] = groupInfo
+			container._buiGroups[slot] = info
 		end
 	end
 end
