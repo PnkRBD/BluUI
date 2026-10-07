@@ -16,7 +16,6 @@ local SECTION_TITLE_SCALE = 1.2
 local ROW_SELECTED_ALPHA = 0.2
 local ROW_HOVER_ALPHA = 0.06
 local BINDING_SELECTED_ALPHA = 0.3
-local SLIDER_TRACK_HEIGHT = 2
 local CHECK_INSET = 4
 local LARGE_CHECK_INSET = 6
 local LAYOUT_NAME_INSET = { left = -5, right = -5, top = 6, bottom = 6 }
@@ -120,13 +119,7 @@ end
 
 local function StyleStepper(button, direction)
 	if not button then return end
-	if not button._buiStepper then
-		button._buiStepper = true
-		Skin.TipPageButton(button, direction)
-		local refresh = Wrap('Skin.SystemPanels stepper state', Skin.RefreshPageButton)
-		button:HookScript('OnEnable', refresh)
-		button:HookScript('OnDisable', refresh)
-	end
+	Skin.TipStepper(button, direction)
 	FadeRegions(button)
 end
 
@@ -137,22 +130,7 @@ local function StyleSliderTrack(slider)
 		local region = select(regionIndex, slider:GetRegions())
 		if region ~= thumb and region.IsObjectType and region:IsObjectType('Texture') and not region.__buiSkin then Fade(region) end
 	end
-	local track = slider:CreateTexture(nil, 'BACKGROUND')
-	track.__buiSkin = true
-	track:SetHeight(SLIDER_TRACK_HEIGHT)
-	track:SetPoint('LEFT', slider, 'LEFT', 0, 0)
-	track:SetPoint('RIGHT', slider, 'RIGHT', 0, 0)
-	local edge = Skin.PANEL_EDGE
-	FlatTexture(track, edge[1], edge[2], edge[3], edge[4])
-	if thumb then
-		local fill = slider:CreateTexture(nil, 'BACKGROUND', nil, 1)
-		fill.__buiSkin = true
-		fill:SetHeight(SLIDER_TRACK_HEIGHT)
-		fill:SetPoint('LEFT', track, 'LEFT', 0, 0)
-		fill:SetPoint('RIGHT', thumb, 'CENTER', 0, 0)
-		AccentTexture(fill, 1)
-	end
-	slider._buiTrack = track
+	Skin.TipSliderTrack(slider)
 end
 
 local function StyleStepSlider(stepper)

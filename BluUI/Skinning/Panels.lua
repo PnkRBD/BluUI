@@ -1,5 +1,6 @@
 local _, BUI = ...
 
+local Hook = BUI.Profiler.Hooker('Skin.Panels')
 local Skin = BUI.Skinning
 
 local ART_KEYS = { 'Border', 'BorderFrame', 'Background', 'BackgroundTile', 'BG', 'Bg', 'NineSlice', 'Inset', 'InsetFrame', 'PortraitContainer', 'TitleBg', 'TitleContainer', 'TopTileStreaks', 'ArtFrame', 'Overlay' }
@@ -10,6 +11,41 @@ local DROPDOWN_KEYS = { 'Dropdown', 'DropDown', 'FilterDropdown', 'SelectionDrop
 local FONT_DEPTH = 2
 local MODEL_CONTROL_KEYS = { 'zoomInButton', 'zoomOutButton', 'rotateLeftButton', 'rotateRightButton', 'resetButton' }
 local MODEL_CONTROL_INSET = 4
+local SLIDER_TEXT_KEYS = { 'LeftText', 'RightText', 'TopText', 'MinText', 'MaxText' }
+
+local function SkinCustomizeRow(row)
+	if row._buiCustomizeRow then return end
+	row._buiCustomizeRow = true
+	Skin.TipFace(row.Label, 'body')
+	if row.Dropdown then
+		local details = row.Dropdown.SelectionDetails
+		Skin.TipDropdown(row.Dropdown, nil, true)
+		Skin.TipFace(details.SelectionName, 'body')
+		Skin.TipFace(details.SelectionNumber, 'body')
+		Skin.TipFace(details.SelectionNumberBG, 'body')
+		Skin.TipStepper(row.DecrementButton, 'previous')
+		Skin.TipStepper(row.IncrementButton, 'next')
+	elseif row.Slider then
+		Skin.TipSliderTrack(row.Slider)
+		Skin.TipStepper(row.Back, 'previous')
+		Skin.TipStepper(row.Forward, 'next')
+		for index = 1, #SLIDER_TEXT_KEYS do Skin.TipFace(row[SLIDER_TEXT_KEYS[index]], 'body') end
+	elseif row.Button then
+		Skin.TipCheckBox(row.Button)
+	end
+end
+
+local function SkinCustomizeOptions(customize)
+	for _, row in ipairs({ customize.Options:GetChildren() }) do SkinCustomizeRow(row) end
+end
+
+local function SkinBarberShop()
+	local customize = CharCustomizeFrame
+	if not customize or customize._buiCustomizeHooked then return end
+	customize._buiCustomizeHooked = true
+	Hook(customize, 'UpdateOptionButtons', SkinCustomizeOptions)
+	SkinCustomizeOptions(customize)
+end
 
 local function SkinHousingPreview(frame, context)
 	local preview = frame.ModelPreview
@@ -115,6 +151,7 @@ local WINDOWS = {
 		icon = 'Interface/Icons/INV_Misc_Comb_01',
 		frames = { 'BarberShopFrame' },
 		fullscreen = true,
+		extra = SkinBarberShop,
 	},
 	{
 		id = 'iteminteraction',
