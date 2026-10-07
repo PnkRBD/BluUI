@@ -615,16 +615,18 @@ local function BuildAggro(frame)
 end
 
 function GroupFrames.ApplyAggroToChild(child, settings)
+	local outline = child.ThreatIndicator
+	if not outline then return end
 	local aggro = settings.aggroBorder
 	local color = aggro.color
-	local outline = child.ThreatIndicator
 	outline:SetLook(color[1], color[2], color[3], color[4], aggro.thickness)
 	outline.wanted = aggro.enabled and (not aggro.tankOrHealerOnly or TankOrHealer())
 	UpdateAggro(child)
 end
 
 local function RefreshAggro()
-	GroupFrames.EachChild(function(child) GroupFrames.ApplyAggroToChild(child, GroupFrames.SettingsForFrame(child)) end)
+	local party = GroupFrames.GetDB().party
+	GroupFrames.EachPartyChild(function(child) GroupFrames.ApplyAggroToChild(child, party) end)
 end
 
 BUI.Events:RegisterUnit("PLAYER_SPECIALIZATION_CHANGED", "player", "GroupFrames.Aggro", RefreshAggro)
@@ -696,7 +698,7 @@ local function GroupFrameStyle(frame, unit)
 	BuildAbsorb(frame, unit)
 	GroupFrames.BuildIndicators(frame, unit)
 	GroupFrames.BuildSelection(frame, unit)
-	BuildAggro(frame)
+	if GroupFrames.SectionForFrame(frame) == "party" then BuildAggro(frame) end
 	BuildRangeFade(frame, unit)
 	GroupFrames.BuildKeystone(frame, unit)
 
