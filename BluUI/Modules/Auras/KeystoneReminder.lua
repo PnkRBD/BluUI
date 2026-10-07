@@ -13,6 +13,7 @@ BUI.Auras.KeystoneReminder = KeystoneReminder
 local FRAME_NAME = 'BUI_KeystoneReminder'
 local EVENT_KEY = 'KeystoneReminder'
 local ROSTER_KEY = 'KeystoneReminder.Roster'
+local CARD_KEY = 'KeystoneReminder.Card'
 local WIDTH, HEIGHT = 250, 64
 local PAD = 8
 local SLOT_SIZE = 30
@@ -160,6 +161,10 @@ local function PaintRole()
     card.role:SetText(ROLE_NAMES[role] or '')
 end
 
+local function SyncCard()
+    card:SetShown(current ~= nil)
+end
+
 local function Paint(info)
     card.name:SetText(info.dungeon or info.activity)
     card.icon:SetTexture(info.texture or KEYSTONE_ICON)
@@ -171,14 +176,14 @@ function KeystoneReminder.Show(info)
     Build()
     current = info
     Paint(info)
-    card:Show()
+    BUI.Events:AfterCombat(SyncCard, CARD_KEY)
     BUI.Events:Register('GROUP_ROSTER_UPDATE', ROSTER_KEY, PaintRole)
 end
 
 function KeystoneReminder.Hide()
     current = nil
     BUI.Events:Unregister('GROUP_ROSTER_UPDATE', ROSTER_KEY)
-    if card then card:Hide() end
+    if card then BUI.Events:AfterCombat(SyncCard, CARD_KEY) end
 end
 
 function KeystoneReminder.ShowPreview()
