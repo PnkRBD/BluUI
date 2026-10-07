@@ -346,7 +346,7 @@ local function OpenSpecHover(anchor)
 end
 
 Datatext.Register('lootSpec', {
-    name = 'Loot Spec', show = 'showLootSpec', label = 'Loot:',
+    name = 'Loot & Spec', show = 'showLootSpec', label = 'Loot:',
     events = {
         'PLAYER_LOOT_SPEC_UPDATED', 'PLAYER_SPECIALIZATION_CHANGED', 'PLAYER_ENTERING_WORLD',
         'TRAIT_CONFIG_UPDATED', 'TRAIT_CONFIG_LIST_UPDATED', 'CONFIG_COMMIT_FAILED', 'SELECTED_LOADOUT_CHANGED',
