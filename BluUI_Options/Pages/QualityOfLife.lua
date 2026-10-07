@@ -8,13 +8,14 @@ local RAIL_GROUPS = {
 		{ id = 'combat', label = 'Combat', icon = 'power' },
 		{ id = 'interface', label = 'Interface', icon = 'eye' },
 		{ id = 'automation', label = 'Automation', icon = 'reload' },
+		{ id = 'mythicplus', label = 'Mythic+', icon = 'clock' },
 	} },
 	{ title = 'System', items = {
 		{ id = 'graphics', label = 'Graphics', icon = 'checker' },
 		{ id = 'danger', label = 'Danger zone', icon = 'skull' },
 	} },
 }
-local TAB_IDS = { 'combat', 'interface', 'automation', 'graphics', 'danger' }
+local TAB_IDS = { 'combat', 'interface', 'automation', 'graphics', 'danger', 'mythicplus' }
 local TAB_INDEX = {}
 for index, id in ipairs(TAB_IDS) do TAB_INDEX[id] = index end
 local SLIDER_WIDTH = 220
@@ -755,12 +756,27 @@ local function DangerPane(ui, parent, width)
 	return host
 end
 
+local function CelebrationBoard(ui, parent, width)
+	local settings = BUI.GetDB().celebrations
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Celebrations',
+		description = 'Confetti across your screen when something goes right.',
+		buttons = { { text = 'Try it', icon = 'play', onClick = function() BUI.Celebrations.Test() end } },
+	})
+	board:AddSwitch('Timed keys', function() return settings.timedKey == true end, function(value) settings.timedKey = value end, 'When you finish a Mythic+ key in time')
+	board:AddSwitch('Raid bosses', function() return settings.raidBoss == true end, function(value) settings.raidBoss = value end, 'When your raid kills a boss')
+	board:AddSwitch('Dungeon bosses', function() return settings.dungeonBoss == true end, function(value) settings.dungeonBoss = value end, 'When your group kills a dungeon boss, keys included')
+	return board
+end
+
 local PANES = {
 	combat = function(ui, parent, width) return { SettingBoard(ui, parent, width, BOARDS.combat), SettingBoard(ui, parent, width, BOARDS.logging) } end,
 	interface = function(ui, parent, width) return { SettingBoard(ui, parent, width, BOARDS.interface) } end,
 	automation = function(ui, parent, width) return { SettingBoard(ui, parent, width, BOARDS.automation) } end,
 	graphics = function(ui, parent, width) return { GraphicsBoard(ui, parent, width) } end,
 	danger = function(ui, parent, width) return { DangerPane(ui, parent, width) } end,
+	mythicplus = function(ui, parent, width) return { CelebrationBoard(ui, parent, width) } end,
 }
 
 BUI.PageEngine.RegisterPage('qol', {
