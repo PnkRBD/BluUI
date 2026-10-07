@@ -1711,8 +1711,24 @@ local RunChangedSpellWalk = Wrap("CDM.Custom changed spell walk", function()
     end
 end)
 
+local function ItemCooldownUnchanged(frameData)
+    if frameData.iconType ~= "consumable" then return false end
+    local key = IconEngine.ItemCooldownKey(frameData.itemID or frameData.customSpellID)
+    if key ~= nil and key == frameData._itemCooldownKey then return true end
+    frameData._itemCooldownKey = key
+    return false
+end
+
 local RunItemWalk = Wrap("CDM.Custom item walk", function()
-    for _, iconSet in pairs(itemMap) do WalkIconSet(iconSet) end
+    for _, iconSet in pairs(itemMap) do
+        for icon in pairs(iconSet) do
+            local frameData = FrameData[icon]
+            if frameData and not flushSeen[icon] then
+                flushSeen[icon] = true
+                if not frameData.hidden and not ItemCooldownUnchanged(frameData) then UpdateIcon(icon) end
+            end
+        end
+    end
     for _, iconSet in pairs(spellMap) do WalkIconSet(iconSet, true) end
 end)
 

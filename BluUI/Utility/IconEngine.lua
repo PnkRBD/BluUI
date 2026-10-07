@@ -219,6 +219,15 @@ local KNOWN_ITEM_DURATIONS = {
 }
 for itemID, duration in pairs(KNOWN_ITEM_DURATIONS) do knownItemDurations[itemID] = duration end
 
+function IconEngine.ItemCooldownKey(itemID)
+	local cooldownStart, cooldownDuration, enable = C_Container.GetItemCooldown(itemID)
+	if enable == 0 then return nil end
+	if cooldownStart and cooldownStart > 0 and ((cooldownDuration or 0) > ITEM_CD_THRESHOLD or knownItemDurations[itemID]) then
+		return cooldownStart
+	end
+	return 0
+end
+
 function IconEngine.ApplyItemVisual(texture, cooldown, cooldownStart, cooldownDuration, count, itemID, onExpireCallback)
 	if count == 0 then
 		if cooldown and cooldown._lastItemState ~= "empty" then
