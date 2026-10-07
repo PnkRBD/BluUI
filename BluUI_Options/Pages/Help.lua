@@ -203,7 +203,7 @@ local function Sections(ui, _, parent, width)
 		scroll:SetVerticalScroll(0)
 		edit:SetFocus()
 		edit:HighlightText()
-	end, 'report2')
+	end, 'copy')
 	generate:SetPoint('BOTTOMLEFT', pad, pad)
 
 	local link = ui.Button(card, 'Copy the issues link', 'secondary', function()

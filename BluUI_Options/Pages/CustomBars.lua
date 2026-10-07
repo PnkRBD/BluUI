@@ -333,7 +333,7 @@ local function TrackedBoard(ui, parent, width, bar, page)
 			Repaint()
 		end }), TOOL_SIZE)
 		if entry.potion then
-			Put(ui.IconButton(row, 'edit', PotionLabel(entry), function()
+			Put(ui.IconButton(row, 'cog', PotionLabel(entry), function()
 				BUI.ShowCDMPotionModal(BUI.CDM, entry.id, entry.stored, bar, nil, function()
 					Apply()
 					page:RebuildCurrent()
