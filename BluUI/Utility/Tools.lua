@@ -309,6 +309,11 @@ if C_Secrets and C_Secrets.HasSecretRestrictions() then
         return value
     end
 
+    function Tools.SafeBool(value)
+        if issecretvalue(value) then return nil end
+        return value
+    end
+
     function Tools.ShouldAurasBeSecret()
         return C_Secrets.ShouldAurasBeSecret()
     end
@@ -381,6 +386,10 @@ else
 
     function Tools.SafeNum(value)
         if type(value) ~= "number" then return nil end
+        return value
+    end
+
+    function Tools.SafeBool(value)
         return value
     end
 end

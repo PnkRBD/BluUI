@@ -3,6 +3,7 @@ local _, BUI = ...
 local oUF = BUI.oUF
 local UnitFrames = BUI.UnitFrames
 local Pixel = BUI.Pixel
+local SafeBool = BUI.Tools.SafeBool
 
 local CreateFrame = CreateFrame
 local UnitExists = UnitExists
@@ -383,10 +384,10 @@ local function Style(self, unit)
 	leaderTexture:Hide()
 	leaderTexture.Override = function(frame)
 		local indicator = frame.LeaderIndicator
-		if indicator._buiHidden or not frame.unit or not UnitInParty(frame.unit) or not UnitIsGroupLeader(frame.unit) then
+		if indicator._buiHidden or not frame.unit or not UnitInParty(frame.unit) or not SafeBool(UnitIsGroupLeader(frame.unit)) then
 			indicator:Hide()
 		else
-			indicator:SetAtlas('UI-HUD-UnitFrame-Player-Group-LeaderIcon', true)
+			indicator:SetAtlas('UI-HUD-UnitFrame-Player-Group-LeaderIcon')
 			indicator:Show()
 		end
 	end
@@ -399,10 +400,10 @@ local function Style(self, unit)
 	assistantTexture:Hide()
 	assistantTexture.Override = function(frame)
 		local indicator = frame.AssistantIndicator
-		if indicator._buiHidden or not frame.unit or not UnitInParty(frame.unit) or not UnitIsGroupAssistant(frame.unit) or UnitIsGroupLeader(frame.unit) then
+		if indicator._buiHidden or not frame.unit or not UnitInParty(frame.unit) or not SafeBool(UnitIsGroupAssistant(frame.unit)) or SafeBool(UnitIsGroupLeader(frame.unit)) then
 			indicator:Hide()
 		else
-			indicator:SetAtlas('UI-HUD-UnitFrame-Party-PortraitOn-Icon-Assist', true)
+			indicator:SetAtlas('UI-HUD-UnitFrame-Party-PortraitOn-Icon-Assist')
 			indicator:Show()
 		end
 	end
