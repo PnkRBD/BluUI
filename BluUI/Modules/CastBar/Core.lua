@@ -451,23 +451,19 @@ function CastBar.PreviewInterrupt(barType)
 	previewTickers[barType] = { ticker = ticker, castbar = castbar, parent = parent, strata = strata, frame = frame }
 end
 
-local function TimeTextHandler(self, duration)
-	local display = self._countdown and duration:GetRemainingDuration() or duration:GetElapsedDuration()
-	if not display then return end
-	if self._showTotalTime then
-		local total = duration:GetTotalDuration()
-		if total then
-			self.Time:SetFormattedText('%.1f / %.1f', display, total)
-			return
-		end
-	end
-	self.Time:SetFormattedText('%.1f', display)
-end
+local DurationProperty = Enum.DurationTextBindingProperty
+local TIME_DECIMAL_SECONDS = 60
 
 function CastBar.SetupTimeText(castbar, settings)
-	castbar._showTotalTime = settings.showTotalTime
-	castbar._countdown = settings.countdown
-	castbar.CustomTimeText = TimeTextHandler
+	local formatter = BUI.TimeFormat.GetFormatter(TIME_DECIMAL_SECONDS)
+	local shown = { property = settings.countdown and DurationProperty.RemainingDuration or DurationProperty.ElapsedDuration, formatter = formatter }
+	local binding = castbar.Time.binding or C_DurationUtil.CreateDurationTextBinding()
+	castbar.Time.binding = binding
+	if settings.showTotalTime then
+		binding:SetTextFormat('{} / {}', { shown, { property = DurationProperty.TotalDuration, formatter = formatter } })
+	else
+		binding:SetTextFormat('{}', { shown })
+	end
 end
 
 local containers = {}
