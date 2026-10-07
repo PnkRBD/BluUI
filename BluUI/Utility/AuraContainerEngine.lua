@@ -761,6 +761,7 @@ HatchNext = BUI.Dispatcher.New(function()
 	if not container then return end
 	EnsureRuleGroups(container, container._buiLastConfig)
 	container._buiHatched = true
+	if container._buiOnHatch then container._buiOnHatch() end
 	if container._buiUnit and container.UpdateAllAuras then container:UpdateAllAuras() end
 	if nest[1] then HatchNext() end
 end, 'AuraEngine.Hatch')

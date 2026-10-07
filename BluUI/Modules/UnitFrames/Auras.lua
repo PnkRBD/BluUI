@@ -181,16 +181,31 @@ end
 
 UnitFrames.ResolveAuraStyle = ResolveStyle
 
+local AURA_FLOWS = {
+	debuffsOnBuffs    = { debuffsFollow = true, stacked = true },
+	buffsOnDebuffs    = { debuffsFollow = false, stacked = true },
+	debuffsAfterBuffs = { debuffsFollow = true },
+	buffsAfterDebuffs = { debuffsFollow = false },
+}
+
+local function StackEdge(style)
+	return (style.growY == 'UP' and 'TOP' or 'BOTTOM') .. (style.growX == 'RIGHT' and 'LEFT' or 'RIGHT')
+end
+
 function UnitFrames.ResolveAuraFlow(unitSettings, debuffStyle, buffStyle)
-	local flow = unitSettings.auraFlow
-	local follower, leader
-	if flow == 'debuffsAfterBuffs' then
-		follower, leader = debuffStyle, buffStyle
-	elseif flow == 'buffsAfterDebuffs' then
-		follower, leader = buffStyle, debuffStyle
-	end
-	if not (follower and follower.shown and leader.shown) then return end
-	return follower, leader
+	local flow = AURA_FLOWS[unitSettings.auraFlow]
+	if not flow then return end
+	local follower, leader = buffStyle, debuffStyle
+	if flow.debuffsFollow then follower, leader = debuffStyle, buffStyle end
+	if not (follower.shown and leader.shown) then return end
+	if flow.stacked then follower.growX, follower.growY = leader.growX, leader.growY end
+	return follower, leader, flow.stacked
+end
+
+function UnitFrames.StackAuras(follower, leader, followerFrame, leaderFrame)
+	local gap = leader.growY == 'UP' and leader.gap or -leader.gap
+	followerFrame:ClearAllPoints()
+	followerFrame:SetPoint(GrowthToAnchor(follower.growX, follower.growY), leaderFrame, StackEdge(leader), 0, Pixel.Scale(gap))
 end
 
 
@@ -291,8 +306,9 @@ local function EngineApplyAuraPositions(frame, unitType)
 	local debuffs, buffs = frame.DebuffContainer, frame.BuffContainer
 	local debuffStyle = ResolveStyle(unitSettings, true)
 	local buffStyle = ResolveStyle(unitSettings, false)
-	local follower, leader = UnitFrames.ResolveAuraFlow(unitSettings, debuffStyle, buffStyle)
-	if follower then
+	local follower, leader, stacked = UnitFrames.ResolveAuraFlow(unitSettings, debuffStyle, buffStyle)
+	debuffs._buiOnHatch, buffs._buiOnHatch = nil, nil
+	if follower and not stacked then
 		local leaderIsDebuff = leader == debuffStyle
 		local host = leaderIsDebuff and debuffs or buffs
 		local idle = leaderIsDebuff and buffs or debuffs
@@ -306,6 +322,15 @@ local function EngineApplyAuraPositions(frame, unitType)
 		ApplyContainer(buffs, unitSettings, buffStyle)
 		PlaceContainer(frame, debuffs, debuffStyle)
 		PlaceContainer(frame, buffs, buffStyle)
+		if follower then
+			local followerContainer = follower == debuffStyle and debuffs or buffs
+			local leaderContainer = followerContainer == debuffs and buffs or debuffs
+			local function Stack()
+				if next(followerContainer._buiGroups) then UnitFrames.StackAuras(follower, leader, followerContainer, leaderContainer) end
+			end
+			followerContainer._buiOnHatch = Stack
+			Stack()
+		end
 	end
 
 	BindUnit(frame)
