@@ -236,7 +236,7 @@ BUI.Defaults = {
 		weeklyMplusHistory = {},
 	},
 	profile = {
-		celebrations = { timedKey = true, raidBoss = true, dungeonBoss = false },
+		celebrations = { timedKey = false, raidBoss = true, dungeonBoss = false },
 		general = {
 			useClassColorTheme    = true,
 			themeColor            = { 0.8313726186752319, 0, 0.3725490272045136, 1 },
