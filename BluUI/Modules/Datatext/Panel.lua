@@ -3,8 +3,10 @@ local _, BUI = ...
 local Datatext = BUI.Datatext
 local Pixel = BUI.Pixel
 local Widget = BUI.BUILibClient.Widget
+local Controls = BUI.BUILibClient.Controls
 
 local CARD_RADIUS = 8
+local PANEL_GAP = 6
 
 local hoverPanels = {}
 
@@ -53,7 +55,7 @@ local OnUpdate = BUI.Profiler.Wrap('Datatext.Panel hover check', function(self, 
         ForceHide(self)
         return
     end
-    if self:IsMouseOver() or (self.anchor and self.anchor:IsMouseOver()) then
+    if self:IsMouseOver() or (self.anchor and self.anchor:IsMouseOver()) or Controls.ContextMenuIsMouseOver() then
         self._outTime = 0
         if self._fadingOut then
             self._fadingOut = false
@@ -107,6 +109,21 @@ function Datatext.PlacePanelAtCursor(panel)
         panel:SetPoint('BOTTOMLEFT', UIParent, 'BOTTOMLEFT', cursorX + offset, cursorY + offset)
     else
         panel:SetPoint('TOPLEFT', UIParent, 'BOTTOMLEFT', cursorX + offset, cursorY - offset)
+    end
+end
+
+function Datatext.PlacePanelAtBar(panel, anchor)
+    local bar = anchor.bar.frame
+    local panelScale = panel:GetEffectiveScale()
+    local barScale = bar:GetEffectiveScale() / panelScale
+    local centerX = anchor:GetCenter() * anchor:GetEffectiveScale() / panelScale
+    local barTop, barBottom = bar:GetTop() * barScale, bar:GetBottom() * barScale
+    local gap = Pixel.Scale(PANEL_GAP)
+    panel:ClearAllPoints()
+    if barTop + barBottom > UIParent:GetHeight() then
+        panel:SetPoint('TOP', UIParent, 'BOTTOMLEFT', centerX, barBottom - gap)
+    else
+        panel:SetPoint('BOTTOM', UIParent, 'BOTTOMLEFT', centerX, barTop + gap)
     end
 end
 
