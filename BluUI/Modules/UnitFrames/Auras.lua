@@ -234,6 +234,7 @@ local function BindUnit(frame, rebind)
 end
 
 local EnsureEventlessTicker
+local targetTargetFrames = {}
 
 local function EngineCreateAuraElements(frame, unitType)
 	frame.DebuffContainer = Engine.NewContainer(frame, true)
@@ -241,13 +242,17 @@ local function EngineCreateAuraElements(frame, unitType)
 	frame.DebuffContainer._buiScope = 'unit'
 	frame.BuffContainer._buiScope = 'unit'
 	auraFrames[#auraFrames + 1] = { frame = frame, unitType = unitType }
-	if unitType == 'targettarget' then
-		frame:HookScript('OnShow', BUI.Profiler.Wrap('UnitFrames.Auras targettarget show', function(shownFrame)
-			BindUnit(shownFrame, true)
-			EnsureEventlessTicker()
-		end))
-	end
+	if unitType == 'targettarget' then targetTargetFrames[frame] = true end
 end
+
+local TargetTargetShown = BUI.Profiler.Wrap('UnitFrames.Auras targettarget show', function(shownFrame)
+	BindUnit(shownFrame, true)
+	EnsureEventlessTicker()
+end)
+
+BUI.oUF:RegisterInitCallback(function(frame)
+	if targetTargetFrames[frame] then frame:HookScript('OnShow', TargetTargetShown) end
+end)
 
 local function ApplyContainer(frame, container, style, rules)
 	local anchor = GrowthToAnchor(style.growX, style.growY)
