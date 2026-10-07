@@ -197,7 +197,7 @@ local entries = {
 	{ label = "Position", page = "datatext", panel = "Bars and panels", keywords = "anchor x y offset strata frame level align below minimap mirror chat" },
 	{ label = "Background", page = "datatext", panel = "Bars and panels", keywords = "background opacity color border width height" },
 	{ label = "Ping source", page = "datatext", panel = "Datatexts", keywords = "ping source home world" },
-	{ label = "Datatexts", page = "datatext", panel = "Datatexts", keywords = "fps framerate ping latency durability gold ilvl item level coords location loot spec friends guild modules order time clock" },
+	{ label = "Datatexts", page = "datatext", panel = "Datatexts", keywords = "fps framerate ping latency durability gold ilvl item level coords location loot spec specialization talent loadout friends guild modules order time clock" },
 
 	{ label = "Enable", page = "chat", keywords = "chat skin enable" },
 	{ label = "Panel", page = "chat", panel = "Panel", keywords = "chat font background border edit box position size padding lock move resize" },
