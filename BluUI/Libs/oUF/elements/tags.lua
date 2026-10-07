@@ -836,16 +836,55 @@ local function getTagFunc(tagstr)
 	return func
 end
 
+local ownerFontStrings = {}
+local ownerEventKinds = {}
+
+local function isOwnerEvent(event)
+	local kind = ownerEventKinds[event]
+	if(kind == nil) then
+		kind = not unitlessEvents[event] and Private.isUnitEvent(event, 'player')
+		ownerEventKinds[event] = kind
+	end
+
+	return kind
+end
+
+local function onOwnerEvent(owner, event)
+	for fs in next, ownerFontStrings[owner][event] do
+		if(fs:IsVisible()) then
+			queueTagUpdate(fs)
+		end
+	end
+end
+
 local function registerEvent(event, fs)
-	if(validateEvent(event)) then
-		if(not eventFontStrings[event]) then
-			eventFontStrings[event] = {}
+	if(not validateEvent(event)) then return end
+
+	if(not fs.extraUnits and isOwnerEvent(event)) then
+		local owner = fs.__owner
+		local events = ownerFontStrings[owner]
+		if(not events) then
+			events = {}
+			ownerFontStrings[owner] = events
 		end
 
-		eventFontStrings[event][fs] = true
+		if(not events[event]) then
+			events[event] = {}
+		end
 
-		eventFrame:RegisterEvent(event)
+		events[event][fs] = true
+
+		owner:RegisterEvent(event, onOwnerEvent)
+		return
 	end
+
+	if(not eventFontStrings[event]) then
+		eventFontStrings[event] = {}
+	end
+
+	eventFontStrings[event][fs] = true
+
+	eventFrame:RegisterEvent(event)
 end
 
 local function registerEvents(fs, ts)
@@ -865,6 +904,21 @@ local function unregisterEvents(fs)
 
 		if(not next(strings)) then
 			eventFrame:UnregisterEvent(event)
+		end
+	end
+
+	local owner = fs.__owner
+	local events = ownerFontStrings[owner]
+	if(not events) then return end
+
+	for event, strings in next, events do
+		if(strings[fs]) then
+			strings[fs] = nil
+
+			if(not next(strings)) then
+				events[event] = nil
+				owner:UnregisterEvent(event, onOwnerEvent)
+			end
 		end
 	end
 end
@@ -921,8 +975,6 @@ local function Tag(self, fs, ts, ...)
 
 			registerTimer(fs, timer)
 		else
-			registerEvents(fs, ts)
-
 			if(...) then
 				if(not fs.extraUnits) then
 					fs.extraUnits = {}
@@ -932,6 +984,8 @@ local function Tag(self, fs, ts, ...)
 					fs.extraUnits[select(index, ...)] = true
 				end
 			end
+
+			registerEvents(fs, ts)
 		end
 	end
 
