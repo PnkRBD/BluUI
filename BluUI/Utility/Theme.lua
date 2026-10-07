@@ -43,6 +43,23 @@ function BUI.GetAddonFont()
 	return ADDON_FONT
 end
 
+local function Present(value)
+	if type(value) == 'table' and next(value) == nil then return nil end
+	return value
+end
+
+function BUI.SameThemeLook(first, second)
+	first, second = Present(first), Present(second)
+	if type(first) ~= 'table' or type(second) ~= 'table' then return first == second end
+	for key, value in pairs(first) do
+		if key ~= 'name' and not BUI.SameThemeLook(value, second[key]) then return false end
+	end
+	for key, value in pairs(second) do
+		if key ~= 'name' and first[key] == nil and Present(value) ~= nil then return false end
+	end
+	return true
+end
+
 function BUI.FetchFont(name)
 	return sharedMedia:Fetch('font', name, true)
 end

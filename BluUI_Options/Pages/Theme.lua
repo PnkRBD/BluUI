@@ -247,23 +247,6 @@ local function FindSaved(name)
 	end
 end
 
-local function Present(value)
-	if type(value) == 'table' and next(value) == nil then return nil end
-	return value
-end
-
-local function SameTable(first, second)
-	first, second = Present(first), Present(second)
-	if type(first) ~= 'table' or type(second) ~= 'table' then return first == second end
-	for key, value in pairs(first) do
-		if key ~= 'name' and not SameTable(value, second[key]) then return false end
-	end
-	for key, value in pairs(second) do
-		if key ~= 'name' and first[key] == nil and Present(value) ~= nil then return false end
-	end
-	return true
-end
-
 local function ActiveLook()
 	local store = Store()
 	local name = store.name
@@ -272,12 +255,12 @@ local function ActiveLook()
 			if preset.name == name and PresetMatches(preset) then return preset end
 		end
 		local _, saved = FindSaved(name)
-		if saved and SameTable(saved.theme, store) then return saved end
+		if saved and BUI.SameThemeLook(saved.theme, store) then return saved end
 	end
 	local preset = ActivePreset()
 	if preset then return preset end
 	for _, saved in ipairs(SavedThemes()) do
-		if SameTable(saved.theme, store) then return saved end
+		if BUI.SameThemeLook(saved.theme, store) then return saved end
 	end
 end
 
