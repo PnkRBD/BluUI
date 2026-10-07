@@ -356,8 +356,25 @@ local function UpdateRankFill(rankBar)
 	local ratio = rankBar.ratio or 0
 	local fill = rankBar._buiFill
 	fill:SetShown(ratio > 0)
-	if ratio > 0 then fill:SetWidth((rankBar:GetWidth() - 2) * ratio) end
+	if ratio > 0 then fill:SetWidth((rankBar:GetWidth() - 2 - rankBar:GetHeight()) * ratio) end
 	rankBar.Flare:Hide()
+end
+
+local function LayoutRankBar(rankBar)
+	local expansion = rankBar.ExpansionDropdownButton
+	expansion:ClearAllPoints()
+	expansion:SetPoint('TOPRIGHT')
+	expansion:SetPoint('BOTTOMRIGHT')
+	expansion:SetWidth(rankBar:GetHeight())
+	local divider = Own(rankBar:CreateTexture(nil, 'OVERLAY'))
+	local edge = BUI.C.PANEL_BACKDROP
+	divider:SetColorTexture(edge[5], edge[6], edge[7], edge[8])
+	divider:SetPoint('TOPRIGHT', expansion, 'TOPLEFT', 0, -1)
+	divider:SetPoint('BOTTOMRIGHT', expansion, 'BOTTOMLEFT', 0, 1)
+	PixelUtil.SetWidth(divider, 1, 1)
+	rankBar.Rank:ClearAllPoints()
+	rankBar.Rank:SetPoint('TOPLEFT')
+	rankBar.Rank:SetPoint('BOTTOMRIGHT', expansion, 'BOTTOMLEFT')
 end
 
 local function SkinRankBar(rankBar)
@@ -370,11 +387,15 @@ local function SkinRankBar(rankBar)
 		fill:SetPoint('BOTTOMLEFT', 1, 1)
 		fill:SetTexture(BUI.GetGlobalTexture())
 		rankBar._buiFill = fill
+		LayoutRankBar(rankBar)
 		Hook(rankBar, 'Update', UpdateRankFill)
 	end
 	local red, green, blue = Theme.GetAccent()
 	rankBar._buiFill:SetVertexColor(red, green, blue, 1)
-	Skin.TipFace(rankBar.Rank.Text, 'body')
+	local text = rankBar.Rank.Text
+	Skin.TipFace(text, 'body')
+	local font, size = text:GetFont()
+	text:SetFont(font, size, 'OUTLINE')
 	local expansion = rankBar.ExpansionDropdownButton
 	Fade(expansion.Texture)
 	Skin.TipArrow(expansion, true)
