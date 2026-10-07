@@ -55,11 +55,16 @@ end
 
 local BLACK_COLOR = { 0, 0, 0, 1 }
 
+local kindCandidates = {}
+
 local function KindCandidates(kind)
 	local polarity = KIND_POLARITY[kind]
-	local exclude = {}
+	local blacklist = BUI.AuraBlacklist.GroupSet(polarity)
+	local cached = kindCandidates[kind]
+	if cached and cached.source == blacklist then return cached.candidates, cached.fingerprint end
 
-	for spellID in pairs(BUI.AuraBlacklist.GroupSet(polarity)) do
+	local exclude = {}
+	for spellID in pairs(blacklist) do
 		exclude[spellID] = true
 	end
 	if polarity == "HELPFUL" then
@@ -68,8 +73,13 @@ local function KindCandidates(kind)
 		end
 	end
 
-	if next(exclude) == nil then return nil, '' end
-	return { excludeSpellIDs = exclude }, 'bl:' .. Engine.SortedKeys(exclude)
+	cached = { source = blacklist, fingerprint = '' }
+	if next(exclude) ~= nil then
+		cached.candidates = { excludeSpellIDs = exclude }
+		cached.fingerprint = 'bl:' .. Engine.SortedKeys(exclude)
+	end
+	kindCandidates[kind] = cached
+	return cached.candidates, cached.fingerprint
 end
 
 local function KindSuffix(settings, kind)

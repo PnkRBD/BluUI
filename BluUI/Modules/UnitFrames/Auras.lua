@@ -14,6 +14,7 @@ local BUFF_BASE_COLOR = { 0, 0, 0, 1 }
 
 local filterCache
 local debuffWhitelistActive, buffWhitelistActive = false, false
+local candidateCache = {}
 
 local function GetFilters()
 	if not filterCache then
@@ -27,6 +28,7 @@ end
 
 function UnitFrames.InvalidateFilterCache()
 	filterCache = nil
+	wipe(candidateCache)
 end
 
 local DEBUFF_FILTER = 'HARMFUL|INCLUDE_NAME_PLATE_ONLY'
@@ -195,6 +197,9 @@ end
 local auraFrames = {}
 
 local function BuildCandidates(isDebuff)
+	local cached = candidateCache[isDebuff]
+	if cached then return cached.candidates, cached.fingerprint end
+
 	local filters = GetFilters()
 	local candidates, fingerprint
 
@@ -224,6 +229,7 @@ local function BuildCandidates(isDebuff)
 		end
 	end
 
+	candidateCache[isDebuff] = { candidates = candidates, fingerprint = fingerprint or '' }
 	return candidates, fingerprint or ''
 end
 
