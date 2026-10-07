@@ -601,7 +601,7 @@ function GroupFrames.RefreshRange()
 		range.outsideAlpha = rangeSettings.outsideAlpha
 		range.rangeFade    = rangeSettings.enabled
 		range.fadeOffline  = rangeSettings.fadeOffline
-		child:UpdateAllElements("BluRangeRefresh")
+		RangeOverride(child)
 	end
 	GroupFrames.EachChild(ApplyToChild)
 end
