@@ -642,12 +642,13 @@ local function HookTooltip(frame)
 	frame:HookScript("OnLeave", BUI.Profiler.Wrap('GroupFrames.Style frame OnLeave', function() GameTooltip:Hide() end))
 end
 
+local ShowClicks = BUI.Profiler.Wrap("GroupFrames.Style show clicks", function(self)
+	if self._bluClicksMode == GroupFrames.GetDB().clickMode and self:GetFrameStrata() == "LOW" then return end
+	BUI.Profiler.After("GroupFrames.Style secure clicks", 0, function() ApplySecureClicks(self) end)
+end)
+
 local function GroupFrameStyle(frame, unit)
 	BUI.Profiler.After("GroupFrames.Style secure clicks", 0, function() ApplySecureClicks(frame) end)
-	frame:HookScript("OnShow", BUI.Profiler.Wrap("GroupFrames.Style show clicks", function(self)
-		if self._bluClicksMode == GroupFrames.GetDB().clickMode and self:GetFrameStrata() == "LOW" then return end
-		BUI.Profiler.After("GroupFrames.Style secure clicks", 0, function() ApplySecureClicks(self) end)
-	end))
 
 	HookTooltip(frame)
 
@@ -661,7 +662,6 @@ local function GroupFrameStyle(frame, unit)
 	BuildRangeFade(frame, unit)
 	GroupFrames.BuildKeystone(frame, unit)
 
-	GroupFrames.ApplyGeometry(frame, GroupFrames.SettingsForFrame(frame))
 	frame.PreUpdate = SyncUnitClass
 end
 
@@ -683,4 +683,6 @@ end
 BUI.oUF:RegisterInitCallback(function(frame)
 	if frame.style ~= GroupFrames.STYLE_NAME then return end
 	frame:HookScript("OnAttributeChanged", BUI.Profiler.Wrap('GroupFrames.Style frame OnAttributeChanged', OnAttributeChanged))
+	frame:HookScript("OnShow", ShowClicks)
+	GroupFrames.ApplyGeometry(frame, GroupFrames.SettingsForFrame(frame))
 end)
