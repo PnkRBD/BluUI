@@ -701,6 +701,7 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 	local SECTION_GAP = 18
 	local ITEM_GAP = 6
 	local LABEL_GAP = 4
+	local FOOTER_ROOM = 72
 
 	local preview = dialog:CreateTexture(nil, 'ARTWORK')
 	preview:SetSize(36, 36)
@@ -836,6 +837,7 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 
 	local warnCBFrame
 	local glowModeDDFrame
+	local FitHeight
 	local function UpdateThresholdVisibility()
 		local show = glowMode ~= 'always'
 		threshInput:SetShown(show)
@@ -848,6 +850,7 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 				warnCBFrame:SetPoint('TOPLEFT', glowModeDDFrame, 'BOTTOMLEFT', 0, -SECTION_GAP)
 			end
 		end
+		if FitHeight then FitHeight() end
 	end
 
 	local glowModeDD = Controls.Dropdown(dialog, nil, {
@@ -975,6 +978,11 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 	end)
 	local globalCBFrame = globalCB.frame
 	globalCBFrame:SetPoint('LEFT', perSpecCBFrame, 'RIGHT', 110, 0)
+
+	function FitHeight()
+		dialog:SetHeight(math.ceil(dialog:GetTop() - perSpecCBFrame:GetBottom()) + FOOTER_ROOM)
+	end
+	FitHeight()
 
 	local fired = false
 	local function PerformSave()
