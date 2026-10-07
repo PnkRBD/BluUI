@@ -850,10 +850,13 @@ local function EditBoxOf(chatFrame)
 	return chatFrame.editBox or _G[chatFrame:GetName() .. 'EditBox']
 end
 
-local function AlignDockTabs(dock)
+local dockTabsMoved = false
+
+local AlignDockTabs = Wrap('Skin.Chat FCFDock_UpdateTabs', function(dock)
 	if not Enabled() then return end
 	if dock ~= GeneralDockManager then return end
 	if not dock:IsVisible() then return end
+	dockTabsMoved = false
 	for _, chatFrame in ipairs(dock.DOCKED_CHAT_FRAMES) do
 		local tab = TabOf(chatFrame)
 		if tab._buiChat then
@@ -872,7 +875,7 @@ local function AlignDockTabs(dock)
 			end
 		end
 	end
-end
+end)
 
 local function RefreshTabs()
 	for tabIndex = 1, #skinnedTabs do StyleTab(skinnedTabs[tabIndex]) end
@@ -1884,6 +1887,7 @@ local function Install()
 	Refresh()
 
 	Hook('FCFTab_UpdateColors', function(tab, selected)
+		dockTabsMoved = true
 		if not Enabled() or not tab._buiChat then return end
 		if selected == nil then selected = IsTabSelected(tab) end
 		if selected then StopTabPulse(tab) end
@@ -1891,7 +1895,9 @@ local function Install()
 		ApplyTabAlpha(tab)
 	end)
 
-	Hook('FCFDock_UpdateTabs', AlignDockTabs)
+	hooksecurefunc('FCFDock_UpdateTabs', function(dock)
+		if dockTabsMoved then AlignDockTabs(dock) end
+	end)
 
 	Hook('FCF_StartAlertFlash', function(chatFrame)
 		if not (Enabled() and TabFlash()) then return end
