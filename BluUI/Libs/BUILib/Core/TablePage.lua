@@ -206,19 +206,26 @@ function Layout.TableKit(window)
 			unit, decimals = unit * 10, decimals + 1
 		end
 		local pattern = '%.' .. decimals .. 'f'
+		local function Clamp(value)
+			return math.max(spec.min, math.min(spec.max, value))
+		end
 		local function Snap(value)
-			return math.max(spec.min, math.min(spec.max, spec.min + math.floor((value - spec.min) / step + 0.5) * step))
+			return Clamp(spec.min + math.floor((value - spec.min) / step + 0.5) * step)
+		end
+		local function Settle(value)
+			if spec.precise then return Clamp(value) end
+			return Snap(value)
 		end
 
 		local box = CreateFrame('Frame', nil, frame)
-		box:SetSize(SLIDER_BOX, CONTROL_HEIGHT)
+		box:SetSize(spec.boxWidth or SLIDER_BOX, CONTROL_HEIGHT)
 		box:SetPoint('RIGHT')
 		window:Fill(box, 'input'):SetAllPoints()
 		local edit = CreateFrame('EditBox', nil, box)
 		edit:SetAllPoints()
 		edit:SetAutoFocus(false)
 		edit:SetJustifyH('CENTER')
-		edit:SetMaxLetters(8)
+		edit:SetMaxLetters(spec.precise and 24 or 8)
 		edit:SetFont(window.font, 12, '')
 		window:Paint(edit, 'text')
 		window:SetFontRole(edit, 'control')
@@ -250,14 +257,19 @@ function Layout.TableKit(window)
 		fill:SetHeight(SLIDER_TRACK)
 
 		local function Show(value)
-			edit:SetText(pattern:format(value))
+			edit:SetText(spec.format and spec.format(value) or pattern:format(value))
 		end
-		local function Set(value)
-			value = Snap(value)
+		local holding = false
+		local function Set(value, typed)
+			value = typed and Settle(value) or Snap(value)
+			holding = true
 			slider:SetValue(value)
+			holding = false
+			Show(value)
 			spec.set(value)
 		end
 		slider:SetScript('OnValueChanged', function(_, value, userInput)
+			if holding then return end
 			value = Snap(value)
 			Show(value)
 			if userInput then spec.set(value) end
@@ -266,14 +278,16 @@ function Layout.TableKit(window)
 		plus:SetScript('OnClick', function() Set(slider:GetValue() + step) end)
 		edit:SetScript('OnEnterPressed', function(self)
 			local typed = tonumber(self:GetText())
-			if typed then Set(typed) else Show(Snap(slider:GetValue())) end
+			if typed then Set(typed, true) else Show(Settle(spec.get())) end
 			self:ClearFocus()
 		end)
 		edit:SetScript('OnEscapePressed', function(self) self:ClearFocus() end)
-		edit:SetScript('OnEditFocusLost', function() Show(Snap(slider:GetValue())) end)
+		edit:SetScript('OnEditFocusLost', function() Show(Settle(spec.get())) end)
 		window:Bind(frame, function()
-			local value = Snap(spec.get())
+			local value = Settle(spec.get())
+			holding = true
 			slider:SetValue(value)
+			holding = false
 			Show(value)
 		end)
 		frame.slider = slider
@@ -716,6 +730,7 @@ function Layout.TableKit(window)
 		card:SetScript('OnClick', onClick)
 		local ring = kit.Disc(card, CHOICE_RING, selected and 'accent' or 'faint')
 		ring:SetPoint('TOPRIGHT', -CHOICE_RING_INSET, -CHOICE_RING_INSET)
+		card.ring = ring
 		if selected then
 			kit.Glyph(card, 'check', CHOICE_CHECK, 'onAccent', 'OVERLAY'):SetPoint('CENTER', ring)
 		else
