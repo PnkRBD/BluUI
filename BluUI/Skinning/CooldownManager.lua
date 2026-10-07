@@ -151,7 +151,7 @@ local function Classify(frame, child)
 	if child:IsObjectType('EditBox') then return 'editbox' end
 	if not child:IsObjectType('Button') then return nil end
 	if IsKeyed(frame, child, TAB_KEYS) or FirstKey(child, SELECTED_KEYS) then return 'tab' end
-	if child.SetupMenu then return 'dropdown' end
+	if child.SetupMenu then return child.Text and 'dropdown' or nil end
 	if HasText(child) then return 'button' end
 	if FirstKey(child, ICON_KEYS) and (child:GetWidth() or 0) <= TAB_MAX_WIDTH then return 'tab' end
 	return nil
