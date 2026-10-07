@@ -35,20 +35,39 @@ function Power.GetScope()
     return ScopeOf(BUI.GetDB())
 end
 
+local completedVariants = setmetatable({}, { __mode = 'k' })
+
+local function FillMissing(target, defaults)
+    for key, value in pairs(defaults) do
+        local current = target[key]
+        if current == nil then
+            target[key] = BUI.Tools.DeepCopy(value)
+        elseif type(current) == 'table' and type(value) == 'table' then
+            FillMissing(current, value)
+        end
+    end
+end
+
 local function EnsureVariant(profile, key)
     local variants = profile.powerVariants
     local variant = variants and variants[key]
-    if variant and variant.powerBar and variant.secondaryPower then return variant end
-    profile.powerVariants = variants or {}
-    if not variant then
-        variant = {
-            powerBar = BUI.Tools.DeepCopy(profile.powerBar),
-            secondaryPower = BUI.Tools.DeepCopy(profile.secondaryPower),
-        }
-        profile.powerVariants[key] = variant
-    else
-        if not variant.powerBar then variant.powerBar = BUI.Tools.DeepCopy(profile.powerBar) end
-        if not variant.secondaryPower then variant.secondaryPower = BUI.Tools.DeepCopy(profile.secondaryPower) end
+    if not (variant and variant.powerBar and variant.secondaryPower) then
+        profile.powerVariants = variants or {}
+        if not variant then
+            variant = {
+                powerBar = BUI.Tools.DeepCopy(profile.powerBar),
+                secondaryPower = BUI.Tools.DeepCopy(profile.secondaryPower),
+            }
+            profile.powerVariants[key] = variant
+        else
+            if not variant.powerBar then variant.powerBar = BUI.Tools.DeepCopy(profile.powerBar) end
+            if not variant.secondaryPower then variant.secondaryPower = BUI.Tools.DeepCopy(profile.secondaryPower) end
+        end
+    end
+    if not completedVariants[variant] then
+        completedVariants[variant] = true
+        FillMissing(variant.powerBar, BUI.Defaults.profile.powerBar)
+        FillMissing(variant.secondaryPower, BUI.Defaults.profile.secondaryPower)
     end
     return variant
 end
