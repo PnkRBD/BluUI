@@ -105,7 +105,7 @@ local function ApplyIndicator(texture, config)
 	local name = texture._elementName
 	if config.enabled then
 		if name and not frame:IsElementEnabled(name) then
-			frame:EnableElement(name)
+			frame:EnableElement(name, frame:GetAttribute("oUF-guessUnit"))
 		end
 		if texture.ForceUpdate and not TRANSIENT_ELEMENTS[name] and frame.unit and UnitExists(frame.unit) then texture:ForceUpdate() end
 	else
@@ -273,7 +273,7 @@ local function RestoreElementAsset(child, texture)
 	local name = texture._elementName
 	if name and child:IsElementEnabled(name) then
 		child:DisableElement(name)
-		child:EnableElement(name)
+		child:EnableElement(name, child:GetAttribute("oUF-guessUnit"))
 	end
 	if texture.ForceUpdate and child.unit and UnitExists(child.unit) then texture:ForceUpdate() end
 end
