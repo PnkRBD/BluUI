@@ -120,66 +120,32 @@ local function DefaultSortDirection()
 end
 
 function Engine.ResolveSortMethod(key)
-	local enum = AuraContainerSortMethod
-	if not enum then return nil end
 	for choiceIndex = 1, #SORT_CHOICES do
 		local choice = SORT_CHOICES[choiceIndex]
-		if choice.key == key then
-			local value = enum[choice.enumKey]
-			if value ~= nil then return value end
-			break
-		end
+		if choice.key == key then return AuraContainerSortMethod[choice.enumKey] end
 	end
-	return enum.Default
+	return AuraContainerSortMethod.Default
 end
 
 function Engine.SortMethodItems()
-	local enum = AuraContainerSortMethod
 	local items = {}
-	if enum then
-		for choiceIndex = 1, #SORT_CHOICES do
-			local choice = SORT_CHOICES[choiceIndex]
-			if enum[choice.enumKey] ~= nil then
-				items[#items + 1] = { value = choice.key, text = choice.label }
-			end
-		end
+	for choiceIndex = 1, #SORT_CHOICES do
+		local choice = SORT_CHOICES[choiceIndex]
+		items[choiceIndex] = { value = choice.key, text = choice.label }
 	end
 	return items
 end
 
-local function CallMethod(object, names, ...)
-	for nameIndex = 1, #names do
-		local method = object[names[nameIndex]]
-		if method then
-			method(object, ...)
-			return true
-		end
-	end
-	return false
-end
-
-local FLOW_ANCHOR    = { 'SetFlowLayoutAnchorPoint',     'SetAuraLayoutAnchorPoint' }
-local FLOW_GROWTH    = { 'SetFlowLayoutGrowthDirection', 'SetAuraLayoutGrowthDirection' }
-local FLOW_PADDING   = { 'SetFlowLayoutPadding',         'SetAuraLayoutPadding' }
-local FLOW_LINE_SIZE = { 'SetFlowLayoutMaximumLineSize', 'SetAuraLayoutMaximumLineSize' }
-
-local function FlowDirections(style)
-	local FlowDirection = AnchorUtil and AnchorUtil.FlowDirection
-	if not FlowDirection then return nil end
-	local horizontal = style.growX == 'RIGHT' and FlowDirection.Right or FlowDirection.Left
-	local vertical = style.growY == 'UP' and FlowDirection.Up or FlowDirection.Down
-	return horizontal, vertical
-end
-
 local function ApplyLayout(container, style)
-	local anchor = Engine.GrowthToAnchor(style.growX, style.growY)
-	CallMethod(container, FLOW_ANCHOR, anchor)
-	local horizontal, vertical = FlowDirections(style)
-	if horizontal then CallMethod(container, FLOW_GROWTH, horizontal, vertical) end
+	local FlowDirection = AnchorUtil.FlowDirection
+	container:SetFlowLayoutAnchorPoint(Engine.GrowthToAnchor(style.growX, style.growY))
+	container:SetFlowLayoutGrowthDirection(
+		style.growX == 'RIGHT' and FlowDirection.Right or FlowDirection.Left,
+		style.growY == 'UP' and FlowDirection.Up or FlowDirection.Down)
 	local padding = Pixel.Scale(style.padding or style.gap)
-	CallMethod(container, FLOW_PADDING, padding, padding, padding, padding)
+	container:SetFlowLayoutPadding(padding, padding, padding, padding)
 	local lineSize = style.perRow * style.size + (style.perRow - 1) * style.gap + 0.4
-	CallMethod(container, FLOW_LINE_SIZE, Pixel.Scale(lineSize))
+	container:SetFlowLayoutMaximumLineSize(Pixel.Scale(lineSize))
 end
 
 function Engine.ApplyFlowLayout(container, style)
@@ -229,9 +195,7 @@ local function SetCaptureArmed(armed)
 	if BUI.Tools.ShouldAurasBeSecret() then return end
 	captureArmed = armed
 	for button in pairs(captureButtons) do
-		if button.SetMouseClickEnabled then
-			button:SetMouseClickEnabled(armed)
-		end
+		button:SetMouseClickEnabled(armed)
 	end
 end
 
@@ -291,7 +255,7 @@ local function RestyleButton(container, button, buttonInfo, style)
 	end
 	buttonInfo.mousePending = nil
 	button:SetMouseMotionEnabled(style.showTooltips and true or false)
-	if button.SetPropagateMouseMotion then button:SetPropagateMouseMotion(true) end
+	button:SetPropagateMouseMotion(true)
 end
 
 local function Retired(buttonInfo)
@@ -373,25 +337,17 @@ local function MakeInitializer(container, groupInfo)
 		container._buiStyleStamp = container._buiStyleStamp or 1
 		xpcall(AttemptRestyle, geterrorhandler(), container, button)
 
-		if button.SetIcon then button:SetIcon(icon) end
-		if button.SetDurationCooldown then button:SetDurationCooldown(cooldown) end
-		if button.SetApplicationCount then button:SetApplicationCount(count, {}) end
+		button:SetIcon(icon)
+		button:SetDurationCooldown(cooldown)
+		button:SetApplicationCount(count, {})
 
-		if groupInfo.style.showDispelType and button.AddDispelTypeTexture then
-			local dispelOptions = { showWhenHarmful = true }
-			local styleEnum = Enum.CustomAuraButtonDispelTypeTextureStyle
-			if styleEnum and styleEnum.PreserveAsset then dispelOptions.style = styleEnum.PreserveAsset end
-			button:AddDispelTypeTexture(dispel, dispelOptions)
+		if groupInfo.style.showDispelType then
+			button:AddDispelTypeTexture(dispel, { showWhenHarmful = true, style = Enum.CustomAuraButtonDispelTypeTextureStyle.PreserveAsset })
 		end
 
-		local capturable = not container._buiNoCapture
-		if capturable then
-			captureButtons[button] = container
-			button:HookScript('OnMouseDown', BUI.Profiler.Wrap('AuraContainerEngine button OnMouseDown', OnButtonMouseDown))
-		end
-		if button.SetMouseClickEnabled then
-			button:SetMouseClickEnabled(capturable and captureArmed or false)
-		end
+		captureButtons[button] = container
+		button:HookScript('OnMouseDown', BUI.Profiler.Wrap('AuraContainerEngine button OnMouseDown', OnButtonMouseDown))
+		button:SetMouseClickEnabled(captureArmed)
 
 		buttonInfo.created = true
 	end
@@ -516,21 +472,14 @@ local function EnsureRuleGroups(container, sets)
 		if not wanted[fingerprint] and info.active then
 			info.active = false
 			info.max = 0
-			if container.SetAuraGroupMaxFrameCount then
-				container:SetAuraGroupMaxFrameCount(info.key, 0)
-			end
+			container:SetAuraGroupMaxFrameCount(info.key, 0)
 		end
 	end
 
-	if not container.AddAuraGroup then return end
-
-	local defaultSort = AuraContainerSortMethod and AuraContainerSortMethod.Default
 	local sortDirection = DefaultSortDirection()
 
 	for fingerprint, spec in pairs(wanted) do
 		local style = spec.style
-		local sortMethod = style.sortMethod
-		if sortMethod == nil then sortMethod = defaultSort end
 		local layout = {
 			elementWidth = style.size, elementHeight = style.size,
 			elementSpacing = style.gap, lineSpacing = style.rowGap or style.gap,
@@ -540,33 +489,24 @@ local function EnsureRuleGroups(container, sets)
 		if info then
 			info.active = true
 			info.style = style
-			if info.max ~= style.max and container.SetAuraGroupMaxFrameCount then
+			if info.max ~= style.max then
 				info.max = style.max
 				container:SetAuraGroupMaxFrameCount(info.key, style.max)
 			end
-			if container.SetAuraGroupLayout then
-				container:SetAuraGroupLayout(info.key, layout)
-			end
-			if sortMethod ~= nil and sortDirection ~= nil and container.SetAuraGroupSortMethod then
-				container:SetAuraGroupSortMethod(info.key, sortMethod, sortDirection)
-			end
+			container:SetAuraGroupLayout(info.key, layout)
+			container:SetAuraGroupSortMethod(info.key, style.sortMethod, sortDirection)
 		else
 			container._buiGroupSeq = (container._buiGroupSeq or 0) + 1
 			local key = 'bui' .. container._buiGroupSeq
 			local groupInfo = { key = key, active = true, max = style.max, style = style, harmful = spec.harmful }
-			local groupOptions = {
+			container:AddAuraGroup(key, spec.filter, {
 				maxFrameCount = style.max,
 				initializeFrame = MakeInitializer(container, groupInfo),
 				candidateFilters = spec.cand,
 				layout = layout,
-			}
-			if sortMethod ~= nil then
-				groupOptions.sortMethod = sortMethod
-			end
-			if sortDirection ~= nil then
-				groupOptions.sortDirection = sortDirection
-			end
-			container:AddAuraGroup(key, spec.filter, groupOptions)
+				sortMethod = style.sortMethod,
+				sortDirection = sortDirection,
+			})
 			container._buiGroups[fingerprint] = groupInfo
 		end
 	end
@@ -591,7 +531,6 @@ end
 Engine.NewAuraCooldownDriver = Engine.NewAuraDriver
 
 local function SyncButtonDriver(driver, wanted, spellSet, stamp, width, height, init, style)
-	if not Engine.Available then return end
 	if not wanted then
 		if driver.container then
 			driver.container:Hide()
@@ -621,19 +560,13 @@ local function SyncButtonDriver(driver, wanted, spellSet, stamp, width, height, 
 		if driver.spellSet == spellSet then
 			entry = driver.entry
 		else
-			if driver.group and container.SetAuraGroupMaxFrameCount then
-				container:SetAuraGroupMaxFrameCount(driver.group, 0)
-			end
+			if driver.group then container:SetAuraGroupMaxFrameCount(driver.group, 0) end
 			driver.groupsBySet = driver.groupsBySet or {}
 			entry = driver.groupsBySet[spellSet]
-			if entry and container.SetAuraGroupMaxFrameCount then
-				container:SetAuraGroupMaxFrameCount(entry.key, 1)
-			end
+			if entry then container:SetAuraGroupMaxFrameCount(entry.key, 1) end
 		end
 		if entry then
-			if container.SetAuraGroupLayout then
-				container:SetAuraGroupLayout(entry.key, layout)
-			end
+			container:SetAuraGroupLayout(entry.key, layout)
 			for buttonIndex = 1, #entry.buttons do
 				local button = entry.buttons[buttonIndex]
 				button:SetSize(width, height)
@@ -644,20 +577,18 @@ local function SyncButtonDriver(driver, wanted, spellSet, stamp, width, height, 
 			local key = 'acd' .. driver.seq
 			local buttons = {}
 			entry = { key = key, buttons = buttons }
-			if container.AddAuraGroup then
-				container:AddAuraGroup(key, 'HELPFUL', {
-					maxFrameCount = 1,
-					initializeFrame = function(button)
-						buttons[#buttons + 1] = button
-						button:SetSize(driver.w, driver.h)
-						driver.init(driver, button)
-						if button.SetMouseClickEnabled then button:SetMouseClickEnabled(false) end
-						if button.SetMouseMotionEnabled then button:SetMouseMotionEnabled(false) end
-					end,
-					candidateFilters = { includeSpellIDs = spellSet },
-					layout = layout,
-				})
-			end
+			container:AddAuraGroup(key, 'HELPFUL', {
+				maxFrameCount = 1,
+				initializeFrame = function(button)
+					buttons[#buttons + 1] = button
+					button:SetSize(driver.w, driver.h)
+					driver.init(driver, button)
+					button:SetMouseClickEnabled(false)
+					button:SetMouseMotionEnabled(false)
+				end,
+				candidateFilters = { includeSpellIDs = spellSet },
+				layout = layout,
+			})
 			driver.groupsBySet = driver.groupsBySet or {}
 			driver.groupsBySet[spellSet] = entry
 		end
@@ -666,7 +597,7 @@ local function SyncButtonDriver(driver, wanted, spellSet, stamp, width, height, 
 		driver.spellSet = spellSet
 		driver.stamp = stamp
 		driver.bound = false
-		if container.UpdateAllAuras then container:UpdateAllAuras() end
+		container:UpdateAllAuras()
 	end
 	if not driver.bound then
 		driver.container:Show()
@@ -762,7 +693,7 @@ HatchNext = BUI.Dispatcher.New(function()
 	EnsureRuleGroups(container, container._buiLastConfig)
 	container._buiHatched = true
 	if container._buiOnHatch then container._buiOnHatch() end
-	if container._buiUnit and container.UpdateAllAuras then container:UpdateAllAuras() end
+	if container._buiUnit then container:UpdateAllAuras() end
 	if nest[1] then HatchNext() end
 end, 'AuraEngine.Hatch')
 
@@ -803,7 +734,7 @@ ConfigureContainer = function(container, sets, forced)
 		nest[#nest + 1] = container
 	end
 	container._buiGUID = nil
-	if regenerated and container._buiUnit and container.UpdateAllAuras then container:UpdateAllAuras() end
+	if regenerated and container._buiUnit then container:UpdateAllAuras() end
 
 	for _, button in ipairs(container._buiButtons) do
 		AttemptRestyle(container, button)
@@ -822,21 +753,21 @@ function Engine.BindUnit(container, unit)
 	if not unit then
 		container._buiUnit = nil
 		container._buiGUID = nil
-		if container._buiEnabled ~= false and container.SetEnabled then
+		if container._buiEnabled ~= false then
 			container._buiEnabled = false
 			container:SetEnabled(false)
 		end
 		return
 	end
 	local changed = false
-	if container._buiEnabled ~= true and container.SetEnabled then
+	if container._buiEnabled ~= true then
 		container._buiEnabled = true
 		container:SetEnabled(true)
 		changed = true
 	end
 	if container._buiUnit ~= unit then
 		container._buiUnit = unit
-		if container.SetUnit then container:SetUnit(unit) end
+		container:SetUnit(unit)
 		changed = true
 	end
 	local guid = UnitGUID(unit)
@@ -847,7 +778,7 @@ function Engine.BindUnit(container, unit)
 		if guid ~= container._buiGUID then changed = true end
 		container._buiGUID = guid
 	end
-	if changed and container.UpdateAllAuras then container:UpdateAllAuras() end
+	if changed then container:UpdateAllAuras() end
 end
 
 function Engine.RebindUnit(container, unit)
@@ -864,15 +795,12 @@ function Engine.RebindUnit(container, unit)
 	end
 end
 
-if Engine.Available then
-	BUI.Events:Register('PLAYER_REGEN_ENABLED', 'AuraEngine.RestyleDrain', function() BUI.Events:AfterCombatSettled(DrainRestyleQueue, 'AuraEngine.RestyleDrain') end)
-	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'AuraEngine.RestyleDrain', DrainRestyleQueue)
-	BUI.Events:Register('MODIFIER_STATE_CHANGED', 'AuraEngine.Capture', OnModifierChanged)
-	BUI.Events:Register('PLAYER_REGEN_DISABLED', 'AuraEngine.Capture', function()
-		SetCaptureArmed(false)
-	end)
-	BUI.Events:Register('PLAYER_REGEN_ENABLED', 'AuraEngine.Capture', function()
-		SetCaptureArmed(IsShiftKeyDown())
-	end)
-end
-
+BUI.Events:Register('PLAYER_REGEN_ENABLED', 'AuraEngine.RestyleDrain', function() BUI.Events:AfterCombatSettled(DrainRestyleQueue, 'AuraEngine.RestyleDrain') end)
+BUI.Events:Register('PLAYER_ENTERING_WORLD', 'AuraEngine.RestyleDrain', DrainRestyleQueue)
+BUI.Events:Register('MODIFIER_STATE_CHANGED', 'AuraEngine.Capture', OnModifierChanged)
+BUI.Events:Register('PLAYER_REGEN_DISABLED', 'AuraEngine.Capture', function()
+	SetCaptureArmed(false)
+end)
+BUI.Events:Register('PLAYER_REGEN_ENABLED', 'AuraEngine.Capture', function()
+	SetCaptureArmed(IsShiftKeyDown())
+end)

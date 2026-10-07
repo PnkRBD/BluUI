@@ -121,7 +121,7 @@ local function ApplyKind(frame, settings, kind)
 	local key = KIND_KEYS[kind]
 	local container = frame[key]
 
-	if not config.enabled or not Engine.Available then
+	if not config.enabled then
 		if container then
 			container:Hide()
 			Engine.BindUnit(container, nil)
@@ -183,13 +183,9 @@ local function ResetFrameAuras(frame, unit)
 	BindAllKinds(frame, unit)
 end
 
-local UNIT_AURA_EVENTS = Engine.Available and { "UNIT_AURA" } or { "UNIT_AURA", "UNIT_FLAGS", "UNIT_PHASE", "UNIT_CONNECTION" }
-
 local function RegisterAuraUnitEvents(watcher, unit)
-	for eventIndex = 1, #UNIT_AURA_EVENTS do
-		if unit then watcher:RegisterUnitEvent(UNIT_AURA_EVENTS[eventIndex], unit)
-		else      watcher:UnregisterEvent(UNIT_AURA_EVENTS[eventIndex]) end
-	end
+	if unit then watcher:RegisterUnitEvent("UNIT_AURA", unit)
+	else watcher:UnregisterEvent("UNIT_AURA") end
 end
 
 function GroupFrames.RewireAuraEvents(frame, unit)
@@ -233,15 +229,8 @@ local function AuraUpdateRelevant(frame, info)
 	return not GroupFrames.DispelViaEngine and frame._dispelColor ~= nil
 end
 
-local warnedNoEngine = false
-
 local function BuildAuraContainers(frame)
 	local settings = GroupFrames.SettingsForFrame(frame)
-
-	if not Engine.Available and not warnedNoEngine then
-		warnedNoEngine = true
-		GroupFrames.Print("Aura displays need the AuraContainer API (12.x) and are disabled on this client.")
-	end
 
 	for kindIndex = 1, #KIND_LIST do
 		ApplyKind(frame, settings, KIND_LIST[kindIndex])

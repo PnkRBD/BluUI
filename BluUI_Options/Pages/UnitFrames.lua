@@ -954,7 +954,7 @@ local function AuraRow(board, unitKey, unitSettings, isDebuff)
 	board:AddTools(title, (isDebuff and 'Debuff' or 'Buff') .. ' icons attached to the frame', {
 		AuraLists.Rules({
 			getRules = function() return UnitFrames().GetAuraRules(unitSettings, isDebuff) end,
-			polarity = isDebuff and 'HARMFUL' or 'HELPFUL', unitFramesOnly = true,
+			polarity = isDebuff and 'HARMFUL' or 'HELPFUL',
 			onChanged = RefreshFrames,
 		}),
 		{ icon = 'location', tooltip = 'Anchor, growth and offset', title = title, options = layout },
