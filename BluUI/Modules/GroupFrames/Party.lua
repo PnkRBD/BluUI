@@ -154,6 +154,7 @@ end
 function GroupFrames.RefreshParty()
 	local header = GroupFrames.headers.party
 	if not header then return end
+	if InCombatLockdown() then GroupFrames.AfterCombat(GroupFrames.RefreshParty, "GF.RefreshParty"); return end
 	local partySettings = GroupFrames.GetDB().party
 
 	local target = PositionHeader(header, partySettings)
@@ -172,10 +173,8 @@ function GroupFrames.RefreshParty()
 	SetHeaderAttribute(header, "groupingOrder", SortOrderFor(partySettings))
 	GroupFrames.SetHeaderVisibility(header, VisibilityFor(partySettings))
 
-	if not InCombatLockdown() then
-		GroupFrames.EachPartyChild(function(child) child:ClearAllPoints() end)
-		if header:IsVisible() then header:Hide(); header:Show() end
-	end
+	GroupFrames.EachPartyChild(function(child) child:ClearAllPoints() end)
+	if header:IsVisible() then header:Hide(); header:Show() end
 
 	local geometry = {
 		width           = effectiveWidth,
