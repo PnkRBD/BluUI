@@ -143,13 +143,13 @@ local function UpdateLifeState(self, unit)
 	return true
 end
 
-local function HealthPostUpdate(element, unit)
+local function HealthPostUpdate(element, unit, cur)
 	local deadOrGhost = UnitIsDeadOrGhost(unit)
 	if deadOrGhost then
 		element:SetMinMaxValues(0, 1)
 		element:SetValue(0)
 	elseif unit == 'player' and not UnitIsConnected(unit) then
-		element:SetValue(element.cur or 0, element.smoothing)
+		element:SetValue(cur, element.smoothing)
 	end
 	local frame = element.__owner
 	if deadOrGhost or frame._statusState then UpdateLifeState(frame, unit) end
