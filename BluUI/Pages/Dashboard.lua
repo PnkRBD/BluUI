@@ -394,6 +394,14 @@ local function PreviousSeasonScore()
     return type(keystone) == 'table' and tonumber(keystone.previousScore) or 0
 end
 
+local function CurrentRaids(raidProfile)
+    local current = {}
+    for _, summary in ipairs(raidProfile.raidProgress) do
+        if summary.current then current[summary.raid] = true end
+    end
+    return current
+end
+
 local function RaiderIORaidProgress()
     local profile = RaiderIOProfile()
     local raidProfile = profile and profile.raidProfile
@@ -401,13 +409,14 @@ local function RaiderIORaidProgress()
     local progressList = raidProfile.progress or raidProfile.sortedProgress or raidProfile.raidProgress
     if type(progressList) ~= 'table' or #progressList == 0 then return nil end
 
+    local currentRaids = CurrentRaids(raidProfile)
     local raidsByName, orderedRaids = {}, {}
     for _, entry in ipairs(progressList) do
         local raid = entry.raid or entry.currentRaid
         local raidName = (type(raid) == 'table' and (raid.name or raid.shortName)) or entry.raidName
         local difficulty = tonumber(entry.difficulty or entry.diff)
         local kills = entry.killsPerBoss or entry.kills
-        if raidName and difficulty and difficulty >= 1 and difficulty <= 3 and type(kills) == 'table' then
+        if currentRaids[raid] and raidName and difficulty and difficulty >= 1 and difficulty <= 3 and type(kills) == 'table' then
             local raidEntry = raidsByName[raidName]
             if not raidEntry then
                 raidEntry = { name = raidName, bossCount = 0, diffs = {}, source = 'rio' }
