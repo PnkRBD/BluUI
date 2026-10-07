@@ -133,6 +133,12 @@ local function Abbreviate(number)
 	return AbbreviateNumbers(number)
 end
 
+local function HealthPlusAbsorb(unit)
+	local health, absorb = UnitHealth(unit), UnitGetTotalAbsorbs(unit)
+	if issecretvalue(health) or issecretvalue(absorb) then return health end
+	return health + absorb
+end
+
 local TagEvents = {
 	['hp']             = 'UNIT_HEALTH UNIT_MAXHEALTH UNIT_CONNECTION',
 	['hp:short']       = 'UNIT_HEALTH UNIT_MAXHEALTH UNIT_CONNECTION',
@@ -297,15 +303,11 @@ local Handlers = {
 	['absorbs'] = function(unit) return Abbreviate(UnitGetTotalAbsorbs(unit)) end,
 	['hpabsorb'] = function(unit)
 		if UnitIsDeadOrGhost(unit) then return 'Dead' end
-		local health = UnitHealth(unit) or 0
-		local absorb = UnitGetTotalAbsorbs(unit) or 0
-		return tostring(health + absorb)
+		return HealthPlusAbsorb(unit)
 	end,
 	['hpabsorb:short'] = function(unit)
 		if UnitIsDeadOrGhost(unit) then return 'Dead' end
-		local health = UnitHealth(unit) or 0
-		local absorb = UnitGetTotalAbsorbs(unit) or 0
-		return Abbreviate(health + absorb)
+		return Abbreviate(HealthPlusAbsorb(unit))
 	end,
 	['name'] = function(unit) return UnitName(unit) or '' end,
 	['name:short'] = function(unit) local name = UnitName(unit) return name and Tools.TruncateName(name, 10) or '' end,
@@ -353,7 +355,7 @@ local Handlers = {
 	['group'] = function(unit)
 		if not IsInRaid() then return '' end
 		local name = UnitName(unit)
-		if not name then return '' end
+		if not name or issecretvalue(name) then return '' end
 		for memberIndex = 1, GetNumGroupMembers() do
 			local rosterName, _, subgroup = GetRaidRosterInfo(memberIndex)
 			if rosterName == name then return tostring(subgroup) end
@@ -402,6 +404,7 @@ local Handlers = {
 	['title'] = function(unit)
 		local name = UnitPVPName(unit)
 		local plainName = UnitName(unit)
+		if issecretvalue(name) or issecretvalue(plainName) then return '' end
 		if name and plainName and name ~= plainName then
 			return name:gsub(plainName, ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub(',%s*$', '')
 		end
