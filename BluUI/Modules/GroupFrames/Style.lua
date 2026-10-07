@@ -207,7 +207,7 @@ local function BuildHealth(frame, unit)
 
 	frame.Health = healthBar
 	frame:RegisterEvent("UNIT_FLAGS", CatchUpHealth)
-	frame:RegisterEvent("PLAYER_FLAGS_CHANGED", CatchUpHealth, true)
+	frame:RegisterEvent("PLAYER_FLAGS_CHANGED", CatchUpHealth)
 end
 
 local function AnchorAbsorb(absorb, health, direction)
