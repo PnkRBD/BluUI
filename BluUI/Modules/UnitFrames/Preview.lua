@@ -325,13 +325,27 @@ local function ShowFakeAuras(frame, unitType)
 		icon.cd:SetText(tostring(30 + iconIndex * 5))
 	end)
 
-	LayoutGrid(cached.debuffHolder, cached.debuffs, debuffCount, debuffStyle, frame)
-	LayoutGrid(cached.buffHolder, cached.buffs, buffCount, buffStyle, frame)
-	if follower then
-		local followerHolder = follower == debuffStyle and cached.debuffHolder or cached.buffHolder
-		local leaderHolder = followerHolder == cached.debuffHolder and cached.buffHolder or cached.debuffHolder
-		UnitFrames.AttachAuraFlow(follower, leader, followerHolder, leaderHolder)
+	if not follower then
+		LayoutGrid(cached.debuffHolder, cached.debuffs, debuffCount, debuffStyle, frame)
+		LayoutGrid(cached.buffHolder, cached.buffs, buffCount, buffStyle, frame)
+		return
 	end
+	local leaderIsDebuff = leader == debuffStyle
+	local leaderIcons, leaderCount, leaderHolder = cached.buffs, buffCount, cached.buffHolder
+	local followerIcons, followerCount, followerHolder = cached.debuffs, debuffCount, cached.debuffHolder
+	if leaderIsDebuff then
+		leaderIcons, leaderCount, leaderHolder = cached.debuffs, debuffCount, cached.debuffHolder
+		followerIcons, followerCount, followerHolder = cached.buffs, buffCount, cached.buffHolder
+	end
+	local flow = cached.flow or {}
+	cached.flow = flow
+	wipe(flow)
+	for iconIndex = 1, leaderCount do flow[iconIndex] = leaderIcons[iconIndex] end
+	for iconIndex = 1, followerCount do flow[leaderCount + iconIndex] = followerIcons[iconIndex] end
+	LayoutGrid(leaderHolder, flow, leaderCount + followerCount, leader, frame)
+	followerHolder:ClearAllPoints()
+	followerHolder:SetAllPoints(leaderHolder)
+	followerHolder:Show()
 end
 
 local function RestoreContainer(container)
