@@ -50,6 +50,7 @@ Utility\TimeFormat.lua
 Utility\Keybinds.lua
 Utility\Pixel.lua
 Utility\Animation.lua
+Utility\Confetti.lua
 Utility\GlowManager.lua
 Utility\TTS.lua
 Utility\Anchors.lua
@@ -161,6 +162,7 @@ Modules\CDM\EditModeLock.lua
 Modules\CDM\Profiles.lua
 Modules\CDM\Initialize.lua
 
+Modules\Celebrations\Celebrations.lua
 Modules\Auras\Auras.lua
 Modules\Auras\CombatTimer.lua
 Modules\Auras\CombatMessage.lua
