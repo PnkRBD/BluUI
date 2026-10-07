@@ -911,6 +911,12 @@ local function PositionTool(unitKey, unitSettings)
 	return BUI.PositionTool(proxy, { frames = frames, noCenter = true, matchWidth = true, matchHeight = true, rangeX = POSITION_RANGE_X, rangeY = POSITION_RANGE_Y })
 end
 
+local AURA_FLOWS = {
+	{ value = 'separate', text = 'Separate' },
+	{ value = 'debuffsAfterBuffs', text = 'Debuffs after buffs' },
+	{ value = 'buffsAfterDebuffs', text = 'Buffs after debuffs' },
+}
+
 local function AuraRow(board, unitKey, unitSettings, isDebuff)
 	local prefix = isDebuff and 'debuff' or 'buff'
 	local title = isDebuff and 'Debuffs' or 'Buffs'
@@ -1145,6 +1151,9 @@ local function UnitBoards(ui, parent, width, unit)
 		})
 		AuraRow(auras, unitKey, unitSettings, true)
 		AuraRow(auras, unitKey, unitSettings, false)
+		auras:AddTools('Flow', 'Let one set of icons pick up right where the other ends, it follows their direction', {
+			Menu(unitSettings, 'auraFlow', AURA_FLOWS, 200),
+		}, RefreshFrames)
 		boards[#boards + 1] = auras
 	end
 	if unitKey == 'boss' then
