@@ -72,6 +72,8 @@ local ICON_GAP = 10
 local CURRENCY_ROW = 28
 local CURRENCY_ICON = 18
 local CURRENCY_ROWS = 12
+local CURRENCY_HELD = 56
+local CURRENCY_EARNED = 110
 local GROUP_RULE = 9
 local CHAR_ROW = 26
 local CHAR_ROWS = 20
@@ -324,7 +326,8 @@ local function CurrencyRows(ids, rows, crest)
     for _, currencyID in ipairs(ids) do
         local info = C_CurrencyInfo.GetCurrencyInfo(currencyID)
         if info then
-            rows[#rows + 1] = { name = info.name, icon = info.iconFileID, quality = info.quality, quantity = info.quantity, max = BUI.Currency.Cap(currencyID, info), crest = crest }
+            local earned, cap, weekly = BUI.Currency.Progress(currencyID, info)
+            rows[#rows + 1] = { name = info.name, icon = info.iconFileID, quality = info.quality, quantity = info.quantity, earned = earned, cap = cap, weekly = weekly, crest = crest }
         end
     end
 end
@@ -1352,6 +1355,14 @@ local function BuildCurrencies()
     currencies.id = 'crests'
     local empty = Empty(currencies, 'No season currencies found yet.')
     local rule = Rule(currencies)
+    local heldHead = kit.Text(currencies, 'Held', 11, 'faint')
+    heldHead:SetPoint('TOPRIGHT', -PAD, -TABLE_TOP)
+    heldHead:SetWidth(CURRENCY_HELD)
+    heldHead:SetJustifyH('RIGHT')
+    local earnedHead = kit.Text(currencies, 'Earned', 11, 'faint')
+    earnedHead:SetPoint('TOPRIGHT', heldHead, 'TOPLEFT', -ICON_GAP, 0)
+    earnedHead:SetWidth(CURRENCY_EARNED)
+    earnedHead:SetJustifyH('RIGHT')
     local rows = {}
     for index = 1, CURRENCY_ROWS do
         local row = CreateFrame('Frame', nil, currencies)
@@ -1360,11 +1371,17 @@ local function BuildCurrencies()
         row.icon:SetSize(CURRENCY_ICON, CURRENCY_ICON)
         row.icon:SetPoint('LEFT')
         row.icon:SetTexCoord(unpack(ICON_CROP))
-        row.value = kit.Text(row, '', 12, 'text')
-        row.value:SetPoint('RIGHT')
+        row.held = kit.Text(row, '', 12, 'text')
+        row.held:SetPoint('RIGHT')
+        row.held:SetWidth(CURRENCY_HELD)
+        row.held:SetJustifyH('RIGHT')
+        row.earned = kit.Text(row, '', 12, 'text')
+        row.earned:SetPoint('RIGHT', row.held, 'LEFT', -ICON_GAP, 0)
+        row.earned:SetWidth(CURRENCY_EARNED)
+        row.earned:SetJustifyH('RIGHT')
         row.name = kit.Text(row, '', 12, 'text')
         row.name:SetPoint('LEFT', CURRENCY_ICON + ICON_GAP, 0)
-        row.name:SetPoint('RIGHT', row.value, 'LEFT', -ICON_GAP, 0)
+        row.name:SetPoint('RIGHT', row.earned, 'LEFT', -ICON_GAP, 0)
         row.name:SetWordWrap(false)
         rows[index] = row
     end
@@ -1373,6 +1390,8 @@ local function BuildCurrencies()
     function currencies.Refresh()
         data = SeasonCurrencies()
         empty:SetShown(#data == 0)
+        heldHead:SetShown(#data > 0)
+        earnedHead:SetShown(#data > 0)
         for index, row in ipairs(rows) do
             local currency = data[index]
             row:SetShown(currency ~= nil)
@@ -1380,13 +1399,19 @@ local function BuildCurrencies()
                 row.icon:SetTexture(currency.icon)
                 row.name:SetText(currency.name)
                 Tint(row.name, ColorOf(ITEM_QUALITY_COLORS[currency.quality]))
-                row.value:SetText(currency.max > 0 and ('%d / %d'):format(currency.quantity, currency.max) or currency.quantity)
+                row.held:SetText(BreakUpLargeNumbers(currency.quantity))
+                if currency.cap then
+                    row.earned:SetText(('%s / %s%s'):format(BreakUpLargeNumbers(currency.earned), BreakUpLargeNumbers(currency.cap), currency.weekly and ' wk' or ''))
+                    window:Paint(row.earned, currency.earned >= currency.cap and 'positive' or 'text')
+                else
+                    Dash(row.earned)
+                end
             end
         end
     end
 
     function currencies:Layout()
-        local y = TABLE_TOP - 4
+        local y = TABLE_ROWS_TOP
         local previousCrest = false
         rule:Hide()
         for index = 1, math.min(#data, CURRENCY_ROWS) do
