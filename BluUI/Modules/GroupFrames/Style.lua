@@ -100,6 +100,7 @@ local function PaintHealth(self, updatedUnit, offline)
 	offline = (live and offline) and true or false
 	local deadOrGhost = (live and UnitIsDeadOrGhost(updatedUnit)) and true or false
 	if live then GroupFrames.SyncLifeState(owner, deadOrGhost, offline) end
+	if offline then self:SetValue(0) end
 	local dead = deadOrGhost and not offline
 	local class = owner._bluClass
 	local dispel = owner._dispelColor
@@ -135,7 +136,6 @@ local function PaintHealth(self, updatedUnit, offline)
 	if tintBar and not offline then red, green, blue = dispelRed, dispelGreen, dispelBlue end
 	if deadColor then red, green, blue = deadColor[1], deadColor[2], deadColor[3] end
 
-	if offline then self:SetValue(0) end
 	self:SetStatusBarColor(red, green, blue, deadColor and (deadColor[4] or 1) or alpha)
 
 	local backgroundAlpha = transparent and 0 or 1
