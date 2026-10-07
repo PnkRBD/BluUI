@@ -307,6 +307,16 @@ local function PowerRoleAllowed(healerOnly, frame)
 	return Util.FrameRole(frame) == "HEALER"
 end
 
+function GroupFrames.TintPowerBackground(power, red, green, blue)
+	local multiplier = power.bg.multiplier
+	power.bg:SetVertexColor(red * multiplier, green * multiplier, blue * multiplier)
+end
+
+local function PostUpdatePowerColor(self, _, color, red, green, blue)
+	if color then red, green, blue = color:GetRGB() end
+	if red then GroupFrames.TintPowerBackground(self, red, green, blue) end
+end
+
 local function BuildPower(frame, unit)
 	local settings  = GroupFrames.SettingsForFrame(frame)
 	local texture = ResolveTexture(settings.statusbarTexture)
@@ -322,6 +332,7 @@ local function BuildPower(frame, unit)
 	powerBar.bg.multiplier = 0.25
 
 	powerBar.colorPower = true
+	powerBar.PostUpdateColor = PostUpdatePowerColor
 	powerBar.smoothing = BUI.GetDB().general.smoothBars and Enum.StatusBarInterpolation.ExponentialEaseOut or nil
 
 	frame.Power = powerBar

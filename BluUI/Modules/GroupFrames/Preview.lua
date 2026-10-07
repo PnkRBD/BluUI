@@ -178,9 +178,7 @@ local function PaintBars(child, decoy, settings)
 		if color and color.GetRGB then
 			local red, green, blue = color:GetRGB()
 			power:SetStatusBarColor(red, green, blue)
-			if power.bg then
-				power.bg:SetVertexColor(red * power.bg.multiplier, green * power.bg.multiplier, blue * power.bg.multiplier)
-			end
+			GroupFrames.TintPowerBackground(power, red, green, blue)
 		end
 	end
 end
