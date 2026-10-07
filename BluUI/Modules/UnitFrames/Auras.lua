@@ -5,7 +5,7 @@ local Pixel = BUI.Pixel
 local AuraBlacklist = BUI.AuraBlacklist
 local Engine = BUI.AuraEngine
 
-local ipairs = ipairs
+local pairs, ipairs = pairs, ipairs
 
 local UnitExists = UnitExists
 
@@ -217,15 +217,20 @@ local function BuildCandidates(isDebuff)
 		candidates = { includeSpellIDs = whitelist }
 		fingerprint = 'wl:' .. Engine.SortedKeys(whitelist)
 	else
+		local exclude
 		if whitelistActive then
-			candidates = { pinSpellIDs = whitelist }
+			exclude = {}
+			for spellID in pairs(whitelist) do exclude[spellID] = true end
 			fingerprint = 'pin:' .. Engine.SortedKeys(whitelist)
 		end
-		if blacklist and next(blacklist) then
-			candidates = candidates or {}
-			candidates.excludeSpellIDs = blacklist
+		if next(blacklist) then
+			exclude = exclude or {}
+			for spellID in pairs(blacklist) do exclude[spellID] = true end
 			local blacklistFingerprint = 'bl:' .. Engine.SortedKeys(blacklist)
 			fingerprint = fingerprint and (fingerprint .. '+' .. blacklistFingerprint) or blacklistFingerprint
+		end
+		if exclude then
+			candidates = { pinSpellIDs = whitelistActive and whitelist or nil, excludeSpellIDs = exclude }
 		end
 	end
 
