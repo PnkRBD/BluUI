@@ -418,7 +418,7 @@ local function OnApplicant(button)
 	button._buiApplicant = true
 	IconButton(button.DeclineButton)
 	Button(button.InviteButton)
-	Button(button.InviteButtonSmall)
+	IconButton(button.InviteButtonSmall)
 end
 
 local function OnAutoComplete(panel)
