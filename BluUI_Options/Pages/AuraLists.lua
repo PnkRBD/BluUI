@@ -272,7 +272,7 @@ function BUI.AuraRuleEditor(parent, options)
 					{})
 				list:SetPoint('TOPLEFT', 0, -34)
 				Fill()
-				local addDropdown = Controls.Dropdown(panel, nil, AuraRules.DropdownItems(options.polarity, nil, options.unitFramesOnly), nil, function(value)
+				local addDropdown = Controls.Dropdown(panel, nil, AuraRules.DropdownItems(options.polarity), nil, function(value)
 					for ruleIndex = 1, #rules do
 						if rules[ruleIndex] == value then return end
 					end

@@ -454,8 +454,6 @@ do
 	local IS_HUNTER = playerClass == 'HUNTER'
 	local EMERGENCY_SALVE_SPELL_ID = 459517
 
-	local feignSalveAuras = {}
-	BUI._feignSalveAuras = feignSalveAuras
 	local feignFirstID
 	local feignSignature = 0
 
@@ -466,7 +464,6 @@ do
 			if not auraData then break end
 			local dispelName, instanceID = auraData.dispelName, BUI.Tools.SafeNum(auraData.auraInstanceID)
 			if instanceID and dispelName and not issecretvalue(dispelName) and (dispelName == 'Poison' or dispelName == 'Disease') then
-				feignSalveAuras[instanceID] = true
 				if not feignFirstID then feignFirstID = instanceID end
 				count = count + 1
 				feignSignature = bit.bxor(feignSignature, instanceID)
@@ -477,7 +474,6 @@ do
 
 	local function RefreshFeignSalveSet(unit)
 		if unit ~= 'player' then return false end
-		wipe(feignSalveAuras)
 		feignFirstID, feignSignature = nil, 0
 		if not (IS_HUNTER and C_SpellBook.IsSpellKnown(EMERGENCY_SALVE_SPELL_ID)) then return false end
 		if BUI.Tools.ShouldAurasBeSecret() or BUI.Tools.AuraQueriesBlocked() then return false end
