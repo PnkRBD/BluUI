@@ -438,7 +438,7 @@ local function RailGroups()
 	local bars, panels = {}, {}
 	for index, config in ipairs(Bars()) do
 		local kind = Datatext.IsPanel(config) and 'PANEL' or 'TEXT'
-		local item = { id = (kind == 'PANEL' and 'panel' or 'bar') .. index, label = config.name, kind = kind, index = index }
+		local item = { id = (kind == 'PANEL' and 'panel' or 'bar') .. index, label = config.name, icon = kind == 'PANEL' and 'panel' or 'textbar', kind = kind, index = index }
 		items[item.id] = item
 		local list = kind == 'PANEL' and panels or bars
 		list[#list + 1] = item
