@@ -8,6 +8,8 @@ local ITEM_HEIGHT = 36
 local ITEM_GAP = 2
 local ITEM_INSET = 14
 local ICON_SIZE = 13
+local ICON_CROP = 0.08
+local REST_ICON_ALPHA = 0.7
 local LABEL_X = 38
 local COUNT_WIDTH = 56
 local ACCENT_BAR = 2
@@ -30,7 +32,13 @@ local function ListButton(window, kit, parent, item, width, iconColumn)
 	kit.Hover(button)
 
 	local textX = iconColumn and LABEL_X or ITEM_INSET
-	if item.icon then
+	if item.texture then
+		button.texture = button:CreateTexture(nil, 'ARTWORK')
+		button.texture:SetTexture(item.texture)
+		button.texture:SetTexCoord(ICON_CROP, 1 - ICON_CROP, ICON_CROP, 1 - ICON_CROP)
+		button.texture:SetSize(ICON_SIZE, ICON_SIZE)
+		button.texture:SetPoint('LEFT', ITEM_INSET, 0)
+	elseif item.icon then
 		button.icon = kit.Glyph(button, item.icon, ICON_SIZE, 'muted')
 		button.icon:SetPoint('LEFT', ITEM_INSET, 0)
 	end
@@ -48,6 +56,10 @@ local function ListButton(window, kit, parent, item, width, iconColumn)
 		local role = selected and 'text' or (item.disabled and 'faint' or 'muted')
 		window:Paint(self.label, role)
 		if self.icon then window:Paint(self.icon, role) end
+		if self.texture then
+			self.texture:SetDesaturated(not selected)
+			self.texture:SetAlpha(selected and 1 or REST_ICON_ALPHA)
+		end
 		self.count:SetText(count and tostring(count) or '')
 	end
 	return button
@@ -121,7 +133,7 @@ function Layout.Rail(window, parent, width, spec)
 	local iconColumn = false
 	for _, group in ipairs(spec.groups) do
 		for _, item in ipairs(group.items) do
-			if item.icon then iconColumn = true end
+			if item.icon or item.texture then iconColumn = true end
 		end
 	end
 

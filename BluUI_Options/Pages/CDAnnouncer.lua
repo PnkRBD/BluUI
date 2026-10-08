@@ -657,10 +657,10 @@ local function RailGroups()
 	items = {}
 	local cooldowns = {}
 	for _, entry in ipairs(CDAnnouncer.GetSpells()) do
-		local _, name = Describe(entry)
-		cooldowns[#cooldowns + 1] = { id = 'spell' .. entry.spellID, label = name, spellID = entry.spellID }
+		local icon, name = Describe(entry)
+		cooldowns[#cooldowns + 1] = { id = 'spell' .. entry.spellID, label = name, texture = icon, spellID = entry.spellID }
 	end
-	if #cooldowns == 0 then cooldowns[1] = { id = 'none', label = 'Nothing announced yet', disabled = true } end
+	if #cooldowns == 0 then cooldowns[1] = { id = 'none', label = 'Nothing announced yet', icon = 'sound', disabled = true } end
 	local groups = {
 		{ title = 'Settings', items = { { id = 'announcer', label = 'Announcer', icon = 'cog' } } },
 		{ title = 'Cooldowns', items = cooldowns },
