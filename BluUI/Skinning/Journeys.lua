@@ -122,7 +122,7 @@ local function SkinNavBar(navBar)
 end
 
 local function SkinSearchResult(row)
-	if not Enabled() or row._buiSearchRow then return end
+	if row._buiSearchRow then return end
 	row._buiSearchRow = true
 	FadeStateTextures(row)
 	Fade(row.iconFrame)
@@ -140,6 +140,7 @@ local function SkinSearch(frame)
 	Fade(results.NineSlice)
 	Shell(results)
 	ScrollBar(results.ScrollBar)
+	Skin.SweepScrollBox(results.ScrollBox, GuardEnabled(SkinSearchResult))
 end
 
 local function SkinInstanceTile(tile)
@@ -196,8 +197,7 @@ local function OnBossUnselected(button)
 	button._buiBossSelected:Hide()
 end
 
-local function OnBossButton(button)
-	if not Enabled() then return end
+local function SkinBossButton(button)
 	if not button._buiBoss then
 		button._buiBoss = true
 		Skin.TipButton(button, BOSS_TEXT_SCALE)
@@ -213,8 +213,12 @@ local function OnBossButton(button)
 	button._buiBossSelected:SetShown(_G.EncounterJournal.encounterID == button.encounterID)
 end
 
-local function OnLootItem(item)
-	if not Enabled() then return end
+local function RefreshLootRow(item)
+	if Enabled() then Skin.SetIconEdgeQuality(item.icon, item.IconBorder) end
+end
+
+local function SkinLootRow(item)
+	if not item.IconBorder then return end
 	if not item._buiLoot then
 		item._buiLoot = true
 		KeepTexture(item.icon)
@@ -225,8 +229,9 @@ local function OnLootItem(item)
 		Skin.TipFace(item.name, 'title')
 		for _, key in ipairs(LOOT_ITEM_TEXT_KEYS) do Skin.TipFont(item[key], 'body') end
 		Shell(item, LOOT_INSET)
+		Hook(item, 'Init', RefreshLootRow)
 	end
-	Skin.SetIconEdgeQuality(item.icon, item.IconBorder)
+	RefreshLootRow(item)
 end
 
 local function RefreshHeaderState(button)
@@ -340,6 +345,7 @@ local function SkinLootPage(loot)
 	Shell(clear)
 	Skin.TipFace(clear.text, 'body')
 	Close((clear:GetChildren()))
+	Skin.SweepScrollBox(loot.ScrollBox, GuardEnabled(SkinLootRow))
 end
 
 local function SkinModelPage(model)
@@ -358,6 +364,7 @@ local function SkinInfo(info)
 	FadeRegions(instanceButton)
 	Dropdown(info.difficulty)
 	ScrollBar(info.BossesScrollBar)
+	Skin.SweepScrollBox(info.BossesScrollBox, GuardEnabled(SkinBossButton))
 	SkinOverviewPage(info.overviewScroll)
 	SkinDetailsPage(info.detailsScroll)
 	SkinLootPage(info.LootContainer)
@@ -373,16 +380,18 @@ local function SkinEncounter(encounter)
 end
 
 local function CardEnter(card)
-	if card._buiCard then Skin.TipShellEdges(card, true) end
+	if Enabled() then Skin.TipShellEdges(card, true) end
 end
 
 local function CardLeave(card)
-	if card._buiCard then Skin.TipShellEdges(card, false) end
+	if Enabled() then Skin.TipShellEdges(card, false) end
 end
 
 local function SkinJourneyCard(card)
 	if card._buiCard then return end
 	card._buiCard = true
+	card:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Journeys card OnEnter', CardEnter))
+	card:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Journeys card OnLeave', CardLeave))
 	FadeStateTextures(card)
 	Skin.TipShell(card, CARD_INSET)
 	Skin.TipFont(card.RenownCardFactionName or card.JourneyCardName, 'title', CARD_TITLE_SCALE)
@@ -526,31 +535,16 @@ local function Apply()
 	OnLootFilterUpdated()
 end
 
-local function HookMixin(mixin, method, callback)
-	if mixin and mixin[method] then Hook(mixin, method, callback) end
-end
-
-local function HookGlobal(name, callback)
-	if _G[name] then Hook(name, callback) end
-end
-
-local function HookRows()
-	HookMixin(_G.EncounterBossButtonMixin, 'Init', OnBossButton)
-	HookMixin(_G.EncounterJournalItemMixin, 'Init', OnLootItem)
-	HookMixin(_G.EncounterSearchResultLGMixin, 'Init', SkinSearchResult)
-	HookMixin(_G.RenownCardButtonMixin, 'OnEnter', CardEnter)
-	HookMixin(_G.RenownCardButtonMixin, 'OnLeave', CardLeave)
-	HookMixin(_G.JourneyCardButtonMixin, 'OnEnter', CardEnter)
-	HookMixin(_G.JourneyCardButtonMixin, 'OnLeave', CardLeave)
-	HookGlobal('NavBar_AddButton', OnNavButtonAdded)
-	HookGlobal('EncounterJournal_SetTab', OnTabSet)
-	HookGlobal('EncounterJournal_SetTabEnabled', OnTabEnabled)
-	HookGlobal('EncounterJournal_DisplayInstance', OnInstanceDisplayed)
-	HookGlobal('EncounterJournal_UpdateFilterString', OnLootFilterUpdated)
-	HookGlobal('EncounterJournal_ToggleHeaders', SweepHeaders)
-	HookGlobal('EncounterJournal_SetUpOverview', SweepHeaders)
-	HookGlobal('EncounterJournal_SetBullets', OnBullets)
-	HookGlobal('EncounterJournal_UpdateButtonState', RefreshHeaderState)
+local function HookJournal()
+	Hook('NavBar_AddButton', OnNavButtonAdded)
+	Hook('EncounterJournal_SetTab', OnTabSet)
+	Hook('EncounterJournal_SetTabEnabled', OnTabEnabled)
+	Hook('EncounterJournal_DisplayInstance', OnInstanceDisplayed)
+	Hook('EncounterJournal_UpdateFilterString', OnLootFilterUpdated)
+	Hook('EncounterJournal_ToggleHeaders', SweepHeaders)
+	Hook('EncounterJournal_SetUpOverview', SweepHeaders)
+	Hook('EncounterJournal_SetBullets', OnBullets)
+	Hook('EncounterJournal_UpdateButtonState', RefreshHeaderState)
 end
 
 local function Install()
@@ -559,7 +553,7 @@ local function Install()
 	if not frame then return end
 	installed = true
 	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Journeys frame reskin', Apply))
-	HookRows()
+	HookJournal()
 	if frame:IsShown() then Apply() end
 end
 
