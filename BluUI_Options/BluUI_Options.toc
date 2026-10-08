@@ -33,6 +33,7 @@ Pages\GroupFrames.lua
 Pages\StreamerTools.lua
 Pages\BuffTracking.lua
 Pages\Bloodlust.lua
+Pages\SecondaryStats.lua
 Pages\Visibility.lua
 Pages\Skinning.lua
 Pages\Theme.lua

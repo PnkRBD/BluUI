@@ -138,6 +138,18 @@ local function CombatMessagesRow(board)
 	}, CombatMessage.Refresh)
 end
 
+local function SecondaryStatsRow(board)
+	local db = BUI.GetDB().secondaryStats
+	local SecondaryStats = BUI.Auras.SecondaryStats
+	SecondaryStats.SetLockListener(Repaint)
+	board:AddTools('Secondary Stats', 'Your main, secondary and tertiary stats on screen, each in its own color', {
+		{ icon = 'cog', tooltip = 'Open the Secondary Stats page', onClick = function() BUI.PageEngine.NavigateToID('secondaryStats') end },
+		BUI.PositionTool(db, { selfTag = 'BUI_SecondaryStats' }),
+		Eye('Preview, drag to move', function() return not db.locked end, function(value) SecondaryStats.SetLocked(not value) end),
+		Switch(db, 'enabled'),
+	}, SecondaryStats.Refresh)
+end
+
 local function KeystoneReminderRow(board)
 	local db = BUI.GetDB().keystoneReminder
 	local KeystoneReminder = BUI.Auras.KeystoneReminder
@@ -319,6 +331,7 @@ local function AlertsBoard(ui, parent, width)
 	})
 	CombatTimerRow(board)
 	CombatMessagesRow(board)
+	SecondaryStatsRow(board)
 	KeystoneReminderRow(board)
 	PrivateWarningRow(board)
 	LowHpRow(board)
