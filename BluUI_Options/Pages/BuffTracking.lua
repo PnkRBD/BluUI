@@ -391,7 +391,7 @@ local function Sections(ui, _, parent, width)
 	elseif Druid.IsRestoration() then
 		local restoration = Board('Restoration', 'Reminders for Restoration upkeep and procs.')
 		TextAlert(restoration, {
-			key = 'druidLifebloom', frame = 'BUI_DruidLifebloom', title = 'Lifebloom refresh', description = 'REFRESH when your Lifebloom on anyone in the group is about to fall off', spell = 33763,
+			key = 'druidLifebloom', frame = 'BUI_DruidLifebloom', title = 'Lifebloom refresh', description = 'REFRESH when your Lifebloom is about to fall off', spell = 33763,
 			textTiming = function(db) return { Seconds(db, 'refreshSeconds', 'Show at seconds left') } end,
 			soundTiming = function(db) return { Seconds(db, 'soundSeconds', 'Play at seconds left') } end,
 		})
