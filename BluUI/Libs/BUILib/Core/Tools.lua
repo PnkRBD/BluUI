@@ -6,8 +6,8 @@ local Widget = BUILib.Widget
 
 local TOOL_GAP = 12
 local GROUP_GAP = 8
-local SLOT_ORDER = { 'erase', 'switch', 'toggle', 'icon', 'button', 'menu', 'input', 'swatch' }
-local ALIGNED = { erase = true, switch = true, toggle = true }
+local SLOT_ORDER = { 'erase', 'switch', 'toggle', 'position', 'settings', 'text', 'icon', 'button', 'menu', 'input', 'swatch' }
+local ALIGNED = { erase = true, switch = true, toggle = true, position = true, settings = true, text = true }
 local MENU_WIDTH = 150
 local SWATCH_SIZE = 18
 local CONTROL_HEIGHT = 30
