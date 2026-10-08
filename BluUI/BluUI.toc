@@ -169,6 +169,7 @@ Modules\Auras\Crosshair.lua
 Modules\Auras\GatewayAlert.lua
 Modules\Auras\KeystoneReminder.lua
 Modules\Auras\PrivateWarning.lua
+Modules\Auras\SecondaryStats.lua
 
 Modules\StreamerTools\GCDHistory.lua
 
