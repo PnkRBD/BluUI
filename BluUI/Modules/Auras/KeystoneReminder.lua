@@ -20,8 +20,9 @@ local PORTAL_SIZE = 42
 local LEVEL_SIZE = 13
 local PREVIEW_LEVEL = 12
 local FULL_PARTY = 5
-local JOINED_TEXT = 'MYTHIC+ GROUP JOINED'
-local FULL_TEXT = 'MYTHIC+ GROUP FULL'
+local PREVIEW_SIZE = 3
+local FILLING_TEXT = 'MYTHIC+  ·  FILLING %d/%d'
+local FULL_TEXT = 'MYTHIC+  ·  GROUP FULL'
 local TEXT_GAP = 10
 local CLOSE_SIZE = 14
 local CARD_RADIUS = 8
@@ -40,7 +41,7 @@ local UNLEARNED_TEXT = 'Teleport not learned'
 local IsSecret = BUI.Tools.IsSecretValue
 local PartyKeys = BUI.PartyKeys
 
-local card, current, listed, lockListener
+local card, current, dismissed, lockListener
 
 local function GetDB() return BUI.GetDB().keystoneReminder end
 
@@ -114,6 +115,11 @@ local function CardText(size)
     return text
 end
 
+local function Dismiss()
+    dismissed = current and current.activity
+    KeystoneReminder.SetLocked(true)
+end
+
 local function Build()
     if card then return end
     card = CreateFrame('Frame', FRAME_NAME, UIParent)
@@ -124,7 +130,7 @@ local function Build()
 
     card.portal = BuildPortal(card)
 
-    local close = Controls.Icon(card, { preset = 'close', size = CLOSE_SIZE, onClick = function() KeystoneReminder.Hide() end })
+    local close = Controls.Icon(card, { preset = 'close', size = CLOSE_SIZE, onClick = Dismiss })
     close:SetPoint('TOPRIGHT', Pixel.Scale(-8), Pixel.Scale(-8))
     Widget.Unwrap(close)._keepMouseForTooltip = true
 
@@ -146,7 +152,7 @@ local function Build()
     card:EnableMouse(true)
     BUI.Dragging.MakeDraggable(card, {
         skipClickThrough = true,
-        onRightClick = function() KeystoneReminder.SetLocked(true) end,
+        onRightClick = Dismiss,
         onPositionChanged = function() BUI.Anchor.SaveDrop(card, GetDB()) end,
     })
     Apply()
@@ -155,7 +161,6 @@ end
 local function PaintCard()
     card.fill:SetVertexColor(BUI.ThemeColor('page'))
     card.edge:SetVertexColor(BUI.ThemeColor('edge'))
-    card.kicker:SetTextColor(BUI.ThemeColor('accent'))
     card.name:SetTextColor(BUI.ThemeColor('text'))
     card.meta:SetTextColor(BUI.ThemeColor('muted'))
     PaintPortalEdge(card.portal, card.portal:IsMouseOver())
@@ -215,8 +220,16 @@ local function OnCooldown()
     PaintMeta()
 end
 
+local function PaintStatus()
+    local size = current.size or math.max(1, math.min(GetNumGroupMembers(), FULL_PARTY))
+    local full = size >= FULL_PARTY
+    card.kicker:SetText(full and FULL_TEXT or FILLING_TEXT:format(size, FULL_PARTY))
+    card.kicker:SetTextColor(BUI.ThemeColor(full and 'positive' or 'accent'))
+end
+
 local function OnRoster()
     PaintMeta()
+    PaintStatus()
     if not current.level and current.mapID then PartyKeys.Request() end
 end
 
@@ -226,7 +239,7 @@ end
 
 local function Paint(info)
     PaintCard()
-    card.kicker:SetText(info.full and FULL_TEXT or JOINED_TEXT)
+    PaintStatus()
     card.name:SetText(info.dungeon or info.activity)
     SetPortal(info.spellID, info.texture)
     PaintMeta()
@@ -257,7 +270,7 @@ end
 function KeystoneReminder.ShowPreview()
     local dungeon = BUI.PortalData.seasons[1].dungeons[1].name
     local _, texture, mapID = FindDungeon(dungeon)
-    KeystoneReminder.Show({ dungeon = dungeon, texture = texture, mapID = mapID, level = PREVIEW_LEVEL, spellID = BUI.PortalManager.TeleportSpell(dungeon) })
+    KeystoneReminder.Show({ dungeon = dungeon, texture = texture, mapID = mapID, level = PREVIEW_LEVEL, size = PREVIEW_SIZE, spellID = BUI.PortalManager.TeleportSpell(dungeon) })
 end
 
 local function MythicPlusActivity(activityID)
@@ -265,7 +278,7 @@ local function MythicPlusActivity(activityID)
     if activity and activity.isMythicPlusActivity then return activity end
 end
 
-local function ShowFor(activity, full)
+local function ShowFor(activity)
     if select(2, IsInInstance()) == 'party' then return end
     local dungeon, texture, mapID = FindDungeon(activity.fullName)
     KeystoneReminder.Show({
@@ -274,28 +287,32 @@ local function ShowFor(activity, full)
         activity = activity.fullName,
         texture = texture,
         spellID = dungeon and BUI.PortalManager.TeleportSpell(dungeon),
-        full = full,
     })
 end
 
 local function OnJoined(_, resultID)
     local result = C_LFGList.GetSearchResultInfo(resultID)
     local activity = result and MythicPlusActivity(result.activityIDs[1])
-    if activity then ShowFor(activity, false) end
+    if activity then ShowFor(activity) end
 end
 
 local function OnListing()
     local entry = C_LFGList.GetActiveEntryInfo()
-    if entry then
-        listed = MythicPlusActivity(entry.activityIDs[1])
-        return
-    end
-    if listed and GetNumGroupMembers() >= FULL_PARTY then ShowFor(listed, true) end
-    listed = nil
+    local activity = entry and MythicPlusActivity(entry.activityIDs[1])
+    if not activity or activity.fullName == dismissed then return end
+    if current and current.activity == activity.fullName then return end
+    ShowFor(activity)
 end
 
 local function OnWorld()
-    if current and select(2, IsInInstance()) == 'party' then KeystoneReminder.Hide() end
+    if select(2, IsInInstance()) ~= 'party' then return end
+    dismissed = nil
+    if current then KeystoneReminder.Hide() end
+end
+
+local function OnGroupLeft()
+    dismissed = nil
+    KeystoneReminder.Hide()
 end
 
 function KeystoneReminder.Enable()
@@ -304,7 +321,7 @@ function KeystoneReminder.Enable()
     C_MythicPlus.RequestMapInfo()
     BUI.Events:Register('LFG_LIST_JOINED_GROUP', EVENT_KEY, OnJoined)
     BUI.Events:Register('LFG_LIST_ACTIVE_ENTRY_UPDATE', EVENT_KEY, OnListing)
-    BUI.Events:Register('GROUP_LEFT', EVENT_KEY, KeystoneReminder.Hide)
+    BUI.Events:Register('GROUP_LEFT', EVENT_KEY, OnGroupLeft)
     BUI.Events:Register('PLAYER_ENTERING_WORLD', EVENT_KEY, OnWorld)
     OnListing()
 end
