@@ -166,6 +166,11 @@ local function OffsetOf(frame)
 	return y
 end
 
+local function Press(frame)
+	local _, cursorY = GetCursorPosition()
+	frame.pressY = cursorY
+end
+
 local function PlaceAt(board, frame, y)
 	frame:ClearAllPoints()
 	frame:SetPoint('TOPLEFT', board.panel, 'TOPLEFT', 0, y)
@@ -338,11 +343,10 @@ local function StartDrag(board, frame, track, dimmed, title, subtitle, icon)
 	PlaceAt(board, ghost, OffsetOf(frame))
 	Motion.To(ghost, 'x', indent, 0)
 	Motion.To(ghost, 'width', board.panelWidth - indent, 0)
-	local _, cursorY = GetCursorPosition()
 	drag.dragging = frame
 	drag.origin = not frame.dragHeader and frame.dragGroup or nil
 	drag.dimmed = dimmed
-	drag.grabOffset = frame:GetTop() - cursorY / board.frame:GetEffectiveScale()
+	drag.grabOffset = frame:GetTop() - frame.pressY / board.frame:GetEffectiveScale()
 	for _, row in ipairs(dimmed) do Motion.To(row, 'alpha', DRAG_ALPHA, 0) end
 	ghost.icon:SetShown(icon ~= nil)
 	if icon then ghost.icon:SetTexture(icon) end
@@ -415,6 +419,7 @@ function Board:AddDragRow(label, room, sub, icon, group)
 	local title, subtitle = kit.RowTitle(row, label, sub, textX, self.panelWidth - textX - kit.ROW_INSET - room - CONTROL_GAP)
 	row:EnableMouse(true)
 	row:RegisterForDrag('LeftButton')
+	row:SetScript('OnMouseDown', Press)
 	row:SetScript('OnDragStart', function(frame) StartDrag(self, frame, TrackDrag, { frame }, title, subtitle, icon) end)
 	row:SetScript('OnDragStop', function(frame) EndDrag(self, frame) end)
 	return row, title, subtitle
@@ -465,7 +470,10 @@ function Board:AddDragHeader(label, sub, tools, after, folded, onFold, tint)
 	row.controls = placer.controls
 	row:EnableMouse(true)
 	row:RegisterForDrag('LeftButton')
-	row:SetScript('OnMouseDown', function(frame) frame.dragged = false end)
+	row:SetScript('OnMouseDown', function(frame)
+		frame.dragged = false
+		Press(frame)
+	end)
 	row:SetScript('OnMouseUp', function(frame, button)
 		if button ~= 'LeftButton' or frame.dragged or not frame:IsMouseOver() then return end
 		onFold()
