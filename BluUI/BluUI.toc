@@ -199,7 +199,7 @@ Modules\WorldMap\ZoneLabels.lua
 Modules\WorldMap\InstancePins.lua
 Modules\Cursor\Cursor.lua
 Modules\Markers\Markers.lua
-Modules\CustomBars\CustomBars.lua
+Modules\CDM\CustomBars.lua
 Modules\CDAnnouncer\CDAnnouncer.lua
 Modules\CooldownFlash\CooldownFlash.lua
 Modules\Settings\Settings.lua

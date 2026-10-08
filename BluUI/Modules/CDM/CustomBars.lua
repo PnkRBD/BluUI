@@ -209,12 +209,12 @@ local function CreateIcon(parent, barIndex, iconIndex)
     icon:EnableMouse(true)
     icon:RegisterForDrag("LeftButton")
 
-    icon:SetScript("OnDragStart", BUI.Profiler.Script('CustomBars.CustomBars icon OnDragStart', function()
+    icon:SetScript("OnDragStart", BUI.Profiler.Script('CDM.CustomBars icon OnDragStart', function()
         if IsDragBlocked(barIndex) then return end
         parent.dragActive = true
         parent:StartMoving()
     end))
-    icon:SetScript("OnDragStop", BUI.Profiler.Script('CustomBars.CustomBars icon OnDragStop', function()
+    icon:SetScript("OnDragStop", BUI.Profiler.Script('CDM.CustomBars icon OnDragStop', function()
         parent:StopMovingOrSizing()
         parent.dragActive = false
         local settings = GetBar(barIndex)
@@ -222,7 +222,7 @@ local function CreateIcon(parent, barIndex, iconIndex)
             settings.posX, settings.posY = BUI.Dragging.GetCenterOffset(parent)
         end
     end))
-    icon:SetScript("OnMouseUp", BUI.Profiler.Script('CustomBars.CustomBars icon OnMouseUp', function(_, button)
+    icon:SetScript("OnMouseUp", BUI.Profiler.Script('CDM.CustomBars icon OnMouseUp', function(_, button)
         if button == "RightButton" and not parent.dragActive then
             LockBar(barIndex)
         end
@@ -249,7 +249,7 @@ local function CreateIcon(parent, barIndex, iconIndex)
     overlay:EnableMouse(false)
     icon._tooltipOverlay = overlay
 
-    icon:SetScript("OnEnter", BUI.Profiler.Script('CustomBars.CustomBars icon OnEnter', function()
+    icon:SetScript("OnEnter", BUI.Profiler.Script('CDM.CustomBars icon OnEnter', function()
         local settings = GetBar(barIndex)
         if not settings or settings.showTooltips == false then return end
         if not icon.itemID or not icon.iconType then return end
@@ -261,7 +261,7 @@ local function CreateIcon(parent, barIndex, iconIndex)
         end
         GameTooltip:Show()
     end))
-    icon:SetScript("OnLeave", BUI.Profiler.Script('CustomBars.CustomBars icon OnLeave', function() GameTooltip:Hide() end))
+    icon:SetScript("OnLeave", BUI.Profiler.Script('CDM.CustomBars icon OnLeave', function() GameTooltip:Hide() end))
     icon.stack = overlay:CreateFontString(nil, "OVERLAY")
     Pixel.ApplyFont(icon.stack, 12, BUI.GetTrackingFont())
 
@@ -565,7 +565,7 @@ local function PositionBar(bar, settings)
         end
         if not frame._hintSizeTimer then
             frame._hintSizeTimer = true
-            BUI.Profiler.After("CustomBars.CustomBars hint width", 0, function()
+            BUI.Profiler.After("CDM.CustomBars hint width", 0, function()
                 frame._hintSizeTimer = nil
                 if frame.dragHint and frame.dragHint:IsShown() then
                     frame.dragHint:SetWidth(Pixel.Scale(frame.dragHint.text:GetStringWidth() + 16))
@@ -953,7 +953,7 @@ local function ScheduleCooldownRefresh()
     if not cooldownDispatchFrame then
         cooldownDispatchFrame = CreateFrame("Frame", "BUI_CustomBarsFlush")
         cooldownDispatchFrame:Hide()
-        cooldownDispatchFrame:SetScript("OnUpdate", BUI.Profiler.Wrap("CustomBars.CustomBars cooldown flush", FlushCooldownDispatch))
+        cooldownDispatchFrame:SetScript("OnUpdate", BUI.Profiler.Wrap("CDM.CustomBars cooldown flush", FlushCooldownDispatch))
     end
     cooldownDispatchFrame:Show()
 end
@@ -1020,10 +1020,6 @@ local function RunMigrations(db)
             db.customBars = db.trackingBars
         end
         db.trackingBars = nil
-    end
-    if db.modules and db.modules.tracking ~= nil then
-        db.modules.customBars = db.modules.tracking
-        db.modules.tracking = nil
     end
     local global = BUI.db.global
     if global.charTrackingSpells then
@@ -1133,4 +1129,4 @@ function CustomBars.Initialize()
     CustomBars.Enable()
 end
 
-BUI.Events:OnLogin("CustomBars", function() CustomBars.Initialize() end, "customBars")
+BUI.Events:OnLogin("CustomBars", function() CustomBars.Initialize() end, "cdm")

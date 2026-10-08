@@ -23,8 +23,8 @@ Pages\Auras.lua
 Pages\ActionBars.lua
 Pages\Power.lua
 Pages\CDMIconManagement.lua
-Pages\CDM.lua
 Pages\CustomBars.lua
+Pages\CDM.lua
 Pages\CDAnnouncer.lua
 Pages\CooldownFlash.lua
 Pages\Bars.lua
