@@ -10,16 +10,6 @@ local STYLES = {
 	{ value = 'dot', text = 'Dot' },
 }
 
-local TINTS = {
-	{ 0.35, 0.6, 1 },
-	{ 0.4, 0.9, 0.5 },
-	{ 1, 0.65, 0.25 },
-	{ 0.8, 0.45, 1 },
-	{ 1, 0.4, 0.5 },
-	{ 0.3, 0.85, 0.85 },
-	{ 0.95, 0.85, 0.3 },
-}
-
 local LOW_HP_FIELDS = {
 	posX = 'lowHpPosX', posY = 'lowHpPosY',
 	anchorFrame = 'lowHpAnchorFrame', anchorPoint = 'lowHpAnchorPoint',
@@ -458,169 +448,18 @@ local ROWS = {
 	LowHpRow, PetWarningsRow, GatewayRow, BloodlustRow, CDAnnouncerRow, CooldownFlashRow, CrosshairRow,
 }
 
-local function Members(group, specs)
-	local members = {}
-	for _, id in ipairs(group.members) do members[#members + 1] = specs[id] end
-	return members
-end
-
-local function MemberCount(group, specs)
-	local count = #Members(group, specs)
-	if count == 0 then return 'Empty' end
-	return count == 1 and '1 aura' or (count .. ' auras')
-end
-
-local function GroupSwitch(group, specs)
-	return {
-		get = function()
-			local members = Members(group, specs)
-			for _, spec in ipairs(members) do
-				if not spec.switch.get() then return false end
-			end
-			return #members > 0
-		end,
-		set = function(value)
-			for _, spec in ipairs(Members(group, specs)) do
-				if spec.switch.get() ~= value then
-					spec.switch.set(value)
-					spec.after()
-				end
-			end
-		end,
-	}
-end
-
-local function DeleteGroup(layout, group)
-	local nodes = {}
-	for _, node in ipairs(layout.nodes) do
-		if node == group then
-			for _, id in ipairs(group.members) do nodes[#nodes + 1] = id end
-		else
-			nodes[#nodes + 1] = node
-		end
-	end
-	layout.nodes = nodes
-	BUI.PageEngine.RefreshCurrentPage()
-end
-
-local function ConfirmDeleteGroup(layout, group, specs)
-	local count = #Members(group, specs)
-	if count == 0 then
-		DeleteGroup(layout, group)
-		return
-	end
-	BUILib.Modals.Confirm({
-		parent = Window().frame,
-		title = 'Delete ' .. group.name,
-		message = ('Delete "%s"? Its %s stay where they are, just out of the group.'):format(group.name, count == 1 and 'aura' or (count .. ' auras')),
-		confirmText = 'Delete', cancelText = 'Cancel',
-		onConfirm = function() DeleteGroup(layout, group) end,
-	})
-end
-
-local function GroupCount(layout)
-	local count = 0
-	for _, node in ipairs(layout.nodes) do
-		if type(node) == 'table' then count = count + 1 end
-	end
-	return count
-end
-
-local function Arrange(layout, specs, order)
-	local entries, placed = {}, {}
-	local function Place(id, group)
-		if not specs[id] or placed[id] then return end
-		placed[id] = true
-		entries[#entries + 1] = { spec = specs[id], group = group }
-	end
-	for _, node in ipairs(layout.nodes) do
-		if type(node) == 'table' then
-			entries[#entries + 1] = { header = node }
-			for _, id in ipairs(node.members) do Place(id, node) end
-		else
-			Place(node)
-		end
-	end
-	for _, spec in ipairs(order) do Place(spec.id) end
-	return entries
-end
-
-local function Save(layout, board, nodeOf)
-	local nodes = {}
-	for _, frame in ipairs(board:DragRows()) do
-		local node = nodeOf[frame]
-		if frame.dragGroup then
-			local members = nodeOf[frame.dragGroup].members
-			members[#members + 1] = node
-		else
-			if type(node) == 'table' then node.members = {} end
-			nodes[#nodes + 1] = node
-		end
-	end
-	layout.nodes = nodes
-end
-
-local function GroupHeader(ui, board, layout, group, specs, page)
-	local row, title, subtitle = board:AddDragHeader(group.name, MemberCount(group, specs), {
-		{ kind = 'swatch', label = 'Color', tooltip = 'Group color', slot = 'settings', get = function() return unpack(group.tint) end, set = function(red, green, blue) group.tint = { red, green, blue } end },
-		{ icon = 'text', tooltip = 'Rename', title = 'Group', slot = 'position', options = {
-			{ label = 'Name', kind = 'input', placeholder = 'Group name', get = function() return group.name end, set = function(text)
-				if text ~= '' then group.name = text end
-			end },
-		} },
-		{ icon = 'erase', size = Layout.ERASE_SIZE, tooltip = 'Delete the group', hover = 'danger', slot = 'toggle', onClick = function() ConfirmDeleteGroup(layout, group, specs) end },
-		GroupSwitch(group, specs),
-	}, Repaint, function() return group.collapsed == true end, function()
-		group.collapsed = not group.collapsed or nil
-		page:Resize()
-	end, function() return unpack(group.tint) end)
-	ui.Bind(title, function() title:SetText(group.name) end)
-	ui.Bind(subtitle, function() subtitle:SetText(MemberCount(group, specs)) end)
-	return row
-end
-
 local function GeneralBoard(ui, parent, width, page)
-	local layout = BUI.GetDB().auraGroups
-	local order, specs = {}, {}
-	for index, Row in ipairs(ROWS) do
-		local spec = Row(ui)
-		spec.tools[#spec.tools + 1] = spec.switch
-		order[index] = spec
-		specs[spec.id] = spec
-	end
-	local nodeOf, headers = {}, {}
-	local board
-	local function NewGroup()
-		Save(layout, board, nodeOf)
-		local count = GroupCount(layout)
-		table.insert(layout.nodes, 1, { name = 'Group ' .. (count + 1), members = {}, tint = CopyTable(TINTS[count % #TINTS + 1]) })
-		BUI.PageEngine.RefreshCurrentPage()
-	end
-	board = ui.Board(parent, width, {
-		stacked = true,
+	local items = {}
+	for index, Row in ipairs(ROWS) do items[index] = Row(ui) end
+	return ui.GroupBoard(parent, width, {
 		title = 'General',
 		description = 'Drag a row to reorder it or drop it on a group. The eye shows an alert so you can move it.',
-		buttons = { { text = 'New group', onClick = NewGroup } },
+		layout = BUI.GetDB().auraGroups,
+		items = items,
+		noun = { 'aura', 'auras' },
+		resize = function() page:Resize() end,
+		rebuild = BUI.PageEngine.RefreshCurrentPage,
 	})
-	board:DragList(function() page:Resize() end, function()
-		Save(layout, board, nodeOf)
-		page:Resize()
-		Repaint()
-	end)
-	local groupIndex = 0
-	for _, entry in ipairs(Arrange(layout, specs, order)) do
-		if entry.header then
-			groupIndex = groupIndex + 1
-			entry.header.tint = entry.header.tint or CopyTable(TINTS[(groupIndex - 1) % #TINTS + 1])
-			local header = GroupHeader(ui, board, layout, entry.header, specs, page)
-			headers[entry.header] = header
-			nodeOf[header] = entry.header
-		else
-			local spec = entry.spec
-			nodeOf[board:AddDragTools(spec.name, spec.sub, nil, spec.tools, spec.after, headers[entry.group])] = spec.id
-		end
-	end
-	return board
 end
 
 local function General(ui, _, parent, width, page)
