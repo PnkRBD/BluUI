@@ -199,7 +199,12 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 		elseif kind == 'toggle' then
 			return kit.Toggle(parent, tool)
 		elseif kind == 'button' then
-			return kit.Button(parent, tool.text, tool.style, tool.onClick, tool.icon)
+			local button = kit.Button(parent, tool.text, tool.style, tool.onClick, tool.icon)
+			if tool.tooltip then
+				button:HookScript('OnEnter', function(self) Widget.ShowTip(self, tool.tooltip) end)
+				button:HookScript('OnLeave', Widget.HideTip)
+			end
+			return button
 		elseif kind == 'menu' then
 			return kit.Menu(parent, tool.width or MENU_WIDTH, tool, after)
 		elseif kind == 'swatch' then

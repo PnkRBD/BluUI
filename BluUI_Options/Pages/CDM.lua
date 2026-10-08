@@ -788,13 +788,9 @@ local function BuildPreview(band, kit)
 			customBars:Update()
 			return
 		end
-		local mock = mocks[selected]
-		if not mock then
-			note:SetText('Pick a viewer from the rail to see it here')
-			note:Show()
-			return
-		end
-		if selected == 'buffBars' then mock:Render() else mock:Render(selected) end
+		local viewerKey = mocks[selected] and selected or 'essential'
+		local mock = mocks[viewerKey]
+		if viewerKey == 'buffBars' then mock:Render() else mock:Render(viewerKey) end
 		note:SetText('Nothing tracked in this viewer yet')
 		note:SetShown(not mock:IsShown())
 	end
@@ -811,23 +807,14 @@ local function GeneralBoards(ui, parent, width, page)
 		title = 'Cooldown Manager',
 		description = 'Skin, arrange and extend the Blizzard Cooldown Manager.',
 	})
-	setup:AddTools('Shortcuts', 'Blizzard Edit Mode and the full Cooldown Viewer settings panel', {
-		{ text = 'Advanced CDM', onClick = function()
-			if CooldownViewerSettings then CooldownViewerSettings:SetShown(not CooldownViewerSettings:IsShown()) end
-		end },
-		{ text = 'Edit Mode', onClick = BUI.ToggleEditMode },
-	})
 	local EditModeLock = module.EditModeLock
 	local systems = Enum.EditModeCooldownViewerSystemIndices
 	local settingsEnum = Enum.EditModeCooldownViewerSetting
 	local viewerNames = { [systems.Essential] = 'Essential', [systems.Utility] = 'Utility', [systems.BuffIcon] = 'Buff icons' }
 	if systems.BuffBar then viewerNames[systems.BuffBar] = 'Buff bars' end
 	local settingNames = { [settingsEnum.VisibleSetting] = 'Always visible', [settingsEnum.ShowTimer] = 'Show timer', [settingsEnum.HideWhenInactive] = 'Hide when inactive' }
-	local function EditModeStatus()
-		local compliance = EditModeLock.GetCompliance()
-		if not compliance.isReady then return 'Edit Mode is not loaded, reload the interface' end
-		if compliance.isPreset then return 'This is a Blizzard preset layout, make a custom one first' end
-		if compliance.isCompliant then return 'The viewers are configured' end
+	local compliance = EditModeLock.GetCompliance()
+	local function Mismatches()
 		local byViewer = {}
 		for _, mismatch in ipairs(compliance.mismatches) do
 			byViewer[mismatch.systemIndex] = byViewer[mismatch.systemIndex] or {}
@@ -837,22 +824,33 @@ local function GeneralBoards(ui, parent, width, page)
 		for _, systemIndex in ipairs({ systems.Essential, systems.Utility, systems.BuffIcon, systems.BuffBar }) do
 			if systemIndex and byViewer[systemIndex] then parts[#parts + 1] = viewerNames[systemIndex] .. ': ' .. table.concat(byViewer[systemIndex], ', ') end
 		end
-		return 'Needs fixing. ' .. table.concat(parts, '. ')
+		return 'Edit Mode needs these: ' .. table.concat(parts, '. ')
 	end
-	setup:AddTools('Edit Mode setup', EditModeStatus(), {
-		{ text = 'Apply fix', onClick = function()
+	local status = 'Edit Mode is set up'
+	if not compliance.isReady then status = 'Reload to load Edit Mode'
+	elseif compliance.isPreset then status = 'Make a custom Edit Mode layout'
+	elseif not compliance.isCompliant then status = 'Edit Mode needs a fix' end
+	local blizzard = {}
+	if compliance.isReady and not compliance.isPreset and not compliance.isCompliant then
+		blizzard[#blizzard + 1] = { text = 'Apply fix', tooltip = Mismatches(), onClick = function()
 			local result = EditModeLock.ApplyRecommendedSettings()
 			local messages = {
 				applied = 'Viewers configured, reload to apply.',
 				noop = 'Nothing to change.',
-				preset = 'This is a Blizzard preset layout, make a custom one first.',
 				in_combat = 'Cannot edit in combat.',
-				not_ready = 'Edit Mode is not loaded, reload the interface.',
 			}
 			BUI.Print(messages[result] or 'Could not apply the settings.')
 			module._emStatusRefresh()
-		end },
-	})
+		end }
+	end
+	blizzard[#blizzard + 1] = { text = 'Advanced CDM', onClick = function()
+		if CooldownViewerSettings then CooldownViewerSettings:SetShown(not CooldownViewerSettings:IsShown()) end
+	end }
+	blizzard[#blizzard + 1] = { text = 'Edit Mode', onClick = BUI.ToggleEditMode }
+	blizzard[#blizzard + 1] = { tooltip = 'Blizzard settings panel', title = 'Advanced CDM', options = {
+		Toggle(cdm, 'BluUI overlay on the panel', 'showBlizzardOverlay'),
+	} }
+	setup:AddTools('Blizzard settings', status, blizzard)
 	module._emStatusRefresh = function()
 		if selected == 'general' then RebuildPane(page) end
 	end
@@ -862,27 +860,10 @@ local function GeneralBoards(ui, parent, width, page)
 		title = 'Behavior',
 		description = 'How the viewers act and what they show.',
 	})
-	behavior:AddSwitch('Sync settings', function() return cdm.syncViewers == true end, function(value) cdm.syncViewers = value end, 'Essential, Utility and Buff icons share one set of appearance settings')
-	behavior:AddSwitch('Blizzard panel overlay', function() return cdm.showBlizzardOverlay == true end, function(value) cdm.showBlizzardOverlay = value end, 'The BluUI overlay on the Blizzard Cooldown Viewer settings panel')
-	behavior:AddSwitch('Tooltips', function() return cdm.showTooltips ~= false end, function(value) cdm.showTooltips = value end, 'Spell tooltips when hovering tracked icons')
-	behavior:AddSwitch('Buff duration', function() return cdm.showBuffDuration ~= false end, function(value)
-		cdm.showBuffDuration = value
-		module.RefreshBuffOverrideCache()
-		for cooldown in pairs(module.CDMCooldowns) do
-			module.ForceSpellCooldownIfBuffHidden(cooldown)
-			local icon = cooldown:GetParent()
-			if icon and icon.Icon then
-				if value then icon.Icon:SetDesaturation(0) else module.RefreshIconDesaturation(icon.Icon) end
-			end
-		end
-	end, 'Remaining time on tracked buff icons')
-	local function SetAllViewers(key, value)
-		cdm.essential[key], cdm.utility[key], cdm.buffs[key] = value, value, value
-		module.RefreshCooldownStyleFlags()
-	end
-	behavior:AddSwitch('Cooldown flash', function() return cdm.essential.showFlash == true end, function(value) SetAllViewers('showFlash', value) end, 'Flash when a cooldown completes')
-	behavior:AddSwitch('Cooldown edge', function() return cdm.essential.showEdge == true end, function(value) SetAllViewers('showEdge', value) end, 'Bright leading edge on the cooldown sweep')
-	behavior:AddTools('Move icons individually', 'Drag any icon out of its grid to place it freely', {
+	behavior:AddSwitch('Sync settings', function() return cdm.syncViewers == true end, function(value) cdm.syncViewers = value end, 'Essential and Utility share their look')
+	behavior:AddSwitch('Tooltips', function() return cdm.showTooltips ~= false end, function(value) cdm.showTooltips = value end, 'Spell tooltips on hover')
+	behavior:AddSwitch('Buff time on cooldowns', function() return cdm.showBuffDuration ~= false end, module.SetShowBuffDuration, 'Off shows the cooldown instead')
+	behavior:AddTools('Move icons individually', 'Drag icons out of the grid', {
 		{ tooltip = 'Resizing and snapping', title = 'Detached icons', options = {
 			Toggle(cdm, 'Resize detached icons', 'allowIndividualResize'),
 			Toggle(cdm, 'Disable snapping', 'disableSnapping'),
@@ -898,7 +879,7 @@ local function GeneralBoards(ui, parent, width, page)
 			module.RefreshAll()
 		end },
 	})
-	behavior:AddTools('Font', 'Timer and stack text across the Cooldown Manager', {
+	behavior:AddTools('Font', 'Timer and stack text', {
 		{ entries = fonts, width = MENU_WIDTH, get = function() return db.general.cdmFont or BUI.C.GLOBAL_OPTION end, set = function(value) db.general.cdmFont = value ~= BUI.C.GLOBAL_OPTION and value or nil end },
 	}, module.RefreshSkinSettings)
 
@@ -910,7 +891,7 @@ local function GeneralBoards(ui, parent, width, page)
 	local glow = cdm.glow
 	local glowTypes = {}
 	for _, glowType in ipairs(module.GLOW_TYPES) do glowTypes[#glowTypes + 1] = { value = glowType.id, text = glowType.name } end
-	effects:AddTools('Custom glows', 'A BluUI styled glow for procs and alerts, replacing the Blizzard highlight', {
+	effects:AddTools('Custom glows', 'Proc glow on the icons', {
 		Color(glow, 'Glow color', 'color', module.RefreshGlowPreview),
 		Menu(glow, 'type', glowTypes),
 		{ tooltip = 'Speed, lines and thickness', title = 'Glow shape', options = {
@@ -926,15 +907,25 @@ local function GeneralBoards(ui, parent, width, page)
 			module.RefreshSkinSettings()
 		end },
 	}, module.RefreshActiveGlows)
-	effects:AddTools('Assisted highlight', 'Color for the Blizzard assisted combat highlight', {
+	effects:AddTools('Assisted highlight', 'Blizzard\'s next-spell marker', {
 		Color(cdm.assist, 'Highlight color', 'color'),
+		{ get = function() return GetCVarBool('assistedCombatHighlight') end, set = function(value)
+			if InCombatLockdown() then
+				BUI.Print('The assisted highlight can change after combat.')
+				Repaint()
+				return
+			end
+			SetCVar('assistedCombatHighlight', value and '1' or '0')
+		end },
 	}, module.RefreshAssistHighlight)
 	local press = cdm.pressHighlight
 	effects:AddTools('Keypress highlight', 'Flash the icon when its key is pressed', {
 		Color(press, 'Tint color', 'tintColor'),
-		Color(press, 'Border color', 'borderColor'),
 		Menu(press, 'overlayStyle', module.PressHighlight.OVERLAY_STYLES),
-		{ tooltip = 'Border', title = 'Keypress highlight', options = { Toggle(press, 'Show the border', 'showBorder') } },
+		{ tooltip = 'Border', title = 'Keypress highlight', options = {
+			Toggle(press, 'Show the border', 'showBorder'),
+			Color(press, 'Border color', 'borderColor'),
+		} },
 		Toggle(press, nil, 'enabled'),
 	}, module.PressHighlight.Refresh)
 	return { setup, behavior, effects }
@@ -1064,9 +1055,20 @@ local function ViewerBoards(ui, parent, width, viewer)
 		SyncedColor('Border color', 'borderColor'),
 		{ tooltip = 'Thickness', title = 'Border', options = { Synced('Thickness', 'borderSize', { min = 0, max = 5, step = 1 }) } },
 	})
-	board:AddTools('Swipe', 'The cooldown sweep, reversed fills up instead of emptying', {
+	local function SweepFlag(label, key)
+		return { label = label, get = function() return viewerSettings[key] == true end, set = function(value)
+			viewerSettings[key] = value
+			if canSync then module.SyncSetting(key, value) end
+			module.RefreshCooldownStyleFlags()
+		end }
+	end
+	board:AddTools('Swipe', 'Color, edge, flash and direction', {
 		SyncedColor('Swipe color', 'swipeColor'),
-		SyncedToggle(nil, 'reverseSwipe'),
+		{ tooltip = 'Edge, flash and direction', title = 'Swipe', options = {
+			SweepFlag('Bright edge', 'showEdge'),
+			SweepFlag('Flash when ready', 'showFlash'),
+			SyncedToggle('Reverse the sweep', 'reverseSwipe'),
+		} },
 	})
 
 	local text = ui.Board(parent, width, {
@@ -1468,10 +1470,11 @@ local function RefreshIfOpen()
 	for _, callback in pairs(module._iconListRefreshers) do callback() end
 end
 
+local RefreshSoon = BUI.Dispatcher.NewDelayed(RefreshIfOpen, 0.3, 'CDM page refresh')
+
 BUI.Events:Register('PLAYER_SPECIALIZATION_CHANGED', 'CDMPage', function(_, unit)
-	if unit ~= 'player' then return end
-	C_Timer.After(0.3, RefreshIfOpen)
+	if unit == 'player' then RefreshSoon() end
 end)
-BUI.Events:Register('TRAIT_CONFIG_UPDATED', 'CDMPage', function() C_Timer.After(0.3, RefreshIfOpen) end)
-BUI.Events:Register('COOLDOWN_VIEWER_DATA_LOADED', 'CDMPage', function() C_Timer.After(0.3, RefreshIfOpen) end)
+BUI.Events:Register('TRAIT_CONFIG_UPDATED', 'CDMPage', RefreshSoon)
+BUI.Events:Register('COOLDOWN_VIEWER_DATA_LOADED', 'CDMPage', RefreshSoon)
 BUI.Events:Register('EDIT_MODE_LAYOUTS_UPDATED', 'CDMPage', RefreshIfOpen)
