@@ -460,7 +460,7 @@ function Display.CreateTracker(config)
         if tracker.getColorStacks then colorStacks = tracker.getColorStacks() end
 
         if stacks ~= lastStacks or colorStacks ~= lastColorStacks or layoutDirty then
-            if lastStacks == -1 and stacks > 0 and not config.previewTextOnly then Display.Announce(settings) end
+            if lastStacks == -1 and stacks > 0 and not config.quiet then Display.Announce(settings) end
 
             local restyle = layoutDirty
             lastStacks = stacks
@@ -473,8 +473,6 @@ function Display.CreateTracker(config)
                 UpdateText(stacks, colorStacks, restyle)
             end
         end
-
-        if config.previewTextOnly then tracker.textDisplay:SetAlpha(forceShow and 1 or 0) end
     end
 
     function tracker.ApplyPosition()
@@ -507,7 +505,6 @@ function Display.CreateTracker(config)
             tracker.DisableDragging()
         end
         tracker.RecheckActive()
-        if config.onRefresh then config.onRefresh() end
     end
 
     function tracker.Initialize()
