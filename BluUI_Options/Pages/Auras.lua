@@ -503,6 +503,21 @@ local function DeleteGroup(layout, group)
 	BUI.PageEngine.RefreshCurrentPage()
 end
 
+local function ConfirmDeleteGroup(layout, group, specs)
+	local count = #Members(group, specs)
+	if count == 0 then
+		DeleteGroup(layout, group)
+		return
+	end
+	BUILib.Modals.Confirm({
+		parent = Window().frame,
+		title = 'Delete ' .. group.name,
+		message = ('Delete "%s"? Its %s stay where they are, just out of the group.'):format(group.name, count == 1 and 'aura' or (count .. ' auras')),
+		confirmText = 'Delete', cancelText = 'Cancel',
+		onConfirm = function() DeleteGroup(layout, group) end,
+	})
+end
+
 local function GroupCount(layout)
 	local count = 0
 	for _, node in ipairs(layout.nodes) do
@@ -553,7 +568,7 @@ local function GroupHeader(ui, board, layout, group, specs, page)
 			end },
 			{ kind = 'swatch', label = 'Tint', tooltip = 'Tint', get = function() return unpack(group.tint) end, set = function(red, green, blue) group.tint = { red, green, blue } end },
 		} },
-		{ icon = 'erase', size = Layout.ERASE_SIZE, tooltip = 'Delete the group, its auras stay where it was', hover = 'danger', slot = 'icon', onClick = function() DeleteGroup(layout, group) end },
+		{ icon = 'erase', size = Layout.ERASE_SIZE, tooltip = 'Delete the group, its auras stay where it was', hover = 'danger', slot = 'icon', onClick = function() ConfirmDeleteGroup(layout, group, specs) end },
 		GroupSwitch(group, specs),
 	}, Repaint, function() return group.collapsed == true end, function()
 		group.collapsed = not group.collapsed or nil
