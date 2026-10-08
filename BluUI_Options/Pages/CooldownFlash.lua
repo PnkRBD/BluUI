@@ -122,7 +122,7 @@ BUI.PageEngine.RegisterPage('cooldownFlash', {
 			icon = 'glow',
 			title = 'Cooldown Flash',
 			placeholder = 'Search cooldown flash...',
-			back = { label = 'alerts', onClick = function() BUI.PageEngine.NavigateToID('auras') end },
+			back = { label = 'Weaker Auras', onClick = function() BUI.PageEngine.NavigateToID('auras') end },
 			tabs = { { label = 'Cooldown Flash', build = Sections } },
 		})
 		page:AutoRefresh()

@@ -701,7 +701,7 @@ BUI.PageEngine.RegisterPage('cdAnnouncer', {
 			title = 'CD Announcer',
 			placeholder = 'Search announcer settings...',
 			disabled = function() return cfg.enabled ~= true end,
-			back = { label = 'alerts', onClick = function() BUI.PageEngine.NavigateToID('auras') end },
+			back = { label = 'Weaker Auras', onClick = function() BUI.PageEngine.NavigateToID('auras') end },
 			tools = {
 				{ icon = 'enable', tooltip = 'Turn the announcer on or off', get = function() return cfg.enabled == true end, set = function(value)
 					cfg.enabled = value
