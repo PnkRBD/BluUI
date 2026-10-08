@@ -43,7 +43,7 @@ local VAULT_KICKER_SIZE = 10
 local VAULT_TEXT_GAP = 0
 local VAULT_TEXT_TOP = 10
 local VAULT_FOOT = 24
-local VAULT_SHADE_TOP, VAULT_SHADE_BOTTOM = 0, 0.6
+local VAULT_ART = { trim = 0.15, slot = { top = 0, bottom = 0.6 }, tile = { top = 0.3, bottom = 0.6 } }
 local VAULT_SHADE_LIGHT = 0.5
 local VAULT_PILL_HEIGHT = 18
 local VAULT_PILL_RADIUS = 6
@@ -876,8 +876,36 @@ local function BuildStats()
     return strip
 end
 
-local function VaultTile(parent)
+local function VaultArt(tile, atlas, shades)
+    local info = C_Texture.GetAtlasInfo(atlas)
+    local art = tile:CreateTexture(nil, 'BACKGROUND', nil, -2)
+    art:SetPoint('TOPLEFT', 2, -2)
+    art:SetPoint('BOTTOMRIGHT', -2, 2)
+    art:SetTexture(info.file)
+    local spanX = (info.rightTexCoord - info.leftTexCoord) * (1 - VAULT_ART.trim * 2)
+    local spanY = (info.bottomTexCoord - info.topTexCoord) * (1 - VAULT_ART.trim * 2)
+    local left = info.leftTexCoord + (info.rightTexCoord - info.leftTexCoord) * VAULT_ART.trim
+    local top = info.topTexCoord + (info.bottomTexCoord - info.topTexCoord) * VAULT_ART.trim
+    local artWidth, artHeight = info.width * (1 - VAULT_ART.trim * 2), info.height * (1 - VAULT_ART.trim * 2)
+    tile:HookScript('OnSizeChanged', function(_, width, height)
+        if width <= 0 or height <= 0 then return end
+        local scale = math.max(width / artWidth, height / artHeight)
+        local cropX = (1 - width / (artWidth * scale)) / 2 * spanX
+        local cropY = (1 - height / (artHeight * scale)) / 2 * spanY
+        art:SetTexCoord(left + cropX, left + spanX - cropX, top + cropY, top + spanY - cropY)
+    end)
+    local shade, shadeEdge = Widget.DrawCardShape(tile, INSET_RADIUS, WHITE, WHITE, 'BACKGROUND', -1, 1)
+    shadeEdge:Hide()
+    window:Paint(shade, function(texture)
+        local red, green, blue = window:Color('card')
+        if (red + green + blue) / 3 < VAULT_SHADE_LIGHT then red, green, blue = 0, 0, 0 end
+        texture:SetGradient('VERTICAL', CreateColor(red, green, blue, shades.bottom), CreateColor(red, green, blue, shades.top))
+    end)
+end
+
+local function VaultTile(parent, atlas)
     local tile = Inset(parent)
+    VaultArt(tile, atlas, VAULT_ART.tile)
     tile.value = kit.Text(tile, '', 16, 'text')
     tile.value:SetPoint('TOP', 0, -VAULT_VALUE_Y)
     tile.sub = kit.Text(tile, '', 10, 'text')
@@ -889,17 +917,7 @@ end
 
 local function VaultSlot(parent, atlas)
     local tile = Inset(parent)
-    local art = tile:CreateTexture(nil, 'BACKGROUND', nil, -2)
-    art:SetPoint('TOPLEFT', 2, -2)
-    art:SetPoint('BOTTOMRIGHT', -2, 2)
-    art:SetAtlas(atlas)
-    local shade, shadeEdge = Widget.DrawCardShape(tile, INSET_RADIUS, WHITE, WHITE, 'BACKGROUND', -1, 1)
-    shadeEdge:Hide()
-    window:Paint(shade, function(texture)
-        local red, green, blue = window:Color('card')
-        if (red + green + blue) / 3 < VAULT_SHADE_LIGHT then red, green, blue = 0, 0, 0 end
-        texture:SetGradient('VERTICAL', CreateColor(red, green, blue, VAULT_SHADE_BOTTOM), CreateColor(red, green, blue, VAULT_SHADE_TOP))
-    end)
+    VaultArt(tile, atlas, VAULT_ART.slot)
 
     local iconFrame = CreateFrame('Frame', nil, tile)
     iconFrame:SetSize(VAULT_SLOT_ICON, VAULT_SLOT_ICON)
@@ -1020,7 +1038,7 @@ local function BuildVault(onChange)
         row.label:SetPoint('LEFT', row.icon, 'RIGHT', VAULT_VALUE_Y, 0)
         row.small, row.big = {}, {}
         for slot = 1, 3 do
-            row.small[slot] = VaultTile(row)
+            row.small[slot] = VaultTile(row, spec.atlas)
             row.big[slot] = VaultSlot(row, spec.atlas)
         end
         row.chip = VaultChip(row)
