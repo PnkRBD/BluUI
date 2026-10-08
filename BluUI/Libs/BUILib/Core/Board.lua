@@ -2,6 +2,8 @@ local BUILib = LibStub("BUILib")
 if not BUILib.__loadChildren then return end
 local Layout = BUILib.Layout
 local Widget = BUILib.Widget
+local Motion = BUILib.Motion
+local Ease = Motion.Ease
 
 local PAD = 10
 local CELL_INSET = 8
@@ -23,6 +25,7 @@ local DRAG_TITLE_X = 44
 local GRABBER_SIZE = 12
 local DRAG_ALPHA = 0.35
 local SLIDE_TIME = 0.16
+local DROP_TIME = 0.24
 
 Layout.DRAG_TITLE_X = DRAG_TITLE_X
 
@@ -119,6 +122,7 @@ local function DragGhost(board)
 	ghost.icon:SetPoint('LEFT', DRAG_TITLE_X, 0)
 	ghost.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 	ghost.label = kit.Text(ghost, '', 12, 'text')
+	ghost.sub = kit.Text(ghost, '', 11, 'muted')
 	ghost:Hide()
 	drag.ghost = ghost
 	return ghost
@@ -138,37 +142,8 @@ local function PlaceAt(board, frame, y)
 	frame:SetPoint('TOPLEFT', board.panel, 'TOPLEFT', 0, y)
 end
 
-local function FinishSlide(board, frame)
-	local slide = board.drag.slides[frame]
-	board.drag.slides[frame] = nil
-	PlaceAt(board, frame, slide.to)
-	if slide.done then slide.done() end
-end
-
-local function RunSlides(board, elapsed)
-	local slides = board.drag.slides
-	for frame, slide in pairs(slides) do
-		slide.elapsed = slide.elapsed + elapsed
-		if slide.elapsed >= SLIDE_TIME then
-			FinishSlide(board, frame)
-		else
-			local progress = 1 - (1 - slide.elapsed / SLIDE_TIME) ^ 3
-			PlaceAt(board, frame, slide.from + (slide.to - slide.from) * progress)
-		end
-	end
-	if not next(slides) then board.drag.animator:SetScript('OnUpdate', nil) end
-end
-
-local function Slide(board, frame, from, to, done)
-	local drag = board.drag
-	drag.slides[frame] = { from = from, to = to, elapsed = 0, done = done }
-	PlaceAt(board, frame, from)
-	drag.animator:SetScript('OnUpdate', function(_, elapsed) RunSlides(board, elapsed) end)
-end
-
-local function SlotOf(board, row)
-	local slide = board.drag.slides[row]
-	return slide and slide.to or OffsetOf(row)
+local function SlotOf(row)
+	return Motion.Goal(row, 'y') or OffsetOf(row)
 end
 
 local function TrackDrag(board)
@@ -181,7 +156,7 @@ local function TrackDrag(board)
 	local from, over
 	for index, row in ipairs(drag.rows) do
 		if row == drag.dragging then from = index end
-		local top = SlotOf(board, row)
+		local top = SlotOf(row)
 		if centre <= top and centre >= top - row:GetHeight() then over = index end
 	end
 	if not over or over == from then return end
@@ -193,13 +168,24 @@ local function TrackDrag(board)
 	drag.onMove(from, delta)
 	for _, row in ipairs(drag.rows) do
 		local target = OffsetOf(row)
-		if before[row] ~= target then Slide(board, row, before[row], target) end
+		if before[row] ~= target then Motion.To(row, 'y', target, SLIDE_TIME, { from = before[row], easing = Ease.outCubic }) end
 	end
 end
 
+local function Mirror(text, source)
+	text:SetShown(source ~= nil)
+	if not source then return end
+	text:SetFont(source:GetFont())
+	local point, _, _, x, y = source:GetPoint(1)
+	text:ClearAllPoints()
+	text:SetPoint(point, x, y)
+	text:SetWidth(source:GetWidth())
+	text:SetWordWrap(false)
+	text:SetText(source:GetText())
+end
+
 function Board:DragList(onMove, onDrop)
-	local animator = CreateFrame('Frame', nil, self.panel)
-	self.drag = { rows = {}, slides = {}, animator = animator, onMove = onMove, onDrop = onDrop }
+	self.drag = { rows = {}, onMove = onMove, onDrop = onDrop }
 end
 
 function Board:AddDragRow(label, room, sub, icon)
@@ -221,16 +207,16 @@ function Board:AddDragRow(label, room, sub, icon)
 	row:RegisterForDrag('LeftButton')
 	row:SetScript('OnDragStart', function(frame)
 		local ghost = DragGhost(self)
-		if drag.slides[ghost] then FinishSlide(self, ghost) end
+		Motion.Finish(ghost, 'y')
 		local _, cursorY = GetCursorPosition()
 		drag.dragging = frame
 		drag.grabOffset = frame:GetTop() - cursorY / self.frame:GetEffectiveScale()
-		frame:SetAlpha(DRAG_ALPHA)
+		Motion.To(frame, 'alpha', DRAG_ALPHA, 0)
 		ghost.icon:SetShown(icon ~= nil)
 		if icon then ghost.icon:SetTexture(icon) end
-		ghost.label:ClearAllPoints()
-		ghost.label:SetPoint('LEFT', textX, 0)
-		ghost.label:SetText(label)
+		Mirror(ghost.label, title)
+		Mirror(ghost.sub, subtitle)
+		Motion.To(ghost, 'alpha', 1, 0)
 		ghost:Show()
 		TrackDrag(self)
 		frame:SetScript('OnUpdate', function() TrackDrag(self) end)
@@ -238,12 +224,11 @@ function Board:AddDragRow(label, room, sub, icon)
 	row:SetScript('OnDragStop', function(frame)
 		frame:SetScript('OnUpdate', nil)
 		drag.dragging = nil
-		local ghost = drag.ghost
-		Slide(self, ghost, OffsetOf(ghost), SlotOf(self, frame), function()
-			ghost:Hide()
-			frame:SetAlpha(1)
-		end)
 		drag.onDrop()
+		local ghost = drag.ghost
+		Motion.To(ghost, 'y', SlotOf(frame), DROP_TIME, { easing = Ease.outCubic, onComplete = function() ghost:Hide() end })
+		Motion.To(ghost, 'alpha', 0, DROP_TIME, { easing = Ease.outCubic })
+		Motion.To(frame, 'alpha', 1, DROP_TIME, { easing = Ease.outCubic })
 	end)
 	return row, title, subtitle
 end
