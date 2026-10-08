@@ -562,13 +562,13 @@ end
 
 local function GroupHeader(ui, board, layout, group, specs, page)
 	local row, title, subtitle = board:AddDragHeader(group.name, MemberCount(group, specs), {
-		{ tooltip = 'Name and tint', title = 'Group', slot = 'settings', options = {
+		{ kind = 'swatch', label = 'Color', tooltip = 'Group color', slot = 'settings', get = function() return unpack(group.tint) end, set = function(red, green, blue) group.tint = { red, green, blue } end },
+		{ icon = 'text', tooltip = 'Rename', title = 'Group', slot = 'position', options = {
 			{ label = 'Name', kind = 'input', placeholder = 'Group name', get = function() return group.name end, set = function(text)
 				if text ~= '' then group.name = text end
 			end },
-			{ kind = 'swatch', label = 'Tint', tooltip = 'Tint', get = function() return unpack(group.tint) end, set = function(red, green, blue) group.tint = { red, green, blue } end },
 		} },
-		{ icon = 'erase', size = Layout.ERASE_SIZE, tooltip = 'Delete the group, its auras stay where it was', hover = 'danger', slot = 'icon', onClick = function() ConfirmDeleteGroup(layout, group, specs) end },
+		{ icon = 'erase', size = Layout.ERASE_SIZE, tooltip = 'Delete the group', hover = 'danger', slot = 'toggle', onClick = function() ConfirmDeleteGroup(layout, group, specs) end },
 		GroupSwitch(group, specs),
 	}, Repaint, function() return group.collapsed == true end, function()
 		group.collapsed = not group.collapsed or nil
