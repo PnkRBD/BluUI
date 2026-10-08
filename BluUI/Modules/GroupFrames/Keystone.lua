@@ -1,22 +1,17 @@
 local _, BUI = ...
 
 local GroupFrames = BUI.GroupFrames
-local Util = GroupFrames.Util
+local PartyKeys = BUI.PartyKeys
 
 local CreateFrame            = CreateFrame
-local GetUnitName            = GetUnitName
-local GetNormalizedRealmName = GetNormalizedRealmName
 local UnitExists             = UnitExists
 local C_ChallengeMode        = C_ChallengeMode
-local LibStub                = LibStub
 
 local Keystone = {}
 GroupFrames.Keystone = Keystone
 
-local keys = {}
 local abbreviations = {}
 local runActive = false
-local libHandle
 local refreshQueued = false
 
 local FILLER = { the = true, of = true, ["and"] = true, ["in"] = true, ["a"] = true }
@@ -34,22 +29,6 @@ local function Abbreviate(mapID)
 	if letters == "" then return nil end
 	abbreviations[mapID] = letters
 	return letters
-end
-
-local function NameKey(name)
-	if type(name) ~= "string" or name == "" then return nil end
-	if Util.IsSecret(name) then return nil end
-	if name:find("-", 1, true) then return name end
-	local realm = GetNormalizedRealmName()
-	if type(realm) ~= "string" or realm == "" then return name end
-	return name .. "-" .. realm
-end
-
-local function UnitKey(unit)
-	if not unit then return nil end
-	local name = GetUnitName(unit, true)
-	if Util.IsSecret(name) then return nil end
-	return NameKey(name)
 end
 
 local function Label(entry)
@@ -85,7 +64,7 @@ function Keystone.Update(child)
 		text:Hide()
 		return
 	end
-	local label = Label(keys[UnitKey(unit)])
+	local label = Label(PartyKeys.ForUnit(unit))
 	if not label then
 		text:Hide()
 		return
@@ -105,30 +84,6 @@ local function QueueRefresh()
 	BUI.Profiler.After("GroupFrames.Keystone refresh", 0, RefreshAll)
 end
 
-local function Receive(level, mapID, _, sender)
-	local key = NameKey(sender)
-	if not key then return end
-	local entry = keys[key]
-	if not entry then
-		entry = {}
-		keys[key] = entry
-	end
-	entry.level, entry.mapID = level, mapID
-	QueueRefresh()
-end
-
-local function Library()
-	if libHandle then return libHandle end
-	local lib = LibStub("LibKeystone")
-	lib.Register(Keystone, Receive)
-	libHandle = lib
-	return lib
-end
-
-local function RequestKeys()
-	Library().Request("PARTY")
-end
-
 local function KeysWanted()
 	if not GroupFrames.IsActive() or not GroupFrames.GetDB().enabled then return false end
 	local partySettings = GroupFrames.GetDB().party
@@ -138,7 +93,8 @@ end
 
 function Keystone.Sync()
 	if not KeysWanted() then return end
-	RequestKeys()
+	PartyKeys.Listen("GroupFrames.Keystone", QueueRefresh)
+	PartyKeys.Request()
 	QueueRefresh()
 end
 

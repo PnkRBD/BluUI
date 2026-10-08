@@ -62,6 +62,7 @@ Utility\RangeEngine.lua
 Utility\AuraRules.lua
 Utility\AuraBlacklist.lua
 Utility\Tools.lua
+Utility\PartyKeys.lua
 Utility\TrueStats.lua
 Utility\AuraContainerEngine.lua
 Utility\PowerPrediction.lua
