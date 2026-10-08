@@ -32,6 +32,7 @@ local selectedIndex = 1
 local showingImport = false
 local importCharacter
 local importSkips = {}
+local railIcons = {}
 local preview
 local fonts
 
@@ -189,6 +190,20 @@ local function SaveOrder(spells, entries)
 	for position, key in ipairs(order) do spells[position] = key end
 end
 
+local function FirstIcon(bar)
+	for _, entry in ipairs(Entries(bar)) do
+		if entry.icon ~= DEFAULT_ICON then return entry.icon end
+	end
+end
+
+local function RailIconChanged()
+	return FirstIcon(Current()) ~= railIcons[selectedIndex]
+end
+
+local function RefreshList(page)
+	if RailIconChanged() then RebuildPage() else RebuildPane(page) end
+end
+
 local function PotionLabel(entry)
 	local _, _, _, _, _, _, subclassID = C_Item.GetItemInfoInstant(entry.id)
 	local label = subclassID == Enum.ItemConsumableSubclass.Flask and 'Flask display' or 'Potion display'
@@ -221,7 +236,7 @@ local function SettingsBoard(ui, parent, width, bar, index, page)
 	board:AddSwitch('Racials', function() return bar.showRacials == true end, function(value)
 		bar.showRacials = value
 		Apply()
-		RebuildPane(page)
+		RefreshList(page)
 	end, 'Add the racial abilities you know')
 	board:AddSwitch('Hide when not in bags', function() return bar.hideIfNotInBags == true end, function(value)
 		bar.hideIfNotInBags = value
@@ -239,7 +254,7 @@ local function SettingsBoard(ui, parent, width, bar, index, page)
 		{ tooltip = 'Which trinkets', title = 'Trinkets', options = { Toggle(bar, 'Usable trinkets only', 'trinketsUsableOnly') } },
 		{ get = function() return bar.showTrinkets == true end, set = function(value)
 			bar.showTrinkets = value
-			RebuildPane(page)
+			RefreshList(page)
 		end },
 	}, Apply)
 	board:AddTools('Icons', 'Size, border and opacity', {
@@ -301,7 +316,7 @@ local function TrackedBoard(ui, parent, width, bar, page)
 		if StoredIndex(spells, stored) then return end
 		spells[#spells + 1] = stored
 		Apply()
-		page:RebuildCurrent()
+		RefreshList(page)
 	end
 	local addRow = Section.AddRow(board, 'add a spell or item')
 	ui.RowTitle(addRow, 'Add a spell or item', 'Name, ID or link', LIST_ICON_X, NAME_WIDTH)
@@ -313,6 +328,7 @@ local function TrackedBoard(ui, parent, width, bar, page)
 	end, function()
 		SaveOrder(spells, entries)
 		Apply()
+		if RailIconChanged() then RebuildPage() end
 	end)
 	for _, entry in ipairs(entries) do
 		local row, title, subtitle = board:AddDragRow(entry.name, TOOLS_ROOM, entry.sub, entry.icon)
@@ -332,7 +348,7 @@ local function TrackedBoard(ui, parent, width, bar, page)
 			Put(ui.IconButton(row, 'erase', 'Remove ' .. entry.name, function()
 				table.remove(spells, StoredIndex(spells, entry.stored))
 				Apply()
-				page:RebuildCurrent()
+				RefreshList(page)
 			end, 'danger', ERASE_SIZE), ERASE_SIZE)
 		else
 			x = x + ERASE_SIZE + TOOL_GAP
@@ -491,8 +507,10 @@ end
 
 local function RailGroup()
 	local list = {}
+	wipe(railIcons)
 	for index, bar in ipairs(Bars()) do
-		list[index] = { id = ID_PREFIX .. index, label = bar.name, icon = 'capsule', index = index }
+		railIcons[index] = FirstIcon(bar)
+		list[index] = { id = ID_PREFIX .. index, label = bar.name, texture = railIcons[index], icon = 'capsule', index = index }
 	end
 	list[#list + 1] = { id = NEW_ID, label = 'New bar', icon = 'plus' }
 	list[#list + 1] = { id = IMPORT_ID, label = 'Import', icon = 'copy' }
