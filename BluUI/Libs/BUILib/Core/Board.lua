@@ -29,6 +29,7 @@ local DROP_TIME = 0.24
 local CHEVRON_SIZE = 10
 local GHOST_TINT_ALPHA = 0.3
 local GROUP_INDENT = 20
+local TINT_ALPHA = 0.07
 local COUNT_GAP = 10
 
 Layout.DRAG_TITLE_X = DRAG_TITLE_X
@@ -144,6 +145,22 @@ local function IndentOf(row)
 	return row.dragGroup and GROUP_INDENT or 0
 end
 
+local function TintRow(row)
+	local header = row.dragHeader and row or row.dragGroup
+	row.groupTint:SetShown(header ~= nil)
+	if not header then return end
+	local red, green, blue = header.dragTint()
+	row.groupTint:SetVertexColor(red, green, blue, TINT_ALPHA)
+	row.groupTint:SetPoint('TOPLEFT', -IndentOf(row), 0)
+end
+
+local function Tint(board, row)
+	row.groupTint = row:CreateTexture(nil, 'BACKGROUND', nil, 2)
+	row.groupTint:SetTexture(Widget.WHITE)
+	row.groupTint:SetPoint('BOTTOMRIGHT')
+	board.kit.Bind(row.groupTint, function() TintRow(row) end)
+end
+
 local function OffsetOf(frame)
 	local _, _, _, _, y = frame:GetPoint(1)
 	return y
@@ -203,12 +220,14 @@ end
 local function DropTone(drag)
 	local dragging = drag.dragging
 	if not dragging or dragging.dragHeader then return end
-	if drag.target or dragging.dragGroup then return 'positive' end
+	local header = drag.target or dragging.dragGroup
+	if header then return function(region) region:SetVertexColor(header.dragTint()) end end
 	if drag.origin then return 'danger' end
 end
 
 local function PaintGroups(board)
 	local drag, window = board.drag, board.window
+	for _, row in ipairs(drag.rows) do TintRow(row) end
 	local ghost = drag.ghost
 	if not ghost then return end
 	if drag.dragging then
@@ -383,6 +402,7 @@ function Board:AddDragRow(label, room, sub, icon, group)
 	row:SetHeight(DRAG_ROW)
 	row.dragGroup = group
 	drag.rows[#drag.rows + 1] = row
+	Tint(self, row)
 	kit.Glyph(row, 'grabber', GRABBER_SIZE, 'faint'):SetPoint('LEFT', kit.ROW_INSET, 0)
 	local textX = DragTextX(icon)
 	if icon then
@@ -417,16 +437,18 @@ function Board:AddDragTools(label, sub, icon, tools, after, group)
 	return row
 end
 
-function Board:AddDragHeader(label, sub, tools, after, folded, onFold)
+function Board:AddDragHeader(label, sub, tools, after, folded, onFold, tint)
 	local kit, drag = self.kit, self.drag
 	local row = Section.AddRow(self, label)
 	row:SetHeight(DRAG_ROW)
 	row.dragHeader = true
 	row.dragFolded = folded
+	row.dragTint = tint
 	row.dragEntry = self.rows[#self.rows]
 	row.dragEntry.kind = 'header'
 	drag.rows[#drag.rows + 1] = row
 	kit.Fill(row, 'secondary', 'BACKGROUND', 0):SetAllPoints()
+	Tint(self, row)
 	kit.Hover(row)
 	local chevron = kit.Glyph(row, 'dropdown', CHEVRON_SIZE, 'muted')
 	chevron:SetPoint('LEFT', kit.ROW_INSET, 0)

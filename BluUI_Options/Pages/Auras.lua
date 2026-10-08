@@ -10,6 +10,16 @@ local STYLES = {
 	{ value = 'dot', text = 'Dot' },
 }
 
+local TINTS = {
+	{ 0.35, 0.6, 1 },
+	{ 0.4, 0.9, 0.5 },
+	{ 1, 0.65, 0.25 },
+	{ 0.8, 0.45, 1 },
+	{ 1, 0.4, 0.5 },
+	{ 0.3, 0.85, 0.85 },
+	{ 0.95, 0.85, 0.3 },
+}
+
 local LOW_HP_FIELDS = {
 	posX = 'lowHpPosX', posY = 'lowHpPosY',
 	anchorFrame = 'lowHpAnchorFrame', anchorPoint = 'lowHpAnchorPoint',
@@ -537,17 +547,18 @@ end
 
 local function GroupHeader(ui, board, layout, group, specs, page)
 	local row, title, subtitle = board:AddDragHeader(group.name, MemberCount(group, specs), {
-		{ tooltip = 'Rename', title = 'Group', slot = 'settings', options = {
+		{ tooltip = 'Name and tint', title = 'Group', slot = 'settings', options = {
 			{ label = 'Name', kind = 'input', placeholder = 'Group name', get = function() return group.name end, set = function(text)
 				if text ~= '' then group.name = text end
 			end },
+			{ kind = 'swatch', label = 'Tint', tooltip = 'Tint', get = function() return unpack(group.tint) end, set = function(red, green, blue) group.tint = { red, green, blue } end },
 		} },
 		{ icon = 'erase', size = Layout.ERASE_SIZE, tooltip = 'Delete the group, its auras stay where it was', hover = 'danger', slot = 'icon', onClick = function() DeleteGroup(layout, group) end },
 		GroupSwitch(group, specs),
 	}, Repaint, function() return group.collapsed == true end, function()
 		group.collapsed = not group.collapsed or nil
 		page:Resize()
-	end)
+	end, function() return unpack(group.tint) end)
 	ui.Bind(title, function() title:SetText(group.name) end)
 	ui.Bind(subtitle, function() subtitle:SetText(MemberCount(group, specs)) end)
 	return row
@@ -566,7 +577,8 @@ local function GeneralBoard(ui, parent, width, page)
 	local board
 	local function NewGroup()
 		Save(layout, board, nodeOf)
-		table.insert(layout.nodes, 1, { name = 'Group ' .. (GroupCount(layout) + 1), members = {} })
+		local count = GroupCount(layout)
+		table.insert(layout.nodes, 1, { name = 'Group ' .. (count + 1), members = {}, tint = CopyTable(TINTS[count % #TINTS + 1]) })
 		BUI.PageEngine.RefreshCurrentPage()
 	end
 	board = ui.Board(parent, width, {
@@ -580,8 +592,11 @@ local function GeneralBoard(ui, parent, width, page)
 		page:Resize()
 		Repaint()
 	end)
+	local groupIndex = 0
 	for _, entry in ipairs(Arrange(layout, specs, order)) do
 		if entry.header then
+			groupIndex = groupIndex + 1
+			entry.header.tint = entry.header.tint or CopyTable(TINTS[(groupIndex - 1) % #TINTS + 1])
 			local header = GroupHeader(ui, board, layout, entry.header, specs, page)
 			headers[entry.header] = header
 			nodeOf[header] = entry.header
