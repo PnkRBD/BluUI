@@ -150,7 +150,7 @@ local function OnEnteringWorld()
 end
 
 local lifeblooms = {}
-local castTargets = {}
+local pendingCast, pendingTarget
 local swiftnessArmed = false
 
 local function ClearLifeblooms()
@@ -158,7 +158,7 @@ local function ClearLifeblooms()
         lifeblooms[index].timer:Cancel()
         lifeblooms[index] = nil
     end
-    wipe(castTargets)
+    pendingCast, pendingTarget = nil, nil
     swiftnessArmed = false
 end
 
@@ -195,7 +195,7 @@ local function Schedule(entry, settings)
 end
 
 local function OnCastSent(_, _, target, castGUID, spellID)
-    if (spellID == LIFEBLOOM or spellID == REGROWTH) and not issecretvalue(target) then castTargets[castGUID] = target end
+    if (spellID == LIFEBLOOM or spellID == REGROWTH) and not issecretvalue(target) then pendingCast, pendingTarget = castGUID, target end
 end
 
 local function OnLifebloomCast(target, settings)
@@ -223,8 +223,11 @@ local function OnFlourish(settings)
 end
 
 local function OnPlayerCast(_, _, castGUID, spellID)
-    local target = castTargets[castGUID]
-    castTargets[castGUID] = nil
+    local target
+    if castGUID == pendingCast then
+        target = pendingTarget
+        pendingCast, pendingTarget = nil, nil
+    end
     if not isRestoration then return end
     local settings = GetSettings()
     if not settings.enabled then return end
