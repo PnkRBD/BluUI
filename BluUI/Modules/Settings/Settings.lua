@@ -557,16 +557,29 @@ function Settings.SetFCT(cvar, value)
     if CombatText_UpdateDisplayedMessages then CombatText_UpdateDisplayedMessages() end
 end
 
-local function ApplyAHCurrentExpansion(value)
-    if AUCTION_HOUSE_DEFAULT_FILTERS and Enum.AuctionHouseFilter then
-        AUCTION_HOUSE_DEFAULT_FILTERS[Enum.AuctionHouseFilter.CurrentExpansionOnly] = value and true or false
-    end
+local function ForceCurrentExpansion()
+    if not BUI.GetDB().automation.ahCurrentExpansionOnly then return end
+    g_auctionHouseFilters.filters[Enum.AuctionHouseFilter.CurrentExpansionOnly] = true
+    AuctionHouseFrame.SearchBar:UpdateClearFiltersButton()
 end
-Settings.ToggleAHCurrentExpansion = function(_, enabled) ApplyAHCurrentExpansion(enabled) end
-BUI.Events:Register('ADDON_LOADED', 'Settings.AHFilter', function(_, addon)
-    if addon ~= 'Blizzard_AuctionHouseUI' then return end
-    ApplyAHCurrentExpansion(BUI.GetDB().automation.ahCurrentExpansionOnly)
-end)
+
+local function HookAuctionHouse()
+    AuctionHouseFrame:HookScript('OnShow', BUI.Profiler.Wrap('Settings.AHFilter OnShow', ForceCurrentExpansion))
+end
+
+Settings.ToggleAHCurrentExpansion = function(_, enabled)
+    if enabled and AuctionHouseFrame and AuctionHouseFrame:IsShown() then ForceCurrentExpansion() end
+end
+
+if C_AddOns.IsAddOnLoaded('Blizzard_AuctionHouseUI') then
+    HookAuctionHouse()
+else
+    BUI.Events:Register('ADDON_LOADED', 'Settings.AHFilter', function(_, addon)
+        if addon ~= 'Blizzard_AuctionHouseUI' then return end
+        BUI.Events:Unregister('ADDON_LOADED', 'Settings.AHFilter')
+        HookAuctionHouse()
+    end)
+end
 
 function Settings.SetSpellQueueWindow(_, milliseconds)
     milliseconds = tonumber(milliseconds)
