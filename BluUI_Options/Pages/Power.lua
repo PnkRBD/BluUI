@@ -1377,10 +1377,10 @@ end
 local RAIL_GROUPS = {
 	{ title = 'Settings', items = { { id = 'scope', label = 'Scope', icon = 'profile', count = function() return SCOPE_TAGS[BUI.Power.GetScope()] end } } },
 	{ title = 'Bars', items = {
-		{ id = 'primary', label = 'Primary' },
-		{ id = 'secondary', label = 'Secondary' },
+		{ id = 'primary', label = 'Primary', icon = 'power' },
+		{ id = 'secondary', label = 'Secondary', icon = 'more' },
 	} },
-	{ title = 'Layout', items = { { id = 'stacking', label = 'Stacking' } } },
+	{ title = 'Layout', items = { { id = 'stacking', label = 'Stacking', icon = 'order' } } },
 }
 
 BUI.PageEngine.RegisterPage('power', {
