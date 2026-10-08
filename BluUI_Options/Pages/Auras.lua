@@ -4,7 +4,6 @@ local Layout = BUILib.Layout
 
 local PAGE_WIDTH = 960
 local MENU_WIDTH = 150
-local SPECS_WIDTH = 220
 
 local STYLES = {
 	{ value = 'cross', text = 'Cross' },
@@ -322,9 +321,120 @@ local function CooldownFlashRow()
 	}
 end
 
+local function SpecList()
+	local specs = {}
+	for classID = 1, GetNumClasses() do
+		local className, classFile = GetClassInfo(classID)
+		if className then
+			local classColor = RAID_CLASS_COLORS[classFile]
+			local colorText = classColor and classColor.colorStr or 'ffcccccc'
+			for specIndex = 1, GetNumSpecializationsForClassID(classID) do
+				local specID, specName = GetSpecializationInfoForClassID(classID, specIndex)
+				if specID then
+					specs[#specs + 1] = { className = className, id = specID, text = ('|c%s%s|r  |cff888888%s|r'):format(colorText, specName or ('Spec ' .. specIndex), className) }
+				end
+			end
+		end
+	end
+	table.sort(specs, function(left, right)
+		if left.className ~= right.className then return left.className < right.className end
+		return left.text < right.text
+	end)
+	return specs
+end
+
+local function SpecsTool(ui, db, apply)
+	local specs = SpecList()
+	local melee = BUI.Crosshair.MELEE_SPEC_IDS
+	local function Selected()
+		if db.specs then return db.specs end
+		local all = {}
+		for _, spec in ipairs(specs) do all[spec.id] = true end
+		return all
+	end
+	local function Choose(filter)
+		local map = {}
+		for _, spec in ipairs(specs) do
+			if filter(spec.id) then map[spec.id] = true end
+		end
+		db.specs = map
+		apply()
+		Repaint()
+	end
+	local function Count()
+		local selected, count = Selected(), 0
+		for _, spec in ipairs(specs) do
+			if selected[spec.id] then count = count + 1 end
+		end
+		return count
+	end
+	return {
+		kind = 'custom',
+		build = function(parent)
+			local dropdown = ui.Dropdown(parent, MENU_WIDTH, function()
+				local selected = Selected()
+				local items = {
+					{ text = 'Select all', callback = function() Choose(function() return true end) end },
+					{ text = 'Deselect all', callback = function() Choose(function() return false end) end },
+					{ text = 'Melee only', callback = function() Choose(function(id) return melee[id] == true end) end },
+					{ separator = true },
+				}
+				for _, spec in ipairs(specs) do
+					local item = { text = spec.text, checked = selected[spec.id] == true }
+					item.callback = function()
+						local map = CopyTable(Selected())
+						map[spec.id] = not map[spec.id] or nil
+						item.checked = map[spec.id] == true
+						db.specs = map
+						apply()
+						Repaint()
+						return true
+					end
+					items[#items + 1] = item
+				end
+				return items
+			end)
+			ui.Bind(dropdown, function()
+				local count = Count()
+				dropdown.label:SetText(count == #specs and 'All specs' or count == 0 and 'No specs' or (count .. ' specs'))
+			end)
+			return dropdown
+		end,
+	}
+end
+
+local function CrosshairRow(ui)
+	local db = BUI.GetDB().crosshair
+	local Crosshair = BUI.Crosshair
+	return {
+		id = 'crosshair', name = 'Crosshair', sub = 'A reticle at the center of your screen', after = Crosshair.Refresh,
+		switch = Switch(db, 'enabled'),
+		tools = {
+			ChannelColor(db, 'Crosshair color', 'alpha'),
+			{ entries = STYLES, width = MENU_WIDTH, get = function() return db.style end, set = function(value) db.style = value end },
+			SpecsTool(ui, db, Crosshair.Refresh),
+			{ tooltip = 'Appearance and visibility', title = 'Crosshair', options = {
+				Option(db, 'Size', 'size', { min = 5, max = 100, step = 1 }),
+				Option(db, 'Thickness', 'thickness', { min = 1, max = 10, step = 1 }),
+				Option(db, 'Center gap', 'gap', { min = 0, max = 30, step = 1 }),
+				Option(db, 'Hide out of combat', 'hideOutOfCombat'),
+				Option(db, 'Hide in town', 'hideInTown'),
+				Option(db, 'Range indicator, ' .. Crosshair.RangeLabel(), 'rangeIndicator'),
+				ArrayColor(db, 'In range color', 'inRangeColor', false),
+				ArrayColor(db, 'Out of range color', 'outOfRangeColor', false),
+			} },
+			{ icon = 'location', tooltip = 'Screen offset', title = 'Position', options = {
+				Option(db, 'Horizontal offset', 'offsetX', { min = -500, max = 500, step = 1 }),
+				Option(db, 'Vertical offset', 'offsetY', { min = -500, max = 500, step = 1 }),
+			} },
+			Eye('Preview', Crosshair.IsPreviewing, Crosshair.SetPreview),
+		},
+	}
+end
+
 local ROWS = {
 	CombatTimerRow, CombatMessagesRow, SecondaryStatsRow, KeystoneReminderRow, PrivateWarningRow,
-	LowHpRow, PetWarningsRow, GatewayRow, BloodlustRow, CDAnnouncerRow, CooldownFlashRow,
+	LowHpRow, PetWarningsRow, GatewayRow, BloodlustRow, CDAnnouncerRow, CooldownFlashRow, CrosshairRow,
 }
 
 local function Members(group, specs)
@@ -436,7 +546,7 @@ local function GeneralBoard(ui, parent, width, page)
 	local layout = BUI.GetDB().auraGroups
 	local order, specs = {}, {}
 	for index, Row in ipairs(ROWS) do
-		local spec = Row()
+		local spec = Row(ui)
 		spec.tools[#spec.tools + 1] = spec.switch
 		order[index] = spec
 		specs[spec.id] = spec
@@ -472,122 +582,8 @@ local function GeneralBoard(ui, parent, width, page)
 	return board
 end
 
-local function SpecList()
-	local specs = {}
-	for classID = 1, GetNumClasses() do
-		local className, classFile = GetClassInfo(classID)
-		if className then
-			local classColor = RAID_CLASS_COLORS[classFile]
-			local colorText = classColor and classColor.colorStr or 'ffcccccc'
-			for specIndex = 1, GetNumSpecializationsForClassID(classID) do
-				local specID, specName = GetSpecializationInfoForClassID(classID, specIndex)
-				if specID then
-					specs[#specs + 1] = { className = className, id = specID, text = ('|c%s%s|r  |cff888888%s|r'):format(colorText, specName or ('Spec ' .. specIndex), className) }
-				end
-			end
-		end
-	end
-	table.sort(specs, function(left, right)
-		if left.className ~= right.className then return left.className < right.className end
-		return left.text < right.text
-	end)
-	return specs
-end
-
-local function SpecsTool(ui, db, apply)
-	local specs = SpecList()
-	local melee = BUI.Crosshair.MELEE_SPEC_IDS
-	local function Selected()
-		if db.specs then return db.specs end
-		local all = {}
-		for _, spec in ipairs(specs) do all[spec.id] = true end
-		return all
-	end
-	local function Choose(filter)
-		local map = {}
-		for _, spec in ipairs(specs) do
-			if filter(spec.id) then map[spec.id] = true end
-		end
-		db.specs = map
-		apply()
-		Repaint()
-	end
-	local function Count()
-		local selected, count = Selected(), 0
-		for _, spec in ipairs(specs) do
-			if selected[spec.id] then count = count + 1 end
-		end
-		return count
-	end
-	return {
-		kind = 'custom',
-		build = function(parent)
-			local dropdown = ui.Dropdown(parent, SPECS_WIDTH, function()
-				local selected = Selected()
-				local items = {
-					{ text = 'Select all', callback = function() Choose(function() return true end) end },
-					{ text = 'Deselect all', callback = function() Choose(function() return false end) end },
-					{ text = 'Melee only', callback = function() Choose(function(id) return melee[id] == true end) end },
-					{ separator = true },
-				}
-				for _, spec in ipairs(specs) do
-					local item = { text = spec.text, checked = selected[spec.id] == true }
-					item.callback = function()
-						local map = CopyTable(Selected())
-						map[spec.id] = not map[spec.id] or nil
-						item.checked = map[spec.id] == true
-						db.specs = map
-						apply()
-						Repaint()
-						return true
-					end
-					items[#items + 1] = item
-				end
-				return items
-			end)
-			ui.Bind(dropdown, function()
-				local count = Count()
-				dropdown.label:SetText(count == #specs and 'All specs' or count == 0 and 'No specs' or (count .. ' specs'))
-			end)
-			return dropdown
-		end,
-	}
-end
-
-local function CrosshairBoard(ui, parent, width)
-	local db = BUI.GetDB().crosshair
-	local Crosshair = BUI.Crosshair
-	local board = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Crosshair',
-		description = 'A reticle at the center of your screen, shown for the specs you pick.',
-	})
-	board:AddTools('Crosshair', 'Style, size, color and when it hides', {
-		ChannelColor(db, 'Crosshair color', 'alpha'),
-		{ entries = STYLES, width = MENU_WIDTH, get = function() return db.style end, set = function(value) db.style = value end },
-		{ tooltip = 'Appearance and visibility', title = 'Crosshair', options = {
-			Option(db, 'Size', 'size', { min = 5, max = 100, step = 1 }),
-			Option(db, 'Thickness', 'thickness', { min = 1, max = 10, step = 1 }),
-			Option(db, 'Center gap', 'gap', { min = 0, max = 30, step = 1 }),
-			Option(db, 'Hide out of combat', 'hideOutOfCombat'),
-			Option(db, 'Hide in town', 'hideInTown'),
-			Option(db, 'Range indicator, ' .. Crosshair.RangeLabel(), 'rangeIndicator'),
-			ArrayColor(db, 'In range color', 'inRangeColor', false),
-			ArrayColor(db, 'Out of range color', 'outOfRangeColor', false),
-		} },
-		{ icon = 'location', tooltip = 'Screen offset', title = 'Position', options = {
-			Option(db, 'Horizontal offset', 'offsetX', { min = -500, max = 500, step = 1 }),
-			Option(db, 'Vertical offset', 'offsetY', { min = -500, max = 500, step = 1 }),
-		} },
-		Eye('Preview', Crosshair.IsPreviewing, Crosshair.SetPreview),
-		Switch(db, 'enabled'),
-	}, Crosshair.Refresh)
-	board:AddTools('Show for specs', 'Specializations the crosshair is shown for', { SpecsTool(ui, db, Crosshair.Refresh) })
-	return board
-end
-
 local function General(ui, _, parent, width, page)
-	return { GeneralBoard(ui, parent, width, page), CrosshairBoard(ui, parent, width) }
+	return { GeneralBoard(ui, parent, width, page) }
 end
 
 BUI.PageEngine.RegisterPage('auras', {
