@@ -125,10 +125,11 @@ local function Build()
     card.meta:SetPoint('BOTTOMLEFT', card.portal, 'BOTTOMRIGHT', textLeft, 0)
     card.meta:SetPoint('RIGHT', Pixel.Scale(-PAD), 0)
 
-    BUI.Dragging.MakeAnchoredAlert(card, {
-        settings = GetDB,
-        isLocked = function() return GetDB().locked end,
+    card:EnableMouse(true)
+    BUI.Dragging.MakeDraggable(card, {
+        skipClickThrough = true,
         onRightClick = function() KeystoneReminder.SetLocked(true) end,
+        onPositionChanged = function() BUI.Anchor.SaveDrop(card, GetDB()) end,
     })
     Apply()
 end
@@ -240,7 +241,6 @@ function KeystoneReminder.SetLocked(locked)
     if not db.enabled then return end
     Build()
     Apply()
-    BUI.Dragging.SetLocked(card, locked)
     if locked then
         KeystoneReminder.Hide()
     else
@@ -255,7 +255,6 @@ function KeystoneReminder.Refresh()
         return
     end
     KeystoneReminder.Enable()
-    BUI.Dragging.SetLocked(card, db.locked)
 end
 
 BUI.Events:OnLogin('KeystoneReminder', function()
