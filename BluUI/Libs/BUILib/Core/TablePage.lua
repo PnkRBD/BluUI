@@ -21,6 +21,8 @@ local COLUMN_FONT = 11
 local COLUMN_Y = 12
 local ROW_HEIGHT = 58
 local ROW_INSET = 20
+local TITLE_LIFT = 7
+local SUB_DROP = 7
 local CONTROL_HEIGHT = 30
 local TAB_HEIGHT = 30
 local TAB_GAP = 40
@@ -509,12 +511,12 @@ function Layout.TableKit(window)
 
 	function kit.RowTitle(row, name, sub, x, width)
 		local title = kit.Text(row, name, 12, 'text', width)
-		title:SetPoint('LEFT', x, sub and 9 or 0)
+		title:SetPoint('LEFT', x, sub and TITLE_LIFT or 0)
 		title:SetWordWrap(false)
 		local subtitle
 		if sub then
 			subtitle = kit.Text(row, sub, 11, 'muted', width)
-			subtitle:SetPoint('LEFT', x, -10)
+			subtitle:SetPoint('LEFT', x, -SUB_DROP)
 			subtitle:SetWordWrap(false)
 		end
 		return title, subtitle
