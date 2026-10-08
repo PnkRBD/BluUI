@@ -12,10 +12,13 @@ BUI.Auras.KeystoneReminder = KeystoneReminder
 local FRAME_NAME = 'BUI_KeystoneReminder'
 local EVENT_KEY = 'KeystoneReminder'
 local ROSTER_KEY = 'KeystoneReminder.Roster'
+local COOLDOWN_KEY = 'KeystoneReminder.Cooldown'
 local CARD_KEY = 'KeystoneReminder.Card'
 local WIDTH, HEIGHT = 260, 62
 local PAD = 10
 local PORTAL_SIZE = 42
+local LEVEL_SIZE = 13
+local PREVIEW_LEVEL = 12
 local TEXT_GAP = 10
 local CLOSE_SIZE = 14
 local CARD_RADIUS = 8
@@ -29,9 +32,12 @@ local ROLE_COORDS = {
 local ROLE_NAMES = { TANK = 'Tank', HEALER = 'Healer', DAMAGER = 'DPS' }
 local KEYSTONE_ICON = 'Interface\\Icons\\INV_Relics_Hourglass'
 local READY_TEXT = 'Click to teleport'
+local COOLDOWN_TEXT = 'Teleport on cooldown'
 local UNLEARNED_TEXT = 'Teleport not learned'
+local IsSecret = BUI.Tools.IsSecretValue
+local PartyKeys = BUI.PartyKeys
 
-local card, current, portalStatus, lockListener
+local card, current, lockListener
 
 local function GetDB() return BUI.GetDB().keystoneReminder end
 
@@ -51,7 +57,7 @@ end
 local function FindDungeon(activityName)
     for _, mapID in ipairs(C_ChallengeMode.GetMapTable()) do
         local name, _, _, texture = C_ChallengeMode.GetMapUIInfo(mapID)
-        if name and activityName:find(name, 1, true) then return name, texture end
+        if name and activityName:find(name, 1, true) then return name, texture, mapID end
     end
 end
 
@@ -73,6 +79,16 @@ local function BuildPortal(parent)
     portal.icon:SetPoint('TOPLEFT', inset, -inset)
     portal.icon:SetPoint('BOTTOMRIGHT', -inset, inset)
     portal.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    portal.cooldown = CreateFrame('Cooldown', nil, portal, 'CooldownFrameTemplate')
+    portal.cooldown:SetAllPoints(portal.icon)
+    portal.cooldown:SetDrawEdge(false)
+    portal.cooldown:SetHideCountdownNumbers(false)
+    local overlay = CreateFrame('Frame', nil, portal)
+    overlay:SetAllPoints()
+    overlay:SetFrameLevel(portal.cooldown:GetFrameLevel() + 1)
+    portal.level = overlay:CreateFontString(nil, 'OVERLAY')
+    Pixel.ApplyFont(portal.level, LEVEL_SIZE, FONT, 'OUTLINE')
+    portal.level:SetPoint('TOP', 0, Pixel.Scale(-2))
     portal:SetScript('OnEnter', BUI.Profiler.Script('Auras.KeystoneReminder portal OnEnter', function(self)
         PaintPortalEdge(self, true)
         if not self._spellID then return end
@@ -143,27 +159,63 @@ local function PaintCard()
     PaintPortalEdge(card.portal, card.portal:IsMouseOver())
 end
 
+local function PaintCooldown()
+    local portal = card.portal
+    local info = portal._known and C_Spell.GetSpellCooldown(portal._spellID)
+    if not info or IsSecret(info.isActive) or IsSecret(info.isOnGCD) then return end
+    portal._cooling = info.isActive and not info.isOnGCD
+    if portal._cooling then
+        portal.cooldown:SetCooldownFromDurationObject(C_Spell.GetSpellCooldownDuration(portal._spellID))
+    else
+        portal.cooldown:Clear()
+    end
+end
+
 local function SetPortal(spellID, texture)
     local portal = card.portal
-    portal._spellID = spellID
     local known = spellID ~= nil and C_SpellBook.IsSpellInSpellBook(spellID)
+    portal._spellID, portal._known, portal._cooling = spellID, known, false
+    portal.cooldown:Clear()
     portal.icon:SetTexture(spellID and C_Spell.GetSpellTexture(spellID) or texture or KEYSTONE_ICON)
     portal.icon:SetDesaturated(spellID ~= nil and not known)
-    portalStatus = spellID and (known and READY_TEXT or UNLEARNED_TEXT)
+    PaintCooldown()
     BUI.Events:AfterCombat(function()
         portal:SetAttribute('spell', known and spellID or nil)
     end, 'KeystoneReminder.Portal')
+end
+
+local function PortalStatus()
+    local portal = card.portal
+    if not portal._spellID then return nil end
+    if not portal._known then return UNLEARNED_TEXT end
+    return portal._cooling and COOLDOWN_TEXT or READY_TEXT
 end
 
 local function PaintMeta()
     local playerRole = PlayerRole()
     local coords = ROLE_COORDS[playerRole]
     local role = coords and (ROLE_MARKUP:format(coords[1], coords[2], coords[3], coords[4]) .. ROLE_NAMES[playerRole])
-    if role and portalStatus then
-        card.meta:SetText(role .. '  ·  ' .. portalStatus)
+    local status = PortalStatus()
+    if role and status then
+        card.meta:SetText(role .. '  ·  ' .. status)
     else
-        card.meta:SetText(role or portalStatus or '')
+        card.meta:SetText(role or status or '')
     end
+end
+
+local function PaintLevel()
+    local level = current.level or (current.mapID and PartyKeys.LevelFor(current.mapID))
+    card.portal.level:SetText(level and ('+' .. level) or '')
+end
+
+local function OnCooldown()
+    PaintCooldown()
+    PaintMeta()
+end
+
+local function OnRoster()
+    PaintMeta()
+    if not current.level and current.mapID then PartyKeys.Request() end
 end
 
 local function SyncCard()
@@ -175,6 +227,7 @@ local function Paint(info)
     card.name:SetText(info.dungeon or info.activity)
     SetPortal(info.spellID, info.texture)
     PaintMeta()
+    PaintLevel()
 end
 
 function KeystoneReminder.Show(info)
@@ -182,19 +235,26 @@ function KeystoneReminder.Show(info)
     current = info
     Paint(info)
     BUI.Events:AfterCombat(SyncCard, CARD_KEY)
-    BUI.Events:Register('GROUP_ROSTER_UPDATE', ROSTER_KEY, PaintMeta)
+    BUI.Events:Register('GROUP_ROSTER_UPDATE', ROSTER_KEY, OnRoster)
+    BUI.Events:Register('SPELL_UPDATE_COOLDOWN', COOLDOWN_KEY, OnCooldown)
+    if not info.level and info.mapID then
+        PartyKeys.Listen(EVENT_KEY, PaintLevel)
+        PartyKeys.Request()
+    end
 end
 
 function KeystoneReminder.Hide()
     current = nil
     BUI.Events:Unregister('GROUP_ROSTER_UPDATE', ROSTER_KEY)
+    BUI.Events:Unregister('SPELL_UPDATE_COOLDOWN', COOLDOWN_KEY)
+    PartyKeys.Listen(EVENT_KEY, nil)
     if card then BUI.Events:AfterCombat(SyncCard, CARD_KEY) end
 end
 
 function KeystoneReminder.ShowPreview()
     local dungeon = BUI.PortalData.seasons[1].dungeons[1].name
-    local _, texture = FindDungeon(dungeon)
-    KeystoneReminder.Show({ dungeon = dungeon, texture = texture, spellID = BUI.PortalManager.TeleportSpell(dungeon) })
+    local _, texture, mapID = FindDungeon(dungeon)
+    KeystoneReminder.Show({ dungeon = dungeon, texture = texture, mapID = mapID, level = PREVIEW_LEVEL, spellID = BUI.PortalManager.TeleportSpell(dungeon) })
 end
 
 local function OnJoined(_, resultID)
@@ -203,9 +263,10 @@ local function OnJoined(_, resultID)
     if not result then return end
     local activity = C_LFGList.GetActivityInfoTable(result.activityIDs[1])
     if not activity or not activity.isMythicPlusActivity then return end
-    local dungeon, texture = FindDungeon(activity.fullName)
+    local dungeon, texture, mapID = FindDungeon(activity.fullName)
     KeystoneReminder.Show({
         dungeon = dungeon,
+        mapID = mapID,
         activity = activity.fullName,
         texture = texture,
         spellID = dungeon and BUI.PortalManager.TeleportSpell(dungeon),
