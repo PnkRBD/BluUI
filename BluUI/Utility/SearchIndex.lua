@@ -242,6 +242,7 @@ local entries = {
 	{ label = "Tip of the Spear", page = "auras", tab = 3, panel = "Class", keywords = "tip spear stacks bars survival width height spacing border filled empty color" },
 	{ label = "Smart Misdirection", page = "auras", tab = 3, panel = "Class", keywords = "misdirect smart tank focus pet macro" },
 	{ label = "Misdirect alert", page = "auras", tab = 3, panel = "Class", keywords = "misdirection target text alert" },
+	{ label = "Hunter's Mark", page = "auras", tab = 3, panel = "Class", keywords = "hunters mark missing target callout hunter" },
 	{ label = "Precise Shots", page = "auras", tab = 3, panel = "Class", keywords = "precise shots lock and load bulletstorm marksmanship text alert" },
 	{ label = "Vivacious Vivification", page = "auras", tab = 3, panel = "Class", keywords = "mistweaver vivify instant reminder" },
 	{ label = "Lifebloom refresh", page = "auras", tab = 3, panel = "Class", keywords = "restoration druid lifebloom refresh" },

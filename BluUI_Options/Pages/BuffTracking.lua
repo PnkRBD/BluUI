@@ -12,6 +12,12 @@ local ALERT_MODES = {
 	{ value = 'flash', text = 'Flash briefly' },
 	{ value = 'stay', text = 'Stay on screen' },
 }
+local MARK_FIELDS = {
+	posX = 'markPosX', posY = 'markPosY',
+	anchorFrame = 'markAnchorFrame', anchorPoint = 'markAnchorPoint',
+	anchorOffsetX = 'markAnchorOffsetX', anchorOffsetY = 'markAnchorOffsetY',
+	centerHorizontally = 'markCenterHorizontally',
+}
 local SECONDS_WIDTH = 70
 local MIN_SECONDS, MAX_SECONDS = 0.5, 14
 
@@ -136,11 +142,12 @@ local function Open(spec)
 end
 
 local function Alert(board, spec)
+	spec.flag = spec.flag or 'enabled'
 	local db = BUI.GetDB()[spec.key]
 	local Refresh = Refresher(spec)
 	local tools = { { icon = 'cog', tooltip = 'Open the ' .. spec.title .. ' page', onClick = function() Open(spec) end } }
 	if spec.eye then tools[#tools + 1] = spec.eye(db, Refresh, spec) end
-	tools[#tools + 1] = Toggle(db, nil, 'enabled')
+	tools[#tools + 1] = Toggle(db, nil, spec.flag)
 	board:AddTools(spec.title, spec.description, tools, Refresh, SpellIcon(spec.spell))
 end
 
@@ -297,6 +304,38 @@ local function SmartMisdirect(board)
 	})
 end
 
+local function HuntersMark(board)
+	local Auras = BUI.Auras
+	Alert(board, {
+		key = 'auras', flag = 'markWarning', title = "Hunter's Mark", description = "Callout while your target is missing Hunter's Mark", spell = 257284,
+		refresh = Auras.UpdateMark,
+		eye = function(db, Refresh)
+			Auras._markLockToggle = { SetValue = Repaint }
+			return { icon = 'eye', tooltip = 'Preview, drag to move, right-click it to lock', get = function() return db.markLocked == false end, set = function(value)
+				db.markLocked = not value
+				Refresh()
+			end }
+		end,
+		build = function(db, Board, Refresh)
+			local mark = Board("Hunter's Mark", 'The callout, its icon and when it shows.')
+			Switch(mark, db, 'Spell icon', 'markShowIcon', Refresh)
+			Switch(mark, db, 'Pulse icon', 'markPulse', Refresh)
+			Switch(mark, db, 'Combat only', 'markCombatOnly', Refresh)
+			Switch(mark, db, 'Group only', 'markGroupOnly', Refresh)
+			Switch(mark, db, 'Hide in town', 'markHideInTown', Refresh)
+			mark:AddTools('Text', 'Wording, font, size, color and where it sits', {
+				Color(db, 'Text color', 'markColor', true),
+				{ entries = fonts, get = function() return db.markFont end, set = function(value) db.markFont = value end },
+				TextTool('Text', {
+					Option(db, 'Text', 'markText', { kind = 'input', placeholder = 'Text' }),
+					Option(db, 'Text size', 'markFontSize', { min = 10, max = 48, step = 1 }),
+				}),
+				BUI.PositionTool(db, { selfTag = 'BUI_MarkWarning', fields = MARK_FIELDS }),
+			}, Refresh)
+		end,
+	})
+end
+
 local function Sections(ui, _, parent, width)
 	fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
 	sounds = BUI.BuildSoundDropdownItems()
@@ -330,8 +369,9 @@ local function Sections(ui, _, parent, width)
 		TextAlert(procs, { key = 'hunterBulletstorm', frame = 'BUI_BuffTrackingHunterBS', title = 'Bulletstorm', description = 'Empowered Aimed Shots left after Rapid Fire', spell = 389019 })
 	end
 	if Hunter.IsBeastMasteryOrSurvival() or Hunter.IsMarksmanshipHunter() then
-		local utility = Board('Utility', 'Misdirection helpers.')
+		local utility = Board('Utility', "Misdirection and Hunter's Mark helpers.")
 		SmartMisdirect(utility)
+		HuntersMark(utility)
 		TextAlert(utility, {
 			key = 'misdirectAlert', frame = 'BUI_MisdirectAlert', title = 'Misdirect alert', description = 'On-screen text naming your current Misdirection target', spell = 34477, textLabel = 'Prefix',
 			extra = function(alert, db, Refresh)
@@ -393,8 +433,8 @@ BUI.PageEngine.RegisterPage('classAlert', {
 		local db = BUI.GetDB()[current.key]
 		local Refresh = Refresher(current)
 		local tools = {
-			{ icon = 'enable', tooltip = 'Turn it on or off', get = function() return db.enabled == true end, set = function(value)
-				db.enabled = value
+			{ icon = 'enable', tooltip = 'Turn it on or off', get = function() return db[current.flag] == true end, set = function(value)
+				db[current.flag] = value
 				Refresh()
 			end },
 		}
@@ -404,7 +444,7 @@ BUI.PageEngine.RegisterPage('classAlert', {
 			icon = 'glow',
 			title = current.title,
 			placeholder = 'Search ' .. current.title .. '...',
-			disabled = function() return db.enabled ~= true end,
+			disabled = function() return db[current.flag] ~= true end,
 			back = { label = 'Weaker Auras', onClick = function() BUI.PageEngine.NavigateToID('auras') end },
 			tools = tools,
 			tabs = { { label = current.title, build = Detail } },

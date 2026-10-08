@@ -18,13 +18,6 @@ local LOW_HP_FIELDS = {
 	centerHorizontally = 'lowHpCenterHorizontally',
 }
 
-local MARK_FIELDS = {
-	posX = 'markPosX', posY = 'markPosY',
-	anchorFrame = 'markAnchorFrame', anchorPoint = 'markAnchorPoint',
-	anchorOffsetX = 'markAnchorOffsetX', anchorOffsetY = 'markAnchorOffsetY',
-	centerHorizontally = 'markCenterHorizontally',
-}
-
 local fonts, sounds
 
 local function Window()
@@ -221,32 +214,6 @@ local function PetWarningsRow(board)
 	}, Auras.Update)
 end
 
-local function MarkWarningRow(board)
-	local db = BUI.GetDB().auras
-	local Auras = BUI.Auras
-	Auras._markLockToggle = relock
-	board:AddTools("Hunter's Mark Warning", "Callout while your target is missing Hunter's Mark, hunters only", {
-		TableColor(db, 'Text color', 'markColor', true),
-		Font(db, 'markFont'),
-		TextTool({
-			Option(db, 'Warning text', 'markText', { kind = 'input', placeholder = 'Warning text' }),
-			Option(db, 'Font size', 'markFontSize', { min = 10, max = 48, step = 1 }),
-		}),
-		{ tooltip = 'Icon and visibility', title = "Hunter's mark", options = {
-			{ label = 'Spell icon', get = function() return db.markShowIcon ~= false end, set = function(value) db.markShowIcon = value end },
-			{ label = 'Pulse icon', get = function() return db.markPulse ~= false end, set = function(value) db.markPulse = value end },
-			Option(db, 'Combat only', 'markCombatOnly'),
-			Option(db, 'Group only', 'markGroupOnly'),
-			Option(db, 'Hide in town', 'markHideInTown'),
-		} },
-		BUI.PositionTool(db, { selfTag = 'BUI_MarkWarning', fields = MARK_FIELDS }),
-		Eye('Preview, drag to move', function() return db.markLocked == false end, function(value)
-			db.markLocked = not value
-			Auras.UpdateMark()
-		end),
-		Switch(db, 'markWarning'),
-	}, Auras.UpdateMark)
-end
 
 local function GatewayRow(board)
 	local db = BUI.GetDB().gatewayAlert
@@ -336,7 +303,6 @@ local function GeneralBoard(ui, parent, width)
 	PrivateWarningRow(board)
 	LowHpRow(board)
 	PetWarningsRow(board)
-	MarkWarningRow(board)
 	GatewayRow(board)
 	BloodlustRow(board)
 	CDAnnouncerRow(board)
@@ -497,10 +463,6 @@ BUI.PageEngine.RegisterPage('auras', {
 		if settings.lowHpLocked == false then
 			settings.lowHpLocked = true
 			BUI.Auras.UpdateLowHp()
-		end
-		if settings.markLocked == false then
-			settings.markLocked = true
-			BUI.Auras.UpdateMark()
 		end
 		BUI.Crosshair.SetPreview(false)
 		if BUI.Bloodlust.IsPreviewing() then BUI.Bloodlust.StopPreview() end
