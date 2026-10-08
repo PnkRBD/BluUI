@@ -136,34 +136,13 @@ end
 
 local MENU_ANIM_DURATION = 0.12
 function Widget.ShowMenuAnimated(menu)
-	menu:SetAlpha(0)
 	menu:Show()
-	local start = GetTime()
-	menu:SetScript("OnUpdate", function(self)
-		local progress = (GetTime() - start) / MENU_ANIM_DURATION
-		if progress >= 1 then
-			self:SetAlpha(1)
-			self:SetScript("OnUpdate", nil)
-		else
-			local eased = 1 - (1 - progress) * (1 - progress)
-			self:SetAlpha(eased)
-		end
-	end)
+	BUILib.Motion.To(menu, "alpha", 1, MENU_ANIM_DURATION, { from = 0 })
 end
 
 function Widget.HideMenuAnimated(menu)
 	if not menu:IsShown() then return end
-	local startAlpha = menu:GetAlpha()
-	local start = GetTime()
-	menu:SetScript("OnUpdate", function(self)
-		local progress = (GetTime() - start) / MENU_ANIM_DURATION
-		if progress >= 1 then
-			self:SetScript("OnUpdate", nil); self:Hide()
-		else
-			local eased = 1 - (1 - progress) * (1 - progress)
-			self:SetAlpha(startAlpha * (1 - eased))
-		end
-	end)
+	BUILib.Motion.To(menu, "alpha", 0, MENU_ANIM_DURATION, { onComplete = function() menu:Hide() end })
 end
 
 function Widget.SafeGetHeight(frame) return frame and frame:GetHeight() or 0 end

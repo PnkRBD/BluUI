@@ -1,6 +1,7 @@
 local _, BUI = ...
 
 local Pixel = BUI.Pixel
+local Motion = BUI.BUILibClient.Motion
 local sharedMedia = LibStub('LibSharedMedia-3.0')
 
 local CreateFrame = CreateFrame
@@ -376,7 +377,7 @@ local function SetFrameOpacity(frame, opacity)
 	frame:SetAlpha(opacity)
 end
 
-BUI.Animation.RegisterProperty('ufOpacity',
+Motion.RegisterProperty('ufOpacity',
 	function(frame) return frame._ufOpacity or 1 end,
 	function(frame, value) SetFrameOpacity(frame, value) end
 )
@@ -385,15 +386,14 @@ local OPACITY_UNITS = {'player', 'target', 'targettarget', 'focus', 'pet'}
 
 function UnitFrames.UpdateOpacity(instant)
 	local opacity = UnitFrames.GetContextualOpacity() / 100
-	local Animation = BUI.Animation
 	local duration = instant and 0 or 0.3
 	for _, unitType in ipairs(OPACITY_UNITS) do
 		local unitFrame = UnitFrames[unitType]
-		if unitFrame then Animation.To(unitFrame, 'ufOpacity', opacity, duration) end
+		if unitFrame then Motion.To(unitFrame, 'ufOpacity', opacity, duration) end
 	end
 	for bossIndex = 1, 5 do
 		local unitFrame = UnitFrames['boss' .. bossIndex]
-		if unitFrame then Animation.To(unitFrame, 'ufOpacity', opacity, duration) end
+		if unitFrame then Motion.To(unitFrame, 'ufOpacity', opacity, duration) end
 	end
 end
 
