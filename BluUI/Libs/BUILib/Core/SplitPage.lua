@@ -47,8 +47,6 @@ local THUMB_FRAME = 1
 local THUMB_IDLE_ALPHA = 0.6
 local DOT_TILE = 16
 local PREVIEW_MIN = 360
-local SCROLL_INSET = 8
-local FILL_MARGIN = 16
 local LINK_HEIGHT = 20
 local WHITE = { 1, 1, 1, 1 }
 
@@ -341,8 +339,7 @@ function Layout.SplitPage(tab, shell, spec)
 
 	local function Resize()
 		local height = main:Measure(mainWidth)
-		local viewport = tab.frame:GetHeight() - HEAD_HEIGHT - HEAD_GAP - SCROLL_INSET - FILL_MARGIN
-		local columns = math.max(height, PREVIEW_MIN, viewport)
+		local columns = math.max(height, PREVIEW_MIN)
 		local last = LastShown(main)
 		if last and columns > height then last:SetHeight(last:GetHeight() + columns - height) end
 		main:ClearAllPoints()
@@ -357,7 +354,6 @@ function Layout.SplitPage(tab, shell, spec)
 		end)
 	end
 	kit.Relayout = Resize
-	tab.frame:HookScript('OnSizeChanged', Resize)
 	tab.frame:HookScript('OnShow', Resize)
 
 	Resize()
