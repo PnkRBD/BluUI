@@ -323,10 +323,10 @@ local function CooldownFlashRow(board)
 	}, CooldownFlash.Refresh)
 end
 
-local function AlertsBoard(ui, parent, width)
+local function GeneralBoard(ui, parent, width)
 	local board = ui.Board(parent, width, {
 		stacked = true,
-		title = 'Alerts',
+		title = 'General',
 		description = 'Text callouts for combat, your pet, your health and your target. The eye on a row previews it and lets you drag it, right-click the alert to lock it again.',
 	})
 	CombatTimerRow(board)
@@ -458,8 +458,8 @@ local function CrosshairBoard(ui, parent, width)
 	return board
 end
 
-local function Alerts(ui, _, parent, width)
-	return { AlertsBoard(ui, parent, width), CrosshairBoard(ui, parent, width) }
+local function General(ui, _, parent, width)
+	return { GeneralBoard(ui, parent, width), CrosshairBoard(ui, parent, width) }
 end
 
 BUI.PageEngine.RegisterPage('auras', {
@@ -474,7 +474,7 @@ BUI.PageEngine.RegisterPage('auras', {
 		local handle = Layout.TablePage(page:GetTab(1), { window = Window() }, {
 			icon = 'glow',
 			title = '|cffFF0000Weaker|r Auras',
-			placeholder = 'Search alerts...',
+			placeholder = 'Search auras...',
 			disabled = function() return not enabled end,
 			tools = {
 				{ icon = 'enable', tooltip = 'Turn the auras module on or off, needs a reload', get = function() return BUI.IsModuleEnabled('auras') end, set = function(value)
@@ -482,7 +482,7 @@ BUI.PageEngine.RegisterPage('auras', {
 				end },
 			},
 			tabs = {
-				{ label = 'Alerts', build = Alerts },
+				{ label = 'General', build = General },
 				{ label = 'GCD History', build = BUI.StreamerToolsPage.GCDHistory },
 				{ label = 'Class', build = BUI.BuffTrackingPage.Class },
 			},

@@ -405,7 +405,7 @@ BUI.PageEngine.RegisterPage('classAlert', {
 			title = current.title,
 			placeholder = 'Search ' .. current.title .. '...',
 			disabled = function() return db.enabled ~= true end,
-			back = { label = 'alerts', onClick = function() BUI.PageEngine.NavigateToID('auras') end },
+			back = { label = 'Weaker Auras', onClick = function() BUI.PageEngine.NavigateToID('auras') end },
 			tools = tools,
 			tabs = { { label = current.title, build = Detail } },
 		})
