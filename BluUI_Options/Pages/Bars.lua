@@ -21,9 +21,9 @@ local UNITS = { 'player', 'target', 'focus' }
 local UNIT_INDEX = { player = 1, target = 2, focus = 3 }
 local RAIL_GROUPS = {
 	{ title = 'Bars', items = {
-		{ id = 'player', label = 'Player' },
-		{ id = 'target', label = 'Target' },
-		{ id = 'focus', label = 'Focus' },
+		{ id = 'player', label = 'Player', icon = 'profile' },
+		{ id = 'target', label = 'Target', icon = 'crosshair' },
+		{ id = 'focus', label = 'Focus', icon = 'viewfinder' },
 	} },
 }
 local TITLES = { player = 'Player cast bar', target = 'Target cast bar', focus = 'Focus cast bar' }

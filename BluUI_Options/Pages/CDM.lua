@@ -1355,10 +1355,10 @@ local RAIL_GROUPS = {
 		{ id = 'icons', label = 'Icon management', icon = 'grabber' },
 	} },
 	{ title = 'Viewers', items = {
-		{ id = 'essential', label = 'Essential' },
-		{ id = 'utility', label = 'Utility' },
-		{ id = 'buffs', label = 'Buff icons' },
-		{ id = 'buffBars', label = 'Buff bars' },
+		{ id = 'essential', label = 'Essential', icon = 'clock' },
+		{ id = 'utility', label = 'Utility', icon = 'cogcube' },
+		{ id = 'buffs', label = 'Buff icons', icon = 'glow' },
+		{ id = 'buffBars', label = 'Buff bars', icon = 'pill' },
 	} },
 }
 
