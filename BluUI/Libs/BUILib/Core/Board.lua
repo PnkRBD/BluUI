@@ -531,7 +531,14 @@ function Board:Layout(y, query)
 	for _, row in ipairs(self.rows) do
 		if row.match and row.frame.tools then row.frame.tools.Place(slots) end
 	end
-	local top = self.headHeight or PAD
+	local first, last
+	for _, row in ipairs(self.rows) do
+		if row.match then
+			first = first or row
+			last = row
+		end
+	end
+	local top = self.headHeight or (first and first.kind == 'cell' and PAD or 0)
 	local height, column, x = top, 0, CELL_INSET
 	local function Break()
 		if column == 0 then return end
@@ -560,7 +567,7 @@ function Board:Layout(y, query)
 	end
 	Break()
 	if self.drag then PaintGroups(self) end
-	return self:Place(y, height + PAD)
+	return self:Place(y, height + (last and last.kind == 'cell' and PAD or 0))
 end
 
 Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit)
