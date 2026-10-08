@@ -226,6 +226,7 @@ local function SettingsBoard(ui, parent, width, bar, index, page)
 		BUI.PositionTool(bar, { noCenter = true }),
 		{ icon = 'eye', tooltip = 'Unlock to drag, right-click the bar to lock', get = function() return not bar.locked end, set = function(value)
 			bar.locked = not value
+			Apply()
 			Repaint()
 		end },
 		{ get = function() return bar.enabled == true end, set = function(value)
