@@ -2,6 +2,7 @@ local _, BUI = ...
 
 local Datatext = BUI.Datatext
 local Pixel = BUI.Pixel
+local Motion = BUI.BUILibClient.Motion
 
 local registry = Datatext.registry
 local IsPanel = Datatext.IsPanel
@@ -751,7 +752,7 @@ local function MouseoverTick()
         local target = BarRevealed(bar) and 1 or 0
         if bar.alphaTarget ~= target then
             bar.alphaTarget = target
-            BUI.Animation.To(bar.frame, 'alpha', target, MOUSEOVER_FADE)
+            Motion.To(bar.frame, 'alpha', target, MOUSEOVER_FADE)
         end
     end
 end
@@ -762,7 +763,7 @@ local function TrackMouseover(bar)
         mouseoverBars[#mouseoverBars + 1] = bar
     elseif bar.alphaTarget then
         bar.alphaTarget = nil
-        BUI.Animation.To(bar.frame, 'alpha', 1, 0)
+        Motion.To(bar.frame, 'alpha', 1, 0)
     end
 end
 

@@ -49,7 +49,6 @@ Utility\Math.lua
 Utility\TimeFormat.lua
 Utility\Keybinds.lua
 Utility\Pixel.lua
-Utility\Animation.lua
 Utility\Confetti.lua
 Utility\GlowManager.lua
 Utility\TTS.lua
