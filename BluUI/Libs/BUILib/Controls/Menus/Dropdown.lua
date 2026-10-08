@@ -15,6 +15,8 @@ local BUTTON_ICON_TEXT_OFFSET = BUTTON_ICON_INSET + ICON_SIZE + ICON_TEXT_GAP
 local ROW_ICON_INSET = BUTTON_ICON_INSET - Widget.PANEL_INSET
 local ROW_ICON_TEXT_OFFSET = ROW_ICON_INSET + ICON_SIZE + ICON_TEXT_GAP
 local CHECK_SIZE = 12
+local SELECTED = { 1, 1, 1, 0.06 }
+local CLEAR = { 0, 0, 0, 0 }
 local unpack = unpack
 
 local ShowMenu = Widget.ShowMenuAnimated
@@ -25,7 +27,7 @@ local STRATA_ORDER = {BACKGROUND=0,LOW=1,MEDIUM=2,HIGH=3,DIALOG=4,FULLSCREEN_DIA
 function Widget.DropdownMenuScaffold(parentFrame, anchorButton, menuWidth, scrollStep, onClose)
 	local menuWidget = Widget.New({frame = UIParent}, "Frame", nil, {raw = true, size = {menuWidth, 100}})
 	local menu = menuWidget.frame
-	Widget.RoundedPanel(menu, Widget.INPUT_RADIUS, nil, Theme.border.light)
+	Widget.RoundedPanel(menu, Widget.INPUT_RADIUS, Theme.bg.input, Theme.border.input)
 	local parentStrata = parentFrame:GetFrameStrata(); local parentLevel = parentFrame:GetFrameLevel()
 	local popupStrata = BUILib.GetPopupStrata(); local popupLevel = BUILib.GetPopupLevel()
 	local useParent = (STRATA_ORDER[parentStrata] or 0) > (STRATA_ORDER[popupStrata] or 0) or
@@ -162,27 +164,23 @@ function Controls.Dropdown(parent, label, items, selected, callback, tooltip, wi
 		if rowPool[index] then rowPool[index]:SetHeight(rowHeight); rowPool[index]:Show(); return rowPool[index] end
 		local row = CreateFrame("Button", nil, scrollChild); row:SetHeight(rowHeight)
 		if iconMode then
-			row.bg = row:CreateTexture(nil, "BACKGROUND"); row.bg:SetAllPoints(); row.bg:SetColorTexture(0, 0, 0, 0)
+			row.bg = row:CreateTexture(nil, "BACKGROUND"); row.bg:SetAllPoints(); row.bg:SetColorTexture(unpack(CLEAR))
 			row.icon = row:CreateTexture(nil, "ARTWORK"); row.icon:SetSize(ICON_SIZE, ICON_SIZE); row.icon:SetPoint("LEFT", ROW_ICON_INSET, 0)
 			row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 			row.text = row:CreateFontString(nil, "OVERLAY"); row.text:SetFont(BUILib.Font, 11, ""); row.text:SetPoint("LEFT", ROW_ICON_TEXT_OFFSET, 0)
 			row.check = row:CreateTexture(nil, "OVERLAY")
 			row.check:SetTexture(BUILib.GetLibMedia("check"))
 			row.check:SetSize(CHECK_SIZE, CHECK_SIZE); row.check:SetPoint("RIGHT", -10, 0)
-			row:SetScript("OnEnter", function(rowButton) rowButton.bg:SetColorTexture(unpack(Theme.bg.hover)) end)
+			row.check:SetVertexColor(unpack(Theme.text.primary))
+			row:SetScript("OnEnter", function(rowButton) rowButton.bg:SetColorTexture(unpack(BUILib.Layout.SOLID_HOVER)) end)
 			row:SetScript("OnLeave", function(rowButton)
-				if rowButton._selected then
-					local red, green, blue = Theme.GetAccent()
-					rowButton.bg:SetColorTexture(red, green, blue, 0.15)
-				else
-					rowButton.bg:SetColorTexture(0, 0, 0, 0)
-				end
+				rowButton.bg:SetColorTexture(unpack(rowButton._selected and SELECTED or CLEAR))
 			end)
 		else
 			row.text = row:CreateFontString(nil, "OVERLAY"); row.text:SetFont(BUILib.Font, 11, ""); row.text:SetPoint("LEFT", 6, 0)
-			row.hl = Widget.Create(row, Theme.GetAccent()); row.hl:SetAllPoints(); row.hl:SetDrawLayer("BACKGROUND"); row.hl:SetAlpha(0.18); row.hl:Hide()
+			row.hl = row:CreateTexture(nil, "BACKGROUND"); row.hl:SetAllPoints(); row.hl:SetColorTexture(unpack(SELECTED)); row.hl:Hide()
 			row.hover = row:CreateTexture(nil, "BACKGROUND", nil, 1)
-			row.hover:SetAllPoints(); row.hover:SetColorTexture(unpack(Theme.bg.hover)); row.hover:Hide()
+			row.hover:SetAllPoints(); row.hover:SetColorTexture(unpack(BUILib.Layout.SOLID_HOVER)); row.hover:Hide()
 			row:SetScript("OnEnter", function(rowButton) rowButton.hover:Show(); rowButton.text:SetTextColor(1, 1, 1) end)
 			row:SetScript("OnLeave", function(rowButton)
 				rowButton.hover:Hide()
@@ -208,17 +206,13 @@ function Controls.Dropdown(parent, label, items, selected, callback, tooltip, wi
 				row._selected = isSelected
 				row.text:SetTextColor(unpack(Theme.text.primary))
 				row.icon:SetTexture(itemIcon or "Interface\\Icons\\INV_Misc_QuestionMark")
-				local red, green, blue = Theme.GetAccent()
-				row.check:SetVertexColor(red, green, blue, 1)
 				row.check:SetShown(isSelected)
-				if isSelected then row.bg:SetColorTexture(red, green, blue, 0.15)
-				else row.bg:SetColorTexture(0, 0, 0, 0) end
+				row.bg:SetColorTexture(unpack(isSelected and SELECTED or CLEAR))
 			else
 				local isSelected = value == state.value
 				row._selected = isSelected
 				if type(item) == "table" and item.fontPath then row.text:SetFont(item.fontPath, 11, "")
 				else row.text:SetFont(BUILib.Font, 11, "") end
-				local red, green, blue = Theme.GetAccent(); Widget.SetColor(row.hl, red, green, blue, 0.18)
 				row.hl:SetShown(isSelected)
 				row.text:SetTextColor(unpack(isSelected and Theme.text.primary or Theme.text.secondary))
 			end

@@ -28,6 +28,8 @@ local MAX_ROWS    = 12
 local MENU_RADIUS = 8
 local ROW_RADIUS  = 6
 local SELECTED_ALPHA = 0.12
+local CONTROL_SELECTED = { 1, 1, 1, 0.06 }
+local CONTROL_LINE = { 1, 1, 1, 0.1 }
 local TRACK_WIDTH = 4
 local TRACK_INSET = 4
 local SHADOWS     = { { inset = -2, radius = 10, alpha = 0.3 }, { inset = -6, radius = 14, alpha = 0.12 } }
@@ -43,16 +45,16 @@ local activeMenu
 local function Palette(window)
 	if not window then
 		return {
-			fill = Theme.bg.dark, edge = Theme.border.light, hover = Theme.bg.hover, selected = { 1, 1, 1, SELECTED_ALPHA },
+			fill = Theme.bg.dark, edge = Theme.border.light, line = Theme.border.light, hover = Theme.bg.hover, selected = { 1, 1, 1, SELECTED_ALPHA },
 			text = Theme.text.primary, muted = Theme.text.muted, disabled = Theme.text.disabled,
 			thumb = Theme.scrollbar.thumb, check = STATIC_CHECK, font = BUILib.Font,
 		}
 	end
-	local red, green, blue = window:Color('accent')
+	local text = { window:Color('controlText') }
 	return {
-		fill = { window:Color('page') }, edge = { window:Color('edge') }, hover = { window:Color('input') }, selected = { red, green, blue, SELECTED_ALPHA },
-		text = { window:Color('text') }, muted = { window:Color('muted') }, disabled = { window:Color('faint') },
-		thumb = { window:Color('faint') }, check = { texture = BUILib.GetLibMedia('check'), color = { red, green, blue, 1 } }, font = window:FontPath('control'),
+		square = true, fill = { window:Color('control') }, line = CONTROL_LINE, hover = BUILib.Layout.SOLID_HOVER, selected = CONTROL_SELECTED,
+		text = text, muted = { window:Color('muted') }, disabled = { window:Color('faint') },
+		thumb = { window:Color('faint') }, check = { texture = BUILib.GetLibMedia('check'), color = text }, font = window:FontPath('control'),
 	}
 end
 
@@ -79,8 +81,12 @@ end
 local function MakeRow(parent)
 	local row = CreateFrame("Button", nil, parent)
 	row:SetHeight(ROW_HEIGHT)
-	row.hl = Widget.DrawCardShape(row, ROW_RADIUS, SOLID, CLEAR, "BACKGROUND", 0, 0)
-	row.hl:Hide()
+	row.round = Widget.DrawCardShape(row, ROW_RADIUS, SOLID, CLEAR, "BACKGROUND", 0, 0)
+	row.round:Hide()
+	row.flat = row:CreateTexture(nil, "BACKGROUND")
+	row.flat:SetTexture(WHITE)
+	row.flat:SetAllPoints()
+	row.flat:Hide()
 
 	row.icon = row:CreateTexture(nil, "ARTWORK")
 	row.icon:SetSize(ICON_SIZE, ICON_SIZE)
@@ -134,6 +140,9 @@ local function ShowSub(row, item)
 end
 
 local function BindRow(row, item, onSelect, palette, textX)
+	row.round:Hide()
+	row.flat:Hide()
+	row.hl = palette.square and row.flat or row.round
 	row.text:SetFont(item.fontPath or palette.font, FONT_SIZE, "")
 	row.sub:SetFont(palette.font, SUBTLE_FONT_SIZE, "")
 	row.text:SetPoint("LEFT", textX, 0)
@@ -188,7 +197,7 @@ local function MakeSeparator(parent)
 	return line
 end
 
-local sharedMenu, menuFill, menuEdge, scrollFrame, scrollChild, scrollTrack, scrollThumb, scrollLogic
+local sharedMenu, menuFill, menuEdge, menuSquare, scrollFrame, scrollChild, scrollTrack, scrollThumb, scrollLogic
 local rowPool = {}
 local titlePool = {}
 local separatorPool = {}
@@ -206,6 +215,9 @@ local function EnsureMenu()
 		Widget.DrawCardShape(menu, shadow.radius, { 0, 0, 0, shadow.alpha }, CLEAR, "BACKGROUND", -8 + index, shadow.inset)
 	end
 	menuFill, menuEdge = Widget.DrawCardShape(menu, MENU_RADIUS, SOLID, SOLID, "BACKGROUND", 0, 0)
+	menuSquare = menu:CreateTexture(nil, "BACKGROUND")
+	menuSquare:SetTexture(WHITE)
+	menuSquare:SetAllPoints()
 
 	scrollFrame = CreateFrame("ScrollFrame", nil, menu)
 	scrollFrame:SetPoint("TOPLEFT")
@@ -298,9 +310,16 @@ function Controls.ContextMenu(items, options)
 	local innerWidth = width - PADDING_X * 2 - trackSpace
 	menu:SetSize(width, visibleHeight)
 	scrollChild:SetSize(width, totalHeight)
-	menuFill:SetVertexColor(unpack(palette.fill))
-	menuEdge:SetVertexColor(unpack(palette.edge))
-	scrollTrack.fill:SetVertexColor(palette.edge[1], palette.edge[2], palette.edge[3], 0.5)
+	menuSquare:SetShown(palette.square == true)
+	menuFill:SetShown(not palette.square)
+	menuEdge:SetShown(not palette.square)
+	if palette.square then
+		menuSquare:SetVertexColor(unpack(palette.fill))
+	else
+		menuFill:SetVertexColor(unpack(palette.fill))
+		menuEdge:SetVertexColor(unpack(palette.edge))
+	end
+	scrollTrack.fill:SetVertexColor(palette.line[1], palette.line[2], palette.line[3], (palette.line[4] or 1) * 0.5)
 	scrollThumb.fill:SetVertexColor(unpack(palette.thumb))
 
 	local rowIndex, titleIndex, separatorIndex = 0, 0, 0
@@ -313,7 +332,7 @@ function Controls.ContextMenu(items, options)
 			line:ClearAllPoints()
 			line:SetPoint("BOTTOMLEFT", scrollChild, "TOPLEFT", PADDING_X + SEPARATOR_INSET, separatorY)
 			line:SetPoint("BOTTOMRIGHT", scrollChild, "TOPRIGHT", -(PADDING_X + SEPARATOR_INSET + trackSpace), separatorY)
-			line:SetVertexColor(unpack(palette.edge))
+			line:SetVertexColor(unpack(palette.line))
 			line:Show()
 			y = y - SEPARATOR_HEIGHT
 		elseif item.title then
