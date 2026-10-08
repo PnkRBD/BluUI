@@ -98,7 +98,7 @@ local function CombatTimerRow()
 	local CombatTimer = BUI.CombatTimer
 	CombatTimer._lockToggle = relock
 	return {
-		id = 'combatTimer', name = 'Combat Timer', sub = 'Elapsed time readout while you are in combat', after = CombatTimer.ApplySettings,
+		id = 'combatTimer', name = 'Combat Timer', sub = 'How long you have been in combat', after = CombatTimer.ApplySettings,
 		switch = { get = function() return db.enabled == true end, set = CombatTimer.Toggle },
 		tools = {
 			ChannelColor(db, 'Text color'),
@@ -118,7 +118,7 @@ local function CombatMessagesRow()
 	local CombatMessage = BUI.CombatMessage
 	CombatMessage._lockToggle = relock
 	return {
-		id = 'combatMessage', name = 'Combat Messages', sub = 'On-screen text when combat starts and ends', after = CombatMessage.Refresh,
+		id = 'combatMessage', name = 'Combat Messages', sub = 'Text when combat starts and ends', after = CombatMessage.Refresh,
 		switch = { get = function() return db.enabled == true end, set = function(value)
 			db.enabled = value
 			if value then CombatMessage.Enable() else CombatMessage.Disable() end
@@ -142,7 +142,7 @@ local function SecondaryStatsRow()
 	local SecondaryStats = BUI.Auras.SecondaryStats
 	SecondaryStats.SetLockListener(Repaint)
 	return {
-		id = 'secondaryStats', name = 'Secondary Stats', sub = 'Your main, secondary and tertiary stats on screen, each in its own color', after = SecondaryStats.Refresh,
+		id = 'secondaryStats', name = 'Secondary Stats', sub = 'Your stats on screen', after = SecondaryStats.Refresh,
 		switch = Switch(db, 'enabled'),
 		tools = {
 			{ icon = 'cog', tooltip = 'Open the Secondary Stats page', onClick = function() BUI.PageEngine.NavigateToID('secondaryStats') end },
@@ -157,7 +157,7 @@ local function KeystoneReminderRow()
 	local KeystoneReminder = BUI.Auras.KeystoneReminder
 	KeystoneReminder.SetLockListener(Repaint)
 	return {
-		id = 'keystoneReminder', name = 'Keystone Reminder', sub = 'Card with the dungeon, your role and its portal when you join a Mythic+ group, gone once you are inside or leave', after = KeystoneReminder.Refresh,
+		id = 'keystoneReminder', name = 'Keystone Reminder', sub = 'Dungeon and teleport when you join a key', after = KeystoneReminder.Refresh,
 		switch = { get = function() return db.enabled == true end, set = function(value)
 			db.enabled = value
 			if value then KeystoneReminder.Enable() else KeystoneReminder.Disable() end
@@ -174,7 +174,7 @@ local function PrivateWarningRow()
 	local PrivateWarning = BUI.Auras.PrivateWarning
 	PrivateWarning.SetLockListener(Repaint)
 	return {
-		id = 'privateWarning', name = 'Private raid warning', sub = "Blizzard's warning text for boss mechanics only you can see, placed and scaled by BluUI", after = PrivateWarning.Refresh,
+		id = 'privateWarning', name = 'Private raid warning', sub = "Moves Blizzard's private boss warnings", after = PrivateWarning.Refresh,
 		switch = Switch(db, 'enabled'),
 		tools = {
 			BUI.PositionTool(db),
@@ -189,7 +189,7 @@ local function LowHpRow()
 	local Auras = BUI.Auras
 	Auras._lowHpLockToggle = relock
 	return {
-		id = 'lowHp', name = 'Low HP Warning', sub = 'Warning text when your health drops below the threshold', after = Auras.UpdateLowHp,
+		id = 'lowHp', name = 'Low HP Warning', sub = 'Text when your health is low', after = Auras.UpdateLowHp,
 		switch = Switch(db, 'lowHpWarning'),
 		tools = {
 			TableColor(db, 'Text color', 'lowHpColor', true),
@@ -215,7 +215,7 @@ local function PetWarningsRow()
 	local Auras = BUI.Auras
 	Auras._lockToggle = relock
 	return {
-		id = 'petWarnings', name = 'Pet Warnings', sub = 'Alerts when your pet is dead, missing, idle or low on health', after = Auras.Update,
+		id = 'petWarnings', name = 'Pet Warnings', sub = 'Dead, missing, idle or hurt pet', after = Auras.Update,
 		switch = Switch(db, 'petWarningsEnabled'),
 		tools = {
 			TableColor(db, 'Warning color', 'warningColor', true),
@@ -244,7 +244,7 @@ local function GatewayRow()
 	end
 	Display.RegisterAnchorCallback('gatewayAlert', Repaint)
 	return {
-		id = 'gatewayAlert', name = 'Gateway Alert', sub = 'Text while a Demonic Gateway is in reach and off cooldown, needs a Gateway Control Shard on an action bar', after = Apply,
+		id = 'gatewayAlert', name = 'Gateway Alert', sub = 'Text when a Demonic Gateway is in reach', after = Apply,
 		switch = Switch(db, 'enabled'),
 		tools = {
 			TableColor(db, 'Text color', 'textColor', true),
@@ -273,7 +273,7 @@ local function BloodlustRow()
 	local Bloodlust = BUI.Bloodlust
 	Bloodlust.onPreviewStop = Repaint
 	return {
-		id = 'bloodlust', name = 'Bloodlust', sub = 'Tracks Bloodlust, Heroism and similar haste buffs', after = Bloodlust.Refresh,
+		id = 'bloodlust', name = 'Bloodlust', sub = 'Lust timers and alerts', after = Bloodlust.Refresh,
 		switch = Switch(db, 'enabled'),
 		tools = {
 			Font(db, 'font'),
@@ -292,7 +292,7 @@ local function CDAnnouncerRow()
 	local CDAnnouncer = BUI.CDAnnouncer
 	CDAnnouncer.RegisterAnchorCallback(Repaint)
 	return {
-		id = 'cdAnnouncer', name = 'Cooldown Announcer', sub = 'Countdowns and ready alerts for the cooldowns you pick', after = CDAnnouncer.Refresh,
+		id = 'cdAnnouncer', name = 'Cooldown Announcer', sub = 'Countdowns for cooldowns you pick', after = CDAnnouncer.Refresh,
 		switch = Switch(db, 'enabled'),
 		tools = {
 			{ icon = 'cog', tooltip = 'Open the Cooldown Announcer page', onClick = function() BUI.PageEngine.NavigateToID('cdAnnouncer') end },
@@ -309,7 +309,7 @@ local function CooldownFlashRow()
 	local CooldownFlash = BUI.CooldownFlash
 	CooldownFlash.RegisterAnchorCallback(Repaint)
 	return {
-		id = 'cooldownFlash', name = 'Cooldown Flash', sub = 'Spell icons that flash on screen when a cooldown is ready or a CDM buff falls off, saved per spec', after = CooldownFlash.Refresh,
+		id = 'cooldownFlash', name = 'Cooldown Flash', sub = 'Flashes spells as they come off cooldown', after = CooldownFlash.Refresh,
 		switch = Switch(db, 'enabled'),
 		tools = {
 			{ icon = 'cog', tooltip = 'Open the Cooldown Flash page', onClick = function() BUI.PageEngine.NavigateToID('cooldownFlash') end },
@@ -335,7 +335,7 @@ end
 
 local function MemberCount(group, specs)
 	local count = #Members(group, specs)
-	if count == 0 then return 'Empty, drag an aura onto this header' end
+	if count == 0 then return 'Empty' end
 	return count == 1 and '1 aura' or (count .. ' auras')
 end
 
@@ -451,7 +451,7 @@ local function GeneralBoard(ui, parent, width, page)
 	board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'General',
-		description = 'Text callouts and readouts. Drag a row by its grip to reorder it, or onto a group to put it in there. Click a group to fold it, drag it to move the whole group, and its switch turns all of it on or off. The eye on a row previews it and lets you drag it, right-click the alert to lock it again.',
+		description = 'Drag a row to reorder it or drop it on a group. The eye shows an alert so you can move it.',
 		buttons = { { text = 'New group', onClick = NewGroup } },
 	})
 	board:DragList(function() page:Resize() end, function()
