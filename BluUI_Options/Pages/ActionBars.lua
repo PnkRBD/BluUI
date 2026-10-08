@@ -69,12 +69,12 @@ local TEXT_KINDS = {
 local ACTION_BAR_ROWS = { hotkeys = true, macroText = true, cooldownText = true, hideEmpty = true, clickThrough = true }
 local CLICK_THROUGH = { { key = 'clickThrough', label = 'Click through' } }
 local EXTRA_BARS = {
-	{ key = 'pet', title = 'Pet bar', description = 'Replaces the Blizzard pet bar. Turning it off needs a reload to bring the Blizzard one back.', selfTag = 'BUI_PetBar', buttons = true, maxButtons = 10, rows = { hotkeys = true, cooldownText = true, hideEmpty = true, clickThrough = true } },
-	{ key = 'stance', title = 'Stance bar', description = 'Replaces the Blizzard stance and form bar. Turning it off needs a reload to bring the Blizzard one back.', selfTag = 'BUI_StanceBar', buttons = true, maxButtons = 10, countLabel = 'Max buttons, one per stance', rows = { hotkeys = true, cooldownText = true, clickThrough = true } },
-	{ key = 'vehicle', title = 'Vehicle exit', description = 'One button to leave a vehicle, land a taxi early or cancel possession. Only shows when it can act.', size = true, toggles = CLICK_THROUGH, cogTooltip = 'Layer and click through' },
-	{ key = 'micro', title = 'Micro menu', description = 'The Blizzard micro buttons on a bar you control.', micro = true, toggles = CLICK_THROUGH, cogTooltip = 'Layer and click through' },
-	{ key = 'bags', title = 'Bag bar', description = 'The Blizzard bag buttons on a bar you control.', scaleOnly = true, toggles = { { key = 'singleBag', label = 'Single bag' } }, cogTooltip = 'Layer and single bag' },
-	{ key = 'extra', title = 'Extra action', description = 'The Blizzard extra action and zone ability buttons on a bar you control. Turning it off needs a reload to bring the Blizzard one back.', scaleOnly = true, toggles = { { key = 'clickThrough', label = 'Click through' }, { key = 'blizzardArt', label = 'Blizzard art' } }, cogTooltip = 'Layer, click through and Blizzard art' },
+	{ key = 'pet', title = 'Pet bar', icon = 'paw', description = 'Replaces the Blizzard pet bar. Turning it off needs a reload to bring the Blizzard one back.', selfTag = 'BUI_PetBar', buttons = true, maxButtons = 10, rows = { hotkeys = true, cooldownText = true, hideEmpty = true, clickThrough = true } },
+	{ key = 'stance', title = 'Stance bar', icon = 'stance', description = 'Replaces the Blizzard stance and form bar. Turning it off needs a reload to bring the Blizzard one back.', selfTag = 'BUI_StanceBar', buttons = true, maxButtons = 10, countLabel = 'Max buttons, one per stance', rows = { hotkeys = true, cooldownText = true, clickThrough = true } },
+	{ key = 'vehicle', title = 'Vehicle exit', icon = 'exit', description = 'One button to leave a vehicle, land a taxi early or cancel possession. Only shows when it can act.', size = true, toggles = CLICK_THROUGH, cogTooltip = 'Layer and click through' },
+	{ key = 'micro', title = 'Micro menu', icon = 'apps', description = 'The Blizzard micro buttons on a bar you control.', micro = true, toggles = CLICK_THROUGH, cogTooltip = 'Layer and click through' },
+	{ key = 'bags', title = 'Bag bar', icon = 'bag', description = 'The Blizzard bag buttons on a bar you control.', scaleOnly = true, toggles = { { key = 'singleBag', label = 'Single bag' } }, cogTooltip = 'Layer and single bag' },
+	{ key = 'extra', title = 'Extra action', icon = 'sparkle', description = 'The Blizzard extra action and zone ability buttons on a bar you control. Turning it off needs a reload to bring the Blizzard one back.', scaleOnly = true, toggles = { { key = 'clickThrough', label = 'Click through' }, { key = 'blizzardArt', label = 'Blizzard art' } }, cogTooltip = 'Layer, click through and Blizzard art' },
 }
 local EXTRA_BY_KEY = {}
 for _, extra in ipairs(EXTRA_BARS) do EXTRA_BY_KEY[extra.key] = extra end
@@ -664,10 +664,10 @@ end
 local function RailGroups()
 	local bars = {}
 	for index = 1, BUI.ActionBars.BAR_COUNT do
-		bars[index] = { id = 'bar' .. index, label = 'Bar ' .. index }
+		bars[index] = { id = 'bar' .. index, label = 'Bar ' .. index, icon = 'key' .. index }
 	end
 	local extras = {}
-	for _, extra in ipairs(EXTRA_BARS) do extras[#extras + 1] = { id = extra.key, label = extra.title } end
+	for _, extra in ipairs(EXTRA_BARS) do extras[#extras + 1] = { id = extra.key, label = extra.title, icon = extra.icon } end
 	return {
 		{ title = 'Settings', items = { { id = 'general', label = 'General', icon = 'cog' } } },
 		{ title = 'Bars', items = bars },
