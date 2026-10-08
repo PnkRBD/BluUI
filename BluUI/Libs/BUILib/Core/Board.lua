@@ -26,6 +26,10 @@ local GRABBER_SIZE = 12
 local DRAG_ALPHA = 0.35
 local SLIDE_TIME = 0.16
 local DROP_TIME = 0.24
+local CHEVRON_SIZE = 10
+local GHOST_TINT_ALPHA = 0.3
+local GROUP_INDENT = 20
+local COUNT_GAP = 10
 
 Layout.DRAG_TITLE_X = DRAG_TITLE_X
 
@@ -112,10 +116,14 @@ local function DragGhost(board)
 	ghost:SetFrameLevel(board.panel:GetFrameLevel() + 10)
 	ghost:SetSize(board.panelWidth, DRAG_ROW)
 	kit.Fill(ghost, 'control'):SetAllPoints()
-	local edge = kit.Fill(ghost, 'accent', 'ARTWORK', 1)
-	edge:SetPoint('TOPLEFT')
-	edge:SetPoint('BOTTOMLEFT')
-	edge:SetWidth(2)
+	ghost.tint = kit.Fill(ghost, 'positive', 'BACKGROUND', 1)
+	ghost.tint:SetAllPoints()
+	ghost.tint:SetAlpha(GHOST_TINT_ALPHA)
+	ghost.tint:Hide()
+	ghost.edge = kit.Fill(ghost, 'accent', 'ARTWORK', 1)
+	ghost.edge:SetPoint('TOPLEFT')
+	ghost.edge:SetPoint('BOTTOMLEFT')
+	ghost.edge:SetWidth(2)
 	kit.Glyph(ghost, 'grabber', GRABBER_SIZE, 'text'):SetPoint('LEFT', kit.ROW_INSET, 0)
 	ghost.icon = ghost:CreateTexture(nil, 'ARTWORK')
 	ghost.icon:SetSize(ICON_SIZE, ICON_SIZE)
@@ -132,6 +140,10 @@ local function DragTextX(icon)
 	return icon and (DRAG_TITLE_X + ICON_SIZE + CONTROL_GAP) or DRAG_TITLE_X
 end
 
+local function IndentOf(row)
+	return row.dragGroup and GROUP_INDENT or 0
+end
+
 local function OffsetOf(frame)
 	local _, _, _, _, y = frame:GetPoint(1)
 	return y
@@ -146,29 +158,144 @@ local function SlotOf(row)
 	return Motion.Goal(row, 'y') or OffsetOf(row)
 end
 
-local function TrackDrag(board)
-	local drag = board.drag
-	local _, cursorY = GetCursorPosition()
-	local panelTop = board.panel:GetTop()
-	local ghostY = cursorY / board.frame:GetEffectiveScale() + drag.grabOffset - panelTop
-	PlaceAt(board, drag.ghost, ghostY)
-	local centre = ghostY - DRAG_ROW / 2
-	local from, over
-	for index, row in ipairs(drag.rows) do
-		if row == drag.dragging then from = index end
-		local top = SlotOf(row)
-		if centre <= top and centre >= top - row:GetHeight() then over = index end
+local function IndexOf(list, item)
+	for index, value in ipairs(list) do
+		if value == item then return index end
 	end
-	if not over or over == from then return end
-	local delta = over > from and 1 or -1
+end
+
+local function RowIndex(board, frame)
+	for index, row in ipairs(board.rows) do
+		if row.frame == frame then return index end
+	end
+end
+
+local function Shift(list, from, delta, count)
+	local block = {}
+	for index = 1, count do block[index] = table.remove(list, from) end
+	for index = count, 1, -1 do table.insert(list, from + delta, block[index]) end
+end
+Layout.ShiftBlock = Shift
+
+local function NodeSize(rows, index)
+	local head = rows[index]
+	if not head.dragHeader then return 1 end
+	local count = 1
+	while rows[index + count] and rows[index + count].dragGroup == head do count = count + 1 end
+	return count
+end
+
+local function NodeBefore(rows, index)
+	local row = rows[index - 1]
+	if not row then return nil end
+	return row.dragGroup and IndexOf(rows, row.dragGroup) or index - 1
+end
+
+local function ShownHeight(rows, index)
+	local height = 0
+	for offset = 0, NodeSize(rows, index) - 1 do
+		local row = rows[index + offset]
+		if row:IsShown() then height = height + row:GetHeight() end
+	end
+	return height
+end
+
+local function DropTone(drag)
+	local dragging = drag.dragging
+	if not dragging or dragging.dragHeader then return end
+	if drag.target or dragging.dragGroup then return 'positive' end
+	if drag.origin then return 'danger' end
+end
+
+local function PaintGroups(board)
+	local drag, window = board.drag, board.window
+	local ghost = drag.ghost
+	if not ghost then return end
+	if drag.dragging then
+		local indent = IndentOf(drag.dragging)
+		if Motion.Goal(ghost, 'x') ~= indent then
+			Motion.To(ghost, 'x', indent, SLIDE_TIME, { easing = Ease.outCubic })
+			Motion.To(ghost, 'width', board.panelWidth - indent, SLIDE_TIME, { easing = Ease.outCubic })
+		end
+	end
+	local tone = DropTone(drag)
+	ghost.tint:SetShown(tone ~= nil)
+	if tone then window:Paint(ghost.tint, tone) end
+	window:Paint(ghost.edge, tone or 'accent')
+end
+
+local function Reorder(board, from, delta, count)
+	local drag = board.drag
 	local before = {}
 	for _, row in ipairs(drag.rows) do before[row] = OffsetOf(row) end
-	drag.rows[from], drag.rows[from + delta] = drag.rows[from + delta], drag.rows[from]
-	board:Move(drag.dragging, delta)
-	drag.onMove(from, delta)
+	Shift(board.rows, RowIndex(board, drag.rows[from]), delta, count)
+	Shift(drag.rows, from, delta, count)
+	drag.onMove(from, delta, count)
 	for _, row in ipairs(drag.rows) do
 		local target = OffsetOf(row)
 		if before[row] ~= target then Motion.To(row, 'y', target, SLIDE_TIME, { from = before[row], easing = Ease.outCubic }) end
+	end
+end
+
+local function MoveTo(board, to, group)
+	local drag = board.drag
+	local dragging = drag.dragging
+	local from = IndexOf(drag.rows, dragging)
+	if from == to and dragging.dragGroup == group then return end
+	dragging.dragGroup = group
+	Reorder(board, from, to - from, 1)
+	PaintGroups(board)
+end
+
+local function PlaceGhost(board)
+	local drag = board.drag
+	local _, cursorY = GetCursorPosition()
+	local ghostY = cursorY / board.frame:GetEffectiveScale() + drag.grabOffset - board.panel:GetTop()
+	Motion.To(drag.ghost, 'y', ghostY, 0)
+	return ghostY - DRAG_ROW / 2
+end
+
+local function TrackDrag(board)
+	local drag = board.drag
+	local centre = PlaceGhost(board)
+	local rows = drag.rows
+	local over, first, last
+	for index, row in ipairs(rows) do
+		if row:IsShown() then
+			local top = SlotOf(row)
+			if centre <= top and centre >= top - row:GetHeight() then over = row end
+			first = first or row
+			last = row
+		end
+	end
+	local target
+	if over and over.dragHeader then
+		target = over
+	elseif over then
+		MoveTo(board, IndexOf(rows, over), over.dragGroup)
+	elseif first and centre > SlotOf(first) then
+		MoveTo(board, 1, nil)
+	elseif last and centre < SlotOf(last) - last:GetHeight() then
+		MoveTo(board, #rows, nil)
+	end
+	if target ~= drag.target then
+		drag.target = target
+		PaintGroups(board)
+	end
+end
+
+local function TrackBlock(board)
+	local drag = board.drag
+	local centre = PlaceGhost(board)
+	local rows = drag.rows
+	local from = IndexOf(rows, drag.dragging)
+	local count = NodeSize(rows, from)
+	local previous = NodeBefore(rows, from)
+	local following = rows[from + count] and from + count
+	if previous and centre > SlotOf(rows[previous]) - DRAG_ROW then
+		Reorder(board, from, previous - from, count)
+	elseif following and centre <= SlotOf(drag.dragging) - ShownHeight(rows, following) then
+		Reorder(board, from, NodeSize(rows, following), count)
 	end
 end
 
@@ -184,14 +311,77 @@ local function Mirror(text, source)
 	text:SetText(source:GetText())
 end
 
+local function StartDrag(board, frame, track, dimmed, title, subtitle, icon)
+	local drag = board.drag
+	local ghost = DragGhost(board)
+	Motion.Finish(ghost, 'y')
+	local indent = IndentOf(frame)
+	PlaceAt(board, ghost, OffsetOf(frame))
+	Motion.To(ghost, 'x', indent, 0)
+	Motion.To(ghost, 'width', board.panelWidth - indent, 0)
+	local _, cursorY = GetCursorPosition()
+	drag.dragging = frame
+	drag.origin = not frame.dragHeader and frame.dragGroup or nil
+	drag.dimmed = dimmed
+	drag.grabOffset = frame:GetTop() - cursorY / board.frame:GetEffectiveScale()
+	for _, row in ipairs(dimmed) do Motion.To(row, 'alpha', DRAG_ALPHA, 0) end
+	ghost.icon:SetShown(icon ~= nil)
+	if icon then ghost.icon:SetTexture(icon) end
+	Mirror(ghost.label, title)
+	Mirror(ghost.sub, subtitle)
+	Motion.To(ghost, 'alpha', 1, 0)
+	ghost:Show()
+	PaintGroups(board)
+	track(board)
+	frame:SetScript('OnUpdate', function() track(board) end)
+end
+
+local function JoinTarget(board, frame)
+	local drag = board.drag
+	local target = drag.target
+	drag.target = nil
+	if not target or frame.dragGroup == target then return end
+	local rows = drag.rows
+	local from = IndexOf(rows, frame)
+	local header = IndexOf(rows, target)
+	local to = header + NodeSize(rows, header)
+	if from < to then to = to - 1 end
+	MoveTo(board, to, target)
+end
+
+local function Landing(rows, frame)
+	for index = IndexOf(rows, frame), 1, -1 do
+		if rows[index]:IsShown() then return SlotOf(rows[index]) end
+	end
+	return SlotOf(frame)
+end
+
+local function EndDrag(board, frame)
+	local drag = board.drag
+	frame:SetScript('OnUpdate', nil)
+	JoinTarget(board, frame)
+	drag.dragging, drag.origin = nil, nil
+	drag.onDrop()
+	PaintGroups(board)
+	local ghost = drag.ghost
+	Motion.To(ghost, 'y', Landing(drag.rows, frame), DROP_TIME, { easing = Ease.outCubic, onComplete = function() ghost:Hide() end })
+	Motion.To(ghost, 'alpha', 0, DROP_TIME, { easing = Ease.outCubic })
+	for _, row in ipairs(drag.dimmed) do Motion.To(row, 'alpha', 1, DROP_TIME, { easing = Ease.outCubic }) end
+end
+
 function Board:DragList(onMove, onDrop)
 	self.drag = { rows = {}, onMove = onMove, onDrop = onDrop }
 end
 
-function Board:AddDragRow(label, room, sub, icon)
+function Board:DragRows()
+	return self.drag.rows
+end
+
+function Board:AddDragRow(label, room, sub, icon, group)
 	local kit, drag = self.kit, self.drag
 	local row = Section.AddRow(self, sub and (label .. ' ' .. sub) or label)
 	row:SetHeight(DRAG_ROW)
+	row.dragGroup = group
 	drag.rows[#drag.rows + 1] = row
 	kit.Glyph(row, 'grabber', GRABBER_SIZE, 'faint'):SetPoint('LEFT', kit.ROW_INSET, 0)
 	local textX = DragTextX(icon)
@@ -205,49 +395,70 @@ function Board:AddDragRow(label, room, sub, icon)
 	local title, subtitle = kit.RowTitle(row, label, sub, textX, self.panelWidth - textX - kit.ROW_INSET - room - CONTROL_GAP)
 	row:EnableMouse(true)
 	row:RegisterForDrag('LeftButton')
-	row:SetScript('OnDragStart', function(frame)
-		local ghost = DragGhost(self)
-		Motion.Finish(ghost, 'y')
-		local _, cursorY = GetCursorPosition()
-		drag.dragging = frame
-		drag.grabOffset = frame:GetTop() - cursorY / self.frame:GetEffectiveScale()
-		Motion.To(frame, 'alpha', DRAG_ALPHA, 0)
-		ghost.icon:SetShown(icon ~= nil)
-		if icon then ghost.icon:SetTexture(icon) end
-		Mirror(ghost.label, title)
-		Mirror(ghost.sub, subtitle)
-		Motion.To(ghost, 'alpha', 1, 0)
-		ghost:Show()
-		TrackDrag(self)
-		frame:SetScript('OnUpdate', function() TrackDrag(self) end)
-	end)
-	row:SetScript('OnDragStop', function(frame)
-		frame:SetScript('OnUpdate', nil)
-		drag.dragging = nil
-		drag.onDrop()
-		local ghost = drag.ghost
-		Motion.To(ghost, 'y', SlotOf(frame), DROP_TIME, { easing = Ease.outCubic, onComplete = function() ghost:Hide() end })
-		Motion.To(ghost, 'alpha', 0, DROP_TIME, { easing = Ease.outCubic })
-		Motion.To(frame, 'alpha', 1, DROP_TIME, { easing = Ease.outCubic })
-	end)
+	row:SetScript('OnDragStart', function(frame) StartDrag(self, frame, TrackDrag, { frame }, title, subtitle, icon) end)
+	row:SetScript('OnDragStop', function(frame) EndDrag(self, frame) end)
 	return row, title, subtitle
 end
 
-function Board:AddDragTools(label, sub, icon, tools, after)
+function Board:AddDragTools(label, sub, icon, tools, after, group)
 	local kit = self.kit
-	local row, title, subtitle = self:AddDragRow(label, 0, sub, icon)
+	local row, title, subtitle = self:AddDragRow(label, 0, sub, icon, group)
 	local placer = kit.Tools(row, tools, after)
 	local textWidth = self.panelWidth - DragTextX(icon) - kit.ROW_INSET - CONTROL_GAP
 	row.tools = {
 		widths = placer.widths,
 		Place = function(slots)
-			local width = textWidth - placer.Place(slots)
+			local width = textWidth - IndentOf(row) - placer.Place(slots)
 			title:SetWidth(width)
 			if subtitle then subtitle:SetWidth(width) end
 		end,
 	}
 	row.controls = placer.controls
 	return row
+end
+
+function Board:AddDragHeader(label, sub, tools, after, folded, onFold)
+	local kit, drag = self.kit, self.drag
+	local row = Section.AddRow(self, label)
+	row:SetHeight(DRAG_ROW)
+	row.dragHeader = true
+	row.dragFolded = folded
+	row.dragEntry = self.rows[#self.rows]
+	row.dragEntry.kind = 'header'
+	drag.rows[#drag.rows + 1] = row
+	kit.Fill(row, 'secondary', 'BACKGROUND', 0):SetAllPoints()
+	kit.Hover(row)
+	local chevron = kit.Glyph(row, 'dropdown', CHEVRON_SIZE, 'muted')
+	chevron:SetPoint('LEFT', kit.ROW_INSET, 0)
+	local function Turn() chevron:SetRotation(folded() and math.pi / 2 or 0) end
+	Turn()
+	local title = kit.Text(row, label, 13, 'text', nil, 'title')
+	title:SetPoint('LEFT', DRAG_TITLE_X, 0)
+	title:SetWordWrap(false)
+	local count = kit.Text(row, sub, 11, 'muted')
+	count:SetPoint('LEFT', title, 'RIGHT', COUNT_GAP, 0)
+	count:SetWordWrap(false)
+	local placer = kit.Tools(row, tools, after)
+	row.tools = { widths = placer.widths, Place = placer.Place }
+	row.controls = placer.controls
+	row:EnableMouse(true)
+	row:RegisterForDrag('LeftButton')
+	row:SetScript('OnMouseDown', function(frame) frame.dragged = false end)
+	row:SetScript('OnMouseUp', function(frame, button)
+		if button ~= 'LeftButton' or frame.dragged or not frame:IsMouseOver() then return end
+		onFold()
+		Turn()
+	end)
+	row:SetScript('OnDragStart', function(frame)
+		frame.dragged = true
+		local rows = drag.rows
+		local from = IndexOf(rows, frame)
+		local block = {}
+		for offset = 0, NodeSize(rows, from) - 1 do block[#block + 1] = rows[from + offset] end
+		StartDrag(self, frame, TrackBlock, block, title)
+	end)
+	row:SetScript('OnDragStop', function(frame) EndDrag(self, frame) end)
+	return row, title, count
 end
 
 function Board:Move(frame, delta)
@@ -287,17 +498,22 @@ function Board:Layout(y, query)
 	end
 	local columns = math.min(self.stacked and STACKED_COLUMNS or SIDE_COLUMNS, math.max(1, math.floor(room / widest)))
 	local cellWidth = math.floor(room / columns)
-	local shown, group = 0
+	local shown, caption = 0, nil
+	local dragging = self.drag and self.drag.dragging
 	for _, row in ipairs(self.rows) do
+		local header = row.frame.dragGroup
 		if row.kind == 'caption' then
-			group = row
+			caption = row
 			row.match = false
+		elseif row.kind == 'header' then
+			row.match = query == '' or row.search:find(query, 1, true) ~= nil
 		else
 			row.match = query == '' or row.search:find(query, 1, true) ~= nil
 			if row.match then
 				shown = shown + 1
-				if group then group.match = true end
+				if header then header.dragEntry.match = true elseif caption then caption.match = true end
 			end
+			if header and query == '' and header.dragFolded() and row.frame ~= dragging then row.match = false end
 		end
 	end
 	if shown == 0 and query ~= '' then
@@ -334,13 +550,16 @@ function Board:Layout(y, query)
 				if not packed and column == columns then Break() end
 			else
 				Break()
+				local indent = IndentOf(row.frame)
 				row.rule:SetShown(height > top)
-				row.frame:SetPoint('TOPLEFT', 0, -height)
+				row.frame:SetPoint('TOPLEFT', indent, -height)
+				row.frame:SetWidth(self.panelWidth - indent)
 				height = height + row.frame:GetHeight()
 			end
 		end
 	end
 	Break()
+	if self.drag then PaintGroups(self) end
 	return self:Place(y, height + PAD)
 end
 

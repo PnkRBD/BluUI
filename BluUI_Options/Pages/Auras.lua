@@ -93,129 +93,149 @@ local function ChannelColor(db, label, alphaKey)
 	}
 end
 
-local function CombatTimerRow(board)
+local function CombatTimerRow()
 	local db = BUI.GetDB().combatTimer
 	local CombatTimer = BUI.CombatTimer
 	CombatTimer._lockToggle = relock
-	board:AddTools('Combat Timer', 'Elapsed time readout while you are in combat', {
-		ChannelColor(db, 'Text color'),
-		Font(db, 'font'),
-		TextTool({ Option(db, 'Font size', 'fontSize', { min = 10, max = 40, step = 1 }) }),
-		{ tooltip = 'Readout', title = 'Combat timer', options = {
-			Option(db, 'Milliseconds', 'showMilliseconds'),
-		} },
-		BUI.PositionTool(db, { selfTag = 'BUI_CombatTimer' }),
-		Eye('Preview, drag to move', function() return not db.locked end, function(value) CombatTimer.SetLocked(not value) end),
-		{ get = function() return db.enabled == true end, set = CombatTimer.Toggle },
-	}, CombatTimer.ApplySettings)
+	return {
+		id = 'combatTimer', name = 'Combat Timer', sub = 'Elapsed time readout while you are in combat', after = CombatTimer.ApplySettings,
+		switch = { get = function() return db.enabled == true end, set = CombatTimer.Toggle },
+		tools = {
+			ChannelColor(db, 'Text color'),
+			Font(db, 'font'),
+			TextTool({ Option(db, 'Font size', 'fontSize', { min = 10, max = 40, step = 1 }) }),
+			{ tooltip = 'Readout', title = 'Combat timer', options = {
+				Option(db, 'Milliseconds', 'showMilliseconds'),
+			} },
+			BUI.PositionTool(db, { selfTag = 'BUI_CombatTimer' }),
+			Eye('Preview, drag to move', function() return not db.locked end, function(value) CombatTimer.SetLocked(not value) end),
+		},
+	}
 end
 
-local function CombatMessagesRow(board)
+local function CombatMessagesRow()
 	local db = BUI.GetDB().combatMessage
 	local CombatMessage = BUI.CombatMessage
 	CombatMessage._lockToggle = relock
-	board:AddTools('Combat Messages', 'On-screen text when combat starts and ends', {
-		ArrayColor(db, 'Enter combat', 'enterColor', true),
-		ArrayColor(db, 'Leave combat', 'leaveColor', true),
-		Font(db, 'font'),
-		TextTool({ Option(db, 'Font size', 'fontSize', { min = 10, max = 40, step = 1 }) }),
-		{ tooltip = 'Timing', title = 'Messages', options = {
-			Option(db, 'Fade time', 'fadeTime', { min = 0.2, max = 3, step = 0.1 }),
-		} },
-		BUI.PositionTool(db, { selfTag = 'BUI_CombatMessage' }),
-		Eye('Preview, drag to move', function() return not db.locked end, function(value) CombatMessage.SetLocked(not value) end),
-		{ get = function() return db.enabled == true end, set = function(value)
+	return {
+		id = 'combatMessage', name = 'Combat Messages', sub = 'On-screen text when combat starts and ends', after = CombatMessage.Refresh,
+		switch = { get = function() return db.enabled == true end, set = function(value)
 			db.enabled = value
 			if value then CombatMessage.Enable() else CombatMessage.Disable() end
 		end },
-	}, CombatMessage.Refresh)
+		tools = {
+			ArrayColor(db, 'Enter combat', 'enterColor', true),
+			ArrayColor(db, 'Leave combat', 'leaveColor', true),
+			Font(db, 'font'),
+			TextTool({ Option(db, 'Font size', 'fontSize', { min = 10, max = 40, step = 1 }) }),
+			{ tooltip = 'Timing', title = 'Messages', options = {
+				Option(db, 'Fade time', 'fadeTime', { min = 0.2, max = 3, step = 0.1 }),
+			} },
+			BUI.PositionTool(db, { selfTag = 'BUI_CombatMessage' }),
+			Eye('Preview, drag to move', function() return not db.locked end, function(value) CombatMessage.SetLocked(not value) end),
+		},
+	}
 end
 
-local function SecondaryStatsRow(board)
+local function SecondaryStatsRow()
 	local db = BUI.GetDB().secondaryStats
 	local SecondaryStats = BUI.Auras.SecondaryStats
 	SecondaryStats.SetLockListener(Repaint)
-	board:AddTools('Secondary Stats', 'Your main, secondary and tertiary stats on screen, each in its own color', {
-		{ icon = 'cog', tooltip = 'Open the Secondary Stats page', onClick = function() BUI.PageEngine.NavigateToID('secondaryStats') end },
-		BUI.PositionTool(db, { selfTag = 'BUI_SecondaryStats' }),
-		Eye('Preview, drag to move', function() return not db.locked end, function(value) SecondaryStats.SetLocked(not value) end),
-		Switch(db, 'enabled'),
-	}, SecondaryStats.Refresh)
+	return {
+		id = 'secondaryStats', name = 'Secondary Stats', sub = 'Your main, secondary and tertiary stats on screen, each in its own color', after = SecondaryStats.Refresh,
+		switch = Switch(db, 'enabled'),
+		tools = {
+			{ icon = 'cog', tooltip = 'Open the Secondary Stats page', onClick = function() BUI.PageEngine.NavigateToID('secondaryStats') end },
+			BUI.PositionTool(db, { selfTag = 'BUI_SecondaryStats' }),
+			Eye('Preview, drag to move', function() return not db.locked end, function(value) SecondaryStats.SetLocked(not value) end),
+		},
+	}
 end
 
-local function KeystoneReminderRow(board)
+local function KeystoneReminderRow()
 	local db = BUI.GetDB().keystoneReminder
 	local KeystoneReminder = BUI.Auras.KeystoneReminder
 	KeystoneReminder.SetLockListener(Repaint)
-	board:AddTools('Keystone Reminder', 'Card with the dungeon, your role and its portal when you join a Mythic+ group, gone once you are inside or leave', {
-		BUI.PositionTool(db, { selfTag = 'BUI_KeystoneReminder' }),
-		Eye('Preview, drag to move', function() return not db.locked end, function(value) KeystoneReminder.SetLocked(not value) end),
-		{ get = function() return db.enabled == true end, set = function(value)
+	return {
+		id = 'keystoneReminder', name = 'Keystone Reminder', sub = 'Card with the dungeon, your role and its portal when you join a Mythic+ group, gone once you are inside or leave', after = KeystoneReminder.Refresh,
+		switch = { get = function() return db.enabled == true end, set = function(value)
 			db.enabled = value
 			if value then KeystoneReminder.Enable() else KeystoneReminder.Disable() end
 		end },
-	}, KeystoneReminder.Refresh)
+		tools = {
+			BUI.PositionTool(db, { selfTag = 'BUI_KeystoneReminder' }),
+			Eye('Preview, drag to move', function() return not db.locked end, function(value) KeystoneReminder.SetLocked(not value) end),
+		},
+	}
 end
 
-local function PrivateWarningRow(board)
+local function PrivateWarningRow()
 	local db = BUI.GetDB().privateWarning
 	local PrivateWarning = BUI.Auras.PrivateWarning
 	PrivateWarning.SetLockListener(Repaint)
-	board:AddTools('Private raid warning', "Blizzard's warning text for boss mechanics only you can see, placed and scaled by BluUI", {
-		BUI.PositionTool(db),
-		{ icon = 'resize', tooltip = 'Scale', title = 'Private raid warning', options = { Option(db, 'Scale', 'scale', { min = 50, max = 200, step = 5 }) } },
-		Eye('Preview, drag to move', function() return not db.locked end, function(value) PrivateWarning.SetLocked(not value) end),
-		Switch(db, 'enabled'),
-	}, PrivateWarning.Refresh)
+	return {
+		id = 'privateWarning', name = 'Private raid warning', sub = "Blizzard's warning text for boss mechanics only you can see, placed and scaled by BluUI", after = PrivateWarning.Refresh,
+		switch = Switch(db, 'enabled'),
+		tools = {
+			BUI.PositionTool(db),
+			{ icon = 'resize', tooltip = 'Scale', title = 'Private raid warning', options = { Option(db, 'Scale', 'scale', { min = 50, max = 200, step = 5 }) } },
+			Eye('Preview, drag to move', function() return not db.locked end, function(value) PrivateWarning.SetLocked(not value) end),
+		},
+	}
 end
 
-local function LowHpRow(board)
+local function LowHpRow()
 	local db = BUI.GetDB().auras
 	local Auras = BUI.Auras
 	Auras._lowHpLockToggle = relock
-	board:AddTools('Low HP Warning', 'Warning text when your health drops below the threshold', {
-		TableColor(db, 'Text color', 'lowHpColor', true),
-		Font(db, 'lowHpFont'),
-		TextTool({
-			Option(db, 'Warning text', 'lowHpText', { kind = 'input', placeholder = 'Warning text' }),
-			Option(db, 'Font size', 'lowHpFontSize', { min = 10, max = 60, step = 1 }),
-		}),
-		{ tooltip = 'Threshold', title = 'Low HP warning', options = {
-			Option(db, 'Threshold %', 'lowHpThreshold', { min = 5, max = 95, step = 5 }),
-		} },
-		BUI.PositionTool(db, { selfTag = 'BUI_LowHpWarning', fields = LOW_HP_FIELDS }),
-		Eye('Preview, drag to move', function() return db.lowHpLocked == false end, function(value)
-			db.lowHpLocked = not value
-			Auras.UpdateLowHp()
-		end),
-		Switch(db, 'lowHpWarning'),
-	}, Auras.UpdateLowHp)
+	return {
+		id = 'lowHp', name = 'Low HP Warning', sub = 'Warning text when your health drops below the threshold', after = Auras.UpdateLowHp,
+		switch = Switch(db, 'lowHpWarning'),
+		tools = {
+			TableColor(db, 'Text color', 'lowHpColor', true),
+			Font(db, 'lowHpFont'),
+			TextTool({
+				Option(db, 'Warning text', 'lowHpText', { kind = 'input', placeholder = 'Warning text' }),
+				Option(db, 'Font size', 'lowHpFontSize', { min = 10, max = 60, step = 1 }),
+			}),
+			{ tooltip = 'Threshold', title = 'Low HP warning', options = {
+				Option(db, 'Threshold %', 'lowHpThreshold', { min = 5, max = 95, step = 5 }),
+			} },
+			BUI.PositionTool(db, { selfTag = 'BUI_LowHpWarning', fields = LOW_HP_FIELDS }),
+			Eye('Preview, drag to move', function() return db.lowHpLocked == false end, function(value)
+				db.lowHpLocked = not value
+				Auras.UpdateLowHp()
+			end),
+		},
+	}
 end
 
-local function PetWarningsRow(board)
+local function PetWarningsRow()
 	local db = BUI.GetDB().auras
 	local Auras = BUI.Auras
 	Auras._lockToggle = relock
-	board:AddTools('Pet Warnings', 'Alerts when your pet is dead, missing, idle or low on health', {
-		TableColor(db, 'Warning color', 'warningColor', true),
-		Font(db, 'font'),
-		TextTool({ Option(db, 'Font size', 'fontSize', { min = 14, max = 48, step = 1 }) }),
-		{ tooltip = 'Warning types', title = 'Pet warnings', options = {
-			Flag(db.petAttackWarning, 'Pet not attacking'),
-			Flag(db.petDeadWarning, 'Pet dead or missing'),
-			Flag(db.grimoireSacrificeWarning, 'Grimoire of Sacrifice'),
-			Flag(db.playDeadWarning, 'Playing dead'),
-			Flag(db.petHealthWarning, 'Pet low health'),
-			{ label = 'Low health %', min = 10, max = 80, step = 5, get = function() return db.petHealthWarning.threshold end, set = function(value) db.petHealthWarning.threshold = value end },
-		} },
-		BUI.PositionTool(db, { selfTag = 'BUI_PetWarning' }),
-		Eye('Preview, drag to move', function() return not db.locked end, function(value) Auras.SetLocked(not value) end),
-		Switch(db, 'petWarningsEnabled'),
-	}, Auras.Update)
+	return {
+		id = 'petWarnings', name = 'Pet Warnings', sub = 'Alerts when your pet is dead, missing, idle or low on health', after = Auras.Update,
+		switch = Switch(db, 'petWarningsEnabled'),
+		tools = {
+			TableColor(db, 'Warning color', 'warningColor', true),
+			Font(db, 'font'),
+			TextTool({ Option(db, 'Font size', 'fontSize', { min = 14, max = 48, step = 1 }) }),
+			{ tooltip = 'Warning types', title = 'Pet warnings', options = {
+				Flag(db.petAttackWarning, 'Pet not attacking'),
+				Flag(db.petDeadWarning, 'Pet dead or missing'),
+				Flag(db.grimoireSacrificeWarning, 'Grimoire of Sacrifice'),
+				Flag(db.playDeadWarning, 'Playing dead'),
+				Flag(db.petHealthWarning, 'Pet low health'),
+				{ label = 'Low health %', min = 10, max = 80, step = 5, get = function() return db.petHealthWarning.threshold end, set = function(value) db.petHealthWarning.threshold = value end },
+			} },
+			BUI.PositionTool(db, { selfTag = 'BUI_PetWarning' }),
+			Eye('Preview, drag to move', function() return not db.locked end, function(value) Auras.SetLocked(not value) end),
+		},
+	}
 end
 
-
-local function GatewayRow(board)
+local function GatewayRow()
 	local db = BUI.GetDB().gatewayAlert
 	local Display = BUI.BuffTracking.Display
 	local function Apply()
@@ -223,90 +243,232 @@ local function GatewayRow(board)
 		if tracker then tracker.Refresh() end
 	end
 	Display.RegisterAnchorCallback('gatewayAlert', Repaint)
-	board:AddTools('Gateway Alert', 'Text while a Demonic Gateway is in reach and off cooldown, needs a Gateway Control Shard on an action bar', {
-		TableColor(db, 'Text color', 'textColor', true),
-		Font(db, 'font'),
-		TextTool({
-			Option(db, 'Text', 'customText', { kind = 'input', placeholder = 'Alert text' }),
-			Option(db, 'Font size', 'textSize', { min = 10, max = 48, step = 1 }),
-		}),
-		{ icon = 'sound', tooltip = 'Sound', title = 'Gateway alert', options = {
-			{ label = 'Sound', entries = sounds, get = function() return db.sound end, set = function(value)
-				db.sound = value
-				BUI.PlaySoundByName(value)
-			end },
-		} },
-		BUI.PositionTool(db, { selfTag = 'BUI_GatewayAlert' }),
-		Eye('Unlock, drag to move', function() return db.showAnchor == true end, function(value)
-			db.showAnchor = value
-			Apply()
-		end),
-		Switch(db, 'enabled'),
-	}, Apply)
+	return {
+		id = 'gatewayAlert', name = 'Gateway Alert', sub = 'Text while a Demonic Gateway is in reach and off cooldown, needs a Gateway Control Shard on an action bar', after = Apply,
+		switch = Switch(db, 'enabled'),
+		tools = {
+			TableColor(db, 'Text color', 'textColor', true),
+			Font(db, 'font'),
+			TextTool({
+				Option(db, 'Text', 'customText', { kind = 'input', placeholder = 'Alert text' }),
+				Option(db, 'Font size', 'textSize', { min = 10, max = 48, step = 1 }),
+			}),
+			{ icon = 'sound', tooltip = 'Sound', title = 'Gateway alert', options = {
+				{ label = 'Sound', entries = sounds, get = function() return db.sound end, set = function(value)
+					db.sound = value
+					BUI.PlaySoundByName(value)
+				end },
+			} },
+			BUI.PositionTool(db, { selfTag = 'BUI_GatewayAlert' }),
+			Eye('Unlock, drag to move', function() return db.showAnchor == true end, function(value)
+				db.showAnchor = value
+				Apply()
+			end),
+		},
+	}
 end
 
-local function BloodlustRow(board)
+local function BloodlustRow()
 	local db = BUI.GetDB().bloodlust
 	local Bloodlust = BUI.Bloodlust
 	Bloodlust.onPreviewStop = Repaint
-	board:AddTools('Bloodlust', 'Tracks Bloodlust, Heroism and similar haste buffs', {
-		Font(db, 'font'),
-		TextTool({ Option(db, 'Font size', 'fontSize', { min = 8, max = 48, step = 1 }) }),
-		{ icon = 'cog', tooltip = 'Open the Bloodlust page', onClick = function() BUI.PageEngine.NavigateToID('bloodlust') end },
-		BUI.PositionTool(db),
-		Eye('Preview the alerts', Bloodlust.IsPreviewing, function(value)
-			if value then Bloodlust.StartPreview() else Bloodlust.StopPreview() end
-		end),
-		Switch(db, 'enabled'),
-	}, Bloodlust.Refresh)
+	return {
+		id = 'bloodlust', name = 'Bloodlust', sub = 'Tracks Bloodlust, Heroism and similar haste buffs', after = Bloodlust.Refresh,
+		switch = Switch(db, 'enabled'),
+		tools = {
+			Font(db, 'font'),
+			TextTool({ Option(db, 'Font size', 'fontSize', { min = 8, max = 48, step = 1 }) }),
+			{ icon = 'cog', tooltip = 'Open the Bloodlust page', onClick = function() BUI.PageEngine.NavigateToID('bloodlust') end },
+			BUI.PositionTool(db),
+			Eye('Preview the alerts', Bloodlust.IsPreviewing, function(value)
+				if value then Bloodlust.StartPreview() else Bloodlust.StopPreview() end
+			end),
+		},
+	}
 end
 
-local function CDAnnouncerRow(board)
+local function CDAnnouncerRow()
 	local db = BUI.GetDB().cdAnnouncer
 	local CDAnnouncer = BUI.CDAnnouncer
 	CDAnnouncer.RegisterAnchorCallback(Repaint)
-	board:AddTools('Cooldown Announcer', 'Countdowns and ready alerts for the cooldowns you pick', {
-		{ icon = 'cog', tooltip = 'Open the Cooldown Announcer page', onClick = function() BUI.PageEngine.NavigateToID('cdAnnouncer') end },
-		Eye('Unlock the anchor to drag it, right-click it to lock', function() return db.showAnchor == true end, function(value)
-			db.showAnchor = value
-			CDAnnouncer.Refresh()
-		end),
-		Switch(db, 'enabled'),
-	}, CDAnnouncer.Refresh)
+	return {
+		id = 'cdAnnouncer', name = 'Cooldown Announcer', sub = 'Countdowns and ready alerts for the cooldowns you pick', after = CDAnnouncer.Refresh,
+		switch = Switch(db, 'enabled'),
+		tools = {
+			{ icon = 'cog', tooltip = 'Open the Cooldown Announcer page', onClick = function() BUI.PageEngine.NavigateToID('cdAnnouncer') end },
+			Eye('Unlock the anchor to drag it, right-click it to lock', function() return db.showAnchor == true end, function(value)
+				db.showAnchor = value
+				CDAnnouncer.Refresh()
+			end),
+		},
+	}
 end
 
-local function CooldownFlashRow(board)
+local function CooldownFlashRow()
 	local db = BUI.GetDB().cooldownFlash
 	local CooldownFlash = BUI.CooldownFlash
 	CooldownFlash.RegisterAnchorCallback(Repaint)
-	board:AddTools('Cooldown Flash', 'Spell icons that flash on screen when a cooldown is ready or a CDM buff falls off, saved per spec', {
-		{ icon = 'cog', tooltip = 'Open the Cooldown Flash page', onClick = function() BUI.PageEngine.NavigateToID('cooldownFlash') end },
-		BUI.PositionTool(db, { selfTag = 'BUI_CooldownFlash' }),
-		Eye('Unlock to drag the icons, right-click them to lock', function() return db.showAnchor == true end, function(value)
-			db.showAnchor = value
-			CooldownFlash.Refresh()
-		end),
-		Switch(db, 'enabled'),
-	}, CooldownFlash.Refresh)
+	return {
+		id = 'cooldownFlash', name = 'Cooldown Flash', sub = 'Spell icons that flash on screen when a cooldown is ready or a CDM buff falls off, saved per spec', after = CooldownFlash.Refresh,
+		switch = Switch(db, 'enabled'),
+		tools = {
+			{ icon = 'cog', tooltip = 'Open the Cooldown Flash page', onClick = function() BUI.PageEngine.NavigateToID('cooldownFlash') end },
+			BUI.PositionTool(db, { selfTag = 'BUI_CooldownFlash' }),
+			Eye('Unlock to drag the icons, right-click them to lock', function() return db.showAnchor == true end, function(value)
+				db.showAnchor = value
+				CooldownFlash.Refresh()
+			end),
+		},
+	}
 end
 
-local function GeneralBoard(ui, parent, width)
-	local board = ui.Board(parent, width, {
+local ROWS = {
+	CombatTimerRow, CombatMessagesRow, SecondaryStatsRow, KeystoneReminderRow, PrivateWarningRow,
+	LowHpRow, PetWarningsRow, GatewayRow, BloodlustRow, CDAnnouncerRow, CooldownFlashRow,
+}
+
+local function Members(group, specs)
+	local members = {}
+	for _, id in ipairs(group.members) do members[#members + 1] = specs[id] end
+	return members
+end
+
+local function MemberCount(group, specs)
+	local count = #Members(group, specs)
+	if count == 0 then return 'Empty, drag an aura onto this header' end
+	return count == 1 and '1 aura' or (count .. ' auras')
+end
+
+local function GroupSwitch(group, specs)
+	return {
+		get = function()
+			local members = Members(group, specs)
+			for _, spec in ipairs(members) do
+				if not spec.switch.get() then return false end
+			end
+			return #members > 0
+		end,
+		set = function(value)
+			for _, spec in ipairs(Members(group, specs)) do
+				if spec.switch.get() ~= value then
+					spec.switch.set(value)
+					spec.after()
+				end
+			end
+		end,
+	}
+end
+
+local function DeleteGroup(layout, group)
+	local nodes = {}
+	for _, node in ipairs(layout.nodes) do
+		if node == group then
+			for _, id in ipairs(group.members) do nodes[#nodes + 1] = id end
+		else
+			nodes[#nodes + 1] = node
+		end
+	end
+	layout.nodes = nodes
+	BUI.PageEngine.RefreshCurrentPage()
+end
+
+local function GroupCount(layout)
+	local count = 0
+	for _, node in ipairs(layout.nodes) do
+		if type(node) == 'table' then count = count + 1 end
+	end
+	return count
+end
+
+local function Arrange(layout, specs, order)
+	local entries, placed = {}, {}
+	local function Place(id, group)
+		if not specs[id] or placed[id] then return end
+		placed[id] = true
+		entries[#entries + 1] = { spec = specs[id], group = group }
+	end
+	for _, node in ipairs(layout.nodes) do
+		if type(node) == 'table' then
+			entries[#entries + 1] = { header = node }
+			for _, id in ipairs(node.members) do Place(id, node) end
+		else
+			Place(node)
+		end
+	end
+	for _, spec in ipairs(order) do Place(spec.id) end
+	return entries
+end
+
+local function Save(layout, board, nodeOf)
+	local nodes = {}
+	for _, frame in ipairs(board:DragRows()) do
+		local node = nodeOf[frame]
+		if frame.dragGroup then
+			local members = nodeOf[frame.dragGroup].members
+			members[#members + 1] = node
+		else
+			if type(node) == 'table' then node.members = {} end
+			nodes[#nodes + 1] = node
+		end
+	end
+	layout.nodes = nodes
+end
+
+local function GroupHeader(ui, board, layout, group, specs, page)
+	local row, title, subtitle = board:AddDragHeader(group.name, MemberCount(group, specs), {
+		{ tooltip = 'Rename', title = 'Group', options = {
+			{ label = 'Name', kind = 'input', placeholder = 'Group name', get = function() return group.name end, set = function(text)
+				if text ~= '' then group.name = text end
+			end },
+		} },
+		{ icon = 'erase', size = Layout.ERASE_SIZE, tooltip = 'Delete the group, its auras stay where it was', hover = 'danger', slot = 'icon', onClick = function() DeleteGroup(layout, group) end },
+		GroupSwitch(group, specs),
+	}, Repaint, function() return group.collapsed == true end, function()
+		group.collapsed = not group.collapsed or nil
+		page:Resize()
+	end)
+	ui.Bind(title, function() title:SetText(group.name) end)
+	ui.Bind(subtitle, function() subtitle:SetText(MemberCount(group, specs)) end)
+	return row
+end
+
+local function GeneralBoard(ui, parent, width, page)
+	local layout = BUI.GetDB().auraGroups
+	local order, specs = {}, {}
+	for index, Row in ipairs(ROWS) do
+		local spec = Row()
+		spec.tools[#spec.tools + 1] = spec.switch
+		order[index] = spec
+		specs[spec.id] = spec
+	end
+	local nodeOf, headers = {}, {}
+	local board
+	local function NewGroup()
+		Save(layout, board, nodeOf)
+		table.insert(layout.nodes, 1, { name = 'Group ' .. (GroupCount(layout) + 1), members = {} })
+		BUI.PageEngine.RefreshCurrentPage()
+	end
+	board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'General',
-		description = 'Text callouts for combat, your pet, your health and your target. The eye on a row previews it and lets you drag it, right-click the alert to lock it again.',
+		description = 'Text callouts and readouts. Drag a row by its grip to reorder it, or onto a group to put it in there. Click a group to fold it, drag it to move the whole group, and its switch turns all of it on or off. The eye on a row previews it and lets you drag it, right-click the alert to lock it again.',
+		buttons = { { text = 'New group', onClick = NewGroup } },
 	})
-	CombatTimerRow(board)
-	CombatMessagesRow(board)
-	SecondaryStatsRow(board)
-	KeystoneReminderRow(board)
-	PrivateWarningRow(board)
-	LowHpRow(board)
-	PetWarningsRow(board)
-	GatewayRow(board)
-	BloodlustRow(board)
-	CDAnnouncerRow(board)
-	CooldownFlashRow(board)
+	board:DragList(function() page:Resize() end, function()
+		Save(layout, board, nodeOf)
+		page:Resize()
+		Repaint()
+	end)
+	for _, entry in ipairs(Arrange(layout, specs, order)) do
+		if entry.header then
+			local header = GroupHeader(ui, board, layout, entry.header, specs, page)
+			headers[entry.header] = header
+			nodeOf[header] = entry.header
+		else
+			local spec = entry.spec
+			nodeOf[board:AddDragTools(spec.name, spec.sub, nil, spec.tools, spec.after, headers[entry.group])] = spec.id
+		end
+	end
 	return board
 end
 
@@ -424,8 +586,8 @@ local function CrosshairBoard(ui, parent, width)
 	return board
 end
 
-local function General(ui, _, parent, width)
-	return { GeneralBoard(ui, parent, width), CrosshairBoard(ui, parent, width) }
+local function General(ui, _, parent, width, page)
+	return { GeneralBoard(ui, parent, width, page), CrosshairBoard(ui, parent, width) }
 end
 
 BUI.PageEngine.RegisterPage('auras', {

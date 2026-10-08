@@ -933,8 +933,8 @@ local function ButtonsBoard(ui, parent, width, page)
 		board:AddRow('No addon buttons yet', Interface().addonButtons == 'NONE' and 'Turn on the drawer or the button bar to collect them' or 'They appear here as addons add buttons to the minimap')
 		return board
 	end
-	board:DragList(function(index, delta)
-		entries[index], entries[index + delta] = entries[index + delta], entries[index]
+	board:DragList(function(index, delta, count)
+		Layout.ShiftBlock(entries, index, delta, count)
 		page:Resize()
 	end, function()
 		local names = {}

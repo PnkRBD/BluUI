@@ -91,8 +91,8 @@ local function SpellsBoard(ui, parent, width, page)
 		if CooldownFlash.AddSpell(hit.id) then RebuildPage() end
 	end }):SetPoint('RIGHT', -ui.ROW_INSET, 0)
 
-	board:DragList(function(index, delta)
-		entries[index], entries[index + delta] = entries[index + delta], entries[index]
+	board:DragList(function(index, delta, count)
+		Layout.ShiftBlock(entries, index, delta, count)
 		page:Resize()
 	end, function()
 		CooldownFlash.ReorderSpells(entries)
