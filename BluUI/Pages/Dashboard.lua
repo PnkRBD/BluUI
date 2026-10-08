@@ -933,9 +933,6 @@ local function VaultSlot(parent, atlas)
     tile.state = kit.Text(pill, '', 11, 'positive')
     tile.pill = pill
 
-    local rule = Rule(tile)
-    rule:SetPoint('BOTTOMLEFT', 1, VAULT_FOOT)
-    rule:SetPoint('BOTTOMRIGHT', -1, VAULT_FOOT)
     tile.foot = kit.Text(tile, '', 12, 'text')
     tile.foot:SetPoint('CENTER', tile, 'BOTTOM', 0, VAULT_FOOT / 2)
     tile.foot.tile = tile
