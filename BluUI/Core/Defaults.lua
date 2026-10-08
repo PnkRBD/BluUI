@@ -349,7 +349,6 @@ BUI.Defaults = {
 			auras         = true,
 			buffTracking  = true,
 			datatext      = true,
-			customBars    = true,
 			cursor        = true,
 			streamerTools = true,
 			gemCounter    = true,
@@ -1973,6 +1972,7 @@ BUI.DeprecatedKeys = {
 	['unitFrames.boss.textSize']         = true,
 	['dashboard.layout']        = true,
 	['dashboard.topCols']       = true,
+	['modules.customBars']      = true,
 
 	['powerBar.opacity']        = true,
 	['secondaryPower.opacity']  = true,

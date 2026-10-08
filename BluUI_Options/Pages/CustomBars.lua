@@ -6,8 +6,6 @@ local CustomBars = BUI.CustomBars
 local IconEngine = BUI.IconEngine
 local Pixel = BUI.Pixel
 
-local PAGE_WIDTH = 960
-local PREVIEW_HEIGHT = 110
 local PREVIEW_INSET = 20
 local PREVIEW_ROOM = 40
 local MENU_WIDTH = 150
@@ -23,15 +21,17 @@ local TOOLS_ROOM = ERASE_INSET + ERASE_SIZE + 3 * (TOOL_GAP + TOOL_SIZE) + TOOL_
 local HIDDEN_ALPHA = 0.45
 local DEFAULT_ICON = 134400
 local TRINKET_SLOTS = { 13, 14 }
+local ID_PREFIX = 'customBar'
+local NEW_ID = ID_PREFIX .. 'New'
+local IMPORT_ID = ID_PREFIX .. 'Import'
 
 local GROW_OPTIONS = { { value = 'LEFT', text = 'Grow left' }, { value = 'RIGHT', text = 'Grow right' } }
 local ROW_OPTIONS = { { value = 'DOWN', text = 'Down' }, { value = 'UP', text = 'Up' } }
 
 local selectedIndex = 1
-local showingImport = true
+local showingImport = false
 local importCharacter
 local importSkips = {}
-local items = {}
 local preview
 local fonts
 
@@ -200,12 +200,24 @@ local function SettingsBoard(ui, parent, width, bar, index, page)
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = bar.name,
-		description = 'A row of icons for the cooldowns, trinkets, potions and buffs you pick. Unlock it with the eye in the header to drag it, right-click it to lock it again.',
+		description = 'A row of icons for the cooldowns, trinkets, potions and buffs you pick. Unlock it with the eye to drag it, right-click it to lock it again.',
 		buttons = {
 			{ text = 'Duplicate', icon = 'copy', onClick = function() Duplicate(index) end },
 			{ text = 'Delete', style = 'danger', onClick = function() ConfirmDelete(index) end },
 		},
 	})
+	board:AddTools('Bar', 'Name, position and on or off', {
+		{ icon = 'text', tooltip = 'Name', title = 'Bar', options = { NameOption(bar) } },
+		BUI.PositionTool(bar, { noCenter = true }),
+		{ icon = 'eye', tooltip = 'Unlock to drag, right-click the bar to lock', get = function() return not bar.locked end, set = function(value)
+			bar.locked = not value
+			Repaint()
+		end },
+		{ get = function() return bar.enabled == true end, set = function(value)
+			bar.enabled = value
+			Repaint()
+		end },
+	}, Apply)
 	board:AddSwitch('Racials', function() return bar.showRacials == true end, function(value)
 		bar.showRacials = value
 		Apply()
@@ -230,17 +242,15 @@ local function SettingsBoard(ui, parent, width, bar, index, page)
 			RebuildPane(page)
 		end },
 	}, Apply)
-	board:AddTools('Bar', 'Name, icon size, border and opacity', {
+	board:AddTools('Icons', 'Size, border and opacity', {
 		Color(bar, 'Border color', 'borderColor'),
-		{ icon = 'text', tooltip = 'Name', title = 'Bar', options = { NameOption(bar) } },
-		{ tooltip = 'Icon size, border and opacity', title = 'Bar', options = {
+		{ tooltip = 'Icon size, border and opacity', title = 'Icons', options = {
 			Option(bar, 'Icon size', 'iconSize', { min = 20, max = 80, step = 1 }),
 			Option(bar, 'Spacing', 'spacing', { min = -20, max = 20, step = 1 }),
 			{ label = 'Zoom %', min = 0, max = 20, step = 1, get = function() return math.floor(bar.zoom * 100 + 0.5) end, set = function(value) bar.zoom = value / 100 end },
 			Option(bar, 'Border size', 'borderSize', { min = 0, max = 5, step = 1 }),
 			Option(bar, 'Opacity %', 'barOpacity', { min = 0, max = 100, step = 1 }),
 		} },
-		BUI.PositionTool(bar, { noCenter = true }),
 	}, Apply)
 	board:AddTools('Layout', 'Grow direction, rows and layering', {
 		{ entries = GROW_OPTIONS, width = MENU_WIDTH, get = function() return bar.growDirection end, set = function(value) bar.growDirection = value end },
@@ -410,10 +420,12 @@ local function ImportBoard(ui, parent, width, page)
 end
 
 local function BuildPreview(band, kit)
+	local stage = CreateFrame('Frame', nil, band)
+	stage:SetAllPoints()
 	local pool = {}
-	local note = kit.Text(band, '', 12, 'muted')
+	local note = kit.Text(stage, '', 12, 'muted')
 	note:SetPoint('CENTER')
-	function band:Update()
+	function stage:Update()
 		for _, frame in ipairs(pool) do frame:Hide() end
 		local bar = Shown()
 		local list = bar and CustomBars.ShownIcons(bar) or {}
@@ -433,7 +445,7 @@ local function BuildPreview(band, kit)
 		end
 		local gap = bar.spacing
 		local room = self:GetWidth() - PREVIEW_ROOM
-		local size = math.min(bar.iconSize, PREVIEW_HEIGHT - PREVIEW_INSET)
+		local size = math.min(bar.iconSize, self:GetHeight() - PREVIEW_INSET)
 		local total = count * size + (count - 1) * gap
 		if total > room then
 			size = math.floor((room - (count - 1) * gap) / count)
@@ -461,98 +473,65 @@ local function BuildPreview(band, kit)
 			frame:Show()
 		end
 	end
-	band:HookScript('OnShow', function(self) self:Update() end)
-	return band
+	preview = stage
+	return stage
 end
 
 local function Panes(ui, _, parent, width, item, page)
-	if item.id == 'new' then
+	if item.id == NEW_ID then
 		selectedIndex = CustomBars.AddBar()
 		showingImport = false
 		RebuildPage()
 		return {}
 	end
-	if item.id == 'import' then return { ImportBoard(ui, parent, width, page) } end
+	if item.id == IMPORT_ID then return { ImportBoard(ui, parent, width, page) } end
 	local bar = Bars()[item.index]
 	return { SettingsBoard(ui, parent, width, bar, item.index, page), TrackedBoard(ui, parent, width, bar, page) }
 end
 
-local function RailGroups()
-	items = {}
-	local bars = {}
+local function RailGroup()
+	local list = {}
 	for index, bar in ipairs(Bars()) do
-		bars[index] = { id = 'bar' .. index, label = bar.name, index = index }
+		list[index] = { id = ID_PREFIX .. index, label = bar.name, icon = 'capsule', index = index }
 	end
-	bars[#bars + 1] = { id = 'new', label = 'New bar', icon = 'plus' }
-	local groups = {
-		{ title = 'Settings', items = { { id = 'import', label = 'Import', icon = 'copy' } } },
-		{ title = 'Bars', items = bars },
-	}
-	for _, group in ipairs(groups) do
-		for _, item in ipairs(group.items) do items[item.id] = item end
-	end
-	return groups
+	list[#list + 1] = { id = NEW_ID, label = 'New bar', icon = 'plus' }
+	list[#list + 1] = { id = IMPORT_ID, label = 'Import', icon = 'copy' }
+	return { title = 'Custom bars', items = list }
+end
+
+local function Owns(id)
+	return id:sub(1, #ID_PREFIX) == ID_PREFIX
+end
+
+local function Select(id)
+	showingImport = id == IMPORT_ID
+	local index = tonumber(id:match('^' .. ID_PREFIX .. '(%d+)$'))
+	if index then selectedIndex = index end
+end
+
+local function BarID()
+	if Current() then return ID_PREFIX .. selectedIndex end
+	return IMPORT_ID
 end
 
 local function ActiveID()
-	if Shown() then return 'bar' .. selectedIndex end
-	return 'import'
+	if showingImport then return IMPORT_ID end
+	return BarID()
 end
 
-local function HeaderToggle(icon, tooltip, get, set)
-	return { icon = icon, tooltip = tooltip, get = function()
-		local bar = Current()
-		return bar ~= nil and get(bar)
-	end, set = function(value)
-		local bar = Current()
-		if bar then
-			set(bar, value)
-			Apply()
-		end
-		Repaint()
-	end }
+local function Prepare(fontItems)
+	fonts = fontItems
+	CustomBars.SetLockCallback(Repaint)
 end
 
-BUI.PageEngine.RegisterPage('customBars', {
-	title = 'Custom Bars',
-	buttonText = 'Custom Bars',
-	icon = 'capsule',
-	OnBuild = function(pageFrame)
-		fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
-		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
-		local tab = page:GetTab(1)
-		Current()
-		local adapter = { tabContents = {}, currentTab = selectedIndex }
-		for index in ipairs(Bars()) do adapter.tabContents[index] = tab end
-		local rail
-		rail = Layout.RailPage(tab, { window = Window() }, {
-			icon = 'capsule',
-			title = 'Custom Bars',
-			placeholder = 'Search bar settings...',
-			tools = {
-				HeaderToggle('enable', 'Turn this bar on or off', function(bar) return bar.enabled == true end, function(bar, value) bar.enabled = value end),
-				HeaderToggle('eye', 'Unlock this bar to drag it, right-click it to lock', function(bar) return not bar.locked end, function(bar, value) bar.locked = not value end),
-			},
-			preview = { height = PREVIEW_HEIGHT, build = function(band, kit) preview = BuildPreview(band, kit) end },
-			rail = { groups = RailGroups(), selected = ActiveID() },
-			build = Panes,
-		})
-		local Select = rail.Select
-		function rail:Select(id)
-			local item = items[id]
-			showingImport = id == 'import'
-			if item.index then selectedIndex = item.index end
-			adapter.currentTab = selectedIndex
-			Select(self, id)
-			Repaint()
-			RefreshPreview()
-		end
-		function adapter:SetTab(index)
-			rail:Select(Bars()[index] and ('bar' .. index) or 'import')
-		end
-		pageFrame._page = adapter
-		RefreshPreview()
-		CustomBars.SetLockCallback(Repaint)
-		page:AutoRefresh()
-	end,
-})
+BUI.CustomBarsPage = {
+	IMPORT_ID = IMPORT_ID,
+	Owns = Owns,
+	RailGroup = RailGroup,
+	Select = Select,
+	BarID = BarID,
+	ActiveID = ActiveID,
+	Panes = Panes,
+	BuildPreview = BuildPreview,
+	Prepare = Prepare,
+}

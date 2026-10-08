@@ -1,6 +1,7 @@
 local BUI = BluUI
 local BUILib = BluUI.BUILibClient
 local Controls, Layout, Modals = BUILib.Controls, BUILib.Layout, BUILib.Modals
+local CustomBarsPage = BUI.CustomBarsPage
 
 local PAGE_WIDTH = 960
 local PREVIEW_HEIGHT = 150
@@ -38,6 +39,8 @@ for _, viewer in ipairs(VIEWERS) do VIEWER_BY_KEY[viewer.key] = viewer end
 local TAB_IDS = { 'general', 'essential', 'utility', 'buffs', 'buffBars', 'layouts', 'icons' }
 local TAB_INDEX = {}
 for index, id in ipairs(TAB_IDS) do TAB_INDEX[id] = index end
+local CUSTOM_BAR_TAB = #TAB_IDS + 1
+local CUSTOM_IMPORT_TAB = #TAB_IDS + 2
 local ALL_LAYOUTS = '__all__'
 
 local selected = 'general'
@@ -773,10 +776,18 @@ local function BuildPreview(band, kit)
 	local mocks = {}
 	for _, viewer in ipairs(VIEWERS) do mocks[viewer.key] = CreateViewerMock(stage, viewer.keybinds) end
 	mocks.buffBars = CreateBuffBarMock(stage)
+	local customBars = CustomBarsPage.BuildPreview(band, kit)
 	local note = kit.Text(band, '', 12, 'muted')
 	note:SetPoint('CENTER')
 	function band:Update()
 		for _, mock in pairs(mocks) do mock:Hide() end
+		local custom = CustomBarsPage.Owns(selected)
+		customBars:SetShown(custom)
+		if custom then
+			note:Hide()
+			customBars:Update()
+			return
+		end
 		local mock = mocks[selected]
 		if not mock then
 			note:SetText('Pick a viewer from the rail to see it here')
@@ -1340,7 +1351,8 @@ local function IconManagementHost(parent, width)
 	return wrapper
 end
 
-local function Panes(ui, _, parent, width, item, page)
+local function Panes(ui, shell, parent, width, item, page)
+	if CustomBarsPage.Owns(item.id) then return CustomBarsPage.Panes(ui, shell, parent, width, item, page) end
 	if item.id == 'general' then return GeneralBoards(ui, parent, width, page) end
 	if item.id == 'buffBars' then return BuffBarBoards(ui, parent, width) end
 	if item.id == 'layouts' then return LayoutBoards(ui, parent, width, page) end
@@ -1362,6 +1374,17 @@ local RAIL_GROUPS = {
 	} },
 }
 
+local function RailGroups(enabled)
+	if not enabled then return RAIL_GROUPS end
+	return { RAIL_GROUPS[1], RAIL_GROUPS[2], CustomBarsPage.RailGroup() }
+end
+
+local function TabTarget(index)
+	if index == CUSTOM_BAR_TAB then return CustomBarsPage.BarID() end
+	if index == CUSTOM_IMPORT_TAB then return CustomBarsPage.IMPORT_ID end
+	return TAB_IDS[index] or 'general'
+end
+
 BUI.PageEngine.RegisterPage('cdm', {
 	title = 'Cooldown Manager',
 	buttonText = 'CDM',
@@ -1374,7 +1397,9 @@ BUI.PageEngine.RegisterPage('cdm', {
 		if enabled then
 			CDM().Initialize()
 			HookRefreshers()
+			CustomBarsPage.Prepare(fonts)
 		end
+		if CustomBarsPage.Owns(selected) then selected = enabled and CustomBarsPage.ActiveID() or 'general' end
 		local rail
 		rail = Layout.RailPage(tab, { window = Window() }, {
 			icon = 'wheel',
@@ -1386,7 +1411,7 @@ BUI.PageEngine.RegisterPage('cdm', {
 				end },
 			},
 			preview = enabled and { height = PREVIEW_HEIGHT, build = function(band, kit) preview = BuildPreview(band, kit) end } or nil,
-			rail = { groups = RAIL_GROUPS, selected = selected },
+			rail = { groups = RailGroups(enabled), selected = selected },
 			disabled = function() return not enabled end,
 			build = Panes,
 		})
@@ -1395,16 +1420,19 @@ BUI.PageEngine.RegisterPage('cdm', {
 			return
 		end
 		railPage = rail
+		local tabs = {}
+		for index = 1, CUSTOM_IMPORT_TAB do tabs[index] = tab end
+		local controller = { tabContents = tabs, currentTab = TAB_INDEX[selected], SetTab = function(_, index) rail:Select(TabTarget(index)) end }
 		local Select = rail.Select
 		function rail:Select(id)
 			selected = id
+			controller.currentTab = TAB_INDEX[id]
+			if CustomBarsPage.Owns(id) then CustomBarsPage.Select(id) end
 			Select(self, id)
 			Repaint()
 			RefreshPreview()
 		end
-		local tabs = {}
-		for index = 1, #TAB_IDS do tabs[index] = tab end
-		pageFrame._page = { tabContents = tabs, currentTab = TAB_INDEX[selected], SetTab = function(_, index) rail:Select(TAB_IDS[index] or 'general') end }
+		pageFrame._page = controller
 		local module = CDM()
 		module.state.buffsPreviewButton = { SetText = Repaint }
 		module._previewBtn = { SetValue = Repaint }

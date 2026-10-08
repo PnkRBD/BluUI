@@ -31,7 +31,7 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 15
+local PROFILE_MIGRATION_VERSION = 16
 local LEGACY_UNIT_KEYS = { 'player', 'target', 'targettarget', 'focus', 'focustarget', 'pet', 'boss', 'arena', 'party' }
 local HEALING_RULE = 'mineRaidCombat'
 
@@ -470,6 +470,21 @@ function BUI.MigrateProfile(profile)
 		if type(profile.groupFrames.raid) ~= 'table' then profile.groupFrames.raid = {} end
 		if type(profile.groupFrames.raid.buffs) ~= 'table' then profile.groupFrames.raid.buffs = {} end
 		PutHealingBuffsFirst(profile.groupFrames.raid.buffs, 'rules', 'raidRelevant')
+	end
+
+	if not general._customBarsInCDM then
+		general._customBarsInCDM = true
+		local modules = type(profile.modules) == 'table' and profile.modules
+		if modules then
+			if modules.customBars == false or modules.tracking == false then
+				for _, key in ipairs({ 'customBars', 'trackingBars' }) do
+					for _, bar in ipairs(type(profile[key]) == 'table' and profile[key] or {}) do
+						if type(bar) == 'table' then bar.enabled = false end
+					end
+				end
+			end
+			modules.customBars, modules.tracking = nil, nil
+		end
 	end
 
 	general._buiMigrationVersion = PROFILE_MIGRATION_VERSION

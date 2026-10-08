@@ -323,7 +323,7 @@ local function RefreshAllModules()
     if on('cursor') and BUI.MouseCursor and BUI.MouseCursor.Initialize then BUI.MouseCursor.Initialize() end
     if on('minimap') and BUI.Minimap and BUI.Minimap.Initialize then BUI.Minimap.Initialize() end
 
-    if on('customBars') and BUI.CustomBars then
+    if on('cdm') and BUI.CustomBars then
         if BUI.CustomBars.Initialize then BUI.CustomBars.Initialize() end
         if BUI.CustomBars.RefreshAllBars then BUI.CustomBars.RefreshAllBars() end
     end
