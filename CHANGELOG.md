@@ -1,41 +1,39 @@
 # 5.6.0
 
-Weaker Auras gets a stats readout and groups, and unit frame auras get a lot tidier.
+Weaker Auras got a lot bigger this time, and unit frame auras behave better.
 
 **Weaker Auras**
 
-There's a new Secondary Stats readout. It puts your crit, haste, mastery and versatility on screen, and you can add your main stat, stamina, leech, avoidance and speed too. Each stat has its own color, you drag them into the order you want, and the numbers keep updating in combat.
+You can put your stats on screen now. Turn on Secondary Stats and you get your main stat, crit, haste, mastery and vers, each in its own color. On its page you can add the rest and drag them into whatever order you like. The numbers keep up in combat too.
 
-The Alerts tab is now called General, and you can sort it into groups. Press New group, then drag an aura onto the group's header to put it in. Click a group to fold it, drag it to move the whole thing, and use its switch to turn everything in it on or off.
+The Alerts tab is called General now, and you can make groups on it. Hit New group and drag your auras onto it. Click a group to fold it up, or drag it to move it around. Its switch turns the whole group on or off.
 
-The Hunter's Mark warning moved to the Class tab with the other hunter helpers. The gateway and pet alerts show up again.
+Hunter's Mark moved over to the Class tab, where the other hunter stuff lives. The gateway and pet alerts had gone missing, and they're back.
 
 **Unit frame auras**
 
-Buffs and debuffs can share a row now. Pick a flow on the Auras tab and debuffs carry on right after your buffs, or stack on top of them.
+Buffs and debuffs can share a row now. Set it up on the Auras tab and your debuffs pick up right where your buffs end.
 
-Pinned auras don't show twice anymore. Pinned debuffs stopped letting every debuff through on friendly frames, and My Healing Buffs no longer doubles up with the rules under it. Changing a filter doesn't build a fresh set of icons each time. Shift-right-click only hits the aura under your mouse, and Recently seen fills itself from the frames on screen when you open it.
+Pinned auras were showing up twice, and they don't anymore. Pinned debuffs were letting everything through on friendly frames, that's fixed too. My Healing Buffs stopped doubling up, and shift-right-click only touches the aura you're pointing at.
 
 **Party frames**
 
-Party frames have an aggro border, an outline on whoever the enemies are hitting. You pick the color and thickness, and you can have it show only when you're the tank or healer. The player frame's aggro border keeps working even when threat is hidden.
+Party frames can show an aggro border around whoever is getting hit. You can have it show only when you're tanking or healing.
 
 **Datatexts and Dashboard**
 
-The Loot Spec datatext is now Loot & Spec, and clicking it lets you switch spec and loadout too. The add datatext picker sits at the top of the list.
-
-On the Dashboard, currencies show what you've earned and what you hold. Raid progress only lists this tier's raids, and its ticks show on every difficulty.
+Loot Spec is now Loot & Spec, and you can switch your spec and loadout from it. On the Dashboard, currencies show what you've earned next to what you're holding, and raid progress only shows this tier.
 
 **Keystone reminder**
 
-The keystone reminder card has a new look with one teleport button. It waits for combat to end before it hides.
+The keystone card has a new look with one teleport button. It goes away once you're in the dungeon it's for, or when the key starts.
 
 **Skins**
 
-The quest offers on the Prey scouting map are skinned. Profession book cards line up and the skill bar text is centered. Numbers on skinned item icons have an outline. The green invite tick on group applicants is back.
+The quest offers on the Prey scouting map are skinned now. Profession books line up properly, and the numbers on item icons have an outline so you can actually read them. The green tick on group applicants is back.
 
 **Settings window**
 
-The objective tracker settings have their own page. Dropping a row you dragged in any list blends it into place instead of snapping it back. The Power page no longer throws a tick mark error, the gear next to the cooldown settings search works, and the manual buff buttons stop covering the save options. An imported theme that never had a name now saves.
+Objective tracker settings have their own page. Dragging rows around in a list feels smoother when you let go. There's a handful of small fixes too, like the tick mark error on the Power page and imported themes that never got a name.
 
 Updating by hand: delete the old BluUI and BluUI_Options folders, then extract the new ones. Your settings are kept. Restart the game rather than /reload.
