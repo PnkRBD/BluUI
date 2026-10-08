@@ -1,39 +1,35 @@
-# 5.6.0
+# 5.7.0
 
-Weaker Auras got a lot bigger this time, and unit frame auras behave better.
+Custom Bars moved into the Cooldown Manager, every side menu got icons, and Lifebloom finally keeps time.
+
+**Cooldown Manager**
+
+Custom Bars live in the Cooldown Manager now. They have their own section in its side menu, and they turn on and off with it. If you had Custom Bars switched off, your bars come in switched off too.
+
+The General page is a lot tidier. The Blizzard shortcuts and the Edit Mode fix share one row, and Apply fix only shows up when something actually needs fixing. Cooldown flash and edge moved to each viewer's Swipe settings, so you can set them per viewer. The assisted highlight has its own on/off switch, and the preview shows your Essential icons on every page.
+
+**Side menus**
+
+Every side menu has icons now. Each action bar gets a numbered key, Datatext bars and panels have their own, and CD Announcer shows each cooldown's spell icon. Custom bars show the first thing they track.
+
+**Dropdowns**
+
+Dropdown menus look like the dropdown you opened them from. No more near-black menus with purple borders.
+
+**Lifebloom**
+
+The Lifebloom text and voice go off together now, and they work on anyone you heal, not just your group. Refreshing on the callout keeps the leftover time like the game does, so the next callout stays on time. A Nature's Swiftness Regrowth with Overgrowth counts as a refresh too.
+
+**Keystone card**
+
+You can drag the keystone card around when it pops up. The portal shows its cooldown, and the icon shows the key level if whoever holds the key runs something that shares it, like BigWigs.
 
 **Weaker Auras**
 
-You can put your stats on screen now. Turn on Secondary Stats and you get your main stat, crit, haste, mastery and vers, each in its own color. On its page you can add the rest and drag them into whatever order you like. The numbers keep up in combat too.
-
-The Alerts tab is called General now, and you can make groups on it. Hit New group and drag your auras onto it. Click a group to fold it up, or drag it to move it around. Its switch turns the whole group on or off.
-
-Hunter's Mark moved over to the Class tab, where the other hunter stuff lives. The gateway and pet alerts had gone missing, and they're back.
-
-**Unit frame auras**
-
-Buffs and debuffs can share a row now. Set it up on the Auras tab and your debuffs pick up right where your buffs end.
-
-Pinned auras were showing up twice, and they don't anymore. Pinned debuffs were letting everything through on friendly frames, that's fixed too. My Healing Buffs stopped doubling up, and shift-right-click only touches the aura you're pointing at.
-
-**Party frames**
-
-Party frames can show an aggro border around whoever is getting hit. You can have it show only when you're tanking or healing.
-
-**Datatexts and Dashboard**
-
-Loot Spec is now Loot & Spec, and you can switch your spec and loadout from it. On the Dashboard, currencies show what you've earned next to what you're holding, and raid progress only shows this tier.
-
-**Keystone reminder**
-
-The keystone card has a new look with one teleport button. It goes away once you're in the dungeon it's for, or when the key starts.
-
-**Skins**
-
-The quest offers on the Prey scouting map are skinned now. Profession books line up properly, and the numbers on item icons have an outline so you can actually read them. The green tick on group applicants is back.
+Aura groups get their own light tint, and their color, rename and delete sit right next to the group switch. Deleting a group that still has auras in it asks you first.
 
 **Settings window**
 
-Objective tracker settings have their own page. Dragging rows around in a list feels smoother when you let go. There's a handful of small fixes too, like the tick mark error on the Power page and imported themes that never got a name.
+Rows line up better, names sit closer to their descriptions, and a row you drag stays under your cursor. There's a handful of small fixes too, like the Cursor preview matching the height of its settings.
 
 Updating by hand: delete the old BluUI and BluUI_Options folders, then extract the new ones. Your settings are kept. Restart the game rather than /reload.
