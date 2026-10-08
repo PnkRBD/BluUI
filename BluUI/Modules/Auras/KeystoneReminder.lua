@@ -91,7 +91,7 @@ local function BuildPortal(parent)
     overlay:SetFrameLevel(portal.cooldown:GetFrameLevel() + 1)
     portal.level = overlay:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(portal.level, LEVEL_SIZE, FONT, 'OUTLINE')
-    portal.level:SetPoint('TOP', 0, Pixel.Scale(-2))
+    portal.level:SetPoint('BOTTOMRIGHT', Pixel.Scale(-2), Pixel.Scale(2))
     portal:SetScript('OnEnter', BUI.Profiler.Script('Auras.KeystoneReminder portal OnEnter', function(self)
         PaintPortalEdge(self, true)
         if not self._spellID then return end
