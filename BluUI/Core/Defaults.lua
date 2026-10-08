@@ -1551,6 +1551,10 @@ BUI.Defaults = {
 			},
 		},
 
+		auraGroups = {
+			nodes = {},
+		},
+
 		combatTimer = {
 			enabled            = false,
 			locked             = true,

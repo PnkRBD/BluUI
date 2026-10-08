@@ -297,8 +297,8 @@ local function TrackedBoard(ui, parent, width, bar, page)
 	ui.RowTitle(addRow, 'Add a spell or item', 'Name, ID or link', LIST_ICON_X, NAME_WIDTH)
 	BUI.SpellSearch(ui, addRow, INPUT_WIDTH, { onPick = function(hit) Add(hit.id, hit.isItem) end }):SetPoint('RIGHT', -ui.ROW_INSET, 0)
 
-	board:DragList(function(index, delta)
-		entries[index], entries[index + delta] = entries[index + delta], entries[index]
+	board:DragList(function(index, delta, count)
+		Layout.ShiftBlock(entries, index, delta, count)
 		page:Resize()
 	end, function()
 		SaveOrder(spells, entries)

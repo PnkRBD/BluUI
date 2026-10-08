@@ -236,6 +236,7 @@ local entries = {
 	{ label = "Secondary Stats", page = "auras", tab = 1, panel = "General", keywords = "secondary stats crit haste mastery versatility vers rating percent readout weakaura" },
 	{ label = "Stats", page = "secondaryStats", tab = 1, panel = "Stats", keywords = "primary agility strength intellect stamina crit haste mastery versatility leech avoidance speed color order show hide" },
 	{ label = "Readout", page = "secondaryStats", tab = 1, panel = "Text", keywords = "stats font size align rating percent combat only position" },
+	{ label = "New group", page = "auras", tab = 1, panel = "General", keywords = "group folder organize drag weakaura" },
 	{ label = "Add a spell", page = "cooldownFlash", tab = 1, panel = "Spells", keywords = "cooldown flash spell add remove reorder per spec size color glow text sound tts opacity position" },
 	{ label = "Pack Leader", page = "auras", tab = 3, panel = "Class", keywords = "pack leader beast cycle wyvern bear boar hunter" },
 	{ label = "Kill Command overlay", page = "auras", tab = 3, panel = "Class", keywords = "kill command overlay timer beast name" },

@@ -377,11 +377,15 @@ local function DatatextsBoard(ui, parent, width, config, page, after)
 		dropdown:SetPoint('RIGHT', -ui.ROW_INSET, 0)
 		dropdown.label:SetText('Pick one')
 	end
-	board:DragList(function(index, delta)
-		local id, otherID = active[index], active[index + delta]
-		local from, to = IndexOf(order, id), IndexOf(order, otherID)
-		order[from], order[to] = otherID, id
-		active[index], active[index + delta] = otherID, id
+	board:DragList(function(index, delta, count)
+		Layout.ShiftBlock(active, index, delta, count)
+		local slot = 0
+		for position, id in ipairs(order) do
+			if config[Datatext.Get(id).show] then
+				slot = slot + 1
+				order[position] = active[slot]
+			end
+		end
 		config.order = order
 		page:Resize()
 	end, after)
