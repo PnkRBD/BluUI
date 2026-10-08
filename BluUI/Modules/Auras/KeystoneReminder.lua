@@ -19,6 +19,9 @@ local PAD = 10
 local PORTAL_SIZE = 42
 local LEVEL_SIZE = 13
 local PREVIEW_LEVEL = 12
+local FULL_PARTY = 5
+local JOINED_TEXT = 'MYTHIC+ GROUP JOINED'
+local FULL_TEXT = 'MYTHIC+ GROUP FULL'
 local TEXT_GAP = 10
 local CLOSE_SIZE = 14
 local CARD_RADIUS = 8
@@ -37,7 +40,7 @@ local UNLEARNED_TEXT = 'Teleport not learned'
 local IsSecret = BUI.Tools.IsSecretValue
 local PartyKeys = BUI.PartyKeys
 
-local card, current, lockListener
+local card, current, listed, lockListener
 
 local function GetDB() return BUI.GetDB().keystoneReminder end
 
@@ -131,7 +134,6 @@ local function Build()
     card.kicker = CardText(10)
     card.kicker:SetPoint('TOPLEFT', card.portal, 'TOPRIGHT', textLeft, 0)
     card.kicker:SetPoint('RIGHT', textRight, 0)
-    card.kicker:SetText('MYTHIC+ GROUP JOINED')
 
     card.name = CardText(14)
     card.name:SetPoint('LEFT', card.portal, 'RIGHT', textLeft, Pixel.Scale(1))
@@ -224,6 +226,7 @@ end
 
 local function Paint(info)
     PaintCard()
+    card.kicker:SetText(info.full and FULL_TEXT or JOINED_TEXT)
     card.name:SetText(info.dungeon or info.activity)
     SetPortal(info.spellID, info.texture)
     PaintMeta()
@@ -257,12 +260,13 @@ function KeystoneReminder.ShowPreview()
     KeystoneReminder.Show({ dungeon = dungeon, texture = texture, mapID = mapID, level = PREVIEW_LEVEL, spellID = BUI.PortalManager.TeleportSpell(dungeon) })
 end
 
-local function OnJoined(_, resultID)
+local function MythicPlusActivity(activityID)
+    local activity = C_LFGList.GetActivityInfoTable(activityID)
+    if activity and activity.isMythicPlusActivity then return activity end
+end
+
+local function ShowFor(activity, full)
     if select(2, IsInInstance()) == 'party' then return end
-    local result = C_LFGList.GetSearchResultInfo(resultID)
-    if not result then return end
-    local activity = C_LFGList.GetActivityInfoTable(result.activityIDs[1])
-    if not activity or not activity.isMythicPlusActivity then return end
     local dungeon, texture, mapID = FindDungeon(activity.fullName)
     KeystoneReminder.Show({
         dungeon = dungeon,
@@ -270,7 +274,24 @@ local function OnJoined(_, resultID)
         activity = activity.fullName,
         texture = texture,
         spellID = dungeon and BUI.PortalManager.TeleportSpell(dungeon),
+        full = full,
     })
+end
+
+local function OnJoined(_, resultID)
+    local result = C_LFGList.GetSearchResultInfo(resultID)
+    local activity = result and MythicPlusActivity(result.activityIDs[1])
+    if activity then ShowFor(activity, false) end
+end
+
+local function OnListing()
+    local entry = C_LFGList.GetActiveEntryInfo()
+    if entry then
+        listed = MythicPlusActivity(entry.activityIDs[1])
+        return
+    end
+    if listed and GetNumGroupMembers() >= FULL_PARTY then ShowFor(listed, true) end
+    listed = nil
 end
 
 local function OnWorld()
@@ -282,8 +303,10 @@ function KeystoneReminder.Enable()
     Apply()
     C_MythicPlus.RequestMapInfo()
     BUI.Events:Register('LFG_LIST_JOINED_GROUP', EVENT_KEY, OnJoined)
+    BUI.Events:Register('LFG_LIST_ACTIVE_ENTRY_UPDATE', EVENT_KEY, OnListing)
     BUI.Events:Register('GROUP_LEFT', EVENT_KEY, KeystoneReminder.Hide)
     BUI.Events:Register('PLAYER_ENTERING_WORLD', EVENT_KEY, OnWorld)
+    OnListing()
 end
 
 function KeystoneReminder.Disable()

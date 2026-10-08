@@ -166,7 +166,7 @@ local function KeystoneReminderRow()
 	local KeystoneReminder = BUI.Auras.KeystoneReminder
 	KeystoneReminder.SetLockListener(Repaint)
 	return {
-		id = 'keystoneReminder', name = 'Keystone Reminder', sub = 'Dungeon and teleport when you join a key', after = KeystoneReminder.Refresh,
+		id = 'keystoneReminder', name = 'Keystone Reminder', sub = 'Dungeon and teleport when a key group forms', after = KeystoneReminder.Refresh,
 		switch = { get = function() return db.enabled == true end, set = function(value)
 			db.enabled = value
 			if value then KeystoneReminder.Enable() else KeystoneReminder.Disable() end
