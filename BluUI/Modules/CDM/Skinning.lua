@@ -230,7 +230,6 @@ local function ApplyAuraCooldownOverride(cooldown)
     cooldown:SetCooldownFromDurationObject(replacement)
     cooldownOverrideGuard[cooldown] = nil
 end
-CDM.ForceSpellCooldownIfBuffHidden = ApplyAuraCooldownOverride
 
 local function ResolveDesaturationValue(icon)
     local info = icon and icon.cooldownInfo
@@ -265,7 +264,18 @@ local function ApplyDesaturation(texture)
     local target = ResolveDesaturationValue(icon)
     if target then texture:SetDesaturation(target) end
 end
-CDM.RefreshIconDesaturation = ApplyDesaturation
+
+function CDM.SetShowBuffDuration(show)
+    BUI.GetDB().cdm.showBuffDuration = show
+    CDM.RefreshBuffOverrideCache()
+    for cooldown in pairs(CDM.CDMCooldowns) do
+        ApplyAuraCooldownOverride(cooldown)
+        local texture = cooldown:GetParent().Icon
+        if texture then
+            if show then texture:SetDesaturation(0) else ApplyDesaturation(texture) end
+        end
+    end
+end
 
 local function HookIconDesaturation(icon)
     local texture = icon and icon.Icon
