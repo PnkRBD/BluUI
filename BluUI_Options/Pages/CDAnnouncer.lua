@@ -380,14 +380,7 @@ local function AnnouncerBoard(ui, parent, width)
 		Color(cfg, 'Ready color', 'readyColor'),
 		Font(cfg),
 		{ entries = GROWTH, width = MENU_WIDTH, get = function() return cfg.growth or 'center' end, set = function(value) cfg.growth = value end },
-		{ icon = 'location', tooltip = 'Position', title = 'Position', options = {
-			Option(cfg, 'Horizontal', 'posX', { min = -POSITION_RANGE_X, max = POSITION_RANGE_X, step = 1 }),
-			Option(cfg, 'Vertical', 'posY', { min = -POSITION_RANGE_Y, max = POSITION_RANGE_Y, step = 1 }),
-			{ label = 'Center horizontally', get = function() return cfg.centerHorizontally == true end, set = function(value)
-				cfg.centerHorizontally = value
-				if value then cfg.posX = 0 end
-			end },
-		} },
+		BUI.PositionTool(cfg, { noAnchor = true }),
 	}, Apply)
 	return board
 end

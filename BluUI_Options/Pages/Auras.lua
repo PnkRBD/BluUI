@@ -44,7 +44,17 @@ local function Font(db, key)
 end
 
 local function TextTool(options)
-	return { icon = 'text', tooltip = 'Text', title = 'Text', options = options }
+	return { icon = 'text', tooltip = 'Text', title = 'Text', slot = 'text', options = options }
+end
+
+local function PageCog(label, id)
+	return { icon = 'cog', tooltip = 'Open the ' .. label .. ' page', slot = 'settings', onClick = function() BUI.PageEngine.NavigateToID(id) end }
+end
+
+local function Pin(db, options)
+	local tool = BUI.PositionTool(db, options)
+	tool.slot = 'position'
+	return tool
 end
 
 local function Eye(tooltip, get, set)
@@ -103,10 +113,10 @@ local function CombatTimerRow()
 			ChannelColor(db, 'Text color'),
 			Font(db, 'font'),
 			TextTool({ Option(db, 'Font size', 'fontSize', { min = 10, max = 40, step = 1 }) }),
-			{ tooltip = 'Readout', title = 'Combat timer', options = {
+			{ tooltip = 'Readout', title = 'Combat timer', slot = 'settings', options = {
 				Option(db, 'Milliseconds', 'showMilliseconds'),
 			} },
-			BUI.PositionTool(db, { selfTag = 'BUI_CombatTimer' }),
+			Pin(db, { selfTag = 'BUI_CombatTimer' }),
 			Eye('Preview, drag to move', function() return not db.locked end, function(value) CombatTimer.SetLocked(not value) end),
 		},
 	}
@@ -127,10 +137,10 @@ local function CombatMessagesRow()
 			ArrayColor(db, 'Leave combat', 'leaveColor', true),
 			Font(db, 'font'),
 			TextTool({ Option(db, 'Font size', 'fontSize', { min = 10, max = 40, step = 1 }) }),
-			{ tooltip = 'Timing', title = 'Messages', options = {
+			{ tooltip = 'Timing', title = 'Messages', slot = 'settings', options = {
 				Option(db, 'Fade time', 'fadeTime', { min = 0.2, max = 3, step = 0.1 }),
 			} },
-			BUI.PositionTool(db, { selfTag = 'BUI_CombatMessage' }),
+			Pin(db, { selfTag = 'BUI_CombatMessage' }),
 			Eye('Preview, drag to move', function() return not db.locked end, function(value) CombatMessage.SetLocked(not value) end),
 		},
 	}
@@ -144,8 +154,8 @@ local function SecondaryStatsRow()
 		id = 'secondaryStats', name = 'Secondary Stats', sub = 'Your stats on screen', after = SecondaryStats.Refresh,
 		switch = Switch(db, 'enabled'),
 		tools = {
-			{ icon = 'cog', tooltip = 'Open the Secondary Stats page', onClick = function() BUI.PageEngine.NavigateToID('secondaryStats') end },
-			BUI.PositionTool(db, { selfTag = 'BUI_SecondaryStats' }),
+			PageCog('Secondary Stats', 'secondaryStats'),
+			Pin(db, { selfTag = 'BUI_SecondaryStats' }),
 			Eye('Preview, drag to move', function() return not db.locked end, function(value) SecondaryStats.SetLocked(not value) end),
 		},
 	}
@@ -162,7 +172,7 @@ local function KeystoneReminderRow()
 			if value then KeystoneReminder.Enable() else KeystoneReminder.Disable() end
 		end },
 		tools = {
-			BUI.PositionTool(db, { selfTag = 'BUI_KeystoneReminder' }),
+			Pin(db, { selfTag = 'BUI_KeystoneReminder' }),
 			Eye('Preview, drag to move', function() return not db.locked end, function(value) KeystoneReminder.SetLocked(not value) end),
 		},
 	}
@@ -176,8 +186,8 @@ local function PrivateWarningRow()
 		id = 'privateWarning', name = 'Private raid warning', sub = "Moves Blizzard's private boss warnings", after = PrivateWarning.Refresh,
 		switch = Switch(db, 'enabled'),
 		tools = {
-			BUI.PositionTool(db),
-			{ icon = 'resize', tooltip = 'Scale', title = 'Private raid warning', options = { Option(db, 'Scale', 'scale', { min = 50, max = 200, step = 5 }) } },
+			TextTool({ Option(db, 'Scale', 'scale', { min = 50, max = 200, step = 5 }) }),
+			Pin(db),
 			Eye('Preview, drag to move', function() return not db.locked end, function(value) PrivateWarning.SetLocked(not value) end),
 		},
 	}
@@ -197,10 +207,10 @@ local function LowHpRow()
 				Option(db, 'Warning text', 'lowHpText', { kind = 'input', placeholder = 'Warning text' }),
 				Option(db, 'Font size', 'lowHpFontSize', { min = 10, max = 60, step = 1 }),
 			}),
-			{ tooltip = 'Threshold', title = 'Low HP warning', options = {
+			{ tooltip = 'Threshold', title = 'Low HP warning', slot = 'settings', options = {
 				Option(db, 'Threshold %', 'lowHpThreshold', { min = 5, max = 95, step = 5 }),
 			} },
-			BUI.PositionTool(db, { selfTag = 'BUI_LowHpWarning', fields = LOW_HP_FIELDS }),
+			Pin(db, { selfTag = 'BUI_LowHpWarning', fields = LOW_HP_FIELDS }),
 			Eye('Preview, drag to move', function() return db.lowHpLocked == false end, function(value)
 				db.lowHpLocked = not value
 				Auras.UpdateLowHp()
@@ -220,7 +230,7 @@ local function PetWarningsRow()
 			TableColor(db, 'Warning color', 'warningColor', true),
 			Font(db, 'font'),
 			TextTool({ Option(db, 'Font size', 'fontSize', { min = 14, max = 48, step = 1 }) }),
-			{ tooltip = 'Warning types', title = 'Pet warnings', options = {
+			{ tooltip = 'Warning types', title = 'Pet warnings', slot = 'settings', options = {
 				Flag(db.petAttackWarning, 'Pet not attacking'),
 				Flag(db.petDeadWarning, 'Pet dead or missing'),
 				Flag(db.grimoireSacrificeWarning, 'Grimoire of Sacrifice'),
@@ -228,7 +238,7 @@ local function PetWarningsRow()
 				Flag(db.petHealthWarning, 'Pet low health'),
 				{ label = 'Low health %', min = 10, max = 80, step = 5, get = function() return db.petHealthWarning.threshold end, set = function(value) db.petHealthWarning.threshold = value end },
 			} },
-			BUI.PositionTool(db, { selfTag = 'BUI_PetWarning' }),
+			Pin(db, { selfTag = 'BUI_PetWarning' }),
 			Eye('Preview, drag to move', function() return not db.locked end, function(value) Auras.SetLocked(not value) end),
 		},
 	}
@@ -252,13 +262,13 @@ local function GatewayRow()
 				Option(db, 'Text', 'customText', { kind = 'input', placeholder = 'Alert text' }),
 				Option(db, 'Font size', 'textSize', { min = 10, max = 48, step = 1 }),
 			}),
-			{ icon = 'sound', tooltip = 'Sound', title = 'Gateway alert', options = {
+			{ icon = 'sound', tooltip = 'Sound', title = 'Gateway alert', slot = 'settings', options = {
 				{ label = 'Sound', entries = sounds, get = function() return db.sound end, set = function(value)
 					db.sound = value
 					BUI.PlaySoundByName(value)
 				end },
 			} },
-			BUI.PositionTool(db, { selfTag = 'BUI_GatewayAlert' }),
+			Pin(db, { selfTag = 'BUI_GatewayAlert' }),
 			Eye('Unlock, drag to move', function() return db.showAnchor == true end, function(value)
 				db.showAnchor = value
 				Apply()
@@ -277,8 +287,8 @@ local function BloodlustRow()
 		tools = {
 			Font(db, 'font'),
 			TextTool({ Option(db, 'Font size', 'fontSize', { min = 8, max = 48, step = 1 }) }),
-			{ icon = 'cog', tooltip = 'Open the Bloodlust page', onClick = function() BUI.PageEngine.NavigateToID('bloodlust') end },
-			BUI.PositionTool(db),
+			PageCog('Bloodlust', 'bloodlust'),
+			Pin(db),
 			Eye('Preview the alerts', Bloodlust.IsPreviewing, function(value)
 				if value then Bloodlust.StartPreview() else Bloodlust.StopPreview() end
 			end),
@@ -294,7 +304,8 @@ local function CDAnnouncerRow()
 		id = 'cdAnnouncer', name = 'Cooldown Announcer', sub = 'Countdowns for cooldowns you pick', after = CDAnnouncer.Refresh,
 		switch = Switch(db, 'enabled'),
 		tools = {
-			{ icon = 'cog', tooltip = 'Open the Cooldown Announcer page', onClick = function() BUI.PageEngine.NavigateToID('cdAnnouncer') end },
+			PageCog('Cooldown Announcer', 'cdAnnouncer'),
+			Pin(db, { noAnchor = true }),
 			Eye('Unlock the anchor to drag it, right-click it to lock', function() return db.showAnchor == true end, function(value)
 				db.showAnchor = value
 				CDAnnouncer.Refresh()
@@ -311,8 +322,8 @@ local function CooldownFlashRow()
 		id = 'cooldownFlash', name = 'Cooldown Flash', sub = 'Flashes spells as they come off cooldown', after = CooldownFlash.Refresh,
 		switch = Switch(db, 'enabled'),
 		tools = {
-			{ icon = 'cog', tooltip = 'Open the Cooldown Flash page', onClick = function() BUI.PageEngine.NavigateToID('cooldownFlash') end },
-			BUI.PositionTool(db, { selfTag = 'BUI_CooldownFlash' }),
+			PageCog('Cooldown Flash', 'cooldownFlash'),
+			Pin(db, { selfTag = 'BUI_CooldownFlash' }),
 			Eye('Unlock to drag the icons, right-click them to lock', function() return db.showAnchor == true end, function(value)
 				db.showAnchor = value
 				CooldownFlash.Refresh()
@@ -413,7 +424,7 @@ local function CrosshairRow(ui)
 			ChannelColor(db, 'Crosshair color', 'alpha'),
 			{ entries = STYLES, width = MENU_WIDTH, get = function() return db.style end, set = function(value) db.style = value end },
 			SpecsTool(ui, db, Crosshair.Refresh),
-			{ tooltip = 'Appearance and visibility', title = 'Crosshair', options = {
+			{ tooltip = 'Appearance and visibility', title = 'Crosshair', slot = 'settings', options = {
 				Option(db, 'Size', 'size', { min = 5, max = 100, step = 1 }),
 				Option(db, 'Thickness', 'thickness', { min = 1, max = 10, step = 1 }),
 				Option(db, 'Center gap', 'gap', { min = 0, max = 30, step = 1 }),
@@ -423,7 +434,7 @@ local function CrosshairRow(ui)
 				ArrayColor(db, 'In range color', 'inRangeColor', false),
 				ArrayColor(db, 'Out of range color', 'outOfRangeColor', false),
 			} },
-			{ icon = 'location', tooltip = 'Screen offset', title = 'Position', options = {
+			{ icon = 'location', tooltip = 'Screen offset', title = 'Position', slot = 'position', options = {
 				Option(db, 'Horizontal offset', 'offsetX', { min = -500, max = 500, step = 1 }),
 				Option(db, 'Vertical offset', 'offsetY', { min = -500, max = 500, step = 1 }),
 			} },
@@ -526,7 +537,7 @@ end
 
 local function GroupHeader(ui, board, layout, group, specs, page)
 	local row, title, subtitle = board:AddDragHeader(group.name, MemberCount(group, specs), {
-		{ tooltip = 'Rename', title = 'Group', options = {
+		{ tooltip = 'Rename', title = 'Group', slot = 'settings', options = {
 			{ label = 'Name', kind = 'input', placeholder = 'Group name', get = function() return group.name end, set = function(text)
 				if text ~= '' then group.name = text end
 			end },
