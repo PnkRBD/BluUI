@@ -1,29 +1,21 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.Guild')
-local Wrap = BUI.Profiler.Wrap
-
 local ipairs, pairs = ipairs, pairs
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 
-local SKIN_ID = 'guild'
 local HOVER_ALPHA = 0.06
 local SELECTED_ALPHA = 0.18
-local ROW_TEXTURE_INSET = 1
 local SIDE_TAB_TOP_OFFSET = -36
-local SIDE_TAB_OPTIONS = { width = 32, height = 32, crop = true }
+local SIDE_TAB_OPTIONS = { width = 34, height = 34, iconWidth = 26, crop = true, dim = true }
 local LIST_SHELL_INSET = { left = 1 }
+local LIST_CARD_INSET = { left = 6, right = 6, top = 3, bottom = 3 }
 local MEMBER_LIST_SHELL_INSET = { top = -3 }
 local SEARCH_BOX_INSET = { left = -5, top = 7, bottom = 7 }
 local CHAT_EDIT_INSET = { left = -2, right = -3, top = 2, bottom = 10 }
 local CHECK_INSET_DIVISOR = 4
 local NAME_SCALE = 1.5
 local BIG_TITLE_SCALE = 2
-local BODY_COLOR = { 0.87, 0.87, 0.9, 1 }
-local HTML_ELEMENTS = { P = 12, H1 = 16, H2 = 14, H3 = 13 }
-local MAIN_ART = { 'Bg', 'TopTileStreaks', 'Inset' }
 local LIST_ART = { 'Bg', 'TopFiligree', 'BottomFiligree' }
 local SIDE_TAB_KEYS = { 'ChatTab', 'RosterTab', 'GuildBenefitsTab', 'GuildInfoTab' }
 local FINDER_TAB_KEYS = { 'ClubFinderSearchTab', 'ClubFinderPendingTab' }
@@ -61,56 +53,38 @@ local BORDER_BOX_KEYS = { 'BorderBox' }
 local BANK_TAB_COUNT = 4
 local BANK_TAB_INSET = 1
 
-local installed = false
-local communitiesInstalled = false
-local bankInstalled = false
-local controlInstalled = false
-local communitiesSkinned = false
-local bankSkinned = false
-local controlSkinned = false
-
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
+local context = Skin.Define('guild', {
+	name = 'Guild & Communities',
+	description = 'The Guild & Communities window with its chat, roster, perks, guild info, finder and dialogs; also skins the Guild Bank and Guild Control windows, which only open at a guild vault.',
+	icon = 'Interface/Icons/achievement_guildperk_everybodysfriend',
+})
+local Hook, Guard, Own = context.Hook, context.Guard, context.Own
 local Fade, FadeRegions, FadeKeys, FadeArt = context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt
 local Shell, Button, Close, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.Dropdown, context.EditBox, context.CheckBox
-local ScrollBar, TextBox, Face, Title = context.ScrollBar, context.TextBox, context.Face, context.Title
+local ScrollBar, TextBox, Face, Title, Card = context.ScrollBar, context.TextBox, context.Face, context.Title, context.Card
 local FlatTexture, AccentTexture, CropIcon = Skin.FlatTexture, Skin.AccentTexture, Skin.CropIcon
 
 local function KeepTexture(texture)
 	if texture then texture.__buiSkin = true end
 end
 
-local function GuardEnabled(callback)
-	return function(...)
-		if Enabled() then callback(...) end
-	end
-end
-
-local function FitTexture(texture, host, inset)
-	if not texture or not host then return end
-	inset = inset or 0
+local function FitToCard(texture, host)
+	local inset = LIST_CARD_INSET
 	texture:ClearAllPoints()
-	texture:SetPoint('TOPLEFT', host, 'TOPLEFT', inset, -inset)
-	texture:SetPoint('BOTTOMRIGHT', host, 'BOTTOMRIGHT', -inset, inset)
+	texture:SetPoint('TOPLEFT', host, 'TOPLEFT', inset.left + 1, -inset.top - 1)
+	texture:SetPoint('BOTTOMRIGHT', host, 'BOTTOMRIGHT', -inset.right - 1, inset.bottom + 1)
 end
 
-local function FlatHighlight(button, alpha)
+local function Highlight(button, accent)
 	local highlight = button.GetHighlightTexture and button:GetHighlightTexture()
 	if not highlight then return end
 	KeepTexture(highlight)
 	highlight:SetBlendMode('BLEND')
-	FlatTexture(highlight, 1, 1, 1, alpha or HOVER_ALPHA)
-end
-
-local function RowHover(button)
-	local highlight = button.GetHighlightTexture and button:GetHighlightTexture()
-	if not highlight then return end
-	KeepTexture(highlight)
-	highlight:SetBlendMode('BLEND')
-	Skin.RowHighlight(button)
+	if accent then
+		Skin.RowHighlight(button)
+	else
+		FlatTexture(highlight, 1, 1, 1, HOVER_ALPHA)
+	end
 end
 
 local function FrameIcon(parent, icon)
@@ -161,21 +135,6 @@ local function OptionRow(row)
 	end
 end
 
-local function SkinHtml(html)
-	if not html or not html.SetFont or not html.SetTextColor then return end
-	for element, size in pairs(HTML_ELEMENTS) do
-		html:SetFont(element, BUILib.Font, size, '')
-		html:SetTextColor(element, BODY_COLOR[1], BODY_COLOR[2], BODY_COLOR[3])
-	end
-end
-
-local function ScrollChild(scrollFrame, key)
-	if not scrollFrame then return nil end
-	local child = scrollFrame:GetScrollChild()
-	if child and key and child[key] then return child[key] end
-	return child
-end
-
 local function SkinDialogButtons(frame)
 	for _, child in ipairs({ frame:GetChildren() }) do
 		if child.IsObjectType and child:IsObjectType('Button') then
@@ -189,52 +148,31 @@ local function SkinDialogButtons(frame)
 	end
 end
 
-local skinnedSideTabs = {}
-local sideTabs
+local tabGroups = {}
 
-local function SideTabs(frame)
-	if not sideTabs then
-		sideTabs = {}
-		for index, key in ipairs(SIDE_TAB_KEYS) do sideTabs[index] = frame[key] end
+local function RefreshTabGroup(tabs)
+	for _, tab in ipairs(tabs) do Skin.SetSideTabSelected(tab, tab:GetChecked()) end
+	Skin.LayoutSideTabs(_G.CommunitiesFrame, tabs, SIDE_TAB_TOP_OFFSET)
+end
+
+local function SkinTabGroup(host, keys, method)
+	local tabs = tabGroups[host]
+	if not tabs then
+		tabs = {}
+		for index, key in ipairs(keys) do tabs[index] = host[key] end
+		tabGroups[host] = tabs
+		local function Refresh() RefreshTabGroup(tabs) end
+		if method then
+			Hook(host, method, Refresh)
+		else
+			for _, tab in ipairs(tabs) do Hook(tab, 'SetTab', Refresh) end
+		end
 	end
-	return sideTabs
-end
-
-local function RefreshTabSelected(tab)
-	if tab and tab._buiSideTab then Skin.SetSideTabSelected(tab, tab:GetChecked() == true) end
-end
-
-local function RefreshSideTabs()
-	local frame = _G.CommunitiesFrame
-	if not frame or not Enabled() then return end
-	for _, tab in ipairs(SideTabs(frame)) do
-		Skin.SideTab(context, tab, SIDE_TAB_OPTIONS)
-		RefreshTabSelected(tab)
-	end
-	Skin.LayoutSideTabs(frame, sideTabs, SIDE_TAB_TOP_OFFSET)
-end
-
-local function RefreshFinderTabs(finder)
-	if not finder or not Enabled() then return end
-	for _, key in ipairs(FINDER_TAB_KEYS) do
-		local tab = finder[key]
-		Skin.SideTab(context, tab, SIDE_TAB_OPTIONS)
-		RefreshTabSelected(tab)
-	end
-	Skin.LayoutSideTabs(_G.CommunitiesFrame, { finder[FINDER_TAB_KEYS[1]], finder[FINDER_TAB_KEYS[2]] }, SIDE_TAB_TOP_OFFSET)
-end
-
-local function SkinSideTab(tab, onClick)
-	if not tab or tab._buiGuildTab then return end
-	tab._buiGuildTab = true
-	Skin.SideTab(context, tab, SIDE_TAB_OPTIONS)
-	skinnedSideTabs[#skinnedSideTabs + 1] = tab
-	tab:HookScript('OnClick', BUI.Profiler.Wrap('Skin.Guild tab OnClick', onClick))
-	RefreshTabSelected(tab)
+	for _, tab in ipairs(tabs) do Skin.SideTab(context, tab, SIDE_TAB_OPTIONS) end
+	RefreshTabGroup(tabs)
 end
 
 local function RestyleListEntry(entry)
-	if not Enabled() then return end
 	local selection = entry.Selection
 	if selection then
 		selection:SetBlendMode('BLEND')
@@ -252,46 +190,43 @@ local function SkinListEntry(entry)
 		entry._buiListEntry = true
 		Fade(entry.Background)
 		Fade(entry.IconRing)
-		if entry.CircleMask then entry.CircleMask:Hide() end
-		FlatHighlight(entry)
-		FitTexture(entry:GetHighlightTexture(), entry, ROW_TEXTURE_INSET)
-		FitTexture(entry.Selection, entry, ROW_TEXTURE_INSET)
+		entry.CircleMask:Hide()
+		Highlight(entry)
+		FitToCard(entry:GetHighlightTexture(), entry)
+		FitToCard(entry.Selection, entry)
 		FrameIcon(entry, entry.Icon)
 		Face(entry.Name)
-		for _, method in ipairs(LIST_ENTRY_METHODS) do
-			if entry[method] then Hook(entry, method, RestyleListEntry) end
-		end
+		for _, method in ipairs(LIST_ENTRY_METHODS) do Hook(entry, method, RestyleListEntry) end
 	end
+	Card(entry, LIST_CARD_INSET)
 	RestyleListEntry(entry)
 end
 
 local function SkinCommunitiesList(list)
-	if not list then return end
 	FadeKeys(list, LIST_ART)
 	FadeRegions(list.FilligreeOverlay)
 	FadeArt(list.InsetFrame)
 	Shell(list, LIST_SHELL_INSET)
 	ScrollBar(list.ScrollBar)
-	Skin.SweepScrollBox(list.ScrollBox, GuardEnabled(SkinListEntry))
+	Skin.SweepScrollBox(list.ScrollBox, Guard(SkinListEntry))
 end
 
 local function SkinColumnHeader(header)
 	if header._buiColumnHeader then return end
 	header._buiColumnHeader = true
 	FadeKeys(header, THREE_SLICE_ART)
-	FlatHighlight(header)
+	Highlight(header)
 	Face(header.GetFontString and header:GetFontString())
 end
 
 local function SkinColumnHeaders(columnDisplay)
-	if not Enabled() then return end
 	for _, child in ipairs({ columnDisplay:GetChildren() }) do
 		if child.IsObjectType and child:IsObjectType('Button') then SkinColumnHeader(child) end
 	end
 end
 
 local function SkinColumnDisplay(columnDisplay)
-	if not columnDisplay or columnDisplay._buiColumns then return end
+	if columnDisplay._buiColumns then return end
 	columnDisplay._buiColumns = true
 	FadeRegions(columnDisplay)
 	if columnDisplay.LayoutColumns then Hook(columnDisplay, 'LayoutColumns', SkinColumnHeaders) end
@@ -302,7 +237,7 @@ local function SkinMemberRow(row)
 	if row._buiMemberRow then return end
 	row._buiMemberRow = true
 	Fade(row:GetNormalTexture())
-	RowHover(row)
+	Highlight(row, true)
 	FaceKeys(row, MEMBER_ROW_TEXT)
 	Face(row.NameFrame and row.NameFrame.Name)
 	local header = row.ProfessionHeader
@@ -315,39 +250,31 @@ local function SkinMemberRow(row)
 end
 
 local function HideWatermark(memberList)
-	if not Enabled() then return end
-	local watermarkFrame = memberList.WatermarkFrame
-	if watermarkFrame then watermarkFrame:SetShown(false) end
+	memberList.WatermarkFrame:Hide()
 end
 
 local function SkinMemberList(memberList)
-	if not memberList then return end
 	FadeArt(memberList.InsetFrame)
 	Shell(memberList, MEMBER_LIST_SHELL_INSET)
-	local watermarkFrame = memberList.WatermarkFrame
-	if watermarkFrame then
-		Fade(watermarkFrame.Watermark)
-		watermarkFrame:SetShown(false)
-		if memberList.UpdateWatermark and not memberList._buiWatermarkHooked then
-			memberList._buiWatermarkHooked = true
-			Hook(memberList, 'UpdateWatermark', HideWatermark)
-		end
+	Fade(memberList.WatermarkFrame.Watermark)
+	HideWatermark(memberList)
+	if not memberList._buiWatermarkHooked then
+		memberList._buiWatermarkHooked = true
+		Hook(memberList, 'UpdateWatermark', HideWatermark)
 	end
 	Label(memberList.MemberCount)
 	CheckBox(memberList.ShowOfflineButton)
 	SkinColumnDisplay(memberList.ColumnDisplay)
 	ScrollBar(memberList.ScrollBar)
-	Skin.SweepScrollBox(memberList.ScrollBox, GuardEnabled(SkinMemberRow))
+	Skin.SweepScrollBox(memberList.ScrollBox, Guard(SkinMemberRow))
 end
 
 local function SkinNoteBox(box)
-	if not box then return end
 	Fade(box.NineSlice)
 	Shell(box)
 end
 
 local function SkinMemberDetail(detail)
-	if not detail then return end
 	FadeKeys(detail, DETAIL_BORDER_KEYS)
 	Shell(detail)
 	Skin.TipFaceTree(detail, 1)
@@ -358,28 +285,23 @@ local function SkinMemberDetail(detail)
 	Dropdown(detail.RankDropdown)
 	SkinNoteBox(detail.NoteBackground)
 	SkinNoteBox(detail.OfficerNoteBackground)
-	Face(detail.NoteBackground and detail.NoteBackground.PersonalNoteText)
-	Face(detail.OfficerNoteBackground and detail.OfficerNoteBackground.OfficerNoteText)
+	Face(detail.NoteBackground.PersonalNoteText)
+	Face(detail.OfficerNoteBackground.OfficerNoteText)
 end
 
 local function SkinChat(frame)
 	local chat = frame.Chat
-	if chat then
-		FadeArt(chat.InsetFrame)
-		Shell(chat.InsetFrame)
-		ScrollBar(chat.ScrollBar)
-	end
+	FadeArt(chat.InsetFrame)
+	Shell(chat.InsetFrame)
+	ScrollBar(chat.ScrollBar)
 	Button(_G.JumpToUnreadButton)
 	local editBox = frame.ChatEditBox
-	if editBox then
-		FadeKeys(editBox, CHAT_EDIT_ART)
-		EditBox(editBox, CHAT_EDIT_INSET)
-		editBox:SetTextInsets(6, 6, 0, 8)
-	end
+	FadeKeys(editBox, CHAT_EDIT_ART)
+	EditBox(editBox, CHAT_EDIT_INSET)
+	editBox:SetTextInsets(6, 6, 0, 8)
 end
 
 local function SkinAddToChat(button)
-	if not button then return end
 	FadeRegions(button)
 	Shell(button)
 	Skin.TipArrow(button, true)
@@ -401,17 +323,15 @@ local function SkinRewardRow(row)
 	if row._buiRewardRow then return end
 	row._buiRewardRow = true
 	Fade(row:GetNormalTexture())
-	RowHover(row)
+	Highlight(row, true)
 	FrameIcon(row, row.Icon)
 	Face(row.Name)
 	Face(row.SubText)
 end
 
 local function SkinFactionBar(factionFrame)
-	if not factionFrame then return end
 	Label(factionFrame.Label)
 	local bar = factionFrame.Bar
-	if not bar then return end
 	FadeKeys(bar, FACTION_BAR_ART)
 	local trough = bar.BG
 	if trough then
@@ -423,29 +343,21 @@ local function SkinFactionBar(factionFrame)
 end
 
 local function SkinBenefits(benefits)
-	if not benefits then return end
 	FadeRegions(benefits)
 	local perks = benefits.Perks
-	if perks then
-		FadeRegions(perks)
-		Title(perks.TitleText)
-		ScrollBar(perks.ScrollBar)
-		Skin.SweepScrollBox(perks.ScrollBox, GuardEnabled(SkinPerkRow))
-	end
+	FadeRegions(perks)
+	Title(perks.TitleText)
+	ScrollBar(perks.ScrollBar)
+	Skin.SweepScrollBox(perks.ScrollBox, Guard(SkinPerkRow))
 	local rewards = benefits.Rewards
-	if rewards then
-		Fade(rewards.Bg)
-		Title(rewards.TitleText)
-		ScrollBar(rewards.ScrollBar)
-		Skin.SweepScrollBox(rewards.ScrollBox, GuardEnabled(SkinRewardRow))
-	end
+	Fade(rewards.Bg)
+	Title(rewards.TitleText)
+	ScrollBar(rewards.ScrollBar)
+	Skin.SweepScrollBox(rewards.ScrollBox, Guard(SkinRewardRow))
 	local tutorial = benefits.GuildRewardsTutorialButton
-	if tutorial then
-		Fade(tutorial)
-		tutorial:EnableMouse(false)
-	end
-	local points = benefits.GuildAchievementPointDisplay
-	if points then Face(points.SumText) end
+	Fade(tutorial)
+	tutorial:EnableMouse(false)
+	Face(benefits.GuildAchievementPointDisplay.SumText)
 	SkinFactionBar(benefits.FactionFrame)
 end
 
@@ -459,31 +371,24 @@ local function SkinChallenges(info)
 end
 
 local function SkinGuildInfo(info)
-	if not info then return end
 	FadeRegions(info)
 	Skin.TipFaceTree(info, 1)
 	Title(info.TitleText)
 	Label(info.Header1Label)
 	Label(info.Header2Label)
 	SkinChallenges(info)
-	local motdScroll = info.MOTDScrollFrame
-	if motdScroll then
-		ScrollBar(motdScroll.ScrollBar)
-		SkinHtml(ScrollChild(motdScroll, 'MOTD'))
-	end
-	local detailsScroll = info.DetailsFrame
-	if detailsScroll then
-		ScrollBar(detailsScroll.ScrollBar)
-		Face(ScrollChild(detailsScroll, 'Details'))
-	end
-	Face(info.EditMOTDButton and info.EditMOTDButton:GetFontString())
-	Face(info.EditDetailsButton and info.EditDetailsButton:GetFontString())
+	ScrollBar(info.MOTDScrollFrame.ScrollBar)
+	Skin.TipFont(info.MOTDScrollFrame.MOTD, 'body')
+	ScrollBar(info.DetailsFrame.ScrollBar)
+	Face(info.DetailsFrame:GetScrollChild().Details)
+	Face(info.EditMOTDButton:GetFontString())
+	Face(info.EditDetailsButton:GetFontString())
 end
 
 local function SkinNewsRow(row)
 	if not row._buiNewsRow then
 		row._buiNewsRow = true
-		RowHover(row)
+		Highlight(row, true)
 		Face(row.text)
 		Face(row.dash)
 	end
@@ -491,44 +396,35 @@ local function SkinNewsRow(row)
 end
 
 local function SkinBossModel(model)
-	if not model then return end
 	FadeRegions(model)
 	Shell(model)
 	Face(model.BossName)
 	local textFrame = model.TextFrame
-	if textFrame then
-		FadeRegions(textFrame)
-		Shell(textFrame)
-		Face(textFrame.BossLocationText)
-	end
+	FadeRegions(textFrame)
+	Shell(textFrame)
+	Face(textFrame.BossLocationText)
 end
 
 local function SkinGuildNews(news)
-	if not news then return end
 	FadeRegions(news)
 	Skin.TipFaceTree(news, 1)
 	Title(news.TitleText)
 	Face(news.NoNews)
-	Face(news.SetFiltersButton and news.SetFiltersButton:GetFontString())
-	local impeach = news.GMImpeachButton
-	if impeach then
-		RowHover(impeach)
-		Face(impeach.Text)
-	end
+	Face(news.SetFiltersButton:GetFontString())
+	Highlight(news.GMImpeachButton, true)
+	Face(news.GMImpeachButton.Text)
 	ScrollBar(news.ScrollBar)
-	Skin.SweepScrollBox(news.ScrollBox, GuardEnabled(SkinNewsRow))
+	Skin.SweepScrollBox(news.ScrollBox, Guard(SkinNewsRow))
 	SkinBossModel(news.BossModel)
 end
 
 local function SkinGuildDetails(details)
-	if not details then return end
 	FadeRegions(details)
 	SkinGuildInfo(details.Info)
 	SkinGuildNews(details.News)
 end
 
 local function SkinNewsFilters(filters)
-	if not filters then return end
 	FadeArt(filters)
 	Shell(filters)
 	Title(filters.Title)
@@ -540,37 +436,30 @@ local function SkinNewsFilters(filters)
 end
 
 local function SkinTextContainer(container)
-	if not container then return end
 	Fade(container.NineSlice)
 	Shell(container)
-	local scroll = container.ScrollFrame
-	if scroll then ScrollBar(scroll.ScrollBar) end
+	ScrollBar(container.ScrollFrame.ScrollBar)
 end
 
 local function SkinGuildLog(log)
-	if not log then return end
 	FadeArt(log)
 	Shell(log)
 	Title(_G.CommunitiesGuildLogFrameTitle)
 	SkinDialogButtons(log)
 	SkinTextContainer(log.Container)
-	local scroll = log.Container and log.Container.ScrollFrame
-	if scroll then SkinHtml(scroll.Child and scroll.Child.HTMLFrame or ScrollChild(scroll, 'HTMLFrame')) end
+	Skin.TipFont(log.Container.ScrollFrame.Child.HTMLFrame, 'body')
 end
 
 local function SkinTextEdit(edit)
-	if not edit then return end
 	FadeArt(edit)
 	Shell(edit)
 	Title(edit.Title)
 	SkinDialogButtons(edit)
 	SkinTextContainer(edit.Container)
-	local scroll = edit.Container and edit.Container.ScrollFrame
-	if scroll then Face(scroll.EditBox or ScrollChild(scroll, 'EditBox')) end
+	Face(edit.Container.ScrollFrame.EditBox)
 end
 
 local function SkinStreamDialog(dialog)
-	if not dialog then return end
 	FadeKeys(dialog, DIALOG_BORDER_KEYS)
 	Shell(dialog)
 	Title(dialog.TitleLabel)
@@ -582,14 +471,11 @@ local function SkinStreamDialog(dialog)
 end
 
 local function SkinNotificationEntries(dialog)
-	if not Enabled() then return end
-	local child = dialog.ScrollFrame and dialog.ScrollFrame.Child
-	if not child then return end
-	for _, entry in ipairs({ child:GetChildren() }) do
+	for _, entry in ipairs({ dialog.ScrollFrame.Child:GetChildren() }) do
 		if entry.StreamName and not entry._buiStreamEntry then
 			entry._buiStreamEntry = true
 			Face(entry.StreamName)
-			FlatHighlight(entry)
+			Highlight(entry)
 			SizedCheckBox(entry.ShowNotificationsButton)
 			SizedCheckBox(entry.HideNotificationsButton)
 		end
@@ -597,29 +483,20 @@ local function SkinNotificationEntries(dialog)
 end
 
 local function SkinNotificationDialog(dialog)
-	if not dialog then return end
 	Fade(dialog.BG)
 	FadeKeys(dialog, SELECTOR_KEYS)
 	Shell(dialog)
 	Title(dialog.TitleLabel)
 	Dropdown(dialog.CommunitiesListDropdown)
-	local selector = dialog.Selector
-	if selector then
-		Button(selector.OkayButton)
-		Button(selector.CancelButton)
-	end
+	Button(dialog.Selector.OkayButton)
+	Button(dialog.Selector.CancelButton)
 	local scroll = dialog.ScrollFrame
-	if scroll then
-		ScrollBar(scroll.ScrollBar)
-		local child = scroll.Child
-		if child then
-			Face(child.SettingsLabel)
-			CheckBox(child.QuickJoinButton)
-			Button(child.NoneButton)
-			Button(child.AllButton)
-		end
-	end
-	if dialog.Refresh and not dialog._buiRefreshHooked then
+	ScrollBar(scroll.ScrollBar)
+	Face(scroll.Child.SettingsLabel)
+	CheckBox(scroll.Child.QuickJoinButton)
+	Button(scroll.Child.NoneButton)
+	Button(scroll.Child.AllButton)
+	if not dialog._buiRefreshHooked then
 		dialog._buiRefreshHooked = true
 		Hook(dialog, 'Refresh', SkinNotificationEntries)
 	end
@@ -627,14 +504,12 @@ local function SkinNotificationDialog(dialog)
 end
 
 local function SkinMessageInput(messageFrame, inputKey)
-	if not messageFrame then return end
 	FadeRegions(messageFrame)
 	Label(messageFrame.Label)
 	TextBox(messageFrame[inputKey])
 end
 
 local function SkinRecruitmentDialog(dialog)
-	if not dialog then return end
 	FadeKeys(dialog, DIALOG_BORDER_KEYS)
 	Shell(dialog)
 	Title(dialog.DialogLabel)
@@ -646,7 +521,6 @@ local function SkinRecruitmentDialog(dialog)
 end
 
 local function SkinSettingsDialog(dialog)
-	if not dialog then return end
 	FadeKeys(dialog, DIALOG_BORDER_KEYS)
 	Fade(dialog.IconPreviewRing)
 	if dialog.CircleMask then dialog.CircleMask:Hide() end
@@ -668,7 +542,7 @@ end
 local function SkinAvatarButton(button)
 	if not button.Icon or button._buiAvatar then return end
 	button._buiAvatar = true
-	FlatHighlight(button)
+	Highlight(button)
 	FrameIcon(button, button.Icon)
 	local selected = button.Selected
 	if selected then
@@ -686,36 +560,31 @@ local function SkinAvatarRow(row)
 end
 
 local function SkinAvatarPicker(dialog)
-	if not dialog then return end
 	FadeRegions(dialog)
 	FadeKeys(dialog, SELECTOR_KEYS)
 	Shell(dialog)
 	Skin.TipFaceTree(dialog, 1)
-	local selector = dialog.Selector
-	if selector then
-		Button(selector.OkayButton)
-		Button(selector.CancelButton)
-	end
+	Button(dialog.Selector.OkayButton)
+	Button(dialog.Selector.CancelButton)
 	ScrollBar(dialog.ScrollBar)
-	Skin.SweepScrollBox(dialog.ScrollBox, GuardEnabled(SkinAvatarRow))
+	Skin.SweepScrollBox(dialog.ScrollBox, Guard(SkinAvatarRow))
 end
 
 local function SkinTicketRow(row)
 	if row._buiTicketRow then return end
 	row._buiTicketRow = true
 	Fade(row.Stripe)
-	RowHover(row)
+	Highlight(row, true)
 	FaceKeys(row, TICKET_ROW_TEXT)
 	Button(row.CopyLinkButton)
 	IconButton(row.RevokeButton)
 end
 
 local function SkinTicketManager(dialog)
-	if not dialog then return end
 	KeepTexture(dialog.Icon)
 	KeepTexture(dialog.CircleMask)
 	FadeRegions(dialog)
-	if dialog.CircleMask then dialog.CircleMask:Hide() end
+	dialog.CircleMask:Hide()
 	FrameIcon(dialog, dialog.Icon)
 	Shell(dialog)
 	Skin.TipFaceTree(dialog, 1)
@@ -724,19 +593,18 @@ local function SkinTicketManager(dialog)
 	for _, key in ipairs(TICKET_DROPDOWN_KEYS) do Dropdown(dialog[key]) end
 	IconButton(dialog.MaximizeButton)
 	local manager = dialog.InviteManager
-	if not manager then return end
 	FadeRegions(manager.ArtOverlay)
 	SkinColumnDisplay(manager.ColumnDisplay)
-	if manager.ScrollBox then Fade(manager.ScrollBox.Background) end
+	Fade(manager.ScrollBox.Background)
 	ScrollBar(manager.ScrollBar)
-	Skin.SweepScrollBox(manager.ScrollBox, GuardEnabled(SkinTicketRow))
+	Skin.SweepScrollBox(manager.ScrollBox, Guard(SkinTicketRow))
 end
 
 local function SkinApplicantRow(row)
 	if row._buiApplicantRow then return end
 	row._buiApplicantRow = true
 	Fade(row:GetNormalTexture())
-	RowHover(row)
+	Highlight(row, true)
 	FaceKeys(row, APPLICANT_ROW_TEXT)
 	IconButton(row.CancelInvitationButton)
 	local invite = row.InviteButton
@@ -747,16 +615,14 @@ local function SkinApplicantRow(row)
 end
 
 local function SkinApplicantList(list)
-	if not list then return end
 	FadeArt(list.InsetFrame)
 	Shell(list)
 	SkinColumnDisplay(list.ColumnDisplay)
 	ScrollBar(list.ScrollBar)
-	Skin.SweepScrollBox(list.ScrollBox, GuardEnabled(SkinApplicantRow))
+	Skin.SweepScrollBox(list.ScrollBox, Guard(SkinApplicantRow))
 end
 
 local function SkinRequestSpecs(request)
-	if not Enabled() then return end
 	local pool = request.SpecsPool
 	if not pool then return end
 	for spec in pool:EnumerateActive() do
@@ -775,7 +641,7 @@ local function SkinRequestToJoin(request)
 	SkinMessageInput(request.MessageFrame, 'MessageScroll')
 	Button(request.Apply)
 	Button(request.Cancel)
-	if request.Initialize then Hook(request, 'Initialize', SkinRequestSpecs) end
+	Hook(request, 'Initialize', SkinRequestSpecs)
 	SkinRequestSpecs(request)
 end
 
@@ -789,7 +655,6 @@ local function SkinWarningDialog(warning)
 end
 
 local function SkinInvitation(invitation)
-	if not invitation then return end
 	for _, key in ipairs(INVITATION_KEEP) do KeepTexture(invitation[key]) end
 	KeepTexture(invitation.CircleMask)
 	FadeRegions(invitation)
@@ -806,7 +671,6 @@ local function SkinInvitation(invitation)
 end
 
 local function RefreshCardPager(cards)
-	if not Enabled() then return end
 	Skin.RefreshPageButton(cards.PreviousPage)
 	Skin.RefreshPageButton(cards.NextPage)
 end
@@ -822,7 +686,6 @@ local function SkinGuildCard(card)
 end
 
 local function SkinGuildCards(cards)
-	if not cards then return end
 	if cards.Cards then
 		for _, card in ipairs(cards.Cards) do SkinGuildCard(card) end
 	end
@@ -842,7 +705,7 @@ local function SkinCommunityCard(card)
 	Fade(card.Background)
 	Fade(card.LogoBorder)
 	if card.CircleMask then card.CircleMask:Hide() end
-	FlatHighlight(card)
+	Highlight(card)
 	FrameIcon(card, card.CommunityLogo)
 	Shell(card)
 	Skin.TipFaceTree(card, 1)
@@ -852,13 +715,11 @@ local function SkinCommunityCard(card)
 end
 
 local function SkinCommunityCards(cards)
-	if not cards then return end
 	ScrollBar(cards.ScrollBar)
-	Skin.SweepScrollBox(cards.ScrollBox, GuardEnabled(SkinCommunityCard))
+	Skin.SweepScrollBox(cards.ScrollBox, Guard(SkinCommunityCard))
 end
 
 local function SkinFinderOptions(options)
-	if not options then return end
 	if options.PendingTextFrame then Title(options.PendingTextFrame.Text) end
 	for _, key in ipairs(FINDER_DROPDOWN_KEYS) do LabeledDropdown(options[key]) end
 	for _, key in ipairs(FINDER_ROLE_KEYS) do
@@ -870,33 +731,22 @@ local function SkinFinderOptions(options)
 end
 
 local function SkinFinder(finder)
-	if not finder then return end
 	SkinFinderOptions(finder.OptionsList)
 	for _, key in ipairs(FINDER_CARD_KEYS) do SkinGuildCards(finder[key]) end
 	for _, key in ipairs(FINDER_LIST_KEYS) do SkinCommunityCards(finder[key]) end
 	SkinRequestToJoin(finder.RequestToJoinFrame)
 	local inset = finder.InsetFrame
-	if inset then
-		FadeArt(inset)
-		Skin.TipFace(inset.GuildDescription, 'title')
-		Skin.TipFace(inset.ErrorDescription, 'title')
-	end
+	FadeArt(inset)
+	Skin.TipFace(inset.GuildDescription, 'title')
+	Skin.TipFace(inset.ErrorDescription, 'title')
 	local disabled = finder.DisabledFrame
-	if disabled then
-		FadeArt(disabled)
-		Skin.TipFace(disabled.Title, 'title', BIG_TITLE_SCALE)
-		Skin.TipFace(disabled.Description, 'title')
-	end
-	local function OnFinderTab() RefreshFinderTabs(finder) end
-	for _, key in ipairs(FINDER_TAB_KEYS) do
-		local tab = finder[key]
-		SkinSideTab(tab, OnFinderTab)
-		if tab and tab.SetTab then Hook(tab, 'SetTab', OnFinderTab) end
-	end
+	FadeArt(disabled)
+	Skin.TipFace(disabled.Title, 'title', BIG_TITLE_SCALE)
+	Skin.TipFace(disabled.Description, 'title')
+	SkinTabGroup(finder, FINDER_TAB_KEYS)
 end
 
 local function SkinNameChange(frame)
-	if not frame then return end
 	FadeRegions(frame)
 	Shell(frame)
 	Skin.TipFaceTree(frame, 1)
@@ -907,37 +757,16 @@ local function SkinNameChange(frame)
 end
 
 local function SkinPostingExpiration(expiration)
-	if not expiration then return end
 	Skin.TipFaceTree(expiration, 1)
-	local info = expiration.InfoButton
-	if info then
-		Fade(info)
-		info:EnableMouse(false)
-	end
-end
-
-local function SkinMaximize(maximize)
-	if not maximize then return end
-	Skin.TipPageButton(maximize.MaximizeButton, 'expand')
-	Skin.TipPageButton(maximize.MinimizeButton, 'condense')
+	Fade(expiration.InfoButton)
+	expiration.InfoButton:EnableMouse(false)
 end
 
 local function SkinMainFrame(frame)
-	Fade(frame.NineSlice)
-	FadeKeys(frame, MAIN_ART)
-	FadeRegions(frame)
-	if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
-	if frame.PortraitOverlay then KeepTexture(frame.PortraitOverlay.CircleMask) end
+	context.Chrome(frame)
+	KeepTexture(frame.PortraitOverlay.CircleMask)
 	FadeRegions(frame.PortraitOverlay)
-	Shell(frame)
-	Title(frame.TitleContainer and frame.TitleContainer.TitleText)
-	Close(frame.CloseButton)
-	SkinMaximize(frame.MaximizeMinimizeFrame)
-	for _, key in ipairs(SIDE_TAB_KEYS) do SkinSideTab(frame[key], RefreshSideTabs) end
-	if frame.UpdateCommunitiesTabs and not frame._buiTabsHooked then
-		frame._buiTabsHooked = true
-		Hook(frame, 'UpdateCommunitiesTabs', RefreshSideTabs)
-	end
+	SkinTabGroup(frame, SIDE_TAB_KEYS, 'UpdateCommunitiesTabs')
 	Dropdown(frame.StreamDropdown)
 	Dropdown(frame.GuildMemberListDropdown)
 	Dropdown(frame.CommunityMemberListDropdown)
@@ -949,38 +778,34 @@ local function SkinMainFrame(frame)
 	SkinPostingExpiration(frame.PostingExpirationText)
 end
 
-local function ApplyCommunities()
-	local frame = _G.CommunitiesFrame
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if not communitiesSkinned then
-		communitiesSkinned = true
-		SkinMainFrame(frame)
-		SkinCommunitiesList(frame.CommunitiesList)
-		SkinChat(frame)
-		SkinMemberList(frame.MemberList)
-		SkinMemberDetail(frame.GuildMemberDetailFrame)
-		SkinBenefits(frame.GuildBenefitsFrame)
-		SkinGuildDetails(frame.GuildDetailsFrame)
-		SkinNewsFilters(_G.CommunitiesGuildNewsFiltersFrame)
-		SkinGuildLog(_G.CommunitiesGuildLogFrame)
-		SkinTextEdit(_G.CommunitiesGuildTextEditFrame)
-		SkinStreamDialog(frame.EditStreamDialog)
-		SkinNotificationDialog(frame.NotificationSettingsDialog)
-		SkinRecruitmentDialog(frame.RecruitmentDialog)
-		SkinSettingsDialog(_G.CommunitiesSettingsDialog)
-		SkinAvatarPicker(_G.CommunitiesAvatarPickerDialog)
-		SkinTicketManager(_G.CommunitiesTicketManagerDialog)
-		SkinApplicantList(frame.ApplicantList)
-		SkinInvitation(frame.InvitationFrame)
-		SkinInvitation(frame.TicketFrame)
-		SkinInvitation(frame.ClubFinderInvitationFrame)
-		SkinFinder(frame.GuildFinderFrame)
-		SkinFinder(frame.CommunityFinderFrame)
-		for _, key in ipairs(NAME_CHANGE_KEYS) do SkinNameChange(frame[key]) end
-	end
-	RefreshSideTabs()
-	RefreshFinderTabs(frame.GuildFinderFrame)
-	RefreshFinderTabs(frame.CommunityFinderFrame)
+local function SkinCommunities(frame)
+	SkinMainFrame(frame)
+	SkinCommunitiesList(frame.CommunitiesList)
+	SkinChat(frame)
+	SkinMemberList(frame.MemberList)
+	SkinMemberDetail(frame.GuildMemberDetailFrame)
+	SkinBenefits(frame.GuildBenefitsFrame)
+	SkinGuildDetails(frame.GuildDetailsFrame)
+	SkinNewsFilters(_G.CommunitiesGuildNewsFiltersFrame)
+	SkinGuildLog(_G.CommunitiesGuildLogFrame)
+	SkinTextEdit(_G.CommunitiesGuildTextEditFrame)
+	SkinStreamDialog(frame.EditStreamDialog)
+	SkinNotificationDialog(frame.NotificationSettingsDialog)
+	SkinRecruitmentDialog(frame.RecruitmentDialog)
+	SkinSettingsDialog(_G.CommunitiesSettingsDialog)
+	SkinAvatarPicker(_G.CommunitiesAvatarPickerDialog)
+	SkinTicketManager(_G.CommunitiesTicketManagerDialog)
+	SkinApplicantList(frame.ApplicantList)
+	SkinInvitation(frame.InvitationFrame)
+	SkinInvitation(frame.TicketFrame)
+	SkinInvitation(frame.ClubFinderInvitationFrame)
+	SkinFinder(frame.GuildFinderFrame)
+	SkinFinder(frame.CommunityFinderFrame)
+	for _, key in ipairs(NAME_CHANGE_KEYS) do SkinNameChange(frame[key]) end
+end
+
+local function RefreshTabGroups()
+	for _, tabs in pairs(tabGroups) do RefreshTabGroup(tabs) end
 end
 
 local function SkinBankSlot(button)
@@ -991,15 +816,14 @@ local function SkinBankSlot(button)
 	Fade(button.IconOverlay)
 	local icon = button.icon
 	if not icon then return end
-	local fill = button:CreateTexture(nil, 'BACKGROUND')
-	fill.__buiSkin = true
+	local fill = Own(button:CreateTexture(nil, 'BACKGROUND'))
 	fill:SetAllPoints(icon)
 	BUI.Painter.Fill(fill, 'skinBackground')
 	FrameIcon(button, icon)
 end
 
 local function RefreshBankSlots(frame)
-	if not Enabled() or frame.mode ~= 'bank' then return end
+	if frame.mode ~= 'bank' then return end
 	local tab = GetCurrentGuildBankTab()
 	for _, column in ipairs(frame.Columns) do
 		for _, button in ipairs(column.Buttons) do
@@ -1022,14 +846,13 @@ local function SkinBankTab(tab)
 	Fade(button.NormalTexture)
 	Fade(button:GetPushedTexture())
 	Fade(button:GetCheckedTexture())
-	FlatHighlight(button)
+	Highlight(button)
 	CropIcon(button.IconTexture)
 	Shell(button, BANK_TAB_INSET)
 	Skin.TipCount(button.Count)
 end
 
 local function RefreshBankTabs(frame)
-	if not Enabled() then return end
 	for _, tab in ipairs(frame.BankTabs) do
 		local button = tab.Button
 		if button and tab._buiBankTab then
@@ -1044,7 +867,7 @@ local function SkinIconCell(button)
 	button._buiIconCell = true
 	KeepTexture(button.Icon)
 	KeepTexture(button.SelectedTexture)
-	FlatHighlight(button)
+	Highlight(button)
 	FadeRegions(button)
 	FrameIcon(button, button.Icon)
 	local selected = button.SelectedTexture
@@ -1066,7 +889,6 @@ local function SkinSelectedIcon(area)
 end
 
 local function SkinBankPopup(popup)
-	if not popup then return end
 	Fade(popup.BG)
 	FadeKeys(popup, BORDER_BOX_KEYS)
 	Shell(popup)
@@ -1091,26 +913,19 @@ local function SkinBankPopup(popup)
 	if selector then
 		FadeRegions(selector)
 		ScrollBar(selector.ScrollBar)
-		Skin.SweepScrollBox(selector.ScrollBox, GuardEnabled(SkinIconCell))
+		Skin.SweepScrollBox(selector.ScrollBox, Guard(SkinIconCell))
 	end
 end
 
 local function SkinBankInfo(info)
-	if not info then return end
 	Button(info.SaveButton)
-	local scroll = info.ScrollFrame
-	if not scroll then return end
-	ScrollBar(scroll.ScrollBar)
-	Face(scroll.EditBox or ScrollChild(scroll, 'EditBox'))
+	ScrollBar(info.ScrollFrame.ScrollBar)
+	Face(info.ScrollFrame.EditBox)
 end
 
 local function SkinGuildBankFrame(frame)
-	Fade(frame.NineSlice)
-	FadeRegions(frame)
+	context.Chrome(frame)
 	FadeRegions(frame.Emblem)
-	Shell(frame)
-	Title(frame.TitleContainer and frame.TitleContainer.TitleText or frame.TitleText)
-	Close(frame.CloseButton)
 	Face(frame.TabTitle)
 	Label(frame.LimitLabel)
 	Face(frame.ErrorMessage)
@@ -1141,20 +956,13 @@ local function SkinGuildBankFrame(frame)
 	SkinBankPopup(_G.GuildBankPopupFrame)
 end
 
-local function ApplyGuildBank()
-	local frame = _G.GuildBankFrame
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if not bankSkinned then
-		bankSkinned = true
-		SkinGuildBankFrame(frame)
-	end
+local function RefreshGuildBank(frame)
 	Skin.RefreshTabStrip(frame)
 	RefreshBankTabs(frame)
 	RefreshBankSlots(frame)
 end
 
 local function SkinRankRows()
-	if not Enabled() then return end
 	for rankIndex = 1, GuildControlGetNumRanks() do
 		local rankFrame = _G['GuildControlUIRankOrderFrameRank' .. rankIndex]
 		if rankFrame and not rankFrame._buiRankRow then
@@ -1189,7 +997,6 @@ local function SkinBankPermissionRow(row)
 end
 
 local function SkinBankPermissionRows()
-	if not Enabled() then return end
 	local rowIndex = 1
 	local row = _G['GuildControlBankTab' .. rowIndex]
 	while row do
@@ -1200,7 +1007,6 @@ local function SkinBankPermissionRows()
 end
 
 local function SkinDiscordPanels()
-	if not Enabled() then return end
 	local linked = _G.DiscordLinkFrame
 	if linked and not linked._buiDiscord then
 		linked._buiDiscord = true
@@ -1218,7 +1024,6 @@ local function SkinDiscordPanels()
 end
 
 local function SkinRankPermissions(permissions)
-	if not permissions then return end
 	Dropdown(permissions.dropdown)
 	Skin.TipFaceTree(permissions.dropdown, 1)
 	Face(permissions.OfficerPermissions)
@@ -1268,89 +1073,35 @@ local function SkinGuildControlFrame(frame)
 	SkinRankPermissions(frame.rankPermFrame)
 end
 
-local function ApplyGuildControl()
-	local frame = _G.GuildControlUI
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if not controlSkinned then
-		controlSkinned = true
-		SkinGuildControlFrame(frame)
-	end
+local function RefreshGuildControl()
 	SkinRankRows()
 	SkinBankPermissionRows()
 	SkinDiscordPanels()
 end
 
-local function InstallCommunities()
-	if communitiesInstalled then return end
-	local frame = _G.CommunitiesFrame
-	if not frame then return end
-	communitiesInstalled = true
-	frame:HookScript('OnShow', Wrap('Skin.Guild communities reskin', ApplyCommunities))
-	if frame:IsShown() then ApplyCommunities() end
-end
+context.Window('CommunitiesFrame', { skin = SkinCommunities, show = RefreshTabGroups })
 
-local function InstallGuildBank()
-	if bankInstalled then return end
-	local frame = _G.GuildBankFrame
-	if not frame then return end
-	bankInstalled = true
-	frame:HookScript('OnShow', Wrap('Skin.Guild bank reskin', ApplyGuildBank))
-	if frame.Update then Hook(frame, 'Update', RefreshBankSlots) end
-	if frame.UpdateTabs then Hook(frame, 'UpdateTabs', RefreshBankTabs) end
-	if frame:IsShown() then ApplyGuildBank() end
-end
+context.Window('GuildBankFrame', {
+	skin = SkinGuildBankFrame,
+	show = RefreshGuildBank,
+	install = function(frame)
+		Hook(frame, 'Update', RefreshBankSlots)
+		Hook(frame, 'UpdateTabs', RefreshBankTabs)
+	end,
+})
 
-local function InstallGuildControl()
-	if controlInstalled then return end
-	local frame = _G.GuildControlUI
-	if not frame then return end
-	controlInstalled = true
-	frame:HookScript('OnShow', Wrap('Skin.Guild control reskin', ApplyGuildControl))
-	Hook('GuildControlUI_RankOrder_Update', SkinRankRows)
-	Hook('GuildControlUI_BankTabPermissions_Update', SkinBankPermissionRows)
-	Hook('GuildControlUI_Discord_Update', SkinDiscordPanels)
-	if frame:IsShown() then ApplyGuildControl() end
-end
+context.Window('GuildControlUI', {
+	skin = SkinGuildControlFrame,
+	show = RefreshGuildControl,
+	install = function()
+		Hook('GuildControlUI_RankOrder_Update', SkinRankRows)
+		Hook('GuildControlUI_BankTabPermissions_Update', SkinBankPermissionRows)
+		Hook('GuildControlUI_Discord_Update', SkinDiscordPanels)
+	end,
+})
 
-local function Install()
-	InstallCommunities()
-	InstallGuildBank()
-	InstallGuildControl()
-	installed = communitiesInstalled and bankInstalled and controlInstalled
-end
-
-local function TryInstall()
-	Install()
-	if installed then BUI.Events:Unregister('ADDON_LOADED', 'Skin.Guild') end
-end
-
-local function ApplyIfShown(frameName, apply)
-	local frame = _G[frameName]
-	if frame and frame:IsShown() then apply() end
-end
-
-local function Deactivate()
-	context.Restore()
-	for _, tab in ipairs(skinnedSideTabs) do Skin.ResetSideTab(tab) end
-	communitiesSkinned = false
-	bankSkinned = false
-	controlSkinned = false
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		if not installed then BUI.Events:Register('ADDON_LOADED', 'Skin.Guild', TryInstall) end
-		ApplyIfShown('CommunitiesFrame', ApplyCommunities)
-		ApplyIfShown('GuildBankFrame', ApplyGuildBank)
-		ApplyIfShown('GuildControlUI', ApplyGuildControl)
-	else
-		Deactivate()
+context.OnDisable(function()
+	for _, tabs in pairs(tabGroups) do
+		for _, tab in ipairs(tabs) do Skin.ResetSideTab(tab) end
 	end
 end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Guild & Communities',
-	description = 'The Guild & Communities window with its chat, roster, perks, guild info, finder and dialogs; also skins the Guild Bank and Guild Control windows, which only open at a guild vault.',
-	icon = 'Interface/Icons/achievement_guildperk_everybodysfriend',
-})
