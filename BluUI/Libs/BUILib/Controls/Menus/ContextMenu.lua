@@ -42,7 +42,7 @@ local unpack = unpack
 
 local activeMenu
 
-local function Palette(window)
+local function Palette(window, surface)
 	if not window then
 		return {
 			fill = Theme.bg.dark, edge = Theme.border.light, line = Theme.border.light, hover = Theme.bg.hover, selected = { 1, 1, 1, SELECTED_ALPHA },
@@ -52,7 +52,7 @@ local function Palette(window)
 	end
 	local text = { window:Color('controlText') }
 	return {
-		square = true, fill = { window:Color('control') }, line = CONTROL_LINE, hover = BUILib.Layout.SOLID_HOVER, selected = CONTROL_SELECTED,
+		square = true, fill = { window:Color(surface or 'control') }, line = CONTROL_LINE, hover = BUILib.Layout.SOLID_HOVER, selected = CONTROL_SELECTED,
 		text = text, muted = { window:Color('muted') }, disabled = { window:Color('faint') },
 		thumb = { window:Color('faint') }, check = { texture = BUILib.GetLibMedia('check'), color = text }, font = window:FontPath('control'),
 	}
@@ -273,7 +273,7 @@ end
 
 function Controls.ContextMenu(items, options)
 	options = options or {}
-	local palette = Palette(options.window)
+	local palette = Palette(options.window, options.surface)
 	local width = math.min(options.width or DEFAULT_WIDTH, MAX_WIDTH)
 
 	local menu = EnsureMenu()

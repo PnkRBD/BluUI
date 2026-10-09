@@ -151,7 +151,7 @@ local function OpenList(row, anchor)
 			end,
 		}
 	end
-	Controls.ContextMenu(items, { anchor = anchor, width = math.max(Pixel.Scale(DROPDOWN_W), LIST_MIN_W), offsetY = -LIST_GAP, window = THEME })
+	Controls.ContextMenu(items, { anchor = anchor, width = math.max(Pixel.Scale(DROPDOWN_W), LIST_MIN_W), offsetY = -LIST_GAP, window = THEME, surface = 'page' })
 end
 
 local function CreateDropdown(row)
