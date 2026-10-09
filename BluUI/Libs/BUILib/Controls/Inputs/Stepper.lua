@@ -40,9 +40,14 @@ function Controls.Stepper(parent, label, value, minValue, maxValue, step, callba
 	valueBox:SetTextColor(unpack(Theme.text.primary)); valueBox:SetJustifyH("CENTER")
 	valueBox:SetAutoFocus(false); valueBox:SetNumeric(true); valueBox:SetMaxLetters(6)
 	container.valueBox = valueBox
+	local onLimit
 	local function UpdateDisplay() valueBox:SetText(tostring(state.value)) end
+	local function Clamp(requested)
+		if requested > maxValue and onLimit then onLimit() end
+		return math_min(maxValue, math_max(minValue, requested))
+	end
 	local function Commit()
-		state.value = math_min(maxValue, math_max(minValue, tonumber(valueBox:GetText()) or minValue))
+		state.value = Clamp(tonumber(valueBox:GetText()) or minValue)
 		UpdateDisplay(); if callback then callback(state.value) end
 	end
 	valueBox:SetScript("OnEnterPressed", function(editBox) editBox:ClearFocus() end)
@@ -53,7 +58,7 @@ function Controls.Stepper(parent, label, value, minValue, maxValue, step, callba
 		if callback then callback(state.value) end
 	end)
 	plusButton:SetScript("OnClick", function()
-		state.value = math_min(maxValue, state.value + step); UpdateDisplay()
+		state.value = Clamp(state.value + step); UpdateDisplay()
 		if callback then callback(state.value) end
 	end)
 	local function RowEnter() row.frame:SetBackdropBorderColor(Theme.GetAccent()) end
@@ -67,5 +72,11 @@ function Controls.Stepper(parent, label, value, minValue, maxValue, step, callba
 	UpdateDisplay()
 	function container:GetValue() return state.value end
 	function container:SetValue(newValue) state.value = newValue; UpdateDisplay() end
+	function container:SetMax(newMax, limitHandler)
+		maxValue, onLimit = math_max(minValue, newMax), limitHandler
+		if state.value <= maxValue then return end
+		state.value = maxValue; UpdateDisplay()
+		if callback then callback(state.value) end
+	end
 	return Widget.Wrap(container)
 end
