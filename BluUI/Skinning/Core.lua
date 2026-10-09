@@ -484,6 +484,23 @@ function Skin.CardRow(row, inset)
 	Skin.AccentHover(row)
 end
 
+local COLLAPSE_GLYPH_SIZE = 10
+
+local function PaintCollapseGlyph(button, collapsed)
+	if not button._buiCollapseEnabled() then return end
+	BUILib.Widget.SetGlyph(button.Icon, BUILib.GetLibMedia(collapsed and 'plus' or 'minus'))
+	button.Icon:SetSize(COLLAPSE_GLYPH_SIZE, COLLAPSE_GLYPH_SIZE)
+end
+
+function Skin.TipCollapseButton(button, enabled)
+	if not button._buiCollapseEnabled then
+		button._buiCollapseEnabled = enabled
+		Painter.Tint(button.Icon, 'skinLabel')
+		Hook(button, 'UpdateCollapsedState', PaintCollapseGlyph)
+	end
+	PaintCollapseGlyph(button, button.collapsed)
+end
+
 local LEFT_TITLE_X, LEFT_TITLE_SCALE = 12, 14 / 12
 
 function Skin.LeftTitle(frame)
@@ -1551,7 +1568,7 @@ end
 local TEXT_BOX_PAD = 6
 
 function Skin.NewContext(enabled)
-	local fadedArt, shelled = {}, {}
+	local fadedArt, shelled, owned = {}, {}, {}
 	local context = { enabled = enabled }
 
 	local function Fade(object)
@@ -1678,16 +1695,142 @@ function Skin.NewContext(enabled)
 		if fontString then Skin.TipFont(fontString, 'body') end
 	end
 
+	local function Chrome(frame, closeButton)
+		FadeArt(frame)
+		if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
+		Shell(frame)
+		if frame.TitleContainer then
+			Skin.LeftTitle(frame)
+		else
+			Title(frame.TitleText)
+		end
+		Close(closeButton or frame.CloseButton)
+		local maximize = frame.MaximizeMinimizeFrame or frame.MaximizeMinimize
+		if not maximize then return end
+		Skin.TipPageButton(maximize.MaximizeButton, 'expand')
+		Skin.TipPageButton(maximize.MinimizeButton, 'condense')
+	end
+
+	local function Own(texture)
+		texture.__buiSkin = true
+		owned[texture] = true
+		return texture
+	end
+
+	local function ShowOwned(shown)
+		for texture in pairs(owned) do texture:SetShown(shown) end
+	end
+
+	local function CollapseButton(button)
+		Fade(button:GetHighlightTexture())
+		Skin.TipCollapseButton(button, enabled)
+	end
+
 	local function Restore()
 		for object in pairs(fadedArt) do object:SetAlpha(1) end
 		wipe(fadedArt)
 		for frame in pairs(shelled) do Skin.HideTipShell(frame) end
+		ShowOwned(false)
 	end
 
 	context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt = Fade, FadeRegions, FadeKeys, FadeArt
 	context.Shell, context.Button, context.Close, context.Dropdown, context.Card = Shell, Button, Close, Dropdown, Card
 	context.EditBox, context.CheckBox, context.TextBox, context.ScrollBar, context.Tab = EditBox, CheckBox, TextBox, ScrollBar, Tab
 	context.Face, context.FaceOnce, context.Title, context.Body, context.Restore = Face, FaceOnce, Title, Body, Restore
+	context.Chrome, context.Own, context.ShowOwned, context.CollapseButton = Chrome, Own, ShowOwned, CollapseButton
+	return context
+end
+
+local waitingWindows = {}
+local watchingAddons = false
+
+local function Safely(handler, ...)
+	return xpcall(handler, geterrorhandler(), ...)
+end
+
+local function ApplyWindow(window)
+	local frame = _G[window.name]
+	if not frame or frame:IsForbidden() or not frame:IsShown() or not window.enabled() then return end
+	if not window.skinned then
+		window.skinned = true
+		Safely(window.skin, frame)
+	end
+	if window.show then Safely(window.show, frame) end
+end
+
+local function InstallWindow(window)
+	local frame = _G[window.name]
+	if not frame then return false end
+	waitingWindows[window] = nil
+	window.installed = true
+	if window.install then Safely(window.install, frame) end
+	if window.enable and window.enabled() then Safely(window.enable, frame) end
+	frame:HookScript('OnShow', Wrap(window.label, function() ApplyWindow(window) end))
+	ApplyWindow(window)
+	return true
+end
+
+local function InstallWaiting()
+	for window in pairs(waitingWindows) do InstallWindow(window) end
+	if next(waitingWindows) then return end
+	watchingAddons = false
+	BUI.Events:Unregister('ADDON_LOADED', 'Skin.Windows')
+end
+
+local function WatchWindow(window)
+	if window.installed then
+		if window.enable then Safely(window.enable, _G[window.name]) end
+		ApplyWindow(window)
+	elseif not InstallWindow(window) then
+		waitingWindows[window] = true
+		if watchingAddons then return end
+		watchingAddons = true
+		BUI.Events:Register('ADDON_LOADED', 'Skin.Windows', InstallWaiting)
+	end
+end
+
+function Skin.Define(id, info)
+	local function Enabled() return Skin.IsSkinEnabled(id) end
+	local context = Skin.NewContext(Enabled)
+	local hooker = BUI.Profiler.Hooker('Skin.' .. id)
+	local windows, disablers = {}, {}
+
+	local function Guard(handler)
+		return function(...)
+			if Enabled() then Safely(handler, ...) end
+		end
+	end
+
+	function context.Hook(target, method, handler)
+		if handler then
+			hooker(target, method, Guard(handler))
+		else
+			hooker(target, Guard(method))
+		end
+	end
+
+	function context.Window(name, spec)
+		spec.name, spec.enabled, spec.label = name, Enabled, 'Skin.' .. id .. ' ' .. name
+		windows[#windows + 1] = spec
+	end
+
+	function context.OnDisable(callback)
+		disablers[#disablers + 1] = callback
+	end
+
+	context.Enabled, context.Guard, context.Safely, context.info = Enabled, Guard, Safely, info
+
+	Skin.OnToggle(id, function(enabled)
+		if enabled then
+			context.ShowOwned(true)
+			for _, window in ipairs(windows) do WatchWindow(window) end
+			return
+		end
+		context.Restore()
+		for _, window in ipairs(windows) do window.skinned = false end
+		for _, callback in ipairs(disablers) do callback() end
+	end)
+	Skin.RegisterSkin(id, info)
 	return context
 end
 
