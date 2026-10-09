@@ -288,113 +288,49 @@ function BAG.Colors()
         skinning.characterFrameArrowPlate or { 1, 1, 1, 0.85 }
 end
 
-local EQUIP_LOC_SLOTS = {
-    INVTYPE_HEAD = { 'HeadSlot' },           INVTYPE_NECK = { 'NeckSlot' },
-    INVTYPE_SHOULDER = { 'ShoulderSlot' },   INVTYPE_CLOAK = { 'BackSlot' },
-    INVTYPE_CHEST = { 'ChestSlot' },         INVTYPE_ROBE = { 'ChestSlot' },
-    INVTYPE_BODY = { 'ShirtSlot' },          INVTYPE_TABARD = { 'TabardSlot' },
-    INVTYPE_WRIST = { 'WristSlot' },         INVTYPE_HAND = { 'HandsSlot' },
-    INVTYPE_WAIST = { 'WaistSlot' },         INVTYPE_LEGS = { 'LegsSlot' },
-    INVTYPE_FEET = { 'FeetSlot' },
-    INVTYPE_FINGER = { 'Finger0Slot', 'Finger1Slot' },
-    INVTYPE_TRINKET = { 'Trinket0Slot', 'Trinket1Slot' },
-    INVTYPE_WEAPON = { 'MainHandSlot', 'SecondaryHandSlot' },
-    INVTYPE_2HWEAPON = { 'MainHandSlot' },   INVTYPE_WEAPONMAINHAND = { 'MainHandSlot' },
-    INVTYPE_WEAPONOFFHAND = { 'SecondaryHandSlot' }, INVTYPE_HOLDABLE = { 'SecondaryHandSlot' },
-    INVTYPE_SHIELD = { 'SecondaryHandSlot' },
-    INVTYPE_RANGED = { 'MainHandSlot' },     INVTYPE_RANGEDRIGHT = { 'MainHandSlot' },
-}
-
 local bagItemsBySlot = {}
 local bagPopup
-
-local function ScanBagsManually()
-    if not C_Container then return end
-    for bag = BACKPACK_CONTAINER or 0, NUM_BAG_SLOTS or 4 do
-        for slot = 1, C_Container.GetContainerNumSlots(bag) or 0 do
-            local info = C_Container.GetContainerItemInfo(bag, slot)
-            local link = info and info.hyperlink
-            if link and info.itemID then
-                local _, _, _, equipLoc, icon = C_Item.GetItemInfoInstant(info.itemID)
-                local targets = EQUIP_LOC_SLOTS[equipLoc]
-                if targets then
-                    local level = 0
-                    local location = ItemLocation and ItemLocation:CreateFromBagAndSlot(bag, slot)
-                    if location and location:IsValid() and C_Item.DoesItemExist(location) then
-                        level = C_Item.GetCurrentItemLevel(location) or 0
-                    end
-                    local entry = {
-                        bag = bag, slot = slot, link = link, level = level,
-                        icon = info.iconFileID or icon, quality = info.quality or 1,
-                        name = link:match('%[(.-)%]') or '?',
-                    }
-                    for _, slotName in ipairs(targets) do
-                        bagItemsBySlot[slotName] = bagItemsBySlot[slotName] or {}
-                        table.insert(bagItemsBySlot[slotName], entry)
-                    end
-                end
-            end
-        end
-    end
-    for _, list in pairs(bagItemsBySlot) do
-        table.sort(list, function(left, right)
-            if left.level ~= right.level then return left.level > right.level end
-            return left.name < right.name
-        end)
-    end
-end
-
 local flyoutScratch = {}
 
-local function ScanBags()
-    wipe(bagItemsBySlot)
-    if not (GetInventoryItemsForSlot and EquipmentManager_UnpackLocation) then
-        ScanBagsManually()
-        return
-    end
-    for _, labels in pairs(slotLabels) do
-        local slotName = labels.info.id
-        local slotID = GetInventorySlotInfo(slotName)
-        wipe(flyoutScratch)
-        GetInventoryItemsForSlot(slotID, flyoutScratch)
-        local list = {}
-        for location, itemID in pairs(flyoutScratch) do
-            local _, _, inBags, inVoid, slot, bag = EquipmentManager_UnpackLocation(location)
-            local link = inBags and not inVoid and bag and slot and C_Container.GetContainerItemLink(bag, slot)
-            if link then
-                local level = 0
-                local itemLocation = ItemLocation and ItemLocation:CreateFromBagAndSlot(bag, slot)
-                if itemLocation and itemLocation:IsValid() and C_Item.DoesItemExist(itemLocation) then
-                    level = C_Item.GetCurrentItemLevel(itemLocation) or 0
-                end
-                list[#list + 1] = {
-                    location = location, slotID = slotID, bag = bag, slot = slot, link = link, level = level,
-                    icon = select(5, C_Item.GetItemInfoInstant(itemID)), quality = C_Item.GetItemQualityByID(link) or 1,
-                    name = link:match('%[(.-)%]') or '?',
-                }
-            end
+local function ByLevelThenName(left, right)
+    if left.level ~= right.level then return left.level > right.level end
+    return left.name < right.name
+end
+
+local function ScanSlot(slotID, list)
+    wipe(flyoutScratch)
+    GetInventoryItemsForSlot(slotID, flyoutScratch)
+    for location, itemID in pairs(flyoutScratch) do
+        local place = EquipmentManager_GetLocationData(location)
+        local link = place.isBags and not place.isBank and C_Container.GetContainerItemLink(place.bag, place.slot)
+        if link then
+            local itemLocation = ItemLocation:CreateFromBagAndSlot(place.bag, place.slot)
+            list[#list + 1] = {
+                location = location, slotID = slotID, link = link,
+                level = C_Item.DoesItemExist(itemLocation) and C_Item.GetCurrentItemLevel(itemLocation) or 0,
+                icon = C_Item.GetItemIconByID(itemID), quality = C_Item.GetItemQualityByID(link) or 1,
+                name = link:match('%[(.-)%]') or '?',
+            }
         end
-        table.sort(list, function(left, right)
-            if left.level ~= right.level then return left.level > right.level end
-            return left.name < right.name
-        end)
-        bagItemsBySlot[slotName] = list
+    end
+    table.sort(list, ByLevelThenName)
+end
+
+local function ScanBags()
+    for slotName in pairs(slotLabels) do
+        local list = bagItemsBySlot[slotName]
+        if list then wipe(list) else list = {}; bagItemsBySlot[slotName] = list end
+        ScanSlot(GetInventorySlotInfo(slotName), list)
     end
 end
 
-local function EquipBagItem(entry, slotName)
+local function EquipBagItem(entry)
     if InCombatLockdown() then
         BUI.Print('Gear cannot change during combat.')
         return
     end
-    if entry.location and EquipmentManager_EquipItemByLocation then
-        EquipmentManager_EquipItemByLocation(entry.location, entry.slotID or GetInventorySlotInfo(slotName))
-    else
-        ClearCursor()
-        C_Container.PickupContainerItem(entry.bag, entry.slot)
-        EquipCursorItem(GetInventorySlotInfo(slotName))
-        ClearCursor()
-    end
+    local action = EquipmentManager_EquipItemByLocation(entry.location, entry.slotID)
+    if action then EquipmentManager_RunAction(action) end
     if bagPopup then bagPopup:Hide() end
 end
 
@@ -454,7 +390,7 @@ local function BagPopupCell(index)
         GameTooltip:Show()
     end))
     cell:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame cell OnLeave', function(self) self.hover:Hide(); GameTooltip:Hide() end))
-    cell:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame cell OnClick', function(self) EquipBagItem(self.entry, self.slotName) end))
+    cell:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame cell OnClick', function(self) EquipBagItem(self.entry) end))
     bagPopup.rows[index] = cell
     return cell
 end
@@ -464,7 +400,7 @@ local function ShowBagPopup(labels)
     if not list or #list == 0 then return end
     local popup = EnsureBagPopup()
     popup.owner = labels.bagArrow
-    popup.title:SetText(#list > 0 and ('In bags (%d)'):format(#list) or 'Nothing in bags for this slot')
+    popup.title:SetText(('In bags (%d)'):format(#list))
     local side, opposite = PopupSide(labels.info)
     local popupPixels = popup:GetWidth() * popup:GetEffectiveScale() + Pixel.Scale(4) * popup:GetEffectiveScale()
     local buttonScale = labels.button:GetEffectiveScale()
@@ -478,7 +414,7 @@ local function ShowBagPopup(labels)
     local count = math.min(#list, BAG.POPUP_MAX)
     for index = 1, count do
         local entry, cell = list[index], BagPopupCell(index)
-        cell.entry, cell.slotName, cell.tipAnchor = entry, labels.info.id, tipAnchor
+        cell.entry, cell.tipAnchor = entry, tipAnchor
         cell.icon:SetTexture(entry.icon)
         local red, green, blue = C_Item.GetItemQualityColor(entry.quality or 1)
         cell:SetBackdropBorderColor(red, green, blue, 1)
