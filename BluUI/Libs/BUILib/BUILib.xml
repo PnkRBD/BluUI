@@ -3,6 +3,7 @@
     <Script file="Core\Motion.lua"/>
     <Script file="Core\Theme.lua"/>
     <Script file="Core\Widget.lua"/>
+    <Script file="Core\Glyphs.lua"/>
     <Script file="Core\NavChip.lua"/>
     <Script file="Core\Skin.lua"/>
     <Script file="Core\Layout.lua"/>

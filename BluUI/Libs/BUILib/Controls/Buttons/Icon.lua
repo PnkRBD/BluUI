@@ -134,7 +134,7 @@ function Controls.Icon(parent, config)
 	if config.atlas then
 		icon:SetAtlas(config.atlas)
 	else
-		icon:SetTexture(config.texture or BUILib.GetLibMedia(config.icon or "cog"))
+		Widget.SetGlyph(icon, config.texture or BUILib.GetLibMedia(config.icon or "cog"))
 	end
 
 	local function ApplyIdleColor()
@@ -171,9 +171,9 @@ function Controls.Icon(parent, config)
 	function button:SetCallback(callback) button:SetScript("OnClick", function() if callback then callback(button) end end) end
 	function button:SetIcon(nameOrPath)
 		if type(nameOrPath) == "string" and nameOrPath:find("\\") then
-			icon:SetTexture(nameOrPath)
+			Widget.SetGlyph(icon, nameOrPath)
 		else
-			icon:SetTexture(BUILib.GetLibMedia(nameOrPath or "cog"))
+			Widget.SetGlyph(icon, BUILib.GetLibMedia(nameOrPath or "cog"))
 		end
 	end
 	function button:SetIdleColor(red, green, blue, alpha)

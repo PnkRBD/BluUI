@@ -1037,7 +1037,7 @@ local function MakeCornerButton(chat, mediaKey)
 	button:SetAlpha(0.25)
 	local texture = button:CreateTexture(nil, 'ARTWORK')
 	texture:SetAllPoints()
-	texture:SetTexture(BUILib.GetLibMedia(mediaKey))
+	BUILib.Widget.SetGlyph(texture, BUILib.GetLibMedia(mediaKey))
 	texture:SetVertexColor(BUTTON_IDLE[1], BUTTON_IDLE[2], BUTTON_IDLE[3], 1)
 	button._tex = texture
 	button:SetScript('OnEnter', BUI.Profiler.Script('Skin.Chat button OnEnter', function()
@@ -1573,7 +1573,7 @@ do
 	local function SkinMenuButton(button)
 		SetArtAlpha(0, ButtonArt(button))
 		local glyph = Glyph(button)
-		glyph:SetTexture(BUILib.GetLibMedia(MENU_GLYPH))
+		BUILib.Widget.SetGlyph(glyph, BUILib.GetLibMedia(MENU_GLYPH))
 		return function(red, green, blue, alpha)
 			glyph:SetVertexColor(red, green, blue, 1)
 			button:SetAlpha(alpha)
@@ -1609,7 +1609,7 @@ do
 		end
 		for _, key in ipairs(FRIENDS_COUNTS) do button[key]:Hide() end
 		local glyph = Glyph(button)
-		glyph:SetTexture(BUILib.GetLibMedia(FRIENDS_GLYPH))
+		BUILib.Widget.SetGlyph(glyph, BUILib.GetLibMedia(FRIENDS_GLYPH))
 		return function(red, green, blue, alpha)
 			glyph:SetVertexColor(red, green, blue, alpha)
 		end

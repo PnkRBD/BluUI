@@ -227,7 +227,7 @@ local function CreateToolRow(action)
 	if action.dynamic then
 		button.icon:SetAtlas(CalendarAtlas())
 	else
-		button.icon:SetTexture(action.texture)
+		Widget.SetGlyph(button.icon, action.texture)
 	end
 	button.dot = button:CreateTexture(nil, 'OVERLAY')
 	button.dot:SetSize(Pixel.Scale(DOT_SIZE), Pixel.Scale(DOT_SIZE))

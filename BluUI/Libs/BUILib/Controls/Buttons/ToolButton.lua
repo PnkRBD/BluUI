@@ -70,7 +70,7 @@ function Controls.ToolButton(parent, options)
 	end
 
 	function button:SetIconTexture(texture)
-		self.icon:SetTexture(texture)
+		Widget.SetGlyph(self.icon, texture)
 		self.icon:SetVertexColor(ICON_IDLE[1], ICON_IDLE[2], ICON_IDLE[3])
 	end
 

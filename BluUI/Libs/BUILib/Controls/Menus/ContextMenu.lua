@@ -148,7 +148,7 @@ local function BindRow(row, item, onSelect, palette, textX)
 	row.text:SetPoint("LEFT", textX, 0)
 	row.text:SetText(item.text or "")
 	row.icon:SetShown(item.icon ~= nil)
-	if item.icon then row.icon:SetTexture(item.icon) end
+	if item.icon then Widget.SetGlyph(row.icon, item.icon) end
 	ShowCheck(row, item, palette)
 	ShowSub(row, item)
 	PaintRow(row, palette, false)

@@ -244,6 +244,7 @@ local function SafeClose(close)
 	for getterIndex = 1, #STATE_TEXTURE_GETTERS do
 		local texture = close[STATE_TEXTURE_GETTERS[getterIndex]](close)
 		if texture then
+			BUILib.Widget.SetGlyph(texture, glyph)
 			texture:ClearAllPoints()
 			texture:SetPoint('CENTER', close, 'CENTER', 0, 0)
 			texture:SetSize(CLOSE_GLYPH_SIZE, CLOSE_GLYPH_SIZE)

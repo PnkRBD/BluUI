@@ -138,7 +138,7 @@ function Layout.TableKit(window)
 
 	function kit.Glyph(parent, name, size, role, layer)
 		local glyph = parent:CreateTexture(nil, layer or 'ARTWORK')
-		glyph:SetTexture(BUILib.GetLibMedia(name))
+		Widget.SetGlyph(glyph, BUILib.GetLibMedia(name))
 		glyph:SetSize(size, size)
 		return window:Paint(glyph, role)
 	end

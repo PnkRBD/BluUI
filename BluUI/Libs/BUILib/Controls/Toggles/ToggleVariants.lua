@@ -161,7 +161,7 @@ function Controls.IconToggle(parent, checked, callback, options)
 	else
 		icon:SetAllPoints()
 	end
-	icon:SetTexture(options.texture or BUILib.GetLibMedia("mover"))
+	Widget.SetGlyph(icon, options.texture or BUILib.GetLibMedia("mover"))
 
 	local function Render()
 		if disabled then

@@ -841,7 +841,7 @@ local function BuildStats()
     end)
     weekly:SetScript('OnLeave', Widget.HideTip)
     local session = Stat('stat_session', 'SESSION')
-    session.icon:SetTexture(BUILib.GetLibMedia('clock'))
+    Widget.SetGlyph(session.icon, BUILib.GetLibMedia('clock'))
     window:Paint(session.icon, 'muted')
 
     function strip.RefreshSession()
