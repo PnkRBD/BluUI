@@ -733,7 +733,7 @@ end
 
 local function Inset(parent, frameType)
     local frame = CreateFrame(frameType or 'Frame', nil, parent)
-    window:Paint(Widget.DrawOutline(frame, INSET_RADIUS, WHITE, 'BACKGROUND', 1), 'cardEdge')
+    window:Paint(Widget.DrawOutline(frame, INSET_RADIUS, WHITE, 'BACKGROUND', 1), 'inputEdge')
     return frame
 end
 
@@ -745,7 +745,7 @@ local function Empty(card, text)
 end
 
 local function Rule(parent)
-    local rule = kit.Fill(parent, 'cardEdge', 'ARTWORK')
+    local rule = kit.Fill(parent, 'rule', 'ARTWORK')
     rule:SetHeight(1)
     return rule
 end
@@ -813,7 +813,7 @@ local function BuildStats()
         cell.value:SetPoint('TOPLEFT', cell.kicker, 'BOTTOMLEFT', 0, -4)
         cell.sub = kit.Text(cell, '', 12, 'muted')
         cell.sub:SetPoint('BOTTOMLEFT', cell.value, 'BOTTOMRIGHT', VALUE_GAP, 3)
-        cell.divider = kit.Fill(cell, 'cardEdge', 'ARTWORK')
+        cell.divider = kit.Fill(cell, 'rule', 'ARTWORK')
         cell.divider:SetPoint('TOPLEFT', 0, -DIVIDER_INSET)
         cell.divider:SetPoint('BOTTOMLEFT', 0, DIVIDER_INSET)
         cell.divider:SetWidth(1)
