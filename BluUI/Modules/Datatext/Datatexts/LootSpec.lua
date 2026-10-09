@@ -116,9 +116,15 @@ local function ClearPendingLoadout()
     pendingSpecID, pendingConfigID, pendingUnflag = nil, nil, nil
 end
 
+local function SyncTalentsFrame(configID)
+    local talents = PlayerSpellsFrame and PlayerSpellsFrame.TalentsFrame
+    if talents then talents:SetSelectedSavedConfigID(configID, false, true) end
+end
+
 local function FinishLoadout(specID, configID, unflagStarter)
     C_ClassTalents.UpdateLastSelectedSavedConfigID(specID, configID)
     if unflagStarter then C_ClassTalents.SetStarterBuildActive(false) end
+    SyncTalentsFrame(configID)
 end
 
 local function LoadLoadout(specID, configID)
@@ -152,6 +158,7 @@ local function OpenLoadoutMenu(anchor)
             checked = starterActive,
             callback = function()
                 if not C_ClassTalents.GetStarterBuildActive() then C_ClassTalents.SetStarterBuildActive(true) end
+                SyncTalentsFrame(Constants.TraitConsts.STARTER_BUILD_TRAIT_CONFIG_ID)
             end,
         }
     end
