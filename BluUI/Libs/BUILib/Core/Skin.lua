@@ -79,22 +79,20 @@ function Skin.ChildBackdrop(frame, options)
 		backdrop:SetScript('OnSizeChanged', nil)
 		backdrop:SetPoint('TOPLEFT', frame, 'TOPLEFT', inset, -inset)
 		backdrop:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -inset, inset)
-		backdrop._buiLevelOffset = options.inside and 0 or -1
 		frame._buiBackdrop = backdrop
 		frame:HookScript('OnHide', function() backdrop:Hide() end)
 	end
-	local offset = backdrop._buiLevelOffset
 	local strata, level = frame:GetFrameStrata(), frame:GetFrameLevel()
 	if issecretvalue and (issecretvalue(strata) or issecretvalue(level)) then
 		C_Timer.After(0, function()
 			local resolvedStrata, resolvedLevel = frame:GetFrameStrata(), frame:GetFrameLevel()
 			if issecretvalue(resolvedStrata) or issecretvalue(resolvedLevel) then return end
 			backdrop:SetFrameStrata(resolvedStrata)
-			backdrop:SetFrameLevel(max(0, resolvedLevel + offset))
+			backdrop:SetFrameLevel(max(0, resolvedLevel - 1))
 		end)
 	else
 		backdrop:SetFrameStrata(strata)
-		backdrop:SetFrameLevel(max(0, level + offset))
+		backdrop:SetFrameLevel(max(0, level - 1))
 	end
 	backdrop:Show()
 	return backdrop
