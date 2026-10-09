@@ -1,6 +1,6 @@
 local _, BUI = ...
 
-local ipairs, pairs, xpcall, geterrorhandler = ipairs, pairs, xpcall, geterrorhandler
+local ipairs = ipairs
 local SecureHook = BUI.Profiler.Hooker('Skin.Professions')
 local Wrap = BUI.Profiler.Wrap
 
@@ -8,10 +8,7 @@ local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 local Theme = BUILib.Theme
 
-local SKIN_ID = 'professions'
-local FRAME_ART = { 'NineSlice', 'Bg', 'TopTileStreaks', 'Inset' }
 local CUSTOMER_FRAME_ART = { 'MoneyFrameInset', 'MoneyFrameBorder' }
-local DIALOG_ART = { 'NineSlice', 'Bg' }
 local LIST_ART = { 'Background', 'NineSlice' }
 local RECIPE_LIST_ART = { 'Background', 'BackgroundNineSlice' }
 local SCHEMATIC_ART = { 'Background', 'MinimalBackground', 'NineSlice' }
@@ -44,57 +41,27 @@ local OUTPUT_CRIT_SCALE = 0.8
 local PREVIEW_TITLE_SCALE = 1.5
 local CATEGORY_TITLE_SCALE = 12 / 11
 local TAB_BASELINE_OFFSET = 8
-local BOOK_TITLE_SCALE = 1.25
-local BOOK_SUBTITLE_SCALE = 1.1
-local BOOK_CARD_WIDTH, BOOK_CARD_HEIGHT = 510, 82
-local BOOK_COLUMN_X = 20
-local BOOK_TOP_Y = -52
-local PRIMARY_CARD_COUNT = 2
-local BOOK_CARD_GAP, BOOK_GROUP_GAP = 8, 16
-local BOOK_CARD_PADDING = 10
-local BOOK_ICON_SIZE, BOOK_ICON_GAP = 40, 10
-local BOOK_BAR_HEIGHT = 14
+local BOOK = { NAME_SCALE = 14 / 12, MARGIN = 12, TOP = -34, CARD_WIDTH = 526, CARD_HEIGHT = 72, GAP = 8, PAD = 10, BAR = 14, LINE = 3 }
+local SPELL = { SIZE = 36, LABEL_GAP = 8, LABEL_WIDTH = 100, SLOT_GAP = 12, COLUMN_GAP = 16 }
+SPELL.SLOT = SPELL.SIZE + SPELL.LABEL_GAP + SPELL.LABEL_WIDTH
+BOOK.TEXT_WIDTH = BOOK.CARD_WIDTH - BOOK.PAD * 2 - SPELL.SLOT * 2 - SPELL.SLOT_GAP - SPELL.COLUMN_GAP
 local UNLEARN_GAP = 8
-local SPELL_BUTTON_SIZE = 40
-local SPELL_LABEL_GAP, SPELL_LABEL_WIDTH = 5, 100
-local SPELL_SLOT_GAP = 12
-local SPELL_SLOT_WIDTH = SPELL_BUTTON_SIZE + SPELL_LABEL_GAP + SPELL_LABEL_WIDTH
-local BOOK_TEXT_RIGHT = BOOK_CARD_WIDTH - BOOK_CARD_PADDING * 2 - SPELL_SLOT_WIDTH * 2 - SPELL_SLOT_GAP
 
-local frameInstalled, bookInstalled, customerInstalled, templatesInstalled = false, false, false, false
+local templatesInstalled = false
 local waitingForWidth = false
-local frameSkinned, bookSkinned, bookLaidOut, customerSkinned = false, false, false, false
-local owned = {}
+local bookLaidOut = false
 
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
+local context = Skin.Define('professions', {
+	name = 'Professions',
+	description = 'The professions book, crafting window and crafting orders: recipe list, schematic panel, flat rank bar, tabs, specializations, the crafter order browser and order view, and the customer order window (NPC only, so the preview shows the book).',
+	icon = 'Interface/Icons/Trade_Engineering',
+})
+local Enabled, Hook, Own, Chrome = context.Enabled, context.Hook, context.Own, context.Chrome
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
-local Shell, Button, Close, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.Dropdown, context.EditBox, context.CheckBox
+local Shell, Button, Card = context.Shell, context.Button, context.Card
+local Dropdown, EditBox, CheckBox = context.Dropdown, context.EditBox, context.CheckBox
 local ScrollBar, Tab, Body, Title = context.ScrollBar, context.Tab, context.Body, context.Title
 local FlatTexture, AccentTexture, CropIcon = Skin.FlatTexture, Skin.AccentTexture, Skin.CropIcon
-
-local function Safely(handler, ...)
-	xpcall(handler, geterrorhandler(), ...)
-end
-
-local function Guard(handler)
-	return function(...)
-		if Enabled() then xpcall(handler, geterrorhandler(), ...) end
-	end
-end
-
-local function Hook(target, method, handler)
-	SecureHook(target, method, Guard(handler))
-end
-
-local function Own(texture)
-	texture.__buiSkin = true
-	owned[texture] = true
-	return texture
-end
 
 local function NoteFonts()
 	if _G[NOTE_FONT] then return end
@@ -102,58 +69,17 @@ local function NoteFonts()
 	Skin.TipFont(CreateFont(NOTE_HINT_FONT), 'label')
 end
 
-local function HoverEdges(button)
-	if button._buiHoverEdges then return end
-	local red, green, blue = Theme.GetAccent()
-	local edges = {}
-	for edgeIndex = 1, 4 do
-		local edge = Own(button:CreateTexture(nil, 'HIGHLIGHT'))
-		edge:SetColorTexture(red, green, blue, 1)
-		edges[edgeIndex] = edge
-	end
-	edges[1]:SetPoint('TOPLEFT'); edges[1]:SetPoint('TOPRIGHT'); edges[1]:SetHeight(1)
-	edges[2]:SetPoint('BOTTOMLEFT'); edges[2]:SetPoint('BOTTOMRIGHT'); edges[2]:SetHeight(1)
-	edges[3]:SetPoint('TOPLEFT'); edges[3]:SetPoint('BOTTOMLEFT'); edges[3]:SetWidth(1)
-	edges[4]:SetPoint('TOPRIGHT'); edges[4]:SetPoint('BOTTOMRIGHT'); edges[4]:SetWidth(1)
-	BUILib.Skin.AlignEdges(button, nil, edges)
-	button._buiHoverEdges = edges
-end
-
-local function SkinButton(button)
-	if not button then return end
-	Button(button)
-	HoverEdges(button)
-end
-
-local function FadeStateTextures(button)
+local function SkinIconButton(button)
 	Fade(button:GetNormalTexture())
 	Fade(button:GetPushedTexture())
 	Fade(button:GetDisabledTexture())
 	Fade(button:GetHighlightTexture())
-end
-
-local function SkinIconButton(button)
-	if not button then return end
-	FadeStateTextures(button)
 	Shell(button)
-	HoverEdges(button)
-end
-
-local function SkinPanel(frame)
-	FadeKeys(frame, FRAME_ART)
-	FadeRegions(frame)
-	if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
-	Shell(frame)
-	Title(frame.TitleContainer and frame.TitleContainer.TitleText)
-	Close(frame.CloseButton)
+	Skin.AccentHover(button)
 end
 
 local function SkinDialog(dialog)
-	FadeRegions(dialog)
-	FadeKeys(dialog, DIALOG_ART)
-	Shell(dialog)
-	Title(dialog.TitleContainer and dialog.TitleContainer.TitleText)
-	Close(dialog.ClosePanelButton)
+	Chrome(dialog, dialog.ClosePanelButton)
 end
 
 local function TrackArrowState(arrow)
@@ -333,8 +259,8 @@ local function SkinQualityDialog(dialog)
 		SkinSlotButton(container.Button)
 		SkinSpinner(container.EditBox)
 	end
-	SkinButton(dialog.AcceptButton)
-	SkinButton(dialog.CancelButton)
+	Button(dialog.AcceptButton)
+	Button(dialog.CancelButton)
 end
 
 local function SkinSchematicText(form)
@@ -431,30 +357,35 @@ local function SkinCraftingPage(page)
 	Shell(form)
 	SkinSchematicText(form)
 	SkinRankBar(page.RankBar)
-	for _, key in ipairs(CRAFTING_BUTTON_KEYS) do SkinButton(page[key]) end
+	for _, key in ipairs(CRAFTING_BUTTON_KEYS) do Button(page[key]) end
 	SkinSpinner(page.CreateMultipleInputBox)
 	for _, slot in ipairs(page.InventorySlots) do SkinItemButton(slot) end
 	FadeRegions(page.GearSlotDivider)
 	Body(page.ConcentrationDisplay.Amount)
 	EditBox(page.MinimizedSearchBox)
-	SkinPanel(page.MinimizedSearchResults)
-	ScrollBar(page.MinimizedSearchResults.ScrollBar)
+	local results = page.MinimizedSearchResults
+	Chrome(results)
+	ScrollBar(results.ScrollBar)
 	SkinOutputLog(page.CraftingOutputLog)
 end
 
-local function OnSpecTabSelected(tab, selected)
+local function OnTabSelected(tab, selected)
 	Skin.TipTabSelected(tab, selected == true)
 end
 
-local function SkinSpecTab(tab)
-	if not tab._buiSpecTab then
-		tab._buiSpecTab = true
-		tab.StateIcon.__buiSkin = true
-		tab.StateIconGlow.__buiSkin = true
+local function SkinSelectTab(tab)
+	if not tab._buiSelectTab then
+		tab._buiSelectTab = true
 		Tab(tab)
-		Hook(tab, 'SetTabSelected', OnSpecTabSelected)
+		Hook(tab, 'SetTabSelected', OnTabSelected)
 	end
 	Skin.TipTabSelected(tab, tab.isSelected == true)
+end
+
+local function SkinSpecTab(tab)
+	tab.StateIcon.__buiSkin = true
+	tab.StateIconGlow.__buiSkin = true
+	SkinSelectTab(tab)
 end
 
 local function SweepSpecTabs(spec)
@@ -472,8 +403,8 @@ local function SkinSpecPage(spec)
 	Title(detailed.PathName)
 	Fade(detailed.UnspentPoints.CurrencyBackground)
 	Body(detailed.UnspentPoints.Count)
-	SkinButton(detailed.SpendPointsButton)
-	SkinButton(detailed.UnlockPathButton)
+	Button(detailed.SpendPointsButton)
+	Button(detailed.UnlockPathButton)
 	DividerLine(spec.VerticalDivider, true)
 	DividerLine(spec.TopDivider, false)
 	local preview = spec.TreePreview
@@ -483,7 +414,7 @@ local function SkinSpecPage(spec)
 	Body(preview.Description)
 	Skin.TipFont(preview.HighlightsHeader, 'label')
 	for _, highlight in ipairs(preview.Highlights) do Body(highlight.Description) end
-	for _, key in ipairs(SPEC_BUTTON_KEYS) do SkinButton(spec[key]) end
+	for _, key in ipairs(SPEC_BUTTON_KEYS) do Button(spec[key]) end
 	if not spec._buiSpecHooked then
 		spec._buiSpecHooked = true
 		Hook(spec, 'InitializeTabs', SweepSpecTabs)
@@ -491,25 +422,14 @@ local function SkinSpecPage(spec)
 	SweepSpecTabs(spec)
 end
 
-local function OnOrderTypeTab(tab, selected)
-	Skin.TipTabSelected(tab, selected == true)
-end
-
 local function SkinOrderBrowse(browse)
 	SkinRecipeList(browse.RecipeList)
 	SkinIconButton(browse.FavoritesSearchButton)
-	SkinButton(browse.SearchButton)
+	Button(browse.SearchButton)
 	FadeKeys(browse.BackButton, PANEL_BUTTON_ART)
 	Skin.TipPageButton(browse.BackButton, 'previous')
 	SkinList(browse.OrderList)
-	for _, tab in ipairs(browse.orderTypeTabs) do
-		Tab(tab)
-		Skin.TipTabSelected(tab, tab.isSelected == true)
-		if not tab._buiTypeTab then
-			tab._buiTypeTab = true
-			Hook(tab, 'SetTabSelected', OnOrderTypeTab)
-		end
-	end
+	for _, tab in ipairs(browse.orderTypeTabs) do SkinSelectTab(tab) end
 	local remaining = browse.OrdersRemainingDisplay
 	Fade(remaining.Background)
 	Body(remaining.OrdersRemaining)
@@ -530,7 +450,7 @@ local function SkinOrderInfo(info)
 	Shell(info)
 	for _, key in ipairs(ORDER_INFO_LABEL_KEYS) do Skin.TipFont(info[key], 'label') end
 	for _, key in ipairs(ORDER_INFO_BODY_KEYS) do Body(info[key]) end
-	for _, key in ipairs(ORDER_INFO_BUTTON_KEYS) do SkinButton(info[key]) end
+	for _, key in ipairs(ORDER_INFO_BUTTON_KEYS) do Button(info[key]) end
 	SkinStretchButton(info.SocialDropdown)
 	local noteBox = info.NoteBox
 	Fade(noteBox.Background.Border)
@@ -561,13 +481,13 @@ local function SkinOrderView(view)
 	SkinNoteFrame(fulfillment.NoteEditBox)
 	SkinRankBar(view.RankBar)
 	Body(view.ConcentrationDisplay.Amount)
-	for _, key in ipairs(ORDER_VIEW_BUTTON_KEYS) do SkinButton(view[key]) end
+	for _, key in ipairs(ORDER_VIEW_BUTTON_KEYS) do Button(view[key]) end
 	local decline = view.DeclineOrderDialog
 	SkinDialog(decline)
 	Body(decline.ConfirmationText)
 	SkinNoteFrame(decline.NoteEditBox)
-	SkinButton(decline.CancelButton)
-	SkinButton(decline.ConfirmButton)
+	Button(decline.CancelButton)
+	Button(decline.ConfirmButton)
 	SkinOutputLog(view.CraftingOutputLog)
 	if not view._buiOrderHook then
 		view._buiOrderHook = true
@@ -575,28 +495,9 @@ local function SkinOrderView(view)
 	end
 end
 
-local function ShowSelectedTab(tabSystem)
-	for _, tab in ipairs(tabSystem.tabs) do Skin.TipTabSelected(tab, tab.isSelected == true) end
-end
-
-local function SkinTabSystem(tabSystem, frame)
-	for _, tab in ipairs(tabSystem.tabs) do Tab(tab, true) end
-	ShowSelectedTab(tabSystem)
-	if not tabSystem._buiTabHook then
-		tabSystem._buiTabHook = true
-		Hook(tabSystem, 'SetTabVisuallySelected', ShowSelectedTab)
-	end
-	tabSystem.spacing = BUILib.Skin.TAB_STRIP_OVERLAP
-	tabSystem:MarkDirty()
-	tabSystem:ClearAllPoints()
-	tabSystem:SetPoint('TOPLEFT', frame, 'BOTTOMLEFT', -BUILib.Skin.TAB_INSET, BUILib.Skin.TAB_INSET)
-end
-
 local function SkinProfessionsFrame(frame)
-	SkinPanel(frame)
-	Skin.TipPageButton(frame.MaximizeMinimize.MaximizeButton, 'expand')
-	Skin.TipPageButton(frame.MaximizeMinimize.MinimizeButton, 'condense')
-	SkinTabSystem(frame.TabSystem, frame)
+	Chrome(frame)
+	Skin.RegisterTabSystem(frame.TabSystem, context, frame)
 	SkinCraftingPage(frame.CraftingPage)
 	SkinSpecPage(frame.SpecPage)
 	SkinOrderBrowse(frame.OrdersPage.BrowseFrame)
@@ -605,8 +506,8 @@ end
 
 local function OnCategoryButton(button)
 	if button.isSpacer then return end
-	button.NormalTexture:SetAlpha(0)
-	button.Lines:SetAlpha(0)
+	Fade(button.NormalTexture)
+	Fade(button.Lines)
 	local selected, highlight = button.SelectedTexture, button.HighlightTexture
 	selected:SetBlendMode('BLEND')
 	AccentTexture(selected, ROW_SELECTED_ALPHA)
@@ -620,7 +521,7 @@ end
 local function SkinSearchBar(bar)
 	SkinIconButton(bar.FavoritesSearchButton)
 	EditBox(bar.SearchBox)
-	SkinButton(bar.SearchButton)
+	Button(bar.SearchButton)
 	Dropdown(bar.FilterDropdown)
 end
 
@@ -650,15 +551,14 @@ local function SkinPayment(payment)
 	SkinMoneyInput(payment.TipMoneyInputFrame)
 	Body(payment.TimeRemainingDisplay.Text)
 	Dropdown(payment.DurationDropdown)
-	SkinButton(payment.ListOrderButton)
-	SkinButton(payment.CancelOrderButton)
+	Button(payment.ListOrderButton)
+	Button(payment.CancelOrderButton)
 end
 
 local function SkinListings(listings)
 	SkinDialog(listings)
-	FadeKeys(listings, FRAME_ART)
 	SkinList(listings.OrderList)
-	SkinButton(listings.CloseButton)
+	Button(listings.CloseButton)
 end
 
 local function SkinCustomerForm(form)
@@ -672,7 +572,7 @@ local function SkinCustomerForm(form)
 		FadeKeys(panel, LIST_ART)
 		Shell(panel)
 	end
-	SkinButton(form.BackButton)
+	Button(form.BackButton)
 	Skin.TipFont(form.MinimumQuality.Text, 'label')
 	Dropdown(form.MinimumQuality.Dropdown)
 	Dropdown(form.OrderRecipientDropdown)
@@ -700,7 +600,7 @@ local function SkinCustomerForm(form)
 end
 
 local function SkinCustomerFrame(frame)
-	SkinPanel(frame)
+	Chrome(frame)
 	FadeKeys(frame, CUSTOMER_FRAME_ART)
 	Skin.RegisterTabStrip(frame, frame.Tabs, context)
 	Skin.RefreshTabStrip(frame)
@@ -736,82 +636,69 @@ local function SkinBookBar(bar)
 	Skin.TipFace(bar.rankText, 'body')
 end
 
-local function PlaceSpellButton(button, point, relativeTo, relativePoint, x, y)
+local function LayoutSpellButton(button, relativeTo, relativePoint, x)
+	button:SetSize(SPELL.SIZE, SPELL.SIZE)
 	button:ClearAllPoints()
-	button:SetPoint(point, relativeTo, relativePoint, x, y)
+	button:SetPoint('RIGHT', relativeTo, relativePoint, x, 0)
+	button.spellString:ClearAllPoints()
+	button.spellString:SetPoint('LEFT', button, 'RIGHT', SPELL.LABEL_GAP, 0)
 end
 
-local function LayoutPrimaryIdentity(row)
-	local border = _G[row:GetName() .. 'IconBorder']
-	border:ClearAllPoints()
-	border:SetSize(BOOK_ICON_SIZE, BOOK_ICON_SIZE)
-	border:SetPoint('TOPLEFT', row, 'TOPLEFT', BOOK_CARD_PADDING, -BOOK_CARD_PADDING)
-	row.specialization:ClearAllPoints()
-	row.specialization:SetPoint('TOPLEFT', row.professionName, 'BOTTOMLEFT', 0, -2)
-	row.UnlearnButton:ClearAllPoints()
-	row.UnlearnButton:SetPoint('LEFT', row.professionName, 'RIGHT', UNLEARN_GAP, 0)
-end
-
-local function LayoutBookCard(row, primary)
-	local textX = primary and (BOOK_CARD_PADDING + BOOK_ICON_SIZE + BOOK_ICON_GAP) or BOOK_CARD_PADDING
-	if primary then LayoutPrimaryIdentity(row) end
-	row.professionName:ClearAllPoints()
-	row.professionName:SetPoint('TOPLEFT', row, 'TOPLEFT', textX, -BOOK_CARD_PADDING)
-	row.rank:ClearAllPoints()
-	row.rank:SetPoint('TOPLEFT', primary and row.specialization or row.professionName, 'BOTTOMLEFT', 0, -2)
-	row.rank:SetWidth(BOOK_TEXT_RIGHT - textX)
-	row.rank:SetWordWrap(false)
-	row.missingHeader:ClearAllPoints()
-	row.missingHeader:SetPoint('TOPLEFT', row, 'TOPLEFT', textX, -BOOK_CARD_PADDING)
-	local bar = row.statusBar
+local function LayoutBookCard(row)
+	local name, rank, header, bar = row.professionName, row.rank, row.missingHeader, row.statusBar
+	name:ClearAllPoints()
+	name:SetPoint('TOPLEFT', row, 'TOPLEFT', BOOK.PAD, -BOOK.PAD)
+	rank:ClearAllPoints()
+	rank:SetPoint('TOPLEFT', name, 'BOTTOMLEFT', 0, -BOOK.LINE)
+	rank:SetWidth(BOOK.TEXT_WIDTH)
+	rank:SetWordWrap(false)
+	header:ClearAllPoints()
+	header:SetPoint('TOPLEFT', row, 'TOPLEFT', BOOK.PAD, -BOOK.PAD)
+	row.missingText:ClearAllPoints()
+	row.missingText:SetPoint('TOPLEFT', header, 'BOTTOMLEFT', 0, -BOOK.LINE)
+	row.missingText:SetWidth(BOOK.CARD_WIDTH - BOOK.PAD * 2)
 	bar:ClearAllPoints()
-	bar:SetHeight(BOOK_BAR_HEIGHT)
-	bar:SetPoint('BOTTOMLEFT', row, 'BOTTOMLEFT', BOOK_CARD_PADDING, BOOK_CARD_PADDING)
-	bar:SetPoint('BOTTOMRIGHT', row, 'BOTTOMRIGHT', -BOOK_CARD_PADDING, BOOK_CARD_PADDING)
-	PlaceSpellButton(row.SpellButton1, 'TOPRIGHT', row, 'TOPRIGHT', -(BOOK_CARD_PADDING + SPELL_LABEL_GAP + SPELL_LABEL_WIDTH), -BOOK_CARD_PADDING)
-	PlaceSpellButton(row.SpellButton2, 'TOPRIGHT', row.SpellButton1, 'TOPLEFT', -(SPELL_LABEL_GAP + SPELL_LABEL_WIDTH + SPELL_SLOT_GAP), 0)
+	bar:SetSize(BOOK.TEXT_WIDTH, BOOK.BAR)
+	bar:SetPoint('BOTTOMLEFT', row, 'BOTTOMLEFT', BOOK.PAD, BOOK.PAD)
+	bar.rankText:ClearAllPoints()
+	bar.rankText:SetPoint('CENTER', bar, 'CENTER', 0, 0)
+	if row.UnlearnButton then
+		row.UnlearnButton:ClearAllPoints()
+		row.UnlearnButton:SetPoint('LEFT', name, 'RIGHT', UNLEARN_GAP, 0)
+	end
+	LayoutSpellButton(row.SpellButton1, row, 'RIGHT', -(BOOK.PAD + SPELL.LABEL_GAP + SPELL.LABEL_WIDTH))
+	LayoutSpellButton(row.SpellButton2, row.SpellButton1, 'LEFT', -(SPELL.LABEL_GAP + SPELL.LABEL_WIDTH + SPELL.SLOT_GAP))
 end
 
 local function LayoutBookCards(frame)
 	if bookLaidOut or not Enabled() then return end
 	local previous
-	for index, name in ipairs(BOOK_ROW_NAMES) do
+	for _, name in ipairs(BOOK_ROW_NAMES) do
 		local row = _G[name]
-		row:SetSize(BOOK_CARD_WIDTH, BOOK_CARD_HEIGHT)
+		row:SetSize(BOOK.CARD_WIDTH, BOOK.CARD_HEIGHT)
 		row:ClearAllPoints()
 		if previous then
-			row:SetPoint('TOPLEFT', previous, 'BOTTOMLEFT', 0, -(index == PRIMARY_CARD_COUNT + 1 and BOOK_GROUP_GAP or BOOK_CARD_GAP))
+			row:SetPoint('TOPLEFT', previous, 'BOTTOMLEFT', 0, -BOOK.GAP)
 		else
-			row:SetPoint('TOPLEFT', frame, 'TOPLEFT', BOOK_COLUMN_X, BOOK_TOP_Y)
+			row:SetPoint('TOPLEFT', frame, 'TOPLEFT', BOOK.MARGIN, BOOK.TOP)
 		end
-		LayoutBookCard(row, index <= PRIMARY_CARD_COUNT)
-		local rankText = row.statusBar.rankText
-		rankText:ClearAllPoints()
-		rankText:SetPoint('CENTER', row.statusBar, 'CENTER', 0, 0)
+		LayoutBookCard(row)
 		previous = row
 	end
+	local count = #BOOK_ROW_NAMES
+	frame:SetHeight(BOOK.MARGIN - BOOK.TOP + count * BOOK.CARD_HEIGHT + (count - 1) * BOOK.GAP)
 	bookLaidOut = true
 end
 
-local function SkinBookRow(row, primary)
-	local icon = row.icon
-	if icon then
+local function SkinBookRow(row)
+	if row.icon then
+		Fade(row.icon)
 		Fade(_G[row:GetName() .. 'IconBorder'])
 	end
-	if icon and not row._buiIcon then
-		row._buiIcon = true
-		icon:RemoveMaskTexture(row.CircleMask)
-		icon:SetBlendMode('BLEND')
-		icon:SetAlpha(1)
-		icon:SetDesaturation(0)
-		CropIcon(icon)
-		Skin.TipIconFrame(row, icon)
-	end
-	Shell(row)
-	Skin.TipFont(row.professionName, 'title', primary and BOOK_TITLE_SCALE or BOOK_SUBTITLE_SCALE)
-	Body(row.specialization)
+	Card(row)
+	Skin.TipFont(row.professionName, 'title', BOOK.NAME_SCALE)
 	Skin.TipFont(row.rank, 'label')
-	Title(row.missingHeader)
+	Skin.TipFont(row.missingHeader, 'title', BOOK.NAME_SCALE)
 	Body(row.missingText)
 	SkinBookSpellButton(row.SpellButton1)
 	SkinBookSpellButton(row.SpellButton2)
@@ -819,31 +706,10 @@ local function SkinBookRow(row, primary)
 end
 
 local function SkinBook(frame)
-	SkinPanel(frame)
+	Chrome(frame)
 	for _, name in ipairs(BOOK_PAGE_NAMES) do Fade(_G[name]) end
-	for index, name in ipairs(BOOK_ROW_NAMES) do SkinBookRow(_G[name], index <= PRIMARY_CARD_COUNT) end
-	BUI.Events:AfterCombat(function() Safely(LayoutBookCards, frame) end, 'Skin.ProfessionsBookLayout')
-end
-
-local function ApplyFrame()
-	local frame = _G.ProfessionsFrame
-	if frameSkinned or not frame or frame:IsForbidden() or not frame:IsShown() or not Enabled() then return end
-	SkinProfessionsFrame(frame)
-	frameSkinned = true
-end
-
-local function ApplyBook()
-	local frame = _G.ProfessionsBookFrame
-	if bookSkinned or not frame or frame:IsForbidden() or not frame:IsShown() or not Enabled() then return end
-	SkinBook(frame)
-	bookSkinned = true
-end
-
-local function ApplyCustomer()
-	local frame = _G.ProfessionsCustomerOrdersFrame
-	if customerSkinned or not frame or frame:IsForbidden() or not frame:IsShown() or not Enabled() then return end
-	SkinCustomerFrame(frame)
-	customerSkinned = true
+	for _, name in ipairs(BOOK_ROW_NAMES) do SkinBookRow(_G[name]) end
+	BUI.Events:AfterCombat(function() context.Safely(LayoutBookCards, frame) end, 'Skin.ProfessionsBookLayout')
 end
 
 local function InstallTemplates()
@@ -873,78 +739,14 @@ local function HideUntilSized(frame)
 	frame:SetAlpha(0)
 end
 
-local function InstallFrame()
-	local frame = _G.ProfessionsFrame
-	if frameInstalled or not frame then return end
-	frameInstalled = true
+local function InstallCraftingHooks(frame)
 	InstallTemplates()
 	Hook(ProfessionsCraftingOutputLogElementMixin, 'Init', OnOutputEntry)
-	frame:HookScript('OnShow', Wrap('Skin.Professions hide until sized', Guard(HideUntilSized)))
+	frame:HookScript('OnShow', Wrap('Skin.Professions hide until sized', context.Guard(HideUntilSized)))
 	SecureHook(frame, 'SetTab', RevealOnceSized)
 	SecureHook(frame, 'ApplyDesiredWidth', RevealOnceSized)
-	frame:HookScript('OnShow', Wrap('Skin.Professions frame reskin', Guard(ApplyFrame)))
-	Safely(ApplyFrame)
 end
 
-local function InstallBook()
-	local frame = _G.ProfessionsBookFrame
-	if bookInstalled or not frame then return end
-	bookInstalled = true
-	frame:HookScript('OnShow', Wrap('Skin.Professions book reskin', Guard(ApplyBook)))
-	Safely(ApplyBook)
-end
-
-local function InstallCustomer()
-	local frame = _G.ProfessionsCustomerOrdersFrame
-	if customerInstalled or not frame then return end
-	customerInstalled = true
-	InstallTemplates()
-	frame:HookScript('OnShow', Wrap('Skin.Professions orders reskin', Guard(ApplyCustomer)))
-	Safely(ApplyCustomer)
-end
-
-local function AllInstalled()
-	return frameInstalled and bookInstalled and customerInstalled
-end
-
-local function TryInstall()
-	InstallFrame()
-	InstallBook()
-	InstallCustomer()
-	if AllInstalled() then BUI.Events:Unregister('ADDON_LOADED', 'Skin.Professions') end
-end
-
-local function SetOwnedShown(shown)
-	for texture in pairs(owned) do texture:SetShown(shown) end
-end
-
-local function Deactivate()
-	context.Restore()
-	SetOwnedShown(false)
-	frameSkinned, bookSkinned, customerSkinned = false, false, false
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		SetOwnedShown(true)
-		TryInstall()
-		if not AllInstalled() then BUI.Events:Register('ADDON_LOADED', 'Skin.Professions', TryInstall) end
-		Safely(ApplyFrame)
-		Safely(ApplyBook)
-		Safely(ApplyCustomer)
-	else
-		Deactivate()
-	end
-end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Professions',
-	description = 'The professions book, crafting window and crafting orders: recipe list, schematic panel, flat rank bar, tabs, specializations, the crafter order browser and order view, and the customer order window (NPC only, so the preview shows the book).',
-	icon = 'Interface/Icons/Trade_Engineering',
-})
-
-BUI.Events:Once('PLAYER_LOGIN', 'Skin.ProfessionsInstall', function()
-	if not Enabled() then return end
-	TryInstall()
-	if not AllInstalled() then BUI.Events:Register('ADDON_LOADED', 'Skin.Professions', TryInstall) end
-end)
+context.Window('ProfessionsFrame', { skin = SkinProfessionsFrame, install = InstallCraftingHooks })
+context.Window('ProfessionsBookFrame', { skin = SkinBook })
+context.Window('ProfessionsCustomerOrdersFrame', { skin = SkinCustomerFrame, install = InstallTemplates })
