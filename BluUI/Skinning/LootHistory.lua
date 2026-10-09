@@ -172,8 +172,7 @@ local function SkinScrollBar(scrollBar)
 		fill.__buiSkin = true
 		fill:SetPoint('TOPLEFT', thumb, 'TOPLEFT', 2, 0)
 		fill:SetPoint('BOTTOMRIGHT', thumb, 'BOTTOMRIGHT', -2, 0)
-		local edge = BUI.C.PANEL_BACKDROP
-		Tools.SetColorTex(fill, edge[5], edge[6], edge[7], 1)
+		BUI.Painter.Fill(fill, 'skinBorder')
 	end
 end
 

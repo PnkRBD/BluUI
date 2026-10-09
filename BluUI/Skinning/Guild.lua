@@ -415,8 +415,7 @@ local function SkinFactionBar(factionFrame)
 	FadeKeys(bar, FACTION_BAR_ART)
 	local trough = bar.BG
 	if trough then
-		local fill = Skin.PANEL_FILL
-		FlatTexture(trough, fill[1], fill[2], fill[3], fill[4])
+		BUI.Painter.Fill(trough, 'skinBackground')
 		Skin.TipIconFrame(bar, trough)
 	end
 	AccentTexture(bar.Progress, 1)
@@ -995,8 +994,7 @@ local function SkinBankSlot(button)
 	local fill = button:CreateTexture(nil, 'BACKGROUND')
 	fill.__buiSkin = true
 	fill:SetAllPoints(icon)
-	local panel = Skin.PANEL_FILL
-	FlatTexture(fill, panel[1], panel[2], panel[3], panel[4])
+	BUI.Painter.Fill(fill, 'skinBackground')
 	FrameIcon(button, icon)
 end
 

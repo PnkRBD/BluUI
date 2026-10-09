@@ -29,7 +29,7 @@ local function Enabled()
 end
 
 local context = Skin.NewContext(Enabled)
-local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
+local Fade, FadeRegions = context.Fade, context.FadeRegions
 local Shell, Button, Close, Body, Face = context.Shell, context.Button, context.Close, context.Body, context.Face
 local FlatTexture, CropIcon = Skin.FlatTexture, Skin.CropIcon
 
@@ -43,8 +43,7 @@ local function ReplaceDivider(texture)
 		line:SetHeight(1)
 		line:SetPoint('LEFT', texture, 'LEFT', DIVIDER_INSET, 0)
 		line:SetPoint('RIGHT', texture, 'RIGHT', -DIVIDER_INSET, 0)
-		local edge = Skin.PANEL_EDGE
-		FlatTexture(line, edge[1], edge[2], edge[3], edge[4])
+		BUI.Painter.Fill(line, 'skinBorder')
 		BUILib.Skin.PixelLine(line, texture, false, DIVIDER_INSET, DIVIDER_INSET)
 		texture._buiDividerLine = line
 		dividerLines[#dividerLines + 1] = line

@@ -258,6 +258,7 @@ local entries = {
 
 	{ label = "Use Class Color", page = "settings", tab = 1, panel = "Accent", keywords = "theme color accent class" },
 	{ label = "Accent Color", page = "settings", tab = 1, panel = "Accent", keywords = "theme color accent" },
+	{ label = "Blizzard windows", page = "settings", tab = 7, panel = "Theme", keywords = "skin skins blizzard game windows background border lines titles text labels color colour" },
 	{ label = "Global Bar Texture", page = "settings", tab = 1, panel = "Bar Textures", keywords = "texture statusbar" },
 	{ label = "Gradient Tint", page = "settings", tab = 1, panel = "Bar Textures", keywords = "gradient color texture" },
 	{ label = "Global Font", page = "settings", tab = 1, panel = "Fonts", keywords = "font typeface" },

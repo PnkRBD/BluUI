@@ -109,8 +109,7 @@ local function FrameCircle(frame, host)
 	local ring = frame:CreateTexture(nil, 'ARTWORK', nil, RING_SUBLEVEL)
 	ring.__buiSkin = true
 	ring:SetTexture(RECT_MASK_TEXTURE)
-	local backdrop = BUI.C.PANEL_BACKDROP
-	ring:SetVertexColor(backdrop[5], backdrop[6], backdrop[7], backdrop[8])
+	BUI.Painter.Tint(ring, 'skinBorder')
 	ring:SetSize(ringSize, ringSize)
 	ring:SetPoint('CENTER', host, 'CENTER', CIRCLE_OFFSET_X, CIRCLE_OFFSET_Y)
 	ring:AddMaskTexture(ringMask)

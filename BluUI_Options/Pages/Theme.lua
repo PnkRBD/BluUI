@@ -17,9 +17,8 @@ local OPACITY_STEPS = { 100, 98, 95, 90, 85, 80, 70, 50 }
 local WINDOW_SCALE_STEPS = { 120, 110, 100, 95, 90, 85, 80, 75, 70 }
 
 local DEFAULT_PAGE = Layout.DefaultColor('page', 'dark')
-local SHELL = BUI.C.PANEL_BACKDROP
-local SHELL_FILL = { SHELL[1], SHELL[2], SHELL[3], SHELL[4] }
-local SHELL_EDGE = { SHELL[5], SHELL[6], SHELL[7], SHELL[8] }
+local SHELL_FILL = { unpack(Layout.DefaultColor('skinBackground', 'dark')) }
+local SHELL_EDGE = { unpack(Layout.DefaultColor('skinBorder', 'dark')) }
 local SHELL_TILE = { 0.03, 0.03, 0.036, 1 }
 local PRESETS = {
 	{ name = 'Glass', theme = {} },
@@ -80,6 +79,18 @@ local COLOR_SECTIONS = {
 			{ role = 'secondary', name = 'Buttons', sub = 'Actions like Reset' },
 		},
 	},
+	{
+		title = 'Blizzard windows',
+		description = 'Every skinned game window, like the character sheet, Adventure Guide and Group Finder. Changes show straight away.',
+		roles = {
+			{ role = 'skinBackground', name = 'Background', sub = 'Behind every skinned window', opacity = true },
+			{ role = 'skinBorder', name = 'Borders', sub = 'Window, button and icon outlines' },
+			{ role = 'skinLine', name = 'Lines', sub = 'Dividers under titles', opacity = true },
+			{ role = 'skinTitle', name = 'Titles', sub = 'Headings and names' },
+			{ role = 'skinText', name = 'Text', sub = 'Body text and buttons' },
+			{ role = 'skinLabel', name = 'Labels', sub = 'Captions and disabled text' },
+		},
+	},
 }
 
 local function Window()
@@ -92,6 +103,7 @@ end
 
 local function Repaint()
 	Window():Repaint()
+	BUI.Painter.Repaint()
 end
 
 local function Hex(red, green, blue)

@@ -411,8 +411,7 @@ local function SkinJourneyEntry(entry)
 		line:SetPoint('LEFT', entry, 'LEFT', 14, 0)
 		line:SetPoint('RIGHT', entry, 'RIGHT', -31, 0)
 		line:SetHeight(1)
-		local edge = Skin.PANEL_EDGE
-		FlatTexture(line, edge[1], edge[2], edge[3], edge[4])
+		BUI.Painter.Fill(line, 'skinBorder')
 		BUILib.Skin.PixelLine(line, entry, false, 14, 31)
 	end
 end
