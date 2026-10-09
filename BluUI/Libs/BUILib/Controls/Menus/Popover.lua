@@ -47,8 +47,7 @@ function Controls.Popover(options)
 		bg = options.bg or Theme.bg.dark, border = options.border or Theme.border.light, size = { width, totalHeight },
 	})
 	local frame = frameWidget.frame
-	frame:SetFrameStrata(BUILib.GetPopupStrata())
-	frame:SetFrameLevel(BUILib.GetPopupLevel() + 50)
+	Widget.LiftAbove(frame, anchor)
 	frame:SetClampedToScreen(true)
 	frame:EnableMouse(true)
 	frame:Hide()

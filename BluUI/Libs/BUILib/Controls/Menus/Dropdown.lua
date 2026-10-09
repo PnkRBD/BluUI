@@ -22,18 +22,11 @@ local unpack = unpack
 local ShowMenu = Widget.ShowMenuAnimated
 local HideMenu = Widget.HideMenuAnimated
 
-local STRATA_ORDER = {BACKGROUND=0,LOW=1,MEDIUM=2,HIGH=3,DIALOG=4,FULLSCREEN_DIALOG=5,TOOLTIP=6}
-
 function Widget.DropdownMenuScaffold(parentFrame, anchorButton, menuWidth, scrollStep, onClose)
 	local menuWidget = Widget.New({frame = UIParent}, "Frame", nil, {raw = true, size = {menuWidth, 100}})
 	local menu = menuWidget.frame
 	Widget.RoundedPanel(menu, Widget.INPUT_RADIUS, Theme.bg.input, Theme.border.input)
-	local parentStrata = parentFrame:GetFrameStrata(); local parentLevel = parentFrame:GetFrameLevel()
-	local popupStrata = BUILib.GetPopupStrata(); local popupLevel = BUILib.GetPopupLevel()
-	local useParent = (STRATA_ORDER[parentStrata] or 0) > (STRATA_ORDER[popupStrata] or 0) or
-		((STRATA_ORDER[parentStrata] or 0) == (STRATA_ORDER[popupStrata] or 0) and parentLevel >= popupLevel)
-	menu:SetFrameStrata(useParent and parentStrata or popupStrata)
-	menu:SetFrameLevel((useParent and parentLevel or popupLevel) + 50)
+	Widget.LiftAbove(menu, parentFrame)
 	menu:SetClampedToScreen(true); menu:Hide()
 
 	local panelInset = Widget.PANEL_INSET
