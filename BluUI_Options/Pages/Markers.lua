@@ -40,23 +40,26 @@ local function Offset(label, freeKey, anchoredKey, range)
 	}
 end
 
-local function Switch(board, label, key, tip)
-	board:AddSwitch(label, function() return Config()[key] == true end, function(value)
-		Config()[key] = value
-		Apply()
-	end, tip)
-end
-
 local function Sections(ui, _, parent, width)
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Marker bar',
-		description = 'Raid target and world marker tiles in a row. Click marks your target, Shift-Click places a world marker, Shift-Right-Click clears it. The countdown tile starts the primary timer on click, the secondary on Right-Click, and Shift-Click cancels it.',
+		description = 'Click a tile to mark your target, Shift-Click to place a world marker.',
 	})
-	Switch(board, 'Only in a group', 'onlyInGroup', 'Hide the bar while not in a party or raid')
-	Switch(board, 'Tooltips', 'tooltips', 'Explain each tile on mouseover')
-	board:AddTools('Position', 'Free on the screen, or hung off another BluUI frame', {
-		{ icon = 'location', tooltip = 'Position and anchor', title = 'Position', options = {
+	board:AddTools('Bar', 'Size, display and position', {
+		{ icon = 'resize', tooltip = 'Size, applied after combat', title = 'Size', options = {
+			Option('Icon size', 'iconSize', { min = 16, max = 40, step = 1 }),
+			Option('Spacing', 'spacing', { min = 0, max = 12, step = 1 }),
+		} },
+		{ tooltip = 'Display and fade', title = 'Display', slot = 'settings', options = {
+			Option('Only in a group', 'onlyInGroup'),
+			Option('Tooltips', 'tooltips'),
+			Option('Fade until moused over', 'fadeEnabled', { separator = true }),
+			Option('Bar opacity', 'alpha', { min = 10, max = 100, step = 1 }),
+			Option('Faded opacity', 'fadeAlpha', { min = 0, max = 100, step = 1 }),
+			Option('Fade time', 'fadeDuration', { min = 0, max = 1, step = 0.05 }),
+		} },
+		{ icon = 'location', tooltip = 'Position and anchor', title = 'Position', slot = 'position', options = {
 			Option('Anchor to', 'anchorFrame', { entries = ANCHORS }),
 			Option('Anchor side', 'anchorPoint', { entries = BUI.C.ANCHOR_PLACEMENT_OPTIONS }),
 			Offset('Horizontal offset', 'posX', 'anchorOffsetX', 1500),
@@ -64,23 +67,8 @@ local function Sections(ui, _, parent, width)
 			Option('Match anchor width', 'matchAnchorWidth'),
 		} },
 	}, Apply)
-	board:AddTools('Size', 'Icon size and spacing, applied after combat ends', {
-		{ tooltip = 'Icon size and spacing', title = 'Size', options = {
-			Option('Icon size', 'iconSize', { min = 16, max = 40, step = 1 }),
-			Option('Spacing', 'spacing', { min = 0, max = 12, step = 1 }),
-		} },
-	}, Apply)
-	board:AddTools('Mouseover fade', 'Fade the bar out until the cursor is over it', {
-		{ tooltip = 'Opacity and fade', title = 'Fade', options = {
-			Option('Bar opacity', 'alpha', { min = 10, max = 100, step = 1 }),
-			Option('Faded opacity', 'fadeAlpha', { min = 0, max = 100, step = 1 }),
-			Option('Fade time', 'fadeDuration', { min = 0.05, max = 1, step = 0.05 }),
-			Option('Animate', 'fadeAnimated'),
-		} },
-		{ get = function() return Config().fadeEnabled == true end, set = function(value) Config().fadeEnabled = value end },
-	}, Apply)
-	board:AddTools('Utility tiles', 'Clear, ready check and countdown beside the markers', {
-		{ tooltip = 'Countdown seconds', title = 'Countdowns', options = {
+	board:AddTools('Utility tiles', 'Clear, ready check and countdown', {
+		{ icon = 'clock', tooltip = 'Countdown seconds', title = 'Countdowns', options = {
 			Option('Primary countdown', 'countdownTime', { min = 0, max = 60, step = 1 }),
 			Option('Secondary countdown', 'countdownTime2', { min = 0, max = 60, step = 1 }),
 		} },
