@@ -55,6 +55,7 @@ local context = Skin.Define('professions', {
 	name = 'Professions',
 	description = 'The professions book, crafting window and crafting orders: recipe list, schematic panel, flat rank bar, tabs, specializations, the crafter order browser and order view, and the customer order window (NPC only, so the preview shows the book).',
 	icon = 'Interface/Icons/Trade_Engineering',
+	newLook = true,
 })
 local Enabled, Hook, Own, Chrome = context.Enabled, context.Hook, context.Own, context.Chrome
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys

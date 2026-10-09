@@ -26,6 +26,7 @@ local SEARCH_TEXT_INSET = 6
 local context = Skin.Define('worldmap', {
 	name = 'World Map',
 	description = 'The map and quest log frame in the dark shell, plus continent-map extras: zone name labels and dungeon/raid entrance pins.',
+	newLook = true,
 })
 local Hook = context.Hook
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys

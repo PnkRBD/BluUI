@@ -843,4 +843,5 @@ Skin.RegisterSkin('merchant', {
 	name = 'Merchant',
 	description = 'Replaces the default vendor window with a dark, searchable frame featuring bulk buy and type filters.',
 	icon = 'Interface\\Icons\\INV_Misc_Coin_01',
+	newLook = true,
 })
