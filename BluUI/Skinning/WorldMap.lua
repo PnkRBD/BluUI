@@ -1,22 +1,20 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.WorldMap')
-
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Layout = BUILib.Layout
 
-local SKIN_ID = 'worldmap'
 local BORDER_ART = { 'Bg', 'TopTileStreaks', 'InsetBorderTop', 'Underlay' }
 local DETAILS_ART = { 'Bg', 'SealMaterialBG' }
 local REWARDS_ART = { 'Bottom', 'Top', 'Background' }
+local CAMPAIGN_ART = { 'Background', 'TopFiligree', 'HighlightTexture', 'SelectedHighlight' }
 local DETAIL_BUTTON_KEYS = { 'AbandonButton', 'ShareButton', 'TrackButton' }
 local SIDE_TAB_KEYS = { 'QuestsTab', 'EventsTab', 'MapLegendTab' }
+local SIDE_TAB_OPTIONS = { dim = true }
 local SIDE_TAB_TOP_OFFSET = -2
 local ROW_HOVER_ALPHA = 0.1
-local SELECTED_ROW_ALPHA = 0.18
 local DIVIDER_ALPHA = 0.1
 local CHECKBOX_INSET = 1
 local ACTIVE_RING_PADDING = 3
@@ -25,17 +23,15 @@ local SEARCH_WIDTH, SEARCH_HEIGHT = 160, 22
 local SEARCH_INSET = 8
 local SEARCH_TEXT_INSET = 6
 
-local installed = false
-local skinned = false
-
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
+local context = Skin.Define('worldmap', {
+	name = 'World Map',
+	description = 'The map and quest log frame in the dark shell, plus continent-map extras: zone name labels and dungeon/raid entrance pins.',
+})
+local Hook = context.Hook
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
-local Shell, Button, Close, Dropdown = context.Shell, context.Button, context.Close, context.Dropdown
-local EditBox, ScrollBar, Body, Title = context.EditBox, context.ScrollBar, context.Body, context.Title
+local Shell, Button, Card, Dropdown = context.Shell, context.Button, context.Card, context.Dropdown
+local EditBox, ScrollBar, Body = context.EditBox, context.ScrollBar, context.Body
+local CollapseButton = context.CollapseButton
 local AccentTexture = Skin.AccentTexture
 
 local function RefreshExtras()
@@ -47,39 +43,15 @@ local function KeepTexture(texture)
 	if texture then texture.__buiSkin = true end
 end
 
-local function FadeStateTextures(button)
-	Fade(button:GetNormalTexture())
-	Fade(button:GetPushedTexture())
-	Fade(button:GetDisabledTexture())
-	Fade(button:GetHighlightTexture())
-end
-
-local function FitTexture(texture, host)
-	local anchor = host.Background or host
-	texture:ClearAllPoints()
-	texture:SetPoint('TOPLEFT', anchor, 'TOPLEFT', 0, 0)
-	texture:SetPoint('BOTTOMRIGHT', anchor, 'BOTTOMRIGHT', 0, 0)
-end
-
 local function AccentTint(texture, alpha)
-	if not texture then return end
 	KeepTexture(texture)
 	texture:SetBlendMode('BLEND')
-	AccentTexture(texture, alpha)
-end
-
-local function AccentFill(texture, host, alpha)
-	if not texture then return end
-	KeepTexture(texture)
-	texture:SetBlendMode('BLEND')
-	FitTexture(texture, host)
 	AccentTexture(texture, alpha)
 end
 
 local function DividerLine(frame)
 	if frame._buiDivider then return end
-	local line = frame:CreateTexture(nil, 'ARTWORK')
-	line.__buiSkin = true
+	local line = context.Own(frame:CreateTexture(nil, 'ARTWORK'))
 	line:SetColorTexture(1, 1, 1, DIVIDER_ALPHA)
 	line:SetHeight(1)
 	line:SetPoint('LEFT', frame, 'LEFT', 8, 0)
@@ -93,38 +65,37 @@ local function SkinWindow(map)
 	Shell(map)
 	Shell(map.ScrollContainer)
 	local toggle = map.SidePanelToggle
-	if toggle then
-		FadeRegions(toggle.OpenButton)
-		FadeRegions(toggle.CloseButton)
-		Skin.TipPageButton(toggle.OpenButton, 'next')
-		Skin.TipPageButton(toggle.CloseButton, 'previous')
-	end
+	FadeRegions(toggle.OpenButton)
+	FadeRegions(toggle.CloseButton)
+	Skin.TipPageButton(toggle.OpenButton, 'next')
+	Skin.TipPageButton(toggle.CloseButton, 'previous')
 end
 
 local function SkinBorder(border)
 	Fade(border.NineSlice)
 	FadeKeys(border, BORDER_ART)
 	Fade(border.PortraitContainer.portrait)
-	Title(border.TitleContainer.TitleText)
-	Close(border.CloseButton)
+	Skin.LeftTitle(border)
+	context.Close(border.CloseButton)
 	local maxMin = border.MaximizeMinimizeFrame
 	Skin.TipPageButton(maxMin.MaximizeButton, 'expand')
 	Skin.TipPageButton(maxMin.MinimizeButton, 'condense')
 end
 
 local function SkinNavButton(button)
-	if not button then return end
 	FadeRegions(button)
-	FadeStateTextures(button)
+	Fade(button:GetNormalTexture())
+	Fade(button:GetPushedTexture())
+	Fade(button:GetDisabledTexture())
+	Fade(button:GetHighlightTexture())
 	Shell(button)
 	Body(button.text)
 	Skin.TipNavArrow(button.MenuArrowButton)
 end
 
 local function OnNavButtonAdded(navBar)
-	if not Enabled() or navBar ~= _G.WorldMapFrame.NavBar then return end
-	local buttons = navBar.navList
-	SkinNavButton(buttons[#buttons])
+	if navBar ~= _G.WorldMapFrame.NavBar then return end
+	SkinNavButton(navBar.navList[#navBar.navList])
 end
 
 local function SkinNavBar(navBar)
@@ -156,9 +127,7 @@ local function SkinRoundButton(button)
 end
 
 local function SkinOverlayFrames(map)
-	local overlays = map.overlayFrames
-	if not overlays then return end
-	for _, frame in ipairs(overlays) do
+	for _, frame in ipairs(map.overlayFrames) do
 		if frame.CursorCoords then
 			Body(frame.CursorCoords.Label)
 			Body(frame.PlayerCoords.Label)
@@ -194,7 +163,7 @@ local function SkinRareScannerSearch(map)
 	editBox:SetSize(SEARCH_WIDTH, SEARCH_HEIGHT)
 	search:SetSize(SEARCH_WIDTH, SEARCH_HEIGHT)
 	search:ClearAllPoints()
-	search:SetPoint('TOPLEFT', map:GetCanvasContainer(), 'TOPLEFT', SEARCH_INSET, -SEARCH_INSET)
+	search:SetPoint('RIGHT', map.NavBar, 'RIGHT', -SEARCH_INSET, 0)
 end
 
 local function ReleaseRareScannerSearch()
@@ -214,24 +183,19 @@ local function IsTabSelected(questLog, tab)
 end
 
 local function OnTabChecked(tab, checked)
-	if Enabled() then Skin.SetSideTabSelected(tab, checked == true) end
+	Skin.SetSideTabSelected(tab, checked == true)
 end
 
-local sideTabs
-
-local function SideTabs(questLog)
-	if not sideTabs then
-		sideTabs = {}
-		for index, key in ipairs(SIDE_TAB_KEYS) do sideTabs[index] = questLog[key] end
-	end
-	return sideTabs
-end
+local sideTabs = {}
 
 local function RefreshSideTabs(questLog)
-	for _, tab in ipairs(SideTabs(questLog)) do
-		local fresh = not tab._buiSideTab
-		Skin.SideTab(context, tab)
-		if fresh then Hook(tab, 'SetChecked', OnTabChecked) end
+	for index, key in ipairs(SIDE_TAB_KEYS) do
+		local tab = questLog[key]
+		if not sideTabs[index] then
+			sideTabs[index] = tab
+			Hook(tab, 'SetChecked', OnTabChecked)
+		end
+		Skin.SideTab(context, tab, SIDE_TAB_OPTIONS)
 		Skin.SetSideTabSelected(tab, IsTabSelected(questLog, tab))
 	end
 	Skin.LayoutSideTabs(questLog, sideTabs, SIDE_TAB_TOP_OFFSET)
@@ -256,62 +220,44 @@ local function SkinObjective(line)
 	Skin.TipFace(line.Text, 'body')
 end
 
-local function SkinHeaderRow(header)
-	if not header._buiHeaderRow then
-		header._buiHeaderRow = true
-		Skin.TipFace(header.ButtonText, 'title')
-	end
-	Button(header)
+local function SkinListHeader(header)
+	Fade(header:GetNormalTexture())
+	Fade(header:GetHighlightTexture())
+	Skin.TipFace(header.ButtonText, 'title')
+	CollapseButton(header.CollapseButton)
+	Card(header)
 end
 
 local function SkinCampaignHeader(header)
-	if not header._buiCampaign then
-		header._buiCampaign = true
-		Skin.TipFace(header.Text, 'title')
-		Skin.TipFace(header.Progress, 'body')
-		Skin.TipFace(header.NextObjective.Text, 'body')
-		AccentFill(header.HighlightTexture, header, ROW_HOVER_ALPHA)
-		AccentFill(header.SelectedHighlight, header, SELECTED_ROW_ALPHA)
-	end
-	Fade(header.Background)
-	Fade(header.TopFiligree)
-	AccentTexture(header.HighlightTexture, ROW_HOVER_ALPHA)
-	Shell(header)
+	FadeKeys(header, CAMPAIGN_ART)
+	Skin.TipFace(header.Text, 'title')
+	Skin.TipFace(header.Progress, 'body')
+	Skin.TipFace(header.NextObjective.Text, 'body')
+	CollapseButton(header.CollapseButton)
+	Card(header)
 end
 
 local function SkinCampaignMinimalHeader(header)
-	if not header._buiCampaignMinimal then
-		header._buiCampaignMinimal = true
-		Skin.TipFace(header.Text, 'title')
-		Skin.TipFace(header.NextObjective.Text, 'body')
-		KeepTexture(header.Background)
-		AccentFill(header.Highlight, header, ROW_HOVER_ALPHA)
-	end
 	Fade(header.Background)
-	Button(header)
+	Fade(header.Highlight)
+	Skin.TipFace(header.Text, 'title')
+	Skin.TipFace(header.NextObjective.Text, 'body')
+	CollapseButton(header.CollapseButton)
+	Card(header)
 end
 
 local function SkinCallingsHeader(header)
-	if not header._buiCallings then
-		header._buiCallings = true
-		Skin.TipFace(header.ButtonText, 'title')
-		KeepTexture(header.Background)
-		KeepTexture(header.Divider)
-		KeepTexture(header.SelectedTexture)
-		AccentFill(header.HighlightTexture, header, ROW_HOVER_ALPHA)
-		AccentFill(header.SelectedHighlight, header, SELECTED_ROW_ALPHA)
-	end
 	Fade(header.Background)
 	Fade(header.Divider)
 	Fade(header.SelectedTexture)
-	Button(header)
+	SkinListHeader(header)
 end
 
 local function SweepQuestLog()
 	local scroll = _G.QuestScrollFrame
 	for button in scroll.titleFramePool:EnumerateActive() do SkinQuestTitle(button) end
 	for line in scroll.objectiveFramePool:EnumerateActive() do SkinObjective(line) end
-	for header in scroll.headerFramePool:EnumerateActive() do SkinHeaderRow(header) end
+	for header in scroll.headerFramePool:EnumerateActive() do SkinListHeader(header) end
 	for header in scroll.campaignHeaderFramePool:EnumerateActive() do SkinCampaignHeader(header) end
 	for header in scroll.campaignHeaderMinimalFramePool:EnumerateActive() do SkinCampaignMinimalHeader(header) end
 	for header in scroll.covenantCallingsHeaderFramePool:EnumerateActive() do SkinCallingsHeader(header) end
@@ -320,10 +266,10 @@ end
 local function SkinStoryHeader(header)
 	Fade(header.Background)
 	Fade(header.Divider)
+	Fade(header.HighlightTexture)
 	Skin.TipFace(header.Text, 'title')
 	Skin.TipFace(header.Progress, 'body')
-	AccentFill(header.HighlightTexture, header, ROW_HOVER_ALPHA)
-	Shell(header)
+	Card(header)
 end
 
 local function SkinQuestScroll(scroll)
@@ -354,8 +300,7 @@ end
 
 local function SkinCampaignOverview(overview)
 	Skin.FadeTree(overview.BorderFrame)
-	Fade(overview.TopShadow)
-	Fade(overview.BottomShadow)
+	Fade(overview.BG)
 	local header = overview.Header
 	Fade(header.Background)
 	Fade(header.TopFiligree)
@@ -363,8 +308,8 @@ local function SkinCampaignOverview(overview)
 	Skin.TipFace(header.Progress, 'body')
 	local scroll = overview.ScrollFrame
 	ScrollBar(scroll.ScrollBar)
-	local child = scroll.ScrollChild
-	Fade(child and child.BG)
+	Fade(scroll.TopShadow)
+	Fade(scroll.BottomShadow)
 end
 
 local function SkinEventRow(frame)
@@ -373,11 +318,11 @@ local function SkinEventRow(frame)
 			frame._buiEventRow = true
 			Skin.TipFace(frame.Name, 'body')
 			Skin.TipFace(frame.Location, 'body')
-			AccentFill(frame.Highlight, frame, ROW_HOVER_ALPHA)
 		end
 		Fade(frame.Background)
 		Fade(frame.Background2)
-		Shell(frame)
+		Fade(frame.Highlight)
+		Card(frame)
 	elseif frame.Label then
 		if not frame._buiEventLabel then
 			frame._buiEventLabel = true
@@ -387,10 +332,6 @@ local function SkinEventRow(frame)
 	end
 end
 
-local function OnEventRow(frame)
-	if Enabled() then SkinEventRow(frame) end
-end
-
 local function SkinEvents(events)
 	FadeRegions(events)
 	Skin.FadeTree(events.BorderFrame)
@@ -398,7 +339,7 @@ local function SkinEvents(events)
 	Body(events.ScrollBox.EmptyText)
 	ScrollBar(events.ScrollBar)
 	Skin.TipFace(events.TitleText, 'title')
-	Skin.SweepScrollBox(events.ScrollBox, OnEventRow)
+	Skin.SweepScrollBox(events.ScrollBox, context.Guard(SkinEventRow))
 end
 
 local function SkinLegendButton(button)
@@ -431,7 +372,6 @@ end
 
 local function SkinQuestLog(questLog)
 	Fade(questLog.VerticalSeparator)
-	RefreshSideTabs(questLog)
 	local quests = questLog.QuestsFrame
 	SkinQuestScroll(quests.ScrollFrame)
 	SkinDetails(quests.DetailsFrame)
@@ -452,91 +392,48 @@ local function IsInsideQuestLog(frame)
 end
 
 local function OnQuestInfoDisplayed(_, parentFrame)
-	if not skinned or not Enabled() or not Skin.RefreshQuestInfoText then return end
-	if IsInsideQuestLog(parentFrame) then Skin.RefreshQuestInfoText() end
+	if Skin.RefreshQuestInfoText and IsInsideQuestLog(parentFrame) then Skin.RefreshQuestInfoText() end
 end
 
-local function Apply()
-	local map = _G.WorldMapFrame
-	if map:IsForbidden() or not Enabled() then return end
-	if not skinned then
-		skinned = true
-		SkinWindow(map)
-		SkinBorder(map.BorderFrame)
-		SkinNavBar(map.NavBar)
-		SkinOverlayFrames(map)
-		SkinQuestLog(_G.QuestMapFrame)
-	end
+local function SkinMap(map)
+	SkinWindow(map)
+	SkinBorder(map.BorderFrame)
+	SkinNavBar(map.NavBar)
+	SkinOverlayFrames(map)
+	SkinQuestLog(_G.QuestMapFrame)
+end
+
+local function RefreshMap(map)
 	SkinRareScannerSearch(map)
 	SweepQuestLog()
 	RefreshSideTabs(_G.QuestMapFrame)
 end
 
-local function OnQuestLogUpdated()
-	if skinned and Enabled() then SweepQuestLog() end
-end
-
-local function OnTabsValidated()
-	if skinned and Enabled() then RefreshSideTabs(_G.QuestMapFrame) end
-end
-
-local function Install()
-	if installed then return end
-	local map = _G.WorldMapFrame
-	if not map then return end
-	installed = true
-	map:HookScript('OnShow', BUI.Profiler.Wrap('Skin.WorldMap map reskin', Apply))
+local function InstallMap()
 	Hook('NavBar_AddButton', OnNavButtonAdded)
-	Hook('QuestLogQuests_Update', OnQuestLogUpdated)
+	Hook('QuestLogQuests_Update', SweepQuestLog)
 	Hook('QuestInfo_Display', OnQuestInfoDisplayed)
-	Hook(_G.QuestMapFrame, 'ValidateTabs', OnTabsValidated)
-	if map:IsShown() then Apply() end
+	Hook(_G.QuestMapFrame, 'ValidateTabs', function() RefreshSideTabs(_G.QuestMapFrame) end)
 end
 
-local function TryInstall()
-	Install()
-	if installed then BUI.Events:Unregister('ADDON_LOADED', 'Skin.WorldMap') end
-end
+context.Window('WorldMapFrame', { skin = SkinMap, show = RefreshMap, install = InstallMap })
 
-local function Deactivate()
-	context.Restore()
+context.OnDisable(function()
 	ReleaseRareScannerSearch()
-	if sideTabs then
-		for _, tab in ipairs(sideTabs) do Skin.ResetSideTab(tab) end
-	end
-	skinned = false
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	RefreshExtras()
-	if enabled then
-		Install()
-		if not installed then
-			BUI.Events:Register('ADDON_LOADED', 'Skin.WorldMap', TryInstall)
-		elseif _G.WorldMapFrame:IsShown() then
-			Apply()
-		end
-	else
-		Deactivate()
-	end
+	for _, tab in ipairs(sideTabs) do Skin.ResetSideTab(tab) end
 end)
 
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'World Map',
-	description = 'The map and quest log frame in the dark shell, plus continent-map extras: zone name labels and dungeon/raid entrance pins.',
-	buildSettings = function(content)
-		local db = BUI.GetDB()
+Skin.OnToggle('worldmap', RefreshExtras)
 
-		local panel = Layout.SettingsCard(content, { title = 'Continent Maps' })
-		Layout.Toggle(panel, 'Zone Names', db.interface.worldMapZoneNames == true, function(value)
-			db.interface.worldMapZoneNames = value
-			RefreshExtras()
-		end)
-		Layout.Toggle(panel, 'Dungeon & Raid Pins', db.interface.worldMapDungeonPins == true, function(value)
-			db.interface.worldMapDungeonPins = value
-			RefreshExtras()
-		end)
-	end,
-})
-
-BUI.Events:Once('PLAYER_LOGIN', 'Skin.WorldMapInstall', TryInstall)
+context.info.buildSettings = function(content)
+	local db = BUI.GetDB()
+	local panel = Layout.SettingsCard(content, { title = 'Continent Maps' })
+	Layout.Toggle(panel, 'Zone Names', db.interface.worldMapZoneNames == true, function(value)
+		db.interface.worldMapZoneNames = value
+		RefreshExtras()
+	end)
+	Layout.Toggle(panel, 'Dungeon & Raid Pins', db.interface.worldMapDungeonPins == true, function(value)
+		db.interface.worldMapDungeonPins = value
+		RefreshExtras()
+	end)
+end
