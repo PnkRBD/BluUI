@@ -11,8 +11,7 @@ local IsSecretValue = BUI.Tools.IsSecretValue
 local Pixel = BUI.Pixel
 
 local function HasConflictingCharSheet()
-    local loaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
-    return (loaded and loaded('ChonkyCharacterSheet')) and true or false
+    return C_AddOns.IsAddOnLoaded('ChonkyCharacterSheet')
 end
 
 local FRAME_LEVEL   = 100
@@ -68,14 +67,13 @@ local IDLE_BORDER   = { 0.4, 0.4, 0.4 }
 local SLOT_BG       = { 0.05, 0.05, 0.06, 1 }
 local TOGGLE_BORDER = { 0.2, 0.2, 0.22, 1 }
 local ART = {
-    BLEED = 0,
     SIDE_SHARE = 19 / 275, TOP_SHARE = 256 / 384, SIDE_COORD = 0.296875,
     OVERLAY_ALPHA = { BLOODELF = 0.8, NIGHTELF = 0.6, SCOURGE = 0.3, TROLL = 0.6, ORC = 0.6, WORGEN = 0.5, GOBLIN = 0.6 },
     OVERLAY_DEFAULT = 0.7,
     MODEL_EDGE = { 1, 1, 1, 0.12 },
 }
-local SIDEBAR_BG    = { 0, 0, 0, 0 }
 local BIG_ILVL_COLOR = { 0.6, 0.2, 1 }
+local PVP_ILVL_COLOR = { 0, 0.8, 0.4 }
 local INFO_COLOR    = { 0.8, 0.8, 0.8 }
 local LABEL_COLOR   = { 0.8, 0.8, 0.8 }
 local VALUE_COLOR   = { 1, 1, 1 }
@@ -1231,45 +1229,33 @@ local function InCombatNotice()
     return true
 end
 
-StaticPopupDialogs['BUI_NEW_EQUIPMENT_SET'] = {
-    text = 'Name for the new equipment set:',
-    button1 = 'Create', button2 = 'Cancel',
-    hasEditBox = true, editBoxWidth = 200,
-    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-    OnAccept = function(dialog)
-        local editBox = dialog.EditBox or dialog.editBox
-        local name = editBox and editBox:GetText() or ''
-        name = name:gsub('^%s+', ''):gsub('%s+$', '')
-        if name == '' or InCombatLockdown() then return end
-        C_EquipmentSet.CreateEquipmentSet(name, QUESTION_MARK_ICON)
-    end,
-    EditBoxOnEnterPressed = function(editBox)
-        local dialog = editBox:GetParent()
-        StaticPopupDialogs['BUI_NEW_EQUIPMENT_SET'].OnAccept(dialog)
-        dialog:Hide()
-    end,
-    EditBoxOnEscapePressed = function(editBox) editBox:GetParent():Hide() end,
-}
+local function NameDialog(text, button, apply)
+    local dialog = {
+        text = text, button1 = button, button2 = 'Cancel',
+        hasEditBox = true, editBoxWidth = 200,
+        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+        EditBoxOnEscapePressed = function(editBox) editBox:GetParent():Hide() end,
+    }
+    function dialog.OnAccept(popup)
+        local editBox = popup.EditBox or popup.editBox
+        local name = editBox:GetText():gsub('^%s+', ''):gsub('%s+$', '')
+        if name ~= '' and not InCombatLockdown() then apply(name, popup.data) end
+    end
+    function dialog.EditBoxOnEnterPressed(editBox)
+        local popup = editBox:GetParent()
+        dialog.OnAccept(popup)
+        popup:Hide()
+    end
+    return dialog
+end
 
-StaticPopupDialogs['BUI_RENAME_EQUIPMENT_SET'] = {
-    text = 'Rename %s to:',
-    button1 = 'Rename', button2 = 'Cancel',
-    hasEditBox = true, editBoxWidth = 200,
-    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-    OnAccept = function(dialog)
-        local editBox = dialog.EditBox or dialog.editBox
-        local name = editBox and editBox:GetText() or ''
-        name = name:gsub('^%s+', ''):gsub('%s+$', '')
-        if name == '' or InCombatLockdown() then return end
-        C_EquipmentSet.ModifyEquipmentSet(dialog.data, name)
-    end,
-    EditBoxOnEnterPressed = function(editBox)
-        local dialog = editBox:GetParent()
-        StaticPopupDialogs['BUI_RENAME_EQUIPMENT_SET'].OnAccept(dialog)
-        dialog:Hide()
-    end,
-    EditBoxOnEscapePressed = function(editBox) editBox:GetParent():Hide() end,
-}
+StaticPopupDialogs['BUI_NEW_EQUIPMENT_SET'] = NameDialog('Name for the new equipment set:', 'Create', function(name)
+    C_EquipmentSet.CreateEquipmentSet(name, QUESTION_MARK_ICON)
+end)
+
+StaticPopupDialogs['BUI_RENAME_EQUIPMENT_SET'] = NameDialog('Rename %s to:', 'Rename', function(name, setID)
+    C_EquipmentSet.ModifyEquipmentSet(setID, name)
+end)
 
 StaticPopupDialogs['BUI_DELETE_EQUIPMENT_SET'] = {
     text = 'Delete the equipment set %s?',
@@ -1283,7 +1269,7 @@ StaticPopupDialogs['BUI_DELETE_EQUIPMENT_SET'] = {
 
 local function EquipSet(setID)
     if not setID or InCombatNotice() then return end
-    if EquipmentManager_EquipSet then EquipmentManager_EquipSet(setID) else C_EquipmentSet.UseEquipmentSet(setID) end
+    EquipmentManager_EquipSet(setID)
 end
 
 local iconPopupContext = Skin.NewContext(function() return Skin.IsSkinEnabled('characterFrame') end)
@@ -1306,7 +1292,7 @@ end
 
 local function ShowSetMenu(row)
     local setID, setName = row.setID, row.setName
-    local assigned = C_EquipmentSet.GetEquipmentSetAssignedSpec and C_EquipmentSet.GetEquipmentSetAssignedSpec(setID)
+    local assigned = C_EquipmentSet.GetEquipmentSetAssignedSpec(setID)
     local items = {
         { title = true, text = setName },
         { text = 'Equip', callback = function() EquipSet(setID) end },
@@ -1661,7 +1647,7 @@ local function BuildStatsPane(parent)
             { left = 'Equipped', right = ('%.2f'):format(info.equipped) },
             { left = 'Average (bags included)', right = ('%.2f'):format(info.total), rightColor = BIG_ILVL_COLOR },
         }
-        if info.pvp > 0 then rows[#rows + 1] = { left = 'PvP', right = ('%.2f'):format(info.pvp), rightColor = { 0, 0.8, 0.4 } } end
+        if info.pvp > 0 then rows[#rows + 1] = { left = 'PvP', right = ('%.2f'):format(info.pvp), rightColor = PVP_ILVL_COLOR } end
         Widget.ShowTipRows(self, 'Item Level', rows, { anchor = 'BOTTOM' })
     end))
     ilvlHit:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame ilvlHit OnLeave', function() Widget.HideTip() end))
@@ -1721,10 +1707,6 @@ local function BuildSidebar(parent)
     sidebar:SetPoint('TOPLEFT', parent, 'TOPLEFT', STATS_X, TOP_Y + 6)
     sidebar:SetPoint('BOTTOMLEFT', parent, 'BOTTOMLEFT', STATS_X, SLOT_SIZE + BOTTOM_PAD + 10)
     sidebar:SetWidth(STATS_W)
-
-    local background = sidebar:CreateTexture(nil, 'BACKGROUND')
-    background:SetAllPoints()
-    background:SetColorTexture(SIDEBAR_BG[1], SIDEBAR_BG[2], SIDEBAR_BG[3], SIDEBAR_BG[4])
     sidebar.panelBorder, sidebar.panelFill = Widget.RoundedPanel(sidebar, 8, { 0, 0, 0, 0 }, { 1, 1, 1, 0.08 })
 
     sidebar.tabs = {}
@@ -1762,7 +1744,7 @@ local function RefreshHeader()
         pane.ilvlHit:EnableMouse(true)
     end
     if pvp and not IsSecretValue(pvp) and pvp > 0 then
-        pane.pvpIlvl:SetFormattedText('PvP iLvl: |cff00cc66%d|r', math.floor(pvp))
+        pane.pvpIlvl:SetFormattedText('PvP iLvl: |cff%s%d|r', BUI.Hex(PVP_ILVL_COLOR[1], PVP_ILVL_COLOR[2], PVP_ILVL_COLOR[3]), math.floor(pvp))
     else
         pane.pvpIlvl:SetText('')
     end
@@ -1838,11 +1820,10 @@ end
 
 local function BuildModelBackground(parent)
     local art = CreateFrame('Frame', nil, parent)
-    local artWidth = MODEL_WIDTH + ART.BLEED * 2
-    art:SetPoint('TOPLEFT', parent, 'TOPLEFT', MODEL_X - ART.BLEED, TOP_Y + 6)
-    art:SetSize(artWidth, MODEL_HEIGHT)
+    art:SetPoint('TOPLEFT', parent, 'TOPLEFT', MODEL_X, TOP_Y + 6)
+    art:SetSize(MODEL_WIDTH, MODEL_HEIGHT)
 
-    local mainWidth, sideWidth = artWidth * (1 - ART.SIDE_SHARE), artWidth * ART.SIDE_SHARE
+    local mainWidth, sideWidth = MODEL_WIDTH * (1 - ART.SIDE_SHARE), MODEL_WIDTH * ART.SIDE_SHARE
     local topHeight, bottomHeight = MODEL_HEIGHT * ART.TOP_SHARE, MODEL_HEIGHT * (1 - ART.TOP_SHARE)
     local function Piece(width, height, narrow)
         local texture = art:CreateTexture(nil, 'BACKGROUND')
