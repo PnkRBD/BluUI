@@ -1129,45 +1129,57 @@ function Skin.TipTab(tab, fused)
 	BUILib.Skin.Tab(tab, TAB_STYLE, fused)
 end
 
-local LINE_TAB_THICKNESS = 2
-local lineTabSelectedFont
+local SEGMENT_PAD, SEGMENT_GAP, SEGMENT_HEIGHT, SEGMENT_TEXT_PAD = 2, 2, 22, 12
+local segmentSelectedFont
 
-local function LineTabSelectedFont()
-	if lineTabSelectedFont then return lineTabSelectedFont end
-	lineTabSelectedFont = CreateFont('BUI_TipLineTabSelected')
-	lineTabSelectedFont:SetFont(BUILib.Font, TIP_BODY_SIZE, '')
-	Painter.Text(lineTabSelectedFont, 'skinTitle')
-	return lineTabSelectedFont
+local function SegmentSelectedFont()
+	if segmentSelectedFont then return segmentSelectedFont end
+	segmentSelectedFont = CreateFont('BUI_TipSegmentSelected')
+	segmentSelectedFont:SetFont(BUILib.Font, TIP_BODY_SIZE, '')
+	Painter.Text(segmentSelectedFont, 'skinTitle')
+	return segmentSelectedFont
 end
 
-local function PaintLineTab(tab)
-	local state = tab._buiLineTab
+local function PaintSegment(tab)
+	local state = tab._buiSegment
 	local live = state.enabled()
 	local selected = live and tab.isSelected == true
-	state.line:SetShown(selected)
+	state.fill:SetShown(selected)
 	if not live then return end
+	state.fill:SetColorTexture(CARD_FILL[1], CARD_FILL[2], CARD_FILL[3], CARD_FILL[4])
 	local fonts = ButtonFontObjects()
-	local rest = selected and LineTabSelectedFont() or fonts.disabled
+	local rest = selected and SegmentSelectedFont() or fonts.disabled
 	tab:SetNormalFontObject(rest)
 	tab:SetDisabledFontObject(rest)
 	tab:SetHighlightFontObject(selected and rest or fonts.normal)
 	tab.Text:SetPoint('CENTER', tab, 'CENTER', 0, 0)
-	if not selected then return end
-	Skin.AccentTexture(state.line, 1)
-	state.line:SetWidth(math.ceil(tab.Text:GetStringWidth()))
 end
 
-function Skin.LineTab(tab, enabled)
-	if not tab._buiLineTab then
-		BUILib.Skin.StripButton(tab)
-		local line = tab:CreateTexture(nil, 'OVERLAY')
-		line.__buiSkin = true
-		line:SetHeight(LINE_TAB_THICKNESS)
-		line:SetPoint('BOTTOM', tab, 'BOTTOM', 0, 0)
-		tab._buiLineTab = { line = line, enabled = enabled }
-		Hook(tab, 'SetTabSelected', PaintLineTab)
+local function SizeSegment(tab)
+	if not tab._buiSegment.enabled() then return end
+	local text = tab.Text
+	text:SetWidth(0)
+	tab:SetSize(math.ceil(text:GetStringWidth()) + SEGMENT_TEXT_PAD * 2, SEGMENT_HEIGHT)
+end
+
+function Skin.SegmentTabs(tabSystem, enabled)
+	tabSystem.spacing = SEGMENT_GAP
+	tabSystem.leftPadding, tabSystem.rightPadding = SEGMENT_PAD, SEGMENT_PAD
+	tabSystem.topPadding, tabSystem.bottomPadding = SEGMENT_PAD, SEGMENT_PAD
+	for _, tab in ipairs(tabSystem.tabs) do
+		if not tab._buiSegment then
+			BUILib.Skin.StripButton(tab)
+			local fill = tab:CreateTexture(nil, 'BACKGROUND')
+			fill.__buiSkin = true
+			fill:SetAllPoints(tab)
+			tab._buiSegment = { fill = fill, enabled = enabled }
+			Hook(tab, 'SetTabSelected', PaintSegment)
+			Hook(tab, 'UpdateTabWidth', SizeSegment)
+		end
+		PaintSegment(tab)
+		SizeSegment(tab)
 	end
-	PaintLineTab(tab)
+	tabSystem:MarkDirty()
 end
 
 function Skin.TipArrow(frame, centered, rotation)
@@ -1767,8 +1779,9 @@ function Skin.NewContext(enabled)
 		for texture in pairs(owned) do texture:SetShown(shown) end
 	end
 
-	local function LineTab(tab)
-		Skin.LineTab(tab, enabled)
+	local function SegmentTabs(tabSystem)
+		Shell(tabSystem)
+		Skin.SegmentTabs(tabSystem, enabled)
 	end
 
 	local function CollapseButton(button)
@@ -1788,7 +1801,7 @@ function Skin.NewContext(enabled)
 	context.EditBox, context.CheckBox, context.TextBox, context.ScrollBar, context.Tab = EditBox, CheckBox, TextBox, ScrollBar, Tab
 	context.Face, context.FaceOnce, context.Title, context.Body, context.Restore = Face, FaceOnce, Title, Body, Restore
 	context.Chrome, context.Own, context.ShowOwned, context.CollapseButton = Chrome, Own, ShowOwned, CollapseButton
-	context.LineTab = LineTab
+	context.SegmentTabs = SegmentTabs
 	return context
 end
 

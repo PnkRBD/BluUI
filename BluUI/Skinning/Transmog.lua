@@ -15,6 +15,8 @@ local SET_MODEL_ART = { 'Border', 'Highlight', 'TransmogStateTexture' }
 local PAGED_FRAMES = { 'ItemsFrame', 'SetsFrame', 'CustomSetsFrame' }
 local DROPDOWN_KEYS = { 'FilterButton', 'WeaponDropdown', 'WeaponSheatheDropdown' }
 local DISPLAY_ICON = { scale = 0.8, x = 4, textX = 42 }
+local TABS = { x = 23, y = -22, level = 10 }
+local NEW_SET = { x = -29, y = -22 }
 
 local context = Skin.Define('transmog', {
 	name = 'Transmogrify',
@@ -184,13 +186,15 @@ end
 
 local function SkinWardrobe(collection)
 	FadeRegions(collection)
-	for _, tab in ipairs(collection.TabHeaders.tabs) do
-		Fade(tab.SelectedHighlight)
-		context.LineTab(tab)
-	end
 	local content = collection.TabContent
 	FadeRegions(content)
 	Shell(content)
+	local headers = collection.TabHeaders
+	for _, tab in ipairs(headers.tabs) do Fade(tab.SelectedHighlight) end
+	context.SegmentTabs(headers)
+	headers:ClearAllPoints()
+	headers:SetPoint('TOPLEFT', content, 'TOPLEFT', TABS.x, TABS.y)
+	headers:SetFrameLevel(content:GetFrameLevel() + TABS.level)
 	for _, key in ipairs(PAGED_FRAMES) do
 		local paged = content[key]
 		Dropdown(paged.FilterButton)
@@ -198,7 +202,10 @@ local function SkinWardrobe(collection)
 		SkinPager(paged)
 	end
 	SkinItems(content.ItemsFrame)
-	Button(content.CustomSetsFrame.NewCustomSetButton)
+	local newSet = content.CustomSetsFrame.NewCustomSetButton
+	Button(newSet)
+	newSet:ClearAllPoints()
+	newSet:SetPoint('TOPRIGHT', content.CustomSetsFrame, 'TOPRIGHT', NEW_SET.x, NEW_SET.y)
 	SkinSituations(content.SituationsFrame)
 end
 
