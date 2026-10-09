@@ -206,8 +206,6 @@ local checkFrame
 local function EnsureMenu()
 	if sharedMenu then return sharedMenu end
 	local menu = CreateFrame("Frame", nil, UIParent)
-	menu:SetFrameStrata(BUILib.GetPopupStrata())
-	menu:SetFrameLevel(BUILib.GetPopupLevel() + 50)
 	menu:SetClampedToScreen(true)
 	menu:EnableMouse(true)
 	menu:Hide()
@@ -363,7 +361,9 @@ function Controls.ContextMenu(items, options)
 	scrollFrame:SetVerticalScroll(0)
 	BUILib.Defer(scrollLogic.UpdateThumb)
 
-	Widget.MatchScale(menu, options.anchor or (options.window and options.window.frame) or UIParent)
+	local host = options.anchor or (options.window and options.window.frame)
+	Widget.MatchScale(menu, host or UIParent)
+	Widget.LiftAbove(menu, host)
 	menu:ClearAllPoints()
 	if options.anchor and not options.atCursor then
 		menu:SetPoint(options.point or "TOPLEFT", options.anchor, options.relPt or "BOTTOMLEFT",
@@ -377,7 +377,6 @@ function Controls.ContextMenu(items, options)
 
 	if not checkFrame then checkFrame = CreateFrame("Frame") end
 	local armed = not (IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton"))
-	local host = options.anchor or (options.window and options.window.frame)
 	checkFrame:SetScript("OnUpdate", function(self)
 		if not menu:IsShown() then
 			self:SetScript("OnUpdate", nil)

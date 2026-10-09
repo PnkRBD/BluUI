@@ -92,6 +92,21 @@ function Widget.MatchScale(frame, host)
 	frame:SetScale(host:GetEffectiveScale() / frame:GetParent():GetEffectiveScale())
 end
 
+local STRATA_ORDER = { BACKGROUND = 1, LOW = 2, MEDIUM = 3, HIGH = 4, DIALOG = 5, FULLSCREEN = 6, FULLSCREEN_DIALOG = 7, TOOLTIP = 8 }
+local POPUP_LIFT = 50
+
+function Widget.LiftAbove(frame, host)
+	local strata, level = BUILib.GetPopupStrata(), BUILib.GetPopupLevel()
+	if host then
+		local hostStrata, hostLevel = host:GetFrameStrata(), host:GetFrameLevel()
+		if STRATA_ORDER[hostStrata] > STRATA_ORDER[strata] or (hostStrata == strata and hostLevel >= level) then
+			strata, level = hostStrata, hostLevel
+		end
+	end
+	frame:SetFrameStrata(strata)
+	frame:SetFrameLevel(level + POPUP_LIFT)
+end
+
 function Widget.StripColorCodes(text)
 	if type(text) ~= "string" then return tostring(text or "") end
 	return (text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
