@@ -57,6 +57,7 @@ local context = Skin.Define('guild', {
 	name = 'Guild & Communities',
 	description = 'The Guild & Communities window with its chat, roster, perks, guild info, finder and dialogs; also skins the Guild Bank and Guild Control windows, which only open at a guild vault.',
 	icon = 'Interface/Icons/achievement_guildperk_everybodysfriend',
+	newLook = true,
 })
 local Hook, Guard, Own = context.Hook, context.Guard, context.Own
 local Fade, FadeRegions, FadeKeys, FadeArt = context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt

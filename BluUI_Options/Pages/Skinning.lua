@@ -402,9 +402,11 @@ local function SkinsBoard(ui, parent, width)
 			if tag then tag:Hide() end
 			if not enabled and RELOAD_SKINS[id] then ConfirmReload(info) end
 		end, info.description, icons * ICON_ROOM)
-		if Skin.IsSkinNew(id) then
-			tag = ui.Text(cell, 'NEW', 9, 'accent')
-			tag:SetPoint('LEFT', cell.label, 'LEFT', math.ceil(cell.label:GetStringWidth()) + 6, 0)
+		local mark = Skin.IsSkinNew(id) and 'NEW' or info.newLook and 'NEW LOOK'
+		if mark then
+			local text = ui.Text(cell, mark, 9, mark == 'NEW' and 'accent' or 'positive')
+			text:SetPoint('LEFT', cell.label, 'LEFT', math.ceil(cell.label:GetStringWidth()) + 6, 0)
+			if mark == 'NEW' then tag = text end
 		end
 		local anchor
 		if info.window then

@@ -18,6 +18,7 @@ local context = Skin.Define('itemupgrade', {
 	name = 'Item Upgrade',
 	description = 'The item upgrade window: dark shell over the stone panels, framed item slot and currency icons, house fonts on the upgrade previews, level dropdown and cost strip.',
 	icon = 'Interface/Icons/UI_ItemUpgrade',
+	newLook = true,
 })
 local Hook = context.Hook
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys

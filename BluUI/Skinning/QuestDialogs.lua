@@ -642,4 +642,5 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Quest Dialogs',
 	description = 'NPC quest offers, turn-ins, gossip menus, readable books and the quest offers on the Prey scouting map: dark shells, house text on the parchment, framed reward icons and house buttons. Only visible while talking to an NPC or reading an object, so there is no preview.',
 	icon = 'Interface/QuestFrame/UI-QuestLog-BookIcon',
+	newLook = true,
 })
