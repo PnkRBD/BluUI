@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.Inspect')
-
 local ipairs = ipairs
 local floor = math.floor
 
@@ -10,10 +8,8 @@ local Skin = BUI.Skinning
 local Readout = Skin.Readout
 local IsSecretValue = BUI.Tools.IsSecretValue
 
-local SKIN_ID = 'inspect'
 local BOTTOM_TAB_COUNT = 3
 local PVP_TALENT_SLOT_COUNT = 3
-local MAIN_ART = { 'Bg', 'TopTileStreaks', 'Inset' }
 local SLOT_NAMES = {
 	'Head', 'Neck', 'Shoulder', 'Back', 'Chest', 'Shirt', 'Tabard', 'Wrist',
 	'Hands', 'Waist', 'Legs', 'Feet', 'Finger0', 'Finger1', 'Trinket0', 'Trinket1',
@@ -70,19 +66,19 @@ local SLOT_HOVER_ALPHA = 0.22
 local GUILD_NAME_SCALE = 1.5
 local HONOR_LEVEL_SCALE = 1.2
 
-local installed = false
 local skinned = false
 local slotButtons = {}
 local totalLevelText, ratingText
 local overlay
 
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
+local context = Skin.Define('inspect', {
+	name = 'Inspect',
+	description = 'The inspect window: dark shell, house tabs, framed equipment slots with quality edges and item levels, their M+ rating, flat PvP ratings and guild panel. Preview needs an inspectable target.',
+	icon = 'Interface/Icons/INV_Misc_Spyglass_03',
+})
+local Enabled = context.Enabled
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
-local Shell, Button, Close = context.Shell, context.Button, context.Close
+local Shell, Button = context.Shell, context.Button
 local Face, Title, Body = context.Face, context.Title, context.Body
 local CropIcon, RowHighlight = Skin.CropIcon, Skin.RowHighlight
 
@@ -360,14 +356,8 @@ local function SkinGuild(guild)
 end
 
 local function SkinMainFrame(frame)
-	Fade(frame.NineSlice)
-	FadeKeys(frame, MAIN_ART)
-	FadeRegions(frame)
-	if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
-	Shell(frame)
+	context.Chrome(frame)
 	Shell(frame.Inset)
-	Title(frame.TitleContainer and frame.TitleContainer.TitleText)
-	Close(frame.CloseButton)
 	local tabs = {}
 	for tabIndex = 1, BOTTOM_TAB_COUNT do tabs[tabIndex] = _G['InspectFrameTab' .. tabIndex] end
 	local talents = TalentsTab()
@@ -394,90 +384,54 @@ local function ShowSlotLabels(shown)
 	end
 end
 
-local function Apply()
-	local frame = _G.InspectFrame
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if not skinned then
-		skinned = true
-		SkinMainFrame(frame)
-		SkinPaperDoll(_G.InspectPaperDollFrame)
-		SkinPvp(_G.InspectPVPFrame)
-		SkinGuild(_G.InspectGuildFrame)
-	end
-	ShowSlotLabels(true)
+local function SkinFrame(frame)
+	skinned = true
+	SkinMainFrame(frame)
+	SkinPaperDoll(_G.InspectPaperDollFrame)
+	SkinPvp(_G.InspectPVPFrame)
+	SkinGuild(_G.InspectGuildFrame)
+end
+
+local function RefreshReadouts()
 	for _, button in ipairs(slotButtons) do RefreshSlot(button) end
 	UpdateTotalLevel()
 	UpdateRating()
+end
+
+local function RefreshFrame(frame)
+	ShowSlotLabels(true)
+	RefreshReadouts()
 	ApplyScale()
 	Skin.RefreshTabStrip(frame)
 end
 
-local function Install()
-	if installed then return end
-	local frame = _G.InspectFrame
-	if not frame then return end
-	installed = true
-	ApplyScale()
-	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Inspect frame reskin', Apply))
-	Hook('InspectPaperDollItemSlotButton_Update', RefreshSlot)
+local function InstallFrame()
+	context.Hook('InspectPaperDollItemSlotButton_Update', RefreshSlot)
 	BUI.Events:Register('INSPECT_READY', 'Skin.InspectLevels', function()
 		if not Enabled() or not skinned then return end
-		for _, button in ipairs(slotButtons) do RefreshSlot(button) end
-		UpdateTotalLevel()
-		UpdateRating()
+		RefreshReadouts()
 		Skin.RefreshTabStrip(_G.InspectFrame)
 	end)
-	if frame:IsShown() then Apply() end
 end
 
-local function TryInstall()
-	Install()
-	if installed then BUI.Events:Unregister('ADDON_LOADED', 'Skin.Inspect') end
-end
+context.Window('InspectFrame', { skin = SkinFrame, show = RefreshFrame, install = InstallFrame, enable = ApplyScale })
 
-local function Deactivate()
-	context.Restore()
-	ShowSlotLabels(false)
-	if installed then _G.InspectFrame:SetScale(1) end
+context.OnDisable(function()
 	skinned = false
+	ShowSlotLabels(false)
+	if _G.InspectFrame then _G.InspectFrame:SetScale(1) end
+end)
+
+context.info.buildSettings = function(content)
+	local skinDB = BUI.GetDB().skinning
+	local card = BUILib.Layout.SettingsCard(content, { title = 'Size' })
+	Skin.TipCardSlider(card, {
+		label = 'Scale %', min = 80, max = 150, step = 5, value = skinDB[SCALE_SETTING],
+		tooltip = 'How big the inspect window is. 100 is the game size.',
+		callback = function(value)
+			skinDB[SCALE_SETTING] = value
+			if _G.InspectFrame then ApplyScale() end
+		end,
+	})
+	card:Refresh()
 end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		if not installed then
-			BUI.Events:Register('ADDON_LOADED', 'Skin.Inspect', TryInstall)
-		elseif _G.InspectFrame:IsShown() then
-			Apply()
-		else
-			ApplyScale()
-		end
-	else
-		Deactivate()
-	end
-end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Inspect',
-	description = 'The inspect window: dark shell, house tabs, framed equipment slots with quality edges and item levels, their M+ rating, flat PvP ratings and guild panel. Preview needs an inspectable target.',
-	icon = 'Interface/Icons/INV_Misc_Spyglass_03',
-	buildSettings = function(content)
-		local skinDB = BUI.GetDB().skinning
-		local card = BUILib.Layout.SettingsCard(content, { title = 'Size' })
-		Skin.TipCardSlider(card, {
-			label = 'Scale %', min = 80, max = 150, step = 5, value = skinDB[SCALE_SETTING],
-			tooltip = 'How big the inspect window is. 100 is the game size.',
-			callback = function(value)
-				skinDB[SCALE_SETTING] = value
-				if installed then ApplyScale() end
-			end,
-		})
-		card:Refresh()
-	end,
-})
-
-BUI.Events:Once('PLAYER_LOGIN', 'Skin.InspectInstall', function()
-	if not Enabled() then return end
-	Install()
-	if not installed then BUI.Events:Register('ADDON_LOADED', 'Skin.Inspect', TryInstall) end
-end)

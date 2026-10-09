@@ -1,13 +1,11 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.Trade')
 local Wrap = BUI.Profiler.Wrap
 
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
 
-local SKIN_ID = 'trade'
 local ITEM_COUNT = 7
 local PLATE_GAP = 4
 local HIGHLIGHT_ALPHA = 0.12
@@ -25,17 +23,15 @@ local ENCHANT_LABELS = { 'TradeFramePlayerEnchantText', 'TradeFrameRecipientEnch
 local NAME_HEADERS = { 'TradeFramePlayerNameText', 'TradeFrameRecipientNameText' }
 local ACTION_BUTTONS = { 'TradeFrameTradeButton', 'TradeFrameCancelButton' }
 
-local installed = false
-local skinned = false
-
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
+local context = Skin.Define('trade', {
+	name = 'Trade',
+	description = 'The trade window: dark shell, framed item slots with quality edges, house money boxes and buttons, accent accept highlight. No preview: it only opens while trading with another player.',
+	icon = 'Interface/Icons/INV_Misc_Coin_01',
+})
+local Enabled = context.Enabled
 local Fade, FadeRegions, FadeArt = context.Fade, context.FadeRegions, context.FadeArt
-local Shell, Button, Close, EditBox = context.Shell, context.Button, context.Close, context.EditBox
-local Body, Title = context.Body, context.Title
+local Shell, Button, EditBox = context.Shell, context.Button, context.EditBox
+local Title = context.Title
 local FlatTexture, AccentTexture, CropIcon = Skin.FlatTexture, Skin.AccentTexture, Skin.CropIcon
 
 local function RefreshItemEdges(button)
@@ -92,7 +88,7 @@ local function SkinInsets(names)
 end
 
 local function SetColumnAccent(insetNames, accent)
-	if not Enabled() or not skinned then return end
+	if not Enabled() then return end
 	for _, name in ipairs(insetNames) do
 		local inset = _G[name]
 		if inset and inset._buiShell then Skin.TipShellEdges(inset, accent) end
@@ -138,16 +134,12 @@ local function SkinActionButtons()
 end
 
 local function SkinMainFrame(frame)
-	FadeArt(frame)
-	if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
+	context.Chrome(frame)
 	local overlay = frame.RecipientOverlay
 	if overlay then
 		Fade(overlay.portrait)
 		Fade(overlay.portraitFrame)
 	end
-	Shell(frame)
-	Title(frame.TitleContainer and frame.TitleContainer.TitleText)
-	Close(frame.CloseButton)
 	for _, name in ipairs(NAME_HEADERS) do Title(_G[name]) end
 	for _, name in ipairs(ENCHANT_LABELS) do Skin.TipFont(_G[name], 'label') end
 	SkinInsets(PLAYER_INSETS)
@@ -164,61 +156,24 @@ local function RefreshAllEdges()
 	end
 end
 
-local function Apply()
-	local frame = _G.TradeFrame
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if not skinned then
-		skinned = true
-		SkinMainFrame(frame)
-	end
+local function RefreshFrame(frame)
 	SkinHighlights(frame)
 	RefreshAllEdges()
 end
 
 local function OnPlayerItemUpdated(slotIndex)
-	if Enabled() and skinned then RefreshItemEdges(_G[ITEM_PREFIXES.player .. slotIndex .. 'ItemButton']) end
+	RefreshItemEdges(_G[ITEM_PREFIXES.player .. slotIndex .. 'ItemButton'])
 end
 
 local function OnTargetItemUpdated(slotIndex)
-	if Enabled() and skinned then RefreshItemEdges(_G[ITEM_PREFIXES.recipient .. slotIndex .. 'ItemButton']) end
+	RefreshItemEdges(_G[ITEM_PREFIXES.recipient .. slotIndex .. 'ItemButton'])
 end
 
-local function Install()
-	if installed then return end
-	local frame = _G.TradeFrame
-	if not frame then return end
-	installed = true
-	frame:HookScript('OnShow', Wrap('Skin.Trade frame reskin', Apply))
-	Hook('TradeFrame_UpdatePlayerItem', OnPlayerItemUpdated)
-	Hook('TradeFrame_UpdateTargetItem', OnTargetItemUpdated)
-	if frame:IsShown() then Apply() end
-end
-
-local function TryInstall()
-	Install()
-	if installed then BUI.Events:Unregister('ADDON_LOADED', 'Skin.Trade') end
-end
-
-local function Deactivate()
-	context.Restore()
-	skinned = false
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		if not installed then
-			BUI.Events:Register('ADDON_LOADED', 'Skin.Trade', TryInstall)
-		elseif _G.TradeFrame:IsShown() then
-			Apply()
-		end
-	else
-		Deactivate()
-	end
-end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Trade',
-	description = 'The trade window: dark shell, framed item slots with quality edges, house money boxes and buttons, accent accept highlight. No preview: it only opens while trading with another player.',
-	icon = 'Interface/Icons/INV_Misc_Coin_01',
+context.Window('TradeFrame', {
+	skin = SkinMainFrame,
+	show = RefreshFrame,
+	install = function()
+		context.Hook('TradeFrame_UpdatePlayerItem', OnPlayerItemUpdated)
+		context.Hook('TradeFrame_UpdateTargetItem', OnTargetItemUpdated)
+	end,
 })
