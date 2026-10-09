@@ -11,7 +11,6 @@ BUI.Auras.KeystoneReminder = KeystoneReminder
 
 local FRAME_NAME = 'BUI_KeystoneReminder'
 local EVENT_KEY = 'KeystoneReminder'
-local ROSTER_KEY = 'KeystoneReminder.Roster'
 local COOLDOWN_KEY = 'KeystoneReminder.Cooldown'
 local CARD_KEY = 'KeystoneReminder.Card'
 local WIDTH, HEIGHT = 260, 62
@@ -21,6 +20,7 @@ local LEVEL_SIZE = 13
 local PREVIEW_LEVEL = 12
 local FULL_PARTY = 5
 local PREVIEW_SIZE = 3
+local LEAVE_SETTLE = 1
 local FILLING_TEXT = 'MYTHIC+  ·  FILLING %d/%d'
 local FULL_TEXT = 'MYTHIC+  ·  GROUP FULL'
 local TEXT_GAP = 10
@@ -41,7 +41,7 @@ local UNLEARNED_TEXT = 'Teleport not learned'
 local IsSecret = BUI.Tools.IsSecretValue
 local PartyKeys = BUI.PartyKeys
 
-local card, current, dismissed, lockListener
+local card, current, group, dismissed, lockListener
 
 local function GetDB() return BUI.GetDB().keystoneReminder end
 
@@ -227,12 +227,6 @@ local function PaintStatus()
     card.kicker:SetTextColor(BUI.ThemeColor(full and 'positive' or 'accent'))
 end
 
-local function OnRoster()
-    PaintMeta()
-    PaintStatus()
-    if not current.level and current.mapID then PartyKeys.Request() end
-end
-
 local function SyncCard()
     card:SetShown(current ~= nil)
 end
@@ -251,7 +245,6 @@ function KeystoneReminder.Show(info)
     current = info
     Paint(info)
     BUI.Events:AfterCombat(SyncCard, CARD_KEY)
-    BUI.Events:Register('GROUP_ROSTER_UPDATE', ROSTER_KEY, OnRoster)
     BUI.Events:Register('SPELL_UPDATE_COOLDOWN', COOLDOWN_KEY, OnCooldown)
     if not info.level and info.mapID then
         PartyKeys.Listen(EVENT_KEY, PaintLevel)
@@ -261,7 +254,6 @@ end
 
 function KeystoneReminder.Hide()
     current = nil
-    BUI.Events:Unregister('GROUP_ROSTER_UPDATE', ROSTER_KEY)
     BUI.Events:Unregister('SPELL_UPDATE_COOLDOWN', COOLDOWN_KEY)
     PartyKeys.Listen(EVENT_KEY, nil)
     if card then BUI.Events:AfterCombat(SyncCard, CARD_KEY) end
@@ -274,12 +266,20 @@ function KeystoneReminder.ShowPreview()
 end
 
 local function MythicPlusActivity(activityID)
-    local activity = C_LFGList.GetActivityInfoTable(activityID)
+    local activity = activityID and C_LFGList.GetActivityInfoTable(activityID)
     if activity and activity.isMythicPlusActivity then return activity end
 end
 
+local function ResultActivity(resultID)
+    local result = C_LFGList.GetSearchResultInfo(resultID)
+    return result and MythicPlusActivity(result.activityIDs[1])
+end
+
+local function InDungeon()
+    return select(2, IsInInstance()) == 'party'
+end
+
 local function ShowFor(activity)
-    if select(2, IsInInstance()) == 'party' then return end
     local dungeon, texture, mapID = FindDungeon(activity.fullName)
     KeystoneReminder.Show({
         dungeon = dungeon,
@@ -290,29 +290,58 @@ local function ShowFor(activity)
     })
 end
 
+local function Sync()
+    if not GetDB().locked then return end
+    if not group or group.fullName == dismissed or InDungeon() then
+        if current then KeystoneReminder.Hide() end
+    elseif not current or current.activity ~= group.fullName then
+        ShowFor(group)
+    else
+        PaintMeta()
+        PaintStatus()
+        if not current.level and current.mapID then PartyKeys.Request() end
+    end
+end
+
+local function Remember(activity)
+    if not activity then return end
+    group = activity
+    Sync()
+end
+
 local function OnJoined(_, resultID)
-    local result = C_LFGList.GetSearchResultInfo(resultID)
-    local activity = result and MythicPlusActivity(result.activityIDs[1])
-    if activity then ShowFor(activity) end
+    Remember(ResultActivity(resultID))
 end
 
 local function OnListing()
     local entry = C_LFGList.GetActiveEntryInfo()
-    local activity = entry and MythicPlusActivity(entry.activityIDs[1])
-    if not activity or activity.fullName == dismissed then return end
-    if current and current.activity == activity.fullName then return end
-    ShowFor(activity)
+    Remember(entry and MythicPlusActivity(entry.activityIDs[1]))
+end
+
+local function OnRoster()
+    if group then
+        Sync()
+    elseif C_LFGList.HasActiveEntryInfo() then
+        OnListing()
+    end
+end
+
+local function Forget()
+    group, dismissed = nil, nil
+    Sync()
 end
 
 local function OnWorld()
-    if select(2, IsInInstance()) ~= 'party' then return end
-    dismissed = nil
-    if current then KeystoneReminder.Hide() end
+    if InDungeon() then Forget() end
+end
+
+local function Settle()
+    if IsInGroup() or C_LFGList.HasActiveEntryInfo() then return end
+    Forget()
 end
 
 local function OnGroupLeft()
-    dismissed = nil
-    KeystoneReminder.Hide()
+    BUI.Profiler.After('Auras.KeystoneReminder group left', LEAVE_SETTLE, Settle)
 end
 
 function KeystoneReminder.Enable()
@@ -321,6 +350,7 @@ function KeystoneReminder.Enable()
     C_MythicPlus.RequestMapInfo()
     BUI.Events:Register('LFG_LIST_JOINED_GROUP', EVENT_KEY, OnJoined)
     BUI.Events:Register('LFG_LIST_ACTIVE_ENTRY_UPDATE', EVENT_KEY, OnListing)
+    BUI.Events:Register('GROUP_ROSTER_UPDATE', EVENT_KEY, OnRoster)
     BUI.Events:Register('GROUP_LEFT', EVENT_KEY, OnGroupLeft)
     BUI.Events:Register('PLAYER_ENTERING_WORLD', EVENT_KEY, OnWorld)
     OnListing()
@@ -328,6 +358,7 @@ end
 
 function KeystoneReminder.Disable()
     BUI.Events:UnregisterAll(EVENT_KEY)
+    group, dismissed = nil, nil
     KeystoneReminder.Hide()
 end
 
@@ -344,6 +375,7 @@ function KeystoneReminder.SetLocked(locked)
     Apply()
     if locked then
         KeystoneReminder.Hide()
+        Sync()
     else
         KeystoneReminder.ShowPreview()
     end
