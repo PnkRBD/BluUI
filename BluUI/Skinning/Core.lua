@@ -420,13 +420,13 @@ local TIP_PADDING_X, TIP_PADDING_Y, TIP_TITLE_BLOCK = 10, 8, 24
 local TIP_BODY_SIZE, TIP_TITLE_SIZE = 11, 12
 local TIP_TITLE_COLOR, TIP_BODY_COLOR, TIP_LABEL_COLOR = {}, {}, {}
 local PANEL_FILL, PANEL_EDGE = {}, {}
-local TAB_REST, TAB_HOVER, TAB_SELECTED = {}, {}, {}
+local TAB_REST, TAB_HOVER, TAB_SELECTED, CARD_FILL = {}, {}, {}, {}
 local TIP_ROLES = { title = 'skinTitle', label = 'skinLabel' }
 local PALETTE = {
 	[PANEL_FILL] = 'skinBackground', [PANEL_EDGE] = 'skinBorder',
 	[TIP_TITLE_COLOR] = 'skinTitle', [TIP_BODY_COLOR] = 'skinText', [TIP_LABEL_COLOR] = 'skinLabel',
 }
-local TAB_SHADES = { [TAB_REST] = 2 / 3, [TAB_HOVER] = 4 / 3, [TAB_SELECTED] = 5 / 3 }
+local TAB_SHADES = { [TAB_REST] = 2 / 3, [TAB_HOVER] = 4 / 3, [TAB_SELECTED] = 5 / 3, [CARD_FILL] = 1.6 }
 
 local function LoadPalette(read)
 	for target, role in pairs(PALETTE) do target[1], target[2], target[3], target[4] = read(role) end
@@ -453,6 +453,46 @@ end
 
 function Skin.HideTipShell(frame)
 	BUILib.Skin.HideShell(frame)
+end
+
+local CARD_STYLE = { fill = CARD_FILL, edge = PANEL_EDGE }
+local ACCENT_EDGE = {}
+
+local function AccentEdge()
+	ACCENT_EDGE[1], ACCENT_EDGE[2], ACCENT_EDGE[3] = BUILib.Theme.GetAccent()
+	ACCENT_EDGE[4] = 1
+	return ACCENT_EDGE
+end
+
+local HoverEnter = Wrap('Skin.Core hover enter', function(frame)
+	BUILib.Skin.SetShellEdges(frame, AccentEdge())
+end)
+
+local HoverLeave = Wrap('Skin.Core hover leave', function(frame)
+	BUILib.Skin.SetShellEdges(frame, PANEL_EDGE)
+end)
+
+function Skin.AccentHover(frame)
+	if frame._buiAccentHover then return end
+	frame._buiAccentHover = true
+	frame:HookScript('OnEnter', HoverEnter)
+	frame:HookScript('OnLeave', HoverLeave)
+end
+
+function Skin.CardRow(row, inset)
+	BUILib.Skin.Shell(row, CARD_STYLE, inset)
+	Skin.AccentHover(row)
+end
+
+local LEFT_TITLE_X, LEFT_TITLE_SCALE = 12, 14 / 12
+
+function Skin.LeftTitle(frame)
+	local container = frame.TitleContainer
+	local title = container.TitleText
+	Skin.TipFont(title, 'title', LEFT_TITLE_SCALE)
+	title:ClearAllPoints()
+	title:SetPoint('LEFT', container, 'LEFT', frame:GetLeft() - container:GetLeft() + LEFT_TITLE_X, 0)
+	title:SetJustifyH('LEFT')
 end
 
 local DROPDOWN_HEIGHT_FALLBACK = 26
@@ -591,22 +631,12 @@ function Skin.TipButtonFonts(button, scale)
 	if button.SetDisabledFontObject then button:SetDisabledFontObject(fonts.disabled) end
 end
 
-local function TipButtonEnter(button)
-	local red, green, blue = BUILib.Theme.GetAccent()
-	BUILib.Skin.SetEdgeColor(button._buiShell.edges, { red, green, blue, 1 })
-end
-
-local function TipButtonLeave(button)
-	BUILib.Skin.SetEdgeColor(button._buiShell.edges, PANEL_EDGE)
-end
-
 function Skin.TipButton(button, scale)
 	if not button then return end
 	if not button._buiTipButton then
 		button._buiTipButton = true
 		BUILib.Skin.StripButton(button)
-		button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Core button OnEnter', TipButtonEnter))
-		button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Core button OnLeave', TipButtonLeave))
+		Skin.AccentHover(button)
 	end
 	Skin.TipShell(button)
 	Skin.TipButtonFonts(button, scale)
@@ -1188,8 +1218,7 @@ function Skin.TipCheckBox(check, inset)
 	FadeStateTextures(check)
 	Skin.TipCheckGlyph(check, false)
 	Skin.TipFace(check.Text or (check.GetFontString and check:GetFontString()), 'body')
-	check:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Core check OnEnter', TipButtonEnter))
-	check:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Core check OnLeave', TipButtonLeave))
+	Skin.AccentHover(check)
 end
 
 local BACKDROP_BUTTON_ART = { 'Left', 'Middle', 'Right', 'LeftDisabled', 'MiddleDisabled', 'RightDisabled' }
@@ -1551,6 +1580,12 @@ function Skin.NewContext(enabled)
 		if button then Skin.TipClose(button) end
 	end
 
+	local function Card(row, inset)
+		if not row then return end
+		shelled[row] = true
+		Skin.CardRow(row, inset)
+	end
+
 	local function Dropdown(dropdown)
 		if not dropdown then return end
 		shelled[dropdown] = true
@@ -1624,7 +1659,7 @@ function Skin.NewContext(enabled)
 	end
 
 	context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt = Fade, FadeRegions, FadeKeys, FadeArt
-	context.Shell, context.Button, context.Close, context.Dropdown = Shell, Button, Close, Dropdown
+	context.Shell, context.Button, context.Close, context.Dropdown, context.Card = Shell, Button, Close, Dropdown, Card
 	context.EditBox, context.CheckBox, context.TextBox, context.ScrollBar, context.Tab = EditBox, CheckBox, TextBox, ScrollBar, Tab
 	context.Face, context.FaceOnce, context.Title, context.Body, context.Restore = Face, FaceOnce, Title, Body, Restore
 	return context

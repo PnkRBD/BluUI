@@ -13,7 +13,8 @@ local SKIN_ID = 'questdialogs'
 local MAIN_ART = { 'Bg', 'TopTileStreaks', 'Inset' }
 local QUEST_TITLE_SCALE = 1.25
 local SECTION_TITLE_SCALE = 1.1
-local ROW_HOVER_ALPHA = 0.12
+local PANEL = { INSET = 6, TOP = -65, BOTTOM = 28, BAR_INSET = 4, BAR_LEVEL = 10, ROW_PAD = 10, ICON_X = 3 }
+local GOSSIP = { CARD_INSET = { top = -5, bottom = -5 }, PAD = 8, SPACING = 12, DIVIDER = 1, BAR_SPACE = 20 }
 local ITEM_HIGHLIGHT_ALPHA = 0.18
 local ITEM_HIGHLIGHT_OFFSET_X, ITEM_HIGHLIGHT_OFFSET_Y = 8, -7
 local ITEM_BUTTON_WIDTH, ITEM_BUTTON_HEIGHT = 147, 41
@@ -66,9 +67,9 @@ end
 
 local context = Skin.NewContext(Enabled)
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
-local Shell, Button, Close = context.Shell, context.Button, context.Close
+local Shell, Button, Close, Card = context.Shell, context.Button, context.Close, context.Card
 local ScrollBar, Face, Body, Title = context.ScrollBar, context.Face, context.Body, context.Title
-local AccentTexture, RowHighlight, CropIcon = Skin.AccentTexture, Skin.RowHighlight, Skin.CropIcon
+local AccentTexture, CropIcon = Skin.AccentTexture, Skin.CropIcon
 
 local function SetColor(fontString, color)
 	if fontString then fontString:SetTextColor(color[1], color[2], color[3], color[4]) end
@@ -96,13 +97,26 @@ local function FaceMoney(frame)
 	end
 end
 
+local function WideScroll(frame, scroll, scrollBar)
+	scroll:ClearAllPoints()
+	scroll:SetPoint('TOPLEFT', frame, 'TOPLEFT', PANEL.INSET, PANEL.TOP)
+	scroll:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -PANEL.INSET, PANEL.BOTTOM)
+	scrollBar:ClearAllPoints()
+	scrollBar:SetPoint('TOPRIGHT', scroll, 'TOPRIGHT', -PANEL.BAR_INSET, -PANEL.BAR_INSET)
+	scrollBar:SetPoint('BOTTOMRIGHT', scroll, 'BOTTOMRIGHT', -PANEL.BAR_INSET, PANEL.BAR_INSET)
+	scrollBar:SetFrameLevel(scroll:GetFrameLevel() + PANEL.BAR_LEVEL)
+	scrollBar:SetHideIfUnscrollable(true)
+	Fade(scrollBar.Back)
+	Fade(scrollBar.Forward)
+end
+
 local function SkinPanelFrame(frame)
 	FadeRegions(frame)
 	Fade(frame.NineSlice)
 	FadeKeys(frame, MAIN_ART)
 	if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
 	Shell(frame)
-	Title(frame.TitleContainer and frame.TitleContainer.TitleText)
+	Skin.LeftTitle(frame)
 	Close(frame.CloseButton)
 end
 
@@ -114,17 +128,13 @@ local function SkinFriendshipBar(bar)
 	Shell(bar)
 end
 
-local function SkinListRow(button)
-	if not button._buiQuestRow then
-		button._buiQuestRow = true
-		local highlight = button:GetHighlightTexture()
-		if highlight then highlight:SetBlendMode('BLEND') end
-		RowHighlight(button, ROW_HOVER_ALPHA)
-	end
+local function SkinListRow(button, inset)
 	local fontString = button:GetFontString()
 	if not fontString then return end
 	fontString:SetFixedColor(true)
 	Body(fontString)
+	Fade(button:GetHighlightTexture())
+	Card(button, inset)
 end
 
 local function SkinRewardIcon(button)
@@ -275,7 +285,9 @@ local function RefreshGreeting()
 	local panel = _G.QuestFrameGreetingPanel
 	for button in panel.titleButtonPool:EnumerateActive() do
 		SkinListRow(button)
-		button:SetHeight(math.max(button:GetTextHeight() + 2, button.Icon:GetHeight()))
+		button.Icon:ClearAllPoints()
+		button.Icon:SetPoint('LEFT', PANEL.ICON_X, 0)
+		button:SetHeight(math.max(button:GetTextHeight() + 2, button.Icon:GetHeight()) + PANEL.ROW_PAD)
 	end
 end
 
@@ -336,6 +348,7 @@ local function SkinQuestFrame(frame)
 		FadeRegions(scroll)
 		Shell(scroll)
 		ScrollBar(scroll.ScrollBar)
+		WideScroll(frame, scroll, scroll.ScrollBar)
 	end
 	for _, name in ipairs(QUEST_BUTTON_NAMES) do Button(_G[name]) end
 	for fontString in pairs(questPanelTexts) do StylePanelText(fontString) end
@@ -381,8 +394,10 @@ local function SkinGossipRow(row)
 	if row.GreetingText then
 		row.GreetingText:SetFixedColor(true)
 		Body(row.GreetingText)
+		row.GreetingText:ClearAllPoints()
+		row.GreetingText:SetPoint('TOPLEFT', PANEL.ICON_X, 0)
 	elseif row.GetFontString then
-		SkinListRow(row)
+		SkinListRow(row, GOSSIP.CARD_INSET)
 	end
 end
 
@@ -414,6 +429,28 @@ local function OnGossipUpdated()
 	if Enabled() and gossipSkinned then RefreshGossip() end
 end
 
+local function PadGossipList(scrollBox, scrollBar)
+	local right = scrollBar:IsShown() and GOSSIP.BAR_SPACE or GOSSIP.PAD
+	scrollBox:GetView():SetPadding(GOSSIP.PAD, GOSSIP.PAD, GOSSIP.PAD, right, GOSSIP.SPACING)
+end
+
+local function ShapeGossipList(scrollBox, scrollBar)
+	local view = scrollBox:GetView()
+	local measure = view:GetElementExtentCalculator()
+	view:SetElementExtentCalculator(function(dataIndex, elementData)
+		if Enabled() and elementData.buttonType == GOSSIP_BUTTON_TYPE_DIVIDER then return GOSSIP.DIVIDER end
+		return measure(dataIndex, elementData)
+	end)
+	PadGossipList(scrollBox, scrollBar)
+	local function Repad()
+		PadGossipList(scrollBox, scrollBar)
+		scrollBox:FullUpdate()
+	end
+	scrollBar:HookScript('OnShow', Wrap('Skin.QuestDialogs gossip bar shown', Repad))
+	scrollBar:HookScript('OnHide', Wrap('Skin.QuestDialogs gossip bar hidden', Repad))
+	if view:GetDataProvider() then scrollBox:Rebuild(ScrollBoxConstants.RetainScrollPosition) end
+end
+
 local function SkinGossipFrame(frame)
 	SkinPanelFrame(frame)
 	SkinFriendshipBar(frame.FriendshipStatusBar)
@@ -421,7 +458,9 @@ local function SkinGossipFrame(frame)
 	FadeRegions(panel)
 	Shell(panel.ScrollBox)
 	ScrollBar(panel.ScrollBar)
+	WideScroll(frame, panel.ScrollBox, panel.ScrollBar)
 	Button(panel.GoodbyeButton)
+	ShapeGossipList(panel.ScrollBox, panel.ScrollBar)
 	Skin.SweepScrollBox(panel.ScrollBox, SkinGossipRow)
 end
 
