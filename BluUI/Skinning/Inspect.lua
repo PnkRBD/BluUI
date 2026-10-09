@@ -417,6 +417,7 @@ local function Install()
 	local frame = _G.InspectFrame
 	if not frame then return end
 	installed = true
+	ApplyScale()
 	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Inspect frame reskin', Apply))
 	Hook('InspectPaperDollItemSlotButton_Update', RefreshSlot)
 	BUI.Events:Register('INSPECT_READY', 'Skin.InspectLevels', function()
@@ -448,6 +449,8 @@ Skin.OnToggle(SKIN_ID, function(enabled)
 			BUI.Events:Register('ADDON_LOADED', 'Skin.Inspect', TryInstall)
 		elseif _G.InspectFrame:IsShown() then
 			Apply()
+		else
+			ApplyScale()
 		end
 	else
 		Deactivate()
