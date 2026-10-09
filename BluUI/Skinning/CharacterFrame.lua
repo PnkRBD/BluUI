@@ -1109,9 +1109,33 @@ local function ShowPane(key)
 end
 
 
-local function TitleSortKey(name)
-    return (name or ''):gsub('%%s', ' '):gsub('^%s+', ''):gsub('%s+$', ''):lower()
+local Titles = { entries = {}, dirty = true }
+
+function Titles.ByKey(left, right)
+    if left.index == NO_TITLE then return true end
+    if right.index == NO_TITLE then return false end
+    return left.key < right.key
 end
+
+function Titles.Collect()
+    local entries = Titles.entries
+    Titles.dirty = false
+    wipe(entries)
+    entries[1] = { index = NO_TITLE, label = 'No Title', key = 'no title' }
+    for titleIndex = 1, GetNumTitles() do
+        local name = IsTitleKnown(titleIndex) and GetTitleName(titleIndex)
+        if name then
+            local label = name:gsub('%%s', ''):gsub('^%s+', ''):gsub('%s+$', '')
+            entries[#entries + 1] = { index = titleIndex, label = label, key = label:lower() }
+        end
+    end
+    table.sort(entries, Titles.ByKey)
+end
+
+Titles.Pick = BUI.Profiler.Script('Skin.CharacterFrame title OnClick', function(self)
+    SetCurrentTitle(self.titleIndex)
+    for _, other in ipairs(sidebar.panes.titles.rows) do SetRowSelected(other, other.titleIndex == self.titleIndex) end
+end)
 
 local function BuildTitlesPane(parent)
     local pane = CreateFrame('Frame', nil, parent)
@@ -1147,49 +1171,30 @@ local function BuildTitlesPane(parent)
     pane.area, pane.scroll = CreateScrollList(pane, TAB_ROW_HEIGHT + 8 + 22 + 6, rowWidth)
     pane.rowWidth = rowWidth
     pane.rows = {}
-    pane.entries = {}
     return pane
 end
 
 RefreshTitles = function()
     local pane = sidebar and sidebar.panes.titles
     if not pane or not pane:IsShown() then return end
-
-    local entries = pane.entries
-    wipe(entries)
-    entries[#entries + 1] = { index = NO_TITLE, name = 'No Title' }
-    for titleIndex = 1, GetNumTitles() do
-        if IsTitleKnown(titleIndex) then
-            local name = GetTitleName(titleIndex)
-            if name then entries[#entries + 1] = { index = titleIndex, name = name } end
-        end
-    end
-    table.sort(entries, function(left, right)
-        if left.index == NO_TITLE then return true end
-        if right.index == NO_TITLE then return false end
-        return TitleSortKey(left.name) < TitleSortKey(right.name)
-    end)
+    if Titles.dirty then Titles.Collect() end
 
     local filter = pane.search:GetText():lower()
     local current = GetCurrentTitle()
     if not current or current == 0 then current = NO_TITLE end
 
     local visible = 0
-    for _, entry in ipairs(entries) do
-        local shown = filter == '' or TitleSortKey(entry.name):find(filter, 1, true) ~= nil
-        if shown then
+    for _, entry in ipairs(Titles.entries) do
+        if filter == '' or entry.key:find(filter, 1, true) then
             visible = visible + 1
             local row = pane.rows[visible]
             if not row then
                 row = CreateListRow(pane.scroll.child, pane.rowWidth)
-                row:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame row OnClick', function(self)
-                    SetCurrentTitle(self.titleIndex)
-                    for _, other in ipairs(pane.rows) do SetRowSelected(other, other.titleIndex == self.titleIndex) end
-                end))
+                row:SetScript('OnClick', Titles.Pick)
                 pane.rows[visible] = row
             end
             row.titleIndex = entry.index
-            row.text:SetText((entry.name:gsub('%%s', ''):gsub('^%s+', ''):gsub('%s+$', '')))
+            row.text:SetText(entry.label)
             SetRowSelected(row, entry.index == current)
             row:ClearAllPoints()
             row:SetPoint('TOPLEFT', pane.scroll.child, 'TOPLEFT', 0, -Pixel.Scale((visible - 1) * (LIST_ROW_H + LIST_ROW_GAP)))
@@ -2214,7 +2219,7 @@ end
 local function RefreshEquipment() RefreshSlots(); RefreshHeader(); RefreshSets(); RefreshBagAlternatives(); RefreshModel() end
 local function OnEquipmentChanged() QueueRefresh('equipment', RefreshEquipment) end
 local function OnStatsChanged() QueueRefresh('stats', RefreshStats) end
-local function OnTitlesChanged() QueueRefresh('titles', function() RefreshTitles(); UpdateSubtitle() end) end
+local function OnTitlesChanged() Titles.dirty = true; QueueRefresh('titles', function() RefreshTitles(); UpdateSubtitle() end) end
 local function OnHeaderChanged() QueueRefresh('header', RefreshHeader) end
 
 BUI.Events:Register('PLAYER_EQUIPMENT_CHANGED',     'Skinning.CharacterFrame', OnEquipmentChanged)
