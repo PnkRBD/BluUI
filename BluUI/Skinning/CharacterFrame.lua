@@ -120,15 +120,6 @@ local EQUIPMENT_SLOT_NAMES = {
     'Finger 1', 'Finger 2', 'Trinket 1', 'Trinket 2', 'Back', 'Main Hand', 'Off Hand', 'Ranged', 'Tabard',
 }
 
-local MP_COLOR_BRACKETS = {
-    { 3850, 'ff8000' }, { 3695, 'f9753f' }, { 3575, 'f16961' }, { 3455, 'e75e7f' }, { 3335, 'db529c' },
-    { 3215, 'cc47b9' }, { 3095, 'b83dd6' }, { 2965, '9c3eed' }, { 2845, '715be5' }, { 2725, '2c6dde' },
-    { 2565, '3b7fcd' }, { 2445, '5292b9' }, { 2325, '5ca6a4' }, { 2205, '5fba8d' }, { 2085, '5cce75' },
-    { 1965, '50e258' }, { 1845, '35f72d' }, { 1725, '3eff26' }, { 1600, '5eff43' }, { 1475, '74ff58' },
-    { 1350, '88ff6b' }, { 1225, '98ff7d' }, { 1100, 'a8ff8d' }, { 975, 'b6ff9e' },  { 850, 'c3ffae' },
-    { 725, 'cfffbd' },  { 600, 'dbffcd' },  { 475, 'e7ffdd' },  { 350, 'f2ffec' },  { 225, 'fdfffc' },
-}
-
 local NO_TITLE = -1
 local CONQUEST_CURRENCY, QUESTION_MARK_ICON = 1602, 134400
 
@@ -663,13 +654,6 @@ local function SetStatText(fontString, text)
     if not pcall(fontString.SetFormattedText, fontString, text.format, text.value) then
         fontString:SetText(STAT_UNAVAILABLE)
     end
-end
-
-local function MPScoreHex(score)
-    for _, bracket in ipairs(MP_COLOR_BRACKETS) do
-        if score >= bracket[1] then return bracket[2] end
-    end
-    return 'ffffff'
 end
 
 local function DurabilityPercent()
@@ -1788,10 +1772,9 @@ local function RefreshHeader()
         pane.pvpIlvl:SetText('')
     end
 
-    local score = C_ChallengeMode and C_ChallengeMode.GetOverallDungeonScore and C_ChallengeMode.GetOverallDungeonScore() or 0
+    local score = C_ChallengeMode.GetOverallDungeonScore()
     if score and not IsSecretValue(score) and score > 0 then
-        score = math.floor(score)
-        pane.score:SetText('M+ Score: |cff' .. MPScoreHex(score) .. score .. '|r')
+        pane.score:SetText('M+ Score: ' .. C_ChallengeMode.GetDungeonScoreRarityColor(score):WrapTextInColorCode(math.floor(score)))
     else
         pane.score:SetText('')
     end
