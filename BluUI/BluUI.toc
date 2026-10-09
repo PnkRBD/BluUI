@@ -215,6 +215,7 @@ Modules\Installer\Installer.lua
 Skinning\Core.lua
 Skinning\ToastAnchors.lua
 Skinning\Widgets.lua
+Skinning\ItemReadout.lua
 Skinning\Merchant.lua
 Skinning\Trainer.lua
 Skinning\ExperienceBar.lua

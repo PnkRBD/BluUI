@@ -6,6 +6,7 @@ local Controls = BUILib.Controls
 local Colors = BUILib.Colors
 local FONT = BUILib.Font or STANDARD_TEXT_FONT
 local Skin = BUI.Skinning
+local Readout = Skin.Readout
 local IsSecretValue = BUI.Tools.IsSecretValue
 local Pixel = BUI.Pixel
 
@@ -79,9 +80,7 @@ local INFO_COLOR    = { 0.8, 0.8, 0.8 }
 local LABEL_COLOR   = { 0.8, 0.8, 0.8 }
 local VALUE_COLOR   = { 1, 1, 1 }
 local SEPARATOR_COLOR = { 0.54, 0.56, 0.6 }
-local MISSING_COLOR = { 0.898, 0.286, 0.286 }
-local GEM_BORDER_RARE   = { 1, 0.82, 0 }
-local GEM_BORDER_COMMON = { 0.75, 0.75, 0.75 }
+local MISSING_COLOR = Readout.MISSING_COLOR
 local LIST_ROW_BG   = { 1, 1, 1, 0.04 }
 local LIST_ROW_HOVER = { 1, 1, 1, 0.1 }
 local SEARCH_BG     = { 0, 0, 0, 0.5 }
@@ -93,15 +92,6 @@ local SECTION_COLORS = {
     Attack     = { 1, 0.45, 0.4 },
     Defense    = { 0.7, 0.55, 1 },
     PvP        = { 0.95, 0.6, 0.8 },
-}
-
-local TRACK_COLORS = {
-    explorer   = { 0.62, 0.62, 0.62 },
-    adventurer = { 1, 1, 1 },
-    veteran    = { 0.12, 1, 0 },
-    champion   = { 0, 0.44, 0.87 },
-    hero       = { 0.64, 0.21, 0.93 },
-    myth       = { 1, 0.5, 0 },
 }
 
 local SLOTS = {
@@ -130,20 +120,6 @@ local EQUIPMENT_SLOT_NAMES = {
     'Finger 1', 'Finger 2', 'Trinket 1', 'Trinket 2', 'Back', 'Main Hand', 'Off Hand', 'Ranged', 'Tabard',
 }
 
-local EMPTY_SOCKET_ATLAS = {
-    EMPTY_SOCKET_META       = 'socket-meta',
-    EMPTY_SOCKET_RED        = 'socket-red',
-    EMPTY_SOCKET_YELLOW     = 'socket-yellow',
-    EMPTY_SOCKET_BLUE       = 'socket-blue',
-    EMPTY_SOCKET_PRISMATIC  = 'socket-prismatic',
-    EMPTY_SOCKET_TINKER     = 'socket-tinker',
-    EMPTY_SOCKET_PRIMORDIAL = 'socket-primordial',
-    EMPTY_SOCKET_DOMINATION = 'socket-domination',
-    EMPTY_SOCKET_CYPHER     = 'socket-cypher',
-    EMPTY_SOCKET_HYDRAULIC  = 'socket-hydraulic',
-    EMPTY_SOCKET_COGWHEEL   = 'socket-cogwheel',
-}
-
 local MP_COLOR_BRACKETS = {
     { 3850, 'ff8000' }, { 3695, 'f9753f' }, { 3575, 'f16961' }, { 3455, 'e75e7f' }, { 3335, 'db529c' },
     { 3215, 'cc47b9' }, { 3095, 'b83dd6' }, { 2965, '9c3eed' }, { 2845, '715be5' }, { 2725, '2c6dde' },
@@ -165,160 +141,13 @@ function Skin.GetCharacterFrame()
     return frame
 end
 
-local ENCHANT_LINE_TYPE = Enum and Enum.TooltipDataLineType and Enum.TooltipDataLineType.ItemEnchantmentPermanent or 15
-
-local function EscapePattern(text)
-    return (text:gsub('([%(%)%.%[%]%^%$%*%+%-%?%%])', '%%%1'))
-end
-
-local function PatternFromFormat(format)
-    if not format then return nil end
-    local head, tail = format:match('^(.-)%%s(.*)$')
-    if not head then return nil end
-    return '^' .. EscapePattern(head) .. '(.+)' .. EscapePattern(tail) .. '$'
-end
-
-local ENCHANT_PATTERN = PatternFromFormat(ENCHANTED_TOOLTIP_LINE)
-local UPGRADE_PATTERN
-if ITEM_UPGRADE_TOOLTIP_FORMAT then
-    local escaped = EscapePattern(ITEM_UPGRADE_TOOLTIP_FORMAT)
-    escaped = escaped:gsub('%%%%s', '(.-)'):gsub('%%%%d', '(%%d+)')
-    UPGRADE_PATTERN = '^' .. escaped .. '$'
-end
-
-local function TooltipLines(inventorySlot)
-    if not C_TooltipInfo or not C_TooltipInfo.GetInventoryItem then return nil end
-    local data = C_TooltipInfo.GetInventoryItem('player', inventorySlot)
-    if not data then return nil end
-    if TooltipUtil and TooltipUtil.SurfaceArgs then TooltipUtil.SurfaceArgs(data) end
-    return data.lines
-end
-
-local function StripColors(text)
-    if not text then return '' end
-    text = text:gsub('|cn.-:(.-)|r', '%1')
-    text = text:gsub('|c%x%x%x%x%x%x%x%x', '')
-    text = text:gsub('|r', '')
-    text = text:gsub('^%s*[%+&]%s*', '')
-    return text
-end
-
-local enchantCache = {}
-
-local function ReadEnchant(inventorySlot, link)
-    local enchantID = tonumber(link:match('item:%d+:(%d+)'))
-    if not enchantID or enchantID == 0 then return '' end
-    local cached = enchantCache[enchantID]
-    if cached then return cached end
-
-    local lines = TooltipLines(inventorySlot)
-    if not lines then return '' end
-    for _, line in ipairs(lines) do
-        local raw = StripColors(line.leftText)
-        local matched
-        if line.type == ENCHANT_LINE_TYPE then
-            matched = (ENCHANT_PATTERN and raw:match(ENCHANT_PATTERN)) or raw
-        elseif ENCHANT_PATTERN then
-            matched = raw:match(ENCHANT_PATTERN)
-        end
-        if matched and matched ~= '' then
-            matched = matched:gsub('^Enchanted:%s*', '')
-            matched = matched:gsub('^Enchant%s+[^%-]+%s*%-%s*', '')
-            enchantCache[enchantID] = matched
-            return matched
-        end
-    end
-    return ''
-end
-
-local function ParseUpgradeLine(raw)
-    if UPGRADE_PATTERN then
-        local track, current, maximum = raw:match(UPGRADE_PATTERN)
-        if track then return track, current, maximum end
-    end
-    local track, current, maximum = raw:match('(%a+)%s+(%d+)%s*/%s*(%d+)%s*$')
-    if track and TRACK_COLORS[track:lower()] then return track, current, maximum end
-    return nil
-end
-
-local function ReadUpgradeTrack(inventorySlot)
-    local lines = TooltipLines(inventorySlot)
-    if not lines then return nil end
-    for _, line in ipairs(lines) do
-        local raw = StripColors(line.leftText)
-        local track, current, maximum = ParseUpgradeLine(raw)
-        if track then
-            local key = track:lower():match('^(%a+)')
-            return track .. ' ' .. current .. '/' .. maximum, TRACK_COLORS[key]
-        end
-    end
-    return nil
-end
-
 local function ReadItemLevel(inventorySlot, link)
-    if ItemLocation and C_Item.GetCurrentItemLevel then
-        local location = ItemLocation:CreateFromEquipmentSlot(inventorySlot)
-        if location and location:IsValid() and C_Item.DoesItemExist(location) then
-            local level = C_Item.GetCurrentItemLevel(location)
-            if level and level > 0 then return level end
-        end
+    local location = ItemLocation:CreateFromEquipmentSlot(inventorySlot)
+    if location:IsValid() and C_Item.DoesItemExist(location) then
+        local level = C_Item.GetCurrentItemLevel(location)
+        if level and level > 0 then return level end
     end
     return C_Item.GetDetailedItemLevelInfo(link) or 0
-end
-
-local function ReadSockets(link)
-    local entries, gemLinks = {}, {}
-    if not link or not C_Item.GetItemGem or not C_Item.GetItemStats then return entries, gemLinks end
-
-    for gemIndex = 1, 4 do
-        local _, gemLink = C_Item.GetItemGem(link, gemIndex)
-        if gemLink then
-            gemLinks[#gemLinks + 1] = gemLink
-            local icon = C_Item.GetItemIconByID(gemLink) or select(5, C_Item.GetItemInfoInstant(gemLink))
-            entries[#entries + 1] = { icon = icon or QUESTION_MARK_ICON }
-        end
-    end
-
-    local stats = C_Item.GetItemStats(link)
-    if stats then
-        local total, firstAtlas = 0, nil
-        for key, count in pairs(stats) do
-            local atlas = EMPTY_SOCKET_ATLAS[key]
-            if atlas and count and count > 0 then
-                total = total + count
-                firstAtlas = firstAtlas or atlas
-            end
-        end
-        for _ = 1, math.max(0, total - #gemLinks) do
-            entries[#entries + 1] = { atlas = firstAtlas }
-        end
-    end
-    return entries, gemLinks
-end
-
-local function QualityColor(link)
-    local quality = link and C_Item.GetItemQualityByID(link)
-    if quality and quality > 1 then
-        local red, green, blue = C_Item.GetItemQualityColor(quality)
-        return { red, green, blue }
-    end
-    return nil
-end
-
-local function AtEnchantLevel()
-    local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or 90
-    local level = UnitLevel('player')
-    if not level or IsSecretValue(level) then return false end
-    return level >= maxLevel
-end
-
-local function CanHaveEnchant(info, link)
-    if info.enchant == 'weapon' then
-        if not link then return false end
-        local _, _, _, _, _, classID = C_Item.GetItemInfoInstant(link)
-        return classID == Enum.ItemClass.Weapon
-    end
-    return info.enchant == true
 end
 
 local function SlotAnchor(info)
@@ -390,15 +219,28 @@ local function HideBlizzardDecorations(button)
     end
 end
 
-local function ApplyQualityBorder(button, link)
-    local color = QualityColor(link)
-    button._buiQualityColor = color
-    if color then
-        button:SetBackdropBorderColor(color[1], color[2], color[3], 1)
-    else
-        button:SetBackdropBorderColor(IDLE_BORDER[1], IDLE_BORDER[2], IDLE_BORDER[3], 1)
+local qualityColors = {}
+
+local function QualityColor(quality)
+    if not quality or quality <= 1 then return nil end
+    local color = qualityColors[quality]
+    if not color then
+        local red, green, blue = C_Item.GetItemQualityColor(quality)
+        color = { red, green, blue }
+        qualityColors[quality] = color
     end
+    return color
 end
+
+local function PaintSlotBorder(button)
+    local color = button._buiQualityColor or IDLE_BORDER
+    button:SetBackdropBorderColor(color[1], color[2], color[3], 1)
+end
+
+local SlotEnter = BUI.Profiler.Wrap('Skin.CharacterFrame slot OnEnter', function(self)
+    self:SetBackdropBorderColor(Colors.GetAccent())
+end)
+local SlotLeave = BUI.Profiler.Wrap('Skin.CharacterFrame slot OnLeave', PaintSlotBorder)
 
 local function StyleSlotButton(button)
     if button._buiStyled then return end
@@ -428,37 +270,8 @@ local function StyleSlotButton(button)
         icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     end
 
-    button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.CharacterFrame button OnEnter 2', function(self)
-        self:SetBackdropBorderColor(Colors.GetAccent())
-    end))
-    button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.CharacterFrame button OnLeave 2', function(self)
-        local color = self._buiQualityColor
-        if color then
-            self:SetBackdropBorderColor(color[1], color[2], color[3], 1)
-        else
-            self:SetBackdropBorderColor(IDLE_BORDER[1], IDLE_BORDER[2], IDLE_BORDER[3], 1)
-        end
-    end))
-end
-
-local function CreateGemFrame(button)
-    local gem = CreateFrame('Frame', nil, overlay, 'BackdropTemplate')
-    gem:SetSize(Pixel.Scale(GEM_SIZE), Pixel.Scale(GEM_SIZE))
-    gem:SetFrameLevel(button:GetFrameLevel() + 6)
-    Pixel.SetTemplate(gem, 0, 0, 0, 1)
-    gem.icon = gem:CreateTexture(nil, 'ARTWORK')
-    gem.icon:SetPoint('TOPLEFT', 1, -1)
-    gem.icon:SetPoint('BOTTOMRIGHT', -1, 1)
-    gem:EnableMouse(true)
-    gem:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame gem OnEnter', function(self)
-        if not self.link then return end
-        GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
-        GameTooltip:SetHyperlink(self.link)
-        GameTooltip:Show()
-    end))
-    gem:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame gem OnLeave', function() GameTooltip:Hide() end))
-    gem:Hide()
-    return gem
+    button:HookScript('OnEnter', SlotEnter)
+    button:HookScript('OnLeave', SlotLeave)
 end
 
 local BAG = { ARROW_SIZE = GEM_SIZE, COLS = 5, CELL = 40, GAP = 4, PAD = 8, POPUP_TOP = 24, POPUP_MAX = 15, POPUP_LINGER = 0.35 }
@@ -706,7 +519,7 @@ local function RefreshBagAlternatives()
     if bagPopup and bagPopup:IsShown() then bagPopup:Hide() end
 end
 
-function Skin.SyncSlotGemDim(labels)
+local function SyncGemDim(labels)
     local contextOverlay = labels.button.ItemContextOverlay
     local alpha = (contextOverlay and contextOverlay:IsShown()) and 0.25 or 1
     for _, gem in ipairs(labels.gems) do gem:SetAlpha(alpha) end
@@ -787,7 +600,7 @@ local function BuildSlotLabels(button, info)
     local contextOverlay = button.ItemContextOverlay
     if contextOverlay then
         local Hook = BUI.Profiler.Hooker('Skin.CharacterFrame')
-        local function Sync() Skin.SyncSlotGemDim(labels) end
+        local function Sync() SyncGemDim(labels) end
         Hook(contextOverlay, 'Show', Sync)
         Hook(contextOverlay, 'Hide', Sync)
         Hook(contextOverlay, 'SetShown', Sync)
@@ -796,60 +609,33 @@ local function BuildSlotLabels(button, info)
     return labels
 end
 
+local gemMetrics
+
 local function RefreshGems(labels, link)
-    local entries, gemLinks = ReadSockets(link)
-    for index = 1, math.max(#entries, #labels.gems) do
-        local entry = entries[index]
-        local gem = labels.gems[index]
-        if entry and not gem then
-            gem = CreateGemFrame(labels.button)
-            labels.gems[index] = gem
-            Skin.SyncSlotGemDim(labels)
-        end
-        if gem then
-            if entry then
-                if gem.icon.SetAtlas then gem.icon:SetAtlas(nil) end
-                gem.icon:SetTexture(nil)
-                if entry.atlas then
-                    gem.icon:SetAtlas(entry.atlas)
-                    gem.link = nil
-                    gem:SetBackdropBorderColor(GEM_BORDER_COMMON[1], GEM_BORDER_COMMON[2], GEM_BORDER_COMMON[3], 0.6)
-                else
-                    gem.icon:SetTexture(entry.icon)
-                    gem.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-                    gem.link = gemLinks[index]
-                    local quality = gem.link and C_Item.GetItemQualityByID(gem.link) or 2
-                    local border = quality >= 3 and GEM_BORDER_RARE or GEM_BORDER_COMMON
-                    gem:SetBackdropBorderColor(border[1], border[2], border[3], 1)
-                end
-                gem:ClearAllPoints()
-                gem:SetPoint('BOTTOMRIGHT', labels.button, 'BOTTOMRIGHT',
-                    -Pixel.Scale(GEM_INSET), Pixel.Scale(GEM_INSET + (index - 1) * (GEM_SIZE + GEM_PAD)))
-                gem:Show()
-            else
-                gem:Hide()
-            end
-        end
-    end
+    Readout.RefreshGems(labels, link, gemMetrics)
+    SyncGemDim(labels)
 end
 
 local function RefreshSlot(labels)
     local info, button = labels.info, labels.button
     local inventorySlot = GetInventorySlotInfo(info.id)
     local link = GetInventoryItemLink('player', inventorySlot)
-    ApplyQualityBorder(button, link)
+    local qualityColor = link and QualityColor(C_Item.GetItemQualityByID(link))
+    button._buiQualityColor = qualityColor
+    PaintSlotBorder(button)
 
     if not link or info.cosmetic then
         labels.ilvl:SetText('')
         labels.track:SetText('')
         labels.enchant:SetText('')
         labels.enchantHover:Hide()
-        RefreshGems(labels, info.cosmetic and nil or link)
+        RefreshGems(labels, nil)
         return
     end
 
-    local trackText, trackColor = ReadUpgradeTrack(inventorySlot)
-    local color = trackColor or QualityColor(link) or { 1, 1, 1 }
+    local canEnchant = Readout.CanHaveEnchant(info, link)
+    local trackText, trackColor, enchant = Readout.Read('player', inventorySlot, link, canEnchant)
+    local color = trackColor or qualityColor or VALUE_COLOR
 
     local level = ReadItemLevel(inventorySlot, link)
     labels.ilvl:SetText(level > 0 and tostring(level) or '')
@@ -858,34 +644,18 @@ local function RefreshSlot(labels)
     labels.track:SetText(trackText or '')
     labels.track:SetTextColor(color[1], color[2], color[3], 0.6)
 
-    local canEnchant = CanHaveEnchant(info, link)
-    local enchant = canEnchant and ReadEnchant(inventorySlot, link) or ''
-    local hasEnchant = enchant ~= ''
-    local missing = canEnchant and not hasEnchant and AtEnchantLevel()
-
-    if missing then
-        labels.enchant:SetText('No Enchant')
-        labels.enchant:SetTextColor(MISSING_COLOR[1], MISSING_COLOR[2], MISSING_COLOR[3], 1)
-
-        labels.enchantHover.tooltip = 'Enchant missing'
-        labels.enchantHover.slot = nil
-        labels.enchantHover:Show()
-    elseif hasEnchant then
-        local icons = {}
-        for atlas in enchant:gmatch('|A:[^|]+|a') do icons[#icons + 1] = atlas end
-        local name = enchant:gsub('|A:[^|]+|a', ''):gsub('^%s+', ''):gsub('%s+$', '')
-        name = name:gsub('^.-%s*%-%s*', '')
-        labels.enchant:SetText(table.concat(icons, '') .. (#icons > 0 and ' ' or '') .. name)
-        labels.enchant:SetTextColor(
-            color[1] + (1 - color[1]) * 0.5,
-            color[2] + (1 - color[2]) * 0.5,
-            color[3] + (1 - color[3]) * 0.5, 0.95)
-        labels.enchantHover.tooltip = name
-        labels.enchantHover.slot = inventorySlot
-        labels.enchantHover:Show()
+    local hover = labels.enchantHover
+    if enchant ~= '' then
+        Readout.PaintEnchant(labels.enchant, hover, enchant, color[1], color[2], color[3])
+        hover.slot = inventorySlot
+        hover:Show()
+    elseif canEnchant and Readout.AtEnchantLevel('player') then
+        Readout.PaintMissingEnchant(labels.enchant, hover)
+        hover.slot = nil
+        hover:Show()
     else
         labels.enchant:SetText('')
-        labels.enchantHover:Hide()
+        hover:Hide()
     end
 
     RefreshGems(labels, link)
@@ -2388,6 +2158,7 @@ local function BuildFrame()
     overlay = CreateFrame('Frame', nil, frame)
     overlay:SetAllPoints()
     overlay:SetFrameLevel(frame:GetFrameLevel() + 8)
+    gemMetrics = { parent = overlay, size = Pixel.Scale(GEM_SIZE), pad = Pixel.Scale(GEM_PAD), inset = Pixel.Scale(GEM_INSET) }
 
     BuildSidebar(frame)
 

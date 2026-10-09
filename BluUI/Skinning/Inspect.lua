@@ -4,10 +4,10 @@ local Hook = BUI.Profiler.Hooker('Skin.Inspect')
 
 local ipairs = ipairs
 local floor = math.floor
-local max = math.max
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
+local Readout = Skin.Readout
 local IsSecretValue = BUI.Tools.IsSecretValue
 
 local SKIN_ID = 'inspect'
@@ -34,32 +34,6 @@ local LABEL_LINE_Y = 13
 local GEM_SIZE = 14
 local GEM_PAD = 1
 local GEM_INSET = 2
-local GEM_MAX = 4
-local GEM_RARE_QUALITY = 3
-local GEM_BORDER_RARE = { 1, 0.82, 0 }
-local GEM_BORDER_COMMON = { 0.75, 0.75, 0.75 }
-local QUESTION_MARK_ICON = 134400
-local TRACK_COLORS = {
-	explorer   = { 0.62, 0.62, 0.62 },
-	adventurer = { 1, 1, 1 },
-	veteran    = { 0.12, 1, 0 },
-	champion   = { 0, 0.44, 0.87 },
-	hero       = { 0.64, 0.21, 0.93 },
-	myth       = { 1, 0.5, 0 },
-}
-local EMPTY_SOCKET_ATLAS = {
-	EMPTY_SOCKET_META       = 'socket-meta',
-	EMPTY_SOCKET_RED        = 'socket-red',
-	EMPTY_SOCKET_YELLOW     = 'socket-yellow',
-	EMPTY_SOCKET_BLUE       = 'socket-blue',
-	EMPTY_SOCKET_PRISMATIC  = 'socket-prismatic',
-	EMPTY_SOCKET_TINKER     = 'socket-tinker',
-	EMPTY_SOCKET_PRIMORDIAL = 'socket-primordial',
-	EMPTY_SOCKET_DOMINATION = 'socket-domination',
-	EMPTY_SOCKET_CYPHER     = 'socket-cypher',
-	EMPTY_SOCKET_HYDRAULIC  = 'socket-hydraulic',
-	EMPTY_SOCKET_COGWHEEL   = 'socket-cogwheel',
-}
 local READOUT_SIZE = 24
 local READOUT_INSET_X = 8
 local READOUT_TOP = -20
@@ -70,12 +44,7 @@ local SCALE_SETTING = 'inspectScale'
 local ENCHANT_SIZE = 9
 local ENCHANT_NAME_W = 100
 local ENCHANT_HOVER_H = 14
-local ENCHANT_TINT = 0.5
-local ENCHANT_ALPHA = 0.95
-local MISSING_COLOR = { 0.898, 0.286, 0.286, 1 }
-local MAX_LEVEL_FALLBACK = 90
 local OVERLAY_LEVEL_BUMP = 20
-local ENCHANT_LINE_TYPE = Enum and Enum.TooltipDataLineType and Enum.TooltipDataLineType.ItemEnchantmentPermanent or 15
 local SLOT_INFO = {
 	Head = { col = 'left', enchant = true },
 	Neck = { col = 'left' },
@@ -117,155 +86,9 @@ local Shell, Button, Close = context.Shell, context.Button, context.Close
 local Face, Title, Body = context.Face, context.Title, context.Body
 local CropIcon, RowHighlight = Skin.CropIcon, Skin.RowHighlight
 
-local function EscapePattern(text)
-	return (text:gsub('([%(%)%.%[%]%^%$%*%+%-%?%%])', '%%%1'))
-end
-
-local function PatternFromFormat(format)
-	if not format then return nil end
-	local head, tail = format:match('^(.-)%%s(.*)$')
-	if not head then return nil end
-	return '^' .. EscapePattern(head) .. '(.+)' .. EscapePattern(tail) .. '$'
-end
-
-local ENCHANT_PATTERN = PatternFromFormat(ENCHANTED_TOOLTIP_LINE)
-
-local function StripColors(text)
-	if not text then return '' end
-	text = text:gsub('|cn.-:(.-)|r', '%1')
-	text = text:gsub('|c%x%x%x%x%x%x%x%x', '')
-	text = text:gsub('|r', '')
-	text = text:gsub('^%s*[%+&]%s*', '')
-	return text
-end
-
-local enchantCache = {}
-local trackCache = {}
-local NO_TRACK = {}
-
-local function TooltipLines(unit, slotID, link)
-	if not C_TooltipInfo then return nil end
-	local data
-	if unit and C_TooltipInfo.GetInventoryItem then data = C_TooltipInfo.GetInventoryItem(unit, slotID) end
-	if not data and link and C_TooltipInfo.GetHyperlink then data = C_TooltipInfo.GetHyperlink(link) end
-	if not data then return nil end
-	if TooltipUtil and TooltipUtil.SurfaceArgs then TooltipUtil.SurfaceArgs(data) end
-	return data.lines
-end
-
-local function ReadEnchant(unit, slotID, link)
-	local enchantID = tonumber(link:match('item:%d+:(%d+)'))
-	if not enchantID or enchantID == 0 then return '' end
-	local cached = enchantCache[enchantID]
-	if cached then return cached end
-
-	local lines = TooltipLines(unit, slotID, link)
-	if not lines then return '' end
-	for _, line in ipairs(lines) do
-		local raw = StripColors(line.leftText)
-		local matched
-		if line.type == ENCHANT_LINE_TYPE then
-			matched = (ENCHANT_PATTERN and raw:match(ENCHANT_PATTERN)) or raw
-		elseif ENCHANT_PATTERN then
-			matched = raw:match(ENCHANT_PATTERN)
-		end
-		if matched and matched ~= '' then
-			matched = matched:gsub('^Enchanted:%s*', '')
-			matched = matched:gsub('^Enchant%s+[^%-]+%s*%-%s*', '')
-			enchantCache[enchantID] = matched
-			return matched
-		end
-	end
-	return ''
-end
-
-local function CanHaveEnchant(info, link)
-	if info.enchant == 'weapon' then
-		if not link then return false end
-		local _, _, _, _, _, classID = C_Item.GetItemInfoInstant(link)
-		return classID == Enum.ItemClass.Weapon
-	end
-	return info.enchant == true
-end
-
-local function AtEnchantLevel(unit)
-	local maxLevel = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion() or MAX_LEVEL_FALLBACK
-	local level = unit and UnitLevel(unit)
-	if not level or IsSecretValue(level) then return false end
-	return level >= maxLevel
-end
-
 local function SlotSides(info)
 	if info.col == 'left' or info.col == 'offhand' then return 'RIGHT', 'LEFT' end
 	return 'LEFT', 'RIGHT'
-end
-
-local UPGRADE_PATTERN
-if ITEM_UPGRADE_TOOLTIP_FORMAT then
-	local escaped = EscapePattern(ITEM_UPGRADE_TOOLTIP_FORMAT)
-	escaped = escaped:gsub('%%%%s', '(.-)'):gsub('%%%%d', '(%%d+)')
-	UPGRADE_PATTERN = '^' .. escaped .. '$'
-end
-
-local function ParseUpgradeLine(raw)
-	if UPGRADE_PATTERN then
-		local track, current, maximum = raw:match(UPGRADE_PATTERN)
-		if track then return track, current, maximum end
-	end
-	local track, current, maximum = raw:match('(%a+)%s+(%d+)%s*/%s*(%d+)%s*$')
-	if track and TRACK_COLORS[track:lower()] then return track, current, maximum end
-	return nil
-end
-
-local function ReadUpgradeTrack(unit, slotID, link)
-	local cached = trackCache[link]
-	if cached == NO_TRACK then return nil end
-	if cached then return cached[1], cached[2] end
-
-	local lines = TooltipLines(unit, slotID, link)
-	if not lines then return nil end
-	for _, line in ipairs(lines) do
-		local raw = StripColors(line.leftText)
-		local track, current, maximum = ParseUpgradeLine(raw)
-		if track then
-			local key = track:lower():match('^(%a+)')
-			local text, color = track .. ' ' .. current .. '/' .. maximum, TRACK_COLORS[key]
-			trackCache[link] = { text, color }
-			return text, color
-		end
-	end
-	trackCache[link] = NO_TRACK
-	return nil
-end
-
-local function ReadSockets(link)
-	local entries, gemLinks = {}, {}
-	if not link or not C_Item.GetItemGem or not C_Item.GetItemStats then return entries, gemLinks end
-
-	for gemIndex = 1, GEM_MAX do
-		local _, gemLink = C_Item.GetItemGem(link, gemIndex)
-		if gemLink then
-			gemLinks[#gemLinks + 1] = gemLink
-			local icon = C_Item.GetItemIconByID(gemLink) or select(5, C_Item.GetItemInfoInstant(gemLink))
-			entries[#entries + 1] = { icon = icon or QUESTION_MARK_ICON }
-		end
-	end
-
-	local stats = C_Item.GetItemStats(link)
-	if stats then
-		local total, firstAtlas = 0, nil
-		for key, count in pairs(stats) do
-			local atlas = EMPTY_SOCKET_ATLAS[key]
-			if atlas and count and count > 0 then
-				total = total + count
-				firstAtlas = firstAtlas or atlas
-			end
-		end
-		for _ = 1, max(0, total - #gemLinks) do
-			entries[#entries + 1] = { atlas = firstAtlas }
-		end
-	end
-	return entries, gemLinks
 end
 
 local function IsSlotContent(button, region)
@@ -332,62 +155,8 @@ local function ColorSlotEdges(button)
 	end
 end
 
-local function GemTooltip(self)
-	if not self.link then return end
-	GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
-	GameTooltip:SetHyperlink(self.link)
-	GameTooltip:Show()
-end
+local gemMetrics = { size = GEM_SIZE, pad = GEM_PAD, inset = GEM_INSET }
 
-local function CreateGemFrame()
-	local gem = CreateFrame('Frame', nil, overlay, 'BackdropTemplate')
-	gem:SetSize(GEM_SIZE, GEM_SIZE)
-	gem:SetFrameLevel(overlay:GetFrameLevel() + 1)
-	BUI.Pixel.SetTemplate(gem, 0, 0, 0, 1)
-	gem.icon = gem:CreateTexture(nil, 'ARTWORK')
-	gem.icon:SetPoint('TOPLEFT', 1, -1)
-	gem.icon:SetPoint('BOTTOMRIGHT', -1, 1)
-	gem:EnableMouse(true)
-	gem:SetScript('OnEnter', BUI.Profiler.Script('Skin.Inspect gem OnEnter', GemTooltip))
-	gem:SetScript('OnLeave', BUI.Profiler.Script('Skin.Inspect gem OnLeave', function() GameTooltip:Hide() end))
-	gem:Hide()
-	return gem
-end
-
-local function RefreshGems(labels, link)
-	local entries, gemLinks = ReadSockets(link)
-	for index = 1, max(#entries, #labels.gems) do
-		local entry = entries[index]
-		local gem = labels.gems[index]
-		if entry and not gem then
-			gem = CreateGemFrame()
-			labels.gems[index] = gem
-		end
-		if gem then
-			if entry then
-				if gem.icon.SetAtlas then gem.icon:SetAtlas(nil) end
-				gem.icon:SetTexture(nil)
-				if entry.atlas then
-					gem.icon:SetAtlas(entry.atlas)
-					gem.link = nil
-					gem:SetBackdropBorderColor(GEM_BORDER_COMMON[1], GEM_BORDER_COMMON[2], GEM_BORDER_COMMON[3], 0.6)
-				else
-					gem.icon:SetTexture(entry.icon)
-					gem.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-					gem.link = gemLinks[index]
-					local quality = gem.link and C_Item.GetItemQualityByID(gem.link) or 2
-					local border = quality >= GEM_RARE_QUALITY and GEM_BORDER_RARE or GEM_BORDER_COMMON
-					gem:SetBackdropBorderColor(border[1], border[2], border[3], 1)
-				end
-				gem:ClearAllPoints()
-				gem:SetPoint('BOTTOMRIGHT', labels.button, 'BOTTOMRIGHT', -GEM_INSET, GEM_INSET + (index - 1) * (GEM_SIZE + GEM_PAD))
-				gem:Show()
-			else
-				gem:Hide()
-			end
-		end
-	end
-end
 
 local function EnchantTooltip(self)
 	GameTooltip:SetOwner(self, self.anchor)
@@ -448,11 +217,12 @@ local function UpdateSlotLabels(button)
 		labels.track:SetText('')
 		labels.enchant:SetText('')
 		labels.hover:Hide()
-		RefreshGems(labels, nil)
+		Readout.RefreshGems(labels, nil, gemMetrics)
 		return
 	end
 
-	local trackText, trackColor = ReadUpgradeTrack(unit, slotID, link)
+	local canEnchant = Readout.CanHaveEnchant(info, link)
+	local trackText, trackColor, enchant = Readout.Read(unit, slotID, link, canEnchant)
 	local red, green, blue
 	if trackColor then
 		red, green, blue = trackColor[1], trackColor[2], trackColor[3]
@@ -471,26 +241,12 @@ local function UpdateSlotLabels(button)
 	labels.track:SetText(trackText or '')
 	labels.track:SetTextColor(red, green, blue, TRACK_ALPHA)
 
-	local canEnchant = CanHaveEnchant(info, link)
-	local enchant = canEnchant and ReadEnchant(unit, slotID, link) or ''
-
 	if enchant ~= '' then
-		local icons = {}
-		for atlas in enchant:gmatch('|A:[^|]+|a') do icons[#icons + 1] = atlas end
-		local name = enchant:gsub('|A:[^|]+|a', ''):gsub('^%s+', ''):gsub('%s+$', '')
-		name = name:gsub('^.-%s*%-%s*', '')
-		labels.enchant:SetText(table.concat(icons, '') .. (#icons > 0 and ' ' or '') .. name)
-		labels.enchant:SetTextColor(
-			red + (1 - red) * ENCHANT_TINT,
-			green + (1 - green) * ENCHANT_TINT,
-			blue + (1 - blue) * ENCHANT_TINT, ENCHANT_ALPHA)
-		labels.hover.tooltip = name
+		Readout.PaintEnchant(labels.enchant, labels.hover, enchant, red, green, blue)
 		labels.hover.unit, labels.hover.slot = unit, slotID
 		labels.hover:Show()
-	elseif canEnchant and AtEnchantLevel(unit) then
-		labels.enchant:SetText('No Enchant')
-		labels.enchant:SetTextColor(MISSING_COLOR[1], MISSING_COLOR[2], MISSING_COLOR[3], MISSING_COLOR[4])
-		labels.hover.tooltip = 'Enchant missing'
+	elseif canEnchant and Readout.AtEnchantLevel(unit) then
+		Readout.PaintMissingEnchant(labels.enchant, labels.hover)
 		labels.hover.unit, labels.hover.slot = nil, nil
 		labels.hover:Show()
 	else
@@ -498,7 +254,7 @@ local function UpdateSlotLabels(button)
 		labels.hover:Hide()
 	end
 
-	RefreshGems(labels, link)
+	Readout.RefreshGems(labels, link, gemMetrics)
 end
 
 local function RefreshSlot(button)
@@ -537,6 +293,7 @@ local function SkinPaperDoll(paperDoll)
 	overlay = overlay or CreateFrame('Frame', nil, paperDoll)
 	overlay:SetAllPoints()
 	overlay:SetFrameLevel(paperDoll:GetFrameLevel() + OVERLAY_LEVEL_BUMP)
+	gemMetrics.parent = overlay
 	if not totalLevelText then
 		totalLevelText = CreateReadout('RIGHT')
 		totalLevelText:SetTextColor(TOTAL_LEVEL_COLOR[1], TOTAL_LEVEL_COLOR[2], TOTAL_LEVEL_COLOR[3], TOTAL_LEVEL_COLOR[4])
