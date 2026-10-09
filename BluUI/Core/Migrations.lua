@@ -31,7 +31,7 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 16
+local PROFILE_MIGRATION_VERSION = 17
 local LEGACY_UNIT_KEYS = { 'player', 'target', 'targettarget', 'focus', 'focustarget', 'pet', 'boss', 'arena', 'party' }
 local HEALING_RULE = 'mineRaidCombat'
 
@@ -484,6 +484,23 @@ function BUI.MigrateProfile(profile)
 				end
 			end
 			modules.customBars, modules.tracking = nil, nil
+		end
+	end
+
+	if not general._fadeTimeOnly then
+		general._fadeTimeOnly = true
+		local function FoldAnimated(settings)
+			if type(settings) ~= 'table' then return end
+			if settings.fadeAnimated == false then settings.fadeDuration = 0 end
+			settings.fadeAnimated = nil
+		end
+		FoldAnimated(profile.markers)
+		local actionBars = profile.actionBars
+		if type(actionBars) == 'table' then
+			for _, barSettings in pairs(type(actionBars.bars) == 'table' and actionBars.bars or {}) do FoldAnimated(barSettings) end
+			for _, settingsKey in ipairs({ 'petBar', 'stanceBar', 'vehicleBar', 'microBar', 'bagBar', 'extraBar' }) do
+				FoldAnimated(actionBars[settingsKey])
+			end
 		end
 	end
 
