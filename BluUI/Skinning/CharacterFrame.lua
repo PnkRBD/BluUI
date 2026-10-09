@@ -722,120 +722,180 @@ local function ArmorReduction()
     return FormatPct(reduction * 100) .. ' physical damage reduced'
 end
 
+local Stat = { DETAIL_STEP = 100 }
+
+function Stat.MasterySpell()
+    local specIndex = GetSpecialization()
+    return specIndex and GetSpecializationMasterySpells(specIndex)
+end
+
+function Stat.HasMana()
+    local mana = UnitPowerMax('player', Enum.PowerType.Mana)
+    return mana ~= nil and not IsSecretValue(mana) and mana > 0
+end
+
+function Stat.UsesSpellPower() return PrimaryStatIndex() == 4 end
+function Stat.UsesAttackPower() return PrimaryStatIndex() ~= 4 end
+
 local STAT_SECTIONS = {
     {
         title = 'Attributes',
-        stats = function()
-            local primary = PrimaryStatIndex()
-            local rows = {
-                { name = PRIMARY_NAMES[primary] or 'Primary', primary = true, value = function() return FormatBigNumber((select(2, UnitStat('player', primary)))) end },
-                { name = 'Stamina', value = function() return FormatBigNumber((select(2, UnitStat('player', 3)))) end },
-                { name = 'Health',  value = function() return FormatBigNumber(UnitHealthMax('player')) end },
-            }
-            local mana = UnitPowerMax('player', Enum.PowerType.Mana) or 0
-            if not IsSecretValue(mana) and mana > 0 then
-                rows[#rows + 1] = { name = 'Mana', value = function() return FormatBigNumber(UnitPowerMax('player', Enum.PowerType.Mana)) end }
-            end
-            return rows
-        end,
+        stats = {
+            { name = function() return PRIMARY_NAMES[PrimaryStatIndex()] or 'Primary' end, value = function() return FormatBigNumber((select(2, UnitStat('player', PrimaryStatIndex())))) end },
+            { name = 'Stamina', value = function() return FormatBigNumber((select(2, UnitStat('player', 3)))) end },
+            { name = 'Health',  value = function() return FormatBigNumber(UnitHealthMax('player')) end },
+            { name = 'Mana', shown = Stat.HasMana, value = function() return FormatBigNumber(UnitPowerMax('player', Enum.PowerType.Mana)) end },
+        },
     },
     {
         title = 'Secondary',
-        stats = function()
-            return {
-                PctStat('Critical Strike', function() return GetCritChance() end, CR_CRIT_MELEE,
-                    'Your attacks and spells have a %.2f%% chance to critically strike, dealing double damage or healing.'),
-                PctStat('Haste',           function() return GetHaste() end, CR_HASTE_MELEE,
-                    'Your attacks and casts are %.2f%% faster, and resources that scale with haste generate that much quicker.'),
-                PctStat('Mastery', function() return GetMasteryEffect() end, CR_MASTERY,
-                    function()
-                        local specIndex = GetSpecialization()
-                        local masterySpell = specIndex and GetSpecializationMasterySpells(specIndex)
-                        local description = masterySpell and C_Spell.GetSpellDescription(masterySpell)
-                        if description and description ~= '' then return description end
-                        return nil
-                    end,
-                    function()
-                        local specIndex = GetSpecialization()
-                        local masterySpell = specIndex and GetSpecializationMasterySpells(specIndex)
-                        return masterySpell and C_Spell.GetSpellName(masterySpell) or nil
-                    end),
-                PctStat('Versatility',     function() return GetCombatRatingBonus(CR_VERSATILITY_DAMAGE_DONE) end, CR_VERSATILITY_DAMAGE_DONE,
-                    function()
-                        local done = GetCombatRatingBonus(CR_VERSATILITY_DAMAGE_DONE)
-                        if type(done) ~= 'number' or IsSecretValue(done) then return nil end
-                        local taken = CR_VERSATILITY_DAMAGE_TAKEN and GetCombatRatingBonus(CR_VERSATILITY_DAMAGE_TAKEN)
-                        if type(taken) ~= 'number' or IsSecretValue(taken) then
-                            return ('Increases your damage and healing done by %.2f%%.'):format(done)
-                        end
-                        return ('Increases your damage and healing done by %.2f%%, and reduces damage you take by %.2f%%.'):format(done, taken)
-                    end),
-            }
-        end,
+        stats = {
+            PctStat('Critical Strike', GetCritChance, CR_CRIT_MELEE,
+                'Your attacks and spells have a %.2f%% chance to critically strike, dealing double damage or healing.'),
+            PctStat('Haste', GetHaste, CR_HASTE_MELEE,
+                'Your attacks and casts are %.2f%% faster, and resources that scale with haste generate that much quicker.'),
+            PctStat('Mastery', GetMasteryEffect, CR_MASTERY,
+                function()
+                    local masterySpell = Stat.MasterySpell()
+                    local description = masterySpell and C_Spell.GetSpellDescription(masterySpell)
+                    if description and description ~= '' then return description end
+                end,
+                function()
+                    local masterySpell = Stat.MasterySpell()
+                    return masterySpell and C_Spell.GetSpellName(masterySpell)
+                end),
+            PctStat('Versatility', function() return GetCombatRatingBonus(CR_VERSATILITY_DAMAGE_DONE) end, CR_VERSATILITY_DAMAGE_DONE,
+                function()
+                    local done = GetCombatRatingBonus(CR_VERSATILITY_DAMAGE_DONE)
+                    if type(done) ~= 'number' or IsSecretValue(done) then return nil end
+                    local taken = GetCombatRatingBonus(CR_VERSATILITY_DAMAGE_TAKEN)
+                    if type(taken) ~= 'number' or IsSecretValue(taken) then
+                        return ('Increases your damage and healing done by %.2f%%.'):format(done)
+                    end
+                    return ('Increases your damage and healing done by %.2f%%, and reduces damage you take by %.2f%%.'):format(done, taken)
+                end),
+        },
     },
     {
         title = 'Tertiary',
-        stats = function()
-            return {
-                PctStat('Leech',     function() return GetLifesteal() end, CR_LIFESTEAL,
-                    'Heals you for %.2f%% of the damage and healing you deal.'),
-                PctStat('Avoidance', function() return GetAvoidance() end, CR_AVOIDANCE,
-                    'Reduces the damage you take from area effects by %.2f%%.'),
-                PctStat('Speed',     function() return GetSpeed() end, CR_SPEED,
-                    'Increases your movement speed by %.2f%% above base run speed.'),
-            }
-        end,
+        stats = {
+            PctStat('Leech', GetLifesteal, CR_LIFESTEAL,
+                'Heals you for %.2f%% of the damage and healing you deal.'),
+            PctStat('Avoidance', GetAvoidance, CR_AVOIDANCE,
+                'Reduces the damage you take from area effects by %.2f%%.'),
+            PctStat('Speed', GetSpeed, CR_SPEED,
+                'Increases your movement speed by %.2f%% above base run speed.'),
+        },
     },
     {
         title = 'Attack',
-        stats = function()
-            local rows = {}
-            if PrimaryStatIndex() == 4 then
-                rows[#rows + 1] = { name = 'Spell Power', value = function() return FormatBigNumber(GetSpellBonusDamage(7)) end }
-            else
-                rows[#rows + 1] = { name = 'Attack Power', value = function()
-                    local base, positive, negative = UnitAttackPower('player')
-                    if IsSecretValue(base) or IsSecretValue(positive) or IsSecretValue(negative) then return FormatBigNumber(base) end
-                    return FormatBigNumber((base or 0) + (positive or 0) + (negative or 0))
-                end }
-            end
-            rows[#rows + 1] = { name = 'Attack Speed', value = function() return FormatDecimal((UnitAttackSpeed('player'))) end }
-            return rows
-        end,
+        stats = {
+            { name = 'Spell Power', shown = Stat.UsesSpellPower, value = function() return FormatBigNumber(GetSpellBonusDamage(7)) end },
+            { name = 'Attack Power', shown = Stat.UsesAttackPower, value = function()
+                local base, positive, negative = UnitAttackPower('player')
+                if IsSecretValue(base) or IsSecretValue(positive) or IsSecretValue(negative) then return FormatBigNumber(base) end
+                return FormatBigNumber((base or 0) + (positive or 0) + (negative or 0))
+            end },
+            { name = 'Attack Speed', value = function() return FormatDecimal((UnitAttackSpeed('player'))) end },
+        },
     },
     {
         title = 'Defense',
-        stats = function()
-            local rows = {
-                { name = 'Armor', value = function() return FormatBigNumber((select(3, UnitArmor('player')))) end, detail = ArmorReduction },
-                { name = 'Dodge', value = function() return FormatPct(GetDodgeChance()) end },
-                { name = 'Parry', value = function() return FormatPct(GetParryChance()) end },
-                { name = 'Block', value = function() return FormatPct(GetBlockChance()) end },
-            }
-            if IsBrewmaster() then
-                rows[#rows + 1] = { name = 'Stagger', value = function() return FormatPct(C_PaperDollInfo.GetStaggerPercentage('player')) end }
-            end
-            return rows
-        end,
+        stats = {
+            { name = 'Armor', value = function() return FormatBigNumber((select(3, UnitArmor('player')))) end, detail = ArmorReduction },
+            { name = 'Dodge', value = function() return FormatPct(GetDodgeChance()) end },
+            { name = 'Parry', value = function() return FormatPct(GetParryChance()) end },
+            { name = 'Block', value = function() return FormatPct(GetBlockChance()) end },
+            { name = 'Stagger', shown = IsBrewmaster, value = function() return FormatPct(C_PaperDollInfo.GetStaggerPercentage('player')) end },
+        },
     },
     {
         title = 'PvP',
-        stats = function()
-            return {
-                { name = 'Honor Level', value = function() return tostring(UnitHonorLevel and UnitHonorLevel('player') or 0) end },
-                { name = 'Honor', value = function()
-                    local current = UnitHonor and UnitHonor('player') or 0
-                    local maximum = UnitHonorMax and UnitHonorMax('player') or 0
-                    return FormatBigNumber(current) .. '/' .. FormatBigNumber(maximum)
-                end },
-                { name = 'Conquest', value = function()
-                    local info = C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo(CONQUEST_CURRENCY)
-                    return FormatBigNumber(info and info.quantity or 0)
-                end },
-            }
-        end,
+        stats = {
+            { name = 'Honor Level', value = function() return tostring(UnitHonorLevel('player') or 0) end },
+            { name = 'Honor', value = function()
+                return FormatBigNumber(UnitHonor('player') or 0) .. '/' .. FormatBigNumber(UnitHonorMax('player') or 0)
+            end },
+            { name = 'Conquest', value = function()
+                local info = C_CurrencyInfo.GetCurrencyInfo(CONQUEST_CURRENCY)
+                return FormatBigNumber(info and info.quantity or 0)
+            end },
+        },
     },
 }
+
+function Stat.Tooltip(self)
+    local stat = self.stat
+    if not stat then return end
+    local detail = stat.detail and stat.detail()
+    local blurb = stat.tooltip
+    if type(blurb) == 'function' then blurb = blurb() end
+    local dr = stat.ratingID and BUI.TrueStats.Get(stat.ratingID)
+    if not detail and not blurb and not dr then return end
+    local heading = stat.title
+    if type(heading) == 'function' then heading = heading() end
+    local color = self.sectionColor or VALUE_COLOR
+    GameTooltip:SetOwner(self, 'ANCHOR_LEFT')
+    GameTooltip:SetText(heading or self.label:GetText(), color[1], color[2], color[3])
+    if detail then GameTooltip:AddLine(detail, color[1], color[2], color[3]) end
+    if blurb then
+        local highlighted = blurb:gsub('(%d+%.?%d*%%)', '|cff' .. BUI.Hex(color[1], color[2], color[3]) .. '%1|r')
+        GameTooltip:AddLine(highlighted, 0.8, 0.8, 0.8, true)
+    end
+    if dr then
+        local red, green, blue = BUI.TrueStats.PenaltyColor(dr.penalty)
+        GameTooltip:AddLine(' ')
+        GameTooltip:AddDoubleLine('Effective rating', FormatRating(dr.effective), 0.8, 0.8, 0.8, red, green, blue)
+        GameTooltip:AddDoubleLine('Lost to diminishing returns',
+            FormatRating(dr.wasted) .. '  ' .. math.floor(dr.penalty * 100 + 0.5) .. '%', 0.8, 0.8, 0.8, red, green, blue)
+        if dr.toNext > 0 and dr.nextPenalty < 1 then
+            local nextRed, nextGreen, nextBlue = BUI.TrueStats.PenaltyColor(dr.nextPenalty)
+            GameTooltip:AddDoubleLine('Until ' .. math.floor(dr.nextPenalty * 100 + 0.5) .. '% penalty',
+                FormatRating(dr.toNext), 0.8, 0.8, 0.8, nextRed, nextGreen, nextBlue)
+        end
+        if self.detailed then
+            GameTooltip:AddLine(' ')
+            local step = BUI.TrueStats.GainFrom(stat.ratingID, Stat.DETAIL_STEP)
+            if step then
+                GameTooltip:AddDoubleLine('+' .. Stat.DETAIL_STEP .. ' rating gives', FormatPct(step), 0.6, 0.6, 0.6, red, green, blue)
+            end
+            local toWhole = BUI.TrueStats.CostOfNext(stat.ratingID, 1)
+            if toWhole and toWhole > 0 then
+                GameTooltip:AddDoubleLine('Next +1% costs', FormatRating(toWhole) .. ' rating', 0.6, 0.6, 0.6, 0.9, 0.9, 0.95)
+            end
+            if BUI.TrueStats.IsDamageRating(stat.ratingID) then
+                local costs = BUI.TrueStats.DamageCosts()
+                if costs then
+                    GameTooltip:AddDoubleLine('Rating per +1%', costs, 0.6, 0.6, 0.6, 0.9, 0.9, 0.95)
+                end
+            elseif stat.ratingID == CR_MASTERY then
+                GameTooltip:AddLine('Mastery damage per point is spec specific, so it will not line up with the others.', 0.55, 0.55, 0.6, true)
+            end
+        else
+            GameTooltip:AddLine('Hold Ctrl for details', 0.45, 0.45, 0.5)
+        end
+    end
+    GameTooltip:Show()
+end
+
+Stat.Watch = BUI.Profiler.Wrap('Skin.CharacterFrame stat modifier', function(self)
+    local held = IsControlKeyDown() == true
+    if held ~= self.detailed then
+        self.detailed = held
+        Stat.Tooltip(self)
+    end
+end)
+
+Stat.Enter = BUI.Profiler.Script('Skin.CharacterFrame stat row OnEnter', function(self)
+    self.detailed = IsControlKeyDown() == true
+    Stat.Tooltip(self)
+    if self.stat and self.stat.ratingID then self:SetScript('OnUpdate', Stat.Watch) end
+end)
+
+Stat.Leave = BUI.Profiler.Script('Skin.CharacterFrame stat row OnLeave', function(self)
+    self:SetScript('OnUpdate', nil)
+    GameTooltip:Hide()
+end)
 
 local function CreateStatRow(parent)
     local row = CreateFrame('Frame', nil, parent)
@@ -851,7 +911,6 @@ local function CreateStatRow(parent)
     Pixel.ApplyFont(row.value, ROW_SIZE, FONT, '')
     row.value:SetPoint('RIGHT', 0, 0)
     row.value:SetJustifyH('RIGHT')
-    row.value:SetTextColor(VALUE_COLOR[1], VALUE_COLOR[2], VALUE_COLOR[3], 1)
 
     row.separator = row:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(row.separator, ROW_SIZE, FONT, '')
@@ -864,81 +923,9 @@ local function CreateStatRow(parent)
     Pixel.ApplyFont(row.percent, ROW_SIZE, FONT, '')
     row.percent:SetPoint('RIGHT', row.separator, 'LEFT', -Pixel.Scale(COLUMN_GAP), 0)
     row.percent:SetJustifyH('RIGHT')
-    row.percent:SetTextColor(VALUE_COLOR[1], VALUE_COLOR[2], VALUE_COLOR[3], 1)
 
-    local DETAIL_STEP = 100
-
-    local function BuildTooltip(self)
-        if not self.stat then return end
-        local detail = self.stat.detail and self.stat.detail()
-        local blurb = self.stat.tooltip
-        if type(blurb) == 'function' then blurb = blurb() end
-        local dr = self.stat.ratingID and BUI.TrueStats and BUI.TrueStats.Get and BUI.TrueStats.Get(self.stat.ratingID)
-        if not detail and not blurb and not dr then return end
-        local heading = self.stat.title
-        if type(heading) == 'function' then heading = heading() end
-        local color = self.sectionColor or VALUE_COLOR
-        GameTooltip:SetOwner(self, 'ANCHOR_LEFT')
-        GameTooltip:SetText(heading or self.stat.name, color[1], color[2], color[3])
-        if detail then GameTooltip:AddLine(detail, color[1], color[2], color[3]) end
-        if blurb then
-            local highlighted = blurb:gsub('(%d+%.?%d*%%)', '|cff' .. BUI.Hex(color[1], color[2], color[3]) .. '%1|r')
-            GameTooltip:AddLine(highlighted, 0.8, 0.8, 0.8, true)
-        end
-        if dr then
-            local red, green, blue = BUI.TrueStats.PenaltyColor(dr.penalty)
-            GameTooltip:AddLine(' ')
-            GameTooltip:AddDoubleLine('Effective rating', FormatRating(dr.effective), 0.8, 0.8, 0.8, red, green, blue)
-            GameTooltip:AddDoubleLine('Lost to diminishing returns',
-                FormatRating(dr.wasted) .. '  ' .. math.floor(dr.penalty * 100 + 0.5) .. '%', 0.8, 0.8, 0.8, red, green, blue)
-            if dr.toNext > 0 and dr.nextPenalty < 1 then
-                local nextRed, nextGreen, nextBlue = BUI.TrueStats.PenaltyColor(dr.nextPenalty)
-                GameTooltip:AddDoubleLine('Until ' .. math.floor(dr.nextPenalty * 100 + 0.5) .. '% penalty',
-                    FormatRating(dr.toNext), 0.8, 0.8, 0.8, nextRed, nextGreen, nextBlue)
-            end
-            if self.detailed then
-                GameTooltip:AddLine(' ')
-                local step = BUI.TrueStats.GainFrom(self.stat.ratingID, DETAIL_STEP)
-                if step then
-                    GameTooltip:AddDoubleLine('+' .. DETAIL_STEP .. ' rating gives', FormatPct(step), 0.6, 0.6, 0.6, red, green, blue)
-                end
-                local toWhole = BUI.TrueStats.CostOfNext(self.stat.ratingID, 1)
-                if toWhole and toWhole > 0 then
-                    GameTooltip:AddDoubleLine('Next +1% costs', FormatRating(toWhole) .. ' rating', 0.6, 0.6, 0.6, 0.9, 0.9, 0.95)
-                end
-                if BUI.TrueStats.IsDamageRating(self.stat.ratingID) then
-                    local costs = BUI.TrueStats.DamageCosts()
-                    if costs then
-                        GameTooltip:AddDoubleLine('Rating per +1%', costs, 0.6, 0.6, 0.6, 0.9, 0.9, 0.95)
-                    end
-                elseif self.stat.ratingID == CR_MASTERY then
-                    GameTooltip:AddLine('Mastery damage per point is spec specific, so it will not line up with the others.', 0.55, 0.55, 0.6, true)
-                end
-            else
-                GameTooltip:AddLine('Hold Ctrl for details', 0.45, 0.45, 0.5)
-            end
-        end
-        GameTooltip:Show()
-    end
-
-    local WatchModifier = BUI.Profiler.Wrap('Skin.CharacterFrame stat modifier', function(self)
-        local held = IsControlKeyDown() and true or false
-        if held ~= self.detailed then
-            self.detailed = held
-            BuildTooltip(self)
-        end
-    end)
-
-    row:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame row OnEnter', function(self)
-        self.detailed = IsControlKeyDown() and true or false
-        BuildTooltip(self)
-        if self.stat and self.stat.ratingID then self:SetScript('OnUpdate', WatchModifier) end
-    end))
-
-    row:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame row OnLeave', function(self)
-        self:SetScript('OnUpdate', nil)
-        GameTooltip:Hide()
-    end))
+    row:SetScript('OnEnter', Stat.Enter)
+    row:SetScript('OnLeave', Stat.Leave)
     return row
 end
 
@@ -989,22 +976,25 @@ local function BuildSection(parent, definition)
 end
 
 local function FillSection(section)
-    local stats = section.definition.stats()
-    for index, stat in ipairs(stats) do
-        local row = section.rows[index]
-        if not row then
-            row = CreateStatRow(section.container)
-            section.rows[index] = row
+    local color = SECTION_COLORS[section.definition.title] or VALUE_COLOR
+    local count = 0
+    for _, stat in ipairs(section.definition.stats) do
+        if not stat.shown or stat.shown() then
+            count = count + 1
+            local row = section.rows[count]
+            if not row then
+                row = CreateStatRow(section.container)
+                section.rows[count] = row
+            end
+            row.stat = stat
+            row.label:SetText(type(stat.name) == 'function' and stat.name() or stat.name)
+            row.sectionColor = color
+            row.value:SetTextColor(color[1], color[2], color[3], 1)
+            row.percent:SetTextColor(color[1], color[2], color[3], 1)
         end
-        row.stat = stat
-        row.label:SetText(stat.name)
-        local color = SECTION_COLORS[section.definition.title] or VALUE_COLOR
-        row.sectionColor = color
-        row.value:SetTextColor(color[1], color[2], color[3], 1)
-        row.percent:SetTextColor(color[1], color[2], color[3], 1)
     end
-    for index = #stats + 1, #section.rows do section.rows[index]:Hide() end
-    section.rowCount = #stats
+    for index = count + 1, #section.rows do section.rows[index]:Hide() end
+    section.rowCount = count
 end
 
 LayoutSections = function()
