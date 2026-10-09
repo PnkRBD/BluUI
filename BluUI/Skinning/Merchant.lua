@@ -3,7 +3,6 @@ local _, BUI = ...
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Widget = BUILib.Widget
 local Controls = BUILib.Controls
-local Colors = BUILib.Colors
 local FONT = BUILib.Font or STANDARD_TEXT_FONT
 local Skin = BUI.Skinning
 local Pixel = BUI.Pixel
@@ -18,6 +17,16 @@ local SCROLL_PAD = 8
 local MAX_QTY = 200
 local ICON_SIZE = 32
 local COST_ICON_SIZE = 14
+local BUY_STEP = 0.2
+local MONEY_KEY = 0
+local NO_LIMIT = math.huge
+local SHORT_COLOR = { 0.9, 0.3, 0.3 }
+local COST_COLOR = { 0.8, 0.8, 0.8 }
+local PRICE_COLOR = { 0.65, 0.65, 0.65 }
+local BLOCKED_NAME = { 0.55, 0.55, 0.6 }
+local BLOCKED_EDGE = { 0.5, 0.15, 0.15 }
+local BLOCKED_CONTROLS_ALPHA = 0.4
+local BLOCKED_TEXT_ALPHA = 0.6
 
 local TYPE_FILTERS = {
 	{ label = 'All',         classID = nil },
@@ -68,49 +77,83 @@ local function PassesSearch(name)
 	return name:lower():find(searchText, 1, true) ~= nil
 end
 
-local function CanAffordMerchantItem(merchantIndex, goldPrice, hasExtendedCost)
-	if goldPrice and goldPrice > 0 and goldPrice > GetMoney() then return false end
-	if not hasExtendedCost then return true end
+local function Owned(cost)
+	if cost.currencyID then
+		local info = C_CurrencyInfo.GetCurrencyInfo(cost.currencyID)
+		return info and info.quantity or 0
+	end
+	if cost.itemID then return C_Item.GetItemCount(cost.itemID, false, false, true) end
+	return GetMoney()
+end
 
-	local numCosts = GetMerchantItemCostInfo(merchantIndex)
-	for costIndex = 1, numCosts or 0 do
-		local _, quantity, link = GetMerchantItemCostItem(merchantIndex, costIndex)
-		if link and quantity then
-			local currencyID = tonumber(link:match('currency:(%d+)'))
-			if currencyID then
-				local info = C_CurrencyInfo.GetCurrencyInfo(currencyID)
-				if info and info.quantity < quantity then return false end
-			end
-			local itemID = tonumber(link:match('item:(%d+)'))
-			if itemID and C_Item.GetItemCount(itemID, true) < quantity then return false end
+local function MaxUnits(entry, budget)
+	local units = entry.stock
+	for costIndex = 1, entry.costCount do
+		local cost = entry.costs[costIndex]
+		local have = budget[cost.key]
+		if have == nil then
+			have = Owned(cost)
+			budget[cost.key] = have
+		end
+		units = math.min(units, math.floor(have / cost.amount))
+	end
+	return math.max(0, units)
+end
+
+local function Spend(entry, budget, units)
+	for costIndex = 1, entry.costCount do
+		local cost = entry.costs[costIndex]
+		budget[cost.key] = budget[cost.key] - cost.amount * units
+	end
+end
+
+local function AddCost(entry, key, amount, currencyID, itemID, texture, link)
+	entry.costCount = entry.costCount + 1
+	local cost = entry.costs[entry.costCount] or {}
+	entry.costs[entry.costCount] = cost
+	cost.key, cost.amount, cost.currencyID, cost.itemID, cost.texture, cost.link = key, amount, currencyID, itemID, texture, link
+end
+
+local function ReadCosts(entry, info)
+	entry.costs = entry.costs or {}
+	entry.costCount = 0
+	local stack = math.max(1, info.stackCount or 1)
+	if info.price and info.price > 0 then AddCost(entry, MONEY_KEY, info.hasExtendedCost and info.price or info.price / stack) end
+	local available = info.numAvailable or -1
+	entry.stock = available < 0 and NO_LIMIT or info.hasExtendedCost and available or available * stack
+	if not info.hasExtendedCost then return end
+	for costIndex = 1, GetMerchantItemCostInfo(entry.idx) do
+		local texture, amount, link = GetMerchantItemCostItem(entry.idx, costIndex)
+		local currencyID = link and tonumber(link:match('currency:(%d+)'))
+		local itemID = link and not currencyID and tonumber(link:match('item:(%d+)'))
+		if amount and amount > 0 and (currencyID or itemID) then
+			AddCost(entry, currencyID or -itemID, amount, currencyID, itemID, texture, link)
 		end
 	end
-	return true
+end
+
+local function Unmet(color)
+	return color and color.r > 0.9 and color.g < 0.3 and color.b < 0.3
+end
+
+local function RequirementText(merchantIndex)
+	local data = C_TooltipInfo.GetMerchantItem(merchantIndex)
+	local lines = data and data.lines
+	for lineIndex = 2, lines and #lines or 0 do
+		local line = lines[lineIndex]
+		if line.leftText and line.leftText ~= '' and Unmet(line.leftColor) then return line.leftText end
+	end
 end
 
 local function SellJunk()
 	C_MerchantFrame.SellAllJunkItems()
 end
 
-local scanTip = CreateFrame('GameTooltip', 'BUIMerchantScanTip', nil, 'GameTooltipTemplate')
-scanTip:SetOwner(WorldFrame, 'ANCHOR_NONE')
-
-local function ScanMerchantItemStatus(merchantIndex)
-	scanTip:ClearLines()
-	scanTip:SetMerchantItem(merchantIndex)
-	for lineIndex = 2, scanTip:NumLines() do
-		local line = _G['BUIMerchantScanTipTextLeft' .. lineIndex]
-		local text = line and line:GetText()
-		if text == ITEM_SPELL_KNOWN then
-			return 'Already known'
-		elseif text and text:find('^Requires') then
-			return text
-		end
-	end
-end
+local scanBudget = {}
 
 local function ScanBuyItems()
 	local count = 0
+	wipe(scanBudget)
 	for merchantIndex = 1, GetMerchantNumItems() do
 		local info = C_MerchantFrame.GetItemInfo(merchantIndex)
 		if info and info.name then
@@ -123,13 +166,14 @@ local function ScanBuyItems()
 				entry.name = info.name
 				entry.texture = info.texture
 				entry.price = info.price or 0
-				entry.stackCount = info.stackCount or 1
 				entry.numAvailable = info.numAvailable or -1
 				entry.soldOut = info.numAvailable == 0
-				entry.canAfford = not entry.soldOut and CanAffordMerchantItem(merchantIndex, info.price, info.hasExtendedCost)
+				entry.locked = info.isPurchasable == false
 				entry.isUsable = info.isUsable ~= false
-				entry.statusText = entry.soldOut and 'Sold out' or (info.isUsable == false) and ScanMerchantItemStatus(merchantIndex) or nil
 				entry.extendedCost = info.hasExtendedCost
+				ReadCosts(entry, info)
+				entry.limit = entry.locked and 0 or MaxUnits(entry, scanBudget)
+				entry.canAfford = entry.limit > 0
 				entry.qualityR, entry.qualityG, entry.qualityB = Skin.QualityColor(GetMerchantItemID(merchantIndex))
 			end
 		end
@@ -140,7 +184,7 @@ end
 local function ScanBuybackItems()
 	local count = 0
 	for buybackIndex = 1, GetNumBuybackItems() do
-		local name, texture, price, stackCount = GetBuybackItemInfo(buybackIndex)
+		local name, texture, price = GetBuybackItemInfo(buybackIndex)
 		if name and PassesSearch(name) then
 			local link = GetBuybackItemLink(buybackIndex)
 			local itemID = link and tonumber(link:match('item:(%d+)'))
@@ -151,7 +195,6 @@ local function ScanBuybackItems()
 			entry.name = name
 			entry.texture = texture
 			entry.price = price or 0
-			entry.stackCount = stackCount or 1
 			entry.qualityR, entry.qualityG, entry.qualityB = Skin.QualityColor(itemID)
 		end
 	end
@@ -197,41 +240,47 @@ local function CreateIconLabel(parent, fontSize)
 	return frame
 end
 
-local function PopulateCostIcons(row, merchantIndex, hasExtendedCost)
-	if not row.costIcons then row.costIcons = {} end
-	for _, costIcon in ipairs(row.costIcons) do costIcon:Hide() end
-	if not hasExtendedCost then return end
+local function Short(cost)
+	local have = scanBudget[cost.key]
+	if have == nil then have = Owned(cost) end
+	return have < cost.amount
+end
 
-	local numCosts = GetMerchantItemCostInfo(merchantIndex)
-	if not numCosts or numCosts == 0 then return end
+local function PaintText(fontString, color)
+	fontString:SetTextColor(color[1], color[2], color[3], 1)
+end
 
-	local previousAnchor = row.priceText
-	for costIndex = 1, numCosts do
-		local texture, quantity, link = GetMerchantItemCostItem(merchantIndex, costIndex)
-		if texture and quantity then
-			local costIcon = row.costIcons[costIndex]
+local function PopulateCostIcons(row, entry)
+	row.costIcons = row.costIcons or {}
+	local shown, previous = 0, nil
+	local alpha = entry.canAfford and 1 or BLOCKED_TEXT_ALPHA
+	for costIndex = 1, entry.costCount do
+		local cost = entry.costs[costIndex]
+		if cost.texture then
+			shown = shown + 1
+			local costIcon = row.costIcons[shown]
 			if not costIcon then
 				costIcon = CreateIconLabel(row)
-				row.costIcons[costIndex] = costIcon
+				row.costIcons[shown] = costIcon
 			end
-			costIcon.icon:SetTexture(texture)
-			costIcon.qtyText:SetText(quantity)
-			costIcon.link = link
+			costIcon.icon:SetTexture(cost.texture)
+			costIcon.qtyText:SetText(cost.amount)
+			PaintText(costIcon.qtyText, Short(cost) and SHORT_COLOR or COST_COLOR)
+			costIcon.link = cost.link
+			costIcon:SetAlpha(alpha)
 			costIcon:ClearAllPoints()
-			if previousAnchor == row.priceText then
-				local goldText = row.priceText:GetText()
-				if goldText and goldText ~= '' then
-					costIcon:SetPoint('LEFT', row.priceText, 'RIGHT', Pixel.Scale(6), 0)
-				else
-					costIcon:SetPoint('LEFT', row.iconBorder, 'RIGHT', Pixel.Scale(8), Pixel.Scale(-8))
-				end
+			if previous then
+				costIcon:SetPoint('LEFT', previous, 'RIGHT', Pixel.Scale(6), 0)
+			elseif row.priceText:GetText() ~= '' then
+				costIcon:SetPoint('LEFT', row.priceText, 'RIGHT', Pixel.Scale(6), 0)
 			else
-				costIcon:SetPoint('LEFT', previousAnchor, 'RIGHT', Pixel.Scale(6), 0)
+				costIcon:SetPoint('LEFT', row.iconBorder, 'RIGHT', Pixel.Scale(8), Pixel.Scale(-8))
 			end
 			costIcon:Show()
-			previousAnchor = costIcon
+			previous = costIcon
 		end
 	end
+	for costIndex = shown + 1, #row.costIcons do row.costIcons[costIndex]:Hide() end
 end
 
 local function UpdateCurrencyBar(parentFrame)
@@ -268,25 +317,73 @@ local function UpdateCurrencyBar(parentFrame)
 	end
 end
 
-local function ApplyAffordTint(row, info)
-	if not info.canAfford then
-		row.nameText:SetTextColor(info.qualityR * 0.5, info.qualityG * 0.5, info.qualityB * 0.5)
-		row.nameText:SetAlpha(0.6)
-		row.iconBorder:SetBackdropBorderColor(0.5, 0.15, 0.15, 1)
-		row.priceText:SetAlpha(0.7)
-		row.priceText:SetTextColor(0.7, 0.25, 0.25, 1)
+local function PaintRowState(row, info)
+	local blocked = not info.canAfford
+	local red, green, blue = info.qualityR, info.qualityG, info.qualityB
+	if blocked then
+		PaintText(row.nameText, BLOCKED_NAME)
+		row.iconBorder:SetBackdropBorderColor(BLOCKED_EDGE[1], BLOCKED_EDGE[2], BLOCKED_EDGE[3], 1)
 	elseif not info.isUsable then
-		row.nameText:SetTextColor(info.qualityR * 0.7, info.qualityG * 0.7, info.qualityB * 0.7)
-		row.nameText:SetAlpha(0.8)
-		row.iconBorder:SetBackdropBorderColor(info.qualityR, info.qualityG, info.qualityB, 0.5)
-		row.priceText:SetAlpha(1)
-		row.priceText:SetTextColor(0.65, 0.65, 0.65, 1)
+		row.nameText:SetTextColor(red * 0.7, green * 0.7, blue * 0.7, 1)
+		row.iconBorder:SetBackdropBorderColor(red, green, blue, 0.5)
 	else
-		row.nameText:SetTextColor(info.qualityR, info.qualityG, info.qualityB)
-		row.nameText:SetAlpha(1)
-		row.iconBorder:SetBackdropBorderColor(info.qualityR, info.qualityG, info.qualityB, 1)
-		row.priceText:SetAlpha(1)
-		row.priceText:SetTextColor(0.65, 0.65, 0.65, 1)
+		row.nameText:SetTextColor(red, green, blue, 1)
+		row.iconBorder:SetBackdropBorderColor(red, green, blue, 1)
+	end
+	row.icon:SetDesaturated(blocked)
+	PaintText(row.priceText, info.price > 0 and GetMoney() < info.price and SHORT_COLOR or PRICE_COLOR)
+	row.priceText:SetAlpha(blocked and BLOCKED_TEXT_ALPHA or 1)
+	local controlsAlpha = blocked and BLOCKED_CONTROLS_ALPHA or 1
+	row.stepper:SetAlpha(controlsAlpha)
+	row.buyButton:SetAlpha(controlsAlpha)
+end
+
+local purchases = {}
+local purchasing = false
+
+local function PurchaseNext()
+	local step = table.remove(purchases, 1)
+	if not step or not merchantFrame or not merchantFrame:IsShown() then
+		wipe(purchases)
+		purchasing = false
+		return
+	end
+	BuyMerchantItem(step.idx, step.qty)
+	After('Skin.Merchant buy step', BUY_STEP, PurchaseNext)
+end
+
+local function Enqueue(entry, units)
+	local chunk = entry.extendedCost and 1 or math.max(1, GetMerchantItemMaxStack(entry.idx))
+	while units > 0 do
+		local quantity = math.min(units, chunk)
+		purchases[#purchases + 1] = { idx = entry.idx, qty = quantity }
+		units = units - quantity
+	end
+end
+
+local function StartPurchases()
+	if purchasing or not purchases[1] then return end
+	purchasing = true
+	PurchaseNext()
+end
+
+local function Warn(text)
+	UIErrorsFrame:AddMessage(text, RED_FONT_COLOR:GetRGB())
+end
+
+local function LimitMessage(entry)
+	if entry.locked then
+		Warn(RequirementText(entry.idx) or 'This item is locked.')
+	elseif entry.soldOut then
+		Warn('Sold out.')
+	elseif entry.limit > MAX_QTY then
+		Warn(('Up to %d at a time.'):format(MAX_QTY))
+	elseif entry.limit < 1 then
+		Warn("You can't afford this.")
+	elseif entry.limit == entry.stock then
+		Warn(('Only %d left.'):format(entry.limit))
+	else
+		Warn(('You can only afford %d.'):format(entry.limit))
 	end
 end
 
@@ -299,40 +396,33 @@ local function CreateBuyRow(parent)
 	row.stockText:SetPoint('LEFT', row.nameText, 'RIGHT', Pixel.Scale(4), 0)
 	row.stockText:SetTextColor(0.5, 0.5, 0.5, 1)
 
-	row.statusText = row:CreateFontString(nil, 'OVERLAY')
-	Pixel.ApplyFont(row.statusText, 9, FONT, '')
-	row.statusText:SetPoint('LEFT', row.iconBorder, 'RIGHT', Pixel.Scale(8), Pixel.Scale(-8))
-	row.statusText:SetTextColor(0.6, 0.4, 0.4, 1)
-
 	local buyButton = Skin.SmallButton(row, 48, 22, 'Buy')
 	buyButton:SetPoint('RIGHT', row, 'RIGHT', Pixel.Scale(-8), 0)
+	row.buyButton = buyButton
 
 	row.stepper = Controls.Stepper(row, nil, 0, 0, MAX_QTY, 1, function(value) row.qty = value end, 75, 22)
 	row.stepper:ClearAllPoints()
 	row.stepper:SetPoint('RIGHT', buyButton, 'LEFT', Pixel.Scale(-6), 0)
+	local stepperFrame = Widget.Unwrap(row.stepper)
 
 	row.qty = 0
+	row.onLimit = function() if row.entry then LimitMessage(row.entry) end end
 
 	buyButton:SetScript('OnClick', BUI.Profiler.Script('Skin.Merchant buyButton OnClick', function()
-		if not row.merchantIdx or not row.canAfford then return end
-		local stepperFrame = Widget.Unwrap(row.stepper)
-		if stepperFrame.valueBox and stepperFrame.valueBox:HasFocus() then stepperFrame.valueBox:ClearFocus() end
-		local quantity = stepperFrame.GetValue and stepperFrame:GetValue() or row.qty
-		if quantity < 1 then return end
-		if not row.extendedCost or quantity == 1 then
-			BuyMerchantItem(row.merchantIdx, quantity)
+		local entry = row.entry
+		if not entry then return end
+		if stepperFrame.valueBox:HasFocus() then stepperFrame.valueBox:ClearFocus() end
+		entry.limit = entry.locked and 0 or MaxUnits(entry, {})
+		local wanted = stepperFrame:GetValue()
+		if wanted < 1 then
+			if entry.limit < 1 then LimitMessage(entry) end
 			return
 		end
-
-		local remaining = quantity
-		local function BuyOne()
-			if remaining <= 0 then return end
-			if not merchantFrame or not merchantFrame:IsShown() then return end
-			remaining = remaining - 1
-			BuyMerchantItem(row.merchantIdx, 1)
-			if remaining > 0 then After('Skin.Merchant buy step', 0.2, BuyOne) end
-		end
-		BuyOne()
+		local units = math.min(wanted, entry.limit)
+		if units < wanted then LimitMessage(entry) end
+		if units < 1 then return end
+		Enqueue(entry, units)
+		StartPurchases()
 	end))
 
 	row:HookScript('OnClick', BUI.Profiler.Wrap('Skin.Merchant row OnClick', function(self)
@@ -401,21 +491,10 @@ local function PopulateBuyRows(items, pool, parent, isBulk)
 			row.stepper:SetValue(row.qty)
 		end
 		row.merchantIdx = info.idx
-		row.canAfford = info.canAfford
-		row.extendedCost = info.extendedCost
+		row.entry = info
+		row.stepper:SetMax(math.max(isBulk and 0 or 1, math.min(info.limit, MAX_QTY)), row.onLimit)
 		row.nameText:SetText(info.name)
-		row.icon:SetDesaturated(not info.canAfford)
-
-		ApplyAffordTint(row, info)
-
-		if info.statusText then
-			row.statusText:SetText(info.statusText)
-			row.statusText:Show()
-			row.priceText:Hide()
-		else
-			row.statusText:Hide()
-			row.priceText:Show()
-		end
+		PaintRowState(row, info)
 
 		local hasStock = info.numAvailable and info.numAvailable > 0
 		if hasStock then row.stockText:SetText('x' .. info.numAvailable) end
@@ -423,14 +502,7 @@ local function PopulateBuyRows(items, pool, parent, isBulk)
 
 		local goldString = info.price > 0 and GetCoinTextureString(info.price) or nil
 		row.priceText:SetText(goldString or (info.extendedCost and '' or 'Free'))
-		PopulateCostIcons(row, info.idx, info.extendedCost)
-
-		if row.costIcons then
-			local affordAlpha = info.canAfford and 1 or 0.5
-			for _, costIcon in ipairs(row.costIcons) do
-				if costIcon:IsShown() then costIcon:SetAlpha(affordAlpha) end
-			end
-		end
+		PopulateCostIcons(row, info)
 		row:Show()
 	end
 	for rowIndex = #items + 1, #pool do pool[rowIndex]:Hide() end
@@ -480,17 +552,11 @@ end
 local function BuildFrame()
 	if merchantFrame then return end
 
-	local frame = Widget.New(UIParent, 'Frame', nil, {
-		bg = Colors.bg.dark,
-		border = Colors.border.light,
-		size = { FRAME_WIDTH, FRAME_HEIGHT },
-	}).frame
-	Skin.MakeDraggable(frame, 'merchant', 'CENTER', Pixel.Scale(-100), 0, 'MerchantFrame')
-	frame:SetFrameStrata('DIALOG')
-	frame:SetFrameLevel(100)
-	frame:Hide()
-
-	local titleBar = Skin.CreateTitleBar(frame, 'Merchant', 36, CloseMerchant)
+	local frame = Skin.CreateWindow({
+		width = FRAME_WIDTH, height = FRAME_HEIGHT, title = 'Merchant', onClose = CloseMerchant,
+		dbKey = 'merchant', x = Pixel.Scale(-100), follow = 'MerchantFrame', contentTop = 104, contentBottom = 62,
+	})
+	local titleBar = frame.titleBar
 
 	frame.countText = titleBar:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(frame.countText, 11, FONT, '')
@@ -519,7 +585,7 @@ local function BuildFrame()
 	filterDropdown:SetPoint('LEFT', frame.searchBox, 'RIGHT', Pixel.Scale(6), 0)
 
 	local lootFilterItems = BuildLootFilterItems()
-	if SetMerchantFilter and #lootFilterItems > 1 then
+	if #lootFilterItems > 1 then
 		local lootDropdown = Skin.CreateDropdown(frame, lootFilterItems, function(item)
 			SetMerchantFilter(item.filterIndex)
 			listReset = true
@@ -530,9 +596,7 @@ local function BuildFrame()
 		frame.lootFilterDD = lootDropdown
 	end
 
-	local contentArea = Widget.New(frame, 'Frame', nil, { bg = Colors.bg.medium, border = Colors.border.dark }).frame
-	contentArea:SetPoint('TOPLEFT', Pixel.Scale(12), Pixel.Scale(-104))
-	contentArea:SetPoint('BOTTOMRIGHT', Pixel.Scale(-12), Pixel.Scale(62))
+	local contentArea = frame.content
 
 	frame.buyPanel,  frame.buyScroll,  frame.buyChild  = CreatePanel(contentArea)
 	frame.bbPanel,   frame.bbScroll,   frame.bbChild   = CreatePanel(contentArea)
@@ -541,26 +605,20 @@ local function BuildFrame()
 	frame.bulkPanel:Hide()
 
 	frame.buyAllBtn = Controls.Button(frame, 'Buy All', 80, function()
-		local queue = {}
+		local budget, short = {}, false
 		for _, row in ipairs(bulkRows) do
-			if row:IsShown() and row.merchantIdx and row.qty > 0 and row.canAfford then
-				if row.extendedCost then
-					for _ = 1, row.qty do queue[#queue + 1] = { idx = row.merchantIdx, qty = 1 } end
-				else
-					queue[#queue + 1] = { idx = row.merchantIdx, qty = row.qty }
+			local entry = row:IsShown() and row.qty > 0 and row.entry
+			if entry and not entry.locked then
+				local units = math.min(row.qty, MaxUnits(entry, budget))
+				if units < row.qty then short = true end
+				if units > 0 then
+					Spend(entry, budget, units)
+					Enqueue(entry, units)
 				end
 			end
 		end
-		local queueIndex = 0
-		local function BuyNext()
-			if not merchantFrame or not merchantFrame:IsShown() then return end
-			queueIndex = queueIndex + 1
-			if queue[queueIndex] then
-				BuyMerchantItem(queue[queueIndex].idx, queue[queueIndex].qty)
-				After('Skin.Merchant bulk buy', 0.2, BuyNext)
-			end
-		end
-		BuyNext()
+		if short then Warn('Not enough for all of it, buying what you can afford.') end
+		StartPurchases()
 	end)
 	frame.buyAllBtn:SetPoint('BOTTOMRIGHT', Pixel.Scale(-12), Pixel.Scale(14))
 	frame.buyAllBtn:SetFrameLevel(frame:GetFrameLevel() + 10)
@@ -575,7 +633,7 @@ local function BuildFrame()
 			if previousCount and numItems >= previousCount then return end
 			previousCount = numItems
 			BuybackItem(numItems)
-			After('Skin.Merchant buyback step', 0.2, BuybackNext)
+			After('Skin.Merchant buyback step', BUY_STEP, BuybackNext)
 		end
 		BuybackNext()
 	end)
@@ -706,7 +764,7 @@ end
 local function ClearRowData()
 	for _, pool in ipairs({ buyRows, bulkRows }) do
 		for _, row in ipairs(pool) do
-			row.merchantIdx = nil
+			row.merchantIdx, row.entry = nil, nil
 			if row.costIcons then
 				for _, costIcon in ipairs(row.costIcons) do costIcon.link = nil end
 			end
@@ -743,7 +801,7 @@ local function OnMerchantEvent(event)
 			merchantFrame.lootFilterDD.label:SetText(ALL)
 			SetMerchantFilter(LE_LOOT_FILTER_ALL)
 		end
-		BUI.Events:Register('BAG_UPDATE', 'Skinning.Merchant.Live', OnMerchantEvent)
+		BUI.Events:Register('BAG_UPDATE_DELAYED', 'Skinning.Merchant.Live', OnMerchantEvent)
 		BUI.Events:Register('PLAYER_MONEY', 'Skinning.Merchant.Live', OnMerchantEvent)
 		BUI.Events:Register('CURRENCY_DISPLAY_UPDATE', 'Skinning.Merchant.Live', OnMerchantEvent)
 		After('Skin.Merchant page reskin', 0, RefreshContent)

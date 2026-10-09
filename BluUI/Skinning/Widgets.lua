@@ -8,10 +8,15 @@ local Skin = BUI.Skinning
 local Wrap = BUI.Profiler.Wrap
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Controls = BUILib.Controls
+local Widget = BUILib.Widget
 local Colors = BUILib.Colors
 local FONT = BUILib.Font or STANDARD_TEXT_FONT
 
 local SetColorTex = BUI.Tools.SetColorTex
+
+local WINDOW_TITLE_HEIGHT = 36
+local WINDOW_INSET = 12
+local WINDOW_LEVEL = 100
 
 function Skin.SmallButton(parent, width, height, label)
 	local button = CreateFrame('Button', nil, parent)
@@ -184,6 +189,27 @@ function Skin.CreateTitleBar(frame, title, height, onClose)
 	bar.closeBtn = closeButton
 
 	return bar
+end
+
+function Skin.CreateWindow(spec)
+	local frame = Widget.New(UIParent, 'Frame', nil, {
+		bg = Colors.bg.dark,
+		border = Colors.border.light,
+		size = { spec.width, spec.height },
+	}).frame
+	Skin.MakeDraggable(frame, spec.dbKey, 'CENTER', spec.x or 0, spec.y or 0, spec.follow)
+	frame:SetFrameStrata('DIALOG')
+	frame:SetFrameLevel(WINDOW_LEVEL)
+	frame:Hide()
+	frame.titleBar = Skin.CreateTitleBar(frame, spec.title or '', WINDOW_TITLE_HEIGHT, spec.onClose)
+	local content = Widget.New(frame, 'Frame', nil, { bg = Colors.bg.medium, border = Colors.border.dark }).frame
+	content:SetPoint('BOTTOMRIGHT', Pixel.Scale(-WINDOW_INSET), Pixel.Scale(spec.contentBottom))
+	frame.content = content
+	function frame:SetContentTop(top)
+		content:SetPoint('TOPLEFT', Pixel.Scale(WINDOW_INSET), Pixel.Scale(-top))
+	end
+	frame:SetContentTop(spec.contentTop)
+	return frame
 end
 
 function Skin.CreateListRow(parent, height, iconSize)
