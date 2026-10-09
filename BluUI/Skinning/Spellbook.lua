@@ -46,7 +46,7 @@ local context = Skin.NewContext(Enabled)
 local Fade, FadeRegions, FadeKeys, FadeArt = context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt
 local Shell, Button, Close, Dropdown, EditBox, CheckBox, TextBox = context.Shell, context.Button, context.Close, context.Dropdown, context.EditBox, context.CheckBox, context.TextBox
 local ScrollBar, Body, Title = context.ScrollBar, context.Body, context.Title
-local FlatTexture, CropIcon, RowHighlight = Skin.FlatTexture, Skin.CropIcon, Skin.RowHighlight
+local CropIcon, RowHighlight = Skin.CropIcon, Skin.RowHighlight
 
 local function FadeAgain(texture)
 	if not texture then return end
@@ -92,8 +92,7 @@ local function ReplaceDivider(texture)
 	line:SetHeight(1)
 	line:SetPoint('LEFT', texture, 'LEFT', DIVIDER_INSET, 0)
 	line:SetPoint('RIGHT', texture, 'RIGHT', 0, 0)
-	local edge = Skin.PANEL_EDGE
-	FlatTexture(line, edge[1], edge[2], edge[3], edge[4])
+	BUI.Painter.Fill(line, 'skinBorder')
 	BUILib.Skin.PixelLine(line, texture, false, DIVIDER_INSET, 0)
 	texture._buiDividerLine = line
 end

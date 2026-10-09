@@ -68,7 +68,7 @@ local context = Skin.NewContext(Enabled)
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
 local Shell, Button, Close = context.Shell, context.Button, context.Close
 local ScrollBar, Face, Body, Title = context.ScrollBar, context.Face, context.Body, context.Title
-local FlatTexture, AccentTexture, RowHighlight, CropIcon = Skin.FlatTexture, Skin.AccentTexture, Skin.RowHighlight, Skin.CropIcon
+local AccentTexture, RowHighlight, CropIcon = Skin.AccentTexture, Skin.RowHighlight, Skin.CropIcon
 
 local function SetColor(fontString, color)
 	if fontString then fontString:SetTextColor(color[1], color[2], color[3], color[4]) end
@@ -305,8 +305,7 @@ local function SkinGreetingBreak(texture)
 	line:SetHeight(1)
 	line:SetPoint('LEFT', texture, 'LEFT', 0, 0)
 	line:SetPoint('RIGHT', texture, 'RIGHT', 0, 0)
-	local edge = Skin.PANEL_EDGE
-	FlatTexture(line, edge[1], edge[2], edge[3], edge[4])
+	BUI.Painter.Fill(line, 'skinBorder')
 	BUILib.Skin.PixelLine(line, texture)
 end
 

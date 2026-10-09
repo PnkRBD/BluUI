@@ -10,7 +10,6 @@ BUI.C.FALLBACK_TEXTURE    = [[Interface\Buttons\WHITE8X8]]
 BUI.C.FADE_TEXTURE        = BUI.C.MEDIA_PATH .. 'bui_fade.tga'
 BUI.C.CURSOR_RING_TEXTURE = [[Interface\AddOns\BluUI\Media\Textures\cursor_ring.tga]]
 BUI.C.RAID_ICON_TEXTURE   = [[Interface\TargetingFrame\UI-RaidTargetingIcons]]
-BUI.C.PANEL_BACKDROP = { 0.045, 0.045, 0.055, 0.97, 0.145, 0.145, 0.175, 1 }
 BUI.C.COLOR_PINK         = 'FD008B'
 BUI.C.COLOR_BRAND        = '6D00FD'
 BUI.C.CHAT_PREFIX        = '|cff' .. BUI.C.COLOR_BRAND .. 'BluUI:|r '

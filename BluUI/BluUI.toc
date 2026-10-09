@@ -42,6 +42,7 @@ Core\Commands.lua
 
 Utility\Scheduler.lua
 Utility\Theme.lua
+Utility\Painter.lua
 Utility\Dispatcher.lua
 Utility\Events.lua
 Utility\Visibility.lua

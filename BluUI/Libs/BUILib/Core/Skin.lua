@@ -258,11 +258,18 @@ end
 
 
 local SHELL_SUBLEVEL = -8
+local shells = {}
 
 function Skin.SetEdgeColor(edges, color)
 	for edgeIndex = 1, 4 do
 		edges[edgeIndex]:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
 	end
+end
+
+local function PaintShell(shell)
+	local fill = shell.fillColor
+	shell.fill:SetColorTexture(fill[1], fill[2], fill[3], fill[4] or 1)
+	Skin.SetEdgeColor(shell.edges, shell.edgeColor)
 end
 
 local function ResolveInsets(inset)
@@ -283,13 +290,11 @@ function Skin.Shell(frame, style, inset)
 		return shell
 	end
 	local left, right, top, bottom = ResolveInsets(inset)
-	local fillColor = style.fill
 	local fill = frame:CreateTexture(nil, 'BACKGROUND', nil, SHELL_SUBLEVEL)
 	fill.__buiSkin = true
 	fill.ignoreInLayout = true
 	fill:SetPoint('TOPLEFT', frame, 'TOPLEFT', left, -top)
 	fill:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -right, bottom)
-	fill:SetColorTexture(fillColor[1], fillColor[2], fillColor[3], fillColor[4] or 1)
 	local edges = {}
 	for edgeIndex = 1, 4 do
 		edges[edgeIndex] = frame:CreateTexture(nil, 'BORDER')
@@ -301,10 +306,11 @@ function Skin.Shell(frame, style, inset)
 	edges[3]:SetPoint('TOPLEFT', frame, 'TOPLEFT', left, -top); edges[3]:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', left, bottom)
 	edges[4]:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -right, -top); edges[4]:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -right, bottom)
 	SizeEdges(edges[1], edges[2], edges[3], edges[4])
-	Skin.SetEdgeColor(edges, style.edge)
 	local insets = { left = left, right = right, top = top, bottom = bottom }
-	shell = { fill = fill, edges = edges, inset = inset, insets = insets }
+	shell = { fill = fill, edges = edges, inset = inset, insets = insets, fillColor = style.fill, edgeColor = style.edge }
+	PaintShell(shell)
 	frame._buiShell = shell
+	shells[frame] = shell
 	shell.aligner = Skin.PixelAlign(frame, frame, AlignBox(frame, fill, edges[1], edges[2], edges[3], edges[4], insets))
 	return shell
 end
@@ -318,12 +324,20 @@ end
 
 function Skin.SetShellEdges(frame, color)
 	local shell = frame and frame._buiShell
-	if shell then Skin.SetEdgeColor(shell.edges, color) end
+	if not shell then return end
+	shell.edgeColor = color
+	Skin.SetEdgeColor(shell.edges, color)
 end
 
 function Skin.SetShellFill(frame, color)
 	local shell = frame and frame._buiShell
-	if shell then shell.fill:SetColorTexture(color[1], color[2], color[3], color[4] or 1) end
+	if not shell then return end
+	shell.fillColor = color
+	shell.fill:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
+end
+
+function Skin.RepaintShells()
+	for _, shell in pairs(shells) do PaintShell(shell) end
 end
 
 local TAB_INSET = 3
@@ -344,10 +358,14 @@ local tabStyleCount = 0
 Skin.TAB_INSET = TAB_INSET
 Skin.TAB_STRIP_OVERLAP = TAB_STRIP_OVERLAP
 
+local function TintFont(font, color)
+	font:SetTextColor(color[1], color[2], color[3], color[4] or 1)
+end
+
 local function TabFont(name, size, color)
 	local font = CreateFont(name)
 	font:SetFont(BUILib.Font, size, '')
-	font:SetTextColor(color[1], color[2], color[3], color[4] or 1)
+	TintFont(font, color)
 	font:SetShadowColor(0, 0, 0, 0)
 	font:SetShadowOffset(0, 0)
 	return font
@@ -368,6 +386,13 @@ function Skin.TabStyle(overrides)
 		disabled = TabFont(prefix .. 'Disabled', style.fontSize, style.disabledText),
 	}
 	return style
+end
+
+function Skin.RefreshTabStyle(style)
+	local fonts = style.fonts
+	TintFont(fonts.rest, style.restText)
+	TintFont(fonts.hover, style.hoverText)
+	TintFont(fonts.disabled, style.disabledText)
 end
 
 local function TabFuse(tab, fused)

@@ -42,8 +42,7 @@ local function DelveCover(frame)
 	if cover then return cover end
 	cover = frame:CreateTexture(nil, 'BACKGROUND', nil, COVER_SUBLEVEL)
 	cover.__buiSkin = true
-	local fill = Skin.PANEL_FILL
-	cover:SetColorTexture(fill[1], fill[2], fill[3], fill[4] or 1)
+	BUI.Painter.Fill(cover, 'skinBackground')
 	cover:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -1, -1)
 	cover:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -1, 1)
 	frame._buiDelveCover = cover

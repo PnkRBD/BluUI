@@ -8,6 +8,7 @@ local Skin = BUI.Skinning
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Colors = BUILib.Colors
+local Painter = BUI.Painter
 
 local toggleCallbacks = {}
 local skinRegistry = {}
@@ -182,11 +183,13 @@ end)
 
 function Skin.RefreshAll()
 	ClearStagger()
+	Skin.RefreshPalette()
 	for _, id in ipairs(skinOrder) do RefreshSkin(id) end
 end
 
 function Skin.RefreshAllStaggered()
 	ClearStagger()
+	Skin.RefreshPalette()
 	for index, id in ipairs(skinOrder) do staggerQueue[index] = id end
 	staggerDriver:Show()
 end
@@ -415,12 +418,28 @@ end
 
 local TIP_PADDING_X, TIP_PADDING_Y, TIP_TITLE_BLOCK = 10, 8, 24
 local TIP_BODY_SIZE, TIP_TITLE_SIZE = 11, 12
-local TIP_TITLE_COLOR = { 0.9, 0.9, 0.93, 1 }
-local TIP_BODY_COLOR = { 0.87, 0.87, 0.9, 1 }
-local TIP_LABEL_COLOR = { 0.55, 0.55, 0.6, 1 }
-local TIP_LINE_COLOR = { 1, 1, 1, 0.1 }
-local PANEL_FILL = { BUI.C.PANEL_BACKDROP[1], BUI.C.PANEL_BACKDROP[2], BUI.C.PANEL_BACKDROP[3], BUI.C.PANEL_BACKDROP[4] }
-local PANEL_EDGE = { BUI.C.PANEL_BACKDROP[5], BUI.C.PANEL_BACKDROP[6], BUI.C.PANEL_BACKDROP[7], BUI.C.PANEL_BACKDROP[8] }
+local TIP_TITLE_COLOR, TIP_BODY_COLOR, TIP_LABEL_COLOR = {}, {}, {}
+local PANEL_FILL, PANEL_EDGE = {}, {}
+local TAB_REST, TAB_HOVER, TAB_SELECTED = {}, {}, {}
+local TIP_ROLES = { title = 'skinTitle', label = 'skinLabel' }
+local PALETTE = {
+	[PANEL_FILL] = 'skinBackground', [PANEL_EDGE] = 'skinBorder',
+	[TIP_TITLE_COLOR] = 'skinTitle', [TIP_BODY_COLOR] = 'skinText', [TIP_LABEL_COLOR] = 'skinLabel',
+}
+local TAB_SHADES = { [TAB_REST] = 2 / 3, [TAB_HOVER] = 4 / 3, [TAB_SELECTED] = 5 / 3 }
+
+local function LoadPalette(read)
+	for target, role in pairs(PALETTE) do target[1], target[2], target[3], target[4] = read(role) end
+	for target, shade in pairs(TAB_SHADES) do
+		target[1], target[2], target[3], target[4] = PANEL_FILL[1] * shade, PANEL_FILL[2] * shade, PANEL_FILL[3] * shade, PANEL_FILL[4]
+	end
+end
+
+LoadPalette(function(role) return unpack(BUILib.Layout.DefaultColor(role, 'dark')) end)
+
+function Skin.RefreshPalette()
+	LoadPalette(BUI.ThemeColor)
+end
 
 Skin.TIP_PADDING_X = TIP_PADDING_X
 Skin.TIP_PADDING_Y = TIP_PADDING_Y
@@ -500,8 +519,7 @@ function Skin.TipTitleLine(frame, scale)
 	scale = scale or 1
 	local line = frame._buiTipLine
 	if not line then
-		line = frame:CreateTexture(nil, 'BORDER')
-		line:SetColorTexture(TIP_LINE_COLOR[1], TIP_LINE_COLOR[2], TIP_LINE_COLOR[3], TIP_LINE_COLOR[4])
+		line = Painter.Fill(frame:CreateTexture(nil, 'BORDER'), 'skinLine')
 		line:SetHeight(1)
 		frame._buiTipLine = line
 	end
@@ -516,30 +534,30 @@ end
 
 local HTML_TEXT_TYPES = { 'P', 'H1', 'H2', 'H3' }
 
+local function PaintHTML(html)
+	for _, textType in ipairs(HTML_TEXT_TYPES) do
+		html:SetTextColor(textType, Painter.Color(textType ~= 'P' and 'skinTitle' or html._buiTipRole))
+	end
+end
+
 function Skin.TipFont(fontString, kind, scale)
 	if not fontString then return end
-	local color = TIP_BODY_COLOR
-	local size = TIP_BODY_SIZE
-	if kind == 'title' then
-		color, size = TIP_TITLE_COLOR, TIP_TITLE_SIZE
-	elseif kind == 'label' then
-		color = TIP_LABEL_COLOR
-	end
-	size = math.floor(size * (scale or 1) + 0.5)
+	local role = TIP_ROLES[kind] or 'skinText'
+	local size = math.floor((kind == 'title' and TIP_TITLE_SIZE or TIP_BODY_SIZE) * (scale or 1) + 0.5)
 	if fontString.GetObjectType and fontString:GetObjectType() == 'SimpleHTML' then
 		local titleSize = math.floor(TIP_TITLE_SIZE * (scale or 1) + 0.5)
 		for _, textType in ipairs(HTML_TEXT_TYPES) do
 			local isHeader = textType ~= 'P'
-			local typeColor = isHeader and TIP_TITLE_COLOR or color
 			fontString:SetFont(textType, BUILib.Font, isHeader and titleSize or size, '')
-			fontString:SetTextColor(textType, typeColor[1], typeColor[2], typeColor[3], typeColor[4])
 			fontString:SetShadowColor(textType, 0, 0, 0, 0)
 			fontString:SetShadowOffset(textType, 0, 0)
 		end
+		fontString._buiTipRole = role
+		Painter.Custom(fontString, PaintHTML)
 		return
 	end
 	fontString:SetFont(BUILib.Font, size, '')
-	fontString:SetTextColor(color[1], color[2], color[3], color[4])
+	Painter.Text(fontString, role)
 	fontString:SetShadowColor(0, 0, 0, 0)
 	fontString:SetShadowOffset(0, 0)
 end
@@ -552,12 +570,12 @@ local function ButtonFontObjects(scale)
 	if not fonts then
 		local normal = CreateFont('BUI_TipButtonFont' .. size)
 		normal:SetFont(BUILib.Font, size, '')
-		normal:SetTextColor(TIP_BODY_COLOR[1], TIP_BODY_COLOR[2], TIP_BODY_COLOR[3], TIP_BODY_COLOR[4])
+		Painter.Text(normal, 'skinText')
 		normal:SetShadowColor(0, 0, 0, 0)
 		normal:SetShadowOffset(0, 0)
 		local disabled = CreateFont('BUI_TipButtonFontDisabled' .. size)
 		disabled:SetFont(BUILib.Font, size, '')
-		disabled:SetTextColor(TIP_LABEL_COLOR[1], TIP_LABEL_COLOR[2], TIP_LABEL_COLOR[3], TIP_LABEL_COLOR[4])
+		Painter.Text(disabled, 'skinLabel')
 		disabled:SetShadowColor(0, 0, 0, 0)
 		disabled:SetShadowOffset(0, 0)
 		fonts = { normal = normal, disabled = disabled }
@@ -1038,7 +1056,16 @@ function Skin.TipEditBox(editBox, scale, inset)
 	Skin.TipFace(editBox, 'body', scale)
 end
 
-local TAB_STYLE = BUILib.Skin.TabStyle({ fill = PANEL_FILL, edge = PANEL_EDGE, disabledText = TIP_LABEL_COLOR, fontSize = TIP_TITLE_SIZE })
+local TAB_STYLE = BUILib.Skin.TabStyle({
+	fill = PANEL_FILL, edge = PANEL_EDGE, restFill = TAB_REST, hoverFill = TAB_HOVER, selectedFill = TAB_SELECTED,
+	hoverText = TIP_TITLE_COLOR, disabledText = TIP_LABEL_COLOR, fontSize = TIP_TITLE_SIZE,
+})
+
+Painter.OnRepaint('Skin', function()
+	Skin.RefreshPalette()
+	BUILib.Skin.RefreshTabStyle(TAB_STYLE)
+	BUILib.Skin.RepaintShells()
+end)
 
 Skin.TIP_TAB_INSET = BUILib.Skin.TAB_INSET
 
@@ -1167,6 +1194,10 @@ end
 
 local BACKDROP_BUTTON_ART = { 'Left', 'Middle', 'Right', 'LeftDisabled', 'MiddleDisabled', 'RightDisabled' }
 
+function Skin.PaintPanelBackdrop(frame)
+	Skin.ApplyBackdrop(frame, PANEL_FILL, PANEL_EDGE)
+end
+
 local function BackdropButtonEnter(button)
 	local red, green, blue = BUILib.Theme.GetAccent()
 	button:SetBackdropBorderColor(red, green, blue, 1)
@@ -1187,7 +1218,7 @@ function Skin.TipBackdropButton(button, scale)
 			local texture = button[key] or (name and _G[name .. key])
 			if texture and texture.SetAlpha then texture:SetAlpha(0) end
 		end
-		Skin.ApplyBackdrop(button, PANEL_FILL, PANEL_EDGE)
+		Painter.Custom(button, Skin.PaintPanelBackdrop)
 		button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Core button OnEnter 4', BackdropButtonEnter))
 		button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Core button OnLeave 4', BackdropButtonLeave))
 	end
@@ -1211,9 +1242,6 @@ function Skin.TipFaceTree(frame, depth, kind)
 		end
 	end
 end
-
-Skin.PANEL_FILL = PANEL_FILL
-Skin.PANEL_EDGE = PANEL_EDGE
 
 local HELP_BUTTON_DEPTH = 4
 
@@ -1292,6 +1320,10 @@ local function IconEdgeAligner(edges, icon, state)
 	end
 end
 
+local function PaintIconEdges(icon)
+	if not icon._buiIconState.custom then BUILib.Skin.SetEdgeColor(icon._buiIconFrame, PANEL_EDGE) end
+end
+
 function Skin.TipIconFrame(parent, icon, thickness)
 	if not icon or icon._buiIconFrame then return end
 	local edges = {}
@@ -1299,12 +1331,12 @@ function Skin.TipIconFrame(parent, icon, thickness)
 		edges[edgeIndex] = parent:CreateTexture(nil, 'OVERLAY')
 		edges[edgeIndex].__buiSkin = true
 	end
-	local state = { thickness = thickness or 1 }
+	local state = { thickness = thickness or 1, custom = false }
 	LayoutIconEdges(edges, icon, state.thickness)
-	BUILib.Skin.SetEdgeColor(edges, PANEL_EDGE)
 	icon._buiIconFrame = edges
 	state.aligner = BUILib.Skin.PixelAlign(parent, icon, IconEdgeAligner(edges, icon, state))
 	icon._buiIconState = state
+	Painter.Custom(icon, PaintIconEdges)
 end
 
 function Skin.SetIconEdgeThickness(icon, thickness)
@@ -1335,10 +1367,12 @@ function Skin.SetIconEdgeColor(icon, red, green, blue)
 			icon._buiEdgeR, icon._buiEdgeG, icon._buiEdgeB = red, green, blue
 		end
 		iconEdgeColor[1], iconEdgeColor[2], iconEdgeColor[3] = red, green, blue
+		icon._buiIconState.custom = true
 		BUILib.Skin.SetEdgeColor(edges, iconEdgeColor)
 	else
 		if icon._buiEdgeR == false then return end
 		icon._buiEdgeR, icon._buiEdgeG, icon._buiEdgeB = false, nil, nil
+		icon._buiIconState.custom = false
 		BUILib.Skin.SetEdgeColor(edges, PANEL_EDGE)
 	end
 end
@@ -1730,7 +1764,7 @@ function Skin.TipSliderTrack(slider)
 	track:SetHeight(SLIDER_TRACK_HEIGHT)
 	track:SetPoint('LEFT', slider, 'LEFT', 0, 0)
 	track:SetPoint('RIGHT', slider, 'RIGHT', 0, 0)
-	Skin.FlatTexture(track, PANEL_EDGE[1], PANEL_EDGE[2], PANEL_EDGE[3], PANEL_EDGE[4])
+	Painter.Fill(track, 'skinBorder')
 	if thumb then
 		local fill = slider:CreateTexture(nil, 'BACKGROUND', nil, 1)
 		fill.__buiSkin = true

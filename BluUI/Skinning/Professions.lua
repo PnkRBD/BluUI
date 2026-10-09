@@ -207,9 +207,7 @@ end
 local function DividerLine(frame, vertical)
 	FadeRegions(frame)
 	if frame._buiLine then return end
-	local line = Own(frame:CreateTexture(nil, 'ARTWORK'))
-	local edge = BUI.C.PANEL_BACKDROP
-	line:SetColorTexture(edge[5], edge[6], edge[7], edge[8])
+	local line = BUI.Painter.Fill(Own(frame:CreateTexture(nil, 'ARTWORK')), 'skinBorder')
 	if vertical then
 		line:SetPoint('TOP')
 		line:SetPoint('BOTTOM')
@@ -368,9 +366,7 @@ local function LayoutRankBar(rankBar)
 	expansion:SetPoint('TOPRIGHT')
 	expansion:SetPoint('BOTTOMRIGHT')
 	expansion:SetWidth(rankBar:GetHeight())
-	local divider = Own(rankBar:CreateTexture(nil, 'OVERLAY'))
-	local edge = BUI.C.PANEL_BACKDROP
-	divider:SetColorTexture(edge[5], edge[6], edge[7], edge[8])
+	local divider = BUI.Painter.Fill(Own(rankBar:CreateTexture(nil, 'OVERLAY')), 'skinBorder')
 	divider:SetPoint('TOPRIGHT', expansion, 'TOPLEFT', 0, -1)
 	divider:SetPoint('BOTTOMRIGHT', expansion, 'BOTTOMLEFT', 0, 1)
 	PixelUtil.SetWidth(divider, 1, 1)

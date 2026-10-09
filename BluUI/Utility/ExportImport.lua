@@ -343,6 +343,7 @@ local function RefreshAllModules()
     BUI.PageEngine.RebuildAllPages()
     BUI.BUILibClient.SetFont(BUI.WindowFont())
     if BUI.PageEngine.window then BUI.PageEngine.window:ApplyTheme(BUI.GetDB().windowTheme) end
+    BUI.Painter.Repaint()
 
     if on('cdm') and BUI.CDM and BUI.CDM.ApplyAllPositions then
         BUI.CDM.ApplyAllPositions()

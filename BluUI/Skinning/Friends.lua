@@ -469,7 +469,7 @@ local function SkinRaidTab()
 	Face(idLabel and idLabel.text)
 	if not info._buiBackdrop then
 		info._buiBackdrop = true
-		Skin.ApplyBackdrop(info, Skin.PANEL_FILL, Skin.PANEL_EDGE)
+		BUI.Painter.Custom(info, Skin.PaintPanelBackdrop)
 	end
 	SafeClose(_G.RaidInfoCloseButton)
 	ScrollBar(info.ScrollBar, true)

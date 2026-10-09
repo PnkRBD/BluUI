@@ -98,8 +98,7 @@ local function ReplaceDivider(texture, parent)
 	line:SetHeight(1)
 	line:SetPoint('LEFT', texture, 'LEFT', 0, 0)
 	line:SetPoint('RIGHT', texture, 'RIGHT', 0, 0)
-	local edge = Skin.PANEL_EDGE
-	FlatTexture(line, edge[1], edge[2], edge[3], edge[4])
+	BUI.Painter.Fill(line, 'skinBorder')
 	BUILib.Skin.PixelLine(line, texture)
 	texture._buiLine = line
 end
