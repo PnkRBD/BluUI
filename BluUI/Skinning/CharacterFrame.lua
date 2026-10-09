@@ -2216,33 +2216,43 @@ local function QueueRefresh(key, callback)
     end)
 end
 
-local function RefreshEquipment() RefreshSlots(); RefreshHeader(); RefreshSets(); RefreshBagAlternatives(); RefreshModel() end
-local function OnEquipmentChanged() QueueRefresh('equipment', RefreshEquipment) end
-local function OnStatsChanged() QueueRefresh('stats', RefreshStats) end
-local function OnTitlesChanged() Titles.dirty = true; QueueRefresh('titles', function() RefreshTitles(); UpdateSubtitle() end) end
-local function OnHeaderChanged() QueueRefresh('header', RefreshHeader) end
+local On = {}
 
-BUI.Events:Register('PLAYER_EQUIPMENT_CHANGED',     'Skinning.CharacterFrame', OnEquipmentChanged)
-BUI.Events:Register('PLAYER_AVG_ITEM_LEVEL_UPDATE', 'Skinning.CharacterFrame', OnEquipmentChanged)
-BUI.Events:Register('SOCKET_INFO_UPDATE',           'Skinning.CharacterFrame', OnEquipmentChanged)
-BUI.Events:Register('GET_ITEM_INFO_RECEIVED',       'Skinning.CharacterFrame', OnEquipmentChanged)
-BUI.Events:Register('EQUIPMENT_SETS_CHANGED',       'Skinning.CharacterFrame', function() QueueRefresh('sets', RefreshSets) end)
-BUI.Events:Register('EQUIPMENT_SWAP_FINISHED',      'Skinning.CharacterFrame', OnEquipmentChanged)
-BUI.Events:Register('KNOWN_TITLES_UPDATE',          'Skinning.CharacterFrame', OnTitlesChanged)
-BUI.Events:Register('UPDATE_INVENTORY_DURABILITY',  'Skinning.CharacterFrame', OnHeaderChanged)
-BUI.Events:Register('CHALLENGE_MODE_COMPLETED',     'Skinning.CharacterFrame', OnHeaderChanged)
-BUI.Events:Register('PLAYER_LOOT_SPEC_UPDATED', 'Skinning.CharacterFrame', OnHeaderChanged)
-BUI.Events:Register('COMBAT_RATING_UPDATE',         'Skinning.CharacterFrame', OnStatsChanged)
-BUI.Events:Register('PLAYER_REGEN_ENABLED',         'Skinning.CharacterFrame', function() if CharacterFrame then CharacterFrame._buiCombatNoticed = nil end; ApplyAfterCombat(); OnStatsChanged() end)
+function On.Bags() QueueRefresh('bags', RefreshBagAlternatives) end
+function On.EquipmentRefresh() RefreshSlots(); RefreshHeader(); RefreshSets(); On.Bags() end
+function On.Equipment() QueueRefresh('equipment', On.EquipmentRefresh) end
+function On.ItemInfo() QueueRefresh('slots', RefreshSlots) end
+function On.Stats() QueueRefresh('stats', RefreshStats) end
+function On.Sets() QueueRefresh('sets', RefreshSets) end
+function On.Header() QueueRefresh('header', RefreshHeader) end
+function On.Model() QueueRefresh('model', RefreshModel) end
+function On.TitlesRefresh() RefreshTitles(); UpdateSubtitle() end
+function On.Titles()
+    Titles.dirty = true
+    QueueRefresh('titles', On.TitlesRefresh)
+end
+
+BUI.Events:Register('PLAYER_EQUIPMENT_CHANGED',     'Skinning.CharacterFrame', On.Equipment)
+BUI.Events:Register('PLAYER_AVG_ITEM_LEVEL_UPDATE', 'Skinning.CharacterFrame', On.Equipment)
+BUI.Events:Register('SOCKET_INFO_UPDATE',           'Skinning.CharacterFrame', On.Equipment)
+BUI.Events:Register('GET_ITEM_INFO_RECEIVED',       'Skinning.CharacterFrame', On.ItemInfo)
+BUI.Events:Register('EQUIPMENT_SETS_CHANGED',       'Skinning.CharacterFrame', On.Sets)
+BUI.Events:Register('EQUIPMENT_SWAP_FINISHED',      'Skinning.CharacterFrame', On.Equipment)
+BUI.Events:Register('KNOWN_TITLES_UPDATE',          'Skinning.CharacterFrame', On.Titles)
+BUI.Events:Register('UPDATE_INVENTORY_DURABILITY',  'Skinning.CharacterFrame', On.Header)
+BUI.Events:Register('CHALLENGE_MODE_COMPLETED',     'Skinning.CharacterFrame', On.Header)
+BUI.Events:Register('PLAYER_LOOT_SPEC_UPDATED',     'Skinning.CharacterFrame', On.Header)
+BUI.Events:Register('COMBAT_RATING_UPDATE',         'Skinning.CharacterFrame', On.Stats)
+BUI.Events:Register('PLAYER_REGEN_ENABLED',         'Skinning.CharacterFrame', function() if CharacterFrame then CharacterFrame._buiCombatNoticed = nil end; ApplyAfterCombat(); On.Stats() end)
 BUI.Events:Register('PLAYER_SPECIALIZATION_CHANGED', 'Skinning.CharacterFrame', function()
     if IsOpen() then UpdateSubtitle(); RefreshStats(); RefreshHeader() end
 end)
-BUI.Events:RegisterUnit('UNIT_INVENTORY_CHANGED', 'player', 'Skinning.CharacterFrame', OnEquipmentChanged)
-BUI.Events:RegisterUnit('UNIT_STATS', 'player', 'Skinning.CharacterFrame', OnStatsChanged)
+BUI.Events:RegisterUnit('UNIT_INVENTORY_CHANGED', 'player', 'Skinning.CharacterFrame', On.Equipment)
+BUI.Events:RegisterUnit('UNIT_STATS', 'player', 'Skinning.CharacterFrame', On.Stats)
 BUI.Events:RegisterUnit('UNIT_NAME_UPDATE', 'player', 'Skinning.CharacterFrame', function() if IsOpen() then UpdateSubtitle() end end)
-BUI.Events:RegisterUnit('UNIT_MODEL_CHANGED', 'player', 'Skinning.CharacterFrame', function() QueueRefresh('model', RefreshModel) end)
-BUI.Events:Register('TRANSMOGRIFY_SUCCESS', 'Skinning.CharacterFrame', function() QueueRefresh('model', RefreshModel) end)
-BUI.Events:Register('BAG_UPDATE_DELAYED', 'Skinning.CharacterFrame', function() QueueRefresh('bags', RefreshBagAlternatives) end)
+BUI.Events:RegisterUnit('UNIT_MODEL_CHANGED', 'player', 'Skinning.CharacterFrame', On.Model)
+BUI.Events:Register('TRANSMOGRIFY_SUCCESS', 'Skinning.CharacterFrame', On.Model)
+BUI.Events:Register('BAG_UPDATE_DELAYED', 'Skinning.CharacterFrame', On.Bags)
 
 Skin.OnToggle('characterFrame', function(enabled)
     if not enabled then
