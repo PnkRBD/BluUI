@@ -72,6 +72,7 @@ end
 function BUI.ThemeColor(role)
 	return BUI.BUILibClient.Layout.ThemeColor(BUI.GetDB().windowTheme, role)
 end
+BUI.BUILibClient.themeColor = BUI.ThemeColor
 
 function BUI.ThemeFontPath(fontRole)
 	return BUI.BUILibClient.Layout.ThemeFontPath(BUI.GetDB().windowTheme, fontRole, BUI.FetchFont, BUI.WindowFont())

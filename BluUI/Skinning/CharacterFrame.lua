@@ -1973,7 +1973,7 @@ local function BuildStatsPane(parent)
     ilvlHit:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame ilvlHit OnEnter', function(self)
         local info = pane.ilvlInfo
         local rows = {
-            { left = 'Equipped', right = ('%.2f'):format(info.equipped), rightColor = { 1, 1, 1 } },
+            { left = 'Equipped', right = ('%.2f'):format(info.equipped) },
             { left = 'Average (bags included)', right = ('%.2f'):format(info.total), rightColor = BIG_ILVL_COLOR },
         }
         if info.pvp > 0 then rows[#rows + 1] = { left = 'PvP', right = ('%.2f'):format(info.pvp), rightColor = { 0, 0.8, 0.4 } } end

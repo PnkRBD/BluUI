@@ -559,6 +559,15 @@ do
 	local tip
 	local MAX_WIDTH, PADDING_X, PADDING_Y = 260, 10, 8
 	local TIP_RADIUS = 6
+	local TIP_BLANK = { 1, 1, 1, 1 }
+	local NO_THEME = {}
+
+	local function TipColor(window, role)
+		if window then return window:Color(role) end
+		local read = BUILib.GetActiveClient().themeColor
+		if read then return read(role) end
+		return BUILib.Layout.ThemeColor(NO_THEME, role)
+	end
 
 	local function AcquireTip()
 		if tip then return tip end
@@ -567,11 +576,10 @@ do
 		tip:SetClampedToScreen(true)
 		tip:SetSize(MAX_WIDTH, 30)
 
-		tip.fill, tip.edge = Widget.DrawCardShape(tip, TIP_RADIUS, getTheme().bg.card, getTheme().border.light, "BACKGROUND", -8, 0)
+		tip.fill, tip.edge = Widget.DrawCardShape(tip, TIP_RADIUS, TIP_BLANK, TIP_BLANK, "BACKGROUND", -8, 0)
 
 		tip.label = tip:CreateFontString(nil, "OVERLAY")
 		tip.label:SetFont(BUILib.Font, 11, "")
-		tip.label:SetTextColor(1, 1, 1, 0.9)
 		tip.label:SetPoint("TOPLEFT", PADDING_X, -PADDING_Y)
 		tip.label:SetPoint("TOPRIGHT", -PADDING_X, -PADDING_Y)
 		tip.label:SetWordWrap(true)
@@ -590,19 +598,10 @@ do
 		return tip
 	end
 
-	local function StyleTip(tooltip, window)
-		if window then
-			Widget.SetShapeColor(tooltip.fill, window:Color("card"))
-			Widget.SetShapeColor(tooltip.edge, window:Color("cardEdge"))
-		else
-			local theme = getTheme()
-			Widget.SetShapeColor(tooltip.fill, unpack(theme.bg.card))
-			Widget.SetShapeColor(tooltip.edge, unpack(theme.border.light))
-		end
-	end
-
 	local function PositionTip(tooltip, owner, config)
-		StyleTip(tooltip, config and config.window)
+		local window = config and config.window
+		Widget.SetShapeColor(tooltip.fill, TipColor(window, "page"))
+		Widget.SetShapeColor(tooltip.edge, TipColor(window, "edge"))
 		Widget.MatchScale(tooltip, owner)
 		tooltip:ClearAllPoints()
 		local anchor = config and config.anchor
@@ -642,7 +641,7 @@ do
 		if config and config.color then
 			tooltip.label:SetTextColor(config.color[1], config.color[2], config.color[3], 0.9)
 		else
-			tooltip.label:SetTextColor(1, 1, 1, 0.9)
+			tooltip.label:SetTextColor(TipColor(config and config.window, "text"))
 		end
 
 		tooltip:SetAlpha(0); tooltip:Show()
@@ -653,8 +652,14 @@ do
 	end
 
 	local ROW_HEIGHT, ROW_GAP, COLUMN_GAP, ROWS_MIN_WIDTH, TITLE_BLOCK = 16, 6, 24, 140, 24
-	local ROWS_LABEL_COLOR = {0.55, 0.55, 0.6}
-	local ROWS_VALUE_COLOR = {0.9, 0.9, 0.92}
+
+	local function PaintCell(fontString, color, window, role)
+		if color then
+			fontString:SetTextColor(color[1], color[2], color[3])
+		else
+			fontString:SetTextColor(TipColor(window, role))
+		end
+	end
 
 	local function AcquireRow(tooltip, rowIndex)
 		local row = rowPool[rowIndex]
@@ -678,19 +683,20 @@ do
 		if not tooltip.title then
 			tooltip.title = tooltip:CreateFontString(nil, "OVERLAY")
 			tooltip.title:SetFont(BUILib.Font, 12, "")
-			tooltip.title:SetTextColor(0.95, 0.95, 1)
 			tooltip.title:SetPoint("TOPLEFT", PADDING_X, -PADDING_Y)
 			tooltip.titleLine = tooltip:CreateTexture(nil, "BORDER")
-			tooltip.titleLine:SetColorTexture(1, 1, 1, 0.1)
 			tooltip.titleLine:SetHeight(1)
 			tooltip.titleLine:SetPoint("TOPLEFT", PADDING_X, -(PADDING_Y + TITLE_BLOCK - 6))
 			tooltip.titleLine:SetPoint("TOPRIGHT", -PADDING_X, -(PADDING_Y + TITLE_BLOCK - 6))
 		end
 		tooltip:SetAlpha(0); tooltip:Show()
 
+		local window = config and config.window
 		local hasTitle = title ~= nil and title ~= ""
 		tooltip.title:SetText(hasTitle and title or "")
+		tooltip.title:SetTextColor(TipColor(window, "text"))
 		tooltip.title:SetShown(hasTitle)
+		tooltip.titleLine:SetColorTexture(TipColor(window, "cardEdge"))
 		tooltip.titleLine:SetShown(hasTitle)
 
 		local contentWidth = hasTitle and tooltip.title:GetStringWidth() or 0
@@ -705,13 +711,11 @@ do
 				row.left:ClearAllPoints()
 				row.left:SetPoint("TOPLEFT", PADDING_X, -y)
 				row.left:SetText(spec.left or "")
-				local leftColor = spec.leftColor or ROWS_LABEL_COLOR
-				row.left:SetTextColor(leftColor[1], leftColor[2], leftColor[3])
+				PaintCell(row.left, spec.leftColor, window, "muted")
 				row.right:ClearAllPoints()
 				row.right:SetPoint("TOPRIGHT", -PADDING_X, -y)
 				row.right:SetText(spec.right or "")
-				local rightColor = spec.rightColor or ROWS_VALUE_COLOR
-				row.right:SetTextColor(rightColor[1], rightColor[2], rightColor[3])
+				PaintCell(row.right, spec.rightColor, window, "text")
 				row.left:Show()
 				row.right:Show()
 				local rowWidth = row.left:GetStringWidth() + COLUMN_GAP + row.right:GetStringWidth()
