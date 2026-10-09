@@ -1131,7 +1131,7 @@ function Skin.TipClose(button)
 	BUILib.Skin.StripButton(button)
 	local glyph = button:CreateTexture(nil, 'OVERLAY')
 	glyph.__buiSkin = true
-	glyph:SetTexture(BUILib.GetLibMedia('x'))
+	BUILib.Widget.SetGlyph(glyph, BUILib.GetLibMedia('x'))
 	glyph:SetSize(12, 12)
 	glyph:SetPoint('CENTER', button, 'CENTER', 0, 0)
 	glyph:SetVertexColor(CLOSE_IDLE[1], CLOSE_IDLE[2], CLOSE_IDLE[3], CLOSE_IDLE[4])

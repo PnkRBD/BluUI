@@ -178,7 +178,7 @@ end
 
 local function Glyph(button, key, color)
     local glyph = button:CreateTexture(nil, 'ARTWORK')
-    glyph:SetTexture(BUILib.GetLibMedia(key))
+    BUILib.Widget.SetGlyph(glyph, BUILib.GetLibMedia(key))
     glyph:SetVertexColor(color[1], color[2], color[3], 1)
     glyph:SetPoint('CENTER')
     button.glyph = glyph

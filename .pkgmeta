@@ -11,3 +11,4 @@ ignore:
     - .pkgmeta
     - .gitattributes
     - .gitignore
+    - Tools

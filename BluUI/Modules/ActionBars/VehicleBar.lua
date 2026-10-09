@@ -55,7 +55,7 @@ local function CreateBar()
 	background:SetVertexColor(0, 0, 0, BACKGROUND_ALPHA)
 
 	local icon = button:CreateTexture(nil, 'ARTWORK')
-	icon:SetTexture(BUILib.GetLibMedia('x'))
+	BUILib.Widget.SetGlyph(icon, BUILib.GetLibMedia('x'))
 	icon:SetVertexColor(ICON_COLOR[1], ICON_COLOR[2], ICON_COLOR[3], 1)
 	icon:SetPoint('CENTER')
 	button.icon = icon

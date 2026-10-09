@@ -1117,7 +1117,7 @@ function Skin.TrackerHeaderControls(parent, anchor)
 	filterButton:SetSize(Pixel.PixelSize(MINIMIZE_SIZE), Pixel.PixelSize(MINIMIZE_SIZE))
 	filterButton:SetPoint('RIGHT', anchor, 'LEFT', -Pixel.Scale(4), 0)
 	local filterGlyph = filterButton:CreateTexture(nil, 'OVERLAY')
-	filterGlyph:SetTexture(BUILib.GetLibMedia('eye'))
+	LibWidget.SetGlyph(filterGlyph, BUILib.GetLibMedia('eye'))
 	filterGlyph:SetPoint('CENTER', 0, 0)
 	filterGlyph:SetSize(Pixel.Scale(GLYPH_SIZE + 2), Pixel.Scale(GLYPH_SIZE + 2))
 	headerFilter = filterButton
