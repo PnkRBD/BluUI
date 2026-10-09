@@ -1,170 +1,242 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.Transmog')
-
 local ipairs = ipairs
 
+local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 
-local SKIN_ID = 'transmog'
-local SLOT_CONTAINERS = { 'LeftSlots', 'RightSlots', 'BottomSlots' }
 local SLOT_ART_KEYS = { 'Border', 'ShowEquippedIcon' }
+local SLOT_KEEP_KEYS = { 'Icon', 'DisabledIcon', 'HiddenVisualIcon' }
+local SLOT_POOLS = { 'CharacterAppearanceSlotFramePool', 'CharacterIllusionSlotFramePool' }
 local TOGGLE_KEYS = { 'HideIgnoredToggle', 'SheatheWeaponToggle', 'PreviewedWeaponToggle' }
+local OUTFIT_ART = { 'NormalTexture', 'HighlightTexture', 'Selected', 'SelectedPurple', 'Glow', 'GlowPurple' }
+local ITEM_MODEL_ART = { 'Border', 'BorderHighlight', 'StateTexture' }
+local SET_MODEL_ART = { 'Border', 'Highlight', 'TransmogStateTexture' }
+local PAGED_FRAMES = { 'ItemsFrame', 'SetsFrame', 'CustomSetsFrame' }
+local DROPDOWN_KEYS = { 'FilterButton', 'WeaponDropdown', 'WeaponSheatheDropdown' }
+local DISPLAY_ICON = { scale = 0.8, x = 4, textX = 42 }
 
-local installed = false
-local skinned = false
-
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
+local context = Skin.Define('transmog', {
+	name = 'Transmogrify',
+	description = 'The transmogrifier at the vendor: outfit cards, framed slot icons around the model, item and set cards with an accent edge on the applied look, and the appearance tabs on the house tab strip.',
+	icon = 'Interface/Icons/INV_Arcane_Orb',
+	newLook = true,
+})
+local Hook = context.Hook
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
-local Shell, Button, Close, ScrollBar = context.Shell, context.Button, context.Close, context.ScrollBar
-local CheckBox, Tab, Title, Body = context.CheckBox, context.Tab, context.Title, context.Body
+local Shell, Button, Card, CheckBox = context.Shell, context.Button, context.Card, context.CheckBox
+local Dropdown, EditBox, ScrollBar = context.Dropdown, context.EditBox, context.ScrollBar
+local Body, Title = context.Body, context.Title
+local CropIcon = Skin.CropIcon
 
-local function KeepTexture(texture)
-	if texture then texture.__buiSkin = true end
-end
-
-local function SkinSlot(slot)
-	if not slot or slot._buiSlot or not slot.Icon then return end
-	slot._buiSlot = true
-
-	KeepTexture(slot.Icon)
-	KeepTexture(slot.DisabledIcon)
-	KeepTexture(slot.HiddenVisualIcon)
-	FadeRegions(slot)
-	FadeKeys(slot, SLOT_ART_KEYS)
-
-	Skin.CropIcon(slot.Icon)
-	Skin.TipIconFrame(slot, slot.Icon, 1)
-end
-
-local function SweepSlots(preview)
-	if not preview then return end
-	for _, key in ipairs(SLOT_CONTAINERS) do
-		local container = preview[key]
-		if container and container.GetChildren then
-			for _, slot in ipairs({ container:GetChildren() }) do SkinSlot(slot) end
-		end
+local function KeepKeys(frame, keys)
+	for _, key in ipairs(keys) do
+		local texture = frame[key]
+		if texture then texture.__buiSkin = true end
 	end
 end
 
-local function SkinToggles(preview)
-	if not preview or not preview.ToggleOptions then return end
-	for _, key in ipairs(TOGGLE_KEYS) do
-		local toggle = preview.ToggleOptions[key]
-		if toggle then
-			CheckBox(toggle.Checkbox)
-			Body(toggle.Text)
-		end
+local function AccentIconEdge(icon, active)
+	if active then
+		Skin.SetIconEdgeColor(icon, BUILib.Theme.GetAccent())
+	else
+		Skin.SetIconEdgeColor(icon)
 	end
 end
 
-local function SkinTabs(collection)
-	if not collection or not collection.TabHeaders then return end
-	if not collection.TabHeaders.GetChildren then return end
-	for _, tab in ipairs({ collection.TabHeaders:GetChildren() }) do Tab(tab) end
+local function FramedIcon(owner, icon)
+	CropIcon(icon)
+	Skin.TipIconFrame(owner, icon)
+end
+
+local function PaintOutfit(entry)
+	local button = entry.OutfitButton
+	local text = button.TextContent
+	local selected = button.Selected:IsShown()
+	Skin.SetActiveEdge(button, selected)
+	Skin.TipFont(text.Name, selected and 'title' or 'body')
+	Skin.TipFont(text.SituationInfo, 'label')
+	text:Layout()
+	AccentIconEdge(entry.OutfitIcon.Icon, entry.OutfitIcon.OverlayActive:IsShown())
+end
+
+local function SkinOutfit(entry)
+	if not entry._buiOutfit then
+		entry._buiOutfit = true
+		local icon = entry.OutfitIcon
+		Fade(icon.Border)
+		Fade(icon.OverlayActive)
+		Fade(icon:GetHighlightTexture())
+		FramedIcon(icon, icon.Icon)
+		FadeKeys(entry.OutfitButton, OUTFIT_ART)
+		Hook(entry, 'SetSelected', PaintOutfit)
+	end
+	Card(entry.OutfitButton)
+	PaintOutfit(entry)
 end
 
 local function SkinOutfits(outfits)
-	if not outfits then return end
 	FadeRegions(outfits)
-	if outfits.OutfitList then
-		FadeRegions(outfits.OutfitList)
-		ScrollBar(outfits.OutfitList.ScrollBar)
-	end
-	Button(outfits.PurchaseOutfitButton)
+	Body(outfits.UsableDiscountText)
+	local spell = outfits.ShowEquippedGearSpellFrame
+	Fade(spell.Button.Border)
+	Fade(spell.OverlayFX.OverlayActive)
+	FramedIcon(spell.Button, spell.Button.Icon)
+	Title(spell.Label)
+	FadeRegions(outfits.OutfitList)
+	ScrollBar(outfits.OutfitList.ScrollBar)
+	Skin.SweepScrollBox(outfits.OutfitList.ScrollBox, context.Guard(SkinOutfit))
+	local purchase = outfits.PurchaseOutfitButton
+	purchase.Icon.__buiSkin = true
+	Button(purchase)
 	Button(outfits.SaveOutfitButton)
-	if outfits.MoneyFrame then FadeRegions(outfits.MoneyFrame) end
-	if outfits.ShowEquippedGearSpellFrame then FadeRegions(outfits.ShowEquippedGearSpellFrame) end
+	FadeRegions(outfits.MoneyFrame)
 end
 
-local function Apply()
-	local frame = _G.TransmogFrame
-	if not frame or frame:IsForbidden() or not Enabled() then return end
+local function PaintSlot(slot)
+	AccentIconEdge(slot.Icon, slot.SelectedFrame:IsShown())
+end
 
-	if not skinned then
-		skinned = true
-		FadeRegions(frame)
-		Fade(frame.NineSlice)
-		if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
-		Shell(frame)
-		Skin.HideHelpButtons(frame)
-		Close(frame.CloseButton)
-		Title(frame.TitleContainer and frame.TitleContainer.TitleText)
+local function SkinSlot(slot)
+	if not slot._buiSlot then
+		slot._buiSlot = true
+		KeepKeys(slot, SLOT_KEEP_KEYS)
+		FadeRegions(slot)
+		FadeKeys(slot, SLOT_ART_KEYS)
+		Fade(slot.SelectedFrame.Border)
+		CropIcon(slot.Icon)
+		Skin.TipIconFrame(slot, slot.Icon, 1)
+		Hook(slot, 'SetSelected', PaintSlot)
+	end
+	PaintSlot(slot)
+end
 
-		SkinOutfits(frame.OutfitCollection)
+local function SweepSlots(preview)
+	for _, key in ipairs(SLOT_POOLS) do
+		for slot in preview[key]:EnumerateActive() do SkinSlot(slot) end
+	end
+end
 
-		local preview = frame.CharacterPreview
-		if preview then
-			FadeRegions(preview)
-			Fade(preview.Gradients)
-			SkinToggles(preview)
-			Button(preview.ClearAllPendingButton)
-			if preview.SetupSlots then
-				Hook(preview, 'SetupSlots', function(self) SweepSlots(self) end)
-			end
-		end
+local function SkinPreview(preview)
+	FadeRegions(preview)
+	Fade(preview.Gradients)
+	for _, key in ipairs(TOGGLE_KEYS) do
+		local toggle = preview.ToggleOptions[key]
+		CheckBox(toggle.Checkbox)
+		Body(toggle.Text)
+	end
+	preview.ClearAllPendingButton.Icon.__buiSkin = true
+	Button(preview.ClearAllPendingButton)
+	SweepSlots(preview)
+end
 
-		local collection = frame.WardrobeCollection
-		if collection then
-			FadeRegions(collection)
-			if collection.TabContent then FadeRegions(collection.TabContent) end
-		end
-
-		if frame.OutfitPopup then
-			FadeRegions(frame.OutfitPopup)
-			Shell(frame.OutfitPopup)
-			Close(frame.OutfitPopup.CloseButton)
+local function PaintDisplayButtons(items)
+	for _, button in ipairs({ items.DisplayTypes:GetChildren() }) do
+		if button.StateTexture then
+			button:GetNormalTexture():SetAlpha(0)
+			Skin.TipButtonFonts(button)
+			Skin.SetActiveEdge(button, button.StateTexture:IsShown())
 		end
 	end
+end
 
-	SkinTabs(frame.WardrobeCollection)
+local function SkinDisplayButtons(items)
+	for _, button in ipairs({ items.DisplayTypes:GetChildren() }) do
+		if button.StateTexture then
+			Button(button)
+			Fade(button.StateTexture)
+			local iconFrame = button.IconFrame
+			Fade(iconFrame.Border)
+			iconFrame:SetScale(DISPLAY_ICON.scale)
+			iconFrame:ClearAllPoints()
+			iconFrame:SetPoint('LEFT', button, 'LEFT', DISPLAY_ICON.x / DISPLAY_ICON.scale, 0)
+			button.Text:SetPoint('LEFT', button, 'LEFT', DISPLAY_ICON.textX, 1)
+		end
+	end
+	PaintDisplayButtons(items)
+end
+
+local function SkinPager(paged)
+	local content = paged.PagedContent
+	local controls = content.PagingControls
+	Skin.TipPageButton(controls.PrevPageButton, 'previous')
+	Skin.TipPageButton(controls.NextPageButton, 'next')
+	Body(controls.PageText)
+	Body(content.NoEntriesText)
+end
+
+local function SkinItems(items)
+	Skin.TipFont(items.ActiveSlotTitle, 'title', 1.5)
+	for _, key in ipairs(DROPDOWN_KEYS) do Dropdown(items[key]) end
+	SkinDisplayButtons(items)
+	local toggle = items.SecondaryAppearanceToggle
+	CheckBox(toggle.Checkbox)
+	Body(toggle.Text)
+end
+
+local function SkinSituations(situations)
+	Body(situations.DescriptionText)
+	Button(situations.DefaultsButton)
+	Button(situations.ApplyButton)
+	CheckBox(situations.EnabledToggle.Checkbox)
+	Body(situations.EnabledToggle.Text)
+end
+
+local function SkinWardrobe(collection)
+	FadeRegions(collection)
+	for _, tab in ipairs(collection.TabHeaders.tabs) do
+		Fade(tab.SelectedHighlight)
+		context.LineTab(tab)
+	end
+	local content = collection.TabContent
+	FadeRegions(content)
+	Shell(content)
+	for _, key in ipairs(PAGED_FRAMES) do
+		local paged = content[key]
+		Dropdown(paged.FilterButton)
+		EditBox(paged.SearchBox)
+		SkinPager(paged)
+	end
+	SkinItems(content.ItemsFrame)
+	Button(content.CustomSetsFrame.NewCustomSetButton)
+	SkinSituations(content.SituationsFrame)
+end
+
+local function SkinModel(model, art, state)
+	if not model._buiModel then
+		model._buiModel = true
+		FadeKeys(model, art)
+	end
+	Card(model)
+	Skin.SetActiveEdge(model, model[state]:IsShown())
+end
+
+local function OnItemModel(model)
+	SkinModel(model, ITEM_MODEL_ART, 'StateTexture')
+end
+
+local function OnSetModel(model)
+	SkinModel(model, SET_MODEL_ART, 'TransmogStateTexture')
+end
+
+local function SkinFrame(frame)
+	context.Chrome(frame)
+	SkinOutfits(frame.OutfitCollection)
+	SkinPreview(frame.CharacterPreview)
+	SkinWardrobe(frame.WardrobeCollection)
+	Skin.TipIconPopup(context, frame.OutfitPopup)
+end
+
+local function InstallFrame(frame)
+	Hook(frame.CharacterPreview, 'SetupSlots', SweepSlots)
+	Hook(frame.WardrobeCollection.TabContent.ItemsFrame, 'RefreshDisplayTypeButtons', PaintDisplayButtons)
+	Hook(TransmogItemModelMixin, 'UpdateItemBorder', OnItemModel)
+	Hook(TransmogSetModelMixin, 'UpdateSet', OnSetModel)
+	Hook(TransmogCustomSetModelMixin, 'UpdateSet', OnSetModel)
+end
+
+local function RefreshFrame(frame)
 	SweepSlots(frame.CharacterPreview)
 end
 
-local function Install()
-	if installed then return end
-	local frame = _G.TransmogFrame
-	if not frame then return end
-	installed = true
-	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Transmog frame reskin', Apply))
-	if frame:IsShown() then Apply() end
-end
-
-local function TryInstall()
-	Install()
-	if installed then BUI.Events:Unregister('ADDON_LOADED', 'Skin.Transmog') end
-end
-
-local function Deactivate()
-	context.Restore()
-	skinned = false
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		if not installed then
-			BUI.Events:Register('ADDON_LOADED', 'Skin.Transmog', TryInstall)
-		elseif _G.TransmogFrame and _G.TransmogFrame:IsShown() then
-			Apply()
-		end
-	else
-		Deactivate()
-	end
-end)
-
-BUI.Events:Once('PLAYER_LOGIN', 'Skin.TransmogInstall', function()
-	if not Enabled() then return end
-	Install()
-	if not installed then BUI.Events:Register('ADDON_LOADED', 'Skin.Transmog', TryInstall) end
-end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Transmogrify',
-	description = 'The transmogrifier at the vendor: dark shell over the stone window, framed slot icons around the model, house buttons and checkboxes, and the appearance tabs on the house tab strip.',
-	icon = 'Interface/Icons/INV_Arcane_Orb',
-})
+context.Window('TransmogFrame', { skin = SkinFrame, show = RefreshFrame, install = InstallFrame })

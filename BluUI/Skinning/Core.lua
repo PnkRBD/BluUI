@@ -469,8 +469,13 @@ local HoverEnter = Wrap('Skin.Core hover enter', function(frame)
 end)
 
 local HoverLeave = Wrap('Skin.Core hover leave', function(frame)
-	BUILib.Skin.SetShellEdges(frame, PANEL_EDGE)
+	BUILib.Skin.SetShellEdges(frame, frame._buiActive and AccentEdge() or PANEL_EDGE)
 end)
+
+function Skin.SetActiveEdge(frame, active)
+	frame._buiActive = active
+	BUILib.Skin.SetShellEdges(frame, (active or frame:IsMouseOver()) and AccentEdge() or PANEL_EDGE)
+end
 
 function Skin.AccentHover(frame)
 	if frame._buiAccentHover then return end
@@ -1124,6 +1129,47 @@ function Skin.TipTab(tab, fused)
 	BUILib.Skin.Tab(tab, TAB_STYLE, fused)
 end
 
+local LINE_TAB_THICKNESS = 2
+local lineTabSelectedFont
+
+local function LineTabSelectedFont()
+	if lineTabSelectedFont then return lineTabSelectedFont end
+	lineTabSelectedFont = CreateFont('BUI_TipLineTabSelected')
+	lineTabSelectedFont:SetFont(BUILib.Font, TIP_BODY_SIZE, '')
+	Painter.Text(lineTabSelectedFont, 'skinTitle')
+	return lineTabSelectedFont
+end
+
+local function PaintLineTab(tab)
+	local state = tab._buiLineTab
+	local live = state.enabled()
+	local selected = live and tab.isSelected == true
+	state.line:SetShown(selected)
+	if not live then return end
+	local fonts = ButtonFontObjects()
+	local rest = selected and LineTabSelectedFont() or fonts.disabled
+	tab:SetNormalFontObject(rest)
+	tab:SetDisabledFontObject(rest)
+	tab:SetHighlightFontObject(selected and rest or fonts.normal)
+	tab.Text:SetPoint('CENTER', tab, 'CENTER', 0, 0)
+	if not selected then return end
+	Skin.AccentTexture(state.line, 1)
+	state.line:SetWidth(math.ceil(tab.Text:GetStringWidth()))
+end
+
+function Skin.LineTab(tab, enabled)
+	if not tab._buiLineTab then
+		BUILib.Skin.StripButton(tab)
+		local line = tab:CreateTexture(nil, 'OVERLAY')
+		line.__buiSkin = true
+		line:SetHeight(LINE_TAB_THICKNESS)
+		line:SetPoint('BOTTOM', tab, 'BOTTOM', 0, 0)
+		tab._buiLineTab = { line = line, enabled = enabled }
+		Hook(tab, 'SetTabSelected', PaintLineTab)
+	end
+	PaintLineTab(tab)
+end
+
 function Skin.TipArrow(frame, centered, rotation)
 	local arrow = frame._buiTipArrow
 	if not arrow then
@@ -1721,6 +1767,10 @@ function Skin.NewContext(enabled)
 		for texture in pairs(owned) do texture:SetShown(shown) end
 	end
 
+	local function LineTab(tab)
+		Skin.LineTab(tab, enabled)
+	end
+
 	local function CollapseButton(button)
 		Fade(button:GetHighlightTexture())
 		Skin.TipCollapseButton(button, enabled)
@@ -1738,6 +1788,7 @@ function Skin.NewContext(enabled)
 	context.EditBox, context.CheckBox, context.TextBox, context.ScrollBar, context.Tab = EditBox, CheckBox, TextBox, ScrollBar, Tab
 	context.Face, context.FaceOnce, context.Title, context.Body, context.Restore = Face, FaceOnce, Title, Body, Restore
 	context.Chrome, context.Own, context.ShowOwned, context.CollapseButton = Chrome, Own, ShowOwned, CollapseButton
+	context.LineTab = LineTab
 	return context
 end
 
