@@ -326,8 +326,7 @@ local function BarRows(ui, board, key, title, db, spec)
 		{ tooltip = 'Opacity and timing', title = 'Mouseover fade', options = {
 			Option(db, 'Bar opacity %', 'alpha', { min = 10, max = 100, step = 1 }),
 			Option(db, 'Faded opacity %', 'fadeAlpha', { min = 0, max = 100, step = 1 }),
-			Toggle(db, 'Animated', 'fadeAnimated'),
-			Option(db, 'Fade time in seconds', 'fadeDuration', { min = 0.05, max = 1, step = 0.05 }),
+			Option(db, 'Fade time in seconds', 'fadeDuration', { min = 0, max = 1, step = 0.05 }),
 		} },
 		Toggle(db, nil, 'fadeEnabled'),
 	}, apply)

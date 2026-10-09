@@ -16,11 +16,6 @@ local function TargetAlpha(bar, barSettings)
 	return alpha
 end
 
-local function FadeSeconds(barSettings)
-	if not barSettings.fadeAnimated then return 0 end
-	return barSettings.fadeDuration
-end
-
 local function StopFader(fader)
 	fader.playing = false
 	fader.header:SetScript('OnUpdate', nil)
@@ -70,7 +65,7 @@ end
 local function ApplyBar(bar)
 	local barSettings = ActionBars.GetBarSettings(bar.key)
 	if barSettings and barSettings.enabled then
-		SetAlphaTarget(bar, TargetAlpha(bar, barSettings), FadeSeconds(barSettings))
+		SetAlphaTarget(bar, TargetAlpha(bar, barSettings), barSettings.fadeDuration)
 	end
 end
 
@@ -231,7 +226,7 @@ local function RefreshBarFade(bar)
 		else
 			StopGapWatch(bar)
 		end
-		SetAlphaTarget(bar, TargetAlpha(bar, barSettings), FadeSeconds(barSettings))
+		SetAlphaTarget(bar, TargetAlpha(bar, barSettings), barSettings.fadeDuration)
 	end
 end
 

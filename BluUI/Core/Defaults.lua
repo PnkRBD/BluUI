@@ -29,7 +29,6 @@ local ActionBarBase = {
 	frameStrata        = 'MEDIUM',
 	fadeEnabled        = false,
 	fadeAlpha          = 30,
-	fadeAnimated       = true,
 	fadeDuration       = 0.2,
 	pagingEnabled      = false,
 	modifierPages      = { ctrl = 0, alt = 0, shift = 0 },
@@ -629,7 +628,6 @@ BUI.Defaults = {
 			alpha          = 100,
 			fadeEnabled    = false,
 			fadeAlpha      = 0,
-			fadeAnimated   = true,
 			fadeDuration   = 0.2,
 		},
 

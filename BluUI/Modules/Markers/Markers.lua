@@ -117,7 +117,7 @@ local function ApplyAlpha(instant)
     local config = GetConfig()
     local target = TargetAlpha()
     local seconds = 0
-    if not instant and config.fadeEnabled and config.fadeAnimated then
+    if not instant and config.fadeEnabled then
         seconds = config.fadeDuration
     end
     if fadeGroup then fadeGroup:Stop() end
