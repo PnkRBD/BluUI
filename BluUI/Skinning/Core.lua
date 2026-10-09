@@ -1442,7 +1442,7 @@ local SIDE_TAB_WIDTH, SIDE_TAB_HEIGHT = 30, 40
 local SIDE_TAB_GAP = 4
 local SIDE_TAB_EDGE_GAP = 2
 local SIDE_TAB_SELECTED_ALPHA = 0.3
-local SIDE_TAB_HOVER_ALPHA = 0.15
+local SIDE_TAB_DIM_ALPHA = 0.55
 local NO_OPTIONS = {}
 local SIDE_TAB_ICON_KEYS = { 'Icon' }
 
@@ -1462,11 +1462,32 @@ local function FitToTab(texture, tab)
 	texture:SetAllPoints(tab)
 end
 
+local function PaintSideTab(tab)
+	if not tab._buiSideLive then return end
+	local selected = tab._buiSideActive
+	tab._buiSideSelected:SetShown(selected)
+	BUILib.Skin.SetShellEdges(tab, selected and AccentEdge() or PANEL_EDGE)
+	if not tab._buiSideDim then return end
+	local alpha = (selected or tab._buiSideHovered) and 1 or SIDE_TAB_DIM_ALPHA
+	for _, icon in ipairs(tab._buiSideIcons) do icon:SetAlpha(alpha) end
+end
+
+local SideTabEnter = Wrap('Skin.Core side tab enter', function(tab)
+	tab._buiSideHovered = true
+	PaintSideTab(tab)
+end)
+
+local SideTabLeave = Wrap('Skin.Core side tab leave', function(tab)
+	tab._buiSideHovered = false
+	PaintSideTab(tab)
+end)
+
 function Skin.SideTab(context, tab, options)
 	if not tab then return end
 	options = options or NO_OPTIONS
 	if not tab._buiSideTab then
 		tab._buiSideTab = true
+		local icons = {}
 		for _, key in ipairs(options.iconKeys or SIDE_TAB_ICON_KEYS) do
 			local icon = tab[key]
 			if icon then
@@ -1475,36 +1496,41 @@ function Skin.SideTab(context, tab, options)
 				if options.iconWidth then icon:SetSize(options.iconWidth, options.iconHeight or options.iconWidth) end
 				CenterSideTabIcon(icon)
 				Hook(icon, 'SetPoint', CenterSideTabIcon)
+				icons[#icons + 1] = icon
 			end
 		end
+		tab._buiSideIcons = icons
+		tab._buiSideDim = options.dim
 		if tab.IconOverlay then tab.IconOverlay.__buiSkin = true end
 		if tab.TabGlow then FitToTab(tab.TabGlow, tab) end
 		local selected = tab:CreateTexture(nil, 'ARTWORK', nil, -1)
 		FitToTab(selected, tab)
 		selected:Hide()
 		tab._buiSideSelected = selected
-		local hover = tab:CreateTexture(nil, 'HIGHLIGHT')
-		FitToTab(hover, tab)
-		hover:SetColorTexture(1, 1, 1, SIDE_TAB_HOVER_ALPHA)
-		tab._buiSideHover = hover
+		tab:HookScript('OnEnter', SideTabEnter)
+		tab:HookScript('OnLeave', SideTabLeave)
 	end
+	tab._buiSideLive = true
 	tab:SetSize(options.width or SIDE_TAB_WIDTH, options.height or SIDE_TAB_HEIGHT)
 	context.FadeRegions(tab)
 	context.Shell(tab)
 	Skin.AccentTexture(tab._buiSideSelected, SIDE_TAB_SELECTED_ALPHA)
 	if tab.TabGlow then Skin.AccentTexture(tab.TabGlow, SIDE_TAB_SELECTED_ALPHA) end
-	tab._buiSideHover:Show()
+	PaintSideTab(tab)
 end
 
 function Skin.SetSideTabSelected(tab, selected)
-	local overlay = tab and tab._buiSideSelected
-	if overlay then overlay:SetShown(selected == true) end
+	if not tab or not tab._buiSideTab then return end
+	tab._buiSideActive = selected == true
+	PaintSideTab(tab)
 end
 
 function Skin.ResetSideTab(tab)
 	if not tab or not tab._buiSideTab then return end
+	tab._buiSideLive = false
 	tab._buiSideSelected:Hide()
-	tab._buiSideHover:Hide()
+	if not tab._buiSideDim then return end
+	for _, icon in ipairs(tab._buiSideIcons) do icon:SetAlpha(1) end
 end
 
 function Skin.LayoutSideTabs(host, tabs, topOffset)
