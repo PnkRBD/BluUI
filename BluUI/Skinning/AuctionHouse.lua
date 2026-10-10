@@ -1,16 +1,14 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.AuctionHouse')
-
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
+local Painter = BUI.Painter
 local Theme = BUILib.Theme
 
-local SKIN_ID = 'auctionhouse'
 local BACKGROUND_KEYS = { 'Background', 'NineSlice' }
-local MAIN_ART = { 'Bg', 'TopTileStreaks', 'MoneyFrameInset', 'MoneyFrameBorder' }
+local MONEY_ART = { 'MoneyFrameInset', 'MoneyFrameBorder' }
 local HEADER_ART = { 'Left', 'Middle', 'Right' }
 local SELL_TAB_ART = { 'CreateAuctionTabLeft', 'CreateAuctionTabMiddle', 'CreateAuctionTabRight' }
 local MULTISELL_ART = { 'Fill', 'Left', 'Right', 'Middle' }
@@ -20,73 +18,53 @@ local AUCTIONS_LIST_KEYS = { 'AllAuctionsList', 'BidsList', 'ItemList', 'Commodi
 local AUCTIONS_TAB_KEYS = { 'AuctionsTab', 'BidsTab' }
 local DIALOG_BUTTON_KEYS = { 'BuyNowButton', 'CancelButton', 'OkayButton' }
 local CELL_TEXT_KEYS = { 'Text', 'ExtraInfo', 'Prefix' }
-local CATEGORY_SELECTED_ALPHA = 0.15
-local CATEGORY_HOVER_ALPHA = 0.06
 local ROW_SELECTED_ALPHA = 0.18
 local ROW_HOVER_ALPHA = 0.08
 local NAME_SCALE = 1.2
+local CATEGORY_SCALE = 12 / 11
 local SEARCHING_SCALE = 1.5
 local MUTED_TEXT_THRESHOLD = 0.6
-local BRIGHT_TEXT = { 0.9, 0.9, 0.93, 1 }
-local BODY_TEXT = { 0.87, 0.87, 0.9, 1 }
-local LABEL_TEXT = { 0.55, 0.55, 0.6, 1 }
 
-local installed = false
-local skinned = false
-
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
-local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
-local Shell, Button, Close, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.Dropdown, context.EditBox, context.CheckBox
+local context = Skin.Define('auctionhouse', {
+	name = 'Auction House',
+	description = 'Browse, buy, sell and manage auctions: card categories with an accent edge on the selected one, result tables, sell forms and the buy dialog.',
+	icon = 'Interface/Icons/INV_Misc_Coin_01',
+	newLook = true,
+})
+local Hook = context.Hook
+local Fade, FadeKeys = context.Fade, context.FadeKeys
+local Shell, Button, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Dropdown, context.EditBox, context.CheckBox
 local ScrollBar, Tab, Body, Title = context.ScrollBar, context.Tab, context.Body, context.Title
 local FlatTexture, AccentTexture, CropIcon = Skin.FlatTexture, Skin.AccentTexture, Skin.CropIcon
 
-local function SetColor(fontString, color)
-	if fontString then fontString:SetTextColor(color[1], color[2], color[3], color[4]) end
-end
-
-local function AccentColor(fontString)
-	local red, green, blue = Theme.GetAccent()
-	fontString:SetTextColor(red, green, blue, 1)
-end
-
-local function FadeStateTextures(button)
-	Fade(button:GetNormalTexture())
-	Fade(button:GetPushedTexture())
-	Fade(button:GetDisabledTexture())
-	Fade(button:GetHighlightTexture())
-end
-
-local function IconButtonEnter(button)
+local function ShellEdgeEnter(button)
 	Skin.TipShellEdges(button, true)
 end
 
-local function IconButtonLeave(button)
+local function ShellEdgeLeave(button)
 	Skin.TipShellEdges(button, false)
 end
 
 local function SkinIconButton(button)
-	if not button then return end
 	if not button._buiIconButton then
 		button._buiIconButton = true
-		FadeStateTextures(button)
-		button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.AuctionHouse button OnEnter', IconButtonEnter))
-		button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.AuctionHouse button OnLeave', IconButtonLeave))
+		Fade(button:GetNormalTexture())
+		Fade(button:GetPushedTexture())
+		Fade(button:GetDisabledTexture())
+		Fade(button:GetHighlightTexture())
+		button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.AuctionHouse button OnEnter', context.Guard(ShellEdgeEnter)))
+		button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.AuctionHouse button OnLeave', context.Guard(ShellEdgeLeave)))
 	end
 	Shell(button)
 end
 
 local function SkinBackgroundFrame(frame)
-	if not frame then return end
 	FadeKeys(frame, BACKGROUND_KEYS)
 	Shell(frame)
 end
 
 local function SkinItemButton(button)
-	if not button or button._buiItemButton then return end
+	if button._buiItemButton then return end
 	button._buiItemButton = true
 	Fade(button:GetNormalTexture())
 	Fade(button.IconOverlay)
@@ -96,7 +74,6 @@ local function SkinItemButton(button)
 end
 
 local function SkinItemDisplay(display)
-	if not display then return end
 	SkinBackgroundFrame(display)
 	SkinItemButton(display.ItemButton)
 	Skin.TipFont(display.Name, 'title', NAME_SCALE)
@@ -110,8 +87,10 @@ local function SkinMoneyInput(frame)
 end
 
 local function RecolorAlignedLabels(control)
-	local muted = control.Label:GetTextColor() < MUTED_TEXT_THRESHOLD
-	for _, key in ipairs(LABEL_KEYS) do SetColor(control[key], muted and LABEL_TEXT or BODY_TEXT) end
+	local role = control.Label:GetTextColor() < MUTED_TEXT_THRESHOLD and 'skinLabel' or 'skinText'
+	for _, key in ipairs(LABEL_KEYS) do
+		if control[key] then Painter.Text(control[key], role) end
+	end
 end
 
 local function SkinAlignedControl(control)
@@ -127,17 +106,12 @@ local function SkinAlignedControl(control)
 end
 
 local function SkinBidFrame(frame)
-	if not frame then return end
 	SkinMoneyInput(frame.BidAmount)
 	Button(frame.BidButton)
 end
 
-local function SkinBuyoutFrame(frame)
-	if frame then Button(frame.BuyoutButton) end
-end
-
 local function SkinItemList(list)
-	if not list or list._buiItemList then return end
+	if list._buiItemList then return end
 	list._buiItemList = true
 	SkinBackgroundFrame(list)
 	ScrollBar(list.ScrollBar)
@@ -151,21 +125,13 @@ local function SkinItemList(list)
 end
 
 local function SkinSearchBar(bar)
-	if not bar then return end
 	SkinIconButton(bar.FavoritesSearchButton)
 	EditBox(bar.SearchBox)
-	Dropdown(bar.FilterButton)
+	context.TextDropdown(bar.FilterButton)
 	Button(bar.SearchButton)
 end
 
-local function SkinCategories(list)
-	if not list then return end
-	SkinBackgroundFrame(list)
-	ScrollBar(list.ScrollBar)
-end
-
 local function SkinSellFrame(frame)
-	if not frame then return end
 	SkinBackgroundFrame(frame)
 	FadeKeys(frame, SELL_TAB_ART)
 	Title(frame.CreateAuctionLabel)
@@ -176,61 +142,52 @@ local function SkinSellFrame(frame)
 end
 
 local function SkinItemBuy(frame)
-	if not frame then return end
 	Button(frame.BackButton)
 	SkinItemDisplay(frame.ItemDisplay)
-	SkinBuyoutFrame(frame.BuyoutFrame)
+	Button(frame.BuyoutFrame.BuyoutButton)
 	SkinBidFrame(frame.BidFrame)
 	SkinItemList(frame.ItemList)
 end
 
 local function SkinCommoditiesBuy(frame)
-	if not frame then return end
 	Button(frame.BackButton)
 	local display = frame.BuyDisplay
-	if display then
-		SkinBackgroundFrame(display)
-		SkinItemDisplay(display.ItemDisplay)
-		for _, key in ipairs(ALIGNED_CONTROL_KEYS) do SkinAlignedControl(display[key]) end
-		Button(display.BuyButton)
-	end
+	SkinBackgroundFrame(display)
+	SkinItemDisplay(display.ItemDisplay)
+	for _, key in ipairs(ALIGNED_CONTROL_KEYS) do SkinAlignedControl(display[key]) end
+	Button(display.BuyButton)
 	SkinItemList(frame.ItemList)
 end
 
 local function SkinBuyDialog(dialog)
-	if not dialog then return end
 	Skin.FadeTree(dialog.Border)
 	Shell(dialog)
-	if dialog.ItemDisplay then Title(dialog.ItemDisplay.ItemText) end
+	Title(dialog.ItemDisplay.ItemText)
 	for _, key in ipairs(DIALOG_BUTTON_KEYS) do Button(dialog[key]) end
-	if dialog.Notification then Body(dialog.Notification.Text) end
+	Body(dialog.Notification.Text)
 	Skin.TipFace(dialog.TimeLeftText, 'body')
 end
 
 local function SkinAuctionsFrame(frame)
-	if not frame then return end
 	for _, key in ipairs(AUCTIONS_TAB_KEYS) do Tab(frame[key]) end
 	Button(frame.CancelAuctionButton)
-	SkinBuyoutFrame(frame.BuyoutFrame)
+	Button(frame.BuyoutFrame.BuyoutButton)
 	SkinBidFrame(frame.BidFrame)
-	local summary = frame.SummaryList
-	if summary then
-		SkinBackgroundFrame(summary)
-		ScrollBar(summary.ScrollBar)
-	end
+	SkinBackgroundFrame(frame.SummaryList)
+	ScrollBar(frame.SummaryList.ScrollBar)
 	SkinItemDisplay(frame.ItemDisplay)
 	for _, key in ipairs(AUCTIONS_LIST_KEYS) do SkinItemList(frame[key]) end
+	frame._buiTabsSkinned = true
 end
 
 local function RefreshAuctionsTabs(frame)
 	for _, key in ipairs(AUCTIONS_TAB_KEYS) do
 		local tab = frame[key]
-		if tab then Skin.TipTabSelected(tab, tab:GetID() == frame.selectedTab) end
+		Skin.TipTabSelected(tab, tab:GetID() == frame.selectedTab)
 	end
 end
 
 local function SkinTokenResults(frame)
-	if not frame then return end
 	SkinBackgroundFrame(frame)
 	Body(frame.BuyoutLabel)
 	Title(frame.BuyoutPrice)
@@ -239,7 +196,6 @@ local function SkinTokenResults(frame)
 end
 
 local function SkinTokenSell(frame)
-	if not frame then return end
 	SkinBackgroundFrame(frame)
 	FadeKeys(frame, SELL_TAB_ART)
 	Title(frame.CreateAuctionLabel)
@@ -254,23 +210,22 @@ local function SkinTokenSell(frame)
 end
 
 local function SkinMultisell(frame)
-	if not frame then return end
 	FadeKeys(frame, MULTISELL_ART)
 	Shell(frame)
 end
 
-local function SkinMainFrame(frame)
-	Fade(frame.NineSlice)
-	FadeKeys(frame, MAIN_ART)
-	FadeRegions(frame)
-	if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
-	Shell(frame)
-	Title(frame.TitleContainer and frame.TitleContainer.TitleText)
-	Close(frame.CloseButton)
+local function SkinCategories(list)
+	SkinBackgroundFrame(list)
+	ScrollBar(list.ScrollBar)
+end
+
+local function SkinFrame(frame)
+	context.Chrome(frame)
+	FadeKeys(frame, MONEY_ART)
 	Skin.RegisterTabStrip(frame, frame.Tabs, context)
 	SkinSearchBar(frame.SearchBar)
 	SkinCategories(frame.CategoriesList)
-	if frame.BrowseResultsFrame then SkinItemList(frame.BrowseResultsFrame.ItemList) end
+	SkinItemList(frame.BrowseResultsFrame.ItemList)
 	SkinTokenResults(frame.WoWTokenResults)
 	SkinCommoditiesBuy(frame.CommoditiesBuyFrame)
 	SkinItemBuy(frame.ItemBuyFrame)
@@ -285,27 +240,11 @@ local function SkinMainFrame(frame)
 end
 
 local function OnCategoryButton(button, info)
-	if not Enabled() or not button then return end
-	button.NormalTexture:SetAlpha(0)
-	button.Lines:SetAlpha(0)
-	local selected, highlight = button.SelectedTexture, button.HighlightTexture
-	selected:SetBlendMode('BLEND')
-	AccentTexture(selected, CATEGORY_SELECTED_ALPHA)
-	highlight:SetBlendMode('BLEND')
-	FlatTexture(highlight, 1, 1, 1, CATEGORY_HOVER_ALPHA)
-	local text = button.Text
-	Skin.TipFace(text, 'body')
-	if info.selected then
-		AccentColor(text)
-	elseif info.type == 'category' then
-		SetColor(text, BRIGHT_TEXT)
-	else
-		SetColor(text, BODY_TEXT)
-	end
+	Skin.TipCategoryButton(context, button, info.type == 'category' and CATEGORY_SCALE or nil)
 end
 
 local function OnRowPopulated(row)
-	if not Enabled() or row._buiRow then return end
+	if row._buiRow then return end
 	row._buiRow = true
 	local stripe = row:GetNormalTexture()
 	if stripe then stripe:SetAlpha(0) end
@@ -332,22 +271,21 @@ local function SkinCell(cell)
 end
 
 local function OnCellsArranged(_, row)
-	if not Enabled() or not row.GetItemList or not row.cells then return end
+	if not row.GetItemList or not row.cells then return end
 	for _, cell in ipairs(row.cells) do SkinCell(cell) end
 end
 
 local function OnHeaderInit(header)
-	if not Enabled() or header._buiHeader then return end
+	if header._buiHeader then return end
 	header._buiHeader = true
 	FadeKeys(header, HEADER_ART)
 	Fade(header:GetHighlightTexture())
 	Skin.TipFont(header.Text, 'label')
-	local red, green, blue = Theme.GetAccent()
-	header.Arrow:SetVertexColor(red, green, blue, 1)
+	header.Arrow:SetVertexColor(Theme.GetAccent())
 end
 
 local function OnSummaryLine(line)
-	if not Enabled() or line._buiSummaryLine then return end
+	if line._buiSummaryLine then return end
 	line._buiSummaryLine = true
 	line.IconBorder:SetAlpha(0)
 	CropIcon(line.Icon)
@@ -358,65 +296,27 @@ local function OnSummaryLine(line)
 end
 
 local function OnTabsUpdated(frame)
-	local auctionHouse = _G.AuctionHouseFrame
-	if Enabled() and skinned and auctionHouse and frame == auctionHouse.AuctionsFrame then RefreshAuctionsTabs(frame) end
+	local auctions = _G.AuctionHouseFrame.AuctionsFrame
+	if frame == auctions and auctions._buiTabsSkinned then RefreshAuctionsTabs(frame) end
 end
 
-local function Apply()
-	local frame = _G.AuctionHouseFrame
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if not skinned then
-		skinned = true
-		SkinMainFrame(frame)
-	end
+local function RefreshFrame(frame)
 	Skin.RefreshTabStrip(frame)
 	RefreshAuctionsTabs(frame.AuctionsFrame)
 end
 
-local function HookRows()
+local function InstallFrame()
 	Hook('AuctionHouseFilterButton_SetUp', OnCategoryButton)
-	Hook(_G.AuctionHouseItemListLineMixin, 'Populate', OnRowPopulated)
-	Hook(_G.TableBuilderMixin, 'ArrangeCells', OnCellsArranged)
-	Hook(_G.AuctionHouseTableHeaderStringMixin, 'Init', OnHeaderInit)
-	Hook(_G.AuctionHouseAuctionsSummaryLineMixin, 'Init', OnSummaryLine)
+	Hook(AuctionHouseItemListLineMixin, 'Populate', OnRowPopulated)
+	Hook(TableBuilderMixin, 'ArrangeCells', OnCellsArranged)
+	Hook(AuctionHouseTableHeaderStringMixin, 'Init', OnHeaderInit)
+	Hook(AuctionHouseAuctionsSummaryLineMixin, 'Init', OnSummaryLine)
 	Hook('PanelTemplates_UpdateTabs', OnTabsUpdated)
 end
 
-local function Install()
-	if installed then return end
+context.Window('AuctionHouseFrame', { skin = SkinFrame, show = RefreshFrame, install = InstallFrame })
+
+context.OnDisable(function()
 	local frame = _G.AuctionHouseFrame
-	if not frame then return end
-	installed = true
-	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.AuctionHouse frame reskin', Apply))
-	HookRows()
-	if frame:IsShown() then Apply() end
-end
-
-local function TryInstall()
-	Install()
-	if installed then BUI.Events:Unregister('ADDON_LOADED', 'Skin.AuctionHouse') end
-end
-
-local function Deactivate()
-	context.Restore()
-	skinned = false
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		if not installed then
-			BUI.Events:Register('ADDON_LOADED', 'Skin.AuctionHouse', TryInstall)
-		elseif _G.AuctionHouseFrame:IsShown() then
-			Apply()
-		end
-	else
-		Deactivate()
-	end
+	if frame then frame.AuctionsFrame._buiTabsSkinned = nil end
 end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Auction House',
-	description = 'Browse, buy, sell and manage auctions in the dark panel look: categories, result tables, sell forms and the buy dialog.',
-	icon = 'Interface/Icons/INV_Misc_Coin_01',
-})
