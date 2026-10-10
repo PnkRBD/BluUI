@@ -1,14 +1,14 @@
 local _, BUI = ...
 local PoolGet, PoolHideFrom = BUI.Tools.PoolGet, BUI.Tools.PoolHideFrom
-local Pixel = BUI.Pixel
-local After = BUI.Profiler.After
+local Pixel   = BUI.Pixel
+local Painter = BUI.Painter
+local Skin    = BUI.Skinning
+local After   = BUI.Profiler.After
 
 local BUILib = BluUI.BUILibClient
-local Widget   = BUILib.Widget
-local Controls = BUILib.Controls
-local Colors   = BUILib.Colors
-local Modals   = BUILib.Modals
-local FONT     = BUILib.Font
+local Widget = BUILib.Widget
+local Modals = BUILib.Modals
+local FONT   = BUILib.Font
 
 BUI.GemCounter = {}
 
@@ -16,18 +16,26 @@ local GEM_CLASS      = Enum.ItemClass.Gem
 local PANEL_WIDTH    = 600
 local COLUMN_WIDTH   = 278
 local COLUMN_GAP     = 12
+local COLUMN_TOP     = 92
+local LABEL_TOP      = 72
+local LABEL_HEIGHT   = 16
 local HEADER_HEIGHT  = 30
 local SOCKET_HEIGHT  = 26
 local GEM_HEIGHT     = 34
+local ROW_GAP        = 4
 local INDENT         = 30
-local ITEM_GAP       = 4
+local ITEM_GAP       = 6
 local BOTTOM_HEIGHT  = 58
 local BOTTOM_OFFSET  = 76
+local BUTTON_W, BUTTON_H = 72, 26
 local BAGS           = { 0, 1, 2, 3, 4, 5 }
 local MAX_GEM_FIELDS = 4
 local QUALITY_HEADER_HEIGHT = 22
 local STRIP_ICON_GAP = 28
 local STRIP_MAX_ICONS = 14
+local PENDING_ALPHA  = 0.12
+local HOVER_ALPHA    = 0.05
+local EMPTY_SOCKET_EDGE = { 0.5, 0.15, 0.15 }
 
 local SLOT_NAMES = {
 	[1]  = 'Head',       [2]  = 'Neck',      [3]  = 'Shoulder',  [5]  = 'Chest',
@@ -62,7 +70,7 @@ local function QualityColor(quality)
 		local color = ITEM_QUALITY_COLORS[quality]
 		return color.r, color.g, color.b
 	end
-	return 0.9, 0.9, 0.9
+	return Painter.Color('skinText')
 end
 
 local function SetQualityAtlas(pipTexture, itemID)
@@ -76,7 +84,7 @@ local function SetQualityAtlas(pipTexture, itemID)
 end
 
 local function SetIconTexture(iconTexture, texture)
-	BUI.Skinning.CropIcon(iconTexture)
+	Skin.CropIcon(iconTexture)
 	iconTexture:SetTexture(texture)
 end
 
@@ -91,26 +99,19 @@ end
 local function MakeIconFrame(parent, frameSize, iconSize)
 	local iconFrame = CreateFrame('Frame', nil, parent, 'BackdropTemplate')
 	iconFrame:SetSize(Pixel.Scale(frameSize), Pixel.Scale(frameSize))
-	Pixel.SetTemplate(iconFrame, 0, 0, 0, 1)
+	Skin.PaintPanelBackdrop(iconFrame)
 	local icon = iconFrame:CreateTexture(nil, 'ARTWORK')
 	icon:SetSize(Pixel.Scale(iconSize), Pixel.Scale(iconSize))
 	icon:SetPoint('CENTER')
-	BUI.Skinning.CropIcon(icon)
+	Skin.CropIcon(icon)
 	iconFrame.icon = icon
 	return iconFrame
 end
 
-local function MakeRowButton(parent, height, backgroundColor, border)
-	local row = CreateFrame('Button', nil, parent, 'BackdropTemplate')
-	row:SetHeight(height)
-	Pixel.SetTemplate(row, backgroundColor[1], backgroundColor[2], backgroundColor[3], backgroundColor[4], border[1], border[2], border[3], border[4], 1)
-	row:EnableMouse(true)
-	return row
-end
-
-local function MakeLabel(parent, size, flags)
+local function MakeLabel(parent, size, role, flags)
 	local fontString = parent:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(fontString, size, FONT, flags or '')
+	if role then Painter.Text(fontString, role) end
 	return fontString
 end
 
@@ -387,12 +388,12 @@ end
 local function BeginApply()
 	if applying then return end
 	if InCombatLockdown() then
-		print('|cffff4444Gem Manager:|r Cannot socket gems during combat.')
+		BUI.Print('Gems cannot be socketed during combat.')
 		return
 	end
 	local groups, dropped = BuildApplyGroups()
 	if dropped > 0 then
-		print('|cffff4444Gem Manager:|r ' .. dropped .. ' queued gem(s) are no longer in your bags and were skipped.')
+		BUI.Print(dropped .. ' queued gem(s) are no longer in your bags and were skipped.')
 	end
 	if #groups == 0 then
 		ClearAllPending()
@@ -405,34 +406,17 @@ local function BeginApply()
 	ProcessNextItem()
 end
 
-local function HeaderEnter(self)
-	self:SetBackdropBorderColor(Colors.GetAccent())
+local function ShowItemTooltip(self)
 	GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 	GameTooltip:SetInventoryItem('player', self._slotID)
 	GameTooltip:Show()
 end
 
-local function HeaderLeave(self)
-	self:SetBackdropBorderColor(0.15, 0.15, 0.15, 1)
-	GameTooltip:Hide()
-end
-
 local function SocketEnter(self)
-	self:SetBackdropBorderColor(0.3, 0.3, 0.3, 0.6)
-	if self._gemItemID then
-		GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
-		GameTooltip:SetItemByID(self._gemItemID)
-		GameTooltip:Show()
-	end
-end
-
-local function SocketLeave(self)
-	if pendingByKey[self._pendingKey] then
-		self:SetBackdropBorderColor(0.2, 0.7, 0.2, 0.5)
-	else
-		self:SetBackdropBorderColor(0.1, 0.1, 0.1, 0)
-	end
-	GameTooltip:Hide()
+	if not self._gemItemID then return end
+	GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
+	GameTooltip:SetItemByID(self._gemItemID)
+	GameTooltip:Show()
 end
 
 local function SocketClick(self)
@@ -448,21 +432,9 @@ local function SocketClick(self)
 end
 
 local function GemEnter(self)
-	if self._itemID ~= selectedBagGemID then
-		self:SetBackdropBorderColor(Colors.GetAccent())
-	end
 	GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 	GameTooltip:SetItemByID(self._itemID)
 	GameTooltip:Show()
-end
-
-local function GemLeave(self)
-	if self._itemID == selectedBagGemID then
-		self:SetBackdropBorderColor(Colors.GetAccent())
-	else
-		self:SetBackdropBorderColor(0.12, 0.12, 0.12, 1)
-	end
-	GameTooltip:Hide()
 end
 
 local function GemClick(self)
@@ -480,7 +452,11 @@ local function StripIconEnter(self)
 end
 
 local function CreateItemHeader(parent)
-	local row = MakeRowButton(parent, HEADER_HEIGHT, {0.1, 0.1, 0.1, 0.8}, {0.15, 0.15, 0.15, 1})
+	local row = CreateFrame('Button', nil, parent)
+	row:SetHeight(Pixel.Scale(HEADER_HEIGHT))
+	row:SetScript('OnEnter', BUI.Profiler.Script('GemCounter.GemCounter item OnEnter', ShowItemTooltip))
+	row:SetScript('OnLeave', GameTooltip_Hide)
+	Skin.CardRow(row)
 
 	local iconFrame = MakeIconFrame(row, 24, 20)
 	iconFrame:SetPoint('LEFT', Pixel.Scale(6), 0)
@@ -494,18 +470,29 @@ local function CreateItemHeader(parent)
 	nameLabel:SetWordWrap(false)
 	row.nameText = nameLabel
 
-	local slotLabel = MakeLabel(row, 10)
-	slotLabel:SetPoint('RIGHT', Pixel.Scale(-6), 0)
-	slotLabel:SetTextColor(0.5, 0.5, 0.5)
+	local slotLabel = MakeLabel(row, 10, 'skinLabel')
+	slotLabel:SetPoint('RIGHT', Pixel.Scale(-8), 0)
 	row.slotText = slotLabel
-
-	row:SetScript('OnEnter', BUI.Profiler.Script('GemCounter.GemCounter row OnEnter', HeaderEnter))
-	row:SetScript('OnLeave', BUI.Profiler.Script('GemCounter.GemCounter row OnLeave', HeaderLeave))
 	return row
 end
 
 local function CreateSocketRow(parent)
-	local row = MakeRowButton(parent, SOCKET_HEIGHT, {0.06, 0.06, 0.06, 0.5}, {0.1, 0.1, 0.1, 0})
+	local row = CreateFrame('Button', nil, parent)
+	row:SetHeight(Pixel.Scale(SOCKET_HEIGHT))
+	row:SetScript('OnEnter', BUI.Profiler.Script('GemCounter.GemCounter socket OnEnter', SocketEnter))
+	row:SetScript('OnLeave', GameTooltip_Hide)
+	row:SetScript('OnClick', BUI.Profiler.Script('GemCounter.GemCounter socket OnClick', SocketClick))
+
+	local hover = row:CreateTexture(nil, 'HIGHLIGHT')
+	hover:SetAllPoints()
+	hover:SetColorTexture(1, 1, 1, HOVER_ALPHA)
+
+	row.pendingTint = row:CreateTexture(nil, 'BACKGROUND')
+	row.pendingTint:SetAllPoints()
+	Painter.Custom(row.pendingTint, function(texture)
+		local red, green, blue = Painter.Color('positive')
+		texture:SetColorTexture(red, green, blue, PENDING_ALPHA)
+	end)
 
 	local iconBorder = MakeIconFrame(row, 20, 16)
 	iconBorder:SetPoint('LEFT', INDENT, 0)
@@ -523,15 +510,19 @@ local function CreateSocketRow(parent)
 	nameLabel:SetJustifyH('LEFT')
 	nameLabel:SetWordWrap(false)
 	row.nameText = nameLabel
-
-	row:SetScript('OnEnter', BUI.Profiler.Script('GemCounter.GemCounter row OnEnter 2', SocketEnter))
-	row:SetScript('OnLeave', BUI.Profiler.Script('GemCounter.GemCounter row OnLeave 2', SocketLeave))
-	row:SetScript('OnClick', BUI.Profiler.Script('GemCounter.GemCounter row OnClick', SocketClick))
 	return row
 end
 
 local function CreateGemRow(parent)
-	local row = MakeRowButton(parent, GEM_HEIGHT, {0.08, 0.08, 0.08, 0.8}, {0.12, 0.12, 0.12, 1})
+	local row = CreateFrame('Button', nil, parent)
+	row:SetHeight(Pixel.Scale(GEM_HEIGHT))
+	row:SetScript('OnEnter', BUI.Profiler.Script('GemCounter.GemCounter gem OnEnter', GemEnter))
+	row:SetScript('OnLeave', GameTooltip_Hide)
+	row:SetScript('OnClick', BUI.Profiler.Script('GemCounter.GemCounter gem OnClick', GemClick))
+	row:RegisterForDrag('LeftButton')
+	row:SetScript('OnDragStart', BUI.Profiler.Script('GemCounter.GemCounter gem OnDragStart', GemDragStart))
+	row:SetScript('OnDragStop', BUI.Profiler.Script('GemCounter.GemCounter gem OnDragStop', StopGemDrag))
+	Skin.CardRow(row)
 
 	local iconFrame = MakeIconFrame(row, 28, 24)
 	iconFrame:SetPoint('LEFT', Pixel.Scale(6), 0)
@@ -543,48 +534,35 @@ local function CreateGemRow(parent)
 	qualityPip:SetPoint('LEFT', iconFrame, 'RIGHT', Pixel.Scale(4), 0)
 	row.qualPip = qualityPip
 
+	local countText = MakeLabel(row, 11, 'skinLabel')
+	countText:SetPoint('RIGHT', Pixel.Scale(-8), 0)
+	countText:SetJustifyH('RIGHT')
+	row.countText = countText
+
 	local nameLabel = MakeLabel(row, 12)
 	nameLabel:SetPoint('LEFT', qualityPip, 'RIGHT', Pixel.Scale(2), 0)
+	nameLabel:SetPoint('RIGHT', countText, 'LEFT', Pixel.Scale(-4), 0)
 	nameLabel:SetJustifyH('LEFT')
 	nameLabel:SetWordWrap(false)
 	row.nameText = nameLabel
-
-	local countText = MakeLabel(row, 11)
-	countText:SetPoint('RIGHT', Pixel.Scale(-6), 0)
-	countText:SetJustifyH('RIGHT')
-	countText:SetTextColor(0.7, 0.7, 0.7)
-	row.countText = countText
-
-	nameLabel:SetPoint('RIGHT', countText, 'LEFT', Pixel.Scale(-4), 0)
-
-	row:SetScript('OnEnter', BUI.Profiler.Script('GemCounter.GemCounter row OnEnter 3', GemEnter))
-	row:SetScript('OnLeave', BUI.Profiler.Script('GemCounter.GemCounter row OnLeave 3', GemLeave))
-	row:SetScript('OnClick', BUI.Profiler.Script('GemCounter.GemCounter row OnClick 2', GemClick))
-	row:RegisterForDrag('LeftButton')
-	row:SetScript('OnDragStart', BUI.Profiler.Script('GemCounter.GemCounter row OnDragStart', GemDragStart))
-	row:SetScript('OnDragStop', BUI.Profiler.Script('GemCounter.GemCounter row OnDragStop', StopGemDrag))
 	return row
 end
 
 local function CreateQualityHeader(parent)
 	local header = CreateFrame('Frame', nil, parent)
 	header:SetHeight(QUALITY_HEADER_HEIGHT)
-	local label = MakeLabel(header, 10)
-	label:SetPoint('LEFT', Pixel.Scale(6), 0)
-	header.text = label
+	header.text = MakeLabel(header, 10)
+	header.text:SetPoint('LEFT', Pixel.Scale(6), 0)
 	return header
 end
 
 local function CreateGemIcon(parent)
 	local frame = MakeIconFrame(parent, 24, 20)
-
-	local countText = MakeLabel(frame, 9, 'OUTLINE')
-	countText:SetPoint('BOTTOMRIGHT', Pixel.Scale(2), Pixel.Scale(-2))
-	frame.count = countText
-
+	frame.count = MakeLabel(frame, 9, nil, 'OUTLINE')
+	frame.count:SetPoint('BOTTOMRIGHT', Pixel.Scale(2), Pixel.Scale(-2))
 	frame:EnableMouse(true)
-	frame:SetScript('OnEnter', BUI.Profiler.Script('GemCounter.GemCounter frame OnEnter', StripIconEnter))
-	frame:SetScript('OnLeave', BUI.Profiler.Script('GemCounter.GemCounter frame OnLeave', Widget.HideTip))
+	frame:SetScript('OnEnter', BUI.Profiler.Script('GemCounter.GemCounter strip OnEnter', StripIconEnter))
+	frame:SetScript('OnLeave', BUI.Profiler.Script('GemCounter.GemCounter strip OnLeave', Widget.HideTip))
 	return frame
 end
 
@@ -592,24 +570,71 @@ local function RankLabel(rank)
 	return ITEM_QUALITY_COLORS[rank].hex .. _G['ITEM_QUALITY' .. rank .. '_DESC'] .. '|r'
 end
 
+local function ColumnLabel(text, left)
+	local header = Skin.CreateListHeader(panel, LABEL_HEIGHT)
+	header:SetPoint('TOPLEFT', Pixel.Scale(left), Pixel.Scale(-LABEL_TOP))
+	header:SetWidth(Pixel.Scale(COLUMN_WIDTH))
+	header.text:SetText(text)
+end
+
+local function Column(left, rowHeight)
+	local area = CreateFrame('Frame', nil, panel)
+	area:SetPoint('TOPLEFT', Pixel.Scale(left), Pixel.Scale(-COLUMN_TOP))
+	area:SetPoint('BOTTOMLEFT', Pixel.Scale(left), Pixel.Scale(BOTTOM_OFFSET))
+	area:SetWidth(Pixel.Scale(COLUMN_WIDTH))
+	local _, child = Skin.CreateScrollArea(area, rowHeight, 4)
+	return area, child
+end
+
+local function Rule(texture)
+	Painter.Fill(texture, 'skinBorder')
+	return texture
+end
+
+local function BuildBottomBar()
+	local bottomBar = CreateFrame('Frame', nil, panel)
+	bottomBar:SetPoint('BOTTOMLEFT', Pixel.Scale(12), Pixel.Scale(8))
+	bottomBar:SetPoint('BOTTOMRIGHT', Pixel.Scale(-12), Pixel.Scale(8))
+	bottomBar:SetHeight(Pixel.Scale(BOTTOM_HEIGHT))
+
+	panel.hintText = MakeLabel(bottomBar, 10, 'skinLabel')
+	panel.hintText:SetPoint('TOP', bottomBar, 'TOP')
+	panel.hintText:SetJustifyH('CENTER')
+	panel.hintText:Hide()
+
+	panel.gemStrip = CreateFrame('Frame', nil, bottomBar)
+	panel.gemStrip:SetPoint('TOPLEFT', 0, Pixel.Scale(-2))
+	panel.gemStrip:SetSize(Pixel.Scale(400), Pixel.Scale(24))
+	panel.gemIcons = {}
+
+	panel.gemOverflowText = MakeLabel(panel.gemStrip, 10, 'skinLabel')
+	panel.gemOverflowText:SetPoint('LEFT', (STRIP_MAX_ICONS - 1) * STRIP_ICON_GAP + Pixel.Scale(2), 0)
+
+	panel.statsText = MakeLabel(bottomBar, 10, 'skinLabel')
+	panel.statsText:SetPoint('BOTTOMLEFT', 0, 0)
+	panel.statsText:SetJustifyH('LEFT')
+
+	panel.applyBtn = Skin.SmallButton(panel, BUTTON_W, BUTTON_H, 'Apply')
+	panel.applyBtn:SetScript('OnClick', BUI.Profiler.Script('GemCounter.GemCounter apply OnClick', function()
+		Modals.Confirm({ title = 'Apply Gem Changes', message = ApplyMessage(), parent = panel, onConfirm = BeginApply })
+	end))
+	panel.applyBtn:SetPoint('BOTTOMRIGHT', bottomBar, 'BOTTOMRIGHT')
+
+	panel.clearBtn = Skin.SmallButton(panel, BUTTON_W, BUTTON_H, 'Clear')
+	panel.clearBtn:SetScript('OnClick', BUI.Profiler.Script('GemCounter.GemCounter clear OnClick', function()
+		ClearAllPending()
+		Redraw()
+	end))
+	panel.clearBtn:SetPoint('RIGHT', panel.applyBtn, 'LEFT', Pixel.Scale(-8), 0)
+end
+
 local function BuildPanel()
-	local panelFrame = Widget.New(UIParent, 'Frame', nil, { bg = Colors.bg.dark, border = Colors.border.light, size = { PANEL_WIDTH, 400 } }).frame
-	panelFrame:SetFrameStrata('HIGH')
-	panelFrame:SetFrameLevel(50)
-	panelFrame:SetClampedToScreen(false)
-	panelFrame:Hide()
-	panel = panelFrame
+	panel = Skin.CreatePanelWindow('Gem Manager', function() slide.Close() end)
 
-	BUI.Skinning.CreateTitleBar(panelFrame, 'Gem Manager', 36, function() slide.Close() end)
-	local toolbar = CreateFrame('Frame', nil, panelFrame)
-	toolbar:SetPoint('TOPLEFT', 12, -40)
-	toolbar:SetPoint('TOPRIGHT', -12, -40)
-	toolbar:SetHeight(Pixel.Scale(30))
+	local searchBox = Skin.CreateSearchBox(panel, 240, function(text) searchText = text; Redraw() end)
+	searchBox:SetPoint('TOPLEFT', Pixel.Scale(12), Pixel.Scale(-40))
 
-	local searchBox = BUI.Skinning.CreateSearchBox(panelFrame, 240, function(text) searchText = text; Redraw() end)
-	searchBox:SetPoint('TOPLEFT', toolbar, 'TOPLEFT')
-
-	local filterDropdown = BUI.Skinning.CreateDropdown(panelFrame, {
+	local filterDropdown = Skin.CreateDropdown(panel, {
 		{ label = 'All Qualities', value = 0 },
 		{ label = RankLabel(1), value = 1 },
 		{ label = RankLabel(2), value = 2 },
@@ -617,95 +642,34 @@ local function BuildPanel()
 		{ label = RankLabel(4), value = 4 },
 		{ label = RankLabel(5), value = 5 },
 	}, function(item) qualityFilter = item.value; Redraw() end, 140)
-	filterDropdown:SetPoint('TOPRIGHT', toolbar, 'TOPRIGHT')
+	filterDropdown:SetPoint('TOPRIGHT', Pixel.Scale(-12), Pixel.Scale(-40))
 
-	local leftHeader = MakeLabel(panelFrame, 10)
-	leftHeader:SetPoint('TOPLEFT', 14, -76)
-	leftHeader:SetText('EQUIPPED SOCKETS')
-	leftHeader:SetTextColor(0.5, 0.5, 0.5)
+	local rightLeft = 8 + COLUMN_WIDTH + COLUMN_GAP
+	ColumnLabel('Equipped sockets', 8)
+	ColumnLabel('Bag gems', rightLeft)
+	local leftArea, rightArea
+	leftArea, panel.leftChild = Column(8, HEADER_HEIGHT)
+	rightArea, panel.rightChild = Column(rightLeft, GEM_HEIGHT)
 
-	local rightHeader = MakeLabel(panelFrame, 10)
-	rightHeader:SetPoint('TOPLEFT', 14 + COLUMN_WIDTH + COLUMN_GAP, -76)
-	rightHeader:SetText('BAG GEMS')
-	rightHeader:SetTextColor(0.5, 0.5, 0.5)
-
-	local leftArea = CreateFrame('Frame', nil, panelFrame)
-	leftArea:SetPoint('TOPLEFT', 8, -92)
-	leftArea:SetPoint('BOTTOMLEFT', 8, BOTTOM_OFFSET)
-	leftArea:SetWidth(COLUMN_WIDTH)
-	panelFrame.leftChild = select(2, BUI.Skinning.CreateScrollArea(leftArea, HEADER_HEIGHT, 4))
-
-	local rightArea = CreateFrame('Frame', nil, panelFrame)
-	rightArea:SetPoint('TOPLEFT', 8 + COLUMN_WIDTH + COLUMN_GAP, -92)
-	rightArea:SetPoint('BOTTOMLEFT', 8 + COLUMN_WIDTH + COLUMN_GAP, BOTTOM_OFFSET)
-	rightArea:SetWidth(COLUMN_WIDTH)
-	panelFrame.rightChild = select(2, BUI.Skinning.CreateScrollArea(rightArea, GEM_HEIGHT, 4))
-
-	local divider = panelFrame:CreateTexture(nil, 'ARTWORK')
+	local divider = Rule(panel:CreateTexture(nil, 'ARTWORK'))
 	divider:SetWidth(Pixel.PixelSize(1))
-	divider:SetPoint('TOP', 8 + COLUMN_WIDTH + COLUMN_GAP / 2, -92)
-	divider:SetPoint('BOTTOM', 0, BOTTOM_OFFSET)
-	BUI.Tools.SetColorTex(divider, 0.15, 0.15, 0.15, 0.6)
+	divider:SetPoint('TOP', Pixel.Scale(8 + COLUMN_WIDTH + COLUMN_GAP / 2), Pixel.Scale(-COLUMN_TOP))
+	divider:SetPoint('BOTTOM', 0, Pixel.Scale(BOTTOM_OFFSET))
 
-	local separator = panelFrame:CreateTexture(nil, 'ARTWORK')
+	local separator = Rule(panel:CreateTexture(nil, 'ARTWORK'))
 	separator:SetHeight(Pixel.PixelSize(1))
-	separator:SetPoint('BOTTOMLEFT', 8, BOTTOM_OFFSET - 6)
-	separator:SetPoint('BOTTOMRIGHT', -8, BOTTOM_OFFSET - 6)
-	BUI.Tools.SetColorTex(separator, 0.15, 0.15, 0.15, 0.6)
+	separator:SetPoint('BOTTOMLEFT', Pixel.Scale(8), Pixel.Scale(BOTTOM_OFFSET - 6))
+	separator:SetPoint('BOTTOMRIGHT', Pixel.Scale(-8), Pixel.Scale(BOTTOM_OFFSET - 6))
 
-	local bottomBar = CreateFrame('Frame', nil, panelFrame)
-	bottomBar:SetPoint('BOTTOMLEFT', 12, 8)
-	bottomBar:SetPoint('BOTTOMRIGHT', -12, 8)
-	bottomBar:SetHeight(BOTTOM_HEIGHT)
+	BuildBottomBar()
 
-	panelFrame.hintText = MakeLabel(bottomBar, 10)
-	panelFrame.hintText:SetPoint('TOP', bottomBar, 'TOP')
-	panelFrame.hintText:SetJustifyH('CENTER')
-	panelFrame.hintText:SetTextColor(0.4, 0.4, 0.4)
-	panelFrame.hintText:Hide()
+	panel.leftEmpty = Skin.CreateEmptyText(panel, leftArea)
+	panel.leftEmpty:SetText('No socketed gear.')
+	panel.rightEmpty = Skin.CreateEmptyText(panel, rightArea)
+end
 
-	panelFrame.gemStrip = CreateFrame('Frame', nil, bottomBar)
-	panelFrame.gemStrip:SetPoint('TOPLEFT', 0, Pixel.Scale(-2))
-	panelFrame.gemStrip:SetSize(Pixel.Scale(400), Pixel.Scale(24))
-	panelFrame.gemIcons = {}
-
-	panelFrame.gemOverflowText = MakeLabel(panelFrame.gemStrip, 10)
-	panelFrame.gemOverflowText:SetPoint('LEFT', (STRIP_MAX_ICONS - 1) * STRIP_ICON_GAP + Pixel.Scale(2), 0)
-	panelFrame.gemOverflowText:SetTextColor(0.6, 0.6, 0.6)
-
-	panelFrame.statsText = MakeLabel(bottomBar, 10)
-	panelFrame.statsText:SetPoint('BOTTOMLEFT', 0, 0)
-	panelFrame.statsText:SetJustifyH('LEFT')
-	panelFrame.statsText:SetTextColor(0.5, 0.5, 0.5)
-
-	panelFrame.applyBtn = Controls.Button(panelFrame, 'Apply', 72, function()
-		Modals.Confirm({
-			title = 'Apply Gem Changes',
-			message = ApplyMessage(),
-			parent = panelFrame,
-			onConfirm = BeginApply,
-		})
-	end)
-	panelFrame.applyBtn.frame:SetHeight(Pixel.Scale(26))
-	panelFrame.applyBtn:SetPoint('BOTTOMRIGHT', bottomBar, 'BOTTOMRIGHT')
-	panelFrame.applyBtn:SetFrameLevel(panelFrame:GetFrameLevel() + 10)
-
-	panelFrame.clearBtn = Controls.Button(panelFrame, 'Clear', 72, function() ClearAllPending(); Redraw() end)
-	panelFrame.clearBtn.frame:SetHeight(Pixel.Scale(26))
-	panelFrame.clearBtn:SetPoint('RIGHT', panelFrame.applyBtn, 'LEFT', Pixel.Scale(-8), 0)
-	panelFrame.clearBtn:SetFrameLevel(panelFrame:GetFrameLevel() + 10)
-
-	panelFrame.leftEmpty = MakeLabel(panelFrame, 11)
-	panelFrame.leftEmpty:SetPoint('CENTER', leftArea)
-	panelFrame.leftEmpty:SetTextColor(0.4, 0.4, 0.4)
-	panelFrame.leftEmpty:SetText('No socketed gear.')
-	panelFrame.leftEmpty:Hide()
-
-	panelFrame.rightEmpty = MakeLabel(panelFrame, 11)
-	panelFrame.rightEmpty:SetPoint('CENTER', rightArea)
-	panelFrame.rightEmpty:SetTextColor(0.4, 0.4, 0.4)
-	panelFrame.rightEmpty:SetText('No gems in bags.')
-	panelFrame.rightEmpty:Hide()
+local function Hex(role)
+	return BUI.Hex(Painter.Color(role))
 end
 
 local function RefreshSummary()
@@ -728,14 +692,13 @@ local function RefreshSummary()
 	panel.gemOverflowText:SetText('+' .. overflow)
 	panel.gemOverflowText:SetShown(overflow > 0)
 
-	local emptyColor = emptySockets > 0 and 'ffee5555' or 'ff55cc55'
-	local separator = '  |cff444444||  '
-	panel.statsText:SetText(
-		'|c' .. emptyColor .. emptySockets .. '|r |cff888888Empty|r' .. separator ..
-		'|cffffffff' .. totalSocketed .. '|r |cff888888Socketed|r' .. separator ..
-		'|cffffffff' .. #gemCounts .. '|r |cff888888Unique|r' .. separator ..
-		'|cffffffff' .. totalBagGems .. '|r |cff888888in Bags|r'
-	)
+	local value = '|cff' .. Hex('skinText') .. '%d|r %s'
+	panel.statsText:SetText(table.concat({
+		('|cff%s%d|r Empty'):format(Hex(emptySockets > 0 and 'danger' or 'positive'), emptySockets),
+		value:format(totalSocketed, 'Socketed'),
+		value:format(#gemCounts, 'Unique'),
+		value:format(totalBagGems, 'in Bags'),
+	}, '  ||  '))
 end
 
 local function RefreshActions()
@@ -746,13 +709,9 @@ local function RefreshActions()
 	panel.clearBtn:SetAlpha(alpha)
 	panel.clearBtn:EnableMouse(hasPending)
 
-	if selectedBagGemID then
-		local gem = bagGemByID[selectedBagGemID]
-		panel.hintText:SetText('Click a socket to assign: ' .. (gem and gem.name or ''))
-		panel.hintText:Show()
-	else
-		panel.hintText:Hide()
-	end
+	local gem = selectedBagGemID and bagGemByID[selectedBagGemID]
+	panel.hintText:SetShown(gem ~= nil)
+	if gem then panel.hintText:SetText('Click a socket to assign: ' .. gem.name) end
 end
 
 local function MatchesSearch(item)
@@ -765,6 +724,48 @@ local function MatchesSearch(item)
 	return false
 end
 
+local function Place(frame, child, cursorY)
+	frame:ClearAllPoints()
+	frame:SetPoint('TOPLEFT', child, 'TOPLEFT', 0, -cursorY)
+	frame:SetPoint('TOPRIGHT', child, 'TOPRIGHT', 0, -cursorY)
+	frame:Show()
+end
+
+local function FillSocket(socketRow, item, socket)
+	socketRow._slotID     = item.slotID
+	socketRow._socketIdx  = socket.index
+	socketRow._pendingKey = socket.key
+	socketRow._socketedID = socket.gemItemID
+
+	local pending = pendingByKey[socket.key]
+	socketRow.pendingTint:SetShown(pending ~= nil)
+	if pending then
+		local gem = pending.gem
+		local red, green, blue = QualityColor(gem.quality)
+		SetIconTexture(socketRow.icon, gem.icon)
+		socketRow.nameText:SetText(('%s |cff%s(pending)|r'):format(gem.name, Hex('positive')))
+		socketRow.nameText:SetTextColor(red, green, blue)
+		socketRow.iconBorder:SetBackdropBorderColor(red, green, blue, 0.8)
+		SetQualityAtlas(socketRow.qualPip, gem.itemID)
+		socketRow._gemItemID = gem.itemID
+	elseif socket.empty then
+		socketRow.icon:SetAtlas('Professions-Icon-Jewel-Empty')
+		socketRow.nameText:SetText('Empty Socket')
+		socketRow.nameText:SetTextColor(Painter.Color('danger'))
+		socketRow.iconBorder:SetBackdropBorderColor(EMPTY_SOCKET_EDGE[1], EMPTY_SOCKET_EDGE[2], EMPTY_SOCKET_EDGE[3], 0.8)
+		socketRow.qualPip:Hide()
+		socketRow._gemItemID = nil
+	else
+		local red, green, blue = QualityColor(socket.gemQuality)
+		SetIconTexture(socketRow.icon, socket.gemIcon)
+		socketRow.nameText:SetText(socket.gemName or '')
+		socketRow.nameText:SetTextColor(red, green, blue)
+		socketRow.iconBorder:SetBackdropBorderColor(red, green, blue, 0.6)
+		SetQualityAtlas(socketRow.qualPip, socket.gemItemID)
+		socketRow._gemItemID = socket.gemItemID
+	end
+end
+
 local function RefreshEquipped()
 	local child = panel.leftChild
 	local headerIndex, socketIndex, cursorY = 0, 0, 0
@@ -773,9 +774,6 @@ local function RefreshEquipped()
 		if searchText == '' or MatchesSearch(item) then
 			headerIndex = headerIndex + 1
 			local header = PoolGet(headerPool, headerIndex, CreateItemHeader, child)
-			header:ClearAllPoints()
-			header:SetPoint('TOPLEFT', 0, -cursorY)
-			header:SetPoint('RIGHT')
 			header.icon:SetTexture(item.itemIcon)
 			local red, green, blue = QualityColor(item.quality)
 			header.nameText:SetText(item.itemName)
@@ -783,49 +781,14 @@ local function RefreshEquipped()
 			header.iconBg:SetBackdropBorderColor(red, green, blue, 0.6)
 			header.slotText:SetText(item.slotName)
 			header._slotID = item.slotID
-			header:Show()
-			cursorY = cursorY + HEADER_HEIGHT
+			Place(header, child, cursorY)
+			cursorY = cursorY + HEADER_HEIGHT + ROW_GAP
 
 			for _, socket in ipairs(item.sockets) do
 				socketIndex = socketIndex + 1
 				local socketRow = PoolGet(socketPool, socketIndex, CreateSocketRow, child)
-				socketRow:ClearAllPoints()
-				socketRow:SetPoint('TOPLEFT', 0, -cursorY)
-				socketRow:SetPoint('RIGHT')
-				socketRow._slotID     = item.slotID
-				socketRow._socketIdx  = socket.index
-				socketRow._pendingKey = socket.key
-				socketRow._socketedID = socket.gemItemID
-				socketRow:SetBackdropBorderColor(0.1, 0.1, 0.1, 0)
-
-				local pending = pendingByKey[socket.key]
-				if pending then
-					local gem = pending.gem
-					local qualityRed, qualityGreen, qualityBlue = QualityColor(gem.quality)
-					SetIconTexture(socketRow.icon, gem.icon)
-					socketRow.nameText:SetText(gem.name .. ' |cff55cc55(pending)|r')
-					socketRow.nameText:SetTextColor(qualityRed, qualityGreen, qualityBlue)
-					socketRow:SetBackdropBorderColor(0.2, 0.7, 0.2, 0.4)
-					socketRow.iconBorder:SetBackdropBorderColor(qualityRed, qualityGreen, qualityBlue, 0.8)
-					SetQualityAtlas(socketRow.qualPip, gem.itemID)
-					socketRow._gemItemID = gem.itemID
-				elseif socket.empty then
-					socketRow.icon:SetAtlas('Professions-Icon-Jewel-Empty')
-					socketRow.nameText:SetText('Empty Socket')
-					socketRow.nameText:SetTextColor(0.9, 0.3, 0.3)
-					socketRow.iconBorder:SetBackdropBorderColor(0.5, 0.15, 0.15, 0.8)
-					socketRow.qualPip:Hide()
-					socketRow._gemItemID = nil
-				else
-					local qualityRed, qualityGreen, qualityBlue = QualityColor(socket.gemQuality)
-					SetIconTexture(socketRow.icon, socket.gemIcon)
-					socketRow.nameText:SetText(socket.gemName or '')
-					socketRow.nameText:SetTextColor(qualityRed, qualityGreen, qualityBlue)
-					socketRow.iconBorder:SetBackdropBorderColor(qualityRed, qualityGreen, qualityBlue, 0.6)
-					SetQualityAtlas(socketRow.qualPip, socket.gemItemID)
-					socketRow._gemItemID = socket.gemItemID
-				end
-				socketRow:Show()
+				FillSocket(socketRow, item, socket)
+				Place(socketRow, child, cursorY)
 				cursorY = cursorY + SOCKET_HEIGHT
 			end
 			cursorY = cursorY + ITEM_GAP
@@ -841,6 +804,7 @@ end
 local function RefreshInventory()
 	local child = panel.rightChild
 	local gemIndex, qualityIndex, cursorY, lastQuality = 0, 0, 0, nil
+	local usedHex = Hex('positive')
 
 	for _, gem in ipairs(bagGemData) do
 		if (qualityFilter == 0 or gem.quality == qualityFilter)
@@ -850,20 +814,14 @@ local function RefreshInventory()
 				lastQuality = gem.quality
 				qualityIndex = qualityIndex + 1
 				local qualityHeader = PoolGet(qualityPool, qualityIndex, CreateQualityHeader, child)
-				qualityHeader:ClearAllPoints()
-				qualityHeader:SetPoint('TOPLEFT', 0, -cursorY)
-				qualityHeader:SetPoint('RIGHT')
 				qualityHeader.text:SetText('Rank ' .. gem.quality)
 				qualityHeader.text:SetTextColor(red, green, blue)
-				qualityHeader:Show()
+				Place(qualityHeader, child, cursorY)
 				cursorY = cursorY + QUALITY_HEADER_HEIGHT
 			end
 
 			gemIndex = gemIndex + 1
 			local row = PoolGet(gemPool, gemIndex, CreateGemRow, child)
-			row:ClearAllPoints()
-			row:SetPoint('TOPLEFT', 0, -cursorY)
-			row:SetPoint('RIGHT')
 			row.icon:SetTexture(gem.icon)
 			row.nameText:SetText(gem.name)
 			row.nameText:SetTextColor(red, green, blue)
@@ -873,19 +831,15 @@ local function RefreshInventory()
 			local used      = PendingCountFor(gem.itemID)
 			local available = gem.count - used
 			row.countText:SetText(used > 0
-				and ('x' .. available .. ' |cff55cc55(-' .. used .. ')|r')
+				and ('x%d |cff%s(-%d)|r'):format(available, usedHex, used)
 				or  ('x' .. gem.count))
 
 			local selected = selectedBagGemID == gem.itemID
-			if selected then
-				row:SetBackdropBorderColor(Colors.GetAccent())
-			else
-				row:SetBackdropBorderColor(0.12, 0.12, 0.12, 1)
-			end
+			Skin.SetActiveEdge(row, selected)
 			row:SetAlpha((available <= 0 and not selected) and 0.35 or 1)
 			row._itemID = gem.itemID
-			row:Show()
-			cursorY = cursorY + GEM_HEIGHT + 2
+			Place(row, child, cursorY)
+			cursorY = cursorY + GEM_HEIGHT + ROW_GAP
 		end
 	end
 
@@ -894,9 +848,7 @@ local function RefreshInventory()
 	child:SetHeight(math.max(1, cursorY))
 
 	panel.rightEmpty:SetShown(gemIndex == 0)
-	if gemIndex == 0 then
-		panel.rightEmpty:SetText(searchText ~= '' and 'No matching gems.' or 'No gems in bags.')
-	end
+	panel.rightEmpty:SetText(searchText ~= '' and 'No matching gems.' or 'No gems in bags.')
 end
 
 Redraw = function()
@@ -916,80 +868,75 @@ end
 
 local ThrottledRefresh = BUI.Dispatcher.NewDelayed(RefreshContent, 0.3, 'Gem counter refresh')
 
+local function OnInventoryChanged()
+	if not applying then ThrottledRefresh() end
+end
+
+local INVENTORY_EVENTS = { 'BAG_UPDATE_DELAYED', 'PLAYER_EQUIPMENT_CHANGED' }
+
 slide = BUI.SlidePanel.New({
 	skin = 'gemcounter',
 	width = PANEL_WIDTH,
 	hiddenX = -PANEL_WIDTH,
 	panel = function() return panel end,
 	build = BuildPanel,
-	onOpen = RefreshContent,
+	onOpen = function()
+		for _, event in ipairs(INVENTORY_EVENTS) do BUI.Events:Register(event, 'GemCounter', OnInventoryChanged) end
+		RefreshContent()
+	end,
+	onClose = function()
+		for _, event in ipairs(INVENTORY_EVENTS) do BUI.Events:Unregister(event, 'GemCounter') end
+	end,
 })
 
 function BUI.GemCounter.Toggle()
 	slide.Toggle()
 end
 
-local function OnCharacterHide()
-	slide.Close(true)
-	ClearAllPending()
-end
-
 local fallbackButton
 
 local function UpdateFallbackButton()
-	fallbackButton:SetShown(BUI.Skinning.IsSkinEnabled('gemcounter') and not BUI.Skinning.IsSkinEnabled('characterFrame'))
+	fallbackButton:SetShown(Skin.IsSkinEnabled('gemcounter') and not Skin.IsSkinEnabled('characterFrame'))
 end
 
 local function BuildFallbackButton()
-	fallbackButton = CreateFrame('Button', nil, CharacterFrame, 'BackdropTemplate')
-	fallbackButton:SetSize(28, 28)
+	fallbackButton = Skin.SmallButton(CharacterFrame, 28, 28, '')
 	fallbackButton:SetFrameLevel(CharacterFrame:GetFrameLevel() + 5)
-	Pixel.SetTemplate(fallbackButton, 0.05, 0.05, 0.06, 1, 0.2, 0.2, 0.22, 1, 1)
 	fallbackButton:SetPoint('TOPLEFT', CharacterFrame, 'TOPRIGHT', 4, -36)
 
 	local iconTexture = fallbackButton:CreateTexture(nil, 'ARTWORK')
 	iconTexture:SetAtlas('Professions-Icon-Jewel-Empty')
-	iconTexture:SnapPoint('TOPLEFT', 3, -3)
-	iconTexture:SnapPoint('BOTTOMRIGHT', -3, 3)
+	iconTexture:SetPoint('TOPLEFT', 3, -3)
+	iconTexture:SetPoint('BOTTOMRIGHT', -3, 3)
 
-	fallbackButton:SetScript('OnEnter', BUI.Profiler.Script('GemCounter.GemCounter fallbackButton OnEnter', function(self)
-		self:SetBackdropBorderColor(Colors.GetAccent())
+	fallbackButton:HookScript('OnEnter', BUI.Profiler.Script('GemCounter.GemCounter fallbackButton OnEnter', function()
 		GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 		GameTooltip:SetText('Gem Manager', 1, 1, 1)
 		GameTooltip:Show()
 	end))
-	fallbackButton:SetScript('OnLeave', BUI.Profiler.Script('GemCounter.GemCounter fallbackButton OnLeave', function(self)
-		self:SetBackdropBorderColor(0.2, 0.2, 0.22, 1)
-		GameTooltip:Hide()
-	end))
+	fallbackButton:HookScript('OnLeave', GameTooltip_Hide)
 	fallbackButton:SetScript('OnClick', BUI.Profiler.Script('GemCounter.GemCounter fallbackButton OnClick', BUI.GemCounter.Toggle))
 end
 
-local function OnInventoryChanged()
-	if not applying and panel and panel:IsShown() then ThrottledRefresh() end
+local function CloseAndClear()
+	slide.Close(true)
+	ClearAllPending()
 end
 
 BUI.Events:OnLogin('GemCounter', function()
-	CharacterFrame:HookScript('OnHide', BUI.Profiler.Wrap('GemCounter.GemCounter character hide', OnCharacterHide))
-	BuildFallbackButton()
-	UpdateFallbackButton()
-
-	BUI.Events:Register('BAG_UPDATE_DELAYED',       'GemCounter', OnInventoryChanged)
-	BUI.Events:Register('PLAYER_EQUIPMENT_CHANGED', 'GemCounter', OnInventoryChanged)
-	BUI.Events:Register('SOCKET_INFO_UPDATE',       'GemCounter', OnSocketInfoUpdate)
-	BUI.Events:Register('SOCKET_INFO_CLOSE',        'GemCounter', OnSocketInfoClose)
-
-	BUI.Skinning.OnToggle('gemcounter', function(enabled)
-		if not enabled then
-			slide.Close(true)
-			ClearAllPending()
-		end
-		UpdateFallbackButton()
-	end)
-	BUI.Skinning.OnToggle('characterFrame', UpdateFallbackButton)
-	BUI.Skinning.RegisterSkin('gemcounter', {
+	local context = Skin.Define('gemcounter', {
 		name = 'Gem Manager',
 		description = 'Two-column gem panel beside the Character frame with sandbox socketing.',
 		icon = 'Interface\\Icons\\INV_Misc_Gem_01',
+		newLook = true,
 	})
+	context.OnDisable(CloseAndClear)
+	CharacterFrame:HookScript('OnHide', BUI.Profiler.Wrap('GemCounter.GemCounter character hide', CloseAndClear))
+	BuildFallbackButton()
+	UpdateFallbackButton()
+
+	BUI.Events:Register('SOCKET_INFO_UPDATE', 'GemCounter', OnSocketInfoUpdate)
+	BUI.Events:Register('SOCKET_INFO_CLOSE',  'GemCounter', OnSocketInfoClose)
+	Skin.OnToggle('gemcounter', UpdateFallbackButton)
+	Skin.OnToggle('characterFrame', UpdateFallbackButton)
 end, 'gemCounter')
