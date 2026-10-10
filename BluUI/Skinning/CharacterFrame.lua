@@ -9,6 +9,16 @@ local Skin = BUI.Skinning
 local Readout = Skin.Readout
 local IsSecretValue = BUI.Tools.IsSecretValue
 local Pixel = BUI.Pixel
+local Painter = BUI.Painter
+local PALETTE = Skin.PALETTE
+local CARD = { fill = PALETTE.card, edge = PALETTE.edge }
+
+local context = Skin.Define('characterFrame', {
+    name = 'Character Frame',
+    description = 'Replaces the default character paperdoll with a dark sheet: item level, upgrade track, enchant and gem readouts beside each slot, and a sidebar with stats, titles and equipment sets.',
+    icon = 'Interface\\Icons\\INV_Chest_Plate03',
+    newLook = true,
+})
 
 local function HasConflictingCharSheet()
     return C_AddOns.IsAddOnLoaded('ChonkyCharacterSheet')
@@ -17,9 +27,10 @@ end
 local FRAME_LEVEL   = 100
 local SLOT_SIZE     = 40
 local SLOT_GAP      = 6
-local LABEL_ZONE_W  = 96
+local LABEL_ZONE_W  = 100
+local MODEL_GAP     = 6
 local MODEL_HEIGHT  = 384
-local MODEL_WIDTH   = 275
+local MODEL_WIDTH   = 186 + (LABEL_ZONE_W - MODEL_GAP) * 2
 local STATS_W       = 264
 local STATS_GAP     = 14
 local TOP_Y         = -60
@@ -27,8 +38,8 @@ local BOTTOM_PAD    = 12
 local HEADER = { BAR_H = 48, TOP_PAD = 12, SUBTITLE_GAP = 4 }
 
 local LEFT_X  = 16
-local MODEL_X = LEFT_X + SLOT_SIZE + LABEL_ZONE_W
-local RIGHT_X = MODEL_X + MODEL_WIDTH + LABEL_ZONE_W
+local MODEL_X = LEFT_X + SLOT_SIZE + MODEL_GAP
+local RIGHT_X = MODEL_X + MODEL_WIDTH + MODEL_GAP
 local STATS_X = RIGHT_X + SLOT_SIZE + STATS_GAP
 local FRAME_WIDTH  = STATS_X + STATS_W + LEFT_X
 local FRAME_HEIGHT = -(TOP_Y + 6) + MODEL_HEIGHT + 6 + SLOT_SIZE + BOTTOM_PAD + 4
@@ -36,53 +47,38 @@ local FRAME_HEIGHT = -(TOP_Y + 6) + MODEL_HEIGHT + 6 + SLOT_SIZE + BOTTOM_PAD + 
 local ILVL_SIZE     = 11
 local TRACK_SIZE    = 10
 local ENCHANT_SIZE  = 9
-local HEADER_SIZE   = 11
 local ROW_SIZE      = 11
 local BIG_ILVL_SIZE, BIG_ILVL_DROP = 34, 4
-local STACK_RIGHT_PAD = 14
 local INFO_SIZE     = 11
-local TAB_SIZE      = 10
 local LIST_SIZE     = 10
 
-local TAB_ROW_HEIGHT = 25
 local ROW_HEIGHT     = 16
 local RATING_COL_W   = 30
 local COLUMN_GAP     = 3
 local HEADER_HEIGHT  = 16
 local SECTION_GAP    = 8
 local HEADER_ROW_GAP = 6
-local LIST_ROW_H     = 22
-local LIST_ROW_GAP   = 2
-local SIDEBAR_INSET  = 8
-local SCROLLBAR_W    = 18
-local LIST_RIGHT_PAD = 12
+local LIST_ROW_H     = 24
+local LIST_ROW_GAP   = 4
+local PANE_GAP       = 8
+local HEADLINE_PAD   = 10
+local SEARCH_H       = 24
+local BUTTON_H       = 24
+local TOGGLE_SIZE    = 28
 
 local GEM_SIZE  = 14
 local GEM_PAD   = 1
-local LABEL_GAP_X    = 5
+local LABEL_GAP_X    = MODEL_GAP + 5
 local GEM_INSET, ENCHANT_NAME_W = 2, LABEL_ZONE_W - LABEL_GAP_X - 8
 local LABEL_LINE_Y   = 13
 
-local IDLE_BORDER   = { 0.4, 0.4, 0.4 }
-local SLOT_BG       = { 0.05, 0.05, 0.06, 1 }
-local TOGGLE_BORDER = { 0.2, 0.2, 0.22, 1 }
 local ART = {
-    SIDE_SHARE = 19 / 275, TOP_SHARE = 256 / 384, SIDE_COORD = 0.296875,
+    PIECE_WIDTH = 256, TOP_HEIGHT = 256, BOTTOM_HEIGHT = 128,
     OVERLAY_ALPHA = { BLOODELF = 0.8, NIGHTELF = 0.6, SCOURGE = 0.3, TROLL = 0.6, ORC = 0.6, WORGEN = 0.5, GOBLIN = 0.6 },
     OVERLAY_DEFAULT = 0.7,
-    MODEL_EDGE = { 1, 1, 1, 0.12 },
+    SHADE_ALPHA = 0.55,
 }
-local BIG_ILVL_COLOR = { 0.6, 0.2, 1 }
-local PVP_ILVL_COLOR = { 0, 0.8, 0.4 }
-local INFO_COLOR    = { 0.8, 0.8, 0.8 }
-local LABEL_COLOR   = { 0.8, 0.8, 0.8 }
-local VALUE_COLOR   = { 1, 1, 1 }
-local SEPARATOR_COLOR = { 0.54, 0.56, 0.6 }
 local MISSING_COLOR = Readout.MISSING_COLOR
-local LIST_ROW_BG   = { 1, 1, 1, 0.04 }
-local LIST_ROW_HOVER = { 1, 1, 1, 0.1 }
-local SEARCH_BG     = { 0, 0, 0, 0.5 }
-
 local SECTION_COLORS = {
     Attributes = { 0.55, 0.85, 0.55 },
     Secondary  = { 0.45, 0.72, 1 },
@@ -222,8 +218,13 @@ local function QualityColor(quality)
 end
 
 local function PaintSlotBorder(button)
-    local color = button._buiQualityColor or IDLE_BORDER
+    local color = button._buiQualityColor or PALETTE.edge
     button:SetBackdropBorderColor(color[1], color[2], color[3], 1)
+end
+
+local function PaintSlot(button)
+    Skin.PaintPanelBackdrop(button)
+    PaintSlotBorder(button)
 end
 
 local SlotEnter = BUI.Profiler.Wrap('Skin.CharacterFrame slot OnEnter', function(self)
@@ -241,7 +242,7 @@ local function StyleSlotButton(button)
     local existing = {}
     for regionIndex = 1, button:GetNumRegions() do existing[select(regionIndex, button:GetRegions())] = true end
 
-    Pixel.SetTemplate(button, SLOT_BG[1], SLOT_BG[2], SLOT_BG[3], 1, IDLE_BORDER[1], IDLE_BORDER[2], IDLE_BORDER[3], 1, 1)
+    Painter.Custom(button, PaintSlot)
 
     for regionIndex = 1, button:GetNumRegions() do
         local region = select(regionIndex, button:GetRegions())
@@ -330,11 +331,11 @@ local function EnsureBagPopup()
     bagPopup:SetClampedToScreen(true)
     bagPopup:EnableMouse(true)
     bagPopup:SetWidth(Pixel.Scale(BAG.POPUP_W))
-    Pixel.SetTemplate(bagPopup, 0.04, 0.04, 0.05, 0.98, TOGGLE_BORDER[1], TOGGLE_BORDER[2], TOGGLE_BORDER[3], 1, 1)
+    Painter.Custom(bagPopup, Skin.PaintPanelBackdrop)
     bagPopup.title = bagPopup:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(bagPopup.title, LIST_SIZE, FONT, '')
     bagPopup.title:SetPoint('TOPLEFT', Pixel.Scale(8), Pixel.Scale(-6))
-    bagPopup.title:SetTextColor(LABEL_COLOR[1], LABEL_COLOR[2], LABEL_COLOR[3], 1)
+    Painter.Text(bagPopup.title, 'skinLabel')
     bagPopup.rows = {}
     bagPopup:SetScript('OnUpdate', BUI.Profiler.Wrap('Skin.CharacterFrame bag popup', function(self, elapsed)
         if self:IsMouseOver() or (self.owner and self.owner:IsMouseOver()) then
@@ -358,7 +359,7 @@ local function BagPopupCell(index)
     cell:SetPoint('TOPLEFT', bagPopup, 'TOPLEFT',
         Pixel.Scale(BAG.PAD + column * (BAG.CELL + BAG.GAP)),
         -Pixel.Scale(BAG.POPUP_TOP + rowIndex * (BAG.CELL + BAG.GAP)))
-    Skin.ApplyBackdrop(cell, SLOT_BG, TOGGLE_BORDER)
+    Skin.PaintPanelBackdrop(cell)
     cell.icon = cell:CreateTexture(nil, 'ARTWORK')
     cell.icon:SetPoint('TOPLEFT', 1, -1)
     cell.icon:SetPoint('BOTTOMRIGHT', -1, 1)
@@ -560,7 +561,7 @@ local function RefreshSlot(labels)
 
     local canEnchant = Readout.CanHaveEnchant(info, link)
     local trackText, trackColor, enchant = Readout.Read('player', inventorySlot, link, canEnchant)
-    local color = trackColor or qualityColor or VALUE_COLOR
+    local color = trackColor or qualityColor or { Painter.Color('skinText') }
 
     local level = ReadItemLevel(inventorySlot, link)
     labels.ilvl:SetText(level > 0 and tostring(level) or '')
@@ -832,16 +833,16 @@ function Stat.Tooltip(self)
     if not detail and not blurb and not dr then return end
     local heading = stat.title
     if type(heading) == 'function' then heading = heading() end
-    local color = self.sectionColor or VALUE_COLOR
+    local red, green, blue = unpack(self.sectionColor)
     GameTooltip:SetOwner(self, 'ANCHOR_LEFT')
-    GameTooltip:SetText(heading or self.label:GetText(), color[1], color[2], color[3])
-    if detail then GameTooltip:AddLine(detail, color[1], color[2], color[3]) end
+    GameTooltip:SetText(heading or self.label:GetText(), red, green, blue)
+    if detail then GameTooltip:AddLine(detail, red, green, blue) end
     if blurb then
-        local highlighted = blurb:gsub('(%d+%.?%d*%%)', '|cff' .. BUI.Hex(color[1], color[2], color[3]) .. '%1|r')
+        local highlighted = blurb:gsub('(%d+%.?%d*%%)', '|cff' .. BUI.Hex(red, green, blue) .. '%1|r')
         GameTooltip:AddLine(highlighted, 0.8, 0.8, 0.8, true)
     end
     if dr then
-        local red, green, blue = BUI.TrueStats.PenaltyColor(dr.penalty)
+        red, green, blue = BUI.TrueStats.PenaltyColor(dr.penalty)
         GameTooltip:AddLine(' ')
         GameTooltip:AddDoubleLine('Effective rating', FormatRating(dr.effective), 0.8, 0.8, 0.8, red, green, blue)
         GameTooltip:AddDoubleLine('Lost to diminishing returns',
@@ -903,7 +904,7 @@ local function CreateStatRow(parent)
     row.label = row:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(row.label, ROW_SIZE, FONT, '')
     row.label:SetPoint('LEFT', 0, 0)
-    row.label:SetTextColor(LABEL_COLOR[1], LABEL_COLOR[2], LABEL_COLOR[3], 1)
+    Painter.Text(row.label, 'skinText')
 
     row.value = row:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(row.value, ROW_SIZE, FONT, '')
@@ -914,7 +915,7 @@ local function CreateStatRow(parent)
     Pixel.ApplyFont(row.separator, ROW_SIZE, FONT, '')
     row.separator:SetPoint('RIGHT', row, 'RIGHT', -Pixel.Scale(RATING_COL_W), 0)
     row.separator:SetText('|')
-    row.separator:SetTextColor(SEPARATOR_COLOR[1], SEPARATOR_COLOR[2], SEPARATOR_COLOR[3], 1)
+    Painter.Text(row.separator, 'skinLabel')
     row.separator:Hide()
 
     row.percent = row:CreateFontString(nil, 'OVERLAY')
@@ -927,33 +928,6 @@ local function CreateStatRow(parent)
     return row
 end
 
-local function CreateSectionHeader(parent, title, color)
-    local header = CreateFrame('Button', nil, parent)
-    header:SetHeight(Pixel.Scale(HEADER_HEIGHT))
-    header:RegisterForClicks('LeftButtonUp')
-
-    local text = header:CreateFontString(nil, 'OVERLAY')
-    Pixel.ApplyFont(text, HEADER_SIZE, FONT, '')
-    text:SetPoint('CENTER')
-    text:SetTextColor(color[1], color[2], color[3], 1)
-    text:SetText(title)
-
-    local leftBar = header:CreateTexture(nil, 'ARTWORK')
-    leftBar:SetHeight(Pixel.PixelSize(1))
-    leftBar:SetPoint('BOTTOMLEFT', header, 'LEFT', 0, 0)
-    leftBar:SetPoint('BOTTOMRIGHT', text, 'LEFT', Pixel.Scale(-6), 0)
-    leftBar:SetColorTexture(color[1], color[2], color[3], 0.8)
-
-    local rightBar = header:CreateTexture(nil, 'ARTWORK')
-    rightBar:SetHeight(Pixel.PixelSize(1))
-    rightBar:SetPoint('BOTTOMLEFT', text, 'RIGHT', Pixel.Scale(6), 0)
-    rightBar:SetPoint('BOTTOMRIGHT', header, 'RIGHT', 0, 0)
-    rightBar:SetColorTexture(color[1], color[2], color[3], 0.8)
-
-    header.text = text
-    return header
-end
-
 local LayoutSections
 
 local function BuildSection(parent, definition)
@@ -963,10 +937,14 @@ local function BuildSection(parent, definition)
         rows = {},
         collapsed = false,
     }
-    section.header = CreateSectionHeader(section.container, definition.title, SECTION_COLORS[definition.title])
+    local color = SECTION_COLORS[definition.title]
+    section.header = Skin.CreateListHeader(section.container, HEADER_HEIGHT)
+    section.header.text:SetText(definition.title)
+    Painter.Custom(section.header.text, function(text) text:SetTextColor(color[1], color[2], color[3], 1) end)
     section.header:SetPoint('TOPLEFT')
     section.header:SetPoint('TOPRIGHT')
-    section.header:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame header OnClick', function()
+    section.header:EnableMouse(true)
+    section.header:SetScript('OnMouseUp', BUI.Profiler.Script('Skin.CharacterFrame header OnMouseUp', function()
         section.collapsed = not section.collapsed
         LayoutSections()
     end))
@@ -974,7 +952,7 @@ local function BuildSection(parent, definition)
 end
 
 local function FillSection(section)
-    local color = SECTION_COLORS[section.definition.title] or VALUE_COLOR
+    local color = SECTION_COLORS[section.definition.title]
     local count = 0
     for _, stat in ipairs(section.definition.stats) do
         if not stat.shown or stat.shown() then
@@ -1022,87 +1000,49 @@ LayoutSections = function()
         section.header.text:SetAlpha(section.collapsed and 0.6 or 1)
         offsetY = offsetY - height - SECTION_GAP
     end
-    sidebar.statsScroll:SetChildHeight(Pixel.Scale(-offsetY + 4))
-    sidebar.statsScroll:UpdateScroll()
+    scrollChild:SetHeight(Pixel.Scale(-offsetY + 4))
 end
 
-local function CreateListRow(parent, width)
+local function CreateListRow(parent)
     local row = CreateFrame('Button', nil, parent)
-    row:SetSize(Pixel.Scale(width), Pixel.Scale(LIST_ROW_H))
-    row.bg = row:CreateTexture(nil, 'BACKGROUND')
-    row.bg:SetAllPoints()
-    row.bg:SetColorTexture(LIST_ROW_BG[1], LIST_ROW_BG[2], LIST_ROW_BG[3], LIST_ROW_BG[4])
-    row.hover = row:CreateTexture(nil, 'ARTWORK')
-    row.hover:SetAllPoints()
-    row.hover:SetColorTexture(LIST_ROW_HOVER[1], LIST_ROW_HOVER[2], LIST_ROW_HOVER[3], LIST_ROW_HOVER[4])
-    row.hover:Hide()
+    row:SetHeight(Pixel.Scale(LIST_ROW_H))
+    Skin.CardRow(row)
     row.text = row:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(row.text, LIST_SIZE, FONT, '')
     row.text:SetPoint('LEFT', Pixel.Scale(8), 0)
     row.text:SetPoint('RIGHT', Pixel.Scale(-8), 0)
     row.text:SetJustifyH('LEFT')
     row.text:SetWordWrap(false)
-    row.text:SetTextColor(1, 1, 1, 1)
-    row:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame row OnEnter 2', function(self) self.hover:Show() end))
-    row:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame row OnLeave 2', function(self) self.hover:Hide() end))
+    Painter.Text(row.text, 'skinText')
     return row
 end
 
-local function SetRowSelected(row, selected)
-    if selected then
-        local red, green, blue = Colors.GetAccent()
-        row.bg:SetColorTexture(red, green, blue, 0.5)
-    else
-        row.bg:SetColorTexture(LIST_ROW_BG[1], LIST_ROW_BG[2], LIST_ROW_BG[3], LIST_ROW_BG[4])
-    end
+local function PlaceListRow(row, parent, index, height)
+    local offsetY = -Pixel.Scale((index - 1) * (height + LIST_ROW_GAP))
+    row:ClearAllPoints()
+    row:SetPoint('TOPLEFT', parent, 'TOPLEFT', 0, offsetY)
+    row:SetPoint('TOPRIGHT', parent, 'TOPRIGHT', 0, offsetY)
+    row:Show()
 end
 
-local function CreateScrollList(parent, topOffset, rowWidth)
+local function CreateScrollList(parent, topOffset)
     local area = CreateFrame('Frame', nil, parent)
-    area:SetPoint('TOPLEFT', parent, 'TOPLEFT', Pixel.Scale(SIDEBAR_INSET), Pixel.Scale(-topOffset))
-    area:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMRIGHT', Pixel.Scale(-SIDEBAR_INSET), Pixel.Scale(SIDEBAR_INSET))
-    local scroll = Widget.Unwrap(Controls.ScrollFrame(area, nil, nil, 100, Pixel.Scale(rowWidth)))
+    area:SetPoint('TOPLEFT', parent, 'TOPLEFT', 0, Pixel.Scale(-topOffset))
+    area:SetPoint('BOTTOMRIGHT')
+    local scroll, child = Skin.CreateScrollArea(area, LIST_ROW_H, 0)
+    scroll.child = child
     return area, scroll
 end
 
-local function CreateTab(parent, label, onClick)
-    local tab = CreateFrame('Button', nil, parent)
-    tab:SetHeight(Pixel.Scale(TAB_ROW_HEIGHT))
-    tab.text = tab:CreateFontString(nil, 'OVERLAY')
-    Pixel.ApplyFont(tab.text, TAB_SIZE, FONT, '')
-    tab.text:SetPoint('CENTER')
-    tab.text:SetText(label)
-    tab.underline = tab:CreateTexture(nil, 'OVERLAY')
-    tab.underline:SetHeight(Pixel.PixelSize(1))
-    tab.underline:SetPoint('BOTTOMLEFT', Pixel.Scale(6), 0)
-    tab.underline:SetPoint('BOTTOMRIGHT', Pixel.Scale(-6), 0)
-    tab.underline:Hide()
-    tab:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame tab OnEnter', function(self) if not self.active then self.text:SetTextColor(1, 1, 1, 1) end end))
-    tab:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame tab OnLeave', function(self) if not self.active then self.text:SetTextColor(1, 1, 1, 0.6) end end))
-    tab:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame tab OnClick', onClick))
-    return tab
-end
-
-local function PaintTabs()
-    for _, tab in ipairs(sidebar.tabs) do
-        if tab.active then
-            local red, green, blue = Colors.GetAccent()
-            tab.text:SetTextColor(red, green, blue, 1)
-            tab.underline:SetColorTexture(red, green, blue, 1)
-            tab.underline:Show()
-        else
-            tab.text:SetTextColor(1, 1, 1, 0.6)
-            tab.underline:Hide()
-        end
-    end
+local function PaneTop()
+    return Skin.DropdownHeight() + PANE_GAP
 end
 
 local RefreshTitles, RefreshSets
 
 local function ShowPane(key)
     for paneKey, pane in pairs(sidebar.panes) do pane:SetShown(paneKey == key) end
-    for _, tab in ipairs(sidebar.tabs) do tab.active = tab.key == key end
-    PaintTabs()
+    for _, tab in ipairs(sidebar.tabs) do Skin.SetSegmentSelected(tab, tab.key == key) end
     if key == 'titles' then RefreshTitles() elseif key == 'sets' then RefreshSets() end
 end
 
@@ -1132,7 +1072,7 @@ end
 
 Titles.Pick = BUI.Profiler.Script('Skin.CharacterFrame title OnClick', function(self)
     SetCurrentTitle(self.titleIndex)
-    for _, other in ipairs(sidebar.panes.titles.rows) do SetRowSelected(other, other.titleIndex == self.titleIndex) end
+    for _, other in ipairs(sidebar.panes.titles.rows) do Skin.SetActiveEdge(other, other.titleIndex == self.titleIndex) end
 end)
 
 local function BuildTitlesPane(parent)
@@ -1140,34 +1080,15 @@ local function BuildTitlesPane(parent)
     pane:SetAllPoints()
     pane:Hide()
 
-    local search = CreateFrame('EditBox', nil, pane)
-    search:SetPoint('TOPLEFT', pane, 'TOPLEFT', Pixel.Scale(SIDEBAR_INSET), Pixel.Scale(-(TAB_ROW_HEIGHT + 8)))
-    search:SetPoint('TOPRIGHT', pane, 'TOPRIGHT', Pixel.Scale(-SIDEBAR_INSET), Pixel.Scale(-(TAB_ROW_HEIGHT + 8)))
-    search:SetHeight(Pixel.Scale(22))
-    search:SetAutoFocus(false)
-    search:SetMaxLetters(24)
-    Pixel.ApplyFont(search, LIST_SIZE, FONT, '')
-    search:SetTextInsets(Pixel.Scale(6), Pixel.Scale(6), 0, 0)
-    search:SetTextColor(1, 1, 1, 1)
-    local searchBg = search:CreateTexture(nil, 'BACKGROUND')
-    searchBg:SetAllPoints()
-    searchBg:SetColorTexture(SEARCH_BG[1], SEARCH_BG[2], SEARCH_BG[3], SEARCH_BG[4])
-    local hint = search:CreateFontString(nil, 'OVERLAY')
-    Pixel.ApplyFont(hint, LIST_SIZE, FONT, '')
-    hint:SetPoint('LEFT', Pixel.Scale(6), 0)
-    hint:SetText('Search titles')
-    hint:SetTextColor(0.6, 0.6, 0.6, 0.7)
-    search:SetScript('OnEscapePressed', BUI.Profiler.Script('Skin.CharacterFrame search OnEscapePressed', function(self) self:SetText(''); self:ClearFocus() end))
-    search:SetScript('OnEnterPressed', BUI.Profiler.Script('Skin.CharacterFrame search OnEnterPressed', function(self) self:ClearFocus() end))
-    search:SetScript('OnTextChanged', BUI.Profiler.Script('Skin.CharacterFrame search OnTextChanged', function(self)
-        hint:SetShown(self:GetText() == '')
-        RefreshTitles()
-    end))
-    pane.search = search
+    local top = PaneTop()
+    local search = Skin.CreateSearchBox(pane, STATS_W, function() RefreshTitles() end)
+    search:SetPoint('TOPLEFT', pane, 'TOPLEFT', 0, Pixel.Scale(-top))
+    search:SetPoint('TOPRIGHT', pane, 'TOPRIGHT', 0, Pixel.Scale(-top))
+    search.hint:SetText('Search titles')
+    search.editBox:SetMaxLetters(24)
+    pane.search = search.editBox
 
-    local rowWidth = STATS_W - SIDEBAR_INSET * 2 - SCROLLBAR_W - LIST_RIGHT_PAD
-    pane.area, pane.scroll = CreateScrollList(pane, TAB_ROW_HEIGHT + 8 + 22 + 6, rowWidth)
-    pane.rowWidth = rowWidth
+    pane.area, pane.scroll = CreateScrollList(pane, top + SEARCH_H + PANE_GAP)
     pane.rows = {}
     return pane
 end
@@ -1181,27 +1102,25 @@ RefreshTitles = function()
     local current = GetCurrentTitle()
     if not current or current == 0 then current = NO_TITLE end
 
+    local child = pane.scroll.child
     local visible = 0
     for _, entry in ipairs(Titles.entries) do
         if filter == '' or entry.key:find(filter, 1, true) then
             visible = visible + 1
             local row = pane.rows[visible]
             if not row then
-                row = CreateListRow(pane.scroll.child, pane.rowWidth)
+                row = CreateListRow(child)
                 row:SetScript('OnClick', Titles.Pick)
                 pane.rows[visible] = row
             end
             row.titleIndex = entry.index
             row.text:SetText(entry.label)
-            SetRowSelected(row, entry.index == current)
-            row:ClearAllPoints()
-            row:SetPoint('TOPLEFT', pane.scroll.child, 'TOPLEFT', 0, -Pixel.Scale((visible - 1) * (LIST_ROW_H + LIST_ROW_GAP)))
-            row:Show()
+            Skin.SetActiveEdge(row, entry.index == current)
+            PlaceListRow(row, child, visible, LIST_ROW_H)
         end
     end
     for index = visible + 1, #pane.rows do pane.rows[index]:Hide() end
-    pane.scroll:SetChildHeight(Pixel.Scale(math.max(1, visible * (LIST_ROW_H + LIST_ROW_GAP))))
-    pane.scroll:UpdateScroll()
+    child:SetHeight(Pixel.Scale(math.max(1, visible * (LIST_ROW_H + LIST_ROW_GAP))))
 end
 
 
@@ -1272,8 +1191,6 @@ local function EquipSet(setID)
     EquipmentManager_EquipSet(setID)
 end
 
-local iconPopupContext = Skin.NewContext(function() return Skin.IsSkinEnabled('characterFrame') end)
-
 local function EditSetIcon(setID, setName)
     if InCombatNotice() then return end
     local popup = GearManagerPopupFrame
@@ -1283,7 +1200,7 @@ local function EditSetIcon(setID, setName)
     popup:EnableMouse(true)
     popup:ClearAllPoints()
     popup:SetPoint('TOPLEFT', frame, 'TOPRIGHT', Pixel.Scale(4), 0)
-    Skin.TipIconPopup(iconPopupContext, popup)
+    Skin.TipIconPopup(context, popup)
     popup.mode = IconSelectorPopupFrameModes.Edit
     popup.setID = setID
     popup.origName = setName
@@ -1346,16 +1263,14 @@ end
 
 
 local SET = {
-    ROW_H = 36, ROW_GAP = 3, ROW_ICON = 28,
+    ROW_H = 36, ROW_ICON = 28,
     GRID_COLS = 9, GRID_ICON = 24, GRID_GAP = 3, GRID_PAD = 4, BLOCK_GAP = 8,
     GRID_ORDER = { 1, 2, 3, 15, 5, 4, 19, 9, 10, 6, 7, 8, 11, 12, 13, 14, 16, 17 },
-    CELL_BORDER = { 0.16, 0.16, 0.18, 1 },
-    TICK_COLOR = { 0.5, 0.88, 0.5 },
 }
 function SET.CreateCell(parent)
     local cell = CreateFrame('Button', nil, parent, 'BackdropTemplate')
     cell:SetSize(Pixel.Scale(SET.GRID_ICON), Pixel.Scale(SET.GRID_ICON))
-    Skin.ApplyBackdrop(cell, SLOT_BG, SET.CELL_BORDER)
+    Skin.PaintPanelBackdrop(cell)
     cell.icon = cell:CreateTexture(nil, 'ARTWORK')
     cell.icon:SetPoint('TOPLEFT', 1, -1)
     cell.icon:SetPoint('BOTTOMRIGHT', -1, 1)
@@ -1372,13 +1287,13 @@ function SET.CreateCell(parent)
 end
 
 function SET.CreateRow(pane)
-    local row = CreateListRow(pane.scroll.child, pane.rowWidth)
+    local row = CreateListRow(pane.scroll.child)
     row:SetHeight(Pixel.Scale(SET.ROW_H))
 
     row.iconFrame = CreateFrame('Frame', nil, row, 'BackdropTemplate')
     row.iconFrame:SetSize(Pixel.Scale(SET.ROW_ICON), Pixel.Scale(SET.ROW_ICON))
     row.iconFrame:SetPoint('LEFT', Pixel.Scale(4), 0)
-    Skin.ApplyBackdrop(row.iconFrame, SLOT_BG, SET.CELL_BORDER)
+    Painter.Custom(row.iconFrame, Skin.PaintPanelBackdrop)
     row.icon = row.iconFrame:CreateTexture(nil, 'ARTWORK')
     row.icon:SetPoint('TOPLEFT', 1, -1)
     row.icon:SetPoint('BOTTOMRIGHT', -1, 1)
@@ -1388,19 +1303,20 @@ function SET.CreateRow(pane)
     row.marker:SetSize(Pixel.Scale(14), Pixel.Scale(14))
     row.marker:SetPoint('RIGHT', Pixel.Scale(-8), 0)
     row.marker:SetTexture(BUILib.GetLibMedia('check'))
-    row.marker:SetVertexColor(SET.TICK_COLOR[1], SET.TICK_COLOR[2], SET.TICK_COLOR[3], 1)
+    Painter.Tint(row.marker, 'positive')
 
     row.text:ClearAllPoints()
     row.text:SetPoint('TOPLEFT', row.iconFrame, 'TOPRIGHT', Pixel.Scale(8), Pixel.Scale(-1))
     row.text:SetPoint('RIGHT', row.marker, 'LEFT', Pixel.Scale(-6), 0)
-    Pixel.ApplyFont(row.text, LIST_SIZE + 1, FONT, 'OUTLINE')
+    Pixel.ApplyFont(row.text, LIST_SIZE + 1, FONT, '')
 
     row.status = row:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(row.status, LIST_SIZE - 1, FONT, '')
-    row.status:SetPoint('TOPLEFT', row.text, 'BOTTOMLEFT', 0, Pixel.Scale(-1))
+    row.status:SetPoint('TOPLEFT', row.text, 'BOTTOMLEFT', 0, Pixel.Scale(-2))
     row.status:SetPoint('RIGHT', row.marker, 'LEFT', Pixel.Scale(-6), 0)
     row.status:SetJustifyH('LEFT')
     row.status:SetWordWrap(false)
+    Painter.Text(row.status, 'skinLabel')
 
     row:RegisterForClicks('LeftButtonUp', 'RightButtonUp')
     row:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame row OnClick 2', function(self, mouseButton)
@@ -1409,8 +1325,7 @@ function SET.CreateRow(pane)
         if mouseButton == 'RightButton' then ShowSetMenu(self) end
     end))
     row:SetScript('OnDoubleClick', BUI.Profiler.Script('Skin.CharacterFrame row OnDoubleClick', function(self) EquipSet(self.setID) end))
-    row:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame row OnEnter 3', function(self)
-        self.hover:Show()
+    row:HookScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame row OnEnter 3', function(self)
         local missing = MissingSetItems(self.setID)
         GameTooltip:SetOwner(self, 'ANCHOR_LEFT')
         GameTooltip:SetText(self.setName, 1, 1, 1)
@@ -1424,8 +1339,18 @@ function SET.CreateRow(pane)
         GameTooltip:AddLine('Double-click to equip, right-click for spec binding.', 0.6, 0.6, 0.6)
         GameTooltip:Show()
     end))
-    row:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame row OnLeave 3', function(self) self.hover:Hide(); GameTooltip:Hide() end))
+    row:HookScript('OnLeave', GameTooltip_Hide)
     return row
+end
+
+local function SheetButton(parent, width, label, tooltip, onClick)
+    local button = Skin.SmallButton(parent, width, BUTTON_H, label)
+    button:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame ' .. label .. ' OnClick', onClick))
+    button:HookScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame ' .. label .. ' OnEnter', function(self)
+        Widget.ShowTip(self, tooltip, { anchor = 'TOP' })
+    end))
+    button:HookScript('OnLeave', function() Widget.HideTip() end)
+    return button
 end
 
 local function BuildSetsPane(parent)
@@ -1433,35 +1358,32 @@ local function BuildSetsPane(parent)
     pane:SetAllPoints()
     pane:Hide()
 
-    local innerWidth = STATS_W - SIDEBAR_INSET * 2
-    local buttonWidth = math.floor((innerWidth - SET.BLOCK_GAP * 2) / 3)
-    local top = TAB_ROW_HEIGHT + 8
-
-    pane.equipButton = Controls.Button(pane, 'Equip', buttonWidth, function() EquipSet(selectedSetID) end, { radius = 6, tooltip = 'Equip the selected set' })
-    pane.equipButton:SetPoint('BOTTOMLEFT', pane, 'BOTTOMLEFT', Pixel.Scale(SIDEBAR_INSET), Pixel.Scale(SIDEBAR_INSET))
-    pane.saveButton = Controls.Button(pane, 'Save', buttonWidth, function()
+    local buttonWidth = math.floor((STATS_W - SET.BLOCK_GAP * 2) / 3)
+    pane.equipButton = SheetButton(pane, buttonWidth, 'Equip', 'Equip the selected set', function() EquipSet(selectedSetID) end)
+    pane.equipButton:SetPoint('BOTTOMLEFT')
+    pane.saveButton = SheetButton(pane, buttonWidth, 'Save', 'Overwrite the selected set with what you are wearing', function()
         if not selectedSetID or InCombatNotice() then return end
         C_EquipmentSet.SaveEquipmentSet(selectedSetID)
         BUI.Print('Equipment set updated with your current gear.')
         RefreshSets()
-    end, { radius = 6, tooltip = 'Overwrite the selected set with what you are wearing' })
-    pane.saveButton:SetPoint('BOTTOM', pane, 'BOTTOM', 0, Pixel.Scale(SIDEBAR_INSET))
-    pane.newButton = Controls.Button(pane, 'New', buttonWidth, function()
+    end)
+    pane.saveButton:SetPoint('BOTTOM')
+    pane.newButton = SheetButton(pane, buttonWidth, 'New', 'Save what you are wearing as a new set', function()
         if InCombatNotice() then return end
         StaticPopup_Show('BUI_NEW_EQUIPMENT_SET')
-    end, { radius = 6, tooltip = 'Save what you are wearing as a new set' })
-    pane.newButton:SetPoint('BOTTOMRIGHT', pane, 'BOTTOMRIGHT', Pixel.Scale(-SIDEBAR_INSET), Pixel.Scale(SIDEBAR_INSET))
+    end)
+    pane.newButton:SetPoint('BOTTOMRIGHT')
 
     local gridRows = math.ceil(#SET.GRID_ORDER / SET.GRID_COLS)
     local gridHeight = gridRows * SET.GRID_ICON + (gridRows - 1) * SET.GRID_GAP + SET.GRID_PAD * 2
     local gridWidth = SET.GRID_COLS * SET.GRID_ICON + (SET.GRID_COLS - 1) * SET.GRID_GAP
     pane.grid = CreateFrame('Frame', nil, pane)
     pane.grid:SetHeight(Pixel.Scale(gridHeight))
-    pane.grid:SetPoint('BOTTOMLEFT', Widget.Unwrap(pane.equipButton), 'TOPLEFT', 0, Pixel.Scale(SET.BLOCK_GAP))
-    pane.grid:SetPoint('BOTTOMRIGHT', Widget.Unwrap(pane.newButton), 'TOPRIGHT', 0, Pixel.Scale(SET.BLOCK_GAP))
-    Widget.RoundedPanel(pane.grid, 6, LIST_ROW_BG, SET.CELL_BORDER)
+    pane.grid:SetPoint('BOTTOMLEFT', pane.equipButton, 'TOPLEFT', 0, Pixel.Scale(SET.BLOCK_GAP))
+    pane.grid:SetPoint('BOTTOMRIGHT', pane.newButton, 'TOPRIGHT', 0, Pixel.Scale(SET.BLOCK_GAP))
+    BUILib.Skin.Shell(pane.grid, CARD)
     pane.cells = {}
-    local startX = math.floor((innerWidth - gridWidth) / 2)
+    local startX = math.floor((STATS_W - gridWidth) / 2)
     for index in ipairs(SET.GRID_ORDER) do
         local column = (index - 1) % SET.GRID_COLS
         local rowIndex = math.floor((index - 1) / SET.GRID_COLS)
@@ -1472,15 +1394,13 @@ local function BuildSetsPane(parent)
         pane.cells[index] = cell
     end
 
-    local rowWidth = STATS_W - SIDEBAR_INSET * 2 - SCROLLBAR_W - LIST_RIGHT_PAD
-    pane.area, pane.scroll = CreateScrollList(pane, top, rowWidth)
+    pane.area, pane.scroll = CreateScrollList(pane, PaneTop())
     pane.area:SetPoint('BOTTOMRIGHT', pane.grid, 'TOPRIGHT', 0, Pixel.Scale(SET.BLOCK_GAP))
-    pane.rowWidth = rowWidth
     pane.rows = {}
     pane.empty = pane:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(pane.empty, LIST_SIZE, FONT, '')
     pane.empty:SetPoint('TOP', pane.area, 'TOP', 0, Pixel.Scale(-12))
-    pane.empty:SetTextColor(0.6, 0.6, 0.6, 1)
+    Painter.Text(pane.empty, 'skinLabel')
     pane.empty:SetText('No equipment sets yet.')
     pane.empty:Hide()
     return pane
@@ -1489,9 +1409,11 @@ end
 function SET.RefreshGrid(pane)
     local items = selectedSetID and C_EquipmentSet.GetItemIDs(selectedSetID)
     pane.grid:SetShown(items ~= nil)
+    local edge = PALETTE.edge
     for index, slot in ipairs(SET.GRID_ORDER) do
         local cell = pane.cells[index]
         local itemID = items and items[slot]
+        local border = edge
         if itemID and itemID > 0 then
             cell.itemID = itemID
             cell.icon:SetTexture(C_Item.GetItemIconByID(itemID) or QUESTION_MARK_ICON)
@@ -1500,19 +1422,15 @@ function SET.RefreshGrid(pane)
             cell.missing = not inBags
             cell.icon:SetDesaturated(not inBags)
             cell.icon:SetAlpha(inBags and 1 or 0.55)
-            if not inBags then
-                cell:SetBackdropBorderColor(MISSING_COLOR[1], MISSING_COLOR[2], MISSING_COLOR[3], 1)
-            else
-                cell:SetBackdropBorderColor(SET.CELL_BORDER[1], SET.CELL_BORDER[2], SET.CELL_BORDER[3], 1)
-            end
+            if not inBags then border = MISSING_COLOR end
             cell:Show()
         else
             cell.itemID = nil
             cell.missing = nil
             cell.icon:SetTexture(nil)
-            cell:SetBackdropBorderColor(SET.CELL_BORDER[1], SET.CELL_BORDER[2], SET.CELL_BORDER[3], 1)
             cell:SetShown(items ~= nil)
         end
+        cell:SetBackdropBorderColor(border[1], border[2], border[3], 1)
     end
 end
 
@@ -1520,7 +1438,10 @@ RefreshSets = function()
     local pane = sidebar and sidebar.panes.sets
     if not pane or not pane:IsShown() then return end
 
+    local child = pane.scroll.child
     local setIDs = C_EquipmentSet.GetEquipmentSetIDs() or {}
+    local equippedHex = BUI.Hex(Painter.Color('positive'))
+    local missingHex = BUI.Hex(MISSING_COLOR[1], MISSING_COLOR[2], MISSING_COLOR[3])
     local count = 0
     local anyEquipped, selectedStillExists
     for _, setID in ipairs(setIDs) do
@@ -1540,26 +1461,22 @@ RefreshSets = function()
             local status
             row.marker:SetShown(isEquipped)
             if isEquipped then
-                status = '|cff80e080Equipped|r'
+                status = ('|cff%sEquipped|r'):format(equippedHex)
             elseif lost > 0 then
-                status = ('|cff%02x%02x%02x%d missing|r'):format(MISSING_COLOR[1] * 255, MISSING_COLOR[2] * 255, MISSING_COLOR[3] * 255, lost)
+                status = ('|cff%s%d missing|r'):format(missingHex, lost)
             else
                 status = ('%d/%d'):format(worn, total)
             end
-            if specName then status = status .. '  |cff555555||  ' .. specName end
+            if specName then status = status .. '  ||  ' .. specName end
             row.status:SetText(status)
-            row.status:SetTextColor(0.6, 0.6, 0.62, 1)
-            row:ClearAllPoints()
-            row:SetPoint('TOPLEFT', pane.scroll.child, 'TOPLEFT', 0, -Pixel.Scale((count - 1) * (SET.ROW_H + SET.ROW_GAP)))
-            row:Show()
+            PlaceListRow(row, child, count, SET.ROW_H)
         end
     end
     if not selectedStillExists then selectedSetID = anyEquipped end
-    for index = 1, count do SetRowSelected(pane.rows[index], pane.rows[index].setID == selectedSetID) end
+    for index = 1, count do Skin.SetActiveEdge(pane.rows[index], pane.rows[index].setID == selectedSetID) end
     for index = count + 1, #pane.rows do pane.rows[index]:Hide() end
     pane.empty:SetShown(count == 0)
-    pane.scroll:SetChildHeight(Pixel.Scale(math.max(1, count * (SET.ROW_H + SET.ROW_GAP))))
-    pane.scroll:UpdateScroll()
+    child:SetHeight(Pixel.Scale(math.max(1, count * (SET.ROW_H + LIST_ROW_GAP))))
     SET.RefreshGrid(pane)
 end
 
@@ -1626,52 +1543,58 @@ function LootSpec.OpenMenu(anchor)
     Controls.ContextMenu(items, { anchor = anchor, point = 'TOPRIGHT', relPt = 'BOTTOMRIGHT', offsetY = -4, width = 230 })
 end
 
+local function InfoLine(parent, anchor)
+    local text = parent:CreateFontString(nil, 'OVERLAY')
+    Pixel.ApplyFont(text, INFO_SIZE, FONT, '')
+    text:SetJustifyH('RIGHT')
+    text:SetPoint('TOPRIGHT', anchor, 'BOTTOMRIGHT', 0, Pixel.Scale(-2))
+    Painter.Text(text, 'skinText')
+    return text
+end
+
 local function BuildStatsPane(parent)
     local pane = CreateFrame('Frame', nil, parent)
     pane:SetAllPoints()
 
+    local top = PaneTop()
     local stackHeight = INFO_SIZE * 4 + 6
-    pane.ilvl = pane:CreateFontString(nil, 'OVERLAY')
+    local headlineHeight = stackHeight + HEADLINE_PAD * 2
+    local headline = CreateFrame('Frame', nil, pane)
+    headline:SetPoint('TOPLEFT', pane, 'TOPLEFT', 0, Pixel.Scale(-top))
+    headline:SetPoint('TOPRIGHT', pane, 'TOPRIGHT', 0, Pixel.Scale(-top))
+    headline:SetHeight(Pixel.Scale(headlineHeight))
+    BUILib.Skin.Shell(headline, CARD)
+
+    pane.ilvl = headline:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(pane.ilvl, BIG_ILVL_SIZE, FONT, '')
     pane.ilvl:SetJustifyH('LEFT')
-    pane.ilvl:SetPoint('LEFT', pane, 'TOPLEFT', Pixel.Scale(SIDEBAR_INSET), Pixel.Scale(-(TAB_ROW_HEIGHT + 8) - stackHeight / 2 - BIG_ILVL_DROP))
-    pane.ilvl:SetTextColor(BIG_ILVL_COLOR[1], BIG_ILVL_COLOR[2], BIG_ILVL_COLOR[3], 1)
+    pane.ilvl:SetPoint('LEFT', headline, 'LEFT', Pixel.Scale(HEADLINE_PAD), -Pixel.Scale(BIG_ILVL_DROP))
 
     pane.ilvlInfo = { equipped = 0, total = 0, pvp = 0 }
-    local ilvlHit = CreateFrame('Button', nil, pane)
+    local ilvlHit = CreateFrame('Button', nil, headline)
     ilvlHit:SetPoint('TOPLEFT', pane.ilvl, 'TOPLEFT', 0, 0)
     ilvlHit:SetPoint('BOTTOMRIGHT', pane.ilvl, 'BOTTOMRIGHT', 0, 0)
     ilvlHit:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame ilvlHit OnEnter', function(self)
         local info = pane.ilvlInfo
         local rows = {
             { left = 'Equipped', right = ('%.2f'):format(info.equipped) },
-            { left = 'Average (bags included)', right = ('%.2f'):format(info.total), rightColor = BIG_ILVL_COLOR },
+            { left = 'Average (bags included)', right = ('%.2f'):format(info.total), rightColor = { Colors.GetAccent() } },
         }
-        if info.pvp > 0 then rows[#rows + 1] = { left = 'PvP', right = ('%.2f'):format(info.pvp), rightColor = PVP_ILVL_COLOR } end
+        if info.pvp > 0 then rows[#rows + 1] = { left = 'PvP', right = ('%.2f'):format(info.pvp), rightColor = { Painter.Color('positive') } } end
         Widget.ShowTipRows(self, 'Item Level', rows, { anchor = 'BOTTOM' })
     end))
     ilvlHit:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame ilvlHit OnLeave', function() Widget.HideTip() end))
     pane.ilvlHit = ilvlHit
 
-    pane.score = pane:CreateFontString(nil, 'OVERLAY')
+    pane.score = headline:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(pane.score, INFO_SIZE, FONT, '')
     pane.score:SetJustifyH('RIGHT')
-    pane.score:SetPoint('TOPRIGHT', pane, 'TOPRIGHT', Pixel.Scale(-(SIDEBAR_INSET + STACK_RIGHT_PAD)), Pixel.Scale(-(TAB_ROW_HEIGHT + 8)))
-    pane.score:SetTextColor(INFO_COLOR[1], INFO_COLOR[2], INFO_COLOR[3], 1)
+    pane.score:SetPoint('TOPRIGHT', headline, 'TOPRIGHT', -Pixel.Scale(HEADLINE_PAD), -Pixel.Scale(HEADLINE_PAD))
+    Painter.Text(pane.score, 'skinText')
+    pane.pvpIlvl = InfoLine(headline, pane.score)
+    pane.durability = InfoLine(headline, pane.pvpIlvl)
 
-    pane.pvpIlvl = pane:CreateFontString(nil, 'OVERLAY')
-    Pixel.ApplyFont(pane.pvpIlvl, INFO_SIZE, FONT, '')
-    pane.pvpIlvl:SetJustifyH('RIGHT')
-    pane.pvpIlvl:SetPoint('TOPRIGHT', pane.score, 'BOTTOMRIGHT', 0, Pixel.Scale(-2))
-    pane.pvpIlvl:SetTextColor(INFO_COLOR[1], INFO_COLOR[2], INFO_COLOR[3], 1)
-
-    pane.durability = pane:CreateFontString(nil, 'OVERLAY')
-    Pixel.ApplyFont(pane.durability, INFO_SIZE, FONT, '')
-    pane.durability:SetJustifyH('RIGHT')
-    pane.durability:SetPoint('TOPRIGHT', pane.pvpIlvl, 'BOTTOMRIGHT', 0, Pixel.Scale(-2))
-    pane.durability:SetTextColor(INFO_COLOR[1], INFO_COLOR[2], INFO_COLOR[3], 1)
-
-    local lootSpec = CreateFrame('Button', nil, pane)
+    local lootSpec = CreateFrame('Button', nil, headline)
     lootSpec:SetHeight(Pixel.Scale(INFO_SIZE + 2))
     lootSpec:SetWidth(Pixel.Scale(80))
     lootSpec:SetPoint('TOPRIGHT', pane.durability, 'BOTTOMRIGHT', 0, Pixel.Scale(-2))
@@ -1679,21 +1602,19 @@ local function BuildStatsPane(parent)
     Pixel.ApplyFont(lootSpec.text, INFO_SIZE, FONT, '')
     lootSpec.text:SetJustifyH('RIGHT')
     lootSpec.text:SetPoint('TOPRIGHT')
-    lootSpec.text:SetTextColor(INFO_COLOR[1], INFO_COLOR[2], INFO_COLOR[3], 1)
+    Painter.Text(lootSpec.text, 'skinText')
     lootSpec:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame lootSpec OnClick', function(self) LootSpec.OpenMenu(self) end))
     lootSpec:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame lootSpec OnEnter', function(self)
-        self.text:SetTextColor(1, 1, 1, 1)
+        self.text:SetTextColor(Painter.Color('skinTitle'))
         Widget.ShowTip(self, 'Click to change your loot specialization', { anchor = 'LEFT' })
     end))
     lootSpec:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame lootSpec OnLeave', function(self)
-        self.text:SetTextColor(INFO_COLOR[1], INFO_COLOR[2], INFO_COLOR[3], 1)
+        self.text:SetTextColor(Painter.Color('skinText'))
         Widget.HideTip()
     end))
     pane.lootSpec = lootSpec
 
-    local headerHeight = TAB_ROW_HEIGHT + 8 + math.max(BIG_ILVL_SIZE, stackHeight) + 12
-    local rowWidth = STATS_W - SIDEBAR_INSET * 2 - SCROLLBAR_W - LIST_RIGHT_PAD
-    pane.area, pane.scroll = CreateScrollList(pane, headerHeight, rowWidth)
+    pane.area, pane.scroll = CreateScrollList(pane, top + headlineHeight + PANE_GAP)
     sidebar.statsScroll = pane.scroll
 
     for _, definition in ipairs(STAT_SECTIONS) do
@@ -1707,18 +1628,22 @@ local function BuildSidebar(parent)
     sidebar:SetPoint('TOPLEFT', parent, 'TOPLEFT', STATS_X, TOP_Y + 6)
     sidebar:SetPoint('BOTTOMLEFT', parent, 'BOTTOMLEFT', STATS_X, SLOT_SIZE + BOTTOM_PAD + 10)
     sidebar:SetWidth(STATS_W)
-    sidebar.panelBorder, sidebar.panelFill = Widget.RoundedPanel(sidebar, 8, { 0, 0, 0, 0 }, { 1, 1, 1, 0.08 })
 
+    local strip = CreateFrame('Frame', nil, sidebar)
+    strip:SetPoint('TOPLEFT')
     sidebar.tabs = {}
     sidebar.panes = {}
-    local tabWidth = STATS_W / 3
     local definitions = { { key = 'stats', label = 'Character' }, { key = 'titles', label = 'Titles' }, { key = 'sets', label = 'Sets' } }
     for index, definition in ipairs(definitions) do
-        local tab = CreateTab(sidebar, definition.label, function() ShowPane(definition.key) end)
+        local tab = CreateFrame('Button', nil, strip)
         tab.key = definition.key
-        tab:SetWidth(Pixel.Scale(tabWidth))
-        tab:SetPoint('TOPLEFT', sidebar, 'TOPLEFT', Pixel.Scale((index - 1) * tabWidth), 0)
+        tab:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame tab OnClick', function() ShowPane(definition.key) end))
         sidebar.tabs[index] = tab
+    end
+    Skin.SegmentStrip(strip, sidebar.tabs, STATS_W)
+    for index, tab in ipairs(sidebar.tabs) do
+        Skin.SetSegmentSelected(tab, false)
+        tab:SetText(definitions[index].label)
     end
 
     sidebar.panes.stats = BuildStatsPane(sidebar)
@@ -1733,6 +1658,7 @@ local function RefreshHeader()
     if not pane then return end
 
     local total, equipped, pvp = GetAverageItemLevel()
+    pane.ilvl:SetTextColor(Colors.GetAccent())
     if IsSecretValue(equipped) or IsSecretValue(total) then
         pane.ilvl:SetText('')
         pane.ilvlHit:EnableMouse(false)
@@ -1744,7 +1670,7 @@ local function RefreshHeader()
         pane.ilvlHit:EnableMouse(true)
     end
     if pvp and not IsSecretValue(pvp) and pvp > 0 then
-        pane.pvpIlvl:SetFormattedText('PvP iLvl: |cff%s%d|r', BUI.Hex(PVP_ILVL_COLOR[1], PVP_ILVL_COLOR[2], PVP_ILVL_COLOR[3]), math.floor(pvp))
+        pane.pvpIlvl:SetFormattedText('PvP iLvl: |cff%s%d|r', BUI.Hex(Painter.Color('positive')), math.floor(pvp))
     else
         pane.pvpIlvl:SetText('')
     end
@@ -1761,8 +1687,7 @@ local function RefreshHeader()
     pane.durability:SetFormattedText('Durability: |cff%02x%02x%02x%d%%|r', red * 255, green * 255, blue * 255, percent)
 
     local lootName = LootSpec.Name()
-    local accentRed, accentGreen, accentBlue = Colors.GetAccent()
-    pane.lootSpec.text:SetFormattedText('Loot Spec: |cff%s%s|r', BUI.Hex(accentRed, accentGreen, accentBlue), lootName)
+    pane.lootSpec.text:SetFormattedText('Loot Spec: |cff%s%s|r', BUI.Hex(Colors.GetAccent()), lootName)
     pane.lootSpec:SetWidth(pane.lootSpec.text:GetStringWidth() + Pixel.Scale(2))
 end
 
@@ -1782,35 +1707,29 @@ local function RefreshStats()
 end
 
 local function MakeToggleButton(parent, options)
-    local button = CreateFrame('Button', nil, parent, 'BackdropTemplate')
-    button:SetSize(Pixel.Scale(28), Pixel.Scale(28))
+    local button = Skin.SmallButton(parent, TOGGLE_SIZE, TOGGLE_SIZE, '')
     button:SetFrameLevel(parent:GetFrameLevel() + 5)
-    Pixel.SetTemplate(button, SLOT_BG[1], SLOT_BG[2], SLOT_BG[3], 1, TOGGLE_BORDER[1], TOGGLE_BORDER[2], TOGGLE_BORDER[3], 1, 1)
-
-    local inset = options.inset or 2
     local texture = button:CreateTexture(nil, 'ARTWORK')
-    texture:SetPoint('TOPLEFT', inset, -inset)
-    texture:SetPoint('BOTTOMRIGHT', -inset, inset)
-    if options.atlas then
-        texture:SetAtlas(options.atlas)
-    elseif options.icon then
-        texture:SetTexture(options.icon)
-        texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    end
-
-    button:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame button OnEnter', function(self)
-        self:SetBackdropBorderColor(Colors.GetAccent())
+    texture:SetPoint('TOPLEFT', 2, -2)
+    texture:SetPoint('BOTTOMRIGHT', -2, 2)
+    texture:SetTexture(options.icon)
+    texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    button:HookScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame button OnEnter', function(self)
         GameTooltip:SetOwner(self, 'ANCHOR_TOP')
         GameTooltip:SetText(options.title, 1, 1, 1)
         GameTooltip:Show()
     end))
-    button:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame button OnLeave', function(self)
-        self:SetBackdropBorderColor(unpack(TOGGLE_BORDER))
-        GameTooltip:Hide()
-    end))
-    button:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame button OnClick', options.onClick))
+    button:HookScript('OnLeave', GameTooltip_Hide)
+    button:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame button OnClick', function() BUI[options.module].Toggle() end))
     return button
 end
+
+local TOGGLES = {
+    { icon = 'Interface\\Icons\\INV_Misc_Gem_01', title = 'Gem Manager', module = 'GemCounter' },
+    { icon = 'Interface\\Icons\\Spell_Arcane_PortalDalaran', title = 'Portals', module = 'PortalManager' },
+    { icon = 'Interface\\Icons\\INV_Misc_Coin_01', title = 'Currency', module = 'CurrencyManager' },
+    { icon = 'Interface\\Icons\\Achievement_Reputation_01', title = 'Reputation', module = 'ReputationManager' },
+}
 
 local function RaceBackgroundPath()
     local _, fileName = UnitRace('player')
@@ -1823,28 +1742,45 @@ local function BuildModelBackground(parent)
     art:SetPoint('TOPLEFT', parent, 'TOPLEFT', MODEL_X, TOP_Y + 6)
     art:SetSize(MODEL_WIDTH, MODEL_HEIGHT)
 
-    local mainWidth, sideWidth = MODEL_WIDTH * (1 - ART.SIDE_SHARE), MODEL_WIDTH * ART.SIDE_SHARE
-    local topHeight, bottomHeight = MODEL_HEIGHT * ART.TOP_SHARE, MODEL_HEIGHT * (1 - ART.TOP_SHARE)
-    local function Piece(width, height, narrow)
+    local scale = math.max(MODEL_WIDTH / ART.PIECE_WIDTH, MODEL_HEIGHT / (ART.TOP_HEIGHT + ART.BOTTOM_HEIGHT))
+    local cropX = (1 - MODEL_WIDTH / (ART.PIECE_WIDTH * scale)) / 2
+    local cropY = ((ART.TOP_HEIGHT + ART.BOTTOM_HEIGHT) * scale - MODEL_HEIGHT) / 2
+    local topHeight, bottomHeight = ART.TOP_HEIGHT * scale, ART.BOTTOM_HEIGHT * scale
+    local function Piece(height, top, bottom)
         local texture = art:CreateTexture(nil, 'BACKGROUND')
-        texture:SetSize(width, height)
-        if narrow then texture:SetTexCoord(0, ART.SIDE_COORD, 0, 1) end
+        texture:SetSize(MODEL_WIDTH, height)
+        texture:SetTexCoord(cropX, 1 - cropX, top, bottom)
         return texture
     end
-    art.pieces = { Piece(mainWidth, topHeight), Piece(sideWidth, topHeight, true), Piece(mainWidth, bottomHeight), Piece(sideWidth, bottomHeight, true) }
+    art.pieces = {
+        Piece(topHeight - cropY, cropY / topHeight, 1),
+        Piece(bottomHeight - cropY, 0, 1 - cropY / bottomHeight),
+    }
     art.pieces[1]:SetPoint('TOPLEFT', art, 'TOPLEFT', 0, 0)
-    art.pieces[2]:SetPoint('TOPLEFT', art.pieces[1], 'TOPRIGHT', 0, 0)
-    art.pieces[3]:SetPoint('TOPLEFT', art.pieces[1], 'BOTTOMLEFT', 0, 0)
-    art.pieces[4]:SetPoint('TOPLEFT', art.pieces[1], 'BOTTOMRIGHT', 0, 0)
+    art.pieces[2]:SetPoint('TOPLEFT', art.pieces[1], 'BOTTOMLEFT', 0, 0)
 
     art.overlay = art:CreateTexture(nil, 'BORDER')
     art.overlay:SetAllPoints()
     art.overlay:SetColorTexture(0, 0, 0, 1)
 
+    for _, side in ipairs({ 'LEFT', 'RIGHT' }) do
+        local shade = art:CreateTexture(nil, 'ARTWORK')
+        shade:SetPoint('TOP' .. side)
+        shade:SetPoint('BOTTOM' .. side)
+        shade:SetWidth(LABEL_ZONE_W)
+        shade:SetColorTexture(1, 1, 1, 1)
+        local dark, clear = CreateColor(0, 0, 0, ART.SHADE_ALPHA), CreateColor(0, 0, 0, 0)
+        if side == 'LEFT' then
+            shade:SetGradient('HORIZONTAL', dark, clear)
+        else
+            shade:SetGradient('HORIZONTAL', clear, dark)
+        end
+    end
+
     local edges = {}
     for edgeIndex = 1, 4 do
         edges[edgeIndex] = art:CreateTexture(nil, 'OVERLAY')
-        edges[edgeIndex]:SetColorTexture(ART.MODEL_EDGE[1], ART.MODEL_EDGE[2], ART.MODEL_EDGE[3], ART.MODEL_EDGE[4])
+        Painter.Fill(edges[edgeIndex], 'skinBorder')
     end
     edges[1]:SetPoint('TOPLEFT'); edges[1]:SetPoint('TOPRIGHT'); edges[1]:SetHeight(1)
     edges[2]:SetPoint('BOTTOMLEFT'); edges[2]:SetPoint('BOTTOMRIGHT'); edges[2]:SetHeight(1)
@@ -1853,7 +1789,8 @@ local function BuildModelBackground(parent)
     BUILib.Skin.AlignEdges(art, nil, edges)
 
     local path, fileName = RaceBackgroundPath()
-    for index = 1, 4 do art.pieces[index]:SetTexture(path .. index) end
+    art.pieces[1]:SetTexture(path .. 1)
+    art.pieces[2]:SetTexture(path .. 3)
     art.overlay:SetAlpha(ART.OVERLAY_ALPHA[strupper(fileName or '')] or ART.OVERLAY_DEFAULT)
     return art
 end
@@ -1956,11 +1893,11 @@ local function PaintAmbience(parent)
         panel:SetPoint('BOTTOMLEFT', parent, 'BOTTOMLEFT', left, SLOT_SIZE + BOTTOM_PAD + 10)
         panel:SetWidth(width)
         panel:SetFrameLevel(parent:GetFrameLevel())
-        Widget.RoundedPanel(panel, 8, { 0, 0, 0, 0 }, { 1, 1, 1, 0.08 })
+        BUILib.Skin.Shell(panel, CARD)
         parent.panels[#parent.panels + 1] = panel
     end
-    Column(LEFT_X - 6, SLOT_SIZE + LABEL_ZONE_W)
-    Column(RIGHT_X - LABEL_ZONE_W + 6, SLOT_SIZE + LABEL_ZONE_W)
+    Column(LEFT_X - 4, SLOT_SIZE + 8)
+    Column(RIGHT_X - 4, SLOT_SIZE + 8)
 end
 
 local function ApplyBackground()
@@ -1974,22 +1911,16 @@ local function ApplyBackground()
         frame.tint:Hide()
     end
     local showPanels = skinning.characterFramePanels == true
-    for _, panel in ipairs(frame.panels or {}) do panel:SetShown(showPanels) end
-    if sidebar and sidebar.panelFill then
-        sidebar.panelFill:SetShown(showPanels)
-        sidebar.panelBorder:SetShown(showPanels)
-    end
+    for _, panel in ipairs(frame.panels) do panel:SetShown(showPanels) end
 end
 
 local function BuildFrame()
     if frame then return true end
     if not CharacterFrame or not _G.CharacterHeadSlot then return false end
 
-    frame = Widget.New(CharacterFrame, 'Frame', nil, {
-        bg = Colors.bg.dark,
-        border = Colors.border.light,
-        size = { FRAME_WIDTH, FRAME_HEIGHT },
-    }).frame
+    frame = CreateFrame('Frame', nil, CharacterFrame, 'BackdropTemplate')
+    frame:SetSize(FRAME_WIDTH, FRAME_HEIGHT)
+    Painter.Custom(frame, Skin.PaintPanelBackdrop)
     frame:SetIgnoreParentAlpha(true)
     frame.__buiKeepMouse = true
     frame:SetPoint('CENTER')
@@ -2046,7 +1977,7 @@ local function BuildFrame()
     frame.subText = frame:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(frame.subText, 11, FONT, '')
     frame.subText:SetPoint('TOPLEFT', frame.titleText, 'BOTTOMLEFT', 0, Pixel.Scale(-HEADER.SUBTITLE_GAP))
-    frame.subText:SetTextColor(0.55, 0.55, 0.55, 1)
+    Painter.Text(frame.subText, 'skinLabel')
 
     model = BuildModel(frame)
 
@@ -2057,33 +1988,16 @@ local function BuildFrame()
 
     BuildSidebar(frame)
 
-    local gemButton = MakeToggleButton(frame, {
-        icon    = 'Interface/Icons/INV_Misc_Gem_01',
-        title   = 'Gem Manager',
-        onClick = function() BUI.GemCounter.Toggle() end,
-    })
-    gemButton:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', Pixel.Scale(-10), Pixel.Scale(10))
-
-    local portalButton = MakeToggleButton(frame, {
-        icon    = 'Interface\\Icons\\Spell_Arcane_PortalDalaran',
-        title   = 'Portals',
-        onClick = function() BUI.PortalManager.Toggle() end,
-    })
-    portalButton:SetPoint('RIGHT', gemButton, 'LEFT', Pixel.Scale(-6), 0)
-
-    local currencyButton = MakeToggleButton(frame, {
-        icon    = 'Interface\\Icons\\INV_Misc_Coin_01',
-        title   = 'Currency',
-        onClick = function() BUI.CurrencyManager.Toggle() end,
-    })
-    currencyButton:SetPoint('RIGHT', portalButton, 'LEFT', Pixel.Scale(-6), 0)
-
-    local reputationButton = MakeToggleButton(frame, {
-        icon    = 'Interface\\Icons\\Achievement_Reputation_01',
-        title   = 'Reputation',
-        onClick = function() BUI.ReputationManager.Toggle() end,
-    })
-    reputationButton:SetPoint('RIGHT', currencyButton, 'LEFT', Pixel.Scale(-6), 0)
+    local previous
+    for _, toggle in ipairs(TOGGLES) do
+        local button = MakeToggleButton(frame, toggle)
+        if previous then
+            button:SetPoint('RIGHT', previous, 'LEFT', Pixel.Scale(-6), 0)
+        else
+            button:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', Pixel.Scale(-10), Pixel.Scale(10))
+        end
+        previous = button
+    end
 
     PlaceSlotButtons()
     return true
@@ -2146,7 +2060,7 @@ local function IsOpen()
 end
 
 local function ApplySkin()
-    if not Skin.IsSkinEnabled('characterFrame') or HasConflictingCharSheet() then return end
+    if not context.Enabled() or HasConflictingCharSheet() then return end
     if InCombatLockdown() and not frame then
         if not CharacterFrame._buiCombatNoticed and CharacterFrame:IsShown() then
             CharacterFrame._buiCombatNoticed = true
@@ -2155,35 +2069,32 @@ local function ApplySkin()
         return
     end
     if not CharacterFrame._buiSuppressActive then Skin.SuppressBlizzardFrame(CharacterFrame) end
-    if CharacterModelScene then
-        CharacterModelScene:SetAlpha(0)
-        CharacterModelScene:EnableMouse(false)
-        local controlFrame = CharacterModelScene.ControlFrame
-        if controlFrame then
-            controlFrame:Hide()
-            controlFrame:SetAlpha(0)
-            controlFrame:EnableMouse(false)
-            controlFrame.Show = controlFrame.Hide
-            for _, child in ipairs({ controlFrame:GetChildren() }) do
-                child:Hide()
-                child:SetAlpha(0)
-                child.Show = child.Hide
-            end
-        end
+    local scene = _G.CharacterModelScene
+    if scene then
+        context.Fade(scene)
+        context.Fade(scene.ControlFrame)
     end
     BUI.Profiler.After('Skin.CharacterFrame show sheet', 0, function()
-        if CharacterFrame and CharacterFrame:IsShown() then ShowSkin() end
+        if CharacterFrame:IsShown() then ShowSkin() end
     end)
 end
 
 local function ApplyAfterCombat()
-    if CharacterFrame and CharacterFrame:IsShown() and not IsOpen() then ApplySkin() end
+    if CharacterFrame:IsShown() and not IsOpen() then ApplySkin() end
 end
 
-BUI.Events:Register('PLAYER_LOGIN', 'Skinning.CharacterFrame', function()
-    if not CharacterFrame or HasConflictingCharSheet() then return end
-    CharacterFrame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.CharacterFrame frame reskin', ApplySkin))
-    CharacterFrame:HookScript('OnHide', BUI.Profiler.Wrap('Skin.CharacterFrame frame restore', HideSkin))
+context.Window('CharacterFrame', {
+    show = ApplySkin,
+    install = function(blizzard)
+        blizzard:HookScript('OnHide', BUI.Profiler.Wrap('Skin.CharacterFrame frame restore', context.Guard(HideSkin)))
+    end,
+})
+
+context.OnDisable(function()
+    HideSkin()
+    if frame then frame:Hide() end
+    Skin.RestoreBlizzardFrame(CharacterFrame)
+    Skin.ReleasePanelSlot(CharacterFrame)
 end)
 
 local pendingRefresh = {}
@@ -2235,19 +2146,6 @@ BUI.Events:RegisterUnit('UNIT_MODEL_CHANGED', 'player', 'Skinning.CharacterFrame
 BUI.Events:Register('TRANSMOGRIFY_SUCCESS', 'Skinning.CharacterFrame', On.Model)
 BUI.Events:Register('BAG_UPDATE_DELAYED', 'Skinning.CharacterFrame', On.Bags)
 
-Skin.OnToggle('characterFrame', function(enabled)
-    if not enabled then
-        HideSkin()
-        if frame then frame:Hide() end
-        if CharacterFrame then
-            Skin.RestoreBlizzardFrame(CharacterFrame)
-            Skin.ReleasePanelSlot(CharacterFrame)
-        end
-    elseif CharacterFrame and CharacterFrame:IsShown() then
-        ApplySkin()
-    end
-end)
-
 local TINT_DEFAULT = { 0.45, 0.45, 0.6, 0.15 }
 local ARROW_KEYS = { 'characterFrameArrow', 'characterFrameArrowEmpty', 'characterFrameArrowPlate' }
 
@@ -2265,47 +2163,42 @@ local function ArrowSwatch(label, index, separator)
     }
 end
 
-Skin.RegisterSkin('characterFrame', {
-    name = 'Character Frame',
-    description = 'Replaces the default character paperdoll with a dark sheet: item level, upgrade track, enchant and gem readouts beside each slot, and a sidebar with stats, titles and equipment sets.',
-    icon = 'Interface\\Icons\\INV_Chest_Plate03',
-    settings = {
-        {
-            label = 'Outline the slot columns and sidebar',
-            get = function() return BUI.GetDB().skinning.characterFramePanels == true end,
-            set = function(value)
-                BUI.GetDB().skinning.characterFramePanels = value
-                ApplyBackground()
-            end,
-        },
-        {
-            label = 'Tint the sheet',
-            get = function() return BUI.GetDB().skinning.characterFrameTintEnabled == true end,
-            set = function(value)
-                local skinning = BUI.GetDB().skinning
-                skinning.characterFrameTintEnabled = value
-                skinning.characterFrameTint = skinning.characterFrameTint or TINT_DEFAULT
-                ApplyBackground()
-            end,
-        },
-        {
-            kind = 'swatch', label = 'Tint color and strength', opacity = true,
-            get = function() return unpack(BUI.GetDB().skinning.characterFrameTint or TINT_DEFAULT) end,
-            set = function(red, green, blue, alpha)
-                BUI.GetDB().skinning.characterFrameTint = { red, green, blue, alpha }
-                ApplyBackground()
-            end,
-        },
-        ArrowSwatch('Bag arrow, something in bags', 1, true),
-        ArrowSwatch('Bag arrow, nothing in bags', 2),
-        ArrowSwatch('Plate behind the arrow', 3),
-        {
-            label = 'Bag arrow colors', text = 'Reset',
-            onClick = function()
-                local skinning = BUI.GetDB().skinning
-                for _, key in ipairs(ARROW_KEYS) do skinning[key] = nil end
-                RefreshBagAlternatives()
-            end,
-        },
+context.info.settings = {
+    {
+        label = 'Cards behind the slot columns',
+        get = function() return BUI.GetDB().skinning.characterFramePanels == true end,
+        set = function(value)
+            BUI.GetDB().skinning.characterFramePanels = value
+            ApplyBackground()
+        end,
     },
-})
+    {
+        label = 'Tint the sheet',
+        get = function() return BUI.GetDB().skinning.characterFrameTintEnabled == true end,
+        set = function(value)
+            local skinning = BUI.GetDB().skinning
+            skinning.characterFrameTintEnabled = value
+            skinning.characterFrameTint = skinning.characterFrameTint or TINT_DEFAULT
+            ApplyBackground()
+        end,
+    },
+    {
+        kind = 'swatch', label = 'Tint color and strength', opacity = true,
+        get = function() return unpack(BUI.GetDB().skinning.characterFrameTint or TINT_DEFAULT) end,
+        set = function(red, green, blue, alpha)
+            BUI.GetDB().skinning.characterFrameTint = { red, green, blue, alpha }
+            ApplyBackground()
+        end,
+    },
+    ArrowSwatch('Bag arrow, something in bags', 1, true),
+    ArrowSwatch('Bag arrow, nothing in bags', 2),
+    ArrowSwatch('Plate behind the arrow', 3),
+    {
+        label = 'Bag arrow colors', text = 'Reset',
+        onClick = function()
+            local skinning = BUI.GetDB().skinning
+            for _, key in ipairs(ARROW_KEYS) do skinning[key] = nil end
+            RefreshBagAlternatives()
+        end,
+    },
+}
