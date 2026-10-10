@@ -12,8 +12,14 @@ local Skin3 = BUILib.Skin
 local Skin = BUI.Skinning
 
 local ARROW_TEXTURE = 130940
-local MENU_BG = { 0.06, 0.06, 0.06, 0.95 }
+local MENU_FILL = {}
 local SEPARATOR_COLOR = theme.border.default
+
+local function MenuFill()
+	local panel = Skin.PALETTE.panel
+	MENU_FILL[1], MENU_FILL[2], MENU_FILL[3], MENU_FILL[4] = panel[1], panel[2], panel[3], 1
+	return MENU_FILL
+end
 
 local function SkinRow(button)
 	if button and button.divider then
@@ -41,7 +47,9 @@ local function ApplySkin(frame)
 	if not Skin.IsSkinEnabled('menus') then return end
 	Skin3.StripTextures(frame)
 	frame._buiBackdrop = frame._buiBackdrop or menuBackdrops[frame]
-	menuBackdrops[frame] = Skin3.ChildBackdrop(frame, { bg = MENU_BG, border = theme.border.light, inside = true })
+	local backdrop = Skin3.ChildBackdrop(frame, { inside = true })
+	menuBackdrops[frame] = backdrop
+	Skin.ApplyBackdrop(backdrop, MenuFill(), Skin.PALETTE.edge)
 	SkinTree(frame, 0)
 end
 
