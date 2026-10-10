@@ -1132,6 +1132,11 @@ function Skin.SetSegmentSelected(tab, selected)
 	tab:SetHighlightFontObject(fonts.normal)
 end
 
+function Skin.SegmentText(text, bright)
+	local fonts = ButtonFontObjects()
+	text:SetFontObject(bright and fonts.normal or fonts.disabled)
+end
+
 function Skin.SegmentStrip(strip, tabs, width)
 	local height = Skin.DropdownHeight()
 	local tabWidth = (width - SEGMENT_PAD * 2 - SEGMENT_GAP * (#tabs - 1)) / #tabs
