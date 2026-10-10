@@ -396,12 +396,12 @@ local function BuildPreview(band, kit)
 	local captionY = -(PREVIEW_HEIGHT / 2) + 16
 	function band:Update()
 		local module = UnitFrames()
-		local combat = InCombatLockdown()
+		local combat = module.StageLocked()
 		notice:SetShown(combat)
 		groupNote:SetShown(not combat and GROUP_TABS[selected] == true)
+		for _, caption in ipairs(captions) do caption:Hide() end
 		if combat then return end
 		module.ClearStage(stage)
-		for _, caption in ipairs(captions) do caption:Hide() end
 		if GROUP_TABS[selected] then return end
 		if selected == 'appearance' or selected == 'filters' then
 			local playerX, targetX = module.StagePair(stage, kit, PREVIEW_PAIR_WIDTH, PREVIEW_FRAME_HEIGHT, PREVIEW_GAP)
@@ -429,6 +429,7 @@ local function BuildPreview(band, kit)
 		if frame then module.PlaceStaged(frame, stage, 0, 0) end
 	end
 	band:HookScript('OnShow', function(self) self:Update() end)
+	UnitFrames().WatchStage(stage, function() band:Update() end)
 	return band
 end
 
