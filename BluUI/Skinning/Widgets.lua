@@ -169,7 +169,12 @@ function Skin.CreateSearchBox(parent, width, callback)
 		hint:SetShown(text == '')
 		callback(text)
 	end))
-	editBox:SetScript('OnEscapePressed', BUI.Profiler.Script('Skin.Widgets editBox OnEscapePressed', function(self) self:SetText(''); self:ClearFocus() end))
+	editBox:SetScript('OnEscapePressed', BUI.Profiler.Script('Skin.Widgets editBox OnEscapePressed', function(self)
+		self:SetText('')
+		self:ClearFocus()
+		hint:Show()
+		callback('')
+	end))
 	local function showAccent() AccentBorder(container) end
 	local function showIdle() RestBorder(container) end
 
