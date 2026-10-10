@@ -1298,6 +1298,10 @@ function Skin.PaintPanelBackdrop(frame)
 	Skin.ApplyBackdrop(frame, PANEL_FILL, PANEL_EDGE)
 end
 
+function Skin.PaintCardBackdrop(frame)
+	Skin.ApplyBackdrop(frame, CARD_FILL, PANEL_EDGE)
+end
+
 local function BackdropButtonEnter(button)
 	local red, green, blue = BUILib.Theme.GetAccent()
 	button:SetBackdropBorderColor(red, green, blue, 1)
