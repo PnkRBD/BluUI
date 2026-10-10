@@ -13,9 +13,10 @@ local OUTFIT_ART = { 'NormalTexture', 'HighlightTexture', 'Selected', 'SelectedP
 local ITEM_MODEL_ART = { 'Border', 'BorderHighlight', 'StateTexture' }
 local SET_MODEL_ART = { 'Border', 'Highlight', 'TransmogStateTexture' }
 local PAGED_FRAMES = { 'ItemsFrame', 'SetsFrame', 'CustomSetsFrame' }
-local DROPDOWN_KEYS = { 'FilterButton', 'WeaponDropdown', 'WeaponSheatheDropdown' }
+local DROPDOWN_KEYS = { 'WeaponDropdown', 'WeaponSheatheDropdown' }
+local SEARCH = { gap = 8, textX = 8 }
 local DISPLAY_ICON = { scale = 0.8, x = 4, textX = 42 }
-local TABS = { x = 23, y = -22, level = 10 }
+local TABS = { x = 23, y = -24, level = 10 }
 local NEW_SET = { x = -29, y = -22 }
 
 local context = Skin.Define('transmog', {
@@ -163,6 +164,21 @@ local function ThemedDropdown(dropdown)
 	Skin.TipFont(dropdown.Text, 'body')
 end
 
+local function SkinFilterRow(paged, tabs)
+	local filter, search = paged.FilterButton, paged.SearchBox
+	if not filter then return end
+	ThemedDropdown(filter)
+	local text = filter.Text
+	text:ClearAllPoints()
+	text:SetPoint('LEFT', filter, 'LEFT', SEARCH.textX, 0)
+	text:SetJustifyH('LEFT')
+	EditBox(search)
+	search:SetHeight(filter:GetHeight())
+	search:ClearAllPoints()
+	search:SetPoint('LEFT', tabs, 'RIGHT', SEARCH.gap, 0)
+	search:SetPoint('RIGHT', filter, 'LEFT', -SEARCH.gap, 0)
+end
+
 local function SkinPager(paged)
 	local content = paged.PagedContent
 	local controls = content.PagingControls
@@ -202,8 +218,7 @@ local function SkinWardrobe(collection)
 	headers:SetFrameLevel(content:GetFrameLevel() + TABS.level)
 	for _, key in ipairs(PAGED_FRAMES) do
 		local paged = content[key]
-		ThemedDropdown(paged.FilterButton)
-		EditBox(paged.SearchBox)
+		SkinFilterRow(paged, headers)
 		SkinPager(paged)
 	end
 	SkinItems(content.ItemsFrame)
