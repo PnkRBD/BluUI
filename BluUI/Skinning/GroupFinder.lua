@@ -1,16 +1,11 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.GroupFinder')
-
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 local Theme = BUILib.Theme
 
-local SKIN_ID = 'groupfinder'
-local PVP_ADDON = 'Blizzard_PVPUI'
-local CHALLENGES_ADDON = 'Blizzard_ChallengesUI'
 local BOTTOM_TAB_COUNT = 3
 local GROUP_BUTTON_COUNT = 4
 local PVP_CATEGORY_COUNT = 5
@@ -21,9 +16,7 @@ local ACTIVITY_TITLE_SIZE = 14
 local LIST_CHECK_INSET = 2
 local HIGHLIGHT_ALPHA = 0.06
 local SELECTED_ALPHA = 0.15
-local MENU_REST_FILL = { 0.03, 0.03, 0.036, 0.97 }
-local MENU_SELECTED_FILL = { 0.075, 0.078, 0.088, 0.97 }
-local MENU_TEXT = { 0.87, 0.87, 0.9, 1 }
+local MENU = { x = 12, top = -32, gap = 8, width = 201 }
 local ROLE_KEYS = { 'RoleButtonTank', 'RoleButtonHealer', 'RoleButtonDPS', 'RoleButtonLeader' }
 local PVP_ROLE_KEYS = { 'TankIcon', 'HealerIcon', 'DPSIcon' }
 local LIST_OPTION_KEYS = { 'ItemLevel', 'MythicPlusRating', 'PVPRating', 'PvpItemLevel', 'VoiceChat', 'PrivateGroup', 'CrossFactionGroup' }
@@ -51,21 +44,17 @@ local SEARCH_BOX_LEFT = 12
 local BOTTOM_POINTS = { BOTTOM = true, BOTTOMLEFT = true, BOTTOMRIGHT = true }
 local TOP_POINTS = { TOP = true, TOPLEFT = true, TOPRIGHT = true }
 
-local installed = false
-local skinned = false
-local pvpSkinned = false
-local pvpHooked = false
-local challengesSkinned = false
-local challengesHooked = false
 local pvpSelectedIndex
 
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
+local context = Skin.Define('groupfinder', {
+	name = 'Group Finder',
+	description = 'Dungeons & Raids, PvP and Mythic+ window with its side menu, queue panels and Premade Groups.',
+	icon = 'Interface/LFGFrame/UI-LFG-PORTRAIT',
+	newLook = true,
+})
+local Hook = context.Hook
 local Fade, FadeRegions, FadeKeys, FadeArt = context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt
-local Shell, Button, Close, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.Dropdown, context.EditBox, context.CheckBox
+local Shell, Button, Close, Card, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.Card, context.Dropdown, context.EditBox, context.CheckBox
 local ScrollBar, Face, Title, Body, TextBox = context.ScrollBar, context.Face, context.Title, context.Body, context.TextBox
 local AccentTexture, RowHighlight, CropIcon, FlatTexture = Skin.AccentTexture, Skin.RowHighlight, Skin.CropIcon, Skin.FlatTexture
 
@@ -107,19 +96,9 @@ local function MenuButtonName(button)
 end
 
 local function SetMenuButtonSelected(button, selected)
-	local shell = button._buiShell
-	if shell then
-		local fill = selected and MENU_SELECTED_FILL or MENU_REST_FILL
-		shell.fill:SetColorTexture(fill[1], fill[2], fill[3], fill[4])
-	end
+	Skin.SetActiveEdge(button, selected)
 	local name = MenuButtonName(button)
-	if not name then return end
-	if selected then
-		local red, green, blue = Theme.GetAccent()
-		name:SetTextColor(red, green, blue, 1)
-	else
-		name:SetTextColor(MENU_TEXT[1], MENU_TEXT[2], MENU_TEXT[3], MENU_TEXT[4])
-	end
+	if name then BUI.Painter.Text(name, selected and 'skinTitle' or 'skinText') end
 end
 
 local function SkinMenuButton(button)
@@ -140,7 +119,7 @@ local function SkinMenuButton(button)
 	end
 	Fade(button.bg or button.Background)
 	Fade(button.ring or button.Ring)
-	Shell(button)
+	Card(button)
 	SetMenuButtonSelected(button, false)
 end
 
@@ -194,7 +173,6 @@ local function SkinRewardPanel(child)
 end
 
 local function OnRewardItem(parentFrame, _, index)
-	if not Enabled() then return end
 	local name = parentFrame and parentFrame.GetName and parentFrame:GetName()
 	if name then SkinRewardItem(_G[name .. 'Item' .. index]) end
 end
@@ -210,7 +188,7 @@ local function SkinDungeonRow(button, partial)
 end
 
 local function OnDungeonRow(button, dungeonID, _, checkedList)
-	if not Enabled() or not button then return end
+	if not button then return end
 	SkinDungeonRow(button, checkedList and dungeonID and checkedList[dungeonID] == 1)
 end
 
@@ -377,7 +355,6 @@ local function SkinCategoryButton(button)
 end
 
 local function OnCategoryButton(selection, buttonIndex, categoryID, filters)
-	if not Enabled() then return end
 	local button = selection.CategoryButtons and selection.CategoryButtons[buttonIndex]
 	if not button then return end
 	SkinCategoryButton(button)
@@ -408,13 +385,13 @@ local function PaintSearchEntryState(button)
 end
 
 local function OnSearchEntry(button)
-	if not Enabled() or not button then return end
+	if not button then return end
 	SkinSearchEntry(button)
 	PaintSearchEntryState(button)
 end
 
 local function OnApplicant(button)
-	if not Enabled() or not button or button._buiApplicant then return end
+	if not button or button._buiApplicant then return end
 	button._buiApplicant = true
 	IconButton(button.DeclineButton)
 	Button(button.InviteButton)
@@ -422,7 +399,6 @@ local function OnApplicant(button)
 end
 
 local function OnAutoComplete(panel)
-	if not Enabled() then return end
 	local autoComplete = panel and panel.AutoCompleteFrame
 	if not autoComplete then return end
 	for _, child in ipairs({ autoComplete:GetChildren() }) do
@@ -586,7 +562,7 @@ local function SkinSpecificRow(button)
 end
 
 local function SkinSpecificRows(scrollBox)
-	if Enabled() then Skin.ForEachScrollFrame(scrollBox, SkinSpecificRow) end
+	Skin.ForEachScrollFrame(scrollBox, SkinSpecificRow)
 end
 
 local function OnHonorListUpdated()
@@ -595,7 +571,6 @@ local function OnHonorListUpdated()
 end
 
 local function RefreshConquestBar(bar)
-	if not Enabled() then return end
 	for keyIndex = 1, #CONQUEST_BAR_ART do bar[CONQUEST_BAR_ART[keyIndex]]:SetAlpha(0) end
 	bar:SetStatusBarTexture(BUI.GetGlobalTexture())
 	local red, green, blue = Theme.GetAccent()
@@ -647,14 +622,11 @@ end
 
 local function OnPvpSelection(index)
 	pvpSelectedIndex = index
-	if Enabled() and pvpSkinned then RefreshPvpButtons() end
+	RefreshPvpButtons()
 end
 
 local function SkinPvp()
-	if pvpSkinned or not Enabled() then return end
 	local queue = _G.PVPQueueFrame
-	if not queue then return end
-	pvpSkinned = true
 	FadeRegions(_G.PVPUIFrame)
 	for buttonIndex = 1, PVP_CATEGORY_COUNT do SkinMenuButton(queue['CategoryButton' .. buttonIndex]) end
 	RefreshPvpButtons()
@@ -682,14 +654,13 @@ local function SkinPvp()
 		Button(season.Leave)
 		SkinRoundIcon(season.SeasonRewardFrame)
 	end
-	if pvpHooked then return end
-	pvpHooked = true
+end
+
+local function InstallPvp()
 	if _G.HonorFrameSpecificList_Update then Hook('HonorFrameSpecificList_Update', OnHonorListUpdated) end
 	if _G.PVPQueueFrame_SelectButton then Hook('PVPQueueFrame_SelectButton', OnPvpSelection) end
 	local trainingMixin = _G.PVPSpecificTrainingGroundButtonMixin
-	if trainingMixin and trainingMixin.Initialize then
-		Hook(trainingMixin, 'Initialize', function(button) if Enabled() then SkinSpecificRow(button) end end)
-	end
+	if trainingMixin and trainingMixin.Initialize then Hook(trainingMixin, 'Initialize', SkinSpecificRow) end
 end
 
 local function SkinDungeonIcon(child)
@@ -705,7 +676,7 @@ local function SkinDungeonIcon(child)
 end
 
 local function OnChallengesUpdated(frame)
-	if not Enabled() or not frame.DungeonIcons then return end
+	if not frame.DungeonIcons then return end
 	for _, child in ipairs(frame.DungeonIcons) do SkinDungeonIcon(child) end
 end
 
@@ -721,7 +692,6 @@ local function KeystoneBackdropTexture(frame)
 end
 
 local function RefadeKeystoneArt(frame)
-	if not Enabled() then return end
 	local backdrop = KeystoneBackdropTexture(frame)
 	if backdrop then backdrop:SetAlpha(0) end
 	for keyIndex = 1, #KEYSTONE_ART do
@@ -731,7 +701,6 @@ local function RefadeKeystoneArt(frame)
 end
 
 local function SkinKeystoneFrame(frame)
-	if not Enabled() then return end
 	RefadeKeystoneArt(frame)
 	Shell(frame)
 	Close(frame.CloseButton)
@@ -741,11 +710,7 @@ local function SkinKeystoneFrame(frame)
 	FaceSize(frame.TimeLimit, KEYSTONE_TEXT_SIZE)
 end
 
-local function SkinChallenges()
-	if challengesSkinned or not Enabled() then return end
-	local frame = _G.ChallengesFrame
-	if not frame then return end
-	challengesSkinned = true
+local function SkinChallenges(frame)
 	FadeRegions(frame)
 	FadeArt(_G.ChallengesFrameInset)
 	OnChallengesUpdated(frame)
@@ -757,25 +722,20 @@ local function SkinChallenges()
 	end
 	local keystone = _G.ChallengesKeystoneFrame
 	if keystone and keystone:IsShown() then SkinKeystoneFrame(keystone) end
-	if challengesHooked then return end
-	challengesHooked = true
-	if frame.Update then Hook(frame, 'Update', OnChallengesUpdated) end
-	if keystone then
-		keystone:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GroupFinder keystone reskin', SkinKeystoneFrame))
-		if keystone.Reset then Hook(keystone, 'Reset', RefadeKeystoneArt) end
-	end
+end
+
+local function InstallChallenges(frame)
+	Hook(frame, 'Update', OnChallengesUpdated)
+	local keystone = _G.ChallengesKeystoneFrame
+	if not keystone then return end
+	keystone:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GroupFinder keystone reskin', context.Guard(SkinKeystoneFrame)))
+	Hook(keystone, 'Reset', RefadeKeystoneArt)
 end
 
 local function SkinMainFrame(frame)
-	FadeRegions(frame)
-	Fade(frame.NineSlice)
-	if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
+	context.Chrome(frame)
 	FadeRegions(frame.shadows)
-	FadeArt(frame.Inset)
 	Shell(frame.Inset)
-	Shell(frame)
-	Title(frame.TitleContainer and frame.TitleContainer.TitleText)
-	Close(frame.CloseButton)
 	local tabs = {}
 	for tabIndex = 1, BOTTOM_TAB_COUNT do tabs[tabIndex] = frame['tab' .. tabIndex] or _G['PVEFrameTab' .. tabIndex] end
 	Skin.RegisterTabStrip(frame, tabs, context)
@@ -783,118 +743,68 @@ end
 
 local function SkinGroupButtons()
 	local frame = _G.GroupFinderFrame
-	if not frame then return end
-	for buttonIndex = 1, GROUP_BUTTON_COUNT do SkinMenuButton(frame['groupButton' .. buttonIndex]) end
+	local previous
+	for buttonIndex = 1, GROUP_BUTTON_COUNT do
+		local button = frame['groupButton' .. buttonIndex]
+		SkinMenuButton(button)
+		button:SetWidth(MENU.width)
+		button:ClearAllPoints()
+		if previous then
+			button:SetPoint('TOP', previous, 'BOTTOM', 0, -MENU.gap)
+		else
+			button:SetPoint('TOPLEFT', frame, 'TOPLEFT', MENU.x, MENU.top)
+		end
+		previous = button
+	end
 	RefreshGroupButtons()
 end
 
-local function Apply()
-	local frame = _G.PVEFrame
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if not skinned then
-		skinned = true
-		SkinMainFrame(frame)
-		SkinGroupButtons()
-		SkinDungeonFinder()
-		SkinRaidFinder()
-		SkinPremadeGroups()
-	end
+local function SkinPVE(frame)
+	SkinMainFrame(frame)
+	SkinGroupButtons()
+	SkinDungeonFinder()
+	SkinRaidFinder()
+	SkinPremadeGroups()
+end
+
+local function RefreshPVE(frame)
 	RefreshGroupButtons()
 	Skin.RefreshTabStrip(frame)
 	local queue = _G.LFDQueueFrame
-	if queue then
-		SweepDungeonRows(queue.Specific)
-		SweepDungeonRows(queue.Follower)
-	end
-	SkinPvp()
-	SkinChallenges()
+	SweepDungeonRows(queue.Specific)
+	SweepDungeonRows(queue.Follower)
 end
 
-local function OnGroupSelection()
-	if Enabled() and skinned then RefreshGroupButtons() end
-end
-
-local function OnAddonLoaded(first, second)
-	local addonName = second or first
-	if addonName == PVP_ADDON then
-		SkinPvp()
-	elseif addonName == CHALLENGES_ADDON then
-		SkinChallenges()
-	end
-	if pvpSkinned and challengesSkinned then BUI.Events:Unregister('ADDON_LOADED', 'Skin.GroupFinder') end
-end
-
-local function HookRows()
+local function InstallPVE()
 	Hook('LFGRewardsFrame_SetItemButton', OnRewardItem)
 	Hook('LFGDungeonListButton_SetDungeon', OnDungeonRow)
-	Hook('GroupFinderFrame_SelectGroupButton', OnGroupSelection)
-	if _G.LFGListCategorySelection_AddButton then Hook('LFGListCategorySelection_AddButton', OnCategoryButton) end
-	if _G.LFGListSearchEntry_Update then Hook('LFGListSearchEntry_Update', OnSearchEntry) end
-	if _G.LFGListApplicationViewer_UpdateApplicant then Hook('LFGListApplicationViewer_UpdateApplicant', OnApplicant) end
-	if _G.LFGListSearchPanel_UpdateAutoComplete then Hook('LFGListSearchPanel_UpdateAutoComplete', OnAutoComplete) end
+	Hook('GroupFinderFrame_SelectGroupButton', RefreshGroupButtons)
+	Hook('LFGListCategorySelection_AddButton', OnCategoryButton)
+	Hook('LFGListSearchEntry_Update', OnSearchEntry)
+	Hook('LFGListApplicationViewer_UpdateApplicant', OnApplicant)
+	Hook('LFGListSearchPanel_UpdateAutoComplete', OnAutoComplete)
 end
 
-local function Install()
-	if installed then return end
+context.Window('PVEFrame', { skin = SkinPVE, show = RefreshPVE, install = InstallPVE })
+context.Window('PVPUIFrame', { skin = SkinPvp, install = InstallPvp })
+context.Window('ChallengesFrame', { skin = SkinChallenges, install = InstallChallenges })
+
+context.info.test = function()
 	local frame = _G.PVEFrame
 	if not frame then return end
-	installed = true
-	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GroupFinder frame reskin', Apply))
-	HookRows()
-	BUI.Events:Register('ADDON_LOADED', 'Skin.GroupFinder', OnAddonLoaded)
-	if frame:IsShown() then Apply() end
-end
-
-local function TryInstall()
-	Install()
-	if installed then BUI.Events:Unregister('ADDON_LOADED', 'Skin.GroupFinderInstall') end
-end
-
-local function Deactivate()
-	context.Restore()
-	skinned = false
-	pvpSkinned = false
-	challengesSkinned = false
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		if installed and not (pvpSkinned and challengesSkinned) then
-			BUI.Events:Register('ADDON_LOADED', 'Skin.GroupFinder', OnAddonLoaded)
-			SkinPvp()
-			SkinChallenges()
-		end
-		if not installed then
-			BUI.Events:Register('ADDON_LOADED', 'Skin.GroupFinderInstall', TryInstall)
-		elseif _G.PVEFrame:IsShown() then
-			Apply()
-		end
-	else
-		Deactivate()
+	if _G.PVEFrame_ShowLeftInset then PVEFrame_ShowLeftInset() end
+	if _G.PVPUIFrame then _G.PVPUIFrame:Hide() end
+	if _G.ChallengesFrame then _G.ChallengesFrame:Hide() end
+	PanelTemplates_SetTab(frame, 1)
+	local groupFinder = _G.GroupFinderFrame
+	if groupFinder then
+		groupFinder:Show()
+		if _G.GroupFinderFrame_ShowGroupFrame then GroupFinderFrame_ShowGroupFrame(_G.LFDParentFrame) end
 	end
-end)
+	frame:Show()
+	return frame
+end
 
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Group Finder',
-	description = 'Dungeons & Raids, PvP and Mythic+ window with its side menu, queue panels and Premade Groups.',
-	icon = 'Interface/LFGFrame/UI-LFG-PORTRAIT',
-	test = function()
-		local frame = _G.PVEFrame
-		if not frame then return end
-		if _G.PVEFrame_ShowLeftInset then PVEFrame_ShowLeftInset() end
-		if _G.PVPUIFrame then _G.PVPUIFrame:Hide() end
-		if _G.ChallengesFrame then _G.ChallengesFrame:Hide() end
-		PanelTemplates_SetTab(frame, 1)
-		local groupFinder = _G.GroupFinderFrame
-		if groupFinder then
-			groupFinder:Show()
-			if _G.GroupFinderFrame_ShowGroupFrame then GroupFinderFrame_ShowGroupFrame(_G.LFDParentFrame) end
-		end
-		frame:Show()
-		return frame
-	end,
-	stopTest = function()
-		if _G.PVEFrame then HideUIPanel(_G.PVEFrame) end
-	end,
-})
+context.info.stopTest = function()
+	if _G.PVEFrame then HideUIPanel(_G.PVEFrame) end
+end
