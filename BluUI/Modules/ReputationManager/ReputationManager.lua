@@ -1,23 +1,38 @@
 local _, BUI = ...
 local PoolGet, PoolHideFrom = BUI.Tools.PoolGet, BUI.Tools.PoolHideFrom
 local Pixel = BUI.Pixel
+local Painter = BUI.Painter
+local Skin = BUI.Skinning
 
 local BUILib = BluUI.BUILibClient
 local Widget   = BUILib.Widget
-local Colors   = BUILib.Colors
 local Controls = BUILib.Controls
 local FONT     = BUILib.Font
 
 local PANEL_W  = 380
-local PANEL_H  = 460
 local ROW_H    = 32
+local ROW_GAP  = 4
 local HEADER_H = 22
+local BAR_H    = 2
 
 local MAX_STANDING = 8
 
 local RENOWN_COLOR     = { 0.4, 0.7, 1 }
 local PARAGON_COLOR    = { 1, 0.82, 0 }
 local FRIENDSHIP_COLOR = { 0.2, 0.85, 0.55 }
+local WARBAND_COLOR    = { 0.55, 0.85, 1 }
+local STANDING_COLORS  = {}
+for reaction = 1, MAX_STANDING do
+    local color = FACTION_BAR_COLORS[reaction]
+    STANDING_COLORS[reaction] = { color.r, color.g, color.b }
+end
+
+local context = Skin.Define('reputationManager', {
+    name = 'Reputation Manager',
+    description = 'Faction list beside the Character frame.',
+    icon = 'Interface\\Icons\\Achievement_Reputation_01',
+    newLook = true,
+})
 
 BUI.ReputationManager = {}
 
@@ -29,11 +44,6 @@ local RefreshContent
 
 local function StandingLabel(reaction)
     return GetText('FACTION_STANDING_LABEL' .. reaction, UnitSex('player'))
-end
-
-local function StandingColor(reaction)
-    local color = FACTION_BAR_COLORS[reaction]
-    return color.r, color.g, color.b
 end
 
 local function MajorFactionData(factionID)
@@ -56,6 +66,10 @@ local function FriendshipProgress(friendshipInfo)
     return current, max
 end
 
+local function PaintPanel(frame)
+    Painter.Custom(frame, Skin.PaintPanelBackdrop)
+end
+
 local JOURNEY_W      = 260
 local JOURNEY_PAD    = 12
 local JOURNEY_LINE_H = 16
@@ -63,6 +77,7 @@ local JOURNEY_HEADER = 44
 local STATE_PAST    = 1
 local STATE_CURRENT = 2
 local STATE_FUTURE  = 3
+local FUTURE_ALPHA  = 0.6
 
 local function HideJourneyPanel()
     if journeyPanel then journeyPanel:Hide() end
@@ -70,30 +85,26 @@ end
 
 local function BuildJourneyPanel()
     if journeyPanel then return end
-    journeyPanel = Widget.New(UIParent, 'Frame', nil, {
-        bg = Colors.bg.dark,
-        border = Colors.border.light,
-        size = { JOURNEY_W, 200 },
-    }).frame
+    journeyPanel = CreateFrame('Frame', nil, UIParent, 'BackdropTemplate')
+    journeyPanel:SetWidth(Pixel.Scale(JOURNEY_W))
+    PaintPanel(journeyPanel)
     journeyPanel:SetFrameStrata('TOOLTIP')
     journeyPanel:SetClampedToScreen(true)
     journeyPanel:Hide()
 
     journeyPanel.title = journeyPanel:CreateFontString(nil, 'OVERLAY')
-    Pixel.ApplyFont(journeyPanel.title, 13, FONT, 'OUTLINE')
+    Skin.TipFont(journeyPanel.title, 'title')
     journeyPanel.title:SetPoint('TOPLEFT', Pixel.Scale(JOURNEY_PAD), Pixel.Scale(-JOURNEY_PAD))
     journeyPanel.title:SetPoint('TOPRIGHT', Pixel.Scale(-JOURNEY_PAD - 16), Pixel.Scale(-JOURNEY_PAD))
     journeyPanel.title:SetJustifyH('LEFT')
 
     journeyPanel.subtitle = journeyPanel:CreateFontString(nil, 'OVERLAY')
-    Pixel.ApplyFont(journeyPanel.subtitle, 10, FONT, '')
+    Skin.TipFont(journeyPanel.subtitle, 'label')
     journeyPanel.subtitle:SetPoint('TOPLEFT', journeyPanel.title, 'BOTTOMLEFT', 0, Pixel.Scale(-2))
     journeyPanel.subtitle:SetPoint('TOPRIGHT', journeyPanel.title, 'BOTTOMRIGHT', 0, Pixel.Scale(-2))
     journeyPanel.subtitle:SetJustifyH('LEFT')
-    journeyPanel.subtitle:SetTextColor(0.6, 0.6, 0.6)
 
-    local closeButton = Controls.Icon(journeyPanel, { preset = 'clear', size = Pixel.Scale(16),
-        idleColor = { 0.7, 0.7, 0.7 }, onClick = HideJourneyPanel })
+    local closeButton = Controls.Icon(journeyPanel, { preset = 'clear', size = Pixel.Scale(16), onClick = HideJourneyPanel })
     closeButton:SetPoint('TOPRIGHT', Pixel.Scale(-6), Pixel.Scale(-6))
 
     journeyPanel.lines = {}
@@ -121,7 +132,7 @@ local function GetJourneyLine(index)
     Pixel.ApplyFont(line.value, 10, FONT, '')
     line.value:SetPoint('RIGHT', Pixel.Scale(-8), 0)
     line.value:SetJustifyH('RIGHT')
-    line.value:SetTextColor(0.65, 0.65, 0.65)
+    Painter.Text(line.value, 'skinLabel')
 
     line.label:SetPoint('RIGHT', line.value, 'LEFT', Pixel.Scale(-6), 0)
 
@@ -136,20 +147,20 @@ local function SetJourneyLine(index, state, label, labelColor, value)
     line:SetPoint('TOPLEFT', Pixel.Scale(JOURNEY_PAD), y)
     line:SetPoint('TOPRIGHT', Pixel.Scale(-JOURNEY_PAD), y)
 
+    local labelRed, labelGreen, labelBlue, labelAlpha = Painter.Color('skinLabel')
     if state == STATE_PAST then
         line.marker:SetSize(Pixel.Scale(6), Pixel.Scale(6))
-        line.marker:SetColorTexture(0.4, 0.7, 0.4, 1)
-        line.label:SetTextColor(0.55, 0.55, 0.55)
+        line.marker:SetColorTexture(Painter.Color('positive'))
     elseif state == STATE_CURRENT then
         line.marker:SetSize(Pixel.Scale(8), Pixel.Scale(8))
-        line.marker:SetColorTexture(1, 0.82, 0, 1)
-        line.label:SetTextColor(labelColor[1], labelColor[2], labelColor[3])
+        line.marker:SetColorTexture(PARAGON_COLOR[1], PARAGON_COLOR[2], PARAGON_COLOR[3], 1)
+        labelRed, labelGreen, labelBlue, labelAlpha = labelColor[1], labelColor[2], labelColor[3], 1
     else
         line.marker:SetSize(Pixel.Scale(4), Pixel.Scale(4))
-        line.marker:SetColorTexture(0.3, 0.3, 0.3, 1)
-        line.label:SetTextColor(0.4, 0.4, 0.4)
+        line.marker:SetColorTexture(Painter.Color('skinBorder'))
+        labelAlpha = FUTURE_ALPHA
     end
-
+    line.label:SetTextColor(labelRed, labelGreen, labelBlue, labelAlpha)
     line.label:SetText(label)
     line.value:SetText(value or '')
     line:Show()
@@ -167,9 +178,7 @@ end
 
 local function PopulateStandardJourney(factionID, factionData)
     local reaction = factionData.reaction
-    local lines = 0
     for standingID = 1, MAX_STANDING do
-        lines = lines + 1
         local state = StateFor(standingID, reaction)
         local value
         if state == STATE_CURRENT then
@@ -180,15 +189,13 @@ local function PopulateStandardJourney(factionID, factionData)
                 value = 'Max'
             end
         end
-        SetJourneyLine(lines, state, StandingLabel(standingID), { StandingColor(standingID) }, value)
+        SetJourneyLine(standingID, state, StandingLabel(standingID), STANDING_COLORS[standingID], value)
     end
 
     local paragonCurrent, paragonMax, paragonLabel = ParagonProgress(factionID)
-    if paragonCurrent then
-        lines = lines + 1
-        SetJourneyLine(lines, STATE_CURRENT, paragonLabel, PARAGON_COLOR, ProgressText(paragonCurrent, paragonMax))
-    end
-    return lines
+    if not paragonCurrent then return MAX_STANDING end
+    SetJourneyLine(MAX_STANDING + 1, STATE_CURRENT, paragonLabel, PARAGON_COLOR, ProgressText(paragonCurrent, paragonMax))
+    return MAX_STANDING + 1
 end
 
 local function PopulateRenownJourney(factionID, majorFactionData)
@@ -246,10 +253,9 @@ local function ShowJourneyPanel(row)
     if not factionData then return end
 
     journeyPanel.title:SetText(factionData.name)
-    local subParts = {}
-    if factionData.isAccountWide then subParts[#subParts + 1] = '|cff8cd9ffWarband|r' end
-    subParts[#subParts + 1] = row._standingLabel
-    journeyPanel.subtitle:SetText(table.concat(subParts, '  '))
+    local subtitle = row._standingLabel
+    if factionData.isAccountWide then subtitle = '|cff8cd9ffWarband|r  ' .. subtitle end
+    journeyPanel.subtitle:SetText(subtitle)
 
     local lineCount
     local majorFactionData = MajorFactionData(factionID)
@@ -261,7 +267,7 @@ local function ShowJourneyPanel(row)
     else
         lineCount = PopulateStandardJourney(factionID, factionData)
     end
-    for lineIndex = lineCount + 1, #journeyPanel.lines do journeyPanel.lines[lineIndex]:Hide() end
+    PoolHideFrom(journeyPanel.lines, lineCount + 1)
 
     journeyPanel:SetHeight(Pixel.Scale(JOURNEY_HEADER + lineCount * JOURNEY_LINE_H + JOURNEY_PAD))
 
@@ -304,57 +310,74 @@ local function ShowRowMenu(row)
             callback = function() C_Reputation.SetWatchedFactionByIndex(factionIndex); RefreshContent() end,
         }
     end
-    Controls.ContextMenu(items, { atCursor = true, width = 220 })
+    Skin.ContextMenu(items, { atCursor = true, width = 220 })
 end
 
-local function AddParagonTooltipLines(factionID)
+local function AddParagonTooltipLines(factionID, name)
     local paragonCurrent, paragonMax, _, hasReward, rewardQuestID = ParagonProgress(factionID)
     if not paragonCurrent then return end
-    local factionData = C_Reputation.GetFactionDataByID(factionID)
-    local text = PARAGON_REPUTATION_TOOLTIP_TEXT
     GameTooltip:AddLine(' ')
     GameTooltip:AddLine('Paragon  ' .. ProgressText(paragonCurrent, paragonMax), PARAGON_COLOR[1], PARAGON_COLOR[2], PARAGON_COLOR[3])
-    GameTooltip:AddLine(text:format(factionData and factionData.name or ''), 0.7, 0.7, 0.7, true)
+    GameTooltip:AddLine(PARAGON_REPUTATION_TOOLTIP_TEXT:format(name), 0.7, 0.7, 0.7, true)
     if rewardQuestID then
-        if not HaveQuestRewardData(rewardQuestID) then
-            C_QuestLog.RequestLoadQuestByID(rewardQuestID)
-        end
+        if not HaveQuestRewardData(rewardQuestID) then C_QuestLog.RequestLoadQuestByID(rewardQuestID) end
         local rewardName, rewardTexture, rewardCount, rewardQuality = GetQuestLogRewardInfo(1, rewardQuestID)
         if rewardName then
-            local qualityColor = ITEM_QUALITY_COLORS[rewardQuality or 1]
-            local countPrefix = (rewardCount or 1) > 1 and (rewardCount .. 'x ') or ''
-            GameTooltip:AddLine(('|T%s:14|t %s%s'):format(rewardTexture or 134400, countPrefix, rewardName),
-                qualityColor and qualityColor.r or 1, qualityColor and qualityColor.g or 1, qualityColor and qualityColor.b or 1)
+            local quality = ITEM_QUALITY_COLORS[rewardQuality] or ITEM_QUALITY_COLORS[1]
+            local countPrefix = rewardCount > 1 and (rewardCount .. 'x ') or ''
+            GameTooltip:AddLine(('|T%s:14|t %s%s'):format(rewardTexture, countPrefix, rewardName), quality.r, quality.g, quality.b)
         end
     end
     if hasReward then GameTooltip:AddLine('Reward ready to collect', 0.2, 1, 0.2) end
 end
 
+local RowEnter = BUI.Profiler.Script('ReputationManager.ReputationManager row OnEnter', function(self)
+    GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
+    GameTooltip:SetText(self._name, 1, 1, 1)
+    GameTooltip:AddLine(self._standingLabel, 0.7, 0.7, 0.7, true)
+    if self._accountWide then
+        GameTooltip:AddLine('Warband Reputation', WARBAND_COLOR[1], WARBAND_COLOR[2], WARBAND_COLOR[3], true)
+    end
+    if self._description ~= '' then
+        GameTooltip:AddLine(' ')
+        GameTooltip:AddLine(self._description, 0.7, 0.7, 0.7, true)
+    end
+    AddParagonTooltipLines(self._factionID, self._name)
+    GameTooltip:AddLine(' ')
+    GameTooltip:AddLine('|cff888888Right-click for options|r', 0.7, 0.7, 0.7)
+    GameTooltip:Show()
+end)
+
+local RowClick = BUI.Profiler.Script('ReputationManager.ReputationManager row OnClick', ShowRowMenu)
+
 local function CreateRow(parent)
-    local row = CreateFrame('Button', nil, parent, 'BackdropTemplate')
+    local row = CreateFrame('Button', nil, parent)
     row:SetHeight(Pixel.Scale(ROW_H))
     row:RegisterForClicks('RightButtonUp')
-    Pixel.SetTemplate(row, 0.07, 0.07, 0.08, 0.6, 0.13, 0.13, 0.15, 1, 1)
+    row:SetScript('OnEnter', RowEnter)
+    row:SetScript('OnLeave', GameTooltip_Hide)
+    row:SetScript('OnClick', RowClick)
+    Skin.CardRow(row)
 
     local watched = row:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(watched, 11, FONT, 'OUTLINE')
-    watched:SetPoint('BOTTOMRIGHT', row, 'BOTTOMRIGHT', Pixel.Scale(-4), Pixel.Scale(4))
-    watched:SetTextColor(1, 0.82, 0, 1)
+    watched:SetPoint('BOTTOMRIGHT', row, 'BOTTOMRIGHT', Pixel.Scale(-6), Pixel.Scale(5))
+    watched:SetTextColor(PARAGON_COLOR[1], PARAGON_COLOR[2], PARAGON_COLOR[3], 1)
     watched:SetText('★')
     row.watchedText = watched
 
     local warband = row:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(warband, 9, FONT, 'OUTLINE')
-    warband:SetPoint('TOPLEFT', Pixel.Scale(6), Pixel.Scale(-4))
-    warband:SetTextColor(0.55, 0.85, 1, 1)
+    warband:SetPoint('TOPLEFT', Pixel.Scale(8), Pixel.Scale(-5))
+    warband:SetTextColor(WARBAND_COLOR[1], WARBAND_COLOR[2], WARBAND_COLOR[3], 1)
     warband:SetText('W')
     row.warbandText = warband
 
     local progress = row:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(progress, 10, FONT, '')
-    progress:SetPoint('TOPRIGHT', Pixel.Scale(-6), Pixel.Scale(-4))
+    progress:SetPoint('TOPRIGHT', Pixel.Scale(-8), Pixel.Scale(-5))
     progress:SetJustifyH('RIGHT')
-    progress:SetTextColor(0.7, 0.7, 0.7, 1)
+    Painter.Text(progress, 'skinLabel')
     row.progressText = progress
 
     local name = row:CreateFontString(nil, 'OVERLAY')
@@ -369,40 +392,15 @@ local function CreateRow(parent)
     standing:SetJustifyH('LEFT')
     row.standingText = standing
 
-    local barBg = row:CreateTexture(nil, 'BACKGROUND')
-    barBg:SetPoint('BOTTOMLEFT', Pixel.Scale(4), Pixel.Scale(1))
-    barBg:SetPoint('BOTTOMRIGHT', Pixel.Scale(-4), Pixel.Scale(1))
-    barBg:SetHeight(Pixel.PixelSize(2))
-    barBg:SetColorTexture(0.15, 0.15, 0.15, 1)
-    row.barBg = barBg
-
-    local bar = row:CreateTexture(nil, 'ARTWORK')
-    bar:SetPoint('BOTTOMLEFT', barBg, 'BOTTOMLEFT', 0, 0)
-    bar:SetPoint('TOPLEFT', barBg, 'TOPLEFT', 0, 0)
+    local bar = CreateFrame('StatusBar', nil, row)
+    bar:SetPoint('BOTTOMLEFT', Pixel.Scale(6), Pixel.Scale(3))
+    bar:SetPoint('BOTTOMRIGHT', Pixel.Scale(-6), Pixel.Scale(3))
+    bar:SetHeight(Pixel.PixelSize(BAR_H))
+    bar:SetStatusBarTexture(Widget.WHITE)
+    local barBg = bar:CreateTexture(nil, 'BACKGROUND')
+    barBg:SetAllPoints()
+    Painter.Fill(barBg, 'skinBorder')
     row.bar = bar
-
-    row:SetScript('OnEnter', BUI.Profiler.Script('ReputationManager.ReputationManager row OnEnter', function(self)
-        self:SetBackdropBorderColor(Colors.GetAccent())
-        GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
-        GameTooltip:SetText(self._name, 1, 1, 1)
-        GameTooltip:AddLine(self._standingLabel, 0.7, 0.7, 0.7, true)
-        if self._accountWide then
-            GameTooltip:AddLine('Warband Reputation', 0.55, 0.85, 1, true)
-        end
-        if self._description ~= '' then
-            GameTooltip:AddLine(' ')
-            GameTooltip:AddLine(self._description, 0.7, 0.7, 0.7, true)
-        end
-        AddParagonTooltipLines(self._factionID)
-        GameTooltip:AddLine(' ')
-        GameTooltip:AddLine('|cff888888Right-click for options|r', 0.7, 0.7, 0.7)
-        GameTooltip:Show()
-    end))
-    row:SetScript('OnLeave', BUI.Profiler.Script('ReputationManager.ReputationManager row OnLeave', function(self)
-        self:SetBackdropBorderColor(0.13, 0.13, 0.15, 1)
-        GameTooltip:Hide()
-    end))
-    row:SetScript('OnClick', BUI.Profiler.Script('ReputationManager.ReputationManager row OnClick', function(self) ShowRowMenu(self) end))
     return row
 end
 
@@ -415,164 +413,125 @@ local function ResolveStanding(factionData)
         local label = RENOWN_LEVEL_LABEL:format(majorFactionData.renownLevel)
         local paragonCurrent, paragonMax, paragonLabel
         if atMax then paragonCurrent, paragonMax, paragonLabel = ParagonProgress(factionID) end
-        if paragonCurrent then
-            return { current = paragonCurrent, max = paragonMax, label = label .. '  ' .. paragonLabel, color = PARAGON_COLOR }
-        end
-        if atMax then label = label .. ' (Max)' end
-        return {
-            current = atMax and majorFactionData.renownLevelThreshold or majorFactionData.renownReputationEarned,
-            max     = majorFactionData.renownLevelThreshold,
-            label   = label,
-            color   = RENOWN_COLOR,
-        }
+        if paragonCurrent then return paragonCurrent, paragonMax, label .. '  ' .. paragonLabel, PARAGON_COLOR end
+        local threshold = majorFactionData.renownLevelThreshold
+        if atMax then return threshold, threshold, label .. ' (Max)', RENOWN_COLOR end
+        return majorFactionData.renownReputationEarned, threshold, label, RENOWN_COLOR
     end
 
     local paragonCurrent, paragonMax, paragonLabel = ParagonProgress(factionID)
-    if paragonCurrent then
-        return { current = paragonCurrent, max = paragonMax, label = paragonLabel, color = PARAGON_COLOR }
-    end
+    if paragonCurrent then return paragonCurrent, paragonMax, paragonLabel, PARAGON_COLOR end
 
     local friendshipInfo = C_GossipInfo.GetFriendshipReputation(factionID)
     if friendshipInfo and friendshipInfo.friendshipFactionID > 0 then
         local label = friendshipInfo.reaction
         local ranks = C_GossipInfo.GetFriendshipReputationRanks(factionID)
-        if ranks.maxLevel > 0 then
-            label = label .. ' (' .. ranks.currentLevel .. '/' .. ranks.maxLevel .. ')'
-        end
+        if ranks.maxLevel > 0 then label = label .. ' (' .. ranks.currentLevel .. '/' .. ranks.maxLevel .. ')' end
         local current, max = FriendshipProgress(friendshipInfo)
-        if max <= 0 then
-            current, max = 1, 1
-            label = label .. ' (Max)'
-        end
-        return { current = current, max = max, label = label, color = FRIENDSHIP_COLOR }
+        if max <= 0 then return 1, 1, label .. ' (Max)', FRIENDSHIP_COLOR end
+        return current, max, label, FRIENDSHIP_COLOR
     end
 
+    local reaction = factionData.reaction
     local current = factionData.currentStanding - factionData.currentReactionThreshold
     local max = factionData.nextReactionThreshold - factionData.currentReactionThreshold
-    if factionData.reaction == MAX_STANDING and max == 0 then current, max = 1, 1 end
-    return {
-        current = current,
-        max     = max,
-        label   = StandingLabel(factionData.reaction),
-        color   = { StandingColor(factionData.reaction) },
-    }
+    if reaction == MAX_STANDING and max == 0 then current, max = 1, 1 end
+    return current, max, StandingLabel(reaction), STANDING_COLORS[reaction]
 end
 
 local function BuildPanel()
     if panel then return end
 
-    panel = Widget.New(UIParent, 'Frame', nil, {
-        bg = Colors.bg.dark,
-        border = Colors.border.light,
-        size = { PANEL_W, PANEL_H },
-    }).frame
-    panel:SetFrameStrata('HIGH')
-    panel:SetFrameLevel(50)
-    panel:SetClampedToScreen(false)
-    panel:Hide()
-
-    BUI.Skinning.CreateTitleBar(panel, 'Reputation', 36, function() slide.Close(true) end)
-    panel.searchBox = BUI.Skinning.CreateSearchBox(panel, PANEL_W - 24, function(text)
+    panel = Skin.CreatePanelWindow('Reputation', function() slide.Close(true) end)
+    panel.searchBox = Skin.CreateSearchBox(panel, PANEL_W - 24, function(text)
         searchText = text
         RefreshContent()
+        panel.scroll:SetVerticalScroll(0)
     end)
     panel.searchBox:SetPoint('TOPLEFT', Pixel.Scale(12), Pixel.Scale(-44))
 
-    local scrollArea = CreateFrame('Frame', nil, panel)
-    scrollArea:SetPoint('TOPLEFT', Pixel.Scale(8), Pixel.Scale(-78))
-    scrollArea:SetPoint('BOTTOMRIGHT', Pixel.Scale(-8), Pixel.Scale(12))
-    panel.scroll, panel.child = BUI.Skinning.CreateScrollArea(scrollArea, ROW_H, 4)
-
-    panel.emptyText = panel:CreateFontString(nil, 'OVERLAY')
-    Pixel.ApplyFont(panel.emptyText, 11, FONT, '')
-    panel.emptyText:SetPoint('CENTER', scrollArea)
-    panel.emptyText:SetTextColor(0.4, 0.4, 0.4)
-    panel.emptyText:Hide()
+    local area
+    area, panel.scroll, panel.child = Skin.CreateListArea(panel, 78, ROW_H)
+    panel.emptyText = Skin.CreateEmptyText(panel, area)
 end
 
 local function CreateHeader(parent)
-    return BUI.Skinning.CreateListHeader(parent, HEADER_H)
+    return Skin.CreateListHeader(parent, HEADER_H)
+end
+
+local function PlaceRow(frame, y)
+    frame:ClearAllPoints()
+    frame:SetPoint('TOPLEFT', panel.child, 'TOPLEFT', 0, -y)
+    frame:SetPoint('TOPRIGHT', panel.child, 'TOPRIGHT', 0, -y)
+    frame:Show()
+end
+
+local function FillRow(row, factionData, factionIndex)
+    local current, max, label, color = ResolveStanding(factionData)
+    local red, green, blue = color[1], color[2], color[3]
+
+    row.warbandText:SetShown(factionData.isAccountWide)
+    row.nameText:ClearAllPoints()
+    if factionData.isAccountWide then
+        row.nameText:SetPoint('TOPLEFT', row.warbandText, 'TOPRIGHT', Pixel.Scale(4), 0)
+    else
+        row.nameText:SetPoint('TOPLEFT', Pixel.Scale(8), Pixel.Scale(-5))
+    end
+    row.nameText:SetPoint('RIGHT', row.progressText, 'LEFT', Pixel.Scale(-6), 0)
+    row.watchedText:SetShown(factionData.isWatched)
+
+    row.nameText:SetText(factionData.name)
+    row.nameText:SetTextColor(red, green, blue)
+    row.standingText:SetText(label)
+    row.standingText:SetTextColor(red, green, blue)
+
+    local hasBar = max > 0
+    row.progressText:SetText(hasBar and ProgressText(current, max) or '')
+    row.bar:SetShown(hasBar)
+    if hasBar then
+        row.bar:SetMinMaxValues(0, max)
+        row.bar:SetValue(math.min(current, max))
+        row.bar:SetStatusBarColor(red, green, blue, 0.9)
+    end
+
+    row._factionID = factionData.factionID
+    row._factionIndex = factionIndex
+    row._name = factionData.name
+    row._standingLabel = label
+    row._accountWide = factionData.isAccountWide
+    row._watched = factionData.isWatched
+    row._description = factionData.description
 end
 
 RefreshContent = function()
     if not panel or not panel:IsShown() then return end
 
-    C_Reputation.ExpandAllFactionHeaders()
     local headerIndex, rowIndex, y = 0, 0, 0
-    local activeHeader, headerPlaced
-    local rowWidth = panel.child:GetWidth()
-    if rowWidth <= 0 then rowWidth = PANEL_W - 30 end
-
+    local pendingHeader
     for factionIndex = 1, C_Reputation.GetNumFactions() do
         local factionData = C_Reputation.GetFactionDataByIndex(factionIndex)
-        if factionData and factionData.isHeader and not factionData.isHeaderWithRep then
-            if activeHeader and not headerPlaced then activeHeader:Hide() end
-            headerIndex = headerIndex + 1
-            activeHeader = PoolGet(headerPool, headerIndex, CreateHeader, panel.child)
-            activeHeader.text:SetText(factionData.name)
-            headerPlaced = false
-        elseif factionData and (searchText == '' or factionData.name:lower():find(searchText, 1, true)) then
-            if activeHeader and not headerPlaced then
-                activeHeader:ClearAllPoints()
-                activeHeader:SetPoint('TOPLEFT', panel.child, 'TOPLEFT', 0, -y)
-                activeHeader:SetPoint('TOPRIGHT', panel.child, 'TOPRIGHT', 0, -y)
-                activeHeader:Show()
-                headerPlaced = true
-                y = y + HEADER_H + 2
+        if factionData.isHeader and not factionData.isHeaderWithRep then
+            pendingHeader = factionData.name
+        elseif searchText == '' or factionData.name:lower():find(searchText, 1, true) then
+            if pendingHeader then
+                headerIndex = headerIndex + 1
+                local header = PoolGet(headerPool, headerIndex, CreateHeader, panel.child)
+                header.text:SetText(pendingHeader)
+                PlaceRow(header, y)
+                y = y + HEADER_H + ROW_GAP
+                pendingHeader = nil
             end
             rowIndex = rowIndex + 1
             local row = PoolGet(rowPool, rowIndex, CreateRow, panel.child)
-            row:ClearAllPoints()
-            row:SetPoint('TOPLEFT', panel.child, 'TOPLEFT', 0, -y)
-            row:SetPoint('TOPRIGHT', panel.child, 'TOPRIGHT', 0, -y)
-
-            local standing = ResolveStanding(factionData)
-            local red, green, blue = standing.color[1], standing.color[2], standing.color[3]
-
-            row.warbandText:SetShown(factionData.isAccountWide)
-            row.nameText:ClearAllPoints()
-            if factionData.isAccountWide then
-                row.nameText:SetPoint('TOPLEFT', row.warbandText, 'TOPRIGHT', Pixel.Scale(4), 0)
-            else
-                row.nameText:SetPoint('TOPLEFT', Pixel.Scale(6), Pixel.Scale(-4))
-            end
-            row.nameText:SetPoint('RIGHT', row.progressText, 'LEFT', Pixel.Scale(-6), 0)
-            row.watchedText:SetShown(factionData.isWatched)
-
-            row.nameText:SetText(factionData.name)
-            row.nameText:SetTextColor(red, green, blue)
-            row.standingText:SetText(standing.label)
-            row.standingText:SetTextColor(red, green, blue)
-
-            if standing.max > 0 then
-                row.progressText:SetText(ProgressText(standing.current, standing.max))
-                row.bar:SetWidth(math.max(1, (rowWidth - 8) * math.min(1, standing.current / standing.max)))
-                row.bar:SetColorTexture(red, green, blue, 0.9)
-                row.bar:Show()
-                row.barBg:Show()
-            else
-                row.progressText:SetText('')
-                row.bar:Hide()
-                row.barBg:Hide()
-            end
-
-            row._factionID = factionData.factionID
-            row._factionIndex = factionIndex
-            row._name = factionData.name
-            row._standingLabel = standing.label
-            row._accountWide = factionData.isAccountWide
-            row._watched = factionData.isWatched
-            row._description = factionData.description
-            row:Show()
-            y = y + ROW_H + 2
+            FillRow(row, factionData, factionIndex)
+            PlaceRow(row, y)
+            y = y + ROW_H + ROW_GAP
         end
     end
-    if activeHeader and not headerPlaced then activeHeader:Hide() end
 
     PoolHideFrom(headerPool, headerIndex + 1)
     PoolHideFrom(rowPool, rowIndex + 1)
     panel.child:SetHeight(math.max(1, y))
-    panel.scroll:SetVerticalScroll(0)
 
     panel.emptyText:SetShown(rowIndex == 0)
     panel.emptyText:SetText(searchText ~= '' and 'No matching factions.' or 'No factions tracked.')
@@ -580,14 +539,28 @@ end
 
 local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3, 'Reputation refresh')
 
+local function OnRepEvent()
+    ThrottledRefresh()
+end
+
+local EVENTS = { 'UPDATE_FACTION', 'MAJOR_FACTION_UNLOCKED', 'MAJOR_FACTION_RENOWN_LEVEL_CHANGED' }
+
 slide = BUI.SlidePanel.New({
     skin = 'reputationManager',
     width = function() return Pixel.Scale(PANEL_W) end,
     hiddenX = -PANEL_W,
     panel = function() return panel end,
     build = BuildPanel,
-    onOpen = function() RefreshContent() end,
-    onClose = HideJourneyPanel,
+    onOpen = function()
+        for _, event in ipairs(EVENTS) do BUI.Events:Register(event, 'ReputationManager', OnRepEvent) end
+        C_Reputation.ExpandAllFactionHeaders()
+        RefreshContent()
+        panel.scroll:SetVerticalScroll(0)
+    end,
+    onClose = function()
+        for _, event in ipairs(EVENTS) do BUI.Events:Unregister(event, 'ReputationManager') end
+        HideJourneyPanel()
+    end,
 })
 
 function BUI.ReputationManager.Toggle()
@@ -598,23 +571,5 @@ function BUI.ReputationManager.IsOpen()
     return slide.IsOpen()
 end
 
-local function OnRepEvent()
-    if slide.IsOpen() then ThrottledRefresh() end
-end
-
-BUI.Events:OnLogin('ReputationManager', function()
-    CharacterFrame:HookScript('OnHide', BUI.Profiler.Wrap('ReputationManager.ReputationManager character hide', function() slide.Close(true) end))
-
-    BUI.Events:Register('UPDATE_FACTION',                    'ReputationManager', OnRepEvent)
-    BUI.Events:Register('MAJOR_FACTION_UNLOCKED',            'ReputationManager', OnRepEvent)
-    BUI.Events:Register('MAJOR_FACTION_RENOWN_LEVEL_CHANGED', 'ReputationManager', OnRepEvent)
-
-    BUI.Skinning.OnToggle('reputationManager', function(enabled)
-        if not enabled then slide.Close(true) end
-    end)
-    BUI.Skinning.RegisterSkin('reputationManager', {
-        name = 'Reputation Manager',
-        description = 'Faction list beside the Character frame.',
-        icon = 'Interface\\Icons\\Achievement_Reputation_01',
-    })
-end)
+CharacterFrame:HookScript('OnHide', BUI.Profiler.Wrap('ReputationManager.ReputationManager character hide', function() slide.Close(true) end))
+context.OnDisable(function() slide.Close(true) end)

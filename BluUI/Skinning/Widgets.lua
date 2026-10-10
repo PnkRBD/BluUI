@@ -19,6 +19,8 @@ local TITLE_SCALE = 14 / 12
 local WINDOW_TITLE_HEIGHT = 36
 local WINDOW_INSET = 12
 local WINDOW_LEVEL = 100
+local SLIDE_LEVEL = 50
+local LIST_INSET, LIST_BOTTOM = 8, 12
 
 local function PaintBackdrop(frame, fill)
 	Painter.Custom(frame, function(target) Skin.ApplyBackdrop(target, fill, PALETTE.edge) end)
@@ -210,15 +212,60 @@ function Skin.CreateTitleBar(frame, title, height, onClose)
 	return bar
 end
 
-function Skin.CreateWindow(spec)
+local MENU_THEME = {}
+
+function MENU_THEME:Color(role)
+	return BUI.ThemeColor(role)
+end
+
+function MENU_THEME:FontPath(fontRole)
+	return BUI.ThemeFontPath(fontRole)
+end
+
+Skin.MENU_THEME = MENU_THEME
+
+function Skin.ContextMenu(items, options)
+	options.window = MENU_THEME
+	options.surface = options.surface or 'skinBackground'
+	Controls.ContextMenu(items, options)
+end
+
+local function NewWindow(title, onClose, level)
 	local frame = CreateFrame('Frame', nil, UIParent, 'BackdropTemplate')
-	frame:SetSize(Pixel.Scale(spec.width), Pixel.Scale(spec.height))
 	PaintBackdrop(frame, PALETTE.panel)
+	frame:SetFrameLevel(level)
+	frame:Hide()
+	frame.titleBar = Skin.CreateTitleBar(frame, title, WINDOW_TITLE_HEIGHT, onClose)
+	return frame
+end
+
+function Skin.CreatePanelWindow(title, onClose)
+	return NewWindow(title, onClose, SLIDE_LEVEL)
+end
+
+function Skin.CreateListArea(frame, top, rowHeight, bottom)
+	local area = CreateFrame('Frame', nil, frame)
+	area:SetPoint('TOPLEFT', Pixel.Scale(LIST_INSET), Pixel.Scale(-top))
+	area:SetPoint('BOTTOMRIGHT', Pixel.Scale(-LIST_INSET), Pixel.Scale(bottom or LIST_BOTTOM))
+	local scroll, child = Skin.CreateScrollArea(area, rowHeight, 4)
+	return area, scroll, child
+end
+
+function Skin.CreateEmptyText(parent, area)
+	local label = parent:CreateFontString(nil, 'OVERLAY')
+	Pixel.ApplyFont(label, 11, FONT, '')
+	label:SetPoint('CENTER', area)
+	Painter.Text(label, 'skinLabel')
+	label:Hide()
+	return label
+end
+
+function Skin.CreateWindow(spec)
+	local frame = NewWindow(spec.title or '', spec.onClose, WINDOW_LEVEL)
+	frame:SetSize(Pixel.Scale(spec.width), Pixel.Scale(spec.height))
 	Skin.MakeDraggable(frame, spec.dbKey, 'CENTER', spec.x or 0, spec.y or 0, spec.follow)
 	frame:SetFrameStrata('DIALOG')
 	frame:SetFrameLevel(WINDOW_LEVEL)
-	frame:Hide()
-	frame.titleBar = Skin.CreateTitleBar(frame, spec.title or '', WINDOW_TITLE_HEIGHT, spec.onClose)
 	local content = CreateFrame('Frame', nil, frame, 'BackdropTemplate')
 	PaintBackdrop(content, PALETTE.panel)
 	content:SetPoint('BOTTOMRIGHT', Pixel.Scale(-WINDOW_INSET), Pixel.Scale(spec.contentBottom))
