@@ -17,6 +17,7 @@ local LIST_TOP   = 96
 local DROPDOWN_W = 170
 local FILL_ALPHA = 0.45
 local MIN_COOLDOWN = 1.5
+local COUNTDOWN_SIZE = 11
 
 local CHEST_COLORS = {
     [0] = { 0.6, 0.6, 0.6 },
@@ -252,7 +253,7 @@ local function CreateRow(parent, index)
     local cooldown = CreateFrame('Cooldown', nil, row, 'CooldownFrameTemplate')
     cooldown:SetAllPoints(icon)
     cooldown:SetDrawEdge(false)
-    cooldown:SetHideCountdownNumbers(true)
+    cooldown:SetHideCountdownNumbers(false)
     row.cooldown = cooldown
 
     local time = row:CreateFontString(nil, 'OVERLAY')
@@ -369,12 +370,21 @@ local function SummaryText(sorted)
     return table.concat(parts, separator)
 end
 
+local function StyleCountdown(cooldown)
+    if cooldown._buiCountdownStyled then return end
+    local text = BUI.Tools.CooldownFontString(cooldown)
+    if not text then return end
+    cooldown._buiCountdownStyled = true
+    Pixel.ApplyFont(text, COUNTDOWN_SIZE, FONT, 'OUTLINE')
+end
+
 local function RefreshCooldowns()
     if not panel:IsShown() then return end
     for _, row in ipairs(rows) do
         local cooldownInfo = row:IsShown() and row._known and C_Spell.GetSpellCooldown(row._spellID)
         if cooldownInfo and cooldownInfo.duration > MIN_COOLDOWN then
             CooldownFrame_Set(row.cooldown, cooldownInfo.startTime, cooldownInfo.duration, cooldownInfo.isEnabled)
+            StyleCountdown(row.cooldown)
         else
             row.cooldown:Clear()
         end
