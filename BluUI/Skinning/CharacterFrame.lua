@@ -2,7 +2,6 @@ local _, BUI = ...
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Widget = BUILib.Widget
-local Controls = BUILib.Controls
 local Colors = BUILib.Colors
 local FONT = BUILib.Font or STANDARD_TEXT_FONT
 local Skin = BUI.Skinning
@@ -1258,7 +1257,7 @@ local function ShowSetMenu(row)
             if dialog then dialog.data = setID end
         end,
     }
-    Controls.ContextMenu(items, { atCursor = true, width = 200 })
+    Skin.ContextMenu(items, { atCursor = true, width = 200 })
 end
 
 
@@ -1540,7 +1539,7 @@ function LootSpec.OpenMenu(anchor)
             }
         end
     end
-    Controls.ContextMenu(items, { anchor = anchor, point = 'TOPRIGHT', relPt = 'BOTTOMRIGHT', offsetY = -4, width = 230 })
+    Skin.ContextMenu(items, { anchor = anchor, point = 'TOPRIGHT', relPt = 'BOTTOMRIGHT', offsetY = -4, width = 230 })
 end
 
 local function InfoLine(parent, anchor)
