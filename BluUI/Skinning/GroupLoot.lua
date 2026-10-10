@@ -229,17 +229,16 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Loot Rolls',
 	description = 'Need, greed and pass roll popups drawn like the BluUI tooltip, with a quality border on the item.',
 	icon = 'Interface/Buttons/UI-GroupLoot-Dice-Up',
-	buildSettings = function(content)
-		local skinDB = BUI.GetDB().skinning
-		local panel = Layout.SettingsCard(content, { title = 'Layout' })
-		Layout.Toggle(panel, {
-			label = 'Grow downwards',
-			tooltip = 'Stack new rolls below the first one.',
-		}, skinDB[GROW_DOWN_SETTING], function(value)
-			skinDB[GROW_DOWN_SETTING] = value
-			Skin.ToastAnchors.Refresh(ANCHOR_KEY)
-		end)
-	end,
+	settings = {
+		{
+			label = 'Stack new rolls below the first one',
+			get = function() return BUI.GetDB().skinning[GROW_DOWN_SETTING] == true end,
+			set = function(value)
+				BUI.GetDB().skinning[GROW_DOWN_SETTING] = value
+				Skin.ToastAnchors.Refresh(ANCHOR_KEY)
+			end,
+		},
+	},
 	unlock = {
 		tooltip = 'Unlock position. Drag the roll popup window, then click again to lock.',
 		get = function() return Skin.ToastAnchors.IsUnlocked(ANCHOR_KEY) end,

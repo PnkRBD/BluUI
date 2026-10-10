@@ -6,7 +6,6 @@ local Wrap = BUI.Profiler.Wrap
 
 local Skin = BUI.Skinning
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
-local Layout = BUILib.Layout
 local Theme = BUILib.Theme
 
 local SKIN_ID = 'bonusroll'
@@ -262,15 +261,17 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Bonus Roll',
 	description = 'The bonus roll prompt in the dark shell with an accent timer, and an optional hold-to-roll on the dice button.',
 	icon = 'Interface/Icons/INV_Misc_Coin_19',
-	buildSettings = function(content)
-		local db = BUI.GetDB()
-		local panel = Layout.SettingsCard(content, { title = 'Rolling' })
-		Layout.Toggle(panel, ('Hold the dice for %d seconds to roll'):format(HOLD_SECONDS), db.skinning[HOLD_SETTING] ~= false, function(value)
-			db.skinning[HOLD_SETTING] = value
-			local frame = _G.BonusRollFrame
-			RefreshHint(frame and frame.PromptFrame and frame.PromptFrame.RollButton)
-		end)
-	end,
+	settings = {
+		{
+			label = ('Hold the dice for %d seconds to roll'):format(HOLD_SECONDS),
+			get = function() return BUI.GetDB().skinning[HOLD_SETTING] ~= false end,
+			set = function(value)
+				BUI.GetDB().skinning[HOLD_SETTING] = value
+				local frame = _G.BonusRollFrame
+				RefreshHint(frame and frame.PromptFrame and frame.PromptFrame.RollButton)
+			end,
+		},
+	},
 	unlock = {
 		tooltip = 'Unlock position. Drag the bonus roll window, then click again to lock.',
 		get = function() return Skin.ToastAnchors.IsUnlocked('bonusroll') end,

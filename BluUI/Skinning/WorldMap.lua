@@ -4,7 +4,6 @@ local ipairs = ipairs
 
 local Skin = BUI.Skinning
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
-local Layout = BUILib.Layout
 
 local BORDER_ART = { 'Bg', 'TopTileStreaks', 'InsetBorderTop', 'Underlay' }
 local DETAILS_ART = { 'Bg', 'SealMaterialBG' }
@@ -426,15 +425,18 @@ end)
 
 Skin.OnToggle('worldmap', RefreshExtras)
 
-context.info.buildSettings = function(content)
-	local db = BUI.GetDB()
-	local panel = Layout.SettingsCard(content, { title = 'Continent Maps' })
-	Layout.Toggle(panel, 'Zone Names', db.interface.worldMapZoneNames == true, function(value)
-		db.interface.worldMapZoneNames = value
-		RefreshExtras()
-	end)
-	Layout.Toggle(panel, 'Dungeon & Raid Pins', db.interface.worldMapDungeonPins == true, function(value)
-		db.interface.worldMapDungeonPins = value
-		RefreshExtras()
-	end)
+local function ExtraOption(label, key)
+	return {
+		label = label,
+		get = function() return BUI.GetDB().interface[key] == true end,
+		set = function(value)
+			BUI.GetDB().interface[key] = value
+			RefreshExtras()
+		end,
+	}
 end
+
+context.info.settings = {
+	ExtraOption('Zone names on continent maps', 'worldMapZoneNames'),
+	ExtraOption('Dungeon and raid pins', 'worldMapDungeonPins'),
+}

@@ -422,16 +422,13 @@ context.OnDisable(function()
 	if _G.InspectFrame then _G.InspectFrame:SetScale(1) end
 end)
 
-context.info.buildSettings = function(content)
-	local skinDB = BUI.GetDB().skinning
-	local card = BUILib.Layout.SettingsCard(content, { title = 'Size' })
-	Skin.TipCardSlider(card, {
-		label = 'Scale %', min = 80, max = 150, step = 5, value = skinDB[SCALE_SETTING],
-		tooltip = 'How big the inspect window is. 100 is the game size.',
-		callback = function(value)
-			skinDB[SCALE_SETTING] = value
+context.info.settings = {
+	{
+		label = 'Scale %', min = 80, max = 150, step = 5,
+		get = function() return BUI.GetDB().skinning[SCALE_SETTING] end,
+		set = function(value)
+			BUI.GetDB().skinning[SCALE_SETTING] = value
 			if _G.InspectFrame then ApplyScale() end
 		end,
-	})
-	card:Refresh()
-end
+	},
+}

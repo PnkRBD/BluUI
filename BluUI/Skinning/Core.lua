@@ -665,35 +665,15 @@ function Skin.TipButton(button, scale)
 	Skin.TipButtonFonts(button, scale)
 end
 
-function Skin.TipCardSlider(card, config)
-	local Layout = BUILib.Layout
-	local Controls = BUILib.Controls
-	local sliderHeight = Layout.HEIGHTS.slider
-	local holder = CreateFrame('Frame', nil, card.child)
-	holder:SetSize(card.width, sliderHeight)
-	local anchorControl, anchorY = card:GetAnchor(14)
-	if anchorControl then holder:SetPoint('TOPLEFT', anchorControl, 'BOTTOMLEFT', 0, anchorY) end
-	card:SetLast(holder, 0)
-	card:AddY(14 + sliderHeight)
-	local slider = Controls.Slider(holder, config.label, config.min, config.max, config.value, config.callback,
-		config.decimals or 0, nil, config.tooltip, config.step or 1, card.width)
-	slider:SetPoint('TOPLEFT', holder, 'TOPLEFT', 0, 0)
-	return slider
-end
-
-function Skin.TipScaleCard(content, key, onChange)
-	local db = BUI.GetDB().skinning
-	local card = BUILib.Layout.SettingsCard(content, { title = 'Size' })
-	Skin.TipCardSlider(card, {
-		label = 'Scale', min = 1, max = 2.5, value = db[key], step = 0.1, decimals = 0,
-		tooltip = 'Overall size. 1 is tooltip size.',
-		callback = function(value)
-			db[key] = value
+function Skin.ScaleOption(key, onChange)
+	return {
+		label = 'Scale', min = 1, max = 2.5, step = 0.1,
+		get = function() return BUI.GetDB().skinning[key] end,
+		set = function(value)
+			BUI.GetDB().skinning[key] = value
 			if onChange then onChange() end
 		end,
-	})
-	card:Refresh()
-	return card
+	}
 end
 
 local SHOWCASE_NAME = 'BUI_SkinShowcase'

@@ -2248,52 +2248,64 @@ Skin.OnToggle('characterFrame', function(enabled)
     end
 end)
 
+local TINT_DEFAULT = { 0.45, 0.45, 0.6, 0.15 }
+local ARROW_KEYS = { 'characterFrameArrow', 'characterFrameArrowEmpty', 'characterFrameArrowPlate' }
+
+local function ArrowSwatch(label, index, separator)
+    return {
+        kind = 'swatch', label = label, opacity = true, separator = separator,
+        get = function()
+            local color = select(index, BAG.Colors())
+            return color[1], color[2], color[3], color[4] or 1
+        end,
+        set = function(red, green, blue, alpha)
+            BUI.GetDB().skinning[ARROW_KEYS[index]] = { red, green, blue, alpha }
+            RefreshBagAlternatives()
+        end,
+    }
+end
+
 Skin.RegisterSkin('characterFrame', {
     name = 'Character Frame',
     description = 'Replaces the default character paperdoll with a dark sheet: item level, upgrade track, enchant and gem readouts beside each slot, and a sidebar with stats, titles and equipment sets.',
     icon = 'Interface\\Icons\\INV_Chest_Plate03',
-    buildSettings = function(content)
-        local Layout = BUILib.Layout
-        local skinning = BUI.GetDB().skinning
-
-        local background = Layout.SettingsCard(content, { title = 'Background' })
-        Layout.Toggle(background, 'Outline the slot columns and sidebar', skinning.characterFramePanels == true, function(value)
-            skinning.characterFramePanels = value
-            ApplyBackground()
-        end)
-        local tint = skinning.characterFrameTint or { 0.45, 0.45, 0.6, 0.15 }
-        Layout.Toggle(background, 'Tint the sheet', skinning.characterFrameTintEnabled == true, function(value)
-            skinning.characterFrameTintEnabled = value
-            skinning.characterFrameTint = skinning.characterFrameTint or tint
-            ApplyBackground()
-        end)
-        Layout.ColorSwatch(background, 'Tint color and strength', tint[1], tint[2], tint[3], tint[4], function(red, green, blue, alpha)
-            skinning.characterFrameTint = { red, green, blue, alpha }
-            ApplyBackground()
-        end)
-
-        background:Refresh()
-
-        local arrows = Layout.SettingsCard(content, { title = 'Bag arrows' })
-        local arrowColor, emptyColor, plateColor = BAG.Colors()
-        local swatches = {}
-        local function Swatch(label, color, key)
-            swatches[key] = Layout.ColorSwatch(arrows, label, color[1], color[2], color[3], color[4] or 1, function(red, green, blue, alpha)
-                skinning[key] = { red, green, blue, alpha }
+    settings = {
+        {
+            label = 'Outline the slot columns and sidebar',
+            get = function() return BUI.GetDB().skinning.characterFramePanels == true end,
+            set = function(value)
+                BUI.GetDB().skinning.characterFramePanels = value
+                ApplyBackground()
+            end,
+        },
+        {
+            label = 'Tint the sheet',
+            get = function() return BUI.GetDB().skinning.characterFrameTintEnabled == true end,
+            set = function(value)
+                local skinning = BUI.GetDB().skinning
+                skinning.characterFrameTintEnabled = value
+                skinning.characterFrameTint = skinning.characterFrameTint or TINT_DEFAULT
+                ApplyBackground()
+            end,
+        },
+        {
+            kind = 'swatch', label = 'Tint color and strength', opacity = true,
+            get = function() return unpack(BUI.GetDB().skinning.characterFrameTint or TINT_DEFAULT) end,
+            set = function(red, green, blue, alpha)
+                BUI.GetDB().skinning.characterFrameTint = { red, green, blue, alpha }
+                ApplyBackground()
+            end,
+        },
+        ArrowSwatch('Bag arrow, something in bags', 1, true),
+        ArrowSwatch('Bag arrow, nothing in bags', 2),
+        ArrowSwatch('Plate behind the arrow', 3),
+        {
+            label = 'Bag arrow colors', text = 'Reset',
+            onClick = function()
+                local skinning = BUI.GetDB().skinning
+                for _, key in ipairs(ARROW_KEYS) do skinning[key] = nil end
                 RefreshBagAlternatives()
-            end)
-        end
-        Swatch('Arrow (something in bags)', arrowColor, 'characterFrameArrow')
-        Swatch('Arrow (nothing in bags)', emptyColor, 'characterFrameArrowEmpty')
-        Swatch('Plate behind the arrow', plateColor, 'characterFrameArrowPlate')
-        Layout.ButtonRow(arrows, { buttons = { { text = 'Reset arrow colors', width = 150, callback = function()
-            skinning.characterFrameArrow, skinning.characterFrameArrowEmpty, skinning.characterFrameArrowPlate = nil, nil, nil
-            local arrow, empty, plate = BAG.Colors()
-            swatches.characterFrameArrow:SetColor(arrow[1], arrow[2], arrow[3], arrow[4])
-            swatches.characterFrameArrowEmpty:SetColor(empty[1], empty[2], empty[3], empty[4])
-            swatches.characterFrameArrowPlate:SetColor(plate[1], plate[2], plate[3], plate[4])
-            RefreshBagAlternatives()
-        end } } })
-        arrows:Refresh()
-    end,
+            end,
+        },
+    },
 })
