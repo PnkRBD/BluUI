@@ -107,9 +107,15 @@ function Section:Layout(y, query)
 	return self:Place(y, panelHeight)
 end
 
+function Section:SetLast(last)
+	self.last = last
+	self.rule:SetShown(not last)
+end
+
 function Section:Place(y, panelHeight)
 	self.panel:SetHeight(panelHeight)
-	local height = self.pad * 2 + math.max(self.leftHeight, self.panelTop - self.pad + panelHeight) + 1
+	local tail = self.last and 0 or self.pad + 1
+	local height = self.pad + math.max(self.leftHeight, self.panelTop - self.pad + panelHeight) + tail
 	self.frame:ClearAllPoints()
 	self.frame:SetPoint('TOPLEFT', 0, -y)
 	self.frame:SetHeight(height)
@@ -817,6 +823,7 @@ function Layout.TableKit(window)
 		local rule = kit.DottedRule(frame)
 		rule:SetPoint('BOTTOMLEFT')
 		rule:SetPoint('BOTTOMRIGHT')
+		section.rule = rule
 		return section
 	end
 
