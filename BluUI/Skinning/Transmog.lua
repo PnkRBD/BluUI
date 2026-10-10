@@ -29,7 +29,7 @@ local context = Skin.Define('transmog', {
 local Hook = context.Hook
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
 local Shell, Button, Card, CheckBox = context.Shell, context.Button, context.Card, context.CheckBox
-local Dropdown, EditBox, ScrollBar = context.Dropdown, context.EditBox, context.ScrollBar
+local TextDropdown, EditBox, ScrollBar = context.TextDropdown, context.EditBox, context.ScrollBar
 local Body, Title = context.Body, context.Title
 local CropIcon = Skin.CropIcon
 
@@ -160,15 +160,10 @@ local function SkinDisplayButtons(items)
 	PaintDisplayButtons(items)
 end
 
-local function ThemedDropdown(dropdown)
-	Dropdown(dropdown)
-	Skin.TipFont(dropdown.Text, 'body')
-end
-
 local function SkinFilterRow(paged, tabs)
 	local filter, search = paged.FilterButton, paged.SearchBox
 	if not filter then return end
-	ThemedDropdown(filter)
+	TextDropdown(filter)
 	local text = filter.Text
 	text:ClearAllPoints()
 	text:SetPoint('LEFT', filter, 'LEFT', SEARCH.textX, 0)
@@ -191,7 +186,7 @@ end
 
 local function SkinItems(items)
 	Skin.TipFont(items.ActiveSlotTitle, 'title', 1.5)
-	for _, key in ipairs(DROPDOWN_KEYS) do ThemedDropdown(items[key]) end
+	for _, key in ipairs(DROPDOWN_KEYS) do TextDropdown(items[key]) end
 	SkinDisplayButtons(items)
 	local toggle = items.SecondaryAppearanceToggle
 	CheckBox(toggle.Checkbox)
@@ -202,7 +197,7 @@ local function PaintSituations(situations)
 	local kind = C_TransmogOutfitInfo.GetOutfitSituationsEnabled() and 'body' or 'label'
 	for row in situations.SituationFramePool:EnumerateActive() do
 		Skin.TipFont(row.Title, kind)
-		ThemedDropdown(row.Dropdown)
+		TextDropdown(row.Dropdown)
 	end
 	Body(situations.EnabledToggle.Text)
 end
