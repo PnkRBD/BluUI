@@ -406,11 +406,13 @@ end
 local function FontGossipMeasures(scrollBox)
 	local provider = scrollBox:GetDataProvider()
 	if not provider then return end
+	local restyled = false
 	for _, elementData in provider:EnumerateEntireRange() do
 		for _, key in ipairs(GOSSIP_MEASURE_KEYS) do
 			local measure = elementData[key]
 			if measure and not measure._buiMeasure then
 				measure._buiMeasure = true
+				restyled = true
 				if measure.GreetingText then
 					Face(measure.GreetingText)
 				elseif measure.GetFontString then
@@ -419,6 +421,7 @@ local function FontGossipMeasures(scrollBox)
 			end
 		end
 	end
+	if restyled then scrollBox:Rebuild(ScrollBoxConstants.RetainScrollPosition) end
 end
 
 local function RefreshGossip()
