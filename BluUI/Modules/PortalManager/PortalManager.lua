@@ -1,21 +1,22 @@
 local _, BUI = ...
-local Pixel = BUI.Pixel
+local Pixel   = BUI.Pixel
+local Painter = BUI.Painter
+local Skin    = BUI.Skinning
 
 local BUILib = BluUI.BUILibClient
-local Widget = BUILib.Widget
 local Colors = BUILib.Colors
 local FONT   = BUILib.Font
 
 local PANEL_W    = 300
-local PANEL_H    = 460
 local ROW_H      = 34
-local ROW_GAP    = 2
+local ROW_GAP    = 4
 local ICON_SIZE  = 26
 local LEVEL_W    = 40
 local TIME_W     = 104
 local LIST_TOP   = 96
 local DROPDOWN_W = 170
 local FILL_ALPHA = 0.45
+local MIN_COOLDOWN = 1.5
 
 local CHEST_COLORS = {
     [0] = { 0.6, 0.6, 0.6 },
@@ -23,6 +24,13 @@ local CHEST_COLORS = {
     [2] = { 1, 0.82, 0 },
     [3] = { 1, 0.45, 0 },
 }
+
+local context = Skin.Define('portalManager', {
+    name = 'Portal Manager',
+    description = 'Dungeon and raid portals beside the Character frame.',
+    icon = 'Interface\\Icons\\Spell_Arcane_PortalDalaran',
+    newLook = true,
+})
 
 BUI.PortalManager = {}
 
@@ -119,8 +127,9 @@ end
 
 local function BestRun(mapID)
     local affixScores = C_MythicPlus.GetSeasonBestAffixScoreInfoForMap(mapID)
+    if not affixScores then return nil end
     local best
-    for _, info in ipairs(affixScores or {}) do
+    for _, info in ipairs(affixScores) do
         if not best or info.score > best.score then best = info end
     end
     if not best then return nil end
@@ -183,10 +192,6 @@ local function RowForSpell(spellID)
 end
 
 castDriver:SetScript('OnUpdate', BUI.Profiler.Wrap('PortalManager.PortalManager cast fill', function()
-    if not castingSpellID or not panel:IsVisible() then
-        StopCastFill()
-        return
-    end
     if not castingRow then return end
     local progress = math.min(1, (GetTime() - castStart) / (castEnd - castStart))
     castingRow.castFill:SetWidth(math.max(1, (castingRow:GetWidth() - Pixel.Scale(2)) * progress))
@@ -203,15 +208,24 @@ local function StartCastFill(spellID)
     castDriver:Show()
 end
 
+local RowEnter = BUI.Profiler.Script('PortalManager.PortalManager row OnEnter', function(self)
+    GameTooltip:SetOwner(self, 'ANCHOR_NONE')
+    GameTooltip:SetPoint('TOPRIGHT', self, 'TOPLEFT', -6, 0)
+    GameTooltip:SetSpellByID(self._spellID)
+    GameTooltip:Show()
+end)
+
 local function CreateRow(parent, index)
-    local row = CreateFrame('Button', nil, parent, 'SecureActionButtonTemplate, BackdropTemplate')
+    local row = CreateFrame('Button', nil, parent, 'SecureActionButtonTemplate')
     row:SetHeight(Pixel.Scale(ROW_H))
     row:SetPoint('TOPLEFT', 0, Pixel.Scale(-(index - 1) * (ROW_H + ROW_GAP)))
-    row:SetPoint('RIGHT', parent, 'RIGHT', Pixel.Scale(-2), 0)
-    Pixel.SetTemplate(row, 0.07, 0.07, 0.08, 0.6, 0.13, 0.13, 0.15, 1, 1)
+    row:SetPoint('RIGHT', parent, 'RIGHT')
     row:RegisterForClicks('LeftButtonUp')
     row:SetAttribute('type', 'spell')
     row:SetAttribute('useOnKeyDown', false)
+    row:SetScript('OnEnter', RowEnter)
+    row:SetScript('OnLeave', GameTooltip_Hide)
+    Skin.CardRow(row)
 
     local castFill = row:CreateTexture(nil, 'BACKGROUND', nil, 1)
     castFill:SetPoint('TOPLEFT', Pixel.Scale(1), Pixel.Scale(-1))
@@ -231,7 +245,8 @@ local function CreateRow(parent, index)
     local icon = row:CreateTexture(nil, 'ARTWORK')
     icon:SetSize(Pixel.Scale(ICON_SIZE), Pixel.Scale(ICON_SIZE))
     icon:SetPoint('LEFT', Pixel.Scale(4), 0)
-    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    Skin.CropIcon(icon)
+    Skin.TipIconFrame(row, icon)
     row.icon = icon
 
     local cooldown = CreateFrame('Cooldown', nil, row, 'CooldownFrameTemplate')
@@ -245,7 +260,7 @@ local function CreateRow(parent, index)
     time:SetPoint('BOTTOMRIGHT', Pixel.Scale(-8), Pixel.Scale(4))
     time:SetWidth(Pixel.Scale(TIME_W))
     time:SetJustifyH('RIGHT')
-    time:SetTextColor(0.8, 0.8, 0.8, 1)
+    Painter.Text(time, 'skinLabel')
     row.timeText = time
 
     local level = row:CreateFontString(nil, 'OVERLAY')
@@ -257,36 +272,19 @@ local function CreateRow(parent, index)
 
     local name = row:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(name, 11, FONT, '')
-    name:SetPoint('LEFT', icon, 'RIGHT', Pixel.Scale(8), 0)
-    name:SetPoint('RIGHT', Pixel.Scale(-8), 0)
     name:SetJustifyH('LEFT')
     name:SetWordWrap(false)
     row.nameText = name
-
-    row:SetScript('OnEnter', BUI.Profiler.Script('PortalManager.PortalManager row OnEnter', function(self)
-        self:SetBackdropBorderColor(Colors.GetAccent())
-        GameTooltip:SetOwner(self, 'ANCHOR_NONE')
-        GameTooltip:SetPoint('TOPRIGHT', self, 'TOPLEFT', -6, 0)
-        GameTooltip:SetSpellByID(self._spellID)
-        GameTooltip:Show()
-    end))
-    row:SetScript('OnLeave', BUI.Profiler.Script('PortalManager.PortalManager row OnLeave', function(self)
-        self:SetBackdropBorderColor(0.13, 0.13, 0.15, 1)
-        GameTooltip:Hide()
-    end))
     return row
 end
 
 local function EnsureRows(count)
-    if #rows >= count then return true end
+    if #rows >= count then return end
     if InCombatLockdown() then
         BUI.Events:AfterCombat(function() RefreshContent() end, 'PortalManager.Rows')
-        return false
+        return
     end
-    for index = #rows + 1, count do
-        rows[index] = CreateRow(panel.child, index)
-    end
-    return true
+    for index = #rows + 1, count do rows[index] = CreateRow(panel.child, index) end
 end
 
 local function BuildPanel()
@@ -294,32 +292,22 @@ local function BuildPanel()
     lists = BuildLists()
     activeList = lists[1]
 
-    panel = Widget.New(UIParent, 'Frame', nil, {
-        bg = Colors.bg.dark,
-        border = Colors.border.light,
-        size = { PANEL_W, PANEL_H },
-    }).frame
-    panel:SetFrameStrata('HIGH')
-    panel:SetFrameLevel(50)
-    panel:SetClampedToScreen(false)
-    panel:Hide()
-
-    BUI.Skinning.CreateTitleBar(panel, 'Portals', 36, function() slide.Close(true) end)
-
-    panel.dropdown = BUI.Skinning.CreateDropdown(panel, lists, function(item)
+    panel = Skin.CreatePanelWindow('Portals', function() slide.Close(true) end)
+    panel.dropdown = Skin.CreateDropdown(panel, lists, function(item)
         if InCombatLockdown() then
             panel.dropdown.label:SetText(activeList.label)
             return
         end
         activeList = item
         RefreshContent()
+        panel.scroll:SetVerticalScroll(0)
     end, DROPDOWN_W)
     panel.dropdown:SetPoint('TOPLEFT', Pixel.Scale(12), Pixel.Scale(-44))
 
     panel.combatText = panel:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(panel.combatText, 11, FONT, '')
     panel.combatText:SetPoint('RIGHT', panel, 'TOPRIGHT', Pixel.Scale(-14), Pixel.Scale(-56))
-    panel.combatText:SetTextColor(0.9, 0.3, 0.3)
+    Painter.Text(panel.combatText, 'danger')
     panel.combatText:SetText('In combat')
     panel.combatText:Hide()
 
@@ -328,13 +316,10 @@ local function BuildPanel()
     panel.summaryText:SetPoint('TOPLEFT', Pixel.Scale(14), Pixel.Scale(-74))
     panel.summaryText:SetPoint('RIGHT', Pixel.Scale(-14), 0)
     panel.summaryText:SetJustifyH('LEFT')
-    panel.summaryText:SetTextColor(0.7, 0.7, 0.7, 1)
+    Painter.Text(panel.summaryText, 'skinLabel')
 
-    local scrollArea = CreateFrame('Frame', nil, panel)
-    scrollArea:SetPoint('TOPLEFT', Pixel.Scale(8), Pixel.Scale(-LIST_TOP))
-    scrollArea:SetPoint('BOTTOMRIGHT', Pixel.Scale(-8), Pixel.Scale(12))
-    panel.scroll, panel.child = BUI.Skinning.CreateScrollArea(scrollArea, ROW_H, 4)
-
+    local _
+    _, panel.scroll, panel.child = Skin.CreateListArea(panel, LIST_TOP, ROW_H)
     panel:HookScript('OnHide', BUI.Profiler.Wrap('PortalManager.PortalManager panel hidden', StopCastFill))
 end
 
@@ -342,7 +327,7 @@ local function SortedEntries(entries)
     local sorted = {}
     for index, entry in ipairs(entries) do
         local mapID = mapIDByName[entry.name]
-        sorted[index] = { entry = entry, mapID = mapID, run = mapID and BestRun(mapID) or nil, order = index }
+        sorted[index] = { entry = entry, mapID = mapID, run = mapID and BestRun(mapID), order = index }
     end
     table.sort(sorted, function(a, b)
         if (a.run ~= nil) ~= (b.run ~= nil) then return a.run ~= nil end
@@ -367,7 +352,7 @@ local function SummaryText(sorted)
     end
     if mapCount == 0 then return '' end
 
-    local separator = '  |cff444444||  '
+    local separator = '  ||  '
     local score = C_ChallengeMode.GetOverallDungeonScore()
     local parts = { 'Score ' .. ScoreColor(score):WrapTextInColorCode(('%d'):format(score)) }
 
@@ -384,9 +369,54 @@ local function SummaryText(sorted)
     return table.concat(parts, separator)
 end
 
+local function RefreshCooldowns()
+    if not panel:IsShown() then return end
+    for _, row in ipairs(rows) do
+        local cooldownInfo = row:IsShown() and row._known and C_Spell.GetSpellCooldown(row._spellID)
+        if cooldownInfo and cooldownInfo.duration > MIN_COOLDOWN then
+            CooldownFrame_Set(row.cooldown, cooldownInfo.startTime, cooldownInfo.duration, cooldownInfo.isEnabled)
+        else
+            row.cooldown:Clear()
+        end
+    end
+end
+
+local function FillRow(row, item, inCombat)
+    local spellID = ResolveSpellID(item.entry)
+    local known = C_SpellBook.IsSpellInSpellBook(spellID)
+    row._spellID, row._known = spellID, known
+    if not inCombat then
+        row:SetAttribute('spell', known and spellID or nil)
+        row:Show()
+    end
+
+    row.icon:SetTexture(C_Spell.GetSpellTexture(spellID))
+    row.icon:SetDesaturated(not known)
+    row.nameText:SetText(item.entry.name)
+    Painter.Text(row.nameText, known and 'skinText' or 'skinLabel')
+
+    row.nameText:ClearAllPoints()
+    row.nameText:SetPoint('RIGHT', row, 'RIGHT', Pixel.Scale(-8), 0)
+    if item.mapID then
+        row.nameText:SetPoint('TOPLEFT', row.icon, 'TOPRIGHT', Pixel.Scale(8), Pixel.Scale(-1))
+    else
+        row.nameText:SetPoint('LEFT', row.icon, 'RIGHT', Pixel.Scale(8), 0)
+    end
+
+    local run = item.run
+    if run then
+        local color = CHEST_COLORS[run.chests]
+        row.levelText:SetText(string.rep('+', math.max(1, run.chests)) .. run.level)
+        row.levelText:SetTextColor(color[1], color[2], color[3], 1)
+        row.timeText:SetText(SecondsToClock(run.durationSec) .. ' ' .. DeltaText(run.delta))
+    else
+        row.levelText:SetText('')
+        row.timeText:SetText(item.mapID and 'no run' or '')
+    end
+end
+
 RefreshContent = function()
     if not panel or not panel:IsShown() then return end
-    RebuildMapLookup()
     local inCombat = InCombatLockdown()
     panel.combatText:SetShown(inCombat)
 
@@ -394,58 +424,11 @@ RefreshContent = function()
     panel.summaryText:SetText(SummaryText(sorted))
     EnsureRows(#sorted)
     local shown = math.min(#rows, #sorted)
-
-    for index = 1, shown do
-        local row, item = rows[index], sorted[index]
-        local spellID = ResolveSpellID(item.entry)
-        local known = C_SpellBook.IsSpellInSpellBook(spellID)
-        row._spellID = spellID
-        if not inCombat then
-            row:SetAttribute('spell', known and spellID or nil)
-            row:Show()
-        end
-
-        row.icon:SetTexture(C_Spell.GetSpellTexture(spellID))
-        row.icon:SetDesaturated(not known)
-        row.nameText:SetText(item.entry.name)
-        if known then
-            row.nameText:SetTextColor(0.85, 0.85, 0.85, 1)
-        else
-            row.nameText:SetTextColor(0.45, 0.45, 0.45, 1)
-        end
-
-        row.nameText:ClearAllPoints()
-        row.nameText:SetPoint('RIGHT', row, 'RIGHT', Pixel.Scale(-8), 0)
-        if item.mapID then
-            row.nameText:SetPoint('TOPLEFT', row.icon, 'TOPRIGHT', Pixel.Scale(8), Pixel.Scale(-1))
-        else
-            row.nameText:SetPoint('LEFT', row.icon, 'RIGHT', Pixel.Scale(8), 0)
-        end
-
-        local run = item.run
-        if run then
-            local color = CHEST_COLORS[run.chests]
-            row.levelText:SetText(string.rep('+', math.max(1, run.chests)) .. run.level)
-            row.levelText:SetTextColor(color[1], color[2], color[3], 1)
-            row.timeText:SetText(SecondsToClock(run.durationSec) .. ' ' .. DeltaText(run.delta))
-        elseif item.mapID then
-            row.levelText:SetText('')
-            row.timeText:SetText('|cff555555no run|r')
-        else
-            row.levelText:SetText('')
-            row.timeText:SetText('')
-        end
-
-        local cooldownInfo = known and C_Spell.GetSpellCooldown(spellID)
-        if cooldownInfo and cooldownInfo.duration > 1.5 then
-            CooldownFrame_Set(row.cooldown, cooldownInfo.startTime, cooldownInfo.duration, cooldownInfo.isEnabled)
-        else
-            row.cooldown:Clear()
-        end
-    end
+    for index = 1, shown do FillRow(rows[index], sorted[index], inCombat) end
     if not inCombat then
         for index = shown + 1, #rows do rows[index]:Hide() end
     end
+    RefreshCooldowns()
 
     if castingSpellID then
         local row = RowForSpell(castingSpellID)
@@ -454,12 +437,48 @@ RefreshContent = function()
             if row then AttachCastFill(row) end
         end
     end
-
     panel.child:SetHeight(Pixel.Scale(math.max(1, shown * (ROW_H + ROW_GAP))))
-    panel.scroll:SetVerticalScroll(0)
 end
 
 local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3, 'Portal refresh')
+local QueueCooldowns = BUI.Dispatcher.New(RefreshCooldowns, 'Portal cooldowns')
+
+local function OnMapsUpdated()
+    RebuildMapLookup()
+    ThrottledRefresh()
+end
+
+local function OnCastStart(_, _, _, spellID)
+    StartCastFill(spellID)
+end
+
+local function OnCastEnd()
+    if castingSpellID then StopCastFill() end
+end
+
+local EVENTS = {
+    SPELL_UPDATE_COOLDOWN = QueueCooldowns,
+    SPELLS_CHANGED = ThrottledRefresh,
+    CHALLENGE_MODE_MAPS_UPDATE = OnMapsUpdated,
+    PLAYER_REGEN_ENABLED = ThrottledRefresh,
+    PLAYER_REGEN_DISABLED = ThrottledRefresh,
+}
+local CAST_EVENTS = {
+    UNIT_SPELLCAST_START = OnCastStart,
+    UNIT_SPELLCAST_STOP = OnCastEnd,
+    UNIT_SPELLCAST_SUCCEEDED = OnCastEnd,
+    UNIT_SPELLCAST_INTERRUPTED = OnCastEnd,
+    UNIT_SPELLCAST_FAILED = OnCastEnd,
+}
+
+local function ListenWhileOpen(open)
+    for event, handler in pairs(EVENTS) do
+        if open then BUI.Events:Register(event, 'PortalManager', handler) else BUI.Events:Unregister(event, 'PortalManager') end
+    end
+    for event, handler in pairs(CAST_EVENTS) do
+        if open then BUI.Events:RegisterUnit(event, 'player', 'PortalManager', handler) else BUI.Events:Unregister(event, 'PortalManager') end
+    end
+end
 
 slide = BUI.SlidePanel.New({
     skin = 'portalManager',
@@ -468,8 +487,15 @@ slide = BUI.SlidePanel.New({
     panel = function() return panel end,
     build = BuildPanel,
     onOpen = function()
+        ListenWhileOpen(true)
         C_MythicPlus.RequestMapInfo()
+        RebuildMapLookup()
         RefreshContent()
+        panel.scroll:SetVerticalScroll(0)
+    end,
+    onClose = function()
+        ListenWhileOpen(false)
+        StopCastFill()
     end,
 })
 
@@ -481,38 +507,5 @@ function BUI.PortalManager.IsOpen()
     return slide.IsOpen()
 end
 
-local function OnPortalEvent()
-    if slide.IsOpen() then ThrottledRefresh() end
-end
-
-local function OnCastStart(_, _, _, spellID)
-    if slide.IsOpen() then StartCastFill(spellID) end
-end
-
-local function OnCastEnd()
-    if castingSpellID then StopCastFill() end
-end
-
-BUI.Events:OnLogin('PortalManager', function()
-    CharacterFrame:HookScript('OnHide', BUI.Profiler.Wrap('PortalManager.PortalManager character hide', function() slide.Close(true) end))
-
-    BUI.Events:Register('SPELL_UPDATE_COOLDOWN',       'PortalManager', OnPortalEvent)
-    BUI.Events:Register('SPELLS_CHANGED',              'PortalManager', OnPortalEvent)
-    BUI.Events:Register('CHALLENGE_MODE_MAPS_UPDATE',  'PortalManager', OnPortalEvent)
-    BUI.Events:Register('PLAYER_REGEN_ENABLED',        'PortalManager', OnPortalEvent)
-    BUI.Events:Register('PLAYER_REGEN_DISABLED',       'PortalManager', OnPortalEvent)
-    BUI.Events:RegisterUnit('UNIT_SPELLCAST_START',       'player', 'PortalManager.Cast', OnCastStart)
-    BUI.Events:RegisterUnit('UNIT_SPELLCAST_STOP',        'player', 'PortalManager.CastStop', OnCastEnd)
-    BUI.Events:RegisterUnit('UNIT_SPELLCAST_SUCCEEDED',   'player', 'PortalManager.CastDone', OnCastEnd)
-    BUI.Events:RegisterUnit('UNIT_SPELLCAST_INTERRUPTED', 'player', 'PortalManager.CastInterrupted', OnCastEnd)
-    BUI.Events:RegisterUnit('UNIT_SPELLCAST_FAILED',      'player', 'PortalManager.CastFailed', OnCastEnd)
-
-    BUI.Skinning.OnToggle('portalManager', function(enabled)
-        if not enabled then slide.Close(true) end
-    end)
-    BUI.Skinning.RegisterSkin('portalManager', {
-        name = 'Portal Manager',
-        description = 'Dungeon and raid portals beside the Character frame.',
-        icon = 'Interface\\Icons\\Spell_Arcane_PortalDalaran',
-    })
-end)
+CharacterFrame:HookScript('OnHide', BUI.Profiler.Wrap('PortalManager.PortalManager character hide', function() slide.Close(true) end))
+context.OnDisable(function() slide.Close(true) end)

@@ -207,7 +207,6 @@ Modules\CooldownFlash\CooldownFlash.lua
 Modules\Settings\Settings.lua
 Modules\CombatLogging\CombatLogging.lua
 Modules\GemCounter\GemCounter.lua
-Modules\PortalManager\PortalManager.lua
 Modules\Installer\Installer.lua
 
 Skinning\Core.lua
@@ -215,6 +214,7 @@ Skinning\ToastAnchors.lua
 Skinning\Widgets.lua
 Modules\CurrencyManager\CurrencyManager.lua
 Modules\ReputationManager\ReputationManager.lua
+Modules\PortalManager\PortalManager.lua
 Skinning\ItemReadout.lua
 Skinning\Merchant.lua
 Skinning\Trainer.lua
