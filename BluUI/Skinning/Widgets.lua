@@ -289,7 +289,7 @@ function Skin.CreateListRow(parent, height, iconSize)
 	row.iconBorder = CreateFrame('Frame', nil, row, 'BackdropTemplate')
 	row.iconBorder:SetSize(Pixel.Scale(iconSize + 2), Pixel.Scale(iconSize + 2))
 	row.iconBorder:SetPoint('LEFT', Pixel.Scale(4), 0)
-	Pixel.SetTemplate(row.iconBorder, 0, 0, 0, 1, 0.15, 0.15, 0.15, 1, 1)
+	Skin.PaintPanelBackdrop(row.iconBorder)
 
 	row.icon = row.iconBorder:CreateTexture(nil, 'ARTWORK')
 	row.icon:SetSize(Pixel.Scale(iconSize), Pixel.Scale(iconSize))
