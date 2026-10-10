@@ -55,8 +55,8 @@ local ROW_HEIGHT     = 16
 local RATING_COL_W   = 30
 local COLUMN_GAP     = 3
 local HEADER_HEIGHT  = 16
-local SECTION_GAP    = 8
-local HEADER_ROW_GAP = 6
+local SECTION_GAP    = 12
+local HEADER_ROW_GAP = 4
 local LIST_ROW_H     = 24
 local LIST_ROW_GAP   = 4
 local PANE_GAP       = 8
@@ -938,7 +938,7 @@ local function BuildSection(parent, definition)
     }
     local color = SECTION_COLORS[definition.title]
     section.header = Skin.CreateListHeader(section.container, HEADER_HEIGHT)
-    section.header.text:SetText(definition.title)
+    section.header:SetTitle(definition.title)
     Painter.Custom(section.header.text, function(text) text:SetTextColor(color[1], color[2], color[3], 1) end)
     section.header:SetPoint('TOPLEFT')
     section.header:SetPoint('TOPRIGHT')

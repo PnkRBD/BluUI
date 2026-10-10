@@ -306,7 +306,7 @@ RefreshContent = function()
             if pendingHeader then
                 headerIndex = headerIndex + 1
                 local header = PoolGet(headerPool, headerIndex, CreateHeader, panel.child)
-                header.text:SetText(pendingHeader)
+                header:SetTitle(pendingHeader)
                 PlaceRow(header, y)
                 y = y + HEADER_H + ROW_GAP
                 pendingHeader = nil
