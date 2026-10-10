@@ -61,6 +61,9 @@ local fileLoadStart = debugprofilestop()
 
 local ALERT_MS = 100
 local ALERT_GAP = 30
+local WINDOW_SECONDS = 1
+local UNNAMED_KEEP = 30
+local TOP_UNNAMED = 5
 
 local stats, frameSpent, lastSpent, hitches, labels, baseline, libraryOwners = {}, {}, {}, {}, {}, {}, {}
 local noted, lastNoted, unseen = {}, {}, {}
@@ -76,6 +79,10 @@ local overheadPerCall = 0
 local loginPending = false
 local spikes, spikeCount = {}, 0
 local loadedAt, loadingScreen, loadingEndedAt = GetTime(), true, 0
+local callCount = 0
+local window = { actual = 0, named = 0, calls = 0, driver = 0, startedAt = 0 }
+local unnamedTotal, foreignTotal = 0, 0
+local unnamedWindows = {}
 
 local function TopOf(map, count, field)
 	local list = {}
@@ -114,6 +121,7 @@ local function Record(label, elapsed)
 	end
 	stat.total = stat.total + elapsed
 	stat.calls = stat.calls + 1
+	callCount = callCount + 1
 	if elapsed > stat.max then stat.max = elapsed end
 	if depth > 0 then return end
 	stat.own = stat.own + elapsed
@@ -224,7 +232,7 @@ local function AlertSpike(actual)
 	if now - lastAlertAt < ALERT_GAP or now - loadedAt < STARTUP_WINDOW then return end
 	lastAlertAt = now
 	local top = spikes[#spikes].top
-	BUI.Print(format('a frame took %.0fms in BluUI (%s)%s. /bui profile report for more.',
+	BUI.Print(format('Slow frame: %.0fms (%s)%s',
 		actual, SpikeContext(), #top > 0 and ': ' .. TopParts(top) or ', nothing named'))
 end
 
@@ -239,6 +247,34 @@ local function WatchSpikes(actual)
 		RecordSpike(game, addons, actual)
 		if actual >= ALERT_MS then AlertSpike(actual) end
 	end
+end
+
+local function KeepUnnamed(entry)
+	unnamedWindows[#unnamedWindows + 1] = entry
+	if #unnamedWindows <= UNNAMED_KEEP then return end
+	local smallest = 1
+	for index, kept in ipairs(unnamedWindows) do
+		if kept.ms < unnamedWindows[smallest].ms then smallest = index end
+	end
+	remove(unnamedWindows, smallest)
+end
+
+local function CloseWindow(now)
+	local overhead = (callCount - window.calls) * overheadPerCall + driverTotal - window.driver
+	local residual = window.actual - window.named - overhead
+	if residual > 0 then
+		unnamedTotal = unnamedTotal + residual
+		KeepUnnamed({ at = now, ms = residual, context = SpikeContext() })
+	else
+		foreignTotal = foreignTotal - residual
+	end
+	window.actual, window.named, window.calls, window.driver, window.startedAt = 0, 0, callCount, driverTotal, now
+end
+
+local function ResetWindows()
+	unnamedTotal, foreignTotal = 0, 0
+	wipe(unnamedWindows)
+	window.actual, window.named, window.calls, window.driver, window.startedAt = 0, 0, callCount, 0, GetTime()
 end
 
 local driver = CreateFrame('Frame')
@@ -266,6 +302,10 @@ driver:SetScript('OnUpdate', function(_, elapsed)
 		hitches[#hitches + 1] = { at = GetTime(), actual = actual, named = lastTotal + frameTotal, top = TopOf(Combined(lastSpent, frameSpent), TOP_IN_FRAME) }
 		if #hitches > HITCH_KEEP then remove(hitches, 1) end
 	end
+	window.actual = window.actual + actual
+	window.named = window.named + frameTotal
+	local now = GetTime()
+	if now - window.startedAt >= WINDOW_SECONDS then CloseWindow(now) end
 	lastSpent, frameSpent = frameSpent, lastSpent
 	wipe(frameSpent)
 	lastTotal, frameTotal = frameTotal, 0
@@ -495,6 +535,7 @@ function Profiler.Start()
 	frameTotal, lastTotal, depth = 0, 0, 0
 	namedTotal, actualTotal, ticks, driverTotal = 0, 0, 0, 0
 	startedAt = GetTime()
+	ResetWindows()
 	for _, counter in ipairs(COUNTERS) do baseline[counter.label] = GetAddOnMetric(addonName, counter.metric) end
 	Profiler.active = true
 	WatchGlows()
@@ -514,7 +555,7 @@ local function AddOnComparison(metric)
 	for _, entry in ipairs(GetTopKAddOnsForMetric(metric, TOP_ADDONS)) do
 		parts[#parts + 1] = format('%s %.2f', entry.addOnName, entry.metricValue)
 	end
-	return format('BluUI %.2f, all addons %.2f. Heaviest: %s', GetAddOnMetric(addonName, metric), GetOverallMetric(metric), concat(parts, ', '))
+	return format('BluUI %.2f, all addons %.2f, top: %s', GetAddOnMetric(addonName, metric), GetOverallMetric(metric), concat(parts, ', '))
 end
 
 local function SharedLibraryLine()
@@ -527,7 +568,7 @@ local function SharedLibraryLine()
 			billedElsewhere[#billedElsewhere + 1] = format('%s to %s', entry.major, owner)
 		end
 	end
-	return format('Shared libraries running BluUI\'s copy, so every addon\'s use of them counts as BluUI: %s. Running another addon\'s copy, so BluUI\'s use counts there: %s.',
+	return format('Libraries billed to BluUI: %s. Billed elsewhere: %s',
 		#billedHere > 0 and concat(billedHere, ', ') or 'none', #billedElsewhere > 0 and concat(billedElsewhere, ', ') or 'none')
 end
 
@@ -539,8 +580,8 @@ local function RunningGlowsLine()
 		local name = frame:GetParent():GetDebugName()
 		if #owners < TOP_GLOW_OWNERS and not issecretvalue(name) then owners[#owners + 1] = name end
 	end)
-	if count == 0 then return 'Glows on screen now: none.' end
-	return format('Glows on screen now: %d, on %s.', count, concat(owners, ', '))
+	if count == 0 then return 'Glows on screen: none' end
+	return format('Glows on screen: %d (%s)', count, concat(owners, ', '))
 end
 
 local function AreaOf(label)
@@ -575,14 +616,14 @@ local function Clock(seconds)
 end
 
 local function SpikeLine(spike)
-	local line = format('  %s after reload: game %.0fms, all addons %.0fms, BluUI %.0fms (%s). Heaviest: %s',
+	local line = format('  %s: game %.0fms, addons %.0fms, BluUI %.0fms (%s). Top addons: %s',
 		Clock(spike.at - loadedAt), spike.game, spike.addons, spike.actual, spike.context, spike.heaviest)
 	if #spike.top == 0 then return line end
-	return line .. '. BluUI handlers: ' .. TopParts(spike.top)
+	return line .. '. BluUI: ' .. TopParts(spike.top)
 end
 
 local function UnseenLine(entry)
-	local line = format('  %s after reload: %d %s (%s), %.0fms of BluUI work named',
+	local line = format('  %s: %d %s (%s), %.0fms named',
 		Clock(entry.at - loadedAt), entry.count, entry.count == 1 and 'frame' or 'frames', entry.context, entry.named)
 	if #entry.top == 0 then return line end
 	return line .. ': ' .. TopParts(entry.top)
@@ -593,8 +634,8 @@ local function SinceLoad(metric)
 end
 
 local function AddUnseenSpikes(lines)
-	lines[#lines + 1] = format('Blizzard counts BluUI frames since reload over 50ms: %d, over 100ms: %d. %d of the over-50ms frames came while BluUI could not watch frame by frame (login, loading screens)%s',
-		SinceLoad(Metric.CountTimeOver50Ms), SinceLoad(Metric.CountTimeOver100Ms), unseenCount, #unseen > 0 and '. Biggest:' or '.')
+	lines[#lines + 1] = format('BluUI frames over 50/100ms since reload: %d/%d, %d during login or loading screens',
+		SinceLoad(Metric.CountTimeOver50Ms), SinceLoad(Metric.CountTimeOver100Ms), unseenCount)
 	local biggest = {}
 	for index, entry in ipairs(unseen) do biggest[index] = entry end
 	sort(biggest, function(left, right) return left.named > right.named end)
@@ -605,7 +646,7 @@ local function AddSessionSpikes(lines)
 	local biggest = {}
 	for index, spike in ipairs(spikes) do biggest[index] = spike end
 	sort(biggest, function(left, right) return left.game > right.game end)
-	lines[#lines + 1] = format('Since reload (%s ago), slow frames (game over %dms, or addons or BluUI over %dms): %d. Biggest:', Clock(GetTime() - loadedAt), GAME_SPIKE_MS, SPIKE_MS, spikeCount)
+	lines[#lines + 1] = format('Slow frames since reload (%s, over %dms): %d', Clock(GetTime() - loadedAt), SPIKE_MS, spikeCount)
 	for index = 1, math.min(TOP_SPIKES, #biggest) do lines[#lines + 1] = SpikeLine(biggest[index]) end
 end
 
@@ -614,45 +655,63 @@ local function Share(metric)
 	return mine, game > 0 and mine / game * 100 or 0
 end
 
-local function BlizzardLine()
-	local counts = {}
-	for _, counter in ipairs(COUNTERS) do counts[#counts + 1] = format('%s %d', counter.label, SinceLoad(counter.metric)) end
+local COUNTER_HEADER = '5/10/50/100/500ms'
+
+local function CounterValues(read)
+	local values = {}
+	for _, counter in ipairs(COUNTERS) do values[#values + 1] = read(counter) end
+	return concat(values, '/')
+end
+
+local function BlizzardLines(lines)
 	local recent, recentShare = Share(Metric.RecentAverageTime)
 	local session, sessionShare = Share(Metric.SessionAverageTime)
 	local encounter, encounterShare = Share(Metric.EncounterAverageTime)
-	return format("Blizzard's numbers for BluUI, the same ones addon managers show: now %.2fms a frame (%.2f%% of the game), since login %.2fms (%.2f%%), last boss %.2fms (%.2f%%), worst frame since login %.0fms. Frames over %s since reload.",
-		recent, recentShare, session, sessionShare, encounter, encounterShare, GetAddOnMetric(addonName, Metric.PeakTime), concat(counts, ', '))
+	lines[#lines + 1] = format('CPU: now %.2fms/frame (%.2f%%), session %.2fms (%.2f%%), last boss %.2fms (%.2f%%), worst frame %.0fms',
+		recent, recentShare, session, sessionShare, encounter, encounterShare, GetAddOnMetric(addonName, Metric.PeakTime))
+	lines[#lines + 1] = format('Frames over %s since reload: %s', COUNTER_HEADER, CounterValues(function(counter) return SinceLoad(counter.metric) end))
+end
+
+local function UnnamedLines(lines)
+	if #unnamedWindows == 0 then return end
+	local biggest = {}
+	for index, entry in ipairs(unnamedWindows) do biggest[index] = entry end
+	sort(biggest, function(left, right) return left.ms > right.ms end)
+	lines[#lines + 1] = 'Unnamed BluUI time, worst seconds:'
+	for index = 1, math.min(TOP_UNNAMED, #biggest) do
+		local entry = biggest[index]
+		lines[#lines + 1] = format('  +%.0fs: %.1fms (%s)', entry.at - startedAt, entry.ms, entry.context)
+	end
 end
 
 function Profiler.Report()
+	local lines = {}
+	BlizzardLines(lines)
 	if startedAt == 0 then
-		local lines = { BlizzardLine() }
 		AddSessionSpikes(lines)
 		AddUnseenSpikes(lines)
-		lines[#lines + 1] = 'No profile run yet. Type /bui profile to start one.'
+		lines[#lines + 1] = 'No profile yet. /bui profile to start one.'
 		return lines, #lines
 	end
 	local now = Profiler.active and GetTime() or stoppedAt
-	local lines = { BlizzardLine() }
-	local overCounts = {}
-	for _, counter in ipairs(COUNTERS) do
-		overCounts[#overCounts + 1] = format('%s %d', counter.label, GetAddOnMetric(addonName, counter.metric) - baseline[counter.label])
-	end
 	local calls = 0
 	for _, stat in pairs(stats) do calls = calls + stat.calls end
-	lines[#lines + 1] = format('BluUI profile over %.0fs. Ticks over %s', now - startedAt, concat(overCounts, ', '))
-	local function PercentOfActual(spent) return actualTotal > 0 and spent / actualTotal * 100 or 0 end
-	local timing = calls * overheadPerCall
-	local unexplained = max(0, actualTotal - namedTotal - timing - driverTotal)
-	lines[#lines + 1] = format("BluUI used %.0fms over %d frames (%.2fms a frame). Named below: %.0fms (%.0f%%). Timing itself cost about %.0fms of that, and the profiler's own per-frame bookkeeping %.0fms. Left unexplained: %.0fms (%.0f%%).",
-		actualTotal, ticks, actualTotal / max(ticks, 1), namedTotal, PercentOfActual(namedTotal), timing, driverTotal, unexplained, PercentOfActual(unexplained))
+	local function Percent(spent) return actualTotal > 0 and spent / actualTotal * 100 or 0 end
+	local profilerCost = calls * overheadPerCall + driverTotal
+	local named = max(0, namedTotal - foreignTotal)
+	lines[#lines + 1] = format('Profile: %.0fs, %d frames, %.0fms (%.2fms/frame). Frames over %s: %s',
+		now - startedAt, ticks, actualTotal, actualTotal / max(ticks, 1), COUNTER_HEADER,
+		CounterValues(function(counter) return GetAddOnMetric(addonName, counter.metric) - baseline[counter.label] end))
+	lines[#lines + 1] = format('Named %.0fms (%.0f%%), unnamed %.0fms (%.0f%%), profiler %.0fms (%.0f%%). Other addons inside BluUI calls: %.0fms',
+		named, Percent(named), unnamedTotal, Percent(unnamedTotal), profilerCost, Percent(profilerCost), foreignTotal)
+	UnnamedLines(lines)
 	lines[#lines + 1] = SharedLibraryLine()
 	local glowsLine = RunningGlowsLine()
 	if glowsLine then lines[#lines + 1] = glowsLine end
 	if GetAddOnMetric(addonName, Metric.EncounterAverageTime) > 0 then
-		lines[#lines + 1] = 'Last boss, ms a frame: ' .. AddOnComparison(Metric.EncounterAverageTime)
+		lines[#lines + 1] = 'Last boss (ms/frame): ' .. AddOnComparison(Metric.EncounterAverageTime)
 	end
-	lines[#lines + 1] = 'Since login, ms a frame: ' .. AddOnComparison(Metric.SessionAverageTime)
+	lines[#lines + 1] = 'Session (ms/frame): ' .. AddOnComparison(Metric.SessionAverageTime)
 	AddSessionSpikes(lines)
 	AddUnseenSpikes(lines)
 	local areas, members = Areas()
@@ -662,7 +721,7 @@ function Profiler.Report()
 	local biggest = {}
 	for index, hitch in ipairs(hitches) do biggest[index] = hitch end
 	sort(biggest, function(left, right) return left.actual > right.actual end)
-	lines[#lines + 1] = format('Biggest frames over %dms (%d in total; time since start, BluUI time that frame, named in it and the frame before, top handlers):', HITCH_MS, #hitches)
+	lines[#lines + 1] = format('Frames over %dms: %d (time, BluUI ms, named ms, top handlers)', HITCH_MS, #hitches)
 	for index = 1, math.min(TOP_HITCHES, #biggest) do lines[#lines + 1] = HitchLine(biggest[index]) end
 	lines[#lines + 1] = 'Most time:'
 	local preview
@@ -672,7 +731,7 @@ function Profiler.Report()
 		if index == PREVIEW_TOTAL then preview = #lines end
 	end
 	preview = preview or #lines
-	lines[#lines + 1] = 'Inside each area (time includes anything nested inside it):'
+	lines[#lines + 1] = 'Inside each area (includes nested calls):'
 	for _, area in ipairs(areas) do
 		local parts = {}
 		for _, item in ipairs(TopOf(members[area.label], TOP_IN_AREA)) do parts[#parts + 1] = format('%s %.0f', item.label, item.value) end
@@ -682,7 +741,7 @@ function Profiler.Report()
 	for _, item in ipairs(TopOf(stats, TOP_MAX, 'max')) do
 		lines[#lines + 1] = format('  %s: %.1fms', item.label, item.value)
 	end
-	lines[#lines + 1] = 'Every frame over ' .. HITCH_MS .. 'ms, in order:'
+	lines[#lines + 1] = 'All frames over ' .. HITCH_MS .. 'ms:'
 	for _, hitch in ipairs(hitches) do lines[#lines + 1] = HitchLine(hitch) end
 	return lines, preview
 end
