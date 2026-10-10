@@ -64,7 +64,8 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 	scroll:SetPoint('BOTTOMRIGHT', Pixel.Scale(-padding - SCROLL_TRACK_SPACE), Pixel.Scale(padding))
 
 	local child = CreateFrame('Frame', nil, scroll)
-	child:SetHeight(Pixel.PixelSize(1))
+	local contentHeight = Pixel.PixelSize(1)
+	child:SetHeight(contentHeight)
 	scroll:SetScrollChild(child)
 
 	local track = CreateFrame('Frame', nil, parent)
@@ -95,10 +96,33 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 		return min(1, max(0, percent))
 	end
 
-	local function ApplyScrollPct(percent)
-		local maxScroll = max(0, child:GetHeight() - scroll:GetHeight())
-		scroll:SetVerticalScroll(math.floor(percent * maxScroll + 0.5))
+	local function MaxScroll()
+		return max(0, contentHeight - scroll:GetHeight())
 	end
+
+	local function ApplyScrollPct(percent)
+		scroll:SetVerticalScroll(math.floor(percent * MaxScroll() + 0.5))
+	end
+
+	local function UpdateRange()
+		local maxScroll = MaxScroll()
+		if maxScroll <= 0 then
+			thumb:Hide()
+			track:Hide()
+			scroll:SetPoint('BOTTOMRIGHT', Pixel.Scale(-padding), Pixel.Scale(padding))
+		else
+			track:Show()
+			thumb:Show()
+			scroll:SetPoint('BOTTOMRIGHT', Pixel.Scale(-padding - SCROLL_TRACK_SPACE), Pixel.Scale(padding))
+			local height = scroll:GetHeight()
+			thumb:SetHeight(max(20, track:GetHeight() * (height / (height + maxScroll))))
+		end
+	end
+
+	hooksecurefunc(child, 'SetHeight', Wrap('Skin.Widgets content height', function(_, height)
+		contentHeight = height
+		UpdateRange()
+	end))
 
 	thumb:EnableMouse(true)
 	thumb:RegisterForDrag('LeftButton')
@@ -116,34 +140,19 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 
 	scroll:EnableMouseWheel(true)
 	scroll:SetScript('OnMouseWheel', BUI.Profiler.Script('Skin.Widgets scroll OnMouseWheel', function(self, delta)
-		local currentScroll = self:GetVerticalScroll()
-		local maxScroll = max(0, child:GetHeight() - self:GetHeight())
-		self:SetVerticalScroll(min(maxScroll, max(0, currentScroll - delta * rowHeight * 2)))
+		self:SetVerticalScroll(min(MaxScroll(), max(0, self:GetVerticalScroll() - delta * rowHeight * 2)))
 	end))
 
 	scroll:SetScript('OnSizeChanged', Wrap('Skin.Widgets scroll resize', function(_, width)
-		if width and width > 0 then child:SetWidth(width) end
+		if width > 0 then child:SetWidth(width) end
+		UpdateRange()
 	end))
 
-	scroll:SetScript('OnScrollRangeChanged', Wrap('Skin.Widgets scroll range', function(self, _, yMax)
-		yMax = yMax or 0
-		if yMax <= 0 then
-			thumb:Hide()
-			track:Hide()
-			scroll:SetPoint('BOTTOMRIGHT', Pixel.Scale(-padding), Pixel.Scale(padding))
-		else
-			track:Show()
-			thumb:Show()
-			scroll:SetPoint('BOTTOMRIGHT', Pixel.Scale(-padding - SCROLL_TRACK_SPACE), Pixel.Scale(padding))
-			thumb:SetHeight(max(20, track:GetHeight() * (self:GetHeight() / (self:GetHeight() + yMax))))
-		end
-	end))
-
-	scroll:SetScript('OnVerticalScroll', Wrap('Skin.Widgets scroll thumb', function(self, offset)
-		local yMax = max(0, child:GetHeight() - self:GetHeight())
-		if yMax <= 0 then return end
+	scroll:SetScript('OnVerticalScroll', Wrap('Skin.Widgets scroll thumb', function(_, offset)
+		local maxScroll = MaxScroll()
+		if maxScroll <= 0 then return end
 		thumb:ClearAllPoints()
-		thumb:SetPoint('TOP', track, 'TOP', 0, -(offset / yMax) * (track:GetHeight() - thumb:GetHeight()))
+		thumb:SetPoint('TOP', track, 'TOP', 0, -(offset / maxScroll) * (track:GetHeight() - thumb:GetHeight()))
 	end))
 
 	return scroll, child
