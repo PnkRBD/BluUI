@@ -506,24 +506,20 @@ local function SkinProfessionsFrame(frame)
 end
 
 local function OnCategoryButton(button)
-	if button.isSpacer then return end
-	Fade(button.NormalTexture)
-	Fade(button.Lines)
-	local selected, highlight = button.SelectedTexture, button.HighlightTexture
-	selected:SetBlendMode('BLEND')
-	AccentTexture(selected, ROW_SELECTED_ALPHA)
-	highlight:SetBlendMode('BLEND')
-	FlatTexture(highlight, 1, 1, 1, ROW_HOVER_ALPHA)
+	if button.isSpacer then
+		Skin.HideTipShell(button)
+		return
+	end
 	local info = button.categoryInfo
 	local primary = info == nil or info.type == Enum.CraftingOrderCustomerCategoryType.Primary
-	Skin.TipButtonFonts(button, primary and CATEGORY_TITLE_SCALE or nil)
+	Skin.TipCategoryButton(context, button, primary and CATEGORY_TITLE_SCALE or nil)
 end
 
 local function SkinSearchBar(bar)
 	SkinIconButton(bar.FavoritesSearchButton)
 	EditBox(bar.SearchBox)
 	Button(bar.SearchButton)
-	Dropdown(bar.FilterDropdown)
+	context.TextDropdown(bar.FilterDropdown)
 end
 
 local function SkinBrowseOrders(page)
@@ -750,4 +746,10 @@ end
 
 context.Window('ProfessionsFrame', { skin = SkinProfessionsFrame, install = InstallCraftingHooks })
 context.Window('ProfessionsBookFrame', { skin = SkinBook })
-context.Window('ProfessionsCustomerOrdersFrame', { skin = SkinCustomerFrame, install = InstallTemplates })
+context.Window('ProfessionsCustomerOrdersFrame', {
+	skin = SkinCustomerFrame,
+	install = function()
+		InstallTemplates()
+		Hook(ProfessionsCustomerOrdersCategoryButtonMixin, 'UpdateSelected', OnCategoryButton)
+	end,
+})
