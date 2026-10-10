@@ -107,6 +107,9 @@ local function ApplySettings(frame, unitType, index)
 	if unitType == 'boss' and frame.Castbar then
 		BUI.CastBar.ApplyBossCastbar(frame, index)
 	end
+	if unitType == 'boss' and not frame._stage then
+		UnitFrames.ApplyBossOutlines(frame)
+	end
 
 	if (unitType == 'player' or unitType == 'target' or unitType == 'focus') and frame.Castbar then
 		BUI.CastBar.ApplyCastbar(frame, unitType)

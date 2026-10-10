@@ -1089,6 +1089,16 @@ local function UnitBoards(ui, parent, width, unit)
 			Toggle(unitSettings, nil, 'aggroBorder'),
 		}, RefreshFrames)
 	end
+	if unitKey == 'boss' then
+		board:AddTools('Target border', 'Outline on the boss you target', {
+			Color(unitSettings, 'Border color', 'targetBorderColor'),
+			Toggle(unitSettings, nil, 'targetBorder'),
+		}, RefreshFrames)
+		board:AddTools('Mouseover border', 'Outline on the boss under your mouse', {
+			Color(unitSettings, 'Border color', 'mouseoverBorderColor'),
+			Toggle(unitSettings, nil, 'mouseoverBorder'),
+		}, RefreshFrames)
+	end
 	if unitKey == 'pet' then
 		board:AddTools('Pet colors', 'Health, power, backgrounds and border', {
 			Color(settings, 'Health', 'petHealthColor'),

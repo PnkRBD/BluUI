@@ -438,6 +438,55 @@ function UnitFrames.UpdateCombatBorder(frame, unitType, inCombat)
 	UpdateAggroOutline(frame, unitType, unitSettings, inCombat)
 end
 
+local OUTLINE_THICKNESS = 2
+local MOUSEOVER_LEVEL, TARGET_LEVEL = 16, 17
+
+local function BossOutline(frame, key, enabled, color, levelOffset)
+	local outline = frame[key]
+	if not enabled then
+		if outline then outline:Hide() end
+		return
+	end
+	if not outline then
+		outline = CreateFrame('Frame', nil, frame)
+		outline:SetAllPoints()
+		outline:SetFrameLevel(frame:GetFrameLevel() + levelOffset)
+		frame[key] = outline
+	end
+	Pixel.SetTemplate(outline, 0, 0, 0, 0, color[1], color[2], color[3], color[4], OUTLINE_THICKNESS)
+	outline:Show()
+end
+
+function UnitFrames.UpdateBossTarget(frame)
+	local outline = frame.TargetOutline
+	if not outline or not outline:IsShown() then return end
+	if frame.unit then
+		outline:SetAlphaFromBoolean(UnitIsUnit('target', frame.unit), 1, 0)
+	else
+		outline:SetAlpha(0)
+	end
+end
+
+function UnitFrames.UpdateBossMouseover(frame)
+	local outline = frame.MouseoverOutline
+	if outline then outline:SetAlpha(frame._hovered and 1 or 0) end
+end
+
+function UnitFrames.ApplyBossOutlines(frame)
+	local unitSettings = UnitFrames.GetUnitSettings('boss')
+	BossOutline(frame, 'TargetOutline', unitSettings.targetBorder, unitSettings.targetBorderColor, TARGET_LEVEL)
+	BossOutline(frame, 'MouseoverOutline', unitSettings.mouseoverBorder, unitSettings.mouseoverBorderColor, MOUSEOVER_LEVEL)
+	UnitFrames.UpdateBossTarget(frame)
+	UnitFrames.UpdateBossMouseover(frame)
+end
+
+BUI.Events:Register('PLAYER_TARGET_CHANGED', 'UF.BossTarget', function()
+	for bossIndex = 1, 5 do
+		local frame = UnitFrames['boss' .. bossIndex]
+		if frame then UnitFrames.UpdateBossTarget(frame) end
+	end
+end)
+
 do
 	local GetDebuffDataByIndex = C_UnitAuras.GetDebuffDataByIndex
 	local Engine = BUI.AuraEngine
