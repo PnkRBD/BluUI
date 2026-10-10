@@ -1,6 +1,5 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.Panels')
 local Skin = BUI.Skinning
 
 local ART_KEYS = { 'Border', 'BorderFrame', 'Background', 'BackgroundTile', 'BG', 'Bg', 'NineSlice', 'Inset', 'InsetFrame', 'PortraitContainer', 'TitleBg', 'TitleContainer', 'TopTileStreaks', 'ArtFrame', 'Overlay' }
@@ -49,7 +48,7 @@ local function SkinBarberShop(_, context)
 	local customize = CharCustomizeFrame
 	if not customize or customize._buiCustomizeHooked then return end
 	customize._buiCustomizeHooked = true
-	Hook(customize, 'UpdateOptionButtons', function() SkinCustomizeOptions(customize, context) end)
+	context.Hook(customize, 'UpdateOptionButtons', function() SkinCustomizeOptions(customize, context) end)
 	SkinCustomizeOptions(customize, context)
 end
 
@@ -217,16 +216,11 @@ local WINDOWS = {
 	},
 }
 
-local function SkinWindow(entry, frame)
-	if not frame or frame._buiPanelSkin or frame:IsForbidden() then return end
-	frame._buiPanelSkin = true
-	entry.skinned[#entry.skinned + 1] = frame
-
-	local context = entry.context
+local function SkinWindow(entry, frame, context)
 	if not entry.fullscreen then
-		context.FadeArt(frame)
 		context.FadeKeys(frame, ART_KEYS)
-		context.Shell(frame)
+		Skin.TipFaceTree(frame, FONT_DEPTH)
+		context.Chrome(frame)
 	end
 	for index = 1, #CLOSE_KEYS do context.Close(frame[CLOSE_KEYS[index]]) end
 	for index = 1, #SCROLL_KEYS do context.ScrollBar(frame[SCROLL_KEYS[index]]) end
@@ -234,42 +228,16 @@ local function SkinWindow(entry, frame)
 	for index = 1, #DROPDOWN_KEYS do context.Dropdown(frame[DROPDOWN_KEYS[index]]) end
 	if entry.extra then entry.extra(frame, context) end
 	Skin.HideHelpButtons(frame)
-	if not entry.fullscreen then Skin.TipFaceTree(frame, FONT_DEPTH) end
 end
 
-local function TrySkin(entry)
-	if not entry.enabled() then return end
-	for index = 1, #entry.frames do
-		SkinWindow(entry, _G[entry.frames[index]])
-	end
-end
-
-local function SweepAll()
-	for index = 1, #WINDOWS do TrySkin(WINDOWS[index]) end
-end
-
-for index = 1, #WINDOWS do
-	local entry = WINDOWS[index]
-	entry.skinned = {}
-	entry.enabled = function() return Skin.IsSkinEnabled(entry.id) end
-	entry.context = Skin.NewContext(entry.enabled)
-	Skin.OnToggle(entry.id, function(enabled)
-		if enabled then
-			TrySkin(entry)
-		else
-			entry.context.Restore()
-			for frameIndex = 1, #entry.skinned do entry.skinned[frameIndex]._buiPanelSkin = nil end
-			wipe(entry.skinned)
-		end
-	end)
-	Skin.RegisterSkin(entry.id, {
+for _, entry in ipairs(WINDOWS) do
+	local context = Skin.Define(entry.id, {
 		name = entry.name,
 		description = entry.description,
 		icon = entry.icon,
 		legacy = entry.legacy,
+		newLook = entry.newLook,
 	})
+	local function SkinFrame(frame) SkinWindow(entry, frame, context) end
+	for _, frameName in ipairs(entry.frames) do context.Window(frameName, { skin = SkinFrame }) end
 end
-
-BUI.Events:Register('ADDON_LOADED', 'Skin.Panels', SweepAll)
-BUI.Events:Register('PLAYER_ENTERING_WORLD', 'Skin.Panels', SweepAll)
-BUI.Events:Once('PLAYER_LOGIN', 'Skin.Panels', SweepAll)
