@@ -158,6 +158,11 @@ local function SkinDisplayButtons(items)
 	PaintDisplayButtons(items)
 end
 
+local function ThemedDropdown(dropdown)
+	Dropdown(dropdown)
+	Skin.TipFont(dropdown.Text, 'body')
+end
+
 local function SkinPager(paged)
 	local content = paged.PagedContent
 	local controls = content.PagingControls
@@ -169,7 +174,7 @@ end
 
 local function SkinItems(items)
 	Skin.TipFont(items.ActiveSlotTitle, 'title', 1.5)
-	for _, key in ipairs(DROPDOWN_KEYS) do Dropdown(items[key]) end
+	for _, key in ipairs(DROPDOWN_KEYS) do ThemedDropdown(items[key]) end
 	SkinDisplayButtons(items)
 	local toggle = items.SecondaryAppearanceToggle
 	CheckBox(toggle.Checkbox)
@@ -197,7 +202,7 @@ local function SkinWardrobe(collection)
 	headers:SetFrameLevel(content:GetFrameLevel() + TABS.level)
 	for _, key in ipairs(PAGED_FRAMES) do
 		local paged = content[key]
-		Dropdown(paged.FilterButton)
+		ThemedDropdown(paged.FilterButton)
 		EditBox(paged.SearchBox)
 		SkinPager(paged)
 	end
