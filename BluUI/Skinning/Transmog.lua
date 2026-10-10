@@ -18,6 +18,7 @@ local SEARCH = { gap = 8, textX = 8 }
 local DISPLAY_ICON = { scale = 0.8, x = 4, textX = 42 }
 local TABS = { x = 23, y = -24, level = 10 }
 local NEW_SET_PAD = 14
+local SITUATIONS = { textX = 29, textY = -75, defaultsX = -29, defaultsY = -72 }
 
 local context = Skin.Define('transmog', {
 	name = 'Transmogrify',
@@ -197,12 +198,25 @@ local function SkinItems(items)
 	Body(toggle.Text)
 end
 
+local function PaintSituations(situations)
+	local kind = C_TransmogOutfitInfo.GetOutfitSituationsEnabled() and 'body' or 'label'
+	for row in situations.SituationFramePool:EnumerateActive() do
+		Skin.TipFont(row.Title, kind)
+		ThemedDropdown(row.Dropdown)
+	end
+	Body(situations.EnabledToggle.Text)
+end
+
 local function SkinSituations(situations)
+	Fade(situations.Situations.Background)
+	Card(situations.Situations)
 	Body(situations.DescriptionText)
+	situations.DescriptionText:SetPoint('TOPLEFT', situations, 'TOPLEFT', SITUATIONS.textX, SITUATIONS.textY)
 	Button(situations.DefaultsButton)
+	situations.DefaultsButton:SetPoint('TOPRIGHT', situations, 'TOPRIGHT', SITUATIONS.defaultsX, SITUATIONS.defaultsY)
 	Button(situations.ApplyButton)
 	CheckBox(situations.EnabledToggle.Checkbox)
-	Body(situations.EnabledToggle.Text)
+	PaintSituations(situations)
 end
 
 local function SkinWardrobe(collection)
@@ -261,6 +275,9 @@ local function InstallFrame(frame)
 	Hook(TransmogItemModelMixin, 'UpdateItemBorder', OnItemModel)
 	Hook(TransmogSetModelMixin, 'UpdateSet', OnSetModel)
 	Hook(TransmogCustomSetModelMixin, 'UpdateSet', OnSetModel)
+	local situations = frame.WardrobeCollection.TabContent.SituationsFrame
+	Hook(situations, 'Init', PaintSituations)
+	Hook(situations, 'Refresh', PaintSituations)
 end
 
 local function RefreshFrame(frame)
