@@ -483,11 +483,26 @@ local function SetupDrag(frame, unitType)
 	})
 end
 
+local staged = setmetatable({}, { __mode = 'k' })
+local stagePlates = setmetatable({}, { __mode = 'k' })
+local stagePaints = setmetatable({}, { __mode = 'k' })
+local stageLocked = false
+local parking = CreateFrame('Frame', nil, UIParent)
+parking:Hide()
+
+function UnitFrames.StageLocked()
+	return stageLocked or InCombatLockdown()
+end
+
+function UnitFrames.WatchStage(stage, paint)
+	stagePaints[stage] = paint
+end
+
 function UnitFrames.StageFrame(unitType, index, parent, options)
+	if UnitFrames.StageLocked() then return nil end
 	local key = WatchKey(unitType, index)
 	local frame = stageFrames[key]
 	if not frame then
-		if InCombatLockdown() then return nil end
 		BUI.oUF:SetActiveStyle('BluUIStage')
 		frame = BUI.oUF:Spawn(index and (unitType .. index) or unitType, 'BUI_Stage_' .. key)
 		BUI.oUF:SetActiveStyle('BluUI')
@@ -506,12 +521,13 @@ function UnitFrames.StageFrame(unitType, index, parent, options)
 	return frame
 end
 
-local staged = setmetatable({}, { __mode = 'k' })
-local stagePlates = setmetatable({}, { __mode = 'k' })
-
 function UnitFrames.ClearStage(stage)
 	for _, frame in ipairs(staged[stage] or {}) do
-		frame:Hide()
+		if frame:GetParent() == stage then
+			frame:Hide()
+			frame:ClearAllPoints()
+			frame:SetParent(parking)
+		end
 		local plate = stagePlates[stage][frame]
 		plate:Hide()
 		plate.dots:Hide()
@@ -560,6 +576,23 @@ function UnitFrames.StagePair(stage, kit, maxWidth, maxHeight, gap, options)
 	UnitFrames.PlaceStaged(target, stage, targetX, 0)
 	return playerX, targetX
 end
+
+local function RepaintStages()
+	for stage, paint in pairs(stagePaints) do
+		if stage:IsVisible() then paint() end
+	end
+end
+
+BUI.Events:Register('PLAYER_REGEN_DISABLED', 'UnitFrames.Preview.ParkStages', function()
+	stageLocked = true
+	for stage in pairs(staged) do UnitFrames.ClearStage(stage) end
+	RepaintStages()
+end)
+
+BUI.Events:Register('PLAYER_REGEN_ENABLED', 'UnitFrames.Preview.RestoreStages', function()
+	stageLocked = false
+	RepaintStages()
+end)
 
 function UnitFrames.SetPreviewListener(callback)
 	listener = callback

@@ -659,7 +659,7 @@ local function Theme(kit, shell, parent, width, _, page)
 	notice:SetPoint('CENTER')
 	local captionY = -(BAND_HEIGHT / 2) + 12
 	local function PaintStage()
-		local combat = InCombatLockdown()
+		local combat = module.StageLocked()
 		notice:SetShown(combat)
 		for _, caption in ipairs(captions) do caption:Hide() end
 		if combat then return end
@@ -673,6 +673,7 @@ local function Theme(kit, shell, parent, width, _, page)
 		end
 	end
 	PaintStage()
+	module.WatchStage(stage, PaintStage)
 	y = y + BAND_HEIGHT + THEME_GAP
 
 	local settings = BUI.GetDB().unitFrames
