@@ -46,7 +46,7 @@ local THUMB_GAP = 6
 local THUMB_FRAME = 1
 local THUMB_IDLE_ALPHA = 0.6
 local DOT_TILE = 16
-local PREVIEW_MIN = 360
+local PREVIEW_HEIGHT = 360
 local LINK_HEIGHT = 20
 local WHITE = { 1, 1, 1, 1 }
 
@@ -348,12 +348,12 @@ function Layout.SplitPage(tab, shell, spec)
 	local function Resize()
 		local last = MarkLast()
 		local height = main:Measure(mainWidth)
-		local columns = math.max(height, PREVIEW_MIN)
+		local columns = math.max(height, PREVIEW_HEIGHT)
 		if last and columns > height then last:SetHeight(last:GetHeight() + columns - height) end
 		main:ClearAllPoints()
 		main:SetPoint('TOPLEFT')
 		main:SetSize(mainWidth, columns)
-		preview:SetHeight(columns)
+		preview:SetHeight(PREVIEW_HEIGHT)
 		block:SetHeight(columns)
 		block.layoutHeight = columns
 		BUILib.Defer(function()
