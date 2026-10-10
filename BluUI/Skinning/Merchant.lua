@@ -5,6 +5,7 @@ local Widget = BUILib.Widget
 local Controls = BUILib.Controls
 local FONT = BUILib.Font or STANDARD_TEXT_FONT
 local Skin = BUI.Skinning
+local Painter = BUI.Painter
 local Pixel = BUI.Pixel
 local After = BUI.Profiler.After
 
@@ -227,7 +228,7 @@ local function CreateIconLabel(parent, fontSize)
 	frame.qtyText = frame:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(frame.qtyText, fontSize or 10, FONT, '')
 	frame.qtyText:SetPoint('LEFT', frame.icon, 'RIGHT', Pixel.Scale(2), 0)
-	frame.qtyText:SetTextColor(0.8, 0.8, 0.8, 1)
+	Painter.Text(frame.qtyText, 'skinText')
 
 	frame:SetScript('OnEnter', BUI.Profiler.Script('Skin.Merchant frame OnEnter', function(self)
 		if self.link then
@@ -394,7 +395,7 @@ local function CreateBuyRow(parent)
 	row.stockText = row:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(row.stockText, 9, FONT, '')
 	row.stockText:SetPoint('LEFT', row.nameText, 'RIGHT', Pixel.Scale(4), 0)
-	row.stockText:SetTextColor(0.5, 0.5, 0.5, 1)
+	Painter.Text(row.stockText, 'skinLabel')
 
 	local buyButton = Skin.SmallButton(row, 48, 22, 'Buy')
 	buyButton:SetPoint('RIGHT', row, 'RIGHT', Pixel.Scale(-8), 0)
@@ -561,7 +562,7 @@ local function BuildFrame()
 	frame.countText = titleBar:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(frame.countText, 11, FONT, '')
 	frame.countText:SetPoint('RIGHT', titleBar.closeBtn.frame, 'LEFT', Pixel.Scale(-12), 0)
-	frame.countText:SetTextColor(0.5, 0.5, 0.5, 1)
+	Painter.Text(frame.countText, 'skinLabel')
 
 	frame.tabBar = Controls.TabLineBar(frame, { 'Buy', 'Buyback', 'Bulk Buy' }, TAB_BUY, function(tabIndex)
 		activeTab = tabIndex
@@ -644,7 +645,7 @@ local function BuildFrame()
 	frame.emptyText = contentArea:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(frame.emptyText, 13, FONT, '')
 	frame.emptyText:SetPoint('CENTER', 0, Pixel.Scale(20))
-	frame.emptyText:SetTextColor(0.45, 0.45, 0.45, 1)
+	Painter.Text(frame.emptyText, 'skinLabel')
 	frame.emptyText:Hide()
 
 	frame.repairAll = Controls.Button(frame, 'Repair All', 80, function() RepairAllItems(false) end)
@@ -661,7 +662,7 @@ local function BuildFrame()
 	frame.moneyText = frame:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(frame.moneyText, 11, FONT, '')
 	frame.moneyText:SetPoint('BOTTOMLEFT', Pixel.Scale(16), Pixel.Scale(20))
-	frame.moneyText:SetTextColor(0.8, 0.8, 0.8, 1)
+	Painter.Text(frame.moneyText, 'skinText')
 
 	merchantFrame = frame
 end

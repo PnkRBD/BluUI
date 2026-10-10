@@ -456,6 +456,7 @@ function Skin.HideTipShell(frame)
 end
 
 local CARD_STYLE = { fill = CARD_FILL, edge = PANEL_EDGE }
+Skin.PALETTE = { panel = PANEL_FILL, edge = PANEL_EDGE, card = CARD_FILL }
 local ACCENT_EDGE = {}
 
 local function AccentEdge()
