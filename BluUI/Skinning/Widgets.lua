@@ -417,20 +417,25 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 	return dropdown
 end
 
+local function SetHeaderTitle(header, title)
+	header.text:SetText(title:upper())
+end
+
 function Skin.CreateListHeader(parent, height)
 	local header = CreateFrame('Frame', nil, parent)
 	header:SetHeight(Pixel.Scale(height or 22))
 
 	local text = header:CreateFontString(nil, 'OVERLAY')
-	Pixel.ApplyFont(text, 11, BUILib.Font or STANDARD_TEXT_FONT, 'OUTLINE')
-	text:SetPoint('LEFT', Pixel.Scale(4), 0)
+	Pixel.ApplyFont(text, 10, FONT, '')
+	text:SetPoint('LEFT')
 	Painter.Text(text, 'skinLabel')
 	header.text = text
+	header.SetTitle = SetHeaderTitle
 
 	local line = header:CreateTexture(nil, 'BACKGROUND')
 	line:SetHeight(Pixel.PixelSize(1))
-	line:SetPoint('LEFT', text, 'RIGHT', Pixel.Scale(6), 0)
-	line:SetPoint('RIGHT', header, 'RIGHT', Pixel.Scale(-2), 0)
+	line:SetPoint('LEFT', text, 'RIGHT', Pixel.Scale(8), 0)
+	line:SetPoint('RIGHT')
 	Painter.Fill(line, 'skinBorder')
 	return header
 end

@@ -574,7 +574,7 @@ local function ColumnLabel(text, left)
 	local header = Skin.CreateListHeader(panel, LABEL_HEIGHT)
 	header:SetPoint('TOPLEFT', Pixel.Scale(left), Pixel.Scale(-LABEL_TOP))
 	header:SetWidth(Pixel.Scale(COLUMN_WIDTH))
-	header.text:SetText(text)
+	header:SetTitle(text)
 end
 
 local function Column(left, rowHeight)
