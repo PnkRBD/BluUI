@@ -46,16 +46,6 @@ local SECTIONS = {
 local HUNTER_TRACKING_SUBTYPE = 1
 local TOWNSFOLK_TRACKING_SUBTYPE = 2
 
-local THEME = {}
-
-function THEME:Color(role)
-	return BUI.ThemeColor(role)
-end
-
-function THEME:FontPath(fontRole)
-	return BUI.ThemeFontPath(fontRole)
-end
-
 local function SectionKey(info)
 	if info.subType == TOWNSFOLK_TRACKING_SUBTYPE then return 'world' end
 	if info.subType == HUNTER_TRACKING_SUBTYPE or info.spellID or info.type == 'spell' then return 'tracking' end
@@ -151,7 +141,7 @@ local function OpenList(row, anchor)
 			end,
 		}
 	end
-	Controls.ContextMenu(items, { anchor = anchor, width = math.max(Pixel.Scale(DROPDOWN_W), LIST_MIN_W), offsetY = -LIST_GAP, window = THEME, surface = 'page' })
+	BUI.Skinning.ContextMenu(items, { anchor = anchor, width = math.max(Pixel.Scale(DROPDOWN_W), LIST_MIN_W), offsetY = -LIST_GAP, surface = 'page' })
 end
 
 local function CreateDropdown(row)

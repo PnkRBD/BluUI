@@ -10,7 +10,6 @@ local After = BUI.Profiler.After
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Theme = BUILib.Theme
 local Skin3 = BUILib.Skin
-local Controls = BUILib.Controls
 local LibWidget = BUILib.Widget
 local FONT = BUILib.Font or STANDARD_TEXT_FONT
 local Skin = BUI.Skinning
@@ -938,7 +937,7 @@ function QuestFilter.ShowMenu()
 			end,
 		}
 	end
-	Controls.ContextMenu(items, { width = 180, anchor = headerFilter, point = 'TOPRIGHT', relPt = 'BOTTOMRIGHT', offsetY = -4 })
+	Skin.ContextMenu(items, { width = 180, anchor = headerFilter, point = 'TOPRIGHT', relPt = 'BOTTOMRIGHT', offsetY = -4 })
 end
 
 local function UpdateHeaderCounts()
