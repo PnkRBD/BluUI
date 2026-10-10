@@ -1698,6 +1698,11 @@ function Skin.NewContext(enabled)
 		Skin.TipDropdown(dropdown)
 	end
 
+	local function TextDropdown(dropdown)
+		Dropdown(dropdown)
+		Skin.TipFont(dropdown.Text, 'body')
+	end
+
 	local function EditBox(editBox, inset)
 		if not editBox then return end
 		shelled[editBox] = true
@@ -1803,6 +1808,7 @@ function Skin.NewContext(enabled)
 
 	context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt = Fade, FadeRegions, FadeKeys, FadeArt
 	context.Shell, context.Button, context.Close, context.Dropdown, context.Card = Shell, Button, Close, Dropdown, Card
+	context.TextDropdown = TextDropdown
 	context.EditBox, context.CheckBox, context.TextBox, context.ScrollBar, context.Tab = EditBox, CheckBox, TextBox, ScrollBar, Tab
 	context.Face, context.FaceOnce, context.Title, context.Body, context.Restore = Face, FaceOnce, Title, Body, Restore
 	context.Chrome, context.Own, context.ShowOwned, context.CollapseButton = Chrome, Own, ShowOwned, CollapseButton
@@ -1968,6 +1974,20 @@ function Skin.RegisterTabSystem(tabSystem, context, panel)
 end
 
 local ROLE_CHECK_SIZE = 18
+
+local CATEGORY_ART = { 'NormalTexture', 'Lines', 'SelectedTexture', 'HighlightTexture' }
+local CATEGORY_CARD_INSET = 1
+
+function Skin.TipCategoryButton(context, button, scale)
+	for _, key in ipairs(CATEGORY_ART) do
+		local texture = button[key]
+		context.Fade(texture)
+		texture:SetAlpha(0)
+	end
+	context.Card(button, CATEGORY_CARD_INSET)
+	Skin.SetActiveEdge(button, button.SelectedTexture:IsShown())
+	Skin.TipButtonFonts(button, scale)
+end
 
 function Skin.TipRoleButton(context, button)
 	if not button or button._buiRole then return end
