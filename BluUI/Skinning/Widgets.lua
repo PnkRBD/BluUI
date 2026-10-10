@@ -8,29 +8,43 @@ local Skin = BUI.Skinning
 local Wrap = BUI.Profiler.Wrap
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Controls = BUILib.Controls
-local Widget = BUILib.Widget
 local Colors = BUILib.Colors
 local FONT = BUILib.Font or STANDARD_TEXT_FONT
 
 local SetColorTex = BUI.Tools.SetColorTex
+local Painter = BUI.Painter
+local PALETTE = Skin.PALETTE
+local TITLE_SCALE = 14 / 12
 
 local WINDOW_TITLE_HEIGHT = 36
 local WINDOW_INSET = 12
 local WINDOW_LEVEL = 100
 
+local function PaintBackdrop(frame, fill)
+	Painter.Custom(frame, function(target) Skin.ApplyBackdrop(target, fill, PALETTE.edge) end)
+end
+
+local function AccentBorder(frame)
+	frame:SetBackdropBorderColor(Colors.GetAccent())
+end
+
+local function RestBorder(frame)
+	frame:SetBackdropBorderColor(unpack(PALETTE.edge))
+end
+
 function Skin.SmallButton(parent, width, height, label)
 	local button = CreateFrame('Button', nil, parent)
 	button:SetSize(Pixel.Scale(width), Pixel.Scale(height))
-	Skin.ApplyBackdrop(button, Colors.bg.light, Colors.border.default)
+	PaintBackdrop(button, PALETTE.panel)
 
 	local text = button:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(text, 11, FONT, '')
 	text:SetPoint('CENTER')
 	text:SetText(label)
-	text:SetTextColor(0.9, 0.9, 0.9, 1)
+	Painter.Text(text, 'skinText')
 
-	button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Widgets button OnEnter', function(self) self:SetBackdropBorderColor(Colors.GetAccent()) end))
-	button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Widgets button OnLeave', function(self) self:SetBackdropBorderColor(unpack(Colors.border.default)) end))
+	button:HookScript('OnEnter', Wrap('Skin.Widgets button OnEnter', AccentBorder))
+	button:HookScript('OnLeave', Wrap('Skin.Widgets button OnLeave', RestBorder))
 	return button
 end
 
@@ -135,20 +149,19 @@ end
 function Skin.CreateSearchBox(parent, width, callback)
 	local container = CreateFrame('Frame', nil, parent, 'BackdropTemplate')
 	container:SetSize(Pixel.Scale(width), Pixel.Scale(24))
-	local idleBorder = Colors.border.input or Colors.border.default
-	Skin.ApplyBackdrop(container, Colors.bg.input or Colors.bg.medium, idleBorder)
+	PaintBackdrop(container, PALETTE.panel)
 
 	local hint = container:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(hint, 11, FONT, '')
 	hint:SetPoint('LEFT', Pixel.Scale(8), 0)
 	hint:SetText('Search...')
-	hint:SetTextColor(0.35, 0.35, 0.35, 1)
+	Painter.Text(hint, 'skinLabel')
 
 	local editBox = CreateFrame('EditBox', nil, container)
 	editBox:SetAllPoints()
 	editBox:SetTextInsets(8, 8, 0, 0)
 	Pixel.ApplyFont(editBox, 11, FONT, '')
-	editBox:SetTextColor(0.9, 0.9, 0.9, 1)
+	Painter.Text(editBox, 'skinText')
 	editBox:SetAutoFocus(false)
 	editBox:SetScript('OnTextChanged', BUI.Profiler.Script('Skin.Widgets editBox OnTextChanged', function(self, userInput)
 		if not userInput then return end
@@ -157,8 +170,8 @@ function Skin.CreateSearchBox(parent, width, callback)
 		callback(text)
 	end))
 	editBox:SetScript('OnEscapePressed', BUI.Profiler.Script('Skin.Widgets editBox OnEscapePressed', function(self) self:SetText(''); self:ClearFocus() end))
-	local function showAccent() container:SetBackdropBorderColor(Colors.GetAccent()) end
-	local function showIdle() container:SetBackdropBorderColor(unpack(idleBorder)) end
+	local function showAccent() AccentBorder(container) end
+	local function showIdle() RestBorder(container) end
 
 	container:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets container OnEnter', showAccent))
 	container:SetScript('OnLeave', BUI.Profiler.Script('Skin.Widgets container OnLeave', function() if not editBox:HasFocus() then showIdle() end end))
@@ -178,9 +191,8 @@ function Skin.CreateTitleBar(frame, title, height, onClose)
 	bar:SetHeight(Pixel.Scale(height))
 
 	frame.titleText = bar:CreateFontString(nil, 'OVERLAY')
-	Pixel.ApplyFont(frame.titleText, 14, FONT, 'OUTLINE')
-	frame.titleText:SetPoint('LEFT', Pixel.Scale(14), 0)
-	frame.titleText:SetTextColor(1, 1, 1, 1)
+	Skin.TipFont(frame.titleText, 'title', TITLE_SCALE)
+	frame.titleText:SetPoint('LEFT', Pixel.Scale(12), 0)
 	frame.titleText:SetText(title)
 
 	local closeButton = Controls.Icon(frame, { preset = 'close', size = 20, onClick = onClose })
@@ -192,17 +204,16 @@ function Skin.CreateTitleBar(frame, title, height, onClose)
 end
 
 function Skin.CreateWindow(spec)
-	local frame = Widget.New(UIParent, 'Frame', nil, {
-		bg = Colors.bg.dark,
-		border = Colors.border.light,
-		size = { spec.width, spec.height },
-	}).frame
+	local frame = CreateFrame('Frame', nil, UIParent, 'BackdropTemplate')
+	frame:SetSize(Pixel.Scale(spec.width), Pixel.Scale(spec.height))
+	PaintBackdrop(frame, PALETTE.panel)
 	Skin.MakeDraggable(frame, spec.dbKey, 'CENTER', spec.x or 0, spec.y or 0, spec.follow)
 	frame:SetFrameStrata('DIALOG')
 	frame:SetFrameLevel(WINDOW_LEVEL)
 	frame:Hide()
 	frame.titleBar = Skin.CreateTitleBar(frame, spec.title or '', WINDOW_TITLE_HEIGHT, spec.onClose)
-	local content = Widget.New(frame, 'Frame', nil, { bg = Colors.bg.medium, border = Colors.border.dark }).frame
+	local content = CreateFrame('Frame', nil, frame, 'BackdropTemplate')
+	PaintBackdrop(content, PALETTE.panel)
 	content:SetPoint('BOTTOMRIGHT', Pixel.Scale(-WINDOW_INSET), Pixel.Scale(spec.contentBottom))
 	frame.content = content
 	function frame:SetContentTop(top)
@@ -218,7 +229,7 @@ function Skin.CreateListRow(parent, height, iconSize)
 
 	local row = CreateFrame('Button', nil, parent, 'BackdropTemplate')
 	row:SetHeight(Pixel.Scale(height))
-	Skin.ApplyBackdrop(row, Colors.bg.medium, Colors.border.dark)
+	PaintBackdrop(row, PALETTE.card)
 	row:EnableMouse(true)
 
 	row.iconBorder = CreateFrame('Frame', nil, row, 'BackdropTemplate')
@@ -240,11 +251,11 @@ function Skin.CreateListRow(parent, height, iconSize)
 	row.priceText = row:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(row.priceText, 10, FONT, '')
 	row.priceText:SetPoint('LEFT', row.iconBorder, 'RIGHT', Pixel.Scale(8), Pixel.Scale(-8))
-	row.priceText:SetTextColor(0.65, 0.65, 0.65, 1)
+	Painter.Text(row.priceText, 'skinLabel')
 
-	row:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets row OnEnter', function(self) self:SetBackdropBorderColor(Colors.GetAccent()) end))
+	row:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets row OnEnter', AccentBorder))
 	row:SetScript('OnLeave', BUI.Profiler.Script('Skin.Widgets row OnLeave', function(self)
-		self:SetBackdropBorderColor(unpack(Colors.border.dark))
+		RestBorder(self)
 		GameTooltip:Hide()
 	end))
 
@@ -261,15 +272,14 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 
 	local dropdown = CreateFrame('Frame', nil, parent, 'BackdropTemplate')
 	dropdown:SetSize(Pixel.Scale(width), Pixel.Scale(24))
-	local idleBorder = Colors.border.input or Colors.border.default
-	Skin.ApplyBackdrop(dropdown, Colors.bg.input or Colors.bg.medium, idleBorder)
+	PaintBackdrop(dropdown, PALETTE.panel)
 
 	local label = dropdown:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(label, 11, FONT, '')
 	label:SetPoint('LEFT', Pixel.Scale(8), 0)
 	label:SetPoint('RIGHT', Pixel.Scale(-16), 0)
 	label:SetJustifyH('LEFT')
-	label:SetTextColor(0.85, 0.85, 0.85, 1)
+	Painter.Text(label, 'skinText')
 	label:SetText(items[1] and items[1].label or '')
 	dropdown.label = label
 
@@ -283,7 +293,7 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 	menu:SetFrameStrata('FULLSCREEN_DIALOG')
 	menu:SetPoint('TOPLEFT', dropdown, 'BOTTOMLEFT', 0, Pixel.Scale(-2))
 	menu:SetWidth(Pixel.Scale(width))
-	Skin.ApplyBackdrop(menu, { 0.04, 0.045, 0.05, 0.98 }, Colors.border.default)
+	PaintBackdrop(menu, PALETTE.panel)
 	menu:Hide()
 
 	local rowHeight = 22
@@ -298,7 +308,7 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 		text:SetPoint('LEFT', Pixel.Scale(8), 0)
 		text:SetJustifyH('LEFT')
 		text:SetText(item.label)
-		text:SetTextColor(0.8, 0.8, 0.8, 1)
+		Painter.Text(text, 'skinText')
 
 		local highlight = row:CreateTexture(nil, 'HIGHLIGHT')
 		highlight:SetAllPoints()
@@ -323,9 +333,9 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 			SetArrowOpen(true)
 		end
 	end))
-	dropdown:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets dropdown OnEnter', function(self) self:SetBackdropBorderColor(Colors.GetAccent()) end))
+	dropdown:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets dropdown OnEnter', AccentBorder))
 	dropdown:SetScript('OnLeave', BUI.Profiler.Script('Skin.Widgets dropdown OnLeave', function(self)
-		if not menu:IsShown() then self:SetBackdropBorderColor(unpack(idleBorder)) end
+		if not menu:IsShown() then RestBorder(self) end
 	end))
 
 	local grace = 0
@@ -337,7 +347,7 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 			if grace > 0.3 then
 				updatingMenu:Hide()
 				SetArrowOpen(false)
-				dropdown:SetBackdropBorderColor(unpack(idleBorder))
+				RestBorder(dropdown)
 			end
 		end
 	end)
@@ -356,13 +366,13 @@ function Skin.CreateListHeader(parent, height)
 	local text = header:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(text, 11, BUILib.Font or STANDARD_TEXT_FONT, 'OUTLINE')
 	text:SetPoint('LEFT', Pixel.Scale(4), 0)
-	text:SetTextColor(0.55, 0.55, 0.55)
+	Painter.Text(text, 'skinLabel')
 	header.text = text
 
 	local line = header:CreateTexture(nil, 'BACKGROUND')
 	line:SetHeight(Pixel.PixelSize(1))
 	line:SetPoint('LEFT', text, 'RIGHT', Pixel.Scale(6), 0)
 	line:SetPoint('RIGHT', header, 'RIGHT', Pixel.Scale(-2), 0)
-	line:SetColorTexture(0.22, 0.22, 0.22, 0.6)
+	Painter.Fill(line, 'skinBorder')
 	return header
 end
