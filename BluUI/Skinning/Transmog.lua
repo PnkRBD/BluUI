@@ -17,7 +17,7 @@ local DROPDOWN_KEYS = { 'WeaponDropdown', 'WeaponSheatheDropdown' }
 local SEARCH = { gap = 8, textX = 8 }
 local DISPLAY_ICON = { scale = 0.8, x = 4, textX = 42 }
 local TABS = { x = 23, y = -24, level = 10 }
-local NEW_SET = { x = -29, y = -22 }
+local NEW_SET_PAD = 14
 
 local context = Skin.Define('transmog', {
 	name = 'Transmogrify',
@@ -224,8 +224,9 @@ local function SkinWardrobe(collection)
 	SkinItems(content.ItemsFrame)
 	local newSet = content.CustomSetsFrame.NewCustomSetButton
 	Button(newSet)
+	newSet:SetSize(math.ceil(newSet.Text:GetStringWidth()) + NEW_SET_PAD * 2, Skin.DropdownHeight())
 	newSet:ClearAllPoints()
-	newSet:SetPoint('TOPRIGHT', content.CustomSetsFrame, 'TOPRIGHT', NEW_SET.x, NEW_SET.y)
+	newSet:SetPoint('LEFT', headers, 'RIGHT', SEARCH.gap, 0)
 	SkinSituations(content.SituationsFrame)
 end
 
