@@ -4,9 +4,7 @@ local BUILib = BluUI.BUILibClient
 local Visibility = BUI.Visibility
 
 local SLIDER_WIDTH = 220
-local ARROW = 22
-local ARROW_GAP = 4
-local CONTROL_ROOM = SLIDER_WIDTH + 12 + ARROW * 2 + ARROW_GAP
+local CONTROL_ROOM = SLIDER_WIDTH + 12
 
 local STATES = {
 	outOfCombat = { label = 'Out of combat', sub = 'The fallback when nothing else applies' },
@@ -72,12 +70,10 @@ local function StateBoard(ui, parent, width, page)
 	local db = BUI.GetDB()
 	local opacity = db.general.visibilityOpacity
 	local priority = ValidatePriority(db)
-	local rows = {}
-	local board
-	board = ui.Board(parent, width, {
+	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'State opacity',
-		description = 'How see-through the modules go in each state. Higher rows win when several states apply, and out of combat is the fallback.',
+		description = 'How see-through the modules go in each state. Drag to reorder, higher rows win and out of combat is the fallback.',
 		buttons = {
 			{ text = 'Reset order', icon = 'reset', onClick = function()
 				for index, conditionKey in ipairs(Visibility.DEFAULT_PRIORITY) do priority[index] = conditionKey end
@@ -92,33 +88,24 @@ local function StateBoard(ui, parent, width, page)
 			end },
 		},
 	})
-	local function Move(key, delta)
-		local index
-		for position, conditionKey in ipairs(priority) do
-			if conditionKey == key then index = position end
-		end
-		if not priority[index + delta] then return end
-		priority[index], priority[index + delta] = priority[index + delta], priority[index]
-		board:Move(rows[key], delta)
-		Visibility.Update(true)
+	board:DragList(function(index, delta, count)
+		BUILib.Layout.ShiftBlock(priority, index, delta, count)
 		page:Resize()
-	end
-	local function StateRow(key, movable)
-		local state = STATES[key]
-		local row = board:AddRow(state.label, state.sub, CONTROL_ROOM)
-		rows[key] = row
+	end, function()
+		Visibility.Update(true)
+	end)
+	local function OpacitySlider(row, key)
 		ui.Slider(row, SLIDER_WIDTH, { min = 0, max = 100, step = 1, get = function() return opacity[key] end, set = function(value)
 			opacity[key] = value
 			Visibility.Update(true)
 		end }):SetPoint('RIGHT', -ui.ROW_INSET, 0)
-		if movable then
-			local down = ui.ArrowButton(row, false, function() Move(key, 1) end)
-			down:SetPoint('RIGHT', -(ui.ROW_INSET + SLIDER_WIDTH + 12), 0)
-			ui.ArrowButton(row, true, function() Move(key, -1) end):SetPoint('RIGHT', down, 'LEFT', -ARROW_GAP, 0)
-		end
 	end
-	for _, key in ipairs(priority) do StateRow(key, true) end
-	StateRow('outOfCombat', false)
+	for _, key in ipairs(priority) do
+		local state = STATES[key]
+		OpacitySlider(board:AddDragRow(state.label, CONTROL_ROOM, state.sub), key)
+	end
+	local fallback = STATES.outOfCombat
+	OpacitySlider(board:AddRow(fallback.label, fallback.sub, CONTROL_ROOM), 'outOfCombat')
 	return board
 end
 
