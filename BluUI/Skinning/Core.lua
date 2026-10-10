@@ -1129,16 +1129,7 @@ function Skin.TipTab(tab, fused)
 	BUILib.Skin.Tab(tab, TAB_STYLE, fused)
 end
 
-local SEGMENT_PAD, SEGMENT_GAP, SEGMENT_HEIGHT, SEGMENT_TEXT_PAD = 2, 2, 22, 12
-local segmentSelectedFont
-
-local function SegmentSelectedFont()
-	if segmentSelectedFont then return segmentSelectedFont end
-	segmentSelectedFont = CreateFont('BUI_TipSegmentSelected')
-	segmentSelectedFont:SetFont(BUILib.Font, TIP_BODY_SIZE, '')
-	Painter.Text(segmentSelectedFont, 'skinTitle')
-	return segmentSelectedFont
-end
+local SEGMENT_PAD, SEGMENT_GAP, SEGMENT_TEXT_PAD = 2, 2, 12
 
 local function PaintSegment(tab)
 	local state = tab._buiSegment
@@ -1148,10 +1139,10 @@ local function PaintSegment(tab)
 	if not live then return end
 	state.fill:SetColorTexture(CARD_FILL[1], CARD_FILL[2], CARD_FILL[3], CARD_FILL[4])
 	local fonts = ButtonFontObjects()
-	local rest = selected and SegmentSelectedFont() or fonts.disabled
-	tab:SetNormalFontObject(rest)
-	tab:SetDisabledFontObject(rest)
-	tab:SetHighlightFontObject(selected and rest or fonts.normal)
+	local font = selected and fonts.normal or fonts.disabled
+	tab:SetNormalFontObject(font)
+	tab:SetDisabledFontObject(font)
+	tab:SetHighlightFontObject(fonts.normal)
 	tab.Text:SetPoint('CENTER', tab, 'CENTER', 0, 0)
 end
 
@@ -1159,7 +1150,7 @@ local function SizeSegment(tab)
 	if not tab._buiSegment.enabled() then return end
 	local text = tab.Text
 	text:SetWidth(0)
-	tab:SetSize(math.ceil(text:GetStringWidth()) + SEGMENT_TEXT_PAD * 2, SEGMENT_HEIGHT)
+	tab:SetSize(math.ceil(text:GetStringWidth()) + SEGMENT_TEXT_PAD * 2, Skin.DropdownHeight() - SEGMENT_PAD * 2)
 end
 
 function Skin.SegmentTabs(tabSystem, enabled)
