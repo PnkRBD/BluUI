@@ -2060,13 +2060,6 @@ end
 
 local function ApplySkin()
     if not context.Enabled() or HasConflictingCharSheet() then return end
-    if InCombatLockdown() and not frame then
-        if not CharacterFrame._buiCombatNoticed and CharacterFrame:IsShown() then
-            CharacterFrame._buiCombatNoticed = true
-            BUI.Print('Character sheet opens after combat.')
-        end
-        return
-    end
     if not CharacterFrame._buiSuppressActive then Skin.SuppressBlizzardFrame(CharacterFrame) end
     local scene = _G.CharacterModelScene
     if scene then
@@ -2076,10 +2069,6 @@ local function ApplySkin()
     BUI.Profiler.After('Skin.CharacterFrame show sheet', 0, function()
         if CharacterFrame:IsShown() then ShowSkin() end
     end)
-end
-
-local function ApplyAfterCombat()
-    if CharacterFrame:IsShown() and not IsOpen() then ApplySkin() end
 end
 
 context.Window('CharacterFrame', {
@@ -2134,7 +2123,7 @@ BUI.Events:Register('UPDATE_INVENTORY_DURABILITY',  'Skinning.CharacterFrame', O
 BUI.Events:Register('CHALLENGE_MODE_COMPLETED',     'Skinning.CharacterFrame', On.Header)
 BUI.Events:Register('PLAYER_LOOT_SPEC_UPDATED',     'Skinning.CharacterFrame', On.Header)
 BUI.Events:Register('COMBAT_RATING_UPDATE',         'Skinning.CharacterFrame', On.Stats)
-BUI.Events:Register('PLAYER_REGEN_ENABLED',         'Skinning.CharacterFrame', function() if CharacterFrame then CharacterFrame._buiCombatNoticed = nil end; ApplyAfterCombat(); On.Stats() end)
+BUI.Events:Register('PLAYER_REGEN_ENABLED',         'Skinning.CharacterFrame', On.Stats)
 BUI.Events:Register('PLAYER_SPECIALIZATION_CHANGED', 'Skinning.CharacterFrame', function()
     if IsOpen() then UpdateSubtitle(); RefreshStats(); RefreshHeader() end
 end)
