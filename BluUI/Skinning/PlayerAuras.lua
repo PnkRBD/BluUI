@@ -7,9 +7,6 @@ local min = math.min
 local IsSecret = _G.issecretvalue or function() return false end
 
 local Skin = BUI.Skinning
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
-local Controls = BUILib.Controls
-local PageKit = BUILib.PageKit
 local Pixel = BUI.Pixel
 
 local SKIN_ID = 'playerauras'
@@ -256,28 +253,33 @@ local function Deactivate()
 	Skin.SetPageButtonSkinned(collapseButton, false)
 end
 
-local function TextCardRows(card, title, keys)
-	local settings = Settings()
-	local cog = PageKit.SettingsIcon(card, {
-		title = title, tooltip = 'Size & offsets', options = {
-			{ kind = 'slider', label = 'Font Size', min = 6, max = 24,
-			  get = function() return settings[keys.size] end,
-			  set = function(value) settings[keys.size] = value end, apply = Restyle },
-			{ kind = 'slider', label = 'X Offset', min = -30, max = 30,
-			  get = function() return settings[keys.offsetX] end,
-			  set = function(value) settings[keys.offsetX] = value end, apply = Restyle },
-			{ kind = 'slider', label = 'Y Offset', min = -30, max = 30,
-			  get = function() return settings[keys.offsetY] end,
-			  set = function(value) settings[keys.offsetY] = value end, apply = Restyle },
-		},
-	})
-	PageKit.Row(card, 38, 'Size & Offsets', cog)
-
-	local anchorDropdown = Controls.Dropdown(card, nil, BUI.C.ANCHOR_POINT_OPTIONS, settings[keys.anchor], function(value)
-		settings[keys.anchor] = value
+local function AuraSetting(label, key, extra)
+	local option = extra
+	option.label = label
+	option.get = function() return Settings()[key] end
+	option.set = function(value)
+		Settings()[key] = value
 		Restyle()
-	end, nil, 150)
-	PageKit.Row(card, 78, 'Anchor', anchorDropdown)
+	end
+	return option
+end
+
+local function TextSettings(name, prefix)
+	local offset = { min = -30, max = 30, step = 1 }
+	return AuraSetting(name .. ' size', prefix .. 'Size', { separator = true, min = 6, max = 24, step = 1 }),
+		AuraSetting(name .. ' anchor', prefix .. 'Anchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
+		AuraSetting(name .. ' X offset', prefix .. 'OffsetX', CopyTable(offset)),
+		AuraSetting(name .. ' Y offset', prefix .. 'OffsetY', CopyTable(offset))
+end
+
+local function AuraSettings()
+	local options = {
+		AuraSetting('Font', 'font', { entries = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION) }),
+		AuraSetting('Outline', 'outline', { entries = OUTLINE_ITEMS }),
+	}
+	for _, option in ipairs({ TextSettings('Timer', 'timer') }) do options[#options + 1] = option end
+	for _, option in ipairs({ TextSettings('Stack', 'stack') }) do options[#options + 1] = option end
+	return options
 end
 
 Skin.OnToggle(SKIN_ID, function(enabled)
@@ -295,44 +297,7 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Player Auras',
 	description = 'The buff, debuff and weapon enchant icons beside the minimap: cropped icons in a thin edge that takes the debuff type color, with your own timer and stack text.',
 	icon = 'Interface/Icons/Spell_Holy_WordFortitude',
-	buildSettings = function(content)
-		local settings = Settings()
-		local width = content.width
-		local gap = PageKit.GAP
-		local fontHeight = PageKit.CardHeight(2)
-		local textHeight = PageKit.CardHeight(2)
-
-		local root = CreateFrame('Frame', nil, content.child)
-		root:SetPoint('TOPLEFT', 0, -8)
-		root:SetSize(width, fontHeight + gap + textHeight + gap + textHeight)
-
-		local offsetY = 0
-		local function MakeCard(title, height)
-			local card = Controls.SettingsCard(root, { title = title, width = width }).frame
-			card:SetSize(width, height)
-			card:SetPoint('TOPLEFT', 0, -offsetY)
-			card:SetFrameLevel((root:GetFrameLevel() or 0) + 5)
-			offsetY = offsetY + height + gap
-			return card
-		end
-
-		local fontCard = MakeCard('FONT', fontHeight)
-		local fontDropdown = Controls.Dropdown(fontCard, nil, BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION), settings.font, function(value)
-			settings.font = value
-			Restyle()
-		end, nil, 150)
-		PageKit.Row(fontCard, 38, 'Font', fontDropdown)
-		local outlineDropdown = Controls.Dropdown(fontCard, nil, OUTLINE_ITEMS, settings.outline, function(value)
-			settings.outline = value
-			Restyle()
-		end, nil, 150)
-		PageKit.Row(fontCard, 78, 'Outline', outlineDropdown)
-
-		TextCardRows(MakeCard('TIMER TEXT', textHeight), 'TIMER TEXT',
-			{ size = 'timerSize', anchor = 'timerAnchor', offsetX = 'timerOffsetX', offsetY = 'timerOffsetY' })
-		TextCardRows(MakeCard('STACK TEXT', textHeight), 'STACK TEXT',
-			{ size = 'stackSize', anchor = 'stackAnchor', offsetX = 'stackOffsetX', offsetY = 'stackOffsetY' })
-	end,
+	settings = AuraSettings,
 })
 
 BUI.Events:Once('PLAYER_LOGIN', 'Skin.PlayerAurasInstall', function()

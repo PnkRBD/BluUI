@@ -7,8 +7,6 @@ local GetTime = GetTime
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local RegisterAccentElement = BUILib.Colors.RegisterAccentElement
-local Layout = BUILib.Layout
-local Controls = BUILib.Controls
 
 local Pixel = BUI.Pixel
 local Skin = BUI.Skinning
@@ -792,94 +790,68 @@ local POSITION_OPTIONS = {
 	{ value = 'FREE',   text = 'Free Position' },
 }
 
+local function Setting(label, key, apply, extra)
+	local option = extra or {}
+	option.label = label
+	option.get = function() return GetConfig()[key] end
+	option.set = function(value)
+		GetConfig()[key] = value
+		if apply then apply(value) end
+	end
+	return option
+end
+
+local function Switch(label, key, apply, defaultOn)
+	local option = Setting(label, key, apply)
+	option.get = function()
+		local value = GetConfig()[key]
+		if defaultOn then return value ~= false end
+		return value == true
+	end
+	return option
+end
+
+local function ColorSetting(label, key)
+	return {
+		kind = 'swatch', label = label,
+		get = function()
+			local color = GetConfig()[key]
+			return color[1], color[2], color[3], 1
+		end,
+		set = function(red, green, blue)
+			GetConfig()[key] = { red, green, blue }
+			ApplySettings()
+		end,
+	}
+end
+
+local function CenterHorizontally(value)
+	if value then GetConfig().posX = 0 end
+	if barFrame then barFrame:RefreshDragState() end
+	ApplySettings()
+end
+
+local function Lock(value)
+	if barFrame then Dragging.SetLocked(barFrame, value) end
+end
+
 Skin.RegisterSkin('experiencebar', {
 	name = 'Experience Bar',
 	description = 'Replaces the Blizzard status tracking bars with a minimal dark bar. Supports edge anchoring and free drag positioning.',
 	icon = 'Interface\\Icons\\Achievement_Level_80',
-	buildSettings = function(content)
-		local config = GetConfig()
-
-		local posPanel = Layout.SettingsCard(content, { title = 'Position' })
-		Layout.Dropdown(posPanel, nil, POSITION_OPTIONS, config.position or 'BOTTOM', function(value)
-			config.position = value
-			ApplySettings()
-			content.Rebuild()
-		end)
-		local isHorizontal = not IsVertical(config.position or 'BOTTOM')
-		local isFree = config.position == 'FREE'
-
-		if isHorizontal and not isFree then
-			Layout.Toggle(posPanel, 'Full Width', config.fullWidth ~= false, function(value)
-				config.fullWidth = value; ApplySettings()
-			end)
-		end
-		if isFree then
-			Layout.Toggle(posPanel, 'Center Horizontally', config.centerH or false, function(value)
-				config.centerH = value
-				if value then config.posX = 0 end
-				if barFrame then barFrame:RefreshDragState() end
-				ApplySettings()
-			end)
-			Layout.Toggle(posPanel, 'Locked', config.locked ~= false, function(value)
-				config.locked = value
-				if barFrame then Dragging.SetLocked(barFrame, value) end
-			end)
-		end
-		posPanel:Refresh()
-
-		local sizing = Layout.SettingsCard(content, { title = 'Bar Sizing' })
-
-		local COL_GAP = 8
-		local sliderHeight = Layout.HEIGHTS.slider
-		local colWidth = floor((sizing.width - COL_GAP) / 2)
-		local gridHeight = sliderHeight * 2 + COL_GAP
-
-		local grid = CreateFrame('Frame', nil, sizing.child)
-		grid:SetSize(sizing.width, gridHeight)
-
-		local anchorControl, anchorY = sizing:GetAnchor(14)
-		if anchorControl then
-			grid:SetPoint('TOPLEFT', anchorControl, 'BOTTOMLEFT', 0, anchorY)
-		end
-		sizing:SetLast(grid, 0)
-		sizing:AddY(14 + gridHeight)
-
-		local function MakeSlider(label, minValue, maxValue, currentValue, callback, offsetX, offsetY)
-			local slider = Controls.Slider(grid, label, minValue, maxValue, currentValue, callback, 0, nil, nil, 1, colWidth)
-			slider:SetPoint('TOPLEFT', grid, 'TOPLEFT', offsetX, offsetY)
-			return slider
-		end
-
-		MakeSlider('Bar Height',   2,   24,   config.barHeight,         function(value) config.barHeight   = value; ApplySettings() end, 0,                  0)
-		MakeSlider('Hover Height', 10,  40,   config.hoverHeight,       function(value) config.hoverHeight = value end,                  colWidth + COL_GAP, 0)
-		MakeSlider('Font Size',    6,   18,   config.fontSize,          function(value) config.fontSize    = value; ApplySettings() end, 0,                  -(sliderHeight + COL_GAP))
-		MakeSlider('Bar Width',    500, 1500, config.barWidth or 500,   function(value) config.barWidth    = value; ApplySettings() end, colWidth + COL_GAP, -(sliderHeight + COL_GAP))
-		sizing:Refresh()
-
-		local colorsPanel = Layout.SettingsCard(content, { title = 'Colors & Display' })
-		Layout.Toggle(colorsPanel, 'Use Accent Color for XP Bar', config.useAccentColor, function(value)
-			config.useAccentColor = value; ApplySettings()
-		end)
-		if not config.useAccentColor then
-			Layout.ColorSwatch(colorsPanel, 'XP Bar Color', config.xpColor[1], config.xpColor[2], config.xpColor[3], 1, function(red, green, blue)
-				config.xpColor = { red, green, blue }; ApplySettings()
-			end)
-		end
-		Layout.Toggle(colorsPanel, 'Show Rested XP', config.showRestedXP, function(value)
-			config.showRestedXP = value; ApplySettings()
-		end)
-		Layout.ColorSwatch(colorsPanel, 'Rested XP Color', config.restedColor[1], config.restedColor[2], config.restedColor[3], 1, function(red, green, blue)
-			config.restedColor = { red, green, blue }; ApplySettings()
-		end)
-		local opacity = Controls.Slider(colorsPanel.child, 'Background Opacity', 0, 100, config.bgOpacity, function(value)
-			config.bgOpacity = value; ApplySettings()
-		end, 0, nil, nil, 1, colorsPanel.width)
-		local opacityAnchor, opacityY = colorsPanel:GetAnchor(14)
-		opacity:SetPoint('TOPLEFT', opacityAnchor, 'BOTTOMLEFT', 0, opacityY)
-		colorsPanel:SetLast(opacity, 0)
-		colorsPanel:AddY(14 + sliderHeight)
-		colorsPanel:Refresh()
-
-		content:Refresh()
-	end,
+	settings = {
+		Setting('Position', 'position', ApplySettings, { entries = POSITION_OPTIONS }),
+		Switch('Full width on the top or bottom edge', 'fullWidth', ApplySettings, true),
+		Switch('Center horizontally when free', 'centerH', CenterHorizontally),
+		Switch('Locked when free', 'locked', Lock, true),
+		Setting('Bar height', 'barHeight', ApplySettings, { separator = true, min = 2, max = 24, step = 1 }),
+		Setting('Hover height', 'hoverHeight', nil, { min = 10, max = 40, step = 1 }),
+		Setting('Font size', 'fontSize', ApplySettings, { min = 6, max = 18, step = 1 }),
+		Setting('Bar width', 'barWidth', ApplySettings, { min = 500, max = 1500, step = 1 }),
+		Switch('Accent color for the XP bar', 'useAccentColor', ApplySettings),
+		ColorSetting('XP bar color', 'xpColor'),
+		Switch('Show rested XP', 'showRestedXP', ApplySettings),
+		ColorSetting('Rested XP color', 'restedColor'),
+		Setting('Background opacity', 'bgOpacity', ApplySettings, { min = 0, max = 100, step = 1 }),
+	},
 })

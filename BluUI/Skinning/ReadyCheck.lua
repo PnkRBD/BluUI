@@ -244,10 +244,9 @@ Skin.RegisterSkin(SKIN_ID, {
 	name = 'Ready Check',
 	description = 'Ready check prompt drawn like the BluUI tooltip, with a countdown of the time left.',
 	icon = 'Interface/RaidFrame/ReadyCheck-Ready',
-	settingsHeight = 240,
-	buildSettings = function(content)
-		Skin.TipScaleCard(content, SCALE_KEY, function()
+	settings = {
+		Skin.ScaleOption(SCALE_KEY, function()
 			if _G.ReadyCheckListenerFrame and _G.ReadyCheckListenerFrame:IsShown() then Apply() end
-		end)
-	end,
+		end),
+	},
 })
