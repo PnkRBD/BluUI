@@ -1,13 +1,10 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.SplashFrame')
-
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 
-local SKIN_ID = 'splash'
 local KIT_TEXTURE_KEYS = { 'LeftTexture', 'RightTexture', 'BottomTexture' }
 local FEATURE_KEYS = { 'TopLeftFeature', 'BottomLeftFeature' }
 local RECT_MASK_TEXTURE = BUI.C.MEDIA_PATH .. 'solid'
@@ -29,16 +26,15 @@ local RIGHT_BODY_SCALE = 1.1
 local QUEST_BUTTON_SCALE = 1.3
 local SHADOW_OFFSET = 1
 
-local installed = false
-local built = false
 local pictures = {}
 local decor = {}
 
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
+local context = Skin.Define('splash', {
+	name = "What's New",
+	description = "The seasonal What's New splash: parchment and banner art replaced by the dark shell, the feature pictures kept as framed cards and a round portrait, house fonts and buttons.",
+	icon = 'Interface/Icons/INV_Misc_Note_06',
+	newLook = true,
+})
 local FadeRegions = context.FadeRegions
 local Shell, Button, Close = context.Shell, context.Button, context.Close
 
@@ -159,60 +155,24 @@ local function SkinFrame(frame)
 	Button(frame.RightFeature.StartQuestButton)
 end
 
-local function Apply()
-	local frame = _G.SplashFrame
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if not built then
-		built = true
+local function SkinSplash(frame)
+	if not frame._buiSplashBuilt then
+		frame._buiSplashBuilt = true
 		Build(frame)
 	end
 	SkinFrame(frame)
+end
+
+local function RefreshSplash(frame)
 	RefreshText(frame)
 	SetDecorShown(true)
 	SyncPictures()
 end
 
-local function Install()
-	if installed then return end
-	local frame = _G.SplashFrame
-	if not frame then return end
-	installed = true
-	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.SplashFrame frame reskin', Apply))
-	Hook(frame, 'SetupFrame', Apply)
-	if frame:IsShown() then Apply() end
-end
-
-local function TryInstall()
-	Install()
-	if installed then BUI.Events:Unregister('ADDON_LOADED', 'Skin.Splash') end
-end
-
-local function Deactivate()
-	context.Restore()
-	SetDecorShown(false)
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		if not installed then
-			BUI.Events:Register('ADDON_LOADED', 'Skin.Splash', TryInstall)
-		elseif _G.SplashFrame:IsShown() then
-			Apply()
-		end
-	else
-		Deactivate()
-	end
-end)
-
-BUI.Events:Once('PLAYER_LOGIN', 'Skin.SplashInstall', function()
-	if not Enabled() then return end
-	Install()
-	if not installed then BUI.Events:Register('ADDON_LOADED', 'Skin.Splash', TryInstall) end
-end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = "What's New",
-	description = "The seasonal What's New splash: parchment and banner art replaced by the dark shell, the feature pictures kept as framed cards and a round portrait, house fonts and buttons.",
-	icon = 'Interface/Icons/INV_Misc_Note_06',
+context.Window('SplashFrame', {
+	skin = SkinSplash,
+	show = RefreshSplash,
+	install = function(frame) context.Hook(frame, 'SetupFrame', RefreshSplash) end,
 })
+
+context.OnDisable(function() SetDecorShown(false) end)
