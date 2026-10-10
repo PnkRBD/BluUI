@@ -398,6 +398,8 @@ local function SkinGossipRow(row)
 		row.GreetingText:SetPoint('TOPLEFT', PANEL.ICON_X, 0)
 	elseif row.GetFontString then
 		SkinListRow(row, GOSSIP.CARD_INSET)
+		row.Icon:ClearAllPoints()
+		row.Icon:SetPoint('LEFT', row, 'LEFT', PANEL.ICON_X, 0)
 	end
 end
 
