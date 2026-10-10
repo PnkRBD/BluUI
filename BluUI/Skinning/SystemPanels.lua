@@ -1,16 +1,13 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.SystemPanels')
 local Wrap = BUI.Profiler.Wrap
 
-local pairs = pairs
+local pairs, ipairs = pairs, ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 local Theme = BUILib.Theme
 
-local SKIN_ID = 'systempanels'
-local MAIN_ART = { 'Bg', 'TopTileStreaks', 'Inset' }
 local LIST_TITLE_SCALE = 1.4
 local SECTION_TITLE_SCALE = 1.2
 local ROW_SELECTED_ALPHA = 0.2
@@ -18,6 +15,7 @@ local ROW_HOVER_ALPHA = 0.06
 local BINDING_SELECTED_ALPHA = 0.3
 local CHECK_INSET = 4
 local LARGE_CHECK_INSET = 6
+local SEGMENT_PAD = 2
 local LAYOUT_NAME_INSET = { left = -5, right = -5, top = 6, bottom = 6 }
 local IMPORT_NAME_INSET = { right = -10, top = 6, bottom = 6 }
 local NAME_TEXT_PAD = 6
@@ -25,6 +23,7 @@ local NAME_LOCKED_HINT = 'Paste a valid layout string first'
 local LABEL_GAP = 4
 local ARROW_EXPANDED = 0
 local ARROW_COLLAPSED = math.pi / 2
+local GRAY_MATCH = 0.02
 local CATEGORY_ACTIVE_ATLAS = 'Options_List_Active'
 local CATEGORY_HOVER_ATLAS = 'Options_List_Hover'
 local SETTINGS_TAB_KEYS = { 'GameTab', 'AddOnsTab' }
@@ -37,6 +36,7 @@ local ROW_BUTTON_KEYS = { 'Button1', 'Button2', 'PushToTalkKeybindButton', 'Togg
 local EDIT_MODE_CHECK_KEYS = { 'ShowGridCheckButton', 'EnableSnapCheckButton', 'EnableAdvancedOptionsCheckButton' }
 local EDIT_MODE_TITLE_KEYS = { 'FramesTitle', 'CombatTitle', 'MiscTitle' }
 local EDIT_MODE_LABEL_KEYS = { 'EditBoxLabel', 'NameEditBoxLabel' }
+local LAYOUT_DIALOGS = { 'EditModeLayoutDialog', 'EditModeImportLayoutDialog', 'EditModeImportLayoutLinkDialog', 'CooldownViewerLayoutDialog', 'CooldownViewerImportLayoutDialog' }
 local UNSAVED_BUTTON_KEYS = { 'SaveAndProceedButton', 'ProceedButton', 'CancelButton' }
 local MACRO_BUTTON_NAMES = { 'MacroEditButton', 'MacroSaveButton', 'MacroCancelButton', 'MacroDeleteButton', 'MacroNewButton', 'MacroExitButton' }
 local MACRO_TAB_COUNT = 2
@@ -46,88 +46,73 @@ local QUICK_KEYBIND_TEXT_KEYS = { 'InstructionText', 'CancelDescriptionText', 'O
 local QUICK_KEYBIND_BUTTON_KEYS = { 'DefaultsButton', 'CancelButton', 'OkayButton' }
 local STATE_TEXTURE_GETTERS = { 'GetNormalTexture', 'GetPushedTexture', 'GetHighlightTexture', 'GetDisabledTexture' }
 
-local installed = false
-local macroInstalled = false
-local quickKeybindInstalled = false
-local skinnedWindows = {}
-
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
-local Fade, FadeRegions, FadeKeys, FadeArt = context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt
+local context = Skin.Define('systempanels', {
+	name = 'Settings & Editors',
+	description = 'The game settings window, Edit Mode manager and dialogs, quick keybinding, macro editor and addon list: segmented tabs, left titles, house controls, flat sliders and clean list rows.',
+	icon = 'Interface/Icons/INV_Misc_Gear_01',
+	newLook = true,
+})
+local Hook = context.Hook
+local Fade, FadeRegions, FadeArt = context.Fade, context.FadeRegions, context.FadeArt
 local Shell, Button, Close, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.Dropdown, context.EditBox, context.CheckBox
-local TextBox, ScrollBar, Tab, Face, Title, Body = context.TextBox, context.ScrollBar, context.Tab, context.Face, context.Title, context.Body
+local TextBox, ScrollBar, Face, Title, Body = context.TextBox, context.ScrollBar, context.Face, context.Title, context.Body
 local FlatTexture, AccentTexture, RowHighlight = Skin.FlatTexture, Skin.AccentTexture, Skin.RowHighlight
 
-local function Once(key)
-	if skinnedWindows[key] then return false end
-	skinnedWindows[key] = true
-	return true
-end
+local lockHints = {}
 
-local function FadeAgain(texture)
-	if not texture then return end
+local function Refade(texture)
 	Fade(texture)
 	texture:SetAlpha(0)
 end
 
 local function FadeButtonStates(button)
-	for getterIndex = 1, #STATE_TEXTURE_GETTERS do
-		local getter = button[STATE_TEXTURE_GETTERS[getterIndex]]
-		local texture = getter and getter(button)
-		if texture then FadeAgain(texture) end
+	for _, getter in ipairs(STATE_TEXTURE_GETTERS) do
+		local texture = button[getter](button)
+		if texture then Refade(texture) end
 	end
 end
 
-local function FaceRegions(frame, kind)
-	if not frame then return end
+local function FaceRegions(frame)
 	for regionIndex = 1, select('#', frame:GetRegions()) do
 		local region = select(regionIndex, frame:GetRegions())
-		if region.IsObjectType and region:IsObjectType('FontString') then Skin.TipFace(region, kind or 'body') end
+		if region:IsObjectType('FontString') then Skin.TipFace(region, 'body') end
 	end
 end
 
 local function ReplaceDivider(texture, parent)
-	if not texture then return end
-	FadeAgain(texture)
+	Refade(texture)
 	if texture._buiLine then return end
-	local line = (parent or texture:GetParent()):CreateTexture(nil, 'ARTWORK')
+	local line = parent:CreateTexture(nil, 'ARTWORK')
 	line.__buiSkin = true
 	line:SetHeight(1)
-	line:SetPoint('LEFT', texture, 'LEFT', 0, 0)
-	line:SetPoint('RIGHT', texture, 'RIGHT', 0, 0)
 	BUI.Painter.Fill(line, 'skinBorder')
 	BUILib.Skin.PixelLine(line, texture)
 	texture._buiLine = line
 end
 
 local function ReplaceDividerRegions(frame)
-	if not frame then return end
 	for regionIndex = 1, select('#', frame:GetRegions()) do
 		local region = select(regionIndex, frame:GetRegions())
-		if region.IsObjectType and region:IsObjectType('Texture') and not region.__buiSkin then ReplaceDivider(region, frame) end
+		if region:IsObjectType('Texture') and not region.__buiSkin then ReplaceDivider(region, frame) end
 	end
 end
 
 local function SetArrowRotation(button, expanded)
-	local arrow = button and button._buiTipArrow
+	local arrow = button._buiTipArrow
 	if arrow then arrow:SetRotation(expanded and ARROW_EXPANDED or ARROW_COLLAPSED) end
 end
 
 local function StyleStepper(button, direction)
-	if not button then return end
 	Skin.TipStepper(button, direction)
 	FadeRegions(button)
 end
 
 local function StyleSliderTrack(slider)
-	if not slider or slider._buiTrack then return end
-	local thumb = slider.Thumb or (slider.GetThumbTexture and slider:GetThumbTexture())
+	if slider._buiTrack then return end
+	local thumb = slider.Thumb or slider:GetThumbTexture()
 	for regionIndex = 1, select('#', slider:GetRegions()) do
 		local region = select(regionIndex, slider:GetRegions())
-		if region ~= thumb and region.IsObjectType and region:IsObjectType('Texture') and not region.__buiSkin then Fade(region) end
+		if region ~= thumb and region:IsObjectType('Texture') and not region.__buiSkin then Fade(region) end
 	end
 	Skin.TipSliderTrack(slider)
 end
@@ -137,7 +122,7 @@ local function StyleStepSlider(stepper)
 	StyleSliderTrack(stepper.Slider)
 	StyleStepper(stepper.Back, 'previous')
 	StyleStepper(stepper.Forward, 'next')
-	for keyIndex = 1, #SLIDER_TEXT_KEYS do Face(stepper[SLIDER_TEXT_KEYS[keyIndex]]) end
+	for _, key in ipairs(SLIDER_TEXT_KEYS) do Face(stepper[key]) end
 end
 
 local function StyleDropdownControl(control)
@@ -153,38 +138,67 @@ local function StyleDropdownControl(control)
 end
 
 local function StyleLabeledCheck(holder, inset)
-	if not holder then return end
 	CheckBox(holder.Button, inset)
 	Face(holder.Label)
 end
 
+local function PaintMinimalTab(tab)
+	local selected = tab:IsSelected()
+	Skin.SetSegmentSelected(tab, selected)
+	Skin.SegmentText(tab.Text, selected or tab.over)
+	tab.Text:ClearAllPoints()
+	tab.Text:SetPoint('CENTER')
+end
+
+local function SegmentMinimalTabs(owner, keys)
+	local first, last = owner[keys[1]], owner[keys[#keys]]
+	for _, key in ipairs(keys) do
+		local tab = owner[key]
+		Skin.SegmentButton(tab)
+		if not tab._buiSegmentHook then
+			tab._buiSegmentHook = true
+			Hook(tab, 'OnSelected', PaintMinimalTab)
+			local repaint = Wrap('Skin.SystemPanels tab hover', context.Guard(PaintMinimalTab))
+			tab:HookScript('OnEnter', repaint)
+			tab:HookScript('OnLeave', repaint)
+		end
+		PaintMinimalTab(tab)
+	end
+	local strip = first._buiStrip
+	if not strip then
+		strip = CreateFrame('Frame', nil, first:GetParent())
+		strip:SetPoint('TOPLEFT', first, 'TOPLEFT', -SEGMENT_PAD, SEGMENT_PAD)
+		strip:SetPoint('BOTTOMRIGHT', last, 'BOTTOMRIGHT', SEGMENT_PAD, -SEGMENT_PAD)
+		strip:SetFrameLevel(math.max(0, first:GetFrameLevel() - 1))
+		first._buiStrip = strip
+	end
+	Shell(strip)
+end
+
 local function RefreshCategoryState(button)
 	local texture = button.Texture
-	if not texture or not texture:IsShown() then return end
+	if not texture:IsShown() then return end
 	local atlas = texture:GetAtlas()
 	if atlas == CATEGORY_ACTIVE_ATLAS then
 		AccentTexture(texture, ROW_SELECTED_ALPHA)
-		local red, green, blue = Theme.GetAccent()
-		if button.Label then button.Label:SetTextColor(red, green, blue, 1) end
+		button.Label:SetTextColor(Theme.GetAccent())
 	elseif atlas == CATEGORY_HOVER_ATLAS then
 		FlatTexture(texture, 1, 1, 1, ROW_HOVER_ALPHA)
 	end
 end
 
 local function OnCategoryState(button)
-	if not Enabled() then return end
 	Skin.TipFont(button.Label, 'body')
 	RefreshCategoryState(button)
 end
 
 local function CategoryExpanded(button)
-	local elementData = button.GetElementData and button:GetElementData()
-	local category = elementData and elementData.data and elementData.data.category
-	return category and category.IsExpanded and category:IsExpanded()
+	local category = button:GetElementData().data.category
+	return category and category:IsExpanded()
 end
 
 local function StyleCategoryRow(button)
-	if not Enabled() or button:IsForbidden() then return end
+	if button:IsForbidden() then return end
 	if button.Toggle then
 		if not button._buiCategoryRow then
 			button._buiCategoryRow = true
@@ -195,7 +209,7 @@ local function StyleCategoryRow(button)
 		SetArrowRotation(button.Toggle, CategoryExpanded(button))
 		OnCategoryState(button)
 	elseif button.Background then
-		FadeAgain(button.Background)
+		Refade(button.Background)
 		Skin.TipFont(button.Label, 'label')
 	end
 end
@@ -214,11 +228,11 @@ end
 local function StyleBindingRow(row)
 	Face(row.Label)
 	if row.Highlight then AccentTexture(row.Highlight, ROW_HOVER_ALPHA) end
-	for keyIndex = 1, #BINDING_BUTTON_KEYS do StyleBindingButton(row[BINDING_BUTTON_KEYS[keyIndex]]) end
+	for _, key in ipairs(BINDING_BUTTON_KEYS) do StyleBindingButton(row[key]) end
 end
 
 local function StyleControl(control)
-	if not control or control:IsForbidden() then return end
+	if control:IsForbidden() then return end
 	if control.Button1 or control.Button2 then
 		StyleBindingRow(control)
 		return
@@ -234,67 +248,33 @@ end
 local function StyleControls(holder)
 	local controls = holder.Controls
 	if not controls then return end
-	for controlIndex = 1, #controls do StyleControl(controls[controlIndex]) end
-end
-
-local function StyleTabText(tab)
-	local text = tab.Text
-	Skin.TipFont(text, 'title')
-	if tab:IsSelected() then
-		local red, green, blue = Theme.GetAccent()
-		text:SetTextColor(red, green, blue, 1)
-	end
-end
-
-local function OnTabHover(tab)
-	if Enabled() then StyleTabText(tab) end
-end
-
-local function RefreshMinimalTab(tab)
-	if not Enabled() then return end
-	Skin.TipTabSelected(tab, tab:IsSelected())
-	StyleTabText(tab)
-end
-
-local function SkinMinimalTab(tab)
-	Tab(tab, false)
-	if not tab._buiTabHook then
-		tab._buiTabHook = true
-		Hook(tab, 'OnSelected', RefreshMinimalTab)
-		tab:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.SystemPanels tab OnEnter', OnTabHover))
-		tab:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.SystemPanels tab OnLeave', OnTabHover))
-	end
-	RefreshMinimalTab(tab)
+	for _, control in ipairs(controls) do StyleControl(control) end
 end
 
 local function OnSectionToggle(button)
-	local row = button:GetParent()
-	local elementData = row and row.GetElementData and row:GetElementData()
-	local data = elementData and elementData.data
+	local data = button:GetParent():GetElementData().data
 	SetArrowRotation(button, data and data.expanded)
 end
 
 local function StyleRowButton(row)
 	local button = row.Button
 	if not button then return end
-	if button.Left and button.Right then
-		if not button._buiSection then
-			button._buiSection = true
-			FadeRegions(button)
-			Shell(button)
-			Skin.TipArrow(button, false, ARROW_EXPANDED)
-			Skin.TipFont(button.Text, 'title')
-			button:HookScript('OnClick', BUI.Profiler.Wrap('Skin.SystemPanels button OnClick', OnSectionToggle))
-		end
-		FadeAgain(button.Left)
-		FadeAgain(button.Right)
-		OnSectionToggle(button)
-	else
+	if not (button.Left and button.Right) then
 		Button(button)
+		return
 	end
+	if not button._buiSection then
+		button._buiSection = true
+		FadeRegions(button)
+		Shell(button)
+		Skin.TipArrow(button, false, ARROW_EXPANDED)
+		Skin.TipFont(button.Text, 'title')
+		button:HookScript('OnClick', Wrap('Skin.SystemPanels section toggle', context.Guard(OnSectionToggle)))
+	end
+	Refade(button.Left)
+	Refade(button.Right)
+	OnSectionToggle(button)
 end
-
-local GRAY_MATCH = 0.02
 
 local function RowTextEnabled(row)
 	if row._buiTextEnabled ~= nil then return row._buiTextEnabled end
@@ -305,13 +285,11 @@ end
 
 local function OnRowDisplayEnabled(row, enabled)
 	row._buiTextEnabled = enabled ~= false
-	if not Enabled() or not row.Text then return end
 	Skin.TipFont(row.Text, enabled == false and 'label' or 'body')
 end
 
 local function StyleRowText(row)
-	local text = row.Text
-	if not text then return end
+	if not row.Text then return end
 	if not row._buiTextHook then
 		row._buiTextHook = true
 		if row.DisplayEnabled then Hook(row, 'DisplayEnabled', OnRowDisplayEnabled) end
@@ -320,9 +298,8 @@ local function StyleRowText(row)
 end
 
 local function StyleSettingsRow(row)
-	if not Enabled() or row:IsForbidden() then return end
+	if row:IsForbidden() then return end
 	StyleRowText(row)
-
 	if row.Title then Skin.TipFont(row.Title, 'title', SECTION_TITLE_SCALE) end
 	if row.MouseoverOverlay then
 		row.MouseoverOverlay:SetBlendMode('BLEND')
@@ -333,97 +310,50 @@ local function StyleSettingsRow(row)
 	StyleDropdownControl(row.Control)
 	StyleDropdownControl(row.Dropdown)
 	StyleRowButton(row)
-	for keyIndex = 1, #ROW_BUTTON_KEYS do Button(row[ROW_BUTTON_KEYS[keyIndex]]) end
+	for _, key in ipairs(ROW_BUTTON_KEYS) do Button(row[key]) end
 	if row.NineSlice then
 		Fade(row.NineSlice)
 		Shell(row)
 	end
 	StyleControls(row)
 	if row.BaseQualityControls then
-		for keyIndex = 1, #QUALITY_TAB_KEYS do SkinMinimalTab(row[QUALITY_TAB_KEYS[keyIndex]]) end
-		for keyIndex = 1, #QUALITY_GROUP_KEYS do StyleControls(row[QUALITY_GROUP_KEYS[keyIndex]]) end
+		SegmentMinimalTabs(row, QUALITY_TAB_KEYS)
+		for _, key in ipairs(QUALITY_GROUP_KEYS) do StyleControls(row[key]) end
 	end
-end
-
-local function SkinListHeader(header)
-	if not header then return end
-	ReplaceDividerRegions(header)
-	Skin.TipFont(header.Title, 'title', LIST_TITLE_SCALE)
-	Button(header.DefaultsButton)
 end
 
 local function SkinSettingsPanel(frame)
 	FadeRegions(frame)
-	if frame.Bg then FadeRegions(frame.Bg) end
-	local nineSlice = frame.NineSlice
-	if nineSlice then
-		FadeRegions(nineSlice)
-		Title(nineSlice.Text)
-	end
+	FadeRegions(frame.Bg)
+	FadeRegions(frame.NineSlice)
+	Title(frame.NineSlice.Text)
 	Shell(frame)
 	Close(frame.ClosePanelButton)
 	Body(frame.OutputText)
 	EditBox(frame.SearchBox)
-	for keyIndex = 1, #SETTINGS_BUTTON_KEYS do Button(frame[SETTINGS_BUTTON_KEYS[keyIndex]]) end
+	for _, key in ipairs(SETTINGS_BUTTON_KEYS) do Button(frame[key]) end
 	local categoryList = frame.CategoryList
-	if categoryList then
-		Shell(categoryList)
-		ScrollBar(categoryList.ScrollBar)
-		Skin.SweepScrollBox(categoryList.ScrollBox, StyleCategoryRow)
-	end
+	Shell(categoryList)
+	ScrollBar(categoryList.ScrollBar)
+	Skin.SweepScrollBox(categoryList.ScrollBox, StyleCategoryRow)
 	local container = frame.Container
-	local settingsList = container and container.SettingsList
-	if settingsList then
-		Shell(container)
-		SkinListHeader(settingsList.Header)
-		ScrollBar(settingsList.ScrollBar)
-		Skin.SweepScrollBox(settingsList.ScrollBox, StyleSettingsRow)
-	end
+	local settingsList = container.SettingsList
+	Shell(container)
+	ReplaceDividerRegions(settingsList.Header)
+	Skin.TipFont(settingsList.Header.Title, 'title', LIST_TITLE_SCALE)
+	Button(settingsList.Header.DefaultsButton)
+	ScrollBar(settingsList.ScrollBar)
+	Skin.SweepScrollBox(settingsList.ScrollBox, StyleSettingsRow)
 end
 
-local function SweepSettingsLists()
-	local frame = _G.SettingsPanel
-	if not frame or not Enabled() then return end
-	local categoryBox = frame.CategoryList and frame.CategoryList.ScrollBox
-	Skin.ForEachScrollFrame(categoryBox, StyleCategoryRow)
-	local settingsList = frame.Container and frame.Container.SettingsList
-	local settingsBox = settingsList and settingsList.ScrollBox
-	Skin.ForEachScrollFrame(settingsBox, StyleSettingsRow)
+local function RefreshSettings(frame)
+	SegmentMinimalTabs(frame, SETTINGS_TAB_KEYS)
+	Skin.ForEachScrollFrame(frame.CategoryList.ScrollBox, StyleCategoryRow)
+	Skin.ForEachScrollFrame(frame.Container.SettingsList.ScrollBox, StyleSettingsRow)
 end
 
-local function ApplySettings()
-	local frame = _G.SettingsPanel
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if Once('settings') then SkinSettingsPanel(frame) end
-	for keyIndex = 1, #SETTINGS_TAB_KEYS do SkinMinimalTab(frame[SETTINGS_TAB_KEYS[keyIndex]]) end
-	SweepSettingsLists()
-end
-
-local function SkinAccountSettings(account)
-	if not account then return end
-	local container = account.SettingsContainer
-	if container then
-		if container.BorderArt then FadeRegions(container.BorderArt) end
-		Shell(container)
-		ScrollBar(container.ScrollBar)
-		local checks = account.settingsCheckButtons
-		if checks then
-			for _, check in pairs(checks) do StyleLabeledCheck(check, LARGE_CHECK_INSET) end
-		end
-		local scrollChild = container.ScrollChild
-		local advanced = scrollChild and scrollChild.AdvancedOptionsContainer
-		if advanced then
-			for keyIndex = 1, #EDIT_MODE_TITLE_KEYS do
-				local holder = advanced[EDIT_MODE_TITLE_KEYS[keyIndex]]
-				if holder then Title(holder.Title) end
-			end
-		end
-	end
-	local expander = account.Expander
-	if expander then
-		ReplaceDivider(expander.Divider, expander)
-		Face(expander.Label)
-	end
+local function StyleAccountChecks(account)
+	for _, check in pairs(account.settingsCheckButtons) do StyleLabeledCheck(check, LARGE_CHECK_INSET) end
 end
 
 local function SkinEditModeManager(frame)
@@ -433,15 +363,28 @@ local function SkinEditModeManager(frame)
 	Skin.TipFont(frame.LayoutLabel, 'label')
 	Close(frame.CloseButton)
 	Dropdown(frame.LayoutDropdown)
-	for keyIndex = 1, #EDIT_MODE_CHECK_KEYS do StyleLabeledCheck(frame[EDIT_MODE_CHECK_KEYS[keyIndex]], LARGE_CHECK_INSET) end
-	if frame.GridSpacingSlider then StyleStepSlider(frame.GridSpacingSlider.Slider) end
+	for _, key in ipairs(EDIT_MODE_CHECK_KEYS) do StyleLabeledCheck(frame[key], LARGE_CHECK_INSET) end
+	StyleStepSlider(frame.GridSpacingSlider.Slider)
 	Button(frame.SaveChangesButton)
 	Button(frame.RevertAllChangesButton)
-	SkinAccountSettings(frame.AccountSettings)
+
+	local account = frame.AccountSettings
+	local container = account.SettingsContainer
+	FadeRegions(container.BorderArt)
+	Shell(container)
+	ScrollBar(container.ScrollBar)
+	local advanced = container.ScrollChild.AdvancedOptionsContainer
+	for _, key in ipairs(EDIT_MODE_TITLE_KEYS) do Title(advanced[key].Title) end
+	ReplaceDivider(account.Expander.Divider, account.Expander)
+	Face(account.Expander.Label)
+end
+
+local function RefreshEditMode(frame)
+	StyleAccountChecks(frame.AccountSettings)
 end
 
 local function StyleSystemSetting(frame)
-	if not frame or frame:IsForbidden() then return end
+	if frame:IsForbidden() then return end
 	if frame.Dropdown then
 		Dropdown(frame.Dropdown)
 		Face(frame.Label)
@@ -450,35 +393,26 @@ local function StyleSystemSetting(frame)
 		Face(frame.Label)
 	elseif frame.Button and frame.Label then
 		StyleLabeledCheck(frame, LARGE_CHECK_INSET)
-	elseif frame.IsObjectType and frame:IsObjectType('Button') then
+	elseif frame:IsObjectType('Button') then
 		Button(frame)
 	end
 end
 
 local function SweepSystemDialog(dialog)
-	if not Enabled() or not dialog.pools then return end
 	for frame in dialog.pools:EnumerateActive() do StyleSystemSetting(frame) end
 end
 
 local function SkinSystemDialog(dialog)
-	if not dialog or not Enabled() then return end
-	if Once('systemDialog') then
-		FadeArt(dialog.Border)
-		Shell(dialog)
-		Title(dialog.Title)
-		Close(dialog.CloseButton)
-		local buttons = dialog.Buttons
-		if buttons then
-			Button(buttons.RevertChangesButton)
-			ReplaceDivider(buttons.Divider, buttons)
-		end
-	end
-	SweepSystemDialog(dialog)
+	FadeArt(dialog.Border)
+	Shell(dialog)
+	Title(dialog.Title)
+	Close(dialog.CloseButton)
+	Button(dialog.Buttons.RevertChangesButton)
+	ReplaceDivider(dialog.Buttons.Divider, dialog.Buttons)
 end
 
 local function SyncNameBoxState(nameBox)
-	local hint = nameBox._buiLockHint
-	if hint then hint:SetShown(Enabled() and not nameBox:IsEnabled()) end
+	nameBox._buiLockHint:SetShown(not nameBox:IsEnabled())
 end
 
 local function AlignLabel(label, box, inset)
@@ -487,12 +421,24 @@ local function AlignLabel(label, box, inset)
 	label:SetPoint('BOTTOMLEFT', box, 'TOPLEFT', inset and inset.left or 0, LABEL_GAP - (inset and inset.top or 0))
 end
 
+local function AddLockHint(nameBox, importBox, textPad)
+	if nameBox._buiLockHint then return end
+	local instructions = importBox.EditBox.Instructions
+	local hint = nameBox:CreateFontString(nil, 'OVERLAY')
+	hint:SetFontObject(instructions:GetFontObject())
+	hint:SetTextColor(instructions:GetTextColor())
+	hint:SetPoint('LEFT', nameBox, 'LEFT', textPad, 0)
+	hint:SetText(NAME_LOCKED_HINT)
+	nameBox._buiLockHint = hint
+	lockHints[hint] = true
+	Hook(nameBox, 'SetEnabled', SyncNameBoxState)
+end
+
 local function SkinLayoutDialog(dialog)
-	if not dialog or not Enabled() then return end
 	FadeArt(dialog.Border)
 	Shell(dialog)
 	Title(dialog.Title)
-	for keyIndex = 1, #EDIT_MODE_LABEL_KEYS do Skin.TipFont(dialog[EDIT_MODE_LABEL_KEYS[keyIndex]], 'label') end
+	for _, key in ipairs(EDIT_MODE_LABEL_KEYS) do Skin.TipFont(dialog[key], 'label') end
 	local importBox = dialog.ImportBox
 	if importBox then
 		TextBox(importBox)
@@ -500,57 +446,34 @@ local function SkinLayoutDialog(dialog)
 	end
 	local nameBox = dialog.LayoutNameEditBox
 	local nameInset = importBox and IMPORT_NAME_INSET or LAYOUT_NAME_INSET
-	EditBox(nameBox, nameInset)
 	if nameBox then
+		EditBox(nameBox, nameInset)
 		local textPad = NAME_TEXT_PAD + (nameInset.left or 0)
 		nameBox:SetTextInsets(textPad, NAME_TEXT_PAD, 0, 0)
-		if importBox and not nameBox._buiLockHint then
-			local instructions = importBox.EditBox.Instructions
-			local hint = nameBox:CreateFontString(nil, 'OVERLAY')
-			hint:SetFontObject(instructions:GetFontObject())
-			hint:SetTextColor(instructions:GetTextColor())
-			hint:SetPoint('LEFT', nameBox, 'LEFT', textPad, 0)
-			hint:SetText(NAME_LOCKED_HINT)
-			nameBox._buiLockHint = hint
-			Hook(nameBox, 'SetEnabled', SyncNameBoxState)
-		end
-		SyncNameBoxState(nameBox)
+		if importBox then AddLockHint(nameBox, importBox, textPad) end
 	end
 	AlignLabel(dialog.EditBoxLabel, importBox)
 	AlignLabel(dialog.NameEditBoxLabel, nameBox, nameInset)
-	StyleLabeledCheck(dialog.CharacterSpecificLayoutCheckButton, LARGE_CHECK_INSET)
+	if dialog.CharacterSpecificLayoutCheckButton then StyleLabeledCheck(dialog.CharacterSpecificLayoutCheckButton, LARGE_CHECK_INSET) end
 	Button(dialog.AcceptButton)
 	Button(dialog.CancelButton)
 end
 
+local function RefreshLayoutDialog(dialog)
+	local nameBox = dialog.LayoutNameEditBox
+	if nameBox and nameBox._buiLockHint then SyncNameBoxState(nameBox) end
+end
+
 local function SkinUnsavedDialog(dialog)
-	if not dialog or not Enabled() then return end
 	FadeArt(dialog.Border)
 	Shell(dialog)
 	Body(dialog.Title)
-	for keyIndex = 1, #UNSAVED_BUTTON_KEYS do Button(dialog[UNSAVED_BUTTON_KEYS[keyIndex]]) end
-end
-
-local function ApplyEditMode()
-	local frame = _G.EditModeManagerFrame
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if Once('editMode') then SkinEditModeManager(frame) end
-	local account = frame.AccountSettings
-	local checks = account and account.settingsCheckButtons
-	if checks then
-		for _, check in pairs(checks) do StyleLabeledCheck(check, LARGE_CHECK_INSET) end
-	end
+	for _, key in ipairs(UNSAVED_BUTTON_KEYS) do Button(dialog[key]) end
 end
 
 local function SkinMacroFrame(frame)
-	Fade(frame.NineSlice)
-	FadeKeys(frame, MAIN_ART)
-	FadeRegions(frame)
-	if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
-	Shell(frame)
 	FaceRegions(frame)
-	Title(frame.TitleContainer and frame.TitleContainer.TitleText)
-	Close(frame.CloseButton)
+	context.Chrome(frame)
 	Skin.TipFont(_G.MacroFrameSelectedMacroName, 'title')
 	Skin.TipFont(_G.MacroFrameEnterMacroText, 'label')
 	Skin.TipFont(_G.MacroFrameCharLimitText, 'label')
@@ -558,43 +481,25 @@ local function SkinMacroFrame(frame)
 	for tabIndex = 1, MACRO_TAB_COUNT do tabs[tabIndex] = _G['MacroFrameTab' .. tabIndex] end
 	Skin.RegisterTabStrip(frame, tabs, context)
 	Skin.TipIconSelector(context, frame.MacroSelector)
-	Skin.TipIconButton(frame.SelectedMacroButton)
-	for nameIndex = 1, #MACRO_BUTTON_NAMES do Button(_G[MACRO_BUTTON_NAMES[nameIndex]]) end
+	for _, name in ipairs(MACRO_BUTTON_NAMES) do Button(_G[name]) end
 	local textBackground = _G.MacroFrameTextBackground
-	if textBackground then
-		Fade(textBackground.NineSlice)
-		FadeRegions(textBackground)
-		Shell(textBackground)
-	end
+	FadeArt(textBackground)
+	Shell(textBackground)
 	Face(_G.MacroFrameText)
-	local scrollFrame = _G.MacroFrameScrollFrame
-	if scrollFrame then ScrollBar(scrollFrame.ScrollBar) end
+	ScrollBar(_G.MacroFrameScrollFrame.ScrollBar)
 end
 
-local function SkinIconPopup(popup)
-	if not popup or popup:IsForbidden() or not Enabled() then return end
-	if Once('iconPopup') then
-		Skin.TipIconPopup(context, popup)
-	else
-		Skin.SweepIconSelector(popup.IconSelector)
-	end
-end
-
-local function ApplyMacro()
-	local frame = _G.MacroFrame
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if Once('macro') then SkinMacroFrame(frame) end
+local function RefreshMacro(frame)
 	Skin.RefreshTabStrip(frame)
 	Skin.SweepIconSelector(frame.MacroSelector)
 	Skin.TipIconButton(frame.SelectedMacroButton)
 end
 
 local function StyleAddonEntry(entry)
-	if not entry or entry:IsForbidden() then return end
+	if entry:IsForbidden() then return end
 	if not entry._buiAddonRow then
 		entry._buiAddonRow = true
-		local highlight = entry:GetHighlightTexture()
-		if highlight then highlight:SetBlendMode('BLEND') end
+		entry:GetHighlightTexture():SetBlendMode('BLEND')
 		RowHighlight(entry)
 		Face(entry.Title)
 		Face(entry.Status)
@@ -602,190 +507,90 @@ local function StyleAddonEntry(entry)
 		CheckBox(entry.Enabled, CHECK_INSET)
 		Button(entry.LoadAddonButton)
 	end
-	local check = entry.Enabled
-	if check then Skin.TipCheckGlyph(check, check.state == Enum.AddOnEnableState.Some) end
-end
-
-local function OnAddonEntry(entry)
-	if Enabled() then StyleAddonEntry(entry) end
+	Skin.TipCheckGlyph(entry.Enabled, entry.Enabled.state == Enum.AddOnEnableState.Some)
 end
 
 local function StyleAddonRow(row)
-	if not Enabled() or row:IsForbidden() then return end
+	if row:IsForbidden() then return end
 	local collapse = row.CollapseExpand
-	if collapse then
-		if not row._buiAddonCategory then
-			row._buiAddonCategory = true
-			local highlight = row:GetHighlightTexture()
-			if highlight then highlight:SetBlendMode('BLEND') end
-			RowHighlight(row)
-			Skin.TipFont(row.Title, 'title')
-			Skin.TipPageButton(collapse, 'down')
-		end
-		FadeButtonStates(collapse)
-		local treeNode = collapse.treeNode
-		SetArrowRotation(collapse, not (treeNode and treeNode:IsCollapsed()))
-	elseif row.Enabled then
-		StyleAddonEntry(row)
+	if not collapse then
+		if row.Enabled then StyleAddonEntry(row) end
+		return
 	end
-end
-
-local function SkinAddonPerformance(performance)
-	if not performance then return end
-	Skin.TipFont(performance.Header, 'title')
-	for keyIndex = 1, #PERFORMANCE_TEXT_KEYS do Face(performance[PERFORMANCE_TEXT_KEYS[keyIndex]]) end
-	ReplaceDivider(performance.Divider, performance)
+	if not row._buiAddonCategory then
+		row._buiAddonCategory = true
+		row:GetHighlightTexture():SetBlendMode('BLEND')
+		RowHighlight(row)
+		Skin.TipFont(row.Title, 'title')
+		Skin.TipPageButton(collapse, 'down')
+	end
+	FadeButtonStates(collapse)
+	local treeNode = collapse.treeNode
+	SetArrowRotation(collapse, not (treeNode and treeNode:IsCollapsed()))
 end
 
 local function SkinAddonList(frame)
-	Fade(frame.NineSlice)
-	FadeKeys(frame, MAIN_ART)
-	if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
-	Shell(frame)
-	Title(frame.TitleContainer and frame.TitleContainer.TitleText)
-	Close(frame.CloseButton)
+	context.Chrome(frame)
 	Dropdown(frame.Dropdown)
-	local forceLoad = frame.ForceLoad
-	if forceLoad then
-		CheckBox(forceLoad, CHECK_INSET)
-		FaceRegions(forceLoad)
-	end
+	CheckBox(frame.ForceLoad, CHECK_INSET)
+	FaceRegions(frame.ForceLoad)
 	EditBox(frame.SearchBox)
-	SkinAddonPerformance(frame.Performance)
+	local performance = frame.Performance
+	Skin.TipFont(performance.Header, 'title')
+	for _, key in ipairs(PERFORMANCE_TEXT_KEYS) do Face(performance[key]) end
+	ReplaceDivider(performance.Divider, performance)
 	ScrollBar(frame.ScrollBar)
-	for keyIndex = 1, #ADDON_BUTTON_KEYS do Button(frame[ADDON_BUTTON_KEYS[keyIndex]]) end
+	for _, key in ipairs(ADDON_BUTTON_KEYS) do Button(frame[key]) end
 	Skin.SweepScrollBox(frame.ScrollBox, StyleAddonRow)
 end
 
-local function SkinAddonDialog(dialog)
-	if not dialog or not Enabled() or not Once('addonDialog') then return end
-	local background = _G.AddonDialogBackground
-	if background then
-		FadeArt(background)
-		Shell(background)
-	end
+local function RefreshAddonList(frame)
+	Skin.ForEachScrollFrame(frame.ScrollBox, StyleAddonRow)
+end
+
+local function SkinAddonDialog()
+	FadeArt(_G.AddonDialogBackground)
+	Shell(_G.AddonDialogBackground)
 	Body(_G.AddonDialogText)
 	Button(_G.AddonDialogButton1)
 	Button(_G.AddonDialogButton2)
 end
 
-local function ApplyAddonList()
-	local frame = _G.AddonList
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if Once('addonList') then SkinAddonList(frame) end
-	local box = frame.ScrollBox
-	Skin.ForEachScrollFrame(box, StyleAddonRow)
-end
-
 local function SkinQuickKeybind(frame)
 	FadeArt(frame.BG)
 	Shell(frame)
-	local header = frame.Header
-	if header then
-		FadeRegions(header)
-		Title(header.Text)
-	end
-	for keyIndex = 1, #QUICK_KEYBIND_TEXT_KEYS do Body(frame[QUICK_KEYBIND_TEXT_KEYS[keyIndex]]) end
+	FadeRegions(frame.Header)
+	Title(frame.Header.Text)
+	for _, key in ipairs(QUICK_KEYBIND_TEXT_KEYS) do Body(frame[key]) end
 	CheckBox(frame.UseCharacterBindingsButton, LARGE_CHECK_INSET)
-	for keyIndex = 1, #QUICK_KEYBIND_BUTTON_KEYS do Button(frame[QUICK_KEYBIND_BUTTON_KEYS[keyIndex]]) end
+	for _, key in ipairs(QUICK_KEYBIND_BUTTON_KEYS) do Button(frame[key]) end
 end
 
-local function ApplyQuickKeybind()
-	local frame = _G.QuickKeybindFrame
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if Once('quickKeybind') then SkinQuickKeybind(frame) end
-end
-
-local function HookDialog(frame, callback)
-	if frame then frame:HookScript('OnShow', Wrap('Skin.SystemPanels dialog reskin', callback)) end
-end
-
-local function InstallMacro()
-	if macroInstalled then return end
-	local frame = _G.MacroFrame
-	if not frame then return end
-	macroInstalled = true
-	frame:HookScript('OnShow', Wrap('Skin.SystemPanels macro reskin', ApplyMacro))
-	HookDialog(_G.MacroPopupFrame, SkinIconPopup)
-	if frame:IsShown() then ApplyMacro() end
-end
-
-local function InstallQuickKeybind()
-	if quickKeybindInstalled then return end
-	local frame = _G.QuickKeybindFrame
-	if not frame then return end
-	quickKeybindInstalled = true
-	frame:HookScript('OnShow', Wrap('Skin.SystemPanels keybind reskin', ApplyQuickKeybind))
-	if frame:IsShown() then ApplyQuickKeybind() end
-end
-
-local function Install()
-	if installed then return end
-	local settings = _G.SettingsPanel
-	if not settings then return end
-	installed = true
-	settings:HookScript('OnShow', Wrap('Skin.SystemPanels settings reskin', ApplySettings))
-	if settings:IsShown() then ApplySettings() end
-	local editMode = _G.EditModeManagerFrame
-	if editMode then
-		editMode:HookScript('OnShow', Wrap('Skin.SystemPanels edit mode reskin', ApplyEditMode))
-		local systemDialog = _G.EditModeSystemSettingsDialog
-		if systemDialog then
-			systemDialog:HookScript('OnShow', Wrap('Skin.SystemPanels system dialog reskin', SkinSystemDialog))
-			Hook(systemDialog, 'UpdateSettings', SweepSystemDialog)
-			Hook(systemDialog, 'UpdateExtraButtons', SweepSystemDialog)
-		end
-		HookDialog(_G.EditModeLayoutDialog, SkinLayoutDialog)
-		HookDialog(_G.EditModeImportLayoutDialog, SkinLayoutDialog)
-		HookDialog(_G.EditModeImportLayoutLinkDialog, SkinLayoutDialog)
-		HookDialog(_G.EditModeUnsavedChangesDialog, SkinUnsavedDialog)
-		if editMode:IsShown() then ApplyEditMode() end
-	end
-	HookDialog(_G.CooldownViewerLayoutDialog, SkinLayoutDialog)
-	HookDialog(_G.CooldownViewerImportLayoutDialog, SkinLayoutDialog)
-	local addonList = _G.AddonList
-	if addonList then
-		addonList:HookScript('OnShow', Wrap('Skin.SystemPanels addons reskin', ApplyAddonList))
-		if _G.AddonList_InitAddon then Hook('AddonList_InitAddon', OnAddonEntry) end
-		HookDialog(_G.AddonDialog, SkinAddonDialog)
-		if addonList:IsShown() then ApplyAddonList() end
-	end
-end
-
-local function TryInstall()
-	Install()
-	InstallMacro()
-	InstallQuickKeybind()
-	if installed and macroInstalled and quickKeybindInstalled then BUI.Events:Unregister('ADDON_LOADED', 'Skin.SystemPanels') end
-end
-
-local function ReapplyShown()
-	if _G.SettingsPanel and _G.SettingsPanel:IsShown() then ApplySettings() end
-	if _G.EditModeManagerFrame and _G.EditModeManagerFrame:IsShown() then ApplyEditMode() end
-	if _G.AddonList and _G.AddonList:IsShown() then ApplyAddonList() end
-	if _G.MacroFrame and _G.MacroFrame:IsShown() then ApplyMacro() end
-	if _G.QuickKeybindFrame and _G.QuickKeybindFrame:IsShown() then ApplyQuickKeybind() end
-end
-
-local function Deactivate()
-	context.Restore()
-	wipe(skinnedWindows)
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		TryInstall()
-		if not (installed and macroInstalled and quickKeybindInstalled) then
-			BUI.Events:Register('ADDON_LOADED', 'Skin.SystemPanels', TryInstall)
-		end
-		ReapplyShown()
-	else
-		Deactivate()
-	end
-end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Settings & Editors',
-	description = 'The game settings window, Edit Mode manager and dialogs, quick keybinding, macro editor and addon list: dark shells, house controls, flat sliders and clean list rows.',
-	icon = 'Interface/Icons/INV_Misc_Gear_01',
+context.Window('SettingsPanel', { skin = SkinSettingsPanel, show = RefreshSettings })
+context.Window('EditModeManagerFrame', { skin = SkinEditModeManager, show = RefreshEditMode })
+context.Window('EditModeSystemSettingsDialog', {
+	skin = SkinSystemDialog,
+	show = SweepSystemDialog,
+	install = function(dialog)
+		Hook(dialog, 'UpdateSettings', SweepSystemDialog)
+		Hook(dialog, 'UpdateExtraButtons', SweepSystemDialog)
+	end,
 })
+for _, dialogName in ipairs(LAYOUT_DIALOGS) do context.Window(dialogName, { skin = SkinLayoutDialog, show = RefreshLayoutDialog }) end
+context.Window('EditModeUnsavedChangesDialog', { skin = SkinUnsavedDialog })
+context.Window('AddonList', {
+	skin = SkinAddonList,
+	show = RefreshAddonList,
+	install = function() Hook('AddonList_InitAddon', StyleAddonEntry) end,
+})
+context.Window('AddonDialog', { skin = SkinAddonDialog })
+context.Window('MacroFrame', { skin = SkinMacroFrame, show = RefreshMacro })
+context.Window('MacroPopupFrame', {
+	skin = function(popup) Skin.TipIconPopup(context, popup) end,
+	show = function(popup) Skin.SweepIconSelector(popup.IconSelector) end,
+})
+context.Window('QuickKeybindFrame', { skin = SkinQuickKeybind })
+
+context.OnDisable(function()
+	for hint in pairs(lockHints) do hint:Hide() end
+end)
