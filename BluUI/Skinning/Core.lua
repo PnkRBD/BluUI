@@ -1759,7 +1759,7 @@ function Skin.NewContext(enabled)
 			Title(frame.TitleText)
 		end
 		Close(closeButton or frame.CloseButton)
-		local maximize = frame.MaximizeMinimizeFrame or frame.MaximizeMinimize
+		local maximize = frame.MaximizeMinimizeFrame or frame.MaximizeMinimize or frame.MaximizeMinimizeButton
 		if not maximize then return end
 		Skin.TipPageButton(maximize.MaximizeButton, 'expand')
 		Skin.TipPageButton(maximize.MinimizeButton, 'condense')
