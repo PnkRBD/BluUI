@@ -7,13 +7,15 @@ local pairs = pairs
 local wipe = wipe
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
-local theme = BUILib.Theme
 local Skin3 = BUILib.Skin
 local Skin = BUI.Skinning
 
 local ARROW_TEXTURE = 130940
-local MENU_FILL = {}
-local SEPARATOR_COLOR = theme.border.default
+local WHITE_TEXTURE = 'Interface\\Buttons\\WHITE8X8'
+local CHECK_TEXTURE = BUILib.GetLibMedia('check')
+local ROUND_TEXTURE = BUILib.GetLibMedia('circle_mask')
+local MARK = { box = 14, tick = 12, dot = 6, textGap = 7 }
+local MENU_FILL, ACCENT = {}, {}
 
 local function MenuFill()
 	local panel = Skin.PALETTE.panel
@@ -21,21 +23,63 @@ local function MenuFill()
 	return MENU_FILL
 end
 
-local function SkinRow(button)
-	if button and button.divider then
-		button.divider:SetColorTexture(SEPARATOR_COLOR[1], SEPARATOR_COLOR[2], SEPARATOR_COLOR[3], SEPARATOR_COLOR[4] or 1)
-		button.divider:SetHeight(1)
-		if not button.divider._buiPixelLine then button.divider._buiPixelLine = Skin3.PixelLine(button.divider, button) end
-	end
+local function Accent()
+	ACCENT[1], ACCENT[2], ACCENT[3] = BUILib.Theme.GetAccent()
+	return ACCENT
 end
 
-local function SkinTree(frame, depth)
-	if depth > 8 or not frame.GetChildren then return end
-	local children = { frame:GetChildren() }
-	for childIndex = 1, #children do
-		SkinRow(children[childIndex])
-		SkinTree(children[childIndex], depth + 1)
-	end
+local function OnePixel(region)
+	return PixelUtil.GetNearestPixelSize(1, region:GetEffectiveScale(), 1)
+end
+
+local function Tint(texture, file, color, size)
+	texture:SetTexture(file, nil, nil, 'TRILINEAR')
+	texture:SetVertexColor(color[1], color[2], color[3], 1)
+	if size then texture:SetSize(size, size) end
+end
+
+local function PaintSelection(frame, round)
+	local box = frame.leftTexture1
+	if not (box and Skin.IsSkinEnabled('menus')) then return end
+	local shape = round and ROUND_TEXTURE or WHITE_TEXTURE
+	Tint(box, shape, Skin.PALETTE.edge, MARK.box)
+	box:SetDrawLayer('ARTWORK', 0)
+	box:ClearAllPoints()
+	box:SetPoint('LEFT')
+	local fill = frame:AttachTexture()
+	Tint(fill, shape, MenuFill())
+	fill:SetDrawLayer('ARTWORK', 1)
+	local pixel = OnePixel(box)
+	fill:SetPoint('TOPLEFT', box, 'TOPLEFT', pixel, -pixel)
+	fill:SetPoint('BOTTOMRIGHT', box, 'BOTTOMRIGHT', -pixel, pixel)
+	frame.fontString:SetPoint('LEFT', box, 'RIGHT', MARK.textGap, 0)
+	local mark = frame.leftTexture2
+	if not mark then return end
+	Tint(mark, round and ROUND_TEXTURE or CHECK_TEXTURE, Accent(), round and MARK.dot or MARK.tick)
+	mark:SetDrawLayer('ARTWORK', 2)
+	mark:ClearAllPoints()
+	mark:SetPoint('CENTER', box, 'CENTER')
+end
+
+local function OnCheckbox(_, frame)
+	PaintSelection(frame, false)
+end
+
+local function OnRadio(_, frame)
+	PaintSelection(frame, true)
+end
+
+local function OnDivider(frame)
+	if not Skin.IsSkinEnabled('menus') then return end
+	local divider = frame:GetRegions()
+	if not divider then return end
+	divider:SetAlpha(0)
+	local edge = Skin.PALETTE.edge
+	local line = frame:AttachTexture()
+	line:SetColorTexture(edge[1], edge[2], edge[3], 1)
+	line:SetPoint('LEFT', divider, 'LEFT')
+	line:SetPoint('RIGHT', divider, 'RIGHT')
+	line:SetHeight(OnePixel(line))
 end
 
 local menuBackdrops = setmetatable({}, { __mode = 'k' })
@@ -50,7 +94,6 @@ local function ApplySkin(frame)
 	local backdrop = Skin3.ChildBackdrop(frame, { inside = true })
 	menuBackdrops[frame] = backdrop
 	Skin.ApplyBackdrop(backdrop, MenuFill(), Skin.PALETTE.edge)
-	SkinTree(frame, 0)
 end
 
 local function FlushPending()
@@ -99,6 +142,12 @@ local function Install()
 	if not manager then return end
 	Hook(manager, 'OpenMenu', OnMenuOpen)
 	Hook(manager, 'OpenContextMenu', OnMenuOpen)
+	local variants = _G.MenuVariants
+	if variants then
+		Hook(variants, 'CreateCheckbox', OnCheckbox)
+		Hook(variants, 'CreateRadio', OnRadio)
+		Hook(variants, 'CreateDivider', OnDivider)
+	end
 	if _G.CompositorMixin and _G.CompositorMixin.AttachTexture then
 		Hook(_G.CompositorMixin, 'AttachTexture', SkinAttachments)
 	end
