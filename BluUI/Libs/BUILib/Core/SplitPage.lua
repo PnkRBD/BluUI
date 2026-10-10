@@ -337,10 +337,18 @@ function Layout.SplitPage(tab, shell, spec)
 		end
 	end
 
+	local function MarkLast()
+		local last = LastShown(main)
+		for _, item in ipairs(main.items) do
+			if item.SetLast then item:SetLast(item == last) end
+		end
+		return last
+	end
+
 	local function Resize()
+		local last = MarkLast()
 		local height = main:Measure(mainWidth)
 		local columns = math.max(height, PREVIEW_MIN)
-		local last = LastShown(main)
 		if last and columns > height then last:SetHeight(last:GetHeight() + columns - height) end
 		main:ClearAllPoints()
 		main:SetPoint('TOPLEFT')

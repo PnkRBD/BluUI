@@ -276,6 +276,9 @@ local function BoardItem(kit, parent, width, build)
 	function item:Measure()
 		return board:Layout(0, query)
 	end
+	function item:SetLast(last)
+		board:SetLast(last)
+	end
 	return item
 end
 
