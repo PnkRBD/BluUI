@@ -1112,23 +1112,50 @@ end
 
 local SEGMENT_PAD, SEGMENT_GAP, SEGMENT_TEXT_PAD = 2, 2, 12
 
-local function PaintSegment(tab)
-	local state = tab._buiSegment
-	local live = state.enabled()
-	local selected = live and tab.isSelected == true
-	state.fill:SetShown(selected)
-	if not live then return end
-	state.fill:SetColorTexture(CARD_FILL[1], CARD_FILL[2], CARD_FILL[3], CARD_FILL[4])
+function Skin.SegmentButton(tab)
+	if tab._buiSegmentFill then return end
+	BUILib.Skin.StripButton(tab)
+	local fill = tab:CreateTexture(nil, 'BACKGROUND')
+	fill.__buiSkin = true
+	fill:SetAllPoints(tab)
+	tab._buiSegmentFill = fill
+end
+
+function Skin.SetSegmentSelected(tab, selected)
+	local fill = tab._buiSegmentFill
+	fill:SetShown(selected)
+	fill:SetColorTexture(CARD_FILL[1], CARD_FILL[2], CARD_FILL[3], CARD_FILL[4])
 	local fonts = ButtonFontObjects()
 	local font = selected and fonts.normal or fonts.disabled
 	tab:SetNormalFontObject(font)
 	tab:SetDisabledFontObject(font)
 	tab:SetHighlightFontObject(fonts.normal)
+end
+
+function Skin.SegmentStrip(strip, tabs, width)
+	local height = Skin.DropdownHeight()
+	local tabWidth = (width - SEGMENT_PAD * 2 - SEGMENT_GAP * (#tabs - 1)) / #tabs
+	strip:SetSize(width, height)
+	Skin.TipShell(strip)
+	for index, tab in ipairs(tabs) do
+		Skin.SegmentButton(tab)
+		tab:SetSize(tabWidth, height - SEGMENT_PAD * 2)
+		tab:ClearAllPoints()
+		tab:SetPoint('LEFT', strip, 'LEFT', SEGMENT_PAD + (index - 1) * (tabWidth + SEGMENT_GAP), 0)
+	end
+end
+
+local function PaintSegment(tab)
+	if not tab._buiSegment() then
+		tab._buiSegmentFill:Hide()
+		return
+	end
+	Skin.SetSegmentSelected(tab, tab.isSelected == true)
 	tab.Text:SetPoint('CENTER', tab, 'CENTER', 0, 0)
 end
 
 local function SizeSegment(tab)
-	if not tab._buiSegment.enabled() then return end
+	if not tab._buiSegment() then return end
 	local text = tab.Text
 	text:SetWidth(0)
 	tab:SetSize(math.ceil(text:GetStringWidth()) + SEGMENT_TEXT_PAD * 2, Skin.DropdownHeight() - SEGMENT_PAD * 2)
@@ -1140,11 +1167,8 @@ function Skin.SegmentTabs(tabSystem, enabled)
 	tabSystem.topPadding, tabSystem.bottomPadding = SEGMENT_PAD, SEGMENT_PAD
 	for _, tab in ipairs(tabSystem.tabs) do
 		if not tab._buiSegment then
-			BUILib.Skin.StripButton(tab)
-			local fill = tab:CreateTexture(nil, 'BACKGROUND')
-			fill.__buiSkin = true
-			fill:SetAllPoints(tab)
-			tab._buiSegment = { fill = fill, enabled = enabled }
+			Skin.SegmentButton(tab)
+			tab._buiSegment = enabled
 			Hook(tab, 'SetTabSelected', PaintSegment)
 			Hook(tab, 'UpdateTabWidth', SizeSegment)
 		end
@@ -1789,7 +1813,7 @@ local function ApplyWindow(window)
 	if not frame or frame:IsForbidden() or not frame:IsShown() or not window.enabled() then return end
 	if not window.skinned then
 		window.skinned = true
-		Safely(window.skin, frame)
+		if window.skin then Safely(window.skin, frame) end
 	end
 	if window.show then Safely(window.show, frame) end
 end
