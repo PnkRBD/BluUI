@@ -3,7 +3,6 @@ local _, BUI = ...
 local Datatext = BUI.Datatext
 local Pixel = BUI.Pixel
 local BUILib = LibStub('BUILib')
-local Controls = BUILib.Controls
 local Widget = BUILib.Widget
 
 local CURRENT_SPEC_ICON = 132222
@@ -58,7 +57,7 @@ end
 
 local function ActiveText(text, isActive)
     if not isActive then return text end
-    local red, green, blue = BUILib.Theme.GetAccent()
+    local red, green, blue = BUI.ThemeColor('accent')
     return '|cff' .. BUI.Hex(red, green, blue) .. text .. '|r'
 end
 
@@ -72,7 +71,7 @@ local function MenuOptions(anchor)
     local _, centerY = anchor:GetCenter()
     local vertical = centerY < UIParent:GetTop() * screenScale / 2 and 'BOTTOM' or 'TOP'
     return {
-        anchor = anchor, width = MENU_WIDTH, offsetY = 0,
+        anchor = anchor, width = MENU_WIDTH, offsetY = 0, surface = 'page',
         point = vertical .. (openLeft and 'RIGHT' or 'LEFT'),
         relPt = vertical .. (openLeft and 'LEFT' or 'RIGHT'),
         offsetX = openLeft and -FLYOUT_GAP or FLYOUT_GAP,
@@ -102,7 +101,7 @@ local function OpenLootSpecMenu(anchor)
             }
         end
     end
-    Controls.ContextMenu(items, MenuOptions(anchor))
+    BUI.Skinning.ContextMenu(items, MenuOptions(anchor))
 end
 
 local function ActiveLoadoutName(specID)
@@ -173,7 +172,7 @@ local function OpenLoadoutMenu(anchor)
         end
     end
     if #items == 1 then items[2] = { text = 'No saved loadouts', disabled = true } end
-    Controls.ContextMenu(items, MenuOptions(anchor))
+    BUI.Skinning.ContextMenu(items, MenuOptions(anchor))
 end
 
 local function ActivateSpec(specIndex)
