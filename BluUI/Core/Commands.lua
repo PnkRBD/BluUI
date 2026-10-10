@@ -29,14 +29,14 @@ local function ProfileCommand(option)
 	elseif option == 'alerts' then
 		local global = BUI.db.global
 		global.profileAlerts = not global.profileAlerts or nil
-		BUI.Print(global.profileAlerts and 'Slow frame alerts on. BluUI will say in chat when it takes 100ms or more in a frame.' or 'Slow frame alerts off.')
+		BUI.Print(global.profileAlerts and 'Slow frame alerts on (100ms or more).' or 'Slow frame alerts off.')
 	elseif Profiler.active then
 		Profiler.Stop()
 		BUI.Print('Profiling stopped.')
 		ShowProfile()
 	else
 		Profiler.Start()
-		BUI.Print('Profiling started. Play as normal, then type /bui profile again for the report.')
+		BUI.Print('Profiling started. /bui profile to stop.')
 	end
 end
 
