@@ -69,6 +69,34 @@ local function SkinHousingPreview(frame, context)
 	context.Title(preview.NameContainer.Name)
 end
 
+local TABARD_ROWS = 5
+local TABARD_BOXES = { 'TabardFrameCostFrame', 'TabardFrameMoneyInset' }
+
+local function SkinTabard(_, context)
+	for index = 1, TABARD_ROWS do
+		local name = 'TabardFrameCustomization' .. index
+		local row = _G[name]
+		context.FadeRegions(row)
+		context.Card(row)
+		Skin.TipFont(_G[name .. 'Text'], 'body')
+		Skin.TipPageButton(_G[name .. 'LeftButton'], 'previous')
+		Skin.TipPageButton(_G[name .. 'RightButton'], 'next')
+	end
+	context.FadeRegions(_G.TabardFrameCustomizationFrame)
+	for _, boxName in ipairs(TABARD_BOXES) do
+		local box = _G[boxName]
+		context.FadeArt(box)
+		context.Shell(box)
+	end
+	context.FadeRegions(_G.TabardFrameMoneyBg)
+	context.Button(_G.TabardFrameAcceptButton)
+	context.Button(_G.TabardFrameCancelButton)
+	Skin.TipPageButton(_G.TabardCharacterModelRotateLeftButton, 'previous')
+	Skin.TipPageButton(_G.TabardCharacterModelRotateRightButton, 'next')
+	context.Title(_G.TabardFrameNameText)
+	context.Body(_G.TabardFrameGreetingText)
+end
+
 local WINDOWS = {
 	{
 		id = 'petstable',
@@ -178,9 +206,11 @@ local WINDOWS = {
 		id = 'tabard',
 		legacy = 'miscpanels',
 		name = 'Tabard Designer',
-		description = 'The guild tabard design window.',
+		description = 'The guild tabard design window: card rows with page arrows for each part of the design.',
 		icon = 'Interface/Icons/INV_Shirt_GuildTabard_01',
 		frames = { 'TabardFrame' },
+		newLook = true,
+		extra = SkinTabard,
 	},
 	{
 		id = 'petition',
