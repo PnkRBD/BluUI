@@ -171,6 +171,7 @@ local function FramePostUpdate(self)
 	UnitFrames.UpdateLevelTextVisibility(self, self._unitType)
 	UnitFrames.FollowDebuffHighlightUnit(self)
 	if not UpdateLifeState(self, unit) then ApplyLifeVisuals(self) end
+	if self.TargetOutline then UnitFrames.UpdateBossTarget(self) end
 end
 
 function UnitFrames.RefreshLifeVisuals()
@@ -192,6 +193,16 @@ local function SetupTooltip(frame)
 		GameTooltip:Hide()
 	end))
 end
+
+local BossEnter = BUI.Profiler.Wrap('UnitFrames.Layout boss OnEnter', function(self)
+	self._hovered = true
+	UnitFrames.UpdateBossMouseover(self)
+end)
+
+local BossLeave = BUI.Profiler.Wrap('UnitFrames.Layout boss OnLeave', function(self)
+	self._hovered = false
+	UnitFrames.UpdateBossMouseover(self)
+end)
 
 local function Style(self, unit)
 	local unitType = unit:gsub('%d+$', '')
@@ -422,6 +433,8 @@ local function Style(self, unit)
 
 	if unitType == 'boss' and not self._stage then
 		BUI.CastBar.CreateBossCastbar(self)
+		self:HookScript('OnEnter', BossEnter)
+		self:HookScript('OnLeave', BossLeave)
 	end
 
 	if (unitType == 'player' or unitType == 'target' or unitType == 'focus') and not self._stage then
