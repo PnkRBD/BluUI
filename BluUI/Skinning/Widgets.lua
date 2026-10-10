@@ -269,11 +269,6 @@ function Skin.CreateListRow(parent, height, iconSize)
 	return row
 end
 
-function Skin.GetPooledRow(pool, factory, parent, index)
-	if not pool[index] then pool[index] = factory(parent) end
-	return pool[index]
-end
-
 function Skin.CreateDropdown(parent, items, onSelect, width)
 	width = width or 148
 

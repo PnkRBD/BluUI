@@ -8,6 +8,7 @@ local Skin = BUI.Skinning
 local Painter = BUI.Painter
 local Pixel = BUI.Pixel
 local After = BUI.Profiler.After
+local PoolGet = BUI.Tools.PoolGet
 
 local TAB_BUY, TAB_BUYBACK, TAB_BULK = 1, 2, 3
 local ROW_HEIGHT = 40
@@ -481,7 +482,7 @@ end
 
 local function PopulateBuyRows(items, pool, parent, isBulk)
 	for itemIndex, info in ipairs(items) do
-		local row = Skin.GetPooledRow(pool, CreateBuyRow, parent, itemIndex)
+		local row = PoolGet(pool, itemIndex, CreateBuyRow, parent)
 		row:ClearAllPoints()
 		row:SetPoint('TOPLEFT', 0, Pixel.Scale(-(itemIndex - 1) * (ROW_HEIGHT + ROW_PAD)))
 		row:SetPoint('RIGHT')
@@ -512,7 +513,7 @@ end
 
 local function PopulateBuybackRows(items, pool, parent)
 	for itemIndex, info in ipairs(items) do
-		local row = Skin.GetPooledRow(pool, CreateBuybackRow, parent, itemIndex)
+		local row = PoolGet(pool, itemIndex, CreateBuybackRow, parent)
 		row:ClearAllPoints()
 		row:SetPoint('TOPLEFT', 0, Pixel.Scale(-(itemIndex - 1) * (ROW_HEIGHT + ROW_PAD)))
 		row:SetPoint('RIGHT')
