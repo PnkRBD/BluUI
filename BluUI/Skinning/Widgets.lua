@@ -175,6 +175,7 @@ function Skin.CreateSearchBox(parent, width, callback)
 		hint:Show()
 		callback('')
 	end))
+	editBox:SetScript('OnEnterPressed', BUI.Profiler.Script('Skin.Widgets editBox OnEnterPressed', editBox.ClearFocus))
 	local function showAccent() AccentBorder(container) end
 	local function showIdle() RestBorder(container) end
 
