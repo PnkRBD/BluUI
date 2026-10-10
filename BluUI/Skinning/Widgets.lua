@@ -51,6 +51,7 @@ end
 local THUMB_IDLE  = { 0.35, 0.35, 0.35, 0.8 }
 local THUMB_HOVER = { 0.5,  0.5,  0.5,  0.9 }
 local TRACK_BG    = { 0.08, 0.08, 0.08, 0.5 }
+local SCROLL_TRACK_SPACE = 20
 
 function Skin.CreateScrollArea(parent, rowHeight, padding)
 	rowHeight = rowHeight or 40
@@ -58,7 +59,7 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 
 	local scroll = CreateFrame('ScrollFrame', nil, parent)
 	scroll:SetPoint('TOPLEFT', Pixel.Scale(padding), Pixel.Scale(-padding))
-	scroll:SetPoint('BOTTOMRIGHT', Pixel.Scale(-padding - 8), Pixel.Scale(padding))
+	scroll:SetPoint('BOTTOMRIGHT', Pixel.Scale(-padding - SCROLL_TRACK_SPACE), Pixel.Scale(padding))
 
 	local child = CreateFrame('Frame', nil, scroll)
 	child:SetHeight(Pixel.PixelSize(1))
@@ -131,7 +132,7 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 		else
 			track:Show()
 			thumb:Show()
-			scroll:SetPoint('BOTTOMRIGHT', Pixel.Scale(-padding - 8), Pixel.Scale(padding))
+			scroll:SetPoint('BOTTOMRIGHT', Pixel.Scale(-padding - SCROLL_TRACK_SPACE), Pixel.Scale(padding))
 			thumb:SetHeight(max(20, track:GetHeight() * (self:GetHeight() / (self:GetHeight() + yMax))))
 		end
 	end))
