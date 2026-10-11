@@ -109,6 +109,25 @@ local function Sections(ui, _, parent, width)
 	return { grid }
 end
 
+local function BlacklistSections(ui, _, parent, width, page)
+	local AuraBlacklist, AuraLists = BUI.AuraBlacklist, BUI.AuraLists
+	local share = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Blacklist',
+		description = 'Auras that never show on the buff and debuff frames.',
+	})
+	share:AddSwitch('Share with the unit frames', AuraBlacklist.IsFrameShared, function(value)
+		AuraBlacklist.SetFrameShared(value)
+		AuraBlacklist.RefreshConsumers('frames')
+		BUILib.Defer(function() page:RebuildCurrent() end)
+	end, 'Use the unit frames blacklist here too')
+	return {
+		share,
+		AuraLists.Blacklist(ui, parent, width, page, { scope = 'frames', polarity = 'HELPFUL', title = 'Buffs', description = 'Buffs that never show on the buff frame.' }),
+		AuraLists.Blacklist(ui, parent, width, page, { scope = 'frames', polarity = 'HARMFUL', title = 'Debuffs', description = 'Debuffs that never show on the debuff frame. Blizzard only lets addons hide a few on you, like Sated.' }),
+	}
+end
+
 BUI.PageEngine.RegisterPage('buffs', {
 	title = 'Buffs & Debuffs',
 	buttonText = 'Buffs & Debuffs',
@@ -123,7 +142,7 @@ BUI.PageEngine.RegisterPage('buffs', {
 			tools = {
 				{ icon = 'enable', tooltip = 'Turn the buff and debuff frames on or off', get = function() return BUI.IsModuleEnabled(MODULE_KEY) end, set = function(value) BUI.SetModuleEnabled(MODULE_KEY, value) end },
 			},
-			tabs = { { label = 'Buffs & Debuffs', build = Sections } },
+			tabs = { { label = 'Frames', build = Sections }, { label = 'Blacklist', build = BlacklistSections } },
 		})
 		page:AutoRefresh()
 	end,

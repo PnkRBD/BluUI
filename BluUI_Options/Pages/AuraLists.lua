@@ -10,6 +10,7 @@ local STRIP_GAP = 4
 local STRIP_MAX = 12
 local DEFAULT_ICON = 134400
 local ENEMIES_ONLY_TIP = 'Blizzard does not let addons hide this debuff on you or your group, so it only hides on enemies.'
+local SELF_LOCKED_TIP = 'Blizzard does not let addons hide this debuff on you, so it still shows on the debuff frame.'
 
 local AuraLists = {}
 BUI.AuraLists = AuraLists
@@ -114,6 +115,8 @@ end
 function AuraLists.Blacklist(ui, parent, width, page, options)
 	local AB = BUI.AuraBlacklist
 	local scope, polarity = options.scope, options.polarity
+	local lockedTip, lockedNote = ENEMIES_ONLY_TIP, ', enemies only'
+	if scope == 'frames' then lockedTip, lockedNote = SELF_LOCKED_TIP, ', still shows' end
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = options.title,
@@ -125,11 +128,11 @@ function AuraLists.Blacklist(ui, parent, width, page, options)
 		page:RebuildCurrent()
 	end
 	local function Add(spellID)
-		local set = scope == 'group' and AB.GroupSet(polarity) or AB.UnitSet(polarity)
+		local set = AB.Set(scope, polarity)
 		if set[spellID] then return end
 		AB.UserAdd(scope, polarity, spellID)
 		if not AB.HidesOnFriendly(spellID, polarity) then
-			BUI.Print((C_Spell.GetSpellName(spellID) or ('Spell ' .. spellID)) .. ': ' .. ENEMIES_ONLY_TIP)
+			BUI.Print((C_Spell.GetSpellName(spellID) or ('Spell ' .. spellID)) .. ': ' .. lockedTip)
 		end
 		Changed()
 	end
@@ -161,7 +164,7 @@ function AuraLists.Blacklist(ui, parent, width, page, options)
 		local name = #group.ids > 1 and (group.name .. ', ' .. #group.ids .. ' spells') or group.name
 		local sub = 'Spell ' .. table.concat(group.ids, ', ')
 		if group.builtin then sub = sub .. ', built in' end
-		if enemiesOnly then sub = sub .. ', enemies only' end
+		if enemiesOnly then sub = sub .. lockedNote end
 		local row = SpellRow(board, group.icon, name, sub, group.builtin and 'Turn this built-in off' or 'Remove ' .. group.name, function()
 			for _, spellID in ipairs(group.ids) do
 				if group.builtin then AB.SetBuiltInHidden(polarity, spellID, false) else AB.UserRemove(scope, polarity, spellID) end
@@ -170,7 +173,7 @@ function AuraLists.Blacklist(ui, parent, width, page, options)
 		end)
 		if enemiesOnly then
 			row:EnableMouse(true)
-			row:SetScript('OnEnter', function(self) Widget.ShowTip(self, ENEMIES_ONLY_TIP) end)
+			row:SetScript('OnEnter', function(self) Widget.ShowTip(self, lockedTip) end)
 			row:SetScript('OnLeave', Widget.HideTip)
 		end
 	end

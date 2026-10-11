@@ -968,6 +968,15 @@ function Layout.TablePage(tab, shell, spec)
 	function page:Resize()
 		Resize()
 	end
+	function page:RebuildCurrent()
+		local old = panes[current].frame
+		old:Hide()
+		old:SetParent(nil)
+		local frame = CreateFrame('Frame', nil, block)
+		frame:SetAllPoints()
+		panes[current] = { frame = frame, sections = spec.tabs[current].build(kit, shell, frame, tab.width, page) }
+		Resize()
+	end
 	Resize()
 	Layout.Add(tab, block, selectTab and TABS_MARGIN or -Layout.DEFAULT_PADDING)
 	Align()

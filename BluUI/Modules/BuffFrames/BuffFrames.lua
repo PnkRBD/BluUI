@@ -189,6 +189,7 @@ local function ApplyLayout(header)
 	container:SetAuraGroupLayout(GROUP_KEY, ElementLayout(config))
 	container:SetAuraGroupMaxFrameCount(GROUP_KEY, config.perRow * config.rows)
 	container:SetAuraGroupSortMethod(GROUP_KEY, SortMethod(config), SortDirection(config))
+	container:SetAuraGroupCandidateFilters(GROUP_KEY, { excludeSpellIDs = BUI.AuraBlacklist.FrameSet(header.kind.filter) })
 	if header.kind.enchants then
 		container:SetItemEnchantmentLayout(EnchantLayout(config))
 		container:SetItemEnchantmentSortMethod(AuraContainerItemEnchantmentSortMethod.Duration, SortDirection(config))
