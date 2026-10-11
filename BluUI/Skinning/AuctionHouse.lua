@@ -21,6 +21,7 @@ local ROW_HOVER_ALPHA = 0.08
 local NAME_SCALE = 1.2
 local CATEGORY_SCALE = 12 / 11
 local SEARCHING_SCALE = 1.5
+local SEARCH_BAR_HEIGHT = 22
 local MUTED_TEXT_THRESHOLD = 0.6
 
 local context = Skin.Define('auctionhouse', {
@@ -43,7 +44,7 @@ local function ShellEdgeLeave(button)
 	Skin.TipShellEdges(button, false)
 end
 
-local function SkinIconButton(button)
+local function SkinIconButton(button, inset)
 	if not button._buiIconButton then
 		button._buiIconButton = true
 		Fade(button:GetNormalTexture())
@@ -53,7 +54,7 @@ local function SkinIconButton(button)
 		button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.AuctionHouse button OnEnter', context.Guard(ShellEdgeEnter)))
 		button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.AuctionHouse button OnLeave', context.Guard(ShellEdgeLeave)))
 	end
-	Shell(button)
+	Shell(button, inset)
 end
 
 local function SkinBackgroundFrame(frame)
@@ -129,11 +130,23 @@ local function SkinItemList(list)
 	end
 end
 
+local function BarInset(control)
+	return (control:GetHeight() - SEARCH_BAR_HEIGHT) / 2
+end
+
+local function BarInsets(control)
+	local inset = BarInset(control)
+	return { top = inset, bottom = inset }
+end
+
 local function SkinSearchBar(bar)
-	SkinIconButton(bar.FavoritesSearchButton)
-	EditBox(bar.SearchBox)
-	context.TextDropdown(bar.FilterButton, true)
-	Button(bar.SearchButton)
+	local favorites, box, filter, search = bar.FavoritesSearchButton, bar.SearchBox, bar.FilterButton, bar.SearchButton
+	SkinIconButton(favorites, BarInset(favorites))
+	EditBox(box, BarInsets(box))
+	Shell(filter, BarInsets(filter))
+	context.TextDropdown(filter, true)
+	Shell(search, BarInsets(search))
+	Button(search)
 end
 
 local function SkinSellFrame(frame)
