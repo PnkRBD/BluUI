@@ -17,9 +17,9 @@ local COUNT_INSET = 1
 local CANCEL_BUTTON = 'RightButtonUp'
 
 local SORT_METHODS = {
-	{ value = 'time',     text = 'Time remaining', enumKey = 'Expiration' },
+	{ value = 'time',     text = 'Time remaining', enumKey = 'ExpirationOnly' },
 	{ value = 'priority', text = 'Priority order', enumKey = 'Default' },
-	{ value = 'name',     text = 'Spell name',     enumKey = 'Name' },
+	{ value = 'name',     text = 'Spell name',     enumKey = 'NameOnly' },
 	{ value = 'applied',  text = 'Order applied',  enumKey = 'AuraInstanceIDOnly' },
 }
 BuffFrames.SORT_METHODS = SORT_METHODS
