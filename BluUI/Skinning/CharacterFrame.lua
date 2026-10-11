@@ -295,9 +295,9 @@ local function ScanSlot(slotID, list)
         local link = place.isBags and not place.isBank and C_Container.GetContainerItemLink(place.bag, place.slot)
         if link then
             local itemLocation = ItemLocation:CreateFromBagAndSlot(place.bag, place.slot)
+            local level = C_Item.DoesItemExist(itemLocation) and C_Item.GetCurrentItemLevel(itemLocation) or 0
             list[#list + 1] = {
-                location = location, slotID = slotID, link = link,
-                level = C_Item.DoesItemExist(itemLocation) and C_Item.GetCurrentItemLevel(itemLocation) or 0,
+                location = location, slotID = slotID, link = link, level = level, corner = level > 0 and tostring(level) or '',
                 icon = C_Item.GetItemIconByID(itemID), quality = C_Item.GetItemQualityByID(link) or 1,
                 name = link:match('%[(.-)%]') or '?',
             }
@@ -380,17 +380,15 @@ local function BagPopupCell(index)
         GameTooltip:Show()
     end))
     cell:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame cell OnLeave', function(self) self.hover:Hide(); GameTooltip:Hide() end))
-    cell:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame cell OnClick', function(self) EquipBagItem(self.entry) end))
+    cell:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame cell OnClick', function(self) bagPopup.onPick(self.entry, bagPopup.owner) end))
     bagPopup.rows[index] = cell
     return cell
 end
 
-local function ShowBagPopup(labels)
-    local list = bagItemsBySlot[labels.info.id]
-    if not list or #list == 0 then return end
+local function ShowPickPopup(owner, labels, title, list, onPick)
     local popup = EnsureBagPopup()
-    popup.owner = labels.bagMarker
-    popup.title:SetText(('In bags (%d)'):format(#list))
+    popup.owner, popup.onPick = owner, onPick
+    popup.title:SetText(title)
     local side, opposite = PopupSide(labels.info)
     local popupPixels = popup:GetWidth() * popup:GetEffectiveScale() + Pixel.Scale(4) * popup:GetEffectiveScale()
     local buttonScale = labels.button:GetEffectiveScale()
@@ -408,7 +406,7 @@ local function ShowBagPopup(labels)
         cell.icon:SetTexture(entry.icon)
         local red, green, blue = C_Item.GetItemQualityColor(entry.quality or 1)
         cell:SetBackdropBorderColor(red, green, blue, 1)
-        cell.level:SetText(entry.level > 0 and tostring(entry.level) or '')
+        cell.level:SetText(entry.corner)
         cell:Show()
     end
     for index = count + 1, #popup.rows do popup.rows[index]:Hide() end
@@ -422,12 +420,113 @@ local function ShowBagPopup(labels)
     popup:Show()
 end
 
-local function ToggleBagPopup(labels)
-    if bagPopup and bagPopup:IsShown() and bagPopup.owner == labels.bagMarker then
+local function TogglePickPopup(owner)
+    if bagPopup and bagPopup:IsShown() and bagPopup.owner == owner then
         bagPopup:Hide()
+        return true
+    end
+end
+
+local function ToggleBagPopup(labels)
+    if TogglePickPopup(labels.bagMarker) then return end
+    local list = bagItemsBySlot[labels.info.id]
+    if not list or #list == 0 then return end
+    ShowPickPopup(labels.bagMarker, labels, ('In bags (%d)'):format(#list), list, EquipBagItem)
+end
+
+local GEMS = { EVENTS = { 'SOCKET_INFO_UPDATE', 'SOCKET_INFO_SUCCESS', 'SOCKET_INFO_FAILURE', 'SOCKET_INFO_CLOSE' } }
+GEMS.list, GEMS.byItem = {}, {}
+GEMS.events = CreateFrame('Frame')
+
+local function ByQualityThenName(left, right)
+    if left.quality ~= right.quality then return left.quality > right.quality end
+    return left.name < right.name
+end
+
+local function ScanGems()
+    local list, byItem = GEMS.list, GEMS.byItem
+    wipe(list)
+    wipe(byItem)
+    for bag = BACKPACK_CONTAINER, NUM_TOTAL_EQUIPPED_BAG_SLOTS do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) do
+            local info = C_Container.GetContainerItemInfo(bag, slot)
+            if info and not info.isLocked then
+                local _, _, _, _, _, classID, subclassID = C_Item.GetItemInfoInstant(info.itemID)
+                if classID == Enum.ItemClass.Gem and subclassID ~= Enum.ItemGemSubclass.Artifactrelic then
+                    local entry = byItem[info.itemID]
+                    if entry then
+                        entry.count = entry.count + info.stackCount
+                    else
+                        entry = { bag = bag, slot = slot, link = info.hyperlink, icon = info.iconFileID, quality = info.quality or 1, name = info.itemName, count = info.stackCount }
+                        byItem[info.itemID] = entry
+                        list[#list + 1] = entry
+                    end
+                end
+            end
+        end
+    end
+    for _, entry in ipairs(list) do entry.corner = entry.count > 1 and tostring(entry.count) or '' end
+    table.sort(list, ByQualityThenName)
+    return list
+end
+
+local function EndSocketing()
+    GEMS.events:UnregisterAllEvents()
+    GEMS.job = nil
+end
+
+local function PlaceGem(job)
+    ClearCursor()
+    C_Container.PickupContainerItem(job.bag, job.slot)
+    C_ItemSocketInfo.ClickSocketButton(job.socket)
+    if CursorHasItem() then ClearCursor() end
+    if not C_ItemSocketInfo.GetNewSocketLink(job.socket) then
+        BUI.Print('That gem does not fit this socket.')
+        C_ItemSocketInfo.CloseSocketInfo()
         return
     end
-    ShowBagPopup(labels)
+    if C_ItemSocketInfo.GetSocketItemBoundTradeable() then
+        StaticPopup_Show('END_BOUND_TRADEABLE', nil, nil, 'gem')
+    elseif C_ItemSocketInfo.GetExistingSocketInfo(job.socket) then
+        StaticPopup_Show('CONFIRM_ACCEPT_SOCKETS')
+    else
+        C_ItemSocketInfo.AcceptSockets()
+        PlaySound(SOUNDKIT.JEWEL_CRAFTING_FINALIZE)
+    end
+end
+
+GEMS.events:SetScript('OnEvent', BUI.Profiler.Script('Skin.CharacterFrame socketing', function(_, event)
+    local job = GEMS.job
+    if event == 'SOCKET_INFO_UPDATE' then
+        if job.placed then return end
+        job.placed = true
+        PlaceGem(job)
+    elseif event == 'SOCKET_INFO_CLOSE' then
+        EndSocketing()
+    else
+        C_ItemSocketInfo.CloseSocketInfo()
+    end
+end))
+
+local function SocketGem(entry, gem)
+    if bagPopup then bagPopup:Hide() end
+    if InCombatLockdown() then
+        BUI.Print('Gems cannot change during combat.')
+        return
+    end
+    GEMS.job = { bag = entry.bag, slot = entry.slot, socket = gem.socket }
+    for _, event in ipairs(GEMS.EVENTS) do GEMS.events:RegisterEvent(event) end
+    SocketInventoryItem(GetInventorySlotInfo(gem.labels.info.id))
+end
+
+local function ToggleGemPopup(gem)
+    if TogglePickPopup(gem) then return end
+    local list = ScanGems()
+    if #list == 0 then
+        BUI.Print('No gems in your bags.')
+        return
+    end
+    ShowPickPopup(gem, gem.labels, (gem.link and 'Swap gem (%d in bags)' or 'Gems in bags (%d)'):format(#list), list, SocketGem)
 end
 
 local function RefreshBagAlternatives()
@@ -1986,7 +2085,7 @@ local function BuildFrame()
     overlay = CreateFrame('Frame', nil, frame)
     overlay:SetAllPoints()
     overlay:SetFrameLevel(frame:GetFrameLevel() + 8)
-    gemMetrics = { parent = overlay, size = Pixel.Scale(GEM_SIZE), pad = Pixel.Scale(GEM_PAD), inset = Pixel.Scale(GEM_INSET) }
+    gemMetrics = { parent = overlay, size = Pixel.Scale(GEM_SIZE), pad = Pixel.Scale(GEM_PAD), inset = Pixel.Scale(GEM_INSET), onClick = ToggleGemPopup }
 
     BuildSidebar(frame)
 

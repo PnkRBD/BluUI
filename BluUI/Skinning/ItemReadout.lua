@@ -178,11 +178,13 @@ function Readout.PaintMissingEnchant(label, hover)
 	hover.tooltip = 'Enchant missing'
 end
 
-local socketIcons, socketLinks = {}, {}
+local socketIcons, socketLinks, socketIndexes, takenSockets = {}, {}, {}, {}
 
 local function ReadSockets(link)
 	wipe(socketIcons)
 	wipe(socketLinks)
+	wipe(socketIndexes)
+	wipe(takenSockets)
 	if not link then return 0 end
 	local filled = 0
 	for gemIndex = 1, GEM_MAX do
@@ -191,6 +193,8 @@ local function ReadSockets(link)
 			filled = filled + 1
 			socketIcons[filled] = C_Item.GetItemIconByID(gemLink) or QUESTION_MARK_ICON
 			socketLinks[filled] = gemLink
+			socketIndexes[filled] = gemIndex
+			takenSockets[gemIndex] = true
 		end
 	end
 	local stats = C_Item.GetItemStats(link)
@@ -203,18 +207,32 @@ local function ReadSockets(link)
 			socketType = socketType or name
 		end
 	end
+	local free = 0
 	for index = filled + 1, math.max(filled, total) do
+		repeat free = free + 1 until not takenSockets[free]
 		socketIcons[index] = EMPTY_SOCKET_PATH .. socketType
 		socketLinks[index] = false
+		socketIndexes[index] = free
 	end
 	return math.max(filled, total)
 end
 
 local function GemTooltip(self)
-	if not self.link then return end
+	if not (self.link or self.onClick) then return end
 	GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
-	GameTooltip:SetHyperlink(self.link)
+	if self.link then
+		GameTooltip:SetHyperlink(self.link)
+	else
+		GameTooltip:SetText('Empty socket', 1, 1, 1)
+	end
+	if self.onClick then
+		GameTooltip:AddLine(self.link and 'Click to swap it for a gem in your bags.' or 'Click to add a gem from your bags.', 0.7, 0.7, 0.7)
+	end
 	GameTooltip:Show()
+end
+
+local function GemClick(self, button)
+	if button == 'LeftButton' and self:IsMouseOver() then self.onClick(self) end
 end
 
 local function HideTooltip() GameTooltip:Hide() end
@@ -230,6 +248,10 @@ local function NewGem(metrics)
 	gem:EnableMouse(true)
 	gem:SetScript('OnEnter', BUI.Profiler.Script('Skin.Readout gem OnEnter', GemTooltip))
 	gem:SetScript('OnLeave', BUI.Profiler.Script('Skin.Readout gem OnLeave', HideTooltip))
+	if metrics.onClick then
+		gem.onClick = metrics.onClick
+		gem:SetScript('OnMouseUp', BUI.Profiler.Script('Skin.Readout gem OnMouseUp', GemClick))
+	end
 	return gem
 end
 
@@ -246,7 +268,7 @@ function Readout.RefreshGems(labels, link, metrics)
 				gems[index] = gem
 			end
 			local gemLink = socketLinks[index] or nil
-			gem.link = gemLink
+			gem.link, gem.socket, gem.labels = gemLink, socketIndexes[index], labels
 			gem.icon:SetTexture(socketIcons[index])
 			if gemLink then
 				gem.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
