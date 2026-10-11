@@ -89,6 +89,7 @@ local function SkinMenu(frame)
 	for _, key in ipairs(NEW_TAG_KEYS) do Fade(frame[key]) end
 	Shell(frame, PanelInsets(frame))
 	Card(shortcut, CARD_INSETS)
+	Skin.SetAccentEdge(shortcut, true)
 	shortcut:Show()
 	SkinButtons(frame)
 end
