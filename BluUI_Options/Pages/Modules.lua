@@ -22,7 +22,6 @@ local MODULES = {
 	{ key = 'markers', name = 'Markers', sub = 'Raid and world markers', icon = 'markers' },
 	{ key = 'buffFrames', name = 'Buffs & Debuffs', sub = 'Your own buff and debuff icons', icon = 'updown' },
 	{ key = 'streamerTools', name = 'Streamer Tools', sub = 'Overlays for streaming, like the GCD history', icon = 'eye' },
-	{ key = 'gemCounter', name = 'Gem Manager', sub = 'Keeps count of your gems', icon = 'check' },
 }
 
 local booted = CopyTable(BUI.GetDB().modules)
