@@ -6,6 +6,14 @@ local UnitGetDetailedHealPrediction = UnitGetDetailedHealPrediction
 local CreateUnitHealPredictionCalculator = CreateUnitHealPredictionCalculator
 
 local SHIELD_EVENTS = { 'UNIT_ABSORB_AMOUNT_CHANGED', 'UNIT_HEAL_ABSORB_AMOUNT_CHANGED', 'UNIT_MAXHEALTH' }
+local DAMAGE_CLAMP = Enum.UnitDamageAbsorbClampMode
+
+function UnitFrames.SetAbsorbOverflow(frame, shown)
+	local bars = frame.AbsorbBars
+	bars.Overflow:SetShown(shown)
+	bars.damageClamp = shown and DAMAGE_CLAMP.MissingHealthWithoutIncomingHeals or DAMAGE_CLAMP.MaximumHealth
+	if bars.values then bars.values:SetDamageAbsorbClampMode(bars.damageClamp) end
+end
 
 local function Fit(bars)
 	local width = bars.__owner.Health:GetWidth()
@@ -30,7 +38,11 @@ local function Update(self, _, unit)
 	local values = bars.values
 	UnitGetDetailedHealPrediction(unit, 'player', values)
 	local maxHealth = values:GetMaximumHealth()
-	if damage:IsShown() then Fill(damage, maxHealth, (values:GetDamageAbsorbs())) end
+	if damage:IsShown() then
+		local amount, overflow = values:GetDamageAbsorbs()
+		Fill(damage, maxHealth, amount)
+		if bars.Overflow then bars.Overflow:SetAlphaFromBoolean(overflow, 1, 0) end
+	end
 	if heal:IsShown() then Fill(heal, maxHealth, (values:GetHealAbsorbs())) end
 end
 
@@ -50,7 +62,7 @@ local function Enable(self)
 	bars.ForceUpdate = ForceUpdate
 	if not bars.values then
 		bars.values = CreateUnitHealPredictionCalculator()
-		bars.values:SetDamageAbsorbClampMode(Enum.UnitDamageAbsorbClampMode.MaximumHealth)
+		bars.values:SetDamageAbsorbClampMode(bars.damageClamp or DAMAGE_CLAMP.MaximumHealth)
 		bars.values:SetHealAbsorbClampMode(Enum.UnitHealAbsorbClampMode.MaximumHealth)
 		self.Health:HookScript('OnSizeChanged', BUI.Profiler.Wrap('UnitFrames.AbsorbBars fit', function() Fit(bars) end))
 	end

@@ -49,8 +49,13 @@ end
 
 function UnitFrames.ApplyAbsorbStyles(frame, settings)
 	if not frame.Absorb then return end
-	UnitFrames.ApplyAbsorbVisual(frame.Absorb, UnitFrames.BuildAbsorbCfg(settings))
-	ApplyAbsorbBar(frame, frame.Absorb, settings.shieldDirection, settings.shieldEnabled ~= false)
+	local config = UnitFrames.BuildAbsorbCfg(settings)
+	local enabled = settings.shieldEnabled ~= false
+	UnitFrames.ApplyAbsorbVisual(frame.Absorb, config)
+	ApplyAbsorbBar(frame, frame.Absorb, settings.shieldDirection, enabled)
+	local color = config.color
+	UnitFrames.ApplyAbsorbVisual(frame.AbsorbBars.Overflow, { texture = config.texture, color = { color[1], color[2], color[3], 1 } })
+	UnitFrames.SetAbsorbOverflow(frame, enabled and settings.shieldDirection == 'right')
 end
 
 function UnitFrames.ApplyHealAbsorbStyles(frame, settings)
