@@ -7,7 +7,6 @@ local Wrap = BUI.Profiler.Wrap
 local After = BUI.Profiler.After
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
-local Theme = BUILib.Theme
 local LibSkin = BUILib.Skin
 local LibWidget = BUILib.Widget
 local FONT = BUILib.Font or STANDARD_TEXT_FONT
@@ -845,8 +844,7 @@ end
 function QuestFilter.UpdateTint()
 	if not headerFilter then return end
 	if QuestFilter.HasActive() then
-		local accentRed, accentGreen, accentBlue = Theme.GetAccent()
-		headerFilter.glyph:SetVertexColor(accentRed, accentGreen, accentBlue, 1)
+		headerFilter.glyph:SetVertexColor(Painter.Color('skinTitle'))
 	else
 		PaintGlyph(headerFilter.glyph, false)
 	end
@@ -954,9 +952,9 @@ local function FlashProgressBlock()
 		if block.poiQuestID == questID then targetBlock = block end
 	end)
 	if not targetBlock or not targetBlock.usedLines then return end
-	local accentRed, accentGreen, accentBlue = Theme.GetAccent()
+	local red, green, blue = Painter.Color('skinTitle')
 	for _, line in pairs(targetBlock.usedLines) do
-		if line.Text then line.Text:SetTextColor((accentRed + 1) / 2, (accentGreen + 1) / 2, (accentBlue + 1) / 2, 1) end
+		if line.Text then line.Text:SetTextColor(red, green, blue, 1) end
 	end
 	After('Skin.ObjectiveTracker flash restore', FLASH_SECONDS, function()
 		if Enabled() then OnUpdateHighlight(targetBlock) end
@@ -1160,16 +1158,17 @@ local function CardBackdrop(frame)
 	return LibSkin.ChildBackdrop(frame, { bg = Skin.PALETTE.card, border = Skin.PALETTE.edge })
 end
 
+local function PaintBar(bar)
+	bar:SetStatusBarColor(Painter.Color('skinLabel'))
+end
+
 local function SkinBar(bar)
 	if not bar or bar.__buiSkinned then return end
 	bar.__buiSkinned = true
 
 	LibSkin.StripTextures(bar)
 	bar:SetStatusBarTexture(FLAT_TEXTURE)
-	bar:SetStatusBarColor(Theme.GetAccent())
-	Theme.RegisterAccentElement(bar, function(element, red, green, blue)
-		element:SetStatusBarColor(red, green, blue, 1)
-	end)
+	Painter.Custom(bar, PaintBar)
 	local backdrop = CardBackdrop(bar)
 	skinnedBars[bar] = backdrop
 	bar:HookScript('OnShow', Wrap('Skin.ObjectiveTracker bar backdrop', function(self)
@@ -1245,13 +1244,10 @@ local function SkinItemButton(button)
 	if glow then
 		local outset = Pixel.PixelSize(2)
 		glow:SetAtlas(nil)
-		glow:SetColorTexture(Theme.GetAccent())
+		Painter.Fill(glow, 'skinTitle')
 		glow:ClearAllPoints()
 		glow:SetPoint('TOPLEFT', button, 'TOPLEFT', -outset, outset)
 		glow:SetPoint('BOTTOMRIGHT', button, 'BOTTOMRIGHT', outset, -outset)
-		Theme.RegisterAccentElement(glow, function(element, red, green, blue)
-			element:SetColorTexture(red, green, blue, 1)
-		end)
 	end
 
 	local count = button.Count or button.count
@@ -1262,19 +1258,16 @@ local function ApplyCheckTexture(check)
 	if check.__buiApplyingCheck then return end
 	check.__buiApplyingCheck = true
 	check:SetTexture(BUILib.GetLibMedia('check'))
-	check:SetVertexColor(Theme.GetAccent())
+	check:SetVertexColor(Painter.Color('skinTitle'))
 	check.__buiApplyingCheck = nil
 end
 
 local function SkinCheck(check)
 	if not check or check.__buiSkinned then return end
 	check.__buiSkinned = true
-	ApplyCheckTexture(check)
+	Painter.Custom(check, ApplyCheckTexture)
 	Hook(check, 'SetAtlas', ApplyCheckTexture)
 	Hook(check, 'SetTexture', ApplyCheckTexture)
-	Theme.RegisterAccentElement(check, function(element, red, green, blue)
-		element:SetVertexColor(red, green, blue, 1)
-	end)
 end
 
 local function SkinBlockText(fontString, role, wrapSet, wantWrap)
@@ -1402,7 +1395,7 @@ function Scenario.ApplyHeader(widget)
 		if timerBar then
 			SkinBar(timerBar)
 			timerBar:SetStatusBarTexture(FLAT_TEXTURE)
-			timerBar:SetStatusBarColor(Theme.GetAccent())
+			PaintBar(timerBar)
 			ApplySkinFont(widget.Timer.Text, 'timer')
 		end
 	end

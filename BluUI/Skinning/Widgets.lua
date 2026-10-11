@@ -8,12 +8,12 @@ local Skin = BUI.Skinning
 local Wrap = BUI.Profiler.Wrap
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Controls = BUILib.Controls
-local Colors = BUILib.Colors
 local FONT = BUILib.Font or STANDARD_TEXT_FONT
 
 local SetColorTex = BUI.Tools.SetColorTex
 local Painter = BUI.Painter
 local PALETTE = Skin.PALETTE
+local HOVER_COLOR = Skin.HOVER_COLOR
 local TITLE_SCALE = 14 / 12
 
 local WINDOW_TITLE_HEIGHT = 36
@@ -26,8 +26,8 @@ local function PaintBackdrop(frame, fill)
 	Painter.Custom(frame, function(target) Skin.ApplyBackdrop(target, fill, PALETTE.edge) end)
 end
 
-local function AccentBorder(frame)
-	frame:SetBackdropBorderColor(Colors.GetAccent())
+local function HoverBorder(frame)
+	frame:SetBackdropBorderColor(unpack(HOVER_COLOR))
 end
 
 local function RestBorder(frame)
@@ -45,7 +45,7 @@ function Skin.SmallButton(parent, width, height, label)
 	text:SetText(label)
 	Painter.Text(text, 'skinText')
 
-	button:HookScript('OnEnter', Wrap('Skin.Widgets button OnEnter', AccentBorder))
+	button:HookScript('OnEnter', Wrap('Skin.Widgets button OnEnter', HoverBorder))
 	button:HookScript('OnLeave', Wrap('Skin.Widgets button OnLeave', RestBorder))
 	return button
 end
@@ -188,12 +188,12 @@ function Skin.CreateSearchBox(parent, width, callback)
 		callback('')
 	end))
 	editBox:SetScript('OnEnterPressed', BUI.Profiler.Script('Skin.Widgets editBox OnEnterPressed', editBox.ClearFocus))
-	local function showAccent() AccentBorder(container) end
+	local function showHover() HoverBorder(container) end
 	local function showIdle() RestBorder(container) end
 
-	container:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets container OnEnter', showAccent))
+	container:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets container OnEnter', showHover))
 	container:SetScript('OnLeave', BUI.Profiler.Script('Skin.Widgets container OnLeave', function() if not editBox:HasFocus() then showIdle() end end))
-	editBox:SetScript('OnEditFocusGained', BUI.Profiler.Script('Skin.Widgets editBox OnEditFocusGained', showAccent))
+	editBox:SetScript('OnEditFocusGained', BUI.Profiler.Script('Skin.Widgets editBox OnEditFocusGained', showHover))
 	editBox:SetScript('OnEditFocusLost', BUI.Profiler.Script('Skin.Widgets editBox OnEditFocusLost', showIdle))
 
 	container.editBox = editBox
@@ -316,7 +316,7 @@ function Skin.CreateListRow(parent, height, iconSize)
 	row.priceText:SetPoint('LEFT', row.iconBorder, 'RIGHT', Pixel.Scale(8), Pixel.Scale(-8))
 	Painter.Text(row.priceText, 'skinLabel')
 
-	row:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets row OnEnter', AccentBorder))
+	row:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets row OnEnter', HoverBorder))
 	row:SetScript('OnLeave', BUI.Profiler.Script('Skin.Widgets row OnLeave', function(self)
 		RestBorder(self)
 		GameTooltip:Hide()
@@ -391,7 +391,7 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 			SetArrowOpen(true)
 		end
 	end))
-	dropdown:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets dropdown OnEnter', AccentBorder))
+	dropdown:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets dropdown OnEnter', HoverBorder))
 	dropdown:SetScript('OnLeave', BUI.Profiler.Script('Skin.Widgets dropdown OnLeave', function(self)
 		if not menu:IsShown() then RestBorder(self) end
 	end))

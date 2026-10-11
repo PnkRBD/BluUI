@@ -85,7 +85,6 @@ local function Layout(frame)
 	inviter:SetPoint('TOPLEFT', frame, 'TOPLEFT', textX, -top)
 	invite:SetPoint('TOPLEFT', inviter, 'BOTTOMLEFT', 0, -LINE_GAP)
 	guild:SetPoint('TOPLEFT', invite, 'BOTTOMLEFT', 0, -LINE_GAP)
-	guild:SetTextColor(BUILib.Theme.GetAccent())
 
 	local points = frame.Points
 	points:ClearAllPoints()
@@ -213,7 +212,7 @@ end)
 
 Skin.RegisterSkin(SKIN_ID, {
 	name = 'Guild Invite',
-	description = 'The guild invitation prompt in the dark shell: tabard, guild name in your accent color, achievement points and the reputation warning laid out cleanly, flat buttons, and a countdown until the invite expires.',
+	description = 'The guild invitation prompt in the dark shell: tabard, guild name in white, achievement points and the reputation warning laid out cleanly, flat buttons, and a countdown until the invite expires.',
 	icon = 'Interface/Icons/INV_Shirt_GuildTabard_01',
 	test = StartPreview,
 	stopTest = StopPreview,

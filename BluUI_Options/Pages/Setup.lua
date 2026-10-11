@@ -449,7 +449,7 @@ local function SkinnedMock(kit, parent)
 		if rowIndex == 1 then
 			local highlight = row:CreateTexture(nil, 'BACKGROUND')
 			highlight:SetAllPoints(row)
-			Skin().AccentTexture(highlight, 0.22)
+			Skin().SelectedTexture(highlight, 0.12)
 		end
 		kit.Text(row, rowText, 11, rowIndex == 1 and 'text' or 'muted'):SetPoint('LEFT', 4, 0)
 		kit.Text(row, rowIndex == 1 and 'Online' or 'Away', 11, 'faint'):SetPoint('RIGHT', -4, 0)

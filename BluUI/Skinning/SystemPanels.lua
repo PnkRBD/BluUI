@@ -6,13 +6,12 @@ local pairs, ipairs = pairs, ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
-local Theme = BUILib.Theme
 
 local LIST_TITLE_SCALE = 1.4
 local SECTION_TITLE_SCALE = 1.2
-local ROW_SELECTED_ALPHA = 0.2
+local ROW_SELECTED_ALPHA = 0.12
 local ROW_HOVER_ALPHA = 0.06
-local BINDING_SELECTED_ALPHA = 0.3
+local BINDING_SELECTED_ALPHA = 0.15
 local CHECK_INSET = 4
 local LARGE_CHECK_INSET = 6
 local SEGMENT_PAD = 2
@@ -56,7 +55,7 @@ local Hook = context.Hook
 local Fade, FadeRegions, FadeArt = context.Fade, context.FadeRegions, context.FadeArt
 local Shell, Button, Close, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.Dropdown, context.EditBox, context.CheckBox
 local TextBox, ScrollBar, Face, Title, Body = context.TextBox, context.ScrollBar, context.Face, context.Title, context.Body
-local FlatTexture, AccentTexture, RowHighlight = Skin.FlatTexture, Skin.AccentTexture, Skin.RowHighlight
+local FlatTexture, SelectedTexture, RowHighlight = Skin.FlatTexture, Skin.SelectedTexture, Skin.RowHighlight
 
 local lockHints = {}
 
@@ -180,8 +179,8 @@ local function RefreshCategoryState(button)
 	if not texture:IsShown() then return end
 	local atlas = texture:GetAtlas()
 	if atlas == CATEGORY_ACTIVE_ATLAS then
-		AccentTexture(texture, ROW_SELECTED_ALPHA)
-		button.Label:SetTextColor(Theme.GetAccent())
+		SelectedTexture(texture, ROW_SELECTED_ALPHA)
+		BUI.Painter.Text(button.Label, 'skinTitle')
 	elseif atlas == CATEGORY_HOVER_ATLAS then
 		FlatTexture(texture, 1, 1, 1, ROW_HOVER_ALPHA)
 	end
@@ -220,14 +219,14 @@ local function StyleBindingButton(button)
 	if selectedHighlight and not button._buiTipButton then
 		selectedHighlight.__buiSkin = true
 		selectedHighlight:SetBlendMode('BLEND')
-		AccentTexture(selectedHighlight, BINDING_SELECTED_ALPHA)
+		SelectedTexture(selectedHighlight, BINDING_SELECTED_ALPHA)
 	end
 	Button(button)
 end
 
 local function StyleBindingRow(row)
 	Face(row.Label)
-	if row.Highlight then AccentTexture(row.Highlight, ROW_HOVER_ALPHA) end
+	if row.Highlight then SelectedTexture(row.Highlight, ROW_HOVER_ALPHA) end
 	for _, key in ipairs(BINDING_BUTTON_KEYS) do StyleBindingButton(row[key]) end
 end
 

@@ -390,6 +390,7 @@ function Skin.RefreshTabStyle(style)
 	local fonts = style.fonts
 	TintFont(fonts.rest, style.restText)
 	TintFont(fonts.hover, style.hoverText)
+	TintFont(fonts.selected, style.hoverText)
 	TintFont(fonts.disabled, style.disabledText)
 end
 
@@ -424,8 +425,6 @@ function Skin.SetTabSelected(tab, selected)
 	if state.fused then TabFuse(tab, state.selected) end
 	local fonts = style.fonts
 	if state.selected then
-		local red, green, blue = Theme.GetAccent()
-		fonts.selected:SetTextColor(red, green, blue, 1)
 		tab:SetNormalFontObject(fonts.selected)
 		tab:SetHighlightFontObject(fonts.selected)
 		tab:SetDisabledFontObject(fonts.selected)

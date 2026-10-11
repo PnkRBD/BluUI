@@ -7,7 +7,7 @@ local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
-local Theme = BUILib.Theme
+local SELECTED = Skin.SELECTED_COLOR
 local Pixel = BUI.Pixel
 
 local SKIN_ID = 'achievements'
@@ -16,8 +16,8 @@ local SEARCH_PREVIEW_COUNT = 5
 local TAB_COUNT = 3
 local SUMMARY_CATEGORY_COUNT = 12
 local HOVER_ALPHA = 0.08
-local SELECTED_ALPHA = 0.18
-local HEADER_ROW_ALPHA = 0.12
+local SELECTED_ALPHA = 0.12
+local HEADER_ROW_ALPHA = 0.1
 local STRIPE_ALPHA = 0.03
 local POINTS_TOP_OFFSET = -5
 local BAR_TEXT_INSET = 6
@@ -65,7 +65,7 @@ local context = Skin.NewContext(Enabled)
 local Fade, FadeRegions = context.Fade, context.FadeRegions
 local Shell, Button, Close, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.EditBox, context.CheckBox
 local ScrollBar, Body, Title = context.ScrollBar, context.Body, context.Title
-local FlatTexture, AccentTexture, CropIcon = Skin.FlatTexture, Skin.AccentTexture, Skin.CropIcon
+local FlatTexture, SelectedTexture, CropIcon = Skin.FlatTexture, Skin.SelectedTexture, Skin.CropIcon
 
 local function KeepTexture(texture)
 	if texture then texture.__buiSkin = true end
@@ -82,12 +82,6 @@ local function SetColor(fontString, color)
 	if not fontString then return end
 	fontString:SetVertexColor(1, 1, 1, 1)
 	fontString:SetTextColor(color[1], color[2], color[3], color[4])
-end
-
-local function AccentColor(fontString)
-	local red, green, blue = Theme.GetAccent()
-	fontString:SetVertexColor(1, 1, 1, 1)
-	fontString:SetTextColor(red, green, blue, 1)
 end
 
 local function LabelColor(frame, completed)
@@ -107,23 +101,22 @@ local function HoverFill(host, alpha)
 		fill:SetAllPoints(host)
 		host._buiHover = fill
 	end
-	AccentTexture(host._buiHover, alpha)
+	SelectedTexture(host._buiHover, alpha)
 	FadeRegions(host)
 end
 
-local function AccentFill(texture, host, alpha)
+local function SelectedFill(texture, host, alpha)
 	KeepTexture(texture)
 	texture:ClearAllPoints()
 	texture:SetAllPoints(host)
-	AccentTexture(texture, alpha)
+	SelectedTexture(texture, alpha)
 end
 
 local function CheckGlyph(texture)
 	KeepTexture(texture)
 	texture:SetTexture(BUILib.GetLibMedia('check'))
 	texture:SetTexCoord(CHECK_CROP[1], CHECK_CROP[2], CHECK_CROP[3], CHECK_CROP[4])
-	local red, green, blue = Theme.GetAccent()
-	texture:SetVertexColor(red, green, blue, 1)
+	texture:SetVertexColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
 end
 
 local function FitScrollBar(scrollBar)
@@ -214,7 +207,7 @@ local function SkinBar(bar, sideText, gutter)
 	Fade(bar:GetStatusBarTexture())
 	FadeRegions(bar)
 	Shell(bar, gutter and VALUE_SHELL_INSET or nil)
-	AccentTexture(bar._buiMeter, 1)
+	SelectedTexture(bar._buiMeter, 1)
 	LayoutMeter(bar)
 end
 
@@ -235,7 +228,7 @@ end
 
 local function PaintPoints(points, completed)
 	Skin.TipFont(points, 'title')
-	if completed then AccentColor(points) else SetColor(points, MUTED_TEXT) end
+	SetColor(points, completed and SELECTED or MUTED_TEXT)
 end
 
 local function SkinShield(shield, completed)
@@ -271,7 +264,7 @@ local function SkinMeta(objectivesFrame, meta)
 		Skin.TipIconFrame(meta, meta.Icon)
 		local highlight = meta:GetHighlightTexture()
 		highlight:SetBlendMode('BLEND')
-		AccentTexture(highlight, HOVER_ALPHA)
+		SelectedTexture(highlight, HOVER_ALPHA)
 		Skin.TipFace(meta.Label, 'body')
 	end
 	Fade(meta.Border)
@@ -318,7 +311,7 @@ local function OnCategoryRow(category)
 		highlight:SetBlendMode('BLEND')
 		highlight:ClearAllPoints()
 		highlight:SetAllPoints(button)
-		AccentTexture(highlight, HOVER_ALPHA)
+		SelectedTexture(highlight, HOVER_ALPHA)
 	end
 	Skin.TipFace(button.Label, 'body')
 	button.Label:SetJustifyV('MIDDLE')
@@ -328,7 +321,7 @@ end
 local function OnCategorySelection(category, selected)
 	if not Enabled() then return end
 	local label = category.Button.Label
-	if selected then AccentColor(label) else SetColor(label, BODY_TEXT) end
+	SetColor(label, selected and SELECTED or MUTED_TEXT)
 end
 
 local function BuildExpandArrow(row)
@@ -350,7 +343,7 @@ local function PaintRow(row)
 	SetColor(row.Description, BODY_TEXT)
 	SetColor(row.HiddenDescription, BODY_TEXT)
 	row.Description:SetShadowOffset(0, 0)
-	if row.completed then AccentColor(row.Reward) else SetColor(row.Reward, MUTED_TEXT) end
+	SetColor(row.Reward, row.completed and SELECTED or MUTED_TEXT)
 	SkinShield(row.Shield, row.completed)
 end
 
@@ -462,7 +455,7 @@ local function SkinStatRow(row)
 		local hover = row:CreateTexture(nil, 'HIGHLIGHT')
 		hover.__buiSkin = true
 		hover:SetAllPoints(row)
-		AccentTexture(hover, HOVER_ALPHA)
+		SelectedTexture(hover, HOVER_ALPHA)
 	else
 		Skin.TipFace(row.Text, 'body')
 	end
@@ -478,7 +471,7 @@ local function OnStatRow(row, elementData)
 	end
 	local fill = StatFill(row)
 	if elementData.header then
-		AccentTexture(fill, HEADER_ROW_ALPHA)
+		SelectedTexture(fill, HEADER_ROW_ALPHA)
 	else
 		FlatTexture(fill, 1, 1, 1, elementData.colorIndex == 1 and STRIPE_ALPHA or 0)
 	end
@@ -511,7 +504,7 @@ local function SkinSearchPreviewButton(button)
 		button._buiPreview = true
 		KeepTexture(button.Icon)
 		CropIcon(button.Icon)
-		AccentFill(button.SelectedTexture, button, SELECTED_ALPHA)
+		SelectedFill(button.SelectedTexture, button, SELECTED_ALPHA)
 		Skin.TipFont(button.Name, 'body')
 		Skin.TipFont(button.Text, 'body')
 	end
@@ -735,6 +728,6 @@ end)
 
 Skin.RegisterSkin(SKIN_ID, {
 	name = 'Achievements',
-	description = 'The achievements window: dark shell, flat category list, card rows for achievements, summary and comparison, accent progress bars, statistics, search and tabs.',
+	description = 'The achievements window: dark shell, flat category list, card rows for achievements, summary and comparison, white progress bars, statistics, search and tabs.',
 	icon = 'Interface/Icons/Achievement_Level_10',
 })

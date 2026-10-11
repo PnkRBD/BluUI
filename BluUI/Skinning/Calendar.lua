@@ -14,7 +14,7 @@ local FRAME_ART_NAMES = {
 local WEEKDAY_COUNT = 7
 local DAY_BUTTON_COUNT = 42
 local DAY_INSET = 1
-local DAY_HOVER_ALPHA = 0.15
+local DAY_HOVER_ALPHA = 0.07
 local MONTH_SCALE = 1.3
 local EVENT_FRAME_NAMES = { 'CalendarViewEventFrame', 'CalendarViewHolidayFrame', 'CalendarViewRaidFrame', 'CalendarCreateEventFrame' }
 local EVENT_BUTTON_NAMES = {
@@ -39,7 +39,7 @@ end
 local context = Skin.NewContext(Enabled)
 local Fade, FadeRegions = context.Fade, context.FadeRegions
 local Shell, Button, Close, Dropdown, ScrollBar, Body, Title = context.Shell, context.Button, context.Close, context.Dropdown, context.ScrollBar, context.Body, context.Title
-local AccentTexture = Skin.AccentTexture
+local SelectedTexture = Skin.SelectedTexture
 
 local function SkinDayButton(dayIndex)
 	local button = _G['CalendarDayButton' .. dayIndex]
@@ -49,7 +49,7 @@ local function SkinDayButton(dayIndex)
 	local highlight = button:GetHighlightTexture()
 	if highlight then
 		highlight:SetBlendMode('BLEND')
-		AccentTexture(highlight, DAY_HOVER_ALPHA)
+		SelectedTexture(highlight, DAY_HOVER_ALPHA)
 	end
 	Shell(button, DAY_INSET)
 	Fade(_G[name .. 'DateFrameBackground'])
@@ -151,6 +151,6 @@ end)
 
 Skin.RegisterSkin(SKIN_ID, {
 	name = 'Calendar',
-	description = 'The calendar: dark month grid with accent day highlights, house arrows and filter, and dark event dialogs.',
+	description = 'The calendar: dark month grid with white day highlights, house arrows and filter, and dark event dialogs.',
 	icon = 'Interface/Icons/INV_Misc_Note_02',
 })

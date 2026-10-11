@@ -6,14 +6,14 @@ local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
-local Theme = BUILib.Theme
+local SELECTED = Skin.SELECTED_COLOR
 
 local SKIN_ID = 'friends'
 local BOTTOM_TAB_COUNT = 4
 local WHO_COLUMN_COUNT = 4
 local ROW_BASE_ALPHA = 0.04
-local QUICK_JOIN_HIGHLIGHT_ALPHA = 0.5
-local QUICK_JOIN_SELECTED_ALPHA = 0.6
+local QUICK_JOIN_HIGHLIGHT_ALPHA = 0.14
+local QUICK_JOIN_SELECTED_ALPHA = 0.3
 local INVITE_BUTTON_SIZE = 24
 local INVITE_ICON_INSET = 2
 local GAME_ICON_SIZE = 24
@@ -55,7 +55,7 @@ local context = Skin.NewContext(Enabled)
 local Fade, FadeRegions, FadeKeys, FadeArt = context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt
 local Shell, Button, Close, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.Dropdown, context.EditBox, context.CheckBox
 local ScrollBar, Tab, Face, FaceOnce, Title = context.ScrollBar, context.Tab, context.Face, context.FaceOnce, context.Title
-local FlatTexture, AccentTexture, RowHighlight, CropIcon = Skin.FlatTexture, Skin.AccentTexture, Skin.RowHighlight, Skin.CropIcon
+local FlatTexture, SelectedTexture, RowHighlight, CropIcon = Skin.FlatTexture, Skin.SelectedTexture, Skin.RowHighlight, Skin.CropIcon
 
 local function UpdateInvitePass(button)
 	local travel = button.travelPassButton
@@ -194,8 +194,8 @@ end
 local function SkinQuickJoinRow(button)
 	if not button._buiQuickJoinRow then
 		button._buiQuickJoinRow = true
-		AccentTexture(button.Highlight, QUICK_JOIN_HIGHLIGHT_ALPHA)
-		AccentTexture(button.Selected, QUICK_JOIN_SELECTED_ALPHA)
+		SelectedTexture(button.Highlight, QUICK_JOIN_HIGHLIGHT_ALPHA)
+		SelectedTexture(button.Selected, QUICK_JOIN_SELECTED_ALPHA)
 	end
 	Fade(button.Background)
 	local members, queues = button.Members, button.Queues
@@ -251,11 +251,10 @@ local function SafeClose(close)
 			texture:SetBlendMode('BLEND')
 		end
 	end
-	local red, green, blue = Theme.GetAccent()
 	close:GetNormalTexture():SetVertexColor(CLOSE_IDLE[1], CLOSE_IDLE[2], CLOSE_IDLE[3], CLOSE_IDLE[4])
 	close:GetPushedTexture():SetVertexColor(1, 1, 1, 1)
 	close:GetDisabledTexture():SetVertexColor(CLOSE_DISABLED[1], CLOSE_DISABLED[2], CLOSE_DISABLED[3], CLOSE_DISABLED[4])
-	close:GetHighlightTexture():SetVertexColor(red, green, blue, 1)
+	close:GetHighlightTexture():SetVertexColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
 end
 
 local function HeaderTabs()

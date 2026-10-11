@@ -8,6 +8,7 @@ local floor = math.floor
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
+local SELECTED_COLOR = Skin.SELECTED_COLOR
 
 local SKIN_ID = 'instanceabandon'
 local PREVIEW_DIALOG = 'BUI_INSTANCE_ABANDON_PREVIEW'
@@ -71,7 +72,7 @@ local function StyleText(dialog)
 	local votes = Votes()
 	Skin.TipFont(votes.VoteText, 'body')
 	Skin.TipFont(votes.ResponseText, 'body')
-	votes.ResponseText:SetTextColor(BUILib.Theme.GetAccent())
+	BUI.Painter.Text(votes.ResponseText, 'skinTitle')
 end
 
 local function LayoutBar(dialog)
@@ -83,7 +84,7 @@ local function LayoutBar(dialog)
 	border:SetHeight(BAR_HEIGHT)
 	fill:SetHeight(BAR_HEIGHT)
 	fill:SetTexture(BUI.GetGlobalTexture())
-	fill:SetVertexColor(BUILib.Theme.GetAccent())
+	fill:SetVertexColor(SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], 1)
 	track:SetShown(border:IsShown())
 end
 
@@ -193,7 +194,7 @@ end)
 
 Skin.RegisterSkin(SKIN_ID, {
 	name = 'Abandon Instance Vote',
-	description = 'The group vote to abandon a dungeon in the dark shell: the vote icons stay, the timer becomes a slim accent bar with a countdown, and the buttons go flat.',
+	description = 'The group vote to abandon a dungeon in the dark shell: the vote icons stay, the timer becomes a slim white bar with a countdown, and the buttons go flat.',
 	icon = 'Interface/Icons/INV_Misc_Key_03',
 	test = StartPreview,
 	stopTest = StopPreview,
