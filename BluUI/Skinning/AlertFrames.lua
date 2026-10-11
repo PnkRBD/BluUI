@@ -1,123 +1,162 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.AlertFrames')
+local ipairs = ipairs
 
 local Skin = BUI.Skinning
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
-local Layout = BUILib.Layout
+local AnchorHook = BUI.Profiler.Hooker('Skin.AlertFrames')
 
-local SKIN_ID = 'alerts'
-local TITLE_KEYS = { 'Label', 'Title', 'Unlocked', 'TopText' }
-local BODY_KEYS = { 'ItemName', 'Name', 'Amount', 'BonusText', 'RewardText', 'SubTitle', 'Text' }
+local ANCHOR_KEY = 'alerts'
 local ANCHOR_DEFAULT_Y = 180
+local FACE_DEPTH = 2
+local ICON_KEYS = { 'Icon', 'dungeonTexture', 'QuestTexture' }
+local PART_KEYS = { 'Icon', 'Shield', 'lootItem' }
+local KEEP_KEYS = { 'RollTypeIcon', 'SpecIcon', 'heroicIcon', 'DigsiteTypeTexture', 'EmblemIcon', 'GuildTabardEmblem', 'MissionType', 'Portrait', 'DieIcon', 'Banner', 'Checkmark' }
+local EFFECT_KEYS = {
+	'Background', 'Background2', 'Background3', 'Ring1', 'Particles1', 'Particles2', 'Particles3', 'Starglow',
+	'Sheen', 'BorderGlow', 'BaseQualityBorder', 'UpgradeQualityBorder', 'Glow', 'LightRays', 'LightRays2', 'Sparkles',
+}
+local FLASH_KEYS = { 'glow', 'shine' }
+local CAPTION_KEYS = { 'Label', 'Title', 'Unlocked', 'ToastText', 'completionText', 'HeaderLabel', 'CollectedLabel', 'CompletedLabel' }
+local NAME_KEYS = { 'Name', 'Amount', 'instanceName', 'dungeonName', 'QuestName', 'ZoneName', 'DigsiteType', 'Description', 'GuildName', 'DecorName', 'TaskName' }
 
-local installed = false
-local skinnedAlerts = {}
-
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
-local FadeRegions, Shell, Body, Title = context.FadeRegions, context.Shell, context.Body, context.Title
+local context = Skin.Define('alerts', {
+	name = 'Alert Toasts',
+	description = 'Loot, money, achievement and other reward pop-ups in a dark card with a framed icon.',
+	icon = 'Interface/Icons/INV_Misc_Bag_10',
+	newLook = true,
+	unlock = {
+		tooltip = 'Unlock position. Drag the toast window, then click again to lock.',
+		get = function() return Skin.ToastAnchors.IsUnlocked(ANCHOR_KEY) end,
+		set = function(value) Skin.ToastAnchors.SetUnlocked(ANCHOR_KEY, value) end,
+	},
+})
+local FadeRegions, Shell = context.FadeRegions, context.Shell
+local Title, Body, Face = context.Title, context.Body, context.Face
 local CropIcon = Skin.CropIcon
 
-local function FontString(frame, key)
-	local region = frame[key]
-	if region and region.GetStringWidth then return region end
-	return nil
-end
+local skinned = {}
 
 local function AlertIcon(frame)
-	local icon = frame.Icon
-	if icon and icon.SetTexCoord then return icon end
-	if icon and icon.texture and icon.texture.SetTexCoord then return icon.texture end
-	local lootItem = frame.lootItem
-	if lootItem and lootItem.Icon and lootItem.Icon.SetTexCoord then return lootItem.Icon end
-	return nil
-end
-
-local function SkinAlert(frame)
-	if not frame or frame._buiAlert or frame:IsForbidden() then return end
-	frame._buiAlert = true
-	skinnedAlerts[#skinnedAlerts + 1] = frame
-
-	local icon = AlertIcon(frame)
-	if icon then icon.__buiSkin = true end
-	FadeRegions(frame)
-	Shell(frame)
-	if icon then
-		CropIcon(icon)
-		Skin.TipIconFrame(frame, icon)
-	end
-	for index = 1, #TITLE_KEYS do Title(FontString(frame, TITLE_KEYS[index])) end
-	for index = 1, #BODY_KEYS do Body(FontString(frame, BODY_KEYS[index])) end
-end
-
-local function SweepAlerts()
-	if not Enabled() then return end
-	local alertFrame = _G.AlertFrame
-	local subSystems = alertFrame and alertFrame.alertFrameSubSystems
-	if not subSystems then return end
-	for index = 1, #subSystems do
-		local pool = subSystems[index].alertFramePool
-		if pool and pool.EnumerateActive then
-			for frame in pool:EnumerateActive() do SkinAlert(frame) end
+	local loot = frame.lootItem
+	if loot then return loot.Icon end
+	for _, key in ipairs(ICON_KEYS) do
+		local icon = frame[key]
+		if icon then
+			if icon:IsObjectType('Texture') then return icon end
+			return icon.Texture
 		end
 	end
 end
 
-local function Install()
-	if installed or not Enabled() then return end
-	local alertFrame = _G.AlertFrame
-	if not alertFrame or not alertFrame.UpdateAnchors then return end
-	installed = true
-	Hook(alertFrame, 'UpdateAnchors', SweepAlerts)
-	SweepAlerts()
+local function FrameIcon(host, icon)
+	CropIcon(icon)
+	Skin.TipIconFrame(host, icon)
 end
 
+local function StripArt(part)
+	for _, key in ipairs(KEEP_KEYS) do
+		local region = part[key]
+		if region then region.__buiSkin = true end
+	end
+	FadeRegions(part)
+end
+
+local function HideKeys(frame, keys)
+	for _, key in ipairs(keys) do
+		local region = frame[key]
+		if region then region:Hide() end
+	end
+end
+
+local function ApplyFonts(frame, keys, apply)
+	for _, key in ipairs(keys) do apply(frame[key]) end
+end
+
+local function SkinAlert(frame)
+	local icon = AlertIcon(frame)
+	if icon then icon.__buiSkin = true end
+	StripArt(frame)
+	for _, key in ipairs(PART_KEYS) do
+		local part = frame[key]
+		if part then StripArt(part) end
+	end
+	HideKeys(frame, EFFECT_KEYS)
+	Shell(frame)
+	Skin.HoverEdge(frame)
+	if icon and not icon:GetAtlas() then FrameIcon(frame, icon) end
+	Skin.TipFaceTree(frame, FACE_DEPTH)
+	ApplyFonts(frame, CAPTION_KEYS, Title)
+	ApplyFonts(frame, NAME_KEYS, Body)
+	local loot = frame.lootItem
+	if loot then Skin.TipCount(loot.Count) end
+end
+
+local function RefreshAlert(frame)
+	HideKeys(frame, FLASH_KEYS)
+	if frame.tradeSkillID then
+		frame.Icon:SetMask('')
+		CropIcon(frame.Icon)
+	end
+	if frame.hyperlink then Skin.SetIconEdgeItemQuality(AlertIcon(frame), frame.hyperlink) end
+	local shield = frame.Shield
+	if shield then Face(shield.Points) end
+end
+
+local function OnAlertAdded(_, frame)
+	if frame:IsForbidden() then return end
+	if not skinned[frame] then
+		skinned[frame] = true
+		SkinAlert(frame)
+	end
+	RefreshAlert(frame)
+end
+
+local function SkinActive(container)
+	for _, subSystem in ipairs(container.alertFrameSubSystems) do
+		local pool = subSystem.alertFramePool
+		if pool then
+			for frame in pool:EnumerateActive() do OnAlertAdded(container, frame) end
+		end
+	end
+end
+
+local function SkinRewards(frame)
+	local rewards = frame.RewardFrames
+	if not rewards then return end
+	for _, button in ipairs(rewards) do
+		if not skinned[button] then
+			skinned[button] = true
+			local icon = button.texture
+			icon.__buiSkin = true
+			icon:RemoveMaskTexture(button.CircleMask)
+			FadeRegions(button)
+			FrameIcon(button, icon)
+		end
+	end
+end
+
+context.Window('AlertFrame', {
+	install = function(frame)
+		context.Hook(frame, 'AddAlertFrame', OnAlertAdded)
+		context.Hook('StandardRewardAlertFrame_AdjustRewardAnchors', SkinRewards)
+	end,
+	enable = SkinActive,
+})
+
+context.OnDisable(function() wipe(skinned) end)
+
 Skin.ToastAnchors.Register({
-	key = 'alerts',
+	key = ANCHOR_KEY,
 	label = 'ALERT FRAMES',
 	defaultY = ANCHOR_DEFAULT_Y,
 	point = 'BOTTOM',
 	sample = 'toast',
 	sampleRelativePoint = 'TOP',
-	config = function()
-		local db = BUI.GetDB()
-		return db and db.alerts
-	end,
+	config = function() return BUI.GetDB().alerts end,
 	frame = function() return _G.AlertFrame end,
 	apply = function(frame, anchor)
 		frame:ClearAllPoints()
 		frame:SetAllPoints(anchor)
 	end,
-	hooks = function(reapply)
-		local alertFrame = _G.AlertFrame
-		if alertFrame and alertFrame.UpdateAnchors then Hook(alertFrame, 'UpdateAnchors', reapply) end
-	end,
+	hooks = function(reapply) AnchorHook(_G.AlertFrame, 'UpdateAnchors', reapply) end,
 })
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		SweepAlerts()
-	else
-		context.Restore()
-		for index = 1, #skinnedAlerts do skinnedAlerts[index]._buiAlert = nil end
-		wipe(skinnedAlerts)
-	end
-end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Alert Toasts',
-	description = 'The pop-ups that slide up mid-screen when you win loot, gain money or earn an achievement: dark shell, framed icon, house font, none of the gold filigree.',
-	icon = 'Interface/Icons/INV_Misc_Bag_10',
-	unlock = {
-		tooltip = 'Unlock position. Drag the toast window, then click again to lock.',
-		get = function() return Skin.ToastAnchors.IsUnlocked('alerts') end,
-		set = function(value) Skin.ToastAnchors.SetUnlocked('alerts', value) end,
-	},
-})
-
-BUI.Events:Once('PLAYER_LOGIN', 'Skin.AlertFrames', Install)
