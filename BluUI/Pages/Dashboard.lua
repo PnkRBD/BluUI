@@ -55,11 +55,11 @@ local VAULT_FOLD = 0.18
 local CHEVRON = 10
 local LINK_HEIGHT = 20
 local LINK_GAP = 6
-local RAID_ROW = 54
-local RAID_ROW_GAP = 8
-local RAID_BAR = 3
-local RAID_INSET = 10
-local RAID_TEXT_X = 16
+local RAID_ROW = 38
+local RAID_ROW_GAP = 14
+local RAID_BAR = 2
+local RAID_COUNT_DROP = 2
+local RAID_TEXT_X = 12
 local RAID_DOT = 14
 local RAID_DOT_MARK = 8
 local RAID_DOT_GAP = 4
@@ -1217,24 +1217,25 @@ local function BuildRaid()
     local current
     local rows = {}
     for key, difficulty in ipairs(RAID_DIFFICULTIES) do
-        local row = Inset(raid)
+        local row = CreateFrame('Frame', nil, raid)
         row:SetHeight(RAID_ROW)
         local red, green, blue = unpack(difficulty.color)
         local bar = row:CreateTexture(nil, 'ARTWORK')
         bar:SetColorTexture(red, green, blue, 1)
         bar:SetWidth(RAID_BAR)
-        bar:SetPoint('TOPLEFT', 1, -RAID_INSET)
-        bar:SetPoint('BOTTOMLEFT', 1, RAID_INSET)
-        kit.Text(row, difficulty.label, 13, 'text'):SetPoint('TOPLEFT', RAID_TEXT_X, -RAID_INSET)
+        bar:SetPoint('TOPLEFT')
+        bar:SetPoint('BOTTOMLEFT')
+        kit.Text(row, difficulty.label, 13, 'text'):SetPoint('TOPLEFT', RAID_TEXT_X, 0)
         row.count = kit.Text(row, '', 11, 'muted')
-        row.count:SetPoint('BOTTOMLEFT', RAID_TEXT_X, RAID_INSET)
-        row.clear = kit.Text(row, 'Clear', 11, 'positive')
-        row.clear:SetPoint('TOPRIGHT', -(RAID_TEXT_X + STATUS_MARK + MARK_GAP), -RAID_INSET)
+        row.count:SetPoint('TOPRIGHT', 0, -RAID_COUNT_DROP)
         row.clearMark = kit.Glyph(row, 'check', STATUS_MARK, 'positive')
-        row.clearMark:SetPoint('LEFT', row.clear, 'RIGHT', MARK_GAP, 0)
+        row.clearMark:SetPoint('TOPRIGHT', 0, -RAID_COUNT_DROP)
+        row.clear = kit.Text(row, 'Clear', 11, 'positive')
+        row.clear:SetPoint('RIGHT', row.clearMark, 'LEFT', -MARK_GAP, 0)
         row.dots = {}
         for dot = 1, RAID_MAX_DOTS do
             local disc = kit.Disc(row, RAID_DOT, 'control', 'ARTWORK', 1)
+            disc:SetPoint('BOTTOMLEFT', RAID_TEXT_X + (dot - 1) * (RAID_DOT + RAID_DOT_GAP), 0)
             local mark = kit.Glyph(row, 'check', RAID_DOT_MARK, PaintTick, 'OVERLAY')
             mark:SetPoint('CENTER', disc)
             row.dots[dot] = { disc = disc, mark = mark }
@@ -1267,6 +1268,7 @@ local function BuildRaid()
             local killed = info and info.killed or 0
             row.count:SetText(('%d / %d bosses'):format(killed, bossCount))
             local clear = bossCount > 0 and killed >= bossCount
+            row.count:SetShown(not clear)
             row.clear:SetShown(clear)
             row.clearMark:SetShown(clear)
             local red, green, blue = unpack(RAID_DIFFICULTIES[key].color)
@@ -1276,8 +1278,6 @@ local function BuildRaid()
                 pieces.disc:SetShown(visible)
                 pieces.mark:SetShown(dead)
                 if visible then
-                    pieces.disc:ClearAllPoints()
-                    pieces.disc:SetPoint('BOTTOMRIGHT', -(RAID_TEXT_X + (shown - dot) * (RAID_DOT + RAID_DOT_GAP)), RAID_INSET)
                     if dead then
                         window:Paint(pieces.disc, function(disc) disc:SetVertexColor(red, green, blue) end)
                     else
