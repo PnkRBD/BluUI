@@ -10,46 +10,64 @@ local DROPDOWN_KEYS = { 'Dropdown', 'DropDown', 'FilterDropdown', 'SelectionDrop
 local FONT_DEPTH = 2
 local MODEL_CONTROL_KEYS = { 'zoomInButton', 'zoomOutButton', 'rotateLeftButton', 'rotateRightButton', 'resetButton' }
 local MODEL_CONTROL_INSET = 4
-local SLIDER_TEXT_KEYS = { 'LeftText', 'RightText', 'TopText', 'MinText', 'MaxText' }
 
-local function SkinStepper(button, direction, context)
-	if not button then return end
-	Skin.TipStepper(button, direction)
-	context.FadeRegions(button)
-end
+local OPTIONS_INSETS = { left = -170, right = -8, top = -8, bottom = -8 }
+local CAMERA_BUTTON_INSET = 6
+
+local customizeRows = 0
 
 local function SkinCustomizeRow(row, context)
-	if row._buiCustomizeRow then return end
-	row._buiCustomizeRow = true
-	context.Face(row.Label)
+	Skin.TipFont(row.Label, 'label')
+	if row.Button then
+		context.CheckBox(row.Button)
+		return
+	end
 	if row.Dropdown then
 		local details = row.Dropdown.SelectionDetails
-		Skin.TipDropdown(row.Dropdown, nil, true)
-		Skin.TipFont(details.SelectionName, 'body')
-		Skin.TipFont(details.SelectionNumber, 'body')
-		context.Fade(details.SelectionNumberBG)
-		SkinStepper(row.DecrementButton, 'previous', context)
-		SkinStepper(row.IncrementButton, 'next', context)
-	elseif row.Slider then
+		context.Dropdown(row.Dropdown, true)
+		context.Face(details.SelectionNumber)
+		context.Face(details.SelectionName)
+	else
 		Skin.TipSliderTrack(row.Slider)
-		SkinStepper(row.Back, 'previous', context)
-		SkinStepper(row.Forward, 'next', context)
-		for index = 1, #SLIDER_TEXT_KEYS do context.Face(row[SLIDER_TEXT_KEYS[index]]) end
-	elseif row.Button then
-		Skin.TipCheckBox(row.Button)
 	end
+	Skin.TipStepper(row.DecrementButton, 'previous')
+	Skin.TipStepper(row.IncrementButton, 'next')
+	context.FadeRegions(row.DecrementButton)
+	context.FadeRegions(row.IncrementButton)
 end
 
 local function SkinCustomizeOptions(customize, context)
-	for _, row in ipairs({ customize.Options:GetChildren() }) do SkinCustomizeRow(row, context) end
+	local options = customize.Options
+	local count = options:GetNumChildren()
+	if count ~= customizeRows then
+		customizeRows = count
+		for _, row in ipairs({ options:GetChildren() }) do SkinCustomizeRow(row, context) end
+	end
+	for row in customize.dropdownPool:EnumerateActive() do
+		local details = row.Dropdown.SelectionDetails
+		BUI.Painter.Text(details.SelectionNumber, 'skinLabel')
+		BUI.Painter.Text(details.SelectionName, 'skinText')
+	end
+end
+
+local function SkinCameraButton(button, context)
+	context.Fade(button.NormalTexture)
+	context.Fade(button.PushedTexture)
+	context.Shell(button, CAMERA_BUTTON_INSET)
+	Skin.HoverEdge(button)
 end
 
 local function SkinBarberShop(_, context)
 	local customize = CharCustomizeFrame
-	if not customize or customize._buiCustomizeHooked then return end
-	customize._buiCustomizeHooked = true
-	context.Hook(customize, 'UpdateOptionButtons', function() SkinCustomizeOptions(customize, context) end)
+	if not customize._buiCustomizeHooked then
+		customize._buiCustomizeHooked = true
+		context.Hook(customize, 'UpdateOptionButtons', function() SkinCustomizeOptions(customize, context) end)
+	end
+	context.Shell(customize.Options, OPTIONS_INSETS)
+	customizeRows = 0
 	SkinCustomizeOptions(customize, context)
+	for _, button in ipairs(customize.SmallButtons.ControlButtons) do SkinCameraButton(button, context) end
+	SkinCameraButton(customize.RandomizeAppearanceButton, context)
 end
 
 local function SkinHousingPreview(frame, context)
@@ -180,10 +198,11 @@ local WINDOWS = {
 		id = 'barbershop',
 		legacy = 'miscpanels',
 		name = 'Barber Shop',
-		description = 'The barber shop appearance window.',
+		description = 'The barber shop: appearance options on a dark panel with house dropdowns, steppers, checkboxes and camera buttons.',
 		icon = 'Interface/Icons/INV_Misc_Comb_01',
 		frames = { 'BarberShopFrame' },
 		fullscreen = true,
+		newLook = true,
 		extra = SkinBarberShop,
 	},
 	{
