@@ -115,7 +115,6 @@ local function BuildPreview(stage, kit)
 
 	function view:UpdateRing()
 		local config = Config()
-		local screenRatio = UIParent:GetEffectiveScale() / holder:GetEffectiveScale()
 		for _, ring in ipairs(RINGS) do
 			local slot = config.slots[ring.key]
 			local widget = widgets[ring.key]
@@ -124,7 +123,7 @@ local function BuildPreview(stage, kit)
 			widget.cooldown:Hide()
 			if widget.kind ~= 'off' then
 				widget.layer:SetFrameLevel(holderLevel + slot.zOrder)
-				local diameter = MouseCursor.SlotDiameter(slot) * screenRatio
+				local diameter = MouseCursor.SlotDiameter(slot)
 				widget.texture:SetSize(diameter, diameter)
 				widget.texture:SetVertexColor(slot.colorR, slot.colorG, slot.colorB, slot.alpha)
 				widget.cooldown:SetSize(diameter, diameter)
