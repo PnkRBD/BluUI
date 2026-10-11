@@ -382,6 +382,7 @@ function Layout.TableKit(window)
 		end
 		local label = kit.Text(button, text, 12, look.text)
 		button:SetHeight(CONTROL_HEIGHT)
+		local minWidth = 0
 		local function Measure()
 			local lit = true
 			if active then
@@ -395,14 +396,25 @@ function Layout.TableKit(window)
 				window:Paint(button.glyph, look.text)
 				if lit then textX = 32 end
 			end
-			label:SetPoint('LEFT', textX, 0)
 			window:Paint(label, look.text)
-			button:SetWidth(Widget.EvenSize(textX + label:GetStringWidth() + 14))
+			local width = Widget.EvenSize(textX + label:GetStringWidth() + 14)
+			label:ClearAllPoints()
+			if width < minWidth then
+				label:SetPoint('CENTER', (textX - 14) / 2, 0)
+				width = minWidth
+			else
+				label:SetPoint('LEFT', textX, 0)
+			end
+			button:SetWidth(width)
 		end
 		window:Bind(button, Measure)
 		button:SetScript('OnClick', function() onClick() end)
 		function button:SetText(newText)
 			label:SetText(newText)
+			Measure()
+		end
+		function button:SetMinWidth(width)
+			minWidth = width
 			Measure()
 		end
 		return button
