@@ -17,8 +17,9 @@ local COLUMNS = {
 	{ highlights = { 'TradeHighlightPlayer', 'TradeHighlightPlayerEnchant' }, insets = { 'TradePlayerItemsInset', 'TradePlayerEnchantInset' } },
 	{ highlights = { 'TradeHighlightRecipient', 'TradeHighlightRecipientEnchant' }, insets = { 'TradeRecipientItemsInset', 'TradeRecipientEnchantInset' } },
 }
-local MONEY_INSETS = { 'TradePlayerInputMoneyInset', 'TradeRecipientMoneyInset' }
+local RECIPIENT_MONEY_INSETS = { 'TradeRecipientMoneyInset' }
 local MONEY_BOX_KEYS = { 'Gold', 'Silver', 'Copper' }
+local MONEY_BOX_INSET = { left = -5 }
 local ENCHANT_LABELS = { 'TradeFramePlayerEnchantText', 'TradeFrameRecipientEnchantText' }
 local NAME_HEADERS = { 'TradeFramePlayerNameText', 'TradeFrameRecipientNameText' }
 local ACTION_BUTTONS = { 'TradeFrameTradeButton', 'TradeFrameCancelButton' }
@@ -96,8 +97,10 @@ end
 local function SkinMoney()
 	for _, key in ipairs(MONEY_BOX_KEYS) do
 		local box = _G['TradePlayerInputMoneyFrame' .. key]
-		if not box:IsForbidden() then EditBox(box) end
+		if not box:IsForbidden() then EditBox(box, MONEY_BOX_INSET) end
 	end
+	FadeArt(_G.TradePlayerInputMoneyInset)
+	SkinInsets(RECIPIENT_MONEY_INSETS)
 	FadeRegions(_G.TradeRecipientMoneyBg)
 	Skin.TipFaceTree(_G.TradeRecipientMoneyFrame, 2)
 end
@@ -109,7 +112,6 @@ local function SkinFrame(frame)
 	for _, name in ipairs(NAME_HEADERS) do Title(_G[name]) end
 	for _, name in ipairs(ENCHANT_LABELS) do Skin.TipFont(_G[name], 'label') end
 	for _, column in ipairs(COLUMNS) do SkinInsets(column.insets) end
-	SkinInsets(MONEY_INSETS)
 	ForEachItemButton(SkinItemRow)
 	SkinMoney()
 	_G.TradeFrameTradeButton.WarningIcon.__buiSkin = true
