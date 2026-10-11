@@ -16,7 +16,6 @@ local ACTIVITY_TITLE_SIZE = 14
 local LIST_CHECK_INSET = 2
 local HIGHLIGHT_ALPHA = 0.06
 local SELECTED_ALPHA = 0.15
-local MENU = { x = 12, top = -32, gap = 8, width = 201 }
 local ROLE_KEYS = { 'RoleButtonTank', 'RoleButtonHealer', 'RoleButtonDPS', 'RoleButtonLeader' }
 local PVP_ROLE_KEYS = { 'TankIcon', 'HealerIcon', 'DPSIcon' }
 local LIST_OPTION_KEYS = { 'ItemLevel', 'MythicPlusRating', 'PVPRating', 'PvpItemLevel', 'VoiceChat', 'PrivateGroup', 'CrossFactionGroup' }
@@ -744,19 +743,7 @@ end
 
 local function SkinGroupButtons()
 	local frame = _G.GroupFinderFrame
-	local previous
-	for buttonIndex = 1, GROUP_BUTTON_COUNT do
-		local button = frame['groupButton' .. buttonIndex]
-		SkinMenuButton(button)
-		button:SetWidth(MENU.width)
-		button:ClearAllPoints()
-		if previous then
-			button:SetPoint('TOP', previous, 'BOTTOM', 0, -MENU.gap)
-		else
-			button:SetPoint('TOPLEFT', frame, 'TOPLEFT', MENU.x, MENU.top)
-		end
-		previous = button
-	end
+	for buttonIndex = 1, GROUP_BUTTON_COUNT do SkinMenuButton(frame['groupButton' .. buttonIndex]) end
 	RefreshGroupButtons()
 end
 
