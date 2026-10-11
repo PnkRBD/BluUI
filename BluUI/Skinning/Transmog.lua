@@ -2,7 +2,6 @@ local _, BUI = ...
 
 local ipairs = ipairs
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 
 local SLOT_ART_KEYS = { 'Border', 'ShowEquippedIcon' }
@@ -22,7 +21,7 @@ local SITUATIONS = { textX = 29, textY = -75, defaultsX = -29, defaultsY = -72 }
 
 local context = Skin.Define('transmog', {
 	name = 'Transmogrify',
-	description = 'The transmogrifier at the vendor: outfit cards, framed slot icons around the model, item and set cards with an accent edge on the applied look, and the appearance tabs on the house tab strip.',
+	description = 'The transmogrifier at the vendor: outfit cards, framed slot icons around the model, item and set cards with a white edge on the applied look, and the appearance tabs on the house tab strip.',
 	icon = 'Interface/Icons/INV_Arcane_Orb',
 	newLook = true,
 })
@@ -40,9 +39,9 @@ local function KeepKeys(frame, keys)
 	end
 end
 
-local function AccentIconEdge(icon, active)
+local function ActiveIconEdge(icon, active)
 	if active then
-		Skin.SetIconEdgeColor(icon, BUILib.Theme.GetAccent())
+		Skin.SetIconEdgeColor(icon, unpack(Skin.SELECTED_COLOR))
 	else
 		Skin.SetIconEdgeColor(icon)
 	end
@@ -61,7 +60,7 @@ local function PaintOutfit(entry)
 	Skin.TipFont(text.Name, selected and 'title' or 'body')
 	Skin.TipFont(text.SituationInfo, 'label')
 	text:Layout()
-	AccentIconEdge(entry.OutfitIcon.Icon, entry.OutfitIcon.OverlayActive:IsShown())
+	ActiveIconEdge(entry.OutfitIcon.Icon, entry.OutfitIcon.OverlayActive:IsShown())
 end
 
 local function SkinOutfit(entry)
@@ -98,7 +97,7 @@ local function SkinOutfits(outfits)
 end
 
 local function PaintSlot(slot)
-	AccentIconEdge(slot.Icon, slot.SelectedFrame:IsShown())
+	ActiveIconEdge(slot.Icon, slot.SelectedFrame:IsShown())
 end
 
 local function SkinSlot(slot)

@@ -5,9 +5,6 @@ local Hook = BUI.Profiler.Hooker('Skin.ExperienceBar')
 local floor, format, max, min = math.floor, string.format, math.max, math.min
 local GetTime = GetTime
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
-local RegisterAccentElement = BUILib.Colors.RegisterAccentElement
-
 local Pixel = BUI.Pixel
 local Skin = BUI.Skinning
 local Dragging = BUI.Dragging
@@ -149,7 +146,6 @@ end
 
 local function GetXPColor()
 	local config = GetConfig()
-	if config.useAccentColor then return BUI.GetAccentColor() end
 	return config.xpColor[1], config.xpColor[2], config.xpColor[3]
 end
 
@@ -577,10 +573,6 @@ local function CreateBars()
 	xpBar:SetStatusBarTexture(BLANK)
 	xpBar:SetFrameLevel(barFrame:GetFrameLevel() + 2)
 
-	RegisterAccentElement(xpBar, function(_, red, green, blue)
-		if GetConfig().useAccentColor then xpBar:SetStatusBarColor(red, green, blue, 0.85) end
-	end)
-
 	reputationBar = CreateFrame('StatusBar', nil, barFrame)
 	reputationBar:SetStatusBarTexture(BLANK)
 	reputationBar:SetStatusBarColor(0.6, 0.6, 0.6)
@@ -848,7 +840,6 @@ Skin.RegisterSkin('experiencebar', {
 		Setting('Hover height', 'hoverHeight', nil, { min = 10, max = 40, step = 1 }),
 		Setting('Font size', 'fontSize', ApplySettings, { min = 6, max = 18, step = 1 }),
 		Setting('Bar width', 'barWidth', ApplySettings, { min = 500, max = 1500, step = 1 }),
-		Switch('Accent color for the XP bar', 'useAccentColor', ApplySettings),
 		ColorSetting('XP bar color', 'xpColor'),
 		Switch('Show rested XP', 'showRestedXP', ApplySettings),
 		ColorSetting('Rested XP color', 'restedColor'),

@@ -15,17 +15,12 @@ local WHITE_TEXTURE = 'Interface\\Buttons\\WHITE8X8'
 local CHECK_TEXTURE = BUILib.GetLibMedia('check')
 local ROUND_TEXTURE = BUILib.GetLibMedia('circle_mask')
 local MARK = { box = 14, tick = 12, dot = 6, textGap = 7 }
-local MENU_FILL, ACCENT = {}, {}
+local MENU_FILL = {}
 
 local function MenuFill()
 	local panel = Skin.PALETTE.panel
 	MENU_FILL[1], MENU_FILL[2], MENU_FILL[3], MENU_FILL[4] = panel[1], panel[2], panel[3], 1
 	return MENU_FILL
-end
-
-local function Accent()
-	ACCENT[1], ACCENT[2], ACCENT[3] = BUILib.Theme.GetAccent()
-	return ACCENT
 end
 
 local function OnePixel(region)
@@ -55,7 +50,7 @@ local function PaintSelection(frame, round)
 	frame.fontString:SetPoint('LEFT', box, 'RIGHT', MARK.textGap, 0)
 	local mark = frame.leftTexture2
 	if not mark then return end
-	Tint(mark, round and ROUND_TEXTURE or CHECK_TEXTURE, Accent(), round and MARK.dot or MARK.tick)
+	Tint(mark, round and ROUND_TEXTURE or CHECK_TEXTURE, Skin.SELECTED_COLOR, round and MARK.dot or MARK.tick)
 	mark:SetDrawLayer('ARTWORK', 2)
 	mark:ClearAllPoints()
 	mark:SetPoint('CENTER', box, 'CENTER')

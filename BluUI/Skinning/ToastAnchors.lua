@@ -1,7 +1,6 @@
 local _, BUI = ...
 
 local Skin = BUI.Skinning
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 
 local ANCHOR_WIDTH = 300
 local CAPTION_BUTTON_WIDTH = 58
@@ -188,9 +187,7 @@ local function SampleButton(frame, text, width, point, relativeTo, relativePoint
 end
 
 local function SampleTimer(frame, fraction)
-	local line = frame:CreateTexture(nil, 'OVERLAY')
-	local red, green, blue = BUILib.Theme.GetAccent()
-	line:SetColorTexture(red, green, blue, 1)
+	local line = BUI.Painter.Fill(frame:CreateTexture(nil, 'OVERLAY'), 'skinTitle')
 	line:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', 1, 1)
 	line:SetSize(math.floor(frame:GetWidth() * fraction), SAMPLE_LINE_HEIGHT)
 	return line

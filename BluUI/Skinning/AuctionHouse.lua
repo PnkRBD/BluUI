@@ -2,10 +2,8 @@ local _, BUI = ...
 
 local ipairs = ipairs
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 local Painter = BUI.Painter
-local Theme = BUILib.Theme
 
 local BACKGROUND_KEYS = { 'Background', 'NineSlice' }
 local MONEY_ART = { 'MoneyFrameInset', 'MoneyFrameBorder' }
@@ -18,7 +16,7 @@ local AUCTIONS_LIST_KEYS = { 'AllAuctionsList', 'BidsList', 'ItemList', 'Commodi
 local AUCTIONS_TAB_KEYS = { 'AuctionsTab', 'BidsTab' }
 local DIALOG_BUTTON_KEYS = { 'BuyNowButton', 'CancelButton', 'OkayButton' }
 local CELL_TEXT_KEYS = { 'Text', 'ExtraInfo', 'Prefix' }
-local ROW_SELECTED_ALPHA = 0.18
+local ROW_SELECTED_ALPHA = 0.12
 local ROW_HOVER_ALPHA = 0.08
 local NAME_SCALE = 1.2
 local CATEGORY_SCALE = 12 / 11
@@ -27,7 +25,7 @@ local MUTED_TEXT_THRESHOLD = 0.6
 
 local context = Skin.Define('auctionhouse', {
 	name = 'Auction House',
-	description = 'Browse, buy, sell and manage auctions: card categories with an accent edge on the selected one, result tables, sell forms and the buy dialog.',
+	description = 'Browse, buy, sell and manage auctions: card categories with a white edge on the selected one, result tables, sell forms and the buy dialog.',
 	icon = 'Interface/Icons/INV_Misc_Coin_01',
 	newLook = true,
 })
@@ -35,10 +33,10 @@ local Hook = context.Hook
 local Fade, FadeKeys = context.Fade, context.FadeKeys
 local Shell, Button, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Dropdown, context.EditBox, context.CheckBox
 local ScrollBar, Tab, Body, Title = context.ScrollBar, context.Tab, context.Body, context.Title
-local FlatTexture, AccentTexture, CropIcon = Skin.FlatTexture, Skin.AccentTexture, Skin.CropIcon
+local FlatTexture, SelectedTexture, CropIcon = Skin.FlatTexture, Skin.SelectedTexture, Skin.CropIcon
 
 local function ShellEdgeEnter(button)
-	Skin.TipShellEdges(button, true)
+	Skin.TipShellEdges(button, Skin.HOVER_COLOR)
 end
 
 local function ShellEdgeLeave(button)
@@ -251,7 +249,7 @@ local function OnRowPopulated(row)
 	local selected, highlight = row.SelectedHighlight, row.HighlightTexture
 	if selected then
 		selected:SetBlendMode('BLEND')
-		AccentTexture(selected, ROW_SELECTED_ALPHA)
+		SelectedTexture(selected, ROW_SELECTED_ALPHA)
 	end
 	if highlight then
 		highlight:SetBlendMode('BLEND')
@@ -281,7 +279,7 @@ local function OnHeaderInit(header)
 	FadeKeys(header, HEADER_ART)
 	Fade(header:GetHighlightTexture())
 	Skin.TipFont(header.Text, 'label')
-	header.Arrow:SetVertexColor(Theme.GetAccent())
+	Painter.Tint(header.Arrow, 'skinTitle')
 end
 
 local function OnSummaryLine(line)
@@ -291,7 +289,7 @@ local function OnSummaryLine(line)
 	CropIcon(line.Icon)
 	Skin.TipIconFrame(line, line.Icon)
 	line.SelectedHighlight:SetBlendMode('BLEND')
-	AccentTexture(line.SelectedHighlight, ROW_SELECTED_ALPHA)
+	SelectedTexture(line.SelectedHighlight, ROW_SELECTED_ALPHA)
 	Skin.TipFace(line.Text, 'body')
 end
 

@@ -5,6 +5,7 @@ local pairs = pairs
 local unpack = unpack
 
 local Skin = BUI.Skinning
+local SELECTED, HOVER = Skin.SELECTED_COLOR, Skin.HOVER_COLOR
 local Painter = BUI.Painter
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Wrap = BUI.Profiler.Wrap
@@ -17,7 +18,7 @@ local DETAIL_BUTTON_KEYS = { 'AbandonButton', 'ShareButton', 'TrackButton' }
 local SIDE_TAB_KEYS = { 'QuestsTab', 'EventsTab', 'MapLegendTab' }
 local SIDE_TAB_OPTIONS = { dim = true }
 local SIDE_TAB_TOP_OFFSET = -2
-local ROW_HOVER_ALPHA = 0.1
+local ROW_HOVER_ALPHA = 0.07
 local DIVIDER_INSET = 8
 local ROW_INSETS = { top = 2, bottom = 4 }
 local CHECK_GLYPH_SIZE = 10
@@ -43,7 +44,7 @@ local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.F
 local Shell, Button, Card, Dropdown = context.Shell, context.Button, context.Card, context.Dropdown
 local EditBox, ScrollBar, Body = context.EditBox, context.ScrollBar, context.Body
 local CollapseButton = context.CollapseButton
-local AccentTexture = Skin.AccentTexture
+local SelectedTexture = Skin.SelectedTexture
 
 local generation = 0
 local sideTabs = {}
@@ -234,11 +235,11 @@ local function RefreshSideTabs()
 end
 
 local PlateEnter = Wrap('Skin.WorldMap header plate enter', function(header)
-	Skin.SetActiveEdge(header._buiPlate, true)
+	Skin.TipShellEdges(header._buiPlate, HOVER)
 end)
 
 local PlateLeave = Wrap('Skin.WorldMap header plate leave', function(header)
-	Skin.SetActiveEdge(header._buiPlate, false)
+	Skin.TipShellEdges(header._buiPlate, false)
 end)
 
 local PlateShown = Wrap('Skin.WorldMap header plate shown', function(header)
@@ -272,7 +273,7 @@ local function MoveCollapseButton(button, plate)
 end
 
 local SyncRowHighlight = Wrap('Skin.WorldMap quest row highlight', function(texture)
-	Skin.SetActiveEdge(texture:GetParent(), texture:IsShown())
+	Skin.TipShellEdges(texture:GetParent(), texture:IsShown() and HOVER)
 end)
 
 local function SkinTrackBox(checkbox)
@@ -286,7 +287,7 @@ local function SkinTrackBox(checkbox)
 	check:SetSize(CHECK_GLYPH_SIZE, CHECK_GLYPH_SIZE)
 	check:ClearAllPoints()
 	check:SetPoint('CENTER')
-	check:SetVertexColor(BUILib.Theme.GetAccent())
+	check:SetVertexColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
 	Shell(checkbox)
 end
 
@@ -449,7 +450,7 @@ end
 local function SkinLegendButton(button)
 	local highlight = button:GetHighlightTexture()
 	highlight:SetBlendMode('BLEND')
-	AccentTexture(highlight, ROW_HOVER_ALPHA)
+	SelectedTexture(highlight, ROW_HOVER_ALPHA)
 	Skin.TipFace(button:GetFontString(), 'body')
 end
 

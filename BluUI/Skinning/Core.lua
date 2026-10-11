@@ -432,37 +432,37 @@ end
 
 local CARD_STYLE = { fill = CARD_FILL, edge = PANEL_EDGE }
 Skin.PALETTE = { panel = PANEL_FILL, edge = PANEL_EDGE, card = CARD_FILL }
-local ACCENT_EDGE = {}
+local SELECTED_COLOR, HOVER_COLOR = TIP_TITLE_COLOR, TIP_LABEL_COLOR
+Skin.SELECTED_COLOR, Skin.HOVER_COLOR = SELECTED_COLOR, HOVER_COLOR
 
-local function AccentEdge()
-	ACCENT_EDGE[1], ACCENT_EDGE[2], ACCENT_EDGE[3] = BUILib.Theme.GetAccent()
-	ACCENT_EDGE[4] = 1
-	return ACCENT_EDGE
+local function RestEdge(frame)
+	if frame._buiActive then return SELECTED_COLOR end
+	return PANEL_EDGE
 end
 
 local HoverEnter = Wrap('Skin.Core hover enter', function(frame)
-	BUILib.Skin.SetShellEdges(frame, AccentEdge())
+	BUILib.Skin.SetShellEdges(frame, frame._buiActive and SELECTED_COLOR or HOVER_COLOR)
 end)
 
 local HoverLeave = Wrap('Skin.Core hover leave', function(frame)
-	BUILib.Skin.SetShellEdges(frame, frame._buiActive and AccentEdge() or PANEL_EDGE)
+	BUILib.Skin.SetShellEdges(frame, RestEdge(frame))
 end)
 
 function Skin.SetActiveEdge(frame, active)
 	frame._buiActive = active
-	BUILib.Skin.SetShellEdges(frame, (active or frame:IsMouseOver()) and AccentEdge() or PANEL_EDGE)
+	BUILib.Skin.SetShellEdges(frame, (not active and frame:IsMouseOver()) and HOVER_COLOR or RestEdge(frame))
 end
 
-function Skin.AccentHover(frame)
-	if frame._buiAccentHover then return end
-	frame._buiAccentHover = true
+function Skin.HoverEdge(frame)
+	if frame._buiHoverEdge then return end
+	frame._buiHoverEdge = true
 	frame:HookScript('OnEnter', HoverEnter)
 	frame:HookScript('OnLeave', HoverLeave)
 end
 
 function Skin.CardRow(row, inset)
 	BUILib.Skin.Shell(row, CARD_STYLE, inset)
-	Skin.AccentHover(row)
+	Skin.HoverEdge(row)
 end
 
 local COLLAPSE_GLYPH_SIZE = 10
@@ -634,7 +634,7 @@ function Skin.TipButton(button, scale)
 	if not button._buiTipButton then
 		button._buiTipButton = true
 		BUILib.Skin.StripButton(button)
-		Skin.AccentHover(button)
+		Skin.HoverEdge(button)
 	end
 	Skin.TipShell(button)
 	Skin.TipButtonFonts(button, scale)
@@ -968,8 +968,7 @@ local SCROLL_THUMB_REST, SCROLL_THUMB_HOVER, SCROLL_THUMB_DRAG = 0.35, 0.6, 0.85
 local SCROLL_ARROW_SIZE = 10
 
 local function ThumbFill(thumb, alpha)
-	local red, green, blue = BUILib.Theme.GetAccent()
-	thumb._buiThumbFill:SetColorTexture(red, green, blue, alpha)
+	thumb._buiThumbFill:SetColorTexture(SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], alpha)
 end
 
 local function ThumbEnter(thumb)
@@ -991,8 +990,7 @@ local function ThumbUp(thumb)
 end
 
 local function ArrowEnter(button)
-	local red, green, blue = BUILib.Theme.GetAccent()
-	button._buiTipArrow:SetVertexColor(red, green, blue, 1)
+	button._buiTipArrow:SetVertexColor(SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], 1)
 end
 
 local function ArrowLeave(button)
@@ -1066,7 +1064,7 @@ end
 
 local TAB_STYLE = BUILib.Skin.TabStyle({
 	fill = PANEL_FILL, edge = PANEL_EDGE, restFill = TAB_REST, hoverFill = TAB_HOVER, selectedFill = TAB_SELECTED,
-	hoverText = TIP_TITLE_COLOR, disabledText = TIP_LABEL_COLOR, fontSize = TIP_TITLE_SIZE,
+	restText = TIP_LABEL_COLOR, hoverText = TIP_TITLE_COLOR, disabledText = TIP_LABEL_COLOR, fontSize = TIP_TITLE_SIZE,
 })
 
 Painter.OnRepaint('Skin', function()
@@ -1199,8 +1197,7 @@ end
 local CLOSE_IDLE = { 0.75, 0.75, 0.8, 1 }
 
 local function CloseEnter(button)
-	local red, green, blue = BUILib.Theme.GetAccent()
-	button._buiCloseGlyph:SetVertexColor(red, green, blue, 1)
+	button._buiCloseGlyph:SetVertexColor(SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], 1)
 end
 
 local function CloseLeave(button)
@@ -1250,12 +1247,7 @@ function Skin.TipCheckGlyph(check, muted)
 	local glyph = BUILib.GetLibMedia('check')
 	check:SetCheckedTexture(glyph)
 	check:SetDisabledCheckedTexture(glyph)
-	local color = TIP_LABEL_COLOR
-	if not muted then
-		local red, green, blue = BUILib.Theme.GetAccent()
-		color = { red, green, blue, 1 }
-	end
-	PlaceCheckGlyph(check, check:GetCheckedTexture(), color, inset + CHECK_GLYPH_GAP)
+	PlaceCheckGlyph(check, check:GetCheckedTexture(), muted and TIP_LABEL_COLOR or SELECTED_COLOR, inset + CHECK_GLYPH_GAP)
 	PlaceCheckGlyph(check, check:GetDisabledCheckedTexture(), TIP_LABEL_COLOR, inset + CHECK_GLYPH_GAP)
 end
 
@@ -1269,7 +1261,7 @@ function Skin.TipCheckBox(check, inset)
 	FadeStateTextures(check)
 	Skin.TipCheckGlyph(check, false)
 	Skin.TipFace(check.Text or (check.GetFontString and check:GetFontString()), 'body')
-	Skin.AccentHover(check)
+	Skin.HoverEdge(check)
 end
 
 local BACKDROP_BUTTON_ART = { 'Left', 'Middle', 'Right', 'LeftDisabled', 'MiddleDisabled', 'RightDisabled' }
@@ -1283,8 +1275,7 @@ function Skin.PaintCardBackdrop(frame)
 end
 
 local function BackdropButtonEnter(button)
-	local red, green, blue = BUILib.Theme.GetAccent()
-	button:SetBackdropBorderColor(red, green, blue, 1)
+	button:SetBackdropBorderColor(HOVER_COLOR[1], HOVER_COLOR[2], HOVER_COLOR[3], 1)
 end
 
 local function BackdropButtonLeave(button)
@@ -1357,7 +1348,7 @@ end
 
 local PANEL_ART = { 'NineSlice', 'Bg', 'Border', 'Inset', 'TopTileStreaks', 'ScrollFrameBorder' }
 Skin.PANEL_ART = PANEL_ART
-local ROW_HIGHLIGHT_ALPHA = 0.22
+local ROW_HIGHLIGHT_ALPHA = 0.08
 local ICON_CROP = 0.08
 
 function Skin.FlatTexture(texture, red, green, blue, alpha)
@@ -1365,14 +1356,13 @@ function Skin.FlatTexture(texture, red, green, blue, alpha)
 	texture:SetColorTexture(red, green, blue, alpha)
 end
 
-function Skin.AccentTexture(texture, alpha)
+function Skin.SelectedTexture(texture, alpha)
 	if not texture then return end
-	local red, green, blue = BUILib.Theme.GetAccent()
-	texture:SetColorTexture(red, green, blue, alpha)
+	texture:SetColorTexture(SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], alpha)
 end
 
 function Skin.RowHighlight(button, alpha)
-	Skin.AccentTexture(button.GetHighlightTexture and button:GetHighlightTexture(), alpha or ROW_HIGHLIGHT_ALPHA)
+	Skin.SelectedTexture(button.GetHighlightTexture and button:GetHighlightTexture(), alpha or ROW_HIGHLIGHT_ALPHA)
 end
 
 function Skin.CropIcon(icon)
@@ -1482,12 +1472,11 @@ function Skin.SetIconEdgeItemQuality(icon, item)
 	Skin.SetIconEdgeRarity(icon, item and C_Item.GetItemQualityByID(item))
 end
 
-function Skin.TipShellEdges(frame, accent)
-	if accent == true then
-		local red, green, blue = BUILib.Theme.GetAccent()
-		BUILib.Skin.SetShellEdges(frame, { red, green, blue, 1 })
-	elseif accent then
-		BUILib.Skin.SetShellEdges(frame, accent)
+function Skin.TipShellEdges(frame, edge)
+	if edge == true then
+		BUILib.Skin.SetShellEdges(frame, SELECTED_COLOR)
+	elseif edge then
+		BUILib.Skin.SetShellEdges(frame, edge)
 	else
 		BUILib.Skin.SetShellEdges(frame, PANEL_EDGE)
 	end
@@ -1496,7 +1485,7 @@ end
 local SIDE_TAB_WIDTH, SIDE_TAB_HEIGHT = 30, 40
 local SIDE_TAB_GAP = 4
 local SIDE_TAB_EDGE_GAP = 2
-local SIDE_TAB_SELECTED_ALPHA = 0.3
+local SIDE_TAB_SELECTED_ALPHA = 0.1
 local SIDE_TAB_DIM_ALPHA = 0.55
 local NO_OPTIONS = {}
 local SIDE_TAB_ICON_KEYS = { 'Icon' }
@@ -1521,7 +1510,7 @@ local function PaintSideTab(tab)
 	if not tab._buiSideLive then return end
 	local selected = tab._buiSideActive
 	tab._buiSideSelected:SetShown(selected)
-	BUILib.Skin.SetShellEdges(tab, selected and AccentEdge() or PANEL_EDGE)
+	BUILib.Skin.SetShellEdges(tab, selected and SELECTED_COLOR or PANEL_EDGE)
 	if not tab._buiSideDim then return end
 	local alpha = (selected or tab._buiSideHovered) and 1 or SIDE_TAB_DIM_ALPHA
 	for _, icon in ipairs(tab._buiSideIcons) do icon:SetAlpha(alpha) end
@@ -1569,8 +1558,8 @@ function Skin.SideTab(context, tab, options)
 	tab:SetSize(options.width or SIDE_TAB_WIDTH, options.height or SIDE_TAB_HEIGHT)
 	context.FadeRegions(tab)
 	context.Shell(tab)
-	Skin.AccentTexture(tab._buiSideSelected, SIDE_TAB_SELECTED_ALPHA)
-	if tab.TabGlow then Skin.AccentTexture(tab.TabGlow, SIDE_TAB_SELECTED_ALPHA) end
+	Skin.SelectedTexture(tab._buiSideSelected, SIDE_TAB_SELECTED_ALPHA)
+	if tab.TabGlow then Skin.SelectedTexture(tab.TabGlow, SIDE_TAB_SELECTED_ALPHA) end
 	PaintSideTab(tab)
 end
 
@@ -1983,8 +1972,7 @@ local PAGE_ROTATION = { previous = -math.pi / 2, next = math.pi / 2, up = math.p
 
 local function PageArrowEnter(button)
 	if not button:IsEnabled() then return end
-	local red, green, blue = BUILib.Theme.GetAccent()
-	button._buiTipArrow:SetVertexColor(red, green, blue, 1)
+	button._buiTipArrow:SetVertexColor(SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], 1)
 end
 
 local function PageArrowLeave(button)
@@ -2039,7 +2027,7 @@ function Skin.TipSliderTrack(slider)
 		fill:SetHeight(SLIDER_TRACK_HEIGHT)
 		fill:SetPoint('LEFT', track, 'LEFT', 0, 0)
 		fill:SetPoint('RIGHT', thumb, 'CENTER', 0, 0)
-		Skin.AccentTexture(fill, 1)
+		Skin.SelectedTexture(fill, 1)
 	end
 	slider._buiTrack = track
 end
@@ -2085,7 +2073,7 @@ function Skin.SweepScrollBox(scrollBox, callback)
 end
 
 local ICON_HOVER_ALPHA = 0.15
-local ICON_SELECTED_ALPHA = 0.35
+local ICON_SELECTED_ALPHA = 0.15
 local ICON_POPUP_EDIT_ART = { 'IconSelectorPopupNameLeft', 'IconSelectorPopupNameMiddle', 'IconSelectorPopupNameRight' }
 
 function Skin.TipIconButton(button)
@@ -2111,7 +2099,7 @@ function Skin.TipIconButton(button)
 	local selected = button.SelectedTexture
 	if selected then
 		selected:SetBlendMode('BLEND')
-		Skin.AccentTexture(selected, ICON_SELECTED_ALPHA)
+		Skin.SelectedTexture(selected, ICON_SELECTED_ALPHA)
 	end
 end
 

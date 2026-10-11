@@ -41,9 +41,9 @@ local function Refade(texture)
 	texture:SetAlpha(0)
 end
 
-local function AccentIconEdge(icon, active)
-	if active then
-		Skin.SetIconEdgeColor(icon, BUILib.Theme.GetAccent())
+local function HoverIconEdge(icon, hovered)
+	if hovered then
+		Skin.SetIconEdgeColor(icon, unpack(Skin.HOVER_COLOR))
 	else
 		Skin.SetIconEdgeColor(icon)
 	end
@@ -65,13 +65,13 @@ end
 
 local function OnSpellEnter(item)
 	Refade(item.Backplate)
-	AccentIconEdge(item.Button.Icon, true)
+	HoverIconEdge(item.Button.Icon, true)
 end
 
 local function OnSpellLeave(item)
 	Refade(item.Backplate)
 	Refade(item.Button.IconHighlight)
-	AccentIconEdge(item.Button.Icon, false)
+	HoverIconEdge(item.Button.Icon, false)
 end
 
 local function StyleHeader(header)

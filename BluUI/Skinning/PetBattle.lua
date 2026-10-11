@@ -4,15 +4,15 @@ local Hook = BUI.Profiler.Hooker('Skin.PetBattle')
 
 local ipairs = ipairs
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 local Pixel = BUI.Pixel
+local SELECTED_COLOR = Skin.SELECTED_COLOR
 
 local SKIN_ID = 'petBattle'
 local BLIZZARD_ADDON = 'Blizzard_PetBattleUI'
 local HOVER_ALPHA = 0.15
 local PRESS_ALPHA = 0.25
-local SELECTED_ALPHA = 0.35
+local SELECTED_ALPHA = 0.2
 local BAR_ART_KEYS = { 'LeftEndCap', 'RightEndCap', 'Background' }
 local BAR_FRAME_KEYS = { 'FlowFrame', 'Delimiter', 'MicroButtonFrame' }
 local FIXED_BUTTON_KEYS = { 'SwitchPetButton', 'CatchButton', 'ForfeitButton' }
@@ -51,8 +51,7 @@ local function SkinActionButton(button)
 	Skin.CropIcon(button.Icon)
 	FlattenOverlay(button:GetHighlightTexture(), 1, 1, 1, HOVER_ALPHA, button)
 	FlattenOverlay(button:GetPushedTexture(), 1, 1, 1, PRESS_ALPHA, button)
-	local red, green, blue = BUILib.Theme.GetAccent()
-	FlattenOverlay(button.SelectedHighlight, red, green, blue, SELECTED_ALPHA, button)
+	FlattenOverlay(button.SelectedHighlight, SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], SELECTED_ALPHA, button)
 	local size, color = BorderSettings()
 	Pixel.ApplyBorder(button, size, color[1], color[2], color[3], color[4])
 end

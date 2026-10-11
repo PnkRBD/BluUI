@@ -8,6 +8,7 @@ local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 local Tools = BUI.Tools
 local Layout = BUILib.Layout
+local SELECTED_COLOR = Skin.SELECTED_COLOR
 
 local SKIN_ID = 'grouploot'
 local ANCHOR_KEY = 'lootrolls'
@@ -94,7 +95,6 @@ end
 
 local function SkinAll()
 	if not Enabled() then return end
-	local red, green, blue = BUILib.Theme.GetAccent()
 	for _, frame in pairs(_G.GroupLootContainer.rollFrames) do
 		if rollFrames[frame] then
 			if not skinned[frame] then
@@ -107,7 +107,7 @@ local function SkinAll()
 			else
 				Skin.SetIconEdgeColor(frame.IconFrame.Icon, 0, 0, 0)
 			end
-			frame.Timer:SetStatusBarColor(red, green, blue, 1)
+			frame.Timer:SetStatusBarColor(SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], 1)
 		end
 	end
 end
@@ -139,8 +139,7 @@ local function BuildExample(parent, spec)
 	SetRollButton(frame.NeedButton, spec.need)
 	frame.TransmogButton:SetShown(spec.transmog == true)
 	frame.GreedButton:SetShown(not spec.transmog)
-	local red, green, blue = BUILib.Theme.GetAccent()
-	frame.Timer:SetStatusBarColor(red, green, blue, 1)
+	frame.Timer:SetStatusBarColor(SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], 1)
 	frame.Timer:SetMinMaxValues(0, 1)
 	frame.Timer:SetValue(spec.timeLeft)
 	frame:Show()

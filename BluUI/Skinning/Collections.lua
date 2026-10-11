@@ -4,9 +4,8 @@ local Hook = BUI.Profiler.Hooker('Skin.Collections')
 
 local ipairs = ipairs
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
-local Theme = BUILib.Theme
+local SELECTED = Skin.SELECTED_COLOR
 
 local SKIN_ID = 'collections'
 local COLLECTIONS_ADDON = 'Blizzard_Collections'
@@ -18,7 +17,7 @@ local PET_INSET_KEYS = { 'LeftInset', 'PetCardInset', 'RightInset', 'PetCount', 
 local SPELL_SLOT_ART = { 'slotFrameCollected', 'slotFrameUncollected', 'slotFrameUncollectedInnerGlow' }
 local TOY_BUTTON_COUNT = 18
 local WARDROBE_TAB_KEYS = { 'ItemsTab', 'SetsTab' }
-local ROW_SELECTED_ALPHA = 0.2
+local ROW_SELECTED_ALPHA = 0.12
 local ROW_HOVER_ALPHA = 0.06
 local UNUSABLE_ROW_ALPHA = 0.12
 local MUTED_TEXT_THRESHOLD = 0.6
@@ -36,7 +35,7 @@ local context = Skin.NewContext(Enabled)
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
 local Shell, Button, Close, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.Dropdown, context.EditBox, context.CheckBox
 local ScrollBar, Tab, Body, Title = context.ScrollBar, context.Tab, context.Body, context.Title
-local FlatTexture, AccentTexture, CropIcon = Skin.FlatTexture, Skin.AccentTexture, Skin.CropIcon
+local FlatTexture, SelectedTexture, CropIcon = Skin.FlatTexture, Skin.SelectedTexture, Skin.CropIcon
 
 local function SetColor(fontString, color)
 	if fontString then fontString:SetTextColor(color[1], color[2], color[3], color[4]) end
@@ -75,8 +74,7 @@ local function SkinProgressBar(bar)
 	bar._buiProgress = true
 	Fade(bar.border)
 	bar:SetStatusBarTexture(BUI.GetGlobalTexture())
-	local red, green, blue = Theme.GetAccent()
-	bar:SetStatusBarColor(red, green, blue, 1)
+	bar:SetStatusBarColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
 	Shell(bar)
 	Skin.TipFace(bar.text, 'body')
 end
@@ -97,7 +95,7 @@ end
 local function SkinRowTextures(row, selected, highlight)
 	if selected then
 		selected:SetBlendMode('BLEND')
-		AccentTexture(selected, ROW_SELECTED_ALPHA)
+		SelectedTexture(selected, ROW_SELECTED_ALPHA)
 	end
 	if highlight then
 		highlight:SetBlendMode('BLEND')

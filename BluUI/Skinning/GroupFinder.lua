@@ -4,7 +4,7 @@ local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
-local Theme = BUILib.Theme
+local SELECTED = Skin.SELECTED_COLOR
 
 local BOTTOM_TAB_COUNT = 3
 local GROUP_BUTTON_COUNT = 4
@@ -15,9 +15,9 @@ local MENU_NAME_SIZE = 13
 local ACTIVITY_TITLE_SIZE = 14
 local LIST_CHECK_INSET = 2
 local HIGHLIGHT_ALPHA = 0.06
-local SELECTED_ALPHA = 0.15
+local SELECTED_ALPHA = 0.12
 local ROLE_KEYS = { 'RoleButtonTank', 'RoleButtonHealer', 'RoleButtonDPS', 'RoleButtonLeader' }
-local ROLE_BAND = { width = 321, height = 64, x = -10, y = -28, alpha = 0.2 }
+local ROLE_BAND = { width = 321, height = 64, x = -10, y = -28, alpha = 0.08 }
 local PVP_ROLE_KEYS = { 'TankIcon', 'HealerIcon', 'DPSIcon' }
 local LIST_OPTION_KEYS = { 'ItemLevel', 'MythicPlusRating', 'PVPRating', 'PvpItemLevel', 'VoiceChat', 'PrivateGroup', 'CrossFactionGroup' }
 local LIST_DROPDOWN_KEYS = { 'GroupDropdown', 'ActivityDropdown', 'PlayStyleDropdown' }
@@ -61,7 +61,7 @@ local Hook = context.Hook
 local Fade, FadeRegions, FadeKeys, FadeArt = context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt
 local Shell, Button, Close, Card, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.Card, context.Dropdown, context.EditBox, context.CheckBox
 local ScrollBar, Face, Title, Body, TextBox = context.ScrollBar, context.Face, context.Title, context.Body, context.TextBox
-local AccentTexture, RowHighlight, CropIcon, FlatTexture = Skin.AccentTexture, Skin.RowHighlight, Skin.CropIcon, Skin.FlatTexture
+local SelectedTexture, RowHighlight, CropIcon, FlatTexture = Skin.SelectedTexture, Skin.RowHighlight, Skin.CropIcon, Skin.FlatTexture
 
 local function FaceSize(fontString, size)
 	if not fontString then return end
@@ -277,9 +277,8 @@ local function PadBottomRow(inset, buttons, content)
 end
 
 local function PaintRoleBand(texture)
-	local red, green, blue = Theme.GetAccent()
 	texture:SetColorTexture(1, 1, 1, 1)
-	texture:SetGradient('VERTICAL', CreateColor(red, green, blue, 0), CreateColor(red, green, blue, ROLE_BAND.alpha))
+	texture:SetGradient('VERTICAL', CreateColor(SELECTED[1], SELECTED[2], SELECTED[3], 0), CreateColor(SELECTED[1], SELECTED[2], SELECTED[3], ROLE_BAND.alpha))
 end
 
 local function RoleBand(texture, frame)
@@ -388,7 +387,7 @@ local function SkinSearchEntry(button)
 	if button._buiSearchEntry then return end
 	button._buiSearchEntry = true
 	Fade(button.ResultBG)
-	AccentTexture(button.Highlight, SELECTED_ALPHA)
+	SelectedTexture(button.Highlight, HIGHLIGHT_ALPHA)
 	for _, key in ipairs(SEARCH_ENTRY_TEXT_KEYS) do Face(button[key]) end
 	IconButton(button.CancelButton)
 	local cover = CreateFrame('Frame', nil, button)
@@ -445,7 +444,7 @@ local function PaintSearchEntryState(button)
 	elseif button.isApplication then
 		FlatTexture(background, ENTRY_APPLIED_COLOR[1], ENTRY_APPLIED_COLOR[2], ENTRY_APPLIED_COLOR[3], ENTRY_APPLIED_COLOR[4])
 	elseif button.isSelected then
-		AccentTexture(background, SELECTED_ALPHA)
+		SelectedTexture(background, SELECTED_ALPHA)
 	end
 end
 
@@ -587,7 +586,7 @@ local function SkinActivityButton(button)
 	button._buiActivity = true
 	local selected = button.SelectedTexture
 	if selected then
-		AccentTexture(selected, SELECTED_ALPHA)
+		SelectedTexture(selected, SELECTED_ALPHA)
 		selected:ClearAllPoints()
 		selected:SetPoint('TOPLEFT', 1, -1)
 		selected:SetPoint('BOTTOMRIGHT', -1, 1)
@@ -618,7 +617,7 @@ local function SkinSpecificRow(button)
 	button._buiSpecificRow = true
 	Fade(button.Bg)
 	Fade(button.Border)
-	AccentTexture(button.SelectedTexture, SELECTED_ALPHA)
+	SelectedTexture(button.SelectedTexture, SELECTED_ALPHA)
 	RowHighlight(button)
 	CropIcon(button.Icon)
 	Face(button.SizeText)
@@ -638,8 +637,7 @@ end
 local function RefreshConquestBar(bar)
 	for keyIndex = 1, #CONQUEST_BAR_ART do bar[CONQUEST_BAR_ART[keyIndex]]:SetAlpha(0) end
 	bar:SetStatusBarTexture(BUI.GetGlobalTexture())
-	local red, green, blue = Theme.GetAccent()
-	bar:SetStatusBarColor(red, green, blue, 1)
+	bar:SetStatusBarColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
 end
 
 local function SkinConquestBar(bar)

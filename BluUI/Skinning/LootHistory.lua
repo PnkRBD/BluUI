@@ -7,6 +7,7 @@ local select, pcall = select, pcall
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 local Tools = BUI.Tools
+local SELECTED_COLOR = Skin.SELECTED_COLOR
 
 local SKIN_ID = 'loothistory'
 local FRAME_NAME = 'GroupLootHistoryFrame'
@@ -157,8 +158,7 @@ local function SkinTimer(timer)
 	end
 	if fill then
 		fill:SetTexture(BUI.GetGlobalTexture())
-		local red, green, blue = BUILib.Theme.GetAccent()
-		fill:SetVertexColor(red, green, blue, 1)
+		fill:SetVertexColor(SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], 1)
 	end
 end
 
@@ -232,6 +232,6 @@ end)
 
 Skin.RegisterSkin(SKIN_ID, {
 	name = 'Loot History',
-	description = 'The Loot Rolls window drawn like the BluUI tooltip: flat shell, accent timer, clean rows, and every roll listed when you hover an item.',
+	description = 'The Loot Rolls window drawn like the BluUI tooltip: flat shell, white timer, clean rows, and every roll listed when you hover an item.',
 	icon = 'Interface/Icons/INV_Misc_Bag_10',
 })

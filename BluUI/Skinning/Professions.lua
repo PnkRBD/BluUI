@@ -6,7 +6,7 @@ local Wrap = BUI.Profiler.Wrap
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
-local Theme = BUILib.Theme
+local SELECTED = Skin.SELECTED_COLOR
 
 local CUSTOMER_FRAME_ART = { 'MoneyFrameInset', 'MoneyFrameBorder' }
 local LIST_ART = { 'Background', 'NineSlice' }
@@ -34,7 +34,7 @@ local BOOK_BAR_ART = { 'Left', 'Right', 'BGLeft', 'BGRight', 'BGMiddle' }
 local BOOK_PAGE_NAMES = { 'ProfessionsBookPage1', 'ProfessionsBookPage2' }
 local NOTE_FONT, NOTE_HINT_FONT = 'BUI_ProfessionsNoteFont', 'BUI_ProfessionsNoteHintFont'
 local CATEGORY_FILL_ALPHA = 0.04
-local ROW_SELECTED_ALPHA = 0.18
+local ROW_SELECTED_ALPHA = 0.12
 local ROW_HOVER_ALPHA = 0.06
 local OUTPUT_TITLE_SCALE = 1.2
 local OUTPUT_CRIT_SCALE = 0.8
@@ -62,7 +62,7 @@ local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.F
 local Shell, Button, Card = context.Shell, context.Button, context.Card
 local Dropdown, EditBox, CheckBox = context.Dropdown, context.EditBox, context.CheckBox
 local ScrollBar, Tab, Body, Title = context.ScrollBar, context.Tab, context.Body, context.Title
-local FlatTexture, AccentTexture, CropIcon = Skin.FlatTexture, Skin.AccentTexture, Skin.CropIcon
+local FlatTexture, SelectedTexture, CropIcon = Skin.FlatTexture, Skin.SelectedTexture, Skin.CropIcon
 
 local function NoteFonts()
 	if _G[NOTE_FONT] then return end
@@ -76,7 +76,7 @@ local function SkinIconButton(button)
 	Fade(button:GetDisabledTexture())
 	Fade(button:GetHighlightTexture())
 	Shell(button)
-	Skin.AccentHover(button)
+	Skin.HoverEdge(button)
 end
 
 local function SkinDialog(dialog)
@@ -179,7 +179,7 @@ local function OnRecipeInit(row)
 	if row._buiRecipe then return end
 	row._buiRecipe = true
 	FillRow(row.SelectedOverlay, row)
-	AccentTexture(row.SelectedOverlay, ROW_SELECTED_ALPHA)
+	SelectedTexture(row.SelectedOverlay, ROW_SELECTED_ALPHA)
 	FillRow(row.HighlightOverlay, row)
 	row.HighlightOverlay:SetAlpha(1)
 	FlatTexture(row.HighlightOverlay, 1, 1, 1, ROW_HOVER_ALPHA)
@@ -209,8 +209,7 @@ local function OnHeaderInit(header)
 	FadeKeys(header, HEADER_ART)
 	Fade(header:GetHighlightTexture())
 	Skin.TipFont(header.Text, 'label')
-	local red, green, blue = Theme.GetAccent()
-	header.Arrow:SetVertexColor(red, green, blue, 1)
+	BUI.Painter.Tint(header.Arrow, 'skinTitle')
 end
 
 local function SkinCell(cell)
@@ -315,8 +314,7 @@ local function SkinRankBar(rankBar)
 		LayoutRankBar(rankBar)
 		Hook(rankBar, 'Update', UpdateRankFill)
 	end
-	local red, green, blue = Theme.GetAccent()
-	rankBar._buiFill:SetVertexColor(red, green, blue, 1)
+	rankBar._buiFill:SetVertexColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
 	local text = rankBar.Rank.Text
 	Skin.TipFace(text, 'body')
 	local font, size = text:GetFont()
@@ -627,8 +625,7 @@ local function SkinBookBar(bar)
 	local name = bar:GetName()
 	for _, key in ipairs(BOOK_BAR_ART) do Fade(_G[name .. key]) end
 	bar:SetStatusBarTexture(BUI.GetGlobalTexture())
-	local red, green, blue = Theme.GetAccent()
-	bar:SetStatusBarColor(red, green, blue, 1)
+	bar:SetStatusBarColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
 	Shell(bar)
 	Skin.TipFace(bar.rankText, 'body')
 end

@@ -5,7 +5,8 @@ local ipairs, pairs = ipairs, pairs
 local Skin = BUI.Skinning
 
 local HOVER_ALPHA = 0.06
-local SELECTED_ALPHA = 0.18
+local SELECTED_ALPHA = 0.12
+local ICON_SELECTED_ALPHA = 0.15
 local SIDE_TAB_TOP_OFFSET = -36
 local SIDE_TAB_OPTIONS = { width = 34, height = 34, iconWidth = 26, crop = true, dim = true }
 local LIST_SHELL_INSET = { left = 1 }
@@ -63,7 +64,7 @@ local Hook, Guard, Own = context.Hook, context.Guard, context.Own
 local Fade, FadeRegions, FadeKeys, FadeArt = context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt
 local Shell, Button, Close, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.Dropdown, context.EditBox, context.CheckBox
 local ScrollBar, TextBox, Face, Title, Card = context.ScrollBar, context.TextBox, context.Face, context.Title, context.Card
-local FlatTexture, AccentTexture, CropIcon = Skin.FlatTexture, Skin.AccentTexture, Skin.CropIcon
+local FlatTexture, SelectedTexture, CropIcon = Skin.FlatTexture, Skin.SelectedTexture, Skin.CropIcon
 
 local function KeepTexture(texture)
 	if texture then texture.__buiSkin = true end
@@ -76,12 +77,12 @@ local function FitToCard(texture, host)
 	texture:SetPoint('BOTTOMRIGHT', host, 'BOTTOMRIGHT', -inset.right - 1, inset.bottom + 1)
 end
 
-local function Highlight(button, accent)
+local function Highlight(button, rowHighlight)
 	local highlight = button.GetHighlightTexture and button:GetHighlightTexture()
 	if not highlight then return end
 	KeepTexture(highlight)
 	highlight:SetBlendMode('BLEND')
-	if accent then
+	if rowHighlight then
 		Skin.RowHighlight(button)
 	else
 		FlatTexture(highlight, 1, 1, 1, HOVER_ALPHA)
@@ -177,7 +178,7 @@ local function RestyleListEntry(entry)
 	local selection = entry.Selection
 	if selection then
 		selection:SetBlendMode('BLEND')
-		AccentTexture(selection, SELECTED_ALPHA)
+		SelectedTexture(selection, SELECTED_ALPHA)
 	end
 	local edges = entry.Icon and entry.Icon._buiIconFrame
 	if edges then
@@ -339,7 +340,7 @@ local function SkinFactionBar(factionFrame)
 		BUI.Painter.Fill(trough, 'skinBackground')
 		Skin.TipIconFrame(bar, trough)
 	end
-	AccentTexture(bar.Progress, 1)
+	SelectedTexture(bar.Progress, 1)
 	Face(bar.Label)
 end
 
@@ -548,7 +549,7 @@ local function SkinAvatarButton(button)
 	local selected = button.Selected
 	if selected then
 		selected:SetBlendMode('BLEND')
-		AccentTexture(selected, SELECTED_ALPHA * 2)
+		SelectedTexture(selected, ICON_SELECTED_ALPHA)
 	end
 end
 
@@ -874,7 +875,7 @@ local function SkinIconCell(button)
 	local selected = button.SelectedTexture
 	if selected then
 		selected:SetBlendMode('BLEND')
-		AccentTexture(selected, SELECTED_ALPHA * 2)
+		SelectedTexture(selected, ICON_SELECTED_ALPHA)
 	end
 end
 

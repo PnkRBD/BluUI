@@ -10,9 +10,9 @@ local upper = string.upper
 local find = string.find
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
-local theme = BUILib.Theme
 local Skin3 = BUILib.Skin
 local Skin = BUI.Skinning
+local SELECTED, HOVER = Skin.SELECTED_COLOR, Skin.HOVER_COLOR
 local sharedMedia = LibStub('LibSharedMedia-3.0')
 local GLOBAL_OPTION = BUI.C.GLOBAL_OPTION
 
@@ -120,9 +120,7 @@ local function BorderColor()
 end
 
 local function SelectedColor()
-	local config = GetConfig()
-	if config.selectedUseAccent then return theme.GetAccent() end
-	local color = config.selectedColor
+	local color = GetConfig().selectedColor
 	return color[1], color[2], color[3]
 end
 
@@ -459,13 +457,13 @@ local function CreateScrollBar(parent, label, model)
 	thumb:RegisterForDrag('LeftButton')
 	local thumbTexture = thumb:CreateTexture(nil, 'OVERLAY')
 	thumbTexture:SetAllPoints()
-	local function ThumbColor(accent)
-		if accent or model.accentIdle then
-			thumbTexture:SetColorTexture(theme.GetAccent())
+	local function ThumbColor(active)
+		if active then
+			thumbTexture:SetColorTexture(SELECTED[1], SELECTED[2], SELECTED[3], 1)
 		else
 			thumbTexture:SetColorTexture(0.65, 0.65, 0.7, 1)
 		end
-		thumbTexture:SetAlpha(accent and 0.9 or 0.55)
+		thumbTexture:SetAlpha(active and 0.9 or 0.55)
 	end
 	ThumbColor(false)
 
@@ -543,7 +541,7 @@ local function GetCopyWindow()
 	closeGlyph:SetPoint('CENTER')
 	closeGlyph:SetText('×')
 	closeGlyph:SetTextColor(0.7, 0.7, 0.7)
-	close:SetScript('OnEnter', BUI.Profiler.Script('Skin.Chat close OnEnter', function() closeGlyph:SetTextColor(theme.GetAccent()) end))
+	close:SetScript('OnEnter', BUI.Profiler.Script('Skin.Chat close OnEnter', function() closeGlyph:SetTextColor(SELECTED[1], SELECTED[2], SELECTED[3]) end))
 	close:SetScript('OnLeave', BUI.Profiler.Script('Skin.Chat close OnLeave', function() closeGlyph:SetTextColor(0.7, 0.7, 0.7) end))
 	close:SetScript('OnClick', BUI.Profiler.Script('Skin.Chat close OnClick', function() window:Hide() end))
 
@@ -604,7 +602,6 @@ local function GetCopyWindow()
 
 	local bar = CreateScrollBar(window, 'Skin.Chat copy scrollbar', {
 		minThumb = 20,
-		accentIdle = true,
 		Read = function()
 			local range = scroll:GetVerticalScrollRange()
 			if range <= 1 then return end
@@ -946,7 +943,7 @@ local function SkinEditBox(editBox, chat)
 	PositionEditBox(chat)
 
 	editBox:HookScript('OnShow', Wrap('Skin.Chat editbox position', function(self) PositionEditBox(self._buiChat) end))
-	editBox:HookScript('OnEditFocusGained', BUI.Profiler.Wrap('Skin.Chat editBox OnEditFocusGained', function(self) self:SetBackdropBorderColor(theme.GetAccent()) end))
+	editBox:HookScript('OnEditFocusGained', BUI.Profiler.Wrap('Skin.Chat editBox OnEditFocusGained', function(self) self:SetBackdropBorderColor(HOVER[1], HOVER[2], HOVER[3], 1) end))
 	editBox:HookScript('OnEditFocusLost', BUI.Profiler.Wrap('Skin.Chat editBox OnEditFocusLost 2', function(self) self:SetBackdropBorderColor(BorderColor()) end))
 end
 
@@ -1015,8 +1012,7 @@ local function UpdateCornerButtons()
 	if chat._buiCopy and ShowCopyButton() then chat._buiCopy:SetAlpha(alpha) end
 	for button, paint in pairs(auxPainters) do
 		if button:IsMouseOver() then
-			local red, green, blue = theme.GetAccent()
-			paint(red, green, blue, alpha)
+			paint(SELECTED[1], SELECTED[2], SELECTED[3], alpha)
 		else
 			paint(BUTTON_IDLE[1], BUTTON_IDLE[2], BUTTON_IDLE[3], alpha)
 		end
@@ -1041,7 +1037,7 @@ local function MakeCornerButton(chat, mediaKey)
 	texture:SetVertexColor(BUTTON_IDLE[1], BUTTON_IDLE[2], BUTTON_IDLE[3], 1)
 	button._tex = texture
 	button:SetScript('OnEnter', BUI.Profiler.Script('Skin.Chat button OnEnter', function()
-		texture:SetVertexColor(theme.GetAccent())
+		texture:SetVertexColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
 		TouchFader()
 	end))
 	button:SetScript('OnLeave', BUI.Profiler.Script('Skin.Chat button OnLeave', function()
@@ -1118,11 +1114,10 @@ local function SkinPanel()
 	local lock = MakeCornerButton(chat, 'lock')
 	lock:SetPoint('TOP', copy, 'BOTTOM', 0, -5)
 	local function PaintLock(hovered)
-		local red, green, blue = theme.GetAccent()
 		if hovered then
-			lock._tex:SetVertexColor(red, green, blue, 1)
+			lock._tex:SetVertexColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
 		elseif lock._lockedTint then
-			lock._tex:SetVertexColor(red * 0.75, green * 0.75, blue * 0.75, 1)
+			lock._tex:SetVertexColor(HOVER[1], HOVER[2], HOVER[3], 1)
 		else
 			lock._tex:SetVertexColor(BUTTON_IDLE[1], BUTTON_IDLE[2], BUTTON_IDLE[3], 1)
 		end
@@ -1173,10 +1168,10 @@ local function CreateMover()
 	mover:RegisterForDrag('LeftButton')
 	local highlight = mover:CreateTexture(nil, 'ARTWORK')
 	highlight:SetAllPoints()
-	highlight:SetColorTexture(theme.GetAccent())
+	highlight:SetColorTexture(SELECTED[1], SELECTED[2], SELECTED[3], 1)
 	highlight:SetAlpha(0)
 	mover._hl = highlight
-	mover:SetScript('OnEnter', BUI.Profiler.Script('Skin.Chat mover OnEnter', function(self) self._hl:SetAlpha(0.18) end))
+	mover:SetScript('OnEnter', BUI.Profiler.Script('Skin.Chat mover OnEnter', function(self) self._hl:SetAlpha(0.08) end))
 	mover:SetScript('OnLeave', BUI.Profiler.Script('Skin.Chat mover OnLeave', function(self) self._hl:SetAlpha(0) end))
 	mover:SetScript('OnDragStart', BUI.Profiler.Script('Skin.Chat mover OnDragStart', function()
 		if InCombatLockdown() then return end
@@ -1221,9 +1216,9 @@ local function CreateSizer()
 	grip:SetAllPoints()
 	sizer._grip = grip
 
-	local function GripColor(accent)
-		if accent then
-			grip:SetVertexColor(theme.GetAccent())
+	local function GripColor(active)
+		if active then
+			grip:SetVertexColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
 		else
 			grip:SetVertexColor(0.65, 0.65, 0.7, 1)
 		end
@@ -2170,18 +2165,16 @@ Skin.RegisterSkin('chat', {
 		}, ApplySettings)
 		tabs:AddTools('Colors', 'Background tabs, the active tab and how see-through they are', {
 			Color('Background tabs', 'inactiveColor', InactiveColor),
-			{ kind = 'swatch', tooltip = 'Active tab, turns off the theme accent', get = function()
+			{ kind = 'swatch', tooltip = 'Active tab', get = function()
 				local red, green, blue = SelectedColor()
 				return red, green, blue, 1
 			end, set = function(red, green, blue)
 				config.selectedColor = { red, green, blue }
-				config.selectedUseAccent = false
 			end },
 			Cog('Opacity', 'Tab opacity', {
 				Percent('Active tab', 'selectedAlpha', SelectedAlpha, 10),
 				Percent('Background tabs', 'dockedAlpha', DockedAlpha, 0),
 			}),
-			Switch(function() return config.selectedUseAccent end, 'selectedUseAccent'),
 		}, ApplySettings)
 		tabs:AddTools('Flash on message', 'Pulse a background tab when a message arrives', {
 			Color('Flash color', 'flashColor', FlashColor),

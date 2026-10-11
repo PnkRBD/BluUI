@@ -10,7 +10,7 @@ local SKIN_ID = 'dressup'
 local MAIN_ART = { 'Bg', 'TopTileStreaks', 'Inset', 'ModelBackground' }
 local PANEL_INSET = 6
 local SET_TITLE_SCALE = 1.2
-local ROW_SELECTED_ALPHA = 0.2
+local ROW_SELECTED_ALPHA = 0.12
 local ROW_HOVER_ALPHA = 0.06
 local BOTTOM_BUTTON_KEYS = { 'LinkButton', 'ResetButton' }
 
@@ -25,14 +25,14 @@ local context = Skin.NewContext(Enabled)
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
 local Shell, Button, Close, Dropdown = context.Shell, context.Button, context.Close, context.Dropdown
 local ScrollBar, Title = context.ScrollBar, context.Title
-local FlatTexture, AccentTexture, CropIcon = Skin.FlatTexture, Skin.AccentTexture, Skin.CropIcon
+local FlatTexture, SelectedTexture, CropIcon = Skin.FlatTexture, Skin.SelectedTexture, Skin.CropIcon
 
 local function SkinSetRow(row)
 	if not Enabled() or row._buiRow then return end
 	row._buiRow = true
 	Fade(row.BackgroundTexture)
 	row.SelectedTexture:SetBlendMode('BLEND')
-	AccentTexture(row.SelectedTexture, ROW_SELECTED_ALPHA)
+	SelectedTexture(row.SelectedTexture, ROW_SELECTED_ALPHA)
 	row.HighlightTexture:SetBlendMode('BLEND')
 	FlatTexture(row.HighlightTexture, 1, 1, 1, ROW_HOVER_ALPHA)
 	CropIcon(row.Icon)

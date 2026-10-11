@@ -7,6 +7,7 @@ local pairs = pairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
+local SELECTED, MUTED_TEXT = Skin.SELECTED_COLOR, Skin.HOVER_COLOR
 
 local SKIN_ID = 'journeys'
 local MAIN_ART = { 'Bg', 'TopTileStreaks', 'inset', 'InsetBorderBottomLeft', 'InsetBorderBottomRight', 'InsetBorderBottom', 'InsetBorderLeft', 'InsetBorderRight' }
@@ -29,7 +30,7 @@ local SEARCH_TITLE_SCALE = 1.15
 local LORE_TITLE_SCALE = 1.6
 local ENCOUNTER_TITLE_SCALE = 1.2
 local BOSS_TEXT_SCALE = 1.2
-local BOSS_SELECTED_ALPHA = 0.18
+local BOSS_SELECTED_ALPHA = 0.12
 local BULLET_SIZE = 4
 local ROW_HOVER_ALPHA = 0.07
 local BODY_TEXT = { 0.87, 0.87, 0.9, 1 }
@@ -48,7 +49,7 @@ local context = Skin.NewContext(Enabled)
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
 local Shell, Button, Close, Dropdown, EditBox = context.Shell, context.Button, context.Close, context.Dropdown, context.EditBox
 local ScrollBar, Body, Title = context.ScrollBar, context.Body, context.Title
-local FlatTexture, AccentTexture, CropIcon = Skin.FlatTexture, Skin.AccentTexture, Skin.CropIcon
+local FlatTexture, SelectedTexture, CropIcon = Skin.FlatTexture, Skin.SelectedTexture, Skin.CropIcon
 
 local function KeepTexture(texture)
 	if texture then texture.__buiSkin = true end
@@ -56,12 +57,6 @@ end
 
 local function SetColor(fontString, color)
 	if fontString then fontString:SetTextColor(color[1], color[2], color[3], color[4]) end
-end
-
-local function AccentColor(fontString)
-	if not fontString then return end
-	local red, green, blue = BUILib.Theme.GetAccent()
-	fontString:SetTextColor(red, green, blue, 1)
 end
 
 local function PictureText(fontString, kind, scale)
@@ -209,7 +204,7 @@ local function SkinBossButton(button)
 		Hook(button, 'LockHighlight', OnBossSelected)
 		Hook(button, 'UnlockHighlight', OnBossUnselected)
 	end
-	AccentTexture(button._buiBossSelected, BOSS_SELECTED_ALPHA)
+	SelectedTexture(button._buiBossSelected, BOSS_SELECTED_ALPHA)
 	button._buiBossSelected:SetShown(_G.EncounterJournal.encounterID == button.encounterID)
 end
 
@@ -236,7 +231,7 @@ end
 
 local function RefreshHeaderState(button)
 	if not Enabled() or not button.title then return end
-	if button:GetParent().expanded then AccentColor(button.title) else SetColor(button.title, BODY_TEXT) end
+	SetColor(button.title, button:GetParent().expanded and SELECTED or MUTED_TEXT)
 	SetColor(button.expandedIcon, BODY_TEXT)
 end
 
@@ -273,7 +268,7 @@ local function SkinBullet(bullet)
 	local dot = bullet.Bullet
 	if not dot then return end
 	dot:SetSize(BULLET_SIZE, BULLET_SIZE)
-	AccentTexture(dot, 1)
+	SelectedTexture(dot, 1)
 end
 
 local function OnBullets(object)
@@ -380,7 +375,7 @@ local function SkinEncounter(encounter)
 end
 
 local function CardEnter(card)
-	if Enabled() then Skin.TipShellEdges(card, true) end
+	if Enabled() then Skin.TipShellEdges(card, Skin.HOVER_COLOR) end
 end
 
 local function CardLeave(card)
@@ -469,8 +464,7 @@ local function SkinThresholdBar(container)
 		local bar = container[key]
 		if bar then
 			bar:SetStatusBarTexture(BUI.GetGlobalTexture())
-			local red, green, blue = BUILib.Theme.GetAccent()
-			bar:SetStatusBarColor(red, green, blue, 1)
+			bar:SetStatusBarColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
 		end
 	end
 	local textContainer = container.TextContainer

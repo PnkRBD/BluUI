@@ -5,8 +5,7 @@ local Wrap = BUI.Profiler.Wrap
 
 
 local Skin = BUI.Skinning
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
-local Theme = BUILib.Theme
+local SELECTED_COLOR = Skin.SELECTED_COLOR
 
 local SKIN_ID = 'bonusroll'
 local HOLD_SETTING = 'bonusrollHoldToRoll'
@@ -18,7 +17,7 @@ local HINT_IDLE_COLOR = { 0.55, 0.55, 0.6, 1 }
 local HINT_WARN_COLOR = { 0.9, 0.35, 0.3, 1 }
 local HINT_WARN_SECONDS = 0.8
 local COUNT_SCALE = 1.5
-local SWEEP_ALPHA = 0.55
+local SWEEP_ALPHA = 0.3
 local FRAME_ART = { 'Background', 'LootSpinnerBG', 'IconBorder' }
 
 local skinned = false
@@ -66,8 +65,7 @@ local function HoldSweep(button)
 	sweep:SetReverse(true)
 	sweep:SetHideCountdownNumbers(true)
 	sweep:EnableMouse(false)
-	local red, green, blue = Theme.GetAccent()
-	sweep:SetSwipeColor(red, green, blue, SWEEP_ALPHA)
+	sweep:SetSwipeColor(SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], SWEEP_ALPHA)
 	local count = sweep:CreateFontString(nil, 'OVERLAY')
 	Skin.TipFont(count, 'title', COUNT_SCALE)
 	count:SetPoint('CENTER')
@@ -85,8 +83,7 @@ local function SetHint(button, state)
 	end
 	hint:Show()
 	if state == 'holding' then
-		local red, green, blue = Theme.GetAccent()
-		hint:SetTextColor(red, green, blue, 1)
+		hint:SetTextColor(SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], 1)
 		hint:SetText(HINT_HOLDING)
 	elseif state == 'warn' then
 		hint:SetTextColor(HINT_WARN_COLOR[1], HINT_WARN_COLOR[2], HINT_WARN_COLOR[3], HINT_WARN_COLOR[4])
@@ -178,8 +175,7 @@ end
 local function SkinTimer(timer)
 	if not timer then return end
 	timer:SetStatusBarTexture(BUI.GetGlobalTexture())
-	local red, green, blue = Theme.GetAccent()
-	timer:SetStatusBarColor(red, green, blue, 1)
+	timer:SetStatusBarColor(SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], 1)
 	Shell(timer)
 end
 
@@ -259,7 +255,7 @@ end)
 
 Skin.RegisterSkin(SKIN_ID, {
 	name = 'Bonus Roll',
-	description = 'The bonus roll prompt in the dark shell with an accent timer, and an optional hold-to-roll on the dice button.',
+	description = 'The bonus roll prompt in the dark shell with a white timer, and an optional hold-to-roll on the dice button.',
 	icon = 'Interface/Icons/INV_Misc_Coin_19',
 	settings = {
 		{

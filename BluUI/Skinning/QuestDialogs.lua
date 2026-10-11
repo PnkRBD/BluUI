@@ -7,7 +7,7 @@ local ipairs, pairs = ipairs, pairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
-local Theme = BUILib.Theme
+local SELECTED = Skin.SELECTED_COLOR
 
 local SKIN_ID = 'questdialogs'
 local MAIN_ART = { 'Bg', 'TopTileStreaks', 'Inset' }
@@ -15,7 +15,7 @@ local QUEST_TITLE_SCALE = 1.25
 local SECTION_TITLE_SCALE = 1.1
 local PANEL = { INSET = 6, TOP = -65, BOTTOM = 28, BAR_INSET = 4, BAR_LEVEL = 10, ROW_PAD = 10, ICON_X = 3 }
 local GOSSIP = { CARD_INSET = { top = -5, bottom = -5 }, PAD = 8, SPACING = 12, DIVIDER = 1, BAR_SPACE = 20 }
-local ITEM_HIGHLIGHT_ALPHA = 0.18
+local ITEM_HIGHLIGHT_ALPHA = 0.12
 local ITEM_HIGHLIGHT_OFFSET_X, ITEM_HIGHLIGHT_OFFSET_Y = 8, -7
 local ITEM_BUTTON_WIDTH, ITEM_BUTTON_HEIGHT = 147, 41
 local PROGRESS_ITEM_COUNT = 6
@@ -69,7 +69,7 @@ local context = Skin.NewContext(Enabled)
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
 local Shell, Button, Close, Card = context.Shell, context.Button, context.Close, context.Card
 local ScrollBar, Face, Body, Title = context.ScrollBar, context.Face, context.Body, context.Title
-local AccentTexture, CropIcon = Skin.AccentTexture, Skin.CropIcon
+local SelectedTexture, CropIcon = Skin.SelectedTexture, Skin.CropIcon
 
 local function SetColor(fontString, color)
 	if fontString then fontString:SetTextColor(color[1], color[2], color[3], color[4]) end
@@ -192,7 +192,7 @@ local function SkinItemHighlight(highlight)
 	fill.__buiSkin = true
 	fill:SetPoint('TOPLEFT', highlight, 'TOPLEFT', ITEM_HIGHLIGHT_OFFSET_X, ITEM_HIGHLIGHT_OFFSET_Y)
 	fill:SetSize(ITEM_BUTTON_WIDTH, ITEM_BUTTON_HEIGHT)
-	AccentTexture(fill, ITEM_HIGHLIGHT_ALPHA)
+	SelectedTexture(fill, ITEM_HIGHLIGHT_ALPHA)
 end
 
 local function SkinRewardsFrame(rewards)
@@ -500,8 +500,7 @@ local function SkinItemTextFrame(frame)
 	if bar then
 		FadeRegions(bar)
 		bar:SetStatusBarTexture(BUI.GetGlobalTexture())
-		local red, green, blue = Theme.GetAccent()
-		bar:SetStatusBarColor(red, green, blue, 1)
+		bar:SetStatusBarColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
 		Shell(bar)
 	end
 end

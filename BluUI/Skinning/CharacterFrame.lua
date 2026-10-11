@@ -2,7 +2,6 @@ local _, BUI = ...
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Widget = BUILib.Widget
-local Colors = BUILib.Colors
 local FONT = BUILib.Font or STANDARD_TEXT_FONT
 local Skin = BUI.Skinning
 local Readout = Skin.Readout
@@ -227,7 +226,7 @@ local function PaintSlot(button)
 end
 
 local SlotEnter = BUI.Profiler.Wrap('Skin.CharacterFrame slot OnEnter', function(self)
-    self:SetBackdropBorderColor(Colors.GetAccent())
+    self:SetBackdropBorderColor(Painter.Color('skinLabel'))
 end)
 local SlotLeave = BUI.Profiler.Wrap('Skin.CharacterFrame slot OnLeave', PaintSlotBorder)
 
@@ -267,12 +266,7 @@ local BAG = { ARROW_SIZE = GEM_SIZE, COLS = 5, CELL = 40, GAP = 4, PAD = 8, POPU
 BAG.POPUP_W = BAG.PAD * 2 + BAG.COLS * BAG.CELL + (BAG.COLS - 1) * BAG.GAP
 function BAG.Colors()
     local skinning = BUI.GetDB().skinning
-    local arrow = skinning.characterFrameArrow
-    if not arrow then
-        local red, green, blue = Colors.GetAccent()
-        arrow = { red, green, blue, 1 }
-    end
-    return arrow,
+    return skinning.characterFrameArrow or Skin.PALETTE.panel,
         skinning.characterFrameArrowEmpty or { 0.45, 0.45, 0.48, 1 },
         skinning.characterFrameArrowPlate or { 1, 1, 1, 0.85 }
 end
@@ -508,8 +502,7 @@ local function BuildSlotLabels(button, info)
     arrow:SetPoint('BOTTOMRIGHT', -1, 1)
     arrow:SetTexture(BUILib.GetLibMedia('dropdown'))
     arrow:SetRotation(popupSign * math.pi / 2)
-    local accentRed, accentGreen, accentBlue = Colors.GetAccent()
-    arrow:SetVertexColor(accentRed, accentGreen, accentBlue, 1)
+    arrow:SetVertexColor(Painter.Color('skinBackground'))
     labels.bagArrow.arrow = arrow
     labels.bagArrow.plate = arrowBg
     labels.bagArrow:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame bagArrow OnEnter', function(self)
@@ -1515,10 +1508,9 @@ function LootSpec.OpenMenu(anchor)
     if InCombatLockdown() then return end
     local lootSpecID = GetLootSpecialization()
     local currentName = LootSpec.Name()
-    local accentHex = BUI.Hex(Colors.GetAccent())
+    local activeHex, idleHex = BUI.Hex(Painter.Color('skinTitle')), BUI.Hex(Painter.Color('skinLabel'))
     local function Active(text, isActive)
-        if not isActive then return text end
-        return '|cff' .. accentHex .. text .. '|r'
+        return '|cff' .. (isActive and activeHex or idleHex) .. text .. '|r'
     end
     local items = {
         { title = 'Loot Specialization' },
@@ -1568,6 +1560,7 @@ local function BuildStatsPane(parent)
     Pixel.ApplyFont(pane.ilvl, BIG_ILVL_SIZE, FONT, '')
     pane.ilvl:SetJustifyH('LEFT')
     pane.ilvl:SetPoint('LEFT', headline, 'LEFT', Pixel.Scale(HEADLINE_PAD), -Pixel.Scale(BIG_ILVL_DROP))
+    Painter.Text(pane.ilvl, 'skinTitle')
 
     pane.ilvlInfo = { equipped = 0, total = 0, pvp = 0 }
     local ilvlHit = CreateFrame('Button', nil, headline)
@@ -1577,7 +1570,7 @@ local function BuildStatsPane(parent)
         local info = pane.ilvlInfo
         local rows = {
             { left = 'Equipped', right = ('%.2f'):format(info.equipped) },
-            { left = 'Average (bags included)', right = ('%.2f'):format(info.total), rightColor = { Colors.GetAccent() } },
+            { left = 'Average (bags included)', right = ('%.2f'):format(info.total), rightColor = { Painter.Color('skinTitle') } },
         }
         if info.pvp > 0 then rows[#rows + 1] = { left = 'PvP', right = ('%.2f'):format(info.pvp), rightColor = { Painter.Color('positive') } } end
         Widget.ShowTipRows(self, 'Item Level', rows, { anchor = 'BOTTOM' })
@@ -1657,7 +1650,6 @@ local function RefreshHeader()
     if not pane then return end
 
     local total, equipped, pvp = GetAverageItemLevel()
-    pane.ilvl:SetTextColor(Colors.GetAccent())
     if IsSecretValue(equipped) or IsSecretValue(total) then
         pane.ilvl:SetText('')
         pane.ilvlHit:EnableMouse(false)
@@ -1686,7 +1678,7 @@ local function RefreshHeader()
     pane.durability:SetFormattedText('Durability: |cff%02x%02x%02x%d%%|r', red * 255, green * 255, blue * 255, percent)
 
     local lootName = LootSpec.Name()
-    pane.lootSpec.text:SetFormattedText('Loot Spec: |cff%s%s|r', BUI.Hex(Colors.GetAccent()), lootName)
+    pane.lootSpec.text:SetFormattedText('Loot Spec: |cff%s%s|r', BUI.Hex(Painter.Color('skinTitle')), lootName)
     pane.lootSpec:SetWidth(pane.lootSpec.text:GetStringWidth() + Pixel.Scale(2))
 end
 
