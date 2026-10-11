@@ -60,8 +60,9 @@ function Widget.DropdownMenuScaffold(parentFrame, anchorButton, menuWidth, scrol
 		self:Raise()
 		BUILib._popupCount = (BUILib._popupCount or 0) + 1
 		self.checkFrame = self.checkFrame or CreateFrame("Frame")
+		local anchorTop = anchorButton:GetTop()
 		self.checkFrame:SetScript("OnUpdate", function(updateFrame)
-			if not anchorButton:IsVisible() then
+			if not anchorButton:IsVisible() or Widget.AnchorMoved(anchorButton, anchorTop) then
 				HideMenu(menu); onClose(); updateFrame:SetScript("OnUpdate", nil)
 				return
 			end

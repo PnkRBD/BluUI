@@ -162,6 +162,13 @@ end
 
 function Widget.SafeGetHeight(frame) return frame and frame:GetHeight() or 0 end
 
+local ANCHOR_DRIFT = 0.5
+function Widget.AnchorMoved(anchor, top)
+	if not (anchor and top) then return false end
+	local now = anchor:GetTop()
+	return not now or math.abs(now - top) > ANCHOR_DRIFT
+end
+
 local WHITE_TEX = "Interface\\Buttons\\WHITE8x8"
 Widget.WHITE = WHITE_TEX
 
