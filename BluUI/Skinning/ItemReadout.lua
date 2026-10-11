@@ -107,11 +107,13 @@ local function AddMark(text, mark)
 	return mark
 end
 
-local function TrackLine(scan, link)
-	local text = scan.text
-	if select(16, C_Item.GetItemInfo(link)) then text = AddMark(text, TIER_MARK) end
-	if scan.embellished then text = AddMark(text, EMBELLISH_MARK) end
-	return text
+local function TrackLine(scan, link, marksFirst)
+	local marks
+	if select(16, C_Item.GetItemInfo(link)) then marks = TIER_MARK end
+	if scan.embellished then marks = AddMark(marks, EMBELLISH_MARK) end
+	if not (marks and scan.text) then return marks or scan.text end
+	if marksFirst then return marks .. MARK_GAP .. scan.text end
+	return scan.text .. MARK_GAP .. marks
 end
 
 local function ScanEnchant(lines)
@@ -123,7 +125,7 @@ local function ScanEnchant(lines)
 	end
 end
 
-function Readout.Read(unit, slotID, link, wantEnchant)
+function Readout.Read(unit, slotID, link, wantEnchant, marksFirst)
 	local track = trackCache[link]
 	local enchantID = wantEnchant and tonumber(link:match('item:%d+:(%d+)'))
 	if enchantID == 0 then enchantID = nil end
@@ -142,7 +144,7 @@ function Readout.Read(unit, slotID, link, wantEnchant)
 		end
 	end
 	if not track then return nil, nil, enchant or '' end
-	return TrackLine(track, link), track.color, enchant or ''
+	return TrackLine(track, link, marksFirst), track.color, enchant or ''
 end
 
 function Readout.CanHaveEnchant(info, link)

@@ -218,7 +218,7 @@ local function UpdateSlotLabels(button)
 	end
 
 	local canEnchant = Readout.CanHaveEnchant(info, link)
-	local trackText, trackColor, enchant = Readout.Read(unit, slotID, link, canEnchant)
+	local trackText, trackColor, enchant = Readout.Read(unit, slotID, link, canEnchant, labels.track:GetJustifyH() == 'RIGHT')
 	local red, green, blue
 	if trackColor then
 		red, green, blue = trackColor[1], trackColor[2], trackColor[3]

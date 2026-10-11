@@ -564,7 +564,7 @@ local function RefreshSlot(labels)
     end
 
     local canEnchant = Readout.CanHaveEnchant(info, link)
-    local trackText, trackColor, enchant = Readout.Read('player', inventorySlot, link, canEnchant)
+    local trackText, trackColor, enchant = Readout.Read('player', inventorySlot, link, canEnchant, labels.track:GetJustifyH() == 'RIGHT')
     local color = trackColor or qualityColor or { Painter.Color('skinText') }
 
     local level = ReadItemLevel(inventorySlot, link)
