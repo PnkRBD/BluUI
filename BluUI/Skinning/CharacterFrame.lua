@@ -1868,7 +1868,6 @@ function Placement.OnDragStop()
 end
 
 function Placement.OnShow()
-    if frame and CharacterFrame then Skin.ReservePanelSlot(CharacterFrame, frame:GetWidth(), frame:GetHeight()) end
     if Placement.Mode() ~= 'session' or not Placement.dragged then Placement.Home() end
 end
 
@@ -2082,7 +2081,6 @@ context.OnDisable(function()
     HideSkin()
     if frame then frame:Hide() end
     Skin.RestoreBlizzardFrame(CharacterFrame)
-    Skin.ReleasePanelSlot(CharacterFrame)
 end)
 
 local pendingRefresh = {}

@@ -281,6 +281,5 @@ context.Window('ClassTrainerFrame', {
 })
 
 context.OnDisable(function()
-	Skin.ReleasePanelSlot('ClassTrainerFrame')
 	if trainerFrame and trainerFrame:IsShown() then CloseTrainerSkin() end
 end)
