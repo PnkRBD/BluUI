@@ -577,7 +577,7 @@ local function ApplyMainBar(bar)
     local config = bar.getConfig()
     local frame = bar.frame
 
-    if not config or not config.enabled or not ModuleEnabled() then
+    if not config or not config.enabled or not ModuleEnabled() or BUI.Visibility.InPetBattle() then
         HideBarObject(bar)
         return
     end

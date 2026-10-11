@@ -207,7 +207,29 @@ local function EnsureFlyStateDriver()
 	RegisterStateDriver(flyStateFrame, 'buiflying', '[flying] fly; [mounted] mounted; ground')
 end
 
+local inPetBattle = false
+local petBattleListeners = {}
+
+function Visibility.InPetBattle()
+	return inPetBattle
+end
+
+function Visibility.OnPetBattle(key, callback)
+	petBattleListeners[key] = callback
+end
+
+local function SetPetBattle(active)
+	if inPetBattle == active then return end
+	inPetBattle = active
+	for _, callback in pairs(petBattleListeners) do callback(active) end
+end
+
 local function OnVisibilityEvent(event)
+	if event == 'PET_BATTLE_OPENING_START' or event == 'PET_BATTLE_CLOSE' then
+		SetPetBattle(event == 'PET_BATTLE_OPENING_START')
+	elseif event == 'PLAYER_ENTERING_WORLD' then
+		SetPetBattle(C_PetBattles.IsInBattle())
+	end
 	if event == 'PLAYER_ENTERING_WORLD' then
 		forceInstant = true
 		BUI.Profiler.After('Utility.Visibility instant reset', 1, function() forceInstant = false end)
