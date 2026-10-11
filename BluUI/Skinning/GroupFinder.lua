@@ -26,7 +26,12 @@ local REWARD_TITLE_KEYS = { 'title', 'rewardsLabel' }
 local REWARD_TEXT_KEYS = { 'description', 'rewardsDescription', 'xpLabel' }
 local SEARCH_ENTRY_TEXT_KEYS = { 'Name', 'ActivityName', 'Playstyle', 'ExpirationTime', 'PendingLabel' }
 local ENTRY_APPLIED_COLOR = { 0.25, 0.8, 0.35, 0.14 }
-local ENTRY_FILTERED_ALPHA = 0.45
+local ENTRY_UNAVAILABLE_ALPHA = 0.45
+local ENTRY_STATUS_SIZE = 14
+local ENTRY_STATUS_LEVEL = 10
+local ENTRY_PLATE_ALPHA = 0.8
+local ENTRY_DELISTED = 'DELISTED'
+local ENTRY_FILTERED = 'NO LONGER MATCHES'
 local COLUMN_HEADER_KEYS = { 'NameColumnHeader', 'RoleColumnHeader', 'ItemLevelColumnHeader', 'RatingColumnHeader' }
 local BONUS_ART_KEYS = { 'ShadowOverlay', 'WorldBattlesTexture' }
 local CONQUEST_BAR_ART = { 'Border', 'Background' }
@@ -374,14 +379,56 @@ local function SkinSearchEntry(button)
 	AccentTexture(button.Highlight, SELECTED_ALPHA)
 	for _, key in ipairs(SEARCH_ENTRY_TEXT_KEYS) do Face(button[key]) end
 	IconButton(button.CancelButton)
+	local cover = CreateFrame('Frame', nil, button)
+	cover:SetAllPoints()
+	cover:SetFrameLevel(button:GetFrameLevel() + ENTRY_STATUS_LEVEL)
+	cover:SetIgnoreParentAlpha(true)
+	cover:Hide()
+	local plate = BUI.Painter.Fill(cover:CreateTexture(nil, 'BACKGROUND'), 'skinBackground')
+	plate:SetAllPoints()
+	plate:SetAlpha(ENTRY_PLATE_ALPHA)
+	cover.label = cover:CreateFontString(nil, 'OVERLAY')
+	cover.label:SetPoint('CENTER')
+	FaceSize(cover.label, ENTRY_STATUS_SIZE)
+	BUI.Painter.Text(cover.label, 'skinTitle')
+	button._buiStatus = cover
+end
+
+local function FilterReason(resultID, info)
+	local filter = C_LFGList.GetAdvancedFilter()
+	local counts = C_LFGList.GetSearchResultMemberCounts(resultID)
+	local _, class = UnitClass('player')
+	if filter.needsTank and counts.TANK ~= 0 then return 'TANK TAKEN' end
+	if filter.needsHealer and counts.HEALER ~= 0 then return 'HEALER TAKEN' end
+	if filter.needsDamage and counts.DAMAGER >= 3 then return 'DPS FULL' end
+	if filter.needsMyClass and counts[class] > 0 then return 'HAS YOUR CLASS' end
+	if filter.hasTank and counts.TANK == 0 then return 'NO TANK' end
+	if filter.hasHealer and counts.HEALER == 0 then return 'NO HEALER' end
+	if filter.minimumRating > (info.leaderOverallDungeonScore or 0) then return 'LEADER RATING TOO LOW' end
+	return ENTRY_FILTERED
+end
+
+local function EntryStatus(button)
+	if button.isApplication then return end
+	local pending = button.PendingLabel
+	if pending:IsShown() then return pending:GetText():upper() end
+	local resultID = button.resultID
+	if not resultID or not C_LFGList.HasSearchResultInfo(resultID) then return end
+	local info = C_LFGList.GetSearchResultInfo(resultID)
+	if info.isDelisted then return ENTRY_DELISTED end
+	if button.isNowFilteredOut then return FilterReason(resultID, info) end
 end
 
 local function PaintSearchEntryState(button)
-	button:SetAlpha(button.isNowFilteredOut and ENTRY_FILTERED_ALPHA or 1)
+	local status = EntryStatus(button)
+	button:SetAlpha(status and ENTRY_UNAVAILABLE_ALPHA or 1)
+	button.PendingLabel:SetAlpha(status and 0 or 1)
+	button._buiStatus.label:SetText(status)
+	button._buiStatus:SetShown(status ~= nil)
 	local background = button.BackgroundTexture
 	if not background then return end
 	background:SetBlendMode('BLEND')
-	if button.isNowFilteredOut then
+	if status then
 		FlatTexture(background, 0, 0, 0, 0)
 	elseif button.isApplication then
 		FlatTexture(background, ENTRY_APPLIED_COLOR[1], ENTRY_APPLIED_COLOR[2], ENTRY_APPLIED_COLOR[3], ENTRY_APPLIED_COLOR[4])
