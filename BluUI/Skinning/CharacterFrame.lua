@@ -1827,7 +1827,6 @@ local function MakeToggleButton(parent, options)
 end
 
 local TOGGLES = {
-    { icon = 'Interface\\Icons\\INV_Misc_Gem_01', title = 'Gem Manager', module = 'GemCounter' },
     { icon = 'Interface\\Icons\\Spell_Arcane_PortalDalaran', title = 'Portals', module = 'PortalManager' },
     { icon = 'Interface\\Icons\\INV_Misc_Coin_01', title = 'Currency', module = 'CurrencyManager' },
     { icon = 'Interface\\Icons\\Achievement_Reputation_01', title = 'Reputation', module = 'ReputationManager' },

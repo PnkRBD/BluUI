@@ -329,7 +329,6 @@ local entries = {
 	{ label = "Datatext", page = "settings", tab = 5, panel = "Modules" },
 	{ label = "Cursor", page = "settings", tab = 5, panel = "Modules" },
 	{ label = "Streamer Tools", page = "settings", tab = 5, panel = "Modules" },
-	{ label = "Gem Manager", page = "settings", tab = 5, panel = "Modules" },
 
 	{ label = "Switch profile with spec", page = "exportimport", tab = 1, panel = "Spec profiles", keywords = "export import profile share spec" },
 

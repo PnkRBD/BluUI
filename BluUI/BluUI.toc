@@ -215,7 +215,6 @@ Skinning\Widgets.lua
 Modules\CurrencyManager\CurrencyManager.lua
 Modules\ReputationManager\ReputationManager.lua
 Modules\PortalManager\PortalManager.lua
-Modules\GemCounter\GemCounter.lua
 Skinning\ItemReadout.lua
 Skinning\Merchant.lua
 Skinning\Trainer.lua
