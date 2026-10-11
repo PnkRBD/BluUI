@@ -1,134 +1,161 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.PetBattle')
-
 local ipairs = ipairs
+local ceil = math.ceil
 
 local Skin = BUI.Skinning
 local Pixel = BUI.Pixel
-local SELECTED_COLOR = Skin.SELECTED_COLOR
+local Painter = BUI.Painter
 
-local SKIN_ID = 'petBattle'
-local BLIZZARD_ADDON = 'Blizzard_PetBattleUI'
 local HOVER_ALPHA = 0.15
 local PRESS_ALPHA = 0.25
 local SELECTED_ALPHA = 0.2
-local BAR_ART_KEYS = { 'LeftEndCap', 'RightEndCap', 'Background' }
+local TIMER_Y = -12
+local BLIZZARD_BAR_WIDTH = 337
+local TIMER_LINE_INSET, TIMER_LINE_HEIGHT = 1, 3
+local XP_EDGE = -1
+local INSTRUCTION_SCALE = 4 / 3
+local PET_CARD_INSET = { left = 13, right = 10, top = 152, bottom = 6 }
 local BAR_FRAME_KEYS = { 'FlowFrame', 'Delimiter', 'MicroButtonFrame' }
+local TIMER_ART = { 'TimerBG', 'ArtFrame', 'ArtFrame2' }
+local PET_CARD_ART = { 'Framing', 'SelectedTexture', 'MouseoverHighlight' }
 local FIXED_BUTTON_KEYS = { 'SwitchPetButton', 'CatchButton', 'ForfeitButton' }
 
-local installed = false
-local skinned = false
-local skinnedButtons = {}
+local context = Skin.Define('petBattle', {
+	name = 'Pet Battle',
+	description = 'The pet battle bar with square buttons, a white turn timer, a flat XP bar and pet picker cards.',
+	icon = 'Interface/Icons/INV_Pet_BattlePetTraining',
+	newLook = true,
+})
+local Fade, FadeKeys, FadeRegions = context.Fade, context.FadeKeys, context.FadeRegions
+local Shell, Title, Body = context.Shell, context.Title, context.Body
 
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
+local timerBox
+
+local function EvenWidth(frame)
+	frame:SetWidth(ceil(frame:GetWidth() / 2) * 2)
 end
 
-local context = Skin.NewContext(Enabled)
-local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
-
-local function BorderSettings()
-	local actionBars = BUI.ActionBars
-	local settings = actionBars and actionBars.GetSettings and actionBars.GetSettings()
-	local color = settings and settings.borderColor or { 0, 0, 0, 1 }
-	return settings and settings.borderSize or 1, color
-end
-
-local function FlattenOverlay(texture, red, green, blue, alpha, button)
-	if not texture then return end
-	Skin.FlatTexture(texture, red, green, blue, alpha)
+local function Overlay(texture, button)
+	texture:SetBlendMode('BLEND')
 	texture:ClearAllPoints()
 	texture:SetAllPoints(button)
+	return texture
 end
 
 local function SkinActionButton(button)
-	if not button or button._buiPetSkin then return end
-	button._buiPetSkin = true
-	skinnedButtons[#skinnedButtons + 1] = button
-	Fade(button.NormalTexture or button:GetNormalTexture())
+	if not button._buiPetButton then
+		button._buiPetButton = true
+		Skin.CropIcon(button.Icon)
+		Skin.FlatTexture(Overlay(button:GetHighlightTexture(), button), 1, 1, 1, HOVER_ALPHA)
+		Skin.FlatTexture(Overlay(button:GetPushedTexture(), button), 1, 1, 1, PRESS_ALPHA)
+		Skin.SelectedTexture(Overlay(button.SelectedHighlight, button), SELECTED_ALPHA)
+	end
+	Fade(button.NormalTexture)
 	Fade(button.CooldownShadow)
-	Skin.CropIcon(button.Icon)
-	FlattenOverlay(button:GetHighlightTexture(), 1, 1, 1, HOVER_ALPHA, button)
-	FlattenOverlay(button:GetPushedTexture(), 1, 1, 1, PRESS_ALPHA, button)
-	FlattenOverlay(button.SelectedHighlight, SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], SELECTED_ALPHA, button)
-	local size, color = BorderSettings()
-	Pixel.ApplyBorder(button, size, color[1], color[2], color[3], color[4])
+	local settings = BUI.ActionBars.GetSettings()
+	local color = settings.borderColor
+	Pixel.ApplyBorder(button, settings.borderSize, color[1], color[2], color[3], color[4])
 end
 
-local function SkinAbilityButtons(bottom)
-	local buttons = bottom and bottom.abilityButtons
-	if not buttons then return end
-	for _, button in ipairs(buttons) do SkinActionButton(button) end
+local function ForEachActionButton(bottom, callback)
+	for _, button in ipairs(bottom.abilityButtons) do callback(button) end
+	for _, key in ipairs(FIXED_BUTTON_KEYS) do callback(bottom[key]) end
 end
 
 local function SkinBar(bottom)
-	FadeKeys(bottom, BAR_ART_KEYS)
+	local switch = bottom.SwitchPetButton
+	FadeRegions(bottom)
 	for _, key in ipairs(BAR_FRAME_KEYS) do FadeRegions(bottom[key]) end
+	Skin.SelectedTexture(Overlay(switch:GetCheckedTexture(), switch), SELECTED_ALPHA)
+	ForEachActionButton(bottom, SkinActionButton)
+	Skin.TipFont(bottom.FlowFrame.SelectPetInstruction, 'title', INSTRUCTION_SCALE)
 end
 
-local function Apply()
-	if skinned or not Enabled() then return end
-	local frame = _G.PetBattleFrame
-	if not frame or not frame.BottomFrame then return end
-	skinned = true
+local function SkinTimer(timer)
+	local bar, text = timer.Bar, timer.TimerText
+	FadeKeys(timer, TIMER_ART)
+	timer:SetPoint('CENTER', timer:GetParent(), 'TOP', 0, TIMER_Y)
+	EvenWidth(timer)
+	context.Button(timer.SkipButton)
+	Shell(timerBox)
+	bar:ClearAllPoints()
+	bar:SetPoint('BOTTOMLEFT', timerBox, 'BOTTOMLEFT', TIMER_LINE_INSET, TIMER_LINE_INSET)
+	bar:SetHeight(TIMER_LINE_HEIGHT)
+	Painter.Fill(bar, 'skinTitle')
+	text:ClearAllPoints()
+	text:SetPoint('CENTER', timerBox)
+	Body(text)
+end
+
+local function SkinXPBar(bar)
+	bar:SetStatusBarTexture(BUI.GetGlobalTexture())
+	bar:GetStatusBarTexture().__buiSkin = true
+	FadeRegions(bar)
+	Shell(bar, XP_EDGE)
+	Skin.TipCount(bar.TextString)
+end
+
+local function SyncPetCard(unit)
+	if unit._buiPetCard then Skin.SetActiveEdge(unit, unit.SelectedTexture:IsShown()) end
+end
+
+local function SkinPetCard(button)
+	local dead = button.DeadOverlay
+	button._buiPetCard = true
+	FadeKeys(button, PET_CARD_ART)
+	context.Card(button, PET_CARD_INSET)
+	dead:ClearAllPoints()
+	dead:SetPoint('TOPLEFT', PET_CARD_INSET.left, -PET_CARD_INSET.top)
+	dead:SetPoint('BOTTOMRIGHT', -PET_CARD_INSET.right, PET_CARD_INSET.bottom)
+	Title(button.Name)
+	Skin.TipCount(button.Level)
+	Skin.TipCount(button.HealthText)
+	SyncPetCard(button)
+end
+
+local function SkinFrame(frame)
 	local bottom = frame.BottomFrame
 	SkinBar(bottom)
-	for _, key in ipairs(FIXED_BUTTON_KEYS) do SkinActionButton(bottom[key]) end
-	SkinAbilityButtons(bottom)
+	SkinTimer(bottom.TurnTimer)
+	SkinXPBar(bottom.xpBar)
+	local selection = bottom.PetSelectionFrame
+	for index = 1, NUM_BATTLE_PETS_IN_BATTLE do SkinPetCard(selection['Pet' .. index]) end
 end
 
-local function EvenBottomFrame(frame)
-	local bottom = frame and frame.BottomFrame
-	if not bottom or InCombatLockdown() then return end
-	local width = bottom:GetWidth()
-	if width and width > 0 then bottom:SetWidth(math.ceil(width / 2) * 2) end
+local function SyncTimer(frame)
+	timerBox:SetShown(frame.BottomFrame.TurnTimer.TimerBG:IsShown())
 end
 
 local function OnActionBarLayout(frame)
-	EvenBottomFrame(frame)
-	if skinned and Enabled() then SkinAbilityButtons(frame.BottomFrame) end
+	local bottom = frame.BottomFrame
+	EvenWidth(bottom)
+	ForEachActionButton(bottom, SkinActionButton)
 end
 
-local function Install()
-	if installed or not Enabled() then return end
-	if not _G.PetBattleFrame then return end
-	installed = true
-	Hook('PetBattleFrame_UpdateActionBarLayout', OnActionBarLayout)
-	Apply()
+local function BuildTimerBox(timer)
+	local skip = timer.SkipButton
+	local box = context.Own(CreateFrame('Frame', nil, timer:GetParent()))
+	box:SetPoint('TOPLEFT', skip, 'TOPRIGHT', Skin.CONTROL_GAP, 0)
+	box:SetPoint('BOTTOMLEFT', skip, 'BOTTOMRIGHT', Skin.CONTROL_GAP, 0)
+	box:SetWidth(BLIZZARD_BAR_WIDTH + TIMER_LINE_INSET * 2)
+	local track = box:CreateTexture(nil, 'ARTWORK')
+	track:SetPoint('BOTTOMLEFT', TIMER_LINE_INSET, TIMER_LINE_INSET)
+	track:SetPoint('BOTTOMRIGHT', -TIMER_LINE_INSET, TIMER_LINE_INSET)
+	track:SetHeight(TIMER_LINE_HEIGHT)
+	Painter.Fill(track, 'skinLine')
+	return box
 end
 
-local function TryInstall(_, addonName)
-	if addonName ~= BLIZZARD_ADDON and addonName then return end
-	Install()
-	if installed then BUI.Events:Unregister('ADDON_LOADED', 'Skin.PetBattle') end
+local function InstallFrame(frame)
+	timerBox = BuildTimerBox(frame.BottomFrame.TurnTimer)
+	context.Hook('PetBattleFrame_UpdateActionBarLayout', OnActionBarLayout)
+	context.Hook('PetBattleFrame_UpdatePassButtonAndTimer', SyncTimer)
+	context.Hook('PetBattleUnitFrame_UpdateDisplay', SyncPetCard)
 end
 
-local function Deactivate()
-	context.Restore()
-	for _, button in ipairs(skinnedButtons) do
-		Pixel.HideBorder(button)
-		button._buiPetSkin = nil
-	end
-	wipe(skinnedButtons)
-	skinned = false
-end
+context.Window('PetBattleFrame', { skin = SkinFrame, show = SyncTimer, install = InstallFrame })
 
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		if not installed then
-			BUI.Events:Register('ADDON_LOADED', 'Skin.PetBattle', TryInstall)
-		else
-			Apply()
-		end
-	else
-		Deactivate()
-	end
+context.OnDisable(function()
+	if timerBox then ForEachActionButton(_G.PetBattleFrame.BottomFrame, Pixel.HideBorder) end
 end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Pet Battle Bar',
-	description = 'The pet battle action bar: square ability, swap, trap and forfeit buttons with the action bar border, no ornate bar art. No preview: it only shows during a pet battle.',
-	icon = 'Interface/Icons/INV_Pet_BattlePetTraining',
-})
