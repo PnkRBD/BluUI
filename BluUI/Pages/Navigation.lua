@@ -6,7 +6,7 @@ local PAGE_ABBREVIATIONS = {
 	dashboard = 'DSH', cursor = 'CUR', minimap = 'MAP', datatext = 'DAT',
 	markers = 'MRK',
 	auras = 'AUR', actionbars = 'ABR', power = 'PWR', cdm = 'CDM', castbars = 'CST',
-	unitframes = 'UFR',
+	unitframes = 'UFR', buffs = 'BUF',
 	qol = 'QOL',
 	settings = 'SET',
 	exportimport = 'PRF',
@@ -14,7 +14,7 @@ local PAGE_ABBREVIATIONS = {
 
 local SECTIONS = {
 	{header = 'General',  ids = {'dashboard', 'cursor', 'minimap', 'datatext', 'markers', 'auras'}},
-	{header = 'Combat',   ids = {'actionbars', 'power', 'cdm', 'castbars', 'unitframes'}},
+	{header = 'Combat',   ids = {'actionbars', 'power', 'cdm', 'castbars', 'unitframes', 'buffs'}},
 	{header = 'Quality of life', ids = {'qol'}},
 	{header = 'System',   ids = {'settings', 'exportimport'}},
 }
