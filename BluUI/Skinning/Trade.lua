@@ -5,6 +5,7 @@ local Wrap = BUI.Profiler.Wrap
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
+local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 
 local ITEM_COUNT = 7
 local PLATE_GAP = 4
@@ -18,6 +19,10 @@ local COLUMNS = {
 	{ highlights = { 'TradeHighlightRecipient', 'TradeHighlightRecipientEnchant' }, insets = { 'TradeRecipientItemsInset', 'TradeRecipientEnchantInset' } },
 }
 local RECIPIENT_MONEY_INSETS = { 'TradeRecipientMoneyInset' }
+local COIN_BOXES = { { left = 11, width = 62 }, { left = 83, width = 35 }, { left = 128, width = 35 } }
+local COIN_BOX_TOP, COIN_BOX_HEIGHT, COIN_CAP, COIN_RIM = -61, 20, 5, 3
+local COIN_COVER_LEVEL = 10
+local CLEAR = { 0, 0, 0, 0 }
 local ENCHANT_LABELS = { 'TradeFramePlayerEnchantText', 'TradeFrameRecipientEnchantText' }
 local NAME_HEADERS = { 'TradeFramePlayerNameText', 'TradeFrameRecipientNameText' }
 local ACTION_BUTTONS = { 'TradeFrameTradeButton', 'TradeFrameCancelButton' }
@@ -92,7 +97,32 @@ local function SkinHighlights(frame)
 	end
 end
 
-local function SkinMoney()
+local function CoverStrip(cover, first, second, width, height)
+	local strip = cover:CreateTexture(nil, 'BACKGROUND')
+	strip:SetPoint(first)
+	strip:SetPoint(second)
+	if width then strip:SetWidth(width) else strip:SetHeight(height) end
+	BUI.Painter.Fill(strip, 'skinBackground')
+end
+
+local function CoverCoinBox(frame, box)
+	local cover = context.Own(CreateFrame('Frame', nil, frame))
+	cover:SetFrameLevel(frame:GetFrameLevel() + COIN_COVER_LEVEL)
+	cover:SetPoint('TOPLEFT', frame, 'TOPLEFT', box.left - COIN_CAP, COIN_BOX_TOP)
+	cover:SetSize(box.width + COIN_CAP, COIN_BOX_HEIGHT)
+	CoverStrip(cover, 'TOPLEFT', 'TOPRIGHT', nil, COIN_RIM)
+	CoverStrip(cover, 'BOTTOMLEFT', 'BOTTOMRIGHT', nil, COIN_RIM)
+	CoverStrip(cover, 'TOPLEFT', 'BOTTOMLEFT', COIN_CAP)
+	CoverStrip(cover, 'TOPRIGHT', 'BOTTOMRIGHT', COIN_RIM)
+	Shell(cover)
+	BUILib.Skin.SetShellFill(cover, CLEAR)
+end
+
+local function SkinMoney(frame)
+	if not frame._buiCoinCovers then
+		frame._buiCoinCovers = true
+		for _, box in ipairs(COIN_BOXES) do CoverCoinBox(frame, box) end
+	end
 	FadeArt(_G.TradePlayerInputMoneyInset)
 	SkinInsets(RECIPIENT_MONEY_INSETS)
 	FadeRegions(_G.TradeRecipientMoneyBg)
@@ -107,7 +137,7 @@ local function SkinFrame(frame)
 	for _, name in ipairs(ENCHANT_LABELS) do Skin.TipFont(_G[name], 'label') end
 	for _, column in ipairs(COLUMNS) do SkinInsets(column.insets) end
 	ForEachItemButton(SkinItemRow)
-	SkinMoney()
+	SkinMoney(frame)
 	_G.TradeFrameTradeButton.WarningIcon.__buiSkin = true
 	for _, name in ipairs(ACTION_BUTTONS) do Button(_G[name]) end
 	SkinHighlights(frame)
