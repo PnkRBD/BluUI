@@ -261,7 +261,6 @@ Skinning\Transmog.lua
 Skinning\ItemUpgrade.lua
 Skinning\SplashFrame.lua
 Skinning\Chat.lua
-Skinning\PlayerAuras.lua
 Skinning\WorldMap.lua
 Skinning\ObjectiveTracker.lua
 Skinning\PetBattle.lua
