@@ -150,6 +150,8 @@ local function FactionLabel(factionGroup)
     elseif factionGroup == 'Alliance' then return '|cff5a8fe6' .. FACTION_ALLIANCE .. '|r' end
 end
 
+local BNET_COLOR = { FRIENDS_BNET_NAME_COLOR:GetRGB() }
+
 local STATUS_TAG = {
     AFK = '|cffff9900AFK|r',
     DND = '|cffff3333DND|r',
@@ -400,23 +402,22 @@ local function GatherFriends()
                         { text = nameText, color = ClassColor(gameAccount.className) },
                         { text = gameAccount.characterLevel and tostring(gameAccount.characterLevel) or '' },
                         { text = ZoneText(gameAccount.areaName, statusText) },
-                        { text = battleTagText, color = accountInfo.isFavorite and 'text' or 'muted' },
+                        { text = battleTagText, color = BNET_COLOR },
                         { text = 'WoW', color = 'muted' }
                     ),
                 }
             else
                 local statusText = (accountInfo.isAFK and 'AFK') or (accountInfo.isDND and 'DND') or nil
-                local identityColor = accountInfo.isFavorite and 'text' or 'muted'
                 list[#list + 1] = {
                     member = { isBNet = true, bnetName = bnetName, battleTag = battleTagText, gameAccountID = gameAccount.gameAccountID, status = statusText, favorite = accountInfo.isFavorite or nil },
                     sortName = ShowBattleTag() and battleTagText or bnetName,
                     sortBlank = ShowBattleTag() or nil,
                     cols = FriendCells(
                         { text = '' },
-                        { text = ShowBattleTag() and '' or bnetName, color = identityColor },
+                        { text = ShowBattleTag() and '' or bnetName, color = BNET_COLOR },
                         { text = '' },
                         { text = ZoneText(gameAccount.richPresence, statusText), color = 'muted' },
-                        { text = battleTagText, color = identityColor },
+                        { text = battleTagText, color = BNET_COLOR },
                         { text = ClientName(gameAccount.clientProgram), color = 'muted' }
                     ),
                 }
@@ -514,7 +515,7 @@ local function GetSocialRow(rowIndex)
             end
             local tagText = member.isBNet and (member.battleTag or member.bnetName) or nil
             if tagText then
-                tagText = Tinted(member.favorite and 'text' or 'muted', tagText)
+                tagText = FRIENDS_BNET_NAME_COLOR:WrapTextInColorCode(tagText)
                 titleText = (titleText ~= '') and (titleText .. '  ' .. Tinted('faint', '||') .. '  ' .. tagText) or tagText
             end
             if titleText == '' then titleText = '?' end
