@@ -4,6 +4,7 @@ local Layout = BUILib.Layout
 
 local PAGE_WIDTH = 960
 local FREE = ''
+local ANCHOR_MENU_WIDTH = 200
 
 local ANCHORS = { { value = FREE, text = 'None, free on the screen' } }
 for _, frame in ipairs(BUI.AnchorFramesExcept('BUI_MarkerBar')) do
@@ -60,8 +61,8 @@ local function Sections(ui, _, parent, width)
 			Option('Fade time', 'fadeDuration', { min = 0, max = 1, step = 0.05 }),
 		} },
 		{ icon = 'location', tooltip = 'Position and anchor', title = 'Position', slot = 'position', options = {
-			Option('Anchor to', 'anchorFrame', { entries = ANCHORS }),
-			Option('Anchor side', 'anchorPoint', { entries = BUI.C.ANCHOR_PLACEMENT_OPTIONS }),
+			Option('Anchor to', 'anchorFrame', { entries = ANCHORS, width = ANCHOR_MENU_WIDTH }),
+			Option('Anchor side', 'anchorPoint', { entries = BUI.C.ANCHOR_PLACEMENT_OPTIONS, width = ANCHOR_MENU_WIDTH }),
 			Offset('Horizontal offset', 'posX', 'anchorOffsetX', 1500),
 			Offset('Vertical offset', 'posY', 'anchorOffsetY', 1000),
 			Option('Match anchor width', 'matchAnchorWidth'),
