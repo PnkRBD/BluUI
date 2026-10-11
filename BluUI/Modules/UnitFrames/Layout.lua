@@ -13,6 +13,8 @@ local UnitIsDeadOrGhost = UnitIsDeadOrGhost
 local UnitIsGhost = UnitIsGhost
 local UnitPowerType = UnitPowerType
 
+local ABSORB_OVERFLOW_W = 6
+
 local HEALTH_VALUE_EVENTS = {
 	UNIT_HEALTH = true,
 	UNIT_MAXHEALTH = true,
@@ -281,7 +283,16 @@ local function Style(self, unit)
 	local healAbsorb = CreateFrame('StatusBar', nil, absorbClip)
 	healAbsorb:SetFrameLevel(absorbClip:GetFrameLevel() + 2)
 	self.HealAbsorb = healAbsorb
-	self.AbsorbBars = { Damage = absorb, Heal = healAbsorb }
+
+	local overflow = CreateFrame('StatusBar', nil, absorbClip)
+	overflow:SetFrameLevel(absorbClip:GetFrameLevel() + 1)
+	overflow:SetPoint('TOPRIGHT')
+	overflow:SetPoint('BOTTOMRIGHT')
+	overflow:SetWidth(Pixel.Scale(ABSORB_OVERFLOW_W))
+	overflow:SetMinMaxValues(0, 1)
+	overflow:SetValue(1)
+	overflow:SetAlpha(0)
+	self.AbsorbBars = { Damage = absorb, Heal = healAbsorb, Overflow = overflow }
 
 	local power = CreateFrame('StatusBar', nil, self)
 	power:SetStatusBarTexture(texture)
