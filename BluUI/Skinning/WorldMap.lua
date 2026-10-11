@@ -28,6 +28,7 @@ local PARENT_WALK_DEPTH = 6
 local SEARCH_WIDTH, SEARCH_HEIGHT = 160, 22
 local SEARCH_INSET = 8
 local SEARCH_TEXT_INSET = 6
+local SEARCH_ROOM = SEARCH_WIDTH + SEARCH_INSET * 2
 local TITLE_COORDS_GAP = 16
 local COLUMN_LEFT, COLUMN_RIGHT = 2, 304
 local TEXT_X = COLUMN_LEFT + 15
@@ -57,6 +58,8 @@ local restyledChecks = {}
 local anchors = {}
 local sizes = {}
 local rareScannerSearch
+local navCorner
+local searchRoom
 
 local function RefreshExtras()
 	BUI.WorldMapLabels.Refresh()
@@ -219,41 +222,57 @@ local function SkinOverlayFrames(map)
 	end
 end
 
+local SyncSearchRoom = Wrap('Skin.WorldMap search room', function()
+	if not navCorner then return end
+	local room = rareScannerSearch.EditBox:IsShown() and SEARCH_ROOM or 0
+	if room == searchRoom then return end
+	searchRoom = room
+	local navBar = WorldMapFrame.NavBar
+	navBar:SetPoint('BOTTOMRIGHT', navCorner[1], navCorner[2], navCorner[3] - room, navCorner[4])
+	NavBar_CheckLength(navBar)
+end)
+
 local function FindRareScannerSearch(map)
 	local mixin = _G.RSSearchMixin
 	if rareScannerSearch or not mixin then return rareScannerSearch end
 	for _, child in ipairs({ map:GetChildren() }) do
 		if child.OnLoad == mixin.OnLoad then
 			rareScannerSearch = child
+			child.EditBox:HookScript('OnShow', SyncSearchRoom)
+			child.EditBox:HookScript('OnHide', SyncSearchRoom)
 			return child
 		end
 	end
 end
 
+local function NavBarCorner(navBar)
+	for index = 1, navBar:GetNumPoints() do
+		local point, relativeTo, relativePoint, x, y = navBar:GetPoint(index)
+		if point == 'BOTTOMRIGHT' then return { relativeTo, relativePoint, x, y } end
+	end
+end
+
 local function SkinRareScannerSearch(map)
 	local search = FindRareScannerSearch(map)
-	if not search or search._buiHome then return end
+	if not search or navCorner then return end
 	local editBox = search.EditBox
-	search._buiHome = { point = { search:GetPoint(1) }, width = editBox:GetWidth(), height = editBox:GetHeight() }
+	navCorner = NavBarCorner(map.NavBar)
 	FadeRegions(editBox)
 	EditBox(editBox)
 	editBox:SetTextInsets(SEARCH_TEXT_INSET, SEARCH_TEXT_INSET, 0, 0)
-	editBox:SetSize(SEARCH_WIDTH, SEARCH_HEIGHT)
-	search:SetSize(SEARCH_WIDTH, SEARCH_HEIGHT)
-	search:ClearAllPoints()
-	search:SetPoint('RIGHT', map.NavBar, 'RIGHT', -SEARCH_INSET, 0)
+	Resize(editBox, SEARCH_WIDTH, SEARCH_HEIGHT)
+	Resize(search, SEARCH_WIDTH, SEARCH_HEIGHT)
+	Place(search, 'LEFT', map.NavBar, 'RIGHT', SEARCH_INSET, 0)
+	SyncSearchRoom()
 end
 
 local function ReleaseRareScannerSearch()
-	local home = rareScannerSearch and rareScannerSearch._buiHome
-	if not home then return end
-	rareScannerSearch._buiHome = nil
-	local editBox = rareScannerSearch.EditBox
-	editBox:SetTextInsets(0, 0, 0, 0)
-	editBox:SetSize(home.width, home.height)
-	rareScannerSearch:SetSize(home.width, home.height)
-	rareScannerSearch:ClearAllPoints()
-	rareScannerSearch:SetPoint(unpack(home.point))
+	if not navCorner then return end
+	local navBar = WorldMapFrame.NavBar
+	navBar:SetPoint('BOTTOMRIGHT', unpack(navCorner))
+	navCorner, searchRoom = nil, nil
+	rareScannerSearch.EditBox:SetTextInsets(0, 0, 0, 0)
+	NavBar_CheckLength(navBar)
 end
 
 local function IsTabSelected(questLog, tab)
