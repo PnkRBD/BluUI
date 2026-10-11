@@ -17,6 +17,7 @@ local LIST_CHECK_INSET = 2
 local HIGHLIGHT_ALPHA = 0.06
 local SELECTED_ALPHA = 0.15
 local ROLE_KEYS = { 'RoleButtonTank', 'RoleButtonHealer', 'RoleButtonDPS', 'RoleButtonLeader' }
+local ROLE_BAND = { width = 321, height = 64, x = -10, y = -28, alpha = 0.2 }
 local PVP_ROLE_KEYS = { 'TankIcon', 'HealerIcon', 'DPSIcon' }
 local LIST_OPTION_KEYS = { 'ItemLevel', 'MythicPlusRating', 'PVPRating', 'PvpItemLevel', 'VoiceChat', 'PrivateGroup', 'CrossFactionGroup' }
 local LIST_DROPDOWN_KEYS = { 'GroupDropdown', 'ActivityDropdown', 'PlayStyleDropdown' }
@@ -275,14 +276,25 @@ local function PadBottomRow(inset, buttons, content)
 	for index = 1, (content and #content or 0) do RaiseBottom(content[index], lift, inset) end
 end
 
-local function KeepRoleBand(texture)
-	if texture then texture.__buiSkin = true end
+local function PaintRoleBand(texture)
+	local red, green, blue = Theme.GetAccent()
+	texture:SetColorTexture(1, 1, 1, 1)
+	texture:SetGradient('VERTICAL', CreateColor(red, green, blue, 0), CreateColor(red, green, blue, ROLE_BAND.alpha))
+end
+
+local function RoleBand(texture, frame)
+	if not texture then return end
+	texture.__buiSkin = true
+	texture:ClearAllPoints()
+	texture:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', ROLE_BAND.x, ROLE_BAND.y)
+	texture:SetSize(ROLE_BAND.width, ROLE_BAND.height)
+	BUI.Painter.Custom(texture, PaintRoleBand)
 end
 
 local function SkinDungeonFinder()
 	local parent = _G.LFDParentFrame
 	if not parent then return end
-	KeepRoleBand(_G.LFDParentFrameRoleBackground)
+	RoleBand(_G.LFDParentFrameRoleBackground, parent)
 	FadeRegions(parent)
 	FadeArt(parent.Inset)
 	Shell(parent.Inset)
@@ -316,7 +328,7 @@ end
 local function SkinRaidFinder()
 	local frame = _G.RaidFinderFrame
 	if not frame then return end
-	KeepRoleBand(_G.RaidFinderFrameRoleBackground)
+	RoleBand(_G.RaidFinderFrameRoleBackground, frame)
 	FadeRegions(frame)
 	FadeArt(frame.Inset)
 	FadeArt(_G.RaidFinderFrameBottomInset)
