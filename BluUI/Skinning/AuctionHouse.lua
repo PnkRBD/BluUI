@@ -98,16 +98,25 @@ local function SkinBackgroundFrame(frame)
 	Shell(frame)
 end
 
+local function SquareIcon(owner, icon, border)
+	Fade(border)
+	CropIcon(icon)
+	Skin.TipIconFrame(owner, icon)
+end
+
+local function SelectedRow(texture)
+	texture:SetBlendMode('BLEND')
+	SelectedTexture(texture, ROW_SELECTED_ALPHA)
+end
+
 local function SkinItemButton(button)
 	if button._buiItemButton then return end
 	button._buiItemButton = true
 	local icon = button.Icon
 	Fade(button.EmptyBackground)
-	Fade(button.IconBorder)
 	Fade(button.IconOverlay)
 	icon:RemoveMaskTexture(button.IconMask or button.CircleMask)
-	CropIcon(icon)
-	Skin.TipIconFrame(button, icon)
+	SquareIcon(button, icon, button.IconBorder)
 	Skin.TipCount(button.Count)
 end
 
@@ -187,13 +196,17 @@ local function SkinSearchBar(bar)
 	Button(search)
 end
 
-local function SkinSellFrame(frame)
+local function SkinSellBase(frame)
 	SkinBackgroundFrame(frame)
 	FadeKeys(frame, SELL_TAB_ART)
 	Title(frame.CreateAuctionLabel)
 	SkinItemDisplay(frame.ItemDisplay)
-	for _, key in ipairs(ALIGNED_CONTROL_KEYS) do SkinAlignedControl(frame[key]) end
 	Button(frame.PostButton)
+end
+
+local function SkinSellFrame(frame)
+	SkinSellBase(frame)
+	for _, key in ipairs(ALIGNED_CONTROL_KEYS) do SkinAlignedControl(frame[key]) end
 	CheckBox(frame.BuyoutModeCheckButton)
 end
 
@@ -256,15 +269,11 @@ local function SkinTokenResults(frame)
 end
 
 local function SkinTokenSell(frame)
-	SkinBackgroundFrame(frame)
-	FadeKeys(frame, SELL_TAB_ART)
-	Title(frame.CreateAuctionLabel)
+	SkinSellBase(frame)
 	Body(frame.BuyoutPriceLabel)
 	HoldHouseFont(frame.MarketPrice)
 	Body(frame.EstimatedTime)
 	Body(frame.TimeToSell)
-	SkinItemDisplay(frame.ItemDisplay)
-	Button(frame.PostButton)
 	SkinBackgroundFrame(frame.DummyItemList)
 	SkinIconButton(frame.DummyRefreshButton)
 end
@@ -309,17 +318,10 @@ end
 local function OnRowPopulated(row)
 	if row._buiRow then return end
 	row._buiRow = true
-	local stripe = row:GetNormalTexture()
-	if stripe then stripe:SetAlpha(0) end
-	local selected, highlight = row.SelectedHighlight, row.HighlightTexture
-	if selected then
-		selected:SetBlendMode('BLEND')
-		SelectedTexture(selected, ROW_SELECTED_ALPHA)
-	end
-	if highlight then
-		highlight:SetBlendMode('BLEND')
-		FlatTexture(highlight, 1, 1, 1, ROW_HOVER_ALPHA)
-	end
+	Fade(row:GetNormalTexture())
+	SelectedRow(row.SelectedHighlight)
+	row.HighlightTexture:SetBlendMode('BLEND')
+	FlatTexture(row.HighlightTexture, 1, 1, 1, ROW_HOVER_ALPHA)
 end
 
 local function SkinCell(cell)
@@ -330,11 +332,7 @@ local function SkinCell(cell)
 		if text then HoldHouseFont(text) end
 	end
 	if cell.MoneyDisplay then HoldMoney(cell.MoneyDisplay) end
-	if cell.Icon and cell.IconBorder then
-		cell.IconBorder:SetAlpha(0)
-		CropIcon(cell.Icon)
-		Skin.TipIconFrame(cell, cell.Icon)
-	end
+	if cell.Icon and cell.IconBorder then SquareIcon(cell, cell.Icon, cell.IconBorder) end
 end
 
 local function OnCellsArranged(_, row)
@@ -354,17 +352,13 @@ end
 local function OnSummaryLine(line)
 	if line._buiSummaryLine then return end
 	line._buiSummaryLine = true
-	line.IconBorder:SetAlpha(0)
-	CropIcon(line.Icon)
-	Skin.TipIconFrame(line, line.Icon)
-	line.SelectedHighlight:SetBlendMode('BLEND')
-	SelectedTexture(line.SelectedHighlight, ROW_SELECTED_ALPHA)
+	SquareIcon(line, line.Icon, line.IconBorder)
+	SelectedRow(line.SelectedHighlight)
 	Face(line.Text)
 end
 
 local function OnTabsUpdated(frame)
-	local auctions = _G.AuctionHouseFrame.AuctionsFrame
-	if frame == auctions and auctions._buiTabsSkinned then RefreshAuctionsTabs(frame) end
+	if frame._buiTabsSkinned then RefreshAuctionsTabs(frame) end
 end
 
 local function RefreshFrame(frame)
