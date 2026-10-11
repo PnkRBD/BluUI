@@ -400,13 +400,13 @@ local function GatherFriends()
                         { text = nameText, color = ClassColor(gameAccount.className) },
                         { text = gameAccount.characterLevel and tostring(gameAccount.characterLevel) or '' },
                         { text = ZoneText(gameAccount.areaName, statusText) },
-                        { text = battleTagText, color = accountInfo.isFavorite and 'accent' or 'muted' },
+                        { text = battleTagText, color = accountInfo.isFavorite and 'text' or 'muted' },
                         { text = 'WoW', color = 'muted' }
                     ),
                 }
             else
                 local statusText = (accountInfo.isAFK and 'AFK') or (accountInfo.isDND and 'DND') or nil
-                local identityColor = accountInfo.isFavorite and 'accent' or 'text'
+                local identityColor = accountInfo.isFavorite and 'text' or 'muted'
                 list[#list + 1] = {
                     member = { isBNet = true, bnetName = bnetName, battleTag = battleTagText, gameAccountID = gameAccount.gameAccountID, status = statusText, favorite = accountInfo.isFavorite or nil },
                     sortName = ShowBattleTag() and battleTagText or bnetName,
@@ -451,7 +451,7 @@ local function SetRowSectionHeader(row, entry)
     row.sectionLabel:SetText(entry.label .. '  ' .. Tinted('muted', '(' .. entry.count .. ')'))
     local isCollapsed = BUI.GetDB().socialCollapsedSections[entry.header] == true
     row.sectionState:SetText(isCollapsed and 'OFF' or 'ON')
-    row.sectionState:SetTextColor(Role(isCollapsed and 'muted' or 'accent'))
+    row.sectionState:SetTextColor(Role(isCollapsed and 'muted' or 'text'))
     row.headerBg:Show()
     row.sectionLabel:Show()
     row.sectionState:Show()
@@ -514,7 +514,7 @@ local function GetSocialRow(rowIndex)
             end
             local tagText = member.isBNet and (member.battleTag or member.bnetName) or nil
             if tagText then
-                tagText = Tinted(member.favorite and 'accent' or 'muted', tagText)
+                tagText = Tinted(member.favorite and 'text' or 'muted', tagText)
                 titleText = (titleText ~= '') and (titleText .. '  ' .. Tinted('faint', '||') .. '  ' .. tagText) or tagText
             end
             if titleText == '' then titleText = '?' end
@@ -523,7 +523,7 @@ local function GetSocialRow(rowIndex)
             if faction or member.status then
                 local line = faction or ''
                 if member.status then
-                    line = (line ~= '' and (line .. '  ') or '') .. Tinted('accent', member.status)
+                    line = (line ~= '' and (line .. '  ') or '') .. STATUS_TAG[member.status]
                 end
                 GameTooltip:AddLine(line)
             end
@@ -536,10 +536,10 @@ local function GetSocialRow(rowIndex)
                     GameTooltip:AddDoubleLine('Key', member.rioBest, mutedRed, mutedGreen, mutedBlue, textRed, textGreen, textBlue)
                 end
             end
-            GameTooltip:AddLine(Tinted('accent', 'Left-Click') .. '  ' .. Tinted('text', 'Whisper'))
-            if member.name then GameTooltip:AddLine(Tinted('accent', 'Shift-Click') .. '  ' .. Tinted('text', 'Who')) end
+            GameTooltip:AddLine(Tinted('text', 'Left-Click') .. '  ' .. Tinted('muted', 'Whisper'))
+            if member.name then GameTooltip:AddLine(Tinted('text', 'Shift-Click') .. '  ' .. Tinted('muted', 'Who')) end
             if member.name or (member.isBNet and member.gameAccountID) then
-                GameTooltip:AddLine(Tinted('accent', 'Right-Click') .. '  ' .. Tinted('text', 'Invite'))
+                GameTooltip:AddLine(Tinted('text', 'Right-Click') .. '  ' .. Tinted('muted', 'Invite'))
             end
             GameTooltip:Show()
         end))
@@ -823,7 +823,7 @@ local function BuildSocialPanel()
         local inputRed, inputGreen, inputBlue = Role('input')
         local edgeRed, edgeGreen, edgeBlue = Role('inputEdge')
         Pixel.SetTemplate(advancedBox, inputRed, inputGreen, inputBlue, 1, edgeRed, edgeGreen, edgeBlue, 1)
-        self.advancedCheck:SetVertexColor(Role('accent'))
+        self.advancedCheck:SetVertexColor(Role('text'))
         advancedLabel:SetTextColor(Role('faint'))
         for _, headerButton in ipairs(self.header) do
             headerButton.label:SetTextColor(Role('faint'))
@@ -831,7 +831,7 @@ local function BuildSocialPanel()
         end
         BUI.Tools.SetColorTex(self.headerLine, Role('cardEdge'))
         self.key:SetTextColor(Role('muted'))
-        self.key:SetText(Tinted('accent', 'Left-Click') .. ' Whisper   ' .. Tinted('accent', 'Shift-Click') .. ' Who   ' .. Tinted('accent', 'Right-Click') .. ' Invite')
+        self.key:SetText(Tinted('text', 'Left-Click') .. ' Whisper   ' .. Tinted('text', 'Shift-Click') .. ' Who   ' .. Tinted('text', 'Right-Click') .. ' Invite')
         for _, row in pairs(socialRows) do
             BUI.Tools.SetColorTex(row.highlight, Role('hover'))
             BUI.Tools.SetColorTex(row.headerBg, Role('hover'))
