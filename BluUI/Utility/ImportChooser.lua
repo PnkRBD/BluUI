@@ -43,6 +43,7 @@ local GROUPS = {
 		{ key = 'cursor',       name = 'Cursor' },
 		{ key = 'crosshair',    name = 'Crosshair' },
 		{ key = 'markers',      name = 'Markers' },
+		{ key = 'buffFrames',   name = 'Buffs & Debuffs' },
 		{ key = 'gcdHistory',   name = 'GCD History' },
 	}},
 	{ header = 'Automation & Social', sections = {

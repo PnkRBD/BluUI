@@ -18,6 +18,9 @@ BUI.C.ANCHOR_FRAMES = {
     { tag = "BUI_PetBar", desc = "BUI_PetBar" },
     { tag = "BUI_StanceBar", desc = "BUI_StanceBar" },
     { tag = "BUI_MarkerBar", desc = "BUI_MarkerBar" },
+    { tag = "BUI_BuffFrame", desc = "BUI_BuffFrame" },
+    { tag = "BUI_DebuffFrame", desc = "BUI_DebuffFrame" },
+    { tag = "Minimap", desc = "Minimap" },
 }
 
 BUI.C.ANCHOR_FRAMES_WITH_MOUSE = { { tag = "Mouse", desc = "Mouse" } }
