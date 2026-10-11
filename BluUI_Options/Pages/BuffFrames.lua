@@ -71,6 +71,7 @@ local function AddKind(grid, spec)
 		Option(db, factory, 'Reverse the order', 'sortReverse'),
 		Option(db, factory, 'Cooldown swipe', 'swipe', { separator = true }),
 		Option(db, factory, 'Reverse the swipe', 'swipeReverse'),
+		Option(db, factory, 'Bright edge', 'swipeEdge'),
 		Option(db, factory, 'Tooltips on mouseover', 'tooltips', { separator = true }),
 		Option(db, factory, 'Tooltips in combat', 'tooltipsInCombat'),
 	}
