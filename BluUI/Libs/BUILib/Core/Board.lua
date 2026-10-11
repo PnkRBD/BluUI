@@ -73,8 +73,8 @@ function Board:AddRow(name, sub, room, search)
 	local kit = self.kit
 	local row = Section.AddRow(self, search or (sub and (name .. ' ' .. sub) or name))
 	if not sub then row:SetHeight(PLAIN_ROW) end
-	kit.RowTitle(row, name, sub, kit.ROW_INSET, room and (self.panelWidth - kit.ROW_INSET * 2 - room - CONTROL_GAP))
-	return row
+	local title, subtitle = kit.RowTitle(row, name, sub, kit.ROW_INSET, room and (self.panelWidth - kit.ROW_INSET * 2 - room - CONTROL_GAP))
+	return row, title, subtitle
 end
 
 function Board:AddTools(name, sub, tools, after, icon)

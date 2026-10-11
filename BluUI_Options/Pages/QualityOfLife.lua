@@ -22,7 +22,7 @@ local SLIDER_WIDTH = 220
 local BUTTON_ROOM = 130
 local STATUS_ROOM = 120
 local BUTTON_GAP = 10
-local GATE_WIDTH = 420
+local GATE_PAD = 24
 local GATE_BLEED = 8
 local DIALOG_WIDTH, DIALOG_HEIGHT = 660, 720
 local DIALOG_PAD = 24
@@ -33,15 +33,7 @@ local ROW_ROOM = 220
 local READOUT_GAP = 16
 local ARROW_SIZE = 10
 local ARROW_GAP = 8
-local DANGER_CARD = 160
-local DANGER_EDGE_ALPHA = 0.5
-local DANGER_VALUE_Y = 44
-local DANGER_VALUE_SIZE = 30
-local DANGER_NOTE_Y = 84
-local DANGER_BUTTON_Y = 16
-local DANGER_HEAD_GAP = 16
-local ACCOUNT_MACRO_SLOTS = 120
-local CHARACTER_MACRO_SLOTS = 18
+local DISABLED_ALPHA = 0.4
 local ABANDON_GAP = 0.3
 local ABANDON_TIMEOUT = 3
 
@@ -501,7 +493,8 @@ end
 local function DeleteCharacterMacros()
 	Confirm('Delete Character Macros', 'This will delete ALL character-specific macros on this toon. This cannot be undone.', 'Delete', function()
 		local _, characterMacroCount = GetNumMacros()
-		for macroIndex = ACCOUNT_MACRO_SLOTS + characterMacroCount, ACCOUNT_MACRO_SLOTS + 1, -1 do
+		local accountSlots = Constants.MacroConsts.MAX_ACCOUNT_MACROS
+		for macroIndex = accountSlots + characterMacroCount, accountSlots + 1, -1 do
 			DeleteMacro(macroIndex)
 		end
 		BUI.Print(('Deleted %d character macro(s).'):format(characterMacroCount))
@@ -622,139 +615,111 @@ local function LoadoutCount()
 	return #(C_ClassTalents.GetConfigIDsBySpecID(specID) or {})
 end
 
-local function AbandonableCount()
-	local seen, count = {}, 0
-	for entryIndex = 1, C_QuestLog.GetNumQuestLogEntries() do
-		local info = C_QuestLog.GetInfo(entryIndex)
-		local questID = info and not info.isHeader and info.questID
-		if questID and not seen[questID] and C_QuestLog.CanAbandonQuest(questID) then
-			seen[questID] = true
-			count = count + 1
-		end
-	end
-	return count
-end
-
 local function Plural(count, singular, plural)
 	return count == 1 and singular or plural
 end
 
-local DANGER_CARDS = {
-	loadouts = {
+local DANGER_ROWS = {
+	{
 		title = 'Talent loadouts',
 		events = { 'TRAIT_CONFIG_LIST_UPDATED', 'TRAIT_CONFIG_CREATED', 'TRAIT_CONFIG_DELETED', 'ACTIVE_PLAYER_SPECIALIZATION_CHANGED' },
 		read = function()
 			local count = LoadoutCount()
-			return count, Plural(count, 'loadout on this spec', 'loadouts on this spec')
+			return count, count .. ' on this spec'
 		end,
 		buttons = {
-			{ text = 'Create 10 test loadouts', style = 'control', onClick = CreateTestLoadouts },
-			{ text = 'Delete every loadout', onClick = DeleteLoadouts },
+			{ text = 'Create 10', style = 'control', always = true, onClick = CreateTestLoadouts },
+			{ text = 'Delete all', onClick = DeleteLoadouts },
 		},
 	},
-	quests = {
+	{
 		title = 'Quest log',
 		events = { 'QUEST_LOG_UPDATE', 'QUEST_ACCEPTED', 'QUEST_REMOVED' },
 		read = function()
-			local count = AbandonableCount()
-			return count, Plural(count, 'quest can be abandoned', 'quests can be abandoned')
+			local count = #AbandonableQuests()
+			return count, count .. Plural(count, ' quest can be abandoned', ' quests can be abandoned')
 		end,
-		buttons = { { text = 'Abandon every quest', onClick = AbandonQuests } },
+		buttons = { { text = 'Abandon all', onClick = AbandonQuests } },
 	},
-	characterMacros = {
+	{
 		title = 'Character macros',
 		events = { 'UPDATE_MACROS' },
 		read = function()
 			local _, count = GetNumMacros()
-			return count, 'of ' .. CHARACTER_MACRO_SLOTS .. ' slots on this character'
+			return count, ('%d of %d on this character'):format(count, Constants.MacroConsts.MAX_CHARACTER_MACROS)
 		end,
-		buttons = { { text = 'Delete character macros', onClick = DeleteCharacterMacros } },
+		buttons = { { text = 'Delete all', onClick = DeleteCharacterMacros } },
 	},
-	generalMacros = {
+	{
 		title = 'General macros',
 		events = { 'UPDATE_MACROS' },
 		read = function()
 			local count = GetNumMacros()
-			return count, 'of ' .. ACCOUNT_MACRO_SLOTS .. ' account wide slots'
+			return count, ('%d of %d account wide'):format(count, Constants.MacroConsts.MAX_ACCOUNT_MACROS)
 		end,
-		buttons = { { text = 'Delete general macros', onClick = DeleteGeneralMacros } },
+		buttons = { { text = 'Delete all', onClick = DeleteGeneralMacros } },
 	},
-	reset = {
+	{
 		title = 'BluUI settings',
+		events = {},
 		read = function()
 			local db = BUI.GetAceDB()
-			return db:GetCurrentProfile(), #db:GetProfiles() .. ' profiles saved  ·  every setting back to its default, then a reload'
+			local saved = #db:GetProfiles()
+			return 1, ('%s, %d %s saved'):format(db:GetCurrentProfile(), saved, Plural(saved, 'profile', 'profiles'))
 		end,
-		buttons = { { text = 'Reset BluUI', onClick = ResetSettings } },
+		buttons = { { text = 'Reset', always = true, onClick = ResetSettings } },
 	},
 }
 
-local function DangerCard(ui, cards, parent, x, y, width, spec)
-	local card = cards.Card(parent, x, y, width, DANGER_CARD, { edge = 'danger' })
-	card.edge:SetAlpha(DANGER_EDGE_ALPHA)
-	cards.Title(card, spec.title)
-	local value = cards.Readout(card, cards.PAD, DANGER_VALUE_Y, DANGER_VALUE_SIZE, width - cards.PAD * 2)
-	local note = cards.Label(card, '', cards.PAD, DANGER_NOTE_Y, 11, 'muted')
-	note:SetWidth(width - cards.PAD * 2)
-	note:SetWordWrap(false)
-	local anchor
+local function DangerRow(ui, board, cards, spec)
+	local row, _, sub = board:AddRow(spec.title, ' ')
+	local gated, anchor = {}, nil
 	for index = #spec.buttons, 1, -1 do
 		local action = spec.buttons[index]
-		local button = ui.Button(card, action.text, action.style or 'danger', action.onClick)
+		local button = ui.Button(row, action.text, action.style or 'danger', action.onClick)
 		if anchor then
 			button:SetPoint('RIGHT', anchor, 'LEFT', -BUTTON_GAP, 0)
 		else
-			button:SetPoint('BOTTOMRIGHT', -cards.PAD, DANGER_BUTTON_Y)
+			button:SetPoint('RIGHT', -ui.ROW_INSET, 0)
 		end
 		anchor = button
+		if not action.always then gated[#gated + 1] = button end
 	end
-	local function Update()
-		local text, hint = spec.read()
-		value:SetText(text)
-		note:SetText(hint)
-	end
-	if spec.events then cards.Listen(card, spec.events, Update) else Update() end
-	return card
+	cards.Listen(row, spec.events, function()
+		local count, text = spec.read()
+		sub:SetText(text)
+		for _, button in ipairs(gated) do
+			button:SetEnabled(count > 0)
+			button:SetAlpha(count > 0 and 1 or DISABLED_ALPHA)
+		end
+	end)
 end
 
-local function DangerPane(ui, parent, width)
-	local cards = Layout.CardKit(Window())
-	local host = CreateFrame('Frame', nil, parent)
-	host:SetWidth(width)
-	local title = ui.Text(host, 'Danger zone', 13, 'text')
-	title:SetPoint('TOPLEFT', 0, -2)
-	local description = ui.Text(host, 'Tools that delete loadouts, macros or quests, and the reset that puts every BluUI setting back. None of it can be undone.', 12, 'muted', width)
-	description:SetWordWrap(true)
-	description:SetSpacing(4)
-	description:SetPoint('TOPLEFT', title, 'BOTTOMLEFT', 0, -8)
-	local head = 2 + ui.Height(title) + 8 + ui.Height(description) + DANGER_HEAD_GAP
-
-	local grid = CreateFrame('Frame', nil, host)
-	grid:SetPoint('TOPLEFT', 0, -head)
-	grid:SetWidth(width)
-	local function Card(spec)
-		return function(gridParent, x, y, span) return DangerCard(ui, cards, gridParent, x, y, span, spec) end
-	end
-	local height = cards.Grid(grid, width, {
-		{ { span = 'half', build = Card(DANGER_CARDS.loadouts) }, { span = 'half', build = Card(DANGER_CARDS.quests) } },
-		{ { span = 'half', build = Card(DANGER_CARDS.characterMacros) }, { span = 'half', build = Card(DANGER_CARDS.generalMacros) } },
-		{ { span = 'full', build = Card(DANGER_CARDS.reset) } },
-	})
-	grid:SetHeight(height)
-	host:SetHeight(head + height)
-
-	local gate = CreateFrame('Frame', nil, host)
-	gate:SetPoint('TOPLEFT', grid, 'TOPLEFT', -GATE_BLEED, GATE_BLEED)
-	gate:SetPoint('BOTTOMRIGHT', grid, 'BOTTOMRIGHT', GATE_BLEED, -GATE_BLEED)
-	gate:SetFrameLevel(grid:GetFrameLevel() + 20)
+local function DangerGate(ui, board)
+	local panel = board.panel
+	local gate = CreateFrame('Frame', nil, panel)
+	gate:SetPoint('TOPLEFT', -GATE_BLEED, GATE_BLEED)
+	gate:SetPoint('BOTTOMRIGHT', GATE_BLEED, -GATE_BLEED)
+	gate:SetFrameLevel(panel:GetFrameLevel() + 20)
 	gate:EnableMouse(true)
-	ui.Fill(gate, 'page'):SetAllPoints()
-	local warning = ui.Text(gate, GATE_TEXT, 12, 'danger', GATE_WIDTH)
+	ui.Fill(gate, 'panel'):SetAllPoints()
+	local warning = ui.Text(gate, GATE_TEXT, 12, 'danger', board.panelWidth - GATE_PAD * 2)
 	warning:SetJustifyH('CENTER')
 	warning:SetSpacing(3)
 	warning:SetPoint('CENTER', 0, 24)
 	ui.Button(gate, 'I confirm I will be careful', 'control', function() gate:Hide() end):SetPoint('TOP', warning, 'BOTTOM', 0, -16)
-	return host
+end
+
+local function DangerPane(ui, parent, width)
+	local cards = Layout.CardKit(Window())
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Danger zone',
+		description = 'Delete loadouts, macros or quests, or put every BluUI setting back. None of it can be undone.',
+	})
+	for _, spec in ipairs(DANGER_ROWS) do DangerRow(ui, board, cards, spec) end
+	DangerGate(ui, board)
+	return board
 end
 
 local function CelebrationBoard(ui, parent, width)
