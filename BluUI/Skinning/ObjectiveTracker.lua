@@ -3,52 +3,42 @@ local _, BUI = ...
 local pairs = pairs
 local ipairs = ipairs
 local select = select
-local Hook = BUI.Profiler.Hooker('Skin.ObjectiveTracker')
 local Wrap = BUI.Profiler.Wrap
 local After = BUI.Profiler.After
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Theme = BUILib.Theme
-local Skin3 = BUILib.Skin
+local LibSkin = BUILib.Skin
 local LibWidget = BUILib.Widget
 local FONT = BUILib.Font or STANDARD_TEXT_FONT
 local Skin = BUI.Skinning
 local Pixel = BUI.Pixel
-local sharedMedia = LibStub and LibStub('LibSharedMedia-3.0', true)
+local Painter = BUI.Painter
+local sharedMedia = LibStub('LibSharedMedia-3.0', true)
 
-local LIBRARY_FONT_OPTION    = 'LIBRARY'
-local DEFAULT_FONT_SIZE      = 11
-local DEFAULT_CARD_OPACITY   = 98
-local ROLE_SIZE_DELTA        = { line = 0, title = 1, header = 2, timer = 8 }
-local TRACKER_STASH_SCALE    = 0.01
-local DEFAULT_TRACKER_COLORS = {
-	title     = { 1, 0.82, 0.25 },
-	hover     = { 1, 1, 1 },
-	objective = { 0.85, 0.85, 0.9 },
-	completed = { 0.45, 0.85, 0.45 },
-	ready     = { 0.35, 1, 0.45 },
-	timeLeft  = { 1, 0.45, 0.45 },
-	dim       = { 0.45, 0.45, 0.5 },
-}
-local TIP_TEXT_MAX_LENGTH    = 46
-local CARD_TEXTURE_TINT      = { 0.18, 0.19, 0.21 }
-local READY_COUNT_HEX        = 'ffd140'
-local FLASH_SECONDS          = 0.7
+local LIBRARY_FONT_OPTION = 'LIBRARY'
+local FLAT_TEXTURE_OPTION = 'FLAT'
+local ROLE_SIZE_DELTA     = { caption = -1, line = 0, title = 1, header = 2, timer = 8 }
+local TRACKER_STASH_SCALE = 0.01
+local TIP_TEXT_MAX_LENGTH = 46
+local CARD_TEXTURE_TINT   = { 0.18, 0.19, 0.21 }
+local READY_COUNT_HEX     = 'ffd140'
+local FLASH_SECONDS       = 0.7
 
-local GLYPH_SIZE        = 10
-local BAR_LABEL_SIZE    = 11
-local HEADER_TEXT_INSET = 11
-local MINIMIZE_SIZE     = 15
-local KEY_TOOL_WIDTH    = 120
-local MODIFIER_KEYS     = { LSHIFT = true, RSHIFT = true, LCTRL = true, RCTRL = true, LALT = true, RALT = true, LMETA = true, RMETA = true }
-local BAR_ICON_SIZE     = 20
-local CARD_PAD_LEFT     = 22
-local CARD_PAD_RIGHT    = 10
-local CARD_PAD_Y        = 6
-
-local POI_BUTTON_SCALE  = 0.8
+local GLYPH_SIZE          = 10
+local BAR_LABEL_SIZE      = 11
+local HEADER_TEXT_INSET   = 11
+local RULE_GAP            = 8
+local MINIMIZE_SIZE       = 15
+local KEY_TOOL_WIDTH      = 120
+local MODIFIER_KEYS       = { LSHIFT = true, RSHIFT = true, LCTRL = true, RCTRL = true, LALT = true, RALT = true, LMETA = true, RMETA = true }
+local BAR_ICON_SIZE       = 20
+local CARD_PAD_LEFT       = 22
+local CARD_PAD_RIGHT      = 10
+local CARD_PAD_Y          = 6
+local POI_BUTTON_SCALE    = 0.8
 local POI_ANCHOR_OFFSET_X = -10
-local FLAT_TEXTURE      = 'Interface\\Buttons\\WHITE8X8'
+local FLAT_TEXTURE        = 'Interface\\Buttons\\WHITE8X8'
 
 local TRACKER_NAMES = {
 	'ScenarioObjectiveTracker',
@@ -64,83 +54,97 @@ local TRACKER_NAMES = {
 	'InitiativeTasksObjectiveTracker',
 }
 
+local QUEST_CACHE_EVENTS = {
+	'QUEST_LOG_UPDATE', 'QUEST_WATCH_LIST_CHANGED', 'QUEST_ACCEPTED', 'QUEST_REMOVED', 'QUEST_TURNED_IN', 'PLAYER_ENTERING_WORLD',
+}
+
 local addedElements = {}
 local restoreHeaders = {}
+local moduleHeaders = {}
+local headerRoles = {}
+local chevrons = {}
+local rules = {}
 local skinnedBars = {}
 local hiddenTextures = {}
 local restoreFonts = {}
 local hiddenPoiButtons = {}
-local trackerCard
-local headerCounts
-local headerFilter
-local readyQuestIDs = {}
-local previousReadyByQuest = {}
-local watchedCount = 0
-local readyCount = 0
-local pendingMenuQuestID
+local dashFontStrings = {}
+local linkedPanels = {}
 local wrapAdjustedText = { titles = {}, objectives = {} }
+local readyQuestIDs = {}
+local readyByQuest, nextReadyByQuest = {}, {}
+local trackerCard, headerCounts, headerFilter
+local trackerSkinned = false
+local trackerStashScale, trackerFadedOut
+local watchedCount, readyCount = 0, 0
+local fontGeneration = 1
+local pendingMenuQuestID
 local questClassificationLabels
+local styleOverrides
 local Scenario = {}
 local QuestFilter = {}
 local QuestItem = { POSITION_KEY = 'trackerquestitem', SIZE = 40 }
 local QuestInfo = { WOWHEAD_URL = 'https://www.wowhead.com/%s=%d', previousObjectives = {} }
+local NO_OBJECTIVES = {}
 
-local function IsEnabled()
-	return Skin.IsSkinEnabled('objectivetracker')
-end
+local context = Skin.Define('objectivetracker', {
+	name = 'Objective Tracker',
+	description = 'A dark panel behind the tracker, quest counts and track presets on the header, flat bars and square quest items.',
+	icon = 'Interface\\Icons\\INV_Misc_Book_07',
+	page = 'objectivetracker',
+	newLook = true,
+})
+local Enabled, Hook, Guard = context.Enabled, context.Hook, context.Guard
 
 local function GetSettings()
-	local skinningDB = BUI.GetDB().skinning
-	if not skinningDB.objectivetrackerSettings then skinningDB.objectivetrackerSettings = {} end
-	return skinningDB.objectivetrackerSettings
+	return BUI.GetDB().skinning.objectivetrackerSettings
 end
 
 local function GetSkinFont()
 	local fontName = GetSettings().font
-	if fontName == BUI.C.GLOBAL_OPTION then
-		return BUI.GetGlobalFont() or FONT
-	end
-	if fontName and fontName ~= LIBRARY_FONT_OPTION and sharedMedia then
-		local fetched = sharedMedia:Fetch('font', fontName, true)
-		if fetched then return fetched end
+	if fontName == BUI.C.GLOBAL_OPTION then return BUI.GetGlobalFont() or FONT end
+	if fontName ~= LIBRARY_FONT_OPTION and sharedMedia then
+		return sharedMedia:Fetch('font', fontName, true) or FONT
 	end
 	return FONT
-end
-
-local function GetSkinFontFlags()
-	return GetSettings().fontOutline and 'OUTLINE' or ''
-end
-
-local function GetRoleSize(role)
-	return (GetSettings().fontSize or DEFAULT_FONT_SIZE) + (ROLE_SIZE_DELTA[role] or 0)
 end
 
 local function ApplySkinFont(fontString, role)
 	if not fontString then return end
 	local entry = restoreFonts[fontString]
-	if entry then
-		entry.role = role
-	else
-		local font, oldSize, flags = fontString:GetFont()
-		restoreFonts[fontString] = { font = font, size = oldSize, flags = flags, role = role }
+	if not entry then
+		local font, size, flags = fontString:GetFont()
+		entry = { font = font, size = size, flags = flags }
+		restoreFonts[fontString] = entry
+	elseif entry.role == role and entry.generation == fontGeneration then
+		return
 	end
-	Pixel.ApplyFont(fontString, GetRoleSize(role), GetSkinFont(), GetSkinFontFlags())
+	entry.role, entry.generation = role, fontGeneration
+	local settings = GetSettings()
+	Pixel.ApplyFont(fontString, settings.fontSize + ROLE_SIZE_DELTA[role], GetSkinFont(), settings.fontOutline and 'OUTLINE' or '')
 end
 
-local linkedPanels = {}
+local function SetRawText(fontString, value)
+	getmetatable(fontString).__index.SetText(fontString, value)
+end
 
-local FLAT_TEXTURE_OPTION = 'FLAT'
+local function RoleColor(role)
+	local red, green, blue = Painter.Color(role)
+	return { red, green, blue }
+end
+
+local function PanelColor(key, role)
+	local color = GetSettings()[key]
+	if color then return color[1], color[2], color[3], color[4] or 1 end
+	return Painter.Color(role)
+end
 
 local function ApplyPanelStyle(panel)
 	local settings = GetSettings()
-	local opacity = (settings.cardOpacity or DEFAULT_CARD_OPACITY) / 100
-	local borderColor = settings.cardBorderColor or Theme.border.light
-	local borderAlpha = settings.cardBorder == false and 0 or (borderColor[4] or 1)
-	local textureName = settings.cardTexture or FLAT_TEXTURE_OPTION
-	local texturePath
-	if textureName ~= FLAT_TEXTURE_OPTION and sharedMedia then
-		texturePath = sharedMedia:Fetch('statusbar', textureName, true)
-	end
+	local opacity = settings.cardOpacity / 100
+	local borderRed, borderGreen, borderBlue, borderAlpha = PanelColor('cardBorderColor', 'skinBorder')
+	if settings.cardBorder == false then borderAlpha = 0 end
+	local texturePath = settings.cardTexture ~= FLAT_TEXTURE_OPTION and sharedMedia and sharedMedia:Fetch('statusbar', settings.cardTexture, true)
 	local overlay = panel.__buiCardTexture
 	if texturePath then
 		if not overlay then
@@ -150,16 +154,17 @@ local function ApplyPanelStyle(panel)
 			overlay:SetPoint('BOTTOMRIGHT', panel, 'BOTTOMRIGHT', -inset, inset)
 			panel.__buiCardTexture = overlay
 		end
+		local tint = settings.cardTextureColor or CARD_TEXTURE_TINT
 		overlay:SetTexture(texturePath)
-		local textureTint = settings.cardTextureColor or CARD_TEXTURE_TINT
-		overlay:SetVertexColor(textureTint[1], textureTint[2], textureTint[3], opacity)
+		overlay:SetVertexColor(tint[1], tint[2], tint[3], opacity)
 		overlay:Show()
-		panel:SetBackdropColor(Theme.bg.dark[1], Theme.bg.dark[2], Theme.bg.dark[3], 0)
-	else
-		if overlay then overlay:Hide() end
-		panel:SetBackdropColor(Theme.bg.dark[1], Theme.bg.dark[2], Theme.bg.dark[3], opacity)
+		opacity = 0
+	elseif overlay then
+		overlay:Hide()
 	end
-	panel:SetBackdropBorderColor(borderColor[1], borderColor[2], borderColor[3], borderAlpha)
+	local red, green, blue = Painter.Color('skinBackground')
+	panel:SetBackdropColor(red, green, blue, opacity)
+	panel:SetBackdropBorderColor(borderRed, borderGreen, borderBlue, borderAlpha)
 end
 
 local function ApplyCardStyle()
@@ -167,52 +172,21 @@ local function ApplyCardStyle()
 	for panel in pairs(linkedPanels) do ApplyPanelStyle(panel) end
 end
 
-Skin.trackerRules = {}
-
-function Skin.TrackerSeparatorColor()
-	local color = GetSettings().separatorColor or Theme.border.light
-	return color[1], color[2], color[3], color[4] or 1
+local function PaintRule(rule)
+	rule:SetColorTexture(PanelColor('separatorColor', 'skinLine'))
 end
 
-local normalizedTrackerColors = {}
-
-local function NormalizeTrackerColor(color)
-	if type(color) ~= 'table' then return nil end
-	if type(color[1]) == 'number' and type(color[2]) == 'number' and type(color[3]) == 'number' then return color end
-	if type(color.r) == 'number' and type(color.g) == 'number' and type(color.b) == 'number' then return { color.r, color.g, color.b } end
-	return nil
+local function PaintRules()
+	for rule in pairs(rules) do PaintRule(rule) end
 end
 
-function Skin.ClearTrackerColorCache()
-	wipe(normalizedTrackerColors)
-end
-
-function Skin.TrackerColor(key)
-	local cached = normalizedTrackerColors[key]
-	if cached then return cached end
-	local colors = GetSettings().colors
-	local color = NormalizeTrackerColor(colors and colors[key]) or DEFAULT_TRACKER_COLORS[key] or DEFAULT_TRACKER_COLORS.objective
-	if type(color[1]) ~= 'number' then color = DEFAULT_TRACKER_COLORS[key] or DEFAULT_TRACKER_COLORS.objective end
-	color = { color[1], color[2], color[3] }
-	normalizedTrackerColors[key] = color
-	return color
-end
-
-function Skin.TrackerColorRGB(key)
-	local color = Skin.TrackerColor(key)
-	return color[1], color[2], color[3], 1
-end
-
-function Skin.ApplyTrackerSeparators()
-	local red, green, blue, alpha = Skin.TrackerSeparatorColor()
-	for rule in pairs(Skin.trackerRules) do
-		rule:SetColorTexture(red, green, blue, alpha)
-	end
+local function PaintGlyph(glyph, bright)
+	glyph:SetVertexColor(Painter.Color(bright and 'skinText' or 'skinLabel'))
 end
 
 function Skin.RegisterTrackerPanel(frame)
 	linkedPanels[frame] = true
-	ApplyCardStyle()
+	ApplyPanelStyle(frame)
 end
 
 function Skin.GetTrackerPanelOutsets()
@@ -220,8 +194,7 @@ function Skin.GetTrackerPanelOutsets()
 end
 
 local function IsFiniteNumber(value)
-	if type(value) ~= 'number' then return false end
-	if issecretvalue and issecretvalue(value) then return false end
+	if type(value) ~= 'number' or issecretvalue(value) then return false end
 	return value == value and value ~= math.huge and value ~= -math.huge
 end
 
@@ -240,16 +213,15 @@ local function GetLaidOutTrackerHeight(trackerFrame)
 end
 
 local function UpdateCardAnchors()
-	local trackerFrame = _G.ObjectiveTrackerFrame
-	if not trackerCard or not trackerFrame then return end
+	if not trackerCard then return end
+	local trackerFrame = ObjectiveTrackerFrame
 	local padLeft = Pixel.PixelSize(CARD_PAD_LEFT)
 	local padRight = Pixel.PixelSize(CARD_PAD_RIGHT)
 	local padY = Pixel.PixelSize(CARD_PAD_Y)
 	trackerCard:ClearAllPoints()
 	trackerCard:SetPoint('TOPLEFT', trackerFrame, 'TOPLEFT', -padLeft, padY)
 	trackerCard:SetPoint('TOPRIGHT', trackerFrame, 'TOPRIGHT', padRight, padY)
-	local collapsed = trackerFrame.IsCollapsed and trackerFrame:IsCollapsed()
-	if collapsed and trackerFrame.Header then
+	if trackerFrame:IsCollapsed() then
 		trackerCard:SetPoint('BOTTOM', trackerFrame.Header, 'BOTTOM', 0, -padY)
 	else
 		trackerCard:SetHeight(GetLaidOutTrackerHeight(trackerFrame) + padY * 2)
@@ -258,85 +230,119 @@ end
 
 local function SyncTrackerCardShown()
 	if not trackerCard then return end
-	local trackerFrame = _G.ObjectiveTrackerFrame
-	local nineSlice = trackerFrame and trackerFrame.NineSlice
-	local shown = IsEnabled() and not Skin.trackerStashScale and not Skin.trackerFadedOut
-	if trackerFrame then shown = shown and trackerFrame:IsVisible() end
-	if nineSlice then shown = shown and nineSlice:IsShown() end
+	local trackerFrame = ObjectiveTrackerFrame
+	local shown = Enabled() and not trackerStashScale and not trackerFadedOut and trackerFrame:IsVisible() and trackerFrame.NineSlice:IsShown()
 	trackerCard:SetShown(shown and true or false)
 end
 
-local function SyncTrackerCardSoon()
-	After('Skin.ObjectiveTracker card sync', 0, SyncTrackerCardShown)
+local function TrackerClamp()
+	if not trackerCard or not Enabled() or trackerStashScale then return end
+	if InCombatLockdown() then
+		BUI.Events:AfterCombat(TrackerClamp, 'Skinning.TrackerClamp')
+		return
+	end
+	local trackerFrame = ObjectiveTrackerFrame
+	local left, right, top, bottom = trackerCard:GetLeft(), trackerCard:GetRight(), trackerCard:GetTop(), trackerCard:GetBottom()
+	local frameLeft, frameRight, frameTop, frameBottom = trackerFrame:GetLeft(), trackerFrame:GetRight(), trackerFrame:GetTop(), trackerFrame:GetBottom()
+	if not IsFiniteNumber(left) or not IsFiniteNumber(bottom) or not IsFiniteNumber(frameLeft) or not IsFiniteNumber(frameBottom) then return end
+	for panel in pairs(linkedPanels) do
+		local panelTop, panelBottom = panel:GetTop(), panel:GetBottom()
+		if panel:IsShown() and IsFiniteNumber(panelTop) and IsFiniteNumber(panelBottom) then
+			top = math.max(top, panelTop)
+			bottom = math.min(bottom, panelBottom)
+		end
+	end
+	local ratio = trackerCard:GetEffectiveScale() / trackerFrame:GetEffectiveScale()
+	local insetLeft, insetRight = left * ratio - frameLeft, right * ratio - frameRight
+	local insetTop, insetBottom = top * ratio - frameTop, bottom * ratio - frameBottom
+	local applied = trackerCard._buiClamp
+	if applied and applied[1] == insetLeft and applied[2] == insetRight and applied[3] == insetTop and applied[4] == insetBottom then return end
+	trackerCard._buiClamp = { insetLeft, insetRight, insetTop, insetBottom }
+	trackerFrame:SetClampRectInsets(insetLeft, insetRight, insetTop, insetBottom)
 end
 
-local function EnsureTrackerCard()
-	local trackerFrame = _G.ObjectiveTrackerFrame
-	if not trackerFrame then return end
-	local nineSlice = trackerFrame.NineSlice
-	if not trackerCard then
-		trackerCard = CreateFrame('Frame', 'BUI_TrackerPanel', UIParent, 'BackdropTemplate')
-		trackerCard:SetFrameStrata('LOW')
-		trackerCard:SetFrameLevel(0)
-		Skin3.Backdrop(trackerCard, { bg = Theme.bg.dark, border = Theme.border.light })
-		trackerCard:HookScript('OnSizeChanged', Wrap('Skin.ObjectiveTracker tracker clamp', Skin.TrackerClamp))
-
-		local syncShown = Wrap('Skin.ObjectiveTracker card sync', SyncTrackerCardShown)
-		if trackerFrame.SetCollapsed then Hook(trackerFrame, 'SetCollapsed', UpdateCardAnchors) end
-		if nineSlice then
-			nineSlice:SetAlpha(0)
-			Hook(nineSlice, 'SetAlpha', function(self, alpha)
-				if IsEnabled() and alpha ~= 0 then self:SetAlpha(0) end
-			end)
-			nineSlice:HookScript('OnShow', syncShown)
-			nineSlice:HookScript('OnHide', syncShown)
-			Hook(nineSlice, 'SetPoint', UpdateCardAnchors)
-		end
-		trackerFrame:HookScript('OnHide', syncShown)
-		trackerFrame:HookScript('OnShow', syncShown)
-		if trackerFrame.SetRolesets then Hook(trackerFrame, 'SetRolesets', SyncTrackerCardSoon) end
-		Hook(trackerFrame, 'SetAlpha', function(_, alpha)
-			local fadedOut = not issecretvalue(alpha) and alpha == 0 and not Skin.trackerStashScale
-			if fadedOut == (Skin.trackerFadedOut or false) then return end
-			Skin.trackerFadedOut = fadedOut or nil
-			SyncTrackerCardShown()
-		end)
+local function StashTracker(stashed)
+	if stashed == (trackerStashScale ~= nil) then return end
+	local trackerFrame = ObjectiveTrackerFrame
+	if stashed then
+		trackerStashScale = trackerFrame:GetScale()
+		trackerFrame:SetScaleBase(TRACKER_STASH_SCALE)
+		trackerFrame:SetAlpha(0)
+	else
+		trackerFrame:SetScaleBase(trackerStashScale)
+		trackerFrame:SetAlpha(1)
+		trackerStashScale = nil
 	end
-	UpdateCardAnchors()
-	ApplyCardStyle()
+	SyncTrackerCardShown()
+	TrackerClamp()
+end
+
+local function ApplyTrackerHidden()
+	if InCombatLockdown() then
+		BUI.Events:AfterCombat(ApplyTrackerHidden, 'Skinning.TrackerHidden')
+		return
+	end
+	StashTracker(Enabled() and GetSettings().trackerHidden == true)
+end
+
+local function OnTrackerAlpha(_, alpha)
+	local fadedOut = not issecretvalue(alpha) and alpha == 0 and not trackerStashScale
+	if fadedOut == (trackerFadedOut or false) then return end
+	trackerFadedOut = fadedOut or nil
 	SyncTrackerCardShown()
 end
 
-local styleOverrides
+local function CreateTrackerCard(trackerFrame)
+	trackerCard = CreateFrame('Frame', 'BUI_TrackerPanel', UIParent, 'BackdropTemplate')
+	trackerCard:SetFrameStrata('LOW')
+	trackerCard:SetFrameLevel(0)
+	Pixel.SetTemplate(trackerCard, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+	trackerCard:Hide()
+	trackerCard:HookScript('OnSizeChanged', Wrap('Skin.ObjectiveTracker tracker clamp', TrackerClamp))
+
+	local nineSlice = trackerFrame.NineSlice
+	local syncShown = Wrap('Skin.ObjectiveTracker card sync', SyncTrackerCardShown)
+	Hook(trackerFrame, 'SetCollapsed', UpdateCardAnchors)
+	Hook(trackerFrame, 'SetAlpha', OnTrackerAlpha)
+	Hook(nineSlice, 'SetPoint', UpdateCardAnchors)
+	Hook(nineSlice, 'SetAlpha', function(self, alpha)
+		if alpha ~= 0 then self:SetAlpha(0) end
+	end)
+	nineSlice:HookScript('OnShow', syncShown)
+	nineSlice:HookScript('OnHide', syncShown)
+	trackerFrame:HookScript('OnShow', syncShown)
+	trackerFrame:HookScript('OnHide', syncShown)
+end
+
+local function TrackerColorRGB(key)
+	local color = GetSettings().colors[key]
+	return color[1], color[2], color[3], 1
+end
 
 local function GetStyleOverrides()
 	if styleOverrides then return styleOverrides end
-	local palette = _G.OBJECTIVE_TRACKER_COLOR
-	if not palette then return nil end
-	styleOverrides = {}
+	local colors = GetSettings().colors
 	local map = {
-		Header             = Skin.TrackerColor('title'),
-		HeaderHighlight    = Skin.TrackerColor('hover'),
-		Normal             = Skin.TrackerColor('objective'),
-		NormalHighlight    = Skin.TrackerColor('hover'),
-		Complete           = Skin.TrackerColor('completed'),
-		CompleteHighlight  = Skin.TrackerColor('completed'),
-		TimeLeft           = Skin.TrackerColor('timeLeft'),
-		TimeLeftHighlight  = Skin.TrackerColor('hover'),
+		Header            = colors.title,
+		HeaderHighlight   = colors.hover,
+		Normal            = colors.objective,
+		NormalHighlight   = colors.hover,
+		Complete          = colors.completed,
+		CompleteHighlight = colors.completed,
+		TimeLeft          = colors.timeLeft,
+		TimeLeftHighlight = colors.hover,
 	}
+	styleOverrides = {}
 	for key, replacement in pairs(map) do
-		local style = palette[key]
+		local style = OBJECTIVE_TRACKER_COLOR[key]
 		if style then styleOverrides[style] = replacement end
 	end
 	return styleOverrides
 end
 
 local function PaintFromStyle(fontString, style)
-	local overrides = GetStyleOverrides()
-	local replacement = overrides and style and overrides[style]
-	if replacement then
-		fontString:SetTextColor(replacement[1], replacement[2], replacement[3], 1)
-	end
+	local replacement = style and GetStyleOverrides()[style]
+	if replacement then fontString:SetTextColor(replacement[1], replacement[2], replacement[3], 1) end
 end
 
 local function IsReadyBlock(block)
@@ -345,23 +351,22 @@ local function IsReadyBlock(block)
 end
 
 local function OnSetStringText(block, fontString, _, _, colorStyle, useHighlight)
-	if not IsEnabled() or not fontString or GetSettings().customColors == false then return end
+	if GetSettings().customColors == false then return end
 	if fontString == block.HeaderText and IsReadyBlock(block) then
-		fontString:SetTextColor(Skin.TrackerColorRGB(useHighlight and 'hover' or 'ready'))
+		fontString:SetTextColor(TrackerColorRGB(useHighlight and 'hover' or 'ready'))
 		return
 	end
-	local palette = _G.OBJECTIVE_TRACKER_COLOR
-	local effective = colorStyle or (palette and palette.Normal)
-	if useHighlight and effective and effective.reverse then effective = effective.reverse end
+	local effective = colorStyle or OBJECTIVE_TRACKER_COLOR.Normal
+	if useHighlight and effective.reverse then effective = effective.reverse end
 	PaintFromStyle(fontString, effective)
 end
 
 local function OnUpdateHighlight(block)
-	if not IsEnabled() or GetSettings().customColors == false then return end
+	if GetSettings().customColors == false then return end
 	local headerText = block.HeaderText
 	if headerText then
 		local key = IsReadyBlock(block) and 'ready' or 'title'
-		headerText:SetTextColor(Skin.TrackerColorRGB(block.isHighlighted and 'hover' or key))
+		headerText:SetTextColor(TrackerColorRGB(block.isHighlighted and 'hover' or key))
 	end
 	if block.usedLines then
 		for _, line in pairs(block.usedLines) do
@@ -373,7 +378,7 @@ end
 local function ForEachTrackedBlock(callback)
 	for _, trackerName in ipairs(TRACKER_NAMES) do
 		local tracker = _G[trackerName]
-		if tracker and tracker.usedBlocks then
+		if tracker then
 			for _, blocks in pairs(tracker.usedBlocks) do
 				for _, block in pairs(blocks) do callback(block) end
 			end
@@ -399,9 +404,8 @@ local function RepaintBlizzardColors()
 	end)
 end
 
-function Skin.ApplyTrackerColors()
+local function ApplyTrackerColors()
 	styleOverrides = nil
-	Skin.ClearTrackerColorCache()
 	if GetSettings().customColors == false then
 		RepaintBlizzardColors()
 	else
@@ -420,7 +424,8 @@ function QuestItem.OnEnter(self)
 	if not self.questLogIndex then return end
 	GameTooltip:SetOwner(self, 'ANCHOR_LEFT')
 	GameTooltip:SetQuestLogSpecialItem(self.questLogIndex)
-	GameTooltip:AddLine('Ctrl+drag to move', Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3])
+	local red, green, blue = Painter.Color('skinLabel')
+	GameTooltip:AddLine('Ctrl+drag to move', red, green, blue)
 	GameTooltip:Show()
 end
 
@@ -465,7 +470,8 @@ function QuestItem.Ensure()
 	highlight:SetAllPoints(button)
 	highlight:SetColorTexture(1, 1, 1, 0.22)
 
-	Pixel.ApplyBorder(button, 1, Theme.border.light[1], Theme.border.light[2], Theme.border.light[3], 1)
+	local edgeRed, edgeGreen, edgeBlue = Painter.Color('skinBorder')
+	Pixel.ApplyBorder(button, 1, edgeRed, edgeGreen, edgeBlue, 1)
 	button:SetScript('OnEnter', BUI.Profiler.Script('Skin.ObjectiveTracker button OnEnter', QuestItem.OnEnter))
 	button:SetScript('OnLeave', GameTooltip_Hide)
 	button:SetScript('OnDragStart', BUI.Profiler.Script('Skin.ObjectiveTracker button OnDragStart', QuestItem.OnDragStart))
@@ -518,8 +524,8 @@ end
 function QuestItem.Update()
 	local settings = GetSettings()
 	local key = settings.questItemKey
-	local wantBinding = IsEnabled() and key and key ~= 'NONE'
-	local wantButton = IsEnabled() and settings.showQuestItemButton == true
+	local wantBinding = Enabled() and key and key ~= 'NONE'
+	local wantButton = Enabled() and settings.showQuestItemButton == true
 	if not QuestItem.button and not wantBinding and not wantButton then return end
 	if InCombatLockdown() then
 		BUI.Events:AfterCombat(QuestItem.Update, 'Skinning.TrackerItemKey')
@@ -588,7 +594,7 @@ function QuestItem.KeyTool(ui)
 end
 
 function QuestInfo.AddWowheadButton(rootDescription, kind, id)
-	if not IsEnabled() or not id then return end
+	if not id then return end
 	rootDescription:CreateButton('Copy Wowhead Link', function()
 		BUI.Modals.Input({
 			title = 'Wowhead Link',
@@ -599,101 +605,71 @@ function QuestInfo.AddWowheadButton(rootDescription, kind, id)
 	end)
 end
 
+function QuestInfo.FindWaypoint(questID)
+	local mapID, waypointX, waypointY = C_QuestLog.GetNextWaypoint(questID)
+	if mapID then return mapID, waypointX, waypointY end
+	local uiMapID = GetQuestUiMapID(questID)
+	if not uiMapID or uiMapID == 0 then uiMapID = C_Map.GetBestMapForUnit('player') end
+	if not uiMapID or uiMapID == 0 then return end
+	waypointX, waypointY = C_QuestLog.GetNextWaypointForMap(questID, uiMapID)
+	if waypointX then return uiMapID, waypointX, waypointY end
+	for _, questPOI in ipairs(C_QuestLog.GetQuestsOnMap(uiMapID) or {}) do
+		if questPOI.questID == questID and questPOI.x and questPOI.y then return uiMapID, questPOI.x, questPOI.y end
+	end
+	local taskX, taskY = C_TaskQuest.GetQuestLocation(questID, uiMapID)
+	if taskX and taskY then return uiMapID, taskX, taskY end
+end
+
 function QuestInfo.AddTomTomButton(rootDescription)
-	if not IsEnabled() then return end
 	local TomTom = _G.TomTom
-	if not TomTom or not TomTom.AddWaypoint then return end
 	local questID = pendingMenuQuestID
-	if not questID then return end
+	if not TomTom or not TomTom.AddWaypoint or not questID then return end
 	rootDescription:CreateButton('TomTom Waypoint', function()
-		local mapID, waypointX, waypointY
-		if C_QuestLog.GetNextWaypoint then
-			mapID, waypointX, waypointY = C_QuestLog.GetNextWaypoint(questID)
-		end
+		local mapID, waypointX, waypointY = QuestInfo.FindWaypoint(questID)
 		if not mapID then
-			local uiMapID = GetQuestUiMapID and GetQuestUiMapID(questID)
-			if (not uiMapID or uiMapID == 0) and C_Map and C_Map.GetBestMapForUnit then
-				uiMapID = C_Map.GetBestMapForUnit('player')
-			end
-			if uiMapID and uiMapID ~= 0 then
-				if C_QuestLog.GetNextWaypointForMap then
-					waypointX, waypointY = C_QuestLog.GetNextWaypointForMap(questID, uiMapID)
-					if waypointX then mapID = uiMapID end
-				end
-				if not mapID and C_QuestLog.GetQuestsOnMap then
-					local questsOnMap = C_QuestLog.GetQuestsOnMap(uiMapID)
-					if questsOnMap then
-						for _, questPOI in ipairs(questsOnMap) do
-							if questPOI.questID == questID and questPOI.x and questPOI.y then
-								mapID, waypointX, waypointY = uiMapID, questPOI.x, questPOI.y
-								break
-							end
-						end
-					end
-				end
-				if not mapID and C_TaskQuest and C_TaskQuest.GetQuestLocation then
-					local taskX, taskY = C_TaskQuest.GetQuestLocation(questID, uiMapID)
-					if taskX and taskY then
-						mapID, waypointX, waypointY = uiMapID, taskX, taskY
-					end
-				end
-			end
-		end
-		if not mapID or not waypointX or not waypointY then
 			BUI.Print('No map location available for that quest.')
 			return
 		end
-		local title = C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(questID) or ('Quest ' .. questID)
+		local title = C_QuestLog.GetTitleForQuestID(questID) or ('Quest ' .. questID)
 		TomTom:AddWaypoint(mapID, waypointX, waypointY, { title = title, persistent = false, minimap = true, world = true })
 	end)
 end
 
-local menuHookInstalled = false
-
 local function InstallMenuHook()
-	if menuHookInstalled then return end
-	if not Menu or not Menu.ModifyMenu then return end
-	menuHookInstalled = true
-	Menu.ModifyMenu('MENU_QUEST_OBJECTIVE_TRACKER', function(_, rootDescription)
+	Menu.ModifyMenu('MENU_QUEST_OBJECTIVE_TRACKER', Guard(function(_, rootDescription)
 		QuestInfo.AddTomTomButton(rootDescription)
 		QuestInfo.AddWowheadButton(rootDescription, 'quest', pendingMenuQuestID)
-	end)
-	Menu.ModifyMenu('MENU_BONUS_OBJECTIVE_TRACKER', function(_, rootDescription, block)
+	end))
+	Menu.ModifyMenu('MENU_BONUS_OBJECTIVE_TRACKER', Guard(function(_, rootDescription, block)
 		QuestInfo.AddWowheadButton(rootDescription, 'quest', block and block.id)
-	end)
-	Menu.ModifyMenu('MENU_ACHIEVEMENT_TRACKER', function(_, rootDescription, block)
+	end))
+	Menu.ModifyMenu('MENU_ACHIEVEMENT_TRACKER', Guard(function(_, rootDescription, block)
 		QuestInfo.AddWowheadButton(rootDescription, 'achievement', block and block.id)
-	end)
+	end))
 end
 
 local function SingleLineTitlesEnabled()
 	return GetSettings().singleLineTitles ~= false
 end
 
-local function ApplyTitleWrap()
-	local titleWrap = not (IsEnabled() and SingleLineTitlesEnabled())
-	for fontString in pairs(wrapAdjustedText.titles) do
-		fontString.__buiWordWrap = titleWrap
-		fontString:SetWordWrap(titleWrap)
-	end
-	local objectiveWrap = not (IsEnabled() and GetSettings().singleLineObjectives ~= false)
-	for fontString in pairs(wrapAdjustedText.objectives) do
-		fontString.__buiWordWrap = objectiveWrap
-		fontString:SetWordWrap(objectiveWrap)
+local function ApplyWrap(fontStrings, wrap)
+	for fontString in pairs(fontStrings) do
+		fontString.__buiWordWrap = wrap
+		fontString:SetWordWrap(wrap)
 	end
 end
 
+local function ApplyTitleWrap()
+	ApplyWrap(wrapAdjustedText.titles, not (Enabled() and SingleLineTitlesEnabled()))
+	ApplyWrap(wrapAdjustedText.objectives, not (Enabled() and GetSettings().singleLineObjectives ~= false))
+end
+
 local function TruncateTipText(text)
-	if #text > TIP_TEXT_MAX_LENGTH then
-		return text:sub(1, TIP_TEXT_MAX_LENGTH) .. '...'
-	end
+	if #text > TIP_TEXT_MAX_LENGTH then return text:sub(1, TIP_TEXT_MAX_LENGTH) .. '...' end
 	return text
 end
 
 local function GetQuestClassificationLabel(questID)
-	if not C_QuestInfoSystem or not C_QuestInfoSystem.GetQuestClassification then return nil end
-	local classificationEnum = Enum.QuestClassification
-	if not classificationEnum then return nil end
 	if not questClassificationLabels then
 		local labelByMemberName = {
 			Normal = { 'Standard', 'e8e8f0' },
@@ -710,7 +686,7 @@ local function GetQuestClassificationLabel(questID)
 		}
 		questClassificationLabels = {}
 		for memberName, entry in pairs(labelByMemberName) do
-			local value = classificationEnum[memberName]
+			local value = Enum.QuestClassification[memberName]
 			if value then questClassificationLabels[value] = entry end
 		end
 	end
@@ -749,7 +725,7 @@ function QuestInfo.AddRewardRows(rows, questID)
 	end
 	local choiceCount = GetNumQuestLogChoices(questID)
 	if choiceCount > 0 then
-		rewardRows[#rewardRows + 1] = { left = 'Choose one:', leftColor = Skin.TrackerColor('dim') }
+		rewardRows[#rewardRows + 1] = { left = 'Choose one:', leftColor = RoleColor('skinLabel') }
 		for choiceIndex = 1, choiceCount do
 			local name, texture, amount, quality = GetQuestLogChoiceInfo(choiceIndex, questID)
 			if name then rewardRows[#rewardRows + 1] = QuestInfo.RewardRow(texture, name, amount, quality) end
@@ -757,90 +733,65 @@ function QuestInfo.AddRewardRows(rows, questID)
 	end
 	if #rewardRows == 0 then return end
 	rows[#rows + 1] = { space = true }
-	rows[#rows + 1] = { left = 'Rewards', leftColor = Skin.TrackerColor('dim') }
+	rows[#rows + 1] = { left = 'Rewards', leftColor = RoleColor('skinLabel') }
 	for _, row in ipairs(rewardRows) do rows[#rows + 1] = row end
 end
 
+function QuestInfo.MetaLine(questID)
+	local parts = {}
+	local logIndex = C_QuestLog.GetLogIndexForQuestID(questID)
+	local info = logIndex and C_QuestLog.GetInfo(logIndex)
+	if info and info.level then parts[#parts + 1] = '|cffe8e8f0' .. info.level .. '|r' end
+	local typeLabel, typeHex = GetQuestClassificationLabel(questID)
+	if typeLabel then parts[#parts + 1] = '|cff' .. typeHex .. typeLabel .. '|r' end
+	if info then
+		if info.frequency == Enum.QuestFrequency.Daily then
+			parts[#parts + 1] = '|cff5fb0ffDaily|r'
+		elseif info.frequency == Enum.QuestFrequency.Weekly then
+			parts[#parts + 1] = '|cff5fb0ffWeekly|r'
+		end
+		if info.suggestedGroup and info.suggestedGroup > 0 then parts[#parts + 1] = ('Group %d'):format(info.suggestedGroup) end
+	end
+	local uiMapID = GetQuestUiMapID(questID)
+	local mapInfo = uiMapID and uiMapID ~= 0 and C_Map.GetMapInfo(uiMapID)
+	if mapInfo and mapInfo.name then parts[#parts + 1] = '|cff7fb0ff' .. mapInfo.name .. '|r' end
+	if #parts == 0 then return nil end
+	return table.concat(parts, ' \194\183 ')
+end
+
 local function OnQuestBlockHeaderEnter(_, block, questID, isInGroup)
-	if not IsEnabled() or GetSettings().questTooltip == false then return end
-	if isInGroup or not block or not questID then return end
-	local title = C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(questID)
+	if GetSettings().questTooltip == false or isInGroup or not block or not questID then return end
+	local title = C_QuestLog.GetTitleForQuestID(questID)
 	if not title then return end
 
 	local rows = {}
-	local logIndex = C_QuestLog.GetLogIndexForQuestID and C_QuestLog.GetLogIndexForQuestID(questID)
-	local info = logIndex and C_QuestLog.GetInfo and C_QuestLog.GetInfo(logIndex)
-	local metaParts = {}
-	if info and info.level then
-		metaParts[#metaParts + 1] = '|cffe8e8f0' .. info.level .. '|r'
-	end
-	local typeLabel, typeHex = GetQuestClassificationLabel(questID)
-	if typeLabel then
-		metaParts[#metaParts + 1] = '|cff' .. typeHex .. typeLabel .. '|r'
-	end
-	if info and Enum.QuestFrequency then
-		if info.frequency == Enum.QuestFrequency.Daily then
-			metaParts[#metaParts + 1] = '|cff5fb0ffDaily|r'
-		elseif info.frequency == Enum.QuestFrequency.Weekly then
-			metaParts[#metaParts + 1] = '|cff5fb0ffWeekly|r'
-		end
-	end
-	if info and info.suggestedGroup and info.suggestedGroup > 0 then
-		metaParts[#metaParts + 1] = ('Group %d'):format(info.suggestedGroup)
-	end
-	local uiMapID = GetQuestUiMapID and GetQuestUiMapID(questID)
-	if uiMapID and uiMapID ~= 0 and C_Map and C_Map.GetMapInfo then
-		local mapInfo = C_Map.GetMapInfo(uiMapID)
-		if mapInfo and mapInfo.name then
-			metaParts[#metaParts + 1] = '|cff7fb0ff' .. mapInfo.name .. '|r'
-		end
-	end
-	if #metaParts > 0 then
-		rows[#rows + 1] = {
-			left = table.concat(metaParts, ' \194\183 '),
-			right = tostring(questID),
-			rightColor = Skin.TrackerColor('dim'),
-		}
+	local meta = QuestInfo.MetaLine(questID)
+	if meta then
+		rows[#rows + 1] = { left = meta, right = tostring(questID), rightColor = RoleColor('skinLabel') }
 		rows[#rows + 1] = { space = true }
 	end
-
-	local objectives = C_QuestLog.GetQuestObjectives and C_QuestLog.GetQuestObjectives(questID)
-	if objectives then
-		for _, objective in ipairs(objectives) do
-			if objective.text and objective.text ~= '' then
-				local objectiveText = TruncateTipText(objective.text)
-				if not objective.finished then
-					objectiveText = objectiveText:gsub('^(%d+/%d+)', '|cff' .. READY_COUNT_HEX .. '%1|r')
-				end
-				rows[#rows + 1] = {
-					left = objectiveText,
-					leftColor = Skin.TrackerColor(objective.finished and 'completed' or 'objective'),
-				}
+	local colors = GetSettings().colors
+	for _, objective in ipairs(C_QuestLog.GetQuestObjectives(questID) or {}) do
+		if objective.text and objective.text ~= '' then
+			local objectiveText = TruncateTipText(objective.text)
+			if not objective.finished then
+				objectiveText = objectiveText:gsub('^(%d+/%d+)', '|cff' .. READY_COUNT_HEX .. '%1|r')
 			end
+			rows[#rows + 1] = { left = objectiveText, leftColor = objective.finished and colors.completed or colors.objective }
 		end
 	end
 	if readyQuestIDs[questID] then
-		rows[#rows + 1] = { left = '|A:UI-QuestIcon-TurnIn-Normal:14:14|a Ready to turn in', leftColor = Skin.TrackerColor('ready') }
+		rows[#rows + 1] = { left = '|A:UI-QuestIcon-TurnIn-Normal:14:14|a Ready to turn in', leftColor = colors.ready }
 	end
 	QuestInfo.AddRewardRows(rows, questID)
 	if #rows == 0 then return end
 
-	local blockCenterX = block.GetCenter and block:GetCenter()
-	local anchorSide = (blockCenterX and blockCenterX < UIParent:GetWidth() / 2) and 'RIGHT' or 'LEFT'
+	local anchorSide = block:GetCenter() < UIParent:GetWidth() / 2 and 'RIGHT' or 'LEFT'
 	LibWidget.ShowTipRows(block, title, rows, { anchor = anchorSide })
 end
 
 local function HideQuestTip()
 	LibWidget.HideTip()
-end
-
-local questTipHookInstalled = false
-
-local function InstallQuestTipHook()
-	if questTipHookInstalled then return end
-	if not EventRegistry or not EventRegistry.RegisterCallback then return end
-	questTipHookInstalled = true
-	EventRegistry:RegisterCallback('OnQuestBlockHeader.OnEnter', OnQuestBlockHeaderEnter, wrapAdjustedText)
 end
 
 function QuestFilter.HasActive()
@@ -852,54 +803,41 @@ function QuestFilter.Trackable(info)
 	return not info.isHeader and not info.isTask and (not info.isBounty or C_QuestLog.IsComplete(info.questID))
 end
 
-function QuestFilter.MaxWatches()
-	return Constants and Constants.QuestWatchConsts and Constants.QuestWatchConsts.MAX_QUEST_WATCHES or 25
+function QuestFilter.Wanted(spec, info, inZoneHeader)
+	if spec == 'all' then return true end
+	if spec == 'zone' then return info.isOnMap or inZoneHeader end
+	if spec == 'campaign' then return (info.campaignID or 0) ~= 0 end
+	if spec == 'daily' then return (info.frequency or 0) >= Enum.QuestFrequency.Daily end
+	if spec == 'ready' then return C_QuestLog.IsComplete(info.questID) end
 end
 
 function QuestFilter.Retrack(spec)
-	if not C_QuestLog.GetNumQuestLogEntries or not C_QuestLog.GetInfo then return end
 	GetSettings().trackerTrackSpec = spec
 	QuestFilter.UpdateTint()
 	local numEntries = C_QuestLog.GetNumQuestLogEntries()
-	local maxWatches = QuestFilter.MaxWatches()
-	local superTracked = C_SuperTrack and C_SuperTrack.GetSuperTrackedQuestID and C_SuperTrack.GetSuperTrackedQuestID() or 0
+	local maxWatches = Constants.QuestWatchConsts.MAX_QUEST_WATCHES
+	local superTracked = C_SuperTrack.GetSuperTrackedQuestID()
 	if not IsShiftKeyDown() then
 		for entryIndex = 1, numEntries do
 			local info = C_QuestLog.GetInfo(entryIndex)
-			if info and QuestFilter.Trackable(info) then
-				C_QuestLog.RemoveQuestWatch(info.questID)
-			end
+			if info and QuestFilter.Trackable(info) then C_QuestLog.RemoveQuestWatch(info.questID) end
 		end
 	end
-	local zoneName = GetRealZoneText() or ''
+	local zoneName = GetRealZoneText()
 	local inZoneHeader = false
 	for entryIndex = 1, numEntries do
 		local info = C_QuestLog.GetInfo(entryIndex)
 		if info and not info.isHidden then
 			if info.isHeader then
 				inZoneHeader = info.title == zoneName
-			elseif QuestFilter.Trackable(info) then
-				local wanted
-				if spec == 'all' then
-					wanted = true
-				elseif spec == 'zone' then
-					wanted = info.isOnMap or inZoneHeader
-				elseif spec == 'campaign' then
-					wanted = (info.campaignID or 0) ~= 0
-				elseif spec == 'daily' then
-					wanted = info.frequency and Enum.QuestFrequency and info.frequency >= Enum.QuestFrequency.Daily
-				elseif spec == 'ready' then
-					wanted = C_QuestLog.IsComplete(info.questID)
-				end
-				if wanted then
-					if C_QuestLog.GetNumQuestWatches() >= maxWatches then break end
-					C_QuestLog.AddQuestWatch(info.questID)
-				end
+			elseif QuestFilter.Trackable(info) and QuestFilter.Wanted(spec, info, inZoneHeader) then
+				if C_QuestLog.GetNumQuestWatches() >= maxWatches then break end
+				C_QuestLog.AddQuestWatch(info.questID)
 			end
 		end
 	end
 	C_QuestLog.SortQuestWatches()
-	if superTracked > 0 and C_QuestLog.GetQuestWatchType and C_QuestLog.GetQuestWatchType(superTracked) then
+	if superTracked > 0 and C_QuestLog.GetQuestWatchType(superTracked) then
 		C_SuperTrack.SetSuperTrackedQuestID(superTracked)
 	end
 end
@@ -910,14 +848,13 @@ function QuestFilter.UpdateTint()
 		local accentRed, accentGreen, accentBlue = Theme.GetAccent()
 		headerFilter.glyph:SetVertexColor(accentRed, accentGreen, accentBlue, 1)
 	else
-		headerFilter.glyph:SetVertexColor(Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3], 1)
+		PaintGlyph(headerFilter.glyph, false)
 	end
 end
 
 function QuestFilter.ShowMenu()
 	local settings = GetSettings()
-	local items = {}
-	items[#items + 1] = { title = 'TRACK' }
+	local items = { { title = 'TRACK' } }
 	for _, preset in ipairs({
 		{ spec = 'zone', label = 'Current Zone' },
 		{ spec = 'campaign', label = 'Campaign' },
@@ -955,12 +892,10 @@ end
 
 function QuestInfo.AnnounceObjectives(questID, previousFinished)
 	local finished = {}
-	local objectives = C_QuestLog.GetQuestObjectives(questID)
-	if not objectives then return finished end
-	for objectiveIndex, objective in ipairs(objectives) do
+	for objectiveIndex, objective in ipairs(C_QuestLog.GetQuestObjectives(questID) or {}) do
 		finished[objectiveIndex] = objective.finished
 		if objective.finished and previousFinished and previousFinished[objectiveIndex] == false and objective.text and objective.text ~= '' then
-			UIErrorsFrame:AddMessage('Objective complete: ' .. objective.text, Skin.TrackerColorRGB('completed'))
+			UIErrorsFrame:AddMessage('Objective complete: ' .. objective.text, TrackerColorRGB('completed'))
 		end
 	end
 	return finished
@@ -968,150 +903,94 @@ end
 
 function QuestInfo.AnnounceReady(questID)
 	local title = C_QuestLog.GetTitleForQuestID(questID)
-	if title then UIErrorsFrame:AddMessage(title .. ' complete', Skin.TrackerColorRGB('ready')) end
+	if title then UIErrorsFrame:AddMessage(title .. ' complete', TrackerColorRGB('ready')) end
 end
 
 local function RefreshQuestCache()
-	if not IsEnabled() then return end
-	if not C_QuestLog.GetNumQuestWatches or not C_QuestLog.GetQuestIDForQuestWatchIndex then return end
+	if not Enabled() then return end
 	local announce = GetSettings().completionMessage == true
-	local newObjectivesByQuest = {}
-	local newReadyByQuest = {}
-	local chime = false
-	local readyChanged = false
-	readyQuestIDs = {}
-	watchedCount = 0
-	readyCount = 0
+	local objectivesByQuest = announce and {} or nil
+	local chime, readyChanged = false, false
+	wipe(readyQuestIDs)
+	wipe(nextReadyByQuest)
+	watchedCount, readyCount = 0, 0
 	for watchIndex = 1, C_QuestLog.GetNumQuestWatches() do
 		local questID = C_QuestLog.GetQuestIDForQuestWatchIndex(watchIndex)
 		if questID then
 			watchedCount = watchedCount + 1
-			local ready = C_QuestLog.IsComplete and C_QuestLog.IsComplete(questID) or false
+			local ready = C_QuestLog.IsComplete(questID)
 			if ready then
 				readyCount = readyCount + 1
 				readyQuestIDs[questID] = true
-				if previousReadyByQuest[questID] == false then
+				if readyByQuest[questID] == false then
 					chime = true
 					if announce then QuestInfo.AnnounceReady(questID) end
 				end
 			elseif announce then
-				newObjectivesByQuest[questID] = QuestInfo.AnnounceObjectives(questID, QuestInfo.previousObjectives[questID])
+				objectivesByQuest[questID] = QuestInfo.AnnounceObjectives(questID, QuestInfo.previousObjectives[questID])
 			end
-			if previousReadyByQuest[questID] ~= ready then readyChanged = true end
-			newReadyByQuest[questID] = ready
+			if readyByQuest[questID] ~= ready then readyChanged = true end
+			nextReadyByQuest[questID] = ready
 		end
 	end
-	previousReadyByQuest = newReadyByQuest
-	QuestInfo.previousObjectives = newObjectivesByQuest
+	readyByQuest, nextReadyByQuest = nextReadyByQuest, readyByQuest
+	QuestInfo.previousObjectives = objectivesByQuest or NO_OBJECTIVES
 	UpdateHeaderCounts()
 	if readyChanged then RepaintSkinColors() end
 	QuestItem.Update()
 	if chime then BUI.PlaySoundByName(GetSettings().completionSound) end
 end
 
-local queueQuestCacheRefresh = BUI.Dispatcher.NewDelayed(RefreshQuestCache, 0.3, 'Quest cache refresh')
+local RefreshQuestCacheSoon = BUI.Dispatcher.NewDelayed(RefreshQuestCache, 0.3, 'Quest cache refresh')
 
 local flashQuestID
-
-local function GetFlashColor()
-	local accentRed, accentGreen, accentBlue = Theme.GetAccent()
-	return (accentRed + 1) / 2, (accentGreen + 1) / 2, (accentBlue + 1) / 2
-end
 
 local function FlashProgressBlock()
 	local questID = flashQuestID
 	flashQuestID = nil
-	if not questID or not IsEnabled() then return end
+	if not questID or not Enabled() then return end
 	local targetBlock
 	ForEachTrackedBlock(function(block)
 		if block.poiQuestID == questID then targetBlock = block end
 	end)
 	if not targetBlock or not targetBlock.usedLines then return end
-	local flashRed, flashGreen, flashBlue = GetFlashColor()
+	local accentRed, accentGreen, accentBlue = Theme.GetAccent()
 	for _, line in pairs(targetBlock.usedLines) do
-		if line.Text then line.Text:SetTextColor(flashRed, flashGreen, flashBlue, 1) end
+		if line.Text then line.Text:SetTextColor((accentRed + 1) / 2, (accentGreen + 1) / 2, (accentBlue + 1) / 2, 1) end
 	end
 	After('Skin.ObjectiveTracker flash restore', FLASH_SECONDS, function()
-		if IsEnabled() then OnUpdateHighlight(targetBlock) end
+		if Enabled() then OnUpdateHighlight(targetBlock) end
 	end)
 end
 
-local queueProgressFlash = BUI.Dispatcher.NewDelayed(FlashProgressBlock, 0.15, 'Quest progress flash')
+local FlashProgressSoon = BUI.Dispatcher.NewDelayed(FlashProgressBlock, 0.15, 'Quest progress flash')
 
 local function OnQuestProgress(_, questID)
-	if not IsEnabled() or not questID then return end
+	if not questID then return end
 	flashQuestID = questID
-	queueProgressFlash()
+	FlashProgressSoon()
 end
 
-local dashFontStrings = {}
-
 local function DashesVisible()
-	return not IsEnabled() or GetSettings().showDashes == true
+	return not Enabled() or GetSettings().showDashes == true
 end
 
 local function ApplyDashAlpha()
-	local visible = DashesVisible()
-	for dash in pairs(dashFontStrings) do
-		dash:SetAlpha(visible and 1 or 0)
-	end
+	local alpha = DashesVisible() and 1 or 0
+	for dash in pairs(dashFontStrings) do dash:SetAlpha(alpha) end
 end
 
 local function SetPoiButtonVisible(button, visible)
 	button:SetAlpha(visible and 1 or 0)
-	if button.EnableMouse then button:EnableMouse(visible) end
+	button:EnableMouse(visible)
 end
 
 local function ApplyPoiVisibility()
-	local visible = not IsEnabled() or GetSettings().showQuestIcons == true
-	for button in pairs(hiddenPoiButtons) do
-		SetPoiButtonVisible(button, visible)
-	end
+	local visible = not Enabled() or GetSettings().showQuestIcons == true
+	for button in pairs(hiddenPoiButtons) do SetPoiButtonVisible(button, visible) end
 end
 
-function Skin.StashTracker(stashed)
-	local trackerFrame = _G.ObjectiveTrackerFrame
-	if stashed == (Skin.trackerStashScale ~= nil) then return end
-	if stashed then
-		Skin.trackerStashScale = trackerFrame:GetScale()
-		trackerFrame:SetScaleBase(TRACKER_STASH_SCALE)
-		trackerFrame:SetAlpha(0)
-	else
-		trackerFrame:SetScaleBase(Skin.trackerStashScale)
-		trackerFrame:SetAlpha(1)
-		Skin.trackerStashScale = nil
-	end
-	SyncTrackerCardShown()
-	Skin.TrackerClamp()
-end
-
-function Skin.TrackerClamp()
-	if not trackerCard or not IsEnabled() or Skin.trackerStashScale then return end
-	if InCombatLockdown() then
-		BUI.Events:AfterCombat(Skin.TrackerClamp, 'Skinning.TrackerClamp')
-		return
-	end
-	local trackerFrame = _G.ObjectiveTrackerFrame
-	local left, right, top, bottom = trackerCard:GetLeft(), trackerCard:GetRight(), trackerCard:GetTop(), trackerCard:GetBottom()
-	local frameLeft, frameRight, frameTop, frameBottom = trackerFrame:GetLeft(), trackerFrame:GetRight(), trackerFrame:GetTop(), trackerFrame:GetBottom()
-	if not IsFiniteNumber(left) or not IsFiniteNumber(bottom) or not IsFiniteNumber(frameLeft) or not IsFiniteNumber(frameBottom) then return end
-	for panel in pairs(linkedPanels) do
-		local panelTop, panelBottom = panel:GetTop(), panel:GetBottom()
-		if panel:IsShown() and IsFiniteNumber(panelTop) and IsFiniteNumber(panelBottom) then
-			top = math.max(top, panelTop)
-			bottom = math.min(bottom, panelBottom)
-		end
-	end
-	local ratio = trackerCard:GetEffectiveScale() / trackerFrame:GetEffectiveScale()
-	local insetLeft, insetRight = left * ratio - frameLeft, right * ratio - frameRight
-	local insetTop, insetBottom = top * ratio - frameTop, bottom * ratio - frameBottom
-	local applied = trackerCard._buiClamp
-	if applied and applied[1] == insetLeft and applied[2] == insetRight and applied[3] == insetTop and applied[4] == insetBottom then return end
-	trackerCard._buiClamp = { insetLeft, insetRight, insetTop, insetBottom }
-	trackerFrame:SetClampRectInsets(insetLeft, insetRight, insetTop, insetBottom)
-end
-
-function Skin.TrackerHeaderControls(parent, anchor)
+local function HeaderControls(parent, anchor)
 	local filterButton = CreateFrame('Button', nil, parent)
 	filterButton:SetSize(Pixel.PixelSize(MINIMIZE_SIZE), Pixel.PixelSize(MINIMIZE_SIZE))
 	filterButton:SetPoint('RIGHT', anchor, 'LEFT', -Pixel.Scale(4), 0)
@@ -1119,14 +998,12 @@ function Skin.TrackerHeaderControls(parent, anchor)
 	LibWidget.SetGlyph(filterGlyph, BUILib.GetLibMedia('eye'))
 	filterGlyph:SetPoint('CENTER', 0, 0)
 	filterGlyph:SetSize(Pixel.Scale(GLYPH_SIZE + 2), Pixel.Scale(GLYPH_SIZE + 2))
+	filterButton.glyph = filterGlyph
 	headerFilter = filterButton
-	headerFilter.glyph = filterGlyph
 	filterButton:SetScript('OnEnter', BUI.Profiler.Script('Skin.ObjectiveTracker filterButton OnEnter', function()
-		filterGlyph:SetVertexColor(1, 1, 1, 1)
+		PaintGlyph(filterGlyph, true)
 	end))
-	filterButton:SetScript('OnLeave', BUI.Profiler.Script('Skin.ObjectiveTracker filterButton OnLeave', function()
-		QuestFilter.UpdateTint()
-	end))
+	filterButton:SetScript('OnLeave', BUI.Profiler.Script('Skin.ObjectiveTracker filterButton OnLeave', QuestFilter.UpdateTint))
 	filterButton:SetScript('OnClick', BUI.Profiler.Script('Skin.ObjectiveTracker filterButton OnClick', QuestFilter.ShowMenu))
 	QuestFilter.UpdateTint()
 
@@ -1134,101 +1011,68 @@ function Skin.TrackerHeaderControls(parent, anchor)
 	ApplySkinFont(headerCounts, 'line')
 	headerCounts:SetPoint('RIGHT', filterButton, 'LEFT', -Pixel.Scale(8), 0)
 	headerCounts:SetJustifyH('RIGHT')
-	headerCounts:SetTextColor(Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3], 1)
+	headerCounts:SetTextColor(Painter.Color('skinLabel'))
 	UpdateHeaderCounts()
 end
 
-function Skin.TrackerDecorateHeader(trackerFrame)
+local function DecorateHeader(trackerFrame)
 	local header = trackerFrame.Header
-	if not header.__buiDecorated then
-		header.__buiDecorated = true
-		Skin.TrackerHeaderControls(header, header.MinimizeButton)
-		Hook(trackerFrame, 'Init', Skin.TrackerDecorateHeader)
-	end
-	local enabled = IsEnabled()
-	local text = header.Text
-	getmetatable(text).__index.SetText(text, enabled and 'OBJECTIVES' or trackerFrame.headerText)
+	local enabled = Enabled()
+	if enabled and not headerFilter then HeaderControls(header, header.MinimizeButton) end
+	SetRawText(header.Text, enabled and 'OBJECTIVES' or trackerFrame.headerText)
+	if not headerFilter then return end
 	headerFilter:SetShown(enabled)
 	headerCounts:SetShown(enabled)
 end
 
 local function ApplyHeaderRowVisibility()
-	local trackerFrame = _G.ObjectiveTrackerFrame
-	local header = trackerFrame and trackerFrame.Header
-	if not header then return end
-	header:SetShown(not IsEnabled() or GetSettings().showHeaderRow ~= false)
-	Skin.TrackerDecorateHeader(trackerFrame)
-end
-
-local function ApplyTextSettings()
-	local font = GetSkinFont()
-	local flags = GetSkinFontFlags()
-	for fontString, entry in pairs(restoreFonts) do
-		Pixel.ApplyFont(fontString, GetRoleSize(entry.role), font, flags)
-	end
-	ApplyCardStyle()
+	local trackerFrame = ObjectiveTrackerFrame
+	trackerFrame.Header:SetShown(not Enabled() or GetSettings().showHeaderRow ~= false)
+	DecorateHeader(trackerFrame)
 end
 
 local function Track(element)
-	if element then addedElements[#addedElements + 1] = element end
+	addedElements[#addedElements + 1] = element
 	return element
 end
 
-local function SetCollapsedGlyph(header, collapsed)
-	local button = header and header.MinimizeButton
-	local chevron = button and button.__buiChevron
-	if chevron then chevron:SetRotation(collapsed and 0 or math.pi) end
-end
-
 local function ReassertHidden(texture)
-	if texture.__buiReasserting then return end
-	if texture.__buiHidden and IsEnabled() then
-		texture.__buiReasserting = true
-		texture:SetTexture(nil)
-		texture:SetAlpha(0)
-		texture.__buiReasserting = nil
-	end
+	if texture.__buiReasserting or not texture.__buiHidden then return end
+	texture.__buiReasserting = true
+	texture:SetTexture(nil)
+	texture:SetAlpha(0)
+	texture.__buiReasserting = nil
 end
 
 local function HideBlizzardTexture(texture)
 	if not texture or texture.__buiHidden then return end
 	texture.__buiHidden = true
 	texture.__buiOldAlpha = texture:GetAlpha()
-	texture.__buiOldAtlas = texture.GetAtlas and texture:GetAtlas() or nil
+	texture.__buiOldAtlas = texture:GetAtlas()
 	if not texture.__buiOldAtlas then texture.__buiOldTexture = texture:GetTexture() end
 	hiddenTextures[#hiddenTextures + 1] = texture
-
-	texture:SetTexture(nil)
-	texture:SetAlpha(0)
+	ReassertHidden(texture)
 	Hook(texture, 'SetAtlas', ReassertHidden)
 	Hook(texture, 'SetTexture', ReassertHidden)
-	Hook(texture, 'SetShown', ReassertHidden)
-	Hook(texture, 'Show', ReassertHidden)
-	Hook(texture, 'SetAlpha', ReassertHidden)
 end
 
 local function HideFrameTextures(frame)
-	if not frame or not frame.GetRegions then return end
 	for regionIndex = 1, select('#', frame:GetRegions()) do
 		local region = select(regionIndex, frame:GetRegions())
-		if region and region.IsObjectType and region:IsObjectType('Texture') then
-			HideBlizzardTexture(region)
-		end
+		if region:IsObjectType('Texture') then HideBlizzardTexture(region) end
 	end
 end
 
-local function ClearButtonTextures(button, getters)
-	for _, getter in ipairs(getters) do
-		HideBlizzardTexture(button[getter] and button[getter](button))
-	end
+local function SetCollapsedGlyph(header, collapsed)
+	header.MinimizeButton.__buiChevron:SetRotation(collapsed and 0 or math.pi)
 end
 
 local function SkinMinimizeButton(header)
 	local button = header.MinimizeButton
-	if not button or button.__buiSkinned then return end
-	button.__buiSkinned = true
-
-	ClearButtonTextures(button, { 'GetNormalTexture', 'GetPushedTexture', 'GetDisabledTexture', 'GetHighlightTexture' })
+	HideBlizzardTexture(button:GetNormalTexture())
+	HideBlizzardTexture(button:GetPushedTexture())
+	HideBlizzardTexture(button:GetDisabledTexture())
+	HideBlizzardTexture(button:GetHighlightTexture())
 	HideFrameTextures(button)
 	button:SetSize(Pixel.PixelSize(MINIMIZE_SIZE), Pixel.PixelSize(MINIMIZE_SIZE))
 
@@ -1237,76 +1081,101 @@ local function SkinMinimizeButton(header)
 	chevron:SetPoint('CENTER', 0, 0)
 	chevron:SetSize(Pixel.Scale(GLYPH_SIZE), Pixel.Scale(GLYPH_SIZE))
 	button.__buiChevron = chevron
+	chevrons[chevron] = true
+	PaintGlyph(chevron, false)
 
-	local function PaintGlyph(red, green, blue)
-		chevron:SetVertexColor(red, green, blue, 1)
-	end
-	PaintGlyph(Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3])
-
-	button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.ObjectiveTracker button OnEnter 2', function()
-		if IsEnabled() then PaintGlyph(1, 1, 1) end
+	button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.ObjectiveTracker minimize OnEnter', function()
+		if Enabled() then PaintGlyph(chevron, true) end
 	end))
-	button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.ObjectiveTracker button OnLeave', function()
-		PaintGlyph(Theme.text.muted[1], Theme.text.muted[2], Theme.text.muted[3])
+	button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.ObjectiveTracker minimize OnLeave', function()
+		PaintGlyph(chevron, false)
 	end))
 
 	SetCollapsedGlyph(header, header.isCollapsed)
-	if header.SetCollapsed then Hook(header, 'SetCollapsed', SetCollapsedGlyph) end
+	Hook(header, 'SetCollapsed', SetCollapsedGlyph)
 end
 
-local function SkinHeader(header)
-	if not header or header.__buiSkinned then return end
+local function PlaceHeaderRule(header)
+	local text = header.Text
+	header.__buiRule:SetPoint('LEFT', text, 'LEFT', text:GetUnboundedStringWidth() + Pixel.Scale(RULE_GAP), 0)
+end
+
+local function UpperHeader(header)
+	local text = header.Text
+	local value = text:GetText()
+	if not value or value == header.__buiUpper then return end
+	header.__buiOriginal = value
+	header.__buiUpper = value:upper()
+	SetRawText(text, header.__buiUpper)
+	PlaceHeaderRule(header)
+end
+
+local function OnSetHeader(module)
+	local header = module.Header
+	if header and header.__buiSkinned then UpperHeader(header) end
+end
+
+local function SkinHeader(header, isContainer)
+	if header.__buiSkinned then return end
 	header.__buiSkinned = true
 
-	local entry = {}
-	restoreHeaders[header] = entry
-
+	local text = header.Text
+	restoreHeaders[header] = { text:GetTextColor() }
 	HideFrameTextures(header)
 	HideBlizzardTexture(header.Background)
 
-	local headerTextInset = -Pixel.Scale(HEADER_TEXT_INSET)
+	local inset = -Pixel.Scale(HEADER_TEXT_INSET)
+	text:ClearAllPoints()
+	text:SetPoint('LEFT', header, 'LEFT', inset, 0)
 
 	local rule = Track(header:CreateTexture(nil, 'ARTWORK'))
-	rule:SetPoint('BOTTOMLEFT', header, 'BOTTOMLEFT', headerTextInset, 0)
-	rule:SetPoint('BOTTOMRIGHT', header, 'BOTTOMRIGHT', 0, 0)
 	rule:SetHeight(Pixel.PixelSize(1))
-	Skin.trackerRules[rule] = true
-	rule:SetColorTexture(Skin.TrackerSeparatorColor())
+	header.__buiRule = rule
+	rules[rule] = true
+	PaintRule(rule)
 
-	local text = header.Text
-	if text then
-		entry.red, entry.green, entry.blue, entry.alpha = text:GetTextColor()
-
+	if isContainer then
+		rule:SetPoint('BOTTOMLEFT', header, 'BOTTOMLEFT', inset, 0)
+		rule:SetPoint('BOTTOMRIGHT')
+		headerRoles[text] = 'skinTitle'
 		ApplySkinFont(text, 'header')
-		text:ClearAllPoints()
-		text:SetPoint('LEFT', header, 'LEFT', headerTextInset, 0)
-		text:SetTextColor(Theme.text.label[1], Theme.text.label[2], Theme.text.label[3], 1)
+	else
+		rule:SetPoint('RIGHT', header.MinimizeButton, 'LEFT', -Pixel.Scale(RULE_GAP), 0)
+		headerRoles[text] = 'skinLabel'
+		moduleHeaders[header] = true
+		ApplySkinFont(text, 'caption')
+		UpperHeader(header)
+		PlaceHeaderRule(header)
 	end
-
+	text:SetTextColor(Painter.Color(headerRoles[text]))
 	SkinMinimizeButton(header)
 end
 
 local function CropIcon(icon)
-	if icon.GetAtlas and icon:GetAtlas() then return end
+	if icon:GetAtlas() then return end
 	icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+end
+
+local function CardBackdrop(frame)
+	return LibSkin.ChildBackdrop(frame, { bg = Skin.PALETTE.card, border = Skin.PALETTE.edge })
 end
 
 local function SkinBar(bar)
 	if not bar or bar.__buiSkinned then return end
 	bar.__buiSkinned = true
 
-	Skin3.StripTextures(bar)
+	LibSkin.StripTextures(bar)
 	bar:SetStatusBarTexture(FLAT_TEXTURE)
 	bar:SetStatusBarColor(Theme.GetAccent())
 	Theme.RegisterAccentElement(bar, function(element, red, green, blue)
 		element:SetStatusBarColor(red, green, blue, 1)
 	end)
-	local backdrop = Skin3.ChildBackdrop(bar, { bg = Theme.bg.dark, border = Theme.border.default })
+	local backdrop = CardBackdrop(bar)
 	skinnedBars[bar] = backdrop
 	bar:HookScript('OnShow', Wrap('Skin.ObjectiveTracker bar backdrop', function(self)
-		backdrop:SetShown(IsEnabled() and self:IsShown())
+		backdrop:SetShown(Enabled() and self:IsShown())
 	end))
-	backdrop:SetShown(IsEnabled() and bar:IsShown())
+	backdrop:SetShown(Enabled() and bar:IsShown())
 
 	local label = bar.Label
 	if label then
@@ -1317,7 +1186,7 @@ local function SkinBar(bar)
 
 	local icon = bar.Icon
 	if icon then
-		if icon.SetMask then icon:SetMask('') end
+		icon:SetMask('')
 		CropIcon(icon)
 		icon:SetSize(Pixel.Scale(BAR_ICON_SIZE), Pixel.Scale(BAR_ICON_SIZE))
 		icon:ClearAllPoints()
@@ -1326,9 +1195,8 @@ local function SkinBar(bar)
 end
 
 local function SkinStageBlock()
-	local scenarioTracker = _G.ScenarioObjectiveTracker
-	local stageBlock = scenarioTracker and scenarioTracker.StageBlock
-	if not stageBlock or stageBlock.__buiSkinned then return end
+	local stageBlock = ScenarioObjectiveTracker.StageBlock
+	if stageBlock.__buiSkinned then return end
 	stageBlock.__buiSkinned = true
 
 	HideBlizzardTexture(stageBlock.NormalBG)
@@ -1336,7 +1204,7 @@ local function SkinStageBlock()
 	HideBlizzardTexture(stageBlock.FinalBG)
 	HideBlizzardTexture(stageBlock.GlowTexture)
 
-	skinnedBars[stageBlock] = Skin3.ChildBackdrop(stageBlock, { bg = Theme.bg.light, border = Theme.border.light })
+	skinnedBars[stageBlock] = CardBackdrop(stageBlock)
 	stageBlock:HookScript('OnShow', Wrap('Skin.ObjectiveTracker stage backdrop', Scenario.SyncStageBackdrop))
 	stageBlock:HookScript('OnHide', Wrap('Skin.ObjectiveTracker stage backdrop', Scenario.SyncStageBackdrop))
 	Hook(stageBlock, 'UpdateWidgetRegistration', Scenario.SyncStageBackdrop)
@@ -1346,21 +1214,18 @@ local function SkinStageBlock()
 	ApplySkinFont(stageBlock.Stage, 'header')
 	ApplySkinFont(stageBlock.Name, 'title')
 	ApplySkinFont(stageBlock.CompleteLabel, 'header')
-	if stageBlock.Stage then
-		stageBlock.Stage:SetTextColor(Skin.TrackerColorRGB('title'))
-	end
-	if stageBlock.Name then
-		stageBlock.Name:SetTextColor(Skin.TrackerColorRGB('title'))
-	end
+	if stageBlock.Stage then stageBlock.Stage:SetTextColor(TrackerColorRGB('title')) end
+	if stageBlock.Name then stageBlock.Name:SetTextColor(TrackerColorRGB('title')) end
 end
 
 local function SkinItemButton(button)
 	if not button or button.__buiSkinned then return end
 	button.__buiSkinned = true
 
-	ClearButtonTextures(button, { 'GetNormalTexture', 'GetPushedTexture' })
+	HideBlizzardTexture(button:GetNormalTexture())
+	HideBlizzardTexture(button:GetPushedTexture())
 
-	local highlight = button.GetHighlightTexture and button:GetHighlightTexture()
+	local highlight = button:GetHighlightTexture()
 	if highlight then
 		highlight:SetAtlas(nil)
 		highlight:SetColorTexture(1, 1, 1, 0.22)
@@ -1373,7 +1238,8 @@ local function SkinItemButton(button)
 		icon:SetAllPoints(button)
 	end
 
-	Pixel.ApplyBorder(button, 1, Theme.border.light[1], Theme.border.light[2], Theme.border.light[3], 1)
+	local edgeRed, edgeGreen, edgeBlue = Painter.Color('skinBorder')
+	Pixel.ApplyBorder(button, 1, edgeRed, edgeGreen, edgeBlue, 1)
 
 	local glow = button.Glow
 	if glow then
@@ -1411,18 +1277,18 @@ local function SkinCheck(check)
 	end)
 end
 
-local function SkinLine(line)
-	SkinCheck(line.Check)
-	ApplySkinFont(line.Text, 'line')
-	local lineText = line.Text
-	if lineText then
-		wrapAdjustedText.objectives[lineText] = true
-		local wantWrap = GetSettings().singleLineObjectives == false
-		if lineText.__buiWordWrap ~= wantWrap then
-			lineText.__buiWordWrap = wantWrap
-			lineText:SetWordWrap(wantWrap)
-		end
+local function SkinBlockText(fontString, role, wrapSet, wantWrap)
+	ApplySkinFont(fontString, role)
+	wrapSet[fontString] = true
+	if fontString.__buiWordWrap ~= wantWrap then
+		fontString.__buiWordWrap = wantWrap
+		fontString:SetWordWrap(wantWrap)
 	end
+end
+
+local function SkinLine(line, wantWrap)
+	SkinCheck(line.Check)
+	if line.Text then SkinBlockText(line.Text, 'line', wrapAdjustedText.objectives, wantWrap) end
 	local dash = line.Dash
 	if dash and not dashFontStrings[dash] then
 		dashFontStrings[dash] = true
@@ -1430,32 +1296,40 @@ local function SkinLine(line)
 	end
 end
 
+local function OnAddPOIButton(block)
+	local button = block.poiButton
+	if button and block.HeaderText then
+		button:ClearAllPoints()
+		button:SetPoint('RIGHT', block.HeaderText, 'LEFT', POI_ANCHOR_OFFSET_X, 0)
+	end
+end
+
+local OnBlockMouseDown = BUI.Profiler.Wrap('Skin.ObjectiveTracker block OnMouseDown', function(block)
+	pendingMenuQuestID = block.poiQuestID or block.id
+end)
+
+local function HookBlock(block)
+	block.__buiHooked = true
+	if block.AddPOIButton then Hook(block, 'AddPOIButton', OnAddPOIButton) end
+	if block.SetStringText then Hook(block, 'SetStringText', OnSetStringText) end
+	if block.UpdateHighlight then Hook(block, 'UpdateHighlight', OnUpdateHighlight) end
+	block:HookScript('OnMouseDown', OnBlockMouseDown)
+	OnUpdateHighlight(block)
+end
+
 local function OnAddBlock(_, block)
-	if not IsEnabled() or not block then return end
 	SkinItemButton(block.ItemButton or block.itemButton)
 	if block.addedRegions and not InCombatLockdown() then
-		local raisedLevel = (block.GetFrameLevel and block:GetFrameLevel() or 0) + 5
+		local raisedLevel = block:GetFrameLevel() + 5
 		for region in pairs(block.addedRegions) do
 			if region.SetFrameLevel and region:GetFrameLevel() ~= raisedLevel then region:SetFrameLevel(raisedLevel) end
 		end
 	end
 	HideBlizzardTexture(block.HeaderGlow)
-	ApplySkinFont(block.HeaderText, 'title')
-	local blockHeaderText = block.HeaderText
-	if blockHeaderText then
-		wrapAdjustedText.titles[blockHeaderText] = true
-		local wantWrap = not SingleLineTitlesEnabled()
-		if blockHeaderText.__buiWordWrap ~= wantWrap then
-			blockHeaderText.__buiWordWrap = wantWrap
-			blockHeaderText:SetWordWrap(wantWrap)
-		end
-	end
-	local currentLine = block.currentLine
-	if currentLine then SkinLine(currentLine) end
+	if block.HeaderText then SkinBlockText(block.HeaderText, 'title', wrapAdjustedText.titles, not SingleLineTitlesEnabled()) end
 	if block.usedLines then
-		for _, line in pairs(block.usedLines) do
-			SkinLine(line)
-		end
+		local objectiveWrap = GetSettings().singleLineObjectives == false
+		for _, line in pairs(block.usedLines) do SkinLine(line, objectiveWrap) end
 	end
 	local poiButton = block.poiButton
 	if poiButton and not hiddenPoiButtons[poiButton] then
@@ -1463,71 +1337,39 @@ local function OnAddBlock(_, block)
 		poiButton:SetScale(POI_BUTTON_SCALE)
 		SetPoiButtonVisible(poiButton, GetSettings().showQuestIcons == true)
 	end
-	if not block.__buiPoiAnchorHook and block.AddPOIButton then
-		block.__buiPoiAnchorHook = true
-		Hook(block, 'AddPOIButton', function(self)
-			if not IsEnabled() then return end
-			local button = self.poiButton
-			if button and self.HeaderText then
-				button:ClearAllPoints()
-				button:SetPoint('RIGHT', self.HeaderText, 'LEFT', POI_ANCHOR_OFFSET_X, 0)
-			end
-		end)
-	end
-	if not block.__buiMenuHook then
-		block.__buiMenuHook = true
-		block:HookScript('OnMouseDown', BUI.Profiler.Wrap('Skin.ObjectiveTracker block OnMouseDown', function(self)
-			pendingMenuQuestID = self.poiQuestID or self.id
-		end))
-	end
-	if not block.__buiColorHook then
-		block.__buiColorHook = true
-		if block.SetStringText then Hook(block, 'SetStringText', OnSetStringText) end
-		if block.UpdateHighlight then Hook(block, 'UpdateHighlight', OnUpdateHighlight) end
-	end
-	OnUpdateHighlight(block)
+	if not block.__buiHooked then HookBlock(block) end
 end
 
 local function OnGetProgressBar(tracker, key)
-	if not IsEnabled() then return end
-	local progressBar = tracker.usedProgressBars and tracker.usedProgressBars[key]
+	local progressBar = tracker.usedProgressBars[key]
 	if progressBar then SkinBar(progressBar.Bar) end
 end
 
 local function OnGetTimerBar(tracker, key)
-	if not IsEnabled() then return end
-	local timerBar = tracker.usedTimerBars and tracker.usedTimerBars[key]
+	local timerBar = tracker.usedTimerBars[key]
 	if timerBar then SkinBar(timerBar.Bar) end
-end
-
-local hookedTrackers = {}
-
-local function ApplyTrackerHidden()
-	if InCombatLockdown() then
-		BUI.Events:AfterCombat(ApplyTrackerHidden, 'Skinning.TrackerHidden')
-		return
-	end
-	Skin.StashTracker(IsEnabled() and GetSettings().trackerHidden == true)
 end
 
 Scenario.headers = {}
 Scenario.headerMixins = { 'UIWidgetTemplateScenarioHeaderDelvesMixin', 'UIWidgetTemplateScenarioHeaderTimerMixin', 'UIWidgetTemplateScenarioHeaderCurrenciesAndBackgroundMixin' }
 Scenario.headerOverhangKeys = { 'SpellContainer', 'CurrencyContainer', 'RewardFrame' }
-Scenario.headerBackdropInset = 1
+Scenario.stageTextKeys = { 'Stage', 'Name', 'CompleteLabel' }
+Scenario.backdropInset = 1
 Scenario.headerBackdropPad = 4
+Scenario.stageBackdropPad = 8
 
-Scenario.FitHeaderBackdrop = function(widget, backdrop)
+function Scenario.FitHeaderBackdrop(widget, backdrop)
 	local bottom = widget:GetBottom()
 	if not bottom then return false end
-	local keys, lowest = Scenario.headerOverhangKeys, bottom
-	for keyIndex = 1, #keys do
-		local child = widget[keys[keyIndex]]
+	local lowest = bottom
+	for _, key in ipairs(Scenario.headerOverhangKeys) do
+		local child = widget[key]
 		if child and child:IsShown() then
 			local childBottom = child:GetBottom()
 			if childBottom and childBottom < lowest then lowest = childBottom end
 		end
 	end
-	local inset = Scenario.headerBackdropInset
+	local inset = Scenario.backdropInset
 	local drop = bottom - lowest
 	if drop > 0 then drop = drop + Scenario.headerBackdropPad end
 	if backdrop._buiHeaderDrop == drop then return true end
@@ -1538,9 +1380,9 @@ Scenario.FitHeaderBackdrop = function(widget, backdrop)
 	return true
 end
 
-Scenario.ApplyHeader = function(widget)
+function Scenario.ApplyHeader(widget)
 	Scenario.headers[widget] = true
-	local enabled = IsEnabled()
+	local enabled = Enabled()
 	local alpha = enabled and 0 or 1
 	widget.Frame:SetAlpha(alpha)
 	widget.ThemeOverlay:SetAlpha(alpha)
@@ -1548,14 +1390,14 @@ Scenario.ApplyHeader = function(widget)
 	local backdrop = skinnedBars[widget]
 	if enabled then
 		if not backdrop then
-			backdrop = Skin3.ChildBackdrop(widget, { bg = Theme.bg.light, border = Theme.border.light })
+			backdrop = CardBackdrop(widget)
 			skinnedBars[widget] = backdrop
 		end
 		if not Scenario.FitHeaderBackdrop(widget, backdrop) then
 			After('Skin.ObjectiveTracker header fit', 0, function() Scenario.FitHeaderBackdrop(widget, backdrop) end)
 		end
 		ApplySkinFont(widget.HeaderText, 'title')
-		widget.HeaderText:SetTextColor(Skin.TrackerColorRGB('title'))
+		widget.HeaderText:SetTextColor(TrackerColorRGB('title'))
 		local timerBar = widget.TimerBar
 		if timerBar then
 			SkinBar(timerBar)
@@ -1567,33 +1409,26 @@ Scenario.ApplyHeader = function(widget)
 	if backdrop then backdrop:SetShown(enabled and widget:IsShown()) end
 end
 
-Scenario.TrackHeader = function(widget)
-	if Scenario.headers[widget] or not widget.Frame or not widget.HeaderText then return end
-	Hook(widget, 'Setup', Scenario.ApplyHeader)
-	Scenario.ApplyHeader(widget)
-end
-
-Scenario.ScanHeaders = function()
-	local scenarioTracker = _G.ScenarioObjectiveTracker
-	local container = scenarioTracker and scenarioTracker.StageBlock and scenarioTracker.StageBlock.WidgetContainer
-	local frames = container and container.widgetFrames
+function Scenario.ScanHeaders()
+	local frames = ScenarioObjectiveTracker.StageBlock.WidgetContainer.widgetFrames
 	if type(frames) ~= 'table' then return end
-	for _, widget in pairs(frames) do Scenario.TrackHeader(widget) end
+	for _, widget in pairs(frames) do
+		if not Scenario.headers[widget] and widget.Frame and widget.HeaderText then
+			Hook(widget, 'Setup', Scenario.ApplyHeader)
+			Scenario.headers[widget] = true
+		end
+	end
+	for widget in pairs(Scenario.headers) do Scenario.ApplyHeader(widget) end
 end
 
-Scenario.InstallHeaderHooks = function()
-	if Scenario.headerHooked then return end
-	Scenario.headerHooked = true
+function Scenario.InstallHeaderHooks()
 	for _, mixinName in ipairs(Scenario.headerMixins) do
 		local mixin = _G[mixinName]
 		if mixin then Hook(mixin, 'Setup', Scenario.ApplyHeader) end
 	end
 end
 
-Scenario.stageTextKeys = { 'Stage', 'Name', 'CompleteLabel' }
-Scenario.stageBackdropPad = 8
-
-Scenario.FitStageBackdrop = function(stageBlock, backdrop)
+function Scenario.FitStageBackdrop(stageBlock, backdrop)
 	local top = stageBlock:GetTop()
 	if not top then return false end
 	local lowest
@@ -1609,7 +1444,7 @@ Scenario.FitStageBackdrop = function(stageBlock, backdrop)
 	height = math.floor(height + 0.5)
 	if backdrop._buiStageHeight == height then return true end
 	backdrop._buiStageHeight = height
-	local inset = Scenario.headerBackdropInset
+	local inset = Scenario.backdropInset
 	backdrop:ClearAllPoints()
 	backdrop:SetPoint('TOPLEFT', stageBlock, 'TOPLEFT', inset, -inset)
 	backdrop:SetPoint('TOPRIGHT', stageBlock, 'TOPRIGHT', -inset, -inset)
@@ -1617,7 +1452,7 @@ Scenario.FitStageBackdrop = function(stageBlock, backdrop)
 	return true
 end
 
-Scenario.SyncStageBackdrop = function(stageBlock)
+function Scenario.SyncStageBackdrop(stageBlock)
 	local backdrop = skinnedBars[stageBlock]
 	if not backdrop then return end
 	local blockParent = stageBlock:GetParent()
@@ -1625,7 +1460,7 @@ Scenario.SyncStageBackdrop = function(stageBlock)
 		backdrop:SetParent(blockParent)
 		backdrop:SetFrameLevel(math.max(0, stageBlock:GetFrameLevel() - 1))
 	end
-	local shown = IsEnabled() and stageBlock:IsShown() and not stageBlock.widgetSetID
+	local shown = Enabled() and stageBlock:IsShown() and not stageBlock.widgetSetID
 	backdrop:SetShown(shown)
 	if shown and not Scenario.FitStageBackdrop(stageBlock, backdrop) then
 		After('Skin.ObjectiveTracker stage fit', 0, function()
@@ -1634,102 +1469,104 @@ Scenario.SyncStageBackdrop = function(stageBlock)
 	end
 end
 
-function Scenario.Install()
-	Scenario.ScanHeaders()
-	Scenario.InstallHeaderHooks()
+local function PaintHeaders()
+	for text, role in pairs(headerRoles) do text:SetTextColor(Painter.Color(role)) end
+	for chevron in pairs(chevrons) do PaintGlyph(chevron, false) end
+	if headerCounts then headerCounts:SetTextColor(Painter.Color('skinLabel')) end
+	QuestFilter.UpdateTint()
 end
 
-function Scenario.Remove()
-	for widget in pairs(Scenario.headers) do Scenario.ApplyHeader(widget) end
+local function ApplyTextSettings()
+	fontGeneration = fontGeneration + 1
+	for fontString, entry in pairs(restoreFonts) do ApplySkinFont(fontString, entry.role) end
+	for header in pairs(moduleHeaders) do PlaceHeaderRule(header) end
+	ApplyCardStyle()
 end
 
-local function Install()
-	if not IsEnabled() then return end
-	Scenario.Install()
-	InstallMenuHook()
-	InstallQuestTipHook()
-
-	local trackerFrame = _G.ObjectiveTrackerFrame
-	if trackerFrame then
-		if trackerFrame.Header then SkinHeader(trackerFrame.Header) end
-		if trackerFrame.NineSlice then HideFrameTextures(trackerFrame.NineSlice) end
-		if not hookedTrackers[trackerFrame] then
-			hookedTrackers[trackerFrame] = true
-			Hook(trackerFrame, 'UpdateClampOffsets', Skin.TrackerClamp)
-		end
-	end
-
+local function EachTracker(callback)
 	for _, trackerName in ipairs(TRACKER_NAMES) do
 		local tracker = _G[trackerName]
-		if tracker then
-			if tracker.Header then SkinHeader(tracker.Header) end
-			if not hookedTrackers[tracker] then
-				hookedTrackers[tracker] = true
-				if tracker.AddBlock then Hook(tracker, 'AddBlock', OnAddBlock) end
-				if tracker.GetProgressBar then Hook(tracker, 'GetProgressBar', OnGetProgressBar) end
-				if tracker.GetTimerBar then Hook(tracker, 'GetTimerBar', OnGetTimerBar) end
-				if tracker.OnBlockHeaderLeave then Hook(tracker, 'OnBlockHeaderLeave', HideQuestTip) end
-			end
-		end
+		if tracker then callback(tracker) end
 	end
-
-	SkinStageBlock()
-	EnsureTrackerCard()
-	ApplyHeaderRowVisibility()
-	ApplyTrackerHidden()
-
-	BUI.Events:Register('QUEST_LOG_UPDATE', 'Skinning.TrackerQuestCache', queueQuestCacheRefresh)
-	BUI.Events:Register('QUEST_WATCH_LIST_CHANGED', 'Skinning.TrackerQuestCache', queueQuestCacheRefresh)
-	BUI.Events:Register('QUEST_ACCEPTED', 'Skinning.TrackerQuestCache', queueQuestCacheRefresh)
-	BUI.Events:Register('QUEST_REMOVED', 'Skinning.TrackerQuestCache', queueQuestCacheRefresh)
-	BUI.Events:Register('QUEST_TURNED_IN', 'Skinning.TrackerQuestCache', queueQuestCacheRefresh)
-	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'Skinning.TrackerQuestCache', queueQuestCacheRefresh)
-	BUI.Events:Register('QUEST_WATCH_UPDATE', 'Skinning.TrackerProgress', OnQuestProgress)
-	BUI.Events:Register('ZONE_CHANGED_NEW_AREA', 'Skinning.TrackerItemKey', QuestItem.Update)
-	BUI.Events:Register('BAG_UPDATE_COOLDOWN', 'Skinning.TrackerItemCooldown', QuestItem.UpdateCooldown)
-	queueQuestCacheRefresh()
 end
 
-BUI.Events:OnLogin('Skinning.ObjectiveTracker', Install)
+local function HookTracker(tracker)
+	Hook(tracker, 'AddBlock', OnAddBlock)
+	Hook(tracker, 'GetProgressBar', OnGetProgressBar)
+	Hook(tracker, 'GetTimerBar', OnGetTimerBar)
+	Hook(tracker, 'OnBlockHeaderLeave', HideQuestTip)
+	Hook(tracker, 'SetHeader', OnSetHeader)
+end
 
-Skin.OnToggle('objectivetracker', function(enabled)
-	Skin.ClearTrackerColorCache()
-	if enabled then
-		Install()
-		for _, element in ipairs(addedElements) do element:Show() end
-		for bar, backdrop in pairs(skinnedBars) do backdrop:SetShown(bar:IsShown()) end
-		Scenario.SyncStageBackdrop(_G.ScenarioObjectiveTracker.StageBlock)
-		for button in pairs(hiddenPoiButtons) do button:SetScale(POI_BUTTON_SCALE) end
-		ApplyPoiVisibility()
-		ApplyDashAlpha()
-		ApplyTitleWrap()
-		Skin.ApplyTrackerSeparators()
-		ApplyTextSettings()
-		Skin.ApplyTrackerColors()
-		queueQuestCacheRefresh()
-		QuestItem.Update()
-		for _, texture in ipairs(hiddenTextures) do ReassertHidden(texture) end
-		return
-	end
+local function SkinModuleHeader(tracker)
+	if not tracker.Header then return end
+	SkinHeader(tracker.Header, false)
+	UpperHeader(tracker.Header)
+end
+
+local function InstallTracker(trackerFrame)
+	Scenario.InstallHeaderHooks()
+	InstallMenuHook()
+	EventRegistry:RegisterCallback('OnQuestBlockHeader.OnEnter', Guard(OnQuestBlockHeaderEnter), context)
+	Hook(trackerFrame, 'UpdateClampOffsets', TrackerClamp)
+	Hook(trackerFrame, 'Init', DecorateHeader)
+	CreateTrackerCard(trackerFrame)
+	EachTracker(HookTracker)
+
+	local refresh = Guard(RefreshQuestCacheSoon)
+	for _, event in ipairs(QUEST_CACHE_EVENTS) do BUI.Events:Register(event, 'Skinning.TrackerQuestCache', refresh) end
+	BUI.Events:Register('QUEST_WATCH_UPDATE', 'Skinning.TrackerProgress', Guard(OnQuestProgress))
+	BUI.Events:Register('ZONE_CHANGED_NEW_AREA', 'Skinning.TrackerItemKey', Guard(QuestItem.Update))
+	BUI.Events:Register('BAG_UPDATE_COOLDOWN', 'Skinning.TrackerItemCooldown', Guard(QuestItem.UpdateCooldown))
+	Painter.OnRepaint('Skin.ObjectiveTracker', Guard(function()
+		ApplyCardStyle()
+		PaintRules()
+		PaintHeaders()
+	end))
+end
+
+local function SkinTracker(trackerFrame)
+	trackerSkinned = true
+	Scenario.ScanHeaders()
+	SkinStageBlock()
+	SkinHeader(trackerFrame.Header, true)
+	EachTracker(SkinModuleHeader)
+	trackerFrame.NineSlice:SetAlpha(0)
+	HideFrameTextures(trackerFrame.NineSlice)
+
+	for _, element in ipairs(addedElements) do element:Show() end
+	for bar, backdrop in pairs(skinnedBars) do backdrop:SetShown(bar:IsShown()) end
+	for button in pairs(hiddenPoiButtons) do button:SetScale(POI_BUTTON_SCALE) end
+	for _, texture in ipairs(hiddenTextures) do ReassertHidden(texture) end
+	Scenario.SyncStageBackdrop(ScenarioObjectiveTracker.StageBlock)
+
+	ApplyPoiVisibility()
+	ApplyDashAlpha()
+	ApplyTitleWrap()
+	ApplyTextSettings()
+	PaintRules()
+	PaintHeaders()
+	ApplyTrackerColors()
+	UpdateCardAnchors()
+	SyncTrackerCardShown()
+	ApplyHeaderRowVisibility()
+	ApplyTrackerHidden()
+	RefreshQuestCacheSoon()
+end
+
+local function RestoreTracker()
+	if not trackerSkinned then return end
+	trackerSkinned = false
+	local trackerFrame = ObjectiveTrackerFrame
 
 	for _, element in ipairs(addedElements) do element:Hide() end
 	for _, backdrop in pairs(skinnedBars) do backdrop:Hide() end
-	if trackerCard then trackerCard:Hide() end
+	trackerCard:Hide()
+	trackerCard._buiClamp = nil
 	for button in pairs(hiddenPoiButtons) do
 		button:SetScale(1)
 		button:ClearAllPoints()
 	end
-	ApplyTitleWrap()
-	ApplyHeaderRowVisibility()
-	HideQuestTip()
-	Scenario.Remove()
-	if trackerCard then trackerCard._buiClamp = nil end
-	_G.ObjectiveTrackerFrame:UpdateClampOffsets()
-	QuestItem.Update()
-	ApplyPoiVisibility()
-	ApplyDashAlpha()
-	ApplyTrackerHidden()
-	RepaintBlizzardColors()
 	for _, texture in ipairs(hiddenTextures) do
 		if texture.__buiOldAtlas then
 			texture:SetAtlas(texture.__buiOldAtlas)
@@ -1740,130 +1577,139 @@ Skin.OnToggle('objectivetracker', function(enabled)
 	end
 	for fontString, entry in pairs(restoreFonts) do
 		if entry.font then fontString:SetFont(entry.font, entry.size, entry.flags) end
+		entry.generation = nil
 	end
-	for header, entry in pairs(restoreHeaders) do
-		local text = header.Text
-		if text and entry.red then
-			text:SetTextColor(entry.red, entry.green, entry.blue, entry.alpha)
+	for header, color in pairs(restoreHeaders) do
+		header.Text:SetTextColor(color[1], color[2], color[3], color[4])
+		if header.__buiOriginal then
+			header.Text:SetText(header.__buiOriginal)
+			header.__buiUpper = nil
 		end
 	end
-end)
 
-Skin.RegisterSkin('objectivetracker', {
-	name = 'Objective Tracker',
-	description = 'Tooltip-style dark cards behind each tracker section, clean library fonts on quest text, accent-marked headers, flat progress bars, and square quest item icons. The OBJECTIVES header carries quest counts and track presets. Move and size the tracker in Edit Mode.',
-	icon = 'Interface\\Icons\\INV_Misc_Book_07',
-	page = 'objectivetracker',
-	buildBoards = function(ui, parent, width)
-		local settings = GetSettings()
+	trackerFrame.NineSlice:SetAlpha(1)
+	trackerFrame:UpdateClampOffsets()
+	ApplyTitleWrap()
+	ApplyHeaderRowVisibility()
+	HideQuestTip()
+	for widget in pairs(Scenario.headers) do Scenario.ApplyHeader(widget) end
+	ApplyPoiVisibility()
+	ApplyDashAlpha()
+	ApplyTrackerHidden()
+	RepaintBlizzardColors()
+	QuestItem.Update()
+end
 
-		local function OnByDefault(key)
-			return function() return settings[key] ~= false end
-		end
-		local function OffByDefault(key)
-			return function() return settings[key] == true end
-		end
-		local function Store(key, apply)
-			return function(value)
-				settings[key] = value
-				if apply then apply() end
-			end
-		end
-		local function TrackerSwatch(label, key)
-			return { kind = 'swatch', label = label, get = function() return Skin.TrackerColorRGB(key) end, set = function(red, green, blue)
-				settings.colors[key] = { red, green, blue }
-			end }
-		end
-		local function TextureTint()
-			local tint = settings.cardTextureColor or CARD_TEXTURE_TINT
-			return tint[1], tint[2], tint[3], 1
-		end
-		local function BorderColor()
-			local color = settings.cardBorderColor or Theme.border.light
-			return color[1], color[2], color[3], color[4] or 1
-		end
-		local function ApplyLines()
-			ApplyCardStyle()
-			Skin.ApplyTrackerSeparators()
-		end
-		local function ResetItemButton()
-			local positions = BUI.GetDB().framePositions
-			if positions then positions[QuestItem.POSITION_KEY] = nil end
-			if QuestItem.button then QuestItem.button.placedVisible = nil end
-			QuestItem.Update()
-		end
+context.Window('ObjectiveTrackerFrame', { install = InstallTracker, skin = SkinTracker })
+context.OnDisable(RestoreTracker)
 
-		local fontItems = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
-		table.insert(fontItems, 1, { value = LIBRARY_FONT_OPTION, text = 'Tooltip Font' })
-		local textureItems = BUI.BuildTextureDropdownItems()
-		table.insert(textureItems, 1, { value = FLAT_TEXTURE_OPTION, text = 'Flat' })
+local function BuildBoards(ui, parent, width)
+	local settings = GetSettings()
 
-		local text = ui.Board(parent, width, { stacked = true, title = 'Text', description = 'The font on quest titles and objectives, and the colors they use.' })
-		text:AddTools('Font', 'Typeface, size, outline and line wrapping', {
-			{ entries = fontItems, get = function() return settings.font end, set = Store('font') },
-			{ icon = 'text', tooltip = 'Size, outline and wrapping', title = 'Font', options = {
-				{ label = 'Size', min = 8, max = 16, step = 1, get = function() return settings.fontSize end, set = Store('fontSize') },
-				{ label = 'Outlined text', get = OffByDefault('fontOutline'), set = Store('fontOutline') },
-				{ label = 'Single-line titles', separator = true, get = OnByDefault('singleLineTitles'), set = Store('singleLineTitles', ApplyTitleWrap) },
-				{ label = 'Single-line objectives', get = OnByDefault('singleLineObjectives'), set = Store('singleLineObjectives', ApplyTitleWrap) },
-			} },
-		}, ApplyTextSettings)
-		text:AddTools('Colors', "Your own colors for quests and objectives, off keeps Blizzard's", {
-			{ icon = 'palette', tooltip = 'Pick the colors', title = 'Colors', options = {
-				TrackerSwatch('Quest title', 'title'),
-				TrackerSwatch('Title on hover', 'hover'),
-				TrackerSwatch('Objective', 'objective'),
-				TrackerSwatch('Completed objective', 'completed'),
-				TrackerSwatch('Ready to turn in', 'ready'),
-				TrackerSwatch('Time left', 'timeLeft'),
-			} },
-			{ get = OnByDefault('customColors'), set = Store('customColors') },
-		}, Skin.ApplyTrackerColors)
+	local function OnByDefault(key)
+		return function() return settings[key] ~= false end
+	end
+	local function OffByDefault(key)
+		return function() return settings[key] == true end
+	end
+	local function Store(key, apply)
+		return function(value)
+			settings[key] = value
+			if apply then apply() end
+		end
+	end
+	local function TrackerSwatch(label, key)
+		return { kind = 'swatch', label = label, get = function() return TrackerColorRGB(key) end, set = function(red, green, blue)
+			settings.colors[key] = { red, green, blue }
+		end }
+	end
+	local function TextureTint()
+		local tint = settings.cardTextureColor or CARD_TEXTURE_TINT
+		return tint[1], tint[2], tint[3], 1
+	end
+	local function ApplyLines()
+		ApplyCardStyle()
+		PaintRules()
+	end
+	local function ResetItemButton()
+		local positions = BUI.GetDB().framePositions
+		if positions then positions[QuestItem.POSITION_KEY] = nil end
+		if QuestItem.button then QuestItem.button.placedVisible = nil end
+		QuestItem.Update()
+	end
 
-		local panel = ui.Board(parent, width, { stacked = true, title = 'Panel', description = 'The dark card behind each tracker section and the lines inside it.' })
-		panel:AddTools('Background', 'Texture, tint and opacity', {
-			{ kind = 'swatch', tooltip = 'Texture tint', get = TextureTint, set = function(red, green, blue)
-				settings.cardTextureColor = { red, green, blue }
-			end },
-			{ entries = textureItems, get = function() return settings.cardTexture end, set = Store('cardTexture') },
-			{ tooltip = 'Opacity', title = 'Background', options = {
-				{ label = 'Opacity', min = 0, max = 100, step = 1, get = function() return settings.cardOpacity end, set = Store('cardOpacity') },
-			} },
-		}, ApplyCardStyle)
-		panel:AddTools('Lines', 'Border and separator colors, the switch shows the border', {
-			{ kind = 'swatch', tooltip = 'Border color', opacity = true, get = BorderColor, set = function(red, green, blue, alpha)
-				settings.cardBorderColor = { red, green, blue, alpha }
-			end },
-			{ kind = 'swatch', tooltip = 'Separator color', opacity = true, get = Skin.TrackerSeparatorColor, set = function(red, green, blue, alpha)
-				settings.separatorColor = { red, green, blue, alpha }
-			end },
-			{ get = OnByDefault('cardBorder'), set = Store('cardBorder') },
-		}, ApplyLines)
+	local fontItems = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
+	table.insert(fontItems, 1, { value = LIBRARY_FONT_OPTION, text = 'Tooltip Font' })
+	local textureItems = BUI.BuildTextureDropdownItems()
+	table.insert(textureItems, 1, { value = FLAT_TEXTURE_OPTION, text = 'Flat' })
 
-		local quests = ui.Board(parent, width, { stacked = true, title = 'Quests', description = 'What the tracker shows and how it tells you about progress.' })
-		quests:AddSwitch('Objectives header', OnByDefault('showHeaderRow'), function(value)
-			settings.showHeaderRow = value
-			if value == false then
-				settings.trackerTrackSpec = nil
-				QuestFilter.UpdateTint()
-			end
-			ApplyHeaderRowVisibility()
-		end, 'Quest counts and track presets above the list')
-		quests:AddSwitch('Quest type icons', OffByDefault('showQuestIcons'), Store('showQuestIcons', ApplyPoiVisibility))
-		quests:AddSwitch('Objective dashes', OffByDefault('showDashes'), Store('showDashes', ApplyDashAlpha), 'A dash in front of each objective')
-		quests:AddSwitch('Quest tooltips', OnByDefault('questTooltip'), Store('questTooltip'), 'Quest details when you hover a quest')
-		quests:AddSwitch('Completion messages', OffByDefault('completionMessage'), Store('completionMessage'), 'Say on screen when an objective or quest is done')
-		quests:AddSwitch('Hide the tracker', OffByDefault('trackerHidden'), Store('trackerHidden', ApplyTrackerHidden), 'Hide the objective tracker completely')
-		quests:AddTools('Completion sound', 'Plays when a quest is ready to turn in', {
-			{ entries = BUI.BuildSoundDropdownItems(), get = function() return settings.completionSound or 'None' end, set = Store('completionSound') },
-			{ icon = 'play', tooltip = 'Hear it', onClick = function() BUI.PlaySoundByName(settings.completionSound) end },
-		})
-		quests:AddTools('Quest item', "A key for your closest quest's item, the switch adds a button you can drag", {
-			QuestItem.KeyTool(ui),
-			{ icon = 'reset', tooltip = 'Put the button back where it started', onClick = ResetItemButton },
-			{ get = OffByDefault('showQuestItemButton'), set = Store('showQuestItemButton') },
-		}, QuestItem.Update)
+	local text = ui.Board(parent, width, { stacked = true, title = 'Text', description = 'The font on quest titles and objectives, and the colors they use.' })
+	text:AddTools('Font', 'Typeface, size, outline and line wrapping', {
+		{ entries = fontItems, get = function() return settings.font end, set = Store('font') },
+		{ icon = 'text', tooltip = 'Size, outline and wrapping', title = 'Font', options = {
+			{ label = 'Size', min = 8, max = 16, step = 1, get = function() return settings.fontSize end, set = Store('fontSize') },
+			{ label = 'Outlined text', get = OffByDefault('fontOutline'), set = Store('fontOutline') },
+			{ label = 'Single-line titles', separator = true, get = OnByDefault('singleLineTitles'), set = Store('singleLineTitles', ApplyTitleWrap) },
+			{ label = 'Single-line objectives', get = OnByDefault('singleLineObjectives'), set = Store('singleLineObjectives', ApplyTitleWrap) },
+		} },
+	}, Guard(ApplyTextSettings))
+	text:AddTools('Colors', "Your own colors for quests and objectives, off keeps Blizzard's", {
+		{ icon = 'palette', tooltip = 'Pick the colors', title = 'Colors', options = {
+			TrackerSwatch('Quest title', 'title'),
+			TrackerSwatch('Title on hover', 'hover'),
+			TrackerSwatch('Objective', 'objective'),
+			TrackerSwatch('Completed objective', 'completed'),
+			TrackerSwatch('Ready to turn in', 'ready'),
+			TrackerSwatch('Time left', 'timeLeft'),
+		} },
+		{ get = OnByDefault('customColors'), set = Store('customColors') },
+	}, Guard(ApplyTrackerColors))
 
-		return { text, panel, quests }
-	end,
-})
+	local panel = ui.Board(parent, width, { stacked = true, title = 'Panel', description = 'The dark card behind the tracker and the lines inside it.' })
+	panel:AddTools('Background', 'Texture, tint and opacity', {
+		{ kind = 'swatch', tooltip = 'Texture tint', get = TextureTint, set = function(red, green, blue)
+			settings.cardTextureColor = { red, green, blue }
+		end },
+		{ entries = textureItems, get = function() return settings.cardTexture end, set = Store('cardTexture') },
+		{ tooltip = 'Opacity', title = 'Background', options = {
+			{ label = 'Opacity', min = 0, max = 100, step = 1, get = function() return settings.cardOpacity end, set = Store('cardOpacity') },
+		} },
+	}, ApplyCardStyle)
+	panel:AddTools('Lines', 'Border and separator colors, the switch shows the border', {
+		{ kind = 'swatch', tooltip = 'Border color', opacity = true, get = function() return PanelColor('cardBorderColor', 'skinBorder') end, set = function(red, green, blue, alpha)
+			settings.cardBorderColor = { red, green, blue, alpha }
+		end },
+		{ kind = 'swatch', tooltip = 'Separator color', opacity = true, get = function() return PanelColor('separatorColor', 'skinLine') end, set = function(red, green, blue, alpha)
+			settings.separatorColor = { red, green, blue, alpha }
+		end },
+		{ get = OnByDefault('cardBorder'), set = Store('cardBorder') },
+	}, ApplyLines)
+
+	local quests = ui.Board(parent, width, { stacked = true, title = 'Quests', description = 'What the tracker shows and how it tells you about progress.' })
+	quests:AddSwitch('Objectives header', OnByDefault('showHeaderRow'), function(value)
+		settings.showHeaderRow = value
+		if value == false then
+			settings.trackerTrackSpec = nil
+			QuestFilter.UpdateTint()
+		end
+		ApplyHeaderRowVisibility()
+	end, 'Quest counts and track presets above the list')
+	quests:AddSwitch('Quest type icons', OffByDefault('showQuestIcons'), Store('showQuestIcons', ApplyPoiVisibility))
+	quests:AddSwitch('Objective dashes', OffByDefault('showDashes'), Store('showDashes', ApplyDashAlpha), 'A dash in front of each objective')
+	quests:AddSwitch('Quest tooltips', OnByDefault('questTooltip'), Store('questTooltip'), 'Quest details when you hover a quest')
+	quests:AddSwitch('Completion messages', OffByDefault('completionMessage'), Store('completionMessage'), 'Say on screen when an objective or quest is done')
+	quests:AddSwitch('Hide the tracker', OffByDefault('trackerHidden'), Store('trackerHidden', ApplyTrackerHidden), 'Hide the objective tracker completely')
+	quests:AddTools('Completion sound', 'Plays when a quest is ready to turn in', {
+		{ entries = BUI.BuildSoundDropdownItems(), get = function() return settings.completionSound or 'None' end, set = Store('completionSound') },
+		{ icon = 'play', tooltip = 'Hear it', onClick = function() BUI.PlaySoundByName(settings.completionSound) end },
+	})
+	quests:AddTools('Quest item', "A key for your closest quest's item, the switch adds a button you can drag", {
+		QuestItem.KeyTool(ui),
+		{ icon = 'reset', tooltip = 'Put the button back where it started', onClick = ResetItemButton },
+		{ get = OffByDefault('showQuestItemButton'), set = Store('showQuestItemButton') },
+	}, QuestItem.Update)
+
+	return { text, panel, quests }
+end
+
+context.info.buildBoards = BuildBoards

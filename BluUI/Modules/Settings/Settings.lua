@@ -436,8 +436,7 @@ do
 			holder:SetPoint('BOTTOMLEFT', panel, 'TOPLEFT', 0, gap)
 			holder:SetPoint('BOTTOMRIGHT', panel, 'TOPRIGHT', 0, gap)
 		else
-			local outsetLeft, outsetRight, outsetTop = Pixel.PixelSize(14), Pixel.PixelSize(24), Pixel.PixelSize(6)
-			outsetLeft, outsetRight, outsetTop = BUI.Skinning.GetTrackerPanelOutsets()
+			local outsetLeft, outsetRight, outsetTop = BUI.Skinning.GetTrackerPanelOutsets()
 			holder:SetPoint('BOTTOMLEFT', anchor, 'TOPLEFT', -outsetLeft, outsetTop + gap)
 			holder:SetPoint('BOTTOMRIGHT', anchor, 'TOPRIGHT', outsetRight, outsetTop + gap)
 		end
