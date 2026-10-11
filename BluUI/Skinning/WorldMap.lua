@@ -1,9 +1,13 @@
 local _, BUI = ...
 
 local ipairs = ipairs
+local pairs = pairs
+local unpack = unpack
 
 local Skin = BUI.Skinning
+local Painter = BUI.Painter
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
+local Wrap = BUI.Profiler.Wrap
 
 local BORDER_ART = { 'Bg', 'TopTileStreaks', 'InsetBorderTop', 'Underlay' }
 local DETAILS_ART = { 'Bg', 'SealMaterialBG' }
@@ -14,49 +18,74 @@ local SIDE_TAB_KEYS = { 'QuestsTab', 'EventsTab', 'MapLegendTab' }
 local SIDE_TAB_OPTIONS = { dim = true }
 local SIDE_TAB_TOP_OFFSET = -2
 local ROW_HOVER_ALPHA = 0.1
-local DIVIDER_ALPHA = 0.1
-local CHECKBOX_INSET = 1
+local DIVIDER_INSET = 8
+local ROW_INSETS = { top = 2, bottom = 4 }
+local CHECK_GLYPH_SIZE = 10
+local CHECK_ATLAS = 'questlog-icon-checkmark-yellow'
 local ACTIVE_RING_PADDING = 3
 local PARENT_WALK_DEPTH = 6
 local SEARCH_WIDTH, SEARCH_HEIGHT = 160, 22
 local SEARCH_INSET = 8
 local SEARCH_TEXT_INSET = 6
+local LIST_ROW_WIDTH = 289
+local CAMPAIGN_PLATE_TOP, CAMPAIGN_PLATE_HEIGHT = 6, 46
+local CAMPAIGN_TITLE_DROP = 16
+local COLLAPSE_INSET = 8
+local TITLE_COORDS_GAP = 16
 
 local context = Skin.Define('worldmap', {
 	name = 'World Map',
 	description = 'The map and quest log frame in the dark shell, plus continent-map extras: zone name labels and dungeon/raid entrance pins.',
 	newLook = true,
 })
-local Hook = context.Hook
+local Hook, Enabled = context.Hook, context.Enabled
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
 local Shell, Button, Card, Dropdown = context.Shell, context.Button, context.Card, context.Dropdown
 local EditBox, ScrollBar, Body = context.EditBox, context.ScrollBar, context.Body
 local CollapseButton = context.CollapseButton
 local AccentTexture = Skin.AccentTexture
 
+local generation = 0
+local sideTabs = {}
+local clearedArt = {}
+local restyledChecks = {}
+local plates = {}
+local movedButtons = {}
+local rareScannerSearch
+
 local function RefreshExtras()
-	if BUI.WorldMapLabels then BUI.WorldMapLabels.Refresh() end
-	if BUI.WorldMapInstancePins then BUI.WorldMapInstancePins.Refresh() end
+	BUI.WorldMapLabels.Refresh()
+	BUI.WorldMapInstancePins.Refresh()
 end
 
 local function KeepTexture(texture)
 	if texture then texture.__buiSkin = true end
 end
 
-local function AccentTint(texture, alpha)
-	KeepTexture(texture)
-	texture:SetBlendMode('BLEND')
-	AccentTexture(texture, alpha)
+local function ClearArt(texture)
+	if clearedArt[texture] ~= nil then return end
+	clearedArt[texture] = texture:GetAtlas() or false
+	texture:SetTexture(nil)
+end
+
+local function RestoreArt()
+	for texture, atlas in pairs(clearedArt) do
+		if atlas then texture:SetAtlas(atlas, true) end
+	end
+	wipe(clearedArt)
+	for check in pairs(restyledChecks) do
+		check:SetAtlas(CHECK_ATLAS, true)
+		check:SetVertexColor(1, 1, 1, 1)
+		check:ClearAllPoints()
+		check:SetPoint('CENTER', 1, 1)
+	end
+	wipe(restyledChecks)
 end
 
 local function DividerLine(frame)
 	if frame._buiDivider then return end
-	local line = context.Own(frame:CreateTexture(nil, 'ARTWORK'))
-	line:SetColorTexture(1, 1, 1, DIVIDER_ALPHA)
-	line:SetHeight(1)
-	line:SetPoint('LEFT', frame, 'LEFT', 8, 0)
-	line:SetPoint('RIGHT', frame, 'RIGHT', -8, 0)
-	BUILib.Skin.PixelLine(line, frame, false, 8, 8)
+	local line = context.Own(Painter.Fill(frame:CreateTexture(nil, 'ARTWORK'), 'skinLine'))
+	BUILib.Skin.PixelLine(line, frame, false, DIVIDER_INSET, DIVIDER_INSET)
 	frame._buiDivider = line
 end
 
@@ -82,19 +111,22 @@ local function SkinBorder(border)
 	Skin.TipPageButton(maxMin.MinimizeButton, 'condense')
 end
 
+local function PlaceTomTomCoords()
+	local coords = _G.TomTomWorldFrame
+	if not coords then return end
+	coords.Player:ClearAllPoints()
+	coords.Player:SetPoint('LEFT', WorldMapFrame.BorderFrame.TitleContainer.TitleText, 'RIGHT', TITLE_COORDS_GAP, 0)
+end
+
 local function SkinNavButton(button)
 	FadeRegions(button)
-	Fade(button:GetNormalTexture())
-	Fade(button:GetPushedTexture())
-	Fade(button:GetDisabledTexture())
-	Fade(button:GetHighlightTexture())
 	Shell(button)
 	Body(button.text)
 	Skin.TipNavArrow(button.MenuArrowButton)
 end
 
 local function OnNavButtonAdded(navBar)
-	if navBar ~= _G.WorldMapFrame.NavBar then return end
+	if navBar ~= WorldMapFrame.NavBar then return end
 	SkinNavButton(navBar.navList[#navBar.navList])
 end
 
@@ -138,8 +170,6 @@ local function SkinOverlayFrames(map)
 		end
 	end
 end
-
-local rareScannerSearch
 
 local function FindRareScannerSearch(map)
 	local mixin = _G.RSSearchMixin
@@ -186,9 +216,7 @@ local function OnTabChecked(tab, checked)
 	Skin.SetSideTabSelected(tab, checked == true)
 end
 
-local sideTabs = {}
-
-local function RefreshSideTabs(questLog)
+local function SkinSideTabs(questLog)
 	for index, key in ipairs(SIDE_TAB_KEYS) do
 		local tab = questLog[key]
 		if not sideTabs[index] then
@@ -196,26 +224,88 @@ local function RefreshSideTabs(questLog)
 			Hook(tab, 'SetChecked', OnTabChecked)
 		end
 		Skin.SideTab(context, tab, SIDE_TAB_OPTIONS)
-		Skin.SetSideTabSelected(tab, IsTabSelected(questLog, tab))
 	end
+end
+
+local function RefreshSideTabs()
+	local questLog = QuestMapFrame
+	for _, tab in ipairs(sideTabs) do Skin.SetSideTabSelected(tab, IsTabSelected(questLog, tab)) end
 	Skin.LayoutSideTabs(questLog, sideTabs, SIDE_TAB_TOP_OFFSET)
 end
 
-local function SkinQuestTitle(button)
-	local checkbox = button.Checkbox
-	if not button._buiQuestRow then
-		button._buiQuestRow = true
-		Skin.TipFace(button.Text, 'body')
-		AccentTint(button.HighlightTexture, ROW_HOVER_ALPHA)
-		KeepTexture(checkbox.CheckMark)
+local PlateEnter = Wrap('Skin.WorldMap header plate enter', function(header)
+	Skin.SetActiveEdge(header._buiPlate, true)
+end)
+
+local PlateLeave = Wrap('Skin.WorldMap header plate leave', function(header)
+	Skin.SetActiveEdge(header._buiPlate, false)
+end)
+
+local PlateShown = Wrap('Skin.WorldMap header plate shown', function(header)
+	header._buiPlate:SetShown(Enabled() and header:IsShown())
+end)
+
+local function HeaderPlate(header)
+	local plate = header._buiPlate
+	if not plate then
+		plate = CreateFrame('Frame', nil, header:GetParent())
+		plate.ignoreInLayout = true
+		header._buiPlate = plate
+		plates[header] = plate
+		header:HookScript('OnShow', PlateShown)
+		header:HookScript('OnHide', PlateShown)
+		header:HookScript('OnEnter', PlateEnter)
+		header:HookScript('OnLeave', PlateLeave)
 	end
-	FadeRegions(checkbox)
-	Shell(checkbox, CHECKBOX_INSET)
+	plate:SetFrameStrata(header:GetFrameStrata())
+	plate:SetFrameLevel(math.max(0, header:GetFrameLevel() - 1))
+	plate:ClearAllPoints()
+	Card(plate)
+	PlateShown(header)
+	return plate
+end
+
+local function MoveCollapseButton(button, plate)
+	if not movedButtons[button] then movedButtons[button] = { button:GetPoint(1) } end
+	button:ClearAllPoints()
+	button:SetPoint('RIGHT', plate, 'TOPRIGHT', -COLLAPSE_INSET, -CAMPAIGN_TITLE_DROP)
+end
+
+local SyncRowHighlight = Wrap('Skin.WorldMap quest row highlight', function(texture)
+	Skin.SetActiveEdge(texture:GetParent(), texture:IsShown())
+end)
+
+local function SkinTrackBox(checkbox)
+	local check = checkbox.CheckMark
+	for regionIndex = 1, select('#', checkbox:GetRegions()) do
+		local region = select(regionIndex, checkbox:GetRegions())
+		if region ~= check and region:IsObjectType('Texture') then ClearArt(region) end
+	end
+	restyledChecks[check] = true
+	check:SetTexture(BUILib.GetLibMedia('check'))
+	check:SetSize(CHECK_GLYPH_SIZE, CHECK_GLYPH_SIZE)
+	check:ClearAllPoints()
+	check:SetPoint('CENTER')
+	check:SetVertexColor(BUILib.Theme.GetAccent())
+	Shell(checkbox)
+end
+
+local function SkinQuestTitle(button)
+	local highlight = button.HighlightTexture
+	Skin.TipFace(button.Text, 'body')
+	Fade(highlight)
+	Card(button, ROW_INSETS)
+	SkinTrackBox(button.Checkbox)
+	if not button._buiHighlightHooked then
+		button._buiHighlightHooked = true
+		Hook(highlight, 'Show', SyncRowHighlight)
+		Hook(highlight, 'Hide', SyncRowHighlight)
+		Hook(highlight, 'SetShown', SyncRowHighlight)
+	end
+	SyncRowHighlight(highlight)
 end
 
 local function SkinObjective(line)
-	if line._buiObjective then return end
-	line._buiObjective = true
 	Skin.TipFace(line.Dash, 'body')
 	Skin.TipFace(line.Text, 'body')
 end
@@ -234,7 +324,10 @@ local function SkinCampaignHeader(header)
 	Skin.TipFace(header.Progress, 'body')
 	Skin.TipFace(header.NextObjective.Text, 'body')
 	CollapseButton(header.CollapseButton)
-	Card(header)
+	local plate = HeaderPlate(header)
+	plate:SetPoint('TOPLEFT', header.Background, 'TOPLEFT', 0, -CAMPAIGN_PLATE_TOP)
+	plate:SetSize(LIST_ROW_WIDTH, CAMPAIGN_PLATE_HEIGHT)
+	MoveCollapseButton(header.CollapseButton, plate)
 end
 
 local function SkinCampaignMinimalHeader(header)
@@ -243,7 +336,7 @@ local function SkinCampaignMinimalHeader(header)
 	Skin.TipFace(header.Text, 'title')
 	Skin.TipFace(header.NextObjective.Text, 'body')
 	CollapseButton(header.CollapseButton)
-	Card(header)
+	HeaderPlate(header):SetAllPoints(header.Background)
 end
 
 local function SkinCallingsHeader(header)
@@ -253,14 +346,25 @@ local function SkinCallingsHeader(header)
 	SkinListHeader(header)
 end
 
+local function SweepPool(pool, skin)
+	for frame in pool:EnumerateActive() do
+		if frame._buiGeneration ~= generation then
+			skin(frame)
+			frame._buiGeneration = generation
+		end
+	end
+end
+
 local function SweepQuestLog()
-	local scroll = _G.QuestScrollFrame
-	for button in scroll.titleFramePool:EnumerateActive() do SkinQuestTitle(button) end
-	for line in scroll.objectiveFramePool:EnumerateActive() do SkinObjective(line) end
-	for header in scroll.headerFramePool:EnumerateActive() do SkinListHeader(header) end
-	for header in scroll.campaignHeaderFramePool:EnumerateActive() do SkinCampaignHeader(header) end
-	for header in scroll.campaignHeaderMinimalFramePool:EnumerateActive() do SkinCampaignMinimalHeader(header) end
-	for header in scroll.covenantCallingsHeaderFramePool:EnumerateActive() do SkinCallingsHeader(header) end
+	if not QuestMapFrame:IsVisible() then return end
+	local scroll = QuestScrollFrame
+	SweepPool(scroll.titleFramePool, SkinQuestTitle)
+	SweepPool(scroll.objectiveFramePool, SkinObjective)
+	SweepPool(scroll.headerFramePool, SkinListHeader)
+	SweepPool(scroll.campaignHeaderFramePool, SkinCampaignHeader)
+	SweepPool(scroll.campaignHeaderMinimalFramePool, SkinCampaignMinimalHeader)
+	SweepPool(scroll.covenantCallingsHeaderFramePool, SkinCallingsHeader)
+	BUILib.Skin.QueuePixelAlign()
 end
 
 local function SkinStoryHeader(header)
@@ -379,48 +483,59 @@ local function SkinQuestLog(questLog)
 	SkinEvents(questLog.EventsFrame)
 	SkinLegend(questLog.MapLegend)
 	SkinSessionManagement(questLog.QuestSessionManagement)
+	SkinSideTabs(questLog)
 end
 
 local function IsInsideQuestLog(frame)
-	local questLog = _G.QuestMapFrame
 	for _ = 1, PARENT_WALK_DEPTH do
 		if not frame then return false end
-		if frame == questLog then return true end
+		if frame == QuestMapFrame then return true end
 		frame = frame:GetParent()
 	end
 	return false
 end
 
 local function OnQuestInfoDisplayed(_, parentFrame)
-	if Skin.RefreshQuestInfoText and IsInsideQuestLog(parentFrame) then Skin.RefreshQuestInfoText() end
-end
-
-local function SkinMap(map)
-	SkinWindow(map)
-	SkinBorder(map.BorderFrame)
-	SkinNavBar(map.NavBar)
-	SkinOverlayFrames(map)
-	SkinQuestLog(_G.QuestMapFrame)
+	if IsInsideQuestLog(parentFrame) then Skin.RefreshQuestInfoText() end
 end
 
 local function RefreshMap(map)
 	SkinRareScannerSearch(map)
+	PlaceTomTomCoords()
 	SweepQuestLog()
-	RefreshSideTabs(_G.QuestMapFrame)
+	RefreshSideTabs()
+end
+
+local function SkinMap(map)
+	generation = generation + 1
+	SkinWindow(map)
+	SkinBorder(map.BorderFrame)
+	SkinNavBar(map.NavBar)
+	SkinOverlayFrames(map)
+	SkinQuestLog(QuestMapFrame)
 end
 
 local function InstallMap()
 	Hook('NavBar_AddButton', OnNavButtonAdded)
 	Hook('QuestLogQuests_Update', SweepQuestLog)
 	Hook('QuestInfo_Display', OnQuestInfoDisplayed)
-	Hook(_G.QuestMapFrame, 'ValidateTabs', function() RefreshSideTabs(_G.QuestMapFrame) end)
+	Hook(QuestMapFrame, 'ValidateTabs', RefreshSideTabs)
+	if _G.TomTom and TomTom.ShowHideWorldCoords then Hook(TomTom, 'ShowHideWorldCoords', PlaceTomTomCoords) end
 end
 
 context.Window('WorldMapFrame', { skin = SkinMap, show = RefreshMap, install = InstallMap })
 
 context.OnDisable(function()
 	ReleaseRareScannerSearch()
+	RestoreArt()
 	for _, tab in ipairs(sideTabs) do Skin.ResetSideTab(tab) end
+	for _, plate in pairs(plates) do plate:Hide() end
+	for button, point in pairs(movedButtons) do
+		button:ClearAllPoints()
+		button:SetPoint(unpack(point))
+	end
+	wipe(movedButtons)
+	if _G.TomTom and TomTom.ShowHideWorldCoords and _G.TomTomWorldFrame then TomTom:ShowHideWorldCoords() end
 end)
 
 Skin.OnToggle('worldmap', RefreshExtras)
