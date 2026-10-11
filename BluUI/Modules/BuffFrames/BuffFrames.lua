@@ -84,6 +84,13 @@ local function ElementLayout(config)
 	}
 end
 
+local function EnchantLayout(config)
+	local layout = ElementLayout(config)
+	local Placement = CustomAuraContainerItemEnchantmentPlacement
+	layout.placement = config.sortReverse and Placement.AfterAuraGroups or Placement.BeforeAuraGroups
+	return layout
+end
+
 local function StyleButton(header, button)
 	local config = Settings()[header.key]
 	local parts = header.parts[button]
@@ -182,7 +189,10 @@ local function ApplyLayout(header)
 	container:SetAuraGroupLayout(GROUP_KEY, ElementLayout(config))
 	container:SetAuraGroupMaxFrameCount(GROUP_KEY, config.perRow * config.rows)
 	container:SetAuraGroupSortMethod(GROUP_KEY, SortMethod(config), SortDirection(config))
-	if header.kind.enchants then container:SetItemEnchantmentLayout(ElementLayout(config)) end
+	if header.kind.enchants then
+		container:SetItemEnchantmentLayout(EnchantLayout(config))
+		container:SetItemEnchantmentSortMethod(AuraContainerItemEnchantmentSortMethod.Duration, SortDirection(config))
+	end
 
 	holder:SetSize(Pixel.Scale(GridWidth(config)), Pixel.Scale(GridHeight(config)))
 	BUI.Anchor.ApplyPosition(holder, config)
