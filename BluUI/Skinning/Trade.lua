@@ -18,8 +18,6 @@ local COLUMNS = {
 	{ highlights = { 'TradeHighlightRecipient', 'TradeHighlightRecipientEnchant' }, insets = { 'TradeRecipientItemsInset', 'TradeRecipientEnchantInset' } },
 }
 local RECIPIENT_MONEY_INSETS = { 'TradeRecipientMoneyInset' }
-local MONEY_BOX_KEYS = { 'Gold', 'Silver', 'Copper' }
-local MONEY_BOX_INSET = { left = -5 }
 local ENCHANT_LABELS = { 'TradeFramePlayerEnchantText', 'TradeFrameRecipientEnchantText' }
 local NAME_HEADERS = { 'TradeFramePlayerNameText', 'TradeFrameRecipientNameText' }
 local ACTION_BUTTONS = { 'TradeFrameTradeButton', 'TradeFrameCancelButton' }
@@ -31,7 +29,7 @@ local context = Skin.Define('trade', {
 	newLook = true,
 })
 local Fade, FadeRegions, FadeArt = context.Fade, context.FadeRegions, context.FadeArt
-local Shell, Button, Card, EditBox = context.Shell, context.Button, context.Card, context.EditBox
+local Shell, Button, Card = context.Shell, context.Button, context.Card
 local Title = context.Title
 local CropIcon = Skin.CropIcon
 
@@ -95,10 +93,6 @@ local function SkinHighlights(frame)
 end
 
 local function SkinMoney()
-	for _, key in ipairs(MONEY_BOX_KEYS) do
-		local box = _G['TradePlayerInputMoneyFrame' .. key]
-		if not box:IsForbidden() then EditBox(box, MONEY_BOX_INSET) end
-	end
 	FadeArt(_G.TradePlayerInputMoneyInset)
 	SkinInsets(RECIPIENT_MONEY_INSETS)
 	FadeRegions(_G.TradeRecipientMoneyBg)
