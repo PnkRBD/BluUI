@@ -22,7 +22,6 @@ local function OnEnter(button)
 end
 
 local function OnPostClick()
-	if InCombatLockdown() then return end
 	if UnitOnTaxi('player') then
 		TaxiRequestEarlyLanding()
 	elseif not CanExitVehicle() then
