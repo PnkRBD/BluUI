@@ -61,6 +61,7 @@ local EMBELLISH_CATEGORY = 'Embellish'
 local MARK_GAP = '  '
 local TIER_MARK = NORMAL_FONT_COLOR:WrapTextInColorCode('Tier')
 local EMBELLISH_MARK = GREEN_FONT_COLOR:WrapTextInColorCode('Embellished')
+local FILLER_WORDS = { ['of'] = true, ['the'] = true, ['a'] = true, ['an'] = true }
 
 local function StripColors(text)
 	if not text then return '' end
@@ -160,11 +161,29 @@ function Readout.AtEnchantLevel(unit)
 	return level >= (GetMaxLevelForPlayerExpansion() or MAX_LEVEL_FALLBACK)
 end
 
+local function Fits(label, text)
+	label:SetText(text)
+	return label:GetUnboundedStringWidth() <= label:GetWidth()
+end
+
+local function FitName(label, prefix, name)
+	if Fits(label, prefix .. name) then return end
+	local words = {}
+	for word in name:gmatch('%S+') do
+		if #words == 0 or not FILLER_WORDS[word:lower()] then words[#words + 1] = word end
+	end
+	for index = 1, #words - 1 do
+		if Fits(label, prefix .. table.concat(words, ' ')) then return end
+		words[index] = words[index]:match('^[%z\1-\127\194-\244][\128-\191]*') .. '.'
+	end
+	label:SetText(prefix .. table.concat(words, ' '))
+end
+
 function Readout.PaintEnchant(label, hover, enchant, red, green, blue)
 	local icons = ''
 	for atlas in enchant:gmatch(ATLAS_MARKUP) do icons = icons .. atlas end
 	local name = enchant:gsub(ATLAS_MARKUP, ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('^Enchant%s+[^%-]+%-%s*', '')
-	label:SetText(icons ~= '' and (icons .. ' ' .. name) or name)
+	FitName(label, icons ~= '' and (icons .. ' ') or '', name)
 	label:SetTextColor(red + (1 - red) * ENCHANT_TINT, green + (1 - green) * ENCHANT_TINT, blue + (1 - blue) * ENCHANT_TINT, ENCHANT_ALPHA)
 	hover.tooltip = name
 end
