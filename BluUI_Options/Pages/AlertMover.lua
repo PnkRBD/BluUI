@@ -3,6 +3,7 @@ local BUI = BluUI
 local POSITION_RANGE_X = 1500
 local POSITION_RANGE_Y = 1000
 local ANCHOR_RANGE = 200
+local ANCHOR_MENU_WIDTH = 200
 
 local function PositionTool(db, options)
 	options = options or {}
@@ -37,8 +38,8 @@ local function PositionTool(db, options)
 		rows[#rows + 1] = centered
 	end
 	if not options.noAnchor then
-		rows[#rows + 1] = Option('Anchor to', 'anchorFrame', { entries = frames, separator = true })
-		rows[#rows + 1] = Option('Anchor side', 'anchorPoint', { entries = BUI.C.ANCHOR_PLACEMENT_OPTIONS })
+		rows[#rows + 1] = Option('Anchor to', 'anchorFrame', { entries = frames, width = ANCHOR_MENU_WIDTH, separator = true })
+		rows[#rows + 1] = Option('Anchor side', 'anchorPoint', { entries = BUI.C.ANCHOR_PLACEMENT_OPTIONS, width = ANCHOR_MENU_WIDTH })
 		rows[#rows + 1] = Option('Anchor offset X', 'anchorOffsetX', { min = -ANCHOR_RANGE, max = ANCHOR_RANGE, step = 1 })
 		rows[#rows + 1] = Option('Anchor offset Y', 'anchorOffsetY', { min = -ANCHOR_RANGE, max = ANCHOR_RANGE, step = 1 })
 	end
