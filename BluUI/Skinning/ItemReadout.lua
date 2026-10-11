@@ -56,6 +56,11 @@ end
 
 local ENCHANT_PATTERN = PatternFromFormat(ENCHANTED_TOOLTIP_LINE)
 local UPGRADE_PATTERN = '^' .. EscapePattern(ITEM_UPGRADE_TOOLTIP_FORMAT):gsub('%%%%s', '(.-)'):gsub('%%%%d', '(%%d+)') .. '$'
+local LIMIT_PATTERN = '^' .. EscapePattern(ITEM_LIMIT_CATEGORY_MULTIPLE):gsub('%%%%s', '(.-)'):gsub('%%%%d', '%%d+') .. '$'
+local EMBELLISH_CATEGORY = 'Embellish'
+local MARK_GAP = '  '
+local TIER_MARK = NORMAL_FONT_COLOR:WrapTextInColorCode('Tier')
+local EMBELLISH_MARK = GREEN_FONT_COLOR:WrapTextInColorCode('Embellished')
 
 local function StripColors(text)
 	if not text then return '' end
@@ -78,17 +83,36 @@ local function ParseUpgradeLine(raw)
 	if track and TRACK_COLORS[track:lower()] then return track, current, maximum end
 end
 
-local NO_TRACK = {}
 local trackCache, enchantCache = {}, {}
 
+local function IsEmbellishLine(raw)
+	local category = raw:match(LIMIT_PATTERN)
+	return category ~= nil and category:find(EMBELLISH_CATEGORY, 1, true) ~= nil
+end
+
 local function ScanTrack(lines)
+	local scan = {}
 	for _, line in ipairs(lines) do
-		local track, current, maximum = ParseUpgradeLine(StripColors(line.leftText))
-		if track then
-			return { track .. ' ' .. current .. '/' .. maximum, TRACK_COLORS[track:lower():match('^(%a+)')] }
+		local raw = StripColors(line.leftText)
+		if not scan.text then
+			local track, current, maximum = ParseUpgradeLine(raw)
+			if track then scan.text, scan.color = track .. ' ' .. current .. '/' .. maximum, TRACK_COLORS[track:lower():match('^(%a+)')] end
 		end
+		if not scan.embellished and IsEmbellishLine(raw) then scan.embellished = true end
 	end
-	return NO_TRACK
+	return scan
+end
+
+local function AddMark(text, mark)
+	if text then return text .. MARK_GAP .. mark end
+	return mark
+end
+
+local function TrackLine(scan, link)
+	local text = scan.text
+	if select(16, C_Item.GetItemInfo(link)) then text = AddMark(text, TIER_MARK) end
+	if scan.embellished then text = AddMark(text, EMBELLISH_MARK) end
+	return text
 end
 
 local function ScanEnchant(lines)
@@ -118,9 +142,8 @@ function Readout.Read(unit, slotID, link, wantEnchant)
 			end
 		end
 	end
-	local trackText, trackColor
-	if track and track ~= NO_TRACK then trackText, trackColor = track[1], track[2] end
-	return trackText, trackColor, enchant or ''
+	if not track then return nil, nil, enchant or '' end
+	return TrackLine(track, link), track.color, enchant or ''
 end
 
 function Readout.CanHaveEnchant(info, link)
