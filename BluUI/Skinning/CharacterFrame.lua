@@ -33,7 +33,7 @@ local STATS_W       = 264
 local STATS_GAP     = 14
 local TOP_Y         = -60
 local BOTTOM_PAD    = 12
-local HEADER = { BAR_H = 48, TOP_PAD = 12, SUBTITLE_GAP = 4 }
+local HEADER = { BAR_H = 48, TOP_PAD = 12, SUBTITLE_GAP = 1 }
 
 local LEFT_X  = 16
 local MODEL_X = LEFT_X + SLOT_SIZE + MODEL_GAP
