@@ -1,7 +1,6 @@
 local BUI = BluUI
 local BUILib = BluUI.BUILibClient
 local Layout, Modals = BUILib.Layout, BUILib.Modals
-local Pixel = BUI.Pixel
 local AuraLists = BUI.AuraLists
 
 local PAGE_WIDTH = 960
@@ -11,7 +10,6 @@ local WIDE_MENU = 200
 local TAG_WIDTH = 300
 local TAB_STRIP_GAP = 12
 local LINE_WIDTH = 40
-local DEFAULT_ROW = 40
 local RESET_COLUMN = { '', 'reset', 42, 'CENTER' }
 local FRAME_COLUMNS = { { 'Setting', 'name', 130 }, { 'Shows', 'sub' }, { 'Colors', 'swatch', 140 }, { 'Options', 'icon', 110, 'CENTER' }, RESET_COLUMN, { 'Preview', 'toggle', 50, 'CENTER' }, { 'Enabled', 'switch', 70, 'CENTER' } }
 local TEXT_COLUMNS = { { 'Text', 'name', 110 }, { 'Tag', 'input' }, { 'Colors', 'swatch', 100 }, { 'Options', 'icon', 60, 'CENTER' }, RESET_COLUMN, { 'Enabled', 'switch', 70, 'CENTER' } }
@@ -456,57 +454,10 @@ local function DefaultFormat(key, fallback)
 	return fallback
 end
 
-local function ResetTool(ui, tooltip, isChanged, reset)
-	return { slot = 'icon', build = function(parent)
-		local button = ui.IconButton(parent, 'redo', tooltip, reset, 'text', 16, 'accent')
-		ui.Bind(button, function() button:SetShown(isChanged()) end)
-		return button
-	end }
-end
-
-local function RowReset(ui, tools, after)
-	local entries = {}
-	for _, tool in ipairs(tools) do
-		if tool.slot == 'reset' then return tools end
-		for _, option in ipairs(tool.options or { tool }) do
-			if option.default then entries[#entries + 1] = option end
-		end
-	end
-	if #entries == 0 then return tools end
-	local reset = ResetTool(ui, 'Changed from the factory default, click to restore it', function()
-		for _, option in ipairs(entries) do
-			local a1, a2, a3, a4 = option.get()
-			local d1, d2, d3, d4 = option.default()
-			if a1 ~= d1 or a2 ~= d2 or a3 ~= d3 or a4 ~= d4 then return true end
-		end
-		return false
-	end, function()
-		for _, option in ipairs(entries) do option.set(option.default()) end
-		if after then after() end
-		Repaint()
-	end)
-	reset.slot = 'reset'
-	tools[#tools + 1] = reset
-	return tools
-end
+local ResetTool, ToolGrid = BUI.ResetTool, BUI.ToolGrid
 
 local function DropUnitPanes(page)
 	for _, unit in ipairs(UNITS) do page:Rebuild(unit.key) end
-end
-
-local function ToolGrid(ui, parent, width, title, description, columns)
-	local fixed = 0
-	for _, column in ipairs(columns) do fixed = fixed + (column[3] or 0) end
-	local specs = {}
-	for index, column in ipairs(columns) do
-		specs[index] = { title = column[1], slot = column[2], width = column[3] or (width - fixed), align = column[4] }
-	end
-	local grid = ui.Grid(parent, width, { title = title, description = description, rowHeight = DEFAULT_ROW, columns = specs })
-	local AddTools = grid.AddTools
-	function grid:AddTools(name, sub, tools, after)
-		return AddTools(self, name, sub, RowReset(ui, tools, after), after)
-	end
-	return grid
 end
 
 local function AppearanceBoards(ui, parent, width, page)
