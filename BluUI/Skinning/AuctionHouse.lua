@@ -64,11 +64,18 @@ end
 local function SkinItemButton(button)
 	if button._buiItemButton then return end
 	button._buiItemButton = true
-	Fade(button:GetNormalTexture())
+	local icon = button.Icon
+	Fade(button.EmptyBackground)
+	Fade(button.IconBorder)
 	Fade(button.IconOverlay)
-	CropIcon(button.icon)
-	Skin.TipIconFrame(button, button.icon)
+	icon:RemoveMaskTexture(button.IconMask)
+	CropIcon(icon)
+	Skin.TipIconFrame(button, icon)
 	Skin.TipCount(button.Count)
+end
+
+local function OnItemButtonQuality(button, quality)
+	if button._buiItemButton then Skin.SetIconEdgeRarity(button.Icon, quality) end
 end
 
 local function SkinItemDisplay(display)
@@ -310,6 +317,7 @@ local function InstallFrame()
 	Hook(AuctionHouseTableHeaderStringMixin, 'Init', OnHeaderInit)
 	Hook(AuctionHouseAuctionsSummaryLineMixin, 'Init', OnSummaryLine)
 	Hook('PanelTemplates_UpdateTabs', OnTabsUpdated)
+	Hook('SetItemButtonQuality', OnItemButtonQuality)
 end
 
 context.Window('AuctionHouseFrame', { skin = SkinFrame, show = RefreshFrame, install = InstallFrame })
