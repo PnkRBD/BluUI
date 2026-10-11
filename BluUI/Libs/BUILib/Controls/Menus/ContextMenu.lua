@@ -379,12 +379,14 @@ function Controls.ContextMenu(items, options)
 
 	if not checkFrame then checkFrame = CreateFrame("Frame") end
 	local armed = not (IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton"))
+	local anchor = not options.atCursor and options.anchor
+	local anchorTop = anchor and anchor:GetTop()
 	checkFrame:SetScript("OnUpdate", function(self)
 		if not menu:IsShown() then
 			self:SetScript("OnUpdate", nil)
 			return
 		end
-		if host and not host:IsVisible() then
+		if (host and not host:IsVisible()) or Widget.AnchorMoved(anchor, anchorTop) then
 			self:SetScript("OnUpdate", nil)
 			CloseActive()
 			return
