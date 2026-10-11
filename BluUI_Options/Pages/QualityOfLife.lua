@@ -22,6 +22,7 @@ local SLIDER_WIDTH = 220
 local BUTTON_ROOM = 130
 local STATUS_ROOM = 120
 local BUTTON_GAP = 10
+local DANGER_BUTTON_WIDTH = 110
 local GATE_PAD = 24
 local GATE_BLEED = 8
 local DIALOG_WIDTH, DIALOG_HEIGHT = 660, 720
@@ -677,6 +678,7 @@ local function DangerRow(ui, board, cards, spec)
 	for index = #spec.buttons, 1, -1 do
 		local action = spec.buttons[index]
 		local button = ui.Button(row, action.text, action.style or 'danger', action.onClick)
+		button:SetMinWidth(DANGER_BUTTON_WIDTH)
 		if anchor then
 			button:SetPoint('RIGHT', anchor, 'LEFT', -BUTTON_GAP, 0)
 		else
