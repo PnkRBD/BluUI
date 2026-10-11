@@ -111,11 +111,11 @@ end
 BUI.PageEngine.RegisterPage('buffs', {
 	title = 'Buffs & Debuffs',
 	buttonText = 'Buffs & Debuffs',
-	icon = 'sparkle',
+	icon = 'updown',
 	OnBuild = function(pageFrame)
 		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
 		Layout.TablePage(page:GetTab(1), { window = Window() }, {
-			icon = 'sparkle',
+			icon = 'updown',
 			title = 'Buffs & Debuffs',
 			placeholder = 'Search buff settings...',
 			disabled = function() return not BUI.IsModuleEnabled(MODULE_KEY) end,
