@@ -4,6 +4,7 @@ local Hook = BUI.Profiler.Hooker('Skin.Menus')
 
 local next = next
 local pairs = pairs
+local ipairs = ipairs
 local wipe = wipe
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
@@ -16,6 +17,8 @@ local CHECK_TEXTURE = BUILib.GetLibMedia('check')
 local ROUND_TEXTURE = BUILib.GetLibMedia('circle_mask')
 local MARK = { box = 14, tick = 12, dot = 6, textGap = 7 }
 local MENU_FILL = {}
+local LOADOUT_MENU_TAG = 'MENU_CLASS_TALENT_PROFILE'
+local BLIZZARD_CHECK = 'UI%-CheckBox%-Check'
 
 local function MenuFill()
 	local panel = Skin.PALETTE.panel
@@ -62,6 +65,24 @@ end
 
 local function OnRadio(_, frame)
 	PaintSelection(frame, true)
+end
+
+local function RestoreRadio(button)
+	if not Skin.IsSkinEnabled('menus') then return end
+	local box, fontString = button.leftTexture1, button.fontString
+	box:Show()
+	if button.leftTexture2 then button.leftTexture2:Show() end
+	fontString:SetPoint('LEFT', box, 'RIGHT', MARK.textGap, 0)
+	fontString:SetTextColor(HIGHLIGHT_FONT_COLOR:GetRGBA())
+	for _, region in ipairs({ button:GetRegions() }) do
+		if region ~= fontString and region:IsObjectType('FontString') and (region:GetText() or ''):find(BLIZZARD_CHECK) then region:Hide() end
+	end
+end
+
+local function OnLoadoutMenu(_, rootDescription)
+	for _, description in rootDescription:EnumerateElementDescriptions() do
+		if description:IsRadio() then description:AddInitializer(RestoreRadio) end
+	end
 end
 
 local function OnDivider(frame)
@@ -137,6 +158,7 @@ local function Install()
 	if not manager then return end
 	Hook(manager, 'OpenMenu', OnMenuOpen)
 	Hook(manager, 'OpenContextMenu', OnMenuOpen)
+	_G.Menu.ModifyMenu(LOADOUT_MENU_TAG, OnLoadoutMenu)
 	local variants = _G.MenuVariants
 	if variants then
 		Hook(variants, 'CreateCheckbox', OnCheckbox)
