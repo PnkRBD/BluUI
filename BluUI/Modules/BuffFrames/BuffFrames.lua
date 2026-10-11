@@ -12,8 +12,6 @@ local GROUP_KEY = 'all'
 local HIDDEN_ROLESET = 'alwaysBlocked'
 local BLIZZARD_ROLESET = 'buffs'
 local BLIZZARD_FRAMES = { 'BuffFrame', 'DebuffFrame' }
-local DURATION_GAP = 2
-local COUNT_INSET = 1
 local CANCEL_BUTTON = 'RightButtonUp'
 
 local SORT_METHODS = {
@@ -91,6 +89,11 @@ local function EnchantLayout(config)
 	return layout
 end
 
+local function PlaceText(fontString, button, anchor, offsetX, offsetY)
+	fontString:ClearAllPoints()
+	fontString:SetPoint(anchor, button, anchor, Pixel.Scale(offsetX), Pixel.Scale(offsetY))
+end
+
 local function StyleButton(header, button)
 	local config = Settings()[header.key]
 	local parts = header.parts[button]
@@ -100,12 +103,10 @@ local function StyleButton(header, button)
 
 	local timer = config.timer
 	Pixel.ApplyFont(parts.duration, config.durationSize, font, outline)
-	parts.duration:ClearAllPoints()
-	parts.duration:SetPoint('TOP', button, 'BOTTOM', 0, -Pixel.Scale(DURATION_GAP))
+	PlaceText(parts.duration, button, config.durationAnchor, config.durationOffsetX, config.durationOffsetY)
 	parts.duration:SetShown(timer == 'below')
 	Pixel.ApplyFont(parts.count, config.countSize, font, outline)
-	parts.count:ClearAllPoints()
-	parts.count:SetPoint('BOTTOMRIGHT', button, 'BOTTOMRIGHT', -Pixel.Scale(COUNT_INSET), Pixel.Scale(COUNT_INSET))
+	PlaceText(parts.count, button, config.countAnchor, config.countOffsetX, config.countOffsetY)
 
 	local cooldown = parts.cooldown
 	cooldown:SetDrawSwipe(config.swipe ~= false)

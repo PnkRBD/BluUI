@@ -15,9 +15,10 @@ local GROWTH_ROWS = {
 	{ value = 'DOWN', text = 'Down' },
 	{ value = 'UP', text = 'Up' },
 }
+local TEXT_OFFSET = { min = -40, max = 40, step = 1 }
 local TIMER_PLACES = {
-	{ value = 'below', text = 'Below the icon' },
-	{ value = 'icon', text = 'On the icon' },
+	{ value = 'below', text = 'Text' },
+	{ value = 'icon', text = 'Cooldown numbers' },
 	{ value = 'none', text = 'Hidden' },
 }
 local OUTLINES = {
@@ -92,7 +93,13 @@ local function AddKind(grid, spec)
 			Option(db, factory, 'Outline', 'fontOutline', { entries = OUTLINES, width = WIDE_MENU }),
 			Option(db, factory, 'Timer', 'timer', { entries = TIMER_PLACES, width = WIDE_MENU, separator = true }),
 			Option(db, factory, 'Timer size', 'durationSize', { min = 6, max = 24, step = 1 }),
-			Option(db, factory, 'Stack size', 'countSize', { min = 6, max = 24, step = 1 }),
+			Option(db, factory, 'Timer anchor', 'durationAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS, width = WIDE_MENU }),
+			Option(db, factory, 'Timer X offset', 'durationOffsetX', TEXT_OFFSET),
+			Option(db, factory, 'Timer Y offset', 'durationOffsetY', TEXT_OFFSET),
+			Option(db, factory, 'Stack size', 'countSize', { min = 6, max = 24, step = 1, separator = true }),
+			Option(db, factory, 'Stack anchor', 'countAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS, width = WIDE_MENU }),
+			Option(db, factory, 'Stack X offset', 'countOffsetX', TEXT_OFFSET),
+			Option(db, factory, 'Stack Y offset', 'countOffsetY', TEXT_OFFSET),
 		} },
 		{ tooltip = 'Sorting, swipe and tooltips', title = spec.title, options = behavior },
 		{ icon = 'eye', tooltip = 'Show the ' .. spec.title:lower() .. ' frame, drag to move', get = function() return db.locked == false end, set = function(value)
