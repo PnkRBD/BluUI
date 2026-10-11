@@ -373,17 +373,25 @@ local function LinkifyURLs(text, config)
 	return tconcat(parts)
 end
 
-local function ProcessChannels(text, config)
-	if config.hideChannelNumbers then
-		text = gsub(text, '(%[)%d+%.%s*', '%1')
+local channelConfig
+
+local function ShortChannel(head, label, tail)
+	if channelConfig.hideChannelNumbers then
+		label = gsub(label, '^(%[)%d+%.%s*', '%1')
 	end
-	if config.abbreviateChannels then
-		text = gsub(text, '%[(%d*%.?%s*)([%a]+)%s*%-%s*[^%]]-%]', '[%1%2]')
+	if channelConfig.abbreviateChannels then
+		label = gsub(label, '^%[(%d*%.?%s*)([%a]+)%s*%-%s*[^%]]-%]$', '[%1%2]')
 		for fullName, abbreviation in pairs(CHANNEL_ABBR) do
-			text = gsub(text, '(%[%d*%.?%s*)' .. fullName .. '%]', '%1' .. abbreviation .. ']')
+			label = gsub(label, '^(%[%d*%.?%s*)' .. fullName .. '%]$', '%1' .. abbreviation .. ']')
 		end
 	end
-	return text
+	return head .. label .. tail
+end
+
+local function ProcessChannels(text, config)
+	if not (config.hideChannelNumbers or config.abbreviateChannels) then return text end
+	channelConfig = config
+	return (gsub(text, '(|Hchannel:[^|]*|h)(%[[^%]]*%])(|h)', ShortChannel))
 end
 
 local lastCheckedFormat, lastFormatValid
