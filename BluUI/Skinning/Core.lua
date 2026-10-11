@@ -63,7 +63,7 @@ local BASELINE_SKINS = {}
 for _, id in ipairs({
 	'achievements', 'alerts', 'auctionhouse', 'bonusroll', 'calendar', 'chatpanels', 'collections', 'deathrecap', 'mirrortimers',
 	'cooldownmanager', 'delves', 'dressup', 'friends', 'greatvault', 'groupfinder', 'grouploot', 'guild', 'inspect',
-	'instanceabandon', 'itemsocketing', 'itemupgrade', 'journeys', 'loothistory', 'lootwindow', 'mail', 'playerauras',
+	'instanceabandon', 'itemsocketing', 'itemupgrade', 'journeys', 'loothistory', 'lootwindow', 'mail',
 	'professions', 'questdialogs', 'queuepopups', 'readycheck', 'spellbook', 'splash', 'staticpopup', 'systempanels',
 	'trade', 'transmog', 'travel', 'worldmap', 'characterFrame', 'chat', 'gameMenu', 'menus',
 	'merchant', 'objectivetracker', 'trainer', 'petstable', 'playerchoice', 'pvpmatch', 'renown', 'keybinds',
