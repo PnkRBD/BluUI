@@ -16,3 +16,4 @@ end
 BUI.Events:OnLogin('Datatext', Datatext.Initialize, 'datatext')
 
 BUI.Events:Register('PLAYER_REGEN_DISABLED', 'Datatext.CombatHovers', Datatext.HideHoversInCombat)
+BUI.Visibility.OnPetBattle('Datatext', Datatext.Apply)
