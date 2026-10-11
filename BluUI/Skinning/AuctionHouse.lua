@@ -105,7 +105,7 @@ local function SkinItemButton(button)
 	Fade(button.EmptyBackground)
 	Fade(button.IconBorder)
 	Fade(button.IconOverlay)
-	if button.IconMask then icon:RemoveMaskTexture(button.IconMask) end
+	icon:RemoveMaskTexture(button.IconMask or button.CircleMask)
 	CropIcon(icon)
 	Skin.TipIconFrame(button, icon)
 	Skin.TipCount(button.Count)
