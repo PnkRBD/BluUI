@@ -27,7 +27,7 @@ local REWARD_TITLE_KEYS = { 'title', 'rewardsLabel' }
 local REWARD_TEXT_KEYS = { 'description', 'rewardsDescription', 'xpLabel' }
 local SEARCH_ENTRY_TEXT_KEYS = { 'Name', 'ActivityName', 'Playstyle', 'ExpirationTime', 'PendingLabel' }
 local ENTRY_APPLIED_COLOR = { 0.25, 0.8, 0.35, 0.14 }
-local ENTRY_FILTERED_COLOR = { 0.85, 0.25, 0.25, 0.14 }
+local ENTRY_FILTERED_ALPHA = 0.45
 local COLUMN_HEADER_KEYS = { 'NameColumnHeader', 'RoleColumnHeader', 'ItemLevelColumnHeader', 'RatingColumnHeader' }
 local BONUS_ART_KEYS = { 'ShadowOverlay', 'WorldBattlesTexture' }
 local CONQUEST_BAR_ART = { 'Border', 'Background' }
@@ -372,11 +372,12 @@ local function SkinSearchEntry(button)
 end
 
 local function PaintSearchEntryState(button)
+	button:SetAlpha(button.isNowFilteredOut and ENTRY_FILTERED_ALPHA or 1)
 	local background = button.BackgroundTexture
 	if not background then return end
 	background:SetBlendMode('BLEND')
 	if button.isNowFilteredOut then
-		FlatTexture(background, ENTRY_FILTERED_COLOR[1], ENTRY_FILTERED_COLOR[2], ENTRY_FILTERED_COLOR[3], ENTRY_FILTERED_COLOR[4])
+		FlatTexture(background, 0, 0, 0, 0)
 	elseif button.isApplication then
 		FlatTexture(background, ENTRY_APPLIED_COLOR[1], ENTRY_APPLIED_COLOR[2], ENTRY_APPLIED_COLOR[3], ENTRY_APPLIED_COLOR[4])
 	elseif button.isSelected then
