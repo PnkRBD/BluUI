@@ -30,12 +30,12 @@ local MODEL_GAP     = 6
 local MODEL_HEIGHT  = 384
 local MODEL_WIDTH   = 186 + (LABEL_ZONE_W - MODEL_GAP) * 2
 local STATS_W       = 264
-local STATS_GAP     = 14
+local STATS_GAP     = 22
 local TOP_Y         = -60
 local BOTTOM_PAD    = 12
 local HEADER = { BAR_H = 48, TOP_PAD = 12, SUBTITLE_GAP = 1 }
 
-local LEFT_X  = 16
+local LEFT_X  = 22
 local MODEL_X = LEFT_X + SLOT_SIZE + MODEL_GAP
 local RIGHT_X = MODEL_X + MODEL_WIDTH + MODEL_GAP
 local STATS_X = RIGHT_X + SLOT_SIZE + STATS_GAP
