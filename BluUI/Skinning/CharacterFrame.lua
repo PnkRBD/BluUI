@@ -226,7 +226,7 @@ local function PaintSlot(button)
 end
 
 local SlotEnter = BUI.Profiler.Wrap('Skin.CharacterFrame slot OnEnter', function(self)
-    self:SetBackdropBorderColor(Painter.Color('skinLabel'))
+    self:SetBackdropBorderColor(unpack(Skin.HoverColor()))
 end)
 local SlotLeave = BUI.Profiler.Wrap('Skin.CharacterFrame slot OnLeave', PaintSlotBorder)
 

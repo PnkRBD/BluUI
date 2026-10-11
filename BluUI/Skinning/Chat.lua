@@ -12,7 +12,7 @@ local find = string.find
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin3 = BUILib.Skin
 local Skin = BUI.Skinning
-local SELECTED, HOVER = Skin.SELECTED_COLOR, Skin.HOVER_COLOR
+local SELECTED, MUTED, HoverColor = Skin.SELECTED_COLOR, Skin.MUTED_COLOR, Skin.HoverColor
 local sharedMedia = LibStub('LibSharedMedia-3.0')
 local GLOBAL_OPTION = BUI.C.GLOBAL_OPTION
 
@@ -541,7 +541,7 @@ local function GetCopyWindow()
 	closeGlyph:SetPoint('CENTER')
 	closeGlyph:SetText('×')
 	closeGlyph:SetTextColor(0.7, 0.7, 0.7)
-	close:SetScript('OnEnter', BUI.Profiler.Script('Skin.Chat close OnEnter', function() closeGlyph:SetTextColor(SELECTED[1], SELECTED[2], SELECTED[3]) end))
+	close:SetScript('OnEnter', BUI.Profiler.Script('Skin.Chat close OnEnter', function() closeGlyph:SetTextColor(unpack(HoverColor())) end))
 	close:SetScript('OnLeave', BUI.Profiler.Script('Skin.Chat close OnLeave', function() closeGlyph:SetTextColor(0.7, 0.7, 0.7) end))
 	close:SetScript('OnClick', BUI.Profiler.Script('Skin.Chat close OnClick', function() window:Hide() end))
 
@@ -943,7 +943,7 @@ local function SkinEditBox(editBox, chat)
 	PositionEditBox(chat)
 
 	editBox:HookScript('OnShow', Wrap('Skin.Chat editbox position', function(self) PositionEditBox(self._buiChat) end))
-	editBox:HookScript('OnEditFocusGained', BUI.Profiler.Wrap('Skin.Chat editBox OnEditFocusGained', function(self) self:SetBackdropBorderColor(HOVER[1], HOVER[2], HOVER[3], 1) end))
+	editBox:HookScript('OnEditFocusGained', BUI.Profiler.Wrap('Skin.Chat editBox OnEditFocusGained', function(self) self:SetBackdropBorderColor(MUTED[1], MUTED[2], MUTED[3], 1) end))
 	editBox:HookScript('OnEditFocusLost', BUI.Profiler.Wrap('Skin.Chat editBox OnEditFocusLost 2', function(self) self:SetBackdropBorderColor(BorderColor()) end))
 end
 
@@ -1012,7 +1012,8 @@ local function UpdateCornerButtons()
 	if chat._buiCopy and ShowCopyButton() then chat._buiCopy:SetAlpha(alpha) end
 	for button, paint in pairs(auxPainters) do
 		if button:IsMouseOver() then
-			paint(SELECTED[1], SELECTED[2], SELECTED[3], alpha)
+			local hover = HoverColor()
+			paint(hover[1], hover[2], hover[3], alpha)
 		else
 			paint(BUTTON_IDLE[1], BUTTON_IDLE[2], BUTTON_IDLE[3], alpha)
 		end
@@ -1037,7 +1038,7 @@ local function MakeCornerButton(chat, mediaKey)
 	texture:SetVertexColor(BUTTON_IDLE[1], BUTTON_IDLE[2], BUTTON_IDLE[3], 1)
 	button._tex = texture
 	button:SetScript('OnEnter', BUI.Profiler.Script('Skin.Chat button OnEnter', function()
-		texture:SetVertexColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
+		texture:SetVertexColor(unpack(HoverColor()))
 		TouchFader()
 	end))
 	button:SetScript('OnLeave', BUI.Profiler.Script('Skin.Chat button OnLeave', function()
@@ -1115,9 +1116,9 @@ local function SkinPanel()
 	lock:SetPoint('TOP', copy, 'BOTTOM', 0, -5)
 	local function PaintLock(hovered)
 		if hovered then
-			lock._tex:SetVertexColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
+			lock._tex:SetVertexColor(unpack(HoverColor()))
 		elseif lock._lockedTint then
-			lock._tex:SetVertexColor(HOVER[1], HOVER[2], HOVER[3], 1)
+			lock._tex:SetVertexColor(MUTED[1], MUTED[2], MUTED[3], 1)
 		else
 			lock._tex:SetVertexColor(BUTTON_IDLE[1], BUTTON_IDLE[2], BUTTON_IDLE[3], 1)
 		end
@@ -1218,7 +1219,7 @@ local function CreateSizer()
 
 	local function GripColor(active)
 		if active then
-			grip:SetVertexColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
+			grip:SetVertexColor(unpack(HoverColor()))
 		else
 			grip:SetVertexColor(0.65, 0.65, 0.7, 1)
 		end

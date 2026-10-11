@@ -7,7 +7,7 @@ local pairs = pairs
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
-local SELECTED, MUTED_TEXT = Skin.SELECTED_COLOR, Skin.HOVER_COLOR
+local SELECTED, MUTED_TEXT = Skin.SELECTED_COLOR, Skin.MUTED_COLOR
 
 local SKIN_ID = 'journeys'
 local MAIN_ART = { 'Bg', 'TopTileStreaks', 'inset', 'InsetBorderBottomLeft', 'InsetBorderBottomRight', 'InsetBorderBottom', 'InsetBorderLeft', 'InsetBorderRight' }
@@ -375,7 +375,7 @@ local function SkinEncounter(encounter)
 end
 
 local function CardEnter(card)
-	if Enabled() then Skin.TipShellEdges(card, Skin.HOVER_COLOR) end
+	if Enabled() then Skin.TipShellEdges(card, Skin.HoverColor()) end
 end
 
 local function CardLeave(card)

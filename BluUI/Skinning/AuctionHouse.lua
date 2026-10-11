@@ -36,7 +36,7 @@ local ScrollBar, Tab, Body, Title = context.ScrollBar, context.Tab, context.Body
 local FlatTexture, SelectedTexture, CropIcon = Skin.FlatTexture, Skin.SelectedTexture, Skin.CropIcon
 
 local function ShellEdgeEnter(button)
-	Skin.TipShellEdges(button, Skin.HOVER_COLOR)
+	Skin.TipShellEdges(button, Skin.HoverColor())
 end
 
 local function ShellEdgeLeave(button)
