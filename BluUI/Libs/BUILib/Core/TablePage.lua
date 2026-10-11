@@ -15,6 +15,7 @@ local AVATAR_SIZE = 28
 local DROPDOWN_WIDTH = 112
 local SECTION_PAD = 32
 local STACK_PAD = 24
+local TITLE_DROP = 2
 local STACK_GAP = 20
 local TABLE_HEAD = 36
 local COLUMN_FONT = 11
@@ -124,7 +125,7 @@ function Section:Place(y, panelHeight)
 end
 
 function Layout.TableKit(window)
-	local kit = { ROW_INSET = ROW_INSET, AVATAR_X = AVATAR_X, NAME_X = NAME_X }
+	local kit = { ROW_INSET = ROW_INSET, AVATAR_X = AVATAR_X, NAME_X = NAME_X, STACK_TITLE_TOP = STACK_PAD + TITLE_DROP }
 
 	function kit.Bind(region, update) return window:Bind(region, update) end
 
@@ -768,7 +769,7 @@ function Layout.TableKit(window)
 		local section = setmetatable({ window = window, frame = frame, rows = {}, buttons = {}, panelWidth = width - panelX, pad = pad, headHeight = spec.columns and TABLE_HEAD or nil }, Section)
 
 		local title = kit.Text(frame, spec.title, 13, 'text')
-		title:SetPoint('TOPLEFT', 0, -(pad + 2))
+		title:SetPoint('TOPLEFT', 0, -(pad + TITLE_DROP))
 
 		for _, buttonSpec in ipairs(spec.buttons or {}) do
 			section.buttons[#section.buttons + 1] = kit.Button(frame, buttonSpec.text, buttonSpec.style, buttonSpec.onClick, buttonSpec.icon, buttonSpec.active)
@@ -802,7 +803,7 @@ function Layout.TableKit(window)
 			if stacked then
 				for _, button in ipairs(self.buttons) do buttonsWidth = buttonsWidth + button:GetWidth() + BUTTON_GAP end
 			end
-			local leftHeight = 2 + kit.Height(title)
+			local leftHeight = TITLE_DROP + kit.Height(title)
 			if description then
 				description:SetWidth(stacked and (width - buttonsWidth - LEFT_GAP) or math.min(LEFT_WIDTH, panelX - LEFT_GAP))
 				leftHeight = leftHeight + descriptionGap + kit.Height(description)

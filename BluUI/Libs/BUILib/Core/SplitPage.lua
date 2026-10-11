@@ -46,7 +46,7 @@ local THUMB_GAP = 6
 local THUMB_FRAME = 1
 local THUMB_IDLE_ALPHA = 0.6
 local DOT_TILE = 16
-local PREVIEW_HEIGHT = 360
+local PREVIEW_MIN = 360
 local LINK_HEIGHT = 20
 local WHITE = { 1, 1, 1, 1 }
 
@@ -207,7 +207,7 @@ end
 
 local function PreviewCard(kit, window, parent, x, width, spec)
 	local card = CreateFrame('Frame', nil, parent)
-	card:SetPoint('TOPLEFT', x, 0)
+	card:SetPoint('TOPLEFT', x, -kit.STACK_TITLE_TOP)
 	card:SetWidth(width)
 	local fill, edge = Widget.DrawCardShape(card, CARD_RADIUS, WHITE, WHITE, 'BACKGROUND', 0, 0)
 	window:Paint(fill, 'card')
@@ -348,12 +348,12 @@ function Layout.SplitPage(tab, shell, spec)
 	local function Resize()
 		local last = MarkLast()
 		local height = main:Measure(mainWidth)
-		local columns = math.max(height, PREVIEW_HEIGHT)
+		local columns = math.max(height, kit.STACK_TITLE_TOP + PREVIEW_MIN)
 		if last and columns > height then last:SetHeight(last:GetHeight() + columns - height) end
 		main:ClearAllPoints()
 		main:SetPoint('TOPLEFT')
 		main:SetSize(mainWidth, columns)
-		preview:SetHeight(PREVIEW_HEIGHT)
+		preview:SetHeight(columns - kit.STACK_TITLE_TOP)
 		block:SetHeight(columns)
 		block.layoutHeight = columns
 		BUILib.Defer(function()
