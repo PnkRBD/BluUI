@@ -303,30 +303,6 @@ local function ResolvePanel(panel)
 	return panel
 end
 
-local function SetPanelLayoutAttribute(panel, name, value)
-	if UIPanelWindows and UIPanelWindows[panel:GetName() or ''] and SetUIPanelAttribute then
-		SetUIPanelAttribute(panel, name, value)
-	elseif panel:GetAttribute('UIPanelLayout-defined') then
-		panel:SetAttributeNoHandler('UIPanelLayout-' .. name, value)
-	end
-end
-
-local function ApplyPanelSlot(panel, width, height)
-	panel = ResolvePanel(panel)
-	if not panel or not panel.GetAttribute or (InCombatLockdown() and panel:IsProtected()) then return end
-	SetPanelLayoutAttribute(panel, 'width', width)
-	SetPanelLayoutAttribute(panel, 'height', height)
-	if panel:IsShown() and UpdateUIPanelPositions then pcall(UpdateUIPanelPositions, panel) end
-end
-
-function Skin.ReservePanelSlot(panel, width, height)
-	ApplyPanelSlot(panel, width, height)
-end
-
-function Skin.ReleasePanelSlot(panel)
-	ApplyPanelSlot(panel, nil, nil)
-end
-
 local function LastPanelSlot(panel)
 	if not (panel.GetLeft and panel.GetTop) then return end
 	local left, top = panel:GetLeft(), panel:GetTop()
@@ -386,7 +362,6 @@ function Skin.MakeDraggable(frame, dbKey, point, x, y, follow)
 	end
 
 	frame:HookScript('OnShow', Wrap('Skin.Core frame home', function(self)
-		if follow then Skin.ReservePanelSlot(follow, self:GetWidth(), self:GetHeight()) end
 		local panel = WatchPanel()
 		if WantsHome() then Home() end
 		if follow and not (panel and panel:IsShown()) then

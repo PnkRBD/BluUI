@@ -834,7 +834,6 @@ Skin.OnToggle('merchant', function(enabled)
 		BUI.Events:UnregisterAll('Skinning.Merchant.Live')
 		if MerchantFrame then
 			Skin.RestoreBlizzardFrame(MerchantFrame)
-			Skin.ReleasePanelSlot(MerchantFrame)
 		end
 	elseif MerchantFrame and MerchantFrame:IsShown() then
 		OnMerchantEvent('MERCHANT_SHOW')
