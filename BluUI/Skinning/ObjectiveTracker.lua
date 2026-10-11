@@ -269,7 +269,7 @@ local function StashTracker(stashed)
 		trackerFrame:SetAlpha(0)
 	else
 		trackerFrame:SetScaleBase(trackerStashScale)
-		trackerFrame:SetAlpha(1)
+		trackerFrame:SetAlpha(BUI.Visibility.InPetBattle() and 0 or 1)
 		trackerStashScale = nil
 	end
 	SyncTrackerCardShown()
@@ -283,6 +283,13 @@ local function ApplyTrackerHidden()
 	end
 	StashTracker(Enabled() and GetSettings().trackerHidden == true)
 end
+
+local function FadeTrackerForPetBattle(active)
+	if trackerStashScale or not Enabled() then return end
+	ObjectiveTrackerFrame:SetAlpha(active and 0 or 1)
+end
+
+BUI.Visibility.OnPetBattle('ObjectiveTracker', FadeTrackerForPetBattle)
 
 local function OnTrackerAlpha(_, alpha)
 	local fadedOut = not issecretvalue(alpha) and alpha == 0 and not trackerStashScale
