@@ -238,7 +238,7 @@ local function UpdateSlotLabels(button)
 	labels.track:SetTextColor(red, green, blue, TRACK_ALPHA)
 
 	if enchant ~= '' then
-		Readout.PaintEnchant(labels.enchant, labels.hover, enchant, red, green, blue)
+		Readout.PaintEnchant(labels.enchant, labels.hover, enchant)
 		labels.hover.unit, labels.hover.slot = unit, slotID
 		labels.hover:Show()
 	elseif canEnchant and Readout.AtEnchantLevel(unit) then
