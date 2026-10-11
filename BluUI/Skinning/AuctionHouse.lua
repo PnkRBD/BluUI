@@ -26,6 +26,7 @@ local ROW_SELECTED_ALPHA = 0.12
 local ROW_HOVER_ALPHA = 0.08
 local ICON_HOVER_ALPHA = 0.2
 local CARD_INSET = 1
+local RESULT_CARD_INSET = { left = 2, right = 2, top = 1, bottom = 1 }
 local BID_COIN_LEFT = -5
 local PROGRESS_EDGE = -1
 local NAME_SCALE = 1.2
@@ -339,13 +340,33 @@ local function OnCategoryButton(button, info)
 	Skin.TipCategoryButton(context, button, info.type == 'category' and CATEGORY_SCALE or nil)
 end
 
+local function FitToCard(texture)
+	texture:ClearAllPoints()
+	texture:SetPoint('TOPLEFT', RESULT_CARD_INSET.left, -RESULT_CARD_INSET.top)
+	texture:SetPoint('BOTTOMRIGHT', -RESULT_CARD_INSET.right, RESULT_CARD_INSET.bottom)
+end
+
+local function OnRowSelected(highlight, shown)
+	Skin.SetActiveEdge(highlight:GetParent(), shown and true or false)
+end
+
+local function OnRowCleared(highlight)
+	Skin.SetActiveEdge(highlight:GetParent(), false)
+end
+
 local function OnRowPopulated(row)
 	if row._buiRow then return end
 	row._buiRow = true
+	local selected, hover = row.SelectedHighlight, row.HighlightTexture
 	Fade(row:GetNormalTexture())
-	SelectedRow(row.SelectedHighlight)
-	row.HighlightTexture:SetBlendMode('BLEND')
-	FlatTexture(row.HighlightTexture, 1, 1, 1, ROW_HOVER_ALPHA)
+	Card(row, RESULT_CARD_INSET)
+	SelectedRow(selected)
+	FitToCard(selected)
+	hover:SetBlendMode('BLEND')
+	FlatTexture(hover, 1, 1, 1, ROW_HOVER_ALPHA)
+	FitToCard(hover)
+	Hook(selected, 'SetShown', OnRowSelected)
+	Hook(selected, 'Hide', OnRowCleared)
 end
 
 local function SkinCell(cell)
