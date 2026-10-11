@@ -93,6 +93,7 @@ local function AddKind(grid, spec)
 			Option(db, factory, 'Outline', 'fontOutline', { entries = OUTLINES, width = WIDE_MENU }),
 			Option(db, factory, 'Timer', 'timer', { entries = TIMER_PLACES, width = WIDE_MENU, separator = true }),
 			Option(db, factory, 'Timer size', 'durationSize', { min = 6, max = 24, step = 1 }),
+			Option(db, factory, 'Compact timer, 11s', 'compactTimer'),
 			Option(db, factory, 'Timer anchor', 'durationAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS, width = WIDE_MENU }),
 			Option(db, factory, 'Timer X offset', 'durationOffsetX', TEXT_OFFSET),
 			Option(db, factory, 'Timer Y offset', 'durationOffsetY', TEXT_OFFSET),
