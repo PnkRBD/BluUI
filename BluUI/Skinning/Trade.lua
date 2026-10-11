@@ -22,6 +22,8 @@ local RECIPIENT_MONEY_INSETS = { 'TradeRecipientMoneyInset' }
 local COIN_BOXES = { { left = 11, width = 62 }, { left = 83, width = 35 }, { left = 128, width = 35 } }
 local COIN_BOX_TOP, COIN_BOX_HEIGHT, COIN_CAP, COIN_RIM = -61, 20, 5, 3
 local COIN_COVER_LEVEL = 10
+local COIN_GOLD_WIDE = 70
+local COIN_WIDE_COPPER = 1000000 * 10000
 local CLEAR = { 0, 0, 0, 0 }
 local ENCHANT_LABELS = { 'TradeFramePlayerEnchantText', 'TradeFrameRecipientEnchantText' }
 local NAME_HEADERS = { 'TradeFramePlayerNameText', 'TradeFrameRecipientNameText' }
@@ -116,12 +118,21 @@ local function CoverCoinBox(frame, box)
 	CoverStrip(cover, 'TOPRIGHT', 'BOTTOMRIGHT', COIN_RIM)
 	Shell(cover)
 	BUILib.Skin.SetShellFill(cover, CLEAR)
+	return cover
+end
+
+local coinCovers = {}
+
+local function LayoutCoinCovers()
+	if not coinCovers[1] then return end
+	local wide = GetPlayerTradeMoney() >= COIN_WIDE_COPPER
+	coinCovers[1]:SetWidth((wide and COIN_GOLD_WIDE or COIN_BOXES[1].width) + COIN_CAP)
+	for index = 2, #coinCovers do coinCovers[index]:SetShown(not wide) end
 end
 
 local function SkinMoney(frame)
-	if not frame._buiCoinCovers then
-		frame._buiCoinCovers = true
-		for _, box in ipairs(COIN_BOXES) do CoverCoinBox(frame, box) end
+	if not coinCovers[1] then
+		for index, box in ipairs(COIN_BOXES) do coinCovers[index] = CoverCoinBox(frame, box) end
 	end
 	FadeArt(_G.TradePlayerInputMoneyInset)
 	SkinInsets(RECIPIENT_MONEY_INSETS)
@@ -144,11 +155,13 @@ local function SkinFrame(frame)
 end
 
 local function RefreshFrame()
+	LayoutCoinCovers()
 	for _, column in ipairs(COLUMNS) do SetColumnAccepted(column) end
 	ForEachItemButton(function(name) RefreshItemEdges(_G[name .. 'ItemButton']) end)
 end
 
 local function InstallFrame()
+	BUI.Events:Register('PLAYER_TRADE_MONEY', 'Skin.Trade coin covers', context.Guard(LayoutCoinCovers))
 	context.Hook('TradeFrame_UpdatePlayerItem', function(slotIndex) RefreshItemEdges(_G[ITEM_PREFIXES[1] .. slotIndex .. 'ItemButton']) end)
 	context.Hook('TradeFrame_UpdateTargetItem', function(slotIndex) RefreshItemEdges(_G[ITEM_PREFIXES[2] .. slotIndex .. 'ItemButton']) end)
 	for _, column in ipairs(COLUMNS) do
