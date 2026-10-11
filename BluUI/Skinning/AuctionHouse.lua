@@ -33,7 +33,7 @@ local context = Skin.Define('auctionhouse', {
 	newLook = true,
 })
 local Hook = context.Hook
-local Fade, FadeKeys = context.Fade, context.FadeKeys
+local Fade, FadeKeys, FadeRegions = context.Fade, context.FadeKeys, context.FadeRegions
 local Shell, Button, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Dropdown, context.EditBox, context.CheckBox
 local ScrollBar, Tab, Body, Title, Face = context.ScrollBar, context.Tab, context.Body, context.Title, context.Face
 local FlatTexture, SelectedTexture, CropIcon = Skin.FlatTexture, Skin.SelectedTexture, Skin.CropIcon
@@ -116,6 +116,7 @@ local function OnItemButtonQuality(button, quality)
 end
 
 local function SkinItemDisplay(display)
+	FadeRegions(display)
 	SkinBackgroundFrame(display)
 	SkinItemButton(display.ItemButton)
 	Skin.TipFont(display.Name, 'title', NAME_SCALE)
