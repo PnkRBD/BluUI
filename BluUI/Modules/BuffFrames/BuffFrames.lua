@@ -13,6 +13,30 @@ local HIDDEN_ROLESET = 'alwaysBlocked'
 local BLIZZARD_ROLESET = 'buffs'
 local BLIZZARD_FRAMES = { 'BuffFrame', 'DebuffFrame' }
 local CANCEL_BUTTON = 'RightButtonUp'
+local TIMER_BAND = 1.5
+
+local function TimerRule(unitSeconds, format)
+	local Rounding = Enum.NumericRuleFormatRounding
+	if unitSeconds == 1 then return { threshold = 0, step = 1, rounding = Rounding.Down, format = format } end
+	return {
+		threshold = 1 + TIMER_BAND * unitSeconds,
+		format = format,
+		components = { { div = unitSeconds, step = 1, rounding = Rounding.Up } },
+	}
+end
+
+local function CompactTimerFormatter()
+	local formatter = C_StringUtil.CreateNumericRuleFormatter()
+	formatter:SetBreakpoints({
+		TimerRule(1, '%ds'),
+		TimerRule(SECONDS_PER_MIN, '%dm'),
+		TimerRule(SECONDS_PER_HOUR, '%dh'),
+		TimerRule(SECONDS_PER_DAY, '%dd'),
+	})
+	return formatter
+end
+
+local COMPACT_TIMER = { textFormatter = CompactTimerFormatter() }
 
 local SORT_METHODS = {
 	{ value = 'time',     text = 'Time remaining', enumKey = 'ExpirationOnly' },
@@ -104,6 +128,7 @@ local function StyleButton(header, button)
 	local timer = config.timer
 	Pixel.ApplyFont(parts.duration, config.durationSize, font, outline)
 	PlaceText(parts.duration, button, config.durationAnchor, config.durationOffsetX, config.durationOffsetY)
+	button:SetDurationText(parts.duration, config.compactTimer and COMPACT_TIMER or nil)
 	parts.duration:SetShown(timer == 'below')
 	Pixel.ApplyFont(parts.count, config.countSize, font, outline)
 	PlaceText(parts.count, button, config.countAnchor, config.countOffsetX, config.countOffsetY)
@@ -162,7 +187,6 @@ local function BuildButton(header, button)
 	button:SetIcon(icon)
 	button:SetDurationCooldown(cooldown)
 	button:SetApplicationCount(parts.count, {})
-	button:SetDurationText(parts.duration)
 end
 
 local function RestyleButtons()
