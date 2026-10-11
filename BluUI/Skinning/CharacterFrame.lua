@@ -262,13 +262,14 @@ local function StyleSlotButton(button)
     button:HookScript('OnLeave', SlotLeave)
 end
 
-local BAG = { ARROW_SIZE = GEM_SIZE, COLS = 5, CELL = 40, GAP = 4, PAD = 8, POPUP_TOP = 24, POPUP_MAX = 15, POPUP_LINGER = 0.35 }
+local BAG = {
+    MARKER_KEY = 'characterFrameArrow', MARKER_W = 10, MARKER_H = 24, MARKER_GAP = 2, MARKER_IDLE_ALPHA = 0.85,
+    LIGHT_MARKER = 0.6, ARROW_LIGHT = { 1, 1, 1, 0.85 }, ARROW_DARK = { 0, 0, 0, 0.6 },
+    COLS = 5, CELL = 40, GAP = 4, PAD = 8, POPUP_TOP = 24, POPUP_MAX = 15, POPUP_LINGER = 0.35,
+}
 BAG.POPUP_W = BAG.PAD * 2 + BAG.COLS * BAG.CELL + (BAG.COLS - 1) * BAG.GAP
-function BAG.Colors()
-    local skinning = BUI.GetDB().skinning
-    return skinning.characterFrameArrow or Skin.PALETTE.panel,
-        skinning.characterFrameArrowEmpty or { 0.45, 0.45, 0.48, 1 },
-        skinning.characterFrameArrowPlate or { 1, 1, 1, 0.85 }
+function BAG.MarkerColor()
+    return BUI.GetDB().skinning[BAG.MARKER_KEY] or Skin.HoverColor()
 end
 
 local bagItemsBySlot = {}
@@ -382,7 +383,7 @@ local function ShowBagPopup(labels)
     local list = bagItemsBySlot[labels.info.id]
     if not list or #list == 0 then return end
     local popup = EnsureBagPopup()
-    popup.owner = labels.bagArrow
+    popup.owner = labels.bagMarker
     popup.title:SetText(('In bags (%d)'):format(#list))
     local side, opposite = PopupSide(labels.info)
     local popupPixels = popup:GetWidth() * popup:GetEffectiveScale() + Pixel.Scale(4) * popup:GetEffectiveScale()
@@ -416,7 +417,7 @@ local function ShowBagPopup(labels)
 end
 
 local function ToggleBagPopup(labels)
-    if bagPopup and bagPopup:IsShown() and bagPopup.owner == labels.bagArrow then
+    if bagPopup and bagPopup:IsShown() and bagPopup.owner == labels.bagMarker then
         bagPopup:Hide()
         return
     end
@@ -425,15 +426,15 @@ end
 
 local function RefreshBagAlternatives()
     ScanBags()
-    local arrowColor, emptyColor, plateColor = BAG.Colors()
+    local color = BAG.MarkerColor()
+    local shade = (0.299 * color[1] + 0.587 * color[2] + 0.114 * color[3]) > BAG.LIGHT_MARKER and BAG.ARROW_DARK or BAG.ARROW_LIGHT
     for _, labels in pairs(slotLabels) do
         local list = bagItemsBySlot[labels.info.id]
-        local count = list and #list or 0
-        labels.bagArrow.count = count
-        labels.bagArrow:Show()
-        local color = count > 0 and arrowColor or emptyColor
-        labels.bagArrow.arrow:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
-        labels.bagArrow.plate:SetColorTexture(plateColor[1], plateColor[2], plateColor[3], plateColor[4] or 1)
+        local marker = labels.bagMarker
+        marker.count = list and #list or 0
+        marker.bar:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
+        marker.arrow:SetVertexColor(shade[1], shade[2], shade[3], shade[4])
+        marker:SetShown(marker.count > 0)
     end
     if bagPopup and bagPopup:IsShown() then bagPopup:Hide() end
 end
@@ -449,7 +450,8 @@ local function BuildSlotLabels(button, info)
     local outer, inner = SlotSides(info)
     local sign = outer == 'RIGHT' and 1 or -1
 
-    local gapX = Pixel.Scale(LABEL_GAP_X * sign)
+    local markerRoom = info.col == 'bottom' and BAG.MARKER_W + BAG.MARKER_GAP or 0
+    local gapX = Pixel.Scale((LABEL_GAP_X + markerRoom) * sign)
     local lineY = Pixel.Scale(LABEL_LINE_Y)
 
     labels.ilvl = overlay:CreateFontString(nil, 'OVERLAY')
@@ -488,32 +490,30 @@ local function BuildSlotLabels(button, info)
     labels.enchantHover:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame enchantHover OnLeave', function() GameTooltip:Hide() end))
     labels.enchantHover:Hide()
 
-    labels.bagArrow = CreateFrame('Button', nil, overlay)
-    labels.bagArrow:SetSize(Pixel.Scale(BAG.ARROW_SIZE), Pixel.Scale(BAG.ARROW_SIZE))
-    local popupSide = PopupSide(info)
+    local popupSide, slotSide = PopupSide(info)
     local popupSign = popupSide == 'RIGHT' and 1 or -1
-    labels.bagArrow:SetPoint('TOP' .. popupSide, button, 'TOP' .. popupSide, -popupSign * Pixel.Scale(GEM_INSET), -Pixel.Scale(GEM_INSET))
-    labels.bagArrow:SetFrameLevel(button:GetFrameLevel() + 6)
-    local arrowBg = labels.bagArrow:CreateTexture(nil, 'BACKGROUND')
-    arrowBg:SetAllPoints()
-    arrowBg:SetColorTexture(1, 1, 1, 0.85)
-    local arrow = labels.bagArrow:CreateTexture(nil, 'OVERLAY')
-    arrow:SetPoint('TOPLEFT', 1, -1)
-    arrow:SetPoint('BOTTOMRIGHT', -1, 1)
-    arrow:SetTexture(BUILib.GetLibMedia('dropdown'))
-    arrow:SetRotation(popupSign * math.pi / 2)
-    arrow:SetVertexColor(Painter.Color('skinBackground'))
-    labels.bagArrow.arrow = arrow
-    labels.bagArrow.plate = arrowBg
-    labels.bagArrow:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame bagArrow OnEnter', function(self)
+    local marker = CreateFrame('Button', nil, overlay)
+    labels.bagMarker = marker
+    marker:SetSize(Pixel.Scale(BAG.MARKER_W), Pixel.Scale(BAG.MARKER_H))
+    marker:SetPoint(slotSide, button, popupSide, popupSign * Pixel.Scale(BAG.MARKER_GAP), 0)
+    marker:SetFrameLevel(button:GetFrameLevel() + 6)
+    marker:SetAlpha(BAG.MARKER_IDLE_ALPHA)
+    marker.bar = marker:CreateTexture(nil, 'ARTWORK')
+    marker.bar:SetAllPoints()
+    marker.arrow = Skin.TipArrow(marker, true, popupSign * math.pi / 2)
+    marker:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame bagMarker OnEnter', function(self)
+        self:SetAlpha(1)
         GameTooltip:SetOwner(self, popupSide == 'RIGHT' and 'ANCHOR_RIGHT' or 'ANCHOR_LEFT')
-        GameTooltip:SetText((self.count or 0) > 0 and string.format('%d in bags for this slot', self.count) or 'Nothing in bags for this slot', 1, 1, 1)
-        if (self.count or 0) > 0 then GameTooltip:AddLine('Click to pick one to equip.', 0.7, 0.7, 0.7) end
+        GameTooltip:SetText(string.format('%d in bags for this slot', self.count), 1, 1, 1)
+        GameTooltip:AddLine('Click to pick one to equip.', 0.7, 0.7, 0.7)
         GameTooltip:Show()
     end))
-    labels.bagArrow:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame bagArrow OnLeave', function() GameTooltip:Hide() end))
-    labels.bagArrow:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame bagArrow OnClick', function() ToggleBagPopup(labels) end))
-    labels.bagArrow:Hide()
+    marker:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame bagMarker OnLeave', function(self)
+        self:SetAlpha(BAG.MARKER_IDLE_ALPHA)
+        GameTooltip:Hide()
+    end))
+    marker:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame bagMarker OnClick', function() ToggleBagPopup(labels) end))
+    marker:Hide()
 
     local contextOverlay = button.ItemContextOverlay
     if contextOverlay then
@@ -2125,21 +2125,6 @@ BUI.Events:Register('TRANSMOGRIFY_SUCCESS', 'Skinning.CharacterFrame', On.Model)
 BUI.Events:Register('BAG_UPDATE_DELAYED', 'Skinning.CharacterFrame', On.Bags)
 
 local TINT_DEFAULT = { 0.45, 0.45, 0.6, 0.15 }
-local ARROW_KEYS = { 'characterFrameArrow', 'characterFrameArrowEmpty', 'characterFrameArrowPlate' }
-
-local function ArrowSwatch(label, index, separator)
-    return {
-        kind = 'swatch', label = label, opacity = true, separator = separator,
-        get = function()
-            local color = select(index, BAG.Colors())
-            return color[1], color[2], color[3], color[4] or 1
-        end,
-        set = function(red, green, blue, alpha)
-            BUI.GetDB().skinning[ARROW_KEYS[index]] = { red, green, blue, alpha }
-            RefreshBagAlternatives()
-        end,
-    }
-end
 
 context.info.settings = {
     {
@@ -2168,14 +2153,21 @@ context.info.settings = {
             ApplyBackground()
         end,
     },
-    ArrowSwatch('Bag arrow, something in bags', 1, true),
-    ArrowSwatch('Bag arrow, nothing in bags', 2),
-    ArrowSwatch('Plate behind the arrow', 3),
     {
-        label = 'Bag arrow colors', text = 'Reset',
+        kind = 'swatch', label = 'Bag swap marker', opacity = true, separator = true,
+        get = function()
+            local color = BAG.MarkerColor()
+            return color[1], color[2], color[3], color[4] or 1
+        end,
+        set = function(red, green, blue, alpha)
+            BUI.GetDB().skinning[BAG.MARKER_KEY] = { red, green, blue, alpha }
+            RefreshBagAlternatives()
+        end,
+    },
+    {
+        label = 'Bag swap marker color', text = 'Reset',
         onClick = function()
-            local skinning = BUI.GetDB().skinning
-            for _, key in ipairs(ARROW_KEYS) do skinning[key] = nil end
+            BUI.GetDB().skinning[BAG.MARKER_KEY] = nil
             RefreshBagAlternatives()
         end,
     },
