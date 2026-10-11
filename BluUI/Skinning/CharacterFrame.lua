@@ -576,7 +576,7 @@ local function RefreshSlot(labels)
 
     local hover = labels.enchantHover
     if enchant ~= '' then
-        Readout.PaintEnchant(labels.enchant, hover, enchant, color[1], color[2], color[3])
+        Readout.PaintEnchant(labels.enchant, hover, enchant)
         hover.slot = inventorySlot
         hover:Show()
     elseif canEnchant and Readout.AtEnchantLevel('player') then

@@ -14,7 +14,6 @@ local EMPTY_SOCKET_ALPHA = 0.6
 local EMPTY_SOCKET_PATH = 'Interface\\ItemSocketingFrame\\UI-EmptySocket-'
 local QUESTION_MARK_ICON = 134400
 local MAX_LEVEL_FALLBACK = 90
-local ENCHANT_TINT = 0.5
 local ENCHANT_ALPHA = 0.95
 local ENCHANT_LINE_TYPE = Enum.TooltipDataLineType.ItemEnchantmentPermanent
 local ATLAS_MARKUP = '|A:[^|]+|a'
@@ -160,12 +159,13 @@ function Readout.AtEnchantLevel(unit)
 	return level >= (GetMaxLevelForPlayerExpansion() or MAX_LEVEL_FALLBACK)
 end
 
-function Readout.PaintEnchant(label, hover, enchant, red, green, blue)
+function Readout.PaintEnchant(label, hover, enchant)
 	local icons = ''
 	for atlas in enchant:gmatch(ATLAS_MARKUP) do icons = icons .. atlas end
 	local name = enchant:gsub(ATLAS_MARKUP, ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub('^Enchant%s+[^%-]+%-%s*', '')
 	label:SetText(icons ~= '' and (icons .. ' ' .. name) or name)
-	label:SetTextColor(red + (1 - red) * ENCHANT_TINT, green + (1 - green) * ENCHANT_TINT, blue + (1 - blue) * ENCHANT_TINT, ENCHANT_ALPHA)
+	local red, green, blue = BUI.Painter.Color('skinText')
+	label:SetTextColor(red, green, blue, ENCHANT_ALPHA)
 	hover.tooltip = name
 end
 
