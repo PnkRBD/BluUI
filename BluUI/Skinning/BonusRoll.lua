@@ -1,278 +1,218 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.BonusRoll')
 local Wrap = BUI.Profiler.Wrap
+local AnchorHook = BUI.Profiler.Hooker('Skin.BonusRoll')
 
+local ceil = math.ceil
 
 local Skin = BUI.Skinning
-local SELECTED_COLOR = Skin.SELECTED_COLOR
+local SELECTED_COLOR, MUTED_COLOR = Skin.SELECTED_COLOR, Skin.MUTED_COLOR
 
-local SKIN_ID = 'bonusroll'
+local ANCHOR_KEY = 'bonusroll'
 local HOLD_SETTING = 'bonusrollHoldToRoll'
 local HOLD_SECONDS = 3
-local HINT_IDLE = 'HOLD TO ROLL'
-local HINT_HOLDING = 'KEEP HOLDING'
+local HOLD_LABEL = ('Hold the dice for %d seconds to roll'):format(HOLD_SECONDS)
+local HOLD_TIP = HOLD_LABEL .. '. Let go to cancel.'
+local HINTS = {
+	idle = { text = 'HOLD TO ROLL', role = 'skinLabel' },
+	holding = { text = 'KEEP HOLDING', role = 'skinTitle' },
+	warn = { text = 'HOLD TO ROLL', role = 'danger' },
+}
 local HINT_SCALE = 0.8
-local HINT_IDLE_COLOR = { 0.55, 0.55, 0.6, 1 }
-local HINT_WARN_COLOR = { 0.9, 0.35, 0.3, 1 }
 local HINT_WARN_SECONDS = 0.8
 local COUNT_SCALE = 1.5
 local SWEEP_ALPHA = 0.3
-local FRAME_ART = { 'Background', 'LootSpinnerBG', 'IconBorder' }
+local TIMER_INSET, TIMER_HEIGHT = 1, 3
+local SPEC_EDGE = 1
+local FRAME_ART = { 'Background', 'LootSpinnerBG', 'IconBorder', 'SpecRing' }
 
-local skinned = false
-local holdElapsed = 0
-local originalRollClick
-
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local function HoldEnabled()
-	return Enabled() and BUI.GetDB().skinning[HOLD_SETTING] ~= false
-end
-
-local context = Skin.NewContext(Enabled)
-local Fade, FadeKeys, Shell, Body, Title = context.Fade, context.FadeKeys, context.Shell, context.Body, context.Title
+local context = Skin.Define('bonusroll', {
+	name = 'Bonus Roll',
+	description = 'The bonus roll prompt in the dark shell with a framed icon, a white timer and an optional hold-to-roll on the dice.',
+	icon = 'Interface/Icons/INV_Misc_Coin_19',
+	newLook = true,
+	unlock = {
+		tooltip = 'Unlock position. Drag the bonus roll window, then click again to lock.',
+		get = function() return Skin.ToastAnchors.IsUnlocked(ANCHOR_KEY) end,
+		set = function(value) Skin.ToastAnchors.SetUnlocked(ANCHOR_KEY, value) end,
+	},
+})
+local Fade, FadeKeys, Shell, Title, Body = context.Fade, context.FadeKeys, context.Shell, context.Title, context.Body
 local CropIcon = Skin.CropIcon
 
-local function RollFrame(button)
-	return button:GetParent():GetParent()
+local rollButton, rollClick, specIcon, hint, sweep
+local holding = false
+local holdElapsed, holdSecond = 0, 0
+
+local function HoldEnabled()
+	return context.Enabled() and BUI.GetDB().skinning[HOLD_SETTING] ~= false
 end
 
-local function HoldHint(button)
-	local hint = button._buiHoldHint
-	if hint then return hint end
+local function SetHint(state)
+	local entry = HINTS[state]
+	hint:SetShown(entry ~= nil)
+	if not entry then return end
+	hint:SetText(entry.text)
+	BUI.Painter.Text(hint, entry.role)
+end
+
+local function RefreshHint()
+	if not holding then SetHint(HoldEnabled() and 'idle') end
+end
+
+local ResetHint = Wrap('Skin.BonusRoll hint reset', RefreshHint)
+
+local function ResetHold()
+	holding = false
+	rollButton:SetScript('OnUpdate', nil)
+	sweep:Clear()
+	sweep:Hide()
+end
+
+local OnHoldUpdate = BUI.Profiler.Hot('Skin.BonusRoll hold update', function(button, elapsed)
+	holdElapsed = holdElapsed + elapsed
+	local remaining = HOLD_SECONDS - holdElapsed
+	if remaining <= 0 then
+		ResetHold()
+		SetHint()
+		rollClick(button, 'LeftButton')
+		return
+	end
+	local second = ceil(remaining)
+	if second == holdSecond then return end
+	holdSecond = second
+	sweep.count:SetFormattedText('%d', second)
+end)
+
+local function OnRollMouseDown(button, mouseButton)
+	if mouseButton ~= 'LeftButton' or not button:IsEnabled() or not HoldEnabled() then return end
+	holding, holdElapsed, holdSecond = true, 0, HOLD_SECONDS
+	sweep.count:SetFormattedText('%d', HOLD_SECONDS)
+	sweep:Show()
+	sweep:SetCooldown(GetTime(), HOLD_SECONDS)
+	SetHint('holding')
+	button:SetScript('OnUpdate', OnHoldUpdate)
+end
+
+local function OnRollMouseUp()
+	if not holding then return end
+	ResetHold()
+	SetHint('warn')
+	C_Timer.After(HINT_WARN_SECONDS, ResetHint)
+end
+
+local function OnRollHide()
+	if holding then ResetHold() end
+end
+
+local OnRollClick = BUI.Profiler.Script('Skin.BonusRoll roll OnClick', function(button, ...)
+	if not HoldEnabled() then rollClick(button, ...) end
+end)
+
+local function OnRollEnter()
+	if not HoldEnabled() then return end
+	GameTooltip:AddLine(HOLD_TIP, MUTED_COLOR[1], MUTED_COLOR[2], MUTED_COLOR[3])
+	GameTooltip:Show()
+end
+
+local function SyncSpecEdges()
+	Skin.SetIconEdgeThickness(specIcon, specIcon:IsShown() and SPEC_EDGE or 0)
+end
+
+local function BuildHold(button)
 	hint = button:GetParent():CreateFontString(nil, 'OVERLAY')
-	hint.__buiSkin = true
 	Skin.TipFont(hint, 'label', HINT_SCALE)
 	hint:SetPoint('TOP', button, 'BOTTOM', 0, -1)
-	hint:SetText(HINT_IDLE)
-	button._buiHoldHint = hint
-	return hint
-end
-
-local function HoldSweep(button)
-	local sweep = button._buiHoldSweep
-	if sweep then return sweep end
 	sweep = CreateFrame('Cooldown', nil, button, 'CooldownFrameTemplate')
-	sweep.__buiSkin = true
-	sweep:SetAllPoints(button)
-	sweep:SetFrameLevel(button:GetFrameLevel() + 2)
 	sweep:SetDrawEdge(false)
 	sweep:SetDrawBling(false)
 	sweep:SetDrawSwipe(true)
 	sweep:SetReverse(true)
 	sweep:SetHideCountdownNumbers(true)
-	sweep:EnableMouse(false)
 	sweep:SetSwipeColor(SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], SWEEP_ALPHA)
-	local count = sweep:CreateFontString(nil, 'OVERLAY')
-	Skin.TipFont(count, 'title', COUNT_SCALE)
-	count:SetPoint('CENTER')
-	sweep.count = count
-	sweep:Hide()
-	button._buiHoldSweep = sweep
-	return sweep
+	sweep.count = sweep:CreateFontString(nil, 'OVERLAY')
+	Skin.TipFont(sweep.count, 'title', COUNT_SCALE)
+	sweep.count:SetPoint('CENTER')
 end
 
-local function SetHint(button, state)
-	local hint = HoldHint(button)
-	if state == 'hidden' then
-		hint:Hide()
-		return
-	end
-	hint:Show()
-	if state == 'holding' then
-		hint:SetTextColor(SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], 1)
-		hint:SetText(HINT_HOLDING)
-	elseif state == 'warn' then
-		hint:SetTextColor(HINT_WARN_COLOR[1], HINT_WARN_COLOR[2], HINT_WARN_COLOR[3], HINT_WARN_COLOR[4])
-		hint:SetText(HINT_IDLE)
-	else
-		hint:SetTextColor(HINT_IDLE_COLOR[1], HINT_IDLE_COLOR[2], HINT_IDLE_COLOR[3], HINT_IDLE_COLOR[4])
-		hint:SetText(HINT_IDLE)
-	end
-end
-
-local function RefreshHint(button)
-	if not button or button._buiHolding then return end
-	SetHint(button, HoldEnabled() and 'idle' or 'hidden')
-end
-
-local function StopHold(button, completed)
-	local wasHolding = button._buiHolding
-	button._buiHolding = nil
-	button:SetScript('OnUpdate', nil)
-	holdElapsed = 0
-	local sweep = button._buiHoldSweep
-	if sweep then
-		sweep:Clear()
-		sweep:Hide()
-	end
-	if completed or not HoldEnabled() then
-		SetHint(button, 'hidden')
-	elseif wasHolding then
-		SetHint(button, 'warn')
-		BUI.Profiler.After('Skin.BonusRoll hint reset', HINT_WARN_SECONDS, function() RefreshHint(button) end)
-	else
-		SetHint(button, 'idle')
-	end
-end
-
-local function CompleteRoll(button)
-	AcceptSpellConfirmationPrompt(RollFrame(button).spellID)
-	button:SetEnabled(false)
-end
-
-local OnHoldUpdate = Wrap('Skin.BonusRoll hold update', function(button, elapsed)
-	holdElapsed = holdElapsed + elapsed
-	local remaining = HOLD_SECONDS - holdElapsed
-	local sweep = HoldSweep(button)
-	sweep.count:SetText(tostring(math.max(1, math.ceil(remaining))))
-	if remaining <= 0 then
-		StopHold(button, true)
-		CompleteRoll(button)
-	end
-end)
-
-local function OnRollMouseDown(button, mouseButton)
-	if mouseButton ~= 'LeftButton' or not button:IsEnabled() or not HoldEnabled() then return end
-	holdElapsed = 0
-	button._buiHolding = true
-	local sweep = HoldSweep(button)
-	sweep.count:SetText(tostring(HOLD_SECONDS))
-	sweep:Show()
-	sweep:SetCooldown(GetTime(), HOLD_SECONDS)
-	SetHint(button, 'holding')
-	button:SetScript('OnUpdate', OnHoldUpdate)
-end
-
-local function OnRollMouseUp(button)
-	if button._buiHolding then StopHold(button, false) end
-end
-
-local function OnRollHide(button)
-	button._buiHolding = nil
-	button:SetScript('OnUpdate', nil)
-	holdElapsed = 0
-	if button._buiHoldSweep then
-		button._buiHoldSweep:Clear()
-		button._buiHoldSweep:Hide()
-	end
-end
-
-local function OnRollClick(button, mouseButton)
-	if HoldEnabled() then return end
-	if originalRollClick then originalRollClick(button, mouseButton) else CompleteRoll(button) end
-end
-
-local function OnRollEnter()
-	if not HoldEnabled() then return end
-	GameTooltip:AddLine(('Hold the dice for %d seconds to roll. Let go to cancel.'):format(HOLD_SECONDS), 0.55, 0.55, 0.6)
-	GameTooltip:Show()
-end
-
-local function SkinTimer(timer)
-	if not timer then return end
+local function SkinTimer(frame, timer)
+	timer:ClearAllPoints()
+	timer:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', TIMER_INSET, TIMER_INSET)
+	timer:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -TIMER_INSET, TIMER_INSET)
+	timer:SetHeight(TIMER_HEIGHT)
 	timer:SetStatusBarTexture(BUI.GetGlobalTexture())
 	timer:SetStatusBarColor(SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], 1)
-	Shell(timer)
 end
 
-local function SkinRollButton(button)
-	if not button then return end
-	if button:GetScript('OnClick') ~= OnRollClick then
-		originalRollClick = button:GetScript('OnClick')
-		button:SetScript('OnClick', OnRollClick)
-	end
-	if button._buiRoll then return end
-	button._buiRoll = true
-	button:HookScript('OnMouseDown', BUI.Profiler.Wrap('Skin.BonusRoll button OnMouseDown', OnRollMouseDown))
-	button:HookScript('OnMouseUp', BUI.Profiler.Wrap('Skin.BonusRoll button OnMouseUp', OnRollMouseUp))
-	button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.BonusRoll button OnEnter', OnRollEnter))
-	button:HookScript('OnHide', Wrap('Skin.BonusRoll roll hide', OnRollHide))
-	button:HookScript('OnShow', Wrap('Skin.BonusRoll hint refresh', RefreshHint))
-	RefreshHint(button)
-end
-
-local function Apply()
-	local frame = _G.BonusRollFrame
-	if not frame or not Enabled() or skinned then return end
-	skinned = true
+local function SkinFrame(frame)
+	local prompt, rolling = frame.PromptFrame, frame.RollingFrame
 	FadeKeys(frame, FRAME_ART)
-	if frame.BlackBackgroundHoist then Fade(frame.BlackBackgroundHoist.Background) end
+	Fade(frame.BlackBackgroundHoist.Background)
 	Shell(frame)
+	Skin.TipIconFrame(prompt, prompt.Icon)
+	CropIcon(specIcon)
+	Skin.TipIconFrame(frame, specIcon)
+	SyncSpecEdges()
+	Title(prompt.InfoFrame.Label)
+	Body(prompt.InfoFrame.Cost)
+	Skin.TipFont(frame.CurrentCountFrame.Text, 'label')
+	Title(rolling.Label)
+	Title(rolling.LootSpinnerFinalText)
+	SkinTimer(frame, prompt.Timer)
+end
+
+local function RaiseTimer(frame)
+	frame.PromptFrame.Timer:SetFrameLevel(frame:GetFrameLevel() + 1)
+end
+
+local function InstallFrame(frame)
 	local prompt = frame.PromptFrame
-	if prompt then
-		CropIcon(prompt.Icon)
-		Skin.TipIconFrame(prompt, prompt.Icon)
-		if prompt.InfoFrame then
-			Title(prompt.InfoFrame.Label)
-			Body(prompt.InfoFrame.Cost)
-		end
-		SkinTimer(prompt.Timer)
-		SkinRollButton(prompt.RollButton)
-	end
-	if frame.CurrentCountFrame then Body(frame.CurrentCountFrame.Text) end
-	if frame.RollingFrame then
-		Title(frame.RollingFrame.Label)
-		Title(frame.RollingFrame.LootSpinnerFinalText)
-	end
+	rollButton, specIcon = prompt.RollButton, frame.SpecIcon
+	rollClick = rollButton:GetScript('OnClick')
+	BuildHold(rollButton)
+	rollButton:HookScript('OnMouseDown', Wrap('Skin.BonusRoll roll OnMouseDown', OnRollMouseDown))
+	rollButton:HookScript('OnMouseUp', Wrap('Skin.BonusRoll roll OnMouseUp', OnRollMouseUp))
+	rollButton:HookScript('OnEnter', Wrap('Skin.BonusRoll roll OnEnter', OnRollEnter))
+	rollButton:HookScript('OnShow', Wrap('Skin.BonusRoll roll OnShow', RefreshHint))
+	rollButton:HookScript('OnHide', Wrap('Skin.BonusRoll roll OnHide', OnRollHide))
+	context.Hook(prompt.Icon, 'SetTexture', CropIcon)
+	context.Hook(specIcon, 'Show', SyncSpecEdges)
+	context.Hook(specIcon, 'Hide', SyncSpecEdges)
 end
 
-local function Deactivate()
-	context.Restore()
-	skinned = false
-	local frame = _G.BonusRollFrame
-	local button = frame and frame.PromptFrame and frame.PromptFrame.RollButton
-	if button and originalRollClick and button:GetScript('OnClick') == OnRollClick then button:SetScript('OnClick', originalRollClick) end
-	if button then
-		OnRollHide(button)
-		if button._buiHoldHint then button._buiHoldHint:Hide() end
-	end
+local function EnableFrame()
+	rollButton:SetScript('OnClick', OnRollClick)
+	RefreshHint()
 end
 
-local function AnchorHooks(reapply)
-	if _G.UIParent_ManageFramePositions then Hook('UIParent_ManageFramePositions', reapply) end
-	local alertFrame = _G.AlertFrame
-	if alertFrame and alertFrame.UpdateAnchors then Hook(alertFrame, 'UpdateAnchors', reapply) end
-end
+context.Window('BonusRollFrame', { skin = SkinFrame, show = RaiseTimer, install = InstallFrame, enable = EnableFrame })
+
+context.OnDisable(function()
+	if not rollButton then return end
+	rollButton:SetScript('OnClick', rollClick)
+	ResetHold()
+	SetHint()
+	Skin.SetIconEdgeThickness(specIcon, 0)
+end)
 
 Skin.ToastAnchors.Register({
-	key = 'bonusroll',
+	key = ANCHOR_KEY,
 	label = 'BONUS ROLL',
 	point = 'CENTER',
 	sample = 'bonus',
 	followFrame = true,
 	defaultY = 340,
 	frame = function() return _G.BonusRollFrame end,
-	hooks = AnchorHooks,
+	hooks = function(reapply) AnchorHook(BottomManagedFrameContainer, 'Layout', reapply) end,
 })
 
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then Apply() else Deactivate() end
-end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Bonus Roll',
-	description = 'The bonus roll prompt in the dark shell with a white timer, and an optional hold-to-roll on the dice button.',
-	icon = 'Interface/Icons/INV_Misc_Coin_19',
-	settings = {
-		{
-			label = ('Hold the dice for %d seconds to roll'):format(HOLD_SECONDS),
-			get = function() return BUI.GetDB().skinning[HOLD_SETTING] ~= false end,
-			set = function(value)
-				BUI.GetDB().skinning[HOLD_SETTING] = value
-				local frame = _G.BonusRollFrame
-				RefreshHint(frame and frame.PromptFrame and frame.PromptFrame.RollButton)
-			end,
-		},
+context.info.settings = {
+	{
+		label = HOLD_LABEL,
+		get = function() return BUI.GetDB().skinning[HOLD_SETTING] ~= false end,
+		set = function(value)
+			BUI.GetDB().skinning[HOLD_SETTING] = value
+			if hint then RefreshHint() end
+		end,
 	},
-	unlock = {
-		tooltip = 'Unlock position. Drag the bonus roll window, then click again to lock.',
-		get = function() return Skin.ToastAnchors.IsUnlocked('bonusroll') end,
-		set = function(value) Skin.ToastAnchors.SetUnlocked('bonusroll', value) end,
-	},
-})
-
-BUI.Events:Once('PLAYER_LOGIN', 'Skin.BonusRoll', Apply)
+}
