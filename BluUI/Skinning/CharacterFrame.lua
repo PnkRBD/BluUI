@@ -1987,18 +1987,6 @@ local function PaintAmbience(parent)
     parent.tint:SetPoint('BOTTOMRIGHT', Pixel.Scale(-1), Pixel.Scale(1))
     parent.tint:SetTexture(Widget.WHITE)
     parent.tint:Hide()
-    parent.panels = {}
-    local function Column(left, width)
-        local panel = CreateFrame('Frame', nil, parent)
-        panel:SetPoint('TOPLEFT', parent, 'TOPLEFT', left, TOP_Y + 6)
-        panel:SetPoint('BOTTOMLEFT', parent, 'BOTTOMLEFT', left, SLOT_SIZE + BOTTOM_PAD + 10)
-        panel:SetWidth(width)
-        panel:SetFrameLevel(parent:GetFrameLevel())
-        BUILib.Skin.Shell(panel, CARD)
-        parent.panels[#parent.panels + 1] = panel
-    end
-    Column(LEFT_X - 4, SLOT_SIZE + 8)
-    Column(RIGHT_X - 4, SLOT_SIZE + 8)
 end
 
 local function ApplyBackground()
@@ -2011,8 +1999,6 @@ local function ApplyBackground()
     else
         frame.tint:Hide()
     end
-    local showPanels = skinning.characterFramePanels == true
-    for _, panel in ipairs(frame.panels) do panel:SetShown(showPanels) end
 end
 
 local function BuildFrame()
@@ -2238,14 +2224,6 @@ BUI.Events:Register('BAG_UPDATE_DELAYED', 'Skinning.CharacterFrame', On.Bags)
 local TINT_DEFAULT = { 0.45, 0.45, 0.6, 0.15 }
 
 context.info.settings = {
-    {
-        label = 'Cards behind the slot columns',
-        get = function() return BUI.GetDB().skinning.characterFramePanels == true end,
-        set = function(value)
-            BUI.GetDB().skinning.characterFramePanels = value
-            ApplyBackground()
-        end,
-    },
     {
         label = 'Tint the sheet',
         get = function() return BUI.GetDB().skinning.characterFrameTintEnabled == true end,
