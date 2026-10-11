@@ -11,11 +11,13 @@ local HEADER_ART = { 'Left', 'Middle', 'Right' }
 local SELL_TAB_ART = { 'CreateAuctionTabLeft', 'CreateAuctionTabMiddle', 'CreateAuctionTabRight' }
 local MULTISELL_ART = { 'Fill', 'Left', 'Right', 'Middle' }
 local ALIGNED_CONTROL_KEYS = { 'QuantityInput', 'PriceInput', 'SecondaryPriceInput', 'Duration', 'Deposit', 'TotalPrice', 'UnitPrice' }
-local LABEL_KEYS = { 'Label', 'LabelTitle', 'Subtext' }
+local LABEL_KEYS = { 'Label', 'LabelTitle' }
 local AUCTIONS_LIST_KEYS = { 'AllAuctionsList', 'BidsList', 'ItemList', 'CommoditiesList' }
 local AUCTIONS_TAB_KEYS = { 'AuctionsTab', 'BidsTab' }
 local DIALOG_BUTTON_KEYS = { 'BuyNowButton', 'CancelButton', 'OkayButton' }
 local CELL_TEXT_KEYS = { 'Text', 'ExtraInfo', 'Prefix' }
+local MONEY_DENOMINATION_KEYS = { 'GoldDisplay', 'SilverDisplay', 'CopperDisplay' }
+local HOUSE_FONT_PREFIX = 'BUI_AuctionHouseFont'
 local ROW_SELECTED_ALPHA = 0.12
 local ROW_HOVER_ALPHA = 0.08
 local NAME_SCALE = 1.2
@@ -33,8 +35,42 @@ local context = Skin.Define('auctionhouse', {
 local Hook = context.Hook
 local Fade, FadeKeys = context.Fade, context.FadeKeys
 local Shell, Button, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Dropdown, context.EditBox, context.CheckBox
-local ScrollBar, Tab, Body, Title = context.ScrollBar, context.Tab, context.Body, context.Title
+local ScrollBar, Tab, Body, Title, Face = context.ScrollBar, context.Tab, context.Body, context.Title, context.Face
 local FlatTexture, SelectedTexture, CropIcon = Skin.FlatTexture, Skin.SelectedTexture, Skin.CropIcon
+local houseFonts, houseFontCount = {}, 0
+
+local function HouseFont(fontObject)
+	local font = houseFonts[fontObject]
+	if font then return font end
+	houseFontCount = houseFontCount + 1
+	font = CreateFont(HOUSE_FONT_PREFIX .. houseFontCount)
+	font:CopyFontObject(fontObject)
+	Face(font)
+	houseFonts[fontObject], houseFonts[font] = font, font
+	return font
+end
+
+local function UseHouseFont(fontString)
+	local fontObject = fontString:GetFontObject()
+	local font = HouseFont(fontObject)
+	if font ~= fontObject then fontString:SetFontObject(font) end
+end
+
+local function HoldHouseFont(fontString)
+	if not fontString._buiHouseFont then
+		fontString._buiHouseFont = true
+		Hook(fontString, 'SetFontObject', UseHouseFont)
+	end
+	UseHouseFont(fontString)
+end
+
+local function HoldMoney(display)
+	for _, key in ipairs(MONEY_DENOMINATION_KEYS) do
+		local denomination = display[key]
+		HoldHouseFont(denomination.Text)
+		denomination:UpdateWidth()
+	end
+end
 
 local function ShellEdgeEnter(button)
 	Skin.TipShellEdges(button, Skin.HoverColor())
@@ -103,11 +139,13 @@ local function SkinAlignedControl(control)
 	if not control or control._buiAligned then return end
 	control._buiAligned = true
 	for _, key in ipairs(LABEL_KEYS) do Body(control[key]) end
+	Skin.TipFont(control.Subtext, 'label')
+	Skin.TipFont(control.PerItemPostfix, 'label')
 	EditBox(control.InputBox)
 	Button(control.MaxButton)
 	SkinMoneyInput(control.MoneyInputFrame)
 	Dropdown(control.Dropdown)
-	if control.PerItemPostfix then Skin.TipFont(control.PerItemPostfix, 'label') end
+	if control.MoneyDisplayFrame then HoldMoney(control.MoneyDisplayFrame) end
 	if control.SetLabelColor then Hook(control, 'SetLabelColor', RecolorAlignedLabels) end
 end
 
@@ -122,12 +160,10 @@ local function SkinItemList(list)
 	SkinBackgroundFrame(list)
 	ScrollBar(list.ScrollBar)
 	Body(list.ResultsText)
-	Skin.TipFont(list.SearchingText, 'title', SEARCHING_SCALE)
+	Skin.TipFont(list.LoadingSpinner.SearchingText, 'title', SEARCHING_SCALE)
 	local refresh = list.RefreshFrame
-	if refresh then
-		SkinIconButton(refresh.RefreshButton)
-		Body(refresh.TotalQuantity)
-	end
+	SkinIconButton(refresh.RefreshButton)
+	Skin.TipFont(refresh.TotalQuantity, 'label')
 end
 
 local function BarInset(control)
@@ -143,6 +179,7 @@ local function SkinSearchBar(bar)
 	local favorites, box, filter, search = bar.FavoritesSearchButton, bar.SearchBox, bar.FilterButton, bar.SearchButton
 	SkinIconButton(favorites, BarInset(favorites))
 	EditBox(box, BarInsets(box))
+	Skin.TipFont(box.Instructions, 'label')
 	Shell(filter, BarInsets(filter))
 	context.TextDropdown(filter, true)
 	Shell(search, BarInsets(search))
@@ -181,9 +218,13 @@ local function SkinBuyDialog(dialog)
 	Skin.FadeTree(dialog.Border)
 	Shell(dialog)
 	Title(dialog.ItemDisplay.ItemText)
+	HoldMoney(dialog.PriceFrame)
 	for _, key in ipairs(DIALOG_BUTTON_KEYS) do Button(dialog[key]) end
-	Body(dialog.Notification.Text)
-	Skin.TipFace(dialog.TimeLeftText, 'body')
+	Face(dialog.TimeLeftText)
+end
+
+local function OnNotificationText(notification)
+	Body(notification.Text)
 end
 
 local function SkinAuctionsFrame(frame)
@@ -208,7 +249,7 @@ end
 local function SkinTokenResults(frame)
 	SkinBackgroundFrame(frame)
 	Body(frame.BuyoutLabel)
-	Title(frame.BuyoutPrice)
+	HoldHouseFont(frame.BuyoutPrice)
 	SkinItemDisplay(frame.TokenDisplay)
 	Button(frame.Buyout)
 end
@@ -218,7 +259,7 @@ local function SkinTokenSell(frame)
 	FadeKeys(frame, SELL_TAB_ART)
 	Title(frame.CreateAuctionLabel)
 	Body(frame.BuyoutPriceLabel)
-	Title(frame.MarketPrice)
+	HoldHouseFont(frame.MarketPrice)
 	Body(frame.EstimatedTime)
 	Body(frame.TimeToSell)
 	SkinItemDisplay(frame.ItemDisplay)
@@ -230,6 +271,7 @@ end
 local function SkinMultisell(frame)
 	FadeKeys(frame, MULTISELL_ART)
 	Shell(frame)
+	Body(frame.ProgressBar.Text)
 end
 
 local function SkinCategories(list)
@@ -240,6 +282,8 @@ end
 local function SkinFrame(frame)
 	context.Chrome(frame)
 	FadeKeys(frame, MONEY_ART)
+	HoldMoney(frame.MoneyFrameBorder.MoneyFrame)
+	HoldMoney(frame.DummyMoneyDisplayFrame)
 	Skin.RegisterTabStrip(frame, frame.Tabs, context)
 	SkinSearchBar(frame.SearchBar)
 	SkinCategories(frame.CategoriesList)
@@ -280,7 +324,11 @@ end
 local function SkinCell(cell)
 	if cell._buiCell then return end
 	cell._buiCell = true
-	for _, key in ipairs(CELL_TEXT_KEYS) do Skin.TipFace(cell[key], 'title') end
+	for _, key in ipairs(CELL_TEXT_KEYS) do
+		local text = cell[key]
+		if text then HoldHouseFont(text) end
+	end
+	if cell.MoneyDisplay then HoldMoney(cell.MoneyDisplay) end
 	if cell.Icon and cell.IconBorder then
 		cell.IconBorder:SetAlpha(0)
 		CropIcon(cell.Icon)
@@ -310,7 +358,7 @@ local function OnSummaryLine(line)
 	Skin.TipIconFrame(line, line.Icon)
 	line.SelectedHighlight:SetBlendMode('BLEND')
 	SelectedTexture(line.SelectedHighlight, ROW_SELECTED_ALPHA)
-	Skin.TipFace(line.Text, 'body')
+	Face(line.Text)
 end
 
 local function OnTabsUpdated(frame)
@@ -323,7 +371,8 @@ local function RefreshFrame(frame)
 	RefreshAuctionsTabs(frame.AuctionsFrame)
 end
 
-local function InstallFrame()
+local function InstallFrame(frame)
+	Hook(frame.BuyDialog.Notification, 'SetNotificationText', OnNotificationText)
 	Hook('AuctionHouseFilterButton_SetUp', OnCategoryButton)
 	Hook(AuctionHouseItemListLineMixin, 'Populate', OnRowPopulated)
 	Hook(TableBuilderMixin, 'ArrangeCells', OnCellsArranged)
