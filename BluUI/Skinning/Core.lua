@@ -1669,14 +1669,14 @@ function Skin.NewContext(enabled)
 		Skin.CardRow(row, inset)
 	end
 
-	local function Dropdown(dropdown)
+	local function Dropdown(dropdown, keepHeight)
 		if not dropdown then return end
 		shelled[dropdown] = true
-		Skin.TipDropdown(dropdown)
+		Skin.TipDropdown(dropdown, nil, keepHeight)
 	end
 
-	local function TextDropdown(dropdown)
-		Dropdown(dropdown)
+	local function TextDropdown(dropdown, keepHeight)
+		Dropdown(dropdown, keepHeight)
 		Skin.TipFont(dropdown.Text, 'body')
 	end
 

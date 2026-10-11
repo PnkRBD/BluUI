@@ -125,7 +125,7 @@ end
 local function SkinSearchBar(bar)
 	SkinIconButton(bar.FavoritesSearchButton)
 	EditBox(bar.SearchBox)
-	context.TextDropdown(bar.FilterButton)
+	context.TextDropdown(bar.FilterButton, true)
 	Button(bar.SearchButton)
 end
 
