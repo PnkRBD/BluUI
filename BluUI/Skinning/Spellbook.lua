@@ -43,7 +43,7 @@ end
 
 local function HoverIconEdge(icon, hovered)
 	if hovered then
-		Skin.SetIconEdgeColor(icon, unpack(Skin.HOVER_COLOR))
+		Skin.SetIconEdgeColor(icon, unpack(Skin.HoverColor()))
 	else
 		Skin.SetIconEdgeColor(icon)
 	end

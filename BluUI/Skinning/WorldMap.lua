@@ -5,7 +5,7 @@ local pairs = pairs
 local unpack = unpack
 
 local Skin = BUI.Skinning
-local SELECTED, HOVER = Skin.SELECTED_COLOR, Skin.HOVER_COLOR
+local SELECTED = Skin.SELECTED_COLOR
 local Painter = BUI.Painter
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Wrap = BUI.Profiler.Wrap
@@ -235,7 +235,7 @@ local function RefreshSideTabs()
 end
 
 local PlateEnter = Wrap('Skin.WorldMap header plate enter', function(header)
-	Skin.TipShellEdges(header._buiPlate, HOVER)
+	Skin.TipShellEdges(header._buiPlate, Skin.HoverColor())
 end)
 
 local PlateLeave = Wrap('Skin.WorldMap header plate leave', function(header)
@@ -273,7 +273,7 @@ local function MoveCollapseButton(button, plate)
 end
 
 local SyncRowHighlight = Wrap('Skin.WorldMap quest row highlight', function(texture)
-	Skin.TipShellEdges(texture:GetParent(), texture:IsShown() and HOVER)
+	Skin.TipShellEdges(texture:GetParent(), texture:IsShown() and Skin.HoverColor())
 end)
 
 local function SkinTrackBox(checkbox)

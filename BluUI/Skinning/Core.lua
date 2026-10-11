@@ -432,16 +432,24 @@ end
 
 local CARD_STYLE = { fill = CARD_FILL, edge = PANEL_EDGE }
 Skin.PALETTE = { panel = PANEL_FILL, edge = PANEL_EDGE, card = CARD_FILL }
-local SELECTED_COLOR, HOVER_COLOR = TIP_TITLE_COLOR, TIP_LABEL_COLOR
-Skin.SELECTED_COLOR, Skin.HOVER_COLOR = SELECTED_COLOR, HOVER_COLOR
+local SELECTED_COLOR, MUTED_COLOR = TIP_TITLE_COLOR, TIP_LABEL_COLOR
+local HOVER_COLOR = {}
+
+local function HoverColor()
+	HOVER_COLOR[1], HOVER_COLOR[2], HOVER_COLOR[3] = BUILib.Theme.GetAccent()
+	HOVER_COLOR[4] = 1
+	return HOVER_COLOR
+end
+Skin.SELECTED_COLOR, Skin.MUTED_COLOR, Skin.HoverColor = SELECTED_COLOR, MUTED_COLOR, HoverColor
 
 local function RestEdge(frame)
 	if frame._buiActive then return SELECTED_COLOR end
+	if frame._buiAccentEdge then return HoverColor() end
 	return PANEL_EDGE
 end
 
 local HoverEnter = Wrap('Skin.Core hover enter', function(frame)
-	BUILib.Skin.SetShellEdges(frame, frame._buiActive and SELECTED_COLOR or HOVER_COLOR)
+	BUILib.Skin.SetShellEdges(frame, frame._buiActive and SELECTED_COLOR or HoverColor())
 end)
 
 local HoverLeave = Wrap('Skin.Core hover leave', function(frame)
@@ -450,7 +458,12 @@ end)
 
 function Skin.SetActiveEdge(frame, active)
 	frame._buiActive = active
-	BUILib.Skin.SetShellEdges(frame, (not active and frame:IsMouseOver()) and HOVER_COLOR or RestEdge(frame))
+	BUILib.Skin.SetShellEdges(frame, (not active and frame:IsMouseOver()) and HoverColor() or RestEdge(frame))
+end
+
+function Skin.SetAccentEdge(frame, accent)
+	frame._buiAccentEdge = accent
+	BUILib.Skin.SetShellEdges(frame, RestEdge(frame))
 end
 
 function Skin.HoverEdge(frame)
@@ -990,7 +1003,7 @@ local function ThumbUp(thumb)
 end
 
 local function ArrowEnter(button)
-	button._buiTipArrow:SetVertexColor(SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], 1)
+	button._buiTipArrow:SetVertexColor(unpack(HoverColor()))
 end
 
 local function ArrowLeave(button)
@@ -1197,7 +1210,7 @@ end
 local CLOSE_IDLE = { 0.75, 0.75, 0.8, 1 }
 
 local function CloseEnter(button)
-	button._buiCloseGlyph:SetVertexColor(SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], 1)
+	button._buiCloseGlyph:SetVertexColor(unpack(HoverColor()))
 end
 
 local function CloseLeave(button)
@@ -1275,7 +1288,7 @@ function Skin.PaintCardBackdrop(frame)
 end
 
 local function BackdropButtonEnter(button)
-	button:SetBackdropBorderColor(HOVER_COLOR[1], HOVER_COLOR[2], HOVER_COLOR[3], 1)
+	button:SetBackdropBorderColor(unpack(HoverColor()))
 end
 
 local function BackdropButtonLeave(button)
@@ -1972,7 +1985,7 @@ local PAGE_ROTATION = { previous = -math.pi / 2, next = math.pi / 2, up = math.p
 
 local function PageArrowEnter(button)
 	if not button:IsEnabled() then return end
-	button._buiTipArrow:SetVertexColor(SELECTED_COLOR[1], SELECTED_COLOR[2], SELECTED_COLOR[3], 1)
+	button._buiTipArrow:SetVertexColor(unpack(HoverColor()))
 end
 
 local function PageArrowLeave(button)

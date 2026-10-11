@@ -13,7 +13,6 @@ local FONT = BUILib.Font or STANDARD_TEXT_FONT
 local SetColorTex = BUI.Tools.SetColorTex
 local Painter = BUI.Painter
 local PALETTE = Skin.PALETTE
-local HOVER_COLOR = Skin.HOVER_COLOR
 local TITLE_SCALE = 14 / 12
 
 local WINDOW_TITLE_HEIGHT = 36
@@ -27,7 +26,7 @@ local function PaintBackdrop(frame, fill)
 end
 
 local function HoverBorder(frame)
-	frame:SetBackdropBorderColor(unpack(HOVER_COLOR))
+	frame:SetBackdropBorderColor(unpack(Skin.HoverColor()))
 end
 
 local function RestBorder(frame)
