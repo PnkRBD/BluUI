@@ -270,9 +270,14 @@ local function PadBottomRow(inset, buttons, content)
 	for index = 1, (content and #content or 0) do RaiseBottom(content[index], lift, inset) end
 end
 
+local function KeepRoleBand(texture)
+	if texture then texture.__buiSkin = true end
+end
+
 local function SkinDungeonFinder()
 	local parent = _G.LFDParentFrame
 	if not parent then return end
+	KeepRoleBand(_G.LFDParentFrameRoleBackground)
 	FadeRegions(parent)
 	FadeArt(parent.Inset)
 	Shell(parent.Inset)
@@ -306,6 +311,7 @@ end
 local function SkinRaidFinder()
 	local frame = _G.RaidFinderFrame
 	if not frame then return end
+	KeepRoleBand(_G.RaidFinderFrameRoleBackground)
 	FadeRegions(frame)
 	FadeArt(frame.Inset)
 	FadeArt(_G.RaidFinderFrameBottomInset)
