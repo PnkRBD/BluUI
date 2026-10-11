@@ -1,156 +1,196 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.Calendar')
-
-local ipairs = ipairs
+local ipairs, pairs = ipairs, pairs
 
 local Skin = BUI.Skinning
 
-local SKIN_ID = 'calendar'
-local FRAME_ART_NAMES = {
-	'TopLeftTexture', 'TopMiddleTexture', 'TopRightTexture', 'LeftTopTexture', 'LeftMiddleTexture', 'LeftBottomTexture',
-	'RightTopTexture', 'RightMiddleTexture', 'RightBottomTexture', 'BottomLeftTexture', 'BottomMiddleTexture', 'BottomRightTexture',
-}
+local DAY_COUNT = 42
 local WEEKDAY_COUNT = 7
-local DAY_BUTTON_COUNT = 42
-local DAY_INSET = 1
-local DAY_HOVER_ALPHA = 0.07
+local EVENTS_PER_DAY = 4
+local DAY_INSET = 2
+local ART_INSET = DAY_INSET + 1
+local DAY_WASH_ALPHA = 0.12
+local EVENT_WASH_ALPHA = 0.1
+local DIM_ALPHA = 0.6
 local MONTH_SCALE = 1.3
-local EVENT_FRAME_NAMES = { 'CalendarViewEventFrame', 'CalendarViewHolidayFrame', 'CalendarViewRaidFrame', 'CalendarCreateEventFrame' }
-local EVENT_BUTTON_NAMES = {
+local HEADER_MIDDLE = -23
+local HEADER_GAP = 6
+local TITLE_X = 14
+local CLOSE_X = -6
+local DIALOG_TITLE_X, DIALOG_TITLE_Y = 16, -10
+local FRAME_INSETS = { bottom = -8 }
+local DIALOGS = { 'CalendarViewHolidayFrame', 'CalendarViewRaidFrame', 'CalendarViewEventFrame', 'CalendarCreateEventFrame', 'CalendarMassInviteFrame', 'CalendarEventPickerFrame', 'CalendarTexturePickerFrame' }
+local PANELS = { 'CalendarViewEventDescriptionContainer', 'CalendarViewEventInviteList', 'CalendarCreateEventDescriptionContainer', 'CalendarCreateEventInviteList' }
+local INVITE_LISTS = { 'CalendarViewEventInviteList', 'CalendarCreateEventInviteList' }
+local PICKERS = { 'CalendarEventPickerFrame', 'CalendarTexturePickerFrame' }
+local SCROLLING_TEXTS = { 'CalendarViewHolidayFrame', 'CalendarViewRaidFrame', 'CalendarViewEventDescriptionContainer' }
+local DIALOG_ART = { 'CalendarViewEventDivider', 'CalendarCreateEventDivider', 'CalendarCreateEventFrameButtonBackground', 'CalendarEventPickerFrameButtonBackground', 'CalendarTexturePickerFrameButtonBackground' }
+local DIALOG_BUTTONS = {
 	'CalendarViewEventAcceptButton', 'CalendarViewEventTentativeButton', 'CalendarViewEventDeclineButton', 'CalendarViewEventRemoveButton',
 	'CalendarCreateEventCreateButton', 'CalendarCreateEventMassInviteButton', 'CalendarCreateEventInviteButton', 'CalendarCreateEventRaidInviteButton',
+	'CalendarMassInviteAcceptButton', 'CalendarEventPickerCloseButton', 'CalendarTexturePickerAcceptButton', 'CalendarTexturePickerCancelButton',
 }
-local EVENT_CLOSE_NAMES = { 'CalendarViewEventCloseButton', 'CalendarViewHolidayCloseButton', 'CalendarViewRaidCloseButton', 'CalendarCreateEventCloseButton' }
-local EVENT_TITLE_NAMES = { 'CalendarViewEventTitle' }
-local EVENT_BODY_NAMES = {
+local DIALOG_CLOSES = { 'CalendarViewEventCloseButton', 'CalendarViewHolidayCloseButton', 'CalendarViewRaidCloseButton', 'CalendarCreateEventCloseButton', 'CalendarMassInviteCloseButton' }
+local EDIT_BOXES = { 'CalendarCreateEventTitleEdit', 'CalendarCreateEventInviteEdit', 'CalendarMassInviteMinLevelEdit', 'CalendarMassInviteMaxLevelEdit' }
+local CHECKS = { 'CalendarCreateEventAutoApproveCheck', 'CalendarCreateEventLockEventCheck' }
+local DROPDOWNS = {
+	CalendarCreateEventFrame = { 'EventTypeDropdown', 'HourDropdown', 'MinuteDropdown', 'AMPMDropdown', 'DifficultyOptionDropdown', 'CommunityDropdown' },
+	CalendarMassInviteFrame = { 'CommunityDropdown', 'RankDropdown' },
+}
+local DIALOG_TEXTS = {
 	'CalendarViewEventCommunityName', 'CalendarViewEventTypeName', 'CalendarViewEventCreatorName', 'CalendarViewEventDateLabel', 'CalendarViewEventTimeLabel',
 	'CalendarCreateEventCommunityName', 'CalendarCreateEventTextureName', 'CalendarCreateEventCreatorName', 'CalendarCreateEventDateLabel',
+	'CalendarMassInviteLevelText', 'CalendarMassInviteRankText',
 }
-local BACKDROP_FRAME_NAMES = { 'CalendarViewEventDescriptionContainer', 'CalendarViewEventInviteList', 'CalendarCreateEventDescriptionContainer', 'CalendarCreateEventInviteList' }
+local ROW_SETUPS = { 'CalendarEventInviteList_InitButtonShared', 'CalendarEventPickerFrame_InitButton', 'CalendarTexturePicker_InitButton' }
 
-local installed = false
-local skinned = false
+local context = Skin.Define('calendar', {
+	name = 'Calendar',
+	description = 'The calendar: dark month grid with card days, house arrows and filter, and dark event dialogs.',
+	icon = 'Interface/Icons/INV_Misc_Note_02',
+	newLook = true,
+})
+local Hook = context.Hook
+local Fade, FadeRegions = context.Fade, context.FadeRegions
+local Shell, Button, Close, Card, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.Card, context.Dropdown, context.EditBox, context.CheckBox
+local ScrollBar, Face, Title, Body = context.ScrollBar, context.Face, context.Title, context.Body
 
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
+local days = {}
+local selectedButton, todayButton
+
+local function Place(region, point, relativeTo, relativePoint, x, y)
+	region:ClearAllPoints()
+	region:SetPoint(point, relativeTo, relativePoint, x, y)
 end
 
-local context = Skin.NewContext(Enabled)
-local Fade, FadeRegions = context.Fade, context.FadeRegions
-local Shell, Button, Close, Dropdown, ScrollBar, Body, Title = context.Shell, context.Button, context.Close, context.Dropdown, context.ScrollBar, context.Body, context.Title
-local SelectedTexture = Skin.SelectedTexture
+local function FitCell(region, button)
+	region:ClearAllPoints()
+	region:SetPoint('TOPLEFT', button, 'TOPLEFT', ART_INSET, -ART_INSET)
+	region:SetPoint('BOTTOMRIGHT', button, 'BOTTOMRIGHT', -ART_INSET, ART_INSET)
+end
 
-local function SkinDayButton(dayIndex)
-	local button = _G['CalendarDayButton' .. dayIndex]
-	if not button then return end
+local function MarkDay(button, marked)
+	if button then Skin.SetActiveEdge(button, marked) end
+end
+
+local function RefreshMarks()
+	MarkDay(selectedButton, false)
+	MarkDay(todayButton, false)
+	selectedButton = _G.CalendarWeekdaySelectedTexture:IsShown() and _G.CalendarFrame.selectedDayButton
+	todayButton = _G.CalendarTodayFrame:IsShown() and _G.CalendarTodayFrame:GetParent()
+	MarkDay(selectedButton, true)
+	MarkDay(todayButton, true)
+end
+
+local function SkinRow(button)
+	if button._buiCalendarRow then return end
+	button._buiCalendarRow = true
+	Skin.RowHighlight(button)
+	Skin.TipFaceTree(button, 1)
+end
+
+local function SkinEventButton(button)
+	local name = button:GetName()
+	Face(_G[name .. 'Text1'])
+	Face(_G[name .. 'Text2'])
+	Skin.RowHighlight(button, EVENT_WASH_ALPHA)
+	Skin.SelectedTexture(button.black, EVENT_WASH_ALPHA)
+end
+
+local function SkinDay(button)
 	local name = button:GetName()
 	Fade(button:GetNormalTexture())
-	local highlight = button:GetHighlightTexture()
-	if highlight then
-		highlight:SetBlendMode('BLEND')
-		SelectedTexture(highlight, DAY_HOVER_ALPHA)
+	Fade(_G[name .. 'DarkFrameTop'])
+	Fade(_G[name .. 'DarkFrameBottom'])
+	Card(button, DAY_INSET)
+end
+
+local function SkinDialog(dialog)
+	FadeRegions(dialog.Border)
+	FadeRegions(dialog.Header)
+	Shell(dialog)
+	Title(dialog.Header.Text)
+	Place(dialog.Header.Text, 'TOPLEFT', dialog, 'TOPLEFT', DIALOG_TITLE_X, DIALOG_TITLE_Y)
+end
+
+local function SkinPanel(panel)
+	Fade(panel.NineSlice)
+	Shell(panel)
+	ScrollBar(panel.ScrollBar)
+end
+
+local function SkinDialogs()
+	for _, name in ipairs(DIALOGS) do SkinDialog(_G[name]) end
+	for _, name in ipairs(PANELS) do SkinPanel(_G[name]) end
+	for _, name in ipairs(PICKERS) do ScrollBar(_G[name].ScrollBar) end
+	for _, name in ipairs(DIALOG_ART) do Fade(_G[name]) end
+	for _, name in ipairs(DIALOG_BUTTONS) do Button(_G[name]) end
+	for _, name in ipairs(DIALOG_CLOSES) do Close(_G[name]) end
+	for _, name in ipairs(EDIT_BOXES) do EditBox(_G[name]) end
+	for _, name in ipairs(CHECKS) do CheckBox(_G[name]) end
+	for _, name in ipairs(DIALOG_TEXTS) do Face(_G[name]) end
+	for _, name in ipairs(SCROLLING_TEXTS) do Face(_G[name].ScrollingFont:GetFontString()) end
+	for name, keys in pairs(DROPDOWNS) do
+		for _, key in ipairs(keys) do Dropdown(_G[name][key]) end
 	end
-	Shell(button, DAY_INSET)
-	Fade(_G[name .. 'DateFrameBackground'])
-	Skin.TipFace(_G[name .. 'DateFrameDate'], 'body')
+	for _, name in ipairs(INVITE_LISTS) do
+		for _, sortButton in pairs(_G[name].sortButtons) do Skin.TipButtonFonts(sortButton) end
+	end
+	Title(_G.CalendarViewEventTitle)
 end
 
-local function OnDayEventButton(button)
-	if not Enabled() or not button then return end
-	local name = button:GetName()
-	Skin.TipFace(name and _G[name .. 'Text1'], 'body')
-	Skin.TipFace(name and _G[name .. 'Text2'], 'body')
-end
-
-local function SkinBackdropFrame(frame)
-	if not frame then return end
+local function SkinFrame(frame)
 	FadeRegions(frame)
-	Fade(frame.NineSlice)
-	Shell(frame)
-	ScrollBar(frame.ScrollBar)
-end
-
-local function SkinEventFrame(frame)
-	if not frame then return end
-	Skin.FadeTree(frame.Border)
-	Shell(frame)
-	if frame.Header then
-		FadeRegions(frame.Header)
-		Title(frame.Header.Text)
-	end
-end
-
-local function SkinEventFrames()
-	for _, name in ipairs(EVENT_FRAME_NAMES) do SkinEventFrame(_G[name]) end
-	for _, name in ipairs(EVENT_BUTTON_NAMES) do Button(_G[name]) end
-	for _, name in ipairs(EVENT_CLOSE_NAMES) do Close(_G[name]) end
-	for _, name in ipairs(EVENT_TITLE_NAMES) do Title(_G[name]) end
-	for _, name in ipairs(EVENT_BODY_NAMES) do Body(_G[name]) end
-	for _, name in ipairs(BACKDROP_FRAME_NAMES) do SkinBackdropFrame(_G[name]) end
-end
-
-local function SkinMainFrame(frame)
-	for _, key in ipairs(FRAME_ART_NAMES) do Fade(_G['CalendarFrame' .. key]) end
-	Shell(frame)
-	for weekday = 1, WEEKDAY_COUNT do
-		Fade(_G['CalendarWeekday' .. weekday .. 'Background'])
-		Skin.TipFont(_G['CalendarWeekday' .. weekday .. 'Name'], 'label')
-	end
-	Fade(_G.CalendarMonthBackground)
-	Fade(_G.CalendarYearBackground)
+	Fade(_G.CalendarLastDayDarkTexture)
+	Fade(_G.CalendarTodayFrame)
+	Shell(frame, FRAME_INSETS)
 	Skin.TipFont(_G.CalendarMonthName, 'title', MONTH_SCALE)
 	Skin.TipFont(_G.CalendarYearName, 'label')
-	Skin.TipPageButton(_G.CalendarPrevMonthButton, 'previous')
-	Skin.TipPageButton(_G.CalendarNextMonthButton, 'next')
-	Dropdown(frame.FilterButton)
+	for weekday = 1, WEEKDAY_COUNT do Skin.TipFont(_G['CalendarWeekday' .. weekday .. 'Name'], 'label') end
 	Close(_G.CalendarCloseButton)
-	for dayIndex = 1, DAY_BUTTON_COUNT do SkinDayButton(dayIndex) end
-	SkinEventFrames()
+	context.TextDropdown(frame.FilterButton, true)
+	Skin.TipStepper(_G.CalendarPrevMonthButton, 'previous')
+	Skin.TipStepper(_G.CalendarNextMonthButton, 'next')
+	for _, button in ipairs(days) do SkinDay(button) end
+	SkinDialogs()
+	RefreshMarks()
 end
 
-local function Apply()
-	local frame = _G.CalendarFrame
-	if not frame or frame:IsForbidden() or not Enabled() or skinned then return end
-	skinned = true
-	SkinMainFrame(frame)
+local function PlaceHeader(frame)
+	local month, close, filter = _G.CalendarMonthName, _G.CalendarCloseButton, frame.FilterButton
+	Place(month, 'LEFT', frame, 'TOPLEFT', TITLE_X, HEADER_MIDDLE)
+	Place(_G.CalendarYearName, 'BOTTOMLEFT', month, 'BOTTOMRIGHT', HEADER_GAP, 0)
+	Place(close, 'RIGHT', frame, 'TOPRIGHT', CLOSE_X, HEADER_MIDDLE)
+	Place(filter, 'RIGHT', close, 'LEFT', -HEADER_GAP, 0)
+	Place(_G.CalendarNextMonthButton, 'RIGHT', filter, 'LEFT', -HEADER_GAP, 0)
+	Place(_G.CalendarPrevMonthButton, 'RIGHT', _G.CalendarNextMonthButton, 'LEFT', 0, 0)
 end
 
-local function Install()
-	if installed then return end
-	local frame = _G.CalendarFrame
-	if not frame then return end
-	installed = true
-	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Calendar frame reskin', Apply))
-	if _G.CalendarDayEventButton_OnLoad then Hook('CalendarDayEventButton_OnLoad', OnDayEventButton) end
-	if frame:IsShown() then Apply() end
+local function BuildDay(button)
+	local name = button:GetName()
+	local dim = context.Own(_G[name .. 'DarkFrame']:CreateTexture(nil, 'OVERLAY'))
+	BUI.Painter.Fill(dim, 'skinBackground')
+	dim:SetAlpha(DIM_ALPHA)
+	FitCell(dim, button)
+	FitCell(button:GetHighlightTexture(), button)
+	FitCell(_G[name .. 'EventTexture'], button)
+	FitCell(_G[name .. 'OverlayFrame'], button)
+	_G[name .. 'EventBackgroundTexture']:SetWidth(button:GetWidth() - ART_INSET * 2)
+	Skin.RowHighlight(button, DAY_WASH_ALPHA)
+	Body(_G[name .. 'DateFrameDate'])
+	Skin.TipPageButton(_G[name .. 'MoreEventsButton'], 'down')
+	for index = 1, EVENTS_PER_DAY do SkinEventButton(_G[name .. 'EventButton' .. index]) end
 end
 
-local function TryInstall()
-	Install()
-	if installed then BUI.Events:Unregister('ADDON_LOADED', 'Skin.Calendar') end
-end
-
-local function Deactivate()
-	context.Restore()
-	skinned = false
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		if not installed then
-			BUI.Events:Register('ADDON_LOADED', 'Skin.Calendar', TryInstall)
-		elseif _G.CalendarFrame:IsShown() then
-			Apply()
-		end
-	else
-		Deactivate()
+local function InstallFrame(frame)
+	PlaceHeader(frame)
+	for index = 1, DAY_COUNT do
+		days[index] = _G['CalendarDayButton' .. index]
+		BuildDay(days[index])
 	end
-end)
+	Hook('CalendarFrame_Update', RefreshMarks)
+	Hook('CalendarDayButton_Click', RefreshMarks)
+	for _, name in ipairs(ROW_SETUPS) do Hook(name, SkinRow) end
+end
 
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Calendar',
-	description = 'The calendar: dark month grid with white day highlights, house arrows and filter, and dark event dialogs.',
-	icon = 'Interface/Icons/INV_Misc_Note_02',
-})
+context.Window('CalendarFrame', { skin = SkinFrame, install = InstallFrame })
