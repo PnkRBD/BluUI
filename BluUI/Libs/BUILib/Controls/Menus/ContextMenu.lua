@@ -198,6 +198,7 @@ local function MakeSeparator(parent)
 end
 
 local sharedMenu, menuFill, menuEdge, menuSquare, scrollFrame, scrollChild, scrollTrack, scrollThumb, scrollLogic
+local menuShadows = {}
 local rowPool = {}
 local titlePool = {}
 local separatorPool = {}
@@ -210,7 +211,7 @@ local function EnsureMenu()
 	menu:EnableMouse(true)
 	menu:Hide()
 	for index, shadow in ipairs(SHADOWS) do
-		Widget.DrawCardShape(menu, shadow.radius, { 0, 0, 0, shadow.alpha }, CLEAR, "BACKGROUND", -8 + index, shadow.inset)
+		menuShadows[index] = Widget.DrawCardShape(menu, shadow.radius, { 0, 0, 0, shadow.alpha }, CLEAR, "BACKGROUND", -8 + index, shadow.inset)
 	end
 	menuFill, menuEdge = Widget.DrawCardShape(menu, MENU_RADIUS, SOLID, SOLID, "BACKGROUND", 0, 0)
 	menuSquare = menu:CreateTexture(nil, "BACKGROUND")
@@ -311,6 +312,7 @@ function Controls.ContextMenu(items, options)
 	menuSquare:SetShown(palette.square == true)
 	menuFill:SetShown(not palette.square)
 	menuEdge:SetShown(not palette.square)
+	for _, shadow in ipairs(menuShadows) do shadow:SetShown(not palette.square) end
 	if palette.square then
 		menuSquare:SetVertexColor(unpack(palette.fill))
 	else
