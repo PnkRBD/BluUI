@@ -29,7 +29,7 @@ end
 
 local function PaintPanel(panel)
     panel.fill:SetVertexColor(BUI.ThemeColor('page'))
-    panel.edge:SetVertexColor(BUI.ThemeColor('edge'))
+    panel.edge:SetVertexColor(BUI.ThemeColor('inputEdge'))
     panel.title:SetTextColor(BUI.ThemeColor('text'))
     if panel.PaintTheme then panel:PaintTheme() end
 end
