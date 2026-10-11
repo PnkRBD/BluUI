@@ -263,13 +263,19 @@ local function StyleSlotButton(button)
 end
 
 local BAG = {
-    MARKER_KEY = 'characterFrameArrow', MARKER_W = 10, MARKER_H = 24, MARKER_GAP = 2, MARKER_IDLE_ALPHA = 0.85,
+    MARKER_KEY = 'characterFrameArrow', MARKER_W = 10, MARKER_H = 24, MARKER_GAP = 2, MARKER_IDLE_ALPHA = 0.85, EMPTY_ALPHA = 0.45,
     LIGHT_MARKER = 0.6, ARROW_LIGHT = { 1, 1, 1, 0.85 }, ARROW_DARK = { 0, 0, 0, 0.6 },
     COLS = 5, CELL = 40, GAP = 4, PAD = 8, POPUP_TOP = 24, POPUP_MAX = 15, POPUP_LINGER = 0.35,
 }
 BAG.POPUP_W = BAG.PAD * 2 + BAG.COLS * BAG.CELL + (BAG.COLS - 1) * BAG.GAP
 function BAG.MarkerColor()
     return BUI.GetDB().skinning[BAG.MARKER_KEY] or Skin.HoverColor()
+end
+function BAG.ArrowShade(color)
+    return (0.299 * color[1] + 0.587 * color[2] + 0.114 * color[3]) > BAG.LIGHT_MARKER and BAG.ARROW_DARK or BAG.ARROW_LIGHT
+end
+function BAG.RestAlpha(marker)
+    marker:SetAlpha(marker.count > 0 and BAG.MARKER_IDLE_ALPHA or BAG.EMPTY_ALPHA)
 end
 
 local bagItemsBySlot = {}
@@ -426,15 +432,18 @@ end
 
 local function RefreshBagAlternatives()
     ScanBags()
-    local color = BAG.MarkerColor()
-    local shade = (0.299 * color[1] + 0.587 * color[2] + 0.114 * color[3]) > BAG.LIGHT_MARKER and BAG.ARROW_DARK or BAG.ARROW_LIGHT
+    local color, empty = BAG.MarkerColor(), Skin.MUTED_COLOR
+    local shade, emptyShade = BAG.ArrowShade(color), BAG.ArrowShade(empty)
     for _, labels in pairs(slotLabels) do
         local list = bagItemsBySlot[labels.info.id]
         local marker = labels.bagMarker
         marker.count = list and #list or 0
-        marker.bar:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
-        marker.arrow:SetVertexColor(shade[1], shade[2], shade[3], shade[4])
-        marker:SetShown(marker.count > 0)
+        local filled = marker.count > 0
+        local fill, arrow = filled and color or empty, filled and shade or emptyShade
+        marker.bar:SetColorTexture(fill[1], fill[2], fill[3], fill[4] or 1)
+        marker.arrow:SetVertexColor(arrow[1], arrow[2], arrow[3], arrow[4])
+        BAG.RestAlpha(marker)
+        marker:Show()
     end
     if bagPopup and bagPopup:IsShown() then bagPopup:Hide() end
 end
@@ -497,19 +506,22 @@ local function BuildSlotLabels(button, info)
     marker:SetSize(Pixel.Scale(BAG.MARKER_W), Pixel.Scale(BAG.MARKER_H))
     marker:SetPoint(slotSide, button, popupSide, popupSign * Pixel.Scale(BAG.MARKER_GAP), 0)
     marker:SetFrameLevel(button:GetFrameLevel() + 6)
-    marker:SetAlpha(BAG.MARKER_IDLE_ALPHA)
     marker.bar = marker:CreateTexture(nil, 'ARTWORK')
     marker.bar:SetAllPoints()
     marker.arrow = Skin.TipArrow(marker, true, popupSign * math.pi / 2)
     marker:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame bagMarker OnEnter', function(self)
-        self:SetAlpha(1)
         GameTooltip:SetOwner(self, popupSide == 'RIGHT' and 'ANCHOR_RIGHT' or 'ANCHOR_LEFT')
-        GameTooltip:SetText(string.format('%d in bags for this slot', self.count), 1, 1, 1)
-        GameTooltip:AddLine('Click to pick one to equip.', 0.7, 0.7, 0.7)
+        if self.count > 0 then
+            self:SetAlpha(1)
+            GameTooltip:SetText(string.format('%d in bags for this slot', self.count), 1, 1, 1)
+            GameTooltip:AddLine('Click to pick one to equip.', 0.7, 0.7, 0.7)
+        else
+            GameTooltip:SetText('Nothing in bags for this slot', 1, 1, 1)
+        end
         GameTooltip:Show()
     end))
     marker:SetScript('OnLeave', BUI.Profiler.Script('Skin.CharacterFrame bagMarker OnLeave', function(self)
-        self:SetAlpha(BAG.MARKER_IDLE_ALPHA)
+        BAG.RestAlpha(self)
         GameTooltip:Hide()
     end))
     marker:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame bagMarker OnClick', function() ToggleBagPopup(labels) end))
