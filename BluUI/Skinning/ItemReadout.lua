@@ -59,8 +59,8 @@ local UPGRADE_PATTERN = '^' .. EscapePattern(ITEM_UPGRADE_TOOLTIP_FORMAT):gsub('
 local LIMIT_PATTERN = '^' .. EscapePattern(ITEM_LIMIT_CATEGORY_MULTIPLE):gsub('%%%%s', '(.-)'):gsub('%%%%d', '%%d+') .. '$'
 local EMBELLISH_CATEGORY = 'Embellish'
 local MARK_GAP = '  '
-local TIER_MARK = NORMAL_FONT_COLOR:WrapTextInColorCode('Tier')
-local EMBELLISH_MARK = GREEN_FONT_COLOR:WrapTextInColorCode('Embellished')
+local TIER_MARK = GREEN_FONT_COLOR:WrapTextInColorCode('Tier')
+local EMBELLISH_MARK = NORMAL_FONT_COLOR:WrapTextInColorCode('Embellished')
 
 local function StripColors(text)
 	if not text then return '' end
