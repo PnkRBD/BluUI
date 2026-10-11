@@ -42,6 +42,8 @@ local DANGER_BUTTON_Y = 16
 local DANGER_HEAD_GAP = 16
 local ACCOUNT_MACRO_SLOTS = 120
 local CHARACTER_MACRO_SLOTS = 18
+local ABANDON_GAP = 0.3
+local ABANDON_TIMEOUT = 3
 
 local BOARDS = {
 	combat = { title = 'Combat', description = 'The numbers that float up over your target, casting feel, the keystone slot and how early the next spell queues.', headers = { 'Target Combat Text', 'Casting' } },
@@ -506,58 +508,57 @@ local function DeleteCharacterMacros()
 	end)
 end
 
+local function AbandonableQuests()
+	local quests, seen = {}, {}
+	for entryIndex = 1, C_QuestLog.GetNumQuestLogEntries() do
+		local info = C_QuestLog.GetInfo(entryIndex)
+		local questID = info and not info.isHeader and info.questID
+		if questID and not seen[questID] and C_QuestLog.CanAbandonQuest(questID) then
+			seen[questID] = true
+			quests[#quests + 1] = questID
+		end
+	end
+	return quests
+end
+
 local function AbandonQuests()
 	if InCombatLockdown() then
 		BUI.Print('Cannot abandon quests in combat.')
 		return
 	end
 	Confirm('Abandon All Quests', 'This will abandon every quest in your log that can be abandoned. Campaign and account quests will be skipped. This cannot be undone.', 'Abandon', function()
-		local queue, seen = {}, {}
-		for entryIndex = 1, C_QuestLog.GetNumQuestLogEntries() do
-			local info = C_QuestLog.GetInfo(entryIndex)
-			local questID = info and not info.isHeader and info.questID
-			if questID and not seen[questID] and C_QuestLog.CanAbandonQuest(questID) then
-				seen[questID] = true
-				queue[#queue + 1] = questID
-			end
-		end
-
+		local queue = AbandonableQuests()
 		if #queue == 0 then
 			BUI.Print('Quest log already clear.')
 			return
 		end
 
-		local confirmed = 0
+		local queueIndex, abandoned, pending, timeout = 0, 0, nil, nil
 		local watcher = CreateFrame('Frame')
-		watcher:RegisterEvent('QUEST_REMOVED')
-		watcher:SetScript('OnEvent', function(_, _, questID)
-			if seen[questID] then
-				confirmed = confirmed + 1
-				seen[questID] = nil
-			end
-		end)
-
-		local queueIndex = 1
-		C_Timer.NewTicker(0.05, function(ticker)
-			local questID = queue[queueIndex]
+		local function AbandonNext()
+			if timeout then timeout:Cancel() end
 			queueIndex = queueIndex + 1
-			if not questID then
-				ticker:Cancel()
-				C_Timer.After(0.5, function()
-					watcher:UnregisterAllEvents()
-					watcher:SetScript('OnEvent', nil)
-					if confirmed == 0 then
-						BUI.Print('Quest log already clear.')
-					else
-						BUI.Print(('Abandoned %d quest(s).'):format(confirmed))
-					end
-				end)
+			pending = queue[queueIndex]
+			if not pending then
+				watcher:UnregisterAllEvents()
+				watcher:SetScript('OnEvent', nil)
+				BUI.Print(('Abandoned %d of %d quest(s).'):format(abandoned, #queue))
 				return
 			end
-			C_QuestLog.SetSelectedQuest(questID)
+			C_QuestLog.SetSelectedQuest(pending)
 			C_QuestLog.SetAbandonQuest()
 			C_QuestLog.AbandonQuest()
+			timeout = C_Timer.NewTimer(ABANDON_TIMEOUT, AbandonNext)
+		end
+		watcher:RegisterEvent('QUEST_REMOVED')
+		watcher:SetScript('OnEvent', function(_, _, questID)
+			if questID ~= pending then return end
+			pending = nil
+			abandoned = abandoned + 1
+			timeout:Cancel()
+			timeout = C_Timer.NewTimer(ABANDON_GAP, AbandonNext)
 		end)
+		AbandonNext()
 	end)
 end
 
