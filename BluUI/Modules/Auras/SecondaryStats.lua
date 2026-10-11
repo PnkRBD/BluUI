@@ -199,7 +199,7 @@ end
 
 local function Sync()
     local db = GetDB()
-    holder:SetShown(enabled and shown > 0 and (not db.locked or not db.combatOnly or inCombat))
+    holder:SetShown(enabled and shown > 0 and not BUI.Visibility.InPetBattle() and (not db.locked or not db.combatOnly or inCombat))
     Paint()
 end
 
@@ -212,6 +212,10 @@ local function OnCombat(event)
     inCombat = event == 'PLAYER_REGEN_DISABLED'
     Sync()
 end
+
+BUI.Visibility.OnPetBattle('SecondaryStats', function()
+    if enabled then Sync() end
+end)
 
 local function Wire()
     for _, event in ipairs(UPDATE_EVENTS) do
