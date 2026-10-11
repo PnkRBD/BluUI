@@ -14,7 +14,6 @@ local BLIZZARD_ROLESET = 'buffs'
 local BLIZZARD_FRAMES = { 'BuffFrame', 'DebuffFrame' }
 local DURATION_GAP = 2
 local COUNT_INSET = 1
-local MOVER_LEVEL = 20
 local CANCEL_BUTTON = 'RightButtonUp'
 
 local SORT_METHODS = {
@@ -26,8 +25,8 @@ local SORT_METHODS = {
 BuffFrames.SORT_METHODS = SORT_METHODS
 
 local KINDS = {
-	buffs   = { frameName = 'BUI_BuffFrame',   filter = 'HELPFUL', cancel = true, enchants = true },
-	debuffs = { frameName = 'BUI_DebuffFrame', filter = 'HARMFUL', dispel = true },
+	buffs   = { frameName = 'BUI_BuffFrame',   filter = 'HELPFUL', cancel = true, enchants = true, hint = 'Buffs | Drag to Reposition | Right-Click to Lock' },
+	debuffs = { frameName = 'BUI_DebuffFrame', filter = 'HARMFUL', dispel = true, hint = 'Debuffs | Drag to Reposition | Right-Click to Lock' },
 }
 local KIND_ORDER = { 'buffs', 'debuffs' }
 
@@ -204,14 +203,13 @@ local function BuildHeader(key)
 	local kind = KINDS[key]
 	local config = Settings()[key]
 	local holder = CreateFrame('Frame', kind.frameName, UIParent)
-	holder:SetFrameStrata('MEDIUM')
+	holder:SetFrameStrata('HIGH')
 	holder:SetClampedToScreen(true)
 
 	local container = CreateFrame('AuraContainer', nil, UIParent, 'CustomAuraContainerTemplate')
 	container:SetFrameStrata('MEDIUM')
 	container:SetSize(1, 1)
 	container._buiSkipMouseWalk = true
-	holder:SetFrameLevel(container:GetFrameLevel() + MOVER_LEVEL)
 
 	local header = { key = key, kind = kind, holder = holder, container = container, parts = {}, buttons = {} }
 	headers[key] = header
@@ -235,7 +233,7 @@ local function BuildHeader(key)
 		skipClickThrough = true,
 		showHint = true,
 		showUnlockedBg = true,
-		hintText = key == 'buffs' and 'Buffs' or 'Debuffs',
+		hintText = kind.hint,
 		isLocked = function() return IsLocked(key) end,
 		onRightClick = function()
 			Settings()[key].locked = true

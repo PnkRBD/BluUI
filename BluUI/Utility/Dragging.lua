@@ -144,6 +144,7 @@ end
 
 local function CreateHintUI(parent, options)
     local hint = CreateFrame("Frame", nil, parent)
+    hint:SetClampedToScreen(true)
     hint:SetFrameLevel(parent:GetFrameLevel() + 10)
 
     local anchor = options.hintAnchor or "TOP"
