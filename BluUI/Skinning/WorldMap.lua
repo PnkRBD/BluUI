@@ -14,13 +14,13 @@ local BORDER_ART = { 'Bg', 'TopTileStreaks', 'InsetBorderTop', 'Underlay' }
 local DETAILS_ART = { 'Bg', 'SealMaterialBG' }
 local REWARDS_ART = { 'Bottom', 'Top', 'Background' }
 local CAMPAIGN_ART = { 'Background', 'TopFiligree', 'HighlightTexture', 'SelectedHighlight' }
+local CALLINGS_ART = { 'Background', 'Divider', 'SelectedTexture', 'SelectedHighlight', 'HighlightTexture' }
+local STORY_ART = { 'Background', 'Divider', 'HighlightTexture' }
 local DETAIL_BUTTON_KEYS = { 'AbandonButton', 'ShareButton', 'TrackButton' }
 local SIDE_TAB_KEYS = { 'QuestsTab', 'EventsTab', 'MapLegendTab' }
 local SIDE_TAB_OPTIONS = { dim = true }
 local SIDE_TAB_TOP_OFFSET = -2
 local ROW_HOVER_ALPHA = 0.07
-local DIVIDER_INSET = 8
-local ROW_INSETS = { top = 2, bottom = 4 }
 local CHECK_GLYPH_SIZE = 10
 local CHECK_ATLAS = 'questlog-icon-checkmark-yellow'
 local ACTIVE_RING_PADDING = 3
@@ -28,18 +28,22 @@ local PARENT_WALK_DEPTH = 6
 local SEARCH_WIDTH, SEARCH_HEIGHT = 160, 22
 local SEARCH_INSET = 8
 local SEARCH_TEXT_INSET = 6
-local LIST_ROW_WIDTH = 289
-local CAMPAIGN_PLATE_TOP, CAMPAIGN_PLATE_HEIGHT = 6, 46
-local CAMPAIGN_TITLE_DROP = 16
-local COLLAPSE_INSET = 8
 local TITLE_COORDS_GAP = 16
+local COLUMN_LEFT, COLUMN_RIGHT = 2, 304
+local TEXT_X = COLUMN_LEFT + 15
+local CONTROL_X = COLUMN_RIGHT - 12
+local QUEST = { top = 2, bottom = 4, control = 15 }
+local HEADER = { top = 0, bottom = 0 }
+local CAMPAIGN = { top = 2, bottom = 7, height = 53, title = 16, progress = 32, next = 42, pad = 8 }
+local MINIMAL = { top = -2, bottom = 2, title = 9, control = 10, next = 19, pad = 5 }
+local STORY = { top = 12, bottom = 14, title = 20 }
 
 local context = Skin.Define('worldmap', {
 	name = 'World Map',
 	description = 'The map and quest log frame in the dark shell, plus continent-map extras: zone name labels and dungeon/raid entrance pins.',
 	newLook = true,
 })
-local Hook, Enabled = context.Hook, context.Enabled
+local Hook = context.Hook
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
 local Shell, Button, Card, Dropdown = context.Shell, context.Button, context.Card, context.Dropdown
 local EditBox, ScrollBar, Body = context.EditBox, context.ScrollBar, context.Body
@@ -50,8 +54,8 @@ local generation = 0
 local sideTabs = {}
 local clearedArt = {}
 local restyledChecks = {}
-local plates = {}
-local movedButtons = {}
+local anchors = {}
+local sizes = {}
 local rareScannerSearch
 
 local function RefreshExtras()
@@ -64,7 +68,7 @@ local function KeepTexture(texture)
 end
 
 local function ClearArt(texture)
-	if clearedArt[texture] ~= nil then return end
+	if not texture or clearedArt[texture] ~= nil then return end
 	clearedArt[texture] = texture:GetAtlas() or false
 	texture:SetTexture(nil)
 end
@@ -83,10 +87,51 @@ local function RestoreArt()
 	wipe(restyledChecks)
 end
 
+local function Place(region, point, relativeTo, relativePoint, x, y)
+	if not anchors[region] then anchors[region] = { region:GetPoint(1) } end
+	region:ClearAllPoints()
+	region:SetPoint(point, relativeTo, relativePoint, x, y)
+end
+
+local function Resize(region, width, height)
+	if not sizes[region] then sizes[region] = { region:GetSize() } end
+	region:SetSize(width, height)
+end
+
+local function RestoreLayout()
+	for region, point in pairs(anchors) do
+		region:ClearAllPoints()
+		region:SetPoint(unpack(point))
+	end
+	wipe(anchors)
+	for region, size in pairs(sizes) do region:SetSize(size[1], size[2]) end
+	wipe(sizes)
+end
+
+local function Span(frame)
+	local left = frame.leftPadding or 0
+	return left, left + frame:GetWidth()
+end
+
+local function ColumnCard(frame, shape)
+	local left, right = Span(frame)
+	Card(frame, { left = COLUMN_LEFT - left, right = right - COLUMN_RIGHT, top = shape.top, bottom = shape.bottom })
+end
+
+local function ColumnControl(control, frame, relativePoint, y)
+	local _, right = Span(frame)
+	Place(control, 'CENTER', frame, relativePoint, CONTROL_X - right, y)
+end
+
+local function ColumnTitle(text, frame, point, y)
+	Place(text, point, frame, 'TOPLEFT', TEXT_X - Span(frame), y)
+end
+
 local function DividerLine(frame)
 	if frame._buiDivider then return end
+	local left, right = Span(frame)
 	local line = context.Own(Painter.Fill(frame:CreateTexture(nil, 'ARTWORK'), 'skinLine'))
-	BUILib.Skin.PixelLine(line, frame, false, DIVIDER_INSET, DIVIDER_INSET)
+	BUILib.Skin.PixelLine(line, frame, false, COLUMN_LEFT - left, right - COLUMN_RIGHT)
 	frame._buiDivider = line
 end
 
@@ -120,6 +165,8 @@ local function PlaceTomTomCoords()
 end
 
 local function SkinNavButton(button)
+	if button._buiGeneration == generation then return end
+	button._buiGeneration = generation
 	FadeRegions(button)
 	Shell(button)
 	Body(button.text)
@@ -234,46 +281,12 @@ local function RefreshSideTabs()
 	Skin.LayoutSideTabs(questLog, sideTabs, SIDE_TAB_TOP_OFFSET)
 end
 
-local PlateEnter = Wrap('Skin.WorldMap header plate enter', function(header)
-	Skin.TipShellEdges(header._buiPlate, Skin.HoverColor())
-end)
-
-local PlateLeave = Wrap('Skin.WorldMap header plate leave', function(header)
-	Skin.TipShellEdges(header._buiPlate, false)
-end)
-
-local PlateShown = Wrap('Skin.WorldMap header plate shown', function(header)
-	header._buiPlate:SetShown(Enabled() and header:IsShown())
-end)
-
-local function HeaderPlate(header)
-	local plate = header._buiPlate
-	if not plate then
-		plate = CreateFrame('Frame', nil, header:GetParent())
-		plate.ignoreInLayout = true
-		header._buiPlate = plate
-		plates[header] = plate
-		header:HookScript('OnShow', PlateShown)
-		header:HookScript('OnHide', PlateShown)
-		header:HookScript('OnEnter', PlateEnter)
-		header:HookScript('OnLeave', PlateLeave)
-	end
-	plate:SetFrameStrata(header:GetFrameStrata())
-	plate:SetFrameLevel(math.max(0, header:GetFrameLevel() - 1))
-	plate:ClearAllPoints()
-	Card(plate)
-	PlateShown(header)
-	return plate
-end
-
-local function MoveCollapseButton(button, plate)
-	if not movedButtons[button] then movedButtons[button] = { button:GetPoint(1) } end
-	button:ClearAllPoints()
-	button:SetPoint('RIGHT', plate, 'TOPRIGHT', -COLLAPSE_INSET, -CAMPAIGN_TITLE_DROP)
-end
-
 local SyncRowHighlight = Wrap('Skin.WorldMap quest row highlight', function(texture)
-	Skin.TipShellEdges(texture:GetParent(), texture:IsShown() and Skin.HoverColor())
+	local row = texture:GetParent()
+	local lit = texture:IsShown()
+	if row._buiLit == lit then return end
+	row._buiLit = lit
+	Skin.TipShellEdges(row, lit and Skin.HoverColor())
 end)
 
 local function SkinTrackBox(checkbox)
@@ -295,14 +308,16 @@ local function SkinQuestTitle(button)
 	local highlight = button.HighlightTexture
 	Skin.TipFace(button.Text, 'body')
 	Fade(highlight)
-	Card(button, ROW_INSETS)
+	ColumnCard(button, QUEST)
 	SkinTrackBox(button.Checkbox)
+	ColumnControl(button.Checkbox, button, 'TOPRIGHT', -QUEST.control)
 	if not button._buiHighlightHooked then
 		button._buiHighlightHooked = true
 		Hook(highlight, 'Show', SyncRowHighlight)
 		Hook(highlight, 'Hide', SyncRowHighlight)
 		Hook(highlight, 'SetShown', SyncRowHighlight)
 	end
+	button._buiLit = nil
 	SyncRowHighlight(highlight)
 end
 
@@ -316,43 +331,64 @@ local function SkinListHeader(header)
 	Fade(header:GetHighlightTexture())
 	Skin.TipFace(header.ButtonText, 'title')
 	CollapseButton(header.CollapseButton)
-	Card(header)
+	ColumnControl(header.CollapseButton, header, 'RIGHT', 0)
+	ColumnCard(header, HEADER)
+end
+
+local function SkinCallingsHeader(header)
+	FadeKeys(header, CALLINGS_ART)
+	SkinListHeader(header)
+end
+
+local function AttachNextObjective(header, shape)
+	local nextObjective = header.NextObjective
+	local text = nextObjective.Text
+	Skin.TipFace(text, 'body')
+	Place(nextObjective, 'TOPLEFT', header, 'TOPLEFT', TEXT_X - Span(header) - select(4, text:GetPoint(1)), -shape.next)
+	if nextObjective._buiPad then return end
+	local pad = context.Own(nextObjective:CreateTexture())
+	pad:SetSize(1, shape.pad + shape.bottom)
+	pad:SetPoint('TOPLEFT', text, 'BOTTOMLEFT')
+	nextObjective._buiPad = pad
 end
 
 local function SkinCampaignHeader(header)
 	FadeKeys(header, CAMPAIGN_ART)
 	Skin.TipFace(header.Text, 'title')
 	Skin.TipFace(header.Progress, 'body')
-	Skin.TipFace(header.NextObjective.Text, 'body')
 	CollapseButton(header.CollapseButton)
-	local plate = HeaderPlate(header)
-	plate:SetPoint('TOPLEFT', header.Background, 'TOPLEFT', 0, -CAMPAIGN_PLATE_TOP)
-	plate:SetSize(LIST_ROW_WIDTH, CAMPAIGN_PLATE_HEIGHT)
-	MoveCollapseButton(header.CollapseButton, plate)
+	Resize(header.Background, header.Background:GetWidth(), CAMPAIGN.height)
+	ColumnTitle(header.Text, header, 'LEFT', -CAMPAIGN.title)
+	ColumnTitle(header.Progress, header, 'LEFT', -CAMPAIGN.progress)
+	ColumnControl(header.CollapseButton, header, 'TOPRIGHT', -CAMPAIGN.title)
+	AttachNextObjective(header, CAMPAIGN)
+	ColumnCard(header, CAMPAIGN)
 end
 
 local function SkinCampaignMinimalHeader(header)
 	Fade(header.Background)
 	Fade(header.Highlight)
 	Skin.TipFace(header.Text, 'title')
-	Skin.TipFace(header.NextObjective.Text, 'body')
 	CollapseButton(header.CollapseButton)
-	HeaderPlate(header):SetAllPoints(header.Background)
+	ColumnTitle(header.Text, header, 'LEFT', -MINIMAL.title)
+	ColumnControl(header.CollapseButton, header, 'TOPRIGHT', -MINIMAL.control)
+	AttachNextObjective(header, MINIMAL)
+	ColumnCard(header, MINIMAL)
 end
 
-local function SkinCallingsHeader(header)
-	Fade(header.Background)
-	Fade(header.Divider)
-	Fade(header.SelectedTexture)
-	SkinListHeader(header)
+local function SkinOnce(frame, skin)
+	if frame._buiGeneration == generation then return end
+	skin(frame)
+	frame._buiGeneration = generation
 end
 
 local function SweepPool(pool, skin)
-	for frame in pool:EnumerateActive() do
-		if frame._buiGeneration ~= generation then
-			skin(frame)
-			frame._buiGeneration = generation
-		end
+	for frame in pool:EnumerateActive() do SkinOnce(frame, skin) end
+end
+
+local function CampaignSetHook(skin)
+	return function(header)
+		if header:GetParent() == QuestScrollFrame.Contents then SkinOnce(header, skin) end
 	end
 end
 
@@ -362,26 +398,31 @@ local function SweepQuestLog()
 	SweepPool(scroll.titleFramePool, SkinQuestTitle)
 	SweepPool(scroll.objectiveFramePool, SkinObjective)
 	SweepPool(scroll.headerFramePool, SkinListHeader)
+	SweepPool(scroll.covenantCallingsHeaderFramePool, SkinCallingsHeader)
 	SweepPool(scroll.campaignHeaderFramePool, SkinCampaignHeader)
 	SweepPool(scroll.campaignHeaderMinimalFramePool, SkinCampaignMinimalHeader)
-	SweepPool(scroll.covenantCallingsHeaderFramePool, SkinCallingsHeader)
-	BUILib.Skin.QueuePixelAlign()
 end
 
+Hook(CampaignHeaderMixin, 'SetCampaign', CampaignSetHook(SkinCampaignHeader))
+Hook(CampaignHeaderMinimalMixin, 'SetCampaign', CampaignSetHook(SkinCampaignMinimalHeader))
+
 local function SkinStoryHeader(header)
-	Fade(header.Background)
-	Fade(header.Divider)
-	Fade(header.HighlightTexture)
+	FadeKeys(header, STORY_ART)
 	Skin.TipFace(header.Text, 'title')
 	Skin.TipFace(header.Progress, 'body')
-	Card(header)
+	ColumnTitle(header.Text, header, 'TOPLEFT', -STORY.title)
+	ColumnCard(header, STORY)
 end
 
 local function SkinQuestScroll(scroll)
+	local search = scroll.SearchBox
+	local _, _, _, _, searchY = search:GetPoint(1)
 	Fade(scroll.Background)
 	Fade(scroll.Edge)
 	Skin.FadeTree(scroll.BorderFrame)
-	EditBox(scroll.SearchBox)
+	EditBox(search)
+	Place(search, 'BOTTOMLEFT', scroll, 'TOPLEFT', COLUMN_LEFT, searchY)
+	Resize(search, COLUMN_RIGHT - COLUMN_LEFT, search:GetHeight())
 	ScrollBar(scroll.ScrollBar)
 	Body(scroll.EmptyText)
 	Body(scroll.NoSearchResultsText)
@@ -418,21 +459,18 @@ local function SkinCampaignOverview(overview)
 end
 
 local function SkinEventRow(frame)
+	if frame._buiGeneration == generation then return end
+	frame._buiGeneration = generation
 	if frame.Name then
-		if not frame._buiEventRow then
-			frame._buiEventRow = true
-			Skin.TipFace(frame.Name, 'body')
-			Skin.TipFace(frame.Location, 'body')
-		end
+		Skin.TipFace(frame.Name, 'body')
+		Skin.TipFace(frame.Location, 'body')
 		Fade(frame.Background)
-		Fade(frame.Background2)
+		ClearArt(frame.Background)
+		ClearArt(frame.Background2)
 		Fade(frame.Highlight)
 		Card(frame)
 	elseif frame.Label then
-		if not frame._buiEventLabel then
-			frame._buiEventLabel = true
-			Skin.TipFace(frame.Label, frame.Background and 'title' or 'body')
-		end
+		Skin.TipFace(frame.Label, frame.Background and 'title' or 'body')
 		Fade(frame.Background)
 	end
 end
@@ -529,13 +567,8 @@ context.Window('WorldMapFrame', { skin = SkinMap, show = RefreshMap, install = I
 context.OnDisable(function()
 	ReleaseRareScannerSearch()
 	RestoreArt()
+	RestoreLayout()
 	for _, tab in ipairs(sideTabs) do Skin.ResetSideTab(tab) end
-	for _, plate in pairs(plates) do plate:Hide() end
-	for button, point in pairs(movedButtons) do
-		button:ClearAllPoints()
-		button:SetPoint(unpack(point))
-	end
-	wipe(movedButtons)
 	if _G.TomTom and TomTom.ShowHideWorldCoords and _G.TomTomWorldFrame then TomTom:ShowHideWorldCoords() end
 end)
 
