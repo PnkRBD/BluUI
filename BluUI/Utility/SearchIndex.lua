@@ -349,7 +349,7 @@ local entries = {
 	{ label = "Power text", page = "unitframes", tab = 11, panel = "Text", keywords = "power mana text" },
 	{ label = "Status text", page = "unitframes", tab = 11, panel = "Text", keywords = "dead ghost offline afk dnd status" },
 	{ label = "Mythic+ key", page = "unitframes", tab = 11, panel = "Text", keywords = "keystone mythic plus key party" },
-	{ label = "Role icon", page = "unitframes", tab = 11, panel = "Indicators", keywords = "role leader raid marker resurrect ready check combat icon" },
+	{ label = "Role icon", page = "unitframes", tab = 11, panel = "Indicators", keywords = "role leader raid marker resurrect summon ready check combat icon" },
 	{ label = "Unit tooltips", page = "unitframes", tab = 11, panel = "Tooltips", keywords = "tooltip aura buff debuff" },
 	{ label = "Raid frames", page = "unitframes", tab = 12, panel = "Raid", keywords = "raid frames position preview enable" },
 	{ label = "Role icons", page = "unitframes", tab = 12, panel = "Raid", keywords = "raid role icon tank healer" },

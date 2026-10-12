@@ -98,6 +98,7 @@ local INDICATORS = {
 	{ key = 'leaderIcon', kind = 'leader', label = 'Leader and assist' },
 	{ key = 'raidTargetIcon', kind = 'raidTarget', label = 'Raid marker' },
 	{ key = 'resurrectIcon', kind = 'resurrect', label = 'Resurrect' },
+	{ key = 'summonIcon', kind = 'summon', label = 'Summon' },
 	{ key = 'readyCheckIcon', kind = 'readyCheck', label = 'Ready check' },
 	{ key = 'combatIcon', kind = 'combat', label = 'Combat' },
 }
