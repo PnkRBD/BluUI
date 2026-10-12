@@ -178,6 +178,11 @@ function Profiler.SetTracer(callback)
 	tracer = callback
 end
 
+function Profiler.Running()
+	if runningDepth == 0 then return 0 end
+	return runningDepth, running[1], running[runningDepth]
+end
+
 function Profiler.Run(label, callback, ...)
 	if not Profiler.active then return Watch(label, callback, ...) end
 	return Run(label, callback, ...)
@@ -280,7 +285,7 @@ end
 local driver = CreateFrame('Frame')
 driver:SetScript('OnUpdate', function(_, elapsed)
 	local driverStart = debugprofilestop()
-	depth, watchDepth = 0, 0
+	depth, watchDepth, runningDepth = 0, 0, 0
 	local active = Profiler.active
 	local actual = active and GetAddOnMetric(addonName, Metric.LastTime)
 	if elapsed >= SPIKE_GATE_SECONDS then
@@ -336,16 +341,24 @@ function Profiler.Script(label, callback)
 	return wrapper
 end
 
-local hookers = {}
+local hookers, hookedMethods = {}, {}
+
+function Profiler.HookedMethod(label)
+	return hookedMethods[label]
+end
 
 function Profiler.Hooker(group)
 	local hooker = hookers[group]
 	if not hooker then
 		hooker = function(target, method, callback)
 			if callback == nil then
-				hooksecurefunc(target, Profiler.Wrap(Profiler.Label(group, target), method))
+				local label = Profiler.Label(group, target)
+				hookedMethods[label] = target
+				hooksecurefunc(target, Profiler.Wrap(label, method))
 			else
-				hooksecurefunc(target, method, Profiler.Wrap(Profiler.Label(group, method), callback))
+				local label = Profiler.Label(group, method)
+				hookedMethods[label] = method
+				hooksecurefunc(target, method, Profiler.Wrap(label, callback))
 			end
 		end
 		hookers[group] = hooker
