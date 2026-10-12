@@ -17,7 +17,6 @@ local reputationEdgeTexture, reputationBackground
 local statLabels = {}
 local hoverTicker
 local isActive = false
-local moversUnlocked = false
 
 local sessionOnlineTime = 0
 local sessionLoginTime = 0
@@ -54,6 +53,11 @@ end
 
 local function GetConfig()
 	return BUI.GetDB().skinning.experiencebarSettings
+end
+
+local function Placing()
+	local config = GetConfig()
+	return config.position == 'FREE' and config.locked == false
 end
 
 local function GetFont()
@@ -428,7 +432,7 @@ local function LayoutBars()
 			reputationEdgeTexture:Hide()
 		end
 
-		if totalWidth == 0 and not moversUnlocked then
+		if totalWidth == 0 and not Placing() then
 			barFrame:Hide()
 		else
 			barFrame:SetWidth(math.max(totalWidth, barHeight) + scaledEdge * 2)
@@ -470,7 +474,7 @@ local function LayoutBars()
 			reputationEdgeTexture:Hide()
 		end
 
-		if totalHeight == 0 and not moversUnlocked then
+		if totalHeight == 0 and not Placing() then
 			barFrame:Hide()
 		else
 			barFrame:SetHeight(math.max(totalHeight, barHeight) + scaledEdge * 2)
@@ -687,7 +691,7 @@ local function CreateBars()
 			local config = GetConfig()
 			if config.position == 'FREE' and not config.locked then
 				config.locked = true
-				Dragging.SetLocked(barFrame, true)
+				ApplySettings()
 			else
 				ToggleCharacter('ReputationFrame')
 			end
@@ -759,14 +763,6 @@ local function Disable()
 end
 
 BUI.Events:OnLogin('Skinning.XPBar.Init', function()
-	BUI.ActionBars.OnMoversChanged('experienceBar', function(kind, unlocked)
-		if kind ~= 'unlocked' then return end
-		moversUnlocked = unlocked
-		if not (isActive and barFrame) then return end
-		LayoutBars()
-		local config = GetConfig()
-		Dragging.SetLocked(barFrame, config.position ~= 'FREE' or (not unlocked and config.locked ~= false))
-	end)
 	if Skin.IsSkinEnabled('experiencebar') then Enable() end
 end)
 
@@ -823,10 +819,6 @@ local function CenterHorizontally(value)
 	ApplySettings()
 end
 
-local function Lock(value)
-	if barFrame then Dragging.SetLocked(barFrame, value) end
-end
-
 Skin.RegisterSkin('experiencebar', {
 	name = 'Experience Bar',
 	description = 'Replaces the Blizzard status tracking bars with a minimal dark bar. Supports edge anchoring and free drag positioning.',
@@ -835,7 +827,7 @@ Skin.RegisterSkin('experiencebar', {
 		Setting('Position', 'position', ApplySettings, { entries = POSITION_OPTIONS }),
 		Switch('Full width on the top or bottom edge', 'fullWidth', ApplySettings, true),
 		Switch('Center horizontally when free', 'centerH', CenterHorizontally),
-		Switch('Locked when free', 'locked', Lock, true),
+		Switch('Locked when free', 'locked', ApplySettings, true),
 		Setting('Bar height', 'barHeight', ApplySettings, { separator = true, min = 2, max = 24, step = 1 }),
 		Setting('Hover height', 'hoverHeight', nil, { min = 10, max = 40, step = 1 }),
 		Setting('Font size', 'fontSize', ApplySettings, { min = 6, max = 18, step = 1 }),
