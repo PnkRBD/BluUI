@@ -215,6 +215,7 @@ function GroupFrames.BuildIndicators(frame, unit)
 	frame.AssistantIndicator  = MakeIndicator(frame, settings.leaderIcon,     "AssistantIndicator")
 	frame.RaidTargetIndicator = MakeIndicator(frame, settings.raidTargetIcon, "RaidTargetIndicator")
 	frame.ResurrectIndicator  = MakeIndicator(frame, settings.resurrectIcon,  "ResurrectIndicator")
+	frame.SummonIndicator     = MakeIndicator(frame, settings.summonIcon,     "SummonIndicator")
 	frame.ReadyCheckIndicator = MakeIndicator(frame, settings.readyCheckIcon, "ReadyCheckIndicator")
 	frame.CombatIndicator     = MakeIndicator(frame, settings.combatIcon,     "CombatIndicator")
 
@@ -243,6 +244,7 @@ function GroupFrames.ApplyIndicatorsToChild(child, settings)
 	ApplyIndicator(child.AssistantIndicator,  settings.leaderIcon)
 	ApplyIndicator(child.RaidTargetIndicator, settings.raidTargetIcon)
 	ApplyIndicator(child.ResurrectIndicator,  settings.resurrectIcon)
+	ApplyIndicator(child.SummonIndicator,     settings.summonIcon)
 	ApplyIndicator(child.ReadyCheckIndicator, settings.readyCheckIcon)
 	ApplyIndicator(child.CombatIndicator,     settings.combatIcon)
 end
@@ -253,6 +255,7 @@ local INDICATOR_FIELD = {
 	assistant  = "AssistantIndicator",
 	raidTarget = "RaidTargetIndicator",
 	resurrect  = "ResurrectIndicator",
+	summon     = "SummonIndicator",
 	readyCheck = "ReadyCheckIndicator",
 	combat     = "CombatIndicator",
 }
@@ -263,6 +266,7 @@ local INDICATOR_PREVIEW = {
 	assistant  = { texture = ASSISTANT_TEXTURE, filter = PIXEL_FILTER },
 	raidTarget = { raidTarget = 8 },
 	resurrect  = { atlas   = "RaidFrame-Icon-Rez" },
+	summon     = { atlas   = "RaidFrame-Icon-SummonPending" },
 	readyCheck = { atlas   = "UI-LFG-ReadyMark-Raid" },
 	combat     = { atlas   = "UI-HUD-UnitFrame-Player-CombatIcon" },
 }

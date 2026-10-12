@@ -77,6 +77,7 @@ local function CommonSettings(sizes)
 		leaderIcon     = IconDefaults(sizes.smallIcon,  "TOPLEFT", 0, sizes.iconY, true),
 		raidTargetIcon = IconDefaults(sizes.markerIcon, "CENTER",  0, 0, true),
 		resurrectIcon  = IconDefaults(sizes.rezIcon,    "CENTER",  0, 0, true),
+		summonIcon     = IconDefaults(sizes.rezIcon,    "CENTER",  0, 0, true),
 		readyCheckIcon = IconDefaults(sizes.readyIcon,  "CENTER",  0, 0, true),
 		combatIcon     = IconDefaults(sizes.combatIcon, "TOP",     0, -2, false),
 		dispelBadge    = { size = sizes.badgeSize, anchor = "CENTER", offsetX = 0, offsetY = 0 },
