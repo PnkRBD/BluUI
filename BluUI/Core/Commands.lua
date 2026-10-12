@@ -16,6 +16,7 @@ local function ShowProfile()
 		title = 'Profile report',
 		message = 'The full report is selected. Press Ctrl+C to copy it.',
 		text = table.concat(lines, ' || '),
+		fullscreen = true,
 	})
 end
 
