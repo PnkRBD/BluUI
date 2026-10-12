@@ -41,7 +41,7 @@ local UNLEARNED_TEXT = 'Teleport not learned'
 local IsSecret = BUI.Tools.IsSecretValue
 local PartyKeys = BUI.PartyKeys
 
-local card, current, group, dismissed, lockListener
+local card, current, group, dismissed, lockListener, keyDone
 
 local function GetDB() return BUI.GetDB().keystoneReminder end
 
@@ -279,6 +279,10 @@ local function InDungeon()
     return select(2, IsInInstance()) == 'party'
 end
 
+local function InRun()
+    return not keyDone and InDungeon()
+end
+
 local function ShowFor(activity)
     local dungeon, texture, mapID = FindDungeon(activity.fullName)
     KeystoneReminder.Show({
@@ -292,7 +296,7 @@ end
 
 local function Sync()
     if not GetDB().locked then return end
-    if not group or group.fullName == dismissed or InDungeon() then
+    if not group or group.fullName == dismissed or InRun() then
         if current then KeystoneReminder.Hide() end
     elseif not current or current.activity ~= group.fullName then
         ShowFor(group)
@@ -332,7 +336,13 @@ local function Forget()
 end
 
 local function OnWorld()
+    keyDone = false
     if InDungeon() then Forget() end
+end
+
+local function OnKeyDone()
+    keyDone = true
+    Sync()
 end
 
 local function Settle()
@@ -353,12 +363,13 @@ function KeystoneReminder.Enable()
     BUI.Events:Register('GROUP_ROSTER_UPDATE', EVENT_KEY, OnRoster)
     BUI.Events:Register('GROUP_LEFT', EVENT_KEY, OnGroupLeft)
     BUI.Events:Register('PLAYER_ENTERING_WORLD', EVENT_KEY, OnWorld)
+    BUI.Events:Register('CHALLENGE_MODE_COMPLETED', EVENT_KEY, OnKeyDone)
     OnListing()
 end
 
 function KeystoneReminder.Disable()
     BUI.Events:UnregisterAll(EVENT_KEY)
-    group, dismissed = nil, nil
+    group, dismissed, keyDone = nil, nil, false
     KeystoneReminder.Hide()
 end
 
