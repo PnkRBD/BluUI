@@ -9,15 +9,43 @@ local function CenterWindow()
 	BUI.Print('Window centered.')
 end
 
-local function ShowProfile()
-	local lines, preview = BUI.Profiler.Report()
+local function ShowReport(title, lines, preview)
 	for index = 1, preview do print(lines[index]) end
 	BUI.BUILibClient.Modals.Copy({
-		title = 'Profile report',
+		title = title,
 		message = 'The full report is selected. Press Ctrl+C to copy it.',
 		text = table.concat(lines, ' || '),
 		fullscreen = true,
 	})
+end
+
+local function ShowProfile()
+	ShowReport('Profile report', BUI.Profiler.Report())
+end
+
+local function ShowCDMProfile()
+	local lines, preview = BUI.CDMProfiler.Report()
+	if not lines then
+		BUI.Print('No CDM profile yet. /bui cdm to start one.')
+		return
+	end
+	ShowReport('CDM profile', lines, preview)
+end
+
+local function CDMCommand(option)
+	local CDMProfiler = BUI.CDMProfiler
+	if option == 'report' then
+		ShowCDMProfile()
+	elseif option == 'reset' then
+		CDMProfiler.Reset()
+		BUI.Print(CDMProfiler.IsRunning() and 'CDM numbers cleared, still profiling.' or 'CDM numbers cleared.')
+	elseif CDMProfiler.IsRunning() then
+		CDMProfiler.Stop()
+		BUI.Print('CDM profiling stopped.')
+		ShowCDMProfile()
+	elseif CDMProfiler.Start() then
+		BUI.Print('CDM profiling started. /bui cdm to stop.')
+	end
 end
 
 local function ProfileCommand(option)
@@ -55,6 +83,9 @@ local function PrintHelp()
 	line('/bui profile report', 'show the timings so far without stopping')
 	line('/bui profile login', 'reload and time everything from login onwards')
 	line('/bui profile alerts', 'say in chat whenever BluUI takes 100ms or more in one frame')
+	line('/bui cdm', 'start or stop counting what the Cooldown Manager does, the report opens when you stop')
+	line('/bui cdm report', 'show the CDM report again, or so far if it is still running')
+	line('/bui cdm reset', 'clear the CDM numbers and keep going')
 	line('/bui trace', 'reload and record everything BluUI runs in the first 20 seconds, then show it')
 	line('/bui trace show', 'show the last launch trace again')
 	line('/cdm', "toggle Blizzard's Cooldown Viewer settings")
@@ -80,6 +111,8 @@ SlashCmdList['BUI'] = BUI.Profiler.Wrap('Core.Commands /bui', function(message)
 		BUI.ActionBars.ToggleKeybindMode()
 	elseif command == 'profile' then
 		ProfileCommand(rest:lower())
+	elseif command == 'cdm' then
+		CDMCommand(rest:lower())
 	elseif command == 'trace' then
 		if rest:lower() == 'show' then BUI.LaunchTrace.Show() else BUI.LaunchTrace.Start() end
 	else

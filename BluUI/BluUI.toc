@@ -162,6 +162,7 @@ Modules\CDM\BuffBarSkin.lua
 Modules\CDM\EditModeLock.lua
 Modules\CDM\Profiles.lua
 Modules\CDM\Initialize.lua
+Modules\CDM\Profiler.lua
 
 Modules\Celebrations\Celebrations.lua
 Modules\Auras\Auras.lua

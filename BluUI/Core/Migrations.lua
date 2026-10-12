@@ -508,6 +508,7 @@ function BUI.MigrateProfile(profile)
 end
 
 function BUI.RunMigrations()
+	BUI.db.global.cdmProfile = nil
 	if not BUI.db.global._layoutCenteredMigrated then
 		BUI.db.global._layoutCenteredMigrated = true
 		BUI.db.global.layoutStyle = 'centered'

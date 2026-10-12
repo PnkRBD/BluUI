@@ -215,6 +215,10 @@ function LaunchTrace.Begin(addon)
 	Profiler.SetTracer(Trace)
 end
 
+function LaunchTrace.IsTracing()
+	return tracing
+end
+
 function LaunchTrace.Start()
 	BUI.db.global.traceNextLogin = true
 	ReloadUI()
