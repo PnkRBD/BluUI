@@ -79,7 +79,7 @@ local watchedCount, readyCount = 0, 0
 local fontGeneration = 1
 local pendingMenuQuestID
 local questClassificationLabels
-local styleOverrides
+local styleColorKeys
 local Scenario = {}
 local QuestFilter = {}
 local QuestItem = { POSITION_KEY = 'trackerquestitem', SIZE = 40 }
@@ -325,30 +325,31 @@ local function TrackerColorRGB(key)
 	return color[1], color[2], color[3], 1
 end
 
-local function GetStyleOverrides()
-	if styleOverrides then return styleOverrides end
-	local colors = GetSettings().colors
-	local map = {
-		Header            = colors.title,
-		HeaderHighlight   = colors.hover,
-		Normal            = colors.objective,
-		NormalHighlight   = colors.hover,
-		Complete          = colors.completed,
-		CompleteHighlight = colors.completed,
-		TimeLeft          = colors.timeLeft,
-		TimeLeftHighlight = colors.hover,
-	}
-	styleOverrides = {}
-	for key, replacement in pairs(map) do
-		local style = OBJECTIVE_TRACKER_COLOR[key]
-		if style then styleOverrides[style] = replacement end
+local STYLE_COLOR_KEYS = {
+	Header            = 'title',
+	HeaderHighlight   = 'hover',
+	Normal            = 'objective',
+	NormalHighlight   = 'hover',
+	Complete          = 'completed',
+	CompleteHighlight = 'completed',
+	TimeLeft          = 'timeLeft',
+	TimeLeftHighlight = 'hover',
+}
+
+local function StyleColorKey(style)
+	if not styleColorKeys then
+		styleColorKeys = {}
+		for name, key in pairs(STYLE_COLOR_KEYS) do
+			local blizzardStyle = OBJECTIVE_TRACKER_COLOR[name]
+			if blizzardStyle then styleColorKeys[blizzardStyle] = key end
+		end
 	end
-	return styleOverrides
+	return styleColorKeys[style]
 end
 
 local function PaintFromStyle(fontString, style)
-	local replacement = style and GetStyleOverrides()[style]
-	if replacement then fontString:SetTextColor(replacement[1], replacement[2], replacement[3], 1) end
+	local key = style and StyleColorKey(style)
+	if key then fontString:SetTextColor(TrackerColorRGB(key)) end
 end
 
 local function IsReadyBlock(block)
@@ -411,7 +412,6 @@ local function RepaintBlizzardColors()
 end
 
 local function ApplyTrackerColors()
-	styleOverrides = nil
 	if GetSettings().customColors == false then
 		RepaintBlizzardColors()
 	else
