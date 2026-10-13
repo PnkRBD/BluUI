@@ -8,7 +8,6 @@ local RECAP_ID = 'deathrecap'
 local MIRROR_ID = 'mirrortimers'
 local LEGACY_ID = 'combatalerts'
 local ART_KEYS = { 'Border', 'BorderFrame', 'Background', 'BackgroundTile', 'NineSlice', 'Inset', 'PortraitContainer', 'TitleBg' }
-local CLOSE_KEYS = { 'CloseButton', 'CloseXButton', 'closeButton' }
 local MIRROR_COUNT = 3
 local FONT_DEPTH = 2
 
@@ -34,8 +33,8 @@ local function ApplyDeathRecap()
 	recapContext.FadeArt(frame)
 	recapContext.FadeKeys(frame, ART_KEYS)
 	recapContext.Shell(frame)
-	for index = 1, #CLOSE_KEYS do recapContext.Close(frame[CLOSE_KEYS[index]]) end
-	recapContext.Button(frame.RecapButton)
+	recapContext.Close(frame.CloseXButton)
+	recapContext.Button(frame.CloseButton)
 	Skin.HideHelpButtons(frame)
 	Skin.TipFaceTree(frame, FONT_DEPTH)
 end
