@@ -73,6 +73,12 @@ AuraRules.CATALOG = {
 		icon = C_Spell.GetSpellTexture(10060),
 	},
 	{
+		id = 'bossBuff', polarity = 'HELPFUL', label = 'Boss & Role Buffs',
+		desc = 'Encounter buffs, plus the ones Blizzard flags for your role.',
+		engineCandidates = { isBossOrRoleAura = true },
+		icon = 237555,
+	},
+	{
 		id = 'stealable', polarity = 'HELPFUL', label = 'Stealable Buffs',
 		desc = 'Buffs Blizzard marks as stealable, the ones a mage can take off an enemy.',
 		engineCandidates = { isStealable = true },
