@@ -25,18 +25,35 @@ local function TimerRule(unitSeconds, format)
 	}
 end
 
-local function CompactTimerFormatter()
+local function TimerFormatter(compact, decimals)
+	local gap = compact and '' or ' '
+	local breakpoints = {}
+	if decimals > 0 then
+		breakpoints[1] = { threshold = 0, step = 0.1, rounding = Enum.NumericRuleFormatRounding.Down, format = '%.1f' .. gap .. 's' }
+	end
+	local seconds = TimerRule(1, '%d' .. gap .. 's')
+	seconds.threshold = decimals
+	breakpoints[#breakpoints + 1] = seconds
+	breakpoints[#breakpoints + 1] = TimerRule(SECONDS_PER_MIN, '%d' .. gap .. 'm')
+	breakpoints[#breakpoints + 1] = TimerRule(SECONDS_PER_HOUR, '%d' .. gap .. 'h')
+	breakpoints[#breakpoints + 1] = TimerRule(SECONDS_PER_DAY, '%d' .. gap .. 'd')
 	local formatter = C_StringUtil.CreateNumericRuleFormatter()
-	formatter:SetBreakpoints({
-		TimerRule(1, '%ds'),
-		TimerRule(SECONDS_PER_MIN, '%dm'),
-		TimerRule(SECONDS_PER_HOUR, '%dh'),
-		TimerRule(SECONDS_PER_DAY, '%dd'),
-	})
+	formatter:SetBreakpoints(breakpoints)
 	return formatter
 end
 
-local COMPACT_TIMER = { textFormatter = CompactTimerFormatter() }
+local timerOptions = {}
+
+local function TimerOptions(compact, decimals)
+	if decimals == 0 and not compact then return nil end
+	local key = (compact and 'c' or 'n') .. decimals
+	local options = timerOptions[key]
+	if not options then
+		options = { textFormatter = TimerFormatter(compact, decimals) }
+		timerOptions[key] = options
+	end
+	return options
+end
 
 local SORT_METHODS = {
 	{ value = 'time',     text = 'Time remaining', enumKey = 'ExpirationOnly' },
@@ -126,9 +143,10 @@ local function StyleButton(header, button)
 	button:SetSize(size, size)
 
 	local timer = config.timer
+	local decimals = config.showCooldownDecimals and config.cooldownDecimalThreshold or 0
 	Pixel.ApplyFont(parts.duration, config.durationSize, font, outline)
 	PlaceText(parts.duration, button, config.durationAnchor, config.durationOffsetX, config.durationOffsetY)
-	button:SetDurationText(parts.duration, config.compactTimer and COMPACT_TIMER or nil)
+	button:SetDurationText(parts.duration, TimerOptions(config.compactTimer, decimals))
 	parts.duration:SetShown(timer == 'below')
 	Pixel.ApplyFont(parts.count, config.countSize, font, outline)
 	PlaceText(parts.count, button, config.countAnchor, config.countOffsetX, config.countOffsetY)
@@ -138,6 +156,7 @@ local function StyleButton(header, button)
 	cooldown:SetReverse(config.swipeReverse ~= false)
 	cooldown:SetDrawEdge(config.swipeEdge)
 	cooldown:SetHideCountdownNumbers(timer ~= 'icon')
+	cooldown:SetCountdownMillisecondsThreshold(decimals)
 	Pixel.ApplyFont(cooldown:GetCountdownFontString(), config.durationSize, font, outline)
 	button:SetCancelAuraButtons((header.kind.cancel and config.rightClickCancel ~= false) and CANCEL_BUTTON or nil)
 	button:SetHideTooltipInCombat(config.tooltipsInCombat == false)

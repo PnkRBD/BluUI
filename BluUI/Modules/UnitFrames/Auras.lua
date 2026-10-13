@@ -188,6 +188,8 @@ local function ResolveStyle(settings, isDebuff)
 	style.stackPos  = GetAuraSetting(settings, isDebuff, 'debuffStackPos', 'buffStackPos', nil, 'BOTTOMRIGHT')
 	style.showCd    = GetAuraSetting(settings, isDebuff, 'debuffShowCd', 'buffShowCd', 'auraShowCd', true)
 	style.cdSize    = GetAuraSetting(settings, isDebuff, 'debuffCdSize', 'buffCdSize', 'auraCdSize', 10)
+	local showDecimals = GetAuraSetting(settings, isDebuff, 'debuffShowDecimals', 'buffShowDecimals', nil, false)
+	style.decimals  = showDecimals and GetAuraSetting(settings, isDebuff, 'debuffDecimalThreshold', 'buffDecimalThreshold', nil, 5) or 0
 	style.reverseSwipe = settings.auraReverseSwipe
 	style.padding = 0
 	style.showTooltips = settings.showTooltips ~= false

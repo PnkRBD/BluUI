@@ -133,6 +133,7 @@ local function KindStyle(settings, kind)
 		stackPos       = "BOTTOMRIGHT",
 		showCd         = true,
 		cdSize         = 11,
+		decimals       = config.showCooldownDecimals and config.cooldownDecimalThreshold or 0,
 		reverseSwipe   = true,
 		showTooltips   = settings.showAuraTooltips and true or false,
 		font           = STANDARD_TEXT_FONT,

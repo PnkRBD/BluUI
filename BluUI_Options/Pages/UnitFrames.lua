@@ -903,6 +903,8 @@ local function AuraRow(board, unitKey, unitSettings, isDebuff)
 	text[#text + 1] = { label = 'Stack position', entries = STACK_POINTS, get = function() return unitSettings[Key('StackPos')] or 'BOTTOMRIGHT' end, set = function(value) unitSettings[Key('StackPos')] = value end }
 	text[#text + 1] = { label = 'Cooldown text', get = function() return ResolveShow(unitSettings[Key('ShowCd')], unitSettings.auraShowCd) end, set = function(value) unitSettings[Key('ShowCd')] = value end }
 	text[#text + 1] = { label = 'Cooldown size', min = 6, max = 32, step = 1, get = function() return unitSettings[Key('CdSize')] or unitSettings.auraCdSize end, set = function(value) unitSettings[Key('CdSize')] = value end }
+	text[#text + 1] = { label = 'Decimals', get = function() return unitSettings[Key('ShowDecimals')] == true end, set = function(value) unitSettings[Key('ShowDecimals')] = value end }
+	text[#text + 1] = { label = 'Decimals under seconds', min = 1, max = 30, step = 1, get = function() return unitSettings[Key('DecimalThreshold')] or 5 end, set = function(value) unitSettings[Key('DecimalThreshold')] = value end }
 	board:AddTools(title, (isDebuff and 'Debuff' or 'Buff') .. ' icons attached to the frame', {
 		AuraLists.Rules({
 			getRules = function() return UnitFrames().GetAuraRules(unitSettings, isDebuff) end,
