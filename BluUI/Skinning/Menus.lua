@@ -109,7 +109,14 @@ local function ApplySkin(frame)
 	frame._buiBackdrop = frame._buiBackdrop or menuBackdrops[frame]
 	local backdrop = Skin3.ChildBackdrop(frame, { inside = true })
 	menuBackdrops[frame] = backdrop
-	Skin.ApplyBackdrop(backdrop, MenuFill(), Skin.PALETTE.edge)
+	local fill, edge = MenuFill(), Skin.PALETTE.edge
+	local width, height = backdrop:GetSize()
+	if issecretvalue(width) or issecretvalue(height) then
+		backdrop:SetBackdropColor(fill[1], fill[2], fill[3], fill[4])
+		backdrop:SetBackdropBorderColor(edge[1], edge[2], edge[3], edge[4])
+	else
+		Skin.ApplyBackdrop(backdrop, fill, edge)
+	end
 end
 
 local function FlushPending()
