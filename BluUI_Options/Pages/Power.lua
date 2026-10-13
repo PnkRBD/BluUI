@@ -440,7 +440,10 @@ local function SecondaryBoards(ui, parent, width, page)
 		elseif isBar then textOnly = not db[prefix .. 'BarMode']
 		else textOnly = db[prefix .. 'NumberOnly'] == true end
 	end
-	local tools = { Source(db, SourceEntries(AutoLabel, 'secondary'), function() RebuildPane(page) end) }
+	local tools = { Source(db, SourceEntries(AutoLabel, 'secondary'), function()
+		if db.source == PowerType.Mana then db.overrideShowPercent = true end
+		RebuildPane(page)
+	end) }
 	if config and not stacked then tools[#tools + 1] = PositionFor(db, textOnly, 'BUI_SecondaryPower') end
 	tools[#tools + 1] = Eye(db, Secondary, EditPreview)
 	tools[#tools + 1] = { get = function() return db.enabled == true end, set = function(value)
