@@ -85,6 +85,12 @@ AuraRules.CATALOG = {
 		icon = C_Spell.GetSpellTexture(30449),
 	},
 	{
+		id = 'fromPlayers', polarity = 'HELPFUL', label = 'Buffs From Players',
+		desc = 'Buffs any player or their pet cast, like a friend\'s own buffs and procs. Leaves out NPC buffs.',
+		engineCandidates = { isFromPlayerOrPlayerPet = true },
+		icon = C_Spell.GetSpellTexture(21562),
+	},
+	{
 		id = 'canApply', polarity = 'HELPFUL', label = 'Buffs I Can Cast',
 		desc = 'Buffs you could put on the unit yourself.',
 		engineCandidates = { canApplyAura = true },
