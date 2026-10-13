@@ -562,6 +562,7 @@ local function GeneralBoards(ui, parent, width)
 end
 
 local function FiltersBoards(ui, parent, width, page)
+	local db = Config()
 	local shared = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Blacklists',
@@ -569,6 +570,11 @@ local function FiltersBoards(ui, parent, width, page)
 	})
 	AuraLists.ShareCell(shared, 'Share blacklists with the unit frames')
 	return {
+		AuraLists.Pinned(ui, parent, width, page, {
+			title = 'Pinned buffs', description = 'Shown first in the buff row. Blizzard blocks picking debuffs on your group by spell, so buffs only.',
+			get = function() return db.buffPins end, onChange = function() GroupFrames().RefreshAuras() end,
+			only = { label = 'Only show pinned buffs', get = function() return db.buffPinsOnly == true end, set = function(value) db.buffPinsOnly = value end, tip = 'The buff row shows nothing but your pinned buffs' },
+		}),
 		shared,
 		AuraLists.Blacklist(ui, parent, width, page, { scope = 'group', polarity = 'HARMFUL', title = 'Debuff blacklist', description = 'Debuffs that never show on the frames.' }),
 		AuraLists.Blacklist(ui, parent, width, page, { scope = 'group', polarity = 'HELPFUL', title = 'Buff blacklist', description = 'Buffs that never show on the frames.' }),
