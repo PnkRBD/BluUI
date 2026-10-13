@@ -111,7 +111,7 @@ local function FillRow(row, service, money)
 		row.priceText:SetPoint('RIGHT', Pixel.Scale(-8), 0)
 	end
 	row.priceText:SetShown(service.cost > 0)
-	row.priceText:SetText(GetCoinTextureString(service.cost))
+	row.priceText:SetText(C_CurrencyInfo.GetCoinTextureString(service.cost))
 
 	row.nameText:ClearAllPoints()
 	row.nameText:SetPoint('LEFT', row.iconBorder, 'RIGHT', Pixel.Scale(8), Pixel.Scale(6))
@@ -221,7 +221,7 @@ end
 RefreshContent = function()
 	if not trainerFrame or not trainerFrame:IsShown() then return end
 	trainerFrame.titleText:SetText(UnitName('npc') or 'Trainer')
-	trainerFrame.moneyText:SetText(GetCoinTextureString(GetMoney()))
+	trainerFrame.moneyText:SetText(C_CurrencyInfo.GetCoinTextureString(GetMoney()))
 
 	ScanServices()
 	local shown = PopulateRows(trainerFrame.child)

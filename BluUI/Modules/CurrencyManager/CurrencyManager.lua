@@ -292,7 +292,7 @@ end
 
 RefreshContent = function()
     if not panel or not panel:IsShown() then return end
-    panel.moneyText:SetText(GetCoinTextureString(GetMoney()))
+    panel.moneyText:SetText(C_CurrencyInfo.GetCoinTextureString(GetMoney()))
 
     local dimHex = BUI.Hex(Painter.Color('skinLabel'))
     local headerIndex, rowIndex, y = 0, 0, 0
