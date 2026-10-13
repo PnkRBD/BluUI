@@ -177,7 +177,10 @@ function PageEngine.Show()
 	end
 
 	if BUI.ReassertBUILib then BUI.ReassertBUILib() end
-	if not PageEngine.EnsureLoaded() then return end
+	if not PageEngine.optionsLoaded then
+		if PageEngine.EnsureLoaded() then BUI.Profiler.After('Pages.PageEngine open after load', 0, PageEngine.Show) end
+		return
+	end
 	if not PageEngine.window then
 		CreateWindow()
 		BUI.Nav.Apply(BUI.Nav.GetCurrentStyle())
