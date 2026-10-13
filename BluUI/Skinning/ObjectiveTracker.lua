@@ -818,6 +818,10 @@ function QuestFilter.Wanted(spec, info, inZoneHeader)
 end
 
 function QuestFilter.Retrack(spec)
+	if InCombatLockdown() then
+		BUI.Events:AfterCombat(function() QuestFilter.Retrack(spec) end, 'Skinning.TrackerRetrack')
+		return
+	end
 	GetSettings().trackerTrackSpec = spec
 	QuestFilter.UpdateTint()
 	local numEntries = C_QuestLog.GetNumQuestLogEntries()
@@ -826,7 +830,7 @@ function QuestFilter.Retrack(spec)
 	if not IsShiftKeyDown() then
 		for entryIndex = 1, numEntries do
 			local info = C_QuestLog.GetInfo(entryIndex)
-			if info and QuestFilter.Trackable(info) then C_QuestLog.RemoveQuestWatch(info.questID) end
+			if info and info.questID ~= superTracked and QuestFilter.Trackable(info) then C_QuestLog.RemoveQuestWatch(info.questID) end
 		end
 	end
 	local zoneName = GetRealZoneText()
@@ -843,9 +847,6 @@ function QuestFilter.Retrack(spec)
 		end
 	end
 	C_QuestLog.SortQuestWatches()
-	if superTracked > 0 and C_QuestLog.GetQuestWatchType(superTracked) then
-		C_SuperTrack.SetSuperTrackedQuestID(superTracked)
-	end
 end
 
 function QuestFilter.UpdateTint()
