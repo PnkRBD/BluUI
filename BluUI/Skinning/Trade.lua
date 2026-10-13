@@ -31,7 +31,7 @@ local ACTION_BUTTONS = { 'TradeFrameTradeButton', 'TradeFrameCancelButton' }
 
 local context = Skin.Define('trade', {
 	name = 'Trade',
-	description = 'The trade window: card item rows with quality edges, house money boxes and buttons, white edge on the side that accepted. No preview: it only opens while trading with another player.',
+	description = 'The trade window: card item rows with quality edges, framed money boxes and buttons, green edge on the side that accepted. No preview: it only opens while trading with another player.',
 	icon = 'Interface/Icons/INV_Misc_Coin_01',
 	newLook = true,
 })
@@ -87,13 +87,16 @@ end
 
 local function SetColumnAccepted(column)
 	local accepted = _G[column.highlights[1]]:IsShown()
-	for _, name in ipairs(column.insets) do Skin.TipShellEdges(_G[name], accepted) end
+	for _, name in ipairs(column.insets) do Skin.TipShellEdges(_G[name], accepted and Skin.PALETTE.positive) end
 end
 
 local function SkinHighlights(frame)
+	local positive = Skin.PALETTE.positive
 	for _, column in ipairs(COLUMNS) do
 		for _, name in ipairs(column.highlights) do
-			for _, part in ipairs(HIGHLIGHT_PARTS) do Skin.SelectedTexture(_G[name .. part], HIGHLIGHT_ALPHA) end
+			for _, part in ipairs(HIGHLIGHT_PARTS) do
+				_G[name .. part]:SetColorTexture(positive[1], positive[2], positive[3], HIGHLIGHT_ALPHA)
+			end
 			_G[name]:SetFrameLevel(frame:GetFrameLevel() + HIGHLIGHT_LEVEL_OFFSET)
 		end
 	end
