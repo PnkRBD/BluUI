@@ -864,11 +864,11 @@ local function PositionTool(unitKey, unitSettings)
 end
 
 local AURA_FLOWS = {
-	{ value = 'separate', text = 'Separate' },
-	{ value = 'debuffsOnBuffs', text = 'Debuffs on buffs' },
-	{ value = 'buffsOnDebuffs', text = 'Buffs on debuffs' },
-	{ value = 'debuffsAfterBuffs', text = 'Debuffs after buffs, same row' },
-	{ value = 'buffsAfterDebuffs', text = 'Buffs after debuffs, same row' },
+	{ value = 'separate', text = 'Each in its own spot' },
+	{ value = 'debuffsOnBuffs', text = 'Debuffs stacked on buffs' },
+	{ value = 'buffsOnDebuffs', text = 'Buffs stacked on debuffs' },
+	{ value = 'debuffsAfterBuffs', text = 'One row, buffs first' },
+	{ value = 'buffsAfterDebuffs', text = 'One row, debuffs first' },
 }
 
 local function AuraRow(board, unitKey, unitSettings, isDebuff)
@@ -1115,7 +1115,7 @@ local function UnitBoards(ui, parent, width, unit)
 		})
 		AuraRow(auras, unitKey, unitSettings, true)
 		AuraRow(auras, unitKey, unitSettings, false)
-		auras:AddTools('Flow', 'The first set keeps its position, the other stacks on it or carries on in the same row', {
+		auras:AddTools('Flow', 'How buffs and debuffs share space', {
 			Menu(unitSettings, 'auraFlow', AURA_FLOWS, 230),
 		}, RefreshFrames)
 		boards[#boards + 1] = auras
