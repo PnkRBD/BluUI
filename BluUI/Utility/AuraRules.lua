@@ -41,6 +41,20 @@ AuraRules.CATALOG = {
 		icon = 132212,
 	},
 	{
+		id = 'mineKeyDebuffs', polarity = 'HARMFUL', label = 'My Key Debuffs',
+		desc = 'Your debuffs the game marks as worth tracking, like DoTs. Leaves out crowd control.',
+		engineFilter = 'HARMFUL|PLAYER|!CROWD_CONTROL',
+		engineCandidates = { nameplateShowPersonal = true },
+		icon = C_Spell.GetSpellTexture(172),
+	},
+	{
+		id = 'keyDebuffs', polarity = 'HARMFUL', label = 'Key Debuffs From Anyone',
+		desc = 'Debuffs from anyone that the game marks for everyone to see. Leaves out crowd control.',
+		engineFilter = 'HARMFUL|!CROWD_CONTROL',
+		engineCandidates = { nameplateShowAll = true, nameplateShowPersonal = false },
+		icon = C_Spell.GetSpellTexture(12294),
+	},
+	{
 		id = 'bigDefensive', polarity = 'HELPFUL', label = 'Big Defensives',
 		desc = 'Major personal damage-reduction cooldowns.',
 		engineFilter = 'HELPFUL|BIG_DEFENSIVE',
