@@ -57,11 +57,27 @@ local BLACK_COLOR = { 0, 0, 0, 1 }
 
 local kindCandidates = {}
 
+local function KindPins(kind)
+	if kind ~= "buffs" then return nil, '' end
+	local db = GroupFrames.GetDB()
+	if next(db.buffPins) == nil then return nil, '' end
+	return db.buffPins, (db.buffPinsOnly and 'only:' or 'pin:') .. Engine.SortedKeys(db.buffPins)
+end
+
 local function KindCandidates(kind)
 	local polarity = KIND_POLARITY[kind]
 	local blacklist = BUI.AuraBlacklist.GroupSet(polarity)
+	local pins, pinSig = KindPins(kind)
 	local cached = kindCandidates[kind]
-	if cached and cached.source == blacklist then return cached.candidates, cached.fingerprint end
+	if cached and cached.source == blacklist and cached.pinSig == pinSig then return cached.candidates, cached.fingerprint end
+
+	cached = { source = blacklist, pinSig = pinSig, fingerprint = '' }
+	kindCandidates[kind] = cached
+	if pins and GroupFrames.GetDB().buffPinsOnly then
+		cached.candidates = { includeSpellIDs = pins }
+		cached.fingerprint = pinSig
+		return cached.candidates, cached.fingerprint
+	end
 
 	local exclude = {}
 	for spellID in pairs(blacklist) do
@@ -72,13 +88,14 @@ local function KindCandidates(kind)
 			exclude[spellID] = true
 		end
 	end
-
-	cached = { source = blacklist, fingerprint = '' }
-	if next(exclude) ~= nil then
-		cached.candidates = { excludeSpellIDs = exclude }
-		cached.fingerprint = 'bl:' .. Engine.SortedKeys(exclude)
+	if pins then
+		for spellID in pairs(pins) do exclude[spellID] = true end
 	end
-	kindCandidates[kind] = cached
+
+	if next(exclude) ~= nil then
+		cached.candidates = { pinSpellIDs = pins, excludeSpellIDs = exclude }
+		cached.fingerprint = pinSig .. 'bl:' .. Engine.SortedKeys(exclude)
+	end
 	return cached.candidates, cached.fingerprint
 end
 

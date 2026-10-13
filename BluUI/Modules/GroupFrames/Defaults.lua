@@ -204,6 +204,8 @@ BUI.Defaults.profile.groupFrames = {
 	hideBlizzardFrames = true,
 
 	blacklistOverrides = { debuff = {}, buff = {} },
+	buffPins           = {},
+	buffPinsOnly       = false,
 
 	range = {
 		enabled      = true,
