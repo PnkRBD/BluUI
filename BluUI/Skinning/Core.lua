@@ -394,11 +394,11 @@ end
 local TIP_PADDING_X, TIP_PADDING_Y, TIP_TITLE_BLOCK = 10, 8, 24
 local TIP_BODY_SIZE, TIP_TITLE_SIZE = 11, 12
 local TIP_TITLE_COLOR, TIP_BODY_COLOR, TIP_LABEL_COLOR = {}, {}, {}
-local PANEL_FILL, PANEL_EDGE = {}, {}
+local PANEL_FILL, PANEL_EDGE, POSITIVE_COLOR = {}, {}, {}
 local TAB_REST, TAB_HOVER, TAB_SELECTED, CARD_FILL = {}, {}, {}, {}
 local TIP_ROLES = { title = 'skinTitle', label = 'skinLabel' }
 local PALETTE = {
-	[PANEL_FILL] = 'skinBackground', [PANEL_EDGE] = 'skinBorder',
+	[PANEL_FILL] = 'skinBackground', [PANEL_EDGE] = 'skinBorder', [POSITIVE_COLOR] = 'positive',
 	[TIP_TITLE_COLOR] = 'skinTitle', [TIP_BODY_COLOR] = 'skinText', [TIP_LABEL_COLOR] = 'skinLabel',
 }
 local TAB_SHADES = { [TAB_REST] = 2 / 3, [TAB_HOVER] = 4 / 3, [TAB_SELECTED] = 5 / 3, [CARD_FILL] = 1.6 }
@@ -431,7 +431,7 @@ function Skin.HideTipShell(frame)
 end
 
 local CARD_STYLE = { fill = CARD_FILL, edge = PANEL_EDGE }
-Skin.PALETTE = { panel = PANEL_FILL, edge = PANEL_EDGE, card = CARD_FILL }
+Skin.PALETTE = { panel = PANEL_FILL, edge = PANEL_EDGE, card = CARD_FILL, positive = POSITIVE_COLOR }
 local SELECTED_COLOR, MUTED_COLOR = TIP_TITLE_COLOR, TIP_LABEL_COLOR
 local HOVER_COLOR = {}
 
