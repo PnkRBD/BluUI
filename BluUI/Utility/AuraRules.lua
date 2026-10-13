@@ -25,6 +25,12 @@ AuraRules.CATALOG = {
 		icon = 237555,
 	},
 	{
+		id = 'priorityDebuff', polarity = 'HARMFUL', label = 'Priority Debuffs',
+		desc = 'Debuffs Blizzard\'s own raid frames always put first.',
+		engineCandidates = { isPriorityAura = true },
+		icon = C_Spell.GetSpellTexture(589),
+	},
+	{
 		id = 'anyDispellable', polarity = 'HARMFUL', label = 'Any Dispel Type',
 		desc = 'Debuffs with a dispel type (Magic, Curse, Disease, Poison, Bleed), dispellable by anyone.',
 		engineFilter = 'HARMFUL|DISPELLABLE',
@@ -65,6 +71,18 @@ AuraRules.CATALOG = {
 		engineFilter = 'HELPFUL|IMPORTANT',
 		engineExcludeToken = 'IMPORTANT',
 		icon = C_Spell.GetSpellTexture(10060),
+	},
+	{
+		id = 'stealable', polarity = 'HELPFUL', label = 'Stealable Buffs',
+		desc = 'Buffs Blizzard marks as stealable, the ones a mage can take off an enemy.',
+		engineCandidates = { isStealable = true },
+		icon = C_Spell.GetSpellTexture(30449),
+	},
+	{
+		id = 'canApply', polarity = 'HELPFUL', label = 'Buffs I Can Cast',
+		desc = 'Buffs you could put on the unit yourself.',
+		engineCandidates = { canApplyAura = true },
+		icon = C_Spell.GetSpellTexture(1126),
 	},
 	{
 		id = 'mineRaidCombat', polarity = 'HELPFUL', label = 'My Healing Buffs',
