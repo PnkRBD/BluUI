@@ -616,7 +616,7 @@ BUI.Defaults = {
 		},
 
 		buffFrames = {
-			shareBlacklist = false,
+			shareBlacklist = true,
 			blacklist      = { buff = {}, debuff = {} },
 			buffs = {
 				enabled          = true,
@@ -1532,7 +1532,7 @@ BUI.Defaults = {
 			buffBlacklist       = {},
 			buffWhitelistOnly   = false,
 			debuffWhitelistOnly = false,
-			shareBlacklists     = false,
+			shareBlacklists     = true,
 		},
 
 		recentAuras = {

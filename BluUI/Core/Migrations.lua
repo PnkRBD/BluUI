@@ -31,7 +31,7 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 17
+local PROFILE_MIGRATION_VERSION = 18
 local LEGACY_UNIT_KEYS = { 'player', 'target', 'targettarget', 'focus', 'focustarget', 'pet', 'boss', 'arena', 'party' }
 local HEALING_RULE = 'mineRaidCombat'
 
@@ -501,6 +501,33 @@ function BUI.MigrateProfile(profile)
 			for _, settingsKey in ipairs({ 'petBar', 'stanceBar', 'vehicleBar', 'microBar', 'bagBar', 'extraBar' }) do
 				FoldAnimated(actionBars[settingsKey])
 			end
+		end
+	end
+
+	if not general._oneBlacklist then
+		general._oneBlacklist = true
+		local groupFrames = type(profile.groupFrames) == 'table' and profile.groupFrames
+		if groupFrames then
+			groupFrames.blacklistOverrides = type(groupFrames.blacklistOverrides) == 'table' and groupFrames.blacklistOverrides or {}
+			local overrides = groupFrames.blacklistOverrides
+			local filters = type(profile.auraFilters) == 'table' and profile.auraFilters or {}
+			local frames = type(profile.buffFrames) == 'table' and profile.buffFrames or {}
+			local frameLists = type(frames.blacklist) == 'table' and frames.blacklist or {}
+			local function Merge(key, polarity, list)
+				if type(list) ~= 'table' then return end
+				overrides[key] = type(overrides[key]) == 'table' and overrides[key] or {}
+				local curated = BUI.AuraBlacklist.Curated(polarity)
+				for spellID in pairs(list) do
+					if curated[spellID] then overrides[key][spellID] = nil else overrides[key][spellID] = 'hide' end
+				end
+			end
+			Merge('buff', 'HELPFUL', filters.buffBlacklist)
+			Merge('debuff', 'HARMFUL', filters.debuffBlacklist)
+			Merge('buff', 'HELPFUL', frameLists.buff)
+			Merge('debuff', 'HARMFUL', frameLists.debuff)
+			if type(profile.auraFilters) == 'table' then profile.auraFilters.shareBlacklists = true end
+			if type(profile.buffFrames) == 'table' then profile.buffFrames.shareBlacklist = true end
+			BUI.AuraBlacklist.Invalidate()
 		end
 	end
 
