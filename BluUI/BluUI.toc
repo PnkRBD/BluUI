@@ -1,4 +1,4 @@
-## Interface: 120100
+## Interface: 120100, 120105
 ## Title: |cff6D00FDBluUI|r
 ## Author: Blu
 ## Version: 5.8.2
