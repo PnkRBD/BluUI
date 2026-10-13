@@ -17,7 +17,7 @@ AuraRules.CATALOG = {
 		icon = 136071,
 	},
 	{
-		id = 'bossAura', polarity = 'HARMFUL', label = 'Boss & Role Auras',
+		id = 'bossAura', polarity = 'HARMFUL', label = 'Boss & Role Debuffs',
 		desc = 'Encounter debuffs, plus the ones Blizzard flags for your role, like tank swap debuffs.',
 		engineCandidates = { isBossOrRoleAura = true },
 		icon = 237555,
@@ -29,7 +29,7 @@ AuraRules.CATALOG = {
 		icon = C_Spell.GetSpellTexture(589),
 	},
 	{
-		id = 'anyDispellable', polarity = 'HARMFUL', label = 'Any Dispel Type',
+		id = 'anyDispellable', polarity = 'HARMFUL', label = 'Dispellable By Anyone',
 		desc = 'Debuffs with a dispel type (Magic, Curse, Disease, Poison, Bleed), dispellable by anyone.',
 		engineFilter = 'HARMFUL|DISPELLABLE',
 		icon = 135739,
@@ -41,15 +41,15 @@ AuraRules.CATALOG = {
 		icon = 132212,
 	},
 	{
-		id = 'mineKeyDebuffs', polarity = 'HARMFUL', label = 'My Key Debuffs',
-		desc = 'Your debuffs the game marks as worth tracking, like DoTs. Leaves out crowd control.',
+		id = 'mineKeyDebuffs', polarity = 'HARMFUL', label = 'My Tracked Debuffs',
+		desc = 'Your debuffs the game says to keep an eye on, like DoTs. Leaves out crowd control.',
 		engineFilter = 'HARMFUL|PLAYER|!CROWD_CONTROL',
 		engineCandidates = { nameplateShowPersonal = true },
 		icon = C_Spell.GetSpellTexture(172),
 	},
 	{
-		id = 'keyDebuffs', polarity = 'HARMFUL', label = 'Key Debuffs From Anyone',
-		desc = 'Debuffs from anyone that the game marks for everyone to see. Leaves out crowd control.',
+		id = 'keyDebuffs', polarity = 'HARMFUL', label = 'Major Debuffs',
+		desc = 'Big debuffs from anyone that the game shows to everyone. Leaves out crowd control.',
 		engineFilter = 'HARMFUL|!CROWD_CONTROL',
 		engineCandidates = { nameplateShowAll = true, nameplateShowPersonal = false },
 		icon = C_Spell.GetSpellTexture(12294),
