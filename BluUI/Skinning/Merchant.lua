@@ -502,7 +502,7 @@ local function PopulateBuyRows(items, pool, parent, isBulk)
 		if hasStock then row.stockText:SetText('x' .. info.numAvailable) end
 		row.stockText:SetShown(hasStock)
 
-		local goldString = info.price > 0 and GetCoinTextureString(info.price) or nil
+		local goldString = info.price > 0 and C_CurrencyInfo.GetCoinTextureString(info.price) or nil
 		row.priceText:SetText(goldString or (info.extendedCost and '' or 'Free'))
 		PopulateCostIcons(row, info)
 		row:Show()
@@ -522,7 +522,7 @@ local function PopulateBuybackRows(items, pool, parent)
 		row.nameText:SetTextColor(info.qualityR, info.qualityG, info.qualityB)
 		row.iconBorder:SetBackdropBorderColor(info.qualityR, info.qualityG, info.qualityB, 1)
 		row.buybackIdx = info.idx
-		row.priceText:SetText(info.price > 0 and GetCoinTextureString(info.price) or 'Free')
+		row.priceText:SetText(info.price > 0 and C_CurrencyInfo.GetCoinTextureString(info.price) or 'Free')
 		row:Show()
 	end
 	for rowIndex = #items + 1, #pool do pool[rowIndex]:Hide() end
@@ -676,7 +676,7 @@ local function UpdateRepairState(targetFrame)
 	if showRepair then
 		local cost, needsRepair = GetRepairAllCost()
 		local repairAll = Widget.Unwrap(targetFrame.repairAll)
-		repairAll:SetText(needsRepair and ('Repair All  ' .. GetCoinTextureString(cost)) or 'Repair All')
+		repairAll:SetText(needsRepair and ('Repair All  ' .. C_CurrencyInfo.GetCoinTextureString(cost)) or 'Repair All')
 		repairAll:SetEnabled(needsRepair and GetMoney() >= cost)
 		if showGuild then
 			local allowance = GetGuildBankWithdrawMoney()
@@ -706,7 +706,7 @@ RefreshContent = function()
 	if not merchantFrame or not merchantFrame:IsShown() then return end
 
 	merchantFrame.titleText:SetText(UnitName('npc') or 'Merchant')
-	merchantFrame.moneyText:SetText(GetCoinTextureString(GetMoney()))
+	merchantFrame.moneyText:SetText(C_CurrencyInfo.GetCoinTextureString(GetMoney()))
 
 	merchantFrame.buyPanel:SetShown(activeTab == TAB_BUY)
 	merchantFrame.bbPanel:SetShown(activeTab == TAB_BUYBACK)

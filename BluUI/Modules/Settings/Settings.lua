@@ -137,7 +137,7 @@ Settings.ToggleAutoRepair = EventToggle('repair', 'MERCHANT_SHOW', function()
 	RepairAllItems()
 	if db.automation.autoRepairShowSummary then
 		local fundsSuffix = usedGuild and ' (guild)' or ''
-		BUI.Print('Repaired for ' .. GetCoinTextureString(cost) .. fundsSuffix)
+		BUI.Print('Repaired for ' .. C_CurrencyInfo.GetCoinTextureString(cost) .. fundsSuffix)
 	end
 end)
 
