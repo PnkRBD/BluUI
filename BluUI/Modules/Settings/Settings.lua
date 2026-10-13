@@ -249,7 +249,7 @@ do
 
 	local function DeferredGossip()
 		gossipPending = false
-		if IsShiftKeyDown() then return end
+		if IsShiftKeyDown() or InCombatLockdown() then return end
 		if pendingGossipType == 'greeting' then
 			if WantComplete() then
 				for questIndex = 1, GetNumActiveQuests() do
@@ -306,7 +306,7 @@ do
 
 	local function DeferredComplete()
 		completePending = false
-		if IsShiftKeyDown() then return end
+		if IsShiftKeyDown() or InCombatLockdown() then return end
 		if QuestRequiresGold() then return end
 		if QuestRequiresCurrency() then return end
 		local choices = GetNumQuestChoices()
@@ -339,7 +339,7 @@ do
 	end
 
 	local function OnQuestEvent(event, arg1)
-		if IsShiftKeyDown() then return end
+		if IsShiftKeyDown() or InCombatLockdown() then return end
 
 		if event == 'GOSSIP_SHOW' or event == 'QUEST_GREETING' then
 			pendingGossipType = event == 'QUEST_GREETING' and 'greeting' or 'gossip'
