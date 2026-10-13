@@ -19,9 +19,9 @@ AuraRules.CATALOG = {
 		icon = 136071,
 	},
 	{
-		id = 'bossAura', polarity = 'HARMFUL', label = 'Boss & Mob Auras',
-		desc = 'Debuffs applied by enemies rather than players.',
-		engineCandidates = { isBossAura = true },
+		id = 'bossAura', polarity = 'HARMFUL', label = 'Boss & Role Auras',
+		desc = 'Encounter debuffs, plus the ones Blizzard flags for your role, like tank swap debuffs.',
+		engineCandidates = { isBossOrRoleAura = true },
 		icon = 237555,
 	},
 	{
