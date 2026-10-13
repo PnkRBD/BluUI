@@ -408,48 +408,83 @@ local function SyncGatedGroups(container)
 	end
 end
 
-local function FilterClaimed(filter, claimedTokens)
-	if not claimedTokens then return false end
-	for tokenIndex = 1, #claimedTokens do
-		if HasFilterToken(filter, claimedTokens[tokenIndex]) then return true end
+local NON_CONDITION_TOKENS = { HARMFUL = true, HELPFUL = true, [NAMEPLATE_ONLY_TOKEN] = true }
+
+local ruleClaims = {}
+
+local function RuleClaim(rule)
+	local claim = ruleClaims[rule]
+	if claim then return claim end
+	claim = {}
+	for token in (rule.engineFilter or ''):gmatch('[^|]+') do
+		local negated = token:sub(1, 1) == '!'
+		local name = negated and token:sub(2) or token
+		if not NON_CONDITION_TOKENS[name] then claim[#claim + 1] = { token = name, negated = negated } end
 	end
-	return false
+	for flag, value in pairs(rule.engineCandidates or {}) do
+		if type(value) == 'boolean' then claim[#claim + 1] = { flag = flag, value = value } end
+	end
+	ruleClaims[rule] = claim
+	return claim
 end
 
-local function SplitAround(filters, tokens)
-	local split = {}
-	for filterIndex = 1, #filters do
-		local filter = filters[filterIndex]
-		local excluded = false
-		for tokenIndex = 1, #tokens do
-			if HasFilterToken(filter, '!' .. tokens[tokenIndex]) then
-				excluded = true
+local function ConditionState(entry, condition)
+	if condition.token then
+		if HasFilterToken(entry.filter, condition.token) then return not condition.negated end
+		if HasFilterToken(entry.filter, '!' .. condition.token) then return condition.negated end
+		return nil
+	end
+	local value = entry.cand and entry.cand[condition.flag]
+	if value == nil then return nil end
+	return value == condition.value
+end
+
+local function WithCondition(entry, condition, holds)
+	if condition.token then
+		local present = holds ~= condition.negated
+		return { filter = entry.filter .. (present and '|' or '|!') .. condition.token, cand = entry.cand, sig = entry.sig }
+	end
+	local cand = {}
+	for key, value in pairs(entry.cand or {}) do cand[key] = value end
+	local value = condition.value == holds
+	cand[condition.flag] = value
+	return { filter = entry.filter, cand = cand, sig = entry.sig .. (value and '+' or '-') .. condition.flag }
+end
+
+local function ExcludeClaim(entries, claim)
+	local kept = {}
+	for entryIndex = 1, #entries do
+		local entry = entries[entryIndex]
+		local outside = false
+		for conditionIndex = 1, #claim do
+			if ConditionState(entry, claim[conditionIndex]) == false then
+				outside = true
 				break
 			end
 		end
-		if excluded then
-			split[#split + 1] = filter
+		if outside then
+			kept[#kept + 1] = entry
 		else
-			local prefix = filter
-			for tokenIndex = 1, #tokens do
-				local token = tokens[tokenIndex]
-				if not HasFilterToken(prefix, token) then
-					split[#split + 1] = prefix .. '|!' .. token
-					prefix = prefix .. '|' .. token
+			for conditionIndex = 1, #claim do
+				local condition = claim[conditionIndex]
+				if ConditionState(entry, condition) == nil then
+					kept[#kept + 1] = WithCondition(entry, condition, false)
+					entry = WithCondition(entry, condition, true)
 				end
 			end
 		end
 	end
-	return split
+	return kept
 end
 
-local function CollectRuleGroups(wanted, container, setIndex, style, rules, baseFilter, candidates, candidateFingerprint, excludeSuffix)
+local function CollectRuleGroups(wanted, container, setIndex, style, rules, baseFilter, candidates, candidateFingerprint, excludeRules)
 	local harmful = HasFilterToken(baseFilter, 'HARMFUL')
 	local slotPrefix = harmful and 'D' or 'B'
 	local slotSuffix = (container._buiGeneration or 0) > 0 and ('@' .. container._buiGeneration) or ''
 	local layoutBase = (setIndex - 1) * SET_LAYOUT_STRIDE
 	local candidateSig = candidateFingerprint or ''
 	local position = 0
+	local claims = {}
 
 	local function Want(filter, cand, candSig, gated)
 		local layoutIndex = layoutBase + position
@@ -457,8 +492,13 @@ local function CollectRuleGroups(wanted, container, setIndex, style, rules, base
 		wanted[slotPrefix .. layoutIndex .. slotSuffix] = { index = layoutIndex, filter = filter, cand = cand, candSig = candSig, gated = gated, style = style, harmful = harmful }
 	end
 
-	local function Suffixed(filter)
-		return excludeSuffix and (filter .. '|' .. excludeSuffix) or filter
+	local function WantUnclaimed(entry, gated)
+		local entries = { entry }
+		for claimIndex = 1, #claims do entries = ExcludeClaim(entries, claims[claimIndex]) end
+		for entryIndex = 1, #entries do
+			local kept = entries[entryIndex]
+			Want(kept.filter, kept.cand, kept.sig, gated)
+		end
 	end
 
 	local pinIDs = candidates and candidates.pinSpellIDs
@@ -471,72 +511,33 @@ local function CollectRuleGroups(wanted, container, setIndex, style, rules, base
 		candidates = next(rest) and rest or nil
 	end
 
+	for ruleIndex = 1, #(excludeRules or {}) do
+		local rule = AR.BY_ID[excludeRules[ruleIndex]]
+		local claim = rule and RuleClaim(rule)
+		if claim and #claim > 0 then claims[#claims + 1] = claim end
+	end
+
 	if candidates and candidates.includeSpellIDs then
-		Want(Suffixed(baseFilter), candidates, 'only/' .. candidateSig, true)
+		WantUnclaimed({ filter = baseFilter, cand = candidates, sig = 'only/' .. candidateSig }, true)
 		return
 	end
 
-	local claimedTokens, claimedSets, claimedFlagNames, claimedFlagValues
 	local keepNameplateOnly = HasFilterToken(baseFilter, NAMEPLATE_ONLY_TOKEN)
 	for ruleIndex = 1, #rules do
 		local rule = AR.BY_ID[rules[ruleIndex]]
-		if rule and not FilterClaimed(rule.engineFilter or baseFilter, claimedTokens) then
-			local flagCascade = ''
-			local candidateFilters = candidates
-			if rule.engineCandidates or claimedFlagNames then
-				candidateFilters = {}
-				if candidates then
-					for key, value in pairs(candidates) do candidateFilters[key] = value end
-				end
-				if claimedFlagNames then
-					for flagIndex = 1, #claimedFlagNames do
-						local flag = claimedFlagNames[flagIndex]
-						if rule.engineCandidates == nil or rule.engineCandidates[flag] == nil then
-							candidateFilters[flag] = not claimedFlagValues[flag]
-							flagCascade = flagCascade .. '~' .. flag
-						end
-					end
-				end
-				if rule.engineCandidates then
-					for key, value in pairs(rule.engineCandidates) do candidateFilters[key] = value end
-				end
-			end
+		if rule then
 			local filter = rule.engineFilter or baseFilter
 			if keepNameplateOnly and not HasFilterToken(filter, NAMEPLATE_ONLY_TOKEN) then
 				filter = filter .. '|' .. NAMEPLATE_ONLY_TOKEN
 			end
-			if claimedTokens then
-				for tokenIndex = 1, #claimedTokens do
-					local token = claimedTokens[tokenIndex]
-					if not HasFilterToken(filter, '!' .. token) then filter = filter .. '|!' .. token end
-				end
-			end
-			local filters = { filter }
-			if claimedSets then
-				for claimIndex = 1, #claimedSets do filters = SplitAround(filters, claimedSets[claimIndex]) end
-			end
-			local candSig = rule.id .. flagCascade .. '/' .. candidateSig
-			for filterIndex = 1, #filters do
-				Want(Suffixed(filters[filterIndex]), candidateFilters, candSig)
-			end
-			if rule.engineExcludeToken then
-				claimedTokens = claimedTokens or {}
-				claimedTokens[#claimedTokens + 1] = rule.engineExcludeToken
-			end
-			if rule.engineExcludeTogether then
-				claimedSets = claimedSets or {}
-				claimedSets[#claimedSets + 1] = rule.engineExcludeTogether
-			end
+			local cand = candidates
 			if rule.engineCandidates then
-				for flag, value in pairs(rule.engineCandidates) do
-					if type(value) == 'boolean' and (claimedFlagValues == nil or claimedFlagValues[flag] == nil) then
-						claimedFlagNames = claimedFlagNames or {}
-						claimedFlagValues = claimedFlagValues or {}
-						claimedFlagNames[#claimedFlagNames + 1] = flag
-						claimedFlagValues[flag] = value
-					end
-				end
+				cand = {}
+				for key, value in pairs(candidates or {}) do cand[key] = value end
+				for key, value in pairs(rule.engineCandidates) do cand[key] = value end
 			end
+			WantUnclaimed({ filter = filter, cand = cand, sig = rule.id .. '/' .. candidateSig })
+			claims[#claims + 1] = RuleClaim(rule)
 		end
 	end
 end
@@ -835,8 +836,8 @@ ConfigureContainer = function(container, sets, forced)
 	end
 end
 
-function Engine.Configure(container, style, rules, baseFilter, candidates, candidateFingerprint, excludeSuffix)
-	ConfigureContainer(container, { { style, rules, baseFilter, candidates, candidateFingerprint, excludeSuffix } }, false)
+function Engine.Configure(container, style, rules, baseFilter, candidates, candidateFingerprint, excludeRules)
+	ConfigureContainer(container, { { style, rules, baseFilter, candidates, candidateFingerprint, excludeRules } }, false)
 end
 
 function Engine.ConfigureSets(container, sets)

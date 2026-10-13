@@ -105,12 +105,12 @@ local function KindCandidates(kind, settings)
 	return cached.candidates, cached.fingerprint
 end
 
-local function KindSuffix(settings, kind)
+local function KindExcludes(settings, kind)
 	if kind == "buffs" and settings.bigDef.enabled then
-		return AuraRules.ExcludeSuffix(GroupFrames.ContainerRules(settings.bigDef, "bigDef"))
+		return GroupFrames.ContainerRules(settings.bigDef, "bigDef")
 	end
 	if kind == "debuffs" and settings.crowdControl.enabled then
-		return AuraRules.ExcludeSuffix(GroupFrames.ContainerRules(settings.crowdControl, "crowdControl"))
+		return GroupFrames.ContainerRules(settings.crowdControl, "crowdControl")
 	end
 end
 
@@ -171,7 +171,7 @@ local function ApplyKind(frame, settings, kind)
 	end
 
 	local candidates, candidateFingerprint = KindCandidates(kind, settings)
-	Engine.Configure(container, KindStyle(settings, kind), GroupFrames.ContainerRules(config, kind), BASE_FILTER[KIND_POLARITY[kind]], candidates, candidateFingerprint, KindSuffix(settings, kind))
+	Engine.Configure(container, KindStyle(settings, kind), GroupFrames.ContainerRules(config, kind), BASE_FILTER[KIND_POLARITY[kind]], candidates, candidateFingerprint, KindExcludes(settings, kind))
 
 	container:ClearAllPoints()
 	container:SetPoint(config.anchorPoint, frame, config.relativePoint, Pixel.Scale(config.offsetX), Pixel.Scale(config.offsetY))
