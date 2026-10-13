@@ -118,7 +118,7 @@ AuraRules.SOURCE_TO_RULES = {
 	mineAll = { 'mineHelpful' },
 	raid    = { 'raidRelevant' },
 	all     = {},
-	bossmob = { 'bossAura' },
+	bossmob = { 'bossAura', 'priorityDebuff' },
 }
 
 function AuraRules.DefaultAllRule(polarity)
