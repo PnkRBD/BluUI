@@ -64,12 +64,22 @@ local function UnitRules(unitSettings, isDebuff)
 end
 UnitFrames.GetAuraRules = UnitRules
 
+local TARGET_BUFF_RULES = { 'bossBuff', 'important', 'stealable', 'mineHelpful' }
+
 local function MigrateDebuffSettings(settings, unitType)
 	if unitType == 'player' and not settings.playerBuffRulesNarrowed then
 		settings.playerBuffRulesNarrowed = true
 		local buffRules = settings.buffRules
 		if type(buffRules) == 'table' and #buffRules == 1 and buffRules[1] == 'mineHelpful' then
 			buffRules[1] = 'mineRaidCombat'
+		end
+	end
+
+	if unitType == 'target' and not settings.targetBuffRulesWidened then
+		settings.targetBuffRulesWidened = true
+		local buffRules = settings.buffRules
+		if type(buffRules) == 'table' and #buffRules == 1 and buffRules[1] == 'mineHelpful' then
+			for index, rule in ipairs(TARGET_BUFF_RULES) do buffRules[index] = rule end
 		end
 	end
 
