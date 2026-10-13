@@ -445,6 +445,8 @@ local function AurasBoards(ui, parent, width, key)
 				Option(settings, 'Icon spacing', 'spacing', { min = 0, max = 10, step = 1 }),
 				Option(settings, 'Row spacing', 'rowSpacing', { min = 0, max = 10, step = 1 }),
 				Option(settings, 'Stack text size', 'stackSize', { min = 6, max = 24, step = 1 }),
+				Toggle(settings, 'Decimals', 'showCooldownDecimals'),
+				Option(settings, 'Decimals under seconds', 'cooldownDecimalThreshold', { min = 1, max = 30, step = 1 }),
 				{ label = 'Sort by', entries = BUI.AuraEngine.SortMethodItems(), get = function() return settings.sortMethod or 'default' end, set = function(value) settings.sortMethod = value end },
 				Option(settings, 'Grow', 'growDirection', { entries = GROWTHS }),
 				Placement(settings),

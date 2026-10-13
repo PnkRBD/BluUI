@@ -23,6 +23,8 @@ local function AuraContainer(options)
 		max           = options.max,
 		perRow        = options.perRow,
 		stackSize     = 10,
+		showCooldownDecimals     = false,
+		cooldownDecimalThreshold = 5,
 		growDirection = options.growDirection,
 		anchorPoint   = options.anchorPoint,
 		relativePoint = options.relativePoint or options.anchorPoint,

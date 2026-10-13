@@ -263,6 +263,7 @@ local function RestyleButton(container, button, buttonInfo, style)
 
 	buttonInfo.cooldown:SetReverse(style.reverseSwipe and true or false)
 	buttonInfo.cooldown:SetHideCountdownNumbers(style.showCd == false)
+	buttonInfo.cooldown:SetCountdownMillisecondsThreshold(style.decimals or 0)
 	if style.showCd ~= false then
 		ApplyCooldownFont(buttonInfo.cooldown, style.cdSize, style.font, style.fontFlags)
 	end
@@ -747,7 +748,7 @@ end
 
 local STYLE_SIGNATURE_KEYS = {
 	'size', 'gap', 'rowGap', 'perRow', 'max', 'growX', 'growY', 'sortMethod', 'showDispelType', 'showStack',
-	'stackSize', 'stackPos', 'showCd', 'cdSize', 'reverseSwipe', 'showTooltips', 'font', 'fontFlags',
+	'stackSize', 'stackPos', 'showCd', 'cdSize', 'reverseSwipe', 'showTooltips', 'font', 'fontFlags', 'decimals',
 }
 
 local signatureParts = {}
