@@ -1848,6 +1848,7 @@ BUI.Defaults = {
 				buffsPerRow             = 8,
 				debuffStackPos          = 'BOTTOMRIGHT',
 				buffStackPos            = 'BOTTOMRIGHT',
+				buffSortMethod          = 'expiration',
 			}),
 
 			targettarget = Merge(UnitFrameBase, UnitBuffBase, {
