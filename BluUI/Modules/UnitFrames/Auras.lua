@@ -64,7 +64,23 @@ local function UnitRules(unitSettings, isDebuff)
 end
 UnitFrames.GetAuraRules = UnitRules
 
-local TARGET_BUFF_RULES = { 'bossBuff', 'important', 'stealable', 'mineHelpful' }
+local TARGET_BUFF_RULES = { 'bossBuff', 'important', 'stealable', 'fromPlayers' }
+local OLD_TARGET_BUFF_RULES = { { 'mineHelpful' }, { 'bossBuff', 'important', 'stealable', 'mineHelpful' } }
+local OLD_TARGET_DEBUFF_RULES = { 'mineHarmful' }
+local TARGET_DEBUFF_RULES = { 'mineHarmful', 'bossAura', 'dispellable' }
+
+local function SameRules(rules, expected)
+	if type(rules) ~= 'table' or #rules ~= #expected then return false end
+	for index = 1, #expected do
+		if rules[index] ~= expected[index] then return false end
+	end
+	return true
+end
+
+local function ReplaceRules(rules, replacement)
+	for index = #rules, 1, -1 do rules[index] = nil end
+	for index, rule in ipairs(replacement) do rules[index] = rule end
+end
 
 local function MigrateDebuffSettings(settings, unitType)
 	if unitType == 'player' and not settings.playerBuffRulesNarrowed then
@@ -75,12 +91,16 @@ local function MigrateDebuffSettings(settings, unitType)
 		end
 	end
 
-	if unitType == 'target' and not settings.targetBuffRulesWidened then
-		settings.targetBuffRulesWidened = true
-		local buffRules = settings.buffRules
-		if type(buffRules) == 'table' and #buffRules == 1 and buffRules[1] == 'mineHelpful' then
-			for index, rule in ipairs(TARGET_BUFF_RULES) do buffRules[index] = rule end
+	if unitType == 'target' and not settings.targetAuraRulesFixed then
+		settings.targetAuraRulesFixed = true
+		settings.targetBuffRulesWidened = nil
+		for _, old in ipairs(OLD_TARGET_BUFF_RULES) do
+			if SameRules(settings.buffRules, old) then
+				ReplaceRules(settings.buffRules, TARGET_BUFF_RULES)
+				break
+			end
 		end
+		if SameRules(settings.debuffRules, OLD_TARGET_DEBUFF_RULES) then ReplaceRules(settings.debuffRules, TARGET_DEBUFF_RULES) end
 	end
 
 	if not settings.debuffShowMode then
