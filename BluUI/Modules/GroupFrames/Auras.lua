@@ -64,15 +64,18 @@ local function KindPins(kind)
 	return db.buffPins, (db.buffPinsOnly and 'only:' or 'pin:') .. Engine.SortedKeys(db.buffPins)
 end
 
-local function KindCandidates(kind)
+local function KindCandidates(kind, settings)
 	local polarity = KIND_POLARITY[kind]
 	local blacklist = BUI.AuraBlacklist.GroupSet(polarity)
 	local pins, pinSig = KindPins(kind)
-	local cached = kindCandidates[kind]
+	local hots, hotSig
+	if kind == "buffs" then hots, hotSig = GroupFrames.HotSlots.ExcludedSpells(settings) end
+	local cacheKey = hotSig and (kind .. hotSig) or kind
+	local cached = kindCandidates[cacheKey]
 	if cached and cached.source == blacklist and cached.pinSig == pinSig then return cached.candidates, cached.fingerprint end
 
 	cached = { source = blacklist, pinSig = pinSig, fingerprint = '' }
-	kindCandidates[kind] = cached
+	kindCandidates[cacheKey] = cached
 	if pins and GroupFrames.GetDB().buffPinsOnly then
 		cached.candidates = { includeSpellIDs = pins }
 		cached.fingerprint = pinSig
@@ -90,6 +93,9 @@ local function KindCandidates(kind)
 	end
 	if pins then
 		for spellID in pairs(pins) do exclude[spellID] = true end
+	end
+	if hots then
+		for spellID in pairs(hots) do exclude[spellID] = true end
 	end
 
 	if next(exclude) ~= nil then
@@ -141,6 +147,7 @@ local function BindAllKinds(frame, unit)
 	end
 	local highlight = frame[GroupFrames.DISPEL_HL_KEY]
 	if highlight then Engine.BindUnit(highlight, unit) end
+	GroupFrames.HotSlots.Bind(frame, unit)
 end
 
 local function ApplyKind(frame, settings, kind)
@@ -162,7 +169,7 @@ local function ApplyKind(frame, settings, kind)
 		frame[key] = container
 	end
 
-	local candidates, candidateFingerprint = KindCandidates(kind)
+	local candidates, candidateFingerprint = KindCandidates(kind, settings)
 	Engine.Configure(container, KindStyle(settings, kind), GroupFrames.ContainerRules(config, kind), BASE_FILTER[KIND_POLARITY[kind]], candidates, candidateFingerprint, KindSuffix(settings, kind))
 
 	container:ClearAllPoints()
@@ -247,6 +254,7 @@ local function BuildAuraContainers(frame)
 	for kindIndex = 1, #KIND_LIST do
 		ApplyKind(frame, settings, KIND_LIST[kindIndex])
 	end
+	GroupFrames.HotSlots.Apply(frame, settings)
 	if GroupFrames.DispelViaEngine then GroupFrames.ConfigureDispelHighlight(frame) end
 
 	local watcher = frame._auraWatcher
@@ -306,6 +314,7 @@ local function reflowAuraVisibility(frame)
 		local container = frame[KIND_KEYS[kind]]
 		if container then container:SetShown(isVisible and settings[kind].enabled and true or false) end
 	end
+	GroupFrames.HotSlots.SetVisible(frame, isVisible)
 	local highlight = frame[GroupFrames.DISPEL_HL_KEY]
 	if highlight and not frame._dispelPreview then
 		highlight:SetShown(isVisible and GroupFrames.DispelHighlightWanted(settings) and true or false)
@@ -361,6 +370,7 @@ local function ApplyAurasToChild(child)
 	for kindIndex = 1, #KIND_LIST do
 		ApplyKind(child, settings, KIND_LIST[kindIndex])
 	end
+	GroupFrames.HotSlots.Apply(child, settings)
 	GroupFrames.RefreshDispelBorder(child, settings)
 
 	child._bluAurasVisible = nil

@@ -581,9 +581,113 @@ local function FiltersBoards(ui, parent, width, page)
 	}
 end
 
+local HOT_SECTIONS = { { key = 'party', label = 'Party' }, { key = 'raid', label = 'Raid' } }
+local HOT_STYLES = { { value = 'square', text = 'Square' }, { value = 'icon', text = 'Icon' } }
+local HOT_INPUT_WIDTH = 220
+local HOT_STYLE_WIDTH = 110
+local hotSpec
+
+local function HotSpecItems()
+	local items = {}
+	for _, specID in ipairs(GroupFrames().HotSlots.SPECS) do
+		local _, name, _, _, _, _, className = GetSpecializationInfoByID(specID)
+		items[#items + 1] = { value = specID, text = name .. ' ' .. className }
+	end
+	return items
+end
+
+local function DefaultHotSpec()
+	local current = PlayerUtil.GetCurrentSpecID()
+	for _, specID in ipairs(GroupFrames().HotSlots.SPECS) do
+		if specID == current then return current end
+	end
+	return GroupFrames().HotSlots.SPECS[1]
+end
+
+local function HotLayoutBoard(ui, parent, width)
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'HoT slots',
+		description = 'Your own HoTs in fixed spots on each frame. An empty spot means that HoT is missing.',
+	})
+	for _, section in ipairs(HOT_SECTIONS) do
+		local slots = Config()[section.key].hotSlots
+		board:AddTools(section.label, nil, {
+			Menu(slots, 'anchor', BUI.C.ANCHOR_POINT_OPTIONS),
+			{ tooltip = 'Size, spacing and offset', title = section.label .. ' HoT slots', options = {
+				Option(slots, 'Size', 'size', { min = 4, max = 24, step = 1 }),
+				Option(slots, 'Spacing', 'spacing', { min = 0, max = 8, step = 1 }),
+				Option(slots, 'Grow', 'growth', { entries = GROWTHS }),
+				Option(slots, 'Horizontal', 'offsetX', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
+				Option(slots, 'Vertical', 'offsetY', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
+			} },
+			Toggle(slots, nil, 'enabled'),
+		}, function() GroupFrames().RefreshAuras(section.key) end)
+	end
+	return board
+end
+
+local function HotSpellsBoard(ui, parent, width, page)
+	local HotSlots = GroupFrames().HotSlots
+	hotSpec = hotSpec or DefaultHotSpec()
+	local list = HotSlots.SpellsFor(hotSpec)
+	local function Changed()
+		HotSlots.Invalidate()
+		GroupFrames().RefreshAuras()
+	end
+	local function Rebuilt()
+		Changed()
+		page:RebuildCurrent()
+	end
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Spells',
+		description = 'Slot order for the spec, drag a row to reorder it. Squares use their color, icons show the spell.',
+	})
+	board:AddTools('Spec', 'The healer spec you are editing', {
+		{ entries = HotSpecItems(), width = WIDE_MENU, get = function() return hotSpec end, set = function(value)
+			hotSpec = value
+			page:RebuildCurrent()
+		end },
+		{ text = 'Reset', onClick = function()
+			HotSlots.ResetSpells(hotSpec)
+			Rebuilt()
+		end },
+	})
+	local addRow = board:AddRow('Add a spell', 'Name, ID or spell link', HOT_INPUT_WIDTH)
+	BUI.SpellSearch(ui, addRow, HOT_INPUT_WIDTH, { spellsOnly = true, onPick = function(hit)
+		for _, entry in ipairs(list) do
+			if entry.id == hit.id then return end
+		end
+		list[#list + 1] = { id = hit.id, color = { 1, 1, 1 } }
+		Rebuilt()
+	end }):SetPoint('RIGHT', -ui.ROW_INSET, 0)
+	board:DragList(function(index, delta, count)
+		BUILib.Layout.ShiftBlock(list, index, delta, count)
+		page:Resize()
+	end, Changed)
+	for index, entry in ipairs(list) do
+		local name = C_Spell.GetSpellName(entry.id) or ('Spell ' .. entry.id)
+		board:AddDragTools(name, 'Spell ' .. entry.id, C_Spell.GetSpellTexture(entry.id), {
+			{ entries = HOT_STYLES, width = HOT_STYLE_WIDTH, get = function() return entry.style or 'square' end, set = function(value) entry.style = value end },
+			{ kind = 'swatch', tooltip = 'Square color', get = function()
+				local color = entry.color
+				return color[1], color[2], color[3], 1
+			end, set = function(red, green, blue) entry.color = { red, green, blue } end },
+			{ slot = 'erase', icon = 'erase', size = BUILib.Layout.ERASE_SIZE, hover = 'danger', tooltip = 'Remove ' .. name, onClick = function()
+				table.remove(list, index)
+				Rebuilt()
+			end },
+		}, Changed)
+	end
+	if #list == 0 then board:AddRow('No spells', 'Search above to add one') end
+	return board
+end
+
 local function Panes(ui, _, parent, width, item, page)
 	if item.id == 'general' then return GeneralBoards(ui, parent, width) end
 	if item.id == 'groupFilters' then return FiltersBoards(ui, parent, width, page) end
+	if item.id == 'hotSlots' then return { HotLayoutBoard(ui, parent, width), HotSpellsBoard(ui, parent, width, page) } end
 	if item.id == 'partyAuras' or item.id == 'raidAuras' then return AurasBoards(ui, parent, width, SECTION_OF[item.id]) end
 	return FramesBoard(ui, parent, width, item.id)
 end
@@ -595,6 +699,7 @@ local ITEMS = {
 	{ id = 'partyAuras', label = 'Party auras', icon = 'glow' },
 	{ id = 'raid', label = 'Raid', icon = 'raid' },
 	{ id = 'raidAuras', label = 'Raid auras', icon = 'glow' },
+	{ id = 'hotSlots', label = 'HoT slots', icon = 'sparkle' },
 }
 
 local function IsOn()
