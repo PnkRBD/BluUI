@@ -1957,7 +1957,7 @@ secondaryPower.comboChargedColorB = 0.73
 
 for _, entry in ipairs({
 	{ 'stagger',    0.52, 1.00, 0.52, 0.15, showPercent = true },
-	{ 'casterMana', 1.00, 1.00, 1.00, 0.10, barMode = false, textColor = false },
+	{ 'casterMana', 1.00, 1.00, 1.00, 0.10, barMode = false, textColor = false, showPercent = true },
 	{ 'override',   0.20, 0.60, 1.00, 0.15 },
 	{ 'soulFrags',  0.40, 1.00, 0.40, 0.15, showPercent = true },
 }) do
