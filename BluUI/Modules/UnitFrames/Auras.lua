@@ -66,8 +66,8 @@ UnitFrames.GetAuraRules = UnitRules
 
 local TARGET_BUFF_RULES = { 'bossBuff', 'important', 'stealable', 'fromPlayers' }
 local OLD_TARGET_BUFF_RULES = { { 'mineHelpful' }, { 'bossBuff', 'important', 'stealable', 'mineHelpful' } }
-local OLD_TARGET_DEBUFF_RULES = { 'mineHarmful' }
-local TARGET_DEBUFF_RULES = { 'mineHarmful', 'bossAura', 'dispellable' }
+local TARGET_DEBUFF_RULES = { 'mineKeyDebuffs', 'keyDebuffs' }
+local OLD_TARGET_DEBUFF_RULES = { { 'mineHarmful' }, { 'mineHarmful', 'bossAura', 'dispellable' } }
 
 local function SameRules(rules, expected)
 	if type(rules) ~= 'table' or #rules ~= #expected then return false end
@@ -100,7 +100,6 @@ local function MigrateDebuffSettings(settings, unitType)
 				break
 			end
 		end
-		if SameRules(settings.debuffRules, OLD_TARGET_DEBUFF_RULES) then ReplaceRules(settings.debuffRules, TARGET_DEBUFF_RULES) end
 	end
 
 	if not settings.debuffShowMode then
@@ -137,6 +136,17 @@ local function MigrateDebuffSettings(settings, unitType)
 		end
 		settings.onlyPlayerBuffs = nil
 		settings.buffImportant   = nil
+	end
+
+	if unitType == 'target' and not settings.targetKeyDebuffs then
+		settings.targetKeyDebuffs = true
+		local debuffRules = UnitRules(settings, true)
+		for _, old in ipairs(OLD_TARGET_DEBUFF_RULES) do
+			if SameRules(debuffRules, old) then
+				ReplaceRules(debuffRules, TARGET_DEBUFF_RULES)
+				break
+			end
+		end
 	end
 end
 
