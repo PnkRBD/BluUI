@@ -29,7 +29,7 @@ local KIND_POLARITY = {
 
 local DEFAULT_RULES = {
 	buffs        = { "raidRelevant" },
-	debuffs      = { "bossAura" },
+	debuffs      = { "bossAura", "priorityDebuff" },
 	bigDef       = { "bigDefensive", "externalDefensive" },
 	crowdControl = { "crowdControl" },
 }
