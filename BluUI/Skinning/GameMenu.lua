@@ -41,8 +41,8 @@ local function SkinButtons(frame)
 	for button in frame.buttonPool:EnumerateActive() do SkinPoolButton(button) end
 end
 
-local function OpenBluUI(button)
-	button:GetParent():Hide()
+local function OpenBluUI()
+	HideUIPanel(GameMenuFrame)
 	BUI.PageEngine.Toggle()
 end
 
