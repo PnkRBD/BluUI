@@ -288,7 +288,7 @@ function BUI.AuraRuleEditor(parent, options)
 						Push()
 					end,
 					true,
-					{})
+					{ hideID = true })
 				list:SetPoint('TOPLEFT', 0, -34)
 				Fill()
 				local addDropdown = Controls.Dropdown(panel, nil, AuraRules.DropdownItems(options.polarity), nil, function(value)
