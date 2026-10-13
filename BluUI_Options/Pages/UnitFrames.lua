@@ -796,13 +796,13 @@ local function FiltersBoards(ui, parent, width, page)
 	return {
 		shared,
 		AuraLists.Pinned(ui, parent, width, page, {
-			title = 'Pinned buffs', description = 'Shown first on friendly units, on top of whatever the buff rules match. Blizzard does not let addons pick out enemy buffs by spell.',
+			polarity = 'HELPFUL', title = 'Pinned buffs', description = 'Shown first on friendly units, on top of whatever the buff rules match. Blizzard does not let addons pick out enemy buffs by spell.',
 			get = function() return filters.buffWhitelist end, onChange = RefreshFilters,
 			only = { label = 'Only show pinned buffs', get = function() return filters.buffWhitelistOnly == true end, set = function(value) filters.buffWhitelistOnly = value end, tip = 'Only your pinned buffs show. Enemies then show no buffs, since Blizzard blocks picking their buffs by spell' },
 		}),
 		AuraLists.Blacklist(ui, parent, width, page, { scope = 'unit', polarity = 'HELPFUL', title = 'Buff blacklist', description = 'Buffs that never show on friendly unit frames. Blizzard does not let addons hide enemy buffs by spell.', onChange = RefreshFilters }),
 		AuraLists.Pinned(ui, parent, width, page, {
-			title = 'Pinned debuffs', description = 'Shown first on enemies, on top of whatever the debuff rules match. Blizzard does not let addons pick out debuffs on you or your group by spell.',
+			polarity = 'HARMFUL', title = 'Pinned debuffs', description = 'Shown first on enemies, on top of whatever the debuff rules match. Blizzard does not let addons pick out debuffs on you or your group by spell.',
 			get = function() return filters.debuffWhitelist end, onChange = RefreshFilters,
 			only = { label = 'Only show pinned debuffs', get = function() return filters.debuffWhitelistOnly == true end, set = function(value) filters.debuffWhitelistOnly = value end, tip = 'Only your pinned debuffs show. You and your group then show no debuffs, since Blizzard blocks picking those by spell' },
 		}),
