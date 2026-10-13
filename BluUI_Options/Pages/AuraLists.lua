@@ -11,6 +11,8 @@ local STRIP_MAX = 12
 local DEFAULT_ICON = 134400
 local ENEMIES_ONLY_TIP = 'Blizzard does not let addons hide this debuff on you or your group, so it only hides on enemies.'
 local SELF_LOCKED_TIP = 'Blizzard does not let addons hide this debuff on you, so it still shows on the debuff frame.'
+local KIND = { HELPFUL = 'buff', HARMFUL = 'debuff' }
+local OTHER_KIND = { HELPFUL = 'debuff', HARMFUL = 'buff' }
 
 local AuraLists = {}
 BUI.AuraLists = AuraLists
@@ -194,6 +196,12 @@ function AuraLists.Blacklist(ui, parent, width, page, options)
 	return board
 end
 
+local function WrongKind(spellID, polarity)
+	local helpful, harmful = C_Spell.IsSpellHelpful(spellID), C_Spell.IsSpellHarmful(spellID)
+	if polarity == 'HARMFUL' then return helpful and not harmful end
+	return harmful and not helpful
+end
+
 function AuraLists.Pinned(ui, parent, width, page, options)
 	local board = ui.Board(parent, width, {
 		stacked = true,
@@ -211,14 +219,21 @@ function AuraLists.Pinned(ui, parent, width, page, options)
 			options.onChange()
 		end, options.only.tip)
 	end
+	local polarity = options.polarity
 	AddRow(ui, board, function(spellID)
 		if list[spellID] then return end
+		if WrongKind(spellID, polarity) then
+			BUI.Print(('%s is a %s, this list only takes %ss.'):format(C_Spell.GetSpellName(spellID) or spellID, OTHER_KIND[polarity], KIND[polarity]))
+			return
+		end
 		list[spellID] = true
 		Changed()
 	end)
 	local items = BUI.SpellListItems(list)
 	for _, item in ipairs(items) do
-		SpellRow(board, item.icon or DEFAULT_ICON, item.name, 'Spell ' .. item.id, 'Unpin ' .. item.name, function()
+		local sub = 'Spell ' .. item.id
+		if WrongKind(item.id, polarity) then sub = sub .. ', a ' .. OTHER_KIND[polarity] .. ', never shows here' end
+		SpellRow(board, item.icon or DEFAULT_ICON, item.name, sub, 'Unpin ' .. item.name, function()
 			list[item.id] = nil
 			Changed()
 		end)
