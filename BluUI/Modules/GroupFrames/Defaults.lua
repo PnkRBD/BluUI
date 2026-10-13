@@ -81,6 +81,7 @@ local function CommonSettings(sizes)
 		readyCheckIcon = IconDefaults(sizes.readyIcon,  "CENTER",  0, 0, true),
 		combatIcon     = IconDefaults(sizes.combatIcon, "TOP",     0, -2, false),
 		dispelBadge    = { size = sizes.badgeSize, anchor = "CENTER", offsetX = 0, offsetY = 0 },
+		hotSlots       = { enabled = true, size = sizes.hotSize, spacing = 1, anchor = "TOPRIGHT", growth = "LEFT", offsetX = -2, offsetY = -2 },
 
 		buffs = AuraContainer({
 			enabled = sizes.buffsOn, source = "raid", size = sizes.smallAura,
@@ -117,7 +118,7 @@ local PARTY = CommonSettings({
 	smallIcon = 20, markerIcon = 32, rezIcon = 30, readyIcon = 28,
 	combatIcon = 18, badgeSize = 28, iconY = 22,
 	smallAura = 22, auraGap = 2, buffMax = 6, debuffMax = 8, buffsOn = true, debuffsOn = true,
-	bigDefSize = 28, bigDefOX = 4, ccSize = 24, ccMax = 4,
+	bigDefSize = 28, bigDefOX = 4, ccSize = 24, ccMax = 4, hotSize = 10,
 })
 MergeTable(PARTY, {
 	enabled     = true,
@@ -162,7 +163,7 @@ local RAID = CommonSettings({
 	smallIcon = 16, markerIcon = 26, rezIcon = 24, readyIcon = 22,
 	combatIcon = 16, badgeSize = 22, iconY = 18,
 	smallAura = 18, auraGap = 1, buffMax = 4, debuffMax = 6, buffsOn = true, debuffsOn = false,
-	bigDefSize = 24, bigDefOX = 2, ccSize = 20, ccMax = 3,
+	bigDefSize = 24, bigDefOX = 2, ccSize = 20, ccMax = 3, hotSize = 8,
 	showAuraTooltips = true,
 })
 MergeTable(RAID, {
@@ -206,6 +207,7 @@ BUI.Defaults.profile.groupFrames = {
 	blacklistOverrides = { debuff = {}, buff = {} },
 	buffPins           = {},
 	buffPinsOnly       = false,
+	hotSpells          = {},
 
 	range = {
 		enabled      = true,

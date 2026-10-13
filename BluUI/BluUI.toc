@@ -94,6 +94,7 @@ Modules\GroupFrames\Engine.lua
 Modules\GroupFrames\Tags.lua
 Modules\GroupFrames\Style.lua
 Modules\GroupFrames\Indicators.lua
+Modules\GroupFrames\HotSlots.lua
 Modules\GroupFrames\Auras.lua
 Modules\GroupFrames\Dispel.lua
 Modules\GroupFrames\Keystone.lua
