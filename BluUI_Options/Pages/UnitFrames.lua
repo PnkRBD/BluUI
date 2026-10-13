@@ -889,7 +889,7 @@ local function AuraRow(board, unitKey, unitSettings, isDebuff)
 	local sizing = {
 		{ label = 'Icon size', min = 12, max = 80, step = 1, get = function() return unitSettings[Key('IconSize')] or unitSettings.auraIconSize end, set = function(value) unitSettings[Key('IconSize')] = value end },
 		{ label = 'Spacing', min = 0, max = 10, step = 1, get = function() return unitSettings[Key('Spacing')] or unitSettings.auraSpacing end, set = function(value) unitSettings[Key('Spacing')] = value end },
-		Option(unitSettings, 'Max icons', isDebuff and 'maxDebuffs' or 'maxBuffs', { min = 1, max = isDebuff and 16 or 32, step = 1 }),
+		Option(unitSettings, 'Max per rule', isDebuff and 'maxDebuffs' or 'maxBuffs', { min = 1, max = isDebuff and 16 or 32, step = 1 }),
 		{ label = 'Per row', min = 1, max = 16, step = 1, get = function() return unitSettings[isDebuff and 'debuffsPerRow' or 'buffsPerRow'] or 8 end, set = function(value) unitSettings[isDebuff and 'debuffsPerRow' or 'buffsPerRow'] = value end },
 	}
 	local text = {}
