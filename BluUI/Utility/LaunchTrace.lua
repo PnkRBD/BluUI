@@ -165,7 +165,7 @@ end
 local function Finish()
 	if not tracing then return end
 	tracing = false
-	Profiler.SetTracer(nil)
+	Profiler.RemoveTracer(Trace)
 	Unwrap()
 	local repeats, doubled = RepeatLines()
 	local never, unused = NeverLines()
@@ -212,7 +212,7 @@ function LaunchTrace.Begin(addon)
 		Mark('PLAYER_LOGIN')
 		return onEnable(...)
 	end)
-	Profiler.SetTracer(Trace)
+	Profiler.AddTracer(Trace)
 end
 
 function LaunchTrace.IsTracing()

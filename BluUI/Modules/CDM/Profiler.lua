@@ -8,6 +8,7 @@ local issecretvalue = issecretvalue
 local CDM = BUI.CDM
 local Profiler = BUI.Profiler
 local Running = Profiler.Running
+local Top, CountsText, Clock = Profiler.Top, Profiler.CountsText, Profiler.Clock
 local FrameData = CDM.FrameData
 local LibEMO = LibStub('LibEditModeOverride-1.0')
 
@@ -156,14 +157,6 @@ local function ByValue(left, right) return left.value > right.value end
 local function ByMs(left, right) return left.ms > right.ms end
 local function ByRepeats(left, right) return left.repeats > right.repeats end
 
-local function Top(map, count)
-	local list = {}
-	for name, value in pairs(map) do list[#list + 1] = { name = name, value = value } end
-	sort(list, ByValue)
-	for index = count + 1, #list do list[index] = nil end
-	return list
-end
-
 local function Pretty(label)
 	local pretty = prettyNames[label]
 	if pretty then return pretty end
@@ -184,14 +177,6 @@ local function KindName(kind)
 	return KIND_NAMES[kind]
 end
 
-local function CountsText(map, count, rename)
-	local parts = {}
-	for _, item in ipairs(Top(map, count)) do
-		parts[#parts + 1] = format('%s %d', rename and rename(item.name) or item.name, item.value)
-	end
-	return concat(parts, '; ')
-end
-
 local function MsText(map, count)
 	local parts = {}
 	for _, item in ipairs(Top(map, count)) do parts[#parts + 1] = format('%s %.1fms', Pretty(item.name), item.value) end
@@ -200,11 +185,6 @@ end
 
 local function Or(text)
 	return text ~= '' and text or 'none'
-end
-
-local function Clock(seconds)
-	seconds = floor(seconds)
-	return format('%dm%02ds', floor(seconds / 60), seconds % 60)
 end
 
 local function CauseName(first, via)
@@ -1031,7 +1011,7 @@ function CDMProfiler.Start()
 	running = true
 	HookFrames()
 	InstallSwaps()
-	Profiler.SetTracer(Trace)
+	Profiler.AddTracer(Trace)
 	BUI.Events:Register('PLAYER_REGEN_DISABLED', EVENT_KEY, OnCombatStart)
 	BUI.Events:Register('PLAYER_REGEN_ENABLED', EVENT_KEY, OnCombatEnd)
 	return true
@@ -1044,7 +1024,7 @@ function CDMProfiler.Stop()
 	running = false
 	stoppedAt = GetTime()
 	frameAt = nil
-	Profiler.SetTracer(nil)
+	Profiler.RemoveTracer(Trace)
 	Unswap()
 	BUI.Events:Unregister('PLAYER_REGEN_DISABLED', EVENT_KEY)
 	BUI.Events:Unregister('PLAYER_REGEN_ENABLED', EVENT_KEY)
