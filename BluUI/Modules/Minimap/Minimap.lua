@@ -621,6 +621,30 @@ local function GhostFootprint(indicator)
 	return width, height
 end
 
+local function AtlasSize(texture)
+	local info = C_Texture.GetAtlasInfo(texture:GetAtlas())
+	return info.width, info.height
+end
+
+local INDICATOR_ART = {
+	queue = function() local size = GetDockSize() return size, size end,
+	mail = function() return AtlasSize(GetMailFrame().MailIcon) end,
+	crafting = function() return AtlasSize(_G.MiniMapCraftingOrderIcon) end,
+	difficulty = function() return AtlasSize(GetBlizzardDifficultyFrame().Default.Background) end,
+	missions = function() return FOLIO_BASE, FOLIO_BASE end,
+}
+
+function Minimap.IndicatorLayout(key, docked)
+	local iconScale = GetIconScale(key)
+	local width, height = GhostFootprint(FindIndicator(key))
+	local artWidth, artHeight = INDICATOR_ART[key]()
+	if not docked then return width * iconScale, height * iconScale, artWidth * iconScale, artHeight * iconScale end
+	local size = GetDockSize() * iconScale
+	if key == 'queue' or key == 'missions' then return size, size, size, size end
+	local fit = size / width
+	return size, height * fit, artWidth * fit, artHeight * fit
+end
+
 local function CopyArt(ghost, source, layer, sublevel)
 	local texture = ghost:CreateTexture(nil, layer, nil, sublevel)
 	texture:SetAtlas(source:GetAtlas(), true)
@@ -754,6 +778,7 @@ local function TameLandingButton()
 end
 
 local relayouting = false
+local DOCK_GAP = 4
 local DOCK_ANCHORS = {
 	TOPLEFT     = { point = 'TOPLEFT',     x =  6, y = -6, dirX =  1 },
 	TOPRIGHT    = { point = 'TOPRIGHT',    x = -6, y = -6, dirX = -1 },
@@ -761,10 +786,11 @@ local DOCK_ANCHORS = {
 	BOTTOMRIGHT = { point = 'BOTTOMRIGHT', x = -6, y =  6, dirX = -1 },
 }
 Minimap.DOCK_ANCHORS = DOCK_ANCHORS
+Minimap.DOCK_GAP = DOCK_GAP
 
 local function LayoutDocked(anchor)
 	local size = GetDockSize()
-	local step = size + 4
+	local step = size + DOCK_GAP
 	local dockedCount = 0
 	for _, indicator in ipairs(indicators) do
 		local frame = indicator.Resolve()
