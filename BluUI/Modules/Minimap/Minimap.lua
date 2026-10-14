@@ -391,6 +391,12 @@ local function UpdateDifficultyText()
 	difficultyFrame:Show()
 end
 
+function Minimap.DifficultySample()
+	local label, prefix = DifficultyLabel()
+	if not label then label, prefix = PREVIEW_DIFFICULTY, 'M+' end
+	return label, prefixColors[prefix] or DEFAULT_GOLD
+end
+
 local function GetBlizzardDifficultyFrame()
 	return _G.MinimapCluster.InstanceDifficulty
 end

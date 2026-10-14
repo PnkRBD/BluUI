@@ -17,6 +17,7 @@ local PREVIEW_HEIGHT = 264
 local PREVIEW_MAP = 200
 local PREVIEW_TICK = 2
 local ICON_SIZE = 18
+local LETTERS_SIZE = 8
 local MENU_WIDTH = 160
 local SWITCH_WIDTH = 40
 local SLIDER_WIDTH = 220
@@ -303,6 +304,26 @@ local function BuildPreview(band)
 		proxy:SetSize(size, size)
 	end
 
+	local function StyleDifficultyProxy()
+		local proxy = icons.difficulty
+		local letters = interfaceDB.minimapTextDifficulty == true
+		proxy._buiLetters = letters
+		proxy.icon:SetShown(not letters)
+		proxy.highlight:SetShown(not letters)
+		proxy.letters:SetShown(letters)
+		proxy:SetBackdropColor(0.08, 0.08, 0.08, letters and 0 or 0.95)
+		local color = MinimapModule.GetIndicatorColor('difficulty')
+		proxy:SetBackdropBorderColor(color[1], color[2], color[3], letters and 0 or 0.9)
+		if not letters then return end
+		local label, textColor = MinimapModule.DifficultySample()
+		local align = interfaceDB.minimapTextDifficultyAlign
+		proxy.letters:SetText(label)
+		proxy.letters:SetTextColor(textColor[1], textColor[2], textColor[3])
+		proxy.letters:ClearAllPoints()
+		proxy.letters:SetPoint(align)
+		proxy.letters:SetJustifyH(align)
+	end
+
 	local function RefreshIcons()
 		local anchor = MinimapModule.DOCK_ANCHORS[MinimapModule.GetDock()]
 		if anchor then
@@ -328,6 +349,7 @@ local function BuildPreview(band)
 				PlaceIcon(icons[def.key], def.key)
 			end
 		end
+		StyleDifficultyProxy()
 	end
 
 	local function OnDragStop(proxy, key)
@@ -367,6 +389,11 @@ local function BuildPreview(band)
 		highlight:SetPoint('TOPRIGHT', -1, -1)
 		highlight:SetHeight(1)
 		highlight:SetVertexColor(1, 1, 1, 0.2)
+		proxy.icon, proxy.highlight = iconTexture, highlight
+		if def.key == 'difficulty' then
+			proxy.letters = proxy:CreateFontString(nil, 'OVERLAY')
+			Pixel.ApplyFont(proxy.letters, LETTERS_SIZE, BUI.GetGlobalFont())
+		end
 
 		proxy:EnableMouse(true)
 		proxy:RegisterForDrag('LeftButton')
@@ -422,7 +449,7 @@ local function BuildPreview(band)
 			Widget.ShowTip(self, format('%s  |  Scale: %.0f%%  |  Drag to move', def.name, MinimapModule.GetIconScale(def.key) * 100))
 		end)
 		proxy:SetScript('OnLeave', function(self)
-			self:SetBackdropBorderColor(0, 0, 0, 1)
+			self:SetBackdropBorderColor(0, 0, 0, self._buiLetters and 0 or 1)
 			Widget.HideTip()
 		end)
 
