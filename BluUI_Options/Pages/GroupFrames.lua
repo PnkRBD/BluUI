@@ -637,9 +637,12 @@ local function HotSpellsBoard(ui, parent, width, page)
 		HotSlots.Invalidate()
 		GroupFrames().RefreshAuras()
 	end
+	local function Rebuild()
+		BUILib.Defer(function() page:RebuildCurrent() end)
+	end
 	local function Rebuilt()
 		Changed()
-		page:RebuildCurrent()
+		Rebuild()
 	end
 	local board = ui.Board(parent, width, {
 		stacked = true,
@@ -649,7 +652,7 @@ local function HotSpellsBoard(ui, parent, width, page)
 	board:AddTools('Spec', 'The healer spec you are editing', {
 		{ entries = HotSpecItems(), width = WIDE_MENU, get = function() return hotSpec end, set = function(value)
 			hotSpec = value
-			page:RebuildCurrent()
+			Rebuild()
 		end },
 		{ text = 'Reset', onClick = function()
 			HotSlots.ResetSpells(hotSpec)
