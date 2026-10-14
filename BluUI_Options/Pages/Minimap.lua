@@ -326,27 +326,22 @@ local function BuildPreview(band)
 
 	local function RefreshIcons()
 		local anchor = MinimapModule.DOCK_ANCHORS[MinimapModule.GetDock()]
-		if anchor then
-			local size = max(8, floor(MinimapModule.GetIconSize() * scale))
-			local step = size + 3
-			local iconIndex = 0
-			for _, def in ipairs(INDICATORS) do
-				local proxy = icons[def.key]
-				if def.key ~= 'difficulty' then
-					proxy:EnableMouse(false)
-					proxy:ClearAllPoints()
-					proxy:SetSize(size, size)
-					proxy:SetPoint(anchor.point, mapFrame, anchor.point, anchor.x * scale + anchor.dirX * iconIndex * step, anchor.y * scale)
-					iconIndex = iconIndex + 1
-				else
-					proxy:EnableMouse(true)
-					PlaceIcon(proxy, def.key)
-				end
-			end
-		else
-			for _, def in ipairs(INDICATORS) do
-				icons[def.key]:EnableMouse(true)
-				PlaceIcon(icons[def.key], def.key)
+		local size = max(8, floor(MinimapModule.GetIconSize() * scale))
+		local step = size + 3
+		local iconIndex = 0
+		for _, def in ipairs(INDICATORS) do
+			local proxy = icons[def.key]
+			local shown = not interfaceDB[def.hide]
+			proxy:SetShown(shown)
+			if shown and anchor and def.key ~= 'difficulty' then
+				proxy:EnableMouse(false)
+				proxy:ClearAllPoints()
+				proxy:SetSize(size, size)
+				proxy:SetPoint(anchor.point, mapFrame, anchor.point, anchor.x * scale + anchor.dirX * iconIndex * step, anchor.y * scale)
+				iconIndex = iconIndex + 1
+			elseif shown then
+				proxy:EnableMouse(true)
+				PlaceIcon(proxy, def.key)
 			end
 		end
 		StyleDifficultyProxy()
