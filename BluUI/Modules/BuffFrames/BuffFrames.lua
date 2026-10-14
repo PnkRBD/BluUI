@@ -132,7 +132,7 @@ end
 
 local function PlaceText(fontString, button, anchor, offsetX, offsetY)
 	fontString:ClearAllPoints()
-	fontString:SetPoint(anchor, button, anchor, Pixel.Scale(offsetX), Pixel.Scale(offsetY))
+	fontString:SetPoint(anchor, button, anchor, Pixel.ScaleFor(button, offsetX), Pixel.ScaleFor(button, offsetY))
 end
 
 local function StyleButton(header, button)
