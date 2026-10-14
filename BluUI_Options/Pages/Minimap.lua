@@ -296,12 +296,17 @@ local function BuildPreview(band)
 
 	local icons = {}
 
+	local function SizeIcon(proxy, key, docked)
+		local width, height, artWidth, artHeight = MinimapModule.IndicatorLayout(key, docked)
+		proxy:SetSize(width * scale, height * scale)
+		proxy.tile:SetSize(artWidth * scale, artHeight * scale)
+	end
+
 	local function PlaceIcon(proxy, key)
 		local point, x, y = MinimapModule.GetIndicatorOffset(key)
 		proxy:ClearAllPoints()
 		proxy:SetPoint(point, mapFrame, point, x * scale, y * scale)
-		local size = floor(ICON_SIZE * (MinimapModule.GetIconScale(key) / 0.8))
-		proxy:SetSize(size, size)
+		SizeIcon(proxy, key, false)
 	end
 
 	local function StyleDifficultyProxy()
@@ -311,9 +316,9 @@ local function BuildPreview(band)
 		proxy.icon:SetShown(not letters)
 		proxy.highlight:SetShown(not letters)
 		proxy.letters:SetShown(letters)
-		proxy:SetBackdropColor(0.08, 0.08, 0.08, letters and 0 or 0.95)
+		proxy.tile:SetBackdropColor(0.08, 0.08, 0.08, letters and 0 or 0.95)
 		local color = MinimapModule.GetIndicatorColor('difficulty')
-		proxy:SetBackdropBorderColor(color[1], color[2], color[3], letters and 0 or 0.9)
+		proxy.tile:SetBackdropBorderColor(color[1], color[2], color[3], letters and 0 or 0.9)
 		if not letters then return end
 		local label, textColor = MinimapModule.DifficultySample()
 		local align = interfaceDB.minimapTextDifficultyAlign
@@ -326,8 +331,7 @@ local function BuildPreview(band)
 
 	local function RefreshIcons()
 		local anchor = MinimapModule.DOCK_ANCHORS[MinimapModule.GetDock()]
-		local size = max(8, floor(MinimapModule.GetIconSize() * scale))
-		local step = size + 3
+		local step = (MinimapModule.GetIconSize() + MinimapModule.DOCK_GAP) * scale
 		local iconIndex = 0
 		for _, def in ipairs(INDICATORS) do
 			local proxy = icons[def.key]
@@ -336,7 +340,7 @@ local function BuildPreview(band)
 			if shown and anchor and def.key ~= 'difficulty' then
 				proxy:EnableMouse(false)
 				proxy:ClearAllPoints()
-				proxy:SetSize(size, size)
+				SizeIcon(proxy, def.key, true)
 				proxy:SetPoint(anchor.point, mapFrame, anchor.point, anchor.x * scale + anchor.dirX * iconIndex * step, anchor.y * scale)
 				iconIndex = iconIndex + 1
 			elseif shown then
@@ -365,20 +369,24 @@ local function BuildPreview(band)
 	end
 
 	for _, def in ipairs(INDICATORS) do
-		local proxy = CreateFrame('Button', nil, mapFrame, 'BackdropTemplate')
+		local proxy = CreateFrame('Button', nil, mapFrame)
 		proxy:SetSize(ICON_SIZE, ICON_SIZE)
-		proxy:SetBackdrop({ bgFile = 'Interface\\Buttons\\WHITE8X8', edgeFile = 'Interface\\Buttons\\WHITE8X8', edgeSize = 1 })
-		proxy:SetBackdropColor(0.08, 0.08, 0.08, 0.95)
-		local color = MinimapModule.GetIndicatorColor(def.key)
-		proxy:SetBackdropBorderColor(color[1], color[2], color[3], 0.9)
 		proxy:SetFrameLevel(mapFrame:GetFrameLevel() + 10)
+		local tile = CreateFrame('Frame', nil, proxy, 'BackdropTemplate')
+		tile:SetPoint('CENTER')
+		tile:SetSize(ICON_SIZE, ICON_SIZE)
+		tile:SetBackdrop({ bgFile = 'Interface\\Buttons\\WHITE8X8', edgeFile = 'Interface\\Buttons\\WHITE8X8', edgeSize = 1 })
+		tile:SetBackdropColor(0.08, 0.08, 0.08, 0.95)
+		local color = MinimapModule.GetIndicatorColor(def.key)
+		tile:SetBackdropBorderColor(color[1], color[2], color[3], 0.9)
+		proxy.tile = tile
 
-		local iconTexture = proxy:CreateTexture(nil, 'ARTWORK')
+		local iconTexture = tile:CreateTexture(nil, 'ARTWORK')
 		iconTexture:SetPoint('TOPLEFT', 2, -2)
 		iconTexture:SetPoint('BOTTOMRIGHT', -2, 2)
 		MinimapModule.ApplyIndicatorArt(iconTexture, def.key)
 
-		local highlight = proxy:CreateTexture(nil, 'OVERLAY')
+		local highlight = tile:CreateTexture(nil, 'OVERLAY')
 		highlight:SetTexture('Interface\\Buttons\\WHITE8x8')
 		highlight:SetPoint('TOPLEFT', 1, -1)
 		highlight:SetPoint('TOPRIGHT', -1, -1)
@@ -440,11 +448,11 @@ local function BuildPreview(band)
 			Repaint()
 		end)
 		proxy:SetScript('OnEnter', function(self)
-			self:SetBackdropBorderColor(1, 1, 1, 1)
+			self.tile:SetBackdropBorderColor(1, 1, 1, 1)
 			Widget.ShowTip(self, format('%s  |  Scale: %.0f%%  |  Drag to move', def.name, MinimapModule.GetIconScale(def.key) * 100))
 		end)
 		proxy:SetScript('OnLeave', function(self)
-			self:SetBackdropBorderColor(0, 0, 0, self._buiLetters and 0 or 1)
+			self.tile:SetBackdropBorderColor(0, 0, 0, self._buiLetters and 0 or 1)
 			Widget.HideTip()
 		end)
 
