@@ -11,6 +11,8 @@ local STRIP_MAX = 12
 local DEFAULT_ICON = 134400
 local ENEMIES_ONLY_TIP = 'Blizzard does not let addons hide this debuff on you or your group, so it only hides on enemies.'
 local SELF_LOCKED_TIP = 'Blizzard does not let addons hide this debuff on you, so it still shows on the debuff frame.'
+local SELF_PIN_TIP = 'Blizzard does not let addons pick out this debuff on you, so pinning it does nothing here.'
+local LOCKED_ALPHA = 0.35
 local KIND = { HELPFUL = 'buff', HARMFUL = 'debuff' }
 local OTHER_KIND = { HELPFUL = 'debuff', HARMFUL = 'buff' }
 
@@ -236,10 +238,17 @@ function AuraLists.Pinned(ui, parent, width, page, options)
 	for _, item in ipairs(items) do
 		local sub = 'Spell ' .. item.id
 		if WrongKind(item.id, polarity) then sub = sub .. ', a ' .. OTHER_KIND[polarity] .. ', never shows here' end
-		SpellRow(board, item.icon or DEFAULT_ICON, item.name, sub, 'Unpin ' .. item.name, function()
+		local row = SpellRow(board, item.icon or DEFAULT_ICON, item.name, sub, 'Unpin ' .. item.name, function()
 			list[item.id] = nil
 			Changed()
 		end)
+		if options.onYou and not BUI.AuraBlacklist.HidesOnFriendly(item.id, polarity) then
+			row.icon:SetDesaturated(true)
+			row.icon:SetAlpha(LOCKED_ALPHA)
+			row:EnableMouse(true)
+			row:SetScript('OnEnter', function(self) Widget.ShowTip(self, SELF_PIN_TIP) end)
+			row:SetScript('OnLeave', Widget.HideTip)
+		end
 	end
 	if #items == 0 then board:AddRow('Nothing pinned', 'Only the rules decide what shows') end
 	return board

@@ -125,7 +125,22 @@ local function BlacklistSections(ui, _, parent, width, page)
 		AuraBlacklist.RefreshConsumers('frames')
 		BUILib.Defer(function() page:RebuildCurrent() end)
 	end, 'Use the unit frames blacklist here too')
+	local settings = BUI.GetDB().buffFrames
+	local function PinsChanged() BUI.BuffFrames.Refresh() end
+	local function OnlySwitch(list, label, tip)
+		return { label = label, tip = tip, get = function() return settings.pinnedOnly[list] == true end, set = function(value) settings.pinnedOnly[list] = value end }
+	end
 	return {
+		AuraLists.Pinned(ui, parent, width, page, {
+			polarity = 'HELPFUL', title = 'Pinned buffs', description = 'Shown first on the buff frame.',
+			get = function() return settings.pinned.buff end, onChange = PinsChanged,
+			only = OnlySwitch('buff', 'Only show pinned buffs', 'The buff frame shows nothing but your pinned buffs'),
+		}),
+		AuraLists.Pinned(ui, parent, width, page, {
+			polarity = 'HARMFUL', title = 'Pinned debuffs', description = 'Shown first on the debuff frame. Blizzard only lets addons pick out a few debuffs on you, like Sated.', onYou = true,
+			get = function() return settings.pinned.debuff end, onChange = PinsChanged,
+			only = OnlySwitch('debuff', 'Only show pinned debuffs', 'The debuff frame shows nothing but your pinned debuffs, like Sated'),
+		}),
 		share,
 		AuraLists.Blacklist(ui, parent, width, page, { scope = 'frames', polarity = 'HELPFUL', title = 'Buffs', description = 'Buffs that never show on the buff frame.' }),
 		AuraLists.Blacklist(ui, parent, width, page, { scope = 'frames', polarity = 'HARMFUL', title = 'Debuffs', description = 'Debuffs that never show on the debuff frame. Blizzard only lets addons hide a few on you, like Sated.' }),
@@ -134,7 +149,7 @@ end
 
 local ITEMS = {
 	{ id = 'buffFrames', label = 'Frames', icon = 'updown' },
-	{ id = 'buffBlacklist', label = 'Blacklist', icon = 'x' },
+	{ id = 'buffBlacklist', label = 'Filters', icon = 'x' },
 }
 local OWNED = {}
 for _, item in ipairs(ITEMS) do OWNED[item.id] = true end
