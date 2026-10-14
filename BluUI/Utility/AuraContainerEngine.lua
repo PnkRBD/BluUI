@@ -82,6 +82,22 @@ function Engine.DispelPaletteStamp()
 	return tconcat(parts, '|')
 end
 
+local borderCurve, borderStamp
+
+function Engine.SyncDispelBorder(button, texture, lastStamp, showWithoutDispelType)
+	local stamp = Engine.DispelPaletteStamp()
+	if stamp == lastStamp then return lastStamp end
+	if stamp ~= borderStamp then borderCurve, borderStamp = Engine.BuildDispelCurve(DEBUFF_TYPE_NONE_COLOR) end
+	if lastStamp then button:RemoveDispelTypeTexture(texture) end
+	button:AddDispelTypeTexture(texture, {
+		showWhenHarmful = true,
+		showWithoutDispelType = showWithoutDispelType,
+		style = Enum.CustomAuraButtonDispelTypeTextureStyle.PreserveAsset,
+		customDispelColorCurve = borderCurve,
+	})
+	return stamp
+end
+
 Engine.StackAnchors = {
 	TOPLEFT      = { 'TOPLEFT', 1, -1 },
 	TOP          = { 'TOP', 0, -1 },
@@ -250,6 +266,9 @@ local function RestyleButton(container, button, buttonInfo, style)
 	buttonInfo.icon:SetPoint('BOTTOMRIGHT', -edge, edge)
 
 	buttonInfo.base:SetVertexColor(unpack(style.baseColor))
+	if buttonInfo.dispelStamp then
+		buttonInfo.dispelStamp = Engine.SyncDispelBorder(button, buttonInfo.dispel, buttonInfo.dispelStamp)
+	end
 
 	if style.showStack == false then
 		buttonInfo.count:Hide()
@@ -301,6 +320,16 @@ local function AttemptRestyle(container, button)
 	RestyleButton(container, button, buttonInfo, style)
 	buttonInfo.stamp = container._buiStyleStamp
 	restyleQueue[button] = buttonInfo.mousePending and container or nil
+end
+
+function Engine.RepaintDispelBorders()
+	for button, container in pairs(captureButtons) do
+		local buttonInfo = buttonData[button]
+		if buttonInfo.dispelStamp then
+			buttonInfo.stamp = nil
+			AttemptRestyle(container, button)
+		end
+	end
 end
 
 local recreateQueue = {}
@@ -362,7 +391,7 @@ local function MakeInitializer(container, groupInfo)
 		button:SetApplicationCount(count, {})
 
 		if groupInfo.style.showDispelType then
-			button:AddDispelTypeTexture(dispel, { showWhenHarmful = true, style = Enum.CustomAuraButtonDispelTypeTextureStyle.PreserveAsset })
+			buttonInfo.dispelStamp = Engine.SyncDispelBorder(button, dispel)
 		end
 
 		captureButtons[button] = container
