@@ -14,6 +14,7 @@ local BLIZZARD_ROLESET = 'buffs'
 local BLIZZARD_FRAMES = { 'BuffFrame', 'DebuffFrame' }
 local CANCEL_BUTTON = 'RightButtonUp'
 local TIMER_BAND = 1.5
+local TEXT_BOX_SPAN = 2
 
 local function TimerRule(unitSeconds, format)
 	local Rounding = Enum.NumericRuleFormatRounding
@@ -130,7 +131,23 @@ local function EnchantLayout(config)
 	return layout
 end
 
-local function PlaceText(fontString, button, anchor, offsetX, offsetY)
+local function EvenPixels(frame, units)
+	local pixel = Pixel.PixelSizeFor(frame, 1)
+	return math.ceil(units / pixel / 2) * 2 * pixel
+end
+
+local function TextJustify(anchor)
+	local horizontal = anchor:find('LEFT') and 'LEFT' or anchor:find('RIGHT') and 'RIGHT' or 'CENTER'
+	local vertical = anchor:find('TOP') and 'TOP' or anchor:find('BOTTOM') and 'BOTTOM' or 'MIDDLE'
+	return horizontal, vertical
+end
+
+local function PlaceText(fontString, button, anchor, offsetX, offsetY, iconSize, fontSize)
+	local horizontal, vertical = TextJustify(anchor)
+	fontString:SetWordWrap(false)
+	fontString:SetJustifyH(horizontal)
+	fontString:SetJustifyV(vertical)
+	fontString:SetSize(EvenPixels(button, iconSize * TEXT_BOX_SPAN), EvenPixels(button, fontSize * TEXT_BOX_SPAN))
 	fontString:ClearAllPoints()
 	fontString:SetPoint(anchor, button, anchor, Pixel.ScaleFor(button, offsetX), Pixel.ScaleFor(button, offsetY))
 end
@@ -145,11 +162,11 @@ local function StyleButton(header, button)
 	local timer = config.timer
 	local decimals = config.showCooldownDecimals and config.cooldownDecimalThreshold or 0
 	Pixel.ApplyFont(parts.duration, config.durationSize, font, outline)
-	PlaceText(parts.duration, button, config.durationAnchor, config.durationOffsetX, config.durationOffsetY)
+	PlaceText(parts.duration, button, config.durationAnchor, config.durationOffsetX, config.durationOffsetY, size, config.durationSize)
 	button:SetDurationText(parts.duration, TimerOptions(config.compactTimer, decimals))
 	parts.duration:SetShown(timer == 'below')
 	Pixel.ApplyFont(parts.count, config.countSize, font, outline)
-	PlaceText(parts.count, button, config.countAnchor, config.countOffsetX, config.countOffsetY)
+	PlaceText(parts.count, button, config.countAnchor, config.countOffsetX, config.countOffsetY, size, config.countSize)
 
 	local cooldown = parts.cooldown
 	cooldown:SetDrawSwipe(config.swipe ~= false)
