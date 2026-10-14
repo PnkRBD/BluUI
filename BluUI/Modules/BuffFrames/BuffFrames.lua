@@ -161,6 +161,7 @@ local function StyleButton(header, button)
 	button:SetCancelAuraButtons((header.kind.cancel and config.rightClickCancel ~= false) and CANCEL_BUTTON or nil)
 	button:SetHideTooltipInCombat(config.tooltipsInCombat == false)
 	button:SetMouseMotionEnabled(config.tooltips ~= false)
+	if parts.dispel then parts.dispelStamp = BUI.AuraEngine.SyncDispelBorder(button, parts.dispel, parts.dispelStamp, true) end
 end
 
 local function BuildButton(header, button)
@@ -168,15 +169,11 @@ local function BuildButton(header, button)
 	base:SetAllPoints()
 	base:SetColorTexture(BORDER_COLOR[1], BORDER_COLOR[2], BORDER_COLOR[3], BORDER_COLOR[4])
 
+	local dispel
 	if header.kind.dispel then
-		local dispel = button:CreateTexture(nil, 'BACKGROUND', nil, 1)
+		dispel = button:CreateTexture(nil, 'BACKGROUND', nil, 1)
 		dispel:SetAllPoints()
 		dispel:SetColorTexture(1, 1, 1, 1)
-		button:AddDispelTypeTexture(dispel, {
-			showWhenHarmful = true,
-			showWithoutDispelType = true,
-			style = Enum.CustomAuraButtonDispelTypeTextureStyle.PreserveAsset,
-		})
 	end
 
 	local edge = Pixel.PixelSize(1)
@@ -198,6 +195,7 @@ local function BuildButton(header, button)
 		cooldown = cooldown,
 		count = textHost:CreateFontString(nil, 'OVERLAY'),
 		duration = textHost:CreateFontString(nil, 'OVERLAY'),
+		dispel = dispel,
 	}
 	header.buttons[#header.buttons + 1] = button
 	StyleButton(header, button)

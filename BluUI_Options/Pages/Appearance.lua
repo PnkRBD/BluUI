@@ -35,7 +35,7 @@ local FONT_OVERRIDES = {
 local COLOR_GROUPS = {
 	{ name = 'Power', description = 'Shared by the power bars, unit frames and group frames.' },
 	{ name = 'Class Resources', description = 'Combo points, runes, holy power and the rest.' },
-	{ name = 'Dispel Types', description = 'Used by unit frame and group frame dispel highlights and badges.' },
+	{ name = 'Dispel Types', description = 'Used by dispel highlights, badges and debuff icon borders.' },
 }
 
 local function Window()

@@ -155,6 +155,8 @@ function BUI.ApplyColors()
         if groupFrames.RefreshColors then groupFrames.RefreshColors() end
         if groupFrames.RestyleAllDispelBadges then groupFrames.RestyleAllDispelBadges() end
     end
+    BUI.AuraEngine.RepaintDispelBorders()
+    BUI.BuffFrames.Refresh()
 end
 
 function BUI.ToggleColorEditor()
