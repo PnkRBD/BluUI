@@ -14,13 +14,13 @@ local GetAuraDispelTypeColor = C_UnitAuras.GetAuraDispelTypeColor
 
 local WHITE8X8 = [[Interface\Buttons\WHITE8X8]]
 
-local DISPEL_RGB = {
-	Magic   = { r = 0.20, g = 0.60, b = 1.00 },
-	Curse   = { r = 0.60, g = 0.00, b = 1.00 },
-	Disease = { r = 0.60, g = 0.40, b = 0.00 },
-	Poison  = { r = 0.00, g = 0.60, b = 0.00 },
-	Bleed   = { r = 1.00, g = 0.20, b = 0.20 },
-	Enrage  = { r = 1.00, g = 0.40, b = 0.00 },
+local PREVIEW_TOKEN = {
+	Magic   = "Magic",
+	Curse   = "Curse",
+	Disease = "Disease",
+	Poison  = "Poison",
+	Bleed   = "Bleed",
+	Enrage  = "Bleed",
 }
 
 local DISPEL_BADGE_ATLAS = {
@@ -86,29 +86,41 @@ local function BuildHighlightKit(host)
 	return kit
 end
 
+local dispelCurve, dispelCurveStamp
+local function GetDispelCurve()
+	if not dispelCurve or dispelCurveStamp ~= Engine.DispelPaletteStamp() then
+		dispelCurve, dispelCurveStamp = GroupFrames.BuildDispelCurve(TRANSPARENT_COLOR)
+	end
+	return dispelCurve, dispelCurveStamp
+end
+
 local tintOptions, badgeOptions
 
-local function DispelTextureOptions()
-	if tintOptions then return tintOptions, badgeOptions end
-	local styleEnum = Enum.CustomAuraButtonDispelTypeTextureStyle
-	tintOptions = { showWhenHarmful = true }
-	badgeOptions = { showWhenHarmful = true }
-	if styleEnum then
-		tintOptions.style = styleEnum.PreserveAsset
-		badgeOptions.style = styleEnum.Icon
+local function DispelTextureOptions(curve)
+	if not tintOptions then
+		local styleEnum = Enum.CustomAuraButtonDispelTypeTextureStyle
+		tintOptions = { showWhenHarmful = true }
+		badgeOptions = { showWhenHarmful = true }
+		if styleEnum then
+			tintOptions.style = styleEnum.PreserveAsset
+			badgeOptions.style = styleEnum.Icon
+		end
 	end
+	tintOptions.customDispelColorCurve = curve
 	return tintOptions, badgeOptions
 end
 
-local function KitSignature(wantTint, wantBadge, badgeSettings)
+local function KitSignature(wantTint, wantBadge, badgeSettings, paletteStamp)
 	return (wantTint and "t" or "") .. (wantBadge and "i" or "")
 		.. "#" .. badgeSettings.size .. badgeSettings.anchor .. badgeSettings.offsetX .. "," .. badgeSettings.offsetY
+		.. "#" .. paletteStamp
 end
 
 local function RegisterKitTextures(kit, wantTint, wantBadge, badgeSettings)
 	local button = kit.button
 	if not button.AddDispelTypeTexture then return end
-	local signature = KitSignature(wantTint, wantBadge, badgeSettings)
+	local curve, paletteStamp = GetDispelCurve()
+	local signature = KitSignature(wantTint, wantBadge, badgeSettings, paletteStamp)
 	if kit.signature == signature then return end
 	if kit.signature and button.ClearDispelTypeTextures then button:ClearDispelTypeTextures() end
 	kit.signature = signature
@@ -117,7 +129,7 @@ local function RegisterKitTextures(kit, wantTint, wantBadge, badgeSettings)
 		kit.fade:Hide()
 	end
 	if not wantBadge then kit.badge:Hide() end
-	local tint, badge = DispelTextureOptions()
+	local tint, badge = DispelTextureOptions(curve)
 	if wantTint then
 		button:AddDispelTypeTexture(kit.fill, tint)
 		button:AddDispelTypeTexture(kit.fade, tint)
@@ -265,14 +277,6 @@ if GroupFrames.DispelViaEngine then
 	BUI.Events:Register("PLAYER_ENTERING_WORLD", "GFDispel.RestyleDrain", DrainHighlightRestyles)
 end
 
-local dispelCurve, dispelCurveStamp
-local function GetDispelCurve()
-	if not dispelCurve or dispelCurveStamp ~= Engine.DispelPaletteStamp() then
-		dispelCurve, dispelCurveStamp = GroupFrames.BuildDispelCurve(TRANSPARENT_COLOR)
-	end
-	return dispelCurve
-end
-
 local SOLID = CreateColor(1, 1, 1, 1)
 local CLEAR = CreateColor(1, 1, 1, 0)
 
@@ -300,7 +304,7 @@ end
 
 local function colorFromCurve(unit, auraInstanceID)
 	if not auraInstanceID then return nil end
-	return GetAuraDispelTypeColor(unit, auraInstanceID, GetDispelCurve())
+	return GetAuraDispelTypeColor(unit, auraInstanceID, (GetDispelCurve()))
 end
 
 local function FindDispelColor(unit, source)
@@ -399,7 +403,7 @@ end
 
 function GroupFrames.ApplyDispelBadgePreview(badge, typeName)
 	if not badge or not badge.icons then return end
-	local key = (typeName == "Enrage") and "Bleed" or typeName
+	local key = PREVIEW_TOKEN[typeName]
 	for _, name in ipairs(DISPEL_BADGE_NAMES) do
 		local texture = badge.icons[name]
 		if texture and name == key then
@@ -479,15 +483,13 @@ end
 
 local function PaintPreviewKit(frame, previewKit, typeName)
 	StyleHighlightKit(frame, previewKit.kit)
-	local dispelRGB = DISPEL_RGB[typeName]
+	local token = PREVIEW_TOKEN[typeName]
+	local red, green, blue = Engine.DispelColorRGB(token)
 	local kit = previewKit.kit
-	kit.fill:SetVertexColor(dispelRGB.r, dispelRGB.g, dispelRGB.b)
-	kit.fade:SetVertexColor(dispelRGB.r, dispelRGB.g, dispelRGB.b)
-	local atlas = DISPEL_BADGE_ATLAS[(typeName == "Enrage") and "Bleed" or typeName]
-	if atlas then
-		kit.badge:SetAtlas(atlas)
-		kit.badge:SetVertexColor(1, 1, 1, 1)
-	end
+	kit.fill:SetVertexColor(red, green, blue)
+	kit.fade:SetVertexColor(red, green, blue)
+	kit.badge:SetAtlas(DISPEL_BADGE_ATLAS[token])
+	kit.badge:SetVertexColor(1, 1, 1, 1)
 end
 
 local function ApplyDispelPreview(frame, dispelName)
@@ -500,8 +502,7 @@ local function ApplyDispelPreview(frame, dispelName)
 			if frame._auraWatcher then GroupFrames.ConfigureDispelHighlight(frame) end
 			return true
 		end
-		local dispelRGB = DISPEL_RGB[dispelName]
-		if not dispelRGB then return false, "unknown type: " .. tostring(dispelName) end
+		if not PREVIEW_TOKEN[dispelName] then return false, "unknown type: " .. tostring(dispelName) end
 		frame._dispelPreview = true
 		if frame[HIGHLIGHT_KEY] then frame[HIGHLIGHT_KEY]:Hide() end
 		local previewKit = EnsurePreviewKit(frame)
@@ -518,9 +519,9 @@ local function ApplyDispelPreview(frame, dispelName)
 		return true
 	end
 
-	local dispelRGB = DISPEL_RGB[dispelName]
-	if not dispelRGB then return false, "unknown type: " .. tostring(dispelName) end
-	local color = CreateColor(dispelRGB.r, dispelRGB.g, dispelRGB.b, 1)
+	local token = PREVIEW_TOKEN[dispelName]
+	if not token then return false, "unknown type: " .. tostring(dispelName) end
+	local color = Engine.DispelColor(token)
 
 	local wantBadge = GroupFrames.SettingsForFrame(frame).dispelBorder.showBadge ~= false
 
