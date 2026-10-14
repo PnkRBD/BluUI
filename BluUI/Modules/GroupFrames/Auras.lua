@@ -201,8 +201,15 @@ function GroupFrames.MarkAurasDirty(frame)
 end
 
 function GroupFrames.SyncLifeState(frame, dead, offline)
-	if frame._bluWasDead == dead and frame._bluWasOffline == offline then return end
-	frame._bluWasDead, frame._bluWasOffline = dead, offline
+	local ghost = false
+	if dead and frame.unit then
+		local isGhost = UnitIsGhost(frame.unit)
+		ghost = CanAccess(isGhost) and isGhost and true or false
+	end
+	if frame._bluWasDead == dead and frame._bluWasOffline == offline and frame._bluWasGhost == ghost then return end
+	frame._bluWasDead, frame._bluWasOffline, frame._bluWasGhost = dead, offline, ghost
+	local status = frame.StatusText
+	if status and status.UpdateTag then status:UpdateTag() end
 end
 
 function GroupFrames.RefreshFrameAuras(frame)
