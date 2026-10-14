@@ -1,13 +1,10 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.Collections')
-
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
 local SELECTED = Skin.SELECTED_COLOR
 
-local SKIN_ID = 'collections'
 local COLLECTIONS_ADDON = 'Blizzard_Collections'
 local TAB_COUNT = 6
 local MAIN_ART = { 'Bg', 'TopTileStreaks' }
@@ -24,14 +21,20 @@ local MUTED_TEXT_THRESHOLD = 0.6
 local BODY_TEXT = { 0.87, 0.87, 0.9, 1 }
 local LABEL_TEXT = { 0.55, 0.55, 0.6, 1 }
 
-local installed = false
-local skinned = false
-
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
+local context = Skin.Define('collections', {
+	name = 'Collections',
+	description = 'Mounts, pets, toys, heirlooms, appearances and campsites: dark panels, clean lists, flat progress bars and library style search and filters.',
+	icon = 'Interface/Icons/MountJournalPortrait',
+	test = function()
+		C_AddOns.LoadAddOn(COLLECTIONS_ADDON)
+		local frame = _G.CollectionsJournal
+		if not frame:IsShown() then ToggleCollectionsJournal(1) end
+		return frame
+	end,
+	stopTest = function()
+		if _G.CollectionsJournal then HideUIPanel(_G.CollectionsJournal) end
+	end,
+})
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
 local Shell, Button, Close, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.Dropdown, context.EditBox, context.CheckBox
 local ScrollBar, Tab, Body, Title = context.ScrollBar, context.Tab, context.Body, context.Title
@@ -118,7 +121,6 @@ local function SkinListRow(row, icon)
 end
 
 local function OnMountRow(button)
-	if not Enabled() or not button then return end
 	SkinListRow(button, button.icon)
 	if not button._buiFill then
 		local fill = button:CreateTexture(nil, 'BACKGROUND')
@@ -134,7 +136,6 @@ local function OnMountRow(button)
 end
 
 local function OnPetRow(pet)
-	if not Enabled() or not pet then return end
 	SkinListRow(pet, pet.icon)
 	Skin.TipFace(pet.name, 'body')
 	RecolorName(pet.name)
@@ -142,7 +143,7 @@ local function OnPetRow(pet)
 end
 
 local function OnSetsRow(row)
-	if not Enabled() or row._buiRow then return end
+	if row._buiRow then return end
 	row._buiRow = true
 	Fade(row.Background)
 	SkinRowTextures(row, row.SelectedTexture, row.HighlightTexture)
@@ -165,14 +166,16 @@ local function SkinSpellButton(button)
 end
 
 local function OnToyButton(button)
-	if not Enabled() or not button then return end
 	SkinSpellButton(button)
 	RecolorName(button.name)
-	RefreshPaging(_G.ToyBox and _G.ToyBox.PagingFrame)
+	RefreshPaging(_G.ToyBox.PagingFrame)
+end
+
+local function OnToyEvent(button)
+	RecolorName(button.name)
 end
 
 local function OnHeirloomButton(journal, button)
-	if not Enabled() or not button then return end
 	SkinSpellButton(button)
 	RecolorName(button.name)
 	RefreshPaging(journal.PagingFrame)
@@ -212,7 +215,7 @@ local function SkinToys(toyBox)
 	Dropdown(toyBox.FilterDropdown)
 	SkinBackgroundFrame(toyBox.iconsFrame)
 	SkinPaging(toyBox.PagingFrame)
-	for buttonIndex = 1, TOY_BUTTON_COUNT do SkinSpellButton(toyBox['spellButton' .. buttonIndex]) end
+	for buttonIndex = 1, TOY_BUTTON_COUNT do SkinSpellButton(toyBox.iconsFrame['spellButton' .. buttonIndex]) end
 end
 
 local function SkinHeirlooms(journal)
@@ -244,7 +247,6 @@ local function SkinWardrobe(frame)
 		SkinBackgroundFrame(items)
 		SkinPaging(items.PagingFrame)
 		Dropdown(items.WeaponDropdown)
-		if items.UpdateItems then Hook(items, 'UpdateItems', function(collection) if Enabled() then RefreshPaging(collection.PagingFrame) end end) end
 	end
 	local sets = frame.SetsCollectionFrame
 	if sets then
@@ -277,84 +279,30 @@ local function SkinMainFrame(frame)
 end
 
 local function OnTabsUpdated(frame)
-	if Enabled() and skinned and frame == _G.WardrobeCollectionFrame then RefreshWardrobeTabs(frame) end
+	if frame == _G.WardrobeCollectionFrame and _G.CollectionsJournal:IsShown() then RefreshWardrobeTabs(frame) end
 end
 
-local function Apply()
-	local frame = _G.CollectionsJournal
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if not skinned then
-		skinned = true
-		SkinMainFrame(frame)
-	end
+local function OnWardrobeItems(collection)
+	RefreshPaging(collection.PagingFrame)
+end
+
+local function ShowJournal(frame)
 	Skin.RefreshTabStrip(frame)
 	if _G.WardrobeCollectionFrame then RefreshWardrobeTabs(_G.WardrobeCollectionFrame) end
 end
 
-local function HookRows()
-	Hook('MountJournal_InitMountButton', OnMountRow)
-	Hook('PetJournal_InitPetButton', OnPetRow)
-	Hook('ToySpellButton_UpdateButton', OnToyButton)
-	if _G.HeirloomsJournal and _G.HeirloomsJournal.UpdateButton then Hook(_G.HeirloomsJournal, 'UpdateButton', OnHeirloomButton) end
+local function InstallJournal()
+	context.Hook('MountJournal_InitMountButton', OnMountRow)
+	context.Hook('PetJournal_InitPetButton', OnPetRow)
+	context.Hook('ToySpellButton_UpdateButton', OnToyButton)
+	local toyEvent = BUI.Profiler.Wrap('Skin.Collections toy event', context.Guard(OnToyEvent))
+	for buttonIndex = 1, TOY_BUTTON_COUNT do _G.ToyBox.iconsFrame['spellButton' .. buttonIndex]:HookScript('OnEvent', toyEvent) end
+	context.Hook(_G.HeirloomsJournal, 'UpdateButton', OnHeirloomButton)
+	local items = _G.WardrobeCollectionFrame and _G.WardrobeCollectionFrame.ItemsCollectionFrame
+	if items then context.Hook(items, 'UpdateItems', OnWardrobeItems) end
 	local setsMixin = _G.WardrobeSetsScrollFrameButtonMixin
-	if setsMixin and setsMixin.Init then Hook(setsMixin, 'Init', OnSetsRow) end
-	Hook('PanelTemplates_UpdateTabs', OnTabsUpdated)
+	if setsMixin then context.Hook(setsMixin, 'Init', OnSetsRow) end
+	context.Hook('PanelTemplates_UpdateTabs', OnTabsUpdated)
 end
 
-local function Install()
-	if installed then return end
-	local frame = _G.CollectionsJournal
-	if not frame then return end
-	installed = true
-	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Collections frame reskin', Apply))
-	HookRows()
-	if frame:IsShown() then Apply() end
-end
-
-local function TryInstall()
-	Install()
-	if installed then BUI.Events:Unregister('ADDON_LOADED', 'Skin.Collections') end
-end
-
-local function Deactivate()
-	context.Restore()
-	skinned = false
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		if not installed then
-			BUI.Events:Register('ADDON_LOADED', 'Skin.Collections', TryInstall)
-		elseif _G.CollectionsJournal:IsShown() then
-			Apply()
-		end
-	else
-		Deactivate()
-	end
-end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Collections',
-	description = 'Mounts, pets, toys, heirlooms, appearances and campsites: dark panels, clean lists, flat progress bars and house search and filters.',
-	icon = 'Interface/Icons/MountJournalPortrait',
-	test = function()
-		if not _G.CollectionsJournal then
-			C_AddOns.LoadAddOn(COLLECTIONS_ADDON)
-			TryInstall()
-		end
-		local frame = _G.CollectionsJournal
-		if not frame then return end
-		if not frame:IsShown() then ToggleCollectionsJournal(1) end
-		return frame
-	end,
-	stopTest = function()
-		if _G.CollectionsJournal then HideUIPanel(_G.CollectionsJournal) end
-	end,
-})
-
-BUI.Events:Once('PLAYER_LOGIN', 'Skin.CollectionsInstall', function()
-	if not Enabled() then return end
-	Install()
-	if not installed then BUI.Events:Register('ADDON_LOADED', 'Skin.Collections', TryInstall) end
-end)
+context.Window('CollectionsJournal', { install = InstallJournal, skin = SkinMainFrame, show = ShowJournal })
