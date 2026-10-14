@@ -1,8 +1,6 @@
 local BUI = BluUI
 local BUILib = BUI.BUILibClient
-local Layout = BUILib.Layout
 
-local PAGE_WIDTH = 960
 local MODULE_KEY = 'buffFrames'
 local WIDE_MENU = 200
 local COLUMNS = { { 'Frame', 'name', 130 }, { 'Shows', 'sub' }, { 'Options', 'icon', 140, 'CENTER' }, { '', 'reset', 42, 'CENTER' }, { 'Preview', 'toggle', 60, 'CENTER' }, { 'Enabled', 'switch', 70, 'CENTER' } }
@@ -31,10 +29,6 @@ local KINDS = {
 	{ key = 'buffs', title = 'Buffs', frameName = 'BUI_BuffFrame', sub = 'Your buffs and weapon enchants', cancel = true },
 	{ key = 'debuffs', title = 'Debuffs', frameName = 'BUI_DebuffFrame', sub = 'Edged in their dispel type color' },
 }
-
-local function Window()
-	return BUI.PageEngine.window
-end
 
 local function Config()
 	return BUI.GetDB().buffFrames
@@ -138,22 +132,29 @@ local function BlacklistSections(ui, _, parent, width, page)
 	}
 end
 
-BUI.PageEngine.RegisterPage('buffs', {
-	title = 'Buffs & Debuffs',
-	buttonText = 'Buffs & Debuffs',
-	icon = 'updown',
-	OnBuild = function(pageFrame)
-		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
-		Layout.TablePage(page:GetTab(1), { window = Window() }, {
-			icon = 'updown',
-			title = 'Buffs & Debuffs',
-			placeholder = 'Search buff settings...',
-			disabled = function() return not BUI.IsModuleEnabled(MODULE_KEY) end,
-			tools = {
-				{ icon = 'enable', tooltip = 'Turn the buff and debuff frames on or off', get = function() return BUI.IsModuleEnabled(MODULE_KEY) end, set = function(value) BUI.SetModuleEnabled(MODULE_KEY, value) end },
-			},
-			tabs = { { label = 'Frames', build = Sections }, { label = 'Blacklist', build = BlacklistSections } },
-		})
-		page:AutoRefresh()
+local ITEMS = {
+	{ id = 'buffFrames', label = 'Frames', icon = 'updown' },
+	{ id = 'buffBlacklist', label = 'Blacklist', icon = 'x' },
+}
+local OWNED = {}
+for _, item in ipairs(ITEMS) do OWNED[item.id] = true end
+
+local function IsOn()
+	return BUI.IsModuleEnabled(MODULE_KEY)
+end
+
+BUI.BuffFramesPage = {
+	group = { title = 'Buffs and debuffs', items = ITEMS },
+	Owns = function(id) return OWNED[id] == true end,
+	IsOn = IsOn,
+	EnableTool = function(repaint)
+		return { icon = 'enable', label = 'Buffs and debuffs', tooltip = 'Turn the buff and debuff frames on or off', get = IsOn, set = function(value)
+			BUI.SetModuleEnabled(MODULE_KEY, value)
+			repaint()
+		end }
 	end,
-})
+	Build = function(ui, shell, parent, width, item, page)
+		if item.id == 'buffBlacklist' then return BlacklistSections(ui, shell, parent, width, page) end
+		return Sections(ui, shell, parent, width)
+	end,
+}

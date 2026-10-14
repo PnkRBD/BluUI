@@ -89,9 +89,9 @@ local entries = {
 	{ label = "Import", page = "cdm", tab = 9, panel = "Custom bars", keywords = "custom bars import copy character alt duplicate" },
 
 
-	{ label = "Buffs", page = "buffs", tab = 1, panel = "Frames", keywords = "buff aura weapon enchant size rows growth sort timer stack anchor offset font outline swipe edge tooltip cancel right click position" },
-	{ label = "Debuffs", page = "buffs", tab = 1, panel = "Frames", keywords = "debuff aura dispel border size rows growth sort timer stack anchor offset font outline swipe edge tooltip position" },
-	{ label = "Buff blacklist", page = "buffs", tab = 2, panel = "Blacklist", keywords = "blacklist hide filter buff debuff spell recently seen share unit frames" },
+	{ label = "Buffs", page = "minimap", tab = 6, panel = "Frames", keywords = "buff aura weapon enchant size rows growth sort timer stack anchor offset font outline swipe edge tooltip cancel right click position" },
+	{ label = "Debuffs", page = "minimap", tab = 6, panel = "Frames", keywords = "debuff aura dispel border size rows growth sort timer stack anchor offset font outline swipe edge tooltip position" },
+	{ label = "Buff blacklist", page = "minimap", tab = 7, panel = "Blacklist", keywords = "blacklist hide filter buff debuff spell recently seen share unit frames" },
 	{ label = "Enable", page = "castbars", tab = 1, keywords = "cast bar player" },
 	{ label = "Show Anchor", page = "castbars", tab = 1, keywords = "anchor mover unlock position" },
 	{ label = "Anchor Frame", page = "castbars", tab = 1, panel = "Anchor" },
