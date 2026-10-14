@@ -94,13 +94,10 @@ local function KindCandidates(kind, settings)
 	if pins then
 		for spellID in pairs(pins) do exclude[spellID] = true end
 	end
-	if hots then
-		for spellID in pairs(hots) do exclude[spellID] = true end
-	end
 
-	if next(exclude) ~= nil then
-		cached.candidates = { pinSpellIDs = pins, excludeSpellIDs = exclude }
-		cached.fingerprint = pinSig .. 'bl:' .. Engine.SortedKeys(exclude)
+	if next(exclude) ~= nil or hots then
+		cached.candidates = { pinSpellIDs = pins, excludeSpellIDs = next(exclude) and exclude or nil, ownExcludeSpellIDs = hots }
+		cached.fingerprint = pinSig .. 'bl:' .. Engine.SortedKeys(exclude) .. (hots and ('own:' .. hotSig) or '')
 	end
 	return cached.candidates, cached.fingerprint
 end

@@ -477,6 +477,19 @@ local function ExcludeClaim(entries, claim)
 	return kept
 end
 
+local function OwnSplit(cand, mine)
+	local split = {}
+	for key, value in pairs(cand) do
+		if key ~= 'ownExcludeSpellIDs' then split[key] = value end
+	end
+	if not mine then return split end
+	local exclude = {}
+	for spellID in pairs(cand.excludeSpellIDs or {}) do exclude[spellID] = true end
+	for spellID in pairs(cand.ownExcludeSpellIDs) do exclude[spellID] = true end
+	split.excludeSpellIDs = exclude
+	return split
+end
+
 local function CollectRuleGroups(wanted, container, setIndex, style, rules, baseFilter, candidates, candidateFingerprint, excludeRules)
 	local harmful = HasFilterToken(baseFilter, 'HARMFUL')
 	local slotPrefix = harmful and 'D' or 'B'
@@ -497,7 +510,17 @@ local function CollectRuleGroups(wanted, container, setIndex, style, rules, base
 		for claimIndex = 1, #claims do entries = ExcludeClaim(entries, claims[claimIndex]) end
 		for entryIndex = 1, #entries do
 			local kept = entries[entryIndex]
-			Want(kept.filter, kept.cand, kept.sig, gated)
+			local cand, filter = kept.cand, kept.filter
+			if not (cand and cand.ownExcludeSpellIDs) then
+				Want(filter, cand, kept.sig, gated)
+			elseif HasFilterToken(filter, '!PLAYER') then
+				Want(filter, OwnSplit(cand, false), kept.sig, gated)
+			elseif HasFilterToken(filter, 'PLAYER') then
+				Want(filter, OwnSplit(cand, true), kept.sig .. '+own', gated)
+			else
+				Want(filter .. '|PLAYER', OwnSplit(cand, true), kept.sig .. '+own', gated)
+				Want(filter .. '|!PLAYER', OwnSplit(cand, false), kept.sig, gated)
+			end
 		end
 	end
 
