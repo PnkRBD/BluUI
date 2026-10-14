@@ -267,9 +267,15 @@ function BUI.AuraRuleEditor(parent, options)
 				local list
 				local function Fill()
 					list:ClearItems()
+					local hidden = rules.hidden
 					for _, id in ipairs(rules) do
-						list:AddItem(AuraRules.Icon(id), AuraRules.Label(id), id, true)
+						list:AddItem(AuraRules.Icon(id), AuraRules.Label(id), id, true, not (hidden and hidden[id]))
 					end
+				end
+				local function SetHidden(id, hide)
+					rules.hidden = rules.hidden or {}
+					rules.hidden[id] = hide or nil
+					if next(rules.hidden) == nil then rules.hidden = nil end
 				end
 				list = Controls.ItemList(panel, nil, panel.width, 176,
 					nil,
@@ -277,6 +283,7 @@ function BUI.AuraRuleEditor(parent, options)
 						for ruleIndex = 1, #rules do
 							if rules[ruleIndex] == row.id then table.remove(rules, ruleIndex); break end
 						end
+						SetHidden(row.id, false)
 						if #rules == 0 then BUI.Print('No rules left, this container shows nothing.') end
 						Push()
 					end,
@@ -288,7 +295,10 @@ function BUI.AuraRuleEditor(parent, options)
 						Push()
 					end,
 					true,
-					{ hideID = true })
+					{ hideID = true, showCheckbox = true, onCheckboxChange = function(id, shown)
+						SetHidden(id, not shown)
+						Push()
+					end })
 				list:SetPoint('TOPLEFT', 0, -34)
 				Fill()
 				local addDropdown = Controls.Dropdown(panel, nil, AuraRules.DropdownItems(options.polarity), nil, function(value)
@@ -305,7 +315,7 @@ function BUI.AuraRuleEditor(parent, options)
 			end,
 		})
 	end)
-	local tip = options.tooltip or 'Pick which auras show here, the top rule claims icon slots first'
+	local tip = options.tooltip or 'Pick which auras show here. The top rule claims its auras first; untick a rule to hide what it claims'
 	button:HookScript('OnEnter', function(self) Widget.ShowTip(self, tip) end)
 	button:HookScript('OnLeave', Widget.HideTip)
 	return button

@@ -511,9 +511,11 @@ local function CollectRuleGroups(wanted, container, setIndex, style, rules, base
 		candidates = next(rest) and rest or nil
 	end
 
+	local excludeHidden = excludeRules and excludeRules.hidden
 	for ruleIndex = 1, #(excludeRules or {}) do
-		local rule = AR.BY_ID[excludeRules[ruleIndex]]
-		local claim = rule and RuleClaim(rule)
+		local id = excludeRules[ruleIndex]
+		local rule = AR.BY_ID[id]
+		local claim = rule and not (excludeHidden and excludeHidden[id]) and RuleClaim(rule)
 		if claim and #claim > 0 then claims[#claims + 1] = claim end
 	end
 
@@ -523,9 +525,13 @@ local function CollectRuleGroups(wanted, container, setIndex, style, rules, base
 	end
 
 	local keepNameplateOnly = HasFilterToken(baseFilter, NAMEPLATE_ONLY_TOKEN)
+	local hidden = rules.hidden
 	for ruleIndex = 1, #rules do
-		local rule = AR.BY_ID[rules[ruleIndex]]
-		if rule then
+		local id = rules[ruleIndex]
+		local rule = AR.BY_ID[id]
+		if rule and hidden and hidden[id] then
+			claims[#claims + 1] = RuleClaim(rule)
+		elseif rule then
 			local filter = rule.engineFilter or baseFilter
 			if keepNameplateOnly and not HasFilterToken(filter, NAMEPLATE_ONLY_TOKEN) then
 				filter = filter .. '|' .. NAMEPLATE_ONLY_TOKEN
