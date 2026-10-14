@@ -269,6 +269,7 @@ Skinning\ObjectiveTracker.lua
 Skinning\PetBattle.lua
 Skinning\BNToast.lua
 Skinning\CooldownManager.lua
+Skinning\MicroMenu.lua
 Modules\MoveFrames\MoveFrames.lua
 
 Modules\BuffTracking\CDMScan.lua

@@ -449,6 +449,7 @@ BUI.Defaults = {
 			auctionhouse = true,
 			journeys = true,
 			collections = true,
+			microbuttons = false,
 			dressup = true,
 			professions = true,
 			spellbook = true,
