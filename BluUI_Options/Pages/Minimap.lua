@@ -17,7 +17,6 @@ local PREVIEW_HEIGHT = 264
 local PREVIEW_MAP = 200
 local PREVIEW_TICK = 2
 local ICON_SIZE = 18
-local LETTERS_SIZE = 8
 local MENU_WIDTH = 160
 local SWITCH_WIDTH = 40
 local SLIDER_WIDTH = 220
@@ -322,6 +321,7 @@ local function BuildPreview(band)
 		if not letters then return end
 		local label, textColor = MinimapModule.DifficultySample()
 		local align = interfaceDB.minimapTextDifficultyAlign
+		Pixel.ApplyFont(proxy.letters, MinimapModule.DIFFICULTY_FONT_SIZE * scale, BUI.GetGlobalFont())
 		proxy.letters:SetText(label)
 		proxy.letters:SetTextColor(textColor[1], textColor[2], textColor[3])
 		proxy.letters:ClearAllPoints()
@@ -395,7 +395,6 @@ local function BuildPreview(band)
 		proxy.icon, proxy.highlight = iconTexture, highlight
 		if def.key == 'difficulty' then
 			proxy.letters = proxy:CreateFontString(nil, 'OVERLAY')
-			Pixel.ApplyFont(proxy.letters, LETTERS_SIZE, BUI.GetGlobalFont())
 		end
 
 		proxy:EnableMouse(true)
@@ -523,15 +522,16 @@ local function BuildPreview(band)
 	PlaceText = function()
 		clockLabel:SetText(date('%H:%M'))
 		zoneLabel:SetText(GetMinimapZoneText() or 'Zone Name')
-		Pixel.ApplyFont(clockLabel, 9, BUI.GetFontByName(interfaceDB.minimapClockFont), '')
-		Pixel.ApplyFont(zoneLabel, 8, BUI.GetFontByName(interfaceDB.minimapZoneFont), '')
+		Pixel.ApplyFont(clockLabel, interfaceDB.minimapClockSize * scale, BUI.GetFontByName(interfaceDB.minimapClockFont))
+		Pixel.ApplyFont(zoneLabel, interfaceDB.minimapZoneSize * scale, BUI.GetFontByName(interfaceDB.minimapZoneFont))
 		clockLabel:ClearAllPoints()
 		zoneLabel:ClearAllPoints()
 		clockLabel:SetShown(interfaceDB.minimapClock ~= false)
 		zoneLabel:SetShown(interfaceDB.minimapZone ~= false)
-		clockLabel:SetPoint('TOPRIGHT', mapFrame, 'TOPRIGHT', -4 + interfaceDB.minimapClockX * scale, -4 + interfaceDB.minimapClockY * scale)
+		local inset, middle = MinimapModule.TEXT_INSET, MinimapModule.TEXT_INSET + MinimapModule.TEXT_BOX_HEIGHT / 2
+		clockLabel:SetPoint('RIGHT', mapFrame, 'TOPRIGHT', (interfaceDB.minimapClockX - inset) * scale, (interfaceDB.minimapClockY - middle) * scale)
 		clockLabel:SetJustifyH('RIGHT')
-		zoneLabel:SetPoint('TOPLEFT', mapFrame, 'TOPLEFT', 4 + interfaceDB.minimapZoneX * scale, -4 + interfaceDB.minimapZoneY * scale)
+		zoneLabel:SetPoint('LEFT', mapFrame, 'TOPLEFT', (interfaceDB.minimapZoneX + inset) * scale, (interfaceDB.minimapZoneY - middle) * scale)
 		zoneLabel:SetJustifyH('LEFT')
 		local clockColor = interfaceDB.minimapClockColor
 		clockLabel:SetTextColor(clockColor.r, clockColor.g, clockColor.b, 0.9)

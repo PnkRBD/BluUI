@@ -46,6 +46,7 @@ local difficultyEvents = {
 local defaultIconScale = { queue = 0.8, difficulty = 0.9, mail = 0.8, crafting = 0.8, missions = 0.8 }
 local FOLIO_BASE = 32
 local PREVIEW_DIFFICULTY = 'M+10'
+local TEXT_INSET, TEXT_BOX_HEIGHT, DIFFICULTY_FONT_SIZE = 5, 16, 12
 
 local hiddenParent = CreateFrame('Frame')
 hiddenParent:Hide()
@@ -241,7 +242,7 @@ end
 local function CreateClock()
 	if clockFrame then return end
 	clockFrame = CreateFrame('Frame', 'BUI_MinimapClock', WoWMinimap)
-	clockFrame:SetSize(Pixel.Scale(60), Pixel.Scale(16))
+	clockFrame:SetSize(Pixel.Scale(60), Pixel.Scale(TEXT_BOX_HEIGHT))
 	clockFrame:SetFrameLevel(WoWMinimap:GetFrameLevel() + 10)
 	clockFrame.text = clockFrame:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(clockFrame.text, 12, GetTextFont('minimapClockFont'))
@@ -254,7 +255,7 @@ function Minimap.RefreshClock()
 	Pixel.ApplyFont(clockFrame.text, config.minimapClockSize, GetTextFont('minimapClockFont'))
 	local color = config.minimapClockColor
 	clockFrame.text:SetTextColor(color.r, color.g, color.b)
-	PositionText(clockFrame, clockFrame.text, 'TOPRIGHT', -5, -5, config.minimapClockX, config.minimapClockY)
+	PositionText(clockFrame, clockFrame.text, 'TOPRIGHT', -TEXT_INSET, -TEXT_INSET, config.minimapClockX, config.minimapClockY)
 	clockFrame.text:ClearAllPoints()
 	clockFrame.text:SetPoint('LEFT', clockFrame, 'LEFT', Pixel.Scale(2), 0)
 	clockFrame.text:SetJustifyH('LEFT')
@@ -305,7 +306,7 @@ end
 local function CreateZoneText()
 	if zoneFrame then return end
 	zoneFrame = CreateFrame('Frame', 'BUI_MinimapZone', WoWMinimap)
-	zoneFrame:SetSize(Pixel.Scale(100), Pixel.Scale(16))
+	zoneFrame:SetSize(Pixel.Scale(100), Pixel.Scale(TEXT_BOX_HEIGHT))
 	zoneFrame:SetFrameLevel(WoWMinimap:GetFrameLevel() + 10)
 	zoneFrame.text = zoneFrame:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(zoneFrame.text, 11, GetTextFont('minimapZoneFont'))
@@ -317,7 +318,7 @@ function Minimap.RefreshZoneText()
 	if not zoneFrame or not zoneFrame:IsShown() then return end
 	local config = GetConfig()
 	Pixel.ApplyFont(zoneFrame.text, config.minimapZoneSize, GetTextFont('minimapZoneFont'))
-	PositionText(zoneFrame, zoneFrame.text, 'TOPLEFT', 5, -5, config.minimapZoneX, config.minimapZoneY)
+	PositionText(zoneFrame, zoneFrame.text, 'TOPLEFT', TEXT_INSET, -TEXT_INSET, config.minimapZoneX, config.minimapZoneY)
 	UpdateZoneText()
 end
 
@@ -350,10 +351,10 @@ end
 local function CreateDifficultyText()
 	if difficultyFrame then return end
 	difficultyFrame = CreateFrame('Frame', 'BUI_MinimapDifficulty', WoWMinimap)
-	difficultyFrame:SetSize(Pixel.Scale(60), Pixel.Scale(16))
+	difficultyFrame:SetSize(Pixel.Scale(60), Pixel.Scale(TEXT_BOX_HEIGHT))
 	difficultyFrame:SetFrameLevel(WoWMinimap:GetFrameLevel() + 10)
 	difficultyFrame.text = difficultyFrame:CreateFontString(nil, 'OVERLAY')
-	Pixel.ApplyFont(difficultyFrame.text, 12, BUI.GetGlobalFont())
+	Pixel.ApplyFont(difficultyFrame.text, DIFFICULTY_FONT_SIZE, BUI.GetGlobalFont())
 	difficultyFrame:Hide()
 end
 
@@ -787,6 +788,7 @@ local DOCK_ANCHORS = {
 }
 Minimap.DOCK_ANCHORS = DOCK_ANCHORS
 Minimap.DOCK_GAP = DOCK_GAP
+Minimap.TEXT_INSET, Minimap.TEXT_BOX_HEIGHT, Minimap.DIFFICULTY_FONT_SIZE = TEXT_INSET, TEXT_BOX_HEIGHT, DIFFICULTY_FONT_SIZE
 
 local function LayoutDocked(anchor)
 	local size = GetDockSize()
@@ -1059,7 +1061,7 @@ function Minimap.ApplySettings()
 	local config = GetConfig()
 	if clockFrame      then Pixel.ApplyFont(clockFrame.text,      config.minimapClockSize, GetTextFont('minimapClockFont')) end
 	if zoneFrame       then Pixel.ApplyFont(zoneFrame.text,       config.minimapZoneSize,  GetTextFont('minimapZoneFont')) end
-	if difficultyFrame then Pixel.ApplyFont(difficultyFrame.text, 12, BUI.GetGlobalFont()) end
+	if difficultyFrame then Pixel.ApplyFont(difficultyFrame.text, DIFFICULTY_FONT_SIZE, BUI.GetGlobalFont()) end
 end
 
 Minimap.RepositionIndicators = PositionAllIndicators
