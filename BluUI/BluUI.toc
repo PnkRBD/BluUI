@@ -104,6 +104,7 @@ Modules\GroupFrames\Raid.lua
 Modules\GroupFrames\Preview.lua
 Modules\GroupFrames\AuraPreview.lua
 Modules\GroupFrames\Initialize.lua
+Modules\UnitFrames\Profiler.lua
 
 Modules\CastBar\Helpers.lua
 Modules\CastBar\Core.lua

@@ -23,28 +23,35 @@ local function ShowProfile()
 	ShowReport('Profile report', BUI.Profiler.Report())
 end
 
-local function ShowCDMProfile()
-	local lines, preview = BUI.CDMProfiler.Report()
+local SESSIONS = {
+	cdm = { profiler = 'CDMProfiler', title = 'CDM profile', noun = 'CDM', Noun = 'CDM' },
+	uf = { profiler = 'UnitFrameProfiler', title = 'Unit frame profile', noun = 'unit frame', Noun = 'Unit frame' },
+}
+
+local function ShowSession(command)
+	local session = SESSIONS[command]
+	local lines, preview = BUI[session.profiler].Report()
 	if not lines then
-		BUI.Print('No CDM profile yet. /bui cdm to start one.')
+		BUI.Print('No ' .. session.noun .. ' profile yet. /bui ' .. command .. ' to start one.')
 		return
 	end
-	ShowReport('CDM profile', lines, preview)
+	ShowReport(session.title, lines, preview)
 end
 
-local function CDMCommand(option)
-	local CDMProfiler = BUI.CDMProfiler
+local function SessionCommand(command, option)
+	local session = SESSIONS[command]
+	local profiler = BUI[session.profiler]
 	if option == 'report' then
-		ShowCDMProfile()
+		ShowSession(command)
 	elseif option == 'reset' then
-		CDMProfiler.Reset()
-		BUI.Print(CDMProfiler.IsRunning() and 'CDM numbers cleared, still profiling.' or 'CDM numbers cleared.')
-	elseif CDMProfiler.IsRunning() then
-		CDMProfiler.Stop()
-		BUI.Print('CDM profiling stopped.')
-		ShowCDMProfile()
-	elseif CDMProfiler.Start() then
-		BUI.Print('CDM profiling started. /bui cdm to stop.')
+		profiler.Reset()
+		BUI.Print(session.Noun .. (profiler.IsRunning() and ' numbers cleared, still profiling.' or ' numbers cleared.'))
+	elseif profiler.IsRunning() then
+		profiler.Stop()
+		BUI.Print(session.Noun .. ' profiling stopped.')
+		ShowSession(command)
+	elseif profiler.Start() then
+		BUI.Print(session.Noun .. ' profiling started. /bui ' .. command .. ' to stop.')
 	end
 end
 
@@ -86,6 +93,9 @@ local function PrintHelp()
 	line('/bui cdm', 'start or stop counting what the Cooldown Manager does, the report opens when you stop')
 	line('/bui cdm report', 'show the CDM report again, or so far if it is still running')
 	line('/bui cdm reset', 'clear the CDM numbers and keep going')
+	line('/bui uf', 'start or stop counting what the unit, party and raid frames do, the report opens when you stop')
+	line('/bui uf report', 'show the unit frame report again, or so far if it is still running')
+	line('/bui uf reset', 'clear the unit frame numbers and keep going')
 	line('/bui trace', 'reload and record everything BluUI runs in the first 20 seconds, then show it')
 	line('/bui trace show', 'show the last launch trace again')
 	line('/cdm', "toggle Blizzard's Cooldown Viewer settings")
@@ -111,8 +121,8 @@ SlashCmdList['BUI'] = BUI.Profiler.Wrap('Core.Commands /bui', function(message)
 		BUI.ActionBars.ToggleKeybindMode()
 	elseif command == 'profile' then
 		ProfileCommand(rest:lower())
-	elseif command == 'cdm' then
-		CDMCommand(rest:lower())
+	elseif SESSIONS[command] then
+		SessionCommand(command, rest:lower())
 	elseif command == 'trace' then
 		if rest:lower() == 'show' then BUI.LaunchTrace.Show() else BUI.LaunchTrace.Start() end
 	else

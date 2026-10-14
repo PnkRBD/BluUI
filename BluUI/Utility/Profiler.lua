@@ -92,6 +92,29 @@ local function TopOf(map, count, field)
 	return list
 end
 
+function Profiler.Top(map, count)
+	local list = {}
+	for name, value in pairs(map) do list[#list + 1] = { name = name, value = value } end
+	sort(list, function(left, right) return left.value > right.value end)
+	for index = count + 1, #list do list[index] = nil end
+	return list
+end
+
+function Profiler.CountsText(map, count, rename)
+	local parts = {}
+	for _, item in ipairs(Profiler.Top(map, count)) do
+		parts[#parts + 1] = format('%s %d', rename and rename(item.name) or item.name, item.value)
+	end
+	return concat(parts, '; ')
+end
+
+function Profiler.Clock(seconds)
+	seconds = math.floor(seconds)
+	return format('%dm%02ds', math.floor(seconds / 60), seconds % 60)
+end
+
+local Clock = Profiler.Clock
+
 local function Combined(first, second)
 	local combined = {}
 	for label, spent in pairs(first) do combined[label] = spent end
@@ -131,7 +154,7 @@ local function Record(label, elapsed)
 end
 
 local running, runningDepth = {}, 0
-local tracer
+local tracers = {}
 
 local function Enter(label)
 	local mine = runningDepth + 1
@@ -142,7 +165,7 @@ end
 
 local function Leave(label, start, elapsed, mine)
 	runningDepth = mine - 1
-	if tracer then tracer(label, start, elapsed, mine, running[mine - 1]) end
+	for index = 1, #tracers do tracers[index](label, start, elapsed, mine, running[mine - 1]) end
 end
 
 local function Close(label, start, mine, ...)
@@ -174,8 +197,14 @@ local function Watch(label, callback, ...)
 	return Settle(label, debugprofilestop(), mine, callback(...))
 end
 
-function Profiler.SetTracer(callback)
-	tracer = callback
+function Profiler.AddTracer(callback)
+	tracers[#tracers + 1] = callback
+end
+
+function Profiler.RemoveTracer(callback)
+	for index = #tracers, 1, -1 do
+		if tracers[index] == callback then remove(tracers, index) end
+	end
 end
 
 function Profiler.Running()
@@ -441,32 +470,42 @@ end
 
 local tagOriginals, tagWrappers = {}, {}
 local oUFHooked = false
+local unitFrameWatcher
 
-local function FieldName(object, region)
+function Profiler.WatchUnitFrames(watcher)
+	unitFrameWatcher = watcher
+end
+
+function Profiler.TagName(object, region)
 	for key, value in pairs(object) do
 		if value == region then return key end
 	end
-	return 'tag'
+	return rawget(region, '_tagString') or 'tag'
 end
 
 local function TimeTag(object, fontString)
 	local update = fontString.UpdateTag
-	if not update or update == tagWrappers[fontString] then return end
-	local wrapper = Profiler.Wrap(Profiler.Label(StyleLabel(object) .. ' text', FieldName(object, fontString)), update)
+	if update == tagWrappers[fontString] then return end
+	local wrapper = Profiler.Wrap(Profiler.Label(StyleLabel(object) .. ' text', Profiler.TagName(object, fontString)), update)
 	tagOriginals[fontString], tagWrappers[fontString] = update, wrapper
 	fontString.UpdateTag = wrapper
 end
 
-local function TimeTagsIn(object, frame)
+local function EachTag(object, frame, callback)
 	if rawget(frame, '_buiAuraContainer') then return end
 	for _, region in ipairs({ frame:GetRegions() }) do
-		if region.__owner == object then TimeTag(object, region) end
+		if region.__owner == object and region.UpdateTag then callback(object, region) end
 	end
-	for _, child in ipairs({ frame:GetChildren() }) do TimeTagsIn(object, child) end
+	for _, child in ipairs({ frame:GetChildren() }) do EachTag(object, child, callback) end
+end
+
+function Profiler.EachTag(object, callback)
+	EachTag(object, object, callback)
 end
 
 local function OnTag(object, fontString)
 	if Profiler.active then TimeTag(object, fontString) end
+	if unitFrameWatcher then unitFrameWatcher.Tag(object, fontString) end
 end
 
 local function RestoreTags()
@@ -482,13 +521,15 @@ local function HookOUF(methods)
 	hooksecurefunc(methods, 'Tag', OnTag)
 	local updateAll = methods.UpdateAllElements
 	methods.UpdateAllElements = function(self, event)
-		return Profiler.Run(Profiler.Label(StyleLabel(self), 'full update'), updateAll, self, event)
+		local label = Profiler.Label(StyleLabel(self), 'full update')
+		if unitFrameWatcher then return unitFrameWatcher.FullUpdate(label, updateAll, self, event) end
+		return Profiler.Run(label, updateAll, self, event)
 	end
 end
 
 local function TimeUnitFrame(object)
 	if not oUFHooked then HookOUF(getmetatable(object).__index) end
-	if Profiler.active then TimeTagsIn(object, object) end
+	if Profiler.active then EachTag(object, object, TimeTag) end
 	if object._bluProfiled or object:GetAttribute('oUF-enableArenaPrep') then return end
 	if object:IsProtected() and InCombatLockdown() then return end
 	object._bluProfiled = true
@@ -496,7 +537,9 @@ local function TimeUnitFrame(object)
 	local onEvent = object:GetScript('OnEvent')
 	if onEvent then
 		object:SetScript('OnEvent', function(self, event, ...)
-			return Profiler.Run(Profiler.Label(style, event), onEvent, self, event, ...)
+			local label = Profiler.Label(style, event)
+			if unitFrameWatcher then return unitFrameWatcher.Event(label, onEvent, self, event, ...) end
+			return Profiler.Run(label, onEvent, self, event, ...)
 		end)
 	end
 	local castbar = object.Castbar
@@ -621,11 +664,6 @@ end
 
 local function HitchLine(hitch)
 	return format('  +%.0fs: %.0fms, %.0f named. %s', hitch.at - startedAt, hitch.actual, hitch.named, TopParts(hitch.top))
-end
-
-local function Clock(seconds)
-	seconds = math.floor(seconds)
-	return format('%dm%02ds', math.floor(seconds / 60), seconds % 60)
 end
 
 local function SpikeLine(spike)
