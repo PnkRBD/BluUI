@@ -7,7 +7,6 @@ local SELECTED = Skin.SELECTED_COLOR
 
 local COLLECTIONS_ADDON = 'Blizzard_Collections'
 local TAB_COUNT = 6
-local MAIN_ART = { 'Bg', 'TopTileStreaks' }
 local MOUNT_INSET_KEYS = { 'LeftInset', 'BottomLeftInset', 'RightInset', 'MountCount' }
 local MOUNT_DISPLAY_ART = { 'YesMountsTex', 'NoMountsTex' }
 local PET_INSET_KEYS = { 'LeftInset', 'PetCardInset', 'RightInset', 'PetCount', 'loadoutBorder' }
@@ -36,7 +35,7 @@ local context = Skin.Define('collections', {
 	end,
 })
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
-local Shell, Button, Close, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.Dropdown, context.EditBox, context.CheckBox
+local Shell, Button, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Dropdown, context.EditBox, context.CheckBox
 local ScrollBar, Tab, Body, Title = context.ScrollBar, context.Tab, context.Body, context.Title
 local FlatTexture, SelectedTexture, CropIcon = Skin.FlatTexture, Skin.SelectedTexture, Skin.CropIcon
 
@@ -47,16 +46,6 @@ end
 local function IsMutedText(fontString)
 	local red, green = fontString:GetTextColor()
 	return red < MUTED_TEXT_THRESHOLD or green < MUTED_TEXT_THRESHOLD
-end
-
-local function SkinPanelFrame(frame)
-	Fade(frame.NineSlice)
-	FadeKeys(frame, MAIN_ART)
-	FadeRegions(frame)
-	if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
-	Shell(frame)
-	Title(frame.TitleContainer and frame.TitleContainer.TitleText)
-	Close(frame.CloseButton)
 end
 
 local function SkinBackgroundFrame(frame)
@@ -266,7 +255,7 @@ local function SkinWarbandScenes(journal)
 end
 
 local function SkinMainFrame(frame)
-	SkinPanelFrame(frame)
+	context.Chrome(frame)
 	local tabs = {}
 	for tabIndex = 1, TAB_COUNT do tabs[tabIndex] = _G['CollectionsJournalTab' .. tabIndex] end
 	Skin.RegisterTabStrip(frame, tabs, context)
