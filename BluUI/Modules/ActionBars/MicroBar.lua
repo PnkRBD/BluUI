@@ -16,10 +16,16 @@ local function ButtonOverlap()
 	return BLIZZARD_PADDING
 end
 
+local function WholePixelPadding(size, padding)
+	local pixel = BUI.Pixel.PixelSizeFor(MicroMenu, 1)
+	return math.floor((size + padding) / pixel + 0.5) * pixel - size
+end
+
 local function WantedLayout(barSettings)
 	local stride = math.max(1, math.min(barSettings.buttonsPerRow, MicroMenu.numButtons))
 	local padding = ButtonOverlap() + barSettings.spacing
-	return not barSettings.vertical, stride, padding
+	local width, height = CharacterMicroButton:GetSize()
+	return not barSettings.vertical, stride, WholePixelPadding(width, padding), WholePixelPadding(height, padding)
 end
 
 local function CompareLayoutIndex(left, right)
@@ -74,8 +80,8 @@ local function ApplyGrid(horizontal, stride, paddingX, paddingY, goingRight, goi
 end
 
 local function ApplyOwnedGrid(barSettings)
-	local horizontal, stride, padding = WantedLayout(barSettings)
-	return ApplyGrid(horizontal, stride, padding, padding, true, false)
+	local horizontal, stride, paddingX, paddingY = WantedLayout(barSettings)
+	return ApplyGrid(horizontal, stride, paddingX, paddingY, true, false)
 end
 
 local function MenuSize(width, height)
@@ -94,8 +100,8 @@ local function Retake(self)
 		MicroMenu:SetFrameLevel(header:GetFrameLevel() + 1)
 		MicroMenu:SetAlpha(1)
 		MicroMenu:Show()
-		header:SetSize(MenuSize(ApplyOwnedGrid(barSettings)))
 		BUI.Pixel.SetScale(header, barSettings.scale / 100)
+		header:SetSize(MenuSize(ApplyOwnedGrid(barSettings)))
 		header:Show()
 	end)
 	ActionBars.PositionBar(self.bar)
