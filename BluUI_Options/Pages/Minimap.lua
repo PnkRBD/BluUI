@@ -311,13 +311,8 @@ local function BuildPreview(band)
 	local function StyleDifficultyProxy()
 		local proxy = icons.difficulty
 		local letters = interfaceDB.minimapTextDifficulty == true
-		proxy._buiLetters = letters
 		proxy.icon:SetShown(not letters)
-		proxy.highlight:SetShown(not letters)
 		proxy.letters:SetShown(letters)
-		proxy.tile:SetBackdropColor(0.08, 0.08, 0.08, letters and 0 or 0.95)
-		local color = MinimapModule.GetIndicatorColor('difficulty')
-		proxy.tile:SetBackdropBorderColor(color[1], color[2], color[3], letters and 0 or 0.9)
 		if not letters then return end
 		local label, textColor = MinimapModule.DifficultySample()
 		local align = interfaceDB.minimapTextDifficultyAlign
@@ -375,24 +370,18 @@ local function BuildPreview(band)
 		local tile = CreateFrame('Frame', nil, proxy, 'BackdropTemplate')
 		tile:SetPoint('CENTER')
 		tile:SetSize(ICON_SIZE, ICON_SIZE)
-		tile:SetBackdrop({ bgFile = 'Interface\\Buttons\\WHITE8X8', edgeFile = 'Interface\\Buttons\\WHITE8X8', edgeSize = 1 })
-		tile:SetBackdropColor(0.08, 0.08, 0.08, 0.95)
-		local color = MinimapModule.GetIndicatorColor(def.key)
-		tile:SetBackdropBorderColor(color[1], color[2], color[3], 0.9)
+		tile:SetBackdrop({ edgeFile = 'Interface\\Buttons\\WHITE8X8', edgeSize = 1 })
+		tile:SetBackdropBorderColor(1, 1, 1, 0)
 		proxy.tile = tile
 
 		local iconTexture = tile:CreateTexture(nil, 'ARTWORK')
-		iconTexture:SetPoint('TOPLEFT', 2, -2)
-		iconTexture:SetPoint('BOTTOMRIGHT', -2, 2)
-		MinimapModule.ApplyIndicatorArt(iconTexture, def.key)
-
-		local highlight = tile:CreateTexture(nil, 'OVERLAY')
-		highlight:SetTexture('Interface\\Buttons\\WHITE8x8')
-		highlight:SetPoint('TOPLEFT', 1, -1)
-		highlight:SetPoint('TOPRIGHT', -1, -1)
-		highlight:SetHeight(1)
-		highlight:SetVertexColor(1, 1, 1, 0.2)
-		proxy.icon, proxy.highlight = iconTexture, highlight
+		iconTexture:SetAllPoints()
+		if def.key == 'difficulty' then
+			MinimapModule.ApplyIndicatorArt(iconTexture, def.key)
+		else
+			MinimapModule.ApplyLiveIndicatorArt(iconTexture, def.key)
+		end
+		proxy.icon = iconTexture
 		if def.key == 'difficulty' then
 			proxy.letters = proxy:CreateFontString(nil, 'OVERLAY')
 		end
@@ -451,7 +440,7 @@ local function BuildPreview(band)
 			Widget.ShowTip(self, format('%s  |  Scale: %.0f%%  |  Drag to move', def.name, MinimapModule.GetIconScale(def.key) * 100))
 		end)
 		proxy:SetScript('OnLeave', function(self)
-			self.tile:SetBackdropBorderColor(0, 0, 0, self._buiLetters and 0 or 1)
+			self.tile:SetBackdropBorderColor(1, 1, 1, 0)
 			Widget.HideTip()
 		end)
 
