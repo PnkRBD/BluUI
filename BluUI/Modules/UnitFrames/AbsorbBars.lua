@@ -46,6 +46,25 @@ local function Update(self, _, unit)
 	if heal:IsShown() then Fill(heal, maxHealth, (values:GetHealAbsorbs())) end
 end
 
+local pending = {}
+local flushScheduled = false
+
+local Flush = BUI.Profiler.Wrap('UnitFrames.AbsorbBars flush', function()
+	flushScheduled = false
+	for frame in pairs(pending) do
+		pending[frame] = nil
+		Update(frame, nil, frame.__unit)
+	end
+end)
+
+local function Queue(self, _, unit)
+	if self.__unit ~= unit then return end
+	pending[self] = true
+	if flushScheduled then return end
+	flushScheduled = true
+	C_Timer.After(0, Flush)
+end
+
 local function Refresh(self, event, unit)
 	Fit(self.AbsorbBars)
 	Update(self, event, unit)
@@ -66,13 +85,13 @@ local function Enable(self)
 		bars.values:SetHealAbsorbClampMode(Enum.UnitHealAbsorbClampMode.MaximumHealth)
 		self.Health:HookScript('OnSizeChanged', BUI.Profiler.Wrap('UnitFrames.AbsorbBars fit', function() Fit(bars) end))
 	end
-	for _, event in ipairs(SHIELD_EVENTS) do self:RegisterEvent(event, Update) end
+	for _, event in ipairs(SHIELD_EVENTS) do self:RegisterEvent(event, Queue) end
 	return true
 end
 
 local function Disable(self)
 	if not self.AbsorbBars then return end
-	for _, event in ipairs(SHIELD_EVENTS) do self:UnregisterEvent(event, Update) end
+	for _, event in ipairs(SHIELD_EVENTS) do self:UnregisterEvent(event, Queue) end
 end
 
 oUF:AddElement('AbsorbBars', Refresh, Enable, Disable)
