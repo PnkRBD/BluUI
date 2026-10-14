@@ -952,10 +952,7 @@ function Skin.TipFace(fontString, kind, scale)
 end
 
 function Skin.TipCount(fontString)
-	if not fontString then return end
-	fontString:SetFont(BUILib.Font, TIP_BODY_SIZE, 'OUTLINE')
-	fontString:SetShadowColor(0, 0, 0, 1)
-	fontString:SetShadowOffset(1, -1)
+	BUI.Pixel.ApplyFont(fontString, TIP_BODY_SIZE, BUILib.Font)
 end
 
 function Skin.FadeTree(frame, keep, depth)
