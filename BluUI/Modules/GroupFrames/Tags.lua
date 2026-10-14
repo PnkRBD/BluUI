@@ -32,7 +32,7 @@ local Methods = oUF.Tags.Methods
 local Events  = oUF.Tags.Events
 
 local HEALTH_EVENTS = "UNIT_HEALTH UNIT_MAXHEALTH UNIT_CONNECTION"
-local STATUS_EVENTS = HEALTH_EVENTS .. " PLAYER_FLAGS_CHANGED UNIT_FLAGS"
+local STATUS_EVENTS = "UNIT_CONNECTION PLAYER_FLAGS_CHANGED UNIT_FLAGS"
 
 local function SafeNumbers(firstValue, secondValue)
 	if firstValue == nil or secondValue == nil or IsSecret(firstValue) or IsSecret(secondValue) then return nil end
