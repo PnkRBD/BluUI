@@ -219,7 +219,7 @@ local function ResetFrameAuras(frame, unit)
 end
 
 local function RegisterAuraUnitEvents(watcher, unit)
-	if unit then watcher:RegisterUnitEvent("UNIT_AURA", unit)
+	if unit and not GroupFrames.DispelViaEngine then watcher:RegisterUnitEvent("UNIT_AURA", unit)
 	else watcher:UnregisterEvent("UNIT_AURA") end
 end
 
