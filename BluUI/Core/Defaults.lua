@@ -1536,6 +1536,8 @@ BUI.Defaults = {
 			buffBlacklist       = {},
 			buffWhitelistOnly   = false,
 			debuffWhitelistOnly = false,
+			buffPinsAnyone      = false,
+			debuffPinsAnyone    = false,
 			shareBlacklists     = true,
 		},
 

@@ -519,6 +519,15 @@ local function OwnSplit(cand, mine)
 	return split
 end
 
+local function SplitPinFilter(baseFilter, candidates)
+	if not (candidates and candidates.pinMineOnly) then return baseFilter, candidates end
+	local rest = {}
+	for key, value in pairs(candidates) do
+		if key ~= 'pinMineOnly' then rest[key] = value end
+	end
+	return baseFilter .. '|PLAYER', rest
+end
+
 local function CollectRuleGroups(wanted, container, setIndex, style, rules, baseFilter, candidates, candidateFingerprint, excludeRules)
 	local harmful = HasFilterToken(baseFilter, 'HARMFUL')
 	local slotPrefix = harmful and 'D' or 'B'
@@ -553,9 +562,11 @@ local function CollectRuleGroups(wanted, container, setIndex, style, rules, base
 		end
 	end
 
+	local pinFilter
+	pinFilter, candidates = SplitPinFilter(baseFilter, candidates)
 	local pinIDs = candidates and candidates.pinSpellIDs
 	if pinIDs then
-		Want(baseFilter, { includeSpellIDs = pinIDs }, 'pin/' .. candidateSig, true)
+		Want(pinFilter, { includeSpellIDs = pinIDs }, 'pin/' .. candidateSig, true)
 		local rest = {}
 		for key, value in pairs(candidates) do
 			if key ~= 'pinSpellIDs' then rest[key] = value end
@@ -572,7 +583,7 @@ local function CollectRuleGroups(wanted, container, setIndex, style, rules, base
 	end
 
 	if candidates and candidates.includeSpellIDs then
-		WantUnclaimed({ filter = baseFilter, cand = candidates, sig = 'only/' .. candidateSig }, true)
+		WantUnclaimed({ filter = pinFilter, cand = candidates, sig = 'only/' .. candidateSig }, true)
 		return
 	end
 

@@ -213,11 +213,14 @@ function AuraLists.Pinned(ui, parent, width, page, options)
 		options.onChange()
 		page:RebuildCurrent()
 	end
-	if options.only then
-		board:AddSwitch(options.only.label, options.only.get, function(value)
-			options.only.set(value)
-			options.onChange()
-		end, options.only.tip)
+	for _, key in ipairs({ 'only', 'anyone' }) do
+		local switch = options[key]
+		if switch then
+			board:AddSwitch(switch.label, switch.get, function(value)
+				switch.set(value)
+				options.onChange()
+			end, switch.tip)
+		end
 	end
 	local polarity = options.polarity
 	AddRow(ui, board, function(spellID)

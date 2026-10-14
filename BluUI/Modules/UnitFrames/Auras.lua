@@ -255,8 +255,10 @@ local function BuildCandidates(isDebuff)
 		whitelistOnly = filters.buffWhitelistOnly
 	end
 
+	local anyone = filters[isDebuff and 'debuffPinsAnyone' or 'buffPinsAnyone']
+	local mineOnly = whitelistActive and anyone ~= true or nil
 	if whitelistActive and whitelistOnly then
-		candidates = { includeSpellIDs = whitelist }
+		candidates = { includeSpellIDs = whitelist, pinMineOnly = mineOnly }
 		fingerprint = 'wl:' .. Engine.SortedKeys(whitelist)
 	else
 		local exclude
@@ -272,9 +274,10 @@ local function BuildCandidates(isDebuff)
 			fingerprint = fingerprint and (fingerprint .. '+' .. blacklistFingerprint) or blacklistFingerprint
 		end
 		if exclude then
-			candidates = { pinSpellIDs = whitelistActive and whitelist or nil, excludeSpellIDs = exclude }
+			candidates = { pinSpellIDs = whitelistActive and whitelist or nil, excludeSpellIDs = exclude, pinMineOnly = mineOnly }
 		end
 	end
+	if mineOnly then fingerprint = (fingerprint or '') .. '+mine' end
 
 	candidateCache[isDebuff] = { candidates = candidates, fingerprint = fingerprint or '' }
 	return candidates, fingerprint or ''
