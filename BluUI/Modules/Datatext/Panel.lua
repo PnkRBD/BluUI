@@ -127,9 +127,10 @@ function Datatext.PlacePanelAtBar(panel, anchor)
     end
 end
 
-function Datatext.AnyHoverShown()
+function Datatext.HoverShownFor(bar)
     for panelIndex = 1, #hoverPanels do
-        if hoverPanels[panelIndex]:IsShown() then return true end
+        local panel = hoverPanels[panelIndex]
+        if panel:IsShown() and panel.anchor.bar == bar then return true end
     end
     return false
 end

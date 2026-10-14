@@ -743,7 +743,7 @@ local function TooltipOnBar(bar)
 end
 
 local function BarRevealed(bar)
-    return bar.dragging or BarUnlocked(bar) or bar.frame:IsMouseOver() or TooltipOnBar(bar) or Datatext.AnyHoverShown()
+    return bar.dragging or BarUnlocked(bar) or bar.frame:IsMouseOver() or TooltipOnBar(bar) or Datatext.HoverShownFor(bar)
 end
 
 local function MouseoverTick()
