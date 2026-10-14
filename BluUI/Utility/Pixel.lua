@@ -77,9 +77,7 @@ function Pixel.ScaleFor(region, value)
     if value == 0 then return 0 end
     local scale = region:GetEffectiveScale()
     if issecretvalue(scale) or scale <= 0 then return gridSnap(value) end
-    local pixels = value / gridUnit
-    pixels = pixels < 0 and -floor(-pixels) or floor(pixels)
-    return pixels * perfectScale / scale
+    return floor(value / gridUnit + 0.5) * perfectScale / scale
 end
 
 function Pixel.ScaleEven(value)
