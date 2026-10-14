@@ -27,6 +27,7 @@ local entries = {
 	{ label = "Cast bar", page = "unitframes", tab = 8, panel = "Boss frames", keywords = "boss cast bar texture height icon text colors per boss interrupt ready line" },
 	{ label = "Pinned buffs", page = "unitframes", tab = 9, panel = "Filters", keywords = "pinned whitelist buffs debuffs only show" },
 	{ label = "Buff blacklist", page = "unitframes", tab = 9, panel = "Filters", keywords = "blacklist filter buff debuff hide spell recently seen built-in share" },
+	{ label = "Hide my pet's debuffs", page = "unitframes", tab = 9, panel = "Filters", keywords = "pet summon guardian demon ghoul debuffs hide hunter warlock target" },
 	{ label = "Show anyone's pinned debuffs", page = "unitframes", tab = 9, panel = "Filters", keywords = "pinned whitelist debuffs mine other players hunter's mark" },
 	{ label = "Show anyone's pinned buffs", page = "unitframes", tab = 9, panel = "Filters", keywords = "pinned whitelist buffs mine other players" },
 	{ label = "Smooth Bars", page = "settings", tab = 1, panel = "Bar Textures", keywords = "animation smooth unit frames group frames" },

@@ -273,6 +273,12 @@ local function BuildCandidates(isDebuff)
 			local blacklistFingerprint = 'bl:' .. Engine.SortedKeys(blacklist)
 			fingerprint = fingerprint and (fingerprint .. '+' .. blacklistFingerprint) or blacklistFingerprint
 		end
+		local petDebuffs = isDebuff and filters.hidePetDebuffs and BUI.PetDebuffs[select(2, UnitClass('player'))]
+		if petDebuffs then
+			exclude = exclude or {}
+			for spellID in pairs(petDebuffs) do exclude[spellID] = true end
+			fingerprint = fingerprint and (fingerprint .. '+pet') or 'pet'
+		end
 		if exclude then
 			candidates = { pinSpellIDs = whitelistActive and whitelist or nil, excludeSpellIDs = exclude, pinMineOnly = mineOnly }
 		end

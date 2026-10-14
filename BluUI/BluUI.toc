@@ -34,6 +34,7 @@ Data\PlatynatorProfile.lua
 Data\DefaultProfile.lua
 Data\MinimapTiles.lua
 Data\Portals.lua
+Data\PetDebuffs.lua
 Utility\Profiler.lua
 Utility\LaunchTrace.lua
 Core\Core.lua
