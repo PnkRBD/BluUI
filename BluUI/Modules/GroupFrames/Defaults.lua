@@ -83,7 +83,7 @@ local function CommonSettings(sizes)
 		readyCheckIcon = IconDefaults(sizes.readyIcon,  "CENTER",  0, 0, true),
 		combatIcon     = IconDefaults(sizes.combatIcon, "TOP",     0, -2, false),
 		dispelBadge    = { size = sizes.badgeSize, anchor = "CENTER", offsetX = 0, offsetY = 0 },
-		hotSlots       = { enabled = true, size = sizes.hotSize, spacing = 1, anchor = "TOPRIGHT", growth = "LEFT", offsetX = -2, offsetY = -2 },
+		hotSlots       = { enabled = false, size = sizes.hotSize, spacing = 1, anchor = "TOPRIGHT", growth = "LEFT", offsetX = -2, offsetY = -2 },
 
 		buffs = AuraContainer({
 			enabled = sizes.buffsOn, source = "raid", size = sizes.smallAura,
