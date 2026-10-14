@@ -11,6 +11,7 @@ HotSlots.SPECS = { 105, 1468, 270, 65, 256, 257, 264 }
 
 local FILTER = 'HELPFUL|PLAYER'
 local SLOT_PREFIX = 'bluHot'
+local NO_SPELLS = { includeSpellIDs = {} }
 local WHITE8X8 = 'Interface\\Buttons\\WHITE8X8'
 local BORDER = { 0, 0, 0, 1 }
 local GROWTH = { LEFT = { -1, 0 }, RIGHT = { 1, 0 }, UP = { 0, 1 }, DOWN = { 0, -1 } }
@@ -181,13 +182,12 @@ function HotSlots.Apply(frame, settings)
 		local candidates = { includeSpellIDs = SpellSet(entry) }
 		if holder.frames[index] then
 			container:SetAuraSlotCandidateFilters(key, candidates)
-			container:SetAuraSlotEnabled(key, true)
 		else
 			holder.frames[index] = container:AddAuraSlot(key, FILTER, { candidateFilters = candidates, initializeFrame = SlotInitializer(holder, index) })
 		end
 		if holder.parts[index] then StyleSlot(holder.parts[index], entry, config.size) end
 	end
-	for index = count + 1, #holder.frames do container:SetAuraSlotEnabled(SLOT_PREFIX .. index, false) end
+	for index = count + 1, #holder.frames do container:SetAuraSlotCandidateFilters(SLOT_PREFIX .. index, NO_SPELLS) end
 
 	local size = Pixel.Scale(config.size)
 	local step = Pixel.Scale(config.size + config.spacing)
