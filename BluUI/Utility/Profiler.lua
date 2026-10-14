@@ -527,11 +527,16 @@ local function HookOUF(methods)
 	end
 end
 
+local TimeUnitFrames
+
 local function TimeUnitFrame(object)
 	if not oUFHooked then HookOUF(getmetatable(object).__index) end
 	if Profiler.active then EachTag(object, object, TimeTag) end
 	if object._bluProfiled or object:GetAttribute('oUF-enableArenaPrep') then return end
-	if object:IsProtected() and InCombatLockdown() then return end
+	if object:IsProtected() and InCombatLockdown() then
+		BUI.Events:AfterCombat(TimeUnitFrames, 'Profiler.UnitFrames')
+		return
+	end
 	object._bluProfiled = true
 	local style = StyleLabel(object)
 	local onEvent = object:GetScript('OnEvent')
@@ -552,13 +557,12 @@ end
 
 local unitFramesWatched = false
 
-local function TimeUnitFrames()
+function TimeUnitFrames()
 	if not unitFramesWatched then
 		unitFramesWatched = true
 		BUI.oUF:RegisterInitCallback(TimeUnitFrame)
 	end
 	for _, object in ipairs(BUI.oUF.objects) do TimeUnitFrame(object) end
-	if InCombatLockdown() then BUI.Events:AfterCombat(TimeUnitFrames, 'Profiler.UnitFrames') end
 end
 
 local actionButtonsHooked = false
