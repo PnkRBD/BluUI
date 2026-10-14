@@ -369,6 +369,42 @@ local function HoldDraggedPosition(target)
 	target:ClearAllPoints()
 	PlaceOnPixels(target, held.point, held.relativeTo, held.relativePoint, held.x, held.y)
 	applying = false
+	return true
+end
+
+local function PanelToLeft(target)
+	if target == GetUIPanel('center') then return GetUIPanel('left') end
+	if target == GetUIPanel('right') then return GetUIPanel('center') or GetUIPanel('doublewide') or GetUIPanel('left') end
+end
+
+local function ScreenRect(frame)
+	local left, bottom, width, height = frame:GetRect()
+	if not left or IsSecret(left) or IsSecret(bottom) or IsSecret(width) or IsSecret(height) then return end
+	local ratio = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
+	return left * ratio, (left + width) * ratio, (bottom + height) * ratio, bottom * ratio, ratio
+end
+
+local function KeepClearOfPanel(target)
+	if not MoveFrames.IsActive() or moving[target] or not CanTouch(target) then return end
+	local neighbour = PanelToLeft(target)
+	if not neighbour or not neighbour:IsShown() then return end
+	local point, relativeTo, relativePoint, x, y = target:GetPoint(1)
+	if point ~= 'TOPLEFT' or IsSecret(x) or IsSecret(y) then return end
+	local left, right, top, bottom, ratio = ScreenRect(target)
+	local otherLeft, otherRight, otherTop, otherBottom = ScreenRect(neighbour)
+	if not left or not otherLeft or bottom >= otherTop or top <= otherBottom then return end
+
+	local gap = GetUIPanelLayoutAttribute('PANEl_SPACING_X')
+	if left >= otherRight + gap or right <= otherLeft - gap then return end
+
+	local shift = otherRight + gap - left
+	if right + shift > UIParent:GetWidth() then
+		shift = otherLeft - gap - right
+		if left + shift < 0 then return end
+	end
+	applying = true
+	PlaceOnPixels(target, point, relativeTo, relativePoint, x + shift / ratio, y)
+	applying = false
 end
 
 local function CaptureDraggedPosition(target)
@@ -386,7 +422,8 @@ end
 local function OnTargetSetPoint(target)
 	if applying or suspended[target] then return end
 	if not moving[target] then SnapshotBlizzardPoints(target) end
-	if not ApplySavedPosition(target) then HoldDraggedPosition(target) end
+	if ApplySavedPosition(target) or HoldDraggedPosition(target) then return end
+	KeepClearOfPanel(target)
 end
 
 local function StopDrag(target)
