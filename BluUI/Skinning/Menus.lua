@@ -44,12 +44,6 @@ local function PaintSelection(frame, round)
 	box:SetDrawLayer('ARTWORK', 0)
 	box:ClearAllPoints()
 	box:SetPoint('LEFT')
-	local fill = frame:AttachTexture()
-	Tint(fill, shape, MenuFill())
-	fill:SetDrawLayer('ARTWORK', 1)
-	local pixel = OnePixel(box)
-	fill:SetPoint('TOPLEFT', box, 'TOPLEFT', pixel, -pixel)
-	fill:SetPoint('BOTTOMRIGHT', box, 'BOTTOMRIGHT', -pixel, pixel)
 	frame.fontString:SetPoint('LEFT', box, 'RIGHT', MARK.textGap, 0)
 	local mark = frame.leftTexture2
 	if not mark then return end
@@ -89,13 +83,9 @@ local function OnDivider(frame)
 	if not Skin.IsSkinEnabled('menus') then return end
 	local divider = frame:GetRegions()
 	if not divider then return end
-	divider:SetAlpha(0)
 	local edge = Skin.PALETTE.edge
-	local line = frame:AttachTexture()
-	line:SetColorTexture(edge[1], edge[2], edge[3], 1)
-	line:SetPoint('LEFT', divider, 'LEFT')
-	line:SetPoint('RIGHT', divider, 'RIGHT')
-	line:SetHeight(OnePixel(line))
+	divider:SetColorTexture(edge[1], edge[2], edge[3], 1)
+	divider:SetHeight(OnePixel(divider))
 end
 
 local menuBackdrops = setmetatable({}, { __mode = 'k' })
