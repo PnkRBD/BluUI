@@ -9,6 +9,8 @@ BUI.BuffFrames = BuffFrames
 local ICON_CROP = 0.08
 local BORDER_COLOR = { 0, 0, 0, 1 }
 local GROUP_KEY = 'all'
+local PIN_KEY = 'pinned'
+local PIN_ORDER, GROUP_ORDER = 1, 2
 local HIDDEN_ROLESET = 'alwaysBlocked'
 local BLIZZARD_ROLESET = 'buffs'
 local BLIZZARD_FRAMES = { 'BuffFrame', 'DebuffFrame' }
@@ -65,8 +67,8 @@ local SORT_METHODS = {
 BuffFrames.SORT_METHODS = SORT_METHODS
 
 local KINDS = {
-	buffs   = { frameName = 'BUI_BuffFrame',   filter = 'HELPFUL', cancel = true, enchants = true, hint = 'Buffs | Drag to Reposition | Right-Click to Lock' },
-	debuffs = { frameName = 'BUI_DebuffFrame', filter = 'HARMFUL', dispel = true, hint = 'Debuffs | Drag to Reposition | Right-Click to Lock' },
+	buffs   = { frameName = 'BUI_BuffFrame',   filter = 'HELPFUL', list = 'buff', cancel = true, enchants = true, hint = 'Buffs | Drag to Reposition | Right-Click to Lock' },
+	debuffs = { frameName = 'BUI_DebuffFrame', filter = 'HARMFUL', list = 'debuff', dispel = true, hint = 'Debuffs | Drag to Reposition | Right-Click to Lock' },
 }
 local KIND_ORDER = { 'buffs', 'debuffs' }
 
@@ -115,12 +117,13 @@ local function GridHeight(config)
 	return config.rows * config.size + (config.rows - 1) * config.rowSpacing
 end
 
-local function ElementLayout(config)
+local function ElementLayout(config, order)
 	return {
 		elementWidth = Pixel.Scale(config.size),
 		elementHeight = Pixel.Scale(config.size),
 		elementSpacing = Pixel.Scale(config.spacing),
 		lineSpacing = Pixel.Scale(config.rowSpacing),
+		layoutIndex = order,
 	}
 end
 
@@ -245,10 +248,26 @@ local function ApplyLayout(header)
 		config.growX == 'RIGHT' and FlowDirection.Right or FlowDirection.Left,
 		config.growY == 'UP' and FlowDirection.Up or FlowDirection.Down)
 	container:SetFlowLayoutMaximumLineSize(Pixel.Scale(GridWidth(config)) + 0.4)
-	container:SetAuraGroupLayout(GROUP_KEY, ElementLayout(config))
-	container:SetAuraGroupMaxFrameCount(GROUP_KEY, config.perRow * config.rows)
+	local settings = Settings()
+	local pins = settings.pinned[header.kind.list]
+	local hasPins = next(pins) ~= nil
+	local blacklist = BUI.AuraBlacklist.FrameSet(header.kind.filter)
+	local exclude = blacklist
+	if hasPins then
+		exclude = {}
+		for spellID in pairs(blacklist) do exclude[spellID] = true end
+		for spellID in pairs(pins) do exclude[spellID] = true end
+	end
+	local count = config.perRow * config.rows
+	local pinsOnly = hasPins and settings.pinnedOnly[header.kind.list] == true
+	container:SetAuraGroupLayout(PIN_KEY, ElementLayout(config, PIN_ORDER))
+	container:SetAuraGroupLayout(GROUP_KEY, ElementLayout(config, GROUP_ORDER))
+	container:SetAuraGroupSortMethod(PIN_KEY, SortMethod(config), SortDirection(config))
 	container:SetAuraGroupSortMethod(GROUP_KEY, SortMethod(config), SortDirection(config))
-	container:SetAuraGroupCandidateFilters(GROUP_KEY, { excludeSpellIDs = BUI.AuraBlacklist.FrameSet(header.kind.filter) })
+	container:SetAuraGroupMaxFrameCount(PIN_KEY, hasPins and count or 0)
+	container:SetAuraGroupCandidateFilters(PIN_KEY, { includeSpellIDs = pins, excludeSpellIDs = blacklist })
+	container:SetAuraGroupMaxFrameCount(GROUP_KEY, pinsOnly and 0 or count)
+	container:SetAuraGroupCandidateFilters(GROUP_KEY, { excludeSpellIDs = exclude })
 	if header.kind.enchants then
 		container:SetItemEnchantmentLayout(EnchantLayout(config))
 		container:SetItemEnchantmentSortMethod(AuraContainerItemEnchantmentSortMethod.Duration, SortDirection(config))
@@ -287,12 +306,19 @@ local function BuildHeader(key)
 	local function Initialize(button)
 		xpcall(BuildButton, geterrorhandler(), header, button)
 	end
+	container:AddAuraGroup(PIN_KEY, kind.filter, {
+		maxFrameCount = 0,
+		initializeFrame = Initialize,
+		sortMethod = SortMethod(config),
+		sortDirection = SortDirection(config),
+		layout = ElementLayout(config, PIN_ORDER),
+	})
 	container:AddAuraGroup(GROUP_KEY, kind.filter, {
 		maxFrameCount = config.perRow * config.rows,
 		initializeFrame = Initialize,
 		sortMethod = SortMethod(config),
 		sortDirection = SortDirection(config),
-		layout = ElementLayout(config),
+		layout = ElementLayout(config, GROUP_ORDER),
 	})
 	if kind.enchants then
 		container:AddItemEnchantment(AuraContainerItemEnchantmentSlot.MainHand, { initializeFrame = Initialize, hidePermanent = true })

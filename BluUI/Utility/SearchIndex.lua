@@ -94,7 +94,9 @@ local entries = {
 
 	{ label = "Buffs", page = "minimap", tab = 6, panel = "Frames", keywords = "buff aura weapon enchant size rows growth sort timer stack anchor offset font outline swipe edge tooltip cancel right click position" },
 	{ label = "Debuffs", page = "minimap", tab = 6, panel = "Frames", keywords = "debuff aura dispel border size rows growth sort timer stack anchor offset font outline swipe edge tooltip position" },
-	{ label = "Buff blacklist", page = "minimap", tab = 7, panel = "Blacklist", keywords = "blacklist hide filter buff debuff spell recently seen share unit frames" },
+	{ label = "Buff blacklist", page = "minimap", tab = 7, panel = "Filters", keywords = "blacklist hide filter buff debuff spell recently seen share unit frames" },
+	{ label = "Pinned debuffs", page = "minimap", tab = 7, panel = "Filters", keywords = "pinned whitelist only show debuffs sated exhaustion bloodlust heroism hero" },
+	{ label = "Pinned buffs", page = "minimap", tab = 7, panel = "Filters", keywords = "pinned whitelist only show buffs" },
 	{ label = "Enable", page = "castbars", tab = 1, keywords = "cast bar player" },
 	{ label = "Show Anchor", page = "castbars", tab = 1, keywords = "anchor mover unlock position" },
 	{ label = "Anchor Frame", page = "castbars", tab = 1, panel = "Anchor" },
