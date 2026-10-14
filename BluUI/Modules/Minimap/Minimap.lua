@@ -528,7 +528,6 @@ local indicators = {
 		squareDefault = { 'BOTTOMLEFT',   5,   5 },
 		raiseFrameLevel = true,
 		atlas = 'groupfinder-eye-single',
-		color = { 0.35, 0.72, 1.00 },
 	},
 	{
 		key = 'difficulty',
@@ -536,7 +535,6 @@ local indicators = {
 		Resolve = GetBlizzardDifficultyFrame,
 		squareDefault = { 'BOTTOMRIGHT', -5,   5 },
 		icon = 'Interface\\Icons\\INV_Misc_Bone_Skull_02',
-		color = { 1.00, 0.55, 0.15 },
 	},
 	{
 		key = 'mail',
@@ -546,7 +544,6 @@ local indicators = {
 		holder = true,
 		squareDefault = { 'TOPLEFT',  5, -30 },
 		icon = 'Interface\\Icons\\INV_Letter_15',
-		color = { 1.00, 0.88, 0.25 },
 	},
 	{
 		key = 'crafting',
@@ -557,7 +554,6 @@ local indicators = {
 		squareDefault = { 'TOPLEFT', 28, -30 },
 		raiseFrameLevel = true,
 		icon = 'Interface\\Icons\\Trade_BlackSmithing',
-		color = { 0.45, 0.82, 0.30 },
 	},
 	{
 		key = 'missions',
@@ -567,7 +563,6 @@ local indicators = {
 		squareDefault = { 'TOPRIGHT', -5, -30 },
 		raiseFrameLevel = true,
 		icon = 'Interface\\Icons\\INV_Misc_Book_09',
-		color = { 0.65, 0.40, 0.95 },
 	},
 }
 
@@ -607,10 +602,6 @@ function Minimap.ApplyIndicatorArt(texture, key)
 	end
 end
 
-function Minimap.GetIndicatorColor(key)
-	return FindIndicator(key).color
-end
-
 local function GhostFootprint(indicator)
 	if indicator.key == 'missions' then return FOLIO_BASE, FOLIO_BASE end
 	local frame = indicator.Resolve()
@@ -627,18 +618,32 @@ local function AtlasSize(texture)
 	return info.width, info.height
 end
 
-local INDICATOR_ART = {
-	queue = function() local size = GetDockSize() return size, size end,
-	mail = function() return AtlasSize(GetMailFrame().MailIcon) end,
-	crafting = function() return AtlasSize(_G.MiniMapCraftingOrderIcon) end,
-	difficulty = function() return AtlasSize(GetBlizzardDifficultyFrame().Default.Background) end,
-	missions = function() return FOLIO_BASE, FOLIO_BASE end,
+local ART_SOURCE = {
+	queue = function() return _G.QueueStatusButton.Eye.texture end,
+	mail = function() return GetMailFrame().MailIcon end,
+	crafting = function() return _G.MiniMapCraftingOrderIcon end,
+	difficulty = function() return GetBlizzardDifficultyFrame().Default.Background end,
+	missions = function() return _G.ExpansionLandingPageMinimapButton:GetNormalTexture() end,
 }
+
+local function ArtSize(key)
+	if key == 'queue' then
+		local size = GetDockSize()
+		return size, size
+	end
+	if key == 'missions' then return FOLIO_BASE, FOLIO_BASE end
+	return AtlasSize(ART_SOURCE[key]())
+end
+
+function Minimap.ApplyLiveIndicatorArt(texture, key)
+	texture:SetAtlas(ART_SOURCE[key]():GetAtlas())
+	texture:SetTexCoord(0, 1, 0, 1)
+end
 
 function Minimap.IndicatorLayout(key, docked)
 	local iconScale = GetIconScale(key)
 	local width, height = GhostFootprint(FindIndicator(key))
-	local artWidth, artHeight = INDICATOR_ART[key]()
+	local artWidth, artHeight = ArtSize(key)
 	if not docked then return width * iconScale, height * iconScale, artWidth * iconScale, artHeight * iconScale end
 	local size = GetDockSize() * iconScale
 	if key == 'queue' or key == 'missions' then return size, size, size, size end
@@ -654,23 +659,23 @@ end
 
 local GHOST_ART = {
 	queue = function(ghost)
-		ghost.eye = CopyArt(ghost, _G.QueueStatusButton.Eye.texture, 'ARTWORK')
+		ghost.eye = CopyArt(ghost, ART_SOURCE.queue(), 'ARTWORK')
 		ghost.eye:SetPoint('CENTER')
 	end,
 	mail = function(ghost)
-		CopyArt(ghost, GetMailFrame().MailIcon, 'ARTWORK'):SetPoint('CENTER')
+		CopyArt(ghost, ART_SOURCE.mail(), 'ARTWORK'):SetPoint('CENTER')
 	end,
 	crafting = function(ghost)
-		CopyArt(ghost, _G.MiniMapCraftingOrderIcon, 'ARTWORK'):SetPoint('CENTER')
+		CopyArt(ghost, ART_SOURCE.crafting(), 'ARTWORK'):SetPoint('CENTER')
 	end,
 	difficulty = function(ghost)
 		local banner = GetBlizzardDifficultyFrame().Default
-		CopyArt(ghost, banner.Background, 'BACKGROUND'):SetPoint('CENTER')
+		CopyArt(ghost, ART_SOURCE.difficulty(), 'BACKGROUND'):SetPoint('CENTER')
 		CopyArt(ghost, banner.Border, 'ARTWORK'):SetPoint('CENTER')
 		CopyArt(ghost, banner.MythicTexture, 'ARTWORK', 1):SetPoint('TOP', -0.5, -4)
 	end,
 	missions = function(ghost)
-		CopyArt(ghost, _G.ExpansionLandingPageMinimapButton:GetNormalTexture(), 'ARTWORK'):SetAllPoints()
+		CopyArt(ghost, ART_SOURCE.missions(), 'ARTWORK'):SetAllPoints()
 	end,
 }
 
