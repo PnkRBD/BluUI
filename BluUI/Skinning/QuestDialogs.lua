@@ -1,6 +1,5 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.QuestDialogs')
 local Wrap = BUI.Profiler.Wrap
 
 local ipairs, pairs = ipairs, pairs
@@ -9,12 +8,12 @@ local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 local SELECTED = Skin.SELECTED_COLOR
 
-local SKIN_ID = 'questdialogs'
-local MAIN_ART = { 'Bg', 'TopTileStreaks', 'Inset' }
 local QUEST_TITLE_SCALE = 1.25
 local SECTION_TITLE_SCALE = 1.1
 local PANEL = { INSET = 6, TOP = -65, BOTTOM = 28, BAR_INSET = 4, BAR_LEVEL = 10, ROW_PAD = 10, ICON_X = 3 }
 local GOSSIP = { CARD_INSET = { top = -5, bottom = -5 }, PAD = 8, SPACING = 12, DIVIDER = 1, BAR_SPACE = 20 }
+local GREETING = { PAD = 8, TEXT_GAP = 4, BREAK_X = 22 }
+GREETING.CARD_INSET = { left = GREETING.PAD, right = GREETING.PAD }
 local ITEM_HIGHLIGHT_ALPHA = 0.12
 local ITEM_HIGHLIGHT_OFFSET_X, ITEM_HIGHLIGHT_OFFSET_Y = 8, -7
 local ITEM_BUTTON_WIDTH, ITEM_BUTTON_HEIGHT = 147, 41
@@ -48,24 +47,20 @@ local TITLE_FRAME_ART = { 'FrameLeft', 'FrameCenter', 'FrameRight' }
 local FRIENDSHIP_ART = { 'BarBorder', 'BarRingBackground', 'BarCircle', 'Notch1', 'Notch2', 'Notch3', 'Notch4' }
 local MODEL_SCENE_ART = { 'ModelBackground', 'ModelNameDivider', 'ModelNameBackground', 'ShadowOverlay', 'Border', 'TopBarBg' }
 local GOSSIP_MEASURE_KEYS = { 'greetingTextFrame', 'titleOptionButton', 'availableQuestButton', 'activeQuestButton' }
-local ADVENTURE_ADDON = 'Blizzard_AdventureMap'
 local ADVENTURE_ART = { 'Background', 'Rewards' }
 local ADVENTURE_BODY_KEYS = { 'DescriptionText', 'ObjectivesText' }
 
-local installed = false
-local questSkinned = false
-local gossipSkinned = false
-local itemTextSkinned = false
-local adventureInstalled = false
-local adventureSkinned = false
 local questPanelTexts = {}
 local questInfoParents = {}
+local breakLine
 
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
+local context = Skin.Define('questdialogs', {
+	name = 'Quest Dialogs',
+	description = 'NPC quest offers, turn-ins, gossip menus, readable books and the quest offers on the Prey scouting map: dark shells, library style text and buttons, and framed reward icons. Only visible while talking to an NPC or reading an object, so there is no preview.',
+	icon = 'Interface/QuestFrame/UI-QuestLog-BookIcon',
+	newLook = true,
+})
+local Enabled = context.Enabled
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
 local Shell, Button, Close, Card = context.Shell, context.Button, context.Close, context.Card
 local ScrollBar, Face, Body, Title = context.ScrollBar, context.Face, context.Body, context.Title
@@ -110,16 +105,6 @@ local function WideScroll(frame, scroll, scrollBar)
 	Fade(scrollBar.Forward)
 end
 
-local function SkinPanelFrame(frame)
-	FadeRegions(frame)
-	Fade(frame.NineSlice)
-	FadeKeys(frame, MAIN_ART)
-	if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
-	Shell(frame)
-	Skin.LeftTitle(frame)
-	Close(frame.CloseButton)
-end
-
 local function SkinFriendshipBar(bar)
 	if not bar then return end
 	FadeKeys(bar, FRIENDSHIP_ART)
@@ -155,7 +140,7 @@ local function RefreshQualityEdge(button)
 end
 
 local function OnItemButtonQuality(button)
-	if Enabled() and button and button._buiRewardIcon then RefreshQualityEdge(button) end
+	if button and button._buiRewardIcon then RefreshQualityEdge(button) end
 end
 
 local function SkinSpellReward(button)
@@ -265,11 +250,11 @@ local function QuestInfoOnQuestFrame()
 end
 
 local function OnQuestInfoDisplay(_, parentFrame)
-	if Enabled() and questInfoParents[parentFrame] then RefreshQuestInfo() end
+	if questInfoParents[parentFrame] then RefreshQuestInfo() end
 end
 
 local function OnQuestInfoRewards()
-	if Enabled() and QuestInfoOnQuestFrame() then SweepRewards() end
+	if QuestInfoOnQuestFrame() then SweepRewards() end
 end
 
 local function StylePanelText(fontString)
@@ -277,22 +262,26 @@ local function StylePanelText(fontString)
 	if style then Skin.TipFont(fontString, style[1], style[2]) end
 end
 
-local function OnPanelText(fontString)
-	if Enabled() then StylePanelText(fontString) end
+local function GreetingRowWidth()
+	return _G.QuestFrame:GetWidth() - 2 * PANEL.INSET
+end
+
+local function LayoutGreetingRow(button, width)
+	SkinListRow(button, GREETING.CARD_INSET)
+	button:SetWidth(width)
+	button.Icon:ClearAllPoints()
+	button.Icon:SetPoint('LEFT', GREETING.PAD + PANEL.ICON_X, 0)
+	local text = button:GetFontString()
+	text:ClearAllPoints()
+	text:SetPoint('LEFT', button.Icon, 'RIGHT', GREETING.TEXT_GAP, 0)
+	text:SetPoint('RIGHT', -GREETING.PAD - PANEL.ICON_X, 0)
+	button:SetHeight(math.max(button:GetTextHeight() + 2, button.Icon:GetHeight()) + PANEL.ROW_PAD)
 end
 
 local function RefreshGreeting()
-	local panel = _G.QuestFrameGreetingPanel
-	for button in panel.titleButtonPool:EnumerateActive() do
-		SkinListRow(button)
-		button.Icon:ClearAllPoints()
-		button.Icon:SetPoint('LEFT', PANEL.ICON_X, 0)
-		button:SetHeight(math.max(button:GetTextHeight() + 2, button.Icon:GetHeight()) + PANEL.ROW_PAD)
-	end
-end
-
-local function OnGreetingShown()
-	if Enabled() then RefreshGreeting() end
+	local width = GreetingRowWidth()
+	for button in _G.QuestFrameGreetingPanel.titleButtonPool:EnumerateActive() do LayoutGreetingRow(button, width) end
+	breakLine:SetShown(_G.QuestGreetingFrameHorizontalBreak:IsShown())
 end
 
 local function RefreshProgress()
@@ -303,22 +292,13 @@ local function RefreshProgress()
 	end
 end
 
-local function OnProgressItems()
-	if Enabled() then RefreshProgress() end
-end
-
-local function SkinGreetingBreak(texture)
-	if not texture then return end
-	Fade(texture)
-	if texture._buiBreakLine then return end
-	texture._buiBreakLine = true
-	local line = texture:GetParent():CreateTexture(nil, 'ARTWORK')
-	line.__buiSkin = true
-	line:SetHeight(1)
-	line:SetPoint('LEFT', texture, 'LEFT', 0, 0)
-	line:SetPoint('RIGHT', texture, 'RIGHT', 0, 0)
-	BUI.Painter.Fill(line, 'skinBorder')
-	BUILib.Skin.PixelLine(line, texture)
+local function BuildBreakLine()
+	local texture = _G.QuestGreetingFrameHorizontalBreak
+	breakLine = context.Own(texture:GetParent():CreateTexture(nil, 'ARTWORK'))
+	BUI.Painter.Fill(breakLine, 'skinBorder')
+	local startInset = GREETING.PAD - GREETING.BREAK_X
+	local endInset = GREETING.BREAK_X + texture:GetWidth() - GreetingRowWidth() + GREETING.PAD
+	BUILib.Skin.PixelLine(breakLine, texture, false, startInset, endInset)
 end
 
 local function SkinModelScene(scene)
@@ -337,7 +317,7 @@ local function SkinModelScene(scene)
 end
 
 local function SkinQuestFrame(frame)
-	SkinPanelFrame(frame)
+	context.Chrome(frame)
 	Fade(_G.QuestFramePortrait)
 	local notice = frame.AccountCompletedNotice
 	if notice then Skin.TipFont(notice.Text, 'label') end
@@ -352,7 +332,7 @@ local function SkinQuestFrame(frame)
 	end
 	for _, name in ipairs(QUEST_BUTTON_NAMES) do Button(_G[name]) end
 	for fontString in pairs(questPanelTexts) do StylePanelText(fontString) end
-	SkinGreetingBreak(_G.QuestGreetingFrameHorizontalBreak)
+	Fade(_G.QuestGreetingFrameHorizontalBreak)
 	Skin.TipFont(_G.QuestProgressRequiredMoneyText, 'label')
 	FaceMoney(_G.QuestProgressRequiredMoneyFrame)
 	for itemIndex = 1, PROGRESS_ITEM_COUNT do SkinRewardIcon(_G['QuestProgressItem' .. itemIndex]) end
@@ -430,8 +410,8 @@ local function RefreshGossip()
 	FontGossipMeasures(scrollBox)
 end
 
-local function OnGossipUpdated()
-	if Enabled() and gossipSkinned then RefreshGossip() end
+local function OnGossipUpdated(frame)
+	if frame:IsShown() then RefreshGossip() end
 end
 
 local function PadGossipList(scrollBox, scrollBar)
@@ -457,7 +437,7 @@ local function ShapeGossipList(scrollBox, scrollBar)
 end
 
 local function SkinGossipFrame(frame)
-	SkinPanelFrame(frame)
+	context.Chrome(frame)
 	SkinFriendshipBar(frame.FriendshipStatusBar)
 	local panel = frame.GreetingPanel
 	FadeRegions(panel)
@@ -478,7 +458,7 @@ local function StylePageHtml()
 end
 
 local function OnItemTextEvent(_, event)
-	if Enabled() and event == 'ITEM_TEXT_BEGIN' then StylePageHtml() end
+	if event == 'ITEM_TEXT_BEGIN' then StylePageHtml() end
 end
 
 local function SkinPageButton(button, direction)
@@ -488,7 +468,7 @@ local function SkinPageButton(button, direction)
 end
 
 local function SkinItemTextFrame(frame)
-	SkinPanelFrame(frame)
+	context.Chrome(frame)
 	Body(_G.ItemTextCurrentPage)
 	local scroll = _G.ItemTextScrollFrame
 	Shell(scroll)
@@ -505,146 +485,43 @@ local function SkinItemTextFrame(frame)
 	end
 end
 
-local function ApplyQuest()
-	local frame = _G.QuestFrame
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if not questSkinned then
-		questSkinned = true
-		SkinQuestFrame(frame)
-	end
+local function OnAdventureRewards(dialog)
+	if dialog:IsShown() then RefreshAdventureRewards(dialog) end
+end
+
+local function InstallQuest()
+	for name, style in pairs(PANEL_TEXT_STYLES) do questPanelTexts[_G[name]] = style end
+	questInfoParents[_G.QuestDetailScrollChildFrame] = true
+	questInfoParents[_G.QuestRewardScrollChildFrame] = true
+	BuildBreakLine()
+	_G.QuestFrameGreetingPanel:HookScript('OnShow', Wrap('Skin.QuestDialogs greeting shown', context.Guard(RefreshGreeting)))
+	context.Hook('QuestInfo_Display', OnQuestInfoDisplay)
+	context.Hook('QuestInfo_ShowRewards', OnQuestInfoRewards)
+	context.Hook('QuestFrame_SetTextColor', StylePanelText)
+	context.Hook('QuestFrame_SetTitleTextColor', StylePanelText)
+	context.Hook('QuestFrameProgressItems_Update', RefreshProgress)
+	context.Hook('SetItemButtonQuality', OnItemButtonQuality)
+end
+
+local function ShowQuest()
 	if _G.QuestFrameGreetingPanel:IsShown() then RefreshGreeting() end
 	if _G.QuestFrameProgressPanel:IsShown() then RefreshProgress() end
 	if QuestInfoOnQuestFrame() then RefreshQuestInfo() end
 end
 
-local function ApplyGossip()
-	local frame = _G.GossipFrame
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if not gossipSkinned then
-		gossipSkinned = true
-		SkinGossipFrame(frame)
-	end
-	RefreshGossip()
+local function InstallGossip(frame)
+	context.Hook(frame, 'Update', OnGossipUpdated)
 end
 
-local function ApplyItemText()
-	local frame = _G.ItemTextFrame
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if not itemTextSkinned then
-		itemTextSkinned = true
-		SkinItemTextFrame(frame)
-	end
-	StylePageHtml()
+local function InstallItemText(frame)
+	frame:HookScript('OnEvent', Wrap('Skin.QuestDialogs text event', context.Guard(OnItemTextEvent)))
 end
 
-local function ApplyAdventure()
-	if not Enabled() then return end
-	local dialog = _G.AdventureMapQuestChoiceDialog
-	if not adventureSkinned then
-		adventureSkinned = true
-		SkinAdventureDialog(dialog)
-	end
-	RefreshAdventureRewards(dialog)
+local function InstallAdventure(dialog)
+	context.Hook(dialog, 'RefreshRewards', OnAdventureRewards)
 end
 
-local function OnAdventureRewards(dialog)
-	if Enabled() and adventureSkinned then RefreshAdventureRewards(dialog) end
-end
-
-local function InstallAdventure()
-	adventureInstalled = true
-	Hook(_G.AdventureMapQuestChoiceDialog, 'RefreshRewards', OnAdventureRewards)
-	ApplyAdventure()
-end
-
-local function OnAdventureLoaded(_, addonName)
-	if addonName ~= ADVENTURE_ADDON then return end
-	BUI.Events:Unregister('ADDON_LOADED', 'Skin.QuestDialogs.AdventureMap')
-	InstallAdventure()
-end
-
-local function WatchAdventureMap()
-	if adventureInstalled then
-		ApplyAdventure()
-	elseif _G.AdventureMapQuestChoiceDialog then
-		InstallAdventure()
-	else
-		BUI.Events:Register('ADDON_LOADED', 'Skin.QuestDialogs.AdventureMap', OnAdventureLoaded)
-	end
-end
-
-local function ApplyShown()
-	if _G.QuestFrame:IsShown() then ApplyQuest() end
-	if _G.GossipFrame:IsShown() then ApplyGossip() end
-	if _G.ItemTextFrame:IsShown() then ApplyItemText() end
-end
-
-local function HookQuest(frame)
-	frame:HookScript('OnShow', Wrap('Skin.QuestDialogs quest reskin', ApplyQuest))
-	Hook('QuestInfo_Display', OnQuestInfoDisplay)
-	Hook('QuestInfo_ShowRewards', OnQuestInfoRewards)
-	Hook('QuestFrame_SetTextColor', OnPanelText)
-	Hook('QuestFrame_SetTitleTextColor', OnPanelText)
-	Hook('QuestFrameGreetingPanel_OnShow', OnGreetingShown)
-	Hook('QuestFrameProgressItems_Update', OnProgressItems)
-	Hook('SetItemButtonQuality', OnItemButtonQuality)
-end
-
-local function HookGossip(frame)
-	frame:HookScript('OnShow', Wrap('Skin.QuestDialogs gossip reskin', ApplyGossip))
-	Hook(frame, 'Update', OnGossipUpdated)
-end
-
-local function HookItemText(frame)
-	frame:HookScript('OnShow', Wrap('Skin.QuestDialogs text reskin', ApplyItemText))
-	Hook('ItemTextFrame_OnEvent', OnItemTextEvent)
-end
-
-local function Install()
-	if installed then return end
-	local quest, gossip, itemText = _G.QuestFrame, _G.GossipFrame, _G.ItemTextFrame
-	if not quest or not gossip or not itemText then return end
-	installed = true
-	for name, style in pairs(PANEL_TEXT_STYLES) do questPanelTexts[_G[name]] = style end
-	questInfoParents[_G.QuestDetailScrollChildFrame] = true
-	questInfoParents[_G.QuestRewardScrollChildFrame] = true
-	HookQuest(quest)
-	HookGossip(gossip)
-	HookItemText(itemText)
-end
-
-local function TryInstall()
-	Install()
-	if not installed then return end
-	BUI.Events:Unregister('ADDON_LOADED', 'Skin.QuestDialogs')
-	ApplyShown()
-end
-
-local function Deactivate()
-	context.Restore()
-	questSkinned = false
-	gossipSkinned = false
-	itemTextSkinned = false
-	adventureSkinned = false
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		if installed then
-			ApplyShown()
-		else
-			BUI.Events:Register('ADDON_LOADED', 'Skin.QuestDialogs', TryInstall)
-		end
-		WatchAdventureMap()
-	else
-		Deactivate()
-	end
-end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Quest Dialogs',
-	description = 'NPC quest offers, turn-ins, gossip menus, readable books and the quest offers on the Prey scouting map: dark shells, house text on the parchment, framed reward icons and house buttons. Only visible while talking to an NPC or reading an object, so there is no preview.',
-	icon = 'Interface/QuestFrame/UI-QuestLog-BookIcon',
-	newLook = true,
-})
+context.Window('QuestFrame', { install = InstallQuest, skin = SkinQuestFrame, show = ShowQuest })
+context.Window('GossipFrame', { install = InstallGossip, skin = SkinGossipFrame, show = RefreshGossip })
+context.Window('ItemTextFrame', { install = InstallItemText, skin = SkinItemTextFrame, show = StylePageHtml })
+context.Window('AdventureMapQuestChoiceDialog', { install = InstallAdventure, skin = SkinAdventureDialog, show = RefreshAdventureRewards })
