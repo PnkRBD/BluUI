@@ -2,6 +2,7 @@ local BUI = BluUI
 local BUILib = BUI.BUILibClient
 local Layout, Modals, Widget = BUILib.Layout, BUILib.Modals, BUILib.Widget
 local MinimapModule = BUI.Minimap
+local BuffFramesPage = BUI.BuffFramesPage
 local Datatext = BUI.Datatext
 local ButtonBar = BUI.MinimapButtonBar
 local AddonButtons = BUI.AddonButtons
@@ -33,8 +34,9 @@ local RAIL_GROUPS = {
 		{ id = 'datatext', label = 'Datatext bar', icon = 'text' },
 		{ id = 'buttons', label = 'Drawer and buttons', icon = 'modules5' },
 	} },
+	BuffFramesPage.group,
 }
-local PANE_IDS = { 'map', 'indicators', 'text', 'datatext', 'buttons' }
+local PANE_IDS = { 'map', 'indicators', 'text', 'datatext', 'buttons', 'buffFrames', 'buffBlacklist' }
 local PANE_INDEX = {}
 for index, id in ipairs(PANE_IDS) do PANE_INDEX[id] = index end
 
@@ -952,7 +954,8 @@ local function ButtonsBoard(ui, parent, width, page)
 	return board
 end
 
-local function Panes(ui, _, parent, width, item, page)
+local function Panes(ui, shell, parent, width, item, page)
+	if BuffFramesPage.Owns(item.id) then return BuffFramesPage.Build(ui, shell, parent, width, item, page) end
 	if item.id == 'map' then return { MapBoard(ui, parent, width) } end
 	if item.id == 'indicators' then return { IndicatorsBoard(ui, parent, width) } end
 	if item.id == 'text' then return { TextBoard(ui, parent, width) } end
@@ -975,10 +978,14 @@ BUI.PageEngine.RegisterPage('minimap', {
 			icon = 'minimap',
 			title = 'Minimap',
 			placeholder = 'Search minimap settings...',
-			disabled = function() return not enabled end,
+			disabled = function(item)
+				if BuffFramesPage.Owns(item.id) then return not BuffFramesPage.IsOn() end
+				return not enabled
+			end,
 			tools = {
 				{ icon = 'enable', tooltip = 'Turn the minimap module on or off, needs a reload', get = function() return Interface().minimapEnabled ~= false end, set = ConfirmModule },
 				{ icon = 'eye', tooltip = 'Unlock the map to drag it and its indicators, right-click it to lock', get = MinimapModule.IsUnlocked, set = MinimapModule.ToggleUnlock },
+				BuffFramesPage.EnableTool(Repaint),
 			},
 			preview = { height = PREVIEW_HEIGHT, build = function(band) preview = BuildPreview(band) end },
 			rail = { groups = RAIL_GROUPS },

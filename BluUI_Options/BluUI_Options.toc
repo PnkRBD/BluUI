@@ -10,11 +10,11 @@
 
 Windows.lua
 Pages\Cursor.lua
+Pages\BuffFrames.lua
 Pages\Minimap.lua
 Pages\Datatext.lua
 Pages\SkinPages.lua
 Pages\Markers.lua
-Pages\BuffFrames.lua
 Pages\QualityOfLife.lua
 Pages\Appearance.lua
 Pages\AlertMover.lua
