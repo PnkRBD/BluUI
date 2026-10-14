@@ -6,9 +6,15 @@ BUI.AuraRules = AuraRules
 AuraRules.CATALOG = {
 	{
 		id = 'dispellable', polarity = 'HARMFUL', label = 'Dispellable By Me',
-		desc = 'Debuffs you can currently dispel.',
-		engineFilter = 'HARMFUL|RAID_PLAYER_DISPELLABLE',
+		desc = 'Debuffs you can dispel.',
+		engineFilter = 'HARMFUL|RAID',
 		icon = 135894,
+	},
+	{
+		id = 'groupDispellable', polarity = 'HARMFUL', label = 'Dispellable By My Group',
+		desc = 'Debuffs someone in your group can dispel.',
+		engineFilter = 'HARMFUL|RAID_PLAYER_DISPELLABLE',
+		icon = 'Interface\\Icons\\Spell_Holy_DispelMagic',
 	},
 	{
 		id = 'crowdControl', polarity = 'HARMFUL', label = 'Crowd Control',
