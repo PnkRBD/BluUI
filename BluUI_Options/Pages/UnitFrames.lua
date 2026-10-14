@@ -792,6 +792,10 @@ local function FiltersBoards(ui, parent, width, page)
 		description = 'Pinned auras always show, blacklisted auras never do.',
 	})
 	AuraLists.ShareCell(shared, 'Share blacklists with the group frames')
+	shared:AddSwitch("Hide my pet's debuffs", function() return filters.hidePetDebuffs == true end, function(value)
+		filters.hidePetDebuffs = value
+		RefreshFilters()
+	end, 'Pet and summon debuffs stay off')
 	return {
 		shared,
 		AuraLists.Pinned(ui, parent, width, page, {

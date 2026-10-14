@@ -1538,6 +1538,7 @@ BUI.Defaults = {
 			debuffWhitelistOnly = false,
 			buffPinsAnyone      = false,
 			debuffPinsAnyone    = false,
+			hidePetDebuffs      = true,
 			shareBlacklists     = true,
 		},
 
