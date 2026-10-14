@@ -110,7 +110,6 @@ local CONTAINERS = {
 	{ key = 'crowdControl', title = 'Crowd control', description = 'Stuns, fears and other loss of control' },
 }
 local POLARITY = { buffs = 'HELPFUL', bigDef = 'HELPFUL', debuffs = 'HARMFUL', crowdControl = 'HARMFUL' }
-local SECTION_OF = { party = 'party', partyAuras = 'party', raid = 'raid', raidAuras = 'raid' }
 local fonts, textures, moduleLoaded
 
 local function Window()
@@ -182,6 +181,106 @@ local function Placement(settings)
 	return { label = 'Anchor', entries = BUI.C.TEXT_PLACEMENT_OPTIONS, get = function() return byPoints[settings.anchorPoint .. ':' .. settings.relativePoint] end, set = function(value)
 		settings.anchorPoint, settings.relativePoint = BUI.Tools.ResolvePlacement(value)
 	end }
+end
+
+local function AurasBoards(ui, parent, width, key)
+	local section = Config()[key]
+	local function Refresh() GroupFrames().Refresh(key) end
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Auras',
+		description = 'Buffs, debuffs, defensives and crowd control on each member. The eye shows sample icons on the frames.',
+	})
+	for _, container in ipairs(CONTAINERS) do
+		local settings = section[container.key]
+		board:AddTools(container.title, container.description, {
+			AuraLists.Rules({
+				getRules = function() return GroupFrames().ContainerRules(settings, container.key) end,
+				polarity = POLARITY[container.key],
+				onChanged = Refresh,
+			}),
+			{ tooltip = 'Layout and sizing', title = container.title, options = {
+				Option(settings, 'Max per rule', 'max', { min = 1, max = 20, step = 1 }),
+				Option(settings, 'Per row', 'perRow', { min = 1, max = 20, step = 1 }),
+				Option(settings, 'Icon size', 'size', { min = 10, max = 48, step = 1 }),
+				Option(settings, 'Icon spacing', 'spacing', { min = 0, max = 10, step = 1 }),
+				Option(settings, 'Row spacing', 'rowSpacing', { min = 0, max = 10, step = 1 }),
+				Option(settings, 'Stack text size', 'stackSize', { min = 6, max = 24, step = 1 }),
+				Toggle(settings, 'Decimals', 'showCooldownDecimals'),
+				Option(settings, 'Decimals under seconds', 'cooldownDecimalThreshold', { min = 1, max = 30, step = 1 }),
+				{ label = 'Sort by', entries = BUI.AuraEngine.SortMethodItems(), get = function() return settings.sortMethod or 'default' end, set = function(value) settings.sortMethod = value end },
+				Option(settings, 'Grow', 'growDirection', { entries = GROWTHS }),
+				Placement(settings),
+				Option(settings, 'Horizontal', 'offsetX', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
+				Option(settings, 'Vertical', 'offsetY', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
+			} },
+			Eye('Show sample icons on the frames', function() return GroupFrames().IsAuraPreviewing(key, container.key) end, function(value) GroupFrames().PreviewAuraKind(key, container.key, value) end),
+			Toggle(settings, nil, 'enabled'),
+		}, Refresh)
+	end
+
+	local dispels = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Dispels',
+		description = 'Color the frame while a member has a dispellable debuff.',
+	})
+	local border, badge = section.dispelBorder, section.dispelBadge
+	local function Badges() GroupFrames().RestyleAllDispelBadges() end
+	dispels:AddTools('Dispel highlight', 'How the frame reacts, following the player frame unless told otherwise', {
+		{ entries = DISPEL_MODES, width = MENU_WIDTH, get = function()
+			local wantTint, style = GroupFrames().DispelLook(section)
+			return wantTint and style or 'off'
+		end, set = function(value)
+			if border.matchPlayer then
+				local player = BUI.GetDB().unitFrames.player
+				player.debuffHighlightBar = TINT_MODES[value] == true
+				if player.debuffHighlightBar then player.debuffHighlightStyle = value end
+				BUI.UnitFrames.InvalidateSettingsCache()
+				BUI.UnitFrames:Refresh()
+				return
+			end
+			border.tintBar = TINT_MODES[value] == true
+			if border.tintBar then border.tintStyle = value end
+		end },
+		{ tooltip = 'Trigger and badge icon', title = 'Dispel highlight', options = {
+			Toggle(border, 'Match the player frame', 'matchPlayer'),
+			Option(border, 'Trigger', 'source', { entries = DISPEL_SOURCES, separator = true }),
+			Toggle(border, 'Dispel icon', 'showBadge'),
+			Option(badge, 'Icon size', 'size', { min = 10, max = 48, step = 1 }),
+			Option(badge, 'Icon anchor', 'anchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
+			Option(badge, 'Icon horizontal', 'offsetX', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
+			Option(badge, 'Icon vertical', 'offsetY', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
+		} },
+		Eye('Cycle the dispel colors on the party frames', GroupFrames().IsDispelPreviewActive, function(value)
+			if value then GroupFrames().StartDispelPartyPreview() else GroupFrames().StopDispelPreview() end
+		end),
+	}, function()
+		Badges()
+		Refresh()
+	end)
+	local store = BUI.Colors.GetStore()
+	local swatches = {
+		{ icon = 'reset', tooltip = 'Back to the default colors', onClick = function()
+			BUI.Colors.ResetGroup('Dispel Types')
+			BUI.ApplyColors()
+			Badges()
+			Refresh()
+			Repaint()
+		end },
+	}
+	for _, typeName in ipairs(DISPEL_TYPES) do
+		local stored = store[BUI.AuraEngine.DispelColorKey(typeName)]
+		swatches[#swatches + 1] = {
+			kind = 'swatch', tooltip = typeName, opacity = true,
+			get = function() return stored.r, stored.g, stored.b, stored.a end,
+			set = function(red, green, blue, alpha) stored.r, stored.g, stored.b, stored.a = red, green, blue, alpha end,
+		}
+	end
+	dispels:AddTools('Dispel type colors', 'Shared with the unit frames and the color editor', swatches, function()
+		Badges()
+		Refresh()
+	end)
+	return board, dispels
 end
 
 local function FramesBoard(ui, parent, width, key)
@@ -419,107 +518,8 @@ local function FramesBoard(ui, parent, width, key)
 		section.showAuraTooltips = value
 		Refresh()
 	end, 'Tooltips on buff and debuff icons')
-	return { board, look, text, indicators, tooltips }
-end
-
-local function AurasBoards(ui, parent, width, key)
-	local section = Config()[key]
-	local function Refresh() GroupFrames().Refresh(key) end
-	local board = ui.Board(parent, width, {
-		stacked = true,
-		title = key == 'party' and 'Party auras' or 'Raid auras',
-		description = 'Buffs, debuffs, defensives and crowd control on each member. The eye shows sample icons on the frames.',
-	})
-	for _, container in ipairs(CONTAINERS) do
-		local settings = section[container.key]
-		board:AddTools(container.title, container.description, {
-			AuraLists.Rules({
-				getRules = function() return GroupFrames().ContainerRules(settings, container.key) end,
-				polarity = POLARITY[container.key],
-				onChanged = Refresh,
-			}),
-			{ tooltip = 'Layout and sizing', title = container.title, options = {
-				Option(settings, 'Max per rule', 'max', { min = 1, max = 20, step = 1 }),
-				Option(settings, 'Per row', 'perRow', { min = 1, max = 20, step = 1 }),
-				Option(settings, 'Icon size', 'size', { min = 10, max = 48, step = 1 }),
-				Option(settings, 'Icon spacing', 'spacing', { min = 0, max = 10, step = 1 }),
-				Option(settings, 'Row spacing', 'rowSpacing', { min = 0, max = 10, step = 1 }),
-				Option(settings, 'Stack text size', 'stackSize', { min = 6, max = 24, step = 1 }),
-				Toggle(settings, 'Decimals', 'showCooldownDecimals'),
-				Option(settings, 'Decimals under seconds', 'cooldownDecimalThreshold', { min = 1, max = 30, step = 1 }),
-				{ label = 'Sort by', entries = BUI.AuraEngine.SortMethodItems(), get = function() return settings.sortMethod or 'default' end, set = function(value) settings.sortMethod = value end },
-				Option(settings, 'Grow', 'growDirection', { entries = GROWTHS }),
-				Placement(settings),
-				Option(settings, 'Horizontal', 'offsetX', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
-				Option(settings, 'Vertical', 'offsetY', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
-			} },
-			Eye('Show sample icons on the frames', function() return GroupFrames().IsAuraPreviewing(key, container.key) end, function(value) GroupFrames().PreviewAuraKind(key, container.key, value) end),
-			Toggle(settings, nil, 'enabled'),
-		}, Refresh)
-	end
-
-	local dispels = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Dispels',
-		description = 'Color the frame while a member has a dispellable debuff.',
-	})
-	local border, badge = section.dispelBorder, section.dispelBadge
-	local function Badges() GroupFrames().RestyleAllDispelBadges() end
-	dispels:AddTools('Dispel highlight', 'How the frame reacts, following the player frame unless told otherwise', {
-		{ entries = DISPEL_MODES, width = MENU_WIDTH, get = function()
-			local wantTint, style = GroupFrames().DispelLook(section)
-			return wantTint and style or 'off'
-		end, set = function(value)
-			if border.matchPlayer then
-				local player = BUI.GetDB().unitFrames.player
-				player.debuffHighlightBar = TINT_MODES[value] == true
-				if player.debuffHighlightBar then player.debuffHighlightStyle = value end
-				BUI.UnitFrames.InvalidateSettingsCache()
-				BUI.UnitFrames:Refresh()
-				return
-			end
-			border.tintBar = TINT_MODES[value] == true
-			if border.tintBar then border.tintStyle = value end
-		end },
-		{ tooltip = 'Trigger and badge icon', title = 'Dispel highlight', options = {
-			Toggle(border, 'Match the player frame', 'matchPlayer'),
-			Option(border, 'Trigger', 'source', { entries = DISPEL_SOURCES, separator = true }),
-			Toggle(border, 'Dispel icon', 'showBadge'),
-			Option(badge, 'Icon size', 'size', { min = 10, max = 48, step = 1 }),
-			Option(badge, 'Icon anchor', 'anchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
-			Option(badge, 'Icon horizontal', 'offsetX', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
-			Option(badge, 'Icon vertical', 'offsetY', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
-		} },
-		Eye('Cycle the dispel colors on the party frames', GroupFrames().IsDispelPreviewActive, function(value)
-			if value then GroupFrames().StartDispelPartyPreview() else GroupFrames().StopDispelPreview() end
-		end),
-	}, function()
-		Badges()
-		Refresh()
-	end)
-	local store = BUI.Colors.GetStore()
-	local swatches = {
-		{ icon = 'reset', tooltip = 'Back to the default colors', onClick = function()
-			BUI.Colors.ResetGroup('Dispel Types')
-			BUI.ApplyColors()
-			Badges()
-			Refresh()
-			Repaint()
-		end },
-	}
-	for _, typeName in ipairs(DISPEL_TYPES) do
-		local stored = store[BUI.AuraEngine.DispelColorKey(typeName)]
-		swatches[#swatches + 1] = {
-			kind = 'swatch', tooltip = typeName, opacity = true,
-			get = function() return stored.r, stored.g, stored.b, stored.a end,
-			set = function(red, green, blue, alpha) stored.r, stored.g, stored.b, stored.a = red, green, blue, alpha end,
-		}
-	end
-	dispels:AddTools('Dispel type colors', 'Shared with the unit frames and the color editor', swatches, function()
-		Badges()
-		Refresh()
-	end)
-	return { board, dispels }
+	local auras, dispels = AurasBoards(ui, parent, width, key)
+	return { board, look, text, auras, dispels, indicators, tooltips }
 end
 
 local function GeneralBoards(ui, parent, width)
@@ -693,7 +693,6 @@ local function Panes(ui, _, parent, width, item, page)
 	if item.id == 'general' then return GeneralBoards(ui, parent, width) end
 	if item.id == 'groupFilters' then return FiltersBoards(ui, parent, width, page) end
 	if item.id == 'hotSlots' then return { HotLayoutBoard(ui, parent, width), HotSpellsBoard(ui, parent, width, page) } end
-	if item.id == 'partyAuras' or item.id == 'raidAuras' then return AurasBoards(ui, parent, width, SECTION_OF[item.id]) end
 	return FramesBoard(ui, parent, width, item.id)
 end
 
@@ -701,9 +700,7 @@ local ITEMS = {
 	{ id = 'general', label = 'General', icon = 'cog' },
 	{ id = 'groupFilters', label = 'Filters', icon = 'x' },
 	{ id = 'party', label = 'Party', icon = 'party' },
-	{ id = 'partyAuras', label = 'Party auras', icon = 'glow' },
 	{ id = 'raid', label = 'Raid', icon = 'raid' },
-	{ id = 'raidAuras', label = 'Raid auras', icon = 'glow' },
 	{ id = 'hotSlots', label = 'HoT slots', icon = 'sparkle' },
 }
 

@@ -42,8 +42,8 @@ local UNITS = {
 local UNIT_BY_KEY = {}
 for _, unit in ipairs(UNITS) do UNIT_BY_KEY[unit.key] = unit end
 local ANCHORABLE = { player = true, target = true, focus = true, pet = true, targettarget = true }
-local TAB_IDS = { 'appearance', 'tags', 'player', 'target', 'targettarget', 'focus', 'pet', 'boss', 'filters', 'general', 'party', 'raid', 'partyAuras', 'raidAuras', 'groupFilters', 'hotSlots' }
-local TAB_INDEX = { appearance = 1, tags = 2, player = 3, target = 4, targettarget = 5, focus = 6, pet = 7, boss = 8, filters = 9, general = 10, party = 11, raid = 12, partyAuras = 13, raidAuras = 14, groupFilters = 15, hotSlots = 16 }
+local TAB_IDS = { 'appearance', 'tags', 'player', 'target', 'targettarget', 'focus', 'pet', 'boss', 'filters', 'general', 'party', 'raid', 'groupFilters', 'hotSlots' }
+local TAB_INDEX = { appearance = 1, tags = 2, player = 3, target = 4, targettarget = 5, focus = 6, pet = 7, boss = 8, filters = 9, general = 10, party = 11, raid = 12, groupFilters = 13, hotSlots = 14 }
 local GROUP_PANE = {}
 local TAG_UNITS = {
 	{ value = 'player', text = 'Player' },

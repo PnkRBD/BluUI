@@ -355,12 +355,12 @@ local entries = {
 	{ label = "Role icons", page = "unitframes", tab = 12, panel = "Raid", keywords = "raid role icon tank healer" },
 	{ label = "Large raid layout", page = "unitframes", tab = 12, panel = "Raid", keywords = "large raid size threshold groups per row spacing" },
 	{ label = "Power bar", page = "unitframes", tab = 12, panel = "Raid", keywords = "raid power bar show hide height healer mana" },
-	{ label = "Buffs", page = "unitframes", tab = 13, panel = "Party auras", keywords = "party aura buff debuff defensive crowd control icons rules" },
-	{ label = "Dispel highlight", page = "unitframes", tab = 13, panel = "Party auras", keywords = "dispel debuff highlight tint badge magic curse poison disease" },
-	{ label = "Dispel type colors", page = "unitframes", tab = 13, panel = "Party auras", keywords = "dispel color magic curse poison disease bleed shared palette" },
-	{ label = "Buffs", page = "unitframes", tab = 14, panel = "Raid auras", keywords = "raid aura buff debuff defensive crowd control icons rules" },
-	{ label = "Dispel highlight", page = "unitframes", tab = 14, panel = "Raid auras", keywords = "raid dispel highlight tint badge" },
-	{ label = "Debuff blacklist", page = "unitframes", tab = 15, panel = "Filters", keywords = "blacklist filter debuff buff hide spell recently seen built-in share" },
+	{ label = "Buffs", page = "unitframes", tab = 11, panel = "Auras", keywords = "party aura buff debuff defensive crowd control icons rules" },
+	{ label = "Dispel highlight", page = "unitframes", tab = 11, panel = "Dispels", keywords = "dispel debuff highlight tint badge magic curse poison disease" },
+	{ label = "Dispel type colors", page = "unitframes", tab = 11, panel = "Dispels", keywords = "dispel color magic curse poison disease bleed shared palette" },
+	{ label = "Buffs", page = "unitframes", tab = 12, panel = "Auras", keywords = "raid aura buff debuff defensive crowd control icons rules" },
+	{ label = "Dispel highlight", page = "unitframes", tab = 12, panel = "Dispels", keywords = "raid dispel highlight tint badge" },
+	{ label = "Debuff blacklist", page = "unitframes", tab = 13, panel = "Filters", keywords = "blacklist filter debuff buff hide spell recently seen built-in share" },
 }
 
 local pageTitles = {}
@@ -438,6 +438,6 @@ SearchIndex.RegisterTabNames('auras', { 'General', 'GCD History', 'Class' })
 SearchIndex.RegisterTabNames('power', { 'Primary', 'Secondary', 'Stacking' })
 SearchIndex.RegisterTabNames('cdm', { 'General', 'Essential', 'Utility', 'Buff icons', 'Buff bars', 'Layouts', 'Icon management' })
 SearchIndex.RegisterTabNames('castbars', { 'Player', 'Target', 'Focus' })
-SearchIndex.RegisterTabNames('unitframes', { 'Appearance', 'Tags', 'Player', 'Target', 'Target of target', 'Focus', 'Pet', 'Boss', 'Filters', 'Groups', 'Party', 'Raid', 'Party auras', 'Raid auras', 'Group filters' })
+SearchIndex.RegisterTabNames('unitframes', { 'Appearance', 'Tags', 'Player', 'Target', 'Target of target', 'Focus', 'Pet', 'Boss', 'Filters', 'Groups', 'Party', 'Raid', 'Group filters', 'HoT slots' })
 SearchIndex.RegisterTabNames('settings', { 'Appearance', 'Sound', 'Skinning', 'Visibility', 'Modules', 'Help', 'Theme' })
 SearchIndex.RegisterTabNames('qol', { 'Combat', 'Interface', 'Automation', 'Graphics', 'Danger zone' })
