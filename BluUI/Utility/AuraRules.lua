@@ -29,6 +29,24 @@ AuraRules.CATALOG = {
 		icon = 237555,
 	},
 	{
+		id = 'bossDebuff', polarity = 'HARMFUL', label = 'Boss Debuffs',
+		desc = 'Debuffs Blizzard marks as boss encounter debuffs.',
+		engineCandidates = { isBossAura = true },
+		icon = 'Interface\\Icons\\INV_Misc_Head_Dragon_01',
+	},
+	{
+		id = 'roleDebuff', polarity = 'HARMFUL', label = 'Role Debuffs',
+		desc = 'Debuffs Blizzard marks for a role, like tank swap stacks.',
+		engineCandidates = { isRoleAura = true },
+		icon = 'Interface\\Icons\\Ability_Warrior_DefensiveStance',
+	},
+	{
+		id = 'npcHarmful', polarity = 'HARMFUL', label = 'Debuffs From NPCs',
+		desc = 'Debuffs from monsters and bosses, not from players or their pets.',
+		engineCandidates = { isFromPlayerOrPlayerPet = false },
+		icon = 'Interface\\Icons\\Spell_Shadow_DeathScream',
+	},
+	{
 		id = 'priorityDebuff', polarity = 'HARMFUL', label = 'Priority Debuffs',
 		desc = 'Debuffs Blizzard\'s own raid frames always put first.',
 		engineCandidates = { isPriorityAura = true },
