@@ -3,107 +3,65 @@ local _, BUI = ...
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
+local Painter = BUI.Painter
 
-local RECAP_ID = 'deathrecap'
-local MIRROR_ID = 'mirrortimers'
 local LEGACY_ID = 'combatalerts'
-local ART_KEYS = { 'Border', 'BorderFrame', 'Background', 'BackgroundTile', 'NineSlice', 'Inset', 'PortraitContainer', 'TitleBg' }
-local MIRROR_COUNT = 3
 local FONT_DEPTH = 2
+local BAR_ROLE = 'skinTitle'
 
-local function DeathRecapEnabled()
-	return Skin.IsSkinEnabled(RECAP_ID)
-end
-
-local function MirrorTimersEnabled()
-	return Skin.IsSkinEnabled(MIRROR_ID)
-end
-
-local recapContext = Skin.NewContext(DeathRecapEnabled)
-local mirrorContext = Skin.NewContext(MirrorTimersEnabled)
-
-local mirrorTimers = {}
-
-local function ApplyDeathRecap()
-	if not DeathRecapEnabled() then return end
-	local frame = _G.DeathRecapFrame
-	if not frame or frame._buiDeathRecap then return end
-	frame._buiDeathRecap = true
-
-	recapContext.FadeArt(frame)
-	recapContext.FadeKeys(frame, ART_KEYS)
-	recapContext.Shell(frame)
-	recapContext.Close(frame.CloseXButton)
-	recapContext.Button(frame.CloseButton)
-	Skin.HideHelpButtons(frame)
-	Skin.TipFaceTree(frame, FONT_DEPTH)
-end
-
-local function SkinMirrorTimer(timer)
-	if not timer or timer._buiMirrorTimer then return end
-	timer._buiMirrorTimer = true
-	mirrorTimers[#mirrorTimers + 1] = timer
-
-	mirrorContext.FadeArt(timer)
-	mirrorContext.FadeKeys(timer, ART_KEYS)
-	local bar = timer.StatusBar or timer
-	if bar.SetStatusBarTexture then
-		bar:SetStatusBarTexture(BUI.GetGlobalTexture())
-		mirrorContext.FadeArt(bar)
-		mirrorContext.Shell(bar)
-	end
-	Skin.TipFaceTree(timer, FONT_DEPTH)
-end
-
-local function ApplyMirrorTimers()
-	if not MirrorTimersEnabled() then return end
-	local container = _G.MirrorTimerContainer
-	if container and container.GetChildren then
-		for _, child in ipairs({ container:GetChildren() }) do SkinMirrorTimer(child) end
-		return
-	end
-	for index = 1, MIRROR_COUNT do SkinMirrorTimer(_G['MirrorTimer' .. index]) end
-end
-
-local function Apply()
-	ApplyDeathRecap()
-	ApplyMirrorTimers()
-end
-
-Skin.OnToggle(RECAP_ID, function(enabled)
-	if enabled then
-		ApplyDeathRecap()
-	else
-		recapContext.Restore()
-		local frame = _G.DeathRecapFrame
-		if frame then frame._buiDeathRecap = nil end
-	end
-end)
-
-Skin.OnToggle(MIRROR_ID, function(enabled)
-	if enabled then
-		ApplyMirrorTimers()
-	else
-		mirrorContext.Restore()
-		for index = 1, #mirrorTimers do mirrorTimers[index]._buiMirrorTimer = nil end
-		wipe(mirrorTimers)
-	end
-end)
-
-Skin.RegisterSkin(RECAP_ID, {
+local recapContext = Skin.Define('deathrecap', {
 	name = 'Death Recap',
 	description = 'The window listing the blows that killed you.',
 	icon = 'Interface/Icons/Ability_Rogue_FeignDeath',
 	legacy = LEGACY_ID,
 })
 
-Skin.RegisterSkin(MIRROR_ID, {
+local function SkinDeathRecap(frame)
+	recapContext.FadeArt(frame)
+	recapContext.Shell(frame)
+	recapContext.Close(frame.CloseXButton)
+	recapContext.Button(frame.CloseButton)
+	Skin.TipFaceTree(frame, FONT_DEPTH)
+end
+
+recapContext.Window('DeathRecapFrame', { skin = SkinDeathRecap })
+
+local mirrorContext = Skin.Define('mirrortimers', {
 	name = 'Breath & Fatigue Timers',
 	description = 'The breath, fatigue and feign death bars below the minimap.',
 	icon = 'Interface/Icons/Spell_Shadow_DemonBreath',
 	legacy = LEGACY_ID,
 })
 
-BUI.Events:Register('ADDON_LOADED', 'Skin.CombatAlerts', Apply)
-BUI.Events:Register('PLAYER_ENTERING_WORLD', 'Skin.CombatAlerts', Apply)
-BUI.Events:Once('PLAYER_LOGIN', 'Skin.CombatAlerts', Apply)
+local function PaintBar(bar)
+	if not mirrorContext.Enabled() then return end
+	bar:SetStatusBarTexture(BUI.GetGlobalTexture())
+	bar:SetStatusBarColor(Painter.Color(BAR_ROLE))
+end
+
+local function PaintTimer(timer)
+	PaintBar(timer.StatusBar)
+end
+
+local function SkinTimers(container)
+	for _, timer in ipairs(container.mirrorTimers) do
+		mirrorContext.FadeArt(timer)
+		mirrorContext.Shell(timer.StatusBar)
+		Skin.TipCount(timer.Text)
+		Painter.Custom(timer.StatusBar, PaintBar)
+	end
+end
+
+local function InstallTimers(container)
+	for _, timer in ipairs(container.mirrorTimers) do mirrorContext.Hook(timer, 'Setup', PaintTimer) end
+end
+
+mirrorContext.Window('MirrorTimerContainer', { install = InstallTimers, skin = SkinTimers })
+
+mirrorContext.OnDisable(function()
+	for _, timer in ipairs(MirrorTimerContainer.mirrorTimers) do
+		local bar = timer.StatusBar
+		bar:SetStatusBarColor(1, 1, 1)
+		if timer.timer then bar:SetStatusBarTexture(MirrorTimerAtlas[timer.timer]) end
+	end
+end)
