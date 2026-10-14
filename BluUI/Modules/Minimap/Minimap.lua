@@ -674,11 +674,7 @@ local function PlaceGhost(indicator, point, x, y)
 	ghost:SetSize(width, height)
 	ghost:ClearAllPoints()
 	ghost:SetPoint(point, WoWMinimap, point, x, y)
-	if ghost.eye then
-		local eye = indicator.Resolve().Eye
-		local size = eye:GetWidth() * eye:GetScale()
-		ghost.eye:SetSize(size, size)
-	end
+	if ghost.eye then ghost.eye:SetScale(indicator.Resolve().Eye:GetScale()) end
 end
 
 local function PlaceDifficultyText(frame, point, x, y)
