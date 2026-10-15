@@ -353,22 +353,12 @@ local function ShowFakeAuras(frame, unitType)
 	followerHolder:Show()
 end
 
-local function RestoreContainer(container)
-	if not container then return end
-	container:Show()
-	if container.UpdateAllAuras then container:UpdateAllAuras() end
-end
-
 local function HideFakeAuras(frame)
 	local cached = auraCache[frame]
 	if cached then
 		cached.debuffHolder:Hide()
 		cached.buffHolder:Hide()
 	end
-	if frame.Debuffs then frame.Debuffs:Show() end
-	if frame.Buffs then frame.Buffs:Show() end
-	RestoreContainer(frame.DebuffContainer)
-	RestoreContainer(frame.BuffContainer)
 end
 
 local function PaintSampleCast(frame)
@@ -424,6 +414,7 @@ local function HideUnit(frame, unitType, index)
 	HideSampleCast(frame)
 	HideFakeAuras(frame)
 	Thaw(frame)
+	if UnitFrames.GetUnitConfig(unitType).hasAuras then UnitFrames.RefreshAuraLayout(frame, unitType) end
 	local key = WatchKey(unitType, index)
 	if savedWatch[key] then
 		RegisterUnitWatch(frame)
