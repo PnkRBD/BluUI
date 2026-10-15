@@ -586,19 +586,21 @@ local function BuildPreview(band)
 			return
 		end
 
-		local layout = ButtonBar.Arrange(config, count, PreviewPixels)
-		barHolder:SetSize(layout.width, layout.height)
+		local layout = ButtonBar.Arrange(config, count, Pixel.Scale)
+		local function Preview(value) return floor(value * uiScale + 0.5) end
+		barHolder:SetSize(Preview(layout.width), Preview(layout.height))
 		barHolder:ClearAllPoints()
-		barHolder:SetPoint(layout.point, mapFrame, layout.relativePoint, layout.x, layout.y)
+		barHolder:SetPoint(layout.point, mapFrame, layout.relativePoint, Preview(layout.x), Preview(layout.y))
 
 		local background = config.background
+		local size = Preview(layout.size)
 		for index = 1, count do
 			local proxy = BarProxy(index)
 			local slot = layout.slots[index]
-			proxy:SetSize(layout.size, layout.size)
+			proxy:SetSize(size, size)
 			proxy:SetBackdropColor(background[1], background[2], background[3], background[4])
 			proxy:ClearAllPoints()
-			proxy:SetPoint(layout.corner, barHolder, layout.corner, slot[1], slot[2])
+			proxy:SetPoint(layout.corner, barHolder, layout.corner, Preview(slot[1]), Preview(slot[2]))
 			local icon = entries[index].icon
 			if icon then
 				proxy.icon:SetTexture(icon)
