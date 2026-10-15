@@ -713,8 +713,21 @@ local function PlaceGhost(indicator, point, x, y)
 	if ghost.eye then ghost.eye:SetScale(indicator.Resolve().Eye:GetScale()) end
 end
 
-local function PlaceDifficultyText(frame, point, x, y)
+local function DifficultyTextAlign(point, x)
 	local align = GetConfig().minimapTextDifficultyAlign
+	if align ~= 'AUTO' then return align end
+	if point:find('LEFT', 1, true) then return 'LEFT' end
+	if point:find('RIGHT', 1, true) then return 'RIGHT' end
+	return x < 0 and 'LEFT' or 'RIGHT'
+end
+
+function Minimap.DifficultyTextAlign()
+	local point, x = IndicatorPlacement(FindIndicator('difficulty'))
+	return DifficultyTextAlign(point, x)
+end
+
+local function PlaceDifficultyText(frame, point, x, y)
+	local align = DifficultyTextAlign(point, x)
 	local iconScale = GetIconScale('difficulty')
 	local width, height = frame._buiNativeW * iconScale, frame._buiNativeH * iconScale
 	local left = point:find('LEFT') and x or point:find('RIGHT') and (x - width) or (x - width / 2)

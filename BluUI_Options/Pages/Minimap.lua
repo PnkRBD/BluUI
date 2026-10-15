@@ -69,6 +69,7 @@ local INDICATORS = {
 }
 
 local TEXT_ALIGNS = {
+	{ value = 'AUTO', text = 'Auto' },
 	{ value = 'LEFT', text = 'Left' },
 	{ value = 'RIGHT', text = 'Right' },
 }
@@ -315,7 +316,7 @@ local function BuildPreview(band)
 		proxy.letters:SetShown(letters)
 		if not letters then return end
 		local label, textColor = MinimapModule.DifficultySample()
-		local align = interfaceDB.minimapTextDifficultyAlign
+		local align = MinimapModule.DifficultyTextAlign()
 		Pixel.ApplyFont(proxy.letters, MinimapModule.DIFFICULTY_FONT_SIZE * scale, BUI.GetGlobalFont())
 		proxy.letters:SetText(label)
 		proxy.letters:SetTextColor(textColor[1], textColor[2], textColor[3])
