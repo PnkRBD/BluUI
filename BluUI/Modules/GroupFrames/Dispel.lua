@@ -567,7 +567,6 @@ end
 local function StepCycle()
 	cycleIndex = cycleIndex + 1
 	GroupFrames.PreviewDispelOnAllParty(cycleIndex)
-	GroupFrames.Print("Party dispel preview: shift " .. cycleIndex)
 end
 local StepCycleTimed = BUI.Profiler.Wrap("GroupFrames.Dispel preview cycle", StepCycle)
 
@@ -576,7 +575,6 @@ function GroupFrames.StartDispelPartyPreview()
 	cycleIndex = 0
 	StepCycle()
 	cycleTicker = C_Timer.NewTicker(DISPEL_INTERVAL, StepCycleTimed)
-	GroupFrames.Print("Party dispel preview started. Click again to stop.")
 end
 
 function GroupFrames.StopDispelPreview() StopCycle() end
