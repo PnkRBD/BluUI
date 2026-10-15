@@ -39,8 +39,22 @@ local KIND_LIST = { "buffs", "debuffs", "bigDef", "crowdControl" }
 local KIND_KEYS = {}
 for kindIndex = 1, #KIND_LIST do KIND_KEYS[KIND_LIST[kindIndex]] = "BluAura_" .. KIND_LIST[kindIndex] end
 
+local EXCLUDED_BY = {
+	buffs   = "bigDef",
+	debuffs = "crowdControl",
+}
+
+local EXCLUDE_SOURCES = {}
+for _, source in pairs(EXCLUDED_BY) do EXCLUDE_SOURCES[source] = true end
+
 function GroupFrames.ContainerRules(config, kind)
-	return AuraRules.EnsureRules(config, KIND_POLARITY[kind], DEFAULT_RULES[kind])
+	local rules = AuraRules.EnsureRules(config, KIND_POLARITY[kind], DEFAULT_RULES[kind])
+	if EXCLUDE_SOURCES[kind] then AuraRules.DropSortRules(rules) end
+	return rules
+end
+
+function GroupFrames.FeedsExclusions(kind)
+	return EXCLUDE_SOURCES[kind] == true
 end
 
 local function isBlacklistedDebuff(spellID)
@@ -103,11 +117,9 @@ local function KindCandidates(kind, settings)
 end
 
 local function KindExcludes(settings, kind)
-	if kind == "buffs" and settings.bigDef.enabled then
-		return GroupFrames.ContainerRules(settings.bigDef, "bigDef")
-	end
-	if kind == "debuffs" and settings.crowdControl.enabled then
-		return GroupFrames.ContainerRules(settings.crowdControl, "crowdControl")
+	local source = EXCLUDED_BY[kind]
+	if source and settings[source].enabled then
+		return GroupFrames.ContainerRules(settings[source], source)
 	end
 end
 

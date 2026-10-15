@@ -166,18 +166,26 @@ function AuraRules.DefaultAllRule(polarity)
 	return polarity == 'HELPFUL' and 'allHelpful' or 'allHarmful'
 end
 
-function AuraRules.DropdownItems(polarity, chosen)
-	local taken = {}
-	if chosen then
-		for chosenIndex = 1, #chosen do taken[chosen[chosenIndex]] = true end
-	end
+function AuraRules.DropdownItems(polarity, withoutSorts)
 	local items = {}
 	for _, rule in ipairs(AuraRules.CATALOG) do
-		if rule.polarity == polarity and not taken[rule.id] then
+		if rule.polarity == polarity and not (withoutSorts and rule.sortFirst) then
 			items[#items + 1] = { value = rule.id, text = rule.label }
 		end
 	end
 	return items
+end
+
+function AuraRules.DropSortRules(rules)
+	for ruleIndex = #rules, 1, -1 do
+		local id = rules[ruleIndex]
+		local rule = AuraRules.BY_ID[id]
+		if rule and rule.sortFirst then
+			table.remove(rules, ruleIndex)
+			if rules.hidden then rules.hidden[id] = nil end
+		end
+	end
+	if rules.hidden and next(rules.hidden) == nil then rules.hidden = nil end
 end
 
 function AuraRules.Label(id)

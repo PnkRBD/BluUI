@@ -197,6 +197,7 @@ local function AurasBoards(ui, parent, width, key)
 			AuraLists.Rules({
 				getRules = function() return GroupFrames().ContainerRules(settings, container.key) end,
 				polarity = POLARITY[container.key],
+				withoutSorts = GroupFrames().FeedsExclusions(container.key),
 				onChanged = Refresh,
 			}),
 			{ tooltip = 'Layout and sizing', title = container.title, options = {
