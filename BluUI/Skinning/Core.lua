@@ -524,12 +524,21 @@ end
 
 local LEFT_TITLE_X, LEFT_TITLE_SCALE = 12, 14 / 12
 
+local function TitleContainerInset(frame, container)
+	for index = 1, container:GetNumPoints() do
+		local point, relativeTo, relativePoint, offsetX = container:GetPoint(index)
+		if relativeTo == frame and point:find('LEFT', 1, true) and relativePoint:find('LEFT', 1, true) then return offsetX end
+	end
+	local frameLeft, containerLeft = frame:GetLeft(), container:GetLeft()
+	return frameLeft and containerLeft and containerLeft - frameLeft or 0
+end
+
 function Skin.LeftTitle(frame)
 	local container = frame.TitleContainer
 	local title = container.TitleText
 	Skin.TipFont(title, 'title', LEFT_TITLE_SCALE)
 	title:ClearAllPoints()
-	title:SetPoint('LEFT', container, 'LEFT', frame:GetLeft() - container:GetLeft() + LEFT_TITLE_X, 0)
+	title:SetPoint('LEFT', container, 'LEFT', LEFT_TITLE_X - TitleContainerInset(frame, container), 0)
 	title:SetJustifyH('LEFT')
 end
 
