@@ -536,16 +536,17 @@ local function CollectRuleGroups(wanted, container, setIndex, style, rules, base
 	local candidateSig = candidateFingerprint or ''
 	local position = 0
 	local claims = {}
+	local sortMethod
 
 	local function Want(filter, cand, candSig, gated)
 		local layoutIndex = layoutBase + position
 		position = position + 1
-		wanted[slotPrefix .. layoutIndex .. slotSuffix] = { index = layoutIndex, filter = filter, cand = cand, candSig = candSig, gated = gated, style = style, harmful = harmful }
+		wanted[slotPrefix .. layoutIndex .. slotSuffix] = { index = layoutIndex, filter = filter, cand = cand, candSig = candSig, gated = gated, style = style, harmful = harmful, sortMethod = sortMethod }
 	end
 
-	local function WantUnclaimed(entry, gated)
+	local function WantUnclaimed(entry, claimList, gated)
 		local entries = { entry }
-		for claimIndex = 1, #claims do entries = ExcludeClaim(entries, claims[claimIndex]) end
+		for claimIndex = 1, #claimList do entries = ExcludeClaim(entries, claimList[claimIndex]) end
 		for entryIndex = 1, #entries do
 			local kept = entries[entryIndex]
 			local cand, filter = kept.cand, kept.filter
@@ -578,34 +579,53 @@ local function CollectRuleGroups(wanted, container, setIndex, style, rules, base
 	for ruleIndex = 1, #(excludeRules or {}) do
 		local id = excludeRules[ruleIndex]
 		local rule = AR.BY_ID[id]
-		local claim = rule and not (excludeHidden and excludeHidden[id]) and RuleClaim(rule)
+		local claim = rule and not rule.sortFirst and not (excludeHidden and excludeHidden[id]) and RuleClaim(rule)
 		if claim and #claim > 0 then claims[#claims + 1] = claim end
 	end
 
 	if candidates and candidates.includeSpellIDs then
-		WantUnclaimed({ filter = pinFilter, cand = candidates, sig = 'only/' .. candidateSig }, true)
+		WantUnclaimed({ filter = pinFilter, cand = candidates, sig = 'only/' .. candidateSig }, claims, true)
 		return
 	end
 
 	local keepNameplateOnly = HasFilterToken(baseFilter, NAMEPLATE_ONLY_TOKEN)
+
+	local function RuleEntry(rule)
+		local filter = rule.engineFilter or baseFilter
+		if keepNameplateOnly and not HasFilterToken(filter, NAMEPLATE_ONLY_TOKEN) then
+			filter = filter .. '|' .. NAMEPLATE_ONLY_TOKEN
+		end
+		local cand = candidates
+		if rule.engineCandidates then
+			cand = {}
+			for key, value in pairs(candidates or {}) do cand[key] = value end
+			for key, value in pairs(rule.engineCandidates) do cand[key] = value end
+		end
+		return { filter = filter, cand = cand, sig = rule.id .. '/' .. candidateSig }
+	end
+
+	local function ClaimsAround(ruleIndex)
+		local around = {}
+		for claimIndex = 1, #claims do around[claimIndex] = claims[claimIndex] end
+		for laterIndex = ruleIndex + 1, #rules do
+			local later = AR.BY_ID[rules[laterIndex]]
+			if later and not later.sortFirst then around[#around + 1] = RuleClaim(later) end
+		end
+		return around
+	end
+
 	local hidden = rules.hidden
 	for ruleIndex = 1, #rules do
 		local id = rules[ruleIndex]
 		local rule = AR.BY_ID[id]
-		if rule and hidden and hidden[id] then
-			claims[#claims + 1] = RuleClaim(rule)
+		local off = hidden and hidden[id]
+		if rule and rule.sortFirst then
+			if not off then
+				WantUnclaimed(RuleEntry(rule), ClaimsAround(ruleIndex))
+				sortMethod = AuraContainerSortMethod[rule.sortFirst]
+			end
 		elseif rule then
-			local filter = rule.engineFilter or baseFilter
-			if keepNameplateOnly and not HasFilterToken(filter, NAMEPLATE_ONLY_TOKEN) then
-				filter = filter .. '|' .. NAMEPLATE_ONLY_TOKEN
-			end
-			local cand = candidates
-			if rule.engineCandidates then
-				cand = {}
-				for key, value in pairs(candidates or {}) do cand[key] = value end
-				for key, value in pairs(rule.engineCandidates) do cand[key] = value end
-			end
-			WantUnclaimed({ filter = filter, cand = cand, sig = rule.id .. '/' .. candidateSig })
+			if not off then WantUnclaimed(RuleEntry(rule), claims) end
 			claims[#claims + 1] = RuleClaim(rule)
 		end
 	end
@@ -654,7 +674,7 @@ local function EnsureRuleGroups(container, sets)
 				container:SetAuraGroupMaxFrameCount(info.key, max)
 			end
 			container:SetAuraGroupLayout(info.key, layout)
-			container:SetAuraGroupSortMethod(info.key, style.sortMethod, sortDirection)
+			container:SetAuraGroupSortMethod(info.key, spec.sortMethod or style.sortMethod, sortDirection)
 		else
 			container._buiGroupSeq = (container._buiGroupSeq or 0) + 1
 			info = {
@@ -666,7 +686,7 @@ local function EnsureRuleGroups(container, sets)
 				initializeFrame = MakeInitializer(container, info),
 				candidateFilters = spec.cand,
 				layout = layout,
-				sortMethod = style.sortMethod,
+				sortMethod = spec.sortMethod or style.sortMethod,
 				sortDirection = sortDirection,
 			})
 			container._buiGroups[slot] = info
