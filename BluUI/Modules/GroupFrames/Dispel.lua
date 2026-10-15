@@ -77,7 +77,6 @@ local function BuildHighlightKit(host)
 	local kit = {}
 	kit.fill = host:CreateTexture(nil, "OVERLAY", nil, 1)
 	kit.fade = host:CreateTexture(nil, "OVERLAY", nil, 1)
-	kit.shade = host:CreateTexture(nil, "OVERLAY", nil, 1)
 
 	local badge = host:CreateTexture(nil, "OVERLAY", nil, 7)
 	badge:SetTexture(WHITE8X8)
@@ -151,7 +150,6 @@ local function StyleHighlightKit(frame, kit)
 	badge:SetPoint(badgeSettings.anchor, frame.Health, badgeSettings.anchor, Pixel.Scale(badgeSettings.offsetX), Pixel.Scale(badgeSettings.offsetY))
 
 	if kit.button then
-		kit.shade:SetShown(wantTint)
 		RegisterKitTextures(kit, wantTint, wantBadge, badgeSettings)
 		return
 	end
