@@ -278,8 +278,12 @@ context.Window('ClassTrainerFrame', {
 	install = function(blizzard)
 		blizzard:HookScript('OnHide', BUI.Profiler.Wrap('Skin.Trainer blizzard hide', context.Guard(CloseTrainerSkin)))
 	end,
+	enable = function(blizzard)
+		Skin.ReserveWidth(blizzard, FRAME_WIDTH, UIParent)
+	end,
 })
 
 context.OnDisable(function()
 	if trainerFrame and trainerFrame:IsShown() then CloseTrainerSkin() end
+	Skin.ReleaseWidth(ClassTrainerFrame)
 end)

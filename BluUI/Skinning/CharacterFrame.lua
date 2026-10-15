@@ -2163,11 +2163,15 @@ context.Window('CharacterFrame', {
     install = function(blizzard)
         blizzard:HookScript('OnHide', BUI.Profiler.Wrap('Skin.CharacterFrame frame restore', context.Guard(HideSkin)))
     end,
+    enable = function(blizzard)
+        if not HasConflictingCharSheet() then Skin.ReserveWidth(blizzard, FRAME_WIDTH, blizzard) end
+    end,
 })
 
 context.OnDisable(function()
     HideSkin()
     if frame then frame:Hide() end
+    Skin.ReleaseWidth(CharacterFrame)
     Skin.RestoreBlizzardFrame(CharacterFrame)
 end)
 
