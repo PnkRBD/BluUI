@@ -227,6 +227,12 @@ local function AurasBoards(ui, parent, width, key)
 	})
 	local border, badge = section.dispelBorder, section.dispelBadge
 	local function Badges() GroupFrames().RestyleAllDispelBadges() end
+	local opacity = Option(BUI.GetDB().unitFrames, 'Bar tint opacity %', 'dispelOpacity', { min = 0, max = 100, step = 5, separator = true })
+	local setOpacity = opacity.set
+	opacity.set = function(value)
+		setOpacity(value)
+		BUI.UnitFrames:Refresh()
+	end
 	dispels:AddTools('Dispel highlight', 'How the frame reacts, following the player frame unless told otherwise', {
 		{ entries = DISPEL_MODES, width = MENU_WIDTH, get = function()
 			local wantTint, style = GroupFrames().DispelLook(section)
@@ -243,7 +249,7 @@ local function AurasBoards(ui, parent, width, key)
 			border.tintBar = TINT_MODES[value] == true
 			if border.tintBar then border.tintStyle = value end
 		end },
-		{ tooltip = 'Trigger and badge icon', title = 'Dispel highlight', options = {
+		{ tooltip = 'Trigger, badge icon and opacity', title = 'Dispel highlight', options = {
 			Toggle(border, 'Match the player frame', 'matchPlayer'),
 			Option(border, 'Trigger', 'source', { entries = DISPEL_SOURCES, separator = true }),
 			Toggle(border, 'Dispel icon', 'showBadge'),
@@ -251,6 +257,7 @@ local function AurasBoards(ui, parent, width, key)
 			Option(badge, 'Icon anchor', 'anchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
 			Option(badge, 'Icon horizontal', 'offsetX', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
 			Option(badge, 'Icon vertical', 'offsetY', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
+			opacity,
 		} },
 		Eye('Cycle the dispel colors on the party frames', GroupFrames().IsDispelPreviewActive, function(value)
 			if value then GroupFrames().StartDispelPartyPreview() else GroupFrames().StopDispelPreview() end
