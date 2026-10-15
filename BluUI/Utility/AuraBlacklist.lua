@@ -123,10 +123,6 @@ function AuraBlacklist.IsGroupBlacklisted(spellID, polarity)
 	return AuraBlacklist.GroupSet(polarity)[spellID] == true
 end
 
-function AuraBlacklist.IsUnitBlacklisted(spellID, isHarmful)
-	return AuraBlacklist.UnitSet(isHarmful and 'HARMFUL' or 'HELPFUL')[spellID] == true
-end
-
 function AuraBlacklist.UserAdd(scope, polarity, spellID)
 	scope = Resolve(scope)
 	if EditsSharedStore(scope) then
@@ -303,8 +299,8 @@ function AuraBlacklist.RefreshConsumers(scope)
 		end
 		local unitFrames = BUI.UnitFrames
 		if (scope ~= 'group' or shared) and unitFrames and BUI.IsModuleEnabled('unitFrames') then
-			if unitFrames.InvalidateFilterCache then unitFrames.InvalidateFilterCache() end
-			if unitFrames.Refresh then unitFrames:Refresh() end
+			unitFrames.InvalidateFilterCache()
+			unitFrames:Refresh()
 		end
 	end
 	if scope == 'frames' or scope == nil or AuraBlacklist.IsFrameShared() then BUI.BuffFrames.Refresh() end

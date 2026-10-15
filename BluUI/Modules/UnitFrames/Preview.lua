@@ -269,8 +269,6 @@ local function LayoutGrid(holder, icons, count, style, parent)
 end
 
 local function HideAuraElements(frame)
-	if frame.Debuffs then frame.Debuffs:Hide() end
-	if frame.Buffs then frame.Buffs:Hide() end
 	if frame.DebuffContainer then frame.DebuffContainer:Hide() end
 	if frame.BuffContainer then frame.BuffContainer:Hide() end
 end

@@ -19,8 +19,7 @@ local candidateCache = {}
 
 local function GetFilters()
 	if not filterCache then
-		local db = BUI.GetDB()
-		filterCache = db and db.auraFilters or {}
+		filterCache = BUI.GetDB().auraFilters
 		debuffWhitelistActive = (filterCache.debuffWhitelist and next(filterCache.debuffWhitelist)) ~= nil
 		buffWhitelistActive   = (filterCache.buffWhitelist   and next(filterCache.buffWhitelist))   ~= nil
 	end
@@ -85,7 +84,7 @@ local function ResolveStyle(settings, isDebuff)
 		style.baseColor = BUFF_BASE_COLOR
 		style.showDispelType = false
 	end
-	style.sortMethod = Engine.ResolveSortMethod(GetAuraSetting(settings, isDebuff, 'debuffSortMethod', 'buffSortMethod', 'auraSortMethod', 'default'))
+	style.sortMethod = Engine.ResolveSortMethod(GetAuraSetting(settings, isDebuff, 'debuffSortMethod', 'buffSortMethod', nil, 'default'))
 	style.showStack = GetAuraSetting(settings, isDebuff, 'debuffShowStack', 'buffShowStack', 'auraShowStack', true)
 	style.stackSize = GetAuraSetting(settings, isDebuff, 'debuffStackSize', 'buffStackSize', 'auraStackSize', 10)
 	style.stackPos  = GetAuraSetting(settings, isDebuff, 'debuffStackPos', 'buffStackPos', nil, 'BOTTOMRIGHT')
@@ -272,11 +271,6 @@ local function ApplyAuraPositions(frame, unitType)
 	BindUnit(frame)
 end
 
-local function RefreshAuraLayout(frame, unitType)
-	if not frame then return end
-	ApplyAuraPositions(frame, unitType)
-end
-
 local function PokeFrames(matchTypes, rebind)
 	for _, entry in ipairs(auraFrames) do
 		local frame = entry.frame
@@ -335,9 +329,6 @@ end)
 BUI.Events:Register('INSTANCE_ENCOUNTER_ENGAGE_UNIT', 'UFAuras.Boss', function()
 	PokeFrames({ boss = true }, true)
 end)
-BUI.Events:RegisterUnit('UNIT_PET', 'player', 'UFAuras.Pet', function()
-	PokeFrames({ pet = true }, true)
-end)
 
 UnitFrames.CreateAuraElements = CreateAuraElements
-UnitFrames.RefreshAuraLayout = RefreshAuraLayout
+UnitFrames.RefreshAuraLayout = ApplyAuraPositions

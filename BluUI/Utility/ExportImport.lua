@@ -247,7 +247,7 @@ local function RefreshAllModules()
     local function on(key) return modules[key] ~= false end
 
     if on('unitFrames') and BUI.UnitFrames then
-        if BUI.UnitFrames.InvalidateFilterCache then BUI.UnitFrames.InvalidateFilterCache() end
+        BUI.UnitFrames.InvalidateFilterCache()
         if BUI.UnitFrames.InvalidateSettingsCache then BUI.UnitFrames.InvalidateSettingsCache() end
         if BUI.UnitFrames.Refresh then BUI.UnitFrames:Refresh() end
     end
