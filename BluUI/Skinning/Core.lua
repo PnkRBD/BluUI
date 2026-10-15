@@ -1220,7 +1220,7 @@ function Skin.TipDropdown(dropdown, scale, keepHeight)
 		dropdown._buiTipDropdown = true
 		for regionIndex = 1, select('#', dropdown:GetRegions()) do
 			local region = select(regionIndex, dropdown:GetRegions())
-			if region and region.IsObjectType and region:IsObjectType('Texture') and not region.__buiSkin then
+			if region and region.IsObjectType and region:IsObjectType('Texture') and not region.__buiSkin and region ~= dropdown.Language then
 				region:SetAlpha(0)
 			end
 		end
