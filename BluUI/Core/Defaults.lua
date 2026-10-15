@@ -206,7 +206,6 @@ local UnitFrameBase = {
 
 local UnitAuraBase = {
 	showDebuffs    = true,
-	debuffShowMode = 'mine',
 	auraSpacing    = 2,
 	auraStackSize  = 10,
 	auraCdSize     = 10,
@@ -215,7 +214,6 @@ local UnitAuraBase = {
 }
 
 local UnitBuffBase = Merge(UnitAuraBase, {
-	buffShowMode    = 'all',
 	buffAnchorPoint = 'BOTTOMLEFT',
 	buffOffsetX     = 0,
 	buffOffsetY     = -4,
