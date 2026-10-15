@@ -395,13 +395,22 @@ local function PokeFrames(matchTypes, rebind)
 	end
 end
 
+local function RefreshEventless(frame)
+	local unit = frame.unit
+	if not unit then return end
+	for _, key in ipairs(UNIT_CONTAINER_KEYS) do
+		local container = frame[key]
+		if container and container:IsVisible() and not Engine.BindUnit(container, unit) then container:UpdateAllAuras() end
+	end
+end
+
 local eventlessTicker
 local PollEventlessUnits = BUI.Profiler.Wrap('UnitFrames.Auras eventless poll', function()
 	local active = false
 	for _, entry in ipairs(auraFrames) do
 		if entry.unitType == 'targettarget' and entry.frame:IsVisible() then
 			active = true
-			BindUnit(entry.frame)
+			RefreshEventless(entry.frame)
 		end
 	end
 	if not active and eventlessTicker then

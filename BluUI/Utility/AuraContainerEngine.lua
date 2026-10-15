@@ -964,6 +964,7 @@ function Engine.BindUnit(container, unit)
 	end
 	SyncGatedGroups(container)
 	if changed then container:UpdateAllAuras() end
+	return changed
 end
 
 function Engine.RebindUnit(container, unit)
