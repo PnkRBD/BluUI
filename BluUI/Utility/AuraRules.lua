@@ -98,8 +98,9 @@ AuraRules.CATALOG = {
 	},
 	{
 		id = 'important', polarity = 'HELPFUL', label = 'Important Buffs',
-		desc = 'Buffs Blizzard flags as important, the ones enemy nameplates always show.',
+		desc = 'Important buffs no other rule shows. The rules below it show important buffs first.',
 		engineFilter = 'HELPFUL|IMPORTANT',
+		sortFirst = 'ImportantOnly',
 		icon = C_Spell.GetSpellTexture(10060),
 	},
 	{
