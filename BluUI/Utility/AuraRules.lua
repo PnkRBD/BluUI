@@ -178,7 +178,7 @@ function AuraRules.DropdownItems(polarity, withoutSorts)
 	local items = {}
 	for _, rule in ipairs(AuraRules.CATALOG) do
 		if rule.polarity == polarity and not (withoutSorts and rule.sortFirst) then
-			items[#items + 1] = { value = rule.id, text = rule.label }
+			items[#items + 1] = { value = rule.id, text = rule.label, tip = rule.desc }
 		end
 	end
 	return items
