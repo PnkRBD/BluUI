@@ -759,18 +759,13 @@ do
 		local settings = UnitFrames.GetSettings()
 		local blend = settings.dispelBlend and 'ADD' or 'BLEND'
 		local half = style == 'top' or style == 'bottom'
-		local shaded = half or style == 'shaded'
 		local fill, fade, shade = kit.fill, kit.fade, kit.shade
 		PrepFillTexture(fill, half and FADE_TEXTURE or WHITE8X8, blend, alpha)
 		PrepFillTexture(fade, FADE_TEXTURE, blend, alpha)
-		PrepFillTexture(shade, FADE_TEXTURE, 'BLEND', (shaded and alpha > 0) and settings.dispelFadeDark / 100 or 0)
+		PrepFillTexture(shade, FADE_TEXTURE, 'BLEND', (half and alpha > 0) and settings.dispelFadeDark / 100 or 0)
 		shade:SetVertexColor(0, 0, 0)
 		if style == 'top' then
 			shade:SetPoint('TOPLEFT', healthTexture, 'LEFT')
-			shade:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
-			shade:SetTexCoord(0, 1, 1, 0)
-		elseif style == 'shaded' then
-			shade:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
 			shade:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
 			shade:SetTexCoord(0, 1, 1, 0)
 		else

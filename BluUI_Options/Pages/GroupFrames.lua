@@ -50,9 +50,8 @@ local DISPEL_MODES = {
 	{ value = 'bar', text = 'Tint the whole bar' },
 	{ value = 'top', text = 'Fade from the top' },
 	{ value = 'bottom', text = 'Fade from the bottom' },
-	{ value = 'shaded', text = 'Darken towards the bottom' },
 }
-local TINT_MODES = { bar = true, top = true, bottom = true, shaded = true }
+local TINT_MODES = { bar = true, top = true, bottom = true }
 local DISPEL_SOURCES = {
 	{ value = 'mine', text = 'Dispellable by me' },
 	{ value = 'all', text = 'All magic, curse, disease and poison' },

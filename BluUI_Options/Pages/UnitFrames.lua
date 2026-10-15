@@ -73,7 +73,6 @@ local DISPEL_STYLES = {
 	{ value = 'bar', text = 'Tint the whole bar' },
 	{ value = 'top', text = 'Fade from the top' },
 	{ value = 'bottom', text = 'Fade from the bottom' },
-	{ value = 'shaded', text = 'Darken towards the bottom' },
 }
 local DISPEL_SOURCES = {
 	{ value = 'mine', text = 'Dispellable by me' },
