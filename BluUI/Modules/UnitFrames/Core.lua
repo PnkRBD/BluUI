@@ -670,7 +670,7 @@ do
 		end)
 	end
 
-	local HIGHLIGHT_SETTING_INPUTS = 12
+	local HIGHLIGHT_SETTING_INPUTS = 10
 	local HIGHLIGHT_INPUT_COUNT = HIGHLIGHT_SETTING_INPUTS + #HL_TYPES * 3
 	local highlightInputs = {}
 
@@ -686,9 +686,7 @@ do
 		highlightInputs[7] = settings.dispelOpacity
 		highlightInputs[8] = unitSettings.debuffHighlightBar and true or false
 		highlightInputs[9] = unitSettings.debuffHighlightStyle
-		highlightInputs[10] = settings.dispelFadeMiddle
-		highlightInputs[11] = settings.dispelFadeFar
-		highlightInputs[12] = classFilter and select(2, GetSelfCleanseTypes()) or ''
+		highlightInputs[10] = classFilter and select(2, GetSelfCleanseTypes()) or ''
 		for typeIndex = 1, #HL_TYPES do
 			local slot = HIGHLIGHT_SETTING_INPUTS + (typeIndex - 1) * 3
 			highlightInputs[slot + 1], highlightInputs[slot + 2], highlightInputs[slot + 3] = Engine.DispelColorRGB(HL_TYPES[typeIndex])
@@ -739,6 +737,7 @@ do
 
 	local WHITE8X8 = [[Interface\Buttons\WHITE8X8]]
 	local FADE_TEXTURE = BUI.C.FADE_TEXTURE
+	local FADE_MIDDLE_COORD, FADE_FAR_COORD = 0.75, 1.05
 	local frameKits = setmetatable({}, { __mode = 'k' })
 	local framePending = {}
 
@@ -750,29 +749,17 @@ do
 
 	local function PrepFillTexture(texture, asset, blend, alpha)
 		texture:ClearAllPoints()
-		texture:SetTexture(asset)
+		texture:SetTexture(asset, 'CLAMP', 'CLAMP')
 		texture:SetBlendMode(blend)
 		texture:SetAlpha(alpha)
 	end
 
 	function UnitFrames.StyleDispelFill(kit, style, healthTexture, rightEdge, rightSide, alpha)
-		local settings = UnitFrames.GetSettings()
-		local blend = settings.dispelBlend and 'ADD' or 'BLEND'
+		local blend = UnitFrames.GetSettings().dispelBlend and 'ADD' or 'BLEND'
 		local half = style == 'top' or style == 'bottom'
-		local fill, fade, shade = kit.fill, kit.fade, kit.shade
+		local fill, fade = kit.fill, kit.fade
 		PrepFillTexture(fill, half and FADE_TEXTURE or WHITE8X8, blend, alpha)
 		PrepFillTexture(fade, FADE_TEXTURE, blend, alpha)
-		PrepFillTexture(shade, FADE_TEXTURE, 'BLEND', (half and alpha > 0) and settings.dispelFadeDark / 100 or 0)
-		shade:SetVertexColor(0, 0, 0)
-		if style == 'top' then
-			shade:SetPoint('TOPLEFT', healthTexture, 'LEFT')
-			shade:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
-			shade:SetTexCoord(0, 1, 1, 0)
-		else
-			shade:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
-			shade:SetPoint('BOTTOMRIGHT', rightEdge, rightSide)
-			shade:SetTexCoord(0, 1, 0, 1)
-		end
 		if not half then
 			fill:SetTexCoord(0, 1, 0, 1)
 			fill:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
@@ -782,22 +769,20 @@ do
 			fade:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
 			return
 		end
-		local middle = settings.dispelFadeMiddle / 100
-		local far = math.min(settings.dispelFadeFar / 100, middle)
 		if style == 'bottom' then
 			fill:SetPoint('TOPLEFT', healthTexture, 'LEFT')
 			fill:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
-			fill:SetTexCoord(0, 1, 1 - middle, 0)
+			fill:SetTexCoord(0, 1, FADE_MIDDLE_COORD, 0)
 			fade:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
 			fade:SetPoint('BOTTOMRIGHT', rightEdge, rightSide)
-			fade:SetTexCoord(0, 1, 1 - far, 1 - middle)
+			fade:SetTexCoord(0, 1, FADE_FAR_COORD, FADE_MIDDLE_COORD)
 		else
 			fill:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
 			fill:SetPoint('BOTTOMRIGHT', rightEdge, rightSide)
-			fill:SetTexCoord(0, 1, 0, 1 - middle)
+			fill:SetTexCoord(0, 1, 0, FADE_MIDDLE_COORD)
 			fade:SetPoint('TOPLEFT', healthTexture, 'LEFT')
 			fade:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
-			fade:SetTexCoord(0, 1, 1 - middle, 1 - far)
+			fade:SetTexCoord(0, 1, FADE_MIDDLE_COORD, FADE_FAR_COORD)
 		end
 	end
 
@@ -862,7 +847,6 @@ do
 				typeName = typeName,
 				fill = button:CreateTexture(nil, 'ARTWORK', nil, priority),
 				fade = button:CreateTexture(nil, 'ARTWORK', nil, priority),
-				shade = button:CreateTexture(nil, 'ARTWORK', nil, priority),
 			}
 			local kits = frameKits[frame]
 			if not kits then kits = {}; frameKits[frame] = kits end
@@ -932,7 +916,6 @@ do
 		local kit = { frame = frame, host = host }
 		kit.fill = host:CreateTexture(nil, 'ARTWORK', nil, 6)
 		kit.fade = host:CreateTexture(nil, 'ARTWORK', nil, 6)
-		kit.shade = host:CreateTexture(nil, 'ARTWORK', nil, 6)
 		previewKit = kit
 		return kit
 	end
