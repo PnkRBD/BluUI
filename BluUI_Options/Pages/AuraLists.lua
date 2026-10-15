@@ -281,7 +281,8 @@ function BUI.AuraRuleEditor(parent, options)
 					list:ClearItems()
 					local hidden = rules.hidden
 					for _, id in ipairs(rules) do
-						list:AddItem(AuraRules.Icon(id), AuraRules.Label(id), id, true, not (hidden and hidden[id]))
+						local item = list:AddItem(AuraRules.Icon(id), AuraRules.Label(id), id, true, not (hidden and hidden[id]))
+						item.data.tip = AuraRules.Description(id)
 					end
 				end
 				local function SetHidden(id, hide)

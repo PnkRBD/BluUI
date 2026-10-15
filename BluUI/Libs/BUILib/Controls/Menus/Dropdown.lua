@@ -166,19 +166,27 @@ function Controls.Dropdown(parent, label, items, selected, callback, tooltip, wi
 			row.check:SetTexture(BUILib.GetLibMedia("check"))
 			row.check:SetSize(CHECK_SIZE, CHECK_SIZE); row.check:SetPoint("RIGHT", -10, 0)
 			row.check:SetVertexColor(unpack(Theme.text.primary))
-			row:SetScript("OnEnter", function(rowButton) rowButton.bg:SetColorTexture(unpack(BUILib.Layout.SOLID_HOVER)) end)
+			row:SetScript("OnEnter", function(rowButton)
+				rowButton.bg:SetColorTexture(unpack(BUILib.Layout.SOLID_HOVER))
+				if rowButton.tip then Widget.ShowTip(rowButton, rowButton.tip) end
+			end)
 			row:SetScript("OnLeave", function(rowButton)
 				rowButton.bg:SetColorTexture(unpack(rowButton._selected and SELECTED or CLEAR))
+				if rowButton.tip then Widget.HideTip() end
 			end)
 		else
 			row.text = row:CreateFontString(nil, "OVERLAY"); row.text:SetFont(BUILib.Font, 11, ""); row.text:SetPoint("LEFT", 6, 0)
 			row.hl = row:CreateTexture(nil, "BACKGROUND"); row.hl:SetAllPoints(); row.hl:SetColorTexture(unpack(SELECTED)); row.hl:Hide()
 			row.hover = row:CreateTexture(nil, "BACKGROUND", nil, 1)
 			row.hover:SetAllPoints(); row.hover:SetColorTexture(unpack(BUILib.Layout.SOLID_HOVER)); row.hover:Hide()
-			row:SetScript("OnEnter", function(rowButton) rowButton.hover:Show(); rowButton.text:SetTextColor(1, 1, 1) end)
+			row:SetScript("OnEnter", function(rowButton)
+				rowButton.hover:Show(); rowButton.text:SetTextColor(1, 1, 1)
+				if rowButton.tip then Widget.ShowTip(rowButton, rowButton.tip) end
+			end)
 			row:SetScript("OnLeave", function(rowButton)
 				rowButton.hover:Hide()
 				if not rowButton._selected then rowButton.text:SetTextColor(unpack(Theme.text.secondary)) end
+				if rowButton.tip then Widget.HideTip() end
 			end)
 		end
 		rowPool[index] = row; return row
@@ -195,6 +203,7 @@ function Controls.Dropdown(parent, label, items, selected, callback, tooltip, wi
 			local row = GetRow(itemIndex)
 			row:SetPoint("TOPLEFT", 0, -offsetY); row:SetPoint("TOPRIGHT", 0, -offsetY)
 			row.text:SetText(display)
+			row.tip = type(item) == "table" and item.tip or nil
 			if iconMode then
 				local isSelected = value == state.value
 				row._selected = isSelected

@@ -400,6 +400,7 @@ function Controls.ItemList(parent, placeholder, width, height, onAdd, onRemove, 
 				GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 				local entryID = row.data.id
 				if entryID and type(entryID) == "number" then GameTooltip:SetSpellByID(entryID) else GameTooltip:SetText(row.data.name or "") end
+				if row.data.tip then GameTooltip:AddLine(row.data.tip, 1, 1, 1, true) end
 				if entryID and not hideID then GameTooltip:AddLine("ID: " .. tostring(entryID), 0.5, 0.5, 0.5) end
 				GameTooltip:Show()
 			end
