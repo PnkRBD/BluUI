@@ -832,12 +832,12 @@ Skin.OnToggle('merchant', function(enabled)
 	if not enabled then
 		if merchantFrame and merchantFrame:IsShown() then merchantFrame:Hide() end
 		BUI.Events:UnregisterAll('Skinning.Merchant.Live')
-		if MerchantFrame then
-			Skin.RestoreBlizzardFrame(MerchantFrame)
-		end
-	elseif MerchantFrame and MerchantFrame:IsShown() then
-		OnMerchantEvent('MERCHANT_SHOW')
+		Skin.ReleaseWidth(MerchantFrame)
+		Skin.RestoreBlizzardFrame(MerchantFrame)
+		return
 	end
+	Skin.ReserveWidth(MerchantFrame, Pixel.Scale(FRAME_WIDTH), UIParent)
+	if MerchantFrame:IsShown() then OnMerchantEvent('MERCHANT_SHOW') end
 end)
 
 Skin.RegisterSkin('merchant', {

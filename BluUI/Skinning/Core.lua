@@ -247,6 +247,33 @@ function Skin.RestoreBlizzardFrame(frame)
 	if BUI.MoveFrames and BUI.MoveFrames.OnFrameRestored then BUI.MoveFrames.OnFrameRestored(frame) end
 end
 
+local reservedWidths, blizzardWidths, widthHooked = {}, {}, {}
+
+local function HoldReservedWidth(frame, width)
+	local reserved = reservedWidths[frame]
+	if not reserved or width == reserved then return end
+	blizzardWidths[frame] = width
+	frame:SetWidth(reserved)
+end
+
+function Skin.ReserveWidth(frame, width, space)
+	local reserved = width * space:GetEffectiveScale() / frame:GetEffectiveScale()
+	if not reservedWidths[frame] then blizzardWidths[frame] = frame:GetWidth() end
+	if not widthHooked[frame] then
+		widthHooked[frame] = true
+		Hook(frame, 'SetWidth', HoldReservedWidth)
+	end
+	reservedWidths[frame] = reserved
+	frame:SetWidth(reserved)
+end
+
+function Skin.ReleaseWidth(frame)
+	if not reservedWidths[frame] then return end
+	reservedWidths[frame] = nil
+	frame:SetWidth(blizzardWidths[frame])
+	blizzardWidths[frame] = nil
+end
+
 function Skin.ApplyBackdrop(frame, bgColor, borderColor)
 	local background, border = bgColor or Colors.bg.dark, borderColor or Colors.border.default
 	BUI.Pixel.SetTemplate(frame, background[1], background[2], background[3], background[4], border[1], border[2], border[3], border[4], 1)
