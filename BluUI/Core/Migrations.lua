@@ -31,7 +31,62 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 18
+local PROFILE_MIGRATION_VERSION = 19
+
+local OLD_TARGET_BUFF_RULES = { { 'mineHelpful' }, { 'bossBuff', 'important', 'stealable', 'mineHelpful' } }
+local OLD_TARGET_DEBUFF_RULES = { { 'mineHarmful' }, { 'mineHarmful', 'bossAura', 'dispellable' } }
+local SHOW_MODE_RULES = {
+	debuffShowMode = { key = 'debuffRules', modes = { all = 'allHarmful', mine = 'mineHarmful', dispellable = 'dispellable', allDispellable = 'anyDispellable', blizzardRaid = 'allHarmful' } },
+	buffShowMode   = { key = 'buffRules', modes = { all = 'allHelpful', mine = 'mineHelpful', mineAll = 'mineHelpful', raid = 'raidRelevant' } },
+}
+local RETIRED_AURA_KEYS = {
+	'buffShowMode', 'debuffShowMode', 'debuffFilter', 'onlyPlayerDebuffs', 'debuffOnlyMine', 'debuffImportant',
+	'onlyDispellableDebuffs', 'onlyPlayerBuffs', 'buffImportant',
+	'playerBuffRulesNarrowed', 'targetAuraRulesFixed', 'targetBuffRulesWidened', 'targetKeyDebuffs',
+}
+
+local function SameRules(rules, expected)
+	if type(rules) ~= 'table' or #rules ~= #expected then return false end
+	for index = 1, #expected do
+		if rules[index] ~= expected[index] then return false end
+	end
+	return true
+end
+
+local function ReplaceOldRules(rules, oldLists, replacement)
+	for _, old in ipairs(oldLists) do
+		if SameRules(rules, old) then
+			for index = #rules, 1, -1 do rules[index] = nil end
+			for index, rule in ipairs(replacement) do rules[index] = rule end
+			return
+		end
+	end
+end
+
+local function SettleUnitAuraRules(unitFrames)
+	for _, unit in pairs(unitFrames) do
+		if type(unit) == 'table' then
+			for showKey, legacy in pairs(SHOW_MODE_RULES) do
+				local rule = legacy.modes[unit[showKey]]
+				if rule and type(unit[legacy.key]) ~= 'table' then unit[legacy.key] = { rule } end
+			end
+		end
+	end
+	local player, target = unitFrames.player, unitFrames.target
+	if type(player) == 'table' and not player.playerBuffRulesNarrowed and SameRules(player.buffRules, { 'mineHelpful' }) then
+		player.buffRules[1] = 'mineRaidCombat'
+	end
+	if type(target) == 'table' then
+		local defaults = BUI.AuraRules.UNIT_DEFAULTS.target
+		if not target.targetAuraRulesFixed then ReplaceOldRules(target.buffRules, OLD_TARGET_BUFF_RULES, defaults.buff) end
+		if not target.targetKeyDebuffs then ReplaceOldRules(target.debuffRules, OLD_TARGET_DEBUFF_RULES, defaults.debuff) end
+	end
+	for _, unit in pairs(unitFrames) do
+		if type(unit) == 'table' then
+			for _, key in ipairs(RETIRED_AURA_KEYS) do unit[key] = nil end
+		end
+	end
+end
 local LEGACY_UNIT_KEYS = { 'player', 'target', 'targettarget', 'focus', 'focustarget', 'pet', 'boss', 'arena', 'party' }
 local HEALING_RULE = 'mineRaidCombat'
 
@@ -529,6 +584,11 @@ function BUI.MigrateProfile(profile)
 			if type(profile.buffFrames) == 'table' then profile.buffFrames.shareBlacklist = true end
 			BUI.AuraBlacklist.Invalidate()
 		end
+	end
+
+	if not general._auraRuleListsSettled then
+		general._auraRuleListsSettled = true
+		if type(profile.unitFrames) == 'table' then SettleUnitAuraRules(profile.unitFrames) end
 	end
 
 	general._buiMigrationVersion = PROFILE_MIGRATION_VERSION

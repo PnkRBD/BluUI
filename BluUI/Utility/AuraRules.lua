@@ -162,6 +162,14 @@ AuraRules.SOURCE_TO_RULES = {
 	bossmob = { 'bossAura', 'priorityDebuff' },
 }
 
+AuraRules.UNIT_DEFAULTS = {
+	player       = { buff = { 'mineRaidCombat' }, debuff = { 'allHarmful' } },
+	target       = { buff = { 'bossBuff', 'important', 'stealable', 'fromPlayers' }, debuff = { 'mineKeyDebuffs', 'keyDebuffs' } },
+	targettarget = { buff = { 'allHelpful' }, debuff = { 'mineHarmful' } },
+	focus        = { buff = { 'allHelpful' }, debuff = { 'mineHarmful' } },
+	boss         = { buff = { 'allHelpful' }, debuff = { 'mineHarmful' } },
+}
+
 function AuraRules.DefaultAllRule(polarity)
 	return polarity == 'HELPFUL' and 'allHelpful' or 'allHarmful'
 end
@@ -198,8 +206,13 @@ function AuraRules.Icon(id)
 	return rule and rule.icon or 134400
 end
 
-function AuraRules.EnsureRules(config, polarity, defaultRules)
-	local rules = config.rules
+function AuraRules.Description(id)
+	local rule = AuraRules.BY_ID[id]
+	return rule and rule.desc
+end
+
+function AuraRules.EnsureRules(config, key, polarity, defaultRules)
+	local rules = config[key]
 	if type(rules) == 'table' then return rules end
 	rules = {}
 	local sourceRules = config.source and AuraRules.SOURCE_TO_RULES[config.source] or defaultRules
@@ -207,6 +220,6 @@ function AuraRules.EnsureRules(config, polarity, defaultRules)
 		for ruleIndex = 1, #sourceRules do rules[ruleIndex] = sourceRules[ruleIndex] end
 	end
 	if #rules == 0 then rules[1] = AuraRules.DefaultAllRule(polarity) end
-	config.rules = rules
+	config[key] = rules
 	return rules
 end

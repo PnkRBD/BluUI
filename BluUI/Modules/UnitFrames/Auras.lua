@@ -3,6 +3,7 @@ local _, BUI = ...
 local UnitFrames = BUI.UnitFrames
 local Pixel = BUI.Pixel
 local AuraBlacklist = BUI.AuraBlacklist
+local AuraRules = BUI.AuraRules
 local Engine = BUI.AuraEngine
 
 local pairs, ipairs = pairs, ipairs
@@ -34,121 +35,13 @@ end
 local DEBUFF_FILTER = 'HARMFUL|INCLUDE_NAME_PLATE_ONLY'
 local BUFF_FILTER = 'HELPFUL'
 
-local SHOWMODE_TO_RULES = {
-	debuff = {
-		all            = { 'allHarmful' },
-		mine           = { 'mineHarmful' },
-		dispellable    = { 'dispellable' },
-		allDispellable = { 'anyDispellable' },
-		blizzardRaid   = { 'allHarmful' },
-	},
-	buff = {
-		all     = { 'allHelpful' },
-		mine    = { 'mineHelpful' },
-		mineAll = { 'mineHelpful' },
-		raid    = { 'raidRelevant' },
-	},
-}
-
-local function UnitRules(unitSettings, isDebuff)
-	local key = isDebuff and 'debuffRules' or 'buffRules'
-	local rules = unitSettings[key]
-	if type(rules) == 'table' then return rules end
-	local map = isDebuff and SHOWMODE_TO_RULES.debuff or SHOWMODE_TO_RULES.buff
-	local mode = isDebuff and (unitSettings.debuffShowMode or 'all') or (unitSettings.buffShowMode or 'all')
-	local from = map[mode] or { isDebuff and 'allHarmful' or 'allHelpful' }
-	rules = {}
-	for ruleIndex = 1, #from do rules[ruleIndex] = from[ruleIndex] end
-	unitSettings[key] = rules
-	return rules
+local function UnitRules(unitType, isDebuff)
+	local unitSettings = UnitFrames.GetUnitSettings(unitType)
+	local defaults = AuraRules.UNIT_DEFAULTS[unitType]
+	if isDebuff then return AuraRules.EnsureRules(unitSettings, 'debuffRules', 'HARMFUL', defaults.debuff) end
+	return AuraRules.EnsureRules(unitSettings, 'buffRules', 'HELPFUL', defaults.buff)
 end
 UnitFrames.GetAuraRules = UnitRules
-
-local TARGET_BUFF_RULES = { 'bossBuff', 'important', 'stealable', 'fromPlayers' }
-local OLD_TARGET_BUFF_RULES = { { 'mineHelpful' }, { 'bossBuff', 'important', 'stealable', 'mineHelpful' } }
-local TARGET_DEBUFF_RULES = { 'mineKeyDebuffs', 'keyDebuffs' }
-local OLD_TARGET_DEBUFF_RULES = { { 'mineHarmful' }, { 'mineHarmful', 'bossAura', 'dispellable' } }
-
-local function SameRules(rules, expected)
-	if type(rules) ~= 'table' or #rules ~= #expected then return false end
-	for index = 1, #expected do
-		if rules[index] ~= expected[index] then return false end
-	end
-	return true
-end
-
-local function ReplaceRules(rules, replacement)
-	for index = #rules, 1, -1 do rules[index] = nil end
-	for index, rule in ipairs(replacement) do rules[index] = rule end
-end
-
-local function MigrateDebuffSettings(settings, unitType)
-	if unitType == 'player' and not settings.playerBuffRulesNarrowed then
-		settings.playerBuffRulesNarrowed = true
-		local buffRules = settings.buffRules
-		if type(buffRules) == 'table' and #buffRules == 1 and buffRules[1] == 'mineHelpful' then
-			buffRules[1] = 'mineRaidCombat'
-		end
-	end
-
-	if unitType == 'target' and not settings.targetAuraRulesFixed then
-		settings.targetAuraRulesFixed = true
-		settings.targetBuffRulesWidened = nil
-		for _, old in ipairs(OLD_TARGET_BUFF_RULES) do
-			if SameRules(settings.buffRules, old) then
-				ReplaceRules(settings.buffRules, TARGET_BUFF_RULES)
-				break
-			end
-		end
-	end
-
-	if not settings.debuffShowMode then
-		local mode = settings.debuffFilter
-		if mode then
-			settings.debuffOnlyMine = (mode == 'mine' or mode == 'myimportant')
-			settings.debuffImportant = (mode == 'important' or mode == 'myimportant')
-			settings.debuffFilter = nil
-		end
-		if settings.onlyPlayerDebuffs then
-			settings.debuffOnlyMine = true
-			settings.onlyPlayerDebuffs = nil
-		end
-
-		if settings.debuffOnlyMine then
-			settings.debuffShowMode = 'mine'
-		elseif settings.onlyDispellableDebuffs then
-			settings.debuffShowMode = 'dispellable'
-		else
-			settings.debuffShowMode = 'all'
-		end
-		settings.debuffImportant = nil
-		settings.debuffOnlyMine  = nil
-		settings.onlyDispellableDebuffs = nil
-	end
-
-	if not settings.buffShowMode then
-		if settings.onlyPlayerBuffs then
-			settings.buffShowMode = settings.buffImportant and 'mine' or 'mineAll'
-		elseif settings.buffImportant then
-			settings.buffShowMode = 'raid'
-		else
-			settings.buffShowMode = 'all'
-		end
-		settings.onlyPlayerBuffs = nil
-		settings.buffImportant   = nil
-	end
-
-	if unitType == 'target' and not settings.targetKeyDebuffs then
-		settings.targetKeyDebuffs = true
-		local debuffRules = UnitRules(settings, true)
-		for _, old in ipairs(OLD_TARGET_DEBUFF_RULES) do
-			if SameRules(debuffRules, old) then
-				ReplaceRules(debuffRules, TARGET_DEBUFF_RULES)
-				break
-			end
-		end
-	end
-end
 
 local function GetAuraSetting(settings, isDebuff, debuffKey, buffKey, globalKey, fallback)
 	local specificKey = isDebuff and debuffKey or buffKey
@@ -329,14 +222,14 @@ end)
 
 local NO_RULES = {}
 
-local function AuraSet(unitSettings, style, isDebuff)
+local function AuraSet(unitType, style, isDebuff)
 	local candidates, candidatesFingerprint = BuildCandidates(isDebuff)
-	return { style, UnitRules(unitSettings, isDebuff), isDebuff and DEBUFF_FILTER or BUFF_FILTER, candidates, candidatesFingerprint }
+	return { style, UnitRules(unitType, isDebuff), isDebuff and DEBUFF_FILTER or BUFF_FILTER, candidates, candidatesFingerprint }
 end
 
-local function ApplyContainer(container, unitSettings, style)
+local function ApplyContainer(container, unitType, style)
 	container:SetShown(style.shown)
-	Engine.ConfigureSets(container, { AuraSet(unitSettings, style, container._buiIsDebuff) })
+	Engine.ConfigureSets(container, { AuraSet(unitType, style, container._buiIsDebuff) })
 end
 
 local function PlaceContainer(frame, container, style)
@@ -346,8 +239,6 @@ end
 
 local function ApplyAuraPositions(frame, unitType)
 	local unitSettings = UnitFrames.GetUnitSettings(unitType)
-	MigrateDebuffSettings(unitSettings, unitType)
-
 	local debuffs, buffs = frame.DebuffContainer, frame.BuffContainer
 	local debuffStyle = ResolveStyle(unitSettings, true)
 	local buffStyle = ResolveStyle(unitSettings, false)
@@ -358,13 +249,13 @@ local function ApplyAuraPositions(frame, unitType)
 		local host = leaderIsDebuff and debuffs or buffs
 		local idle = leaderIsDebuff and buffs or debuffs
 		host:Show()
-		Engine.ConfigureSets(host, { AuraSet(unitSettings, leader, leaderIsDebuff), AuraSet(unitSettings, follower, not leaderIsDebuff) })
+		Engine.ConfigureSets(host, { AuraSet(unitType, leader, leaderIsDebuff), AuraSet(unitType, follower, not leaderIsDebuff) })
 		idle:Hide()
 		Engine.Configure(idle, follower, NO_RULES, idle._buiIsDebuff and DEBUFF_FILTER or BUFF_FILTER)
 		PlaceContainer(frame, host, leader)
 	else
-		ApplyContainer(debuffs, unitSettings, debuffStyle)
-		ApplyContainer(buffs, unitSettings, buffStyle)
+		ApplyContainer(debuffs, unitType, debuffStyle)
+		ApplyContainer(buffs, unitType, buffStyle)
 		PlaceContainer(frame, debuffs, debuffStyle)
 		PlaceContainer(frame, buffs, buffStyle)
 		if follower then

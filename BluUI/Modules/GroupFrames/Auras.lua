@@ -48,7 +48,7 @@ local EXCLUDE_SOURCES = {}
 for _, source in pairs(EXCLUDED_BY) do EXCLUDE_SOURCES[source] = true end
 
 function GroupFrames.ContainerRules(config, kind)
-	local rules = AuraRules.EnsureRules(config, KIND_POLARITY[kind], DEFAULT_RULES[kind])
+	local rules = AuraRules.EnsureRules(config, 'rules', KIND_POLARITY[kind], DEFAULT_RULES[kind])
 	if EXCLUDE_SOURCES[kind] then AuraRules.DropSortRules(rules) end
 	return rules
 end

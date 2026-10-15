@@ -912,7 +912,7 @@ local function AuraRow(board, unitKey, unitSettings, isDebuff)
 	text[#text + 1] = { label = 'Decimals under seconds', min = 1, max = 30, step = 1, get = function() return unitSettings[Key('DecimalThreshold')] or 5 end, set = function(value) unitSettings[Key('DecimalThreshold')] = value end }
 	board:AddTools(title, (isDebuff and 'Debuff' or 'Buff') .. ' icons attached to the frame', {
 		AuraLists.Rules({
-			getRules = function() return UnitFrames().GetAuraRules(unitSettings, isDebuff) end,
+			getRules = function() return UnitFrames().GetAuraRules(unitKey, isDebuff) end,
 			polarity = isDebuff and 'HARMFUL' or 'HELPFUL',
 			onChanged = RefreshFrames,
 		}),
