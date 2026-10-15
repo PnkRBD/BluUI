@@ -488,7 +488,6 @@ BUI.Events:Register('PLAYER_TARGET_CHANGED', 'UF.BossTarget', function()
 end)
 
 do
-	local GetDebuffDataByIndex = C_UnitAuras.GetDebuffDataByIndex
 	local Engine = BUI.AuraEngine
 
 	local DISPEL_BADGE_ATLAS = {
@@ -502,33 +501,6 @@ do
 	local _, playerClass = UnitClass('player')
 	local IS_HUNTER = playerClass == 'HUNTER'
 	local EMERGENCY_SALVE_SPELL_ID = 459517
-
-	local feignFirstID
-	local feignSignature = 0
-
-	local function ScanFeignSalveSet(unit)
-		local count = 0
-		for auraIndex = 1, 40 do
-			local auraData = GetDebuffDataByIndex(unit, auraIndex)
-			if not auraData then break end
-			local dispelName, instanceID = auraData.dispelName, BUI.Tools.SafeNum(auraData.auraInstanceID)
-			if instanceID and dispelName and not issecretvalue(dispelName) and (dispelName == 'Poison' or dispelName == 'Disease') then
-				if not feignFirstID then feignFirstID = instanceID end
-				count = count + 1
-				feignSignature = bit.bxor(feignSignature, instanceID)
-			end
-		end
-		feignSignature = feignSignature + count * 0x1000000
-	end
-
-	local function RefreshFeignSalveSet(unit)
-		if unit ~= 'player' then return false end
-		feignFirstID, feignSignature = nil, 0
-		if not (IS_HUNTER and C_SpellBook.IsSpellKnown(EMERGENCY_SALVE_SPELL_ID)) then return false end
-		if BUI.Tools.ShouldAurasBeSecret() or BUI.Tools.AuraQueriesBlocked() then return false end
-		ScanFeignSalveSet(unit)
-		return feignFirstID ~= nil
-	end
 
 	local GetSelfCleanseTypes
 
@@ -578,8 +550,6 @@ do
 		if enabled == false then return false end
 		return not active
 	end
-
-	UnitFrames.DispelViaEngine = Engine.Available and true or false
 
 	local HL_TYPES = { 'Magic', 'Curse', 'Disease', 'Poison', 'Bleed' }
 	local TYPE_ICON_GAP = 6
@@ -654,8 +624,8 @@ do
 			kit.icon:SetAtlas(DISPEL_BADGE_ATLAS[typeName])
 			typeRowKits[#typeRowKits + 1] = kit
 			StyleTypeRowKit(kit)
-			if button.SetMouseClickEnabled then button:SetMouseClickEnabled(false) end
-			if button.SetMouseMotionEnabled then button:SetMouseMotionEnabled(false) end
+			button:SetMouseClickEnabled(false)
+			button:SetMouseMotionEnabled(false)
 		end
 	end
 
@@ -901,8 +871,8 @@ do
 			if not kits then kits = {}; frameKits[frame] = kits end
 			kits[#kits + 1] = kit
 			StyleFrameKit(frame, kit)
-			if button.SetMouseClickEnabled then button:SetMouseClickEnabled(false) end
-			if button.SetMouseMotionEnabled then button:SetMouseMotionEnabled(false) end
+			button:SetMouseClickEnabled(false)
+			button:SetMouseMotionEnabled(false)
 		end
 	end
 
@@ -1147,9 +1117,7 @@ do
 		local mark = ready ~= false and 1 or 0
 		if cell.lastPick == mark then return end
 		cell.lastPick = mark
-		if calloutContainer and calloutContainer.SetAuraGroupMaxFrameCount then
-			calloutContainer:SetAuraGroupMaxFrameCount(cell.part.groupKey, mark)
-		end
+		if calloutContainer then calloutContainer:SetAuraGroupMaxFrameCount(cell.part.groupKey, mark) end
 	end
 
 	local calloutPaletteStamp, calloutRepaintPending
@@ -1203,8 +1171,8 @@ do
 			name:SetPoint('TOP', outline, 'BOTTOM', 0, Pixel.Scale(-4))
 			part.edges = edges
 			PaintCalloutRing(part)
-			if button.SetMouseClickEnabled then button:SetMouseClickEnabled(false) end
-			if button.SetMouseMotionEnabled then button:SetMouseMotionEnabled(false) end
+			button:SetMouseClickEnabled(false)
+			button:SetMouseMotionEnabled(false)
 		end
 	end
 
@@ -1234,7 +1202,6 @@ do
 			growX = 'RIGHT', growY = 'DOWN',
 			gap = CALLOUT_PAD, size = calloutCellWidth, perRow = #callouts,
 		})
-		if not calloutContainer.AddAuraGroup then return end
 		for calloutIndex = 1, #callouts do
 			local callout = callouts[calloutIndex]
 			local types = {}
@@ -1262,10 +1229,8 @@ do
 	local function ResetCallouts()
 		if calloutContainer then
 			Engine.BindUnit(calloutContainer, nil)
-			if calloutContainer.SetAuraGroupMaxFrameCount then
-				for _, cell in ipairs(calloutCells) do
-					calloutContainer:SetAuraGroupMaxFrameCount(cell.part.groupKey, 0)
-				end
+			for _, cell in ipairs(calloutCells) do
+				calloutContainer:SetAuraGroupMaxFrameCount(cell.part.groupKey, 0)
 			end
 			calloutContainer:Hide()
 			calloutContainer = nil
@@ -1300,34 +1265,22 @@ do
 		end
 	end
 
-	if UnitFrames.DispelViaEngine then
-		BUI.Events:Register('PLAYER_REGEN_ENABLED', 'UF.DispelRow.Restyle', function() BUI.Events:AfterCombatSettled(DrainTypeRowRestyle, 'UF.DispelRow.Restyle') end)
-		BUI.Events:Register('PLAYER_ENTERING_WORLD', 'UF.DispelRow.Restyle', DrainTypeRowRestyle)
-		BUI.Events:Register('PLAYER_REGEN_ENABLED', 'UF.DispelFrame.Restyle', function() BUI.Events:AfterCombatSettled(DrainFrameRestyle, 'UF.DispelFrame.Restyle') end)
-		BUI.Events:Register('PLAYER_ENTERING_WORLD', 'UF.DispelFrame.Restyle', DrainFrameRestyle)
-		BUI.Events:Register('PLAYER_REGEN_ENABLED', 'UF.DispelCallout.Repaint', function() BUI.Events:AfterCombatSettled(DrainCalloutRepaint, 'UF.DispelCallout.Repaint') end)
-		BUI.Events:Register('PLAYER_ENTERING_WORLD', 'UF.DispelCallout.Repaint', DrainCalloutRepaint)
-	end
+	BUI.Events:Register('PLAYER_REGEN_ENABLED', 'UF.DispelRow.Restyle', function() BUI.Events:AfterCombatSettled(DrainTypeRowRestyle, 'UF.DispelRow.Restyle') end)
+	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'UF.DispelRow.Restyle', DrainTypeRowRestyle)
+	BUI.Events:Register('PLAYER_REGEN_ENABLED', 'UF.DispelFrame.Restyle', function() BUI.Events:AfterCombatSettled(DrainFrameRestyle, 'UF.DispelFrame.Restyle') end)
+	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'UF.DispelFrame.Restyle', DrainFrameRestyle)
+	BUI.Events:Register('PLAYER_REGEN_ENABLED', 'UF.DispelCallout.Repaint', function() BUI.Events:AfterCombatSettled(DrainCalloutRepaint, 'UF.DispelCallout.Repaint') end)
+	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'UF.DispelCallout.Repaint', DrainCalloutRepaint)
 
 	function UnitFrames.UpdateDebuffHighlight(frame)
 		if not frame then return end
 		local unitSettings = UnitFrames.GetUnitSettings('player')
-
-		if UnitFrames.DispelViaEngine then
-			local badgeWanted = unitSettings.debuffHighlightBadge ~= false
-			local frameColorsWanted = unitSettings.debuffHighlightBar and true or false
-			if badgeWanted or frameColorsWanted then GatherHighlightInputs(unitSettings) end
-			ConfigureTypeRow(badgeWanted)
-			ConfigureCallouts(unitSettings.debuffHighlightTypeText and true or false)
-			ConfigureFrameColors(frame, frameColorsWanted)
-			return
-		end
-
-		RefreshFeignSalveSet(frame.unit or 'player')
-		if feignSignature ~= frame._feignSig then
-			frame._feignSig = feignSignature
-			if frame.Debuffs and frame.Debuffs.ForceUpdate then frame.Debuffs:ForceUpdate() end
-		end
+		local badgeWanted = unitSettings.debuffHighlightBadge ~= false
+		local frameColorsWanted = unitSettings.debuffHighlightBar and true or false
+		if badgeWanted or frameColorsWanted then GatherHighlightInputs(unitSettings) end
+		ConfigureTypeRow(badgeWanted)
+		ConfigureCallouts(unitSettings.debuffHighlightTypeText and true or false)
+		ConfigureFrameColors(frame, frameColorsWanted)
 	end
 
 	function UnitFrames.FollowDebuffHighlightUnit(frame)
@@ -1344,28 +1297,7 @@ do
 	BUI.Tools.OnAuraQueriesUnblocked(ScanPlayer, 'Unit frame debuff highlight')
 	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'UF.DebuffHighlight.Scan', ScanPlayer)
 
-	if UnitFrames.DispelViaEngine then
-		BUI.Events:OnTalentBurst('UF.DebuffHighlight', ScanPlayer)
-	else
-		local flushFrame = CreateFrame('Frame')
-		flushFrame:Hide()
-		flushFrame:SetScript('OnUpdate', BUI.Profiler.Wrap('UnitFrames.Core debuff highlight', function(self)
-			self:Hide()
-			ScanPlayer()
-		end))
-		BUI.Events:RegisterUnit('UNIT_AURA', 'player', 'UF.DebuffHighlight', function(_, _, updateInfo)
-			if updateInfo then
-				local full = updateInfo.isFullUpdate
-				local added = updateInfo.addedAuras
-				local removed = updateInfo.removedAuraInstanceIDs
-				if not (issecretvalue(full) or issecretvalue(added) or issecretvalue(removed))
-					and not full and not added and not removed then
-					return
-				end
-			end
-			flushFrame:Show()
-		end)
-	end
+	BUI.Events:OnTalentBurst('UF.DebuffHighlight', ScanPlayer)
 end
 
 do
