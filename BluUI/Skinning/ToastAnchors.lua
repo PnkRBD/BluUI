@@ -338,6 +338,14 @@ function ToastAnchors.IsUnlocked(key)
 	return entries[key].unlocked == true
 end
 
+function ToastAnchors.Places(frame)
+	for index = 1, #order do
+		local entry = order[index]
+		if entry.target == frame and (entry.pinned or Config(entry).positioned) then return true end
+	end
+	return false
+end
+
 function ToastAnchors.Refresh(key)
 	local entry = entries[key]
 	if not entry.anchor then return end

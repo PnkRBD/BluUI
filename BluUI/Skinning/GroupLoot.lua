@@ -162,12 +162,14 @@ local function StackRolls(container, point)
 	local offset = 0
 	for index = 1, container.maxIndex do
 		local frame = container.rollFrames[index]
-		local size = (Enabled() and (not frame or rollFrames[frame])) and ROLL_STEP or container.reservedSize
-		if frame then
-			frame:ClearAllPoints()
-			frame:SetPoint('CENTER', container, point, 0, direction * (offset + size / 2))
+		if not (frame and Skin.ToastAnchors.Places(frame)) then
+			local size = (Enabled() and (not frame or rollFrames[frame])) and ROLL_STEP or container.reservedSize
+			if frame then
+				frame:ClearAllPoints()
+				frame:SetPoint('CENTER', container, point, 0, direction * (offset + size / 2))
+			end
+			offset = offset + size
 		end
-		offset = offset + size
 	end
 end
 
