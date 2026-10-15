@@ -148,7 +148,7 @@ end
 local function EnsureLiveTimer(entry, config, wanted)
     local Hunter = GetHunter()
     local Engine = BUI.AuraEngine
-    if not entry.liveDriver then entry.liveDriver = Engine.NewAuraCooldownDriver(entry.frame) end
+    if not entry.liveDriver then entry.liveDriver = Engine.NewAuraDriver(entry.frame) end
     local icon = entry.icon
     local width, height = icon:GetWidth(), icon:GetHeight()
     if width <= 0 then width = 40 end

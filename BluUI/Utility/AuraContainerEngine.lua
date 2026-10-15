@@ -34,16 +34,17 @@ local DISPEL_COLOR_KEY = {
 	Poison  = 'dispel_poison',
 	Bleed   = 'dispel_bleed',
 }
-local DISPEL_FALLBACK = {
+local DISPEL_DEFAULTS = {
 	Magic   = { 0.20, 0.60, 1.00 },
 	Curse   = { 0.60, 0.00, 1.00 },
 	Disease = { 0.60, 0.40, 0.00 },
 	Poison  = { 0.00, 0.60, 0.00 },
 	Bleed   = { 1.00, 0.20, 0.20 },
 }
+Engine.DISPEL_DEFAULTS = DISPEL_DEFAULTS
 
 function Engine.DispelColorRGB(token)
-	local fallback = DISPEL_FALLBACK[token]
+	local fallback = DISPEL_DEFAULTS[token]
 	if not fallback then return 1, 1, 1 end
 	local db = BUI.GetDB()
 	local color = db and db.colors and db.colors[DISPEL_COLOR_KEY[token]]
@@ -711,8 +712,6 @@ end
 function Engine.NewAuraDriver(parent)
 	return { parent = parent, seq = 0 }
 end
-
-Engine.NewAuraCooldownDriver = Engine.NewAuraDriver
 
 local function SyncButtonDriver(driver, wanted, spellSet, stamp, width, height, init, style)
 	if not wanted then
