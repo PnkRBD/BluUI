@@ -1,5 +1,11 @@
 local _, BUI = ...
 
+local Engine = BUI.AuraEngine
+
+local function DispelEntry(token)
+    return { key = Engine.DispelColorKey(token), label = token, def = Engine.DISPEL_DEFAULTS[token] }
+end
+
 local GROUPS = {
     { name = 'Power', colors = {
         { key = 'astral',     label = 'Astral Power',  def = { 0.30, 0.52, 0.90 } },
@@ -28,11 +34,7 @@ local GROUPS = {
         { key = 'soulshards',  label = 'Soul Shards',      def = { 0.58, 0.36, 0.62 } },
     } },
     { name = 'Dispel Types', colors = {
-        { key = 'dispel_bleed',   label = 'Bleed',   def = { 1.00, 0.20, 0.20 } },
-        { key = 'dispel_curse',   label = 'Curse',   def = { 0.60, 0.00, 1.00 } },
-        { key = 'dispel_disease', label = 'Disease', def = { 0.60, 0.40, 0.00 } },
-        { key = 'dispel_magic',   label = 'Magic',   def = { 0.20, 0.60, 1.00 } },
-        { key = 'dispel_poison',  label = 'Poison',  def = { 0.00, 0.60, 0.00 } },
+        DispelEntry('Bleed'), DispelEntry('Curse'), DispelEntry('Disease'), DispelEntry('Magic'), DispelEntry('Poison'),
     } },
 }
 

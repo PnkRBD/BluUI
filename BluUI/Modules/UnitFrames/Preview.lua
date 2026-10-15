@@ -305,7 +305,7 @@ local function ShowFakeAuras(frame, unitType)
 		icon.Icon:SetTexture(Pick(ICONS, iconIndex))
 		local debuffType = debuffStyle.showDispelType and DEBUFF_TYPES[iconIndex]
 		if debuffType then
-			local red, green, blue = UnitFrames.DispelTypeColor(debuffType)
+			local red, green, blue = Engine.DispelColorRGB(debuffType)
 			Pixel.SetBorderColor(icon, red, green, blue, 1)
 		else
 			Pixel.SetBorderColor(icon, unpack(debuffStyle.baseColor))

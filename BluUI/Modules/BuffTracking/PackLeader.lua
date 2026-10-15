@@ -41,7 +41,7 @@ function PackLeader.Create()
 
     local function SyncLiveSwipe(config)
         local Engine = BUI.AuraEngine
-        if not swipeDriver then swipeDriver = Engine.NewAuraCooldownDriver(mainPip) end
+        if not swipeDriver then swipeDriver = Engine.NewAuraDriver(mainPip) end
         Engine.SyncAuraCooldownDriver(swipeDriver, config.enabled, Hunter.PackLeaderSpellSet, swipeStamp, swipeSize, swipeSize, StyleSwipe)
     end
 

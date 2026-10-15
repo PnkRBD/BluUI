@@ -553,8 +553,30 @@ do
 
 	local HL_TYPES = { 'Magic', 'Curse', 'Disease', 'Poison', 'Bleed' }
 	local TYPE_ICON_GAP = 6
-	function UnitFrames.DispelTypeColor(typeName)
-		return Engine.DispelColorRGB(typeName)
+	local PLAIN_FILTER, BYME_FILTER = 'HARMFUL', 'HARMFUL|RAID_PLAYER_DISPELLABLE'
+
+	local function SyncDispelTypeGroups(container, groups, addGroup)
+		local unitSettings = UnitFrames.GetUnitSettings('player')
+		local byMe = unitSettings.debuffHighlightClassFilter ~= false
+		local covered = byMe and GetSelfCleanseTypes() or nil
+		for typeIndex = 1, #HL_TYPES do
+			local typeName = HL_TYPES[typeIndex]
+			local plainKey, bymeKey = typeName, typeName .. '#byme'
+			local activeKey = (byMe and not (covered and covered[typeName])) and bymeKey or plainKey
+			for variant = 1, 2 do
+				local variantKey = variant == 1 and plainKey or bymeKey
+				local info = groups[variantKey]
+				local wantActive = variantKey == activeKey
+				if info then
+					if info.active ~= wantActive then
+						info.active = wantActive
+						container:SetAuraGroupMaxFrameCount(info.key, wantActive and 1 or 0)
+					end
+				elseif wantActive then
+					groups[variantKey] = { key = addGroup(typeIndex, typeName, variantKey == bymeKey and BYME_FILTER or PLAIN_FILTER), active = true }
+				end
+			end
+		end
 	end
 
 	local typeRowHost, typeRowContainer
@@ -595,7 +617,7 @@ do
 		kit.icon:SetAllPoints(kit.button)
 		if settings.dispelRecolor then
 			kit.icon:SetDesaturated(true)
-			kit.icon:SetVertexColor(UnitFrames.DispelTypeColor(kit.typeName))
+			kit.icon:SetVertexColor(Engine.DispelColorRGB(kit.typeName))
 		else
 			kit.icon:SetDesaturated(false)
 			kit.icon:SetVertexColor(1, 1, 1)
@@ -630,47 +652,22 @@ do
 	end
 
 	local function EnsureTypeRowGroups(container)
-		if not container.AddAuraGroup then return end
-		local unitSettings = UnitFrames.GetUnitSettings('player')
-		local byMe = unitSettings.debuffHighlightClassFilter ~= false
-		local covered = byMe and GetSelfCleanseTypes() or nil
-		local groups = container._rowGroups
-		for slot = 1, #HL_TYPES do
-			local typeName = HL_TYPES[slot]
-			local wantByme = byMe and not (covered and covered[typeName])
-			local plainKey, bymeKey = typeName, typeName .. '#byme'
-			local activeKey = wantByme and bymeKey or plainKey
-			local function SyncVariant(variantKey)
-				local info = groups[variantKey]
-				local wantActive = variantKey == activeKey
-				if info then
-					if info.active ~= wantActive then
-						info.active = wantActive
-						if container.SetAuraGroupMaxFrameCount then
-							container:SetAuraGroupMaxFrameCount(info.key, wantActive and 1 or 0)
-						end
-					end
-				elseif wantActive then
-					container._rowSeq = (container._rowSeq or 0) + 1
-					local key = 'row' .. container._rowSeq
-					local filter = variantKey == bymeKey and 'HARMFUL|RAID_PLAYER_DISPELLABLE' or 'HARMFUL'
-					local size = TypeRowIconSize()
-					container:AddAuraGroup(key, filter, {
-						maxFrameCount = 1,
-						initializeFrame = TypeRowInitializer(typeName, slot),
-						candidateFilters = { includeDispelTypes = { [typeName] = true } },
-						layout = {
-							elementWidth = size, elementHeight = size,
-							elementSpacing = TYPE_ICON_GAP, lineSpacing = TYPE_ICON_GAP,
-							layoutIndex = slot,
-						},
-					})
-					groups[variantKey] = { key = key, active = true }
-				end
-			end
-			SyncVariant(plainKey)
-			SyncVariant(bymeKey)
-		end
+		SyncDispelTypeGroups(container, container._rowGroups, function(slot, typeName, filter)
+			container._rowSeq = (container._rowSeq or 0) + 1
+			local key = 'row' .. container._rowSeq
+			local size = TypeRowIconSize()
+			container:AddAuraGroup(key, filter, {
+				maxFrameCount = 1,
+				initializeFrame = TypeRowInitializer(typeName, slot),
+				candidateFilters = { includeDispelTypes = { [typeName] = true } },
+				layout = {
+					elementWidth = size, elementHeight = size,
+					elementSpacing = TYPE_ICON_GAP, lineSpacing = TYPE_ICON_GAP,
+					layoutIndex = slot,
+				},
+			})
+			return key
+		end)
 	end
 
 	local HIGHLIGHT_SETTING_INPUTS = 12
@@ -694,7 +691,7 @@ do
 		highlightInputs[12] = classFilter and select(2, GetSelfCleanseTypes()) or ''
 		for typeIndex = 1, #HL_TYPES do
 			local slot = HIGHLIGHT_SETTING_INPUTS + (typeIndex - 1) * 3
-			highlightInputs[slot + 1], highlightInputs[slot + 2], highlightInputs[slot + 3] = UnitFrames.DispelTypeColor(HL_TYPES[typeIndex])
+			highlightInputs[slot + 1], highlightInputs[slot + 2], highlightInputs[slot + 3] = Engine.DispelColorRGB(HL_TYPES[typeIndex])
 		end
 	end
 
@@ -832,7 +829,7 @@ do
 	local function PaintDispelVisual(frame, kit, typeName, forceOn)
 		local wantFill = forceOn or UnitFrames.GetUnitSettings('player').debuffHighlightBar
 		AnchorDispelFill(kit, frame, wantFill and UnitFrames.GetSettings().dispelOpacity / 100 or 0)
-		local red, green, blue = UnitFrames.DispelTypeColor(typeName)
+		local red, green, blue = Engine.DispelColorRGB(typeName)
 		kit.fill:SetVertexColor(red, green, blue)
 		kit.fade:SetVertexColor(red, green, blue)
 	end
@@ -877,41 +874,16 @@ do
 	end
 
 	local function EnsureFrameGroups(container, frame)
-		if not container.AddAuraGroup then return end
-		local unitSettings = UnitFrames.GetUnitSettings('player')
-		local byMe = unitSettings.debuffHighlightClassFilter ~= false
-		local covered = byMe and GetSelfCleanseTypes() or nil
-		local groups = container._fgGroups
-		for typeIndex = 1, #HL_TYPES do
-			local typeName = HL_TYPES[typeIndex]
-			local wantByme = byMe and not (covered and covered[typeName])
-			local plainKey, bymeKey = typeName, typeName .. '#byme'
-			local activeKey = wantByme and bymeKey or plainKey
-			local function SyncVariant(variantKey)
-				local info = groups[variantKey]
-				local wantActive = variantKey == activeKey
-				if info then
-					if info.active ~= wantActive then
-						info.active = wantActive
-						if container.SetAuraGroupMaxFrameCount then
-							container:SetAuraGroupMaxFrameCount(info.key, wantActive and 1 or 0)
-						end
-					end
-				elseif wantActive then
-					container._fgSeq = (container._fgSeq or 0) + 1
-					local key = 'fg' .. container._fgSeq
-					local filter = variantKey == bymeKey and 'HARMFUL|RAID_PLAYER_DISPELLABLE' or 'HARMFUL'
-					container:AddAuraGroup(key, filter, {
-						maxFrameCount = 1,
-						initializeFrame = FrameInitializer(frame, typeName, #HL_TYPES - typeIndex + 1),
-						candidateFilters = { includeDispelTypes = { [typeName] = true } },
-					})
-					groups[variantKey] = { key = key, active = true }
-				end
-			end
-			SyncVariant(plainKey)
-			SyncVariant(bymeKey)
-		end
+		SyncDispelTypeGroups(container, container._fgGroups, function(typeIndex, typeName, filter)
+			container._fgSeq = (container._fgSeq or 0) + 1
+			local key = 'fg' .. container._fgSeq
+			container:AddAuraGroup(key, filter, {
+				maxFrameCount = 1,
+				initializeFrame = FrameInitializer(frame, typeName, #HL_TYPES - typeIndex + 1),
+				candidateFilters = { includeDispelTypes = { [typeName] = true } },
+			})
+			return key
+		end)
 	end
 
 	local function ConfigureFrameColors(frame, wanted)
@@ -1007,7 +979,7 @@ do
 			texture:SetPoint('CENTER', host, 'CENTER', Pixel.Scale(left + (typeIndex - 1) * (size + TYPE_ICON_GAP)), 0)
 			if recolor then
 				texture:SetDesaturated(true)
-				texture:SetVertexColor(UnitFrames.DispelTypeColor(HL_TYPES[typeIndex]))
+				texture:SetVertexColor(Engine.DispelColorRGB(HL_TYPES[typeIndex]))
 			else
 				texture:SetDesaturated(false)
 				texture:SetVertexColor(1, 1, 1)
@@ -1101,7 +1073,7 @@ do
 		local map = part.types and CALLOUT_EDGE_MAP[#part.types]
 		for edgeIndex = 1, 4 do
 			if map then
-				local red, green, blue = UnitFrames.DispelTypeColor(part.types[map[edgeIndex]])
+				local red, green, blue = Engine.DispelColorRGB(part.types[map[edgeIndex]])
 				part.edges[edgeIndex]:SetColorTexture(red, green, blue, 1)
 				part.edges[edgeIndex]:SetAlpha(1)
 			else
