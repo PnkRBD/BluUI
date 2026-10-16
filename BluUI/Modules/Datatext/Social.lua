@@ -247,6 +247,7 @@ local function ClassColor(className)
 end
 
 local function WhisperMember(member)
+    if BUI.Tools.IsChatHeaderSecret(ChatFrameUtil.ChooseBoxForSend()) then return end
     if member.isBNet and member.bnetName then
         ChatFrameUtil.SendBNetTell(member.bnetName)
     elseif member.name then
