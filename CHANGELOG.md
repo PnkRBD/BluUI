@@ -1,39 +1,39 @@
-# 5.10.0
+# 5.11.0
 
-Mostly fixes from your reports this time, plus a way to keep your pet's debuffs off your target.
+Lust shows on your debuffs again, there's a new Micro Menu skin, and a pile of fixes from your reports.
 
-**Pet debuffs**
+**Buffs & Debuffs**
 
-If you play a hunter, warlock or death knight, your target could fill up with your pets' debuffs. A Beast Mastery hunter could see half a dozen copies of the same bleed, one from each pet. There's a new Hide my pet's debuffs switch on the Unit Frames Filters page, and it's on by default. It only hides your own class's pet spells, so you still see a party warlock's Legion Strike.
+Sated, Exhaustion and the other lust debuffs were missing from your debuff frame. The buff and debuff frames were borrowing the raid frames' built-in hide list, which is there to keep lust off twenty raid frames at once. They have their own blacklist now. If you'd hidden anything yourself, it's been copied over.
 
-**Pinned auras**
-
-Pinned debuffs and buffs now only show your own copy. Pin Hunter's Mark and you'll see your mark, not every hunter's on that dummy. If you liked seeing everyone's, turn on Show anyone's pinned debuffs or Show anyone's pinned buffs.
+You can pin buffs and debuffs on the Buffs & Debuffs page too. Pinned ones show first, and there's a switch to show nothing but your pins.
 
 **Aura rules**
 
-Dispellable By Me now really means you. There's a separate Dispellable By My Group rule for debuffs someone in your group can clear. There are also new Boss Debuffs, Role Debuffs and Debuffs From NPCs rules.
+Hover a rule in the list and it tells you what it shows. Buffs don't show up twice anymore when Important Buffs is in your list, and Important Buffs stays out of the party and raid Defensives row.
 
-Each rule has a tick box now. Untick one and the auras it matches stay hidden, instead of falling through to a rule further down.
+Boss Debuffs and Role Debuffs are gone, since Boss & Role Debuffs already covers both. If you used either one, your list switches over by itself.
 
-**Dispel colours**
+New profiles start with a hand-picked set of target buffs. Target of target auras keep up to date, and the unit frame preview doesn't turn hidden auras back on.
 
-The colours you pick for Magic, Curse, Bleed and the rest now show up everywhere. The party and raid dispel tint used Blizzard's colours no matter what you set, so a white Bleed still came out red. Debuff icon borders follow your colours too.
+**Dispels**
 
-**Party and raid frames**
+Fade from the top and Fade from the bottom have a softer look. The bar tint opacity slider sits on the party and raid Dispels cog now, as well as the player's. The party dispel preview doesn't fill your chat anymore.
 
-Auras and dispels have moved into the Party and Raid pages, the same way Player and Target hold their own. HoT slots are off until you turn them on. When they're on, other players' HoTs stay in the buff row instead of vanishing with yours. The frames also do less work during fights.
+**Micro Menu skin**
 
-**Minimap page**
-
-Buffs & Debuffs lives on the Minimap page now. The preview there matches the real map better. The queue eye is the right size, difficulty shows as letters if you use letters, and indicators you've turned off stay off.
+There's a new skin for the row of game menu buttons. They're flat tiles that light up on hover and while their window is open. It's off by default, so turn it on with the other skins if you want it.
 
 **Windows**
 
-If you'd dragged a window like the merchant somewhere else, Blizzard could open the character sheet right on top of it. Windows now slide over to leave a gap. When an NPC offers several quests, the list lines up properly. The underwater breath bar fills and has readable text again. Toy Box names stop flipping between colours, and the Collections title sits on the left like the other windows.
+Blizzard windows don't open on top of the merchant, trainer or character window anymore. The bonus roll stays in its spot when loot rolls restack. Socketing an item from the character sheet doesn't throw an error, and the language dropdowns in Blizzard's Options show the language names again.
+
+**Minimap**
+
+The minimap preview looks like your real map now. Indicators sit where they really are and use the real art, and the button bar fits the map. Difficulty text lines up on whichever side it sits, and the delve letter clears when you leave a delve.
 
 **Fixes**
 
-Item counts and other small numbers in skinned windows follow your Slug setting. Buff and debuff timers move smoothly when you nudge their offset. Right-clicking the target frame doesn't throw an error. The HoT slots page doesn't error, and its spec picker shows your specs. On the keystone reminder, the teleport cooldown sits above the key level.
+Hovering one mouseover datatext bar doesn't bring the others up with it.
 
 Updating by hand: delete the old BluUI and BluUI_Options folders, then extract the new ones. Your settings are kept. Restart the game rather than /reload.
