@@ -402,7 +402,7 @@ do
 			UpdateRegistration()
 			local pageSync = Settings._pageToggles and Settings._pageToggles[dbKey]
 			if pageSync then pageSync(checked) end
-		end, nil, true, tooltip)
+		end, nil, true, tooltip, 'compact')
 		local frame = Widget.Unwrap(checkbox)
 		frame.dbKey = dbKey
 		frame.labelFs = frame.label
@@ -425,7 +425,7 @@ do
 
 		overlayHolder = CreateFrame('Frame', nil, ObjectiveTrackerFrame, 'BackdropTemplate')
 		local holder = overlayHolder
-		holder:SetHeight(Pixel.Scale(30))
+		holder:SetHeight(Pixel.Scale(38))
 		BUI.Skinning.AttachTrackerStrip(holder)
 		holder:SetShown(BUI.Skinning.IsSkinEnabled('questoverlay'))
 
