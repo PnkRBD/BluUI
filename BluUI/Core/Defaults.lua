@@ -615,7 +615,6 @@ BUI.Defaults = {
 		},
 
 		buffFrames = {
-			shareBlacklist = true,
 			blacklist      = { buff = {}, debuff = {} },
 			pinned         = { buff = {}, debuff = {} },
 			pinnedOnly     = { buff = false, debuff = false },

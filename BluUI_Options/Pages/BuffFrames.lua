@@ -1,5 +1,4 @@
 local BUI = BluUI
-local BUILib = BUI.BUILibClient
 
 local MODULE_KEY = 'buffFrames'
 local WIDE_MENU = 200
@@ -114,17 +113,7 @@ local function Sections(ui, _, parent, width)
 end
 
 local function BlacklistSections(ui, _, parent, width, page)
-	local AuraBlacklist, AuraLists = BUI.AuraBlacklist, BUI.AuraLists
-	local share = ui.Board(parent, width, {
-		stacked = true,
-		title = 'Blacklist',
-		description = 'Auras that never show on the buff and debuff frames.',
-	})
-	share:AddSwitch('Share with the unit frames', AuraBlacklist.IsFrameShared, function(value)
-		AuraBlacklist.SetFrameShared(value)
-		AuraBlacklist.RefreshConsumers('frames')
-		BUILib.Defer(function() page:RebuildCurrent() end)
-	end, 'Use the unit frames blacklist here too')
+	local AuraLists = BUI.AuraLists
 	local settings = BUI.GetDB().buffFrames
 	local function PinsChanged() BUI.BuffFrames.Refresh() end
 	local function OnlySwitch(list, label, tip)
@@ -141,9 +130,8 @@ local function BlacklistSections(ui, _, parent, width, page)
 			get = function() return settings.pinned.debuff end, onChange = PinsChanged,
 			only = OnlySwitch('debuff', 'Only show pinned debuffs', 'The debuff frame shows nothing but your pinned debuffs, like Sated'),
 		}),
-		share,
-		AuraLists.Blacklist(ui, parent, width, page, { scope = 'frames', polarity = 'HELPFUL', title = 'Buffs', description = 'Buffs that never show on the buff frame.' }),
-		AuraLists.Blacklist(ui, parent, width, page, { scope = 'frames', polarity = 'HARMFUL', title = 'Debuffs', description = 'Debuffs that never show on the debuff frame. Blizzard only lets addons hide a few on you, like Sated.' }),
+		AuraLists.Blacklist(ui, parent, width, page, { scope = 'frames', polarity = 'HELPFUL', title = 'Buff blacklist', description = 'Buffs that never show on the buff frame.' }),
+		AuraLists.Blacklist(ui, parent, width, page, { scope = 'frames', polarity = 'HARMFUL', title = 'Debuff blacklist', description ='Debuffs that never show on the debuff frame. Blizzard only lets addons hide a few on you, like Sated.' }),
 	}
 end
 
