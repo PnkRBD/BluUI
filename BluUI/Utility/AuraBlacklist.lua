@@ -61,16 +61,6 @@ function AuraBlacklist.IsShared()
 	return (filters and filters.shareBlacklists) == true
 end
 
-function AuraBlacklist.IsFrameShared()
-	local settings = FrameSettings()
-	return (settings and settings.shareBlacklist) == true
-end
-
-local function Resolve(scope)
-	if scope == 'frames' and AuraBlacklist.IsFrameShared() then return 'unit' end
-	return scope
-end
-
 local function EditsSharedStore(scope)
 	if scope == 'frames' then return false end
 	return scope == 'group' or AuraBlacklist.IsShared()
@@ -105,7 +95,6 @@ function AuraBlacklist.UnitSet(polarity)
 end
 
 function AuraBlacklist.FrameSet(polarity)
-	if AuraBlacklist.IsFrameShared() then return AuraBlacklist.UnitSet(polarity) end
 	return FrameOwn(polarity) or EMPTY
 end
 
@@ -124,7 +113,6 @@ function AuraBlacklist.IsGroupBlacklisted(spellID, polarity)
 end
 
 function AuraBlacklist.UserAdd(scope, polarity, spellID)
-	scope = Resolve(scope)
 	if EditsSharedStore(scope) then
 		local overrides = Overrides(polarity)
 		if not overrides then return end
@@ -138,7 +126,6 @@ function AuraBlacklist.UserAdd(scope, polarity, spellID)
 end
 
 function AuraBlacklist.UserRemove(scope, polarity, spellID)
-	scope = Resolve(scope)
 	if EditsSharedStore(scope) then
 		local overrides = Overrides(polarity)
 		if overrides then overrides[spellID] = nil end
@@ -179,28 +166,11 @@ function AuraBlacklist.SetShared(on)
 	AuraBlacklist.Invalidate()
 end
 
-function AuraBlacklist.SetFrameShared(on)
-	local settings = FrameSettings()
-	if not settings then return end
-	on = on and true or false
-	if settings.shareBlacklist == on then return end
-	settings.shareBlacklist = on
-	if on then
-		for polarity in pairs(POL_KEY) do
-			for spellID, active in pairs(FrameOwn(polarity)) do
-				if active then AuraBlacklist.UserAdd('unit', polarity, spellID) end
-			end
-		end
-	end
-	AuraBlacklist.Invalidate()
-end
-
 function AuraBlacklist.ShowsBuiltIns(scope, polarity)
-	return EditsSharedStore(Resolve(scope)) and next(AuraBlacklist.Curated(polarity)) ~= nil
+	return EditsSharedStore(scope) and next(AuraBlacklist.Curated(polarity)) ~= nil
 end
 
 function AuraBlacklist.UserEntries(scope, polarity)
-	scope = Resolve(scope)
 	local entries = {}
 	if EditsSharedStore(scope) then
 		local curated = AuraBlacklist.Curated(polarity)
@@ -290,7 +260,6 @@ end
 
 function AuraBlacklist.RefreshConsumers(scope)
 	AuraBlacklist.Invalidate()
-	scope = Resolve(scope)
 	if scope ~= 'frames' then
 		local shared = AuraBlacklist.IsShared()
 		local groupFrames = BUI.GroupFrames
@@ -303,5 +272,5 @@ function AuraBlacklist.RefreshConsumers(scope)
 			unitFrames:Refresh()
 		end
 	end
-	if scope == 'frames' or scope == nil or AuraBlacklist.IsFrameShared() then BUI.BuffFrames.Refresh() end
+	if scope == 'frames' then BUI.BuffFrames.Refresh() end
 end
