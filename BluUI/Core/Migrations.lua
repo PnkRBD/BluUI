@@ -31,7 +31,7 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 19
+local PROFILE_MIGRATION_VERSION = 20
 
 local OLD_TARGET_BUFF_RULES = { { 'mineHelpful' }, { 'bossBuff', 'important', 'stealable', 'mineHelpful' } }
 local OLD_TARGET_DEBUFF_RULES = { { 'mineHarmful' }, { 'mineHarmful', 'bossAura', 'dispellable' } }
@@ -84,6 +84,48 @@ local function SettleUnitAuraRules(unitFrames)
 	for _, unit in pairs(unitFrames) do
 		if type(unit) == 'table' then
 			for _, key in ipairs(RETIRED_AURA_KEYS) do unit[key] = nil end
+		end
+	end
+end
+local MERGED_RULES = { bossDebuff = 'bossAura', roleDebuff = 'bossAura' }
+
+local function MergeRetiredRules(rules)
+	if type(rules) ~= 'table' then return end
+	local retired = false
+	for _, id in ipairs(rules) do retired = retired or MERGED_RULES[id] ~= nil end
+	if not retired then return end
+	local hidden = type(rules.hidden) == 'table' and rules.hidden or {}
+	local kept, hide = {}, {}
+	for _, id in ipairs(rules) do
+		local merged = MERGED_RULES[id] or id
+		if hide[merged] == nil then
+			kept[#kept + 1] = merged
+			hide[merged] = hidden[id] == true
+		end
+	end
+	for index = #rules, 1, -1 do rules[index] = nil end
+	rules.hidden = nil
+	for index, id in ipairs(kept) do
+		rules[index] = id
+		if hide[id] then
+			rules.hidden = rules.hidden or {}
+			rules.hidden[id] = true
+		end
+	end
+end
+
+local function MergeRetiredRuleLists(profile)
+	for _, unit in pairs(type(profile.unitFrames) == 'table' and profile.unitFrames or {}) do
+		if type(unit) == 'table' then
+			MergeRetiredRules(unit.buffRules)
+			MergeRetiredRules(unit.debuffRules)
+		end
+	end
+	for _, section in pairs(type(profile.groupFrames) == 'table' and profile.groupFrames or {}) do
+		if type(section) == 'table' then
+			for _, container in pairs(section) do
+				if type(container) == 'table' then MergeRetiredRules(container.rules) end
+			end
 		end
 	end
 end
@@ -589,6 +631,11 @@ function BUI.MigrateProfile(profile)
 	if not general._auraRuleListsSettled then
 		general._auraRuleListsSettled = true
 		if type(profile.unitFrames) == 'table' then SettleUnitAuraRules(profile.unitFrames) end
+	end
+
+	if not general._bossRoleRulesMerged then
+		general._bossRoleRulesMerged = true
+		MergeRetiredRuleLists(profile)
 	end
 
 	general._buiMigrationVersion = PROFILE_MIGRATION_VERSION
