@@ -680,7 +680,7 @@ local function SetupEditHistory(editBox)
 	editBox:SetAltArrowKeyMode(false)
 
 	editBox:HookScript('OnKeyDown', BUI.Profiler.Wrap('Skin.Chat editBox OnKeyDown', function(self, key)
-		if C_ChatInfo.InChatMessagingLockdown() then return end
+		if C_ChatInfo.InChatMessagingLockdown() or BUI.Tools.IsChatHeaderSecret(self) then return end
 		if not (Enabled() and EditHistory()) then return end
 		local history = GetHistory()
 		local historyCount = #history
@@ -1332,6 +1332,7 @@ local function SetupScroll(frame)
 			if not userInput or not Enabled() then return end
 			local text = self:GetText()
 			if issecretvalue(text) or not TARGET_TELL_COMMANDS[text:lower()] then return end
+			if BUI.Tools.IsChatHeaderSecret(self) then return end
 			if not UnitExists('target') or not UnitIsPlayer('target') then return end
 			local name = GetUnitName('target', true)
 			if not name or name == '' then return end
