@@ -70,6 +70,7 @@ end
 local STAMP_PRESETS = {
 	mini    = { box = 14 },
 	small   = { box = 18 },
+	compact = { box = 20 },
 	midsize = { box = 21 },
 	medium  = { box = 24 },
 	large   = { box = 26 },
