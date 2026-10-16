@@ -49,6 +49,7 @@ end
 local function InsertChatLink(link)
     if not link or ChatEdit_InsertLink(link) then return end
     local editBox = ChatEdit_ChooseBoxForSend()
+    if BUI.Tools.IsChatHeaderSecret(editBox) then return end
     ChatEdit_ActivateChat(editBox)
     editBox:Insert(link)
 end
