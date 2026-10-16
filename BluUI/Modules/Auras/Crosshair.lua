@@ -12,6 +12,7 @@ local RANGE_TICK = 0.1
 local crosshairFrame
 local rangeTicker
 local previewing = false
+local inCombat = false
 local RefreshRangeTicker
 
 local function GetDB() return BUI.GetDB().crosshair end
@@ -125,7 +126,7 @@ local function UpdateVisibility()
     local db = GetDB()
 
     local show = db.enabled and IsSpecAllowed()
-    if show and db.hideOutOfCombat and not InCombatLockdown() then show = false end
+    if show and db.hideOutOfCombat and not inCombat then show = false end
     if show and db.hideInTown and BUI.Tools.IsInTown() then show = false end
     if previewing then show = true end
 
@@ -136,6 +137,11 @@ local function UpdateVisibility()
         crosshairFrame:Hide()
     end
     RefreshRangeTicker()
+end
+
+local function OnCombat(event)
+    inCombat = event == "PLAYER_REGEN_DISABLED"
+    UpdateVisibility()
 end
 
 local function PlaceSegment(segment, shadow, width, height, anchor, offsetX, offsetY)
@@ -203,8 +209,9 @@ local function Build()
     crosshairFrame.top   = crosshairFrame:CreateTexture(nil, "ARTWORK")
     crosshairFrame.bot   = crosshairFrame:CreateTexture(nil, "ARTWORK")
 
-    BUI.Events:Register("PLAYER_REGEN_ENABLED",          "Crosshair", UpdateVisibility)
-    BUI.Events:Register("PLAYER_REGEN_DISABLED",         "Crosshair", UpdateVisibility)
+    inCombat = InCombatLockdown()
+    BUI.Events:Register("PLAYER_REGEN_ENABLED",          "Crosshair", OnCombat)
+    BUI.Events:Register("PLAYER_REGEN_DISABLED",         "Crosshair", OnCombat)
     BUI.Events:Register("PLAYER_UPDATE_RESTING",         "Crosshair", UpdateVisibility)
     BUI.Events:Register("ZONE_CHANGED_NEW_AREA",         "Crosshair", UpdateVisibility)
     BUI.Events:RegisterUnit("PLAYER_SPECIALIZATION_CHANGED", "player", "Crosshair", function()
