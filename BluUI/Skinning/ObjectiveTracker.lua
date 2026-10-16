@@ -2,7 +2,6 @@ local _, BUI = ...
 
 local pairs = pairs
 local ipairs = ipairs
-local select = select
 local Wrap = BUI.Profiler.Wrap
 local After = BUI.Profiler.After
 
@@ -13,7 +12,7 @@ local FONT = BUILib.Font or STANDARD_TEXT_FONT
 local Skin = BUI.Skinning
 local Pixel = BUI.Pixel
 local Painter = BUI.Painter
-local sharedMedia = LibStub('LibSharedMedia-3.0', true)
+local sharedMedia = LibStub('LibSharedMedia-3.0')
 
 local LIBRARY_FONT_OPTION = 'LIBRARY'
 local FLAT_TEXTURE_OPTION = 'FLAT'
@@ -104,14 +103,13 @@ end
 local function GetSkinFont()
 	local fontName = GetSettings().font
 	if fontName == BUI.C.GLOBAL_OPTION then return BUI.GetGlobalFont() or FONT end
-	if fontName ~= LIBRARY_FONT_OPTION and sharedMedia then
+	if fontName ~= LIBRARY_FONT_OPTION then
 		return sharedMedia:Fetch('font', fontName, true) or FONT
 	end
 	return FONT
 end
 
 local function ApplySkinFont(fontString, role)
-	if not fontString then return end
 	local entry = restoreFonts[fontString]
 	if not entry then
 		local font, size, flags = fontString:GetFont()
@@ -145,7 +143,7 @@ local function ApplyPanelStyle(panel)
 	local opacity = settings.cardOpacity / 100
 	local borderRed, borderGreen, borderBlue, borderAlpha = PanelColor('cardBorderColor', 'skinBorder')
 	if settings.cardBorder == false then borderAlpha = 0 end
-	local texturePath = settings.cardTexture ~= FLAT_TEXTURE_OPTION and sharedMedia and sharedMedia:Fetch('statusbar', settings.cardTexture, true)
+	local texturePath = settings.cardTexture ~= FLAT_TEXTURE_OPTION and sharedMedia:Fetch('statusbar', settings.cardTexture, true)
 	local overlay = panel.__buiCardTexture
 	if texturePath then
 		if not overlay then
@@ -378,21 +376,20 @@ local function OnUpdateHighlight(block)
 		headerText:SetTextColor(TrackerColorRGB(block.isHighlighted and 'hover' or key))
 	end
 	if block.usedLines then
-		for _, line in pairs(block.usedLines) do
-			if line.Text then PaintFromStyle(line.Text, line.Text.colorStyle) end
-		end
+		for _, line in pairs(block.usedLines) do PaintFromStyle(line.Text, line.Text.colorStyle) end
 	end
 end
 
+local function EachTracker(callback)
+	for _, trackerName in ipairs(TRACKER_NAMES) do callback(_G[trackerName]) end
+end
+
 local function ForEachTrackedBlock(callback)
-	for _, trackerName in ipairs(TRACKER_NAMES) do
-		local tracker = _G[trackerName]
-		if tracker then
-			for _, blocks in pairs(tracker.usedBlocks) do
-				for _, block in pairs(blocks) do callback(block) end
-			end
+	EachTracker(function(tracker)
+		for _, blocks in pairs(tracker.usedBlocks) do
+			for _, block in pairs(blocks) do callback(block) end
 		end
-	end
+	end)
 end
 
 local function RepaintSkinColors()
@@ -406,7 +403,7 @@ local function RepaintBlizzardColors()
 		if headerStyle then headerText:SetTextColor(headerStyle.r, headerStyle.g, headerStyle.b) end
 		if block.usedLines then
 			for _, line in pairs(block.usedLines) do
-				local style = line.Text and line.Text.colorStyle
+				local style = line.Text.colorStyle
 				if style then line.Text:SetTextColor(style.r, style.g, style.b) end
 			end
 		end
@@ -976,9 +973,7 @@ local function FlashProgressBlock()
 	end)
 	if not targetBlock or not targetBlock.usedLines then return end
 	local red, green, blue = Painter.Color('skinTitle')
-	for _, line in pairs(targetBlock.usedLines) do
-		if line.Text then line.Text:SetTextColor(red, green, blue, 1) end
-	end
+	for _, line in pairs(targetBlock.usedLines) do line.Text:SetTextColor(red, green, blue, 1) end
 	After('Skin.ObjectiveTracker flash restore', FLASH_SECONDS, function()
 		if Enabled() then OnUpdateHighlight(targetBlock) end
 	end)
@@ -1078,8 +1073,7 @@ local function HideBlizzardTexture(texture)
 end
 
 local function HideFrameTextures(frame)
-	for regionIndex = 1, select('#', frame:GetRegions()) do
-		local region = select(regionIndex, frame:GetRegions())
+	for _, region in ipairs({ frame:GetRegions() }) do
 		if region:IsObjectType('Texture') then HideBlizzardTexture(region) end
 	end
 end
@@ -1231,8 +1225,8 @@ local function SkinStageBlock()
 	ApplySkinFont(stageBlock.Stage, 'header')
 	ApplySkinFont(stageBlock.Name, 'title')
 	ApplySkinFont(stageBlock.CompleteLabel, 'header')
-	if stageBlock.Stage then stageBlock.Stage:SetTextColor(TrackerColorRGB('title')) end
-	if stageBlock.Name then stageBlock.Name:SetTextColor(TrackerColorRGB('title')) end
+	stageBlock.Stage:SetTextColor(TrackerColorRGB('title'))
+	stageBlock.Name:SetTextColor(TrackerColorRGB('title'))
 end
 
 local function IsItemButton(region)
@@ -1303,7 +1297,7 @@ end
 
 local function SkinLine(line, wantWrap)
 	SkinCheck(line)
-	if line.Text then SkinBlockText(line.Text, 'line', wrapAdjustedText.objectives, wantWrap) end
+	SkinBlockText(line.Text, 'line', wrapAdjustedText.objectives, wantWrap)
 	local dash = line.Dash
 	if dash and not dashFontStrings[dash] then
 		dashFontStrings[dash] = true
@@ -1427,7 +1421,7 @@ end
 
 function Scenario.ScanHeaders()
 	local frames = ScenarioObjectiveTracker.StageBlock.WidgetContainer.widgetFrames
-	if type(frames) ~= 'table' then return end
+	if not frames then return end
 	for _, widget in pairs(frames) do
 		if not Scenario.headers[widget] and widget.Frame and widget.HeaderText then
 			Hook(widget, 'Setup', Scenario.ApplyHeader)
@@ -1438,10 +1432,7 @@ function Scenario.ScanHeaders()
 end
 
 function Scenario.InstallHeaderHooks()
-	for _, mixinName in ipairs(Scenario.headerMixins) do
-		local mixin = _G[mixinName]
-		if mixin then Hook(mixin, 'Setup', Scenario.ApplyHeader) end
-	end
+	for _, mixinName in ipairs(Scenario.headerMixins) do Hook(_G[mixinName], 'Setup', Scenario.ApplyHeader) end
 end
 
 function Scenario.FitStageBackdrop(stageBlock, backdrop)
@@ -1499,13 +1490,6 @@ local function ApplyTextSettings()
 	ApplyCardStyle()
 end
 
-local function EachTracker(callback)
-	for _, trackerName in ipairs(TRACKER_NAMES) do
-		local tracker = _G[trackerName]
-		if tracker then callback(tracker) end
-	end
-end
-
 local function HookTracker(tracker)
 	Hook(tracker, 'AddBlock', OnAddBlock)
 	Hook(tracker, 'GetProgressBar', OnGetProgressBar)
@@ -1515,9 +1499,7 @@ local function HookTracker(tracker)
 end
 
 local function SkinModuleHeader(tracker)
-	if not tracker.Header then return end
 	SkinHeader(tracker.Header, false)
-	UpperHeader(tracker.Header)
 end
 
 local function InstallTracker(trackerFrame)
@@ -1590,7 +1572,7 @@ local function RestoreTracker()
 		elseif texture.__buiOldTexture then
 			texture:SetTexture(texture.__buiOldTexture)
 		end
-		texture:SetAlpha(texture.__buiOldAlpha or 1)
+		texture:SetAlpha(texture.__buiOldAlpha)
 	end
 	for icon in pairs(checkIcons) do RestoreCheck(icon) end
 	for fontString, entry in pairs(restoreFonts) do
