@@ -421,6 +421,22 @@ local function ApplyTrackerColors()
 	end
 end
 
+local function CropIcon(icon)
+	if icon:GetAtlas() then return end
+	icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+end
+
+local function PaintItemBorder(button)
+	local red, green, blue = Painter.Color('skinBorder')
+	Pixel.ApplyBorder(button, 1, red, green, blue, 1)
+end
+
+local function SquareItemButton(button, icon, highlight)
+	CropIcon(icon)
+	highlight:SetColorTexture(1, 1, 1, 0.22)
+	Painter.Custom(button, PaintItemBorder)
+end
+
 function QuestItem.UpdateCooldown()
 	local button = QuestItem.button
 	if not button or not button.questLogIndex or not button:IsShown() then return end
@@ -457,7 +473,6 @@ function QuestItem.Ensure()
 
 	local icon = button:CreateTexture(nil, 'ARTWORK')
 	icon:SetAllPoints(button)
-	icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 	button.icon = icon
 
 	local cooldown = CreateFrame('Cooldown', nil, button, 'CooldownFrameTemplate')
@@ -476,10 +491,8 @@ function QuestItem.Ensure()
 
 	local highlight = button:CreateTexture(nil, 'HIGHLIGHT')
 	highlight:SetAllPoints(button)
-	highlight:SetColorTexture(1, 1, 1, 0.22)
+	SquareItemButton(button, icon, highlight)
 
-	local edgeRed, edgeGreen, edgeBlue = Painter.Color('skinBorder')
-	Pixel.ApplyBorder(button, 1, edgeRed, edgeGreen, edgeBlue, 1)
 	button:SetScript('OnEnter', BUI.Profiler.Script('Skin.ObjectiveTracker button OnEnter', QuestItem.OnEnter))
 	button:SetScript('OnLeave', GameTooltip_Hide)
 	button:SetScript('OnDragStart', BUI.Profiler.Script('Skin.ObjectiveTracker button OnDragStart', QuestItem.OnDragStart))
@@ -1159,11 +1172,6 @@ local function SkinHeader(header, isContainer)
 	SkinMinimizeButton(header)
 end
 
-local function CropIcon(icon)
-	if icon:GetAtlas() then return end
-	icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-end
-
 local function CardBackdrop(frame)
 	return LibSkin.ChildBackdrop(frame, { bg = Skin.PALETTE.card, border = Skin.PALETTE.edge })
 end
@@ -1227,41 +1235,30 @@ local function SkinStageBlock()
 	if stageBlock.Name then stageBlock.Name:SetTextColor(TrackerColorRGB('title')) end
 end
 
+local function IsItemButton(region)
+	return region.SetUp == QuestObjectiveItemButtonMixin.SetUp
+end
+
 local function SkinItemButton(button)
-	if not button or button.__buiSkinned then return end
+	if button.__buiSkinned then return end
 	button.__buiSkinned = true
 
 	HideBlizzardTexture(button:GetNormalTexture())
 	HideBlizzardTexture(button:GetPushedTexture())
 
-	local highlight = button:GetHighlightTexture()
-	if highlight then
-		highlight:SetAtlas(nil)
-		highlight:SetColorTexture(1, 1, 1, 0.22)
-	end
-
-	local icon = button.icon or button.Icon or button.IconTexture
-	if icon then
-		CropIcon(icon)
-		icon:ClearAllPoints()
-		icon:SetAllPoints(button)
-	end
-
-	local edgeRed, edgeGreen, edgeBlue = Painter.Color('skinBorder')
-	Pixel.ApplyBorder(button, 1, edgeRed, edgeGreen, edgeBlue, 1)
+	local icon = button.icon
+	icon:ClearAllPoints()
+	icon:SetAllPoints(button)
+	SquareItemButton(button, icon, button:GetHighlightTexture())
 
 	local glow = button.Glow
-	if glow then
-		local outset = Pixel.PixelSize(2)
-		glow:SetAtlas(nil)
-		Painter.Fill(glow, 'skinTitle')
-		glow:ClearAllPoints()
-		glow:SetPoint('TOPLEFT', button, 'TOPLEFT', -outset, outset)
-		glow:SetPoint('BOTTOMRIGHT', button, 'BOTTOMRIGHT', outset, -outset)
-	end
+	local outset = Pixel.PixelSize(2)
+	Painter.Fill(glow, 'skinTitle')
+	glow:ClearAllPoints()
+	glow:SetPoint('TOPLEFT', button, 'TOPLEFT', -outset, outset)
+	glow:SetPoint('BOTTOMRIGHT', button, 'BOTTOMRIGHT', outset, -outset)
 
-	local count = button.Count or button.count
-	if count then Pixel.ApplyFont(count, BAR_LABEL_SIZE, FONT, 'OUTLINE') end
+	Pixel.ApplyFont(button.Count, BAR_LABEL_SIZE, FONT, 'OUTLINE')
 end
 
 local function PaintCheck(icon)
@@ -1336,11 +1333,12 @@ local function HookBlock(block)
 end
 
 local function OnAddBlock(_, block)
-	SkinItemButton(block.ItemButton or block.itemButton)
-	if block.addedRegions and not InCombatLockdown() then
+	if block.addedRegions then
+		local raise = not InCombatLockdown()
 		local raisedLevel = block:GetFrameLevel() + 5
 		for region in pairs(block.addedRegions) do
-			if region.SetFrameLevel and region:GetFrameLevel() ~= raisedLevel then region:SetFrameLevel(raisedLevel) end
+			if IsItemButton(region) then SkinItemButton(region) end
+			if raise and region.SetFrameLevel and region:GetFrameLevel() ~= raisedLevel then region:SetFrameLevel(raisedLevel) end
 		end
 	end
 	HideBlizzardTexture(block.HeaderGlow)
