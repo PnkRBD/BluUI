@@ -69,11 +69,10 @@ local restoreFonts = {}
 local hiddenPoiButtons = {}
 local dashFontStrings = {}
 local checkIcons = {}
-local linkedPanels = {}
 local wrapAdjustedText = { titles = {}, objectives = {} }
 local readyQuestIDs = {}
 local readyByQuest, nextReadyByQuest = {}, {}
-local trackerCard, headerCounts, headerFilter
+local trackerCard, topStrip, headerCounts, headerFilter
 local trackerSkinned = false
 local trackerStashScale, trackerFadedOut
 local watchedCount, readyCount = 0, 0
@@ -166,9 +165,26 @@ local function ApplyPanelStyle(panel)
 	panel:SetBackdropBorderColor(borderRed, borderGreen, borderBlue, borderAlpha)
 end
 
+local function TopStripDocked()
+	return trackerCard and trackerCard:IsShown()
+end
+
+local function StyleTopStrip()
+	if not topStrip then return end
+	local docked = TopStripDocked()
+	topStrip.__buiRule:SetShown(docked)
+	if not docked then
+		ApplyPanelStyle(topStrip)
+		return
+	end
+	topStrip:SetBackdropColor(0, 0, 0, 0)
+	topStrip:SetBackdropBorderColor(0, 0, 0, 0)
+	if topStrip.__buiCardTexture then topStrip.__buiCardTexture:Hide() end
+end
+
 local function ApplyCardStyle()
 	if trackerCard then ApplyPanelStyle(trackerCard) end
-	for panel in pairs(linkedPanels) do ApplyPanelStyle(panel) end
+	StyleTopStrip()
 end
 
 local function PaintRule(rule)
@@ -181,15 +197,6 @@ end
 
 local function PaintGlyph(glyph, bright)
 	glyph:SetVertexColor(Painter.Color(bright and 'skinText' or 'skinLabel'))
-end
-
-function Skin.RegisterTrackerPanel(frame)
-	linkedPanels[frame] = true
-	ApplyPanelStyle(frame)
-end
-
-function Skin.GetTrackerPanelOutsets()
-	return Pixel.PixelSize(CARD_PAD_LEFT), Pixel.PixelSize(CARD_PAD_RIGHT), Pixel.PixelSize(CARD_PAD_Y)
 end
 
 local function IsFiniteNumber(value)
@@ -211,20 +218,42 @@ local function GetLaidOutTrackerHeight(trackerFrame)
 	return trackerFrame.topModulePadding + total + trackerFrame.bottomModulePadding
 end
 
+local function TopStripHeight()
+	if topStrip and topStrip:IsShown() then return topStrip:GetHeight() end
+	return 0
+end
+
 local function UpdateCardAnchors()
 	if not trackerCard then return end
 	local trackerFrame = ObjectiveTrackerFrame
 	local padLeft = Pixel.PixelSize(CARD_PAD_LEFT)
 	local padRight = Pixel.PixelSize(CARD_PAD_RIGHT)
 	local padY = Pixel.PixelSize(CARD_PAD_Y)
+	local stripHeight = TopStripHeight()
 	trackerCard:ClearAllPoints()
-	trackerCard:SetPoint('TOPLEFT', trackerFrame, 'TOPLEFT', -padLeft, padY)
-	trackerCard:SetPoint('TOPRIGHT', trackerFrame, 'TOPRIGHT', padRight, padY)
+	trackerCard:SetPoint('TOPLEFT', trackerFrame, 'TOPLEFT', -padLeft, padY + stripHeight)
+	trackerCard:SetPoint('TOPRIGHT', trackerFrame, 'TOPRIGHT', padRight, padY + stripHeight)
 	if trackerFrame:IsCollapsed() then
 		trackerCard:SetPoint('BOTTOM', trackerFrame.Header, 'BOTTOM', 0, -padY)
 	else
-		trackerCard:SetHeight(GetLaidOutTrackerHeight(trackerFrame) + padY * 2)
+		trackerCard:SetHeight(GetLaidOutTrackerHeight(trackerFrame) + padY * 2 + stripHeight)
 	end
+end
+
+local function PlaceTopStrip()
+	if not topStrip then return end
+	local edge = Pixel.PixelSize(1)
+	topStrip:ClearAllPoints()
+	if TopStripDocked() then
+		topStrip:SetPoint('TOPLEFT', trackerCard, 'TOPLEFT', edge, -edge)
+		topStrip:SetPoint('TOPRIGHT', trackerCard, 'TOPRIGHT', -edge, -edge)
+	else
+		local trackerFrame = ObjectiveTrackerFrame
+		local padY = Pixel.PixelSize(CARD_PAD_Y)
+		topStrip:SetPoint('BOTTOMLEFT', trackerFrame, 'TOPLEFT', -Pixel.PixelSize(CARD_PAD_LEFT), padY + edge)
+		topStrip:SetPoint('BOTTOMRIGHT', trackerFrame, 'TOPRIGHT', Pixel.PixelSize(CARD_PAD_RIGHT), padY + edge)
+	end
+	StyleTopStrip()
 end
 
 local function SyncTrackerCardShown()
@@ -244,13 +273,6 @@ local function TrackerClamp()
 	local left, right, top, bottom = trackerCard:GetLeft(), trackerCard:GetRight(), trackerCard:GetTop(), trackerCard:GetBottom()
 	local frameLeft, frameRight, frameTop, frameBottom = trackerFrame:GetLeft(), trackerFrame:GetRight(), trackerFrame:GetTop(), trackerFrame:GetBottom()
 	if not IsFiniteNumber(left) or not IsFiniteNumber(bottom) or not IsFiniteNumber(frameLeft) or not IsFiniteNumber(frameBottom) then return end
-	for panel in pairs(linkedPanels) do
-		local panelTop, panelBottom = panel:GetTop(), panel:GetBottom()
-		if panel:IsShown() and IsFiniteNumber(panelTop) and IsFiniteNumber(panelBottom) then
-			top = math.max(top, panelTop)
-			bottom = math.min(bottom, panelBottom)
-		end
-	end
 	local ratio = trackerCard:GetEffectiveScale() / trackerFrame:GetEffectiveScale()
 	local insetLeft, insetRight = left * ratio - frameLeft, right * ratio - frameRight
 	local insetTop, insetBottom = top * ratio - frameTop, bottom * ratio - frameBottom
@@ -305,6 +327,9 @@ local function CreateTrackerCard(trackerFrame)
 	Pixel.SetTemplate(trackerCard, 0, 0, 0, 0, 0, 0, 0, 0, 1)
 	trackerCard:Hide()
 	trackerCard:HookScript('OnSizeChanged', Wrap('Skin.ObjectiveTracker tracker clamp', TrackerClamp))
+	local dockStrip = Wrap('Skin.ObjectiveTracker top strip dock', PlaceTopStrip)
+	trackerCard:HookScript('OnShow', dockStrip)
+	trackerCard:HookScript('OnHide', dockStrip)
 
 	local nineSlice = trackerFrame.NineSlice
 	local syncShown = Wrap('Skin.ObjectiveTracker card sync', SyncTrackerCardShown)
@@ -318,6 +343,24 @@ local function CreateTrackerCard(trackerFrame)
 	nineSlice:HookScript('OnHide', syncShown)
 	trackerFrame:HookScript('OnShow', syncShown)
 	trackerFrame:HookScript('OnHide', syncShown)
+end
+
+function Skin.AttachTrackerStrip(frame)
+	topStrip = frame
+	Pixel.SetTemplate(frame, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+	local edge = Pixel.PixelSize(1)
+	local rule = frame:CreateTexture(nil, 'ARTWORK')
+	rule:SetHeight(edge)
+	rule:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', Pixel.PixelSize(CARD_PAD_LEFT) - Pixel.Scale(HEADER_TEXT_INSET) - edge, 0)
+	rule:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', edge - Pixel.PixelSize(CARD_PAD_RIGHT), 0)
+	frame.__buiRule = rule
+	rules[rule] = true
+	PaintRule(rule)
+	local resizeCard = Wrap('Skin.ObjectiveTracker top strip size', UpdateCardAnchors)
+	frame:HookScript('OnShow', resizeCard)
+	frame:HookScript('OnHide', resizeCard)
+	PlaceTopStrip()
+	UpdateCardAnchors()
 end
 
 local function TrackerColorRGB(key)
