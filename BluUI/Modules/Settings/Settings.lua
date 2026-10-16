@@ -423,25 +423,10 @@ do
 		if overlayCreated then return end
 		overlayCreated = true
 
-		local panel = _G.BUI_TrackerPanel
-		local anchor = panel or ObjectiveTrackerFrame
-		if not anchor then return end
-
-		overlayHolder = CreateFrame('Frame', nil, anchor, 'BackdropTemplate')
+		overlayHolder = CreateFrame('Frame', nil, ObjectiveTrackerFrame, 'BackdropTemplate')
 		local holder = overlayHolder
-		local Theme = BUILib.Theme
-		local gap = Pixel.PixelSize(1)
 		holder:SetHeight(Pixel.Scale(30))
-		if panel then
-			holder:SetPoint('BOTTOMLEFT', panel, 'TOPLEFT', 0, gap)
-			holder:SetPoint('BOTTOMRIGHT', panel, 'TOPRIGHT', 0, gap)
-		else
-			local outsetLeft, outsetRight, outsetTop = BUI.Skinning.GetTrackerPanelOutsets()
-			holder:SetPoint('BOTTOMLEFT', anchor, 'TOPLEFT', -outsetLeft, outsetTop + gap)
-			holder:SetPoint('BOTTOMRIGHT', anchor, 'TOPRIGHT', outsetRight, outsetTop + gap)
-		end
-		Pixel.SetTemplate(holder, Theme.bg.dark[1], Theme.bg.dark[2], Theme.bg.dark[3], Theme.bg.dark[4], Theme.border.light[1], Theme.border.light[2], Theme.border.light[3], 1, 1)
-		BUI.Skinning.RegisterTrackerPanel(holder)
+		BUI.Skinning.AttachTrackerStrip(holder)
 		holder:SetShown(BUI.Skinning.IsSkinEnabled('questoverlay'))
 
 		local items = {
