@@ -38,6 +38,7 @@ local CARD_PAD_Y          = 6
 local POI_BUTTON_SCALE    = 0.8
 local POI_ANCHOR_OFFSET_X = -10
 local FLAT_TEXTURE        = 'Interface\\Buttons\\WHITE8X8'
+local CHECK_ATLAS         = 'ui-questtracker-tracker-check'
 
 local TRACKER_NAMES = {
 	'ScenarioObjectiveTracker',
@@ -68,6 +69,7 @@ local hiddenTextures = {}
 local restoreFonts = {}
 local hiddenPoiButtons = {}
 local dashFontStrings = {}
+local checkIcons = {}
 local linkedPanels = {}
 local wrapAdjustedText = { titles = {}, objectives = {} }
 local readyQuestIDs = {}
@@ -1262,20 +1264,35 @@ local function SkinItemButton(button)
 	if count then Pixel.ApplyFont(count, BAR_LABEL_SIZE, FONT, 'OUTLINE') end
 end
 
-local function ApplyCheckTexture(check)
-	if check.__buiApplyingCheck then return end
-	check.__buiApplyingCheck = true
-	check:SetTexture(BUILib.GetLibMedia('check'))
-	check:SetVertexColor(Painter.Color('skinTitle'))
-	check.__buiApplyingCheck = nil
+local function PaintCheck(icon)
+	if icon.__buiCheck then icon:SetVertexColor(Painter.Color('skinTitle')) end
 end
 
-local function SkinCheck(check)
-	if not check or check.__buiSkinned then return end
-	check.__buiSkinned = true
-	Painter.Custom(check, ApplyCheckTexture)
-	Hook(check, 'SetAtlas', ApplyCheckTexture)
-	Hook(check, 'SetTexture', ApplyCheckTexture)
+local function ShowCheck(icon, atlas)
+	icon.__buiCheck = atlas ~= nil and atlas:lower() == CHECK_ATLAS
+	if icon.__buiCheck then
+		LibWidget.SetGlyph(icon, BUILib.GetLibMedia('check'))
+		PaintCheck(icon)
+	else
+		icon:SetVertexColor(1, 1, 1)
+	end
+end
+
+local function RestoreCheck(icon)
+	if not icon.__buiCheck then return end
+	icon.__buiCheck = false
+	icon:SetAtlas(CHECK_ATLAS, false)
+	icon:SetVertexColor(1, 1, 1)
+end
+
+local function SkinCheck(line)
+	local icon = line.Icon
+	if not icon or checkIcons[icon] then return end
+	checkIcons[icon] = true
+	HideBlizzardTexture(line.CheckGlow)
+	ShowCheck(icon, icon:GetAtlas())
+	Painter.Custom(icon, PaintCheck)
+	Hook(icon, 'SetAtlas', ShowCheck)
 end
 
 local function SkinBlockText(fontString, role, wrapSet, wantWrap)
@@ -1288,7 +1305,7 @@ local function SkinBlockText(fontString, role, wrapSet, wantWrap)
 end
 
 local function SkinLine(line, wantWrap)
-	SkinCheck(line.Check)
+	SkinCheck(line)
 	if line.Text then SkinBlockText(line.Text, 'line', wrapAdjustedText.objectives, wantWrap) end
 	local dash = line.Dash
 	if dash and not dashFontStrings[dash] then
@@ -1539,6 +1556,7 @@ local function SkinTracker(trackerFrame)
 	for bar, backdrop in pairs(skinnedBars) do backdrop:SetShown(bar:IsShown()) end
 	for button in pairs(hiddenPoiButtons) do button:SetScale(POI_BUTTON_SCALE) end
 	for _, texture in ipairs(hiddenTextures) do ReassertHidden(texture) end
+	for icon in pairs(checkIcons) do ShowCheck(icon, icon:GetAtlas()) end
 	Scenario.SyncStageBackdrop(ScenarioObjectiveTracker.StageBlock)
 
 	ApplyPoiVisibility()
@@ -1576,6 +1594,7 @@ local function RestoreTracker()
 		end
 		texture:SetAlpha(texture.__buiOldAlpha or 1)
 	end
+	for icon in pairs(checkIcons) do RestoreCheck(icon) end
 	for fontString, entry in pairs(restoreFonts) do
 		if entry.font then fontString:SetFont(entry.font, entry.size, entry.flags) end
 		entry.generation = nil
