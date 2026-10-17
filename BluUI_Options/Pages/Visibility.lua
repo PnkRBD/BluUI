@@ -26,31 +26,12 @@ local MODULE_LABELS = {
 	BuffTracking = 'Buff Tracking',
 	CDAnnouncer = 'CD Announcer',
 	CooldownFlash = 'Cooldown Flash',
+	Markers = 'Markers',
 	PowerBar = 'Power Bar',
 	SecondaryPower = 'Secondary Power',
 }
 
-local function Window()
-	return BUI.PageEngine.window
-end
-
-local function ValidatePriority(db)
-	local priority = db.general.visibilityPriority
-	local present = {}
-	for index = 1, #priority do present[priority[index]] = true end
-	for _, conditionKey in ipairs(Visibility.DEFAULT_PRIORITY) do
-		if not present[conditionKey] then priority[#priority + 1] = conditionKey end
-	end
-	local keptCount = 0
-	for index = 1, #priority do
-		if Visibility.CONDITIONS[priority[index]] then
-			keptCount = keptCount + 1
-			priority[keptCount] = priority[index]
-		end
-	end
-	for index = keptCount + 1, #priority do priority[index] = nil end
-	return priority
-end
+local Window = BUI.OptionsKit.Window
 
 local function ModulesBoard(ui, parent, width)
 	local disabled = BUI.GetDB().general.visibilityModulesDisabled
@@ -69,7 +50,7 @@ end
 local function StateBoard(ui, parent, width, page)
 	local db = BUI.GetDB()
 	local opacity = db.general.visibilityOpacity
-	local priority = ValidatePriority(db)
+	local priority = db.general.visibilityPriority
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'State opacity',

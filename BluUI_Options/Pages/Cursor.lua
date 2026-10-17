@@ -41,9 +41,7 @@ local BEHAVIORS = {
 
 local preview
 
-local function Window()
-	return BUI.PageEngine.window
-end
+local Window = BUI.OptionsKit.Window
 
 local function Config()
 	return BUI.GetDB().cursor
@@ -199,16 +197,18 @@ local function SizeOption(label, store, key, min, max)
 			store()[key] = value
 			Restyle()
 		end,
+		default = function() return BUI.FactoryOf(store())[key] end,
 	}
 end
 
 local function RingRow(board, ring)
 	local function slot() return Config().slots[ring.key] end
+	local function shipped() return BUI.FactoryOf(slot()) end
 	board:AddTools(ring.name, ring.about, {
 		{ entries = BEHAVIORS, width = MENU_WIDTH, get = function() return slot().kind end, set = function(value)
 			slot().kind = value
 			Changed()
-		end },
+		end, default = function() return shipped().kind end },
 		{ kind = 'swatch', opacity = true, tooltip = 'Ring colour', get = function()
 			local current = slot()
 			return current.colorR, current.colorG, current.colorB, current.alpha
@@ -216,6 +216,9 @@ local function RingRow(board, ring)
 			local current = slot()
 			current.colorR, current.colorG, current.colorB, current.alpha = red, green, blue, alpha
 			Restyle()
+		end, default = function()
+			local factory = shipped()
+			return factory.colorR, factory.colorG, factory.colorB, factory.alpha
 		end },
 		{ tooltip = 'Size and layer', title = ring.name, options = {
 			SizeOption('Size offset', slot, 'offset', -40, 80),
@@ -224,7 +227,7 @@ local function RingRow(board, ring)
 		{ get = function() return slot().enabled == true end, set = function(value)
 			slot().enabled = value
 			Changed()
-		end },
+		end, default = function() return shipped().enabled == true end },
 	})
 end
 
@@ -256,30 +259,13 @@ local function CursorBoard(kit, parent, width)
 end
 
 local function RingsBoard(kit, parent, width)
-	local board = kit.Board(parent, width, {
+	local board = BUI.ResetBoard(kit, kit.Board(parent, width, {
 		stacked = true,
 		title = 'Rings',
 		description = 'Main, inner and outer. Each ring has its own behavior, colour, size and layer.',
-	})
+	}))
 	for _, ring in ipairs(RINGS) do RingRow(board, ring) end
 	return board
-end
-
-local function BoardItem(kit, parent, width, build)
-	local item = CreateFrame('Frame', nil, parent)
-	local board = build(kit, item, width)
-	local query = ''
-	function item:Filter(text)
-		query = text
-		return board:Layout(0, query) > 0
-	end
-	function item:Measure()
-		return board:Layout(0, query)
-	end
-	function item:SetLast(last)
-		board:SetLast(last)
-	end
-	return item
 end
 
 BUI.PageEngine.RegisterPage('cursor', {
@@ -296,7 +282,7 @@ BUI.PageEngine.RegisterPage('cursor', {
 			disabled = function() return not BUI.IsModuleEnabled('cursor') end,
 			enable = { get = function() return BUI.IsModuleEnabled('cursor') end, set = function(value) BUI.SetModuleEnabled('cursor', value) end },
 			build = function(kit, main, width)
-				return { BoardItem(kit, main, width, CursorBoard), BoardItem(kit, main, width, RingsBoard) }
+				return { kit.BoardItem(main, width, CursorBoard), kit.BoardItem(main, width, RingsBoard) }
 			end,
 			preview = {
 				title = 'Live preview',
@@ -306,6 +292,7 @@ BUI.PageEngine.RegisterPage('cursor', {
 				build = function(stage, kit) preview = BuildPreview(stage, kit) end,
 			},
 		})
+		pageFrame._page = page
 		page:AutoRefresh()
 	end,
 })

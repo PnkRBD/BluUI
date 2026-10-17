@@ -16,8 +16,6 @@ local RAIL_GROUPS = {
 	} },
 }
 local TAB_IDS = { 'combat', 'interface', 'automation', 'graphics', 'danger', 'mythicplus' }
-local TAB_INDEX = {}
-for index, id in ipairs(TAB_IDS) do TAB_INDEX[id] = index end
 local SLIDER_WIDTH = 220
 local BUTTON_ROOM = 130
 local STATUS_ROOM = 120
@@ -47,7 +45,7 @@ local BOARDS = {
 
 local FPS_CVARS = {
 	vsync = '0', LowLatencyMode = '3', MSAAQuality = '0',
-	ffxAntiAliasingMode = '0', alphaTestMSAA = '1', cameraFov = '90',
+	ffxAntiAliasingMode = '0', cameraFov = '90',
 	graphicsQuality = '9', graphicsShadowQuality = '0',
 	graphicsLiquidDetail = '1', graphicsParticleDensity = '5',
 	graphicsSSAO = '0', graphicsDepthEffects = '0',
@@ -58,10 +56,8 @@ local FPS_CVARS = {
 	graphicsProjectedTextures = '1', projectedTextures = '1',
 	graphicsViewDistance = '3', graphicsEnvironmentDetail = '0',
 	graphicsGroundClutter = '0',
-	gxTripleBuffer = '0', textureFilteringMode = '5',
-	graphicsRayTracedShadows = '0', rtShadowQuality = '0',
-	ResampleQuality = '4', ffxSuperResolution = '1',
-	VRSMode = '0', physicsLevel = '0',
+	textureFilteringMode = '5',
+	ResampleQuality = '4', physicsLevel = '0',
 	maxFPS = '144', maxFPSBk = '60',
 	targetFPS = '61', useTargetFPS = '0',
 	ResampleSharpness = '0.2',
@@ -80,8 +76,8 @@ local FPS_CVARS = {
 }
 
 local FPS_CVAR_GROUPS = {
-	{ label = 'Shadows', cvars = { 'graphicsShadowQuality', 'graphicsRayTracedShadows', 'rtShadowQuality', 'entityShadowFadeScale' } },
-	{ label = 'Anti-aliasing', cvars = { 'MSAAQuality', 'ffxAntiAliasingMode', 'alphaTestMSAA' } },
+	{ label = 'Shadows', cvars = { 'graphicsShadowQuality', 'entityShadowFadeScale' } },
+	{ label = 'Anti-aliasing', cvars = { 'MSAAQuality', 'ffxAntiAliasingMode' } },
 	{ label = 'View distance', cvars = { 'graphicsViewDistance', 'farclip', 'horizonStart', 'horizonClip' } },
 	{ label = 'Ground clutter', cvars = { 'graphicsGroundClutter', 'graphicsEnvironmentDetail', 'doodadLodScale', 'groundEffectDist' } },
 	{ label = 'Particles and spell density', cvars = { 'graphicsParticleDensity', 'graphicsSpellDensity', 'spellClutter', 'spellVisualDensityFilterSetting', 'particulatesEnabled' } },
@@ -94,16 +90,10 @@ local FPS_CVAR_GROUPS = {
 
 local GATE_TEXT = 'These tools permanently delete loadouts, macros or quests, or put every BluUI setting back to default. There is no undo.\n\nBy clicking below, I solemnly swear not to cry in Discord when my stuff disappears because I clearly cannot read.'
 
-local function Window()
-	return BUI.PageEngine.window
-end
-
-local function PrintTalents(message)
-	print('|cff' .. BUI.C.COLOR_BRAND .. 'BUI/Talents:|r ' .. message)
-end
+local Window = BUI.OptionsKit.Window
 
 local function Confirm(title, message, confirmText, onConfirm)
-	Modals.Confirm({ parent = Window().frame, title = title, message = message, confirmText = confirmText, cancelText = 'Cancel', onConfirm = onConfirm })
+	Modals.Confirm({ parent = Window().frame, title = title, message = message, confirmText = confirmText, onConfirm = onConfirm })
 end
 
 local function SectionNamed(header)
@@ -113,11 +103,10 @@ local function SectionNamed(header)
 end
 
 local function Read(item)
-	if item.fct then return BUI.Settings.GetFCTBool(item.cvar) end
+	if item.fct then return C_CVar.GetCVarBool(item.cvar) end
 	if item.cvarInit then return C_CVar.GetCVarBool(item.cvarInit) end
-	local value = BUI.GetDB()[item.db][item.key]
-	if value == nil and item.cvar then return C_CVar.GetCVarBool(item.cvar) end
-	return value
+	if item.cvar then return C_CVar.GetCVarBool(item.cvar) end
+	return BUI.GetDB()[item.db][item.key]
 end
 
 local function Write(item, checked)
@@ -125,18 +114,17 @@ local function Write(item, checked)
 		BUI.Settings.SetFCT(item.cvar, checked and 1 or 0)
 		return
 	end
-	BUI.GetDB()[item.db][item.key] = checked
-	if item.toggle then
-		BUI.Settings[item.toggle](BUI.Settings, checked)
-	elseif item.fn then
-		BUI.Settings[item.fn](BUI.Settings, checked)
-	elseif item.cvar then
+	if item.cvar then
 		C_CVar.SetCVar(item.cvar, checked and '1' or '0')
+		return
 	end
+	BUI.GetDB()[item.db][item.key] = checked
+	local handler = item.toggle or item.fn
+	if handler then BUI.Settings[handler](BUI.Settings, checked) end
 end
 
 local function ReadNumber(item)
-	if item.fct then return tonumber(BUI.Settings.GetFCT(item.cvar)) end
+	if item.fct then return tonumber(C_CVar.GetCVar(item.cvar)) end
 	return BUI.GetDB()[item.db][item.key] or tonumber(C_CVar.GetCVar(item.cvarInit))
 end
 
@@ -160,18 +148,15 @@ local function SameCVarValue(current, target)
 end
 
 local function PendingCVars()
-	local pending, total, known = {}, 0, 0
+	local differing, known = 0, 0
 	for cvar, value in pairs(FPS_CVARS) do
 		local current = C_CVar.GetCVar(cvar)
 		if current then
 			known = known + 1
-			if not SameCVarValue(current, value) then
-				pending[cvar] = current
-				total = total + 1
-			end
+			if not SameCVarValue(current, value) then differing = differing + 1 end
 		end
 	end
-	return pending, total, known
+	return differing, known
 end
 
 local function GroupedCVars()
@@ -206,27 +191,26 @@ local function BackupCVars()
 	end
 end
 
-local function SetSelected(selected, Target, report)
+local function SetSelected(selected, Target)
 	BackupCVars()
-	local changed, failed = 0, 0
 	for cvar in pairs(selected) do
 		local current, target = C_CVar.GetCVar(cvar), Target(cvar)
-		if current and target and not SameCVarValue(current, target) then
-			if C_CVar.SetCVar(cvar, target) then changed = changed + 1 else failed = failed + 1 end
-		end
+		if current and target and not SameCVarValue(current, target) then C_CVar.SetCVar(cvar, target) end
 	end
-	local message = report:format(changed)
-	if failed > 0 then message = message .. (' %d could not be set.'):format(failed) end
-	BUI.Print(message)
 	Window():Repaint()
 end
 
 local function ApplyPreset(selected)
-	SetSelected(selected, function(cvar) return FPS_CVARS[cvar] end, 'Changed %d graphics settings to the preset. Originals backed up.')
+	SetSelected(selected, function(cvar) return FPS_CVARS[cvar] end)
 end
 
 local function ApplyDefaults(selected)
-	SetSelected(selected, C_CVar.GetCVarDefault, 'Put %d graphics settings back to Blizzard defaults. Originals backed up.')
+	SetSelected(selected, C_CVar.GetCVarDefault)
+end
+
+local function HasBackup()
+	local backup = BUI.db.global.cvarBackup
+	return backup ~= nil and next(backup) ~= nil
 end
 
 local function Selected(picked)
@@ -328,26 +312,18 @@ local function ShowPresetDialog()
 end
 
 local function RestoreFPS()
+	if not HasBackup() then return end
 	local globalDB = BUI.db.global
-	if not globalDB.cvarBackup or not next(globalDB.cvarBackup) then
-		BUI.Print('No backup found, apply the FPS preset first.')
-		return
-	end
-	local restored = 0
 	for cvar, value in pairs(globalDB.cvarBackup) do
 		local current = C_CVar.GetCVar(cvar)
-		if current and not SameCVarValue(current, tostring(value)) and C_CVar.SetCVar(cvar, tostring(value)) then restored = restored + 1 end
+		if current and not SameCVarValue(current, tostring(value)) then C_CVar.SetCVar(cvar, tostring(value)) end
 	end
 	globalDB.cvarBackup = nil
-	BUI.Print('Restored ' .. restored .. ' settings to their original values.')
 	Window():Repaint()
 end
 
 local function CreateTestLoadouts()
-	if InCombatLockdown() then
-		BUI.Print('Cannot create loadouts in combat.')
-		return
-	end
+	if InCombatLockdown() then return end
 	if not C_AddOns.IsAddOnLoaded('Blizzard_PlayerSpells') then
 		C_AddOns.LoadAddOn('Blizzard_PlayerSpells')
 	end
@@ -371,17 +347,13 @@ local function CreateTestLoadouts()
 			if loadoutIndex > 10 then
 				watcher:UnregisterAllEvents()
 				watcher:SetScript('OnEvent', nil)
-				PrintTalents('Create batch done.')
 				if PlayerSpellsFrame and PlayerSpellsFrame:IsShown() and not InCombatLockdown() then
 					HideUIPanel(PlayerSpellsFrame)
 					ShowUIPanel(PlayerSpellsFrame)
 				end
 				return
 			end
-			local name = ('test_%s_%d'):format(timeStamp, loadoutIndex)
-			local success = C_ClassTalents.RequestNewConfig(name)
-			PrintTalents(('RequestNewConfig("%s") -> %s'):format(name, tostring(success)))
-			if success then
+			if C_ClassTalents.RequestNewConfig(('test_%s_%d'):format(timeStamp, loadoutIndex)) then
 				pending = true
 			else
 				C_Timer.After(0.3, createNext)
@@ -393,40 +365,18 @@ local function CreateTestLoadouts()
 end
 
 local function DeleteLoadouts()
-	if InCombatLockdown() then
-		BUI.Print('Cannot delete loadouts in combat.')
-		return
-	end
+	if InCombatLockdown() then return end
 	Confirm('Delete Talent Loadouts', 'Delete every talent loadout for this spec? Other specs must be cleaned from those specs.', 'Delete', function()
 		if not C_AddOns.IsAddOnLoaded('Blizzard_PlayerSpells') then
-			PrintTalents('Loading Blizzard_PlayerSpells...')
 			C_AddOns.LoadAddOn('Blizzard_PlayerSpells')
 		end
 
 		C_Timer.After(0.2, function()
 			local specID = PlayerUtil.GetCurrentSpecID()
-			if not specID then
-				PrintTalents('ERROR: no current spec.')
-				return
-			end
+			if not specID then return end
 
-			local activeID = C_ClassTalents.GetActiveConfigID()
-			local before = C_ClassTalents.GetConfigIDsBySpecID(specID) or {}
-			PrintTalents(('Spec %d, %d loadout(s), active=%s'):format(specID, #before, tostring(activeID)))
-
-			if #before == 0 then
-				PrintTalents('No loadouts on current spec.')
-				return
-			end
-
-			local NameOfConfig = function(configID)
-				local info = C_Traits.GetConfigInfo(configID)
-				return info and info.name or '?'
-			end
-			for configIndex, configID in ipairs(before) do
-				local tag = (configID == activeID) and ' [ACTIVE]' or ''
-				PrintTalents(('  [%d] id=%s name="%s"%s'):format(configIndex, tostring(configID), NameOfConfig(configID), tag))
-			end
+			local before = C_ClassTalents.GetConfigIDsBySpecID(specID)
+			if #before == 0 then return end
 
 			local deleteIndex = 1
 			local pending = nil
@@ -439,16 +389,9 @@ local function DeleteLoadouts()
 				watcher:UnregisterAllEvents()
 				watcher:SetScript('OnEvent', nil)
 				C_Timer.After(0.3, function()
-					local after = C_ClassTalents.GetConfigIDsBySpecID(specID) or {}
-					local actuallyDeleted = #before - #after
-					PrintTalents(('Final: %d of %d deleted, %d remain.'):format(actuallyDeleted, #before, #after))
-					for configIndex, configID in ipairs(after) do
-						PrintTalents(('  REMAIN [%d] id=%s name="%s"'):format(configIndex, tostring(configID), NameOfConfig(configID)))
-					end
 					if PlayerSpellsFrame and PlayerSpellsFrame:IsShown() and not InCombatLockdown() then
 						HideUIPanel(PlayerSpellsFrame)
 						ShowUIPanel(PlayerSpellsFrame)
-						PrintTalents('Dropdown refreshed.')
 					end
 				end)
 			end
@@ -461,9 +404,7 @@ local function DeleteLoadouts()
 					return
 				end
 				pending = configID
-				local success = C_ClassTalents.DeleteConfig(configID)
-				PrintTalents(('DeleteConfig(%s "%s") -> %s'):format(tostring(configID), NameOfConfig(configID), tostring(success)))
-				if not success then
+				if not C_ClassTalents.DeleteConfig(configID) then
 					pending = nil
 					C_Timer.After(0.3, deleteNext)
 				end
@@ -487,7 +428,6 @@ local function DeleteGeneralMacros()
 		for macroIndex = generalMacroCount, 1, -1 do
 			DeleteMacro(macroIndex)
 		end
-		BUI.Print(('Deleted %d general macro(s).'):format(generalMacroCount))
 	end)
 end
 
@@ -498,7 +438,6 @@ local function DeleteCharacterMacros()
 		for macroIndex = accountSlots + characterMacroCount, accountSlots + 1, -1 do
 			DeleteMacro(macroIndex)
 		end
-		BUI.Print(('Deleted %d character macro(s).'):format(characterMacroCount))
 	end)
 end
 
@@ -516,18 +455,12 @@ local function AbandonableQuests()
 end
 
 local function AbandonQuests()
-	if InCombatLockdown() then
-		BUI.Print('Cannot abandon quests in combat.')
-		return
-	end
+	if InCombatLockdown() then return end
 	Confirm('Abandon All Quests', 'This will abandon every quest in your log that can be abandoned. Campaign and account quests will be skipped. This cannot be undone.', 'Abandon', function()
 		local queue = AbandonableQuests()
-		if #queue == 0 then
-			BUI.Print('Quest log already clear.')
-			return
-		end
+		if #queue == 0 then return end
 
-		local queueIndex, abandoned, pending, timeout = 0, 0, nil, nil
+		local queueIndex, pending, timeout = 0, nil, nil
 		local watcher = CreateFrame('Frame')
 		local function AbandonNext()
 			if timeout then timeout:Cancel() end
@@ -536,7 +469,6 @@ local function AbandonQuests()
 			if not pending then
 				watcher:UnregisterAllEvents()
 				watcher:SetScript('OnEvent', nil)
-				BUI.Print(('Abandoned %d of %d quest(s).'):format(abandoned, #queue))
 				return
 			end
 			C_QuestLog.SetSelectedQuest(pending)
@@ -548,7 +480,6 @@ local function AbandonQuests()
 		watcher:SetScript('OnEvent', function(_, _, questID)
 			if questID ~= pending then return end
 			pending = nil
-			abandoned = abandoned + 1
 			timeout:Cancel()
 			timeout = C_Timer.NewTimer(ABANDON_GAP, AbandonNext)
 		end)
@@ -596,7 +527,7 @@ local function GraphicsBoard(ui, parent, width)
 		title = 'Graphics',
 		description = 'A performance preset for the graphics CVars. Your current values are backed up the first time it is applied, and Restore puts them back.',
 		buttons = {
-			{ text = 'Restore', icon = 'reset', onClick = RestoreFPS },
+			{ text = 'Restore', icon = 'reset', onClick = RestoreFPS, disabled = not HasBackup() },
 			{ style = 'primary', text = 'Apply preset', onClick = ShowPresetDialog },
 		},
 	})
@@ -604,8 +535,8 @@ local function GraphicsBoard(ui, parent, width)
 	local status = ui.Text(row, '', 11, 'muted')
 	status:SetPoint('RIGHT', -ui.ROW_INSET, 0)
 	ui.Bind(row, function()
-		local _, total, known = PendingCVars()
-		status:SetText(total == 0 and 'At the preset' or (total .. ' of ' .. known .. ' differ'))
+		local differing, known = PendingCVars()
+		status:SetText(differing == 0 and 'At the preset' or (differing .. ' of ' .. known .. ' differ'))
 	end)
 	return board
 end
@@ -613,7 +544,7 @@ end
 local function LoadoutCount()
 	local specID = PlayerUtil.GetCurrentSpecID()
 	if not specID then return 0 end
-	return #(C_ClassTalents.GetConfigIDsBySpecID(specID) or {})
+	return #C_ClassTalents.GetConfigIDsBySpecID(specID)
 end
 
 local function Plural(count, singular, plural)
@@ -732,9 +663,9 @@ local function CelebrationBoard(ui, parent, width)
 		description = 'Confetti across your screen when something goes right.',
 		buttons = { { text = 'Try it', icon = 'play', onClick = function() BUI.Celebrations.Test() end } },
 	})
-	board:AddSwitch('Timed keys', function() return settings.timedKey == true end, function(value) settings.timedKey = value end, 'When you finish a Mythic+ key in time')
-	board:AddSwitch('Raid bosses', function() return settings.raidBoss == true end, function(value) settings.raidBoss = value end, 'When your raid kills a boss')
-	board:AddSwitch('Dungeon bosses', function() return settings.dungeonBoss == true end, function(value) settings.dungeonBoss = value end, 'When your group kills a dungeon boss, keys included')
+	board:AddSwitch('Timed keys', function() return settings.timedKey end, function(value) settings.timedKey = value end, 'When you finish a Mythic+ key in time')
+	board:AddSwitch('Raid bosses', function() return settings.raidBoss end, function(value) settings.raidBoss = value end, 'When your raid kills a boss')
+	board:AddSwitch('Dungeon bosses', function() return settings.dungeonBoss end, function(value) settings.dungeonBoss = value end, 'When your group kills a dungeon boss, keys included')
 	return board
 end
 
@@ -753,25 +684,15 @@ BUI.PageEngine.RegisterPage('qol', {
 	icon = 'plus',
 	OnBuild = function(pageFrame)
 		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
-		local adapter = { tabContents = {}, currentTab = 1 }
-		for index in ipairs(TAB_IDS) do adapter.tabContents[index] = {} end
-		local rail
-		rail = Layout.RailPage(page:GetTab(1), { window = Window() }, {
+		local rail = Layout.RailPage(page:GetTab(1), { window = Window() }, {
 			icon = 'plus',
 			title = 'Quality of life',
 			placeholder = 'Search quality of life settings...',
+			tabs = TAB_IDS,
 			rail = { groups = RAIL_GROUPS },
 			build = function(kit, _, parent, width, item) return PANES[item.id](kit, parent, width) end,
 		})
-		local Select = rail.Select
-		function rail:Select(id)
-			Select(self, id)
-			adapter.currentTab = TAB_INDEX[id]
-		end
-		function adapter:SetTab(index)
-			rail:Select(TAB_IDS[index])
-		end
-		pageFrame._page = adapter
+		pageFrame._page = rail.adapter
 		page:AutoRefresh()
 	end,
 })

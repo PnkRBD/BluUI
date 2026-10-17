@@ -13,7 +13,7 @@ local DROPDOWN_WIDTH = 112
 local PRESET_DROPDOWN_WIDTH = 140
 local SWATCH_SIZE = 28
 local FONT_DROPDOWN_WIDTH = 200
-local OPACITY_STEPS = { 100, 98, 95, 90, 85, 80, 70, 50 }
+local OPACITY_STEPS = { 100, 98, 97, 95, 90, 85, 80, 70, 50, 30, 20, 10 }
 local WINDOW_SCALE_STEPS = { 120, 110, 100, 95, 90, 85, 80, 75, 70 }
 
 local DEFAULT_PAGE = Layout.DefaultColor('page', 'dark')
@@ -93,34 +93,29 @@ local COLOR_SECTIONS = {
 	},
 }
 
-local function Window()
-	return BUI.PageEngine.window
-end
+local Kit = BUI.OptionsKit
+local Window = Kit.Window
 
 local function Store()
 	return BUI.GetDB().windowTheme
 end
 
-local function Repaint()
-	Window():Repaint()
-	BUI.Painter.Repaint()
+local function Skinned(role)
+	return role:sub(1, 4) == 'skin'
 end
 
-local function Hex(red, green, blue)
-	return ('#%02X%02X%02X'):format(math.floor(red * 255 + 0.5), math.floor(green * 255 + 0.5), math.floor(blue * 255 + 0.5))
-end
-
-local function Trim(text)
-	return (text:gsub('^%s+', ''):gsub('%s+$', ''))
+local function Repaint(skinned)
+	Kit.Repaint()
+	if skinned then BUI.Painter.Repaint() end
 end
 
 local function ToastOptions()
 	return { style = 'bar', position = 'bottom', parent = Window().frame }
 end
 
-local function Touch()
+local function Touch(skinned)
 	Store().name = nil
-	Repaint()
+	Repaint(skinned)
 end
 
 local function Overrides(create)
@@ -141,21 +136,22 @@ end
 
 local function SetRole(role, color)
 	Overrides(true)[role] = color
-	Touch()
+	Touch(Skinned(role))
 end
 
 local function ResetRoles(entries)
-	local overrides = Overrides()
-	if overrides then
-		for _, entry in ipairs(entries) do overrides[entry.role] = nil end
+	local overrides, skinned = Overrides(), false
+	for _, entry in ipairs(entries) do
+		if overrides then overrides[entry.role] = nil end
+		skinned = skinned or Skinned(entry.role)
 	end
-	Touch()
+	Touch(skinned)
 end
 
 local function PickRole(role, anchor)
-	local current = IsCustom(role) and Overrides()[role] or nil
-	local previous = current and CopyTable(current) or nil
+	local previous = IsCustom(role) and CopyTable(Overrides()[role]) or nil
 	local red, green, blue, alpha = Window():Color(role)
+	local skinned = Skinned(role)
 	Controls.OpenColorPicker({
 		r = red, g = green, b = blue, a = alpha, hasOpacity = true, anchorTo = anchor,
 		callback = function(newRed, newGreen, newBlue, newAlpha, cancelled)
@@ -163,30 +159,30 @@ local function PickRole(role, anchor)
 			local color = Overrides(true)[role]
 			if not color then return SetRole(role, { newRed, newGreen, newBlue, newAlpha }) end
 			color[1], color[2], color[3], color[4] = newRed, newGreen, newBlue, newAlpha
-			Touch()
+			Touch(skinned)
 		end,
 	})
 end
 
-local function Opacity()
-	local _, _, _, alpha = Window():Color('page')
+local function Opacity(role)
+	local _, _, _, alpha = Window():Color(role)
 	return math.floor(alpha * 100 + 0.5)
 end
 
-local function DefaultOpacity()
-	local color = Layout.DefaultColor('page', Window():GetMode())
+local function DefaultOpacity(role)
+	local color = Layout.DefaultColor(role, Window():GetMode())
 	return math.floor(color[4] * 100 + 0.5)
 end
 
-local function SetOpacity(percent)
-	local red, green, blue = Window():Color('page')
-	Overrides(true).page = { red, green, blue, percent / 100 }
-	Touch()
+local function SetOpacity(role, percent)
+	local red, green, blue = Window():Color(role)
+	Overrides(true)[role] = { red, green, blue, percent / 100 }
+	Touch(Skinned(role))
 end
 
 local function PresetColor(preset, role)
 	local color = preset.theme[role] or Layout.DefaultColor(role, 'dark')
-	return color[1], color[2], color[3], color[4] or 1
+	return color[1], color[2], color[3], color[4]
 end
 
 local function PresetMatches(preset)
@@ -213,13 +209,14 @@ local function ApplyPreset(preset)
 	for role, value in pairs(preset.theme) do store.dark[role] = CopyTable(value) end
 	store.name = preset.name
 	Window():SetMode('dark')
+	BUI.Painter.Repaint()
 end
 
 local function ResetAll()
 	local store = Store()
 	store[Window():GetMode()] = nil
 	store.edgeAccent = nil
-	Touch()
+	Touch(true)
 end
 
 local function FontName(role)
@@ -233,7 +230,7 @@ local function SetFontRole(role, name, page)
 	if role == 'base' and name == BUI.C.WINDOW_FONT then name = nil end
 	store.fonts[role] = name
 	store.name = nil
-	if role == 'base' then BUI.ApplyWindowFont() else Repaint() end
+	if role == 'base' then BUI.ApplyWindowFont() else Repaint(true) end
 	page:Resize()
 end
 
@@ -288,6 +285,7 @@ local function ApplySaved(saved, page)
 	for key, value in pairs(CopyTable(saved.theme)) do store[key] = value end
 	store.name = saved.name
 	BUI.ApplyWindowFont()
+	BUI.Painter.Repaint()
 	page:Resize()
 end
 
@@ -318,7 +316,7 @@ local function AskName(title, message, defaultName, onName)
 		defaultText = defaultName,
 		confirmText = 'Save',
 		onConfirm = function(text)
-			local name = Trim(text)
+			local name = strtrim(text)
 			if name ~= '' then onName(name) end
 		end,
 	})
@@ -539,7 +537,7 @@ end
 
 local function SetSeparators(value)
 	Store().separators = value ~= 'dotted' and value or nil
-	Touch()
+	Touch(false)
 end
 
 local function SeparatorRow(ui, section)
@@ -566,25 +564,27 @@ local function SeparatorRow(ui, section)
 	end)
 end
 
-local function OpacityRow(ui, section)
+local function OpacityRow(ui, section, role)
 	local row = section:AddRow('Opacity see through')
 	ui.IconAvatar(row, SWATCH_SIZE, 'eye'):SetPoint('LEFT', ui.AVATAR_X, 0)
 	ui.RowTitle(row, 'Opacity', 'How much of the game shows through', ui.NAME_X)
 	local value = ui.Cell(row, '', SECOND_COLUMN)
-	local reset = ui.IconButton(row, 'reset', 'Back to default', function() SetOpacity(DefaultOpacity()) end)
+	local reset = ui.IconButton(row, 'reset', 'Back to default', function() SetOpacity(role, DefaultOpacity(role)) end)
 	reset:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
 	local dropdown = ui.Dropdown(row, DROPDOWN_WIDTH, function()
+		local current = Opacity(role)
 		local items = {}
 		for _, step in ipairs(OPACITY_STEPS) do
-			items[#items + 1] = { text = step .. '%', checked = Opacity() == step, callback = function() SetOpacity(step) end }
+			items[#items + 1] = { text = step .. '%', checked = current == step, callback = function() SetOpacity(role, step) end }
 		end
 		return items
 	end)
 	dropdown:SetPoint('RIGHT', reset, 'LEFT', -10, 0)
 	ui.Bind(row, function()
-		value:SetText(Opacity() .. '%')
-		dropdown.label:SetText(Opacity() .. '%')
-		reset:SetActive(Opacity() ~= DefaultOpacity())
+		local current = Opacity(role)
+		value:SetText(current .. '%')
+		dropdown.label:SetText(current .. '%')
+		reset:SetActive(current ~= DefaultOpacity(role))
 	end)
 end
 
@@ -648,7 +648,7 @@ local function ThemeSections(ui, _, parent, width, page)
 		})
 		for _, entry in ipairs(spec.roles) do
 			ColorRow(ui, section, entry)
-			if entry.opacity then OpacityRow(ui, section) end
+			if entry.opacity then OpacityRow(ui, section, entry.role) end
 		end
 		if spec.separators then SeparatorRow(ui, section) end
 		sections[#sections + 1] = section

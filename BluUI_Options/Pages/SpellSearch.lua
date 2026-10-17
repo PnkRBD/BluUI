@@ -15,9 +15,7 @@ local DEBOUNCE = 0.2
 local MIN_LETTERS = 2
 local ICON_CROP = 0.08
 
-local function Window()
-	return BUI.PageEngine.window
-end
+local Window = BUI.OptionsKit.Window
 
 local function BuildList(ui, window, box)
 	local list = CreateFrame('Frame', nil, window.frame)
@@ -78,10 +76,10 @@ function BUI.SpellSearch(ui, parent, width, options)
 		for index, row in ipairs(list.rows) do
 			local hit = hits[index]
 			row:SetShown(hit ~= nil)
+			row.hit = hit
 			if hit then
 				row.icon:SetTexture(hit.icon)
 				row.label:SetText(hit.name)
-				row:SetScript('OnClick', function() Pick(hit) end)
 			end
 		end
 		list:SetHeight(PAD * 2 + shown * ROW_HEIGHT)
@@ -98,12 +96,13 @@ function BUI.SpellSearch(ui, parent, width, options)
 		end)
 	end
 
-	box = ui.Input(parent, width, { placeholder = options.placeholder or 'Search...', get = function() return '' end, set = function(text)
+	box = ui.Input(parent, width, { placeholder = 'Search...', get = function() return '' end, set = function(text)
 		if not enterPressed or text == '' then return end
 		local found = #hits > 0 and hits or Results(text)
 		if found[1] then Pick(found[1]) end
 	end })
 	list = BuildList(ui, window, box)
+	for _, row in ipairs(list.rows) do row:SetScript('OnClick', function(self) Pick(self.hit) end) end
 
 	box.edit:HookScript('OnKeyDown', function(_, key) enterPressed = key == 'ENTER' or key == 'NUMPADENTER' end)
 	box.edit:HookScript('OnTextChanged', function(self, userInput)
