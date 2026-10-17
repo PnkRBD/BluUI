@@ -9,6 +9,8 @@
 ## IconTexture: Interface\AddOns\BluUI\Media\Icon\logo_small
 
 Windows.lua
+Pages\AlertMover.lua
+Pages\Kit.lua
 Pages\Cursor.lua
 Pages\BuffFrames.lua
 Pages\Minimap.lua
@@ -17,7 +19,6 @@ Pages\SkinPages.lua
 Pages\Markers.lua
 Pages\QualityOfLife.lua
 Pages\Appearance.lua
-Pages\AlertMover.lua
 Pages\SpellSearch.lua
 Pages\AuraLists.lua
 Pages\Auras.lua
