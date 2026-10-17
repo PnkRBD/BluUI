@@ -18,7 +18,7 @@ local Specs = {
 }
 ClassPowers.Specs = Specs
 
-local playerClass, specID, isDruid
+local playerClass, specID
 
 function ClassPowers.UpdateSpecID()
     local newSpec = PlayerUtil.GetCurrentSpecID()
@@ -27,10 +27,7 @@ function ClassPowers.UpdateSpecID()
 end
 
 function ClassPowers.GetPlayerClass()
-    if not playerClass then
-        _, playerClass = BUI.Tools.SafeUnitClass("player")
-        isDruid = playerClass == "DRUID"
-    end
+    if not playerClass then playerClass = select(2, UnitClass("player")) end
     return playerClass
 end
 
@@ -114,17 +111,16 @@ function ClassPowers.GetPrimaryPowerType()
     end
 
     local powerType = ClassPowers.GetAutoPowerType()
-    local isMana = powerType == Enum.PowerType.Mana
-    return powerType, isMana
+    return powerType, powerType == Enum.PowerType.Mana
 end
 
 local function ClassIs(classToken) return ClassPowers.GetPlayerClass() == classToken end
 local function SpecIs(targetSpecID) return ClassPowers.GetSpecID() == targetSpecID end
 
+function ClassPowers.IsDruid()        return ClassIs("DRUID") end
 function ClassPowers.IsRogue()        return ClassIs("ROGUE") end
 function ClassPowers.IsPaladin()      return ClassIs("PALADIN") end
 function ClassPowers.IsWarlock()      return ClassIs("WARLOCK") end
-function ClassPowers.IsHunter()       return ClassIs("HUNTER") end
 function ClassPowers.IsEvoker()       return ClassIs("EVOKER") end
 function ClassPowers.IsDeathKnight()  return ClassIs("DEATHKNIGHT") end
 
@@ -138,11 +134,6 @@ function ClassPowers.IsWindwalker()   return SpecIs(Specs.WINDWALKER) end
 function ClassPowers.IsDevourer()     return SpecIs(Specs.DEVOURER_DH) end
 function ClassPowers.IsVengeance()    return SpecIs(Specs.VENGEANCE_DH) end
 function ClassPowers.IsBalance()      return SpecIs(Specs.BALANCE) end
-
-function ClassPowers.IsDruid()
-    if isDruid == nil then ClassPowers.GetPlayerClass() end
-    return isDruid == true
-end
 
 function ClassPowers.IsDruidInCatForm()
     return ClassPowers.IsDruid() and GetShapeshiftFormID() == 1

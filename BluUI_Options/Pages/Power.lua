@@ -12,9 +12,7 @@ local ORDER_WIDTH = 250
 local COPY_WIDTH = 220
 local OFFSET_RANGE = 50
 local WHITE = 'Interface\\Buttons\\WHITE8x8'
-local SAMPLE_FILL = 0.7
 local EVENT_KEY = 'Pages.PowerPreview'
-local POLL_KEY = 'PowerPagePreview'
 local LABEL_KEY = 'Pages.PowerSourceLabels'
 
 local PowerType = Enum.PowerType
@@ -70,11 +68,10 @@ local CASTBAR_MODES = {
 	{ value = 'collapse', text = 'Collapse when not casting' },
 	{ value = 'hold', text = 'Hold the space when not casting' },
 }
-local STACK_TAGS = { BUI_PowerBar = true, BUI_SecondaryPower = true, BUI_Castbar_player = true, BUI_PowerBarAny = true }
+local STACK_TAGS = { BUI_Castbar_player = true, BUI_PowerBarAny = true }
 local MEMBER_NAMES = { primary = 'Primary power', secondary = 'Secondary power' }
 local KINDS = { primary = 'primary', secondary = 'secondary' }
 local TAB_IDS = { 'primary', 'secondary', 'stacking' }
-local TAB_INDEX = { primary = 1, secondary = 2, stacking = 3 }
 
 local selected = 'scope'
 local preview
@@ -83,26 +80,12 @@ local copySource
 local fonts
 local autoLabels = {}
 
-local function Window()
-	return BUI.PageEngine.window
-end
-
-local function Repaint()
-	Window():Repaint()
-end
-
-local relock = { SetValue = Repaint }
+local Kit = BUI.OptionsKit
+local Window, Repaint, RebuildPage, RebuildPane = Kit.Window, Kit.Repaint, Kit.RebuildPage, Kit.RebuildPane
+local Setting, Option, Toggle, OnUnlessOff, Color = Kit.Setting, Kit.Option, Kit.Toggle, Kit.OnUnlessOff, Kit.Color
 
 local function RefreshPreview()
 	if preview then preview:Update() end
-end
-
-local function RebuildPage()
-	BUILib.Defer(function() BUI.PageEngine.RefreshCurrentPage() end)
-end
-
-local function RebuildPane(page)
-	BUILib.Defer(function() page:RebuildCurrent() end)
 end
 
 local function Stacked(key)
@@ -117,15 +100,18 @@ end
 
 local function RefreshAutoLabels()
 	for _, refresh in pairs(autoLabels) do refresh() end
-	local engine = BUI.PageEngine
-	if engine.frame and engine.frame:IsShown() then Repaint() end
+	local frame = BUI.PageEngine.frame
+	if frame and frame:IsShown() then Repaint() end
 end
+
+BUI.Events:OnTalentBurst(LABEL_KEY, RefreshAutoLabels)
+BUI.Events:Register('UPDATE_SHAPESHIFT_FORM', LABEL_KEY, RefreshAutoLabels)
 
 local function ScopeInfo()
 	local scope = BUI.Power.GetScope()
 	if scope == 'spec' then
-		local _, name = GetSpecializationInfo(GetSpecialization() or 0)
-		return scope, name
+		local specIndex = C_SpecializationInfo.GetSpecialization()
+		return scope, specIndex and select(2, C_SpecializationInfo.GetSpecializationInfo(specIndex))
 	elseif scope == 'class' then
 		return scope, (UnitClass('player'))
 	end
@@ -139,53 +125,31 @@ local function ScopeStatus()
 	return 'These settings apply to every character on this profile.'
 end
 
-local function Option(db, label, key, extra)
-	local option = { label = label, get = function() return db[key] end, set = function(value) db[key] = value end }
-	for name, value in pairs(extra or {}) do option[name] = value end
+local function Not(value) return not value end
+
+local function Inverse(db, label, key)
+	local option = Setting(db, label, key, Not)
+	option.set = function(value) db[key] = not value end
 	return option
 end
 
-local function Toggle(db, label, key)
-	return { label = label, get = function() return db[key] == true end, set = function(value) db[key] = value end }
-end
-
-local function OnUnlessOff(db, label, key)
-	return { label = label, get = function() return db[key] ~= false end, set = function(value) db[key] = value end }
-end
-
 local function Channels(db, prefix, label, alpha, fallback)
-	return {
+	local function Read(store)
+		local red, green, blue = store[prefix .. 'R'], store[prefix .. 'G'], store[prefix .. 'B']
+		if red == nil then red, green, blue = fallback() end
+		return red, green, blue, alpha and store[prefix .. 'A'] or 1
+	end
+	local swatch = {
 		kind = 'swatch', label = label, tooltip = label, opacity = alpha,
-		get = function()
-			local red, green, blue, opacity = db[prefix .. 'R'], db[prefix .. 'G'], db[prefix .. 'B'], db[prefix .. 'A']
-			if red == nil or green == nil or blue == nil then
-				local fallbackRed, fallbackGreen, fallbackBlue, fallbackAlpha = 1, 1, 1, 1
-				if fallback then fallbackRed, fallbackGreen, fallbackBlue, fallbackAlpha = fallback() end
-				red, green, blue = red or fallbackRed, green or fallbackGreen, blue or fallbackBlue
-				opacity = opacity or fallbackAlpha
-			end
-			return red, green, blue, alpha and (opacity or 1) or 1
-		end,
+		get = function() return Read(db) end,
 		set = function(red, green, blue, opacity)
 			db[prefix .. 'R'], db[prefix .. 'G'], db[prefix .. 'B'] = red, green, blue
 			if alpha then db[prefix .. 'A'] = opacity end
 		end,
 	}
-end
-
-local BAR_BACKGROUND, POINT_BACKGROUND = 0.1, 0.15
-local function BarBackground() return BAR_BACKGROUND, BAR_BACKGROUND, BAR_BACKGROUND, 1 end
-local function PointBackground() return POINT_BACKGROUND, POINT_BACKGROUND, POINT_BACKGROUND, 1 end
-
-local function ArrayColor(db, label, key)
-	return {
-		kind = 'swatch', label = label, tooltip = label, opacity = true,
-		get = function()
-			local color = db[key]
-			return color[1], color[2], color[3], color[4]
-		end,
-		set = function(red, green, blue, alpha) db[key] = { red, green, blue, alpha } end,
-	}
+	local factory = BUI.FactoryOf(db)
+	if factory then swatch.default = function() return Read(factory) end end
+	return swatch
 end
 
 local function StoreColor(key, label)
@@ -197,6 +161,7 @@ local function StoreColor(key, label)
 			color.r, color.g, color.b = red, green, blue
 			BUI.ApplyColors()
 		end,
+		default = function() return BUI.Colors.Default(key) end,
 	}
 end
 
@@ -207,9 +172,10 @@ local function ResourceColor(db, config, label)
 end
 
 local function FontMenu(key)
-	return { entries = fonts, width = MENU_WIDTH, get = function() return BUI.GetDB().general[key] or BUI.C.GLOBAL_OPTION end, set = function(value)
-		BUI.GetDB().general[key] = value ~= BUI.C.GLOBAL_OPTION and value or nil
-	end }
+	local general = BUI.GetDB().general
+	return { entries = fonts, width = MENU_WIDTH, get = function() return general[key] or BUI.C.GLOBAL_OPTION end, set = function(value)
+		general[key] = value ~= BUI.C.GLOBAL_OPTION and value or nil
+	end, default = function() return BUI.FactoryOf(general)[key] or BUI.C.GLOBAL_OPTION end }
 end
 
 local function TextIcon(title, options)
@@ -250,11 +216,21 @@ local function SourceEntries(auto, key)
 end
 
 local function Source(db, entries, after)
+	local factory = BUI.FactoryOf(db)
 	return { entries = entries, width = SOURCE_WIDTH, get = function() return db.source or 'auto' end, set = function(value)
 		db.source = value ~= 'auto' and value or nil
 		BUI.Power.Stack.OnMemberToggled()
 		if after then after() end
-	end }
+	end, default = function() return factory.source or 'auto' end }
+end
+
+local function Enabled(db, module)
+	local switch = Toggle(db, nil, 'enabled')
+	switch.set = function(value)
+		module.Toggle(value)
+		BUI.Power.Stack.OnMemberToggled()
+	end
+	return switch
 end
 
 local function PositionFor(db, isText, selfTag)
@@ -280,9 +256,9 @@ local function TickRow(board, db, Apply)
 			}))
 			return editor
 		end },
-		ArrayColor(db, 'Tick color', 'tickMarkColor'),
+		Color(db, 'Tick color', 'tickMarkColor'),
 		{ tooltip = 'Width', title = 'Tick marks', options = { Option(db, 'Tick width', 'tickMarkWidth', { min = 1, max = 4, step = 1 }) } },
-		{ icon = 'erase', size = BUILib.Layout.ERASE_SIZE, tooltip = 'Clear every tick mark', hover = 'danger', onClick = function()
+		{ icon = 'erase', size = Layout.ERASE_SIZE, tooltip = 'Clear every tick mark', hover = 'danger', onClick = function()
 			wipe(db.tickMarks)
 			Refresh()
 		end },
@@ -324,26 +300,24 @@ end
 local function PrimaryBoards(ui, parent, width, page)
 	local Primary = BUI.Power.Primary
 	local db = BUI.Power.GetPrimaryDB()
+	BUI.SetFactory(db, BUI.ExportImport.FactoryProfile().powerBar)
 	local function Apply()
 		Primary.Apply()
 		RefreshPreview()
 	end
-	Primary._lockToggle = relock
+	BUI.OnModuleChange('powerBar', Repaint)
 	local stacked = Stacked('primary')
-	local board = ui.Board(parent, width, {
+	local board = BUI.ResetBoard(ui, ui.Board(parent, width, {
 		stacked = true,
 		title = 'Primary power',
 		description = 'Whatever your spec runs on. The eye lets you drag it, right-click the bar to lock it again.',
-	})
+	}))
 	local tools = {
 		Source(db, SourceEntries(function() return POWER_NAMES[BUI.ClassPowers.GetAutoPowerType()] end, 'primary')),
 	}
 	if not stacked then tools[#tools + 1] = PositionFor(db, not db.barMode, 'BUI_PowerBar') end
 	tools[#tools + 1] = Eye(db, Primary)
-	tools[#tools + 1] = { get = function() return db.enabled == true end, set = function(value)
-		Primary.Toggle(value)
-		BUI.Power.Stack.OnMemberToggled()
-	end }
+	tools[#tools + 1] = Enabled(db, Primary)
 	board:AddTools('Primary bar', stacked and 'Source and on or off, its position comes from Stacking' or 'Source, position and on or off', tools, Apply)
 	board:AddSwitch('Bar instead of a number', function() return db.barMode == true end, function(value)
 		db.barMode = value
@@ -374,11 +348,11 @@ local function PrimaryBoards(ui, parent, width, page)
 			FontMenu('powerFont'),
 			TextIcon('Bar text', {
 				Option(db, 'Text size', 'barTextSize', { min = 8, max = 50, step = 1 }),
-				{ label = 'Percent sign', get = function() return not db.hidePercentSign end, set = function(value) db.hidePercentSign = not value end },
+				Inverse(db, 'Percent sign', 'hidePercentSign'),
 				Layer(db, 'textStrata'),
 			}),
 			Offsets(db, 'Bar text', 'barTextOffsetX', 'barTextOffsetY', { Toggle(db, 'Above the bar', 'barTextAbove') }),
-			{ get = function() return not db.barHideText end, set = function(value) db.barHideText = not value end },
+			Inverse(db, nil, 'barHideText'),
 		}, Apply)
 	else
 		board:AddTools('Text', 'Size, color and font of the number', {
@@ -386,7 +360,7 @@ local function PrimaryBoards(ui, parent, width, page)
 			FontMenu('powerFont'),
 			TextIcon('Text', {
 				Option(db, 'Text size', 'textSize', { min = 10, max = 50, step = 1 }),
-				{ label = 'Percent sign', get = function() return not db.hidePercentSign end, set = function(value) db.hidePercentSign = not value end },
+				Inverse(db, 'Percent sign', 'hidePercentSign'),
 				Layer(db, 'frameStrata'),
 			}),
 		}, Apply)
@@ -396,7 +370,7 @@ local function PrimaryBoards(ui, parent, width, page)
 	if BUI.ClassPowers.IsDruid() then
 		db.formPowerOverrides = db.formPowerOverrides or {}
 		boards[#boards + 1] = DruidBoard(ui, parent, width, db, Apply, 'formPowerOverrides', DRUID_POWERS, function(form)
-			return POWER_NAMES[BUI.ClassPowers.GetDruidAutoPowerForForm(form)] or 'Mana'
+			return POWER_NAMES[BUI.ClassPowers.GetDruidAutoPowerForForm(form)]
 		end)
 	end
 	return boards
@@ -411,20 +385,21 @@ end
 local function SecondaryBoards(ui, parent, width, page)
 	local Secondary = BUI.Power.Secondary
 	local db = BUI.Power.GetSecondaryDB()
+	BUI.SetFactory(db, BUI.ExportImport.FactoryProfile().secondaryPower)
 	local function Apply()
 		Secondary.Apply()
 		RefreshPreview()
 	end
-	Secondary._lockToggle = relock
+	BUI.OnModuleChange('secondaryPower', Repaint)
 	local available = Secondary.GetConfigsForClass()
 	local config = Secondary.GetActiveConfig() or available[1]
 	editConfig = config
 	local stacked = Stacked('secondary')
-	local board = ui.Board(parent, width, {
+	local board = BUI.ResetBoard(ui, ui.Board(parent, width, {
 		stacked = true,
 		title = 'Secondary power',
 		description = config and (config.label .. ' and the other class resources. The eye lets you drag it, right-click the bar to lock it again.') or 'Your class has no secondary resource, only a manual source shows here.',
-	})
+	}))
 	local function AutoLabel()
 		for _, candidate in ipairs(available) do
 			if candidate.check() then return candidate.label end
@@ -446,10 +421,7 @@ local function SecondaryBoards(ui, parent, width, page)
 	end) }
 	if config and not stacked then tools[#tools + 1] = PositionFor(db, textOnly, 'BUI_SecondaryPower') end
 	tools[#tools + 1] = Eye(db, Secondary, EditPreview)
-	tools[#tools + 1] = { get = function() return db.enabled == true end, set = function(value)
-		Secondary.Toggle(value)
-		BUI.Power.Stack.OnMemberToggled()
-	end }
+	tools[#tools + 1] = Enabled(db, Secondary)
 	board:AddTools('Secondary bar', stacked and 'Source and on or off, its position comes from Stacking' or 'Source, position and on or off', tools, Apply)
 	if not config then return { board } end
 
@@ -497,7 +469,7 @@ local function SecondaryBoards(ui, parent, width, page)
 		elseif isBar then
 			board:AddTools('Bar', 'Colors and size', {
 				ResourceColor(db, config, 'Bar color'),
-				Channels(db, prefix .. 'BgColor', 'Background', true, BarBackground),
+				Channels(db, prefix .. 'BgColor', 'Background', true),
 				{ tooltip = 'Size', title = 'Bar', options = {
 					Option(db, 'Width', prefix .. 'BarWidth', { min = 50, max = 400, step = 1 }),
 					Option(db, 'Height', prefix .. 'BarHeight', { min = 4, max = 40, step = 1 }),
@@ -507,7 +479,7 @@ local function SecondaryBoards(ui, parent, width, page)
 		else
 			local style = {
 				ResourceColor(db, config, 'Active color'),
-				Channels(db, prefix .. 'BgColor', 'Background', true, PointBackground),
+				Channels(db, prefix .. 'BgColor', 'Background', true),
 			}
 			if prefix == 'combo' then table.insert(style, 2, Channels(db, 'comboChargedColor', 'Charged')) end
 			style[#style + 1] = { tooltip = 'Size and spacing', title = 'Segments', options = {
@@ -572,7 +544,7 @@ local function SecondaryBoards(ui, parent, width, page)
 					Layer(db, 'textStrata'),
 				}),
 				Offsets(db, 'Bar text', 'staggerValueOffsetX', 'staggerValueOffsetY'),
-				{ get = function() return not db.staggerHideBarText end, set = function(value) db.staggerHideBarText = not value end },
+				Inverse(db, nil, 'staggerHideBarText'),
 			}, Apply)
 		end
 	elseif isBar then
@@ -598,7 +570,7 @@ local function SecondaryBoards(ui, parent, width, page)
 					Layer(db, 'textStrata'),
 				}),
 				Offsets(db, 'Bar text', prefix .. 'ValueOffsetX', prefix .. 'ValueOffsetY'),
-				{ get = function() return not db[prefix .. 'HideBarText'] end, set = function(value) db[prefix .. 'HideBarText'] = not value end },
+				Inverse(db, nil, prefix .. 'HideBarText'),
 			}, Apply)
 		end
 		LowPowerRow(board, db, Apply)
@@ -606,9 +578,7 @@ local function SecondaryBoards(ui, parent, width, page)
 		if textOnly then
 			ClassColorCell()
 			board:AddTools('Text', 'Size, color and font of the number', {
-				{ kind = 'swatch', tooltip = 'Text color',
-					get = function() return db[prefix .. 'TextColorR'] or db[prefix .. 'ColorR'], db[prefix .. 'TextColorG'] or db[prefix .. 'ColorG'], db[prefix .. 'TextColorB'] or db[prefix .. 'ColorB'], 1 end,
-					set = function(red, green, blue) db[prefix .. 'TextColorR'], db[prefix .. 'TextColorG'], db[prefix .. 'TextColorB'] = red, green, blue end },
+				Channels(db, prefix .. 'TextColor', 'Text color', nil, function() return Secondary.GetResourceColor(config) end),
 				FontMenu('secondaryPowerFont'),
 				TextIcon('Text', {
 					Toggle(db, 'Show the maximum', prefix .. 'ShowMax'),
@@ -625,7 +595,7 @@ local function SecondaryBoards(ui, parent, width, page)
 					Layer(db, 'textStrata'),
 				}),
 				Offsets(db, 'Count', prefix .. 'ValueOffsetX', prefix .. 'ValueOffsetY'),
-				{ get = function() return not db[prefix .. 'HideBarText'] end, set = function(value) db[prefix .. 'HideBarText'] = not value end },
+				Inverse(db, nil, prefix .. 'HideBarText'),
 			}, Apply)
 		end
 	end
@@ -691,19 +661,29 @@ end
 local function StackingBoard(ui, parent, width)
 	local Container = BUI.Power.Container
 	local settings = Container.GetDB()
+	local shipped = BUI.ExportImport.FactoryProfile().powerBar.stackLab
+	BUI.SetFactory(settings, shipped)
 	local function Apply()
 		if Container.IsEnabled() then Container.ApplyAll() end
 		RefreshPreview()
 	end
-	Container._lockToggle = relock
-	local board = ui.Board(parent, width, {
+	BUI.OnModuleChange('powerStack', Repaint)
+	local board = BUI.ResetBoard(ui, ui.Board(parent, width, {
 		stacked = true,
 		title = 'Stacking',
 		description = 'Stack the power bars and your cast bar into one container that moves as a unit. The eye lets you drag it, right-click it to lock it again.',
-	})
+	}))
 	local frames = {}
 	for _, frame in ipairs(BUI.C.ANCHOR_FRAMES) do
 		if not STACK_TAGS[frame.tag] then frames[#frames + 1] = frame end
+	end
+	local enabled = Toggle(settings, nil, 'enabled')
+	enabled.set = function(value)
+		if value then
+			local issues = TextModeMembers(settings)
+			if #issues > 0 then return ConfirmBars(issues, function() Container.SetEnabled(true) end) end
+		end
+		Container.SetEnabled(value)
 	end
 	board:AddTools('Stack', 'Position, width and gap', {
 		BUI.PositionTool(settings, { frames = frames, matchWidth = true }),
@@ -712,21 +692,15 @@ local function StackingBoard(ui, parent, width)
 			Option(settings, 'Gap', 'gap', { min = -10, max = 40, step = 1 }),
 			Toggle(settings, 'Match member widths', 'matchWidth'),
 		} },
-		{ icon = 'eye', tooltip = 'Unlock to drag it, right-click it to lock', get = function() return not settings.locked end, set = function(value) Container.SetLocked(not value) end },
-		{ get = function() return settings.enabled == true end, set = function(value)
-			if value then
-				local issues = TextModeMembers(settings)
-				if #issues > 0 then return ConfirmBars(issues, function() Container.SetEnabled(true) end) end
-			end
-			Container.SetEnabled(value)
-		end },
+		Eye(settings, Container),
+		enabled,
 	}, Apply)
 	board:AddTools('Order', 'Top to bottom', {
 		{ entries = STACK_ORDERS, width = ORDER_WIDTH, get = function() return table.concat(settings.order, ',') end, set = function(value)
 			local order = {}
 			for key in value:gmatch('[^,]+') do order[#order + 1] = key end
 			settings.order = order
-		end },
+		end, default = function() return table.concat(shipped.order, ',') end },
 	}, Apply)
 	local function Attach(key, value)
 		if value and settings.enabled then
@@ -743,7 +717,7 @@ local function StackingBoard(ui, parent, width)
 	board:AddSwitch('Primary power bar', function() return settings.attached.primary == true end, function(value) Attach('primary', value) end, 'Whatever your spec runs on')
 	board:AddSwitch('Secondary power bar', function() return settings.attached.secondary == true end, function(value) Attach('secondary', value) end, 'Combo points, holy power, soul shards and the other class resources')
 	board:AddTools('Player cast bar', 'Slot your cast bar into the stack', {
-		{ entries = CASTBAR_MODES, width = ORDER_WIDTH, get = function() return settings.castbarMode end, set = function(value) settings.castbarMode = value end },
+		Option(settings, nil, 'castbarMode', { entries = CASTBAR_MODES, width = ORDER_WIDTH }),
 		Toggle(settings.attached, nil, 'castbar'),
 	}, Apply)
 	return board
@@ -817,33 +791,6 @@ local function BuildPreview(band, kit)
 		return config, settings
 	end
 
-	local function StackedSecondaryOn()
-		if BUI.Power.Container.IsEnabled() then return BUI.Power.Container.HasMember('secondary') end
-		return BUI.Power.Stack.IsEnabled() and BUI.Power.Stack.IsMemberActive('secondary')
-	end
-
-	local function NeedsPoll()
-		local config
-		if kind == 'secondary' then
-			config = ResolveSecondaryConfig()
-		elseif kind == 'general' and StackedSecondaryOn() then
-			config = BUI.Power.Secondary.GetDisplayConfig()
-		end
-		return (config and config.trigger and (not config.check or config.check())) and true or false
-	end
-
-	local pollActive = false
-	local function SyncPoll(shouldPoll)
-		shouldPoll = (shouldPoll and band:IsVisible()) and true or false
-		if shouldPoll == pollActive then return end
-		pollActive = shouldPoll
-		if shouldPoll then
-			BUI.Scheduler.RegisterUpdate(POLL_KEY, function() band:Update() end, 0.2, true)
-		else
-			BUI.Scheduler.UnregisterUpdate(POLL_KEY)
-		end
-	end
-
 	local QueueUpdate = BUI.Dispatcher.New(function()
 		if band:IsVisible() then band:Update() end
 	end, 'Power.Preview')
@@ -853,12 +800,12 @@ local function BuildPreview(band, kit)
 		BUI.Events:RegisterUnit('UNIT_POWER_POINT_CHARGE', 'player', EVENT_KEY, QueueUpdate)
 		BUI.Events:RegisterUnit('UNIT_MAXPOWER', 'player', EVENT_KEY, QueueUpdate)
 		BUI.Events:RegisterUnit('UNIT_DISPLAYPOWER', 'player', EVENT_KEY, QueueUpdate)
+		BUI.Events:RegisterUnit('UNIT_AURA', 'player', EVENT_KEY, QueueUpdate)
 		BUI.Events:Register('RUNE_POWER_UPDATE', EVENT_KEY, QueueUpdate)
 		QueueUpdate()
 	end)
 	band:HookScript('OnHide', function()
 		BUI.Events:UnregisterAll(EVENT_KEY)
-		SyncPoll(false)
 	end)
 
 	local bar = CreateFrame('Frame', nil, stage)
@@ -937,41 +884,37 @@ local function BuildPreview(band, kit)
 
 	local function ShowBar(options)
 		bar:SetSize(options.w, options.h)
-		local fillWidth = math.max(0.5, options.w * math.min(1, math.max(0, options.frac or SAMPLE_FILL)))
+		local fillWidth = math.max(0.5, options.w * math.min(1, math.max(0, options.frac)))
 		barFill:SetWidth(fillWidth)
-		barFill:SetVertexColor(options.r or 1, options.g or 1, options.b or 1, 1)
-		local background = options.bg or {}
-		barBg:SetVertexColor(background[1] or 0.1, background[2] or 0.1, background[3] or 0.1, background[4] or 1)
+		barFill:SetVertexColor(options.r, options.g, options.b, 1)
+		local background = options.bg
+		barBg:SetVertexColor(background[1], background[2], background[3], background[4])
 		if options.predict then
 			barPredict:SetWidth(math.max(0.5, math.min(options.w - fillWidth, options.w * 0.15)))
-			barPredict:SetVertexColor(options.predict[1] or 1, options.predict[2] or 1, options.predict[3] or 1, options.predict[4] or 0.35)
+			barPredict:SetVertexColor(options.predict[1], options.predict[2], options.predict[3], options.predict[4])
 			barPredict:Show()
 		else
 			barPredict:Hide()
 		end
-		local tickCount = 0
-		if options.ticks then
-			local tickColor = options.tickColor or { 1, 1, 1, 0.6 }
-			for index, percent in ipairs(options.ticks) do
-				tickCount = index
-				local tick = Tick(index)
-				tick:SetSize(options.tickWidth or 1, options.h)
-				tick:ClearAllPoints()
-				tick:SetPoint('CENTER', bar, 'LEFT', options.w * (percent / 100), 0)
-				tick:SetVertexColor(tickColor[1] or 1, tickColor[2] or 1, tickColor[3] or 1, tickColor[4] or 0.6)
-				tick:Show()
-			end
+		local tickColor = options.tickColor
+		for index, percent in ipairs(options.ticks) do
+			local tick = Tick(index)
+			tick:SetSize(options.tickWidth, options.h)
+			tick:ClearAllPoints()
+			tick:SetPoint('CENTER', bar, 'LEFT', options.w * (percent / 100), 0)
+			tick:SetVertexColor(tickColor[1], tickColor[2], tickColor[3], tickColor[4])
+			tick:Show()
 		end
-		for index = tickCount + 1, #ticks do ticks[index]:Hide() end
+		for index = #options.ticks + 1, #ticks do ticks[index]:Hide() end
 		if options.text then
-			Pixel.ApplyFont(barText, options.textSize or 14, PreviewFont())
+			Pixel.ApplyFont(barText, options.textSize, PreviewFont())
 			barText:SetText(options.text)
-			barText:SetTextColor(options.tr or 1, options.tg or 1, options.tb or 1, 1)
+			barText:SetTextColor(options.tr, options.tg, options.tb, 1)
 			barText:ClearAllPoints()
 			if options.textAbove then
-				barText:SetPoint('BOTTOM', bar, 'TOP', options.textX or 0, 2 + (options.textY or 0))
+				barText:SetPoint('BOTTOM', bar, 'TOP', options.textX, 2 + options.textY)
 			else
-				barText:SetPoint('CENTER', bar, 'CENTER', options.textX or 0, options.textY or 0)
+				barText:SetPoint('CENTER', bar, 'CENTER', options.textX, options.textY)
 			end
 			barText:Show()
 		else
@@ -980,19 +923,18 @@ local function BuildPreview(band, kit)
 		bar:Show()
 	end
 
-	local function ShowText(text, size, red, green, blue, flags)
-		Pixel.ApplyFont(bigText, size or 26, PreviewFont(), flags)
+	local function ShowText(text, size, red, green, blue)
+		Pixel.ApplyFont(bigText, size, PreviewFont())
 		bigText:SetText(text)
-		bigText:SetTextColor(red or 1, green or 1, blue or 1, 1)
+		bigText:SetTextColor(red, green, blue, 1)
 		bigText:Show()
 	end
 
 	local function ShowSegments(totalWidth, count, height, spacing, background, FillColor, offsetY)
-		if not count or count < 1 then return 0 end
 		offsetY = offsetY or 0
 		local db = BUI.Power.GetSecondaryDB()
-		local edge = Pixel.ClampBorder(db.borderSize or 1)
-		local borderColor = db.borderColor or { 0, 0, 0, 1 }
+		local edge = Pixel.ClampBorder(db.borderSize)
+		local borderColor = db.borderColor
 		local visualGap = spacing == 0 and -edge or spacing
 		local segmentWidth = math.max(edge * 2 + 1, (totalWidth - (count - 1) * spacing) / count)
 		local innerWidth = math.max(0.5, segmentWidth - edge * 2)
@@ -1004,18 +946,18 @@ local function BuildPreview(band, kit)
 			border:SetSize(segmentWidth, height)
 			border:ClearAllPoints()
 			border:SetPoint('LEFT', stage, 'CENTER', x, offsetY)
-			border:SetVertexColor(borderColor[1] or 0, borderColor[2] or 0, borderColor[3] or 0, borderColor[4] or 1)
+			border:SetVertexColor(borderColor[1], borderColor[2], borderColor[3], borderColor[4])
 			border:Show()
 			backdrop:SetSize(innerWidth, innerHeight)
 			backdrop:ClearAllPoints()
 			backdrop:SetPoint('LEFT', stage, 'CENTER', x + edge, offsetY)
-			backdrop:SetVertexColor(background[1] or 0.15, background[2] or 0.15, background[3] or 0.15, background[4] or 1)
+			backdrop:SetVertexColor(background[1], background[2], background[3], background[4])
 			backdrop:Show()
 			local red, green, blue, alpha, fraction = FillColor(index)
 			fill:SetSize(math.max(0.5, innerWidth * math.min(1, fraction or 1)), innerHeight)
 			fill:ClearAllPoints()
 			fill:SetPoint('LEFT', stage, 'CENTER', x + edge, offsetY)
-			fill:SetVertexColor(red or 1, green or 1, blue or 1, alpha or 1)
+			fill:SetVertexColor(red, green, blue, alpha or 1)
 			fill:Show()
 			x = x + segmentWidth + visualGap
 		end
@@ -1031,7 +973,7 @@ local function BuildPreview(band, kit)
 	local function SecondaryTextColor(settings, config)
 		if settings.useClassColor then return BUI.Power.Secondary.GetResourceColor(config) end
 		if config.id == 'runes' then return settings.runeTextColorR, settings.runeTextColorG, settings.runeTextColorB end
-		if config.id == 'stagger' then return settings.staggerTextColorR or 1, settings.staggerTextColorG or 1, settings.staggerTextColorB or 1 end
+		if config.id == 'stagger' then return settings.staggerTextColorR, settings.staggerTextColorG, settings.staggerTextColorB end
 		local prefix = config.prefix
 		local red, green, blue = BUI.Power.Secondary.GetResourceColor(config)
 		return settings[prefix .. 'TextColorR'] or red, settings[prefix .. 'TextColorG'] or green, settings[prefix .. 'TextColorB'] or blue
@@ -1112,23 +1054,21 @@ local function BuildPreview(band, kit)
 					if config.mode == 'bar' then
 						if not (current and maxValue and maxValue > 0) then current, maxValue = 60, 100 end
 						members[#members + 1] = {
-							w = secondaryDb[prefix .. 'BarWidth'] or 200, h = secondaryDb[prefix .. 'BarHeight'] or 16,
+							w = secondaryDb[prefix .. 'BarWidth'], h = secondaryDb[prefix .. 'BarHeight'],
 							r = red, g = green, b = blue, frac = current / maxValue,
-							bg = { secondaryDb[prefix .. 'BgColorR'] or 0.12, secondaryDb[prefix .. 'BgColorG'] or 0.12, secondaryDb[prefix .. 'BgColorB'] or 0.12, 1 },
+							bg = { secondaryDb[prefix .. 'BgColorR'], secondaryDb[prefix .. 'BgColorG'], secondaryDb[prefix .. 'BgColorB'], 1 },
 							text = FormatBarValue(secondaryDb, prefix, current, math.floor((current / maxValue) * 100 + 0.5)) or '',
 						}
 					else
-						maxValue = SafeNum(maxValue) or config.max or 5
-						if maxValue < 1 then maxValue = config.max or 5 end
-						current = SafeNum(current) or math.ceil(maxValue * 0.6)
-						local isRunes = config.id == 'runes'
+						if not maxValue or maxValue < 1 then maxValue = config.max end
+						current = current or math.ceil(maxValue * 0.6)
 						members[#members + 1] = {
 							segments = true, n = maxValue, cur = current,
-							w = (isRunes and secondaryDb.runeTotalWidth or secondaryDb[prefix .. 'TotalWidth']) or 200,
-							h = (isRunes and secondaryDb.runeHeight or secondaryDb[prefix .. 'Height']) or 12,
-							spacing = (isRunes and secondaryDb.runeSpacing or secondaryDb[prefix .. 'Spacing']) or 2,
+							w = secondaryDb[prefix .. 'TotalWidth'],
+							h = secondaryDb[prefix .. 'Height'],
+							spacing = secondaryDb[prefix .. 'Spacing'],
 							r = red, g = green, b = blue,
-							bg = { secondaryDb[prefix .. 'BgColorR'] or 0.12, secondaryDb[prefix .. 'BgColorG'] or 0.12, secondaryDb[prefix .. 'BgColorB'] or 0.12, 1 },
+							bg = { secondaryDb[prefix .. 'BgColorR'], secondaryDb[prefix .. 'BgColorG'], secondaryDb[prefix .. 'BgColorB'], 1 },
 						}
 					end
 				end
@@ -1148,7 +1088,7 @@ local function BuildPreview(band, kit)
 			local matched
 			if stackDb.anchorFrame and stackDb.anchorFrame ~= '' then
 				local target = BUI.ResolveAnchorFrame(stackDb.anchorFrame, stackDb.anchorPoint)
-				matched = target and target.GetWidth and target:GetWidth()
+				matched = target and target:GetWidth()
 				if matched then matched = math.min(matched, 700) end
 			else
 				local anchorPoint = stackDb.anchorPoint or 'TOP'
@@ -1242,8 +1182,6 @@ local function BuildPreview(band, kit)
 			ShowText('No secondary power', 16, 0.45, 0.45, 0.5)
 		elseif config.id == 'runes' then
 			local ready, maxRunes = LiveValue(config)
-			maxRunes = maxRunes or 6
-			ready = ready or math.ceil(maxRunes * 0.6)
 			if settings.runeNumberOnly then
 				local red, green, blue = SecondaryTextColor(settings, config)
 				ShowText(settings.runeShowMax and (ready .. '/' .. maxRunes) or tostring(ready), settings.runeTextSize, red, green, blue)
@@ -1283,7 +1221,7 @@ local function BuildPreview(band, kit)
 			if settings.staggerBarMode then
 				local red, green, blue = config.getColor()
 				ShowBar({
-					w = settings.staggerBarWidth or 200, h = settings.staggerBarHeight or 16, frac = percent / 100, r = red, g = green, b = blue,
+					w = settings.staggerBarWidth, h = settings.staggerBarHeight, frac = percent / 100, r = red, g = green, b = blue,
 					bg = { settings.staggerBgColorR, settings.staggerBgColorG, settings.staggerBgColorB, settings.staggerBgColorA },
 					text = not settings.staggerHideBarText and valueText or nil, textSize = settings.staggerValueSize,
 					tr = settings.staggerValueColorR, tg = settings.staggerValueColorG, tb = settings.staggerValueColorB,
@@ -1305,7 +1243,7 @@ local function BuildPreview(band, kit)
 				local red, green, blue = Secondary.GetBarColor(config)
 				if settings.lowPowerEnabled and config.power then red, green, blue = LowPowerTint(settings, percent, red, green, blue) end
 				ShowBar({
-					w = settings[prefix .. 'BarWidth'] or 200, h = settings[prefix .. 'BarHeight'] or 16, frac = fraction, r = red, g = green, b = blue,
+					w = settings[prefix .. 'BarWidth'], h = settings[prefix .. 'BarHeight'], frac = fraction, r = red, g = green, b = blue,
 					bg = { settings[prefix .. 'BgColorR'], settings[prefix .. 'BgColorG'], settings[prefix .. 'BgColorB'], settings[prefix .. 'BgColorA'] },
 					text = not settings[prefix .. 'HideBarText'] and valueText or nil, textSize = settings[prefix .. 'ValueSize'],
 					tr = settings[prefix .. 'ValueColorR'], tg = settings[prefix .. 'ValueColorG'], tb = settings[prefix .. 'ValueColorB'],
@@ -1319,7 +1257,7 @@ local function BuildPreview(band, kit)
 		else
 			local prefix = config.prefix
 			local value, maxValue = LiveValue(config)
-			maxValue = maxValue or config.max or 5
+			if not maxValue or maxValue < 1 then maxValue = config.max end
 			value = value or math.ceil(maxValue * 0.6)
 			if settings[prefix .. 'NumberOnly'] then
 				local red, green, blue = SecondaryTextColor(settings, config)
@@ -1334,7 +1272,7 @@ local function BuildPreview(band, kit)
 					end
 				end
 				local red, green, blue = Secondary.GetBarColor(config)
-				ShowSegments(settings[prefix .. 'TotalWidth'] or 200, maxValue, settings[prefix .. 'Height'] or 12, settings[prefix .. 'Spacing'] or 0,
+				ShowSegments(settings[prefix .. 'TotalWidth'], maxValue, settings[prefix .. 'Height'], settings[prefix .. 'Spacing'],
 					{ settings[prefix .. 'BgColorR'], settings[prefix .. 'BgColorG'], settings[prefix .. 'BgColorB'], settings[prefix .. 'BgColorA'] },
 					function(index)
 						if charged and charged[index] and index <= value then
@@ -1345,11 +1283,11 @@ local function BuildPreview(band, kit)
 						return 0, 0, 0, 0
 					end)
 				if not settings[prefix .. 'HideBarText'] then
-					Pixel.ApplyFont(segmentText, settings[prefix .. 'CenterTextSize'] or 14, PreviewFont())
+					Pixel.ApplyFont(segmentText, settings[prefix .. 'CenterTextSize'], PreviewFont())
 					segmentText:SetText(value)
-					segmentText:SetTextColor(settings[prefix .. 'ValueColorR'] or 1, settings[prefix .. 'ValueColorG'] or 1, settings[prefix .. 'ValueColorB'] or 1, 1)
+					segmentText:SetTextColor(settings[prefix .. 'ValueColorR'], settings[prefix .. 'ValueColorG'], settings[prefix .. 'ValueColorB'], 1)
 					segmentText:ClearAllPoints()
-					segmentText:SetPoint('CENTER', stage, 'CENTER', settings[prefix .. 'ValueOffsetX'] or 0, settings[prefix .. 'ValueOffsetY'] or 0)
+					segmentText:SetPoint('CENTER', stage, 'CENTER', settings[prefix .. 'ValueOffsetX'], settings[prefix .. 'ValueOffsetY'])
 					segmentText:Show()
 				end
 			end
@@ -1358,7 +1296,6 @@ local function BuildPreview(band, kit)
 
 	function band:Update()
 		kind = KINDS[selected] or 'general'
-		SyncPoll(NeedsPoll())
 		HideAll()
 		if kind == 'general' then
 			if BUI.Power.Container.IsEnabled() or BUI.Power.Stack.IsEnabled() then return ShowStacked() end
@@ -1400,6 +1337,7 @@ BUI.PageEngine.RegisterPage('power', {
 			icon = 'power',
 			title = 'Power',
 			placeholder = 'Search power settings...',
+			tabs = TAB_IDS,
 			disabled = function() return not enabled end,
 			tools = {
 				{ icon = 'enable', tooltip = 'Turn the power module on or off, needs a reload', get = function() return BUI.IsModuleEnabled('power') end, set = function(value)
@@ -1418,16 +1356,16 @@ BUI.PageEngine.RegisterPage('power', {
 			Repaint()
 			RefreshPreview()
 		end
-		pageFrame._page = { tabContents = { tab, tab, tab }, currentTab = TAB_INDEX[selected] or 1, SetTab = function(_, index) rail:Select(TAB_IDS[index] or 'scope') end }
+		pageFrame._page = rail.adapter
 		EditPreview()
 		RefreshPreview()
-		BUI.Events:OnTalentBurst(LABEL_KEY, RefreshAutoLabels)
-		BUI.Events:Register('UPDATE_SHAPESHIFT_FORM', LABEL_KEY, RefreshAutoLabels)
 		page:AutoRefresh()
 	end,
 	OnHide = function()
 		BUI.Power.Secondary.SetEditPreview(nil)
 		local Container = BUI.Power.Container
 		if not Container.GetDB().locked then Container.SetLocked(true) end
+		if not BUI.Power.GetPrimaryDB().locked then BUI.Power.Primary.SetLocked(true) end
+		if not BUI.Power.GetSecondaryDB().locked then BUI.Power.Secondary.SetLocked(true) end
 	end,
 })
