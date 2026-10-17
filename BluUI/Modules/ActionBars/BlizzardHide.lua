@@ -39,7 +39,7 @@ local function Hider()
 end
 
 local function FrameKey(frame)
-	return frame:GetName() or tostring(frame)
+	return frame:GetName()
 end
 
 local function HideFrame(frame)
@@ -64,7 +64,7 @@ local function SnapParent(frame, parent)
 end
 
 local function Suppress(frame)
-	if not frame or suppressed[frame] then return end
+	if suppressed[frame] then return end
 	if InCombatLockdown() then
 		ActionBars.RunSecure('Suppress.' .. FrameKey(frame), function() Suppress(frame) end)
 		return
@@ -90,15 +90,12 @@ local function SuppressButtons(barName)
 end
 
 local function DropControllerEvents(events)
-	local controller = _G.ActionBarController
-	if not controller then return end
-	for _, event in ipairs(events) do controller:UnregisterEvent(event) end
+	for _, event in ipairs(events) do ActionBarController:UnregisterEvent(event) end
 end
 
 local function AllBarsSuppressed()
 	for _, name in ipairs(BLIZZARD_BAR_FOR_INDEX) do
-		local frame = _G[name]
-		if frame and not suppressed[frame] then return false end
+		if not suppressed[_G[name]] then return false end
 	end
 	return true
 end
@@ -123,11 +120,8 @@ function ActionBars.HideBlizzardBars()
 	for barIndex, name in ipairs(BLIZZARD_BAR_FOR_INDEX) do
 		local barSettings = ActionBars.GetBarSettings(barIndex)
 		if barSettings and barSettings.enabled then
-			local frame = _G[name]
-			if frame then
-				Suppress(frame)
-				SuppressButtons(name)
-			end
+			Suppress(_G[name])
+			SuppressButtons(name)
 			if barIndex == 1 then
 				for _, companion in ipairs(MAIN_BAR_COMPANIONS) do
 					Suppress(_G[companion])

@@ -5,15 +5,12 @@ local Hook = BUI.Profiler.Hooker('ActionBars.BagBar')
 local ActionBars = BUI.ActionBars
 
 local EVENT_KEY = 'ActionBars.BagBar'
-local SLOT_NAMES = {
-	'MainMenuBarBackpackButton', 'CharacterBag0Slot', 'CharacterBag1Slot', 'CharacterBag2Slot', 'CharacterBag3Slot',
-	'CharacterReagentBag0Slot', 'BagBarExpandToggle',
-}
 local RELEASE_INSET = 4
 local BAG_BUTTON_NAMES = {
 	'MainMenuBarBackpackButton', 'CharacterBag0Slot', 'CharacterBag1Slot', 'CharacterBag2Slot', 'CharacterBag3Slot',
 	'CharacterReagentBag0Slot',
 }
+ActionBars.BAG_BUTTON_NAMES = BAG_BUTTON_NAMES
 local MASKED_REGIONS = { 'icon', 'searchOverlay', 'ItemContextOverlay' }
 local COUNT_SIZE = 12
 local BACKPACK_ICON = 133633
@@ -196,11 +193,12 @@ local function InstallHooks()
 	Hook(BagsBar, 'Layout', AfterBlizzardLayout)
 	Hook(BagsBar, 'UpdateSystemSettingSize', OnBlizzardLayout)
 	local onSlotLayout = BUI.Profiler.Wrap('ActionBars.BagBar slot layout', OnBlizzardLayout)
-	for _, name in ipairs(SLOT_NAMES) do
-		local slot = _G[name]
+	local function HookSlot(slot)
 		slot:HookScript('OnShow', onSlotLayout)
 		slot:HookScript('OnHide', onSlotLayout)
 	end
+	for _, name in ipairs(BAG_BUTTON_NAMES) do HookSlot(_G[name]) end
+	HookSlot(BagBarExpandToggle)
 end
 
 bagBar = ActionBars.NewBlizzardBar({

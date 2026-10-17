@@ -105,7 +105,7 @@ local function StartGapWatch(bar)
 	if bar.gapWatch then return end
 	if not bar.gapCheck then
 		bar.gapCheck = BUI.Profiler.Wrap('ActionBars.Fade gap watch', function()
-			if (bar.hoverCount or 0) > 0 then
+			if bar.hoverCount > 0 then
 				StopGapWatch(bar)
 			elseif not CursorOverBar(bar) then
 				StopGapWatch(bar)
@@ -118,25 +118,28 @@ end
 
 local function Enter(bar)
 	if not bar then return end
-	bar.hoverCount = (bar.hoverCount or 0) + 1
+	bar.hoverCount = bar.hoverCount + 1
 	StopGapWatch(bar)
 	SetHovered(bar, true)
 end
 
 local function Leave(bar)
 	if not bar then return end
-	bar.hoverCount = math.max(0, (bar.hoverCount or 0) - 1)
+	bar.hoverCount = math.max(0, bar.hoverCount - 1)
 	if bar.hoverCount > 0 or bar.leavePending then return end
 	bar.leavePending = true
-	BUI.Profiler.After('ActionBars.Fade leave check', 0, function()
-		bar.leavePending = nil
-		if bar.hoverCount > 0 then return end
-		if CursorOverBar(bar) then
-			StartGapWatch(bar)
-		else
-			SetHovered(bar, false)
-		end
-	end)
+	if not bar.leaveCheck then
+		bar.leaveCheck = BUI.Profiler.Wrap('ActionBars.Fade leave check', function()
+			bar.leavePending = nil
+			if bar.hoverCount > 0 then return end
+			if CursorOverBar(bar) then
+				StartGapWatch(bar)
+			else
+				SetHovered(bar, false)
+			end
+		end)
+	end
+	C_Timer.After(0, bar.leaveCheck)
 end
 
 local function OnFrameEnter(frame) Enter(frame._buiFadeBar) end
@@ -147,7 +150,7 @@ local function OnFlyoutButtonLeave() Leave((FlyoutBar())) end
 local function OnFlyoutHidden(flyout)
 	local owner = flyout:GetParent()
 	local bar = owner and owner._buiFadeBar
-	if bar and bar.hovered and (bar.hoverCount or 0) == 0 and not bar.header:IsMouseOver() then
+	if bar and bar.hovered and bar.hoverCount == 0 and not bar.header:IsMouseOver() then
 		SetHovered(bar, false)
 	end
 end
@@ -250,7 +253,7 @@ function ActionBars.SetBarContentHidden(bar, hidden)
 	if barSettings and barSettings.enabled then
 		SetAlphaTarget(bar, TargetAlpha(bar, barSettings), 0)
 	end
-	ActionBars.RefreshFade()
+	RefreshBarFade(bar)
 end
 
 ActionBars.OnMoversChanged('fade', ActionBars.RefreshFade)

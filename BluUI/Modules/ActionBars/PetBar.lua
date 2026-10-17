@@ -8,8 +8,8 @@ local COMMAND = 'BONUSACTIONBUTTON'
 local VISIBILITY = '[petbattle] hide; [novehicleui,pet,nooverridebar,nopossessbar] show; hide'
 local EVENT_KEY = 'ActionBars.PetBar'
 local UPDATE_EVENTS = {
-	'PET_UI_UPDATE', 'PET_BAR_UPDATE', 'PLAYER_CONTROL_GAINED', 'PLAYER_CONTROL_LOST', 'PLAYER_ENTERING_WORLD',
-	'PLAYER_FARSIGHT_FOCUS_CHANGED', 'SPELLS_CHANGED',
+	'PET_UI_UPDATE', 'PET_BAR_UPDATE', 'PET_BAR_UPDATE_USABLE', 'PLAYER_CONTROL_GAINED', 'PLAYER_CONTROL_LOST',
+	'PLAYER_ENTERING_WORLD', 'PLAYER_FARSIGHT_FOCUS_CHANGED', 'SPELLS_CHANGED',
 }
 local UNUSABLE_TINT = 0.4
 local BUILib = BUI.BUILibClient
@@ -152,7 +152,6 @@ function ActionBars.RefreshPetBar()
 		button.config.showGrid = not barSettings.hideEmptyButtons
 		ActionBars.SkinButton(button)
 		button.HotKey:SetShown(barSettings.showHotkey)
-		button._formattedHotkey = nil
 		ActionBars.ApplyHotkeyText(button)
 	end
 	ActionBars.LayoutBar(bar)

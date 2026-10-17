@@ -26,13 +26,13 @@ end
 local function BoundKeysText(command)
 	local first, second = GetBindingKey(command)
 	if not first then return 'not bound' end
-	local text = BUI.Keybinds.Format(first) or first
-	if second then text = text .. ', ' .. (BUI.Keybinds.Format(second) or second) end
+	local text = BUI.Keybinds.Format(first)
+	if second then text = text .. ', ' .. BUI.Keybinds.Format(second) end
 	return text
 end
 
 local function ButtonLabel(button)
-	local spellID = ActionBars.Plain(button.GetSpellId and button:GetSpellId())
+	local spellID = ActionBars.Plain(button:GetSpellId())
 	if spellID then
 		local info = C_Spell.GetSpellInfo(spellID)
 		if info and info.name then return info.name end
@@ -72,22 +72,18 @@ end
 local function Bind(button, chord)
 	local command = ButtonCommand(button)
 	if not command then return end
-	if InCombatLockdown() then
-		BUI.Print('Keybinds cannot change during combat.')
-		return
-	end
 	if not SetBinding(chord, command) then
 		BUI.Print('Could not bind ' .. chord .. '.')
 		return
 	end
 	SaveBindingSet()
-	BUI.Print((BUI.Keybinds.Format(chord) or chord) .. ' bound to ' .. ButtonLabel(button) .. '.')
+	BUI.Print(BUI.Keybinds.Format(chord) .. ' bound to ' .. ButtonLabel(button) .. '.')
 	RefreshHoverText()
 end
 
 local function ClearBindings(button)
 	local command = ButtonCommand(button)
-	if not command or InCombatLockdown() then return end
+	if not command then return end
 	local first, second = GetBindingKey(command)
 	if not first then return end
 	SetBinding(first)
@@ -181,8 +177,7 @@ local function EnsureFrames()
 	hoverText:SetTextColor(1, 1, 1, 1)
 
 	local done = Controls.Button(banner, 'Done', 70, function() ActionBars.SetKeybindMode(false) end)
-	local doneFrame = done.frame or done
-	doneFrame:SetPoint('RIGHT', banner, 'RIGHT', -10, 0)
+	done.frame:SetPoint('RIGHT', banner, 'RIGHT', -10, 0)
 end
 
 local function PaintHighlight()

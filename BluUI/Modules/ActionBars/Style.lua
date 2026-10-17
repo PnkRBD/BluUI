@@ -165,7 +165,7 @@ end
 local function OnSwipeColorSet(cooldown, red, _, _, alpha)
 	if reassertingCooldown then return end
 	cooldown._buiSwipeApplied = nil
-	if alpha == 0 or (red or 0) > 0 then return end
+	if alpha == 0 or red > 0 then return end
 	ApplyCooldownStyle(cooldown)
 end
 
@@ -252,7 +252,6 @@ function ActionBars.SkinButtonArt(button)
 	FlattenStateTexture(button.CheckedTexture, 1, 1, 1, 0.3)
 	FlattenStateTexture(button.SpellHighlightTexture, 1, 0.85, 0.3, 0.35)
 	FlattenStateTexture(button.NewActionTexture, 1, 1, 1, 0.2)
-	if button.FlyoutBorderShadow then button.FlyoutBorderShadow:SetAlpha(0) end
 	Pixel.ApplyBorder(button, settings.borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
 end
 
@@ -312,12 +311,11 @@ BUI.Events:Register('ACTIONBAR_HIDEGRID', 'ActionBars.GridSync', QueueEmptyButto
 
 function ActionBars.ApplyHotkeyText(button)
 	local hotkey = button.HotKey
-	local command = button.config and button.config.keyBoundTarget
+	local command = button.config.keyBoundTarget
 	if not hotkey or not command then return end
 	local text = BUI.Keybinds.Format(GetBindingKey(command)) or ''
-	if button._formattedHotkey == text then return end
 	button._formattedHotkey = text
-	hotkey:SetText(text)
+	if hotkey:GetText() ~= text then hotkey:SetText(text) end
 end
 
 function ActionBars.RefreshAllHotkeyText()
@@ -368,7 +366,7 @@ end
 
 function ActionBars.ApplyButtonLock(button)
 	if InCombatLockdown() then return end
-	button:SetAttribute('buttonlock', ActionBars.GetSettings().lockButtons or nil)
+	button:SetAttribute('buttonlock', ActionBars.GetSettings().lockButtons)
 end
 
 function ActionBars.ApplyPickupKey()
@@ -409,7 +407,6 @@ function ActionBars.ApplyButtonConfig(bar)
 		button:UpdateConfig(ActionBars.BuildButtonConfig(bar.key, buttonIndex))
 		ActionBars.ApplyButtonLock(button)
 		ActionBars.SkinButton(button)
-		button._formattedHotkey = nil
 		ActionBars.ApplyHotkeyText(button)
 		ActionBars.SyncEmptyButtonAlpha(button)
 	end
