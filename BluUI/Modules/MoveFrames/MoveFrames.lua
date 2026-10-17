@@ -74,7 +74,6 @@ local LOAD_ON_DEMAND = {
 	Blizzard_AzeriteEssenceUI = { 'AzeriteEssenceUI' },
 	Blizzard_AzeriteRespecUI = { 'AzeriteRespecFrame' },
 	Blizzard_AzeriteUI = { 'AzeriteEmpoweredItemUI' },
-	Blizzard_BarbershopUI = { 'BarberShopFrame' },
 	Blizzard_BlackMarketUI = { 'BlackMarketFrame' },
 	Blizzard_Calendar = {
 		{ 'CalendarFrame', 'CalendarCreateEventFrame', 'CalendarViewEventFrame', 'CalendarViewHolidayFrame', 'CalendarViewRaidFrame' },
