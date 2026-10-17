@@ -65,13 +65,7 @@ local OPPOSITES_HORIZONTAL = {
 
 function BUI.ResolveAnchorFrame(name, anchorPoint)
     if not name or name == "" then return nil end
-    if name == "BUI_PowerBarAny" then
-        if BUI.Power.Container.IsEnabled() then
-            local stackFrame = _G["BUI_StackLab"]
-            if stackFrame then return stackFrame end
-        end
-        return BUI.Power.Stack.GetFirstAvailableFrame(anchorPoint)
-    end
+    if name == "BUI_PowerBarAny" then return BUI.Power.Container.AnchorFrame() end
     return _G[name]
 end
 

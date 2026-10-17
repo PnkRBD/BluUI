@@ -2018,10 +2018,8 @@ BUI.NilDefaultKeys = {
 	textAnchorOffsetY = true,
 	textMatchAnchorWidth  = true,
 	textMatchAnchorHeight = true,
-	stackFlushEdge    = true,
 	noGap             = true,
 	scaleOffsets      = true,
-	stack             = true,
 	stackLab          = true,
 }
 for _, prefix in ipairs({ 'combo', 'vengeanceFrags', 'holy', 'arcane', 'shard', 'essence', 'chi', 'mwStacks', 'icicles', 'casterMana' }) do
@@ -2055,6 +2053,9 @@ BUI.DeprecatedKeys = {
 	['general.gradientColor']   = true,
 	['interface.minimapIconDock'] = true,
 	['interface.minimapEnabled']  = true,
+	['powerBar.stack']            = true,
+	['powerBar.stackFlushEdge']   = true,
+	['secondaryPower.stackFlushEdge'] = true,
 	['dashboard.layout']        = true,
 	['dashboard.topCols']       = true,
 	['modules.customBars']      = true,

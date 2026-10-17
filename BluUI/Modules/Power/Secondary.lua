@@ -25,7 +25,6 @@ local function Setting(prefix, key)
     return GetDB()[fullKey]
 end
 local function IsStacked()
-    if BUI.Power.Stack.IsEnabled() then return true end
     return BUI.Power.Container.HasMember('secondary')
 end
 
@@ -809,8 +808,7 @@ local function StyleBarDisplay(config)
         backgroundRed, backgroundGreen, backgroundBlue, backgroundAlpha,
         borderColor[1], borderColor[2], borderColor[3], borderColor[4], borderSize)
 
-    Shared.ApplyStackFlush(BarDisplay.container, BarDisplay.bar, db.stackFlushEdge, edge,
-        backgroundRed, backgroundGreen, backgroundBlue, backgroundAlpha)
+    Shared.InsetBar(BarDisplay.container, BarDisplay.bar, edge)
     BarDisplay.bar:SetStatusBarTexture(texture)
     BarDisplay.bar:SetStatusBarColor(SecondaryPower.GetBarColor(config))
 
@@ -895,9 +893,7 @@ local function Build()
     frame:Hide()
     frame:EnableMouse(true)
     local NotifyAnchorChange = BUI.Profiler.Wrap("Power.Secondary anchor notify", function()
-        if not BUI.Power.Stack.IsEnabled() then
-            BUI.Anchor.OnAnchorSizeChanged()
-        end
+        BUI.Anchor.OnAnchorSizeChanged()
     end)
     frame:HookScript("OnShow", NotifyAnchorChange)
     frame:HookScript("OnHide", NotifyAnchorChange)

@@ -88,7 +88,6 @@ end
 function Power.ReapplyAll()
     Power.Primary.Apply()
     Power.Secondary.Apply()
-    if Power.Stack.IsEnabled() then Power.Stack.Apply() end
 end
 
 function Power.SetScope(scope)

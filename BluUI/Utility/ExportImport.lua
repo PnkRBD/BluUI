@@ -264,7 +264,6 @@ local function RefreshAllModules()
     local powerOn = on('power')
     BUI.Power.Primary.Toggle(powerOn and BUI.Power.GetPrimaryDB().enabled and true or false)
     BUI.Power.Secondary.Toggle(powerOn and BUI.Power.GetSecondaryDB().enabled and true or false)
-    if powerOn and BUI.Power.Stack.IsEnabled() then BUI.Power.Stack.Apply() end
 
     BUI.GCDHistory.Toggle(on('streamerTools') and profile.gcdHistory.enabled and true or false)
 

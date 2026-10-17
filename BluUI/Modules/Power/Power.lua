@@ -118,8 +118,7 @@ local function Style()
         db.barBgColorR, db.barBgColorG, db.barBgColorB, db.barBgColorA,
         borderColor[1], borderColor[2], borderColor[3], borderColor[4], borderSize)
 
-    Shared.ApplyStackFlush(barContainer, bar, db.stackFlushEdge, edge,
-        db.barBgColorR, db.barBgColorG, db.barBgColorB, db.barBgColorA)
+    Shared.InsetBar(barContainer, bar, edge)
     bar:SetStatusBarTexture(texture)
 
     local red, green, blue = GetBaseBarColor(db)
@@ -157,9 +156,7 @@ local function Build()
     frame:Hide()
     frame:EnableMouse(true)
     local NotifyAnchorChange = BUI.Profiler.Wrap("Power.Power anchor notify", function()
-        if not BUI.Power.Stack.IsEnabled() then
-            BUI.Anchor.OnAnchorSizeChanged()
-        end
+        BUI.Anchor.OnAnchorSizeChanged()
     end)
     frame:HookScript("OnShow", NotifyAnchorChange)
     frame:HookScript("OnHide", NotifyAnchorChange)
