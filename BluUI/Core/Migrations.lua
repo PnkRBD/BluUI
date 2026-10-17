@@ -31,7 +31,172 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 21
+local PROFILE_MIGRATION_VERSION = 27
+
+local AURA_GROUP_KINDS = { 'buffs', 'debuffs', 'bigDef', 'crowdControl' }
+
+local function ZeroInsideAuraOffsets(profile)
+	local groupFrames = profile.groupFrames
+	if type(groupFrames) ~= 'table' then return end
+	for _, sectionKey in ipairs({ 'party', 'raid' }) do
+		local section = groupFrames[sectionKey]
+		if type(section) == 'table' then
+			for _, kind in ipairs(AURA_GROUP_KINDS) do
+				local group = section[kind]
+				if type(group) == 'table' and group.anchorPoint and group.anchorPoint == group.relativePoint then
+					if group.offsetX == nil then group.offsetX = 0 end
+					if group.offsetY == nil then group.offsetY = 0 end
+				end
+			end
+		end
+	end
+end
+
+local CDM_VIEWER_KEYS = { 'essential', 'utility', 'buffs' }
+
+local function StripAutoSlots(list)
+	if type(list) ~= 'table' then return end
+	for slotIndex = #list, 1, -1 do
+		local entry = list[slotIndex]
+		if type(entry) == 'string' and (entry:match('^trinket:%d$') or entry:match('^racial:%d$')) then
+			table.remove(list, slotIndex)
+		end
+	end
+end
+
+local function SettleGlowTypes(node, validTypes)
+	if type(node) ~= 'table' then return end
+	for key, value in pairs(node) do
+		if key == 'glow' and type(value) == 'table' then
+			if type(value.type) == 'string' and not validTypes[value.type] then value.type = 'pixel' end
+			if type(value.style) == 'string' and not validTypes[value.style] then value.style = 'pixel' end
+		elseif type(value) == 'table' then
+			SettleGlowTypes(value, validTypes)
+		end
+	end
+end
+
+local function SettleIconOrderKeys(iconOrder)
+	if type(iconOrder) ~= 'table' then return end
+	local numericKeys = {}
+	for key in pairs(iconOrder) do
+		if type(key) == 'number' then numericKeys[#numericKeys + 1] = key end
+	end
+	for _, key in ipairs(numericKeys) do
+		local list = iconOrder[key]
+		iconOrder[key] = nil
+		local stringKey = tostring(key)
+		if type(list) == 'table' and not iconOrder[stringKey] then
+			for entryIndex, id in ipairs(list) do
+				local itemID = type(id) == 'string' and id:match('^item:(%d+)$')
+				if itemID then list[entryIndex] = 'custom:' .. itemID end
+			end
+			iconOrder[stringKey] = list
+		end
+	end
+end
+
+local function MergePotionPrios(cdm, customBars)
+	local merged = type(cdm.potionPrio) == 'table' and cdm.potionPrio or {}
+	cdm.potionPrio = merged
+	local function Absorb(config)
+		local source = type(config) == 'table' and config.potionPrio
+		if type(source) ~= 'table' then return end
+		for buildKey, bucket in pairs(source) do
+			if type(bucket) == 'table' then
+				local destination = merged[buildKey]
+				if not destination then destination = {}; merged[buildKey] = destination end
+				for id, priority in pairs(bucket) do
+					local key = BUI.CDM.PotionPrioKey(id)
+					if destination[key] == nil then destination[key] = priority end
+				end
+			end
+		end
+		config.potionPrio = nil
+	end
+	for _, key in ipairs(CDM_VIEWER_KEYS) do Absorb(cdm[key]) end
+	if type(customBars) == 'table' then
+		for _, bar in ipairs(customBars) do Absorb(bar) end
+	end
+	cdm._potionPrioShared = nil
+end
+
+local function ConsumablesBarFromTracking(tracking)
+	local bar = {
+		name = 'Consumables', enabled = tracking.enabled ~= false,
+		locked = tracking.locked, iconSize = tracking.iconSize, spacing = tracking.spacing,
+		zoom = tracking.zoom or 0.08, borderSize = tracking.borderSize, borderColor = tracking.borderColor,
+		growDirection = tracking.growDirection, growVertical = tracking.growVertical, maxPerRow = tracking.maxPerRow,
+		showTrinkets = tracking.showTrinkets, showStackText = tracking.showStackText, showCooldownText = tracking.showCooldownText,
+		stackTextPosition = tracking.stackTextPosition, stackTextOffsetX = tracking.stackTextOffsetX, stackTextOffsetY = tracking.stackTextOffsetY,
+		cooldownTextPosition = tracking.cooldownTextPosition, cooldownTextOffsetX = tracking.cooldownTextOffsetX, cooldownTextOffsetY = tracking.cooldownTextOffsetY,
+		stackTextSize = tracking.stackTextSize, cooldownTextSize = tracking.cooldownTextSize,
+		posX = tracking.posX, posY = tracking.posY, anchorFrame = tracking.anchorFrame,
+		anchorPoint = tracking.anchorPoint or 'BOTTOM', anchorOffsetX = tracking.anchorOffsetX, anchorOffsetY = tracking.anchorOffsetY,
+		customSpells = {},
+	}
+	if type(tracking.customItems) == 'table' then
+		for _, itemID in ipairs(tracking.customItems) do
+			bar.customSpells[#bar.customSpells + 1] = 'item:' .. itemID
+		end
+	end
+	return bar
+end
+
+local function FoldLegacyBarLists(bar)
+	if not (bar.items or bar.spells) then return end
+	bar.customSpells = type(bar.customSpells) == 'table' and bar.customSpells or {}
+	local list, seen = bar.customSpells, {}
+	for _, value in ipairs(list) do seen[tostring(value)] = true end
+	for _, itemID in ipairs(type(bar.items) == 'table' and bar.items or {}) do
+		local stored = 'item:' .. itemID
+		if not seen[stored] then list[#list + 1] = stored; seen[stored] = true end
+	end
+	for _, spellID in ipairs(type(bar.spells) == 'table' and bar.spells or {}) do
+		if not seen[tostring(spellID)] then list[#list + 1] = spellID; seen[tostring(spellID)] = true end
+	end
+	bar.items, bar.spells, bar.blacklist = nil, nil, nil
+end
+
+local function ScanTrinketsOnTrinketBar(bar)
+	if bar._trinketMigrated or type(bar.name) ~= 'string' or not bar.name:lower():find('trinket') or bar.showTrinkets then return end
+	bar.showTrinkets = true
+	if type(bar.customSpells) ~= 'table' then return end
+	local kept = {}
+	for _, value in ipairs(bar.customSpells) do
+		local itemID = tonumber(tostring(value):match('^item:(%d+)$'))
+		local equipSlot = itemID and select(4, C_Item.GetItemInfoInstant(itemID))
+		if equipSlot ~= 'INVTYPE_TRINKET' then kept[#kept + 1] = value end
+	end
+	bar.customSpells = kept
+end
+
+local function SettleCustomBarShapes(profile)
+	if type(profile.trackingBars) == 'table' then
+		if next(profile.trackingBars) and not (type(profile.customBars) == 'table' and next(profile.customBars)) then
+			profile.customBars = profile.trackingBars
+		end
+		profile.trackingBars = nil
+	end
+	local tracking = profile.tracking
+	if type(tracking) == 'table' then
+		local first = type(profile.customBars) == 'table' and profile.customBars[1]
+		if not (type(first) == 'table' and first.name) then
+			profile.customBars = { ConsumablesBarFromTracking(tracking) }
+		end
+		profile.tracking = nil
+	end
+	if type(profile.customBars) ~= 'table' then return end
+	for _, bar in ipairs(profile.customBars) do
+		if type(bar) == 'table' then
+			FoldLegacyBarLists(bar)
+			ScanTrinketsOnTrinketBar(bar)
+			bar._trinketMigrated = nil
+		end
+	end
+end
+
+local LEGACY_SKIN_IDS = { miscpanels = true, shop = true, micromenu = true, combatalerts = true, lossofcontrol = true }
 
 local OLD_TARGET_BUFF_RULES = { { 'mineHelpful' }, { 'bossBuff', 'important', 'stealable', 'mineHelpful' } }
 local OLD_TARGET_DEBUFF_RULES = { { 'mineHarmful' }, { 'mineHarmful', 'bossAura', 'dispellable' } }
@@ -184,6 +349,38 @@ local function PutHealingBuffsFirst(container, key, stockRule)
 	table.insert(rules, 1, HEALING_RULE)
 end
 
+local function SettleVisibilityPriority(general)
+	local saved = general.visibilityPriority
+	if type(saved) ~= 'table' then return end
+	local defaults, conditions = BUI.Visibility.DEFAULT_PRIORITY, BUI.Visibility.CONDITIONS
+	local last = #defaults
+	for key in pairs(saved) do
+		if type(key) == 'number' and key > last then last = key end
+	end
+	local order, seen = {}, {}
+	local function Keep(key)
+		if conditions[key] and not seen[key] then
+			seen[key] = true
+			order[#order + 1] = key
+		end
+	end
+	for index = 1, last do Keep(rawget(saved, index) or defaults[index]) end
+	for _, key in ipairs(defaults) do Keep(key) end
+	for key in pairs(saved) do saved[key] = nil end
+	for index, key in ipairs(order) do saved[index] = key end
+end
+
+local function DropRetiredKeys(profile)
+	profile.general.gradientColor = nil
+	if type(profile.interface) == 'table' then profile.interface.minimapIconDock = nil end
+	local unitFrames = profile.unitFrames
+	if type(unitFrames) ~= 'table' then return end
+	for _, unitKey in ipairs(LEGACY_UNIT_KEYS) do
+		local unit = unitFrames[unitKey]
+		if type(unit) == 'table' then unit.powerColor = nil end
+	end
+end
+
 function BUI.MigrateProfile(profile)
 	profile.general = profile.general or {}
 	local general = profile.general
@@ -300,7 +497,7 @@ function BUI.MigrateProfile(profile)
 		general._skinMasterRetired = true
 		local masterOn = profile.interface and profile.interface.skinBlizzardFrames == true
 		local hasSkinningTable = type(profile.skinning) == 'table' and next(profile.skinning) ~= nil
-		if not masterOn and not hasSkinningTable and BUI.Skinning and BUI.Skinning.GetSkinRegistry then
+		if not masterOn and not hasSkinningTable then
 			profile.skinning = profile.skinning or {}
 			local _, order = BUI.Skinning.GetSkinRegistry()
 			for _, id in ipairs(order) do
@@ -678,14 +875,82 @@ function BUI.MigrateProfile(profile)
 		MergeRetiredRuleLists(profile)
 	end
 
+	if not general._legacySkinIdsDropped then
+		general._legacySkinIdsDropped = true
+		local skinning = profile.skinning
+		if type(skinning) == 'table' then
+			for id, info in pairs(BUI.Skinning.GetSkinRegistry()) do
+				if LEGACY_SKIN_IDS[info.legacy] and skinning[id] == nil and skinning[info.legacy] == false then skinning[id] = false end
+			end
+			for id in pairs(LEGACY_SKIN_IDS) do skinning[id] = nil end
+		end
+	end
+
+	if not general._customBarShapesSettled then
+		general._customBarShapesSettled = true
+		SettleCustomBarShapes(profile)
+	end
+
+	if not general._cdmLoginShimsSettled then
+		general._cdmLoginShimsSettled = true
+		local cdm = profile.cdm
+		if type(cdm) == 'table' then
+			local validGlowTypes = {}
+			for _, entry in ipairs(BUI.CDM.GLOW_TYPES) do validGlowTypes[entry.id] = true end
+			SettleGlowTypes(cdm, validGlowTypes)
+			for _, key in ipairs(CDM_VIEWER_KEYS) do
+				local viewer = cdm[key]
+				if type(viewer) == 'table' then
+					viewer._pxW, viewer._pxH, viewer._pxGap = nil, nil, nil
+					SettleIconOrderKeys(viewer.iconOrder)
+					if key ~= 'buffs' then StripAutoSlots(viewer.customSpells) end
+				end
+			end
+			if type(cdm.assist) == 'table' then cdm.assist.enabled = nil end
+			MergePotionPrios(cdm, profile.customBars)
+		end
+	end
+
+	if not general._insideAuraOffsetsZeroed then
+		general._insideAuraOffsetsZeroed = true
+		ZeroInsideAuraOffsets(profile)
+	end
+
+	if not general._visibilityPrioritySettled then
+		general._visibilityPrioritySettled = true
+		SettleVisibilityPriority(general)
+	end
+
+	if not general._retiredKeysDropped then
+		general._retiredKeysDropped = true
+		DropRetiredKeys(profile)
+	end
+
+	if not general._minimapEnabledFolded then
+		general._minimapEnabledFolded = true
+		local interface = profile.interface
+		if type(interface) == 'table' then
+			if interface.minimapEnabled == false then
+				profile.modules = type(profile.modules) == 'table' and profile.modules or {}
+				profile.modules.minimap = false
+			end
+			interface.minimapEnabled = nil
+		end
+	end
+
 	general._buiMigrationVersion = PROFILE_MIGRATION_VERSION
 end
 
 function BUI.RunMigrations()
-	BUI.db.global.cdmProfile = nil
-	if not BUI.db.global._layoutCenteredMigrated then
-		BUI.db.global._layoutCenteredMigrated = true
-		BUI.db.global.layoutStyle = 'centered'
+	local global = BUI.db.global
+	global.cdmProfile = nil
+	if not global._layoutCenteredMigrated then
+		global._layoutCenteredMigrated = true
+		global.layoutStyle = 'centered'
+	end
+	if global.charTrackingSpells then
+		global.charCustomBarsSpells = global.charCustomBarsSpells or global.charTrackingSpells
+		global.charTrackingSpells = nil
 	end
 
 	for _, profile in pairs(BUI.db.profiles) do
