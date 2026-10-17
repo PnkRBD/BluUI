@@ -88,12 +88,6 @@ local function Restricted()
 	return BUI.Tools.ShouldAurasBeSecret() or BUI.Tools.AuraQueriesBlocked()
 end
 
-local function ResolveFont(config)
-	local name = config.font
-	if name == BUI.C.GLOBAL_OPTION then return BUI.GetGlobalFont() end
-	return LibStub('LibSharedMedia-3.0'):Fetch('font', name, true) or BUI.GetGlobalFont()
-end
-
 local function SortMethod(config)
 	for _, choice in ipairs(SORT_METHODS) do
 		if choice.value == config.sortMethod then return AuraContainerSortMethod[choice.enumKey] end
@@ -159,7 +153,7 @@ local function StyleButton(header, button)
 	local config = Settings()[header.key]
 	local parts = header.parts[button]
 	local size = Pixel.Scale(config.size)
-	local font, outline = ResolveFont(config), config.fontOutline
+	local font, outline = BUI.GetModuleFont(config), config.fontOutline
 	button:SetSize(size, size)
 
 	local timer = config.timer
@@ -172,15 +166,15 @@ local function StyleButton(header, button)
 	PlaceText(parts.count, button, config.countAnchor, config.countOffsetX, config.countOffsetY, size, config.countSize)
 
 	local cooldown = parts.cooldown
-	cooldown:SetDrawSwipe(config.swipe ~= false)
-	cooldown:SetReverse(config.swipeReverse ~= false)
+	cooldown:SetDrawSwipe(config.swipe)
+	cooldown:SetReverse(config.swipeReverse)
 	cooldown:SetDrawEdge(config.swipeEdge)
 	cooldown:SetHideCountdownNumbers(timer ~= 'icon')
 	cooldown:SetCountdownMillisecondsThreshold(decimals)
 	Pixel.ApplyFont(cooldown:GetCountdownFontString(), config.durationSize, font, outline)
-	button:SetCancelAuraButtons((header.kind.cancel and config.rightClickCancel ~= false) and CANCEL_BUTTON or nil)
-	button:SetHideTooltipInCombat(config.tooltipsInCombat == false)
-	button:SetMouseMotionEnabled(config.tooltips ~= false)
+	button:SetCancelAuraButtons((header.kind.cancel and config.rightClickCancel) and CANCEL_BUTTON or nil)
+	button:SetHideTooltipInCombat(not config.tooltipsInCombat)
+	button:SetMouseMotionEnabled(config.tooltips)
 	if parts.dispel then parts.dispelStamp = BUI.AuraEngine.SyncDispelBorder(button, parts.dispel, parts.dispelStamp, true) end
 end
 
@@ -259,7 +253,7 @@ local function ApplyLayout(header)
 		for spellID in pairs(pins) do exclude[spellID] = true end
 	end
 	local count = config.perRow * config.rows
-	local pinsOnly = hasPins and settings.pinnedOnly[header.kind.list] == true
+	local pinsOnly = hasPins and settings.pinnedOnly[header.kind.list]
 	container:SetAuraGroupLayout(PIN_KEY, ElementLayout(config, PIN_ORDER))
 	container:SetAuraGroupLayout(GROUP_KEY, ElementLayout(config, GROUP_ORDER))
 	container:SetAuraGroupSortMethod(PIN_KEY, SortMethod(config), SortDirection(config))
@@ -280,7 +274,7 @@ local function ApplyLayout(header)
 end
 
 local function IsLocked(key)
-	return Settings()[key].locked ~= false
+	return Settings()[key].locked
 end
 
 local function ApplyLock(header)
@@ -298,7 +292,6 @@ local function BuildHeader(key)
 	local container = CreateFrame('AuraContainer', nil, UIParent, 'CustomAuraContainerTemplate')
 	container:SetFrameStrata('MEDIUM')
 	container:SetSize(1, 1)
-	container._buiSkipMouseWalk = true
 
 	local header = { key = key, kind = kind, holder = holder, container = container, parts = {}, buttons = {} }
 	headers[key] = header
@@ -345,8 +338,7 @@ end
 
 local function SetBlizzardHidden(hidden)
 	for _, name in ipairs(BLIZZARD_FRAMES) do
-		local frame = _G[name]
-		if frame then frame:SetRolesets(hidden and HIDDEN_ROLESET or BLIZZARD_ROLESET) end
+		_G[name]:SetRolesets(hidden and HIDDEN_ROLESET or BLIZZARD_ROLESET)
 	end
 end
 
@@ -356,7 +348,7 @@ function BuffFrames.Refresh()
 	SetBlizzardHidden(enabled)
 	for _, key in ipairs(KIND_ORDER) do
 		local header = headers[key]
-		local shown = enabled and Settings()[key].enabled ~= false
+		local shown = enabled and Settings()[key].enabled
 		header.container:SetEnabled(shown)
 		header.container:SetShown(shown)
 		header.holder:SetShown(shown)
