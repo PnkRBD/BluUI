@@ -18,7 +18,7 @@ local function ShowDragDropPicker(parent, itemID, spellID, onSelect, onCancel, i
 	if itemID then
 		local itemName, _, _, _, _, _, _, _, _, itemIcon = C_Item.GetItemInfo(itemID)
 		if not itemName then
-			local _, _, _, _, instantIcon = GetItemInfoInstant(itemID)
+			local _, _, _, _, instantIcon = C_Item.GetItemInfoInstant(itemID)
 			itemIcon = instantIcon; C_Item.RequestLoadItemDataByID(itemID)
 		end
 		options[#options + 1] = {type = "item", id = itemID, name = itemName or ("Item " .. itemID), icon = itemIcon or 134400, label = "Item ID"}
@@ -192,7 +192,7 @@ function Controls.ItemInput(parent, options)
 			if options.noDragPicker then
 				if onAdd then onAdd("item:" .. id) end
 			else
-				local _, itemSpellID = GetItemSpell(id)
+				local _, itemSpellID = C_Item.GetItemSpell(id)
 				if itemSpellID then
 					ShowDragDropPicker(options.modalParent or container, id, itemSpellID,
 						function(selectedType, selectedID) if onAdd then onAdd((selectedType == "item" and "item:" or "spell:") .. selectedID) end end, nil)
@@ -250,7 +250,7 @@ function Controls.ItemList(parent, placeholder, width, height, onAdd, onRemove, 
 			if config.noDragPicker then
 				if onAdd then onAdd("item:" .. id) end
 			else
-				local _, itemSpellID = GetItemSpell(id)
+				local _, itemSpellID = C_Item.GetItemSpell(id)
 				if itemSpellID then
 					ShowDragDropPicker(GetModalParent(), id, itemSpellID,
 						function(selectedType, selectedID) if onAdd then onAdd((selectedType == "item" and "item:" or "spell:") .. selectedID) end end, nil)
