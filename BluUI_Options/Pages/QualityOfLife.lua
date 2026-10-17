@@ -35,6 +35,7 @@ local ARROW_GAP = 8
 local DISABLED_ALPHA = 0.4
 local ABANDON_GAP = 0.3
 local ABANDON_TIMEOUT = 3
+local MAX_QUEST_ID = 200000
 
 local BOARDS = {
 	combat = { title = 'Combat', description = 'The numbers that float up over your target, casting feel, the keystone slot and how early the next spell queues.', headers = { 'Target Combat Text', 'Casting' } },
@@ -522,6 +523,15 @@ local function SettingBoard(ui, parent, width, spec)
 	return board
 end
 
+local function UntrackQuests()
+	if InCombatLockdown() then return end
+	Confirm('Untrack All Quests', 'This untracks every quest, hidden ones included. Old characters can carry hundreds of hidden ones that cost FPS. Track the quests you want again from the quest log.', 'Untrack', function()
+		if InCombatLockdown() then return end
+		for questID = 1, MAX_QUEST_ID do C_QuestLog.RemoveQuestWatch(questID) end
+		Window():Repaint()
+	end)
+end
+
 local function GraphicsBoard(ui, parent, width)
 	local board = ui.Board(parent, width, {
 		title = 'Graphics',
@@ -537,6 +547,15 @@ local function GraphicsBoard(ui, parent, width)
 	ui.Bind(row, function()
 		local differing, known = PendingCVars()
 		status:SetText(differing == 0 and 'At the preset' or (differing .. ' of ' .. known .. ' differ'))
+	end)
+	local quests = board:AddRow('Hidden quests', 'Untrack every quest, hidden ones too', BUTTON_ROOM + STATUS_ROOM)
+	local untrack = ui.Button(quests, 'Untrack all', 'control', UntrackQuests)
+	untrack:SetPoint('RIGHT', -ui.ROW_INSET, 0)
+	local tracked = ui.Text(quests, '', 11, 'muted')
+	tracked:SetPoint('RIGHT', untrack, 'LEFT', -BUTTON_GAP, 0)
+	ui.Bind(quests, function()
+		local count = C_QuestLog.GetNumQuestWatches()
+		tracked:SetText(count .. ' tracked')
 	end)
 	return board
 end
