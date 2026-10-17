@@ -349,7 +349,6 @@ function Container.SetEnabled(on)
     local settings = Container.GetDB()
     layoutKnown = false
     if on then
-        if BUI.Power.Stack.IsEnabled() then BUI.Power.Stack.Disable() end
         settings.enabled = true
         Container.ApplyAll()
     else
@@ -363,6 +362,19 @@ end
 function Container.HasMember(key)
     local settings = Container.GetDB()
     return (settings.enabled and settings.attached[key]) or false
+end
+
+function Container.AnchorFrame()
+    if stackFrame and Container.IsEnabled() then return stackFrame end
+    local fallback
+    for _, key in ipairs({ 'primary', 'secondary' }) do
+        local frame = FrameFor(key)
+        if frame then
+            if frame:IsShown() then return frame end
+            fallback = fallback or frame
+        end
+    end
+    return fallback
 end
 
 function Container.SetLocked(locked)
@@ -402,4 +414,9 @@ BUI.Events:OnLogin('StackLab', function()
     BUI.Profiler.After('Power.Container stack setup', 0.3, function()
         if Container.IsEnabled() then Container.ApplyAll() end
     end)
+end)
+
+BUI.RegisterModuleControl('power', function()
+    BUI.Power.Primary.Apply()
+    BUI.Power.Secondary.Apply()
 end)

@@ -31,7 +31,7 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 28
+local PROFILE_MIGRATION_VERSION = 29
 
 local AURA_GROUP_KINDS = { 'buffs', 'debuffs', 'bigDef', 'crowdControl' }
 
@@ -384,7 +384,7 @@ end
 local STACK_SNAPSHOT_FIELDS = {
 	'anchorFrame', 'anchorPoint', 'anchorOffsetX', 'anchorOffsetY',
 	'centerHorizontally', 'matchAnchorWidth', 'noGap', 'scaleOffsets',
-	'stackFlushEdge', 'posX', 'posY',
+	'posX', 'posY',
 }
 
 local function ClearStackAnchor(memberDB)
@@ -396,12 +396,13 @@ local function ClearStackAnchor(memberDB)
 	memberDB.matchAnchorWidth = nil
 	memberDB.noGap = nil
 	memberDB.scaleOffsets = nil
-	memberDB.stackFlushEdge = nil
 end
 
-local function MigrateClassicPowerStack(powerBar, secondaryPower)
+local function RetireClassicPowerStack(powerBar, secondaryPower)
 	if type(powerBar) ~= 'table' then return end
 	local stack = powerBar.stack
+	powerBar.stack, powerBar.stackFlushEdge = nil, nil
+	if type(secondaryPower) == 'table' then secondaryPower.stackFlushEdge = nil end
 	if type(stack) ~= 'table' or not stack.enabled then return end
 	local members = { primary = powerBar }
 	if type(secondaryPower) == 'table' then members.secondary = secondaryPower end
@@ -448,16 +449,13 @@ local function MigrateClassicPowerStack(powerBar, secondaryPower)
 	else
 		for _, memberDB in pairs(members) do ClearStackAnchor(memberDB) end
 	end
-	stack.enabled = false
-	stack.baseMember = nil
-	stack.preStack = nil
 end
 
-local function MigrateClassicPowerStacks(profile)
-	MigrateClassicPowerStack(profile.powerBar, profile.secondaryPower)
+local function RetireClassicPowerStacks(profile)
+	RetireClassicPowerStack(profile.powerBar, profile.secondaryPower)
 	if type(profile.powerVariants) ~= 'table' then return end
 	for _, variant in pairs(profile.powerVariants) do
-		if type(variant) == 'table' then MigrateClassicPowerStack(variant.powerBar, variant.secondaryPower) end
+		if type(variant) == 'table' then RetireClassicPowerStack(variant.powerBar, variant.secondaryPower) end
 	end
 end
 
@@ -1097,9 +1095,10 @@ function BUI.MigrateProfile(profile)
 		end
 	end
 
-	if not general._classicPowerStackMigrated then
-		general._classicPowerStackMigrated = true
-		MigrateClassicPowerStacks(profile)
+	if not general._classicPowerStackRetired then
+		general._classicPowerStackRetired = true
+		general._classicPowerStackMigrated = nil
+		RetireClassicPowerStacks(profile)
 	end
 
 	if not general._moveFramesModeSettled then

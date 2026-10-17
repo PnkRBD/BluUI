@@ -89,7 +89,7 @@ local function RefreshPreview()
 end
 
 local function Stacked(key)
-	return BUI.Power.Stack.HasMember(key) or BUI.Power.Container.HasMember(key)
+	return BUI.Power.Container.HasMember(key)
 end
 
 local function EditPreview()
@@ -219,17 +219,13 @@ local function Source(db, entries, after)
 	local factory = BUI.FactoryOf(db)
 	return { entries = entries, width = SOURCE_WIDTH, get = function() return db.source or 'auto' end, set = function(value)
 		db.source = value ~= 'auto' and value or nil
-		BUI.Power.Stack.OnMemberToggled()
 		if after then after() end
 	end, default = function() return factory.source or 'auto' end }
 end
 
 local function Enabled(db, module)
 	local switch = Toggle(db, nil, 'enabled')
-	switch.set = function(value)
-		module.Toggle(value)
-		BUI.Power.Stack.OnMemberToggled()
-	end
+	switch.set = function(value) module.Toggle(value) end
 	return switch
 end
 
@@ -290,7 +286,6 @@ local function DruidBoard(ui, parent, width, db, Apply, key, choices, auto)
 		board:AddTools(form.label, nil, {
 			{ entries = entries, width = SOURCE_WIDTH, get = function() return overrides[form.form] or 'auto' end, set = function(value)
 				overrides[form.form] = value ~= 'auto' and value or nil
-				BUI.Power.Stack.OnMemberToggled()
 			end },
 		}, Apply)
 	end
@@ -1007,25 +1002,21 @@ local function BuildPreview(band, kit)
 	end
 
 	local function ShowStacked()
-		local Stack = BUI.Power.Stack
-		local Container = BUI.Power.Container
-		local containerDb = Container.IsEnabled() and Container.GetDB() or nil
-		local stackDb = Stack.GetDB()
-		local order = (containerDb and containerDb.order) or stackDb.order
-		local gap = (containerDb and containerDb.gap) or stackDb.gap or 0
+		local containerDb = BUI.Power.Container.GetDB()
+		local order = containerDb.order
+		local gap = containerDb.gap
 		local primaryDb = BUI.Power.GetPrimaryDB()
 		local secondaryDb = BUI.Power.GetSecondaryDB()
 		local Secondary = BUI.Power.Secondary
 		local config = Secondary.GetDisplayConfig()
 
 		local function MemberOn(key)
-			if containerDb then
-				if not containerDb.attached[key] then return false end
-				if key == 'castbar' then return BUI.CastBar.GetSettings('player').enabled == true end
-			elseif key == 'castbar' then
-				return false
+			if not containerDb.attached[key] then return false end
+			if key == 'castbar' then return BUI.CastBar.GetSettings('player').enabled == true end
+			if key == 'primary' then
+				return primaryDb.enabled and primaryDb.source ~= 'none' and not BUI.ClassPowers.IsPrimaryHiddenForForm()
 			end
-			return Stack.IsMemberActive(key) or false
+			return secondaryDb.enabled and Secondary.HasSecondary()
 		end
 
 		local members = {}
@@ -1080,26 +1071,8 @@ local function BuildPreview(band, kit)
 			return
 		end
 
-		if containerDb then
-			if containerDb.matchWidth then
-				for _, member in ipairs(members) do member.w = containerDb.width end
-			end
-		elseif stackDb.matchAnchorWidth ~= false then
-			local matched
-			if stackDb.anchorFrame and stackDb.anchorFrame ~= '' then
-				local target = BUI.ResolveAnchorFrame(stackDb.anchorFrame, stackDb.anchorPoint)
-				matched = target and target:GetWidth()
-				if matched then matched = math.min(matched, 700) end
-			else
-				local anchorPoint = stackDb.anchorPoint or 'TOP'
-				local base = anchorPoint:find('BOTTOM') and members[1] or members[#members]
-				matched = base and base.w
-			end
-			if not matched or matched <= 0 then
-				matched = 0
-				for _, member in ipairs(members) do matched = math.max(matched, member.w) end
-			end
-			for _, member in ipairs(members) do member.w = matched end
+		if containerDb.matchWidth then
+			for _, member in ipairs(members) do member.w = containerDb.width end
 		end
 
 		local edge = Pixel.Scale(1)
@@ -1298,7 +1271,7 @@ local function BuildPreview(band, kit)
 		kind = KINDS[selected] or 'general'
 		HideAll()
 		if kind == 'general' then
-			if BUI.Power.Container.IsEnabled() or BUI.Power.Stack.IsEnabled() then return ShowStacked() end
+			if BUI.Power.Container.IsEnabled() then return ShowStacked() end
 			return ShowPrimary()
 		end
 		if kind == 'primary' then return ShowPrimary() end

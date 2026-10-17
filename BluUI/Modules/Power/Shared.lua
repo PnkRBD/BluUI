@@ -40,34 +40,10 @@ function Shared.StyleTicks(bar, db, fallbackWidth, fallbackHeight, edge)
     for tickIndex = #ticks + 1, #bar._tickMarks do bar._tickMarks[tickIndex]:Hide() end
 end
 
-function Shared.ApplyStackFlush(container, bar, flushEdge, edge, backgroundRed, backgroundGreen, backgroundBlue, backgroundAlpha)
-    local topInset, bottomInset = -edge, edge
-    if flushEdge == 'BOTTOM' then bottomInset = 0
-    elseif flushEdge == 'TOP' then topInset = 0 end
+function Shared.InsetBar(container, bar, edge)
     bar:ClearAllPoints()
-    bar:SetPoint("TOPLEFT", container, "TOPLEFT", edge, topInset)
-    bar:SetPoint("BOTTOMRIGHT", container, "BOTTOMRIGHT", -edge, bottomInset)
-
-    local cover = container._stackFlushCover
-    if not flushEdge then
-        if cover then cover:Hide() end
-        return
-    end
-    if not cover then
-        cover = container:CreateTexture(nil, "ARTWORK")
-        container._stackFlushCover = cover
-    end
-    cover:SetColorTexture(backgroundRed, backgroundGreen, backgroundBlue, backgroundAlpha)
-    cover:ClearAllPoints()
-    if flushEdge == 'BOTTOM' then
-        cover:SetPoint("BOTTOMLEFT", container, "BOTTOMLEFT", 0, 0)
-        cover:SetPoint("BOTTOMRIGHT", container, "BOTTOMRIGHT", 0, 0)
-    else
-        cover:SetPoint("TOPLEFT", container, "TOPLEFT", 0, 0)
-        cover:SetPoint("TOPRIGHT", container, "TOPRIGHT", 0, 0)
-    end
-    cover:SetHeight(edge)
-    cover:Show()
+    bar:SetPoint("TOPLEFT", container, "TOPLEFT", edge, -edge)
+    bar:SetPoint("BOTTOMRIGHT", container, "BOTTOMRIGHT", -edge, edge)
 end
 
 function Shared.IsAnchoredFor(db, isText)
@@ -82,7 +58,6 @@ end
 function Shared.ShouldReanchor(frame, db)
     if not frame then return false end
     if not db.enabled then return false end
-    if BUI.Power.Stack.IsEnabled() then return false end
     return BUI.Anchor.ShouldRefreshOnAnchorChange(db)
 end
 

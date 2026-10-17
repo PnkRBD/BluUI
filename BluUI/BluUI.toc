@@ -117,7 +117,6 @@ Modules\Power\Scope.lua
 Modules\Power\Shared.lua
 Modules\Power\Power.lua
 Modules\Power\Secondary.lua
-Modules\Power\Stack.lua
 Modules\Power\Container.lua
 
 Modules\ActionBars\Core.lua
