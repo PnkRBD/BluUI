@@ -29,84 +29,68 @@ local KINDS = {
 	{ key = 'debuffs', title = 'Debuffs', frameName = 'BUI_DebuffFrame', sub = 'Edged in their dispel type color' },
 }
 
+local fonts
+
+local Option = BUI.OptionsKit.Option
+
 local function Config()
 	return BUI.GetDB().buffFrames
-end
-
-local function Factory()
-	return BUI.Defaults.profile.buffFrames
 end
 
 local function Apply()
 	BUI.BuffFrames.Refresh()
 end
 
-local function Option(db, factory, label, key, extra)
-	local option = {
-		label = label,
-		get = function() return db[key] end,
-		set = function(value) db[key] = value end,
-		default = function() return factory[key] end,
-	}
-	for name, value in pairs(extra or {}) do option[name] = value end
-	return option
-end
-
-local function SortItems()
-	local items = {}
-	for _, choice in ipairs(BUI.BuffFrames.SORT_METHODS) do items[#items + 1] = { value = choice.value, text = choice.text } end
-	return items
-end
-
 local function AddKind(grid, spec)
-	local db, factory = Config()[spec.key], Factory()[spec.key]
+	local db = Config()[spec.key]
 	local behavior = {
-		Option(db, factory, 'Sort by', 'sortMethod', { entries = SortItems(), width = WIDE_MENU }),
-		Option(db, factory, 'Reverse the order', 'sortReverse'),
-		Option(db, factory, 'Cooldown swipe', 'swipe', { separator = true }),
-		Option(db, factory, 'Reverse the swipe', 'swipeReverse'),
-		Option(db, factory, 'Bright edge', 'swipeEdge'),
-		Option(db, factory, 'Tooltips on mouseover', 'tooltips', { separator = true }),
-		Option(db, factory, 'Tooltips in combat', 'tooltipsInCombat'),
+		Option(db, 'Sort by', 'sortMethod', { entries = BUI.BuffFrames.SORT_METHODS, width = WIDE_MENU }),
+		Option(db, 'Reverse the order', 'sortReverse'),
+		Option(db, 'Cooldown swipe', 'swipe', { separator = true }),
+		Option(db, 'Reverse the swipe', 'swipeReverse'),
+		Option(db, 'Bright edge', 'swipeEdge'),
+		Option(db, 'Tooltips on mouseover', 'tooltips', { separator = true }),
+		Option(db, 'Tooltips in combat', 'tooltipsInCombat'),
 	}
-	if spec.cancel then behavior[#behavior + 1] = Option(db, factory, 'Right-click a buff to cancel it', 'rightClickCancel', { separator = true }) end
+	if spec.cancel then behavior[#behavior + 1] = Option(db, 'Right-click a buff to cancel it', 'rightClickCancel', { separator = true }) end
 	grid:AddTools(spec.title, spec.sub, {
 		BUI.PositionTool(db, { selfTag = spec.frameName }),
 		{ icon = 'resize', tooltip = 'Size and grid', title = spec.title, options = {
-			Option(db, factory, 'Icon size', 'size', { min = 16, max = 64, step = 1 }),
-			Option(db, factory, 'Per row', 'perRow', { min = 1, max = 40, step = 1 }),
-			Option(db, factory, 'Rows', 'rows', { min = 1, max = 8, step = 1 }),
-			Option(db, factory, 'Spacing', 'spacing', { min = 0, max = 20, step = 1, separator = true }),
-			Option(db, factory, 'Row spacing', 'rowSpacing', { min = 0, max = 40, step = 1 }),
-			Option(db, factory, 'Grow sideways', 'growX', { entries = GROWTH_SIDEWAYS, separator = true }),
-			Option(db, factory, 'Grow rows', 'growY', { entries = GROWTH_ROWS }),
+			Option(db, 'Icon size', 'size', { min = 16, max = 64, step = 1 }),
+			Option(db, 'Per row', 'perRow', { min = 1, max = 40, step = 1 }),
+			Option(db, 'Rows', 'rows', { min = 1, max = 8, step = 1 }),
+			Option(db, 'Spacing', 'spacing', { min = 0, max = 20, step = 1, separator = true }),
+			Option(db, 'Row spacing', 'rowSpacing', { min = 0, max = 40, step = 1 }),
+			Option(db, 'Grow sideways', 'growX', { entries = GROWTH_SIDEWAYS, separator = true }),
+			Option(db, 'Grow rows', 'growY', { entries = GROWTH_ROWS }),
 		} },
 		{ icon = 'text', tooltip = 'Font, timer and stacks', title = spec.title, options = {
-			Option(db, factory, 'Font', 'font', { entries = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION), width = WIDE_MENU }),
-			Option(db, factory, 'Outline', 'fontOutline', { entries = OUTLINES, width = WIDE_MENU }),
-			Option(db, factory, 'Timer', 'timer', { entries = TIMER_PLACES, width = WIDE_MENU, separator = true }),
-			Option(db, factory, 'Timer size', 'durationSize', { min = 6, max = 24, step = 1 }),
-			Option(db, factory, 'Compact timer, 11s', 'compactTimer'),
-			Option(db, factory, 'Decimals', 'showCooldownDecimals'),
-			Option(db, factory, 'Decimals under seconds', 'cooldownDecimalThreshold', { min = 1, max = 30, step = 1 }),
-			Option(db, factory, 'Timer anchor', 'durationAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS, width = WIDE_MENU }),
-			Option(db, factory, 'Timer X offset', 'durationOffsetX', TEXT_OFFSET),
-			Option(db, factory, 'Timer Y offset', 'durationOffsetY', TEXT_OFFSET),
-			Option(db, factory, 'Stack size', 'countSize', { min = 6, max = 24, step = 1, separator = true }),
-			Option(db, factory, 'Stack anchor', 'countAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS, width = WIDE_MENU }),
-			Option(db, factory, 'Stack X offset', 'countOffsetX', TEXT_OFFSET),
-			Option(db, factory, 'Stack Y offset', 'countOffsetY', TEXT_OFFSET),
+			Option(db, 'Font', 'font', { entries = fonts, width = WIDE_MENU }),
+			Option(db, 'Outline', 'fontOutline', { entries = OUTLINES, width = WIDE_MENU }),
+			Option(db, 'Timer', 'timer', { entries = TIMER_PLACES, width = WIDE_MENU, separator = true }),
+			Option(db, 'Timer size', 'durationSize', { min = 6, max = 24, step = 1 }),
+			Option(db, 'Compact timer, 11s', 'compactTimer'),
+			Option(db, 'Decimals', 'showCooldownDecimals'),
+			Option(db, 'Decimals under seconds', 'cooldownDecimalThreshold', { min = 1, max = 30, step = 1 }),
+			Option(db, 'Timer anchor', 'durationAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS, width = WIDE_MENU }),
+			Option(db, 'Timer X offset', 'durationOffsetX', TEXT_OFFSET),
+			Option(db, 'Timer Y offset', 'durationOffsetY', TEXT_OFFSET),
+			Option(db, 'Stack size', 'countSize', { min = 6, max = 24, step = 1, separator = true }),
+			Option(db, 'Stack anchor', 'countAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS, width = WIDE_MENU }),
+			Option(db, 'Stack X offset', 'countOffsetX', TEXT_OFFSET),
+			Option(db, 'Stack Y offset', 'countOffsetY', TEXT_OFFSET),
 		} },
 		{ tooltip = 'Sorting, swipe and tooltips', title = spec.title, options = behavior },
 		{ icon = 'eye', tooltip = 'Show the ' .. spec.title:lower() .. ' frame, drag to move', get = function() return db.locked == false end, set = function(value)
 			db.locked = not value
 			Apply()
 		end },
-		Option(db, factory, nil, 'enabled'),
+		Option(db, nil, 'enabled'),
 	}, Apply)
 end
 
 local function Sections(ui, _, parent, width)
+	fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
 	local grid = BUI.ToolGrid(ui, parent, width, 'Frames', 'Your buff and debuff icons. The eye shows a frame so you can drag it.', COLUMNS)
 	for _, spec in ipairs(KINDS) do AddKind(grid, spec) end
 	return { grid }
