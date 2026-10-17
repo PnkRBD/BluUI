@@ -163,8 +163,7 @@ local function SampleIcon(frame, size, x)
 	icon:SetSize(size, size)
 	icon:SetPoint('LEFT', frame, 'LEFT', x, 0)
 	icon:SetTexture(SAMPLE_ICON)
-	Skin.CropIcon(icon)
-	Skin.TipIconFrame(frame, icon)
+	Skin.SquareIcon(frame, icon)
 	return icon
 end
 

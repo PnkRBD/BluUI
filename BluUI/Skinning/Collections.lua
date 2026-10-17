@@ -3,9 +3,8 @@ local _, BUI = ...
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
-local SELECTED = Skin.SELECTED_COLOR
+local SELECTED, LABEL_TEXT, BODY_TEXT = Skin.SELECTED_COLOR, Skin.MUTED_COLOR, Skin.BODY_COLOR
 
-local COLLECTIONS_ADDON = 'Blizzard_Collections'
 local TAB_COUNT = 6
 local MOUNT_INSET_KEYS = { 'LeftInset', 'BottomLeftInset', 'RightInset', 'MountCount' }
 local MOUNT_DISPLAY_ART = { 'YesMountsTex', 'NoMountsTex' }
@@ -17,30 +16,19 @@ local ROW_SELECTED_ALPHA = 0.12
 local ROW_HOVER_ALPHA = 0.06
 local UNUSABLE_ROW_ALPHA = 0.12
 local MUTED_TEXT_THRESHOLD = 0.6
-local BODY_TEXT = { 0.87, 0.87, 0.9, 1 }
-local LABEL_TEXT = { 0.55, 0.55, 0.6, 1 }
 
 local context = Skin.Define('collections', {
 	name = 'Collections',
 	description = 'Mounts, pets, toys, heirlooms, appearances and campsites: dark panels, clean lists, flat progress bars and library style search and filters.',
 	icon = 'Interface/Icons/MountJournalPortrait',
-	test = function()
-		C_AddOns.LoadAddOn(COLLECTIONS_ADDON)
-		local frame = _G.CollectionsJournal
-		if not frame:IsShown() then ToggleCollectionsJournal(1) end
-		return frame
-	end,
-	stopTest = function()
-		if _G.CollectionsJournal then HideUIPanel(_G.CollectionsJournal) end
-	end,
 })
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
 local Shell, Button, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Dropdown, context.EditBox, context.CheckBox
-local ScrollBar, Tab, Body, Title = context.ScrollBar, context.Tab, context.Body, context.Title
+local ScrollBar, Tab, Body, Title, Paging = context.ScrollBar, context.Tab, context.Body, context.Title, context.Paging
 local FlatTexture, SelectedTexture, CropIcon = Skin.FlatTexture, Skin.SelectedTexture, Skin.CropIcon
 
 local function SetColor(fontString, color)
-	if fontString then fontString:SetTextColor(color[1], color[2], color[3], color[4]) end
+	fontString:SetTextColor(color[1], color[2], color[3], color[4])
 end
 
 local function IsMutedText(fontString)
@@ -49,20 +37,18 @@ local function IsMutedText(fontString)
 end
 
 local function SkinBackgroundFrame(frame)
-	if not frame then return end
 	FadeRegions(frame)
 	Fade(frame.NineSlice)
 	Shell(frame)
 end
 
 local function SkinCountInset(inset)
-	if not inset then return end
 	Body(inset.Count)
 	Skin.TipFont(inset.Label, 'label')
 end
 
 local function SkinProgressBar(bar)
-	if not bar or bar._buiProgress then return end
+	if bar._buiProgress then return end
 	bar._buiProgress = true
 	Fade(bar.border)
 	bar:SetStatusBarTexture(BUI.GetGlobalTexture())
@@ -71,28 +57,15 @@ local function SkinProgressBar(bar)
 	Skin.TipFace(bar.text, 'body')
 end
 
-local function SkinPaging(paging)
-	if not paging then return end
-	Skin.TipPageButton(paging.PrevPageButton, 'previous')
-	Skin.TipPageButton(paging.NextPageButton, 'next')
-	Body(paging.PageText)
-end
-
 local function RefreshPaging(paging)
-	if not paging then return end
-	Skin.RefreshPageButton(paging.PrevPageButton)
-	Skin.RefreshPageButton(paging.NextPageButton)
+	Skin.RefreshPageButtons(paging.PrevPageButton, paging.NextPageButton)
 end
 
 local function SkinRowTextures(row, selected, highlight)
-	if selected then
-		selected:SetBlendMode('BLEND')
-		SelectedTexture(selected, ROW_SELECTED_ALPHA)
-	end
-	if highlight then
-		highlight:SetBlendMode('BLEND')
-		FlatTexture(highlight, 1, 1, 1, ROW_HOVER_ALPHA)
-	end
+	selected:SetBlendMode('BLEND')
+	SelectedTexture(selected, ROW_SELECTED_ALPHA)
+	highlight:SetBlendMode('BLEND')
+	FlatTexture(highlight, 1, 1, 1, ROW_HOVER_ALPHA)
 end
 
 local function RecolorName(name)
@@ -104,16 +77,14 @@ local function SkinListRow(row, icon)
 	row._buiRow = true
 	Fade(row.background)
 	SkinRowTextures(row, row.selectedTexture, row:GetHighlightTexture())
-	CropIcon(icon)
-	Skin.TipIconFrame(row, icon)
+	Skin.SquareIcon(row, icon)
 	Skin.TipFace(row.name, 'body')
 end
 
 local function OnMountRow(button)
 	SkinListRow(button, button.icon)
 	if not button._buiFill then
-		local fill = button:CreateTexture(nil, 'BACKGROUND')
-		fill.__buiSkin = true
+		local fill = context.Own(button:CreateTexture(nil, 'BACKGROUND'))
 		fill:SetAllPoints(button)
 		button._buiFill = fill
 	end
@@ -136,21 +107,17 @@ local function OnSetsRow(row)
 	row._buiRow = true
 	Fade(row.Background)
 	SkinRowTextures(row, row.SelectedTexture, row.HighlightTexture)
-	if row.IconFrame then
-		CropIcon(row.IconFrame.Icon)
-		Skin.TipIconFrame(row.IconFrame, row.IconFrame.Icon)
-	end
+	Skin.SquareIcon(row.IconFrame, row.IconFrame.Icon)
 	Skin.TipFace(row.Name, 'body')
 	Skin.TipFace(row.Label, 'body')
 end
 
 local function SkinSpellButton(button)
-	if not button or button._buiSpell then return end
+	if button._buiSpell then return end
 	button._buiSpell = true
 	FadeKeys(button, SPELL_SLOT_ART)
-	CropIcon(button.iconTexture)
 	CropIcon(button.iconTextureUncollected)
-	Skin.TipIconFrame(button, button.iconTexture)
+	Skin.SquareIcon(button, button.iconTexture)
 	Skin.TipFace(button.name, 'body')
 end
 
@@ -171,7 +138,6 @@ local function OnHeirloomButton(journal, button)
 end
 
 local function SkinMounts(journal)
-	if not journal then return end
 	FadeKeys(journal, MOUNT_INSET_KEYS)
 	SkinCountInset(journal.MountCount)
 	EditBox(journal.searchBox)
@@ -179,15 +145,12 @@ local function SkinMounts(journal)
 	ScrollBar(journal.ScrollBar)
 	Button(journal.MountButton)
 	local display = journal.MountDisplay
-	if display then
-		FadeKeys(display, MOUNT_DISPLAY_ART)
-		Shell(display)
-		Title(display.NoMounts)
-	end
+	FadeKeys(display, MOUNT_DISPLAY_ART)
+	Shell(display)
+	Title(display.NoMounts)
 end
 
 local function SkinPets(journal)
-	if not journal then return end
 	FadeKeys(journal, PET_INSET_KEYS)
 	SkinCountInset(journal.PetCount)
 	EditBox(journal.searchBox)
@@ -198,60 +161,51 @@ local function SkinPets(journal)
 end
 
 local function SkinToys(toyBox)
-	if not toyBox then return end
 	SkinProgressBar(toyBox.progressBar)
 	EditBox(toyBox.searchBox)
 	Dropdown(toyBox.FilterDropdown)
 	SkinBackgroundFrame(toyBox.iconsFrame)
-	SkinPaging(toyBox.PagingFrame)
+	Paging(toyBox.PagingFrame)
 	for buttonIndex = 1, TOY_BUTTON_COUNT do SkinSpellButton(toyBox.iconsFrame['spellButton' .. buttonIndex]) end
 end
 
 local function SkinHeirlooms(journal)
-	if not journal then return end
 	SkinProgressBar(journal.progressBar)
 	EditBox(journal.SearchBox)
 	Dropdown(journal.FilterDropdown)
 	Dropdown(journal.ClassDropdown)
 	SkinBackgroundFrame(journal.iconsFrame)
-	SkinPaging(journal.PagingFrame)
+	Paging(journal.PagingFrame)
 end
 
 local function RefreshWardrobeTabs(frame)
 	for _, key in ipairs(WARDROBE_TAB_KEYS) do
 		local tab = frame[key]
-		if tab then Skin.TipTabSelected(tab, tab:GetID() == frame.selectedTab) end
+		Skin.TipTabSelected(tab, tab:GetID() == frame.selectedTab)
 	end
 end
 
 local function SkinWardrobe(frame)
-	if not frame then return end
 	for _, key in ipairs(WARDROBE_TAB_KEYS) do Tab(frame[key]) end
 	EditBox(frame.SearchBox)
 	SkinProgressBar(frame.progressBar)
 	Dropdown(frame.FilterButton)
 	Dropdown(frame.ClassDropdown)
 	local items = frame.ItemsCollectionFrame
-	if items then
-		SkinBackgroundFrame(items)
-		SkinPaging(items.PagingFrame)
-		Dropdown(items.WeaponDropdown)
-	end
+	SkinBackgroundFrame(items)
+	Paging(items.PagingFrame)
+	Dropdown(items.WeaponDropdown)
 	local sets = frame.SetsCollectionFrame
-	if sets then
-		Fade(sets.LeftInset and sets.LeftInset.NineSlice)
-		if sets.LeftInset then FadeRegions(sets.LeftInset) end
-		SkinBackgroundFrame(sets.RightInset)
-		if sets.ListContainer then ScrollBar(sets.ListContainer.ScrollBar) end
-		if sets.DetailsFrame then Dropdown(sets.DetailsFrame.VariantSetsDropdown) end
-	end
+	Fade(sets.LeftInset.NineSlice)
+	FadeRegions(sets.LeftInset)
+	SkinBackgroundFrame(sets.RightInset)
+	ScrollBar(sets.ListContainer.ScrollBar)
+	Dropdown(sets.DetailsFrame.VariantSetsDropdown)
 end
 
 local function SkinWarbandScenes(journal)
-	if not journal then return end
 	SkinBackgroundFrame(journal.IconsFrame)
-	local controls = journal.Controls or (journal.IconsFrame and journal.IconsFrame.Controls)
-	if controls and controls.ShowOwned then CheckBox(controls.ShowOwned.Checkbox) end
+	CheckBox(journal.IconsFrame.Icons.Controls.ShowOwned.Checkbox)
 end
 
 local function SkinMainFrame(frame)
@@ -277,7 +231,7 @@ end
 
 local function ShowJournal(frame)
 	Skin.RefreshTabStrip(frame)
-	if _G.WardrobeCollectionFrame then RefreshWardrobeTabs(_G.WardrobeCollectionFrame) end
+	RefreshWardrobeTabs(_G.WardrobeCollectionFrame)
 end
 
 local function InstallJournal()
@@ -287,10 +241,8 @@ local function InstallJournal()
 	local toyEvent = BUI.Profiler.Wrap('Skin.Collections toy event', context.Guard(OnToyEvent))
 	for buttonIndex = 1, TOY_BUTTON_COUNT do _G.ToyBox.iconsFrame['spellButton' .. buttonIndex]:HookScript('OnEvent', toyEvent) end
 	context.Hook(_G.HeirloomsJournal, 'UpdateButton', OnHeirloomButton)
-	local items = _G.WardrobeCollectionFrame and _G.WardrobeCollectionFrame.ItemsCollectionFrame
-	if items then context.Hook(items, 'UpdateItems', OnWardrobeItems) end
-	local setsMixin = _G.WardrobeSetsScrollFrameButtonMixin
-	if setsMixin then context.Hook(setsMixin, 'Init', OnSetsRow) end
+	context.Hook(_G.WardrobeCollectionFrame.ItemsCollectionFrame, 'UpdateItems', OnWardrobeItems)
+	context.Hook(_G.WardrobeSetsScrollFrameButtonMixin, 'Init', OnSetsRow)
 	context.Hook('PanelTemplates_UpdateTabs', OnTabsUpdated)
 end
 

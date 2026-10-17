@@ -3,10 +3,9 @@ local _, BUI = ...
 local ipairs, unpack = ipairs, unpack
 local floor, max = math.floor, math.max
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
+local BUILib = BluUI.BUILibClient
 local Skin = BUI.Skinning
 
-local SKIN_ID = 'guildinvite'
 local WIDTH = 320
 local TABARD = 62
 local TEXT_GAP = 12
@@ -18,25 +17,17 @@ local BUTTON_HEIGHT = 22
 local BUTTON_GAP = 8
 local SHIELD = 18
 local INVITE_SECONDS = 60
-local PREVIEW_OFFSET_Y = -140
 local WARNING_COLOR = { 0.94, 0.62, 0.42, 1 }
 local KEEP_TEXTURES = { 'GuildInviteFrameTabardBackground', 'GuildInviteFrameTabardBorder', 'GuildInviteFrameTabardEmblem' }
-local PREVIEW_GUILD = 'Sample Guild'
-local PREVIEW_OLD_GUILD = 'Your Old Guild'
-local PREVIEW_POINTS = '120'
 
 local title, countdown, countdownTicker
 
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
-local FadeArt, Shell, Button = context.FadeArt, context.Shell, context.Button
-
-local function Frame()
-	return _G.GuildInviteFrame
-end
+local context = Skin.Define('guildinvite', {
+	name = 'Guild Invite',
+	description = 'The guild invitation prompt in the dark shell: tabard, guild name in white, achievement points and the reputation warning laid out cleanly, flat buttons, and a countdown until the invite expires.',
+	icon = 'Interface/Icons/INV_Shirt_GuildTabard_01',
+})
+local FadeArt, Shell, Button, Guard, Keep = context.FadeArt, context.Shell, context.Button, context.Guard, context.Keep
 
 local function Height(fontString)
 	return floor(fontString:GetStringHeight() + 0.5)
@@ -51,7 +42,7 @@ local function StopCountdown()
 end
 
 local TickCountdown = BUI.Profiler.Wrap('Skin.GuildInvite countdown tick', function()
-	local remaining = INVITE_SECONDS - Frame().elapsed
+	local remaining = INVITE_SECONDS - _G.GuildInviteFrame.elapsed
 	if remaining <= 0 then
 		StopCountdown()
 		return
@@ -122,37 +113,18 @@ local function Layout(frame)
 	frame:SetSize(WIDTH, top + blockHeight + warningHeight + ROW_GAP + BUTTON_HEIGHT + paddingY)
 end
 
-local function OnShow()
-	if not Enabled() then return end
-	Layout(Frame())
-	StartCountdown()
-end
-
-local function OnEvent(_, event)
-	if event == 'GUILD_INVITE_REQUEST' and Enabled() then Layout(Frame()) end
-end
-
-local function Apply()
-	if not Enabled() then return end
-	local frame = Frame()
+local function SkinInvite(frame)
 	if not frame._buiGuildInvite then
 		frame._buiGuildInvite = true
-		for _, name in ipairs(KEEP_TEXTURES) do _G[name].__buiSkin = true end
-		FadeArt(frame)
+		for _, name in ipairs(KEEP_TEXTURES) do Keep(_G[name]) end
 		title = frame:CreateFontString(nil, 'OVERLAY')
-		Skin.TipFont(title, 'title')
 		title:SetPoint('TOPLEFT', frame, 'TOPLEFT', Skin.TIP_PADDING_X, -Skin.TIP_PADDING_Y)
 		title:SetText('Guild invitation')
 		countdown = frame:CreateFontString(nil, 'OVERLAY')
-		Skin.TipFont(countdown, 'body')
 		countdown:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -Skin.TIP_PADDING_X, -Skin.TIP_PADDING_Y)
 		countdown:SetJustifyH('RIGHT')
-		frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GuildInvite invite layout', OnShow))
-		frame:HookScript('OnHide', BUI.Profiler.Wrap('Skin.GuildInvite countdown stop', StopCountdown))
-		frame:HookScript('OnEvent', BUI.Profiler.Wrap('Skin.GuildInvite invite event', OnEvent))
 	end
-	title:Show()
-	countdown:Show()
+	FadeArt(frame)
 	Shell(frame)
 	Skin.TipTitleLine(frame)
 	Skin.TipFont(title, 'title')
@@ -166,54 +138,32 @@ local function Apply()
 	_G.GuildInviteFrameWarningText:SetTextColor(unpack(WARNING_COLOR))
 	Button(_G.GuildInviteFrameJoinButton)
 	Button(_G.GuildInviteFrameDeclineButton)
-	Layout(frame)
-	if frame:IsShown() then StartCountdown() end
 end
 
-local function Deactivate()
+local function ShowInvite(frame)
+	title:Show()
+	countdown:Show()
+	Layout(frame)
+	StartCountdown()
+end
+
+context.Window('GuildInviteFrame', {
+	skin = SkinInvite,
+	show = ShowInvite,
+	install = function(frame)
+		frame:HookScript('OnHide', BUI.Profiler.Wrap('Skin.GuildInvite countdown stop', StopCountdown))
+		frame:HookScript('OnEvent', BUI.Profiler.Wrap('Skin.GuildInvite invite event', Guard(function(_, event)
+			if event == 'GUILD_INVITE_REQUEST' then Layout(frame) end
+		end)))
+	end,
+})
+
+context.OnDisable(function()
 	StopCountdown()
-	context.Restore()
-	local frame = Frame()
+	local frame = _G.GuildInviteFrame
 	if frame._buiTipLine then frame._buiTipLine:Hide() end
 	if title then
 		title:Hide()
 		countdown:Hide()
 	end
-end
-
-local function StartPreview()
-	local frame = Frame()
-	local player = UnitName('player')
-	_G.GuildInviteFrameInviterName:SetText(player)
-	_G.GuildInviteFrameGuildName:SetText(PREVIEW_GUILD)
-	frame.Points.Text:SetText(PREVIEW_POINTS)
-	_G.GuildInviteFrameWarningText:SetFormattedText(GUILD_REPUTATION_WARNING, PREVIEW_OLD_GUILD)
-	SetLargeGuildTabardTextures('player', _G.GuildInviteFrameTabardEmblem, _G.GuildInviteFrameTabardBackground, _G.GuildInviteFrameTabardBorder)
-	frame.inviter = player
-	frame.accepted = true
-	frame.elapsed = 0
-	frame:ClearAllPoints()
-	frame:SetPoint('TOP', UIParent, 'TOP', 0, PREVIEW_OFFSET_Y)
-	frame:Show()
-	return frame
-end
-
-local function StopPreview()
-	Frame():Hide()
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Apply()
-	else
-		Deactivate()
-	end
 end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Guild Invite',
-	description = 'The guild invitation prompt in the dark shell: tabard, guild name in white, achievement points and the reputation warning laid out cleanly, flat buttons, and a countdown until the invite expires.',
-	icon = 'Interface/Icons/INV_Shirt_GuildTabard_01',
-	test = StartPreview,
-	stopTest = StopPreview,
-})

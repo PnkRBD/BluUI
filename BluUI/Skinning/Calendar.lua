@@ -46,7 +46,7 @@ local ROW_SETUPS = { 'CalendarEventInviteList_InitButtonShared', 'CalendarEventP
 
 local context = Skin.Define('calendar', {
 	name = 'Calendar',
-	description = 'The calendar: dark month grid with card days, house arrows and filter, and dark event dialogs.',
+	description = 'The calendar: dark month grid with card days, library style arrows and filter, and dark event dialogs.',
 	icon = 'Interface/Icons/INV_Misc_Note_02',
 	newLook = true,
 })

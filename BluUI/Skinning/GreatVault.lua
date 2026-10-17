@@ -1,13 +1,9 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.GreatVault')
-
-local ipairs, select = ipairs, select
+local ipairs = ipairs
 
 local Skin = BUI.Skinning
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 
-local SKIN_ID = 'greatvault'
 local PANEL_INSET = 8
 local SELECT_BUTTON_ROOM = 14
 local CONCESSION_INSET = 2
@@ -19,43 +15,26 @@ local DIM_ALPHA = 0.55
 local SLOT_EDGE_PIXELS = 3
 local TYPE_FRAME_KEYS = { 'RaidFrame', 'MythicFrame', 'PVPFrame', 'WorldFrame' }
 
-local installed = false
-local skinned = false
-local dividerLines = {}
-local slotEdges = {}
-
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
-local Fade, FadeRegions = context.Fade, context.FadeRegions
+local context = Skin.Define('greatvault', {
+	name = 'Great Vault',
+	description = 'The Great Vault window: dark shell, faded gold chrome, library style row titles and progress text, framed reward icons. Reward slots keep their own art.',
+	icon = 'Interface/Icons/INV_Box_01',
+})
+local Hook = context.Hook
+local Fade, FadeRegions, Keep, Line = context.Fade, context.FadeRegions, context.Keep, context.Line
 local Shell, Button, Close, Body, Face = context.Shell, context.Button, context.Close, context.Body, context.Face
-local FlatTexture, CropIcon = Skin.FlatTexture, Skin.CropIcon
+local FlatTexture = Skin.FlatTexture
 
 local function ReplaceDivider(texture)
-	if not texture then return end
 	Fade(texture)
-	local line = texture._buiDividerLine
-	if not line then
-		line = texture:GetParent():CreateTexture(nil, 'BORDER')
-		line.__buiSkin = true
-		line:SetHeight(1)
-		line:SetPoint('LEFT', texture, 'LEFT', DIVIDER_INSET, 0)
-		line:SetPoint('RIGHT', texture, 'RIGHT', -DIVIDER_INSET, 0)
-		BUI.Painter.Fill(line, 'skinBorder')
-		BUILib.Skin.PixelLine(line, texture, false, DIVIDER_INSET, DIVIDER_INSET)
-		texture._buiDividerLine = line
-		dividerLines[#dividerLines + 1] = line
-	end
-	line:Show()
+	if texture._buiDividerLine then return end
+	texture._buiDividerLine = Line(texture:GetParent(), texture, false, DIVIDER_INSET, DIVIDER_INSET, 'BORDER')
 end
 
 local function DimFrame(holder, inset)
-	if not holder or holder._buiDim then return end
+	if holder._buiDim then return end
 	holder._buiDim = true
-	for regionIndex = 1, select('#', holder:GetRegions()) do
-		local region = select(regionIndex, holder:GetRegions())
+	for _, region in ipairs({ holder:GetRegions() }) do
 		if region:IsObjectType('Texture') then
 			region:ClearAllPoints()
 			region:SetPoint('TOPLEFT', holder, 'TOPLEFT', inset, -inset)
@@ -66,17 +45,15 @@ local function DimFrame(holder, inset)
 end
 
 local function QualityEdges(holder, icon, hyperlink)
-	CropIcon(icon)
-	Skin.TipIconFrame(holder, icon)
+	Skin.SquareIcon(holder, icon)
 	Skin.SetIconEdgeItemQuality(icon, hyperlink)
 end
 
 local function StyleItemFrame(itemFrame)
-	if not Enabled() or not itemFrame then return end
 	if not itemFrame._buiItem then
 		itemFrame._buiItem = true
-		if itemFrame.Icon then itemFrame.Icon.__buiSkin = true end
-		if itemFrame.IconOverlay then itemFrame.IconOverlay.__buiSkin = true end
+		Keep(itemFrame.Icon)
+		Keep(itemFrame.IconOverlay)
 	end
 	FadeRegions(itemFrame)
 	local hyperlink = itemFrame.displayedItemDBID and C_WeeklyRewards.GetItemHyperlink(itemFrame.displayedItemDBID)
@@ -85,28 +62,23 @@ local function StyleItemFrame(itemFrame)
 end
 
 local function BlackEdges(activity)
-	local edges = activity._buiEdges
-	if not edges then
-		edges = {}
-		local thickness = BUI.Pixel.PixelSizeFor(activity, SLOT_EDGE_PIXELS)
-		for edgeIndex = 1, 4 do
-			local edge = activity:CreateTexture(nil, 'OVERLAY', nil, 7)
-			edge.__buiSkin = true
-			FlatTexture(edge, 0, 0, 0, 1)
-			edges[edgeIndex] = edge
-			slotEdges[#slotEdges + 1] = edge
-		end
-		edges[1]:SetPoint('TOPLEFT')
-		edges[1]:SetPoint('BOTTOMRIGHT', activity, 'TOPRIGHT', 0, -thickness)
-		edges[2]:SetPoint('BOTTOMLEFT')
-		edges[2]:SetPoint('TOPRIGHT', activity, 'BOTTOMRIGHT', 0, thickness)
-		edges[3]:SetPoint('TOPLEFT', 0, -thickness)
-		edges[3]:SetPoint('BOTTOMRIGHT', activity, 'BOTTOMLEFT', thickness, thickness)
-		edges[4]:SetPoint('TOPRIGHT', 0, -thickness)
-		edges[4]:SetPoint('BOTTOMLEFT', activity, 'BOTTOMRIGHT', -thickness, thickness)
-		activity._buiEdges = edges
+	if activity._buiEdges then return end
+	local edges = {}
+	local thickness = BUI.Pixel.PixelSizeFor(activity, SLOT_EDGE_PIXELS)
+	for edgeIndex = 1, 4 do
+		local edge = context.Own(activity:CreateTexture(nil, 'OVERLAY', nil, 7))
+		FlatTexture(edge, 0, 0, 0, 1)
+		edges[edgeIndex] = edge
 	end
-	for edgeIndex = 1, 4 do edges[edgeIndex]:Show() end
+	edges[1]:SetPoint('TOPLEFT')
+	edges[1]:SetPoint('BOTTOMRIGHT', activity, 'TOPRIGHT', 0, -thickness)
+	edges[2]:SetPoint('BOTTOMLEFT')
+	edges[2]:SetPoint('TOPRIGHT', activity, 'BOTTOMRIGHT', 0, thickness)
+	edges[3]:SetPoint('TOPLEFT', 0, -thickness)
+	edges[3]:SetPoint('BOTTOMRIGHT', activity, 'BOTTOMLEFT', thickness, thickness)
+	edges[4]:SetPoint('TOPRIGHT', 0, -thickness)
+	edges[4]:SetPoint('BOTTOMLEFT', activity, 'BOTTOMRIGHT', -thickness, thickness)
+	activity._buiEdges = edges
 end
 
 local function SkinActivity(activity)
@@ -127,13 +99,11 @@ local function SkinConcession(concession)
 	DimFrame(concession.UnselectedFrame, CONCESSION_INSET)
 	Shell(concession, CONCESSION_INSET)
 	local rewards = concession.RewardsFrame
-	if not rewards then return end
 	Skin.TipFont(rewards.Label, 'label')
 	Skin.TipFont(rewards.Text, concession.unlocked and 'body' or 'label')
 end
 
 local function RefreshActivities(frame)
-	if not Enabled() or not frame.Activities then return end
 	for _, activity in ipairs(frame.Activities) do
 		if activity.RewardsFrame then
 			SkinConcession(activity)
@@ -144,18 +114,15 @@ local function RefreshActivities(frame)
 end
 
 local function SkinTypeFrame(typeFrame)
-	if not typeFrame then return end
 	Fade(typeFrame.Border)
 	local background = typeFrame.Background
-	if background then
-		Fade(background)
-		background:SetAlpha(HEADER_ART_ALPHA)
-	end
+	Fade(background)
+	background:SetAlpha(HEADER_ART_ALPHA)
 	Skin.TipFont(typeFrame.Name, 'title', ROW_NAME_SCALE)
 end
 
 local function SkinOverlay(overlay)
-	if not overlay or not Enabled() then return end
+	if not overlay then return end
 	Fade(overlay.Background)
 	Fade(overlay.NineSlice)
 	Fade(overlay.ModelScene)
@@ -165,30 +132,24 @@ local function SkinOverlay(overlay)
 end
 
 local function SkinWarning(dialog)
-	if not dialog or not Enabled() then return end
 	Fade(dialog.NineSlice)
 	Shell(dialog)
 	Body(dialog.Description)
 end
 
 local function RefreshConfirm(confirm)
-	if not confirm or not Enabled() then return end
 	local itemFrame = confirm.ItemFrame
-	if itemFrame then
-		Fade(itemFrame.NameFrame)
-		Fade(itemFrame.IconBorder)
-		QualityEdges(itemFrame, itemFrame.Icon, itemFrame.itemHyperlink)
-		Face(itemFrame.Name)
-		Skin.TipCount(itemFrame.Count)
-	end
+	Fade(itemFrame.NameFrame)
+	Fade(itemFrame.IconBorder)
+	QualityEdges(itemFrame, itemFrame.Icon, itemFrame.itemHyperlink)
+	Face(itemFrame.Name)
+	Skin.TipCount(itemFrame.Count)
 	local alsoItems = confirm.AlsoItemsFrame
-	if alsoItems then
-		Body(alsoItems.Text)
-		if alsoItems.pool then
-			for item in alsoItems.pool:EnumerateActive() do
-				Fade(item.IconBorder)
-				QualityEdges(item, item.Icon, item.itemHyperlink)
-			end
+	Body(alsoItems.Text)
+	if alsoItems.pool then
+		for item in alsoItems.pool:EnumerateActive() do
+			Fade(item.IconBorder)
+			QualityEdges(item, item.Icon, item.itemHyperlink)
 		end
 	end
 	Skin.TipFaceTree(confirm.CurrencyFrame, 2)
@@ -211,91 +172,41 @@ local function SkinMainFrame(frame)
 	FadeRegions(frame.BorderContainer)
 	Shell(frame, { all = PANEL_INSET, bottom = -SELECT_BUTTON_ROOM })
 	local header = frame.HeaderFrame
-	if header then
-		Skin.TipFont(header.Text, 'title', TITLE_SCALE)
-		Fade(header.HeaderDivider)
-	end
+	Skin.TipFont(header.Text, 'title', TITLE_SCALE)
+	Fade(header.HeaderDivider)
 	Body(frame.PreviousRewardNotification)
 	for _, key in ipairs(TYPE_FRAME_KEYS) do SkinTypeFrame(frame[key]) end
-	local concessions = frame.ConcessionsFrame
-	if concessions then Skin.TipFont(concessions.HeaderText, 'title') end
+	Skin.TipFont(frame.ConcessionsFrame.HeaderText, 'title')
 	Button(frame.SelectRewardButton)
 	Close(frame.CloseButton)
 	SkinWarning(_G.WeeklyRewardExpirationWarningDialog)
 end
 
-local function Apply()
-	local frame = _G.WeeklyRewardsFrame
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if not skinned then
-		skinned = true
-		SkinMainFrame(frame)
-	end
+local function ShowFrame(frame)
 	RefreshActivities(frame)
 	SkinOverlay(frame.Overlay)
 	SkinConfirm(frame.confirmSelectionFrame)
 end
 
-local function OnRefresh(frame)
-	if skinned then RefreshActivities(frame) end
-end
-
 local function OnSetUpActivity(frame, typeFrame)
-	if not skinned or not Enabled() then return end
 	SkinTypeFrame(typeFrame)
 	RefreshActivities(frame)
 end
 
 local function OnOverlay(frame)
-	if skinned then SkinOverlay(frame.Overlay) end
+	SkinOverlay(frame.Overlay)
 end
 
 local function OnSelectReward(frame)
-	if skinned and Enabled() then SkinConfirm(frame.confirmSelectionFrame) end
+	SkinConfirm(frame.confirmSelectionFrame)
 end
 
-local function Install()
-	if installed then return end
-	local frame = _G.WeeklyRewardsFrame
-	if not frame then return end
-	installed = true
-	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GreatVault frame reskin', Apply))
-	Hook(frame, 'Refresh', OnRefresh)
+local function InstallFrame(frame)
+	Hook(frame, 'Refresh', RefreshActivities)
 	Hook(frame, 'SetUpActivity', OnSetUpActivity)
 	Hook(frame, 'UpdateOverlay', OnOverlay)
 	Hook(frame, 'SelectReward', OnSelectReward)
-	local warning = _G.WeeklyRewardExpirationWarningDialog
-	if warning then warning:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GreatVault warning reskin', SkinWarning)) end
-	if frame:IsShown() then Apply() end
+	_G.WeeklyRewardExpirationWarningDialog:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GreatVault warning reskin', context.Guard(SkinWarning)))
 end
 
-local function TryInstall()
-	Install()
-	if installed then BUI.Events:Unregister('ADDON_LOADED', 'Skin.GreatVault') end
-end
-
-local function Deactivate()
-	context.Restore()
-	for _, line in ipairs(dividerLines) do line:Hide() end
-	for _, edge in ipairs(slotEdges) do edge:Hide() end
-	skinned = false
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		if not installed then
-			BUI.Events:Register('ADDON_LOADED', 'Skin.GreatVault', TryInstall)
-		elseif _G.WeeklyRewardsFrame:IsShown() then
-			Apply()
-		end
-	else
-		Deactivate()
-	end
-end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Great Vault',
-	description = 'The Great Vault window: dark shell, faded gold chrome, house row titles and progress text, framed reward icons. Reward slots keep their own art.',
-	icon = 'Interface/Icons/INV_Box_01',
-})
+context.Window('WeeklyRewardsFrame', { install = InstallFrame, skin = SkinMainFrame, show = ShowFrame })

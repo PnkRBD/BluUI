@@ -2,7 +2,7 @@ local _, BUI = ...
 
 local ipairs = ipairs
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
+local BUILib = BluUI.BUILibClient
 local Skin = BUI.Skinning
 
 local KIT_TEXTURE_KEYS = { 'LeftTexture', 'RightTexture', 'BottomTexture' }
@@ -31,11 +31,11 @@ local decor = {}
 
 local context = Skin.Define('splash', {
 	name = "What's New",
-	description = "The seasonal What's New splash: parchment and banner art replaced by the dark shell, the feature pictures kept as framed cards and a round portrait, house fonts and buttons.",
+	description = "The seasonal What's New splash: parchment and banner art replaced by the dark shell, the feature pictures kept as framed cards and a round portrait, library fonts and buttons.",
 	icon = 'Interface/Icons/INV_Misc_Note_06',
 	newLook = true,
 })
-local FadeRegions = context.FadeRegions
+local FadeRegions, Keep = context.FadeRegions, context.Keep
 local Shell, Button, Close = context.Shell, context.Button, context.Close
 
 local function PictureText(fontString, kind, scale)
@@ -52,14 +52,10 @@ end
 
 local function AddPictures(frame, mask)
 	for _, key in ipairs(KIT_TEXTURE_KEYS) do
-		local source = frame[key]
-		if source then
-			local picture = frame:CreateTexture(nil, 'ARTWORK', nil, PICTURE_SUBLEVEL)
-			picture.__buiSkin = true
-			picture:AddMaskTexture(mask)
-			picture.source = source
-			pictures[#pictures + 1] = picture
-		end
+		local picture = Keep(frame:CreateTexture(nil, 'ARTWORK', nil, PICTURE_SUBLEVEL))
+		picture:AddMaskTexture(mask)
+		picture.source = frame[key]
+		pictures[#pictures + 1] = picture
 	end
 end
 
@@ -102,8 +98,7 @@ local function FrameCircle(frame, host)
 	local ringMask = NewMask(frame, CIRCLE_MASK_TEXTURE)
 	ringMask:SetSize(ringSize, ringSize)
 	ringMask:SetPoint('CENTER', host, 'CENTER', CIRCLE_OFFSET_X, CIRCLE_OFFSET_Y)
-	local ring = frame:CreateTexture(nil, 'ARTWORK', nil, RING_SUBLEVEL)
-	ring.__buiSkin = true
+	local ring = Keep(frame:CreateTexture(nil, 'ARTWORK', nil, RING_SUBLEVEL))
 	ring:SetTexture(RECT_MASK_TEXTURE)
 	BUI.Painter.Tint(ring, 'skinBorder')
 	ring:SetSize(ringSize, ringSize)

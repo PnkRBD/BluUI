@@ -1,12 +1,7 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.ChatConfig')
-
 local Skin = BUI.Skinning
 
-local SKIN_ID = 'chatpanels'
-local ADDONS = { 'Blizzard_Channels' }
-local FRAMES = { 'ChatConfigFrame', 'ChannelFrame', 'CreateChannelPopup' }
 local MAX_DEPTH = 7
 local FONT_DEPTH = 7
 local ART_KEYS = { 'Border', 'BorderFrame', 'Background', 'BackgroundTile', 'BG', 'Bg', 'NineSlice', 'Inset', 'InsetFrame', 'PortraitContainer', 'TitleBg', 'TitleContainer', 'TopTileStreaks', 'ArtFrame', 'Overlay', 'Header' }
@@ -33,30 +28,24 @@ local CHECK_SIZE = 16
 local SWATCH_INSET = 2
 local WHITE = [[Interface\Buttons\WHITE8X8]]
 
-local testShown = {}
-
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
+local context = Skin.Define('chatpanels', {
+	name = 'Chat Settings',
+	description = 'The chat settings window from a chat tab, the channels window and the new channel dialog: dark shell, flat panels, library checkboxes, tabs and buttons.',
+	icon = 'Interface/Icons/INV_Scroll_03',
+})
+local Hook, Enabled = context.Hook, context.Enabled
 local Fade, FadeRegions, FadeKeys, FadeArt = context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt
 local Shell, Button, Close, Dropdown = context.Shell, context.Button, context.Close, context.Dropdown
 local EditBox, CheckBox, ScrollBar, Tab = context.EditBox, context.CheckBox, context.ScrollBar, context.Tab
 local Face, Title = context.Face, context.Title
 
 local function FrameName(frame)
-	return (frame.GetName and frame:GetName()) or ''
-end
-
-local function IsType(object, kind)
-	local ok, result = pcall(object.IsObjectType, object, kind)
-	return ok and result == true
+	return frame:GetName() or ''
 end
 
 local function NamedFontString(name)
 	local object = _G[name]
-	if type(object) == 'table' and IsType(object, 'FontString') then return object end
+	if object and object:IsObjectType('FontString') then return object end
 end
 
 local function ForEachNumbered(prefix, callback)
@@ -89,9 +78,8 @@ end
 
 local function IsPanelButton(button)
 	if button.Left ~= nil and button.Right ~= nil then return true end
-	if not button.GetText then return false end
 	local text = button:GetText()
-	return text ~= nil and text ~= '' and button.GetNormalTexture ~= nil and button:GetNormalTexture() ~= nil
+	return text ~= nil and text ~= '' and button:GetNormalTexture() ~= nil
 end
 
 local function IsNavButton(button)
@@ -174,7 +162,6 @@ local function Swatch(swatch)
 end
 
 local function CheckRow(row)
-	Fade(row.NineSlice)
 	Check(row.CheckButton)
 	Face(row.BlankText)
 	Swatch(row.ColorSwatch)
@@ -182,7 +169,6 @@ local function CheckRow(row)
 end
 
 local function SwatchRow(row)
-	Fade(row.NineSlice)
 	local name = FrameName(row)
 	Face(NamedFontString(name .. 'Text'))
 	Swatch(_G[name .. 'ColorSwatch'])
@@ -235,26 +221,26 @@ end
 
 local function SkinChild(child, depth, flat)
 	if child._buiDeepSkip or child:IsForbidden() then return end
-	if IsType(child, 'CheckButton') then
+	if child:IsObjectType('CheckButton') then
 		Check(child)
 		DeepSkin(child, depth - 1, flat)
 		return
 	end
-	if IsType(child, 'EditBox') then
+	if child:IsObjectType('EditBox') then
 		EditBox(child)
 		return
 	end
-	if IsType(child, 'Slider') or IsType(child, 'StatusBar') then return end
-	if IsType(child, 'DropdownButton') or IsLegacyDropdown(child) then
+	if child:IsObjectType('Slider') or child:IsObjectType('StatusBar') then return end
+	if child:IsObjectType('DropdownButton') or IsLegacyDropdown(child) then
 		Dropdown(child)
 		return
 	end
-	if IsType(child, 'ScrollFrame') then
+	if child:IsObjectType('ScrollFrame') then
 		SkinScrollHost(child)
 		DeepSkin(child, depth - 1, flat)
 		return
 	end
-	if IsType(child, 'Button') then
+	if child:IsObjectType('Button') then
 		SkinButton(child, depth, flat)
 		return
 	end
@@ -290,14 +276,11 @@ local function SkinRow(row)
 	if not Enabled() or row._buiRow then return end
 	row._buiRow = true
 	Skin.TipFaceTree(row, 2)
-	if row.GetNormalTexture then
-		Fade(row:GetNormalTexture())
-		Skin.RowHighlight(row)
-	end
+	Fade(row:GetNormalTexture())
+	Skin.RowHighlight(row)
 end
 
 local function SkinPooledRows(list)
-	if not Enabled() then return end
 	for index = 1, #LIST_POOLS do
 		local pool = list[LIST_POOLS[index]]
 		if pool then
@@ -311,7 +294,7 @@ local function SkinChannelLists(frame)
 		local list = frame[SCROLL_LIST_KEYS[index]]
 		if list then
 			ScrollBar(list.ScrollBar)
-			if list.ScrollBar then list.ScrollBar._buiDeepSkip = true end
+			list.ScrollBar._buiDeepSkip = true
 			if list.ScrollBox then
 				list.ScrollBox._buiDeepSkip = true
 				Skin.SweepScrollBox(list.ScrollBox, SkinRow)
@@ -364,14 +347,12 @@ local function StyleTab(tab, selected)
 end
 
 local function RefreshWindowTabs(manager)
-	if not Enabled() then return end
 	for tab in manager.tabPool:EnumerateActive() do
 		StyleTab(tab, tab:GetID() == CURRENT_CHAT_FRAME_ID)
 	end
 end
 
 local function RefreshCombatTabs()
-	if not Enabled() then return end
 	for index, info in ipairs(COMBAT_CONFIG_TABS) do
 		StyleTab(_G[CHAT_CONFIG_COMBAT_TAB_NAME .. index], _G[info.frame]:IsShown())
 	end
@@ -416,7 +397,6 @@ local function SkinConfigWindow(frame)
 end
 
 local function SkinWindow(frame)
-	if frame:IsForbidden() or not Enabled() then return end
 	local isConfig = frame == ChatConfigFrame
 	FadeArt(frame)
 	FadeKeys(frame, ART_KEYS)
@@ -444,51 +424,6 @@ local function SkinWindow(frame)
 	if isConfig then SkinConfigWindow(frame) end
 end
 
-local function SweepAll()
-	if not Enabled() then return end
-	for index = 1, #FRAMES do
-		local frame = _G[FRAMES[index]]
-		if frame then
-			if not frame._buiChatShowHook then
-				frame._buiChatShowHook = true
-				frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.ChatConfig window reskin', SkinWindow))
-			end
-			if frame:IsShown() then SkinWindow(frame) end
-		end
-	end
-end
-
-local function LoadWindows()
-	for index = 1, #ADDONS do
-		pcall(C_AddOns.LoadAddOn, ADDONS[index])
-	end
-end
-
-local function Test()
-	LoadWindows()
-	SweepAll()
-	local shown = {}
-	for index = 1, #FRAMES do
-		local frame = _G[FRAMES[index]]
-		if frame and not frame:IsShown() and pcall(frame.Show, frame) then
-			testShown[#testShown + 1] = frame
-			shown[#shown + 1] = frame
-		end
-	end
-	return unpack(shown)
-end
-
-local function StopTest()
-	for index = 1, #testShown do
-		pcall(testShown[index].Hide, testShown[index])
-	end
-	wipe(testShown)
-end
-
-local function Deactivate()
-	context.Restore()
-end
-
 local pendingChecks, pendingSwatches = {}, {}
 
 local function SkinEntries(frame)
@@ -504,7 +439,6 @@ local function SkinEntries(frame)
 end
 
 local function QueueEntries(frame, pending)
-	if not Enabled() then return end
 	pending[frame] = true
 	if frame:IsVisible() then
 		SkinEntries(frame)
@@ -522,21 +456,9 @@ local function OnSwatchesCreated(frame)
 	QueueEntries(frame, pendingSwatches)
 end
 
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		SweepAll()
-	else
-		Deactivate()
-	end
-end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Chat Settings',
-	description = 'The chat settings window from a chat tab, the channels window and the new channel dialog: dark shell, flat panels, house checkboxes, tabs and buttons.',
-	icon = 'Interface/Icons/INV_Scroll_03',
-	test = Test,
-	stopTest = StopTest,
-})
+context.Window('ChatConfigFrame', { show = SkinWindow })
+context.Window('ChannelFrame', { show = SkinWindow })
+context.Window('CreateChannelPopup', { show = SkinWindow })
 
 Hook('ChatConfig_CreateCheckboxes', OnCheckboxesCreated)
 Hook('ChatConfig_CreateTieredCheckboxes', OnCheckboxesCreated)
@@ -545,6 +467,3 @@ Hook('TextToSpeechFrame_CreateCheckboxes', OnCheckboxesCreated)
 Hook('ChatConfig_UpdateCombatTabs', RefreshCombatTabs)
 Hook(ChatConfigFrame.ChatTabManager, 'UpdateSelection', RefreshWindowTabs)
 Hook(ChatConfigFrame.ChatTabManager, 'UpdateWidth', RefreshWindowTabs)
-
-BUI.Events:Register('ADDON_LOADED', 'Skin.ChatConfig', SweepAll)
-BUI.Events:Once('PLAYER_LOGIN', 'Skin.ChatConfig', SweepAll)

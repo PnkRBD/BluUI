@@ -27,7 +27,7 @@ local context = Skin.Define('petBattle', {
 	icon = 'Interface/Icons/INV_Pet_BattlePetTraining',
 	newLook = true,
 })
-local Fade, FadeKeys, FadeRegions = context.Fade, context.FadeKeys, context.FadeRegions
+local Fade, FadeKeys, FadeRegions, Keep = context.Fade, context.FadeKeys, context.FadeRegions, context.Keep
 local Shell, Title, Body = context.Shell, context.Title, context.Body
 
 local timerBox
@@ -90,7 +90,7 @@ end
 
 local function SkinXPBar(bar)
 	bar:SetStatusBarTexture(BUI.GetGlobalTexture())
-	bar:GetStatusBarTexture().__buiSkin = true
+	Keep(bar:GetStatusBarTexture())
 	FadeRegions(bar)
 	Shell(bar, XP_EDGE)
 	Skin.TipCount(bar.TextString)

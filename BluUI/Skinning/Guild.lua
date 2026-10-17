@@ -60,15 +60,11 @@ local context = Skin.Define('guild', {
 	icon = 'Interface/Icons/achievement_guildperk_everybodysfriend',
 	newLook = true,
 })
-local Hook, Guard, Own = context.Hook, context.Guard, context.Own
+local Hook, Guard, Own, Keep, SideTab = context.Hook, context.Guard, context.Own, context.Keep, context.SideTab
 local Fade, FadeRegions, FadeKeys, FadeArt = context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt
 local Shell, Button, Close, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.Dropdown, context.EditBox, context.CheckBox
 local ScrollBar, TextBox, Face, Title, Card = context.ScrollBar, context.TextBox, context.Face, context.Title, context.Card
 local FlatTexture, SelectedTexture, CropIcon = Skin.FlatTexture, Skin.SelectedTexture, Skin.CropIcon
-
-local function KeepTexture(texture)
-	if texture then texture.__buiSkin = true end
-end
 
 local function FitToCard(texture, host)
 	local inset = LIST_CARD_INSET
@@ -78,9 +74,9 @@ local function FitToCard(texture, host)
 end
 
 local function Highlight(button, rowHighlight)
-	local highlight = button.GetHighlightTexture and button:GetHighlightTexture()
+	local highlight = button:GetHighlightTexture()
 	if not highlight then return end
-	KeepTexture(highlight)
+	Keep(highlight)
 	highlight:SetBlendMode('BLEND')
 	if rowHighlight then
 		Skin.RowHighlight(button)
@@ -90,20 +86,16 @@ local function Highlight(button, rowHighlight)
 end
 
 local function FrameIcon(parent, icon)
-	if not icon then return end
-	KeepTexture(icon)
-	CropIcon(icon)
-	Skin.TipIconFrame(parent, icon)
+	Keep(icon)
+	Skin.SquareIcon(parent, icon)
 end
 
 local function IconButton(button)
-	if not button then return end
-	KeepTexture(button.icon or button.Icon)
+	Keep(button.icon or button.Icon)
 	Button(button)
 end
 
 local function FaceKeys(frame, keys)
-	if not frame then return end
 	for _, key in ipairs(keys) do Face(frame[key]) end
 end
 
@@ -112,7 +104,6 @@ local function Label(fontString)
 end
 
 local function ButtonKeys(frame, keys)
-	if not frame then return end
 	for _, key in ipairs(keys) do Button(frame[key]) end
 end
 
@@ -139,8 +130,8 @@ end
 
 local function SkinDialogButtons(frame)
 	for _, child in ipairs({ frame:GetChildren() }) do
-		if child.IsObjectType and child:IsObjectType('Button') then
-			local text = child.GetText and child:GetText()
+		if child:IsObjectType('Button') then
+			local text = child:GetText()
 			if text and text ~= '' then
 				Button(child)
 			else
@@ -170,7 +161,7 @@ local function SkinTabGroup(host, keys, method)
 			for _, tab in ipairs(tabs) do Hook(tab, 'SetTab', Refresh) end
 		end
 	end
-	for _, tab in ipairs(tabs) do Skin.SideTab(context, tab, SIDE_TAB_OPTIONS) end
+	for _, tab in ipairs(tabs) do SideTab(tab, SIDE_TAB_OPTIONS) end
 	RefreshTabGroup(tabs)
 end
 
@@ -218,12 +209,12 @@ local function SkinColumnHeader(header)
 	header._buiColumnHeader = true
 	FadeKeys(header, THREE_SLICE_ART)
 	Highlight(header)
-	Face(header.GetFontString and header:GetFontString())
+	Face(header:GetFontString())
 end
 
 local function SkinColumnHeaders(columnDisplay)
 	for _, child in ipairs({ columnDisplay:GetChildren() }) do
-		if child.IsObjectType and child:IsObjectType('Button') then SkinColumnHeader(child) end
+		if child:IsObjectType('Button') then SkinColumnHeader(child) end
 	end
 end
 
@@ -231,7 +222,7 @@ local function SkinColumnDisplay(columnDisplay)
 	if columnDisplay._buiColumns then return end
 	columnDisplay._buiColumns = true
 	FadeRegions(columnDisplay)
-	if columnDisplay.LayoutColumns then Hook(columnDisplay, 'LayoutColumns', SkinColumnHeaders) end
+	Hook(columnDisplay, 'LayoutColumns', SkinColumnHeaders)
 	SkinColumnHeaders(columnDisplay)
 end
 
@@ -241,13 +232,11 @@ local function SkinMemberRow(row)
 	Fade(row:GetNormalTexture())
 	Highlight(row, true)
 	FaceKeys(row, MEMBER_ROW_TEXT)
-	Face(row.NameFrame and row.NameFrame.Name)
+	Face(row.NameFrame.Name)
 	local header = row.ProfessionHeader
-	if header then
-		FadeKeys(header, THREE_SLICE_ART)
-		Face(header.Name)
-		Face(header.AllRecipes and header.AllRecipes:GetFontString())
-	end
+	FadeKeys(header, THREE_SLICE_ART)
+	Face(header.Name)
+	Face(header.AllRecipes:GetFontString())
 	IconButton(row.CancelInvitationButton)
 end
 
@@ -313,7 +302,7 @@ end
 local function SkinPerkRow(row)
 	if row._buiPerkRow then return end
 	row._buiPerkRow = true
-	KeepTexture(row.Icon)
+	Keep(row.Icon)
 	FadeRegions(row)
 	FadeRegions(row.NormalBorder)
 	FadeRegions(row.DisabledBorder)
@@ -336,10 +325,8 @@ local function SkinFactionBar(factionFrame)
 	local bar = factionFrame.Bar
 	FadeKeys(bar, FACTION_BAR_ART)
 	local trough = bar.BG
-	if trough then
-		BUI.Painter.Fill(trough, 'skinBackground')
-		Skin.TipIconFrame(bar, trough)
-	end
+	BUI.Painter.Fill(trough, 'skinBackground')
+	Skin.TipIconFrame(bar, trough)
 	SelectedTexture(bar.Progress, 1)
 	Face(bar.Label)
 end
@@ -364,9 +351,7 @@ local function SkinBenefits(benefits)
 end
 
 local function SkinChallenges(info)
-	local challenges = info.Challenges
-	if not challenges then return end
-	for _, challenge in ipairs(challenges) do
+	for _, challenge in ipairs(info.Challenges) do
 		Face(challenge.label)
 		Face(challenge.count)
 	end
@@ -431,10 +416,7 @@ local function SkinNewsFilters(filters)
 	Shell(filters)
 	Title(filters.Title)
 	Close(filters.CloseButton)
-	local checks = filters.GuildNewsFilterButtons
-	if checks then
-		for _, check in ipairs(checks) do CheckBox(check) end
-	end
+	for _, check in ipairs(filters.GuildNewsFilterButtons) do CheckBox(check) end
 end
 
 local function SkinTextContainer(container)
@@ -525,7 +507,7 @@ end
 local function SkinSettingsDialog(dialog)
 	FadeKeys(dialog, DIALOG_BORDER_KEYS)
 	Fade(dialog.IconPreviewRing)
-	if dialog.CircleMask then dialog.CircleMask:Hide() end
+	dialog.CircleMask:Hide()
 	Shell(dialog)
 	Title(dialog.DialogLabel)
 	for _, key in ipairs(SETTINGS_LABEL_KEYS) do Label(dialog[key]) end
@@ -547,10 +529,8 @@ local function SkinAvatarButton(button)
 	Highlight(button)
 	FrameIcon(button, button.Icon)
 	local selected = button.Selected
-	if selected then
-		selected:SetBlendMode('BLEND')
-		SelectedTexture(selected, ICON_SELECTED_ALPHA)
-	end
+	selected:SetBlendMode('BLEND')
+	SelectedTexture(selected, ICON_SELECTED_ALPHA)
 end
 
 local function SkinAvatarRow(row)
@@ -583,8 +563,8 @@ local function SkinTicketRow(row)
 end
 
 local function SkinTicketManager(dialog)
-	KeepTexture(dialog.Icon)
-	KeepTexture(dialog.CircleMask)
+	Keep(dialog.Icon)
+	Keep(dialog.CircleMask)
 	FadeRegions(dialog)
 	dialog.CircleMask:Hide()
 	FrameIcon(dialog, dialog.Icon)
@@ -610,10 +590,8 @@ local function SkinApplicantRow(row)
 	FaceKeys(row, APPLICANT_ROW_TEXT)
 	IconButton(row.CancelInvitationButton)
 	local invite = row.InviteButton
-	if invite then
-		Button(invite)
-		Face(invite.Text)
-	end
+	Button(invite)
+	Face(invite.Text)
 end
 
 local function SkinApplicantList(list)
@@ -657,15 +635,15 @@ local function SkinWarningDialog(warning)
 end
 
 local function SkinInvitation(invitation)
-	for _, key in ipairs(INVITATION_KEEP) do KeepTexture(invitation[key]) end
-	KeepTexture(invitation.CircleMask)
+	for _, key in ipairs(INVITATION_KEEP) do Keep(invitation[key]) end
+	Keep(invitation.CircleMask)
 	FadeRegions(invitation)
-	if invitation.CircleMask then invitation.CircleMask:Hide() end
+	invitation.CircleMask:Hide()
 	FrameIcon(invitation, invitation.Icon)
 	FadeArt(invitation.InsetFrame)
 	Shell(invitation)
 	Title(invitation.InvitationText)
-	if invitation.Name then Skin.TipFace(invitation.Name, 'title', NAME_SCALE) end
+	Skin.TipFace(invitation.Name, 'title', NAME_SCALE)
 	FaceKeys(invitation, INVITATION_TEXT)
 	ButtonKeys(invitation, INVITATION_BUTTONS)
 	SkinWarningDialog(invitation.WarningDialog)
@@ -673,12 +651,11 @@ local function SkinInvitation(invitation)
 end
 
 local function RefreshCardPager(cards)
-	Skin.RefreshPageButton(cards.PreviousPage)
-	Skin.RefreshPageButton(cards.NextPage)
+	Skin.RefreshPageButtons(cards.PreviousPage, cards.NextPage)
 end
 
 local function SkinGuildCard(card)
-	if not card or card._buiGuildCard then return end
+	if card._buiGuildCard then return end
 	card._buiGuildCard = true
 	Fade(card.CardBackground)
 	Shell(card)
@@ -688,17 +665,13 @@ local function SkinGuildCard(card)
 end
 
 local function SkinGuildCards(cards)
-	if cards.Cards then
-		for _, card in ipairs(cards.Cards) do SkinGuildCard(card) end
-	end
-	Skin.TipPageButton(cards.PreviousPage, 'previous')
-	Skin.TipPageButton(cards.NextPage, 'next')
-	if cards.RefreshLayout and not cards._buiLayoutHooked then
+	for _, card in ipairs(cards.Cards) do SkinGuildCard(card) end
+	Skin.TipPageButtons(cards.PreviousPage, cards.NextPage)
+	if not cards._buiLayoutHooked then
 		cards._buiLayoutHooked = true
 		Hook(cards, 'RefreshLayout', RefreshCardPager)
 	end
-	local spinner = cards.SearchingSpinner
-	if spinner then Title(spinner.Label) end
+	Title(cards.SearchingSpinner.Label)
 end
 
 local function SkinCommunityCard(card)
@@ -706,14 +679,13 @@ local function SkinCommunityCard(card)
 	card._buiCommunityCard = true
 	Fade(card.Background)
 	Fade(card.LogoBorder)
-	if card.CircleMask then card.CircleMask:Hide() end
+	card.CircleMask:Hide()
 	Highlight(card)
 	FrameIcon(card, card.CommunityLogo)
 	Shell(card)
 	Skin.TipFaceTree(card, 1)
 	Title(card.Name)
-	local join = card.RequestJoin
-	if join then Face(join.InvitedString) end
+	Face(card.RequestJoin.InvitedString)
 end
 
 local function SkinCommunityCards(cards)
@@ -722,12 +694,9 @@ local function SkinCommunityCards(cards)
 end
 
 local function SkinFinderOptions(options)
-	if options.PendingTextFrame then Title(options.PendingTextFrame.Text) end
+	Title(options.PendingTextFrame.Text)
 	for _, key in ipairs(FINDER_DROPDOWN_KEYS) do LabeledDropdown(options[key]) end
-	for _, key in ipairs(FINDER_ROLE_KEYS) do
-		local role = options[key]
-		if role then SizedCheckBox(role.Checkbox) end
-	end
+	for _, key in ipairs(FINDER_ROLE_KEYS) do SizedCheckBox(options[key].Checkbox) end
 	EditBox(options.SearchBox, SEARCH_BOX_INSET)
 	Button(options.Search)
 end
@@ -766,7 +735,7 @@ end
 
 local function SkinMainFrame(frame)
 	context.Chrome(frame)
-	KeepTexture(frame.PortraitOverlay.CircleMask)
+	Keep(frame.PortraitOverlay.CircleMask)
 	FadeRegions(frame.PortraitOverlay)
 	SkinTabGroup(frame, SIDE_TAB_KEYS, 'UpdateCommunitiesTabs')
 	Dropdown(frame.StreamDropdown)
@@ -817,7 +786,6 @@ local function SkinBankSlot(button)
 	Fade(button.IconBorder)
 	Fade(button.IconOverlay)
 	local icon = button.icon
-	if not icon then return end
 	local fill = Own(button:CreateTexture(nil, 'BACKGROUND'))
 	fill:SetAllPoints(icon)
 	BUI.Painter.Fill(fill, 'skinBackground')
@@ -830,7 +798,7 @@ local function RefreshBankSlots(frame)
 	for _, column in ipairs(frame.Columns) do
 		for _, button in ipairs(column.Buttons) do
 			local icon = button.icon
-			if icon and icon._buiIconFrame then
+			if icon._buiIconFrame then
 				CropIcon(icon)
 				local _, _, _, _, quality = GetGuildBankItemInfo(tab, button:GetID())
 				Skin.SetIconEdgeRarity(icon, quality)
@@ -840,11 +808,10 @@ local function RefreshBankSlots(frame)
 end
 
 local function SkinBankTab(tab)
-	if not tab or tab._buiBankTab then return end
+	if tab._buiBankTab then return end
 	tab._buiBankTab = true
 	FadeRegions(tab)
 	local button = tab.Button
-	if not button then return end
 	Fade(button.NormalTexture)
 	Fade(button:GetPushedTexture())
 	Fade(button:GetCheckedTexture())
@@ -856,8 +823,8 @@ end
 
 local function RefreshBankTabs(frame)
 	for _, tab in ipairs(frame.BankTabs) do
-		local button = tab.Button
-		if button and tab._buiBankTab then
+		if tab._buiBankTab then
+			local button = tab.Button
 			CropIcon(button.IconTexture)
 			Skin.TipShellEdges(button, button:GetChecked() == true)
 		end
@@ -867,8 +834,8 @@ end
 local function SkinIconCell(button)
 	if button._buiIconCell then return end
 	button._buiIconCell = true
-	KeepTexture(button.Icon)
-	KeepTexture(button.SelectedTexture)
+	Keep(button.Icon)
+	Keep(button.SelectedTexture)
 	Highlight(button)
 	FadeRegions(button)
 	FrameIcon(button, button.Icon)
@@ -880,13 +847,10 @@ local function SkinIconCell(button)
 end
 
 local function SkinSelectedIcon(area)
-	if not area then return end
 	local button = area.SelectedIconButton
-	if button then
-		KeepTexture(button.Icon)
-		FadeRegions(button)
-		FrameIcon(button, button.Icon)
-	end
+	Keep(button.Icon)
+	FadeRegions(button)
+	FrameIcon(button, button.Icon)
 	Skin.TipFaceTree(area, 3)
 end
 
@@ -895,28 +859,20 @@ local function SkinBankPopup(popup)
 	FadeKeys(popup, BORDER_BOX_KEYS)
 	Shell(popup)
 	local box = popup.BorderBox
-	if box then
-		Label(box.EditBoxHeaderText)
-		Face(box.IconSelectionText)
-		local editBox = box.IconSelectorEditBox
-		if editBox then
-			FadeKeys(editBox, ICON_SELECTOR_EDIT_ART)
-			EditBox(editBox)
-		end
-		Dropdown(box.IconTypeDropdown)
-		Dropdown(box.IconFilterDropdown)
-		Button(box.OkayButton or popup.OkayButton)
-		Button(box.CancelButton or popup.CancelButton)
-		SkinSelectedIcon(box.SelectedIconArea)
-		local drag = box.IconDragArea
-		if drag then Skin.TipFaceTree(drag, 2) end
-	end
+	Label(box.EditBoxHeaderText)
+	Face(box.IconSelectionText)
+	local editBox = box.IconSelectorEditBox
+	FadeKeys(editBox, ICON_SELECTOR_EDIT_ART)
+	EditBox(editBox)
+	Dropdown(box.IconTypeDropdown)
+	Button(box.OkayButton)
+	Button(box.CancelButton)
+	SkinSelectedIcon(box.SelectedIconArea)
+	Skin.TipFaceTree(box.IconDragArea, 2)
 	local selector = popup.IconSelector
-	if selector then
-		FadeRegions(selector)
-		ScrollBar(selector.ScrollBar)
-		Skin.SweepScrollBox(selector.ScrollBox, Guard(SkinIconCell))
-	end
+	FadeRegions(selector)
+	ScrollBar(selector.ScrollBar)
+	Skin.SweepScrollBox(selector.ScrollBox, Guard(SkinIconCell))
 end
 
 local function SkinBankInfo(info)
@@ -936,11 +892,9 @@ local function SkinGuildBankFrame(frame)
 		for _, button in ipairs(column.Buttons) do SkinBankSlot(button) end
 	end
 	local moneyBackground = frame.MoneyFrameBG
-	if moneyBackground then
-		FadeRegions(moneyBackground)
-		Label(moneyBackground.LimitLabel)
-		Face(moneyBackground.UnlimitedLabel)
-	end
+	FadeRegions(moneyBackground)
+	Label(moneyBackground.LimitLabel)
+	Face(moneyBackground.UnlimitedLabel)
 	Button(frame.DepositButton)
 	Button(frame.WithdrawButton)
 	local tabs = {}
@@ -948,11 +902,9 @@ local function SkinGuildBankFrame(frame)
 	Skin.RegisterTabStrip(frame, tabs, context)
 	for _, tab in ipairs(frame.BankTabs) do SkinBankTab(tab) end
 	local buyInfo = frame.BuyInfo
-	if buyInfo then
-		Skin.TipFaceTree(buyInfo, 1)
-		Button(buyInfo.PurchaseButton)
-	end
-	if frame.Log then ScrollBar(frame.Log.ScrollBar) end
+	Skin.TipFaceTree(buyInfo, 1)
+	Button(buyInfo.PurchaseButton)
+	ScrollBar(frame.Log.ScrollBar)
 	SkinBankInfo(frame.Info)
 	EditBox(_G.GuildItemSearchBox)
 	SkinBankPopup(_G.GuildBankPopupFrame)
@@ -980,22 +932,16 @@ local function SkinBankPermissionRow(row)
 	if row._buiPermissionRow then return end
 	row._buiPermissionRow = true
 	local owned = row.owned
-	if owned then
-		FrameIcon(owned, owned.tabIcon)
-		Face(owned.tabName)
-		CheckBox(owned.viewCB)
-		CheckBox(owned.depositCB)
-		local stackBox = owned.editBox
-		if stackBox then
-			EditBox(stackBox)
-			Label(_G[stackBox:GetName() .. 'LabelText'])
-		end
-	end
+	FrameIcon(owned, owned.tabIcon)
+	Face(owned.tabName)
+	CheckBox(owned.viewCB)
+	CheckBox(owned.depositCB)
+	local stackBox = owned.editBox
+	EditBox(stackBox)
+	Label(_G[stackBox:GetName() .. 'LabelText'])
 	local buy = row.buy
-	if buy then
-		Skin.TipFaceTree(buy, 1)
-		Button(buy.button)
-	end
+	Skin.TipFaceTree(buy, 1)
+	Button(buy.button)
 end
 
 local function SkinBankPermissionRows()
@@ -1033,10 +979,8 @@ local function SkinRankPermissions(permissions)
 	CheckBox(permissions.OfficerCheckbox)
 	for flagIndex = 1, NUM_RANK_FLAGS do CheckBox(_G['GuildControlUIRankSettingsFrameCheckbox' .. flagIndex]) end
 	local goldBox = permissions.goldBox
-	if goldBox then
-		EditBox(goldBox)
-		Skin.TipFaceTree(goldBox, 1)
-	end
+	EditBox(goldBox)
+	Skin.TipFaceTree(goldBox, 1)
 end
 
 local function SkinGuildControlFrame(frame)
@@ -1047,31 +991,23 @@ local function SkinGuildControlFrame(frame)
 	Dropdown(frame.dropdown)
 	FadeRegions(_G.GuildControlUIHbar)
 	local order = frame.orderFrame
-	if order then
-		Button(order.newButton)
-		Button(order.dupButton)
-	end
+	Button(order.newButton)
+	Button(order.dupButton)
 	local bank = frame.bankTabFrame
-	if bank then
-		Dropdown(bank.dropdown)
-		Skin.TipFaceTree(bank.dropdown, 1)
-		local inset = bank.inset
-		if inset then
-			FadeArt(inset)
-			Shell(inset)
-			if inset.scrollFrame then ScrollBar(inset.scrollFrame.ScrollBar) end
-		end
-	end
+	Dropdown(bank.dropdown)
+	Skin.TipFaceTree(bank.dropdown, 1)
+	local inset = bank.inset
+	FadeArt(inset)
+	Shell(inset)
+	ScrollBar(inset.scrollFrame.ScrollBar)
 	local discord = frame.discordFrame
-	if discord then
-		Dropdown(discord.serverDropdown)
-		Skin.TipFaceTree(discord.serverDropdown, 1)
-		Dropdown(discord.channelDropdown)
-		Skin.TipFaceTree(discord.channelDropdown, 1)
-		Button(discord.channelButton)
-		Face(discord.channelListTitle)
-		Face(discord.noChannelsError)
-	end
+	Dropdown(discord.serverDropdown)
+	Skin.TipFaceTree(discord.serverDropdown, 1)
+	Dropdown(discord.channelDropdown)
+	Skin.TipFaceTree(discord.channelDropdown, 1)
+	Button(discord.channelButton)
+	Face(discord.channelListTitle)
+	Face(discord.noChannelsError)
 	SkinRankPermissions(frame.rankPermFrame)
 end
 
@@ -1101,9 +1037,3 @@ context.Window('GuildControlUI', {
 		Hook('GuildControlUI_Discord_Update', SkinDiscordPanels)
 	end,
 })
-
-context.OnDisable(function()
-	for _, tabs in pairs(tabGroups) do
-		for _, tab in ipairs(tabs) do Skin.ResetSideTab(tab) end
-	end
-end)

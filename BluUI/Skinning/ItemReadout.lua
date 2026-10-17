@@ -1,7 +1,6 @@
 local _, BUI = ...
 
 local Skin = BUI.Skinning
-local IsSecretValue = BUI.Tools.IsSecretValue
 
 local Readout = {}
 Skin.Readout = Readout
@@ -13,7 +12,6 @@ local GEM_BORDER_COMMON = { 0.75, 0.75, 0.75 }
 local EMPTY_SOCKET_ALPHA = 0.6
 local EMPTY_SOCKET_PATH = 'Interface\\ItemSocketingFrame\\UI-EmptySocket-'
 local QUESTION_MARK_ICON = 134400
-local MAX_LEVEL_FALLBACK = 90
 local ENCHANT_ALPHA = 0.95
 local ENCHANT_LINE_TYPE = Enum.TooltipDataLineType.ItemEnchantmentPermanent
 local ATLAS_MARKUP = '|A:[^|]+|a'
@@ -157,8 +155,8 @@ end
 
 function Readout.AtEnchantLevel(unit)
 	local level = UnitLevel(unit)
-	if not level or IsSecretValue(level) then return false end
-	return level >= (GetMaxLevelForPlayerExpansion() or MAX_LEVEL_FALLBACK)
+	if not level or issecretvalue(level) then return false end
+	return level >= GetMaxLevelForPlayerExpansion()
 end
 
 function Readout.PaintEnchant(label, hover, enchant)
@@ -271,7 +269,7 @@ function Readout.RefreshGems(labels, link, metrics)
 			gem.link, gem.socket, gem.labels = gemLink, socketIndexes[index], labels
 			gem.icon:SetTexture(socketIcons[index])
 			if gemLink then
-				gem.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+				Skin.CropIcon(gem.icon)
 				local border = (C_Item.GetItemQualityByID(gemLink) or 2) >= GEM_RARE_QUALITY and GEM_BORDER_RARE or GEM_BORDER_COMMON
 				gem:SetBackdropBorderColor(border[1], border[2], border[3], 1)
 			else

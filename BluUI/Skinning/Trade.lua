@@ -5,7 +5,7 @@ local Wrap = BUI.Profiler.Wrap
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
+local BUILib = BluUI.BUILibClient
 
 local ITEM_COUNT = 7
 local PLATE_GAP = 4
@@ -37,8 +37,7 @@ local context = Skin.Define('trade', {
 })
 local Fade, FadeRegions, FadeArt = context.Fade, context.FadeRegions, context.FadeArt
 local Shell, Button, Card = context.Shell, context.Button, context.Card
-local Title = context.Title
-local CropIcon = Skin.CropIcon
+local Title, Keep = context.Title, context.Keep
 
 local function RefreshItemEdges(button)
 	Skin.SetIconEdgeQuality(button.icon, button.IconBorder)
@@ -47,8 +46,7 @@ end
 local function SkinItemButton(button)
 	Fade(button.NormalTexture)
 	Fade(button.IconBorder)
-	CropIcon(button.icon)
-	Skin.TipIconFrame(button, button.icon)
+	Skin.SquareIcon(button, button.icon)
 	Skin.FlatTexture(button:GetHighlightTexture(), 1, 1, 1, ICON_HOVER_ALPHA)
 	Skin.TipCount(button.Count)
 	RefreshItemEdges(button)
@@ -152,7 +150,7 @@ local function SkinFrame(frame)
 	for _, column in ipairs(COLUMNS) do SkinInsets(column.insets) end
 	ForEachItemButton(SkinItemRow)
 	SkinMoney(frame)
-	_G.TradeFrameTradeButton.WarningIcon.__buiSkin = true
+	Keep(_G.TradeFrameTradeButton.WarningIcon)
 	for _, name in ipairs(ACTION_BUTTONS) do Button(_G[name]) end
 	SkinHighlights(frame)
 end

@@ -4,7 +4,6 @@ local Wrap = BUI.Profiler.Wrap
 
 local pairs, ipairs = pairs, ipairs
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 
 local LIST_TITLE_SCALE = 1.4
@@ -43,16 +42,15 @@ local ADDON_BUTTON_KEYS = { 'EnableAllButton', 'DisableAllButton', 'OkayButton',
 local PERFORMANCE_TEXT_KEYS = { 'Current', 'Average', 'Peak' }
 local QUICK_KEYBIND_TEXT_KEYS = { 'InstructionText', 'CancelDescriptionText', 'OutputText' }
 local QUICK_KEYBIND_BUTTON_KEYS = { 'DefaultsButton', 'CancelButton', 'OkayButton' }
-local STATE_TEXTURE_GETTERS = { 'GetNormalTexture', 'GetPushedTexture', 'GetHighlightTexture', 'GetDisabledTexture' }
 
 local context = Skin.Define('systempanels', {
 	name = 'Settings & Editors',
-	description = 'The game settings window, Edit Mode manager and dialogs, quick keybinding, macro editor and addon list: segmented tabs, left titles, house controls, flat sliders and clean list rows.',
+	description = 'The game settings window, Edit Mode manager and dialogs, quick keybinding, macro editor and addon list: segmented tabs, left titles, library controls, flat sliders and clean list rows.',
 	icon = 'Interface/Icons/INV_Misc_Gear_01',
 	newLook = true,
 })
-local Hook = context.Hook
-local Fade, FadeRegions, FadeArt = context.Fade, context.FadeRegions, context.FadeArt
+local Hook, Enabled = context.Hook, context.Enabled
+local Fade, FadeRegions, FadeArt, FadeStates, Keep, Line = context.Fade, context.FadeRegions, context.FadeArt, context.FadeStates, context.Keep, context.Line
 local Shell, Button, Close, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.Dropdown, context.EditBox, context.CheckBox
 local TextBox, ScrollBar, Face, Title, Body = context.TextBox, context.ScrollBar, context.Face, context.Title, context.Body
 local FlatTexture, SelectedTexture, RowHighlight = Skin.FlatTexture, Skin.SelectedTexture, Skin.RowHighlight
@@ -64,34 +62,14 @@ local function Refade(texture)
 	texture:SetAlpha(0)
 end
 
-local function FadeButtonStates(button)
-	for _, getter in ipairs(STATE_TEXTURE_GETTERS) do
-		local texture = button[getter](button)
-		if texture then Refade(texture) end
-	end
-end
-
-local function FaceRegions(frame)
-	for regionIndex = 1, select('#', frame:GetRegions()) do
-		local region = select(regionIndex, frame:GetRegions())
-		if region:IsObjectType('FontString') then Skin.TipFace(region, 'body') end
-	end
-end
-
 local function ReplaceDivider(texture, parent)
 	Refade(texture)
 	if texture._buiLine then return end
-	local line = parent:CreateTexture(nil, 'ARTWORK')
-	line.__buiSkin = true
-	line:SetHeight(1)
-	BUI.Painter.Fill(line, 'skinBorder')
-	BUILib.Skin.PixelLine(line, texture)
-	texture._buiLine = line
+	texture._buiLine = Line(parent, texture)
 end
 
 local function ReplaceDividerRegions(frame)
-	for regionIndex = 1, select('#', frame:GetRegions()) do
-		local region = select(regionIndex, frame:GetRegions())
+	for _, region in ipairs({ frame:GetRegions() }) do
 		if region:IsObjectType('Texture') and not region.__buiSkin then ReplaceDivider(region, frame) end
 	end
 end
@@ -109,8 +87,7 @@ end
 local function StyleSliderTrack(slider)
 	if slider._buiTrack then return end
 	local thumb = slider.Thumb or slider:GetThumbTexture()
-	for regionIndex = 1, select('#', slider:GetRegions()) do
-		local region = select(regionIndex, slider:GetRegions())
+	for _, region in ipairs({ slider:GetRegions() }) do
 		if region ~= thumb and region:IsObjectType('Texture') and not region.__buiSkin then Fade(region) end
 	end
 	Skin.TipSliderTrack(slider)
@@ -197,14 +174,14 @@ local function CategoryExpanded(button)
 end
 
 local function StyleCategoryRow(button)
-	if button:IsForbidden() then return end
+	if not Enabled() or button:IsForbidden() then return end
 	if button.Toggle then
 		if not button._buiCategoryRow then
 			button._buiCategoryRow = true
 			Skin.TipPageButton(button.Toggle, 'down')
 			Hook(button, 'UpdateStateInternal', OnCategoryState)
 		end
-		FadeButtonStates(button.Toggle)
+		FadeStates(button.Toggle)
 		SetArrowRotation(button.Toggle, CategoryExpanded(button))
 		OnCategoryState(button)
 	elseif button.Background then
@@ -217,7 +194,7 @@ local function StyleBindingButton(button)
 	if not button then return end
 	local selectedHighlight = button.SelectedHighlight or button.selectedHighlight
 	if selectedHighlight and not button._buiTipButton then
-		selectedHighlight.__buiSkin = true
+		Keep(selectedHighlight)
 		selectedHighlight:SetBlendMode('BLEND')
 		SelectedTexture(selectedHighlight, BINDING_SELECTED_ALPHA)
 	end
@@ -258,7 +235,7 @@ end
 local function StyleRowButton(row)
 	local button = row.Button
 	if not button then return end
-	if not (button.Left and button.Right) then
+	if not row.OnExpandedChanged then
 		Button(button)
 		return
 	end
@@ -297,7 +274,7 @@ local function StyleRowText(row)
 end
 
 local function StyleSettingsRow(row)
-	if row:IsForbidden() then return end
+	if not Enabled() or row:IsForbidden() then return end
 	StyleRowText(row)
 	if row.Title then Skin.TipFont(row.Title, 'title', SECTION_TITLE_SCALE) end
 	if row.MouseoverOverlay then
@@ -445,22 +422,20 @@ local function SkinLayoutDialog(dialog)
 	end
 	local nameBox = dialog.LayoutNameEditBox
 	local nameInset = importBox and IMPORT_NAME_INSET or LAYOUT_NAME_INSET
-	if nameBox then
-		EditBox(nameBox, nameInset)
-		local textPad = NAME_TEXT_PAD + (nameInset.left or 0)
-		nameBox:SetTextInsets(textPad, NAME_TEXT_PAD, 0, 0)
-		if importBox then AddLockHint(nameBox, importBox, textPad) end
-	end
+	EditBox(nameBox, nameInset)
+	local textPad = NAME_TEXT_PAD + (nameInset.left or 0)
+	nameBox:SetTextInsets(textPad, NAME_TEXT_PAD, 0, 0)
+	if importBox then AddLockHint(nameBox, importBox, textPad) end
 	AlignLabel(dialog.EditBoxLabel, importBox)
 	AlignLabel(dialog.NameEditBoxLabel, nameBox, nameInset)
-	if dialog.CharacterSpecificLayoutCheckButton then StyleLabeledCheck(dialog.CharacterSpecificLayoutCheckButton, LARGE_CHECK_INSET) end
+	StyleLabeledCheck(dialog.CharacterSpecificLayoutCheckButton, LARGE_CHECK_INSET)
 	Button(dialog.AcceptButton)
 	Button(dialog.CancelButton)
 end
 
 local function RefreshLayoutDialog(dialog)
 	local nameBox = dialog.LayoutNameEditBox
-	if nameBox and nameBox._buiLockHint then SyncNameBoxState(nameBox) end
+	if nameBox._buiLockHint then SyncNameBoxState(nameBox) end
 end
 
 local function SkinUnsavedDialog(dialog)
@@ -471,7 +446,7 @@ local function SkinUnsavedDialog(dialog)
 end
 
 local function SkinMacroFrame(frame)
-	FaceRegions(frame)
+	Skin.TipFaceTree(frame, 1)
 	context.Chrome(frame)
 	Skin.TipFont(_G.MacroFrameSelectedMacroName, 'title')
 	Skin.TipFont(_G.MacroFrameEnterMacroText, 'label')
@@ -510,7 +485,7 @@ local function StyleAddonEntry(entry)
 end
 
 local function StyleAddonRow(row)
-	if row:IsForbidden() then return end
+	if not Enabled() or row:IsForbidden() then return end
 	local collapse = row.CollapseExpand
 	if not collapse then
 		if row.Enabled then StyleAddonEntry(row) end
@@ -523,7 +498,7 @@ local function StyleAddonRow(row)
 		Skin.TipFont(row.Title, 'title')
 		Skin.TipPageButton(collapse, 'down')
 	end
-	FadeButtonStates(collapse)
+	FadeStates(collapse)
 	local treeNode = collapse.treeNode
 	SetArrowRotation(collapse, not (treeNode and treeNode:IsCollapsed()))
 end
@@ -532,7 +507,7 @@ local function SkinAddonList(frame)
 	context.Chrome(frame)
 	Dropdown(frame.Dropdown)
 	CheckBox(frame.ForceLoad, CHECK_INSET)
-	FaceRegions(frame.ForceLoad)
+	Skin.TipFaceTree(frame.ForceLoad, 1)
 	EditBox(frame.SearchBox)
 	local performance = frame.Performance
 	Skin.TipFont(performance.Header, 'title')
@@ -577,11 +552,7 @@ context.Window('EditModeSystemSettingsDialog', {
 })
 for _, dialogName in ipairs(LAYOUT_DIALOGS) do context.Window(dialogName, { skin = SkinLayoutDialog, show = RefreshLayoutDialog }) end
 context.Window('EditModeUnsavedChangesDialog', { skin = SkinUnsavedDialog })
-context.Window('AddonList', {
-	skin = SkinAddonList,
-	show = RefreshAddonList,
-	install = function() Hook('AddonList_InitAddon', StyleAddonEntry) end,
-})
+context.Window('AddonList', { skin = SkinAddonList, show = RefreshAddonList })
 context.Window('AddonDialog', { skin = SkinAddonDialog })
 context.Window('MacroFrame', { skin = SkinMacroFrame, show = RefreshMacro })
 context.Window('MacroPopupFrame', {

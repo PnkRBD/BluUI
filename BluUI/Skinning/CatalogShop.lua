@@ -4,7 +4,6 @@ local ipairs = ipairs
 
 local Skin = BUI.Skinning
 
-local SKIN_ID = 'catalogshop'
 local HEADER_ART = { 'Background', 'DisabledBackground' }
 local DETAIL_TEXT_KEYS = { 'ProductType', 'QuantityOwned', 'ProductDescription' }
 local DETAIL_NOTE_KEYS = { 'LegalDisclaimerText', 'HousingWarningText' }
@@ -12,18 +11,17 @@ local BUTTON_NOTE_KEYS = { 'NoPriceInGlues', 'PendingPurchasesText', 'DynamicBun
 local DETAIL_TITLE_SCALE = 1.5
 local DETAIL_TEXT_SCALE = 1.1
 
-local installed = false
-local skinned = false
-local titleBand
-
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
+local context = Skin.Define('catalogshop', {
+	name = 'In-Game Shop',
+	description = 'The Blizzard shop window: dark shell and title band, search box, scroll bars, library style buttons and a flat details panel. Category tabs and product cards are locked by Blizzard and keep their own art.',
+	icon = 'Interface/Icons/INV_Misc_Coin_02',
+	legacy = 'shop',
+})
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
 local Shell, Button, Close, EditBox = context.Shell, context.Button, context.Close, context.EditBox
 local ScrollBar, Title = context.ScrollBar, context.Title
+
+local titleBand
 
 local function SkinProductContainer(container)
 	FadeRegions(container.ShadowLayer)
@@ -44,8 +42,7 @@ local function SkinHeader(header)
 	FadeKeys(header, HEADER_ART)
 	EditBox(header.SearchBox)
 	local navBar = header.CatalogShopNavBar
-	Skin.TipPageButton(navBar.ScrollBackwards, 'previous')
-	Skin.TipPageButton(navBar.ScrollForwards, 'next')
+	Skin.TipPageButtons(navBar.ScrollBackwards, navBar.ScrollForwards)
 	Fade(navBar.ScrollBackwards.Arrow)
 	Fade(navBar.ScrollForwards.Arrow)
 end
@@ -81,54 +78,4 @@ local function SkinFrame(frame)
 	Shell(frame.CatalogShopVCFrame)
 end
 
-local function Apply()
-	if not Enabled() or skinned then return end
-	skinned = true
-	SkinFrame(_G.CatalogShopFrame)
-end
-
-local function Install()
-	if installed then return end
-	local frame = _G.CatalogShopFrame
-	if not frame or frame:IsForbidden() then return end
-	installed = true
-	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.CatalogShop frame reskin', Apply))
-	if frame:IsShown() then Apply() end
-end
-
-local function TryInstall()
-	Install()
-	if installed then BUI.Events:Unregister('ADDON_LOADED', 'Skin.CatalogShop') end
-end
-
-local function Deactivate()
-	if not skinned then return end
-	context.Restore()
-	skinned = false
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		if not installed then
-			BUI.Events:Register('ADDON_LOADED', 'Skin.CatalogShop', TryInstall)
-		elseif _G.CatalogShopFrame:IsShown() then
-			Apply()
-		end
-	else
-		Deactivate()
-	end
-end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'In-Game Shop',
-	description = 'The Blizzard shop window: dark shell and title band, search box, scroll bars, house buttons and a flat details panel. Category tabs and product cards are locked by Blizzard and keep their own art.',
-	icon = 'Interface/Icons/INV_Misc_Coin_02',
-	legacy = 'shop',
-})
-
-BUI.Events:Once('PLAYER_LOGIN', 'Skin.CatalogShopInstall', function()
-	if not Enabled() then return end
-	Install()
-	if not installed then BUI.Events:Register('ADDON_LOADED', 'Skin.CatalogShop', TryInstall) end
-end)
+context.Window('CatalogShopFrame', { skin = SkinFrame })

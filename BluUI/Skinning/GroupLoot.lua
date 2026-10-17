@@ -1,16 +1,13 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.GroupLoot')
+local AnchorHook = BUI.Profiler.Hooker('Skin.GroupLoot')
 
 local ipairs = ipairs
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
 local Tools = BUI.Tools
-local Layout = BUILib.Layout
 local SELECTED_COLOR = Skin.SELECTED_COLOR
 
-local SKIN_ID = 'grouploot'
 local ANCHOR_KEY = 'lootrolls'
 local GROW_DOWN_SETTING = 'grouplootGrowDown'
 local ROLL_WIDTH, ROLL_HEIGHT = 300, 48
@@ -23,22 +20,38 @@ local BUTTON_SIZE = 26
 local BUTTON_GAP = 4
 local TEXT_GAP = 8
 local TIMER_HEIGHT = 3
+local EXAMPLE_SCRIPTS = { 'OnShow', 'OnHide', 'OnEvent', 'OnUpdate' }
 local EXAMPLES = {
 	{ name = 'Example Epic Sword', icon = 'Interface/Icons/INV_Sword_04', quality = 4, need = true, timeLeft = 0.8 },
 	{ name = 'Example Rare Helm', icon = 'Interface/Icons/INV_Helmet_25', quality = 3, need = true, transmog = true, timeLeft = 0.55 },
 	{ name = 'Example Rare Trinket', icon = 'Interface/Icons/INV_Misc_Gem_01', quality = 3, need = false, timeLeft = 0.3 },
 }
 
-local installed = false
+local context = Skin.Define('grouploot', {
+	name = 'Loot Rolls',
+	description = 'Need, greed and pass roll popups drawn like the BluUI tooltip, with a quality border on the item.',
+	icon = 'Interface/Buttons/UI-GroupLoot-Dice-Up',
+	settings = {
+		{
+			label = 'Stack new rolls below the first one',
+			get = function() return BUI.GetDB().skinning[GROW_DOWN_SETTING] == true end,
+			set = function(value)
+				BUI.GetDB().skinning[GROW_DOWN_SETTING] = value
+				Skin.ToastAnchors.Refresh(ANCHOR_KEY)
+			end,
+		},
+	},
+	unlock = {
+		tooltip = 'Unlock position. Drag the roll popup window, then click again to lock.',
+		get = function() return Skin.ToastAnchors.IsUnlocked(ANCHOR_KEY) end,
+		set = function(value) Skin.ToastAnchors.SetUnlocked(ANCHOR_KEY, value) end,
+	},
+})
+local Enabled = context.Enabled
+local Fade, Shell = context.Fade, context.Shell
+
 local skinned = {}
 local rollFrames = {}
-
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
-local Fade = context.Fade
 
 local function QualityColor(frame)
 	local _, _, _, quality = GetLootRollItemInfo(frame.rollID)
@@ -83,13 +96,11 @@ local function SkinFrame(frame)
 	Fade(frame.Border)
 	Fade(iconFrame.Border)
 	LayoutFrame(frame)
-	context.Shell(frame)
+	Shell(frame)
 	Skin.TipFace(frame.Name, 'body')
-	Skin.CropIcon(iconFrame.Icon)
-	Skin.TipIconFrame(iconFrame, iconFrame.Icon)
+	Skin.SquareIcon(iconFrame, iconFrame.Icon)
 	timer:SetStatusBarTexture(BUI.GetGlobalTexture())
 	Tools.SetColorTex(timer.Background, 0, 0, 0, 0.5)
-	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GroupLoot frame OnShow', RaiseTimer))
 	RaiseTimer(frame)
 end
 
@@ -127,7 +138,7 @@ local function BuildExample(parent, spec)
 	frame:SetParent(parent)
 	EventRegistry:UnregisterFrameEventAndCallback('OPEN_MASTER_LOOT_LIST', frame)
 	frame:UnregisterAllEvents()
-	for _, script in ipairs({ 'OnShow', 'OnHide', 'OnEvent', 'OnUpdate' }) do frame:SetScript(script, nil) end
+	for _, script in ipairs(EXAMPLE_SCRIPTS) do frame:SetScript(script, nil) end
 	frame.IconFrame:EnableMouse(false)
 	for _, button in ipairs(frame.LootButtons) do button:EnableMouse(false) end
 	SkinFrame(frame)
@@ -174,23 +185,19 @@ local function StackRolls(container, point)
 end
 
 local function Install()
-	if installed then return end
-	installed = true
 	local index = 1
-	while _G['GroupLootFrame' .. index] do
-		rollFrames[_G['GroupLootFrame' .. index]] = true
+	local frame = _G['GroupLootFrame' .. index]
+	while frame do
+		rollFrames[frame] = true
+		frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GroupLoot frame OnShow', RaiseTimer))
 		index = index + 1
+		frame = _G['GroupLootFrame' .. index]
 	end
-	Hook('GroupLootContainer_Update', Resweep)
-end
-
-local function Deactivate()
-	context.Restore()
-	wipe(skinned)
+	context.Hook('GroupLootContainer_Update', Resweep)
 end
 
 local function AnchorHooks(reapply)
-	Hook(BottomManagedFrameContainer, 'Layout', reapply)
+	AnchorHook(BottomManagedFrameContainer, 'Layout', reapply)
 end
 
 local function GrowPoint()
@@ -205,6 +212,10 @@ local function PlaceRolls(container, anchor)
 	StackRolls(container, point)
 end
 
+context.Window('GroupLootContainer', { install = Install, enable = Resweep })
+
+context.OnDisable(function() wipe(skinned) end)
+
 Skin.ToastAnchors.Register({
 	key = ANCHOR_KEY,
 	label = 'LOOT ROLLS',
@@ -215,34 +226,4 @@ Skin.ToastAnchors.Register({
 	frame = function() return _G.GroupLootContainer end,
 	apply = PlaceRolls,
 	hooks = AnchorHooks,
-})
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		Resweep()
-	else
-		Deactivate()
-	end
-end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Loot Rolls',
-	description = 'Need, greed and pass roll popups drawn like the BluUI tooltip, with a quality border on the item.',
-	icon = 'Interface/Buttons/UI-GroupLoot-Dice-Up',
-	settings = {
-		{
-			label = 'Stack new rolls below the first one',
-			get = function() return BUI.GetDB().skinning[GROW_DOWN_SETTING] == true end,
-			set = function(value)
-				BUI.GetDB().skinning[GROW_DOWN_SETTING] = value
-				Skin.ToastAnchors.Refresh(ANCHOR_KEY)
-			end,
-		},
-	},
-	unlock = {
-		tooltip = 'Unlock position. Drag the roll popup window, then click again to lock.',
-		get = function() return Skin.ToastAnchors.IsUnlocked(ANCHOR_KEY) end,
-		set = function(value) Skin.ToastAnchors.SetUnlocked(ANCHOR_KEY, value) end,
-	},
 })

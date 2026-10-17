@@ -1,16 +1,14 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.Achievements')
 local Wrap = BUI.Profiler.Wrap
 
 local ipairs = ipairs
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
+local BUILib = BluUI.BUILibClient
 local Skin = BUI.Skinning
-local SELECTED = Skin.SELECTED_COLOR
+local SELECTED, BODY_TEXT = Skin.SELECTED_COLOR, Skin.BODY_COLOR
 local Pixel = BUI.Pixel
 
-local SKIN_ID = 'achievements'
 local ROW_HIDDEN_ART = { 'TitleBar', 'Glow', 'BottomLeftTsunami', 'BottomRightTsunami', 'TopLeftTsunami', 'TopRightTsunami', 'BottomTsunami1', 'TopTsunami1' }
 local SEARCH_PREVIEW_COUNT = 5
 local TAB_COUNT = 3
@@ -47,29 +45,24 @@ local SUMMARY_PANEL_INSET = { right = -1 }
 local ACHIEVEMENTS_PANEL_INSET = { right = -26 }
 local STATS_PANEL_INSET = { right = -24 }
 local COMPARISON_HEADER_INSET = { left = 21, right = 40, top = 13 }
-local BODY_TEXT = { 0.87, 0.87, 0.9, 1 }
 local MUTED_TEXT = { 0.62, 0.62, 0.66, 1 }
 local ACCOUNT_TEXT = { 0.4, 0.72, 1, 1 }
 local ACCOUNT_MUTED_TEXT = { 0.25, 0.42, 0.58, 1 }
 local COMPLETED_TEXT = { 0.5, 0.9, 0.5, 1 }
 
-local installed = false
-local skinned = false
 local autoHiddenBars = {}
+local meters = {}
 
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
-local Fade, FadeRegions = context.Fade, context.FadeRegions
+local context = Skin.Define('achievements', {
+	name = 'Achievements',
+	description = 'The achievements window: dark shell, flat category list, card rows for achievements, summary and comparison, white progress bars, statistics, search and tabs.',
+	icon = 'Interface/Icons/Achievement_Level_10',
+})
+local Hook = context.Hook
+local Fade, FadeRegions, Keep = context.Fade, context.FadeRegions, context.Keep
 local Shell, Button, Close, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.EditBox, context.CheckBox
 local ScrollBar, Body, Title = context.ScrollBar, context.Body, context.Title
 local FlatTexture, SelectedTexture, CropIcon = Skin.FlatTexture, Skin.SelectedTexture, Skin.CropIcon
-
-local function KeepTexture(texture)
-	if texture then texture.__buiSkin = true end
-end
 
 local function HideKeys(frame, keys)
 	for _, key in ipairs(keys) do
@@ -96,8 +89,7 @@ end
 local function HoverFill(host, alpha)
 	if not host then return end
 	if not host._buiHover then
-		local fill = host:CreateTexture(nil, 'BACKGROUND')
-		fill.__buiSkin = true
+		local fill = context.Own(host:CreateTexture(nil, 'BACKGROUND'))
 		fill:SetAllPoints(host)
 		host._buiHover = fill
 	end
@@ -106,21 +98,21 @@ local function HoverFill(host, alpha)
 end
 
 local function SelectedFill(texture, host, alpha)
-	KeepTexture(texture)
+	Keep(texture)
 	texture:ClearAllPoints()
 	texture:SetAllPoints(host)
 	SelectedTexture(texture, alpha)
 end
 
 local function CheckGlyph(texture)
-	KeepTexture(texture)
-	texture:SetTexture(BUILib.GetLibMedia('check'))
+	Keep(texture)
+	BUILib.Widget.SetGlyph(texture, BUILib.GetLibMedia('check'))
 	texture:SetTexCoord(CHECK_CROP[1], CHECK_CROP[2], CHECK_CROP[3], CHECK_CROP[4])
 	texture:SetVertexColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
 end
 
 local function FitScrollBar(scrollBar)
-	if Enabled() then scrollBar:SetAlpha(scrollBar:HasScrollableExtent() and 1 or 0) end
+	scrollBar:SetAlpha(scrollBar:HasScrollableExtent() and 1 or 0)
 end
 
 local function AutoHideScrollBar(scrollBar)
@@ -149,12 +141,12 @@ local function LayoutMeter(bar)
 end
 
 local function BuildMeter(bar, gutter)
-	local meter = bar:CreateTexture(nil, 'ARTWORK')
-	meter.__buiSkin = true
+	local meter = Keep(bar:CreateTexture(nil, 'ARTWORK'))
 	meter:SetPoint('TOPLEFT', bar, 'TOPLEFT', METER_INSET, -METER_INSET)
 	meter:SetPoint('BOTTOMLEFT', bar, 'BOTTOMLEFT', METER_INSET, METER_INSET)
 	bar._buiMeter = meter
 	bar._buiGutter = gutter
+	meters[#meters + 1] = meter
 	local layout = Wrap('Skin.Achievements meter layout', LayoutMeter)
 	bar:HookScript('OnValueChanged', layout)
 	bar:HookScript('OnMinMaxChanged', layout)
@@ -219,8 +211,7 @@ end
 local function SkinIconFrame(iconFrame)
 	if not iconFrame._buiIcon then
 		iconFrame._buiIcon = true
-		CropIcon(iconFrame.texture)
-		Skin.TipIconFrame(iconFrame, iconFrame.texture)
+		Skin.SquareIcon(iconFrame, iconFrame.texture)
 	end
 	Fade(iconFrame.frame)
 	Fade(iconFrame.bling)
@@ -260,8 +251,7 @@ local function SkinMeta(objectivesFrame, meta)
 	if not meta._buiObjective then
 		meta._buiObjective = true
 		CheckGlyph(meta.Check)
-		CropIcon(meta.Icon)
-		Skin.TipIconFrame(meta, meta.Icon)
+		Skin.SquareIcon(meta, meta.Icon)
 		local highlight = meta:GetHighlightTexture()
 		highlight:SetBlendMode('BLEND')
 		SelectedTexture(highlight, HOVER_ALPHA)
@@ -274,8 +264,7 @@ end
 local function SkinMini(mini)
 	if not mini._buiObjective then
 		mini._buiObjective = true
-		CropIcon(mini.Icon)
-		Skin.TipIconFrame(mini, mini.Icon)
+		Skin.SquareIcon(mini, mini.Icon)
 		local points = mini.Points
 		MeterText(points)
 		points:SetWidth(0)
@@ -303,7 +292,6 @@ local function SkinObjectives(objectivesFrame)
 end
 
 local function OnCategoryRow(category)
-	if not Enabled() then return end
 	local button = category.Button
 	if not button._buiCategory then
 		button._buiCategory = true
@@ -319,9 +307,7 @@ local function OnCategoryRow(category)
 end
 
 local function OnCategorySelection(category, selected)
-	if not Enabled() then return end
-	local label = category.Button.Label
-	SetColor(label, selected and SELECTED or MUTED_TEXT)
+	SetColor(category.Button.Label, selected and SELECTED or MUTED_TEXT)
 end
 
 local function BuildExpandArrow(row)
@@ -333,7 +319,7 @@ end
 
 local function OnPlusMinus(row)
 	local arrow = row._buiTipArrow
-	if not arrow or not Enabled() then return end
+	if not arrow then return end
 	arrow:SetShown(row.PlusMinus:IsShown())
 	arrow:SetRotation(row.collapsed and COLLAPSED_ROTATION or EXPANDED_ROTATION)
 end
@@ -348,7 +334,6 @@ local function PaintRow(row)
 end
 
 local function OnAchievementRow(row)
-	if not Enabled() then return end
 	if not row._buiRow then
 		row._buiRow = true
 		CheckGlyph(row.Check)
@@ -372,7 +357,7 @@ local function OnAchievementRow(row)
 end
 
 local function OnRowObjectives(row)
-	if Enabled() then SkinObjectives(row:GetObjectiveFrame()) end
+	SkinObjectives(row:GetObjectiveFrame())
 end
 
 local function AnchorCardDescription(card)
@@ -381,8 +366,8 @@ local function AnchorCardDescription(card)
 	local _, _, _, _, iconTop = icon:GetPoint(1)
 	local _, _, _, _, shieldTop = shield:GetPoint(1)
 	description:ClearAllPoints()
-	description:SetPoint('TOPLEFT', icon, 'TOPRIGHT', CARD_DESCRIPTION_GAP, CARD_DESCRIPTION_TOP - (iconTop or 0))
-	description:SetPoint('TOPRIGHT', shield, 'TOPLEFT', -CARD_DESCRIPTION_GAP, CARD_DESCRIPTION_TOP - (shieldTop or 0))
+	description:SetPoint('TOPLEFT', icon, 'TOPRIGHT', CARD_DESCRIPTION_GAP, CARD_DESCRIPTION_TOP - iconTop)
+	description:SetPoint('TOPRIGHT', shield, 'TOPLEFT', -CARD_DESCRIPTION_GAP, CARD_DESCRIPTION_TOP - shieldTop)
 end
 
 local function PaintCard(card)
@@ -413,7 +398,6 @@ local function SkinCard(card)
 end
 
 local function OnSummaryUpdated()
-	if not Enabled() then return end
 	local cards = _G.AchievementFrameSummaryAchievements.buttons
 	if not cards then return end
 	local header = _G.AchievementFrameSummaryAchievementsHeader
@@ -437,8 +421,7 @@ end
 local function StatFill(row)
 	local fill = row._buiFill
 	if fill then return fill end
-	fill = row:CreateTexture(nil, 'BACKGROUND')
-	fill.__buiSkin = true
+	fill = context.Own(row:CreateTexture(nil, 'BACKGROUND'))
 	fill:SetAllPoints(row)
 	row._buiFill = fill
 	return fill
@@ -452,8 +435,7 @@ local function SkinStatRow(row)
 	SetColor(row.Value, BODY_TEXT)
 	if row.SetNormalFontObject then
 		Skin.TipButtonFonts(row)
-		local hover = row:CreateTexture(nil, 'HIGHLIGHT')
-		hover.__buiSkin = true
+		local hover = context.Own(row:CreateTexture(nil, 'HIGHLIGHT'))
 		hover:SetAllPoints(row)
 		SelectedTexture(hover, HOVER_ALPHA)
 	else
@@ -462,7 +444,6 @@ local function SkinStatRow(row)
 end
 
 local function OnStatRow(row, elementData)
-	if not Enabled() then return end
 	if not row._buiRow then SkinStatRow(row) end
 	row.Background:SetAlpha(0)
 	if row.FriendValue then
@@ -478,22 +459,19 @@ local function OnStatRow(row, elementData)
 end
 
 local function OnComparisonRow(row)
-	if not Enabled() then return end
 	SkinCard(row.Player)
 	SkinCard(row.Friend)
 end
 
 local function OnSearchResultRow(row)
-	if not Enabled() or row._buiRow then return end
+	if row._buiRow then return end
 	row._buiRow = true
-	KeepTexture(row.Icon)
-	local highlight = row:GetHighlightTexture()
-	KeepTexture(highlight)
+	Keep(row.Icon)
+	local highlight = Keep(row:GetHighlightTexture())
 	highlight:SetBlendMode('BLEND')
 	Skin.RowHighlight(row, HOVER_ALPHA)
 	FadeRegions(row)
-	CropIcon(row.Icon)
-	Skin.TipIconFrame(row, row.Icon)
+	Skin.SquareIcon(row, row.Icon)
 	Skin.TipFont(row.Name, 'title')
 	Skin.TipFont(row.Path, 'label')
 	Skin.TipFont(row.ResultType, 'label')
@@ -502,7 +480,7 @@ end
 local function SkinSearchPreviewButton(button)
 	if not button._buiPreview then
 		button._buiPreview = true
-		KeepTexture(button.Icon)
+		Keep(button.Icon)
 		CropIcon(button.Icon)
 		SelectedFill(button.SelectedTexture, button, SELECTED_ALPHA)
 		Skin.TipFont(button.Name, 'body')
@@ -530,13 +508,12 @@ local function SkinSearchPreview(container)
 end
 
 local function RefreshBackButton()
-	if not Enabled() then return end
 	local back = _G.AchievementFrame.HeaderDetails.Back
 	back:SetAlpha(back:IsEnabled() and 1 or 0)
 end
 
 local function OnRefreshView()
-	if Enabled() then _G.AchievementFrame.Header.Points:SetVertexColor(1, 1, 1, 1) end
+	_G.AchievementFrame.Header.Points:SetVertexColor(1, 1, 1, 1)
 end
 
 local function RefreshTabs()
@@ -610,8 +587,7 @@ local function SkinSummary(summary)
 end
 
 local function SkinComparisonHeader(header)
-	local portrait = _G.AchievementFrameComparisonHeaderPortrait
-	KeepTexture(portrait)
+	local portrait = Keep(_G.AchievementFrameComparisonHeaderPortrait)
 	FadeRegions(header)
 	Shell(header, COMPARISON_HEADER_INSET)
 	Skin.TipIconFrame(header, portrait)
@@ -661,73 +637,34 @@ local function SkinMainFrame(frame)
 	SkinSearchResults(frame.SearchResults)
 end
 
-local function Apply()
-	local frame = _G.AchievementFrame
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if not skinned then
-		skinned = true
-		SkinMainFrame(frame)
-	end
+local function ShowFrame(frame)
 	Skin.RefreshTabStrip(frame)
 	OnSummaryUpdated()
 	RefreshBackButton()
 	OnRefreshView()
 end
 
-local function HookMixin(mixin, method, callback)
-	if mixin and mixin[method] then Hook(mixin, method, callback) end
-end
-
-local function Install()
-	if installed then return end
-	local frame = _G.AchievementFrame
-	if not frame then return end
-	installed = true
-	frame:HookScript('OnShow', Wrap('Skin.Achievements frame reskin', Apply))
-	HookMixin(_G.AchievementCategoryTemplateMixin, 'Init', OnCategoryRow)
-	HookMixin(_G.AchievementCategoryTemplateMixin, 'UpdateSelectionState', OnCategorySelection)
-	HookMixin(_G.AchievementTemplateMixin, 'Init', OnAchievementRow)
-	HookMixin(_G.AchievementTemplateMixin, 'DisplayObjectives', OnRowObjectives)
-	HookMixin(_G.AchievementTemplateMixin, 'UpdatePlusMinusTexture', OnPlusMinus)
-	HookMixin(_G.AchievementStatTemplateMixin, 'Init', OnStatRow)
-	HookMixin(_G.AchievementComparisonTemplateMixin, 'Init', OnComparisonRow)
-	HookMixin(_G.AchivementComparisonStatMixin, 'Init', OnStatRow)
-	HookMixin(_G.AchievementFullSearchResultsButtonMixin, 'Init', OnSearchResultRow)
+local function InstallFrame()
+	Hook(_G.AchievementCategoryTemplateMixin, 'Init', OnCategoryRow)
+	Hook(_G.AchievementCategoryTemplateMixin, 'UpdateSelectionState', OnCategorySelection)
+	Hook(_G.AchievementTemplateMixin, 'Init', OnAchievementRow)
+	Hook(_G.AchievementTemplateMixin, 'DisplayObjectives', OnRowObjectives)
+	Hook(_G.AchievementTemplateMixin, 'UpdatePlusMinusTexture', OnPlusMinus)
+	Hook(_G.AchievementStatTemplateMixin, 'Init', OnStatRow)
+	Hook(_G.AchievementComparisonTemplateMixin, 'Init', OnComparisonRow)
+	Hook(_G.AchivementComparisonStatMixin, 'Init', OnStatRow)
+	Hook(_G.AchievementFullSearchResultsButtonMixin, 'Init', OnSearchResultRow)
 	Hook('AchievementFrameSummary_UpdateAchievements', OnSummaryUpdated)
 	Hook('AchievementFrame_UpdateTabs', RefreshTabs)
 	Hook('AchievementFrame_RefreshBackButton', RefreshBackButton)
 	Hook('AchievementFrame_RefreshView', OnRefreshView)
-	if frame:IsShown() then Apply() end
 end
 
-local function TryInstall()
-	Install()
-	if installed then BUI.Events:Unregister('ADDON_LOADED', 'Skin.Achievements') end
-end
+context.Window('AchievementFrame', { install = InstallFrame, skin = SkinMainFrame, show = ShowFrame })
 
-local function Deactivate()
-	context.Restore()
+context.OnDisable(function()
 	for _, scrollBar in ipairs(autoHiddenBars) do scrollBar:SetAlpha(1) end
+	for _, meter in ipairs(meters) do meter:Hide() end
 	local frame = _G.AchievementFrame
 	if frame then frame.HeaderDetails.Back:SetAlpha(1) end
-	skinned = false
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		if not installed then
-			BUI.Events:Register('ADDON_LOADED', 'Skin.Achievements', TryInstall)
-		elseif _G.AchievementFrame:IsShown() then
-			Apply()
-		end
-	else
-		Deactivate()
-	end
 end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Achievements',
-	description = 'The achievements window: dark shell, flat category list, card rows for achievements, summary and comparison, white progress bars, statistics, search and tabs.',
-	icon = 'Interface/Icons/Achievement_Level_10',
-})

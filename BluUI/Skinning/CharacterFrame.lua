@@ -1,8 +1,9 @@
 local _, BUI = ...
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
+local BUILib = BluUI.BUILibClient
 local Widget = BUILib.Widget
-local FONT = BUILib.Font or STANDARD_TEXT_FONT
+local FONT = BUILib.Font
+local Hook = BUI.Profiler.Hooker('Skin.CharacterFrame')
 local Skin = BUI.Skinning
 local Readout = Skin.Readout
 local IsSecretValue = BUI.Tools.IsSecretValue
@@ -116,7 +117,6 @@ local NO_TITLE = -1
 local CONQUEST_CURRENCY, QUESTION_MARK_ICON = 1602, 134400
 
 local frame, model, sidebar, overlay
-local slots = {}
 local slotLabels = {}
 local sections = {}
 
@@ -174,19 +174,16 @@ local function HideTexture(texture)
 end
 
 local function HideBlizzardDecorations(button)
-    local name = button:GetName()
-    local icon = button.icon or (name and _G[name .. 'IconTexture'])
-    local contextOverlay = button.ItemContextOverlay
-    if contextOverlay and not contextOverlay._buiContext then
+    local icon, contextOverlay = button.icon, button.ItemContextOverlay
+    if not contextOverlay._buiContext then
         contextOverlay._buiContext = true
         contextOverlay:ClearAllPoints()
         contextOverlay:SetPoint('TOPLEFT', 1, -1)
         contextOverlay:SetPoint('BOTTOMRIGHT', -1, 1)
         contextOverlay:SetColorTexture(0, 0, 0, CONTEXT_DIM_ALPHA)
     end
-    for regionIndex = 1, button:GetNumRegions() do
-        local region = select(regionIndex, button:GetRegions())
-        if region and region ~= icon and region ~= contextOverlay and not region._buiOurs and region:GetObjectType() == 'Texture' then
+    for _, region in ipairs({ button:GetRegions() }) do
+        if region ~= icon and region ~= contextOverlay and not region._buiOurs and region:GetObjectType() == 'Texture' then
             HideTexture(region)
         end
     end
@@ -195,10 +192,6 @@ local function HideBlizzardDecorations(button)
             child:Hide()
             child.Show = child.Hide
         end
-    end
-    if button.NineSlice then
-        button.NineSlice:Hide()
-        button.NineSlice.Show = button.NineSlice.Hide
     end
 end
 
@@ -235,28 +228,24 @@ local function StyleSlotButton(button)
     button._buiStyled = true
 
     button.backgroundTextureName = nil
-    if not button.SetBackdrop then Mixin(button, BackdropTemplateMixin) end
+    Mixin(button, BackdropTemplateMixin)
 
     local existing = {}
-    for regionIndex = 1, button:GetNumRegions() do existing[select(regionIndex, button:GetRegions())] = true end
+    for _, region in ipairs({ button:GetRegions() }) do existing[region] = true end
 
     Painter.Custom(button, PaintSlot)
 
-    for regionIndex = 1, button:GetNumRegions() do
-        local region = select(regionIndex, button:GetRegions())
-        if region and not existing[region] then region._buiOurs = true end
+    for _, region in ipairs({ button:GetRegions() }) do
+        if not existing[region] then region._buiOurs = true end
     end
 
     HideBlizzardDecorations(button)
 
-    local name = button:GetName()
-    local icon = button.icon or (name and _G[name .. 'IconTexture'])
-    if icon then
-        icon:ClearAllPoints()
-        icon:SetPoint('TOPLEFT', 1, -1)
-        icon:SetPoint('BOTTOMRIGHT', -1, 1)
-        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    end
+    local icon = button.icon
+    icon:ClearAllPoints()
+    icon:SetPoint('TOPLEFT', 1, -1)
+    icon:SetPoint('BOTTOMRIGHT', -1, 1)
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
     button:HookScript('OnEnter', SlotEnter)
     button:HookScript('OnLeave', SlotLeave)
@@ -337,12 +326,13 @@ local function EnsureBagPopup()
     bagPopup.title:SetPoint('TOPLEFT', Pixel.Scale(8), Pixel.Scale(-6))
     Painter.Text(bagPopup.title, 'skinLabel')
     bagPopup.rows = {}
+    bagPopup.away = 0
     bagPopup:SetScript('OnUpdate', BUI.Profiler.Wrap('Skin.CharacterFrame bag popup', function(self, elapsed)
-        if self:IsMouseOver() or (self.owner and self.owner:IsMouseOver()) then
+        if self:IsMouseOver() or self.owner:IsMouseOver() then
             self.away = 0
             return
         end
-        self.away = (self.away or 0) + elapsed
+        self.away = self.away + elapsed
         if self.away > BAG.POPUP_LINGER then self:Hide() end
     end))
     bagPopup:Hide()
@@ -374,8 +364,7 @@ local function BagPopupCell(index)
     cell.level:SetTextColor(1, 1, 1, 1)
     cell:SetScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame cell OnEnter', function(self)
         self.hover:Show()
-        if not self.entry then return end
-        GameTooltip:SetOwner(self, self.tipAnchor or 'ANCHOR_RIGHT')
+        GameTooltip:SetOwner(self, self.tipAnchor)
         GameTooltip:SetHyperlink(self.entry.link)
         GameTooltip:Show()
     end))
@@ -390,12 +379,13 @@ local function ShowPickPopup(owner, labels, title, list, onPick)
     popup.owner, popup.onPick = owner, onPick
     popup.title:SetText(title)
     local side, opposite = PopupSide(labels.info)
-    local popupPixels = popup:GetWidth() * popup:GetEffectiveScale() + Pixel.Scale(4) * popup:GetEffectiveScale()
+    local popupPixels = (popup:GetWidth() + Pixel.Scale(4)) * popup:GetEffectiveScale()
     local buttonScale = labels.button:GetEffectiveScale()
+    local buttonLeft, buttonRight = labels.button:GetLeft(), labels.button:GetRight()
     local screenPixels = UIParent:GetWidth() * UIParent:GetEffectiveScale()
-    if side == 'LEFT' and labels.button:GetLeft() and labels.button:GetLeft() * buttonScale < popupPixels then
+    if side == 'LEFT' and buttonLeft * buttonScale < popupPixels then
         side, opposite = 'RIGHT', 'LEFT'
-    elseif side == 'RIGHT' and labels.button:GetRight() and screenPixels - labels.button:GetRight() * buttonScale < popupPixels then
+    elseif side == 'RIGHT' and screenPixels - buttonRight * buttonScale < popupPixels then
         side, opposite = 'LEFT', 'RIGHT'
     end
     local tipAnchor = side == 'RIGHT' and 'ANCHOR_RIGHT' or 'ANCHOR_LEFT'
@@ -404,7 +394,7 @@ local function ShowPickPopup(owner, labels, title, list, onPick)
         local entry, cell = list[index], BagPopupCell(index)
         cell.entry, cell.tipAnchor = entry, tipAnchor
         cell.icon:SetTexture(entry.icon)
-        local red, green, blue = C_Item.GetItemQualityColor(entry.quality or 1)
+        local red, green, blue = C_Item.GetItemQualityColor(entry.quality)
         cell:SetBackdropBorderColor(red, green, blue, 1)
         cell.level:SetText(entry.corner)
         cell:Show()
@@ -548,8 +538,7 @@ local function RefreshBagAlternatives()
 end
 
 local function SyncGemDim(labels)
-    local contextOverlay = labels.button.ItemContextOverlay
-    local alpha = (contextOverlay and contextOverlay:IsShown()) and 0.25 or 1
+    local alpha = labels.button.ItemContextOverlay:IsShown() and 0.25 or 1
     for _, gem in ipairs(labels.gems) do gem:SetAlpha(alpha) end
 end
 
@@ -587,7 +576,7 @@ local function BuildSlotLabels(button, info)
         GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
         if self.slot and GetInventoryItemLink('player', self.slot) then
             GameTooltip:SetInventoryItem('player', self.slot)
-        elseif self.tooltip and self.tooltip ~= '' then
+        elseif self.tooltip ~= '' then
             GameTooltip:SetText(self.tooltip, 1, 1, 1, 1, true)
         else
             GameTooltip:Hide()
@@ -627,18 +616,16 @@ local function BuildSlotLabels(button, info)
     marker:Hide()
 
     local contextOverlay = button.ItemContextOverlay
-    if contextOverlay then
-        local Hook = BUI.Profiler.Hooker('Skin.CharacterFrame')
-        local function Sync() SyncGemDim(labels) end
-        Hook(contextOverlay, 'Show', Sync)
-        Hook(contextOverlay, 'Hide', Sync)
-        Hook(contextOverlay, 'SetShown', Sync)
-    end
+    local function Sync() SyncGemDim(labels) end
+    Hook(contextOverlay, 'Show', Sync)
+    Hook(contextOverlay, 'Hide', Sync)
+    Hook(contextOverlay, 'SetShown', Sync)
 
     return labels
 end
 
 local gemMetrics
+local plainColor = {}
 
 local function RefreshGems(labels, link)
     Readout.RefreshGems(labels, link, gemMetrics)
@@ -664,7 +651,11 @@ local function RefreshSlot(labels)
 
     local canEnchant = Readout.CanHaveEnchant(info, link)
     local trackText, trackColor, enchant = Readout.Read('player', inventorySlot, link, canEnchant, labels.track:GetJustifyH() == 'RIGHT')
-    local color = trackColor or qualityColor or { Painter.Color('skinText') }
+    local color = trackColor or qualityColor
+    if not color then
+        color = plainColor
+        color[1], color[2], color[3] = Painter.Color('skinText')
+    end
 
     local level = ReadItemLevel(inventorySlot, link)
     labels.ilvl:SetText(level > 0 and tostring(level) or '')
@@ -693,35 +684,29 @@ end
 local function PlaceSlotButtons()
     for _, info in ipairs(SLOTS) do
         local button = _G['Character' .. info.id]
-        if button then
-            button:SetParent(frame)
-            button:ClearAllPoints()
-            button:SetSize(SLOT_SIZE, SLOT_SIZE)
-            local x, y = SlotAnchor(info)
-            button:SetPoint('TOPLEFT', frame, 'TOPLEFT', x, y)
-            button:SetFrameStrata(frame:GetFrameStrata())
-            button:SetFrameLevel(frame:GetFrameLevel() + 3)
-            button:SetAlpha(1)
-            button:EnableMouse(true)
-            button:Show()
-            StyleSlotButton(button)
-            slots[info.id] = button
-            if not slotLabels[info.id] then slotLabels[info.id] = BuildSlotLabels(button, info) end
-        end
+        button:SetParent(frame)
+        button:ClearAllPoints()
+        button:SetSize(SLOT_SIZE, SLOT_SIZE)
+        local x, y = SlotAnchor(info)
+        button:SetPoint('TOPLEFT', frame, 'TOPLEFT', x, y)
+        button:SetFrameStrata(frame:GetFrameStrata())
+        button:SetFrameLevel(frame:GetFrameLevel() + 3)
+        button:SetAlpha(1)
+        button:EnableMouse(true)
+        button:Show()
+        StyleSlotButton(button)
+        slotLabels[info.id] = BuildSlotLabels(button, info)
     end
 
     BUI.Profiler.After('Skin.CharacterFrame slot decorations', 0, function()
-        for _, info in ipairs(SLOTS) do
-            local button = _G['Character' .. info.id]
-            if button and button._buiStyled then HideBlizzardDecorations(button) end
-        end
+        for _, labels in pairs(slotLabels) do HideBlizzardDecorations(labels.button) end
     end)
 end
 
 local function FormatBigNumber(number)
     if number == nil then return '0' end
     if IsSecretValue(number) then return string.format('%s', AbbreviateNumbers(number)) end
-    return BreakUpLargeNumbers and BreakUpLargeNumbers(number) or tostring(number)
+    return BreakUpLargeNumbers(number)
 end
 
 local STAT_UNAVAILABLE = 'n/a'
@@ -778,9 +763,9 @@ end
 local PRIMARY_NAMES = { [1] = 'Strength', [2] = 'Agility', [3] = 'Stamina', [4] = 'Intellect' }
 
 local function PrimaryStatIndex()
-    local specIndex = GetSpecialization()
+    local specIndex = C_SpecializationInfo.GetSpecialization()
     if specIndex then
-        local _, _, _, _, _, primary = GetSpecializationInfo(specIndex)
+        local _, _, _, _, _, primary = C_SpecializationInfo.GetSpecializationInfo(specIndex)
         if primary then return primary end
     end
     return 4
@@ -795,7 +780,7 @@ local function PctStat(name, percentFn, ratingID, tooltip, title)
         local template = tooltip
         tooltip = function()
             local value = percentFn()
-            if type(value) ~= 'number' or IsSecretValue(value) then return nil end
+            if value == nil or IsSecretValue(value) then return nil end
             return template:format(value)
         end
     end
@@ -816,24 +801,23 @@ end
 
 local function ArmorReduction()
     local armor = select(3, UnitArmor('player'))
-    if type(armor) ~= 'number' or IsSecretValue(armor) then return nil end
-    local Effectiveness = C_PaperDollInfo and C_PaperDollInfo.GetArmorEffectiveness
-    if not Effectiveness then return nil end
-    local reduction = Effectiveness(armor, UnitLevel('player'))
-    if type(reduction) ~= 'number' or IsSecretValue(reduction) then return nil end
+    if armor == nil or IsSecretValue(armor) then return nil end
+    local reduction = C_PaperDollInfo.GetArmorEffectiveness(armor, UnitLevel('player'))
+    if reduction == nil or IsSecretValue(reduction) then return nil end
     return FormatPct(reduction * 100) .. ' physical damage reduced'
 end
 
 local Stat = { DETAIL_STEP = 100 }
 
 function Stat.MasterySpell()
-    local specIndex = GetSpecialization()
-    return specIndex and GetSpecializationMasterySpells(specIndex)
+    local specIndex = C_SpecializationInfo.GetSpecialization()
+    local spells = specIndex and C_SpecializationInfo.GetSpecializationMasterySpells(specIndex)
+    return spells and spells[1]
 end
 
 function Stat.HasMana()
     local mana = UnitPowerMax('player', Enum.PowerType.Mana)
-    return mana ~= nil and not IsSecretValue(mana) and mana > 0
+    return not IsSecretValue(mana) and mana > 0
 end
 
 function Stat.UsesSpellPower() return PrimaryStatIndex() == 4 end
@@ -869,9 +853,9 @@ local STAT_SECTIONS = {
             PctStat('Versatility', function() return GetCombatRatingBonus(CR_VERSATILITY_DAMAGE_DONE) end, CR_VERSATILITY_DAMAGE_DONE,
                 function()
                     local done = GetCombatRatingBonus(CR_VERSATILITY_DAMAGE_DONE)
-                    if type(done) ~= 'number' or IsSecretValue(done) then return nil end
+                    if done == nil or IsSecretValue(done) then return nil end
                     local taken = GetCombatRatingBonus(CR_VERSATILITY_DAMAGE_TAKEN)
-                    if type(taken) ~= 'number' or IsSecretValue(taken) then
+                    if taken == nil or IsSecretValue(taken) then
                         return ('Increases your damage and healing done by %.2f%%.'):format(done)
                     end
                     return ('Increases your damage and healing done by %.2f%%, and reduces damage you take by %.2f%%.'):format(done, taken)
@@ -914,9 +898,9 @@ local STAT_SECTIONS = {
     {
         title = 'PvP',
         stats = {
-            { name = 'Honor Level', value = function() return tostring(UnitHonorLevel('player') or 0) end },
+            { name = 'Honor Level', value = function() return tostring(UnitHonorLevel('player')) end },
             { name = 'Honor', value = function()
-                return FormatBigNumber(UnitHonor('player') or 0) .. '/' .. FormatBigNumber(UnitHonorMax('player') or 0)
+                return FormatBigNumber(UnitHonor('player')) .. '/' .. FormatBigNumber(UnitHonorMax('player'))
             end },
             { name = 'Conquest', value = function()
                 local info = C_CurrencyInfo.GetCurrencyInfo(CONQUEST_CURRENCY)
@@ -1038,6 +1022,7 @@ local function BuildSection(parent, definition)
         definition = definition,
         container = CreateFrame('Frame', nil, parent),
         rows = {},
+        rowCount = 0,
         collapsed = false,
     }
     local color = SECTION_COLORS[definition.title]
@@ -1084,7 +1069,7 @@ LayoutSections = function()
         local height = HEADER_HEIGHT
         if not section.collapsed then
             local rowY = -(HEADER_HEIGHT + HEADER_ROW_GAP)
-            for index = 1, section.rowCount or 0 do
+            for index = 1, section.rowCount do
                 local row = section.rows[index]
                 row:ClearAllPoints()
                 row:SetPoint('TOPLEFT', section.container, 'TOPLEFT', 0, Pixel.Scale(rowY))
@@ -1092,9 +1077,9 @@ LayoutSections = function()
                 row:Show()
                 rowY = rowY - ROW_HEIGHT
             end
-            height = HEADER_HEIGHT + HEADER_ROW_GAP + (section.rowCount or 0) * ROW_HEIGHT
+            height = HEADER_HEIGHT + HEADER_ROW_GAP + section.rowCount * ROW_HEIGHT
         else
-            for index = 1, section.rowCount or 0 do section.rows[index]:Hide() end
+            for index = 1, section.rowCount do section.rows[index]:Hide() end
         end
         section.container:ClearAllPoints()
         section.container:SetPoint('TOPLEFT', scrollChild, 'TOPLEFT', 0, Pixel.Scale(offsetY))
@@ -1146,7 +1131,7 @@ local RefreshTitles, RefreshSets
 local function ShowPane(key)
     for paneKey, pane in pairs(sidebar.panes) do pane:SetShown(paneKey == key) end
     for _, tab in ipairs(sidebar.tabs) do Skin.SetSegmentSelected(tab, tab.key == key) end
-    if key == 'titles' then RefreshTitles() elseif key == 'sets' then RefreshSets() end
+    if key == 'titles' then RefreshTitles() elseif key == 'sets' then RefreshSets(true) end
 end
 
 
@@ -1203,7 +1188,7 @@ RefreshTitles = function()
 
     local filter = pane.search:GetText():lower()
     local current = GetCurrentTitle()
-    if not current or current == 0 then current = NO_TITLE end
+    if current <= 0 then current = NO_TITLE end
 
     local child = pane.scroll.child
     local visible = 0
@@ -1235,8 +1220,7 @@ local function MissingSetItems(setID)
     if not items then return missing end
     for slot, itemID in pairs(items) do
         if itemID and itemID > 0 and GetInventoryItemID('player', slot) ~= itemID then
-            local count = C_Item.GetItemCount(itemID, true, true) or 0
-            if count == 0 then
+            if C_Item.GetItemCount(itemID, true, true) == 0 then
                 local name = C_Item.GetItemInfo(itemID) or ('item ' .. itemID)
                 missing[#missing + 1] = (EQUIPMENT_SLOT_NAMES[slot] or 'Slot') .. ': ' .. name
             end
@@ -1259,8 +1243,7 @@ local function NameDialog(text, button, apply)
         EditBoxOnEscapePressed = function(editBox) editBox:GetParent():Hide() end,
     }
     function dialog.OnAccept(popup)
-        local editBox = popup.EditBox or popup.editBox
-        local name = editBox:GetText():gsub('^%s+', ''):gsub('%s+$', '')
+        local name = popup.EditBox:GetText():gsub('^%s+', ''):gsub('%s+$', '')
         if name ~= '' and not InCombatLockdown() then apply(name, popup.data) end
     end
     function dialog.EditBoxOnEnterPressed(editBox)
@@ -1320,9 +1303,9 @@ local function ShowSetMenu(row)
         { title = true, text = 'Assign to spec' },
     }
     for specIndex = 1, GetNumSpecializations() do
-        local _, specName = GetSpecializationInfo(specIndex)
+        local _, specName = C_SpecializationInfo.GetSpecializationInfo(specIndex)
         items[#items + 1] = {
-            text = specName or ('Spec ' .. specIndex),
+            text = specName,
             checked = assigned == specIndex,
             callback = function()
                 if InCombatNotice() then return end
@@ -1405,7 +1388,7 @@ function SET.CreateRow(pane)
     row.marker = row:CreateTexture(nil, 'ARTWORK')
     row.marker:SetSize(Pixel.Scale(14), Pixel.Scale(14))
     row.marker:SetPoint('RIGHT', Pixel.Scale(-8), 0)
-    row.marker:SetTexture(BUILib.GetLibMedia('check'))
+    Widget.SetGlyph(row.marker, BUILib.GetLibMedia('check'))
     Painter.Tint(row.marker, 'positive')
 
     row.text:ClearAllPoints()
@@ -1521,7 +1504,7 @@ function SET.RefreshGrid(pane)
             cell.itemID = itemID
             cell.icon:SetTexture(C_Item.GetItemIconByID(itemID) or QUESTION_MARK_ICON)
             local equipped = GetInventoryItemID('player', slot) == itemID
-            local inBags = equipped or (C_Item.GetItemCount(itemID, true, true) or 0) > 0
+            local inBags = equipped or C_Item.GetItemCount(itemID, true, true) > 0
             cell.missing = not inBags
             cell.icon:SetDesaturated(not inBags)
             cell.icon:SetAlpha(inBags and 1 or 0.55)
@@ -1537,17 +1520,16 @@ function SET.RefreshGrid(pane)
     end
 end
 
-RefreshSets = function()
+RefreshSets = function(followEquipped)
     local pane = sidebar and sidebar.panes.sets
     if not pane or not pane:IsShown() then return end
 
     local child = pane.scroll.child
-    local setIDs = C_EquipmentSet.GetEquipmentSetIDs() or {}
     local equippedHex = BUI.Hex(Painter.Color('positive'))
     local missingHex = BUI.Hex(MISSING_COLOR[1], MISSING_COLOR[2], MISSING_COLOR[3])
     local count = 0
     local anyEquipped, selectedStillExists
-    for _, setID in ipairs(setIDs) do
+    for _, setID in ipairs(C_EquipmentSet.GetEquipmentSetIDs()) do
         local name, iconFileID, _, isEquipped, numItems, numEquipped, _, numLost = C_EquipmentSet.GetEquipmentSetInfo(setID)
         if name and name ~= '' then
             count = count + 1
@@ -1557,25 +1539,24 @@ RefreshSets = function()
             pane.rows[count] = row
             row.setID, row.setName = setID, name
             row.text:SetText(name)
-            row.icon:SetTexture(iconFileID or QUESTION_MARK_ICON)
+            row.icon:SetTexture(iconFileID)
             local assignedSpec = C_EquipmentSet.GetEquipmentSetAssignedSpec(setID)
-            local specName = assignedSpec and select(2, GetSpecializationInfo(assignedSpec))
-            local total, worn, lost = numItems or 0, numEquipped or 0, numLost or 0
+            local specName = assignedSpec and select(2, C_SpecializationInfo.GetSpecializationInfo(assignedSpec))
             local status
             row.marker:SetShown(isEquipped)
             if isEquipped then
                 status = ('|cff%sEquipped|r'):format(equippedHex)
-            elseif lost > 0 then
-                status = ('|cff%s%d missing|r'):format(missingHex, lost)
+            elseif numLost > 0 then
+                status = ('|cff%s%d missing|r'):format(missingHex, numLost)
             else
-                status = ('%d/%d'):format(worn, total)
+                status = ('%d/%d'):format(numEquipped, numItems)
             end
             if specName then status = status .. '  ||  ' .. specName end
             row.status:SetText(status)
             PlaceListRow(row, child, count, SET.ROW_H)
         end
     end
-    if not selectedStillExists then selectedSetID = anyEquipped end
+    if (followEquipped and anyEquipped) or not selectedStillExists then selectedSetID = anyEquipped end
     for index = 1, count do Skin.SetActiveEdge(pane.rows[index], pane.rows[index].setID == selectedSetID) end
     for index = count + 1, #pane.rows do pane.rows[index]:Hide() end
     pane.empty:SetShown(count == 0)
@@ -1609,9 +1590,9 @@ function LootSpec.Name()
         local _, name = GetSpecializationInfoByID(lootSpecID)
         return LootSpec.SHORT[lootSpecID] or name or '?', false
     end
-    local specIndex = GetSpecialization()
+    local specIndex = C_SpecializationInfo.GetSpecialization()
     local specID, name
-    if specIndex then specID, name = GetSpecializationInfo(specIndex) end
+    if specIndex then specID, name = C_SpecializationInfo.GetSpecializationInfo(specIndex) end
     return LootSpec.SHORT[specID] or name or 'None', true
 end
 
@@ -1633,7 +1614,7 @@ function LootSpec.OpenMenu(anchor)
         { separator = true },
     }
     for specIndex = 1, GetNumSpecializations() do
-        local specID, name, _, icon = GetSpecializationInfo(specIndex)
+        local specID, name, _, icon = C_SpecializationInfo.GetSpecializationInfo(specIndex)
         if specID then
             items[#items + 1] = {
                 text = Active(name, lootSpecID == specID),
@@ -1765,13 +1746,13 @@ local function RefreshHeader()
         pane.ilvl:SetText('')
         pane.ilvlHit:EnableMouse(false)
     else
-        pane.ilvl:SetFormattedText('%.2f', equipped or 0)
-        pane.ilvlInfo.equipped = equipped or 0
-        pane.ilvlInfo.total = total or 0
-        pane.ilvlInfo.pvp = (pvp and not IsSecretValue(pvp)) and pvp or 0
+        pane.ilvl:SetFormattedText('%.2f', equipped)
+        pane.ilvlInfo.equipped = equipped
+        pane.ilvlInfo.total = total
+        pane.ilvlInfo.pvp = IsSecretValue(pvp) and 0 or pvp
         pane.ilvlHit:EnableMouse(true)
     end
-    if pvp and not IsSecretValue(pvp) and pvp > 0 then
+    if not IsSecretValue(pvp) and pvp > 0 then
         pane.pvpIlvl:SetFormattedText('PvP iLvl: |cff%s%d|r', BUI.Hex(Painter.Color('positive')), math.floor(pvp))
     else
         pane.pvpIlvl:SetText('')
@@ -1834,8 +1815,7 @@ local TOGGLES = {
 
 local function RaceBackgroundPath()
     local _, fileName = UnitRace('player')
-    if DressUpTexturePath then return DressUpTexturePath(fileName), fileName end
-    return 'Interface/DressUpFrame/DressUpBackground-' .. (fileName or 'Orc'), fileName
+    return DressUpTexturePath(fileName), fileName
 end
 
 local function BuildModelBackground(parent)
@@ -1892,7 +1872,7 @@ local function BuildModelBackground(parent)
     local path, fileName = RaceBackgroundPath()
     art.pieces[1]:SetTexture(path .. 1)
     art.pieces[2]:SetTexture(path .. 3)
-    art.overlay:SetAlpha(ART.OVERLAY_ALPHA[strupper(fileName or '')] or ART.OVERLAY_DEFAULT)
+    art.overlay:SetAlpha(ART.OVERLAY_ALPHA[strupper(fileName)] or ART.OVERLAY_DEFAULT)
     return art
 end
 
@@ -1930,7 +1910,7 @@ local function BuildModel(parent)
     playerModel:SetScript('OnUpdate', BUI.Profiler.Wrap('Skin.CharacterFrame model spin', function(self)
         if not self.dragStartX then return end
         local cursorX = GetCursorPosition()
-        self.facing = (self.dragStartFacing or 0) + (cursorX - self.dragStartX) / 60
+        self.facing = self.dragStartFacing + (cursorX - self.dragStartX) / 60
         self:SetFacing(self.facing)
     end))
     playerModel:SetScript('OnMouseWheel', BUI.Profiler.Script('Skin.CharacterFrame playerModel OnMouseWheel', function(self, delta)
@@ -1947,8 +1927,8 @@ local function RefreshModel()
     model:SetUnit('player')
     model:SetPortraitZoom(0)
     model:SetPosition(0, 0, 0)
-    model:SetFacing(model.facing or 0)
-    model:SetCamDistanceScale(model.scale or 1)
+    model:SetFacing(model.facing)
+    model:SetCamDistanceScale(model.scale)
 end
 
 local Placement = { dragged = false }
@@ -1993,7 +1973,7 @@ local function ApplyBackground()
     local skinning = BUI.GetDB().skinning
     local tint = skinning.characterFrameTint
     if skinning.characterFrameTintEnabled and tint then
-        frame.tint:SetVertexColor(tint[1] or 0.5, tint[2] or 0.5, tint[3] or 0.6, tint[4] or 0.15)
+        frame.tint:SetVertexColor(tint[1], tint[2], tint[3], tint[4])
         frame.tint:Show()
     else
         frame.tint:Hide()
@@ -2001,9 +1981,6 @@ local function ApplyBackground()
 end
 
 local function BuildFrame()
-    if frame then return true end
-    if not CharacterFrame or not _G.CharacterHeadSlot then return false end
-
     frame = CreateFrame('Frame', nil, CharacterFrame, 'BackdropTemplate')
     frame:SetSize(FRAME_WIDTH, FRAME_HEIGHT)
     Painter.Custom(frame, Skin.PaintPanelBackdrop)
@@ -2020,7 +1997,6 @@ local function BuildFrame()
         Placement.OnDragStart()
         local scale = UIParent:GetEffectiveScale()
         local left, top = frame:GetLeft(), frame:GetTop()
-        if not left or not top then return end
         local cursorX, cursorY = GetCursorPosition()
         local grabX, grabY = cursorX / scale - left, cursorY / scale - top
         dragger:SetScript('OnUpdate', BUI.Profiler.Wrap('Skin.CharacterFrame sheet drag', function()
@@ -2049,9 +2025,7 @@ local function BuildFrame()
     Placement.Home()
 
     local titleBar = Skin.CreateTitleBar(frame, UnitName('player'), HEADER.BAR_H, function()
-        if CharacterFrame and CharacterFrame:IsShown() then
-            HideUIPanel(CharacterFrame)
-        end
+        if CharacterFrame:IsShown() then HideUIPanel(CharacterFrame) end
     end)
     titleBar:EnableMouse(true)
     titleBar:RegisterForDrag('LeftButton')
@@ -2086,25 +2060,23 @@ local function BuildFrame()
     end
 
     PlaceSlotButtons()
-    return true
 end
 
 local function UpdateSubtitle()
-    if not frame or not frame.subText then return end
+    if not frame then return end
     frame.titleText:SetText(UnitPVPName('player') or UnitName('player'))
     local level = UnitLevel('player')
     local _, classFile = UnitClass('player')
-    local className = classFile and LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[classFile] or classFile
     local specName
-    local specIndex = GetSpecialization()
+    local specIndex = C_SpecializationInfo.GetSpecialization()
     if specIndex then
-        local _, name = GetSpecializationInfo(specIndex)
+        local _, name = C_SpecializationInfo.GetSpecializationInfo(specIndex)
         specName = name
     end
     local parts = {}
-    if level and not IsSecretValue(level) then parts[#parts + 1] = 'Level ' .. level end
+    if not IsSecretValue(level) then parts[#parts + 1] = 'Level ' .. level end
     if specName then parts[#parts + 1] = specName end
-    if className then parts[#parts + 1] = className end
+    parts[#parts + 1] = LOCALIZED_CLASS_NAMES_MALE[classFile]
     frame.subText:SetText(table.concat(parts, '  '))
 end
 
@@ -2122,12 +2094,12 @@ local function RefreshAll()
     RefreshHeader()
     RefreshStats()
     RefreshTitles()
-    RefreshSets()
+    RefreshSets(true)
 end
 
 local function ShowSkin()
     if HasConflictingCharSheet() then return end
-    if not BuildFrame() then return end
+    if not frame then BuildFrame() end
     UpdateSubtitle()
     Placement.OnShow()
     if not frame:IsShown() then frame:Show() end
@@ -2148,11 +2120,8 @@ end
 local function ApplySkin()
     if not context.Enabled() or HasConflictingCharSheet() then return end
     if not CharacterFrame._buiSuppressActive then Skin.SuppressBlizzardFrame(CharacterFrame) end
-    local scene = _G.CharacterModelScene
-    if scene then
-        context.Fade(scene)
-        context.Fade(scene.ControlFrame)
-    end
+    context.Fade(CharacterModelScene)
+    context.Fade(CharacterModelScene.ControlFrame)
     BUI.Profiler.After('Skin.CharacterFrame show sheet', 0, function()
         if CharacterFrame:IsShown() then ShowSkin() end
     end)
@@ -2175,15 +2144,20 @@ context.OnDisable(function()
     Skin.RestoreBlizzardFrame(CharacterFrame)
 end)
 
-local pendingRefresh = {}
+local pendingRefresh, refreshRunners = {}, {}
 
 local function QueueRefresh(key, callback)
-    if pendingRefresh[key] then return end
+    if pendingRefresh[key] or not IsOpen() then return end
     pendingRefresh[key] = true
-    BUI.Profiler.After('Skin.CharacterFrame queued refresh', 0, function()
-        pendingRefresh[key] = nil
-        if IsOpen() then callback() end
-    end)
+    local runner = refreshRunners[key]
+    if not runner then
+        runner = function()
+            pendingRefresh[key] = nil
+            if IsOpen() then callback() end
+        end
+        refreshRunners[key] = runner
+    end
+    BUI.Profiler.After('Skin.CharacterFrame queued refresh', 0, runner)
 end
 
 local On = {}
@@ -2194,6 +2168,8 @@ function On.Equipment() QueueRefresh('equipment', On.EquipmentRefresh) end
 function On.ItemInfo() QueueRefresh('slots', RefreshSlots) end
 function On.Stats() QueueRefresh('stats', RefreshStats) end
 function On.Sets() QueueRefresh('sets', RefreshSets) end
+function On.FollowEquippedSet() RefreshSets(true) end
+function On.Swap() QueueRefresh('swap', On.FollowEquippedSet) end
 function On.Header() QueueRefresh('header', RefreshHeader) end
 function On.Model() QueueRefresh('model', RefreshModel) end
 function On.TitlesRefresh() RefreshTitles(); UpdateSubtitle() end
@@ -2207,7 +2183,7 @@ BUI.Events:Register('PLAYER_AVG_ITEM_LEVEL_UPDATE', 'Skinning.CharacterFrame', O
 BUI.Events:Register('SOCKET_INFO_UPDATE',           'Skinning.CharacterFrame', On.Equipment)
 BUI.Events:Register('GET_ITEM_INFO_RECEIVED',       'Skinning.CharacterFrame', On.ItemInfo)
 BUI.Events:Register('EQUIPMENT_SETS_CHANGED',       'Skinning.CharacterFrame', On.Sets)
-BUI.Events:Register('EQUIPMENT_SWAP_FINISHED',      'Skinning.CharacterFrame', On.Equipment)
+BUI.Events:Register('EQUIPMENT_SWAP_FINISHED',      'Skinning.CharacterFrame', On.Swap)
 BUI.Events:Register('KNOWN_TITLES_UPDATE',          'Skinning.CharacterFrame', On.Titles)
 BUI.Events:Register('UPDATE_INVENTORY_DURABILITY',  'Skinning.CharacterFrame', On.Header)
 BUI.Events:Register('CHALLENGE_MODE_COMPLETED',     'Skinning.CharacterFrame', On.Header)

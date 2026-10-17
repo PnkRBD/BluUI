@@ -1,15 +1,11 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.Journeys')
-
 local ipairs = ipairs
 local pairs = pairs
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local Skin = BUI.Skinning
-local SELECTED, MUTED_TEXT = Skin.SELECTED_COLOR, Skin.MUTED_COLOR
+local SELECTED, MUTED_TEXT, BODY_TEXT = Skin.SELECTED_COLOR, Skin.MUTED_COLOR, Skin.BODY_COLOR
 
-local SKIN_ID = 'journeys'
 local MAIN_ART = { 'Bg', 'TopTileStreaks', 'inset', 'InsetBorderBottomLeft', 'InsetBorderBottomRight', 'InsetBorderBottom', 'InsetBorderLeft', 'InsetBorderRight' }
 local TAB_KEYS = { 'JourneysTab', 'MonthlyActivitiesTab', 'suggestTab', 'dungeonsTab', 'raidsTab', 'LootJournalTab', 'TutorialsTab' }
 local SIDE_TAB_KEYS = { 'overviewTab', 'lootTab', 'bossTab', 'modelTab' }
@@ -33,96 +29,74 @@ local BOSS_TEXT_SCALE = 1.2
 local BOSS_SELECTED_ALPHA = 0.12
 local BULLET_SIZE = 4
 local ROW_HOVER_ALPHA = 0.07
-local BODY_TEXT = { 0.87, 0.87, 0.9, 1 }
+local LOOT_FILTER_GAP = 4
+local LORE_COLOR = CreateColor(BODY_TEXT[1], BODY_TEXT[2], BODY_TEXT[3])
 local THRESHOLD_ART = { 'BarBackground', 'BarBackgroundGlow', 'BarBorder', 'BarBorderGlow', 'BarFillGlow' }
 local THRESHOLD_BARS = { 'ThresholdBar', 'BonusThresholdBar' }
 
-local installed = false
-local skinned = false
 local sideTabs
+local bossSelections = {}
 
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
-local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
+local context = Skin.Define('journeys', {
+	name = 'Journeys',
+	description = 'The Adventure Guide: renown cards, dungeon and raid tiles, boss lists, encounter overviews, abilities, loot tables, search and the suggested content pages.',
+	icon = 'Interface/EncounterJournal/UI-EJ-PortraitIcon',
+})
+local Hook, Guard, Enabled = context.Hook, context.Guard, context.Enabled
+local Fade, FadeRegions, FadeKeys, FadeStates, Keep = context.Fade, context.FadeRegions, context.FadeKeys, context.FadeStates, context.Keep
 local Shell, Button, Close, Dropdown, EditBox = context.Shell, context.Button, context.Close, context.Dropdown, context.EditBox
-local ScrollBar, Body, Title = context.ScrollBar, context.Body, context.Title
-local FlatTexture, SelectedTexture, CropIcon = Skin.FlatTexture, Skin.SelectedTexture, Skin.CropIcon
-
-local function KeepTexture(texture)
-	if texture then texture.__buiSkin = true end
-end
+local ScrollBar, Body, Title, Line, SideTab = context.ScrollBar, context.Body, context.Title, context.Line, context.SideTab
+local FlatTexture, SelectedTexture = Skin.FlatTexture, Skin.SelectedTexture
 
 local function SetColor(fontString, color)
-	if fontString then fontString:SetTextColor(color[1], color[2], color[3], color[4]) end
+	fontString:SetTextColor(color[1], color[2], color[3], color[4])
 end
 
 local function PictureText(fontString, kind, scale)
-	if not fontString then return end
 	Skin.TipFont(fontString, kind, scale)
 	fontString:SetShadowColor(0, 0, 0, 1)
 	fontString:SetShadowOffset(1, -1)
-end
-
-local function FadeStateTextures(button)
-	Fade(button:GetNormalTexture())
-	Fade(button:GetPushedTexture())
-	Fade(button:GetDisabledTexture())
-	Fade(button:GetHighlightTexture())
-end
-
-local function GuardEnabled(callback)
-	return function(frame)
-		if Enabled() then callback(frame) end
-	end
 end
 
 local function SkinPanelFrame(frame)
 	Fade(frame.NineSlice)
 	FadeKeys(frame, MAIN_ART)
 	FadeRegions(frame)
-	if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
+	Fade(frame.PortraitContainer.portrait)
 	Shell(frame)
-	Title(frame.TitleContainer and frame.TitleContainer.TitleText)
+	Title(frame.TitleContainer.TitleText)
 	Close(frame.CloseButton)
 end
 
 local function SkinNavButton(button)
-	if not button or button._buiNavButton then return end
+	if button._buiNavButton then return end
 	button._buiNavButton = true
 	FadeRegions(button)
-	FadeStateTextures(button)
+	FadeStates(button)
 	Shell(button)
-	Body(button.text or (button.GetFontString and button:GetFontString()))
+	Body(button.text)
 	Skin.TipNavArrow(button.MenuArrowButton)
 end
 
 local function OnNavButtonAdded(navBar)
-	local journal = _G.EncounterJournal
-	if not Enabled() or not journal or navBar ~= journal.navBar then return end
+	if navBar ~= _G.EncounterJournal.navBar then return end
 	local buttons = navBar.navList
-	if buttons then SkinNavButton(buttons[#buttons]) end
+	SkinNavButton(buttons[#buttons])
 end
 
 local function SkinNavBar(navBar)
-	if not navBar then return end
 	FadeRegions(navBar)
 	Fade(navBar.overlay)
 	SkinNavButton(navBar.homeButton)
-	if navBar.navList then
-		for _, button in ipairs(navBar.navList) do SkinNavButton(button) end
-	end
+	for _, button in ipairs(navBar.navList) do SkinNavButton(button) end
 end
 
 local function SkinSearchResult(row)
 	if row._buiSearchRow then return end
 	row._buiSearchRow = true
-	FadeStateTextures(row)
+	FadeStates(row)
 	Fade(row.iconFrame)
-	CropIcon(row.icon)
-	Skin.TipIconFrame(row, row.icon)
+	Skin.SquareIcon(row, row.icon)
 	Skin.TipFont(row.name, 'title', SEARCH_TITLE_SCALE)
 	for _, key in ipairs(SEARCH_RESULT_LABEL_KEYS) do Skin.TipFont(row[key], 'label') end
 end
@@ -130,30 +104,27 @@ end
 local function SkinSearch(frame)
 	EditBox(frame.searchBox)
 	local results = frame.searchResults
-	if not results then return end
 	FadeRegions(results)
-	Fade(results.NineSlice)
 	Shell(results)
 	ScrollBar(results.ScrollBar)
-	Skin.SweepScrollBox(results.ScrollBox, GuardEnabled(SkinSearchResult))
+	Skin.SweepScrollBox(results.ScrollBox, Guard(SkinSearchResult))
 end
 
 local function SkinInstanceTile(tile)
 	if tile._buiTile then return end
 	tile._buiTile = true
-	FadeStateTextures(tile)
+	FadeStates(tile)
 	Skin.TipIconFrame(tile, tile.bgImage)
 	PictureText(tile.name, 'title', TILE_TITLE_SCALE)
 	Body(tile.range)
 end
 
 local function SkinInstanceSelect(select)
-	if not select then return end
 	FadeKeys(select, INSTANCE_SELECT_ART)
 	Skin.TipFont(select.Title, 'title', TILE_TITLE_SCALE)
 	Dropdown(select.ExpansionDropdown)
 	ScrollBar(select.ScrollBar)
-	Skin.SweepScrollBox(select.ScrollBox, GuardEnabled(SkinInstanceTile))
+	Skin.SweepScrollBox(select.ScrollBox, Guard(SkinInstanceTile))
 end
 
 local function SideTabs(info)
@@ -167,25 +138,25 @@ end
 local function RefreshSideTabs(info)
 	local tabs = SideTabs(info)
 	for index, tab in ipairs(tabs) do
-		Skin.SideTab(context, tab, SIDE_TAB_OPTIONS)
+		SideTab(tab, SIDE_TAB_OPTIONS)
 		Skin.SetSideTabSelected(tab, info.tab == index)
 	end
 	Skin.LayoutSideTabs(info, tabs, SIDE_TAB_TOP_OFFSET)
 end
 
 local function OnTabSet()
-	if Enabled() and skinned then RefreshSideTabs(_G.EncounterJournal.encounter.info) end
+	RefreshSideTabs(_G.EncounterJournal.encounter.info)
 end
 
 local function OnTabEnabled(tab, enabled)
-	if not Enabled() or not tab._buiSideTab then return end
+	if not tab._buiSideTab then return end
 	local alpha = enabled and 1 or DISABLED_ICON_ALPHA
 	tab.selected:SetAlpha(alpha)
 	tab.unselected:SetAlpha(alpha)
 end
 
 local function OnBossSelected(button)
-	if Enabled() then button._buiBossSelected:Show() end
+	button._buiBossSelected:Show()
 end
 
 local function OnBossUnselected(button)
@@ -196,11 +167,11 @@ local function SkinBossButton(button)
 	if not button._buiBoss then
 		button._buiBoss = true
 		Skin.TipButton(button, BOSS_TEXT_SCALE)
-		local selected = button:CreateTexture(nil, 'ARTWORK', nil, -1)
-		selected.__buiSkin = true
+		local selected = Keep(button:CreateTexture(nil, 'ARTWORK', nil, -1))
 		selected:SetAllPoints(button)
 		selected:Hide()
 		button._buiBossSelected = selected
+		bossSelections[#bossSelections + 1] = selected
 		Hook(button, 'LockHighlight', OnBossSelected)
 		Hook(button, 'UnlockHighlight', OnBossUnselected)
 	end
@@ -209,18 +180,17 @@ local function SkinBossButton(button)
 end
 
 local function RefreshLootRow(item)
-	if Enabled() then Skin.SetIconEdgeQuality(item.icon, item.IconBorder) end
+	Skin.SetIconEdgeQuality(item.icon, item.IconBorder)
 end
 
 local function SkinLootRow(item)
 	if not item.IconBorder then return end
 	if not item._buiLoot then
 		item._buiLoot = true
-		KeepTexture(item.icon)
+		Keep(item.icon)
 		FadeKeys(item, LOOT_ITEM_ART)
 		Fade(item.IconBorder)
-		CropIcon(item.icon)
-		Skin.TipIconFrame(item, item.icon)
+		Skin.SquareIcon(item, item.icon)
 		Skin.TipFace(item.name, 'title')
 		for _, key in ipairs(LOOT_ITEM_TEXT_KEYS) do Skin.TipFont(item[key], 'body') end
 		Shell(item, LOOT_INSET)
@@ -230,32 +200,32 @@ local function SkinLootRow(item)
 end
 
 local function RefreshHeaderState(button)
-	if not Enabled() or not button.title then return end
 	SetColor(button.title, button:GetParent().expanded and SELECTED or MUTED_TEXT)
 	SetColor(button.expandedIcon, BODY_TEXT)
 end
 
 local function SkinInfoHeader(header)
-	if header._buiHeader then return end
-	header._buiHeader = true
 	local button = header.button
-	KeepTexture(button.abilityIcon)
-	Button(button)
-	for _, child in ipairs({ button:GetChildren() }) do
-		KeepTexture(child.icon)
-		FadeRegions(child)
+	if not header._buiHeader then
+		header._buiHeader = true
+		Keep(button.abilityIcon)
+		Button(button)
+		for _, child in ipairs({ button:GetChildren() }) do
+			Keep(child.icon)
+			FadeRegions(child)
+		end
+		Skin.TipFace(button.expandedIcon, 'title')
+		Skin.TipFace(button.title, 'title')
+		Skin.TipFont(header.description, 'body')
+		Fade(header.descriptionBG)
+		Fade(header.descriptionBGBottom)
+		Skin.TipFont(header.overviewDescription.Text, 'body')
+		button:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Journeys header OnShow', Guard(RefreshHeaderState)))
 	end
-	Skin.TipFace(button.expandedIcon, 'title')
-	Skin.TipFace(button.title, 'title')
-	Skin.TipFont(header.description, 'body')
-	Fade(header.descriptionBG)
-	Fade(header.descriptionBGBottom)
-	if header.overviewDescription then Skin.TipFont(header.overviewDescription.Text, 'body') end
 	RefreshHeaderState(button)
 end
 
 local function SweepHeaders()
-	if not Enabled() then return end
 	local encounter = _G.EncounterJournal.encounter
 	for _, header in pairs(encounter.usedHeaders) do SkinInfoHeader(header) end
 	for _, header in ipairs(encounter.overviewFrame.overviews) do SkinInfoHeader(header) end
@@ -266,39 +236,27 @@ local function SkinBullet(bullet)
 	bullet._buiBullet = true
 	Skin.TipFont(bullet.Text, 'body')
 	local dot = bullet.Bullet
-	if not dot then return end
 	dot:SetSize(BULLET_SIZE, BULLET_SIZE)
 	SelectedTexture(dot, 1)
 end
 
 local function OnBullets(object)
-	if not Enabled() then return end
 	local bullets = object:GetParent().Bullets
 	if not bullets then return end
 	for _, bullet in ipairs(bullets) do SkinBullet(bullet) end
 end
 
 local function RecolorLore(instance)
-	local scrollingFont = instance.LoreScrollingFont
-	scrollingFont:SetTextColor(CreateColor(BODY_TEXT[1], BODY_TEXT[2], BODY_TEXT[3]))
-	local target = scrollingFont.ScrollBox and scrollingFont.ScrollBox.ScrollTarget
-	if not target then return end
-	for _, child in ipairs({ target:GetChildren() }) do
-		if child.FontString then SetColor(child.FontString, BODY_TEXT) end
-	end
+	instance.LoreScrollingFont:SetTextColor(LORE_COLOR)
 end
 
 local function OnInstanceDisplayed()
-	if not Enabled() or not skinned then return end
 	local encounter = _G.EncounterJournal.encounter
 	RefreshSideTabs(encounter.info)
 	RecolorLore(encounter.instance)
 end
 
-local LOOT_FILTER_GAP = 4
-
 local function OnLootFilterUpdated()
-	if not Enabled() or not skinned then return end
 	local loot = _G.EncounterJournal.encounter.info.LootContainer
 	local filterBar = loot.classClearFilter
 	if not filterBar:IsShown() then return end
@@ -306,11 +264,11 @@ local function OnLootFilterUpdated()
 end
 
 local function SkinInstancePage(instance)
-	KeepTexture(instance.loreBG)
+	Keep(instance.loreBG)
 	FadeRegions(instance)
 	PictureText(instance.title, 'title', LORE_TITLE_SCALE)
 	local mapButton = instance.mapButton
-	KeepTexture(mapButton.texture)
+	Keep(mapButton.texture)
 	FadeRegions(mapButton)
 	Body(_G[mapButton:GetName() .. 'Text'])
 	ScrollBar(instance.LoreScrollBar)
@@ -340,7 +298,7 @@ local function SkinLootPage(loot)
 	Shell(clear)
 	Skin.TipFace(clear.text, 'body')
 	Close((clear:GetChildren()))
-	Skin.SweepScrollBox(loot.ScrollBox, GuardEnabled(SkinLootRow))
+	Skin.SweepScrollBox(loot.ScrollBox, Guard(SkinLootRow))
 end
 
 local function SkinModelPage(model)
@@ -349,17 +307,17 @@ local function SkinModelPage(model)
 end
 
 local function SkinInfo(info)
-	KeepTexture(info.difficultyIcon)
+	Keep(info.difficultyIcon)
 	FadeRegions(info)
 	Shell(info)
 	Skin.TipFont(info.encounterTitle, 'title', ENCOUNTER_TITLE_SCALE)
 	Skin.TipFont(info.instanceTitle, 'title', ENCOUNTER_TITLE_SCALE)
 	local instanceButton = info.instanceButton
-	KeepTexture(instanceButton.icon)
+	Keep(instanceButton.icon)
 	FadeRegions(instanceButton)
 	Dropdown(info.difficulty)
 	ScrollBar(info.BossesScrollBar)
-	Skin.SweepScrollBox(info.BossesScrollBox, GuardEnabled(SkinBossButton))
+	Skin.SweepScrollBox(info.BossesScrollBox, Guard(SkinBossButton))
 	SkinOverviewPage(info.overviewScroll)
 	SkinDetailsPage(info.detailsScroll)
 	SkinLootPage(info.LootContainer)
@@ -368,7 +326,6 @@ local function SkinInfo(info)
 end
 
 local function SkinEncounter(encounter)
-	if not encounter then return end
 	SkinInstancePage(encounter.instance)
 	SkinInfo(encounter.info)
 	SweepHeaders()
@@ -387,7 +344,7 @@ local function SkinJourneyCard(card)
 	card._buiCard = true
 	card:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Journeys card OnEnter', CardEnter))
 	card:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Journeys card OnLeave', CardLeave))
-	FadeStateTextures(card)
+	FadeStates(card)
 	Skin.TipShell(card, CARD_INSET)
 	Skin.TipFont(card.RenownCardFactionName or card.JourneyCardName, 'title', CARD_TITLE_SCALE)
 	Body(card.RenownCardFactionLevel or card.JourneyCardLevel)
@@ -401,27 +358,19 @@ local function SkinJourneyEntry(entry)
 	elseif entry.CategoryDivider and not entry._buiDivider then
 		entry._buiDivider = true
 		Fade(entry.CategoryDivider)
-		local line = entry:CreateTexture(nil, 'ARTWORK')
-		line.__buiSkin = true
-		line:SetPoint('LEFT', entry, 'LEFT', 14, 0)
-		line:SetPoint('RIGHT', entry, 'RIGHT', -31, 0)
-		line:SetHeight(1)
-		BUI.Painter.Fill(line, 'skinBorder')
-		BUILib.Skin.PixelLine(line, entry, false, 14, 31)
+		Line(entry, entry, false, 14, 31)
 	end
 end
 
 local function SkinJourneys(frame)
-	if not frame then return end
 	ScrollBar(frame.ScrollBar)
 	Skin.FadeTree(frame.BorderFrame)
-	Skin.SweepScrollBox(frame.JourneysList, GuardEnabled(SkinJourneyEntry))
-	if frame.JourneyProgress then Button(frame.JourneyProgress.OverviewBtn) end
-	if frame.JourneyOverview then Button(frame.JourneyOverview.OverviewBtn) end
+	Skin.SweepScrollBox(frame.JourneysList, Guard(SkinJourneyEntry))
+	Button(frame.JourneyProgress.OverviewBtn)
+	Button(frame.JourneyOverview.OverviewBtn)
 end
 
 local function OnActivityTextColor(textContainer, data)
-	if not Enabled() then return end
 	if data and data.completed then
 		Skin.TipFont(textContainer.NameText, 'label')
 		Skin.TipFont(textContainer.ConditionsText, 'label')
@@ -432,72 +381,56 @@ local function OnActivityTextColor(textContainer, data)
 end
 
 local function SkinActivityRow(row)
-	if not Enabled() or row._buiActivity then return end
+	if row._buiActivity then return end
 	row._buiActivity = true
 	Fade(row:GetNormalTexture())
 	Fade(row.Ribbon)
 	Fade(row.RibbonStacked)
 	local highlight = row:GetHighlightTexture()
-	if highlight then
-		highlight:SetBlendMode('BLEND')
-		FlatTexture(highlight, 1, 1, 1, ROW_HOVER_ALPHA)
-	end
+	highlight:SetBlendMode('BLEND')
+	FlatTexture(highlight, 1, 1, 1, ROW_HOVER_ALPHA)
 	Shell(row, CARD_INSET)
 	Skin.TipFont(row.Points, 'title')
 	local textContainer = row.TextContainer
-	if textContainer then
-		Skin.TipFace(textContainer.NameText, 'title')
-		Skin.TipFace(textContainer.ConditionsText, 'label')
-		if textContainer.UpdateTextColor then
-			Hook(textContainer, 'UpdateTextColor', OnActivityTextColor)
-		end
-	end
+	Skin.TipFace(textContainer.NameText, 'title')
+	Skin.TipFace(textContainer.ConditionsText, 'label')
+	Hook(textContainer, 'UpdateTextColor', OnActivityTextColor)
 end
 
 local function SkinThresholdBar(container)
-	if not container or container._buiThreshold then return end
+	if container._buiThreshold then return end
 	container._buiThreshold = true
 	for _, key in ipairs(THRESHOLD_ART) do Fade(container[key]) end
-	if container.BarEnd then Fade(container.BarEnd.line) end
+	Fade(container.BarEnd.line)
 	Shell(container)
 	for _, key in ipairs(THRESHOLD_BARS) do
 		local bar = container[key]
-		if bar then
-			bar:SetStatusBarTexture(BUI.GetGlobalTexture())
-			bar:SetStatusBarColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
-		end
+		bar:SetStatusBarTexture(BUI.GetGlobalTexture())
+		bar:SetStatusBarColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
 	end
 	local textContainer = container.TextContainer
-	if textContainer then
-		Body(textContainer.Points)
-		Body(textContainer.ProgressText)
-	end
+	Body(textContainer.Points)
+	Body(textContainer.ProgressText)
 end
 
 local function SkinMonthly(frame)
-	if not frame then return end
 	ScrollBar(frame.ScrollBar)
-	if frame.FilterList then ScrollBar(frame.FilterList.ScrollBar) end
-	if frame.ThemeContainer then FadeRegions(frame.ThemeContainer) end
+	ScrollBar(frame.FilterList.ScrollBar)
+	FadeRegions(frame.ThemeContainer)
 	local header = frame.HeaderContainer
-	if header then
-		Skin.TipFont(header.Title, 'title', CATEGORY_SCALE)
-		Body(header.Month)
-		Body(header.TimeLeft)
-	end
+	Skin.TipFont(header.Title, 'title', CATEGORY_SCALE)
+	Body(header.Month)
+	Body(header.TimeLeft)
 	SkinThresholdBar(frame.ThresholdContainer)
-	Skin.SweepScrollBox(frame.ScrollBox, GuardEnabled(SkinActivityRow))
+	Skin.SweepScrollBox(frame.ScrollBox, Guard(SkinActivityRow))
 end
 
 local function SkinSuggestions(frame)
-	if not frame then return end
 	for _, key in ipairs(SUGGESTION_KEYS) do
 		local suggestion = frame[key]
-		if suggestion then
-			Button(suggestion.button)
-			Skin.TipFaceTree(suggestion.title, 1, 'title')
-			Skin.TipFaceTree(suggestion.description, 1, 'body')
-		end
+		Button(suggestion.button)
+		Skin.TipFaceTree(suggestion.title, 1, 'title')
+		Skin.TipFaceTree(suggestion.description, 1, 'body')
 	end
 end
 
@@ -516,13 +449,7 @@ local function SkinMainFrame(frame)
 	SkinSuggestions(frame.suggestFrame)
 end
 
-local function Apply()
-	local frame = _G.EncounterJournal
-	if not frame or frame:IsForbidden() or not Enabled() then return end
-	if not skinned then
-		skinned = true
-		SkinMainFrame(frame)
-	end
+local function ShowFrame(frame)
 	Skin.RefreshTabStrip(frame)
 	RefreshSideTabs(frame.encounter.info)
 	OnLootFilterUpdated()
@@ -537,47 +464,10 @@ local function HookJournal()
 	Hook('EncounterJournal_ToggleHeaders', SweepHeaders)
 	Hook('EncounterJournal_SetUpOverview', SweepHeaders)
 	Hook('EncounterJournal_SetBullets', OnBullets)
-	Hook('EncounterJournal_UpdateButtonState', RefreshHeaderState)
 end
 
-local function Install()
-	if installed then return end
-	local frame = _G.EncounterJournal
-	if not frame then return end
-	installed = true
-	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Journeys frame reskin', Apply))
-	HookJournal()
-	if frame:IsShown() then Apply() end
-end
+context.Window('EncounterJournal', { install = HookJournal, skin = SkinMainFrame, show = ShowFrame })
 
-local function TryInstall()
-	Install()
-	if installed then BUI.Events:Unregister('ADDON_LOADED', 'Skin.Journeys') end
-end
-
-local function Deactivate()
-	context.Restore()
-	if sideTabs then
-		for _, tab in ipairs(sideTabs) do Skin.ResetSideTab(tab) end
-	end
-	skinned = false
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		if not installed then
-			BUI.Events:Register('ADDON_LOADED', 'Skin.Journeys', TryInstall)
-		elseif _G.EncounterJournal:IsShown() then
-			Apply()
-		end
-	else
-		Deactivate()
-	end
+context.OnDisable(function()
+	for _, selected in ipairs(bossSelections) do selected:Hide() end
 end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Journeys',
-	description = 'The Adventure Guide: renown cards, dungeon and raid tiles, boss lists, encounter overviews, abilities, loot tables, search and the suggested content pages.',
-	icon = 'Interface/EncounterJournal/UI-EJ-PortraitIcon',
-})

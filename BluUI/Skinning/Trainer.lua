@@ -1,7 +1,7 @@
 local _, BUI = ...
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
-local FONT = BUILib.Font or STANDARD_TEXT_FONT
+local BUILib = BluUI.BUILibClient
+local FONT = BUILib.Font
 local Skin = BUI.Skinning
 local Painter = BUI.Painter
 local Pixel = BUI.Pixel
