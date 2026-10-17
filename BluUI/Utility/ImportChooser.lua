@@ -5,7 +5,9 @@ local Controls = BUILib.Controls
 local Layout = BUILib.Layout
 local Modals = BUILib.Modals
 local Widget = BUILib.Widget
-local Theme
+local Theme = BUILib.Theme
+local DeepCopy = BUI.Tools.DeepCopy
+local MergeDefaults = BUI.ExportImport.MergeDefaults
 local pairs, type, ipairs = pairs, type, ipairs
 
 local GROUPS = {
@@ -36,10 +38,16 @@ local GROUPS = {
 		{ key = 'cooldownFlash',   name = 'Cooldown Flash' },
 		{ key = 'bloodlust',       name = 'Bloodlust Tracker' },
 		{ key = 'gatewayAlert',    name = 'Gateway Alert' },
+		{ key = 'keystoneReminder', name = 'Keystone Reminder' },
+		{ key = 'privateWarning',  name = 'Private Warning' },
+		{ key = 'secondaryStats',  name = 'Secondary Stats' },
+		{ key = 'auraGroups',      name = 'Aura Groups' },
+		{ key = 'recentAuras',     name = 'Recent Auras' },
 	}},
 	{ header = 'HUD', sections = {
 		{ key = 'datatext',     name = 'Datatext (Legacy)' },
 		{ key = 'datatextBars', name = 'Datatext Bars' },
+		{ key = 'dashboard',    name = 'Dashboard' },
 		{ key = 'cursor',       name = 'Cursor' },
 		{ key = 'crosshair',    name = 'Crosshair' },
 		{ key = 'markers',      name = 'Markers' },
@@ -50,10 +58,12 @@ local GROUPS = {
 		{ key = 'social',        name = 'Social' },
 		{ key = 'automation',    name = 'Automation' },
 		{ key = 'combatLogging', name = 'Combat Logging' },
+		{ key = 'celebrations',  name = 'Celebrations' },
 	}},
 	{ header = 'Combat', sections = {
 		{ key = 'combatMessage',  name = 'Combat Message' },
 		{ key = 'combatTimer',    name = 'Combat Timer' },
+		{ key = 'combatRes',      name = 'Combat Rez' },
 	}},
 	{ header = 'Buff Tracking', sections = {
 		{ key = 'hunterTip',                  name = 'Hunter Tip' },
@@ -113,8 +123,6 @@ local function Normalize(data)
 end
 
 local function WithDefaults(section, sectionKey)
-	local DeepCopy = BUI.Tools.DeepCopy
-	local MergeDefaults = BUI.ExportImport.MergeDefaults
 	local defaultSection = BUI.Defaults.profile[sectionKey]
 	local copy = DeepCopy(section or {})
 	if defaultSection then MergeDefaults(copy, defaultSection) end
@@ -182,9 +190,7 @@ local function ComputeDiff(currentDB, importData)
 	return result, details
 end
 
-local function ShowChooser(importData, currentDB, onConfirm, onCancel)
-	if not Theme then Theme = BUILib.Theme end
-
+local function ShowChooser(importData, currentDB, onConfirm)
 	local diff, details = ComputeDiff(currentDB, importData)
 
 	local visibleGroups = {}
@@ -209,8 +215,7 @@ local function ShowChooser(importData, currentDB, onConfirm, onCancel)
 			message = 'The import string contains no recognized settings sections.',
 			fullscreen = true,
 		})
-		if overlay then overlay:SetFrameLevel(300) end
-		if onCancel then onCancel() end
+		overlay:SetFrameLevel(300)
 		return
 	end
 
@@ -220,8 +225,7 @@ local function ShowChooser(importData, currentDB, onConfirm, onCancel)
 			message = 'Your settings already match the imported profile. Nothing to update.',
 			fullscreen = true,
 		})
-		if overlay then overlay:SetFrameLevel(300) end
-		if onCancel then onCancel() end
+		overlay:SetFrameLevel(300)
 		return
 	end
 
@@ -230,7 +234,6 @@ local function ShowChooser(importData, currentDB, onConfirm, onCancel)
 		width = 580,
 		height = 500,
 		fullscreen = true,
-		onClose = function() if onCancel then onCancel() end end,
 		buttons = {
 			{ text = 'Import Selected', color = Modals.BTN_CONFIRM, width = 150,
 				onClick = function(close)
@@ -241,20 +244,17 @@ local function ShowChooser(importData, currentDB, onConfirm, onCancel)
 						end
 					end
 					close()
-					if onConfirm then onConfirm(selected) end
+					onConfirm(selected)
 				end,
 			},
 			{ text = 'Cancel', color = Modals.BTN_NEUTRAL, width = 100,
-				onClick = function(close)
-					close()
-					if onCancel then onCancel() end
-				end,
+				onClick = function(close) close() end,
 			},
 		},
 	})
 
 	local accentRed, accentGreen, accentBlue = Theme.GetAccent()
-	local contentWidth = content.contentWidth or content.width or 520
+	local contentWidth = content.contentWidth
 
 	local warnWrap = CreateFrame('Frame', nil, content.child)
 	warnWrap:SetWidth(contentWidth)

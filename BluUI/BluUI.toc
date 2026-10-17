@@ -170,6 +170,7 @@ Modules\CDM\Profiler.lua
 Modules\Celebrations\Celebrations.lua
 Modules\Auras\Auras.lua
 Modules\Auras\CombatTimer.lua
+Modules\Auras\CombatRes.lua
 Modules\Auras\CombatMessage.lua
 Modules\Auras\Crosshair.lua
 Modules\Auras\GatewayAlert.lua
