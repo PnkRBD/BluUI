@@ -13,15 +13,14 @@ local ENEMIES_ONLY_TIP = 'Blizzard does not let addons hide this debuff on you o
 local SELF_LOCKED_TIP = 'Blizzard does not let addons hide this debuff on you, so it still shows on the debuff frame.'
 local SELF_PIN_TIP = 'Blizzard does not let addons pick out this debuff on you, so pinning it does nothing here.'
 local LOCKED_ALPHA = 0.35
-local KIND = { HELPFUL = 'buff', HARMFUL = 'debuff' }
 local OTHER_KIND = { HELPFUL = 'debuff', HARMFUL = 'buff' }
+local SWITCH_KEYS = { 'only', 'anyone' }
+local RULES_TIP = 'Pick which auras show here. The top rule claims its auras first; untick a rule to hide what it claims'
 
 local AuraLists = {}
 BUI.AuraLists = AuraLists
 
-local function Window()
-	return BUI.PageEngine.window
-end
+local Window = BUI.OptionsKit.Window
 
 local function GroupByName(ids)
 	local byName, groups = {}, {}
@@ -41,7 +40,7 @@ local function GroupByName(ids)
 	return groups
 end
 
-local function Strip(ui, spells, tooltip, onPick)
+local function Strip(spells, tooltip, onPick)
 	return { build = function(parent)
 		local frame = CreateFrame('Frame', nil, parent)
 		frame:SetSize(STRIP_MAX * (STRIP_ICON + STRIP_GAP) - STRIP_GAP, STRIP_ICON)
@@ -91,7 +90,7 @@ local function Strip(ui, spells, tooltip, onPick)
 end
 
 local function Search(anchor, text, Add)
-	local spellID = BUI.ResolveSpellInput(text)
+	local spellID = BUI.Lookup.ParseSpellInput(text)
 	if spellID then return Add(spellID) end
 	local hits = BUI.Lookup.SearchSpells(text)
 	if #hits == 1 then return Add(hits[1].id) end
@@ -102,6 +101,7 @@ local function Search(anchor, text, Add)
 	if #menu == 0 then menu[1] = { text = 'Nothing found', disabled = true } end
 	Controls.ContextMenu(menu, { anchor = anchor, width = RESULTS_WIDTH, window = Window() })
 end
+AuraLists.Search = Search
 
 local function AddRow(ui, board, Add)
 	local row = board:AddRow('Add a spell', 'Name, ID or spell link, then press Enter', INPUT_WIDTH)
@@ -135,19 +135,15 @@ function AuraLists.Blacklist(ui, parent, width, page, options)
 		local set = AB.Set(scope, polarity)
 		if set[spellID] then return end
 		AB.UserAdd(scope, polarity, spellID)
-		if not AB.HidesOnFriendly(spellID, polarity) then
-			BUI.Print((C_Spell.GetSpellName(spellID) or ('Spell ' .. spellID)) .. ': ' .. lockedTip)
-		end
 		Changed()
 	end
 	AddRow(ui, board, Add)
 	AB.RecordUnitAuras(scope, polarity)
 	if AB.RecentEntries(scope, polarity)[1] then
-		board:AddTools('Recently seen', 'Click one to blacklist it', { Strip(ui, function() return AB.RecentEntries(scope, polarity) end, 'Click to blacklist', Add) })
+		board:AddTools('Recently seen', 'Click one to blacklist it', { Strip(function() return AB.RecentEntries(scope, polarity) end, 'Click to blacklist', Add) })
 	end
 
-	local entries = {}
-	for _, group in ipairs(GroupByName(AB.UserEntries(scope, polarity))) do entries[#entries + 1] = group end
+	local entries = GroupByName(AB.UserEntries(scope, polarity))
 	local showsBuiltIns = AB.ShowsBuiltIns(scope, polarity)
 	local active, disabled = {}, {}
 	if showsBuiltIns then
@@ -186,7 +182,7 @@ function AuraLists.Blacklist(ui, parent, width, page, options)
 		local groups = GroupByName(disabled)
 		local ids = {}
 		for index, group in ipairs(groups) do ids[index] = group.ids[1] end
-		board:AddTools('Built-ins turned off', 'Click one to turn it back on', { Strip(ui, function() return ids end, 'Click to turn it back on', function(spellID)
+		board:AddTools('Built-ins turned off', 'Click one to turn it back on', { Strip(function() return ids end, 'Click to turn it back on', function(spellID)
 			for _, group in ipairs(groups) do
 				if group.ids[1] == spellID then
 					for _, id in ipairs(group.ids) do AB.SetBuiltInHidden(polarity, id, true) end
@@ -215,7 +211,7 @@ function AuraLists.Pinned(ui, parent, width, page, options)
 		options.onChange()
 		page:RebuildCurrent()
 	end
-	for _, key in ipairs({ 'only', 'anyone' }) do
+	for _, key in ipairs(SWITCH_KEYS) do
 		local switch = options[key]
 		if switch then
 			board:AddSwitch(switch.label, switch.get, function(value)
@@ -227,10 +223,6 @@ function AuraLists.Pinned(ui, parent, width, page, options)
 	local polarity = options.polarity
 	AddRow(ui, board, function(spellID)
 		if list[spellID] then return end
-		if WrongKind(spellID, polarity) then
-			BUI.Print(('%s is a %s, this list only takes %ss.'):format(C_Spell.GetSpellName(spellID) or spellID, OTHER_KIND[polarity], KIND[polarity]))
-			return
-		end
 		list[spellID] = true
 		Changed()
 	end)
@@ -263,15 +255,22 @@ function AuraLists.ShareCell(board, label)
 	end, 'Both frame modules use one combined blacklist')
 end
 
+local ruleKit, ruleKitWindow
+
+local function RuleKit()
+	local window = Window()
+	if ruleKitWindow ~= window then
+		ruleKit, ruleKitWindow = BUILib.Layout.TableKit(window), window
+	end
+	return ruleKit
+end
+
 function BUI.AuraRuleEditor(parent, options)
 	local AuraRules = BUI.AuraRules
-	local kit = BUILib.Layout.TableKit(Window())
 	local button
-	button = kit.Button(parent, 'Priority rules', 'secondary', function()
+	button = RuleKit().Button(parent, 'Priority rules', 'secondary', function()
 		local rules = options.getRules()
-		local function Push()
-			if options.onChanged then options.onChanged() end
-		end
+		local Push = options.onChanged
 		Controls.Popover({
 			anchor = button, width = 320, height = 254, title = 'PRIORITY RULES, TOP WINS',
 			bg = { Window():Color('page') }, border = { Window():Color('edge') },
@@ -297,7 +296,6 @@ function BUI.AuraRuleEditor(parent, options)
 							if rules[ruleIndex] == row.id then table.remove(rules, ruleIndex); break end
 						end
 						SetHidden(row.id, false)
-						if #rules == 0 then BUI.Print('No rules left, this container shows nothing.') end
 						Push()
 					end,
 					nil, nil,
@@ -328,8 +326,7 @@ function BUI.AuraRuleEditor(parent, options)
 			end,
 		})
 	end)
-	local tip = options.tooltip or 'Pick which auras show here. The top rule claims its auras first; untick a rule to hide what it claims'
-	button:HookScript('OnEnter', function(self) Widget.ShowTip(self, tip) end)
+	button:HookScript('OnEnter', function(self) Widget.ShowTip(self, RULES_TIP) end)
 	button:HookScript('OnLeave', Widget.HideTip)
 	return button
 end

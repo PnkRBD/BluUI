@@ -9,7 +9,6 @@ local FOOTER_HEIGHT = 30
 local FOOTER_GAP = 28
 local STEP_HEIGHT = 580
 local LINE_HEIGHT = 32
-local SLIDER_WIDTH = 360
 local SCALE_TILE_HEIGHT = 108
 local SCALE_TILE_PAD = 18
 local SCALE_COLUMNS = 3
@@ -89,6 +88,7 @@ local barsChoice, barsVisited = 'ours', false
 local NeedsBarsStep
 local openingProfile, pendingProfile, pendingNew, lookSnapshot
 local themeVisited, scaleVisited, finishing = false, false, false
+local themeStage
 local scaleChoice
 local SCALE_SCREENS = {
 	{ key = '1080', title = '1080p', height = 1080, note = '1920 x 1080' },
@@ -106,12 +106,12 @@ local function CopyValue(value)
 end
 
 local function CaptureLook(profile)
-	local look = { unitFrames = {}, groups = {}, scale = profile.uiScale and profile.uiScale.scale }
+	local look = { unitFrames = {}, groups = {}, scale = profile.uiScale.scale }
 	for _, key in ipairs(UNIT_LOOK_KEYS) do look.unitFrames[key] = CopyValue(profile.unitFrames[key]) end
 	for _, unit in ipairs(GROUP_UNITS) do
 		local section, saved = profile.groupFrames[unit], {}
 		for _, key in ipairs(GROUP_LOOK_KEYS) do saved[key] = CopyValue(section[key]) end
-		for _, group in ipairs(GROUP_LOOK_NESTED) do saved[group] = CopyValue(section[group] and section[group].color) end
+		for _, group in ipairs(GROUP_LOOK_NESTED) do saved[group] = CopyValue(section[group].color) end
 		look.groups[unit] = saved
 	end
 	return look
@@ -123,9 +123,7 @@ local function WriteLook(profile, look, withTheme, withScale)
 		for _, unit in ipairs(GROUP_UNITS) do
 			local section, saved = profile.groupFrames[unit], look.groups[unit]
 			for _, key in ipairs(GROUP_LOOK_KEYS) do section[key] = CopyValue(saved[key]) end
-			for _, group in ipairs(GROUP_LOOK_NESTED) do
-				if section[group] then section[group].color = CopyValue(saved[group]) end
-			end
+			for _, group in ipairs(GROUP_LOOK_NESTED) do section[group].color = CopyValue(saved[group]) end
 		end
 	end
 	if withScale and look.scale ~= nil then profile.uiScale.scale = look.scale end
@@ -142,7 +140,7 @@ local function CommitProfile()
 	local aceDB = BUI.GetAceDB()
 	if not pendingProfile or pendingProfile == aceDB:GetCurrentProfile() then return end
 	local edited = CaptureLook(BUI.GetDB())
-	if lookSnapshot then WriteLook(BUI.GetDB(), lookSnapshot, true, true) end
+	WriteLook(BUI.GetDB(), lookSnapshot, true, true)
 	local existed = ProfileExists(pendingProfile)
 	BUI._suppressProfileCallback = true
 	aceDB:SetProfile(pendingProfile)
@@ -155,11 +153,11 @@ end
 local function KeptProfiles()
 	local keep = { Default = true }
 	keep[BUI.GetAceDB():GetCurrentProfile()] = true
-	for _, profileName in pairs(BUI.db.sv.profileKeys or {}) do keep[profileName] = true end
-	for _, character in pairs(BUI.db.sv.char or {}) do
-		local store = type(character) == 'table' and character.specProfiles
-		local map = type(store) == 'table' and store.map
-		if type(map) == 'table' then
+	for _, profileName in pairs(BUI.db.sv.profileKeys) do keep[profileName] = true end
+	for _, character in pairs(BUI.db.sv.char) do
+		local store = character.specProfiles
+		local map = store and store.map
+		if map then
 			for _, profileName in pairs(map) do keep[profileName] = true end
 		end
 	end
@@ -168,7 +166,7 @@ end
 
 local function CharacterNames()
 	local names = {}
-	for charKey in pairs(BUI.db.sv.profileKeys or {}) do
+	for charKey in pairs(BUI.db.sv.profileKeys) do
 		local name = charKey:match('^(.-) %- ')
 		if name then names[name] = true end
 	end
@@ -177,22 +175,15 @@ end
 
 local function RemoveLeftoverProfiles()
 	local aceDB = BUI.GetAceDB()
-	local keep, characters, removed = KeptProfiles(), CharacterNames(), {}
+	local keep, characters = KeptProfiles(), CharacterNames()
 	for _, name in pairs(aceDB:GetProfiles()) do
 		local base = name:match('^(.-) %d+$') or name
-		if not keep[name] and (characters[base] or name == BLU_PROFILE) then
-			aceDB:DeleteProfile(name, true)
-			removed[#removed + 1] = name
-		end
-	end
-	if #removed > 0 then
-		table.sort(removed)
-		BUI.Print('Setup removed profiles an unfinished setup left behind: ' .. table.concat(removed, ', ') .. '.')
+		if not keep[name] and (characters[base] or name == BLU_PROFILE) then aceDB:DeleteProfile(name, true) end
 	end
 end
 
 local function RestoreOpeningLook()
-	if finishing or not lookSnapshot or pendingProfile == openingProfile then return end
+	if finishing or pendingProfile == openingProfile then return end
 	BUI.Events:AfterCombat(function()
 		WriteLook(BUI.GetDB(), lookSnapshot, true, true)
 		BUI.ApplyScale()
@@ -245,8 +236,8 @@ local function Heading(kit, frame, title, text, width)
 	return PAD + 2 + kit.Height(titleText) + 8 + kit.Height(body) + PAD
 end
 
-local function Footer(kit, frame, y, back, forward, above)
-	frame:SetHeight(math.max(y + FOOTER_HEIGHT + PAD + 1, STEP_HEIGHT - (above or 0)))
+local function Footer(kit, frame, y, back, forward)
+	frame:SetHeight(math.max(y + FOOTER_HEIGHT + PAD + 1, STEP_HEIGHT))
 	local anchor = kit.Button(frame, forward.text, 'primary', forward.onClick)
 	anchor:SetPoint('BOTTOMRIGHT', 0, PAD + 1)
 	if back then
@@ -257,10 +248,6 @@ local function Footer(kit, frame, y, back, forward, above)
 	rule:SetPoint('BOTTOMLEFT')
 	rule:SetPoint('BOTTOMRIGHT')
 	return frame
-end
-
-local function Choice(kit, parent, x, y, width, height, selected, onClick)
-	return kit.ChoiceCard(parent, x, y, width, height, selected, onClick)
 end
 
 local function Welcome(kit, _, parent, width, _, page)
@@ -303,8 +290,25 @@ local function CurrentScale()
 	return UIParent:GetScale()
 end
 
+local pendingScale, scalePage
+
+local function RefreshScale()
+	BUI.Profiler.After('Setup scale refresh', 0.05, function() scalePage:Rebuild('scale') end)
+end
+
+BUI.Scheduler.RegisterUpdate(SCALE_APPLY_KEY, function()
+	if IsMouseButtonDown('LeftButton') then return end
+	BUI.Scheduler.SetUpdateEnabled(SCALE_APPLY_KEY, false)
+	local value = pendingScale
+	pendingScale = nil
+	if not value then return end
+	ApplyScale(value)
+	RefreshScale()
+end, 0.1, false)
+
 local function Scale(kit, shell, parent, width, _, page)
 	scaleVisited = true
+	scalePage = page
 	local best = BUI.ClampedUIScale()
 	local minimum, maximum = BUI.ScaleBounds()
 	local screenWidth, screenHeight = GetPhysicalScreenSize()
@@ -345,16 +349,15 @@ local function Scale(kit, shell, parent, width, _, page)
 	Paint(chosen.value or current)
 	y = y + SCALE_READOUT + 8 + 16 + PAD
 
-	local function Refresh() BUI.Profiler.After('Setup scale refresh', 0.05, function() page:Rebuild('scale') end) end
 	local tileWidth = math.floor((width - TILE_GAP * (SCALE_COLUMNS - 1)) / SCALE_COLUMNS)
 	local textWidth = tileWidth - SCALE_TILE_PAD * 2
 	for index, choice in ipairs(choices) do
 		local column, row = (index - 1) % SCALE_COLUMNS, math.floor((index - 1) / SCALE_COLUMNS)
-		local tile = Choice(kit, frame, column * (tileWidth + TILE_GAP), y + row * (SCALE_TILE_HEIGHT + TILE_GAP), tileWidth, SCALE_TILE_HEIGHT, choice.key == scaleChoice, function()
+		local tile = kit.ChoiceCard(frame, column * (tileWidth + TILE_GAP), y + row * (SCALE_TILE_HEIGHT + TILE_GAP), tileWidth, SCALE_TILE_HEIGHT, choice.key == scaleChoice, function()
 			scaleChoice = choice.key
 			if choice.value then
 				ApplyScale(choice.value)
-				Refresh()
+				RefreshScale()
 			else
 				page:Rebuild('scale')
 			end
@@ -375,18 +378,8 @@ local function Scale(kit, shell, parent, width, _, page)
 
 	if scaleChoice == 'custom' then
 		y = y + SCALE_CUSTOM_GAP
-		local pending
-		BUI.Scheduler.RegisterUpdate(SCALE_APPLY_KEY, function()
-			if IsMouseButtonDown('LeftButton') then return end
-			BUI.Scheduler.SetUpdateEnabled(SCALE_APPLY_KEY, false)
-			local value = pending
-			pending = nil
-			if not value then return end
-			ApplyScale(value)
-			Refresh()
-		end, 0.1, false)
-		local slider = kit.Slider(frame, SCALE_SLIDER_WIDTH, { min = minimum, max = maximum, step = 0.001, precise = true, boxWidth = SCALE_BOX_WIDTH, format = ExactScale, get = function() return CurrentScale() end, set = function(value)
-			pending = value
+		local slider = kit.Slider(frame, SCALE_SLIDER_WIDTH, { min = minimum, max = maximum, step = 0.001, precise = true, boxWidth = SCALE_BOX_WIDTH, format = ExactScale, get = CurrentScale, set = function(value)
+			pendingScale = value
 			Paint(value)
 			BUI.Scheduler.SetUpdateEnabled(SCALE_APPLY_KEY, true)
 		end })
@@ -397,19 +390,14 @@ local function Scale(kit, shell, parent, width, _, page)
 	return { Footer(kit, frame, y, function() Back(page, 'profile') end, { text = 'Next', onClick = function() Go(page, 'skins') end }) }
 end
 
-local function SkinOrder()
-	local registry, order = Skin().GetSkinRegistry()
-	return registry, order
-end
-
 local function SeedSelection()
 	wipe(skinSelection)
-	local _, order = SkinOrder()
+	local _, order = Skin().GetSkinRegistry()
 	for _, id in ipairs(order) do skinSelection[id] = not SKINS_OFF_BY_DEFAULT[id] end
 end
 
 local function SelectionCounts()
-	local _, order = SkinOrder()
+	local _, order = Skin().GetSkinRegistry()
 	local count, total = 0, 0
 	for _, id in ipairs(order) do
 		if not SKINS_OFF_BY_DEFAULT[id] then
@@ -421,7 +409,7 @@ local function SelectionCounts()
 end
 
 local function ChooseAll(enabled)
-	local _, order = SkinOrder()
+	local _, order = Skin().GetSkinRegistry()
 	for _, id in ipairs(order) do skinSelection[id] = enabled and not SKINS_OFF_BY_DEFAULT[id] end
 end
 
@@ -463,9 +451,7 @@ local function SkinnedMock(kit, parent)
 		tab.Text = tab:GetFontString()
 		tab:EnableMouse(false)
 		Skin().TipTabSelected(tab, tabIndex == 1)
-		if tab.Text then
-			if tabIndex == 1 then tab.Text:SetTextColor(1, 1, 1, 1) else tab.Text:SetTextColor(0.6, 0.62, 0.66, 1) end
-		end
+		if tabIndex == 1 then tab.Text:SetTextColor(1, 1, 1, 1) else tab.Text:SetTextColor(0.6, 0.62, 0.66, 1) end
 		tabs[tabIndex] = tab
 	end
 	BUILib.Skin.LayoutTabStrip(mock, tabs)
@@ -543,7 +529,7 @@ local function Profile(kit, _, parent, width, _, page)
 	local textWidth = tileWidth - TILE_PAD * 2
 	for index, tile in ipairs(tiles) do
 		local column, row = (index - 1) % PROFILE_COLUMNS, math.floor((index - 1) / PROFILE_COLUMNS)
-		local card = Choice(kit, frame, column * (tileWidth + TILE_GAP), y + row * (PROFILE_TILE_HEIGHT + TILE_GAP), tileWidth, PROFILE_TILE_HEIGHT,
+		local card = kit.ChoiceCard(frame, column * (tileWidth + TILE_GAP), y + row * (PROFILE_TILE_HEIGHT + TILE_GAP), tileWidth, PROFILE_TILE_HEIGHT,
 			(tile.create and pendingNew) or (not tile.create and not pendingNew and tile.name == pendingProfile), function() PickProfile(page, tile.name, tile.create == true) end)
 		local avatar
 		if tile.logo then
@@ -579,7 +565,7 @@ local function Skins(kit, shell, parent, width, _, page)
 	local tileWidth = math.floor((width - TILE_GAP) / 2)
 	local textTop = SKIN_WELL_INSET + SKIN_PREVIEW_HEIGHT + SKIN_TEXT_GAP
 	local function Tile(index, selected, mock, title, note, enabled)
-		local tile = Choice(kit, frame, (index - 1) * (tileWidth + TILE_GAP), y, tileWidth, SKIN_TILE_HEIGHT, selected, function()
+		local tile = kit.ChoiceCard(frame, (index - 1) * (tileWidth + TILE_GAP), y, tileWidth, SKIN_TILE_HEIGHT, selected, function()
 			ChooseAll(enabled)
 			page:Rebuild('skins')
 		end)
@@ -634,24 +620,26 @@ local function Theme(kit, shell, parent, width, _, page)
 	themeVisited = true
 	local window = shell.window
 	local module = UnitFrames()
+	if themeStage then module.ReleaseStage(themeStage) end
 	local frame = Block(parent, width)
 	local y = Heading(kit, frame, 'Unit frames', 'Pick a look. The preview shows your real frames, and it changes as you click.', width)
 	local applied = BUI.Installer.AppliedStyle()
 	local tileWidth = math.floor((width - TILE_GAP * 3) / 4)
 	for index, style in ipairs(BUI.Installer.FRAME_STYLES) do
-		local tile = Choice(kit, frame, (index - 1) * (tileWidth + TILE_GAP), y, tileWidth, STYLE_TILE_HEIGHT, applied == style, function()
+		local tile = kit.ChoiceCard(frame, (index - 1) * (tileWidth + TILE_GAP), y, tileWidth, STYLE_TILE_HEIGHT, applied == style, function()
 			BUI.Installer.ApplyFrameStyle(style)
 			page:Rebuild('theme')
 		end)
 		StyleSwatch(kit, tile, style)
 		kit.Text(tile, style.name, 13, 'text'):SetPoint('TOPLEFT', TILE_PAD, -(TILE_PAD + SWATCH_HEIGHT + 16))
-		kit.Text(tile, STYLE_NOTES[style.key] or style.tip, 11, 'muted', tileWidth - TILE_PAD * 2):SetPoint('TOPLEFT', TILE_PAD, -(TILE_PAD + SWATCH_HEIGHT + 36))
+		kit.Text(tile, STYLE_NOTES[style.key], 11, 'muted', tileWidth - TILE_PAD * 2):SetPoint('TOPLEFT', TILE_PAD, -(TILE_PAD + SWATCH_HEIGHT + 36))
 	end
 	y = y + STYLE_TILE_HEIGHT + THEME_GAP
 
 	local band = kit.PreviewBand(frame, width, BAND_HEIGHT)
 	band:SetPoint('TOPLEFT', 0, -y)
 	local stage = CreateFrame('Frame', nil, band)
+	themeStage = stage
 	stage:SetAllPoints()
 	stage:SetClipsChildren(true)
 	local captions = { kit.Text(stage, 'PLAYER', 9, 'faint'), kit.Text(stage, 'TARGET', 9, 'faint') }
@@ -754,10 +742,7 @@ local function ElvUIBarSettings()
 	return type(bars) == 'table' and bars or nil
 end
 
-local function IsInstalled(name)
-	if C_AddOns.DoesAddOnExist then return C_AddOns.DoesAddOnExist(name) end
-	return C_AddOns.GetAddOnInfo(name) ~= nil
-end
+local IsInstalled = C_AddOns.DoesAddOnExist
 
 local function IsOnHere(name)
 	return C_AddOns.IsAddOnLoaded(name) or C_AddOns.GetAddOnEnableState(name, UnitName('player')) > 0
@@ -784,7 +769,7 @@ local function RivalBars()
 	end
 	for index = 1, C_AddOns.GetNumAddOns() do
 		local name = C_AddOns.GetAddOnInfo(index)
-		if name and name:match(SUITE_PREFIX) and name:lower():find('actionbar', 1, true) then
+		if name:match(SUITE_PREFIX) and name:lower():find('actionbar', 1, true) then
 			found[#found + 1] = { name = name, label = "EllesmereUI's action bars", on = IsOnHere(name) }
 		end
 	end
@@ -803,7 +788,7 @@ local function OtherUI()
 	if not seen.EllesmereUI then
 		for index = 1, C_AddOns.GetNumAddOns() do
 			local name = C_AddOns.GetAddOnInfo(index)
-			if name and name:match(SUITE_PREFIX) and not seen[name] and IsOnHere(name) then
+			if name:match(SUITE_PREFIX) and not seen[name] and IsOnHere(name) then
 				found[#found + 1] = 'EllesmereUI'
 				break
 			end
@@ -816,20 +801,14 @@ NeedsBarsStep = function()
 	return #RivalBars() > 0 or #OtherUI() > 0
 end
 
-local function JoinNames(names)
-	if #names == 0 then return nil end
-	if #names == 1 then return names[1] end
-	return table.concat(names, ', ', 1, #names - 1) .. ' and ' .. names[#names]
-end
-
 local function BarOptions()
 	local rivals = RivalBars()
-	local options = { { key = 'ours', title = "Use BluUI's bars", value = 'BluUI', note = 'BluUI runs your action bars', logo = true } }
+	local options = { { key = 'ours', title = "BluUI's action bars", value = 'BluUI', logo = true } }
 	for _, rival in ipairs(rivals) do
 		local owner = rival.suite and 'ElvUI' or rival.name:match(SUITE_PREFIX) and 'EllesmereUI' or rival.name
-		options[#options + 1] = { key = rival.name, title = 'Use ' .. rival.label, value = owner, note = owner .. ' runs your action bars', rival = owner }
+		options[#options + 1] = { key = rival.name, title = rival.label, value = owner, rival = owner }
 	end
-	if #rivals == 0 then options[#options + 1] = { key = 'blizzard', title = "Keep Blizzard's bars", value = 'Blizzard', note = "Blizzard's own action bars" } end
+	if #rivals == 0 then options[#options + 1] = { key = 'blizzard', title = "Blizzard's action bars", value = 'Blizzard' } end
 	return options, rivals
 end
 
@@ -837,13 +816,6 @@ local function Outcomes()
 	local list = { { label = "BluUI's action bars", before = BUI.GetDB().modules.actionBars ~= false, after = barsChoice == 'ours' } }
 	for _, rival in ipairs(RivalBars()) do
 		list[#list + 1] = { label = rival.label, before = rival.on, after = rival.name == barsChoice }
-	end
-	for _, outcome in ipairs(list) do
-		if outcome.after then
-			outcome.state, outcome.role = outcome.before and 'Stays on' or 'Turns on', 'positive'
-		else
-			outcome.state, outcome.role = outcome.before and 'Turns off' or 'Stays off', outcome.before and 'danger' or 'muted'
-		end
 	end
 	return list
 end
@@ -871,7 +843,7 @@ local function ApplyBars()
 			C_AddOns.DisableAddOn(rival.name, character)
 		end
 	end
-	if C_AddOns.SaveAddOns then C_AddOns.SaveAddOns() end
+	C_AddOns.SaveAddOns()
 end
 
 local function BarsSummary()
@@ -899,8 +871,7 @@ local function BarRowState(option, rivalsByName)
 	elseif option.key == 'blizzard' then
 		before = modules.actionBars == false
 	else
-		local rival = rivalsByName[option.key]
-		before = rival and rival.on or false
+		before = rivalsByName[option.key].on
 	end
 	local after = option.key == barsChoice
 	local state = after and (before and 'Stays on' or 'Turns on') or (before and 'Turns off' or 'Stays off')
@@ -928,8 +899,7 @@ end
 local function BarRowNote(option, rivalsByName)
 	if option.key == 'ours' then return 'Built into BluUI' end
 	if option.key == 'blizzard' then return "The game's own action bars" end
-	local rival = rivalsByName[option.key]
-	if rival and rival.on then return 'Installed and on right now' end
+	if rivalsByName[option.key].on then return 'Installed and on right now' end
 	return 'Installed, switched off on this character'
 end
 
@@ -952,7 +922,7 @@ local function Bars(kit, _, parent, width, _, page)
 	local nameWidth = width - BAR_TEXT_X - BAR_STATE_RIGHT - BAR_STATE_WIDTH - TILE_PAD
 	for _, option in ipairs(options) do
 		local selected = option.key == barsChoice
-		local row = Choice(kit, frame, 0, y, width, BAR_ROW_HEIGHT, selected, function()
+		local row = kit.ChoiceCard(frame, 0, y, width, BAR_ROW_HEIGHT, selected, function()
 			barsChoice = option.key
 			page:Rebuild('bars')
 		end)
@@ -969,7 +939,7 @@ local function Bars(kit, _, parent, width, _, page)
 		avatar:SetPoint('LEFT', TILE_PAD, 0)
 		row.ring:ClearAllPoints()
 		row.ring:SetPoint('RIGHT', -TILE_PAD, 0)
-		local title = kit.Text(row, option.key == 'ours' and "BluUI's action bars" or option.key == 'blizzard' and "Blizzard's action bars" or option.title:gsub('^Use ', ''), 14, 'text', nameWidth, 'title')
+		local title = kit.Text(row, option.title, 14, 'text', nameWidth, 'title')
 		title:SetWordWrap(false)
 		title:SetPoint('BOTTOMLEFT', row, 'LEFT', BAR_TEXT_X, 2)
 		local note = kit.Text(row, BarRowNote(option, rivalsByName), 11, 'muted', nameWidth)
@@ -1064,7 +1034,6 @@ local function Finish(kit, shell, parent, width, _, page)
 			CommitProfile()
 			Skin().WriteSkinsEnabled(skinSelection)
 			ApplyBars()
-			BUI.Print('Setup complete. Open settings anytime with |cff' .. BUI.C.COLOR_PINK .. '/bui|r.')
 			ReloadUI()
 		end, 'Setup.Finish')
 	end }) }
@@ -1090,10 +1059,7 @@ BUI.OptionsWindow.New('setup', {
 		wipe(done)
 		shell:RebuildPage('setup')
 	end,
-	onClosed = function()
-		RestoreOpeningLook()
-		BUI.Print('Setup closed. Run it anytime with |cff' .. BUI.C.COLOR_PINK .. '/bui install|r.')
-	end,
+	onClosed = RestoreOpeningLook,
 	build = function(tab, shell)
 		Layout.RailPage(tab, shell, {
 			icon = 'check',

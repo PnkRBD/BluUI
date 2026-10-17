@@ -11,16 +11,15 @@ local OptionsWindow = BUI.OptionsWindow
 local windows = {}
 
 function OptionsWindow.New(id, config)
-	local width, height = config.width or WINDOW_WIDTH, config.height or WINDOW_HEIGHT
 	local shell = Layout.Shell({
 		chrome = 'topnav',
 		title = config.title,
 		icon = BUI.C.ICON_PATH,
 		brand = config.brand,
 		version = BUI.Version,
-		width = width, height = height,
-		minWidth = width, minHeight = height,
-		pageWidth = config.pageWidth or PAGE_WIDTH,
+		width = WINDOW_WIDTH, height = WINDOW_HEIGHT,
+		minWidth = WINDOW_WIDTH, minHeight = WINDOW_HEIGHT,
+		pageWidth = PAGE_WIDTH,
 		strata = 'FULLSCREEN_DIALOG', frameLevel = 200,
 		globalName = config.globalName,
 		resizable = false,

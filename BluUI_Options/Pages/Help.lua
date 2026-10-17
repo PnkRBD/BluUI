@@ -12,9 +12,7 @@ local BOX_PAD = 12
 local SCROLL_STEP = 40
 local ISSUES_URL = 'https://github.com/PnkRBD/BluUI/issues'
 
-local function Window()
-	return BUI.PageEngine.window
-end
+local Window = BUI.OptionsKit.Window
 
 local function Megabytes(kilobytes)
 	return ('%.1f MB'):format(kilobytes / 1024)
@@ -58,8 +56,8 @@ local function GatherDiagnostics()
 	Row('Name', UnitName('player') .. ' - ' .. GetRealmName())
 	local className, classFile = UnitClass('player')
 	Row('Class', className .. ' (' .. classFile .. ')')
-	local specIndex = GetSpecialization()
-	Row('Spec', specIndex and select(2, GetSpecializationInfo(specIndex)) or 'none')
+	local specIndex = C_SpecializationInfo.GetSpecialization()
+	Row('Spec', specIndex and select(2, C_SpecializationInfo.GetSpecializationInfo(specIndex)) or 'none')
 	Row('Race', (UnitRace('player')))
 	Row('Faction', (UnitFactionGroup('player')))
 	Row('Level', UnitLevel('player'))
@@ -72,7 +70,7 @@ local function GatherDiagnostics()
 	Row('Zone', GetZoneText() .. (subZone ~= '' and (' / ' .. subZone) or ''))
 	local instanceName, instanceType, _, difficultyName = GetInstanceInfo()
 	Row('Instance', instanceType == 'none' and 'None' or (instanceName .. ' (' .. (difficultyName ~= '' and difficultyName or instanceType) .. ')'))
-	Row('Mythic+ rating', C_ChallengeMode.GetOverallDungeonScore() or 0)
+	Row('Mythic+ rating', C_ChallengeMode.GetOverallDungeonScore())
 	Row('Session', Elapsed(GetSessionTime()))
 
 	Section('Client')
@@ -100,7 +98,7 @@ local function GatherDiagnostics()
 	Row('UI scale', CVar('uiScale') .. ' (useUiScale ' .. CVar('useUiScale') .. ')')
 	Row('UIParent scale', ('%.4f effective'):format(UIParent:GetEffectiveScale()))
 	Row('Pixel perfect scale', ('%.4f'):format(768 / screenHeight))
-	local frame = BUI.PageEngine.window.frame
+	local frame = Window().frame
 	Row('BluUI window', ('%d x %d at %.4f effective'):format(frame:GetWidth(), frame:GetHeight(), frame:GetEffectiveScale()))
 
 	Section('Memory')

@@ -51,19 +51,38 @@ end
 BUI.PositionTool = PositionTool
 
 local GRID_ROW_HEIGHT = 40
+local RESET_SLOT = 'reset'
+
+local factoryOf = setmetatable({}, { __mode = 'k' })
+
+local function SetFactory(live, factory)
+	factoryOf[live] = factory
+	for key, value in pairs(factory) do
+		local child = live[key]
+		if type(value) == 'table' and type(child) == 'table' and not factoryOf[child] then SetFactory(child, value) end
+	end
+end
+
+local function FactoryOf(db)
+	if factoryOf[db] == nil then
+		SetFactory(BUI.GetDB(), BUI.ExportImport.FactoryProfile())
+		if factoryOf[db] == nil then factoryOf[db] = false end
+	end
+	return factoryOf[db] or nil
+end
 
 local function ResetTool(ui, tooltip, isChanged, reset)
-	return { slot = 'icon', build = function(parent)
+	return { slot = 'icon', reset = true, build = function(parent)
 		local button = ui.IconButton(parent, 'redo', tooltip, reset, 'text', 16, 'accent')
 		ui.Bind(button, function() button:SetShown(isChanged()) end)
 		return button
 	end }
 end
 
-local function RowReset(ui, tools, after)
+local function RowReset(ui, tools, after, slot)
 	local entries = {}
 	for _, tool in ipairs(tools) do
-		if tool.slot == 'reset' then return tools end
+		if tool.reset then return tools end
 		for _, option in ipairs(tool.options or { tool }) do
 			if option.default then entries[#entries + 1] = option end
 		end
@@ -81,9 +100,26 @@ local function RowReset(ui, tools, after)
 		if after then after() end
 		BUI.PageEngine.window:Repaint()
 	end)
-	reset.slot = 'reset'
+	reset.slot = slot
 	tools[#tools + 1] = reset
 	return tools
+end
+
+local function ResetRows(ui, section, slot)
+	local AddTools, AddDragTools = section.AddTools, section.AddDragTools
+	function section:AddTools(name, sub, tools, after, icon)
+		return AddTools(self, name, sub, RowReset(ui, tools, after, slot), after, icon)
+	end
+	if AddDragTools then
+		function section:AddDragTools(label, sub, icon, tools, after, group)
+			return AddDragTools(self, label, sub, icon, RowReset(ui, tools, after, slot), after, group)
+		end
+	end
+	return section
+end
+
+local function ResetBoard(ui, board)
+	return ResetRows(ui, board, RESET_SLOT)
 end
 
 local function ToolGrid(ui, parent, width, title, description, columns)
@@ -94,12 +130,11 @@ local function ToolGrid(ui, parent, width, title, description, columns)
 		specs[index] = { title = column[1], slot = column[2], width = column[3] or (width - fixed), align = column[4] }
 	end
 	local grid = ui.Grid(parent, width, { title = title, description = description, rowHeight = GRID_ROW_HEIGHT, columns = specs })
-	local AddTools = grid.AddTools
-	function grid:AddTools(name, sub, tools, after)
-		return AddTools(self, name, sub, RowReset(ui, tools, after), after)
-	end
-	return grid
+	return ResetRows(ui, grid, RESET_SLOT)
 end
 
+BUI.FactoryOf = FactoryOf
+BUI.SetFactory = SetFactory
 BUI.ResetTool = ResetTool
+BUI.ResetBoard = ResetBoard
 BUI.ToolGrid = ToolGrid

@@ -1,6 +1,6 @@
 local BUI = BluUI
 local BUILib = BluUI.BUILibClient
-local Controls, Modals = BUILib.Controls, BUILib.Modals
+local Controls, Modals, Widget = BUILib.Controls, BUILib.Modals, BUILib.Widget
 
 local WIDTH, HEIGHT = 1000, 680
 local PAD = 24
@@ -13,10 +13,6 @@ local TABS = {
 	{ text = 'Ran more than once', key = 'repeats' },
 	{ text = 'Never ran', key = 'never' },
 }
-
-local function Plain(line)
-	return (line:gsub('|c%x%x%x%x%x%x%x%x', ''):gsub('|r', ''))
-end
 
 function BUI.ShowLaunchTrace(report)
 	local overlay, dialog, Close = Modals.CreateBase(WIDTH, HEIGHT, false)
@@ -56,15 +52,11 @@ function BUI.ShowLaunchTrace(report)
 	tabs:SetPoint('BOTTOMLEFT', scroll, 'TOPLEFT', 0, 4)
 	ShowLines(current)
 
-	overlay:SetScript('OnKeyDown', function(self, key)
-		self:SetPropagateKeyboardInput(key ~= 'ESCAPE')
-		if key == 'ESCAPE' then Close() end
-	end)
 	Modals.LayoutButtons(dialog, {
 		{ text = 'Close', color = Modals.BTN_CONFIRM },
 		{ text = 'Copy this tab', color = Modals.BTN_NEUTRAL, onClick = function()
 			local plain = {}
-			for index, line in ipairs(report[current]) do plain[index] = Plain(line) end
+			for index, line in ipairs(report[current]) do plain[index] = Widget.StripColorCodes(line) end
 			local copy = Modals.Copy({ title = 'Launch trace', message = 'The whole tab is selected. Press Ctrl+C to copy it.', text = table.concat(plain, ' || '), fullscreen = true })
 			copy:SetFrameLevel(overlay:GetFrameLevel() + 50)
 		end },
