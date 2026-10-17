@@ -14,7 +14,6 @@ local ROW_GAP       = 4
 local ICON_SIZE     = 20
 local HEADER_H      = 22
 local WALLET_H      = 28
-local FALLBACK_ICON = 134400
 local WEEKLY_COLOR  = '44bbff'
 local ACCOUNT_COLOR = 'ffd200'
 
@@ -41,21 +40,15 @@ local searchText = ''
 local hideUnused = false
 local RefreshContent
 
-local function EnsureTokenUI()
-    if not TokenFrame then C_AddOns.LoadAddOn('Blizzard_TokenUI') end
-    return TokenFrame ~= nil
-end
-
 local function InsertChatLink(link)
-    if not link or ChatEdit_InsertLink(link) then return end
-    local editBox = ChatEdit_ChooseBoxForSend()
+    if not link or ChatFrameUtil.InsertLink(link) then return end
+    local editBox = ChatFrameUtil.ChooseBoxForSend()
     if BUI.Tools.IsChatHeaderSecret(editBox) then return end
-    ChatEdit_ActivateChat(editBox)
+    ChatFrameUtil.ActivateChat(editBox)
     editBox:Insert(link)
 end
 
 local function SetTracked(listIndex, tracked)
-    if not EnsureTokenUI() then return end
     if TokenFrame:SetTokenWatched(listIndex, tracked) then RefreshContent() end
 end
 
@@ -69,7 +62,7 @@ local function PositionTransferMenu()
 end
 
 local function OpenWarbandTransfer(currencyID, isRetry)
-    if InCombatLockdown() or not EnsureTokenUI() then return end
+    if InCombatLockdown() then return end
     if not C_CurrencyInfo.IsAccountCharacterCurrencyDataReady() then
         C_CurrencyInfo.RequestCurrencyDataForAccountCharacters()
         if not isRetry then
@@ -190,7 +183,7 @@ local function BuildWallet()
     wallet:SetPoint('TOPLEFT', Pixel.Scale(12), Pixel.Scale(-78))
     wallet:SetPoint('TOPRIGHT', Pixel.Scale(-12), Pixel.Scale(-78))
     wallet:SetHeight(Pixel.Scale(WALLET_H))
-    Painter.Custom(wallet, Skin.PaintCardBackdrop)
+    Painter.Custom(wallet, Skin.PaintPanelBackdrop)
 
     local walletLabel = wallet:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(walletLabel, 11, FONT, '')
@@ -272,11 +265,11 @@ local function QuantityLabel(info, dimHex)
 end
 
 local function FillRow(row, info, listIndex, dimHex)
-    row.icon:SetTexture(info.iconFileID or FALLBACK_ICON)
+    row.icon:SetTexture(info.iconFileID)
     local name = info.name
     if info.isAccountWide then name = ('%s  |cff%s[|r|cff%sA|r|cff%s]|r'):format(name, dimHex, ACCOUNT_COLOR, dimHex) end
     row.nameText:SetText(name)
-    local color = ITEM_QUALITY_COLORS[info.quality] or ITEM_QUALITY_COLORS[1]
+    local color = ITEM_QUALITY_COLORS[info.quality]
     row.nameText:SetTextColor(color.r, color.g, color.b)
     row.nameText:SetAlpha(info.isTypeUnused and 0.5 or 1)
     row.warbandIcon:SetShown(info.isAccountTransferable)
@@ -327,11 +320,7 @@ RefreshContent = function()
     panel.emptyText:SetText(searchText ~= '' and 'No matching currencies.' or 'No currencies.')
 end
 
-local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3, 'Currency refresh')
-
-local function OnCurrencyEvent()
-    ThrottledRefresh()
-end
+local ThrottledRefresh = BUI.Dispatcher.NewDelayed(RefreshContent, 0.3, 'Currency refresh')
 
 local EVENTS = { 'CURRENCY_DISPLAY_UPDATE', 'PLAYER_MONEY' }
 
@@ -342,7 +331,7 @@ slide = BUI.SlidePanel.New({
     panel = function() return panel end,
     build = BuildPanel,
     onOpen = function()
-        for _, event in ipairs(EVENTS) do BUI.Events:Register(event, 'CurrencyManager', OnCurrencyEvent) end
+        for _, event in ipairs(EVENTS) do BUI.Events:Register(event, 'CurrencyManager', ThrottledRefresh) end
         C_CurrencyInfo.RequestCurrencyDataForAccountCharacters()
         ExpandAllCurrencyHeaders()
         RefreshContent()
@@ -355,10 +344,6 @@ slide = BUI.SlidePanel.New({
 
 function BUI.CurrencyManager.Toggle()
     slide.Toggle()
-end
-
-function BUI.CurrencyManager.IsOpen()
-    return slide.IsOpen()
 end
 
 CharacterFrame:HookScript('OnHide', BUI.Profiler.Wrap('CurrencyManager.CurrencyManager character hide', function() slide.Close(true) end))
