@@ -11,7 +11,7 @@ local DIFFICULTY_MYTHIC_KEYSTONE = 8
 local DIFFICULTY_MYTHIC_DUNGEON  = 23
 local DIFFICULTY_DELVE           = 208
 
-local frame, dotTexture, labelText
+local frame, labelText
 
 local function GetConfig()
 	return BUI.GetDB().combatLogging
@@ -38,10 +38,10 @@ end
 
 local function DescribeLocation()
 	local name, _, _, difficultyName = GetInstanceInfo()
-	if difficultyName and difficultyName ~= '' then
+	if difficultyName ~= '' then
 		return name .. ' - ' .. difficultyName
 	end
-	return name or 'Unknown'
+	return name
 end
 
 local function Announce(active)
@@ -55,7 +55,6 @@ local function Announce(active)
 end
 
 local function BuildFrame()
-	if frame then return end
 	local BUILib = BluUI.BUILibClient
 
 	frame = CreateFrame('Frame', FRAME_NAME, UIParent)
@@ -68,7 +67,7 @@ local function BuildFrame()
 	dotHolder:SetSize(Pixel.Scale(12), Pixel.Scale(12))
 	dotHolder:SetPoint('LEFT', frame, 'LEFT', 0, 0)
 
-	dotTexture = dotHolder:CreateTexture(nil, 'ARTWORK')
+	local dotTexture = dotHolder:CreateTexture(nil, 'ARTWORK')
 	dotTexture:SetTexture(BUILib.GetLibMedia('round6'))
 	dotTexture:SetVertexColor(1, 0.25, 0.25, 1)
 	dotTexture:SetAllPoints(dotHolder)
@@ -89,20 +88,22 @@ local function BuildFrame()
 	labelText = frame:CreateFontString(nil, 'OVERLAY')
 	labelText:SetPoint('LEFT', dotHolder, 'RIGHT', Pixel.Scale(5), 0)
 
-	frame.anchor = frame:CreateTexture(nil, 'BACKGROUND', nil, -8)
-	frame.anchor:SetAllPoints()
-	BUI.Tools.SetColorTex(frame.anchor, 0, 0, 0, 0.3)
-	frame.anchor:Hide()
-
-	frame.anchorText = frame:CreateFontString(nil, 'OVERLAY')
-	Pixel.ApplyFont(frame.anchorText, 10, BUI.GetGlobalFont(), 'OUTLINE')
-	frame.anchorText:SetPoint('BOTTOM', frame, 'TOP', 0, Pixel.Scale(2))
-	frame.anchorText:SetText('Drag to Reposition | Right-Click to Lock')
-	frame.anchorText:Hide()
+	BUI.Dragging.MakeDraggable(frame, {
+		showHint = true,
+		showUnlockedBg = true,
+		isLocked = function() return not GetConfig().showAnchor end,
+		onRightClick = function()
+			GetConfig().showAnchor = false
+			CombatLogging.Refresh()
+		end,
+		onPositionChanged = function(x, y)
+			local config = GetConfig()
+			config.posX, config.posY = x, y
+		end,
+	})
 end
 
 local function ApplyStyle()
-	if not frame then return end
 	Pixel.ApplyFont(labelText, 13, BUI.GetGlobalFont(), BUI.GetFontOutline())
 	labelText:SetText('LIVE')
 	labelText:SetTextColor(1, 1, 1, 1)
@@ -111,55 +112,33 @@ local function ApplyStyle()
 end
 
 local function ApplyPosition()
-	if not frame then return end
 	local config = GetConfig()
 	frame:ClearAllPoints()
 	frame:SetPoint('CENTER', UIParent, 'CENTER', config.posX, config.posY)
 end
 
-local function SavePosition()
-	BUI.Dragging.SaveCenterPosition(frame, GetConfig(), false)
-end
-
-local function SyncDragging()
-	if not frame then return end
+local function ShouldShowIndicator()
 	local config = GetConfig()
-	if config.showAnchor then
-		BUI.Dragging.EnableAnchorDrag(frame, {
-			onSave = SavePosition,
-			onRightClick = function()
-				GetConfig().showAnchor = false
-				CombatLogging.Refresh()
-			end,
-		})
-		frame.anchor:Show()
-		frame.anchorText:Show()
-	else
-		BUI.Dragging.DisableAnchorDrag(frame)
-		frame.anchor:Hide()
-		frame.anchorText:Hide()
-	end
+	return config.showAnchor or (config.showIndicator and LoggingCombat())
 end
 
 local function UpdateIndicator()
-	if not frame then return end
-	local config = GetConfig()
-	if config.showAnchor then
-		frame:Show()
+	if not ShouldShowIndicator() then
+		if frame then frame:Hide() end
 		return
 	end
-	if config.showIndicator ~= false and LoggingCombat() then
-		frame:Show()
-	else
-		frame:Hide()
+	if not frame then
+		BuildFrame()
+		ApplyStyle()
+		ApplyPosition()
 	end
+	frame:Show()
 end
 
 local announcedState
 
 local function EnsureAdvancedLogging()
-	local config = GetConfig()
-	if config.advancedLogging == false then return end
+	if not GetConfig().advancedLogging then return end
 	if C_CVar.GetCVarBool('advancedCombatLogging') then return end
 	C_CVar.SetCVar('advancedCombatLogging', '1')
 end
@@ -191,10 +170,12 @@ local function ApplyLoggingState()
 end
 
 function CombatLogging.Refresh()
-	BuildFrame()
-	ApplyStyle()
-	ApplyPosition()
-	SyncDragging()
+	if frame then
+		ApplyStyle()
+		ApplyPosition()
+		frame:RefreshDragState()
+	end
+	BUI.Scheduler.SetUpdateEnabled(MODULE_KEY, GetConfig().showIndicator)
 	ApplyLoggingState()
 end
 
@@ -207,8 +188,8 @@ end
 local queueApply = BUI.Dispatcher.New(ApplyLoggingState, 'CombatLogging.Apply')
 
 local function Initialize()
+	BUI.Scheduler.RegisterUpdate(MODULE_KEY, UpdateIndicator, 2, GetConfig().showIndicator)
 	CombatLogging.Refresh()
-	BUI.Scheduler.RegisterUpdate(MODULE_KEY, UpdateIndicator, 2, true)
 end
 
 BUI.Events:OnLogin('CombatLogging', Initialize)

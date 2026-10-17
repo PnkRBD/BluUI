@@ -54,7 +54,7 @@ end
 local function ParagonProgress(factionID)
     if not C_Reputation.IsFactionParagon(factionID) then return nil end
     local currentValue, threshold, rewardQuestID, hasReward = C_Reputation.GetFactionParagonInfo(factionID)
-    if not currentValue or not threshold or threshold <= 0 then return nil end
+    if not currentValue then return nil end
     local label = 'Paragon ' .. math.floor(currentValue / threshold)
     if hasReward then label = label .. ' |TInterface\\RaidFrame\\ReadyCheck-Ready:10|t |cffffd200(reward!)|r' end
     return currentValue % threshold, threshold, label, hasReward, rewardQuestID
@@ -64,10 +64,6 @@ local function FriendshipProgress(friendshipInfo)
     local current = friendshipInfo.standing - friendshipInfo.reactionThreshold
     local max = friendshipInfo.nextThreshold and (friendshipInfo.nextThreshold - friendshipInfo.reactionThreshold) or 0
     return current, max
-end
-
-local function PaintPanel(frame)
-    Painter.Custom(frame, Skin.PaintPanelBackdrop)
 end
 
 local JOURNEY_W      = 260
@@ -87,7 +83,7 @@ local function BuildJourneyPanel()
     if journeyPanel then return end
     journeyPanel = CreateFrame('Frame', nil, UIParent, 'BackdropTemplate')
     journeyPanel:SetWidth(Pixel.Scale(JOURNEY_W))
-    PaintPanel(journeyPanel)
+    Painter.Custom(journeyPanel, Skin.PaintPanelBackdrop)
     journeyPanel:SetFrameStrata('TOOLTIP')
     journeyPanel:SetClampedToScreen(true)
     journeyPanel:Hide()
@@ -323,7 +319,7 @@ local function AddParagonTooltipLines(factionID, name)
         if not HaveQuestRewardData(rewardQuestID) then C_QuestLog.RequestLoadQuestByID(rewardQuestID) end
         local rewardName, rewardTexture, rewardCount, rewardQuality = GetQuestLogRewardInfo(1, rewardQuestID)
         if rewardName then
-            local quality = ITEM_QUALITY_COLORS[rewardQuality] or ITEM_QUALITY_COLORS[1]
+            local quality = ITEM_QUALITY_COLORS[rewardQuality]
             local countPrefix = rewardCount > 1 and (rewardCount .. 'x ') or ''
             GameTooltip:AddLine(('|T%s:14|t %s%s'):format(rewardTexture, countPrefix, rewardName), quality.r, quality.g, quality.b)
         end
@@ -510,9 +506,9 @@ RefreshContent = function()
     local pendingHeader
     for factionIndex = 1, C_Reputation.GetNumFactions() do
         local factionData = C_Reputation.GetFactionDataByIndex(factionIndex)
-        if factionData.isHeader and not factionData.isHeaderWithRep then
+        if factionData and factionData.isHeader and not factionData.isHeaderWithRep then
             pendingHeader = factionData.name
-        elseif searchText == '' or factionData.name:lower():find(searchText, 1, true) then
+        elseif factionData and (searchText == '' or factionData.name:lower():find(searchText, 1, true)) then
             if pendingHeader then
                 headerIndex = headerIndex + 1
                 local header = PoolGet(headerPool, headerIndex, CreateHeader, panel.child)
