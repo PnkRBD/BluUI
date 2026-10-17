@@ -2,9 +2,11 @@ local _, BUI = ...
 
 local Datatext = BUI.Datatext
 local Pixel = BUI.Pixel
+local Painter = BUI.Painter
 local BUILib = LibStub('BUILib')
 local Controls = BUILib.Controls
 local LibMedia = BUILib.GetLibMedia
+local PanelFont = Datatext.PanelFont
 
 local socialPanel, socialRows = nil, {}
 
@@ -12,16 +14,8 @@ local function Role(role) return BUI.ThemeColor(role) end
 local function RoleHex(role) return BUI.Hex(BUI.ThemeColor(role)) end
 local function Tinted(role, text) return '|cff' .. RoleHex(role) .. text .. '|r' end
 local keystoneData = {}
-local keystoneRegistered = false
-local function GetSortState()
-    local profile = BUI.GetDB()
-    local sortState = profile.datatextSortState
-    if not sortState then
-        sortState = {}
-        profile.datatextSortState = sortState
-    end
-    return sortState
-end
+local keystoneLib
+local function GetSortState() return BUI.GetDB().datatextSortState end
 local guildFactionMap = {}
 local guildFactionTime = 0
 
@@ -62,20 +56,14 @@ local function FriendColumns()
     return FRIEND_COLS, FRIEND_HEADERS
 end
 
-local function PanelFont() return BUI.GetGlobalFont() end
-
 local function FitColumn(panel, specs, labels, columnIndex, minWidth, maxWidth)
-    local measureText = panel.measureString or panel:CreateFontString(nil, 'OVERLAY')
-    panel.measureString = measureText
-    Pixel.ApplyFont(measureText, 11, PanelFont())
-
-    local widest = 0
-    measureText:SetText(labels[columnIndex] or '')
-    widest = measureText:GetStringWidth()
+    local measureText = panel.measureString
+    measureText:SetText(labels[columnIndex])
+    local widest = measureText:GetStringWidth()
     for _, entry in ipairs(panel.data) do
-        local cell = entry.cols[columnIndex]
-        if cell and cell.text and cell.text ~= '' then
-            measureText:SetText(cell.text)
+        local cellText = entry.cols[columnIndex].text
+        if cellText ~= '' then
+            measureText:SetText(cellText)
             local cellWidth = measureText:GetStringWidth()
             if cellWidth > widest then widest = cellWidth end
         end
@@ -97,21 +85,19 @@ local function FitColumn(panel, specs, labels, columnIndex, minWidth, maxWidth)
     return resized
 end
 
-local function FriendCells(factionCell, nameCell, levelCell, zoneCell, tagCell, gameCell)
-    if ShowBattleTag() then
+local function FriendCells(showTag, factionCell, nameCell, levelCell, zoneCell, tagCell, gameCell)
+    if showTag then
         return { factionCell, nameCell, levelCell, zoneCell, tagCell, gameCell }
     end
     return { factionCell, nameCell, levelCell, zoneCell, gameCell }
 end
 
 local function SocialColumns(kind)
-    local specs  = (kind == 'guild') and GUILD_COLS or FRIEND_COLS
-    local labels = (kind == 'guild') and GUILD_HEADERS or FRIEND_HEADERS
     if kind ~= 'guild' then return FriendColumns() end
     local wantScore, wantRank = GuildTooltipShows()
-    if not wantScore and not wantRank then return specs, labels end
+    if not wantScore and not wantRank then return GUILD_COLS, GUILD_HEADERS end
     local extendedSpecs, extendedLabels = {}, {}
-    for columnIndex = 1, #specs do extendedSpecs[columnIndex], extendedLabels[columnIndex] = specs[columnIndex], labels[columnIndex] end
+    for columnIndex = 1, #GUILD_COLS do extendedSpecs[columnIndex], extendedLabels[columnIndex] = GUILD_COLS[columnIndex], GUILD_HEADERS[columnIndex] end
     local columnLeft = GUILD_EXTRA_X
     if wantRank then
         extendedSpecs[#extendedSpecs + 1] = { columnLeft = columnLeft, columnWidth = GUILD_RANK_WIDTH }
@@ -129,10 +115,8 @@ local function SocialWidths(specs)
     local contentRight = 0
     for columnIndex = 1, #specs do
         local spec = specs[columnIndex]
-        if spec then
-            local right = spec.columnLeft + spec.columnWidth
-            if right > contentRight then contentRight = right end
-        end
+        local right = spec.columnLeft + spec.columnWidth
+        if right > contentRight then contentRight = right end
     end
     local childWidth     = contentRight + SOCIAL_CHILD_GUTTER
     local containerWidth = childWidth + SOCIAL_CLIP_INSET
@@ -157,8 +141,12 @@ local STATUS_TAG = {
     DND = '|cffff3333DND|r',
 }
 
+local function StatusOf(afk, dnd)
+    if afk then return 'AFK' elseif dnd then return 'DND' end
+end
+
 local function FactionCell(factionGroup)
-    local letterInfo = FACTION_LETTER[factionGroup or '']
+    local letterInfo = FACTION_LETTER[factionGroup]
     if letterInfo then return { text = letterInfo[1], color = { letterInfo[2], letterInfo[3], letterInfo[4] } } end
     return { text = '' }
 end
@@ -178,14 +166,12 @@ local function BestKeyText(level, dungeon)
     return '+' .. level
 end
 
-local function RIOLookup(name, realm)
+local function RIOLookup(name)
     local raiderIO = _G.RaiderIO
-    if not raiderIO or not raiderIO.GetProfile or not name or name == '' then return end
-    if not realm or realm == '' then
-        local baseName, realmName = name:match('^(.-)%-(.+)$')
-        if baseName then name, realm = baseName, realmName else realm = GetRealmName() end
-    end
-    local profile = raiderIO.GetProfile(name, realm)
+    if not raiderIO or not raiderIO.GetProfile then return end
+    local baseName, realm = name:match('^(.-)%-(.+)$')
+    if not baseName then baseName, realm = name, GetRealmName() end
+    local profile = raiderIO.GetProfile(baseName, realm)
     if type(profile) ~= 'table' then return end
     local keystoneProfile = profile.mythicKeystoneProfile
     if not keystoneProfile or not keystoneProfile.currentScore then return end
@@ -200,7 +186,7 @@ end
 
 local function ScoreColor(score)
     local raiderIO = _G.RaiderIO
-    if score and raiderIO and raiderIO.GetScoreColor then
+    if raiderIO and raiderIO.GetScoreColor then
         local red, green, blue = raiderIO.GetScoreColor(score)
         if red then return { red, green, blue } end
     end
@@ -230,16 +216,14 @@ local CLIENT_NAMES = {
     Hero = 'Heroes', DST2 = 'Destiny 2', GRY = 'Warcraft III',
 }
 local function ClientName(code)
-    if not code or code == '' then return 'App' end
+    if code == '' then return 'App' end
     return CLIENT_NAMES[code] or code
 end
 
 local CLASS_TOKEN = {}
-do
-    local function AddClassNames(nameTable) if nameTable then for token, name in pairs(nameTable) do CLASS_TOKEN[name] = token end end end
-    AddClassNames(LOCALIZED_CLASS_NAMES_MALE)
-    AddClassNames(LOCALIZED_CLASS_NAMES_FEMALE)
-end
+for token, name in pairs(LOCALIZED_CLASS_NAMES_MALE) do CLASS_TOKEN[name] = token end
+for token, name in pairs(LOCALIZED_CLASS_NAMES_FEMALE) do CLASS_TOKEN[name] = token end
+
 local function ClassColor(className)
     local token = className and CLASS_TOKEN[className]
     local classColor = token and RAID_CLASS_COLORS[token]
@@ -259,7 +243,7 @@ local function InviteMember(member)
     if member.name then
         C_PartyInfo.InviteUnit(member.name)
     elseif member.isBNet and member.gameAccountID then
-        BNInviteFriend(member.gameAccountID)
+        C_BattleNet.InviteFriend(member.gameAccountID)
     end
 end
 
@@ -275,17 +259,19 @@ local function RefreshGuildFactions()
     local clubId = C_Club.GetGuildClubId()
     if not clubId then return end
     local ids = C_Club.GetClubMembers(clubId)
-    if not ids or BUI.Tools.IsSecretValue(ids) then return end
+    if BUI.Tools.IsSecretValue(ids) then return end
     for _, memberID in ipairs(ids) do
         local memberInfo = C_Club.GetMemberInfo(clubId, memberID)
         local guid = memberInfo and memberInfo.guid
         if guid and not BUI.Tools.IsSecretValue(guid) then
-            local factionValue = memberInfo.faction
-            if BUI.Tools.IsSecretValue(factionValue) then factionValue = nil end
-            local factionGroup = (factionValue == 1 and 'Alliance') or (factionValue == 0 and 'Horde') or nil
-            if not factionGroup and memberInfo.race then
+            local factionGroup
+            if memberInfo.faction == Enum.PvPFaction.Alliance then
+                factionGroup = 'Alliance'
+            elseif memberInfo.faction == Enum.PvPFaction.Horde then
+                factionGroup = 'Horde'
+            elseif memberInfo.race then
                 local factionInfo = C_CreatureInfo.GetFactionInfo(memberInfo.race)
-                factionGroup = factionInfo and factionInfo.groupTag or nil
+                factionGroup = factionInfo and factionInfo.groupTag
             end
             guildFactionMap[guid] = factionGroup
         end
@@ -322,21 +308,21 @@ local function GatherGuild()
     local wantScore, wantRank = GuildTooltipShows()
     for memberIndex = 1, GetNumGuildMembers() do
         local name, rankName, rankIndex, level, _, zone, _, _, online, status, classFile, _, _, _, _, _, guid = GetGuildRosterInfo(memberIndex)
-        if online and name then
+        if online then
             local shortName = name:match('(.-)%-') or name
-            local classColor = classFile and RAID_CLASS_COLORS[classFile]
-            local faction = groupFactions[guid] or guildFactionMap[guid] or (guid == playerGUID and playerFaction) or nil
-            local statusText = ((status == 1 or status == '<AFK>') and 'AFK')
-                or ((status == 2 or status == '<DND>') and 'DND') or nil
+            local classColor = RAID_CLASS_COLORS[classFile]
+            local faction = groupFactions[guid] or guildFactionMap[guid]
+            if not faction and guid == playerGUID then faction = playerFaction end
+            local statusText = StatusOf(status == 1, status == 2)
             local score, scoreColor, best = GuildScore(name)
             local columns = {
                 FactionCell(faction),
                 { text = shortName, color = classColor and { classColor.r, classColor.g, classColor.b } },
-                { text = level and tostring(level) or '' },
+                { text = tostring(level) },
                 { text = ZoneText(zone, statusText) },
             }
             if wantRank then
-                columns[#columns + 1] = { text = rankName or '', sortValue = rankIndex }
+                columns[#columns + 1] = { text = rankName, sortValue = rankIndex }
             end
             if wantScore then
                 columns[#columns + 1] = { text = score and tostring(score) or '', color = scoreColor }
@@ -355,11 +341,11 @@ end
 local function GatherFriends()
     local list = {}
     local playerFaction = UnitFactionGroup('player')
+    local showTag = ShowBattleTag()
     for friendIndex = 1, C_FriendList.GetNumFriends() do
         local info = C_FriendList.GetFriendInfoByIndex(friendIndex)
         if info and info.connected then
-            local statusText = (info.afk and 'AFK') or (info.dnd and 'DND') or nil
-            local shownName = info.name or '?'
+            local statusText = StatusOf(info.afk, info.dnd)
             list[#list + 1] = {
                 member = {
                     name = info.name,
@@ -367,11 +353,11 @@ local function GatherFriends()
                     faction = playerFaction,
                     status = statusText,
                 },
-                sortName = shownName,
-                cols = FriendCells(
+                sortName = info.name,
+                cols = FriendCells(showTag,
                     FactionCell(playerFaction),
-                    { text = shownName, color = ClassColor(info.className) },
-                    { text = (info.level and info.level > 0) and tostring(info.level) or '' },
+                    { text = info.name, color = ClassColor(info.className) },
+                    { text = info.level > 0 and tostring(info.level) or '' },
                     { text = ZoneText(info.area, statusText) },
                     { text = '' },
                     { text = 'WoW', color = 'muted' }
@@ -383,24 +369,22 @@ local function GatherFriends()
         local accountInfo = C_BattleNet.GetFriendAccountInfo(battleNetIndex)
         local gameAccount = accountInfo and accountInfo.gameAccountInfo
         if gameAccount and gameAccount.isOnline then
-            local bnetName = accountInfo.accountName or '?'
-            local battleTagText = accountInfo.battleTag or bnetName
+            local bnetName, battleTagText = accountInfo.accountName, accountInfo.battleTag
             if gameAccount.clientProgram == 'WoW' and gameAccount.characterName and gameAccount.characterName ~= '' then
-                local statusText = (gameAccount.isGameAFK and 'AFK') or (gameAccount.isGameBusy and 'DND') or nil
-                local faction = (gameAccount.factionName == FACTION_HORDE and 'Horde') or (gameAccount.factionName == FACTION_ALLIANCE and 'Alliance') or nil
-                local nameText = gameAccount.characterName
+                local statusText = StatusOf(gameAccount.isGameAFK, gameAccount.isGameBusy)
+                local faction = gameAccount.factionName
                 list[#list + 1] = {
                     member = {
                         name = gameAccount.characterName, isBNet = true, bnetName = bnetName, battleTag = battleTagText, gameAccountID = gameAccount.gameAccountID,
                         classFile = gameAccount.className and CLASS_TOKEN[gameAccount.className],
                         faction = faction,
                         status = statusText,
-                        favorite = accountInfo.isFavorite or nil,
+                        favorite = accountInfo.isFavorite,
                     },
                     sortName = gameAccount.characterName,
-                    cols = FriendCells(
+                    cols = FriendCells(showTag,
                         FactionCell(faction),
-                        { text = nameText, color = ClassColor(gameAccount.className) },
+                        { text = gameAccount.characterName, color = ClassColor(gameAccount.className) },
                         { text = gameAccount.characterLevel and tostring(gameAccount.characterLevel) or '' },
                         { text = ZoneText(gameAccount.areaName, statusText) },
                         { text = battleTagText, color = BNET_COLOR },
@@ -408,14 +392,14 @@ local function GatherFriends()
                     ),
                 }
             else
-                local statusText = (accountInfo.isAFK and 'AFK') or (accountInfo.isDND and 'DND') or nil
+                local statusText = StatusOf(accountInfo.isAFK, accountInfo.isDND)
                 list[#list + 1] = {
-                    member = { isBNet = true, bnetName = bnetName, battleTag = battleTagText, gameAccountID = gameAccount.gameAccountID, status = statusText, favorite = accountInfo.isFavorite or nil },
-                    sortName = ShowBattleTag() and battleTagText or bnetName,
-                    sortBlank = ShowBattleTag() or nil,
-                    cols = FriendCells(
+                    member = { isBNet = true, bnetName = bnetName, battleTag = battleTagText, gameAccountID = gameAccount.gameAccountID, status = statusText, favorite = accountInfo.isFavorite },
+                    sortName = showTag and battleTagText or bnetName,
+                    sortBlank = showTag,
+                    cols = FriendCells(showTag,
                         { text = '' },
-                        { text = ShowBattleTag() and '' or bnetName, color = BNET_COLOR },
+                        { text = showTag and '' or bnetName, color = BNET_COLOR },
                         { text = '' },
                         { text = ZoneText(gameAccount.richPresence, statusText), color = 'muted' },
                         { text = battleTagText, color = BNET_COLOR },
@@ -436,7 +420,7 @@ local function SetRowColumns(row, specs, values)
             fontString:ClearAllPoints()
             fontString:SetPoint('LEFT', row, 'LEFT', Pixel.Scale(spec.columnLeft), 0)
             fontString:SetWidth(Pixel.Scale(spec.columnWidth))
-            fontString:SetText(value.text or '')
+            fontString:SetText(value.text)
             local cellColor = value.color
             if type(cellColor) == 'table' then fontString:SetTextColor(cellColor[1], cellColor[2], cellColor[3]) else fontString:SetTextColor(Role(cellColor or 'text')) end
             fontString:Show()
@@ -451,7 +435,7 @@ local RenderSocial
 local function SetRowSectionHeader(row, entry)
     for columnIndex = 1, 7 do row.cols[columnIndex]:Hide() end
     row.sectionLabel:SetText(entry.label .. '  ' .. Tinted('muted', '(' .. entry.count .. ')'))
-    local isCollapsed = BUI.GetDB().socialCollapsedSections[entry.header] == true
+    local isCollapsed = BUI.GetDB().socialCollapsedSections[entry.header]
     row.sectionState:SetText(isCollapsed and 'OFF' or 'ON')
     row.sectionState:SetTextColor(Role(isCollapsed and 'muted' or 'text'))
     row.headerBg:Show()
@@ -465,6 +449,69 @@ local function ClearRowSectionHeader(row)
     row.sectionState:Hide()
 end
 
+local function RowOnEnter(self)
+    self.highlight:Show()
+    local member = self.member
+    if not member then return end
+    if not socialPanel.anchor.bar.getConfig().rosterTooltips then return end
+    GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
+    GameTooltip:ClearLines()
+    local classColor = member.classFile and RAID_CLASS_COLORS[member.classFile]
+    local titleText = member.name or ''
+    if titleText ~= '' and classColor then
+        titleText = '|c' .. classColor.colorStr .. titleText .. '|r'
+    end
+    local tagText = member.isBNet and (member.battleTag or member.bnetName) or nil
+    if tagText then
+        tagText = FRIENDS_BNET_NAME_COLOR:WrapTextInColorCode(tagText)
+        titleText = (titleText ~= '') and (titleText .. '  ' .. Tinted('faint', '||') .. '  ' .. tagText) or tagText
+    end
+    if titleText == '' then titleText = '?' end
+    GameTooltip:AddLine(titleText, 1, 1, 1)
+    local faction = member.faction and FactionLabel(member.faction)
+    if faction or member.status then
+        local line = faction or ''
+        if member.status then
+            line = (line ~= '' and (line .. '  ') or '') .. STATUS_TAG[member.status]
+        end
+        GameTooltip:AddLine(line)
+    end
+    if member.rioScore then
+        local scoreColor = member.rioScoreColor or { 1, 1, 1 }
+        local mutedRed, mutedGreen, mutedBlue = Role('muted')
+        GameTooltip:AddDoubleLine('M+ Score', tostring(member.rioScore), mutedRed, mutedGreen, mutedBlue, scoreColor[1], scoreColor[2], scoreColor[3])
+        if member.rioBest then
+            local textRed, textGreen, textBlue = Role('text')
+            GameTooltip:AddDoubleLine('Key', member.rioBest, mutedRed, mutedGreen, mutedBlue, textRed, textGreen, textBlue)
+        end
+    end
+    GameTooltip:AddLine(Tinted('text', 'Left-Click') .. '  ' .. Tinted('muted', 'Whisper'))
+    if member.name then GameTooltip:AddLine(Tinted('text', 'Shift-Click') .. '  ' .. Tinted('muted', 'Who')) end
+    if member.name or (member.isBNet and member.gameAccountID) then
+        GameTooltip:AddLine(Tinted('text', 'Right-Click') .. '  ' .. Tinted('muted', 'Invite'))
+    end
+    GameTooltip:Show()
+end
+
+local function RowOnLeave(self)
+    self.highlight:Hide()
+    GameTooltip:Hide()
+end
+
+local function RowOnClick(self, mouseButton)
+    if self.headerKey then
+        local collapsedSections = BUI.GetDB().socialCollapsedSections
+        collapsedSections[self.headerKey] = not collapsedSections[self.headerKey] or nil
+        RenderSocial()
+        socialPanel.scroll:UpdateScroll()
+        return
+    end
+    if not self.member then return end
+    if mouseButton == 'RightButton' then InviteMember(self.member)
+    elseif IsShiftKeyDown() then WhoMember(self.member)
+    else WhisperMember(self.member) end
+end
+
 local function GetSocialRow(rowIndex)
     local row = socialRows[rowIndex]
     if not row then
@@ -474,18 +521,18 @@ local function GetSocialRow(rowIndex)
 
         row.highlight = row:CreateTexture(nil, 'BACKGROUND')
         row.highlight:SetAllPoints()
-        BUI.Tools.SetColorTex(row.highlight, Role('hover'))
+        Painter.Fill(row.highlight, 'hover')
         row.highlight:Hide()
 
         row.headerBg = row:CreateTexture(nil, 'BACKGROUND', nil, -1)
         row.headerBg:SetAllPoints()
-        BUI.Tools.SetColorTex(row.headerBg, Role('hover'))
+        Painter.Fill(row.headerBg, 'hover')
         row.headerBg:Hide()
 
         row.sectionLabel = row:CreateFontString(nil, 'OVERLAY')
         Pixel.ApplyFont(row.sectionLabel, 11, PanelFont())
         row.sectionLabel:SetPoint('LEFT', row, 'LEFT', Pixel.Scale(4), 0)
-        row.sectionLabel:SetTextColor(Role('text'))
+        Painter.Text(row.sectionLabel, 'text')
         row.sectionLabel:Hide()
 
         row.sectionState = row:CreateFontString(nil, 'OVERLAY')
@@ -502,63 +549,9 @@ local function GetSocialRow(rowIndex)
             row.cols[columnIndex] = fontString
         end
 
-        row:SetScript('OnEnter', BUI.Profiler.Script('Datatext.Social row OnEnter', function(self)
-            self.highlight:Show()
-            local member = self.member
-            if not member then return end
-            if not socialPanel.anchor.bar.getConfig().rosterTooltips then return end
-            GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
-            GameTooltip:ClearLines()
-            local classColor = member.classFile and RAID_CLASS_COLORS[member.classFile]
-            local titleText = member.name or ''
-            if titleText ~= '' and classColor then
-                titleText = '|c' .. (classColor.colorStr or 'ffffffff') .. titleText .. '|r'
-            end
-            local tagText = member.isBNet and (member.battleTag or member.bnetName) or nil
-            if tagText then
-                tagText = FRIENDS_BNET_NAME_COLOR:WrapTextInColorCode(tagText)
-                titleText = (titleText ~= '') and (titleText .. '  ' .. Tinted('faint', '||') .. '  ' .. tagText) or tagText
-            end
-            if titleText == '' then titleText = '?' end
-            GameTooltip:AddLine(titleText, 1, 1, 1)
-            local faction = member.faction and FactionLabel(member.faction)
-            if faction or member.status then
-                local line = faction or ''
-                if member.status then
-                    line = (line ~= '' and (line .. '  ') or '') .. STATUS_TAG[member.status]
-                end
-                GameTooltip:AddLine(line)
-            end
-            if member.rioScore then
-                local scoreColor = member.rioScoreColor or { 1, 1, 1 }
-                local mutedRed, mutedGreen, mutedBlue = Role('muted')
-                GameTooltip:AddDoubleLine('M+ Score', tostring(member.rioScore), mutedRed, mutedGreen, mutedBlue, scoreColor[1], scoreColor[2], scoreColor[3])
-                if member.rioBest then
-                    local textRed, textGreen, textBlue = Role('text')
-                    GameTooltip:AddDoubleLine('Key', member.rioBest, mutedRed, mutedGreen, mutedBlue, textRed, textGreen, textBlue)
-                end
-            end
-            GameTooltip:AddLine(Tinted('text', 'Left-Click') .. '  ' .. Tinted('muted', 'Whisper'))
-            if member.name then GameTooltip:AddLine(Tinted('text', 'Shift-Click') .. '  ' .. Tinted('muted', 'Who')) end
-            if member.name or (member.isBNet and member.gameAccountID) then
-                GameTooltip:AddLine(Tinted('text', 'Right-Click') .. '  ' .. Tinted('muted', 'Invite'))
-            end
-            GameTooltip:Show()
-        end))
-        row:SetScript('OnLeave', BUI.Profiler.Script('Datatext.Social row OnLeave', function(self) self.highlight:Hide(); GameTooltip:Hide() end))
-        row:SetScript('OnClick', BUI.Profiler.Script('Datatext.Social row OnClick', function(self, mouseButton)
-            if self.headerKey then
-                local collapsedSections = BUI.GetDB().socialCollapsedSections
-                collapsedSections[self.headerKey] = not collapsedSections[self.headerKey] or nil
-                RenderSocial()
-                socialPanel.scroll:UpdateScroll()
-                return
-            end
-            if not self.member then return end
-            if mouseButton == 'RightButton' then InviteMember(self.member)
-            elseif IsShiftKeyDown() then WhoMember(self.member)
-            else WhisperMember(self.member) end
-        end))
+        row:SetScript('OnEnter', BUI.Profiler.Script('Datatext.Social row OnEnter', RowOnEnter))
+        row:SetScript('OnLeave', BUI.Profiler.Script('Datatext.Social row OnLeave', RowOnLeave))
+        row:SetScript('OnClick', BUI.Profiler.Script('Datatext.Social row OnClick', RowOnClick))
 
         socialRows[rowIndex] = row
     end
@@ -633,7 +626,7 @@ RenderSocial = function()
     for rowIndex = 1, #socialRows do socialRows[rowIndex]:Hide() end
 
     local display = data
-    local advancedView = panel.kind ~= 'guild' and BUI.GetDB().socialAdvancedView == true
+    local advancedView = panel.kind ~= 'guild' and BUI.GetDB().socialAdvancedView
     if advancedView then
         local collapsedSections = BUI.GetDB().socialCollapsedSections
         local favoriteEntries, friendEntries = {}, {}
@@ -654,7 +647,7 @@ RenderSocial = function()
     if #display == 0 then
         local row = GetSocialRow(1)
         row:ClearAllPoints()
-        row:SetWidth(Pixel.Scale(panel.contentW or SOCIAL_MAX_CONTENT))
+        row:SetWidth(Pixel.Scale(panel.contentW))
         row:SetPoint('TOPLEFT', panel.listChild, 'TOPLEFT', 0, 0)
         row.member = nil
         row.headerKey = nil
@@ -665,7 +658,7 @@ RenderSocial = function()
         for rowIndex, entry in ipairs(display) do
             local row = GetSocialRow(rowIndex)
             row:ClearAllPoints()
-            row:SetWidth(Pixel.Scale(panel.contentW or SOCIAL_MAX_CONTENT))
+            row:SetWidth(Pixel.Scale(panel.contentW))
             row:SetPoint('TOPLEFT', panel.listChild, 'TOPLEFT', 0, -Pixel.Scale((rowIndex - 1) * SOCIAL_ROW_HEIGHT))
             if entry.header then
                 row.member = nil
@@ -689,61 +682,56 @@ RenderSocial = function()
     panel:SetHeight(Pixel.Scale(44 + visible * SOCIAL_ROW_HEIGHT + 8 + 22))
 end
 
-local DispatchGuildRefresh = BUI.Dispatcher.NewDelayed(function()
-    if not (socialPanel and socialPanel:IsShown() and socialPanel.kind == 'guild') then return end
-    socialPanel.data = GatherGuild()
+local DispatchSocialRefresh = BUI.Dispatcher.NewDelayed(function()
+    if not socialPanel:IsShown() then return end
+    socialPanel.data = (socialPanel.kind == 'guild') and GatherGuild() or GatherFriends()
     RenderSocial()
     for rowIndex = 1, #socialRows do
         local row = socialRows[rowIndex]
         if row:IsShown() and row.member and row:IsMouseOver() then
-            local onEnter = row:GetScript('OnEnter')
-            if onEnter then onEnter(row) end
+            RowOnEnter(row)
             break
         end
     end
-end, 0.4, 'Guild list refresh')
-
-local function RefreshGuildSoon()
-    if not (socialPanel and socialPanel:IsShown() and socialPanel.kind == 'guild') then return end
-    DispatchGuildRefresh()
-end
-
-local DispatchSocialRefresh = BUI.Dispatcher.NewDelayed(function()
-    if not (socialPanel and socialPanel:IsShown()) then return end
-    socialPanel.data = (socialPanel.kind == 'guild') and GatherGuild() or GatherFriends()
-    RenderSocial()
 end, 0.4, 'Social list refresh')
 
 local function RefreshOpenSocialPanel()
-    if not (socialPanel and socialPanel:IsShown()) then return end
-    DispatchSocialRefresh()
-end
-
-local function SetupKeystone()
-    if keystoneRegistered then return true end
-    local keystoneLib = LibStub('LibKeystone')
-    keystoneRegistered = true
-    Datatext._LKS = keystoneLib
-    keystoneLib.Register(Datatext, function(level, mapID, rating, sender)
-        local entry = keystoneData[sender]
-        if not entry then entry = {}; keystoneData[sender] = entry end
-        entry.level, entry.mapID, entry.score = level, mapID, rating
-        RefreshGuildSoon()
-    end)
-    return true
+    if socialPanel and socialPanel:IsShown() then DispatchSocialRefresh() end
 end
 
 local function RequestKeystones()
-    if SetupKeystone() then
-        Datatext._LKS.Request('GUILD')
-        if IsInGroup() then Datatext._LKS.Request('PARTY') end
+    if not keystoneLib then
+        keystoneLib = LibStub('LibKeystone')
+        keystoneLib.Register(Datatext, function(level, mapID, rating, sender)
+            local entry = keystoneData[sender]
+            if not entry then entry = {}; keystoneData[sender] = entry end
+            entry.level, entry.mapID, entry.score = level, mapID, rating
+            if socialPanel and socialPanel.kind == 'guild' then RefreshOpenSocialPanel() end
+        end)
     end
+    keystoneLib.Request('GUILD')
+    if IsInGroup() then keystoneLib.Request('PARTY') end
+end
+
+local function PaintInputBox(frame)
+    local inputRed, inputGreen, inputBlue = Role('input')
+    local edgeRed, edgeGreen, edgeBlue = Role('inputEdge')
+    Pixel.SetTemplate(frame, inputRed, inputGreen, inputBlue, 1, edgeRed, edgeGreen, edgeBlue, 1)
+end
+
+local function PaintKeyLine(fontString)
+    fontString:SetTextColor(Role('muted'))
+    fontString:SetText(Tinted('text', 'Left-Click') .. ' Whisper   ' .. Tinted('text', 'Shift-Click') .. ' Who   ' .. Tinted('text', 'Right-Click') .. ' Invite')
 end
 
 local function BuildSocialPanel()
     if socialPanel then return end
     local initialPanelWidth, initialContainerWidth, initialChildWidth = SocialWidths(GUILD_COLS)
     local panel = Datatext.CreateHoverPanel('BUI_DatatextSocial', initialPanelWidth)
+    local font = PanelFont()
+
+    panel.measureString = panel:CreateFontString(nil, 'OVERLAY')
+    Pixel.ApplyFont(panel.measureString, 11, font)
 
     panel.advancedToggle = CreateFrame('Button', nil, panel)
     panel.advancedToggle:SetFrameLevel(panel:GetFrameLevel() + 10)
@@ -752,33 +740,35 @@ local function BuildSocialPanel()
     local advancedBox = CreateFrame('Frame', nil, panel.advancedToggle, 'BackdropTemplate')
     advancedBox:SetSize(Pixel.Scale(12), Pixel.Scale(12))
     advancedBox:SetPoint('RIGHT')
+    Painter.Custom(advancedBox, PaintInputBox)
     panel.advancedCheck = advancedBox:CreateTexture(nil, 'OVERLAY')
     panel.advancedCheck:SetSize(Pixel.Scale(10), Pixel.Scale(10))
     panel.advancedCheck:SetPoint('CENTER')
     panel.advancedCheck:SetTexture(LibMedia('check'))
+    Painter.Tint(panel.advancedCheck, 'text')
     panel.advancedCheck:Hide()
     local advancedLabel = panel.advancedToggle:CreateFontString(nil, 'OVERLAY')
-    Pixel.ApplyFont(advancedLabel, 10, PanelFont())
+    Pixel.ApplyFont(advancedLabel, 10, font)
     advancedLabel:SetText('Advanced')
     advancedLabel:SetPoint('RIGHT', advancedBox, 'LEFT', -Pixel.Scale(5), 0)
+    Painter.Text(advancedLabel, 'faint')
     panel.advancedToggle:SetWidth(Pixel.Scale(19) + advancedLabel:GetStringWidth())
     panel.advancedToggle:SetScript('OnEnter', BUI.Profiler.Script('Datatext.Social advancedToggle OnEnter', function() advancedLabel:SetTextColor(Role('text')) end))
     panel.advancedToggle:SetScript('OnLeave', BUI.Profiler.Script('Datatext.Social advancedToggle OnLeave', function() advancedLabel:SetTextColor(Role('faint')) end))
     panel.advancedToggle:SetScript('OnClick', BUI.Profiler.Script('Datatext.Social advancedToggle OnClick', function()
         local profile = BUI.GetDB()
         profile.socialAdvancedView = not profile.socialAdvancedView
-        panel.advancedCheck:SetShown(profile.socialAdvancedView == true)
+        panel.advancedCheck:SetShown(profile.socialAdvancedView)
         RenderSocial()
         panel.scroll:UpdateScroll()
     end))
 
-    local scroll = Controls.ScrollFrame(panel, Pixel.Scale(initialContainerWidth), Pixel.Scale(SOCIAL_MAX_ROWS * SOCIAL_ROW_HEIGHT + 4), nil, Pixel.Scale(initialChildWidth))
-    local scrollWidget = scroll.frame or scroll
-    scrollWidget:ClearAllPoints()
-    scrollWidget:SetPoint('TOPLEFT', Pixel.Scale(8), Pixel.Scale(-44))
-    panel.scroll = scrollWidget
-    panel.listChild = scrollWidget.child
-    panel.scrollFrame = scrollWidget.scrollFrame
+    local scroll = Controls.ScrollFrame(panel, Pixel.Scale(initialContainerWidth), Pixel.Scale(SOCIAL_MAX_ROWS * SOCIAL_ROW_HEIGHT + 4), nil, Pixel.Scale(initialChildWidth)).frame
+    scroll:ClearAllPoints()
+    scroll:SetPoint('TOPLEFT', Pixel.Scale(8), Pixel.Scale(-44))
+    panel.scroll = scroll
+    panel.listChild = scroll.child
+    panel.scrollFrame = scroll.scrollFrame
 
     panel.header = {}
     for columnIndex = 1, 7 do
@@ -788,19 +778,20 @@ local function BuildSocialPanel()
         headerButton:RegisterForClicks('LeftButtonUp')
         headerButton.col = columnIndex
         headerButton.label = headerButton:CreateFontString(nil, 'OVERLAY')
-        Pixel.ApplyFont(headerButton.label, 10, PanelFont())
+        Pixel.ApplyFont(headerButton.label, 10, font)
         headerButton.label:SetJustifyH('LEFT')
         headerButton.label:SetPoint('LEFT')
+        Painter.Text(headerButton.label, 'faint')
         headerButton.arrow = headerButton:CreateTexture(nil, 'OVERLAY')
         headerButton.arrow:SetTexture(LibMedia('sorttri'))
         headerButton.arrow:SetSize(Pixel.Scale(8), Pixel.Scale(8))
         headerButton.arrow:SetPoint('LEFT', headerButton.label, 'RIGHT', Pixel.Scale(1), 0)
+        Painter.Tint(headerButton.arrow, 'muted')
         headerButton.arrow:Hide()
         headerButton:SetScript('OnEnter', BUI.Profiler.Script('Datatext.Social headerButton OnEnter', function(self) self.label:SetTextColor(Role('text')) end))
         headerButton:SetScript('OnLeave', BUI.Profiler.Script('Datatext.Social headerButton OnLeave', function(self) self.label:SetTextColor(Role('faint')) end))
         headerButton:SetScript('OnClick', BUI.Profiler.Script('Datatext.Social headerButton OnClick', function(self)
             local openPanel = socialPanel
-            if not openPanel.data then return end
             if openPanel.sortCol == self.col then
                 openPanel.sortDir = -openPanel.sortDir
             else
@@ -814,32 +805,14 @@ local function BuildSocialPanel()
     end
     panel.headerLine = panel:CreateTexture(nil, 'ARTWORK')
     panel.headerLine:SetHeight(1)
-    panel.headerLine:SetPoint('BOTTOMLEFT',  scrollWidget.scrollFrame, 'TOPLEFT',  0, Pixel.Scale(2))
-    panel.headerLine:SetPoint('BOTTOMRIGHT', scrollWidget.scrollFrame, 'TOPRIGHT', 0, Pixel.Scale(2))
+    panel.headerLine:SetPoint('BOTTOMLEFT',  scroll.scrollFrame, 'TOPLEFT',  0, Pixel.Scale(2))
+    panel.headerLine:SetPoint('BOTTOMRIGHT', scroll.scrollFrame, 'TOPRIGHT', 0, Pixel.Scale(2))
+    Painter.Fill(panel.headerLine, 'cardEdge')
 
     panel.key = panel:CreateFontString(nil, 'OVERLAY')
-    Pixel.ApplyFont(panel.key, 10, PanelFont())
+    Pixel.ApplyFont(panel.key, 10, font)
     panel.key:SetPoint('BOTTOMLEFT', Pixel.Scale(10), Pixel.Scale(7))
-
-    function panel:PaintTheme()
-        local inputRed, inputGreen, inputBlue = Role('input')
-        local edgeRed, edgeGreen, edgeBlue = Role('inputEdge')
-        Pixel.SetTemplate(advancedBox, inputRed, inputGreen, inputBlue, 1, edgeRed, edgeGreen, edgeBlue, 1)
-        self.advancedCheck:SetVertexColor(Role('text'))
-        advancedLabel:SetTextColor(Role('faint'))
-        for _, headerButton in ipairs(self.header) do
-            headerButton.label:SetTextColor(Role('faint'))
-            headerButton.arrow:SetVertexColor(Role('muted'))
-        end
-        BUI.Tools.SetColorTex(self.headerLine, Role('cardEdge'))
-        self.key:SetTextColor(Role('muted'))
-        self.key:SetText(Tinted('text', 'Left-Click') .. ' Whisper   ' .. Tinted('text', 'Shift-Click') .. ' Who   ' .. Tinted('text', 'Right-Click') .. ' Invite')
-        for _, row in pairs(socialRows) do
-            BUI.Tools.SetColorTex(row.highlight, Role('hover'))
-            BUI.Tools.SetColorTex(row.headerBg, Role('hover'))
-            row.sectionLabel:SetTextColor(Role('text'))
-        end
-    end
+    Painter.Custom(panel.key, PaintKeyLine)
 
     local pressedOutside = false
     local function OnGlobalMouse(event)
@@ -862,7 +835,7 @@ end
 local function OpenSocialPanel(anchor, kind)
     local panel = socialPanel
     panel.kind = kind
-    panel.anchor = anchor:GetParent() or anchor
+    panel.anchor = anchor:GetParent()
     if kind == 'guild' then RequestKeystones() end
 
     panel.data  = (kind == 'guild') and GatherGuild() or GatherFriends()
@@ -878,26 +851,24 @@ local function OpenSocialPanel(anchor, kind)
         panel.sortCol, panel.sortDir = nil, 1
     end
     panel.advancedToggle:SetShown(kind ~= 'guild')
-    panel.advancedCheck:SetShown(BUI.GetDB().socialAdvancedView == true)
+    panel.advancedCheck:SetShown(BUI.GetDB().socialAdvancedView)
 
-    local measureText = panel.measureString or panel:CreateFontString(nil, 'OVERLAY')
-    panel.measureString = measureText
-    Pixel.ApplyFont(measureText, 11, PanelFont())
+    local measureText = panel.measureString
     local contentRight = 0
-    for columnIndex = 1, #panel.specs do
-        local columnX = panel.specs[columnIndex].columnLeft
-        measureText:SetText(labels[columnIndex] or '')
+    for columnIndex = 1, #specs do
+        local columnX = specs[columnIndex].columnLeft
+        measureText:SetText(labels[columnIndex])
         if columnX + measureText:GetStringWidth() > contentRight then contentRight = columnX + measureText:GetStringWidth() end
         for _, entry in ipairs(panel.data) do
-            local cell = entry.cols[columnIndex]
-            if cell and cell.text and cell.text ~= '' then
-                measureText:SetText(cell.text)
+            local cellText = entry.cols[columnIndex].text
+            if cellText ~= '' then
+                measureText:SetText(cellText)
                 if columnX + measureText:GetStringWidth() > contentRight then contentRight = columnX + measureText:GetStringWidth() end
             end
         end
     end
     if panel.key:GetStringWidth() > contentRight then contentRight = panel.key:GetStringWidth() end
-    local lastSpec = panel.specs[#panel.specs]
+    local lastSpec = specs[#specs]
     if contentRight > lastSpec.columnLeft + lastSpec.columnWidth then contentRight = lastSpec.columnLeft + lastSpec.columnWidth end
 
     local gutter         = (#panel.data > SOCIAL_MAX_ROWS) and SOCIAL_CHILD_GUTTER or 4
@@ -913,8 +884,8 @@ local function OpenSocialPanel(anchor, kind)
 
     for columnIndex = 1, 7 do
         local headerButton = panel.header[columnIndex]
-        local spec = panel.specs[columnIndex]
-        if spec and labels[columnIndex] then
+        local spec = specs[columnIndex]
+        if spec then
             headerButton:ClearAllPoints()
             headerButton:SetPoint('BOTTOMLEFT', panel.scrollFrame, 'TOPLEFT', Pixel.Scale(spec.columnLeft), Pixel.Scale(4))
             headerButton:SetWidth(Pixel.Scale(spec.columnWidth))
@@ -930,15 +901,12 @@ local function OpenSocialPanel(anchor, kind)
 
     local anchorFrame = panel.anchor
     local offsetX = 0
-    local anchorLeft = anchorFrame:GetLeft()
-    if anchorLeft then
-        local panelRightPixels = anchorLeft * anchorFrame:GetEffectiveScale() + panel:GetWidth() * panel:GetEffectiveScale()
-        local overflowPixels = panelRightPixels - (UIParent:GetRight() * UIParent:GetEffectiveScale() - 24)
-        if overflowPixels > 0 then offsetX = -(overflowPixels / panel:GetEffectiveScale()) end
-    end
+    local panelRightPixels = anchorFrame:GetLeft() * anchorFrame:GetEffectiveScale() + panel:GetWidth() * panel:GetEffectiveScale()
+    local overflowPixels = panelRightPixels - (UIParent:GetRight() * UIParent:GetEffectiveScale() - 24)
+    if overflowPixels > 0 then offsetX = -(overflowPixels / panel:GetEffectiveScale()) end
     panel:ClearAllPoints()
-    local anchorBottomPixels = anchorFrame:GetBottom() and anchorFrame:GetBottom() * anchorFrame:GetEffectiveScale()
-    if anchorBottomPixels and (anchorBottomPixels - panel:GetHeight() * panel:GetEffectiveScale()) < 40 then
+    local anchorBottomPixels = anchorFrame:GetBottom() * anchorFrame:GetEffectiveScale()
+    if anchorBottomPixels - panel:GetHeight() * panel:GetEffectiveScale() < 40 then
         panel:SetPoint('BOTTOMLEFT', anchorFrame, 'TOPLEFT', offsetX, Pixel.Scale(7))
     else
         panel:SetPoint('TOPLEFT', anchorFrame, 'BOTTOMLEFT', offsetX, Pixel.Scale(-7))
@@ -951,7 +919,7 @@ function Datatext.OpenSocialHover(anchor, kind)
     BuildSocialPanel()
     local panel = socialPanel
     if panel:IsShown() and not panel._fadingOut and panel.kind == kind then
-        panel.anchor = anchor:GetParent() or anchor
+        panel.anchor = anchor:GetParent()
         return
     end
     OpenSocialPanel(anchor, kind)

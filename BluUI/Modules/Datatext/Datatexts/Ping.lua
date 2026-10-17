@@ -14,7 +14,6 @@ local pingHome, pingWorld = 0, 0
 
 local function Read()
     local _, _, home, world = GetNetStats()
-    home, world = home or 0, world or 0
     if home ~= pingHome or world ~= pingWorld then
         pingHome, pingWorld = home, world
         return true
@@ -45,8 +44,7 @@ Datatext.Register('ping', {
     OnEnter = function(hit, bar)
         local tooltip = Datatext.Tooltip(hit)
         tooltip:AddLine('Latency', 1, 1, 1)
-        local config = bar.getConfig()
-        local valueColor = (config and config.colorValue) or { r = 0.9, g = 0.9, b = 0.95 }
+        local valueColor = bar.getConfig().colorValue
         local function AddPingLine(label, value)
             local red, green, blue = valueColor.r, valueColor.g, valueColor.b
             if value > 100 then red, green, blue = 1, 0.2, 0.2 end
@@ -59,7 +57,7 @@ Datatext.Register('ping', {
     options = function(getConfig, apply)
         return {
             {
-                kind = 'dropdown', label = 'Source', items = PING_SOURCES, controlWidth = 150,
+                label = 'Source', items = PING_SOURCES,
                 get = function() return getConfig().pingSource end,
                 set = function(value) getConfig().pingSource = value; apply() end,
             },

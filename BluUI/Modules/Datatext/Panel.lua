@@ -2,6 +2,7 @@ local _, BUI = ...
 
 local Datatext = BUI.Datatext
 local Pixel = BUI.Pixel
+local Painter = BUI.Painter
 local Widget = BUI.BUILibClient.Widget
 local Controls = BUI.BUILibClient.Controls
 
@@ -27,15 +28,7 @@ local function ForceHide(panel)
     panel:Hide()
 end
 
-local function PaintPanel(panel)
-    panel.fill:SetVertexColor(BUI.ThemeColor('page'))
-    panel.edge:SetVertexColor(BUI.ThemeColor('inputEdge'))
-    panel.title:SetTextColor(BUI.ThemeColor('text'))
-    if panel.PaintTheme then panel:PaintTheme() end
-end
-
 local function Reveal(panel)
-    PaintPanel(panel)
     panel._outTime = 0
     panel._fadingOut = false
     panel.outroFade:Stop()
@@ -46,7 +39,7 @@ local function Reveal(panel)
 end
 
 local OnUpdate = BUI.Profiler.Wrap('Datatext.Panel hover check', function(self, elapsed)
-    self._accumulated = (self._accumulated or 0) + elapsed
+    self._accumulated = self._accumulated + elapsed
     if self._accumulated < 0.1 then return end
     local accumulated = self._accumulated
     self._accumulated = 0
@@ -63,7 +56,7 @@ local OnUpdate = BUI.Profiler.Wrap('Datatext.Panel hover check', function(self, 
             self:SetAlpha(1)
         end
     elseif not self._fadingOut then
-        self._outTime = (self._outTime or 0) + accumulated
+        self._outTime = self._outTime + accumulated
         if self._outTime > 0.5 then FadeOut(self) end
     end
 end)
@@ -75,12 +68,16 @@ function Datatext.CreateHoverPanel(name, width)
     panel:SetFrameLevel(200)
     panel:SetClampedToScreen(true)
     panel.fill, panel.edge = Widget.DrawCardShape(panel, CARD_RADIUS, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
+    Painter.Tint(panel.fill, 'page')
+    Painter.Tint(panel.edge, 'inputEdge')
     panel:EnableMouse(true)
     panel:Hide()
+    panel._accumulated, panel._outTime = 0, 0
 
     panel.title = panel:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(panel.title, 12, Datatext.PanelFont())
     panel.title:SetPoint('TOPLEFT', Pixel.Scale(10), Pixel.Scale(-8))
+    Painter.Text(panel.title, 'text')
 
     panel.introFade = panel:CreateAnimationGroup()
     local fade = panel.introFade:CreateAnimation('Alpha')
@@ -140,10 +137,4 @@ function Datatext.HideHoversInCombat()
         local panel = hoverPanels[panelIndex]
         if panel:IsShown() and panel.anchor.bar.getConfig().hideHoversInCombat then ForceHide(panel) end
     end
-end
-
-function Datatext.HideAllHovers()
-    for panelIndex = 1, #hoverPanels do ForceHide(hoverPanels[panelIndex]) end
-    local owner = GameTooltip:GetOwner()
-    if owner and owner.isDatatextHit then GameTooltip:Hide() end
 end
