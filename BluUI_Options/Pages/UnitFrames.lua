@@ -43,7 +43,6 @@ local UNIT_BY_KEY = {}
 for _, unit in ipairs(UNITS) do UNIT_BY_KEY[unit.key] = unit end
 local ANCHORABLE = { player = true, target = true, focus = true, pet = true, targettarget = true }
 local TAB_IDS = { 'appearance', 'tags', 'player', 'target', 'targettarget', 'focus', 'pet', 'boss', 'filters', 'general', 'party', 'raid', 'groupFilters', 'hotSlots' }
-local TAB_INDEX = { appearance = 1, tags = 2, player = 3, target = 4, targettarget = 5, focus = 6, pet = 7, boss = 8, filters = 9, general = 10, party = 11, raid = 12, groupFilters = 13, hotSlots = 14 }
 local GROUP_PANE = {}
 local TAG_UNITS = {
 	{ value = 'player', text = 'Player' },
@@ -147,13 +146,9 @@ local tagsTab = 1
 local preview
 local fonts, textures
 
-local function Window()
-	return BUI.PageEngine.window
-end
-
-local function Repaint()
-	Window():Repaint()
-end
+local Kit = BUI.OptionsKit
+local Window, Repaint, RebuildPane = Kit.Window, Kit.Repaint, Kit.RebuildPane
+local Option, Toggle, OnUnlessOff, Color, Menu, Eye = Kit.Option, Kit.Toggle, Kit.OnUnlessOff, Kit.Color, Kit.Menu, Kit.Eye
 
 local function Settings()
 	return BUI.GetDB().unitFrames
@@ -167,61 +162,9 @@ local function RefreshPreview()
 	if preview then preview:Update() end
 end
 
-local function RebuildPane(page)
-	BUILib.Defer(function() page:RebuildCurrent() end)
-end
-
-local function ResolveShow(specific, fallback, defaultOn)
+local function ResolveShow(specific, fallback)
 	if specific ~= nil then return specific == true end
-	if defaultOn == false then return fallback == true end
 	return fallback ~= false
-end
-
-local factoryOf = setmetatable({}, { __mode = 'k' })
-local NO_FACTORY = {}
-
-local function MapFactory(live, factory)
-	factoryOf[live] = factory
-	for key, value in pairs(factory) do
-		local child = live[key]
-		if type(value) == 'table' and type(child) == 'table' and not factoryOf[child] then MapFactory(child, value) end
-	end
-end
-
-local function FactoryFor(db)
-	if factoryOf[db] == nil then
-		MapFactory(BUI.GetDB(), BUI.ExportImport.FactoryProfile())
-		if factoryOf[db] == nil then factoryOf[db] = false end
-	end
-	return factoryOf[db] or NO_FACTORY
-end
-
-local READERS = {
-	on = function(value) return value == true end,
-	off = function(value) return value ~= false end,
-}
-
-local function Setting(db, label, key, shape, extra)
-	local read = READERS[shape]
-	local option = { label = label }
-	option.get = function()
-		if read then return read(db[key]) end
-		return db[key]
-	end
-	option.set = function(value)
-		db[key] = value
-		if option.onChange then option.onChange() end
-	end
-	option.default = function()
-		if read then return read(FactoryFor(db)[key]) end
-		return FactoryFor(db)[key]
-	end
-	for name, value in pairs(extra or {}) do option[name] = value end
-	return option
-end
-
-local function Option(db, label, key, extra)
-	return Setting(db, label, key, nil, extra)
 end
 
 local function Inherit(unitSettings, label, key, extra)
@@ -234,58 +177,18 @@ local function Inherit(unitSettings, label, key, extra)
 	return option
 end
 
-local function Toggle(db, label, key, extra)
-	return Setting(db, label, key, 'on', extra)
-end
-
-local function OnUnlessOff(db, label, key, extra)
-	return Setting(db, label, key, 'off', extra)
-end
-
-local function Color(db, label, key)
-	return {
-		kind = 'swatch', label = label, tooltip = label, opacity = true,
-		get = function()
-			local color = db[key]
-			return color[1], color[2], color[3], color[4] or 1
-		end,
-		set = function(red, green, blue, alpha) db[key] = { red, green, blue, alpha } end,
-		default = function()
-			local color = FactoryFor(db)[key]
-			if color then return color[1], color[2], color[3], color[4] or 1 end
-		end,
-	}
-end
-
 local function StoreColor(key, tooltip)
 	local stored = BUI.Colors.GetStore()[key]
 	return {
 		kind = 'swatch', tooltip = tooltip, opacity = true,
 		get = function() return stored.r, stored.g, stored.b, stored.a end,
 		set = function(red, green, blue, alpha) stored.r, stored.g, stored.b, stored.a = red, green, blue, alpha end,
-		default = function()
-			for _, group in ipairs(BUI.Colors.GROUPS) do
-				for _, entry in ipairs(group.colors) do
-					if entry.key == key then return entry.def[1], entry.def[2], entry.def[3], entry.def[4] or 1 end
-				end
-			end
-		end,
+		default = function() return BUI.Colors.Default(key) end,
 	}
-end
-
-local function Menu(db, key, entries, width)
-	return { entries = entries, width = width or MENU_WIDTH, get = function() return db[key] end, set = function(value) db[key] = value end, default = function() return FactoryFor(db)[key] end }
 end
 
 local function TagInput(db, key, placeholder, width)
 	return { kind = 'input', width = width or TAG_WIDTH, placeholder = placeholder, get = function() return db[key] or '' end, set = function(text) db[key] = text ~= '' and text or nil end }
-end
-
-local function Eye(tooltip, get, set)
-	return { icon = 'eye', tooltip = tooltip, get = get, set = function(value)
-		set(value)
-		Repaint()
-	end }
 end
 
 local function PreviewEye(unitKey, spotlight)
@@ -306,10 +209,11 @@ local function PreviewEye(unitKey, spotlight)
 	end)
 end
 
+local UNMIRRORED = { enabled = true, width = true, height = true, position = true, spacing = true, growthDirection = true, anchorFrame = true, anchorPoint = true, anchorOffsetX = true, anchorOffsetY = true, matchAnchorWidth = true, matchAnchorHeight = true, customName = true }
+
 local function MirrorKeys(source, destination)
-	local blocked = { enabled = true, width = true, height = true, position = true, spacing = true, growthDirection = true, anchorFrame = true, anchorPoint = true, anchorOffsetX = true, anchorOffsetY = true, matchAnchorWidth = true, matchAnchorHeight = true, customName = true }
 	for key in pairs(source) do
-		if not blocked[key] and not (type(key) == 'string' and key:sub(1, 1) == '_') then destination[key] = BUI.Tools.DeepCopy(source[key]) end
+		if not UNMIRRORED[key] and not (type(key) == 'string' and key:sub(1, 1) == '_') then destination[key] = BUI.Tools.DeepCopy(source[key]) end
 	end
 end
 
@@ -476,12 +380,9 @@ local function AppearanceBoards(ui, parent, width, page)
 			Option(settings, 'Font', 'font', { entries = fonts, width = WIDE_MENU }),
 		} },
 		{ tooltip = 'Behavior options', title = 'Behavior', options = {
-			OnUnlessOff(settings, 'Unit tooltip on mouseover', 'showTooltips'),
+			OnUnlessOff(settings, 'Tooltips on the frame and its auras', 'showTooltips'),
 			OnUnlessOff(settings, 'Clicking a frame targets its unit', 'clickToTarget', { onChange = function() module.ApplyClickToTarget() end }),
-			Toggle(BUI.GetDB().general, 'Abbreviate numbers with one decimal, 7.5K', 'showDecimalAbbreviations', { onChange = function()
-				module.RefreshAbbreviationSetting()
-				module.InvalidateTagCache()
-			end }),
+			Toggle(BUI.GetDB().general, 'Abbreviate numbers with one decimal, 7.5K', 'showDecimalAbbreviations', { onChange = module.RefreshAbbreviationSetting }),
 			Toggle(settings, 'Target and pet copy the player frame look', 'syncPlayerTarget', { separator = true }),
 			Toggle(settings, 'Keep the pet independent', 'excludePetFromSync'),
 		} },
@@ -496,7 +397,7 @@ local function AppearanceBoards(ui, parent, width, page)
 	}, RefreshFrames)
 	health:AddTools('Transparent health', 'See through health fill', {
 		{ tooltip = 'Fill opacity', title = 'Transparent health', options = {
-			{ label = 'Fill opacity %', min = 0, max = 100, step = 5, get = function() return math.floor(settings.healthBarAlpha * 100) end, set = function(value) settings.healthBarAlpha = value / 100 end, default = function() return math.floor(FactoryFor(settings).healthBarAlpha * 100) end },
+			{ label = 'Fill opacity %', min = 0, max = 100, step = 5, get = function() return math.floor(settings.healthBarAlpha * 100) end, set = function(value) settings.healthBarAlpha = value / 100 end, default = function() return math.floor(BUI.FactoryOf(settings).healthBarAlpha * 100) end },
 		} },
 		Toggle(settings, nil, 'transparentHealth'),
 	}, RefreshFrames)
@@ -518,9 +419,18 @@ local function AppearanceBoards(ui, parent, width, page)
 		PreviewEye('player', 'healAbsorb'),
 		OnUnlessOff(settings, nil, 'healAbsorbEnabled'),
 	}, RefreshFrames)
+	local powerBackground = Color(settings, 'Background', 'powerBgColor')
+	powerBackground.get = function()
+		local color = settings.powerBgColor or settings.bgColor
+		return color[1], color[2], color[3], color[4] or 1
+	end
+	powerBackground.default = function()
+		local color = BUI.FactoryOf(settings).bgColor
+		return color[1], color[2], color[3], color[4] or 1
+	end
 	health:AddTools('Power bar', 'Power fill and background colors', {
 		Color(settings, 'Power', 'powerColor'),
-		Color(settings, 'Background', 'powerBgColor'),
+		powerBackground,
 		{ tooltip = 'Power bar options', title = 'Power bar', options = {
 			Toggle(settings, 'Color by resource type, mana blue, energy yellow', 'classColorPower'),
 			Toggle(settings, 'Color by class or reaction', 'useClassColorPowerBar'),
@@ -543,7 +453,7 @@ local function AppearanceBoards(ui, parent, width, page)
 	dispel:AddTools('Dispel highlight', 'Frame reaction to a dispellable debuff', {
 		{ tooltip = 'Style, source and strength', title = 'Dispel highlight', options = {
 			Option(player, 'Style', 'debuffHighlightStyle', { entries = DISPEL_STYLES }),
-			{ label = 'Show', entries = DISPEL_SOURCES, get = function() return player.debuffHighlightClassFilter ~= false and 'mine' or 'all' end, set = function(value) player.debuffHighlightClassFilter = value == 'mine' end, default = function() return FactoryFor(player).debuffHighlightClassFilter ~= false and 'mine' or 'all' end },
+			{ label = 'Show', entries = DISPEL_SOURCES, get = function() return player.debuffHighlightClassFilter ~= false and 'mine' or 'all' end, set = function(value) player.debuffHighlightClassFilter = value == 'mine' end, default = function() return BUI.FactoryOf(player).debuffHighlightClassFilter ~= false and 'mine' or 'all' end },
 			Option(settings, 'Bar tint opacity %', 'dispelOpacity', { min = 0, max = 100, step = 5 }),
 			Toggle(settings, 'Blend multiple types instead of showing the top one', 'dispelBlend', { separator = true }),
 		} },
@@ -573,7 +483,7 @@ local function AppearanceBoards(ui, parent, width, page)
 			Option(settings, 'Horizontal', 'raidIconOffsetX', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
 			Option(settings, 'Vertical', 'raidIconOffsetY', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
 		} },
-		{ get = function() return settings.raidIconMode ~= 'off' end, set = function(value) settings.raidIconMode = value and 'icon' or 'off' end, default = function() return FactoryFor(settings).raidIconMode ~= 'off' end },
+		{ get = function() return settings.raidIconMode ~= 'off' end, set = function(value) settings.raidIconMode = value and 'icon' or 'off' end, default = function() return BUI.FactoryOf(settings).raidIconMode ~= 'off' end },
 	}, RefreshFrames)
 	indicators:AddTools('Leader icon', 'Leader and assist crown on the frames', {
 		{ tooltip = 'Position and size', title = 'Leader icon', options = {
@@ -609,9 +519,10 @@ local function CustomTagsBoard(ui, parent, width, page)
 		end },
 	})
 	for index, entry in ipairs(unitSettings.customTags) do
-		custom:AddTools(entry.name or ('Tag ' .. index), entry.tag or '', {
+		local label = entry.name or ('Tag ' .. index)
+		custom:AddTools(label, entry.tag or '', {
 			Color(entry, 'Text color', 'color'),
-			{ icon = 'text', tooltip = 'Name, tag, font and layer', title = entry.name or ('Tag ' .. index), options = {
+			{ icon = 'text', tooltip = 'Name, tag, font and layer', title = label, options = {
 				{ label = 'Name', kind = 'input', placeholder = 'Name', get = function() return entry.name or '' end, set = function(text)
 					entry.name = text ~= '' and text or nil
 					page:RebuildCurrent()
@@ -625,7 +536,7 @@ local function CustomTagsBoard(ui, parent, width, page)
 				Option(entry, 'Layer', 'drawLayer', { entries = LAYERS }),
 				Option(entry, 'Sublevel', 'drawSubLevel', { min = -7, max = 7, step = 1 }),
 			} },
-			{ icon = 'location', tooltip = 'Anchor and offset', title = entry.name or ('Tag ' .. index), options = {
+			{ icon = 'location', tooltip = 'Anchor and offset', title = label, options = {
 				Option(entry, 'Anchor', 'point', { entries = BUI.C.ANCHOR_POINT_OPTIONS_SHORT }),
 				Option(entry, 'Horizontal', 'x', { min = -TAG_RANGE, max = TAG_RANGE, step = 1 }),
 				Option(entry, 'Vertical', 'y', { min = -TAG_RANGE, max = TAG_RANGE, step = 1 }),
@@ -634,7 +545,7 @@ local function CustomTagsBoard(ui, parent, width, page)
 			{ slot = 'erase', icon = 'erase', size = Layout.ERASE_SIZE, hover = 'danger', tooltip = 'Remove this tag', onClick = function()
 				Modals.Confirm({
 					parent = Window().frame,
-					title = 'Remove ' .. (entry.name or ('Tag ' .. index)),
+					title = 'Remove ' .. label,
 					message = 'Remove this tag from the frame? There is no undo.',
 					confirmText = 'Remove', cancelText = 'Cancel',
 					onConfirm = function()
@@ -654,7 +565,7 @@ local DEFAULT_COLOR_KEY = { name = 'nameColor', health = 'healthTextColor', powe
 local DEFAULT_TAG_COLUMNS = { { 'Tag', 'name', 80 }, { 'Shows', 'sub', 140 }, { 'Color', 'swatch', 136 }, { 'Format', 'input', 200 }, { 'Placement', 'icon', 80, 'CENTER' }, { '', 'reset', nil, 'CENTER' } }
 
 local function Factory()
-	return FactoryFor(Settings())
+	return BUI.FactoryOf(Settings())
 end
 
 local function SameColor(a, b)
@@ -838,12 +749,10 @@ local function PositionTool(unitKey, unitSettings)
 		end
 		frames = pruned
 	end
-	local defaultOffsetX = unitKey == 'targettarget' and 5 or 0
 	local proxy = setmetatable({}, {
 		__index = function(_, key)
 			if key == 'posX' then return unitSettings.position.x end
 			if key == 'posY' then return unitSettings.position.y end
-			if key == 'anchorOffsetX' then return unitSettings.anchorOffsetX or defaultOffsetX end
 			return unitSettings[key]
 		end,
 		__newindex = function(_, key, value)
@@ -852,10 +761,7 @@ local function PositionTool(unitKey, unitSettings)
 			elseif key == 'posY' then
 				unitSettings.position.y, unitSettings.position.point, unitSettings.position.relPoint = value, 'CENTER', 'CENTER'
 			elseif key == 'anchorFrame' then
-				if value ~= '' and selfFrame and BUI.Anchor.WouldCycle(selfFrame, BUI.ResolveAnchorFrame(value)) then
-					BUI.Print('That frame already anchors to the ' .. unitKey .. ' frame, it would loop.')
-					return
-				end
+				if value ~= '' and selfFrame and BUI.Anchor.WouldCycle(selfFrame, BUI.ResolveAnchorFrame(value)) then return end
 				unitSettings.anchorFrame = value
 			else
 				unitSettings[key] = value
@@ -876,6 +782,7 @@ local AURA_FLOWS = {
 local function AuraRow(board, unitKey, unitSettings, isDebuff)
 	local prefix = isDebuff and 'debuff' or 'buff'
 	local title = isDebuff and 'Debuffs' or 'Buffs'
+	local maxKey = isDebuff and 'maxDebuffs' or 'maxBuffs'
 	local function Key(name) return prefix .. name end
 	local layout = {
 		{ label = 'Anchor point', entries = BUI.C.ANCHOR_POINT_OPTIONS, get = function() return unitSettings[Key('AnchorPoint')] or (isDebuff and 'TOPLEFT' or 'BOTTOMLEFT') end, set = function(value)
@@ -891,7 +798,7 @@ local function AuraRow(board, unitKey, unitSettings, isDebuff)
 	local sizing = {
 		{ label = 'Icon size', min = 12, max = 80, step = 1, get = function() return unitSettings[Key('IconSize')] or unitSettings.auraIconSize end, set = function(value) unitSettings[Key('IconSize')] = value end },
 		{ label = 'Spacing', min = 0, max = 10, step = 1, get = function() return unitSettings[Key('Spacing')] or unitSettings.auraSpacing end, set = function(value) unitSettings[Key('Spacing')] = value end },
-		Option(unitSettings, 'Max per rule', isDebuff and 'maxDebuffs' or 'maxBuffs', { min = 1, max = isDebuff and 16 or 32, step = 1 }),
+		{ label = 'Max per rule', min = 1, max = isDebuff and 16 or 32, step = 1, get = function() return unitSettings[maxKey] or (isDebuff and 16 or 8) end, set = function(value) unitSettings[maxKey] = value end },
 		{ label = 'Per row', min = 1, max = 16, step = 1, get = function() return unitSettings[isDebuff and 'debuffsPerRow' or 'buffsPerRow'] or 8 end, set = function(value) unitSettings[isDebuff and 'debuffsPerRow' or 'buffsPerRow'] = value end },
 	}
 	local text = {}
@@ -932,78 +839,63 @@ local function BossBoards(ui, parent, width)
 		Menu(boss, 'growthDirection', STACKINGS, 220),
 		{ tooltip = 'Spacing between frames', title = 'Stacking', options = { Option(boss, 'Spacing', 'spacing', { min = 0, max = 100, step = 1 }) } },
 	}, RefreshFrames)
-	local boards = { stacking }
 	local CastBar = BUI.CastBar
 	local castbar = CastBar.GetSettings('boss')
-	if castbar then
-		local Refresh = RefreshFrames
-		local board = ui.Board(parent, width, {
-			stacked = true,
-			title = 'Cast bar',
-			description = 'The cast bar on each boss frame.',
-		})
-		board:AddTools('Cast bar', 'Texture, size and layer', {
-			Menu(castbar, 'texture', textures, MENU_WIDTH),
-			{ tooltip = 'Size and layer', title = 'Cast bar', options = {
-				Option(castbar, 'Height', 'height', { min = 4, max = 50, step = 1 }),
-				Option(castbar, 'Border size', 'borderSize', { min = 0, max = 5, step = 1 }),
-				Option(castbar, 'Layer', 'frameStrata', { entries = BUI.C.STRATA_OPTIONS }),
-			} },
-			Toggle(castbar, nil, 'enabled'),
-		}, Refresh)
-		board:AddSwitch('Spell icon', function() return castbar.showIcon == true end, function(value)
-			castbar.showIcon = value
-			Refresh()
-		end, 'The spell icon beside the bar')
-		board:AddTools('Text', 'Timer, spell name and size', {
-			{ icon = 'text', tooltip = 'What the bar shows', title = 'Text', options = {
-				Toggle(castbar, 'Show timer', 'showTimer'),
-				OnUnlessOff(castbar, 'Show total time', 'showTotalTime'),
-				OnUnlessOff(castbar, 'Countdown', 'countdown'),
-				Toggle(castbar, 'Show spell name', 'showSpellName'),
-				{ label = 'Name length, 0 for no limit', min = 0, max = 30, step = 1, get = function() return castbar.spellNameMaxLength or 0 end, set = function(value) castbar.spellNameMaxLength = value > 0 and value or nil end },
-				Option(castbar, 'Text size', 'textSize', { min = 8, max = 24, step = 1 }),
-			} },
-		}, Refresh)
-		board:AddTools('Colors', 'Bar and border', {
-			Color(castbar, 'Bar color', 'barColor'),
-			Color(castbar, 'Border color', 'borderColor'),
-		}, Refresh)
-		local perBoss = {}
-		for index = 1, 5 do
-			local color = castbar.bossColors[index]
-			if not color then
-				color = { 0.8, 0.2, 0.2, 1 }
-				castbar.bossColors[index] = color
-			end
-			if color[4] == nil then color[4] = 1 end
-			perBoss[#perBoss + 1] = Color(castbar.bossColors, 'Boss ' .. index, index)
-		end
-		perBoss[#perBoss + 1] = Toggle(castbar, nil, 'useIndividualColors')
-		board:AddTools('Per boss colors', 'A distinct bar color for each boss', perBoss, Refresh)
-		if castbar.interruptColor then
-			board:AddTools('Cast colors', 'Bar color by interrupt state', {
-				Color(castbar, 'Interrupt soon', 'interruptWindowColor'),
-				Color(castbar, 'Can interrupt', 'interruptReadyColor'),
-				Color(castbar, 'Interrupt on cooldown', 'interruptOnCDColor'),
-				Color(castbar, 'Not interruptible', 'interruptColor'),
-				{ icon = 'eye', tooltip = 'Preview the ready line and the voice lines', get = function() return CastBar.IsPreviewingInterrupt('boss') end, set = function(value)
-					if value then CastBar.PreviewInterrupt('boss') else CastBar.StopInterruptPreview('boss') end
-					Repaint()
-				end },
-			}, Refresh)
-			board:AddTools('Ready line', 'Line marking when your kick is back up', {
-				Color(castbar, 'Line color', 'interruptTickColor'),
-				{ tooltip = 'Line width and window', title = 'Ready line', options = {
-					Option(castbar, 'Line width', 'interruptTickWidth', { min = 1, max = 6, step = 1 }),
-					OnUnlessOff(castbar, 'Show interrupt window', 'interruptWindow'),
-				} },
-				OnUnlessOff(castbar, nil, 'interruptTick'),
-			}, Refresh)
-		end
-		boards[#boards + 1] = board
-	end
-	return boards
+	local board = ui.Board(parent, width, {
+		stacked = true,
+		title = 'Cast bar',
+		description = 'The cast bar on each boss frame.',
+	})
+	board:AddTools('Cast bar', 'Texture, size and layer', {
+		Menu(castbar, 'texture', textures, MENU_WIDTH),
+		{ tooltip = 'Size and layer', title = 'Cast bar', options = {
+			Option(castbar, 'Height', 'height', { min = 4, max = 50, step = 1 }),
+			Option(castbar, 'Border size', 'borderSize', { min = 0, max = 5, step = 1 }),
+			Option(castbar, 'Layer', 'frameStrata', { entries = BUI.C.STRATA_OPTIONS }),
+		} },
+		Toggle(castbar, nil, 'enabled'),
+	}, RefreshFrames)
+	board:AddSwitch('Spell icon', function() return castbar.showIcon == true end, function(value)
+		castbar.showIcon = value
+		RefreshFrames()
+	end, 'The spell icon beside the bar')
+	board:AddTools('Text', 'Timer, spell name and size', {
+		{ icon = 'text', tooltip = 'What the bar shows', title = 'Text', options = {
+			Toggle(castbar, 'Show timer', 'showTimer'),
+			OnUnlessOff(castbar, 'Show total time', 'showTotalTime'),
+			OnUnlessOff(castbar, 'Countdown', 'countdown'),
+			Toggle(castbar, 'Show spell name', 'showSpellName'),
+			{ label = 'Name length, 0 for no limit', min = 0, max = 30, step = 1, get = function() return castbar.spellNameMaxLength or 0 end, set = function(value) castbar.spellNameMaxLength = value > 0 and value or nil end },
+			Option(castbar, 'Text size', 'textSize', { min = 8, max = 24, step = 1 }),
+		} },
+	}, RefreshFrames)
+	board:AddTools('Colors', 'Bar and border', {
+		Color(castbar, 'Bar color', 'barColor'),
+		Color(castbar, 'Border color', 'borderColor'),
+	}, RefreshFrames)
+	local perBoss = {}
+	for index = 1, 5 do perBoss[index] = Color(castbar.bossColors, 'Boss ' .. index, index) end
+	perBoss[#perBoss + 1] = Toggle(castbar, nil, 'useIndividualColors')
+	board:AddTools('Per boss colors', 'A distinct bar color for each boss', perBoss, RefreshFrames)
+	board:AddTools('Cast colors', 'Bar color by interrupt state', {
+		Color(castbar, 'Interrupt soon', 'interruptWindowColor'),
+		Color(castbar, 'Can interrupt', 'interruptReadyColor'),
+		Color(castbar, 'Interrupt on cooldown', 'interruptOnCDColor'),
+		Color(castbar, 'Not interruptible', 'interruptColor'),
+		{ icon = 'eye', tooltip = 'Preview the ready line and the voice lines', get = function() return CastBar.IsPreviewingInterrupt('boss') end, set = function(value)
+			if value then CastBar.PreviewInterrupt('boss') else CastBar.StopInterruptPreview('boss') end
+			Repaint()
+		end },
+	}, RefreshFrames)
+	board:AddTools('Ready line', 'Line marking when your kick is back up', {
+		Color(castbar, 'Line color', 'interruptTickColor'),
+		{ tooltip = 'Line width and window', title = 'Ready line', options = {
+			Option(castbar, 'Line width', 'interruptTickWidth', { min = 1, max = 6, step = 1 }),
+			OnUnlessOff(castbar, 'Show interrupt window', 'interruptWindow'),
+		} },
+		OnUnlessOff(castbar, nil, 'interruptTick'),
+	}, RefreshFrames)
+	return { stacking, board }
 end
 
 local function UnitBoards(ui, parent, width, unit)
@@ -1089,25 +981,25 @@ local function UnitBoards(ui, parent, width, unit)
 		Color(unitSettings, 'Hostile', 'hostileNameColor'),
 		Placement('name', 'Name', 20, nameExtras),
 		FollowDefaults('name'),
-		{ get = function() return ResolveShow(unitSettings.showName, settings.showName) end, set = function(value) unitSettings.showName = value end },
+		Toggle(unitSettings, nil, 'showName'),
 	}, RefreshFrames)
 	text:AddTools('Health', 'Health value on the bar', {
 		TagInput(unitSettings, 'healthFormat', DefaultFormat('healthFormat', DEFAULT_TAGS.health)),
 		Placement('health', 'Health text', 20),
 		FollowDefaults('health'),
-		{ get = function() return ResolveShow(unitSettings.showHealthText, settings.showHealthText) end, set = function(value) unitSettings.showHealthText = value end },
+		Toggle(unitSettings, nil, 'showHealthText'),
 	}, RefreshFrames)
 	text:AddTools('Status', 'Dead, Ghost or Offline over the bar', {
 		TagInput(unitSettings, 'statusFormat', DefaultFormat('statusFormat', DEFAULT_TAGS.status)),
 		Placement('status', 'Status text', 24),
 		FollowDefaults('status'),
-		{ get = function() return unitSettings.showStatusText ~= false end, set = function(value) unitSettings.showStatusText = value end },
+		OnUnlessOff(unitSettings, nil, 'showStatusText'),
 	}, RefreshFrames)
 	text:AddTools('Power', 'Resource value on the power bar', {
 		TagInput(unitSettings, 'powerFormat', DefaultFormat('powerFormat', DEFAULT_TAGS.power)),
 		Placement('power', 'Power text', 20),
 		FollowDefaults('power'),
-		{ get = function() return ResolveShow(unitSettings.showPowerText, settings.showPowerText, false) end, set = function(value) unitSettings.showPowerText = value end },
+		Toggle(unitSettings, nil, 'showPowerText'),
 	}, RefreshFrames)
 
 	local boards = { board, text }
@@ -1171,6 +1063,7 @@ BUI.PageEngine.RegisterPage('unitframes', {
 			icon = 'profile',
 			title = 'Unit Frames',
 			placeholder = 'Search frame settings...',
+			tabs = TAB_IDS,
 			disabled = function(item) return not enabled or (GROUP_PANE[item.id] and not BUI.GroupFramesPage.IsOn()) end,
 			tools = {
 				{ text = 'Test mode', onClick = function()
@@ -1202,10 +1095,8 @@ BUI.PageEngine.RegisterPage('unitframes', {
 			Repaint()
 			RefreshPreview()
 		end
-		local tabs = {}
-		for index = 1, #TAB_IDS do tabs[index] = tab end
-		pageFrame._page = { tabContents = tabs, currentTab = TAB_INDEX[selected], SetTab = function(_, index) rail:Select(TAB_IDS[index] or 'appearance') end }
-		module.SetPreviewListener(Repaint)
+		pageFrame._page = rail.adapter
+		BUI.OnModuleChange('unitFramePreview', Repaint)
 		RefreshPreview()
 		page:AutoRefresh()
 	end,

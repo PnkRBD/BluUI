@@ -58,10 +58,10 @@ local GrowthToAnchor = Engine.GrowthToAnchor
 local function ResolveStyle(settings, isDebuff)
 	local style = {}
 	if isDebuff then
-		style.size   = settings.debuffIconSize or settings.auraIconSize or 24
-		style.gap    = settings.debuffSpacing or settings.auraSpacing or 2
-		style.perRow = settings.debuffsPerRow or settings.maxDebuffs or 8
-		style.max    = settings.maxDebuffs or 16
+		style.size   = settings.debuffIconSize or settings.auraIconSize
+		style.gap    = settings.debuffSpacing or settings.auraSpacing
+		style.perRow = settings.debuffsPerRow
+		style.max    = settings.maxDebuffs
 		style.growX  = settings.debuffGrowthX
 		style.growY  = settings.debuffGrowthY
 		style.anchorTo = settings.debuffAnchorPoint
@@ -85,16 +85,16 @@ local function ResolveStyle(settings, isDebuff)
 		style.showDispelType = false
 	end
 	style.sortMethod = Engine.ResolveSortMethod(GetAuraSetting(settings, isDebuff, 'debuffSortMethod', 'buffSortMethod', nil, 'default'))
-	style.showStack = GetAuraSetting(settings, isDebuff, 'debuffShowStack', 'buffShowStack', 'auraShowStack', true)
-	style.stackSize = GetAuraSetting(settings, isDebuff, 'debuffStackSize', 'buffStackSize', 'auraStackSize', 10)
+	style.showStack = GetAuraSetting(settings, isDebuff, 'debuffShowStack', 'buffShowStack', 'auraShowStack')
+	style.stackSize = GetAuraSetting(settings, isDebuff, 'debuffStackSize', 'buffStackSize', 'auraStackSize')
 	style.stackPos  = GetAuraSetting(settings, isDebuff, 'debuffStackPos', 'buffStackPos', nil, 'BOTTOMRIGHT')
-	style.showCd    = GetAuraSetting(settings, isDebuff, 'debuffShowCd', 'buffShowCd', 'auraShowCd', true)
-	style.cdSize    = GetAuraSetting(settings, isDebuff, 'debuffCdSize', 'buffCdSize', 'auraCdSize', 10)
+	style.showCd    = GetAuraSetting(settings, isDebuff, 'debuffShowCd', 'buffShowCd', 'auraShowCd')
+	style.cdSize    = GetAuraSetting(settings, isDebuff, 'debuffCdSize', 'buffCdSize', 'auraCdSize')
 	local showDecimals = GetAuraSetting(settings, isDebuff, 'debuffShowDecimals', 'buffShowDecimals', nil, false)
 	style.decimals  = showDecimals and GetAuraSetting(settings, isDebuff, 'debuffDecimalThreshold', 'buffDecimalThreshold', nil, 5) or 0
 	style.reverseSwipe = settings.auraReverseSwipe
 	style.padding = 0
-	style.showTooltips = settings.showTooltips ~= false
+	style.showTooltips = UnitFrames.GetSettings().showTooltips ~= false
 	style.font = UnitFrames.GetFont()
 	return style
 end
