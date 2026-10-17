@@ -16,7 +16,6 @@ local TIME_W     = 104
 local LIST_TOP   = 96
 local DROPDOWN_W = 170
 local FILL_ALPHA = 0.45
-local MIN_COOLDOWN = 1.5
 local COUNTDOWN_SIZE = 11
 
 local CHEST_COLORS = {
@@ -123,7 +122,7 @@ local function ScoreColor(score, isPreviousSeason)
         local red, green, blue = RaiderIO.GetScoreColor(score, isPreviousSeason)
         if red then return CreateColor(red, green, blue) end
     end
-    return C_ChallengeMode.GetDungeonScoreRarityColor(score) or HIGHLIGHT_FONT_COLOR
+    return C_ChallengeMode.GetDungeonScoreRarityColor(score)
 end
 
 local function BestRun(mapID)
@@ -134,7 +133,7 @@ local function BestRun(mapID)
         if not best or info.score > best.score then best = info end
     end
     if not best then return nil end
-    local timeLimit = timeLimitByMap[mapID] or 0
+    local timeLimit = timeLimitByMap[mapID]
     local chests = 0
     if not best.overTime and timeLimit > 0 then
         local ratio = best.durationSec / timeLimit
@@ -381,9 +380,9 @@ end
 local function RefreshCooldowns()
     if not panel:IsShown() then return end
     for _, row in ipairs(rows) do
-        local cooldownInfo = row:IsShown() and row._known and C_Spell.GetSpellCooldown(row._spellID)
-        if cooldownInfo and cooldownInfo.duration > MIN_COOLDOWN then
-            CooldownFrame_Set(row.cooldown, cooldownInfo.startTime, cooldownInfo.duration, cooldownInfo.isEnabled)
+        local duration = row:IsShown() and row._known and C_Spell.GetSpellCooldownDuration(row._spellID, true)
+        if duration then
+            row.cooldown:SetCooldownFromDurationObject(duration)
             StyleCountdown(row.cooldown)
         else
             row.cooldown:Clear()
