@@ -18,17 +18,12 @@ local ABSORB_OVERFLOW_W = 6
 local HEALTH_VALUE_EVENTS = {
 	UNIT_HEALTH = true,
 	UNIT_MAXHEALTH = true,
-	UNIT_HEAL_PREDICTION = true,
-	UNIT_ABSORB_AMOUNT_CHANGED = true,
-	UNIT_HEAL_ABSORB_AMOUNT_CHANGED = true,
-	UNIT_MAX_HEALTH_MODIFIERS_CHANGED = true,
 }
 
 local POWER_VALUE_EVENTS = {
 	UNIT_POWER_FREQUENT = true,
 	UNIT_MAXPOWER = true,
 }
-
 
 local function DeadBackgroundColor(frame)
 	local state = frame._statusState
@@ -42,28 +37,19 @@ local function HealthUpdateColor(self, event, unit)
 	local element = self.Health
 	local deadColor = DeadBackgroundColor(self)
 	if deadColor then
-		element:SetStatusBarColor(deadColor[1], deadColor[2], deadColor[3], deadColor[4] or 1)
+		element:SetStatusBarColor(deadColor[1], deadColor[2], deadColor[3], deadColor[4])
 		return
 	end
 	local settings = UnitFrames.GetSettings()
 
 	local red, green, blue
 	if unit ~= 'player' and not UnitIsConnected(unit) then
-		local disconnectedColor = self.colors.disconnected
-		if disconnectedColor then red, green, blue = disconnectedColor:GetRGB() end
-
+		red, green, blue = self.colors.disconnected:GetRGB()
 	else
 		red, green, blue = UnitFrames.GetHealthColor(unit, settings)
 	end
 
-	if not red then red, green, blue = 1, 1, 1 end
-
-	if settings.transparentHealth then
-		local alpha = settings.healthBarAlpha
-		element:SetStatusBarColor(red, green, blue, alpha)
-	else
-		element:SetStatusBarColor(red, green, blue, 1)
-	end
+	element:SetStatusBarColor(red, green, blue, settings.transparentHealth and settings.healthBarAlpha or 1)
 end
 
 local function PowerUpdateColor(self, event, unit)
@@ -83,15 +69,6 @@ local function PowerUpdateColor(self, event, unit)
 	element:SetStatusBarColor(UnitFrames.GetPowerColor(unit, settings, unitSettings))
 end
 
-local function UpdateNameColor(frame, event, unit)
-	if frame._isPreview then return end
-	unit = unit or frame.unit
-	if not unit or not UnitExists(unit) then return end
-	local unitSettings = UnitFrames.GetUnitSettings(frame._unitType)
-	local red, green, blue = UnitFrames.GetNameColor(unit, unitSettings)
-	frame.Name:SetTextColor(red, green, blue)
-end
-
 local function LifeState(unit)
 	if not unit or not UnitExists(unit) then return end
 	if not UnitIsConnected(unit) then return 'offline' end
@@ -107,8 +84,8 @@ local function PaintDeadBackground(frame)
 	local settings = UnitFrames.GetSettings()
 	local backgroundColor = deadColor or (frame._unitType == 'pet' and settings.petBgColor or settings.bgColor)
 	local deficitColor = deadColor or settings.bgColor
-	BUI.Tools.SetColorTex(frame.FrameBG, backgroundColor[1], backgroundColor[2], backgroundColor[3], settings.transparentHealth and 0 or (backgroundColor[4] or 1))
-	BUI.Tools.SetColorTex(frame.Health.Deficit, deficitColor[1], deficitColor[2], deficitColor[3], deficitColor[4] or 1)
+	BUI.Tools.SetColorTex(frame.FrameBG, backgroundColor[1], backgroundColor[2], backgroundColor[3], settings.transparentHealth and 0 or backgroundColor[4])
+	BUI.Tools.SetColorTex(frame.Health.Deficit, deficitColor[1], deficitColor[2], deficitColor[3], deficitColor[4])
 	HealthUpdateColor(frame, nil, frame.unit)
 end
 
@@ -117,9 +94,7 @@ local function UpdateHealthTextShown(frame)
 		frame.HealthText:Hide()
 		return
 	end
-	local show = UnitFrames.GetUnitSettings(frame._unitType).showHealthText
-	if show == nil then show = UnitFrames.GetSettings().showHealthText ~= false end
-	frame.HealthText:SetShown(show)
+	frame.HealthText:SetShown(UnitFrames.GetUnitSettings(frame._unitType).showHealthText)
 end
 
 local function ApplyStatusText(frame)
@@ -133,7 +108,6 @@ local function ApplyLifeVisuals(frame)
 end
 
 function UnitFrames.RefreshStatusText(frame)
-	if not frame.StatusText then return end
 	ApplyStatusText(frame)
 	if frame.StatusText.UpdateTag then frame.StatusText:UpdateTag() end
 end
@@ -146,13 +120,11 @@ local function UpdateLifeState(self, unit)
 	return true
 end
 
-local function HealthPostUpdate(element, unit, cur)
+local function HealthPostUpdate(element, unit)
 	local deadOrGhost = UnitIsDeadOrGhost(unit)
 	if deadOrGhost then
 		element:SetMinMaxValues(0, 1)
 		element:SetValue(0)
-	elseif unit == 'player' and not UnitIsConnected(unit) then
-		element:SetValue(cur, element.smoothing)
 	end
 	local frame = element.__owner
 	if deadOrGhost or frame._statusState then UpdateLifeState(frame, unit) end
@@ -169,7 +141,7 @@ end
 local function FramePostUpdate(self)
 	local unit = self.unit
 	if not unit or not UnitExists(unit) then return end
-	UpdateNameColor(self, nil, unit)
+	self.Name:SetTextColor(UnitFrames.GetNameColor(unit, UnitFrames.GetUnitSettings(self._unitType)))
 	UnitFrames.UpdateLevelTextVisibility(self, self._unitType)
 	UnitFrames.FollowDebuffHighlightUnit(self)
 	if not UpdateLifeState(self, unit) then ApplyLifeVisuals(self) end
@@ -185,8 +157,7 @@ end
 local function SetupTooltip(frame)
 	frame:HookScript('OnEnter', BUI.Profiler.Wrap('UnitFrames.Layout frame OnEnter', function(self)
 		if not self.unit or GetMouseFoci()[1] ~= self then return end
-		local settings = UnitFrames.GetSettings()
-		if settings and settings.showTooltips ~= false then
+		if UnitFrames.GetSettings().showTooltips ~= false then
 			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 			GameTooltip:SetUnit(self.unit)
 		end
@@ -206,6 +177,30 @@ local BossLeave = BUI.Profiler.Wrap('UnitFrames.Layout boss OnLeave', function(s
 	UnitFrames.UpdateBossMouseover(self)
 end)
 
+local function HideWhenMuted(element)
+	if element._buiHidden then element:Hide() end
+end
+
+local function LeaderOverride(frame)
+	local indicator = frame.LeaderIndicator
+	if indicator._buiHidden or not frame.unit or not UnitInParty(frame.unit) or not SafeBool(UnitIsGroupLeader(frame.unit)) then
+		indicator:Hide()
+	else
+		indicator:SetAtlas('UI-HUD-UnitFrame-Player-Group-LeaderIcon')
+		indicator:Show()
+	end
+end
+
+local function AssistantOverride(frame)
+	local indicator = frame.AssistantIndicator
+	if indicator._buiHidden or not frame.unit or not UnitInParty(frame.unit) or not SafeBool(UnitIsGroupAssistant(frame.unit)) or SafeBool(UnitIsGroupLeader(frame.unit)) then
+		indicator:Hide()
+	else
+		indicator:SetAtlas('UI-HUD-UnitFrame-Party-PortraitOn-Icon-Assist')
+		indicator:Show()
+	end
+end
+
 local function Style(self, unit)
 	local unitType = unit:gsub('%d+$', '')
 	self._unitType = unitType
@@ -213,7 +208,6 @@ local function Style(self, unit)
 	local settings = UnitFrames.GetSettings()
 	local unitSettings = UnitFrames.GetUnitSettings(unitType)
 	local config = UnitFrames.GetUnitConfig(unitType)
-	if not config then return end
 
 	local texture = UnitFrames.GetTexture()
 	local font = UnitFrames.GetFont()
@@ -229,7 +223,7 @@ local function Style(self, unit)
 
 	local bgColor = isPet and settings.petBgColor or settings.bgColor
 	local healthColor = isPet and settings.petHealthColor or settings.healthColor
-	local powerColor = unitSettings.powerColor or settings.powerColor
+	local powerColor = settings.powerColor
 	local borderColor = isPet and settings.petBorderColor or settings.borderColor
 	local borderSize = Pixel.ClampBorder(settings.borderSize)
 	local edge = Pixel.Scale(borderSize)
@@ -241,33 +235,33 @@ local function Style(self, unit)
 	local background = self:CreateTexture(nil, 'BACKGROUND', nil, -8)
 	background:SetPoint('TOPLEFT', self, 'TOPLEFT', edge, -edge)
 	background:SetPoint('BOTTOMRIGHT', self, 'BOTTOMRIGHT', -edge, edge)
-	BUI.Tools.SetColorTex(background, bgColor[1], bgColor[2], bgColor[3], bgColor[4] or 1)
+	BUI.Tools.SetColorTex(background, bgColor[1], bgColor[2], bgColor[3], bgColor[4])
 	self.FrameBG = background
 
-	Pixel.ApplyBorder(self, borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4] or 1)
+	Pixel.ApplyBorder(self, borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
+
+	local smoothing = UnitFrames.GetBarSmoothing()
 
 	local health = CreateFrame('StatusBar', nil, self)
 	health:SetStatusBarTexture(texture)
 	local healthTexture = health:GetStatusBarTexture()
-	if healthTexture then healthTexture:SetTexCoord(0.01, 0.99, 0.01, 0.99) end
+	healthTexture:SetTexCoord(0.01, 0.99, 0.01, 0.99)
 	health:SetPoint('TOPLEFT', self, 'TOPLEFT', edge, -edge)
 	health:SetPoint('TOPRIGHT', self, 'TOPRIGHT', -edge, -edge)
 	health:SetHeight(healthHeight)
 	local initAlpha = settings.transparentHealth and settings.healthBarAlpha or 1
 	health:SetStatusBarColor(healthColor[1], healthColor[2], healthColor[3], initAlpha)
-	health.smoothing = BUI.GetDB().general.smoothBars and Enum.StatusBarInterpolation.ExponentialEaseOut or nil
+	health.smoothing = smoothing
 	health.UpdateColor = HealthUpdateColor
 	health.PostUpdate = HealthPostUpdate
 	self.Health = health
 
 	local deficit = self:CreateTexture(nil, 'ARTWORK', nil, -1)
-	if healthTexture then
-		deficit:SetPoint('TOPLEFT', healthTexture, 'TOPRIGHT')
-		deficit:SetPoint('BOTTOMLEFT', healthTexture, 'BOTTOMRIGHT')
-	end
+	deficit:SetPoint('TOPLEFT', healthTexture, 'TOPRIGHT')
+	deficit:SetPoint('BOTTOMLEFT', healthTexture, 'BOTTOMRIGHT')
 	deficit:SetPoint('RIGHT', health, 'RIGHT')
 	local deficitColor = settings.bgColor
-	BUI.Tools.SetColorTex(deficit, deficitColor[1], deficitColor[2], deficitColor[3], deficitColor[4] or 1)
+	BUI.Tools.SetColorTex(deficit, deficitColor[1], deficitColor[2], deficitColor[3], deficitColor[4])
 	deficit:SetShown(settings.transparentHealth)
 	health.Deficit = deficit
 
@@ -296,13 +290,12 @@ local function Style(self, unit)
 
 	local power = CreateFrame('StatusBar', nil, self)
 	power:SetStatusBarTexture(texture)
-	local powerTexture = power:GetStatusBarTexture()
-	if powerTexture then powerTexture:SetTexCoord(0.01, 0.99, 0.01, 0.99) end
+	power:GetStatusBarTexture():SetTexCoord(0.01, 0.99, 0.01, 0.99)
 	power:SetPoint('BOTTOMLEFT', self, 'BOTTOMLEFT', edge, edge)
 	power:SetPoint('BOTTOMRIGHT', self, 'BOTTOMRIGHT', -edge, edge)
 	power:SetHeight(powerHeight)
-	local powerRed, powerGreen, powerBlue, powerAlpha = powerColor[1], powerColor[2], powerColor[3], powerColor[4] or 1
-	if (settings.classColorPower or settings.useClassColorPowerBar) and unitType then
+	local powerRed, powerGreen, powerBlue, powerAlpha = powerColor[1], powerColor[2], powerColor[3], powerColor[4]
+	if settings.classColorPower or settings.useClassColorPowerBar then
 		local powerType, powerToken = UnitPowerType(unitType)
 		local powerTypeColor = PowerBarColor[powerToken or powerType]
 		if powerTypeColor then powerRed, powerGreen, powerBlue = powerTypeColor.r, powerTypeColor.g, powerTypeColor.b end
@@ -311,25 +304,24 @@ local function Style(self, unit)
 	power:SetShown(showPower)
 	power.frequentUpdates = true
 	power.colorPower = settings.classColorPower
-	power.smoothing = BUI.GetDB().general.smoothBars and Enum.StatusBarInterpolation.ExponentialEaseOut or nil
+	power.smoothing = smoothing
 	power.UpdateColor = PowerUpdateColor
 	self.Power = power
 
 	local powerBG = self:CreateTexture(nil, 'BACKGROUND', nil, -7)
 	powerBG:SetAllPoints(power)
-	BUI.Tools.SetColorTex(powerBG, bgColor[1], bgColor[2], bgColor[3], bgColor[4] or 1)
+	BUI.Tools.SetColorTex(powerBG, bgColor[1], bgColor[2], bgColor[3], bgColor[4])
 	powerBG:SetShown(showPower)
 	self.PowerBG = powerBG
 
 	if unitType == 'player' then
 		local predictionBar = BUI.PowerPrediction.Attach(power, {
-			texture = texture,
 			enabled = function()
 				return UnitFrames.GetUnitSettings('player').powerPrediction == true
 			end,
 		})
-		local predictionColor = settings.powerPredictionColor or { 1, 1, 1, 0.35 }
-		predictionBar:SetStatusBarColor(predictionColor[1] or 1, predictionColor[2] or 1, predictionColor[3] or 1, predictionColor[4] or 0.35)
+		local predictionColor = unitSettings.powerPredictionColor
+		BUI.PowerPrediction.Restyle(predictionBar, texture, predictionColor[1], predictionColor[2], predictionColor[3], predictionColor[4])
 		power._predict = predictionBar
 	end
 
@@ -341,7 +333,7 @@ local function Style(self, unit)
 	separatorFrame:SetShown(showPower)
 	local separator = separatorFrame:CreateTexture(nil, 'OVERLAY', nil, 7)
 	separator:SetAllPoints()
-	BUI.Tools.SetColorTex(separator, borderColor[1], borderColor[2], borderColor[3], borderColor[4] or 1)
+	BUI.Tools.SetColorTex(separator, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
 	self.PowerBorder = separator
 	self.PowerBorderFrame = separatorFrame
 
@@ -391,7 +383,7 @@ local function Style(self, unit)
 	raidIcon:SetTexture(BUI.C.RAID_ICON_TEXTURE)
 	raidIcon:Hide()
 
-	raidIcon.PostUpdate = function(element) if element._buiHidden then element:Hide() end end
+	raidIcon.PostUpdate = HideWhenMuted
 	self.RaidTargetIndicator = raidIcon
 
 	local leaderSize = settings.leaderIconSize
@@ -404,15 +396,7 @@ local function Style(self, unit)
 	leaderTexture:SetSize(Pixel.Scale(leaderSize), Pixel.Scale(leaderSize))
 	leaderTexture:SetPoint(leaderAnchor, self, leaderAnchor, Pixel.Scale(leaderOffsetX), Pixel.Scale(leaderOffsetY))
 	leaderTexture:Hide()
-	leaderTexture.Override = function(frame)
-		local indicator = frame.LeaderIndicator
-		if indicator._buiHidden or not frame.unit or not UnitInParty(frame.unit) or not SafeBool(UnitIsGroupLeader(frame.unit)) then
-			indicator:Hide()
-		else
-			indicator:SetAtlas('UI-HUD-UnitFrame-Player-Group-LeaderIcon')
-			indicator:Show()
-		end
-	end
+	leaderTexture.Override = LeaderOverride
 	leaderTexture._buiHidden = not leaderEnabled
 	self.LeaderIndicator = leaderTexture
 
@@ -420,15 +404,7 @@ local function Style(self, unit)
 	assistantTexture:SetSize(Pixel.Scale(leaderSize), Pixel.Scale(leaderSize))
 	assistantTexture:SetPoint(leaderAnchor, self, leaderAnchor, Pixel.Scale(leaderOffsetX), Pixel.Scale(leaderOffsetY))
 	assistantTexture:Hide()
-	assistantTexture.Override = function(frame)
-		local indicator = frame.AssistantIndicator
-		if indicator._buiHidden or not frame.unit or not UnitInParty(frame.unit) or not SafeBool(UnitIsGroupAssistant(frame.unit)) or SafeBool(UnitIsGroupLeader(frame.unit)) then
-			indicator:Hide()
-		else
-			indicator:SetAtlas('UI-HUD-UnitFrame-Party-PortraitOn-Icon-Assist')
-			indicator:Show()
-		end
-	end
+	assistantTexture.Override = AssistantOverride
 	assistantTexture._buiHidden = not leaderEnabled
 	self.AssistantIndicator = assistantTexture
 

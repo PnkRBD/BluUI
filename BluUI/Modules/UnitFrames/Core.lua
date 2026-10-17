@@ -16,32 +16,13 @@ local SetColorTex = BUI.Tools.SetColorTex
 local UnitFrames = {}
 BUI.UnitFrames = UnitFrames
 
-UnitFrames.UNIT_CONFIG = {
-	player = {
-		width = 271, height = 41, textSize = 12, showPower = true,
-		showPowerDefault = true, hasCombatBorder = true, hasAuras = true,
-	},
-	target = {
-		width = 271, height = 41, textSize = 12, showPower = true,
-		showPowerDefault = true, hasAuras = true,
-	},
-	targettarget = {
-		width = 110, height = 30, textSize = 10, showPower = false,
-		showPowerDefault = false, hasAuras = true,
-	},
-	focus = {
-		width = 186, height = 80, textSize = 10, showPower = true,
-		showPowerDefault = true, hasAuras = true,
-	},
-	pet = {
-		width = 105, height = 41, textSize = 10, showPower = true,
-		showPowerDefault = false,
-	},
-	boss = {
-		width = 180, height = 40, textSize = 11, showPower = true,
-		showPowerDefault = false, hasAuras = true,
-		spacing = 2,
-	},
+local UNIT_CONFIG = {
+	player = { showPower = true, showPowerDefault = true, hasCombatBorder = true, hasAuras = true },
+	target = { showPower = true, showPowerDefault = true, hasAuras = true },
+	targettarget = { showPower = false, showPowerDefault = false, hasAuras = true },
+	focus = { showPower = true, showPowerDefault = true, hasAuras = true },
+	pet = { showPower = true, showPowerDefault = false },
+	boss = { showPower = true, showPowerDefault = false, hasAuras = true },
 }
 
 local unitConfigCache = {}
@@ -51,72 +32,33 @@ function UnitFrames.GetUnitConfig(unit)
 		key = unit:gsub('%d+$', '')
 		unitConfigCache[unit] = key
 	end
-	return UnitFrames.UNIT_CONFIG[key]
+	return UNIT_CONFIG[key]
 end
 
 local WHITE_TEX = [[Interface\Buttons\WHITE8x8]]
-local FILL_TEXTURES = {
-	Solid = WHITE_TEX,
-}
-local OVERLAY_TEXTURES = {
-	Stripes = BUI.C.MEDIA_PATH .. 'stripes.tga',
-}
+local STRIPES_TEXTURE = BUI.C.MEDIA_PATH .. 'stripes.tga'
 
-local function ResolveAbsorbTexture(config, default)
-	if config.texture == 'Solid' then return 'Solid' end
-	if config.texture == 'Stripes' then return 'Stripes' end
-
-	return default
-end
-
-local function ApplyAbsorbStyle(bar, config, default)
-	local key = ResolveAbsorbTexture(config, default)
-	local color = config.color
-
-	bar:SetStatusBarTexture(FILL_TEXTURES[key] or WHITE_TEX)
-	bar:SetStatusBarColor(color[1], color[2], color[3], color[4] or 1)
+function UnitFrames.ApplyAbsorbVisual(bar, textureKey, color, alpha)
+	bar:SetStatusBarTexture(WHITE_TEX)
+	bar:SetStatusBarColor(color[1], color[2], color[3], alpha or color[4])
 	local base = bar:GetStatusBarTexture()
-	if base and base.SetBlendMode then base:SetBlendMode('BLEND') end
+	base:SetBlendMode('BLEND')
 
-	if bar._absBg then bar._absBg:Hide() end
-
-	local overlayTexture = OVERLAY_TEXTURES[key]
-	if overlayTexture then
-		local overlay = bar._absOverlay
-		if not overlay then overlay = bar:CreateTexture(nil, 'OVERLAY'); bar._absOverlay = overlay end
-		overlay:SetTexture(overlayTexture, 'REPEAT', 'REPEAT')
-		overlay:SetHorizTile(true); overlay:SetVertTile(true)
-		overlay:SetBlendMode('BLEND')
-		overlay:SetVertexColor(1, 1, 1)
-		overlay:SetAlpha(1)
-		overlay:ClearAllPoints()
-		overlay:SetAllPoints(base)
-		overlay:Show()
-	elseif bar._absOverlay then
-		bar._absOverlay:Hide()
+	if textureKey == 'Solid' then
+		if bar._absOverlay then bar._absOverlay:Hide() end
+		return
 	end
-end
 
-function UnitFrames.ApplyAbsorbVisual(bar, config)
-	ApplyAbsorbStyle(bar, config, 'Stripes')
-end
-
-function UnitFrames.ApplyHealAbsorbVisual(bar, config)
-	ApplyAbsorbStyle(bar, config, 'Stripes')
-end
-
-function UnitFrames.BuildAbsorbCfg(settings)
-	return {
-		texture = settings.shieldOverlay,
-		color   = settings.shieldColor,
-	}
-end
-
-function UnitFrames.BuildHealAbsorbCfg(settings)
-	return {
-		texture = settings.healAbsorbOverlay,
-		color   = settings.healAbsorbColor,
-	}
+	local overlay = bar._absOverlay
+	if not overlay then overlay = bar:CreateTexture(nil, 'OVERLAY'); bar._absOverlay = overlay end
+	overlay:SetTexture(STRIPES_TEXTURE, 'REPEAT', 'REPEAT')
+	overlay:SetHorizTile(true); overlay:SetVertTile(true)
+	overlay:SetBlendMode('BLEND')
+	overlay:SetVertexColor(1, 1, 1)
+	overlay:SetAlpha(1)
+	overlay:ClearAllPoints()
+	overlay:SetAllPoints(base)
+	overlay:Show()
 end
 
 function UnitFrames.AnchorAbsorb(absorb, health, healthTexture, direction)
@@ -139,11 +81,13 @@ end
 
 local settingsCache
 local unitCache = {}
+local cachedFont, cachedTexture
 
 function UnitFrames.InvalidateSettingsCache()
 	settingsCache = nil
 	wipe(unitCache)
-	UnitFrames.InvalidateMedia()
+	cachedFont = nil
+	cachedTexture = nil
 end
 
 function UnitFrames.GetSettings()
@@ -160,12 +104,11 @@ function UnitFrames.TextSetting(unitSettings, key)
 end
 
 function UnitFrames.GetUnitSettings(unitType)
-	if unitCache[unitType] then return unitCache[unitType] end
-	local settings = UnitFrames.GetSettings()
-
-	local saved = settings and settings[unitType] or BUI.Defaults.profile.unitFrames[unitType]
-	unitCache[unitType] = saved
-	return saved
+	local cached = unitCache[unitType]
+	if cached then return cached end
+	cached = UnitFrames.GetSettings()[unitType]
+	unitCache[unitType] = cached
+	return cached
 end
 
 function UnitFrames.ApplyClickToTarget()
@@ -178,39 +121,32 @@ function UnitFrames.ApplyClickToTarget()
 	end, 'UF.ClickToTarget')
 end
 
-local cachedFont, cachedTexture
-
-function UnitFrames.InvalidateMedia()
-	cachedFont = nil
-	cachedTexture = nil
-end
-
 function UnitFrames.GetTexture()
 	if not cachedTexture then
 		local settings = UnitFrames.GetSettings()
 		cachedTexture = settings.texture == 'GLOBAL'
 			and BUI.GetGlobalTexture()
-			or (sharedMedia:Fetch('statusbar', settings.texture) or BUI.GetGlobalTexture())
+			or (sharedMedia:Fetch('statusbar', settings.texture, true) or BUI.GetGlobalTexture())
 	end
 	return cachedTexture
 end
 
 function UnitFrames.GetFont()
-	if not cachedFont then
-		local settings = UnitFrames.GetSettings()
-		cachedFont = settings.font == 'GLOBAL'
-			and BUI.GetGlobalFont()
-			or (sharedMedia:Fetch('font', settings.font) or BUI.GetGlobalFont())
-	end
+	if not cachedFont then cachedFont = BUI.GetFontByName(UnitFrames.GetSettings().font) end
 	return cachedFont
 end
 
-local IsPetUnit = {
-	pet = true, pet1 = true, pet2 = true, pet3 = true, pet4 = true, pet5 = true,
-}
+function UnitFrames.GetBarSmoothing()
+	return BUI.GetDB().general.smoothBars and Enum.StatusBarInterpolation.ExponentialEaseOut or Enum.StatusBarInterpolation.Immediate
+end
+
+local function ReactionColor(unitSettings, reaction)
+	local color = unitSettings[reaction >= 5 and 'friendlyNameColor' or reaction >= 4 and 'neutralNameColor' or 'hostileNameColor']
+	return color[1], color[2], color[3]
+end
 
 function UnitFrames.GetHealthColor(unit, settings)
-	local isPet = IsPetUnit[unit]
+	local isPet = unit == 'pet'
 	if settings.classColorHealth and not isPet then
 		if UnitIsPlayer(unit) then
 			local red, green, blue = BUI.Tools.GetUnitClassColor(unit)
@@ -224,23 +160,20 @@ function UnitFrames.GetHealthColor(unit, settings)
 		end
 	end
 	local healthColor = isPet and settings.petHealthColor or settings.healthColor
-	return healthColor[1], healthColor[2], healthColor[3], healthColor[4] or 1
+	return healthColor[1], healthColor[2], healthColor[3], healthColor[4]
 end
 
 function UnitFrames.GetPowerColor(unit, settings, unitSettings)
-	local isPet = IsPetUnit[unit]
+	local isPet = unit == 'pet'
 	if settings.useClassColorPowerBar and not isPet then
 		if UnitIsPlayer(unit) then
 			local red, green, blue = BUI.Tools.GetUnitClassColor(unit)
 			if red then return red, green, blue, 1 end
 		else
 			local reaction = UnitReaction(unit, 'player')
-			if reaction and unitSettings then
-				local key = reaction >= 5 and 'friendlyNameColor'
-					or reaction >= 4 and 'neutralNameColor'
-					or 'hostileNameColor'
-				local reactionColor = unitSettings[key]
-				if reactionColor then return reactionColor[1], reactionColor[2], reactionColor[3], 1 end
+			if reaction then
+				local red, green, blue = ReactionColor(unitSettings, reaction)
+				return red, green, blue, 1
 			end
 		end
 	end
@@ -249,36 +182,21 @@ function UnitFrames.GetPowerColor(unit, settings, unitSettings)
 		local powerTypeColor = PowerBarColor[powerToken or powerType]
 		if powerTypeColor then return powerTypeColor.r, powerTypeColor.g, powerTypeColor.b, 1 end
 	end
-	local powerColor
-	if isPet then
-		powerColor = settings.petPowerColor
-	else
-		powerColor = (unitSettings and unitSettings.powerColor) or settings.powerColor
-	end
-	return powerColor[1], powerColor[2], powerColor[3], powerColor[4] or 1
+	local powerColor = isPet and settings.petPowerColor or settings.powerColor
+	return powerColor[1], powerColor[2], powerColor[3], powerColor[4]
 end
 
 function UnitFrames.GetNameColor(unit, unitSettings)
-	if unitSettings.classColorName and not IsPetUnit[unit] then
+	if unitSettings.classColorName and unit ~= 'pet' then
 		if UnitIsPlayer(unit) then
 			local red, green, blue = BUI.Tools.GetUnitClassColor(unit)
 			if red then return red, green, blue end
 		end
 		local reaction = UnitReaction(unit, 'player')
-		if reaction then
-			local key = reaction >= 5 and 'friendlyNameColor'
-				or reaction >= 4 and 'neutralNameColor'
-				or 'hostileNameColor'
-			local reactionColor = unitSettings[key]
-			if reactionColor then return reactionColor[1], reactionColor[2], reactionColor[3] end
-		end
+		if reaction then return ReactionColor(unitSettings, reaction) end
 	end
 	local color = UnitFrames.GetSettings().nameColor
 	return color[1], color[2], color[3]
-end
-
-local function PlaceCentered(frame, x, y)
-	BUI.Anchor.SetCentered(frame, x, y)
 end
 
 local ANCHOR_LAYOUT_FIELDS = {
@@ -351,7 +269,7 @@ function UnitFrames.ApplyPosition(frame, unitType, index)
 
 	if index and index > 1 then
 		local castbarSettings = BUI.CastBar.GetSettings('boss')
-		local castbarExtra = (castbarSettings and castbarSettings.enabled) and (castbarSettings.height + 1) or 0
+		local castbarExtra = castbarSettings.enabled and (castbarSettings.height + 1) or 0
 		local offset = unitSettings.height + castbarExtra + unitSettings.spacing
 		if unitSettings.growthDirection == 'UP' then
 			y = y + ((index - 1) * offset)
@@ -361,15 +279,11 @@ function UnitFrames.ApplyPosition(frame, unitType, index)
 	end
 
 	if point == 'CENTER' and relPoint == 'CENTER' then
-		PlaceCentered(frame, Pixel.Scale(x), Pixel.Scale(y))
+		BUI.Anchor.SetCentered(frame, Pixel.Scale(x), Pixel.Scale(y))
 	else
 		frame:ClearAllPoints()
 		BUI.Anchor.PlaceOnPixels(frame, point, UIParent, relPoint, Pixel.Scale(x), Pixel.Scale(y))
 	end
-end
-
-function UnitFrames.GetContextualOpacity()
-	return BUI.Visibility.GetContextualOpacity("UnitFrames")
 end
 
 local function SetFrameOpacity(frame, opacity)
@@ -385,7 +299,7 @@ Motion.RegisterProperty('ufOpacity',
 local OPACITY_UNITS = {'player', 'target', 'targettarget', 'focus', 'pet'}
 
 function UnitFrames.UpdateOpacity(instant)
-	local opacity = UnitFrames.GetContextualOpacity() / 100
+	local opacity = BUI.Visibility.GetContextualOpacity('UnitFrames') / 100
 	local duration = instant and 0 or 0.3
 	for _, unitType in ipairs(OPACITY_UNITS) do
 		local unitFrame = UnitFrames[unitType]
@@ -418,23 +332,18 @@ local function UpdateAggroOutline(frame, unitType, unitSettings, inCombat)
 	end
 end
 
-function UnitFrames.UpdateCombatBorder(frame, unitType, inCombat)
-	if not frame then return end
+local function UpdateCombatBorder(frame, unitType, inCombat)
 	local settings = UnitFrames.GetSettings()
 	local unitSettings = UnitFrames.GetUnitSettings(unitType)
 	local borderColor
-
 	if unitSettings.combatBorder and inCombat then
 		borderColor = unitSettings.combatBorderColor
-	end
-	if not borderColor then
+	else
 		borderColor = (unitType == 'pet') and settings.petBorderColor or settings.borderColor
 	end
 
 	Pixel.SetBorderColor(frame, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
-	if frame.PowerBorder then
-		SetColorTex(frame.PowerBorder, borderColor[1], borderColor[2], borderColor[3], borderColor[4] or 1)
-	end
+	SetColorTex(frame.PowerBorder, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
 	UpdateAggroOutline(frame, unitType, unitSettings, inCombat)
 end
 
@@ -558,7 +467,7 @@ do
 	local function SyncDispelTypeGroups(container, groups, addGroup)
 		local unitSettings = UnitFrames.GetUnitSettings('player')
 		local byMe = unitSettings.debuffHighlightClassFilter ~= false
-		local covered = byMe and GetSelfCleanseTypes() or nil
+		local covered = byMe and GetSelfCleanseTypes()
 		for typeIndex = 1, #HL_TYPES do
 			local typeName = HL_TYPES[typeIndex]
 			local plainKey, bymeKey = typeName, typeName .. '#byme'
@@ -635,13 +544,9 @@ do
 		end
 	end
 
-	local function DrainTypeRowRestyle()
-		if typeRowRestylePending then RestyleTypeRow() end
-	end
-
-	local function TypeRowInitializer(typeName, slot)
+	local function TypeRowInitializer(typeName)
 		return function(button)
-			local kit = { typeName = typeName, slot = slot, button = button }
+			local kit = { typeName = typeName, button = button }
 			kit.icon = button:CreateTexture(nil, 'OVERLAY', nil, 7)
 			kit.icon:SetAtlas(DISPEL_BADGE_ATLAS[typeName])
 			typeRowKits[#typeRowKits + 1] = kit
@@ -658,7 +563,7 @@ do
 			local size = TypeRowIconSize()
 			container:AddAuraGroup(key, filter, {
 				maxFrameCount = 1,
-				initializeFrame = TypeRowInitializer(typeName, slot),
+				initializeFrame = TypeRowInitializer(typeName),
 				candidateFilters = { includeDispelTypes = { [typeName] = true } },
 				layout = {
 					elementWidth = size, elementHeight = size,
@@ -681,10 +586,10 @@ do
 		highlightInputs[2] = unitSettings.debuffHighlightBadgeSize
 		highlightInputs[3] = unitSettings.debuffHighlightBadgeOffsetX
 		highlightInputs[4] = unitSettings.debuffHighlightBadgeOffsetY
-		highlightInputs[5] = settings.dispelRecolor and true or false
-		highlightInputs[6] = settings.dispelBlend and true or false
+		highlightInputs[5] = settings.dispelRecolor
+		highlightInputs[6] = settings.dispelBlend
 		highlightInputs[7] = settings.dispelOpacity
-		highlightInputs[8] = unitSettings.debuffHighlightBar and true or false
+		highlightInputs[8] = unitSettings.debuffHighlightBar
 		highlightInputs[9] = unitSettings.debuffHighlightStyle
 		highlightInputs[10] = classFilter and select(2, GetSelfCleanseTypes()) or ''
 		for typeIndex = 1, #HL_TYPES do
@@ -741,10 +646,9 @@ do
 	local frameKits = setmetatable({}, { __mode = 'k' })
 	local framePending = {}
 
-	local function OverlappingAbsorb(frame)
-		local settings = UnitFrames.GetSettings()
-		if frame.Absorb and settings.shieldEnabled ~= false and settings.shieldDirection == 'left' then return frame.Absorb end
-		if frame.HealAbsorb and settings.healAbsorbEnabled ~= false and settings.healAbsorbDirection == 'left' then return frame.HealAbsorb end
+	function UnitFrames.OverlappingAbsorb(frame, damageEnabled, damageDirection, healEnabled, healDirection)
+		if frame.Absorb and damageEnabled and damageDirection == 'left' then return frame.Absorb end
+		if frame.HealAbsorb and healEnabled and healDirection == 'left' then return frame.HealAbsorb end
 	end
 
 	local function PrepFillTexture(texture, asset, blend, alpha)
@@ -754,7 +658,10 @@ do
 		texture:SetAlpha(alpha)
 	end
 
-	function UnitFrames.StyleDispelFill(kit, style, healthTexture, rightEdge, rightSide, alpha)
+	function UnitFrames.AnchorDispelFill(kit, frame, style, absorb, alpha)
+		local healthTexture = frame.Health:GetStatusBarTexture()
+		local rightEdge, rightSide = healthTexture, 'RIGHT'
+		if absorb then rightEdge, rightSide = absorb:GetStatusBarTexture(), 'LEFT' end
 		local blend = UnitFrames.GetSettings().dispelBlend and 'ADD' or 'BLEND'
 		local half = style == 'top' or style == 'bottom'
 		local fill, fade = kit.fill, kit.fade
@@ -786,13 +693,10 @@ do
 		end
 	end
 
-	local function AnchorDispelFill(kit, frame, alpha)
-		local healthTexture = frame.Health:GetStatusBarTexture()
-		local style = UnitFrames.GetUnitSettings('player').debuffHighlightStyle
-		local absorb = OverlappingAbsorb(frame)
-		local rightEdge, rightSide = healthTexture, 'RIGHT'
-		if absorb then rightEdge, rightSide = absorb:GetStatusBarTexture(), 'LEFT' end
-		UnitFrames.StyleDispelFill(kit, style, healthTexture, rightEdge, rightSide, alpha)
+	local function AnchorPlayerFill(kit, frame, alpha)
+		local settings = UnitFrames.GetSettings()
+		local absorb = UnitFrames.OverlappingAbsorb(frame, settings.shieldEnabled ~= false, settings.shieldDirection, settings.healAbsorbEnabled ~= false, settings.healAbsorbDirection)
+		UnitFrames.AnchorDispelFill(kit, frame, UnitFrames.GetUnitSettings('player').debuffHighlightStyle, absorb, alpha)
 	end
 
 	local function AnchorFrameEdges(edges, to)
@@ -813,7 +717,7 @@ do
 
 	local function PaintDispelVisual(frame, kit, typeName, forceOn)
 		local wantFill = forceOn or UnitFrames.GetUnitSettings('player').debuffHighlightBar
-		AnchorDispelFill(kit, frame, wantFill and UnitFrames.GetSettings().dispelOpacity / 100 or 0)
+		AnchorPlayerFill(kit, frame, wantFill and UnitFrames.GetSettings().dispelOpacity / 100 or 0)
 		local red, green, blue = Engine.DispelColorRGB(typeName)
 		kit.fill:SetVertexColor(red, green, blue)
 		kit.fade:SetVertexColor(red, green, blue)
@@ -832,13 +736,6 @@ do
 		end
 		framePending[frame] = nil
 		for kitIndex = 1, #kits do StyleFrameKit(frame, kits[kitIndex]) end
-	end
-
-	local function DrainFrameRestyle()
-		for frame in pairs(framePending) do
-			framePending[frame] = nil
-			RestyleFrameKits(frame)
-		end
 	end
 
 	local function FrameInitializer(frame, typeName, priority)
@@ -972,12 +869,12 @@ do
 		host:Show()
 	end
 
-	function UnitFrames.PinDispelPreview(typeName)
+	local function PinDispelPreview(typeName)
 		previewPin = typeName
 		UnitFrames.RefreshDispelPreview()
 	end
 
-	function UnitFrames.UnpinDispelPreview()
+	local function UnpinDispelPreview()
 		previewPin = nil
 		HidePreview()
 	end
@@ -987,13 +884,13 @@ do
 
 	local StepDispelPreview = BUI.Profiler.Wrap('UnitFrames dispel preview', function()
 		previewCycle = previewCycle % #HL_TYPES + 1
-		UnitFrames.PinDispelPreview(HL_TYPES[previewCycle])
+		PinDispelPreview(HL_TYPES[previewCycle])
 	end)
 
 	function UnitFrames.StopDispelPreview()
 		if previewTicker then previewTicker:Cancel() end
 		previewTicker = nil
-		UnitFrames.UnpinDispelPreview()
+		UnpinDispelPreview()
 	end
 
 	function UnitFrames.StartDispelPreview()
@@ -1028,7 +925,7 @@ do
 		end
 		Pixel.ApplyFont(measureFontString, CALLOUT_FONT, BUI.GetGlobalFont(), 'OUTLINE')
 		measureFontString:SetText(word)
-		return measureFontString:GetStringWidth() or 0
+		return measureFontString:GetStringWidth()
 	end
 
 	local calloutCellWidth = CALLOUT_ICON
@@ -1072,7 +969,7 @@ do
 		local mark = ready ~= false and 1 or 0
 		if cell.lastPick == mark then return end
 		cell.lastPick = mark
-		if calloutContainer then calloutContainer:SetAuraGroupMaxFrameCount(cell.part.groupKey, mark) end
+		calloutContainer:SetAuraGroupMaxFrameCount(cell.part.groupKey, mark)
 	end
 
 	local calloutPaletteStamp, calloutRepaintPending
@@ -1086,10 +983,6 @@ do
 		for _, cell in ipairs(calloutCells) do
 			PaintCalloutRing(cell.part)
 		end
-	end
-
-	local function DrainCalloutRepaint()
-		if calloutRepaintPending then RepaintCalloutRings() end
 	end
 
 	local function ApplyCalloutReadiness()
@@ -1214,27 +1107,30 @@ do
 			ApplyCalloutReadiness()
 		end
 		StartCalloutEvents()
-		if calloutContainer then
-			calloutContainer:Show()
-			Engine.BindUnit(calloutContainer, 'player')
-		end
+		calloutContainer:Show()
+		Engine.BindUnit(calloutContainer, 'player')
 	end
 
-	BUI.Events:Register('PLAYER_REGEN_ENABLED', 'UF.DispelRow.Restyle', function() BUI.Events:AfterCombatSettled(DrainTypeRowRestyle, 'UF.DispelRow.Restyle') end)
-	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'UF.DispelRow.Restyle', DrainTypeRowRestyle)
-	BUI.Events:Register('PLAYER_REGEN_ENABLED', 'UF.DispelFrame.Restyle', function() BUI.Events:AfterCombatSettled(DrainFrameRestyle, 'UF.DispelFrame.Restyle') end)
-	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'UF.DispelFrame.Restyle', DrainFrameRestyle)
-	BUI.Events:Register('PLAYER_REGEN_ENABLED', 'UF.DispelCallout.Repaint', function() BUI.Events:AfterCombatSettled(DrainCalloutRepaint, 'UF.DispelCallout.Repaint') end)
-	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'UF.DispelCallout.Repaint', DrainCalloutRepaint)
+	local function DrainPendingRestyles()
+		if typeRowRestylePending then RestyleTypeRow() end
+		for frame in pairs(framePending) do
+			framePending[frame] = nil
+			RestyleFrameKits(frame)
+		end
+		if calloutRepaintPending then RepaintCalloutRings() end
+	end
+
+	BUI.Events:Register('PLAYER_REGEN_ENABLED', 'UF.Dispel.Restyle', function() BUI.Events:AfterCombatSettled(DrainPendingRestyles, 'UF.Dispel.Restyle') end)
+	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'UF.Dispel.Restyle', DrainPendingRestyles)
 
 	function UnitFrames.UpdateDebuffHighlight(frame)
 		if not frame then return end
 		local unitSettings = UnitFrames.GetUnitSettings('player')
 		local badgeWanted = unitSettings.debuffHighlightBadge ~= false
-		local frameColorsWanted = unitSettings.debuffHighlightBar and true or false
+		local frameColorsWanted = unitSettings.debuffHighlightBar
 		if badgeWanted or frameColorsWanted then GatherHighlightInputs(unitSettings) end
 		ConfigureTypeRow(badgeWanted)
-		ConfigureCallouts(unitSettings.debuffHighlightTypeText and true or false)
+		ConfigureCallouts(unitSettings.debuffHighlightTypeText)
 		ConfigureFrameColors(frame, frameColorsWanted)
 	end
 
@@ -1262,7 +1158,7 @@ do
 		pendingCombatEdge = nil
 		for _, unitType in ipairs(OPACITY_UNITS) do
 			local unitFrame = UnitFrames[unitType]
-			if unitFrame then UnitFrames.UpdateCombatBorder(unitFrame, unitType, inCombat) end
+			if unitFrame then UpdateCombatBorder(unitFrame, unitType, inCombat) end
 		end
 		if not inCombat then UnitFrames.RefreshAnchoredFrames() end
 	end, 'UF.CombatBorder')
@@ -1271,9 +1167,7 @@ do
 		if event == 'UNIT_THREAT_SITUATION_UPDATE' then
 			if not InCombatLockdown() then return end
 			local playerFrame = UnitFrames.player
-			if playerFrame then
-				UnitFrames.UpdateCombatBorder(playerFrame, 'player', true)
-			end
+			if playerFrame then UpdateCombatBorder(playerFrame, 'player', true) end
 			return
 		end
 		pendingCombatEdge = event
