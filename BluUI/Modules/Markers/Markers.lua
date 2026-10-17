@@ -47,8 +47,7 @@ local function ShowTip(button, header, ...)
     GameTooltip:ClearLines()
     GameTooltip:AddLine(header, 1, 1, 1)
     for lineIndex = 1, select('#', ...) do
-        local line = select(lineIndex, ...)
-        if line then GameTooltip:AddLine(line, 0.7, 0.7, 0.7) end
+        GameTooltip:AddLine(select(lineIndex, ...), 0.7, 0.7, 0.7)
     end
     GameTooltip:Show()
 end
@@ -283,10 +282,6 @@ local function Build()
     DecorateButton(timer)
     timer.text = timer:CreateFontString(nil, 'OVERLAY')
     timer.text:SetPoint('CENTER', 0, 0)
-    Pixel.ApplyFont(timer.text, 12)
-    timer.text:SetText('5')
-    local accentRed, accentGreen, accentBlue = BUILib.Theme.GetAccent()
-    timer.text:SetTextColor(accentRed, accentGreen, accentBlue, 1)
     timer:SetScript('OnClick', BUI.Profiler.Script('Markers.Markers timer OnClick', function(_, mouseButton)
         local config = GetConfig()
         if IsShiftKeyDown() then
@@ -309,22 +304,12 @@ local function Build()
 
     BUI.Dragging.MakeDraggable(bar, {
         skipClickThrough = true,
-        onPositionChanged = function(x, y)
-            local config = GetConfig()
-            config.posX, config.posY = x, y
-        end,
+        onPositionChanged = function() BUI.Anchor.SaveDrop(bar, GetConfig()) end,
     })
 
-    local function OnButtonDragStart()
-        bar:StartMoving()
-    end
-    local function OnButtonDragStop()
-        bar:StopMovingOrSizing()
-        local config = GetConfig()
-        config.posX, config.posY = BUI.Dragging.GetCenterOffset(bar)
-        bar:ClearAllPoints()
-        bar:SetPoint('CENTER', UIParent, 'CENTER', config.posX, config.posY)
-    end
+    local OnBarDragStart, OnBarDragStop = bar:GetScript('OnDragStart'), bar:GetScript('OnDragStop')
+    local function OnButtonDragStart() OnBarDragStart(bar) end
+    local function OnButtonDragStop() OnBarDragStop(bar) end
     local function ForwardDrag(button)
         button:RegisterForDrag('LeftButton')
         button:SetScript('OnDragStart', BUI.Profiler.Script('Markers.Markers button OnDragStart', OnButtonDragStart))
@@ -343,7 +328,7 @@ local function ApplyLayout()
     local buttonSize = Pixel.ScaleEven(size)
     local edge = Pixel.PixelSize(1)
     local separator = Pixel.Scale(10)
-    local showControls = config.showControls ~= false
+    local showControls = config.showControls
 
     BUI.Anchor.ApplyPosition(bar, config)
 
@@ -388,12 +373,11 @@ local function ApplyLayout()
         Pixel.ApplyFont(controls.timer.text, math.max(10, math.floor(size * 0.55)))
         local accentRed, accentGreen, accentBlue = BUILib.Theme.GetAccent()
         controls.timer.text:SetTextColor(accentRed, accentGreen, accentBlue, 1)
+        controls.timer.text:SetText(tostring(config.countdownTime))
     else
         bar.separator:Hide()
         for _, key in ipairs(CONTROL_ORDER) do controls[key]:Hide() end
     end
-
-    controls.timer.text:SetText(tostring(config.countdownTime))
 
     bar:SetSize(x, buttonSize)
     bar:EnableMouse(true)
@@ -424,14 +408,13 @@ function Markers.Initialize()
         ApplyLayout()
     end)
 
+    local function OnGroupChanged()
+        UpdateVisibility(); UpdateUsability(); UpdateIndicators()
+    end
     Events:Register('RAID_TARGET_UPDATE', 'Markers', UpdateIndicators)
-    Events:Register('GROUP_ROSTER_UPDATE', 'Markers', function()
-        UpdateVisibility(); UpdateUsability(); UpdateIndicators()
-    end)
+    Events:Register('GROUP_ROSTER_UPDATE', 'Markers', OnGroupChanged)
     Events:Register('PARTY_LEADER_CHANGED', 'Markers', UpdateUsability)
-    Events:Register('PLAYER_ENTERING_WORLD', 'Markers', function()
-        UpdateVisibility(); UpdateUsability(); UpdateIndicators()
-    end)
+    Events:Register('PLAYER_ENTERING_WORLD', 'Markers', OnGroupChanged)
 end
 
 Events:OnLogin('Markers', Markers.Initialize, 'markers')

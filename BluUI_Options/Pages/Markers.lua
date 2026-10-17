@@ -3,17 +3,9 @@ local BUILib = BUI.BUILibClient
 local Layout = BUILib.Layout
 
 local PAGE_WIDTH = 960
-local FREE = ''
-local ANCHOR_MENU_WIDTH = 200
 
-local ANCHORS = { { value = FREE, text = 'None, free on the screen' } }
-for _, frame in ipairs(BUI.AnchorFramesExcept('BUI_MarkerBar')) do
-	ANCHORS[#ANCHORS + 1] = { value = frame.tag, text = frame.desc }
-end
-
-local function Window()
-	return BUI.PageEngine.window
-end
+local Kit = BUI.OptionsKit
+local Window, Option, Toggle = Kit.Window, Kit.Option, Kit.Toggle
 
 local function Config()
 	return BUI.GetDB().markers
@@ -23,57 +15,34 @@ local function Apply()
 	BUI.Markers.Refresh()
 end
 
-local function Anchored()
-	return Config().anchorFrame ~= FREE
-end
-
-local function Option(label, key, extra)
-	local option = { label = label, get = function() return Config()[key] end, set = function(value) Config()[key] = value end }
-	for name, value in pairs(extra or {}) do option[name] = value end
-	return option
-end
-
-local function Offset(label, freeKey, anchoredKey, range)
-	return {
-		label = label, min = -range, max = range, step = 1,
-		get = function() return Config()[Anchored() and anchoredKey or freeKey] end,
-		set = function(value) Config()[Anchored() and anchoredKey or freeKey] = value end,
-	}
-end
-
 local function Sections(ui, _, parent, width)
-	local board = ui.Board(parent, width, {
+	local db = Config()
+	local board = BUI.ResetBoard(ui, ui.Board(parent, width, {
 		stacked = true,
 		title = 'Marker bar',
 		description = 'Click a tile to mark your target, Shift-Click to place a world marker.',
-	})
+	}))
 	board:AddTools('Bar', 'Size, display and position', {
 		{ icon = 'resize', tooltip = 'Size, applied after combat', title = 'Size', options = {
-			Option('Icon size', 'iconSize', { min = 16, max = 40, step = 1 }),
-			Option('Spacing', 'spacing', { min = 0, max = 12, step = 1 }),
+			Option(db, 'Icon size', 'iconSize', { min = 16, max = 40, step = 1 }),
+			Option(db, 'Spacing', 'spacing', { min = 0, max = 12, step = 1 }),
 		} },
-		{ tooltip = 'Display and fade', title = 'Display', slot = 'settings', options = {
-			Option('Only in a group', 'onlyInGroup'),
-			Option('Tooltips', 'tooltips'),
-			Option('Fade until moused over', 'fadeEnabled', { separator = true }),
-			Option('Bar opacity', 'alpha', { min = 10, max = 100, step = 1 }),
-			Option('Faded opacity', 'fadeAlpha', { min = 0, max = 100, step = 1 }),
-			Option('Fade time', 'fadeDuration', { min = 0, max = 1, step = 0.05 }),
+		{ tooltip = 'Display and fade', title = 'Display', options = {
+			Option(db, 'Only in a group', 'onlyInGroup'),
+			Option(db, 'Tooltips', 'tooltips'),
+			Option(db, 'Fade until moused over', 'fadeEnabled', { separator = true }),
+			Option(db, 'Bar opacity', 'alpha', { min = 10, max = 100, step = 1 }),
+			Option(db, 'Faded opacity', 'fadeAlpha', { min = 0, max = 100, step = 1 }),
+			Option(db, 'Fade time', 'fadeDuration', { min = 0, max = 1, step = 0.05 }),
 		} },
-		{ icon = 'location', tooltip = 'Position and anchor', title = 'Position', slot = 'position', options = {
-			Option('Anchor to', 'anchorFrame', { entries = ANCHORS, width = ANCHOR_MENU_WIDTH }),
-			Option('Anchor side', 'anchorPoint', { entries = BUI.C.ANCHOR_PLACEMENT_OPTIONS, width = ANCHOR_MENU_WIDTH }),
-			Offset('Horizontal offset', 'posX', 'anchorOffsetX', 1500),
-			Offset('Vertical offset', 'posY', 'anchorOffsetY', 1000),
-			Option('Match anchor width', 'matchAnchorWidth'),
-		} },
+		BUI.PositionTool(db, { selfTag = 'BUI_MarkerBar', noCenter = true, matchWidth = true }),
 	}, Apply)
 	board:AddTools('Utility tiles', 'Clear, ready check and countdown', {
 		{ icon = 'clock', tooltip = 'Countdown seconds', title = 'Countdowns', options = {
-			Option('Primary countdown', 'countdownTime', { min = 0, max = 60, step = 1 }),
-			Option('Secondary countdown', 'countdownTime2', { min = 0, max = 60, step = 1 }),
+			Option(db, 'Primary countdown', 'countdownTime', { min = 0, max = 60, step = 1 }),
+			Option(db, 'Secondary countdown', 'countdownTime2', { min = 0, max = 60, step = 1 }),
 		} },
-		{ get = function() return Config().showControls ~= false end, set = function(value) Config().showControls = value end },
+		Toggle(db, nil, 'showControls'),
 	}, Apply)
 	return { board }
 end
@@ -94,6 +63,7 @@ BUI.PageEngine.RegisterPage('markers', {
 			},
 			tabs = { { label = 'Markers', build = Sections } },
 		})
+		pageFrame._page = page
 		page:AutoRefresh()
 	end,
 })
