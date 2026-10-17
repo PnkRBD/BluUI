@@ -1320,65 +1320,9 @@ function CDAnnouncer.Refresh()
     Render()
 end
 
-local function MigrateToProfileCharScope()
-    local slot = GetCharacterSlot()
-    if slot._migrated then return end
-    slot._migrated = true
-
-    local charScope = BUI.db.char.cdAnnouncer
-    if charScope and charScope.spells and #charScope.spells > 0 and #(slot.spells or {}) == 0 then
-        slot.spells = Tools.DeepCopy(charScope.spells)
-    end
-    if charScope and charScope.active and next(charScope.active) and not next(slot.active or {}) then
-        slot.active = Tools.DeepCopy(charScope.active)
-    end
-    if charScope then
-        charScope.spells = nil
-        charScope.active = nil
-        charScope._migratedFromProfile = nil
-    end
-
-    local profile = GetConfig()
-    if profile.spells and #profile.spells > 0 and #(slot.spells or {}) == 0 then
-        slot.spells = Tools.DeepCopy(profile.spells)
-    end
-    if profile.active and next(profile.active) and not next(slot.active or {}) then
-        slot.active = Tools.DeepCopy(profile.active)
-    end
-end
-
-local function MigrateCdColor()
-    local cdColor = GetConfig().cdColor
-    if cdColor.r == 1 and cdColor.g == 0.55 and cdColor.b == 0.4 then
-        cdColor.r, cdColor.g, cdColor.b, cdColor.a = 1, 1, 1, 1
-    end
-end
-
-local function SettleEntries()
-    local spells = GetSpellList()
-    for spellIndex = #spells, 1, -1 do
-        if spells[spellIndex].kind == 'bloodlust' then table.remove(spells, spellIndex) end
-    end
-
-    for _, entry in ipairs(spells) do
-        if type(entry.soundReady) == 'number' then entry.soundReady = nil end
-        if entry.hideWhileOnCD ~= nil then
-            if entry.hideWhileOnCD == true then entry.cdPhase = false end
-            entry.hideWhileOnCD = nil
-        end
-        entry.fontPath           = nil
-        entry.readyIconSize      = nil
-        entry._cachedDuration    = nil
-        entry._cachedDurationFor = nil
-        CDAnnouncer.ApplyEntryDefaults(entry)
-    end
-end
-
 local function Initialize()
     loginEpoch = time() - GetTime()
-    MigrateToProfileCharScope()
-    MigrateCdColor()
-    SettleEntries()
+    for _, entry in ipairs(GetSpellList()) do CDAnnouncer.ApplyEntryDefaults(entry) end
     BuildFrame()
     RestorePersistedCooldowns()
     BUI.Scheduler.RegisterUpdate(MODULE_KEY, Tick, TICK_INTERVAL, GetConfig().enabled)

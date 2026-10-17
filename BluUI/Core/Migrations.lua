@@ -31,7 +31,7 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 27
+local PROFILE_MIGRATION_VERSION = 28
 
 local AURA_GROUP_KINDS = { 'buffs', 'debuffs', 'bigDef', 'crowdControl' }
 
@@ -378,6 +378,165 @@ local function DropRetiredKeys(profile)
 	for _, unitKey in ipairs(LEGACY_UNIT_KEYS) do
 		local unit = unitFrames[unitKey]
 		if type(unit) == 'table' then unit.powerColor = nil end
+	end
+end
+
+local STACK_SNAPSHOT_FIELDS = {
+	'anchorFrame', 'anchorPoint', 'anchorOffsetX', 'anchorOffsetY',
+	'centerHorizontally', 'matchAnchorWidth', 'noGap', 'scaleOffsets',
+	'stackFlushEdge', 'posX', 'posY',
+}
+
+local function ClearStackAnchor(memberDB)
+	memberDB.anchorFrame = ''
+	memberDB.anchorPoint = nil
+	memberDB.anchorOffsetX = nil
+	memberDB.anchorOffsetY = nil
+	memberDB.centerHorizontally = false
+	memberDB.matchAnchorWidth = nil
+	memberDB.noGap = nil
+	memberDB.scaleOffsets = nil
+	memberDB.stackFlushEdge = nil
+end
+
+local function MigrateClassicPowerStack(powerBar, secondaryPower)
+	if type(powerBar) ~= 'table' then return end
+	local stack = powerBar.stack
+	if type(stack) ~= 'table' or not stack.enabled then return end
+	local members = { primary = powerBar }
+	if type(secondaryPower) == 'table' then members.secondary = secondaryPower end
+
+	local settings = type(powerBar.stackLab) == 'table' and powerBar.stackLab or {}
+	powerBar.stackLab = settings
+	local order = { 'primary', 'secondary', 'castbar' }
+	if type(stack.order) == 'table' and stack.order[1] == 'secondary' then order = { 'secondary', 'primary', 'castbar' } end
+	settings.enabled = true
+	settings.order = order
+	settings.attached = { primary = true, secondary = true, castbar = false }
+	settings.gap = stack.gap or 0
+	settings.width = powerBar.barWidth or settings.width or 230
+	settings.matchWidth = stack.matchAnchorWidth ~= false
+	if settings.matchAnchorWidth == nil then settings.matchAnchorWidth = false end
+	if settings.castbarMode == nil then settings.castbarMode = 'collapse' end
+	if settings.locked == nil then settings.locked = true end
+
+	if stack.anchorFrame and stack.anchorFrame ~= '' then
+		settings.anchorFrame = stack.anchorFrame
+		settings.anchorPoint = stack.anchorPoint or 'TOP'
+		settings.anchorOffsetX = stack.anchorOffsetX or 0
+		settings.anchorOffsetY = stack.anchorOffsetY or 0
+		settings.centerHorizontally = false
+		settings.posX = settings.posX or 0
+		settings.posY = settings.posY or -220
+	else
+		local base = members[stack.baseMember] or members[order[1]] or powerBar
+		settings.anchorFrame = ''
+		settings.anchorPoint = settings.anchorPoint or 'BOTTOM'
+		settings.anchorOffsetX, settings.anchorOffsetY = 0, 0
+		settings.centerHorizontally = base.centerHorizontally == true
+		settings.posX = base.posX or 0
+		settings.posY = base.posY or 0
+	end
+
+	if type(stack.preStack) == 'table' then
+		for key, memberDB in pairs(members) do
+			local snapshot = stack.preStack[key]
+			if type(snapshot) == 'table' then
+				for _, field in ipairs(STACK_SNAPSHOT_FIELDS) do memberDB[field] = snapshot[field] end
+			end
+		end
+	else
+		for _, memberDB in pairs(members) do ClearStackAnchor(memberDB) end
+	end
+	stack.enabled = false
+	stack.baseMember = nil
+	stack.preStack = nil
+end
+
+local function MigrateClassicPowerStacks(profile)
+	MigrateClassicPowerStack(profile.powerBar, profile.secondaryPower)
+	if type(profile.powerVariants) ~= 'table' then return end
+	for _, variant in pairs(profile.powerVariants) do
+		if type(variant) == 'table' then MigrateClassicPowerStack(variant.powerBar, variant.secondaryPower) end
+	end
+end
+
+local function SettleMoveFramesMode(moveFrames)
+	if type(moveFrames) ~= 'table' then return end
+	if moveFrames.autoReset then
+		moveFrames.positionMode = 'reset'
+	elseif moveFrames.rememberPositions == false then
+		moveFrames.positionMode = 'session'
+	end
+	moveFrames.autoReset, moveFrames.rememberPositions = nil, nil
+end
+
+local function AnnouncerSlotKey(charKey)
+	return (charKey:gsub(' %- ', '-', 1))
+end
+
+local function AdoptAnnouncerLists(slot, source)
+	if type(source) ~= 'table' then return end
+	if type(source.spells) == 'table' and #source.spells > 0 and #(slot.spells or {}) == 0 then
+		slot.spells = CopyTable(source.spells)
+	end
+	if type(source.active) == 'table' and next(source.active) and not next(slot.active or {}) then
+		slot.active = CopyTable(source.active)
+	end
+end
+
+local function AdoptLegacyAnnouncer(profile, announcer)
+	local sv = BUI.db and BUI.db.sv
+	if type(sv) ~= 'table' or type(sv.profileKeys) ~= 'table' or type(sv.profiles) ~= 'table' then return end
+	local profileName
+	for name, saved in pairs(sv.profiles) do
+		if saved == profile then profileName = name end
+	end
+	if not profileName then return end
+	announcer.charSpells = type(announcer.charSpells) == 'table' and announcer.charSpells or {}
+	for charKey, usedProfile in pairs(sv.profileKeys) do
+		if usedProfile == profileName then
+			local charData = type(sv.char) == 'table' and sv.char[charKey]
+			local charScope = type(charData) == 'table' and charData.cdAnnouncer or nil
+			local slotKey = AnnouncerSlotKey(charKey)
+			local slot = type(announcer.charSpells[slotKey]) == 'table' and announcer.charSpells[slotKey] or {}
+			if not slot._migrated then
+				AdoptAnnouncerLists(slot, charScope)
+				AdoptAnnouncerLists(slot, announcer)
+				if next(slot) then announcer.charSpells[slotKey] = slot end
+			end
+		end
+	end
+end
+
+local function SettleAnnouncerEntries(spells)
+	for index = #spells, 1, -1 do
+		local entry = spells[index]
+		if type(entry) ~= 'table' or entry.kind == 'bloodlust' then table.remove(spells, index) end
+	end
+	for _, entry in ipairs(spells) do
+		if type(entry.soundReady) == 'number' then entry.soundReady = nil end
+		if entry.hideWhileOnCD == true then entry.cdPhase = false end
+		entry.hideWhileOnCD, entry.fontPath, entry.readyIconSize = nil, nil, nil
+		entry._cachedDuration, entry._cachedDurationFor = nil, nil
+	end
+end
+
+local function SettleAnnouncer(profile)
+	local announcer = profile.cdAnnouncer
+	if type(announcer) ~= 'table' then return end
+	local color = announcer.cdColor
+	if type(color) == 'table' and color.r == 1 and color.g == 0.55 and color.b == 0.4 then
+		color.r, color.g, color.b, color.a = 1, 1, 1, 1
+	end
+	AdoptLegacyAnnouncer(profile, announcer)
+	announcer.spells, announcer.active = nil, nil
+	if type(announcer.charSpells) ~= 'table' then return end
+	for _, slot in pairs(announcer.charSpells) do
+		if type(slot) == 'table' then
+			slot._migrated = nil
+			if type(slot.spells) == 'table' then SettleAnnouncerEntries(slot.spells) end
+		end
 	end
 end
 
@@ -938,6 +1097,21 @@ function BUI.MigrateProfile(profile)
 		end
 	end
 
+	if not general._classicPowerStackMigrated then
+		general._classicPowerStackMigrated = true
+		MigrateClassicPowerStacks(profile)
+	end
+
+	if not general._moveFramesModeSettled then
+		general._moveFramesModeSettled = true
+		SettleMoveFramesMode(profile.moveFrames)
+	end
+
+	if not general._cdAnnouncerSettled then
+		general._cdAnnouncerSettled = true
+		SettleAnnouncer(profile)
+	end
+
 	general._buiMigrationVersion = PROFILE_MIGRATION_VERSION
 end
 
@@ -955,5 +1129,13 @@ function BUI.RunMigrations()
 
 	for _, profile in pairs(BUI.db.profiles) do
 		BUI.MigrateProfile(profile)
+	end
+
+	if not global._cdAnnouncerCharScopeCleared then
+		global._cdAnnouncerCharScopeCleared = true
+		local sv = BUI.db.sv
+		for _, charData in pairs(type(sv) == 'table' and type(sv.char) == 'table' and sv.char or {}) do
+			if type(charData) == 'table' then charData.cdAnnouncer = nil end
+		end
 	end
 end
