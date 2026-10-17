@@ -38,7 +38,17 @@ function Controls.Stepper(parent, label, value, minValue, maxValue, step, callba
 	valueBox:SetPoint("RIGHT", plusButton, "LEFT", -2, 0)
 	valueBox:SetHeight(height - 2); valueBox:SetFont(BUILib.Font, valueFontSize, "")
 	valueBox:SetTextColor(unpack(Theme.text.primary)); valueBox:SetJustifyH("CENTER")
-	valueBox:SetAutoFocus(false); valueBox:SetNumeric(true); valueBox:SetMaxLetters(6)
+	valueBox:SetAutoFocus(false); valueBox:SetMaxLetters(6)
+	if minValue < 0 then
+		valueBox:SetScript("OnTextChanged", function(editBox, userInput)
+			if not userInput then return end
+			local text = editBox:GetText()
+			local clean = text:gsub("[^%d%-]", ""):gsub("(.)%-", "%1")
+			if clean ~= text then editBox:SetText(clean) end
+		end)
+	else
+		valueBox:SetNumeric(true)
+	end
 	container.valueBox = valueBox
 	local onLimit
 	local function UpdateDisplay() valueBox:SetText(tostring(state.value)) end
@@ -47,7 +57,8 @@ function Controls.Stepper(parent, label, value, minValue, maxValue, step, callba
 		return math_min(maxValue, math_max(minValue, requested))
 	end
 	local function Commit()
-		state.value = Clamp(tonumber(valueBox:GetText()) or minValue)
+		local typed = tonumber(valueBox:GetText())
+		if typed then state.value = Clamp(typed) end
 		UpdateDisplay(); if callback then callback(state.value) end
 	end
 	valueBox:SetScript("OnEnterPressed", function(editBox) editBox:ClearFocus() end)
