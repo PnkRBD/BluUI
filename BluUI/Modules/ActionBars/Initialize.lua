@@ -40,6 +40,7 @@ function ActionBars.RefreshOnly(key)
 			ActionBars.RefreshBar(key)
 			ActionBars.RefreshBarPaging(key)
 			ActionBars.RouteKeybinds()
+			ActionBars.HideBlizzardBars()
 		end)
 	elseif SECURE_BARS[key] then
 		ActionBars.RunSecure('Refresh.' .. key, ActionBars[SECURE_BARS[key]])

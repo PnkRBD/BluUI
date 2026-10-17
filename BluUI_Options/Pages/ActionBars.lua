@@ -1,7 +1,8 @@
 local BUI = BluUI
 local BUILib = BluUI.BUILibClient
-local Layout, Modals, Theme = BUILib.Layout, BUILib.Modals, BUILib.Theme
+local Layout, Theme = BUILib.Layout, BUILib.Theme
 local Pixel = BUI.Pixel
+local ActionBars = BUI.ActionBars
 
 local PAGE_WIDTH = 960
 local PREVIEW_HEIGHT = 112
@@ -14,22 +15,8 @@ local MOCK_FILL = { 0.16, 0.17, 0.2, 1 }
 local MOCK_PLAIN_FILL = { 0.11, 0.115, 0.13, 1 }
 local MICRO_WIDTH, MICRO_HEIGHT, MICRO_COUNT, MICRO_OVERLAP = 32, 40, 13, -5
 local BAG_SIZE, BAG_COUNT, BAG_GAP = 30, 6, 4
-local BAG_BUTTON_NAMES = {
-	'MainMenuBarBackpackButton', 'CharacterBag0Slot', 'CharacterBag1Slot', 'CharacterBag2Slot', 'CharacterBag3Slot', 'CharacterReagentBag0Slot',
-}
 local EMPTY_BUTTON_DEFAULT = BUI.Defaults.profile.actionBars.emptyButtonColor
 
-local ANCHORS = {
-	{ value = 'TOPLEFT', text = 'Top left' },
-	{ value = 'TOP', text = 'Top' },
-	{ value = 'TOPRIGHT', text = 'Top right' },
-	{ value = 'LEFT', text = 'Left' },
-	{ value = 'CENTER', text = 'Center' },
-	{ value = 'RIGHT', text = 'Right' },
-	{ value = 'BOTTOMLEFT', text = 'Bottom left' },
-	{ value = 'BOTTOM', text = 'Bottom' },
-	{ value = 'BOTTOMRIGHT', text = 'Bottom right' },
-}
 local GROWTHS = {
 	{ value = 'TOPLEFT', text = 'Top left' },
 	{ value = 'TOPRIGHT', text = 'Top right' },
@@ -82,16 +69,11 @@ for _, extra in ipairs(EXTRA_BARS) do EXTRA_BY_KEY[extra.key] = extra end
 local selected = 'general'
 local preview
 
-local function Window()
-	return BUI.PageEngine.window
-end
-
-local function Repaint()
-	Window():Repaint()
-end
+local Kit = BUI.OptionsKit
+local Window, Repaint, Option, Toggle, Color = Kit.Window, Kit.Repaint, Kit.Option, Kit.Toggle, Kit.Color
 
 local function Settings()
-	return BUI.ActionBars.GetSettings()
+	return ActionBars.GetSettings()
 end
 
 local function RefreshPreview()
@@ -99,7 +81,7 @@ local function RefreshPreview()
 end
 
 local Apply = BUI.Dispatcher.NewDelayed(function()
-	BUI.ActionBars.Refresh()
+	ActionBars.Refresh()
 	RefreshPreview()
 end, 0.15, 'Action bars page apply')
 
@@ -108,7 +90,7 @@ local function ApplyFor(key)
 	local apply = applyByKey[key]
 	if not apply then
 		apply = BUI.Dispatcher.NewDelayed(function()
-			BUI.ActionBars.RefreshOnly(key)
+			ActionBars.RefreshOnly(key)
 			RefreshPreview()
 		end, 0.15, 'Action bars page apply ' .. key)
 		applyByKey[key] = apply
@@ -122,30 +104,9 @@ local function SelectedKey()
 	return index and tonumber(index) or selected
 end
 
-local function Option(db, label, key, extra)
-	local option = { label = label, get = function() return db[key] end, set = function(value) db[key] = value end }
-	for name, value in pairs(extra or {}) do option[name] = value end
-	return option
-end
-
-local function Toggle(db, label, key)
-	return { label = label, get = function() return db[key] == true end, set = function(value) db[key] = value end }
-end
-
-local function Color(db, label, key, opacity)
-	return {
-		kind = 'swatch', label = label, tooltip = label, opacity = opacity ~= false,
-		get = function()
-			local color = db[key]
-			return color[1], color[2], color[3], color[4]
-		end,
-		set = function(red, green, blue, alpha) db[key] = { red, green, blue, alpha or 1 } end,
-	}
-end
-
 local function TextPlacement(db, title, prefix)
 	return { icon = 'location', tooltip = 'Anchor and offset', title = title, options = {
-		Option(db, 'Anchor', prefix .. 'Anchor', { entries = ANCHORS }),
+		Option(db, 'Anchor', prefix .. 'Anchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS_SHORT }),
 		Option(db, 'Horizontal', prefix .. 'OffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
 		Option(db, 'Vertical', prefix .. 'OffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
 	} }
@@ -153,7 +114,6 @@ end
 
 local function GeneralBoards(ui, parent, width)
 	local db = Settings()
-	local ActionBars = BUI.ActionBars
 	local text = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Button text',
@@ -219,12 +179,12 @@ local function GeneralBoards(ui, parent, width)
 		Toggle(db, nil, 'emptyButtonBackground'),
 	}, Apply)
 	look:AddTools('Key presses', 'Flash a button while its keybind is held', {
-		Color(db, 'Flash color', 'pressColor', false),
+		Color(db, 'Flash color', 'pressColor', { opacity = false }),
 		{ tooltip = 'Strength', title = 'Key presses', options = { Option(db, 'Flash opacity %', 'pressOpacity', { min = 5, max = 100, step = 1 }) } },
 		Toggle(db, nil, 'showKeyPresses'),
 	}, Apply)
 	look:AddTools('Proc glow', 'Glow when a spell procs', {
-		Color(db, 'Glow tint', 'procGlowColor', false),
+		Color(db, 'Glow tint', 'procGlowColor', { opacity = false }),
 		{ entries = GLOW_STYLES, width = MENU_WIDTH, get = function() return db.procGlowStyle end, set = function(value) db.procGlowStyle = value end },
 		{ tooltip = 'Speed, lines and thickness', title = 'Proc glow', options = {
 			Option(db, 'Speed %', 'procGlowSpeed', { min = 25, max = 400, step = 25 }),
@@ -274,7 +234,6 @@ end
 
 local function BarRows(ui, board, key, title, db, spec)
 	local apply = ApplyFor(key)
-	local ActionBars = BUI.ActionBars
 	local position = BUI.PositionTool(db, { selfTag = spec.selfTag })
 	local layering = { Option(db, 'Layer', 'frameStrata', { entries = BUI.C.STRATA_OPTIONS }) }
 	if spec.fill then table.insert(layering, 1, Option(db, 'Fill from', 'growth', { entries = GROWTHS })) end
@@ -388,7 +347,7 @@ local function ActionBarBoards(ui, parent, width, index)
 end
 
 local function ExtraBoards(ui, parent, width, extra)
-	local db = BUI.ActionBars.GetBarSettings(extra.key)
+	local db = ActionBars.GetBarSettings(extra.key)
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = extra.title,
@@ -413,7 +372,6 @@ end
 
 local function MicroButtons()
 	local list = {}
-	if not MicroMenu then return list end
 	for _, child in ipairs({ MicroMenu:GetChildren() }) do
 		if child.layoutIndex and child:IsShown() then list[#list + 1] = child end
 	end
@@ -423,9 +381,10 @@ end
 
 local function BagButtons()
 	local list = {}
-	for index = #BAG_BUTTON_NAMES, 1, -1 do
-		local button = _G[BAG_BUTTON_NAMES[index]]
-		if button and button:IsShown() then list[#list + 1] = button end
+	local names = ActionBars.BAG_BUTTON_NAMES
+	for index = #names, 1, -1 do
+		local button = _G[names[index]]
+		if button:IsShown() then list[#list + 1] = button end
 	end
 	return list
 end
@@ -433,7 +392,7 @@ end
 local function LiveButtons(key)
 	if key == 'micro' then return MicroButtons() end
 	if key == 'bags' then return BagButtons() end
-	local bar = BUI.ActionBars.bars[key]
+	local bar = ActionBars.bars[key]
 	if not bar then return nil end
 	local list = {}
 	for _, button in ipairs(bar.buttons) do
@@ -449,20 +408,19 @@ local function PreviewItems(key, db)
 		local items = {}
 		local fallbackWidth = key == 'micro' and MICRO_WIDTH or BAG_SIZE
 		local fallbackHeight = key == 'micro' and MICRO_HEIGHT or BAG_SIZE
-		local fallbackCount = key == 'micro' and MICRO_COUNT or BAG_COUNT
-		local count = live and #live > 0 and #live or fallbackCount
+		local count = #live > 0 and #live or (key == 'micro' and MICRO_COUNT or BAG_COUNT)
 		for index = 1, count do
-			local real = live and live[index]
+			local real = live[index]
 			local width, height = fallbackWidth, fallbackHeight
 			if real then width, height = real:GetSize() end
-			items[index] = { real = real, width = width or fallbackWidth, height = height or fallbackHeight }
+			items[index] = { real = real, width = width, height = height }
 		end
 		local perRow = key == 'micro' and db.buttonsPerRow or count
 		if key == 'micro' and db.vertical then perRow = 1 end
 		local spacing = key == 'micro' and (MICRO_OVERLAP + db.spacing) or BAG_GAP
 		return { items = items, perRow = perRow, spacing = spacing, scale = scale, plain = true }
 	end
-	local count = key == 'vehicle' and 1 or db.buttonCount
+	local count = db.buttonCount
 	if key == 'stance' then
 		local forms = GetNumShapeshiftForms()
 		if forms > 0 then count = math.min(count, forms) end
@@ -506,7 +464,7 @@ end
 
 local function TextOf(fontString, show)
 	if not show or not fontString then return '' end
-	return fontString:GetText() or ''
+	return fontString:GetText()
 end
 
 local function MirrorArt(mock, real)
@@ -519,14 +477,14 @@ local function MirrorArt(mock, real)
 		return true
 	end
 	local texture = real and real.icon
-	if real and not texture and real.GetNormalTexture then
+	if real and not texture then
 		texture = real:GetNormalTexture()
-		if real.IsEnabled and not real:IsEnabled() and real.GetDisabledTexture and real:GetDisabledTexture() then
+		if not real:IsEnabled() and real:GetDisabledTexture() then
 			texture = real:GetDisabledTexture()
 		end
 	end
 	if not texture then return false end
-	local atlas = texture.GetAtlas and texture:GetAtlas()
+	local atlas = texture:GetAtlas()
 	if atlas then
 		mock.icon:SetAtlas(atlas)
 	else
@@ -563,7 +521,7 @@ local function MirrorItem(mock, item, spec, db, scale)
 	else
 		mock.icon:Hide()
 		if real then
-			mock.fill:SetVertexColor(BUI.ActionBars.EmptyButtonColor())
+			mock.fill:SetVertexColor(ActionBars.EmptyButtonColor())
 		else
 			mock.fill:SetVertexColor(unpack(MOCK_FILL))
 		end
@@ -588,18 +546,18 @@ local function BuildPreview(band, kit)
 	local mocks = {}
 	local note = kit.Text(band, 'Pick a bar from the rail to see it here', 12, 'muted')
 	note:SetPoint('CENTER')
-	local elapsed = 0
+	local ticker
 
 	function band:Update()
 		local key = SelectedKey()
-		local db = key and BUI.ActionBars.GetBarSettings(key)
+		local db = key and ActionBars.GetBarSettings(key)
 		note:SetShown(not db)
 		stage:SetShown(db ~= nil)
 		if not db then return end
 		local settings = Settings()
 		local spec = PreviewItems(key, db)
 		local items = spec.items
-		local perRow = math.max(1, math.min(spec.perRow or #items, #items))
+		local perRow = math.max(1, math.min(spec.perRow, #items))
 		local rows = {}
 		for index, item in ipairs(items) do
 			local rowIndex = math.floor((index - 1) / perRow) + 1
@@ -643,13 +601,16 @@ local function BuildPreview(band, kit)
 		end
 		for index = mockIndex + 1, #mocks do mocks[index]:Hide() end
 	end
-	band:SetScript('OnUpdate', function(self, delta)
-		elapsed = elapsed + delta
-		if elapsed < PREVIEW_TICK then return end
-		elapsed = 0
+	band:HookScript('OnShow', function(self)
 		self:Update()
+		ticker = C_Timer.NewTicker(PREVIEW_TICK, function() self:Update() end)
 	end)
-	band:HookScript('OnShow', function(self) self:Update() end)
+	band:HookScript('OnHide', function()
+		if ticker then
+			ticker:Cancel()
+			ticker = nil
+		end
+	end)
 	return band
 end
 
@@ -660,33 +621,16 @@ local function Panes(ui, _, parent, width, item)
 	return ActionBarBoards(ui, parent, width, tonumber(item.id:match('%d+')))
 end
 
-local function RailGroups()
-	local bars = {}
-	for index = 1, BUI.ActionBars.BAR_COUNT do
-		bars[index] = { id = 'bar' .. index, label = 'Bar ' .. index, icon = 'key' .. index }
-	end
-	local extras = {}
-	for _, extra in ipairs(EXTRA_BARS) do extras[#extras + 1] = { id = extra.key, label = extra.title, icon = extra.icon } end
-	return {
-		{ title = 'Settings', items = { { id = 'general', label = 'General', icon = 'cog' } } },
-		{ title = 'Bars', items = bars },
-		{ title = 'Other bars', items = extras },
-	}
+local RAIL_BARS, RAIL_EXTRAS = {}, {}
+for index = 1, ActionBars.BAR_COUNT do
+	RAIL_BARS[index] = { id = 'bar' .. index, label = 'Bar ' .. index, icon = 'key' .. index }
 end
-
-local function ConfirmModule(value)
-	Modals.Confirm({
-		parent = Window().frame,
-		title = value and 'Turn on action bars' or 'Turn off action bars',
-		message = 'This needs a reload of the interface. Reload now?',
-		confirmText = 'Reload', cancelText = 'Cancel',
-		onConfirm = function()
-			BUI.SetModuleEnabled('actionBars', value)
-			ReloadUI()
-		end,
-		onCancel = Repaint,
-	})
-end
+for _, extra in ipairs(EXTRA_BARS) do RAIL_EXTRAS[#RAIL_EXTRAS + 1] = { id = extra.key, label = extra.title, icon = extra.icon } end
+local RAIL_GROUPS = {
+	{ title = 'Settings', items = { { id = 'general', label = 'General', icon = 'cog' } } },
+	{ title = 'Bars', items = RAIL_BARS },
+	{ title = 'Other bars', items = RAIL_EXTRAS },
+}
 
 BUI.PageEngine.RegisterPage('actionbars', {
 	title = 'Action Bars',
@@ -702,14 +646,16 @@ BUI.PageEngine.RegisterPage('actionbars', {
 			title = 'Action Bars',
 			placeholder = 'Search action bar settings...',
 			tools = {
-				{ icon = 'enable', tooltip = 'Turn the action bars module on or off, needs a reload', get = function() return BUI.IsModuleEnabled('actionBars') end, set = ConfirmModule },
-				{ icon = 'eye', tooltip = 'Unlock every bar to drag it, right-click a bar to lock again', get = function() return enabled and BUI.ActionBars.MoversUnlocked() end, set = function(value)
-					if enabled then BUI.ActionBars.SetMoversUnlocked(value) end
+				{ icon = 'enable', tooltip = 'Turn the action bars module on or off, needs a reload', get = function() return BUI.IsModuleEnabled('actionBars') end, set = function(value)
+					BUI.ModulesPage.ConfirmReload('actionBars', value, Repaint)
+				end },
+				{ icon = 'eye', tooltip = 'Unlock every bar to drag it, right-click a bar to lock again', get = function() return enabled and ActionBars.MoversUnlocked() end, set = function(value)
+					if enabled then ActionBars.SetMoversUnlocked(value) end
 					Repaint()
 				end },
 			},
 			preview = enabled and { height = PREVIEW_HEIGHT, build = function(band, kit) preview = BuildPreview(band, kit) end } or nil,
-			rail = { groups = RailGroups(), selected = selected },
+			rail = { groups = RAIL_GROUPS, selected = selected },
 			disabled = function() return not enabled end,
 			build = Panes,
 		})
@@ -725,7 +671,7 @@ BUI.PageEngine.RegisterPage('actionbars', {
 			RefreshPreview()
 		end
 		pageFrame._selectModule = function(key) rail:Select(key) end
-		BUI.ActionBars.OnMoversChanged('ActionBarsPage', Repaint)
+		ActionBars.OnMoversChanged('ActionBarsPage', Repaint)
 		RefreshPreview()
 		page:AutoRefresh()
 	end,

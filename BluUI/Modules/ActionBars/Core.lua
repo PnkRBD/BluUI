@@ -59,10 +59,11 @@ end
 
 function ActionBars.BarLabel(key)
 	if type(key) == 'number' then return 'Bar ' .. key end
-	return ActionBars.LABELS[key] or tostring(key)
+	return ActionBars.LABELS[key]
 end
 
 function ActionBars.RegisterBar(bar)
+	bar.hoverCount = 0
 	ActionBars.bars[bar.key] = bar
 	return bar
 end

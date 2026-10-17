@@ -402,29 +402,13 @@ BUI.Events:Register('PLAYER_REGEN_ENABLED', 'ActionBars.Movers.Settled', functio
 	ActionBars.RefreshMovers()
 end)
 
-local editModeHooked = false
-
-local function HookEditMode()
-	local manager = EditModeManagerFrame
-	if editModeHooked or not manager then return end
-	editModeHooked = true
-	manager:HookScript('OnShow', BUI.Profiler.Wrap('ActionBars.Movers edit mode show', function()
-		if not BUI.IsModuleEnabled('actionBars') or state.unlocked then return end
-		state.editMode = true
-		ActionBars.SetMoversUnlocked(true)
-	end))
-	manager:HookScript('OnHide', BUI.Profiler.Wrap('ActionBars.Movers edit mode hide', function()
-		if not state.editMode then return end
-		state.editMode = false
-		ActionBars.SetMoversUnlocked(false)
-	end))
-	if manager:IsShown() and BUI.IsModuleEnabled('actionBars') and not state.unlocked then
-		state.editMode = true
-		ActionBars.SetMoversUnlocked(true)
-	end
-end
-
-HookEditMode()
-if not editModeHooked then
-	EventUtil.ContinueOnAddOnLoaded('Blizzard_EditMode', HookEditMode)
-end
+EditModeManagerFrame:HookScript('OnShow', BUI.Profiler.Wrap('ActionBars.Movers edit mode show', function()
+	if not BUI.IsModuleEnabled('actionBars') or state.unlocked then return end
+	state.editMode = true
+	ActionBars.SetMoversUnlocked(true)
+end))
+EditModeManagerFrame:HookScript('OnHide', BUI.Profiler.Wrap('ActionBars.Movers edit mode hide', function()
+	if not state.editMode then return end
+	state.editMode = false
+	ActionBars.SetMoversUnlocked(false)
+end))

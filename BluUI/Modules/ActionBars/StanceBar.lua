@@ -120,7 +120,6 @@ function ActionBars.RefreshStanceBar()
 		end
 		ActionBars.SkinButton(button)
 		button.HotKey:SetShown(barSettings.showHotkey)
-		button._formattedHotkey = nil
 		ActionBars.ApplyHotkeyText(button)
 	end
 	local shownCount = math.min(formCount, barSettings.buttonCount)

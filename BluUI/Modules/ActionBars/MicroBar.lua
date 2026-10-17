@@ -12,10 +12,6 @@ local microBar
 local QueueRetake
 local gridButtons = {}
 
-local function ButtonOverlap()
-	return BLIZZARD_PADDING
-end
-
 local function WholePixelPadding(size, padding)
 	local pixel = BUI.Pixel.PixelSizeFor(MicroMenu, 1)
 	return math.floor((size + padding) / pixel + 0.5) * pixel - size
@@ -23,7 +19,7 @@ end
 
 local function WantedLayout(barSettings)
 	local stride = math.max(1, math.min(barSettings.buttonsPerRow, MicroMenu.numButtons))
-	local padding = ButtonOverlap() + barSettings.spacing
+	local padding = BLIZZARD_PADDING + barSettings.spacing
 	local width, height = CharacterMicroButton:GetSize()
 	return not barSettings.vertical, stride, WholePixelPadding(width, padding), WholePixelPadding(height, padding)
 end
