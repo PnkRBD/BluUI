@@ -57,7 +57,6 @@ indicatorHolder:SetSize(1, 1)
 local backdropFrame, clockFrame, zoneFrame, difficultyFrame, unlockOverlay
 local clockTicker, alignmentTimer
 local clockUse24h, clockUseServerTime = false, false
-local lockReleaseCallback, indicatorMovedCallback
 local ghosts, previewing = {}, {}
 
 local function GetConfig()
@@ -69,7 +68,7 @@ local function GetTextFont(key)
 end
 
 local function IsEnabled()
-	return GetConfig().minimapEnabled ~= false
+	return BUI.IsModuleEnabled('minimap')
 end
 
 local function RegisterEvents(key, events, handler)
@@ -88,7 +87,6 @@ local function PositionText(frame, fontString, squareCorner, squareX, squareY, o
 end
 
 local function Park(element, keepParent)
-	if not element then return end
 	element:Hide()
 	element:SetAlpha(0)
 	if not keepParent then element:SetParent(hiddenParent) end
@@ -132,7 +130,7 @@ local function CreateBackdrop()
 
 	local texture = backdropFrame:CreateTexture(nil, 'BACKGROUND')
 	texture:SetAllPoints()
-	BUI.Tools.SetColorTex(texture, 0, 0, 0, 1)
+	texture:SetColorTexture(0, 0, 0, 1)
 end
 
 local backdropAnnounced
@@ -339,7 +337,7 @@ function Minimap.ToggleZoneText(enabled)
 end
 
 local function GetDifficultyPrefix(difficultyID)
-	if not difficultyID or difficultyID == 0 then return nil end
+	if difficultyID == 0 then return nil end
 	local prefix = difficultyPrefix[difficultyID]
 	if prefix then return prefix end
 	local _, _, isHeroic, isChallengeMode = GetDifficultyInfo(difficultyID)
@@ -365,14 +363,14 @@ end
 
 local function DifficultyLabel()
 	local _, instanceType, difficultyID, _, maxPlayers = GetInstanceInfo()
-	if not instanceType or instanceType == 'none' or instanceType == '' then return nil end
+	if instanceType == 'none' then return nil end
 	local prefix = GetDifficultyPrefix(difficultyID)
 	if not prefix then return nil end
 	if difficultyID == 8 then
 		local level = C_ChallengeMode.GetActiveKeystoneInfo()
-		return (level and level > 0) and string.format('%s%d', prefix, level) or prefix, prefix
+		return level > 0 and string.format('%s%d', prefix, level) or prefix, prefix
 	end
-	if maxPlayers and maxPlayers > 5 then return string.format('%s%d', prefix, maxPlayers), prefix end
+	if maxPlayers > 5 then return string.format('%s%d', prefix, maxPlayers), prefix end
 	return prefix, prefix
 end
 
@@ -449,11 +447,7 @@ local function GetIconScale(key)
 	return GetConfig().minimapIconScale[key] or defaultIconScale[key]
 end
 
-local function GetDock()
-	return GetConfig().minimapIconDock
-end
-
-local function GetDockSize()
+local function GetIconSize()
 	return GetConfig().minimapIconSize
 end
 
@@ -480,7 +474,7 @@ local function SaveDraggedPosition(frame, key)
 	local offsetX, offsetY = relativeX / relativeScale, relativeY / relativeScale
 
 	SaveIndicatorPosition(key, 'CENTER', offsetX, offsetY)
-	if indicatorMovedCallback then indicatorMovedCallback() end
+	BUI.NotifyModuleChange('minimapIndicator')
 	return offsetX, offsetY
 end
 
@@ -524,7 +518,6 @@ local indicators = {
 		key = 'queue',
 		hide = 'minimapHideQueue',
 		Resolve = function() return _G.QueueStatusButton end,
-		dockable = true,
 		squareDefault = { 'BOTTOMLEFT',   5,   5 },
 		raiseFrameLevel = true,
 		atlas = 'groupfinder-eye-single',
@@ -540,7 +533,6 @@ local indicators = {
 		key = 'mail',
 		hide = 'minimapHideMail',
 		Resolve = GetMailFrame,
-		dockable = true,
 		holder = true,
 		squareDefault = { 'TOPLEFT',  5, -30 },
 		icon = 'Interface\\Icons\\INV_Letter_15',
@@ -549,7 +541,6 @@ local indicators = {
 		key = 'crafting',
 		hide = 'minimapHideCrafting',
 		Resolve = GetCraftingOrderFrame,
-		dockable = true,
 		holder = true,
 		squareDefault = { 'TOPLEFT', 28, -30 },
 		raiseFrameLevel = true,
@@ -559,7 +550,6 @@ local indicators = {
 		key = 'missions',
 		hide = 'minimapHideGarrison',
 		Resolve = function() return _G.ExpansionLandingPageMinimapButton end,
-		dockable = true,
 		squareDefault = { 'TOPRIGHT', -5, -30 },
 		raiseFrameLevel = true,
 		icon = 'Interface\\Icons\\INV_Misc_Book_09',
@@ -606,8 +596,9 @@ local function GhostFootprint(indicator)
 	if indicator.key == 'missions' then return FOLIO_BASE, FOLIO_BASE end
 	local frame = indicator.Resolve()
 	local width, height = frame._buiNativeW, frame._buiNativeH
+	if not width then width, height = frame:GetSize() end
 	if width <= 1 or height <= 1 then
-		local size = GetDockSize()
+		local size = GetIconSize()
 		return size, size
 	end
 	return width, height
@@ -628,7 +619,7 @@ local ART_SOURCE = {
 
 local function ArtSize(key)
 	if key == 'queue' then
-		local size = GetDockSize()
+		local size = GetIconSize()
 		return size, size
 	end
 	if key == 'missions' then return FOLIO_BASE, FOLIO_BASE end
@@ -640,15 +631,11 @@ function Minimap.ApplyLiveIndicatorArt(texture, key)
 	texture:SetTexCoord(0, 1, 0, 1)
 end
 
-function Minimap.IndicatorLayout(key, docked)
+function Minimap.IndicatorLayout(key)
 	local iconScale = GetIconScale(key)
 	local width, height = GhostFootprint(FindIndicator(key))
 	local artWidth, artHeight = ArtSize(key)
-	if not docked then return width * iconScale, height * iconScale, artWidth * iconScale, artHeight * iconScale end
-	local size = GetDockSize() * iconScale
-	if key == 'queue' or key == 'missions' then return size, size, size, size end
-	local fit = size / width
-	return size, height * fit, artWidth * fit, artHeight * fit
+	return width * iconScale, height * iconScale, artWidth * iconScale, artHeight * iconScale
 end
 
 local function CopyArt(ghost, source, layer, sublevel)
@@ -679,10 +666,12 @@ local GHOST_ART = {
 	end,
 }
 
+local PositionAllIndicators
+
 local function OnGhostDragStop(ghost)
 	ghost:StopMovingOrSizing()
 	SaveDraggedPosition(ghost, ghost._buiKey)
-	Minimap.RepositionIndicators()
+	PositionAllIndicators()
 end
 
 local function CreateGhost(indicator)
@@ -747,7 +736,7 @@ local function PositionIndicator(indicator)
 	frame:SetSize(frame._buiNativeW, frame._buiNativeH)
 	local iconScale = GetIconScale(indicator.key)
 	if frame:GetScale() ~= iconScale then frame:SetScale(iconScale) end
-	if indicator.key == 'queue' then SizeQueueEye(frame, GetDockSize() * iconScale) end
+	if indicator.key == 'queue' then SizeQueueEye(frame, GetIconSize() * iconScale) end
 	if indicator.raiseFrameLevel then
 		frame:SetFrameLevel(WoWMinimap:GetFrameLevel() + 5)
 	end
@@ -788,112 +777,23 @@ local function TameLandingButton()
 	end
 	Clamp()
 	Hook(button, 'SetSize', Clamp)
-
-	local function Repin()
-		Minimap.RepositionIndicators()
-	end
-	Hook(button, 'UpdateIconForGarrison', Repin)
-	Hook(button, 'SetLandingPageIconOffset', Repin)
 end
 
-local relayouting = false
-local DOCK_GAP = 4
-local DOCK_ANCHORS = {
-	TOPLEFT     = { point = 'TOPLEFT',     x =  6, y = -6, dirX =  1 },
-	TOPRIGHT    = { point = 'TOPRIGHT',    x = -6, y = -6, dirX = -1 },
-	BOTTOMLEFT  = { point = 'BOTTOMLEFT',  x =  6, y =  6, dirX =  1 },
-	BOTTOMRIGHT = { point = 'BOTTOMRIGHT', x = -6, y =  6, dirX = -1 },
-}
-Minimap.DOCK_ANCHORS = DOCK_ANCHORS
-Minimap.DOCK_GAP = DOCK_GAP
 Minimap.TEXT_INSET, Minimap.TEXT_BOX_HEIGHT, Minimap.DIFFICULTY_FONT_SIZE = TEXT_INSET, TEXT_BOX_HEIGHT, DIFFICULTY_FONT_SIZE
 
-local function LayoutDocked(anchor)
-	local size = GetDockSize()
-	local step = size + DOCK_GAP
-	local dockedCount = 0
-	for _, indicator in ipairs(indicators) do
-		local frame = indicator.Resolve()
-		local hidden = IndicatorHidden(indicator)
-		if indicator.dockable and frame:IsShown() and not hidden then
-			local parent = IndicatorParent(indicator)
-			if frame:GetParent() ~= parent then frame:SetParent(parent) end
-			frame:ClearAllPoints()
-			local offset = anchor.dirX * dockedCount * step
-			if indicator.key == 'missions' then
-				local missionScale = size / FOLIO_BASE * GetIconScale(indicator.key)
-				frame:SetScale(missionScale)
-				frame:SetSize(FOLIO_BASE, FOLIO_BASE)
-				frame:SetPoint(anchor.point, WoWMinimap, anchor.point, (anchor.x + offset) / missionScale, anchor.y / missionScale)
-			elseif indicator.key == 'queue' then
-				local iconScale = GetIconScale(indicator.key)
-				frame:SetScale(1)
-				frame:SetSize(size * iconScale, size * iconScale)
-				frame:SetPoint(anchor.point, WoWMinimap, anchor.point, anchor.x + offset, anchor.y)
-				SizeQueueEye(frame, size * iconScale)
-			else
-				local iconScale = GetIconScale(indicator.key)
-				local baseWidth = frame._buiNativeW
-				if baseWidth <= 1 then baseWidth = size end
-				local iconFit = size * iconScale / baseWidth
-				frame:SetScale(iconFit)
-				frame:SetPoint(anchor.point, WoWMinimap, anchor.point, (anchor.x + offset) / iconFit, anchor.y / iconFit)
-			end
-			if indicator.raiseFrameLevel then frame:SetFrameLevel(WoWMinimap:GetFrameLevel() + 5) end
-			dockedCount = dockedCount + 1
-		elseif hidden or not indicator.dockable then
-			PositionIndicator(indicator)
-		end
-	end
-end
-
-local function PositionAllIndicators()
-	if not IsEnabled() or relayouting then return end
-	relayouting = true
-
+function PositionAllIndicators()
+	if not IsEnabled() then return end
 	for indicatorIndex = 1, #indicators do
 		local indicator = indicators[indicatorIndex]
 		if not indicator.hooked then
 			indicator.hooked = true
 			local frame = indicator.Resolve()
 			frame._buiNativeW, frame._buiNativeH = frame:GetSize()
-			HookSetPoint(frame, indicator.key, function()
-				if DOCK_ANCHORS[GetDock()] then PositionAllIndicators() else PositionIndicator(indicator) end
-			end)
-			if indicator.dockable then
-				local RelayoutDock = Wrap('Minimap.Minimap relayout dock', function()
-					if not relayouting and DOCK_ANCHORS[GetDock()] then PositionAllIndicators() end
-				end)
-				frame:HookScript('OnShow', RelayoutDock)
-				frame:HookScript('OnHide', RelayoutDock)
-			end
+			HookSetPoint(frame, indicator.key, function() PositionIndicator(indicator) end)
 		end
-	end
-
-	local anchor = DOCK_ANCHORS[GetDock()]
-	if anchor then
-		LayoutDocked(anchor)
-	else
-		for indicatorIndex = 1, #indicators do
-			PositionIndicator(indicators[indicatorIndex])
-		end
+		PositionIndicator(indicator)
 	end
 	TameLandingButton()
-
-	relayouting = false
-end
-
-local function OnMouseWheel(_, delta)
-	if delta > 0 then
-		WoWMinimap.ZoomIn:Click()
-	else
-		WoWMinimap.ZoomOut:Click()
-	end
-end
-
-local function EnableScrollZoom()
-	WoWMinimap:EnableMouseWheel(true)
-	WoWMinimap:SetScript('OnMouseWheel', BUI.Profiler.Script('Minimap.Minimap WoWMinimap OnMouseWheel', OnMouseWheel))
 end
 
 local DEFAULT_SCREEN_OFFSET = -20
@@ -911,7 +811,7 @@ function Minimap.ApplyPosition()
 	UpdateBackdrop()
 end
 
-function Minimap.SetScale(percent)
+local function SetScale(percent)
 	GetConfig().minimapScale = percent
 	Minimap.ApplyPosition()
 end
@@ -921,7 +821,7 @@ function Minimap.GetSizePixels()
 end
 
 function Minimap.SetSizePixels(pixels)
-	Minimap.SetScale(pixels * Pixel.PixelSizeFor(WoWMinimap:GetParent(), 1) / WoWMinimap:GetWidth() * 100)
+	SetScale(pixels * Pixel.PixelSizeFor(WoWMinimap:GetParent(), 1) / WoWMinimap:GetWidth() * 100)
 end
 
 function Minimap.SetPositionX(x)
@@ -965,10 +865,6 @@ end
 
 function Minimap.IsUnlocked()
 	return unlockOverlay and unlockOverlay:IsShown()
-end
-
-function Minimap.SetLockReleaseCallback(callback)
-	lockReleaseCallback = callback
 end
 
 local function CreateUnlockOverlay()
@@ -1025,7 +921,7 @@ local function CreateUnlockOverlay()
 	unlockOverlay:SetScript('OnMouseUp', BUI.Profiler.Script('Minimap.Minimap unlockOverlay OnMouseUp', function(_, button)
 		if button == 'RightButton' then
 			Minimap.ToggleUnlock(false)
-			if lockReleaseCallback then lockReleaseCallback() end
+			BUI.NotifyModuleChange('minimapLock')
 		end
 	end))
 end
@@ -1049,15 +945,14 @@ function Minimap.SetAddonButtons(mode)
 	if IsEnabled() then BUI.AddonButtons.SetMode(mode) end
 end
 
-function Minimap.Enable()
+local function Enable()
 	local interfaceDB = GetConfig()
-	interfaceDB.minimapEnabled = true
 
 	ReparentMinimap()
 	SuppressBlizzardChrome()
 	CreateBackdrop()
 	ApplyShape()
-	EnableScrollZoom()
+	WoWMinimap:EnableMouseWheel(true)
 
 	BUI.MinimapMenu.Setup()
 
@@ -1082,7 +977,6 @@ function Minimap.ApplySettings()
 	if difficultyFrame then Pixel.ApplyFont(difficultyFrame.text, DIFFICULTY_FONT_SIZE, BUI.GetGlobalFont()) end
 end
 
-Minimap.RepositionIndicators = PositionAllIndicators
 Minimap.GetIconScale = GetIconScale
 
 function Minimap.SetIconScale(key, scale)
@@ -1120,14 +1014,6 @@ end
 function Minimap.ClearIndicatorPreviews()
 	for key in pairs(previewing) do Minimap.PreviewIndicator(key, false) end
 end
-
-function Minimap.SetIndicatorMovedCallback(callback)
-	indicatorMovedCallback = callback
-end
-
-Minimap.GetDock = GetDock
-
-Minimap.GetIconSize = GetDockSize
 
 local initialized = false
 
@@ -1181,9 +1067,7 @@ function Minimap.Initialize()
 			end))
 		end
 
-		if _G.HybridMinimap then
-			if IsEnabled() then ApplyShape() end
-		else
+		if not _G.HybridMinimap then
 			Events:Register('ADDON_LOADED', 'MinimapHybrid', function(_, addon)
 				if addon ~= 'Blizzard_HybridMinimap' then return end
 				if IsEnabled() then ApplyShape() end
@@ -1192,8 +1076,7 @@ function Minimap.Initialize()
 		end
 	end
 
-	if GetConfig().minimapEnabled == false then return end
-	Minimap.Enable()
+	Enable()
 end
 
 Events:OnLogin('Minimap', Minimap.Initialize, 'minimap')

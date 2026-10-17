@@ -99,7 +99,7 @@ local function CollectSections()
 	local seen = {}
 	for trackingIndex = 1, C_Minimap.GetNumTrackingTypes() do
 		local info = C_Minimap.GetTrackingInfo(trackingIndex)
-		if info and info.name and not seen[info.name] then
+		if info and not seen[info.name] then
 			seen[info.name] = true
 			local bucket = buckets[SectionKey(info)]
 			bucket.items[#bucket.items + 1] = { value = trackingIndex, text = DisplayName(info.name), icon = info.texture }

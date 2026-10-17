@@ -1,12 +1,11 @@
 local _, BUI = ...
 
 local Pixel = BUI.Pixel
+local AddonButtons = BUI.AddonButtons
 local WoWMinimap = _G.Minimap
 
 local ButtonBar = {}
 BUI.MinimapButtonBar = ButtonBar
-
-local ICON_CROP = 0.08
 
 local ANCHORS = {
 	BOTTOM = { START = { 'TOPLEFT', 'BOTTOMLEFT' }, CENTER = { 'TOP', 'BOTTOM' }, END = { 'TOPRIGHT', 'BOTTOMRIGHT' }, horizontal = true,  dirX = 1,  dirY = -1 },
@@ -64,36 +63,11 @@ local function Tile(index)
 end
 
 local function PlaceButton(button, size, edge, corner, x, y)
+	AddonButtons.Dress(button, frame, size, size - edge * 2, size, frame:GetFrameLevel() + 2)
 	local original = button._buiOriginalFuncs
-	original.SetParent(button, frame)
-	original.SetScale(button, 1)
-	original.SetSize(button, size, size)
 	original.ClearAllPoints(button)
 	original.SetPoint(button, corner, frame, corner, x, y)
-	button:SetFrameStrata('MEDIUM')
-	button:SetFrameLevel(frame:GetFrameLevel() + 2)
-	button:SetAlpha(1)
 	button:Show()
-
-	local icon = button._buiIcon
-	if icon then
-		icon:ClearAllPoints()
-		icon:SetPoint('TOPLEFT', button, 'TOPLEFT', edge, -edge)
-		icon:SetPoint('BOTTOMRIGHT', button, 'BOTTOMRIGHT', -edge, edge)
-		icon:SetTexCoord(ICON_CROP, 1 - ICON_CROP, ICON_CROP, 1 - ICON_CROP)
-		icon:Show()
-	end
-	local highlight = button.GetHighlightTexture and button:GetHighlightTexture()
-	if highlight then
-		highlight:ClearAllPoints()
-		highlight:SetPoint('TOPLEFT', button, 'TOPLEFT', edge, -edge)
-		highlight:SetPoint('BOTTOMRIGHT', button, 'BOTTOMRIGHT', -edge, edge)
-	end
-	local border = button._buiBorder
-	border:ClearAllPoints()
-	border:SetAllPoints(button)
-	Pixel.ApplyBorder(border, 1, 0, 0, 0, 1)
-	border:Show()
 end
 
 function ButtonBar.Show()
@@ -133,4 +107,4 @@ function ButtonBar.Layout(list)
 	frame:SetShown(count > 0)
 end
 
-BUI.AddonButtons.Register('BAR', ButtonBar)
+AddonButtons.Register('BAR', ButtonBar)

@@ -11,6 +11,7 @@ local LDB_PREFIX = 'LibDBIcon10_'
 local UNORDERED_BASE = 100000
 local BORDER_TEXTURE_FILEID = 136430
 local BACKGROUND_TEXTURE_FILEID = 136467
+local ICON_CROP = 0.08
 
 local ignoreNames = {
 	GameTimeFrame                     = true,
@@ -141,11 +142,63 @@ local function Park(button)
 	button:Hide()
 end
 
+function AddonButtons.Dress(button, parent, size, iconSize, borderSize, level)
+	local original = button._buiOriginalFuncs
+	original.SetParent(button, parent)
+	original.SetScale(button, 1)
+	original.SetSize(button, size, size)
+	button:SetFrameStrata('MEDIUM')
+	button:SetFrameLevel(level)
+	button:SetAlpha(1)
+	local icon = button._buiIcon
+	if icon then
+		icon:ClearAllPoints()
+		icon:SetPoint('CENTER')
+		icon:SetSize(iconSize, iconSize)
+		icon:SetTexCoord(ICON_CROP, 1 - ICON_CROP, ICON_CROP, 1 - ICON_CROP)
+		icon:Show()
+	end
+	local highlight = button.GetHighlightTexture and button:GetHighlightTexture()
+	if highlight then
+		highlight:ClearAllPoints()
+		highlight:SetPoint('CENTER')
+		highlight:SetSize(iconSize, iconSize)
+	end
+	local border = button._buiBorder
+	border:ClearAllPoints()
+	border:SetPoint('CENTER')
+	border:SetSize(borderSize, borderSize)
+	Pixel.ApplyBorder(border, 1, 0, 0, 0, 1)
+	border:Show()
+end
+
+local function OrderKey(order, name, captureIndex)
+	for index = 1, #order do
+		if order[index] == name then return index end
+	end
+	return UNORDERED_BASE + captureIndex
+end
+
+local function Sorted(withExcluded)
+	local config = Config()
+	local list, keys = {}, {}
+	for index = 1, #buttons do
+		local button = buttons[index]
+		local name = button:GetName()
+		if withExcluded or not (name and config.excluded[name]) then
+			list[#list + 1] = button
+			keys[button] = name and OrderKey(config.order, name, index) or UNORDERED_BASE + index
+		end
+	end
+	table.sort(list, function(left, right) return keys[left] < keys[right] end)
+	return list
+end
+
 local function Relayout()
 	local display = displays[mode]
 	if not display then return end
 	for index = 1, #buttons do Park(buttons[index]) end
-	display.Layout(AddonButtons.Shown())
+	display.Layout(Sorted(false))
 end
 
 local QueueRelayout = BUI.Dispatcher.New(Relayout, 'Minimap.AddonButtons')
@@ -253,32 +306,6 @@ local function StopCapture()
 	for index = #buttons, 1, -1 do ReleaseButton(buttons[index]) end
 	wipe(buttons)
 	wipe(captured)
-end
-
-local function OrderKey(order, name, captureIndex)
-	for index = 1, #order do
-		if order[index] == name then return index end
-	end
-	return UNORDERED_BASE + captureIndex
-end
-
-local function Sorted(withExcluded)
-	local config = Config()
-	local list, keys = {}, {}
-	for index = 1, #buttons do
-		local button = buttons[index]
-		local name = button:GetName()
-		if withExcluded or not (name and config.excluded[name]) then
-			list[#list + 1] = button
-			keys[button] = name and OrderKey(config.order, name, index) or UNORDERED_BASE + index
-		end
-	end
-	table.sort(list, function(left, right) return keys[left] < keys[right] end)
-	return list
-end
-
-function AddonButtons.Shown()
-	return Sorted(false)
 end
 
 function AddonButtons.Entries()
