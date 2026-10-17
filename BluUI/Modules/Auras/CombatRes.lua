@@ -146,11 +146,7 @@ function CombatRes.SetLocked(locked)
     local db = GetDB()
     db.locked = locked
     BUI.NotifyModuleChange("combatRes")
-    if not frame then return end
-    BUI.Dragging.SetLocked(frame, locked)
-    if not enabled then return end
-    previewing = not locked
-    Refresh()
+    if db.enabled then CombatRes.Enable() end
 end
 
 function CombatRes.Enable()
