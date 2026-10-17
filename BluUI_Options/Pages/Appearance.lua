@@ -1,8 +1,7 @@
 local BUI = BluUI
 local BUILib = BUI.BUILibClient
-local Controls, Widget = BUILib.Controls, BUILib.Widget
+local Controls = BUILib.Controls
 
-local SETTINGS_TAB = 1
 local FIRST_COLUMN = 370
 local SECOND_COLUMN = 450
 local CONTROL_WIDTH = 200
@@ -32,23 +31,19 @@ local FONT_OVERRIDES = {
 	{ key = 'trackingFont', name = 'Custom Bars', sub = 'Text on custom tracking bars' },
 }
 
-local COLOR_GROUPS = {
-	{ name = 'Power', description = 'Shared by the power bars, unit frames and group frames.' },
-	{ name = 'Class Resources', description = 'Combo points, runes, holy power and the rest.' },
-	{ name = 'Dispel Types', description = 'Used by dispel highlights, badges and debuff icon borders.' },
+local COLOR_DESCRIPTIONS = {
+	['Power'] = 'Shared by the power bars, unit frames and group frames.',
+	['Class Resources'] = 'Combo points, runes, holy power and the rest.',
+	['Dispel Types'] = 'Used by dispel highlights, badges and debuff icon borders.',
 }
 
-local function Window()
-	return BUI.PageEngine.window
-end
+local Window = BUI.OptionsKit.Window
 
 local function General()
 	return BUI.GetDB().general
 end
 
-local function Hex(red, green, blue)
-	return ('#%02X%02X%02X'):format(math.floor(red * 255 + 0.5), math.floor(green * 255 + 0.5), math.floor(blue * 255 + 0.5))
-end
+local Hex = BUILib.Layout.HexColor
 
 local function Same(red, green, blue, color)
 	return math.abs(red - color[1]) + math.abs(green - color[2]) + math.abs(blue - color[3]) < 0.01
@@ -96,7 +91,7 @@ local function PickAccent(anchor)
 	local general = General()
 	local color = general.themeColor
 	local red, green, blue = color[1], color[2], color[3]
-	local wasClass = general.useClassColorTheme == true
+	local wasClass = general.useClassColorTheme
 	Controls.OpenColorPicker({
 		r = red, g = green, b = blue, a = 1, hasOpacity = false, anchorTo = anchor,
 		callback = function(newRed, newGreen, newBlue, _, cancelled, phase)
@@ -174,7 +169,7 @@ end
 
 local function AccentName()
 	local general = General()
-	if general.useClassColorTheme == true then return 'Class color' end
+	if general.useClassColorTheme then return 'Class color' end
 	for _, entry in ipairs(PALETTE) do
 		if Same(general.themeColor[1], general.themeColor[2], general.themeColor[3], entry.color) then return entry.name end
 	end
@@ -194,14 +189,13 @@ local function AccentSection(ui, parent, width)
 	swatch:SetPoint('LEFT', ui.AVATAR_X, 0)
 	ui.RowTitle(row, 'Accent', 'Class color, a palette pick, or any color of your own', ui.NAME_X)
 	local hex = ui.Cell(row, '', FIRST_COLUMN)
-	local opacity = ui.Cell(row, '', SECOND_COLUMN)
+	ui.Cell(row, '100%', SECOND_COLUMN)
 	local reset = ui.IconButton(row, 'reset', 'Back to the class color', UseClassColor)
 	reset:SetPoint('RIGHT', -(ui.ROW_INSET - 2), 0)
 	local dropdown
 	dropdown = ui.Dropdown(row, PRESET_DROPDOWN_WIDTH, function()
-		local general = General()
 		local name = AccentName()
-		local items = { { text = 'Class color', checked = general.useClassColorTheme == true, callback = UseClassColor }, { title = 'Palette' } }
+		local items = { { text = 'Class color', checked = General().useClassColorTheme, callback = UseClassColor }, { title = 'Palette' } }
 		for _, entry in ipairs(PALETTE) do
 			items[#items + 1] = { text = entry.name, checked = name == entry.name, callback = function() SetAccent(entry.color[1], entry.color[2], entry.color[3]) end }
 		end
@@ -214,9 +208,8 @@ local function AccentSection(ui, parent, width)
 		local red, green, blue = window:Color('accent')
 		swatch.fill:SetVertexColor(red, green, blue, 1)
 		hex:SetText(Hex(red, green, blue))
-		opacity:SetText('100%')
 		dropdown.label:SetText(AccentName())
-		reset:SetActive(General().useClassColorTheme ~= true)
+		reset:SetActive(not General().useClassColorTheme)
 	end)
 	return section
 end
@@ -273,12 +266,12 @@ local function TextSection(ui, parent, width)
 	OptionRow(ui, section, width, {
 		name = 'Slug rendering', sub = 'Thicker outline on every BluUI font',
 		avatar = function(row) return ui.IconAvatar(row, SWATCH_SIZE, 'glow') end,
-		items = OnOff(function() return General().fontSlug == true end, function(value)
+		items = OnOff(function() return General().fontSlug end, function(value)
 			General().fontSlug = value
 			RefreshAllVisuals()
 		end),
-		label = function() return General().fontSlug == true and 'On' or 'Off' end,
-		custom = function() return General().fontSlug == true end,
+		label = function() return General().fontSlug and 'On' or 'Off' end,
+		custom = function() return General().fontSlug end,
 		resetTip = 'Back to the plain outline', reset = function()
 			General().fontSlug = false
 			RefreshAllVisuals()
@@ -347,50 +340,10 @@ local function BarSection(ui, parent, width)
 	OptionRow(ui, section, width, {
 		name = 'Smooth bars', sub = 'Animate health and power changes on the frames',
 		avatar = function(row) return ui.IconAvatar(row, SWATCH_SIZE, 'play') end,
-		items = OnOff(function() return General().smoothBars ~= false end, SetSmoothBars),
-		label = function() return General().smoothBars ~= false and 'On' or 'Off' end,
-		custom = function() return General().smoothBars == false end,
+		items = OnOff(function() return General().smoothBars end, SetSmoothBars),
+		label = function() return General().smoothBars and 'On' or 'Off' end,
+		custom = function() return not General().smoothBars end,
 		resetTip = 'Back to smooth bars', reset = function() SetSmoothBars(true) end,
-	})
-	local function PickGradient(anchor)
-		local color = General().gradientColor
-		local red, green, blue, alpha = color[1], color[2], color[3], color[4]
-		Controls.OpenColorPicker({ r = red, g = green, b = blue, a = alpha, hasOpacity = true, anchorTo = anchor, callback = function(newRed, newGreen, newBlue, newAlpha, cancelled, phase)
-			if cancelled then
-				color[1], color[2], color[3], color[4] = red, green, blue, alpha
-			else
-				color[1], color[2], color[3], color[4] = newRed, newGreen, newBlue, newAlpha
-			end
-			if phase == 'preview' then Window():Repaint() else RefreshAllVisuals() end
-		end })
-	end
-	local function ResetGradient()
-		General().gradientColor = { 1, 1, 1, 1 }
-		RefreshAllVisuals()
-	end
-	local tintSwatch
-	OptionRow(ui, section, width, {
-		name = 'Gradient tint', sub = 'Only the ' .. BUI.C.GRADIENT_TEXTURE .. ' texture uses it',
-		avatar = function(row)
-			tintSwatch = ui.Swatch(row, SWATCH_SIZE, function(self) PickGradient(self) end)
-			return tintSwatch
-		end,
-		items = function(anchor)
-			return {
-				{ text = 'Default', callback = ResetGradient },
-				{ text = 'Custom color', callback = function() PickGradient(anchor) end },
-			}
-		end,
-		label = function()
-			local color = General().gradientColor
-			tintSwatch.fill:SetVertexColor(color[1], color[2], color[3], color[4])
-			return Hex(color[1], color[2], color[3]) .. '  ' .. math.floor(color[4] * 100 + 0.5) .. '%'
-		end,
-		custom = function()
-			local color = General().gradientColor
-			return not (Same(color[1], color[2], color[3], { 1, 1, 1 }) and color[4] == 1)
-		end,
-		resetTip = 'Back to white', reset = ResetGradient,
 	})
 	local deadSwatch
 	OptionRow(ui, section, width, {
@@ -400,7 +353,7 @@ local function BarSection(ui, parent, width)
 			return deadSwatch
 		end,
 		items = function(anchor)
-			local on = RaidFrames().deadBackground ~= false
+			local on = RaidFrames().deadBackground
 			local custom = DeadColorCustom()
 			return {
 				{ text = 'On', checked = on, callback = function() SetDeadBackground(true) end },
@@ -413,10 +366,10 @@ local function BarSection(ui, parent, width)
 		label = function()
 			local color = RaidFrames().deadBackgroundColor
 			deadSwatch.fill:SetVertexColor(color[1], color[2], color[3], color[4])
-			if RaidFrames().deadBackground == false then return 'Off' end
+			if not RaidFrames().deadBackground then return 'Off' end
 			return Hex(color[1], color[2], color[3]) .. '  ' .. math.floor(color[4] * 100 + 0.5) .. '%'
 		end,
-		custom = function() return RaidFrames().deadBackground == false or DeadColorCustom() end,
+		custom = function() return not RaidFrames().deadBackground or DeadColorCustom() end,
 		resetTip = 'Back to the default red',
 		reset = function()
 			RaidFrames().deadBackground = true
@@ -426,14 +379,14 @@ local function BarSection(ui, parent, width)
 	return section
 end
 
-local function ColorSection(ui, parent, width, group, card)
+local function ColorSection(ui, parent, width, card)
 	local section = ui.Section(parent, width, {
 		stacked = true,
-		title = group.name,
-		description = group.description,
+		title = card.name,
+		description = COLOR_DESCRIPTIONS[card.name],
 		columns = { { 'Name', ui.AVATAR_X }, { 'Hex', FIRST_COLUMN }, { 'Opacity', SECOND_COLUMN } },
 		buttons = { { text = 'Reset', icon = 'reset', onClick = function()
-			BUI.Colors.ResetGroup(group.name)
+			BUI.Colors.ResetGroup(card.name)
 			BUI.ApplyColors()
 			Window():Repaint()
 		end } },
@@ -481,10 +434,8 @@ local function Sections(ui, _, parent, width)
 	sections[#sections + 1] = AccentSection(ui, parent, width)
 	sections[#sections + 1] = TextSection(ui, parent, width)
 	sections[#sections + 1] = BarSection(ui, parent, width)
-	local cards = {}
-	for _, card in ipairs(BUI.Colors.BuildCards()) do cards[card.name] = card end
-	for _, group in ipairs(COLOR_GROUPS) do
-		if cards[group.name] then sections[#sections + 1] = ColorSection(ui, parent, width, group, cards[group.name]) end
+	for _, card in ipairs(BUI.Colors.BuildCards()) do
+		sections[#sections + 1] = ColorSection(ui, parent, width, card)
 	end
 	return sections
 end
@@ -493,8 +444,5 @@ BUI.AppearancePage = { Sections = Sections }
 
 function BUI.OpenAppearance()
 	BUI.PageEngine.Show()
-	BUI.PageEngine.NavigateToID('settings')
-	local pageConfig = BUI.PageEngine.pages.settings
-	local page = pageConfig and pageConfig.frame and pageConfig.frame._page
-	if page and page.SetTab then page:SetTab(SETTINGS_TAB) end
+	BUI.PageEngine.NavigateToTab('settings', 'appearance')
 end

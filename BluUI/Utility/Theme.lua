@@ -21,20 +21,13 @@ end
 function BUI.GetGlobalTexture()
 	local general     = GetGeneral()
 	local textureName = general and general.texture or BUI.C.DEFAULT_TEXTURE
-	return sharedMedia:Fetch('statusbar', textureName) or BUI.C.FALLBACK_TEXTURE
-end
-
-function BUI.GetGradientTint()
-	local general = GetGeneral()
-	if general and general.texture == BUI.C.GRADIENT_TEXTURE then
-		return general.gradientColor
-	end
+	return sharedMedia:Fetch('statusbar', textureName, true) or BUI.C.FALLBACK_TEXTURE
 end
 
 function BUI.GetGlobalFont()
 	local general  = GetGeneral()
 	local fontName = general and general.font or BUI.C.DEFAULT_FONT
-	return sharedMedia:Fetch('font', fontName) or BUI.C.FONT_PATH
+	return sharedMedia:Fetch('font', fontName, true) or BUI.C.FONT_PATH
 end
 
 local ADDON_FONT = BUI.C.BASE_MEDIA_PATH .. [[Fonts\gotham_narrow_ultra.ttf]]
@@ -132,20 +125,7 @@ function BUI.PlaySoundByName(name)
 	if not name or name == '' or name == 'None' then return end
 	local path = sharedMedia:Fetch('sound', name, true)
 	if not path then return end
-	local db = BUI.GetDB()
-	local channel = db and db.general.soundChannel or 'Master'
-	PlaySoundFile(path, channel)
-end
-
-function BUI.ResolveSpellInput(text)
-	if not text or text == '' then return nil end
-	local linkID = tostring(text):match('spell:(%d+)')
-	if linkID then return tonumber(linkID) end
-	local numericID = tonumber(text)
-	if numericID then return numericID end
-	local info = C_Spell.GetSpellInfo(text)
-	if info and info.spellID then return info.spellID end
-	return nil
+	PlaySoundFile(path, BUI.GetDB().general.soundChannel)
 end
 
 function BUI.SpellListItems(list)
@@ -159,7 +139,7 @@ function BUI.SpellListItems(list)
 				items[#items + 1] = { icon = icon, name = name or ('Spell ' .. tostring(spellID)), id = spellID, removable = true }
 			end
 		end
-		table.sort(items, function(itemA, itemB) return (itemA.name or '') < (itemB.name or '') end)
+		table.sort(items, function(itemA, itemB) return itemA.name < itemB.name end)
 	end
 	return items
 end
@@ -169,7 +149,7 @@ local function CreateFontGetter(dbKey)
 		local general  = GetGeneral()
 		local fontName = general and general[dbKey]
 		if fontName then
-			local path = sharedMedia:Fetch('font', fontName)
+			local path = sharedMedia:Fetch('font', fontName, true)
 			if path then return path end
 		end
 		return BUI.GetGlobalFont()
@@ -183,7 +163,7 @@ BUI.GetSecondaryPowerFont = CreateFontGetter('secondaryPowerFont')
 
 function BUI.GetFontByName(fontName)
 	if not fontName or fontName == BUI.C.GLOBAL_OPTION then return BUI.GetGlobalFont() end
-	return sharedMedia:Fetch('font', fontName) or BUI.GetGlobalFont()
+	return sharedMedia:Fetch('font', fontName, true) or BUI.GetGlobalFont()
 end
 
 function BUI.GetModuleFont(moduleSettings)
