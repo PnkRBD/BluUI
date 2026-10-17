@@ -41,7 +41,7 @@ for _, spellID in pairs(CLEARCASTING_BY_SPEC) do CLEARCASTING_SPELLS[spellID] = 
 local clearcastingScan = BUI.BuffTracking.NewCDMScan(CLEARCASTING_SPELLS)
 
 local function DetectSpec()
-    spec = GetSpecialization()
+    spec = C_SpecializationInfo.GetSpecialization()
     isRestoration = spec == RESTORATION
 end
 
@@ -129,7 +129,7 @@ end
 
 local function OnLifebloomCast(target, settings)
     local now = GetTime()
-    local limit = IsPlayerSpell(UNDERGROWTH) and 2 or 1
+    local limit = C_SpellBook.IsSpellKnown(UNDERGROWTH) and 2 or 1
     local refreshed = target and LifebloomOn(target)
     local soonest = SoonestLifebloom()
     local replaced = refreshed or (soonest and (#lifeblooms >= limit or (not target and soonest.expires - now <= settings.refreshSeconds)) and soonest)
@@ -169,7 +169,7 @@ local function OnPlayerCast(_, _, castGUID, spellID)
         swiftnessArmed = true
     elseif swiftnessArmed and SWIFTNESS_SPENDERS[spellID] then
         swiftnessArmed = false
-        if spellID == REGROWTH and IsPlayerSpell(OVERGROWTH) then OnLifebloomCast(target, settings) end
+        if spellID == REGROWTH and C_SpellBook.IsSpellKnown(OVERGROWTH) then OnLifebloomCast(target, settings) end
     end
 end
 

@@ -1,7 +1,7 @@
 local _, BUI = ...
 
 local GetPlayerAuraBySpellID = C_UnitAuras.GetPlayerAuraBySpellID
-local GetSpecialization = GetSpecialization
+local GetSpecialization = C_SpecializationInfo.GetSpecialization
 local IsSpellKnown = C_SpellBook.IsSpellKnown
 local GetTime = GetTime
 local Tools = BUI.Tools
@@ -62,7 +62,7 @@ end
 
 function Hunter.BeastColor(beastId)
 	local color = BUI.GetDB().packLeader.beastColors[beastId]
-	return color.r or color[1], color.g or color[2], color.b or color[3]
+	return color.r, color.g, color.b
 end
 
 local TRACKED_SPELL_IDS = {
@@ -90,7 +90,7 @@ local packLeaderDirty = true
 local scan
 
 local function UpdateTalents()
-	hasPackLeader = (isBeastMastery or isSurvival) and IsSpellKnown(PACK_LEADER_TALENT) == true
+	hasPackLeader = (isBeastMastery or isSurvival) and IsSpellKnown(PACK_LEADER_TALENT)
 end
 
 local function AuraActive(spellID)
@@ -313,17 +313,8 @@ local function PollTipStacks()
 		return
 	end
 	if Tools.AuraQueriesBlocked() then return end
-	local aura = GetPlayerAuraBySpellID(TIP_OF_SPEAR_BUFF)
-	if not aura then
-		tipOfSpearStacks = 0
-		return
-	end
-	local applications = Tools.SafeNum(aura.applications)
-	if applications and applications > 0 then
-		tipOfSpearStacks = applications
-	else
-		tipOfSpearStacks = 1
-	end
+	local stacks = Tools.GetAuraStacks('player', TIP_OF_SPEAR_BUFF)
+	if stacks then tipOfSpearStacks = stacks end
 end
 
 local lastPolledTime = -1
@@ -337,9 +328,9 @@ end
 
 local function DetectSpecialization(isSpecChange)
 	local specializationIndex = GetSpecialization()
-	isBeastMastery = Hunter.PlayerIsHunter and specializationIndex == 1
-	isMarksmanship = Hunter.PlayerIsHunter and specializationIndex == 2
-	isSurvival     = Hunter.PlayerIsHunter and specializationIndex == 3
+	isBeastMastery = specializationIndex == 1
+	isMarksmanship = specializationIndex == 2
+	isSurvival     = specializationIndex == 3
 	UpdateTalents()
 
 	tipOfSpearStacks = 0

@@ -16,15 +16,11 @@ local CDM_CATEGORIES = {
     Enum.CooldownViewerCategory.TrackedBar,
 }
 
-local CDM_FRAME_NAMES = { 'BuffBarCooldownViewer', 'BuffIconCooldownViewer', 'CDMGroups_Buffs' }
-
-local function GetFrameCooldownID(frame)
-    return frame.cooldownID or (frame.cooldownInfo and frame.cooldownInfo.cooldownID)
-end
+local CDM_FRAME_NAMES = { 'BuffBarCooldownViewer', 'BuffIconCooldownViewer' }
 
 local framesByCooldownID = {}
 local frameMapStale = true
-local hookedViewers = {}
+local viewersHooked = false
 local scannerCount = 0
 
 local function MarkFrameMapStale()
@@ -32,45 +28,22 @@ local function MarkFrameMapStale()
 end
 
 local function HookCDMViewers()
+    if viewersHooked then return end
+    viewersHooked = true
     for _, name in ipairs(CDM_FRAME_NAMES) do
         local viewer = _G[name]
-        if viewer and not hookedViewers[viewer] then
-            hookedViewers[viewer] = true
-            if viewer.OnAcquireItemFrame then
-                Hook(viewer, 'OnAcquireItemFrame', MarkFrameMapStale)
-            end
-            if viewer.RefreshLayout then
-                Hook(viewer, 'RefreshLayout', MarkFrameMapStale)
-            end
-            if viewer.RefreshData then
-                Hook(viewer, 'RefreshData', MarkFrameMapStale)
-            end
-        end
-    end
-end
-
-local function RegisterFrame(frame)
-    local cooldownID = GetFrameCooldownID(frame)
-    if cooldownID and not issecretvalue(cooldownID) then
-        framesByCooldownID[cooldownID] = frame
+        Hook(viewer, 'RefreshLayout', MarkFrameMapStale)
+        Hook(viewer, 'RefreshData', MarkFrameMapStale)
     end
 end
 
 local function RebuildFrameMap()
     wipe(framesByCooldownID)
     for _, name in ipairs(CDM_FRAME_NAMES) do
-        local viewer = _G[name]
-        if viewer then
-            local pool = viewer.itemFramePool
-            if pool and pool.EnumerateActive then
-                for itemFrame in pool:EnumerateActive() do
-                    RegisterFrame(itemFrame)
-                end
-            elseif viewer.GetChildren then
-                local children = { viewer:GetChildren() }
-                for childIndex = 1, #children do
-                    RegisterFrame(children[childIndex])
-                end
+        for itemFrame in _G[name].itemFramePool:EnumerateActive() do
+            local cooldownID = itemFrame.cooldownID
+            if cooldownID and not issecretvalue(cooldownID) then
+                framesByCooldownID[cooldownID] = itemFrame
             end
         end
     end
@@ -94,21 +67,10 @@ function BUI.BuffTracking.NewCDMScan(trackedSpellIDs, onRebuilt)
         if info.overrideSpellID and trackedSpellIDs[info.overrideSpellID] then
             return info.overrideSpellID
         end
-        if info.linkedSpellIDs then
-            for _, linkedID in ipairs(info.linkedSpellIDs) do
-                if trackedSpellIDs[linkedID] then return linkedID end
-            end
+        for _, linkedID in ipairs(info.linkedSpellIDs) do
+            if trackedSpellIDs[linkedID] then return linkedID end
         end
         return nil
-    end
-
-    local function TryCache(frame)
-        local cooldownID = GetFrameCooldownID(frame)
-        if not cooldownID or cooldownID <= 0 then return end
-        local matched = MatchTrackedSpell(GetCooldownInfo(cooldownID))
-        if matched then
-            cache[matched] = { cdmFrame = frame, cooldownID = cooldownID }
-        end
     end
 
     function scanner.Build()
@@ -117,22 +79,23 @@ function BUI.BuffTracking.NewCDMScan(trackedSpellIDs, onRebuilt)
             return
         end
         pendingBuild = false
-        cache = {}
+        wipe(cache)
 
         HookCDMViewers()
         RebuildFrameMap()
-        for _, itemFrame in pairs(framesByCooldownID) do
-            TryCache(itemFrame)
+        for cooldownID, itemFrame in pairs(framesByCooldownID) do
+            local matched = MatchTrackedSpell(GetCooldownInfo(cooldownID))
+            if matched then
+                cache[matched] = { cdmFrame = itemFrame, cooldownID = cooldownID }
+            end
         end
 
         for categoryIndex = 1, #CDM_CATEGORIES do
             local cooldownIDs = GetCategorySet(CDM_CATEGORIES[categoryIndex], true)
-            if cooldownIDs then
-                for _, cooldownID in ipairs(cooldownIDs) do
-                    local matched = MatchTrackedSpell(GetCooldownInfo(cooldownID))
-                    if matched and not cache[matched] then
-                        cache[matched] = { cdmFrame = nil, cooldownID = cooldownID }
-                    end
+            for _, cooldownID in ipairs(cooldownIDs) do
+                local matched = MatchTrackedSpell(GetCooldownInfo(cooldownID))
+                if matched and not cache[matched] then
+                    cache[matched] = { cooldownID = cooldownID }
                 end
             end
         end
@@ -149,27 +112,21 @@ function BUI.BuffTracking.NewCDMScan(trackedSpellIDs, onRebuilt)
     function scanner.FrameHasAura(data)
         local frame = data.cdmFrame
         if frame then
-            local currentCooldownID = GetFrameCooldownID(frame)
+            local currentCooldownID = frame.cooldownID
             if not issecretvalue(currentCooldownID) and currentCooldownID ~= data.cooldownID then
                 frame = nil
                 data.cdmFrame = nil
                 MarkFrameMapStale()
             end
         end
-        if not frame and data.cooldownID then
+        if not frame then
             frame = CDMFrameForCooldownID(data.cooldownID)
             data.cdmFrame = frame
+            if not frame then return false end
         end
-        if not frame then return false, nil end
         local auraInstanceID = frame.auraInstanceID
-        if not auraInstanceID then return false, nil end
-        if issecretvalue(auraInstanceID) then
-            return true, auraInstanceID
-        end
-        if type(auraInstanceID) == 'number' and auraInstanceID > 0 then
-            return true, auraInstanceID
-        end
-        return false, nil
+        if not auraInstanceID then return false end
+        return issecretvalue(auraInstanceID) or auraInstanceID > 0
     end
 
     BUI.Events:Register('COOLDOWN_VIEWER_DATA_LOADED', key, scanner.ScheduleRebuild)

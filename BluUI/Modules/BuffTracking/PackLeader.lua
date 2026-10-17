@@ -25,12 +25,12 @@ function PackLeader.Create()
     local Display = BUI.BuffTracking.Display
     local Hunter  = BUI.BuffTracking.Hunter
 
-    local tracker = { settingsKey = SETTINGS_KEY, frame = nil }
+    local tracker = { settingsKey = SETTINGS_KEY }
 
     local root, mainPip, nextPip
     local lastPhase, lastBeastId
     local swipeDriver
-    local swipeSize, swipeStamp = 10, ''
+    local swipeSize, swipeStamp
 
     local function StyleSwipe(cooldown)
         cooldown:SetDrawEdge(false)
@@ -45,9 +45,8 @@ function PackLeader.Create()
         Engine.SyncAuraCooldownDriver(swipeDriver, config.enabled, Hunter.PackLeaderSpellSet, swipeStamp, swipeSize, swipeSize, StyleSwipe)
     end
 
-    local function CreatePip(parent, size, showCountdown)
+    local function CreatePip(parent)
         local pip = CreateFrame('Frame', nil, parent, 'BackdropTemplate')
-        pip:SetSize(size, size)
         Pixel.ApplyBorder(pip, 1, 0, 0, 0, 1)
         Pixel.ShowBorder(pip)
 
@@ -55,18 +54,8 @@ function PackLeader.Create()
         pip.bg:SetAllPoints()
         BUI.Tools.SetColorTex(pip.bg, 0, 0, 0, 1)
 
-        local edge = Pixel.PixelSize(1)
         pip.tex = pip:CreateTexture(nil, 'ARTWORK')
-        pip.tex:SetPoint('TOPLEFT',     edge, -edge)
-        pip.tex:SetPoint('BOTTOMRIGHT', -edge, edge)
         pip.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-
-        pip.swipe = CreateFrame('Cooldown', nil, pip, 'CooldownFrameTemplate')
-        pip.swipe:SetAllPoints(pip)
-        pip.swipe:SetDrawEdge(false)
-        pip.swipe:SetDrawBling(false)
-        pip.swipe:SetSwipeColor(0, 0, 0, 0.6)
-        pip.swipe:SetHideCountdownNumbers(not showCountdown)
 
         return pip
     end
@@ -189,9 +178,6 @@ function PackLeader.Create()
 
     local function BuildFrame()
         if root then return end
-        local config = GetConfig()
-        local mainSize, nextSize, spacing = config.iconSize, config.nextIconSize, config.spacing
-
         root = CreateFrame('Frame', FRAME_NAME, UIParent)
         root:SetFrameStrata('MEDIUM')
         root:SetFrameLevel(10)
@@ -200,22 +186,10 @@ function PackLeader.Create()
         Display.MakeAnchorOverlay(root)
         tracker.frame = root
 
-        mainPip = CreatePip(root, mainSize, config.showCountdownText)
-        mainPip:SetPoint('TOPLEFT', root, 'TOPLEFT', 0, 0)
-
-        nextPip = CreatePip(root, nextSize, false)
-        nextPip:SetPoint('LEFT', mainPip, 'RIGHT', spacing, 0)
-
-        local font = BUI.GetGlobalFont()
-        local labelSize = config.labelTextSize
-
+        mainPip = CreatePip(root)
+        nextPip = CreatePip(root)
         mainPip.topText = mainPip:CreateFontString(nil, 'OVERLAY')
-        Pixel.ApplyFont(mainPip.topText, labelSize, font, 'OUTLINE')
-
         mainPip.bottomText = mainPip:CreateFontString(nil, 'OVERLAY')
-        Pixel.ApplyFont(mainPip.bottomText, labelSize, font, 'OUTLINE')
-
-        root:SetSize(mainSize + spacing + nextSize, mainSize)
     end
 
     local function ApplyLayout()
@@ -230,10 +204,6 @@ function PackLeader.Create()
         mainPip.tex:ClearAllPoints()
         mainPip.tex:SetPoint('TOPLEFT',     edge, -edge)
         mainPip.tex:SetPoint('BOTTOMRIGHT', -edge, edge)
-        mainPip.swipe:ClearAllPoints()
-        mainPip.swipe:SetPoint('TOPLEFT',     edge, -edge)
-        mainPip.swipe:SetPoint('BOTTOMRIGHT', -edge, edge)
-        mainPip.swipe:SetHideCountdownNumbers(not config.showCountdownText)
 
         swipeSize = math.max(mainSize - 2 * edge, 10)
         swipeStamp = math.floor(swipeSize + 0.5) .. '|' .. (config.showCountdownText and 1 or 0)
@@ -325,8 +295,6 @@ function PackLeader.Create()
         else
             mainPip.bottomText:Hide()
         end
-
-        mainPip.swipe:Clear()
 
         if phase == 'ready' and config.glowOnReady then
             StartGlow(mainPip, red, green, blue)

@@ -29,8 +29,6 @@ local function StyleFontString(fontString, size)
     Pixel.ApplyFont(fontString, size, BUI.GetGlobalFont(), 'OUTLINE')
 end
 
-local function AnchorTarget(icon) return icon.Icon or icon end
-
 local cachedIcon
 local cacheDirty = true
 local cachedTimerStamp
@@ -93,7 +91,6 @@ local function EnsureOverlay(icon)
             cooldown         = cooldown,
             timerFS          = BUI.Tools.CooldownFontString(cooldown),
             beastText        = beastText,
-            lastPreviewPhase = nil,
         }
     end
 
@@ -201,7 +198,7 @@ local function ApplyTimerLayout(entry, icon, config)
 
     if entry.timerAnchor ~= anchor or entry.timerOX ~= offsetX or entry.timerOY ~= offsetY then
         fontString:ClearAllPoints()
-        fontString:SetPoint(anchor, AnchorTarget(icon), anchor, Pixel.Scale(offsetX), Pixel.Scale(offsetY))
+        fontString:SetPoint(anchor, icon.Icon, anchor, Pixel.Scale(offsetX), Pixel.Scale(offsetY))
         entry.timerAnchor, entry.timerOX, entry.timerOY = anchor, offsetX, offsetY
     end
 
@@ -223,7 +220,7 @@ local function ApplyBeastLayout(entry, icon, config)
     end
     if entry.beastAnchor ~= anchor or entry.beastOX ~= offsetX or entry.beastOY ~= offsetY then
         entry.beastText:ClearAllPoints()
-        entry.beastText:SetPoint(OPPOSITE_ANCHOR[anchor], AnchorTarget(icon), anchor, Pixel.Scale(offsetX), Pixel.Scale(offsetY))
+        entry.beastText:SetPoint(OPPOSITE_ANCHOR[anchor], icon.Icon, anchor, Pixel.Scale(offsetX), Pixel.Scale(offsetY))
         entry.beastAnchor, entry.beastOX, entry.beastOY = anchor, offsetX, offsetY
     end
 end
