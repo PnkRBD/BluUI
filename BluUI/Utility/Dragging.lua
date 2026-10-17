@@ -2,8 +2,9 @@ local _, BUI = ...
 BUI.Dragging = {}
 local Dragging = BUI.Dragging
 local Pixel = BUI.Pixel
+local Scale = Pixel.Scale
 local HintText = "Drag to Reposition | Right-Click to Lock"
-local HintFontSize, HintBgAlpha, UnlockBgAlpha = 11, 0.7, 0.3
+local HintFontSize, UnlockBgAlpha = 11, 0.3
 
 function Dragging.GetCenterOffset(frame)
     if not frame then return 0, 0 end
@@ -13,14 +14,12 @@ function Dragging.GetCenterOffset(frame)
     if frame.dragSnapCenter then
         local left, bottom = frame:GetLeft(), frame:GetBottom()
         if not left or not bottom then return 0, 0 end
-        frameX = left + (frame:GetWidth() or 0) / 2
-        frameY = bottom + (frame:GetHeight() or 0) / 2
+        frameX = left + frame:GetWidth() / 2
+        frameY = bottom + frame:GetHeight() / 2
     else
         frameX, frameY = frame:GetCenter()
         if not frameX or not frameY then return 0, 0 end
     end
-    if frame.dragNoPixelSnap then return frameX - parentX, frameY - parentY end
-    local Scale = BUI.Pixel.Scale
     return Scale(frameX - parentX), Scale(frameY - parentY)
 end
 
@@ -36,7 +35,6 @@ local OnDragUpdate = BUI.Profiler.Wrap("Utility.Dragging drag update", function(
     elseif self.dragOnDragging then
         local offsetX, offsetY
         if self.dragUsePoint then
-            local Scale = BUI.Pixel.Scale
             local _, _, _, pointX, pointY = self:GetPoint()
             offsetX, offsetY = Scale(pointX), Scale(pointY)
         else
@@ -51,10 +49,10 @@ local function OnDragStart(self)
     if self.dragIsLockedFn then locked = self.dragIsLockedFn() end
     if locked then return end
 
-    if InCombatLockdown() and self.IsProtected and self:IsProtected() then return end
+    if InCombatLockdown() and self:IsProtected() then return end
 
     self.dragActive = true
-    local Scale = BUI.Pixel.Scale
+    self.dragMoved = true
 
     if self.dragLockHorizontal then
         local rawX = self.dragGetLockedX and self.dragGetLockedX() or Dragging.GetCenterOffset(self)
@@ -62,8 +60,9 @@ local function OnDragStart(self)
     end
 
     self:StartMoving()
-    self:SetUserPlaced(false)
+    if not self.dragKeepPlacement then self:SetUserPlaced(false) end
     if self.dragLockHorizontal or self.dragOnDragging then
+        self.dragUpdating = true
         self:SetScript("OnUpdate", OnDragUpdate)
     end
 end
@@ -72,26 +71,26 @@ local function OnDragStop(self)
     if not self.dragActive then return end
     self:StopMovingOrSizing()
     self.dragActive = false
-    self:SetScript("OnUpdate", nil)
+    if self.dragUpdating then
+        self.dragUpdating = nil
+        self:SetScript("OnUpdate", nil)
+    end
 
-    local Scale = BUI.Pixel.Scale
     local offsetX, offsetY = Dragging.GetCenterOffset(self)
 
     if self.dragLockHorizontal and self._dragLockedX then
         offsetX = self._dragLockedX
     end
 
-    self:ClearAllPoints()
-    self:SetPoint("CENTER", UIParent, "CENTER", offsetX, offsetY)
+    if not self.dragKeepPlacement then
+        self:ClearAllPoints()
+        self:SetPoint("CENTER", UIParent, "CENTER", offsetX, offsetY)
+    end
 
     if self.dragOnPosition then
         if self.dragUsePoint then
             local point, _, _, pointX, pointY = self:GetPoint()
-            if self.dragNoPixelSnap then
-                self.dragOnPosition(pointX, pointY, point)
-            else
-                self.dragOnPosition(Scale(pointX), Scale(pointY), point)
-            end
+            self.dragOnPosition(Scale(pointX), Scale(pointY), point)
         else
             self.dragOnPosition(offsetX, offsetY)
         end
@@ -108,12 +107,10 @@ local function ApplyClickThroughToChildren(enabled, ...)
     local inset = enabled and 10000 or 0
     for index = 1, select('#', ...) do
         local child = select(index, ...)
-        local forbidden = (child.IsForbidden and child:IsForbidden()) or child._buiSkipMouseWalk
-        if not forbidden then
+        if not (child:IsForbidden() or child._buiSkipMouseWalk) then
             if not child._keepMouseForTooltip then
                 child:EnableMouse(false)
-                if child.SetMouseClickThrough then child:SetMouseClickThrough(enabled) end
-                if child.SetHitRectInsets then child:SetHitRectInsets(inset, inset, inset, inset) end
+                child:SetHitRectInsets(inset, inset, inset, inset)
             end
             ApplyClickThroughToChildren(enabled, child:GetChildren())
         end
@@ -121,15 +118,9 @@ local function ApplyClickThroughToChildren(enabled, ...)
 end
 
 local function SetClickThrough(frame, enabled)
-    if enabled then
-        frame:EnableMouse(false)
-        if frame.SetMouseClickThrough then frame:SetMouseClickThrough(true) end
-        if frame.SetHitRectInsets then frame:SetHitRectInsets(10000, 10000, 10000, 10000) end
-    else
-        frame:EnableMouse(true)
-        if frame.SetMouseClickThrough then frame:SetMouseClickThrough(false) end
-        if frame.SetHitRectInsets then frame:SetHitRectInsets(0, 0, 0, 0) end
-    end
+    local inset = enabled and 10000 or 0
+    frame:EnableMouse(not enabled)
+    frame:SetHitRectInsets(inset, inset, inset, inset)
     ApplyClickThroughToChildren(enabled, frame:GetChildren())
 end
 
@@ -163,23 +154,16 @@ local function CreateHintUI(parent, options)
     end)
     hint:SnapSize(120, 20)
 
-    if options.showHintBg then
-        local background = hint:CreateTexture(nil, "BACKGROUND")
-        background:SetAllPoints()
-        BUI.Tools.SetColorTex(background, 0, 0, 0, HintBgAlpha)
-        hint.bg = background
-    end
-
     hint:Hide()
     return hint
 end
 
 function Dragging.MakeDraggable(frame, options)
-    options = options or {}
     frame:SetMovable(true)
     frame:RegisterForDrag("LeftButton")
-    frame.dragNoPixelSnap = options.noPixelSnap or false
+    if options.clamp then frame:SetClampedToScreen(true) end
     frame.dragSnapCenter = options.snapCenter or false
+    frame.dragKeepPlacement = options.keepPlacement
 
     frame.dragLocked = type(options.isLocked) == "function" and options.isLocked() or false
     frame.dragOnPosition = options.onPositionChanged
@@ -208,7 +192,9 @@ function Dragging.MakeDraggable(frame, options)
 
     frame:SetScript("OnDragStart", BUI.Profiler.Script('Dragging frame OnDragStart', OnDragStart))
     frame:SetScript("OnDragStop", BUI.Profiler.Script('Dragging frame OnDragStop', OnDragStop))
-    frame:SetScript("OnMouseUp", BUI.Profiler.Script('Dragging frame OnMouseUp', OnMouseUp))
+    if options.onRightClick then
+        frame:SetScript("OnMouseUp", BUI.Profiler.Script('Dragging frame OnMouseUp', OnMouseUp))
+    end
     UpdateDragVisuals(frame)
 
     function frame:RefreshDragState()

@@ -19,9 +19,11 @@ local function StripLegacyHideKeys(unitSettings)
     end
 end
 
+local LEGACY_UNIT_KEYS = { "player", "target", "focus", "pet", "targettarget", "focustarget", "boss" }
+
 local function MigrateLegacyKeysInUnitFrames(data)
     if not data.unitFrames then return end
-    for _, unitKey in ipairs({"player", "target", "focus", "pet", "targettarget", "focustarget", "boss"}) do
+    for _, unitKey in ipairs(LEGACY_UNIT_KEYS) do
         StripLegacyHideKeys(data.unitFrames[unitKey])
     end
 end
@@ -74,7 +76,7 @@ local function DeepCopyClean(source)
 end
 
 local ImportCompanionKeys = {
-    powerBar = { "powerBar2", "powerScope", "powerVariants" },
+    powerBar = { "powerScope", "powerVariants" },
     secondaryPower = { "powerScope", "powerVariants" },
     datatextBars = { "datatextBarsInit", "datatextEnabled", "datatextMinimap" },
     datatext = { "datatextEnabled", "datatextMinimap" },
@@ -168,7 +170,7 @@ local function ApplyImportData(db, data, selectedKeys)
     end
     MergeDefaults(db, BUI.Defaults.profile)
     RestoreMigrationMarkers(db, data)
-    if (not keySet or keySet.customBars) and data.customBars and BUI.CustomBars and BUI.CustomBars.AdoptProfileSpells then
+    if (not keySet or keySet.customBars) and data.customBars then
         BUI.CustomBars.AdoptProfileSpells()
     end
     if not keySet or keySet.windowTheme then
@@ -188,10 +190,7 @@ local function SerializeProfile(db, profileName)
     CompletePartialArrays(exportData, BUI.Defaults.profile)
     exportData._migrations = MigrationMarkers(db.general)
     exportData._savedTheme = ActiveSavedTheme(db)
-    local Profiles = BUI.CDM and BUI.CDM.Profiles
-    if Profiles and Profiles.ExportCurrent then
-        exportData._cdmLayoutData = Profiles.ExportCurrent()
-    end
+    exportData._cdmLayoutData = BUI.CDM.Profiles.ExportCurrent()
     local serialized = LibSerialize:Serialize(exportData)
     return "BUI2=" .. LibDeflate:EncodeForPrint(LibDeflate:CompressDeflate(serialized))
 end
@@ -200,9 +199,7 @@ local function ExportSettings()
     local aceDB = BUI.GetAceDB()
     if not aceDB then return nil, "Database not available" end
     local profileName = aceDB:GetCurrentProfile()
-    local db = BUI.GetDB()
-    if not db then return nil, "Profile data not found" end
-    return SerializeProfile(db, profileName), profileName
+    return SerializeProfile(BUI.GetDB(), profileName), profileName
 end
 
 local function DecodeImportString(importString)
@@ -243,109 +240,84 @@ local function ImportSettings(importString, forceOverwrite)
 end
 
 local function RefreshAllModules()
-    local modules = BUI.GetDB().modules
+    local profile = BUI.GetDB()
+    local modules = profile.modules
     local function on(key) return modules[key] ~= false end
 
-    if on('unitFrames') and BUI.UnitFrames then
+    if on('unitFrames') then
         BUI.UnitFrames.InvalidateFilterCache()
-        if BUI.UnitFrames.InvalidateSettingsCache then BUI.UnitFrames.InvalidateSettingsCache() end
-        if BUI.UnitFrames.Refresh then BUI.UnitFrames:Refresh() end
+        BUI.UnitFrames.InvalidateSettingsCache()
+        BUI.UnitFrames:Refresh()
     end
 
-    if on('groupFrames') and BUI.GroupFrames and BUI.GroupFrames.OnProfileChanged then
-        BUI.GroupFrames.OnProfileChanged()
-    end
+    if on('groupFrames') then BUI.GroupFrames.OnProfileChanged() end
+    if on('actionBars') then BUI.ActionBars.OnProfileChanged() end
 
-    if on('actionBars') and BUI.ActionBars and BUI.ActionBars.OnProfileChanged then
-        BUI.ActionBars.OnProfileChanged()
-    end
-
-    if on('cdm') and BUI.CDM then
-        if BUI.CDM.RefreshAll then BUI.CDM.RefreshAll(true) end
-        if BUI.CDM.RefreshAssistHighlight then BUI.CDM.RefreshAssistHighlight() end
+    if on('cdm') then
+        BUI.CDM.RefreshAll(true)
+        BUI.CDM.RefreshAssistHighlight()
         BUI.CDM.PressHighlight.Refresh()
         BUI.CDM.RefreshProcMsgWatcher()
         BUI.CDM.Detached.UpdateModifierWatcher()
     end
 
-    if BUI.Power then
-        local powerOn = on('power')
-        local powerDB = (BUI.Power.GetPrimaryDB and BUI.Power.GetPrimaryDB()) or BUI.GetDB().powerBar
-        if BUI.Power.Primary and BUI.Power.Primary.Toggle then
-            BUI.Power.Primary.Toggle(powerOn and powerDB and powerDB.enabled and true or false)
-        elseif powerOn and BUI.Power.Primary and BUI.Power.Primary.Apply then
-            BUI.Power.Primary.Apply()
-        end
+    local powerOn = on('power')
+    BUI.Power.Primary.Toggle(powerOn and BUI.Power.GetPrimaryDB().enabled and true or false)
+    BUI.Power.Secondary.Toggle(powerOn and BUI.Power.GetSecondaryDB().enabled and true or false)
+    if powerOn and BUI.Power.Stack.IsEnabled() then BUI.Power.Stack.Apply() end
 
-        local secondaryPowerDB = (BUI.Power.GetSecondaryDB and BUI.Power.GetSecondaryDB()) or BUI.GetDB().secondaryPower
-        if BUI.Power.Secondary and BUI.Power.Secondary.Toggle then
-            BUI.Power.Secondary.Toggle(powerOn and secondaryPowerDB and secondaryPowerDB.enabled and true or false)
-        elseif powerOn and BUI.Power.Secondary and BUI.Power.Secondary.Apply then
-            BUI.Power.Secondary.Apply()
-        end
-
-        if powerOn and BUI.Power.Stack and BUI.Power.Stack.IsEnabled and BUI.Power.Stack.IsEnabled() and BUI.Power.Stack.Apply then
-            BUI.Power.Stack.Apply()
-        end
-    end
-
-    local streamerToolsOn = on('streamerTools')
-    local gcdDB = BUI.GetDB().gcdHistory
-    if BUI.GCDHistory then BUI.GCDHistory.Toggle(streamerToolsOn and gcdDB and gcdDB.enabled and true or false) end
+    BUI.GCDHistory.Toggle(on('streamerTools') and profile.gcdHistory.enabled and true or false)
 
     local aurasOn = on('auras')
-    if aurasOn and BUI.Auras then
+    if aurasOn then
         BUI.Auras.Update()
-        if BUI.Auras.UpdateLowHp then BUI.Auras.UpdateLowHp() end
-        if BUI.Auras.UpdateMark then BUI.Auras.UpdateMark() end
-        if BUI.Crosshair then BUI.Crosshair.Refresh() end
-        if BUI.Auras.GatewayAlert then BUI.Auras.GatewayAlert.Refresh() end
+        BUI.Auras.UpdateLowHp()
+        BUI.Auras.UpdateMark()
+        BUI.Crosshair.Refresh()
+        BUI.Auras.GatewayAlert.Refresh()
     end
 
-    local combatMessageDB = BUI.GetDB().combatMessage
-    if BUI.CombatMessage then
-        if aurasOn and combatMessageDB and combatMessageDB.enabled then
-            if BUI.CombatMessage.Enable then BUI.CombatMessage.Enable() end
-        elseif BUI.CombatMessage.Disable then
-            BUI.CombatMessage.Disable()
-        end
-        if aurasOn and BUI.CombatMessage.Refresh then BUI.CombatMessage.Refresh() end
+    if aurasOn and profile.combatMessage.enabled then
+        BUI.CombatMessage.Enable()
+    else
+        BUI.CombatMessage.Disable()
+    end
+    if aurasOn then BUI.CombatMessage.Refresh() end
+
+    BUI.CombatTimer.Toggle(aurasOn and profile.combatTimer.enabled and true or false)
+    BUI.CombatRes.Toggle(aurasOn and profile.combatRes.enabled and true or false)
+
+    if on('datatext') then
+        BUI.Datatext.Initialize()
+        BUI.Datatext.Apply()
     end
 
-    local combatTimerDB = BUI.GetDB().combatTimer
-    if BUI.CombatTimer then BUI.CombatTimer.Toggle(aurasOn and combatTimerDB and combatTimerDB.enabled and true or false) end
+    if on('cursor') then BUI.MouseCursor.Initialize() end
+    if on('minimap') then BUI.Minimap.Initialize() end
 
-    if on('datatext') and BUI.Datatext then
-        if BUI.Datatext.Initialize then BUI.Datatext.Initialize() end
-        if BUI.Datatext.Apply then BUI.Datatext.Apply() end
+    if on('cdm') then
+        BUI.CustomBars.Initialize()
+        BUI.CustomBars.RefreshAllBars()
     end
 
-    if on('cursor') and BUI.MouseCursor and BUI.MouseCursor.Initialize then BUI.MouseCursor.Initialize() end
-    if on('minimap') and BUI.Minimap and BUI.Minimap.Initialize then BUI.Minimap.Initialize() end
-
-    if on('cdm') and BUI.CustomBars then
-        if BUI.CustomBars.Initialize then BUI.CustomBars.Initialize() end
-        if BUI.CustomBars.RefreshAllBars then BUI.CustomBars.RefreshAllBars() end
-    end
-
-    if on('buffTracking') and BUI.BuffTracking and BUI.BuffTracking.Display then
+    if on('buffTracking') then
         for _, tracker in pairs(BUI.BuffTracking.Display.GetTrackers()) do
-            if tracker.Refresh then tracker.Refresh() end
-            if tracker.RecheckActive then tracker.RecheckActive() end
+            tracker.Refresh()
+            tracker.RecheckActive()
         end
     end
 
-    if BUI.Skinning.RefreshAll then BUI.Skinning.RefreshAll() end
-    if BUI.MoveFrames and BUI.MoveFrames.Refresh then BUI.MoveFrames.Refresh() end
+    BUI.Skinning.RefreshAll()
+    BUI.MoveFrames.Refresh()
 
     BUI.ApplyScale()
     BUI.Scale.SyncButtons()
     BUI.PageEngine.RebuildAllPages()
     BUI.BUILibClient.SetFont(BUI.WindowFont())
-    if BUI.PageEngine.window then BUI.PageEngine.window:ApplyTheme(BUI.GetDB().windowTheme) end
+    if BUI.PageEngine.window then BUI.PageEngine.window:ApplyTheme(profile.windowTheme) end
     BUI.Painter.Repaint()
 
-    if on('cdm') and BUI.CDM and BUI.CDM.ApplyAllPositions then
+    if on('cdm') then
         BUI.CDM.ApplyAllPositions()
         BUI.CDM.NotifyDependents()
     end
@@ -406,7 +378,6 @@ end
 
 local function ClassifyData(data)
     local result = { deprecated = {}, protected = {}, unknown = {} }
-    if not data then return result end
     WalkKeys(data, BUI.Defaults.profile, nil, result,
         BUI.NilDefaultKeys,
         BUI.DeprecatedKeys,
@@ -455,7 +426,7 @@ local function ApplyDefaultProfile(profile)
     end
     MergeDefaults(profile, BUI.Defaults.profile)
     RestoreMigrationMarkers(profile, data)
-    if profile.customBars and BUI.CustomBars and BUI.CustomBars.AdoptProfileSpells then
+    if profile.customBars then
         BUI.CustomBars.AdoptProfileSpells()
     end
     return true
@@ -520,49 +491,6 @@ BUI.ExportImport = {
     CompanionKeys = ImportCompanionKeys,
 }
 
-BUIG = {}
-
-function BUIG:Export(profileKey)
-    local aceDB = BUI.GetAceDB()
-    if not aceDB then return nil, "Database not available" end
-
-    local currentProfile = aceDB:GetCurrentProfile()
-    profileKey = profileKey or currentProfile
-
-    local switched = false
-    if profileKey ~= currentProfile then
-        aceDB:SetProfile(profileKey)
-        switched = true
-    end
-
-    local db = BUI.GetDB()
-    if not db then
-        if switched then aceDB:SetProfile(currentProfile) end
-        return nil, "Profile not found"
-    end
-
-    local result = SerializeProfile(db, profileKey)
-    if switched then aceDB:SetProfile(currentProfile) end
-    return result
-end
-
-local importPending = false
-
-local function SwitchProfileAndApply(aceDB, profileKey, applyCallback)
-    BUI._suppressProfileCallback = true
-    aceDB:SetProfile(profileKey)
-    BUI._suppressProfileCallback = nil
-    local db = BUI.GetDB()
-    if not db then
-        importPending = false
-        return false
-    end
-    applyCallback(db)
-    importPending = false
-    RefreshAllModules()
-    return true
-end
-
 local function ShowImportResult(message)
     BUI.Modals.Confirm({
         title = "Import Complete",
@@ -575,9 +503,9 @@ local function ShowImportResult(message)
 end
 
 local function OfferCDMLayouts(data, andThen)
-    local blob = data and data._cdmLayoutData
-    local Profiles = BUI.CDM and BUI.CDM.Profiles
-    if not blob or blob == "" or not Profiles or not Profiles.IsAvailable() then
+    local blob = data._cdmLayoutData
+    local Profiles = BUI.CDM.Profiles
+    if not blob or blob == "" then
         andThen()
         return
     end
@@ -587,18 +515,16 @@ local function OfferCDMLayouts(data, andThen)
         confirmText = "Add to Mine", laterText = "Replace Everything", cancelText = "Skip", fullscreen = true,
         onConfirm = function()
             local ok, result = Profiles.ImportLayoutString(blob)
-            BUI.Print(ok and ("Added " .. result .. " Cooldown Manager layout(s) next to your existing ones.") or (result or "Could not add the Cooldown Manager layouts."))
-            andThen()
+            andThen(ok and ("Added " .. result .. " Cooldown Manager layout(s) next to your existing ones.") or result)
         end,
         onLater = function()
             local backed, backupName = Profiles.AutoBackupSnapshot()
             local ok, errorMessage = Profiles.ApplyLayoutData(blob)
             if ok then
-                BUI.Print(backed and ("Cooldown Manager layouts applied. Your previous layouts were saved as snapshot '" .. backupName .. "'.") or "Cooldown Manager layouts applied.")
+                andThen(backed and ("Cooldown Manager layouts applied, the previous ones were saved as snapshot '" .. backupName .. "'.") or "Cooldown Manager layouts applied.")
             else
-                BUI.Print(errorMessage or "Could not apply Cooldown Manager layouts.")
+                andThen(errorMessage)
             end
-            andThen()
         end,
         onCancel = andThen,
     })
@@ -606,84 +532,21 @@ end
 
 local function DoImport(data, profileKey)
     local aceDB = BUI.GetAceDB()
-    if not aceDB then return false, "Database not available" end
-
     data._version, data._addon, data._profileName = nil, nil, nil
 
     local currentRaw = DeepCopy(aceDB.profiles[profileKey] or {})
 
     BUI.ImportChooser.ShowChooser(data, currentRaw, function(selectedKeys)
-        if #selectedKeys == 0 then
-            importPending = false
-            return
-        end
-        if not SwitchProfileAndApply(aceDB, profileKey, function(db)
-            ApplyImportData(db, data, selectedKeys)
-        end) then return end
-        OfferCDMLayouts(data, function()
-            ShowImportResult("Now on '" .. profileKey .. "'. " .. #selectedKeys .. " section(s) imported. Reload to apply.")
+        if #selectedKeys == 0 then return end
+        BUI._suppressProfileCallback = true
+        aceDB:SetProfile(profileKey)
+        BUI._suppressProfileCallback = nil
+        ApplyImportData(BUI.GetDB(), data, selectedKeys)
+        RefreshAllModules()
+        OfferCDMLayouts(data, function(note)
+            ShowImportResult("Now on '" .. profileKey .. "'. " .. #selectedKeys .. " section(s) imported. " .. (note and (note .. " ") or "") .. "Reload to apply.")
         end)
-    end, function()
-        importPending = false
     end)
-    return "pending"
 end
 
 BUI.ExportImport.StartImport = DoImport
-
-function BUIG:Import(importString)
-    if importPending then return false, "Import already in progress" end
-
-    local data, errorMessage = DecodeImportString(importString)
-    if not data then return false, errorMessage end
-
-    local aceDB = BUI.GetAceDB()
-    if not aceDB then return false, "Database not available" end
-
-    local profileKey = "BluUI"
-
-    if ProfileExists(aceDB, profileKey) then
-        importPending = true
-        local modalOverlay = BUI.Modals.Custom({
-            title = "Profile Already Exists",
-            message = "'" .. profileKey .. "' profile already exists.",
-            width = 560, height = 240, fullscreen = true,
-            buttons = {
-                {
-                    text = "Create Backup",
-                    color = {0.3, 1, 0.3, 1}, width = 130,
-                    onClick = function(close)
-                        close()
-                        importPending = false
-                        if BUI.PageEngine then
-                            BUI.PageEngine.Show()
-                            for index, pageId in ipairs(BUI.PageEngine.pageOrder) do
-                                if pageId == "exportimport" then
-                                    BUI.PageEngine.ShowPage(index)
-                                    break
-                                end
-                            end
-                        end
-                    end
-                },
-                {
-                    text = "Continue",
-                    color = {1, 0.8, 0.2, 1}, width = 130,
-                    onClick = function(close) close(); DoImport(data, profileKey) end
-                },
-                {
-                    text = "Cancel",
-                    color = {0.5, 0.5, 0.5, 1}, width = 130,
-                    onClick = function(close) close(); importPending = false end
-                }
-            }
-        })
-        if modalOverlay then
-            modalOverlay:HookScript("OnHide", BUI.Profiler.Wrap("Utility.ExportImport import closed", function() importPending = false end))
-        end
-        return "pending", profileKey
-    end
-
-    importPending = true
-    return DoImport(data, profileKey)
-end

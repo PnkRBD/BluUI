@@ -4,20 +4,8 @@ local SpecProfiles = BUI.SpecProfiles
 
 local switching = false
 
-local stateCallbacks = {}
-local function FireStateChange()
-    for _, callback in pairs(stateCallbacks) do
-        callback()
-    end
-end
-
-function SpecProfiles.RegisterStateCallback(key, callback)
-    stateCallbacks[key] = callback
-end
-
 local function Store()
-    local char = BUI.db and BUI.db.char
-    if not char then return nil end
+    local char = BUI.db.char
     local store = char.specProfiles
     if not store then
         store = { enabled = false, map = {} }
@@ -37,13 +25,12 @@ end
 local function ApplyForCurrentSpec(announce)
     if switching then return end
     local store = Store()
-    if not store or not store.enabled then return end
+    if not store.enabled then return end
     local specID = PlayerUtil.GetCurrentSpecID()
     local target = specID and store.map[specID]
     if not target then return end
     if not ProfileExists(target) then
         store.map[specID] = nil
-        FireStateChange()
         return
     end
     if target == BUI.db:GetCurrentProfile() then return end
@@ -56,13 +43,11 @@ local function ApplyForCurrentSpec(announce)
 end
 
 function SpecProfiles.IsEnabled()
-    local store = Store()
-    return (store and store.enabled) or false
+    return Store().enabled
 end
 
 function SpecProfiles.SetEnabled(value)
     local store = Store()
-    if not store then return end
     store.enabled = value and true or false
     if store.enabled then
         local specID = PlayerUtil.GetCurrentSpecID()
@@ -71,27 +56,23 @@ function SpecProfiles.SetEnabled(value)
         end
         ApplyForCurrentSpec(true)
     end
-    FireStateChange()
 end
 
 function SpecProfiles.SetSpecProfile(specID, profileName)
     local store = Store()
-    if not store or not specID then return end
     store.map[specID] = profileName
     if store.enabled then ApplyForCurrentSpec(true) end
-    FireStateChange()
 end
 
 function SpecProfiles.GetProfileForSpec(specID)
-    local store = Store()
-    return store and store.map[specID] or nil
+    return Store().map[specID]
 end
 
 function SpecProfiles.GetPlayerSpecs()
     local numSpecs = GetNumSpecializations()
     local specs = {}
     for specIndex = 1, numSpecs do
-        local specID, name, _, icon = GetSpecializationInfo(specIndex)
+        local specID, name, _, icon = C_SpecializationInfo.GetSpecializationInfo(specIndex)
         if specID then
             specs[#specs + 1] = { index = specIndex, id = specID, name = name, icon = icon }
         end
@@ -107,7 +88,7 @@ local function MigrateOldData(store)
         store.enabled = libDualSpecChar.enabled and true or false
         for specIndex = 1, GetNumSpecializations() do
             local profile = libDualSpecChar[specIndex]
-            local specID = GetSpecializationInfo(specIndex)
+            local specID = C_SpecializationInfo.GetSpecializationInfo(specIndex)
             if type(profile) == 'string' and specID then
                 store.map[specID] = profile
             end
@@ -124,8 +105,7 @@ local function MigrateOldData(store)
 end
 
 function SpecProfiles.ApplyOnLogin()
-    local char = BUI.db and BUI.db.char
-    if char and char.specProfiles == nil and GetNumSpecializations() > 0 then
+    if BUI.db.char.specProfiles == nil and GetNumSpecializations() > 0 then
         MigrateOldData(Store())
     end
 

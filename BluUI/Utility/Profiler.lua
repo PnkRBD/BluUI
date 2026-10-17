@@ -84,21 +84,17 @@ local window = { actual = 0, named = 0, calls = 0, driver = 0, startedAt = 0 }
 local unnamedTotal, foreignTotal = 0, 0
 local unnamedWindows = {}
 
-local function TopOf(map, count, field)
+local function ByValue(left, right) return left.value > right.value end
+
+function Profiler.Top(map, count, field)
 	local list = {}
-	for label, value in pairs(map) do list[#list + 1] = { label = label, value = field and value[field] or value } end
-	sort(list, function(left, right) return left.value > right.value end)
+	for name, value in pairs(map) do list[#list + 1] = { name = name, value = field and value[field] or value } end
+	sort(list, ByValue)
 	for index = count + 1, #list do list[index] = nil end
 	return list
 end
 
-function Profiler.Top(map, count)
-	local list = {}
-	for name, value in pairs(map) do list[#list + 1] = { name = name, value = value } end
-	sort(list, function(left, right) return left.value > right.value end)
-	for index = count + 1, #list do list[index] = nil end
-	return list
-end
+local Top = Profiler.Top
 
 function Profiler.CountsText(map, count, rename)
 	local parts = {}
@@ -114,6 +110,150 @@ function Profiler.Clock(seconds)
 end
 
 local Clock = Profiler.Clock
+
+local function ByMs(left, right) return left.ms > right.ms end
+
+Profiler.ByMs = ByMs
+
+function Profiler.MsText(map, count, rename)
+	local parts = {}
+	for _, item in ipairs(Top(map, count)) do
+		parts[#parts + 1] = format('%s %.1fms', rename and rename(item.name) or item.name, item.value)
+	end
+	return concat(parts, '; ')
+end
+
+function Profiler.Or(text)
+	return text ~= '' and text or 'none'
+end
+
+function Profiler.Percent(part, whole)
+	return whole > 0 and part / whole * 100 or 0
+end
+
+local SESSION_KEEP_FRAMES = 5
+
+local Session = {}
+Session.__index = Session
+
+function Profiler.NewSession(owner, eventKey)
+	local session = setmetatable({
+		owner = owner, eventKey = eventKey,
+		worstFrames = {}, swaps = {}, spanStart = {}, spanMs = {},
+		spanTop = 0, frameMs = 0, frameCombat = false, currentSecond = 0,
+		totalMs = 0, combatMs = 0, busyFrames = 0,
+		inCombat = false, combatSince = 0, combatTime = 0,
+	}, Session)
+	session.onCombatStart = function()
+		if session.inCombat then return end
+		session.inCombat = true
+		session.combatSince = GetTime()
+	end
+	session.onCombatEnd = function()
+		if not session.inCombat then return end
+		session.inCombat = false
+		session.combatTime = session.combatTime + GetTime() - session.combatSince
+	end
+	return session
+end
+
+function Session:Reset()
+	self.startedAt, self.stoppedAt = GetTime(), nil
+	self.frameAt, self.frameMs, self.spanTop, self.currentSecond = nil, 0, 0, 0
+	self.totalMs, self.combatMs, self.busyFrames = 0, 0, 0
+	wipe(self.worstFrames)
+	self.inCombat, self.combatSince, self.combatTime = InCombatLockdown(), self.startedAt, 0
+	self.zoneAtStart, self.clockAtStart = GetRealZoneText(), date('%H:%M')
+end
+
+function Session:Start()
+	self:Reset()
+	BUI.Events:Register('PLAYER_REGEN_DISABLED', self.eventKey, self.onCombatStart)
+	BUI.Events:Register('PLAYER_REGEN_ENABLED', self.eventKey, self.onCombatEnd)
+end
+
+function Session:Stop()
+	if self.frameAt then self:CloseFrame() end
+	self.owner.OnSecondClosed(self)
+	self.onCombatEnd()
+	self.stoppedAt = GetTime()
+	self.frameAt = nil
+	self:Unswap()
+	BUI.Events:Unregister('PLAYER_REGEN_DISABLED', self.eventKey)
+	BUI.Events:Unregister('PLAYER_REGEN_ENABLED', self.eventKey)
+end
+
+function Session:Span(start, elapsed)
+	local spanStart, spanMs = self.spanStart, self.spanMs
+	local top, covered = self.spanTop, 0
+	while top > 0 and spanStart[top] >= start do
+		covered = covered + spanMs[top]
+		top = top - 1
+	end
+	top = top + 1
+	spanStart[top] = start
+	spanMs[top] = elapsed
+	self.spanTop = top
+	self.frameMs = self.frameMs + elapsed - covered
+end
+
+function Session:KeepWorstFrame()
+	local frames = self.worstFrames
+	frames[#frames + 1] = self.owner.DescribeFrame({ at = self.frameAt - self.startedAt, ms = self.frameMs, combat = self.frameCombat })
+	sort(frames, ByMs)
+	frames[SESSION_KEEP_FRAMES + 1] = nil
+end
+
+function Session:CloseFrame()
+	self.busyFrames = self.busyFrames + 1
+	self.totalMs = self.totalMs + self.frameMs
+	if self.frameCombat then self.combatMs = self.combatMs + self.frameMs end
+	local lastWorst = self.worstFrames[SESSION_KEEP_FRAMES]
+	if not lastWorst or self.frameMs > lastWorst.ms then self:KeepWorstFrame() end
+	self.owner.OnFrameClosed(self)
+	self.frameMs, self.spanTop = 0, 0
+end
+
+function Session:Touch()
+	local now = GetTime()
+	if now == self.frameAt then return end
+	if self.frameAt then self:CloseFrame() end
+	self.frameAt = now
+	self.frameCombat = self.inCombat
+	local second = math.floor(now - self.startedAt)
+	if second ~= self.currentSecond then
+		self.owner.OnSecondClosed(self)
+		self.currentSecond = second
+	end
+end
+
+function Session:Duration()
+	return max((self.stoppedAt or GetTime()) - self.startedAt, 1)
+end
+
+function Session:CombatSeconds()
+	if self.inCombat then return self.combatTime + GetTime() - self.combatSince end
+	return self.combatTime
+end
+
+function Session:Rate(count)
+	return count / self:Duration()
+end
+
+function Session:Swap(owner, key, wrapper)
+	local swaps = self.swaps
+	swaps[#swaps + 1] = { owner = owner, key = key, original = rawget(owner, key), wrapper = wrapper }
+	owner[key] = wrapper
+end
+
+function Session:Unswap()
+	local swaps = self.swaps
+	for index = #swaps, 1, -1 do
+		local swap = swaps[index]
+		if rawget(swap.owner, swap.key) == swap.wrapper then swap.owner[swap.key] = swap.original end
+		swaps[index] = nil
+	end
+end
 
 local function Combined(first, second)
 	local combined = {}
@@ -240,7 +380,7 @@ local function RecordSpike(game, addons, actual)
 	spikeCount = spikeCount + 1
 	spikes[#spikes + 1] = {
 		at = GetTime(), game = game, addons = addons, actual = actual, context = SpikeContext(), heaviest = HeaviestAddOns(),
-		top = TopOf(Profiler.active and Combined(lastSpent, frameSpent) or Combined(lastNoted, noted), TOP_IN_FRAME),
+		top = Top(Profiler.active and Combined(lastSpent, frameSpent) or Combined(lastNoted, noted), TOP_IN_FRAME),
 	}
 	if #spikes > SPIKE_KEEP then remove(spikes, 1) end
 end
@@ -249,13 +389,13 @@ local function RecordUnseen(count)
 	unseenCount = unseenCount + count
 	local work = Profiler.active and Combined(frameSpent, noted) or noted
 	local named = notedTotal + (Profiler.active and frameTotal or 0)
-	unseen[#unseen + 1] = { at = GetTime(), count = count, named = named, context = SpikeContext(), top = TopOf(work, TOP_IN_FRAME) }
+	unseen[#unseen + 1] = { at = GetTime(), count = count, named = named, context = SpikeContext(), top = Top(work, TOP_IN_FRAME) }
 	if #unseen > SPIKE_KEEP then remove(unseen, 1) end
 end
 
 local function TopParts(top)
 	local parts = {}
-	for _, item in ipairs(top) do parts[#parts + 1] = format('%s %.0f', item.label, item.value) end
+	for _, item in ipairs(top) do parts[#parts + 1] = format('%s %.0f', item.name, item.value) end
 	return concat(parts, '; ')
 end
 
@@ -333,7 +473,7 @@ driver:SetScript('OnUpdate', function(_, elapsed)
 		if unnamed > 0 then Record('Login loading and setup', unnamed) end
 	end
 	if actual >= HITCH_MS then
-		hitches[#hitches + 1] = { at = GetTime(), actual = actual, named = lastTotal + frameTotal, top = TopOf(Combined(lastSpent, frameSpent), TOP_IN_FRAME) }
+		hitches[#hitches + 1] = { at = GetTime(), actual = actual, named = lastTotal + frameTotal, top = Top(Combined(lastSpent, frameSpent), TOP_IN_FRAME) }
 		if #hitches > HITCH_KEEP then remove(hitches, 1) end
 	end
 	window.actual = window.actual + actual
@@ -521,6 +661,7 @@ local function HookOUF(methods)
 	hooksecurefunc(methods, 'Tag', OnTag)
 	local updateAll = methods.UpdateAllElements
 	methods.UpdateAllElements = function(self, event)
+		if not Profiler.active and not unitFrameWatcher then return updateAll(self, event) end
 		local label = Profiler.Label(StyleLabel(self), 'full update')
 		if unitFrameWatcher then return unitFrameWatcher.FullUpdate(label, updateAll, self, event) end
 		return Profiler.Run(label, updateAll, self, event)
@@ -542,6 +683,7 @@ local function TimeUnitFrame(object)
 	local onEvent = object:GetScript('OnEvent')
 	if onEvent then
 		object:SetScript('OnEvent', function(self, event, ...)
+			if not Profiler.active and not unitFrameWatcher then return onEvent(self, event, ...) end
 			local label = Profiler.Label(style, event)
 			if unitFrameWatcher then return unitFrameWatcher.Event(label, onEvent, self, event, ...) end
 			return Profiler.Run(label, onEvent, self, event, ...)
@@ -663,7 +805,7 @@ local function Areas()
 		end
 		inArea[label] = stat.total
 	end
-	return TopOf(totals, TOP_AREAS), members
+	return Top(totals, TOP_AREAS), members
 end
 
 local function HitchLine(hitch)
@@ -771,7 +913,7 @@ function Profiler.Report()
 	AddUnseenSpikes(lines)
 	local areas, members = Areas()
 	local areaParts = {}
-	for _, item in ipairs(areas) do areaParts[#areaParts + 1] = format('%s %.0fms', item.label, item.value) end
+	for _, item in ipairs(areas) do areaParts[#areaParts + 1] = format('%s %.0fms', item.name, item.value) end
 	lines[#lines + 1] = 'By area: ' .. concat(areaParts, ', ')
 	local biggest = {}
 	for index, hitch in ipairs(hitches) do biggest[index] = hitch end
@@ -780,21 +922,21 @@ function Profiler.Report()
 	for index = 1, math.min(TOP_HITCHES, #biggest) do lines[#lines + 1] = HitchLine(biggest[index]) end
 	lines[#lines + 1] = 'Most time:'
 	local preview
-	for index, item in ipairs(TopOf(stats, TOP_TOTAL, 'total')) do
-		local stat = stats[item.label]
-		lines[#lines + 1] = format('  %s: %.0fms, %d calls, %.2f avg, %.1f max', item.label, stat.total, stat.calls, stat.total / stat.calls, stat.max)
+	for index, item in ipairs(Top(stats, TOP_TOTAL, 'total')) do
+		local stat = stats[item.name]
+		lines[#lines + 1] = format('  %s: %.0fms, %d calls, %.2f avg, %.1f max', item.name, stat.total, stat.calls, stat.total / stat.calls, stat.max)
 		if index == PREVIEW_TOTAL then preview = #lines end
 	end
 	preview = preview or #lines
 	lines[#lines + 1] = 'Inside each area (includes nested calls):'
 	for _, area in ipairs(areas) do
 		local parts = {}
-		for _, item in ipairs(TopOf(members[area.label], TOP_IN_AREA)) do parts[#parts + 1] = format('%s %.0f', item.label, item.value) end
-		lines[#lines + 1] = format('  %s %.0fms: %s', area.label, area.value, concat(parts, '; '))
+		for _, item in ipairs(Top(members[area.name], TOP_IN_AREA)) do parts[#parts + 1] = format('%s %.0f', item.name, item.value) end
+		lines[#lines + 1] = format('  %s %.0fms: %s', area.name, area.value, concat(parts, '; '))
 	end
 	lines[#lines + 1] = 'Slowest single calls:'
-	for _, item in ipairs(TopOf(stats, TOP_MAX, 'max')) do
-		lines[#lines + 1] = format('  %s: %.1fms', item.label, item.value)
+	for _, item in ipairs(Top(stats, TOP_MAX, 'max')) do
+		lines[#lines + 1] = format('  %s: %.1fms', item.name, item.value)
 	end
 	lines[#lines + 1] = 'All frames over ' .. HITCH_MS .. 'ms:'
 	for _, hitch in ipairs(hitches) do lines[#lines + 1] = HitchLine(hitch) end
@@ -826,12 +968,4 @@ loadWatcher:SetScript('OnEvent', function(self, _, loaded)
 		Profiler.Start()
 		loginPending = true
 	end
-end)
-
-local logoutWatcher = CreateFrame('Frame')
-logoutWatcher:RegisterEvent('PLAYER_LOGOUT')
-logoutWatcher:SetScript('OnEvent', function()
-	local global = BUI.db and BUI.db.global
-	if not global then return end
-	global.profileLog = { saved = date('%Y-%m-%d %H:%M'), zone = GetRealZoneText(), lines = (Profiler.Report()) }
 end)

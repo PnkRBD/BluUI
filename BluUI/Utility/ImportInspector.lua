@@ -57,7 +57,7 @@ function ImportInspector.Inspect(importString)
 
     local data, errorMessage = BUI.ExportImport.DecodeImportString(importString)
     if not data then
-        return nil, errorMessage or "Could not decode string."
+        return nil, errorMessage
     end
 
     local sections = {}
@@ -105,5 +105,5 @@ function ImportInspector.Inspect(importString)
         for lineIndex = 1, #lines do output[#output + 1] = lines[lineIndex] end
     end
 
-    return concat(output, "\n"), nil
+    return concat(output, "\n")
 end

@@ -7,10 +7,10 @@ local Dispatcher = {}
 BUI.Dispatcher = Dispatcher
 
 function Dispatcher.New(callback, name)
-    local frame = CreateFrame('Frame', name and ('BUI_Dispatch_' .. name:gsub('%W', '')) or nil)
+    local frame = CreateFrame('Frame', 'BUI_Dispatch_' .. name:gsub('%W', ''))
     frame:Hide()
     local pending = false
-    local label = 'Next frame ' .. (name or tostring(callback))
+    local label = 'Next frame ' .. name
 
     frame:SetScript('OnUpdate', function(self)
         self:Hide()

@@ -19,6 +19,7 @@ function Layout.RailPage(tab, shell, spec)
 	local query, current = '', nil
 	local panes = {}
 	local page = {}
+	local adapter
 
 	local block = CreateFrame('Frame', nil, tab.child)
 	block:SetWidth(tab.width)
@@ -40,6 +41,21 @@ function Layout.RailPage(tab, shell, spec)
 	})
 	rail.frame:SetPoint('TOPLEFT')
 	railScroll:SetChildHeight(rail.height)
+
+	if spec.tabs then
+		local index, contents = {}, {}
+		for position, id in ipairs(spec.tabs) do
+			if type(id) == 'string' then index[id] = position end
+			contents[position] = tab
+		end
+		adapter = { tabContents = contents, index = index }
+		function adapter:SetTab(position)
+			local id = spec.tabs[position]
+			if type(id) == 'function' then id = id() end
+			page:Select(id or rail.entries[1].item.id)
+		end
+		page.adapter = adapter
+	end
 
 	local divider = window:Fill(head, 'rule', 'ARTWORK')
 	divider:SetPoint('TOP', head, 'TOP', 0, -contentTop)
@@ -87,6 +103,7 @@ function Layout.RailPage(tab, shell, spec)
 		if previous then previous.frame:Hide() end
 		if not current or current.id ~= id then tab.scroll:ScrollToTop() end
 		current = rail.byID[id].item
+		if adapter then adapter.currentTab = adapter.index[id] end
 		rail:Select(id)
 		local pane = panes[id]
 		if not pane then

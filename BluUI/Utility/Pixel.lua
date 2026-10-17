@@ -3,19 +3,17 @@ local _, BUI = ...
 local Pixel = {}
 BUI.Pixel = Pixel
 
-local floor, max, huge = math.floor, math.max, math.huge
+local floor, max = math.floor, math.max
 local type, getmetatable, rawget = type, getmetatable, rawget
 local FALLBACK_TEXTURE = BUI.C.FALLBACK_TEXTURE
 local VIRTUAL_HEIGHT = 768
 local _, screenPixels = GetPhysicalScreenSize()
-if not screenPixels or screenPixels <= 0 then screenPixels = VIRTUAL_HEIGHT end
 local perfectScale = VIRTUAL_HEIGHT / screenPixels
 local gridUnit = 1
 local listeners = {}
 
 local function Recompute()
     local _, pixels = GetPhysicalScreenSize()
-    if not pixels or pixels <= 0 then return false end
     local newPerfect = VIRTUAL_HEIGHT / pixels
 
     local active = BUI.AppliedUIScale()
@@ -27,6 +25,10 @@ local function Recompute()
     perfectScale = newPerfect
     gridUnit = newGrid
     return true
+end
+
+function Pixel.PerfectScale()
+    return perfectScale
 end
 
 local function Broadcast()
@@ -58,9 +60,6 @@ end
 local function gridSnap(value)
     if value == 0 then return 0 end
     local unit = gridUnit
-    if unit ~= unit or unit == huge or unit == -huge or unit <= 0 then
-        return BUI.Round(value)
-    end
     if unit == 1 then return value end
     local step = unit > 1 and unit or -unit
     return value - value % (value < 0 and step or -step)
@@ -100,12 +99,11 @@ end
 local Profiler = BUI.Profiler
 
 local function KillSnap(object)
-    if type(object) ~= "table" or rawget(object, "_noSnap") or rawget(object, "_keepSnap") then return end
-    if object.IsForbidden and object:IsForbidden() then return end
+    if rawget(object, "_noSnap") or rawget(object, "_keepSnap") or object:IsForbidden() then return end
 
     local snapsItself = object.SetSnapToPixelGrid ~= nil
-    local target = snapsItself and object or (object.GetStatusBarTexture and object:GetStatusBarTexture())
-    if type(target) ~= "table" or not target.SetSnapToPixelGrid then return end
+    local target = snapsItself and object or object:GetStatusBarTexture()
+    if not target then return end
     if not snapsItself then object._noSnap = true end
     if rawget(target, "_noSnap") then return end
 
@@ -120,9 +118,7 @@ function Pixel.KeepSnap(texture)
 end
 
 local function RearmSnap(object, enabled)
-    if not enabled then return end
-    if type(object) ~= "table" or not rawget(object, "_noSnap") then return end
-    if object.IsForbidden and object:IsForbidden() then return end
+    if not enabled or not rawget(object, "_noSnap") or object:IsForbidden() then return end
     object._noSnap = nil
     local parent = object:GetParent()
     if parent and rawget(parent, "_noSnap") then parent._noSnap = nil end
@@ -139,28 +135,23 @@ local SNAP_HOOKS = {
 }
 
 local function HookSnapMethods(widget)
-    local prototype = widget and getmetatable(widget)
-    prototype = prototype and prototype.__index
-    if type(prototype) ~= "table" or rawget(prototype, "_snapHooked") then return end
+    local prototype = getmetatable(widget).__index
+    if rawget(prototype, "_snapHooked") then return end
     prototype._snapHooked = true
 
     for method, handler in pairs(SNAP_HOOKS) do
         if prototype[method] then
-            _G.hooksecurefunc(prototype, method, handler)
+            hooksecurefunc(prototype, method, handler)
         end
     end
 end
 
+local OnBackdropSizeChanged = Profiler.Wrap("Pixel backdrop resize", BackdropTemplateMixin.OnBackdropSizeChanged)
+
 local function GiveBackdrop(frame)
     if frame.SetBackdrop then return end
-    for key, value in pairs(BackdropTemplateMixin) do
-        if type(value) == "function" then
-            frame[key] = value
-        end
-    end
-    if frame.OnBackdropSizeChanged then
-        frame:HookScript("OnSizeChanged", Profiler.Wrap("Pixel backdrop resize", frame.OnBackdropSizeChanged))
-    end
+    Mixin(frame, BackdropTemplateMixin)
+    frame:HookScript("OnSizeChanged", OnBackdropSizeChanged)
 end
 
 local borderBackdrops = {}
@@ -327,14 +318,6 @@ local function GrantSnapMixins(widget)
     prototype.SnapSize = function(self, width, height)
         self:SetSize(gridSnap(width), gridSnap(height or width))
     end
-    prototype.SnapPoint = function(self, point, arg2, arg3, arg4, arg5, ...)
-        if not arg2 then arg2 = self:GetParent() end
-        if type(arg2) == "number" then arg2 = gridSnap(arg2) end
-        if type(arg3) == "number" then arg3 = gridSnap(arg3) end
-        if type(arg4) == "number" then arg4 = gridSnap(arg4) end
-        if type(arg5) == "number" then arg5 = gridSnap(arg5) end
-        self:SetPoint(point, arg2, arg3, arg4, arg5, ...)
-    end
 end
 
 local probeFrame = CreateFrame("Frame")
@@ -345,7 +328,6 @@ GrantSnapMixins(probeFrame:CreateTexture())
 GrantSnapMixins(probeFrame:CreateMaskTexture())
 GrantSnapMixins(probeFrame:CreateFontString())
 
-HookSnapMethods(probeFrame)
 HookSnapMethods(probeFrame:CreateTexture())
 HookSnapMethods(probeFrame:CreateMaskTexture())
 HookSnapMethods(probeFrame:CreateLine())
@@ -372,6 +354,6 @@ end
 BUI.Events:Register('UI_SCALE_CHANGED', 'Pixel', OnScaleChanged)
 BUI.Events:Register('DISPLAY_SIZE_CHANGED', 'Pixel', OnScaleChanged)
 BUI.Events:Register('GX_RESTARTED', 'Pixel', OnGXRestarted)
-hooksecurefunc(UIParent, "SetScale", BUI.Profiler.Wrap('Pixel hook SetScale', OnScaleChanged))
+hooksecurefunc(UIParent, "SetScale", Profiler.Wrap('Pixel hook SetScale', OnScaleChanged))
 
 Recompute()

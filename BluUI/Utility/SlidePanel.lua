@@ -24,20 +24,15 @@ function BUI.SlidePanel.New(options)
 
     local function SetOffset(offsetX)
         local panel = options.panel()
-        if not panel then return end
         local anchor = Anchor()
-        if not anchor then return end
         panel:ClearAllPoints()
         panel:SetPoint('TOPLEFT', anchor, 'TOPRIGHT', offsetX, 0)
         panel:SetSize(Width(), anchor:GetHeight())
     end
-    slidePanel.SetOffset = SetOffset
 
     local function SlideTo(targetX, onDone)
         local panel = options.panel()
-        if not panel then return end
         local _, _, _, startX = panel:GetPoint(1)
-        startX = startX or hiddenX
         local elapsed = 0
         panel:SetScript('OnUpdate', BUI.Profiler.Wrap('Utility.SlidePanel slide anim', function(self, deltaTime)
             elapsed = elapsed + deltaTime
@@ -60,7 +55,6 @@ function BUI.SlidePanel.New(options)
         end
         if not options.panel() then options.build() end
         local panel = options.panel()
-        if not panel then return end
         panel:SetFrameStrata(STRATA_BELOW[Anchor():GetFrameStrata()])
         SetOffset(hiddenX)
         panel:Show()

@@ -224,18 +224,20 @@ local function SetPetBattle(active)
 	for _, callback in pairs(petBattleListeners) do callback(active) end
 end
 
+local function ClearForceInstant()
+	forceInstant = false
+end
+
 local function OnVisibilityEvent(event)
 	if event == 'PET_BATTLE_OPENING_START' or event == 'PET_BATTLE_CLOSE' then
 		SetPetBattle(event == 'PET_BATTLE_OPENING_START')
 	elseif event == 'PLAYER_ENTERING_WORLD' then
 		SetPetBattle(C_PetBattles.IsInBattle())
-	end
-	if event == 'PLAYER_ENTERING_WORLD' then
 		forceInstant = true
-		BUI.Profiler.After('Utility.Visibility instant reset', 1, function() forceInstant = false end)
+		BUI.Profiler.After('Utility.Visibility instant reset', 1, ClearForceInstant)
 	end
 
-	Visibility.Update(forceInstant or event == 'PLAYER_ENTERING_WORLD')
+	Visibility.Update(forceInstant)
 
 	if event == 'PLAYER_MOUNT_DISPLAY_CHANGED' or event == 'PLAYER_CONTROL_GAINED' or event == 'PLAYER_ENTERING_WORLD' then
 		EnsureFlyStateDriver()

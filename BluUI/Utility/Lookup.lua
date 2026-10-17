@@ -12,14 +12,14 @@ local function SearchBagsAndGear(needle, hits, already, cap)
         local numSlots = C_Container.GetContainerNumSlots(bagID)
         for slot = 1, numSlots do
             local info = C_Container.GetContainerItemInfo(bagID, slot)
-            if info and info.itemID and info.itemName then
+            if info then
                 local key = "i" .. info.itemID
                 if not already[key] and info.itemName:lower():find(needle, 1, true) then
                     already[key] = true
                     hits[#hits + 1] = {
                         id = info.itemID,
                         name = info.itemName .. " [Item]",
-                        icon = info.iconFileID or MISSING_ICON,
+                        icon = info.iconFileID,
                         isItem = true,
                     }
                     if #hits >= cap then return true end
@@ -38,7 +38,7 @@ local function SearchBagsAndGear(needle, hits, already, cap)
                     hits[#hits + 1] = {
                         id = gearID,
                         name = name .. " [Item]",
-                        icon = icon or MISSING_ICON,
+                        icon = icon,
                         isItem = true,
                     }
                     if #hits >= cap then return true end
@@ -65,6 +65,16 @@ local function FetchItemIcon(itemID)
         C_Item.RequestLoadItemDataByID(itemID)
     end
     return icon, name
+end
+
+local function SpellHit(spellID, isItem)
+    local info = C_Spell.GetSpellInfo(spellID)
+    return {
+        id = spellID,
+        name = info and info.name or ("Spell " .. spellID),
+        icon = info and info.iconID or MISSING_ICON,
+        isItem = isItem,
+    }
 end
 
 function Lookup.GetItemInfo(itemID)
@@ -110,11 +120,10 @@ function Lookup.GetSpellInfo(spellID)
     if not numericSpellID then return nil, nil, nil end
     local info = C_Spell.GetSpellInfo(numericSpellID)
     if not info then return MISSING_ICON, nil, numericSpellID end
-    local icon = C_Spell.GetSpellTexture(numericSpellID) or info.iconID or MISSING_ICON
-    return icon, info.name, numericSpellID
+    return info.iconID, info.name, numericSpellID
 end
 
-local function SearchTalents(needle, hits, already, cap, keyPrefix, includePassive)
+local function SearchTalents(needle, hits, already, cap, includePassive)
     local configID = C_ClassTalents.GetActiveConfigID()
     if not configID then return false end
 
@@ -125,7 +134,7 @@ local function SearchTalents(needle, hits, already, cap, keyPrefix, includePassi
     local treeID = C_ClassTalents.GetTraitTreeForSpec(specID)
     if treeID then seenTrees[treeID] = true end
     local configInfo = C_Traits.GetConfigInfo(configID)
-    if configInfo and configInfo.treeIDs then
+    if configInfo then
         for _, configTreeID in ipairs(configInfo.treeIDs) do seenTrees[configTreeID] = true end
     end
 
@@ -134,25 +143,19 @@ local function SearchTalents(needle, hits, already, cap, keyPrefix, includePassi
         if nodeIDs then
             for _, nodeID in ipairs(nodeIDs) do
                 local nodeInfo = C_Traits.GetNodeInfo(configID, nodeID)
-                if nodeInfo and nodeInfo.entryIDs then
+                if nodeInfo then
                     for _, entryID in ipairs(nodeInfo.entryIDs) do
                         local entryInfo = C_Traits.GetEntryInfo(configID, entryID)
                         if entryInfo and entryInfo.definitionID then
                             local definitionInfo = C_Traits.GetDefinitionInfo(entryInfo.definitionID)
                             local spellID = definitionInfo and definitionInfo.spellID
-                            if spellID then
-                                local key = keyPrefix and (keyPrefix .. spellID) or spellID
-                                if not already[key] then
-                                    local info = C_Spell.GetSpellInfo(spellID)
-                                    local name = info and info.name
-                                    if name and name:lower():find(needle, 1, true) then
-                                        local passive = C_Spell.IsSpellPassive(spellID)
-                                        if includePassive or not passive then
-                                            already[key] = true
-                                            local icon = (info and info.iconID) or C_Spell.GetSpellTexture(spellID) or MISSING_ICON
-                                            hits[#hits + 1] = { id = spellID, name = name, icon = icon }
-                                            if #hits >= cap then return true end
-                                        end
+                            if spellID and not already[spellID] then
+                                local info = C_Spell.GetSpellInfo(spellID)
+                                if info and info.name:lower():find(needle, 1, true) then
+                                    if includePassive or not C_Spell.IsSpellPassive(spellID) then
+                                        already[spellID] = true
+                                        hits[#hits + 1] = { id = spellID, name = info.name, icon = info.iconID }
+                                        if #hits >= cap then return true end
                                     end
                                 end
                             end
@@ -165,44 +168,25 @@ local function SearchTalents(needle, hits, already, cap, keyPrefix, includePassi
     return false
 end
 
-local function SearchSpellbook(spellBank, needle, hits, already, cap, keyPrefix)
-    local numTabs = C_SpellBook.GetNumSpellBookSkillLines(spellBank)
-    for tab = 1, numTabs do
-        local tabInfo = C_SpellBook.GetSpellBookSkillLineInfo(tab, spellBank)
-        if not tabInfo then break end
-        for index = 1, tabInfo.numSpellBookItems do
-            local bookSlot = tabInfo.itemIndexOffset + index
-            local spell = C_SpellBook.GetSpellBookItemInfo(bookSlot, spellBank)
-            if spell then
-                if spell.itemType == Enum.SpellBookItemType.Flyout and spell.actionID then
-                    local _, _, numInFlyout = GetFlyoutInfo(spell.actionID)
-                    for flyoutIndex = 1, numInFlyout do
-                        local flySpellID, _, flyKnown = GetFlyoutSlotInfo(spell.actionID, flyoutIndex)
-                        if flySpellID and flyKnown then
-                            local key = keyPrefix and (keyPrefix .. flySpellID) or flySpellID
-                            local flyInfo = C_Spell.GetSpellInfo(flySpellID)
-                            if flyInfo and flyInfo.name and not already[key] then
-                                if flyInfo.name:lower():find(needle, 1, true) then
-                                    already[key] = true
-                                    local flyIcon = C_Spell.GetSpellTexture(flySpellID) or flyInfo.iconID or MISSING_ICON
-                                    hits[#hits + 1] = { id = flySpellID, name = flyInfo.name, icon = flyIcon }
-                                    if #hits >= cap then return true end
-                                end
-                            end
-                        end
-                    end
-                elseif spell.spellID and spell.name then
-                    local key = keyPrefix and (keyPrefix .. spell.spellID) or spell.spellID
-                    if not already[key] then
-                        if spell.name:lower():find(needle, 1, true) then
-                            already[key] = true
-                            local icon = spell.iconID or C_SpellBook.GetSpellBookItemTexture(bookSlot, spellBank) or MISSING_ICON
-                            hits[#hits + 1] = { id = spell.spellID, name = spell.name, icon = icon }
-                            if #hits >= cap then return true end
-                        end
-                    end
+local function MatchSpellBookItem(spell, needle, hits, already, cap)
+    if spell.itemType == Enum.SpellBookItemType.Flyout then
+        local _, _, numInFlyout = GetFlyoutInfo(spell.actionID)
+        for flyoutIndex = 1, numInFlyout do
+            local flySpellID, _, flyKnown = GetFlyoutSlotInfo(spell.actionID, flyoutIndex)
+            if flySpellID and flyKnown and not already[flySpellID] then
+                local flyInfo = C_Spell.GetSpellInfo(flySpellID)
+                if flyInfo and flyInfo.name:lower():find(needle, 1, true) then
+                    already[flySpellID] = true
+                    hits[#hits + 1] = { id = flySpellID, name = flyInfo.name, icon = flyInfo.iconID }
+                    if #hits >= cap then return true end
                 end
             end
+        end
+    elseif spell.spellID and not already[spell.spellID] then
+        if spell.name:lower():find(needle, 1, true) then
+            already[spell.spellID] = true
+            hits[#hits + 1] = { id = spell.spellID, name = spell.name, icon = spell.iconID }
+            if #hits >= cap then return true end
         end
     end
     return false
@@ -218,29 +202,16 @@ function Lookup.SearchSpells(query, maxResults, viewerKey)
 
     local numericSpellID = tonumber(query) or ExtractSpellID(query)
     if numericSpellID then
-        local info = C_Spell.GetSpellInfo(numericSpellID)
-        local icon = info and (C_Spell.GetSpellTexture(numericSpellID) or info.iconID) or MISSING_ICON
-        local name = info and info.name or ("Spell " .. numericSpellID)
-        return {{ id = numericSpellID, name = name, icon = icon }}
+        return { SpellHit(numericSpellID) }
     end
 
-    if SearchSpellbook(Enum.SpellBookSpellBank.Player, needle, hits, already, cap) then
-        return hits
-    end
-    if C_SpellBook.HasPetSpells() then
-        if SearchSpellbook(Enum.SpellBookSpellBank.Pet, needle, hits, already, cap) then
-            return hits
-        end
-    end
-    if SearchTalents(needle, hits, already, cap, nil, includePassive) then
-        return hits
-    end
+    if BUI.Tools.EachSpellBookItem(MatchSpellBookItem, needle, hits, already, cap) then return hits end
+    if SearchTalents(needle, hits, already, cap, includePassive) then return hits end
 
     if #hits == 0 then
         local directLookup = C_Spell.GetSpellInfo(query)
-        if directLookup and directLookup.spellID then
-            local icon = C_Spell.GetSpellTexture(directLookup.spellID) or directLookup.iconID or MISSING_ICON
-            hits[#hits + 1] = { id = directLookup.spellID, name = directLookup.name, icon = icon }
+        if directLookup then
+            hits[#hits + 1] = { id = directLookup.spellID, name = directLookup.name, icon = directLookup.iconID }
         end
     end
 
@@ -257,19 +228,18 @@ function Lookup.ParseSpellOrItemInput(input)
     local numericID = tonumber(input)
     if numericID then
         local itemName = C_Item.GetItemInfo(numericID)
-        local itemCount = C_Item.GetItemCount(numericID, true)
-        if itemName and itemCount and itemCount > 0 then
+        if itemName and C_Item.GetItemCount(numericID, true) > 0 then
             return numericID, true
         end
         return numericID, false
     end
 
     local info = C_Spell.GetSpellInfo(input)
-    if info and info.spellID then
+    if info then
         return info.spellID, false
     end
 
-    local _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, foundItemID = C_Item.GetItemInfo(input)
+    local foundItemID = C_Item.GetItemInfoInstant(input)
     if foundItemID then
         return foundItemID, true
     end
@@ -292,24 +262,14 @@ function Lookup.SearchSpellsAndItems(query, maxResults, viewerKey)
     end
     local spellID = ExtractSpellID(query)
     if spellID then
-        local info = C_Spell.GetSpellInfo(spellID)
-        local icon = info and (C_Spell.GetSpellTexture(spellID) or info.iconID) or MISSING_ICON
-        local name = info and info.name or ("Spell " .. spellID)
-        return {{ id = spellID, name = name, icon = icon, isItem = false }}
+        return { SpellHit(spellID, false) }
     end
 
     local numericID = tonumber(query)
     if numericID then
-        local info = C_Spell.GetSpellInfo(numericID)
-        local spellIcon = info and (C_Spell.GetSpellTexture(numericID) or info.iconID) or MISSING_ICON
-        hits[#hits + 1] = {
-            id = numericID,
-            name = info and info.name or ("Spell " .. numericID),
-            icon = spellIcon,
-            isItem = false,
-        }
+        hits[1] = SpellHit(numericID, false)
         local itemIcon, itemName = FetchItemIcon(numericID)
-        hits[#hits + 1] = {
+        hits[2] = {
             id = numericID,
             name = (itemName and itemName .. " [Item]") or ("Item " .. numericID .. " [Item]"),
             icon = itemIcon or MISSING_ICON,
@@ -318,12 +278,9 @@ function Lookup.SearchSpellsAndItems(query, maxResults, viewerKey)
         return hits
     end
 
-    SearchSpellbook(Enum.SpellBookSpellBank.Player, needle, hits, already, cap, "s")
-    if C_SpellBook.HasPetSpells() and #hits < cap then
-        SearchSpellbook(Enum.SpellBookSpellBank.Pet, needle, hits, already, cap, "s")
-    end
+    BUI.Tools.EachSpellBookItem(MatchSpellBookItem, needle, hits, already, cap)
     if #hits < cap then
-        SearchTalents(needle, hits, already, cap, "s", includePassive)
+        SearchTalents(needle, hits, already, cap, includePassive)
     end
     if #hits < cap then
         SearchBagsAndGear(needle, hits, already, cap)

@@ -23,7 +23,7 @@ BUI.Events:Register('PLAYER_ENTERING_WORLD','IconEngineDead', RefreshDeadState)
 
 local function SetColor(texture, red, green, blue, alpha)
 	if isDead then
-		texture:SetVertexColor(0.4, 0.4, 0.4, alpha or 1)
+		texture:SetVertexColor(0.4, 0.4, 0.4, alpha)
 	else
 		texture:SetVertexColor(red, green, blue, alpha)
 	end
@@ -31,24 +31,23 @@ end
 IconEngine.SetColor = SetColor
 
 local function ScheduleExpiry(cooldown, remaining, callback)
-	if cooldown._expiryTimer then cooldown._expiryTimer:Cancel() end
-	cooldown._expiryTimer = BUI.Profiler.NewTimer('Utility.IconEngine cooldown expiry', remaining + 0.1, function()
-		cooldown._expiryTimer = nil
-		callback()
-	end)
+	BUI.Tools.ReplaceTimer(cooldown, '_expiryTimer', 'Utility.IconEngine cooldown expiry', remaining + 0.1, callback)
 end
 
-local bagItemForSpellFn = nil
-local bagAggregateCountFn = nil
+local function ScheduleSpellExpiry(cooldown, cooldownInfo, callback)
+	if not callback or not cooldownInfo then return end
+	local cooldownStart = BUI.Tools.SafeNum(cooldownInfo.startTime)
+	local cooldownDuration = BUI.Tools.SafeNum(cooldownInfo.duration)
+	if cooldownStart and cooldownDuration and cooldownStart > 0 and cooldownDuration > 1.5 then
+		local remaining = (cooldownStart + cooldownDuration) - GetTime()
+		if remaining > 0 then ScheduleExpiry(cooldown, remaining, callback) end
+	end
+end
 
-function IconEngine.SetBagResolver(itemForSpellFn, aggregateCountFn)
+local bagItemForSpellFn
+
+function IconEngine.SetBagResolver(itemForSpellFn)
 	bagItemForSpellFn = itemForSpellFn
-	bagAggregateCountFn = aggregateCountFn
-end
-
-function IconEngine.GetConsumableCount(itemID)
-	if bagAggregateCountFn then return bagAggregateCountFn(itemID) end
-	return C_Item.GetItemCount(itemID, true, true, true), itemID, nil
 end
 
 local TRINKET_SLOT_INV = { [1] = 13, [2] = 14 }
@@ -64,13 +63,33 @@ function IconEngine.ResolveTrinketSlot(slot)
 	return GetInventoryItemID("player", inventorySlot)
 end
 
-local onUseTrinketFallback = {}
+local itemSpellIDs = {}
+
+function IconEngine.GetItemSpellID(itemID)
+	local cached = itemSpellIDs[itemID]
+	if cached ~= nil then return cached or nil, true end
+	local _, spellID = C_Item.GetItemSpell(itemID)
+	if spellID then
+		itemSpellIDs[itemID] = spellID
+		return spellID, true
+	end
+	if C_Item.IsItemDataCachedByID(itemID) then
+		itemSpellIDs[itemID] = false
+		return nil, true
+	end
+	return nil, false
+end
+
+local GetItemSpellID = IconEngine.GetItemSpellID
+
+local onUseTrinkets
 
 local function OnUseTrinketStore()
-	local globalDB = BUI.db and BUI.db.global
-	if not globalDB then return onUseTrinketFallback end
-	globalDB.onUseTrinketCache = globalDB.onUseTrinketCache or {}
-	return globalDB.onUseTrinketCache
+	if onUseTrinkets then return onUseTrinkets end
+	local globalDB = BUI.db.global
+	onUseTrinkets = globalDB.onUseTrinketCache or {}
+	globalDB.onUseTrinketCache = onUseTrinkets
+	return onUseTrinkets
 end
 
 function IconEngine.TrinketSlotHasItem(slot)
@@ -83,15 +102,14 @@ function IconEngine.IsOnUseTrinketSlot(slot)
 	local itemID = IconEngine.ResolveTrinketSlot(slot)
 	if not itemID then return false, not IconEngine.TrinketSlotHasItem(slot) end
 	local store = OnUseTrinketStore()
-	if C_Item.IsItemDataCachedByID(itemID) then
-		local _, spellID = C_Item.GetItemSpell(itemID)
-		store[itemID] = spellID ~= nil
-		return spellID ~= nil, true
-	end
-	return store[itemID] == true, false
+	local spellID, settled = GetItemSpellID(itemID)
+	if not settled then return store[itemID] == true, false end
+	local onUse = spellID ~= nil
+	if store[itemID] ~= onUse then store[itemID] = onUse end
+	return onUse, true
 end
 
-local racialSlotResolver = nil
+local racialSlotResolver
 function IconEngine.SetRacialSlotResolver(resolver) racialSlotResolver = resolver end
 
 function IconEngine.GetRacialSlotNumber(value)
@@ -100,7 +118,6 @@ function IconEngine.GetRacialSlotNumber(value)
 end
 
 function IconEngine.ResolveRacialSlot(slot)
-	if not racialSlotResolver then return nil end
 	return racialSlotResolver(slot)
 end
 
@@ -147,26 +164,22 @@ function IconEngine.ClassifyAsSpellOrItem(id, isItemByPrefix, itemForSpellFn, is
 		return "spell", nil
 	end
 
-	if IconEngine._isRacialSpell and IconEngine._isRacialSpell(id) then
+	if IconEngine._isRacialSpell(id) then
 		return "spell", nil
 	end
 
-	local resolverFn = itemForSpellFn or bagItemForSpellFn
-	if resolverFn then
-		local _, foundItemID = resolverFn(id)
-		if foundItemID then
-			local _, _, _, equipLoc = C_Item.GetItemInfoInstant(foundItemID)
-			if equipLoc == "INVTYPE_TRINKET" then return "trinket", foundItemID end
-			return "consumable", foundItemID
-		end
+	local _, foundItemID = (itemForSpellFn or bagItemForSpellFn)(id)
+	if foundItemID then
+		local _, _, _, equipLoc = C_Item.GetItemInfoInstant(foundItemID)
+		if equipLoc == "INVTYPE_TRINKET" then return "trinket", foundItemID end
+		return "consumable", foundItemID
 	end
 
 	local _, _, _, equipLoc, _, itemClass = C_Item.GetItemInfoInstant(id)
 	if itemClass then
 		if equipLoc == "INVTYPE_TRINKET" then return "trinket", id end
 		if itemClass == Enum.ItemClass.Consumable then return "consumable", id end
-		local count = C_Item.GetItemCount(id, true)
-		if count and count > 0 then return "consumable", id end
+		if C_Item.GetItemCount(id, true) > 0 then return "consumable", id end
 	end
 
 	return "spell", nil
@@ -201,72 +214,52 @@ function IconEngine.IsTrackedEntryUsable(storedValue, itemForSpellFn)
 	return IconEngine.IsEquippedOrKnownOrInBags(iconType, spellID, itemID)
 end
 
-local knownItemDurations = {}
-local ITEM_CD_THRESHOLD = 1.5
-
-local itemSpellIDs = {}
-local function GetItemSpellID(itemID)
-	local cached = itemSpellIDs[itemID]
-	if cached ~= nil then return cached or nil end
-	local _, spellID = C_Item.GetItemSpell(itemID)
-	itemSpellIDs[itemID] = spellID or false
-	return spellID
-end
-
-local KNOWN_ITEM_DURATIONS = {
+local knownItemDurations = {
 	[5512]   = 60,
 	[224464] = 60,
 }
-for itemID, duration in pairs(KNOWN_ITEM_DURATIONS) do knownItemDurations[itemID] = duration end
+local ITEM_CD_THRESHOLD = 1.5
 
 function IconEngine.ItemCooldownKey(itemID)
 	local cooldownStart, cooldownDuration, enable = C_Container.GetItemCooldown(itemID)
 	if enable == 0 then return nil end
-	if cooldownStart and cooldownStart > 0 and ((cooldownDuration or 0) > ITEM_CD_THRESHOLD or knownItemDurations[itemID]) then
+	if cooldownStart > 0 and (cooldownDuration > ITEM_CD_THRESHOLD or knownItemDurations[itemID]) then
 		return cooldownStart
 	end
 	return 0
 end
 
-function IconEngine.ApplyItemVisual(texture, cooldown, cooldownStart, cooldownDuration, count, itemID, onExpireCallback)
+function IconEngine.ApplyItemVisual(texture, cooldown, count, itemID, onExpireCallback)
 	if count == 0 then
-		if cooldown and cooldown._lastItemState ~= "empty" then
+		if cooldown._lastItemState ~= "empty" then
 			cooldown._lastItemState = "empty"
 			cooldown:Clear()
 		end
-		if cooldown and cooldown._itemFP then cooldown._itemFP.count = 0 end
+		if cooldown._itemFP then cooldown._itemFP.count = 0 end
 		texture:SetDesaturation(1)
 		SetColor(texture, 0.3, 0.3, 1)
 		return
 	end
 
-	local enable = 1
-	if itemID then
-		cooldownStart, cooldownDuration, enable = C_Container.GetItemCooldown(itemID)
-	end
+	local cooldownStart, cooldownDuration, enable = C_Container.GetItemCooldown(itemID)
+	local known = knownItemDurations[itemID]
 
-	cooldownStart = cooldownStart or 0
-	cooldownDuration = cooldownDuration or 0
-	enable = enable or 1
-
-	if cooldown then
-		local fingerprint = cooldown._itemFP
-		if fingerprint and fingerprint.start == cooldownStart and fingerprint.duration == cooldownDuration and fingerprint.enable == enable and fingerprint.count == count then
-			local desaturation = 0
-			if enable == 0 then
-				desaturation = (itemID and knownItemDurations[itemID]) and 1 or 0
-			elseif cooldownStart > 0 and (cooldownDuration > ITEM_CD_THRESHOLD or (itemID and knownItemDurations[itemID])) then
-				desaturation = 1
-			end
-			texture:SetDesaturation(desaturation)
-			return
+	local fingerprint = cooldown._itemFP
+	if fingerprint and fingerprint.start == cooldownStart and fingerprint.duration == cooldownDuration and fingerprint.enable == enable and fingerprint.count == count then
+		local desaturation = 0
+		if enable == 0 then
+			desaturation = known and 1 or 0
+		elseif cooldownStart > 0 and (cooldownDuration > ITEM_CD_THRESHOLD or known) then
+			desaturation = 1
 		end
-		if not fingerprint then fingerprint = {}; cooldown._itemFP = fingerprint end
-		fingerprint.start, fingerprint.duration, fingerprint.enable, fingerprint.count = cooldownStart, cooldownDuration, enable, count
+		texture:SetDesaturation(desaturation)
+		return
 	end
+	if not fingerprint then fingerprint = {}; cooldown._itemFP = fingerprint end
+	fingerprint.start, fingerprint.duration, fingerprint.enable, fingerprint.count = cooldownStart, cooldownDuration, enable, count
 
-	if enable == 0 and itemID and knownItemDurations[itemID] then
-		if cooldown and cooldown._lastItemState ~= "locked" then
+	if enable == 0 and known then
+		if cooldown._lastItemState ~= "locked" then
 			cooldown._lastItemState = "locked"
 			cooldown._lastItemStart = nil
 			cooldown:Clear()
@@ -275,49 +268,40 @@ function IconEngine.ApplyItemVisual(texture, cooldown, cooldownStart, cooldownDu
 		SetColor(texture, 1, 1, 1)
 		return
 	elseif enable == 0 then
-		local itemSpellID = itemID and GetItemSpellID(itemID)
-		local gcdDuration = itemSpellID and C_Spell.GetSpellCooldownDuration(itemSpellID) or nil
-		if cooldown then
-			if gcdDuration then
-				cooldown._lastItemState = "gcd"
-				cooldown._lastItemStart = nil
-				cooldown:SetCooldownFromDurationObject(gcdDuration)
-			elseif cooldown._lastItemState ~= "ready" then
-				cooldown._lastItemState = "ready"
-				cooldown._lastItemStart = nil
-				cooldown:Clear()
-			end
+		local itemSpellID = GetItemSpellID(itemID)
+		local gcdDuration = itemSpellID and C_Spell.GetSpellCooldownDuration(itemSpellID)
+		if gcdDuration then
+			cooldown._lastItemState = "gcd"
+			cooldown._lastItemStart = nil
+			cooldown:SetCooldownFromDurationObject(gcdDuration)
+		elseif cooldown._lastItemState ~= "ready" then
+			cooldown._lastItemState = "ready"
+			cooldown._lastItemStart = nil
+			cooldown:Clear()
 		end
 		texture:SetDesaturation(0)
 		SetColor(texture, 1, 1, 1)
 		return
 	end
 
-	local hasStart = type(cooldownStart) == "number" and cooldownStart > 0
-	local hasDuration = type(cooldownDuration) == "number"
-
-	local duration = (hasDuration and cooldownDuration) or 0
-	if itemID and duration > ITEM_CD_THRESHOLD then
+	local duration = cooldownDuration
+	if duration > ITEM_CD_THRESHOLD then
 		knownItemDurations[itemID] = duration
-	elseif itemID and hasStart and knownItemDurations[itemID] then
-		duration = knownItemDurations[itemID]
+	elseif cooldownStart > 0 and known then
+		duration = known
 	end
 
-	local onCooldown = hasStart and duration > ITEM_CD_THRESHOLD
-
-	if onCooldown then
-		if cooldown then
-			if cooldown._lastItemStart ~= cooldownStart then
-				cooldown._lastItemStart = cooldownStart
-				cooldown._lastItemState = "cd"
-				if not cooldown._itemDurObj then
-					cooldown._itemDurObj = C_DurationUtil.CreateDuration()
-				end
-				cooldown._itemDurObj:SetTimeFromStart(cooldownStart, duration)
-				cooldown:SetCooldownFromDurationObject(cooldown._itemDurObj)
+	if cooldownStart > 0 and duration > ITEM_CD_THRESHOLD then
+		if cooldown._lastItemStart ~= cooldownStart then
+			cooldown._lastItemStart = cooldownStart
+			cooldown._lastItemState = "cd"
+			if not cooldown._itemDurObj then
+				cooldown._itemDurObj = C_DurationUtil.CreateDuration()
 			end
-			texture:SetDesaturation(cooldown._itemDurObj:EvaluateRemainingDuration(BUI.Tools.OnCooldownCurve, 0))
+			cooldown._itemDurObj:SetTimeFromStart(cooldownStart, duration)
+			cooldown:SetCooldownFromDurationObject(cooldown._itemDurObj)
 		end
+		texture:SetDesaturation(cooldown._itemDurObj:EvaluateRemainingDuration(BUI.Tools.OnCooldownCurve, 0))
 		SetColor(texture, 1, 1, 1)
 
 		if onExpireCallback then
@@ -325,7 +309,7 @@ function IconEngine.ApplyItemVisual(texture, cooldown, cooldownStart, cooldownDu
 			if remaining > 0 then ScheduleExpiry(cooldown, remaining, onExpireCallback) end
 		end
 	else
-		if cooldown and cooldown._lastItemState ~= "ready" then
+		if cooldown._lastItemState ~= "ready" then
 			cooldown._lastItemState = "ready"
 			cooldown._lastItemStart = nil
 			cooldown:Clear()
@@ -341,8 +325,6 @@ function IconEngine.ApplyTrinketVisual(texture, cooldown, itemID, itemSpellID, o
 	if countText then countText:Hide() end
 
 	local cooldownStart, cooldownDuration = C_Container.GetItemCooldown(itemID)
-	cooldownStart = tonumber(cooldownStart) or 0
-	cooldownDuration = tonumber(cooldownDuration) or 0
 
 	local idle = cooldownStart == 0 and not cooldown._trinketLastStart
 	if idle and cooldown._trinketWasIdle then
@@ -371,7 +353,7 @@ function IconEngine.ApplyTrinketVisual(texture, cooldown, itemID, itemSpellID, o
 		texture:SetDesaturation(cooldown._trinketDurObj:EvaluateRemainingDuration(BUI.Tools.OnCooldownCurve, 0))
 	else
 
-		local spellDuration = itemSpellID and C_Spell.GetSpellCooldownDuration(itemSpellID) or nil
+		local spellDuration = itemSpellID and C_Spell.GetSpellCooldownDuration(itemSpellID)
 		if spellDuration then
 			cooldown:SetCooldownFromDurationObject(spellDuration)
 		end
@@ -383,7 +365,7 @@ function IconEngine.ApplyTrinketVisual(texture, cooldown, itemID, itemSpellID, o
 	end
 
 	if cooldown._trinketLastStart then
-		local ready = BUI.Tools.SafeNum(IconEngine.ReadyAlpha(cooldown._trinketDurObj))
+		local ready = BUI.Tools.SafeNum(cooldown._trinketDurObj:EvaluateRemainingDuration(BUI.Tools.IsReadyCurve, 0))
 		if ready and ready > 0.5 then
 			cooldown._trinketLastStart = nil
 			cooldown:Clear()
@@ -394,12 +376,7 @@ function IconEngine.ApplyTrinketVisual(texture, cooldown, itemID, itemSpellID, o
 	SetColor(texture, 1, 1, 1)
 end
 
-function IconEngine.ReadyAlpha(durationObject)
-	if not durationObject or not durationObject.EvaluateRemainingDuration then return 1 end
-	return durationObject:EvaluateRemainingDuration(BUI.Tools.IsReadyCurve, 0)
-end
-
-function IconEngine.ApplySpellVisual(texture, cooldown, spellID, hasCharges, onExpireCallback, ignoreGCD, usableIn, notEnoughPowerIn, cooldownInfoIn)
+function IconEngine.ApplySpellVisual(texture, cooldown, spellID, hasCharges, onExpireCallback, ignoreGCD, hideGCD, usableIn, notEnoughPowerIn, cooldownInfoIn)
 	local desaturationCurve = BUI.Tools.OnCooldownCurve
 	local isUsable, notEnoughPower
 	if usableIn ~= nil then
@@ -416,13 +393,11 @@ function IconEngine.ApplySpellVisual(texture, cooldown, spellID, hasCharges, onE
 			SetColor(texture, 0.4, 0.4, 0.4)
 			texture:SetDesaturation(1)
 		end
-		cooldown._spellLastStart = nil
 		cooldown:Clear()
 		return
 	elseif texture._lastUsable == false then
 		texture._lastUsable = true
 		texture:SetDesaturation(0)
-		cooldown._spellLastStart = nil
 	end
 
 	if not issecretvalue(notEnoughPower) and notEnoughPower ~= texture._lastNotEnoughPower then
@@ -434,9 +409,10 @@ function IconEngine.ApplySpellVisual(texture, cooldown, spellID, hasCharges, onE
 	local cooldownInfo = cooldownInfoIn
 	if cooldownInfo == nil then cooldownInfo = C_Spell.GetSpellCooldown(spellID) end
 	local skipGCDDesat = ignoreGCD and cooldownInfo and cooldownInfo.isOnGCD
+	hideGCD = hideGCD == true
 
 	if not hasCharges then
-		local spellDuration = C_Spell.GetSpellCooldownDuration(spellID)
+		local spellDuration = C_Spell.GetSpellCooldownDuration(spellID, hideGCD)
 		if spellDuration then
 			cooldown:SetCooldownFromDurationObject(spellDuration)
 		else
@@ -445,27 +421,18 @@ function IconEngine.ApplySpellVisual(texture, cooldown, spellID, hasCharges, onE
 
 		if skipGCDDesat then
 			texture:SetDesaturation(0)
-		elseif spellDuration and spellDuration.EvaluateRemainingDuration then
-			texture:SetDesaturation(spellDuration:EvaluateRemainingDuration(desaturationCurve, 0) or 0)
+		elseif spellDuration then
+			texture:SetDesaturation(spellDuration:EvaluateRemainingDuration(desaturationCurve, 0))
 		else
 			texture:SetDesaturation(0)
 		end
 
-		if onExpireCallback and cooldownInfo then
-			local cooldownStart = BUI.Tools.SafeNum(cooldownInfo.startTime)
-			local cooldownDuration = BUI.Tools.SafeNum(cooldownInfo.duration)
-			if cooldownStart and cooldownDuration and cooldownStart > 0 and cooldownDuration > 1.5 then
-				local remaining = (cooldownStart + cooldownDuration) - GetTime()
-				if remaining > 0 then ScheduleExpiry(cooldown, remaining, onExpireCallback) end
-			end
-		end
-
+		ScheduleSpellExpiry(cooldown, cooldownInfo, onExpireCallback)
 		return
 	end
 
-	cooldown._spellLastStart = nil
 	local chargeDuration = C_Spell.GetSpellChargeDuration(spellID)
-	local spellDuration = C_Spell.GetSpellCooldownDuration(spellID)
+	local spellDuration = C_Spell.GetSpellCooldownDuration(spellID, hideGCD)
 	local swipeSource = chargeDuration or spellDuration
 	if swipeSource then
 		cooldown:SetCooldownFromDurationObject(swipeSource)
@@ -478,20 +445,12 @@ function IconEngine.ApplySpellVisual(texture, cooldown, spellID, hasCharges, onE
 
 	if (safeCharges and safeCharges > 0) or skipGCDDesat then
 		texture:SetDesaturation(0)
-	elseif spellDuration and spellDuration.EvaluateRemainingDuration then
-		texture:SetDesaturation(spellDuration:EvaluateRemainingDuration(desaturationCurve, 0) or 0)
+	elseif spellDuration then
+		texture:SetDesaturation(spellDuration:EvaluateRemainingDuration(desaturationCurve, 0))
 	else
 		texture:SetDesaturation(0)
 	end
 
-	if onExpireCallback and cooldownInfo then
-		local cooldownStart = BUI.Tools.SafeNum(cooldownInfo.startTime)
-		local cooldownDuration = BUI.Tools.SafeNum(cooldownInfo.duration)
-		if cooldownStart and cooldownDuration and cooldownStart > 0 and cooldownDuration > 1.5 then
-			local remaining = (cooldownStart + cooldownDuration) - GetTime()
-			if remaining > 0 then ScheduleExpiry(cooldown, remaining, onExpireCallback) end
-		end
-	end
-
+	ScheduleSpellExpiry(cooldown, cooldownInfo, onExpireCallback)
 	return safeCharges
 end

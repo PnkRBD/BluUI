@@ -59,7 +59,7 @@ local function Build(decimalThreshold, warnThreshold, warnHex)
 			local segment = segments[index]
 			local nextThreshold = segments[index + 1] and segments[index + 1].threshold or math.huge
 			if segment.threshold < warnThreshold then
-				split[#split + 1] = Segment(segment.threshold, "|c" .. warnHex .. segment.format .. "|r", segment.step, segment.components)
+				split[#split + 1] = Segment(segment.threshold, "|cff" .. warnHex .. segment.format .. "|r", segment.step, segment.components)
 				if warnThreshold < nextThreshold then
 					split[#split + 1] = Segment(warnThreshold, segment.format, segment.step, segment.components)
 				end
@@ -75,15 +75,10 @@ local function Build(decimalThreshold, warnThreshold, warnHex)
 	return formatter
 end
 
-function TimeFormat.ColorHex(color)
-	if not color then return nil end
-	return format("ff%02x%02x%02x", floor((color[1] or 1) * 255 + 0.5), floor((color[2] or 1) * 255 + 0.5), floor((color[3] or 1) * 255 + 0.5))
-end
-
 function TimeFormat.GetFormatter(decimalThreshold, warnThreshold, warnColor)
 	decimalThreshold = decimalThreshold or 0
 	warnThreshold = warnThreshold or 0
-	local warnHex = warnThreshold > 0 and TimeFormat.ColorHex(warnColor) or nil
+	local warnHex = warnThreshold > 0 and warnColor and BUI.Hex(BUI.UnpackColor(warnColor)) or nil
 	if not warnHex then warnThreshold = 0 end
 	local key = decimalThreshold .. ":" .. warnThreshold .. ":" .. (warnHex or "")
 	local formatter = formatters[key]

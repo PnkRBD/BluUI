@@ -38,20 +38,24 @@ local PREFIX_LABELS = {
     NUMPAD      = "N",
 }
 
+local formatted = {}
+
 function Keybinds.Format(key)
     if not key or key == "" then return nil end
-    key = key:upper()
+    local cached = formatted[key]
+    if cached then return cached end
+    local upper = key:upper()
     local result = ""
     local position = 1
     while true do
-        local separator = key:find("-", position, true)
+        local separator = upper:find("-", position, true)
         if not separator then break end
-        local modifierLabel = MODIFIER_LABELS[key:sub(position, separator - 1)]
+        local modifierLabel = MODIFIER_LABELS[upper:sub(position, separator - 1)]
         if not modifierLabel then break end
         result = result .. modifierLabel
         position = separator + 1
     end
-    local base = key:sub(position)
+    local base = upper:sub(position)
     local label = KEY_LABELS[base]
     if not label then
         local prefix, number = base:match("^(%a+)(%d+)$")
@@ -61,5 +65,7 @@ function Keybinds.Format(key)
             label = base
         end
     end
-    return result .. label
+    local text = result .. label
+    formatted[key] = text
+    return text
 end
