@@ -1,11 +1,11 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('StreamerTools.GCDHistory')
 local Wrap = BUI.Profiler.Wrap
 
 BUI.GCDHistory = {}
 local GCDHistory = BUI.GCDHistory
 local Pixel = BUI.Pixel
+local IconEngine = BUI.IconEngine
 local DEBUG_PREFIX = '|cff' .. BUI.C.COLOR_BRAND .. 'GCD:|r '
 
 local wipe, ipairs = wipe, ipairs
@@ -15,7 +15,6 @@ local GetTime = GetTime
 local CreateFrame = CreateFrame
 local C_Spell = C_Spell
 local C_Item = C_Item
-local GetInventorySlotInfo = GetInventorySlotInfo
 local GetInventoryItemID = GetInventoryItemID
 local UnitCastingInfo = UnitCastingInfo
 local UnitChannelInfo = UnitChannelInfo
@@ -35,41 +34,41 @@ local FADE_DURATION           = 0.5
 local REPEAT_GAP              = 0.5
 local CHANNEL_INTERRUPT_MS    = 500
 
-local EQUIP_SLOTS = {
-    'HeadSlot', 'NeckSlot', 'ShoulderSlot', 'BackSlot', 'ChestSlot',
-    'WristSlot', 'MainHandSlot', 'SecondaryHandSlot', 'HandsSlot',
-    'WaistSlot', 'LegsSlot', 'FeetSlot', 'Finger0Slot', 'Finger1Slot',
-    'Trinket0Slot', 'Trinket1Slot',
-}
-
 local container, activeCast
 local iconFrames = {}
 local history    = {}
 local fading     = {}
 local fadePool   = {}
 local itemSpellMap = {}
+local itemSpellMapDirty = true
 local enabled       = false
 local eventsActive  = false
 local channelActive = false
 local channelEndMs, channelSpellID
 
+local function MarkItemSpellMapDirty()
+    itemSpellMapDirty = true
+end
+
 local function RebuildItemSpellMap()
     wipe(itemSpellMap)
-    for _, slotName in ipairs(EQUIP_SLOTS) do
-        local slotID = GetInventorySlotInfo(slotName:upper())
-        local itemID = slotID and GetInventoryItemID('player', slotID)
+    itemSpellMapDirty = false
+    for slotID = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
+        local itemID = GetInventoryItemID('player', slotID)
         if itemID then
-            local _, spellID = C_Item.GetItemSpell(itemID)
+            local spellID, ready = IconEngine.GetItemSpellID(itemID)
             if spellID then itemSpellMap[spellID] = itemID end
+            if not ready then itemSpellMapDirty = true end
         end
     end
 end
 
 local function ResolveIcon(spellID)
     if not spellID or spellID == 0 or issecretvalue(spellID) then return nil end
+    if itemSpellMapDirty then RebuildItemSpellMap() end
     local itemID = itemSpellMap[spellID]
     if itemID then
-        local texture = select(10, C_Item.GetItemInfo(itemID))
+        local texture = C_Item.GetItemIconByID(itemID)
         if texture then return texture end
     end
     return C_Spell.GetSpellTexture(spellID)
@@ -96,17 +95,14 @@ local function StyleIcon(icon, size, borderSize, borderColor, zoom)
     if icon._styleGen == styleGeneration then return end
     icon._styleGen = styleGeneration
     icon:SetSize(Pixel.Scale(size), Pixel.Scale(size))
-    local edge  = borderSize
-    local color = borderColor
-    Pixel.ApplyBorder(icon, edge, color[1], color[2], color[3], color[4])
-    local scaledEdge = Pixel.Scale(edge)
+    Pixel.ApplyBorder(icon, borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
+    local scaledEdge = Pixel.Scale(borderSize)
     icon.tex:ClearAllPoints()
     icon.tex:SetPoint('TOPLEFT',     scaledEdge,  -scaledEdge)
     icon.tex:SetPoint('BOTTOMRIGHT', -scaledEdge,  scaledEdge)
-    local zoomFactor = zoom
-    icon.tex:SetTexCoord(zoomFactor, 1 - zoomFactor, zoomFactor, 1 - zoomFactor)
-    icon._edge        = edge
-    icon._borderColor = color
+    icon.tex:SetTexCoord(zoom, 1 - zoom, zoom, 1 - zoom)
+    icon._edge        = borderSize
+    icon._borderColor = borderColor
 end
 
 local function CreateIconFrame()
@@ -117,12 +113,6 @@ local function CreateIconFrame()
     icon.failX:SetAllPoints(icon.tex)
     icon.failX:SetTexture([[Interface\RaidFrame\ReadyCheck-NotReady]])
     icon.failX:Hide()
-
-    icon.badge = icon:CreateFontString(nil, 'OVERLAY')
-    Pixel.ApplyFont(icon.badge, 14, BUI.GetGlobalFont(), 'OUTLINE')
-    icon.badge:SetPoint('CENTER')
-    icon.badge:SetTextColor(1, 1, 1, 1)
-    icon.badge:Hide()
 
     icon.highlight = icon:CreateTexture(nil, 'ARTWORK', nil, 1)
     icon.highlight:SetAllPoints(icon.tex)
@@ -154,7 +144,6 @@ end
 local function AcquireFade()
     local frame = tremove(fadePool)
     if frame then
-        frame:SetParent(container)
         frame:SetAlpha(1)
         return frame
     end
@@ -164,7 +153,6 @@ end
 local function ReleaseFade(frame)
     frame:Hide()
     frame:ClearAllPoints()
-    frame.badge:Hide()
     frame.failX:Hide()
     tinsert(fadePool, frame)
 end
@@ -188,7 +176,7 @@ fadeDriver:SetScript('OnUpdate', Wrap('StreamerTools.GCDHistory fade', function(
 end))
 
 local function GetActiveCastGap(settings)
-    if not settings.showActiveCast or not activeCast then return 0 end
+    if not settings.showActiveCast then return 0 end
     local scaledSize = Pixel.Scale(settings.iconSize)
     return scaledSize * settings.activeCastScale / 2 + Pixel.Scale(settings.spacing) + scaledSize / 2
 end
@@ -229,7 +217,6 @@ local function StyleActiveCast()
 end
 
 local function BuildActiveCast()
-    if activeCast then return end
     activeCast = CreateFrame('Frame', nil, container, 'BackdropTemplate')
     activeCast:SetFrameLevel(container:GetFrameLevel() + 5)
     activeCast.tex = activeCast:CreateTexture(nil, 'ARTWORK')
@@ -239,13 +226,6 @@ local function BuildActiveCast()
     activeCast.cd:SetDrawBling(false)
     activeCast.cd:SetHideCountdownNumbers(true)
     activeCast.cd:SetSwipeColor(0, 0, 0, 0.6)
-
-    if activeCast.cd.CooldownFlash then
-        Hook(activeCast.cd.CooldownFlash, 'Show', function(self)
-            self:Hide()
-            if self.FlashAnim then self.FlashAnim:Stop() end
-        end)
-    end
 
     StyleActiveCast()
     activeCast:Hide()
@@ -257,7 +237,7 @@ local BOUNCE_DOWN  = 0.12
 local BOUNCE_TOTAL = BOUNCE_UP + BOUNCE_DOWN
 
 local BounceOnUpdate = Wrap('StreamerTools.GCDHistory bounce', function(self, deltaTime)
-    local elapsed = (self._bounceElapsed or 0) + deltaTime
+    local elapsed = self._bounceElapsed + deltaTime
     if elapsed >= BOUNCE_TOTAL then
         self:SetScale(1)
         self:SetScript('OnUpdate', nil)
@@ -280,34 +260,28 @@ local function PlayBounce(frame)
 end
 
 local function ShowActiveCast(spellID, startMs, endMs, isChannel)
-    local settings = GetDB()
-    if not settings.showActiveCast or not activeCast then return end
     local texture = ResolveIcon(spellID)
     if not texture then return end
 
     activeCast.tex:SetTexture(texture)
     activeCast.cd:SetReverse(isChannel == true)
-    if startMs and endMs then
-        local duration = (endMs - startMs) / 1000
-        if duration > 0 then
-            activeCast.cd:SetCooldown(endMs / 1000 - duration, duration)
-        else
-            activeCast.cd:Clear()
-        end
+    local duration = (endMs - startMs) / 1000
+    if duration > 0 then
+        activeCast.cd:SetCooldown(startMs / 1000, duration)
+    else
+        activeCast.cd:Clear()
     end
     activeCast:Show()
     PlayBounce(activeCast)
 end
 
 local function HideActiveCast()
-    if not activeCast then return end
     activeCast:Hide()
     activeCast.cd:Clear()
     activeCast.cd:SetReverse(false)
 end
 
 local function UpdateLayout()
-    if not container then return end
     local settings  = GetDB()
     local growRight = settings.growDirection == 'RIGHT'
     local size      = settings.iconSize
@@ -316,11 +290,9 @@ local function UpdateLayout()
     BUI.Anchor.ApplyPosition(container, settings)
     container:SetSize(Pixel.Scale(size), Pixel.Scale(size))
 
-    if activeCast then
-        StyleActiveCast()
-        activeCast:ClearAllPoints()
-        activeCast:SetPoint('CENTER', container, 'CENTER', 0, 0)
-    end
+    StyleActiveCast()
+    activeCast:ClearAllPoints()
+    activeCast:SetPoint('CENTER', container, 'CENTER', 0, 0)
 
     local castGap = GetActiveCastGap(settings)
 
@@ -332,7 +304,6 @@ local function UpdateLayout()
         icon:SetPoint('CENTER', container, 'CENTER', growRight and offset or -offset, 0)
         icon.tex:SetTexture(entry.texture)
         SetFailed(icon, entry.failed)
-        icon.badge:Hide()
         icon:SetAlpha(1)
         icon:Show()
     end
@@ -346,7 +317,6 @@ local function ClearIcons()
     wipe(history)
     for _, icon in ipairs(iconFrames) do
         SetFailed(icon, false)
-        icon.badge:Hide()
         icon.highlight:Hide()
         icon:Hide()
     end
@@ -359,20 +329,19 @@ local function ClearIcons()
 end
 
 local function ShowPreview()
-    if not container then return end
     local settings = GetDB()
     ClearIcons()
     for previewIndex = 1, min(3, settings.maxIcons) do
         history[previewIndex] = { texture = PREVIEW_TEXTURES[previewIndex] }
     end
-    if settings.showActiveCast and activeCast then
+    if settings.showActiveCast then
         activeCast.tex:SetTexture(PREVIEW_CAST_TEXTURE)
         activeCast.cd:Clear()
         activeCast:Show()
     end
     container:Show()
     UpdateLayout()
-    if iconFrames[1] then iconFrames[1].highlight:Show() end
+    iconFrames[1].highlight:Show()
 end
 
 local function AddSpell(spellID, failed)
@@ -404,7 +373,7 @@ local function AddSpell(spellID, failed)
     end
 
     tinsert(history, 1, { spellID = spellID, texture = texture, time = now, failed = failed or false })
-    if enabled then BUI.Scheduler.SetUpdateEnabled('GCDHistory_Expire', true) end
+    BUI.Scheduler.SetUpdateEnabled('GCDHistory_Expire', true)
 
     while #history > settings.maxIcons do
         local overflow = tremove(history)
@@ -420,7 +389,7 @@ local function CheckExpired()
         return
     end
     local settings = GetDB()
-    if not settings.locked or settings.fadeOldIcons == false or not container then return end
+    if not settings.locked or not settings.fadeOldIcons then return end
 
     local now      = GetTime()
     local lifetime = settings.fadeTime
@@ -446,13 +415,12 @@ local function OnSpellEvent(event, unit, _, spellID)
             tostring(event), tostring(unit), tostring(spellID), tostring(name),
             tostring(UnitCastingInfo('player') ~= nil), tostring(UnitChannelInfo('player') ~= nil)))
     end
-    if unit ~= 'player' then return end
     local settings = GetDB()
 
     if event == 'UNIT_SPELLCAST_START' then
         if settings.showActiveCast then
             local _, _, _, startMs, endMs = UnitCastingInfo('player')
-            if startMs and endMs then ShowActiveCast(spellID, startMs, endMs) end
+            if startMs then ShowActiveCast(spellID, startMs, endMs) end
         end
 
     elseif event == 'UNIT_SPELLCAST_CHANNEL_START' then
@@ -460,7 +428,7 @@ local function OnSpellEvent(event, unit, _, spellID)
         channelActive  = true
         channelEndMs   = endMs
         channelSpellID = spellID
-        if settings.showActiveCast and startMs and endMs then
+        if settings.showActiveCast and startMs then
             ShowActiveCast(spellID, startMs, endMs, true)
         end
 
@@ -496,8 +464,7 @@ local function StartEvents()
     BUI.Events:RegisterUnit('UNIT_SPELLCAST_INTERRUPTED',   'player', 'GCDHistory', OnSpellEvent)
     BUI.Events:RegisterUnit('UNIT_SPELLCAST_CHANNEL_START', 'player', 'GCDHistory', OnSpellEvent)
     BUI.Events:RegisterUnit('UNIT_SPELLCAST_CHANNEL_STOP',  'player', 'GCDHistory', OnSpellEvent)
-    BUI.Events:Register('PLAYER_EQUIPMENT_CHANGED', 'GCDHistory', RebuildItemSpellMap)
-    BUI.Events:Register('PLAYER_ENTERING_WORLD',    'GCDHistory', RebuildItemSpellMap)
+    BUI.Events:Register('PLAYER_EQUIPMENT_CHANGED', 'GCDHistory', MarkItemSpellMapDirty)
 end
 
 local function StopEvents()
@@ -520,10 +487,7 @@ local function CreateContainer()
             local settings = GetDB()
             settings.posX, settings.posY = floor(x), floor(y)
         end,
-        onRightClick = function()
-            GCDHistory.SetLocked(true)
-            BUI.Print('GCD History locked.')
-        end,
+        onRightClick = function() GCDHistory.SetLocked(true) end,
         showHint   = true,
         hintAnchor = 'TOP',
     })
@@ -535,7 +499,6 @@ end
 GCDHistory.debug = false
 function GCDHistory.SetDebug(on)
     GCDHistory.debug = on and true or false
-    BUI.Print(string.format('GCD History debug %s', GCDHistory.debug and '|cff44ff44ON|r' or '|cffff4444OFF|r'))
 end
 
 function GCDHistory.Enable()
@@ -545,7 +508,7 @@ function GCDHistory.Enable()
     if settings.locked then UpdateLayout() else ShowPreview() end
     BUI.Dragging.SetLocked(container, settings.locked or container._isAnchored)
     StartEvents()
-    RebuildItemSpellMap()
+    itemSpellMapDirty = true
     BUI.Scheduler.RegisterUpdate('GCDHistory_Expire', CheckExpired, 0.2, true)
     enabled = true
     container:Show()
@@ -556,7 +519,7 @@ function GCDHistory.Disable()
     StopEvents()
     BUI.Scheduler.SetUpdateEnabled('GCDHistory_Expire', false)
     ClearIcons()
-    if container then container:Hide() end
+    container:Hide()
     enabled = false
 end
 
@@ -569,7 +532,7 @@ function GCDHistory.SetLocked(locked)
         if locked then ClearIcons() else ShowPreview() end
         container:Show()
     end
-    if GCDHistory._lockToggle and GCDHistory._lockToggle.SetValue then GCDHistory._lockToggle:SetValue(not locked) end
+    BUI.NotifyModuleChange('gcdHistory')
 end
 
 function GCDHistory.Toggle(on)
@@ -577,7 +540,7 @@ function GCDHistory.Toggle(on)
 end
 
 function GCDHistory.UpdateAppearance()
-    if not container or not enabled then return end
+    if not enabled then return end
     styleGeneration = styleGeneration + 1
     local settings = GetDB()
     if settings.locked then UpdateLayout() else ShowPreview() end

@@ -10,26 +10,19 @@ local function Settings()
 	return BUI.GetDB().celebrations
 end
 
-local function Readable(value)
-	return value ~= nil and not (issecretvalue and issecretvalue(value))
-end
-
 local function OnEncounterEnd(_, _, _, _, _, success)
-	if not Readable(success) or success ~= KILLED then return end
+	if BUI.Tools.IsSecretValue(success) or success ~= KILLED then return end
 	local settings = Settings()
 	local _, instanceType = GetInstanceInfo()
-	if instanceType == 'raid' and settings.raidBoss then
-		BUI.Confetti.BurstOnScreen()
-	elseif instanceType == 'party' and settings.dungeonBoss then
+	if (instanceType == 'raid' and settings.raidBoss) or (instanceType == 'party' and settings.dungeonBoss) then
 		BUI.Confetti.BurstOnScreen()
 	end
 end
 
 local function OnKeyCompleted()
 	if not Settings().timedKey then return end
-	local info = C_ChallengeMode.GetChallengeCompletionInfo and C_ChallengeMode.GetChallengeCompletionInfo()
-	local onTime = info and info.onTime
-	if Readable(onTime) and onTime then BUI.Confetti.BurstOnScreen() end
+	local onTime = C_ChallengeMode.GetChallengeCompletionInfo().onTime
+	if not BUI.Tools.IsSecretValue(onTime) and onTime then BUI.Confetti.BurstOnScreen() end
 end
 
 function Celebrations.Test()
