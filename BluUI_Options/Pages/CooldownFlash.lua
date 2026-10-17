@@ -16,21 +16,17 @@ local GLOWS = {
 
 local fonts, sounds
 
-local function Window()
-	return BUI.PageEngine.window
-end
-
-local function RebuildPage()
-	BUILib.Defer(function() BUI.PageEngine.RefreshCurrentPage() end)
-end
+local Kit = BUI.OptionsKit
+local Window, RebuildPage = Kit.Window, Kit.RebuildPage
+local DEFAULTS = CooldownFlash.ENTRY_DEFAULTS
 
 local function SpellName(spellID)
 	return C_Spell.GetSpellName(spellID) or ('Spell ' .. spellID)
 end
 
-local function Option(db, label, key, extra)
-	local option = { label = label, get = function() return db[key] end, set = function(value) db[key] = value end }
-	for name, value in pairs(extra or {}) do option[name] = value end
+local function Option(entry, label, key, extra)
+	local option = Kit.Option(entry, label, key, extra)
+	option.default = function() return DEFAULTS[key] end
 	return option
 end
 
@@ -41,14 +37,20 @@ local function SpellTools(entry, name)
 			return color[1], color[2], color[3], 1
 		end, set = function(red, green, blue)
 			entry.color = { red, green, blue }
+		end, default = function()
+			local color = DEFAULTS.color
+			return color[1], color[2], color[3], 1
 		end },
 		{ kind = 'swatch', tooltip = 'Text color', opacity = true, get = function()
 			local color = entry.textColor
 			return color.r, color.g, color.b, color.a
 		end, set = function(red, green, blue, alpha)
 			entry.textColor = { r = red, g = green, b = blue, a = alpha }
+		end, default = function()
+			local color = DEFAULTS.textColor
+			return color.r, color.g, color.b, color.a
 		end },
-		{ entries = fonts, width = MENU_WIDTH, get = function() return entry.font end, set = function(value) entry.font = value end },
+		Option(entry, nil, 'font', { entries = fonts, width = MENU_WIDTH }),
 		{ icon = 'text', tooltip = 'Text', title = name, options = {
 			Option(entry, 'Text', 'text', { kind = 'input', placeholder = name }),
 			Option(entry, 'Text size', 'textSize', { min = 10, max = 48, step = 1 }),
@@ -58,7 +60,7 @@ local function SpellTools(entry, name)
 			{ label = 'Sound', entries = sounds, get = function() return entry.sound end, set = function(value)
 				entry.sound = value
 				BUI.PlaySoundByName(value)
-			end },
+			end, default = function() return DEFAULTS.sound end },
 			Option(entry, 'Spoken text', 'ttsText', { kind = 'input', placeholder = name, separator = true }),
 			Option(entry, 'Say it', 'tts'),
 		} },
@@ -81,11 +83,11 @@ end
 local function SpellsBoard(ui, parent, width, page)
 	local entries = {}
 	for index, entry in ipairs(CooldownFlash.GetSpells()) do entries[index] = entry end
-	local board = ui.Board(parent, width, {
+	local board = BUI.ResetBoard(ui, ui.Board(parent, width, {
 		stacked = true,
 		title = 'Spells',
 		description = ('Saved for %s. Cooldowns flash when they are ready, buffs from the CDM buff viewer flash when they fall off. They flash in this order, drag a row to reorder it.'):format(CooldownFlash.ListLabel()),
-	})
+	}))
 	local addRow = board:AddRow('Add a spell or buff', 'Name, ID or link', INPUT_WIDTH)
 	BUI.SpellSearch(ui, addRow, INPUT_WIDTH, { spellsOnly = true, onPick = function(hit)
 		if CooldownFlash.AddSpell(hit.id) then RebuildPage() end
@@ -125,6 +127,7 @@ BUI.PageEngine.RegisterPage('cooldownFlash', {
 			back = { label = 'Weaker Auras', onClick = function() BUI.PageEngine.NavigateToID('auras') end },
 			tabs = { { label = 'Cooldown Flash', build = Sections } },
 		})
+		pageFrame._page = page
 		page:AutoRefresh()
 	end,
 })

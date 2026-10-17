@@ -22,14 +22,13 @@ local function GetDB() return BUI.GetDB().combatTimer end
 local lastShownStep = -1
 local currentLayoutKey
 
-local function ShowMilliseconds() return GetDB().showMilliseconds == true end
+local function ShowMilliseconds() return GetDB().showMilliseconds end
 
 local function TemplatesFor(showMilliseconds)
     return showMilliseconds and MILLISECOND_TEMPLATES or PLAIN_TEMPLATES
 end
 
 local function MeasureWidth(template)
-    if not timerText or not timerText:GetFont() then return 0 end
     local previousText = timerText:GetText()
     timerText:SetText(template)
     local width = timerText:GetStringWidth()
@@ -38,8 +37,6 @@ local function MeasureWidth(template)
 end
 
 local function ApplyLayout(showMilliseconds, useHours)
-    if not timerFrame or not timerText then return end
-
     local layoutKey = (showMilliseconds and "milliseconds" or "plain") .. (useHours and "hours" or "minutes")
     if layoutKey == currentLayoutKey then return end
 
@@ -50,22 +47,18 @@ local function ApplyLayout(showMilliseconds, useHours)
     timerText:ClearAllPoints()
     timerText:SetJustifyH("LEFT")
     timerText:SetPoint("LEFT", timerFrame, "CENTER", -(tierWidth / 2), 0)
-
-    if reservedWidth > 0 and tierWidth > 0 then
-        timerFrame:SnapSize(reservedWidth + 40, timerText:GetStringHeight() + 20)
-        currentLayoutKey = layoutKey
-    end
+    timerFrame:SnapSize(reservedWidth + 40, timerText:GetStringHeight() + 20)
+    currentLayoutKey = layoutKey
 end
 
 local function ShowIdleText()
-    if not timerText or not timerText:GetFont() then return end
     local showMilliseconds = ShowMilliseconds()
     ApplyLayout(showMilliseconds, false)
     timerText:SetText(showMilliseconds and "00:00.0" or "00:00")
 end
 
 local function Tick()
-    if not inCombat or not timerText or not timerText:GetFont() then return end
+    if not inCombat then return end
 
     local showMilliseconds = ShowMilliseconds()
     local elapsed = GetTime() - startTime
@@ -99,43 +92,31 @@ end
 local function Build()
     if timerFrame then return end
 
-    local db = GetDB()
     timerFrame = CreateFrame("Frame", "BUI_CombatTimer", UIParent)
     timerFrame:SnapSize(80, 40)
-    timerFrame:SetPoint("CENTER", UIParent, "CENTER", db.posX, db.posY)
     timerFrame:SetFrameStrata("HIGH")
     timerFrame:Hide()
 
     timerText = timerFrame:CreateFontString(nil, "OVERLAY")
-    Pixel.ApplyFont(timerText, db.fontSize, BUI.GetGlobalFont())
-
-    timerFrame.TimerText = timerText
-
-    ShowIdleText()
 
     BUI.Dragging.MakeAnchoredAlert(timerFrame, {
         settings = GetDB,
         isLocked = function() return GetDB().locked end,
         onRightClick = function() CombatTimer.SetLocked(true) end,
     })
-
-    BUI.Scheduler.RegisterUpdate("CombatTimer", Tick, 0.1, false)
 end
 
 function CombatTimer.ApplySettings()
-    if not timerFrame or not timerText then return end
+    if not timerFrame then return end
 
     local db = GetDB()
-    local moduleFont = BUI.GetModuleFont(db)
-    Pixel.ApplyFont(timerText, db.fontSize, moduleFont)
+    Pixel.ApplyFont(timerText, db.fontSize, BUI.GetModuleFont(db))
     timerText:SetTextColor(db.colorR, db.colorG, db.colorB)
     BUI.Anchor.ApplyPosition(timerFrame, db)
 
-    local showMilliseconds = ShowMilliseconds()
-    BUI.Scheduler.RegisterUpdate("CombatTimer", Tick, showMilliseconds and 0.05 or 0.1, inCombat)
+    BUI.Scheduler.RegisterUpdate("CombatTimer", Tick, ShowMilliseconds() and 0.05 or 0.1, inCombat)
 
     BUI.Profiler.After("Auras.CombatTimer settings refresh", 0, function()
-        if not timerFrame or not timerText then return end
         currentLayoutKey = nil
         lastShownStep = -1
         if inCombat then Tick() else ShowIdleText() end
@@ -145,10 +126,7 @@ end
 function CombatTimer.SetLocked(locked)
     local db = GetDB()
     db.locked = locked
-
-    if CombatTimer._lockToggle then
-        CombatTimer._lockToggle:SetValue(not locked)
-    end
+    BUI.NotifyModuleChange('combatTimer')
 
     if not timerFrame then return end
 
@@ -173,21 +151,13 @@ local function FinalizeEndCombat()
     inCombat = false
     BUI.Scheduler.SetUpdateEnabled("CombatTimer", false)
     ShowIdleText()
-    if timerFrame then
-        if GetDB().locked then timerFrame:Hide() else timerFrame:Show() end
-    end
+    if GetDB().locked then timerFrame:Hide() else timerFrame:Show() end
 end
 
-local function OnGroupCombatSignal(event, unit)
+local function OnGroupCombatSignal()
     if InCombatLockdown() then
         StopWatchingGroup()
         return
-    end
-
-    if event == "UNIT_FLAGS" and unit then
-        if unit ~= "player" and not unit:match("^party%d") and not unit:match("^raid%d+") then
-            return
-        end
     end
     if not IsGroupInCombat() then
         FinalizeEndCombat()
@@ -220,7 +190,6 @@ end
 
 function CombatTimer.StartCombat()
     if not enabled then return end
-    Build()
 
     if not inCombat then
         startTime = GetTime()
@@ -241,21 +210,16 @@ function CombatTimer.EndCombat()
     FinalizeEndCombat()
 end
 
-function CombatTimer.Clear()
-    FinalizeEndCombat()
-end
-
 function CombatTimer.Enable()
     enabled = true
     Build()
     CombatTimer.ApplySettings()
 
     BUI.Dragging.SetLocked(timerFrame, GetDB().locked)
-    BUI.Scheduler.SetUpdateEnabled("CombatTimer", inCombat)
 
-    BUI.Events:Register("PLAYER_REGEN_DISABLED", "CombatTimer", function() CombatTimer.StartCombat() end)
-    BUI.Events:Register("PLAYER_REGEN_ENABLED",  "CombatTimer", function() CombatTimer.EndCombat() end)
-    BUI.Events:Register("ENCOUNTER_END",         "CombatTimer", function() CombatTimer.Clear() end)
+    BUI.Events:Register("PLAYER_REGEN_DISABLED", "CombatTimer", CombatTimer.StartCombat)
+    BUI.Events:Register("PLAYER_REGEN_ENABLED",  "CombatTimer", CombatTimer.EndCombat)
+    BUI.Events:Register("ENCOUNTER_END",         "CombatTimer", FinalizeEndCombat)
     if GetDB().locked and not inCombat then
         timerFrame:Hide()
     else

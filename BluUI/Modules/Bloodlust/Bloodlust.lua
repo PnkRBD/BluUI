@@ -392,7 +392,7 @@ function Bloodlust.StopPreview()
 	readyMessageUntil = 0
 	BUI.Scheduler.SetUpdateEnabled(MODULE_KEY, GetConfig().enabled)
 	Tick()
-	if wasPreviewing and Bloodlust.onPreviewStop then Bloodlust.onPreviewStop() end
+	if wasPreviewing then BUI.NotifyModuleChange('bloodlust') end
 end
 
 function Bloodlust.IsPreviewing() return previewState ~= nil end
@@ -405,8 +405,6 @@ end
 
 function Bloodlust.Initialize()
 	local config = GetConfig()
-	if config.usedFormat:find('%[caster%]') then config.usedFormat = '[spell] used!' end
-	if config.ttsUsedText:find('%[caster%]') then config.ttsUsedText = 'Lust used' end
 	ApplyLayout()
 
 	BUI.Anchor.Follow('Bloodlust', function() return GetConfig().enabled and frame end, GetConfig)

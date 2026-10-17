@@ -9,7 +9,7 @@ local FRAME_NAME = 'BUI_PrivateWarning'
 local WIDTH, HEIGHT = 800, 80
 local SAMPLE_TEXT = 'Private raid warning'
 
-local holder, lockListener
+local holder
 
 local function GetDB() return BUI.GetDB().privateWarning end
 
@@ -34,51 +34,31 @@ local function Build()
 	})
 end
 
-local function Apply()
+function PrivateWarning.Enable()
 	local db = GetDB()
+	Build()
+	holder:Show()
 	BUI.Anchor.ApplyPosition(holder, db)
 	holder:SetScale(db.scale / 100)
 	Bind(holder)
-end
-
-local function PaintLock(locked)
-	BUI.Dragging.SetLocked(holder, locked)
-	holder:EnableMouse(not locked)
-	holder.sample:SetShown(not locked)
-end
-
-function PrivateWarning.Enable()
-	Build()
-	holder:Show()
-	Apply()
+	BUI.Dragging.SetLocked(holder, db.locked)
+	holder.sample:SetShown(not db.locked)
 end
 
 function PrivateWarning.Disable()
-	if PrivateRaidBossEmoteFrameAnchor then Bind(PrivateRaidBossEmoteFrameAnchor) end
+	Bind(PrivateRaidBossEmoteFrameAnchor)
 	if holder then holder:Hide() end
-end
-
-function PrivateWarning.SetLockListener(callback)
-	lockListener = callback
 end
 
 function PrivateWarning.SetLocked(locked)
 	local db = GetDB()
 	db.locked = locked
-	if lockListener then lockListener() end
-	if not db.enabled then return end
-	PrivateWarning.Enable()
-	PaintLock(locked)
+	BUI.NotifyModuleChange('privateWarning')
+	if db.enabled then PrivateWarning.Enable() end
 end
 
 function PrivateWarning.Refresh()
-	local db = GetDB()
-	if not db.enabled then
-		PrivateWarning.Disable()
-		return
-	end
-	PrivateWarning.Enable()
-	PaintLock(db.locked)
+	if GetDB().enabled then PrivateWarning.Enable() else PrivateWarning.Disable() end
 end
 
 BUI.Events:OnLogin('PrivateWarning', function()

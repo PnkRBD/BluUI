@@ -8,13 +8,8 @@ local MENU_WIDTH = 160
 
 local fonts, sounds
 
-local function Window()
-	return BUI.PageEngine.window
-end
-
-local function Repaint()
-	Window():Repaint()
-end
+local Kit = BUI.OptionsKit
+local Window, Repaint, Option = Kit.Window, Kit.Repaint, Kit.Option
 
 local function Config()
 	return BUI.GetDB().bloodlust
@@ -24,35 +19,12 @@ local function Refresh()
 	Bloodlust.Refresh()
 end
 
-local function Field(key)
-	return function() return Config()[key] end, function(value) Config()[key] = value end
+local function Text(db, label, key)
+	return Option(db, label, key, { kind = 'input', placeholder = 'Nothing' })
 end
 
-local function Option(label, key, extra)
-	local option = { label = label }
-	option.get, option.set = Field(key)
-	for name, value in pairs(extra or {}) do option[name] = value end
-	return option
-end
-
-local function Text(label, key)
-	return Option(label, key, { kind = 'input', placeholder = 'Nothing' })
-end
-
-local function Switch(key)
-	local tool = {}
-	tool.get, tool.set = Field(key)
-	return tool
-end
-
-local function Choice(key, entries)
-	local tool = { entries = entries, width = MENU_WIDTH }
-	tool.get, tool.set = Field(key)
-	return tool
-end
-
-local function Sound(label, key)
-	local tool = Choice(key, sounds)
+local function Sound(db, label, key)
+	local tool = Kit.Menu(db, key, sounds, MENU_WIDTH)
 	tool.label = label
 	local set = tool.set
 	tool.set = function(value)
@@ -62,90 +34,84 @@ local function Sound(label, key)
 	return tool
 end
 
-local function Color(key)
-	return {
-		kind = 'swatch', opacity = true, tooltip = 'Text color',
-		get = function()
-			local color = Config()[key]
-			return color[1], color[2], color[3], color[4]
-		end,
-		set = function(red, green, blue, alpha) Config()[key] = { red, green, blue, alpha } end,
-	}
+local function Color(db, key)
+	return Kit.Color(db, nil, key, { tooltip = 'Text color' })
 end
 
 local function Sections(ui, _, parent, width)
-	local display = ui.Board(parent, width, {
+	local db = Config()
+	local display = BUI.ResetBoard(ui, ui.Board(parent, width, {
 		stacked = true,
 		title = 'Display',
 		description = 'How the text looks and where it sits. Use [spell] for the buff name and [time] for the countdown.',
-	})
+	}))
 	display:AddTools('Text', 'Font, size, icon and position', {
-		Choice('font', fonts),
+		Kit.Menu(db, 'font', fonts, MENU_WIDTH),
 		{ icon = 'text', tooltip = 'Size', title = 'Text', options = {
-			Option('Font size', 'fontSize', { min = 8, max = 48, step = 1 }),
+			Option(db, 'Font size', 'fontSize', { min = 8, max = 48, step = 1 }),
 		} },
 		{ tooltip = 'Icon', title = 'Icon', options = {
-			Option('Show icon', 'showIcon'),
-			Option('Icon size', 'iconSize', { min = 12, max = 64, step = 1 }),
+			Option(db, 'Show icon', 'showIcon'),
+			Option(db, 'Icon size', 'iconSize', { min = 12, max = 64, step = 1 }),
 		} },
-		BUI.PositionTool(Config()),
+		BUI.PositionTool(db),
 	}, Refresh)
 
-	local alerts = ui.Board(parent, width, {
+	local alerts = BUI.ResetBoard(ui, ui.Board(parent, width, {
 		stacked = true,
 		title = 'Alerts',
 		description = 'One-off announcements, each with its own sound.',
-	})
+	}))
 	alerts:AddTools('Used', 'When someone pops Bloodlust', {
-		Color('usedColor'),
-		Sound('Sound', 'soundOnUsed'),
-		{ icon = 'text', tooltip = 'Message text', title = 'Used', options = { Text('Text', 'usedFormat') } },
+		Color(db, 'usedColor'),
+		Sound(db, 'Sound', 'soundOnUsed'),
+		{ icon = 'text', tooltip = 'Message text', title = 'Used', options = { Text(db, 'Text', 'usedFormat') } },
 		{ tooltip = 'Timing and speech', title = 'Used', options = {
-			Option('Hold seconds', 'usedHoldDuration', { min = 0.5, max = 10, step = 0.5 }),
-			Option('Flash', 'flashOnUsed'),
-			Option('Flash seconds', 'flashDuration', { min = 0.2, max = 5, step = 0.1 }),
-			Option('Speak', 'ttsOnUsed'),
-			Text('Speak text', 'ttsUsedText'),
+			Option(db, 'Hold seconds', 'usedHoldDuration', { min = 0.5, max = 10, step = 0.5 }),
+			Option(db, 'Flash', 'flashOnUsed'),
+			Option(db, 'Flash seconds', 'flashDuration', { min = 0.2, max = 5, step = 0.1 }),
+			Option(db, 'Speak', 'ttsOnUsed'),
+			Text(db, 'Speak text', 'ttsUsedText'),
 		} },
 	}, Refresh)
 	alerts:AddTools('Available', 'When Bloodlust comes off cooldown', {
-		Color('readyColor'),
-		Sound('Sound', 'soundOnReady'),
-		{ icon = 'text', tooltip = 'Message text', title = 'Available', options = { Text('Text', 'readyFormat') } },
+		Color(db, 'readyColor'),
+		Sound(db, 'Sound', 'soundOnReady'),
+		{ icon = 'text', tooltip = 'Message text', title = 'Available', options = { Text(db, 'Text', 'readyFormat') } },
 		{ tooltip = 'Timing and speech', title = 'Available', options = {
-			Option('Hold seconds', 'readyHoldDuration', { min = 0.5, max = 10, step = 0.5 }),
-			Option('Keep on screen', 'showWhenReady'),
-			Option('Hide in town', 'readyHideInTown'),
-			Option('Dungeons only', 'readyDungeonOnly'),
-			Option('Flash', 'flashOnReady'),
-			Option('Flash seconds', 'flashReadyDuration', { min = 0.2, max = 5, step = 0.1 }),
-			Option('Speak', 'ttsOnReady'),
-			Text('Speak text', 'ttsReadyText'),
+			Option(db, 'Hold seconds', 'readyHoldDuration', { min = 0.5, max = 10, step = 0.5 }),
+			Option(db, 'Keep on screen', 'showWhenReady'),
+			Option(db, 'Hide in town', 'readyHideInTown'),
+			Option(db, 'Dungeons only', 'readyDungeonOnly'),
+			Option(db, 'Flash', 'flashOnReady'),
+			Option(db, 'Flash seconds', 'flashReadyDuration', { min = 0.2, max = 5, step = 0.1 }),
+			Option(db, 'Speak', 'ttsOnReady'),
+			Text(db, 'Speak text', 'ttsReadyText'),
 		} },
 	}, Refresh)
 
-	local countdowns = ui.Board(parent, width, {
+	local countdowns = BUI.ResetBoard(ui, ui.Board(parent, width, {
 		stacked = true,
 		title = 'Countdowns',
 		description = 'Live timers while the buff runs or recharges.',
-	})
+	}))
 	countdowns:AddTools('Active', 'Timer while the buff runs', {
-		Color('activeColor'),
-		{ icon = 'text', tooltip = 'Timer text', title = 'Active', options = { Text('Text', 'activeFormat') } },
-		Switch('showWhenActive'),
+		Color(db, 'activeColor'),
+		{ icon = 'text', tooltip = 'Timer text', title = 'Active', options = { Text(db, 'Text', 'activeFormat') } },
+		Option(db, nil, 'showWhenActive'),
 	}, Refresh)
 	countdowns:AddTools('On cooldown', 'Timer until Bloodlust is ready, with an optional warning before', {
-		Color('cdColor'),
-		{ icon = 'text', tooltip = 'Timer text', title = 'On cooldown', options = { Text('Text', 'cdFormat') } },
+		Color(db, 'cdColor'),
+		{ icon = 'text', tooltip = 'Timer text', title = 'On cooldown', options = { Text(db, 'Text', 'cdFormat') } },
 		{ tooltip = 'Where it shows and the warning', title = 'On cooldown', options = {
-			Option('Hide in town', 'cdHideInTown'),
-			Option('Dungeons only', 'cdDungeonOnly'),
-			Option('Warn seconds before', 'warnBeforeReady', { min = 0, max = 60, step = 1 }),
-			Sound('Warn sound', 'soundOnWarn'),
-			Option('Speak warning', 'ttsOnWarn'),
-			Text('Warning text', 'ttsWarnText'),
+			Option(db, 'Hide in town', 'cdHideInTown'),
+			Option(db, 'Dungeons only', 'cdDungeonOnly'),
+			Option(db, 'Warn seconds before', 'warnBeforeReady', { min = 0, max = 60, step = 1 }),
+			Sound(db, 'Warn sound', 'soundOnWarn'),
+			Option(db, 'Speak warning', 'ttsOnWarn'),
+			Text(db, 'Warning text', 'ttsWarnText'),
 		} },
-		Switch('showWhenCD'),
+		Option(db, nil, 'showWhenCD'),
 	}, Refresh)
 	return { display, alerts, countdowns }
 end
@@ -176,7 +142,8 @@ BUI.PageEngine.RegisterPage('bloodlust', {
 			},
 			tabs = { { label = 'Bloodlust', build = Sections } },
 		})
-		Bloodlust.onPreviewStop = Repaint
+		BUI.OnModuleChange('bloodlust', Repaint)
+		pageFrame._page = page
 		page:AutoRefresh()
 	end,
 	OnHide = function()

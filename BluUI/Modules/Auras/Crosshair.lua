@@ -10,7 +10,6 @@ local RANGED_CAP_YARDS = 60
 local RANGE_TICK = 0.1
 
 local crosshairFrame
-local rangeTicker
 local previewing = false
 local inCombat = false
 local RefreshRangeTicker
@@ -111,7 +110,6 @@ local function UpdateColor()
         PaintAll(db.colorR, db.colorG, db.colorB, alpha)
     end
 end
-local UpdateColorTimed = BUI.Profiler.Wrap("Auras.Crosshair range check", UpdateColor)
 
 local function IsSpecAllowed()
     local db = GetDB()
@@ -209,6 +207,8 @@ local function Build()
     crosshairFrame.top   = crosshairFrame:CreateTexture(nil, "ARTWORK")
     crosshairFrame.bot   = crosshairFrame:CreateTexture(nil, "ARTWORK")
 
+    BUI.Scheduler.RegisterUpdate("Crosshair", UpdateColor, RANGE_TICK, false)
+
     inCombat = InCombatLockdown()
     BUI.Events:Register("PLAYER_REGEN_ENABLED",          "Crosshair", OnCombat)
     BUI.Events:Register("PLAYER_REGEN_DISABLED",         "Crosshair", OnCombat)
@@ -228,27 +228,11 @@ local function Build()
     end)
 end
 
-local function StopRangeTicker()
-    if rangeTicker then
-        rangeTicker:Cancel()
-        rangeTicker = nil
-    end
-end
-
-local function StartRangeTicker()
-    if not rangeTicker then
-        rangeTicker = C_Timer.NewTicker(RANGE_TICK, UpdateColorTimed)
-    end
-end
-
 RefreshRangeTicker = function()
     local db = GetDB()
-    if (db.enabled or previewing) and db.rangeIndicator
-        and crosshairFrame and crosshairFrame:IsShown() and UnitExists("target") then
-        StartRangeTicker()
-    else
-        StopRangeTicker()
-    end
+    local wanted = (db.enabled or previewing) and db.rangeIndicator
+        and crosshairFrame:IsShown() and UnitExists("target")
+    BUI.Scheduler.SetUpdateEnabled("Crosshair", wanted)
 end
 
 function Crosshair.Refresh()

@@ -38,10 +38,9 @@ local KEYSTONE_ICON = 'Interface\\Icons\\INV_Relics_Hourglass'
 local READY_TEXT = 'Click to teleport'
 local COOLDOWN_TEXT = 'Teleport on cooldown'
 local UNLEARNED_TEXT = 'Teleport not learned'
-local IsSecret = BUI.Tools.IsSecretValue
 local PartyKeys = BUI.PartyKeys
 
-local card, current, group, dismissed, lockListener, keyDone
+local card, current, group, dismissed, keyDone
 
 local function GetDB() return BUI.GetDB().keystoneReminder end
 
@@ -52,7 +51,7 @@ end
 local function PlayerRole()
     local role = UnitGroupRolesAssigned('player')
     if role == 'NONE' then
-        local spec = GetSpecialization()
+        local spec = C_SpecializationInfo.GetSpecialization()
         role = spec and GetSpecializationRole(spec)
     end
     return role
@@ -159,7 +158,6 @@ local function Build()
         onRightClick = Dismiss,
         onPositionChanged = function() BUI.Anchor.SaveDrop(card, GetDB()) end,
     })
-    Apply()
 end
 
 local function PaintCard()
@@ -173,13 +171,16 @@ end
 local function PaintCooldown()
     local portal = card.portal
     local info = portal._known and C_Spell.GetSpellCooldown(portal._spellID)
-    if not info or IsSecret(info.isActive) or IsSecret(info.isOnGCD) then return end
-    portal._cooling = info.isActive and not info.isOnGCD
-    if portal._cooling then
+    if not info then return false end
+    local cooling = info.isActive and not info.isOnGCD
+    if cooling == portal._cooling then return false end
+    portal._cooling = cooling
+    if cooling then
         portal.cooldown:SetCooldownFromDurationObject(C_Spell.GetSpellCooldownDuration(portal._spellID))
     else
         portal.cooldown:Clear()
     end
+    return true
 end
 
 local function SetPortal(spellID, texture)
@@ -220,8 +221,7 @@ local function PaintLevel()
 end
 
 local function OnCooldown()
-    PaintCooldown()
-    PaintMeta()
+    if PaintCooldown() then PaintMeta() end
 end
 
 local function PaintStatus()
@@ -377,14 +377,10 @@ function KeystoneReminder.Disable()
     KeystoneReminder.Hide()
 end
 
-function KeystoneReminder.SetLockListener(callback)
-    lockListener = callback
-end
-
 function KeystoneReminder.SetLocked(locked)
     local db = GetDB()
     db.locked = locked
-    if lockListener then lockListener() end
+    BUI.NotifyModuleChange('keystoneReminder')
     if not db.enabled then return end
     Build()
     Apply()

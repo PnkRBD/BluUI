@@ -92,7 +92,7 @@ local STATS = {
 
 local DEFAULT_ORDER = { 'primary', 'crit', 'haste', 'mastery', 'vers', 'stamina', 'leech', 'avoidance', 'speed' }
 
-local holder, measure, lines, lockListener
+local holder, measure, lines
 local shown, critShown = 0, false
 local enabled, inCombat = false, false
 
@@ -157,8 +157,8 @@ local function Build()
 end
 
 local function ReadPrimary()
-    local spec = GetSpecialization()
-    primaryStat = spec and select(6, GetSpecializationInfo(spec))
+    local spec = C_SpecializationInfo.GetSpecialization()
+    primaryStat = spec and select(6, C_SpecializationInfo.GetSpecializationInfo(spec))
 end
 
 local function Listed(id)
@@ -247,14 +247,10 @@ function SecondaryStats.Disable()
     if holder then holder:Hide() end
 end
 
-function SecondaryStats.SetLockListener(callback)
-    lockListener = callback
-end
-
 function SecondaryStats.SetLocked(locked)
     local db = GetDB()
     db.locked = locked
-    if lockListener then lockListener() end
+    BUI.NotifyModuleChange('secondaryStats')
     if db.enabled then SecondaryStats.Enable() end
 end
 

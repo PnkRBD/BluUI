@@ -34,14 +34,13 @@ local GetSpellName = C_Spell.GetSpellName
 local root
 local pool, active, state = {}, {}, {}
 local tracked, scan = {}, nil
-local anchorCallback
 local Release
 
 local function GetConfig() return BUI.GetDB()[SETTINGS_KEY] end
 
 local function ListKey()
-    local specIndex = GetSpecialization()
-    local specID = specIndex and GetSpecializationInfo(specIndex)
+    local specIndex = C_SpecializationInfo.GetSpecialization()
+    local specID = specIndex and C_SpecializationInfo.GetSpecializationInfo(specIndex)
     if specID then return 'spec:' .. specID end
     local _, class = UnitClass('player')
     return 'class:' .. class
@@ -56,49 +55,35 @@ end
 
 function CooldownFlash.ListLabel()
     local className = UnitClass('player')
-    local specIndex = GetSpecialization()
+    local specIndex = C_SpecializationInfo.GetSpecialization()
     if not specIndex then return className end
-    local _, specName = GetSpecializationInfo(specIndex)
+    local _, specName = C_SpecializationInfo.GetSpecializationInfo(specIndex)
     return specName .. ' ' .. className
 end
 
-function CooldownFlash.RegisterAnchorCallback(callback) anchorCallback = callback end
+local ENTRY_DEFAULTS = {
+    enabled = true,
+    size = 48,
+    holdSeconds = 2.5,
+    color = { 1, 1, 1 },
+    opacity = 100,
+    glow = 'both',
+    showIcon = true,
+    text = '',
+    showText = false,
+    font = BUI.C.GLOBAL_OPTION,
+    textSize = 14,
+    textColor = { r = 1, g = 1, b = 1, a = 1 },
+    sound = 'None',
+    tts = false,
+    ttsText = '',
+}
+CooldownFlash.ENTRY_DEFAULTS = ENTRY_DEFAULTS
 
 local function NewEntry(spellID)
-    return {
-        id = spellID,
-        enabled = true,
-        size = 48,
-        holdSeconds = 2.5,
-        color = { 1, 1, 1 },
-        opacity = 100,
-        glow = 'both',
-        showIcon = true,
-        text = '',
-        showText = false,
-        font = BUI.C.GLOBAL_OPTION,
-        textSize = 14,
-        textColor = { r = 1, g = 1, b = 1, a = 1 },
-        sound = 'None',
-        tts = false,
-        ttsText = '',
-    }
-end
-
-local function MigrateLists()
-    for _, list in pairs(GetConfig().specs) do
-        for index, entry in ipairs(list) do
-            if type(entry) == 'number' then
-                list[index] = NewEntry(entry)
-            else
-                for key, value in pairs(NewEntry(entry.id)) do
-                    if entry[key] == nil then entry[key] = value end
-                end
-                if entry.sound == 'default' then entry.sound = 'None' end
-                if entry.glow == true then entry.glow = 'both' elseif entry.glow == false then entry.glow = 'none' end
-            end
-        end
-    end
+    local entry = CopyTable(ENTRY_DEFAULTS)
+    entry.id = spellID
+    return entry
 end
 
 local function EntryFor(spellID)
@@ -390,7 +375,7 @@ local function Scan(mayFlash)
     BUI.Scheduler.SetUpdateEnabled(EVENT_KEY, AnyBusy())
 end
 
-local function OnCooldowns() Scan(true) end
+local OnCooldowns = BUI.Dispatcher.New(function() Scan(true) end, 'CooldownFlash')
 
 local function SyncTracked()
     wipe(tracked)
@@ -439,7 +424,7 @@ local function BuildRoot()
         onRightClick = function()
             GetConfig().showAnchor = false
             CooldownFlash.Refresh()
-            if anchorCallback then anchorCallback() end
+            BUI.NotifyModuleChange('cooldownFlash')
         end,
     })
 end
@@ -495,11 +480,10 @@ local function OnSpecChanged(_, unit)
 end
 
 local function UpdateOpacity()
-    root:SetAlpha((BUI.Visibility.GetContextualOpacity(EVENT_KEY) or 100) / 100)
+    root:SetAlpha(BUI.Visibility.GetContextualOpacity(EVENT_KEY) / 100)
 end
 
 local function Initialize()
-    MigrateLists()
     scan = BUI.BuffTracking.NewCDMScan(tracked, function()
         if watching then Scan(false) end
     end)

@@ -4,14 +4,15 @@ local Pixel = BUI.Pixel
 BUI.CombatMessage = {}
 local CombatMessage = BUI.CombatMessage
 
+local FADE_OUT = 0.4
+
 local messageFrame, messageText
 local eventsWired = false
+local flashToken = 0
 
 local function GetDB() return BUI.GetDB().combatMessage end
 
-
 local function Apply()
-    if not messageFrame or not messageText then return end
     local db = GetDB()
     BUI.Anchor.ApplyPosition(messageFrame, db)
     Pixel.ApplyFont(messageText, db.fontSize, BUI.GetModuleFont(db))
@@ -28,8 +29,6 @@ local function Build()
     messageText = messageFrame:CreateFontString(nil, "OVERLAY")
     messageText:SetPoint("CENTER")
 
-    Apply()
-
     BUI.Dragging.MakeAnchoredAlert(messageFrame, {
         settings = GetDB,
         isLocked = function() return GetDB().locked end,
@@ -44,34 +43,29 @@ local function PaintForState(inCombat)
     messageText:SetTextColor(color[1], color[2], color[3], color[4])
 end
 
-local function ShowPreview(inCombat)
-    if not messageText then return end
-    PaintForState(inCombat)
+local function ShowPreview()
+    UIFrameFadeRemoveFrame(messageFrame)
+    PaintForState(true)
     messageFrame:SetAlpha(1)
     messageFrame:Show()
 end
 
+local function HideMessage()
+    messageFrame:Hide()
+end
+
 local function Flash(inCombat)
-    local db = GetDB()
-    if not db.enabled or not messageFrame then return end
-
     UIFrameFadeRemoveFrame(messageFrame)
-
-    local token = (messageFrame._flashToken or 0) + 1
-    messageFrame._flashToken = token
+    flashToken = flashToken + 1
+    local token = flashToken
 
     PaintForState(inCombat)
     messageFrame:SetAlpha(1)
     messageFrame:Show()
 
-    BUI.Profiler.After("Auras.CombatMessage fade out", db.fadeTime, function()
-        if not messageFrame or messageFrame._flashToken ~= token then return end
-        UIFrameFadeOut(messageFrame, 0.4, 1, 0)
-        BUI.Profiler.After("Auras.CombatMessage hide", 0.5, function()
-            if messageFrame and messageFrame._flashToken == token then
-                messageFrame:Hide()
-            end
-        end)
+    BUI.Profiler.After("Auras.CombatMessage fade out", GetDB().fadeTime, function()
+        if flashToken ~= token then return end
+        UIFrameFade(messageFrame, { mode = "OUT", timeToFade = FADE_OUT, startAlpha = 1, endAlpha = 0, finishedFunc = HideMessage })
     end)
 end
 
@@ -94,7 +88,7 @@ function CombatMessage.Enable()
     WireEvents()
     Apply()
     if not GetDB().locked then
-        ShowPreview(true)
+        ShowPreview()
         BUI.Dragging.SetLocked(messageFrame, false)
     end
 end
@@ -102,10 +96,7 @@ end
 function CombatMessage.SetLocked(locked)
     local db = GetDB()
     db.locked = locked
-
-    if CombatMessage._lockToggle and CombatMessage._lockToggle.SetValue then
-        CombatMessage._lockToggle:SetValue(not locked)
-    end
+    BUI.NotifyModuleChange('combatMessage')
 
     if not db.enabled then return end
 
@@ -116,7 +107,7 @@ function CombatMessage.SetLocked(locked)
     if locked then
         messageFrame:Hide()
     else
-        ShowPreview(true)
+        ShowPreview()
     end
 end
 
@@ -132,7 +123,7 @@ function CombatMessage.Refresh()
     BUI.Dragging.SetLocked(messageFrame, db.locked)
 
     if messageFrame:IsShown() and not db.locked then
-        ShowPreview(true)
+        ShowPreview()
     end
 end
 

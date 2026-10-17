@@ -32,13 +32,8 @@ local DISPLAYS = {
 
 local fonts
 
-local function Window()
-	return BUI.PageEngine.window
-end
-
-local function Repaint()
-	Window():Repaint()
-end
+local Kit = BUI.OptionsKit
+local Window, Repaint, Option = Kit.Window, Kit.Repaint, Kit.Option
 
 local function Config()
 	return BUI.GetDB().secondaryStats
@@ -46,12 +41,6 @@ end
 
 local function Refresh()
 	SecondaryStats.Refresh()
-end
-
-local function Option(label, key, extra)
-	local option = { label = label, get = function() return Config()[key] end, set = function(value) Config()[key] = value end }
-	for name, value in pairs(extra or {}) do option[name] = value end
-	return option
 end
 
 local function StatColor(stat, label)
@@ -89,23 +78,24 @@ local function StatsBoard(ui, parent, width, page)
 end
 
 local function TextBoard(ui, parent, width)
-	local board = ui.Board(parent, width, {
+	local db = Config()
+	local board = BUI.ResetBoard(ui, ui.Board(parent, width, {
 		stacked = true,
 		title = 'Text',
 		description = 'How the readout looks, what each stat shows and where it sits.',
-	})
+	}))
 	board:AddTools('Text', 'Font, size, alignment and position', {
-		{ entries = fonts, width = MENU_WIDTH, get = function() return Config().font end, set = function(value) Config().font = value end },
+		Option(db, nil, 'font', { entries = fonts, width = MENU_WIDTH }),
 		{ icon = 'text', tooltip = 'Text', title = 'Text', options = {
-			Option('Font size', 'fontSize', { min = 8, max = 40, step = 1 }),
-			Option('Align', 'align', { entries = ALIGNMENTS }),
+			Option(db, 'Font size', 'fontSize', { min = 8, max = 40, step = 1 }),
+			Option(db, 'Align', 'align', { entries = ALIGNMENTS }),
 		} },
-		BUI.PositionTool(Config(), { selfTag = 'BUI_SecondaryStats' }),
+		BUI.PositionTool(db, { selfTag = 'BUI_SecondaryStats' }),
 	}, Refresh)
 	board:AddTools('Readout', 'Rating, percent or both for each stat, and when it shows', {
-		Option('Show', 'display', { entries = DISPLAYS, width = MENU_WIDTH }),
+		Option(db, 'Show', 'display', { entries = DISPLAYS, width = MENU_WIDTH }),
 		{ tooltip = 'When it shows', title = 'Readout', options = {
-			Option('Combat only', 'combatOnly'),
+			Option(db, 'Combat only', 'combatOnly'),
 		} },
 	}, Refresh)
 	return board
@@ -140,7 +130,8 @@ BUI.PageEngine.RegisterPage('secondaryStats', {
 			},
 			tabs = { { label = 'Secondary Stats', build = Sections } },
 		})
-		SecondaryStats.SetLockListener(Repaint)
+		BUI.OnModuleChange('secondaryStats', Repaint)
+		pageFrame._page = page
 		page:AutoRefresh()
 	end,
 })

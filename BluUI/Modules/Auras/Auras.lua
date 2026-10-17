@@ -9,14 +9,14 @@ local PetClasses = { HUNTER = true, WARLOCK = true, DEATHKNIGHT = true }
 
 local NoPetSpecs = { [254] = true, [250] = true, [251] = true }
 
-local _, playerClass = BUI.Tools.SafeUnitClass("player")
+local playerClass = select(2, UnitClass("player"))
 local cachedIsPetSpec
 
 local function InvalidatePetSpec() cachedIsPetSpec = nil end
 
 local function HasPetSpec()
     if cachedIsPetSpec ~= nil then return cachedIsPetSpec end
-    if not playerClass or not PetClasses[playerClass] then
+    if not PetClasses[playerClass] then
         cachedIsPetSpec = false
         return false
     end
@@ -43,7 +43,7 @@ local function CachePlayDeadSlot()
     playDeadSlot = nil
     if not UnitExists("pet") then return end
     for slotIndex = 1, NUM_PET_ACTION_SLOTS do
-        local _, _, _, _, _, _, _, spellID = GetPetActionInfo(slotIndex)
+        local spellID = select(7, GetPetActionInfo(slotIndex))
         if spellID == PLAY_DEAD_BUFF then
             playDeadSlot = slotIndex
             return
@@ -54,7 +54,7 @@ end
 local function HasPlayDead()
     if playerClass ~= "HUNTER" or not playDeadSlot then return false end
     if not UnitExists("pet") then return false end
-    local _, _, _, _, isActive = GetPetActionInfo(playDeadSlot)
+    local _, _, _, isActive = GetPetActionInfo(playDeadSlot)
     return isActive == true
 end
 
@@ -120,7 +120,7 @@ end
 
 local lastStyledFor = nil
 local function Warn(message)
-    if activeWarning == message and warningFrame and warningFrame:IsShown() then return end
+    if activeWarning == message then return end
     hideHealthWarning()
     BuildPetWarning()
     activeWarning = message
@@ -141,8 +141,8 @@ local function BuildHealthWarning()
 end
 
 local function ApplyThresholdAlpha(frame, unit, threshold)
-    local color = UnitHealthPercent(unit, false, BUI.Tools.ThresholdAlphaCurve(threshold))
-    frame:SetAlpha(color and select(4, color:GetRGBA()) or 0)
+    local _, _, _, alpha = UnitHealthPercent(unit, false, BUI.Tools.ThresholdAlphaCurve(threshold)):GetRGBA()
+    frame:SetAlpha(alpha)
 end
 
 local function UpdateHealthAlpha()
@@ -255,13 +255,18 @@ local function SyncPetTriggers()
     end
 end
 
+local function RecachePlayDead()
+    CachePlayDeadSlot()
+    ScheduleCheck()
+end
+
 local eventsWired = false
 local WireEvents
 
 local function OnSpecChanged()
     InvalidatePetSpec()
     WireEvents()
-    CheckPet()
+    ScheduleCheck()
 end
 
 WireEvents = function()
@@ -278,17 +283,16 @@ WireEvents = function()
     if playerClass == "HUNTER" then BUI.Events:RegisterUnit("UNIT_AURA", "pet", "Auras", ScheduleCheck) end
     BUI.Events:RegisterUnit("UNIT_FLAGS",  "pet",    "Auras", ScheduleCheck)
     SyncPetTriggers()
-    BUI.Events:RegisterUnit("UNIT_PET",    "player", "Auras", ScheduleCheck)
+    BUI.Events:RegisterUnit("UNIT_PET",    "player", "Auras", RecachePlayDead)
     BUI.Events:RegisterUnit("UNIT_ENTERED_VEHICLE", "player", "Auras", ScheduleCheck)
     BUI.Events:RegisterUnit("UNIT_EXITED_VEHICLE",  "player", "Auras", ScheduleCheck)
 
     BUI.Events:Register("PLAYER_REGEN_DISABLED",         "Auras", ScheduleCheck)
-    BUI.Events:Register("PLAYER_REGEN_ENABLED",          "Auras", function() CachePlayDeadSlot(); ScheduleCheck() end)
-    BUI.Events:Register("PLAYER_ENTERING_WORLD",         "Auras", function() CachePlayDeadSlot(); ScheduleCheck() end)
+    BUI.Events:Register("PLAYER_REGEN_ENABLED",          "Auras", RecachePlayDead)
+    BUI.Events:Register("PLAYER_ENTERING_WORLD",         "Auras", RecachePlayDead)
     BUI.Events:Register("PLAYER_ALIVE",                  "Auras", ScheduleCheck)
     BUI.Events:Register("PLAYER_DEAD",                   "Auras", ScheduleCheck)
-    BUI.Events:RegisterUnit("UNIT_PET",                  "player", "Auras.PlayDeadCache", function() CachePlayDeadSlot(); ScheduleCheck() end)
-    BUI.Events:Register("PET_BAR_UPDATE",                "Auras", function() CachePlayDeadSlot(); ScheduleCheck() end)
+    BUI.Events:Register("PET_BAR_UPDATE",                "Auras", RecachePlayDead)
     BUI.Events:Register("PLAYER_MOUNT_DISPLAY_CHANGED",  "Auras", ScheduleCheck)
 
     CachePlayDeadSlot()
@@ -309,47 +313,19 @@ local function ShowAnchor()
     Warn("**PET WARNING ANCHOR**")
 end
 
-local PreviewMessages = {
-    petDeadWarning           = "***SUMMON PET***",
-    petHealthWarning         = "***HEAL PET***",
-    grimoireSacrificeWarning = "***SACRIFICE PET***",
-    petAttackWarning         = "***PET NOT ATTACKING***",
-    playDeadWarning          = "***PLAYING DEAD***",
-}
-
-function Auras.ShowPreview(show, warnType)
-    if not GetDB().petWarningsEnabled then
-        HidePetWarning()
-        return
-    end
-    BuildPetWarning()
-    previewing = show
-    if show then
-        Warn(PreviewMessages[warnType] or PreviewMessages.petAttackWarning)
-    else
-        HidePetWarning()
-        CheckPet()
-    end
-end
-
 function Auras.SetLocked(locked)
     GetDB().locked = locked
-
-    if Auras._lockToggle then
-        Auras._lockToggle:SetValue(not locked)
-    end
+    BUI.NotifyModuleChange('petWarnings')
 
     if not GetDB().petWarningsEnabled then
         HidePetWarning()
         return
     end
-
-    BuildPetWarning()
-    BUI.Dragging.SetLocked(warningFrame, locked)
 
     if locked then
         previewing = false
         HidePetWarning()
+        BUI.Dragging.SetLocked(warningFrame, true)
     else
         ShowAnchor()
     end
@@ -379,10 +355,7 @@ function Auras.Update()
 end
 
 function Auras.Initialize()
-    if GetDB().petWarningsEnabled then
-        WireEvents()
-        Auras.Update()
-    end
+    if GetDB().petWarningsEnabled then Auras.Update() end
     Auras.UpdateLowHp()
     Auras.UpdateMark()
 end
@@ -405,11 +378,11 @@ local function BuildLowHp()
 
     BUI.Dragging.MakeAnchoredAlert(lowHpFrame, {
         settings = LowHpSettings,
-        isLocked = function() return GetDB().lowHpLocked ~= false end,
+        isLocked = function() return GetDB().lowHpLocked end,
         onRightClick = function()
             GetDB().lowHpLocked = true
             BUI.Dragging.SetLocked(lowHpFrame, true)
-            if Auras._lowHpLockToggle then Auras._lowHpLockToggle:SetValue(false) end
+            BUI.NotifyModuleChange('lowHp')
         end,
     })
 end
@@ -422,7 +395,7 @@ end
 
 local function UpdateLowHpAlpha()
     local db = GetDB()
-    if db.lowHpLocked == false then
+    if not db.lowHpLocked then
         lowHpFrame:SetAlpha(1)
         return
     end
@@ -464,7 +437,7 @@ function Auras.UpdateLowHp()
         lowHpText:GetStringWidth() + 40,
         lowHpText:GetStringHeight() + 20
     )
-    BUI.Dragging.SetLocked(lowHpFrame, db.lowHpLocked ~= false)
+    BUI.Dragging.SetLocked(lowHpFrame, db.lowHpLocked)
     if not lowHpEventsRegistered then
         lowHpEventsRegistered = true
         BUI.Events:RegisterUnit("UNIT_HEALTH",                  "player", "LowHpWarning", UpdateLowHpAlphaDispatch)
@@ -537,7 +510,7 @@ end
 
 local function RefreshMarkShown()
     if not markPanel then return end
-    if GetDB().markLocked == false then
+    if not GetDB().markLocked then
         markPanel:Show()
         return
     end
@@ -583,7 +556,6 @@ end
 local function BuildMarkWarning()
     if markFrame then return end
     local Engine = BUI.AuraEngine
-    if not Engine.Available then return end
 
     local frame = CreateFrame("Frame", "BUI_MarkWarning", UIParent)
     frame:SetSize(MARK_WINDOW_WIDTH, MARK_WINDOW_HEIGHT)
@@ -600,17 +572,15 @@ local function BuildMarkWarning()
     local container = Engine.NewContainer(clip, true, 1)
     container:ClearAllPoints()
     container:SetPoint("TOPRIGHT", clip, "TOPLEFT", -MARK_SLIDE_GAP, 0)
-    if container.SetFlowLayoutAnchorPoint then container:SetFlowLayoutAnchorPoint("TOPLEFT") end
+    container:SetFlowLayoutAnchorPoint("TOPLEFT")
     container:EnableMouse(false)
-    if container.SetUnit then container:SetUnit("target") end
-    if container.AddAuraGroup then
-        container:AddAuraGroup("markMissing", "HARMFUL", {
-            maxFrameCount = 1,
-            candidateFilters = { includeSpellIDs = { [HUNTERS_MARK_SPELL] = true } },
-            layout = { elementWidth = MARK_SLIDE_WIDTH, elementHeight = MARK_WINDOW_HEIGHT },
-            initializeFrame = HideMarkButton,
-        })
-    end
+    container:SetUnit("target")
+    container:AddAuraGroup("markMissing", "HARMFUL", {
+        maxFrameCount = 1,
+        candidateFilters = { includeSpellIDs = { [HUNTERS_MARK_SPELL] = true } },
+        layout = { elementWidth = MARK_SLIDE_WIDTH, elementHeight = MARK_WINDOW_HEIGHT },
+        initializeFrame = HideMarkButton,
+    })
     Engine.BindUnit(container, nil)
     container:Hide()
 
@@ -645,11 +615,11 @@ local function BuildMarkWarning()
 
     BUI.Dragging.MakeAnchoredAlert(markFrame, {
         settings = MarkSettings,
-        isLocked = function() return GetDB().markLocked ~= false end,
+        isLocked = function() return GetDB().markLocked end,
         onRightClick = function()
             GetDB().markLocked = true
             BUI.Dragging.SetLocked(markFrame, true)
-            if Auras._markLockToggle then Auras._markLockToggle:SetValue(false) end
+            BUI.NotifyModuleChange('markWarning')
             Auras.UpdateMark()
         end,
     })
@@ -665,7 +635,7 @@ local function StyleMarkWarning()
     markText:SetTextColor(color.r, color.g, color.b, color.a)
 
     local iconSize = fontSize + 6
-    local showIcon = db.markShowIcon ~= false
+    local showIcon = db.markShowIcon
     markIcon:SetSize(iconSize, iconSize)
     markIcon:SetShown(showIcon)
 
@@ -680,7 +650,7 @@ local function StyleMarkWarning()
 
     BUI.Anchor.ApplyPosition(markFrame, markSettings)
 
-    if db.markPulse ~= false and showIcon then markPulse:Play() else markPulse:Stop() end
+    if db.markPulse and showIcon then markPulse:Play() else markPulse:Stop() end
 end
 
 local function WireMarkEvents()
@@ -709,7 +679,7 @@ end
 
 function Auras.UpdateMark()
     local db = GetDB()
-    local wanted = db.markWarning == true and playerClass == "HUNTER"
+    local wanted = db.markWarning and playerClass == "HUNTER"
     if not wanted then
         UnwireMarkEvents()
         SetMarkRuntime(false)
@@ -725,9 +695,8 @@ function Auras.UpdateMark()
             return
         end
         BuildMarkWarning()
-        if not markFrame then return end
     end
-    local locked = db.markLocked ~= false
+    local locked = db.markLocked
     StyleMarkWarning()
     AnchorMarkPanel(locked)
     BUI.Dragging.SetLocked(markFrame, locked)
