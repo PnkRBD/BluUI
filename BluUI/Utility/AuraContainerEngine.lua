@@ -4,7 +4,6 @@ local Pixel = BUI.Pixel
 local AR    = BUI.AuraRules
 
 local pairs, ipairs = pairs, ipairs
-local select = select
 local tsort, tconcat = table.sort, table.concat
 local floor = math.floor
 
@@ -23,8 +22,6 @@ local WHITE8X8 = [[Interface\Buttons\WHITE8X8]]
 
 local Engine = {}
 BUI.AuraEngine = Engine
-
-Engine.Available = type(AuraContainerSortMethod) == 'table' and C_Secrets ~= nil
 
 local DISPEL_TOKENS = { 'Magic', 'Curse', 'Disease', 'Poison', 'Bleed' }
 local DISPEL_COLOR_KEY = {
@@ -46,10 +43,10 @@ Engine.DISPEL_DEFAULTS = DISPEL_DEFAULTS
 function Engine.DispelColorRGB(token)
 	local fallback = DISPEL_DEFAULTS[token]
 	if not fallback then return 1, 1, 1 end
-	local db = BUI.GetDB()
-	local color = db and db.colors and db.colors[DISPEL_COLOR_KEY[token]]
+	local colors = BUI.GetDB().colors
+	local color = colors and colors[DISPEL_COLOR_KEY[token]]
 	if not color then return fallback[1], fallback[2], fallback[3] end
-	return color.r or fallback[1], color.g or fallback[2], color.b or fallback[3]
+	return color.r, color.g, color.b
 end
 
 function Engine.DispelColorKey(token)
@@ -148,7 +145,7 @@ function Engine.SortMethodItems()
 	return items
 end
 
-local function ApplyLayout(container, style)
+function Engine.ApplyFlowLayout(container, style)
 	local FlowDirection = AnchorUtil.FlowDirection
 	container:SetFlowLayoutAnchorPoint(Engine.GrowthToAnchor(style.growX, style.growY))
 	container:SetFlowLayoutGrowthDirection(
@@ -158,10 +155,6 @@ local function ApplyLayout(container, style)
 	container:SetFlowLayoutPadding(padding, padding, padding, padding)
 	local lineSize = style.perRow * style.size + (style.perRow - 1) * style.gap + 0.4
 	container:SetFlowLayoutMaximumLineSize(Pixel.Scale(lineSize))
-end
-
-function Engine.ApplyFlowLayout(container, style)
-	ApplyLayout(container, style)
 end
 
 local buttonData = setmetatable({}, { __mode = 'k' })
@@ -186,7 +179,7 @@ local function CaptureSpell(container, buttonInfo)
 		local aura = auras[auraIndex]
 		local icon, spellID = aura.icon, aura.spellId
 		if CanAccess(icon) and icon == fileID and CanAccess(spellID) and type(spellID) == 'number' then
-			local scope = container._buiScope or 'unit'
+			local scope = container._buiScope
 			BUI.AuraBlacklist.UserAdd(scope, polarity, spellID)
 			BUI.AuraBlacklist.RefreshConsumers(scope)
 			local name = C_Spell.GetSpellName(spellID)
@@ -202,6 +195,8 @@ local function OnButtonMouseDown(button, mouseButton)
 	local buttonInfo = buttonData[button]
 	if container and buttonInfo then CaptureSpell(container, buttonInfo) end
 end
+
+local OnButtonMouseDownHook = BUI.Profiler.Wrap('AuraContainerEngine button OnMouseDown', OnButtonMouseDown)
 
 local function DisarmCapture()
 	if not armedButton then return end
@@ -241,20 +236,8 @@ local function FinishPendingDisarm()
 end
 
 local function ApplyCooldownFont(cooldown, size, font, flags)
-	for _, child in pairs({ cooldown:GetChildren() }) do
-		for regionIndex = 1, select('#', child:GetRegions()) do
-			local region = select(regionIndex, child:GetRegions())
-			if region and region:IsObjectType('FontString') then
-				Pixel.ApplyFont(region, size, font, flags)
-			end
-		end
-	end
-	for regionIndex = 1, select('#', cooldown:GetRegions()) do
-		local region = select(regionIndex, cooldown:GetRegions())
-		if region and region:IsObjectType('FontString') then
-			Pixel.ApplyFont(region, size, font, flags)
-		end
-	end
+	local region = BUI.Tools.CooldownFontString(cooldown)
+	if region then Pixel.ApplyFont(region, size, font, flags) end
 end
 
 local function RestyleButton(container, button, buttonInfo, style)
@@ -283,7 +266,7 @@ local function RestyleButton(container, button, buttonInfo, style)
 
 	buttonInfo.cooldown:SetReverse(style.reverseSwipe and true or false)
 	buttonInfo.cooldown:SetHideCountdownNumbers(style.showCd == false)
-	buttonInfo.cooldown:SetCountdownMillisecondsThreshold(style.decimals or 0)
+	buttonInfo.cooldown:SetCountdownMillisecondsThreshold(style.decimals)
 	if style.showCd ~= false then
 		ApplyCooldownFont(buttonInfo.cooldown, style.cdSize, style.font, style.fontFlags)
 	end
@@ -384,7 +367,6 @@ local function MakeInitializer(container, groupInfo)
 		local count = countHost:CreateFontString(nil, 'OVERLAY', 'NumberFontNormal')
 		buttonInfo.count = count
 
-		container._buiStyleStamp = container._buiStyleStamp or 1
 		xpcall(AttemptRestyle, geterrorhandler(), container, button)
 
 		button:SetIcon(icon)
@@ -396,7 +378,7 @@ local function MakeInitializer(container, groupInfo)
 		end
 
 		captureButtons[button] = container
-		button:HookScript('OnMouseDown', BUI.Profiler.Wrap('AuraContainerEngine button OnMouseDown', OnButtonMouseDown))
+		button:HookScript('OnMouseDown', OnButtonMouseDownHook)
 		button:SetMouseClickEnabled(false)
 
 		buttonInfo.created = true
@@ -532,7 +514,7 @@ end
 local function CollectRuleGroups(wanted, container, setIndex, style, rules, baseFilter, candidates, candidateFingerprint, excludeRules)
 	local harmful = HasFilterToken(baseFilter, 'HARMFUL')
 	local slotPrefix = harmful and 'D' or 'B'
-	local slotSuffix = (container._buiGeneration or 0) > 0 and ('@' .. container._buiGeneration) or ''
+	local slotSuffix = container._buiGeneration > 0 and ('@' .. container._buiGeneration) or ''
 	local layoutBase = (setIndex - 1) * SET_LAYOUT_STRIDE
 	local candidateSig = candidateFingerprint or ''
 	local position = 0
@@ -577,7 +559,7 @@ local function CollectRuleGroups(wanted, container, setIndex, style, rules, base
 	end
 
 	local excludeHidden = excludeRules and excludeRules.hidden
-	for ruleIndex = 1, #(excludeRules or {}) do
+	for ruleIndex = 1, excludeRules and #excludeRules or 0 do
 		local id = excludeRules[ruleIndex]
 		local rule = AR.BY_ID[id]
 		local claim = rule and not rule.sortFirst and not (excludeHidden and excludeHidden[id]) and RuleClaim(rule)
@@ -677,7 +659,7 @@ local function EnsureRuleGroups(container, sets)
 			container:SetAuraGroupLayout(info.key, layout)
 			container:SetAuraGroupSortMethod(info.key, spec.sortMethod or style.sortMethod, sortDirection)
 		else
-			container._buiGroupSeq = (container._buiGroupSeq or 0) + 1
+			container._buiGroupSeq = container._buiGroupSeq + 1
 			info = {
 				key = 'bui' .. container._buiGroupSeq, active = true, max = max, style = style,
 				harmful = spec.harmful, gated = spec.gated, filter = spec.filter, candSig = spec.candSig,
@@ -706,11 +688,13 @@ function Engine.NewContainer(parent, isDebuff, levelOffset)
 	container._buiGroups = {}
 	container._buiButtons = {}
 	container._buiStyleStamp = 1
+	container._buiGeneration = 0
+	container._buiGroupSeq = 0
 	return container
 end
 
 function Engine.NewAuraDriver(parent)
-	return { parent = parent, seq = 0 }
+	return { parent = parent, seq = 0, groupsBySet = {} }
 end
 
 local function SyncButtonDriver(driver, wanted, spellSet, stamp, width, height, init, style)
@@ -744,7 +728,6 @@ local function SyncButtonDriver(driver, wanted, spellSet, stamp, width, height, 
 			entry = driver.entry
 		else
 			if driver.group then container:SetAuraGroupMaxFrameCount(driver.group, 0) end
-			driver.groupsBySet = driver.groupsBySet or {}
 			entry = driver.groupsBySet[spellSet]
 			if entry then container:SetAuraGroupMaxFrameCount(entry.key, 1) end
 		end
@@ -772,7 +755,6 @@ local function SyncButtonDriver(driver, wanted, spellSet, stamp, width, height, 
 				candidateFilters = { includeSpellIDs = spellSet },
 				layout = layout,
 			})
-			driver.groupsBySet = driver.groupsBySet or {}
 			driver.groupsBySet[spellSet] = entry
 		end
 		driver.entry = entry
@@ -795,7 +777,7 @@ local function InitCooldownButton(driver, button)
 		cooldown = CreateFrame('Cooldown', nil, button, 'CooldownFrameTemplate')
 		cooldown:SetAllPoints(button)
 		button._buiDriverCd = cooldown
-		if button.SetDurationCooldown then button:SetDurationCooldown(cooldown) end
+		button:SetDurationCooldown(cooldown)
 	end
 	driver.style(cooldown, button)
 end
@@ -820,7 +802,7 @@ local function InitStackButton(driver, button)
 	text:SetPoint('CENTER', button, 'CENTER', 0, 0)
 	button._buiDriverText = text
 	driver.style(text, button)
-	if button.SetApplicationCount then button:SetApplicationCount(text, {}) end
+	button:SetApplicationCount(text, {})
 end
 
 function Engine.SyncAuraCooldownDriver(driver, wanted, spellSet, stamp, width, height, styleCooldown)
@@ -847,10 +829,8 @@ local function StyleSignature(style)
 		signatureParts[index] = tostring(style[STYLE_SIGNATURE_KEYS[index]])
 	end
 	local baseColor = style.baseColor
-	if baseColor then
-		signatureParts[#signatureParts + 1] = ('%.2f,%.2f,%.2f,%.2f'):format(baseColor[1] or 0, baseColor[2] or 0, baseColor[3] or 0, baseColor[4] or 1)
-	end
-	return table.concat(signatureParts, '|')
+	signatureParts[#signatureParts + 1] = ('%.2f,%.2f,%.2f,%.2f'):format(baseColor[1], baseColor[2], baseColor[3], baseColor[4])
+	return tconcat(signatureParts, '|')
 end
 
 local function RestyleRestricted()
@@ -888,7 +868,7 @@ end)
 local function SetsSignature(sets)
 	local parts = {}
 	for index, args in ipairs(sets) do parts[index] = StyleSignature(args[1]) end
-	return table.concat(parts, '||')
+	return tconcat(parts, '||')
 end
 
 ConfigureContainer = function(container, sets, forced)
@@ -903,12 +883,12 @@ ConfigureContainer = function(container, sets, forced)
 		if InCombatLockdown() then
 			recreateQueue[container] = true
 		else
-			container._buiGeneration = (container._buiGeneration or 0) + 1
+			container._buiGeneration = container._buiGeneration + 1
 			regenerated = true
 		end
 	end
 
-	ApplyLayout(container, sets[1][1])
+	Engine.ApplyFlowLayout(container, sets[1][1])
 	if container._buiHatched or (worldReady and not nest[1]) then
 		EnsureRuleGroups(container, sets)
 		container._buiHatched = true
@@ -967,8 +947,6 @@ function Engine.BindUnit(container, unit)
 end
 
 function Engine.RebindUnit(container, unit)
-	unit = unit or container._buiUnit
-	if not unit then return end
 	local now = GetTime()
 	if container._buiRebindTime == now then return end
 	container._buiRebindTime = now

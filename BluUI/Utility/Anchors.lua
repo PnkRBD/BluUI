@@ -1,4 +1,6 @@
 local _, BUI = ...
+local Profiler = BUI.Profiler
+local Widget = BUI.BUILibClient.Widget
 BUI.C.ANCHOR_FRAMES = {
     { tag = "BUI_PlayerFrame", desc = "Player frame" },
     { tag = "BUI_TargetFrame", desc = "Target frame" },
@@ -22,11 +24,6 @@ BUI.C.ANCHOR_FRAMES = {
     { tag = "BUI_DebuffFrame", desc = "Debuffs" },
     { tag = "Minimap", desc = "Minimap" },
 }
-
-BUI.C.ANCHOR_FRAMES_WITH_MOUSE = { { tag = "Mouse", desc = "Mouse" } }
-for frameIndex = 1, #BUI.C.ANCHOR_FRAMES do
-    BUI.C.ANCHOR_FRAMES_WITH_MOUSE[frameIndex + 1] = BUI.C.ANCHOR_FRAMES[frameIndex]
-end
 
 function BUI.AnchorFramesExcept(selfTag)
     if not selfTag or selfTag == "" then return BUI.C.ANCHOR_FRAMES end
@@ -69,13 +66,11 @@ local OPPOSITES_HORIZONTAL = {
 function BUI.ResolveAnchorFrame(name, anchorPoint)
     if not name or name == "" then return nil end
     if name == "BUI_PowerBarAny" then
-        local powerContainer = BUI.Power and BUI.Power.Container
-        if powerContainer and powerContainer.IsEnabled and powerContainer.IsEnabled() then
+        if BUI.Power.Container.IsEnabled() then
             local stackFrame = _G["BUI_StackLab"]
             if stackFrame then return stackFrame end
         end
-        local Stack = BUI.Power and BUI.Power.Stack
-        return Stack and Stack.GetFirstAvailableFrame(anchorPoint) or nil
+        return BUI.Power.Stack.GetFirstAvailableFrame(anchorPoint)
     end
     return _G[name]
 end
@@ -93,7 +88,6 @@ local function GetCDMAnchorOffset(frameName, anchorPoint)
 end
 
 local function GetPointInUIParent(frame, point)
-    if not frame then return nil, nil end
     local left, right, top, bottom = frame:GetLeft(), frame:GetRight(), frame:GetTop(), frame:GetBottom()
     if not left or not right or not top or not bottom then return nil, nil end
     local centerX = (left + right) / 2
@@ -122,29 +116,26 @@ function Anchor.ResolveAnchorPoint(anchorPoint, horizontalMode)
 end
 
 local anchorCallbacks = {}
-local flushFrame
+local armedAt
 
 function Anchor.RegisterCallback(key, callback)
     anchorCallbacks[key] = callback
 end
 
-local function FlushAnchorCallbacks(self)
-    if self._armTime == GetTime() then return end
-    self:Hide()
-    local Profiler = BUI.Profiler
+local FlushAnchors
+FlushAnchors = BUI.Dispatcher.New(function()
+    if armedAt == GetTime() then
+        FlushAnchors()
+        return
+    end
     for key, callback in pairs(anchorCallbacks) do
         Profiler.Run(Profiler.Label('Anchor moved', key), callback)
     end
-end
+end, 'Anchors')
 
 function Anchor.OnAnchorSizeChanged()
-    if not flushFrame then
-        flushFrame = CreateFrame("Frame", "BUI_AnchorFlush")
-        flushFrame:Hide()
-        flushFrame:SetScript("OnUpdate", BUI.Profiler.Script('Anchors flushFrame OnUpdate', FlushAnchorCallbacks))
-    end
-    flushFrame._armTime = GetTime()
-    flushFrame:Show()
+    armedAt = GetTime()
+    FlushAnchors()
 end
 
 function Anchor.WouldCycle(frame, candidate)
@@ -182,7 +173,7 @@ local function ApplyMouseAnchor(frame, settings)
     frame._isAnchored = true
 
     follower:Show()
-    follower:SetScript("OnUpdate", BUI.Profiler.Wrap("Utility.Anchors mouse follow", function(self)
+    follower:SetScript("OnUpdate", Profiler.Wrap("Utility.Anchors mouse follow", function(self)
         local x, y = GetCursorPosition()
         if x == self._lastX and y == self._lastY then return end
         self._lastX, self._lastY = x, y
@@ -241,9 +232,8 @@ local function PlaceIntent(frame)
     frame:SetPoint(intent.point, intent.relativeTo, intent.relativePoint, intent.x, intent.y)
     intent.placedX, intent.placedY = intent.x, intent.y
     local left, top = frame:GetLeft(), frame:GetTop()
-    if not left or not top or (issecretvalue and (issecretvalue(left) or issecretvalue(top))) then return end
+    if not left or not top or issecretvalue(left) or issecretvalue(top) then return end
     local pixel = BUI.Pixel.PixelSizeFor(frame, 1)
-    local Widget = LibStub("BUILib").Widget
     local shiftX = Widget.SnapX(left, pixel) - left
     local shiftY = Widget.SnapY(top, pixel) - top
     if shiftX == 0 and shiftY == 0 then return end
@@ -251,7 +241,7 @@ local function PlaceIntent(frame)
     frame:SetPoint(intent.point, intent.relativeTo, intent.relativePoint, intent.placedX, intent.placedY)
 end
 
-local OnPlacedSizeChanged = BUI.Profiler.Wrap("Utility.Anchors placed resize", function(frame)
+local OnPlacedSizeChanged = Profiler.Wrap("Utility.Anchors placed resize", function(frame)
     local intent = frame._pixelIntent
     if not intent or frame:GetNumPoints() ~= 1 then return end
     if InCombatLockdown() and frame:IsProtected() then return end
@@ -277,7 +267,6 @@ function Anchor.PlaceOnPixels(frame, point, relativeTo, relativePoint, x, y)
 end
 
 function Anchor.SetCentered(frame, posX, posY)
-    if not frame then return end
     frame:ClearAllPoints()
     local scale = frame:GetScale()
     Anchor.PlaceOnPixels(frame, "CENTER", UIParent, "CENTER", posX / scale, posY / scale)
@@ -286,8 +275,7 @@ end
 function Anchor.ApplyPosition(frame, settings)
     if not frame then return end
 
-    local powerContainer = BUI.Power and BUI.Power.Container
-    if powerContainer and powerContainer.PlaceMember and powerContainer.PlaceMember(frame) then
+    if BUI.Power.Container.PlaceMember(frame) then
         return frame._anchorTarget
     end
 
@@ -351,7 +339,7 @@ function Anchor.ApplyPosition(frame, settings)
                 end
 
                 if anchorTarget._row1W and (anchorPoint == "LEFT" or anchorPoint == "RIGHT") then
-                    local frameWidth = anchorTarget._layoutW or anchorTarget:GetWidth() or 0
+                    local frameWidth = anchorTarget._layoutW or anchorTarget:GetWidth()
                     local inset = (frameWidth - anchorTarget._row1W) / 2
                     if inset > 0 then
                         anchorX = anchorPoint == "LEFT" and (anchorX + inset) or (anchorX - inset)
@@ -377,7 +365,6 @@ function Anchor.ApplyPosition(frame, settings)
 end
 
 function Anchor.SaveDragOffsets(frame, settings)
-    if not frame then return nil end
     local anchorFrame = settings.anchorFrame
     if not anchorFrame or anchorFrame == "" or anchorFrame == "Mouse" then return nil end
 
@@ -397,11 +384,8 @@ function Anchor.SaveDragOffsets(frame, settings)
 end
 
 function Anchor.GetAnchorWidth(frame, settings)
-    local powerContainer = BUI.Power and BUI.Power.Container
-    if powerContainer and powerContainer.GetMemberWidth then
-        local memberWidth = powerContainer.GetMemberWidth(frame)
-        if memberWidth then return memberWidth end
-    end
+    local memberWidth = BUI.Power.Container.GetMemberWidth(frame)
+    if memberWidth then return memberWidth end
     if not settings.matchAnchorWidth then return nil end
     if not frame or not frame._anchorTarget then return nil end
 
@@ -414,7 +398,7 @@ function Anchor.GetAnchorWidth(frame, settings)
     else
         anchorWidth = target._topRowW or target._row1W or target:GetWidth()
     end
-    if anchorWidth and anchorWidth > 0 then
+    if anchorWidth > 0 then
         if target._castbarIconWidth and target._castbarIconWidth > 0 then
             anchorWidth = anchorWidth + target._castbarIconWidth
         end
@@ -423,11 +407,11 @@ function Anchor.GetAnchorWidth(frame, settings)
 end
 
 function Anchor.GetAnchorHeight(settings)
-    if not settings or not settings.matchAnchorHeight then return nil end
+    if not settings.matchAnchorHeight then return nil end
     local target = BUI.ResolveAnchorFrame(settings.anchorFrame, settings.anchorPoint)
     if not target then return nil end
     local anchorHeight = target._cachedScaledH or target:GetHeight()
-    if anchorHeight and anchorHeight > 0 then return anchorHeight end
+    if anchorHeight > 0 then return anchorHeight end
 end
 
 function Anchor.ShouldRefreshOnAnchorChange(settings)
@@ -439,7 +423,6 @@ function Anchor.ShouldRefreshOnAnchorChange(settings)
 end
 
 local function NeedsReanchor(frame, settings)
-    if not frame then return false end
     if Anchor.ShouldRefreshOnAnchorChange(settings) then return true end
     local anchorFrame = settings.anchorFrame
     return anchorFrame ~= nil and anchorFrame ~= "" and not frame._isAnchored

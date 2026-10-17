@@ -3,9 +3,9 @@ local _, BUI = ...
 local TrueStats = {}
 BUI.TrueStats = TrueStats
 
-local IsSecretValue = BUI.Tools.IsSecretValue
+local SafeNum = BUI.Tools.SafeNum
 local floor = math.floor
-local ipairs, pairs, type = ipairs, pairs, type
+local ipairs, pairs = ipairs, pairs
 
 local PRECISION = 100
 
@@ -39,9 +39,9 @@ local CURVES = {
 }
 
 local DAMAGE_RATINGS = {
-    [CR_CRIT_MELEE]              = 'Critical Strike',
-    [CR_HASTE_MELEE]             = 'Haste',
-    [CR_VERSATILITY_DAMAGE_DONE] = 'Versatility',
+    [CR_CRIT_MELEE]              = true,
+    [CR_HASTE_MELEE]             = true,
+    [CR_VERSATILITY_DAMAGE_DONE] = true,
 }
 
 local SHARPNESS = {
@@ -105,11 +105,9 @@ function TrueStats.PenaltyColor(penalty)
 end
 
 local function Read(ratingID, curve, reading)
-    local rating = GetCombatRating(ratingID)
-    local gain = GetCombatRatingBonus(ratingID)
-    if type(rating) ~= 'number' or type(gain) ~= 'number' then return end
-    if IsSecretValue(rating) or IsSecretValue(gain) then return end
-    if rating <= 0 or gain <= 0 then return end
+    local rating = SafeNum(GetCombatRating(ratingID))
+    local gain = SafeNum(GetCombatRatingBonus(ratingID))
+    if not rating or not gain or rating <= 0 or gain <= 0 then return end
 
     local raw = RawAt(curve, gain)
     if not raw or raw <= 0 then return end
@@ -129,14 +127,10 @@ local function Read(ratingID, curve, reading)
     reading.usable = true
 end
 
-local function StatsAreSecret()
-    return C_Secrets and C_Secrets.ShouldUnitStatsBeSecret and C_Secrets.ShouldUnitStatsBeSecret('player')
-end
-
 local function Settle()
     if not stale then return end
     stale = false
-    local secret = StatsAreSecret()
+    local secret = C_Secrets.ShouldUnitStatsBeSecret('player')
     for ratingID, curve in pairs(CURVES) do
         local reading = readings[ratingID]
         reading.usable = false
@@ -144,7 +138,7 @@ local function Settle()
     end
 end
 
-function TrueStats.Refresh()
+local function Refresh()
     stale = true
 end
 
@@ -187,30 +181,21 @@ end
 
 function TrueStats.GainFrom(ratingID, amount)
     local reading = TrueStats.Get(ratingID)
-    local curve = CURVES[ratingID]
-    if not reading or not curve or type(amount) ~= 'number' then return nil end
-    local gain = GainAt(curve, (reading.rating + amount) / reading.perPercent)
+    if not reading then return nil end
+    local gain = GainAt(CURVES[ratingID], (reading.rating + amount) / reading.perPercent)
     return Round(gain - reading.gain)
 end
 
 function TrueStats.CostOfNext(ratingID, percent)
     local reading = TrueStats.Get(ratingID)
     if not reading then return nil end
-    return TrueStats.RatingFor(ratingID, reading.gain + (percent or 1))
-end
-
-function TrueStats.RatingFor(ratingID, targetGain)
-    local reading = TrueStats.Get(ratingID)
-    local curve = CURVES[ratingID]
-    if not reading or not curve or type(targetGain) ~= 'number' then return nil end
-    if targetGain <= reading.gain then return 0 end
-    local raw = RawAt(curve, targetGain)
+    local raw = RawAt(CURVES[ratingID], reading.gain + percent)
     if not raw then return nil end
     return Round(raw * reading.perPercent - reading.rating)
 end
 
-BUI.Events:Register('PLAYER_ENTERING_WORLD', 'TrueStats', TrueStats.Refresh)
-BUI.Events:Register('PLAYER_LEVEL_UP', 'TrueStats', TrueStats.Refresh)
-BUI.Events:Register('COMBAT_RATING_UPDATE', 'TrueStats', TrueStats.Refresh)
-BUI.Events:RegisterUnit('PLAYER_SPECIALIZATION_CHANGED', 'player', 'TrueStats', TrueStats.Refresh)
-BUI.Events:Register('PLAYER_REGEN_ENABLED', 'TrueStats', TrueStats.Refresh)
+BUI.Events:Register('PLAYER_ENTERING_WORLD', 'TrueStats', Refresh)
+BUI.Events:Register('PLAYER_LEVEL_UP', 'TrueStats', Refresh)
+BUI.Events:Register('COMBAT_RATING_UPDATE', 'TrueStats', Refresh)
+BUI.Events:RegisterUnit('PLAYER_SPECIALIZATION_CHANGED', 'player', 'TrueStats', Refresh)
+BUI.Events:Register('PLAYER_REGEN_ENABLED', 'TrueStats', Refresh)

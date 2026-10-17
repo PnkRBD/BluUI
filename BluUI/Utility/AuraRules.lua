@@ -3,7 +3,7 @@ local _, BUI = ...
 local AuraRules = {}
 BUI.AuraRules = AuraRules
 
-AuraRules.CATALOG = {
+local CATALOG = {
 	{
 		id = 'dispellable', polarity = 'HARMFUL', label = 'Dispellable By Me',
 		desc = 'Debuffs you can dispel.',
@@ -140,9 +140,9 @@ AuraRules.CATALOG = {
 }
 
 AuraRules.BY_ID = {}
-for _, rule in ipairs(AuraRules.CATALOG) do AuraRules.BY_ID[rule.id] = rule end
+for _, rule in ipairs(CATALOG) do AuraRules.BY_ID[rule.id] = rule end
 
-AuraRules.SOURCE_TO_RULES = {
+local SOURCE_TO_RULES = {
 	mine    = { 'mineRaidCombat' },
 	mineAll = { 'mineHelpful' },
 	raid    = { 'raidRelevant' },
@@ -158,13 +158,9 @@ AuraRules.UNIT_DEFAULTS = {
 	boss         = { buff = { 'allHelpful' }, debuff = { 'mineHarmful' } },
 }
 
-function AuraRules.DefaultAllRule(polarity)
-	return polarity == 'HELPFUL' and 'allHelpful' or 'allHarmful'
-end
-
 function AuraRules.DropdownItems(polarity, withoutSorts)
 	local items = {}
-	for _, rule in ipairs(AuraRules.CATALOG) do
+	for _, rule in ipairs(CATALOG) do
 		if rule.polarity == polarity and not (withoutSorts and rule.sortFirst) then
 			items[#items + 1] = { value = rule.id, text = rule.label, tip = rule.desc }
 		end
@@ -203,11 +199,11 @@ function AuraRules.EnsureRules(config, key, polarity, defaultRules)
 	local rules = config[key]
 	if type(rules) == 'table' then return rules end
 	rules = {}
-	local sourceRules = config.source and AuraRules.SOURCE_TO_RULES[config.source] or defaultRules
+	local sourceRules = config.source and SOURCE_TO_RULES[config.source] or defaultRules
 	if sourceRules then
 		for ruleIndex = 1, #sourceRules do rules[ruleIndex] = sourceRules[ruleIndex] end
 	end
-	if #rules == 0 then rules[1] = AuraRules.DefaultAllRule(polarity) end
+	if #rules == 0 then rules[1] = polarity == 'HELPFUL' and 'allHelpful' or 'allHarmful' end
 	config[key] = rules
 	return rules
 end

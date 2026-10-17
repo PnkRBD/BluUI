@@ -3,14 +3,12 @@ local _, BUI = ...
 local TTS = {}
 BUI.TTS = TTS
 
-local DEFAULT_VOICE_ID = 0
-
 local voiceCache
 local resolvedCache = {}
 
 local function Voices()
     if not voiceCache or #voiceCache == 0 then
-        voiceCache = C_VoiceChat.GetTtsVoices() or {}
+        voiceCache = C_VoiceChat.GetTtsVoices()
     end
     return voiceCache
 end
@@ -20,13 +18,7 @@ local function InvalidateVoices()
     wipe(resolvedCache)
 end
 
-if C_EventUtils.IsEventValid('VOICE_CHAT_TTS_VOICES_UPDATE') then
-    BUI.Events:Register('VOICE_CHAT_TTS_VOICES_UPDATE', 'TTS', InvalidateVoices)
-end
-
-function TTS.IsAvailable()
-    return C_VoiceChat.SpeakText ~= nil
-end
+BUI.Events:Register('VOICE_CHAT_TTS_VOICES_UPDATE', 'TTS', InvalidateVoices)
 
 function TTS.BuildVoiceDropdownItems()
     local items = { { value = -1, text = 'Default Voice' } }
@@ -50,14 +42,12 @@ local function ResolveVoiceID(voiceID)
     end
     if not resolved then
         local standard = C_TTSSettings.GetVoiceOptionID(Enum.TtsVoiceType.Standard)
-        if standard then
-            for _, voice in ipairs(voices) do
-                if voice.voiceID == standard then resolved = standard; break end
-            end
+        for _, voice in ipairs(voices) do
+            if voice.voiceID == standard then resolved = standard; break end
         end
     end
     if not resolved then
-        resolved = voices[1] and voices[1].voiceID or DEFAULT_VOICE_ID
+        resolved = voices[1].voiceID
     end
     resolvedCache[cacheKey] = resolved
     return resolved
@@ -66,7 +56,6 @@ end
 local warnedNoVoices = false
 
 function TTS.Speak(text, options)
-    if not TTS.IsAvailable() then return end
     if type(text) ~= 'string' or issecretvalue(text) or not text:match('%S') then
         return
     end
@@ -78,15 +67,14 @@ function TTS.Speak(text, options)
         return
     end
     options = options or {}
-    local db = BUI.GetDB()
-    local general = db and db.general
+    local general = BUI.GetDB().general
     local voiceID = options.voiceID
     if not voiceID or voiceID == -1 then
-        voiceID = general and general.ttsVoice
+        voiceID = general.ttsVoice
     end
     voiceID = ResolveVoiceID(voiceID)
-    local rate    = options.rate or (C_TTSSettings.GetSpeechRate()) or 0
-    local volume  = options.volume or (general and general.ttsVolume) or 100
+    local rate    = options.rate or C_TTSSettings.GetSpeechRate()
+    local volume  = options.volume or general.ttsVolume
     local overlap = options.overlap ~= false
     C_VoiceChat.SpeakText(voiceID, text, rate, volume, overlap)
 end

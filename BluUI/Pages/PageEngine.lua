@@ -3,6 +3,7 @@ local Pixel = BUI.Pixel
 local Layout = BUI.BUILibClient.Layout
 local Controls = BUI.BUILibClient.Controls
 local WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT = 1228, 848
+local CONTENT_MIN_WIDTH = 895
 
 local PageEngine = {
 	pages        = {},
@@ -13,13 +14,12 @@ local PageEngine = {
 BUI.PageEngine = PageEngine
 
 local function GetCurrentPageConfig()
-	local pageID = PageEngine.pageOrder[PageEngine.currentIndex]
-	return pageID and PageEngine.pages[pageID]
+	return PageEngine.pages[PageEngine.pageOrder[PageEngine.currentIndex]]
 end
 
 local function HideCurrentPage()
 	local pageConfig = GetCurrentPageConfig()
-	if not pageConfig or not pageConfig.frame or not pageConfig.frame:IsShown() then return end
+	if not pageConfig.frame or not pageConfig.frame:IsShown() then return end
 	if pageConfig.OnHide then pageConfig.OnHide(pageConfig.frame) end
 	pageConfig.frame:Hide()
 	local rail = pageConfig.frame.railPage
@@ -37,7 +37,6 @@ local function TeardownPageContent(pageConfig)
 	pageConfig.frame = nil
 	pageConfig.stale = nil
 end
-PageEngine.TeardownPageContent = TeardownPageContent
 
 local function CreateWindow()
 	if PageEngine.window then return end
@@ -59,6 +58,7 @@ local function CreateWindow()
 	})
 	window.frame:Hide()
 	window.frame:SetScale(BUI.db.global.windowScale / 100)
+	window:SetContentMinSize(CONTENT_MIN_WIDTH, 0)
 	PageEngine.window = window
 	PageEngine.frame  = window.frame
 	BUI.Tools.AddPageWatermark(window.content)
@@ -127,7 +127,7 @@ end
 
 function PageEngine.RegisterPage(id, pageConfig)
 	if PageEngine.pages[id] then return end
-	PageEngine.pages[id] = pageConfig or {}
+	PageEngine.pages[id] = pageConfig
 	PageEngine.pageOrder[#PageEngine.pageOrder + 1] = id
 end
 
@@ -136,13 +136,11 @@ function PageEngine.ShowPage(index)
 	local pageID = PageEngine.pageOrder[index]
 	if not pageID then return end
 	local pageConfig = PageEngine.pages[pageID]
-	if pageConfig.disabled then return end
 	if index == PageEngine.currentIndex and pageConfig.frame and pageConfig.frame:IsShown() then return end
 	HideCurrentPage()
 	if pageConfig.frame and pageConfig.stale then TeardownPageContent(pageConfig) end
 	if not pageConfig.frame then pageConfig.frame = BuildPageContent(pageConfig) end
 	pageConfig.frame:Show()
-	PageEngine.window:SetContentMinSize(pageConfig.minContentWidth or 895, pageConfig.minContentHeight or 0)
 	if pageConfig.OnShow then pageConfig.OnShow(pageConfig.frame) end
 	PageEngine.currentIndex = index
 	UpdateNavSelection()
@@ -176,14 +174,14 @@ function PageEngine.Show()
 		return
 	end
 
-	if BUI.ReassertBUILib then BUI.ReassertBUILib() end
+	BUI.ReassertBUILib()
 	if not PageEngine.optionsLoaded then
 		if PageEngine.EnsureLoaded() then BUI.Profiler.After('Pages.PageEngine open after load', 0, PageEngine.Show) end
 		return
 	end
 	if not PageEngine.window then
 		CreateWindow()
-		BUI.Nav.Apply(BUI.Nav.GetCurrentStyle())
+		BUI.Nav.Apply()
 	end
 	PageEngine.window:Show()
 	PageEngine.ShowPage(PageEngine.currentIndex)
@@ -216,16 +214,23 @@ function PageEngine.NavigateToID(id)
 	end
 end
 
+function PageEngine.NavigateToTab(id, tab)
+	PageEngine.NavigateToID(id)
+	local frame = PageEngine.pages[id].frame
+	if not frame then return end
+	if type(tab) == 'number' then frame._page:SetTab(tab) else frame.railPage:Select(tab) end
+end
+
 local function CurrentPageTab()
 	local pageConfig = GetCurrentPageConfig()
-	local page = pageConfig and pageConfig.frame and pageConfig.frame._page
+	local page = pageConfig.frame and pageConfig.frame._page
 	return page and page.currentTab
 end
 
 local function RestorePageTab(tabIndex)
 	if not tabIndex or tabIndex <= 1 then return end
 	local pageConfig = GetCurrentPageConfig()
-	local page = pageConfig and pageConfig.frame and pageConfig.frame._page
+	local page = pageConfig.frame and pageConfig.frame._page
 	if page and page.tabContents and page.tabContents[tabIndex] then
 		page:SetTab(tabIndex)
 	end
@@ -254,7 +259,6 @@ end
 function PageEngine.RefreshCurrentPage()
 	if not PageEngine.frame or not PageEngine.frame:IsShown() then return end
 	local pageConfig = GetCurrentPageConfig()
-	if not pageConfig then return end
 	local keepTab = CurrentPageTab()
 	TeardownPageContent(pageConfig)
 	PageEngine.ShowPage(PageEngine.currentIndex)

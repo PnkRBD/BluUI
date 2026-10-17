@@ -40,7 +40,6 @@ local GROUPS = {
 
 local function GetColorStore()
     local db = BUI.GetDB()
-    if not db then return nil end
     db.colors = db.colors or {}
     local store = db.colors
     for _, group in ipairs(GROUPS) do
@@ -117,11 +116,20 @@ local function Get(key)
     return 1, 1, 1, 1
 end
 
+local function Default(key)
+    for _, group in ipairs(GROUPS) do
+        for _, entry in ipairs(group.colors) do
+            if entry.key == key then return entry.def[1], entry.def[2], entry.def[3], entry.def[4] or 1 end
+        end
+    end
+end
+
 BUI.Colors = {
     GROUPS = GROUPS,
     GetStore = GetColorStore,
     BuildCards = BuildCards,
     Get = Get,
+    Default = Default,
     ResetGroup = function(groupName)
         local store = GetColorStore()
         for _, group in ipairs(GROUPS) do
@@ -141,29 +149,12 @@ BUI.Colors = {
 }
 
 function BUI.ApplyColors()
-    local power = BUI.Power
-    if power then
-        if power.Primary and power.Primary.Apply then power.Primary.Apply() end
-        if power.Secondary and power.Secondary.UpdateAppearance then power.Secondary.UpdateAppearance() end
-        if power.Mods and power.Mods.Apply then power.Mods.Apply() end
-    end
-    local unitFrames = BUI.UnitFrames
-    if unitFrames then
-        if unitFrames.Refresh then unitFrames:Refresh() end
-        if unitFrames.RefreshDispelPreview then unitFrames.RefreshDispelPreview() end
-    end
-    local groupFrames = BUI.GroupFrames
-    if groupFrames then
-        if groupFrames.RefreshColors then groupFrames.RefreshColors() end
-        if groupFrames.RestyleAllDispelBadges then groupFrames.RestyleAllDispelBadges() end
-    end
+    BUI.Power.Primary.Apply()
+    BUI.Power.Secondary.UpdateAppearance()
+    BUI.UnitFrames:Refresh()
+    BUI.UnitFrames.RefreshDispelPreview()
+    BUI.GroupFrames.RefreshColors()
+    BUI.GroupFrames.RestyleAllDispelBadges()
     BUI.AuraEngine.RepaintDispelBorders()
     BUI.BuffFrames.Refresh()
 end
-
-function BUI.ToggleColorEditor()
-    if BUI.PageEngine.EnsureLoaded() and BUI.OpenAppearance then BUI.OpenAppearance('power') end
-end
-
-SLASH_BUICOLORS1 = '/buicolors'
-SlashCmdList['BUICOLORS'] = function() BUI.ToggleColorEditor() end

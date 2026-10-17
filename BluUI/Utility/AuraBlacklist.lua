@@ -7,14 +7,11 @@ local POL_KEY = { HARMFUL = 'debuff', HELPFUL = 'buff' }
 
 local RECENT_CAP = 24
 
-local EMPTY = {}
-
 local curatedCache
 
 function AuraBlacklist.Curated(polarity)
 	if not curatedCache then
-		local registry = BUI.GroupFrames and BUI.GroupFrames.AuraRegistry
-		if not registry then return EMPTY end
+		local registry = BUI.GroupFrames.AuraRegistry
 		local harmful = {}
 		for _, set in ipairs({ registry.debuffBlacklist, registry.satedIDs, registry.deserterIDs, registry.skyridingIDs }) do
 			for spellID in pairs(set) do harmful[spellID] = true end
@@ -25,30 +22,20 @@ function AuraBlacklist.Curated(polarity)
 end
 
 local function Overrides(polarity)
-	local profile = BUI.GetDB()
-	local db = profile and profile.groupFrames
-	return db and db.blacklistOverrides and db.blacklistOverrides[POL_KEY[polarity]]
+	return BUI.GetDB().groupFrames.blacklistOverrides[POL_KEY[polarity]]
 end
 
 local function UnitFilters()
-	local profile = BUI.GetDB()
-	return profile and profile.auraFilters
+	return BUI.GetDB().auraFilters
 end
 
 local function UnitOwn(polarity)
 	local filters = UnitFilters()
-	if not filters then return nil end
 	return polarity == 'HARMFUL' and filters.debuffBlacklist or filters.buffBlacklist
 end
 
-local function FrameSettings()
-	local profile = BUI.GetDB()
-	return profile and profile.buffFrames
-end
-
 local function FrameOwn(polarity)
-	local settings = FrameSettings()
-	return settings and settings.blacklist[POL_KEY[polarity]]
+	return BUI.GetDB().buffFrames.blacklist[POL_KEY[polarity]]
 end
 
 local function OwnStore(scope, polarity)
@@ -57,8 +44,7 @@ local function OwnStore(scope, polarity)
 end
 
 function AuraBlacklist.IsShared()
-	local filters = UnitFilters()
-	return (filters and filters.shareBlacklists) == true
+	return UnitFilters().shareBlacklists == true
 end
 
 local function EditsSharedStore(scope)
@@ -77,12 +63,9 @@ function AuraBlacklist.GroupSet(polarity)
 	if not set then
 		set = {}
 		for spellID in pairs(AuraBlacklist.Curated(polarity)) do set[spellID] = true end
-		local overrides = Overrides(polarity)
-		if overrides then
-			for spellID, mode in pairs(overrides) do
-				if mode == 'hide' then set[spellID] = true
-				elseif mode == 'show' then set[spellID] = nil end
-			end
+		for spellID, mode in pairs(Overrides(polarity)) do
+			if mode == 'hide' then set[spellID] = true
+			elseif mode == 'show' then set[spellID] = nil end
 		end
 		setCache[polarity] = set
 	end
@@ -91,11 +74,11 @@ end
 
 function AuraBlacklist.UnitSet(polarity)
 	if AuraBlacklist.IsShared() then return AuraBlacklist.GroupSet(polarity) end
-	return UnitOwn(polarity) or EMPTY
+	return UnitOwn(polarity)
 end
 
 function AuraBlacklist.FrameSet(polarity)
-	return FrameOwn(polarity) or EMPTY
+	return FrameOwn(polarity)
 end
 
 function AuraBlacklist.Set(scope, polarity)
@@ -115,30 +98,25 @@ end
 function AuraBlacklist.UserAdd(scope, polarity, spellID)
 	if EditsSharedStore(scope) then
 		local overrides = Overrides(polarity)
-		if not overrides then return end
 		if AuraBlacklist.Curated(polarity)[spellID] then overrides[spellID] = nil
 		else overrides[spellID] = 'hide' end
 	else
-		local own = OwnStore(scope, polarity)
-		if own then own[spellID] = true end
+		OwnStore(scope, polarity)[spellID] = true
 	end
 	AuraBlacklist.Invalidate()
 end
 
 function AuraBlacklist.UserRemove(scope, polarity, spellID)
 	if EditsSharedStore(scope) then
-		local overrides = Overrides(polarity)
-		if overrides then overrides[spellID] = nil end
+		Overrides(polarity)[spellID] = nil
 	else
-		local own = OwnStore(scope, polarity)
-		if own then own[spellID] = nil end
+		OwnStore(scope, polarity)[spellID] = nil
 	end
 	AuraBlacklist.Invalidate()
 end
 
 function AuraBlacklist.SetBuiltInHidden(polarity, spellID, hidden)
 	local overrides = Overrides(polarity)
-	if not overrides then return end
 	if hidden then
 		overrides[spellID] = nil
 	else
@@ -149,17 +127,13 @@ end
 
 function AuraBlacklist.SetShared(on)
 	local filters = UnitFilters()
-	if not filters then return end
 	on = on and true or false
 	if filters.shareBlacklists == on then return end
 	filters.shareBlacklists = on
 	if on then
 		for polarity in pairs(POL_KEY) do
-			local own = UnitOwn(polarity)
-			if own then
-				for spellID, active in pairs(own) do
-					if active then AuraBlacklist.UserAdd('group', polarity, spellID) end
-				end
+			for spellID, active in pairs(UnitOwn(polarity)) do
+				if active then AuraBlacklist.UserAdd('group', polarity, spellID) end
 			end
 		end
 	end
@@ -174,18 +148,12 @@ function AuraBlacklist.UserEntries(scope, polarity)
 	local entries = {}
 	if EditsSharedStore(scope) then
 		local curated = AuraBlacklist.Curated(polarity)
-		local overrides = Overrides(polarity)
-		if overrides then
-			for spellID, mode in pairs(overrides) do
-				if mode == 'hide' and not curated[spellID] then entries[#entries + 1] = spellID end
-			end
+		for spellID, mode in pairs(Overrides(polarity)) do
+			if mode == 'hide' and not curated[spellID] then entries[#entries + 1] = spellID end
 		end
 	else
-		local own = OwnStore(scope, polarity)
-		if own then
-			for spellID, active in pairs(own) do
-				if active then entries[#entries + 1] = spellID end
-			end
+		for spellID, active in pairs(OwnStore(scope, polarity)) do
+			if active then entries[#entries + 1] = spellID end
 		end
 	end
 	return entries
@@ -195,15 +163,13 @@ function AuraBlacklist.BuiltInEntries(polarity)
 	local entries = {}
 	local overrides = Overrides(polarity)
 	for spellID in pairs(AuraBlacklist.Curated(polarity)) do
-		entries[#entries + 1] = { id = spellID, hidden = not (overrides and overrides[spellID] == 'show') }
+		entries[#entries + 1] = { id = spellID, hidden = overrides[spellID] ~= 'show' }
 	end
 	return entries
 end
 
 local function RecentStore(polarity)
-	local profile = BUI.GetDB()
-	local recent = profile and profile.recentAuras
-	return recent and recent[POL_KEY[polarity]]
+	return BUI.GetDB().recentAuras[POL_KEY[polarity]]
 end
 
 local UNIT_SCAN = { 'player', 'pet', 'target', 'targettarget', 'focus', 'boss1', 'boss2', 'boss3', 'boss4', 'boss5' }
@@ -227,8 +193,8 @@ local function RecordAura(list, spellID)
 end
 
 function AuraBlacklist.RecordUnitAuras(scope, polarity)
+	if BUI.Tools.ShouldAurasBeSecret() or BUI.Tools.AuraQueriesBlocked() then return end
 	local list = RecentStore(polarity)
-	if not list or BUI.Tools.ShouldAurasBeSecret() or BUI.Tools.AuraQueriesBlocked() then return end
 	local filter = polarity == 'HARMFUL' and 'HARMFUL|INCLUDE_NAME_PLATE_ONLY' or 'HELPFUL'
 	local seen, found = {}, {}
 	for _, unit in ipairs(ScanUnits(scope)) do
@@ -248,7 +214,7 @@ function AuraBlacklist.RecordUnitAuras(scope, polarity)
 end
 
 function AuraBlacklist.RecentEntries(scope, polarity)
-	local list = RecentStore(polarity) or EMPTY
+	local list = RecentStore(polarity)
 	local set = AuraBlacklist.Set(scope, polarity)
 	local entries = {}
 	for listIndex = 1, #list do
@@ -262,14 +228,12 @@ function AuraBlacklist.RefreshConsumers(scope)
 	AuraBlacklist.Invalidate()
 	if scope ~= 'frames' then
 		local shared = AuraBlacklist.IsShared()
-		local groupFrames = BUI.GroupFrames
-		if (scope ~= 'unit' or shared) and groupFrames and groupFrames.IsActive and groupFrames.IsActive() then
-			groupFrames.Refresh()
+		if (scope ~= 'unit' or shared) and BUI.GroupFrames.IsActive() then
+			BUI.GroupFrames.Refresh()
 		end
-		local unitFrames = BUI.UnitFrames
-		if (scope ~= 'group' or shared) and unitFrames and BUI.IsModuleEnabled('unitFrames') then
-			unitFrames.InvalidateFilterCache()
-			unitFrames:Refresh()
+		if (scope ~= 'group' or shared) and BUI.IsModuleEnabled('unitFrames') then
+			BUI.UnitFrames.InvalidateFilterCache()
+			BUI.UnitFrames:Refresh()
 		end
 	end
 	if scope == 'frames' then BUI.BuffFrames.Refresh() end

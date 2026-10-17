@@ -132,10 +132,6 @@ end)
 
 SLASH_BUICDM1 = '/cdm'
 SlashCmdList['BUICDM'] = function()
-	if not CooldownViewerSettings then
-		BUI.Print('CooldownViewerSettings panel not found.')
-		return
-	end
 	BUI.Profiler.After('Core.Commands toggle cdm', 0, function()
 		CooldownViewerSettings:SetShown(not CooldownViewerSettings:IsShown())
 	end)
@@ -146,7 +142,6 @@ SlashCmdList['BUIRL'] = ReloadUI
 
 function BUI.ToggleEditMode()
 	local manager = EditModeManagerFrame
-	if not manager then return end
 	if InCombatLockdown() then
 		BUI.Print('Edit Mode opens when combat ends.')
 		BUI.Events:AfterCombat(BUI.ToggleEditMode, 'Core.ToggleEditMode')

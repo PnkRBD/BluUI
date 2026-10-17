@@ -10,7 +10,6 @@ local COLOR_IN_RANGE, COLOR_EDGE, COLOR_OUT_OF_RANGE = '|cff2bff62', '|cffffd100
 local rangeCheck = LibStub('LibRangeCheck-3.0')
 
 function Range.SpellBracket(unit)
-    if not unit or not UnitExists(unit) then return nil end
     return rangeCheck:GetRange(unit, false, false, CACHE_DURATION)
 end
 
@@ -52,7 +51,6 @@ local function OpenText(minYards)
 end
 
 function Range.DisplayText(unit)
-    if not unit or not UnitExists(unit) then return '' end
     if UnitIsUnit(unit, 'player') then return '' end
     local minYards, maxYards = Range.SpellBracket(unit)
     if minYards == nil then return '' end

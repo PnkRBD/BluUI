@@ -42,6 +42,12 @@ function BUI.IsModuleEnabled(key)
 	return not db or db.modules[key] ~= false
 end
 
+local bootedModules
+
+function BUI.BootedModules()
+	return bootedModules
+end
+
 BUI.ModuleControls = {}
 function BUI.RegisterModuleControl(key, handler) BUI.ModuleControls[key] = handler end
 function BUI.ApplyModuleRuntime(key)
@@ -54,6 +60,14 @@ end
 function BUI.SetModuleEnabled(key, enabled)
 	BUI.GetDB().modules[key] = enabled and true or false
 	return BUI.ApplyModuleRuntime(key)
+end
+
+local moduleChangeListeners = {}
+
+function BUI.OnModuleChange(key, callback) moduleChangeListeners[key] = callback end
+function BUI.NotifyModuleChange(key)
+	local callback = moduleChangeListeners[key]
+	if callback then callback() end
 end
 
 local BUILib     = LibStub('BUILib')
@@ -80,17 +94,12 @@ local function ClampScale(value)
 	return value
 end
 
-function BUI.DeviceScale()
-	local _, physicalHeight = GetPhysicalScreenSize()
-	return 768 / physicalHeight
-end
-
 function BUI.ScaleBounds()
 	return SCALE_FLOOR, SCALE_CEILING
 end
 
 function BUI.ClampedUIScale()
-	return ClampScale(BUI.DeviceScale())
+	return ClampScale(BUI.Pixel.PerfectScale())
 end
 
 function BUI.AppliedUIScale()
@@ -135,7 +144,6 @@ local function AdoptOldDB(legacyDatabase)
 end
 
 function BUI.ImportAzorProfiles()
-	if not BluUI_DB then return end
 	if type(AzortharionUI_DB) == 'table' then
 		BluUI_DB.__forceAdoptOnLoad = true
 	else
@@ -152,7 +160,7 @@ local function PromptAzorImport()
 		confirmText = 'Import & Reload', cancelText = 'Not Now', fullscreen = true,
 		onConfirm = BUI.ImportAzorProfiles,
 		onCancel = function()
-			if BluUI_DB then BluUI_DB.__azorImportDeclined = true end
+			BluUI_DB.__azorImportDeclined = true
 			BUI.Print('Skipped. Import later from the Profiles page.')
 		end,
 	})
@@ -229,24 +237,22 @@ function Addon:OnEnable()
 	BUI.BUILibClient.defaultWidth = BUI.C.PAGE_CONTENT_W
 	BUI.BUILibClient.bodyFont = BUI.GetGlobalFont()
 
+	bootedModules = {}
+	for key, enabled in pairs(BUI.GetDB().modules) do bootedModules[key] = enabled ~= false end
+
 	if BUI.IsModuleEnabled('actionBars') then BUI.ActionBars.Initialize() end
 	if BUI.IsModuleEnabled('unitFrames') then BUI.UnitFrames:Initialize() end
 	if BUI.IsModuleEnabled('groupFrames') then BUI.GroupFrames.Initialize() end
 	if BUI.IsModuleEnabled('cdm') then BUI.CDM.Initialize() end
 	if BUI.IsModuleEnabled('castBars') then After('Core.Core castbar refresh', 0.1, BUI.CastBar.RefreshAll) end
 
-	if BUI.db.global.layoutStyle then
-		BUI.BUILibClient.Layout.SetStyle(BUI.db.global.layoutStyle)
-	end
+	BUI.BUILibClient.Layout.SetStyle(BUI.db.global.layoutStyle)
 
 	local function ReassertBUILib()
 		BUILib.SetDefaultClient(BUI.BUILibClient)
 		BUI.BUILibClient.Colors.RefreshAccent()
 	end
 	ReassertBUILib()
-	BUI.Events:Register('ADDON_LOADED', 'Core.BUILibReassert', function()
-		if BUILib.GetActiveClient() ~= BUI.BUILibClient then ReassertBUILib() end
-	end)
 
 	local lastSpecID
 	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'Core.SpecPageRebuildSeed', function()
@@ -272,7 +278,7 @@ function Addon:OnEnable()
 		if not BUI.ApproxEqual(scaleBefore, UIParent:GetScale()) then
 			BUI.ExportImport.RefreshAllModules()
 		else
-			if BUI.UnitFrames and BUI.IsModuleEnabled('unitFrames') then BUI.UnitFrames.RefreshAnchoredFrames() end
+			if BUI.IsModuleEnabled('unitFrames') then BUI.UnitFrames.RefreshAnchoredFrames() end
 			BUI.GroupFrames.RefreshPartyAnchor()
 			BUI.Skinning.RefreshAllStaggered()
 		end

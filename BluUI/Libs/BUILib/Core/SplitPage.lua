@@ -105,6 +105,23 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 		return frame
 	end
 
+	function kit.BoardItem(parent, width, build)
+		local item = CreateFrame('Frame', nil, parent)
+		local board = build(kit, item, width)
+		local query = ''
+		function item:Filter(text)
+			query = text
+			return board:Layout(0, query) > 0
+		end
+		function item:Measure()
+			return board:Layout(0, query)
+		end
+		function item:SetLast(last)
+			board:SetLast(last)
+		end
+		return item
+	end
+
 	function kit.Select(parent, spec)
 		local button = CreateFrame('Button', nil, parent)
 		button:SetHeight(SELECT_HEIGHT)

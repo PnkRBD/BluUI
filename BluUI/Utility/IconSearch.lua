@@ -21,7 +21,7 @@ local function Finish()
     ready = true
     building = false
     seenPairs = nil
-    if scanFrame then scanFrame:SetScript('OnUpdate', nil) end
+    scanFrame:SetScript('OnUpdate', nil)
     for listenerIndex = 1, #listeners do listeners[listenerIndex]() end
     wipe(listeners)
 end
@@ -76,7 +76,6 @@ end
 function IconSearch.Search(query, cap)
     if not ready then return nil end
     query = query:lower()
-    cap = cap or 24
     local prefix, rest = {}, {}
     local restCap = cap * 4
     for entryIndex = 1, count do

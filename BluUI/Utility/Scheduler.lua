@@ -112,10 +112,9 @@ function Scheduler.RegisterUpdate(name, callback, interval, active)
 
     local enabled = active ~= false
     registry[name] = {
-        name     = name,
         label    = 'Update ' .. name,
         fn       = callback,
-        interval = interval or 0.1,
+        interval = interval,
         due      = GetTime(),
         active   = enabled,
     }

@@ -257,11 +257,7 @@ local function FlushTick(self)
     end
 end
 
-local function EnsureFlushDriver()
-    if flushDriver._ready then return end
-    flushDriver._ready = true
-    flushDriver:SetScript('OnUpdate', FlushTick)
-end
+flushDriver:SetScript('OnUpdate', FlushTick)
 
 local function Enqueue(callback, key)
     key = key or tostring(callback)
@@ -277,10 +273,7 @@ local function ArmSettle()
     C_Timer.After(SETTLE_DELAY, function()
         settlePending = false
         if InCombatLockdown() then return end
-        if combatTaskOrder[combatTaskCursor] then
-            EnsureFlushDriver()
-            flushDriver:Show()
-        end
+        if combatTaskOrder[combatTaskCursor] then flushDriver:Show() end
     end)
 end
 

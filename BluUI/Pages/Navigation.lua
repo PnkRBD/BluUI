@@ -2,52 +2,19 @@ local _, BUI = ...
 local Navigation = {}
 BUI.Nav = Navigation
 
-local PAGE_ABBREVIATIONS = {
-	dashboard = 'DSH', cursor = 'CUR', minimap = 'MAP', datatext = 'DAT',
-	markers = 'MRK',
-	auras = 'AUR', actionbars = 'ABR', power = 'PWR', cdm = 'CDM', castbars = 'CST',
-	unitframes = 'UFR', buffs = 'BUF',
-	qol = 'QOL',
-	settings = 'SET',
-	exportimport = 'PRF',
-}
-
 local SECTIONS = {
 	{header = 'General',  ids = {'dashboard', 'cursor', 'minimap', 'datatext', 'markers', 'auras'}},
-	{header = 'Combat',   ids = {'actionbars', 'power', 'cdm', 'castbars', 'unitframes', 'buffs'}},
+	{header = 'Combat',   ids = {'actionbars', 'power', 'cdm', 'castbars', 'unitframes'}},
 	{header = 'Quality of life', ids = {'qol'}},
 	{header = 'System',   ids = {'settings', 'exportimport'}},
 }
 
-function Navigation.Apply(styleName)
+function Navigation.Apply()
 	local engine = BUI.PageEngine
-	if not engine.window then return end
-
-	local activeIndex = engine.currentIndex
-	local pageConfig = engine.pages[engine.pageOrder[activeIndex]]
-	local tabController = pageConfig and pageConfig.frame and pageConfig.frame._page
-	local activeTab = tabController and tabController.currentTab
-
-	for _, config in pairs(engine.pages) do
-		engine.TeardownPageContent(config)
-	end
-
-	engine.buttons = engine.window:SetNavStyle(styleName, {
-		pageOrder      = engine.pageOrder,
-		pages          = engine.pages,
-		showPage       = engine.ShowPage,
-		abbreviations  = PAGE_ABBREVIATIONS,
-		sections       = SECTIONS,
-		highlightStyle = BUI.db.global.navHighlight,
+	engine.buttons = engine.window:SetNavStyle(nil, {
+		pageOrder = engine.pageOrder,
+		pages     = engine.pages,
+		showPage  = engine.ShowPage,
+		sections  = SECTIONS,
 	})
-
-	engine.ShowPage(activeIndex)
-	tabController = activeTab and pageConfig.frame and pageConfig.frame._page
-	if tabController and tabController.SetTab then
-		tabController:SetTab(activeTab)
-	end
-end
-
-function Navigation.GetCurrentStyle()
-	return BUI.db.global.navStyle
 end

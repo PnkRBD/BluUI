@@ -13,14 +13,11 @@ local PRESETS = {
 local windows = setmetatable({}, { __mode = "k" })
 
 local function GetSavedScale()
-    local db = BUI.GetDB()
-    return db and db.uiScale.scale
+    return BUI.GetDB().uiScale.scale
 end
 
 local function SaveScale(value)
-    local db = BUI.GetDB()
-    if not db then return end
-    db.uiScale.scale = value
+    BUI.GetDB().uiScale.scale = value
 end
 
 local function FindPresetKey(scale)
@@ -41,7 +38,7 @@ local function RefreshButtons(scale)
             local button = buttons[preset.key]
             if button then
                 local active = (preset.key == "Custom") and isCustom or (preset.key == matched)
-                if button.SetActive then button:SetActive(active) end
+                button:SetActive(active)
                 if button.SetFlashing then button:SetFlashing(scale == nil) end
             end
         end
@@ -59,7 +56,7 @@ end
 
 local function Describe(value, format)
     local width, height = GetPhysicalScreenSize()
-    local perfect = BUI.DeviceScale()
+    local perfect = BUI.Pixel.PerfectScale()
     if BUI.ApproxEqual(value, perfect, 0.000001) then return ("Pixel perfect for %d x %d"):format(width, height) end
     local key = FindPresetKey(value)
     if key then return "The " .. key .. " preset" end
@@ -68,7 +65,7 @@ end
 
 local function ShowCustomDialog(parent)
     local minimum, maximum = BUI.ScaleBounds()
-    local presets = { { label = "Pixel perfect", value = BUI.DeviceScale() } }
+    local presets = { { label = "Pixel perfect", value = BUI.Pixel.PerfectScale() } }
     for presetIndex = 1, #PRESETS do
         local preset = PRESETS[presetIndex]
         if preset.value then presets[#presets + 1] = { label = preset.key, value = preset.value } end

@@ -103,10 +103,10 @@ end
 function Confetti.Burst(host)
 	local layer = Layer(host)
 	local width, height = layer:GetWidth(), layer:GetHeight()
-	if not width or width <= 0 or not height or height <= 0 then return end
+	if width <= 0 or height <= 0 then return end
 	local scale = max(1, min(MAX_SCALE, height / REFERENCE_HEIGHT))
 	local count = math.floor(BASE_COUNT * scale)
-	local red, green, blue = BUI.BUILibClient.Theme.GetAccent()
+	local accent = { BUI.BUILibClient.Theme.GetAccent() }
 	for index = count + 1, #layer.pieces do layer.pieces[index].texture:Hide() end
 	for index = 1, count do
 		local piece = Piece(layer, index)
@@ -139,7 +139,7 @@ function Confetti.Burst(host)
 		texture:ClearAllPoints()
 		texture:SetHeight(HEIGHT_MIN + math.random() * HEIGHT_RANGE)
 		texture:SetAlpha(1)
-		local color = math.random() < ACCENT_SHARE and { red, green, blue } or COLORS[math.random(#COLORS)]
+		local color = math.random() < ACCENT_SHARE and accent or COLORS[math.random(#COLORS)]
 		texture:SetVertexColor(color[1], color[2], color[3])
 	end
 	layer.active = count

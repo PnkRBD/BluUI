@@ -39,64 +39,87 @@ function Tools.IsGroupInCombat()
     return false
 end
 
-local overrideCache = {}
-local overrideCacheSize = 0
-local overrideCacheVersion = 1
-local MAX_OVERRIDE_CACHE = 1024
+local overrideCache = { size = 0 }
+local baseCache = { size = 0 }
+local spellCacheVersion = 1
+local MAX_SPELL_CACHE = 1024
 
-function Tools.GetOverrideSpell(spellID)
-    if not spellID then return spellID end
-    local entry = overrideCache[spellID]
+local function CachedSpell(cache, spellID, resolve)
+    local entry = cache[spellID]
     if entry then
-        if entry[2] == overrideCacheVersion then return entry[1] end
-    end
-    local overrideID = C_Spell.GetOverrideSpell(spellID)
-    local result
-    if overrideID and overrideID ~= 0 and overrideID ~= spellID then
-        result = overrideID
-    else
-        result = spellID
-    end
-    if entry then
-        entry[1] = result; entry[2] = overrideCacheVersion
-    else
-        if overrideCacheSize >= MAX_OVERRIDE_CACHE then
-            wipe(overrideCache)
-            overrideCacheSize = 0
+        if entry[2] ~= spellCacheVersion then
+            entry[1], entry[2] = resolve(spellID), spellCacheVersion
         end
-        overrideCache[spellID] = { result, overrideCacheVersion }
-        overrideCacheSize = overrideCacheSize + 1
+        return entry[1]
     end
+    if cache.size >= MAX_SPELL_CACHE then
+        wipe(cache)
+        cache.size = 0
+    end
+    local result = resolve(spellID)
+    cache[spellID] = { result, spellCacheVersion }
+    cache.size = cache.size + 1
     return result
 end
 
+local function ResolveOverrideSpell(spellID)
+    local overrideID = C_Spell.GetOverrideSpell(spellID)
+    if overrideID ~= 0 and overrideID ~= spellID then return overrideID end
+    return spellID
+end
+
+local function ResolveBaseSpell(spellID)
+    local baseID = C_Spell.GetBaseSpell(spellID)
+    if baseID ~= 0 and baseID ~= spellID then return baseID end
+    return spellID
+end
+
+function Tools.GetOverrideSpell(spellID)
+    if not spellID then return spellID end
+    return CachedSpell(overrideCache, spellID, ResolveOverrideSpell)
+end
+
+function Tools.GetBaseSpell(spellID)
+    if not spellID then return spellID end
+    return CachedSpell(baseCache, spellID, ResolveBaseSpell)
+end
+
 function Tools.InvalidateOverrideCache()
-    overrideCacheVersion = overrideCacheVersion + 1
+    spellCacheVersion = spellCacheVersion + 1
+end
+
+function Tools.EachSpellBookItem(callback, ...)
+    for line = 1, C_SpellBook.GetNumSpellBookSkillLines() do
+        local lineInfo = C_SpellBook.GetSpellBookSkillLineInfo(line)
+        if lineInfo then
+            for slot = lineInfo.itemIndexOffset + 1, lineInfo.itemIndexOffset + lineInfo.numSpellBookItems do
+                local item = C_SpellBook.GetSpellBookItemInfo(slot, Enum.SpellBookSpellBank.Player)
+                if item and callback(item, ...) then return true end
+            end
+        end
+    end
+    local numPetSpells = C_SpellBook.HasPetSpells()
+    if numPetSpells then
+        for slot = 1, numPetSpells do
+            local item = C_SpellBook.GetSpellBookItemInfo(slot, Enum.SpellBookSpellBank.Pet)
+            if item and callback(item, ...) then return true end
+        end
+    end
+    return false
 end
 
 local spellBookIconCache = {}
 local spellBookCacheBuilt = false
 
+local function CacheSpellBookIcon(spell)
+    if spell.spellID then
+        spellBookIconCache[spell.spellID] = spell.iconID
+    end
+end
+
 local function BuildSpellBookIconCache()
     wipe(spellBookIconCache)
-    local banks = Enum.SpellBookSpellBank
-    local bankList = { banks.Player }
-    if banks.Pet ~= nil then bankList[#bankList + 1] = banks.Pet end
-    for _, bank in ipairs(bankList) do
-        local numLines = C_SpellBook.GetNumSpellBookSkillLines(bank) or 0
-        for line = 1, numLines do
-            local tabInfo = C_SpellBook.GetSpellBookSkillLineInfo(line, bank)
-            if tabInfo and tabInfo.numSpellBookItems and tabInfo.itemIndexOffset then
-                for itemIndex = 1, tabInfo.numSpellBookItems do
-                    local slot = tabInfo.itemIndexOffset + itemIndex
-                    local spell = C_SpellBook.GetSpellBookItemInfo(slot, bank)
-                    if spell and spell.spellID and spell.iconID then
-                        spellBookIconCache[spell.spellID] = spell.iconID
-                    end
-                end
-            end
-        end
-    end
+    Tools.EachSpellBookItem(CacheSpellBookIcon)
 end
 
 function Tools.InvalidateSpellBookIconCache()
@@ -113,7 +136,7 @@ function Tools.GetStableSpellTexture(spellID)
     local booked = spellBookIconCache[spellID]
     if booked then return booked end
     local info = C_Spell.GetSpellInfo(spellID)
-    return (info and info.iconID) or C_Spell.GetSpellTexture(spellID)
+    return info and info.iconID
 end
 
 local choiceCache = {}
@@ -197,7 +220,7 @@ function Tools.GetActiveChoice(spellID)
     return spellID
 end
 
-function Tools.StepCurve(x1, y1, x2, y2)
+local function StepCurve(x1, y1, x2, y2)
     local curve = C_CurveUtil.CreateCurve()
     curve:SetType(Enum.LuaCurveType.Step)
     curve:AddPoint(x1, y1)
@@ -205,9 +228,9 @@ function Tools.StepCurve(x1, y1, x2, y2)
     return curve
 end
 
-Tools.OnCooldownCurve = Tools.StepCurve(0, 0, 0.001, 1)
-Tools.IsReadyCurve = Tools.StepCurve(0, 1, 0.001, 0)
-Tools.GCDFilterCurve = Tools.StepCurve(0, 0, 1.6, 1)
+Tools.OnCooldownCurve = StepCurve(0, 0, 0.001, 1)
+Tools.IsReadyCurve = StepCurve(0, 1, 0.001, 0)
+Tools.GCDFilterCurve = StepCurve(0, 0, 1.6, 1)
 
 local alphaCurves = {}
 
@@ -304,23 +327,9 @@ function Tools.IsChargeSpell(spellID)
     if Tools.IsSecretValue(maxCharges) then
         return false
     end
-    local isCharge = (maxCharges or 0) > 1
+    local isCharge = maxCharges > 1
     chargeSpellCache[spellID] = isCharge
     return isCharge
-end
-
-function Tools.CallAuraDuration(unit, instanceID)
-    if not instanceID then return nil end
-    return C_UnitAuras.GetAuraDuration(unit or 'player', instanceID)
-end
-
-function Tools.GetAuraDurationObject(instanceID)
-    if not instanceID then return nil end
-    if Tools.IsSecretValue(instanceID) then return nil end
-    if Tools.ShouldAurasBeSecret() or Tools.AuraQueriesBlocked() then return nil end
-    local data = C_UnitAuras.GetAuraDataByAuraInstanceID('player', instanceID)
-    if not data then return nil end
-    return Tools.CallAuraDuration('player', instanceID)
 end
 
 function Tools.GetAuraStacks(unit, spellID)
@@ -343,100 +352,83 @@ function Tools.CountText(count)
     return C_StringUtil.TruncateWhenZero(count)
 end
 
-if C_Secrets and C_Secrets.HasSecretRestrictions() then
-    function Tools.IsSecretValue(value)
-        if value == nil then return false end
-        return issecretvalue(value)
+function Tools.IsSecretValue(value)
+    if value == nil then return false end
+    return issecretvalue(value)
+end
+
+function Tools.SafeNum(value)
+    if type(value) ~= "number" or issecretvalue(value) then return nil end
+    return value
+end
+
+function Tools.SafeBool(value)
+    if issecretvalue(value) then return nil end
+    return value
+end
+
+function Tools.ShouldAurasBeSecret()
+    return C_Secrets.ShouldAurasBeSecret()
+end
+
+local auraProbeTime, auraProbeBlocked = -1, false
+function Tools.AuraQueriesBlocked()
+    local now = GetTime()
+    if now ~= auraProbeTime then
+        auraProbeTime = now
+        auraProbeBlocked = not pcall(C_UnitAuras.GetAuraDataByIndex, 'player', 1, 'HELPFUL')
     end
+    return auraProbeBlocked
+end
 
-    function Tools.SafeNum(value)
-        if type(value) ~= "number" or issecretvalue(value) then return nil end
-        return value
+local WAKE_EDGES = {
+    'PLAYER_REGEN_ENABLED', 'PLAYER_ENTERING_WORLD',
+    'ZONE_CHANGED_NEW_AREA', 'CVAR_UPDATE',
+}
+
+local Profiler = BUI.Profiler
+local wakeSubscribers = {}
+local wakeLabels = {}
+local wakeCursor = 0
+local wakeDriver = CreateFrame('Frame')
+wakeDriver:Hide()
+
+function Tools.OnAuraQueriesUnblocked(callback, label)
+    wakeSubscribers[#wakeSubscribers + 1] = callback
+    wakeLabels[#wakeLabels + 1] = label
+end
+
+wakeDriver:SetScript('OnUpdate', function(self)
+    wakeCursor = wakeCursor + 1
+    local callback = wakeSubscribers[wakeCursor]
+    if not callback or Tools.ShouldAurasBeSecret() or Tools.AuraQueriesBlocked() then
+        self:Hide()
+        return
     end
+    Profiler.Run(Profiler.Label('Aura wake', wakeLabels[wakeCursor]), xpcall, callback, geterrorhandler())
+end)
 
-    function Tools.SafeBool(value)
-        if issecretvalue(value) then return nil end
-        return value
+local function RunWakeNow()
+    if Tools.ShouldAurasBeSecret() or Tools.AuraQueriesBlocked() then return end
+    wakeCursor = 0
+    wakeDriver:Show()
+end
+
+local function RunWakeSubscribers(event, cvarName)
+    if #wakeSubscribers == 0 then return end
+    if event == 'CVAR_UPDATE' then
+        if type(cvarName) ~= 'string' then return end
+        if not cvarName:find('RestrictionsForced', 1, true) then return end
     end
-
-    function Tools.ShouldAurasBeSecret()
-        return C_Secrets.ShouldAurasBeSecret()
+    if event == 'PLAYER_REGEN_ENABLED' then
+        BUI.Events:AfterCombatSettled(RunWakeNow, 'Tools.AuraWake')
+        return
     end
+    RunWakeNow()
+end
 
-    local auraProbeTime, auraProbeBlocked = -1, false
-    function Tools.AuraQueriesBlocked()
-        local now = GetTime()
-        if now ~= auraProbeTime then
-            auraProbeTime = now
-            auraProbeBlocked = not pcall(C_UnitAuras.GetAuraDataByIndex, 'player', 1, 'HELPFUL')
-        end
-        return auraProbeBlocked
-    end
-
-    local WAKE_EDGES = {
-        'PLAYER_REGEN_ENABLED', 'PLAYER_ENTERING_WORLD',
-        'ZONE_CHANGED_NEW_AREA', 'CVAR_UPDATE',
-    }
-
-    local Profiler = BUI.Profiler
-    local wakeSubscribers = {}
-    local wakeLabels = {}
-    local wakeCursor = 0
-    local wakeDriver = CreateFrame('Frame')
-    wakeDriver:Hide()
-
-    function Tools.OnAuraQueriesUnblocked(callback, label)
-        wakeSubscribers[#wakeSubscribers + 1] = callback
-        wakeLabels[#wakeLabels + 1] = label
-    end
-
-    wakeDriver:SetScript('OnUpdate', function(self)
-        wakeCursor = wakeCursor + 1
-        local callback = wakeSubscribers[wakeCursor]
-        if not callback or Tools.ShouldAurasBeSecret() or Tools.AuraQueriesBlocked() then
-            self:Hide()
-            return
-        end
-        Profiler.Run(Profiler.Label('Aura wake', wakeLabels[wakeCursor]), xpcall, callback, geterrorhandler())
-    end)
-
-    local function RunWakeNow()
-        if Tools.ShouldAurasBeSecret() or Tools.AuraQueriesBlocked() then return end
-        wakeCursor = 0
-        wakeDriver:Show()
-    end
-
-    local function RunWakeSubscribers(event, cvarName)
-        if #wakeSubscribers == 0 then return end
-        if event == 'CVAR_UPDATE' then
-            if type(cvarName) ~= 'string' then return end
-            if not cvarName:find('RestrictionsForced', 1, true) then return end
-        end
-        if event == 'PLAYER_REGEN_ENABLED' then
-            BUI.Events:AfterCombatSettled(RunWakeNow, 'Tools.AuraWake')
-            return
-        end
-        RunWakeNow()
-    end
-
-    for edgeIndex = 1, #WAKE_EDGES do
-        BUI.Events:Register(WAKE_EDGES[edgeIndex], 'Tools.AuraWake', RunWakeSubscribers)
-    end
-else
-    local function Never() return false end
-    Tools.IsSecretValue          = Never
-    Tools.ShouldAurasBeSecret    = Never
-    Tools.AuraQueriesBlocked     = Never
-    function Tools.OnAuraQueriesUnblocked() end
-
-    function Tools.SafeNum(value)
-        if type(value) ~= "number" then return nil end
-        return value
-    end
-
-    function Tools.SafeBool(value)
-        return value
-    end
+for edgeIndex = 1, #WAKE_EDGES do
+    BUI.Events:Register(WAKE_EDGES[edgeIndex], 'Tools.AuraWake', RunWakeSubscribers)
 end
 
 function Tools.IsInTown()
@@ -476,13 +468,18 @@ function Tools.DeepCopy(original)
     return CopyTable(original)
 end
 
-function Tools.GetLogo()
-    return BUI.C.ICON_PATH
+function Tools.ReplaceTimer(holder, key, label, delay, callback, arg)
+    local timer = holder[key]
+    if timer then timer:Cancel() end
+    holder[key] = BUI.Profiler.NewTimer(label, delay, function()
+        holder[key] = nil
+        callback(arg)
+    end)
 end
 
 function Tools.AddPageWatermark(frame)
     local mark = frame:CreateTexture(nil, 'BACKGROUND', nil, 1)
-    mark:SetTexture(Tools.GetLogo())
+    mark:SetTexture(BUI.C.ICON_PATH)
     mark:SetSize(BUI.Pixel.Scale(520), BUI.Pixel.Scale(520))
     mark:SetPoint('CENTER')
     mark:SetVertexColor(1, 1, 1, 0.06)
@@ -539,9 +536,9 @@ end
 function Tools.CooldownFontString(cooldown)
     local region = cooldown._buiCountdown
     if region then return region end
-    for index = 1, select('#', cooldown:GetRegions()) do
-        region = select(index, cooldown:GetRegions())
-        if region:GetObjectType() == 'FontString' then
+    for _, candidate in ipairs({ cooldown:GetRegions() }) do
+        if candidate:GetObjectType() == 'FontString' then
+            region = candidate
             cooldown._buiCountdown = region
             return region
         end
