@@ -4,13 +4,8 @@ local Hook = BUI.Profiler.Hooker('WorldMap.ZoneLabels')
 
 local Pixel = BUI.Pixel
 
-BUI.WorldMapLabels = {}
-
 local BASE_FONT_SIZE = 13
 local MIN_FONT_SIZE, MAX_FONT_SIZE = 8, 30
-
-local container
-local labels = {}
 
 local MANUAL_POSITIONS = {
     [12] = {
@@ -19,103 +14,111 @@ local MANUAL_POSITIONS = {
     },
 }
 
-local function IsEnabled()
-    if BUI.GetDB().interface.worldMapZoneNames ~= true then return false end
-    return BUI.Skinning.IsSkinEnabled('worldmap')
+local overlays = {}
+
+local function Fit(overlay, base, minimum, maximum)
+    return math.min(maximum, math.max(minimum, base / overlay.scale))
 end
 
-local function GetContainer(canvas)
-    if container then return container end
-    container = CreateFrame('Frame', nil, canvas)
-    container:SetAllPoints(canvas)
+local function NewOverlay(settingKey, levelOffset, draw)
+    local overlay = {}
 
-    container:SetFrameLevel(canvas:GetFrameLevel() + 10)
-    return container
-end
-
-local function FontSize()
-    local scale = WorldMapFrame:GetCanvasScale()
-    if scale <= 0 then scale = 1 end
-    return math.min(MAX_FONT_SIZE, math.max(MIN_FONT_SIZE, BASE_FONT_SIZE / scale))
-end
-
-local function Update()
-    if not container and not IsEnabled() then return end
-    local canvas = WorldMapFrame:GetCanvas()
-    if not canvas then return end
-    local shelf = GetContainer(canvas)
-
-    local mapID = WorldMapFrame:GetMapID()
-    local info = mapID and C_Map.GetMapInfo(mapID)
-    if not IsEnabled() or not info or info.mapType ~= Enum.UIMapType.Continent then
-        shelf:Hide()
-        return
+    local function IsEnabled()
+        return BUI.GetDB().interface[settingKey] and BUI.Skinning.IsSkinEnabled('worldmap')
     end
 
-    local width, height = canvas:GetWidth(), canvas:GetHeight()
-    if width <= 0 or height <= 0 then
-        shelf:Hide()
-        return
-    end
-
-    local size = FontSize()
-    local font = BUI.C.FONT_PATH
-    local labelCount = 0
-
-    local function PlaceLabel(name, centerX, centerY)
-        labelCount = labelCount + 1
-        local fontString = labels[labelCount]
-        if not fontString then
-            fontString = shelf:CreateFontString(nil, 'OVERLAY')
-            fontString:SetShadowColor(0, 0, 0, 0.8)
-            fontString:SetShadowOffset(1, -1)
-            labels[labelCount] = fontString
+    function overlay.Refresh()
+        local shelf = overlay.shelf
+        if not shelf and not IsEnabled() then return end
+        local canvas = WorldMapFrame:GetCanvas()
+        if not shelf then
+            shelf = CreateFrame('Frame', nil, canvas)
+            shelf:SetAllPoints(canvas)
+            shelf:SetFrameLevel(canvas:GetFrameLevel() + levelOffset)
+            overlay.shelf = shelf
         end
-        Pixel.ApplyFont(fontString, size, font, 'OUTLINE')
-        fontString:SetText(name)
+        local mapID = WorldMapFrame:GetMapID()
+        local info = mapID and C_Map.GetMapInfo(mapID)
+        local width, height = canvas:GetWidth(), canvas:GetHeight()
+        if not IsEnabled() or not info or info.mapType ~= Enum.UIMapType.Continent or width <= 0 or height <= 0 then
+            shelf:Hide()
+            return
+        end
+        overlay.canvas, overlay.width, overlay.height = canvas, width, height
+        overlay.scale = WorldMapFrame:GetCanvasScale()
+        draw(overlay, mapID)
+        shelf:Show()
+    end
+
+    overlays[#overlays + 1] = overlay
+    return overlay
+end
+
+BUI.WorldMapOverlay = { New = NewOverlay, Fit = Fit }
+
+local labels = {}
+local placed = {}
+
+local function PlaceLabel(overlay, index, name, size, centerX, centerY)
+    local fontString = labels[index]
+    if not fontString then
+        fontString = overlay.shelf:CreateFontString(nil, 'OVERLAY')
+        fontString:SetShadowColor(0, 0, 0, 0.8)
+        fontString:SetShadowOffset(1, -1)
         fontString:SetTextColor(1, 1, 1, 0.75)
-        fontString:ClearAllPoints()
-        fontString:SetPoint('CENTER', canvas, 'TOPLEFT', centerX * width, -(centerY * height))
-        fontString:Show()
+        labels[index] = fontString
     end
-
-    local placed = {}
-    local function PlaceChildren(children)
-        for _, child in ipairs(children or {}) do
-            local minX, maxX, minY, maxY = C_Map.GetMapRectOnMap(child.mapID, mapID)
-            if minX and maxX and maxX > minX and child.name and child.name ~= '' then
-                placed[child.mapID] = true
-                PlaceLabel(child.name, (minX + maxX) * 0.5, (minY + maxY) * 0.5)
-            end
-        end
-    end
-    PlaceChildren(C_Map.GetMapChildrenInfo(mapID, Enum.UIMapType.Zone))
-
-    PlaceChildren(C_Map.GetMapChildrenInfo(mapID, Enum.UIMapType.Continent))
-
-    for _, entry in ipairs(MANUAL_POSITIONS[mapID] or {}) do
-        if not placed[entry.mapID] then
-            local zoneInfo = C_Map.GetMapInfo(entry.mapID)
-            if zoneInfo and zoneInfo.name then
-                PlaceLabel(zoneInfo.name, entry.x, entry.y)
-            end
-        end
-    end
-
-    for labelIndex = labelCount + 1, #labels do labels[labelIndex]:Hide() end
-    shelf:Show()
+    Pixel.ApplyFont(fontString, size, BUI.C.FONT_PATH, 'OUTLINE')
+    fontString:SetText(name)
+    fontString:ClearAllPoints()
+    fontString:SetPoint('CENTER', overlay.canvas, 'TOPLEFT', centerX * overlay.width, -(centerY * overlay.height))
+    fontString:Show()
 end
 
-BUI.WorldMapLabels.Refresh = Update
-
-local OnCanvasScaleChanged = BUI.Dispatcher.New(Update, 'WorldMapLabels.Rescale')
-
-BUI.Events:OnLogin('WorldMapLabels', function()
-    if not WorldMapFrame then return end
-    Hook(WorldMapFrame, 'OnMapChanged', Update)
-    WorldMapFrame:HookScript('OnShow', BUI.Profiler.Wrap('WorldMap.ZoneLabels map shown', Update))
-    local scroll = WorldMapFrame.ScrollContainer
-    if scroll and scroll.SetCanvasScale then
-        Hook(scroll, 'SetCanvasScale', OnCanvasScaleChanged)
+local function PlaceChildren(overlay, mapID, children, count, size)
+    if not children then return count end
+    for _, child in ipairs(children) do
+        local minX, maxX, minY, maxY = C_Map.GetMapRectOnMap(child.mapID, mapID)
+        if minX and maxX > minX and child.name ~= '' then
+            placed[child.mapID] = true
+            count = count + 1
+            PlaceLabel(overlay, count, child.name, size, (minX + maxX) * 0.5, (minY + maxY) * 0.5)
+        end
     end
+    return count
+end
+
+local function DrawLabels(overlay, mapID)
+    local size = Fit(overlay, BASE_FONT_SIZE, MIN_FONT_SIZE, MAX_FONT_SIZE)
+    wipe(placed)
+    local count = PlaceChildren(overlay, mapID, C_Map.GetMapChildrenInfo(mapID, Enum.UIMapType.Zone), 0, size)
+    count = PlaceChildren(overlay, mapID, C_Map.GetMapChildrenInfo(mapID, Enum.UIMapType.Continent), count, size)
+    local manual = MANUAL_POSITIONS[mapID]
+    if manual then
+        for _, entry in ipairs(manual) do
+            if not placed[entry.mapID] then
+                local zoneInfo = C_Map.GetMapInfo(entry.mapID)
+                if zoneInfo then
+                    count = count + 1
+                    PlaceLabel(overlay, count, zoneInfo.name, size, entry.x, entry.y)
+                end
+            end
+        end
+    end
+    for labelIndex = count + 1, #labels do labels[labelIndex]:Hide() end
+end
+
+local overlay = NewOverlay('worldMapZoneNames', 10, DrawLabels)
+BUI.WorldMapLabels = { Refresh = overlay.Refresh }
+
+local function RefreshAll()
+    for _, entry in ipairs(overlays) do entry.Refresh() end
+end
+
+local OnCanvasScaleChanged = BUI.Dispatcher.New(RefreshAll, 'WorldMapOverlays.Rescale')
+
+BUI.Events:OnLogin('WorldMapOverlays', function()
+    Hook(WorldMapFrame, 'OnMapChanged', RefreshAll)
+    Hook(WorldMapFrame, 'OnCanvasScaleChanged', OnCanvasScaleChanged)
+    WorldMapFrame:HookScript('OnShow', BUI.Profiler.Wrap('WorldMap.ZoneLabels map shown', RefreshAll))
 end)
