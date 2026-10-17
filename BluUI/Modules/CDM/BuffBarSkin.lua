@@ -3,8 +3,6 @@ local _, BUI = ...
 local Hook = BUI.Profiler.Hooker('CDM.BuffBarSkin')
 
 local _G = _G
-local ipairs = ipairs
-local UnitClass = UnitClass
 
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
@@ -30,7 +28,7 @@ end
 local function GetEffectiveBarWidth(config)
     if config.matchAnchorWidth and config.anchorFrame ~= "" then
         local resolvedAnchor = BUI.ResolveAnchorFrame(config.anchorFrame, config.anchorPoint)
-        if resolvedAnchor and resolvedAnchor.GetWidth then
+        if resolvedAnchor then
             local point = config.anchorPoint
             local anchorWidth
             if point == "BOTTOM" or point == "BOTTOMLEFT" or point == "BOTTOMRIGHT" then
@@ -38,8 +36,8 @@ local function GetEffectiveBarWidth(config)
             else
                 anchorWidth = resolvedAnchor._topRowW or resolvedAnchor._row1W
             end
-            anchorWidth = anchorWidth or resolvedAnchor:GetWidth() or 0
-            local reserved = (config.showIcon ~= false) and (config.iconSize + ICON_GAP) or 0
+            anchorWidth = anchorWidth or resolvedAnchor:GetWidth()
+            local reserved = config.showIcon and (config.iconSize + ICON_GAP) or 0
             local width = anchorWidth - reserved
             if width >= 20 then return width end
         end
@@ -49,18 +47,20 @@ end
 
 local function GetBarColor(config)
     if config.useClassColor then
-        local _, class = UnitClass("player")
-        local color = class and RAID_CLASS_COLORS[class]
-        if color then return color.r, color.g, color.b, 1 end
+        local red, green, blue = BUI.Tools.GetUnitClassColor("player")
+        if red then return red, green, blue, 1 end
     end
     local barColor = config.barColor
-    return barColor[1], barColor[2], barColor[3], barColor[4] or 1
+    return barColor[1], barColor[2], barColor[3], barColor[4]
 end
 
+local regionBuffer = {}
+
 local function StripCDMAtlases(frame)
-    if not frame or not frame.GetRegions then return end
-    for _, region in ipairs({ frame:GetRegions() }) do
-        if region and region:GetObjectType() == "Texture" then
+    local regions, count = CDM.PackInto(regionBuffer, frame:GetRegions())
+    for regionIndex = 1, count do
+        local region = regions[regionIndex]
+        if region:GetObjectType() == "Texture" then
             local atlas = region:GetAtlas()
             if atlas and atlas:find(BAR_ATLAS_PREFIX) then
                 region:SetTexture(nil)
@@ -71,15 +71,6 @@ local function StripCDMAtlases(frame)
     end
 end
 
-local function RemoveMasks(texture)
-    if not texture or not texture.GetMaskTexture then return end
-    local mask = texture:GetMaskTexture(1)
-    while mask do
-        texture:RemoveMaskTexture(mask)
-        mask = texture:GetMaskTexture(1)
-    end
-end
-
 local function PlaceStacks(text, config, iconFrame, bar, showIcon)
     local point = config.stackPoint
     local target = (showIcon and config.stackAttach == "ICON") and iconFrame or bar
@@ -87,18 +78,17 @@ local function PlaceStacks(text, config, iconFrame, bar, showIcon)
     text:ClearAllPoints()
     text:SetPoint(point, target, point, config.stackOffsetX, config.stackOffsetY)
     text:SetTextColor(color[1], color[2], color[3], color[4])
-    text:SetShown(config.showStacks ~= false)
+    text:SetShown(config.showStacks)
 end
 
 local function PlaceDuration(text, config, bar)
     local point = config.durationPoint
     text:ClearAllPoints()
     text:SetPoint(point, bar, point, config.durationOffsetX, config.durationOffsetY)
-    text:SetShown(config.showDuration ~= false)
+    text:SetShown(config.showDuration)
 end
 
 local function HAlignOf(point)
-    if type(point) ~= "string" then return "" end
     if point:find("LEFT",  1, true) then return "LEFT"  end
     if point:find("RIGHT", 1, true) then return "RIGHT" end
     return ""
@@ -173,7 +163,7 @@ local ScheduleReposition = BUI.Dispatcher.New(PositionViewer, 'CDM.BuffBarReposi
 local HookItemVisibility
 
 local function FitBarItem(item, config)
-    local showIcon = config.showIcon ~= false
+    local showIcon = config.showIcon
     local iconSize = config.iconSize
     local barHeight = config.barHeight
     local barWidth = GetEffectiveBarWidth(config)
@@ -182,23 +172,30 @@ local function FitBarItem(item, config)
     fitting = false
 
     local iconFrame = item.Icon
-    if iconFrame then iconFrame:SetShown(showIcon) end
+    iconFrame:SetShown(showIcon)
 
     local bar = item.Bar
-    if not bar then return end
     bar:ClearAllPoints()
-    if showIcon and iconFrame then
+    if showIcon then
         bar:SetPoint("LEFT", iconFrame, "RIGHT", ICON_GAP, 0)
     else
         bar:SetPoint("LEFT", item, "LEFT", 0, 0)
     end
     bar:SetSize(barWidth, barHeight)
-    if bar.Name then bar.Name:SetShown(config.showName ~= false) end
-    if bar.Duration then PlaceDuration(bar.Duration, config, bar) end
+    bar.Name:SetShown(config.showName)
+    PlaceDuration(bar.Duration, config, bar)
+end
+
+local function HideSelf(self)
+    self:Hide()
+end
+
+local function HidePip(self)
+    self:Hide()
+    self:SetAlpha(0)
 end
 
 local function SkinBarItem(item)
-    if not item then return end
     if skinnedItems[item] then return end
     local config = GetSettings()
     if not config.skinEnabled then return end
@@ -211,103 +208,64 @@ local function SkinBarItem(item)
     local border = config.borderColor
     local borderSize = config.borderSize
     local backgroundColor = config.bgColor
-    local showIcon = config.showIcon ~= false
+    local showIcon = config.showIcon
     local iconSize = config.iconSize
     FitBarItem(item, config)
 
-    if item.PandemicIcon then
-        item.PandemicIcon:Hide()
-        if not item._buiPandemicHooked then
-            item._buiPandemicHooked = true
-            Hook(item.PandemicIcon, "Show", function(self) self:Hide() end)
-            if item.ShowPandemicStateFrame then
-                Hook(item, "ShowPandemicStateFrame", function(self)
-                    if self.PandemicIcon then self.PandemicIcon:Hide() end
-                end)
-            end
-        end
-    end
-    if item.CooldownFlash then
-        item.CooldownFlash:Hide()
-        if not item._buiCdFlashHooked then
-            item._buiCdFlashHooked = true
-            Hook(item.CooldownFlash, "Show", function(self)
-                self:Hide()
-                if self.FlashAnim then self.FlashAnim:Stop() end
-            end)
-        end
-    end
-    if item.DebuffBorder then
-        item.DebuffBorder:Hide()
-        if not item._buiDebuffBorderHooked then
-            item._buiDebuffBorderHooked = true
-            Hook(item.DebuffBorder, "Show", function(self) self:Hide() end)
-        end
+    item.DebuffBorder:Hide()
+    if not item._buiDebuffBorderHooked then
+        item._buiDebuffBorderHooked = true
+        Hook(item.DebuffBorder, "Show", HideSelf)
     end
 
     local iconFrame = item.Icon
-    if iconFrame and showIcon then
+    if showIcon then
         iconFrame:SetSize(iconSize, iconSize)
         StripCDMAtlases(iconFrame)
         local inner = iconFrame.Icon
-        if inner then
-            RemoveMasks(inner)
-            if inner.SetTexCoord then inner:SetTexCoord(0.08, 0.92, 0.08, 0.92) end
-            inner:ClearAllPoints()
-            inner:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", 1, -1)
-            inner:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", -1, 1)
-        end
-        Pixel.ApplyBorder(iconFrame, borderSize, border[1], border[2], border[3], border[4] or 1)
+        CDM.RemoveMasks(inner)
+        inner:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        inner:ClearAllPoints()
+        inner:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", 1, -1)
+        inner:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", -1, 1)
+        Pixel.ApplyBorder(iconFrame, borderSize, border[1], border[2], border[3], border[4])
     end
 
     local bar = item.Bar
-    if bar then
-        bar:SetStatusBarTexture(texture)
-        bar:SetStatusBarColor(GetBarColor(config))
+    bar:SetStatusBarTexture(texture)
+    bar:SetStatusBarColor(GetBarColor(config))
 
-        if bar.BarBG then
-            bar.BarBG:SetTexture(texture)
-            bar.BarBG:SetVertexColor(backgroundColor[1], backgroundColor[2], backgroundColor[3], backgroundColor[4] or 1)
-            bar.BarBG:ClearAllPoints()
-            bar.BarBG:SetAllPoints(bar)
-        end
+    bar.BarBG:SetTexture(texture)
+    bar.BarBG:SetVertexColor(backgroundColor[1], backgroundColor[2], backgroundColor[3], backgroundColor[4])
+    bar.BarBG:ClearAllPoints()
+    bar.BarBG:SetAllPoints(bar)
 
-        if bar.Pip then
-            bar.Pip:Hide()
-            bar.Pip:SetAlpha(0)
-            if not bar._buiPipHooked then
-                bar._buiPipHooked = true
-                Hook(bar.Pip, "Show", function(self) self:Hide(); self:SetAlpha(0) end)
-            end
-        end
-        if bar.Spark then bar.Spark:Hide() end
-
-        if not bar._buiBorderHost then
-            bar._buiBorderHost = CreateFrame("Frame", nil, bar)
-            bar._buiBorderHost:SetFrameLevel(bar:GetFrameLevel() + 1)
-        end
-        bar._buiBorderHost:ClearAllPoints()
-        bar._buiBorderHost:SetAllPoints(bar)
-        Pixel.ApplyBorder(bar._buiBorderHost, borderSize, border[1], border[2], border[3], border[4] or 1)
-
-        local stacks = iconFrame and iconFrame.Applications
-        if stacks then
-            if not bar._buiTextLayer then
-                bar._buiTextLayer = CreateFrame("Frame", nil, bar._buiBorderHost)
-                bar._buiTextLayer:SetAllPoints(bar)
-            end
-            stacks:SetParent(bar._buiTextLayer)
-            Pixel.ApplyFont(stacks, math.max(6, config.stackSize), font)
-            PlaceStacks(stacks, config, iconFrame, bar, showIcon)
-        end
-
-        if bar.Name then
-            Pixel.ApplyFont(bar.Name, math.max(6, config.nameSize), font)
-        end
-        if bar.Duration then
-            Pixel.ApplyFont(bar.Duration, math.max(6, config.durationSize), font)
-        end
+    bar.Pip:Hide()
+    bar.Pip:SetAlpha(0)
+    if not bar._buiPipHooked then
+        bar._buiPipHooked = true
+        Hook(bar.Pip, "Show", HidePip)
     end
+
+    if not bar._buiBorderHost then
+        bar._buiBorderHost = CreateFrame("Frame", nil, bar)
+        bar._buiBorderHost:SetFrameLevel(bar:GetFrameLevel() + 1)
+    end
+    bar._buiBorderHost:ClearAllPoints()
+    bar._buiBorderHost:SetAllPoints(bar)
+    Pixel.ApplyBorder(bar._buiBorderHost, borderSize, border[1], border[2], border[3], border[4])
+
+    local stacks = iconFrame.Applications
+    if not bar._buiTextLayer then
+        bar._buiTextLayer = CreateFrame("Frame", nil, bar._buiBorderHost)
+        bar._buiTextLayer:SetAllPoints(bar)
+    end
+    stacks:SetParent(bar._buiTextLayer)
+    Pixel.ApplyFont(stacks, math.max(6, config.stackSize), font)
+    PlaceStacks(stacks, config, iconFrame, bar, showIcon)
+
+    Pixel.ApplyFont(bar.Name, math.max(6, config.nameSize), font)
+    Pixel.ApplyFont(bar.Duration, math.max(6, config.durationSize), font)
 end
 
 local rackItems = {}
@@ -317,7 +275,7 @@ end
 
 local function RestackItems(viewer)
     viewer = viewer or _G.BuffBarCooldownViewer
-    if not viewer or not viewer.itemFramePool or not viewer.itemFramePool.EnumerateActive then return end
+    if not viewer then return end
     local config = GetSettings()
     if not config.skinEnabled then return end
 
@@ -326,7 +284,7 @@ local function RestackItems(viewer)
     local spacing = config.spacing
     local iconSize = config.iconSize
     local barHeight = config.barHeight
-    local slotHeight = math.max(config.showIcon ~= false and iconSize or 0, barHeight)
+    local slotHeight = math.max(config.showIcon and iconSize or 0, barHeight)
     local goingUp = config.growDirection == "UP"
 
     wipe(rackItems)
@@ -354,6 +312,7 @@ end
 
 function CDM.RepositionBuffBarRack()
     PositionViewer()
+    CDM.EditModeLock.SyncBarsLock()
     if previewShelf then ApplyAnchor(previewShelf, GetSettings()) end
 end
 
@@ -361,6 +320,10 @@ local ScheduleReflow = BUI.Dispatcher.New(RestackItems, 'CDM.BuffBarReflow')
 
 local function ReflowUnlessFitting()
     if not fitting then ScheduleReflow() end
+end
+
+local function ReflowUnlessRestacking()
+    if not restacking then ScheduleReflow() end
 end
 
 HookItemVisibility = function(item)
@@ -372,23 +335,12 @@ HookItemVisibility = function(item)
     Hook(item, "SetSize", ReflowUnlessFitting)
     Hook(item, "SetWidth", ReflowUnlessFitting)
     Hook(item, "SetHeight", ReflowUnlessFitting)
-    Hook(item, "SetPoint", function()
-        if not restacking then ScheduleReflow() end
-    end)
-end
-
-local function SkinAllActive(viewer)
-    if viewer and viewer.itemFramePool and viewer.itemFramePool.EnumerateActive then
-        for item in viewer.itemFramePool:EnumerateActive() do
-            SkinBarItem(item)
-        end
-        RestackItems(viewer)
-    end
+    Hook(item, "SetPoint", ReflowUnlessRestacking)
 end
 
 function CDM.RefreshBuffBarSkin()
     local viewer = _G.BuffBarCooldownViewer
-    if not viewer or not viewer.itemFramePool or not viewer.itemFramePool.EnumerateActive then return end
+    if not viewer then return end
     for item in viewer.itemFramePool:EnumerateActive() do
         skinnedItems[item] = nil
         SkinBarItem(item)
@@ -413,22 +365,23 @@ end
 
 local ScheduleRefit = BUI.Dispatcher.New(RefitActiveItems, 'CDM.BuffBarRefit')
 
+local function OnBarItemAcquired(_, item)
+    SkinBarItem(item)
+    ScheduleReflow()
+end
+
 local function HookBuffBarViewer()
     if hooked then return true end
-    local viewer = _G.BuffBarCooldownViewer
-    if not viewer then return false end
+    if not CDM.HookBarViewer(OnBarItemAcquired, ScheduleRefit) then return false end
     hooked = true
 
-    SkinAllActive(viewer)
+    local viewer = _G.BuffBarCooldownViewer
+    for item in viewer.itemFramePool:EnumerateActive() do
+        SkinBarItem(item)
+    end
+    RestackItems(viewer)
     PositionViewer()
 
-    Hook(viewer, "OnAcquireItemFrame", function(self, item)
-        SkinBarItem(item)
-        ScheduleReflow()
-    end)
-    if viewer.RefreshLayout then
-        Hook(viewer, "RefreshLayout", ScheduleRefit)
-    end
     Hook(viewer, "SetPoint", function()
         if positioning then return end
         viewerMoved = true
@@ -440,15 +393,11 @@ end
 
 function CDM.InitBuffBarSkin()
     if HookBuffBarViewer() then return end
-    local watcher = CreateFrame("Frame")
-    watcher:RegisterEvent("COOLDOWN_VIEWER_DATA_LOADED")
-    watcher:RegisterEvent("PLAYER_LOGIN")
-    watcher:SetScript("OnEvent", BUI.Profiler.Wrap("CDM.BuffBarSkin viewer watch", function(self)
+    BUI.Events:Register("COOLDOWN_VIEWER_DATA_LOADED", "CDM.BuffBarSkin", function()
         if HookBuffBarViewer() then
-            self:UnregisterAllEvents()
-            self:SetScript("OnEvent", nil)
+            BUI.Events:Unregister("COOLDOWN_VIEWER_DATA_LOADED", "CDM.BuffBarSkin")
         end
-    end))
+    end)
 end
 
 local PREVIEW_COUNT = 5
@@ -483,7 +432,7 @@ local function BuildPreviewFrame(previewIndex, shelf)
 end
 
 local function StylePreviewFrame(frame, previewIndex, config)
-    local showIcon = config.showIcon ~= false
+    local showIcon = config.showIcon
     local iconSize = config.iconSize
     local barWidth = GetEffectiveBarWidth(config)
     local barHeight = config.barHeight
@@ -501,7 +450,7 @@ local function StylePreviewFrame(frame, previewIndex, config)
         frame.Icon:ClearAllPoints()
         frame.Icon:SetPoint("LEFT", frame, "LEFT", 0, 0)
         frame.Icon:SetSize(iconSize, iconSize)
-        Pixel.ApplyBorder(frame.Icon, borderSize, border[1], border[2], border[3], border[4] or 1)
+        Pixel.ApplyBorder(frame.Icon, borderSize, border[1], border[2], border[3], border[4])
         frame.Icon.Icon:ClearAllPoints()
         frame.Icon.Icon:SetPoint("TOPLEFT", frame.Icon, "TOPLEFT", Pixel.Scale(1), Pixel.Scale(-1))
         frame.Icon.Icon:SetPoint("BOTTOMRIGHT", frame.Icon, "BOTTOMRIGHT", Pixel.Scale(-1), Pixel.Scale(1))
@@ -521,7 +470,7 @@ local function StylePreviewFrame(frame, previewIndex, config)
     frame.Bar:SetMinMaxValues(0, 1)
     frame.Bar:SetValue(0.15 + (previewIndex * 0.17) % 0.85)
     frame.BarBG:SetTexture(texture)
-    frame.BarBG:SetVertexColor(backgroundColor[1], backgroundColor[2], backgroundColor[3], backgroundColor[4] or 1)
+    frame.BarBG:SetVertexColor(backgroundColor[1], backgroundColor[2], backgroundColor[3], backgroundColor[4])
     frame.BarBG:ClearAllPoints()
     frame.BarBG:SetAllPoints(frame.Bar)
     if not frame.Bar._buiBorderHost then
@@ -530,7 +479,7 @@ local function StylePreviewFrame(frame, previewIndex, config)
     end
     frame.Bar._buiBorderHost:ClearAllPoints()
     frame.Bar._buiBorderHost:SetAllPoints(frame.Bar)
-    Pixel.ApplyBorder(frame.Bar._buiBorderHost, borderSize, border[1], border[2], border[3], border[4] or 1)
+    Pixel.ApplyBorder(frame.Bar._buiBorderHost, borderSize, border[1], border[2], border[3], border[4])
 
     Pixel.ApplyFont(frame.Stacks, math.max(6, config.stackSize), font, "OUTLINE")
     frame.Stacks:SetText(PREVIEW_STACKS[((previewIndex - 1) % #PREVIEW_STACKS) + 1])
@@ -540,7 +489,7 @@ local function StylePreviewFrame(frame, previewIndex, config)
     frame.Bar.Name:ClearAllPoints()
     frame.Bar.Name:SetPoint("LEFT", frame.Bar, "LEFT", Pixel.Scale(4), 0)
     frame.Bar.Name:SetText(PREVIEW_NAMES[((previewIndex - 1) % #PREVIEW_NAMES) + 1])
-    frame.Bar.Name:SetShown(config.showName ~= false)
+    frame.Bar.Name:SetShown(config.showName)
 
     Pixel.ApplyFont(frame.Bar.Duration, math.max(6, config.durationSize), font)
     frame.Bar.Duration:SetText(((PREVIEW_COUNT + 1 - previewIndex) * 3) .. "s")
@@ -550,7 +499,7 @@ end
 local function PositionPreviewFrame(frame, previewIndex, config, shelf)
     local iconSize = config.iconSize
     local barHeight = config.barHeight
-    local slotHeight = math.max(config.showIcon ~= false and iconSize or 0, barHeight)
+    local slotHeight = math.max(config.showIcon and iconSize or 0, barHeight)
     local spacing = config.spacing
     local goingUp = config.growDirection == "UP"
     local corner = CornerFrom(config.anchorPoint, goingUp)

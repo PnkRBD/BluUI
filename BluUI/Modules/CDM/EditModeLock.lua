@@ -8,25 +8,41 @@ CDM.EditModeLock = EditModeLock
 
 local CreateFrame = CreateFrame
 local InCombatLockdown = InCombatLockdown
-local pairs, ipairs, type = pairs, ipairs, type
+local pairs, ipairs = pairs, ipairs
 
 local CDM_SYSTEM_FRAMES = {
     "EssentialCooldownViewer",
     "UtilityCooldownViewer",
     "BuffIconCooldownViewer",
 }
+local BAR_VIEWER = "BuffBarCooldownViewer"
 local LOCK_TEXT_TIMEOUT = 2.5
+local COOLDOWN_SYSTEM = Enum.EditModeSystem.CooldownViewer
+local ICON_SETTINGS = {
+    [Enum.EditModeCooldownViewerSetting.VisibleSetting] = Enum.CooldownViewerVisibleSetting.Always,
+    [Enum.EditModeCooldownViewerSetting.ShowTimer] = 1,
+}
+local BUFF_SETTINGS = {
+    [Enum.EditModeCooldownViewerSetting.VisibleSetting] = Enum.CooldownViewerVisibleSetting.Always,
+    [Enum.EditModeCooldownViewerSetting.ShowTimer] = 1,
+    [Enum.EditModeCooldownViewerSetting.HideWhenInactive] = 1,
+}
+local BUFF_SYSTEMS = {
+    [Enum.EditModeCooldownViewerSystemIndices.BuffIcon] = true,
+    [Enum.EditModeCooldownViewerSystemIndices.BuffBar] = true,
+}
 
 local Pixel = BUI.Pixel
 local lockState = setmetatable({}, { __mode = "k" })
-local hookedSystemFrames = setmetatable({}, { __mode = "k" })
-local dialogHooked = false
 local isInEditMode = false
-local lockNoticePrinted = false
 
-local function IsCDMSystemFrame(frame)
-    if not frame then return false end
-    return frame.system == Enum.EditModeSystem.CooldownViewer
+local function BarsLocked()
+    return BUI.GetDB().cdm.buffBars.skinEnabled == true
+end
+
+local function IsLocked(frame)
+    if frame.system ~= COOLDOWN_SYSTEM then return false end
+    return frame ~= _G[BAR_VIEWER] or BarsLocked()
 end
 
 local function OverlayTarget(systemFrame)
@@ -34,9 +50,7 @@ local function OverlayTarget(systemFrame)
     local db = BUI.GetDB()
     for key, name in pairs(CDM.VIEWERS) do
         if name == viewerName then
-            local settings = db.cdm[key]
-            local container = CDM.Anchors[key]
-            if settings and settings.enabled and container then return container end
+            if db.cdm[key].enabled then return CDM.Anchors[key] end
             return systemFrame
         end
     end
@@ -76,13 +90,8 @@ local function EnsureOverlay(systemFrame)
     return state
 end
 
-local function ShowOverlay(systemFrame)
-    if not IsCDMSystemFrame(systemFrame) then return end
-    EnsureOverlay(systemFrame).overlay:Show()
-end
-
 local function ShowLockText(systemFrame)
-    if InCombatLockdown() or not IsCDMSystemFrame(systemFrame) then return end
+    if InCombatLockdown() then return end
     local state = EnsureOverlay(systemFrame)
     state.overlay:Show()
     state.notice:Show()
@@ -94,180 +103,88 @@ local function ShowLockText(systemFrame)
 end
 
 local function HideLockText(systemFrame)
-    local state = systemFrame and lockState[systemFrame]
+    local state = lockState[systemFrame]
     if state then state.notice:Hide() end
 end
 
-local function HideOverlay(systemFrame)
-    local state = systemFrame and lockState[systemFrame]
-    if not state then return end
+local function HideOverlay(state)
     state.token = state.token + 1
     state.notice:Hide()
     state.overlay:Hide()
 end
 
-local function PrintLockNoticeOnce()
-    if lockNoticePrinted then return end
-    lockNoticePrinted = true
-    BUI.Print("CDM edit mode is locked. Use /bui > CDM.")
+local function OnDialogAttach(dialog, systemFrame)
+    if not IsLocked(systemFrame) then return end
+    dialog:Hide()
+    ShowLockText(systemFrame)
 end
 
-local function HookSettingsDialog()
-    if dialogHooked then return end
-    local dialog = _G.EditModeSystemSettingsDialog
-    if not (dialog and dialog.AttachToSystemFrame) then return end
-    dialogHooked = true
-
-    Hook(dialog, "AttachToSystemFrame", function(self, systemFrame)
-        if not IsCDMSystemFrame(systemFrame) then return end
-        self:Hide()
-        ShowLockText(systemFrame)
-        PrintLockNoticeOnce()
-    end)
+local function OnSelectSystem(systemFrame)
+    if isInEditMode and IsLocked(systemFrame) then ShowLockText(systemFrame) end
 end
 
-local function HookSystemFrame(name)
-    local frame = _G[name]
-    if not IsCDMSystemFrame(frame) then return end
-    if hookedSystemFrames[frame] then return end
-    hookedSystemFrames[frame] = true
-
-    frame:SetMovable(false)
-    if frame.Selection then
-        frame.Selection:SetScript("OnDragStart", nil)
-        frame.Selection:SetScript("OnDragStop", nil)
-    end
-
-    if frame.SelectSystem then
-        Hook(frame, "SelectSystem", function(systemFrame)
-            if not isInEditMode then return end
-            systemFrame:SetMovable(false)
-            local dialog = _G.EditModeSystemSettingsDialog
-            if dialog and dialog.attachedToSystem == systemFrame then
-                dialog:Hide()
-            end
-            ShowLockText(systemFrame)
-            PrintLockNoticeOnce()
-        end)
-    end
-
-    if frame.HighlightSystem then
-        Hook(frame, "HighlightSystem", function(systemFrame)
-            if not isInEditMode then return end
-            ShowLockText(systemFrame)
-        end)
-    end
-
-    if frame.ClearHighlight then
-        Hook(frame, "ClearHighlight", function(systemFrame)
-            HideLockText(systemFrame)
-        end)
-    end
+local function HookSystemFrame(frame)
+    Hook(frame, "SelectSystem", OnSelectSystem)
+    Hook(frame, "HighlightSystem", OnSelectSystem)
+    Hook(frame, "ClearHighlight", HideLockText)
 end
 
-local function HookAllSystemFrames()
-    for _, name in ipairs(CDM_SYSTEM_FRAMES) do
-        HookSystemFrame(name)
-    end
+local function SyncBarsLock()
+    local viewer = _G[BAR_VIEWER]
+    local locked = BarsLocked()
+    viewer.isLocked = locked or nil
+    if not isInEditMode then return end
+    local state = EnsureOverlay(viewer)
+    if locked then state.overlay:Show() else HideOverlay(state) end
 end
+EditModeLock.SyncBarsLock = SyncBarsLock
 
 local function OnEditModeShow()
     isInEditMode = true
-    HookSettingsDialog()
-    HookAllSystemFrames()
     for _, name in ipairs(CDM_SYSTEM_FRAMES) do
-        ShowOverlay(_G[name])
+        EnsureOverlay(_G[name]).overlay:Show()
     end
+    SyncBarsLock()
 end
 
 local function OnEditModeHide()
     isInEditMode = false
-    for _, name in ipairs(CDM_SYSTEM_FRAMES) do
-        HideOverlay(_G[name])
-    end
+    for _, state in pairs(lockState) do HideOverlay(state) end
 end
 
-local function BuildDesiredSettings(systemIndex)
-    local desired = {
-        [Enum.EditModeCooldownViewerSetting.VisibleSetting] = Enum.CooldownViewerVisibleSetting.Always,
-        [Enum.EditModeCooldownViewerSetting.ShowTimer]      = 1,
-    }
-    if systemIndex == Enum.EditModeCooldownViewerSystemIndices.BuffIcon
-        or (Enum.EditModeCooldownViewerSystemIndices.BuffBar and
-            systemIndex == Enum.EditModeCooldownViewerSystemIndices.BuffBar) then
-        desired[Enum.EditModeCooldownViewerSetting.HideWhenInactive] = 1
-    end
-    return desired
+local function MarkDirtySoon()
+    BUI.Profiler.After("CDM.EditModeLock edit mode dirty", 0, CDM.MarkAllDirty)
 end
 
-local function MergePresetLayouts(layoutInfo)
-    if type(layoutInfo) ~= "table" then return layoutInfo end
-    if type(layoutInfo.layouts) ~= "table" then return layoutInfo end
-    if type(layoutInfo.activeLayout) ~= "number" then return layoutInfo end
+local function OnManagerShow()
+    MarkDirtySoon()
+    OnEditModeShow()
+end
 
-    local manager = EditModePresetLayoutManager
-    if not (manager and manager.GetCopyOfPresetLayouts) then return layoutInfo end
+local function OnManagerHide()
+    CDM.FlushPendingLayoutRefresh()
+    MarkDirtySoon()
+    OnEditModeHide()
+end
 
-    local presets = manager:GetCopyOfPresetLayouts()
-    if type(presets) ~= "table" then return layoutInfo end
-
-    local custom = layoutInfo.layouts
-    local offset = #presets
-    for layoutIndex = 1, #custom do
-        presets[offset + layoutIndex] = custom[layoutIndex]
-    end
-    layoutInfo.layouts = presets
-    return layoutInfo
+local function DesiredSettings(systemIndex)
+    return BUFF_SYSTEMS[systemIndex] and BUFF_SETTINGS or ICON_SETTINGS
 end
 
 local function FetchLayoutData()
-    return MergePresetLayouts(C_EditMode.GetLayouts())
-end
-
-local function GetManagerActiveLayout()
-    local managerFrame = EditModeManagerFrame
-    if not managerFrame then return nil end
-    local active = managerFrame.GetActiveLayoutInfo and managerFrame:GetActiveLayoutInfo()
-    if type(active) == "table" then return active end
-    local info = managerFrame.layoutInfo
-    if type(info) == "table" and type(info.layouts) == "table"
-        and type(info.activeLayout) == "number" then
-        active = info.layouts[info.activeLayout]
-        if type(active) == "table" then return active end
+    local layoutInfo = C_EditMode.GetLayouts()
+    local layouts = EditModePresetLayoutManager:GetCopyOfPresetLayouts()
+    local offset = #layouts
+    for layoutIndex, layout in ipairs(layoutInfo.layouts) do
+        layouts[offset + layoutIndex] = layout
     end
-    return nil
+    layoutInfo.layouts = layouts
+    return layoutInfo
 end
 
 local function GetActiveLayout(layoutInfo)
-    if type(layoutInfo) ~= "table" or type(layoutInfo.layouts) ~= "table" then return nil end
-    local layouts = layoutInfo.layouts
-
-    local managerActive = GetManagerActiveLayout()
-    if type(managerActive) == "table" then
-        local isPreset = managerActive.layoutType == Enum.EditModeLayoutType.Preset
-        local nameMatch, nameMatchIndex
-        for layoutIndex = 1, #layouts do
-            local layout = layouts[layoutIndex]
-            if type(layout) == "table" and type(layout.systems) == "table"
-                and layout.layoutName == managerActive.layoutName then
-                if layout.layoutType == managerActive.layoutType then
-                    return layout, layoutIndex, isPreset
-                end
-                if not nameMatch and (isPreset or layout.layoutType ~= Enum.EditModeLayoutType.Preset) then
-                    nameMatch, nameMatchIndex = layout, layoutIndex
-                end
-            end
-        end
-        if nameMatch then return nameMatch, nameMatchIndex, isPreset end
-        return nil, nil, isPreset
-    end
-
-    local layoutIndex = layoutInfo.activeLayout
-    if type(layoutIndex) ~= "number" then return nil end
-    local active = layouts[layoutIndex]
-    if type(active) ~= "table" or type(active.systems) ~= "table" then return nil end
-    local isPreset = active.layoutType == Enum.EditModeLayoutType.Preset
-    return active, layoutIndex, isPreset
+    local active = layoutInfo.layouts[layoutInfo.activeLayout]
+    return active, active.layoutType == Enum.EditModeLayoutType.Preset
 end
 
 local function FindSettingValue(settings, settingEnum)
@@ -290,49 +207,25 @@ local function WriteSetting(settings, settingEnum, desired)
     return true
 end
 
-local function EnsureEditModeLoaded()
-    if EditModePresetLayoutManager then return end
-    C_AddOns.LoadAddOn("Blizzard_EditMode")
-end
-
 local function IsEditModeReady()
-    return EditModeManagerFrame and EditModeManagerFrame.accountSettings ~= nil
+    return EditModeManagerFrame:HasAccountSettings()
 end
 
 function EditModeLock.GetCompliance()
     local result = { isCompliant = true, isReady = false, mismatches = {} }
-
-    EnsureEditModeLoaded()
     if not IsEditModeReady() then return result end
-    local active, activeIndex, isPreset = GetActiveLayout(FetchLayoutData())
-    if not active then
-        if isPreset then
-            result.isReady = true
-            result.isPreset = true
-        end
-        return result
-    end
-
+    local active, isPreset = GetActiveLayout(FetchLayoutData())
     result.isReady = true
-    result.activeLayout = activeIndex
     result.isPreset = isPreset
 
-    local cdSystem = Enum.EditModeSystem.CooldownViewer
     local seen = 0
     for _, systemInfo in ipairs(active.systems) do
-        if systemInfo.system == cdSystem and type(systemInfo.settings) == "table" then
+        if systemInfo.system == COOLDOWN_SYSTEM then
             seen = seen + 1
-            local desired = BuildDesiredSettings(systemInfo.systemIndex)
-            for settingEnum, wantedValue in pairs(desired) do
-                local currentValue = FindSettingValue(systemInfo.settings, settingEnum)
-                if currentValue ~= wantedValue then
+            for settingEnum, wantedValue in pairs(DesiredSettings(systemInfo.systemIndex)) do
+                if FindSettingValue(systemInfo.settings, settingEnum) ~= wantedValue then
                     result.isCompliant = false
-                    result.mismatches[#result.mismatches + 1] = {
-                        systemIndex = systemInfo.systemIndex,
-                        setting = settingEnum,
-                        current = currentValue,
-                        desired = wantedValue,
-                    }
+                    result.mismatches[#result.mismatches + 1] = { systemIndex = systemInfo.systemIndex, setting = settingEnum }
                 end
             end
         end
@@ -344,20 +237,15 @@ end
 
 function EditModeLock.ApplyRecommendedSettings()
     if InCombatLockdown() then return "in_combat" end
-
-    EnsureEditModeLoaded()
     if not IsEditModeReady() then return "not_ready" end
     local info = FetchLayoutData()
-    local active, _, isPreset = GetActiveLayout(info)
+    local active, isPreset = GetActiveLayout(info)
     if isPreset then return "preset" end
-    if not active then return "not_ready" end
 
     local changed = false
-    local cdSystem = Enum.EditModeSystem.CooldownViewer
     for _, systemInfo in ipairs(active.systems) do
-        if systemInfo.system == cdSystem and type(systemInfo.settings) == "table" then
-            local desired = BuildDesiredSettings(systemInfo.systemIndex)
-            for settingEnum, wantedValue in pairs(desired) do
+        if systemInfo.system == COOLDOWN_SYSTEM then
+            for settingEnum, wantedValue in pairs(DesiredSettings(systemInfo.systemIndex)) do
                 if WriteSetting(systemInfo.settings, settingEnum, wantedValue) then
                     changed = true
                 end
@@ -372,17 +260,16 @@ function EditModeLock.ApplyRecommendedSettings()
 end
 
 function EditModeLock.Initialize()
-    if not EditModeManagerFrame then return end
+    Hook(EditModeSystemSettingsDialog, "AttachToSystemFrame", OnDialogAttach)
+    for _, name in ipairs(CDM_SYSTEM_FRAMES) do
+        local frame = _G[name]
+        frame.isLocked = true
+        HookSystemFrame(frame)
+    end
+    HookSystemFrame(_G[BAR_VIEWER])
+    SyncBarsLock()
 
-    HookSettingsDialog()
-    HookAllSystemFrames()
-
-    EventUtil.ContinueOnAddOnLoaded("Blizzard_EditMode", function()
-        HookSettingsDialog()
-        HookAllSystemFrames()
-    end)
-
-    EditModeManagerFrame:HookScript("OnShow", BUI.Profiler.Wrap("CDM.EditModeLock edit mode show", OnEditModeShow))
-    EditModeManagerFrame:HookScript("OnHide", BUI.Profiler.Wrap("CDM.EditModeLock edit mode hide", OnEditModeHide))
+    EditModeManagerFrame:HookScript("OnShow", BUI.Profiler.Wrap("CDM.EditModeLock edit mode show", OnManagerShow))
+    EditModeManagerFrame:HookScript("OnHide", BUI.Profiler.Wrap("CDM.EditModeLock edit mode hide", OnManagerHide))
     if EditModeManagerFrame:IsShown() then OnEditModeShow() end
 end
