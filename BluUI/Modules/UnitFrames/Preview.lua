@@ -21,7 +21,6 @@ local savedWatch = {}
 local sampleCasts = {}
 local testFrames = {}
 local stageFrames = {}
-local listener
 local spotlight
 local animFrame
 local testActive = false
@@ -39,7 +38,7 @@ local ICONS = {
 }
 local DEBUFF_TYPES = {'Magic', 'Curse', 'Poison', 'Disease'}
 local CAST_ICONS = {136243, 136235, 136168, 136175}
-local TAG_FIELDS = {'Name', 'HealthText', 'PowerText', 'LevelText', 'StatusText'}
+local TAG_FIELDS = UnitFrames.TAG_FIELDS
 local LIVE_ELEMENTS = {'Health', 'Power', 'AbsorbBars'}
 local RAID_MARKER_COORDS = {
 	{0, 0.25, 0, 0.25}, {0.25, 0.5, 0, 0.25}, {0.5, 0.75, 0, 0.25}, {0.75, 1, 0, 0.25},
@@ -72,7 +71,7 @@ local function WatchKey(unitType, index)
 end
 
 local function Notify()
-	if listener then listener() end
+	BUI.NotifyModuleChange('unitFramePreview')
 end
 
 local function Freeze(frame)
@@ -91,24 +90,18 @@ local function Thaw(frame)
 	frame._previewSample = nil
 	frame.unit = frame.__unit
 	for _, element in ipairs(LIVE_ELEMENTS) do frame:ResumeElement(element) end
-	UnitFrames.TagFontStrings(frame)
-	if frame.unit then frame:UpdateAllElements('PreviewEnd') end
 end
 
 local function HealthAlpha(settings)
 	return settings.transparentHealth and settings.healthBarAlpha or 1
 end
 
-local function Format(unitSettings, settings, key)
-	local format = unitSettings[key]
-	if format and format ~= '' then return format end
-	return settings[key]
-end
+local ResolveTextFormat = UnitFrames.ResolveTextFormat
 
 local function SetTagText(frame, key, unitSettings, settings, formatKey, healthPercent, powerPercent)
 	local fontString = frame[key]
 	if not fontString:IsShown() then return end
-	fontString:SetText(UnitFrames.ParsePreviewTags(Format(unitSettings, settings, formatKey), healthPercent, powerPercent))
+	fontString:SetText(UnitFrames.ParsePreviewTags(ResolveTextFormat(unitSettings, settings, formatKey), healthPercent, powerPercent))
 end
 
 local function SetFakeCustomTags(frame, healthPercent, powerPercent)
@@ -172,10 +165,10 @@ local function SetFakeData(frame, unitType, index, sample, absorbs)
 
 	if sample and sample.name then
 		frame.Name:SetText(sample.name)
-	elseif (unitType == 'player' or unitType == 'pet') and unitSettings.customName and unitSettings.customName ~= '' then
+	elseif (unitType == 'player' or unitType == 'pet') and unitSettings.customName ~= '' then
 		frame.Name:SetText(unitSettings.customName)
 	else
-		frame.Name:SetText(UnitFrames.ParsePreviewTags(Format(unitSettings, settings, 'nameFormat'), healthPercent, powerPercent))
+		frame.Name:SetText(UnitFrames.ParsePreviewTags(ResolveTextFormat(unitSettings, settings, 'nameFormat'), healthPercent, powerPercent))
 	end
 	frame.Name:SetTextColor(SampleNameColor(frame, unitType, unitSettings, classIndex))
 
@@ -412,7 +405,6 @@ local function HideUnit(frame, unitType, index)
 	HideSampleCast(frame)
 	HideFakeAuras(frame)
 	Thaw(frame)
-	if UnitFrames.GetUnitConfig(unitType).hasAuras then UnitFrames.RefreshAuraLayout(frame, unitType) end
 	local key = WatchKey(unitType, index)
 	if savedWatch[key] then
 		RegisterUnitWatch(frame)
@@ -441,11 +433,6 @@ local function SavePosition(unitType, x, y)
 	return position
 end
 
-local function LockPreview(unitType)
-	UnitFrames.HidePreview(unitType)
-	BUI.Print(unitType:sub(1, 1):upper() .. unitType:sub(2) .. ' preview hidden.')
-end
-
 local function SetupDrag(frame, unitType)
 	BUI.Dragging.MakeDraggable(frame, {
 		snapCenter = true,
@@ -468,7 +455,7 @@ local function SetupDrag(frame, unitType)
 			UnitFrames.UpdatePreviews()
 			Notify()
 		end,
-		onRightClick = function() LockPreview(unitType) end,
+		onRightClick = function() UnitFrames.HidePreview(unitType) end,
 	})
 end
 
@@ -511,17 +498,27 @@ function UnitFrames.StageFrame(unitType, index, parent, options)
 end
 
 function UnitFrames.ClearStage(stage)
-	for _, frame in ipairs(staged[stage] or {}) do
+	local list = staged[stage]
+	if not list then return end
+	local plates = stagePlates[stage]
+	for _, frame in ipairs(list) do
 		if frame:GetParent() == stage then
 			frame:Hide()
 			frame:ClearAllPoints()
 			frame:SetParent(parking)
 		end
-		local plate = stagePlates[stage][frame]
+		local plate = plates[frame]
 		plate:Hide()
 		plate.dots:Hide()
 	end
-	staged[stage] = {}
+	wipe(list)
+end
+
+function UnitFrames.ReleaseStage(stage)
+	UnitFrames.ClearStage(stage)
+	staged[stage] = nil
+	stagePlates[stage] = nil
+	stagePaints[stage] = nil
 end
 
 function UnitFrames.StageInto(stage, kit, unitType, index, maxWidth, maxHeight, options)
@@ -583,10 +580,6 @@ BUI.Events:Register('PLAYER_REGEN_ENABLED', 'UnitFrames.Preview.RestoreStages', 
 	RepaintStages()
 end)
 
-function UnitFrames.SetPreviewListener(callback)
-	listener = callback
-end
-
 function UnitFrames.ShowPreview(unitType)
 	if InCombatLockdown() then BUI.Print('Cannot preview during combat.') return end
 	if active[unitType] then return end
@@ -606,7 +599,6 @@ function UnitFrames.ShowPreview(unitType)
 	end
 	SetupDrag(anchor, unitType)
 	Notify()
-	BUI.Print(unitType .. ' preview shown, right-click hides it.')
 end
 
 function UnitFrames.HidePreview(unitType)
@@ -725,7 +717,6 @@ local function ShowAll()
 		animFrame:SetScript('OnUpdate', BUI.Profiler.Wrap('UnitFrames.Preview test animation', Animate))
 	end
 	animFrame:Show()
-	BUI.Print('Test mode |cff00ff00enabled|r. Type |cff' .. BUI.C.COLOR_PINK .. '/buitest|r to disable.')
 end
 
 local function HideAll()
@@ -742,7 +733,6 @@ local function HideAll()
 		ReleaseTestFrame(key)
 	end
 	UnitFrames:Refresh()
-	BUI.Print('Test mode |cffff6600disabled|r.')
 end
 
 UnitFrames.TestMode = {

@@ -5,14 +5,16 @@ local Wrap = BUI.Profiler.Wrap
 local Pixel = BUI.Pixel
 local UnitFrames = BUI.UnitFrames
 local Tools = BUI.Tools
+local Range = BUI.Range
+local Hex = BUI.Hex
 local oUF = BUI.oUF
+local sharedMedia = LibStub('LibSharedMedia-3.0')
 
 local floor = math.floor
 local format = string.format
 local ipairs = ipairs
 local pairs = pairs
 local tostring = tostring
-local type = type
 local unpack = unpack
 local wipe = wipe
 
@@ -48,51 +50,37 @@ local UnitGroupRolesAssigned = UnitGroupRolesAssigned
 local UnitPVPName = UnitPVPName
 local UnitDetailedThreatSituation = UnitDetailedThreatSituation
 local GetAverageItemLevel = GetAverageItemLevel
-local GetSpecialization = GetSpecialization
-local GetSpecializationInfo = GetSpecializationInfo
+local GetSpecialization = C_SpecializationInfo.GetSpecialization
+local GetSpecializationInfo = C_SpecializationInfo.GetSpecializationInfo
+local GetInspectSpecialization = C_SpecializationInfo.GetInspectSpecialization
 local GetSpecializationInfoByID = GetSpecializationInfoByID
-local GetInspectSpecialization = GetInspectSpecialization
+local GetInspectItemLevel = C_PaperDollInfo.GetInspectItemLevel
 local GetInstanceInfo = GetInstanceInfo
 local GetDifficultyInfo = GetDifficultyInfo
-local GetNumGroupMembers = GetNumGroupMembers
-local GetRaidRosterInfo = GetRaidRosterInfo
-local IsInRaid = IsInRaid
+local WrapString = C_StringUtil.WrapString
 local issecretvalue = issecretvalue
 
 local ScaleTo100 = CurveConstants.ScaleTo100
 local PowerTypeMana = Enum.PowerType.Mana
+local GLOBAL_OPTION = BUI.C.GLOBAL_OPTION
+local COMBAT_ICON = '|TInterface\\AddOns\\BluUI\\Media\\Textures\\combat:14:14|t'
 
-local function TintHex(red, green, blue, brightness)
-	local factor = brightness
-	return format('%02x%02x%02x',
-		floor(red * factor * 255 + 0.5),
-		floor(green * factor * 255 + 0.5),
-		floor(blue * factor * 255 + 0.5))
-end
-
+local RESTING_STEPS = {
+	{1.0, 0.5, 0.3},  {0.8, 0.7, 0.3},  {0.55, 1.0, 0.37},
+	{0.4, 0.8, 0.55}, {0.3, 0.55, 1.0},  {0.3, 0.4, 0.8},
+	{0.3, 0.3, 0.55}, {0.3, 0.3, 0.37},  {0.37, 0.3, 0.3},
+	{0.55, 0.3, 0.3}, {0.75, 0.37, 0.3},  {0.9, 0.4, 0.3},
+}
 local restingFrames = {}
 local restingIndex = 1
 local restingTicker
 
 local function BuildRestingFrames(red, green, blue)
-	red, green, blue = red or 1, green or 1, blue or 1
-	wipe(restingFrames)
-
-	local steps = {
-		{1.0, 0.5, 0.3},  {0.8, 0.7, 0.3},  {0.55, 1.0, 0.37},
-		{0.4, 0.8, 0.55}, {0.3, 0.55, 1.0},  {0.3, 0.4, 0.8},
-		{0.3, 0.3, 0.55}, {0.3, 0.3, 0.37},  {0.37, 0.3, 0.3},
-		{0.55, 0.3, 0.3}, {0.75, 0.37, 0.3},  {0.9, 0.4, 0.3},
-	}
-	for stepIndex, step in ipairs(steps) do
-		restingFrames[stepIndex] = '|cff' .. TintHex(red, green, blue, step[1]) .. 'Z|r'
-			.. '|cff' .. TintHex(red, green, blue, step[2]) .. 'z|r'
-			.. '|cff' .. TintHex(red, green, blue, step[3]) .. 'z|r'
+	for stepIndex, step in ipairs(RESTING_STEPS) do
+		restingFrames[stepIndex] = '|cff' .. Hex(red * step[1], green * step[1], blue * step[1]) .. 'Z|r'
+			.. '|cff' .. Hex(red * step[2], green * step[2], blue * step[2]) .. 'z|r'
+			.. '|cff' .. Hex(red * step[3], green * step[3], blue * step[3]) .. 'z|r'
 	end
-end
-
-function UnitFrames.SetRestingAnimation(red, green, blue)
-	BuildRestingFrames(red, green, blue)
 end
 
 BuildRestingFrames(1, 1, 1)
@@ -115,21 +103,11 @@ local AbbrevDataDecimal = {
 local useDecimalAbbreviations = false
 
 function UnitFrames.RefreshAbbreviationSetting()
-	local db = BUI.db and BUI.db.profile
-	useDecimalAbbreviations = db and db.general and db.general.showDecimalAbbreviations or false
-end
-
-local function StatusText(status)
-	local color = UnitFrames.GetSettings().statusColors[status]
-	if not color then return status:upper() end
-	return '|cff' .. BUI.Hex(color[1], color[2], color[3]) .. status:upper() .. '|r'
+	useDecimalAbbreviations = BUI.GetDB().general.showDecimalAbbreviations
 end
 
 local function Abbreviate(number)
-	if not number then return '0' end
-	if useDecimalAbbreviations then
-		return AbbreviateNumbers(number, AbbrevDataDecimal)
-	end
+	if useDecimalAbbreviations then return AbbreviateNumbers(number, AbbrevDataDecimal) end
 	return AbbreviateNumbers(number)
 end
 
@@ -181,7 +159,6 @@ local TagEvents = {
 	['server']         = 'UNIT_NAME_UPDATE',
 	['target']         = 'UNIT_TARGET UNIT_NAME_UPDATE',
 	['name:target']    = 'UNIT_TARGET UNIT_NAME_UPDATE',
-	['group']          = 'GROUP_ROSTER_UPDATE',
 	['itemlevel']      = 'INSPECT_READY PLAYER_AVG_ITEM_LEVEL_UPDATE UNIT_NAME_UPDATE',
 	['spec']           = 'PLAYER_SPECIALIZATION_CHANGED UNIT_NAME_UPDATE',
 	['title']          = 'UNIT_NAME_UPDATE',
@@ -208,11 +185,15 @@ local function GetParentUnitType(unit)
 	return result
 end
 
-local reactionColorCache = {}
+local reactionColorCodes = {}
+local classColorCodes = {}
+local statusTexts = {}
 do
 	local originalInvalidate = UnitFrames.InvalidateSettingsCache
 	UnitFrames.InvalidateSettingsCache = function(...)
-		wipe(reactionColorCache)
+		wipe(reactionColorCodes)
+		wipe(classColorCodes)
+		wipe(statusTexts)
 		return originalInvalidate(...)
 	end
 end
@@ -224,46 +205,53 @@ local function GetReactionColorCode(unit, parentUnitType)
 		or reaction >= 4 and 'neutralNameColor'
 		or 'hostileNameColor'
 	local parentType = parentUnitType or GetParentUnitType(unit)
-	local cacheKey = parentType .. ':' .. bucket
-	local cached = reactionColorCache[cacheKey]
-	if cached then return cached ~= '' and cached or nil end
-	local unitSettings = UnitFrames.GetUnitSettings(parentType)
-	local reactionColor = unitSettings and unitSettings[bucket]
-	if reactionColor then
-		local code = format('|cFF%02x%02x%02x', reactionColor[1] * 255, reactionColor[2] * 255, reactionColor[3] * 255)
-		reactionColorCache[cacheKey] = code
-		return code
+	local codes = reactionColorCodes[parentType]
+	if not codes then
+		codes = {}
+		reactionColorCodes[parentType] = codes
 	end
-	reactionColorCache[cacheKey] = ''
-	return nil
+	local code = codes[bucket]
+	if not code then
+		local reactionColor = UnitFrames.GetUnitSettings(parentType)[bucket]
+		code = '|cff' .. Hex(reactionColor[1], reactionColor[2], reactionColor[3])
+		codes[bucket] = code
+	end
+	return code
+end
+
+local function GetClassColorCode(unit)
+	local _, class = UnitClass(unit)
+	if not class or issecretvalue(class) then return nil end
+	local code = classColorCodes[class]
+	if code == nil then
+		local red, green, blue = Tools.GetUnitClassColor(unit)
+		code = red and ('|cff' .. Hex(red, green, blue)) or false
+		classColorCodes[class] = code
+	end
+	return code or nil
 end
 
 local function ClassColoredName(unit, name, parentUnitType)
-	if not name then return '' end
-	if issecretvalue(name) then
-		if UnitIsPlayer(unit) then
-			local red, green, blue = BUI.Tools.GetUnitClassColor(unit)
-			if red then
-				return format('|cFF%02x%02x%02x', red * 255, green * 255, blue * 255) .. name .. '|r'
-			end
-		else
-			local code = GetReactionColorCode(unit, parentUnitType)
-			if code then return code .. name .. '|r' end
-		end
-		return name
-	end
-	if type(name) ~= 'string' or name == '' then return '' end
+	local code
 	if UnitIsPlayer(unit) then
-		local red, green, blue = BUI.Tools.GetUnitClassColor(unit)
-		if red then
-			return format('|cFF%02x%02x%02x%s|r', red * 255, green * 255, blue * 255, name)
-		end
+		code = GetClassColorCode(unit)
 	else
-		local code = GetReactionColorCode(unit, parentUnitType)
-		if code then return format('%s%s|r', code, name) end
+		code = GetReactionColorCode(unit, parentUnitType)
 	end
-	return name
+	if not code then return name end
+	return WrapString(name, code, '|r')
 end
+
+local function StatusText(status)
+	local text = statusTexts[status]
+	if not text then
+		local color = UnitFrames.GetSettings().statusColors[status]
+		text = '|cff' .. Hex(color[1], color[2], color[3]) .. status:upper() .. '|r'
+		statusTexts[status] = text
+	end
+	return text
+end
+UnitFrames.StatusText = StatusText
 
 local combatStartTime = 0
 local combatTimerText = ''
@@ -278,23 +266,23 @@ end
 local Handlers = {
 	['hp'] = function(unit)
 		if UnitIsDeadOrGhost(unit) then return 'Dead' end
-		return tostring(UnitHealth(unit))
+		return UnitHealth(unit)
 	end,
 	['hp:short'] = function(unit)
 		if UnitIsDeadOrGhost(unit) then return 'Dead' end
 		return Abbreviate(UnitHealth(unit))
 	end,
-	['maxhp'] = function(unit) return tostring(UnitHealthMax(unit)) end,
+	['maxhp'] = UnitHealthMax,
 	['maxhp:short'] = function(unit) return Abbreviate(UnitHealthMax(unit)) end,
 	['perhp'] = function(unit) return format('%d', UnitHealthPercent(unit, true, ScaleTo100)) end,
-	['pp'] = function(unit) return tostring(UnitPower(unit)) end,
+	['pp'] = UnitPower,
 	['pp:short'] = function(unit) return Abbreviate(UnitPower(unit)) end,
-	['maxpp'] = function(unit) return tostring(UnitPowerMax(unit)) end,
+	['maxpp'] = UnitPowerMax,
 	['maxpp:short'] = function(unit) return Abbreviate(UnitPowerMax(unit)) end,
 	['perpp'] = function(unit) return format('%d', UnitPowerPercent(unit, nil, true, ScaleTo100)) end,
-	['mana'] = function(unit) return tostring(UnitPower(unit, PowerTypeMana)) end,
+	['mana'] = function(unit) return UnitPower(unit, PowerTypeMana) end,
 	['mana:short'] = function(unit) return Abbreviate(UnitPower(unit, PowerTypeMana)) end,
-	['maxmana'] = function(unit) return tostring(UnitPowerMax(unit, PowerTypeMana)) end,
+	['maxmana'] = function(unit) return UnitPowerMax(unit, PowerTypeMana) end,
 	['maxmana:short'] = function(unit) return Abbreviate(UnitPowerMax(unit, PowerTypeMana)) end,
 	['permana'] = function(unit)
 		return format('%d', UnitPowerPercent(unit, PowerTypeMana, true, ScaleTo100))
@@ -311,7 +299,7 @@ local Handlers = {
 	end,
 	['name'] = function(unit) return UnitName(unit) or '' end,
 	['name:short'] = function(unit) local name = UnitName(unit) return name and Tools.TruncateName(name, 10) or '' end,
-	['level'] = function(unit) local level = UnitLevel(unit) return level == -1 and '??' or tostring(level) end,
+	['level'] = function(unit) local level = UnitLevel(unit) return level == -1 and '??' or level end,
 	['class'] = function(unit) local _, class = UnitClass(unit) return class or '' end,
 	['classname'] = function(unit) return UnitClass(unit) or '' end,
 	['race'] = function(unit) return UnitRace(unit) or '' end,
@@ -338,10 +326,13 @@ local Handlers = {
 	['afk'] = function(unit) return UnitIsAFK(unit) and StatusText('AFK') or '' end,
 	['dnd'] = function(unit) return UnitIsDND(unit) and StatusText('DND') or '' end,
 
-	['resting'] = function() return IsResting() and restingFrames[restingIndex] or '' end,
-	['combat'] = function(unit) return UnitAffectingCombat(unit) and '|TInterface\\AddOns\\BluUI\\Media\\Textures\\combat:14:14|t' or '' end,
-	['combattime'] = function() return combatTimerText or '' end,
-	['range'] = function(unit) return BUI.Range.DisplayText(unit) or '' end,
+	['resting'] = function(unit)
+		if unit ~= 'player' and unit ~= 'vehicle' then return '' end
+		return IsResting() and restingFrames[restingIndex] or ''
+	end,
+	['combat'] = function(unit) return UnitAffectingCombat(unit) and COMBAT_ICON or '' end,
+	['combattime'] = function() return combatTimerText end,
+	['range'] = function(unit) return Range.DisplayText(unit) end,
 	['threat'] = function()
 		if not UnitExists('target') then return '' end
 		local _, _, threatPercent = UnitDetailedThreatSituation('player', 'target')
@@ -351,17 +342,7 @@ local Handlers = {
 	['creature'] = function(unit) return UnitCreatureFamily(unit) or UnitCreatureType(unit) or '' end,
 	['creaturefamily'] = function(unit) return UnitCreatureFamily(unit) or '' end,
 	['creaturetype'] = function(unit) return UnitCreatureType(unit) or '' end,
-	['server'] = function(unit) local _, realm = UnitName(unit) return realm or GetRealmName() or '' end,
-	['group'] = function(unit)
-		if not IsInRaid() then return '' end
-		local name = UnitName(unit)
-		if not name or issecretvalue(name) then return '' end
-		for memberIndex = 1, GetNumGroupMembers() do
-			local rosterName, _, subgroup = GetRaidRosterInfo(memberIndex)
-			if rosterName == name then return tostring(subgroup) end
-		end
-		return ''
-	end,
+	['server'] = function(unit) local _, realm = UnitName(unit) return realm or GetRealmName() end,
 	['target'] = function(unit)
 		local targetUnit = unit .. 'target'
 		local targetName = UnitName(targetUnit)
@@ -381,8 +362,8 @@ local Handlers = {
 			local _, equipped = GetAverageItemLevel()
 			return format('%d', equipped)
 		end
-		local itemLevel = C_PaperDollInfo.GetInspectItemLevel(unit)
-		if itemLevel and itemLevel > 0 then return format('%d', itemLevel) end
+		local itemLevel = GetInspectItemLevel(unit)
+		if itemLevel > 0 then return format('%d', itemLevel) end
 		return ''
 	end,
 	['spec'] = function(unit)
@@ -395,7 +376,7 @@ local Handlers = {
 			return ''
 		end
 		local specID = GetInspectSpecialization(unit)
-		if specID and specID > 0 then
+		if not issecretvalue(specID) and specID > 0 then
 			local _, name = GetSpecializationInfoByID(specID)
 			return name or ''
 		end
@@ -412,9 +393,8 @@ local Handlers = {
 	end,
 	['difficulty'] = function()
 		local _, _, difficultyID = GetInstanceInfo()
-		if not difficultyID or difficultyID == 0 then return '' end
-		local name = GetDifficultyInfo(difficultyID)
-		return name or ''
+		if difficultyID == 0 then return '' end
+		return GetDifficultyInfo(difficultyID) or ''
 	end,
 	['role'] = function(unit)
 		local role = UnitGroupRolesAssigned(unit)
@@ -460,7 +440,7 @@ local function CacheDirectFontStrings()
 	end
 
 	for fontString, frame in pairs(taggedStrings) do
-		local tagString = frame.unit == 'player' and fontString.UpdateTag and fontString._tagString
+		local tagString = frame._unitType == 'player' and fontString.UpdateTag and fontString._tagString
 		if tagString then
 			for tagName, groupData in pairs(directGroups) do
 				if tagString:find(tagName, 1, true) then
@@ -501,7 +481,7 @@ end
 do
 	local function OnRestingEvent()
 		CacheDirectFontStrings()
-		if IsResting() and not InCombatLockdown() and directGroups.resting.count > 0 then
+		if IsResting() and not InCombatLockdown() and not UnitAffectingCombat('player') and directGroups.resting.count > 0 then
 			StartRestingAnimation()
 		else
 			StopRestingAnimation()
@@ -517,7 +497,7 @@ do
 	local combatTicker
 	local groupWatchActive = false
 
-	local IsGroupInCombat = BUI.Tools.IsGroupInCombat
+	local IsGroupInCombat = Tools.IsGroupInCombat
 
 	local GROUP_WATCH_UNITS = {'player'}
 	for partyIndex = 1, 4 do GROUP_WATCH_UNITS[#GROUP_WATCH_UNITS + 1] = 'party' .. partyIndex end
@@ -529,7 +509,13 @@ do
 		UpdateDirectGroup('combattime')
 	end)
 
-	local StopWatchingGroup
+	local function StopWatchingGroup()
+		if not groupWatchActive then return end
+		groupWatchActive = false
+		BUI.Events:Unregister('UNIT_FLAGS',          'UF.Tags.CombatTimer.GroupWatch')
+		BUI.Events:Unregister('PLAYER_DEAD',         'UF.Tags.CombatTimer.GroupWatch')
+		BUI.Events:Unregister('GROUP_ROSTER_UPDATE', 'UF.Tags.CombatTimer.GroupWatch')
+	end
 
 	local function StartCombatTimer()
 		if combatTicker then return end
@@ -541,7 +527,7 @@ do
 	end
 
 	local function FinalizeStop()
-		if StopWatchingGroup then StopWatchingGroup() end
+		StopWatchingGroup()
 		if not combatTicker then return end
 		combatTicker:Cancel()
 		combatTicker = nil
@@ -552,7 +538,7 @@ do
 
 	local GroupCombatCheck = BUI.Dispatcher.New(function()
 		if UnitAffectingCombat('player') then
-			if StopWatchingGroup then StopWatchingGroup() end
+			StopWatchingGroup()
 			return
 		end
 		if not IsGroupInCombat() then
@@ -571,14 +557,6 @@ do
 		BUI.Events:Register('PLAYER_DEAD',         'UF.Tags.CombatTimer.GroupWatch', OnGroupCombatSignal)
 		BUI.Events:Register('GROUP_ROSTER_UPDATE', 'UF.Tags.CombatTimer.GroupWatch', OnGroupCombatSignal)
 		OnGroupCombatSignal()
-	end
-
-	StopWatchingGroup = function()
-		if not groupWatchActive then return end
-		groupWatchActive = false
-		BUI.Events:Unregister('UNIT_FLAGS',          'UF.Tags.CombatTimer.GroupWatch')
-		BUI.Events:Unregister('PLAYER_DEAD',         'UF.Tags.CombatTimer.GroupWatch')
-		BUI.Events:Unregister('GROUP_ROSTER_UPDATE', 'UF.Tags.CombatTimer.GroupWatch')
 	end
 
 	local function OnPlayerLeftCombat()
@@ -622,10 +600,10 @@ local function EnsureRegistered(tagName)
 	end
 
 	local nameLength, targetLength, separator = tagName:match('^name(%d*):target(%d*)(.*)$')
-	if nameLength or targetLength then
-		local nameLimit = nameLength ~= '' and tonumber(nameLength) or nil
-		local targetLimit = targetLength ~= '' and tonumber(targetLength) or nil
-		separator = (separator and separator ~= '') and separator or '>'
+	if nameLength then
+		local nameLimit = tonumber(nameLength)
+		local targetLimit = tonumber(targetLength)
+		if separator == '' then separator = '>' end
 		oUF.Tags.Methods['bui:' .. tagName] = function(unit)
 			local name = UnitName(unit) or ''
 			local targetUnit = unit .. 'target'
@@ -644,13 +622,33 @@ local function EnsureRegistered(tagName)
 	return false
 end
 
-function UnitFrames.ConvertTagFormat(formatString)
-	if not formatString or formatString == '' then return '' end
+local function ConvertTag(tag)
+	if EnsureRegistered(tag) then return '[bui:' .. tag .. ']' end
+end
 
-	return formatString:gsub('%[(.-)%]', function(tag)
-		if EnsureRegistered(tag) then return '[bui:' .. tag .. ']' end
-		return '[' .. tag .. ']'
-	end)
+function UnitFrames.ConvertTagFormat(formatString)
+	return (formatString:gsub('%[(.-)%]', ConvertTag))
+end
+
+local TAG_FIELDS = { 'Name', 'HealthText', 'PowerText', 'LevelText', 'StatusText' }
+UnitFrames.TAG_FIELDS = TAG_FIELDS
+
+local FALLBACK_FORMATS = { nameFormat = '[name]', healthFormat = '[perhp]%', powerFormat = '[perpp]%', statusFormat = '[status]' }
+
+function UnitFrames.ResolveTextFormat(unitSettings, settings, key)
+	local value = unitSettings[key]
+	if value and value ~= '' then return value end
+	value = settings[key]
+	if value ~= '' then return value end
+	return FALLBACK_FORMATS[key] or value
+end
+
+local function ApplyTag(frame, fontString, formatString)
+	local converted = UnitFrames.ConvertTagFormat(formatString)
+	fontString._tagString = converted
+	taggedStrings[fontString] = frame
+	fontString.frequentUpdates = converted:find('[bui:range]', 1, true) and 0.25 or nil
+	frame:Tag(fontString, converted)
 end
 
 function UnitFrames.TagFontStrings(frame)
@@ -659,46 +657,21 @@ function UnitFrames.TagFontStrings(frame)
 	local settings = UnitFrames.GetSettings()
 	local unitSettings = UnitFrames.GetUnitSettings(unitType)
 
-	local function resolve(unitValue, globalValue, fallback)
-		if unitValue and unitValue ~= '' then return unitValue end
-		if globalValue and globalValue ~= '' then return globalValue end
-		return fallback
+	for _, key in ipairs(TAG_FIELDS) do
+		local fontString = frame[key]
+		frame:Untag(fontString)
+		fontString._tagString = nil
 	end
 
-	local function applyTag(fontString, formatString)
-		local converted = UnitFrames.ConvertTagFormat(formatString)
-		fontString._tagString = converted
-		taggedStrings[fontString] = frame
-		fontString.frequentUpdates = converted:find('%[bui:range%]') and 0.25 or nil
-		frame:Tag(fontString, converted)
+	if (unitType == 'player' or unitType == 'pet') and unitSettings.customName ~= '' then
+		frame.Name:SetText(unitSettings.customName)
+	else
+		ApplyTag(frame, frame.Name, UnitFrames.ResolveTextFormat(unitSettings, settings, 'nameFormat'))
 	end
-
-	if frame.Name then frame:Untag(frame.Name); frame.Name._tagString = nil end
-	if frame.HealthText then frame:Untag(frame.HealthText); frame.HealthText._tagString = nil end
-	if frame.PowerText then frame:Untag(frame.PowerText); frame.PowerText._tagString = nil end
-	if frame.LevelText then frame:Untag(frame.LevelText); frame.LevelText._tagString = nil end
-	if frame.StatusText then frame:Untag(frame.StatusText); frame.StatusText._tagString = nil end
-
-	if frame.Name then
-		if (unitType == 'player' or unitType == 'pet') and unitSettings.customName and unitSettings.customName ~= '' then
-			frame.Name:SetText(unitSettings.customName)
-		else
-			applyTag(frame.Name, resolve(unitSettings.nameFormat, settings.nameFormat, '[name]'))
-		end
-	end
-	if frame.HealthText then
-		applyTag(frame.HealthText, resolve(unitSettings.healthFormat, settings.healthFormat, '[perhp]%'))
-	end
-	if frame.PowerText then
-		applyTag(frame.PowerText, resolve(unitSettings.powerFormat, settings.powerFormat, '[perpp]%'))
-	end
-	if frame.StatusText then
-		applyTag(frame.StatusText, resolve(unitSettings.statusFormat, settings.statusFormat, '[status]'))
-	end
-	if frame.LevelText then
-		local levelFormat = settings.levelFormat
-		if levelFormat and levelFormat ~= '' then applyTag(frame.LevelText, levelFormat) end
-	end
+	ApplyTag(frame, frame.HealthText, UnitFrames.ResolveTextFormat(unitSettings, settings, 'healthFormat'))
+	ApplyTag(frame, frame.PowerText, UnitFrames.ResolveTextFormat(unitSettings, settings, 'powerFormat'))
+	ApplyTag(frame, frame.StatusText, UnitFrames.ResolveTextFormat(unitSettings, settings, 'statusFormat'))
+	if settings.levelFormat ~= '' then ApplyTag(frame, frame.LevelText, settings.levelFormat) end
 
 	UnitFrames.ApplyCustomTags(frame)
 
@@ -707,57 +680,47 @@ end
 
 function UnitFrames.ApplyCustomTags(frame)
 	directCacheDirty = true
-	local unitType = frame._unitType
-	local unitSettings = UnitFrames.GetUnitSettings(unitType)
-	local entries = unitSettings.customTags
+	local unitSettings = UnitFrames.GetUnitSettings(frame._unitType)
 	local font = UnitFrames.GetFont()
-	local overlay = frame.TextOverlay or frame
+	local overlay = frame.TextOverlay
+	local fontStrings = frame._customTags
+	if not fontStrings then
+		fontStrings = {}
+		frame._customTags = fontStrings
+	end
 
-	frame._customTags = frame._customTags or {}
-
-	for _, fontString in ipairs(frame._customTags) do
+	for _, fontString in ipairs(fontStrings) do
 		frame:Untag(fontString)
 		fontString:Hide()
 	end
 
-	for tagIndex, entry in ipairs(entries) do
-		if entry.tag and entry.tag ~= '' and entry.enabled ~= false then
-			local fontString = frame._customTags[tagIndex]
+	for tagIndex, entry in ipairs(unitSettings.customTags) do
+		local tag = entry.tag
+		if tag and tag ~= '' and entry.enabled ~= false then
+			local fontString = fontStrings[tagIndex]
 			if not fontString then
 				fontString = overlay:CreateFontString(nil, 'OVERLAY')
-				frame._customTags[tagIndex] = fontString
+				fontStrings[tagIndex] = fontString
 			end
 
 			local tagFont = font
-			if entry.font and entry.font ~= '' and entry.font ~= 'GLOBAL' then
-				tagFont = LibStub('LibSharedMedia-3.0'):Fetch('font', entry.font) or font
+			if entry.font and entry.font ~= GLOBAL_OPTION then
+				tagFont = sharedMedia:Fetch('font', entry.font, true) or font
 			end
-			Pixel.ApplyFont(fontString, entry.fontSize or 12, tagFont)
-			fontString:SetDrawLayer(entry.drawLayer or 'OVERLAY', entry.drawSubLevel or 0)
+			local point = entry.point
+			Pixel.ApplyFont(fontString, entry.fontSize, tagFont)
+			fontString:SetDrawLayer(entry.drawLayer, entry.drawSubLevel)
 			fontString:ClearAllPoints()
-			fontString:SetPoint(entry.point or 'CENTER', overlay, entry.point or 'CENTER',
-				entry.x or 0, entry.y or 0)
-			fontString:SetJustifyH(entry.point and entry.point:match('LEFT') and 'LEFT'
-				or entry.point and entry.point:match('RIGHT') and 'RIGHT'
-				or 'CENTER')
+			fontString:SetPoint(point, overlay, point, entry.x, entry.y)
+			fontString:SetJustifyH(point:find('LEFT', 1, true) and 'LEFT' or point:find('RIGHT', 1, true) and 'RIGHT' or 'CENTER')
 			fontString:SetWordWrap(false)
 			fontString:SetNonSpaceWrap(false)
 
 			local color = entry.color
-			if color then fontString:SetTextColor(color[1] or 1, color[2] or 1, color[3] or 1, color[4] or 1)
-			else fontString:SetTextColor(1, 1, 1, 1) end
+			fontString:SetTextColor(color[1], color[2], color[3], color[4] or 1)
+			if tag:find('[resting]', 1, true) then BuildRestingFrames(color[1], color[2], color[3]) end
 
-			if entry.tag:find('%[resting%]') then
-				local red, green, blue = 1, 1, 1
-				if color then red, green, blue = color[1] or 1, color[2] or 1, color[3] or 1 end
-				UnitFrames.SetRestingAnimation(red, green, blue)
-			end
-
-			local convertedTag = UnitFrames.ConvertTagFormat(entry.tag)
-			fontString._tagString = convertedTag
-			taggedStrings[fontString] = frame
-			fontString.frequentUpdates = convertedTag:find('%[bui:range%]') and 0.25 or nil
-			frame:Tag(fontString, convertedTag)
+			ApplyTag(frame, fontString, tag)
 			fontString:Show()
 		end
 	end
@@ -767,8 +730,8 @@ local PreviewCache = {}
 local PreviewTags = {
 	['hp'] = function(healthPercent) return tostring(floor(healthPercent * 5000000)) end,
 	['hp:short'] = function(healthPercent) return Abbreviate(floor(healthPercent * 5000000)) end,
-	['maxhp'] = function() return '100000' end,
-	['maxhp:short'] = function() return Abbreviate(50000000) end,
+	['maxhp'] = function() return '500000000' end,
+	['maxhp:short'] = function() return Abbreviate(500000000) end,
 	['perhp'] = function(healthPercent) return tostring(healthPercent) end,
 	['pp'] = function(_, powerPercent) return tostring(floor(powerPercent * 100)) end,
 	['pp:short'] = function(_, powerPercent) return Abbreviate(floor(powerPercent * 100)) end,
@@ -785,7 +748,7 @@ local PreviewTags = {
 	['hpabsorb'] = function(healthPercent) return tostring(floor(healthPercent * 5000000)) end,
 	['hpabsorb:short'] = function(healthPercent) return Abbreviate(floor(healthPercent * 5000000)) end,
 	['name'] = function() return 'Bluetempest' end,
-	['name:short'] = function() return 'Bluetempes...' end,
+	['name:short'] = function() return 'Bluetempes' end,
 	['level'] = function() return '80' end,
 	['class'] = function() return 'HUNTER' end,
 	['classname'] = function() return 'Hunter' end,
@@ -796,9 +759,9 @@ local PreviewTags = {
 	['offline'] = function() return '' end,
 	['afk'] = function() return '' end,
 	['dnd'] = function() return '' end,
-	['resting'] = function() return restingFrames[1] or 'Zzz' end,
-	['combat'] = function() return '|TInterface\\AddOns\\BluUI\\Media\\Textures\\combat:14:14|t' end,
-	['combattime'] = function() return '[01:23]' end,
+	['resting'] = function() return restingFrames[1] end,
+	['combat'] = function() return COMBAT_ICON end,
+	['combattime'] = function() return '01:23.4' end,
 	['range'] = function() return '|cff2bff6225-30|r' end,
 	['creature'] = function() return 'Cat' end,
 	['creaturefamily'] = function() return 'Cat' end,
@@ -820,18 +783,15 @@ local function ResolvePreviewTag(tag)
 	if PreviewTags[tag] then return PreviewTags[tag] end
 	local shortLength = tag:match('^name:short(%d+)$')
 	if shortLength then
-		local fullName = 'Bluetempest'
-		local limit = tonumber(shortLength)
-		local display = #fullName > limit and fullName:sub(1, limit) or fullName
+		local display = Tools.TruncateName('Bluetempest', tonumber(shortLength))
 		return function() return display end
 	end
 	local nameLength, targetLength, separator = tag:match('^name(%d*):target(%d*)(.*)$')
-	if nameLength or targetLength then
-		local displayName = 'Bluetempest'
-		local displayTarget = 'Ragnaros'
-		if nameLength and nameLength ~= '' and #displayName > tonumber(nameLength) then displayName = displayName:sub(1, tonumber(nameLength)) end
-		if targetLength and targetLength ~= '' and #displayTarget > tonumber(targetLength) then displayTarget = displayTarget:sub(1, tonumber(targetLength)) end
-		separator = (separator and separator ~= '') and separator or '>'
+	if nameLength then
+		local displayName, displayTarget = 'Bluetempest', 'Ragnaros'
+		if nameLength ~= '' then displayName = Tools.TruncateName(displayName, tonumber(nameLength)) end
+		if targetLength ~= '' then displayTarget = Tools.TruncateName(displayTarget, tonumber(targetLength)) end
+		if separator == '' then separator = '>' end
 		local result = format('%s |cFFFFFFFF%s|r |cFFC79C6E%s|r', displayName, separator, displayTarget)
 		return function() return result end
 	end
@@ -841,9 +801,6 @@ end
 local valueBuffer = {}
 
 function UnitFrames.ParsePreviewTags(formatString, healthPercent, powerPercent)
-	if not formatString then return '' end
-	healthPercent = healthPercent or 75
-	powerPercent = powerPercent or 60
 	local cached = PreviewCache[formatString]
 	if not cached then
 		local handlers = {}
@@ -875,8 +832,3 @@ function UnitFrames.ParsePreviewTags(formatString, healthPercent, powerPercent)
 	end
 	return cached(healthPercent, powerPercent)
 end
-
-function UnitFrames.InvalidateTagCache()
-	wipe(PreviewCache)
-end
-

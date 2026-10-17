@@ -17,21 +17,16 @@ end
 local function ApplySettings(frame, unitType, index)
 	if not frame then return end
 
-	frame._transparentHealth = nil
-
 	local unitConfig = UnitFrames.GetUnitConfig(unitType)
 	local settings = UnitFrames.GetSettings()
 	local unitSettings = UnitFrames.GetUnitSettings(unitType)
 	local texture = UnitFrames.GetTexture()
 
-	local width = unitSettings.width
-	local height = unitSettings.height
-
 	local anchorHeight = BUI.Anchor.GetAnchorHeight(unitSettings)
-	local scaledHeight = anchorHeight or Pixel.Scale(height)
+	local scaledHeight = anchorHeight or Pixel.Scale(unitSettings.height)
 	local borderSize = settings.borderSize
 
-	frame:SetSize(Pixel.Scale(width), scaledHeight)
+	frame:SetSize(Pixel.Scale(unitSettings.width), scaledHeight)
 	if not frame._stage then UnitFrames.ApplyPosition(frame, unitType, index) end
 
 	local showPower = ShowPower(unitType, unitSettings)
@@ -47,71 +42,58 @@ local function ApplySettings(frame, unitType, index)
 	UnitFrames.ApplyHealthBarLayout(frame, scaledHeight, showPower, unitSettings.powerHeight, borderSize)
 	UnitFrames.ApplyBarTextures(frame, texture)
 
-	if frame.Power then
-		if showPower then
-			if not frame:IsElementEnabled('Power') then
-				frame:EnableElement('Power')
-				frame.Power:ForceUpdate()
-			end
-		elseif frame:IsElementEnabled('Power') then
-			frame:DisableElement('Power')
+	local power = frame.Power
+	if showPower then
+		if not frame:IsElementEnabled('Power') then
+			frame:EnableElement('Power')
+			power:ForceUpdate()
 		end
+	elseif frame:IsElementEnabled('Power') then
+		frame:DisableElement('Power')
 	end
-	if frame.Power then frame.Power:SetShown(showPower) end
-	if frame.PowerBG then frame.PowerBG:SetShown(showPower) end
-	if frame.PowerBorderFrame then frame.PowerBorderFrame:SetShown(showPower) end
+	power:SetShown(showPower)
+	frame.PowerBG:SetShown(showPower)
+	frame.PowerBorderFrame:SetShown(showPower)
 
-	local opacity = UnitFrames.GetContextualOpacity() / 100
+	local opacity = BUI.Visibility.GetContextualOpacity('UnitFrames') / 100
 	frame._ufOpacity = opacity
 	frame:SetAlpha(opacity)
 
 	local isPet = unitType == 'pet'
-	local frameBgColor = isPet and settings.petBgColor or settings.bgColor
-	local powerBgColor = isPet and settings.petPowerBgColor or settings.powerBgColor
-	UnitFrames.ApplyBackgroundColors(frame, frameBgColor, powerBgColor)
+	UnitFrames.ApplyBackgroundColors(frame, isPet and settings.petBgColor or settings.bgColor, isPet and settings.petPowerBgColor or settings.powerBgColor)
 	UnitFrames.ApplyAbsorbStyles(frame, settings)
 	UnitFrames.ApplyHealAbsorbStyles(frame, settings)
 
-	local unitToken = index and (unitType .. index) or unitType
-	UnitFrames.ApplyTextStyles(frame, width, settings, unitSettings, unitToken)
+	UnitFrames.ApplyTextStyles(frame, settings, unitSettings, index and (unitType .. index) or unitType)
 	UnitFrames.ApplyRaidIconPosition(frame, settings, unitSettings)
 	UnitFrames.ApplyLeaderIconPosition(frame, settings)
 	UnitFrames.ApplyLevelTextStyles(frame, settings, unitSettings)
 
-	if frame.PowerText then
-		local showPowerText = unitSettings.showPowerText
-		if showPowerText == nil then showPowerText = settings.showPowerText ~= false end
-		frame.PowerText:SetShown(showPower and showPowerText)
+	frame.PowerText:SetShown(showPower and unitSettings.showPowerText)
+	BUI.Tools.SetColorTex(frame.PowerBorder, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
+
+	local smoothing = UnitFrames.GetBarSmoothing()
+	frame.Health.smoothing = smoothing
+	power.smoothing = smoothing
+	power.colorPower = settings.classColorPower
+
+	local deficit = frame.Health.Deficit
+	deficit:SetShown(settings.transparentHealth)
+	if settings.transparentHealth then
+		local deficitColor = settings.bgColor
+		BUI.Tools.SetColorTex(deficit, deficitColor[1], deficitColor[2], deficitColor[3], deficitColor[4])
 	end
 
-	if frame.PowerBorder then
-		BUI.Tools.SetColorTex(frame.PowerBorder, borderColor[1], borderColor[2], borderColor[3], borderColor[4] or 1)
+	local predict = power._predict
+	if predict then
+		local predictionColor = unitSettings.powerPredictionColor
+		BUI.PowerPrediction.Restyle(predict, texture, predictionColor[1], predictionColor[2], predictionColor[3], predictionColor[4])
 	end
 
-	if frame.Health then
-		frame.Health.smoothing = BUI.GetDB().general.smoothBars and Enum.StatusBarInterpolation.ExponentialEaseOut or nil
-		if frame.Health.Deficit then
-			local isTransparent = settings.transparentHealth
-			frame.Health.Deficit:SetShown(isTransparent)
-			if isTransparent then
-				local deficitColor = settings.bgColor
-				BUI.Tools.SetColorTex(frame.Health.Deficit, deficitColor[1], deficitColor[2], deficitColor[3], deficitColor[4] or 1)
-			end
-		end
-	end
-	if frame.Power then
-		frame.Power.colorPower = settings.classColorPower
-		frame.Power.smoothing = BUI.GetDB().general.smoothBars and Enum.StatusBarInterpolation.ExponentialEaseOut or nil
-	end
-
-	if unitType == 'boss' and frame.Castbar then
-		BUI.CastBar.ApplyBossCastbar(frame, index)
-	end
-	if unitType == 'boss' and not frame._stage then
-		UnitFrames.ApplyBossOutlines(frame)
-	end
-
-	if (unitType == 'player' or unitType == 'target' or unitType == 'focus') and frame.Castbar then
+	if unitType == 'boss' then
+		if frame.Castbar then BUI.CastBar.ApplyBossCastbar(frame, index) end
+		if not frame._stage then UnitFrames.ApplyBossOutlines(frame) end
+	elseif frame.Castbar then
 		BUI.CastBar.ApplyCastbar(frame, unitType)
 	end
 
@@ -156,8 +138,6 @@ local function RefreshPlayerFrame()
 	end
 end
 
-local OnLifeStateChanged = RefreshPlayerFrame
-
 local CORE_UNITS = {'player', 'target', 'targettarget', 'focus', 'pet'}
 local FRAME_NAMES = {
 	player = 'BUI_PlayerFrame',
@@ -179,8 +159,7 @@ function UnitFrames:Initialize()
 			end
 		end
 
-		local bossUnitSettings = UnitFrames.GetUnitSettings('boss')
-		if bossUnitSettings.enabled ~= false then
+		if UnitFrames.GetUnitSettings('boss').enabled ~= false then
 			for bossIndex = 1, 5 do
 				if not self['boss' .. bossIndex] then
 					self['boss' .. bossIndex] = oUF:Spawn('boss' .. bossIndex, 'BUI_BossFrame' .. bossIndex)
@@ -194,9 +173,9 @@ function UnitFrames:Initialize()
 		BUI.Events:RegisterUnit('UNIT_ENTERED_VEHICLE', 'player', 'UF.Vehicle', QueueVehicleToggle)
 		BUI.Events:RegisterUnit('UNIT_EXITED_VEHICLE', 'player', 'UF.Vehicle', QueueVehicleToggle)
 
-		BUI.Events:Register('PLAYER_ALIVE', 'UF.LifeState', OnLifeStateChanged)
-		BUI.Events:Register('PLAYER_UNGHOST', 'UF.LifeState', OnLifeStateChanged)
-		BUI.Events:Register('PLAYER_DEAD', 'UF.LifeState', OnLifeStateChanged)
+		BUI.Events:Register('PLAYER_ALIVE', 'UF.LifeState', RefreshPlayerFrame)
+		BUI.Events:Register('PLAYER_UNGHOST', 'UF.LifeState', RefreshPlayerFrame)
+		BUI.Events:Register('PLAYER_DEAD', 'UF.LifeState', RefreshPlayerFrame)
 
 		self:Refresh()
 	end)
@@ -204,20 +183,16 @@ function UnitFrames:Initialize()
 	Pixel.OnScaleChange('UnitFrames', function() UnitFrames:Refresh() end)
 end
 
-local function RefreshFrame(frame, unitType, index)
+local function RefreshFrame(frame, unitType)
 	if not frame then return end
 
 	if InCombatLockdown() then
-		BUI.Events:AfterCombat(function()
-			RefreshFrame(frame, unitType, index)
-		end, 'UF.RefreshFrame:' .. tostring(unitType) .. (index or ''))
+		BUI.Events:AfterCombat(function() RefreshFrame(frame, unitType) end, 'UF.RefreshFrame:' .. unitType)
 		return
 	end
 
-	local unitSettings = UnitFrames.GetUnitSettings(unitType)
-
-	if unitSettings.enabled ~= false then
-		ApplySettings(frame, unitType, index)
+	if UnitFrames.GetUnitSettings(unitType).enabled ~= false then
+		ApplySettings(frame, unitType)
 		if not frame._isPreview and not frame:IsEnabled() then frame:Enable() end
 	elseif not frame._isPreview then
 		frame:Disable()
@@ -233,32 +208,23 @@ function UnitFrames:Refresh()
 	end
 	UnitFrames.UpdateDebuffHighlight(self.player)
 
-	local bossUnitSettings = UnitFrames.GetUnitSettings('boss')
-	local bossEnabled = bossUnitSettings.enabled ~= false
-
-	if bossEnabled then
-		oUF:SetActiveStyle('BluUI')
-		for bossIndex = 1, 5 do
-			if not self['boss' .. bossIndex] then
-				BUI.Events:AfterCombat(function()
-					self['boss' .. bossIndex] = oUF:Spawn('boss' .. bossIndex, 'BUI_BossFrame' .. bossIndex)
-					ApplySettings(self['boss' .. bossIndex], 'boss', bossIndex)
-				end, 'UF.SpawnBoss:' .. bossIndex)
-			end
-		end
-	end
-
+	local bossEnabled = UnitFrames.GetUnitSettings('boss').enabled ~= false
 	for bossIndex = 1, 5 do
-		local bossFrame = self['boss' .. bossIndex]
-		if bossFrame then
-			if bossEnabled then
-				BUI.Events:AfterCombat(function()
-					ApplySettings(bossFrame, 'boss', bossIndex)
-					if not bossFrame._isPreview and not bossFrame:IsEnabled() then bossFrame:Enable() end
-				end, 'UF.ApplyBoss:' .. bossIndex)
-			elseif not bossFrame._isPreview then
-				BUI.Events:AfterCombat(function() bossFrame:Disable() end, 'UF.DisableBoss:' .. bossIndex)
-			end
+		local key = 'boss' .. bossIndex
+		local bossFrame = self[key]
+		if bossEnabled then
+			BUI.Events:AfterCombat(function()
+				local frame = self[key]
+				if not frame then
+					oUF:SetActiveStyle('BluUI')
+					frame = oUF:Spawn(key, 'BUI_BossFrame' .. bossIndex)
+					self[key] = frame
+				end
+				ApplySettings(frame, 'boss', bossIndex)
+				if not frame._isPreview and not frame:IsEnabled() then frame:Enable() end
+			end, 'UF.ApplyBoss:' .. bossIndex)
+		elseif bossFrame and not bossFrame._isPreview then
+			BUI.Events:AfterCombat(function() bossFrame:Disable() end, 'UF.DisableBoss:' .. bossIndex)
 		end
 	end
 end
@@ -291,4 +257,3 @@ function UnitFrames.RefreshAnchoredFrames()
 		end
 	end
 end
-

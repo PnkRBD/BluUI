@@ -1,20 +1,19 @@
 local _, BUI = ...
 
-local debugprofilestop, GetTime, InCombatLockdown, issecretvalue = debugprofilestop, GetTime, InCombatLockdown, issecretvalue
+local debugprofilestop, issecretvalue = debugprofilestop, issecretvalue
 local pairs, ipairs, rawget, wipe, setmetatable = pairs, ipairs, rawget, wipe, setmetatable
-local sort, concat, format, floor, max, min = table.sort, table.concat, string.format, math.floor, math.max, math.min
+local sort, concat, format, max, min = table.sort, table.concat, string.format, math.max, math.min
 
 local Profiler = BUI.Profiler
 local Engine = BUI.AuraEngine
 local oUF = BUI.oUF
-local CountsText, Clock = Profiler.CountsText, Profiler.Clock
+local CountsText, MsText, Clock, Or, Percent, ByMs = Profiler.CountsText, Profiler.MsText, Profiler.Clock, Profiler.Or, Profiler.Percent, Profiler.ByMs
 
 local UnitFrameProfiler = {}
 BUI.UnitFrameProfiler = UnitFrameProfiler
 
 local EVENT_KEY = 'Unit frame profiler'
 local GROUP_STYLE = 'BluUI-Group'
-local KEEP_FRAMES = 5
 local TOP_EVENTS = 15
 local TOP_BUSY = 10
 local TOP_TAGS = 12
@@ -22,6 +21,7 @@ local TOP_HANDLERS = 15
 local TOP_IN_FRAME = 3
 local TOP_CAUSES = 3
 local CAST_BAR_SUFFIX = ' cast bar'
+local BAR_KINDS = { 'health', 'power' }
 local OWN_LABELS = { 'UnitFrames', 'GroupFrames', 'UFAuras', ' UF.', 'AuraEngine', 'AuraContainerEngine' }
 local UNIT_NAMES = {
 	player = 'Player', target = 'Target', targettarget = 'Target of target', focus = 'Focus', focustarget = 'Focus target',
@@ -33,7 +33,7 @@ for index, key in ipairs(UNIT_ORDER) do UNIT_RANK[key] = index end
 local NOT_MEASURED = 'Not measured: what Blizzard does in its own code (drawing bars, sorting and drawing aura icons), BluUI code without a label, and frames made in combat until combat ends.'
 
 local running = false
-local swapped = {}
+local session
 local keyOf = setmetatable({}, { __mode = 'k' })
 local seenAt = setmetatable({}, { __mode = 'k' })
 local fullAt = setmetatable({}, { __mode = 'k' })
@@ -42,26 +42,17 @@ local lastValue = setmetatable({}, { __mode = 'k' })
 local causeNames = {}
 
 local unitStats, tagStats, labelInfo, watchedBars, countedTexts = {}, {}, {}, {}, {}
-local frameUnits, frameEvents, frameLabels, worstFrames, unwatched = {}, {}, {}, {}, {}
-local SESSION_TABLES = { unitStats, tagStats, labelInfo, watchedBars, countedTexts, frameUnits, frameEvents, frameLabels, worstFrames, unwatched }
-local spanStart, spanMs = {}, {}
-local spanTop = 0
-local frameAt, frameCombat, frameMs = nil, false, 0
-local currentSecond, secondMs, secondEvents = 0, 0, 0
+local frameUnits, frameEvents, frameLabels, unwatched = {}, {}, {}, {}
+local SESSION_TABLES = { unitStats, tagStats, labelInfo, watchedBars, countedTexts, frameUnits, frameEvents, frameLabels, unwatched }
+local secondMs, secondEvents = 0, 0
 local peakMs, peakMsAt, peakEvents, peakEventsAt = 0, 0, 0, 0
-local startedAt, stoppedAt, clockAtStart, zoneAtStart, groupAtStart
-local totalMs, combatMs, busyFrames, draws, watched, frameCount = 0, 0, 0, 0, 0, 0
-local inCombat, combatSince, combatTime = false, 0, 0
+local groupAtStart
+local draws, watched, frameCount = 0, 0, 0
 local currentEvent, currentUnit
 
-local function ByMs(left, right) return left.ms > right.ms end
 local function ByCount(left, right) return left.count > right.count end
 
-local function Or(text)
-	return text ~= '' and text or 'none'
-end
-
-local function UnitName(key)
+local function UnitLabel(key)
 	return UNIT_NAMES[key] or key
 end
 
@@ -127,76 +118,38 @@ local function CauseName(key, event)
 	end
 	local name = byEvent[event]
 	if not name then
-		name = format('%s on %s', event, UnitName(key))
+		name = format('%s on %s', event, UnitLabel(key))
 		byEvent[event] = name
 	end
 	return name
 end
 
-local function MsText(map, count)
-	local parts = {}
-	for _, item in ipairs(Profiler.Top(map, count)) do parts[#parts + 1] = format('%s %.1fms', item.name, item.value) end
-	return concat(parts, '; ')
+local function DescribeFrame(record)
+	record.units = CountsText(frameUnits, TOP_IN_FRAME, UnitLabel)
+	record.events = CountsText(frameEvents, TOP_IN_FRAME)
+	record.handlers = MsText(frameLabels, TOP_IN_FRAME)
+	return record
 end
 
-local function KeepWorstFrame()
-	worstFrames[#worstFrames + 1] = {
-		at = frameAt - startedAt, ms = frameMs, combat = frameCombat,
-		units = CountsText(frameUnits, TOP_IN_FRAME, UnitName), events = CountsText(frameEvents, TOP_IN_FRAME),
-		handlers = MsText(frameLabels, TOP_IN_FRAME),
-	}
-	sort(worstFrames, ByMs)
-	worstFrames[KEEP_FRAMES + 1] = nil
-end
-
-local function CloseFrame()
-	busyFrames = busyFrames + 1
-	totalMs = totalMs + frameMs
-	secondMs = secondMs + frameMs
-	if frameCombat then combatMs = combatMs + frameMs end
-	local lastWorst = worstFrames[KEEP_FRAMES]
-	if not lastWorst or frameMs > lastWorst.ms then KeepWorstFrame() end
+local function OnFrameClosed(closing)
+	secondMs = secondMs + closing.frameMs
 	wipe(frameUnits)
 	wipe(frameEvents)
 	wipe(frameLabels)
-	frameMs, spanTop = 0, 0
+	currentEvent, currentUnit = nil, nil
 end
 
-local function CloseSecond()
-	if secondMs > peakMs then peakMs, peakMsAt = secondMs, currentSecond end
-	if secondEvents > peakEvents then peakEvents, peakEventsAt = secondEvents, currentSecond end
+local function OnSecondClosed(closing)
+	if secondMs > peakMs then peakMs, peakMsAt = secondMs, closing.currentSecond end
+	if secondEvents > peakEvents then peakEvents, peakEventsAt = secondEvents, closing.currentSecond end
 	secondMs, secondEvents = 0, 0
 end
 
-local function Touch()
-	local now = GetTime()
-	if now == frameAt then return end
-	if frameAt then CloseFrame() end
-	frameAt = now
-	frameCombat = inCombat
-	currentEvent, currentUnit = nil, nil
-	local second = floor(now - startedAt)
-	if second ~= currentSecond then
-		CloseSecond()
-		currentSecond = second
-	end
-end
-
-local function Span(start, elapsed)
-	local covered = 0
-	while spanTop > 0 and spanStart[spanTop] >= start do
-		covered = covered + spanMs[spanTop]
-		spanTop = spanTop - 1
-	end
-	spanTop = spanTop + 1
-	spanStart[spanTop] = start
-	spanMs[spanTop] = elapsed
-	frameMs = frameMs + elapsed - covered
-end
+session = Profiler.NewSession({ DescribeFrame = DescribeFrame, OnFrameClosed = OnFrameClosed, OnSecondClosed = OnSecondClosed }, EVENT_KEY)
 
 local function OnEvent(label, onEvent, frame, event, ...)
 	if not running then return Profiler.Run(label, onEvent, frame, event, ...) end
-	Touch()
+	session:Touch()
 	local key = KeyOf(frame)
 	local visible = frame:IsVisible()
 	local outerEvent, outerUnit = currentEvent, currentUnit
@@ -205,7 +158,7 @@ local function OnEvent(label, onEvent, frame, event, ...)
 	Profiler.Run(label, onEvent, frame, event, ...)
 	local elapsed = debugprofilestop() - start
 	currentEvent, currentUnit = outerEvent, outerUnit
-	Span(start, elapsed)
+	session:Span(start, elapsed)
 	local unit = UnitStat(key)
 	local stat = EventStat(unit, event)
 	unit.events = unit.events + 1
@@ -213,7 +166,7 @@ local function OnEvent(label, onEvent, frame, event, ...)
 	stat.count = stat.count + 1
 	stat.ms = stat.ms + elapsed
 	if elapsed > stat.max then stat.max = elapsed end
-	if inCombat then
+	if session.inCombat then
 		unit.combat = unit.combat + 1
 		stat.combat = stat.combat + 1
 	end
@@ -227,6 +180,7 @@ local function OnEvent(label, onEvent, frame, event, ...)
 		seen = {}
 		seenAt[frame] = seen
 	end
+	local frameAt = session.frameAt
 	if seen[event] == frameAt then
 		unit.again = unit.again + 1
 		stat.again = stat.again + 1
@@ -240,16 +194,17 @@ end
 
 local function OnFullUpdate(label, updateAll, frame, event)
 	if not running then return Profiler.Run(label, updateAll, frame, event) end
-	Touch()
+	session:Touch()
 	local start = debugprofilestop()
 	Profiler.Run(label, updateAll, frame, event)
 	local elapsed = debugprofilestop() - start
-	Span(start, elapsed)
+	session:Span(start, elapsed)
 	local unit = UnitStat(KeyOf(frame))
 	unit.full = unit.full + 1
 	unit.fullMs = unit.fullMs + elapsed
 	local cause = event or 'no reason given'
 	unit.fullCauses[cause] = (unit.fullCauses[cause] or 0) + 1
+	local frameAt = session.frameAt
 	if fullAt[frame] == frameAt then
 		unit.fullAgain = unit.fullAgain + 1
 	else
@@ -257,24 +212,11 @@ local function OnFullUpdate(label, updateAll, frame, event)
 	end
 end
 
-local function Swap(owner, key, wrapper)
-	swapped[#swapped + 1] = { owner = owner, key = key, previous = rawget(owner, key), wrapper = wrapper }
-	owner[key] = wrapper
-end
-
-local function Unswap()
-	for index = #swapped, 1, -1 do
-		local swap = swapped[index]
-		if rawget(swap.owner, swap.key) == swap.wrapper then swap.owner[swap.key] = swap.previous end
-		swapped[index] = nil
-	end
-end
-
 local function CountDraws(fontString)
 	if countedTexts[fontString] then return end
 	countedTexts[fontString] = true
 	local method = fontString.SetFormattedText
-	Swap(fontString, 'SetFormattedText', function(self, ...)
+	session:Swap(fontString, 'SetFormattedText', function(self, ...)
 		draws = draws + 1
 		return method(self, ...)
 	end)
@@ -300,14 +242,14 @@ local function WrapTag(object, fontString)
 	local key = KeyOf(object)
 	local stat = TagStat(key, Profiler.TagName(object, fontString))
 	CountDraws(fontString)
-	Swap(fontString, 'UpdateTag', function(self)
+	session:Swap(fontString, 'UpdateTag', function(self)
 		if not running then return original(self) end
-		Touch()
+		session:Touch()
 		local before = draws
 		local start = debugprofilestop()
 		original(self)
 		local elapsed = debugprofilestop() - start
-		Span(start, elapsed)
+		session:Span(start, elapsed)
 		local unit = UnitStat(key)
 		stat.count = stat.count + 1
 		stat.ms = stat.ms + elapsed
@@ -322,7 +264,7 @@ local function WrapTag(object, fontString)
 end
 
 local function CountBar(bar, key, which, value)
-	Touch()
+	session:Touch()
 	local stat = UnitStat(key)[which]
 	stat.sets = stat.sets + 1
 	if issecretvalue(value) then
@@ -332,6 +274,7 @@ local function CountBar(bar, key, which, value)
 		if lastValue[bar] == value then stat.same = stat.same + 1 end
 		lastValue[bar] = value
 	end
+	local frameAt = session.frameAt
 	if barSetAt[bar] == frameAt then
 		stat.again = stat.again + 1
 	else
@@ -345,7 +288,7 @@ local function WatchBar(object, field, which)
 	watchedBars[bar] = true
 	local key = KeyOf(object)
 	local method = bar.SetValue
-	Swap(bar, 'SetValue', function(self, value, ...)
+	session:Swap(bar, 'SetValue', function(self, value, ...)
 		if running then CountBar(self, key, which, value) end
 		return method(self, value, ...)
 	end)
@@ -355,7 +298,7 @@ local function WatchObject(object)
 	if rawget(object, '_bluProfiled') then
 		watched = watched + 1
 	else
-		unwatched[#unwatched + 1] = object:GetName() or UnitName(KeyOf(object))
+		unwatched[#unwatched + 1] = object:GetName() or UnitLabel(KeyOf(object))
 	end
 	WatchBar(object, 'Health', 'health')
 	WatchBar(object, 'Power', 'power')
@@ -369,16 +312,19 @@ local function OnSpawn(object)
 end
 
 local function AuraWrapper(method, countField, msField)
-	return function(container, ...)
-		if not running then return method(container, ...) end
-		Touch()
-		local start = debugprofilestop()
-		method(container, ...)
+	local function Close(key, start, ...)
 		local elapsed = debugprofilestop() - start
-		Span(start, elapsed)
-		local unit = UnitStat(ContainerKey(container))
+		session:Span(start, elapsed)
+		local unit = UnitStat(key)
 		unit[countField] = unit[countField] + 1
 		unit[msField] = unit[msField] + elapsed
+		return ...
+	end
+	return function(container, ...)
+		if not running then return method(container, ...) end
+		session:Touch()
+		local key = ContainerKey(container)
+		return Close(key, debugprofilestop(), method(container, ...))
 	end
 end
 
@@ -404,12 +350,12 @@ local function Trace(label, start, elapsed, _, parent)
 	local info = labelInfo[label]
 	if info == nil then info = LabelInfo(label) end
 	if not info then return end
-	Touch()
-	Span(start, elapsed)
+	session:Touch()
+	session:Span(start, elapsed)
 	info.count = info.count + 1
 	info.ms = info.ms + elapsed
 	if elapsed > info.max then info.max = elapsed end
-	if inCombat then info.combat = info.combat + 1 end
+	if session.inCombat then info.combat = info.combat + 1 end
 	frameLabels[label] = (frameLabels[label] or 0) + elapsed
 	local from = currentEvent and CauseName(currentUnit, currentEvent) or parent or 'its own event or timer'
 	info.from[from] = (info.from[from] or 0) + 1
@@ -417,33 +363,8 @@ end
 
 local WATCHER = { Event = OnEvent, FullUpdate = OnFullUpdate, Tag = function(object, fontString) if running then WrapTag(object, fontString) end end }
 
-local function OnCombatStart()
-	if inCombat then return end
-	inCombat = true
-	combatSince = GetTime()
-end
-
-local function OnCombatEnd()
-	if not inCombat then return end
-	inCombat = false
-	combatTime = combatTime + GetTime() - combatSince
-end
-
-local function Duration()
-	return max((stoppedAt or GetTime()) - startedAt, 1)
-end
-
-local function CombatSeconds()
-	if inCombat then return combatTime + GetTime() - combatSince end
-	return combatTime
-end
-
 local function Rate(count)
-	return count / Duration()
-end
-
-local function Percent(part, whole)
-	return whole > 0 and part / whole * 100 or 0
+	return session:Rate(count)
 end
 
 local function GroupText()
@@ -470,12 +391,13 @@ local function Sum(field, sub)
 end
 
 local function SummaryLines(lines)
-	local duration, combat = Duration(), CombatSeconds()
+	local duration, combat = session:Duration(), session:CombatSeconds()
+	local totalMs, combatMs, worstFrames, currentSecond = session.totalMs, session.combatMs, session.worstFrames, session.currentSecond
 	lines[#lines + 1] = format('Unit frame profile: %s, %s of it in combat. Started in %s at %s, %s.',
-		Clock(duration), Clock(combat), zoneAtStart, clockAtStart, groupAtStart)
+		Clock(duration), Clock(combat), session.zoneAtStart, session.clockAtStart, groupAtStart)
 	lines[#lines + 1] = format('Unit frame work: %.0fms in total, %.2fms a second (%.2f in combat, %.2f out of combat). It ran in %d frames; the worst took %.1fms. Busiest second: %.1fms at +%s.',
 		totalMs, totalMs / duration, combat > 0 and combatMs / combat or 0, (totalMs - combatMs) / max(duration - combat, 1),
-		busyFrames, worstFrames[1] and worstFrames[1].ms or 0, max(peakMs, secondMs), Clock(secondMs > peakMs and currentSecond or peakMsAt))
+		session.busyFrames, worstFrames[1] and worstFrames[1].ms or 0, max(peakMs, secondMs), Clock(secondMs > peakMs and currentSecond or peakMsAt))
 	local events = Sum('events')
 	lines[#lines + 1] = format('Events: %d (%.0f a second). %d reached hidden frames, %d were the same event again on the same frame in one frame. Busiest second: %d events at +%s.',
 		events, Rate(events), Sum('hidden'), Sum('again'), max(peakEvents, secondEvents), Clock(secondEvents > peakEvents and currentSecond or peakEventsAt))
@@ -497,7 +419,7 @@ local function UnitLines(lines)
 	for _, key in ipairs(UnitKeys()) do
 		local stat = unitStats[key]
 		lines[#lines + 1] = format('  %s: %d events (%.1f/s), %.1fms, %d in combat. %d reached the frame while hidden (%.1fms), %d were a repeat in the same frame.',
-			UnitName(key), stat.events, Rate(stat.events), stat.ms, stat.combat, stat.hidden, stat.hiddenMs, stat.again)
+			UnitLabel(key), stat.events, Rate(stat.events), stat.ms, stat.combat, stat.hidden, stat.hiddenMs, stat.again)
 		if stat.full > 0 then
 			lines[#lines + 1] = format('    Full refreshes: %d (%.1fms), %d again in the same frame. From: %s.',
 				stat.full, stat.fullMs, stat.fullAgain, Or(CountsText(stat.fullCauses, TOP_CAUSES)))
@@ -526,7 +448,7 @@ end
 local function EventLine(row)
 	local stat = row.stat
 	return format('  %s on %s: %d (%.1f/s), %.1fms, %.3f avg, %.2f max. %d hidden, %d repeats, %d in combat.',
-		row.event, UnitName(row.key), stat.count, Rate(stat.count), stat.ms, stat.ms / stat.count, stat.max, stat.hidden, stat.again, stat.combat)
+		row.event, UnitLabel(row.key), stat.count, Rate(stat.count), stat.ms, stat.ms / stat.count, stat.max, stat.hidden, stat.again, stat.combat)
 end
 
 local function EventLines(lines)
@@ -550,7 +472,7 @@ local function TagLines(lines)
 		local row = rows[index]
 		local stat = row.stat
 		lines[#lines + 1] = format('  %s %s: %d updates (%.1f/s), %d redrew (%.0f%%), %.1fms, %.3f avg, %.2f max.',
-			UnitName(row.key), row.field, stat.count, Rate(stat.count), stat.draws, Percent(stat.draws, stat.count),
+			UnitLabel(row.key), row.field, stat.count, Rate(stat.count), stat.draws, Percent(stat.draws, stat.count),
 			stat.ms, stat.ms / max(stat.count, 1), stat.max)
 	end
 end
@@ -559,7 +481,7 @@ local function PerUnit(field, sub)
 	local map = {}
 	for key, stat in pairs(unitStats) do
 		local value = sub and stat[sub][field] or stat[field]
-		if value > 0 then map[UnitName(key)] = value end
+		if value > 0 then map[UnitLabel(key)] = value end
 	end
 	return map
 end
@@ -579,7 +501,7 @@ local function WasteLines(lines)
 	lines[#lines + 1] = format('  Events on hidden frames: %d (%.1fms). By unit: %s.', Sum('hidden'), Sum('hiddenMs'), Or(CountsText(PerUnit('hidden'), 6)))
 	lines[#lines + 1] = format('  Same event again on the same frame in one frame: %d. Top: %s.', Sum('again'), Or(CountsText(RepeatPairs(), 5)))
 	lines[#lines + 1] = format('  Full refreshes again in the same frame: %d (%s).', Sum('fullAgain'), Or(CountsText(PerUnit('fullAgain'), 6)))
-	for _, which in ipairs({ 'health', 'power' }) do
+	for _, which in ipairs(BAR_KINDS) do
 		local sets, same, hidden = Sum('sets', which), Sum('same', which), Sum('hidden', which)
 		lines[#lines + 1] = format('  %s sets that changed nothing: %d of %d checked (%.0f%%), %d set again in the same frame, %d hidden by Blizzard. By unit: %s.',
 			which == 'health' and 'Health' or 'Power', same, sets - hidden, Percent(same, sets - hidden), Sum('again', which), hidden,
@@ -591,7 +513,7 @@ end
 
 local function PeakLines(lines)
 	lines[#lines + 1] = '-- Worst frames by unit frame time --'
-	for _, frame in ipairs(worstFrames) do
+	for _, frame in ipairs(session.worstFrames) do
 		lines[#lines + 1] = format('  +%s%s: %.1fms. Units: %s. Events: %s. Handlers: %s.',
 			Clock(frame.at), frame.combat and ' in combat' or '', frame.ms, Or(frame.units), Or(frame.events), Or(frame.handlers))
 	end
@@ -626,28 +548,25 @@ local function Build()
 	return lines, preview
 end
 
-local function ResetSession()
+local function ResetOwnState()
 	for _, map in ipairs(SESSION_TABLES) do wipe(map) end
-	startedAt, stoppedAt = GetTime(), nil
-	frameAt, frameMs, spanTop, currentSecond = nil, 0, 0, 0
 	secondMs, secondEvents, peakMs, peakMsAt, peakEvents, peakEventsAt = 0, 0, 0, 0, 0, 0
-	totalMs, combatMs, busyFrames, draws, watched, frameCount = 0, 0, 0, 0, 0, 0
+	draws, watched, frameCount = 0, 0, 0
 	currentEvent, currentUnit = nil, nil
-	inCombat, combatSince, combatTime = InCombatLockdown(), startedAt, 0
-	zoneAtStart, clockAtStart, groupAtStart = GetRealZoneText(), date('%H:%M'), GroupText()
+	groupAtStart = GroupText()
 end
 
 local function WatchAll()
-	Unswap()
+	session:Unswap()
 	wipe(watchedBars)
 	wipe(countedTexts)
 	wipe(unwatched)
 	watched = 0
 	frameCount = #oUF.objects
 	for _, object in ipairs(oUF.objects) do WatchObject(object) end
-	Swap(Engine, 'Configure', AuraWrapper(Engine.Configure, 'auras', 'aurasMs'))
-	Swap(Engine, 'ConfigureSets', AuraWrapper(Engine.ConfigureSets, 'auras', 'aurasMs'))
-	Swap(Engine, 'BindUnit', AuraWrapper(Engine.BindUnit, 'binds', 'bindsMs'))
+	session:Swap(Engine, 'Configure', AuraWrapper(Engine.Configure, 'auras', 'aurasMs'))
+	session:Swap(Engine, 'ConfigureSets', AuraWrapper(Engine.ConfigureSets, 'auras', 'aurasMs'))
+	session:Swap(Engine, 'BindUnit', AuraWrapper(Engine.BindUnit, 'binds', 'bindsMs'))
 end
 
 local spawnHooked = false
@@ -665,35 +584,28 @@ function UnitFrameProfiler.Start()
 		spawnHooked = true
 		oUF:RegisterInitCallback(OnSpawn)
 	end
-	ResetSession()
+	ResetOwnState()
+	session:Start()
 	running = true
 	WatchAll()
 	Profiler.WatchUnitFrames(WATCHER)
 	Profiler.AddTracer(Trace)
-	BUI.Events:Register('PLAYER_REGEN_DISABLED', EVENT_KEY, OnCombatStart)
-	BUI.Events:Register('PLAYER_REGEN_ENABLED', EVENT_KEY, OnCombatEnd)
 	return true
 end
 
 function UnitFrameProfiler.Stop()
-	if frameAt then CloseFrame() end
-	CloseSecond()
-	OnCombatEnd()
+	session:Stop()
 	running = false
-	stoppedAt = GetTime()
-	frameAt = nil
 	Profiler.WatchUnitFrames(nil)
 	Profiler.RemoveTracer(Trace)
-	Unswap()
-	BUI.Events:Unregister('PLAYER_REGEN_DISABLED', EVENT_KEY)
-	BUI.Events:Unregister('PLAYER_REGEN_ENABLED', EVENT_KEY)
 end
 
 function UnitFrameProfiler.Reset()
-	ResetSession()
-	if running then WatchAll() else startedAt = nil end
+	ResetOwnState()
+	session:Reset()
+	if running then WatchAll() else session.startedAt = nil end
 end
 
 function UnitFrameProfiler.Report()
-	if startedAt then return Build() end
+	if session.startedAt then return Build() end
 end
