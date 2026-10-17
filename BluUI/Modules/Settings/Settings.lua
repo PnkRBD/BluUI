@@ -12,6 +12,8 @@ local ActiveToggles = {}
 
 local LastLoot = 0
 
+local LFG_CATEGORIES = { LE_LFG_CATEGORY_LFD, LE_LFG_CATEGORY_LFR, LE_LFG_CATEGORY_RF, LE_LFG_CATEGORY_SCENARIO, LE_LFG_CATEGORY_FLEXRAID }
+
 local function EventToggle(key, events, handler, cleanup)
     local eventList = type(events) == "string" and { events } or events
     local toggleKey = 'Settings.' .. key
@@ -32,10 +34,8 @@ local function EventToggle(key, events, handler, cleanup)
     end
 end
 
-local function HideFrameToggle(key, getFrame)
+local function HideFrameToggle(frame)
     return function(_, enabled)
-        local frame = getFrame()
-        if not frame then return end
         if enabled then
             frame:Hide()
             if not AceHook.IsHooked(BUI, frame, "OnShow") then
@@ -82,7 +82,7 @@ local function IsBNetFriend(name, guid)
 		local numAccounts = C_BattleNet.GetFriendNumGameAccounts(friendIndex)
 		for accountIndex = 1, numAccounts do
 			local info = C_BattleNet.GetFriendGameAccountInfo(friendIndex, accountIndex)
-			if info and info.clientProgram == 'WoW' then
+			if info and info.clientProgram == BNET_CLIENT_WOW then
 				if guid and info.playerGuid and info.playerGuid == guid then return true end
 				if info.characterName == name then return true end
 			end
@@ -105,14 +105,13 @@ local function IsGuildMember(name, guid)
 end
 
 local function IsInLFGQueue()
-	for _, category in ipairs({ LE_LFG_CATEGORY_LFD, LE_LFG_CATEGORY_LFR, LE_LFG_CATEGORY_RF,
-	                        LE_LFG_CATEGORY_SCENARIO, LE_LFG_CATEGORY_FLEXRAID }) do
+	for _, category in ipairs(LFG_CATEGORIES) do
 		if GetLFGMode(category) then return true end
 	end
 	return false
 end
 
-function Settings.IsFriendly(fullName, guid)
+local function IsFriendly(fullName, guid)
 	if not fullName then return false end
 	local name = StripRealm(fullName)
 	if not name or name == '' then return false end
@@ -131,7 +130,7 @@ Settings.ToggleAutoRepair = EventToggle('repair', 'MERCHANT_SHOW', function()
 	local db = BUI.GetDB()
 	local usedGuild = false
 	if db.automation.autoRepairGuildFunds and IsInGuild() and CanGuildBankRepair() then
-		RepairAllItems(1)
+		RepairAllItems(true)
 		usedGuild = true
 	end
 	RepairAllItems()
@@ -141,49 +140,11 @@ Settings.ToggleAutoRepair = EventToggle('repair', 'MERCHANT_SHOW', function()
 	end
 end)
 
-do
-    local sellActive = false
-
-    local function SellNext()
-        if not sellActive or not (MerchantFrame and MerchantFrame:IsShown()) then
-            sellActive = false
-            return
-        end
-        for bag = 0, 4 do
-            for slot = 1, C_Container.GetContainerNumSlots(bag) do
-                local info = C_Container.GetContainerItemInfo(bag, slot)
-                if info and info.quality == Enum.ItemQuality.Poor and not info.hasNoValue then
-                    C_Container.UseContainerItem(bag, slot)
-                    After("Settings.Settings sell junk", 0.2, SellNext)
-                    return
-                end
-            end
-        end
-        sellActive = false
+Settings.ToggleSellJunk = EventToggle("junk", "MERCHANT_SHOW", function()
+    if C_MerchantFrame.IsSellAllJunkEnabled() and C_MerchantFrame.GetNumJunkItems() > 0 then
+        C_MerchantFrame.SellAllJunkItems()
     end
-
-    local function StopSelling()
-        sellActive = false
-        BUI.Events:Unregister("UI_ERROR_MESSAGE", "Settings.junkSell")
-    end
-
-    local function OnSellError(_, _, errorMsg)
-        if errorMsg == ERR_VENDOR_DOESNT_BUY or errorMsg == ERR_TOO_MUCH_GOLD then
-            StopSelling()
-        end
-    end
-
-    Settings.ToggleSellJunk = EventToggle("junk", { "MERCHANT_SHOW", "MERCHANT_CLOSED" }, function(event)
-        if event == "MERCHANT_SHOW" then
-            StopSelling()
-            sellActive = true
-            BUI.Events:Register("UI_ERROR_MESSAGE", "Settings.junkSell", OnSellError)
-            After("Settings.Settings sell junk start", 0.3, SellNext)
-        elseif event == "MERCHANT_CLOSED" then
-            StopSelling()
-        end
-    end, StopSelling)
-end
+end)
 
 Settings.ToggleAutoKeystone = EventToggle("keystone", "CHALLENGE_MODE_KEYSTONE_RECEPTABLE_OPEN", function()
     for bag = 0, 4 do
@@ -223,21 +184,13 @@ do
 	end
 
 	local function QuestRequiresCurrency()
-		for itemIndex = 1, 6 do
+		for itemIndex = 1, MAX_REQUIRED_ITEMS do
 			local progressItem = _G['QuestProgressItem' .. itemIndex]
-			if progressItem and progressItem:IsShown() and progressItem.type == 'required' then
+			if progressItem:IsShown() and progressItem.type == 'required' then
 				if progressItem.objectType == 'currency' then return true end
 				if progressItem.objectType == 'item' then
 					local _, _, _, _, _, itemID = GetQuestItemInfo('required', itemIndex)
-					if itemID then
-						local info = C_Item.GetItemInfo(itemID)
-						local isCraftingReagent = type(info) == 'table' and info.isCraftingReagent
-						if not isCraftingReagent then
-							local _,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_, craftingReagent = C_Item.GetItemInfo(itemID)
-							isCraftingReagent = craftingReagent
-						end
-						if isCraftingReagent then return true end
-					end
+					if itemID and select(17, C_Item.GetItemInfo(itemID)) then return true end
 				end
 			end
 		end
@@ -271,9 +224,8 @@ do
 			end
 		else
 			if WantComplete() then
-				local activeQuests = C_GossipInfo.GetActiveQuests()
-				for _, info in ipairs(activeQuests) do
-					if info.title and info.isComplete and info.questID then
+				for _, info in ipairs(C_GossipInfo.GetActiveQuests()) do
+					if info.isComplete then
 						C_GossipInfo.SelectActiveQuest(info.questID)
 						return
 					end
@@ -281,19 +233,16 @@ do
 			end
 			if WantAccept() and not IsQuestLogFull() then
 				local availableQuests = C_GossipInfo.GetAvailableQuests()
-				for _, info in ipairs(availableQuests) do
-					if info.questID then
-						C_GossipInfo.SelectAvailableQuest(info.questID)
-						return
-					end
+				if availableQuests[1] then
+					C_GossipInfo.SelectAvailableQuest(availableQuests[1].questID)
+					return
 				end
 			end
 			if WantAccept() then
-				local options = C_GossipInfo.GetOptions()
-				for _, option in ipairs(options) do
+				for _, option in ipairs(C_GossipInfo.GetOptions()) do
 					if option.gossipOptionID then
-						local isQuestFlagged = option.flags and bit.band(option.flags, 1) == 1
-						local isDelve = option.name and option.name:find('%(Delve%)') ~= nil
+						local isQuestFlagged = FlagsUtil.IsSet(option.flags, Enum.GossipOptionRecFlags.QuestLabelPrepend)
+						local isDelve = option.name:find('%(Delve%)') ~= nil
 						if isQuestFlagged or isDelve then
 							C_GossipInfo.SelectOption(option.gossipOptionID)
 							return
@@ -307,35 +256,23 @@ do
 	local function DeferredComplete()
 		completePending = false
 		if IsShiftKeyDown() or InCombatLockdown() then return end
-		if QuestRequiresGold() then return end
-		if QuestRequiresCurrency() then return end
+		if QuestRequiresGold() or QuestRequiresCurrency() then return end
 		local choices = GetNumQuestChoices()
 		if choices <= 1 then
 			GetQuestReward(choices)
-		else
-			local bestIndex, bestPrice = 1, 0
-			for choiceIndex = 1, choices do
-				local link = GetQuestItemLink('choice', choiceIndex)
-				if link then
-					local itemID = tonumber(link:match('item:(%d+)'))
-					if itemID then
-						local result = C_Item.GetItemInfo(itemID)
-						local sellValue = 0
-						if type(result) == 'table' then
-							sellValue = result.sellPrice or 0
-						else
-							local _,_,_,_,_,_,_,_,_,_, vendorPrice = C_Item.GetItemInfo(itemID)
-							sellValue = vendorPrice or 0
-						end
-						if sellValue > bestPrice then
-							bestPrice = sellValue
-							bestIndex = choiceIndex
-						end
-					end
-				end
-			end
-			GetQuestReward(bestIndex)
+			return
 		end
+		local bestIndex, bestPrice = 1, 0
+		for choiceIndex = 1, choices do
+			local link = GetQuestItemLink('choice', choiceIndex)
+			local itemID = link and tonumber(link:match('item:(%d+)'))
+			local sellValue = itemID and select(11, C_Item.GetItemInfo(itemID)) or 0
+			if sellValue > bestPrice then
+				bestPrice = sellValue
+				bestIndex = choiceIndex
+			end
+		end
+		GetQuestReward(bestIndex)
 	end
 
 	local function OnQuestEvent(event, arg1)
@@ -364,13 +301,11 @@ do
 				After('Settings.Settings quest complete', 0, DeferredComplete)
 			end
 		elseif event == 'QUEST_AUTOCOMPLETE' and WantComplete() then
-			local index = arg1 and C_QuestLog.GetLogIndexForQuestID(arg1)
-			if index then
-				local info = C_QuestLog.GetInfo(index)
-				if info and info.isAutoComplete then
-					C_QuestLog.SetSelectedQuest(arg1)
-					ShowQuestComplete(C_QuestLog.GetSelectedQuest())
-				end
+			local index = C_QuestLog.GetLogIndexForQuestID(arg1)
+			local info = index and C_QuestLog.GetInfo(index)
+			if info and info.isAutoComplete then
+				C_QuestLog.SetSelectedQuest(arg1)
+				ShowQuestComplete(arg1)
 			end
 		end
 	end
@@ -397,32 +332,26 @@ do
 
 	local function CreateOverlayCheckbox(parent, label, dbKey, tooltip)
 		local checkbox = Controls.StampCheckbox(parent, label, false, function(checked)
-			local db = GetDB()
-			db[dbKey] = checked
+			GetDB()[dbKey] = checked
 			UpdateRegistration()
 			local pageSync = Settings._pageToggles and Settings._pageToggles[dbKey]
 			if pageSync then pageSync(checked) end
 		end, nil, true, tooltip, 'compact')
 		local frame = Widget.Unwrap(checkbox)
 		frame.dbKey = dbKey
-		frame.labelFs = frame.label
-		frame.Sync = function(checked) checkbox:SetValue(checked) end
 		return frame
 	end
 
 	local function SyncOverlay()
 		local db = GetDB()
 		for _, checkbox in ipairs(overlayCheckboxes) do
-			checkbox.Sync(db[checkbox.dbKey] or false)
+			checkbox:SetValue(db[checkbox.dbKey])
 		end
 	end
 
-	local overlayCreated = false
 	local overlayHolder
-	local function CreateOverlay()
-		if overlayCreated then return end
-		overlayCreated = true
 
+	local function CreateOverlay()
 		overlayHolder = CreateFrame('Frame', nil, ObjectiveTrackerFrame, 'BackdropTemplate')
 		local holder = overlayHolder
 		holder:SetHeight(Pixel.Scale(38))
@@ -438,7 +367,7 @@ do
 		for _, item in ipairs(items) do
 			local checkbox = CreateOverlayCheckbox(holder, item[1], item[2], item[3])
 			if previousCheckbox then
-				checkbox:SetPoint('LEFT', previousCheckbox.labelFs, 'RIGHT', Pixel.Scale(14), 0)
+				checkbox:SetPoint('LEFT', previousCheckbox.label, 'RIGHT', Pixel.Scale(14), 0)
 			else
 				checkbox:SetPoint('LEFT', holder, 'LEFT', Pixel.Scale(8), 0)
 			end
@@ -449,9 +378,7 @@ do
 		SyncOverlay()
 	end
 
-	BUI.Events:Once('PLAYER_ENTERING_WORLD', 'QuestOverlay', function()
-		CreateOverlay()
-	end)
+	BUI.Events:Once('PLAYER_ENTERING_WORLD', 'QuestOverlay', CreateOverlay)
 
 	local function QuestToggle()
 		UpdateRegistration()
@@ -475,17 +402,16 @@ end
 
 Settings.ToggleAutoAcceptParty = EventToggle('party', 'PARTY_INVITE_REQUEST', function(_, inviter, _, _, _, _, _, guid)
 	if IsInLFGQueue() then return end
-	if Settings.IsFriendly(inviter, guid) then
+	if IsFriendly(inviter, guid) then
 		AcceptGroup()
 		StaticPopup_Hide('PARTY_INVITE')
-		StaticPopup_Hide('PARTY_INVITE_XREALM')
 	end
 end)
 
 local roleCheckHooked = false
 
 Settings.ToggleAutoConfirmRole = function(_, enabled)
-	if not enabled or roleCheckHooked or not LFDRoleCheckPopupAcceptButton then return end
+	if not enabled or roleCheckHooked then return end
 	roleCheckHooked = true
 	LFDRoleCheckPopupAcceptButton:HookScript('OnShow', BUI.Profiler.Wrap('Settings.Settings role check', function(self)
 		if not BUI.GetDB().social.autoConfirmRole then return end
@@ -494,22 +420,15 @@ Settings.ToggleAutoConfirmRole = function(_, enabled)
 end
 
 Settings.ToggleEasyItemDestroy = EventToggle("destroy", "DELETE_ITEM_CONFIRM", function()
-    if StaticPopup1EditBox and StaticPopup1Button1 then StaticPopup1EditBox:Hide(); StaticPopup1Button1:Enable() end
+    StaticPopup1EditBox:Hide()
+    StaticPopup1Button1:Enable()
 end)
 
-Settings.ToggleHideTalkingFrame = HideFrameToggle("talkinghead", function()
-    return TalkingHeadFrame
-end)
+Settings.ToggleHideTalkingFrame = HideFrameToggle(TalkingHeadFrame)
 
-Settings.ToggleHideRestedSleep = HideFrameToggle("restedsleep", function()
-    return PlayerFrame.PlayerRestIcon or
-        (PlayerFrame.PlayerFrameContent and PlayerFrame.PlayerFrameContent.PlayerFrameContentContextual and
-            PlayerFrame.PlayerFrameContent.PlayerFrameContentContextual.PlayerRestIcon)
-end)
+Settings.ToggleHideRestedSleep = HideFrameToggle(PlayerFrame.PlayerFrameContent.PlayerFrameContentContextual.PlayerRestLoop)
 
-Settings.ToggleHideZoneText = HideFrameToggle("zonetext", function()
-    return ZoneTextFrame
-end)
+Settings.ToggleHideZoneText = HideFrameToggle(ZoneTextFrame)
 
 Settings.ToggleHideErrorMessages = function(_, enabled)
     if enabled then UIErrorsFrame:UnregisterEvent("UI_ERROR_MESSAGE")
@@ -518,22 +437,8 @@ end
 
 Settings.ToggleCastOnKeyDown = CVarToggle("ActionButtonUseKeyDown")
 
-local function CVarExists(cvar) return C_CVar.GetCVar(cvar) ~= nil end
-local fctNameCache = {}
-function Settings.ResolveFCTCVar(cvar)
-    local cached = fctNameCache[cvar]
-    if cached then return cached end
-    local v2 = cvar .. '_v2'
-    cached = CVarExists(v2) and v2 or cvar
-    fctNameCache[cvar] = cached
-    return cached
-end
-
-function Settings.GetFCTBool(cvar) return C_CVar.GetCVarBool(Settings.ResolveFCTCVar(cvar)) end
-function Settings.GetFCT(cvar)     return C_CVar.GetCVar(Settings.ResolveFCTCVar(cvar))     end
-
 function Settings.SetFCT(cvar, value)
-    C_CVar.SetCVar(Settings.ResolveFCTCVar(cvar), value)
+    C_CVar.SetCVar(cvar, value)
     if C_CVar.GetCVarBool('enableFloatingCombatText') then
         C_CVar.SetCVar('enableFloatingCombatText', 0)
         C_CVar.SetCVar('enableFloatingCombatText', 1)
@@ -573,7 +478,6 @@ end
 
 Settings.ToggleFasterMovieSkip = function(_, enabled)
     local function hookSkip(frame, button)
-        if not frame or not button then return end
         if enabled then
             if not AceHook.IsHooked(BUI, frame, "OnKeyUp") then
                 AceHook.HookScript(BUI, frame, "OnKeyUp", function(_, key)
@@ -582,7 +486,7 @@ Settings.ToggleFasterMovieSkip = function(_, enabled)
             end
             if not AceHook.IsHooked(BUI, frame, "OnShow") then
                 AceHook.HookScript(BUI, frame, "OnShow", function()
-                    After("Settings.Settings movie skip", 0, function() if frame:IsShown() and button then button:Click() end end)
+                    After("Settings.Settings movie skip", 0, function() if frame:IsShown() then button:Click() end end)
                 end)
             end
         else
@@ -591,13 +495,13 @@ Settings.ToggleFasterMovieSkip = function(_, enabled)
         end
     end
     hookSkip(CinematicFrame, CinematicFrameCloseDialogConfirmButton)
-    hookSkip(MovieFrame, MovieFrame and MovieFrame.CloseDialog and MovieFrame.CloseDialog.ConfirmButton)
+    hookSkip(MovieFrame, MovieFrame.CloseDialog.ConfirmButton)
 end
 
 function Settings:Initialize()
     local db = BUI.GetDB()
 
-    SetCVar("UberTooltips", 1)
+    C_CVar.SetCVar("UberTooltips", "1")
 
     local toggles = {
         { db.automation, "fasterLooting", "ToggleFasterLooting" },
@@ -620,31 +524,18 @@ function Settings:Initialize()
 
     for _, toggle in ipairs(toggles) do
         local settingsTable, key, toggleName = toggle[1], toggle[2], toggle[3]
-        if settingsTable[key] ~= nil then
-            Settings[toggleName](nil, settingsTable[key])
-        end
+        Settings[toggleName](nil, settingsTable[key])
     end
 
     if db.automation.spellQueueWindow then
         Settings.SetSpellQueueWindow(nil, db.automation.spellQueueWindow)
-    end
-
-    for _, section in ipairs(Settings.checkboxSections) do
-        for _, item in ipairs(section.items) do
-            if item.cvar and not item.toggle and not item.fn and item.type ~= 'slider' then
-                local settingsTable = item.db and db[item.db]
-                if settingsTable and settingsTable[item.key] ~= nil then
-                    C_CVar.SetCVar(item.cvar, settingsTable[item.key] and '1' or '0')
-                end
-            end
-        end
     end
 end
 
 Settings.checkboxSections = {
     { header = "Looting", items = {
         { db = "automation", key = "fasterLooting", label = "Faster Looting", toggle = "ToggleFasterLooting" },
-        { db = "automation", key = "autoLoot", label = "Auto-Loot All", cvar = "autoLootDefault" },
+        { label = "Auto-Loot All", cvar = "autoLootDefault" },
         { db = "automation", key = "sellJunk", label = "Auto-Sell Junk", toggle = "ToggleSellJunk" },
     }},
     { header = "Merchant", items = {
@@ -676,13 +567,13 @@ Settings.checkboxSections = {
         { type = "button", label = "Indicator Position", sub = "Unlock it, drag it into place, lock it again", buttonText = "Unlock / Lock", fn = "MoveCombatLogIndicator" },
     }},
     { header = "Target Combat Text", items = {
-        { fct = true, cvar = "floatingCombatTextCombatDamage",                label = "Damage Numbers" },
-        { fct = true, cvar = "floatingCombatTextCombatHealing",               label = "Healing Numbers" },
-        { fct = true, cvar = "floatingCombatTextCombatLogPeriodicSpells",     label = "Periodic Spells" },
-        { fct = true, cvar = "floatingCombatTextPetMeleeDamage",              label = "Pet Damage" },
-        { fct = true, cvar = "floatingCombatTextCombatHealingAbsorbTarget",   label = "Healing Absorbs" },
-        { fct = true, cvar = "floatingCombatTextCombatDamageDirectionalScale", label = "Directional Damage" },
-        { fct = true, type = "slider", cvar = "WorldTextScale", label = "World Text Scale", sub = "Size of the floating numbers", min = 0.5, max = 2.5, step = 0.1 },
+        { fct = true, cvar = "floatingCombatTextCombatDamage_v2",                label = "Damage Numbers" },
+        { fct = true, cvar = "floatingCombatTextCombatHealing_v2",               label = "Healing Numbers" },
+        { fct = true, cvar = "floatingCombatTextCombatLogPeriodicSpells_v2",     label = "Periodic Spells" },
+        { fct = true, cvar = "floatingCombatTextPetMeleeDamage_v2",              label = "Pet Damage" },
+        { fct = true, cvar = "floatingCombatTextCombatHealingAbsorbTarget_v2",   label = "Healing Absorbs" },
+        { fct = true, cvar = "floatingCombatTextCombatDamageDirectionalScale_v2", label = "Directional Damage" },
+        { fct = true, type = "slider", cvar = "WorldTextScale_v2", label = "World Text Scale", sub = "Size of the floating numbers", min = 0.5, max = 2.5, step = 0.1 },
     }},
     { header = "Social", items = {
         { db = "social", key = "autoAcceptParty", label = "Auto-Accept Party", toggle = "ToggleAutoAcceptParty" },
