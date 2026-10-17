@@ -4,7 +4,6 @@ local ipairs = ipairs
 
 local Skin = BUI.Skinning
 
-local SLOT_ART_KEYS = { 'Border', 'ShowEquippedIcon' }
 local SLOT_KEEP_KEYS = { 'Icon', 'DisabledIcon', 'HiddenVisualIcon' }
 local SLOT_POOLS = { 'CharacterAppearanceSlotFramePool', 'CharacterIllusionSlotFramePool' }
 local TOGGLE_KEYS = { 'HideIgnoredToggle', 'SheatheWeaponToggle', 'PreviewedWeaponToggle' }
@@ -21,7 +20,7 @@ local SITUATIONS = { textX = 29, textY = -75, defaultsX = -29, defaultsY = -72 }
 
 local context = Skin.Define('transmog', {
 	name = 'Transmogrify',
-	description = 'The transmogrifier at the vendor: outfit cards, framed slot icons around the model, item and set cards with a white edge on the applied look, and the appearance tabs on the house tab strip.',
+	description = 'The transmogrifier at the vendor: outfit cards, framed slot icons around the model, item and set cards with a white edge on the applied look, and the appearance tabs on the library tab strip.',
 	icon = 'Interface/Icons/INV_Arcane_Orb',
 	newLook = true,
 })
@@ -29,15 +28,7 @@ local Hook = context.Hook
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
 local Shell, Button, Card, CheckBox = context.Shell, context.Button, context.Card, context.CheckBox
 local TextDropdown, EditBox, ScrollBar = context.TextDropdown, context.EditBox, context.ScrollBar
-local Body, Title = context.Body, context.Title
-local CropIcon = Skin.CropIcon
-
-local function KeepKeys(frame, keys)
-	for _, key in ipairs(keys) do
-		local texture = frame[key]
-		if texture then texture.__buiSkin = true end
-	end
-end
+local Body, Title, Keep, Paging = context.Body, context.Title, context.Keep, context.Paging
 
 local function ActiveIconEdge(icon, active)
 	if active then
@@ -45,11 +36,6 @@ local function ActiveIconEdge(icon, active)
 	else
 		Skin.SetIconEdgeColor(icon)
 	end
-end
-
-local function FramedIcon(owner, icon)
-	CropIcon(icon)
-	Skin.TipIconFrame(owner, icon)
 end
 
 local function PaintOutfit(entry)
@@ -64,16 +50,16 @@ local function PaintOutfit(entry)
 end
 
 local function SkinOutfit(entry)
+	local icon = entry.OutfitIcon
 	if not entry._buiOutfit then
 		entry._buiOutfit = true
-		local icon = entry.OutfitIcon
-		Fade(icon.Border)
-		Fade(icon.OverlayActive)
-		Fade(icon:GetHighlightTexture())
-		FramedIcon(icon, icon.Icon)
-		FadeKeys(entry.OutfitButton, OUTFIT_ART)
+		Skin.SquareIcon(icon, icon.Icon)
 		Hook(entry, 'SetSelected', PaintOutfit)
 	end
+	Fade(icon.Border)
+	Fade(icon.OverlayActive)
+	Fade(icon:GetHighlightTexture())
+	FadeKeys(entry.OutfitButton, OUTFIT_ART)
 	Card(entry.OutfitButton)
 	PaintOutfit(entry)
 end
@@ -84,13 +70,13 @@ local function SkinOutfits(outfits)
 	local spell = outfits.ShowEquippedGearSpellFrame
 	Fade(spell.Button.Border)
 	Fade(spell.OverlayFX.OverlayActive)
-	FramedIcon(spell.Button, spell.Button.Icon)
+	Skin.SquareIcon(spell.Button, spell.Button.Icon)
 	Title(spell.Label)
 	FadeRegions(outfits.OutfitList)
 	ScrollBar(outfits.OutfitList.ScrollBar)
 	Skin.SweepScrollBox(outfits.OutfitList.ScrollBox, context.Guard(SkinOutfit))
 	local purchase = outfits.PurchaseOutfitButton
-	purchase.Icon.__buiSkin = true
+	Keep(purchase.Icon)
 	Button(purchase)
 	Button(outfits.SaveOutfitButton)
 	FadeRegions(outfits.MoneyFrame)
@@ -103,14 +89,12 @@ end
 local function SkinSlot(slot)
 	if not slot._buiSlot then
 		slot._buiSlot = true
-		KeepKeys(slot, SLOT_KEEP_KEYS)
-		FadeRegions(slot)
-		FadeKeys(slot, SLOT_ART_KEYS)
-		Fade(slot.SelectedFrame.Border)
-		CropIcon(slot.Icon)
-		Skin.TipIconFrame(slot, slot.Icon, 1)
+		for _, key in ipairs(SLOT_KEEP_KEYS) do Keep(slot[key]) end
+		Skin.SquareIcon(slot, slot.Icon, 1)
 		Hook(slot, 'SetSelected', PaintSlot)
 	end
+	FadeRegions(slot)
+	Fade(slot.SelectedFrame.Border)
 	PaintSlot(slot)
 end
 
@@ -128,7 +112,7 @@ local function SkinPreview(preview)
 		CheckBox(toggle.Checkbox)
 		Body(toggle.Text)
 	end
-	preview.ClearAllPendingButton.Icon.__buiSkin = true
+	Keep(preview.ClearAllPendingButton.Icon)
 	Button(preview.ClearAllPendingButton)
 	SweepSlots(preview)
 end
@@ -176,10 +160,7 @@ end
 
 local function SkinPager(paged)
 	local content = paged.PagedContent
-	local controls = content.PagingControls
-	Skin.TipPageButton(controls.PrevPageButton, 'previous')
-	Skin.TipPageButton(controls.NextPageButton, 'next')
-	Body(controls.PageText)
+	Paging(content.PagingControls)
 	Body(content.NoEntriesText)
 end
 
@@ -239,10 +220,7 @@ local function SkinWardrobe(collection)
 end
 
 local function SkinModel(model, art, state)
-	if not model._buiModel then
-		model._buiModel = true
-		FadeKeys(model, art)
-	end
+	FadeKeys(model, art)
 	Card(model)
 	Skin.SetActiveEdge(model, model[state]:IsShown())
 end

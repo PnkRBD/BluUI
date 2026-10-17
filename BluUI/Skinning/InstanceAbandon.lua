@@ -2,19 +2,11 @@ local _, BUI = ...
 
 local Wrap = BUI.Profiler.Wrap
 
-local ipairs = ipairs
 local floor = math.floor
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
+local BUILib = BluUI.BUILibClient
 local Skin = BUI.Skinning
 
-local PREVIEW_DIALOG = 'BUI_INSTANCE_ABANDON_PREVIEW'
-local PREVIEW_DURATION = 60
-local PREVIEW_TIME_LEFT = 42
-local PREVIEW_VOTES = 2
-local PREVIEW_VOTES_NEEDED = 4
-local VOTED_ATLAS = 'ui-lfg-roleicon-generic'
-local WAITING_ATLAS = 'UI-LFG-RoleIcon-Generic-Disabled'
 local BAR_HEIGHT = 2
 local BAR_GAP = 4
 local FILL_INSET = 4
@@ -132,31 +124,3 @@ context.OnDisable(function()
 	fill:SetHeight(BLIZZARD_FILL_HEIGHT)
 	fill:SetAtlas(BLIZZARD_FILL_ATLAS)
 end)
-
-StaticPopupDialogs[PREVIEW_DIALOG] = {
-	text = VOTE_TO_ABANDON_PROMPT,
-	button1 = YES,
-	button2 = NO,
-	whileDead = 1,
-	hideOnEscape = 1,
-	progressBar = 1,
-	GetReservedDialogFrame = Dialog,
-}
-
-context.info.test = function()
-	local votes = _G.InstanceAbandonFrame
-	votes:Show()
-	local dialog = StaticPopup_Show(PREVIEW_DIALOG, nil, nil, nil, votes)
-	if not dialog then return end
-	votes.VoteText:SetFormattedText(VOTE_TO_ABANDON_VOTES_NEEDED, PREVIEW_VOTES_NEEDED)
-	for index, texture in ipairs(votes.StatusFrame.textures) do
-		texture:SetAtlas(index <= PREVIEW_VOTES and VOTED_ATLAS or WAITING_ATLAS)
-	end
-	dialog:Layout()
-	StaticPopup_SetProgressBarTime(dialog, PREVIEW_DURATION, PREVIEW_TIME_LEFT)
-	return dialog
-end
-
-context.info.stopTest = function()
-	StaticPopup_Hide(PREVIEW_DIALOG)
-end

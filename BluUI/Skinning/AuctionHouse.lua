@@ -7,7 +7,6 @@ local Painter = BUI.Painter
 
 local BACKGROUND_KEYS = { 'Background', 'NineSlice' }
 local MONEY_ART = { 'MoneyFrameInset', 'MoneyFrameBorder' }
-local HEADER_ART = { 'Left', 'Middle', 'Right' }
 local SELL_TAB_ART = { 'CreateAuctionTabLeft', 'CreateAuctionTabMiddle', 'CreateAuctionTabRight' }
 local MULTISELL_ART = { 'Fill', 'Left', 'Right', 'Middle' }
 local PROGRESS_ART = { 'DropShadow', 'TextBorder', 'Background', 'Border' }
@@ -21,7 +20,7 @@ local CELL_TEXT_KEYS = { 'Text', 'ExtraInfo', 'Prefix' }
 local MONEY_DENOMINATION_KEYS = { 'GoldDisplay', 'SilverDisplay', 'CopperDisplay' }
 local PRICE_COIN_KEYS = { 'GoldBox', 'SilverBox', 'CopperBox' }
 local BID_COIN_KEYS = { 'gold', 'silver', 'copper' }
-local HOUSE_FONT_PREFIX = 'BUI_AuctionHouseFont'
+local LIBRARY_FONT_PREFIX = 'BUI_AuctionHouseFont'
 local ROW_SELECTED_ALPHA = 0.12
 local ROW_HOVER_ALPHA = 0.08
 local ICON_HOVER_ALPHA = 0.2
@@ -36,7 +35,7 @@ local CONTROL_HEIGHT = 22
 
 local context = Skin.Define('auctionhouse', {
 	name = 'Auction House',
-	description = 'The auction house with card lists, flat tables and house inputs.',
+	description = 'The auction house with card lists, flat tables and library inputs.',
 	icon = 'Interface/Icons/INV_Misc_Coin_01',
 	newLook = true,
 })
@@ -44,38 +43,39 @@ local Hook = context.Hook
 local Fade, FadeKeys, FadeRegions = context.Fade, context.FadeKeys, context.FadeRegions
 local Shell, Button, Card, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Card, context.Dropdown, context.EditBox, context.CheckBox
 local ScrollBar, Tab, Body, Title, Face = context.ScrollBar, context.Tab, context.Body, context.Title, context.Face
-local FlatTexture, SelectedTexture, CropIcon = Skin.FlatTexture, Skin.SelectedTexture, Skin.CropIcon
-local houseFonts, houseFontCount = {}, 0
+local ToolButton, TableHeader = context.ToolButton, context.TableHeader
+local FlatTexture, SelectedTexture = Skin.FlatTexture, Skin.SelectedTexture
+local libraryFonts, libraryFontCount = {}, 0
 
-local function HouseFont(fontObject)
-	local font = houseFonts[fontObject]
+local function LibraryFont(fontObject)
+	local font = libraryFonts[fontObject]
 	if font then return font end
-	houseFontCount = houseFontCount + 1
-	font = CreateFont(HOUSE_FONT_PREFIX .. houseFontCount)
+	libraryFontCount = libraryFontCount + 1
+	font = CreateFont(LIBRARY_FONT_PREFIX .. libraryFontCount)
 	font:CopyFontObject(fontObject)
 	Face(font)
-	houseFonts[fontObject], houseFonts[font] = font, font
+	libraryFonts[fontObject], libraryFonts[font] = font, font
 	return font
 end
 
-local function UseHouseFont(fontString)
+local function UseLibraryFont(fontString)
 	local fontObject = fontString:GetFontObject()
-	local font = HouseFont(fontObject)
+	local font = LibraryFont(fontObject)
 	if font ~= fontObject then fontString:SetFontObject(font) end
 end
 
-local function HoldHouseFont(fontString)
-	if not fontString._buiHouseFont then
-		fontString._buiHouseFont = true
-		Hook(fontString, 'SetFontObject', UseHouseFont)
+local function HoldLibraryFont(fontString)
+	if not fontString._buiLibraryFont then
+		fontString._buiLibraryFont = true
+		Hook(fontString, 'SetFontObject', UseLibraryFont)
 	end
-	UseHouseFont(fontString)
+	UseLibraryFont(fontString)
 end
 
 local function HoldMoney(display)
 	for _, key in ipairs(MONEY_DENOMINATION_KEYS) do
 		local denomination = display[key]
-		HoldHouseFont(denomination.Text)
+		HoldLibraryFont(denomination.Text)
 		denomination:UpdateWidth()
 	end
 end
@@ -95,15 +95,6 @@ local function InputInsets(box, left)
 	return { left = left, top = inset - lift, bottom = inset + lift }
 end
 
-local function SkinIconButton(button, inset)
-	Fade(button:GetNormalTexture())
-	Fade(button:GetPushedTexture())
-	Fade(button:GetDisabledTexture())
-	Fade(button:GetHighlightTexture())
-	Shell(button, inset)
-	Skin.HoverEdge(button)
-end
-
 local function SkinBackgroundFrame(frame)
 	FadeKeys(frame, BACKGROUND_KEYS)
 	Shell(frame)
@@ -116,8 +107,7 @@ end
 
 local function SquareIcon(owner, icon, border)
 	Fade(border)
-	CropIcon(icon)
-	Skin.TipIconFrame(owner, icon)
+	Skin.SquareIcon(owner, icon)
 end
 
 local function SelectedRow(texture)
@@ -192,13 +182,13 @@ local function SkinItemList(list)
 	Body(list.ResultsText)
 	Skin.TipFont(list.LoadingSpinner.SearchingText, 'title', SEARCHING_SCALE)
 	local refresh = list.RefreshFrame
-	SkinIconButton(refresh.RefreshButton)
+	ToolButton(refresh.RefreshButton)
 	Skin.TipFont(refresh.TotalQuantity, 'label')
 end
 
 local function SkinSearchBar(bar)
 	local favorites, box, filter, search = bar.FavoritesSearchButton, bar.SearchBox, bar.FilterButton, bar.SearchButton
-	SkinIconButton(favorites, BarInset(favorites))
+	ToolButton(favorites, BarInset(favorites))
 	EditBox(box, BarInsets(box))
 	Skin.TipFont(box.Instructions, 'label')
 	Shell(filter, BarInsets(filter))
@@ -282,7 +272,7 @@ end
 local function SkinTokenResults(frame)
 	SkinBackgroundFrame(frame)
 	Skin.TipFont(frame.BuyoutLabel, 'label')
-	HoldHouseFont(frame.BuyoutPrice)
+	HoldLibraryFont(frame.BuyoutPrice)
 	SkinItemDisplay(frame.TokenDisplay)
 	Button(frame.Buyout)
 	ScrollBar(frame.DummyScrollBar)
@@ -291,12 +281,12 @@ end
 local function SkinTokenSell(frame)
 	SkinSellBase(frame)
 	Skin.TipFont(frame.BuyoutPriceLabel, 'label')
-	HoldHouseFont(frame.MarketPrice)
+	HoldLibraryFont(frame.MarketPrice)
 	Skin.TipFont(frame.EstimatedTime, 'label')
 	Body(frame.TimeToSell)
 	SkinBackgroundFrame(frame.DummyItemList)
 	ScrollBar(frame.DummyItemList.DummyScrollBar)
-	SkinIconButton(frame.DummyRefreshButton)
+	ToolButton(frame.DummyRefreshButton)
 end
 
 local function SkinMultisell(frame)
@@ -306,8 +296,7 @@ local function SkinMultisell(frame)
 	Shell(frame)
 	Shell(bar, PROGRESS_EDGE)
 	Painter.Fill(bar:GetStatusBarTexture(), 'skinTitle')
-	CropIcon(bar.Icon)
-	Skin.TipIconFrame(bar, bar.Icon)
+	Skin.SquareIcon(bar, bar.Icon)
 	Body(bar.Text)
 	context.Close(frame.CancelButton)
 end
@@ -374,7 +363,7 @@ local function SkinCell(cell)
 	cell._buiCell = true
 	for _, key in ipairs(CELL_TEXT_KEYS) do
 		local text = cell[key]
-		if text then HoldHouseFont(text) end
+		if text then HoldLibraryFont(text) end
 	end
 	if cell.MoneyDisplay then HoldMoney(cell.MoneyDisplay) end
 	if cell.Icon and cell.IconBorder then SquareIcon(cell, cell.Icon, cell.IconBorder) end
@@ -383,15 +372,6 @@ end
 local function OnCellsArranged(_, row)
 	if not row.GetItemList then return end
 	for _, cell in ipairs(row.cells) do SkinCell(cell) end
-end
-
-local function OnHeaderInit(header)
-	if header._buiHeader then return end
-	header._buiHeader = true
-	FadeKeys(header, HEADER_ART)
-	Fade(header:GetHighlightTexture())
-	Skin.TipFont(header.Text, 'label')
-	Painter.Tint(header.Arrow, 'skinTitle')
 end
 
 local function OnSummaryLine(line)
@@ -419,7 +399,7 @@ local function InstallFrame(frame)
 	Hook('AuctionHouseFilterButton_SetUp', OnCategoryButton)
 	Hook(AuctionHouseItemListLineMixin, 'Populate', OnRowPopulated)
 	Hook(TableBuilderMixin, 'ArrangeCells', OnCellsArranged)
-	Hook(AuctionHouseTableHeaderStringMixin, 'Init', OnHeaderInit)
+	Hook(AuctionHouseTableHeaderStringMixin, 'Init', TableHeader)
 	Hook(AuctionHouseAuctionsSummaryLineMixin, 'Init', OnSummaryLine)
 	Hook(AuctionHouseAuctionsSummaryLineMixin, 'SetSelected', Skin.SetActiveEdge)
 	Hook('PanelTemplates_UpdateTabs', OnTabsUpdated)

@@ -6,13 +6,14 @@ local Wrap = BUI.Profiler.Wrap
 BUI.Skinning = {}
 local Skin = BUI.Skinning
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
-local Colors = BUILib.Colors
+local BUILib = BluUI.BUILibClient
 local Painter = BUI.Painter
 
 local toggleCallbacks = {}
 local skinRegistry = {}
 local skinOrder = {}
+local orderDirty = false
+local RefreshPalette
 
 function Skin.OnToggle(name, callback)
 	if not toggleCallbacks[name] then toggleCallbacks[name] = {} end
@@ -20,28 +21,31 @@ function Skin.OnToggle(name, callback)
 end
 
 local function SkinSortName(id)
-	local info = skinRegistry[id]
-	return ((info and info.name) or id):lower()
+	return (skinRegistry[id].name or id):lower()
 end
 
 function Skin.RegisterSkin(id, info)
 	skinRegistry[id] = info
 	skinOrder[#skinOrder + 1] = id
-	table.sort(skinOrder, function(a, b) return SkinSortName(a) < SkinSortName(b) end)
+	orderDirty = true
+end
+
+local function SortedOrder()
+	if orderDirty then
+		orderDirty = false
+		table.sort(skinOrder, function(a, b) return SkinSortName(a) < SkinSortName(b) end)
+	end
+	return skinOrder
 end
 
 function Skin.GetSkinRegistry()
-	return skinRegistry, skinOrder
+	return skinRegistry, SortedOrder()
 end
 
 local function GetSkinDB()
 	local db = BUI.GetDB()
 	if not db.skinning then db.skinning = {} end
 	return db.skinning
-end
-
-function Skin.IsEnabled()
-	return true
 end
 
 function Skin.IsSkinEnabled(id)
@@ -66,7 +70,7 @@ for _, id in ipairs({
 	'instanceabandon', 'itemsocketing', 'itemupgrade', 'journeys', 'loothistory', 'lootwindow', 'mail',
 	'professions', 'questdialogs', 'queuepopups', 'readycheck', 'spellbook', 'splash', 'staticpopup', 'systempanels',
 	'trade', 'transmog', 'travel', 'worldmap', 'characterFrame', 'chat', 'gameMenu', 'menus',
-	'merchant', 'objectivetracker', 'trainer', 'petstable', 'playerchoice', 'pvpmatch', 'renown', 'keybinds',
+	'merchant', 'objectivetracker', 'trainer', 'petstable', 'playerchoice', 'pvpmatch',
 	'currencytransfer', 'housing', 'tradingpost', 'catalogshop', 'landingpage', 'barbershop', 'iteminteraction',
 	'clock', 'tabard', 'petition', 'help', 'talkinghead', 'guildregistrar', 'bnetToast', 'petBattle',
 	'currencyManager', 'portalManager', 'reputationManager', 'questoverlay', 'guildinvite',
@@ -92,12 +96,11 @@ function Skin.SeedSkinStates()
 			skinDB[id] = true
 		end
 	end
-	for _, id in ipairs(skinOrder) do
+	for _, id in ipairs(SortedOrder()) do
 		if not seen[id] then
 			seen[id] = true
 			if skinDB[id] == nil then
-				local info = skinRegistry[id]
-				local legacy = info and info.legacy
+				local legacy = skinRegistry[id].legacy
 				if legacy and skinDB[legacy] == false then
 					skinDB[id] = false
 				elseif firstRun and (not hadKeys or BASELINE_SKINS[id]) then
@@ -109,18 +112,12 @@ function Skin.SeedSkinStates()
 			end
 		end
 	end
-	skinDB.miscpanels = nil
-	skinDB.shop = nil
-	skinDB.micromenu = nil
-	skinDB.combatalerts = nil
-	skinDB.lossofcontrol = nil
 end
 
-local RELOAD_HINT = ' /reload for a full visual reset.'
-
 local function ApplySkinState(id, enabled)
-	GetSkinDB()[id] = enabled
-	ClearNew(GetSkinDB(), id)
+	local skinDB = GetSkinDB()
+	skinDB[id] = enabled
+	ClearNew(skinDB, id)
 	local list = toggleCallbacks[id]
 	if list then
 		for _, callback in ipairs(list) do callback(enabled) end
@@ -128,21 +125,18 @@ local function ApplySkinState(id, enabled)
 end
 
 function Skin.SetSkinEnabled(id, enabled)
-	enabled = enabled and true or false
-	ApplySkinState(id, enabled)
-	if not enabled then BUI.Print(skinRegistry[id].name .. ' skin disabled.' .. RELOAD_HINT) end
+	ApplySkinState(id, enabled and true or false)
 end
 
 function Skin.SetAllSkinsEnabled(enabled)
 	enabled = enabled and true or false
-	for _, id in ipairs(skinOrder) do ApplySkinState(id, enabled) end
+	for _, id in ipairs(SortedOrder()) do ApplySkinState(id, enabled) end
 	ClearNew(GetSkinDB())
-	if not enabled then BUI.Print('All skins disabled.' .. RELOAD_HINT) end
 end
 
 function Skin.WriteSkinsEnabled(enabledByID)
 	local skinDB = GetSkinDB()
-	for _, id in ipairs(skinOrder) do skinDB[id] = enabledByID[id] and true or false end
+	for _, id in ipairs(SortedOrder()) do skinDB[id] = enabledByID[id] and true or false end
 	ClearNew(skinDB)
 end
 
@@ -183,19 +177,15 @@ end)
 
 function Skin.RefreshAll()
 	ClearStagger()
-	Skin.RefreshPalette()
-	for _, id in ipairs(skinOrder) do RefreshSkin(id) end
+	RefreshPalette()
+	for _, id in ipairs(SortedOrder()) do RefreshSkin(id) end
 end
 
 function Skin.RefreshAllStaggered()
 	ClearStagger()
-	Skin.RefreshPalette()
-	for index, id in ipairs(skinOrder) do staggerQueue[index] = id end
+	RefreshPalette()
+	for index, id in ipairs(SortedOrder()) do staggerQueue[index] = id end
 	staggerDriver:Show()
-end
-
-function Skin.Toggle()
-	Skin.RefreshAll()
 end
 
 local SUPPRESS_MOUSE_DEPTH = 3
@@ -214,12 +204,10 @@ function Skin.SuppressBlizzardFrame(frame)
 	frame._buiSavedChildMouse = {}
 
 	local function DisableMouseTree(parent, depth)
-		for _, child in pairs({ parent:GetChildren() }) do
+		for _, child in ipairs({ parent:GetChildren() }) do
 			if not child.__buiKeepMouse then
-				if child.IsMouseEnabled then
-					frame._buiSavedChildMouse[child] = child:IsMouseEnabled()
-				end
-				if child.EnableMouse then child:EnableMouse(false) end
+				frame._buiSavedChildMouse[child] = child:IsMouseEnabled()
+				child:EnableMouse(false)
 				if depth > 1 then DisableMouseTree(child, depth - 1) end
 			end
 		end
@@ -234,17 +222,13 @@ function Skin.RestoreBlizzardFrame(frame)
 	if not frame or not frame._buiSuppressActive then return end
 	frame._buiSuppressActive = false
 
-	frame:SetAlpha(frame._buiSavedAlpha or 1)
-	frame:EnableMouse(frame._buiSavedMouse ~= false)
-	if frame._buiSavedChildMouse then
-		for child, wasEnabled in pairs(frame._buiSavedChildMouse) do
-			if child.EnableMouse then child:EnableMouse(wasEnabled) end
-		end
-	end
+	frame:SetAlpha(frame._buiSavedAlpha)
+	frame:EnableMouse(frame._buiSavedMouse)
+	for child, wasEnabled in pairs(frame._buiSavedChildMouse) do child:EnableMouse(wasEnabled) end
 	frame._buiSavedAlpha = nil
 	frame._buiSavedMouse = nil
 	frame._buiSavedChildMouse = nil
-	if BUI.MoveFrames and BUI.MoveFrames.OnFrameRestored then BUI.MoveFrames.OnFrameRestored(frame) end
+	BUI.MoveFrames.OnFrameRestored(frame)
 end
 
 local reservedWidths, blizzardWidths, widthHooked = {}, {}, {}
@@ -274,8 +258,7 @@ function Skin.ReleaseWidth(frame)
 	blizzardWidths[frame] = nil
 end
 
-function Skin.ApplyBackdrop(frame, bgColor, borderColor)
-	local background, border = bgColor or Colors.bg.dark, borderColor or Colors.border.default
+function Skin.ApplyBackdrop(frame, background, border)
 	BUI.Pixel.SetTemplate(frame, background[1], background[2], background[3], background[4], border[1], border[2], border[3], border[4], 1)
 end
 
@@ -289,8 +272,7 @@ function Skin.SavePosition(frame, dbKey)
 	if not db.framePositions then db.framePositions = {} end
 	PinFrame(frame)
 	local left, top = frame:GetLeft(), frame:GetTop()
-	if type(left) ~= 'number' or type(top) ~= 'number' then return end
-	if issecretvalue and (issecretvalue(left) or issecretvalue(top)) then return end
+	if issecretvalue(left) or issecretvalue(top) or not left then return end
 	db.framePositions[dbKey] = { point = 'TOPLEFT', relPoint = 'BOTTOMLEFT', x = left, y = top }
 end
 
@@ -300,7 +282,7 @@ local VALID_ANCHOR_POINTS = {
 	BOTTOMLEFT = true, BOTTOM = true, BOTTOMRIGHT = true,
 }
 
-function Skin.SavedPosition(dbKey)
+local function SavedPosition(dbKey)
 	local positions = BUI.GetDB().framePositions
 	local position = positions and positions[dbKey]
 	if not position then return nil end
@@ -312,7 +294,7 @@ function Skin.SavedPosition(dbKey)
 end
 
 function Skin.RestorePosition(frame, dbKey)
-	local point, relativePoint, x, y = Skin.SavedPosition(dbKey)
+	local point, relativePoint, x, y = SavedPosition(dbKey)
 	if not point then return false end
 	frame:ClearAllPoints()
 	frame:SetPoint(point, UIParent, relativePoint, x, y)
@@ -321,8 +303,7 @@ function Skin.RestorePosition(frame, dbKey)
 end
 
 function Skin.PositionMode()
-	local config = BUI.MoveFrames and BUI.MoveFrames.GetConfig()
-	return config and config.positionMode or 'remember'
+	return BUI.MoveFrames.GetConfig().positionMode
 end
 
 local function ResolvePanel(panel)
@@ -331,10 +312,8 @@ local function ResolvePanel(panel)
 end
 
 local function LastPanelSlot(panel)
-	if not (panel.GetLeft and panel.GetTop) then return end
 	local left, top = panel:GetLeft(), panel:GetTop()
-	if type(left) ~= 'number' or type(top) ~= 'number' then return end
-	if issecretvalue and (issecretvalue(left) or issecretvalue(top)) then return end
+	if issecretvalue(left) or issecretvalue(top) or not left then return end
 	local ratio = panel:GetEffectiveScale() / UIParent:GetEffectiveScale()
 	return left * ratio, top * ratio - UIParent:GetHeight()
 end
@@ -362,25 +341,22 @@ end
 function Skin.MakeDraggable(frame, dbKey, point, x, y, follow)
 	if frame._buiDraggable then return end
 	frame._buiDraggable = true
-	frame:SetMovable(true)
-	frame:SetClampedToScreen(true)
 	frame:EnableMouse(true)
-	frame:RegisterForDrag('LeftButton')
-	frame:SetScript('OnDragStart', BUI.Profiler.Script('Skin.Core frame OnDragStart', function(self)
-		self._buiDragged = true
-		self:StartMoving()
-	end))
-	frame:SetScript('OnDragStop', BUI.Profiler.Script('Skin.Core frame OnDragStop', function(self)
-		self:StopMovingOrSizing()
-		if dbKey and Skin.PositionMode() == 'remember' then Skin.SavePosition(self, dbKey) end
-	end))
+	BUI.Dragging.MakeDraggable(frame, {
+		clamp = true,
+		keepPlacement = true,
+		skipClickThrough = true,
+		onPositionChanged = function()
+			if dbKey and Skin.PositionMode() == 'remember' then Skin.SavePosition(frame, dbKey) end
+		end,
+	})
 	local function Home() Skin.HomePosition(frame, dbKey, point, x, y, follow) end
-	local function WantsHome() return Skin.PositionMode() ~= 'session' or not frame._buiDragged end
+	local function WantsHome() return Skin.PositionMode() ~= 'session' or not frame.dragMoved end
 
 	local hookedPanel
 	local function WatchPanel()
 		local panel = follow and ResolvePanel(follow)
-		if not panel or panel == hookedPanel or not panel.HookScript then return panel end
+		if not panel or panel == hookedPanel then return panel end
 		hookedPanel = panel
 		panel:HookScript('OnShow', Wrap('Skin.Core follow panel', function()
 			if frame:IsShown() and WantsHome() then Home() end
@@ -401,21 +377,19 @@ function Skin.MakeDraggable(frame, dbKey, point, x, y, follow)
 	frame:HookScript('OnHide', Wrap('Skin.Core frame reset', function(self)
 		if Skin.PositionMode() == 'reset' then
 			Home()
-			self._buiDragged = false
+			self.dragMoved = false
 		end
 	end))
 	Home()
 end
 
-local DEFAULT_QUALITY = { 0.9, 0.9, 0.9 }
 function Skin.QualityColor(itemID)
-	if not itemID then return DEFAULT_QUALITY[1], DEFAULT_QUALITY[2], DEFAULT_QUALITY[3] end
-	local quality = C_Item.GetItemQualityByID(itemID)
+	local quality = itemID and C_Item.GetItemQualityByID(itemID)
 	if quality and quality > 1 then
 		local color = ITEM_QUALITY_COLORS[quality]
-		if color then return color.r, color.g, color.b end
+		return color.r, color.g, color.b
 	end
-	return DEFAULT_QUALITY[1], DEFAULT_QUALITY[2], DEFAULT_QUALITY[3]
+	return 0.9, 0.9, 0.9
 end
 
 local TIP_PADDING_X, TIP_PADDING_Y, TIP_TITLE_BLOCK = 10, 8, 24
@@ -439,7 +413,7 @@ end
 
 LoadPalette(function(role) return unpack(BUILib.Layout.DefaultColor(role, 'dark')) end)
 
-function Skin.RefreshPalette()
+RefreshPalette = function()
 	LoadPalette(BUI.ThemeColor)
 end
 
@@ -467,7 +441,7 @@ local function HoverColor()
 	HOVER_COLOR[4] = 1
 	return HOVER_COLOR
 end
-Skin.SELECTED_COLOR, Skin.MUTED_COLOR, Skin.HoverColor = SELECTED_COLOR, MUTED_COLOR, HoverColor
+Skin.SELECTED_COLOR, Skin.MUTED_COLOR, Skin.BODY_COLOR, Skin.HoverColor = SELECTED_COLOR, MUTED_COLOR, TIP_BODY_COLOR, HoverColor
 
 local function RestEdge(frame)
 	if frame._buiActive then return SELECTED_COLOR end
@@ -513,7 +487,7 @@ local function PaintCollapseGlyph(button, collapsed)
 	button.Icon:SetSize(COLLAPSE_GLYPH_SIZE, COLLAPSE_GLYPH_SIZE)
 end
 
-function Skin.TipCollapseButton(button, enabled)
+local function TipCollapseButton(button, enabled)
 	if not button._buiCollapseEnabled then
 		button._buiCollapseEnabled = enabled
 		Painter.Tint(button.Icon, 'skinLabel')
@@ -542,15 +516,14 @@ function Skin.LeftTitle(frame)
 	title:SetJustifyH('LEFT')
 end
 
-local DROPDOWN_HEIGHT_FALLBACK = 26
 local dropdownHeight
 
 function Skin.DropdownHeight()
-	if dropdownHeight then return dropdownHeight end
-	local ok, probe = pcall(CreateFrame, 'DropdownButton', nil, UIParent, 'WowStyle1DropdownTemplate')
-	local height = ok and probe and probe.GetHeight and probe:GetHeight()
-	if probe and probe.Hide then probe:Hide() end
-	dropdownHeight = (height and height > 0) and math.floor(height + 0.5) or DROPDOWN_HEIGHT_FALLBACK
+	if not dropdownHeight then
+		local probe = CreateFrame('DropdownButton', nil, UIParent, 'WowStyle1DropdownTemplate')
+		probe:Hide()
+		dropdownHeight = math.floor(probe:GetHeight() + 0.5)
+	end
 	return dropdownHeight
 end
 
@@ -577,9 +550,8 @@ local function HasVerticalAnchors(frame, topPrefix, bottomPrefix)
 	return top and bottom
 end
 
-function Skin.NormalizeDropdownHeight(dropdown)
-	if not dropdown or dropdown._buiDropdownHeight or not (dropdown.SetupMenu and dropdown.SetHeight) then return end
-	if not dropdown.GetNumPoints or HasVerticalAnchors(dropdown, 'TOP', 'BOTTOM') then return end
+local function NormalizeDropdownHeight(dropdown)
+	if dropdown._buiDropdownHeight or not dropdown.SetupMenu or HasVerticalAnchors(dropdown, 'TOP', 'BOTTOM') then return end
 	dropdown._buiDropdownHeight = true
 	dropdown:SetHeight(Skin.DropdownHeight())
 end
@@ -588,7 +560,7 @@ local CONTROL_GAP = 6
 Skin.CONTROL_GAP = CONTROL_GAP
 
 function Skin.PadVertical(frame, top, bottom, skip)
-	if not frame or frame._buiPadded or not frame.GetNumPoints then return end
+	if not frame or frame._buiPadded then return end
 	frame._buiPadded = true
 	local points = CollectPoints(frame)
 	for pointIndex = 1, #points do
@@ -631,7 +603,7 @@ function Skin.TipFont(fontString, kind, scale)
 	if not fontString then return end
 	local role = TIP_ROLES[kind] or 'skinText'
 	local size = math.floor((kind == 'title' and TIP_TITLE_SIZE or TIP_BODY_SIZE) * (scale or 1) + 0.5)
-	if fontString.GetObjectType and fontString:GetObjectType() == 'SimpleHTML' then
+	if fontString:IsObjectType('SimpleHTML') then
 		local titleSize = math.floor(TIP_TITLE_SIZE * (scale or 1) + 0.5)
 		for _, textType in ipairs(HTML_TEXT_TYPES) do
 			local isHeader = textType ~= 'P'
@@ -700,281 +672,11 @@ function Skin.ScaleOption(key, onChange)
 	}
 end
 
-local SHOWCASE_NAME = 'BUI_SkinShowcase'
-local SHOWCASE_GAP = 4
-local SHOWCASE_DRIFT_INTERVAL = 0.05
-local SHOWCASE_MARGIN = 40
-local SHOWCASE_TOP_RESERVE = 120
-local SHOWCASE_DIM = { 0, 0, 0, 0.75 }
-local SHOWCASE_STRATA = 'TOOLTIP'
-local SHOWCASE_QUEUE_KEY = 'Skin.ShowcaseQueue'
-local SHOWCASE_STEP_INTERVAL = 0.05
-local showcaseQueue = {}
-local showcase
-local showcaseEntries = {}
-local showcaseActive = false
-local showcaseOnClosed
-local ShowcaseOnUpdate
-local OnEntrySetPoint
-local OnEntryStartMoving
-local placingEntry = false
-
-local function EnsureShowcase()
-	if showcase then return showcase end
-	showcase = CreateFrame('Frame', SHOWCASE_NAME, UIParent)
-	showcase:SetAllPoints(UIParent)
-	showcase:SetFrameStrata('FULLSCREEN_DIALOG')
-	showcase:EnableMouse(true)
-	showcase:Hide()
-	local dim = showcase:CreateTexture(nil, 'BACKGROUND')
-	dim:SetAllPoints(showcase)
-	dim:SetColorTexture(SHOWCASE_DIM[1], SHOWCASE_DIM[2], SHOWCASE_DIM[3], SHOWCASE_DIM[4])
-	local title = showcase:CreateFontString(nil, 'OVERLAY')
-	Skin.TipFont(title, 'title', 3.2)
-	title:SetPoint('TOP', showcase, 'TOP', 0, -SHOWCASE_MARGIN * 0.5)
-	title:SetText('BluUI Skins')
-	local hint = showcase:CreateFontString(nil, 'OVERLAY')
-	Skin.TipFont(hint, 'body', 1.8)
-	hint:SetPoint('TOP', title, 'BOTTOM', 0, -8)
-	hint:SetText('Press Escape to close the showcase')
-	showcase:SetScript('OnHide', Wrap('Skin.Core showcase close', function() if showcaseActive then Skin.StopTest() end end))
-	showcase:SetScript('OnUpdate', Wrap('Skin.Core showcase update', ShowcaseOnUpdate))
-	return showcase
-end
-
-local function RememberPlacement(entry)
-	local frame = entry.frame
-	local points = {}
-	for pointIndex = 1, frame:GetNumPoints() do
-		points[pointIndex] = { frame:GetPoint(pointIndex) }
-	end
-	entry.points = points
-	entry.strata = frame:GetFrameStrata()
-end
-
-local function OnShowcaseFrameHidden(frame)
-	if not showcaseActive then return end
-	for _, entry in ipairs(showcaseEntries) do
-		if entry.frame == frame then
-			Skin.StopTest()
-			return
-		end
-	end
-end
-
-local function WatchShowcaseFrame(frame)
-	if frame.__buiShowcaseWatched then return end
-	frame.__buiShowcaseWatched = true
-	frame:HookScript('OnHide', Wrap('Skin.Core showcase hidden', OnShowcaseFrameHidden))
-	Hook(frame, 'SetPoint', OnEntrySetPoint)
-	Hook(frame, 'StartMoving', OnEntryStartMoving)
-end
-
-local function RestorePlacement(entry)
-	local frame = entry.frame
-	if entry.strata then frame:SetFrameStrata(entry.strata) end
-	local points = entry.points
-	if not points then return end
-	frame:ClearAllPoints()
-	for pointIndex = 1, #points do
-		local point = points[pointIndex]
-		frame:SetPoint(point[1], point[2], point[3], point[4], point[5])
-	end
-end
-
-local function FrameExtent(frame)
-	local scale = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
-	return frame:GetWidth() * scale, frame:GetHeight() * scale, scale
-end
-
-local function PlaceEntry(entry, left, top)
-	local frame = entry.frame
-	local _, _, scale = FrameExtent(frame)
-	local pixel = BUI.Pixel.PixelSizeFor(UIParent, 1)
-	left, top = BUILib.Widget.SnapX(left, pixel), BUILib.Widget.SnapY(top, pixel)
-	entry.left, entry.top = left, top
-	placingEntry = true
-	frame:ClearAllPoints()
-	frame:SetPoint('TOPLEFT', UIParent, 'BOTTOMLEFT', left / scale, top / scale)
-	placingEntry = false
-	if frame:GetFrameStrata() ~= SHOWCASE_STRATA then frame:SetFrameStrata(SHOWCASE_STRATA) end
-end
-
-function OnEntrySetPoint(frame)
-	if placingEntry or not showcaseActive then return end
-	for _, entry in ipairs(showcaseEntries) do
-		if entry.frame == frame then
-			if entry.left and not entry.released then PlaceEntry(entry, entry.left, entry.top) end
-			return
-		end
-	end
-end
-
-function OnEntryStartMoving(frame)
-	if not showcaseActive then return end
-	for _, entry in ipairs(showcaseEntries) do
-		if entry.frame == frame then
-			entry.released = true
-			return
-		end
-	end
-end
-
-local function LayoutShowcase()
-	local screenWidth, screenHeight = UIParent:GetWidth(), UIParent:GetHeight()
-	local maxRowWidth = screenWidth - 2 * SHOWCASE_MARGIN
-	local ordered = {}
-	for index, entry in ipairs(showcaseEntries) do
-		if not entry.released then
-			entry.width, entry.height = FrameExtent(entry.frame)
-			entry.order = index
-			ordered[#ordered + 1] = entry
-		end
-	end
-	table.sort(ordered, function(a, b)
-		if a.height ~= b.height then return a.height > b.height end
-		return a.order < b.order
-	end)
-	local rows, row, rowWidth, rowHeight = {}, nil, 0, 0
-	local function CloseRow()
-		if row then rows[#rows + 1] = { entries = row, width = rowWidth - SHOWCASE_GAP, height = rowHeight } end
-	end
-	for _, entry in ipairs(ordered) do
-		if row and rowWidth + entry.width > maxRowWidth then
-			CloseRow()
-			row = nil
-		end
-		if not row then row, rowWidth, rowHeight = {}, 0, 0 end
-		row[#row + 1] = entry
-		rowWidth = rowWidth + entry.width + SHOWCASE_GAP
-		if entry.height > rowHeight then rowHeight = entry.height end
-	end
-	CloseRow()
-	local totalHeight = -SHOWCASE_GAP
-	for _, rowInfo in ipairs(rows) do totalHeight = totalHeight + rowInfo.height + SHOWCASE_GAP end
-	local bandTop = screenHeight - SHOWCASE_TOP_RESERVE
-	local bandHeight = bandTop - SHOWCASE_MARGIN
-	local cursorY = bandTop - math.max(0, (bandHeight - totalHeight) / 2)
-	for _, rowInfo in ipairs(rows) do
-		local cursorX = (screenWidth - rowInfo.width) / 2
-		for _, entry in ipairs(rowInfo.entries) do
-			PlaceEntry(entry, cursorX, cursorY)
-			cursorX = cursorX + entry.width + SHOWCASE_GAP
-		end
-		cursorY = cursorY - rowInfo.height - SHOWCASE_GAP
-	end
-end
-
-local function ShowcaseDrifted()
-	for _, entry in ipairs(showcaseEntries) do
-		if not entry.released then
-			local width, height = FrameExtent(entry.frame)
-			if math.abs(width - (entry.width or 0)) > 0.5 or math.abs(height - (entry.height or 0)) > 0.5 then return true end
-		end
-	end
-	return false
-end
-
-local sinceDriftCheck = 0
-function ShowcaseOnUpdate(_, elapsed)
-	sinceDriftCheck = sinceDriftCheck + elapsed
-	if sinceDriftCheck < SHOWCASE_DRIFT_INTERVAL then return end
-	sinceDriftCheck = 0
-	if showcaseActive and ShowcaseDrifted() then LayoutShowcase() end
-end
-
-function Skin.StopTest()
-	if not showcaseActive then return end
-	showcaseActive = false
-	BUI.Scheduler.UnregisterUpdate(SHOWCASE_QUEUE_KEY)
-	wipe(showcaseQueue)
-	local stopped = {}
-	for _, entry in ipairs(showcaseEntries) do
-		RestorePlacement(entry)
-		local info = skinRegistry[entry.id]
-		if info.stopTest and not stopped[entry.id] then
-			stopped[entry.id] = true
-			info.stopTest()
-		end
-	end
-	wipe(showcaseEntries)
-	showcase:Hide()
-	tDeleteItem(UISpecialFrames, SHOWCASE_NAME)
-	local onClosed = showcaseOnClosed
-	showcaseOnClosed = nil
-	if onClosed then onClosed() end
-end
-
-local function CollectPreviewFrames(id, info, ok, ...)
-	if not ok then
-		BUI.Print(('Skin preview failed for %s.'):format(info.name or id))
-		return
-	end
-	for resultIndex = 1, select('#', ...) do
-		local frame = select(resultIndex, ...)
-		if type(frame) == 'table' and frame.GetNumPoints then
-			local entry = { id = id, frame = frame, name = info.name }
-			RememberPlacement(entry)
-			WatchShowcaseFrame(frame)
-			frame:SetFrameStrata(SHOWCASE_STRATA)
-			showcaseEntries[#showcaseEntries + 1] = entry
-		end
-	end
-end
-
-local function StepShowcase()
-	if not showcaseActive then return end
-	local id = table.remove(showcaseQueue, 1)
-	if id then
-		local info = skinRegistry[id]
-		CollectPreviewFrames(id, info, pcall(info.test))
-		LayoutShowcase()
-	end
-	if #showcaseQueue > 0 then return end
-
-	BUI.Scheduler.UnregisterUpdate(SHOWCASE_QUEUE_KEY)
-	local frameCount = #showcaseEntries
-	if frameCount == 0 then
-		BUI.Print('No enabled skin has a preview.')
-		Skin.StopTest()
-		return
-	end
-	BUI.Print(('Showcasing %d skin window%s. Press Escape to close.'):format(frameCount, frameCount == 1 and '' or 's'))
-end
-
-function Skin.Test(onClosed, ids)
-	Skin.StopTest()
-	if not ids then return end
-	if InCombatLockdown() then
-		BUI.Print('Skin showcase is unavailable in combat.')
-		return
-	end
-
-	wipe(showcaseQueue)
-	for _, id in ipairs(ids) do
-		local info = skinRegistry[id]
-		if info and info.test and Skin.IsSkinEnabled(id) then
-			showcaseQueue[#showcaseQueue + 1] = id
-		end
-	end
-	if #showcaseQueue == 0 then
-		BUI.Print('No enabled skin has a preview.')
-		return
-	end
-
-	showcaseActive = true
-	showcaseOnClosed = onClosed
-	EnsureShowcase():Show()
-	if not tContains(UISpecialFrames, SHOWCASE_NAME) then tinsert(UISpecialFrames, SHOWCASE_NAME) end
-	BUI.Scheduler.RegisterUpdate(SHOWCASE_QUEUE_KEY, StepShowcase, SHOWCASE_STEP_INTERVAL, true)
-	return true
-end
-
 function Skin.TipFace(fontString, kind, scale)
 	if not fontString then return end
 	local size = kind == 'title' and TIP_TITLE_SIZE or TIP_BODY_SIZE
 	size = math.floor(size * (scale or 1) + 0.5)
-	if fontString.GetObjectType and fontString:GetObjectType() == 'SimpleHTML' then
+	if fontString:IsObjectType('SimpleHTML') then
 		for _, textType in ipairs(HTML_TEXT_TYPES) do
 			fontString:SetFont(textType, BUILib.Font, size, '')
 			fontString:SetShadowColor(textType, 0, 0, 0, 0)
@@ -994,21 +696,25 @@ end
 function Skin.FadeTree(frame, keep, depth)
 	if not frame or frame:IsForbidden() then return end
 	depth = depth or 0
-	if frame.GetRegions then
-		for regionIndex = 1, select('#', frame:GetRegions()) do
-			local region = select(regionIndex, frame:GetRegions())
-			if region and region.IsObjectType and region:IsObjectType('Texture') and not region.__buiSkin and not (keep and keep[region]) then
-				region:SetAlpha(0)
-			end
-		end
+	for _, region in ipairs({ frame:GetRegions() }) do
+		if region:IsObjectType('Texture') and not region.__buiSkin and not (keep and keep[region]) then region:SetAlpha(0) end
 	end
-	if depth < 4 and frame.GetChildren then
-		for _, child in ipairs({ frame:GetChildren() }) do
-			Skin.FadeTree(child, keep, depth + 1)
-		end
+	if depth < 4 then
+		for _, child in ipairs({ frame:GetChildren() }) do Skin.FadeTree(child, keep, depth + 1) end
 	end
 end
 
+local function Keep(region)
+	if region then region.__buiSkin = true end
+	return region
+end
+
+local GLYPH_IDLE = { 0.75, 0.75, 0.8, 1 }
+Skin.GLYPH_IDLE = GLYPH_IDLE
+
+local function PaintIdleGlyph(texture)
+	texture:SetVertexColor(GLYPH_IDLE[1], GLYPH_IDLE[2], GLYPH_IDLE[3], GLYPH_IDLE[4])
+end
 
 local SCROLL_THUMB_REST, SCROLL_THUMB_HOVER, SCROLL_THUMB_DRAG = 0.35, 0.6, 0.85
 local SCROLL_ARROW_SIZE = 10
@@ -1040,8 +746,7 @@ local function ArrowEnter(button)
 end
 
 local function ArrowLeave(button)
-	local color = BUILib.Theme.text.secondary
-	button._buiTipArrow:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
+	PaintIdleGlyph(button._buiTipArrow)
 end
 
 local function ScrollStepper(button, rotation)
@@ -1056,7 +761,7 @@ local function FadeStepperArt(button)
 	if button and button.Texture then button.Texture:SetAlpha(0) end
 end
 
-function Skin.TipScrollBar(scrollBar, keepThumb)
+local function TipScrollBar(scrollBar, keepThumb)
 	if not scrollBar or scrollBar._buiTipScroll then return end
 	scrollBar._buiTipScroll = true
 	local track = scrollBar.Track
@@ -1075,8 +780,7 @@ function Skin.TipScrollBar(scrollBar, keepThumb)
 	ScrollStepper(scrollBar.Forward, 0)
 	local thumb = track and track.Thumb
 	if not thumb then return end
-	local fill = thumb:CreateTexture(nil, 'OVERLAY')
-	fill.__buiSkin = true
+	local fill = Keep(thumb:CreateTexture(nil, 'OVERLAY'))
 	fill:SetPoint('TOPLEFT', thumb, 'TOPLEFT', 1, 0)
 	fill:SetPoint('BOTTOMRIGHT', thumb, 'BOTTOMRIGHT', -1, 0)
 	thumb._buiThumbFill = fill
@@ -1093,15 +797,14 @@ local EDIT_BOX_ART = {
 	'LeftBorder', 'RightBorder', 'MiddleBorder',
 }
 
-function Skin.TipEditBox(editBox, scale, inset)
-	if not editBox then return end
+local function TipEditBox(editBox, scale, inset)
 	if not editBox._buiTipEdit then
 		editBox._buiTipEdit = true
-		local name = editBox.GetName and editBox:GetName()
+		local name = editBox:GetName()
 		for keyIndex = 1, #EDIT_BOX_ART do
 			local key = EDIT_BOX_ART[keyIndex]
 			local texture = editBox[key] or (name and _G[name .. key])
-			if texture and texture.SetAlpha then texture:SetAlpha(0) end
+			if texture then texture:SetAlpha(0) end
 		end
 	end
 	Skin.TipShell(editBox, inset)
@@ -1114,7 +817,7 @@ local TAB_STYLE = BUILib.Skin.TabStyle({
 })
 
 Painter.OnRepaint('Skin', function()
-	Skin.RefreshPalette()
+	RefreshPalette()
 	BUILib.Skin.RefreshTabStyle(TAB_STYLE)
 	BUILib.Skin.RepaintShells()
 end)
@@ -1134,8 +837,7 @@ local SEGMENT_PAD, SEGMENT_GAP, SEGMENT_TEXT_PAD = 2, 2, 12
 function Skin.SegmentButton(tab)
 	if tab._buiSegmentFill then return end
 	BUILib.Skin.StripButton(tab)
-	local fill = tab:CreateTexture(nil, 'BACKGROUND')
-	fill.__buiSkin = true
+	local fill = Keep(tab:CreateTexture(nil, 'BACKGROUND'))
 	fill:SetAllPoints(tab)
 	tab._buiSegmentFill = fill
 end
@@ -1205,8 +907,7 @@ end
 function Skin.TipArrow(frame, centered, rotation)
 	local arrow = frame._buiTipArrow
 	if not arrow then
-		arrow = frame:CreateTexture(nil, 'OVERLAY')
-		arrow.__buiSkin = true
+		arrow = Keep(frame:CreateTexture(nil, 'OVERLAY'))
 		arrow:SetTexture(BUILib.GetLibMedia('dropdown'))
 		arrow:SetSize(12, 12)
 		if centered then
@@ -1215,8 +916,7 @@ function Skin.TipArrow(frame, centered, rotation)
 			arrow:SetPoint('RIGHT', frame, 'RIGHT', -6, 0)
 		end
 		if rotation then arrow:SetRotation(rotation) end
-		local color = BUILib.Theme.text.secondary
-		arrow:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
+		PaintIdleGlyph(arrow)
 		frame._buiTipArrow = arrow
 	end
 	arrow:Show()
@@ -1227,38 +927,32 @@ function Skin.TipDropdown(dropdown, scale, keepHeight)
 	if not dropdown then return end
 	if not dropdown._buiTipDropdown then
 		dropdown._buiTipDropdown = true
-		for regionIndex = 1, select('#', dropdown:GetRegions()) do
-			local region = select(regionIndex, dropdown:GetRegions())
-			if region and region.IsObjectType and region:IsObjectType('Texture') and not region.__buiSkin and region ~= dropdown.Language then
-				region:SetAlpha(0)
-			end
+		for _, region in ipairs({ dropdown:GetRegions() }) do
+			if region:IsObjectType('Texture') and not region.__buiSkin and region ~= dropdown.Language then region:SetAlpha(0) end
 		end
 	end
 	Skin.TipShell(dropdown)
 	Skin.TipArrow(dropdown)
-	if not keepHeight then Skin.NormalizeDropdownHeight(dropdown) end
+	if not keepHeight then NormalizeDropdownHeight(dropdown) end
 	if dropdown.Text then Skin.TipFace(dropdown.Text, 'body', scale) end
 end
-
-local CLOSE_IDLE = { 0.75, 0.75, 0.8, 1 }
 
 local function CloseEnter(button)
 	button._buiCloseGlyph:SetVertexColor(unpack(HoverColor()))
 end
 
 local function CloseLeave(button)
-	button._buiCloseGlyph:SetVertexColor(CLOSE_IDLE[1], CLOSE_IDLE[2], CLOSE_IDLE[3], CLOSE_IDLE[4])
+	PaintIdleGlyph(button._buiCloseGlyph)
 end
 
 function Skin.TipClose(button)
 	if not button or button._buiCloseGlyph then return end
 	BUILib.Skin.StripButton(button)
-	local glyph = button:CreateTexture(nil, 'OVERLAY')
-	glyph.__buiSkin = true
+	local glyph = Keep(button:CreateTexture(nil, 'OVERLAY'))
 	BUILib.Widget.SetGlyph(glyph, BUILib.GetLibMedia('x'))
 	glyph:SetSize(12, 12)
 	glyph:SetPoint('CENTER', button, 'CENTER', 0, 0)
-	glyph:SetVertexColor(CLOSE_IDLE[1], CLOSE_IDLE[2], CLOSE_IDLE[3], CLOSE_IDLE[4])
+	PaintIdleGlyph(glyph)
 	button._buiCloseGlyph = glyph
 	button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Core button OnEnter 3', CloseEnter))
 	button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Core button OnLeave 3', CloseLeave))
@@ -1268,8 +962,7 @@ local STATE_TEXTURE_GETTERS = { 'GetNormalTexture', 'GetPushedTexture', 'GetHigh
 
 local function FadeStateTextures(button)
 	for getterIndex = 1, #STATE_TEXTURE_GETTERS do
-		local getter = button[STATE_TEXTURE_GETTERS[getterIndex]]
-		local texture = getter and getter(button)
+		local texture = button[STATE_TEXTURE_GETTERS[getterIndex]](button)
 		if texture then texture:SetAlpha(0) end
 	end
 end
@@ -1297,8 +990,7 @@ function Skin.TipCheckGlyph(check, muted)
 	PlaceCheckGlyph(check, check:GetDisabledCheckedTexture(), TIP_LABEL_COLOR, inset + CHECK_GLYPH_GAP)
 end
 
-function Skin.TipCheckBox(check, inset)
-	if not check then return end
+local function TipCheckBox(check, inset)
 	inset = inset or CHECK_INSET
 	Skin.TipShell(check, inset)
 	if check._buiTipCheck then return end
@@ -1316,10 +1008,6 @@ function Skin.PaintPanelBackdrop(frame)
 	Skin.ApplyBackdrop(frame, PANEL_FILL, PANEL_EDGE)
 end
 
-function Skin.PaintCardBackdrop(frame)
-	Skin.ApplyBackdrop(frame, CARD_FILL, PANEL_EDGE)
-end
-
 local function BackdropButtonEnter(button)
 	button:SetBackdropBorderColor(unpack(HoverColor()))
 end
@@ -1333,11 +1021,11 @@ function Skin.TipBackdropButton(button, scale)
 	if not button._buiTipBackdrop then
 		button._buiTipBackdrop = true
 		FadeStateTextures(button)
-		local name = button.GetName and button:GetName()
+		local name = button:GetName()
 		for artIndex = 1, #BACKDROP_BUTTON_ART do
 			local key = BACKDROP_BUTTON_ART[artIndex]
 			local texture = button[key] or (name and _G[name .. key])
-			if texture and texture.SetAlpha then texture:SetAlpha(0) end
+			if texture then texture:SetAlpha(0) end
 		end
 		Painter.Custom(button, Skin.PaintPanelBackdrop)
 		button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Core button OnEnter 4', BackdropButtonEnter))
@@ -1349,35 +1037,22 @@ end
 function Skin.TipFaceTree(frame, depth, kind)
 	if not frame or frame:IsForbidden() then return end
 	depth = depth or 2
-	if frame.GetRegions then
-		for regionIndex = 1, select('#', frame:GetRegions()) do
-			local region = select(regionIndex, frame:GetRegions())
-			if region and region.IsObjectType and region:IsObjectType('FontString') then
-				Skin.TipFace(region, kind or 'body')
-			end
-		end
+	for _, region in ipairs({ frame:GetRegions() }) do
+		if region:IsObjectType('FontString') then Skin.TipFace(region, kind or 'body') end
 	end
-	if depth > 1 and frame.GetChildren then
-		for _, child in ipairs({ frame:GetChildren() }) do
-			Skin.TipFaceTree(child, depth - 1, kind)
-		end
+	if depth > 1 then
+		for _, child in ipairs({ frame:GetChildren() }) do Skin.TipFaceTree(child, depth - 1, kind) end
 	end
 end
 
 local HELP_BUTTON_DEPTH = 4
 
-local function IsHelpArt(texture)
-	local art = texture.GetAtlas and texture:GetAtlas() or texture.GetTexture and texture:GetTexture()
-	return type(art) == 'string' and art:lower():find('help', 1, true) ~= nil
-end
-
 local function IsHelpPlateButton(child)
-	if not child.Ring or not child.IsObjectType or not child:IsObjectType('Button') then return false end
-	return child.I ~= nil or IsHelpArt(child.Ring)
+	return child.Ring ~= nil and child.I ~= nil and child:IsObjectType('Button')
 end
 
 function Skin.HideHelpButtons(frame, depth)
-	if not frame or not frame.GetChildren or frame:IsForbidden() then return end
+	if not frame or frame:IsForbidden() then return end
 	depth = depth or HELP_BUTTON_DEPTH
 	for _, child in ipairs({ frame:GetChildren() }) do
 		if IsHelpPlateButton(child) then
@@ -1447,16 +1122,18 @@ end
 function Skin.TipIconFrame(parent, icon, thickness)
 	if not icon or icon._buiIconFrame then return end
 	local edges = {}
-	for edgeIndex = 1, 4 do
-		edges[edgeIndex] = parent:CreateTexture(nil, 'OVERLAY')
-		edges[edgeIndex].__buiSkin = true
-	end
+	for edgeIndex = 1, 4 do edges[edgeIndex] = Keep(parent:CreateTexture(nil, 'OVERLAY')) end
 	local state = { thickness = thickness or 1, custom = false }
 	LayoutIconEdges(edges, icon, state.thickness)
 	icon._buiIconFrame = edges
 	state.aligner = BUILib.Skin.PixelAlign(parent, icon, IconEdgeAligner(edges, icon, state))
 	icon._buiIconState = state
 	Painter.Custom(icon, PaintIconEdges)
+end
+
+function Skin.SquareIcon(parent, icon, thickness)
+	Skin.CropIcon(icon)
+	Skin.TipIconFrame(parent, icon, thickness)
 end
 
 function Skin.SetIconEdgeThickness(icon, thickness)
@@ -1479,7 +1156,7 @@ function Skin.SetIconEdgeColor(icon, red, green, blue)
 	local edges = icon and icon._buiIconFrame
 	if not edges then return end
 	if red then
-		local secret = issecretvalue and (issecretvalue(red) or issecretvalue(green) or issecretvalue(blue))
+		local secret = issecretvalue(red) or issecretvalue(green) or issecretvalue(blue)
 		if not secret and icon._buiEdgeR == red and icon._buiEdgeG == green and icon._buiEdgeB == blue then return end
 		if secret then
 			icon._buiEdgeR, icon._buiEdgeG, icon._buiEdgeB = nil, nil, nil
@@ -1547,7 +1224,7 @@ local function CenterSideTabIcon(icon)
 end
 
 local function FitToTab(texture, tab)
-	texture.__buiSkin = true
+	Keep(texture)
 	texture:ClearAllPoints()
 	texture:SetAllPoints(tab)
 end
@@ -1579,9 +1256,8 @@ function Skin.SideTab(context, tab, options)
 		tab._buiSideTab = true
 		local icons = {}
 		for _, key in ipairs(options.iconKeys or SIDE_TAB_ICON_KEYS) do
-			local icon = tab[key]
+			local icon = Keep(tab[key])
 			if icon then
-				icon.__buiSkin = true
 				if options.crop then Skin.CropIcon(icon) end
 				if options.iconWidth then icon:SetSize(options.iconWidth, options.iconHeight or options.iconWidth) end
 				CenterSideTabIcon(icon)
@@ -1591,7 +1267,7 @@ function Skin.SideTab(context, tab, options)
 		end
 		tab._buiSideIcons = icons
 		tab._buiSideDim = options.dim
-		if tab.IconOverlay then tab.IconOverlay.__buiSkin = true end
+		Keep(tab.IconOverlay)
 		if tab.TabGlow then FitToTab(tab.TabGlow, tab) end
 		local selected = tab:CreateTexture(nil, 'ARTWORK', nil, -1)
 		FitToTab(selected, tab)
@@ -1639,9 +1315,15 @@ function Skin.LayoutSideTabs(host, tabs, topOffset)
 end
 
 local TEXT_BOX_PAD = 6
+local TABLE_HEADER_ART = { 'Left', 'Middle', 'Right' }
 
-function Skin.NewContext(enabled)
-	local fadedArt, shelled, owned = {}, {}, {}
+local function OnSideTabChecked(tab, checked)
+	Skin.SetSideTabSelected(tab, checked == true)
+end
+
+local function NewContext(enabled)
+	local fadedArt, shelled, owned, sideTabs = {}, {}, {}, {}
+	local generation = 0
 	local context = { enabled = enabled }
 
 	local function Fade(object)
@@ -1652,9 +1334,8 @@ function Skin.NewContext(enabled)
 
 	local function FadeRegions(frame)
 		if not frame or not frame.GetRegions then return end
-		for regionIndex = 1, select('#', frame:GetRegions()) do
-			local region = select(regionIndex, frame:GetRegions())
-			if region.IsObjectType and region:IsObjectType('Texture') and not region.__buiSkin then Fade(region) end
+		for _, region in ipairs({ frame:GetRegions() }) do
+			if region:IsObjectType('Texture') and not region.__buiSkin then Fade(region) end
 		end
 	end
 
@@ -1677,6 +1358,22 @@ function Skin.NewContext(enabled)
 		if not frame then return end
 		FadeRegions(frame)
 		FadeKeys(frame, PANEL_ART)
+	end
+
+	local function FadeStates(button)
+		for getterIndex = 1, #STATE_TEXTURE_GETTERS do
+			local texture = button[STATE_TEXTURE_GETTERS[getterIndex]](button)
+			if texture then
+				Fade(texture)
+				texture:SetAlpha(0)
+			end
+		end
+	end
+
+	local function Once(frame, skin)
+		if frame._buiGeneration == generation then return end
+		skin(frame)
+		frame._buiGeneration = generation
 	end
 
 	local function Shell(frame, inset)
@@ -1716,13 +1413,13 @@ function Skin.NewContext(enabled)
 	local function EditBox(editBox, inset)
 		if not editBox then return end
 		shelled[editBox] = true
-		Skin.TipEditBox(editBox, nil, inset)
+		TipEditBox(editBox, nil, inset)
 	end
 
 	local function CheckBox(check, inset)
 		if not check then return end
 		shelled[check] = true
-		Skin.TipCheckBox(check, inset)
+		TipCheckBox(check, inset)
 	end
 
 	local function TextBox(frame)
@@ -1746,7 +1443,7 @@ function Skin.NewContext(enabled)
 	end
 
 	local function ScrollBar(scrollBar, keepThumb)
-		if scrollBar then Skin.TipScrollBar(scrollBar, keepThumb) end
+		if scrollBar then TipScrollBar(scrollBar, keepThumb) end
 	end
 
 	local function Tab(tab, fused)
@@ -1773,6 +1470,43 @@ function Skin.NewContext(enabled)
 		if fontString then Skin.TipFont(fontString, 'body') end
 	end
 
+	local function ToolButton(button, inset)
+		FadeStates(button)
+		Shell(button, inset)
+		Skin.HoverEdge(button)
+	end
+
+	local function TableHeader(header)
+		if header._buiTableHeader then return end
+		header._buiTableHeader = true
+		FadeKeys(header, TABLE_HEADER_ART)
+		Fade(header:GetHighlightTexture())
+		Skin.TipFont(header.Text, 'label')
+		Painter.Tint(header.Arrow, 'skinTitle')
+	end
+
+	local function PageButton(button, direction)
+		Skin.TipPageButton(button, direction)
+		for _, region in ipairs({ button:GetRegions() }) do
+			if region:IsObjectType('FontString') then Body(region) end
+		end
+	end
+
+	local function Paging(paging)
+		Skin.TipPageButtons(paging.PrevPageButton, paging.NextPageButton)
+		Body(paging.PageText)
+	end
+
+	local function SideTab(tab, options)
+		sideTabs[tab] = true
+		Skin.SideTab(context, tab, options)
+	end
+
+	local function CheckedSideTab(tab, options)
+		if not sideTabs[tab] then context.Hook(tab, 'SetChecked', OnSideTabChecked) end
+		SideTab(tab, options)
+	end
+
 	local function Chrome(frame, closeButton)
 		FadeArt(frame)
 		if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
@@ -1790,13 +1524,18 @@ function Skin.NewContext(enabled)
 	end
 
 	local function Own(texture)
-		texture.__buiSkin = true
-		owned[texture] = true
+		owned[Keep(texture)] = true
 		return texture
 	end
 
 	local function ShowOwned(shown)
 		for texture in pairs(owned) do texture:SetShown(shown) end
+	end
+
+	local function Line(parent, reference, vertical, startInset, endInset, layer, role)
+		local line = Own(Painter.Fill(parent:CreateTexture(nil, layer or 'ARTWORK'), role or 'skinBorder'))
+		BUILib.Skin.PixelLine(line, reference, vertical, startInset, endInset)
+		return line
 	end
 
 	local function SegmentTabs(tabSystem)
@@ -1806,23 +1545,26 @@ function Skin.NewContext(enabled)
 
 	local function CollapseButton(button)
 		Fade(button:GetHighlightTexture())
-		Skin.TipCollapseButton(button, enabled)
+		TipCollapseButton(button, enabled)
 	end
 
 	local function Restore()
+		generation = generation + 1
 		for object in pairs(fadedArt) do object:SetAlpha(1) end
 		wipe(fadedArt)
 		for frame in pairs(shelled) do Skin.HideTipShell(frame) end
+		for tab in pairs(sideTabs) do Skin.ResetSideTab(tab) end
 		ShowOwned(false)
 	end
 
-	context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt = Fade, FadeRegions, FadeKeys, FadeArt
+	context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt, context.FadeStates = Fade, FadeRegions, FadeKeys, FadeArt, FadeStates
 	context.Shell, context.Button, context.Close, context.Dropdown, context.Card = Shell, Button, Close, Dropdown, Card
-	context.TextDropdown = TextDropdown
+	context.TextDropdown, context.ToolButton, context.TableHeader = TextDropdown, ToolButton, TableHeader
 	context.EditBox, context.CheckBox, context.TextBox, context.ScrollBar, context.Tab = EditBox, CheckBox, TextBox, ScrollBar, Tab
 	context.Face, context.FaceOnce, context.Title, context.Body, context.Restore = Face, FaceOnce, Title, Body, Restore
-	context.Chrome, context.Own, context.ShowOwned, context.CollapseButton = Chrome, Own, ShowOwned, CollapseButton
-	context.SegmentTabs = SegmentTabs
+	context.Chrome, context.Own, context.Keep, context.ShowOwned, context.CollapseButton = Chrome, Own, Keep, ShowOwned, CollapseButton
+	context.SegmentTabs, context.SideTab, context.CheckedSideTab, context.Once, context.Line = SegmentTabs, SideTab, CheckedSideTab, Once, Line
+	context.PageButton, context.Paging = PageButton, Paging
 	return context
 end
 
@@ -1876,7 +1618,7 @@ end
 
 function Skin.Define(id, info)
 	local function Enabled() return Skin.IsSkinEnabled(id) end
-	local context = Skin.NewContext(Enabled)
+	local context = NewContext(Enabled)
 	local hooker = BUI.Profiler.Hooker('Skin.' .. id)
 	local windows, disablers = {}, {}
 
@@ -2012,7 +1754,6 @@ function Skin.TipRoleButton(context, button)
 end
 
 local PAGE_ARROW_SIZE = 12
-local PAGE_ARROW_IDLE = { 0.75, 0.75, 0.8, 1 }
 local PAGE_ARROW_DISABLED_ALPHA = 0.35
 local PAGE_ROTATION = { previous = -math.pi / 2, next = math.pi / 2, up = math.pi, down = 0, expand = math.pi * 0.75, condense = -math.pi * 0.25 }
 
@@ -2022,7 +1763,7 @@ local function PageArrowEnter(button)
 end
 
 local function PageArrowLeave(button)
-	button._buiTipArrow:SetVertexColor(PAGE_ARROW_IDLE[1], PAGE_ARROW_IDLE[2], PAGE_ARROW_IDLE[3], PAGE_ARROW_IDLE[4])
+	PaintIdleGlyph(button._buiTipArrow)
 end
 
 function Skin.RefreshPageButton(button)
@@ -2052,24 +1793,31 @@ function Skin.TipStepper(button, direction)
 	button:HookScript('OnDisable', RefreshStepper)
 end
 
+function Skin.TipPageButtons(previousButton, nextButton)
+	Skin.TipPageButton(previousButton, 'previous')
+	Skin.TipPageButton(nextButton, 'next')
+end
+
+function Skin.RefreshPageButtons(previousButton, nextButton)
+	Skin.RefreshPageButton(previousButton)
+	Skin.RefreshPageButton(nextButton)
+end
+
 local SLIDER_TRACK_HEIGHT = 2
 
 function Skin.TipSliderTrack(slider)
 	if not slider or slider._buiTrack then return end
 	local thumb = slider.Thumb or (slider.GetThumbTexture and slider:GetThumbTexture())
-	for regionIndex = 1, select('#', slider:GetRegions()) do
-		local region = select(regionIndex, slider:GetRegions())
-		if region ~= thumb and region.IsObjectType and region:IsObjectType('Texture') and not region.__buiSkin then region:SetAlpha(0) end
+	for _, region in ipairs({ slider:GetRegions() }) do
+		if region ~= thumb and region:IsObjectType('Texture') and not region.__buiSkin then region:SetAlpha(0) end
 	end
-	local track = slider:CreateTexture(nil, 'BACKGROUND')
-	track.__buiSkin = true
+	local track = Keep(slider:CreateTexture(nil, 'BACKGROUND'))
 	track:SetHeight(SLIDER_TRACK_HEIGHT)
 	track:SetPoint('LEFT', slider, 'LEFT', 0, 0)
 	track:SetPoint('RIGHT', slider, 'RIGHT', 0, 0)
 	Painter.Fill(track, 'skinBorder')
 	if thumb then
-		local fill = slider:CreateTexture(nil, 'BACKGROUND', nil, 1)
-		fill.__buiSkin = true
+		local fill = Keep(slider:CreateTexture(nil, 'BACKGROUND', nil, 1))
 		fill:SetHeight(SLIDER_TRACK_HEIGHT)
 		fill:SetPoint('LEFT', track, 'LEFT', 0, 0)
 		fill:SetPoint('RIGHT', thumb, 'CENTER', 0, 0)
@@ -2091,22 +1839,8 @@ function Skin.TipNavArrow(button)
 	button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Core button OnEnter 6', MuteNavArrowArt))
 end
 
-function Skin.SetPageButtonSkinned(button, skinned)
-	if not button or not button._buiPageArrow then return end
-	local alpha = 1
-	if skinned then alpha = 0 end
-	for getterIndex = 1, #STATE_TEXTURE_GETTERS do
-		local getter = button[STATE_TEXTURE_GETTERS[getterIndex]]
-		local texture = getter and getter(button)
-		if texture then texture:SetAlpha(alpha) end
-	end
-	if button._buiTipArrow then button._buiTipArrow:SetShown(skinned) end
-end
-
-
 function Skin.ForEachScrollFrame(box, callback)
-	if not box or not box.ForEachFrame then return end
-	if box.GetView and not box:GetView() then return end
+	if not box or not box.ForEachFrame or not box:GetView() then return end
 	box:ForEachFrame(callback)
 end
 
@@ -2129,14 +1863,12 @@ function Skin.TipIconButton(button)
 	local highlight = button.Highlight or (button.GetHighlightTexture and button:GetHighlightTexture())
 	if not button._buiIconButton then
 		button._buiIconButton = true
-		for regionIndex = 1, select('#', button:GetRegions()) do
-			local region = select(regionIndex, button:GetRegions())
-			if region ~= icon and region ~= highlight and region ~= button.SelectedTexture and region.IsObjectType and region:IsObjectType('Texture') and not region.__buiSkin then
+		for _, region in ipairs({ button:GetRegions() }) do
+			if region ~= icon and region ~= highlight and region ~= button.SelectedTexture and region:IsObjectType('Texture') and not region.__buiSkin then
 				region:SetAlpha(0)
 			end
 		end
-		Skin.CropIcon(icon)
-		Skin.TipIconFrame(button, icon)
+		Skin.SquareIcon(button, icon)
 		if highlight then
 			highlight:SetBlendMode('BLEND')
 			Skin.FlatTexture(highlight, 1, 1, 1, ICON_HOVER_ALPHA)
@@ -2158,7 +1890,9 @@ function Skin.TipIconSelector(context, selector)
 	context.FadeArt(selector)
 	context.Shell(selector)
 	context.ScrollBar(selector.ScrollBar)
-	Skin.SweepScrollBox(selector.ScrollBox, Skin.TipIconButton)
+	Skin.SweepScrollBox(selector.ScrollBox, function(button)
+		if context.enabled() then Skin.TipIconButton(button) end
+	end)
 	if selector.UpdateAllSelectedTextures and not selector._buiSelectionHook then
 		selector._buiSelectionHook = true
 		Hook(selector, 'UpdateAllSelectedTextures', function(host)
@@ -2168,14 +1902,11 @@ function Skin.TipIconSelector(context, selector)
 end
 
 local function TipSelectedIcon(context, button)
-	if not button then return end
 	local icon = button.Icon
-	for regionIndex = 1, select('#', button:GetRegions()) do
-		local region = select(regionIndex, button:GetRegions())
-		if region ~= icon and region ~= button.Highlight and region.IsObjectType and region:IsObjectType('Texture') and not region.__buiSkin then context.Fade(region) end
+	for _, region in ipairs({ button:GetRegions() }) do
+		if region ~= icon and region ~= button.Highlight and region:IsObjectType('Texture') and not region.__buiSkin then context.Fade(region) end
 	end
-	Skin.CropIcon(icon)
-	Skin.TipIconFrame(button, icon)
+	Skin.SquareIcon(button, icon)
 	if button.Highlight then
 		button.Highlight:SetBlendMode('BLEND')
 		Skin.FlatTexture(button.Highlight, 1, 1, 1, ICON_HOVER_ALPHA)
@@ -2186,28 +1917,19 @@ function Skin.TipIconPopup(context, popup)
 	if not popup or popup:IsForbidden() then return end
 	context.Fade(popup.BG)
 	local border = popup.BorderBox
-	if border then
-		context.FadeArt(border)
-		Skin.TipFont(border.EditBoxHeaderText, 'label')
-		Skin.TipFont(border.IconSelectionText, 'label')
-		local editBox = border.IconSelectorEditBox
-		if editBox then
-			for keyIndex = 1, #ICON_POPUP_EDIT_ART do context.Fade(editBox[ICON_POPUP_EDIT_ART[keyIndex]]) end
-			context.EditBox(editBox)
-		end
-		context.Dropdown(border.IconTypeDropdown)
-		local area = border.SelectedIconArea
-		if area then
-			TipSelectedIcon(context, area.SelectedIconButton)
-			local text = area.SelectedIconText
-			if text then
-				Skin.TipFont(text.SelectedIconHeader, 'label')
-				context.Face(text.SelectedIconDescription)
-			end
-		end
-		context.Button(border.OkayButton)
-		context.Button(border.CancelButton)
-	end
+	context.FadeArt(border)
+	Skin.TipFont(border.EditBoxHeaderText, 'label')
+	Skin.TipFont(border.IconSelectionText, 'label')
+	local editBox = border.IconSelectorEditBox
+	for keyIndex = 1, #ICON_POPUP_EDIT_ART do context.Fade(editBox[ICON_POPUP_EDIT_ART[keyIndex]]) end
+	context.EditBox(editBox)
+	context.Dropdown(border.IconTypeDropdown)
+	local area = border.SelectedIconArea
+	TipSelectedIcon(context, area.SelectedIconButton)
+	Skin.TipFont(area.SelectedIconText.SelectedIconHeader, 'label')
+	context.Face(area.SelectedIconText.SelectedIconDescription)
+	context.Button(border.OkayButton)
+	context.Button(border.CancelButton)
 	context.Shell(popup)
 	Skin.TipIconSelector(context, popup.IconSelector)
 end

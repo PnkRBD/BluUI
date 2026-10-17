@@ -16,29 +16,7 @@ local POSITION_MODES = {
 	{ value = 'reset', text = 'Reset when closed' },
 }
 
-local function Window()
-	return BUI.PageEngine.window
-end
-
-local function Repaint()
-	Window():Repaint()
-end
-
-local function SettingsPopover(info)
-	local options = {}
-	local settings = type(info.settings) == 'function' and info.settings() or info.settings
-	for index, option in ipairs(settings) do
-		if option.onClick then
-			local click = option.onClick
-			option = setmetatable({ onClick = function()
-				click()
-				Repaint()
-			end }, { __index = option })
-		end
-		options[index] = option
-	end
-	return { title = info.name, options = options }
-end
+local Window, Repaint = BUI.OptionsKit.Window, BUI.OptionsKit.Repaint
 
 local function CellIcon(ui, cell, glyph, tip, onClick, active)
 	local window = Window()
@@ -73,27 +51,13 @@ local function FramesBoard(ui, parent, width)
 	local config = MoveFrames.GetConfig()
 	board:AddSwitch('Movable frames', function() return config.enabled end, function(enabled) MoveFrames.SetEnabled(enabled) end, 'Drag Blizzard windows by clicking and holding on them.')
 	local mode = board:AddRow('After a move', 'What happens to a window once you let go, toasts and popups always keep their spot', DROPDOWN_WIDTH)
-	local dropdown = ui.Dropdown(mode, DROPDOWN_WIDTH, function()
-		local items = {}
-		for _, entry in ipairs(POSITION_MODES) do
-			items[#items + 1] = { text = entry.text, checked = config.positionMode == entry.value, callback = function()
-				config.positionMode = entry.value
-				Window():Repaint()
-			end }
-		end
-		return items
-	end)
-	dropdown:SetPoint('RIGHT', -ui.ROW_INSET, 0)
-	ui.Bind(mode, function()
-		for _, entry in ipairs(POSITION_MODES) do
-			if entry.value == config.positionMode then dropdown.label:SetText(entry.text) end
-		end
-	end)
+	ui.Menu(mode, DROPDOWN_WIDTH, {
+		entries = POSITION_MODES,
+		get = function() return config.positionMode end,
+		set = function(value) config.positionMode = value end,
+	}):SetPoint('RIGHT', -ui.ROW_INSET, 0)
 	local saved = board:AddRow('Saved positions', 'Put every window back where Blizzard puts it', BUTTON_ROOM)
-	ui.Button(saved, 'Reset positions', 'control', function()
-		MoveFrames.ResetPositions()
-		BUI.Print('Blizzard frame positions reset.')
-	end):SetPoint('RIGHT', -ui.ROW_INSET, 0)
+	ui.Button(saved, 'Reset positions', 'control', function() MoveFrames.ResetPositions() end):SetPoint('RIGHT', -ui.ROW_INSET, 0)
 	return board
 end
 
@@ -125,11 +89,11 @@ local function SkinsBoard(ui, parent, width)
 		buttons = {
 			{ text = 'All off', icon = 'check', active = function() return AllSkins(order, false) end, onClick = function()
 				Skin.SetAllSkinsEnabled(false)
-				Window():Repaint()
+				Repaint()
 			end },
 			{ text = 'All on', icon = 'check', active = function() return AllSkins(order, true) end, onClick = function()
 				Skin.SetAllSkinsEnabled(true)
-				Window():Repaint()
+				Repaint()
 			end },
 		},
 	})
@@ -139,7 +103,7 @@ local function SkinsBoard(ui, parent, width)
 		local icons = (info.unlock and 1 or 0) + ((info.page or info.settings) and 1 or 0)
 		local _, cell = board:AddSwitch(info.name, function() return Skin.IsSkinEnabled(id) end, function(enabled)
 			Skin.SetSkinEnabled(id, enabled)
-			Window():Repaint()
+			Repaint()
 			if tag then tag:Hide() end
 			if not enabled and RELOAD_SKINS[id] then ConfirmReload(info) end
 		end, info.description, icons * ICON_ROOM)
@@ -153,11 +117,12 @@ local function SkinsBoard(ui, parent, width)
 		if info.page then
 			anchor = CellIcon(ui, cell, 'cog', 'Settings', function() BUI.PageEngine.NavigateToID(info.page) end)
 		elseif info.settings then
-			anchor = CellIcon(ui, cell, 'cog', 'Settings', function() ui.Popover(anchor, SettingsPopover(info), Repaint) end)
+			local popover = { title = info.name, options = info.settings }
+			anchor = CellIcon(ui, cell, 'cog', 'Settings', function() ui.Popover(anchor, popover, Repaint) end)
 		end
 		if anchor then anchor:SetPoint('RIGHT', -4, 0) end
 		if info.unlock then
-			local eye = CellIcon(ui, cell, 'eye', info.unlock.tooltip or 'Unlock position', function() info.unlock.set(not info.unlock.get()) end, info.unlock.get)
+			local eye = CellIcon(ui, cell, 'eye', info.unlock.tooltip, function() info.unlock.set(not info.unlock.get()) end, info.unlock.get)
 			if anchor then eye:SetPoint('RIGHT', anchor, 'LEFT', 0, 0) else eye:SetPoint('RIGHT', -4, 0) end
 		end
 	end
@@ -169,7 +134,7 @@ local function SkinsBoard(ui, parent, width)
 			for _, info in pairs(registry) do
 				if info.unlock and info.unlock.get() then info.unlock.set(false) end
 			end
-			Window():Repaint()
+			Repaint()
 		end)
 	end
 	return board

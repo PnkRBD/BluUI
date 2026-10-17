@@ -3,7 +3,7 @@ local _, BUI = ...
 local ipairs = ipairs
 local max = math.max
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
+local BUILib = BluUI.BUILibClient
 local Skin = BUI.Skinning
 
 local BUTTON_HEIGHT = 30

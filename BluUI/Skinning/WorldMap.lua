@@ -6,8 +6,7 @@ local unpack = unpack
 
 local Skin = BUI.Skinning
 local SELECTED = Skin.SELECTED_COLOR
-local Painter = BUI.Painter
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
+local BUILib = BluUI.BUILibClient
 local Wrap = BUI.Profiler.Wrap
 
 local BORDER_ART = { 'Bg', 'TopTileStreaks', 'InsetBorderTop', 'Underlay' }
@@ -45,13 +44,12 @@ local context = Skin.Define('worldmap', {
 	newLook = true,
 })
 local Hook = context.Hook
-local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
+local Fade, FadeRegions, FadeKeys, Keep = context.Fade, context.FadeRegions, context.FadeKeys, context.Keep
 local Shell, Button, Card, Dropdown = context.Shell, context.Button, context.Card, context.Dropdown
 local EditBox, ScrollBar, Body = context.EditBox, context.ScrollBar, context.Body
-local CollapseButton = context.CollapseButton
+local CollapseButton, Once, Line, CheckedSideTab = context.CollapseButton, context.Once, context.Line, context.CheckedSideTab
 local SelectedTexture = Skin.SelectedTexture
 
-local generation = 0
 local sideTabs = {}
 local clearedArt = {}
 local restyledChecks = {}
@@ -64,10 +62,6 @@ local searchRoom
 local function RefreshExtras()
 	BUI.WorldMapLabels.Refresh()
 	BUI.WorldMapInstancePins.Refresh()
-end
-
-local function KeepTexture(texture)
-	if texture then texture.__buiSkin = true end
 end
 
 local function ClearArt(texture)
@@ -133,9 +127,7 @@ end
 local function DividerLine(frame)
 	if frame._buiDivider then return end
 	local left, right = Span(frame)
-	local line = context.Own(Painter.Fill(frame:CreateTexture(nil, 'ARTWORK'), 'skinLine'))
-	BUILib.Skin.PixelLine(line, frame, false, COLUMN_LEFT - left, right - COLUMN_RIGHT)
-	frame._buiDivider = line
+	frame._buiDivider = Line(frame, frame, false, COLUMN_LEFT - left, right - COLUMN_RIGHT, nil, 'skinLine')
 end
 
 local function SkinWindow(map)
@@ -145,8 +137,7 @@ local function SkinWindow(map)
 	local toggle = map.SidePanelToggle
 	FadeRegions(toggle.OpenButton)
 	FadeRegions(toggle.CloseButton)
-	Skin.TipPageButton(toggle.OpenButton, 'next')
-	Skin.TipPageButton(toggle.CloseButton, 'previous')
+	Skin.TipPageButtons(toggle.CloseButton, toggle.OpenButton)
 end
 
 local function SkinBorder(border)
@@ -167,9 +158,7 @@ local function PlaceTomTomCoords()
 	coords.Player:SetPoint('LEFT', WorldMapFrame.BorderFrame.TitleContainer.TitleText, 'RIGHT', TITLE_COORDS_GAP, 0)
 end
 
-local function SkinNavButton(button)
-	if button._buiGeneration == generation then return end
-	button._buiGeneration = generation
+local function StyleNavButton(button)
 	FadeRegions(button)
 	Shell(button)
 	Body(button.text)
@@ -178,25 +167,25 @@ end
 
 local function OnNavButtonAdded(navBar)
 	if navBar ~= WorldMapFrame.NavBar then return end
-	SkinNavButton(navBar.navList[#navBar.navList])
+	Once(navBar.navList[#navBar.navList], StyleNavButton)
 end
 
 local function SkinNavBar(navBar)
 	FadeRegions(navBar)
 	Fade(navBar.overlay)
-	SkinNavButton(navBar.homeButton)
+	Once(navBar.homeButton, StyleNavButton)
 	local overflow = navBar.overflowButton
 	FadeRegions(overflow)
 	Skin.TipPageButton(overflow, 'previous')
 	Shell(overflow)
-	for _, button in ipairs(navBar.navList) do SkinNavButton(button) end
+	for _, button in ipairs(navBar.navList) do Once(button, StyleNavButton) end
 end
 
 local function SkinRoundButton(button)
-	KeepTexture(button.Icon)
-	KeepTexture(button.IconOverlay)
-	KeepTexture(button.ActiveTexture)
-	KeepTexture(button.FilterCounterBanner)
+	Keep(button.Icon)
+	Keep(button.IconOverlay)
+	Keep(button.ActiveTexture)
+	Keep(button.FilterCounterBanner)
 	Button(button)
 	button.Icon:ClearAllPoints()
 	button.Icon:SetPoint('CENTER')
@@ -276,21 +265,14 @@ local function ReleaseRareScannerSearch()
 end
 
 local function IsTabSelected(questLog, tab)
-	return questLog.displayMode ~= nil and questLog.displayMode == tab.displayMode
-end
-
-local function OnTabChecked(tab, checked)
-	Skin.SetSideTabSelected(tab, checked == true)
+	return questLog.displayMode == tab.displayMode
 end
 
 local function SkinSideTabs(questLog)
 	for index, key in ipairs(SIDE_TAB_KEYS) do
 		local tab = questLog[key]
-		if not sideTabs[index] then
-			sideTabs[index] = tab
-			Hook(tab, 'SetChecked', OnTabChecked)
-		end
-		Skin.SideTab(context, tab, SIDE_TAB_OPTIONS)
+		sideTabs[index] = tab
+		CheckedSideTab(tab, SIDE_TAB_OPTIONS)
 	end
 end
 
@@ -310,12 +292,11 @@ end)
 
 local function SkinTrackBox(checkbox)
 	local check = checkbox.CheckMark
-	for regionIndex = 1, select('#', checkbox:GetRegions()) do
-		local region = select(regionIndex, checkbox:GetRegions())
+	for _, region in ipairs({ checkbox:GetRegions() }) do
 		if region ~= check and region:IsObjectType('Texture') then ClearArt(region) end
 	end
 	restyledChecks[check] = true
-	check:SetTexture(BUILib.GetLibMedia('check'))
+	BUILib.Widget.SetGlyph(check, BUILib.GetLibMedia('check'))
 	check:SetSize(CHECK_GLYPH_SIZE, CHECK_GLYPH_SIZE)
 	check:ClearAllPoints()
 	check:SetPoint('CENTER')
@@ -395,19 +376,13 @@ local function SkinCampaignMinimalHeader(header)
 	ColumnCard(header, MINIMAL)
 end
 
-local function SkinOnce(frame, skin)
-	if frame._buiGeneration == generation then return end
-	skin(frame)
-	frame._buiGeneration = generation
-end
-
 local function SweepPool(pool, skin)
-	for frame in pool:EnumerateActive() do SkinOnce(frame, skin) end
+	for frame in pool:EnumerateActive() do Once(frame, skin) end
 end
 
 local function CampaignSetHook(skin)
 	return function(header)
-		if header:GetParent() == QuestScrollFrame.Contents then SkinOnce(header, skin) end
+		if header:GetParent() == QuestScrollFrame.Contents then Once(header, skin) end
 	end
 end
 
@@ -477,9 +452,7 @@ local function SkinCampaignOverview(overview)
 	Fade(scroll.BottomShadow)
 end
 
-local function SkinEventRow(frame)
-	if frame._buiGeneration == generation then return end
-	frame._buiGeneration = generation
+local function StyleEventRow(frame)
 	if frame.Name then
 		Skin.TipFace(frame.Name, 'body')
 		Skin.TipFace(frame.Location, 'body')
@@ -492,6 +465,10 @@ local function SkinEventRow(frame)
 		Skin.TipFace(frame.Label, frame.Background and 'title' or 'body')
 		Fade(frame.Background)
 	end
+end
+
+local function SkinEventRow(frame)
+	Once(frame, StyleEventRow)
 end
 
 local function SkinEvents(events)
@@ -565,7 +542,6 @@ local function RefreshMap(map)
 end
 
 local function SkinMap(map)
-	generation = generation + 1
 	SkinWindow(map)
 	SkinBorder(map.BorderFrame)
 	SkinNavBar(map.NavBar)
@@ -587,7 +563,6 @@ context.OnDisable(function()
 	ReleaseRareScannerSearch()
 	RestoreArt()
 	RestoreLayout()
-	for _, tab in ipairs(sideTabs) do Skin.ResetSideTab(tab) end
 	if _G.TomTom and TomTom.ShowHideWorldCoords and _G.TomTomWorldFrame then TomTom:ShowHideWorldCoords() end
 end)
 

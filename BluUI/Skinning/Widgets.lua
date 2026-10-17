@@ -6,9 +6,9 @@ local GetCursorPosition = GetCursorPosition
 local Pixel = BUI.Pixel
 local Skin = BUI.Skinning
 local Wrap = BUI.Profiler.Wrap
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
+local BUILib = BluUI.BUILibClient
 local Controls = BUILib.Controls
-local FONT = BUILib.Font or STANDARD_TEXT_FONT
+local FONT = BUILib.Font
 
 local SetColorTex = BUI.Tools.SetColorTex
 local Painter = BUI.Painter
@@ -123,13 +123,11 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 		UpdateRange()
 	end))
 
+	local DragUpdate = Wrap('Skin.Widgets scroll drag', function() ApplyScrollPct(CursorToScrollPct()) end)
 	thumb:EnableMouse(true)
 	thumb:RegisterForDrag('LeftButton')
-	thumb:SetScript('OnDragStart', BUI.Profiler.Script('Skin.Widgets thumb OnDragStart', function(self) self.dragging = true end))
-	thumb:SetScript('OnDragStop', BUI.Profiler.Script('Skin.Widgets thumb OnDragStop', function(self) self.dragging = false end))
-	thumb:SetScript('OnUpdate', Wrap('Skin.Widgets scroll drag', function(self)
-		if self.dragging then ApplyScrollPct(CursorToScrollPct()) end
-	end))
+	thumb:SetScript('OnDragStart', BUI.Profiler.Script('Skin.Widgets thumb OnDragStart', function(self) self:SetScript('OnUpdate', DragUpdate) end))
+	thumb:SetScript('OnDragStop', BUI.Profiler.Script('Skin.Widgets thumb OnDragStop', function(self) self:SetScript('OnUpdate', nil) end))
 	thumb:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets thumb OnEnter', function() SetColorTex(thumbTex, unpack(THUMB_HOVER)) end))
 	thumb:SetScript('OnLeave', BUI.Profiler.Script('Skin.Widgets thumb OnLeave', function() SetColorTex(thumbTex, unpack(THUMB_IDLE)) end))
 	track:EnableMouse(true)
@@ -273,7 +271,6 @@ function Skin.CreateWindow(spec)
 	frame:SetSize(Pixel.Scale(spec.width), Pixel.Scale(spec.height))
 	Skin.MakeDraggable(frame, spec.dbKey, 'CENTER', spec.x or 0, spec.y or 0, spec.follow)
 	frame:SetFrameStrata('DIALOG')
-	frame:SetFrameLevel(WINDOW_LEVEL)
 	local content = CreateFrame('Frame', nil, frame, 'BackdropTemplate')
 	PaintBackdrop(content, PALETTE.panel)
 	content:SetPoint('BOTTOMRIGHT', Pixel.Scale(-WINDOW_INSET), Pixel.Scale(spec.contentBottom))
@@ -302,7 +299,7 @@ function Skin.CreateListRow(parent, height, iconSize)
 	row.icon = row.iconBorder:CreateTexture(nil, 'ARTWORK')
 	row.icon:SetSize(Pixel.Scale(iconSize), Pixel.Scale(iconSize))
 	row.icon:SetPoint('CENTER')
-	row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	Skin.CropIcon(row.icon)
 
 	row.nameText = row:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(row.nameText, 12, FONT, '')

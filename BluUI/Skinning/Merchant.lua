@@ -1,9 +1,9 @@
 local _, BUI = ...
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
+local BUILib = BluUI.BUILibClient
 local Widget = BUILib.Widget
 local Controls = BUILib.Controls
-local FONT = BUILib.Font or STANDARD_TEXT_FONT
+local FONT = BUILib.Font
 local Skin = BUI.Skinning
 local Painter = BUI.Painter
 local Pixel = BUI.Pixel
@@ -25,7 +25,6 @@ local NO_LIMIT = math.huge
 local SHORT_COLOR = { 0.9, 0.3, 0.3 }
 local COST_COLOR = { 0.8, 0.8, 0.8 }
 local PRICE_COLOR = { 0.65, 0.65, 0.65 }
-local BLOCKED_NAME = { 0.55, 0.55, 0.6 }
 local BLOCKED_EDGE = { 0.5, 0.15, 0.15 }
 local BLOCKED_CONTROLS_ALPHA = 0.4
 local BLOCKED_TEXT_ALPHA = 0.6
@@ -43,6 +42,13 @@ local TYPE_FILTERS = {
 	{ label = 'Mounts',      classID = 15, subclassID = 5 },
 	{ label = 'Misc',        classID = 15, excludeSub = 5 },
 }
+
+local context = Skin.Define('merchant', {
+	name = 'Merchant',
+	description = 'Replaces the default vendor window with a dark, searchable frame featuring bulk buy and type filters.',
+	icon = 'Interface\\Icons\\INV_Misc_Coin_01',
+	newLook = true,
+})
 
 local activeTab = TAB_BUY
 local activeTypeFilter
@@ -119,9 +125,9 @@ end
 local function ReadCosts(entry, info)
 	entry.costs = entry.costs or {}
 	entry.costCount = 0
-	local stack = math.max(1, info.stackCount or 1)
-	if info.price and info.price > 0 then AddCost(entry, MONEY_KEY, info.hasExtendedCost and info.price or info.price / stack) end
-	local available = info.numAvailable or -1
+	local stack = math.max(1, info.stackCount)
+	if info.price > 0 then AddCost(entry, MONEY_KEY, info.hasExtendedCost and info.price or info.price / stack) end
+	local available = info.numAvailable
 	entry.stock = available < 0 and NO_LIMIT or info.hasExtendedCost and available or available * stack
 	if not info.hasExtendedCost then return end
 	for costIndex = 1, GetMerchantItemCostInfo(entry.idx) do
@@ -158,7 +164,7 @@ local function ScanBuyItems()
 	wipe(scanBudget)
 	for merchantIndex = 1, GetMerchantNumItems() do
 		local info = C_MerchantFrame.GetItemInfo(merchantIndex)
-		if info and info.name then
+		if info.name then
 			local classID, subclassID = GetItemClass(merchantIndex)
 			if PassesTypeFilter(classID, subclassID) and PassesSearch(info.name) then
 				count = count + 1
@@ -167,8 +173,8 @@ local function ScanBuyItems()
 				entry.idx = merchantIndex
 				entry.name = info.name
 				entry.texture = info.texture
-				entry.price = info.price or 0
-				entry.numAvailable = info.numAvailable or -1
+				entry.price = info.price
+				entry.numAvailable = info.numAvailable
 				entry.soldOut = info.numAvailable == 0
 				entry.locked = info.isPurchasable == false
 				entry.isUsable = info.isUsable ~= false
@@ -196,7 +202,7 @@ local function ScanBuybackItems()
 			entry.idx = buybackIndex
 			entry.name = name
 			entry.texture = texture
-			entry.price = price or 0
+			entry.price = price
 			entry.qualityR, entry.qualityG, entry.qualityB = Skin.QualityColor(itemID)
 		end
 	end
@@ -224,7 +230,7 @@ local function CreateIconLabel(parent, fontSize)
 	frame.icon = frame:CreateTexture(nil, 'ARTWORK')
 	frame.icon:SetSize(Pixel.Scale(COST_ICON_SIZE), Pixel.Scale(COST_ICON_SIZE))
 	frame.icon:SetPoint('LEFT')
-	frame.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	Skin.CropIcon(frame.icon)
 
 	frame.qtyText = frame:CreateFontString(nil, 'OVERLAY')
 	Pixel.ApplyFont(frame.qtyText, fontSize or 10, FONT, '')
@@ -306,7 +312,7 @@ local function UpdateCurrencyBar(parentFrame)
 		frame.qtyText:SetText(info and info.quantity or 0)
 
 		frame.qtyText:SetWidth(0)
-		frame:SetWidth(Pixel.Scale(COST_ICON_SIZE + 3 + (frame.qtyText:GetStringWidth() or 30) + 2))
+		frame:SetWidth(Pixel.Scale(COST_ICON_SIZE + 3 + frame.qtyText:GetStringWidth() + 2))
 
 		frame:ClearAllPoints()
 		if previousFrame then
@@ -323,7 +329,7 @@ local function PaintRowState(row, info)
 	local blocked = not info.canAfford
 	local red, green, blue = info.qualityR, info.qualityG, info.qualityB
 	if blocked then
-		PaintText(row.nameText, BLOCKED_NAME)
+		row.nameText:SetTextColor(Painter.Color('skinLabel'))
 		row.iconBorder:SetBackdropBorderColor(BLOCKED_EDGE[1], BLOCKED_EDGE[2], BLOCKED_EDGE[3], 1)
 	elseif not info.isUsable then
 		row.nameText:SetTextColor(red * 0.7, green * 0.7, blue * 0.7, 1)
@@ -433,7 +439,7 @@ local function CreateBuyRow(parent)
 			local link = GetMerchantItemLink(self.merchantIdx)
 			if link then DressUpLink(link) end
 		elseif IsModifiedClick('CHATLINK') then
-			ChatEdit_InsertLink(GetMerchantItemLink(self.merchantIdx))
+			ChatFrameUtil.InsertLink(GetMerchantItemLink(self.merchantIdx))
 		end
 	end))
 
@@ -465,7 +471,7 @@ local function CreateBuybackRow(parent)
 		if IsModifiedClick('DRESSUP') then
 			DressUpLink(link)
 		elseif IsModifiedClick('CHATLINK') then
-			ChatEdit_InsertLink(link)
+			ChatFrameUtil.InsertLink(link)
 		end
 	end))
 
@@ -502,7 +508,7 @@ local function PopulateBuyRows(items, pool, parent, isBulk)
 		if hasStock then row.stockText:SetText('x' .. info.numAvailable) end
 		row.stockText:SetShown(hasStock)
 
-		local goldString = info.price > 0 and C_CurrencyInfo.GetCoinTextureString(info.price) or nil
+		local goldString = info.price > 0 and C_CurrencyInfo.GetCoinTextureString(info.price)
 		row.priceText:SetText(goldString or (info.extendedCost and '' or 'Free'))
 		PopulateCostIcons(row, info)
 		row:Show()
@@ -533,7 +539,7 @@ local function BuildLootFilterItems()
 	local items = {}
 	local numSpecs = GetNumSpecializations()
 	for specIndex = 1, numSpecs do
-		local _, name = GetSpecializationInfo(specIndex)
+		local _, name = C_SpecializationInfo.GetSpecializationInfo(specIndex)
 		if name then items[#items + 1] = { label = name, filterIndex = LE_LOOT_FILTER_SPEC1 + specIndex - 1 } end
 	end
 	if numSpecs > 0 then
@@ -763,8 +769,10 @@ RefreshContent = function()
 	end
 end
 
+local BUY_POOLS = { buyRows, bulkRows }
+
 local function ClearRowData()
-	for _, pool in ipairs({ buyRows, bulkRows }) do
+	for _, pool in ipairs(BUY_POOLS) do
 		for _, row in ipairs(pool) do
 			row.merchantIdx, row.entry = nil, nil
 			if row.costIcons then
@@ -775,74 +783,54 @@ local function ClearRowData()
 	for _, row in ipairs(buybackRows) do row.buybackIdx = nil end
 end
 
-local function OnMerchantEvent(event)
-	if event == 'MERCHANT_SHOW' then
-		if not Skin.IsSkinEnabled('merchant') then
-			if MerchantFrame then Skin.RestoreBlizzardFrame(MerchantFrame) end
-			if merchantFrame then merchantFrame:Hide() end
-			return
-		end
-		BuildFrame()
-		if MerchantFrame then
-			Skin.SuppressBlizzardFrame(MerchantFrame)
-			if not MerchantFrame._buiReassertHooked then
-				MerchantFrame._buiReassertHooked = true
-				MerchantFrame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Merchant blizzard suppress', function(self)
-					if merchantFrame and merchantFrame:IsShown() and Skin.IsSkinEnabled('merchant') then Skin.SuppressBlizzardFrame(self) end
-				end))
-			end
-		end
-		activeTab = TAB_BUY
-		listReset = true
-		merchantFrame.tabBar:SetSelected(TAB_BUY)
-		searchText = ''
-		merchantFrame.searchBox.editBox:SetText('')
-		activeTypeFilter = nil
-		merchantFrame:Show()
-		if merchantFrame.lootFilterDD then
-			merchantFrame.lootFilterDD.label:SetText(ALL)
-			SetMerchantFilter(LE_LOOT_FILTER_ALL)
-		end
-		BUI.Events:Register('BAG_UPDATE_DELAYED', 'Skinning.Merchant.Live', OnMerchantEvent)
-		BUI.Events:Register('PLAYER_MONEY', 'Skinning.Merchant.Live', OnMerchantEvent)
-		BUI.Events:Register('CURRENCY_DISPLAY_UPDATE', 'Skinning.Merchant.Live', OnMerchantEvent)
-		After('Skin.Merchant page reskin', 0, RefreshContent)
-	elseif event == 'MERCHANT_CLOSED' then
-		BUI.Events:UnregisterAll('Skinning.Merchant.Live')
-		if merchantFrame then merchantFrame:Hide() end
-		if MerchantFrame then Skin.RestoreBlizzardFrame(MerchantFrame) end
-		wipe(buyItems)
-		wipe(buybackItems)
-		wipe(visibleCurrencies)
-		ClearRowData()
-	elseif merchantFrame and merchantFrame:IsShown() and not merchantFrame.pendingRefresh then
-		merchantFrame.pendingRefresh = true
-		After('Skin.Merchant live refresh', 0.1, function()
-			merchantFrame.pendingRefresh = false
-			RefreshContent()
-		end)
-	end
+local LIVE_EVENTS = { 'MERCHANT_UPDATE', 'BAG_UPDATE_DELAYED', 'PLAYER_MONEY', 'CURRENCY_DISPLAY_UPDATE' }
+
+local function RefreshLater()
+	if merchantFrame.pendingRefresh then return end
+	merchantFrame.pendingRefresh = true
+	After('Skin.Merchant live refresh', 0.1, function()
+		merchantFrame.pendingRefresh = false
+		RefreshContent()
+	end)
 end
 
-BUI.Events:Register('MERCHANT_SHOW', 'Skinning.Merchant', OnMerchantEvent)
-BUI.Events:Register('MERCHANT_CLOSED', 'Skinning.Merchant', OnMerchantEvent)
-BUI.Events:Register('MERCHANT_UPDATE', 'Skinning.Merchant', OnMerchantEvent)
-
-Skin.OnToggle('merchant', function(enabled)
-	if not enabled then
-		if merchantFrame and merchantFrame:IsShown() then merchantFrame:Hide() end
-		BUI.Events:UnregisterAll('Skinning.Merchant.Live')
-		Skin.ReleaseWidth(MerchantFrame)
-		Skin.RestoreBlizzardFrame(MerchantFrame)
-		return
+local function OpenMerchant(frame)
+	Skin.SuppressBlizzardFrame(frame)
+	activeTab = TAB_BUY
+	listReset = true
+	merchantFrame.tabBar:SetSelected(TAB_BUY)
+	searchText = ''
+	merchantFrame.searchBox.editBox:SetText('')
+	activeTypeFilter = nil
+	merchantFrame:Show()
+	if merchantFrame.lootFilterDD then
+		merchantFrame.lootFilterDD.label:SetText(ALL)
+		SetMerchantFilter(LE_LOOT_FILTER_ALL)
 	end
-	Skin.ReserveWidth(MerchantFrame, Pixel.Scale(FRAME_WIDTH), UIParent)
-	if MerchantFrame:IsShown() then OnMerchantEvent('MERCHANT_SHOW') end
-end)
+	for _, event in ipairs(LIVE_EVENTS) do BUI.Events:Register(event, 'Skinning.Merchant.Live', RefreshLater) end
+	After('Skin.Merchant page reskin', 0, RefreshContent)
+end
 
-Skin.RegisterSkin('merchant', {
-	name = 'Merchant',
-	description = 'Replaces the default vendor window with a dark, searchable frame featuring bulk buy and type filters.',
-	icon = 'Interface\\Icons\\INV_Misc_Coin_01',
-	newLook = true,
+local function CloseMerchantWindow(frame)
+	BUI.Events:UnregisterAll('Skinning.Merchant.Live')
+	if merchantFrame then merchantFrame:Hide() end
+	Skin.RestoreBlizzardFrame(frame)
+	wipe(buyItems)
+	wipe(buybackItems)
+	wipe(visibleCurrencies)
+	ClearRowData()
+end
+
+context.Window('MerchantFrame', {
+	skin = BuildFrame,
+	show = OpenMerchant,
+	install = function(frame) frame:HookScript('OnHide', BUI.Profiler.Wrap('Skin.Merchant closed', CloseMerchantWindow)) end,
+	enable = function(frame) Skin.ReserveWidth(frame, Pixel.Scale(FRAME_WIDTH), UIParent) end,
 })
+
+context.OnDisable(function()
+	if merchantFrame and merchantFrame:IsShown() then merchantFrame:Hide() end
+	BUI.Events:UnregisterAll('Skinning.Merchant.Live')
+	Skin.ReleaseWidth(MerchantFrame)
+	Skin.RestoreBlizzardFrame(MerchantFrame)
+end)

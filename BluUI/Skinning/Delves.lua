@@ -1,47 +1,44 @@
 local _, BUI = ...
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
+local ipairs = ipairs
+
+local BUILib = BluUI.BUILibClient
 local Skin = BUI.Skinning
 
-local SKIN_ID = 'delves'
 local CHROME_FRAMES = { 'NineSlice', 'Border' }
-local BUTTON_KEYS = { 'EnterDelveButton', 'StartDelveButton', 'ActivateButton', 'ConfirmButton', 'CancelButton', 'TieredEntranceViewRewardsButton' }
-local DROPDOWN_KEYS = { 'Dropdown', 'DifficultyDropdown', 'TierDropdown' }
-local CLOSE_KEYS = { 'CloseButton', 'ClosePanelButton', 'closeButton' }
 local CLOSE_INSET = -4
-local WINDOW_NAMES = { 'DelvesDifficultyPickerFrame', 'DelvesCompanionConfigurationFrame', 'DelvesCompanionAbilityListFrame' }
 local FONT_DEPTH = 3
 local SHELL_CLEAR = { 0, 0, 0, 0 }
 local COVER_PAD = 6
 local COVER_SUBLEVEL = -7
+local TITLE_SCALE = 1.3
+local REWARDS_GLYPH_SIZE = 16
+local SLOT_KEYS = { 'CompanionCombatRoleSlot', 'CompanionFlavorSlot', 'CompanionCombatTrinketSlot', 'CompanionUtilityTrinketSlot' }
 
-local skinnedWindows = {}
+local context = Skin.Define('delves', {
+	name = 'Delves',
+	description = 'The delve entrance window where you pick a tier, plus the companion panels: the metal frame stripped off, the delve scene left alone.',
+	icon = 'Interface/Icons/INV_Misc_Cave_01',
+})
+local Hook, Guard, Once = context.Hook, context.Guard, context.Once
+local Fade, FadeRegions, Line = context.Fade, context.FadeRegions, context.Line
+local Shell, Close, Button, Dropdown, ScrollBar, ToolButton, Paging = context.Shell, context.Close, context.Button, context.Dropdown, context.ScrollBar, context.ToolButton, context.Paging
 
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
-local Fade, FadeRegions = context.Fade, context.FadeRegions
-local Shell, Close, Button, Dropdown, ScrollBar = context.Shell, context.Close, context.Button, context.Dropdown, context.ScrollBar
-local CropIcon = Skin.CropIcon
-
-local function CloseButtonOf(frame)
-	for index = 1, #CLOSE_KEYS do
-		local button = frame[CLOSE_KEYS[index]]
-		if button and button.SetPoint then return button end
-	end
-	local name = frame.GetName and frame:GetName()
-	local global = name and _G[name .. 'CloseButton']
-	if global and global.SetPoint then return global end
-	return nil
+local function StripDialog(frame)
+	for index = 1, #CHROME_FRAMES do FadeRegions(frame[CHROME_FRAMES[index]]) end
+	Shell(frame)
+	BUILib.Skin.SetShellFill(frame, SHELL_CLEAR)
+	local close = frame.CloseButton
+	Close(close)
+	close:ClearAllPoints()
+	close:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', CLOSE_INSET, CLOSE_INSET)
+	Skin.TipFaceTree(frame, FONT_DEPTH)
 end
 
 local function DelveCover(frame)
 	local cover = frame._buiDelveCover
 	if cover then return cover end
-	cover = frame:CreateTexture(nil, 'BACKGROUND', nil, COVER_SUBLEVEL)
-	cover.__buiSkin = true
+	cover = context.Own(frame:CreateTexture(nil, 'BACKGROUND', nil, COVER_SUBLEVEL))
 	BUI.Painter.Fill(cover, 'skinBackground')
 	cover:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -1, -1)
 	cover:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -1, 1)
@@ -50,76 +47,130 @@ local function DelveCover(frame)
 end
 
 local function FitCover(frame)
-	local rewards = frame.DelveRewardsContainerFrame
-	if not rewards then return false end
-	local right, left = frame:GetRight(), rewards:GetLeft()
+	local right, left = frame:GetRight(), frame.DelveRewardsContainerFrame:GetLeft()
 	if not right or not left or right <= left then return false end
 	DelveCover(frame):SetWidth(right - left + COVER_PAD)
 	return true
 end
 
-local function SkinReward(row)
-	if not row or row._buiDelveReward then return end
-	row._buiDelveReward = true
-	local icon = row.Icon
-	if icon and icon.SetTexCoord then
-		icon.__buiSkin = true
-		CropIcon(icon)
-		Skin.TipIconFrame(row, icon)
-	end
+local function InitReward(row)
 	Fade(row.NameFrame)
 	Fade(row.IconBorder)
-	Skin.TipFaceTree(row, 2)
+	Skin.SquareIcon(row, row.Icon)
+	Skin.TipFaceTree(row, 1)
 end
 
-local function SkinWindow(frame)
-	if not frame or frame._buiDelves or frame:IsForbidden() then return end
-	frame._buiDelves = true
-	skinnedWindows[frame] = true
+local function SkinReward(row)
+	Once(row, InitReward)
+	Skin.SetIconEdgeQuality(row.Icon, row.IconBorder)
+end
 
-	for index = 1, #CHROME_FRAMES do FadeRegions(frame[CHROME_FRAMES[index]]) end
-	Shell(frame)
-	BUILib.Skin.SetShellFill(frame, SHELL_CLEAR)
-	local close = CloseButtonOf(frame)
-	if close then
-		Close(close)
-		close:ClearAllPoints()
-		close:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', CLOSE_INSET, CLOSE_INSET)
-	end
-	ScrollBar(frame.ScrollBar)
-	for index = 1, #BUTTON_KEYS do Button(frame[BUTTON_KEYS[index]]) end
-	for index = 1, #DROPDOWN_KEYS do Dropdown(frame[DROPDOWN_KEYS[index]]) end
+local function RewardsGlyphEnter(button)
+	button._buiRewardsGlyph:SetVertexColor(unpack(Skin.HoverColor()))
+end
+
+local function RewardsGlyphLeave(button)
+	BUI.Painter.Tint(button._buiRewardsGlyph, 'skinLabel')
+end
+
+local function SkinRewardsButton(button)
+	ToolButton(button)
+	if button._buiRewardsGlyph then return end
+	local glyph = context.Own(button:CreateTexture(nil, 'OVERLAY'))
+	BUILib.Widget.SetGlyph(glyph, BUILib.GetLibMedia('dungeon'))
+	glyph:SetSize(REWARDS_GLYPH_SIZE, REWARDS_GLYPH_SIZE)
+	glyph:SetPoint('CENTER')
+	BUI.Painter.Tint(glyph, 'skinLabel')
+	button._buiRewardsGlyph = glyph
+	button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Delves rewards OnEnter', RewardsGlyphEnter))
+	button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Delves rewards OnLeave', RewardsGlyphLeave))
+end
+
+local function SkinPicker(frame)
+	StripDialog(frame)
+	Skin.TipFont(frame.Title, 'title', TITLE_SCALE)
+	Skin.TipFont(frame.ScenarioLabel, 'label')
+	Skin.TipFont(frame.DelveModifiersWidgetContainer.ModifiersLabel, 'title')
+	Skin.TipFont(frame.ChallengesContainerFrame.Title, 'title')
+	Dropdown(frame.Dropdown)
+	Button(frame.EnterDelveButton)
+	SkinRewardsButton(frame.TieredEntranceViewRewardsButton)
 	local rewards = frame.DelveRewardsContainerFrame
-	if rewards then
-		FadeRegions(rewards)
-		if rewards.ScrollBox then Skin.SweepScrollBox(rewards.ScrollBox, SkinReward) end
-		if not frame._buiDelvesFit then
-			frame._buiDelvesFit = true
-			frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Delves cover fit', FitCover))
-		end
-		if not FitCover(frame) then BUI.Profiler.After('Skin.Delves cover fit', 0, function() FitCover(frame) end) end
+	ScrollBar(rewards.ScrollBar)
+	Skin.SweepScrollBox(rewards.ScrollBox, Guard(SkinReward))
+	if not frame._buiDelvesFit then
+		frame._buiDelvesFit = true
+		frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Delves cover fit', Guard(FitCover)))
 	end
+	if not FitCover(frame) then BUI.Profiler.After('Skin.Delves cover fit', 0, function() FitCover(frame) end) end
+end
+
+local function InitOptionRow(row)
+	Fade(row.Border)
+	Skin.SquareIcon(row, row.Icon)
+	Skin.RowHighlight(row)
+	Skin.TipFace(row.Name, 'body')
+end
+
+local function SkinOptionRow(row)
+	Once(row, InitOptionRow)
+	local border = row.Border
+	local red, green, blue = border:GetVertexColor()
+	if border:IsShown() and (red < 1 or green < 1 or blue < 1) then
+		Skin.SetIconEdgeColor(row.Icon, red, green, blue)
+	else
+		Skin.SetIconEdgeColor(row.Icon)
+	end
+end
+
+local function SkinOptionsList(list)
+	FadeRegions(list)
+	Shell(list)
+	Skin.SweepScrollBox(list.ScrollBox, Guard(SkinOptionRow))
+end
+
+local function SkinConfiguration(frame)
+	StripDialog(frame)
+	local info = frame.CompanionInfoFrame
+	Skin.TipFont(info.CompanionName, 'title', TITLE_SCALE)
+	local divider = _G.CompanionInfoGLine
+	Fade(divider)
+	if not frame._buiDelveDivider then frame._buiDelveDivider = Line(info, divider, false, 0, 0, 'ARTWORK') end
+	Button(frame.CompanionConfigShowAbilitiesButton)
+	local slots = frame.CompanionSlots
+	for index = 1, #SLOT_KEYS do SkinOptionsList(slots[SLOT_KEYS[index]].OptionsList) end
+end
+
+local function InitAbility(button)
+	Skin.SquareIcon(button, button.Icon)
+	Skin.TipFace(button.Name, 'body')
+	Skin.TipFace(button.UnlockCondition, 'body')
+	Skin.TipFace(button.Rank, 'body')
+end
+
+local function SweepAbilities(frame)
+	for _, button in ipairs(frame.buttons) do Once(button, InitAbility) end
+end
+
+local function RefreshAbilityPaging(paging)
+	Skin.RefreshPageButtons(paging.PrevPageButton, paging.NextPageButton)
+end
+
+local function SkinAbilityList(frame)
 	Skin.TipFaceTree(frame, FONT_DEPTH)
+	context.Chrome(frame)
+	Dropdown(frame.DelvesCompanionRoleDropdown)
+	local paging = frame.DelvesCompanionAbilityListPagingControls
+	Paging(paging)
+	RefreshAbilityPaging(paging)
+	SweepAbilities(frame)
 end
 
-local function Apply()
-	if not Enabled() then return end
-	for index = 1, #WINDOW_NAMES do SkinWindow(_G[WINDOW_NAMES[index]]) end
+local function InstallAbilityList(frame)
+	Hook(frame, 'Refresh', SweepAbilities)
+	Hook(frame.DelvesCompanionAbilityListPagingControls, 'Refresh', RefreshAbilityPaging)
 end
 
-Skin.OnToggle(SKIN_ID, function(enabled)
-	context.Restore()
-	if enabled then
-		for frame in pairs(skinnedWindows) do frame._buiDelves = nil end
-		Apply()
-	end
-end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Delves',
-	description = 'The delve entrance window where you pick a tier, plus the companion panels: the metal frame stripped off, the delve scene left alone.',
-	icon = 'Interface/Icons/INV_Misc_Cave_01',
-})
-
-BUI.Events:Register('ADDON_LOADED', 'Skin.Delves', Apply)
-BUI.Events:Once('PLAYER_LOGIN', 'Skin.Delves', Apply)
+context.Window('DelvesDifficultyPickerFrame', { skin = SkinPicker })
+context.Window('DelvesCompanionConfigurationFrame', { skin = SkinConfiguration })
+context.Window('DelvesCompanionAbilityListFrame', { install = InstallAbilityList, skin = SkinAbilityList })

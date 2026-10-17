@@ -81,8 +81,7 @@ local function SkinHousingPreview(frame, context)
 		context.Fade(button.PushedTexture)
 		context.Shell(button, MODEL_CONTROL_INSET)
 	end
-	Skin.TipPageButton(preview.VariantLeftButton, 'previous')
-	Skin.TipPageButton(preview.VariantRightButton, 'next')
+	Skin.TipPageButtons(preview.VariantLeftButton, preview.VariantRightButton)
 	Skin.TipFaceTree(preview, FONT_DEPTH)
 	context.Title(preview.NameContainer.Name)
 end
@@ -97,8 +96,7 @@ local function SkinTabard(_, context)
 		context.FadeRegions(row)
 		context.Card(row)
 		Skin.TipFont(_G[name .. 'Text'], 'body')
-		Skin.TipPageButton(_G[name .. 'LeftButton'], 'previous')
-		Skin.TipPageButton(_G[name .. 'RightButton'], 'next')
+		Skin.TipPageButtons(_G[name .. 'LeftButton'], _G[name .. 'RightButton'])
 	end
 	context.FadeRegions(_G.TabardFrameCustomizationFrame)
 	for _, boxName in ipairs(TABARD_BOXES) do
@@ -109,8 +107,7 @@ local function SkinTabard(_, context)
 	context.FadeRegions(_G.TabardFrameMoneyBg)
 	context.Button(_G.TabardFrameAcceptButton)
 	context.Button(_G.TabardFrameCancelButton)
-	Skin.TipPageButton(_G.TabardCharacterModelRotateLeftButton, 'previous')
-	Skin.TipPageButton(_G.TabardCharacterModelRotateRightButton, 'next')
+	Skin.TipPageButtons(_G.TabardCharacterModelRotateLeftButton, _G.TabardCharacterModelRotateRightButton)
 	context.Title(_G.TabardFrameNameText)
 	context.Body(_G.TabardFrameGreetingText)
 end
@@ -146,26 +143,12 @@ local WINDOWS = {
 		frames = { 'PVPMatchResults', 'PVPMatchScoreboard' },
 	},
 	{
-		id = 'renown',
-		name = 'Renown',
-		description = 'The major faction renown track window.',
-		icon = 'Interface/Icons/Achievement_Reputation_01',
-		frames = { 'MajorFactionRenownFrame' },
-	},
-	{
 		id = 'landingpage',
 		legacy = 'renown',
 		name = 'Expansion Summary',
 		description = 'The expansion landing page opened from the minimap.',
 		icon = 'Interface/Icons/INV_Misc_Map_01',
 		frames = { 'ExpansionLandingPage' },
-	},
-	{
-		id = 'keybinds',
-		name = 'Key Bindings',
-		description = 'The key bindings window from the game menu.',
-		icon = 'Interface/Icons/INV_Misc_Key_03',
-		frames = { 'KeyBindingFrame' },
 	},
 	{
 		id = 'currencytransfer',
@@ -175,15 +158,12 @@ local WINDOWS = {
 		frames = { 'CurrencyTransferMenu' },
 		extra = function(frame, context)
 			local content = frame.Content
-			if not content then return end
 			context.FadeArt(content)
 			context.Button(content.ConfirmButton)
 			context.Button(content.CancelButton)
-			if content.SourceSelector then context.Dropdown(content.SourceSelector.Dropdown) end
-			if content.AmountSelector then
-				context.Button(content.AmountSelector.MaxQuantityButton)
-				context.EditBox(content.AmountSelector.InputBox)
-			end
+			context.Dropdown(content.SourceSelector.Dropdown)
+			context.Button(content.AmountSelector.MaxQuantityButton)
+			context.EditBox(content.AmountSelector.InputBox)
 		end,
 	},
 	{
@@ -198,7 +178,7 @@ local WINDOWS = {
 		id = 'barbershop',
 		legacy = 'miscpanels',
 		name = 'Barber Shop',
-		description = 'The barber shop: appearance options on a dark panel with house dropdowns, steppers, checkboxes and camera buttons.',
+		description = 'The barber shop: appearance options on a dark panel with library dropdowns, steppers, checkboxes and camera buttons.',
 		icon = 'Interface/Icons/INV_Misc_Comb_01',
 		frames = { 'BarberShopFrame' },
 		fullscreen = true,
@@ -266,7 +246,9 @@ local WINDOWS = {
 }
 
 local function SkinWindow(entry, frame, context)
-	if not entry.fullscreen then
+	if entry.fullscreen then
+		Skin.HideHelpButtons(frame)
+	else
 		context.FadeKeys(frame, ART_KEYS)
 		Skin.TipFaceTree(frame, FONT_DEPTH)
 		context.Chrome(frame)
@@ -276,7 +258,6 @@ local function SkinWindow(entry, frame, context)
 	for index = 1, #BUTTON_KEYS do context.Button(frame[BUTTON_KEYS[index]]) end
 	for index = 1, #DROPDOWN_KEYS do context.Dropdown(frame[DROPDOWN_KEYS[index]]) end
 	if entry.extra then entry.extra(frame, context) end
-	Skin.HideHelpButtons(frame)
 end
 
 for _, entry in ipairs(WINDOWS) do

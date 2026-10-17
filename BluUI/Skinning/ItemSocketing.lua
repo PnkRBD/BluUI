@@ -1,36 +1,32 @@
 local _, BUI = ...
 
 local ipairs = ipairs
-local select = select
 
 local Skin = BUI.Skinning
 
-local TOOLTIP_ART = { 'NineSlice', 'Bg' }
 local APPLY_INSET = 4
 
 local context = Skin.Define('itemsocketing', {
 	name = 'Item Socketing',
-	description = 'The gem socketing window: the parchment and gold filigree stripped back to the dark shell, framed socket icons and a house-styled Apply button.',
+	description = 'The gem socketing window: the parchment and gold filigree stripped back to the dark shell, framed socket icons and a library-styled Apply button.',
 	icon = 'Interface/Icons/INV_Misc_Gem_Variety_01',
 })
-local FadeRegions, FadeKeys = context.FadeRegions, context.FadeKeys
+local Fade, FadeRegions, Keep = context.Fade, context.FadeRegions, context.Keep
 local Shell, Button, ScrollBar, Title = context.Shell, context.Button, context.ScrollBar, context.Title
 
 local function TitleRegions(frame)
-	for regionIndex = 1, select('#', frame:GetRegions()) do
-		local region = select(regionIndex, frame:GetRegions())
-		if region.IsObjectType and region:IsObjectType('FontString') then Title(region) end
+	for _, region in ipairs({ frame:GetRegions() }) do
+		if region:IsObjectType('FontString') then Title(region) end
 	end
 end
 
 local function SkinSocket(socket)
 	if socket._buiSocket then return end
 	socket._buiSocket = true
-	socket.Icon.__buiSkin = true
+	Keep(socket.Icon)
 	FadeRegions(socket)
 	FadeRegions(socket.BracketFrame)
-	Skin.CropIcon(socket.Icon)
-	Skin.TipIconFrame(socket, socket.Icon, 1)
+	Skin.SquareIcon(socket, socket.Icon, 1)
 end
 
 local function SkinDescription(description)
@@ -39,7 +35,7 @@ local function SkinDescription(description)
 	description:DisableDrawLayer('BORDER')
 	description:DisableDrawLayer('BACKGROUND')
 	FadeRegions(description)
-	FadeKeys(description, TOOLTIP_ART)
+	Fade(description.NineSlice)
 end
 
 local function RefreshSockets(frame)

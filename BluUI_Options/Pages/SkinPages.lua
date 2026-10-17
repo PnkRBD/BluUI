@@ -3,17 +3,11 @@ local BUILib = BUI.BUILibClient
 local Layout = BUILib.Layout
 
 local PAGE_WIDTH = 960
-local SKINNING_TAB = 3
 
-local function Window()
-	return BUI.PageEngine.window
-end
+local Window = BUI.OptionsKit.Window
 
 local function BackToSkins()
-	BUI.PageEngine.NavigateToID('settings')
-	local settings = BUI.PageEngine.pages.settings
-	local adapter = settings and settings.frame and settings.frame._page
-	if adapter and adapter.SetTab then adapter:SetTab(SKINNING_TAB) end
+	BUI.PageEngine.NavigateToTab('settings', 'skinning')
 end
 
 local function RegisterSkinPage(id, title, icon)
@@ -33,7 +27,7 @@ local function RegisterSkinPage(id, title, icon)
 					BUILib.Defer(BUI.PageEngine.RefreshCurrentPage)
 				end }
 			end
-			tools[#tools + 1] = { icon = 'enable', tooltip = 'Turn the ' .. title:lower() .. ' skin on or off', get = function() return Skin.IsSkinEnabled(id) end, set = function(value)
+			tools[#tools + 1] = { icon = 'enable', get = function() return Skin.IsSkinEnabled(id) end, set = function(value)
 				Skin.SetSkinEnabled(id, value)
 				if not value then BUI.SkinningPage.ConfirmReload(info) end
 			end }

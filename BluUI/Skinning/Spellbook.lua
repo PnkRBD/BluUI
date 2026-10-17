@@ -3,7 +3,6 @@ local _, BUI = ...
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 
 local BOOK_ART = { 'TopBar', 'BookBGHalved', 'BookBGLeft', 'BookBGRight', 'BookCornerFlipbook', 'Bookmark' }
 local ITEM_ART = { 'Border', 'BorderSheen', 'IconHighlight' }
@@ -31,7 +30,7 @@ local context = Skin.Define('spellbook', {
 local Hook = context.Hook
 local Fade, FadeRegions, FadeKeys, FadeArt = context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt
 local Shell, Button, Card, Dropdown, EditBox, CheckBox, TextBox = context.Shell, context.Button, context.Card, context.Dropdown, context.EditBox, context.CheckBox, context.TextBox
-local ScrollBar, Face, Body, Title = context.ScrollBar, context.Face, context.Body, context.Title
+local ScrollBar, Face, Title, Line, Paging = context.ScrollBar, context.Face, context.Title, context.Line, context.Paging
 local CropIcon = Skin.CropIcon
 
 local dimmed = {}
@@ -56,8 +55,7 @@ local function StyleSpellItem(item)
 	FadeKeys(button, ITEM_ART)
 	if item._buiSpell then return end
 	item._buiSpell = true
-	CropIcon(button.Icon)
-	Skin.TipIconFrame(button, button.Icon)
+	Skin.SquareIcon(button, button.Icon)
 	Skin.TipFont(item.Name, 'title', SCALE.name)
 	Skin.TipFont(item.SubName, 'label')
 	Skin.TipFont(item.RequiredLevel, 'label')
@@ -80,11 +78,7 @@ local function StyleHeader(header)
 	Fade(header.Border)
 	Skin.TipFont(header.Text, 'title', SCALE.header)
 	if header._buiDivider then return end
-	local line = context.Own(header:CreateTexture(nil, 'OVERLAY'))
-	line:SetHeight(1)
-	BUI.Painter.Fill(line, 'skinBorder')
-	BUILib.Skin.PixelLine(line, header.Border, false, DIVIDER_INSET, 0)
-	header._buiDivider = line
+	header._buiDivider = Line(header, header.Border, false, DIVIDER_INSET, 0, 'OVERLAY')
 end
 
 local function StylePages(book)
@@ -123,10 +117,7 @@ local function SkinSpellBook(book)
 	context.SegmentTabs(book.CategoryTabSystem)
 	EditBox(book.SearchBox)
 	SkinSearchPreview(book.SearchPreviewContainer)
-	local paging = book.PagedSpellsFrame.PagingControls
-	Skin.TipPageButton(paging.PrevPageButton, 'previous')
-	Skin.TipPageButton(paging.NextPageButton, 'next')
-	Body(paging.PageText)
+	Paging(book.PagedSpellsFrame.PagingControls)
 	StylePages(book)
 end
 
@@ -142,8 +133,7 @@ local function StylePvpTalentRow(row)
 	Card(row)
 	if not row._buiPvpRow then
 		row._buiPvpRow = true
-		CropIcon(row.Icon)
-		Skin.TipIconFrame(row, row.Icon)
+		Skin.SquareIcon(row, row.Icon)
 		Face(row.Name)
 	end
 	Skin.SetActiveEdge(row, row.selectedHere == true)
@@ -192,8 +182,7 @@ local function StyleSpecSpell(spell)
 	if spell._buiSpecSpell then return end
 	spell._buiSpecSpell = true
 	spell.CircleMask:Hide()
-	CropIcon(spell.Icon)
-	Skin.TipIconFrame(spell, spell.Icon)
+	Skin.SquareIcon(spell, spell.Icon)
 end
 
 local function StyleSpecContent(content)

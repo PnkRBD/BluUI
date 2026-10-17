@@ -30,7 +30,7 @@ local context = Skin.Define('alerts', {
 		set = function(value) Skin.ToastAnchors.SetUnlocked(ANCHOR_KEY, value) end,
 	},
 })
-local FadeRegions, Shell = context.FadeRegions, context.Shell
+local FadeRegions, Shell, Keep = context.FadeRegions, context.Shell, context.Keep
 local Title, Body, Face = context.Title, context.Body, context.Face
 local CropIcon = Skin.CropIcon
 
@@ -48,16 +48,8 @@ local function AlertIcon(frame)
 	end
 end
 
-local function FrameIcon(host, icon)
-	CropIcon(icon)
-	Skin.TipIconFrame(host, icon)
-end
-
 local function StripArt(part)
-	for _, key in ipairs(KEEP_KEYS) do
-		local region = part[key]
-		if region then region.__buiSkin = true end
-	end
+	for _, key in ipairs(KEEP_KEYS) do Keep(part[key]) end
 	FadeRegions(part)
 end
 
@@ -73,8 +65,7 @@ local function ApplyFonts(frame, keys, apply)
 end
 
 local function SkinAlert(frame)
-	local icon = AlertIcon(frame)
-	if icon then icon.__buiSkin = true end
+	local icon = Keep(AlertIcon(frame))
 	StripArt(frame)
 	for _, key in ipairs(PART_KEYS) do
 		local part = frame[key]
@@ -83,7 +74,7 @@ local function SkinAlert(frame)
 	HideKeys(frame, EFFECT_KEYS)
 	Shell(frame)
 	Skin.HoverEdge(frame)
-	if icon and not icon:GetAtlas() then FrameIcon(frame, icon) end
+	if icon and not icon:GetAtlas() then Skin.SquareIcon(frame, icon) end
 	Skin.TipFaceTree(frame, FACE_DEPTH)
 	ApplyFonts(frame, CAPTION_KEYS, Title)
 	ApplyFonts(frame, NAME_KEYS, Body)
@@ -126,11 +117,10 @@ local function SkinRewards(frame)
 	for _, button in ipairs(rewards) do
 		if not skinned[button] then
 			skinned[button] = true
-			local icon = button.texture
-			icon.__buiSkin = true
+			local icon = Keep(button.texture)
 			icon:RemoveMaskTexture(button.CircleMask)
 			FadeRegions(button)
-			FrameIcon(button, icon)
+			Skin.SquareIcon(button, icon)
 		end
 	end
 end

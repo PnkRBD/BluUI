@@ -1,256 +1,101 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.CooldownManager')
+local ipairs = ipairs
 
+local BUILib = BluUI.BUILibClient
 local Skin = BUI.Skinning
 
-local SKIN_ID = 'cooldownmanager'
-local MAIN_ART = { 'Bg', 'Background', 'TopTileStreaks', 'Inset', 'Border', 'TitleBg', 'BottomInset', 'ScrollInset' }
-local TAB_KEYS = { 'SpellsTab', 'AurasTab', 'ItemsTab', 'BarsTab', 'UtilityTab' }
-local TAB_SYSTEM_KEYS = { 'TabSystem', 'CategoryTabSystem' }
-local SELECTED_KEYS = { 'SelectedTexture', 'Selected', 'ActiveTexture' }
-local ICON_KEYS = { 'Icon', 'icon', 'IconTexture' }
-local ICON_ART = { 'IconBorder', 'Border', 'Backdrop', 'Background' }
-local HEADER_KEYS = { 'Header', 'HeaderButton', 'CategoryHeader', 'TitleBar' }
-local CATEGORY_ART = { 'Background', 'Bg', 'Border', 'NineSlice' }
-local TAB_MAX_WIDTH = 56
-local ITEM_DEPTH = 3
 local FONT_DEPTH = 3
+local SECTION_KEYS = { 'shownSection', 'hiddenSection' }
+local GEAR_GLYPH_SIZE = 14
 
-local chrome = {}
-local sideTabs = {}
-local scrollBox
-
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
-local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
-local Shell, Button, Close, Dropdown, EditBox, ScrollBar = context.Shell, context.Button, context.Close, context.Dropdown, context.EditBox, context.ScrollBar
-local Title = context.Title
-local CropIcon = Skin.CropIcon
-
-local function FirstKey(frame, keys)
-	for index = 1, #keys do
-		local child = frame[keys[index]]
-		if child then return child end
-	end
-	return nil
-end
-
-local function IsKeyed(frame, child, keys)
-	for index = 1, #keys do
-		if frame[keys[index]] == child then return true end
-	end
-	return false
-end
-
-local function HasText(button)
-	if not button.GetText then return false end
-	local text = button:GetText()
-	return text ~= nil and text ~= ''
-end
-
-local function SkinIconButton(button)
-	if button._buiCdmIcon then return end
-	local icon = FirstKey(button, ICON_KEYS)
-	if not icon or not icon.SetTexCoord then return end
-	button._buiCdmIcon = true
-	icon.__buiSkin = true
-	CropIcon(icon)
-	Skin.TipIconFrame(button, icon)
-	for index = 1, #ICON_ART do
-		local art = button[ICON_ART[index]]
-		if art and art ~= icon and art.SetAlpha then Fade(art) end
-	end
-end
-
-local function SweepItems(frame, depth)
-	if depth <= 0 or not frame.GetChildren then return end
-	for _, child in ipairs({ frame:GetChildren() }) do
-		if not child:IsForbidden() then
-			if child:IsObjectType('Button') and FirstKey(child, ICON_KEYS) then
-				SkinIconButton(child)
-			else
-				SweepItems(child, depth - 1)
-			end
-		end
-	end
-end
-
-local function SkinCategory(element)
-	if not Enabled() or not element or element:IsForbidden() then return end
-	if not element._buiCdmCategory then
-		element._buiCdmCategory = true
-		FadeKeys(element, CATEGORY_ART)
-		local header = FirstKey(element, HEADER_KEYS)
-		if header then
-			FadeRegions(header)
-			Shell(header)
-		end
-	end
-	SweepItems(element, ITEM_DEPTH)
-	Skin.TipFaceTree(element, 2)
-end
-
-local function StyleSideTab(tab)
-	local width, height = tab:GetWidth(), tab:GetHeight()
-	Skin.SideTab(context, tab, {
-		iconKeys = ICON_KEYS,
-		width = width > 0 and width or nil,
-		height = height > 0 and height or nil,
-	})
-	sideTabs[tab] = true
-end
-
-local function RefreshTabSystem(tabSystem)
-	if not Enabled() then return end
-	local tabs = tabSystem.tabs
-	if not tabs then return end
-	for index = 1, #tabs do
-		local tab = tabs[index]
-		if sideTabs[tab] then Skin.SetSideTabSelected(tab, tab.isSelected == true) end
-	end
-end
-
-local function SkinTabSystem(tabSystem)
-	local tabs = tabSystem.tabs
-	if not tabs then return end
-	for index = 1, #tabs do
-		local tab = tabs[index]
-		if tab and FirstKey(tab, ICON_KEYS) then StyleSideTab(tab) end
-	end
-	if not tabSystem._buiCdmTabs then
-		tabSystem._buiCdmTabs = true
-		Hook(tabSystem, 'SetTab', RefreshTabSystem)
-	end
-	RefreshTabSystem(tabSystem)
-end
-
-local function MirrorTab(tab, selected)
-	Skin.SetSideTabSelected(tab, selected:IsShown())
-end
-
-local function SkinTab(tab)
-	local selected = FirstKey(tab, SELECTED_KEYS)
-	if not selected or not selected.IsShown or not FirstKey(tab, ICON_KEYS) then return end
-	StyleSideTab(tab)
-	MirrorTab(tab, selected)
-	if tab._buiCdmMirror then return end
-	tab._buiCdmMirror = true
-	local function Mirror() MirrorTab(tab, selected) end
-	Hook(selected, 'Show', Mirror)
-	Hook(selected, 'Hide', Mirror)
-	Hook(selected, 'SetShown', Mirror)
-end
-
-local function Classify(frame, child)
-	if child.ForEachFrame then return 'scrollbox' end
-	if child.HasScrollableExtent or child.SetScrollPercentage then return 'scrollbar' end
-	if child:IsObjectType('EditBox') then return 'editbox' end
-	if not child:IsObjectType('Button') then return nil end
-	if IsKeyed(frame, child, TAB_KEYS) or FirstKey(child, SELECTED_KEYS) then return 'tab' end
-	if child.SetupMenu then return child.Text and 'dropdown' or nil end
-	if HasText(child) then return 'button' end
-	if FirstKey(child, ICON_KEYS) and (child:GetWidth() or 0) <= TAB_MAX_WIDTH then return 'tab' end
-	return nil
-end
-
-local function SkinScrollBox(child)
-	scrollBox = child
-	Skin.SweepScrollBox(child, SkinCategory)
-	Skin.ForEachScrollFrame(child, SkinCategory)
-end
-
-local HANDLERS = {
-	scrollbox = SkinScrollBox,
-	scrollbar = ScrollBar,
-	editbox = EditBox,
-	dropdown = Dropdown,
-	button = Button,
-	tab = SkinTab,
-}
-
-local function SkinChrome(frame)
-	local tabSystem = FirstKey(frame, TAB_SYSTEM_KEYS)
-	if tabSystem and tabSystem.tabs and tabSystem.SetTab then
-		SkinTabSystem(tabSystem)
-	end
-	for _, child in ipairs({ frame:GetChildren() }) do
-		if child ~= tabSystem and not child:IsForbidden() and not child._buiCdmChrome then
-			local kind = Classify(frame, child)
-			if kind then
-				child._buiCdmChrome = true
-				chrome[#chrome + 1] = child
-				HANDLERS[kind](child)
-			end
-		end
-	end
-	Skin.TipFaceTree(frame, FONT_DEPTH)
-end
-
-local function SkinMainFrame(frame)
-	Fade(frame.NineSlice)
-	FadeKeys(frame, MAIN_ART)
-	FadeRegions(frame)
-	if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
-	Shell(frame)
-	Title(frame.TitleContainer and frame.TitleContainer.TitleText)
-	Close(frame.CloseButton)
-	SkinChrome(frame)
-end
-
-local function OnShow(frame)
-	if not Enabled() then return end
-	SkinChrome(frame)
-end
-
-local function Apply()
-	if not Enabled() then return end
-	local frame = _G.CooldownViewerSettings
-	if not frame or frame:IsForbidden() then return end
-	if frame._buiCdmSkin then
-		SkinChrome(frame)
-		return
-	end
-	frame._buiCdmSkin = true
-	SkinMainFrame(frame)
-	if not frame._buiCdmHooked then
-		frame._buiCdmHooked = true
-		frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.CooldownManager chrome reskin', OnShow))
-	end
-end
-
-local function Deactivate()
-	context.Restore()
-	for tab in pairs(sideTabs) do Skin.ResetSideTab(tab) end
-	for index = 1, #chrome do chrome[index]._buiCdmChrome = nil end
-	wipe(chrome)
-	Skin.ForEachScrollFrame(scrollBox, function(element) element._buiCdmCategory = nil end)
-	local frame = _G.CooldownViewerSettings
-	if frame then frame._buiCdmSkin = nil end
-end
-
-local function TryInstall()
-	if not _G.CooldownViewerSettings then return end
-	BUI.Events:Unregister('ADDON_LOADED', 'Skin.CooldownManager')
-	Apply()
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Apply()
-	else
-		Deactivate()
-	end
-end)
-
-Skin.RegisterSkin(SKIN_ID, {
+local context = Skin.Define('cooldownmanager', {
 	name = 'Cooldown Manager',
-	description = 'The Cooldown Manager settings window: the metal frame stripped off, dark category headers, framed icons, and the search box, layout dropdown, buttons and side tabs in the house style.',
+	description = 'The Cooldown Manager settings window: the metal frame stripped off, dark category headers, framed icons, and the search box, settings cog, layout dropdown, buttons and side tabs in the library style.',
 	icon = 'Interface/Icons/INV_Misc_PocketWatch_01',
 })
+local Hook = context.Hook
+local FadeRegions, Keep = context.FadeRegions, context.Keep
+local Shell, Button, Dropdown, EditBox, ScrollBar = context.Shell, context.Button, context.Dropdown, context.EditBox, context.ScrollBar
+local Once, CheckedSideTab = context.Once, context.CheckedSideTab
 
-BUI.Events:Register('ADDON_LOADED', 'Skin.CooldownManager', TryInstall)
-BUI.Events:Once('PLAYER_LOGIN', 'Skin.CooldownManager', Apply)
+local function SkinItem(item)
+	Skin.SquareIcon(item, item.Icon)
+end
+
+local function SkinHeader(header)
+	FadeRegions(header)
+	Shell(header)
+	Skin.TipFace(header.Name, 'body')
+end
+
+local function SkinCategory(category)
+	Once(category.Header, SkinHeader)
+	for item in category.itemPool:EnumerateActive() do Once(item, SkinItem) end
+end
+
+local function SweepCategories(frame)
+	for category in frame.categoryPool:EnumerateActive() do SkinCategory(category) end
+end
+
+local function SweepSections(filter)
+	for _, key in ipairs(SECTION_KEYS) do SkinCategory(filter[key]) end
+end
+
+local function GearEnter(dropdown)
+	dropdown._buiGear:SetVertexColor(unpack(Skin.HoverColor()))
+end
+
+local function GearLeave(dropdown)
+	BUI.Painter.Tint(dropdown._buiGear, 'skinLabel')
+end
+
+local function SkinGear(dropdown)
+	FadeRegions(dropdown)
+	if dropdown._buiGear then return end
+	local glyph = context.Own(dropdown:CreateTexture(nil, 'ARTWORK'))
+	BUILib.Widget.SetGlyph(glyph, BUILib.GetLibMedia('cog'))
+	glyph:SetSize(GEAR_GLYPH_SIZE, GEAR_GLYPH_SIZE)
+	glyph:SetPoint('CENTER')
+	BUI.Painter.Tint(glyph, 'skinLabel')
+	dropdown._buiGear = glyph
+	dropdown:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.CooldownManager gear OnEnter', GearEnter))
+	dropdown:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.CooldownManager gear OnLeave', GearLeave))
+end
+
+local function SkinSideTabs(frame)
+	for _, tab in ipairs(frame.TabButtons) do
+		Keep(tab.NewOptionsFrame)
+		CheckedSideTab(tab, { width = tab:GetWidth(), height = tab:GetHeight() })
+	end
+end
+
+local function RefreshSideTabs(frame)
+	for _, tab in ipairs(frame.TabButtons) do Skin.SetSideTabSelected(tab, frame.displayMode == tab.displayMode) end
+end
+
+local function SkinSettings(frame)
+	Skin.TipFaceTree(frame, FONT_DEPTH)
+	context.Chrome(frame)
+	EditBox(frame.SearchBox)
+	SkinGear(frame.SettingsDropdown)
+	Dropdown(frame.LayoutDropdown)
+	Button(frame.UndoButton)
+	ScrollBar(frame.CooldownScroll.ScrollBar)
+	ScrollBar(frame.GroupBuffFilter.Scroll.ScrollBar)
+	SkinSideTabs(frame)
+end
+
+local function RefreshSettings(frame)
+	SweepCategories(frame)
+	SweepSections(frame.GroupBuffFilter)
+	RefreshSideTabs(frame)
+end
+
+local function InstallSettings(frame)
+	Hook(frame, 'RefreshLayout', SweepCategories)
+	Hook(frame, 'RefreshVisibleCategories', SweepCategories)
+	Hook(frame.GroupBuffFilter, 'Refresh', SweepSections)
+end
+
+context.Window('CooldownViewerSettings', { install = InstallSettings, skin = SkinSettings, show = RefreshSettings })

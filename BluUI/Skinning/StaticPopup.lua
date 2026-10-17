@@ -1,56 +1,25 @@
 local _, BUI = ...
 
-local select = select
+local ipairs = ipairs
 
 local Skin = BUI.Skinning
 
-local SKIN_ID = 'staticpopup'
 local SCALE_KEY = 'staticpopupScale'
 local DIALOG_COUNT = 4
 local GLOW_LOW_ALPHA = 0.15
 local GLOW_PULSE_SECONDS = 0.6
 local RESURRECT_DIALOGS = { RESURRECT = true, RESURRECT_NO_SICKNESS = true, RESURRECT_NO_TIMER = true }
-local BUTTON_KEYS = { 'button1', 'button2', 'button3', 'button4', 'extraButton' }
-local BUTTON_SUFFIXES = { 'Button1', 'Button2', 'Button3', 'Button4', 'ExtraButton' }
+local BUTTON_KEYS = { 'Button1', 'Button2', 'Button3', 'Button4' }
 
-local installed = false
-local fadedArt = {}
-
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
+local context = Skin.Define('staticpopup', {
+	name = 'Popups',
+	description = 'Resurrect, release, confirm and other Blizzard popup dialogs drawn like the BluUI tooltip.',
+	icon = 'Interface/Icons/INV_Misc_Note_02',
+})
+local Fade, FadeRegions, Shell, Button = context.Fade, context.FadeRegions, context.Shell, context.Button
 
 local function CurrentScale()
 	return BUI.GetDB().skinning[SCALE_KEY]
-end
-
-local function FadeTextures(frame)
-	if not frame or not frame.GetRegions then return end
-	for regionIndex = 1, select('#', frame:GetRegions()) do
-		local region = select(regionIndex, frame:GetRegions())
-		if region and region.IsObjectType and region:IsObjectType('Texture') and not region.__buiSkin then
-			fadedArt[region] = true
-			region:SetAlpha(0)
-		end
-	end
-end
-
-local function Child(dialog, key, suffix)
-	local name = dialog:GetName()
-	return dialog[key] or (name and _G[name .. suffix])
-end
-
-local function DialogButtons(dialog)
-	local buttons = {}
-	for keyIndex = 1, #BUTTON_KEYS do
-		local button = Child(dialog, BUTTON_KEYS[keyIndex], BUTTON_SUFFIXES[keyIndex])
-		if button then buttons[#buttons + 1] = button end
-	end
-	return buttons
-end
-
-local function DialogText(dialog)
-	return Child(dialog, 'text', 'Text')
 end
 
 local function KeepAcceptEdges(button)
@@ -77,101 +46,62 @@ local function EnsureAcceptPulse(button)
 end
 
 local function StopAcceptGlow(dialog)
-	local button = Child(dialog, 'button1', 'Button1')
-	local pulse = button and button._buiAcceptPulse
+	local button = dialog.ButtonContainer.Button1
+	local pulse = button._buiAcceptPulse
 	if not pulse or not pulse:IsPlaying() then return end
 	pulse:Stop()
 	Skin.TipShellEdges(button, false)
 end
 
 local function UpdateAcceptGlow(dialog)
-	if not Enabled() or not RESURRECT_DIALOGS[dialog.which] or not dialog:IsShown() then
+	if not RESURRECT_DIALOGS[dialog.which] then
 		StopAcceptGlow(dialog)
 		return
 	end
-	local button = Child(dialog, 'button1', 'Button1')
-	if not button then return end
+	local button = dialog.ButtonContainer.Button1
 	Skin.TipShellEdges(button, true)
 	local pulse = EnsureAcceptPulse(button)
 	if not pulse:IsPlaying() then pulse:Play() end
 end
 
-local function Apply(dialog)
-	if not Enabled() or not dialog or dialog:IsForbidden() then return end
-	if not dialog._buiStaticPopup then
-		dialog._buiStaticPopup = true
-		FadeTextures(dialog)
-		FadeTextures(dialog.Border)
-		if dialog.BG then dialog.BG:SetAlpha(0) end
-		if dialog.NineSlice then dialog.NineSlice:SetAlpha(0) end
-	end
+local function ScaledButton(button, scale)
+	Button(button)
+	Skin.TipButtonFonts(button, scale)
+end
+
+local function SkinDialog(dialog)
+	FadeRegions(dialog)
+	Fade(dialog.BG)
+end
+
+local function RefreshDialog(dialog)
 	local scale = CurrentScale()
-	Skin.TipShell(dialog)
-	Skin.TipFont(DialogText(dialog), 'body', scale)
-	local buttons = DialogButtons(dialog)
-	for buttonIndex = 1, #buttons do
-		Skin.TipButton(buttons[buttonIndex], scale)
-	end
+	Shell(dialog)
+	Skin.TipFont(dialog.Text, 'body', scale)
+	local container = dialog.ButtonContainer
+	for _, key in ipairs(BUTTON_KEYS) do ScaledButton(container[key], scale) end
+	ScaledButton(dialog.ExtraButton, scale)
 	UpdateAcceptGlow(dialog)
 end
 
 local function ApplyShown()
+	if not context.Enabled() then return end
 	for dialogIndex = 1, DIALOG_COUNT do
 		local dialog = _G['StaticPopup' .. dialogIndex]
-		if dialog and dialog:IsShown() then Apply(dialog) end
+		if dialog:IsShown() then RefreshDialog(dialog) end
 	end
 end
 
-local function Install()
-	if installed then return end
-	installed = true
-	local onShow = BUI.Profiler.Wrap('Skin.StaticPopup popup reskin', Apply)
-	local onHide = BUI.Profiler.Wrap('Skin.StaticPopup glow stop', StopAcceptGlow)
-	for dialogIndex = 1, DIALOG_COUNT do
-		local dialog = _G['StaticPopup' .. dialogIndex]
-		if dialog then
-			dialog:HookScript('OnShow', onShow)
-			dialog:HookScript('OnHide', onHide)
-		end
-	end
-	ApplyShown()
+local function InstallDialog(dialog)
+	dialog:HookScript('OnHide', BUI.Profiler.Wrap('Skin.StaticPopup glow stop', StopAcceptGlow))
 end
 
-local function Deactivate()
-	for region in pairs(fadedArt) do region:SetAlpha(1) end
-	for dialogIndex = 1, DIALOG_COUNT do
-		local dialog = _G['StaticPopup' .. dialogIndex]
-		if dialog and dialog._buiStaticPopup then
-			StopAcceptGlow(dialog)
-			if dialog.BG then dialog.BG:SetAlpha(1) end
-			if dialog.NineSlice then dialog.NineSlice:SetAlpha(1) end
-			Skin.HideTipShell(dialog)
-		end
-	end
+for dialogIndex = 1, DIALOG_COUNT do
+	context.Window('StaticPopup' .. dialogIndex, { skin = SkinDialog, show = RefreshDialog, install = InstallDialog })
 end
 
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		ApplyShown()
-	else
-		Deactivate()
-	end
+context.OnDisable(function()
+	for dialogIndex = 1, DIALOG_COUNT do StopAcceptGlow(_G['StaticPopup' .. dialogIndex]) end
 end)
 
-StaticPopupDialogs['BUI_SKIN_TEST'] = {
-	text = 'Skin preview. This is how Blizzard popups look with the BluUI skin on.',
-	button1 = 'Looks Good',
-	button2 = 'Close',
-	timeout = 0,
-	whileDead = true,
-	hideOnEscape = true,
-	preferredIndex = 3,
-}
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Popups',
-	description = 'Resurrect, release, confirm and other Blizzard popup dialogs drawn like the BluUI tooltip.',
-	icon = 'Interface/Icons/INV_Misc_Note_02',
-	settings = { Skin.ScaleOption(SCALE_KEY, ApplyShown) },
-})
+context.info.settings = { Skin.ScaleOption(SCALE_KEY, ApplyShown) }

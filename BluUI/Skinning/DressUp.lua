@@ -1,36 +1,31 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.DressUp')
-
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
 
-local SKIN_ID = 'dressup'
-local MAIN_ART = { 'Bg', 'TopTileStreaks', 'Inset', 'ModelBackground' }
 local PANEL_INSET = 6
 local SET_TITLE_SCALE = 1.2
 local ROW_SELECTED_ALPHA = 0.12
 local ROW_HOVER_ALPHA = 0.06
 local BOTTOM_BUTTON_KEYS = { 'LinkButton', 'ResetButton' }
 
-local installed = false
-local skinned = false
-
-local function Enabled()
-	return Skin.IsSkinEnabled(SKIN_ID)
-end
-
-local context = Skin.NewContext(Enabled)
-local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
+local context = Skin.Define('dressup', {
+	name = 'Dressing Room',
+	description = 'The dressing room and its outfit panels: dark shell, library buttons and dropdown, flat set list and glyph maximize buttons.',
+	icon = 'Interface/Icons/INV_Chest_Cloth_17',
+})
+local Enabled = context.Enabled
+local Fade, FadeRegions = context.Fade, context.FadeRegions
 local Shell, Button, Close, Dropdown = context.Shell, context.Button, context.Close, context.Dropdown
-local ScrollBar, Title = context.ScrollBar, context.Title
+local ScrollBar = context.ScrollBar
 local FlatTexture, SelectedTexture, CropIcon = Skin.FlatTexture, Skin.SelectedTexture, Skin.CropIcon
 
 local function SkinSetRow(row)
-	if not Enabled() or row._buiRow then return end
-	row._buiRow = true
+	if not Enabled() then return end
 	Fade(row.BackgroundTexture)
+	if row._buiRow then return end
+	row._buiRow = true
 	row.SelectedTexture:SetBlendMode('BLEND')
 	SelectedTexture(row.SelectedTexture, ROW_SELECTED_ALPHA)
 	row.HighlightTexture:SetBlendMode('BLEND')
@@ -41,124 +36,41 @@ local function SkinSetRow(row)
 end
 
 local function OnSlotDetails(slot)
-	if Enabled() then Skin.TipFace(slot.Name, 'body') end
+	Skin.TipFace(slot.Name, 'body')
 end
 
 local function SkinSidePanel(panel)
-	if not panel then return end
 	FadeRegions(panel)
 	Shell(panel, PANEL_INSET)
 end
 
 local function SkinSetSelection(panel)
-	if not panel then return end
 	SkinSidePanel(panel)
 	Skin.TipFont(panel.SetName, 'title', SET_TITLE_SCALE)
 	ScrollBar(panel.ScrollBar)
 	Skin.SweepScrollBox(panel.ScrollBox, SkinSetRow)
 end
 
-local function SkinCustomSetDropdown(dropdown)
-	if not dropdown then return end
-	Dropdown(dropdown)
-	for _, child in ipairs({ dropdown:GetChildren() }) do
-		if child:IsObjectType('Button') and child.GetText and child:GetText() then Button(child) end
-	end
-end
-
-local function SkinMaximize(frame)
-	if not frame then return end
-	Skin.TipPageButton(frame.MaximizeButton, 'expand')
-	Skin.TipPageButton(frame.MinimizeButton, 'condense')
-end
-
 local function SkinMainFrame(frame)
-	Fade(frame.NineSlice)
-	FadeKeys(frame, MAIN_ART)
-	FadeRegions(frame)
-	if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
-	Shell(frame)
-	Title(frame.TitleContainer and frame.TitleContainer.TitleText)
-	Close(frame.CloseButton)
-	SkinCustomSetDropdown(frame.CustomSetDropdown)
-	SkinMaximize(frame.MaximizeMinimizeFrame)
+	context.Chrome(frame)
+	Dropdown(frame.CustomSetDropdown)
+	Button(frame.CustomSetDropdown.SaveButton)
 	for _, key in ipairs(BOTTOM_BUTTON_KEYS) do Button(frame[key]) end
 	Button(_G.DressUpFrameCancelButton)
 	SkinSidePanel(frame.CustomSetDetailsPanel)
 	SkinSetSelection(frame.SetSelectionPanel)
 end
 
-local function SkinSideDressUp(frame)
-	if not frame then return end
-	Fade(frame.NineSlice)
-	FadeKeys(frame, MAIN_ART)
+local function SkinSideFrame(frame)
 	FadeRegions(frame)
-	if frame.PortraitContainer then Fade(frame.PortraitContainer.portrait) end
 	Shell(frame)
-	Title(frame.TitleContainer and frame.TitleContainer.TitleText)
 	Button(frame.ResetButton)
-	Close(frame.CloseButton or _G.SideDressUpFrameCloseButton)
+	Close(_G.SideDressUpFrameCloseButton)
 end
 
-local function ApplySide()
-	local frame = _G.SideDressUpFrame
-	if not frame or frame:IsForbidden() or not Enabled() or frame._buiSideSkinned then return end
-	frame._buiSideSkinned = true
-	SkinSideDressUp(frame)
+local function InstallFrame()
+	context.Hook(DressUpCustomSetDetailsSlotMixin, 'SetUp', OnSlotDetails)
 end
 
-local function Apply()
-	ApplySide()
-	local frame = _G.DressUpFrame
-	if not frame or frame:IsForbidden() or not Enabled() or skinned then return end
-	skinned = true
-	SkinMainFrame(frame)
-end
-
-local function Install()
-	if installed then return end
-	local frame = _G.DressUpFrame
-	if not frame then return end
-	installed = true
-	frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.DressUp frame reskin', Apply))
-	if _G.SideDressUpFrame then _G.SideDressUpFrame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.DressUp side reskin', ApplySide)) end
-	local slotMixin = _G.DressUpCustomSetDetailsSlotMixin
-	if slotMixin and slotMixin.SetDetails then Hook(slotMixin, 'SetDetails', OnSlotDetails) end
-	if frame:IsShown() then Apply() end
-end
-
-local function TryInstall()
-	Install()
-	if installed then BUI.Events:Unregister('ADDON_LOADED', 'Skin.DressUp') end
-end
-
-local function Deactivate()
-	context.Restore()
-	skinned = false
-	if _G.SideDressUpFrame then _G.SideDressUpFrame._buiSideSkinned = nil end
-end
-
-Skin.OnToggle(SKIN_ID, function(enabled)
-	if enabled then
-		Install()
-		if not installed then
-			BUI.Events:Register('ADDON_LOADED', 'Skin.DressUp', TryInstall)
-		elseif _G.DressUpFrame:IsShown() then
-			Apply()
-		end
-	else
-		Deactivate()
-	end
-end)
-
-Skin.RegisterSkin(SKIN_ID, {
-	name = 'Dressing Room',
-	description = 'The dressing room and its outfit panels: dark shell, house buttons and dropdown, flat set list and glyph maximize buttons.',
-	icon = 'Interface/Icons/INV_Chest_Cloth_17',
-})
-
-BUI.Events:Once('PLAYER_LOGIN', 'Skin.DressUpInstall', function()
-	if not Enabled() then return end
-	Install()
-	if not installed then BUI.Events:Register('ADDON_LOADED', 'Skin.DressUp', TryInstall) end
-end)
+context.Window('DressUpFrame', { skin = SkinMainFrame, install = InstallFrame })
+context.Window('SideDressUpFrame', { skin = SkinSideFrame })

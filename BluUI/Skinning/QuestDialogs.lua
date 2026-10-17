@@ -4,8 +4,9 @@ local Wrap = BUI.Profiler.Wrap
 
 local ipairs, pairs = ipairs, pairs
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
+local BUILib = BluUI.BUILibClient
 local Skin = BUI.Skinning
+local Painter = BUI.Painter
 local SELECTED = Skin.SELECTED_COLOR
 
 local QUEST_TITLE_SCALE = 1.25
@@ -18,8 +19,8 @@ local ITEM_HIGHLIGHT_ALPHA = 0.12
 local ITEM_HIGHLIGHT_OFFSET_X, ITEM_HIGHLIGHT_OFFSET_Y = 8, -7
 local ITEM_BUTTON_WIDTH, ITEM_BUTTON_HEIGHT = 147, 41
 local PROGRESS_ITEM_COUNT = 6
-local BODY_TEXT = { 0.87, 0.87, 0.9, 1 }
 local SHORT_MONEY_TEXT = { 0.9, 0.35, 0.35, 1 }
+local COMPLETE_SUFFIX = '(' .. COMPLETE .. ')'
 local HTML_ELEMENTS = { P = 12, H1 = 16, H2 = 14, H3 = 13 }
 local MONEY_BUTTON_KEYS = { 'GoldButton', 'SilverButton', 'CopperButton' }
 local QUEST_PANEL_NAMES = { 'QuestFrameGreetingPanel', 'QuestFrameDetailPanel', 'QuestFrameProgressPanel', 'QuestFrameRewardPanel' }
@@ -62,34 +63,18 @@ local context = Skin.Define('questdialogs', {
 })
 local Enabled = context.Enabled
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
-local Shell, Button, Close, Card = context.Shell, context.Button, context.Close, context.Card
-local ScrollBar, Face, Body, Title = context.ScrollBar, context.Face, context.Body, context.Title
-local SelectedTexture, CropIcon = Skin.SelectedTexture, Skin.CropIcon
-
-local function SetColor(fontString, color)
-	if fontString then fontString:SetTextColor(color[1], color[2], color[3], color[4]) end
-end
+local Shell, Button, Close, Card, Keep, Line = context.Shell, context.Button, context.Close, context.Card, context.Keep, context.Line
+local ScrollBar, Face, Body, Title, PageButton = context.ScrollBar, context.Face, context.Body, context.Title, context.PageButton
+local SelectedTexture = Skin.SelectedTexture
 
 local function FadeTexturesExcept(frame, keepFirst, keepSecond)
-	for regionIndex = 1, select('#', frame:GetRegions()) do
-		local region = select(regionIndex, frame:GetRegions())
+	for _, region in ipairs({ frame:GetRegions() }) do
 		if region ~= keepFirst and region ~= keepSecond and region:IsObjectType('Texture') and not region:IsObjectType('MaskTexture') then Fade(region) end
 	end
 end
 
-local function BodyRegions(frame)
-	for regionIndex = 1, select('#', frame:GetRegions()) do
-		local region = select(regionIndex, frame:GetRegions())
-		if region:IsObjectType('FontString') then Body(region) end
-	end
-end
-
 local function FaceMoney(frame)
-	if not frame then return end
-	for _, key in ipairs(MONEY_BUTTON_KEYS) do
-		local button = frame[key]
-		if button then Face(button.Text) end
-	end
+	for _, key in ipairs(MONEY_BUTTON_KEYS) do Face(frame[key].Text) end
 end
 
 local function WideScroll(frame, scroll, scrollBar)
@@ -106,7 +91,6 @@ local function WideScroll(frame, scroll, scrollBar)
 end
 
 local function SkinFriendshipBar(bar)
-	if not bar then return end
 	FadeKeys(bar, FRIENDSHIP_ART)
 	FadeTexturesExcept(bar, bar.icon, bar.Bar)
 	bar:SetStatusBarTexture(BUI.GetGlobalTexture())
@@ -115,7 +99,6 @@ end
 
 local function SkinListRow(button, inset)
 	local fontString = button:GetFontString()
-	if not fontString then return end
 	fontString:SetFixedColor(true)
 	Body(fontString)
 	Fade(button:GetHighlightTexture())
@@ -123,14 +106,13 @@ local function SkinListRow(button, inset)
 end
 
 local function SkinRewardIcon(button)
-	if not button or button._buiRewardIcon then return end
+	if button._buiRewardIcon then return end
 	button._buiRewardIcon = true
 	Fade(button.NameFrame)
 	Fade(button.IconOverlay)
 	Fade(button.IconOverlay2)
 	Fade(button.IconBorder)
-	CropIcon(button.Icon)
-	Skin.TipIconFrame(button, button.Icon)
+	Skin.SquareIcon(button, button.Icon)
 	Face(button.Name)
 	Skin.TipCount(button.Count)
 end
@@ -140,15 +122,14 @@ local function RefreshQualityEdge(button)
 end
 
 local function OnItemButtonQuality(button)
-	if button and button._buiRewardIcon then RefreshQualityEdge(button) end
+	if button._buiRewardIcon then RefreshQualityEdge(button) end
 end
 
 local function SkinSpellReward(button)
-	if not button or button._buiSpellReward then return end
+	if button._buiSpellReward then return end
 	button._buiSpellReward = true
 	FadeTexturesExcept(button, button.Icon)
-	CropIcon(button.Icon)
-	Skin.TipIconFrame(button, button.Icon)
+	Skin.SquareIcon(button, button.Icon)
 	Face(button.Name)
 end
 
@@ -163,18 +144,16 @@ local function SkinReputationReward(button)
 	if button._buiReputationReward then return end
 	button._buiReputationReward = true
 	Fade(button.NameFrame)
-	CropIcon(button.Icon)
-	Skin.TipIconFrame(button, button.Icon)
+	Skin.SquareIcon(button, button.Icon)
 	Face(button.Name)
 	Face(button.RewardAmount)
 end
 
 local function SkinItemHighlight(highlight)
-	if not highlight or highlight._buiItemHighlight then return end
+	if highlight._buiItemHighlight then return end
 	highlight._buiItemHighlight = true
 	FadeRegions(highlight)
-	local fill = highlight:CreateTexture(nil, 'BACKGROUND')
-	fill.__buiSkin = true
+	local fill = Keep(highlight:CreateTexture(nil, 'BACKGROUND'))
 	fill:SetPoint('TOPLEFT', highlight, 'TOPLEFT', ITEM_HIGHLIGHT_OFFSET_X, ITEM_HIGHLIGHT_OFFSET_Y)
 	fill:SetSize(ITEM_BUTTON_WIDTH, ITEM_BUTTON_HEIGHT)
 	SelectedTexture(fill, ITEM_HIGHLIGHT_ALPHA)
@@ -182,33 +161,24 @@ end
 
 local function SkinRewardsFrame(rewards)
 	for _, key in ipairs(REWARD_ITEM_KEYS) do SkinRewardIcon(rewards[key]) end
-	local artifact = rewards.ArtifactXPFrame
-	if artifact then Fade(artifact.Overlay) end
+	Fade(rewards.ArtifactXPFrame.Overlay)
 	local skill = rewards.SkillPointFrame
-	if skill then
-		Fade(skill.CircleBackground)
-		Fade(skill.CircleBackgroundGlow)
-		Face(skill.ValueText)
-	end
+	Fade(skill.CircleBackground)
+	Fade(skill.CircleBackgroundGlow)
+	Face(skill.ValueText)
 	local titleFrame = rewards.TitleFrame
-	if titleFrame then
-		FadeKeys(titleFrame, TITLE_FRAME_ART)
-		CropIcon(titleFrame.Icon)
-		Skin.TipIconFrame(titleFrame, titleFrame.Icon)
-		Face(titleFrame.Name)
-	end
-	if rewards.XPFrame then Face(rewards.XPFrame.ValueText) end
+	FadeKeys(titleFrame, TITLE_FRAME_ART)
+	Skin.SquareIcon(titleFrame, titleFrame.Icon)
+	Face(titleFrame.Name)
+	Face(rewards.XPFrame.ValueText)
 	FaceMoney(rewards.MoneyFrame)
 	SkinItemHighlight(rewards.ItemHighlight)
 end
 
 local function RecolorObjectives()
-	local objectives = _G.QuestInfoObjectivesFrame.Objectives
-	local completeSuffix = '(' .. COMPLETE .. ')'
-	for _, objective in ipairs(objectives) do
+	for _, objective in ipairs(_G.QuestInfoObjectivesFrame.Objectives) do
 		if objective:IsShown() then
-			local text = objective:GetText()
-			local finished = text and text:sub(-#completeSuffix) == completeSuffix
+			local finished = objective:GetText():sub(-#COMPLETE_SUFFIX) == COMPLETE_SUFFIX
 			Skin.TipFont(objective, finished and 'label' or 'body')
 		end
 	end
@@ -216,7 +186,7 @@ end
 
 local function RecolorMoneyLabel(fontString, required)
 	Body(fontString)
-	if required > GetMoney() then SetColor(fontString, SHORT_MONEY_TEXT) end
+	if required > GetMoney() then fontString:SetTextColor(SHORT_MONEY_TEXT[1], SHORT_MONEY_TEXT[2], SHORT_MONEY_TEXT[3], SHORT_MONEY_TEXT[4]) end
 end
 
 local function SweepRewards()
@@ -286,41 +256,31 @@ end
 
 local function RefreshProgress()
 	RecolorMoneyLabel(_G.QuestProgressRequiredMoneyText, GetQuestMoneyToGet())
-	for itemIndex = 1, PROGRESS_ITEM_COUNT do
-		local button = _G['QuestProgressItem' .. itemIndex]
-		if button then RefreshQualityEdge(button) end
-	end
+	for itemIndex = 1, PROGRESS_ITEM_COUNT do RefreshQualityEdge(_G['QuestProgressItem' .. itemIndex]) end
 end
 
 local function BuildBreakLine()
 	local texture = _G.QuestGreetingFrameHorizontalBreak
-	breakLine = context.Own(texture:GetParent():CreateTexture(nil, 'ARTWORK'))
-	BUI.Painter.Fill(breakLine, 'skinBorder')
 	local startInset = GREETING.PAD - GREETING.BREAK_X
 	local endInset = GREETING.BREAK_X + texture:GetWidth() - GreetingRowWidth() + GREETING.PAD
-	BUILib.Skin.PixelLine(breakLine, texture, false, startInset, endInset)
+	breakLine = Line(texture:GetParent(), texture, false, startInset, endInset)
 end
 
 local function SkinModelScene(scene)
-	if not scene then return end
 	FadeKeys(scene, MODEL_SCENE_ART)
 	Shell(scene)
 	Title(_G.QuestNPCModelNameText)
 	local textFrame = scene.ModelTextFrame
-	if textFrame then
-		Fade(textFrame.TextBackground)
-		Shell(textFrame)
-	end
+	Fade(textFrame.TextBackground)
+	Shell(textFrame)
 	Body(_G.QuestNPCModelText)
-	local scroll = _G.QuestNPCModelTextScrollFrame
-	if scroll then ScrollBar(scroll.ScrollBar) end
+	ScrollBar(_G.QuestNPCModelTextScrollFrame.ScrollBar)
 end
 
 local function SkinQuestFrame(frame)
 	context.Chrome(frame)
 	Fade(_G.QuestFramePortrait)
-	local notice = frame.AccountCompletedNotice
-	if notice then Skin.TipFont(notice.Text, 'label') end
+	Skin.TipFont(frame.AccountCompletedNotice.Text, 'label')
 	SkinFriendshipBar(frame.FriendshipStatusBar)
 	for _, name in ipairs(QUEST_PANEL_NAMES) do FadeRegions(_G[name]) end
 	for _, name in ipairs(QUEST_SCROLL_NAMES) do
@@ -345,8 +305,7 @@ end
 local function SkinAdventureReward(reward)
 	Fade(reward.ItemNameBG)
 	Fade(reward.Overlay)
-	CropIcon(reward.Icon)
-	Skin.TipIconFrame(reward, reward.Icon)
+	Skin.SquareIcon(reward, reward.Icon)
 	Face(reward.Name)
 	Skin.TipCount(reward.Count)
 end
@@ -446,25 +405,19 @@ local function SkinGossipFrame(frame)
 	WideScroll(frame, panel.ScrollBox, panel.ScrollBar)
 	Button(panel.GoodbyeButton)
 	ShapeGossipList(panel.ScrollBox, panel.ScrollBar)
-	Skin.SweepScrollBox(panel.ScrollBox, SkinGossipRow)
+	Skin.SweepScrollBox(panel.ScrollBox, context.Guard(SkinGossipRow))
 end
 
 local function StylePageHtml()
 	local html = _G.ItemTextPageText
 	for element, size in pairs(HTML_ELEMENTS) do
 		html:SetFont(element, BUILib.Font, size, '')
-		html:SetTextColor(element, BODY_TEXT[1], BODY_TEXT[2], BODY_TEXT[3])
+		html:SetTextColor(element, Painter.Color('skinText'))
 	end
 end
 
 local function OnItemTextEvent(_, event)
 	if event == 'ITEM_TEXT_BEGIN' then StylePageHtml() end
-end
-
-local function SkinPageButton(button, direction)
-	if not button then return end
-	Skin.TipPageButton(button, direction)
-	BodyRegions(button)
 end
 
 local function SkinItemTextFrame(frame)
@@ -474,15 +427,13 @@ local function SkinItemTextFrame(frame)
 	Shell(scroll)
 	ScrollBar(scroll.ScrollBar)
 	StylePageHtml()
-	SkinPageButton(_G.ItemTextPrevPageButton, 'previous')
-	SkinPageButton(_G.ItemTextNextPageButton, 'next')
+	PageButton(_G.ItemTextPrevPageButton, 'previous')
+	PageButton(_G.ItemTextNextPageButton, 'next')
 	local bar = _G.ItemTextStatusBar
-	if bar then
-		FadeRegions(bar)
-		bar:SetStatusBarTexture(BUI.GetGlobalTexture())
-		bar:SetStatusBarColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
-		Shell(bar)
-	end
+	FadeRegions(bar)
+	bar:SetStatusBarTexture(BUI.GetGlobalTexture())
+	bar:SetStatusBarColor(SELECTED[1], SELECTED[2], SELECTED[3], 1)
+	Shell(bar)
 end
 
 local function OnAdventureRewards(dialog)

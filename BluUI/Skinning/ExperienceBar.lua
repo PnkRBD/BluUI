@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('Skin.ExperienceBar')
-
 local floor, format, max, min = math.floor, string.format, math.max, math.min
 local GetTime = GetTime
 
@@ -11,12 +9,22 @@ local Dragging = BUI.Dragging
 local BLANK = BUI.C.FALLBACK_TEXTURE
 
 local STAT_KEYS = { 'timeLevel', 'timeSession', 'levelingIn', 'completed' }
+local XP_EVENTS = { 'PLAYER_XP_UPDATE', 'PLAYER_LEVEL_UP', 'UPDATE_EXHAUSTION', 'UPDATE_FACTION', 'PLAYER_ENTERING_WORLD', 'TIME_PLAYED_MSG' }
+local BLIZZARD_CONTAINERS = { MainStatusTrackingBarContainer, SecondaryStatusTrackingBarContainer }
+local RENOWN_COLOR = { 0, 0.68, 0.94 }
+local PARAGON_COLOR = { 0, 0.75, 0.44 }
+
+local context = Skin.Define('experiencebar', {
+	name = 'Experience Bar',
+	description = 'Replaces the Blizzard status tracking bars with a minimal dark bar. Supports edge anchoring and free drag positioning.',
+	icon = 'Interface\\Icons\\Achievement_Level_80',
+})
+local Hook, Enabled = context.Hook, context.Enabled
 
 local barFrame, xpBar, restedBar, reputationBar, xpText, reputationText
 local reputationEdgeTexture, reputationBackground
 local statLabels = {}
 local hoverTicker
-local isActive = false
 
 local sessionOnlineTime = 0
 local sessionLoginTime = 0
@@ -28,22 +36,17 @@ local levelPlayedBaseTime = 0
 local levelPlayedReceived = false
 local suppressNextPlayed = false
 
-if ChatFrame_DisplayTimePlayed then
-	local origDisplayTimePlayed = ChatFrame_DisplayTimePlayed
-	ChatFrame_DisplayTimePlayed = function(...)
-		if suppressNextPlayed then
-			suppressNextPlayed = false
-			return
-		end
-		return origDisplayTimePlayed(...)
+local DisplayTimePlayed = ChatFrameUtil.DisplayTimePlayed
+function ChatFrameUtil.DisplayTimePlayed(...)
+	if suppressNextPlayed then
+		suppressNextPlayed = false
+		return
 	end
+	return DisplayTimePlayed(...)
 end
 
 local function IsAtMaxLevel()
-	local level = UnitLevel('player')
-	if IsLevelAtEffectiveMaxLevel then return IsLevelAtEffectiveMaxLevel(level) end
-	if GetMaxLevelForPlayerExpansion then return level >= GetMaxLevelForPlayerExpansion() end
-	return level >= (MAX_PLAYER_LEVEL or 80)
+	return GameRulesUtil.IsPlayerAtEffectiveMaxLevel()
 end
 
 local function GetSessionTime()
@@ -57,11 +60,7 @@ end
 
 local function Placing()
 	local config = GetConfig()
-	return config.position == 'FREE' and config.locked == false
-end
-
-local function GetFont()
-	return BUI.GetGlobalFont() or BUI.C.FONT_PATH
+	return config.position == 'FREE' and not config.locked
 end
 
 local function IsVertical(position)
@@ -69,28 +68,25 @@ local function IsVertical(position)
 end
 
 local function ApplyBarPosition()
-	if not barFrame then return end
 	local config = GetConfig()
-	local position = config.position or 'BOTTOM'
+	local position = config.position
 
 	barFrame:ClearAllPoints()
-	local barWidth = config.barWidth or 400
-	local fullWidth = config.fullWidth ~= false
 
 	if position == 'BOTTOM' then
-		if fullWidth then
+		if config.fullWidth then
 			barFrame:SetPoint('BOTTOMLEFT', UIParent, 'BOTTOMLEFT')
 			barFrame:SetPoint('BOTTOMRIGHT', UIParent, 'BOTTOMRIGHT')
 		else
-			barFrame:SetWidth(barWidth)
+			barFrame:SetWidth(config.barWidth)
 			BUI.Anchor.PlaceOnPixels(barFrame, 'BOTTOM', UIParent, 'BOTTOM', 0, 0)
 		end
 	elseif position == 'TOP' then
-		if fullWidth then
+		if config.fullWidth then
 			barFrame:SetPoint('TOPLEFT', UIParent, 'TOPLEFT')
 			barFrame:SetPoint('TOPRIGHT', UIParent, 'TOPRIGHT')
 		else
-			barFrame:SetWidth(barWidth)
+			barFrame:SetWidth(config.barWidth)
 			BUI.Anchor.PlaceOnPixels(barFrame, 'TOP', UIParent, 'TOP', 0, 0)
 		end
 	elseif position == 'LEFT' then
@@ -100,30 +96,26 @@ local function ApplyBarPosition()
 		barFrame:SetPoint('TOPRIGHT', UIParent, 'TOPRIGHT')
 		barFrame:SetPoint('BOTTOMRIGHT', UIParent, 'BOTTOMRIGHT')
 	elseif position == 'FREE' then
-		barFrame:SetWidth(barWidth)
-		BUI.Anchor.PlaceOnPixels(barFrame, 'CENTER', UIParent, 'CENTER', config.posX or 0, config.posY or -250)
+		barFrame:SetWidth(config.barWidth)
+		BUI.Anchor.PlaceOnPixels(barFrame, 'CENTER', UIParent, 'CENTER', config.posX, config.posY)
 	end
 
-	if barFrame.dragReady then
-		Dragging.SetLocked(barFrame, position ~= 'FREE' or config.locked ~= false)
-	end
+	Dragging.SetLocked(barFrame, position ~= 'FREE' or config.locked)
 end
 
 local function SaveSession()
-	local db = BUI.db
-	if not db then return end
-	if not db.char then db.char = {} end
-	db.char.xpSessionOnline = GetSessionTime()
-	db.char.xpSessionGained = sessionXPGained
+	local char = BUI.db.char
+	char.xpSessionOnline = GetSessionTime()
+	char.xpSessionGained = sessionXPGained
 end
 
 local function InitSession()
 	if sessionLoginTime > 0 then return end
 	sessionLoginTime = time()
-	local db = BUI.db
-	if db and db.char and db.char.xpSessionOnline then
-		sessionOnlineTime = db.char.xpSessionOnline
-		sessionXPGained = db.char.xpSessionGained or 0
+	local char = BUI.db.char
+	if char.xpSessionOnline then
+		sessionOnlineTime = char.xpSessionOnline
+		sessionXPGained = char.xpSessionGained
 	end
 	lastKnownXP = UnitXP('player')
 	lastKnownMax = UnitXPMax('player')
@@ -154,8 +146,7 @@ local function GetXPColor()
 end
 
 local function HasReputation()
-	local data = C_Reputation.GetWatchedFactionData()
-	return data and data.name and true or false
+	return C_Reputation.GetWatchedFactionData() ~= nil
 end
 
 local function HideHoverStats()
@@ -163,7 +154,6 @@ local function HideHoverStats()
 end
 
 local function UpdateHoverStats()
-	if not statLabels.timeLevel then return end
 	if IsAtMaxLevel() then
 		HideHoverStats()
 		return
@@ -205,7 +195,6 @@ local function UpdateHoverStats()
 end
 
 local function UpdateXP()
-	if not isActive then return end
 	local config = GetConfig()
 	if IsAtMaxLevel() then
 		xpBar:Hide()
@@ -240,70 +229,55 @@ local function UpdateXP()
 		ShortNumber(xpMax - currentXP), percent, restedString)
 end
 
-local function GetReputationProgress(data)
-	local factionID = data.factionID
+local function ParagonProgress(factionID, name)
+	if not C_Reputation.IsFactionParagon(factionID) then return end
+	local paragonValue, paragonThreshold, _, hasReward = C_Reputation.GetFactionParagonInfo(factionID)
+	if paragonThreshold <= 0 then return end
+	local suffix = hasReward and ' |cff00ff00Reward!|r' or ''
+	return 0, paragonThreshold, paragonValue % paragonThreshold, format('%s  Paragon%s', name, suffix), PARAGON_COLOR[1], PARAGON_COLOR[2], PARAGON_COLOR[3]
+end
 
-	if factionID and C_Reputation.IsMajorFaction and C_Reputation.IsMajorFaction(factionID) then
+local function GetReputationProgress(data)
+	local factionID, name = data.factionID, data.name
+
+	if C_Reputation.IsMajorFaction(factionID) then
 		local majorData = C_MajorFactions.GetMajorFactionData(factionID)
 		if majorData then
-			local threshold = majorData.renownLevelThreshold or 0
-			local earned = majorData.renownReputationEarned or 0
-			local level = majorData.renownLevel or 0
-			local label = format('%s  Renown %d', data.name, level)
-			if threshold <= 0 then
-				if C_Reputation.IsFactionParagon(factionID) then
-					local paragonValue, paragonThreshold, _, hasReward = C_Reputation.GetFactionParagonInfo(factionID)
-					if paragonValue and paragonThreshold and paragonThreshold > 0 then
-						local currentValue = paragonValue % paragonThreshold
-						local suffix = hasReward and ' |cff00ff00Reward!|r' or ''
-						return 0, paragonThreshold, currentValue, format('%s  Paragon%s', data.name, suffix), 0.0, 0.75, 0.44
-					end
-				end
-				return 0, 1, 1, label .. '  (Max)', 0.0, 0.68, 0.94
+			local threshold = majorData.renownLevelThreshold
+			local label = format('%s  Renown %d', name, majorData.renownLevel)
+			if threshold > 0 then
+				return 0, threshold, majorData.renownReputationEarned, label, RENOWN_COLOR[1], RENOWN_COLOR[2], RENOWN_COLOR[3]
 			end
-			return 0, threshold, earned, label, 0.0, 0.68, 0.94
+			local barMin, barMax, barCurrent, paragonLabel, red, green, blue = ParagonProgress(factionID, name)
+			if barMax then return barMin, barMax, barCurrent, paragonLabel, red, green, blue end
+			return 0, 1, 1, label .. '  (Max)', RENOWN_COLOR[1], RENOWN_COLOR[2], RENOWN_COLOR[3]
 		end
 	end
 
-	if factionID and C_Reputation.IsFactionParagon(factionID) then
-		local paragonValue, paragonThreshold, _, hasReward = C_Reputation.GetFactionParagonInfo(factionID)
-		if paragonValue and paragonThreshold and paragonThreshold > 0 then
-			local currentValue = paragonValue % paragonThreshold
-			local suffix = hasReward and ' |cff00ff00Reward!|r' or ''
-			return 0, paragonThreshold, currentValue, format('%s  Paragon%s', data.name, suffix), 0.0, 0.75, 0.44
+	local barMin, barMax, barCurrent, label, red, green, blue = ParagonProgress(factionID, name)
+	if barMax then return barMin, barMax, barCurrent, label, red, green, blue end
+
+	local friendData = C_GossipInfo.GetFriendshipReputation(factionID)
+	if friendData.friendshipFactionID > 0 then
+		local friendMax = friendData.nextThreshold or 0
+		if friendMax > 0 then
+			return friendData.reactionThreshold, friendMax, friendData.standing
 		end
+		return 0, 1, 1, name .. '  (Max)'
 	end
 
-	if factionID then
-		local friendData = C_GossipInfo.GetFriendshipReputation(factionID)
-		if friendData and friendData.friendshipFactionID and friendData.friendshipFactionID > 0 then
-			local friendMin = friendData.reactionThreshold or 0
-			local friendMax = friendData.nextThreshold or 0
-			if friendMax > 0 then
-				return friendMin, friendMax, friendData.reputation or 0
-			end
-			return 0, 1, 1, data.name .. '  (Max)'
-		end
-	end
-
-	return data.currentReactionThreshold or 0, data.nextReactionThreshold or 0, data.currentStanding or 0
+	return data.currentReactionThreshold, data.nextReactionThreshold, data.currentStanding
 end
 
 local function UpdateReputation()
-	if not isActive then
-		reputationBar:Hide()
-		reputationText:SetText('')
-		return
-	end
-
 	local data = C_Reputation.GetWatchedFactionData()
-	if not data or not data.name then
+	if not data then
 		reputationBar:Hide()
 		reputationText:SetText('')
 		return
 	end
 
-	local barMin, barMax, barCurrent, label, reputationRed, reputationGreen, reputationBlue = GetReputationProgress(data)
+	local barMin, barMax, barCurrent, label, red, green, blue = GetReputationProgress(data)
 	local rangeMax = max(1, barMax - barMin)
 	local rangeCurrent = max(0, min(barCurrent - barMin, rangeMax))
 
@@ -311,16 +285,11 @@ local function UpdateReputation()
 	reputationBar:SetMinMaxValues(0, rangeMax)
 	reputationBar:SetValue(rangeCurrent)
 
-	if reputationRed then
-		reputationBar:SetStatusBarColor(reputationRed, reputationGreen, reputationBlue)
-	else
-		local colors = FACTION_BAR_COLORS[data.reaction or 0]
-		if colors then
-			reputationBar:SetStatusBarColor(colors.r, colors.g, colors.b)
-		else
-			reputationBar:SetStatusBarColor(0.6, 0.6, 0.6)
-		end
+	if not red then
+		local colors = FACTION_BAR_COLORS[data.reaction]
+		red, green, blue = colors.r, colors.g, colors.b
 	end
+	reputationBar:SetStatusBarColor(red, green, blue)
 
 	reputationText:SetFormattedText('%s  %s / %s  (%d%%)',
 		label or data.name, ShortNumber(rangeCurrent), ShortNumber(rangeMax), floor(rangeCurrent / rangeMax * 100))
@@ -332,9 +301,7 @@ local function UpdateAll()
 end
 
 local function LayoutStatLabels()
-	if not statLabels.timeLevel then return end
-	local config = GetConfig()
-	local position = config.position or 'BOTTOM'
+	local position = GetConfig().position
 	local vertical = IsVertical(position)
 	local pad = 6
 
@@ -376,11 +343,9 @@ local function LayoutStatLabels()
 end
 
 local function LayoutBars()
-	if not barFrame then return end
 	local config = GetConfig()
 	local barHeight = config.barHeight
-	local position = config.position or 'BOTTOM'
-	local vertical = IsVertical(position)
+	local vertical = IsVertical(config.position)
 	local atMax = IsAtMaxLevel()
 	local hasReputation = HasReputation()
 	local scaledEdge = Pixel.PixelSize(1)
@@ -435,7 +400,7 @@ local function LayoutBars()
 		if totalWidth == 0 and not Placing() then
 			barFrame:Hide()
 		else
-			barFrame:SetWidth(math.max(totalWidth, barHeight) + scaledEdge * 2)
+			barFrame:SetWidth(max(totalWidth, barHeight) + scaledEdge * 2)
 			barFrame:Show()
 		end
 	else
@@ -477,7 +442,7 @@ local function LayoutBars()
 		if totalHeight == 0 and not Placing() then
 			barFrame:Hide()
 		else
-			barFrame:SetHeight(math.max(totalHeight, barHeight) + scaledEdge * 2)
+			barFrame:SetHeight(max(totalHeight, barHeight) + scaledEdge * 2)
 			barFrame:Show()
 		end
 	end
@@ -486,7 +451,7 @@ local function LayoutBars()
 end
 
 local function ApplySettings()
-	if not barFrame or not isActive then return end
+	if not Enabled() then return end
 	local config = GetConfig()
 	local red, green, blue = GetXPColor()
 	xpBar:SetStatusBarColor(red, green, blue, 0.85)
@@ -498,7 +463,7 @@ local function ApplySettings()
 	BUI.Tools.SetColorTex(barFrame.FrameBG, 0.05, 0.05, 0.05, backgroundAlpha)
 	reputationBackground:SetColorTexture(0.05, 0.05, 0.05, backgroundAlpha)
 
-	local font = GetFont()
+	local font = BUI.GetGlobalFont()
 	Pixel.ApplyFont(xpText, config.fontSize, font, 'OUTLINE')
 	Pixel.ApplyFont(reputationText, config.fontSize, font, 'OUTLINE')
 
@@ -512,43 +477,32 @@ local function ApplySettings()
 	UpdateAll()
 end
 
-local BLIZZ_BAR_FRAMES = { 'StatusTrackingBarManager', 'MainStatusTrackingBarContainer', 'SecondaryStatusTrackingBarContainer' }
+local function HoldAlpha(frame, alpha)
+	if alpha == 0 or frame._buiReasserting then return end
+	frame._buiReasserting = true
+	frame:SetAlpha(0)
+	frame._buiReasserting = nil
+end
 
-local function SuppressBlizzard()
-	for _, name in ipairs(BLIZZ_BAR_FRAMES) do
-		local frame = _G[name]
-		if frame then
-			Skin.SuppressBlizzardFrame(frame)
-			if not frame._buiReassertHooked then
-				frame._buiReassertHooked = true
-				frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.ExperienceBar blizzard suppress', function(self) if isActive then Skin.SuppressBlizzardFrame(self) end end))
-				Hook(frame, 'SetAlpha', function(self, alpha)
-					if isActive and alpha ~= 0 and not self._buiReasserting then
-						self._buiReasserting = true
-						self:SetAlpha(0)
-						self._buiReasserting = nil
-					end
-				end)
-			end
-		end
-	end
+local function InstallBar(frame)
+	Hook(frame, 'SetAlpha', HoldAlpha)
 end
 
 local function RestoreBlizzard()
-	local manager = StatusTrackingBarManager
-	if manager then
-		Skin.RestoreBlizzardFrame(manager)
-		if manager.UpdateBarsShown then manager:UpdateBarsShown() end
+	Skin.RestoreBlizzardFrame(StatusTrackingBarManager)
+	StatusTrackingBarManager:UpdateBarsShown()
+	for _, frame in ipairs(BLIZZARD_CONTAINERS) do
+		Skin.RestoreBlizzardFrame(frame)
+		frame:ApplySystemAnchor()
 	end
-	for _, name in ipairs({ 'MainStatusTrackingBarContainer', 'SecondaryStatusTrackingBarContainer' }) do
-		local frame = _G[name]
-		if frame then
-			Skin.RestoreBlizzardFrame(frame)
-			if frame.ApplySystemAnchor then frame:ApplySystemAnchor() end
-		end
-	end
-	if manager and manager.ApplySystemAnchor then manager:ApplySystemAnchor() end
 end
+
+local RefreshFaction = BUI.Dispatcher.New(function()
+	if not Enabled() then return end
+	LayoutBars()
+	ApplyBarPosition()
+	UpdateAll()
+end, 'Skin.ExperienceBar.Faction')
 
 local function CreateBars()
 	if barFrame then return end
@@ -603,7 +557,7 @@ local function CreateBars()
 	reputationText:SetTextColor(1, 1, 1, 1)
 	reputationText:Hide()
 
-	local font = GetFont()
+	local font = BUI.GetGlobalFont()
 	local statSize = max(config.fontSize, 10)
 	for _, key in ipairs(STAT_KEYS) do
 		local label = barFrame:CreateFontString(nil, 'OVERLAY')
@@ -627,7 +581,7 @@ local function CreateBars()
 	barFrame:SetScript('OnEnter', BUI.Profiler.Script('Skin.ExperienceBar barFrame OnEnter', function(self)
 		local config = GetConfig()
 		local hover = config.hoverHeight
-		local position = config.position or 'BOTTOM'
+		local position = config.position
 		local vertical = IsVertical(position)
 		local scaledEdge = Pixel.PixelSize(1)
 
@@ -657,7 +611,7 @@ local function CreateBars()
 				if position == 'FREE' then
 					local delta = (total + scaledEdge * 2 - oldHeight) / 2
 					self:ClearAllPoints()
-					BUI.Anchor.PlaceOnPixels(self, 'CENTER', UIParent, 'CENTER', config.posX or 0, (config.posY or -250) - delta)
+					BUI.Anchor.PlaceOnPixels(self, 'CENTER', UIParent, 'CENTER', config.posX, config.posY - delta)
 				end
 			end
 		end
@@ -678,7 +632,7 @@ local function CreateBars()
 	Dragging.MakeDraggable(barFrame, {
 		isLocked = function()
 			local config = GetConfig()
-			return config.position ~= 'FREE' or config.locked ~= false
+			return config.position ~= 'FREE' or config.locked
 		end,
 		onPositionChanged = function(x, y)
 			local config = GetConfig()
@@ -702,10 +656,9 @@ local function CreateBars()
 		hintAnchor = 'TOP',
 		skipClickThrough = true,
 	})
-	barFrame.dragReady = true
 
-	local function OnXPBarEvent(event, totalPlayedTime, levelPlayedTime)
-		if not isActive then return end
+	local function OnXPBarEvent(event, _, levelPlayedTime)
+		if not Enabled() then return end
 		if event == 'PLAYER_ENTERING_WORLD' then
 			InitSession()
 			LayoutBars()
@@ -725,19 +678,16 @@ local function CreateBars()
 			levelPlayedReceived = true
 			lastKnownMax = UnitXPMax('player')
 		elseif event == 'UPDATE_FACTION' then
-			LayoutBars()
-			ApplyBarPosition()
-		elseif event == 'TIME_PLAYED_MSG' and levelPlayedTime then
+			RefreshFaction()
+			return
+		elseif event == 'TIME_PLAYED_MSG' then
 			levelPlayedSeconds = levelPlayedTime
 			levelPlayedBaseTime = GetTime()
 			levelPlayedReceived = true
 		end
 		UpdateAll()
 	end
-	for _, event in ipairs({
-		'PLAYER_XP_UPDATE', 'PLAYER_LEVEL_UP', 'UPDATE_EXHAUSTION',
-		'UPDATE_FACTION', 'PLAYER_ENTERING_WORLD', 'TIME_PLAYED_MSG',
-	}) do
+	for _, event in ipairs(XP_EVENTS) do
 		BUI.Events:Register(event, 'Skinning.XPBar', OnXPBarEvent)
 	end
 
@@ -745,29 +695,21 @@ local function CreateBars()
 end
 
 local function Enable()
-	local wasActive = isActive
-	isActive = true
 	CreateBars()
-	SuppressBlizzard()
-	if not wasActive then InitSession() end
+	InitSession()
 	ApplySettings()
 end
 
-local function Disable()
-	if not isActive then return end
-	isActive = false
-	if barFrame then barFrame:Hide() end
-	if hoverTicker then hoverTicker:Hide() end
+context.Window('StatusTrackingBarManager', { install = InstallBar, enable = Enable, show = Skin.SuppressBlizzardFrame })
+context.Window('MainStatusTrackingBarContainer', { install = InstallBar, show = Skin.SuppressBlizzardFrame })
+context.Window('SecondaryStatusTrackingBarContainer', { install = InstallBar, show = Skin.SuppressBlizzardFrame })
+
+context.OnDisable(function()
+	if not barFrame then return end
+	barFrame:Hide()
+	hoverTicker:Hide()
 	HideHoverStats()
 	RestoreBlizzard()
-end
-
-BUI.Events:OnLogin('Skinning.XPBar.Init', function()
-	if Skin.IsSkinEnabled('experiencebar') then Enable() end
-end)
-
-Skin.OnToggle('experiencebar', function(enabled)
-	if enabled then Enable() else Disable() end
 end)
 
 local POSITION_OPTIONS = {
@@ -785,16 +727,6 @@ local function Setting(label, key, apply, extra)
 	option.set = function(value)
 		GetConfig()[key] = value
 		if apply then apply(value) end
-	end
-	return option
-end
-
-local function Switch(label, key, apply, defaultOn)
-	local option = Setting(label, key, apply)
-	option.get = function()
-		local value = GetConfig()[key]
-		if defaultOn then return value ~= false end
-		return value == true
 	end
 	return option
 end
@@ -819,22 +751,17 @@ local function CenterHorizontally(value)
 	ApplySettings()
 end
 
-Skin.RegisterSkin('experiencebar', {
-	name = 'Experience Bar',
-	description = 'Replaces the Blizzard status tracking bars with a minimal dark bar. Supports edge anchoring and free drag positioning.',
-	icon = 'Interface\\Icons\\Achievement_Level_80',
-	settings = {
-		Setting('Position', 'position', ApplySettings, { entries = POSITION_OPTIONS }),
-		Switch('Full width on the top or bottom edge', 'fullWidth', ApplySettings, true),
-		Switch('Center horizontally when free', 'centerH', CenterHorizontally),
-		Switch('Locked when free', 'locked', ApplySettings, true),
-		Setting('Bar height', 'barHeight', ApplySettings, { separator = true, min = 2, max = 24, step = 1 }),
-		Setting('Hover height', 'hoverHeight', nil, { min = 10, max = 40, step = 1 }),
-		Setting('Font size', 'fontSize', ApplySettings, { min = 6, max = 18, step = 1 }),
-		Setting('Bar width', 'barWidth', ApplySettings, { min = 500, max = 1500, step = 1 }),
-		ColorSetting('XP bar color', 'xpColor'),
-		Switch('Show rested XP', 'showRestedXP', ApplySettings),
-		ColorSetting('Rested XP color', 'restedColor'),
-		Setting('Background opacity', 'bgOpacity', ApplySettings, { min = 0, max = 100, step = 1 }),
-	},
-})
+context.info.settings = {
+	Setting('Position', 'position', ApplySettings, { entries = POSITION_OPTIONS }),
+	Setting('Full width on the top or bottom edge', 'fullWidth', ApplySettings),
+	Setting('Center horizontally when free', 'centerH', CenterHorizontally),
+	Setting('Locked when free', 'locked', ApplySettings),
+	Setting('Bar height', 'barHeight', ApplySettings, { separator = true, min = 2, max = 24, step = 1 }),
+	Setting('Hover height', 'hoverHeight', nil, { min = 10, max = 40, step = 1 }),
+	Setting('Font size', 'fontSize', ApplySettings, { min = 6, max = 18, step = 1 }),
+	Setting('Bar width', 'barWidth', ApplySettings, { min = 500, max = 1500, step = 1 }),
+	ColorSetting('XP bar color', 'xpColor'),
+	Setting('Show rested XP', 'showRestedXP', ApplySettings),
+	ColorSetting('Rested XP color', 'restedColor'),
+	Setting('Background opacity', 'bgOpacity', ApplySettings, { min = 0, max = 100, step = 1 }),
+}

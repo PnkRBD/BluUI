@@ -2,7 +2,7 @@ local _, BUI = ...
 
 local ipairs = ipairs
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
+local BUILib = BluUI.BUILibClient
 local Skin = BUI.Skinning
 local SELECTED = Skin.SELECTED_COLOR
 
@@ -58,7 +58,7 @@ local context = Skin.Define('groupfinder', {
 	newLook = true,
 })
 local Hook = context.Hook
-local Fade, FadeRegions, FadeKeys, FadeArt = context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt
+local Fade, FadeRegions, FadeKeys, FadeArt, Keep = context.Fade, context.FadeRegions, context.FadeKeys, context.FadeArt, context.Keep
 local Shell, Button, Close, Card, Dropdown, EditBox, CheckBox = context.Shell, context.Button, context.Close, context.Card, context.Dropdown, context.EditBox, context.CheckBox
 local ScrollBar, Face, Title, Body, TextBox = context.ScrollBar, context.Face, context.Title, context.Body, context.TextBox
 local SelectedTexture, RowHighlight, CropIcon, FlatTexture = Skin.SelectedTexture, Skin.RowHighlight, Skin.CropIcon, Skin.FlatTexture
@@ -77,13 +77,9 @@ local function InsetTexture(texture, red, green, blue, alpha)
 	texture:SetPoint('BOTTOMRIGHT', -1, 1)
 end
 
-local function KeepIcon(button)
-	if button and button.Icon then button.Icon.__buiSkin = true end
-end
-
 local function IconButton(button)
 	if not button then return end
-	KeepIcon(button)
+	Keep(button.Icon)
 	Button(button)
 end
 
@@ -92,8 +88,7 @@ local function SkinRoundIcon(holder)
 	Fade(holder.Border)
 	Fade(holder.Ring)
 	if holder.CircleMask then holder.CircleMask:Hide() end
-	CropIcon(holder.Icon)
-	Skin.TipIconFrame(holder, holder.Icon)
+	Skin.SquareIcon(holder, holder.Icon)
 end
 
 local function MenuButtonName(button)
@@ -102,23 +97,18 @@ end
 
 local function SetMenuButtonSelected(button, selected)
 	Skin.SetActiveEdge(button, selected)
-	local name = MenuButtonName(button)
-	if name then BUI.Painter.Text(name, selected and 'skinTitle' or 'skinText') end
+	BUI.Painter.Text(MenuButtonName(button), selected and 'skinTitle' or 'skinText')
 end
 
 local function SkinMenuButton(button)
-	if not button then return end
 	if not button._buiMenuButton then
 		button._buiMenuButton = true
-		if button.CircleMask then button.CircleMask:Hide() end
+		button.CircleMask:Hide()
 		local icon = button.icon or button.Icon
-		if icon then
-			icon:ClearAllPoints()
-			icon:SetPoint('LEFT', button, 'LEFT', MENU_ICON_INSET, 0)
-			icon:SetSize(MENU_ICON_SIZE, MENU_ICON_SIZE)
-			CropIcon(icon)
-			Skin.TipIconFrame(button, icon)
-		end
+		icon:ClearAllPoints()
+		icon:SetPoint('LEFT', button, 'LEFT', MENU_ICON_INSET, 0)
+		icon:SetSize(MENU_ICON_SIZE, MENU_ICON_SIZE)
+		Skin.SquareIcon(button, icon)
 		InsetTexture(button:GetHighlightTexture(), 1, 1, 1, HIGHLIGHT_ALPHA)
 		FaceSize(MenuButtonName(button), MENU_NAME_SIZE)
 	end
@@ -129,48 +119,38 @@ local function SkinMenuButton(button)
 end
 
 local function RefreshMenuButtons(holder, prefix, count, selectedIndex)
-	if not holder then return end
 	for buttonIndex = 1, count do
 		local button = holder[prefix .. buttonIndex]
-		if button and button._buiMenuButton then SetMenuButtonSelected(button, buttonIndex == selectedIndex) end
+		if button._buiMenuButton then SetMenuButtonSelected(button, buttonIndex == selectedIndex) end
 	end
 end
 
 local function RefreshGroupButtons()
 	local frame = _G.GroupFinderFrame
-	if frame then RefreshMenuButtons(frame, 'groupButton', GROUP_BUTTON_COUNT, frame.selectionIndex) end
+	RefreshMenuButtons(frame, 'groupButton', GROUP_BUTTON_COUNT, frame.selectionIndex)
 end
 
 local function RefreshPvpButtons()
 	RefreshMenuButtons(_G.PVPQueueFrame, 'CategoryButton', PVP_CATEGORY_COUNT, pvpSelectedIndex)
 end
 
-local function SkinRoleButton(button)
-	Skin.TipRoleButton(context, button)
-end
-
 local function SkinRoleButtons(holder, keys, prefix)
-	if not holder then return end
 	for _, key in ipairs(keys) do
-		SkinRoleButton(prefix and _G[prefix .. key] or holder[key])
+		Skin.TipRoleButton(context, prefix and _G[prefix .. key] or holder[key])
 	end
 end
 
 local function SkinRewardItem(item)
-	if not item or item._buiReward then return end
+	if item._buiReward then return end
 	item._buiReward = true
-	local name = item.GetName and item:GetName()
-	local icon = item.Icon or (name and _G[name .. 'IconTexture'])
-	Fade(item.NameFrame or (name and _G[name .. 'NameFrame']))
+	Fade(item.NameFrame)
 	Fade(item.IconOverlay)
-	CropIcon(icon)
-	Skin.TipIconFrame(item, icon)
-	Face(item.Name or (name and _G[name .. 'Name']))
-	Face(item.Count or (name and _G[name .. 'Count']))
+	Skin.SquareIcon(item, item.Icon)
+	Face(item.Name)
+	Face(item.Count)
 end
 
 local function SkinRewardPanel(child)
-	if not child then return end
 	for _, key in ipairs(REWARD_TITLE_KEYS) do Title(child[key]) end
 	for _, key in ipairs(REWARD_TEXT_KEYS) do Body(child[key]) end
 	Face(child.xpAmount)
@@ -178,8 +158,7 @@ local function SkinRewardPanel(child)
 end
 
 local function OnRewardItem(parentFrame, _, index)
-	local name = parentFrame and parentFrame.GetName and parentFrame:GetName()
-	if name then SkinRewardItem(_G[name .. 'Item' .. index]) end
+	SkinRewardItem(_G[parentFrame:GetName() .. 'Item' .. index])
 end
 
 local function SkinDungeonRow(button, partial)
@@ -187,14 +166,13 @@ local function SkinDungeonRow(button, partial)
 		button._buiDungeonRow = true
 		CheckBox(button.enableButton, LIST_CHECK_INSET)
 	end
-	if button.enableButton then Skin.TipCheckGlyph(button.enableButton, partial) end
+	Skin.TipCheckGlyph(button.enableButton, partial)
 	Face(button.instanceName)
 	Face(button.level)
 end
 
 local function OnDungeonRow(button, dungeonID, _, checkedList)
-	if not button then return end
-	SkinDungeonRow(button, checkedList and dungeonID and checkedList[dungeonID] == 1)
+	SkinDungeonRow(button, checkedList and checkedList[dungeonID] == 1)
 end
 
 local function SweepDungeonRow(button)
@@ -202,21 +180,17 @@ local function SweepDungeonRow(button)
 end
 
 local function SweepDungeonRows(list)
-	local box = list and list.ScrollBox
-	Skin.ForEachScrollFrame(box, SweepDungeonRow)
+	Skin.ForEachScrollFrame(list.ScrollBox, SweepDungeonRow)
 end
 
 local function SkinBackfill(cover)
-	if not cover then return end
 	local name = cover:GetName()
-	if not name then return end
 	Button(_G[name .. 'BackfillButton'])
 	Button(_G[name .. 'NoBackfillButton'])
 	Skin.TipFaceTree(cover, 1)
 end
 
 local function TopOffset(frame)
-	if not frame then return end
 	for index = 1, frame:GetNumPoints() do
 		local point, _, _, _, offsetY = frame:GetPoint(index)
 		if TOP_POINTS[point] then return offsetY end
@@ -224,7 +198,6 @@ local function TopOffset(frame)
 end
 
 local function BottomOffset(frame)
-	if not frame then return end
 	for index = 1, frame:GetNumPoints() do
 		local point, _, _, _, offsetY = frame:GetPoint(index)
 		if BOTTOM_POINTS[point] then return offsetY end
@@ -232,7 +205,7 @@ local function BottomOffset(frame)
 end
 
 local function RaiseBottom(frame, lift, skipRelative)
-	if not frame or frame._buiRaised then return end
+	if frame._buiRaised then return end
 	local points, hasTop, hasBottom = {}, false, false
 	for index = 1, frame:GetNumPoints() do
 		local point, relativeTo, relativePoint, offsetX, offsetY = frame:GetPoint(index)
@@ -255,16 +228,16 @@ local function RaiseBottom(frame, lift, skipRelative)
 end
 
 local function PadBottomRow(inset, buttons, content)
-	if not inset or inset._buiBottomRow then return end
+	if inset._buiBottomRow then return end
 	local insetBottom = BottomOffset(inset)
 	if not insetBottom then return end
 	local tallest = 0
 	for index = 1, #buttons do
 		local button = buttons[index]
-		if button and button:GetNumPoints() > 0 then
+		if button:GetNumPoints() > 0 then
 			local point, relativeTo, relativePoint, offsetX = button:GetPoint(1)
 			button:SetPoint(point, relativeTo or button:GetParent(), relativePoint or point, offsetX or 0, BOTTOM_ROW_PAD)
-			local height = button:GetHeight() or 0
+			local height = button:GetHeight()
 			if height > tallest then tallest = height end
 		end
 	end
@@ -282,8 +255,7 @@ local function PaintRoleBand(texture)
 end
 
 local function RoleBand(texture, frame)
-	if not texture then return end
-	texture.__buiSkin = true
+	Keep(texture)
 	texture:ClearAllPoints()
 	texture:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', ROLE_BAND.x, ROLE_BAND.y)
 	texture:SetSize(ROLE_BAND.width, ROLE_BAND.height)
@@ -292,32 +264,25 @@ end
 
 local function SkinDungeonFinder()
 	local parent = _G.LFDParentFrame
-	if not parent then return end
 	RoleBand(_G.LFDParentFrameRoleBackground, parent)
 	FadeRegions(parent)
 	FadeArt(parent.Inset)
 	Shell(parent.Inset)
 	local queue = _G.LFDQueueFrame
-	if not queue then return end
 	FadeRegions(queue)
 	SkinRoleButtons(queue, ROLE_KEYS, 'LFDQueueFrame')
 	Dropdown(queue.TypeDropdown)
 	Face(_G.LFDQueueFrameTypeDropdownName)
 	local random = _G.LFDQueueFrameRandomScrollFrame
-	if random then
-		ScrollBar(random.ScrollBar)
-		SkinRewardPanel(_G.LFDQueueFrameRandomScrollFrameChildFrame)
-	end
-	if queue.Specific then ScrollBar(queue.Specific.ScrollBar) end
+	ScrollBar(random.ScrollBar)
+	SkinRewardPanel(_G.LFDQueueFrameRandomScrollFrameChildFrame)
+	ScrollBar(queue.Specific.ScrollBar)
 	local follower = queue.Follower
-	if follower then
-		ScrollBar(follower.ScrollBar)
-		Title(_G.LFDQueueFrameFollowerTitle)
-		Body(_G.LFDQueueFrameFollowerDescription)
-	end
+	ScrollBar(follower.ScrollBar)
+	Title(_G.LFDQueueFrameFollowerTitle)
+	Body(_G.LFDQueueFrameFollowerDescription)
 	Button(_G.LFDQueueFrameFindGroupButton)
-	PadBottomRow(parent.Inset, { _G.LFDQueueFrameFindGroupButton },
-		{ _G.LFDQueueFrameRandomScrollFrame, queue.Specific, queue.Follower })
+	PadBottomRow(parent.Inset, { _G.LFDQueueFrameFindGroupButton }, { random, queue.Specific, follower })
 	SkinBackfill(queue.PartyBackfill)
 	Fade(_G.LFDQueueFrameNoLFDWhileLFRBlackFilter)
 	Face(_G.LFDQueueFrameNoLFDWhileLFRDescription)
@@ -326,38 +291,29 @@ end
 
 local function SkinRaidFinder()
 	local frame = _G.RaidFinderFrame
-	if not frame then return end
 	RoleBand(_G.RaidFinderFrameRoleBackground, frame)
 	FadeRegions(frame)
 	FadeArt(frame.Inset)
 	FadeArt(_G.RaidFinderFrameBottomInset)
 	Shell(_G.RaidFinderFrameBottomInset)
 	local cover = frame.NoRaidsCover
-	if cover then
-		FadeRegions(cover)
-		Title(cover.Label)
-	end
+	FadeRegions(cover)
+	Title(cover.Label)
 	local queue = _G.RaidFinderQueueFrame
-	if not queue then return end
 	FadeRegions(queue)
 	SkinRoleButtons(queue, ROLE_KEYS, 'RaidFinderQueueFrame')
 	Dropdown(queue.SelectionDropdown)
 	Face(_G.RaidFinderQueueFrameSelectionDropdownName)
 	local scroll = _G.RaidFinderQueueFrameScrollFrame
-	if scroll then
-		ScrollBar(scroll.ScrollBar)
-		SkinRewardPanel(_G.RaidFinderQueueFrameScrollFrameChildFrame)
-	end
+	ScrollBar(scroll.ScrollBar)
+	SkinRewardPanel(_G.RaidFinderQueueFrameScrollFrameChildFrame)
 	SkinBackfill(queue.PartyBackfill)
 	local ineligible = _G.RaidFinderQueueFrameIneligibleFrame
-	if ineligible then
-		Fade(_G.RaidFinderQueueFrameIneligibleFrameBlackFilter)
-		Face(ineligible.description)
-		Button(ineligible.leaveQueueButton)
-	end
+	Fade(_G.RaidFinderQueueFrameIneligibleFrameBlackFilter)
+	Face(ineligible.description)
+	Button(ineligible.leaveQueueButton)
 	Button(_G.RaidFinderFrameFindRaidButton)
-	PadBottomRow(_G.RaidFinderFrameBottomInset, { _G.RaidFinderFrameFindRaidButton },
-		{ _G.RaidFinderQueueFrameScrollFrame })
+	PadBottomRow(_G.RaidFinderFrameBottomInset, { _G.RaidFinderFrameFindRaidButton }, { scroll })
 end
 
 local function SkinCategoryButton(button)
@@ -366,18 +322,15 @@ local function SkinCategoryButton(button)
 	Fade(button.Cover)
 	Fade(button.SelectedTexture)
 	local icon = button.Icon
-	if icon then
-		icon:ClearAllPoints()
-		icon:SetPoint('TOPLEFT', button, 'TOPLEFT', 1, -1)
-		icon:SetPoint('BOTTOMRIGHT', button, 'BOTTOMRIGHT', -1, 1)
-	end
-	InsetTexture(button.HighlightTexture or button:GetHighlightTexture(), 1, 1, 1, HIGHLIGHT_ALPHA)
+	icon:ClearAllPoints()
+	icon:SetPoint('TOPLEFT', button, 'TOPLEFT', 1, -1)
+	icon:SetPoint('BOTTOMRIGHT', button, 'BOTTOMRIGHT', -1, 1)
+	InsetTexture(button.HighlightTexture, 1, 1, 1, HIGHLIGHT_ALPHA)
 	Face(button.Label)
 end
 
 local function OnCategoryButton(selection, buttonIndex, categoryID, filters)
-	local button = selection.CategoryButtons and selection.CategoryButtons[buttonIndex]
-	if not button then return end
+	local button = selection.CategoryButtons[buttonIndex]
 	SkinCategoryButton(button)
 	Shell(button)
 	Skin.TipShellEdges(button, selection.selectedCategory == categoryID and selection.selectedFilters == filters)
@@ -437,7 +390,6 @@ local function PaintSearchEntryState(button)
 	button._buiStatus.label:SetText(status)
 	button._buiStatus:SetShown(status ~= nil)
 	local background = button.BackgroundTexture
-	if not background then return end
 	background:SetBlendMode('BLEND')
 	if status then
 		FlatTexture(background, 0, 0, 0, 0)
@@ -449,13 +401,12 @@ local function PaintSearchEntryState(button)
 end
 
 local function OnSearchEntry(button)
-	if not button then return end
 	SkinSearchEntry(button)
 	PaintSearchEntryState(button)
 end
 
 local function OnApplicant(button)
-	if not button or button._buiApplicant then return end
+	if button._buiApplicant then return end
 	button._buiApplicant = true
 	IconButton(button.DeclineButton)
 	Button(button.InviteButton)
@@ -463,17 +414,15 @@ local function OnApplicant(button)
 end
 
 local function OnAutoComplete(panel)
-	local autoComplete = panel and panel.AutoCompleteFrame
-	if not autoComplete then return end
-	for _, child in ipairs({ autoComplete:GetChildren() }) do
-		if child.IsObjectType and child:IsObjectType('Button') then Button(child) end
+	for _, child in ipairs({ panel.AutoCompleteFrame:GetChildren() }) do
+		if child:IsObjectType('Button') then Button(child) end
 	end
 end
 
 local function AlignSearchRow(panel)
-	local box, refresh, filter = panel.SearchBox, panel.RefreshButton, panel.FilterButton
-	if not box or not refresh or not filter or panel._buiSearchRow then return end
+	if panel._buiSearchRow then return end
 	panel._buiSearchRow = true
+	local box, refresh, filter = panel.SearchBox, panel.RefreshButton, panel.FilterButton
 	local rowHeight = SEARCH_ROW_HEIGHT
 	local insetTop = TopOffset(panel.ResultsInset)
 	if insetTop then
@@ -492,7 +441,6 @@ local function AlignSearchRow(panel)
 end
 
 local function SkinSearchPanel(panel)
-	if not panel then return end
 	Dropdown(panel.FilterButton)
 	EditBox(panel.SearchBox)
 	IconButton(panel.RefreshButton)
@@ -504,16 +452,13 @@ local function SkinSearchPanel(panel)
 	Button(panel.BackButton)
 	Button(panel.SignUpButton)
 	Button(panel.BackToGroupButton)
-	if panel.ScrollBox then Button(panel.ScrollBox.StartGroupButton) end
+	Button(panel.ScrollBox.StartGroupButton)
 	local autoComplete = panel.AutoCompleteFrame
-	if autoComplete then
-		FadeArt(autoComplete)
-		Shell(autoComplete)
-	end
+	FadeArt(autoComplete)
+	Shell(autoComplete)
 end
 
 local function SkinApplicationViewer(viewer)
-	if not viewer then return end
 	Fade(viewer.InfoBackground)
 	Face(viewer.EntryName)
 	Face(viewer.PrivateGroup)
@@ -522,10 +467,8 @@ local function SkinApplicationViewer(viewer)
 	Shell(viewer.Inset)
 	for _, key in ipairs(COLUMN_HEADER_KEYS) do
 		local header = viewer[key]
-		if header then
-			FadeRegions(header)
-			Face(header.Label)
-		end
+		FadeRegions(header)
+		Face(header.Label)
 	end
 	IconButton(viewer.RefreshButton)
 	Button(viewer.RemoveEntryButton)
@@ -535,47 +478,37 @@ local function SkinApplicationViewer(viewer)
 end
 
 local function SkinEntryCreation(creation)
-	if not creation then return end
 	FadeArt(creation.Inset)
 	EditBox(creation.Name)
 	TextBox(creation.Description)
 	for _, key in ipairs(LIST_DROPDOWN_KEYS) do Dropdown(creation[key]) end
 	for _, key in ipairs(LIST_OPTION_KEYS) do
 		local option = creation[key]
-		if option then
-			CheckBox(option.CheckButton)
-			EditBox(option.EditBox)
-		end
+		CheckBox(option.CheckButton)
+		EditBox(option.EditBox)
 	end
 	Button(creation.ListGroupButton)
 	Button(creation.CancelButton)
-	local dialog = creation.ActivityFinder and creation.ActivityFinder.Dialog
-	if dialog then
-		FadeArt(dialog)
-		FadeArt(dialog.BorderFrame)
-		Shell(dialog)
-		EditBox(dialog.EntryBox)
-		ScrollBar(dialog.ScrollBar)
-		Button(dialog.SelectButton)
-		Button(dialog.CancelButton)
-	end
+	local dialog = creation.ActivityFinder.Dialog
+	FadeArt(dialog)
+	FadeArt(dialog.BorderFrame)
+	Shell(dialog)
+	EditBox(dialog.EntryBox)
+	ScrollBar(dialog.ScrollBar)
+	Button(dialog.SelectButton)
+	Button(dialog.CancelButton)
 end
 
 local function SkinPremadeGroups()
 	local list = _G.LFGListFrame
-	if not list then return end
 	local category = list.CategorySelection
-	if category then
-		FadeArt(category.Inset)
-		Button(category.FindGroupButton)
-		Button(category.StartGroupButton)
-		PadBottomRow(category.Inset, { category.FindGroupButton, category.StartGroupButton })
-	end
+	FadeArt(category.Inset)
+	Button(category.FindGroupButton)
+	Button(category.StartGroupButton)
+	PadBottomRow(category.Inset, { category.FindGroupButton, category.StartGroupButton })
 	local nothing = list.NothingAvailable
-	if nothing then
-		FadeArt(nothing.Inset)
-		Skin.TipFaceTree(nothing, 1)
-	end
+	FadeArt(nothing.Inset)
+	Skin.TipFaceTree(nothing, 1)
 	SkinSearchPanel(list.SearchPanel)
 	SkinApplicationViewer(list.ApplicationViewer)
 	SkinEntryCreation(list.EntryCreation)
@@ -585,28 +518,23 @@ local function SkinActivityButton(button)
 	if not button or button._buiActivity then return end
 	button._buiActivity = true
 	local selected = button.SelectedTexture
-	if selected then
-		SelectedTexture(selected, SELECTED_ALPHA)
-		selected:ClearAllPoints()
-		selected:SetPoint('TOPLEFT', 1, -1)
-		selected:SetPoint('BOTTOMRIGHT', -1, 1)
-	end
-	InsetTexture(button.HighlightTexture or button:GetHighlightTexture(), 1, 1, 1, HIGHLIGHT_ALPHA)
+	SelectedTexture(selected, SELECTED_ALPHA)
+	selected:ClearAllPoints()
+	selected:SetPoint('TOPLEFT', 1, -1)
+	selected:SetPoint('BOTTOMRIGHT', -1, 1)
+	InsetTexture(button.HighlightTexture, 1, 1, 1, HIGHLIGHT_ALPHA)
 	FaceSize(button.Title, ACTIVITY_TITLE_SIZE)
 	FaceSize(button.TeamSizeText, ACTIVITY_TITLE_SIZE)
 	Face(button.LevelRequirement)
 	Face(button.TeamTypeText)
 	Face(button.CurrentRating)
 	local reward = button.Reward
-	if reward then
-		SkinRoundIcon(reward)
-		if reward.EnlistmentBonus then FadeRegions(reward.EnlistmentBonus) end
-	end
+	SkinRoundIcon(reward)
+	if reward.EnlistmentBonus then FadeRegions(reward.EnlistmentBonus) end
 	Shell(button)
 end
 
 local function SkinActivityButtons(holder, keys)
-	if not holder or not keys then return end
 	for _, key in ipairs(keys) do
 		SkinActivityButton(type(key) == 'table' and key or holder[key])
 	end
@@ -630,8 +558,7 @@ local function SkinSpecificRows(scrollBox)
 end
 
 local function OnHonorListUpdated()
-	local honor = _G.HonorFrame
-	if honor then SkinSpecificRows(honor.SpecificScrollBox) end
+	SkinSpecificRows(_G.HonorFrame.SpecificScrollBox)
 end
 
 local function RefreshConquestBar(bar)
@@ -655,7 +582,6 @@ local function SkinConquestBar(bar)
 end
 
 local function SkinQueuePanel(panel)
-	if not panel then return end
 	FadeRegions(panel)
 	FadeArt(panel.Inset)
 	SkinRoleButtons(panel.RoleList, PVP_ROLE_KEYS)
@@ -694,48 +620,37 @@ local function SkinPvp()
 	for buttonIndex = 1, PVP_CATEGORY_COUNT do SkinMenuButton(queue['CategoryButton' .. buttonIndex]) end
 	RefreshPvpButtons()
 	local honorInset = queue.HonorInset
-	if honorInset then
-		FadeArt(honorInset)
-		Shell(honorInset)
-		local rated = honorInset.RatedPanel
-		if rated then SkinRoundIcon(rated.SeasonRewardFrame) end
-		local plunder = honorInset.PlunderstormPanel
-		if plunder then Button(plunder.PlunderstoreButton) end
-	end
+	FadeArt(honorInset)
+	Shell(honorInset)
+	SkinRoundIcon(honorInset.RatedPanel.SeasonRewardFrame)
+	Button(honorInset.PlunderstormPanel.PlunderstoreButton)
 	SkinQueuePanel(_G.HonorFrame)
 	SkinQueuePanel(_G.ConquestFrame)
 	SkinQueuePanel(_G.TrainingGroundsFrame)
 	local plunderstorm = _G.PlunderstormFrame
-	if plunderstorm then
-		FadeArt(plunderstorm.Inset)
-		Button(plunderstorm.StartQueue)
-	end
+	FadeArt(plunderstorm.Inset)
+	Button(plunderstorm.StartQueue)
 	local season = queue.NewSeasonPopup
-	if season then
-		FadeRegions(season)
-		Shell(season)
-		Button(season.Leave)
-		SkinRoundIcon(season.SeasonRewardFrame)
-	end
+	FadeRegions(season)
+	Shell(season)
+	Button(season.Leave)
+	SkinRoundIcon(season.SeasonRewardFrame)
 end
 
 local function InstallPvp()
-	if _G.HonorFrameSpecificList_Update then Hook('HonorFrameSpecificList_Update', OnHonorListUpdated) end
-	if _G.PVPQueueFrame_SelectButton then Hook('PVPQueueFrame_SelectButton', OnPvpSelection) end
-	local trainingMixin = _G.PVPSpecificTrainingGroundButtonMixin
-	if trainingMixin and trainingMixin.Initialize then Hook(trainingMixin, 'Initialize', SkinSpecificRow) end
+	Hook('HonorFrameSpecificList_Update', OnHonorListUpdated)
+	Hook('PVPQueueFrame_SelectButton', OnPvpSelection)
+	Hook(_G.PVPSpecificTrainingGroundButtonMixin, 'Initialize', SkinSpecificRow)
 end
 
 local function SkinDungeonIcon(child)
 	if child._buiDungeonIcon then return end
 	child._buiDungeonIcon = true
 	local icon = child.Icon
-	for regionIndex = 1, select('#', child:GetRegions()) do
-		local region = select(regionIndex, child:GetRegions())
-		if region ~= icon and region.IsObjectType and region:IsObjectType('Texture') then Fade(region) end
+	for _, region in ipairs({ child:GetRegions() }) do
+		if region ~= icon and region:IsObjectType('Texture') then Fade(region) end
 	end
-	CropIcon(icon)
-	Skin.TipIconFrame(child, icon)
+	Skin.SquareIcon(child, icon)
 end
 
 local function OnChallengesUpdated(frame)
@@ -745,9 +660,8 @@ end
 
 local function KeystoneBackdropTexture(frame)
 	if frame._buiKeystoneBackdrop then return frame._buiKeystoneBackdrop end
-	for regionIndex = 1, select('#', frame:GetRegions()) do
-		local region = select(regionIndex, frame:GetRegions())
-		if region.GetAtlas and region:GetAtlas() == KEYSTONE_SHELL_ATLAS then
+	for _, region in ipairs({ frame:GetRegions() }) do
+		if region:IsObjectType('Texture') and region:GetAtlas() == KEYSTONE_SHELL_ATLAS then
 			frame._buiKeystoneBackdrop = region
 			return region
 		end
@@ -757,10 +671,7 @@ end
 local function RefadeKeystoneArt(frame)
 	local backdrop = KeystoneBackdropTexture(frame)
 	if backdrop then backdrop:SetAlpha(0) end
-	for keyIndex = 1, #KEYSTONE_ART do
-		local region = frame[KEYSTONE_ART[keyIndex]]
-		if region then region:SetAlpha(0) end
-	end
+	for keyIndex = 1, #KEYSTONE_ART do frame[KEYSTONE_ART[keyIndex]]:SetAlpha(0) end
 end
 
 local function SkinKeystoneFrame(frame)
@@ -778,19 +689,16 @@ local function SkinChallenges(frame)
 	FadeArt(_G.ChallengesFrameInset)
 	OnChallengesUpdated(frame)
 	local notice = frame.SeasonChangeNoticeFrame
-	if notice then
-		FadeRegions(notice)
-		Shell(notice)
-		Button(notice.Leave)
-	end
+	FadeRegions(notice)
+	Shell(notice)
+	Button(notice.Leave)
 	local keystone = _G.ChallengesKeystoneFrame
-	if keystone and keystone:IsShown() then SkinKeystoneFrame(keystone) end
+	if keystone:IsShown() then SkinKeystoneFrame(keystone) end
 end
 
 local function InstallChallenges(frame)
 	Hook(frame, 'Update', OnChallengesUpdated)
 	local keystone = _G.ChallengesKeystoneFrame
-	if not keystone then return end
 	keystone:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GroupFinder keystone reskin', context.Guard(SkinKeystoneFrame)))
 	Hook(keystone, 'Reset', RefadeKeystoneArt)
 end
@@ -800,7 +708,7 @@ local function SkinMainFrame(frame)
 	FadeRegions(frame.shadows)
 	Shell(frame.Inset)
 	local tabs = {}
-	for tabIndex = 1, BOTTOM_TAB_COUNT do tabs[tabIndex] = frame['tab' .. tabIndex] or _G['PVEFrameTab' .. tabIndex] end
+	for tabIndex = 1, BOTTOM_TAB_COUNT do tabs[tabIndex] = frame['tab' .. tabIndex] end
 	Skin.RegisterTabStrip(frame, tabs, context)
 end
 
@@ -839,23 +747,3 @@ end
 context.Window('PVEFrame', { skin = SkinPVE, show = RefreshPVE, install = InstallPVE })
 context.Window('PVPUIFrame', { skin = SkinPvp, install = InstallPvp })
 context.Window('ChallengesFrame', { skin = SkinChallenges, install = InstallChallenges })
-
-context.info.test = function()
-	local frame = _G.PVEFrame
-	if not frame then return end
-	if _G.PVEFrame_ShowLeftInset then PVEFrame_ShowLeftInset() end
-	if _G.PVPUIFrame then _G.PVPUIFrame:Hide() end
-	if _G.ChallengesFrame then _G.ChallengesFrame:Hide() end
-	PanelTemplates_SetTab(frame, 1)
-	local groupFinder = _G.GroupFinderFrame
-	if groupFinder then
-		groupFinder:Show()
-		if _G.GroupFinderFrame_ShowGroupFrame then GroupFinderFrame_ShowGroupFrame(_G.LFDParentFrame) end
-	end
-	frame:Show()
-	return frame
-end
-
-context.info.stopTest = function()
-	if _G.PVEFrame then HideUIPanel(_G.PVEFrame) end
-end

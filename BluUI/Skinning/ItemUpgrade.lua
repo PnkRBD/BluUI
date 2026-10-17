@@ -2,7 +2,7 @@ local _, BUI = ...
 
 local ipairs = ipairs
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
+local BUILib = BluUI.BUILibClient
 local Skin = BUI.Skinning
 
 local SLOT_ART = { 'ButtonFrame', 'EmptySlotGlow', 'IconBorder' }
@@ -16,7 +16,7 @@ local MONEY_DEPTH = 2
 
 local context = Skin.Define('itemupgrade', {
 	name = 'Item Upgrade',
-	description = 'The item upgrade window: dark shell over the stone panels, framed item slot and currency icons, house fonts on the upgrade previews, level dropdown and cost strip.',
+	description = 'The item upgrade window: dark shell over the stone panels, framed item slot and currency icons, library fonts on the upgrade previews, level dropdown and cost strip.',
 	icon = 'Interface/Icons/UI_ItemUpgrade',
 	newLook = true,
 })
@@ -24,7 +24,7 @@ local Hook = context.Hook
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
 local Shell, Button, Card, Dropdown = context.Shell, context.Button, context.Card, context.Dropdown
 local Body, Face = context.Body, context.Face
-local FlatTexture, CropIcon = Skin.FlatTexture, Skin.CropIcon
+local FlatTexture = Skin.FlatTexture
 
 local topCard
 
@@ -56,8 +56,7 @@ end
 
 local function SkinSlot(button)
 	FadeKeys(button, SLOT_ART)
-	CropIcon(button.icon)
-	Skin.TipIconFrame(button, button.icon)
+	Skin.SquareIcon(button, button.icon)
 	FlatTexture(button:GetHighlightTexture(), 1, 1, 1, SLOT_HOVER_ALPHA)
 	Skin.TipCount(button.Count)
 	if not button._buiPlus then
@@ -85,10 +84,7 @@ local function RefreshCurrencyFrame(currencyFrame)
 		for fontString in currencyFrame.quantityPool:EnumerateActive() do Face(fontString) end
 	end
 	if currencyFrame.iconPool then
-		for iconFrame in currencyFrame.iconPool:EnumerateActive() do
-			CropIcon(iconFrame.Icon)
-			Skin.TipIconFrame(iconFrame, iconFrame.Icon)
-		end
+		for iconFrame in currencyFrame.iconPool:EnumerateActive() do Skin.SquareIcon(iconFrame, iconFrame.Icon) end
 	end
 	Skin.TipFaceTree(currencyFrame.MoneyCostFrame, MONEY_DEPTH)
 end

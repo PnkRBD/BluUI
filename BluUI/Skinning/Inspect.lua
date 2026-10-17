@@ -3,7 +3,7 @@ local _, BUI = ...
 local ipairs = ipairs
 local floor = math.floor
 
-local BUILib = BluUI.BUILibClient or LibStub('BUILib')
+local BUILib = BluUI.BUILibClient
 local Skin = BUI.Skinning
 local Readout = Skin.Readout
 local IsSecretValue = BUI.Tools.IsSecretValue
@@ -73,14 +73,14 @@ local overlay
 
 local context = Skin.Define('inspect', {
 	name = 'Inspect',
-	description = 'The inspect window: dark shell, house tabs, framed equipment slots with quality edges and item levels, their M+ rating, flat PvP ratings and guild panel. Preview needs an inspectable target.',
+	description = 'The inspect window: dark shell, library tabs, framed equipment slots with quality edges and item levels, their M+ rating, flat PvP ratings and guild panel. Preview needs an inspectable target.',
 	icon = 'Interface/Icons/INV_Misc_Spyglass_03',
 })
 local Enabled = context.Enabled
 local Fade, FadeRegions, FadeKeys = context.Fade, context.FadeRegions, context.FadeKeys
 local Shell, Button = context.Shell, context.Button
 local Face, Title, Body = context.Face, context.Title, context.Body
-local CropIcon, RowHighlight = Skin.CropIcon, Skin.RowHighlight
+local RowHighlight = Skin.RowHighlight
 
 local function SlotSides(info)
 	if info.col == 'left' or info.col == 'offhand' then return 'RIGHT', 'LEFT' end
@@ -95,8 +95,7 @@ local function IsSlotContent(button, region)
 end
 
 local function FadeSlotArt(button)
-	for regionIndex = 1, select('#', button:GetRegions()) do
-		local region = select(regionIndex, button:GetRegions())
+	for _, region in ipairs({ button:GetRegions() }) do
 		if region:IsObjectType('Texture') and not region.__buiSkin and not IsSlotContent(button, region) then Fade(region) end
 	end
 end
@@ -115,7 +114,6 @@ local function CreateReadout(side)
 end
 
 local function UpdateTotalLevel()
-	if not totalLevelText then return end
 	local unit = _G.InspectFrame.unit
 	local level = unit and C_PaperDollInfo.GetInspectItemLevel(unit)
 	if level and not IsSecretValue(level) and level > 0 then
@@ -126,7 +124,6 @@ local function UpdateTotalLevel()
 end
 
 local function UpdateRating()
-	if not ratingText then return end
 	local unit = _G.InspectFrame.unit
 	local summary = unit and C_PlayerInfo.GetPlayerMythicPlusRatingSummary(unit)
 	local score = summary and summary.currentSeasonScore
@@ -203,7 +200,6 @@ end
 
 local function UpdateSlotLabels(button)
 	local labels, info = button._buiLabels, button._buiInfo
-	if not labels then return end
 	local unit = _G.InspectFrame.unit
 	local slotID = button:GetID()
 	local link = button.hasItem and unit and GetInventoryItemLink(unit, slotID)
@@ -255,37 +251,29 @@ end
 
 local function RefreshSlot(button)
 	if not Enabled() or not button._buiSlot then return end
-	if button.IconBorder then button.IconBorder:SetAlpha(0) end
 	ColorSlotEdges(button)
 	UpdateSlotLabels(button)
 end
 
 local function SkinSlot(button, info)
-	if not button or button._buiSlot then return end
-	button._buiSlot = true
-	button._buiInfo = info or {}
-	slotButtons[#slotButtons + 1] = button
-	FadeSlotArt(button)
-	CropIcon(button.icon)
-	Skin.TipIconFrame(button, button.icon)
-	local highlight = button:GetHighlightTexture()
-	if highlight then
-		highlight:SetBlendMode('BLEND')
-		RowHighlight(button, SLOT_HOVER_ALPHA)
+	if not button._buiSlot then
+		button._buiSlot = true
+		button._buiInfo = info
+		slotButtons[#slotButtons + 1] = button
+		Skin.SquareIcon(button, button.icon)
+		local highlight = button:GetHighlightTexture()
+		if highlight then
+			highlight:SetBlendMode('BLEND')
+			RowHighlight(button, SLOT_HOVER_ALPHA)
+		end
+		Skin.TipCount(button.Count)
+		button._buiLabels = CreateSlotLabels(button, info)
 	end
-	Skin.TipCount(button.Count)
-	button._buiLabels = CreateSlotLabels(button, button._buiInfo)
+	FadeSlotArt(button)
 	RefreshSlot(button)
 end
 
-local function SkinModel(model)
-	if not model then return end
-	FadeRegions(model)
-	Shell(model)
-end
-
 local function SkinPaperDoll(paperDoll)
-	if not paperDoll then return end
 	overlay = overlay or CreateFrame('Frame', nil, paperDoll)
 	overlay:SetAllPoints()
 	overlay:SetFrameLevel(paperDoll:GetFrameLevel() + OVERLAY_LEVEL_BUMP)
@@ -297,45 +285,37 @@ local function SkinPaperDoll(paperDoll)
 	end
 	Body(_G.InspectLevelText)
 	Button(paperDoll.ViewButton)
-	SkinModel(_G.InspectModelFrame)
+	FadeRegions(_G.InspectModelFrame)
+	Shell(_G.InspectModelFrame)
 	for _, slotName in ipairs(SLOT_NAMES) do SkinSlot(_G['Inspect' .. slotName .. 'Slot'], SLOT_INFO[slotName]) end
 end
 
 local function TalentsTab()
-	local items = _G.InspectPaperDollItemsFrame
-	local button = items and items.InspectTalents
-	if not button then return nil end
-	if button:GetParent() ~= _G.InspectFrame then button:SetParent(_G.InspectFrame) end
-	if not button.Text then button.Text = button:GetFontString() end
+	local button = _G.InspectPaperDollItemsFrame.InspectTalents
 	local reference = _G.InspectFrameTab1
-	if reference then
-		button:SetHeight(reference:GetHeight())
-		button:SetFrameLevel(reference:GetFrameLevel())
-	end
+	button:SetParent(_G.InspectFrame)
+	button:SetHeight(reference:GetHeight())
+	button:SetFrameLevel(reference:GetFrameLevel())
 	return button
 end
 
 local function SkinPvpStat(stat)
-	if not stat then return end
 	Title(stat.BGType)
 	for _, key in ipairs(PVP_STAT_LABEL_KEYS) do Skin.TipFont(stat[key], 'label') end
 	for _, key in ipairs(PVP_STAT_VALUE_KEYS) do Body(stat[key]) end
 end
 
 local function SkinPvpTalentSlot(slot)
-	if not slot or slot._buiPvpSlot then return end
-	slot._buiPvpSlot = true
 	Fade(slot.Shadow)
 	Fade(slot.Border)
+	if slot._buiPvpSlot then return end
+	slot._buiPvpSlot = true
 	local icon = slot.Texture
-	if not icon then return end
-	if slot.TextureMask then icon:RemoveMaskTexture(slot.TextureMask) end
-	CropIcon(icon)
-	Skin.TipIconFrame(slot, icon)
+	icon:RemoveMaskTexture(slot.TextureMask)
+	Skin.SquareIcon(slot, icon)
 end
 
 local function SkinPvp(pvp)
-	if not pvp then return end
 	Fade(pvp.BG)
 	Body(pvp.HKs)
 	Skin.TipFont(pvp.HonorLevel, 'title', HONOR_LEVEL_SCALE)
@@ -344,15 +324,11 @@ local function SkinPvp(pvp)
 end
 
 local function SkinGuild(guild)
-	if not guild then return end
 	Fade(_G.InspectGuildFrameBG)
 	Skin.TipFont(guild.guildName, 'title', GUILD_NAME_SCALE)
 	for _, key in ipairs(GUILD_TEXT_KEYS) do Body(guild[key]) end
-	local points = guild.Points
-	if points then
-		FadeKeys(points, GUILD_POINTS_ART)
-		Face(points.SumText)
-	end
+	FadeKeys(guild.Points, GUILD_POINTS_ART)
+	Face(guild.Points.SumText)
 end
 
 local function SkinMainFrame(frame)
@@ -360,22 +336,19 @@ local function SkinMainFrame(frame)
 	Shell(frame.Inset)
 	local tabs = {}
 	for tabIndex = 1, BOTTOM_TAB_COUNT do tabs[tabIndex] = _G['InspectFrameTab' .. tabIndex] end
-	local talents = TalentsTab()
-	if talents then tabs[#tabs + 1] = talents end
+	tabs[#tabs + 1] = TalentsTab()
 	Skin.RegisterTabStrip(frame, tabs, context)
 end
 
 local function ShowSlotLabels(shown)
 	for _, button in ipairs(slotButtons) do
 		local labels = button._buiLabels
-		if labels then
-			labels.ilvl:SetShown(shown)
-			labels.track:SetShown(shown)
-			labels.enchant:SetShown(shown)
-			if not shown then
-				labels.hover:Hide()
-				for _, gem in ipairs(labels.gems) do gem:Hide() end
-			end
+		labels.ilvl:SetShown(shown)
+		labels.track:SetShown(shown)
+		labels.enchant:SetShown(shown)
+		if not shown then
+			labels.hover:Hide()
+			for _, gem in ipairs(labels.gems) do gem:Hide() end
 		end
 	end
 	if totalLevelText then
