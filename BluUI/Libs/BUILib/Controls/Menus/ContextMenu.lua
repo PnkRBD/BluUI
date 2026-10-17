@@ -162,7 +162,7 @@ local function BindRow(row, item, onSelect, palette, textX)
 	end
 
 	row:EnableMouse(true)
-	row.text:SetTextColor(unpack(palette.text))
+	row.text:SetTextColor(unpack(item.color or palette.text))
 	row.sub:SetTextColor(unpack(palette.muted))
 	row:SetScript("OnEnter", function() PaintRow(row, palette, true) end)
 	row:SetScript("OnLeave", function() PaintRow(row, palette, false) end)
