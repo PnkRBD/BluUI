@@ -256,6 +256,7 @@ local entries = {
 	{ label = "Hide Error Msgs", page = "qol", tab = 2, panel = "Interface", keywords = "error red text" },
 	{ label = "FPS preset", page = "qol", tab = 4, panel = "Graphics", keywords = "fps cvar performance graphics vsync apply" },
 	{ label = "Restore", page = "qol", tab = 4, panel = "Graphics", keywords = "fps cvar restore original" },
+	{ label = "Hidden quests", page = "qol", tab = 4, panel = "Graphics", keywords = "untrack hidden quests watch tracker objective fps performance lag" },
 	{ label = "BluUI settings", page = "qol", tab = 5, panel = "Danger zone", keywords = "reset wipe default settings bluui" },
 	{ label = "Celebrations", page = "qol", tab = 6, panel = "Celebrations", keywords = "confetti mythic plus m+ key timed boss kill raid dungeon celebrate" },
 	{ label = "Unit Frames", page = "settings", tab = 5, panel = "Modules", keywords = "enable disable module" },
