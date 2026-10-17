@@ -127,40 +127,30 @@ end
 
 local function PaintText(child, decoy, settings)
 	local nameText = child.NameText
-	if nameText then
-		child:Untag(nameText)
-		local limit = settings.nameMaxLength
-		nameText:SetText(limit > 0 and BUI.Tools.TruncateName(decoy.name, limit) or decoy.name)
-	end
+	child:Untag(nameText)
+	local limit = settings.nameMaxLength
+	nameText:SetText(limit > 0 and BUI.Tools.TruncateName(decoy.name, limit) or decoy.name)
 
 	local hpText = child.HpText
-	if hpText then
-		child:Untag(hpText)
-		hpText:SetText(PreviewText(GroupFrames.InjectAbsorbColor(settings.hpText.format, settings.absorbColor), decoy))
-	end
+	child:Untag(hpText)
+	hpText:SetText(PreviewText(GroupFrames.InjectAbsorbColor(settings.hpText.format, settings.absorbColor), decoy))
 
 	local statusText = child.StatusText
-	if statusText then
-		child:Untag(statusText)
-		statusText:SetText("")
-	end
+	child:Untag(statusText)
+	statusText:SetText("")
 
 	local powerText = child.PowerText
-	if powerText then
-		child:Untag(powerText)
-		powerText:SetText(PreviewText(settings.pwrText.format, decoy))
-	end
+	child:Untag(powerText)
+	powerText:SetText(PreviewText(settings.pwrText.format, decoy))
 end
 
 local function PaintBars(child, decoy, settings)
 	local health = child.Health
-	if health then
-		health:SetMinMaxValues(0, 1)
-		health:SetValue(decoy.health)
-		health:Show()
-		health._inOffline = nil
-		if health.PostUpdateColor then health.PostUpdateColor(health, child.unit) end
-	end
+	health:SetMinMaxValues(0, 1)
+	health:SetValue(decoy.health)
+	health:Show()
+	health._inOffline = nil
+	health.PostUpdateColor(health, child.unit)
 
 	local absorb = child.Absorb
 	if absorb then
@@ -171,16 +161,11 @@ local function PaintBars(child, decoy, settings)
 	if child.HealAbsorb then child.HealAbsorb:Hide() end
 
 	local power = child.Power
-	if power then
-		power:SetMinMaxValues(0, 1)
-		power:SetValue(decoy.power)
-		local color = BUI.oUF.colors.power[decoy.powerType]
-		if color and color.GetRGB then
-			local red, green, blue = color:GetRGB()
-			power:SetStatusBarColor(red, green, blue)
-			GroupFrames.TintPowerBackground(power, red, green, blue)
-		end
-	end
+	power:SetMinMaxValues(0, 1)
+	power:SetValue(decoy.power)
+	local red, green, blue = BUI.oUF.colors.power[decoy.powerType]:GetRGB()
+	power:SetStatusBarColor(red, green, blue)
+	GroupFrames.TintPowerBackground(power, red, green, blue)
 end
 
 function GroupFrames.RepaintPreviewChild(child)

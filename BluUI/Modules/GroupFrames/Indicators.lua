@@ -20,7 +20,7 @@ local ROLE_ATLAS = {
 }
 
 local PIXEL_FILTER  = "NEAREST"
-local TRIMMED_ATLAS = ROLE_ATLAS.HEALER:lower()
+local TRIMMED_ATLAS = ROLE_ATLAS.HEALER
 local TRIM_COLUMN   = 1
 local TRIM_ROW      = 5
 
@@ -69,7 +69,7 @@ end
 local function FitAtlas(texture)
 	local atlas = texture._atlas
 	local slices = texture._slices
-	local trimmed = slices ~= nil and atlas ~= nil and atlas:lower() == TRIMMED_ATLAS
+	local trimmed = slices ~= nil and atlas == TRIMMED_ATLAS
 	texture:ClearAllPoints()
 	if trimmed then
 		FitTrimmed(texture, C_Texture.GetAtlasInfo(atlas))
@@ -92,7 +92,6 @@ end
 local TRANSIENT_ELEMENTS = { ReadyCheckIndicator = true }
 
 local function ApplyIndicator(texture, config)
-	if not texture then return end
 	local holder = texture:GetParent()
 	local frame  = holder:GetParent()
 	holder:SetSize(Pixel.Scale(config.size), Pixel.Scale(config.size))
@@ -128,9 +127,9 @@ local ROLE_ICON_ROLES = {
 local LEADER_ATLAS    = "UI-HUD-UnitFrame-Player-Group-LeaderIcon"
 local ASSISTANT_TEXTURE = "Interface\\GroupFrame\\UI-Group-AssistantIcon"
 
-local function ShowAtlas(element, atlas, useAtlasSize)
+local function ShowAtlas(element, atlas)
 	if element:IsShown() and element._atlas == atlas then return end
-	element:SetAtlas(atlas, useAtlasSize, PIXEL_FILTER)
+	element:SetAtlas(atlas, nil, PIXEL_FILTER)
 	element._atlas = atlas
 	element:Show()
 	FitAtlas(element)
@@ -141,7 +140,7 @@ local function RoleOverride(self)
 	if element._previewOn or not self:IsElementEnabled("GroupRoleIndicator") then return end
 	local role  = Util.FrameRole(self)
 	local atlas = role and ROLE_ATLAS[role]
-	local allowedRoles  = ROLE_ICON_ROLES[GroupFrames.SettingsForFrame(self).roleIconFilter or "all"]
+	local allowedRoles  = ROLE_ICON_ROLES[GroupFrames.SettingsForFrame(self).roleIconFilter]
 	if atlas and (not allowedRoles or allowedRoles[role]) then
 		ShowAtlas(element, atlas)
 	else
@@ -155,14 +154,14 @@ local function LeaderOverride(self)
 	if self._preview then
 		local decoy = self._previewDecoy
 		if decoy and decoy.leader then
-			ShowAtlas(element, LEADER_ATLAS, element.useAtlasSize)
+			ShowAtlas(element, LEADER_ATLAS)
 		else
 			element:Hide()
 		end
 		return
 	end
 	if self.unit and UnitInParty(self.unit) and SafeBool(UnitIsGroupLeader(self.unit)) then
-		ShowAtlas(element, LEADER_ATLAS, element.useAtlasSize)
+		ShowAtlas(element, LEADER_ATLAS)
 	else
 		element:Hide()
 	end
@@ -183,6 +182,9 @@ end
 local function WirePlayerReadyCheck(frame, texture)
 	local watcher = CreateFrame("Frame", nil, frame)
 	local hideTimer
+	local function Allowed()
+		return not texture._previewOn and GroupFrames.SettingsForFrame(frame).readyCheckIcon.enabled
+	end
 	local function ApplyReadyStatus()
 		local status = GetReadyCheckStatus("player")
 		if status and READY_ATLAS[status] then
@@ -192,14 +194,14 @@ local function WirePlayerReadyCheck(frame, texture)
 		end
 	end
 	watcher:SetScript("OnEvent", Wrap("GroupFrames.Indicators ready check", function(_, event)
+		if hideTimer then hideTimer:Cancel(); hideTimer = nil end
+		if not Allowed() then return end
 		if event == "READY_CHECK_FINISHED" then
-			if hideTimer then hideTimer:Cancel() end
 			hideTimer = BUI.Profiler.NewTimer("GroupFrames.Indicators ready hide", 10, function()
 				hideTimer = nil
-				texture:Hide()
+				if not texture._previewOn then texture:Hide() end
 			end)
 		else
-			if hideTimer then hideTimer:Cancel(); hideTimer = nil end
 			ApplyReadyStatus()
 		end
 	end))
@@ -230,8 +232,8 @@ function GroupFrames.BuildIndicators(frame, unit)
 		slices[index] = slice
 	end
 	frame.GroupRoleIndicator._slices  = slices
-	frame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED", function() RoleOverride(frame) end, true)
-	frame:RegisterEvent("PLAYER_ROLES_ASSIGNED", function() RoleOverride(frame) end, true)
+	frame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED", RoleOverride, true)
+	frame:RegisterEvent("PLAYER_ROLES_ASSIGNED", RoleOverride, true)
 
 	if unit == "player" then
 		WirePlayerReadyCheck(frame, frame.ReadyCheckIndicator)
@@ -326,7 +328,6 @@ local targetedFrames = {}
 
 local function UpdateSelection(frame)
 	local selection = frame.Selection
-	if not selection then return end
 	targetedFrames[frame] = nil
 	local unit = frame.unit
 	if not unit then selection:Hide(); return end
@@ -347,7 +348,17 @@ local function UpdateSelection(frame)
 	selection:Show()
 end
 
-function GroupFrames.BuildSelection(frame, unit)
+local SelectionEnter = Wrap('GroupFrames.Indicators frame OnEnter', function(self)
+	self._isMouseover = true
+	UpdateSelection(self)
+end)
+
+local SelectionLeave = Wrap('GroupFrames.Indicators frame OnLeave', function(self)
+	self._isMouseover = false
+	UpdateSelection(self)
+end)
+
+function GroupFrames.BuildSelection(frame)
 	local selection = CreateFrame("Frame", nil, frame)
 	selection:SetFrameLevel(frame:GetFrameLevel() + GroupFrames.Layers.selection)
 	selection:SetPoint("TOPLEFT", 0, 0)
@@ -355,14 +366,8 @@ function GroupFrames.BuildSelection(frame, unit)
 	selection:Hide()
 	frame.Selection = selection
 
-	frame:HookScript("OnEnter", BUI.Profiler.Wrap('GroupFrames.Indicators frame OnEnter', function(self)
-		self._isMouseover = true
-		UpdateSelection(self)
-	end))
-	frame:HookScript("OnLeave", BUI.Profiler.Wrap('GroupFrames.Indicators frame OnLeave', function(self)
-		self._isMouseover = false
-		UpdateSelection(self)
-	end))
+	frame:HookScript("OnEnter", SelectionEnter)
+	frame:HookScript("OnLeave", SelectionLeave)
 end
 
 GroupFrames.RefreshSelection = UpdateSelection

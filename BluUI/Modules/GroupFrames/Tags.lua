@@ -34,11 +34,6 @@ local Events  = oUF.Tags.Events
 local HEALTH_EVENTS = "UNIT_HEALTH UNIT_MAXHEALTH UNIT_CONNECTION"
 local STATUS_EVENTS = "UNIT_CONNECTION PLAYER_FLAGS_CHANGED UNIT_FLAGS"
 
-local function SafeNumbers(firstValue, secondValue)
-	if firstValue == nil or secondValue == nil or IsSecret(firstValue) or IsSecret(secondValue) then return nil end
-	return firstValue, secondValue
-end
-
 local function SafeBoolean(value)
 	if not CanAccess(value) then return nil end
 	return value
@@ -56,30 +51,23 @@ end
 Methods["blu:status"] = function(unit)
 	local status = HealthStatus(unit)
 	if not status then return "" end
-	local color = BUI.UnitFrames.GetSettings().statusColors[status]
-	if color then return ("|cff%02x%02x%02x%s|r"):format(color[1] * 255, color[2] * 255, color[3] * 255, status:upper()) end
-	return status:upper()
+	return BUI.UnitFrames.StatusText(status)
 end
 Events["blu:status"] = STATUS_EVENTS
 
 local SCALE_100 = CurveConstants.ScaleTo100
 
-local function Abbreviate(value)
-	if value == nil then return "" end
-	return AbbreviateNumbers(value)
-end
-
 local function IsOffline(unit) return not unit or SafeBoolean(UnitIsConnected(unit)) == false end
 
 Methods["blu:hp"] = function(unit)
 	if IsOffline(unit) then return "" end
-	return Abbreviate(UnitHealth(unit))
+	return AbbreviateNumbers(UnitHealth(unit))
 end
 Events["blu:hp"] = HEALTH_EVENTS
 
 Methods["blu:hpmax"] = function(unit)
 	if IsOffline(unit) then return "" end
-	return Abbreviate(UnitHealthMax(unit))
+	return AbbreviateNumbers(UnitHealthMax(unit))
 end
 Events["blu:hpmax"] = "UNIT_MAXHEALTH UNIT_CONNECTION"
 
@@ -93,43 +81,34 @@ Events["blu:hppct"] = HEALTH_EVENTS
 
 Methods["blu:hpmissing"] = function(unit)
 	if IsOffline(unit) then return "" end
-	if UnitHealthMissing then
-		local missingHealth = UnitHealthMissing(unit)
-		if missingHealth == nil then return "" end
-		if IsSecret(missingHealth) then
-			local text = C_StringUtil.TruncateWhenZero(missingHealth)
-			if IsSecret(text) or text == "" then return text end
-			return Abbreviate(missingHealth)
-		end
-		if missingHealth <= 0 then return "" end
-		return Abbreviate(missingHealth)
+	local missingHealth = UnitHealthMissing(unit)
+	if IsSecret(missingHealth) then
+		local text = C_StringUtil.TruncateWhenZero(missingHealth)
+		if IsSecret(text) or text == "" then return text end
+		return AbbreviateNumbers(missingHealth)
 	end
-	local current, maximum = SafeNumbers(UnitHealth(unit), UnitHealthMax(unit))
-	if not current or not maximum then return "" end
-	local missing = maximum - current
-	if missing <= 0 then return "" end
-	return Abbreviate(missing)
+	if missingHealth <= 0 then return "" end
+	return AbbreviateNumbers(missingHealth)
 end
 Events["blu:hpmissing"] = HEALTH_EVENTS
 
 Methods["blu:absorb"] = function(unit)
 	if IsOffline(unit) then return "" end
 	local absorb = UnitGetTotalAbsorbs(unit)
-	if absorb == nil then return "" end
 	if not IsSecret(absorb) and absorb <= 0 then return "" end
-	return Abbreviate(absorb)
+	return AbbreviateNumbers(absorb)
 end
 Events["blu:absorb"] = "UNIT_ABSORB_AMOUNT_CHANGED UNIT_CONNECTION"
 
 Methods["blu:pwr"] = function(unit)
 	if IsOffline(unit) then return "" end
-	return Abbreviate(UnitPower(unit))
+	return AbbreviateNumbers(UnitPower(unit))
 end
 Events["blu:pwr"] = "UNIT_POWER_UPDATE UNIT_MAXPOWER UNIT_DISPLAYPOWER UNIT_CONNECTION"
 
 Methods["blu:pwrmax"] = function(unit)
 	if IsOffline(unit) then return "" end
-	return Abbreviate(UnitPowerMax(unit))
+	return AbbreviateNumbers(UnitPowerMax(unit))
 end
 Events["blu:pwrmax"] = "UNIT_MAXPOWER UNIT_DISPLAYPOWER UNIT_CONNECTION"
 
@@ -149,8 +128,7 @@ Methods["blu:name"] = function(unit)
 	if limit > 0 then return Tools.TruncateName(name, limit) end
 	return name
 end
-Events["blu:name"] = "UNIT_NAME_UPDATE UNIT_CLASSIFICATION_CHANGED"
-
+Events["blu:name"] = "UNIT_NAME_UPDATE"
 
 local DIRECT_HP_FORMATS = { ["[blu:hppct]"] = true }
 

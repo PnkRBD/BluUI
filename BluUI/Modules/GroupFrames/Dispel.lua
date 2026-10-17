@@ -4,13 +4,7 @@ local GroupFrames = BUI.GroupFrames
 local Pixel  = BUI.Pixel
 local Engine = BUI.AuraEngine
 
-local CreateFrame   = CreateFrame
-local UnitExists    = UnitExists
-local UnitIsVisible = UnitIsVisible
-local UnitIsFriend  = UnitIsFriend
-
-local GetUnitAuras           = C_UnitAuras.GetUnitAuras
-local GetAuraDispelTypeColor = C_UnitAuras.GetAuraDispelTypeColor
+local CreateFrame = CreateFrame
 
 local WHITE8X8 = [[Interface\Buttons\WHITE8X8]]
 
@@ -31,11 +25,9 @@ local DISPEL_BADGE_ATLAS = {
 	Bleed   = "RaidFrame-Icon-DebuffBleed",
 }
 
-local DISPEL_BADGE_NAMES = { "Magic", "Curse", "Disease", "Poison", "Bleed" }
+local PREVIEW_CYCLE = { "Magic", "Curse", "Disease", "Poison", "Bleed", "Enrage" }
 
 local TRANSPARENT_COLOR = CreateColor(0, 0, 0, 0)
-
-GroupFrames.DispelViaEngine = Engine.Available and true or false
 
 local HIGHLIGHT_KEY = "BluAura_dispelHL"
 GroupFrames.DISPEL_HL_KEY = HIGHLIGHT_KEY
@@ -46,31 +38,23 @@ function GroupFrames.DispelLook(settings)
 	local border = settings.dispelBorder
 	if border.matchPlayer then
 		local player = BUI.UnitFrames.GetUnitSettings("player")
-		return player.debuffHighlightBar == true, player.debuffHighlightStyle
+		return player.debuffHighlightBar, player.debuffHighlightStyle
 	end
-	return border.tintBar == true, border.tintStyle
+	return border.tintBar, border.tintStyle
 end
 
 function GroupFrames.DispelHighlightWanted(settings)
-	return GroupFrames.DispelLook(settings) or settings.dispelBorder.showBadge ~= false
+	return GroupFrames.DispelLook(settings) or settings.dispelBorder.showBadge
 end
 
 local frameKits = setmetatable({}, { __mode = "k" })
 local highlightRestyleQueue = {}
 
-local function OverlappingAbsorb(frame)
-	local settings = GroupFrames.SettingsForFrame(frame)
-	if frame.Absorb and settings.absorb.direction == "left" then return frame.Absorb end
-	if frame.HealAbsorb and settings.healAbsorb.enabled ~= false and settings.healAbsorb.direction == "left" then return frame.HealAbsorb end
-end
-
 local function AnchorFill(kit, frame, alpha)
-	local healthTexture = frame.Health:GetStatusBarTexture()
-	local _, style = GroupFrames.DispelLook(GroupFrames.SettingsForFrame(frame))
-	local absorb = OverlappingAbsorb(frame)
-	local rightEdge, rightSide = healthTexture, "RIGHT"
-	if absorb then rightEdge, rightSide = absorb:GetStatusBarTexture(), "LEFT" end
-	BUI.UnitFrames.StyleDispelFill(kit, style, healthTexture, rightEdge, rightSide, alpha)
+	local settings = GroupFrames.SettingsForFrame(frame)
+	local _, style = GroupFrames.DispelLook(settings)
+	local absorb = BUI.UnitFrames.OverlappingAbsorb(frame, settings.absorb.enabled, settings.absorb.direction, settings.healAbsorb.enabled, settings.healAbsorb.direction)
+	BUI.UnitFrames.AnchorDispelFill(kit, frame, style, absorb, alpha)
 end
 
 local function BuildHighlightKit(host)
@@ -88,26 +72,13 @@ end
 local dispelCurve, dispelCurveStamp
 local function GetDispelCurve()
 	if not dispelCurve or dispelCurveStamp ~= Engine.DispelPaletteStamp() then
-		dispelCurve, dispelCurveStamp = GroupFrames.BuildDispelCurve(TRANSPARENT_COLOR)
+		dispelCurve, dispelCurveStamp = Engine.BuildDispelCurve(TRANSPARENT_COLOR)
 	end
 	return dispelCurve, dispelCurveStamp
 end
 
-local tintOptions, badgeOptions
-
-local function DispelTextureOptions(curve)
-	if not tintOptions then
-		local styleEnum = Enum.CustomAuraButtonDispelTypeTextureStyle
-		tintOptions = { showWhenHarmful = true }
-		badgeOptions = { showWhenHarmful = true }
-		if styleEnum then
-			tintOptions.style = styleEnum.PreserveAsset
-			badgeOptions.style = styleEnum.Icon
-		end
-	end
-	tintOptions.customDispelColorCurve = curve
-	return tintOptions, badgeOptions
-end
+local tintOptions  = { showWhenHarmful = true, style = Enum.CustomAuraButtonDispelTypeTextureStyle.PreserveAsset }
+local badgeOptions = { showWhenHarmful = true, style = Enum.CustomAuraButtonDispelTypeTextureStyle.Icon }
 
 local function KitSignature(wantTint, wantBadge, badgeSettings, paletteStamp)
 	return (wantTint and "t" or "") .. (wantBadge and "i" or "")
@@ -117,30 +88,29 @@ end
 
 local function RegisterKitTextures(kit, wantTint, wantBadge, badgeSettings)
 	local button = kit.button
-	if not button.AddDispelTypeTexture then return end
 	local curve, paletteStamp = GetDispelCurve()
 	local signature = KitSignature(wantTint, wantBadge, badgeSettings, paletteStamp)
 	if kit.signature == signature then return end
-	if kit.signature and button.ClearDispelTypeTextures then button:ClearDispelTypeTextures() end
+	if kit.signature then button:ClearDispelTypeTextures() end
 	kit.signature = signature
 	if not wantTint then
 		kit.fill:Hide()
 		kit.fade:Hide()
 	end
 	if not wantBadge then kit.badge:Hide() end
-	local tint, badge = DispelTextureOptions(curve)
+	tintOptions.customDispelColorCurve = curve
 	if wantTint then
-		button:AddDispelTypeTexture(kit.fill, tint)
-		button:AddDispelTypeTexture(kit.fade, tint)
+		button:AddDispelTypeTexture(kit.fill, tintOptions)
+		button:AddDispelTypeTexture(kit.fade, tintOptions)
 	end
-	if wantBadge then button:AddDispelTypeTexture(kit.badge, badge) end
+	if wantBadge then button:AddDispelTypeTexture(kit.badge, badgeOptions) end
 end
 
 local function StyleHighlightKit(frame, kit)
 	local settings = GroupFrames.SettingsForFrame(frame)
 	local badgeSettings = settings.dispelBadge
 	local wantTint = GroupFrames.DispelLook(settings)
-	local wantBadge = settings.dispelBorder.showBadge ~= false
+	local wantBadge = settings.dispelBorder.showBadge
 
 	local opacity = BUI.UnitFrames.GetSettings().dispelOpacity / 100
 	AnchorFill(kit, frame, (kit.button or wantTint) and opacity or 0)
@@ -164,8 +134,8 @@ local function HighlightInitializer(frame)
 		if not kits then kits = {}; frameKits[frame] = kits end
 		kits[#kits + 1] = kit
 		StyleHighlightKit(frame, kit)
-		if button.SetMouseClickEnabled then button:SetMouseClickEnabled(false) end
-		if button.SetMouseMotionEnabled then button:SetMouseMotionEnabled(false) end
+		button:SetMouseClickEnabled(false)
+		button:SetMouseMotionEnabled(false)
 	end
 end
 
@@ -189,36 +159,38 @@ local function DrainHighlightRestyles()
 	end
 end
 
-local function EnsureHighlightGroup(container, frame)
-	if not container.AddAuraGroup then return end
-	local settings = GroupFrames.SettingsForFrame(frame)
-	local source = settings.dispelBorder.source == "all" and "all" or "mine"
+BUI.Tools.OnAuraQueriesUnblocked(DrainHighlightRestyles, 'Group frame dispel highlight')
 
-	local exclude
-	for spellID in pairs(BUI.AuraBlacklist.GroupSet("HARMFUL")) do
-		exclude = exclude or {}
-		exclude[spellID] = true
+local excludeSource, excludeSet, excludeSignature
+
+local function HighlightExcludes()
+	local blacklist = BUI.AuraBlacklist.GroupSet("HARMFUL")
+	if excludeSource ~= blacklist then
+		excludeSource = blacklist
+		excludeSet = next(blacklist) and blacklist or nil
+		excludeSignature = excludeSet and Engine.SortedKeys(excludeSet) or ""
 	end
+	return excludeSet, excludeSignature
+end
 
-	local fingerprint = source .. "#" .. (exclude and Engine.SortedKeys(exclude) or "")
+local function EnsureHighlightGroup(container, frame)
+	local source = GroupFrames.SettingsForFrame(frame).dispelBorder.source
+	local exclude, signature = HighlightExcludes()
+	local fingerprint = source .. "#" .. signature
 	local groups = container._hlGroups
 	local info = groups[fingerprint]
 
 	for key, other in pairs(groups) do
 		if key ~= fingerprint and other.active then
 			other.active = false
-			if container.SetAuraGroupMaxFrameCount then
-				container:SetAuraGroupMaxFrameCount(other.key, 0)
-			end
+			container:SetAuraGroupMaxFrameCount(other.key, 0)
 		end
 	end
 
 	if info then
 		if not info.active then
 			info.active = true
-			if container.SetAuraGroupMaxFrameCount then
-				container:SetAuraGroupMaxFrameCount(info.key, 1)
-			end
+			container:SetAuraGroupMaxFrameCount(info.key, 1)
 		end
 		return
 	end
@@ -231,7 +203,7 @@ local function EnsureHighlightGroup(container, frame)
 		candidates.includeDispelTypes = ANY_DISPEL_TYPES
 	end
 
-	container._hlSeq = (container._hlSeq or 0) + 1
+	container._hlSeq = container._hlSeq + 1
 	local key = "hl" .. container._hlSeq
 	container:AddAuraGroup(key, filter, {
 		maxFrameCount = 1,
@@ -241,21 +213,20 @@ local function EnsureHighlightGroup(container, frame)
 	groups[fingerprint] = { key = key, active = true }
 end
 
-function GroupFrames.EnsureDispelHighlight(frame)
-	if not GroupFrames.DispelViaEngine or not frame.Health then return nil end
+local function EnsureHighlightContainer(frame)
 	local container = frame[HIGHLIGHT_KEY]
 	if not container then
 		container = Engine.NewContainer(frame.Health, true, 3)
 		container:SetPoint("TOPLEFT", frame, "TOPLEFT")
 		container._hlGroups = {}
+		container._hlSeq = 0
 		frame[HIGHLIGHT_KEY] = container
 	end
 	return container
 end
 
 function GroupFrames.ConfigureDispelHighlight(frame)
-	local container = GroupFrames.EnsureDispelHighlight(frame)
-	if not container then return end
+	local container = EnsureHighlightContainer(frame)
 	local settings = GroupFrames.SettingsForFrame(frame)
 	if not GroupFrames.DispelHighlightWanted(settings) or (frame._preview and not frame._dispelPreview) then
 		container:Hide()
@@ -270,201 +241,12 @@ function GroupFrames.ConfigureDispelHighlight(frame)
 	Engine.BindUnit(container, frame.unit)
 end
 
-if GroupFrames.DispelViaEngine then
-	BUI.Events:Register("PLAYER_REGEN_ENABLED", "GFDispel.RestyleDrain", DrainHighlightRestyles)
-	BUI.Events:Register("PLAYER_ENTERING_WORLD", "GFDispel.RestyleDrain", DrainHighlightRestyles)
-end
-
-local SOLID = CreateColor(1, 1, 1, 1)
-local CLEAR = CreateColor(1, 1, 1, 0)
-
-local function MakeTypeCurve(match)
-	local curve = C_CurveUtil.CreateColorCurve()
-	curve:SetType(Enum.LuaCurveType.Step)
-	for _, dispelIndex in ipairs({ 0, 1, 2, 3, 4, 9, 11 }) do
-		curve:AddPoint(dispelIndex, match[dispelIndex] and SOLID or CLEAR)
-	end
-	return curve
-end
-
-local ICON_CURVES
-local function GetIconCurves()
-	if ICON_CURVES then return ICON_CURVES end
-	ICON_CURVES = {
-		Magic   = MakeTypeCurve({ [1] = true }),
-		Curse   = MakeTypeCurve({ [2] = true }),
-		Disease = MakeTypeCurve({ [3] = true }),
-		Poison  = MakeTypeCurve({ [4] = true }),
-		Bleed   = MakeTypeCurve({ [9] = true, [11] = true }),
-	}
-	return ICON_CURVES
-end
-
-local function colorFromCurve(unit, auraInstanceID)
-	if not auraInstanceID then return nil end
-	return GetAuraDispelTypeColor(unit, auraInstanceID, (GetDispelCurve()))
-end
-
-local function FindDispelColor(unit, source)
-	if not UnitIsFriend("player", unit) then return nil, nil end
-
-	local mine = GetUnitAuras(unit, "HARMFUL|RAID_PLAYER_DISPELLABLE", 40, 0, 0)
-	if mine then
-		for auraIndex = 1, #mine do
-			local aura = mine[auraIndex]
-			if not GroupFrames.IsBlacklistedDebuff(aura.spellId) and aura.auraInstanceID then
-				local color = colorFromCurve(unit, aura.auraInstanceID)
-				if color then return color, aura.auraInstanceID end
-			end
-		end
-	end
-
-	if source ~= "all" then return nil, nil end
-
-	local any = GetUnitAuras(unit, "HARMFUL", 40, 0, 0)
-	if any then
-		for auraIndex = 1, #any do
-			local aura = any[auraIndex]
-			if not GroupFrames.IsBlacklistedDebuff(aura.spellId) and aura.auraInstanceID and aura.dispelName ~= nil then
-				local color = colorFromCurve(unit, aura.auraInstanceID)
-				if color then return color, aura.auraInstanceID end
-			end
-		end
-	end
-	return nil, nil
-end
-
-function GroupFrames.ApplyDispelBadgeStyle(badge, frame)
-	local badgeSettings = GroupFrames.SettingsForFrame(frame).dispelBadge
-	badge:SetSize(Pixel.Scale(badgeSettings.size), Pixel.Scale(badgeSettings.size))
-	badge:ClearAllPoints()
-	badge:SetPoint(badgeSettings.anchor, frame.Health, badgeSettings.anchor, Pixel.Scale(badgeSettings.offsetX), Pixel.Scale(badgeSettings.offsetY))
-end
-
 function GroupFrames.RestyleAllDispelBadges()
 	GroupFrames.EachChild(function(child)
-		if GroupFrames.DispelViaEngine then
-			GroupFrames.RestyleDispelHighlight(child)
-			local previewKit = child._dispelPreviewKit
-			if previewKit and previewKit.host:IsShown() then StyleHighlightKit(child, previewKit.kit) end
-		end
-		if child.DispelBadge then GroupFrames.ApplyDispelBadgeStyle(child.DispelBadge, child) end
+		GroupFrames.RestyleDispelHighlight(child)
+		local previewKit = child._dispelPreviewKit
+		if previewKit and previewKit.host:IsShown() then StyleHighlightKit(child, previewKit.kit) end
 	end)
-end
-
-local function EnsureDispelTextures(frame)
-	local healthBar = frame.Health
-	if not healthBar then return end
-
-	if not frame.DispelBadge then
-		local badge = CreateFrame("Frame", nil, healthBar)
-		badge:SetFrameLevel(healthBar:GetFrameLevel() + 3)
-		badge:EnableMouse(false)
-		badge:Hide()
-		badge.icons = {}
-		for _, name in ipairs(DISPEL_BADGE_NAMES) do
-			local texture = badge:CreateTexture(nil, "OVERLAY", nil, 7)
-			texture:SetAllPoints(badge)
-			texture:SetAtlas(DISPEL_BADGE_ATLAS[name])
-			texture:Hide()
-			badge.icons[name] = texture
-		end
-		frame.DispelBadge = badge
-	end
-	GroupFrames.ApplyDispelBadgeStyle(frame.DispelBadge, frame)
-end
-
-local function HideDispelTextures(frame)
-	if frame.DispelBadge then frame.DispelBadge:Hide() end
-end
-
-local function RepaintHealth(frame, unit)
-	if frame.Health and frame.Health.PostUpdateColor then
-		frame.Health.PostUpdateColor(frame.Health, unit)
-	end
-end
-
-function GroupFrames.ApplyDispelBadgeIcons(badge, unit, auraInstanceID)
-	if not badge or not badge.icons or not auraInstanceID then return end
-	local curves = GetIconCurves()
-	for _, name in ipairs(DISPEL_BADGE_NAMES) do
-		local texture = badge.icons[name]
-		local color   = GetAuraDispelTypeColor(unit, auraInstanceID, curves[name])
-		if texture and color then
-			texture:SetVertexColor(color:GetRGBA())
-			texture:Show()
-		elseif texture then
-			texture:Hide()
-		end
-	end
-end
-
-function GroupFrames.ApplyDispelBadgePreview(badge, typeName)
-	if not badge or not badge.icons then return end
-	local key = PREVIEW_TOKEN[typeName]
-	for _, name in ipairs(DISPEL_BADGE_NAMES) do
-		local texture = badge.icons[name]
-		if texture and name == key then
-			texture:SetVertexColor(1, 1, 1, 1)
-			texture:Show()
-		elseif texture then
-			texture:Hide()
-		end
-	end
-end
-
-function GroupFrames.UpdateDispelBorder(frame, unit)
-	if GroupFrames.DispelViaEngine then return end
-	if frame._dispelPreview then return end
-	if frame._preview then
-		HideDispelTextures(frame)
-		if frame._dispelColor then
-			frame._dispelColor = nil
-		end
-		return
-	end
-	local settings = GroupFrames.SettingsForFrame(frame)
-	local borderSettings = settings.dispelBorder
-
-	if not unit or not UnitExists(unit) or not UnitIsVisible(unit) then
-		HideDispelTextures(frame)
-		if frame._dispelColor then
-			frame._dispelColor = nil
-			RepaintHealth(frame, unit)
-		end
-		return
-	end
-
-	local wantTint = GroupFrames.DispelLook(settings)
-	local wantBadge = borderSettings.showBadge ~= false
-
-	if not wantBadge and not wantTint then
-		if frame._dispelColor then
-			HideDispelTextures(frame)
-			frame._dispelColor = nil
-			RepaintHealth(frame, unit)
-		end
-		return
-	end
-
-	if BUI.Tools.ShouldAurasBeSecret() or BUI.Tools.AuraQueriesBlocked() then return end
-
-	local colorObj, auraInstanceID = FindDispelColor(unit, borderSettings.source)
-	if colorObj then
-		frame._dispelColor = colorObj
-		EnsureDispelTextures(frame)
-		if wantBadge and auraInstanceID then
-			GroupFrames.ApplyDispelBadgeIcons(frame.DispelBadge, unit, auraInstanceID)
-			frame.DispelBadge:Show()
-		else
-			frame.DispelBadge:Hide()
-		end
-		RepaintHealth(frame, unit)
-	elseif frame._dispelColor then
-		HideDispelTextures(frame)
-		frame._dispelColor = nil
-		RepaintHealth(frame, unit)
-	end
 end
 
 local function EnsurePreviewKit(frame)
@@ -491,65 +273,29 @@ local function PaintPreviewKit(frame, previewKit, typeName)
 end
 
 local function ApplyDispelPreview(frame, dispelName)
-	if not frame then return false, "no frame" end
-
-	if GroupFrames.DispelViaEngine then
-		if not dispelName or dispelName == "off" then
-			frame._dispelPreview = nil
-			if frame._dispelPreviewKit then frame._dispelPreviewKit.host:Hide() end
-			if frame._auraWatcher then GroupFrames.ConfigureDispelHighlight(frame) end
-			return true
-		end
-		if not PREVIEW_TOKEN[dispelName] then return false, "unknown type: " .. tostring(dispelName) end
-		frame._dispelPreview = true
-		if frame[HIGHLIGHT_KEY] then frame[HIGHLIGHT_KEY]:Hide() end
-		local previewKit = EnsurePreviewKit(frame)
-		PaintPreviewKit(frame, previewKit, dispelName)
-		previewKit.host:Show()
-		return true
-	end
-
-	if not dispelName or dispelName == "off" then
+	if dispelName == "off" then
 		frame._dispelPreview = nil
-		HideDispelTextures(frame)
-		frame._dispelColor = nil
-		RepaintHealth(frame, frame.unit)
-		return true
+		if frame._dispelPreviewKit then frame._dispelPreviewKit.host:Hide() end
+		GroupFrames.RefreshDispelBorder(frame)
+		return
 	end
-
-	local token = PREVIEW_TOKEN[dispelName]
-	if not token then return false, "unknown type: " .. tostring(dispelName) end
-	local color = Engine.DispelColor(token)
-
-	local wantBadge = GroupFrames.SettingsForFrame(frame).dispelBorder.showBadge ~= false
-
 	frame._dispelPreview = true
-	frame._dispelColor = color
-	EnsureDispelTextures(frame)
-	if wantBadge then
-		GroupFrames.ApplyDispelBadgePreview(frame.DispelBadge, dispelName)
-		frame.DispelBadge:Show()
-	else
-		frame.DispelBadge:Hide()
-	end
-	RepaintHealth(frame, frame.unit)
-	return true
+	if frame[HIGHLIGHT_KEY] then frame[HIGHLIGHT_KEY]:Hide() end
+	local previewKit = EnsurePreviewKit(frame)
+	PaintPreviewKit(frame, previewKit, dispelName)
+	previewKit.host:Show()
 end
 
-function GroupFrames.PreviewDispelOnAllParty(startIndex)
-	startIndex = startIndex or 1
-	local types = { "Magic", "Curse", "Disease", "Poison", "Bleed", "Enrage" }
+local function PreviewDispelOnAllParty(startIndex)
 	local memberIndex = 0
 	GroupFrames.EachChild(function(child)
 		if not child.unit then return end
-		local typeName = types[((startIndex - 1 + memberIndex) % #types) + 1]
-		ApplyDispelPreview(child, typeName)
+		ApplyDispelPreview(child, PREVIEW_CYCLE[((startIndex - 1 + memberIndex) % #PREVIEW_CYCLE) + 1])
 		memberIndex = memberIndex + 1
 	end)
-	return true
 end
 
-function GroupFrames.ClearAllDispelPreviews()
+local function ClearAllDispelPreviews()
 	GroupFrames.EachChild(function(child)
 		if child.unit then ApplyDispelPreview(child, "off") end
 	end)
@@ -561,12 +307,12 @@ local cycleTicker
 
 local function StopCycle()
 	if cycleTicker then cycleTicker:Cancel(); cycleTicker = nil end
-	GroupFrames.ClearAllDispelPreviews()
+	ClearAllDispelPreviews()
 end
 
 local function StepCycle()
 	cycleIndex = cycleIndex + 1
-	GroupFrames.PreviewDispelOnAllParty(cycleIndex)
+	PreviewDispelOnAllParty(cycleIndex)
 end
 local StepCycleTimed = BUI.Profiler.Wrap("GroupFrames.Dispel preview cycle", StepCycle)
 

@@ -15,10 +15,6 @@ GroupFrames.Layers = {
 	indicators  = 25,
 }
 
-function GroupFrames.Print(message)
-	print(BUI.C.CHAT_PREFIX .. message)
-end
-
 function GroupFrames.GetDB()
 	local profile = BUI.GetDB()
 	return profile and profile.groupFrames or BUI.Defaults.profile.groupFrames
@@ -46,6 +42,13 @@ function Util.ClassColor(unit, frame)
 	if classColor then return classColor.r, classColor.g, classColor.b end
 end
 
+function Util.PlayerSpecRole()
+	local spec = C_SpecializationInfo.GetSpecialization()
+	if not spec then return nil end
+	local _, _, _, _, role = C_SpecializationInfo.GetSpecializationInfo(spec)
+	return role
+end
+
 function Util.FrameRole(frame)
 	if not frame then return nil end
 	if frame._previewRole then return frame._previewRole end
@@ -53,11 +56,8 @@ function Util.FrameRole(frame)
 	if not unit then return nil end
 	local role = UnitGroupRolesAssigned(unit)
 	if IsSecret(role) then return nil end
-	if role and role ~= "NONE" then return role end
-	if UnitIsUnit(unit, "player") and GetSpecialization and GetSpecializationRole then
-		local spec = GetSpecialization()
-		if spec then return GetSpecializationRole(spec) end
-	end
+	if role ~= "NONE" then return role end
+	if UnitIsUnit(unit, "player") then return Util.PlayerSpecRole() end
 end
 
 function Util.ResolveGrowth(anchorPoint, growDirection)
@@ -92,20 +92,12 @@ local OPPOSITES = {
 	CENTER = "CENTER",
 }
 
-function Anchor.ResolveFrame(name)
-	if not name or name == "" then return nil end
-	return _G[name]
-end
-
-local function CDMOffset(frameName, point)
-	if not CDM_FRAMES[frameName] then return 0 end
-	local anchorFrame = _G[frameName]
-	if not anchorFrame then return 0 end
+local function CDMOffset(target, point)
 	if point == "TOP" or point == "TOPLEFT" or point == "TOPRIGHT" then
-		return -(anchorFrame._topEdgeOffset or 0)
+		return -(target._topEdgeOffset or 0)
 	end
 	if point == "BOTTOM" or point == "BOTTOMLEFT" or point == "BOTTOMRIGHT" then
-		return anchorFrame._bottomEdgeOffset or 0
+		return target._bottomEdgeOffset or 0
 	end
 	return 0
 end
@@ -133,47 +125,28 @@ local function GapOffsets(point, offsetX, offsetY)
 	return offsetX, offsetY
 end
 
-function Anchor.ApplyPosition(frame, settings)
-	if not frame then return end
+function Anchor.ApplyPosition(frame, target, anchorFrame, anchorPoint, offsetX, offsetY)
 	local Scale = BUI.Pixel.Scale
+	local isCDM = CDM_FRAMES[anchorFrame]
 
 	frame:ClearAllPoints()
-	local target = Anchor.ResolveFrame(settings.anchorFrame)
-	if target == frame then target = nil end
+	local point, framePoint, isInside = BUI.Anchor.ResolveAnchorPoint(anchorPoint)
+	if isCDM then offsetY = offsetY + CDMOffset(target, point) * (isInside and -1 or 1) end
+	offsetX, offsetY = GapOffsets(isInside and OPPOSITES[point] or point, offsetX, offsetY)
 
-	if not target then
-		frame:SetPoint("CENTER", UIParent, "CENTER", Scale(settings.posX or 0), Scale(settings.posY or 0))
-		return
-	end
-
-	local point, framePoint, isInside = BUI.Anchor.ResolveAnchorPoint(settings.anchorPoint)
-	local offsetX, offsetY = settings.anchorOffsetX or 0, settings.anchorOffsetY or 0
-	local direction = isInside and -1 or 1
-
-	offsetY = offsetY + CDMOffset(settings.anchorFrame, point) * direction
-
-	if framePoint == "TOP" or framePoint == "TOPLEFT" or framePoint == "TOPRIGHT" then
-		offsetY = offsetY + (frame._topEdgeOffset or 0) * direction
-	elseif framePoint == "BOTTOM" or framePoint == "BOTTOMLEFT" or framePoint == "BOTTOMRIGHT" then
-		offsetY = offsetY - (frame._bottomEdgeOffset or 0) * direction
-	end
-
-	offsetX, offsetY = GapOffsets(isInside and (OPPOSITES[point] or point) or point, offsetX, offsetY)
-
-	if CDM_FRAMES[settings.anchorFrame] then
+	if isCDM then
 		local anchorX, anchorY = CDMPointInUIParent(target, point)
-		if anchorX and anchorY then
+		if anchorX then
 			if target._row1CenterOffsetX
 				and (point == "TOP" or point == "BOTTOM" or point == "CENTER") then
 				anchorX = anchorX + target._row1CenterOffsetX
 			end
 			frame:SetPoint(framePoint, UIParent, "BOTTOMLEFT", Scale(anchorX + offsetX), Scale(anchorY + offsetY))
-			return target
+			return
 		end
 	end
 
 	frame:SetPoint(framePoint, target, point, Scale(offsetX), Scale(offsetY))
-	return target
 end
 
 function GroupFrames.AfterCombat(callback, key)

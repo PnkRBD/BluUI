@@ -1,6 +1,7 @@
 local _, BUI = ...
 
 local GroupFrames    = BUI.GroupFrames
+local UnitFrames     = BUI.UnitFrames
 local Util  = GroupFrames.Util
 local Pixel = BUI.Pixel
 
@@ -10,31 +11,13 @@ local UnitIsUnit               = UnitIsUnit
 local UnitInRange              = UnitInRange
 local InCombatLockdown         = InCombatLockdown
 local sharedMedia              = LibStub("LibSharedMedia-3.0")
-local WHITE_TEXTURE            = "Interface\\Buttons\\WHITE8x8"
-local IsSecret                 = Util.IsSecret
-
-local FILL_TEXTURES = {
-	Solid = "Interface\\AddOns\\BluUI\\Media\\Textures\\solid.tga",
-}
-local OVERLAY_TEXTURES = {
-	Stripes = BUI.C.MEDIA_PATH .. 'stripes.tga',
-}
 
 local NAME_TAG   = "[blu:name]"
 local STATUS_TAG = "[blu:status]"
 
 local function ResolveTexture(name)
 	if not name or name == BUI.C.GLOBAL_OPTION then return BUI.GetGlobalTexture() end
-	return sharedMedia:Fetch("statusbar", name) or WHITE_TEXTURE
-end
-
-local function ResolveFont(name)
-	if not name or name == BUI.C.GLOBAL_OPTION then return BUI.GetGlobalFont() end
-	return sharedMedia:Fetch("font", name) or STANDARD_TEXT_FONT
-end
-
-local function ResolveOutline(outline)
-	return BUI.ApplySlug(outline)
+	return sharedMedia:Fetch("statusbar", name, true) or BUI.GetGlobalTexture()
 end
 
 local function ResolveBackgroundColor(settings, unit, frame)
@@ -60,7 +43,7 @@ local function HealthAlphaFor(settings)
 end
 
 local function ApplyFrameColors(frame, settings, unit)
-	if frame.Health then frame.Health._inOffline = nil end
+	frame.Health._inOffline = nil
 	local red, green, blue, alpha = ResolveBackgroundColor(settings, unit, frame)
 	if settings.transparentHealth then alpha = 0 end
 	local borderColor = settings.borderColor
@@ -78,7 +61,7 @@ local function BuildBackdrop(frame, unit)
 end
 
 local function CatchUpHealth(frame, _, eventUnit)
-	if eventUnit ~= frame.unit and eventUnit ~= frame.realUnit then return end
+	if eventUnit ~= frame.unit then return end
 	if not frame:IsElementEnabled("Health") then return end
 	local health = frame.Health
 	local dead = (not health._inOffline and UnitIsDeadOrGhost(frame.unit)) and true or false
@@ -103,28 +86,11 @@ local function PaintHealth(self, updatedUnit, offline)
 	if offline then self:SetValue(0) end
 	local dead = deadOrGhost and not offline
 	local class = owner._bluClass
-	local dispel = owner._dispelColor
-	local hasDispel = (dispel and dispel.r ~= nil and dispel.g ~= nil and dispel.b ~= nil) and true or false
-	local dispelRed = hasDispel and dispel.r or false
-	local dispelGreen = hasDispel and dispel.g or false
-	local dispelBlue = hasDispel and dispel.b or false
-	local hasSecretValue = hasDispel and (IsSecret(dispelRed) or IsSecret(dispelGreen) or IsSecret(dispelBlue)) or false
-
-	if not hasSecretValue then
-		if self._inOffline == offline and self._inDead == dead and self._inClass == class
-			and self._inDR == dispelRed and self._inDG == dispelGreen and self._inDB == dispelBlue then
-			return
-		end
-		self._inOffline, self._inDead, self._inClass = offline, dead, class
-		self._inDR, self._inDG, self._inDB = dispelRed, dispelGreen, dispelBlue
-	else
-		self._inOffline, self._inDead = nil, dead
-	end
+	if self._inOffline == offline and self._inDead == dead and self._inClass == class then return end
+	self._inOffline, self._inDead, self._inClass = offline, dead, class
 
 	local ownerSettings = GroupFrames.SettingsForFrame(owner)
 	local deadColor = (dead and ownerSettings.deadBackground) and ownerSettings.deadBackgroundColor or false
-	local wantTint = GroupFrames.DispelLook(ownerSettings)
-	local tintBar = (hasDispel and wantTint) and true or false
 	local transparent = ownerSettings.transparentHealth and true or false
 	local alpha = HealthAlphaFor(ownerSettings)
 
@@ -133,7 +99,6 @@ local function PaintHealth(self, updatedUnit, offline)
 	else backgroundRed, backgroundGreen, backgroundBlue = PickHealthColor(ownerSettings, updatedUnit, owner) end
 
 	local red, green, blue = backgroundRed, backgroundGreen, backgroundBlue
-	if tintBar and not offline then red, green, blue = dispelRed, dispelGreen, dispelBlue end
 	if deadColor then red, green, blue = deadColor[1], deadColor[2], deadColor[3] end
 
 	self:SetStatusBarColor(red, green, blue, deadColor and (deadColor[4] or 1) or alpha)
@@ -145,13 +110,10 @@ local function PaintHealth(self, updatedUnit, offline)
 		self.bg:SetVertexColor(backgroundRed * self.bg.multiplier, backgroundGreen * self.bg.multiplier, backgroundBlue * self.bg.multiplier, backgroundAlpha)
 	end
 
-	local barTexture = self:GetStatusBarTexture()
-	if barTexture then barTexture:SetDesaturated(offline) end
-	if self.Deficit then
-		self.Deficit:SetShown(transparent)
-		local deficitColor = deadColor or ownerSettings.bgColor
-		self.Deficit:SetVertexColor(deficitColor[1], deficitColor[2], deficitColor[3], deficitColor[4] or 1)
-	end
+	self:GetStatusBarTexture():SetDesaturated(offline)
+	self.Deficit:SetShown(transparent)
+	local deficitColor = deadColor or ownerSettings.bgColor
+	self.Deficit:SetVertexColor(deficitColor[1], deficitColor[2], deficitColor[3], deficitColor[4] or 1)
 	GroupFrames.ReflowAuraVisibility(owner)
 end
 
@@ -182,21 +144,19 @@ local function BuildHealth(frame, unit)
 	healthBar:SetPoint("TOPLEFT", edge, -edge)
 	healthBar:SetPoint("TOPRIGHT", -edge, -edge)
 	local healthTexture = healthBar:GetStatusBarTexture()
-	if healthTexture then healthTexture:SetTexCoord(0.01, 0.99, 0.01, 0.99) end
+	healthTexture:SetTexCoord(0.01, 0.99, 0.01, 0.99)
 
 	healthBar.bg = healthBar:CreateTexture(nil, "BACKGROUND")
 	healthBar.bg:SetAllPoints()
 	healthBar.bg:SetTexture(texture)
 	healthBar.bg.multiplier = 0.25
 
-	healthBar.smoothing = BUI.GetDB().general.smoothBars and Enum.StatusBarInterpolation.ExponentialEaseOut or nil
+	healthBar.smoothing = UnitFrames.GetBarSmoothing()
 
 	local deficit = healthBar:CreateTexture(nil, "ARTWORK", nil, -1)
 	deficit:SetTexture(texture)
-	if healthTexture then
-		deficit:SetPoint("TOPLEFT", healthTexture, "TOPRIGHT")
-		deficit:SetPoint("BOTTOMLEFT", healthTexture, "BOTTOMRIGHT")
-	end
+	deficit:SetPoint("TOPLEFT", healthTexture, "TOPRIGHT")
+	deficit:SetPoint("BOTTOMLEFT", healthTexture, "BOTTOMRIGHT")
 	deficit:SetPoint("TOPRIGHT", healthBar, "TOPRIGHT")
 	deficit:SetPoint("BOTTOMRIGHT", healthBar, "BOTTOMRIGHT")
 	deficit:Hide()
@@ -210,60 +170,13 @@ local function BuildHealth(frame, unit)
 	frame:RegisterEvent("PLAYER_FLAGS_CHANGED", CatchUpHealth)
 end
 
-local function AnchorAbsorb(absorb, health, direction)
-	absorb:ClearAllPoints()
-	local healthTexture = health:GetStatusBarTexture()
-	if direction == "left" then
-		absorb:SetReverseFill(true)
-		absorb:SetPoint("TOPRIGHT", healthTexture, "TOPRIGHT")
-		absorb:SetPoint("BOTTOMRIGHT", healthTexture, "BOTTOMRIGHT")
-	elseif direction == "edge" then
-		absorb:SetReverseFill(true)
-		absorb:SetPoint("TOPRIGHT", health, "TOPRIGHT", 0, 0)
-		absorb:SetPoint("BOTTOMRIGHT", health, "BOTTOMRIGHT", 0, 0)
-	else
-		absorb:SetReverseFill(false)
-		absorb:SetPoint("LEFT", healthTexture, "RIGHT")
-		absorb:SetPoint("TOP", health, "TOP")
-		absorb:SetPoint("BOTTOM", health, "BOTTOM")
-	end
+local function ApplyAbsorbLook(bar, health, config)
+	UnitFrames.ApplyAbsorbVisual(bar, config.texture, config.color)
+	UnitFrames.AnchorAbsorb(bar, health, health:GetStatusBarTexture(), config.direction)
 end
-GroupFrames.AnchorAbsorb = AnchorAbsorb
-
-local function ApplyAbsorbStyle(bar, config)
-	local textureKey = config.texture
-	local color   = config.color
-
-	bar:SetStatusBarTexture(FILL_TEXTURES[textureKey] or WHITE_TEXTURE)
-	bar:SetStatusBarColor(color[1], color[2], color[3], color[4])
-	local baseTexture = bar:GetStatusBarTexture()
-	if baseTexture and baseTexture.SetBlendMode then baseTexture:SetBlendMode("BLEND") end
-
-	if bar._absBg then bar._absBg:Hide() end
-
-	local overlayTexturePath = OVERLAY_TEXTURES[textureKey]
-	if overlayTexturePath then
-		local overlay = bar._absOverlay
-		if not overlay then overlay = bar:CreateTexture(nil, "OVERLAY"); bar._absOverlay = overlay end
-		overlay:SetTexture(overlayTexturePath, "REPEAT", "REPEAT")
-		overlay:SetHorizTile(true); overlay:SetVertTile(true)
-		overlay:SetBlendMode("BLEND")
-		overlay:SetVertexColor(1, 1, 1)
-		overlay:SetAlpha(1)
-		overlay:ClearAllPoints()
-		overlay:SetAllPoints(baseTexture)
-		overlay:Show()
-	elseif bar._absOverlay then
-		bar._absOverlay:Hide()
-	end
-end
-
-GroupFrames.ApplyAbsorbVisual = ApplyAbsorbStyle
 
 local function BuildAbsorb(frame, unit)
 	local settings = GroupFrames.SettingsForFrame(frame)
-	local absorbSettings = settings.absorb
-	if not absorbSettings.enabled then return end
 
 	local clip = CreateFrame("Frame", nil, frame.Health)
 	clip:SetAllPoints(frame.Health)
@@ -272,34 +185,24 @@ local function BuildAbsorb(frame, unit)
 
 	local absorb = CreateFrame("StatusBar", nil, clip)
 	absorb:SetFrameLevel(clip:GetFrameLevel() + 1)
-	GroupFrames.ApplyAbsorbVisual(absorb, absorbSettings)
-	AnchorAbsorb(absorb, frame.Health, absorbSettings.direction)
-
+	ApplyAbsorbLook(absorb, frame.Health, settings.absorb)
+	absorb:SetShown(settings.absorb.enabled)
 	frame.Absorb = absorb
 
 	local healAbsorb = CreateFrame("StatusBar", nil, clip)
 	healAbsorb:SetFrameLevel(clip:GetFrameLevel() + 2)
-	GroupFrames.ApplyAbsorbVisual(healAbsorb, settings.healAbsorb)
-	AnchorAbsorb(healAbsorb, frame.Health, settings.healAbsorb.direction)
-
-	healAbsorb:SetShown(settings.healAbsorb.enabled ~= false)
+	ApplyAbsorbLook(healAbsorb, frame.Health, settings.healAbsorb)
+	healAbsorb:SetShown(settings.healAbsorb.enabled)
 	frame.HealAbsorb = healAbsorb
 	frame.AbsorbBars = { Damage = absorb, Heal = healAbsorb }
 end
 
 function GroupFrames.ApplyAbsorbToChild(child, settings)
-	local bars = child.AbsorbBars
-	if not bars then return end
-	local absorbSettings, healSettings = settings.absorb, settings.healAbsorb
-	GroupFrames.ApplyAbsorbVisual(child.Absorb, absorbSettings)
-	AnchorAbsorb(child.Absorb, child.Health, absorbSettings.direction)
-	child.Absorb:SetShown(absorbSettings.enabled)
-
-	GroupFrames.ApplyAbsorbVisual(child.HealAbsorb, healSettings)
-	AnchorAbsorb(child.HealAbsorb, child.Health, healSettings.direction)
-	child.HealAbsorb:SetShown(healSettings.enabled ~= false)
-
-	if child.unit and child:IsElementEnabled("AbsorbBars") then bars:ForceUpdate() end
+	ApplyAbsorbLook(child.Absorb, child.Health, settings.absorb)
+	child.Absorb:SetShown(settings.absorb.enabled)
+	ApplyAbsorbLook(child.HealAbsorb, child.Health, settings.healAbsorb)
+	child.HealAbsorb:SetShown(settings.healAbsorb.enabled)
+	if child.unit and child:IsElementEnabled("AbsorbBars") then child.AbsorbBars:ForceUpdate() end
 end
 
 local function PowerRoleAllowed(healerOnly, frame)
@@ -323,8 +226,7 @@ local function BuildPower(frame, unit)
 
 	local powerBar = CreateFrame("StatusBar", nil, frame)
 	powerBar:SetStatusBarTexture(texture)
-	local powerTexture = powerBar:GetStatusBarTexture()
-	if powerTexture then powerTexture:SetTexCoord(0.01, 0.99, 0.01, 0.99) end
+	powerBar:GetStatusBarTexture():SetTexCoord(0.01, 0.99, 0.01, 0.99)
 
 	powerBar.bg = powerBar:CreateTexture(nil, "BACKGROUND")
 	powerBar.bg:SetAllPoints()
@@ -333,13 +235,13 @@ local function BuildPower(frame, unit)
 
 	powerBar.colorPower = true
 	powerBar.PostUpdateColor = PostUpdatePowerColor
-	powerBar.smoothing = BUI.GetDB().general.smoothBars and Enum.StatusBarInterpolation.ExponentialEaseOut or nil
+	powerBar.smoothing = UnitFrames.GetBarSmoothing()
 
 	frame.Power = powerBar
 end
 
 local function ApplyText(fontString, parent, textSettings, fontFile)
-	fontString:SetFont(fontFile, textSettings.size, ResolveOutline(textSettings.outline))
+	fontString:SetFont(fontFile, textSettings.size, BUI.ApplySlug(textSettings.outline))
 	fontString:SetShadowColor(0, 0, 0, 0)
 	fontString:SetShadowOffset(0, 0)
 	fontString:SetJustifyH(Util.JustifyFor(textSettings.anchor))
@@ -349,7 +251,6 @@ local function ApplyText(fontString, parent, textSettings, fontFile)
 end
 
 GroupFrames.ApplyTextSettings = ApplyText
-GroupFrames.ResolveFont = ResolveFont
 
 local function ReTag(frame, fontString, tag, shown)
 	frame:Untag(fontString)
@@ -390,16 +291,14 @@ function GroupFrames.ApplyTextColors(child, settings)
 end
 
 local function InjectAbsorbColor(tagFormat, color)
-	if not tagFormat or not tagFormat:find("blu:absorb", 1, true) then return tagFormat end
-	local absorbColor = color or { 0.5, 0.5, 1, 1 }
-	local hex = ("%02x%02x%02x%02x"):format((absorbColor[4] or 1) * 255, absorbColor[1] * 255, absorbColor[2] * 255, absorbColor[3] * 255)
+	if not tagFormat:find("blu:absorb", 1, true) then return tagFormat end
+	local hex = ("%02x%02x%02x%02x"):format((color[4] or 1) * 255, color[1] * 255, color[2] * 255, color[3] * 255)
 	return (tagFormat:gsub("%[blu:absorb%]", "|c" .. hex .. "[blu:absorb]|r"))
 end
 GroupFrames.InjectAbsorbColor = InjectAbsorbColor
 
 function GroupFrames.ReTagHp(child, settings)
 	local hpText = child.HpText
-	if not hpText then return end
 	local format = settings.hpText.format
 	if settings.showHpText and GroupFrames.IsDirectHpFormat(format) then
 		child:Untag(hpText)
@@ -417,37 +316,36 @@ function GroupFrames.ReTagHp(child, settings)
 end
 
 function GroupFrames.ApplyTextToChild(child, settings)
-	local fontFile = ResolveFont(settings.font)
+	local fontFile = BUI.GetFontByName(settings.font)
 
-	if child.NameText then
-		ApplyText(child.NameText, child.Health, settings.name, fontFile)
-		ReTag(child, child.NameText, NAME_TAG, settings.showName)
-		child.NameText:SetShown(settings.showName)
-	end
-	if child.HpText then
-		ApplyText(child.HpText, child.Health, settings.hpText, fontFile)
-		GroupFrames.ReTagHp(child, settings)
-		child.HpText:SetShown(settings.showHpText)
-	end
-	if child.StatusText then
-		ApplyText(child.StatusText, child.Health, settings.statusText, fontFile)
-		ReTag(child, child.StatusText, STATUS_TAG, settings.showStatusText)
-		child.StatusText:SetShown(settings.showStatusText)
-	end
-	if child.PowerText then
-		local shown = PowerTextShown(settings, child)
-		ApplyText(child.PowerText, child, settings.pwrText, fontFile)
-		ReTag(child, child.PowerText, settings.pwrText.format, shown)
-		child.PowerText:SetShown(shown)
-	end
+	ApplyText(child.NameText, child.Health, settings.name, fontFile)
+	ReTag(child, child.NameText, NAME_TAG, settings.showName)
+	child.NameText:SetShown(settings.showName)
+
+	ApplyText(child.HpText, child.Health, settings.hpText, fontFile)
+	GroupFrames.ReTagHp(child, settings)
+	child.HpText:SetShown(settings.showHpText)
+
+	ApplyText(child.StatusText, child.Health, settings.statusText, fontFile)
+	ReTag(child, child.StatusText, STATUS_TAG, settings.showStatusText)
+	child.StatusText:SetShown(settings.showStatusText)
+
+	local shown = PowerTextShown(settings, child)
+	ApplyText(child.PowerText, child, settings.pwrText, fontFile)
+	ReTag(child, child.PowerText, settings.pwrText.format, shown)
+	child.PowerText:SetShown(shown)
 
 	GroupFrames.ApplyTextColors(child, settings)
 	child:UpdateTags()
 end
 
+local function RecolorOnNameUpdate(frame)
+	GroupFrames.ApplyTextColors(frame, GroupFrames.SettingsForFrame(frame))
+end
+
 local function BuildText(frame, unit)
 	local settings = GroupFrames.SettingsForFrame(frame)
-	local fontFile = ResolveFont(settings.font)
+	local fontFile = BUI.GetFontByName(settings.font)
 
 	local textLayer = CreateFrame("Frame", nil, frame.Health)
 	textLayer:SetAllPoints()
@@ -477,25 +375,21 @@ local function BuildText(frame, unit)
 
 	GroupFrames.ApplyTextColors(frame, settings)
 
-	frame:RegisterEvent("UNIT_NAME_UPDATE", function()
-		GroupFrames.ApplyTextColors(frame, GroupFrames.SettingsForFrame(frame))
-	end)
+	frame:RegisterEvent("UNIT_NAME_UPDATE", RecolorOnNameUpdate)
 end
 
 function GroupFrames.ApplyGeometry(frame, settings)
 	local width, height = Pixel.Scale(settings.width), Pixel.Scale(settings.height)
 	local currentWidth, currentHeight = frame:GetSize()
-	if math.abs((currentWidth or 0) - width) > 0.1 or math.abs((currentHeight or 0) - height) > 0.1 then
+	if math.abs(currentWidth - width) > 0.1 or math.abs(currentHeight - height) > 0.1 then
 		if not InCombatLockdown() then
 			frame:SetSize(width, height)
 		end
 	end
 
 	local healthBar = frame.Health
-	if not healthBar then return end
-
 	local edge = Pixel.Scale(Pixel.ClampBorder(1))
-	local hasPower = frame.Power and settings.showPower ~= false and settings.powerHeight > 0
+	local hasPower = settings.showPower and settings.powerHeight > 0
 		and PowerRoleAllowed(settings.healerOnlyPower, frame)
 
 	if hasPower then
@@ -518,37 +412,27 @@ function GroupFrames.ApplyGeometry(frame, settings)
 		healthBar:ClearAllPoints()
 		healthBar:SetPoint("TOPLEFT", edge, -edge)
 		healthBar:SetPoint("BOTTOMRIGHT", -edge, edge)
-		if frame.Power then
-			if frame:IsElementEnabled("Power") then
-				frame:DisableElement("Power")
-			end
-			frame.Power:Hide()
+		if frame:IsElementEnabled("Power") then
+			frame:DisableElement("Power")
 		end
+		frame.Power:Hide()
 	end
 
-	if frame.PowerText then
-		local shown = PowerTextShown(settings, frame)
-		SyncPowerTag(frame, shown)
-		frame.PowerText:SetShown(shown)
-	end
-	if frame.NameText then frame.NameText:SetShown(settings.showName)  end
-	if frame.HpText   then frame.HpText:SetShown(settings.showHpText) end
+	local shown = PowerTextShown(settings, frame)
+	SyncPowerTag(frame, shown)
+	frame.PowerText:SetShown(shown)
+	frame.NameText:SetShown(settings.showName)
+	frame.HpText:SetShown(settings.showHpText)
 end
 
 function GroupFrames.ApplyBarTextures(child, settings)
 	local texture = ResolveTexture(settings.statusbarTexture)
-	if child.Health then
-		child.Health:SetStatusBarTexture(texture)
-		if child.Health.bg      then child.Health.bg:SetTexture(texture)      end
-		if child.Health.Deficit then child.Health.Deficit:SetTexture(texture) end
-	end
-	if child.Power then
-		child.Power:SetStatusBarTexture(texture)
-		if child.Power.bg then child.Power.bg:SetTexture(texture) end
-	end
+	child.Health:SetStatusBarTexture(texture)
+	child.Health.bg:SetTexture(texture)
+	child.Health.Deficit:SetTexture(texture)
+	child.Power:SetStatusBarTexture(texture)
+	child.Power.bg:SetTexture(texture)
 end
-
-local EvaluateColorValueFromBoolean = C_CurveUtil and C_CurveUtil.EvaluateColorValueFromBoolean
 
 local function RangeOverride(self)
 	local unit = self.unit
@@ -569,13 +453,7 @@ local function RangeOverride(self)
 	end
 
 	local inRange = UnitInRange(unit)
-	if not IsSecret(inRange) then
-		self:SetAlpha(inRange and element.insideAlpha or element.outsideAlpha)
-	elseif EvaluateColorValueFromBoolean then
-		self:SetAlpha(EvaluateColorValueFromBoolean(inRange, element.insideAlpha, element.outsideAlpha))
-	else
-		self:SetAlphaFromBoolean(inRange, element.insideAlpha, element.outsideAlpha)
-	end
+	self:SetAlphaFromBoolean(inRange, element.insideAlpha, element.outsideAlpha)
 end
 
 local function BuildRangeFade(frame, unit)
@@ -593,8 +471,7 @@ local function BuildRangeFade(frame, unit)
 end
 
 local function TankOrHealer()
-	local spec = GetSpecialization()
-	local role = spec and GetSpecializationRole(spec)
+	local role = Util.PlayerSpecRole()
 	return role == "TANK" or role == "HEALER"
 end
 

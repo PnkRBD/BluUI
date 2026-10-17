@@ -7,7 +7,7 @@ local GroupFrames = BUI.GroupFrames
 local InCombatLockdown = InCombatLockdown
 
 local BLOCKED_ROLESET = "alwaysBlocked"
-local BAR_KEYS = { "healthBar", "healthbar", "HealthBar", "manabar", "ManaBar", "powerBar", "powerBarAlt", "spellbar", "castBar" }
+local BAR_KEYS = { "healthBar", "powerBar", "healthbar", "manabar" }
 
 local blocked = setmetatable({}, { __mode = "k" })
 
@@ -15,10 +15,10 @@ local function Block(frame)
 	if not frame or blocked[frame] then return end
 	blocked[frame] = true
 	frame:UnregisterAllEvents()
-	if frame.SetRolesets then frame:SetRolesets(BLOCKED_ROLESET) end
+	frame:SetRolesets(BLOCKED_ROLESET)
 	for barIndex = 1, #BAR_KEYS do
 		local bar = frame[BAR_KEYS[barIndex]]
-		if bar and bar.UnregisterAllEvents then bar:UnregisterAllEvents() end
+		if bar then bar:UnregisterAllEvents() end
 	end
 end
 
@@ -71,7 +71,7 @@ end
 
 local compactHookInstalled = false
 local function installCompactHook()
-	if compactHookInstalled or not _G.CompactUnitFrame_UpdateUnitEvents then return end
+	if compactHookInstalled then return end
 	compactHookInstalled = true
 	Hook("CompactUnitFrame_UpdateUnitEvents", stripCompactUnitEvents)
 	Hook("CompactUnitFrame_SetUpFrame", markCompactSetup)
@@ -80,15 +80,13 @@ end
 
 local partyHidden = false
 function GroupFrames.HideBlizzardParty()
-	if partyHidden or not PartyFrame or InCombatLockdown() then return end
+	if partyHidden or InCombatLockdown() then return end
 	partyHidden = true
 	partyActive = true
 	installCompactHook()
 
 	Block(PartyFrame)
-	if PartyFrame.PartyMemberFramePool then
-		for member in PartyFrame.PartyMemberFramePool:EnumerateActive() do Block(member) end
-	end
+	for member in PartyFrame.PartyMemberFramePool:EnumerateActive() do Block(member) end
 	for memberIndex = 1, COMPACT_PARTY_MEMBERS do
 		Block(_G["CompactPartyFrameMember" .. memberIndex])
 	end
@@ -97,7 +95,7 @@ end
 
 local raidHidden = false
 function GroupFrames.HideBlizzardRaid()
-	if raidHidden or not CompactRaidFrameContainer or InCombatLockdown() then return end
+	if raidHidden or InCombatLockdown() then return end
 	raidHidden = true
 	raidActive = true
 	installCompactHook()
@@ -106,7 +104,7 @@ end
 
 local raidManagerHidden = false
 function GroupFrames.HideBlizzardRaidManager()
-	if raidManagerHidden or not CompactRaidFrameManager then return end
+	if raidManagerHidden then return end
 	if InCombatLockdown() then GroupFrames.AfterCombat(GroupFrames.HideBlizzardRaidManager, "GF.HideRaidManager"); return end
 	raidManagerHidden = true
 	Block(CompactRaidFrameManager)

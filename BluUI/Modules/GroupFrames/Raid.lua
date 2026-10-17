@@ -61,6 +61,7 @@ local function AllHeaders()
 	if GroupFrames.headers.raidLargeWide then collected[#collected + 1] = GroupFrames.headers.raidLargeWide end
 	return collected
 end
+GroupFrames.AllRaidHeaders = AllHeaders
 
 local function ShownGroupFilter()
 	local parts = {}
@@ -246,10 +247,9 @@ local function WideColumnAnchor(raidSettings)
 end
 
 local function ConfigureWide(header, bank, raidSettings)
-	local base = GroupFrames.GetDB().raid
 	local memberPoint, memberX, memberY = MemberAttrs(raidSettings)
-	local unitsPerColumn = math.max(1, math.min(40, base.wideUnitsPerColumn))
-	local groupBy, order, sortMethod = WideSortAttrs(base)
+	local unitsPerColumn = math.max(1, math.min(40, raidSettings.wideUnitsPerColumn))
+	local groupBy, order, sortMethod = WideSortAttrs(raidSettings)
 	SetHeaderAttribute(header, "oUF-initialConfigFunction", GroupFrames.ConfigSnippet(raidSettings.width, raidSettings.height))
 	SetHeaderAttribute(header, "point",             memberPoint)
 	SetHeaderAttribute(header, "xOffset",           memberX)
@@ -309,10 +309,6 @@ function GroupFrames.PreviewRaidHeaders()
 		return GroupFrames.headers.raidWide and { GroupFrames.headers.raidWide } or nil
 	end
 	return GroupFrames.headers.raid
-end
-
-function GroupFrames.AllRaidHeaders()
-	return AllHeaders()
 end
 
 function GroupFrames.SetRaidEnabled(enabled)

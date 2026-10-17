@@ -2,6 +2,7 @@ local BUI = BluUI
 local BUILib = BluUI.BUILibClient
 local Modals = BUILib.Modals
 local AuraLists = BUI.AuraLists
+local GroupFrames = BUI.GroupFrames
 
 local MENU_WIDTH = 150
 local WIDE_MENU = 200
@@ -112,52 +113,11 @@ local CONTAINERS = {
 local POLARITY = { buffs = 'HELPFUL', bigDef = 'HELPFUL', debuffs = 'HARMFUL', crowdControl = 'HARMFUL' }
 local fonts, textures, moduleLoaded
 
-local function Window()
-	return BUI.PageEngine.window
-end
-
-local function Repaint()
-	Window():Repaint()
-end
-
-local function GroupFrames()
-	return BUI.GroupFrames
-end
+local Kit = BUI.OptionsKit
+local Window, Repaint, Option, Toggle, Color, Menu, Eye = Kit.Window, Kit.Repaint, Kit.Option, Kit.Toggle, Kit.Color, Kit.Menu, Kit.Eye
 
 local function Config()
 	return BUI.GetDB().groupFrames
-end
-
-local function Option(db, label, key, extra)
-	local option = { label = label, get = function() return db[key] end, set = function(value) db[key] = value end }
-	for name, value in pairs(extra or {}) do option[name] = value end
-	return option
-end
-
-local function Toggle(db, label, key)
-	return { label = label, get = function() return db[key] == true end, set = function(value) db[key] = value end }
-end
-
-local function Color(db, label, key)
-	return {
-		kind = 'swatch', label = label, tooltip = label, opacity = true,
-		get = function()
-			local color = db[key]
-			return color[1], color[2], color[3], color[4] or 1
-		end,
-		set = function(red, green, blue, alpha) db[key] = { red, green, blue, alpha } end,
-	}
-end
-
-local function Menu(db, key, entries, width)
-	return { entries = entries, width = width or MENU_WIDTH, get = function() return db[key] end, set = function(value) db[key] = value end }
-end
-
-local function Eye(tooltip, get, set)
-	return { icon = 'eye', tooltip = tooltip, get = get, set = function(value)
-		set(value)
-		Repaint()
-	end }
 end
 
 local function TextOptions(text, extra)
@@ -168,24 +128,35 @@ local function TextOptions(text, extra)
 		Option(text, 'Horizontal', 'offsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
 		Option(text, 'Vertical', 'offsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
 	}
-	for _, option in ipairs(extra or {}) do options[#options + 1] = option end
+	if extra then
+		for _, option in ipairs(extra) do options[#options + 1] = option end
+	end
 	return { icon = 'text', tooltip = 'Size and placement', title = 'Text', options = options }
 end
 
+local PLACEMENT_BY_POINTS = {}
+for _, item in ipairs(BUI.C.TEXT_PLACEMENT_OPTIONS) do
+	local point, relativePoint = BUI.Tools.ResolvePlacement(item.value)
+	PLACEMENT_BY_POINTS[point .. ':' .. relativePoint] = item.value
+end
+
 local function Placement(settings)
-	local byPoints = {}
-	for _, item in ipairs(BUI.C.TEXT_PLACEMENT_OPTIONS) do
-		local point, relativePoint = BUI.Tools.ResolvePlacement(item.value)
-		byPoints[point .. ':' .. relativePoint] = item.value
-	end
-	return { label = 'Anchor', entries = BUI.C.TEXT_PLACEMENT_OPTIONS, get = function() return byPoints[settings.anchorPoint .. ':' .. settings.relativePoint] end, set = function(value)
+	return { label = 'Anchor', entries = BUI.C.TEXT_PLACEMENT_OPTIONS, get = function() return PLACEMENT_BY_POINTS[settings.anchorPoint .. ':' .. settings.relativePoint] end, set = function(value)
+		local wasOutside = settings.anchorPoint ~= settings.relativePoint
 		settings.anchorPoint, settings.relativePoint = BUI.Tools.ResolvePlacement(value)
+		local outside = settings.anchorPoint ~= settings.relativePoint
+		if outside ~= wasOutside then
+			local factory = outside and BUI.FactoryOf(settings)
+			settings.offsetX = factory and factory.offsetX or 0
+			settings.offsetY = factory and factory.offsetY or 0
+		end
 	end }
 end
 
 local function AurasBoards(ui, parent, width, key)
 	local section = Config()[key]
-	local function Refresh() GroupFrames().Refresh(key) end
+	local sortItems = BUI.AuraEngine.SortMethodItems()
+	local function Refresh() GroupFrames.Refresh(key) end
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Auras',
@@ -195,9 +166,9 @@ local function AurasBoards(ui, parent, width, key)
 		local settings = section[container.key]
 		board:AddTools(container.title, container.description, {
 			AuraLists.Rules({
-				getRules = function() return GroupFrames().ContainerRules(settings, container.key) end,
+				getRules = function() return GroupFrames.ContainerRules(settings, container.key) end,
 				polarity = POLARITY[container.key],
-				withoutSorts = GroupFrames().FeedsExclusions(container.key),
+				withoutSorts = GroupFrames.FeedsExclusions(container.key),
 				onChanged = Refresh,
 			}),
 			{ tooltip = 'Layout and sizing', title = container.title, options = {
@@ -209,13 +180,13 @@ local function AurasBoards(ui, parent, width, key)
 				Option(settings, 'Stack text size', 'stackSize', { min = 6, max = 24, step = 1 }),
 				Toggle(settings, 'Decimals', 'showCooldownDecimals'),
 				Option(settings, 'Decimals under seconds', 'cooldownDecimalThreshold', { min = 1, max = 30, step = 1 }),
-				{ label = 'Sort by', entries = BUI.AuraEngine.SortMethodItems(), get = function() return settings.sortMethod or 'default' end, set = function(value) settings.sortMethod = value end },
+				{ label = 'Sort by', entries = sortItems, get = function() return settings.sortMethod end, set = function(value) settings.sortMethod = value end },
 				Option(settings, 'Grow', 'growDirection', { entries = GROWTHS }),
 				Placement(settings),
 				Option(settings, 'Horizontal', 'offsetX', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
 				Option(settings, 'Vertical', 'offsetY', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
 			} },
-			Eye('Show sample icons on the frames', function() return GroupFrames().IsAuraPreviewing(key, container.key) end, function(value) GroupFrames().PreviewAuraKind(key, container.key, value) end),
+			Eye('Show sample icons on the frames', function() return GroupFrames.IsAuraPreviewing(key, container.key) end, function(value) GroupFrames.PreviewAuraKind(key, container.key, value) end),
 			Toggle(settings, nil, 'enabled'),
 		}, Refresh)
 	end
@@ -226,7 +197,7 @@ local function AurasBoards(ui, parent, width, key)
 		description = 'Color the frame while a member has a dispellable debuff.',
 	})
 	local border, badge = section.dispelBorder, section.dispelBadge
-	local function Badges() GroupFrames().RestyleAllDispelBadges() end
+	local function Badges() GroupFrames.RestyleAllDispelBadges() end
 	local opacity = Option(BUI.GetDB().unitFrames, 'Bar tint opacity %', 'dispelOpacity', { min = 0, max = 100, step = 5, separator = true })
 	local setOpacity = opacity.set
 	opacity.set = function(value)
@@ -235,7 +206,7 @@ local function AurasBoards(ui, parent, width, key)
 	end
 	dispels:AddTools('Dispel highlight', 'How the frame reacts, following the player frame unless told otherwise', {
 		{ entries = DISPEL_MODES, width = MENU_WIDTH, get = function()
-			local wantTint, style = GroupFrames().DispelLook(section)
+			local wantTint, style = GroupFrames.DispelLook(section)
 			return wantTint and style or 'off'
 		end, set = function(value)
 			if border.matchPlayer then
@@ -259,8 +230,8 @@ local function AurasBoards(ui, parent, width, key)
 			Option(badge, 'Icon vertical', 'offsetY', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
 			opacity,
 		} },
-		Eye('Cycle the dispel colors on the party frames', GroupFrames().IsDispelPreviewActive, function(value)
-			if value then GroupFrames().StartDispelPartyPreview() else GroupFrames().StopDispelPreview() end
+		Eye('Cycle the dispel colors on the party frames', GroupFrames.IsDispelPreviewActive, function(value)
+			if value then GroupFrames.StartDispelPartyPreview() else GroupFrames.StopDispelPreview() end
 		end),
 	}, function()
 		Badges()
@@ -295,11 +266,11 @@ local function FramesBoard(ui, parent, width, key)
 	local section = Config()[key]
 	local isParty = key == 'party'
 	local function Refresh()
-		GroupFrames().Refresh(key)
+		GroupFrames.Refresh(key)
 		if not isParty then BUI.UnitFrames.RefreshLifeVisuals() end
 	end
 	local function Colors()
-		GroupFrames().RefreshColors()
+		GroupFrames.RefreshColors()
 		if not isParty then BUI.UnitFrames.RefreshLifeVisuals() end
 	end
 	local board = ui.Board(parent, width, {
@@ -320,10 +291,10 @@ local function FramesBoard(ui, parent, width, key)
 	board:AddTools(isParty and 'Party frames' or 'Raid frames', 'On or off, preview and position', {
 		position,
 		Eye('Force the frames to show', function()
-			if isParty then return GroupFrames().IsPartyPreviewShown() end
-			return GroupFrames().IsRaidPreviewShown()
+			if isParty then return GroupFrames.IsPartyPreviewShown() end
+			return GroupFrames.IsRaidPreviewShown()
 		end, function()
-			if isParty then GroupFrames().TogglePartyPreview() else GroupFrames().ToggleRaidPreview() end
+			if isParty then GroupFrames.TogglePartyPreview() else GroupFrames.ToggleRaidPreview() end
 		end),
 		Toggle(section, nil, 'enabled'),
 	}, Refresh)
@@ -508,7 +479,7 @@ local function FramesBoard(ui, parent, width, key)
 				Option(settings, 'Horizontal', 'offsetX', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
 				Option(settings, 'Vertical', 'offsetY', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
 			} },
-			Eye('Preview it on the frames', function() return GroupFrames().IsIndicatorPreviewing(indicator.kind) end, function(value) GroupFrames().PreviewIndicator(indicator.kind, value) end),
+			Eye('Preview it on the frames', function() return GroupFrames.IsIndicatorPreviewing(indicator.kind) end, function(value) GroupFrames.PreviewIndicator(indicator.kind, value) end),
 			Toggle(settings, nil, 'enabled'),
 		}, Refresh)
 	end
@@ -543,10 +514,10 @@ local function GeneralBoards(ui, parent, width)
 	board:AddSwitch('Hide the Blizzard frames', function() return config.hideBlizzardFrames ~= false end, function(value)
 		config.hideBlizzardFrames = value
 		if value then
-			if GroupFrames().IsActive() then
-				GroupFrames().HideBlizzardParty()
-				GroupFrames().HideBlizzardRaid()
-				GroupFrames().HideBlizzardRaidManager()
+			if GroupFrames.IsActive() then
+				GroupFrames.HideBlizzardParty()
+				GroupFrames.HideBlizzardRaid()
+				GroupFrames.HideBlizzardRaidManager()
 			end
 			return
 		end
@@ -558,7 +529,7 @@ local function GeneralBoards(ui, parent, width)
 			onConfirm = ReloadUI,
 		})
 	end, 'Replace the default party and raid frames')
-	board:AddTools('Click casting', 'When clicks on frames register', { Menu(config, 'clickMode', CLICK_MODES) }, GroupFrames().RefreshClickMode)
+	board:AddTools('Click casting', 'When clicks on frames register', { Menu(config, 'clickMode', CLICK_MODES) }, GroupFrames.RefreshClickMode)
 	local range = config.range
 	board:AddTools('Fade out of range', 'Dim members you cannot reach', {
 		{ tooltip = 'Opacity and offline fading', title = 'Range fading', options = {
@@ -567,7 +538,7 @@ local function GeneralBoards(ui, parent, width)
 			Option(range, 'Out of range opacity', 'outsideAlpha', { min = 0.1, max = 1, step = 0.05 }),
 		} },
 		Toggle(range, nil, 'enabled'),
-	}, GroupFrames().RefreshRange)
+	}, GroupFrames.RefreshRange)
 	return { board }
 end
 
@@ -582,7 +553,7 @@ local function FiltersBoards(ui, parent, width, page)
 	return {
 		AuraLists.Pinned(ui, parent, width, page, {
 			polarity = 'HELPFUL', title = 'Pinned buffs', description = 'Shown first in the buff row. Blizzard blocks picking debuffs on your group by spell, so buffs only.',
-			get = function() return db.buffPins end, onChange = function() GroupFrames().RefreshAuras() end,
+			get = function() return db.buffPins end, onChange = function() GroupFrames.RefreshAuras() end,
 			only = { label = 'Only show pinned buffs', get = function() return db.buffPinsOnly == true end, set = function(value) db.buffPinsOnly = value end, tip = 'The buff row shows nothing but your pinned buffs' },
 		}),
 		shared,
@@ -599,7 +570,7 @@ local hotSpec
 
 local function HotSpecItems()
 	local items = {}
-	for _, specID in ipairs(GroupFrames().HotSlots.SPECS) do
+	for _, specID in ipairs(GroupFrames.HotSlots.SPECS) do
 		local _, name, _, _, _, _, className = GetSpecializationInfoByID(specID)
 		items[#items + 1] = { value = specID, text = name .. ' ' .. className }
 	end
@@ -608,10 +579,10 @@ end
 
 local function DefaultHotSpec()
 	local current = PlayerUtil.GetCurrentSpecID()
-	for _, specID in ipairs(GroupFrames().HotSlots.SPECS) do
+	for _, specID in ipairs(GroupFrames.HotSlots.SPECS) do
 		if specID == current then return current end
 	end
-	return GroupFrames().HotSlots.SPECS[1]
+	return GroupFrames.HotSlots.SPECS[1]
 end
 
 local function HotLayoutBoard(ui, parent, width)
@@ -632,21 +603,21 @@ local function HotLayoutBoard(ui, parent, width)
 				Option(slots, 'Vertical', 'offsetY', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
 			} },
 			Toggle(slots, nil, 'enabled'),
-		}, function() GroupFrames().RefreshAuras(section.key) end)
+		}, function() GroupFrames.RefreshAuras(section.key) end)
 	end
 	return board
 end
 
 local function HotSpellsBoard(ui, parent, width, page)
-	local HotSlots = GroupFrames().HotSlots
+	local HotSlots = GroupFrames.HotSlots
 	hotSpec = hotSpec or DefaultHotSpec()
 	local list = HotSlots.SpellsFor(hotSpec)
 	local function Changed()
 		HotSlots.Invalidate()
-		GroupFrames().RefreshAuras()
+		GroupFrames.RefreshAuras()
 	end
 	local function Rebuild()
-		BUILib.Defer(function() page:RebuildCurrent() end)
+		Kit.RebuildPane(page)
 	end
 	local function Rebuilt()
 		Changed()
@@ -720,7 +691,7 @@ local function EnableTool()
 	return { icon = 'enable', label = 'Group frames', tooltip = 'Turn the group frames on or off', get = IsOn, set = function(value)
 		if not moduleLoaded then return BUI.ModulesPage.ConfirmReload('groupFrames', value, Repaint) end
 		Config().enabled = value
-		GroupFrames().SetEnabledLive(value)
+		GroupFrames.SetEnabledLive(value)
 		if value then return end
 		Modals.Confirm({
 			parent = Window().frame,
