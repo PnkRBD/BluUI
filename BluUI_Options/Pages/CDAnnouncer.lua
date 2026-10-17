@@ -11,16 +11,13 @@ local PREVIEW_HEIGHT = 110
 local MENU_WIDTH = 150
 local INPUT_WIDTH = 260
 local NAME_WIDTH = 300
-local ICON_SIZE = 24
-local GRABBER_SIZE = 12
-local GRABBER_X = 18
-local LIST_ICON_X = 42
-local LIST_NAME_X = 78
-local LIST_ROOM = 190
-local ERASE_SIZE = BUILib.Layout.ERASE_SIZE
+local LIST_ICON_X = Layout.DRAG_TITLE_X
+local ERASE_SIZE = Layout.ERASE_SIZE
 local ERASE_INSET = 18
+local TOOL_SIZE = 22
+local SWITCH_WIDTH = 40
 local TOOL_GAP = 12
-local DRAG_ALPHA = 0.35
+local TOOLS_ROOM = ERASE_INSET + ERASE_SIZE + TOOL_GAP + SWITCH_WIDTH + 2 * (TOOL_GAP + TOOL_SIZE) + TOOL_GAP
 local DEFAULT_ICON = 134400
 local LOOP_SECONDS = 7
 local SEG_CD, SEG_LOW = 0.55, 0.20
@@ -53,25 +50,24 @@ local TEXT_SIDES = {
 }
 
 local selectedID
+local cachedID, cachedEntry
 local liveID
 local items = {}
 local preview
 local fonts, sounds
 
-local function Window()
-	return BUI.PageEngine.window
-end
-
-local function Repaint()
-	Window():Repaint()
-end
+local Kit = BUI.OptionsKit
+local Window, Repaint, RebuildPage, Option, Toggle = Kit.Window, Kit.Repaint, Kit.RebuildPage, Kit.Option, Kit.Toggle
 
 local function Config()
 	return BUI.GetDB().cdAnnouncer
 end
 
 local function Selected()
-	return selectedID and CDAnnouncer.FindEntry(selectedID)
+	if cachedID ~= selectedID then
+		cachedID, cachedEntry = selectedID, selectedID and CDAnnouncer.FindEntry(selectedID)
+	end
+	return cachedEntry
 end
 
 local function RefreshPreview()
@@ -81,10 +77,6 @@ end
 local function Apply()
 	CDAnnouncer.Refresh()
 	RefreshPreview()
-end
-
-local function RebuildPage()
-	BUILib.Defer(function() BUI.PageEngine.RefreshCurrentPage() end)
 end
 
 local function StopLive()
@@ -142,7 +134,6 @@ local function Fill(text, entry, value)
 end
 
 local function Speak(entry, phrase, withTime)
-	if not BUI.TTS.IsAvailable() then return end
 	BUI.TTS.Speak(Fill(phrase, entry, withTime and tostring(math.max(1, math.floor(entry.lowThreshold))) or nil))
 end
 
@@ -178,16 +169,6 @@ local function NextShown(entry, position)
 		if phase == 'cd' then position = SEG_CD elseif phase == 'low' then position = SEG_CD + SEG_LOW else position = 0 end
 	end
 	return position
-end
-
-local function Option(holder, label, key, extra)
-	local option = { label = label, get = function() return holder[key] end, set = function(value) holder[key] = value end }
-	for name, value in pairs(extra or {}) do option[name] = value end
-	return option
-end
-
-local function Toggle(holder, label, key)
-	return { label = label, get = function() return holder[key] == true end, set = function(value) holder[key] = value end }
 end
 
 local function Color(holder, label, key, fallback)
@@ -331,8 +312,10 @@ local function SpellBoard(ui, parent, width, entry)
 		Color(entry, 'Ready color', 'readyColor', function() return Config().readyColor end),
 		{ entries = READY_MODES, width = MENU_WIDTH, get = function() return entry.readyMode end, set = function(value) entry.readyMode = value end },
 		Sound(entry, 'soundReady'),
-		{ icon = 'text', tooltip = 'Text', title = 'Ready', options = {
+		{ icon = 'text', tooltip = 'Text and icon', title = 'Ready', options = {
 			{ label = 'Text, [spell] fills in', kind = 'input', placeholder = '[spell] Ready', get = function() return entry.readyDisplayFormat end, set = function(text) entry.readyDisplayFormat = text ~= '' and text or '[spell] Ready' end },
+			Toggle(entry, 'Show text', 'showTextReady'),
+			Toggle(entry, 'Show spell icon', 'showIconReady'),
 		} },
 		{ tooltip = 'Flash', title = 'Ready', options = {
 			Option(entry, 'Flash', 'flashScope', { entries = FLASH_SCOPES }),
@@ -403,70 +386,19 @@ local function CooldownsBoard(ui, parent, width, page)
 	ui.RowTitle(addRow, 'Add a cooldown', 'Name, ID or link', LIST_ICON_X, NAME_WIDTH)
 	BUI.SpellSearch(ui, addRow, INPUT_WIDTH, { onPick = function(hit) Add(hit.id, hit.isItem) end }):SetPoint('RIGHT', -ui.ROW_INSET, 0)
 
-	local rows = {}
-	local function IndexOf(entry)
-		for position, candidate in ipairs(entries) do
-			if candidate == entry then return position end
-		end
-	end
-	local function Move(entry, delta)
-		local position = IndexOf(entry)
-		local other = entries[position + delta]
-		if not other then return end
-		entries[position], entries[position + delta] = other, entry
-		board:Move(rows[entry], delta)
+	board:DragList(function(index, delta, count)
+		Layout.ShiftBlock(entries, index, delta, count)
 		page:Resize()
-	end
-	local function RowUnder(cursorY)
-		for _, entry in ipairs(entries) do
-			local row = rows[entry]
-			local top, bottom = row:GetTop(), row:GetBottom()
-			if top and cursorY <= top and cursorY >= bottom then return entry end
-		end
-	end
-	local dragging, grabOffset, ghost
-	local function Ghost()
-		if ghost then return ghost end
-		ghost = CreateFrame('Frame', nil, board.panel)
-		ghost:SetFrameLevel(board.panel:GetFrameLevel() + 10)
-		ghost:SetWidth(board.panelWidth)
-		ui.Fill(ghost, 'control'):SetAllPoints()
-		local edge = ui.Fill(ghost, 'accent', 'ARTWORK', 1)
-		edge:SetPoint('TOPLEFT')
-		edge:SetPoint('BOTTOMLEFT')
-		edge:SetWidth(2)
-		ui.Glyph(ghost, 'grabber', GRABBER_SIZE, 'text'):SetPoint('LEFT', GRABBER_X, 0)
-		ghost.icon = ghost:CreateTexture(nil, 'ARTWORK')
-		ghost.icon:SetSize(ICON_SIZE, ICON_SIZE)
-		ghost.icon:SetPoint('LEFT', LIST_ICON_X, 0)
-		ghost.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-		ghost.label = ui.Text(ghost, '', 12, 'text')
-		ghost.label:SetPoint('LEFT', LIST_NAME_X, 0)
-		ghost:Hide()
-		return ghost
-	end
-	local function Track()
-		local _, cursorY = GetCursorPosition()
-		cursorY = cursorY / board.frame:GetEffectiveScale()
-		ghost:ClearAllPoints()
-		ghost:SetPoint('TOPLEFT', board.panel, 'TOPLEFT', 0, -(board.panel:GetTop() - cursorY - grabOffset))
-		local over = RowUnder(cursorY)
-		if over and over ~= dragging then
-			Move(dragging, IndexOf(over) > IndexOf(dragging) and 1 or -1)
-		end
-	end
+	end, function()
+		local ids = {}
+		for position, entry in ipairs(entries) do ids[position] = entry.spellID end
+		CDAnnouncer.ReorderSpells(ids)
+		RebuildPage()
+	end)
 	for _, entry in ipairs(entries) do
 		local id = entry.spellID
 		local iconTexture, name = Describe(entry)
-		local row = Section.AddRow(board, name)
-		rows[entry] = row
-		ui.Glyph(row, 'grabber', GRABBER_SIZE, 'faint'):SetPoint('LEFT', GRABBER_X, 0)
-		local icon = row:CreateTexture(nil, 'ARTWORK')
-		icon:SetSize(ICON_SIZE, ICON_SIZE)
-		icon:SetPoint('LEFT', LIST_ICON_X, 0)
-		icon:SetTexture(iconTexture)
-		icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-		ui.RowTitle(row, name, Subtitle(entry), LIST_NAME_X, board.panelWidth - LIST_NAME_X - LIST_ROOM)
+		local row = board:AddDragRow(name, TOOLS_ROOM, Subtitle(entry), iconTexture)
 		local x = ERASE_INSET
 		local function Put(control)
 			control:SetPoint('RIGHT', -x, 0)
@@ -479,30 +411,6 @@ local function CooldownsBoard(ui, parent, width, page)
 		end))
 		Put(ui.IconButton(row, 'eye', 'Preview it on screen', function() CDAnnouncer.PreviewSpell(id, PREVIEW_SECONDS) end))
 		Put(ui.IconButton(row, 'cog', 'Tune the announcement', function() page:Select('spell' .. id) end))
-		row:EnableMouse(true)
-		row:RegisterForDrag('LeftButton')
-		row:SetScript('OnDragStart', function(self)
-			local _, cursorY = GetCursorPosition()
-			dragging = entry
-			grabOffset = self:GetTop() - cursorY / board.frame:GetEffectiveScale()
-			self:SetAlpha(DRAG_ALPHA)
-			Ghost():SetHeight(self:GetHeight())
-			ghost.icon:SetTexture(iconTexture)
-			ghost.label:SetText(name)
-			ghost:Show()
-			Track()
-			self:SetScript('OnUpdate', Track)
-		end)
-		row:SetScript('OnDragStop', function(self)
-			self:SetScript('OnUpdate', nil)
-			self:SetAlpha(1)
-			ghost:Hide()
-			dragging = nil
-			local ids = {}
-			for position, ordered in ipairs(entries) do ids[position] = ordered.spellID end
-			CDAnnouncer.ReorderSpells(ids)
-			RebuildPage()
-		end)
 	end
 	if #entries == 0 then
 		local empty = Section.AddRow(board, 'nothing announced yet')
@@ -685,6 +593,7 @@ BUI.PageEngine.RegisterPage('cdAnnouncer', {
 	OnBuild = function(pageFrame)
 		fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
 		sounds = BUI.BuildSoundDropdownItems()
+		cachedID = nil
 		local cfg = Config()
 		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
 		local tab = page:GetTab(1)
@@ -693,6 +602,7 @@ BUI.PageEngine.RegisterPage('cdAnnouncer', {
 			icon = 'clock',
 			title = 'CD Announcer',
 			placeholder = 'Search announcer settings...',
+			tabs = { 'announcer' },
 			disabled = function() return cfg.enabled ~= true end,
 			back = { label = 'Weaker Auras', onClick = function() BUI.PageEngine.NavigateToID('auras') end },
 			tools = {
@@ -717,9 +627,9 @@ BUI.PageEngine.RegisterPage('cdAnnouncer', {
 			Repaint()
 			RefreshPreview()
 		end
-		pageFrame._page = { tabContents = { tab }, currentTab = 1, SetTab = function() rail:Select('announcer') end }
+		pageFrame._page = rail.adapter
 		RefreshPreview()
-		CDAnnouncer.RegisterAnchorCallback(Repaint)
+		BUI.OnModuleChange('cdAnnouncer', Repaint)
 		page:AutoRefresh()
 	end,
 	OnHide = StopLive,
