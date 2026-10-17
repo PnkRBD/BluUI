@@ -1,7 +1,8 @@
 local _, BUI = ...
 
 local BUILib = BUI.BUILibClient
-local Layout, Widget = BUILib.Layout, BUILib.Widget
+local Layout, Widget, Motion = BUILib.Layout, BUILib.Widget, BUILib.Motion
+local Ease = Motion.Ease
 local Pixel = BUI.Pixel
 
 local PAGE_WIDTH = 960
@@ -19,10 +20,12 @@ local TITLE_GAP = 10
 local CONTENT_TOP = 40
 local TABLE_TOP = 40
 local TABLE_ROWS_TOP = 56
-local STRIP_HEIGHT = 60
+local STRIP_HEIGHT = 76
 local STAT_ICON = 26
 local STAT_TEXT_X = 56
 local STAT_KICKER_Y = 12
+local STAT_VALUE_Y = 26
+local STAT_VALUE_SIZE = 34
 local VALUE_GAP = 10
 local DIVIDER_INSET = 14
 local STATUS_MARK = 12
@@ -84,8 +87,8 @@ local SESSION_RESET_GAP = 120
 local SNAPSHOT_DELAY = 2
 local CURRENCY_RESCAN = 30
 local KEYSTONE_ITEM = 180653
+local SLIDE_STAGGER, SLIDE_TIME, SLIDE_OFFSET = 0.045, 0.38, -18
 local WHITE = { 1, 1, 1, 1 }
-local POINT_RIGHT = { 1, 0, 0, 0, 1, 1, 0, 1 }
 local ICON_CROP = { 0.08, 0.92, 0.08, 0.92 }
 
 local KEY_COLUMNS = { key = 0.47, time = 0.66, under = 0.82 }
@@ -96,6 +99,11 @@ local RAID_DIFFICULTIES = {
     { label = 'Heroic', short = 'H', color = { 0.25, 0.6, 1 } },
     { label = 'Mythic', short = 'M', color = { 0.7, 0.4, 0.95 } },
 }
+for _, difficulty in ipairs(RAID_DIFFICULTIES) do
+    local red, green, blue = unpack(difficulty.color)
+    difficulty.hex = BUI.Hex(red, green, blue)
+    difficulty.paint = function(region) region:SetVertexColor(red, green, blue) end
+end
 
 local CARDS = {
     { id = 'stat_mscore', label = 'M+ score' },
@@ -113,7 +121,7 @@ local RAID_DIFFICULTY_NAMES = { [17] = 'LFR', [14] = 'Normal', [15] = 'Heroic', 
 local VAULT_ROWS = {
     { key = 'raid', type = VaultType.Raid, label = 'Raid', icon = 'markers', atlas = 'evergreen-weeklyrewards-category-raids', slot = 'raid', one = 'boss', many = 'bosses' },
     { key = 'dungeons', type = VaultType.Activities, label = 'Dungeons', icon = 'dashboard', atlas = 'evergreen-weeklyrewards-category-dungeons', slot = 'dungeon', one = 'run', many = 'runs' },
-    { key = 'world', type = VaultType.World, label = 'World', icon = 'location', atlas = 'evergreen-weeklyrewards-category-world', slot = 'world', one = 'activity', many = 'activities' },
+    { key = 'world', type = VaultType.World, label = 'World', icon = 'minimap', atlas = 'evergreen-weeklyrewards-category-world', slot = 'world', one = 'activity', many = 'activities' },
 }
 
 local sessionStart
@@ -143,14 +151,13 @@ local function Clock(seconds)
 end
 
 local function ColorOf(color)
-    if color then return color.r, color.g, color.b end
-    return 1, 1, 1
+    return color.r, color.g, color.b
 end
 
 local function SpecLine()
     local className = UnitClass('player')
-    local specIndex = GetSpecialization()
-    local specName = specIndex and select(2, GetSpecializationInfo(specIndex))
+    local specIndex = C_SpecializationInfo.GetSpecialization()
+    local specName = specIndex and select(2, C_SpecializationInfo.GetSpecializationInfo(specIndex))
     return (specName and (specName .. ' ' .. className) or className) .. '  ·  ' .. GetRealmName()
 end
 
@@ -225,13 +232,12 @@ local function WeeklyMplusCount()
     return count
 end
 
-local PVP_CURRENCY_IDS = { [1602] = true, [1792] = true }
-if Constants.CurrencyConsts then
-    for _, constantName in ipairs({ 'CONQUEST_CURRENCY_ID', 'HONOR_CURRENCY_ID', 'CLASSIC_HONOR_CURRENCY_ID', 'ACCOUNT_WIDE_HONOR_CURRENCY_ID' }) do
-        local currencyID = Constants.CurrencyConsts[constantName]
-        if currencyID then PVP_CURRENCY_IDS[currencyID] = true end
-    end
-end
+local CurrencyConsts = Constants.CurrencyConsts
+local PVP_CURRENCY_IDS = {
+    [CurrencyConsts.CONQUEST_CURRENCY_ID] = true,
+    [CurrencyConsts.HONOR_CURRENCY_ID] = true,
+    [CurrencyConsts.ACCOUNT_WIDE_HONOR_CURRENCY_ID] = true,
+}
 
 local CREST_TIER_ORDER = { 'veteran', 'champion', 'hero', 'myth' }
 local TRACKED_CURRENCY_PATTERNS = { 'manaflux' }
@@ -282,11 +288,10 @@ local function DiscoverSeasonCurrencies()
             headerCount = headerCount + 1
             inPvP = IsPvPHeader(listInfo.name)
         elseif not inPvP then
-            local link = C_CurrencyInfo.GetCurrencyListLink(entry)
-            local currencyID = link and tonumber(link:match('currency:(%d+)'))
+            local currencyID = tonumber(C_CurrencyInfo.GetCurrencyListLink(entry):match('currency:(%d+)'))
             if currencyID and not seen[currencyID] and not PVP_CURRENCY_IDS[currencyID] then
                 local info = C_CurrencyInfo.GetCurrencyInfo(currencyID)
-                if info and not MatchesAny(info.name, HIDDEN_CURRENCY_PATTERNS) then
+                if not MatchesAny(info.name, HIDDEN_CURRENCY_PATTERNS) then
                     if headerCount == 1 or MatchesAny(info.name, TRACKED_CURRENCY_PATTERNS) then
                         seen[currencyID] = true
                         extras[#extras + 1] = currencyID
@@ -326,10 +331,8 @@ end
 local function CurrencyRows(ids, rows, crest)
     for _, currencyID in ipairs(ids) do
         local info = C_CurrencyInfo.GetCurrencyInfo(currencyID)
-        if info then
-            local earned, cap, weekly = BUI.Currency.Progress(currencyID, info)
-            rows[#rows + 1] = { name = info.name, icon = info.iconFileID, quality = info.quality, quantity = info.quantity, earned = earned, cap = cap, weekly = weekly, crest = crest }
-        end
+        local earned, cap, weekly = BUI.Currency.Progress(currencyID, info)
+        rows[#rows + 1] = { name = info.name, icon = info.iconFileID, quality = info.quality, quantity = info.quantity, earned = earned, cap = cap, weekly = weekly, crest = crest }
     end
 end
 
@@ -343,103 +346,102 @@ local function SeasonCurrencies()
 end
 
 local function SameRaidName(firstName, secondName)
-    if not firstName or not secondName then return false end
     firstName = firstName:lower():gsub('^the%s+', '')
     secondName = secondName:lower():gsub('^the%s+', '')
     return firstName == secondName or firstName:find(secondName, 1, true) ~= nil or secondName:find(firstName, 1, true) ~= nil
 end
 
 local bossNameCache = {}
-local function EncounterBossNames(raidName, instanceMapIDs)
-    local cacheKey = raidName or (instanceMapIDs and instanceMapIDs[1])
-    if cacheKey == nil then return nil end
-    if bossNameCache[cacheKey] then return bossNameCache[cacheKey] end
-    C_AddOns.LoadAddOn('Blizzard_EncounterJournal')
+local function EncounterBossNames(raid)
+    local cached = bossNameCache[raid.name]
+    if cached ~= nil then return cached or nil end
     local wanted = {}
-    for _, mapID in ipairs(instanceMapIDs or {}) do wanted[mapID] = true end
+    for _, mapID in ipairs(raid.instanceMapIDs) do wanted[mapID] = true end
+    local names
     for tier = EJ_GetNumTiers(), 1, -1 do
         EJ_SelectTier(tier)
         local instanceIndex = 1
-        while true do
+        while not names do
             local journalID, instanceName, _, _, _, _, _, _, _, _, instanceMapID = EJ_GetInstanceByIndex(instanceIndex, true)
             if not journalID then break end
-            if (instanceMapID and wanted[instanceMapID]) or SameRaidName(instanceName, raidName) then
+            if wanted[instanceMapID] or SameRaidName(instanceName, raid.name) then
                 EJ_SelectInstance(journalID)
-                local names, bossIndex = {}, 1
+                local found, bossIndex = {}, 1
                 while true do
                     local bossName = EJ_GetEncounterInfoByIndex(bossIndex, journalID)
                     if not bossName then break end
-                    names[bossIndex] = bossName
+                    found[bossIndex] = bossName
                     bossIndex = bossIndex + 1
                 end
-                if #names > 0 then
-                    bossNameCache[cacheKey] = names
-                    return names
-                end
+                if found[1] then names = found end
             end
             instanceIndex = instanceIndex + 1
         end
+        if names then break end
     end
+    bossNameCache[raid.name] = names or false
+    return names
 end
 
-local function RaiderIOProfile()
-    if type(RaiderIO) ~= 'table' or type(RaiderIO.GetProfile) ~= 'function' then return nil end
+local function RaiderIORaid(raidProfile)
+    local progressList = raidProfile.progress or raidProfile.sortedProgress or raidProfile.raidProgress
+    if type(progressList) ~= 'table' then return nil end
+    local currentRaids = {}
+    if type(raidProfile.raidProgress) == 'table' then
+        for _, summary in ipairs(raidProfile.raidProgress) do
+            if type(summary) == 'table' and summary.current and summary.raid ~= nil then currentRaids[summary.raid] = true end
+        end
+    end
+    local raid
+    for _, entry in ipairs(progressList) do
+        if type(entry) == 'table' then
+            local source = entry.raid or entry.currentRaid
+            local sourceTable = type(source) == 'table' and source or nil
+            local name = (sourceTable and (sourceTable.name or sourceTable.shortName)) or entry.raidName
+            local difficulty = tonumber(entry.difficulty or entry.diff)
+            local kills = entry.killsPerBoss or entry.kills
+            if currentRaids[source] and type(name) == 'string' and difficulty and difficulty >= 1 and difficulty <= 3 and type(kills) == 'table' and (not raid or raid.name == name) then
+                if not raid then
+                    local mapIDs = sourceTable and sourceTable.instance_map_ids
+                    if type(mapIDs) ~= 'table' then mapIDs = { tonumber(sourceTable and sourceTable.instance_map_id) } end
+                    raid = { name = name, bossCount = 0, instanceMapIDs = mapIDs, diffs = {}, source = 'rio' }
+                end
+                local counts, killed = {}, 0
+                for index, killCount in ipairs(kills) do
+                    counts[index] = tonumber(killCount) or 0
+                    if counts[index] > 0 then killed = killed + 1 end
+                end
+                local bossCount = tonumber(sourceTable and sourceTable.bossCount) or #counts
+                if bossCount > raid.bossCount then raid.bossCount = bossCount end
+                raid.diffs[difficulty] = { killed = killed, kills = counts }
+            end
+        end
+    end
+    return raid
+end
+
+local function ReadRaiderIO()
     local profile = RaiderIO.GetProfile('player')
     if type(profile) ~= 'table' then profile = RaiderIO.GetProfile(UnitName('player'), GetRealmName()) end
-    if type(profile) == 'table' then return profile end
+    if type(profile) ~= 'table' then return nil end
+    local keystone = profile.mythicKeystoneProfile
+    local raidProfile = profile.raidProfile
+    return {
+        previousScore = type(keystone) == 'table' and tonumber(keystone.previousScore) or 0,
+        raid = type(raidProfile) == 'table' and RaiderIORaid(raidProfile),
+    }
+end
+
+local function RaiderIOData()
+    if type(RaiderIO) ~= 'table' or type(RaiderIO.GetProfile) ~= 'function' then return nil end
+    local ok, data = pcall(ReadRaiderIO)
+    if not ok then return nil end
+    return data
 end
 
 local function PreviousSeasonScore()
-    local profile = RaiderIOProfile()
-    local keystone = profile and profile.mythicKeystoneProfile
-    return type(keystone) == 'table' and tonumber(keystone.previousScore) or 0
-end
-
-local function CurrentRaids(raidProfile)
-    local current = {}
-    for _, summary in ipairs(raidProfile.raidProgress) do
-        if summary.current then current[summary.raid] = true end
-    end
-    return current
-end
-
-local function RaiderIORaidProgress()
-    local profile = RaiderIOProfile()
-    local raidProfile = profile and profile.raidProfile
-    if type(raidProfile) ~= 'table' then return nil end
-    local progressList = raidProfile.progress or raidProfile.sortedProgress or raidProfile.raidProgress
-    if type(progressList) ~= 'table' or #progressList == 0 then return nil end
-
-    local currentRaids = CurrentRaids(raidProfile)
-    local raidsByName, orderedRaids = {}, {}
-    for _, entry in ipairs(progressList) do
-        local raid = entry.raid or entry.currentRaid
-        local raidName = (type(raid) == 'table' and (raid.name or raid.shortName)) or entry.raidName
-        local difficulty = tonumber(entry.difficulty or entry.diff)
-        local kills = entry.killsPerBoss or entry.kills
-        if currentRaids[raid] and raidName and difficulty and difficulty >= 1 and difficulty <= 3 and type(kills) == 'table' then
-            local raidEntry = raidsByName[raidName]
-            if not raidEntry then
-                raidEntry = { name = raidName, bossCount = 0, diffs = {}, source = 'rio' }
-                raidsByName[raidName] = raidEntry
-                orderedRaids[#orderedRaids + 1] = raidEntry
-            end
-            local bossCount = (type(raid) == 'table' and raid.bossCount) or #kills
-            if bossCount > raidEntry.bossCount then raidEntry.bossCount = bossCount end
-            if not raidEntry.instanceMapIDs and type(raid) == 'table' then
-                raidEntry.instanceMapIDs = raid.instance_map_ids or (raid.instance_map_id and { raid.instance_map_id })
-            end
-            local killed = 0
-            for _, killCount in ipairs(kills) do
-                if (tonumber(killCount) or 0) > 0 then killed = killed + 1 end
-            end
-            raidEntry.diffs[difficulty] = { killed = killed, kills = kills }
-        end
-    end
-    if #orderedRaids == 0 then return nil end
-    local topRaid = orderedRaids[1]
-    topRaid.bosses = EncounterBossNames(topRaid.name, topRaid.instanceMapIDs)
-    return topRaid
+    local rio = RaiderIOData()
+    return rio and rio.previousScore or 0
 end
 
 local LOCKOUT_DIFFICULTY_KEY = { [14] = 1, [15] = 2, [16] = 3 }
@@ -477,16 +479,20 @@ local function LockoutRaidProgress()
 end
 
 local function RaidProgress()
-    local rio = RaiderIORaidProgress()
+    local data = RaiderIOData()
+    local rio = data and data.raid
     local lockout = LockoutRaidProgress()
     if not rio then return lockout end
+    rio.bosses = EncounterBossNames(rio)
     if not (lockout and SameRaidName(lockout.name, rio.name)) then return rio end
 
     if not rio.bosses and lockout.bosses[1] then rio.bosses = lockout.bosses end
     if lockout.bossCount > rio.bossCount then rio.bossCount = lockout.bossCount end
 
     local bossIndexByName = {}
-    for bossIndex, bossName in ipairs(rio.bosses or {}) do bossIndexByName[bossName] = bossIndex end
+    if rio.bosses then
+        for bossIndex, bossName in ipairs(rio.bosses) do bossIndexByName[bossName] = bossIndex end
+    end
 
     for difficultyKey, lockoutInfo in pairs(lockout.diffs) do
         local rioInfo = rio.diffs[difficultyKey]
@@ -495,7 +501,7 @@ local function RaidProgress()
             rio.diffs[difficultyKey] = rioInfo
         end
         local merged = {}
-        for bossIndex = 1, rio.bossCount do merged[bossIndex] = tonumber(rioInfo.kills[bossIndex]) or 0 end
+        for bossIndex = 1, rio.bossCount do merged[bossIndex] = rioInfo.kills[bossIndex] or 0 end
         for lockoutIndex, kill in ipairs(lockoutInfo.kills) do
             if kill > 0 then
                 local bossName = lockout.bosses[lockoutIndex]
@@ -640,67 +646,54 @@ local function SeasonSummary()
     return best, timed, total
 end
 
-local activeSlideIn
+local slideEasings = {}
 
-local function FinishSlideIn(state)
-    state.ticker:SetScript('OnUpdate', nil)
-    for index, card in ipairs(state.cards) do
-        local anchor = state.anchors[index]
-        card:SetPoint(anchor[1], anchor[2], anchor[3], anchor[4], anchor[5])
-        card:SetAlpha(1)
+local function SlideEasing(index)
+    local easing = slideEasings[index]
+    if not easing then
+        local wait = (index - 1) * SLIDE_STAGGER / (SLIDE_TIME + (index - 1) * SLIDE_STAGGER)
+        easing = function(progress)
+            if progress <= wait then return 0 end
+            return Ease.outCubic((progress - wait) / (1 - wait))
+        end
+        slideEasings[index] = easing
     end
+    return easing
 end
 
-local function SlideIn(cards, ticker)
-    if activeSlideIn then FinishSlideIn(activeSlideIn) end
-    local STAGGER, DURATION, OFFSET = 0.045, 0.38, -18
-    local shown, anchors = {}, {}
+local function SlideIn(cards)
+    local index = 0
     for _, card in ipairs(cards) do
         if card:IsShown() then
-            local point, relative, relativePoint, x, y = card:GetPoint(1)
-            shown[#shown + 1] = card
-            anchors[#anchors + 1] = { point, relative, relativePoint, x, y }
-            card:SetPoint(point, relative, relativePoint, x, y + OFFSET)
-            card:SetAlpha(0)
+            index = index + 1
+            local _, _, _, _, y = card:GetPoint(1)
+            local duration = SLIDE_TIME + (index - 1) * SLIDE_STAGGER
+            local easing = SlideEasing(index)
+            Motion.To(card, 'y', y, duration, { from = y + SLIDE_OFFSET, easing = easing })
+            Motion.To(card, 'alpha', 1, duration, { from = 0, easing = easing })
         end
     end
-    if #shown == 0 then return end
-    local start = GetTime()
-    local state = { ticker = ticker, cards = shown, anchors = anchors }
-    activeSlideIn = state
-    ticker:SetScript('OnUpdate', BUI.Profiler.Hot('Pages.Dashboard card slide', function(self)
-        local now, done = GetTime(), true
-        for index, card in ipairs(shown) do
-            local anchor = anchors[index]
-            local progress = (now - start - (index - 1) * STAGGER) / DURATION
-            if progress < 1 then
-                done = false
-                local eased = progress <= 0 and 0 or 1 - (1 - progress) ^ 3
-                card:SetPoint(anchor[1], anchor[2], anchor[3], anchor[4], math.floor(anchor[5] + OFFSET * (1 - eased) + 0.5))
-                card:SetAlpha(eased)
-            end
-        end
-        if done then
-            FinishSlideIn(state)
-            if activeSlideIn == state then activeSlideIn = nil end
-        end
-    end))
 end
 
-local window, kit, block
+local window, kit, cardKit, block, Relayout
+
+local pendingRefresh = {}
+local FlushRefresh = BUI.Dispatcher.New(function()
+    for refresh in pairs(pendingRefresh) do
+        pendingRefresh[refresh] = nil
+        refresh()
+    end
+    Relayout()
+end, 'Dashboard.Refresh')
 
 local function Tint(region, red, green, blue)
     window:Paint(region, function(target) target:SetTextColor(red, green, blue) end)
 end
 
-local function Tinted(role, alpha)
-    return function(region)
-        local red, green, blue = window:Color(role)
-        region:SetVertexColor(red, green, blue, alpha)
-    end
+local function PillFill(region)
+    local red, green, blue = window:Color('card')
+    region:SetVertexColor(red, green, blue, VAULT_PILL_FILL)
 end
-
-local PillFill = Tinted('card', VAULT_PILL_FILL)
 
 local function PaintTick(mark)
     mark:SetVertexColor(RAID_TICK[1], RAID_TICK[2], RAID_TICK[3])
@@ -731,8 +724,8 @@ local function Card(title)
     return card
 end
 
-local function Inset(parent, frameType)
-    local frame = CreateFrame(frameType or 'Frame', nil, parent)
+local function Inset(parent)
+    local frame = CreateFrame('Frame', nil, parent)
     window:Paint(Widget.DrawOutline(frame, INSET_RADIUS, WHITE, 'BACKGROUND', 1), 'inputEdge')
     return frame
 end
@@ -809,8 +802,7 @@ local function BuildStats()
         cell.icon:SetPoint('LEFT', PAD, 0)
         cell.kicker = kit.Text(cell, kicker, 10, 'muted')
         cell.kicker:SetPoint('TOPLEFT', STAT_TEXT_X, -STAT_KICKER_Y)
-        cell.value = kit.Text(cell, '', 26, 'text')
-        cell.value:SetPoint('TOPLEFT', cell.kicker, 'BOTTOMLEFT', 0, -4)
+        cell.value = cardKit.Readout(cell, STAT_TEXT_X, STAT_VALUE_Y, STAT_VALUE_SIZE)
         cell.sub = kit.Text(cell, '', 12, 'muted')
         cell.sub:SetPoint('BOTTOMLEFT', cell.value, 'BOTTOMRIGHT', VALUE_GAP, 3)
         cell.divider = kit.Fill(cell, 'rule', 'ARTWORK')
@@ -852,7 +844,6 @@ local function BuildStats()
         local rating = math.floor(C_ChallengeMode.GetOverallDungeonScore())
         local red, green, blue = ColorOf(C_ChallengeMode.GetDungeonScoreRarityColor(rating))
         score.value:SetText(rating)
-        Tint(score.value, red, green, blue)
         Tint(score.kicker, red, green, blue)
         local overall, equipped = GetAverageItemLevel()
         level.value:SetText(math.floor(equipped + 0.5))
@@ -964,9 +955,7 @@ local function VaultChip(parent)
     chip.kicker:SetPoint('TOPLEFT', VAULT_SLOT_PAD, -VAULT_VALUE_Y)
     chip.text = kit.Text(chip, '', 12, 'text')
     chip.text:SetPoint('TOPLEFT', chip.kicker, 'BOTTOMLEFT', 0, -2)
-    local chevron = kit.Glyph(chip, 'dropdown', CHEVRON, 'text')
-    chevron:SetTexCoord(unpack(POINT_RIGHT))
-    chevron:SetPoint('RIGHT', -VAULT_SLOT_PAD, 0)
+    cardKit.Chevron(chip, CHEVRON, 'text'):SetPoint('RIGHT', -VAULT_SLOT_PAD, 0)
     return chip
 end
 
@@ -981,8 +970,6 @@ local function BuildVault(onChange)
     statusMark:SetPoint('RIGHT', statusKicker, 'LEFT', -MARK_GAP, 0)
 
     local rows = {}
-    local fold = CreateFrame('Frame', nil, vault)
-    fold.vaultFold = true
     local folding
 
     local function SetAlphas(regions, alpha)
@@ -991,7 +978,7 @@ local function BuildVault(onChange)
 
     local function FinishFold()
         if not folding then return end
-        fold:SetScript('OnUpdate', nil)
+        Motion.Stop(folding.opening, 'height')
         for _, row in ipairs({ folding.opening, folding.closing }) do
             row.foldHeight = nil
             SetAlphas(row.big, 1)
@@ -1001,28 +988,29 @@ local function BuildVault(onChange)
         folding = nil
     end
 
+    local function FoldStep(opening, height)
+        local closing = folding.closing
+        local eased = (height - VAULT_TILE) / (VAULT_BIG - VAULT_TILE)
+        opening.foldHeight = math.floor(height + 0.5)
+        closing.foldHeight = math.floor(VAULT_BIG + VAULT_TILE - height + 0.5)
+        SetAlphas(opening.big, eased)
+        SetAlphas(closing.small, eased)
+        SetAlphas(closing.chrome, eased)
+        onChange()
+    end
+
+    local function FoldDone()
+        FinishFold()
+        onChange()
+    end
+
     local function StartFold(opening, closing)
         FinishFold()
-        folding = { start = GetTime(), opening = opening, closing = closing }
+        folding = { opening = opening, closing = closing }
         SetAlphas(opening.big, 0)
         SetAlphas(closing.small, 0)
         SetAlphas(closing.chrome, 0)
-        fold:SetScript('OnUpdate', BUI.Profiler.Hot('Pages.Dashboard vault fold', function()
-            local progress = (GetTime() - folding.start) / VAULT_FOLD
-            if progress >= 1 then
-                FinishFold()
-                onChange()
-                return
-            end
-            local eased = 1 - (1 - progress) ^ 3
-            local span = (VAULT_BIG - VAULT_TILE) * eased
-            opening.foldHeight = math.floor(VAULT_TILE + span + 0.5)
-            closing.foldHeight = math.floor(VAULT_BIG - span + 0.5)
-            SetAlphas(opening.big, eased)
-            SetAlphas(closing.small, eased)
-            SetAlphas(closing.chrome, eased)
-            onChange()
-        end))
+        Motion.To(opening, 'height', VAULT_BIG, VAULT_FOLD, { from = VAULT_TILE, easing = Ease.outCubic, onUpdate = FoldStep, onComplete = FoldDone })
     end
 
     for index, spec in ipairs(VAULT_ROWS) do
@@ -1071,23 +1059,20 @@ local function BuildVault(onChange)
         end)
     end
 
-    local function FillTile(tile, activity)
-        local open = Unlocked(activity)
+    local function FillValue(tile, activity, open)
         local itemLevel = open and RewardItemLevel(activity)
-        if open then
-            tile.value:SetText(itemLevel or '...')
-            window:Paint(tile.value, 'text')
-        else
-            tile.value:SetText('—')
-            window:Paint(tile.value, 'text')
-        end
+        tile.value:SetText(open and (itemLevel or '...') or '—')
         tile.footLabel = open and VaultSlotLabel(activity) or nil
-        tile.footRest = ('%d/%d'):format(math.min(activity.progress, activity.threshold), activity.threshold)
-        PaintFoot(tile.sub)
         if open and not itemLevel then
             local link = RewardLink(activity)
             if link then WaitForItem(link) end
         end
+    end
+
+    local function FillTile(tile, activity)
+        FillValue(tile, activity, Unlocked(activity))
+        tile.footRest = ('%d/%d'):format(math.min(activity.progress, activity.threshold), activity.threshold)
+        PaintFoot(tile.sub)
     end
 
     local runs
@@ -1101,16 +1086,8 @@ local function BuildVault(onChange)
         else
             tile.block:SetPoint('TOPLEFT', VAULT_SLOT_PAD, -VAULT_SLOT_PAD)
         end
-        local progress = ('%d / %d %s'):format(math.min(activity.progress, activity.threshold), activity.threshold, spec.many)
         local open = Unlocked(activity)
-        local itemLevel = open and RewardItemLevel(activity)
-        if open then
-            tile.value:SetText(itemLevel or '...')
-            window:Paint(tile.value, 'text')
-        else
-            tile.value:SetText('—')
-            window:Paint(tile.value, 'text')
-        end
+        FillValue(tile, activity, open)
         tile.state:SetText(open and 'Unlocked' or 'Locked')
         window:Paint(tile.state, open and 'positive' or 'text')
         tile.mark:SetShown(open)
@@ -1118,13 +1095,8 @@ local function BuildVault(onChange)
         tile.state:ClearAllPoints()
         tile.state:SetPoint('LEFT', VAULT_PILL_PAD + markWidth, 0)
         tile.pill:SetWidth(VAULT_PILL_PAD * 2 + markWidth + math.ceil(tile.state:GetStringWidth()))
-        tile.footLabel = open and VaultSlotLabel(activity) or nil
-        tile.footRest = progress
+        tile.footRest = ('%d / %d %s'):format(math.min(activity.progress, activity.threshold), activity.threshold, spec.many)
         PaintFoot(tile.foot)
-        if open and not itemLevel then
-            local link = RewardLink(activity)
-            if link then WaitForItem(link) end
-        end
     end
 
     function vault.Refresh()
@@ -1192,13 +1164,13 @@ end
 
 local function BossRows(raid)
     local rows = {}
+    local dim = BUI.Hex(window:Color('faint'))
     for bossIndex = 1, raid.bossCount do
         local marks = {}
         for key, difficulty in ipairs(RAID_DIFFICULTIES) do
             local info = raid.diffs[key]
-            local killed = info and (tonumber(info.kills[bossIndex]) or 0) > 0
-            local red, green, blue = unpack(difficulty.color)
-            marks[#marks + 1] = killed and ('|cff%02x%02x%02x%s|r'):format(math.floor(red * 255), math.floor(green * 255), math.floor(blue * 255), difficulty.short) or ('|cff555a62%s|r'):format(difficulty.short)
+            local killed = info and (info.kills[bossIndex] or 0) > 0
+            marks[#marks + 1] = ('|cff%s%s|r'):format(killed and difficulty.hex or dim, difficulty.short)
         end
         rows[#rows + 1] = { left = (raid.bosses and raid.bosses[bossIndex]) or ('Boss ' .. bossIndex), right = table.concat(marks, ' ') }
     end
@@ -1244,8 +1216,7 @@ local function BuildRaid()
     end
     local link = CreateFrame('Button', nil, raid)
     link:SetHeight(LINK_HEIGHT)
-    local chevron = kit.Glyph(link, 'dropdown', CHEVRON, 'accent')
-    chevron:SetTexCoord(unpack(POINT_RIGHT))
+    local chevron = cardKit.Chevron(link, CHEVRON, 'accent')
     chevron:SetPoint('RIGHT')
     local linkText = kit.Text(link, 'View bosses', 12, 'accent')
     linkText:SetPoint('RIGHT', chevron, 'LEFT', -LINK_GAP, 0)
@@ -1271,19 +1242,13 @@ local function BuildRaid()
             row.count:SetShown(not clear)
             row.clear:SetShown(clear)
             row.clearMark:SetShown(clear)
-            local red, green, blue = unpack(RAID_DIFFICULTIES[key].color)
+            local paint = RAID_DIFFICULTIES[key].paint
             for dot, pieces in ipairs(row.dots) do
                 local visible = dot <= shown
-                local dead = visible and info ~= nil and (tonumber(info.kills[dot]) or 0) > 0
+                local dead = visible and info ~= nil and (info.kills[dot] or 0) > 0
                 pieces.disc:SetShown(visible)
                 pieces.mark:SetShown(dead)
-                if visible then
-                    if dead then
-                        window:Paint(pieces.disc, function(disc) disc:SetVertexColor(red, green, blue) end)
-                    else
-                        window:Paint(pieces.disc, 'control')
-                    end
-                end
+                if visible then window:Paint(pieces.disc, dead and paint or 'control') end
             end
         end
     end
@@ -1351,7 +1316,7 @@ local function BuildKeys()
                 row.time:SetText(Clock(run.duration))
                 local spare = run.limit - run.duration
                 row.under:SetText(spare >= 0 and Clock(spare) or ('+' .. Clock(-spare)))
-                if spare >= 0 then Tint(row.under, 0.36, 0.83, 0.48) else window:Paint(row.under, 'danger') end
+                window:Paint(row.under, spare >= 0 and 'positive' or 'danger')
             end
         end
         local best, timed, total = SeasonSummary()
@@ -1561,12 +1526,12 @@ end
 local function BuildDashboard(pageFrame)
     window = BUI.PageEngine.window
     kit = Layout.TableKit(window)
+    cardKit = Layout.CardKit(window)
     local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
     local tab = page:GetTab(1)
     block = CreateFrame('Frame', nil, tab.child)
     block:SetWidth(PAGE_WIDTH)
 
-    local Relayout
     local header = BuildHeader(function() Relayout() end)
     local strip = BuildStats()
     local vault, raid, keys, currencies, characters = BuildVault(function() Relayout() end), BuildRaid(), BuildKeys(), BuildCurrencies(), BuildCharacters()
@@ -1576,7 +1541,6 @@ local function BuildDashboard(pageFrame)
         { cards = { characters }, rows = { { characters } } },
     }
     local selected = 1
-    local slideTicker = CreateFrame('Frame', nil, block)
 
     local function PlaceStrip(y)
         local shown = {}
@@ -1623,9 +1587,10 @@ local function BuildDashboard(pageFrame)
     local contentTop = kit.Tabs(block, HEADER_HEIGHT, { 'Overview', 'Characters (' .. characterCount .. ')' }, function(index)
         selected = index
         Relayout()
-        SlideIn(panes[index].cards, slideTicker)
+        SlideIn(panes[index].cards)
     end) + TABS_GAP
 
+    local function RefreshTab() tab:Refresh() end
     Relayout = function()
         for _, card in ipairs(cards) do card:Hide() end
         local pane = panes[selected]
@@ -1634,26 +1599,25 @@ local function BuildDashboard(pageFrame)
         y = PlaceRows(pane.rows, y)
         block:SetHeight(y)
         block.layoutHeight = y
-        BUILib.Defer(function() tab:Refresh() end)
+        BUILib.Defer(RefreshTab)
     end
 
-    local function Both(first, second) return function() first() second() end end
     local handlers = {
-        PLAYER_EQUIPMENT_CHANGED = strip.Refresh,
-        PLAYER_AVG_ITEM_LEVEL_UPDATE = strip.Refresh,
-        PLAYER_SPECIALIZATION_CHANGED = header.Refresh,
-        CHALLENGE_MODE_COMPLETED = Both(strip.Refresh, keys.Refresh),
-        CHALLENGE_MODE_MAPS_UPDATE = Both(strip.Refresh, keys.Refresh),
-        WEEKLY_REWARDS_UPDATE = Both(strip.Refresh, vault.Refresh),
-        UPDATE_INSTANCE_INFO = raid.Refresh,
-        BOSS_KILL = raid.Refresh,
-        CURRENCY_DISPLAY_UPDATE = currencies.Refresh,
+        PLAYER_EQUIPMENT_CHANGED = { strip.Refresh },
+        PLAYER_AVG_ITEM_LEVEL_UPDATE = { strip.Refresh },
+        PLAYER_SPECIALIZATION_CHANGED = { header.Refresh },
+        CHALLENGE_MODE_COMPLETED = { strip.Refresh, keys.Refresh },
+        CHALLENGE_MODE_MAPS_UPDATE = { strip.Refresh, keys.Refresh },
+        WEEKLY_REWARDS_UPDATE = { strip.Refresh, vault.Refresh },
+        UPDATE_INSTANCE_INFO = { raid.Refresh },
+        BOSS_KILL = { raid.Refresh },
+        CURRENCY_DISPLAY_UPDATE = { currencies.Refresh },
     }
-    for event in pairs(handlers) do block:RegisterEvent(event) end
-    block:SetScript('OnEvent', BUI.Profiler.Wrap('Pages.Dashboard event', function(self, event)
+    for event in pairs(handlers) do pageFrame:RegisterEvent(event) end
+    pageFrame:SetScript('OnEvent', BUI.Profiler.Wrap('Pages.Dashboard event', function(self, event)
         if not self:IsVisible() then return end
-        handlers[event]()
-        Relayout()
+        for _, refresh in ipairs(handlers[event]) do pendingRefresh[refresh] = true end
+        FlushRefresh()
     end))
 
     local sessionTicker
@@ -1663,8 +1627,8 @@ local function BuildDashboard(pageFrame)
         header.Refresh()
         for _, card in ipairs(cards) do card.Refresh() end
         Relayout()
-        sessionTicker = sessionTicker or C_Timer.NewTicker(SESSION_TICK, strip.RefreshSession)
-        SlideIn(panes[selected].cards, slideTicker)
+        sessionTicker = C_Timer.NewTicker(SESSION_TICK, strip.RefreshSession)
+        SlideIn(panes[selected].cards)
     end)
     block:SetScript('OnHide', function()
         if sessionTicker then
@@ -1675,7 +1639,6 @@ local function BuildDashboard(pageFrame)
 
     Relayout()
     Layout.Add(tab, block, -Layout.DEFAULT_PADDING)
-    page:AutoRefresh()
 end
 
 BUI.PageEngine.RegisterPage('dashboard', {
