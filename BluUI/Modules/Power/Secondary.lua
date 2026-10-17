@@ -24,7 +24,6 @@ local function Setting(prefix, key)
     if not fullKey then fullKey = prefix .. key; prefixMemo[key] = fullKey end
     return GetDB()[fullKey]
 end
-local function IsAnchored(db) return BUI.ResolveAnchorFrame(db.anchorFrame) ~= nil end
 local function IsStacked()
     if BUI.Power.Stack.IsEnabled() then return true end
     return BUI.Power.Container.HasMember('secondary')
@@ -38,11 +37,10 @@ local function ResourceColor(config)
             if red then return red, green, blue end
         end
     end
-    return Setting(config.prefix, "ColorR") or 1, Setting(config.prefix, "ColorG") or 1, Setting(config.prefix, "ColorB") or 1
+    return Setting(config.prefix, "ColorR"), Setting(config.prefix, "ColorG"), Setting(config.prefix, "ColorB")
 end
 
 local function UpdateOpacity()
-    if not frame then return end
     frame:SetAlpha(BUI.Visibility.GetContextualOpacity("SecondaryPower") / 100)
 end
 
@@ -72,7 +70,7 @@ local function UpdateStaggerCache()
         staggerCache.time = now
         return
     end
-    local max = UnitHealthMax("player") or 1
+    local max = UnitHealthMax("player")
     if max == 0 then max = 1 end
     staggerCache.value = value
     staggerCache.max = max
@@ -245,8 +243,8 @@ local function GetDisplayConfig()
     return GetActiveConfig()
 end
 
-function SecondaryPower.GetActiveConfig() return GetActiveConfig() end
-function SecondaryPower.GetDisplayConfig() return GetDisplayConfig() end
+SecondaryPower.GetActiveConfig = GetActiveConfig
+SecondaryPower.GetDisplayConfig = GetDisplayConfig
 
 local function IsPreviewing()
     return editPreviewId ~= nil and activeConfig ~= nil
@@ -254,28 +252,28 @@ local function IsPreviewing()
 end
 
 function SecondaryPower.GetConfigsForClass()
-    local _, class = UnitClass("player")
+    local class = ClassPowers.GetPlayerClass()
     local matches = {}
     for _, config in ipairs(Configs) do
-        if config.classes then
-            for _, configClass in ipairs(config.classes) do
-                if configClass == class then matches[#matches + 1] = config; break end
-            end
+        for _, configClass in ipairs(config.classes) do
+            if configClass == class then matches[#matches + 1] = config; break end
         end
     end
     return matches
 end
 
+function SecondaryPower.ClassHasSecondary()
+    return SecondaryPower.GetConfigsForClass()[1] ~= nil
+end
+
 function SecondaryPower.HasSecondary()
     if not BUI.IsModuleEnabled("power") then return false end
-    if GetDB().source == "none" then return false end
-    if type(GetDB().source) == "number" then return true end
-    if ClassPowers.IsHunter() then return false end
+    local source = GetDB().source
+    if source == "none" then return false end
+    if type(source) == "number" then return true end
     ClassPowers.UpdateSpecID()
     return GetDisplayConfig() ~= nil
 end
-
-local function ShouldShow() return SecondaryPower.HasSecondary() end
 
 local function HideAllBars()
     for barIndex = 1, #PointBars do PointBars[barIndex].container:Hide() end
@@ -411,14 +409,10 @@ local function UpdatePointDisplay(config)
     end
 
     if config.secret then
-        local pointCount = SafeNum(max) or config.max or 1
+        local pointCount = SafeNum(max) or config.max
         if Setting(config.prefix, "NumberOnly") then
             HideAllBars()
-            if Setting(config.prefix, "ShowMax") then
-                text:SetText(string.format("%s/%s", AbbreviateNumbers(current), pointCount))
-            else
-                text:SetText(string.format("%s", AbbreviateNumbers(current)))
-            end
+            text:SetFormattedText(Setting(config.prefix, "ShowMax") and "%s/%d" or "%s", current, pointCount)
             text:Show()
             return
         end
@@ -438,8 +432,8 @@ local function UpdatePointDisplay(config)
     end
 
     current = SafeNum(current) or 0
-    max = SafeNum(max) or config.max or 1
-    if max == 0 then max = config.max or 1 end
+    max = SafeNum(max) or config.max
+    if max == 0 then max = config.max end
 
     if IsPreviewing() then current = math.ceil(max * 0.6) end
 
@@ -475,9 +469,9 @@ local function UpdatePointDisplay(config)
         if charged and #charged > 0 then
             chargedSet = wipe(chargedScratch)
             for chargedIndex = 1, #charged do chargedSet[charged[chargedIndex]] = true end
-            chargedRed = Setting(config.prefix, "ChargedColorR") or 0.96
-            chargedGreen = Setting(config.prefix, "ChargedColorG") or 0.55
-            chargedBlue = Setting(config.prefix, "ChargedColorB") or 0.73
+            chargedRed = Setting(config.prefix, "ChargedColorR")
+            chargedGreen = Setting(config.prefix, "ChargedColorG")
+            chargedBlue = Setting(config.prefix, "ChargedColorB")
         end
     end
 
@@ -542,9 +536,9 @@ end
 local function FormatBarText(target, staggerShowsPercent, showValue, showPercent, safeCurrent, current, percent, percentValue, hidePercentSign)
     local percentFormat = hidePercentSign and "%.0f" or "%.0f%%"
     if staggerShowsPercent and showValue then
-        target:SetFormattedText(hidePercentSign and "%d (%.0f)" or "%d (%.0f%%)", safeCurrent or 0, percent or 0)
+        target:SetFormattedText(hidePercentSign and "%d (%.0f)" or "%d (%.0f%%)", safeCurrent, percent)
     elseif staggerShowsPercent then
-        target:SetFormattedText(percentFormat, percent or 0)
+        target:SetFormattedText(percentFormat, percent)
     elseif showPercent and percentValue ~= nil then
         target:SetFormattedText(percentFormat, percentValue)
     elseif showValue and safeCurrent ~= nil then
@@ -563,19 +557,15 @@ local function UpdateBarDisplay(config)
     if config.getValue then
         local firstValue, secondValue, thirdValue = config.getValue()
         if thirdValue then current, percent, max = firstValue, secondValue, thirdValue else current, max = firstValue, secondValue end
-        if config.getColor and BarDisplay then
-            BarDisplay.bar:SetStatusBarColor(config.getColor())
-        end
     else
-        local powerType = config.power or UnitPowerType("player")
-        current = UnitPower("player", powerType)
-        max = UnitPowerMax("player", powerType)
+        current = UnitPower("player", config.power)
+        max = UnitPowerMax("player", config.power)
     end
 
     local staggerLive = config.id == "stagger" and percent ~= nil
     local barMode = Setting(config.prefix, "BarMode")
-    local showValue = Setting(config.prefix, "ShowValue") ~= false
-    local showPercent = Setting(config.prefix, "ShowPercent") == true
+    local showValue = Setting(config.prefix, "ShowValue")
+    local showPercent = Setting(config.prefix, "ShowPercent")
     local hidePercentSign = Setting(config.prefix, "HidePercentSign") == true
     local safeCurrent, safeMax = SafeNum(current), SafeNum(max)
 
@@ -594,7 +584,7 @@ local function UpdateBarDisplay(config)
         end
     end
 
-    local staggerShowsPercent = staggerLive and Setting(config.prefix, "ShowPercent") ~= false
+    local staggerShowsPercent = staggerLive and showPercent
 
     if not barMode then
         HideAllBars()
@@ -608,18 +598,12 @@ local function UpdateBarDisplay(config)
 
     if not BarDisplay then BarDisplay = CreateBarDisplay(frame) end
 
-    BarDisplay.bar:SetMinMaxValues(0, 100)
     BarDisplay.bar:SetValue(percentValue or 0)
 
-    if config._lowPowerCurve and config.power then
-        local color = UnitPowerPercent("player", config.power, false, config._lowPowerCurve)
-        if color and color.GetRGB then
-            BarDisplay.bar:GetStatusBarTexture():SetVertexColor(color:GetRGB())
-        else
-
-            BarDisplay.bar:GetStatusBarTexture():SetVertexColor(
-                Setting(config.prefix, "ColorR") or 1, Setting(config.prefix, "ColorG") or 1, Setting(config.prefix, "ColorB") or 1)
-        end
+    if config.getColor then
+        BarDisplay.bar:SetStatusBarColor(config.getColor())
+    elseif config._lowPowerCurve then
+        BarDisplay.bar:GetStatusBarTexture():SetVertexColor(UnitPowerPercent("player", config.power, false, config._lowPowerCurve):GetRGB())
     end
 
     FormatBarText(BarDisplay.valText, staggerShowsPercent, showValue, showPercent, safeCurrent, current, percent, percentValue, hidePercentSign)
@@ -627,7 +611,6 @@ local function UpdateBarDisplay(config)
 end
 
 local function Update()
-    if not frame then return end
     local config = activeConfig
     if not config then
         HideAllBars()
@@ -653,7 +636,6 @@ local function ApplyTextColor(config)
 end
 
 function SecondaryPower.GetBarColor(config)
-    if not config then return 1, 1, 1 end
     if config.getColor then return config.getColor() end
     return ResourceColor(config)
 end
@@ -667,8 +649,8 @@ local styledPointMax, styledAnchorWidth
 local function PointMax(config)
     local _, max
     if config.getValue then _, max = config.getValue() else max = UnitPowerMax("player", config.power) end
-    max = SafeNum(max) or config.max or 1
-    if max == 0 then max = config.max or 1 end
+    max = SafeNum(max) or config.max
+    if max == 0 then max = config.max end
     return max
 end
 
@@ -699,18 +681,18 @@ local function StylePointBars(config)
     if BarDisplay then BarDisplay.container:Hide() end
 
     local texture = GetTexture()
-    local borderSize = Pixel.ClampBorder(db.borderSize or 1)
-    local borderColor = db.borderColor or { 0, 0, 0, 1 }
+    local borderSize = Pixel.ClampBorder(db.borderSize)
+    local borderColor = db.borderColor
     local edge = Pixel.Scale(borderSize)
 
-    local anchorWidth = BUI.Anchor.GetAnchorWidth(frame, db)
+    local anchorWidth = styledAnchorWidth
     local scaledTotalWidth, scaledWidth, scaledHeight, scaledGap
     local widths
 
     if anchorWidth then
         scaledTotalWidth = anchorWidth
-        scaledHeight = Pixel.Scale(Setting(prefix, "Height") or 12)
-        scaledGap = Pixel.Scale(Setting(prefix, "Spacing") or 0)
+        scaledHeight = Pixel.Scale(Setting(prefix, "Height"))
+        scaledGap = Pixel.Scale(Setting(prefix, "Spacing"))
         local visualGap = scaledGap == 0 and -edge or scaledGap
 
         local contentWidth = scaledTotalWidth - (max - 1) * visualGap
@@ -723,19 +705,19 @@ local function StylePointBars(config)
         end
         scaledWidth = widths[1] or 0
     else
-        local totalWidth = Setting(prefix, "TotalWidth") or 200
-        local gap = Setting(prefix, "Spacing") or 0
+        local totalWidth = Setting(prefix, "TotalWidth")
+        local gap = Setting(prefix, "Spacing")
         scaledWidth = Pixel.Scale((totalWidth - (max - 1) * gap) / max)
-        scaledHeight = Pixel.Scale(Setting(prefix, "Height") or 12)
+        scaledHeight = Pixel.Scale(Setting(prefix, "Height"))
         scaledGap = Pixel.Scale(gap)
         scaledTotalWidth = max * scaledWidth + (max - 1) * scaledGap
     end
     local function SegmentWidth(pointIndex) return widths and widths[pointIndex] or scaledWidth end
 
-    local backgroundRed = Setting(prefix, "BgColorR") or 0.15
-    local backgroundGreen = Setting(prefix, "BgColorG") or 0.15
-    local backgroundBlue = Setting(prefix, "BgColorB") or 0.15
-    local backgroundAlpha = Setting(prefix, "BgColorA") or 1
+    local backgroundRed = Setting(prefix, "BgColorR")
+    local backgroundGreen = Setting(prefix, "BgColorG")
+    local backgroundBlue = Setting(prefix, "BgColorB")
+    local backgroundAlpha = Setting(prefix, "BgColorA")
 
     for pointIndex = 1, max do
         if not PointBars[pointIndex] then PointBars[pointIndex] = CreatePointBar(frame, config) end
@@ -755,11 +737,11 @@ local function StylePointBars(config)
         end
     end
 
-    local barOffsetX = config.id == "runes" and db.runeBarOffsetX or Setting(prefix, "BarOffsetX") or 0
-    local barOffsetY = config.id == "runes" and db.runeBarOffsetY or Setting(prefix, "BarOffsetY") or 0
+    local barOffsetX = Setting(prefix, "BarOffsetX")
+    local barOffsetY = Setting(prefix, "BarOffsetY")
 
     local visualGap = scaledGap == 0 and -edge or scaledGap
-    local anchored = IsAnchored(db) or IsStacked()
+    local anchored = Shared.IsAnchoredFor(db) or IsStacked()
     local contentOffsetX = anchored and 0 or barOffsetX
     local contentOffsetY = anchored and 0 or barOffsetY
 
@@ -786,11 +768,9 @@ local function StylePointBars(config)
 
     if not Setting(prefix, "HideBarText") and config.id ~= "runes" then
         text:ClearAllPoints()
-        local valueOffsetX = Setting(prefix, "ValueOffsetX") or 0
-        local valueOffsetY = Setting(prefix, "ValueOffsetY") or 0
-        text:SetPoint("CENTER", frame, "CENTER", contentOffsetX + valueOffsetX, contentOffsetY + valueOffsetY)
-        Pixel.ApplyFont(text, Setting(prefix, "CenterTextSize") or 14, GetFont())
-        text:SetTextColor(Setting(prefix, "ValueColorR") or 1, Setting(prefix, "ValueColorG") or 1, Setting(prefix, "ValueColorB") or 1)
+        text:SetPoint("CENTER", frame, "CENTER", contentOffsetX + Setting(prefix, "ValueOffsetX"), contentOffsetY + Setting(prefix, "ValueOffsetY"))
+        Pixel.ApplyFont(text, Setting(prefix, "CenterTextSize"), GetFont())
+        text:SetTextColor(Setting(prefix, "ValueColorR"), Setting(prefix, "ValueColorG"), Setting(prefix, "ValueColorB"))
     end
 end
 
@@ -816,30 +796,23 @@ local function StyleBarDisplay(config)
     if not BarDisplay then BarDisplay = CreateBarDisplay(frame) end
 
     local texture = GetTexture()
-    local borderSize = Pixel.ClampBorder(db.borderSize or 1)
-    local borderColor = db.borderColor or { 0, 0, 0, 1 }
+    local borderSize = Pixel.ClampBorder(db.borderSize)
+    local borderColor = db.borderColor
     local edge = Pixel.Scale(borderSize)
 
-    local anchorWidth = BUI.Anchor.GetAnchorWidth(frame, db)
-    local scaledWidth = anchorWidth or Pixel.Scale(Setting(prefix, "BarWidth") or 200)
-    local scaledHeight = Pixel.Scale(Setting(prefix, "BarHeight") or 16)
+    local scaledWidth = styledAnchorWidth or Pixel.Scale(Setting(prefix, "BarWidth"))
+    local scaledHeight = Pixel.Scale(Setting(prefix, "BarHeight"))
+    local backgroundRed, backgroundGreen, backgroundBlue, backgroundAlpha = Setting(prefix, "BgColorR"), Setting(prefix, "BgColorG"), Setting(prefix, "BgColorB"), Setting(prefix, "BgColorA")
 
     BarDisplay.container:SetSize(scaledWidth, scaledHeight)
     Pixel.SetTemplate(BarDisplay.container,
-        Setting(prefix, "BgColorR") or 0.1, Setting(prefix, "BgColorG") or 0.1, Setting(prefix, "BgColorB") or 0.1, Setting(prefix, "BgColorA") or 1,
+        backgroundRed, backgroundGreen, backgroundBlue, backgroundAlpha,
         borderColor[1], borderColor[2], borderColor[3], borderColor[4], borderSize)
 
     Shared.ApplyStackFlush(BarDisplay.container, BarDisplay.bar, db.stackFlushEdge, edge,
-        Setting(prefix, "BgColorR") or 0.1, Setting(prefix, "BgColorG") or 0.1, Setting(prefix, "BgColorB") or 0.1, Setting(prefix, "BgColorA") or 1)
+        backgroundRed, backgroundGreen, backgroundBlue, backgroundAlpha)
     BarDisplay.bar:SetStatusBarTexture(texture)
-
-    local red, green, blue
-    if config.getColor then
-        red, green, blue = config.getColor()
-    else
-        red, green, blue = ResourceColor(config)
-    end
-    BarDisplay.bar:SetStatusBarColor(red, green, blue)
+    BarDisplay.bar:SetStatusBarColor(SecondaryPower.GetBarColor(config))
 
     if db.lowPowerEnabled and config.power and not config.getColor then
         config._lowPowerCurve = Shared.BuildLowPowerCurve(config._lowPowerCurve, db, ResourceColor(config))
@@ -848,26 +821,24 @@ local function StyleBarDisplay(config)
     end
 
     BarDisplay.valText:ClearAllPoints()
-    local valueOffsetX = Setting(prefix, "ValueOffsetX") or 0
-    local valueOffsetY = Setting(prefix, "ValueOffsetY") or 0
-    BarDisplay.valText:SetPoint("CENTER", BarDisplay.container, "CENTER", valueOffsetX, valueOffsetY)
-    Pixel.ApplyFont(BarDisplay.valText, Setting(prefix, "ValueSize") or 14, GetFont())
-    BarDisplay.valText:SetTextColor(Setting(prefix, "ValueColorR") or 1, Setting(prefix, "ValueColorG") or 1, Setting(prefix, "ValueColorB") or 1)
+    BarDisplay.valText:SetPoint("CENTER", BarDisplay.container, "CENTER", Setting(prefix, "ValueOffsetX"), Setting(prefix, "ValueOffsetY"))
+    Pixel.ApplyFont(BarDisplay.valText, Setting(prefix, "ValueSize"), GetFont())
+    BarDisplay.valText:SetTextColor(Setting(prefix, "ValueColorR"), Setting(prefix, "ValueColorG"), Setting(prefix, "ValueColorB"))
     BarDisplay.valText:SetShown(not Setting(prefix, "HideBarText"))
 
     Shared.StyleTicks(BarDisplay.bar, db, scaledWidth, scaledHeight, edge)
 
     BarDisplay.container:ClearAllPoints()
-    if IsAnchored(db) or IsStacked() then
+    if Shared.IsAnchoredFor(db) or IsStacked() then
         BarDisplay.container:SetPoint("CENTER")
     else
-        BarDisplay.container:SetPoint("CENTER", frame, "CENTER", Setting(prefix, "BarOffsetX") or 0, Setting(prefix, "BarOffsetY") or 0)
+        BarDisplay.container:SetPoint("CENTER", frame, "CENTER", Setting(prefix, "BarOffsetX"), Setting(prefix, "BarOffsetY"))
     end
 end
 
 local function ApplyTextStrata()
-    local strata = GetDB().textStrata or 'HIGH'
-    if text then text:GetParent():SetFrameStrata(strata) end
+    local strata = GetDB().textStrata
+    text:GetParent():SetFrameStrata(strata)
     if BarDisplay then BarDisplay.valText:GetParent():SetFrameStrata(strata) end
     for barIndex = 1, #PointBars do
         local pointBar = PointBars[barIndex]
@@ -879,13 +850,12 @@ local function IsTextActive(config)
     if not config then return false end
     local isBar = config.mode == "bar"
     if isBar and Setting(config.prefix, "BarMode") then return false end
-    if config.id == "runes" then return GetDB().runeNumberOnly and true or false end
+    if config.id == "runes" then return GetDB().runeNumberOnly end
     if isBar then return true end
-    return Setting(config.prefix, "NumberOnly") and true or false
+    return Setting(config.prefix, "NumberOnly")
 end
 
 local function Style()
-    if not text then return end
     local db = GetDB()
     local config = activeConfig
     liveCurrent = nil
@@ -895,17 +865,16 @@ local function Style()
     end
 
     local padding = (Shared.IsAnchoredFor(db, IsTextActive(config)) or IsStacked()) and 0 or 20
-    local anchorWidth = BUI.Anchor.GetAnchorWidth(frame, db)
     local frameWidth, frameHeight = 120 + padding, 50 + padding
 
     if config then
         local prefix = config.prefix
         if config.mode == "point" and not Setting(prefix, "NumberOnly") then
-            frameWidth = (anchorWidth or Pixel.Scale(Setting(prefix, "TotalWidth") or 120)) + padding
-            frameHeight = Pixel.Scale(Setting(prefix, "Height") or 12) + padding
+            frameWidth = (styledAnchorWidth or Pixel.Scale(Setting(prefix, "TotalWidth"))) + padding
+            frameHeight = Pixel.Scale(Setting(prefix, "Height")) + padding
         elseif config.mode == "bar" and Setting(prefix, "BarMode") then
-            frameWidth = (anchorWidth or Pixel.Scale(Setting(prefix, "BarWidth") or 200)) + padding
-            frameHeight = Pixel.Scale(Setting(prefix, "BarHeight") or 16) + padding
+            frameWidth = (styledAnchorWidth or Pixel.Scale(Setting(prefix, "BarWidth"))) + padding
+            frameHeight = Pixel.Scale(Setting(prefix, "BarHeight")) + padding
         end
     end
     frame:SetSize(frameWidth, frameHeight)
@@ -913,7 +882,6 @@ local function Style()
 end
 
 local function Position()
-    if not frame then return end
     local db = GetDB()
     BUI.Anchor.ApplyPosition(frame, BUI.Anchor.ModePos(db, IsTextActive(activeConfig)))
 end
@@ -941,7 +909,6 @@ local function Build()
 
     text = overlay:CreateFontString(nil, "OVERLAY")
     text:SetPoint("CENTER")
-    Pixel.ApplyFont(text, 26, GetFont())
 
     BUI.Dragging.MakeDraggable(frame, {
         showHint = true,
@@ -983,9 +950,7 @@ local function OnLifecycleEvent(event)
         checkedFormID = formID
     end
     if (event == "UPDATE_SHAPESHIFT_FORM" or event == "UPDATE_SHAPESHIFT_FORMS") and not ConfigChanged() then return end
-    if event ~= "UPDATE_SHAPESHIFT_FORM" and event ~= "UPDATE_SHAPESHIFT_FORMS" and event ~= "PLAYER_ENTERING_WORLD" then
-        editPreviewId = nil
-    end
+    if event == "PLAYER_SPECIALIZATION_CHANGED" then editPreviewId = nil end
     SecondaryPower.Apply()
 end
 
@@ -995,10 +960,8 @@ local function StartLifecycleEvents()
     local label = "SecondaryPowerLifecycle"
     BUI.Events:Register("PLAYER_ENTERING_WORLD", label, OnLifecycleEvent)
     BUI.Events:RegisterUnit("PLAYER_SPECIALIZATION_CHANGED", "player", label, OnLifecycleEvent)
-    BUI.Events:Register("PLAYER_TALENT_UPDATE", label, OnLifecycleEvent)
     BUI.Events:Register("UPDATE_SHAPESHIFT_FORM", label, OnLifecycleEvent)
     BUI.Events:Register("UPDATE_SHAPESHIFT_FORMS", label, OnLifecycleEvent)
-    BUI.Events:Register("ACTIVE_TALENT_GROUP_CHANGED", label, OnLifecycleEvent)
     BUI.Events:RegisterUnit("UNIT_DISPLAYPOWER", "player", label, function()
         if ConfigChanged() then SecondaryPower.Apply() end
     end)
@@ -1071,7 +1034,6 @@ local function OnAuraEvent()
 end
 
 local function OnLivePowerEvent(event, _, powerToken)
-    if not activeConfig or activeConfig.trigger then return end
     if event == "UNIT_POWER_FREQUENT" then
         local power = activeConfig.power
         if powerToken ~= ClassPowers.PowerToken(power) then return end
@@ -1145,22 +1107,12 @@ function SecondaryPower.Initialize()
             Position()
         end
     end)
-    if not ShouldShow() then return end
-
-    activeConfig = GetDisplayConfig()
-    runesRecharging = false
-    if GetDB().enabled then Activate() end
+    SecondaryPower.Apply()
 end
 
 function SecondaryPower.Toggle(on)
     GetDB().enabled = on
-    if on and ShouldShow() then
-        activeConfig = GetDisplayConfig()
-        runesRecharging = false
-        Activate()
-    else
-        Shutdown()
-    end
+    SecondaryPower.Apply()
 end
 
 function SecondaryPower.Apply()
@@ -1168,7 +1120,7 @@ function SecondaryPower.Apply()
     activeConfig = GetDisplayConfig()
     runesRecharging = false
     runesForceRefresh = true
-    if not GetDB().enabled or not ShouldShow() then
+    if not GetDB().enabled or not SecondaryPower.HasSecondary() then
         Shutdown()
         return
     end
@@ -1195,9 +1147,7 @@ function SecondaryPower.SetLocked(locked)
     local db = GetDB()
     db.locked = locked
     BUI.Dragging.SetLocked(frame, locked)
-    if SecondaryPower._lockToggle and SecondaryPower._lockToggle.SetValue then
-        SecondaryPower._lockToggle:SetValue(not locked)
-    end
+    BUI.NotifyModuleChange('secondaryPower')
 end
 
 BUI.Events:OnLogin("SecondaryPower", function()

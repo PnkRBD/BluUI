@@ -17,16 +17,12 @@ local MEMBERS = {
         apply = function() BUI.Power.Secondary.Apply() end,
     },
 }
-local TAG_TO_KEY = {}
-for _, member in ipairs(MEMBERS) do TAG_TO_KEY[member.tag] = member.key end
 
 local function MemberByKey(key)
     for _, member in ipairs(MEMBERS) do
         if member.key == key then return member end
     end
 end
-
-function Stack.TagToKey(tag) return TAG_TO_KEY[tag] end
 
 function Stack.GetDB()
     local db = BUI.Power.GetPrimaryDB()
@@ -92,19 +88,6 @@ function Stack.HasMember(key)
     return false
 end
 
-local function ForceBarModes()
-    BUI.Power.GetPrimaryDB().barMode = true
-    local secondaryDB = BUI.Power.GetSecondaryDB()
-    local config = BUI.Power.Secondary.GetDisplayConfig()
-    if config and config.prefix then
-        if config.mode == 'bar' then
-            secondaryDB[config.prefix .. 'BarMode'] = true
-        else
-            secondaryDB[config.prefix .. 'NumberOnly'] = false
-        end
-    end
-end
-
 local function SetMemberAnchor(memberDB, frameName, point, offsetX, offsetY, flush, matchWidth)
     memberDB.anchorFrame = frameName
     memberDB.anchorPoint = point
@@ -139,15 +122,6 @@ local SNAPSHOT_FIELDS = {
     'centerHorizontally', 'matchAnchorWidth', 'noGap', 'scaleOffsets',
     'stackFlushEdge', 'posX', 'posY',
 }
-
-local function SnapshotMembers(settings)
-    settings.preStack = {}
-    for _, member in ipairs(MEMBERS) do
-        local memberDB, snapshot = member.getDB(), {}
-        for _, field in ipairs(SNAPSHOT_FIELDS) do snapshot[field] = memberDB[field] end
-        settings.preStack[member.key] = snapshot
-    end
-end
 
 local function RestoreMembers(settings)
     if not settings.preStack then return false end
@@ -208,7 +182,7 @@ local function ApplyMembers()
                 SetMemberAnchor(memberDB, previousFrameName, point, settings.anchorOffsetX or 0, settings.anchorOffsetY or 0, false, matchWidth)
             else
                 local gap = settings.gap or 0
-                local edge = BUI.Pixel.Scale(BUI.Pixel.ClampBorder(memberDB.borderSize or 1))
+                local edge = BUI.Pixel.Scale(BUI.Pixel.ClampBorder(memberDB.borderSize))
                 local offsetY = (gap == 0) and -edge or gap
                 memberDB.stackFlushEdge = nil
                 SetMemberAnchor(memberDB, previousFrameName, point, 0, growUp and offsetY or -offsetY, true, matchWidth)
@@ -231,34 +205,26 @@ function Stack.Apply()
     BUI.Anchor.OnAnchorSizeChanged()
 end
 
-function Stack.SetEnabled(on)
+function Stack.Disable()
     local settings = Stack.GetDB()
-    if on then
-        if not settings.enabled then SnapshotMembers(settings) end
-        settings.enabled = true
-        settings.anchorOffsetX, settings.anchorOffsetY = 0, 0
-        ForceBarModes()
-        Stack.Apply()
-    else
-        settings.enabled = false
-        settings.baseMember = nil
+    settings.enabled = false
+    settings.baseMember = nil
 
-        if not RestoreMembers(settings) then
-            local primaryX, primaryY = CaptureCenter('BUI_PowerBar')
-            local secondaryX, secondaryY = CaptureCenter('BUI_SecondaryPower')
-            local primaryDB = BUI.Power.GetPrimaryDB()
-            local secondaryDB = BUI.Power.GetSecondaryDB()
-            ClearMemberAnchor(primaryDB)
-            ClearMemberAnchor(secondaryDB)
-            if primaryX then primaryDB.posX, primaryDB.posY = primaryX, primaryY end
-            if secondaryX then secondaryDB.posX, secondaryDB.posY = secondaryX, secondaryY end
-        end
-
-        BUI.Power.Primary.Apply()
-        BUI.Power.Secondary.Apply()
-
-        BUI.Anchor.OnAnchorSizeChanged()
+    if not RestoreMembers(settings) then
+        local primaryX, primaryY = CaptureCenter('BUI_PowerBar')
+        local secondaryX, secondaryY = CaptureCenter('BUI_SecondaryPower')
+        local primaryDB = BUI.Power.GetPrimaryDB()
+        local secondaryDB = BUI.Power.GetSecondaryDB()
+        ClearMemberAnchor(primaryDB)
+        ClearMemberAnchor(secondaryDB)
+        if primaryX then primaryDB.posX, primaryDB.posY = primaryX, primaryY end
+        if secondaryX then secondaryDB.posX, secondaryDB.posY = secondaryX, secondaryY end
     end
+
+    BUI.Power.Primary.Apply()
+    BUI.Power.Secondary.Apply()
+
+    BUI.Anchor.OnAnchorSizeChanged()
 end
 
 function Stack.OnMemberToggled()
@@ -277,7 +243,6 @@ BUI.Events:OnLogin('PowerStack', function()
         if unit and unit ~= 'player' then return end
         Reapply()
     end)
-    BUI.Events:Register('PLAYER_TALENT_UPDATE', 'PowerStack', Reapply)
     BUI.Events:RegisterUnit('UNIT_DISPLAYPOWER', 'player', 'PowerStack', Reapply)
 
     if Stack.IsEnabled() then Stack.Apply() end

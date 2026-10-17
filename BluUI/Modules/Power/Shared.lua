@@ -8,17 +8,17 @@ function Shared.BuildLowPowerCurve(curve, db, baseRed, baseGreen, baseBlue)
     curve = curve or C_CurveUtil.CreateColorCurve()
     curve:ClearPoints()
     curve:SetType(Enum.LuaCurveType.Step)
-    curve:AddPoint(0.0, CreateColor(db.lowPowerColorR or 1, db.lowPowerColorG or 0.2, db.lowPowerColorB or 0.2, 1))
-    curve:AddPoint((db.lowPowerThreshold or 30) / 100, CreateColor(db.medPowerColorR or 1, db.medPowerColorG or 1, db.medPowerColorB or 0.2, 1))
-    curve:AddPoint((db.highPowerThreshold or 70) / 100, CreateColor(baseRed or 1, baseGreen or 1, baseBlue or 1, 1))
+    curve:AddPoint(0.0, CreateColor(db.lowPowerColorR, db.lowPowerColorG, db.lowPowerColorB, 1))
+    curve:AddPoint(db.lowPowerThreshold / 100, CreateColor(db.medPowerColorR, db.medPowerColorG, db.medPowerColorB, 1))
+    curve:AddPoint(db.highPowerThreshold / 100, CreateColor(baseRed, baseGreen, baseBlue, 1))
     return curve
 end
 
 function Shared.StyleTicks(bar, db, fallbackWidth, fallbackHeight, edge)
     if not bar._tickMarks then bar._tickMarks = {} end
-    local ticks = db.tickMarks or {}
-    local color = db.tickMarkColor or { 1, 1, 1, 0.6 }
-    local width = Pixel.Scale(db.tickMarkWidth or 1)
+    local ticks = db.tickMarks
+    local color = db.tickMarkColor
+    local width = Pixel.Scale(db.tickMarkWidth)
     local barWidth = bar:GetWidth()
     if barWidth <= 0 then barWidth = fallbackWidth - (edge * 2) end
     local barHeight = bar:GetHeight()
@@ -29,7 +29,7 @@ function Shared.StyleTicks(bar, db, fallbackWidth, fallbackHeight, edge)
             tick = bar:CreateTexture(nil, "OVERLAY")
             bar._tickMarks[tickIndex] = tick
         end
-        tick:SetColorTexture(color[1], color[2], color[3], color[4] or 0.6)
+        tick:SetColorTexture(color[1], color[2], color[3], color[4])
         tick:SetSize(width, barHeight)
         tick:ClearAllPoints()
         local offset = Pixel.Scale(barWidth * (percent / 100))
@@ -57,7 +57,7 @@ function Shared.ApplyStackFlush(container, bar, flushEdge, edge, backgroundRed, 
         cover = container:CreateTexture(nil, "ARTWORK")
         container._stackFlushCover = cover
     end
-    cover:SetColorTexture(backgroundRed or 0.1, backgroundGreen or 0.1, backgroundBlue or 0.1, backgroundAlpha or 1)
+    cover:SetColorTexture(backgroundRed, backgroundGreen, backgroundBlue, backgroundAlpha)
     cover:ClearAllPoints()
     if flushEdge == 'BOTTOM' then
         cover:SetPoint("BOTTOMLEFT", container, "BOTTOMLEFT", 0, 0)

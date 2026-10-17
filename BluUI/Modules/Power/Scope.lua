@@ -4,6 +4,7 @@ BUI.Power = {}
 local Power = BUI.Power
 
 local ClassPowers = BUI.ClassPowers
+local DeepCopy = BUI.Tools.DeepCopy
 
 local VALID = { profile = true, class = true, spec = true }
 
@@ -19,11 +20,8 @@ local function SpecKey()
 end
 
 local function ClassKey()
-    if classKey == nil then
-        local _, class = UnitClass('player')
-        classKey = class and ('class:' .. class) or false
-    end
-    return classKey or nil
+    if not classKey then classKey = 'class:' .. ClassPowers.GetPlayerClass() end
+    return classKey
 end
 
 local function ScopeOf(profile)
@@ -41,7 +39,7 @@ local function FillMissing(target, defaults)
     for key, value in pairs(defaults) do
         local current = target[key]
         if current == nil then
-            target[key] = BUI.Tools.DeepCopy(value)
+            target[key] = DeepCopy(value)
         elseif type(current) == 'table' and type(value) == 'table' then
             FillMissing(current, value)
         end
@@ -50,19 +48,16 @@ end
 
 local function EnsureVariant(profile, key)
     local variants = profile.powerVariants
-    local variant = variants and variants[key]
-    if not (variant and variant.powerBar and variant.secondaryPower) then
-        profile.powerVariants = variants or {}
-        if not variant then
-            variant = {
-                powerBar = BUI.Tools.DeepCopy(profile.powerBar),
-                secondaryPower = BUI.Tools.DeepCopy(profile.secondaryPower),
-            }
-            profile.powerVariants[key] = variant
-        else
-            if not variant.powerBar then variant.powerBar = BUI.Tools.DeepCopy(profile.powerBar) end
-            if not variant.secondaryPower then variant.secondaryPower = BUI.Tools.DeepCopy(profile.secondaryPower) end
-        end
+    local variant = variants[key]
+    if not variant then
+        variant = {
+            powerBar = DeepCopy(profile.powerBar),
+            secondaryPower = DeepCopy(profile.secondaryPower),
+        }
+        variants[key] = variant
+    else
+        if not variant.powerBar then variant.powerBar = DeepCopy(profile.powerBar) end
+        if not variant.secondaryPower then variant.secondaryPower = DeepCopy(profile.secondaryPower) end
     end
     if not completedVariants[variant] then
         completedVariants[variant] = true
@@ -133,7 +128,7 @@ function Power.ListCopySources()
     if currentKey then
         items[#items + 1] = { value = 'profile', text = 'Full Profile' }
     end
-    for key in pairs(profile.powerVariants or {}) do
+    for key in pairs(profile.powerVariants) do
         if key ~= currentKey then
             items[#items + 1] = { value = key, text = VariantLabel(key) }
         end
@@ -148,10 +143,10 @@ end
 
 function Power.CopyFrom(sourceKey)
     local profile = BUI.GetDB()
-    local source = sourceKey == 'profile' and profile or (profile.powerVariants and profile.powerVariants[sourceKey])
+    local source = sourceKey == 'profile' and profile or profile.powerVariants[sourceKey]
     if not source or not (source.powerBar and source.secondaryPower) then return false end
-    local powerBarCopy = BUI.Tools.DeepCopy(source.powerBar)
-    local secondaryCopy = BUI.Tools.DeepCopy(source.secondaryPower)
+    local powerBarCopy = DeepCopy(source.powerBar)
+    local secondaryCopy = DeepCopy(source.secondaryPower)
     local currentKey = CurrentVariantKey()
     if currentKey then
         if currentKey == sourceKey then return false end
