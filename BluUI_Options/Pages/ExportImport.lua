@@ -1,7 +1,6 @@
 local BUI = BluUI
 local BUILib = BUI.BUILibClient
-local Controls, Layout, Modals, Toast = BUILib.Controls, BUILib.Layout, BUILib.Modals, BUILib.Toast
-local GetLibMedia = LibStub('BUILib').GetLibMedia
+local Controls, Layout, Modals, Toast, Widget = BUILib.Controls, BUILib.Layout, BUILib.Modals, BUILib.Toast, BUILib.Widget
 
 local PAGE_WIDTH = 960
 local DEFAULT_NAME = 'Default'
@@ -36,19 +35,11 @@ local RAIL_GROUPS = {
     } },
 }
 local PANE_IDS = { 'profiles', 'transfer', 'addons', 'specs' }
-local PANE_INDEX = {}
-for index, id in ipairs(PANE_IDS) do PANE_INDEX[id] = index end
 
-local function Window()
-    return BUI.PageEngine.window
-end
+local Window, RebuildPage = BUI.OptionsKit.Window, BUI.OptionsKit.RebuildPage
 
 local function AceDB()
     return BUI.GetAceDB()
-end
-
-local function Trim(text)
-    return (text:gsub('^%s+', ''):gsub('%s+$', ''))
 end
 
 local function ToastOptions()
@@ -61,10 +52,6 @@ end
 
 local function Warn(title, message)
     Toast.Error(title, message, ToastOptions())
-end
-
-local function ReclaimScratch()
-    collectgarbage('collect')
 end
 
 local function Plural(count, noun)
@@ -156,10 +143,6 @@ local function Exists(name)
     return false
 end
 
-local function RebuildPage()
-    BUILib.Defer(function() BUI.PageEngine.RefreshCurrentPage() end)
-end
-
 local function RebuildAllPages()
     BUILib.Defer(function() BUI.PageEngine.RebuildAllPages() end)
 end
@@ -176,7 +159,7 @@ local function RequestSwitch(name)
             title = 'Spec Profiles Are On',
             message = 'This character picks its profile from your specialization.\n\nSwitching to "' .. name ..
                 '" works now, but the next spec change will override it.',
-            confirmText = 'Switch Anyway', cancelText = 'Cancel',
+            confirmText = 'Switch Anyway',
             onConfirm = function() SwitchTo(name) end,
         })
         return
@@ -237,9 +220,8 @@ local function PromptName(config)
         message = config.message,
         defaultText = config.defaultText,
         confirmText = config.confirmText,
-        cancelText = 'Cancel',
         onConfirm = function(text)
-            local name = Trim(text)
+            local name = strtrim(text)
             if name == '' or name == config.unchanged then return end
             if Exists(name) then
                 Warn('Name already taken', 'A profile called "' .. name .. '" already exists.')
@@ -335,7 +317,7 @@ local function OpenProfileMenu(name, anchorFrame)
             Modals.Confirm({
                 title = 'Reset Profile',
                 message = 'Put every setting in "' .. name .. '" back to BluUI defaults?\n\nThis cannot be undone.',
-                confirmText = 'Reset', cancelText = 'Cancel',
+                confirmText = 'Reset',
                 onConfirm = function()
                     AceDB():ResetProfile()
                     Notify('Reset "' .. name .. '"', 'Back to BluUI defaults')
@@ -354,7 +336,7 @@ local function OpenProfileMenu(name, anchorFrame)
                             title = 'Copy Settings',
                             message = 'Replace everything in "' .. name .. '" with the settings from "' .. other ..
                                 '"?\n\n"' .. other .. '" itself is left alone.',
-                            confirmText = 'Copy', cancelText = 'Cancel',
+                            confirmText = 'Copy',
                             onConfirm = function()
                                 AceDB():CopyProfile(other, true)
                                 Notify('Copied "' .. other .. '"', 'Into "' .. name .. '"')
@@ -371,7 +353,7 @@ local function OpenProfileMenu(name, anchorFrame)
             title = 'Use Everywhere',
             message = 'Put all of your characters on "' .. name ..
                 '", including ones you create later?\n\nTo undo this, set each character back by hand.',
-            confirmText = 'Apply', cancelText = 'Cancel',
+            confirmText = 'Apply',
             onConfirm = function() UseEverywhere(name) end,
         })
     end })
@@ -379,11 +361,11 @@ local function OpenProfileMenu(name, anchorFrame)
     Add({ separator = true })
 
     local blocked = isActive and 'in use' or (isDefault and 'locked' or nil)
-    Add({ text = '|cffff6060Delete...|r', disabled = blocked ~= nil, sub = blocked, callback = function()
+    Add({ text = 'Delete...', color = { BUI.ThemeColor('danger') }, disabled = blocked ~= nil, sub = blocked, callback = function()
         Modals.Confirm({
             title = 'Delete Profile',
             message = 'Delete "' .. name .. '" and every setting stored in it?\n\nThis cannot be undone.',
-            confirmText = 'Delete', cancelText = 'Cancel',
+            confirmText = 'Delete',
             onConfirm = function() DeleteProfile(name) end,
         })
     end })
@@ -436,7 +418,7 @@ local function SpecSection(ui, shell, parent, width)
         icon:SetSize(AVATAR_SIZE, AVATAR_SIZE)
         icon:SetPoint('LEFT', ui.AVATAR_X, 0)
         icon:SetTexture(spec.icon)
-        icon:SetMask(GetLibMedia('circle_mask'))
+        icon:SetMask(BUILib.GetLibMedia('circle_mask'))
         ui.RowTitle(specRow, spec.name, 'Loaded whenever you play ' .. spec.name, ui.NAME_X, NAME_WIDTH)
         local dropdown = ui.Dropdown(specRow, DROPDOWN_WIDTH, function()
             local paired = SpecProfiles.GetProfileForSpec(spec.id) or AceDB():GetCurrentProfile()
@@ -496,7 +478,7 @@ local function ScrollBox(ui, shell, parent, hintText)
 end
 
 local function SummarizeBox(text)
-    if Trim(text) == '' then return 'Nothing here yet', 'faint' end
+    if strtrim(text) == '' then return 'Nothing here yet', 'faint' end
     local data = BUI.ExportImport.DecodeImportString(text)
     if not data then return 'Not a BluUI profile string', 'faint' end
     local sections = 0
@@ -508,7 +490,6 @@ end
 
 local function TransferSection(ui, shell, parent, width)
     local window = shell.window
-    local Widget = BUILib.Widget
     local block = CreateFrame('Frame', nil, parent)
     block:SetWidth(width)
     local title = ui.Text(block, 'Export and import', 13, 'text')
@@ -546,7 +527,7 @@ local function TransferSection(ui, shell, parent, width)
             Modals.Confirm({
                 title = 'Profile Exists',
                 message = 'You already have a profile called "' .. result .. '".\n\nOverwrite it with the pasted one?',
-                confirmText = 'Overwrite', cancelText = 'Cancel',
+                confirmText = 'Overwrite',
                 onConfirm = function() DoImport(importString, true) end,
             })
         elseif outcome == 'chooser' then
@@ -568,16 +549,14 @@ local function TransferSection(ui, shell, parent, width)
             edit:SetText(text)
             edit:SetCursorPosition(0)
             SetReadout('Readable listing, paste the string again to import it', 'faint')
-            ReclaimScratch()
         end },
         { text = 'Import', style = 'control', onClick = function()
             local importString = edit:GetText()
-            if Trim(importString) == '' then
+            if strtrim(importString) == '' then
                 Warn('Nothing to import', 'Paste a profile string into the box first.')
                 return
             end
             DoImport(importString, false)
-            ReclaimScratch()
         end },
         { text = 'Export', style = 'primary', icon = 'copy', onClick = function()
             local exportString, profileName = BUI.ExportImport.ExportSettings()
@@ -590,7 +569,6 @@ local function TransferSection(ui, shell, parent, width)
             edit:SetFocus()
             edit:HighlightText()
             SetReadout(('Exported "%s", %.1f KB, press Ctrl+C to copy it'):format(profileName, #exportString / 1024), 'text')
-            ReclaimScratch()
             Notify('Exported "' .. profileName .. '"', 'Press Ctrl+C to copy it')
         end },
     }
@@ -644,7 +622,7 @@ local function OtherAddonsSection(ui, parent, width)
             Modals.Confirm({
                 title = 'Copy AzortharionUI Profiles',
                 message = 'Replace ALL BluUI profiles with your current AzortharionUI profiles?\n\nThe UI will reload.',
-                confirmText = 'Copy & Reload', cancelText = 'Cancel',
+                confirmText = 'Copy & Reload',
                 onConfirm = BUI.ImportAzorProfiles,
             })
         end)
@@ -683,25 +661,15 @@ BUI.PageEngine.RegisterPage('exportimport', {
     icon = 'profile',
     OnBuild = function(pageFrame)
         local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
-        local adapter = { tabContents = {}, currentTab = 1 }
-        for index in ipairs(PANE_IDS) do adapter.tabContents[index] = {} end
-        local rail
-        rail = Layout.RailPage(page:GetTab(1), { window = Window() }, {
+        local rail = Layout.RailPage(page:GetTab(1), { window = Window() }, {
             icon = 'profile',
             title = 'Profiles',
             placeholder = 'Search profiles...',
+            tabs = PANE_IDS,
             rail = { groups = RAIL_GROUPS },
             build = Panes,
         })
-        local Select = rail.Select
-        function rail:Select(id)
-            Select(self, id)
-            adapter.currentTab = PANE_INDEX[id]
-        end
-        function adapter:SetTab(index)
-            rail:Select(PANE_IDS[index])
-        end
-        pageFrame._page = adapter
+        pageFrame._page = rail.adapter
         page:AutoRefresh()
     end,
 })
