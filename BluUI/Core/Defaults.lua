@@ -2009,7 +2009,24 @@ BUI.NilDefaultKeys = {
 	powerFormat       = true,
 	statusFormat      = true,
 	specs             = true,
+	textPosX          = true,
+	textPosY          = true,
+	textCenterHorizontally = true,
+	textAnchorFrame   = true,
+	textAnchorPoint   = true,
+	textAnchorOffsetX = true,
+	textAnchorOffsetY = true,
+	textMatchAnchorWidth  = true,
+	textMatchAnchorHeight = true,
+	stackFlushEdge    = true,
+	noGap             = true,
+	scaleOffsets      = true,
+	stack             = true,
+	stackLab          = true,
 }
+for _, prefix in ipairs({ 'combo', 'vengeanceFrags', 'holy', 'arcane', 'shard', 'essence', 'chi', 'mwStacks', 'icicles', 'casterMana' }) do
+	for _, channel in ipairs({ 'R', 'G', 'B' }) do BUI.NilDefaultKeys[prefix .. 'TextColor' .. channel] = true end
+end
 
 BUI.DeprecatedKeys = {
 	['socialFavoritesOnly']     = true,
