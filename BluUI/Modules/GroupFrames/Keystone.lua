@@ -42,15 +42,14 @@ end
 
 local function ReadRunState()
 	if C_ChallengeMode.IsChallengeModeActive() then return true end
-	local level = C_ChallengeMode.GetActiveKeystoneInfo()
-	return type(level) == "number" and level > 0
+	return C_ChallengeMode.GetActiveKeystoneInfo() > 0
 end
 
 function Keystone.Update(child)
-	local text = child and child.KeystoneText
+	local text = child.KeystoneText
 	if not text then return end
 	local settings = GroupFrames.SettingsForFrame(child)
-	if not settings.showKeystone or not settings.keystone or runActive then
+	if not settings.showKeystone or runActive then
 		text:Hide()
 		return
 	end
@@ -99,16 +98,15 @@ function Keystone.Sync()
 end
 
 local function StyleKeystoneText(text, health, config, settings)
-	config.outline = ""
-	GroupFrames.ApplyTextSettings(text, health, config, GroupFrames.ResolveFont(settings.font))
+	GroupFrames.ApplyTextSettings(text, health, config, BUI.GetFontByName(settings.font))
 	local color = config.color
 	text:SetTextColor(color[1], color[2], color[3], color[4] or 1)
 end
 
-function GroupFrames.BuildKeystone(frame, unit)
+function GroupFrames.BuildKeystone(frame)
 	local settings = GroupFrames.SettingsForFrame(frame)
 	local config = settings.keystone
-	if not config or not frame.Health then return end
+	if not config then return end
 
 	local holder = CreateFrame("Frame", nil, frame.Health)
 	holder:SetAllPoints()
@@ -123,12 +121,7 @@ end
 function GroupFrames.ApplyKeystoneToChild(child, settings)
 	local text = child.KeystoneText
 	if not text then return end
-	local config = settings.keystone
-	if not config then
-		text:Hide()
-		return
-	end
-	StyleKeystoneText(text, child.Health, config, settings)
+	StyleKeystoneText(text, child.Health, settings.keystone, settings)
 	Keystone.Update(child)
 end
 
@@ -141,10 +134,7 @@ end
 BUI.Events:Register("CHALLENGE_MODE_START", "GroupFramesKeystone", function() SetRunState(true) end)
 BUI.Events:Register("CHALLENGE_MODE_RESET", "GroupFramesKeystone", function() SetRunState(ReadRunState()) end)
 
-BUI.Events:Register("CHALLENGE_MODE_COMPLETED", "GroupFramesKeystone", function()
-	SetRunState(false)
-	QueueRefresh()
-end)
+BUI.Events:Register("CHALLENGE_MODE_COMPLETED", "GroupFramesKeystone", function() SetRunState(false) end)
 
 BUI.Events:Register("ZONE_CHANGED_NEW_AREA", "GroupFramesKeystone", function()
 	SetRunState(ReadRunState())

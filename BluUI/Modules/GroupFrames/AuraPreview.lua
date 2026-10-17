@@ -3,6 +3,7 @@ local _, BUI = ...
 local Hook = BUI.Profiler.Hooker('GroupFrames.AuraPreview')
 
 local GroupFrames = BUI.GroupFrames
+local Util = GroupFrames.Util
 local Pixel = BUI.Pixel
 
 local FALLBACK_ICON = 'Interface\\Icons\\INV_Misc_QuestionMark'
@@ -22,24 +23,10 @@ local SAMPLE_DISPEL = {
 	debuffs      = { 'Magic', 'Curse', 'Poison' },
 	crowdControl = { 'Magic', 'Magic' },
 }
-local CONTAINER_KINDS = { buffs = true, debuffs = true, bigDef = true, crowdControl = true }
 
 local active = {}
 
 local function Key(sectionKey, kind) return sectionKey .. ':' .. kind end
-
-local function SpellIcon(spellID)
-	local texture = spellID and C_Spell.GetSpellTexture(spellID)
-	return texture or FALLBACK_ICON
-end
-
-local function Growth(anchorPoint, growDirection)
-	local horizontal = anchorPoint:find('RIGHT') and 'LEFT' or 'RIGHT'
-	local vertical = anchorPoint:find('BOTTOM') and 'UP' or 'DOWN'
-	if growDirection == 'LEFT' or growDirection == 'RIGHT' then horizontal = growDirection
-	elseif growDirection == 'UP' or growDirection == 'DOWN' then vertical = growDirection end
-	return horizontal, vertical
-end
 
 local function EachSectionChild(sectionKey, callback)
 	if sectionKey == 'party' then GroupFrames.EachPartyChild(callback) else GroupFrames.EachRaidChild(callback) end
@@ -61,29 +48,27 @@ local function SampleIcon(holder, index)
 	return icon
 end
 
-local function Holder(child, kind, parent, level)
+local function Holder(child, kind)
 	child._buiAuraSamples = child._buiAuraSamples or {}
 	local holder = child._buiAuraSamples[kind]
 	if not holder then
-		holder = CreateFrame('Frame', nil, parent)
+		holder = CreateFrame('Frame', nil, child)
 		holder.icons = {}
 		holder:EnableMouse(false)
+		holder:SetFrameLevel(child:GetFrameLevel() + GroupFrames.Layers.auras + 1)
 		child._buiAuraSamples[kind] = holder
 	end
-	holder:SetParent(parent)
-	holder:SetFrameStrata(parent:GetFrameStrata())
-	holder:SetFrameLevel(child:GetFrameLevel() + level)
 	return holder
 end
 
-local function LayoutHolder(holder, kind, parent, layout)
+local function LayoutHolder(holder, kind, child, layout)
 	local size = Pixel.Scale(layout.size)
-	local gap = Pixel.Scale(layout.spacing or 0)
-	local rowGap = Pixel.Scale(layout.rowSpacing or layout.spacing or 0)
-	local perRow = math.max(1, layout.perRow or 1)
+	local gap = Pixel.Scale(layout.spacing)
+	local rowGap = Pixel.Scale(layout.rowSpacing)
+	local perRow = math.max(1, layout.perRow)
 	local spells = SAMPLE_SPELLS[kind]
 	local count = math.max(1, layout.max)
-	local growX, growY = Growth(layout.anchorPoint, layout.growDirection)
+	local growX, growY = Util.ResolveGrowth(layout.anchorPoint, layout.growDirection)
 	local corner = (growY == 'UP' and 'BOTTOM' or 'TOP') .. (growX == 'RIGHT' and 'LEFT' or 'RIGHT')
 	local directionX = growX == 'RIGHT' and 1 or -1
 	local directionY = growY == 'UP' and 1 or -1
@@ -94,7 +79,7 @@ local function LayoutHolder(holder, kind, parent, layout)
 
 	holder:SetSize(columns * size + (columns - 1) * gap, rows * size + (rows - 1) * rowGap)
 	holder:ClearAllPoints()
-	holder:SetPoint(layout.anchorPoint, parent, layout.relativePoint or layout.anchorPoint, Pixel.Scale(layout.offsetX or 0), Pixel.Scale(layout.offsetY or 0))
+	holder:SetPoint(layout.anchorPoint, child, layout.relativePoint, Pixel.Scale(layout.offsetX), Pixel.Scale(layout.offsetY))
 
 	for index = 1, count do
 		local icon = SampleIcon(holder, index)
@@ -104,7 +89,7 @@ local function LayoutHolder(holder, kind, parent, layout)
 		icon:ClearAllPoints()
 		icon:SetPoint(corner, holder, corner, column * (size + gap) * directionX, row * (size + rowGap) * directionY)
 		local sample = (index - 1) % #spells + 1
-		icon.texture:SetTexture(SpellIcon(spells[sample]))
+		icon.texture:SetTexture(C_Spell.GetSpellTexture(spells[sample]) or FALLBACK_ICON)
 		local dispelType = dispel and dispel[sample]
 		if dispelType then
 			local red, green, blue = BUI.AuraEngine.DispelColorRGB(dispelType)
@@ -114,7 +99,7 @@ local function LayoutHolder(holder, kind, parent, layout)
 		end
 		local stack = stacks and stacks[sample]
 		if stack then
-			Pixel.ApplyFont(icon.count, layout.stackSize or 10, STANDARD_TEXT_FONT, 'OUTLINE')
+			Pixel.ApplyFont(icon.count, layout.stackSize, STANDARD_TEXT_FONT, 'OUTLINE')
 			icon.count:SetText(stack)
 			icon.count:Show()
 		else
@@ -126,29 +111,19 @@ local function LayoutHolder(holder, kind, parent, layout)
 	holder:Show()
 end
 
-local function ApplyContainerSample(child, kind, settings)
-	local config = settings[kind]
-	if not config then return end
-	local holder = Holder(child, kind, child, GroupFrames.Layers.auras + 1)
-	LayoutHolder(holder, kind, child, config)
+local function ApplySample(child, kind, settings)
+	LayoutHolder(Holder(child, kind), kind, child, settings[kind])
 end
 
-local function ClearSample(child, kind, settings)
+local function ClearSample(child, kind)
 	local holder = child._buiAuraSamples and child._buiAuraSamples[kind]
 	if holder then holder:Hide() end
 end
 
-local function ApplySample(child, kind, settings)
-	if CONTAINER_KINDS[kind] then
-		ApplyContainerSample(child, kind, settings)
-	end
-end
-
 local function ApplyKind(sectionKey, kind, enabled)
 	local settings = GroupFrames.GetDB()[sectionKey]
-	if not settings then return end
 	EachSectionChild(sectionKey, function(child)
-		if enabled then ApplySample(child, kind, settings) else ClearSample(child, kind, settings) end
+		if enabled then ApplySample(child, kind, settings) else ClearSample(child, kind) end
 	end)
 end
 

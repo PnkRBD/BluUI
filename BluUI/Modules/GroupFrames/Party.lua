@@ -9,14 +9,13 @@ local Scale              = BUI.Pixel.Scale
 local SetHeaderAttribute = GroupFrames.SetHeaderAttribute
 
 local function ResolveAnchorTarget(partySettings)
-	if partySettings.anchorFrame == "" then return nil end
-	return Anchor.ResolveFrame(partySettings.anchorFrame)
+	return BUI.ResolveAnchorFrame(partySettings.anchorFrame, partySettings.anchorPoint)
 end
 
 local function AnchorWidth(partySettings, target)
 	if not partySettings.matchAnchorWidth or not target then return nil end
 	local width = target._row1W or target:GetWidth()
-	if not width or width <= 0 then return nil end
+	if width <= 0 then return nil end
 	return width
 end
 
@@ -29,14 +28,10 @@ local function PositionHeader(header, partySettings)
 		header:SetPoint(partySettings.point, UIParent, partySettings.relPoint, Scale(partySettings.x), Scale(partySettings.y))
 		return nil
 	end
-	return Anchor.ApplyPosition(header, {
-		anchorFrame   = partySettings.anchorFrame,
-		anchorPoint   = LEFT_PIN_VARIANT[partySettings.anchorPoint] or partySettings.anchorPoint,
-		anchorOffsetX = partySettings.anchorOffsetX,
-		anchorOffsetY = partySettings.anchorOffsetY,
-		posX          = partySettings.x,
-		posY          = partySettings.y,
-	})
+	Anchor.ApplyPosition(header, target, partySettings.anchorFrame,
+		LEFT_PIN_VARIANT[partySettings.anchorPoint] or partySettings.anchorPoint,
+		partySettings.anchorOffsetX, partySettings.anchorOffsetY)
+	return target
 end
 
 local lastSyncedWidth
@@ -112,12 +107,11 @@ end
 function GroupFrames.SpawnParty()
 	if GroupFrames.headers.party then return end
 	local partySettings = GroupFrames.GetDB().party
-	local hidesBlizzard = (partySettings.enabled and GroupFrames.GetDB().hideBlizzardFrames ~= false) == true
 
 	local gap = Scale(partySettings.spacing)
 	local header = GroupFrames.SpawnHeader(
 		GroupFrames.FRAME_PREFIX .. "Party",
-		"showParty",   hidesBlizzard,
+		"showParty",   true,
 		"showPlayer",  partySettings.showPlayer == true,
 		"showSolo",    (partySettings.showSolo and partySettings.showPlayer) == true,
 		"yOffset",     partySettings.vertical and -gap or 0,
@@ -130,7 +124,6 @@ function GroupFrames.SpawnParty()
 		"unitsPerColumn", 5,
 		"oUF-initialConfigFunction", GroupFrames.ConfigSnippet(partySettings.width, partySettings.height)
 	)
-	if not hidesBlizzard then header:SetAttribute("showParty", true) end
 	GroupFrames.SetHeaderVisibility(header, VisibilityFor(partySettings))
 	GroupFrames.headers.party = header
 	GroupFrames.RefreshPartyAnchor()

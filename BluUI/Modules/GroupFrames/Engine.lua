@@ -5,6 +5,7 @@ local GroupFrames = BUI.GroupFrames
 local CreateFrame         = CreateFrame
 local UIParent            = UIParent
 local RegisterStateDriver = RegisterStateDriver
+local IsSecret            = GroupFrames.Util.IsSecret
 
 function GroupFrames.ConfigSnippet(width, height)
 	return ([[
@@ -156,8 +157,8 @@ function GroupFrames.ApplyChildAll(child, settings, geometry)
 	GroupFrames.RefreshSelection(child)
 	GroupFrames.ApplyAggroToChild(child, settings)
 	if child.unit then
-		if child.Health and child:IsElementEnabled("Health") then child.Health:ForceUpdate() end
-		if child.Power and child:IsElementEnabled("Power") then child.Power:ForceUpdate() end
+		if child:IsElementEnabled("Health") then child.Health:ForceUpdate() end
+		if child:IsElementEnabled("Power") then child.Power:ForceUpdate() end
 	end
 	GroupFrames.RepaintPreviewChild(child)
 end
@@ -166,13 +167,11 @@ function GroupFrames.RecolorChild(child, settings)
 	GroupFrames.ApplyFrameColors(child, settings, child.unit)
 	GroupFrames.ApplyAbsorbToChild(child, settings)
 	GroupFrames.RestyleDispelHighlight(child)
-	if child.unit and child.Health and child.Health.PostUpdateColor then
-		child.Health.PostUpdateColor(child.Health, child.unit)
-	end
+	if child.unit then child.Health.PostUpdateColor(child.Health, child.unit) end
 	GroupFrames.ApplyTextColors(child, settings)
-	if child.HpText then GroupFrames.ReTagHp(child, settings) end
+	GroupFrames.ReTagHp(child, settings)
 	if child.unit then child:UpdateTags() end
-	GroupFrames.RefreshDispelBorder(child, settings)
+	GroupFrames.RefreshDispelBorder(child)
 	GroupFrames.RefreshSelection(child)
 	GroupFrames.ApplyAggroToChild(child, settings)
 	GroupFrames.RepaintPreviewChild(child)
@@ -182,6 +181,41 @@ function GroupFrames.RefreshAll(section)
 	if section ~= "raid"  then GroupFrames.RefreshParty() end
 	if section ~= "party" then GroupFrames.RefreshRaid()  end
 	GroupFrames.RefreshAuras(section)
+end
+
+local sweepInCombat = false
+
+local function SweepChild(child)
+	if not child._preview and not child:GetAttribute("unit") then
+		child._bluRosterUnit, child._bluRosterGUID = nil, nil
+		return
+	end
+	local unit = child.unit
+	local guid = unit and UnitGUID(unit) or false
+	if guid and IsSecret(guid) then guid = child._bluRosterGUID end
+	local role = unit and UnitGroupRolesAssigned(unit) or ""
+	if IsSecret(role) then role = "" end
+	local changed = child._bluRosterUnit ~= unit or child._bluRosterGUID ~= guid or child._bluRosterRole ~= role
+	child._bluRosterUnit, child._bluRosterGUID, child._bluRosterRole = unit, guid, role
+
+	GroupFrames.QueueChildAuraSetup(child)
+	local settings = GroupFrames.SettingsForFrame(child)
+	if changed then
+		if sweepInCombat then
+			child._bluRosterGeom = false
+		else
+			GroupFrames.ApplyGeometry(child, settings)
+			child._bluRosterGeom = true
+		end
+		if unit and child:IsElementEnabled("Power") then child.Power:ForceUpdate() end
+		GroupFrames.ApplyTextColors(child, settings)
+		GroupFrames.MarkAurasDirty(child)
+	elseif not child._bluRosterGeom and not sweepInCombat then
+		GroupFrames.ApplyGeometry(child, settings)
+		child._bluRosterGeom = true
+	end
+	GroupFrames.ReflowAuraVisibility(child)
+	GroupFrames.RepaintPreviewChild(child)
 end
 
 local function RosterSweep()
@@ -194,44 +228,9 @@ local function RosterSweep()
 	GroupFrames.UpdateInstanceClamp()
 	GroupFrames.PrecreateParty()
 	GroupFrames.PrecreateRaid()
-	if not InCombatLockdown() then GroupFrames.SyncPreviewChildren() end
-	local inCombat = InCombatLockdown()
-	local IsSecret = GroupFrames.Util.IsSecret
-	GroupFrames.EachChild(function(child)
-		if not child._preview and not child:GetAttribute("unit") then
-			child._bluRosterUnit, child._bluRosterGUID = nil, nil
-			return
-		end
-		local unit = child.unit
-		local guid = unit and UnitGUID(unit) or false
-		if guid and IsSecret(guid) then guid = child._bluRosterGUID end
-		local role = unit and UnitGroupRolesAssigned(unit) or ""
-		if IsSecret(role) then role = "" end
-		local changed = child._bluRosterUnit ~= unit or child._bluRosterGUID ~= guid or child._bluRosterRole ~= role
-		child._bluRosterUnit, child._bluRosterGUID, child._bluRosterRole = unit, guid, role
-
-		GroupFrames.QueueChildAuraSetup(child)
-		local settings = GroupFrames.SettingsForFrame(child)
-		if changed then
-			if inCombat then
-				child._bluRosterGeom = false
-			else
-				GroupFrames.ApplyGeometry(child, settings)
-				child._bluRosterGeom = true
-			end
-			if unit and child.Power and child.Power.ForceUpdate
-				and child:IsElementEnabled("Power") then
-				child.Power:ForceUpdate()
-			end
-			GroupFrames.ApplyTextColors(child, settings)
-			GroupFrames.MarkAurasDirty(child)
-		elseif not child._bluRosterGeom and not inCombat then
-			GroupFrames.ApplyGeometry(child, settings)
-			child._bluRosterGeom = true
-		end
-		GroupFrames.ReflowAuraVisibility(child)
-		GroupFrames.RepaintPreviewChild(child)
-	end)
+	sweepInCombat = InCombatLockdown()
+	if not sweepInCombat then GroupFrames.SyncPreviewChildren() end
+	GroupFrames.EachChild(SweepChild)
 end
 
 local DispatchRosterSweep = BUI.Dispatcher.New(RosterSweep, 'GroupFrames.RosterSweep')

@@ -140,7 +140,7 @@ function StyleSlot(parts, entry, size)
 		local color = entry.color
 		parts.fill:SetVertexColor(color[1], color[2], color[3], 1)
 	end
-	Pixel.ApplyFont(parts.count, math.max(8, size - 1), BUI.GetGlobalFont() or STANDARD_TEXT_FONT, 'OUTLINE')
+	Pixel.ApplyFont(parts.count, math.max(8, size - 1), BUI.GetGlobalFont(), 'OUTLINE')
 end
 
 local function EnsureHolder(frame)
@@ -191,7 +191,7 @@ function HotSlots.Apply(frame, settings)
 
 	local size = Pixel.Scale(config.size)
 	local step = Pixel.Scale(config.size + config.spacing)
-	local direction = GROWTH[config.growth] or GROWTH.LEFT
+	local direction = GROWTH[config.growth]
 	local offsetX, offsetY = Pixel.Scale(config.offsetX), Pixel.Scale(config.offsetY)
 	for index = 1, count do
 		local slot = holder.frames[index]

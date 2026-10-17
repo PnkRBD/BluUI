@@ -34,7 +34,7 @@ function GroupFrames.NarrowPlayerBuffRules()
 	if db.playerBuffRulesNarrowed then return end
 	db.playerBuffRulesNarrowed = true
 	for _, section in ipairs({ db.party, db.raid }) do
-		local rules = section and section.buffs and section.buffs.rules
+		local rules = section.buffs.rules
 		if type(rules) == "table" then
 			local seen = {}
 			for ruleIndex = #rules, 1, -1 do
@@ -69,7 +69,6 @@ local IMPORT_KEYS = {
 
 function GroupFrames.ImportStandaloneProfile()
 	local profile = BUI.GetDB()
-	if not profile or not profile.general then return end
 	if profile.general._groupFramesImported_v1 then return end
 
 	local standaloneDB = _G.BluFramesDB
@@ -97,7 +96,7 @@ function GroupFrames.ImportStandaloneProfile()
 	if standaloneDB.global and standaloneDB.global.hideBlizzardFrames ~= nil then
 		groupFramesSettings.hideBlizzardFrames = standaloneDB.global.hideBlizzardFrames
 	end
-	GroupFrames.Print("Imported your standalone Blu Frames settings into Group Frames.")
+	BUI.Print("Imported your standalone Blu Frames settings into Group Frames.")
 end
 
 local initialized = false
@@ -110,7 +109,7 @@ function GroupFrames.Initialize()
 	GroupFrames.NarrowPlayerBuffRules()
 
 	if C_AddOns.IsAddOnLoaded("BluFrames") then
-		GroupFrames.Print("BluFrames detected, Group Frames stays idle. Disable BluFrames and /reload.")
+		BUI.Print("BluFrames detected, Group Frames stays idle. Disable BluFrames and /reload.")
 		return
 	end
 

@@ -1,12 +1,20 @@
 local _, BUI = ...
 
-local function TextDefaults(size, anchor, offsetX, offsetY, format)
-	return {
-		format = format, size = size, outline = "OUTLINE",
-		anchor = anchor, offsetX = offsetX, offsetY = offsetY,
-		color = { 1, 1, 1, 1 },
-		classColor = false,
-	}
+local function TextLayout(size, anchor, offsetX, offsetY)
+	return { size = size, outline = "OUTLINE", anchor = anchor, offsetX = offsetX, offsetY = offsetY }
+end
+
+local function ColoredText(size, anchor, offsetX, offsetY)
+	local text = TextLayout(size, anchor, offsetX, offsetY)
+	text.color = { 1, 1, 1, 1 }
+	return text
+end
+
+local function ValueText(size, anchor, offsetX, offsetY, format)
+	local text = ColoredText(size, anchor, offsetX, offsetY)
+	text.format = format
+	text.classColor = false
+	return text
 end
 
 local function IconDefaults(size, anchor, offsetX, offsetY, enabled)
@@ -25,6 +33,7 @@ local function AuraContainer(options)
 		stackSize     = 10,
 		showCooldownDecimals     = false,
 		cooldownDecimalThreshold = 5,
+		sortMethod    = "default",
 		growDirection = options.growDirection,
 		anchorPoint   = options.anchorPoint,
 		relativePoint = options.relativePoint or options.anchorPoint,
@@ -34,9 +43,6 @@ local function AuraContainer(options)
 end
 
 local function CommonSettings(sizes)
-	local statusText = TextDefaults(sizes.statusSize, "CENTER", 0, 0)
-	statusText.format = nil
-
 	return {
 		useClassColor        = true,
 		classColorNames      = true,
@@ -63,10 +69,10 @@ local function CommonSettings(sizes)
 		font        = BUI.C.GLOBAL_OPTION,
 		absorbColor = { 0.5, 0.5, 1, 1 },
 
-		name       = TextDefaults(sizes.nameSize, sizes.nameAnchor or "LEFT", sizes.nameOX or 4, 0),
-		hpText     = TextDefaults(sizes.hpSize,   "RIGHT", -3, 0, "[blu:hppct]"),
-		pwrText    = TextDefaults(sizes.pwrSize,  "RIGHT", -3, 0, "[blu:pwr]"),
-		statusText = statusText,
+		name       = ColoredText(sizes.nameSize, sizes.nameAnchor or "LEFT", sizes.nameOX or 4, 0),
+		hpText     = ValueText(sizes.hpSize,  "RIGHT", -3, 0, "[blu:hppct]"),
+		pwrText    = ValueText(sizes.pwrSize, "RIGHT", -3, 0, "[blu:pwr]"),
+		statusText = TextLayout(sizes.statusSize, "CENTER", 0, 0),
 
 		showStatusText   = true,
 		showAuraTooltips = sizes.showAuraTooltips or false,
@@ -112,7 +118,7 @@ local function CommonSettings(sizes)
 	}
 end
 
-local KEYSTONE_TEXT = TextDefaults(10, "TOPRIGHT", -3, -1)
+local KEYSTONE_TEXT = ColoredText(10, "TOPRIGHT", -3, -1)
 KEYSTONE_TEXT.outline = ""
 
 local PARTY = CommonSettings({

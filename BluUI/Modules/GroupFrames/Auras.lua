@@ -57,16 +57,6 @@ function GroupFrames.FeedsExclusions(kind)
 	return EXCLUDE_SOURCES[kind] == true
 end
 
-local function isBlacklistedDebuff(spellID)
-	if not spellID or not CanAccess(spellID) then return false end
-	return BUI.AuraBlacklist.IsGroupBlacklisted(spellID, "HARMFUL")
-end
-GroupFrames.IsBlacklistedDebuff = isBlacklistedDebuff
-
-function GroupFrames.BuildDispelCurve(zeroColor)
-	return Engine.BuildDispelCurve(zeroColor)
-end
-
 local BLACK_COLOR = { 0, 0, 0, 1 }
 
 local kindCandidates = {}
@@ -134,7 +124,7 @@ local function KindStyle(settings, kind)
 		max     = config.max,
 		growX   = growX,
 		growY   = growY,
-		sortMethod     = Engine.ResolveSortMethod(config.sortMethod or 'default'),
+		sortMethod     = Engine.ResolveSortMethod(config.sortMethod),
 		baseColor      = BLACK_COLOR,
 		showDispelType = KIND_POLARITY[kind] == "HARMFUL",
 		showStack      = true,
@@ -144,7 +134,7 @@ local function KindStyle(settings, kind)
 		cdSize         = 11,
 		decimals       = config.showCooldownDecimals and config.cooldownDecimalThreshold or 0,
 		reverseSwipe   = true,
-		showTooltips   = settings.showAuraTooltips and true or false,
+		showTooltips   = settings.showAuraTooltips,
 		font           = STANDARD_TEXT_FONT,
 		fontFlags      = "OUTLINE",
 	}
@@ -155,8 +145,7 @@ local function BindAllKinds(frame, unit)
 		local container = frame[key]
 		if container then Engine.BindUnit(container, unit) end
 	end
-	local highlight = frame[GroupFrames.DISPEL_HL_KEY]
-	if highlight then Engine.BindUnit(highlight, unit) end
+	Engine.BindUnit(frame[GroupFrames.DISPEL_HL_KEY], unit)
 	GroupFrames.HotSlots.Bind(frame, unit)
 end
 
@@ -188,27 +177,6 @@ local function ApplyKind(frame, settings, kind)
 	Engine.BindUnit(container, frame.unit)
 end
 
-local dirtyFrames = {}
-local AURA_FLUSH_BUDGET_MS = 2
-local debugprofilestop = debugprofilestop
-
-local updateDriver = CreateFrame("Frame", "BUI_GroupAuraFlush")
-updateDriver:Hide()
-updateDriver:SetScript("OnUpdate", Wrap("GroupFrames.Auras flush", function(self)
-	local startTime = debugprofilestop()
-	for frame in pairs(dirtyFrames) do
-		dirtyFrames[frame] = nil
-		if frame.unit then GroupFrames.RefreshFrameAuras(frame) end
-		if debugprofilestop() - startTime > AURA_FLUSH_BUDGET_MS then return end
-	end
-	if next(dirtyFrames) == nil then self:Hide() end
-end))
-
-function GroupFrames.MarkAurasDirty(frame)
-	dirtyFrames[frame] = true
-	updateDriver:Show()
-end
-
 function GroupFrames.SyncLifeState(frame, dead, offline)
 	local ghost = false
 	if dead and frame.unit then
@@ -218,51 +186,28 @@ function GroupFrames.SyncLifeState(frame, dead, offline)
 	if frame._bluWasDead == dead and frame._bluWasOffline == offline and frame._bluWasGhost == ghost then return end
 	frame._bluWasDead, frame._bluWasOffline, frame._bluWasGhost = dead, offline, ghost
 	local status = frame.StatusText
-	if status and status.UpdateTag then status:UpdateTag() end
+	if status.UpdateTag then status:UpdateTag() end
 end
 
-function GroupFrames.RefreshFrameAuras(frame)
-	local unit = frame.unit
-	if not unit then return end
-	GroupFrames.UpdateDispelBorder(frame, unit)
-	GroupFrames.SyncLifeState(frame, UnitIsDeadOrGhost(unit) and true or false, not UnitIsConnected(unit))
-end
+local dirtyFrames = {}
 
-local function ResetFrameAuras(frame, unit)
-	if frame.DispelBadge then frame.DispelBadge:Hide() end
-	frame._dispelColor = nil
-	BindAllKinds(frame, unit)
-end
+local FlushDirtyFrames = BUI.Dispatcher.New(function()
+	for frame in pairs(dirtyFrames) do
+		dirtyFrames[frame] = nil
+		local unit = frame.unit
+		if unit then GroupFrames.SyncLifeState(frame, UnitIsDeadOrGhost(unit) and true or false, not UnitIsConnected(unit)) end
+	end
+end, "GroupFrames.AuraFlush")
 
-local function RegisterAuraUnitEvents(watcher, unit)
-	if unit and not GroupFrames.DispelViaEngine then watcher:RegisterUnitEvent("UNIT_AURA", unit)
-	else watcher:UnregisterEvent("UNIT_AURA") end
+function GroupFrames.MarkAurasDirty(frame)
+	dirtyFrames[frame] = true
+	FlushDirtyFrames()
 end
 
 function GroupFrames.RewireAuraEvents(frame, unit)
-	if not frame._auraWatcher then return end
-	RegisterAuraUnitEvents(frame._auraWatcher, unit)
+	if not frame._bluAurasBuilt then return end
 	BindAllKinds(frame, unit)
 	GroupFrames.MarkAurasDirty(frame)
-end
-
-local function ListHasEntries(list)
-	if not CanAccess(list) then return true end
-	if list == nil then return false end
-	local first = list[1]
-	if not CanAccess(first) then return true end
-	return first ~= nil
-end
-
-local function AuraUpdateRelevant(frame, info)
-	local unit = frame.unit
-	if not unit then return false end
-	if (UnitIsDeadOrGhost(unit) and true or false) ~= (frame._bluWasDead or false) then return true end
-	if not info then return true end
-	local isFullUpdate = info.isFullUpdate
-	if not CanAccess(isFullUpdate) or isFullUpdate then return true end
-	if not GroupFrames.DispelViaEngine and ListHasEntries(info.addedAuras) then return true end
-	return not GroupFrames.DispelViaEngine and frame._dispelColor ~= nil
 end
 
 local function BuildAuraContainers(frame)
@@ -272,35 +217,25 @@ local function BuildAuraContainers(frame)
 		ApplyKind(frame, settings, KIND_LIST[kindIndex])
 	end
 	GroupFrames.HotSlots.Apply(frame, settings)
-	if GroupFrames.DispelViaEngine then GroupFrames.ConfigureDispelHighlight(frame) end
+	GroupFrames.ConfigureDispelHighlight(frame)
 
-	local watcher = frame._auraWatcher
-	if not watcher then
-		watcher = CreateFrame("Frame", nil, frame)
-		frame._auraWatcher = watcher
-		watcher:SetScript("OnEvent", Wrap("GroupFrames.Auras aura event", function(_, event, _, updateInfo)
-			if event == "UNIT_AURA" then
-				if AuraUpdateRelevant(frame, updateInfo) then GroupFrames.MarkAurasDirty(frame) end
-				return
-			end
-			if event == "PLAYER_ENTERING_WORLD" then ResetFrameAuras(frame, frame.unit) end
-			GroupFrames.MarkAurasDirty(frame)
-		end))
-		watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
-	end
+	frame._bluAurasBuilt = true
 	frame._bluLastUnit = frame.unit or frame:GetAttribute("unit")
-	RegisterAuraUnitEvents(watcher, frame._bluLastUnit)
 
 	BindAllKinds(frame, frame.unit)
 	GroupFrames.MarkAurasDirty(frame)
 end
 
-function GroupFrames.RefreshDispelBorder(frame, settings)
-	if GroupFrames.DispelViaEngine then
-		if frame._auraWatcher then GroupFrames.ConfigureDispelHighlight(frame) end
-		return
-	end
-	if frame.unit then GroupFrames.UpdateDispelBorder(frame, frame.unit) end
+local function RebindOnWorldEntry(child)
+	GroupFrames.RewireAuraEvents(child, child.unit)
+end
+
+BUI.Events:Register("PLAYER_ENTERING_WORLD", "GroupFrames.AuraRebind", function()
+	GroupFrames.EachChild(RebindOnWorldEntry)
+end)
+
+function GroupFrames.RefreshDispelBorder(frame)
+	if frame._bluAurasBuilt then GroupFrames.ConfigureDispelHighlight(frame) end
 end
 
 local function IsReachable(unit)
@@ -309,41 +244,27 @@ local function IsReachable(unit)
 	return (connected and visible and assist) and true or false
 end
 
-local function ReparseShown(frame)
-	for kindIndex = 1, #KIND_LIST do
-		local container = frame[KIND_KEYS[KIND_LIST[kindIndex]]]
-		if container and container:IsShown() then container:UpdateAllAuras() end
-	end
-	local highlight = frame[GroupFrames.DISPEL_HL_KEY]
-	if highlight and highlight:IsShown() then highlight:UpdateAllAuras() end
-end
-
 local function reflowAuraVisibility(frame)
 	local unit = frame.unit
 	if not unit then return end
 	local isVisible = IsReachable(unit)
-	local wasHidden = frame._bluAurasVisible == false
 	if frame._bluAurasVisible == isVisible then return end
 	frame._bluAurasVisible = isVisible
 	local settings = GroupFrames.SettingsForFrame(frame)
 	for kindIndex = 1, #KIND_LIST do
 		local kind = KIND_LIST[kindIndex]
 		local container = frame[KIND_KEYS[kind]]
-		if container then container:SetShown(isVisible and settings[kind].enabled and true or false) end
+		if container then container:SetShown(isVisible and settings[kind].enabled) end
 	end
 	GroupFrames.HotSlots.SetVisible(frame, isVisible)
 	local highlight = frame[GroupFrames.DISPEL_HL_KEY]
 	if highlight and not frame._dispelPreview then
-		highlight:SetShown(isVisible and GroupFrames.DispelHighlightWanted(settings) and true or false)
+		highlight:SetShown(isVisible and GroupFrames.DispelHighlightWanted(settings))
 	end
-	if isVisible and wasHidden then ReparseShown(frame) end
 end
 GroupFrames.ReflowAuraVisibility = reflowAuraVisibility
 
-local REACHABILITY_EVENTS = {}
-for _, event in ipairs({ "UNIT_CONNECTION", "UNIT_PHASE", "UNIT_FACTION", "UNIT_IN_RANGE_UPDATE", "UNIT_DISTANCE_CHECK_UPDATE" }) do
-	if C_EventUtils.IsEventValid(event) then REACHABILITY_EVENTS[#REACHABILITY_EVENTS + 1] = event end
-end
+local REACHABILITY_EVENTS = { "UNIT_CONNECTION", "UNIT_PHASE", "UNIT_FACTION", "UNIT_IN_RANGE_UPDATE", "UNIT_DISTANCE_CHECK_UPDATE" }
 
 local ReflowOnEvent = Wrap("GroupFrames.Auras reachability event", reflowAuraVisibility)
 local ReflowOnShow  = Wrap("GroupFrames.Auras show reflow", reflowAuraVisibility)
@@ -382,13 +303,13 @@ BUI.Events:Register("GROUP_ROSTER_UPDATE", "GroupFrames.ReachabilitySweep", Grou
 BUI.Events:Register("PLAYER_ENTERING_WORLD", "GroupFrames.ReachabilitySweep", GroupFrames.SyncReachabilitySweep)
 
 local function ApplyAurasToChild(child)
-	if not child._auraWatcher then return end
+	if not child._bluAurasBuilt then return end
 	local settings = GroupFrames.SettingsForFrame(child)
 	for kindIndex = 1, #KIND_LIST do
 		ApplyKind(child, settings, KIND_LIST[kindIndex])
 	end
 	GroupFrames.HotSlots.Apply(child, settings)
-	GroupFrames.RefreshDispelBorder(child, settings)
+	GroupFrames.ConfigureDispelHighlight(child)
 
 	child._bluAurasVisible = nil
 	reflowAuraVisibility(child)
@@ -400,13 +321,14 @@ function GroupFrames.RefreshAuras(section)
 end
 
 local function FinishChildAuraSetup(child)
-	if child._auraWatcher or not child:GetAttribute("unit") then return end
+	if child._bluAurasBuilt or not child:GetAttribute("unit") then return end
 	BuildAuraContainers(child)
 	AttachReachabilityHooks(child)
 end
 
 local pendingSetup = {}
 local SETUP_BUDGET_MS = 4
+local debugprofilestop = debugprofilestop
 
 local setupDriver = CreateFrame("Frame")
 setupDriver:Hide()
@@ -425,32 +347,18 @@ setupDriver:SetScript("OnUpdate", Wrap("GroupFrames.Auras staggered setup", func
 end))
 
 function GroupFrames.QueueChildAuraSetup(child)
-	if child._auraWatcher or not child:GetAttribute("unit") then return end
+	if child._bluAurasBuilt or not child:GetAttribute("unit") then return end
 	pendingSetup[child] = true
 	setupDriver:Show()
 end
 
 function GroupFrames.RebindAuraUnit(frame, unit)
-	local watcher = frame._auraWatcher
-	if not watcher then
+	if not frame._bluAurasBuilt then
 		GroupFrames.QueueChildAuraSetup(frame)
 		return
 	end
 	if unit == frame._bluLastUnit then return end
 	frame._bluLastUnit = unit
-	ResetFrameAuras(frame, unit)
-	RegisterAuraUnitEvents(watcher, unit)
+	BindAllKinds(frame, unit)
 	GroupFrames.MarkAurasDirty(frame)
 end
-
-local function FinishPendingChildren()
-	GroupFrames.EachChild(function(child)
-		GroupFrames.QueueChildAuraSetup(child)
-		if child.unit then GroupFrames.MarkAurasDirty(child) end
-	end)
-end
-
-BUI.Tools.OnAuraQueriesUnblocked(FinishPendingChildren, 'Group frame auras')
-BUI.Events:Register("PLAYER_REGEN_ENABLED", "GroupFrames.FinishChildren", function()
-	BUI.Events:AfterCombatSettled(FinishPendingChildren, "GroupFrames.FinishChildren")
-end)
