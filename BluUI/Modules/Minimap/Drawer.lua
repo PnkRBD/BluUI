@@ -4,10 +4,12 @@ local Drawer = {}
 BUI.Drawer = Drawer
 
 local Pixel = BUI.Pixel
+local AddonButtons = BUI.AddonButtons
 local WoWMinimap = _G.Minimap
 
 local BUTTON_SIZE = 26
 local BUTTON_PAD = 6
+local BUTTON_LEVEL = 120
 local MARGIN = 10
 local MAX_COLS = 5
 local TAB_W = 10
@@ -15,7 +17,6 @@ local TAB_H = 44
 local TAB_INSET = 3
 local HIDE_DELAY = 0.3
 local ICON_SIZE = 22
-local ICON_CROP = 0.08
 local ICON_BORDER_BOX = 24
 
 local TAB_COLOR_NORMAL      = { 0.85,  0.85, 0.85, 1 }
@@ -109,31 +110,7 @@ local function AnchorToTab(target)
 end
 
 local function StyleButton(button)
-	local original = button._buiOriginalFuncs
-	local iconSize = Pixel.Scale(ICON_SIZE)
-	original.SetParent(button, bar)
-	original.SetScale(button, 1)
-	original.SetSize(button, Pixel.Scale(BUTTON_SIZE), Pixel.Scale(BUTTON_SIZE))
-	local iconTexture = button._buiIcon
-	if iconTexture then
-		iconTexture:ClearAllPoints()
-		iconTexture:SetPoint('CENTER')
-		iconTexture:SetSize(iconSize, iconSize)
-		iconTexture:SetTexCoord(ICON_CROP, 1 - ICON_CROP, ICON_CROP, 1 - ICON_CROP)
-		iconTexture:Show()
-	end
-	local highlight = button.GetHighlightTexture and button:GetHighlightTexture()
-	if highlight then
-		highlight:ClearAllPoints()
-		highlight:SetPoint('CENTER')
-		highlight:SetSize(iconSize, iconSize)
-	end
-	local border = button._buiBorder
-	border:ClearAllPoints()
-	border:SetPoint('CENTER')
-	border:SetSize(Pixel.Scale(ICON_BORDER_BOX), Pixel.Scale(ICON_BORDER_BOX))
-	Pixel.ApplyBorder(border, 1, 0, 0, 0, 1)
-	border:Show()
+	AddonButtons.Dress(button, bar, Pixel.Scale(BUTTON_SIZE), Pixel.Scale(ICON_SIZE), Pixel.Scale(ICON_BORDER_BOX), BUTTON_LEVEL)
 	if not button._buiDrawerHooked then
 		button._buiDrawerHooked = true
 		button:HookScript('OnEnter', BUI.Profiler.Wrap('Minimap.Drawer button OnEnter', CancelHide))
@@ -170,9 +147,6 @@ local function ShowDrawer()
 		StyleButton(button)
 		button._buiOriginalFuncs.ClearAllPoints(button)
 		button._buiOriginalFuncs.SetPoint(button, 'TOPLEFT', bar, 'TOPLEFT', margin + col * step, -(margin + row * step))
-		button:SetFrameStrata('MEDIUM')
-		button:SetFrameLevel(120)
-		button:SetAlpha(1)
 		button:Show()
 	end
 
@@ -237,4 +211,4 @@ function Drawer.Layout(list)
 	if bar:IsShown() then ShowDrawer() end
 end
 
-BUI.AddonButtons.Register('DRAWER', Drawer)
+AddonButtons.Register('DRAWER', Drawer)

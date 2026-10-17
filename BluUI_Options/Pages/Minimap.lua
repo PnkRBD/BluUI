@@ -37,8 +37,6 @@ local RAIL_GROUPS = {
 	BuffFramesPage.group,
 }
 local PANE_IDS = { 'map', 'indicators', 'text', 'datatext', 'buttons', 'buffFrames', 'buffBlacklist' }
-local PANE_INDEX = {}
-for index, id in ipairs(PANE_IDS) do PANE_INDEX[id] = index end
 
 local SIDES = {
 	{ value = 'LEFT', text = 'Left' },
@@ -80,9 +78,7 @@ local ADT_TILE = 533.3333333333333
 local preview
 local fonts
 
-local function Window()
-	return BUI.PageEngine.window
-end
+local Window, Repaint = BUI.OptionsKit.Window, BUI.OptionsKit.Repaint
 
 local function Interface()
 	return BUI.GetDB().interface
@@ -94,10 +90,6 @@ end
 
 local function Buttons()
 	return Interface().buttonBar
-end
-
-local function Repaint()
-	Window():Repaint()
 end
 
 local function RefreshPreview()
@@ -118,11 +110,11 @@ local function ConfirmModule(value)
 		message = value and 'Turning the minimap module on needs a UI reload.' or 'Turning the minimap module off needs a UI reload to put everything back.',
 		confirmText = 'Reload now', cancelText = 'Cancel', laterText = 'Later',
 		onConfirm = function()
-			Interface().minimapEnabled = value
+			BUI.SetModuleEnabled('minimap', value)
 			ReloadUI()
 		end,
 		onLater = function()
-			Interface().minimapEnabled = value
+			BUI.SetModuleEnabled('minimap', value)
 			Repaint()
 		end,
 		onCancel = Repaint,
@@ -209,9 +201,11 @@ local function BuildPreview(band)
 
 	local function ApplyMapArt()
 		local mapID = C_Map.GetBestMapForUnit('player')
-		local layer = mapID and (C_Map.GetMapArtLayers(mapID) or {})[1]
-		local textures = layer and C_Map.GetMapArtLayerTextures(mapID, 1)
-		if not (textures and #textures > 0 and layer.tileWidth and layer.tileWidth > 0) then return end
+		if not mapID then return end
+		local layer = C_Map.GetMapArtLayers(mapID)[1]
+		if not layer or layer.tileWidth <= 0 then return end
+		local textures = C_Map.GetMapArtLayerTextures(mapID, 1)
+		if #textures == 0 then return end
 
 		local position = C_Map.GetPlayerMapPosition(mapID, 'player')
 		local playerX = position and position.x or 0.5
@@ -219,8 +213,8 @@ local function BuildPreview(band)
 
 		local yards = YardsAtZoom()
 		local worldWidth, worldHeight = C_Map.GetMapWorldSize(mapID)
-		local fracX = (worldWidth and worldWidth > 0) and min(1, yards / worldWidth) or 0.25
-		local fracY = (worldHeight and worldHeight > 0) and min(1, yards / worldHeight) or 0.25
+		local fracX = worldWidth > 0 and min(1, yards / worldWidth) or 0.25
+		local fracY = worldHeight > 0 and min(1, yards / worldHeight) or 0.25
 
 		local windowWidth = fracX * layer.layerWidth
 		local windowHeight = fracY * layer.layerHeight
@@ -296,17 +290,13 @@ local function BuildPreview(band)
 
 	local icons = {}
 
-	local function SizeIcon(proxy, key, docked)
-		local width, height, artWidth, artHeight = MinimapModule.IndicatorLayout(key, docked)
-		proxy:SetSize(width * scale, height * scale)
-		proxy.tile:SetSize(artWidth * scale, artHeight * scale)
-	end
-
 	local function PlaceIcon(proxy, key)
 		local point, x, y = MinimapModule.GetIndicatorOffset(key)
 		proxy:ClearAllPoints()
 		proxy:SetPoint(point, mapFrame, point, x * scale, y * scale)
-		SizeIcon(proxy, key, false)
+		local width, height, artWidth, artHeight = MinimapModule.IndicatorLayout(key)
+		proxy:SetSize(width * scale, height * scale)
+		proxy.tile:SetSize(artWidth * scale, artHeight * scale)
 	end
 
 	local function StyleDifficultyProxy()
@@ -326,23 +316,11 @@ local function BuildPreview(band)
 	end
 
 	local function RefreshIcons()
-		local anchor = MinimapModule.DOCK_ANCHORS[MinimapModule.GetDock()]
-		local step = (MinimapModule.GetIconSize() + MinimapModule.DOCK_GAP) * scale
-		local iconIndex = 0
 		for _, def in ipairs(INDICATORS) do
 			local proxy = icons[def.key]
 			local shown = not interfaceDB[def.hide]
 			proxy:SetShown(shown)
-			if shown and anchor and def.key ~= 'difficulty' then
-				proxy:EnableMouse(false)
-				proxy:ClearAllPoints()
-				SizeIcon(proxy, def.key, true)
-				proxy:SetPoint(anchor.point, mapFrame, anchor.point, anchor.x * scale + anchor.dirX * iconIndex * step, anchor.y * scale)
-				iconIndex = iconIndex + 1
-			elseif shown then
-				proxy:EnableMouse(true)
-				PlaceIcon(proxy, def.key)
-			end
+			if shown then PlaceIcon(proxy, def.key) end
 		end
 		StyleDifficultyProxy()
 	end
@@ -402,7 +380,7 @@ local function BuildPreview(band)
 				local snap = 8 * scale
 				local best, bestDistance
 				for _, other in pairs(icons) do
-					if other ~= draggedIcon and other:IsShown() and other:IsMouseEnabled() then
+					if other ~= draggedIcon and other:IsShown() then
 						local otherX, otherY = other:GetCenter()
 						if otherX then
 							local distance = abs(cursorX - otherX) + abs(cursorY - otherY)
@@ -511,7 +489,7 @@ local function BuildPreview(band)
 
 	PlaceText = function()
 		clockLabel:SetText(date('%H:%M'))
-		zoneLabel:SetText(GetMinimapZoneText() or 'Zone Name')
+		zoneLabel:SetText(GetMinimapZoneText())
 		Pixel.ApplyFont(clockLabel, interfaceDB.minimapClockSize * scale, BUI.GetFontByName(interfaceDB.minimapClockFont))
 		Pixel.ApplyFont(zoneLabel, interfaceDB.minimapZoneSize * scale, BUI.GetFontByName(interfaceDB.minimapZoneFont))
 		clockLabel:ClearAllPoints()
@@ -587,20 +565,19 @@ local function BuildPreview(band)
 		end
 
 		local layout = ButtonBar.Arrange(config, count, Pixel.Scale)
-		local function Preview(value) return floor(value * uiScale + 0.5) end
-		barHolder:SetSize(Preview(layout.width), Preview(layout.height))
+		barHolder:SetSize(PreviewPixels(layout.width), PreviewPixels(layout.height))
 		barHolder:ClearAllPoints()
-		barHolder:SetPoint(layout.point, mapFrame, layout.relativePoint, Preview(layout.x), Preview(layout.y))
+		barHolder:SetPoint(layout.point, mapFrame, layout.relativePoint, PreviewPixels(layout.x), PreviewPixels(layout.y))
 
 		local background = config.background
-		local size = Preview(layout.size)
+		local size = PreviewPixels(layout.size)
 		for index = 1, count do
 			local proxy = BarProxy(index)
 			local slot = layout.slots[index]
 			proxy:SetSize(size, size)
 			proxy:SetBackdropColor(background[1], background[2], background[3], background[4])
 			proxy:ClearAllPoints()
-			proxy:SetPoint(layout.corner, barHolder, layout.corner, Preview(slot[1]), Preview(slot[2]))
+			proxy:SetPoint(layout.corner, barHolder, layout.corner, PreviewPixels(slot[1]), PreviewPixels(slot[2]))
 			local icon = entries[index].icon
 			if icon then
 				proxy.icon:SetTexture(icon)
@@ -715,15 +692,17 @@ local function BuildPreview(band)
 		RefreshTextBar()
 	end
 
-	local sinceTick = 0
-	card:SetScript('OnUpdate', function(self, elapsed)
-		sinceTick = sinceTick + elapsed
-		if sinceTick >= PREVIEW_TICK then
-			sinceTick = 0
-			self:UpdatePreview()
+	local ticker
+	card:HookScript('OnShow', function(self)
+		self:UpdatePreview()
+		ticker = C_Timer.NewTicker(PREVIEW_TICK, function() self:UpdatePreview() end)
+	end)
+	card:HookScript('OnHide', function()
+		if ticker then
+			ticker:Cancel()
+			ticker = nil
 		end
 	end)
-	card:HookScript('OnShow', function(self) self:UpdatePreview() end)
 	card:UpdatePreview()
 	return card
 end
@@ -992,20 +971,19 @@ BUI.PageEngine.RegisterPage('minimap', {
 	OnBuild = function(pageFrame)
 		fonts = BUI.BuildFontDropdownItems(BUI.C.GLOBAL_OPTION)
 		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
-		local adapter = { tabContents = {}, currentTab = 1 }
-		for index in ipairs(PANE_IDS) do adapter.tabContents[index] = {} end
-		local enabled = Interface().minimapEnabled ~= false
+		local enabled = BUI.IsModuleEnabled('minimap')
 		local rail
 		rail = Layout.RailPage(page:GetTab(1), { window = Window() }, {
 			icon = 'minimap',
 			title = 'Minimap',
 			placeholder = 'Search minimap settings...',
+			tabs = PANE_IDS,
 			disabled = function(item)
 				if BuffFramesPage.Owns(item.id) then return not BuffFramesPage.IsOn() end
 				return not enabled
 			end,
 			tools = {
-				{ icon = 'enable', tooltip = 'Turn the minimap module on or off, needs a reload', get = function() return Interface().minimapEnabled ~= false end, set = ConfirmModule },
+				{ icon = 'enable', tooltip = 'Turn the minimap module on or off, needs a reload', get = function() return BUI.IsModuleEnabled('minimap') end, set = ConfirmModule },
 				{ icon = 'eye', tooltip = 'Unlock the map to drag it and its indicators, right-click it to lock', get = MinimapModule.IsUnlocked, set = MinimapModule.ToggleUnlock },
 				BuffFramesPage.EnableTool(Repaint),
 			},
@@ -1016,14 +994,11 @@ BUI.PageEngine.RegisterPage('minimap', {
 		local Select = rail.Select
 		function rail:Select(id)
 			Select(self, id)
-			adapter.currentTab = PANE_INDEX[id]
+			Repaint()
 		end
-		function adapter:SetTab(index)
-			rail:Select(PANE_IDS[index])
-		end
-		pageFrame._page = adapter
-		MinimapModule.SetLockReleaseCallback(Repaint)
-		MinimapModule.SetIndicatorMovedCallback(function()
+		pageFrame._page = rail.adapter
+		BUI.OnModuleChange('minimapLock', Repaint)
+		BUI.OnModuleChange('minimapIndicator', function()
 			RefreshPreview()
 			Repaint()
 		end)

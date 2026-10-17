@@ -19,8 +19,7 @@ function BUI.InitializeMinimapButton()
 end
 
 function BUI.IsMinimapButtonHidden()
-	local db = BUI.GetDB().general.minimapButton
-	return db.hide and true or false
+	return BUI.GetDB().general.minimapButton.hide
 end
 
 function BUI.SetMinimapButtonHidden(hide)
