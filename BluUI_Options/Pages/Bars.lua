@@ -1,6 +1,6 @@
 local BUI = BluUI
 local BUILib = BluUI.BUILibClient
-local Controls, Layout, Theme = BUILib.Controls, BUILib.Layout, BUILib.Theme
+local Layout, Theme = BUILib.Layout, BUILib.Theme
 local CastBar = BUI.CastBar
 local Pixel = BUI.Pixel
 
@@ -14,11 +14,9 @@ local INPUT_WIDTH = 260
 local ERASE_SIZE = BUILib.Layout.ERASE_SIZE
 local ERASE_INSET = 18
 local TOOL_GAP = 12
-local RESULTS_WIDTH = 280
 local TEXT_OFFSET_RANGE = 100
 
 local UNITS = { 'player', 'target', 'focus' }
-local UNIT_INDEX = { player = 1, target = 2, focus = 3 }
 local RAIL_GROUPS = {
 	{ title = 'Bars', items = {
 		{ id = 'player', label = 'Player', icon = 'profile' },
@@ -36,15 +34,8 @@ local selectedUnit = 'player'
 local preview
 local fonts, textures
 
-local function Window()
-	return BUI.PageEngine.window
-end
-
-local function Repaint()
-	Window():Repaint()
-end
-
-local relock = { SetValue = Repaint }
+local Kit = BUI.OptionsKit
+local Window, Repaint, Option, Toggle, OnUnlessOff, Color = Kit.Window, Kit.Repaint, Kit.Option, Kit.Toggle, Kit.OnUnlessOff, Kit.Color
 
 local function Settings(unit)
 	return CastBar.GetSettings(unit or selectedUnit)
@@ -63,31 +54,6 @@ local function Apply()
 	RefreshPreview()
 end
 
-local function Option(settings, label, key, extra)
-	local option = { label = label, get = function() return settings[key] end, set = function(value) settings[key] = value end }
-	for name, value in pairs(extra or {}) do option[name] = value end
-	return option
-end
-
-local function Color(settings, label, key)
-	return {
-		kind = 'swatch', label = label, tooltip = label, opacity = true,
-		get = function()
-			local color = settings[key]
-			return color[1], color[2], color[3], color[4] or 1
-		end,
-		set = function(red, green, blue, alpha) settings[key] = { red, green, blue, alpha } end,
-	}
-end
-
-local function Toggle(settings, label, key)
-	return { label = label, get = function() return settings[key] == true end, set = function(value) settings[key] = value end }
-end
-
-local function OnUnlessOff(settings, label, key)
-	return { label = label, get = function() return settings[key] ~= false end, set = function(value) settings[key] = value end }
-end
-
 local function TextTools(settings, unit)
 	local options = {
 		Option(settings, 'Text size', 'textSize', { min = 8, max = 24, step = 1 }),
@@ -104,7 +70,7 @@ local function TextTools(settings, unit)
 		tools[#tools + 1] = Color(settings, 'Latency color', 'latencyColor')
 		options[#options + 1] = Toggle(settings, 'Show latency', 'showLatency')
 	end
-	tools[#tools + 1] = { entries = fonts, width = MENU_WIDTH, get = function() return settings.font or BUI.C.GLOBAL_OPTION end, set = function(value) settings.font = value end }
+	tools[#tools + 1] = { entries = fonts, width = MENU_WIDTH, get = function() return settings.font end, set = function(value) settings.font = value end }
 	tools[#tools + 1] = { icon = 'text', tooltip = 'Size and what the bar shows', title = 'Text', options = options }
 	tools[#tools + 1] = { icon = 'location', tooltip = 'Text offset', title = 'Text offset', options = {
 		Option(settings, 'Horizontal', 'textOffsetX', { min = -TEXT_OFFSET_RANGE, max = TEXT_OFFSET_RANGE, step = 1 }),
@@ -142,13 +108,11 @@ local function BarBoard(ui, parent, width, unit)
 		BUI.PositionTool(settings, { matchWidth = true }),
 	}, Apply)
 	board:AddTools('Text', 'Font, color and what the bar shows', TextTools(settings, unit), Apply)
-	if unit == 'player' then
-		board:AddTools('Channel ticks', 'Tick marks on channeled casts', {
-			Color(settings, 'Tick color', 'channelTickColor'),
-			{ tooltip = 'Tick width', title = 'Channel ticks', options = { Option(settings, 'Tick width', 'channelTickWidth', { min = 1, max = 6, step = 1 }) } },
-			Toggle(settings, nil, 'channelTicks'),
-		}, Apply)
-	end
+	board:AddTools('Channel ticks', 'Tick marks on channeled casts', {
+		Color(settings, 'Tick color', 'channelTickColor'),
+		{ tooltip = 'Tick width', title = 'Channel ticks', options = { Option(settings, 'Tick width', 'channelTickWidth', { min = 1, max = 6, step = 1 }) } },
+		Toggle(settings, nil, 'channelTicks'),
+	}, Apply)
 	return board
 end
 
@@ -231,8 +195,8 @@ local function EmpowerBoard(ui, parent, width)
 	return board
 end
 
-local function SpellColorsSection(ui, parent, width, page)
-	local settings = Settings('player')
+local function SpellColorsSection(ui, parent, width, unit, page)
+	local settings = Settings(unit)
 	local section = ui.Section(parent, width, {
 		stacked = true,
 		title = 'Custom spell colors',
@@ -245,18 +209,6 @@ local function SpellColorsSection(ui, parent, width, page)
 		Apply()
 		page:RebuildCurrent()
 	end
-	local function Search(anchor, text)
-		local spellID = BUI.Lookup.ParseSpellInput(text)
-		if spellID then return Add(spellID) end
-		local hits = BUI.Lookup.SearchSpells(text)
-		if #hits == 1 then return Add(hits[1].id) end
-		local items = {}
-		for _, hit in ipairs(hits) do
-			items[#items + 1] = { text = hit.name, icon = hit.icon, callback = function() Add(hit.id) end }
-		end
-		if #items == 0 then items[1] = { text = 'Nothing found', disabled = true } end
-		Controls.ContextMenu(items, { anchor = anchor, width = RESULTS_WIDTH, window = Window() })
-	end
 	local toggleRow = section:AddRow('use custom spell colors')
 	ui.RowTitle(toggleRow, 'Use custom colors', 'Off keeps every cast on the bar color', ui.AVATAR_X, NAME_WIDTH)
 	ui.Switch(toggleRow, function() return settings.useSpellColors == true end, function(value)
@@ -265,9 +217,7 @@ local function SpellColorsSection(ui, parent, width, page)
 	end):SetPoint('RIGHT', -ui.ROW_INSET, 0)
 	local addRow = section:AddRow('add a spell')
 	ui.RowTitle(addRow, 'Add a spell', 'Name, ID or spell link', ui.AVATAR_X, NAME_WIDTH)
-	local box
-	box = ui.Input(addRow, INPUT_WIDTH, { placeholder = 'Search...', get = function() return '' end, set = function(text) Search(box, text) end })
-	box:SetPoint('RIGHT', -ui.ROW_INSET, 0)
+	BUI.SpellSearch(ui, addRow, INPUT_WIDTH, { spellsOnly = true, onPick = function(hit) Add(hit.id) end }):SetPoint('RIGHT', -ui.ROW_INSET, 0)
 	local spells = {}
 	for spellID in pairs(settings.spellColors) do
 		local icon, name = BUI.Lookup.GetSpellInfo(spellID)
@@ -304,10 +254,10 @@ local function Panes(ui, _, parent, width, item, page)
 	local sections = { BarBoard(ui, parent, width, unit) }
 	if unit == 'player' then
 		if BUI.Tools.PlayerCanEmpower() then sections[#sections + 1] = EmpowerBoard(ui, parent, width) end
-		sections[#sections + 1] = SpellColorsSection(ui, parent, width, page)
 	else
 		sections[#sections + 1] = InterruptsBoard(ui, parent, width, unit)
 	end
+	sections[#sections + 1] = SpellColorsSection(ui, parent, width, unit, page)
 	return sections
 end
 
@@ -339,13 +289,9 @@ local function BuildPreview(band)
 		background:SetTexture(texture)
 		local barWidth = math.min(settings.width, PAGE_WIDTH - PREVIEW_ROOM)
 		bar:SetSize(barWidth, settings.height)
-		if settings.useClassColor then
-			local _, class = UnitClass('player')
-			local classColor = class and RAID_CLASS_COLORS[class]
-			if classColor then bar:SetStatusBarColor(classColor.r, classColor.g, classColor.b, 1) else bar:SetStatusBarColor(unpack(settings.barColor)) end
-		else
-			bar:SetStatusBarColor(unpack(settings.barColor))
-		end
+		local red, green, blue
+		if settings.useClassColor then red, green, blue = BUI.Tools.GetUnitClassColor('player') end
+		if red then bar:SetStatusBarColor(red, green, blue, 1) else bar:SetStatusBarColor(unpack(settings.barColor)) end
 		local backgroundColor = settings.bgColor
 		background:SetVertexColor(backgroundColor[1], backgroundColor[2], backgroundColor[3], backgroundColor[4] or 1)
 		local borderColor = settings.borderColor
@@ -357,8 +303,8 @@ local function BuildPreview(band)
 		CastBar.StyleText(bar, name, time, settings, CastBar.GetFont(settings.font))
 		name:SetText('Bloodlust')
 		time:SetText('1.4')
-		name:SetShown(settings.showSpellName ~= false)
-		time:SetShown(settings.showTimer ~= false)
+		name:SetShown(settings.showSpellName)
+		time:SetShown(settings.showTimer)
 	end
 	band:HookScript('OnShow', function(self) self:Update() end)
 	band:Update()
@@ -374,12 +320,12 @@ BUI.PageEngine.RegisterPage('castbars', {
 		textures = BUI.BuildTextureDropdownItems(BUI.C.GLOBAL_OPTION)
 		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
 		local tab = page:GetTab(1)
-		local adapter = { tabContents = { tab, tab, tab }, currentTab = UNIT_INDEX[selectedUnit] }
 		local rail
 		rail = Layout.RailPage(tab, { window = Window() }, {
 			icon = 'play',
 			title = 'Cast Bars',
 			placeholder = 'Search cast bar settings...',
+			tabs = UNITS,
 			disabled = function() return Settings().enabled ~= true end,
 			tools = {
 				{ icon = 'enable', tooltip = 'Turn this cast bar on or off', get = function() return Settings().enabled == true end, set = function(value)
@@ -398,16 +344,12 @@ BUI.PageEngine.RegisterPage('castbars', {
 		local Select = rail.Select
 		function rail:Select(id)
 			selectedUnit = id
-			adapter.currentTab = UNIT_INDEX[id]
 			Select(self, id)
 			Repaint()
 			RefreshPreview()
 		end
-		function adapter:SetTab(index)
-			rail:Select(UNITS[index])
-		end
-		pageFrame._page = adapter
-		CastBar._lockToggles = { player = relock, target = relock, focus = relock }
+		pageFrame._page = rail.adapter
+		BUI.OnModuleChange('castBar', Repaint)
 		page:AutoRefresh()
 	end,
 	OnHide = function()
