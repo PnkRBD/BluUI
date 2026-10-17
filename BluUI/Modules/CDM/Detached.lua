@@ -64,6 +64,17 @@ local function HideSnapHighlight()
     if snapHighlight then snapHighlight:Hide() end
 end
 
+local function PushSnapTarget(left, bottom, width, height)
+    snapTargetCount = snapTargetCount + 1
+    local target = snapTargetPool[snapTargetCount]
+    if not target then
+        target = { l = 0, r = 0, t = 0, b = 0, cx = 0, cy = 0 }
+        snapTargetPool[snapTargetCount] = target
+    end
+    target.l = left; target.r = left + width; target.t = bottom + height; target.b = bottom
+    target.cx = left + width * 0.5; target.cy = bottom + height * 0.5
+end
+
 local function CollectSnapTarget(icon)
     if icon == DragIcon then return end
     if not icon:IsShown() or not icon:IsVisible() then return end
@@ -71,13 +82,7 @@ local function CollectSnapTarget(icon)
     if frameData and frameData.hidden then return end
     local left, bottom, width, height = icon:GetRect()
     if not left then return end
-    snapTargetCount = snapTargetCount + 1
-    if not snapTargetPool[snapTargetCount] then
-        snapTargetPool[snapTargetCount] = { l = 0, r = 0, t = 0, b = 0, cx = 0, cy = 0 }
-    end
-    local target = snapTargetPool[snapTargetCount]
-    target.l = left; target.r = left + width; target.t = bottom + height; target.b = bottom
-    target.cx = left + width * 0.5; target.cy = bottom + height * 0.5
+    PushSnapTarget(left, bottom, width, height)
 end
 
 local function CollectSnapTargets()
@@ -89,14 +94,8 @@ local function CollectSnapTargets()
         local frame = _G[entry.tag]
         if frame and frame:IsShown() and frame:IsVisible() and frame ~= DragIcon then
             local left, bottom, width, height = frame:GetRect()
-            if left and width and width > 0 then
-                snapTargetCount = snapTargetCount + 1
-                if not snapTargetPool[snapTargetCount] then
-                    snapTargetPool[snapTargetCount] = { l = 0, r = 0, t = 0, b = 0, cx = 0, cy = 0 }
-                end
-                local snapTarget = snapTargetPool[snapTargetCount]
-                snapTarget.l = left; snapTarget.r = left + width; snapTarget.t = bottom + height; snapTarget.b = bottom
-                snapTarget.cx = left + width * 0.5; snapTarget.cy = bottom + height * 0.5
+            if left and width > 0 then
+                PushSnapTarget(left, bottom, width, height)
             end
         end
     end
@@ -218,8 +217,7 @@ local function GetDragFrame()
 end
 
 local function IsIndividualMoveEnabled()
-    local db = BUI.GetDB()
-    return db.cdm.allowIndividualMove
+    return BUI.GetDB().cdm.allowIndividualMove
 end
 
 function Detached.StartDrag(icon, key)
@@ -278,7 +276,7 @@ local function ResetDragState()
 end
 
 function Detached.StopDrag()
-    if not DragIcon or not DragSpellID or not DragViewerKey then
+    if not DragIcon then
         ResetDragState()
         return
     end
@@ -309,8 +307,7 @@ local RESIZE_MIN  = 16
 local RESIZE_MAX  = 128
 
 local function IsIndividualResizeEnabled()
-    local db = BUI.GetDB()
-    return db.cdm.allowIndividualResize
+    return BUI.GetDB().cdm.allowIndividualResize
 end
 
 local function ResizeDetachedIcon(icon, key, delta)
@@ -348,13 +345,12 @@ local function ResizeDetachedIcon(icon, key, delta)
 end
 
 local function EnsureOverlay(icon, key)
-    local iconFrameData = FrameData[icon]
-    if iconFrameData and iconFrameData.detachOverlay then return iconFrameData.detachOverlay end
+    local iconFrameData = GetFrameData(icon)
+    if iconFrameData.detachOverlay then return iconFrameData.detachOverlay end
 
     local overlay = CreateFrame("Button", nil, icon)
     overlay:SetAllPoints(icon)
     overlay:SetFrameLevel(icon:GetFrameLevel() + 10)
-    overlay:RegisterForClicks("AnyDown")
 
     overlay:SetScript("OnMouseDown", BUI.Profiler.Script('CDM.Detached overlay OnMouseDown', function(self, button)
         if not IsIndividualMoveEnabled() then return end
@@ -380,7 +376,6 @@ local function EnsureOverlay(icon, key)
     end))
 
     overlay:EnableMouse(true)
-    if not iconFrameData then iconFrameData = GetFrameData(icon) end
     iconFrameData.detachOverlay = overlay
     return overlay
 end
@@ -398,7 +393,7 @@ local overlaysActive = false
 local function UpdateOverlayIcon(icon, key)
     local iconFrameData = FrameData[icon]
     if iconFrameData and iconFrameData.detachHooked and icon:IsShown() then
-        if overlayCtrlHeld and key then
+        if overlayCtrlHeld then
             EnsureOverlay(icon, key):EnableMouse(true)
         elseif iconFrameData.detachOverlay then
             iconFrameData.detachOverlay:EnableMouse(false)
@@ -440,7 +435,7 @@ local function OnModifierState(event, key)
 end
 
 BUI.Events:Register("PLAYER_REGEN_DISABLED", "CDM.Detached.Combat", OnCombatEvent)
-BUI.Events:Register("PLAYER_REGEN_ENABLED", "CDM.Detached.Combat2", OnCombatEvent)
+BUI.Events:Register("PLAYER_REGEN_ENABLED", "CDM.Detached.Combat", OnCombatEvent)
 
 function Detached.UpdateModifierWatcher()
     local shouldWatch = IsIndividualMoveEnabled()
@@ -454,11 +449,8 @@ function Detached.UpdateModifierWatcher()
     end
 end
 
-function Detached.HookIcon(icon, key)
-    local iconFrameData = FrameData[icon]
-    if iconFrameData and iconFrameData.detachHooked then return end
-    if not iconFrameData then iconFrameData = GetFrameData(icon) end
-    iconFrameData.detachHooked = true
+function Detached.HookIcon(icon)
+    GetFrameData(icon).detachHooked = true
 end
 
 function Detached.PlaceIcon(icon, key, iconWidth, iconHeight, settings)
@@ -470,7 +462,7 @@ function Detached.PlaceIcon(icon, key, iconWidth, iconHeight, settings)
     local position = CDM.GetDetachedPosition(settings, spellID)
     if not position then return false end
 
-    Detached.HookIcon(icon, key)
+    Detached.HookIcon(icon)
     CDM.HookIconFrame(icon, key)
 
     local detachedWidth = position.w or iconWidth
@@ -482,8 +474,6 @@ function Detached.PlaceIcon(icon, key, iconWidth, iconHeight, settings)
     local cornerX = Pixel.Snap(position.x - scaledWidth / 2)
     local cornerY = Pixel.Snap(position.y + scaledHeight / 2)
     iconData.anchor = UIParent
-    iconData.posX = position.x
-    iconData.posY = position.y
     iconData.selfPoint = "TOPLEFT"
     iconData.relPoint = "CENTER"
     iconData.posCornerX = cornerX
@@ -504,7 +494,7 @@ function Detached.PlaceIcon(icon, key, iconWidth, iconHeight, settings)
 
     local wasParked = iconData.parked
     iconData.parked = nil
-    icon:SetAlpha(CDM.GetContextualOpacity(key) / 100)
+    icon:SetAlpha(CDM.GetContextualOpacity() / 100)
 
     iconData.locking = false
     if wasParked then CDM.ResumeProcGlow(icon, iconData) end

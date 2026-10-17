@@ -3,7 +3,6 @@ local _, BUI = ...
 local _G = _G
 local sort = table.sort
 local wipe = wipe
-local CreateFrame = CreateFrame
 
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
@@ -13,7 +12,6 @@ local active = false
 local visible = {}
 local orderLookup = {}
 local cachedOpacity = 100
-local pendingFrame = nil
 local lastSnap = {}
 local lastSnapCount = 0
 local lastWidth, lastHeight, lastSpacing, lastVertical
@@ -66,19 +64,19 @@ local function RecordSnapshotKeys(count, customOrder)
 	snapKeyed = true
 end
 
+local function IsCenterable(icon)
+	if not icon:IsShown() then return false end
+	local frameData = FrameData[icon]
+	return not frameData or not (frameData.hidden or frameData.anchor == UIParent)
+end
+
 local function CollectVisible(viewer)
 	local count = 0
 
-	local pool = viewer.itemFramePool
-	if pool and pool.EnumerateActive then
-		for icon in pool:EnumerateActive() do
-			if icon:IsShown() then
-				local frameData = FrameData[icon]
-				if not frameData or not frameData.hidden then
-					count = count + 1
-					visible[count] = icon
-				end
-			end
+	for icon in viewer.itemFramePool:EnumerateActive() do
+		if IsCenterable(icon) then
+			count = count + 1
+			visible[count] = icon
 		end
 	end
 
@@ -86,12 +84,9 @@ local function CollectVisible(viewer)
 	if customList then
 		for customIndex = 1, customCount do
 			local icon = customList[customIndex]
-			if icon and icon:IsShown() then
-				local frameData = FrameData[icon]
-				if not frameData or not frameData.hidden then
-					count = count + 1
-					visible[count] = icon
-				end
+			if IsCenterable(icon) then
+				count = count + 1
+				visible[count] = icon
 			end
 		end
 	end
@@ -100,15 +95,9 @@ local function CollectVisible(viewer)
 end
 
 local function PlaceIconCentered(icon, anchor, x, y, alpha)
-	if not icon then return end
 	local frameData = FrameData[icon]
-	if not frameData then return end
-	local anchorWidth = anchor._layoutW or anchor:GetWidth() or 0
-	local anchorHeight = anchor._layoutH or anchor:GetHeight() or 0
-	local width = frameData.sizeW or anchor._cachedScaledW or 0
-	local height = frameData.sizeH or anchor._cachedScaledH or 0
-	local left = Pixel.Snap(anchorWidth / 2 + x - width / 2)
-	local top = -Pixel.Snap(anchorHeight / 2 - y - height / 2)
+	local left = Pixel.Snap(anchor._layoutW / 2 + x - frameData.sizeW / 2)
+	local top = -Pixel.Snap(anchor._layoutH / 2 - y - frameData.sizeH / 2)
 	frameData.locking = true
 	frameData.anchor = anchor
 	local wasParked = frameData.parked
@@ -117,8 +106,6 @@ local function PlaceIconCentered(icon, anchor, x, y, alpha)
 		frameData.relPoint = 'TOPLEFT'
 		frameData.posCornerX = left
 		frameData.posCornerY = top
-		frameData.posX = nil
-		frameData.posY = nil
 		icon:ClearAllPoints()
 		icon:SetPoint('TOPLEFT', anchor, 'TOPLEFT', left, top)
 	end
@@ -142,16 +129,19 @@ local function PlaceRow(list, iconCount, anchor, vertical, growUp, stepX, stepY,
 	end
 end
 
+local function StopBuffCentering()
+	active = false
+end
+
 local function CenterNow()
 	if not active then return end
 
-	local viewerName = CDM.VIEWERS.buffs
-	local viewer = viewerName and _G[viewerName]
+	local viewer = _G[CDM.VIEWERS.buffs]
 	if not viewer then return end
 
 	local settings = BUI.GetDB().cdm.buffs
-	if not settings or not settings.enabled then
-		CDM.StopBuffCentering()
+	if not settings.enabled then
+		StopBuffCentering()
 		return
 	end
 
@@ -182,13 +172,13 @@ local function CenterNow()
 	anchor:Show()
 
 	local spacing = Pixel.Scale(settings.spacing)
-	local scaledWidth = settings._pxW or Pixel.Scale(settings.iconWidth)
-	local scaledHeight = settings._pxH or Pixel.Scale(settings.iconHeight)
-	local vertical = settings.vertical and true or false
+	local scaledWidth = Pixel.Scale(settings.iconWidth)
+	local scaledHeight = Pixel.Scale(settings.iconHeight)
+	local vertical = settings.vertical
 	anchor._cachedScaledW = scaledWidth
 	anchor._cachedScaledH = scaledHeight
 	local anchorWidth, anchorHeight = anchor._layoutW, anchor._layoutH
-	local alpha = (cachedOpacity / 100) * (anchor._iconAlpha or 1)
+	local alpha = cachedOpacity / 100
 	local growUp = settings.rowGrowth == "Up"
 	local skinVersion = CDM.state.skinVersion
 
@@ -226,28 +216,23 @@ local function CenterNow()
 
 	for iconIndex = 1, visibleCount do
 		local icon = visible[iconIndex]
+		CDM.HookIconFrame(icon, "buffs")
 		local frameData = FrameData[icon]
-		if not frameData then
-			CDM.HookIconFrame(icon, "buffs")
-			frameData = FrameData[icon]
+		local scale = icon:GetScale()
+		if scale > 1.01 or scale < 0.99 then
+			frameData.locking = true
+			icon:SetScale(1)
+			frameData.locking = false
 		end
-		if frameData and frameData.anchor ~= UIParent then
-			local scale = icon:GetScale()
-			if scale and (scale > 1.01 or scale < 0.99) then
-				frameData.locking = true
-				icon:SetScale(1)
-				frameData.locking = false
-			end
-			if frameData.sizeW ~= scaledWidth or frameData.sizeH ~= scaledHeight then
-				frameData.sizeW = scaledWidth
-				frameData.sizeH = scaledHeight
-				frameData.locking = true
-				icon:SetSize(scaledWidth, scaledHeight)
-				frameData.locking = false
-			end
-			if frameData.skinVer ~= skinVersion then
-				CDM.SkinIcon(icon, settings, "buffs")
-			end
+		if frameData.sizeW ~= scaledWidth or frameData.sizeH ~= scaledHeight then
+			frameData.sizeW = scaledWidth
+			frameData.sizeH = scaledHeight
+			frameData.locking = true
+			icon:SetSize(scaledWidth, scaledHeight)
+			frameData.locking = false
+		end
+		if frameData.skinVer ~= skinVersion then
+			CDM.SkinIcon(icon, settings, "buffs")
 		end
 	end
 
@@ -269,16 +254,10 @@ local function CenterNow()
 	lastGrowUp = growUp
 end
 
+local FlushCenter = BUI.Dispatcher.New(CenterNow, 'CDM.BuffCenter flush')
+
 local function ScheduleCenter()
-	if not active then return end
-	if not pendingFrame then
-		pendingFrame = CreateFrame("Frame", "BUI_CDMBuffCenterFlush")
-		pendingFrame:SetScript("OnUpdate", BUI.Profiler.Wrap("CDM.BuffCenter flush", function(self)
-			self:Hide()
-			CenterNow()
-		end))
-	end
-	pendingFrame:Show()
+	if active then FlushCenter() end
 end
 
 function CDM.MarkBuffCenterDirty()
@@ -296,7 +275,7 @@ function CDM.CenterBuffsNow(force)
 end
 
 function CDM.RefreshBuffOpacityCache()
-	local opacity = CDM.GetContextualOpacity("buffs")
+	local opacity = CDM.GetContextualOpacity()
 	if opacity == cachedOpacity then return end
 	cachedOpacity = opacity
 	forceLayout = true
@@ -315,9 +294,4 @@ function CDM.SetupBuffCentering()
 	active = true
 	forceLayout = true
 	CenterNow()
-end
-
-function CDM.StopBuffCentering()
-	active = false
-	if pendingFrame then pendingFrame:Hide() end
 end

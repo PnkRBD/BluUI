@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('CDM.ProcMenu')
-
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
 
@@ -37,7 +35,7 @@ end
 
 local function GetEntry(spellID)
 	local perSpell = GlowDB().perSpell
-	return perSpell and perSpell[spellID] or nil
+	return perSpell and perSpell[spellID]
 end
 
 local function SpellName(spellID)
@@ -76,7 +74,7 @@ local function GetOverlay(icon)
 	if overlay then return overlay end
 	local frame = CreateFrame('Frame', nil, icon)
 	frame:SetAllPoints(OverlayAnchor(icon))
-	frame:SetFrameLevel((icon:GetFrameLevel() or 0) * 2 + 40)
+	frame:SetFrameLevel(icon:GetFrameLevel() * 2 + 40)
 	local text = frame:CreateFontString(nil, 'OVERLAY', nil, 7)
 	text:SetJustifyH('CENTER')
 	overlay = { frame = frame, text = text }
@@ -85,7 +83,7 @@ local function GetOverlay(icon)
 end
 
 function CDM.GetProcMsgAnchor(key)
-	local anchor = ANCHOR_POINTS[key or 'center'] or ANCHOR_POINTS.center
+	local anchor = ANCHOR_POINTS[key]
 	return anchor[1], anchor[2], anchor[3]
 end
 
@@ -95,7 +93,7 @@ local function ApplyOverlay(icon, key, entry)
 	local color = entry.msgColor or entry.color or GlowDB().color
 	if overlay.entry == entry and overlay.font == font and overlay.color == color and overlay.frame:IsShown() then return end
 	overlay.entry, overlay.font, overlay.color = entry, font, color
-	local anchor = ANCHOR_POINTS[entry.msgAnchor or 'center'] or ANCHOR_POINTS.center
+	local anchor = ANCHOR_POINTS[entry.msgAnchor or 'center']
 	local target = OverlayAnchor(icon)
 	Pixel.ApplyFont(overlay.text, entry.msgSize or 14, font, 'OUTLINE')
 	overlay.text:ClearAllPoints()
@@ -117,11 +115,9 @@ local function RefreshActiveOverlays()
 	local perSpell = GlowDB().perSpell
 	for key, icon in pairs(activeIcons) do
 		local entry = perSpell and perSpell[key]
-		if appearManaged[key] then
-			if not entry or not entry.msg then HideOverlayFor(key) end
-		elseif not entry or not entry.msg then
+		if not entry or not entry.msg then
 			HideOverlayFor(key)
-		else
+		elseif not appearManaged[key] then
 			local fresh = CDM.FindIconForSpell(key) or icon
 			if fresh ~= icon then
 				local overlay = overlays[icon]
@@ -143,8 +139,8 @@ local function ResolveEntry(spellID)
 	if not perSpell then return nil end
 	local entry = perSpell[spellID]
 	if entry then return entry, spellID end
-	local base = C_Spell.GetBaseSpell(spellID)
-	if base and base ~= spellID then
+	local base = Tools.GetBaseSpell(spellID)
+	if base ~= spellID then
 		entry = perSpell[base]
 		if entry then return entry, base end
 	end
@@ -154,8 +150,8 @@ watcher:SetScript('OnEvent', BUI.Profiler.Wrap('CDM.ProcMenu proc event', functi
 	if not spellID or IsSecret(spellID) then return end
 	if event == 'SPELL_ACTIVATION_OVERLAY_GLOW_HIDE' then
 		RemoveActive(spellID)
-		local base = C_Spell.GetBaseSpell(spellID)
-		if base and base ~= spellID then RemoveActive(base) end
+		local base = Tools.GetBaseSpell(spellID)
+		if base ~= spellID then RemoveActive(base) end
 		return
 	end
 	local entry, key = ResolveEntry(spellID)
@@ -181,7 +177,6 @@ local appearWatchEnabled = false
 local appearActive = {}
 local appearCooldownActive = {}
 local appearStamps = {}
-local appearHooked
 
 local appearTimers = {}
 
@@ -229,8 +224,7 @@ local function StartAppearGlow(key, icon, entry)
 		if untilThreshold <= 0 then
 			AppearGlowNow(icon, entry)
 		else
-			appearTimers[icon] = BUI.Profiler.NewTimer('CDM.ProcMenu appear glow on', untilThreshold, function()
-				appearTimers[icon] = nil
+			Tools.ReplaceTimer(appearTimers, icon, 'CDM.ProcMenu appear glow on', untilThreshold, function()
 				if IsAppearIconLive(key, icon) and icon:IsShown() then
 					AppearGlowNow(icon, entry)
 				end
@@ -239,8 +233,7 @@ local function StartAppearGlow(key, icon, entry)
 	elseif mode == 'above' then
 		AppearGlowNow(icon, entry)
 		if untilThreshold > 0 then
-			appearTimers[icon] = BUI.Profiler.NewTimer('CDM.ProcMenu appear glow off', untilThreshold, function()
-				appearTimers[icon] = nil
+			Tools.ReplaceTimer(appearTimers, icon, 'CDM.ProcMenu appear glow off', untilThreshold, function()
 				if IsAppearIconLive(key, icon) then
 					CDM.StopProcGlow(icon)
 				end
@@ -266,7 +259,7 @@ local function StopAppearAlert(key, icons)
 	end
 	HideOverlayFor(key)
 	if activeEntries[key] then
-		if type(key) == 'number' and not IsSpellOverlayed(key) then
+		if not IsSpellOverlayed(key) then
 			activeEntries[key] = nil
 		else
 			local perSpell = GlowDB().perSpell
@@ -328,8 +321,8 @@ local function AddCandidate(perSpell, id)
 	if type(id) ~= 'number' or IsSecret(id) then return end
 	local entry, key = perSpell[id], id
 	if not entry then
-		local base = C_Spell.GetBaseSpell(id)
-		if base and base ~= id and perSpell[base] then
+		local base = Tools.GetBaseSpell(id)
+		if base ~= id and perSpell[base] then
 			entry, key = perSpell[base], base
 		end
 	end
@@ -524,11 +517,9 @@ local function CollectBuffSource(icon, perSpell)
 	local overrideID = cooldownInfo and cooldownInfo.overrideSpellID
 	local linked = cooldownInfo and cooldownInfo.linkedSpellIDs
 	CarryIcon(stableID, icon)
-	if cooldownInfo then
-		CarryIcon(overrideID, icon)
-		if linked then
-			for _, linkedSpellID in ipairs(linked) do CarryIcon(linkedSpellID, icon) end
-		end
+	CarryIcon(overrideID, icon)
+	if linked then
+		for _, linkedSpellID in ipairs(linked) do CarryIcon(linkedSpellID, icon) end
 	end
 	local stamp, stampChecked = nil, false
 	if entry then
@@ -550,9 +541,7 @@ end
 
 local function BarSourcePool()
 	local viewer = _G.BuffBarCooldownViewer
-	local pool = viewer and viewer.itemFramePool
-	if pool and pool.EnumerateActive then return pool end
-	return nil
+	return viewer and viewer.itemFramePool
 end
 
 local HookBarViewer
@@ -582,8 +571,6 @@ local function ScanAppearIcons()
 				if bar.cooldownInfo then CollectBuffSource(bar, perSpell) end
 			end
 		end
-	end
-	if perSpell then
 		for key, entry in pairs(perSpell) do
 			if entry.glowTargetSpell and not entry.watchSpell and not carriedKeys[key] and not present[key] then
 				local icon = carried[entry.glowTargetSpell]
@@ -688,17 +675,14 @@ end
 
 local QueueAppearScan = BUI.Dispatcher.New(ScanAppearIcons, 'CDM.AppearScan')
 
+local function WakeAppearScan()
+	if appearWatchEnabled then QueueAppearScan() end
+end
+
 local barViewerHooked = false
 HookBarViewer = function()
 	if barViewerHooked then return end
-	local viewer = _G.BuffBarCooldownViewer
-	if not viewer then return end
-	barViewerHooked = true
-	local function Wake()
-		if appearWatchEnabled then QueueAppearScan() end
-	end
-	if viewer.OnAcquireItemFrame then Hook(viewer, 'OnAcquireItemFrame', Wake) end
-	if viewer.RefreshLayout then Hook(viewer, 'RefreshLayout', Wake) end
+	barViewerHooked = CDM.HookBarViewer(WakeAppearScan, WakeAppearScan)
 end
 
 local auraWatcher = CreateFrame('Frame')
@@ -706,7 +690,12 @@ auraWatcher:SetScript('OnEvent', BUI.Profiler.Wrap('CDM.ProcMenu aura watch', fu
 	if appearWatchEnabled then QueueAppearScan() end
 end))
 
-local trackHooked
+local trackHooked = false
+
+local function OnTrackedIconsChanged()
+	if next(activeIcons) then RefreshActiveOverlays() end
+	if appearWatchEnabled then QueueAppearScan() end
+end
 
 function CDM.RefreshProcMsgWatcher()
 	local perSpell = GlowDB().perSpell
@@ -735,13 +724,12 @@ function CDM.RefreshProcMsgWatcher()
 		end
 	end
 
+	if (procWant or appearWant) and not trackHooked then
+		trackHooked = true
+		CDM.OnTrackedIconsChanged(OnTrackedIconsChanged)
+	end
+
 	if procWant then
-		if not trackHooked then
-			trackHooked = true
-			CDM.OnTrackedIconsChanged(function()
-				if next(activeIcons) then RefreshActiveOverlays() end
-			end)
-		end
 		watcher:RegisterEvent('SPELL_ACTIVATION_OVERLAY_GLOW_SHOW')
 		watcher:RegisterEvent('SPELL_ACTIVATION_OVERLAY_GLOW_HIDE')
 	else
@@ -755,12 +743,6 @@ function CDM.RefreshProcMsgWatcher()
 	appearWatchEnabled = appearWant
 	if appearWant then
 		HookBarViewer()
-		if not appearHooked then
-			appearHooked = true
-			CDM.OnTrackedIconsChanged(function()
-				if appearWatchEnabled then QueueAppearScan() end
-			end)
-		end
 		auraWatcher:RegisterUnitEvent('UNIT_AURA', 'player')
 		auraWatcher:RegisterUnitEvent('UNIT_SPELLCAST_SUCCEEDED', 'player')
 		QueueAppearScan()
@@ -801,29 +783,25 @@ function CDM.FindTrackedBuffSource(spellID)
 	for sourceIndex = 1, #BUFF_SOURCES do
 		local source = BUFF_SOURCES[sourceIndex]
 		local allIDs = GetCategorySet(source.category, true)
-		if allIDs then
-			local shown = {}
-			local shownIDs = GetCategorySet(source.category, false)
-			if shownIDs then
-				for idIndex = 1, #shownIDs do shown[shownIDs[idIndex]] = true end
-			end
-			for idIndex = 1, #allIDs do
-				local cooldownID = allIDs[idIndex]
-				local info = GetCooldownInfo(cooldownID)
-				local matched, viaLinked = false, false
-				if info then matched, viaLinked = CooldownInfoMatch(info, spellID) end
-				if matched then
-					local entrySpellID = info.spellID
-					local hit = {
-						viewer = source.viewer,
-						label = source.label,
-						cooldownID = cooldownID,
-						displayed = shown[cooldownID] == true,
-						viaSpellID = (viaLinked and type(entrySpellID) == 'number' and not IsSecret(entrySpellID)) and entrySpellID or nil,
-					}
-					if hit.displayed then return hit end
-					hiddenHit = hiddenHit or hit
-				end
+		local shown = {}
+		local shownIDs = GetCategorySet(source.category, false)
+		for idIndex = 1, #shownIDs do shown[shownIDs[idIndex]] = true end
+		for idIndex = 1, #allIDs do
+			local cooldownID = allIDs[idIndex]
+			local info = GetCooldownInfo(cooldownID)
+			local matched, viaLinked = false, false
+			if info then matched, viaLinked = CooldownInfoMatch(info, spellID) end
+			if matched then
+				local entrySpellID = info.spellID
+				local hit = {
+					viewer = source.viewer,
+					label = source.label,
+					cooldownID = cooldownID,
+					displayed = shown[cooldownID] == true,
+					viaSpellID = (viaLinked and type(entrySpellID) == 'number' and not IsSecret(entrySpellID)) and entrySpellID or nil,
+				}
+				if hit.displayed then return hit end
+				hiddenHit = hiddenHit or hit
 			end
 		end
 	end
