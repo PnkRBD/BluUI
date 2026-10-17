@@ -102,6 +102,14 @@ local function Surface(frame, fillColor, edgeColor)
 	return fill
 end
 
+local function CloseOnEscape(overlay, onEscape)
+	overlay:SetScript("OnKeyDown", function(self, key)
+		local escape = key == "ESCAPE"
+		if not InCombatLockdown() then self:SetPropagateKeyboardInput(not escape) end
+		if escape then onEscape() end
+	end)
+end
+
 function Modals.CreateBase(width, height, bounded, parent)
 	width = Widget.EvenSize(width or SIZES.width)
 	height = Widget.EvenSize(height or SIZES.height)
@@ -126,7 +134,10 @@ function Modals.CreateBase(width, height, bounded, parent)
 
 	overlay:SetBackdrop(Widget.BACKDROP_BORDERLESS)
 	overlay:SetBackdropColor(unpack(OVERLAY_COLOR))
-	overlay:EnableKeyboard(true)
+	if not InCombatLockdown() then
+		overlay:EnableKeyboard(true)
+		overlay:SetPropagateKeyboardInput(true)
+	end
 
 	local dialog = CreateFrame("Frame", nil, overlay)
 	dialog:SetSize(width, height)
@@ -143,14 +154,7 @@ function Modals.CreateBase(width, height, bounded, parent)
 		overlay:Hide()
 	end
 
-	overlay:SetScript("OnKeyDown", function(self, key)
-		if key == "ESCAPE" then
-			self:SetPropagateKeyboardInput(false)
-			Close()
-		else
-			self:SetPropagateKeyboardInput(true)
-		end
-	end)
+	CloseOnEscape(overlay, Close)
 
 	local overlayAnim = overlay:CreateAnimationGroup()
 	local fade = overlayAnim:CreateAnimation("Alpha")
@@ -312,14 +316,7 @@ function Modals.Confirm(options)
 
 	local fireOnce = OnceGuard()
 
-	overlay:SetScript("OnKeyDown", function(self, key)
-		if key == "ESCAPE" then
-			self:SetPropagateKeyboardInput(false)
-			Close(); fireOnce(options.onCancel)
-		else
-			self:SetPropagateKeyboardInput(true)
-		end
-	end)
+	CloseOnEscape(overlay, function() Close(); fireOnce(options.onCancel) end)
 
 	local buttons = {
 		{text = options.confirmText or "Confirm", color = Modals.BTN_CONFIRM, width = options.buttonWidth,
@@ -366,14 +363,7 @@ function Modals.Input(options)
 
 	local fireOnce = OnceGuard()
 
-	overlay:SetScript("OnKeyDown", function(self, key)
-		if key == "ESCAPE" then
-			self:SetPropagateKeyboardInput(false)
-			Close(); fireOnce(options.onCancel)
-		else
-			self:SetPropagateKeyboardInput(true)
-		end
-	end)
+	CloseOnEscape(overlay, function() Close(); fireOnce(options.onCancel) end)
 
 	input:SetScript("OnEnterPressed", function()
 		local text = input:GetText()
@@ -414,14 +404,7 @@ function Modals.Copy(options)
 	input:SetScript("OnEnterPressed", function() Close() end)
 	input:SetScript("OnEscapePressed", function() Close() end)
 
-	overlay:SetScript("OnKeyDown", function(self, key)
-		if key == "ESCAPE" then
-			self:SetPropagateKeyboardInput(false)
-			Close()
-		else
-			self:SetPropagateKeyboardInput(true)
-		end
-	end)
+	CloseOnEscape(overlay, Close)
 
 	Modals.LayoutButtons(dialog, {
 		{text = options.buttonText or "Done", color = Modals.BTN_CONFIRM, width = options.buttonWidth},
@@ -630,14 +613,7 @@ function Modals.Number(options)
 		fireOnce(options.onConfirm, value)
 	end
 
-	overlay:SetScript('OnKeyDown', function(self, key)
-		if key == 'ESCAPE' then
-			self:SetPropagateKeyboardInput(false)
-			Cancel()
-		else
-			self:SetPropagateKeyboardInput(true)
-		end
-	end)
+	CloseOnEscape(overlay, Cancel)
 
 	local title = dialog:CreateFontString(nil, 'OVERLAY')
 	title:SetFont(BUILib.Font, NUMBER.titleSize, '')
@@ -894,14 +870,7 @@ function Modals.Settings(options)
 
 	local fireOnce = OnceGuard()
 
-	overlay:SetScript("OnKeyDown", function(self, key)
-		if key == "ESCAPE" then
-			self:SetPropagateKeyboardInput(false)
-			Close(); fireOnce(options.onClose)
-		else
-			self:SetPropagateKeyboardInput(true)
-		end
-	end)
+	CloseOnEscape(overlay, function() Close(); fireOnce(options.onClose) end)
 
 	local accentRed, accentGreen, accentBlue = theme.GetAccent()
 
