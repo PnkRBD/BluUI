@@ -16,7 +16,6 @@ local UnitName = UnitName
 local UnitGroupRolesAssigned = UnitGroupRolesAssigned
 local GetPartyAssignment = GetPartyAssignment
 local strcmputf8i = strcmputf8i
-local format = string.format
 
 local Tools = BUI.Tools
 
@@ -27,6 +26,7 @@ local MISDIRECTION_SPELL = 34477
 local BUTTON_NAME = 'BUI_SmartMisdirect'
 local MACRO_NAME = 'BluUI Misdirect'
 local MACRO_BODY = '#showtooltip Misdirection\n/click ' .. BUTTON_NAME .. ' LeftButton'
+local MACRO_FALLBACK_ICON = 134400
 
 local TANK_ROLE_ONLY = 'roleOnly'
 local TANK_ROLE_OR_MAIN = 'roleOrMain'
@@ -49,7 +49,7 @@ local RAID_UNITS, PARTY_UNITS = {}, {}
 for memberIndex = 1, MAX_RAID_MEMBERS do RAID_UNITS[memberIndex] = 'raid' .. memberIndex end
 for memberIndex = 1, MAX_PARTY_MEMBERS do PARTY_UNITS[memberIndex] = 'party' .. memberIndex end
 
-local playerIsHunter = select(2, UnitClass('player')) == 'HUNTER'
+local playerIsHunter = BUI.BuffTracking.Hunter.PlayerIsHunter
 
 local button
 local currentLabel
@@ -148,13 +148,6 @@ local function TargetLabel(unit)
 	return SafeName(unit)
 end
 
-local function TargetColor(unit)
-	if unit == 'pet' then return 1, 1, 1 end
-	local red, green, blue = Tools.GetUnitClassColor(unit)
-	if not red then return 1, 1, 1 end
-	return red, green, blue
-end
-
 local function AlertStacks()
 	if not currentLabel then return 0 end
 	if flashShowing or AlertSettings().alertMode ~= 'flash' then return 1 end
@@ -169,7 +162,6 @@ local function AlertText(settings)
 end
 
 function SmartMisdirect.Create()
-	if not playerIsHunter then return nil end
 	local Display = BUI.BuffTracking.Display
 	alertTracker = Display.CreateTracker({
 		settingsKey   = ALERT_KEY,
@@ -228,12 +220,6 @@ local function Announce(unit)
 	local _, instanceType = IsInInstance()
 	if instanceType == 'pvp' or instanceType == 'arena' then suppressed = true end
 	RefreshAlert(not suppressed and AlertSettings().flashOnTargetChange)
-	if suppressed or not Settings().enabled then return end
-	if not name then
-		BUI.Print('Misdirect: no valid target.')
-		return
-	end
-	BUI.Print(format('Misdirect: |cff%s%s|r', BUI.Hex(TargetColor(unit)), name))
 end
 
 local function ApplyTarget()
@@ -284,12 +270,12 @@ function SmartMisdirect.CreateMacro()
 		BUI.Print('Leave combat before creating the macro.')
 		return
 	end
-	local icon = C_Spell.GetSpellTexture(MISDIRECTION_SPELL)
+	local icon = C_Spell.GetSpellTexture(MISDIRECTION_SPELL) or MACRO_FALLBACK_ICON
 	local index = GetMacroIndexByName(MACRO_NAME)
 	if index > 0 then
 		EditMacro(index, MACRO_NAME, icon, MACRO_BODY)
 	else
-		if GetNumMacros() >= MAX_ACCOUNT_MACROS then
+		if GetNumMacros() >= Constants.MacroConsts.MAX_ACCOUNT_MACROS then
 			BUI.Print('No free account macro slots. Delete one and try again.')
 			return
 		end
@@ -306,7 +292,7 @@ end
 local function AddMenuEntry(_, rootDescription, contextData)
 	local settings = Settings()
 	if not settings.enabled then return end
-	local unit = contextData and contextData.unit
+	local unit = contextData.unit
 	if not unit or not UnitExists(unit) or not UnitIsPlayer(unit) or UnitIsUnit(unit, 'player') then return end
 	local groupUnit = FindGroupUnit(UnitIsUnit, unit)
 	if not groupUnit then return end

@@ -23,13 +23,8 @@ local MIN_SECONDS, MAX_SECONDS = 0.5, 14
 
 local fonts, sounds, current
 
-local function Window()
-	return BUI.PageEngine.window
-end
-
-local function Repaint()
-	Window():Repaint()
-end
+local Kit = BUI.OptionsKit
+local Window, Repaint, Option, Toggle, Color = Kit.Window, Kit.Repaint, Kit.Option, Kit.Toggle, Kit.TableColor
 
 local function RefreshTracker(key)
 	local tracker = Display.GetTracker(key)
@@ -44,34 +39,11 @@ local function SpellIcon(spellID)
 	return C_Spell.GetSpellTexture(spellID)
 end
 
-local function Option(db, label, key, extra)
-	local option = { label = label, get = function() return db[key] end, set = function(value) db[key] = value end }
-	for name, value in pairs(extra or {}) do option[name] = value end
-	return option
-end
-
-local function Toggle(db, label, key)
-	return { label = label, get = function() return db[key] == true end, set = function(value) db[key] = value end }
-end
-
 local function Switch(board, db, label, key, Refresh)
 	board:AddSwitch(label, function() return db[key] == true end, function(value)
 		db[key] = value
 		Refresh()
 	end)
-end
-
-local function Color(db, label, key, opacity)
-	return {
-		kind = 'swatch', label = label, tooltip = label, opacity = opacity,
-		get = function()
-			local color = db[key]
-			return color.r, color.g, color.b, opacity and color.a or 1
-		end,
-		set = function(red, green, blue, alpha)
-			db[key] = opacity and { r = red, g = green, b = blue, a = alpha } or { r = red, g = green, b = blue }
-		end,
-	}
 end
 
 local function Font(db)
@@ -119,7 +91,7 @@ local function SoundRow(board, db, Refresh, timing)
 end
 
 local function Eye(db, Refresh, spec)
-	Display.RegisterAnchorCallback(spec.key, Repaint)
+	BUI.OnModuleChange(spec.key, Repaint)
 	return { icon = 'eye', tooltip = 'Unlock to drag it, right-click it to lock', get = function() return db.showAnchor == true end, set = function(value)
 		db.showAnchor = value
 		Refresh()
@@ -310,7 +282,7 @@ local function HuntersMark(board)
 		key = 'auras', flag = 'markWarning', title = "Hunter's Mark", description = "Callout while your target is missing Hunter's Mark", spell = 257284,
 		refresh = Auras.UpdateMark,
 		eye = function(db, Refresh)
-			Auras._markLockToggle = { SetValue = Repaint }
+			BUI.OnModuleChange('markWarning', Repaint)
 			return { icon = 'eye', tooltip = 'Preview, drag to move, right-click it to lock', get = function() return db.markLocked == false end, set = function(value)
 				db.markLocked = not value
 				Refresh()
@@ -361,6 +333,7 @@ local function Sections(ui, _, parent, width)
 		StackAlert(procs, { key = 'hunterTip', frame = 'BUI_BuffTrackingHunterTip', stacks = 3, title = 'Tip of the Spear', description = 'Stacks as bars or a number, up to 3', spell = 260286 })
 		TextAlert(procs, { key = 'hunterRaptorSwipe', frame = 'BUI_BuffTrackingHunterRS', title = 'Raptor Swipe', description = 'Text alert while Raptor Swipe is active', spell = 1273155, textLabel = 'Text', altTextLabel = 'Text without Tip stacks' })
 		TextAlert(procs, { key = 'hunterRaptorPrompt', frame = 'BUI_BuffTrackingHunterRaptorPrompt', title = 'Raptor Prompt', description = 'Reminder to cast Raptor Strike when nothing else is up', spell = 186270 })
+		TextAlert(procs, { key = 'hunterKillCommand', frame = 'BUI_BuffTrackingHunterKC', title = 'Kill Command', description = 'Text alert when Kill Command procs', spell = 259489 })
 		PackLeader(Board('Pack Leader', 'Beast cycle helpers for Pack Leader.'))
 	elseif Hunter.IsMarksmanshipHunter() then
 		local procs = Board('Procs', 'Text callouts for procs. The eye on a row lets you drag it, right-click the text to lock it again.')
@@ -453,8 +426,7 @@ BUI.PageEngine.RegisterPage('classAlert', {
 	end,
 })
 
-BUI.Events:Register('PLAYER_SPECIALIZATION_CHANGED', 'BuffTrackingPage', function(_, unit)
-	if unit ~= 'player' then return end
+BUI.Events:RegisterUnit('PLAYER_SPECIALIZATION_CHANGED', 'player', 'BuffTrackingPage', function()
 	C_Timer.After(0.3, function()
 		local pageConfig = BUI.PageEngine.pages.auras
 		if pageConfig.frame then pageConfig.stale = true end

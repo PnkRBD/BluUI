@@ -18,7 +18,7 @@ if not playerIsMonk then return end
 local scan = BUI.BuffTracking.NewCDMScan(TRACKED_SPELL_IDS)
 
 local function DetectSpec()
-    isMistweaver = GetSpecialization() == 2
+    isMistweaver = C_SpecializationInfo.GetSpecialization() == 2
 end
 
 local function GetStacks()

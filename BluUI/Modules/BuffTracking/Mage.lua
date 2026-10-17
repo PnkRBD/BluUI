@@ -20,7 +20,7 @@ local Tools = BUI.Tools
 local scan = BUI.BuffTracking.NewCDMScan(SALVO_SPELLS)
 
 local function DetectSpec()
-    isArcane = GetSpecialization() == ARCANE
+    isArcane = C_SpecializationInfo.GetSpecialization() == ARCANE
 end
 
 local function GetStacks()

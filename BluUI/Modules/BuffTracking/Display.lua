@@ -11,8 +11,6 @@ local inCombat = false
 
 local STACK_COLOR_KEYS = { "stack1Color", "stack2Color", "stack3Color" }
 
-local anchorCallbacks = {}
-
 function Display.GetTrackers() return trackers end
 function Display.GetTracker(settingsKey) return trackers[settingsKey] end
 function Display.IsInCombat() return inCombat end
@@ -43,15 +41,6 @@ function Display.UpdateOpacity()
     end
 end
 
-function Display.RegisterAnchorCallback(settingsKey, callback)
-    anchorCallbacks[settingsKey] = callback
-end
-
-function Display.NotifyAnchorChanged(settingsKey, state)
-    local callback = anchorCallbacks[settingsKey]
-    if callback then callback(state) end
-end
-
 function Display.MakeAnchorOverlay(frame)
     frame.anchor = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
     frame.anchor:SetAllPoints()
@@ -76,12 +65,12 @@ function Display.EnableDragging(tracker, GetConfig)
             GetConfig().showAnchor = false
             tracker.DisableDragging()
             tracker.RecheckActive()
-            Display.NotifyAnchorChanged(tracker.settingsKey, false)
+            BUI.NotifyModuleChange(tracker.settingsKey)
         end,
     })
 
-    if frame.anchor     then frame.anchor:Show()     end
-    if frame.anchorText then frame.anchorText:Show() end
+    frame.anchor:Show()
+    frame.anchorText:Show()
 end
 
 function Display.DisableDragging(tracker)
@@ -90,8 +79,8 @@ function Display.DisableDragging(tracker)
 
     BUI.Dragging.DisableAnchorDrag(frame)
 
-    if frame.anchor     then frame.anchor:Hide()     end
-    if frame.anchorText then frame.anchorText:Hide() end
+    frame.anchor:Hide()
+    frame.anchorText:Hide()
 end
 
 local function TrackerLive(tracker)
@@ -147,9 +136,7 @@ function Display.CreateTracker(config)
         getColorStacks = config.getColorStacks,
         isActive       = config.isActive,
         maxStacks      = config.maxStacks,
-        frame          = nil,
         bars           = {},
-        textDisplay    = nil,
     }
 
     local function GetSettings() return BUI.GetDB()[tracker.settingsKey] end
@@ -304,7 +291,7 @@ function Display.CreateTracker(config)
             text:SetText(settings.customText)
         end
         text:SetTextColor(textColor.r, textColor.g, textColor.b, 1)
-        if config.stackDriver and button then
+        if config.stackDriver then
             local label = button._buiDriverLabel
             local wanted = settings.customText
             if wanted ~= "" then
@@ -362,14 +349,12 @@ function Display.CreateTracker(config)
     local function SyncAuraText(shouldSync)
         if not config.auraSpellSet then return false end
         local Engine = BUI.AuraEngine
-        if not Engine.Available then return false end
         local syncDriver = config.stackDriver and Engine.SyncAuraStackDriver or Engine.SyncAuraTextDriver
         if not shouldSync then
             if auraDriver then syncDriver(auraDriver, false) end
             return false
         end
         if not auraDriver then auraDriver = Engine.NewAuraDriver(tracker.frame) end
-        if not auraStamp then RefreshAuraStyle() end
 
         local sizePixels = GetSettings().textSize * 2
         local widthPixels = sizePixels
@@ -556,20 +541,13 @@ local function CreateHunterTracker(Hunter, definition)
     })
 end
 
-local function CreateModuleTracker(module)
-    local tracker = module.Create()
-    if tracker then tracker.Initialize() end
-end
-
 BUI.Events:OnLogin("BuffTrackingDisplay", function()
     local Hunter = BUI.BuffTracking.Hunter
-    if Hunter.PlayerIsHunter then
-        for _, definition in ipairs(HUNTER_TRACKERS) do
-            CreateHunterTracker(Hunter, definition).Initialize()
-        end
-        CreateModuleTracker(BUI.BuffTracking.PackLeader)
+    if not Hunter.PlayerIsHunter then return end
+    for _, definition in ipairs(HUNTER_TRACKERS) do
+        CreateHunterTracker(Hunter, definition).Initialize()
     end
-    CreateModuleTracker(BUI.BuffTracking.PetAlert)
-    CreateModuleTracker(BUI.BuffTracking.SmartMisdirect)
-    RecheckAllActive()
+    BUI.BuffTracking.PackLeader.Create().Initialize()
+    BUI.BuffTracking.PetAlert.Create().Initialize()
+    BUI.BuffTracking.SmartMisdirect.Create().Initialize()
 end, "buffTracking")

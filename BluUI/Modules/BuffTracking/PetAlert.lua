@@ -9,8 +9,6 @@ local EVENT_KEY    = 'BuffTrackingPetAlert'
 
 local GRACE_SECONDS = 0.5
 
-local playerIsHunter = select(2, UnitClass('player')) == 'HUNTER'
-
 local active = false
 local notAttackingSince = nil
 local pendingTimer = nil
@@ -65,7 +63,6 @@ local function GetStacks()
 end
 
 function PetAlert.Create()
-    if not playerIsHunter then return nil end
     local Display = BUI.BuffTracking.Display
 
     activeTracker = Display.CreateTracker({
