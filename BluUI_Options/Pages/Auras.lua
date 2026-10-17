@@ -18,26 +18,10 @@ local LOW_HP_FIELDS = {
 }
 
 local fonts, sounds
+local specList
 
-local function Window()
-	return BUI.PageEngine.window
-end
-
-local function Repaint()
-	Window():Repaint()
-end
-
-local relock = { SetValue = Repaint }
-
-local function Option(db, label, key, extra)
-	local option = { label = label, get = function() return db[key] end, set = function(value) db[key] = value end }
-	for name, value in pairs(extra or {}) do option[name] = value end
-	return option
-end
-
-local function Flag(holder, label)
-	return { label = label, get = function() return holder.enabled == true end, set = function(value) holder.enabled = value end }
-end
+local Kit = BUI.OptionsKit
+local Window, Repaint, Option, Toggle, Color, TableColor = Kit.Window, Kit.Repaint, Kit.Option, Kit.Toggle, Kit.Color, Kit.TableColor
 
 local function Font(db, key)
 	return { entries = fonts, width = MENU_WIDTH, get = function() return db[key] end, set = function(value) db[key] = value end }
@@ -61,33 +45,14 @@ local function Eye(tooltip, get, set)
 	return { icon = 'eye', tooltip = tooltip, get = get, set = set }
 end
 
-local function Switch(db, key)
-	return { get = function() return db[key] == true end, set = function(value) db[key] = value end }
-end
-
-local function TableColor(db, label, key, opacity)
+local function ArrayColor(db, label, key)
 	return {
-		kind = 'swatch', label = label, tooltip = label, opacity = opacity,
+		kind = 'swatch', label = label, tooltip = label, opacity = false,
 		get = function()
 			local color = db[key]
-			return color.r, color.g, color.b, opacity and color.a or 1
+			return color[1], color[2], color[3], 1
 		end,
-		set = function(red, green, blue, alpha)
-			db[key] = opacity and { r = red, g = green, b = blue, a = alpha } or { r = red, g = green, b = blue }
-		end,
-	}
-end
-
-local function ArrayColor(db, label, key, opacity)
-	return {
-		kind = 'swatch', label = label, tooltip = label, opacity = opacity,
-		get = function()
-			local color = db[key]
-			return color[1], color[2], color[3], opacity and color[4] or 1
-		end,
-		set = function(red, green, blue, alpha)
-			db[key] = opacity and { red, green, blue, alpha } or { red, green, blue }
-		end,
+		set = function(red, green, blue) db[key] = { red, green, blue } end,
 	}
 end
 
@@ -105,7 +70,7 @@ end
 local function CombatTimerRow()
 	local db = BUI.GetDB().combatTimer
 	local CombatTimer = BUI.CombatTimer
-	CombatTimer._lockToggle = relock
+	BUI.OnModuleChange('combatTimer', Repaint)
 	return {
 		id = 'combatTimer', name = 'Combat Timer', sub = 'How long you have been in combat', after = CombatTimer.ApplySettings,
 		switch = { get = function() return db.enabled == true end, set = CombatTimer.Toggle },
@@ -122,10 +87,32 @@ local function CombatTimerRow()
 	}
 end
 
+local function CombatResRow()
+	local db = BUI.GetDB().combatRes
+	local CombatRes = BUI.CombatRes
+	BUI.OnModuleChange('combatRes', Repaint)
+	return {
+		id = 'combatRes', name = 'Combat Rez', sub = 'Charges and recharge time in raids and keys', after = CombatRes.ApplySettings,
+		switch = { get = function() return db.enabled == true end, set = CombatRes.Toggle },
+		tools = {
+			TableColor(db, 'Text color', 'textColor'),
+			TableColor(db, 'No charges color', 'emptyColor'),
+			Font(db, 'font'),
+			TextTool({ Option(db, 'Font size', 'fontSize', { min = 10, max = 40, step = 1 }) }),
+			{ tooltip = 'What shows', title = 'Combat rez', slot = 'settings', options = {
+				Toggle(db, 'Spell icon', 'showIcon'),
+				Toggle(db, 'Recharge timer', 'showTimer'),
+			} },
+			Pin(db, { selfTag = 'BUI_CombatRes' }),
+			Eye('Preview, drag to move', function() return not db.locked end, function(value) CombatRes.SetLocked(not value) end),
+		},
+	}
+end
+
 local function CombatMessagesRow()
 	local db = BUI.GetDB().combatMessage
 	local CombatMessage = BUI.CombatMessage
-	CombatMessage._lockToggle = relock
+	BUI.OnModuleChange('combatMessage', Repaint)
 	return {
 		id = 'combatMessage', name = 'Combat Messages', sub = 'Text when combat starts and ends', after = CombatMessage.Refresh,
 		switch = { get = function() return db.enabled == true end, set = function(value)
@@ -133,8 +120,8 @@ local function CombatMessagesRow()
 			if value then CombatMessage.Enable() else CombatMessage.Disable() end
 		end },
 		tools = {
-			ArrayColor(db, 'Enter combat', 'enterColor', true),
-			ArrayColor(db, 'Leave combat', 'leaveColor', true),
+			Color(db, 'Enter combat', 'enterColor'),
+			Color(db, 'Leave combat', 'leaveColor'),
 			Font(db, 'font'),
 			TextTool({ Option(db, 'Font size', 'fontSize', { min = 10, max = 40, step = 1 }) }),
 			{ tooltip = 'Timing', title = 'Messages', slot = 'settings', options = {
@@ -149,10 +136,10 @@ end
 local function SecondaryStatsRow()
 	local db = BUI.GetDB().secondaryStats
 	local SecondaryStats = BUI.Auras.SecondaryStats
-	SecondaryStats.SetLockListener(Repaint)
+	BUI.OnModuleChange('secondaryStats', Repaint)
 	return {
 		id = 'secondaryStats', name = 'Secondary Stats', sub = 'Your stats on screen', after = SecondaryStats.Refresh,
-		switch = Switch(db, 'enabled'),
+		switch = Toggle(db, nil, 'enabled'),
 		tools = {
 			PageCog('Secondary Stats', 'secondaryStats'),
 			Pin(db, { selfTag = 'BUI_SecondaryStats' }),
@@ -164,7 +151,7 @@ end
 local function KeystoneReminderRow()
 	local db = BUI.GetDB().keystoneReminder
 	local KeystoneReminder = BUI.Auras.KeystoneReminder
-	KeystoneReminder.SetLockListener(Repaint)
+	BUI.OnModuleChange('keystoneReminder', Repaint)
 	return {
 		id = 'keystoneReminder', name = 'Keystone Reminder', sub = 'Dungeon and teleport when a key group forms', after = KeystoneReminder.Refresh,
 		switch = { get = function() return db.enabled == true end, set = function(value)
@@ -181,10 +168,10 @@ end
 local function PrivateWarningRow()
 	local db = BUI.GetDB().privateWarning
 	local PrivateWarning = BUI.Auras.PrivateWarning
-	PrivateWarning.SetLockListener(Repaint)
+	BUI.OnModuleChange('privateWarning', Repaint)
 	return {
 		id = 'privateWarning', name = 'Private raid warning', sub = "Moves Blizzard's private boss warnings", after = PrivateWarning.Refresh,
-		switch = Switch(db, 'enabled'),
+		switch = Toggle(db, nil, 'enabled'),
 		tools = {
 			TextTool({ Option(db, 'Scale', 'scale', { min = 50, max = 200, step = 5 }) }),
 			Pin(db),
@@ -196,10 +183,10 @@ end
 local function LowHpRow()
 	local db = BUI.GetDB().auras
 	local Auras = BUI.Auras
-	Auras._lowHpLockToggle = relock
+	BUI.OnModuleChange('lowHp', Repaint)
 	return {
 		id = 'lowHp', name = 'Low HP Warning', sub = 'Text when your health is low', after = Auras.UpdateLowHp,
-		switch = Switch(db, 'lowHpWarning'),
+		switch = Toggle(db, nil, 'lowHpWarning'),
 		tools = {
 			TableColor(db, 'Text color', 'lowHpColor', true),
 			Font(db, 'lowHpFont'),
@@ -222,20 +209,20 @@ end
 local function PetWarningsRow()
 	local db = BUI.GetDB().auras
 	local Auras = BUI.Auras
-	Auras._lockToggle = relock
+	BUI.OnModuleChange('petWarnings', Repaint)
 	return {
 		id = 'petWarnings', name = 'Pet Warnings', sub = 'Dead, missing, idle or hurt pet', after = Auras.Update,
-		switch = Switch(db, 'petWarningsEnabled'),
+		switch = Toggle(db, nil, 'petWarningsEnabled'),
 		tools = {
 			TableColor(db, 'Warning color', 'warningColor', true),
 			Font(db, 'font'),
 			TextTool({ Option(db, 'Font size', 'fontSize', { min = 14, max = 48, step = 1 }) }),
 			{ tooltip = 'Warning types', title = 'Pet warnings', slot = 'settings', options = {
-				Flag(db.petAttackWarning, 'Pet not attacking'),
-				Flag(db.petDeadWarning, 'Pet dead or missing'),
-				Flag(db.grimoireSacrificeWarning, 'Grimoire of Sacrifice'),
-				Flag(db.playDeadWarning, 'Playing dead'),
-				Flag(db.petHealthWarning, 'Pet low health'),
+				Toggle(db.petAttackWarning, 'Pet not attacking', 'enabled'),
+				Toggle(db.petDeadWarning, 'Pet dead or missing', 'enabled'),
+				Toggle(db.grimoireSacrificeWarning, 'Grimoire of Sacrifice', 'enabled'),
+				Toggle(db.playDeadWarning, 'Playing dead', 'enabled'),
+				Toggle(db.petHealthWarning, 'Pet low health', 'enabled'),
 				{ label = 'Low health %', min = 10, max = 80, step = 5, get = function() return db.petHealthWarning.threshold end, set = function(value) db.petHealthWarning.threshold = value end },
 			} },
 			Pin(db, { selfTag = 'BUI_PetWarning' }),
@@ -251,10 +238,10 @@ local function GatewayRow()
 		local tracker = Display.GetTracker('gatewayAlert')
 		if tracker then tracker.Refresh() end
 	end
-	Display.RegisterAnchorCallback('gatewayAlert', Repaint)
+	BUI.OnModuleChange('gatewayAlert', Repaint)
 	return {
 		id = 'gatewayAlert', name = 'Gateway Alert', sub = 'Text when a Demonic Gateway is in reach', after = Apply,
-		switch = Switch(db, 'enabled'),
+		switch = Toggle(db, nil, 'enabled'),
 		tools = {
 			TableColor(db, 'Text color', 'textColor', true),
 			Font(db, 'font'),
@@ -280,10 +267,10 @@ end
 local function BloodlustRow()
 	local db = BUI.GetDB().bloodlust
 	local Bloodlust = BUI.Bloodlust
-	Bloodlust.onPreviewStop = Repaint
+	BUI.OnModuleChange('bloodlust', Repaint)
 	return {
 		id = 'bloodlust', name = 'Bloodlust', sub = 'Lust timers and alerts', after = Bloodlust.Refresh,
-		switch = Switch(db, 'enabled'),
+		switch = Toggle(db, nil, 'enabled'),
 		tools = {
 			Font(db, 'font'),
 			TextTool({ Option(db, 'Font size', 'fontSize', { min = 8, max = 48, step = 1 }) }),
@@ -299,10 +286,10 @@ end
 local function CDAnnouncerRow()
 	local db = BUI.GetDB().cdAnnouncer
 	local CDAnnouncer = BUI.CDAnnouncer
-	CDAnnouncer.RegisterAnchorCallback(Repaint)
+	BUI.OnModuleChange('cdAnnouncer', Repaint)
 	return {
 		id = 'cdAnnouncer', name = 'Cooldown Announcer', sub = 'Countdowns for cooldowns you pick', after = CDAnnouncer.Refresh,
-		switch = Switch(db, 'enabled'),
+		switch = Toggle(db, nil, 'enabled'),
 		tools = {
 			PageCog('Cooldown Announcer', 'cdAnnouncer'),
 			Pin(db, { noAnchor = true }),
@@ -317,10 +304,10 @@ end
 local function CooldownFlashRow()
 	local db = BUI.GetDB().cooldownFlash
 	local CooldownFlash = BUI.CooldownFlash
-	CooldownFlash.RegisterAnchorCallback(Repaint)
+	BUI.OnModuleChange('cooldownFlash', Repaint)
 	return {
 		id = 'cooldownFlash', name = 'Cooldown Flash', sub = 'Flashes spells as they come off cooldown', after = CooldownFlash.Refresh,
-		switch = Switch(db, 'enabled'),
+		switch = Toggle(db, nil, 'enabled'),
 		tools = {
 			PageCog('Cooldown Flash', 'cooldownFlash'),
 			Pin(db, { selfTag = 'BUI_CooldownFlash' }),
@@ -333,25 +320,21 @@ local function CooldownFlashRow()
 end
 
 local function SpecList()
-	local specs = {}
+	if specList then return specList end
+	specList = {}
 	for classID = 1, GetNumClasses() do
 		local className, classFile = GetClassInfo(classID)
-		if className then
-			local classColor = RAID_CLASS_COLORS[classFile]
-			local colorText = classColor and classColor.colorStr or 'ffcccccc'
-			for specIndex = 1, GetNumSpecializationsForClassID(classID) do
-				local specID, specName = GetSpecializationInfoForClassID(classID, specIndex)
-				if specID then
-					specs[#specs + 1] = { className = className, id = specID, text = ('|c%s%s|r  |cff888888%s|r'):format(colorText, specName or ('Spec ' .. specIndex), className) }
-				end
-			end
+		local colorText = RAID_CLASS_COLORS[classFile].colorStr
+		for specIndex = 1, C_SpecializationInfo.GetNumSpecializationsForClassID(classID) do
+			local specID, specName = GetSpecializationInfoForClassID(classID, specIndex)
+			specList[#specList + 1] = { className = className, id = specID, text = ('|c%s%s|r  |cff888888%s|r'):format(colorText, specName, className) }
 		end
 	end
-	table.sort(specs, function(left, right)
+	table.sort(specList, function(left, right)
 		if left.className ~= right.className then return left.className < right.className end
 		return left.text < right.text
 	end)
-	return specs
+	return specList
 end
 
 local function SpecsTool(ui, db, apply)
@@ -419,7 +402,7 @@ local function CrosshairRow(ui)
 	local Crosshair = BUI.Crosshair
 	return {
 		id = 'crosshair', name = 'Crosshair', sub = 'A reticle at the center of your screen', after = Crosshair.Refresh,
-		switch = Switch(db, 'enabled'),
+		switch = Toggle(db, nil, 'enabled'),
 		tools = {
 			ChannelColor(db, 'Crosshair color', 'alpha'),
 			{ entries = STYLES, width = MENU_WIDTH, get = function() return db.style end, set = function(value) db.style = value end },
@@ -431,8 +414,8 @@ local function CrosshairRow(ui)
 				Option(db, 'Hide out of combat', 'hideOutOfCombat'),
 				Option(db, 'Hide in town', 'hideInTown'),
 				Option(db, 'Range indicator, ' .. Crosshair.RangeLabel(), 'rangeIndicator'),
-				ArrayColor(db, 'In range color', 'inRangeColor', false),
-				ArrayColor(db, 'Out of range color', 'outOfRangeColor', false),
+				ArrayColor(db, 'In range color', 'inRangeColor'),
+				ArrayColor(db, 'Out of range color', 'outOfRangeColor'),
 			} },
 			{ icon = 'location', tooltip = 'Screen offset', title = 'Position', slot = 'position', options = {
 				Option(db, 'Horizontal offset', 'offsetX', { min = -500, max = 500, step = 1 }),
@@ -444,7 +427,7 @@ local function CrosshairRow(ui)
 end
 
 local ROWS = {
-	CombatTimerRow, CombatMessagesRow, SecondaryStatsRow, KeystoneReminderRow, PrivateWarningRow,
+	CombatTimerRow, CombatResRow, CombatMessagesRow, SecondaryStatsRow, KeystoneReminderRow, PrivateWarningRow,
 	LowHpRow, PetWarningsRow, GatewayRow, BloodlustRow, CDAnnouncerRow, CooldownFlashRow, CrosshairRow,
 }
 
@@ -492,7 +475,6 @@ BUI.PageEngine.RegisterPage('auras', {
 			},
 		})
 		pageFrame._page = handle
-		pageFrame._selectModule = function() handle:SetTab(1) end
 		page:AutoRefresh()
 	end,
 	OnHide = function()
@@ -505,6 +487,17 @@ BUI.PageEngine.RegisterPage('auras', {
 		BUI.Crosshair.SetPreview(false)
 		if BUI.Bloodlust.IsPreviewing() then BUI.Bloodlust.StopPreview() end
 		if not BUI.GetDB().gcdHistory.locked then BUI.GCDHistory.SetLocked(true) end
+		local db = BUI.GetDB()
+		if not db.combatTimer.locked then BUI.CombatTimer.SetLocked(true) end
+		if not db.combatRes.locked then BUI.CombatRes.SetLocked(true) end
+		if not db.combatMessage.locked then BUI.CombatMessage.SetLocked(true) end
+		if not db.secondaryStats.locked then BUI.Auras.SecondaryStats.SetLocked(true) end
+		if not db.keystoneReminder.locked then BUI.Auras.KeystoneReminder.SetLocked(true) end
+		if not db.privateWarning.locked then BUI.Auras.PrivateWarning.SetLocked(true) end
+		if not settings.markLocked then
+			settings.markLocked = true
+			BUI.Auras.UpdateMark()
+		end
 		local overlays = BUI.BuffTracking
 		if overlays.KillCommandOverlay.IsPreviewing() then overlays.KillCommandOverlay.StopPreview() end
 	end,

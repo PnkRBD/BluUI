@@ -5,7 +5,7 @@ local SearchIndex = BUI.SearchIndex
 
 local entries = {
 	{ label = "Look and behavior", page = "unitframes", tab = 1, panel = "Appearance", keywords = "unit frame texture font statusbar tooltip click to target decimal abbreviations number format sync copy player target pet enable test mode" },
-	{ label = "Status tag", page = "unitframes", tab = 2, panel = "Tags", keywords = "dead ghost offline afk dnd status color shared party raid size position" },
+	{ label = "Status", page = "unitframes", tab = 2, panel = "Default tags", keywords = "dead ghost offline afk dnd status color shared party raid size position" },
 	{ label = "Health bar", page = "unitframes", tab = 1, panel = "Appearance", keywords = "health color background border class color transparent" },
 	{ label = "Damage absorb", page = "unitframes", tab = 1, panel = "Appearance", keywords = "absorb shield heal absorb texture direction preview" },
 	{ label = "Power bar", page = "unitframes", tab = 1, panel = "Appearance", keywords = "power color resource type class reaction" },
@@ -30,7 +30,7 @@ local entries = {
 	{ label = "Hide my pet's debuffs", page = "unitframes", tab = 9, panel = "Filters", keywords = "pet summon guardian demon ghoul debuffs hide hunter warlock target" },
 	{ label = "Show anyone's pinned debuffs", page = "unitframes", tab = 9, panel = "Filters", keywords = "pinned whitelist debuffs mine other players hunter's mark" },
 	{ label = "Show anyone's pinned buffs", page = "unitframes", tab = 9, panel = "Filters", keywords = "pinned whitelist buffs mine other players" },
-	{ label = "Smooth Bars", page = "settings", tab = 1, panel = "Bar Textures", keywords = "animation smooth unit frames group frames" },
+	{ label = "Smooth bars", page = "settings", tab = 1, panel = "Bars", keywords = "animation smooth unit frames group frames health power" },
 
 	{ label = "Blizzard settings", page = "cdm", tab = 1, panel = "Cooldown Manager", keywords = "advanced cdm blizzard edit mode settings panel overlay fix always visible show timer hide when inactive" },
 	{ label = "Sync settings", page = "cdm", tab = 1, panel = "Behavior", keywords = "sync essential utility share appearance" },
@@ -97,43 +97,20 @@ local entries = {
 	{ label = "Buff blacklist", page = "minimap", tab = 7, panel = "Filters", keywords = "blacklist hide filter buff debuff spell recently seen share unit frames" },
 	{ label = "Pinned debuffs", page = "minimap", tab = 7, panel = "Filters", keywords = "pinned whitelist only show debuffs sated exhaustion bloodlust heroism hero" },
 	{ label = "Pinned buffs", page = "minimap", tab = 7, panel = "Filters", keywords = "pinned whitelist only show buffs" },
-	{ label = "Enable", page = "castbars", tab = 1, keywords = "cast bar player" },
-	{ label = "Show Anchor", page = "castbars", tab = 1, keywords = "anchor mover unlock position" },
-	{ label = "Anchor Frame", page = "castbars", tab = 1, panel = "Anchor" },
-	{ label = "Match Anchor Width", page = "castbars", tab = 1, panel = "Anchor" },
-	{ label = "X Position", page = "castbars", tab = 1, panel = "Position" },
-	{ label = "Y Position", page = "castbars", tab = 1, panel = "Position" },
-	{ label = "Texture", page = "castbars", tab = 1, panel = "Size & Appearance" },
-	{ label = "Width", page = "castbars", tab = 1, panel = "Size & Appearance" },
-	{ label = "Height", page = "castbars", tab = 1, panel = "Size & Appearance" },
-	{ label = "Text Size", page = "castbars", tab = 1, panel = "Size & Appearance" },
-	{ label = "Border Size", page = "castbars", tab = 1, panel = "Size & Appearance" },
-	{ label = "Bar Color", page = "castbars", tab = 1, panel = "Colors" },
-	{ label = "Border Color", page = "castbars", tab = 1, panel = "Colors" },
-	{ label = "Background Color", page = "castbars", tab = 1, panel = "Colors" },
-	{ label = "Use Class Color", page = "castbars", tab = 1, panel = "Colors" },
-	{ label = "Show Icon", page = "castbars", tab = 1, panel = "Display Options" },
-	{ label = "Show Timer", page = "castbars", tab = 1, panel = "Display Options" },
-	{ label = "Show Total Time", page = "castbars", tab = 1, panel = "Display Options" },
-	{ label = "Countdown", page = "castbars", tab = 1, panel = "Display Options" },
-	{ label = "Show Spell Name", page = "castbars", tab = 1, panel = "Display Options" },
-	{ label = "Name Max Length", page = "castbars", tab = 1, panel = "Display Options" },
-	{ label = "Show Latency", page = "castbars", tab = 1, panel = "Display Options", keywords = "lag latency" },
-	{ label = "Latency Color", page = "castbars", tab = 1, panel = "Display Options" },
-	{ label = "Line Width", page = "castbars", tab = 1, panel = "Empowered Stages", cond = "empower", keywords = "empowered pip" },
-	{ label = "Glow", page = "castbars", tab = 1, panel = "Empowered Stages", cond = "empower" },
-	{ label = "Pip Color", page = "castbars", tab = 1, panel = "Empowered Stages", cond = "empower" },
-	{ label = "Enable", page = "castbars", tab = 1, panel = "Empowered Stages", cond = "empower", keywords = "empowered stage colors background" },
-	{ label = "Enable", page = "castbars", tab = 1, panel = "Custom Spell Colors" },
-	{ label = "Enable", page = "castbars", tab = 2, keywords = "cast bar target" },
-	{ label = "Width", page = "castbars", tab = 2, panel = "Size & Appearance" },
-	{ label = "Height", page = "castbars", tab = 2, panel = "Size & Appearance" },
-	{ label = "Non-Interruptible", page = "castbars", tab = 2, panel = "Colors", keywords = "interrupt" },
-	{ label = "Interrupt On CD", page = "castbars", tab = 2, panel = "Colors" },
-	{ label = "Enable", page = "castbars", tab = 3, keywords = "cast bar focus" },
-	{ label = "Width", page = "castbars", tab = 3, panel = "Size & Appearance" },
-	{ label = "Height", page = "castbars", tab = 3, panel = "Size & Appearance" },
-	{ label = "Non-Interruptible", page = "castbars", tab = 3, panel = "Colors" },
+	{ label = "Player cast bar", page = "castbars", tab = 1, panel = "Player cast bar", keywords = "cast bar player enable unlock position anchor class color spell icon" },
+	{ label = "Bar", page = "castbars", tab = 1, panel = "Player cast bar", keywords = "cast bar color border background texture width height border size strata layer" },
+	{ label = "Text", page = "castbars", tab = 1, panel = "Player cast bar", keywords = "cast bar text size spell name cast target name length latency lag strata offset" },
+	{ label = "Channel ticks", page = "castbars", tab = 1, panel = "Player cast bar", keywords = "channel tick width" },
+	{ label = "Empowered casts", page = "castbars", tab = 1, panel = "Empowered casts", cond = "empower", keywords = "empowered stage pips line width glow color background evoker" },
+	{ label = "Custom spell colors", page = "castbars", tab = 1, panel = "Custom spell colors", keywords = "custom spell color per spell cast bar" },
+	{ label = "Target cast bar", page = "castbars", tab = 2, panel = "Target cast bar", keywords = "cast bar target enable unlock position anchor class color spell icon" },
+	{ label = "Bar", page = "castbars", tab = 2, panel = "Target cast bar", keywords = "cast bar color border background texture width height border size strata layer" },
+	{ label = "Text", page = "castbars", tab = 2, panel = "Target cast bar", keywords = "cast bar text size spell name cast target name length strata offset" },
+	{ label = "Interrupts", page = "castbars", tab = 2, panel = "Interrupts", keywords = "interrupt non-interruptible kick ready line voice tts color" },
+	{ label = "Focus cast bar", page = "castbars", tab = 3, panel = "Focus cast bar", keywords = "cast bar focus enable unlock position anchor class color spell icon" },
+	{ label = "Bar", page = "castbars", tab = 3, panel = "Focus cast bar", keywords = "cast bar color border background texture width height border size strata layer" },
+	{ label = "Text", page = "castbars", tab = 3, panel = "Focus cast bar", keywords = "cast bar text size spell name cast target name length strata offset" },
+	{ label = "Interrupts", page = "castbars", tab = 3, panel = "Interrupts", keywords = "interrupt non-interruptible kick ready line voice tts color" },
 
 	{ label = "Primary bar", page = "power", tab = 1, panel = "Primary power", keywords = "mana rage energy focus power bar source enable anchor unlock position match width" },
 	{ label = "Bar instead of a number", page = "power", tab = 1, panel = "Primary power", keywords = "bar mode text mode number" },
@@ -153,80 +130,41 @@ local entries = {
 	{ label = "Save power settings", page = "power", panel = "Scope", keywords = "scope profile class spec save copy setup" },
 	{ label = "Power and resource colors", page = "power", panel = "Scope", keywords = "power colors appearance resource" },
 
-	{ label = "Enable", page = "auras", sidebar = "petWarnings", panel = "Pet Warnings", keywords = "pet warning" },
-	{ label = "Show Anchor", page = "auras", sidebar = "petWarnings", panel = "Pet Warnings" },
-	{ label = "X Position", page = "auras", sidebar = "petWarnings", panel = "Position" },
-	{ label = "Y Position", page = "auras", sidebar = "petWarnings", panel = "Position" },
-	{ label = "Font", page = "auras", sidebar = "petWarnings", panel = "Appearance" },
-	{ label = "Font Size", page = "auras", sidebar = "petWarnings", panel = "Appearance" },
-	{ label = "Warning Color", page = "auras", sidebar = "petWarnings", panel = "Appearance" },
-	{ label = "Pet Not Attacking", page = "auras", sidebar = "petWarnings", panel = "Warning Types" },
-	{ label = "Pet Dead / Missing", page = "auras", sidebar = "petWarnings", panel = "Warning Types" },
-	{ label = "Grimoire of Sacrifice", page = "auras", sidebar = "petWarnings", panel = "Warning Types" },
-	{ label = "Pet Low Health", page = "auras", sidebar = "petWarnings", panel = "Warning Types" },
-	{ label = "Enable", page = "auras", sidebar = "combatTimer", panel = "Combat Timer", keywords = "combat timer" },
-	{ label = "Show Anchor", page = "auras", sidebar = "combatTimer", panel = "Combat Timer" },
-	{ label = "Font Size", page = "auras", sidebar = "combatTimer", panel = "Appearance" },
-	{ label = "Text Color", page = "auras", sidebar = "combatTimer", panel = "Appearance" },
-	{ label = "Enable", page = "auras", sidebar = "messages", panel = "Combat Messages", keywords = "combat message text" },
-	{ label = "Font Size", page = "auras", sidebar = "messages", panel = "Appearance" },
-	{ label = "Fade Time", page = "auras", sidebar = "messages", panel = "Appearance" },
-	{ label = "Color", page = "auras", sidebar = "messages", panel = "Appearance" },
-	{ label = "Enable", page = "auras", sidebar = "crosshair", panel = "Crosshair", keywords = "crosshair reticle" },
-	{ label = "Style", page = "auras", sidebar = "crosshair", panel = "Visibility" },
-	{ label = "Hide Out of Combat", page = "auras", sidebar = "crosshair", panel = "Visibility" },
-	{ label = "Hide in Town", page = "auras", sidebar = "crosshair", panel = "Visibility" },
-	{ label = "Size", page = "auras", sidebar = "crosshair", panel = "Appearance" },
-	{ label = "Thickness", page = "auras", sidebar = "crosshair", panel = "Appearance" },
-	{ label = "Center Gap", page = "auras", sidebar = "crosshair", panel = "Appearance" },
-	{ label = "Opacity", page = "auras", sidebar = "crosshair", panel = "Appearance" },
-	{ label = "Color", page = "auras", sidebar = "crosshair", panel = "Appearance" },
-	{ label = "Range Indicator", page = "auras", sidebar = "crosshair", panel = "Crosshair", keywords = "melee range ranged out of range color" },
-	{ label = "Enable", page = "auras", sidebar = "lowHpWarning", panel = "Low HP Warning", keywords = "low health warning hp" },
-	{ label = "Show Anchor", page = "auras", sidebar = "lowHpWarning", panel = "Low HP Warning" },
-	{ label = "Threshold %", page = "auras", sidebar = "lowHpWarning", panel = "Low HP Warning" },
-	{ label = "Font Size", page = "auras", sidebar = "lowHpWarning", panel = "Appearance" },
-	{ label = "Text Color", page = "auras", sidebar = "lowHpWarning", panel = "Appearance" },
+	{ label = "Pet Warnings", page = "auras", tab = 1, panel = "General", keywords = "pet warning not attacking dead missing idle hurt low health grimoire of sacrifice font color position anchor" },
+	{ label = "Combat Timer", page = "auras", tab = 1, panel = "General", keywords = "combat timer readout milliseconds font size text color position anchor" },
+	{ label = "Combat Rez", page = "auras", tab = 1, panel = "General", keywords = "combat rez res brez battle resurrection charges rebirth raise ally soulstone recharge timer raid mythic plus keys" },
+	{ label = "Combat Messages", page = "auras", tab = 1, panel = "General", keywords = "combat message text enter leave fade time font size color" },
+	{ label = "Crosshair", page = "auras", tab = 1, panel = "General", keywords = "crosshair reticle style hide out of combat town size thickness center gap opacity color range indicator melee ranged" },
+	{ label = "Low HP Warning", page = "auras", tab = 1, panel = "General", keywords = "low health warning hp threshold percent font size text color position anchor" },
+	{ label = "Keystone Reminder", page = "auras", tab = 1, panel = "General", keywords = "keystone reminder dungeon teleport key group mythic plus" },
+	{ label = "Private raid warning", page = "auras", tab = 1, panel = "General", keywords = "private raid warning boss blizzard move position" },
+	{ label = "Gateway Alert", page = "auras", tab = 1, panel = "General", keywords = "demonic gateway alert warlock text sound in reach" },
+	{ label = "Bloodlust", page = "auras", tab = 1, panel = "General", keywords = "bloodlust heroism time warp lust timer alert countdown tts sated exhaustion" },
 
-	{ label = "Enable", page = "minimap", keywords = "minimap map" },
-	{ label = "Show Anchor", page = "minimap", keywords = "anchor mover unlock position" },
-	{ label = "Size in pixels", page = "minimap", panel = "Appearance", keywords = "scale size pixels position mover" },
-	{ label = "Border Width", page = "minimap", panel = "Appearance", keywords = "border width position mover" },
-	{ label = "Indicators", page = "minimap", panel = "Appearance", keywords = "difficulty mail crafting orders garrison mission indicators shape cog" },
-	{ label = "24-Hour Format", page = "minimap", panel = "Appearance" },
-	{ label = "Server Time", page = "minimap", panel = "Appearance" },
-	{ label = "Position", page = "minimap", panel = "Appearance", keywords = "position from right from top rotate show anchor move" },
-	{ label = "Enable", page = "minimap", panel = "Datatext", keywords = "datatext minimap bar" },
-	{ label = "Modules", page = "minimap", panel = "Datatext", keywords = "datatext modules order ping fps latency" },
-	{ label = "Text", page = "minimap", panel = "Datatext", keywords = "datatext font size color anchor position background border" },
+	{ label = "Map", page = "minimap", tab = 1, panel = "Map", keywords = "minimap map enable size pixels scale border width position from right from top unlock move anchor" },
+	{ label = "Indicators", page = "minimap", tab = 2, panel = "Indicators", keywords = "difficulty mail crafting orders garrison mission indicators anchor letters text align" },
+	{ label = "Clock", page = "minimap", tab = 3, panel = "Text", keywords = "clock 24-hour server time size offset" },
+	{ label = "Zone name", page = "minimap", tab = 3, panel = "Text", keywords = "zone name text size color offset" },
+	{ label = "Datatext bar", page = "minimap", tab = 4, panel = "Datatext bar", keywords = "datatext minimap bar side gap modules ping fps latency font size color" },
+	{ label = "Addon buttons", page = "minimap", tab = 5, panel = "Addon buttons", keywords = "addon buttons drawer side button bar icon size spacing per line align gap offset" },
+	{ label = "Buttons", page = "minimap", tab = 5, panel = "Buttons", keywords = "addon buttons show hide order drag" },
 
-	{ label = "Enable", page = "datatext", keywords = "datatext info bar module on off" },
-	{ label = "Unlock", page = "datatext", keywords = "anchor mover unlock lock drag position eye" },
-	{ label = "Bars", page = "datatext", panel = "Bars and panels", keywords = "bar select new add delete second multiple bars shown sample" },
-	{ label = "Panels", page = "datatext", panel = "Bars and panels", keywords = "panel blank background square empty new add delete resize shown" },
-	{ label = "Title", page = "datatext", panel = "Bars and panels", keywords = "panel title text label anchor offset size color header" },
-	{ label = "Mouseover and tooltips", page = "datatext", panel = "Bars and panels", keywords = "only on mouseover hide bar fade hover show tooltip combat latency friends guild roster member mplus score rank rio disable behavior" },
-	{ label = "Font", page = "datatext", panel = "Bars and panels" },
-	{ label = "Font size", page = "datatext", panel = "Bars and panels", keywords = "font size" },
-	{ label = "Spacing", page = "datatext", panel = "Bars and panels", keywords = "spacing gap" },
-	{ label = "Orientation", page = "datatext", panel = "Bars and panels", keywords = "orientation vertical horizontal text align stack hide labels" },
-	{ label = "Value color", page = "datatext", panel = "Bars and panels" },
-	{ label = "Position", page = "datatext", panel = "Bars and panels", keywords = "anchor x y offset strata frame level align below minimap mirror chat" },
-	{ label = "Background", page = "datatext", panel = "Bars and panels", keywords = "background opacity color border width height" },
-	{ label = "Ping source", page = "datatext", panel = "Datatexts", keywords = "ping source home world" },
-	{ label = "Datatexts", page = "datatext", panel = "Datatexts", keywords = "fps framerate ping latency durability gold ilvl item level coords location loot spec specialization talent loadout friends guild modules order time clock" },
+	{ label = "Datatext", page = "datatext", keywords = "datatext info bar module on off enable unlock lock drag eye new bar new panel delete" },
+	{ label = "Position", page = "datatext", panel = "Position", keywords = "anchor x y offset strata frame level align below minimap mirror chat layering" },
+	{ label = "Text", page = "datatext", panel = "Text", keywords = "name font size spacing orientation vertical horizontal align text color flow" },
+	{ label = "Bar", page = "datatext", panel = "Bar", keywords = "bar width height border only on mouseover hide tooltips in combat roster tooltips behavior fade" },
+	{ label = "Title", page = "datatext", panel = "Title", keywords = "panel title text anchor size offset header" },
+	{ label = "Panel", page = "datatext", panel = "Panel", keywords = "panel blank background square empty width height border mouseover backdrop" },
+	{ label = "Datatexts", page = "datatext", panel = "Datatexts", keywords = "fps framerate ping latency durability gold ilvl item level coords location loot spec specialization talent loadout friends guild currencies modules order time clock" },
 
-	{ label = "Enable", page = "chat", keywords = "chat skin enable" },
-	{ label = "Panel", page = "chat", panel = "Panel", keywords = "chat font background border edit box position size padding lock move resize" },
+	{ label = "Panel", page = "chat", panel = "Panel", keywords = "chat skin enable font background border edit box position size padding lock move resize" },
 	{ label = "Tabs", page = "chat", panel = "Tabs", keywords = "chat tabs style font uppercase combat log color opacity flash" },
 	{ label = "Messages", page = "chat", panel = "Messages", keywords = "chat timestamps links channel abbreviate fade history copy voice buttons hide scroll" },
-	{ label = "Enable", page = "objectivetracker", keywords = "objective tracker quest skin enable" },
-	{ label = "Text", page = "objectivetracker", panel = "Text", keywords = "objective tracker quest font size outline single line wrap colors title hover objective completed ready time left" },
+	{ label = "Text", page = "objectivetracker", panel = "Text", keywords = "objective tracker quest skin enable font size outline single line wrap colors title hover objective completed ready time left" },
 	{ label = "Panel", page = "objectivetracker", panel = "Panel", keywords = "objective tracker quest background texture tint opacity border separator lines" },
 	{ label = "Quests", page = "objectivetracker", panel = "Quests", keywords = "objective tracker quest header icons dashes tooltips completion messages sound hide item button key" },
 
-	{ label = "Enable", page = "cursor", keywords = "cursor ring circle enable" },
-	{ label = "Cursor size", page = "cursor", panel = "General", keywords = "cursor ring size diameter" },
+	{ label = "Cursor size", page = "cursor", panel = "General", keywords = "cursor ring circle enable size diameter" },
 	{ label = "Only in combat", page = "cursor", panel = "Visibility", keywords = "cursor combat hide show" },
 	{ label = "Rings", page = "cursor", panel = "Rings", keywords = "cursor ring main inner outer behavior color size offset layer click gcd cast" },
 
@@ -238,7 +176,6 @@ local entries = {
 	{ label = "Secondary Stats", page = "auras", tab = 1, panel = "General", keywords = "secondary stats crit haste mastery versatility vers rating percent readout weakaura" },
 	{ label = "Stats", page = "secondaryStats", tab = 1, panel = "Stats", keywords = "primary agility strength intellect stamina crit haste mastery versatility leech avoidance speed color order show hide" },
 	{ label = "Readout", page = "secondaryStats", tab = 1, panel = "Text", keywords = "stats font size align rating percent combat only position" },
-	{ label = "New group", page = "auras", tab = 1, panel = "General", keywords = "group folder organize drag weakaura" },
 	{ label = "Add a spell", page = "cooldownFlash", tab = 1, panel = "Spells", keywords = "cooldown flash spell add remove reorder per spec size color glow text sound tts opacity position" },
 	{ label = "Pack Leader", page = "auras", tab = 3, panel = "Class", keywords = "pack leader beast cycle wyvern bear boar hunter" },
 	{ label = "Kill Command overlay", page = "auras", tab = 3, panel = "Class", keywords = "kill command overlay timer beast name" },
@@ -252,27 +189,24 @@ local entries = {
 	{ label = "Clearcasting", page = "auras", tab = 3, panel = "Class", keywords = "druid feral restoration clearcasting omen of clarity free proc" },
 	{ label = "Arcane Salvo", page = "auras", tab = 3, panel = "Class", keywords = "arcane mage salvo stacks barrage missiles" },
 
-	{ label = "Enable", page = "auras", tab = 2, panel = "GCD History", keywords = "gcd history streamer" },
-	{ label = "Preview", page = "auras", tab = 2, panel = "GCD History", keywords = "gcd anchor unlock drag" },
-	{ label = "Icons", page = "auras", tab = 2, panel = "Display", keywords = "gcd icon size max spacing zoom border" },
-	{ label = "Grow Direction", page = "auras", tab = 2, panel = "Display", keywords = "gcd left right" },
-	{ label = "Border Color", page = "auras", tab = 2, panel = "Display", keywords = "gcd" },
-	{ label = "Position", page = "auras", tab = 2, panel = "Display", keywords = "gcd anchor frame offset" },
-	{ label = "Active Cast", page = "auras", tab = 2, panel = "Behavior", keywords = "gcd cast scale channel" },
-	{ label = "Auto-Expire", page = "auras", tab = 2, panel = "Behavior", keywords = "gcd fade lifetime" },
-	{ label = "Hide Auto Attacks", page = "auras", tab = 2, panel = "Behavior", keywords = "gcd" },
-	{ label = "Debug to Chat", page = "auras", tab = 2, panel = "Behavior", keywords = "gcd" },
-	{ label = "Blacklist", page = "auras", tab = 2, panel = "Blacklist", keywords = "gcd spell ignore" },
+	{ label = "GCD History", page = "auras", tab = 2, panel = "GCD History", keywords = "gcd history streamer strip enable unlock drag anchor grow direction left right" },
+	{ label = "Icons", page = "auras", tab = 2, panel = "GCD History", keywords = "gcd icon size max icons spacing zoom border size" },
+	{ label = "Active cast", page = "auras", tab = 2, panel = "GCD History", keywords = "gcd active cast scale channel" },
+	{ label = "Auto-expire", page = "auras", tab = 2, panel = "GCD History", keywords = "gcd fade lifetime seconds old icons" },
+	{ label = "Debug to chat", page = "auras", tab = 2, panel = "GCD History", keywords = "gcd debug print recorded cast chat" },
+	{ label = "Blacklist", page = "auras", tab = 2, panel = "Blacklist", keywords = "gcd spell ignore blacklist add a spell" },
 
-	{ label = "Use Class Color", page = "settings", tab = 1, panel = "Accent", keywords = "theme color accent class" },
-	{ label = "Accent Color", page = "settings", tab = 1, panel = "Accent", keywords = "theme color accent" },
+	{ label = "Accent", page = "settings", tab = 1, panel = "Accent", keywords = "theme color accent class palette custom" },
 	{ label = "Blizzard windows", page = "settings", tab = 7, panel = "Theme", keywords = "skin skins blizzard game windows background border lines titles text labels color colour" },
-	{ label = "Global Bar Texture", page = "settings", tab = 1, panel = "Bar Textures", keywords = "texture statusbar" },
-	{ label = "Gradient Tint", page = "settings", tab = 1, panel = "Bar Textures", keywords = "gradient color texture" },
-	{ label = "Global Font", page = "settings", tab = 1, panel = "Fonts", keywords = "font typeface" },
-	{ label = "Slug Rendering", page = "settings", tab = 1, panel = "Fonts", keywords = "font slug outline thick" },
-	{ label = "Dispel Type Colors", page = "settings", tab = 1, panel = "Dispel Types", keywords = "dispel magic curse poison disease bleed color shared palette" },
-	{ label = "Window size", page = "settings", tab = 7, panel = "Window", keywords = "window scale size smaller bigger shrink options" },
+	{ label = "Bar texture", page = "settings", tab = 1, panel = "Bars", keywords = "global bar texture statusbar" },
+	{ label = "Gradient tint", page = "settings", tab = 1, panel = "Bars", keywords = "gradient color texture tint" },
+	{ label = "Dead background", page = "settings", tab = 1, panel = "Bars", keywords = "dead background color raid frames unit frames" },
+	{ label = "Font", page = "settings", tab = 1, panel = "Text", keywords = "global font typeface every module" },
+	{ label = "Slug rendering", page = "settings", tab = 1, panel = "Text", keywords = "font slug outline thick" },
+	{ label = "Power", page = "settings", tab = 1, panel = "Power", keywords = "power colors mana rage energy focus runic shared palette color editor" },
+	{ label = "Class Resources", page = "settings", tab = 1, panel = "Class Resources", keywords = "class resource colors combo points runes holy power soul shards chi essence shared palette" },
+	{ label = "Dispel Types", page = "settings", tab = 1, panel = "Dispel Types", keywords = "dispel magic curse poison disease bleed color shared palette badges borders" },
+	{ label = "Size", page = "settings", tab = 7, panel = "Window", keywords = "window scale size smaller bigger shrink options" },
 	{ label = "Hotkey text", page = "actionbars", sidebar = "general", panel = "Button text", keywords = "action bar keybind text size anchor color" },
 	{ label = "Count text", page = "actionbars", sidebar = "general", panel = "Button text", keywords = "action bar stack charges count text" },
 	{ label = "Macro text", page = "actionbars", sidebar = "general", panel = "Button text", keywords = "action bar macro name text" },
@@ -322,7 +256,7 @@ local entries = {
 	{ label = "Hide Error Msgs", page = "qol", tab = 2, panel = "Interface", keywords = "error red text" },
 	{ label = "FPS preset", page = "qol", tab = 4, panel = "Graphics", keywords = "fps cvar performance graphics vsync apply" },
 	{ label = "Restore", page = "qol", tab = 4, panel = "Graphics", keywords = "fps cvar restore original" },
-	{ label = "Reset BluUI", page = "qol", tab = 5, panel = "Danger zone", keywords = "reset wipe default settings" },
+	{ label = "BluUI settings", page = "qol", tab = 5, panel = "Danger zone", keywords = "reset wipe default settings bluui" },
 	{ label = "Celebrations", page = "qol", tab = 6, panel = "Celebrations", keywords = "confetti mythic plus m+ key timed boss kill raid dungeon celebrate" },
 	{ label = "Unit Frames", page = "settings", tab = 5, panel = "Modules", keywords = "enable disable module" },
 	{ label = "Cooldown Manager", page = "settings", tab = 5, panel = "Modules" },
@@ -335,7 +269,9 @@ local entries = {
 	{ label = "Cursor", page = "settings", tab = 5, panel = "Modules" },
 	{ label = "Streamer Tools", page = "settings", tab = 5, panel = "Modules" },
 
-	{ label = "Switch profile with spec", page = "exportimport", tab = 1, panel = "Spec profiles", keywords = "export import profile share spec" },
+	{ label = "Switch profile with spec", page = "exportimport", tab = 4, panel = "Spec profiles", keywords = "profile spec specialization switch" },
+	{ label = "Export and import", page = "exportimport", tab = 2, panel = "Export and import", keywords = "export import profile share string copy paste inspect" },
+	{ label = "Marker bar", page = "markers", tab = 1, panel = "Marker bar", keywords = "raid target markers marker bar icon size spacing only in a group tooltips fade opacity position anchor countdown pull timer" },
 
 	{ label = "Hide the Blizzard frames", page = "unitframes", tab = 10, panel = "Group frames", keywords = "blizzard default frames hide group party raid enable" },
 	{ label = "Click casting", page = "unitframes", tab = 10, panel = "Group frames", keywords = "click cast mouse clique" },
@@ -369,80 +305,65 @@ local entries = {
 }
 
 local pageTitles = {}
-local tabNames = {}
-
-local HAS_SECONDARY_POWER = {
-	DEATHKNIGHT = true, ROGUE = true, WARLOCK = true, PALADIN = true, EVOKER = true,
-	DRUID = true, MONK = true, MAGE = true, PRIEST = true, SHAMAN = true,
+local tabNames = {
+	auras = { 'General', 'GCD History', 'Class' },
+	power = { 'Primary', 'Secondary', 'Stacking' },
+	cdm = { 'General', 'Essential', 'Utility', 'Buff icons', 'Buff bars', 'Layouts', 'Icon management', 'Custom bars', 'Custom bars' },
+	castbars = { 'Player', 'Target', 'Focus' },
+	unitframes = { 'Appearance', 'Tags', 'Player', 'Target', 'Target of target', 'Focus', 'Pet', 'Boss', 'Filters', 'Groups', 'Party', 'Raid', 'Group filters', 'HoT slots' },
+	settings = { 'Appearance', 'Sound', 'Skinning', 'Visibility', 'Modules', 'Help', 'Theme' },
+	qol = { 'Combat', 'Interface', 'Automation', 'Graphics', 'Danger zone', 'Mythic+' },
+	minimap = { 'Map', 'Indicators', 'Clock and zone', 'Datatext bar', 'Drawer and buttons', 'Frames', 'Filters' },
+	exportimport = { 'Profiles', 'Export and import', 'Addons', 'Spec profiles' },
 }
+
 local condChecks = {
 	secondaryPower = function()
-		local _, className = UnitClass('player')
-		return HAS_SECONDARY_POWER[className] == true
+		return BUI.Power.Secondary.ClassHasSecondary()
 	end,
 	empower = function()
 		return BUI.Tools.PlayerCanEmpower()
 	end,
-	module = function(moduleName)
-		local db = BUI.GetDB()
-		if not db then return true end
-		return db.modules[moduleName] ~= false
-	end,
 }
 local function CheckCond(condition)
 	if not condition then return true end
-	local check = condChecks[condition]
-	if check then return check() end
-	local moduleName = condition:match('^module:(.+)')
-	if moduleName then return condChecks.module(moduleName) end
-	return true
+	return condChecks[condition]()
 end
 
-local function EnsureTitles()
-	if next(pageTitles) then return end
-	local engine = BUI.PageEngine
-	if not engine or not engine.pages then return end
-	for pageId, pageConfig in pairs(engine.pages) do
-		pageTitles[pageId] = pageConfig.buttonText or pageConfig.title or pageId
+local indexed = false
+
+local function EnsureIndex()
+	if indexed then return end
+	for pageId, pageConfig in pairs(BUI.PageEngine.pages) do
+		pageTitles[pageId] = pageConfig.buttonText or pageConfig.title
 	end
-end
-
-function SearchIndex.RegisterTabNames(pageId, names)
-	tabNames[pageId] = names
+	for _, entry in ipairs(entries) do
+		entry.haystack = (entry.label .. ' ' .. (entry.panel or '') .. ' ' .. pageTitles[entry.page] .. ' ' .. (entry.keywords or '')):lower()
+	end
+	indexed = true
 end
 
 function SearchIndex.Search(query)
 	if not query or query == '' then return {} end
-	EnsureTitles()
+	EnsureIndex()
 	query = query:lower()
 	local results = {}
 	for _, entry in ipairs(entries) do
-		if CheckCond(entry.cond) then
-			local haystack = (entry.label .. ' ' .. (entry.panel or '') .. ' ' .. (pageTitles[entry.page] or entry.page) .. ' ' .. (entry.keywords or '')):lower()
-			if haystack:find(query, 1, true) then
-				local tabs = tabNames[entry.page]
-				local tabName = tabs and tabs[entry.tab] or nil
-				if entry.sidebar then tabName = entry.panel end
-				results[#results + 1] = {
-					label = entry.label,
-					page = entry.page,
-					pageTitle = pageTitles[entry.page] or entry.page,
-					tab = entry.tab,
-					sidebar = entry.sidebar,
-					tabName = tabName,
-					panel = entry.panel,
-				}
-				if #results >= 30 then break end
-			end
+		if entry.haystack:find(query, 1, true) and CheckCond(entry.cond) then
+			local tabs = tabNames[entry.page]
+			local tabName = tabs and tabs[entry.tab]
+			if entry.sidebar then tabName = entry.panel end
+			results[#results + 1] = {
+				label = entry.label,
+				page = entry.page,
+				pageTitle = pageTitles[entry.page],
+				tab = entry.tab,
+				sidebar = entry.sidebar,
+				tabName = tabName,
+				panel = entry.panel,
+			}
+			if #results >= 30 then break end
 		end
 	end
 	return results
 end
-
-SearchIndex.RegisterTabNames('auras', { 'General', 'GCD History', 'Class' })
-SearchIndex.RegisterTabNames('power', { 'Primary', 'Secondary', 'Stacking' })
-SearchIndex.RegisterTabNames('cdm', { 'General', 'Essential', 'Utility', 'Buff icons', 'Buff bars', 'Layouts', 'Icon management' })
-SearchIndex.RegisterTabNames('castbars', { 'Player', 'Target', 'Focus' })
-SearchIndex.RegisterTabNames('unitframes', { 'Appearance', 'Tags', 'Player', 'Target', 'Target of target', 'Focus', 'Pet', 'Boss', 'Filters', 'Groups', 'Party', 'Raid', 'Group filters', 'HoT slots' })
-SearchIndex.RegisterTabNames('settings', { 'Appearance', 'Sound', 'Skinning', 'Visibility', 'Modules', 'Help', 'Theme' })
-SearchIndex.RegisterTabNames('qol', { 'Combat', 'Interface', 'Automation', 'Graphics', 'Danger zone' })
