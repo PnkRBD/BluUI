@@ -9,7 +9,8 @@ BUI.MoveFrames = MoveFrames
 
 local InCombatLockdown = InCombatLockdown
 local IsAddOnLoaded = C_AddOns.IsAddOnLoaded
-local issecretvalue = issecretvalue
+local IsSecret = issecretvalue
+local Widget = LibStub('BUILib').Widget
 
 local CONFLICTING_ADDONS = { 'BlizzMove', 'MoveAnything' }
 
@@ -22,6 +23,7 @@ local ALWAYS_LOADED = {
 	{ 'BonusRollFrame', 'BonusRollFrame.PromptFrame', 'BonusRollFrame.PromptFrame.InfoFrame', 'BonusRollFrame.RollingFrame', 'BonusRollFrame.BlackBackgroundHoist' },
 	'ChatConfigFrame',
 	'GossipFrame',
+	'GroupLootHistoryFrame',
 	'GuildRegistrarFrame',
 	'HelpFrame',
 	'ItemTextFrame',
@@ -52,12 +54,13 @@ local ALWAYS_LOADED = {
 	'SideDressUpFrame',
 	'SplashFrame',
 	'TabardFrame',
+	'TalkingHeadFrame',
 	'TaxiFrame',
 	'TradeFrame',
-	{ 'DressUpFrame', 'DressUpFrame.OutfitDetailsPanel', 'DressUpFrame.SetSelectionPanel' },
+	{ 'DressUpFrame', 'DressUpFrame.CustomSetDetailsPanel', 'DressUpFrame.SetSelectionPanel' },
 	{ 'FriendsFrame', 'FriendsFrame.IgnoreListWindow' },
 	'FriendsFriendsFrame',
-	{ 'MailFrame', 'SendMailFrame', 'OpenMailFrame', 'OpenMailFrame.OpenMailSender' },
+	{ 'MailFrame', 'SendMailFrame', 'OpenMailFrame' },
 	{ 'WorldMapFrame', 'QuestMapFrame' },
 }
 
@@ -72,7 +75,6 @@ local LOAD_ON_DEMAND = {
 	Blizzard_AzeriteRespecUI = { 'AzeriteRespecFrame' },
 	Blizzard_AzeriteUI = { 'AzeriteEmpoweredItemUI' },
 	Blizzard_BarbershopUI = { 'BarberShopFrame' },
-	Blizzard_BindingUI = { 'KeyBindingFrame' },
 	Blizzard_BlackMarketUI = { 'BlackMarketFrame' },
 	Blizzard_Calendar = {
 		{ 'CalendarFrame', 'CalendarCreateEventFrame', 'CalendarViewEventFrame', 'CalendarViewHolidayFrame', 'CalendarViewRaidFrame' },
@@ -143,9 +145,7 @@ local LOAD_ON_DEMAND = {
 	Blizzard_ItemInteractionUI = { 'ItemInteractionFrame' },
 	Blizzard_ItemSocketingUI = { 'ItemSocketingFrame' },
 	Blizzard_ItemUpgradeUI = { 'ItemUpgradeFrame' },
-	Blizzard_LootHistory = { 'GroupLootHistoryFrame' },
 	Blizzard_MacroUI = { 'MacroFrame', 'MacroPopupFrame' },
-	Blizzard_MajorFactions = { 'MajorFactionRenownFrame' },
 	Blizzard_ObliterumUI = { 'ObliterumForgeFrame' },
 	Blizzard_OrderHallUI = { 'OrderHallTalentFrame' },
 	Blizzard_PerksProgram = { 'PerksProgramFrame' },
@@ -160,20 +160,17 @@ local LOAD_ON_DEMAND = {
 	Blizzard_Professions = { 'ProfessionsFrame', 'InspectRecipeFrame' },
 	Blizzard_ProfessionsBook = { 'ProfessionsBookFrame' },
 	Blizzard_ProfessionsCustomerOrders = { 'ProfessionsCustomerOrdersFrame' },
-	Blizzard_PVPMatch = { 'PVPMatchResults' },
-	Blizzard_PVPUI = { 'PVPMatchScoreboard' },
+	Blizzard_PVPMatch = { 'PVPMatchResults', 'PVPMatchScoreboard' },
 	Blizzard_RemixArtifactUI = { 'RemixArtifactFrame' },
 	Blizzard_RuneforgeUI = { 'RuneforgeFrame' },
 	Blizzard_ScrappingMachineUI = { 'ScrappingMachineFrame' },
 	Blizzard_Soulbinds = { 'SoulbindViewer' },
 	Blizzard_StableUI = { 'StableFrame' },
-	Blizzard_TalkingHeadUI = { 'TalkingHeadFrame' },
 	Blizzard_TimeManager = { 'TimeManagerFrame', 'StopwatchFrame' },
 	Blizzard_TorghastLevelPicker = { 'TorghastLevelPickerFrame' },
 	Blizzard_TrainerUI = { 'ClassTrainerFrame' },
 	Blizzard_Transmog = { 'TransmogFrame' },
 	Blizzard_UIPanels_Game = { { 'CharacterFrame', 'PaperDollFrame', 'ReputationFrame', 'TokenFrame' } },
-	Blizzard_VoidStorageUI = { 'VoidStorageFrame' },
 	Blizzard_WeeklyRewards = { 'WeeklyRewardsFrame', 'WeeklyRewardExpirationWarningDialog' },
 }
 
@@ -198,22 +195,9 @@ local dragged    = {}
 local blizzardPoints = {}
 local heldPoints = {}
 local applying   = false
-local suspended  = {}
-
-local POSITION_MODES = { remember = true, session = true, reset = true }
 
 local function GetConfig()
-	local config = BUI.GetDB().moveFrames
-	if config.autoReset ~= nil or config.rememberPositions ~= nil then
-		if config.autoReset then
-			config.positionMode = 'reset'
-		elseif config.rememberPositions == false then
-			config.positionMode = 'session'
-		end
-		config.autoReset, config.rememberPositions = nil, nil
-	end
-	if not POSITION_MODES[config.positionMode] then config.positionMode = 'remember' end
-	return config
+	return BUI.GetDB().moveFrames
 end
 
 function MoveFrames.GetConfig()
@@ -222,15 +206,11 @@ end
 
 function MoveFrames.IsActive()
 	if MoveFrames.blockedBy then return false end
-	return GetConfig().enabled ~= false
+	return GetConfig().enabled
 end
 
 local function Remembers(path)
 	return ALWAYS_REMEMBER[path] == true or GetConfig().positionMode == 'remember'
-end
-
-local function IsSecret(value)
-	return issecretvalue ~= nil and issecretvalue(value)
 end
 
 local function ResolvePath(path)
@@ -287,7 +267,6 @@ local function PlaceOnPixels(target, point, relativeTo, relativePoint, x, y)
 	local left, top = target:GetLeft(), target:GetTop()
 	if not left or not top or IsSecret(left) or IsSecret(top) then return end
 	local pixel = BUI.Pixel.PixelSizeFor(target, 1)
-	local Widget = LibStub('BUILib').Widget
 	local shiftX = Widget.SnapX(left, pixel) - left
 	local shiftY = Widget.SnapY(top, pixel) - top
 	if shiftX ~= 0 or shiftY ~= 0 then target:SetPoint(point, relativeTo, relativePoint, x + shiftX, y + shiftY) end
@@ -326,10 +305,10 @@ local function SavePosition(target)
 	local point, relativeTo, relativePoint, x, y = target:GetPoint(1)
 	if not point or IsSecret(x) or IsSecret(y) then return end
 
-	local relativeName = relativeTo and relativeTo.GetName and relativeTo:GetName()
+	local relativeName = relativeTo and relativeTo:GetName()
 	if not relativeName then
 		local parent = target:GetParent()
-		relativeName = parent and parent.GetName and parent:GetName() or 'UIParent'
+		relativeName = parent and parent:GetName() or 'UIParent'
 	end
 
 	config.positions[path] = {
@@ -420,7 +399,7 @@ local function CaptureDraggedPosition(target)
 end
 
 local function OnTargetSetPoint(target)
-	if applying or suspended[target] then return end
+	if applying then return end
 	if not moving[target] then SnapshotBlizzardPoints(target) end
 	if ApplySavedPosition(target) or HoldDraggedPosition(target) then return end
 	KeepClearOfPanel(target)
@@ -501,8 +480,8 @@ local function HookFrame(path, rootPath)
 	InstallHandleHooks(handle)
 
 	local rehooking = false
-	Hook(handle, 'SetScript', function(self, scriptName)
-		if rehooking or self ~= handle then return end
+	Hook(handle, 'SetScript', function(_, scriptName)
+		if rehooking then return end
 		if scriptName ~= 'OnDragStart' and scriptName ~= 'OnDragStop' then return end
 		rehooking = true
 		if scriptName == 'OnDragStart' then
@@ -548,14 +527,13 @@ local function DetectConflicts()
 	for _, addonName in ipairs(CONFLICTING_ADDONS) do
 		if IsAddOnLoaded(addonName) then
 			MoveFrames.blockedBy = addonName
-			return true
+			return
 		end
 	end
-	return false
 end
 
 function MoveFrames.Initialize()
-	if MoveFrames.initialized or DetectConflicts() then return end
+	if MoveFrames.initialized then return end
 	MoveFrames.initialized = true
 
 	HookList(ALWAYS_LOADED)
@@ -573,10 +551,6 @@ function MoveFrames.Refresh()
 	end
 end
 
-function MoveFrames.SetSuspended(frame, isSuspended)
-	suspended[frame] = isSuspended or nil
-end
-
 function MoveFrames.OnFrameRestored(frame)
 	if not MoveFrames.IsActive() then return end
 	for handle, target in pairs(dragTarget) do
@@ -586,7 +560,7 @@ end
 
 local function DescribePoint(point, relativeTo, relativePoint, x, y)
 	if not point then return 'no points' end
-	local name = relativeTo and relativeTo.GetName and relativeTo:GetName() or (relativeTo and 'unnamed' or 'parent')
+	local name = relativeTo and (relativeTo:GetName() or 'unnamed') or 'parent'
 	if IsSecret(x) or IsSecret(y) then return ('%s to %s %s (secret)'):format(point, name, relativePoint) end
 	return ('%s to %s %s %.1f %.1f'):format(point, name, relativePoint, x, y)
 end
@@ -635,6 +609,10 @@ function MoveFrames.ResetPositions()
 	local config = GetConfig()
 	wipe(config.positions)
 	wipe(BUI.GetDB().framePositions)
+	wipe(heldPoints)
+	for target in pairs(hookedRoot) do
+		if dragged[target] then RestoreBlizzardPoints(target) end
+	end
 
 	if InCombatLockdown() then return end
 	for target in pairs(hookedRoot) do
