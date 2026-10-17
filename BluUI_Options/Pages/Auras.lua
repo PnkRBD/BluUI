@@ -4,6 +4,7 @@ local Layout = BUILib.Layout
 
 local PAGE_WIDTH = 960
 local MENU_WIDTH = 150
+local TEXT_OFFSET_RANGE = 60
 
 local STYLES = {
 	{ value = 'cross', text = 'Cross' },
@@ -98,10 +99,24 @@ local function CombatResRow()
 			TableColor(db, 'Text color', 'textColor'),
 			TableColor(db, 'No charges color', 'emptyColor'),
 			Font(db, 'font'),
-			TextTool({ Option(db, 'Font size', 'fontSize', { min = 10, max = 40, step = 1 }) }),
-			{ tooltip = 'What shows', title = 'Combat rez', slot = 'settings', options = {
-				Toggle(db, 'Spell icon', 'showIcon'),
-				Toggle(db, 'Recharge timer', 'showTimer'),
+			TextTool({
+				Option(db, 'Show timer', 'showTimer'),
+				Option(db, 'Timer size', 'timerSize', { min = 8, max = 40, step = 1 }),
+				Option(db, 'Timer position', 'timerPosition', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS, width = MENU_WIDTH }),
+				Option(db, 'Timer horizontal', 'timerOffsetX', { min = -TEXT_OFFSET_RANGE, max = TEXT_OFFSET_RANGE, step = 1 }),
+				Option(db, 'Timer vertical', 'timerOffsetY', { min = -TEXT_OFFSET_RANGE, max = TEXT_OFFSET_RANGE, step = 1 }),
+				Option(db, 'Show charges', 'showCharges', { separator = true }),
+				Option(db, 'Charges size', 'chargesSize', { min = 8, max = 40, step = 1 }),
+				Option(db, 'Charges position', 'chargesPosition', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS, width = MENU_WIDTH }),
+				Option(db, 'Charges horizontal', 'chargesOffsetX', { min = -TEXT_OFFSET_RANGE, max = TEXT_OFFSET_RANGE, step = 1 }),
+				Option(db, 'Charges vertical', 'chargesOffsetY', { min = -TEXT_OFFSET_RANGE, max = TEXT_OFFSET_RANGE, step = 1 }),
+			}),
+			{ tooltip = 'Icon', title = 'Icon', slot = 'settings', options = {
+				Option(db, 'Show icon', 'showIcon'),
+				TableColor(db, 'Border color', 'borderColor'),
+				Option(db, 'Icon size', 'size', { min = 24, max = 96, step = 1 }),
+				Option(db, 'Recharge swipe', 'showSwipe'),
+				Option(db, 'Glow when a charge returns', 'glowOnCharge'),
 			} },
 			Pin(db, { selfTag = 'BUI_CombatRes' }),
 			Eye('Preview, drag to move', function() return not db.locked end, function(value) CombatRes.SetLocked(not value) end),
