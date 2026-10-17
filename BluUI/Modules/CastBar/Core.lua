@@ -10,6 +10,8 @@ local EvaluateColorValueFromBoolean = C_CurveUtil.EvaluateColorValueFromBoolean
 local IsSecret = BUI.Tools.IsSecretValue
 
 local WHITE = 'Interface\\Buttons\\WHITE8X8'
+local POLL_KEY = 'CastBar.Interrupts'
+local POLL_SECONDS = 0.1
 local PREVIEW_SECONDS = 4
 local PREVIEW_READY_AT = 0.6
 local PREVIEW_STEP = 0.03
@@ -94,9 +96,9 @@ end
 
 local function PaintInterruptMarks(castbar, settings)
 	local tickColor, windowColor = settings.interruptTickColor, settings.interruptWindowColor
-	castbar._intTick:SetColorTexture(tickColor[1], tickColor[2], tickColor[3], tickColor[4] or 1)
+	castbar._intTick:SetColorTexture(tickColor[1], tickColor[2], tickColor[3], tickColor[4])
 	castbar._intTick:SetWidth(Pixel.PixelSize(settings.interruptTickWidth))
-	castbar._intZone:SetColorTexture(windowColor[1], windowColor[2], windowColor[3], windowColor[4] or 0.8)
+	castbar._intZone:SetColorTexture(windowColor[1], windowColor[2], windowColor[3], windowColor[4])
 end
 
 local function HideInterruptTick(castbar)
@@ -109,13 +111,9 @@ local function HideInterruptTick(castbar)
 end
 
 local trackedCastbars = setmetatable({}, { __mode = 'k' })
-local interruptTicker
-local CheckInterruptCooldowns
 
 local function StopInterruptPoller()
-	if not interruptTicker then return end
-	interruptTicker:Cancel()
-	interruptTicker = nil
+	BUI.Scheduler.SetUpdateEnabled(POLL_KEY, false)
 end
 
 function CastBar.HideInterruptOverlays(castbar)
@@ -138,7 +136,7 @@ local function StyleInterruptOverlays(castbar, barColor, settings)
 	castbar._intStyleCount = #knownInterrupts
 
 	local baseColor = #knownInterrupts > 0 and settings.interruptOnCDColor or barColor
-	castbar:SetStatusBarColor(baseColor[1], baseColor[2], baseColor[3], baseColor[4] or 1)
+	castbar:SetStatusBarColor(baseColor[1], baseColor[2], baseColor[3], baseColor[4])
 
 	local readyColor = settings.interruptReadyColor
 	castbar._readyOverlays = castbar._readyOverlays or {}
@@ -151,7 +149,7 @@ local function StyleInterruptOverlays(castbar, barColor, settings)
 			castbar._readyOverlays[index] = overlay
 		end
 		overlay:SetTexture(texturePath)
-		overlay:SetVertexColor(readyColor[1], readyColor[2], readyColor[3], readyColor[4] or 1)
+		overlay:SetVertexColor(readyColor[1], readyColor[2], readyColor[3], readyColor[4])
 		overlay:SetAllPoints(barTexture)
 	end
 	for index = #knownInterrupts + 1, #castbar._readyOverlays do
@@ -161,7 +159,7 @@ local function StyleInterruptOverlays(castbar, barColor, settings)
 	local interruptColor = settings.interruptColor
 	castbar._niOverlay = castbar._niOverlay or castbar:CreateTexture(nil, 'ARTWORK', nil, 4)
 	castbar._niOverlay:SetTexture(texturePath)
-	castbar._niOverlay:SetVertexColor(interruptColor[1], interruptColor[2], interruptColor[3], interruptColor[4] or 1)
+	castbar._niOverlay:SetVertexColor(interruptColor[1], interruptColor[2], interruptColor[3], interruptColor[4])
 	castbar._niOverlay:SetAllPoints(barTexture)
 end
 
@@ -202,7 +200,7 @@ local function RefreshInterruptTick(castbar, cooldowns)
 	end
 
 	local settings = castbar._intSettings
-	ShowTickParts(castbar, settings.interruptTick and true or false, settings.interruptWindow and true or false)
+	ShowTickParts(castbar, settings.interruptTick, settings.interruptWindow)
 
 	local interruptibleAlpha = EvaluateColorValueFromBoolean(castbar.notInterruptible, 0, 1)
 	local alpha = EvaluateColorValueFromBoolean(kickCooldown:IsZero(), 0, interruptibleAlpha)
@@ -303,7 +301,7 @@ function CastBar.TrackInterrupts(castbar, settings, barColor, unit)
 	castbar._intHostile = CanInterruptUnit(unit)
 	if not castbar._intHostile then
 		CastBar.HideInterruptOverlays(castbar)
-		castbar:SetStatusBarColor(barColor[1], barColor[2], barColor[3], barColor[4] or 1)
+		castbar:SetStatusBarColor(barColor[1], barColor[2], barColor[3], barColor[4])
 		return
 	end
 	castbar._intBarColor = barColor
@@ -315,7 +313,7 @@ function CastBar.TrackInterrupts(castbar, settings, barColor, unit)
 		castbar:HookScript('OnHide', BUI.Profiler.Wrap('CastBar.Core interrupt hide', CastBar.HideInterruptOverlays))
 	end
 	trackedCastbars[castbar] = true
-	if not interruptTicker then interruptTicker = C_Timer.NewTicker(0.1, BUI.Profiler.Wrap('CastBar.Core ticker', CheckInterruptCooldowns)) end
+	BUI.Scheduler.SetUpdateEnabled(POLL_KEY, true)
 	local cooldowns = SampleKickCooldowns()
 	PaintInterruptColor(castbar, barColor, settings, cooldowns)
 	SetupInterruptTick(castbar, settings)
@@ -328,7 +326,7 @@ function CastBar.RefreshInterruptible(castbar, barColor, settings)
 	SetupInterruptTick(castbar, settings)
 end
 
-CheckInterruptCooldowns = BUI.Dispatcher.New(function()
+local function CheckInterruptCooldowns()
 	if #knownInterrupts == 0 then return end
 	local cooldowns = SampleKickCooldowns()
 	for castbar in pairs(trackedCastbars) do
@@ -342,7 +340,9 @@ CheckInterruptCooldowns = BUI.Dispatcher.New(function()
 		end
 	end
 	if not next(trackedCastbars) then StopInterruptPoller() end
-end, 'CastBar.InterruptCheck')
+end
+
+BUI.Scheduler.RegisterUpdate(POLL_KEY, CheckInterruptCooldowns, POLL_SECONDS, false)
 
 local previewTickers = {}
 
@@ -427,7 +427,7 @@ function CastBar.PreviewInterrupt(barType)
 		castbar.Time:SetFormattedText('%.1f', PREVIEW_SECONDS - elapsed)
 		castbar.Time:Show()
 		if progress < PREVIEW_READY_AT then
-			castbar:SetStatusBarColor(onCooldownColor[1], onCooldownColor[2], onCooldownColor[3], onCooldownColor[4] or 1)
+			castbar:SetStatusBarColor(onCooldownColor[1], onCooldownColor[2], onCooldownColor[3], onCooldownColor[4])
 			castbar.Text:SetText('Interrupt on CD')
 			castbar.Text:Show()
 			tick:SetShown(settings.interruptTick)
@@ -437,7 +437,7 @@ function CastBar.PreviewInterrupt(barType)
 				BUI.TTS.Speak(settings.interruptTTSSoonText)
 			end
 		else
-			castbar:SetStatusBarColor(readyColor[1], readyColor[2], readyColor[3], readyColor[4] or 1)
+			castbar:SetStatusBarColor(readyColor[1], readyColor[2], readyColor[3], readyColor[4])
 			castbar.Text:SetText('Can Interrupt!')
 			castbar.Text:Show()
 			tick:Hide()
@@ -457,8 +457,7 @@ local TIME_DECIMAL_SECONDS = 60
 function CastBar.SetupTimeText(castbar, settings)
 	local formatter = BUI.TimeFormat.GetFormatter(TIME_DECIMAL_SECONDS)
 	local shown = { property = settings.countdown and DurationProperty.RemainingDuration or DurationProperty.ElapsedDuration, formatter = formatter }
-	local binding = castbar.Time.binding or C_DurationUtil.CreateDurationTextBinding()
-	castbar.Time.binding = binding
+	local binding = castbar.Time.binding
 	if settings.showTotalTime then
 		binding:SetTextFormat('{} / {}', { shown, { property = DurationProperty.TotalDuration, formatter = formatter } })
 	else
@@ -478,6 +477,77 @@ BUI.Visibility.Register('CastBars', function()
 	local alpha = BUI.Visibility.GetContextualOpacity('CastBars') / 100
 	for _, container in ipairs(containers) do container:SetAlpha(alpha) end
 end, true)
+
+function CastBar.PostCastInterrupted(castbar)
+	castbar._interrupted = true
+	CastBar.HideInterruptOverlays(castbar)
+	castbar:SetStatusBarColor(1, 0, 0, 1)
+	castbar._container:Show()
+end
+
+function CastBar.BuildFrames(frame, barType, name)
+	local settings = CastBar.GetSettings(barType)
+	local font = CastBar.GetFont(settings.font)
+
+	local container = CreateFrame('Frame', name, frame, 'BackdropTemplate')
+	CastBar.TrackContainer(container)
+
+	local iconFrame = CreateFrame('Frame', nil, container, 'BackdropTemplate')
+	local icon = iconFrame:CreateTexture(nil, 'ARTWORK')
+	icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+	local castbar = CreateFrame('StatusBar', nil, container)
+
+	local overlay = CreateFrame('Frame', nil, container)
+	overlay:SetAllPoints(castbar)
+
+	local text = overlay:CreateFontString(nil, 'OVERLAY')
+	Pixel.ApplyFont(text, settings.textSize, font)
+	text:SetJustifyH('LEFT')
+	text:SetJustifyV('MIDDLE')
+
+	local time = overlay:CreateFontString(nil, 'OVERLAY')
+	Pixel.ApplyFont(time, settings.textSize, font)
+	time:SetJustifyH('RIGHT')
+	time:SetJustifyV('MIDDLE')
+
+	castbar.Icon = icon
+	castbar.Text = text
+	castbar.Time = time
+	castbar.timeToHold = 0.5
+	castbar._container = container
+	castbar._iconFrame = iconFrame
+	castbar._overlay = overlay
+	castbar._barType = barType
+	castbar.PostCastStop = CastBar.HideInterruptOverlays
+	castbar.PostCastInterrupted = CastBar.PostCastInterrupted
+
+	frame._castbarContainer = container
+	frame.Castbar = castbar
+	return castbar, container, overlay
+end
+
+function CastBar.FitBar(castbar, settings, height, edge, gap)
+	local container, iconFrame, icon = castbar._container, castbar._iconFrame, castbar.Icon
+	local showIcon = settings.showIcon
+	castbar:ClearAllPoints()
+	castbar:SetPoint('TOPLEFT', container, 'TOPLEFT', edge, -edge)
+	castbar:SetPoint('BOTTOMRIGHT', container, 'BOTTOMRIGHT', -edge, edge)
+	castbar:SetStatusBarTexture(CastBar.GetTexturePath(settings.texture))
+
+	iconFrame:SetSize(height, height)
+	iconFrame:ClearAllPoints()
+	iconFrame:SetPoint('RIGHT', container, 'LEFT', -gap, 0)
+	iconFrame:SetShown(showIcon)
+	local iconSize = height - edge * 2
+	icon:SetSize(iconSize, iconSize)
+	icon:ClearAllPoints()
+	icon:SetPoint('CENTER', iconFrame)
+	icon:SetShown(showIcon)
+
+	CastBar.StyleText(castbar, castbar.Text, castbar.Time, settings, CastBar.GetFont(settings.font))
+	CastBar.SetupTimeText(castbar, settings)
+end
 
 local CHANNEL_TICKS = {
 	[234153] = 5,
@@ -569,7 +639,7 @@ function CastBar.UpdateChannelTicks(castbar, settings)
 			tick = castbar:CreateTexture(nil, 'OVERLAY', nil, 3)
 			castbar._chanTicks[index] = tick
 		end
-		tick:SetColorTexture(color[1], color[2], color[3], color[4] or 0.85)
+		tick:SetColorTexture(color[1], color[2], color[3], color[4])
 		tick:SetWidth(tickWidth)
 	end
 	castbar._chanTickCount = ticks

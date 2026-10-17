@@ -4,8 +4,6 @@ local CastBar = BUI.CastBar
 local Pixel = BUI.Pixel
 local UnpackColor = BUI.UnpackColor
 
-local CreateFrame = CreateFrame
-
 local function ResolveBossColor(castbar, settings)
 	return settings.useIndividualColors and settings.bossColors[castbar._bossIndex] or settings.barColor
 end
@@ -28,60 +26,18 @@ local function BossPostCastInterruptible(castbar)
 	CastBar.RefreshInterruptible(castbar, ResolveBossColor(castbar, settings), settings)
 end
 
-local function BossPostCastInterrupted(castbar)
-	castbar._interrupted = true
-	CastBar.HideInterruptOverlays(castbar)
-	castbar:SetStatusBarColor(1, 0, 0, 1)
-end
-
 function CastBar.CreateBossCastbar(frame)
-	local font = BUI.UnitFrames.GetFont()
-
-	local container = CreateFrame('Frame', nil, frame, 'BackdropTemplate')
+	local castbar, container, overlay = CastBar.BuildFrames(frame, 'boss')
 	container:SetFrameLevel(frame:GetFrameLevel() + 5)
-	CastBar.TrackContainer(container)
-
-	local iconFrame = CreateFrame('Frame', nil, container, 'BackdropTemplate')
-	iconFrame:SetFrameLevel(container:GetFrameLevel() + 1)
-
-	local icon = iconFrame:CreateTexture(nil, 'ARTWORK')
-	icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-
-	local castbar = CreateFrame('StatusBar', nil, container)
 	castbar:SetFrameLevel(container:GetFrameLevel() + 2)
-	castbar._bossIndex = tonumber(frame.unit and frame.unit:match('%d+')) or 1
-
-	local overlay = CreateFrame('Frame', nil, castbar)
-	overlay:SetAllPoints(castbar)
 	overlay:SetFrameLevel(castbar:GetFrameLevel() + 10)
-
-	local text = overlay:CreateFontString(nil, 'OVERLAY')
-	Pixel.ApplyFont(text, 12, font)
-	text:SetJustifyH('LEFT')
-	text:SetJustifyV('MIDDLE')
-
-	local time = overlay:CreateFontString(nil, 'OVERLAY')
-	Pixel.ApplyFont(time, 12, font)
-	time:SetJustifyH('RIGHT')
-	time:SetJustifyV('MIDDLE')
-
-	castbar.Icon = icon
-	castbar.Text = text
-	castbar.Time = time
-	castbar.timeToHold = 0.5
-	castbar._container = container
-	castbar._iconFrame = iconFrame
+	castbar._bossIndex = tonumber(frame.unit:match('%d+'))
 
 	castbar:HookScript('OnShow', BUI.Profiler.Wrap('CastBar.Boss castbar show', function() container:Show() end))
 	castbar:HookScript('OnHide', BUI.Profiler.Wrap('CastBar.Boss castbar hide', function() container:Hide() end))
 	castbar.PostCastStart = BossPostCastStart
-	castbar.PostCastStop = CastBar.HideInterruptOverlays
 	castbar.PostCastFail = CastBar.HideInterruptOverlays
-	castbar.PostCastInterrupted = BossPostCastInterrupted
 	castbar.PostCastInterruptible = BossPostCastInterruptible
-
-	frame._castbarContainer = container
-	frame.Castbar = castbar
 end
 
 function CastBar.ApplyBossCastbar(frame, index)
@@ -126,36 +82,21 @@ function CastBar.ApplyBossCastbar(frame, index)
 		container:SetPoint('TOP', frame, 'BOTTOM', 0, -gap)
 	end
 
-	local backgroundRed, backgroundGreen, backgroundBlue, backgroundAlpha = UnpackColor(settings.bgColor, 0.1, 0.1, 0.1, 0.8)
+	local backgroundRed, backgroundGreen, backgroundBlue, backgroundAlpha = UnpackColor(settings.bgColor)
 	local borderRed, borderGreen, borderBlue, borderAlpha = UnpackColor(settings.borderColor)
 	Pixel.SetTemplate(container, backgroundRed, backgroundGreen, backgroundBlue, backgroundAlpha, borderRed, borderGreen, borderBlue, borderAlpha, settings.borderSize)
 
 	if not castbar:IsShown() then container:Hide() end
 
-	castbar:ClearAllPoints()
-	castbar:SetPoint('TOPLEFT', container, 'TOPLEFT', edge, -edge)
-	castbar:SetPoint('BOTTOMRIGHT', container, 'BOTTOMRIGHT', -edge, edge)
-	castbar:SetStatusBarTexture(CastBar.GetTexturePath(settings.texture))
-
+	CastBar.FitBar(castbar, settings, height, edge, gap)
 	local barColor = ResolveBossColor(castbar, settings)
-	castbar:SetStatusBarColor(barColor[1], barColor[2], barColor[3], barColor[4] or 1)
+	castbar:SetStatusBarColor(barColor[1], barColor[2], barColor[3], barColor[4])
 
 	local iconFrame = castbar._iconFrame
-	iconFrame:SetSize(height, height)
-	iconFrame:ClearAllPoints()
-	iconFrame:SetPoint('RIGHT', container, 'LEFT', -gap, 0)
 	if settings.showIcon and settings.borderSize > 0 then
 		Pixel.ApplyBorder(iconFrame, settings.borderSize, borderRed, borderGreen, borderBlue, borderAlpha)
 		Pixel.ShowBorder(iconFrame)
 	else
 		Pixel.HideBorder(iconFrame)
 	end
-	iconFrame:SetShown(settings.showIcon)
-	castbar.Icon:SetSize(height - edge * 2, height - edge * 2)
-	castbar.Icon:ClearAllPoints()
-	castbar.Icon:SetPoint('CENTER', iconFrame)
-	castbar.Icon:SetShown(settings.showIcon)
-
-	CastBar.StyleText(castbar, castbar.Text, castbar.Time, settings, CastBar.GetFont(settings.font))
-	CastBar.SetupTimeText(castbar, settings)
 end

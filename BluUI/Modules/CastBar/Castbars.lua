@@ -17,12 +17,12 @@ function CastBar.StyleText(anchor, text, time, settings, font)
 	local textColor = settings.textColor
 	local offsetY = -Pixel.Scale(settings.textOffsetY)
 	Pixel.ApplyFont(time, settings.textSize, font)
-	time:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4] or 1)
+	time:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4])
 	time:SetWordWrap(false)
 	time:ClearAllPoints()
 	time:SetPoint('RIGHT', anchor, 'RIGHT', Pixel.Scale(settings.textOffsetX - TEXT_INSET), offsetY)
 	Pixel.ApplyFont(text, settings.textSize, font)
-	text:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4] or 1)
+	text:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4])
 	text:SetWordWrap(false)
 	text:ClearAllPoints()
 	text:SetPoint('LEFT', anchor, 'LEFT', Pixel.Scale(TEXT_INSET + settings.textOffsetX), offsetY)
@@ -79,7 +79,7 @@ local function SetupStageBackgrounds(castbar, stageColors, numStages, boundaries
 
 		local stageColor = stageColors[stage]
 		if stageColor then
-			stageTexture:SetVertexColor(stageColor[1], stageColor[2], stageColor[3], (stageColor[4] or 1) * STAGE_BACKGROUND_ALPHA)
+			stageTexture:SetVertexColor(stageColor[1], stageColor[2], stageColor[3], stageColor[4] * STAGE_BACKGROUND_ALPHA)
 		end
 
 		stageTexture:ClearAllPoints()
@@ -188,7 +188,7 @@ local function PaintEmpoweredStage(castbar)
 	if stage ~= castbar._lastStage then
 		castbar._lastStage = stage
 		local stageColor = castbar._empoweredSettings.stageColors[stage]
-		if stageColor then castbar:SetStatusBarColor(stageColor[1], stageColor[2], stageColor[3], stageColor[4] or 1) end
+		if stageColor then castbar:SetStatusBarColor(stageColor[1], stageColor[2], stageColor[3], stageColor[4]) end
 	end
 	if stage < castbar._numStages then
 		local startTime = castbar._empowerStart
@@ -200,7 +200,7 @@ end
 local function StartStageColors(castbar, settings)
 	CancelStageColors(castbar)
 	if not (castbar._pipFractions and settings.stageColorsEnabled) then return end
-	if settings.stageColorBackground ~= false or not next(settings.stageColors) then return end
+	if settings.stageColorBackground or not next(settings.stageColors) then return end
 	PaintEmpoweredStage(castbar)
 end
 
@@ -213,7 +213,7 @@ local function PostCastStart(castbar, unit)
 
 	local barColor = ResolveColor(castbar, settings)
 	if castbar._barType == 'player' then
-		castbar:SetStatusBarColor(barColor[1], barColor[2], barColor[3], barColor[4] or 1)
+		castbar:SetStatusBarColor(barColor[1], barColor[2], barColor[3], barColor[4])
 		StartStageColors(castbar, settings)
 	else
 		CastBar.TrackInterrupts(castbar, settings, barColor, unit)
@@ -238,13 +238,6 @@ local function PostCastFail(castbar)
 	castbar:SetStatusBarColor(0.8, 0.2, 0.2, 1)
 end
 
-local function PostCastInterrupted(castbar)
-	castbar._interrupted = true
-	CastBar.HideInterruptOverlays(castbar)
-	castbar:SetStatusBarColor(1, 0, 0, 1)
-	castbar._container:Show()
-end
-
 local function ShowPreview(castbar, barType)
 	local settings = CastBar.GetSettings(barType)
 	local container = castbar._container
@@ -253,7 +246,7 @@ local function ShowPreview(castbar, barType)
 	castbar:SetMinMaxValues(0, 1)
 	castbar:SetValue(1)
 	local color = BaseColor(settings, barType)
-	castbar:SetStatusBarColor(color[1], color[2], color[3], color[4] or 1)
+	castbar:SetStatusBarColor(color[1], color[2], color[3], color[4])
 
 	local hint = container._isAnchored and ' - Anchored | Right-Click to Lock' or ' - Drag to Reposition | Right-Click to Lock'
 	castbar.Text:SetText(DISPLAY_NAMES[barType] .. hint)
@@ -270,52 +263,21 @@ local function ShowPreview(castbar, barType)
 end
 
 function CastBar.CreateCastbar(frame, barType)
-	local container = CreateFrame('Frame', 'BUI_Castbar_' .. barType, frame, 'BackdropTemplate')
+	local castbar, container, overlay = CastBar.BuildFrames(frame, barType, 'BUI_Castbar_' .. barType)
 	container:SetFrameStrata('LOW')
 	container:SetFrameLevel(10)
 	container:Hide()
-	CastBar.TrackContainer(container)
-
-	local iconFrame = CreateFrame('Frame', nil, container, 'BackdropTemplate')
-	local icon = iconFrame:CreateTexture(nil, 'ARTWORK')
-	icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-
-	local castbar = CreateFrame('StatusBar', nil, container)
 	castbar:SetFrameLevel(container:GetFrameLevel() + 1)
-	castbar:EnableMouse(false)
-
-	local overlay = CreateFrame('Frame', nil, container)
-	overlay:SetAllPoints(castbar)
 	overlay:SetFrameLevel(container:GetFrameLevel() + 20)
-	overlay:EnableMouse(false)
-
-	local text = overlay:CreateFontString(nil, 'OVERLAY')
-	text:SetJustifyH('LEFT')
-	text:SetJustifyV('MIDDLE')
-
-	local timer = overlay:CreateFontString(nil, 'OVERLAY')
-	timer:SetJustifyH('RIGHT')
-	timer:SetJustifyV('MIDDLE')
 
 	local safeZone = castbar:CreateTexture(nil, 'OVERLAY')
 	safeZone:SetBlendMode('ADD')
 	safeZone:Hide()
-
-	castbar.Icon = icon
-	castbar.Text = text
-	castbar.Time = timer
 	castbar.SafeZone = safeZone
-	castbar._container = container
-	castbar._overlay = overlay
-	castbar._iconFrame = iconFrame
-	castbar._barType = barType
-	castbar.timeToHold = 0.5
 	castbar.Pips = {}
 
 	castbar.PostCastStart = PostCastStart
-	castbar.PostCastStop = CastBar.HideInterruptOverlays
 	castbar.PostCastFail = PostCastFail
-	castbar.PostCastInterrupted = PostCastInterrupted
 	castbar.PostCastInterruptible = PostCastInterruptible
 	castbar.UpdatePips = UpdatePips
 
@@ -349,8 +311,7 @@ function CastBar.CreateCastbar(frame, barType)
 		onRightClick = function()
 			CastBar.GetSettings(barType).locked = true
 			BUI.Dragging.SetLocked(container, true)
-			local toggle = CastBar._lockToggles and CastBar._lockToggles[barType]
-			if toggle then toggle:SetValue(false) end
+			BUI.NotifyModuleChange('castBar')
 			CastBar.HideQuietly(castbar)
 		end,
 	})
@@ -423,14 +384,11 @@ function CastBar.ApplyCastbar(frame, barType)
 	AnchorMoved(container, settings)
 	LayoutContainer(container, settings)
 
-	local backgroundRed, backgroundGreen, backgroundBlue, backgroundAlpha = UnpackColor(settings.bgColor, 0.1, 0.1, 0.1, 0.8)
+	local backgroundRed, backgroundGreen, backgroundBlue, backgroundAlpha = UnpackColor(settings.bgColor)
 	local borderRed, borderGreen, borderBlue, borderAlpha = UnpackColor(settings.borderColor)
 	Pixel.SetTemplate(container, backgroundRed, backgroundGreen, backgroundBlue, backgroundAlpha, borderRed, borderGreen, borderBlue, borderAlpha, settings.borderSize)
 
-	castbar:ClearAllPoints()
-	castbar:SetPoint('TOPLEFT', container, 'TOPLEFT', edge, -edge)
-	castbar:SetPoint('BOTTOMRIGHT', container, 'BOTTOMRIGHT', -edge, edge)
-	castbar:SetStatusBarTexture(CastBar.GetTexturePath(settings.texture))
+	CastBar.FitBar(castbar, settings, height, edge, gap)
 
 	if barType == 'player' and settings.showLatency then
 		local latencyColor = settings.latencyColor
@@ -441,23 +399,12 @@ function CastBar.ApplyCastbar(frame, barType)
 	end
 
 	local iconFrame = castbar._iconFrame
-	iconFrame:SetSize(height, height)
-	iconFrame:ClearAllPoints()
-	iconFrame:SetPoint('RIGHT', container, 'LEFT', -gap, 0)
 	if settings.showIcon and settings.borderSize > 0 then
 		Pixel.SetTemplate(iconFrame, backgroundRed, backgroundGreen, backgroundBlue, backgroundAlpha, borderRed, borderGreen, borderBlue, borderAlpha, settings.borderSize)
 	else
 		iconFrame:SetBackdrop(nil)
 	end
-	iconFrame:SetShown(settings.showIcon)
 
-	castbar.Icon:SetSize(height - edge * 2, height - edge * 2)
-	castbar.Icon:ClearAllPoints()
-	castbar.Icon:SetPoint('CENTER', iconFrame)
-	castbar.Icon:SetShown(settings.showIcon)
-
-	CastBar.StyleText(castbar, castbar.Text, castbar.Time, settings, CastBar.GetFont(settings.font))
-	CastBar.SetupTimeText(castbar, settings)
 	BUI.Dragging.SetLocked(container, settings.locked)
 
 	if not settings.enabled then

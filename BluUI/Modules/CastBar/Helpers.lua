@@ -8,14 +8,11 @@ local sharedMedia = LibStub('LibSharedMedia-3.0')
 local BAR_TYPES = { 'player', 'target', 'focus' }
 
 function CastBar.GetTexturePath(key)
-	if not key or key == BUI.C.GLOBAL_OPTION then return BUI.GetGlobalTexture() end
+	if key == BUI.C.GLOBAL_OPTION then return BUI.GetGlobalTexture() end
 	return sharedMedia:Fetch('statusbar', key)
 end
 
-function CastBar.GetFont(key)
-	if not key or key == BUI.C.GLOBAL_OPTION then return BUI.GetGlobalFont() end
-	return sharedMedia:Fetch('font', key)
-end
+CastBar.GetFont = BUI.GetFontByName
 
 function CastBar.GetSettings(barType)
 	return BUI.GetDB().castBars[barType]
