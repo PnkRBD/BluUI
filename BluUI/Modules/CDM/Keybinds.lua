@@ -19,6 +19,7 @@ local GetMacroItem = GetMacroItem
 local GetMacroIndexByName = GetMacroIndexByName
 local GetActionText = GetActionText
 local GetItemSpell = C_Item.GetItemSpell
+local GetItemInfoInstant = C_Item.GetItemInfoInstant
 local C_Spell = C_Spell
 local C_ActionBar = C_ActionBar
 
@@ -27,6 +28,7 @@ local Pixel = BUI.Pixel
 
 local CDM = BUI.CDM
 local FrameData = CDM.FrameData
+local GetFrameData = CDM.GetFrameData
 
 local SLOTS_PER_PAGE = 12
 
@@ -208,15 +210,6 @@ local function ParseMacroBody(body)
     return results
 end
 
-local function GetMacroBodySafe(macroIndex)
-    if not macroIndex or macroIndex == 0 then return nil end
-    local body = GetMacroBody(macroIndex)
-    if body and body ~= "" then return body end
-    local _, _, infoBody = GetMacroInfo(macroIndex)
-    if infoBody and infoBody ~= "" then return infoBody end
-    return nil
-end
-
 local function ResolveMacroIndex(slot, actionID)
     local macroName = GetActionText(slot)
     if macroName and macroName ~= "" then
@@ -335,6 +328,13 @@ local function CacheOne(id, formatted, raw, slot)
     cacheSize = cacheSize + 1
 end
 
+local function CacheMiss(id)
+    if cacheSize >= MAX_CACHE_SIZE then WipeEntries() end
+    formattedCache[id] = false
+    rawCache[id] = false
+    cacheSize = cacheSize + 1
+end
+
 local function CacheForVariants(id1, id2, id3, formatted, raw, slot)
     CacheOne(id1, formatted, raw, slot)
     CacheOne(id2, formatted, raw, slot)
@@ -357,21 +357,15 @@ local function IndexMacroSlot(slot, actionID, formatted, raw)
     local macroIndex = ResolveMacroIndex(slot, actionID)
     if not macroIndex then return end
 
-    local result = GetMacroSpell(macroIndex)
-    if result then
-        local spellID = type(result) == "number" and result or SpellIDFromName(result)
-        if spellID then IndexMacroSpell(spellID, formatted, raw, slot) end
+    local macroSpellID = GetMacroSpell(macroIndex)
+    if macroSpellID then IndexMacroSpell(macroSpellID, formatted, raw, slot) end
+
+    local _, itemLink = GetMacroItem(macroIndex)
+    if itemLink then
+        CacheOne(GetItemInfoInstant(itemLink), formatted, raw, slot)
     end
 
-    local _, _, macroItemID = GetMacroItem(macroIndex)
-    if macroItemID and formattedCache[macroItemID] == nil then
-        formattedCache[macroItemID] = formatted
-        rawCache[macroItemID] = raw
-        entrySlot[macroItemID] = slot
-    end
-
-    local body = GetMacroBodySafe(macroIndex)
-    local names = ParseMacroBody(body)
+    local names = ParseMacroBody(GetMacroBody(macroIndex))
     if names then
         for nameIndex = 1, #names do
             local spellText = names[nameIndex]
@@ -422,6 +416,8 @@ local function BuildFallbackMaps()
     end
 end
 
+local variantScratch = {}
+
 local function LookupSpell(spellID)
     if not spellID or spellID == 0 then return nil, nil end
 
@@ -431,9 +427,11 @@ local function LookupSpell(spellID)
     end
 
     local variant1, variant2, variant3 = SpellVariants(spellID)
-    local variants = { variant1, variant2, variant3 }
+    variantScratch[1], variantScratch[2], variantScratch[3] = variant1, variant2, variant3
 
-    for _, variantID in ipairs(variants) do
+    for variantIndex = 1, 3 do
+        local variantID = variantScratch[variantIndex]
+        if not variantID then break end
         local slots = C_ActionBar.FindSpellActionButtons(variantID)
         if slots and #slots > 0 then
             local formatted, raw, slot = ShortestFromSlots(slots)
@@ -451,7 +449,9 @@ local function LookupSpell(spellID)
         return cached or nil, rawCache[spellID] or nil
     end
 
-    for _, variantID in ipairs(variants) do
+    for variantIndex = 1, 3 do
+        local variantID = variantScratch[variantIndex]
+        if not variantID then break end
         local name = SpellName(variantID)
         if name then
             local entry = macroByName[name:lower()]
@@ -462,8 +462,7 @@ local function LookupSpell(spellID)
         end
     end
 
-    formattedCache[spellID] = false
-    rawCache[spellID] = false
+    CacheMiss(spellID)
     return nil, nil
 end
 
@@ -479,9 +478,7 @@ local function LookupItem(itemID)
     if itemSpellID then
         local formatted, raw = LookupSpell(itemSpellID)
         if formatted then
-            formattedCache[itemID] = formatted
-            rawCache[itemID] = raw
-            entrySlot[itemID] = entrySlot[itemSpellID]
+            CacheOne(itemID, formatted, raw, entrySlot[itemSpellID])
             return formatted, raw
         end
     end
@@ -497,29 +494,26 @@ local function LookupItem(itemID)
     if slots then
         local formatted, raw, slot = ShortestFromSlots(slots)
         if formatted then
-            formattedCache[itemID] = formatted
-            rawCache[itemID] = raw
-            entrySlot[itemID] = slot
+            CacheOne(itemID, formatted, raw, slot)
             return formatted, raw
         end
     end
 
-    formattedCache[itemID] = false
-    rawCache[itemID] = false
+    CacheMiss(itemID)
     return nil, nil
 end
 
 local function ResolveIconIDs(icon)
-    if not icon then return nil, nil, nil, nil end
-    local frameData = FrameData[icon]
-    local itemID = frameData and frameData.isItemByPrefix and (frameData.itemID or frameData.customSpellID) or nil
-    local customID = frameData and frameData.customSpellID or nil
+    local frameData = GetFrameData(icon)
+    local itemID
+    if frameData.isItemByPrefix then itemID = frameData.itemID or frameData.customSpellID end
+    local customID = frameData.customSpellID
     local cooldownInfo = icon.cooldownInfo
-    local overrideID = cooldownInfo and BUI.Tools.SafeNum(cooldownInfo.overrideSpellID) or nil
-    local spellID = cooldownInfo and BUI.Tools.SafeNum(cooldownInfo.spellID) or nil
+    local overrideID = cooldownInfo and Tools.SafeNum(cooldownInfo.overrideSpellID)
+    local spellID = cooldownInfo and Tools.SafeNum(cooldownInfo.spellID)
 
-    if not spellID and not overrideID and frameData and frameData.storedValue and not itemID then
-        spellID = BUI.Tools.SafeNum(frameData.storedValue)
+    if not spellID and not overrideID and frameData.storedValue and not itemID then
+        spellID = Tools.SafeNum(frameData.storedValue)
     end
     return itemID, customID, overrideID, spellID
 end
@@ -539,22 +533,12 @@ local function LookupForIcon(icon)
     return LookupForIDs(ResolveIconIDs(icon))
 end
 
-local function GetKeybindFont(config)
-    local fontName = config and config.keybindFont
-    if not fontName or fontName == "GLOBAL" then
-        return BUI.GetGlobalFont()
-    end
-    local path = LibStub("LibSharedMedia-3.0"):Fetch("font", fontName)
-    if path then return path end
-    return BUI.GetGlobalFont()
-end
-
 local function ApplyShadow(fontString)
     fontString:SetShadowOffset(0, 0)
 end
 
-local function GetOrCreateKeybindText(icon, config, db)
-    local frameData = CDM.GetFrameData(icon)
+local function GetOrCreateKeybindText(icon, config)
+    local frameData = GetFrameData(icon)
     if frameData.keybindText then return frameData.keybindText end
 
     if not frameData.textOverlay then
@@ -570,8 +554,8 @@ local function GetOrCreateKeybindText(icon, config, db)
 
     local color = config.keybindColor
     fontString:SetTextColor(color[1], color[2], color[3], color[4])
-    Pixel.ApplyFont(fontString, config.keybindFontSize, GetKeybindFont(config), BUI.GetFontOutline())
-    fontString:SetPoint(config.keybindAnchor, icon, config.keybindAnchor, Pixel.Scale(config.keybindOffsetX or -2), Pixel.Scale(config.keybindOffsetY or -2))
+    Pixel.ApplyFont(fontString, config.keybindFontSize, BUI.GetFontByName(config.keybindFont), BUI.GetFontOutline())
+    fontString:SetPoint(config.keybindAnchor, icon, config.keybindAnchor, Pixel.Scale(config.keybindOffsetX), Pixel.Scale(config.keybindOffsetY))
     ApplyShadow(fontString)
 
     return fontString
@@ -579,14 +563,13 @@ end
 
 local function ApplyViewer(viewerKey)
     local config = CDM.GetSettings(viewerKey)
-    local db = BUI.GetDB()
     local list, count = CDM.GetTrackedIcons(viewerKey)
 
     for iconIndex = 1, count do
         local icon = list[iconIndex]
-        local frameData = CDM.GetFrameData(icon)
+        local frameData = GetFrameData(icon)
 
-        if not config or not config.showKeybinds then
+        if not config.showKeybinds then
             if frameData.keybindText then frameData.keybindText:Hide() end
             frameData.keybind = nil
             frameData.keybindGeneration = nil
@@ -602,7 +585,7 @@ local function ApplyViewer(viewerKey)
                 frameData.keybind = keybind
 
                 if keybind then
-                    local fontString = GetOrCreateKeybindText(icon, config, db)
+                    local fontString = GetOrCreateKeybindText(icon, config)
                     fontString:SetText(keybind)
                     fontString:Show()
                 elseif frameData.keybindText then
@@ -624,21 +607,19 @@ CDM.Keybinds = Keybinds
 Keybinds.BindingForSlot = BindingForSlot
 
 local active = false
-local dirty = false
 local needsRetry = false
 local pendingFull = false
 local pendingBindings = false
 
 local function AnyViewerShowsKeybinds()
     for viewerIndex = 1, CDM.VIEWER_KEYS_COUNT do
-        local config = CDM.GetSettings(CDM.VIEWER_KEYS[viewerIndex])
-        if config and config.showKeybinds then return true end
+        if CDM.GetSettings(CDM.VIEWER_KEYS[viewerIndex]).showKeybinds then return true end
     end
     return false
 end
 
 local function PressHighlightEnabled()
-    return BUI.GetDB().cdm.pressHighlight.enabled or false
+    return BUI.GetDB().cdm.pressHighlight.enabled
 end
 
 local function AnyConsumerActive()
@@ -677,10 +658,6 @@ function Keybinds.Apply()
     end
 end
 
-function Keybinds.Refresh()
-    DoRefresh(true)
-end
-
 function Keybinds.RefreshViewer(viewerKey)
     ApplyViewer(viewerKey)
     Keybinds.UpdateConsumerState()
@@ -688,32 +665,23 @@ end
 
 function Keybinds.StyleViewer(viewerKey)
     local config = CDM.GetSettings(viewerKey)
-    if not config then return end
-
-    local db = BUI.GetDB()
     local list, count = CDM.GetTrackedIcons(viewerKey)
 
     for iconIndex = 1, count do
         local icon = list[iconIndex]
-        local frameData = FrameData[icon]
-        local fontString = frameData and frameData.keybindText
+        local fontString = FrameData[icon].keybindText
         if fontString then
             fontString:ClearAllPoints()
-            fontString:SetPoint(config.keybindAnchor, icon, config.keybindAnchor, Pixel.Scale(config.keybindOffsetX or -2), Pixel.Scale(config.keybindOffsetY or -2))
+            fontString:SetPoint(config.keybindAnchor, icon, config.keybindAnchor, Pixel.Scale(config.keybindOffsetX), Pixel.Scale(config.keybindOffsetY))
             local color = config.keybindColor
             fontString:SetTextColor(color[1], color[2], color[3], color[4])
-            Pixel.ApplyFont(fontString, config.keybindFontSize, GetKeybindFont(config), BUI.GetFontOutline())
+            Pixel.ApplyFont(fontString, config.keybindFontSize, BUI.GetFontByName(config.keybindFont), BUI.GetFontOutline())
             ApplyShadow(fontString)
         end
     end
 end
 
-local eventFrame = CreateFrame("Frame", "BUI_CDMKeybindFlush")
-eventFrame:Hide()
-
-eventFrame:SetScript("OnUpdate", BUI.Profiler.Wrap("CDM.Keybinds refresh", function(self)
-    self:Hide()
-    dirty = false
+local QueueRebuild = BUI.Dispatcher.New(function()
     local full = pendingFull
     local bindingsStale = pendingBindings
     pendingFull = false
@@ -722,19 +690,16 @@ eventFrame:SetScript("OnUpdate", BUI.Profiler.Wrap("CDM.Keybinds refresh", funct
 
     if needsRetry then
         needsRetry = false
-
         BUI.Profiler.After("CDM.Keybinds refresh retry", 0.1, function()
             pendingFull = true
             Keybinds.ScheduleRebuild()
         end)
     end
-end))
+end, "CDM.Keybinds refresh")
 
 function Keybinds.ScheduleRebuild()
     if not active then return end
-    if dirty then return end
-    dirty = true
-    eventFrame:Show()
+    QueueRebuild()
 end
 
 local hooksInstalled = false
@@ -744,7 +709,7 @@ local function EnsureHooks()
     local hookedViewer = false
     for key, viewerName in pairs(CDM.VIEWERS) do
         local viewer = key ~= 'buffs' and _G[viewerName]
-        if viewer and viewer.RefreshLayout then
+        if viewer then
             Hook(viewer, "RefreshLayout", Keybinds.ScheduleRebuild)
             hookedViewer = true
         end

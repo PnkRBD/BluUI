@@ -8,7 +8,6 @@ local CDM = BUI.CDM
 local function OnTalentBurst()
     BUI.Tools.InvalidateOverrideCache()
     BUI.Tools.InvalidateSpellBookIconCache()
-    BUI.Tools.InvalidateChargeSpellCache()
     CDM.InvalidateClassSpellCache()
     CDM.MarkAllDirty()
 
@@ -79,6 +78,7 @@ local function CancelAllCDEndTimers()
     end
     wipe(itemEndTimers)
     wipe(itemExpectedEnd)
+    wipe(cdExpectedEnd)
     wipe(cdEstimatedEnd)
 end
 
@@ -114,16 +114,15 @@ local function MarkWatcherViewersDirty(id)
     end
 end
 
-local IsSpellEngagedRef
+local IsSpellEngaged
 
 local function OnCDEndReached(spellID)
-    cdEndTimers[spellID] = nil
     if not cdExpectedEnd[spellID] then return end
     cdExpectedEnd[spellID] = nil
     cdEstimatedEnd[spellID] = nil
     local wasActive = cdWatchedSpells[spellID]
     if wasActive == nil then return end
-    local engaged = IsSpellEngagedRef and IsSpellEngagedRef(spellID) or false
+    local engaged = IsSpellEngaged(spellID)
     if engaged ~= wasActive then
         cdWatchedSpells[spellID] = engaged
         MarkWatcherViewersDirty(spellID)
@@ -199,7 +198,7 @@ end
 
 local IsItemCDActive
 
-local function IsSpellEngaged(spellID)
+IsSpellEngaged = function(spellID)
     if BUI.Tools.IsChargeSpell(spellID) then
         local chargeInfo = C_Spell.GetSpellCharges(spellID)
         local current = chargeInfo and BUI.Tools.SafeNum(chargeInfo.currentCharges)
@@ -229,15 +228,13 @@ local function IsSpellEngaged(spellID)
     local rawOnGCD = cdInfo and cdInfo.isOnGCD
     if not cdInfo or issecretvalue(rawActive) or issecretvalue(rawOnGCD) then
         local durationObject = C_Spell.GetSpellCooldownDuration(spellID)
-        if durationObject and durationObject.EvaluateRemainingDuration then
-            return (durationObject:EvaluateRemainingDuration(BUI.Tools.GCDFilterCurve, 0) or 0) > 0.5
+        if durationObject then
+            return durationObject:EvaluateRemainingDuration(BUI.Tools.GCDFilterCurve, 0) > 0.5
         end
         return false
     end
     return rawActive and not rawOnGCD or false
 end
-
-IsSpellEngagedRef = IsSpellEngaged
 
 local function RebuildCDWatchList()
     wipe(cdWatchedSpells)
@@ -245,29 +242,24 @@ local function RebuildCDWatchList()
     wipe(cdWatchedViewers)
     wipe(cdAltToWatched)
     cdAltConfigID = nil
-    wipe(cdExpectedEnd)
     CancelAllCDEndTimers()
     local db = BUI.GetDB()
     local any = false
     for viewerIndex = 1, CDM.VIEWER_KEYS_COUNT do
         local key = CDM.VIEWER_KEYS[viewerIndex]
         if key ~= 'buffs' then
-            local config = db.cdm[key]
-            if config then
-                local showOnlyEntries = CDM.GetShowOnlyOnCD(config)
-                for id in pairs(showOnlyEntries) do
-                    local kind, numericID = ClassifyWatchEntry(id)
-                    if numericID then
-                        if kind == 'item' then
-                            cdWatchedItems[numericID] = IsItemCDActive(numericID)
-                        else
-                            cdWatchedSpells[numericID] = IsSpellEngaged(numericID)
-                        end
-                        local viewers = cdWatchedViewers[numericID]
-                        if not viewers then viewers = {}; cdWatchedViewers[numericID] = viewers end
-                        viewers[key] = true
-                        any = true
+            for id in pairs(CDM.GetShowOnlyOnCD(db.cdm[key])) do
+                local kind, numericID = ClassifyWatchEntry(id)
+                if numericID then
+                    if kind == 'item' then
+                        cdWatchedItems[numericID] = IsItemCDActive(numericID)
+                    else
+                        cdWatchedSpells[numericID] = IsSpellEngaged(numericID)
                     end
+                    local viewers = cdWatchedViewers[numericID]
+                    if not viewers then viewers = {}; cdWatchedViewers[numericID] = viewers end
+                    viewers[key] = true
+                    any = true
                 end
             end
         end
@@ -287,14 +279,13 @@ local function RefreshCDExpectation(spellID)
     local cdInfo = GetCooldownCached(spellID)
     if not cdInfo or issecretvalue(cdInfo.startTime) or issecretvalue(cdInfo.duration) then return end
     local startTime, duration = cdInfo.startTime, cdInfo.duration
-    if not startTime or not duration or duration <= 1.5 then return end
+    if duration <= 1.5 then return end
     local endTime = startTime + duration
     local now = GetTime()
     if endTime <= now or cdExpectedEnd[spellID] == endTime then return end
     cdExpectedEnd[spellID] = endTime
     cdEstimatedEnd[spellID] = nil
-    CancelCDEndTimer(spellID)
-    cdEndTimers[spellID] = BUI.Profiler.NewTimer('CDM.Events cd end', endTime - now + CD_END_GRACE, function() OnCDEndReached(spellID) end)
+    BUI.Tools.ReplaceTimer(cdEndTimers, spellID, 'CDM.Events cd end', endTime - now + CD_END_GRACE, OnCDEndReached, spellID)
 end
 
 CheckCDWatchList = function()
@@ -331,9 +322,7 @@ CheckCDWatchList = function()
             local endTime = start and duration and (start + duration)
             if endTime and endTime > now and itemExpectedEnd[itemID] ~= endTime then
                 itemExpectedEnd[itemID] = endTime
-                if itemEndTimers[itemID] then itemEndTimers[itemID]:Cancel() end
-                itemEndTimers[itemID] = BUI.Profiler.NewTimer('CDM.Events item cd end', endTime - now + 0.1, function()
-                    itemEndTimers[itemID] = nil
+                BUI.Tools.ReplaceTimer(itemEndTimers, itemID, 'CDM.Events item cd end', endTime - now + CD_END_GRACE, function()
                     itemExpectedEnd[itemID] = nil
                     QueueCDCheck()
                 end)
@@ -373,8 +362,7 @@ local function MarkWatchedSpellActive(targetID, castSpellID)
         if start and duration and duration > 0 and (start + duration) > now then
             cdExpectedEnd[targetID] = start + duration
             cdEstimatedEnd[targetID] = nil
-            CancelCDEndTimer(targetID)
-            cdEndTimers[targetID] = BUI.Profiler.NewTimer('CDM.Events cd end', start + duration - now + CD_END_GRACE, function() OnCDEndReached(targetID) end)
+            BUI.Tools.ReplaceTimer(cdEndTimers, targetID, 'CDM.Events cd end', start + duration - now + CD_END_GRACE, OnCDEndReached, targetID)
         end
         return
     end
@@ -382,7 +370,7 @@ local function MarkWatchedSpellActive(targetID, castSpellID)
 
     local cdInfo = C_Spell.GetSpellCooldown(castSpellID or targetID)
     if cdInfo and not issecretvalue(cdInfo.startTime) and not issecretvalue(cdInfo.duration)
-       and cdInfo.startTime and cdInfo.duration and cdInfo.duration > 1.5 then
+       and cdInfo.duration > 1.5 then
         endTime = cdInfo.startTime + cdInfo.duration
     else
         local baseCDMs = GetSpellBaseCooldown(castSpellID or targetID)
@@ -391,8 +379,7 @@ local function MarkWatchedSpellActive(targetID, castSpellID)
     if endTime and endTime > now then
         cdExpectedEnd[targetID] = endTime
         cdEstimatedEnd[targetID] = estimated
-        CancelCDEndTimer(targetID)
-        cdEndTimers[targetID] = BUI.Profiler.NewTimer('CDM.Events cd end', endTime - now + CD_END_GRACE, function() OnCDEndReached(targetID) end)
+        BUI.Tools.ReplaceTimer(cdEndTimers, targetID, 'CDM.Events cd end', endTime - now + CD_END_GRACE, OnCDEndReached, targetID)
     end
     if cdWatchedSpells[targetID] == true then return end
     cdWatchedSpells[targetID] = true
@@ -456,8 +443,8 @@ function CDM.IsShowOnlyOnCDActive(id)
     return cdWatchedSpells[id] or cdWatchedItems[id] or false
 end
 
-function CDM.OnIconCooldownDone(icon)
-    if not cdLayoutRegistered or not icon then return end
+local function OnIconCooldownDone(icon)
+    if not cdLayoutRegistered then return end
     local frameData = CDM.FrameData[icon]
     local id = CDM.GetStableSpellID(icon)
     if id == nil and frameData then id = frameData.knownBaseID or frameData.knownOverrideID end
@@ -475,21 +462,16 @@ function CDM.OnIconCooldownDone(icon)
 end
 
 CDM.OnCooldownWidgetDone = BUI.Profiler.Wrap('CDM.Events cooldown done', function(cooldown)
-    local icon = cooldown and cooldown:GetParent()
-    if icon then CDM.OnIconCooldownDone(icon) end
+    OnIconCooldownDone(cooldown:GetParent())
 end)
 
 local function ForEachHideWhenZeroViewer(callback)
     local db = BUI.GetDB()
     local any = false
     for key in pairs(CDM.VIEWERS) do
-        if key ~= 'buffs' then
-            local config = db.cdm[key]
-            local hideWhenZeroEntries = config and CDM.GetHideWhenZero(config)
-            if hideWhenZeroEntries and next(hideWhenZeroEntries) then
-                any = true
-                if callback then callback(key) end
-            end
+        if key ~= 'buffs' and next(CDM.GetHideWhenZero(db.cdm[key])) then
+            any = true
+            if callback then callback(key) end
         end
     end
     return any
@@ -520,7 +502,6 @@ end
 local layoutRefreshing = false
 local layoutRefreshPending = false
 local layoutRefreshForced = false
-local layoutHooksDone = false
 local RequestLayoutRefresh
 
 local function DeferLayoutRefresh(force)
@@ -536,6 +517,8 @@ local function FlushPendingLayoutRefresh()
     RequestLayoutRefresh(force)
 end
 
+CDM.FlushPendingLayoutRefresh = FlushPendingLayoutRefresh
+
 local function DoLayoutRefresh()
     layoutRefreshing = true
     CDM.RefreshAll(true)
@@ -548,19 +531,18 @@ end
 local lastActiveLayout
 
 RequestLayoutRefresh = function(force)
-    local managerFrame = _G.EditModeManagerFrame
-    local editing = managerFrame and managerFrame:IsShown()
+    local editing = EditModeManagerFrame:IsShown()
     if layoutRefreshing or editing or InCombatLockdown() then
         DeferLayoutRefresh(force or editing)
+        if InCombatLockdown() then
+            BUI.Events:AfterCombatSettled(FlushPendingLayoutRefresh, "CDM.LayoutPending")
+        end
         return
     end
     if not force then
-        local layouts = C_EditMode.GetLayouts()
-        local active = layouts and layouts.activeLayout
-        if active ~= nil then
-            if active == lastActiveLayout then return end
-            lastActiveLayout = active
-        end
+        local active = C_EditMode.GetLayouts().activeLayout
+        if active == lastActiveLayout then return end
+        lastActiveLayout = active
     end
     layoutRefreshPending = false
     layoutRefreshForced = false
@@ -571,9 +553,4 @@ function CDM.RegisterEvents()
     BUI.Events:OnTalentBurst("CDM", OnTalentBurst)
     BUI.Events:Register("COOLDOWN_VIEWER_DATA_LOADED", "CDM", OnCooldownViewerDataLoaded)
     BUI.Events:Register("EDIT_MODE_LAYOUTS_UPDATED", "CDM.Layout", function() RequestLayoutRefresh() end)
-    BUI.Events:Register("PLAYER_REGEN_ENABLED", "CDM.LayoutPending", function() BUI.Events:AfterCombatSettled(FlushPendingLayoutRefresh, "CDM.LayoutPending") end)
-    if not layoutHooksDone and _G.EditModeManagerFrame then
-        layoutHooksDone = true
-        _G.EditModeManagerFrame:HookScript("OnHide", BUI.Profiler.Wrap('CDM.Events edit mode hide', FlushPendingLayoutRefresh))
-    end
 end

@@ -11,10 +11,20 @@ local PackInto = CDM.PackInto
 
 local COUNT_HOST_LEVEL = 30
 
-function CDM.ResolveSwipeColor(settings)
-    local swipeColor = settings and settings.swipeColor
-    if swipeColor then return swipeColor[1] or 0, swipeColor[2] or 0, swipeColor[3] or 0, swipeColor[4] or 0.58 end
-    return 0, 0, 0, 0.58
+function CDM.ApplyCooldownSwipeStyle(cooldown, settings)
+    local cooldownFrameData = FrameData[cooldown]
+    local swipeColor = settings.swipeColor
+    local reverse, showEdge = settings.reverseSwipe, settings.showEdge
+    local swipeRed, swipeGreen, swipeBlue, swipeAlpha = swipeColor[1], swipeColor[2], swipeColor[3], swipeColor[4]
+    cooldownFrameData.reverseSwipe = reverse
+    cooldownFrameData.showEdge = showEdge
+    cooldownFrameData.swR, cooldownFrameData.swG, cooldownFrameData.swB, cooldownFrameData.swA = swipeRed, swipeGreen, swipeBlue, swipeAlpha
+    cooldown:SetUseCircularEdge(false)
+    cooldown:SetSwipeTexture(BLANK)
+    cooldown:SetDrawBling(false)
+    cooldown:SetDrawEdge(showEdge)
+    cooldown:SetReverse(reverse)
+    cooldown:SetSwipeColor(swipeRed, swipeGreen, swipeBlue, swipeAlpha)
 end
 
 local function OnBlizzardIconEnter()
@@ -25,7 +35,7 @@ local function OnBlizzardIconEnter()
 end
 
 function CDM.GetAspectTexCoords(zoom, frameWidth, frameHeight, keepAspect)
-    if not keepAspect or not frameWidth or not frameHeight or frameWidth == frameHeight then
+    if not keepAspect or frameWidth == frameHeight then
         return zoom, 1 - zoom, zoom, 1 - zoom
     end
     local available = 1 - 2 * zoom
@@ -39,7 +49,6 @@ function CDM.GetAspectTexCoords(zoom, frameWidth, frameHeight, keepAspect)
 end
 
 local regionBuffer = {}
-local regionBuffer2 = {}
 
 local function SuppressShow(self)
     self:Hide()
@@ -47,13 +56,13 @@ local function SuppressShow(self)
 end
 
 local function KillOverlays(icon)
-    local iconFrameData = FrameData[icon]
-    if iconFrameData and iconFrameData.overlaysKilled then return end
+    local iconFrameData = GetFrameData(icon)
+    if iconFrameData.overlaysKilled then return end
 
     local regions, numRegions = PackInto(regionBuffer, icon:GetRegions())
     for regionIndex = 1, numRegions do
         local region = regions[regionIndex]
-        if region and region:IsObjectType("Texture") then
+        if region:IsObjectType("Texture") then
             local atlas = region:GetAtlas()
             if atlas and atlas:find("CoolDownManager.*Overlay") then
                 region:SetTexture(nil)
@@ -64,55 +73,27 @@ local function KillOverlays(icon)
             end
         end
     end
-    if not iconFrameData then iconFrameData = GetFrameData(icon) end
     iconFrameData.overlaysKilled = true
 end
 
 local function KillDebuffBorder(icon)
     local debuffBorder = icon.DebuffBorder
     if not debuffBorder then return end
-    local borderFrameData = FrameData[debuffBorder]
-    if borderFrameData and borderFrameData.killed then return end
+    local borderFrameData = GetFrameData(debuffBorder)
+    if borderFrameData.killed then return end
 
     debuffBorder:Hide()
     debuffBorder:SetAlpha(0)
     Hook(debuffBorder, "Show", SuppressShow)
 
-    if debuffBorder.Texture then
-        debuffBorder.Texture:Hide()
-        debuffBorder.Texture:SetAlpha(0)
-        Hook(debuffBorder.Texture, "Show", SuppressShow)
-    end
+    debuffBorder.Texture:Hide()
+    debuffBorder.Texture:SetAlpha(0)
+    Hook(debuffBorder.Texture, "Show", SuppressShow)
 
-    if not borderFrameData then borderFrameData = GetFrameData(debuffBorder) end
     borderFrameData.killed = true
 end
 
-local function StripBlizzard(icon)
-    for elementIndex = 1, CDM.STRIP_ELEMENTS_COUNT do
-        local element = CDM.STRIP_ELEMENTS[elementIndex]
-        if icon[element] then
-            icon[element]:Hide()
-        end
-    end
-
-    if icon.SetBackdrop then
-        icon:SetBackdrop(nil)
-    end
-    if icon.SetNormalTexture then
-        icon:SetNormalTexture(nil)
-    end
-    if icon.SetHighlightTexture then
-        icon:SetHighlightTexture(nil)
-    end
-    if icon.SetPushedTexture then
-        icon:SetPushedTexture(nil)
-    end
-
-    icon:EnableMouse(false)
-end
-
-local function RemoveMasks(texture)
+function CDM.RemoveMasks(texture)
     local mask = texture:GetMaskTexture(1)
     while mask do
         texture:RemoveMaskTexture(mask)
@@ -173,7 +154,7 @@ end
 
 local function EvaluateGCDFilteredDesaturation(durationObject)
     local gcdInfo = GetGCDInfo()
-    if not gcdInfo or not gcdInfo.startTime or not gcdInfo.duration or gcdInfo.duration <= 0 then
+    if not gcdInfo or gcdInfo.duration <= 0 then
         return nil
     end
     local gcdRemaining = math.floor(((gcdInfo.startTime + gcdInfo.duration) - GetTime()) * 1000 + 0.5) / 1000
@@ -189,7 +170,7 @@ local function EvaluateGCDFilteredDesaturation(durationObject)
         gcdFilterCurve:AddPoint(gcdRemaining + 0.001,  0)
         gcdFilterCurve:AddPoint(gcdRemaining + 0.0011, 1)
     end
-    return durationObject:EvaluateRemainingDuration(gcdFilterCurve, 0) or 0
+    return durationObject:EvaluateRemainingDuration(gcdFilterCurve, 0)
 end
 
 local buffOverrideEnabled = false
@@ -197,14 +178,9 @@ function CDM.RefreshBuffOverrideCache()
     buffOverrideEnabled = BUI.GetDB().cdm.showBuffDuration == false
 end
 
-local function IsBuffOverrideEnabled()
-    return buffOverrideEnabled
-end
-
 local function ShouldOverrideBuffDuration(cooldown)
-    if not IsBuffOverrideEnabled() then return false end
+    if not buffOverrideEnabled then return false end
     local icon = cooldown:GetParent()
-    if not icon then return false end
     local iconFrameData = FrameData[icon]
     if iconFrameData and iconFrameData.viewerKey == 'buffs' then return false end
     return true, icon
@@ -232,12 +208,12 @@ local function ApplyAuraCooldownOverride(cooldown)
 end
 
 local function ResolveDesaturationValue(icon)
-    local info = icon and icon.cooldownInfo
+    local info = icon.cooldownInfo
     if not info then return nil end
     local spellID = info.overrideSpellID or info.spellID
     if not spellID then return nil end
 
-    if type(icon.HasVisualDataSource_Charges) == "function" and icon:HasVisualDataSource_Charges() then
+    if icon:HasVisualDataSource_Charges() then
         return 0
     end
 
@@ -245,20 +221,19 @@ local function ResolveDesaturationValue(icon)
     if not cooldownInfo or not cooldownInfo.isActive then return 0 end
 
     local durationObject = GetCachedSpellCooldownDuration(spellID)
-    if not durationObject or not durationObject.EvaluateRemainingDuration then return 1 end
+    if not durationObject then return 1 end
 
     if cooldownInfo.isOnGCD or icon.isOnGCD then
         local gcdResult = EvaluateGCDFilteredDesaturation(durationObject)
         if gcdResult ~= nil then return gcdResult end
     end
 
-    return durationObject:EvaluateRemainingDuration(BUI.Tools.OnCooldownCurve, 0) or 0
+    return durationObject:EvaluateRemainingDuration(BUI.Tools.OnCooldownCurve, 0)
 end
 
 local function ApplyDesaturation(texture)
-    if not IsBuffOverrideEnabled() then return end
+    if not buffOverrideEnabled then return end
     local icon = texture:GetParent()
-    if not icon then return end
     local iconFrameData = FrameData[icon]
     if iconFrameData and iconFrameData.viewerKey == 'buffs' then return end
     local target = ResolveDesaturationValue(icon)
@@ -271,31 +246,28 @@ function CDM.SetShowBuffDuration(show)
     for cooldown in pairs(CDM.CDMCooldowns) do
         ApplyAuraCooldownOverride(cooldown)
         local texture = cooldown:GetParent().Icon
-        if texture then
-            if show then texture:SetDesaturation(0) else ApplyDesaturation(texture) end
-        end
+        if show then texture:SetDesaturation(0) else ApplyDesaturation(texture) end
     end
 end
 
-local function HookIconDesaturation(icon)
-    local texture = icon and icon.Icon
-    if not texture then return end
-    local frameData = FrameData[texture] or GetFrameData(texture)
+local desaturating = setmetatable({}, { __mode = 'k' })
+
+local function ReapplyDesaturation(texture)
+    if desaturating[texture] then return end
+    local iconFrameData = FrameData[texture:GetParent()]
+    if iconFrameData and iconFrameData.hidden then return end
+    desaturating[texture] = true
+    ApplyDesaturation(texture)
+    desaturating[texture] = nil
+end
+
+local function HookIconDesaturation(texture)
+    local frameData = GetFrameData(texture)
     if frameData.desatHooked then return end
     frameData.desatHooked = true
 
-    local applying = false
-    local function reapply()
-        if applying then return end
-        local iconFrameData = FrameData[icon]
-        if iconFrameData and iconFrameData.hidden then return end
-        applying = true
-        ApplyDesaturation(texture)
-        applying = false
-    end
-
-    Hook(texture, "SetDesaturation", reapply)
-    Hook(texture, "SetDesaturated", reapply)
+    Hook(texture, "SetDesaturation", ReapplyDesaturation)
+    Hook(texture, "SetDesaturated", ReapplyDesaturation)
 end
 
 local function ReenforceCooldownStyle(cooldown)
@@ -317,10 +289,8 @@ local function OnCooldownApplied(cooldown)
 end
 
 function CDM.ReclaimShownIconStyle(icon)
-    local cooldown = icon.Cooldown
-    if cooldown then OnCooldownApplied(cooldown) end
-    local texture = icon.Icon
-    if texture then ApplyDesaturation(texture) end
+    OnCooldownApplied(icon.Cooldown)
+    ApplyDesaturation(icon.Icon)
 end
 
 local function ReclaimDrawEdge(cooldown, drawEdge)
@@ -377,46 +347,27 @@ function CDM.RefreshCooldownStyleFlags()
     for keyIndex = 1, CDM.VIEWER_KEYS_COUNT do
         local key = CDM.VIEWER_KEYS[keyIndex]
         local settings = CDM.GetSettings(key)
-        if settings then
-            local list, count = CDM.GetTrackedIcons(key)
-            for iconIndex = 1, count do
-                local icon = list[iconIndex]
-                local cooldown = icon and icon.Cooldown
-                local cooldownFrameData = cooldown and FrameData[cooldown]
-                if cooldownFrameData and cooldownFrameData.cdSetup then
-                    cooldownFrameData.showEdge = settings.showEdge
-                    cooldown:SetDrawEdge(cooldownFrameData.showEdge)
-                end
+        local list, count = CDM.GetTrackedIcons(key)
+        for iconIndex = 1, count do
+            local cooldown = list[iconIndex].Cooldown
+            local cooldownFrameData = FrameData[cooldown]
+            if cooldownFrameData and cooldownFrameData.cdSetup then
+                cooldownFrameData.showEdge = settings.showEdge
+                cooldown:SetDrawEdge(settings.showEdge)
             end
         end
     end
 end
 
-local function SetupCooldown(icon)
-    local cooldown = icon.Cooldown
-    if not cooldown then return end
-    local cooldownFrameData = FrameData[cooldown]
-    if cooldownFrameData and cooldownFrameData.cdSetup then return end
-    if not cooldownFrameData then cooldownFrameData = GetFrameData(cooldown) end
+local function SetupCooldown(cooldown)
+    local cooldownFrameData = GetFrameData(cooldown)
+    if cooldownFrameData.cdSetup then return end
     cooldownFrameData.cdSetup = true
 
     CDM.CDMCooldowns[cooldown] = true
 
     cooldown:SetDrawSwipe(true)
-    cooldown:SetUseCircularEdge(false)
-    cooldown:SetSwipeTexture(BLANK)
     cooldown:SetHideCountdownNumbers(false)
-
-    local iconFrameData = FrameData[icon]
-    local viewerKey = iconFrameData and iconFrameData.viewerKey
-    local settings = viewerKey and CDM.GetSettings(viewerKey)
-    cooldownFrameData.swR, cooldownFrameData.swG, cooldownFrameData.swB, cooldownFrameData.swA = CDM.ResolveSwipeColor(settings)
-    cooldown:SetSwipeColor(cooldownFrameData.swR, cooldownFrameData.swG, cooldownFrameData.swB, cooldownFrameData.swA)
-    cooldownFrameData.reverseSwipe = settings and settings.reverseSwipe or false
-    cooldownFrameData.showEdge = settings and settings.showEdge or false
-    cooldown:SetReverse(cooldownFrameData.reverseSwipe)
-    cooldown:SetDrawBling(false)
-    cooldown:SetDrawEdge(cooldownFrameData.showEdge)
 
     if not cooldownFrameData.cdHooked then
         cooldownFrameData.cdHooked = true
@@ -433,75 +384,23 @@ function CDM.CooldownTextCenterDrop(fontSize)
     return math.floor(fontSize * 0.1 + 0.5)
 end
 
-local function StyleCooldownText(icon, settings)
-    local cooldown = icon.Cooldown
-    if not cooldown then return end
+local function StyleCooldownText(cooldown, settings)
+    local fontString = BUI.Tools.CooldownFontString(cooldown)
+    if not fontString then return end
 
     local fontSize = settings.cooldownTextSize
     local position = settings.cooldownTextPosition
-    local offsetX, offsetY = settings.cooldownTextOffsetX, settings.cooldownTextOffsetY
+    local offsetY = settings.cooldownTextOffsetY
     if position == "CENTER" and fontSize > 0 then
         offsetY = offsetY - CDM.CooldownTextCenterDrop(fontSize)
     end
     local cdTextColor = settings.cooldownTextColor
 
-    local cooldownFrameData = FrameData[cooldown]
-    if cooldownFrameData and cooldownFrameData.cdTextStyled then
-        local fontString = cooldownFrameData.cdTextFS
-        if fontString then
-            if fontSize > 0 then
-                Pixel.ApplyFont(fontString, fontSize, BUI.GetCDMFont())
-            end
-            fontString:ClearAllPoints()
-            fontString:SetPoint(position, cooldown, position, offsetX, offsetY)
-            if cdTextColor then fontString:SetTextColor(cdTextColor[1], cdTextColor[2], cdTextColor[3], cdTextColor[4]) end
-            fontString:SetDrawLayer("OVERLAY", 7)
-        end
-        return
-    end
-
-    local foundFontString = nil
-    local regions, numRegions = PackInto(regionBuffer, cooldown:GetRegions())
-    for regionIndex = 1, numRegions do
-        local region = regions[regionIndex]
-        if region and region:GetObjectType() == "FontString" then
-            if fontSize > 0 then
-                Pixel.ApplyFont(region, fontSize, BUI.GetCDMFont())
-            end
-            region:ClearAllPoints()
-            region:SetPoint(position, cooldown, position, offsetX, offsetY)
-            if cdTextColor then region:SetTextColor(cdTextColor[1], cdTextColor[2], cdTextColor[3], cdTextColor[4]) end
-            region:SetDrawLayer("OVERLAY", 7)
-            foundFontString = region
-        end
-    end
-
-    if not foundFontString then
-        local children, numChildren = PackInto(regionBuffer, cooldown:GetChildren())
-        for childIndex = 1, numChildren do
-            local child = children[childIndex]
-            if child and child.GetRegions then
-                local childRegions, numChildRegions = PackInto(regionBuffer2, child:GetRegions())
-                for childRegionIndex = 1, numChildRegions do
-                    local region = childRegions[childRegionIndex]
-                    if region and region:GetObjectType() == "FontString" then
-                        if fontSize > 0 then
-                            Pixel.ApplyFont(region, fontSize, BUI.GetCDMFont())
-                        end
-                        region:ClearAllPoints()
-                        region:SetPoint(position, child, position, offsetX, offsetY)
-                        if cdTextColor then region:SetTextColor(cdTextColor[1], cdTextColor[2], cdTextColor[3], cdTextColor[4]) end
-                        region:SetDrawLayer("OVERLAY", 7)
-                        foundFontString = region
-                    end
-                end
-            end
-        end
-    end
-
-    if not cooldownFrameData then cooldownFrameData = GetFrameData(cooldown) end
-    cooldownFrameData.cdTextStyled = true
-    cooldownFrameData.cdTextFS = foundFontString
+    Pixel.ApplyFont(fontString, fontSize, BUI.GetCDMFont())
+    fontString:ClearAllPoints()
+    fontString:SetPoint(position, cooldown, position, settings.cooldownTextOffsetX, offsetY)
+    fontString:SetTextColor(cdTextColor[1], cdTextColor[2], cdTextColor[3], cdTextColor[4])
+    fontString:SetDrawLayer("OVERLAY", 7)
 end
 
 function CDM.ApplyFlashGeometry(icon, settings)
@@ -514,19 +413,19 @@ function CDM.ApplyFlashGeometry(icon, settings)
     flash:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", overhangX, -overhangY)
 end
 
-function CDM.OnCooldownFlashShow(self)
+local function OnCooldownFlashShow(self)
     local frameData = FrameData[self]
     if not frameData then return end
     local settings = frameData.viewerKey and CDM.GetSettings(frameData.viewerKey)
     if settings and not settings.showFlash then
         self:Hide()
-        if self.FlashAnim then self.FlashAnim:Stop() end
+        self.FlashAnim:Stop()
     end
 end
 
-function CDM.OnCooldownFlashPlay(self)
+local function OnCooldownFlashPlay(self)
     local flash = self:GetParent()
-    local frameData = flash and FrameData[flash]
+    local frameData = FrameData[flash]
     if not frameData then return end
     local settings = frameData.viewerKey and CDM.GetSettings(frameData.viewerKey)
     if settings and not settings.showFlash then
@@ -539,22 +438,16 @@ local function ResolveOverrideTexture(icon, iconFrameData)
     if iconFrameData.customIcon then return nil end
     local info = icon.cooldownInfo
     if not info then return nil end
-    local key = iconFrameData.viewerKey
-    local config = key and BUI.GetDB().cdm[key]
-    if not config then return nil end
-    local overrides = CDM.GetIconOverrides(config)
+    local overrides = CDM.GetIconOverrides(BUI.GetDB().cdm[iconFrameData.viewerKey])
     local overrideID = BUI.Tools.SafeNum(info.overrideSpellID)
     local baseID = BUI.Tools.SafeNum(info.spellID)
-    return (overrideID and overrides[overrideID]) or (baseID and overrides[baseID]) or nil
+    return (overrideID and overrides[overrideID]) or (baseID and overrides[baseID])
 end
 
-function CDM.ApplyIconOverrideTexture(icon)
-    local texture = icon.Icon
-    if not texture then return end
-    local iconFrameData = FrameData[icon]
-    if not iconFrameData then return end
+local function ApplyIconOverrideTexture(icon, iconFrameData)
     local wantedTexture = ResolveOverrideTexture(icon, iconFrameData)
     if not wantedTexture then return end
+    local texture = icon.Icon
     local current = texture:GetTexture()
     if issecretvalue(current) then current = nil end
     if current == wantedTexture then return end
@@ -565,38 +458,34 @@ end
 
 local function OnIconTextureChanged(texture)
     local icon = texture:GetParent()
-    local iconFrameData = icon and FrameData[icon]
+    local iconFrameData = FrameData[icon]
     if not iconFrameData or iconFrameData.locking then return end
-    CDM.ApplyIconOverrideTexture(icon)
+    ApplyIconOverrideTexture(icon, iconFrameData)
 end
 
 function CDM.RefreshIconOverrideForSpell(spellID)
     CDM.ForAllIcons(function(icon)
         local iconFrameData = FrameData[icon]
-        if not iconFrameData or iconFrameData.customIcon then return end
+        if iconFrameData.customIcon then return end
         local info = icon.cooldownInfo
         if not info then return end
         local base = BUI.Tools.SafeNum(info.spellID)
         local override = BUI.Tools.SafeNum(info.overrideSpellID)
         if base ~= spellID and override ~= spellID then return end
-        local texture = icon.Icon
-        if not texture then return end
         local wantedTexture = ResolveOverrideTexture(icon, iconFrameData)
             or (override and C_Spell.GetSpellTexture(override))
             or (base and C_Spell.GetSpellTexture(base))
         if not wantedTexture then return end
         iconFrameData.locking = true
-        texture:SetTexture(wantedTexture)
+        icon.Icon:SetTexture(wantedTexture)
         iconFrameData.locking = false
     end)
 end
 
 function CDM.SkinIcon(icon, settings, key)
     local texture = icon.Icon
-    if not texture then return end
-
     local currentVersion = CDM.state.skinVersion
-    local iconFrameData = FrameData[icon] or GetFrameData(icon)
+    local iconFrameData = GetFrameData(icon)
     iconFrameData.viewerKey = key
     if iconFrameData.skinVer == currentVersion then return end
 
@@ -604,9 +493,9 @@ function CDM.SkinIcon(icon, settings, key)
         iconFrameData.texHooked = true
         Hook(texture, 'SetTexture', OnIconTextureChanged)
     end
-    CDM.ApplyIconOverrideTexture(icon)
+    ApplyIconOverrideTexture(icon, iconFrameData)
 
-    RemoveMasks(texture)
+    CDM.RemoveMasks(texture)
 
     local borderSize = settings.borderSize
     local scaledEdge = Pixel.Scale(borderSize)
@@ -619,69 +508,42 @@ function CDM.SkinIcon(icon, settings, key)
 
     KillOverlays(icon)
     KillDebuffBorder(icon)
-    StripBlizzard(icon)
-    HookIconDesaturation(icon)
+    icon:EnableMouse(false)
+    HookIconDesaturation(texture)
 
-    for elementIndex = 1, CDM.HIDE_ELEMENTS_COUNT do
-        local name = CDM.HIDE_ELEMENTS[elementIndex]
-        if icon[name] then
-            icon[name]:Hide()
-        end
-    end
-
-    SetupCooldown(icon)
-
-    local db = BUI.GetDB()
     local cooldown = icon.Cooldown
-    if cooldown then
-        local cooldownEdge = scaledEdge - Pixel.PixelSize(1)
-        if cooldownEdge < 0 then cooldownEdge = 0 end
-        cooldown:ClearAllPoints()
-        cooldown:SetPoint("TOPLEFT", icon, "TOPLEFT", cooldownEdge, -cooldownEdge)
-        cooldown:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -cooldownEdge, cooldownEdge)
-        local swipeRed, swipeGreen, swipeBlue, swipeAlpha = CDM.ResolveSwipeColor(settings)
-        local cooldownFrameData = FrameData[cooldown]
-        if cooldownFrameData then
-            cooldownFrameData.anchoredParent = nil
-            cooldownFrameData.styleVer = nil
-            cooldownFrameData.reverseSwipe = settings.reverseSwipe
-            cooldownFrameData.showEdge = settings.showEdge
-            cooldownFrameData.swR, cooldownFrameData.swG, cooldownFrameData.swB, cooldownFrameData.swA = swipeRed, swipeGreen, swipeBlue, swipeAlpha
-        end
-        cooldown:SetDrawBling(false)
-        cooldown:SetDrawEdge(settings.showEdge)
-        cooldown:SetReverse(settings.reverseSwipe)
-        cooldown:SetSwipeColor(swipeRed, swipeGreen, swipeBlue, swipeAlpha)
-        local decimalThreshold = settings.showCooldownDecimals and settings.cooldownDecimalThreshold or 0
-        cooldown:SetCountdownMillisecondsThreshold(decimalThreshold)
-        cooldown:SetCountdownFormatter(BUI.TimeFormat.GetFormatter(decimalThreshold, settings.cooldownWarnSeconds, settings.cooldownWarnColor))
-    end
-    if icon.CooldownFlash then
-        icon.CooldownFlash:SetAlpha(1)
-        CDM.ApplyFlashGeometry(icon, settings)
+    SetupCooldown(cooldown)
 
-        if icon.CooldownFlash.Flipbook then
-            icon.CooldownFlash.Flipbook:SetBlendMode("ADD")
-        end
-        local flashFrameData = FrameData[icon.CooldownFlash]
-        if not flashFrameData or not flashFrameData.showHooked then
-            if not flashFrameData then flashFrameData = GetFrameData(icon.CooldownFlash) end
+    local cooldownEdge = scaledEdge - Pixel.PixelSize(1)
+    if cooldownEdge < 0 then cooldownEdge = 0 end
+    cooldown:ClearAllPoints()
+    cooldown:SetPoint("TOPLEFT", icon, "TOPLEFT", cooldownEdge, -cooldownEdge)
+    cooldown:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -cooldownEdge, cooldownEdge)
+    local cooldownFrameData = FrameData[cooldown]
+    cooldownFrameData.anchoredParent = nil
+    cooldownFrameData.styleVer = nil
+    CDM.ApplyCooldownSwipeStyle(cooldown, settings)
+    local decimalThreshold = settings.showCooldownDecimals and settings.cooldownDecimalThreshold or 0
+    cooldown:SetCountdownMillisecondsThreshold(decimalThreshold)
+    cooldown:SetCountdownFormatter(BUI.TimeFormat.GetFormatter(decimalThreshold, settings.cooldownWarnSeconds, settings.cooldownWarnColor))
+
+    local flash = icon.CooldownFlash
+    if flash then
+        flash:SetAlpha(1)
+        CDM.ApplyFlashGeometry(icon, settings)
+        flash.Flipbook:SetBlendMode("ADD")
+        local flashFrameData = GetFrameData(flash)
+        if not flashFrameData.showHooked then
             flashFrameData.showHooked = true
-            Hook(icon.CooldownFlash, "Show", CDM.OnCooldownFlashShow)
-            local anim = icon.CooldownFlash.FlashAnim
-            if anim then
-                Hook(anim, "Play", CDM.OnCooldownFlashPlay)
-            end
+            Hook(flash, "Show", OnCooldownFlashShow)
+            Hook(flash.FlashAnim, "Play", OnCooldownFlashPlay)
         end
         flashFrameData.viewerKey = key
         if not settings.showFlash then
-            icon.CooldownFlash:Hide()
-            if icon.CooldownFlash.FlashAnim then icon.CooldownFlash.FlashAnim:Stop() end
+            flash:Hide()
+            flash.FlashAnim:Stop()
         end
     end
-    local textLevel = icon:GetFrameLevel() + CDM.GLOW_LAYER + 1
-    if icon.ChargeCount and icon.ChargeCount.SetFrameLevel then icon.ChargeCount:SetFrameLevel(textLevel) end
-    if icon.Applications and icon.Applications.SetFrameLevel then icon.Applications:SetFrameLevel(textLevel) end
     if icon.OutOfRange then
         icon.OutOfRange:ClearAllPoints()
         icon.OutOfRange:SetAllPoints(texture)
@@ -689,13 +551,7 @@ function CDM.SkinIcon(icon, settings, key)
         icon.OutOfRange:SetTexelSnappingBias(0)
     end
 
-    if db.cdm.glow.enabled then
-        CDM.HideBlizzardGlow(icon)
-    else
-        if icon.Glow then
-            icon.Glow:Show()
-        end
-    end
+    CDM.HideBlizzardGlow(icon)
 
     local countFont = CDM.GetCountFont(icon)
     if countFont then
@@ -704,103 +560,65 @@ function CDM.SkinIcon(icon, settings, key)
         countFont:SetDrawLayer("OVERLAY", 7)
         countFont:ClearAllPoints()
         countFont:SetPoint(settings.textPosition, texture, settings.textPosition, settings.textOffsetX, settings.textOffsetY)
-        local textSize = settings.textSize
-        if textSize > 0 then
-            Pixel.ApplyFont(countFont, textSize, BUI.GetCDMFont())
-        end
+        Pixel.ApplyFont(countFont, settings.textSize, BUI.GetCDMFont())
         local textColor = settings.textColor
         countFont:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4])
     end
 
-    StyleCooldownText(icon, settings)
-
-    if icon.DurationBar then
-        local bar = icon.DurationBar
-        bar:SetStatusBarTexture(BUI.GetGlobalTexture())
-        bar:ClearAllPoints()
-        bar:SetPoint("BOTTOMLEFT", icon, "BOTTOMLEFT", scaledEdge, scaledEdge)
-        bar:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -scaledEdge, scaledEdge)
-        bar:SetHeight(Pixel.Scale(4))
-        bar:SetAlpha(1)
-        bar:Show()
-    end
+    StyleCooldownText(cooldown, settings)
 
     local borderColor = settings.borderColor
     if borderSize > 0 then
         Pixel.ApplyBorder(icon, borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
-        Pixel.ShowBorder(icon)
     else
         Pixel.HideBorder(icon)
     end
 
-    if not iconFrameData then iconFrameData = GetFrameData(icon) end
     if not iconFrameData.customIcon and not iconFrameData.tooltipHooked then
         iconFrameData.tooltipHooked = true
-        icon:HookScript("OnEnter", BUI.Profiler.Wrap('CDM.Skinning icon OnEnter', OnBlizzardIconEnter))
+        icon:HookScript("OnEnter", BUI.Profiler.Script('CDM.Skinning icon OnEnter', OnBlizzardIconEnter))
     end
 
-    iconFrameData.viewerKey = key
     iconFrameData.skinVer = currentVersion
 
-    if icon.Icon and IsBuffOverrideEnabled() and key ~= 'buffs' then
-        ApplyDesaturation(icon.Icon)
-    end
+    ApplyDesaturation(texture)
 end
 
-function CDM.UnskinIcon(icon)
+local function UnskinIcon(icon)
     Pixel.HideBorder(icon)
     icon:EnableMouse(true)
-
-    local iconFrameData = FrameData[icon]
 
     CDM.StopProcGlow(icon)
     CDM.ShowBlizzardGlow(icon)
 
-    for elementIndex = 1, CDM.SHOW_ELEMENTS_COUNT do
-        local name = CDM.SHOW_ELEMENTS[elementIndex]
-        if icon[name] then
-            icon[name]:Show()
-        end
-    end
-
     local texture = icon.Icon
-    if texture then
-        texture:ClearAllPoints()
-        texture:SetAllPoints(icon)
-        texture:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-    end
+    texture:ClearAllPoints()
+    texture:SetAllPoints(icon)
+    texture:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
-    if icon.Cooldown then
-        local cooldownFrameData = FrameData[icon.Cooldown]
-        if cooldownFrameData then cooldownFrameData.cdSetup = nil end
-        CDM.CDMCooldowns[icon.Cooldown] = nil
-        icon.Cooldown:ClearAllPoints()
-        icon.Cooldown:SetAllPoints(icon)
-        icon.Cooldown:SetDrawSwipe(true)
-        icon.Cooldown:SetDrawBling(true)
-        icon.Cooldown:SetDrawEdge(true)
-        icon.Cooldown:SetReverse(false)
-        icon.Cooldown:SetHideCountdownNumbers(false)
-        icon.Cooldown:SetSwipeColor(0, 0, 0, 0.58)
-    end
+    local cooldown = icon.Cooldown
+    local cooldownFrameData = FrameData[cooldown]
+    if cooldownFrameData then cooldownFrameData.cdSetup = nil end
+    CDM.CDMCooldowns[cooldown] = nil
+    cooldown:ClearAllPoints()
+    cooldown:SetAllPoints(icon)
+    cooldown:SetDrawSwipe(true)
+    cooldown:SetDrawBling(true)
+    cooldown:SetDrawEdge(true)
+    cooldown:SetReverse(false)
+    cooldown:SetHideCountdownNumbers(false)
+    cooldown:SetSwipeColor(0, 0, 0, 0.58)
 
     if icon.CooldownFlash then
         icon.CooldownFlash:SetAlpha(1)
     end
 
-    if iconFrameData then
-        iconFrameData.skinVer = nil
-    end
+    FrameData[icon].skinVer = nil
 end
 
 function CDM.UnskinViewer(key)
     local list, count = CDM.GetTrackedIcons(key)
-    if count == 0 then return end
-
     for iconIndex = 1, count do
-        local frame = list[iconIndex]
-        if CDM.IsCooldownIcon(frame) then
-            CDM.UnskinIcon(frame)
-        end
+        UnskinIcon(list[iconIndex])
     end
 end

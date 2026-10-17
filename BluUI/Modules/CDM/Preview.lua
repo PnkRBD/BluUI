@@ -22,11 +22,9 @@ local function CreateIcon(parent, index, iconID)
     icon.textOverlay = textOverlay
 
     icon.Count = textOverlay:CreateFontString(nil, "OVERLAY")
-    Pixel.ApplyFont(icon.Count, 14, BUI.GetGlobalFont())
     icon.Count:SetText(index > 1 and tostring(index) or "")
 
     icon.cdText = textOverlay:CreateFontString(nil, "OVERLAY")
-    Pixel.ApplyFont(icon.cdText, 12, BUI.GetGlobalFont())
     icon.cdText:SetText(index == 1 and "" or tostring(index + 3))
 
     return icon
@@ -53,13 +51,13 @@ local function UpdateIcon(icon, settings)
 
     icon.Count:ClearAllPoints()
     icon.Count:SetPoint(settings.textPosition, icon.Icon, settings.textPosition, settings.textOffsetX, settings.textOffsetY)
-    Pixel.ApplyFont(icon.Count, settings.textSize, BUI.GetGlobalFont())
+    Pixel.ApplyFont(icon.Count, settings.textSize, BUI.GetCDMFont())
     local textColor = settings.textColor
     icon.Count:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4])
 
     icon.cdText:ClearAllPoints()
     icon.cdText:SetPoint(settings.cooldownTextPosition, icon.Icon, settings.cooldownTextPosition, settings.cooldownTextOffsetX, settings.cooldownTextOffsetY)
-    Pixel.ApplyFont(icon.cdText, settings.cooldownTextSize, BUI.GetGlobalFont())
+    Pixel.ApplyFont(icon.cdText, settings.cooldownTextSize, BUI.GetCDMFont())
     local cdTextColor = settings.cooldownTextColor
     icon.cdText:SetTextColor(cdTextColor[1], cdTextColor[2], cdTextColor[3], cdTextColor[4])
 end
@@ -131,7 +129,7 @@ function CDM.ShowBuffsPreview(buffsSettings)
     previewFrame:SetScript("OnMouseUp", BUI.Profiler.Script('CDM.Preview previewFrame OnMouseUp', function(self, mouseButton)
         if mouseButton == "RightButton" then
             self:Hide()
-            if state.buffsPreviewButton then state.buffsPreviewButton:SetText("Show Preview") end
+            BUI.NotifyModuleChange('cdmBuffsPreview')
         end
     end))
 
@@ -146,7 +144,6 @@ function CDM.ShowBuffsPreview(buffsSettings)
     previewFrame.icons = {}
     for iconIndex = 1, 7 do
         previewFrame.icons[iconIndex] = CreateIcon(previewFrame.container, iconIndex, CDM.PreviewIcons[((iconIndex - 1) % #CDM.PreviewIcons) + 1])
-        previewFrame.icons[iconIndex]:Show()
     end
 
     previewFrame.Update = function()
@@ -177,5 +174,5 @@ end
 
 function CDM.RefreshBuffsPreview()
     local previewFrame = CDM.state.buffsPreview
-    if previewFrame and previewFrame:IsShown() and previewFrame.Update then previewFrame.Update() end
+    if previewFrame and previewFrame:IsShown() then previewFrame.Update() end
 end

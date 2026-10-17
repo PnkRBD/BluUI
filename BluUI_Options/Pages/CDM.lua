@@ -1,6 +1,7 @@
 local BUI = BluUI
 local BUILib = BluUI.BUILibClient
-local Controls, Layout, Modals = BUILib.Controls, BUILib.Layout, BUILib.Modals
+local Controls, Layout, Modals, Motion = BUILib.Controls, BUILib.Layout, BUILib.Modals, BUILib.Motion
+local Ease = Motion.Ease
 local CustomBarsPage = BUI.CustomBarsPage
 
 local PAGE_WIDTH = 960
@@ -13,16 +14,25 @@ local OFFSET_RANGE = 40
 local MOCK_WIDTH = 620
 local MOCK_HEIGHT = 140
 local MOCK_MAX_ICONS = 40
+local MOCK_SLIDE_TIME = 0.16
 local HOST_HEIGHT = 640
 local HOST_PAD = 8
 local WHITE = 'Interface\\Buttons\\WHITE8x8'
 local DEFAULT_ICON = 134400
 local MOCK_KEYS = { 'Q', 'E', 'R', 'F', 'T', 'G', 'Z', 'X', 'C', 'V' }
 local MOCK_BARS = {
-	{ icon = 'Interface\\Icons\\Spell_Nature_Rejuvenation', name = 'Rejuvenation', duration = '12s', fill = 0.78, stacks = '3' },
-	{ icon = 'Interface\\Icons\\Ability_Warrior_BattleShout', name = 'Battle Shout', duration = '48s', fill = 0.52 },
-	{ icon = 'Interface\\Icons\\Spell_Holy_PowerWordShield', name = 'Power Word: Shield', duration = '8s', fill = 0.24, stacks = '2' },
+	{ name = 'Rejuvenation', duration = '12s', fill = 0.78, stacks = '3' },
+	{ name = 'Battle Shout', duration = '48s', fill = 0.52 },
+	{ name = 'Power Word: Shield', duration = '8s', fill = 0.24, stacks = '2' },
 }
+local CATEGORY_BY_VIEWER = {
+	essential = Enum.CooldownViewerCategory.Essential,
+	utility = Enum.CooldownViewerCategory.Utility,
+	buffs = Enum.CooldownViewerCategory.TrackedBuff,
+	buffBars = Enum.CooldownViewerCategory.TrackedBar,
+}
+local GLOW_TYPES = {}
+for _, glowType in ipairs(BUI.CDM.GLOW_TYPES) do GLOW_TYPES[#GLOW_TYPES + 1] = { value = glowType.id, text = glowType.name } end
 local POINTS = {}
 for _, point in ipairs({ 'TOPLEFT', 'TOP', 'TOPRIGHT', 'LEFT', 'CENTER', 'RIGHT', 'BOTTOMLEFT', 'BOTTOM', 'BOTTOMRIGHT' }) do
 	POINTS[#POINTS + 1] = { value = point, text = point:sub(1, 1) .. point:sub(2):lower():gsub('left', ' left'):gsub('right', ' right') }
@@ -30,33 +40,25 @@ end
 local GROWTHS = { { value = 'DOWN', text = 'Down' }, { value = 'UP', text = 'Up' } }
 local STACK_ATTACH = { { value = 'ICON', text = 'The icon' }, { value = 'BAR', text = 'The bar' } }
 local VIEWERS = {
-	{ key = 'essential', label = 'Essential', title = 'Essential viewer', description = 'The Blizzard Essential viewer, reskinned.', keybinds = true, frame = 'BUI_EssentialCooldownViewer' },
-	{ key = 'utility', label = 'Utility', title = 'Utility viewer', description = 'Utility and defensive cooldowns from the Utility viewer.', keybinds = true, frame = 'BUI_UtilityCooldownViewer' },
-	{ key = 'buffs', label = 'Buff icons', title = 'Buff icons', description = 'Tracked buff icons from the Buff viewer.', frame = 'BUI_BuffCooldownViewer' },
+	{ key = 'essential', title = 'Essential viewer', description = 'The Blizzard Essential viewer, reskinned.', keybinds = true, frame = 'BUI_EssentialCooldownViewer' },
+	{ key = 'utility', title = 'Utility viewer', description = 'Utility and defensive cooldowns from the Utility viewer.', keybinds = true, frame = 'BUI_UtilityCooldownViewer' },
+	{ key = 'buffs', title = 'Buff icons', description = 'Tracked buff icons from the Buff viewer.', frame = 'BUI_BuffCooldownViewer' },
 }
 local VIEWER_BY_KEY = {}
 for _, viewer in ipairs(VIEWERS) do VIEWER_BY_KEY[viewer.key] = viewer end
-local TAB_IDS = { 'general', 'essential', 'utility', 'buffs', 'buffBars', 'layouts', 'icons' }
-local TAB_INDEX = {}
-for index, id in ipairs(TAB_IDS) do TAB_INDEX[id] = index end
-local CUSTOM_BAR_TAB = #TAB_IDS + 1
-local CUSTOM_IMPORT_TAB = #TAB_IDS + 2
+local TABS = { 'general', 'essential', 'utility', 'buffs', 'buffBars', 'layouts', 'icons', CustomBarsPage.BarID, function() return CustomBarsPage.IMPORT_ID end }
 local ALL_LAYOUTS = '__all__'
 
 local selected = 'general'
+local fixAfterCombat = false
 local snapshot
 local exportChoice = ALL_LAYOUTS
 local preview
 local fonts
 local railPage
 
-local function Window()
-	return BUI.PageEngine.window
-end
-
-local function Repaint()
-	Window():Repaint()
-end
+local Kit = BUI.OptionsKit
+local Window, Repaint, RebuildPane, Option, Toggle, Menu, Eye = Kit.Window, Kit.Repaint, Kit.RebuildPane, Kit.Option, Kit.Toggle, Kit.Menu, Kit.Eye
 
 local function DB()
 	return BUI.GetDB()
@@ -67,58 +69,11 @@ local function CDM()
 end
 
 local function RefreshPreview()
-	if preview then preview:Update() end
+	if preview and preview:IsVisible() then preview:Update() end
 end
 
-local function RebuildPane(page)
-	BUILib.Defer(function() page:RebuildCurrent() end)
-end
-
-local function Media(kind, key, fallback)
-	if key and key ~= '' and key ~= BUI.C.GLOBAL_OPTION then
-		local path = LibStub('LibSharedMedia-3.0'):Fetch(kind, key, true)
-		if path then return path end
-	end
-	return fallback
-end
-
-local function Option(db, label, key, extra)
-	local option = { label = label, get = function() return db[key] end, set = function(value) db[key] = value end }
-	for name, value in pairs(extra or {}) do option[name] = value end
-	return option
-end
-
-local function Toggle(db, label, key)
-	return { label = label, get = function() return db[key] == true end, set = function(value) db[key] = value end }
-end
-
-local function OnUnlessOff(db, label, key)
-	return { label = label, get = function() return db[key] ~= false end, set = function(value) db[key] = value end }
-end
-
-local function Color(db, label, key, after)
-	return {
-		kind = 'swatch', label = label, tooltip = label, opacity = true,
-		get = function()
-			local color = db[key]
-			return color[1], color[2], color[3], color[4]
-		end,
-		set = function(red, green, blue, alpha)
-			db[key] = { red, green, blue, alpha }
-			if after then after(db[key]) end
-		end,
-	}
-end
-
-local function Menu(db, key, entries, width)
-	return { entries = entries, width = width or MENU_WIDTH, get = function() return db[key] end, set = function(value) db[key] = value end }
-end
-
-local function Eye(tooltip, get, set)
-	return { icon = 'eye', tooltip = tooltip, get = get, set = function(value)
-		set(value)
-		Repaint()
-	end }
+local function Color(db, label, key, after, tooltip)
+	return Kit.Color(db, label, key, { tooltip = tooltip, onChange = after and function() after(db[key]) end or nil })
 end
 
 local function HookRefreshers()
@@ -127,20 +82,15 @@ local function HookRefreshers()
 	module._pageMockHooked = true
 	local function Wrap(owner, name)
 		local original = owner[name]
-		if not original then return end
 		owner[name] = function(...)
-			local first, second, third = original(...)
+			original(...)
 			RefreshPreview()
-			return first, second, third
 		end
 	end
-	Wrap(module, 'RefreshSizeSettings')
 	Wrap(module, 'RefreshSkinSettings')
 	Wrap(module, 'RefreshLayoutOnly')
 	Wrap(module, 'RefreshBuffBarSkin')
 	Wrap(module, 'RefreshCooldownStyleFlags')
-	Wrap(module, 'SyncSetting')
-	Wrap(module, 'SyncSettingLayout')
 	Wrap(module.Keybinds, 'StyleViewer')
 	Wrap(module.Keybinds, 'RefreshViewer')
 end
@@ -148,7 +98,7 @@ end
 local function ViewerSpells(viewerKey)
 	local module = CDM()
 	local list, count = module.GetTrackedIcons(viewerKey)
-	if list and count and count > 0 then
+	if list and count > 0 then
 		local results = {}
 		for index = 1, count do
 			local icon = list[index]
@@ -156,19 +106,15 @@ local function ViewerSpells(viewerKey)
 			local info = icon.cooldownInfo
 			local spellID = info and BUI.Tools.SafeNum(info.overrideSpellID or info.spellID)
 			if not spellID and type(key) == 'number' then spellID = key end
-			local texture = icon.Icon and icon.Icon.GetTexture and icon.Icon:GetTexture()
+			local texture = icon.Icon:GetTexture()
 			if texture and BUI.Tools.IsSecretValue(texture) then texture = nil end
 			texture = texture or (spellID and C_Spell.GetSpellTexture(spellID))
 			if texture then results[#results + 1] = { icon = texture, spellID = spellID, key = key } end
 		end
 		if #results > 0 then return results end
 	end
-	local categories = Enum.CooldownViewerCategory
-	local category = ({ essential = categories.Essential, utility = categories.Utility, buffs = categories.TrackedBuff, buffBars = categories.TrackedBar })[viewerKey]
-	local cooldownIDs = category and C_CooldownViewer.GetCooldownViewerCategorySet(category)
-	if not cooldownIDs then return nil end
 	local results = {}
-	for _, cooldownID in ipairs(cooldownIDs) do
+	for _, cooldownID in ipairs(C_CooldownViewer.GetCooldownViewerCategorySet(CATEGORY_BY_VIEWER[viewerKey])) do
 		local info = C_CooldownViewer.GetCooldownViewerCooldownInfo(cooldownID)
 		local spellID = info and (info.overrideSpellID or info.spellID)
 		local texture = spellID and C_Spell.GetSpellTexture(spellID)
@@ -186,7 +132,7 @@ local function LiveIcons(viewerKey, viewerSettings)
 	local hiddenIcons = module.GetHiddenIcons(viewerSettings)
 	local results = {}
 	for index, icon in ipairs(icons) do
-		local hidden = (hiddenSlots and hiddenSlots[index]) or module.IsIconHiddenByUser(viewerKey, hiddenIcons, icon)
+		local hidden = hiddenSlots[index] or module.IsIconHiddenByUser(viewerKey, hiddenIcons, icon)
 		if not hidden then
 			local info = icon.cooldownInfo
 			local spellID = info and BUI.Tools.SafeNum(info.overrideSpellID or info.spellID)
@@ -248,10 +194,12 @@ local function CreateViewerMock(stage, withKeybinds)
 
 	local function RestoreMenu(viewerSettings, hiddenList)
 		local items = { { title = true, text = 'Restore' } }
-		table.sort(hiddenList, function(left, right) return HiddenKeyLabel(left) < HiddenKeyLabel(right) end)
-		for _, hiddenKey in ipairs(hiddenList) do
-			items[#items + 1] = { text = HiddenKeyLabel(hiddenKey), callback = function()
-				CDM().SetHiddenIcon(viewerSettings, hiddenKey, false)
+		local labelled = {}
+		for _, hiddenKey in ipairs(hiddenList) do labelled[#labelled + 1] = { key = hiddenKey, label = HiddenKeyLabel(hiddenKey) } end
+		table.sort(labelled, function(left, right) return left.label < right.label end)
+		for _, entry in ipairs(labelled) do
+			items[#items + 1] = { text = entry.label, callback = function()
+				CDM().SetHiddenIcon(viewerSettings, entry.key, false)
 				Relayout()
 			end }
 		end
@@ -281,22 +229,20 @@ local function CreateViewerMock(stage, withKeybinds)
 		end
 		local potionValue, potionItemID
 		local list, count = module.GetTrackedIcons(holder.viewerKey)
-		if list and count then
-			for index = 1, count do
-				local frameData = module.FrameData[list[index]]
-				if frameData and frameData.customIcon and module.GetSortKey(list[index]) == entry.key then
-					if frameData.iconType == 'consumable' and module.Custom.IsPotionItem(frameData.itemID or frameData.customSpellID) then
-						potionValue = frameData.storedValue
-						potionItemID = frameData.itemID or frameData.customSpellID
-					end
-					break
+		for index = 1, count do
+			local frameData = module.FrameData[list[index]]
+			if frameData and frameData.customIcon and module.GetSortKey(list[index]) == entry.key then
+				if frameData.iconType == 'consumable' and module.Custom.IsPotionItem(frameData.itemID or frameData.customSpellID) then
+					potionValue = frameData.storedValue
+					potionItemID = frameData.itemID or frameData.customSpellID
 				end
+				break
 			end
 		end
 		if potionValue then
 			local label = 'Potion display'
 			local _, _, _, _, _, classID, subclassID = C_Item.GetItemInfoInstant(potionItemID)
-			if classID == Enum.ItemClass.Consumable and subclassID == Enum.ItemConsumableSubclass.Flask then label = 'Flask display' end
+			if classID == Enum.ItemClass.Consumable and subclassID == Enum.ItemConsumableSubclass.Flasksphials then label = 'Flask display' end
 			if module.GetPotionPrioFor(potionValue) then label = label .. ', custom' end
 			items[#items + 1] = { text = label, callback = function() BUI.ShowCDMPotionModal(module, potionItemID, potionValue, viewerSettings, holder.viewerKey, Relayout) end }
 		end
@@ -361,6 +307,17 @@ local function CreateViewerMock(stage, withKeybinds)
 		return index
 	end
 
+	local function Slide(state)
+		local rects = holder.slotRects
+		for index = 1, #rects do
+			local target = rects[TargetSlot(index, state.source, state.hover)]
+			if target then
+				Motion.To(cells[index].frame, 'x', target.x, MOCK_SLIDE_TIME, { easing = Ease.outCubic })
+				Motion.To(cells[index].frame, 'y', -target.y, MOCK_SLIDE_TIME, { easing = Ease.outCubic })
+			end
+		end
+	end
+
 	local function BeginDrag(cell)
 		local entry = cell.entry
 		if not (entry and entry.key and holder.viewerSettings) or not IsControlKeyDown() then return end
@@ -371,28 +328,15 @@ local function CreateViewerMock(stage, withKeybinds)
 		ghostFrame:SetSize(cell.frame:GetWidth() * scale, cell.frame:GetHeight() * scale)
 		ghostFrame.texture:SetTexture(entry.tex)
 		ghostFrame:Show()
-		ghostFrame:SetScript('OnUpdate', function(self, elapsed)
+		ghostFrame:SetScript('OnUpdate', function(self)
 			local cursorX, cursorY = GetCursorPosition()
 			local uiScale = UIParent:GetEffectiveScale()
 			self:ClearAllPoints()
 			self:SetPoint('CENTER', UIParent, 'BOTTOMLEFT', cursorX / uiScale, cursorY / uiScale)
-			local state = dragState
-			local rects = holder.slotRects
-			if not state or not rects then return end
 			local hovered = SlotUnderCursor()
-			if hovered then state.hover = hovered end
-			local lerp = math.min(1, (elapsed or 0.016) * 14)
-			for index = 1, #rects do
-				local other = cells[index]
-				if other and other.frame:IsShown() then
-					local target = rects[TargetSlot(index, state.source, state.hover)]
-					if target then
-						other.x = other.x + (target.x - other.x) * lerp
-						other.y = other.y + (target.y - other.y) * lerp
-						other.frame:ClearAllPoints()
-						other.frame:SetPoint('TOPLEFT', holder, 'TOPLEFT', other.x, -other.y)
-					end
-				end
+			if hovered and hovered ~= dragState.hover then
+				dragState.hover = hovered
+				Slide(dragState)
 			end
 		end)
 	end
@@ -406,6 +350,10 @@ local function CreateViewerMock(stage, withKeybinds)
 		local state = dragState
 		dragState = nil
 		if not state or state.cell ~= cell then return end
+		for _, other in ipairs(cells) do
+			Motion.Finish(other.frame, 'x')
+			Motion.Finish(other.frame, 'y')
+		end
 		local viewerSettings, entries = holder.viewerSettings, holder.entries
 		if not (viewerSettings and entries) then return end
 		local target = state.hover
@@ -455,8 +403,7 @@ local function CreateViewerMock(stage, withKeybinds)
 	function holder:Render(viewerKey)
 		local module = CDM()
 		local viewerSettings = DB().cdm[viewerKey]
-		local iconWidth = viewerSettings.iconWidth or viewerSettings.iconSize or 38
-		local iconHeight = viewerSettings.iconHeight or iconWidth
+		local iconWidth, iconHeight = viewerSettings.iconWidth, viewerSettings.iconHeight
 		local spacing = viewerSettings.spacing
 		local borderSize = viewerSettings.borderSize
 		local borderColor = viewerSettings.borderColor
@@ -544,7 +491,7 @@ local function CreateViewerMock(stage, withKeybinds)
 					y = slot * stepY
 				end
 				local button = cell.frame
-				cell.slot, cell.entry, cell.x, cell.y = iconIndex, list[iconIndex], x, y
+				cell.slot, cell.entry = iconIndex, list[iconIndex]
 				slotRects[iconIndex] = { x = x, y = y, w = iconWidth, h = iconHeight }
 				button:ClearAllPoints()
 				button:SetSize(iconWidth, iconHeight)
@@ -597,7 +544,7 @@ local function CreateViewerMock(stage, withKeybinds)
 
 				if withKeybinds and viewerSettings.showKeybinds then
 					local keybindColor = viewerSettings.keybindColor
-					BUI.Pixel.ApplyFont(cell.keybind, viewerSettings.keybindFontSize, Media('font', viewerSettings.keybindFont, font), 'OUTLINE')
+					BUI.Pixel.ApplyFont(cell.keybind, viewerSettings.keybindFontSize, BUI.GetFontByName(viewerSettings.keybindFont), 'OUTLINE')
 					cell.keybind:SetText(MOCK_KEYS[(iconIndex - 1) % #MOCK_KEYS + 1])
 					cell.keybind:ClearAllPoints()
 					local point = viewerSettings.keybindAnchor
@@ -661,7 +608,7 @@ local function CreateBuffBarMock(stage)
 	function holder:Render()
 		local config = DB().cdm.buffBars
 		local barWidth, barHeight, iconSize = config.barWidth, config.barHeight, config.iconSize
-		local showIcon = config.showIcon ~= false
+		local showIcon = config.showIcon
 		local spacing, borderSize = config.spacing, config.borderSize
 		local borderColor, backgroundColor = config.borderColor, config.bgColor
 		local fillColor = config.barColor
@@ -670,7 +617,7 @@ local function CreateBuffBarMock(stage)
 			local classColor = class and RAID_CLASS_COLORS[class]
 			if classColor then fillColor = { classColor.r, classColor.g, classColor.b, 1 } end
 		end
-		local barTexture = Media('statusbar', config.texture, BUI.GetGlobalTexture())
+		local barTexture = BUI.GetGlobalTexture()
 		local font = BUI.GetGlobalFont()
 		local live = ViewerSpells('buffBars')
 		if not live or #live == 0 then return self:Hide() end
@@ -722,7 +669,7 @@ local function CreateBuffBarMock(stage)
 			bar.background:Show()
 			bar.fill:Show()
 			bar.border:Show()
-			if config.showName ~= false then
+			if config.showName then
 				BUI.Pixel.ApplyFont(bar.name, config.nameSize, font)
 				bar.name:SetText(name)
 				bar.name:ClearAllPoints()
@@ -732,7 +679,7 @@ local function CreateBuffBarMock(stage)
 			else
 				bar.name:Hide()
 			end
-			if config.showDuration ~= false then
+			if config.showDuration then
 				BUI.Pixel.ApplyFont(bar.duration, config.durationSize, font)
 				bar.duration:SetText(sample.duration)
 				bar.duration:ClearAllPoints()
@@ -742,7 +689,7 @@ local function CreateBuffBarMock(stage)
 			else
 				bar.duration:Hide()
 			end
-			if config.showStacks ~= false and sample.stacks then
+			if config.showStacks and sample.stacks then
 				local point = config.stackPoint
 				BUI.Pixel.ApplyFont(bar.stacks, config.stackSize, font, 'OUTLINE')
 				bar.stacks:SetText(sample.stacks)
@@ -777,7 +724,7 @@ local function BuildPreview(band, kit)
 	for _, viewer in ipairs(VIEWERS) do mocks[viewer.key] = CreateViewerMock(stage, viewer.keybinds) end
 	mocks.buffBars = CreateBuffBarMock(stage)
 	local customBars = CustomBarsPage.BuildPreview(band, kit)
-	local note = kit.Text(band, '', 12, 'muted')
+	local note = kit.Text(band, 'Nothing tracked in this viewer yet', 12, 'muted')
 	note:SetPoint('CENTER')
 	function band:Update()
 		for _, mock in pairs(mocks) do mock:Hide() end
@@ -791,7 +738,6 @@ local function BuildPreview(band, kit)
 		local viewerKey = mocks[selected] and selected or 'essential'
 		local mock = mocks[viewerKey]
 		if viewerKey == 'buffBars' then mock:Render() else mock:Render(viewerKey) end
-		note:SetText('Nothing tracked in this viewer yet')
 		note:SetShown(not mock:IsShown())
 	end
 	band:HookScript('OnShow', function(self) self:Update() end)
@@ -802,16 +748,15 @@ local function GeneralBoards(ui, parent, width, page)
 	local db = DB()
 	local module = CDM()
 	local cdm = db.cdm
-	local setup = ui.Board(parent, width, {
+	local setup = BUI.ResetBoard(ui, ui.Board(parent, width, {
 		stacked = true,
 		title = 'Cooldown Manager',
 		description = 'Skin, arrange and extend the Blizzard Cooldown Manager.',
-	})
+	}))
 	local EditModeLock = module.EditModeLock
 	local systems = Enum.EditModeCooldownViewerSystemIndices
 	local settingsEnum = Enum.EditModeCooldownViewerSetting
-	local viewerNames = { [systems.Essential] = 'Essential', [systems.Utility] = 'Utility', [systems.BuffIcon] = 'Buff icons' }
-	if systems.BuffBar then viewerNames[systems.BuffBar] = 'Buff bars' end
+	local viewerNames = { [systems.Essential] = 'Essential', [systems.Utility] = 'Utility', [systems.BuffIcon] = 'Buff icons', [systems.BuffBar] = 'Buff bars' }
 	local settingNames = { [settingsEnum.VisibleSetting] = 'Always visible', [settingsEnum.ShowTimer] = 'Show timer', [settingsEnum.HideWhenInactive] = 'Hide when inactive' }
 	local compliance = EditModeLock.GetCompliance()
 	local function Mismatches()
@@ -822,29 +767,31 @@ local function GeneralBoards(ui, parent, width, page)
 		end
 		local parts = {}
 		for _, systemIndex in ipairs({ systems.Essential, systems.Utility, systems.BuffIcon, systems.BuffBar }) do
-			if systemIndex and byViewer[systemIndex] then parts[#parts + 1] = viewerNames[systemIndex] .. ': ' .. table.concat(byViewer[systemIndex], ', ') end
+			if byViewer[systemIndex] then parts[#parts + 1] = viewerNames[systemIndex] .. ': ' .. table.concat(byViewer[systemIndex], ', ') end
 		end
 		return 'Edit Mode needs these: ' .. table.concat(parts, '. ')
 	end
 	local status = 'Edit Mode is set up'
 	if not compliance.isReady then status = 'Reload to load Edit Mode'
 	elseif compliance.isPreset then status = 'Make a custom Edit Mode layout'
+	elseif fixAfterCombat then status = 'Edit Mode fix applies after combat'
 	elseif not compliance.isCompliant then status = 'Edit Mode needs a fix' end
 	local blizzard = {}
 	if compliance.isReady and not compliance.isPreset and not compliance.isCompliant then
 		blizzard[#blizzard + 1] = { text = 'Apply fix', tooltip = Mismatches(), onClick = function()
-			local result = EditModeLock.ApplyRecommendedSettings()
-			local messages = {
-				applied = 'Viewers configured, reload to apply.',
-				noop = 'Nothing to change.',
-				in_combat = 'Cannot edit in combat.',
-			}
-			BUI.Print(messages[result] or 'Could not apply the settings.')
+			if EditModeLock.ApplyRecommendedSettings() == 'in_combat' and not fixAfterCombat then
+				fixAfterCombat = true
+				BUI.Events:AfterCombat(function()
+					fixAfterCombat = false
+					EditModeLock.ApplyRecommendedSettings()
+					module._emStatusRefresh()
+				end, 'CDM.ApplyEditModeFix')
+			end
 			module._emStatusRefresh()
 		end }
 	end
 	blizzard[#blizzard + 1] = { text = 'Advanced CDM', onClick = function()
-		if CooldownViewerSettings then CooldownViewerSettings:SetShown(not CooldownViewerSettings:IsShown()) end
+		CooldownViewerSettings:SetShown(not CooldownViewerSettings:IsShown())
 	end }
 	blizzard[#blizzard + 1] = { text = 'Edit Mode', onClick = BUI.ToggleEditMode }
 	blizzard[#blizzard + 1] = { tooltip = 'Blizzard settings panel', title = 'Advanced CDM', options = {
@@ -855,14 +802,14 @@ local function GeneralBoards(ui, parent, width, page)
 		if selected == 'general' then RebuildPane(page) end
 	end
 
-	local behavior = ui.Board(parent, width, {
+	local behavior = BUI.ResetBoard(ui, ui.Board(parent, width, {
 		stacked = true,
 		title = 'Behavior',
 		description = 'How the viewers act and what they show.',
-	})
+	}))
 	behavior:AddSwitch('Sync settings', function() return cdm.syncViewers == true end, function(value) cdm.syncViewers = value end, 'Essential and Utility share their look')
 	behavior:AddSwitch('Tooltips', function() return cdm.showTooltips ~= false end, function(value) cdm.showTooltips = value end, 'Spell tooltips on hover')
-	behavior:AddSwitch('Buff time on cooldowns', function() return cdm.showBuffDuration ~= false end, module.SetShowBuffDuration, 'Off shows the cooldown instead')
+	behavior:AddSwitch('Buff time on cooldowns', function() return cdm.showBuffDuration == true end, module.SetShowBuffDuration, 'Off shows the cooldown instead')
 	behavior:AddTools('Move icons individually', 'Drag icons out of the grid', {
 		{ tooltip = 'Resizing and snapping', title = 'Detached icons', options = {
 			Toggle(cdm, 'Resize detached icons', 'allowIndividualResize'),
@@ -877,23 +824,21 @@ local function GeneralBoards(ui, parent, width, page)
 			cdm.allowIndividualMove = value
 			module.Detached.UpdateModifierWatcher()
 			module.RefreshAll()
-		end },
+		end, default = function() return BUI.FactoryOf(cdm).allowIndividualMove == true end },
 	})
 	behavior:AddTools('Font', 'Timer and stack text', {
-		{ entries = fonts, width = MENU_WIDTH, get = function() return db.general.cdmFont or BUI.C.GLOBAL_OPTION end, set = function(value) db.general.cdmFont = value ~= BUI.C.GLOBAL_OPTION and value or nil end },
+		{ entries = fonts, width = MENU_WIDTH, get = function() return db.general.cdmFont or BUI.C.GLOBAL_OPTION end, set = function(value) db.general.cdmFont = value ~= BUI.C.GLOBAL_OPTION and value or nil end, default = function() return BUI.FactoryOf(db.general).cdmFont or BUI.C.GLOBAL_OPTION end },
 	}, module.RefreshSkinSettings)
 
-	local effects = ui.Board(parent, width, {
+	local effects = BUI.ResetBoard(ui, ui.Board(parent, width, {
 		stacked = true,
 		title = 'Glow and highlights',
 		description = 'Procs, the assisted rotation marker and key presses.',
-	})
+	}))
 	local glow = cdm.glow
-	local glowTypes = {}
-	for _, glowType in ipairs(module.GLOW_TYPES) do glowTypes[#glowTypes + 1] = { value = glowType.id, text = glowType.name } end
 	effects:AddTools('Custom glows', 'Proc glow on the icons', {
 		Color(glow, 'Glow color', 'color', module.RefreshGlowPreview),
-		Menu(glow, 'type', glowTypes),
+		Menu(glow, 'type', GLOW_TYPES),
 		{ tooltip = 'Speed, lines and thickness', title = 'Glow shape', options = {
 			Option(glow, 'Speed %', 'speed', { min = 25, max = 400, step = 25 }),
 			Option(glow, 'Lines, pixel style', 'lines', { min = 4, max = 16, step = 1 }),
@@ -905,13 +850,12 @@ local function GeneralBoards(ui, parent, width, page)
 		{ get = function() return glow.enabled == true end, set = function(value)
 			glow.enabled = value
 			module.RefreshSkinSettings()
-		end },
+		end, default = function() return BUI.FactoryOf(glow).enabled == true end },
 	}, module.RefreshActiveGlows)
 	effects:AddTools('Assisted highlight', 'Blizzard\'s next-spell marker', {
 		Color(cdm.assist, 'Highlight color', 'color'),
 		{ get = function() return GetCVarBool('assistedCombatHighlight') end, set = function(value)
 			if InCombatLockdown() then
-				BUI.Print('The assisted highlight can change after combat.')
 				Repaint()
 				return
 			end
@@ -922,7 +866,8 @@ local function GeneralBoards(ui, parent, width, page)
 	effects:AddTools('Keypress highlight', 'Flash the icon when its key is pressed', {
 		Color(press, 'Tint color', 'tintColor'),
 		Menu(press, 'overlayStyle', module.PressHighlight.OVERLAY_STYLES),
-		{ tooltip = 'Border', title = 'Keypress highlight', options = {
+		{ tooltip = 'Tint and border', title = 'Keypress highlight', options = {
+			Toggle(press, 'Tint the icon', 'showTint'),
 			Toggle(press, 'Show the border', 'showBorder'),
 			Color(press, 'Border color', 'borderColor'),
 		} },
@@ -958,22 +903,23 @@ local function ViewerBoards(ui, parent, width, viewer)
 		end
 		return option
 	end
+	local shipped = BUI.FactoryOf(viewerSettings)
 	local function SyncedToggle(label, key, layout)
 		local after = layout and SyncLayout(key) or Sync(key)
 		return { label = label, get = function() return viewerSettings[key] == true end, set = function(value)
 			viewerSettings[key] = value
 			after(value)
-		end }
+		end, default = function() return shipped[key] == true end }
 	end
-	local function SyncedColor(label, key)
-		return Color(viewerSettings, label, key, Sync(key))
+	local function SyncedColor(label, key, tooltip)
+		return Color(viewerSettings, label, key, Sync(key), tooltip)
 	end
 
-	local board = ui.Board(parent, width, {
+	local board = BUI.ResetBoard(ui, ui.Board(parent, width, {
 		stacked = true,
 		title = viewer.title,
 		description = viewer.description .. ' Turning the skin on or off needs a reload.',
-	})
+	}))
 	local frames = {}
 	for _, entry in ipairs(BUI.C.ANCHOR_FRAMES) do
 		if entry.tag ~= viewer.frame then frames[#frames + 1] = entry end
@@ -982,7 +928,7 @@ local function ViewerBoards(ui, parent, width, viewer)
 		__index = function(_, key) return viewerSettings[key] end,
 		__newindex = function(_, key, value)
 			if key == 'centerHorizontally' then
-				Sync('centerHorizontally')(value)
+				if canSync then module.SyncSetting('centerHorizontally', value) end
 				module.OnCenterHorizontallyChanged(viewerKey, value)
 			else
 				viewerSettings[key] = value
@@ -1024,7 +970,7 @@ local function ViewerBoards(ui, parent, width, viewer)
 		rows[#rows + 1] = { label = 'Center the last row', get = function() return viewerSettings.centerLastRow == true end, set = function(value)
 			viewerSettings.centerLastRow = value
 			module.RefreshLayoutOnly()
-		end }
+		end, default = function() return shipped.centerLastRow == true end }
 	end
 	rows[#rows + 1] = SyncedToggle('Vertical', 'vertical', true)
 	board:AddTools('Rows', 'Growth, counts and direction', {
@@ -1032,23 +978,17 @@ local function ViewerBoards(ui, parent, width, viewer)
 	})
 	board:AddTools('Icons', 'Size, spacing and zoom', {
 		{ icon = 'resize', tooltip = 'Size, spacing and zoom', title = 'Icons', options = {
-			{ label = 'Width', min = 20, max = 100, step = 1, get = function() return viewerSettings.iconWidth or viewerSettings.iconSize or 38 end, set = function(value)
-				viewerSettings.iconWidth = value
-				Sync('iconWidth')(value)
-			end },
-			{ label = 'Height', min = 10, max = 100, step = 1, get = function() return viewerSettings.iconHeight or (viewerSettings.iconWidth or viewerSettings.iconSize or 38) * viewerSettings.aspectRatio end, set = function(value)
-				viewerSettings.iconHeight = value
-				Sync('iconHeight')(value)
-			end },
+			Synced('Width', 'iconWidth', { min = 20, max = 100, step = 1 }),
+			Synced('Height', 'iconHeight', { min = 10, max = 100, step = 1 }),
 			Synced('Spacing', 'spacing', { min = -20, max = 20, step = 1 }, true),
 			{ label = 'Zoom %', min = 0, max = 20, step = 1, get = function() return viewerSettings.zoom * 100 end, set = function(value)
 				viewerSettings.zoom = value / 100
 				Sync('zoom')(viewerSettings.zoom)
-			end },
+			end, default = function() return shipped.zoom * 100 end },
 			{ label = 'Keep the aspect ratio', get = function() return viewerSettings.keepAspectRatio == true end, set = function(value)
 				viewerSettings.keepAspectRatio = value or nil
 				Sync('keepAspectRatio')(viewerSettings.keepAspectRatio)
-			end },
+			end, default = function() return shipped.keepAspectRatio == true end },
 		} },
 	})
 	board:AddTools('Border', 'Outline around each icon', {
@@ -1060,7 +1000,7 @@ local function ViewerBoards(ui, parent, width, viewer)
 			viewerSettings[key] = value
 			if canSync then module.SyncSetting(key, value) end
 			module.RefreshCooldownStyleFlags()
-		end }
+		end, default = function() return shipped[key] == true end }
 	end
 	board:AddTools('Swipe', 'Color, edge, flash and direction', {
 		SyncedColor('Swipe color', 'swipeColor'),
@@ -1071,11 +1011,11 @@ local function ViewerBoards(ui, parent, width, viewer)
 		} },
 	})
 
-	local text = ui.Board(parent, width, {
+	local text = BUI.ResetBoard(ui, ui.Board(parent, width, {
 		stacked = true,
 		title = 'Text',
 		description = 'Countdown, stacks and keybinds on each icon.',
-	})
+	}))
 	text:AddTools('Cooldown text', 'Remaining time on each icon', {
 		SyncedColor('Text color', 'cooldownTextColor'),
 		{ icon = 'text', tooltip = 'Position, size, decimals and the warning color', title = 'Cooldown text', options = {
@@ -1085,19 +1025,8 @@ local function ViewerBoards(ui, parent, width, viewer)
 			Synced('Vertical', 'cooldownTextOffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
 			SyncedToggle('Decimals', 'showCooldownDecimals'),
 			Synced('Decimals under seconds', 'cooldownDecimalThreshold', { min = 1, max = 30, step = 1 }),
-			{ label = 'Warning under seconds', min = 0, max = 10, step = 1, get = function() return viewerSettings.cooldownWarnSeconds or 0 end, set = function(value)
-				viewerSettings.cooldownWarnSeconds = value
-				Sync('cooldownWarnSeconds')(value)
-			end },
-			{ kind = 'swatch', label = 'Warning color', tooltip = 'Countdown color inside the warning window', opacity = true,
-				get = function()
-					local color = viewerSettings.cooldownWarnColor
-					return color[1], color[2], color[3], color[4]
-				end,
-				set = function(red, green, blue, alpha)
-					viewerSettings.cooldownWarnColor = { red, green, blue, alpha }
-					Sync('cooldownWarnColor')(viewerSettings.cooldownWarnColor)
-				end },
+			Synced('Warning under seconds', 'cooldownWarnSeconds', { min = 0, max = 10, step = 1 }),
+			SyncedColor('Warning color', 'cooldownWarnColor', 'Countdown color inside the warning window'),
 		} },
 	})
 	text:AddTools('Stack text', 'Charge and stack counts on each icon', {
@@ -1113,7 +1042,7 @@ local function ViewerBoards(ui, parent, width, viewer)
 		local function Style() module.Keybinds.StyleViewer(viewerKey) end
 		text:AddTools('Keybind text', 'Key labels on each icon, read from your action bars', {
 			Color(viewerSettings, 'Text color', 'keybindColor'),
-			{ entries = fonts, width = MENU_WIDTH, get = function() return viewerSettings.keybindFont end, set = function(value) viewerSettings.keybindFont = value end },
+			Menu(viewerSettings, 'keybindFont', fonts),
 			{ icon = 'text', tooltip = 'Anchor, size and offset', title = 'Keybind text', options = {
 				Option(viewerSettings, 'Anchor', 'keybindAnchor', { entries = POINTS }),
 				Option(viewerSettings, 'Size', 'keybindFontSize', { min = 8, max = 24, step = 1 }),
@@ -1123,7 +1052,7 @@ local function ViewerBoards(ui, parent, width, viewer)
 			{ get = function() return viewerSettings.showKeybinds == true end, set = function(value)
 				viewerSettings.showKeybinds = value
 				module.Keybinds.RefreshViewer(viewerKey)
-			end },
+			end, default = function() return shipped.showKeybinds == true end },
 		}, Style)
 	end
 	return { board, text }
@@ -1137,19 +1066,40 @@ local function BuffBarBoards(ui, parent, width)
 		module.RepositionBuffBarRack()
 		Refresh()
 	end
-	local board = ui.Board(parent, width, {
+	local board = BUI.ResetBoard(ui, ui.Board(parent, width, {
 		stacked = true,
 		title = 'Buff bars',
 		description = 'The Blizzard buff bar viewer, reskinned as compact bars.',
-	})
+	}))
 	board:AddTools('Bars', 'Position, growth, preview and the skin on or off', {
 		BUI.PositionTool(config, { fields = { posX = 'positionX', posY = 'positionY' }, matchWidth = true }),
 		Menu(config, 'growDirection', GROWTHS),
 		Eye('Show a preview of the buff bars', module.IsBuffBarPreviewShown, function(value)
 			if value then module.ShowBuffBarPreview() else module.HideBuffBarPreview() end
 		end),
-		Toggle(config, nil, 'skinEnabled'),
-	}, Reposition)
+		{ get = function() return config.skinEnabled == true end, set = function(value)
+			if value then
+				config.skinEnabled = true
+				Reposition()
+				return
+			end
+			Modals.Confirm({
+				parent = Window().frame,
+				title = 'Buff bar skin off',
+				message = 'The bars keep their look until the interface reloads.',
+				confirmText = 'Reload now', laterText = 'Later', cancelText = 'Cancel',
+				onConfirm = function()
+					config.skinEnabled = false
+					ReloadUI()
+				end,
+				onLater = function()
+					config.skinEnabled = false
+					Reposition()
+				end,
+				onCancel = Repaint,
+			})
+		end, default = function() return BUI.FactoryOf(config).skinEnabled == true end },
+	})
 	board:AddTools('Size', 'Width, height and spacing', {
 		{ icon = 'resize', tooltip = 'Width, height and spacing', title = 'Bars', options = {
 			Option(config, 'Width', 'barWidth', { min = 80, max = 400, step = 1 }),
@@ -1159,7 +1109,7 @@ local function BuffBarBoards(ui, parent, width)
 	}, Refresh)
 	board:AddTools('Icon', 'Buff icon beside each bar', {
 		{ icon = 'resize', tooltip = 'Size', title = 'Icon', options = { Option(config, 'Icon size', 'iconSize', { min = 12, max = 64, step = 1 }) } },
-		OnUnlessOff(config, nil, 'showIcon'),
+		Toggle(config, nil, 'showIcon'),
 	}, Reposition)
 	board:AddTools('Colors', 'Bar, background and border', {
 		Color(config, 'Bar color', 'barColor'),
@@ -1172,14 +1122,14 @@ local function BuffBarBoards(ui, parent, width)
 		Refresh()
 	end, 'Fill the bars with your class color')
 
-	local text = ui.Board(parent, width, {
+	local text = BUI.ResetBoard(ui, ui.Board(parent, width, {
 		stacked = true,
 		title = 'Text',
 		description = 'Name, duration and stacks on each bar.',
-	})
+	}))
 	text:AddTools('Name', 'Buff name on each bar', {
-		{ icon = 'text', tooltip = 'Size', title = 'Name', options = { { label = 'Size', min = 6, max = 24, step = 1, get = function() return config.nameSize or 11 end, set = function(value) config.nameSize = value end } } },
-		OnUnlessOff(config, nil, 'showName'),
+		{ icon = 'text', tooltip = 'Size', title = 'Name', options = { Option(config, 'Size', 'nameSize', { min = 6, max = 24, step = 1 }) } },
+		Toggle(config, nil, 'showName'),
 	}, Refresh)
 	text:AddTools('Duration', 'Remaining time on each bar', {
 		{ icon = 'text', tooltip = 'Placement and size', title = 'Duration', options = {
@@ -1188,7 +1138,7 @@ local function BuffBarBoards(ui, parent, width)
 			Option(config, 'Horizontal', 'durationOffsetX', { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 }),
 			Option(config, 'Vertical', 'durationOffsetY', { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 }),
 		} },
-		OnUnlessOff(config, nil, 'showDuration'),
+		Toggle(config, nil, 'showDuration'),
 	}, Refresh)
 	text:AddTools('Stacks', 'Stack count on each bar', {
 		Color(config, 'Stack color', 'stackColor'),
@@ -1199,9 +1149,13 @@ local function BuffBarBoards(ui, parent, width)
 			Option(config, 'Horizontal', 'stackOffsetX', { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 }),
 			Option(config, 'Vertical', 'stackOffsetY', { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 }),
 		} },
-		OnUnlessOff(config, nil, 'showStacks'),
+		Toggle(config, nil, 'showStacks'),
 	}, Refresh)
 	return { board, text }
+end
+
+local function Failed(title, message)
+	Modals.Message({ parent = Window().frame, title = title, message = message })
 end
 
 local function LayoutBoards(ui, parent, width, page)
@@ -1211,10 +1165,6 @@ local function LayoutBoards(ui, parent, width, page)
 		title = 'Layouts',
 		description = 'Save, restore and share your Cooldown Manager setup.',
 	})
-	if not Profiles.IsAvailable() then
-		board:AddRow('Not available', 'The Blizzard Cooldown Manager layout API is missing on this game version')
-		return { board }
-	end
 	local snapshots = {}
 	for _, saved in ipairs(Profiles.GetSnapshots()) do
 		snapshots[#snapshots + 1] = { value = saved.name, text = saved.class and (saved.name .. ', ' .. saved.class) or saved.name }
@@ -1226,7 +1176,7 @@ local function LayoutBoards(ui, parent, width, page)
 		if name == '' then return end
 		local function Commit()
 			local ok, result = Profiles.SaveSnapshot(name)
-			if not ok then return BUI.Print(result or 'Could not save the snapshot.') end
+			if not ok then return Failed('Snapshot not saved', result) end
 			snapshot = result
 			RebuildPane(page)
 		end
@@ -1252,7 +1202,7 @@ local function LayoutBoards(ui, parent, width, page)
 					onConfirm = function()
 						local backed, backupName = Profiles.AutoBackupSnapshot()
 						local ok, err = Profiles.ApplySnapshot(name)
-						if not ok then return BUI.Print(err or 'Could not apply the snapshot.') end
+						if not ok then return Failed('Snapshot not applied', err) end
 						RebuildPane(page)
 						Modals.Confirm({
 							parent = Window().frame,
@@ -1264,7 +1214,7 @@ local function LayoutBoards(ui, parent, width, page)
 					end,
 				})
 			end },
-			{ slot = 'erase', icon = 'erase', size = BUILib.Layout.ERASE_SIZE, hover = 'danger', tooltip = 'Delete this snapshot', onClick = function()
+			{ slot = 'erase', icon = 'erase', size = Layout.ERASE_SIZE, hover = 'danger', tooltip = 'Delete this snapshot', onClick = function()
 				local name = snapshot
 				Modals.Confirm({
 					parent = Window().frame,
@@ -1273,7 +1223,7 @@ local function LayoutBoards(ui, parent, width, page)
 					confirmText = 'Delete', cancelText = 'Cancel',
 					onConfirm = function()
 						local ok, err = Profiles.DeleteSnapshot(name)
-						if not ok then return BUI.Print(err or 'Could not delete the snapshot.') end
+						if not ok then return Failed('Snapshot not deleted', err) end
 						snapshot = nil
 						RebuildPane(page)
 					end,
@@ -1303,7 +1253,7 @@ local function LayoutBoards(ui, parent, width, page)
 		{ text = 'Export', onClick = function()
 			local exportString, err
 			if exportChoice == ALL_LAYOUTS then exportString, err = Profiles.ExportCurrent() else exportString, err = Profiles.ExportLayout(exportChoice) end
-			if not exportString then return BUI.Print(err or 'Could not export.') end
+			if not exportString then return Failed('Nothing to export', err) end
 			Modals.Copy({ parent = Window().frame, title = 'Layout string', text = exportString })
 		end },
 	})
@@ -1316,7 +1266,7 @@ local function LayoutBoards(ui, parent, width, page)
 				confirmText = 'Next',
 				onConfirm = function(text)
 					local valid, layoutString = Profiles.IsLayoutString(text)
-					if not valid then return BUI.Print('That is not a Cooldown Manager layout string.') end
+					if not valid then return Failed('Not a layout string', 'That is not a Cooldown Manager layout string.') end
 					Modals.Confirm({
 						parent = Window().frame,
 						title = 'Import layouts',
@@ -1324,14 +1274,14 @@ local function LayoutBoards(ui, parent, width, page)
 						confirmText = 'Add to mine', laterText = 'Replace everything', cancelText = 'Cancel',
 						onConfirm = function()
 							local ok, result = Profiles.ImportLayoutString(layoutString)
-							if not ok then return BUI.Print(result or 'The import failed.') end
+							if not ok then return Failed('Layouts not added', result) end
 							RebuildPane(page)
 							Modals.Confirm({ parent = Window().frame, title = 'Layouts added', message = 'Added ' .. result .. ' layouts. Reload so everything picks them up?', confirmText = 'Reload', cancelText = 'Later', onConfirm = ReloadUI })
 						end,
 						onLater = function()
 							local backed, backupName = Profiles.AutoBackupSnapshot()
 							local ok, err = Profiles.ApplyLayoutData(layoutString)
-							if not ok then return BUI.Print(err or 'Could not apply that string.') end
+							if not ok then return Failed('Setup not replaced', err) end
 							RebuildPane(page)
 							Modals.Confirm({ parent = Window().frame, title = 'Setup replaced', message = backed and ('Done, the previous layouts were saved as ' .. backupName .. '. Reload now to finish?') or 'Done. Reload now to finish?', confirmText = 'Reload', cancelText = 'Later', onConfirm = ReloadUI })
 						end,
@@ -1381,12 +1331,6 @@ local function RailGroups(enabled)
 	return { RAIL_GROUPS[1], RAIL_GROUPS[2], CustomBarsPage.RailGroup() }
 end
 
-local function TabTarget(index)
-	if index == CUSTOM_BAR_TAB then return CustomBarsPage.BarID() end
-	if index == CUSTOM_IMPORT_TAB then return CustomBarsPage.IMPORT_ID end
-	return TAB_IDS[index] or 'general'
-end
-
 BUI.PageEngine.RegisterPage('cdm', {
 	title = 'Cooldown Manager',
 	buttonText = 'CDM',
@@ -1407,6 +1351,7 @@ BUI.PageEngine.RegisterPage('cdm', {
 			icon = 'wheel',
 			title = 'Cooldown Manager',
 			placeholder = 'Search cooldown manager...',
+			tabs = TABS,
 			tools = {
 				{ icon = 'enable', tooltip = 'Turn the cooldown manager module on or off, needs a reload', get = function() return BUI.IsModuleEnabled('cdm') end, set = function(value)
 					BUI.ModulesPage.ConfirmReload('cdm', value, Repaint)
@@ -1422,22 +1367,17 @@ BUI.PageEngine.RegisterPage('cdm', {
 			return
 		end
 		railPage = rail
-		local tabs = {}
-		for index = 1, CUSTOM_IMPORT_TAB do tabs[index] = tab end
-		local controller = { tabContents = tabs, currentTab = TAB_INDEX[selected], SetTab = function(_, index) rail:Select(TabTarget(index)) end }
 		local Select = rail.Select
 		function rail:Select(id)
 			selected = id
-			controller.currentTab = TAB_INDEX[id]
 			if CustomBarsPage.Owns(id) then CustomBarsPage.Select(id) end
 			Select(self, id)
 			Repaint()
 			RefreshPreview()
 		end
-		pageFrame._page = controller
-		local module = CDM()
-		module.state.buffsPreviewButton = { SetText = Repaint }
-		module._previewBtn = { SetValue = Repaint }
+		pageFrame._page = rail.adapter
+		BUI.OnModuleChange('cdmBuffsPreview', Repaint)
+		BUI.OnModuleChange('cdmGlowPreview', Repaint)
 		if GetCVar('cooldownViewerEnabled') ~= '1' then
 			Modals.Confirm({
 				parent = Window().frame,

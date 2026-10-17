@@ -5,7 +5,7 @@ local type = type
 local tostring, tonumber = tostring, tonumber
 
 local CDM = BUI.CDM
-local GetBuildKey = function() return CDM.GetBuildKey() end
+local GetBuildKey = CDM.GetBuildKey
 
 local EMPTY = {}
 
@@ -22,27 +22,10 @@ local function PerSpecSet(config, field, id, value)
 end
 
 function CDM.GetIconOrder(config)
-    if not config.iconOrder then return nil end
-    local key = GetBuildKey()
-    local numericKey = tonumber(key)
-    local legacy = numericKey and config.iconOrder[numericKey]
-    if legacy then
-        config.iconOrder[numericKey] = nil
-        if not config.iconOrder[key] then
-            for entryIndex, id in ipairs(legacy) do
-                if type(id) == 'string' then
-                    local itemID = id:match('^item:(%d+)$')
-                    if itemID then legacy[entryIndex] = 'custom:' .. itemID end
-                end
-            end
-            config.iconOrder[key] = legacy
-        end
-    end
-    return config.iconOrder[key]
+    return config.iconOrder[GetBuildKey()]
 end
 
 function CDM.SetIconOrder(config, newOrder)
-    config.iconOrder = config.iconOrder or {}
     local key = GetBuildKey()
     local oldOrder = config.iconOrder[key]
 
@@ -66,7 +49,6 @@ local function IsBuffsViewerConfig(config)
 end
 
 local function BucketContains(list, entry)
-    if type(list) ~= 'table' then return false end
     local target = tostring(entry)
     for _, value in ipairs(list) do
         if tostring(value) == target then return true end
@@ -89,10 +71,16 @@ local function BucketRemove(list, entry)
     end
 end
 
+local function RemoveFromSpecLists(config, entry)
+    for _, list in pairs(config.customSpells) do
+        if type(list) == 'table' then BucketRemove(list, entry) end
+    end
+end
+
 function CDM.GetCustomSpells(config)
     if IsBuffsViewerConfig(config) then
         local key = GetBuildKey()
-        local perSpec = config.customSpells and config.customSpells[key]
+        local perSpec = config.customSpells[key]
         local global = config.customSpellsGlobal
         local hasPerSpec = perSpec and perSpec[1] ~= nil
         local hasGlobal = global and global[1] ~= nil
@@ -113,7 +101,7 @@ function CDM.GetCustomSpells(config)
         end
         return merged
     end
-    return config.customSpells or EMPTY
+    return config.customSpells
 end
 
 function CDM.AddCustomSpell(config, entry, asGlobal)
@@ -121,37 +109,25 @@ function CDM.AddCustomSpell(config, entry, asGlobal)
         if asGlobal then
             config.customSpellsGlobal = config.customSpellsGlobal or {}
             BucketAdd(config.customSpellsGlobal, entry)
-            if config.customSpells then
-                for _, list in pairs(config.customSpells) do
-                    if type(list) == 'table' then BucketRemove(list, entry) end
-                end
-            end
+            RemoveFromSpecLists(config, entry)
         else
             BucketRemove(config.customSpellsGlobal, entry)
-            config.customSpells = config.customSpells or {}
             local key = GetBuildKey()
             config.customSpells[key] = config.customSpells[key] or {}
             BucketAdd(config.customSpells[key], entry)
         end
         return
     end
-    config.customSpells = config.customSpells or {}
     BucketAdd(config.customSpells, entry)
 end
 
 function CDM.RemoveCustomSpell(config, entry)
     if IsBuffsViewerConfig(config) then
         BucketRemove(config.customSpellsGlobal, entry)
-        if config.customSpells then
-            for _, list in pairs(config.customSpells) do
-                if type(list) == 'table' then BucketRemove(list, entry) end
-            end
-        end
+        RemoveFromSpecLists(config, entry)
         return
     end
-    if type(config.customSpells) == 'table' then
-        BucketRemove(config.customSpells, entry)
-    end
+    BucketRemove(config.customSpells, entry)
 end
 
 function CDM.ClearAllCustomSpells(config)
@@ -180,9 +156,9 @@ function CDM.IsIconHiddenEffective(viewerKey, hiddenIcons, id)
 end
 
 function CDM.GetIconOverrides(config) return PerSpecGet(config, 'iconOverrides') end
-function CDM.SetIconOverride(config, id, textureID) PerSpecSet(config, 'iconOverrides', id, textureID or nil) end
+function CDM.SetIconOverride(config, id, textureID) PerSpecSet(config, 'iconOverrides', id, textureID) end
 
-function CDM.PotionPrioKey(storedValue)
+local function PotionPrioKey(storedValue)
     if type(storedValue) == 'string' then
         return tonumber(storedValue)
             or tonumber(storedValue:match('^item:(%d+)'))
@@ -191,46 +167,18 @@ function CDM.PotionPrioKey(storedValue)
     return storedValue
 end
 
-local function MigrateSharedPrios(shared)
-    if shared._potionPrioShared then return end
-    shared._potionPrioShared = true
-    local merged = shared.potionPrio or {}
-    shared.potionPrio = merged
-    local function Absorb(config)
-        local source = config and config ~= shared and config.potionPrio
-        if not source then return end
-        for buildKey, bucket in pairs(source) do
-            local destination = merged[buildKey]
-            if not destination then destination = {}; merged[buildKey] = destination end
-            for id, priority in pairs(bucket) do
-                local key = CDM.PotionPrioKey(id)
-                if destination[key] == nil then destination[key] = priority end
-            end
-        end
-        config.potionPrio = nil
-    end
-    Absorb(shared.essential)
-    Absorb(shared.utility)
-    Absorb(shared.buffs)
-    for _, bar in ipairs(BUI.GetDB().customBars) do Absorb(bar) end
-end
-
-local function SharedPrioConfig()
-    local cdm = BUI.GetDB().cdm
-    MigrateSharedPrios(cdm)
-    return cdm
-end
+CDM.PotionPrioKey = PotionPrioKey
 
 function CDM.GetPotionPrioFor(storedValue)
-    return PerSpecGet(SharedPrioConfig(), 'potionPrio')[CDM.PotionPrioKey(storedValue)]
+    return PerSpecGet(BUI.GetDB().cdm, 'potionPrio')[PotionPrioKey(storedValue)]
 end
 
 function CDM.SetSharedPotionPrio(storedValue, priority)
-    PerSpecSet(SharedPrioConfig(), 'potionPrio', CDM.PotionPrioKey(storedValue), priority)
+    PerSpecSet(BUI.GetDB().cdm, 'potionPrio', PotionPrioKey(storedValue), priority)
 end
 
 function CDM.GetBuffTracking(config) return PerSpecGet(config, 'buffTracking') end
-function CDM.SetBuffTracking(config, id, buffSpellID) PerSpecSet(config, 'buffTracking', id, buffSpellID or nil) end
+function CDM.SetBuffTracking(config, id, buffSpellID) PerSpecSet(config, 'buffTracking', id, buffSpellID) end
 
 function CDM.GetManualBuffs(config)
     local perSpec = PerSpecGet(config, 'manualBuffs')
@@ -251,36 +199,27 @@ function CDM.GetManualBuffScope(config, id)
     return nil, nil
 end
 
+local function ClearSpecManualBuff(config, id)
+    if not config.manualBuffs then return end
+    for _, specBuffs in pairs(config.manualBuffs) do
+        if type(specBuffs) == 'table' then specBuffs[id] = nil end
+    end
+end
+
 function CDM.SetManualBuff(config, id, data, asGlobal)
     if data == nil then
         if config.manualBuffsGlobal then config.manualBuffsGlobal[id] = nil end
-        if config.manualBuffs then
-            for _, specBuffs in pairs(config.manualBuffs) do
-                if type(specBuffs) == 'table' then specBuffs[id] = nil end
-            end
-        end
+        ClearSpecManualBuff(config, id)
         BucketRemove(config.customSpellsGlobal, id)
-        if config.customSpells then
-            for _, list in pairs(config.customSpells) do
-                if type(list) == 'table' then BucketRemove(list, id) end
-            end
-        end
+        RemoveFromSpecLists(config, id)
         return
     end
 
     if asGlobal then
         config.manualBuffsGlobal = config.manualBuffsGlobal or {}
         config.manualBuffsGlobal[id] = data
-        if config.manualBuffs then
-            for _, specBuffs in pairs(config.manualBuffs) do
-                if type(specBuffs) == 'table' then specBuffs[id] = nil end
-            end
-        end
-        if config.customSpells then
-            for _, list in pairs(config.customSpells) do
-                if type(list) == 'table' then BucketRemove(list, id) end
-            end
-        end
+        ClearSpecManualBuff(config, id)
+        RemoveFromSpecLists(config, id)
         config.customSpellsGlobal = config.customSpellsGlobal or {}
         BucketAdd(config.customSpellsGlobal, id)
     else
@@ -290,40 +229,33 @@ function CDM.SetManualBuff(config, id, data, asGlobal)
         config.manualBuffs[key] = config.manualBuffs[key] or {}
         config.manualBuffs[key][id] = data
         BucketRemove(config.customSpellsGlobal, id)
-        config.customSpells = config.customSpells or {}
         config.customSpells[key] = config.customSpells[key] or {}
         BucketAdd(config.customSpells[key], id)
     end
 end
 
-function CDM.GetDetachedIcons(config) return PerSpecGet(config, 'detachedIcons') end
+local function GetDetachedIcons(config) return PerSpecGet(config, 'detachedIcons') end
 
 function CDM.IsIconDetached(config, id)
-    local detached = CDM.GetDetachedIcons(config)
-    return detached[id] ~= nil
+    return GetDetachedIcons(config)[id] ~= nil
 end
 
 function CDM.GetDetachedPosition(config, id)
-    local detached = CDM.GetDetachedIcons(config)
-    return detached[id]
+    return GetDetachedIcons(config)[id]
 end
 
 function CDM.SetDetachedIcon(config, id, x, y, width, height)
-    config.detachedIcons = config.detachedIcons or {}
     local key = GetBuildKey()
     config.detachedIcons[key] = config.detachedIcons[key] or {}
     config.detachedIcons[key][id] = { x = x, y = y, w = width, h = height }
 end
 
 function CDM.ClearDetachedIcon(config, id)
-    local key = GetBuildKey()
-    if config.detachedIcons and config.detachedIcons[key] then
-        config.detachedIcons[key][id] = nil
-    end
+    local detached = config.detachedIcons[GetBuildKey()]
+    if detached then detached[id] = nil end
 end
 
 function CDM.ClearAllDetachedIcons(config)
-    if not config.detachedIcons then config.detachedIcons = {} end
     config.detachedIcons[GetBuildKey()] = {}
 end
 
@@ -352,14 +284,14 @@ end
 function CDM.SetHideWhenZero(config, id, enabled) PerSpecSet(config, 'hideWhenZero', id, enabled and true or nil) end
 
 function CDM.GetChoiceNodes(config) return PerSpecGet(config, 'choiceNodes') end
-function CDM.SetChoiceNode(config, id, activeID) PerSpecSet(config, 'choiceNodes', id, activeID or nil) end
+function CDM.SetChoiceNode(config, id, activeID) PerSpecSet(config, 'choiceNodes', id, activeID) end
 
 function CDM.GetTrinketBlacklist(config)
     config.trinketBlacklist = config.trinketBlacklist or {}
     return config.trinketBlacklist
 end
 function CDM.IsTrinketBlacklisted(config, itemID)
-    local blacklist = config and config.trinketBlacklist
+    local blacklist = config.trinketBlacklist
     return blacklist and blacklist[itemID] == true
 end
 function CDM.SetTrinketBlacklisted(config, itemID, enabled)
@@ -372,7 +304,7 @@ function CDM.GetRacialBlacklist(config)
     return config.racialBlacklist
 end
 function CDM.IsRacialBlacklisted(config, spellID)
-    local blacklist = config and config.racialBlacklist
+    local blacklist = config.racialBlacklist
     return blacklist and blacklist[spellID] == true
 end
 function CDM.SetRacialBlacklisted(config, spellID, enabled)

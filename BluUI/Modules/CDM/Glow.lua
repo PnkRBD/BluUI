@@ -34,27 +34,6 @@ local function ReadGlowDB()
 	return BUI.GetDB().cdm.glow
 end
 
-function CDM.MigrateGlowType()
-	local db = BUI.GetDB()
-
-	local function walk(node)
-		if type(node) ~= 'table' then return end
-		for key, value in pairs(node) do
-			if key == 'glow' and type(value) == 'table' then
-				if type(value.type) == 'string' and not TypeLookup[value.type] then
-					value.type = 'pixel'
-				end
-				if type(value.style) == 'string' and not TypeLookup[value.style] then
-					value.style = 'pixel'
-				end
-			elseif type(value) == 'table' then
-				walk(value)
-			end
-		end
-	end
-	walk(db.cdm)
-end
-
 function CDM.HideBlizzardGlow(icon)
 	if not ReadGlowDB().enabled then return end
 
@@ -62,14 +41,9 @@ function CDM.HideBlizzardGlow(icon)
 	if spellAlert then
 		spellAlert:Hide()
 		for childIndex = 1, SAA_CHILDREN_COUNT do
-			local child = spellAlert[SAA_CHILDREN[childIndex]]
-			if child then child:Hide() end
+			spellAlert[SAA_CHILDREN[childIndex]]:Hide()
 		end
 	end
-
-	if icon.overlay then icon.overlay:Hide() end
-	if icon.Overlay then icon.Overlay:Hide() end
-	if icon.Glow    then icon.Glow:Hide()    end
 end
 
 function CDM.ShowBlizzardGlow(icon)
@@ -78,14 +52,9 @@ function CDM.ShowBlizzardGlow(icon)
 		spellAlert:Show()
 		spellAlert:SetAlpha(1)
 		for childIndex = 1, SAA_CHILDREN_COUNT do
-			local child = spellAlert[SAA_CHILDREN[childIndex]]
-			if child then child:Show() end
+			spellAlert[SAA_CHILDREN[childIndex]]:Show()
 		end
 	end
-
-	if icon.overlay then icon.overlay:Show(); icon.overlay:SetAlpha(1) end
-	if icon.Overlay then icon.Overlay:Show(); icon.Overlay:SetAlpha(1) end
-	if icon.Glow    then icon.Glow:Show()    end
 end
 
 local GlowManager = BUI.GlowManager
@@ -94,7 +63,7 @@ local function PixelLength(icon, lineCount)
 	local frameData = FrameData[icon]
 	local settings = frameData and frameData.viewerKey and BUI.GetDB().cdm[frameData.viewerKey]
 	if not settings then return nil end
-	return GlowManager.PixelLength(settings._pxW or Pixel.Scale(settings.iconWidth), settings._pxH or Pixel.Scale(settings.iconHeight), lineCount)
+	return GlowManager.PixelLength(Pixel.Scale(settings.iconWidth), Pixel.Scale(settings.iconHeight), lineCount)
 end
 
 local function DispatchStart(icon, config)
@@ -269,69 +238,38 @@ local function ResolveViewerIcon(frame)
 end
 
 function CDM.SetupGlowHooks()
-	if ActionButtonSpellAlertManager then
-		local pendingHide = {}
-		local hideDrainer = CreateFrame('Frame')
-		hideDrainer:Hide()
-		hideDrainer:SetScript('OnUpdate', BUI.Profiler.Wrap('CDM.Glow hide drain', function(self)
-			self:Hide()
-			for icon in pairs(pendingHide) do
-				pendingHide[icon] = nil
-				CDM.StopProcGlow(icon)
-			end
-		end))
-
-		if ActionButtonSpellAlertManager.ShowAlert then
-			Hook(ActionButtonSpellAlertManager, 'ShowAlert', function(_, frame)
-				local icon = ResolveViewerIcon(frame)
-				if not icon then return end
-				local frameData = GetFrameData(icon)
-				frameData.procPending = true
-				if not ReadGlowDB().enabled then return end
-
-				pendingHide[icon] = nil
-
-				if frameData.glowActive then return end
-
-				StartBlizzardProc(icon, frameData)
-			end)
-		end
-
-		if ActionButtonSpellAlertManager.HideAlert then
-			Hook(ActionButtonSpellAlertManager, 'HideAlert', function(_, frame)
-				local icon = ResolveViewerIcon(frame)
-				if not icon then return end
-				local frameData = FrameData[icon]
-				if not frameData then return end
-				frameData.procPending = nil
-				if not frameData.glowActive then return end
-				pendingHide[icon] = true
-				hideDrainer:Show()
-			end)
-		end
-	end
-
-	if ActionButton_ShowOverlayGlow then
-		Hook('ActionButton_ShowOverlayGlow', function(button)
-			local icon = ResolveViewerIcon(button)
-			if not icon then return end
-			local frameData = GetFrameData(icon)
-			frameData.procPending = true
-			if not ReadGlowDB().enabled then return end
-			if frameData.glowActive then return end
-			StartBlizzardProc(icon, frameData)
-		end)
-	end
-
-	if ActionButton_HideOverlayGlow then
-		Hook('ActionButton_HideOverlayGlow', function(button)
-			local icon = ResolveViewerIcon(button)
-			if not icon then return end
-			local frameData = FrameData[icon]
-			if frameData then frameData.procPending = nil end
+	local pendingHide = {}
+	local DrainHides = BUI.Dispatcher.New(function()
+		for icon in pairs(pendingHide) do
+			pendingHide[icon] = nil
 			CDM.StopProcGlow(icon)
-		end)
-	end
+		end
+	end, 'CDM.Glow hide drain')
+
+	Hook(ActionButtonSpellAlertManager, 'ShowAlert', function(_, frame)
+		local icon = ResolveViewerIcon(frame)
+		if not icon then return end
+		local frameData = GetFrameData(icon)
+		frameData.procPending = true
+		if not ReadGlowDB().enabled then return end
+
+		pendingHide[icon] = nil
+
+		if frameData.glowActive then return end
+
+		StartBlizzardProc(icon, frameData)
+	end)
+
+	Hook(ActionButtonSpellAlertManager, 'HideAlert', function(_, frame)
+		local icon = ResolveViewerIcon(frame)
+		if not icon then return end
+		local frameData = FrameData[icon]
+		if not frameData then return end
+		frameData.procPending = nil
+		if not frameData.glowActive then return end
+		pendingHide[icon] = true
+		DrainHides()
+	end)
 end
 
 do
@@ -361,7 +299,6 @@ do
 		icon.Icon = texture
 
 		Pixel.ApplyBorder(icon, 1, 0, 0, 0, 1)
-		Pixel.ShowBorder(icon)
 
 		frame.previewIcon = icon
 
@@ -396,9 +333,7 @@ do
 			CDM.StopProcGlow(preview.previewIcon)
 		end
 		preview:Hide()
-		if CDM._previewBtn and CDM._previewBtn.SetValue then
-			CDM._previewBtn:SetValue(false)
-		end
+		BUI.NotifyModuleChange('cdmGlowPreview')
 	end
 
 	function CDM.RefreshGlowPreview()

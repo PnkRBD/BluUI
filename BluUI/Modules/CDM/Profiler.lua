@@ -1,14 +1,14 @@
 local _, BUI = ...
 
-local debugprofilestop, GetTime, InCombatLockdown, hooksecurefunc = debugprofilestop, GetTime, InCombatLockdown, hooksecurefunc
-local pairs, ipairs, next, type, wipe = pairs, ipairs, next, type, wipe
-local sort, concat, format, floor, max, min = table.sort, table.concat, string.format, math.floor, math.max, math.min
+local debugprofilestop, hooksecurefunc, rawget = debugprofilestop, hooksecurefunc, rawget
+local pairs, ipairs, next, wipe = pairs, ipairs, next, wipe
+local sort, concat, format, max, min = table.sort, table.concat, string.format, math.max, math.min
 local issecretvalue = issecretvalue
 
 local CDM = BUI.CDM
 local Profiler = BUI.Profiler
 local Running = Profiler.Running
-local Top, CountsText, Clock = Profiler.Top, Profiler.CountsText, Profiler.Clock
+local Top, CountsText, MsText, Clock, Or = Profiler.Top, Profiler.CountsText, Profiler.MsText, Profiler.Clock, Profiler.Or
 local FrameData = CDM.FrameData
 local LibEMO = LibStub('LibEditModeOverride-1.0')
 
@@ -17,7 +17,7 @@ BUI.CDMProfiler = CDMProfiler
 
 local EVENT_KEY = 'Cooldown profiler'
 local FLUSH_LABEL = 'CDM.DirtyTracking flush'
-local BUFF_FLUSH_LABEL = 'CDM.BuffCenter flush'
+local BUFF_FLUSH_LABEL = 'Next frame CDM.BuffCenter flush'
 local UNLABELLED = 'outside any BluUI label'
 local KEEP_FRAMES = 5
 local TOP_CAUSES = 5
@@ -43,9 +43,9 @@ local FRAME_WRITES = { ReanchorFrame = true, SetFrameSetting = true }
 local LABEL_KINDS = {
 	[FLUSH_LABEL] = 'flush',
 	[BUFF_FLUSH_LABEL] = 'buffFlush',
-	['CDM.CustomBars cooldown flush'] = 'barsFlush',
+	['Next frame CustomBars.Cooldowns'] = 'barsFlush',
 	['CDM.Custom dispatch flush'] = 'customFlush',
-	['CDM.Keybinds refresh'] = 'keybindRefresh',
+	['Next frame CDM.Keybinds refresh'] = 'keybindRefresh',
 	['CDM.Keybinds NotifyDependents'] = 'keybindApply',
 	['CDM.Keybinds RefreshLayout'] = 'keybindRequest',
 	['CDM.Events cd poll'] = 'cdPoll',
@@ -57,9 +57,7 @@ local LABEL_KINDS = {
 	['EDIT_MODE_LAYOUTS_UPDATED CDM.Layout'] = 'editModeEvent',
 	['CDM.EditModeLock edit mode show'] = 'editModeOpen',
 	['CDM.Glow ShowAlert'] = 'procShow',
-	['CDM.Glow ActionButton_ShowOverlayGlow'] = 'procShow',
 	['CDM.Glow HideAlert'] = 'procHide',
-	['CDM.Glow ActionButton_HideOverlayGlow'] = 'procHide',
 }
 local KINDS = {
 	{ 'mark', 'Dirty marks (full)' },
@@ -129,7 +127,7 @@ for _, key in ipairs(CDM.VIEWER_KEYS) do LAYOUT_NAMES[key] = VIEWER_TITLES[key] 
 local MARK_KINDS = { 'mark', 'markLayout' }
 
 local running = false
-local swaps = {}
+local session
 local hooked = setmetatable({}, { __mode = 'k' })
 local viewerKeyOf = setmetatable({}, { __mode = 'k' })
 local anchorKeyOf = setmetatable({}, { __mode = 'k' })
@@ -140,21 +138,18 @@ local prettyNames, causeNames, dirtyNames = {}, {}, {}
 local labelInfo, kindStats, blizzard = {}, {}, {}
 local pendingCause, pendingRoot, pendingInner = {}, {}, {}
 local frameKinds, frameLabelMs, frameCauses, frameLayouts, frameRestyled = {}, {}, {}, {}, {}
-local secondKinds, worstFrames, repeatFrames = {}, {}, {}
+local secondKinds, repeatFrames = {}, {}
 local SESSION_TABLES = {
 	labelInfo, kindStats, blizzard, pendingCause, pendingRoot, pendingInner,
-	frameKinds, frameLabelMs, frameCauses, frameLayouts, frameRestyled, secondKinds, worstFrames, repeatFrames,
+	frameKinds, frameLabelMs, frameCauses, frameLayouts, frameRestyled, secondKinds, repeatFrames,
 }
-local spanStart, spanMs, driverName, driverDepth = {}, {}, {}, {}
-local spanTop, driverTop, markDepth, outputs = 0, 0, 0, 0
-local frameAt, frameCombat, frameMs, frameLayoutRepeats, frameRestyleRepeats = nil, false, 0, 0, 0
-local currentSecond = 0
-local startedAt, stoppedAt, clockAtStart, specAtStart, zoneAtStart
-local totalMs, combatMs, busyFrames, repeatFrameCount = 0, 0, 0, 0
-local inCombat, combatSince, combatTime = false, 0, 0
+local driverName, driverDepth = {}, {}
+local driverTop, markDepth, outputs = 0, 0, 0
+local frameLayoutRepeats, frameRestyleRepeats = 0, 0
+local specAtStart
+local repeatFrameCount = 0
 
 local function ByValue(left, right) return left.value > right.value end
-local function ByMs(left, right) return left.ms > right.ms end
 local function ByRepeats(left, right) return left.repeats > right.repeats end
 
 local function Pretty(label)
@@ -175,16 +170,6 @@ end
 
 local function KindName(kind)
 	return KIND_NAMES[kind]
-end
-
-local function MsText(map, count)
-	local parts = {}
-	for _, item in ipairs(Top(map, count)) do parts[#parts + 1] = format('%s %.1fms', Pretty(item.name), item.value) end
-	return concat(parts, '; ')
-end
-
-local function Or(text)
-	return text ~= '' and text or 'none'
 end
 
 local function CauseName(first, via)
@@ -244,11 +229,11 @@ local function Keep(list, entry, compare)
 	list[KEEP_FRAMES + 1] = nil
 end
 
-local function KeepWorstFrame()
-	Keep(worstFrames, {
-		at = frameAt - startedAt, ms = frameMs, combat = frameCombat,
-		work = CountsText(frameKinds, 5, KindName), handlers = MsText(frameLabelMs, 3), causes = CountsText(frameCauses, 3),
-	}, ByMs)
+local function DescribeFrame(record)
+	record.work = CountsText(frameKinds, 5, KindName)
+	record.handlers = MsText(frameLabelMs, 3, Pretty)
+	record.causes = CountsText(frameCauses, 3)
+	return record
 end
 
 local function KeepRepeatFrame(repeats)
@@ -259,17 +244,12 @@ local function KeepRepeatFrame(repeats)
 	end
 	if frameRestyleRepeats > 0 then parts[#parts + 1] = format('%d icon restyles repeated', frameRestyleRepeats) end
 	Keep(repeatFrames, {
-		at = frameAt - startedAt, repeats = repeats, combat = frameCombat,
+		at = session.frameAt - session.startedAt, repeats = repeats, combat = session.frameCombat,
 		text = concat(parts, ', '), causes = CountsText(frameCauses, 3),
 	}, ByRepeats)
 end
 
-local function CloseFrame()
-	busyFrames = busyFrames + 1
-	totalMs = totalMs + frameMs
-	if frameCombat then combatMs = combatMs + frameMs end
-	local lastWorst = worstFrames[KEEP_FRAMES]
-	if not lastWorst or frameMs > lastWorst.ms then KeepWorstFrame() end
+local function OnFrameClosed()
 	local repeats = frameLayoutRepeats + frameRestyleRepeats
 	if repeats > 0 then
 		repeatFrameCount = repeatFrameCount + 1
@@ -281,36 +261,25 @@ local function CloseFrame()
 	wipe(frameCauses)
 	wipe(frameLayouts)
 	wipe(frameRestyled)
-	frameMs, frameLayoutRepeats, frameRestyleRepeats, spanTop = 0, 0, 0, 0
+	frameLayoutRepeats, frameRestyleRepeats = 0, 0
+	driverTop, markDepth = 0, 0
 end
 
-local function CloseSecond()
+local function OnSecondClosed()
 	for kind, count in pairs(secondKinds) do
 		local stat = kindStats[kind]
 		if count > stat.peak then
 			stat.peak = count
-			stat.peakAt = currentSecond
+			stat.peakAt = session.currentSecond
 		end
 	end
 	wipe(secondKinds)
 end
 
-local function Touch()
-	local now = GetTime()
-	if now == frameAt then return end
-	if frameAt then CloseFrame() end
-	frameAt = now
-	frameCombat = inCombat
-	driverTop, markDepth = 0, 0
-	local second = floor(now - startedAt)
-	if second ~= currentSecond then
-		CloseSecond()
-		currentSecond = second
-	end
-end
+session = Profiler.NewSession({ DescribeFrame = DescribeFrame, OnFrameClosed = OnFrameClosed, OnSecondClosed = OnSecondClosed }, EVENT_KEY)
 
 local function Cause()
-	Touch()
+	session:Touch()
 	local depth, root, inner = Running()
 	local first, via = root, inner
 	if driverTop > 0 then
@@ -318,18 +287,6 @@ local function Cause()
 		if driverDepth[driverTop] >= depth then via = driverName[driverTop] end
 	end
 	return CauseName(first or UNLABELLED, via), root, inner
-end
-
-local function Span(start, elapsed)
-	local covered = 0
-	while spanTop > 0 and spanStart[spanTop] >= start do
-		covered = covered + spanMs[spanTop]
-		spanTop = spanTop - 1
-	end
-	spanTop = spanTop + 1
-	spanStart[spanTop] = start
-	spanMs[spanTop] = elapsed
-	frameMs = frameMs + elapsed - covered
 end
 
 local function Attribute(label, kind)
@@ -344,7 +301,7 @@ local function CountKind(kind, key, ms, cause, root, inner)
 		kindStats[kind] = stat
 	end
 	stat.count = stat.count + 1
-	if inCombat then stat.combat = stat.combat + 1 end
+	if session.inCombat then stat.combat = stat.combat + 1 end
 	if ms then
 		stat.ms = stat.ms + ms
 		if ms > stat.max then stat.max = ms end
@@ -378,18 +335,18 @@ local function Trace(label, start, elapsed)
 	if info == nil then info = LabelInfo(label) end
 	if not info then return end
 	local cause = Cause()
-	Span(start, elapsed)
+	session:Span(start, elapsed)
 	info.count = info.count + 1
 	info.ms = info.ms + elapsed
 	if elapsed > info.max then info.max = elapsed end
-	if inCombat then info.combat = info.combat + 1 end
+	if session.inCombat then info.combat = info.combat + 1 end
 	info.from[cause] = (info.from[cause] or 0) + 1
 	frameLabelMs[label] = (frameLabelMs[label] or 0) + elapsed
 	if info.kind then CountKind(info.kind, nil, elapsed) end
 end
 
 local function Driver(name)
-	Touch()
+	session:Touch()
 	driverTop = driverTop + 1
 	driverName[driverTop] = name
 	driverDepth[driverTop] = (Running())
@@ -398,7 +355,7 @@ end
 local function Done(kind, key, start, ...)
 	local elapsed = debugprofilestop() - start
 	driverTop = driverTop - 1
-	Span(start, elapsed)
+	session:Span(start, elapsed)
 	CountKind(kind, key, elapsed, Cause())
 	return ...
 end
@@ -460,9 +417,9 @@ end
 local function EndLayout(key, cause, root, inner, anchor, shown, before, start, ...)
 	local elapsed = debugprofilestop() - start
 	driverTop = driverTop - 1
-	Span(start, elapsed)
+	session:Span(start, elapsed)
 	CountKind('layout', key, elapsed, cause, root, inner)
-	if outputs == before and not (anchor and anchor:IsShown() ~= shown) then
+	if outputs == before and anchor:IsShown() == shown then
 		CountKind('layoutSame', key, nil, cause, root, inner)
 	end
 	local times = (frameLayouts[key] or 0) + 1
@@ -484,14 +441,14 @@ local function LayoutWrapper(original)
 		pendingCause[key] = nil
 		local anchor = CDM.Anchors[key]
 		Driver(LAYOUT_NAMES[key])
-		return EndLayout(key, cause, root, inner, anchor, anchor and anchor:IsShown(), outputs, debugprofilestop(), original(key))
+		return EndLayout(key, cause, root, inner, anchor, anchor:IsShown(), outputs, debugprofilestop(), original(key))
 	end
 end
 
 local function EndSkin(icon, key, before, cause, root, inner, start, ...)
 	local elapsed = debugprofilestop() - start
 	driverTop = driverTop - 1
-	Span(start, elapsed)
+	session:Span(start, elapsed)
 	local frameData = FrameData[icon]
 	if not (frameData and frameData.skinVer ~= before) then
 		CountKind('restyleSkip', key, elapsed, cause, root, inner)
@@ -535,7 +492,7 @@ end
 local function EndGlowStart(icon, wasActive, wasType, wasColor, cause, root, inner, start, ...)
 	local elapsed = debugprofilestop() - start
 	driverTop = driverTop - 1
-	Span(start, elapsed)
+	session:Span(start, elapsed)
 	local frameData = FrameData[icon]
 	local started = frameData and frameData.glowActive
 		and not (wasActive and frameData.glowType == wasType and frameData.glowColor == wasColor)
@@ -637,7 +594,7 @@ local function OnViewerCall(viewer, method)
 	end
 	local cause, root = Cause()
 	stat.count = stat.count + 1
-	if inCombat then stat.combat = stat.combat + 1 end
+	if session.inCombat then stat.combat = stat.combat + 1 end
 	if root or driverTop > 0 then
 		stat.inside = stat.inside + 1
 		stat.from[cause] = (stat.from[cause] or 0) + 1
@@ -666,19 +623,16 @@ local function HookAnchor(anchor, key)
 end
 
 local function HookViewerFrame(viewer, key)
-	if not viewer or hooked[viewer] then return end
+	if hooked[viewer] then return end
 	hooked[viewer] = true
 	viewerKeyOf[viewer] = key
-	for _, method in ipairs(VIEWER_METHODS) do
-		if type(viewer[method]) == 'function' then hooksecurefunc(viewer, method, viewerHooks[method]) end
-	end
+	for _, method in ipairs(VIEWER_METHODS) do hooksecurefunc(viewer, method, viewerHooks[method]) end
 end
 
 local function HookFrames()
 	for key, viewerName in pairs(CDM.VIEWERS) do
 		HookViewerFrame(_G[viewerName], key)
-		local anchor = CDM.Anchors[key]
-		if anchor then HookAnchor(anchor, key) end
+		HookAnchor(CDM.Anchors[key], key)
 		local tracked, trackedCount = CDM.GetTrackedIcons(key)
 		for index = 1, trackedCount do HookIcon(tracked[index]) end
 		local custom, customCount = CDM.Custom.GetIcons(key)
@@ -696,18 +650,7 @@ local function HookIconWrapper(original)
 end
 
 local function Swap(owner, key, make, ...)
-	local original = owner[key]
-	local wrapper = make(original, ...)
-	swaps[#swaps + 1] = { owner = owner, key = key, original = original, wrapper = wrapper }
-	owner[key] = wrapper
-end
-
-local function Unswap()
-	for index = #swaps, 1, -1 do
-		local swap = swaps[index]
-		if swap.owner[swap.key] == swap.wrapper then swap.owner[swap.key] = swap.original end
-		swaps[index] = nil
-	end
+	session:Swap(owner, key, make(rawget(owner, key), ...))
 end
 
 local function InstallSwaps()
@@ -741,40 +684,19 @@ local function InstallSwaps()
 	Swap(Keybinds, 'StyleViewer', Timed, 'keybindViewer', 'Keybinds.StyleViewer', FirstKey)
 	Swap(BUI.CustomBars, 'RefreshAllBars', Timed, 'barsRefresh', 'CustomBars.RefreshAllBars')
 	for method, kind in pairs(EDIT_MODE_WRITES) do
-		if LibEMO[method] then Swap(LibEMO, method, Timed, kind, 'Edit Mode ' .. method, FRAME_WRITES[method] and FrameKey) end
+		Swap(LibEMO, method, Timed, kind, 'Edit Mode ' .. method, FRAME_WRITES[method] and FrameKey)
 	end
 end
 
 local function SpecName()
 	local className = UnitClass('player')
-	local index = GetSpecialization()
-	local specName = index and select(2, GetSpecializationInfo(index))
+	local index = C_SpecializationInfo.GetSpecialization()
+	local specName = index and select(2, C_SpecializationInfo.GetSpecializationInfo(index))
 	return specName and format('%s %s', specName, className) or className
 end
 
-local function OnCombatStart()
-	if inCombat then return end
-	inCombat = true
-	combatSince = GetTime()
-end
-
-local function OnCombatEnd()
-	if not inCombat then return end
-	inCombat = false
-	combatTime = combatTime + GetTime() - combatSince
-end
-
-local function Duration()
-	return max((stoppedAt or GetTime()) - startedAt, 1)
-end
-
-local function CombatSeconds()
-	if inCombat then return combatTime + GetTime() - combatSince end
-	return combatTime
-end
-
 local function Rate(count)
-	return count / Duration()
+	return session:Rate(count)
 end
 
 local function KeysText(keys)
@@ -788,7 +710,7 @@ end
 
 local function Peak(kind, stat)
 	local current = secondKinds[kind] or 0
-	if current > stat.peak then return current, currentSecond end
+	if current > stat.peak then return current, session.currentSecond end
 	return stat.peak, stat.peakAt
 end
 
@@ -808,14 +730,15 @@ local function CauseLine(lines, prefix, causes)
 end
 
 local function SummaryLines(lines)
-	local duration, combat = Duration(), CombatSeconds()
+	local duration, combat = session:Duration(), session:CombatSeconds()
+	local totalMs, combatMs, worstFrames = session.totalMs, session.combatMs, session.worstFrames
 	local spec = SpecName()
 	lines[#lines + 1] = format('CDM profile: %s, %s of it in combat. %s, started in %s at %s.%s',
-		Clock(duration), Clock(combat), specAtStart, zoneAtStart, clockAtStart,
+		Clock(duration), Clock(combat), specAtStart, session.zoneAtStart, session.clockAtStart,
 		spec ~= specAtStart and format(' Spec is now %s.', spec) or '')
 	lines[#lines + 1] = format('CDM work: %.0fms in total, %.2fms a second (%.2f in combat, %.2f out of combat). It ran in %d frames; the worst took %.1fms.',
 		totalMs, totalMs / duration, combat > 0 and combatMs / combat or 0, (totalMs - combatMs) / max(duration - combat, 1),
-		busyFrames, worstFrames[1] and worstFrames[1].ms or 0)
+		session.busyFrames, worstFrames[1] and worstFrames[1].ms or 0)
 	local markAll = Stat('markAll').count
 	for _, key in ipairs(CDM.VIEWER_KEYS) do
 		local layouts = KeyCount('layout', key)
@@ -907,7 +830,7 @@ end
 
 local function PeakLines(lines)
 	lines[#lines + 1] = '-- Worst frames by CDM time --'
-	for _, frame in ipairs(worstFrames) do
+	for _, frame in ipairs(session.worstFrames) do
 		lines[#lines + 1] = format('  +%s%s: %.1fms. Work: %s. Handlers: %s. Causes: %s',
 			Clock(frame.at), frame.combat and ' in combat' or '', frame.ms, Or(frame.work), Or(frame.handlers), Or(frame.causes))
 	end
@@ -984,14 +907,12 @@ local function Build()
 	return lines, preview
 end
 
-local function ResetSession()
+local function ResetOwnState()
 	for _, map in ipairs(SESSION_TABLES) do wipe(map) end
-	startedAt, stoppedAt = GetTime(), nil
-	frameAt, frameMs, frameLayoutRepeats, frameRestyleRepeats = nil, 0, 0, 0
-	spanTop, driverTop, markDepth, currentSecond = 0, 0, 0, 0
-	totalMs, combatMs, busyFrames, repeatFrameCount = 0, 0, 0, 0
-	inCombat, combatSince, combatTime = InCombatLockdown(), startedAt, 0
-	specAtStart, zoneAtStart, clockAtStart = SpecName(), GetRealZoneText(), date('%H:%M')
+	frameLayoutRepeats, frameRestyleRepeats = 0, 0
+	driverTop, markDepth = 0, 0
+	repeatFrameCount = 0
+	specAtStart = SpecName()
 end
 
 function CDMProfiler.IsRunning()
@@ -1007,34 +928,27 @@ function CDMProfiler.Start()
 		BUI.Print('A launch trace is still recording. Try again in a few seconds.')
 		return false
 	end
-	ResetSession()
+	ResetOwnState()
+	session:Start()
 	running = true
 	HookFrames()
 	InstallSwaps()
 	Profiler.AddTracer(Trace)
-	BUI.Events:Register('PLAYER_REGEN_DISABLED', EVENT_KEY, OnCombatStart)
-	BUI.Events:Register('PLAYER_REGEN_ENABLED', EVENT_KEY, OnCombatEnd)
 	return true
 end
 
 function CDMProfiler.Stop()
-	if frameAt then CloseFrame() end
-	CloseSecond()
-	OnCombatEnd()
+	session:Stop()
 	running = false
-	stoppedAt = GetTime()
-	frameAt = nil
 	Profiler.RemoveTracer(Trace)
-	Unswap()
-	BUI.Events:Unregister('PLAYER_REGEN_DISABLED', EVENT_KEY)
-	BUI.Events:Unregister('PLAYER_REGEN_ENABLED', EVENT_KEY)
 end
 
 function CDMProfiler.Reset()
-	ResetSession()
-	if not running then startedAt = nil end
+	ResetOwnState()
+	session:Reset()
+	if not running then session.startedAt = nil end
 end
 
 function CDMProfiler.Report()
-	if startedAt then return Build() end
+	if session.startedAt then return Build() end
 end

@@ -36,13 +36,9 @@ local railIcons = {}
 local preview
 local fonts
 
-local function Window()
-	return BUI.PageEngine.window
-end
-
-local function Repaint()
-	Window():Repaint()
-end
+local Kit = BUI.OptionsKit
+local Window, Repaint, RebuildPage, RebuildPane = Kit.Window, Kit.Repaint, Kit.RebuildPage, Kit.RebuildPane
+local Option, Toggle, OnUnlessOff, Color = Kit.Option, Kit.Toggle, Kit.OnUnlessOff, Kit.Color
 
 local function Bars()
 	return BUI.GetDB().customBars
@@ -68,14 +64,6 @@ local function Apply()
 	RefreshPreview()
 end
 
-local function RebuildPage()
-	BUILib.Defer(function() BUI.PageEngine.RefreshCurrentPage() end)
-end
-
-local function RebuildPane(page)
-	BUILib.Defer(function() page:RebuildCurrent() end)
-end
-
 local function IndexOf(list, value)
 	for position, candidate in ipairs(list) do
 		if candidate == value then return position end
@@ -87,31 +75,6 @@ local function StoredIndex(spells, stored)
 	for position, candidate in ipairs(spells) do
 		if tostring(candidate) == key then return position end
 	end
-end
-
-local function Option(bar, label, key, extra)
-	local option = { label = label, get = function() return bar[key] end, set = function(value) bar[key] = value end }
-	for name, value in pairs(extra or {}) do option[name] = value end
-	return option
-end
-
-local function Toggle(bar, label, key)
-	return { label = label, get = function() return bar[key] == true end, set = function(value) bar[key] = value end }
-end
-
-local function OnUnlessOff(bar, label, key)
-	return { label = label, get = function() return bar[key] ~= false end, set = function(value) bar[key] = value end }
-end
-
-local function Color(bar, label, key)
-	return {
-		kind = 'swatch', label = label, tooltip = label, opacity = true,
-		get = function()
-			local color = bar[key]
-			return color[1], color[2], color[3], color[4] or 1
-		end,
-		set = function(red, green, blue, alpha) bar[key] = { red, green, blue, alpha } end,
-	}
 end
 
 local function NameOption(bar)
@@ -206,7 +169,7 @@ end
 
 local function PotionLabel(entry)
 	local _, _, _, _, _, _, subclassID = C_Item.GetItemInfoInstant(entry.id)
-	local label = subclassID == Enum.ItemConsumableSubclass.Flask and 'Flask display' or 'Potion display'
+	local label = subclassID == Enum.ItemConsumableSubclass.Flasksphials and 'Flask display' or 'Potion display'
 	if BUI.CDM.GetPotionPrioFor(entry.stored) then label = label .. ', customized' end
 	return label
 end
@@ -395,7 +358,7 @@ local function TrackedBoard(ui, parent, width, bar, page)
 end
 
 local function Import()
-	local skips = importSkips[importCharacter] or {}
+	local skips = importSkips[importCharacter]
 	local picks = {}
 	for _, info in ipairs(CustomBars.GetBarInfoForCharacter(importCharacter)) do
 		if not skips[info.index] then picks[#picks + 1] = info.index end
@@ -540,7 +503,7 @@ end
 
 local function Prepare(fontItems)
 	fonts = fontItems
-	CustomBars.SetLockCallback(Repaint)
+	BUI.OnModuleChange('customBars', Repaint)
 end
 
 BUI.CustomBarsPage = {

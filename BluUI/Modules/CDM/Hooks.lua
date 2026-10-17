@@ -9,7 +9,6 @@ local wipe = wipe
 
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
-local BLANK = BUI.C.FALLBACK_TEXTURE
 local FrameData = CDM.FrameData
 local GetFrameData = CDM.GetFrameData
 
@@ -22,11 +21,8 @@ local reconcileBuf = {}
 local function ReconcileKey(key)
     local db = BUI.GetDB()
     local settings = db.cdm[key]
-    if not settings or not settings.enabled then return end
-    local viewerName = CDM.VIEWERS[key]
-    local viewer = viewerName and _G[viewerName]
-    if not viewer or not viewer.itemFramePool or not viewer.itemFramePool.EnumerateActive then return end
-    for frame in viewer.itemFramePool:EnumerateActive() do
+    if not settings.enabled then return end
+    for frame in _G[CDM.VIEWERS[key]].itemFramePool:EnumerateActive() do
         reconcileBuf[frame] = true
     end
     local list, count = CDM.GetTrackedIcons(key)
@@ -67,7 +63,7 @@ local function OnRefreshLayoutComplete(viewer)
     if not key then return end
 
     local pool = viewer.itemFramePool
-    local activeCount = pool and pool.GetNumActive and pool:GetNumActive() or -1
+    local activeCount = pool:GetNumActive()
     if activeCount ~= lastPoolActive[key] then
         lastPoolActive[key] = activeCount
         ReconcileKey(key)
@@ -158,7 +154,7 @@ function CDM.HookIconFrame(icon, key)
     frameData.posHooked = true
     frameData.viewerKey = key
     if key ~= 'buffs' and icon.Cooldown and not frameData.customIcon then
-        icon.Cooldown:HookScript('OnCooldownDone', BUI.Profiler.Wrap('CDM.Hooks Cooldown OnCooldownDone', CDM.OnCooldownWidgetDone))
+        icon.Cooldown:HookScript('OnCooldownDone', CDM.OnCooldownWidgetDone)
     end
 
     Hook(icon, "SetPoint", OnIconSetPoint)
@@ -178,9 +174,9 @@ function CDM.HookIconFrame(icon, key)
         Hook(icon, "OnActiveStateChanged", OnIconActiveStateChanged)
     end
     if key == 'buffs' then
-        Hook(icon, "Show", CDM._OnBuffIconShow)
-        Hook(icon, "Hide", CDM._OnBuffIconHide)
-        Hook(icon, "SetShown", CDM._OnBuffIconShow)
+        Hook(icon, "Show", CDM.MarkBuffCenterDirty)
+        Hook(icon, "Hide", CDM.MarkBuffCenterDirty)
+        Hook(icon, "SetShown", CDM.MarkBuffCenterDirty)
     end
 end
 
@@ -195,7 +191,6 @@ end
 local function SkinAndPark(frame, key)
     local settings = CDM.GetSettings(key)
     local anchor = CDM.Anchors[key]
-    if not settings or not anchor then return end
 
     CDM.HookIconFrame(frame, key)
     local parkData = GetFrameData(frame)
@@ -210,16 +205,13 @@ local function SkinAndPark(frame, key)
     parkData.relPoint = "TOPLEFT"
     parkData.posCornerX = 0
     parkData.posCornerY = 0
-
-    parkData.posX = nil
-    parkData.posY = nil
     parkData.locking = true
     frame:SetScale(1)
     frame:SetAlpha(0)
     frame:ClearAllPoints()
     frame:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, 0)
-    local width = anchor._cachedScaledW or settings._pxW or Pixel.Scale(settings.iconWidth)
-    local height = anchor._cachedScaledH or settings._pxH or Pixel.Scale(settings.iconHeight)
+    local width = anchor._cachedScaledW
+    local height = anchor._cachedScaledH
     parkData.sizeW = width
     parkData.sizeH = height
     frame:SetSize(width, height)
@@ -227,39 +219,21 @@ local function SkinAndPark(frame, key)
 end
 
 local function OnViewerAcquireFrame(viewer, frame)
-    local viewerFrameData = FrameData[viewer]
-    local key = viewerFrameData and viewerFrameData.viewerKey
+    local key = FrameData[viewer].viewerKey
     local isValid = key == "buffs" and frame.Icon or CDM.IsCooldownIcon(frame)
     if not isValid then return end
 
-    if key then
-        local frameData = FrameData[frame]
-        if frameData then
-            frameData.countFont = nil
-            frameData.countFontNil = nil
-        end
-
-        CDM.TrackIcon(key, frame)
-
-        local db = BUI.GetDB()
-        local settings = db.cdm[key]
-        if settings and settings.enabled then
-            SkinAndPark(frame, key)
-        end
+    local frameData = FrameData[frame]
+    if frameData then
+        frameData.countFont = nil
+        frameData.countFontNil = nil
     end
-end
 
-local function OnViewerReleaseFrame(viewer, frame)
-    local key = CDM.GetViewerKey(viewer)
-    if key then
-        CDM.UntrackIcon(key, frame)
+    CDM.TrackIcon(key, frame)
+
+    if BUI.GetDB().cdm[key].enabled then
+        SkinAndPark(frame, key)
     end
-end
-
-local function OnPoolRelease(pool, frame)
-    local poolFrameData = FrameData[pool]
-    local viewer = poolFrameData and poolFrameData.viewer
-    if viewer then OnViewerReleaseFrame(viewer, frame) end
 end
 
 function CDM.HookViewer(viewer, key)
@@ -273,33 +247,17 @@ function CDM.HookViewer(viewer, key)
         Hook(viewer, "Hide", OnViewerVisibilityChanged)
         Hook(viewer, "SetShown", OnViewerVisibilityChanged)
 
-        if not viewerFrameData.poolHooked and viewer.itemFramePool then
-            viewerFrameData.poolHooked = true
+        local pool = viewer.itemFramePool
+        local HookViewer = BUI.Profiler.Hooker("CDM." .. key)
+        HookViewer(viewer, "OnAcquireItemFrame", OnViewerAcquireFrame)
+        HookViewer(viewer, "RefreshLayout", OnRefreshLayoutComplete)
 
-            local HookViewer = BUI.Profiler.Hooker("CDM." .. key)
-            HookViewer(viewer, "OnAcquireItemFrame", OnViewerAcquireFrame)
-
-            if viewer.RefreshLayout then
-                HookViewer(viewer, "RefreshLayout", OnRefreshLayoutComplete)
-            end
-
-            if viewer.itemFramePool.Release then
-                GetFrameData(viewer.itemFramePool).viewer = viewer
-                HookViewer(viewer.itemFramePool, "Release", OnPoolRelease)
-            end
-
-            if viewer.itemFramePool.EnumerateActive then
-                local db = BUI.GetDB()
-                local settings = db.cdm[key]
-                local enabled = settings and settings.enabled
-
-                for frame in viewer.itemFramePool:EnumerateActive() do
-                    local isValid = key == "buffs" and frame.Icon or CDM.IsCooldownIcon(frame)
-                    if isValid then
-                        CDM.TrackIcon(key, frame)
-                        if enabled then SkinAndPark(frame, key) end
-                    end
-                end
+        local enabled = BUI.GetDB().cdm[key].enabled
+        for frame in pool:EnumerateActive() do
+            local isValid = key == "buffs" and frame.Icon or CDM.IsCooldownIcon(frame)
+            if isValid then
+                CDM.TrackIcon(key, frame)
+                if enabled then SkinAndPark(frame, key) end
             end
         end
     end
@@ -319,8 +277,6 @@ function CDM.RestoreViewer(viewer, key)
         local frameData = FrameData[icon]
         if frameData then
             frameData.anchor = nil
-            frameData.posX = nil
-            frameData.posY = nil
             frameData.parked = nil
             frameData.locking = true
             icon:SetAlpha(1)
@@ -329,18 +285,41 @@ function CDM.RestoreViewer(viewer, key)
     end
 
     CDM.UnskinViewer(key)
-    BUI.Print('Cooldown viewer restored. /reload to let Blizzard lay it out again.')
+end
+
+local barAcquireListeners, barLayoutListeners = {}, {}
+local barViewerHooked = false
+
+local function OnBarViewerAcquire(viewer, item)
+    for listenerIndex = 1, #barAcquireListeners do barAcquireListeners[listenerIndex](viewer, item) end
+end
+
+local function OnBarViewerLayout(viewer)
+    for listenerIndex = 1, #barLayoutListeners do barLayoutListeners[listenerIndex](viewer) end
+end
+
+function CDM.HookBarViewer(onAcquire, onLayout)
+    local viewer = _G.BuffBarCooldownViewer
+    if not viewer then return false end
+    barAcquireListeners[#barAcquireListeners + 1] = onAcquire
+    barLayoutListeners[#barLayoutListeners + 1] = onLayout
+    if not barViewerHooked then
+        barViewerHooked = true
+        local HookBars = BUI.Profiler.Hooker("CDM.bars")
+        HookBars(viewer, "OnAcquireItemFrame", OnBarViewerAcquire)
+        HookBars(viewer, "RefreshLayout", OnBarViewerLayout)
+    end
+    return true
 end
 
 local function ApplyCooldownStyle(cooldown, cooldownFrameData)
     local parent = cooldown:GetParent()
-    local parentFrameData = parent and FrameData[parent]
-    local viewerKey = parentFrameData and parentFrameData.viewerKey
-    local settings = viewerKey and CDM.GetSettings(viewerKey)
+    local parentFrameData = FrameData[parent]
+    local settings = CDM.GetSettings(parentFrameData.viewerKey)
 
-    local scaledEdge = (parentFrameData and parentFrameData.skinVer and settings and settings.borderSize and settings.borderSize > 0)
+    local scaledEdge = (parentFrameData.skinVer and settings.borderSize > 0)
         and (Pixel.Scale(settings.borderSize) - Pixel.PixelSize(1)) or 0
-    if parent and (cooldownFrameData.anchoredParent ~= parent or cooldownFrameData.anchoredEdge ~= scaledEdge) then
+    if cooldownFrameData.anchoredParent ~= parent or cooldownFrameData.anchoredEdge ~= scaledEdge then
         cooldownFrameData.anchoredParent = parent
         cooldownFrameData.anchoredEdge = scaledEdge
         cooldown:ClearAllPoints()
@@ -352,18 +331,7 @@ local function ApplyCooldownStyle(cooldown, cooldownFrameData)
         end
     end
 
-    local reverse = settings and settings.reverseSwipe or false
-    local showEdge = settings and settings.showEdge or false
-    local swipeRed, swipeGreen, swipeBlue, swipeAlpha = CDM.ResolveSwipeColor(settings)
-    cooldownFrameData.reverseSwipe = reverse
-    cooldownFrameData.showEdge = showEdge
-    cooldownFrameData.swR, cooldownFrameData.swG, cooldownFrameData.swB, cooldownFrameData.swA = swipeRed, swipeGreen, swipeBlue, swipeAlpha
-    cooldown:SetUseCircularEdge(false)
-    cooldown:SetSwipeTexture(BLANK)
-    cooldown:SetReverse(reverse)
-    cooldown:SetDrawBling(false)
-    cooldown:SetDrawEdge(showEdge)
-    cooldown:SetSwipeColor(swipeRed, swipeGreen, swipeBlue, swipeAlpha)
+    CDM.ApplyCooldownSwipeStyle(cooldown, settings)
     cooldownFrameData.styleVer = CDM.state.skinVersion
 end
 
@@ -374,7 +342,7 @@ function CDM.RestyleCooldown(cooldown)
     local cooldownFrameData = FrameData[cooldown]
     if not cooldownFrameData or not cooldownFrameData.cdSetup then return end
 
-    if EditModeManagerFrame and EditModeManagerFrame:IsShown() then return end
+    if EditModeManagerFrame:IsShown() then return end
 
     if cooldownFrameData.styleVer ~= CDM.state.skinVersion then
         ApplyCooldownStyle(cooldown, cooldownFrameData)

@@ -9,7 +9,6 @@ local UnitIsDeadOrGhost = UnitIsDeadOrGhost
 local UnitCastingInfo = UnitCastingInfo
 local UnitChannelInfo = UnitChannelInfo
 
-local Pixel = BUI.Pixel
 BUI.CDM = {}
 local CDM = BUI.CDM
 local FrameData = setmetatable({}, { __mode = "k" })
@@ -26,20 +25,13 @@ local function GetFrameData(frame)
 end
 CDM.GetFrameData = GetFrameData
 
-function CDM._OnBuffIconShow()
-    CDM.MarkBuffCenterDirty()
-end
-function CDM._OnBuffIconHide()
-    CDM.MarkBuffCenterDirty()
-end
-
 CDM.VIEWERS = {
     essential = "EssentialCooldownViewer",
     utility = "UtilityCooldownViewer",
     buffs = "BuffIconCooldownViewer",
 }
 
-CDM.SYNCED_SETTINGS = {
+local SYNCED_SETTINGS = {
     iconWidth = true, iconHeight = true, spacing = true, zoom = true,
     rowGrowth = true, vertical = true, borderSize = true, borderColor = true,
     textSize = true, textPosition = true, textOffsetX = true, textOffsetY = true, textColor = true,
@@ -55,28 +47,8 @@ CDM.SYNCED_SETTINGS = {
 
 CDM.PreviewIcons = { 136048, 135994, 136018, 135936, 136085, 136074, 135932 }
 
-CDM.STRIP_ELEMENTS = {
-    "Border", "Shadow", "IconBorder", "NormalTexture", "Flash", "Backdrop",
-    "background", "Background", "HighlightTexture", "highlight", "Highlight",
-    "active", "Active", "ActiveOverlay", "Shine", "shine", "Bling", "bling",
-}
-CDM.STRIP_ELEMENTS_COUNT = #CDM.STRIP_ELEMENTS
-
-CDM.HIDE_ELEMENTS = {
-    "Border", "IconBorder", "NormalTexture", "Flash", "CheckedTexture",
-    "SlotBackground", "SlotArt", "SlotFrame",
-}
-CDM.HIDE_ELEMENTS_COUNT = #CDM.HIDE_ELEMENTS
-
-CDM.SHOW_ELEMENTS = {
-    "Border", "IconBorder", "NormalTexture", "Flash", "Glow", "CheckedTexture",
-}
-CDM.SHOW_ELEMENTS_COUNT = #CDM.SHOW_ELEMENTS
-
 CDM.VIEWER_KEYS = { "essential", "utility", "buffs" }
 CDM.VIEWER_KEYS_COUNT = 3
-
-CDM.VIEWER_NAMES = { "EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer" }
 
 CDM.state = {
     initialized = false,
@@ -94,6 +66,7 @@ end
 
 local TrackedIcons = { essential = {}, utility = {}, buffs = {} }
 local TrackedCounts = { essential = 0, utility = 0, buffs = 0 }
+local iconChurn = { essential = 0, utility = 0, buffs = 0 }
 
 local trackSeqCounter = 0
 
@@ -113,7 +86,7 @@ function CDM.TrackIcon(key, icon)
     frameData.trackIndex = count
     frameData.tracked = key
     TrackedCounts[key] = count
-    CDM._iconChurn[key] = (CDM._iconChurn[key] or 0) + 1
+    iconChurn[key] = iconChurn[key] + 1
     CDM.InvalidateIconCache(key)
     CDM.NotifyTrackedIconsChanged(key)
 end
@@ -138,15 +111,13 @@ function CDM.UntrackIcon(key, icon)
 
     frameData.trackIndex = nil
     frameData.tracked = nil
-    CDM._iconChurn[key] = (CDM._iconChurn[key] or 0) + 1
+    iconChurn[key] = iconChurn[key] + 1
     CDM.InvalidateIconCache(key)
     CDM.NotifyTrackedIconsChanged(key)
 end
 
-CDM._iconChurn = {}
-
 function CDM.GetIconChurn(key)
-    return CDM._iconChurn[key] or 0
+    return iconChurn[key]
 end
 
 local trackedChangedListeners = {}
@@ -166,9 +137,7 @@ function CDM.GetTrackedIcons(key)
 end
 
 function CDM.IsViewerEnabled(key)
-    local db = BUI.GetDB()
-    local settings = db.cdm[key]
-    return settings and settings.enabled
+    return BUI.GetDB().cdm[key].enabled
 end
 
 function CDM.ForAllIcons(callback)
@@ -324,7 +293,6 @@ local RACIAL_SPELL_IDS = {
 function CDM.IsRacialSpell(spellID) return RACIAL_SPELL_IDS[spellID] == true end
 
 function CDM.GetKnownRacialSpellIDs(out)
-    out = out or {}
     wipe(out)
     for id in pairs(RACIAL_SPELL_IDS) do
         if C_SpellBook.IsSpellKnown(id) then
@@ -347,7 +315,6 @@ BUI.Events:Register("PLAYER_TALENT_UPDATE", "CDM.KnownRacials", InvalidateKnownR
 BUI.Events:RegisterUnit("PLAYER_SPECIALIZATION_CHANGED", "player", "CDM.KnownRacials", InvalidateKnownRacials)
 
 function CDM.ResolveRacialSlot(slot)
-    slot = slot or 1
     if not knownRacialsValid then
         CDM.GetKnownRacialSpellIDs(knownRacials)
         knownRacialsValid = true
@@ -359,7 +326,7 @@ BUI.IconEngine._isRacialSpell = CDM.IsRacialSpell
 BUI.IconEngine.SetRacialSlotResolver(CDM.ResolveRacialSlot)
 
 function CDM.GetUnavailableTag(storedValue, isItemID)
-    if CDM.Custom.IsTrackedEntryUsable(storedValue, true) then
+    if CDM.Custom.IsTrackedEntryUsable(storedValue) then
         return nil
     end
 
@@ -433,7 +400,7 @@ function CDM.GetCountFont(icon)
         result = icon.Applications.Applications
     end
     if not result then
-        result = icon.Count or icon.count
+        result = icon.Count
     end
 
     frameData = GetFrameData(icon)
@@ -441,20 +408,20 @@ function CDM.GetCountFont(icon)
     return result
 end
 
-function CDM.SyncSetting(settingKey, value)
-    local db = BUI.GetDB()
-    if not db.cdm.syncViewers then return false end
-    if not CDM.SYNCED_SETTINGS[settingKey] then return false end
-
-    local essential, utility = db.cdm.essential, db.cdm.utility
-    if essential then essential[settingKey] = value end
-    if utility then utility[settingKey] = value end
-
+local function WriteSyncedSetting(settingKey, value)
+    local cdm = BUI.GetDB().cdm
+    if not cdm.syncViewers or not SYNCED_SETTINGS[settingKey] then return false end
+    cdm.essential[settingKey] = value
+    cdm.utility[settingKey] = value
     if settingKey == "centerHorizontally" and value then
-        if essential then essential.positionX = 0 end
-        if utility then utility.positionX = 0 end
+        cdm.essential.positionX = 0
+        cdm.utility.positionX = 0
     end
+    return true
+end
 
+function CDM.SyncSetting(settingKey, value)
+    if not WriteSyncedSetting(settingKey, value) then return false end
     if CDM.SIZE_SETTINGS[settingKey] then
         CDM.RefreshSizeSettings()
     else
@@ -464,14 +431,7 @@ function CDM.SyncSetting(settingKey, value)
 end
 
 function CDM.SyncSettingLayout(settingKey, value)
-    local db = BUI.GetDB()
-    if not db.cdm.syncViewers then return false end
-    if not CDM.SYNCED_SETTINGS[settingKey] then return false end
-
-    local essential, utility = db.cdm.essential, db.cdm.utility
-    if essential then essential[settingKey] = value end
-    if utility then utility[settingKey] = value end
-
+    if not WriteSyncedSetting(settingKey, value) then return false end
     CDM.RefreshLayoutOnly()
     return true
 end
@@ -481,18 +441,6 @@ function CDM.InvalidateSkinCache()
     for _, frameData in pairs(FrameData) do
         frameData.countFont = nil
         frameData.countFontNil = nil
-    end
-end
-
-function CDM.UpdatePixelValues(key)
-    local settings = CDM.GetSettings(key)
-    if not settings then return end
-    settings._pxW = Pixel.Scale(settings.iconWidth)    settings._pxH = Pixel.Scale(settings.iconHeight)    settings._pxGap = Pixel.Scale(settings.spacing)
-end
-
-function CDM.UpdateAllPixelValues()
-    for i = 1, CDM.VIEWER_KEYS_COUNT do
-        CDM.UpdatePixelValues(CDM.VIEWER_KEYS[i])
     end
 end
 
@@ -535,7 +483,7 @@ function CDM.RowCapacity(settings, hasThirdRow)
     local perRow = settings.iconsPerRow
     if perRow <= 0 then return nil end
     local total = perRow
-    local row2Count = settings.row2Count or 0
+    local row2Count = settings.row2Count
     if row2Count > 0 then
         total = total + row2Count
         local row3Count = hasThirdRow and settings.row3Count or 0
@@ -569,20 +517,25 @@ end
 local VIEWER_CATEGORY
 local blizzardCDMSpellCache = {}
 local classSpellCache = {}
+local GAME_BUILD = select(2, GetBuildInfo())
+local specCacheStore
 
 local function GetStorage()
-    local globalDB = BUI.db and BUI.db.global
-    if not globalDB then return nil end
-    globalDB.cdmSpecCache = globalDB.cdmSpecCache or {}
-    return globalDB.cdmSpecCache
+    if specCacheStore then return specCacheStore end
+    local globalDB = BUI.db.global
+    specCacheStore = globalDB.cdmSpecCache or {}
+    globalDB.cdmSpecCache = specCacheStore
+    for buildKey, bucket in pairs(specCacheStore) do
+        if bucket.build ~= GAME_BUILD then specCacheStore[buildKey] = nil end
+    end
+    return specCacheStore
 end
 
 local function GetSpecBucket(buildKey, create)
     local store = GetStorage()
-    if not store then return nil end
     local bucket = store[buildKey]
     if not bucket and create then
-        bucket = { class = nil, viewers = {} }
+        bucket = { viewers = {}, build = GAME_BUILD }
         store[buildKey] = bucket
     end
     return bucket
@@ -594,7 +547,7 @@ local function BuildBlizzardCDMSpellCache(viewerKey)
     if memoSpec and memoSpec[viewerKey] then return memoSpec[viewerKey] end
 
     local stored = GetSpecBucket(buildKey, false)
-    if stored and stored.viewers and stored.viewers[viewerKey] then
+    if stored and stored.viewers[viewerKey] then
         memoSpec = memoSpec or {}
         memoSpec[viewerKey] = stored.viewers[viewerKey]
         blizzardCDMSpellCache[buildKey] = memoSpec
@@ -614,20 +567,17 @@ local function BuildBlizzardCDMSpellCache(viewerKey)
 
     local cache = {}
     local ids = C_CooldownViewer.GetCooldownViewerCategorySet(cat, true)
-    if ids then
-        local GetInfo = C_CooldownViewer.GetCooldownViewerCooldownInfo
-        for j = 1, #ids do
-            local info = GetInfo(ids[j])
-            if info and info.spellID then cache[info.spellID] = true end
-        end
+    local GetInfo = C_CooldownViewer.GetCooldownViewerCooldownInfo
+    for j = 1, #ids do
+        local info = GetInfo(ids[j])
+        if info and info.spellID then cache[info.spellID] = true end
     end
 
     memoSpec = memoSpec or {}
     memoSpec[viewerKey] = cache
     blizzardCDMSpellCache[buildKey] = memoSpec
 
-    local bucket = GetSpecBucket(buildKey, true)
-    if bucket then bucket.viewers[viewerKey] = cache end
+    GetSpecBucket(buildKey, true).viewers[viewerKey] = cache
     return cache
 end
 
@@ -653,11 +603,9 @@ local function BuildClassSpellCache()
         local info = GetInfo(cooldownID)
         if info then
             nilStreak = 0
-            cache[info.spellID] = true
-            if info.linkedSpellIDs then
-                for _, linkedID in ipairs(info.linkedSpellIDs) do
-                    cache[linkedID] = true
-                end
+            if info.spellID then cache[info.spellID] = true end
+            for _, linkedID in ipairs(info.linkedSpellIDs) do
+                cache[linkedID] = true
             end
         else
             nilStreak = nilStreak + 1
@@ -666,8 +614,7 @@ local function BuildClassSpellCache()
     end
 
     classSpellCache[buildKey] = cache
-    local bucket = GetSpecBucket(buildKey, true)
-    if bucket then bucket.class = cache end
+    GetSpecBucket(buildKey, true).class = cache
     return cache
 end
 
@@ -675,9 +622,16 @@ function CDM.InvalidateClassSpellCache()
     local buildKey = GetBuildKey()
     classSpellCache[buildKey] = nil
     blizzardCDMSpellCache[buildKey] = nil
-    local store = GetStorage()
-    if store then store[buildKey] = nil end
+    GetStorage()[buildKey] = nil
 end
+
+local function OnCooldownTableHotfixed()
+    wipe(classSpellCache)
+    wipe(blizzardCDMSpellCache)
+    wipe(GetStorage())
+end
+
+BUI.Events:Register("COOLDOWN_VIEWER_TABLE_HOTFIXED", "CDM.SpecCache", OnCooldownTableHotfixed)
 
 function CDM.IsClassSpell(spellID)
     local cache = BuildClassSpellCache()
@@ -695,7 +649,7 @@ function CDM.InvalidateOpacityCache()
     wipe(lastAlpha)
 end
 
-function CDM.UpdateOpacity(instant)
+function CDM.UpdateOpacity()
     CDM.RefreshBuffOpacityCache()
 
     local dead = UnitIsDeadOrGhost('player')
@@ -705,23 +659,18 @@ function CDM.UpdateOpacity(instant)
         if dead then CDM.ClearAllHighlights() end
     end
 
+    local targetAlpha = CDM.GetContextualOpacity() / 100
     for i = 1, CDM.VIEWER_KEYS_COUNT do
         local key = CDM.VIEWER_KEYS[i]
-        local opacity = CDM.GetContextualOpacity(key)
-        local anchor = CDM.Anchors[key]
-        local visAlpha = anchor and anchor._iconAlpha or 1
-        local targetAlpha = (opacity / 100) * visAlpha
         if lastAlpha[key] ~= targetAlpha then
             lastAlpha[key] = targetAlpha
-            local invisible = targetAlpha < 0.01
-            if anchor then
-                if invisible then
-                    anchor:Hide()
-                    anchor._opacityHidden = true
-                elseif anchor._opacityHidden then
-                    anchor._opacityHidden = nil
-                    anchor:Show()
-                end
+            local anchor = CDM.Anchors[key]
+            if targetAlpha < 0.01 then
+                anchor:Hide()
+                anchor._opacityHidden = true
+            elseif anchor._opacityHidden then
+                anchor._opacityHidden = nil
+                anchor:Show()
             end
             local list, count = CDM.GetTrackedIcons(key)
             for j = 1, count do
@@ -766,28 +715,19 @@ function CDM.RefreshAll(immediate)
             CDM.CreateAnchor(key)
         end
 
-        local name = CDM.VIEWERS[key]
-        local viewer = name and _G[name]
-        local settings = db.cdm[key]
-        local isEnabled = settings and settings.enabled
-
-        if viewer then
-            if isEnabled then
-                CDM.HookViewer(viewer, key)
-                CDM.ApplyAnchorPosition(key)
-                CDM.SaveToEditModeLayout(key)
-            else
-                CDM.RestoreViewer(viewer, key)
-            end
+        local viewer = _G[CDM.VIEWERS[key]]
+        if db.cdm[key].enabled then
+            CDM.HookViewer(viewer, key)
+        else
+            CDM.RestoreViewer(viewer, key)
         end
     end
 
     CDM.state.initComplete = true
 
-    CDM.UpdateAllPixelValues()
     CDM.InvalidateSkinCache()
     CDM.InvalidateOpacityCache()
-    CDM.UpdateOpacity(true)
+    CDM.UpdateOpacity()
 
     CDM.Custom.Refresh()
 
@@ -808,8 +748,6 @@ function CDM.RefreshAll(immediate)
 end
 
 function CDM.RefreshSkinSettings()
-    CDM.UpdateAllPixelValues()
-    CDM.InvalidateSkinCache()
     CDM.RefreshAll(true)
     BUI.Anchor.OnAnchorSizeChanged()
 
@@ -823,14 +761,11 @@ function CDM.RefreshSizeSettings()
     for i = 1, CDM.VIEWER_KEYS_COUNT do
         local key = CDM.VIEWER_KEYS[i]
         local settings = db.cdm[key]
-        if settings and settings.enabled then
+        if settings.enabled then
             local list, count = CDM.GetTrackedIcons(key)
             for j = 1, count do
                 local icon = list[j]
-                local texture = icon.Icon
-                if texture then
-                    texture:SetTexCoord(CDM.GetAspectTexCoords(settings.zoom, settings.iconWidth, settings.iconHeight, settings.keepAspectRatio))
-                end
+                icon.Icon:SetTexCoord(CDM.GetAspectTexCoords(settings.zoom, settings.iconWidth, settings.iconHeight, settings.keepAspectRatio))
                 CDM.ApplyFlashGeometry(icon, settings)
             end
         end

@@ -5,6 +5,7 @@ BUI.CustomBars = CustomBars
 
 local Pixel = BUI.Pixel
 local IconEngine = BUI.IconEngine
+local AggregateCountPrio = BUI.CDM.Custom.AggregateCountPrio
 
 local TRINKET_SLOTS = { 13, 14 }
 local CORNER_OFFSETS = {
@@ -12,15 +13,9 @@ local CORNER_OFFSETS = {
     LEFT = { 2, 0 }, CENTER = { 0, 0 }, RIGHT = { -2, 0 },
     BOTTOMLEFT = { 2, 2 }, BOTTOM = { 0, 2 }, BOTTOMRIGHT = { -2, 2 },
 }
-local VALID_STRATA = {
-    BACKGROUND = true, LOW = true, MEDIUM = true, HIGH = true,
-    DIALOG = true, FULLSCREEN_DIALOG = true, TOOLTIP = true,
-}
 
 local bars = {}
-local onLock
 local eventsRegistered = false
-local styleVersion = 0
 local playerKey
 
 local function GetPlayerKey()
@@ -89,19 +84,11 @@ local function LoadSpellsFor(characterKey)
 end
 
 local function GetSettings()
-    local db = BUI.GetDB()
-    for _, bar in ipairs(db.customBars) do
-        bar.customSpells = bar.customSpells or {}
-    end
-    return db.customBars
+    return BUI.GetDB().customBars
 end
 
 local function GetBar(index)
     return GetSettings()[index]
-end
-
-function CustomBars.SetLockCallback(callback)
-    onLock = callback
 end
 
 function CustomBars.GetOtherCharacters()
@@ -188,19 +175,12 @@ local function LockBar(index)
     local settings = GetBar(index)
     if not settings or settings.locked then return end
     settings.locked = true
-    if onLock then onLock() end
+    BUI.NotifyModuleChange('customBars')
     CustomBars.RefreshBar(index)
 end
 
 local function IsDragBlocked(index)
-    local settings = GetBar(index)
-    if settings and settings.locked then return true end
-    local bar = bars[index]
-    return bar and bar.frame._isAnchored or false
-end
-
-local function InvalidateStyle()
-    styleVersion = styleVersion + 1
+    return GetBar(index).locked or bars[index].frame._isAnchored
 end
 
 local function CreateIcon(parent, barIndex, iconIndex)
@@ -247,12 +227,10 @@ local function CreateIcon(parent, barIndex, iconIndex)
     overlay:SetAllPoints()
     overlay:SetFrameLevel(icon:GetFrameLevel() + 20)
     overlay:EnableMouse(false)
-    icon._tooltipOverlay = overlay
 
     icon:SetScript("OnEnter", BUI.Profiler.Script('CDM.CustomBars icon OnEnter', function()
-        local settings = GetBar(barIndex)
-        if not settings or settings.showTooltips == false then return end
-        if not icon.itemID or not icon.iconType then return end
+        if not GetBar(barIndex).showTooltips then return end
+        if not icon.itemID then return end
         GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
         if icon.iconType == "spell" then
             GameTooltip:SetSpellByID(icon.itemID)
@@ -277,9 +255,6 @@ local function FindFontStringRegion(...)
 end
 
 local function StyleIcon(icon, settings)
-    if icon._styleVer == styleVersion then return end
-    icon._styleVer = styleVersion
-
     local size = settings.iconSize
     local zoom = settings.zoom
     local borderSize = settings.borderSize
@@ -297,7 +272,7 @@ local function StyleIcon(icon, settings)
     icon.hl:SetAllPoints(icon.tex)
 
     local stackPosition = settings.stackTextPosition
-    local stackOffset = CORNER_OFFSETS[stackPosition] or { 0, 0 }
+    local stackOffset = CORNER_OFFSETS[stackPosition]
     icon.stack:ClearAllPoints()
     icon.stack:SetPoint(stackPosition, icon, stackPosition,
         Pixel.Scale(settings.stackTextOffsetX + stackOffset[1]),
@@ -305,7 +280,7 @@ local function StyleIcon(icon, settings)
     Pixel.ApplyFont(icon.stack, settings.stackTextSize, BUI.GetTrackingFont())
 
     local cooldownPosition = settings.cooldownTextPosition
-    local cooldownOffset = CORNER_OFFSETS[cooldownPosition] or { 0, 0 }
+    local cooldownOffset = CORNER_OFFSETS[cooldownPosition]
     local cooldownOffsetX = settings.cooldownTextOffsetX + cooldownOffset[1]
     local cooldownOffsetY = settings.cooldownTextOffsetY + cooldownOffset[2]
     local cooldownFontString = FindFontStringRegion(icon.cd:GetRegions())
@@ -335,10 +310,6 @@ local function AcquireEntry()
         entry.hasCharges = nil; entry.hiddenKey = nil; entry.prio = nil
     end
     return entry
-end
-
-local function ConsumableCount(itemID, priority)
-    return BUI.CDM.Custom.AggregateCountPrio(itemID, priority)
 end
 
 local seenScratch = {}
@@ -419,9 +390,8 @@ local function CollectSlot(slot)
     local settings = collectSettings
     local itemID = GetInventoryItemID("player", slot)
     local hideKey = SLOT_KEYS[slot]
-    local hidden, blacklist = settings.hiddenIcons, settings.trinketBlacklist
-    if not itemID or (hidden and hidden[hideKey]) or (blacklist and blacklist[itemID]) then return end
-    if settings.trinketsUsableOnly == true and C_Item.GetItemSpell(itemID) == nil then return end
+    if not itemID or settings.hiddenIcons[hideKey] or settings.trinketBlacklist[itemID] then return end
+    if settings.trinketsUsableOnly and IconEngine.GetItemSpellID(itemID) == nil then return end
     local entry = AcquireEntry()
     entry.id = itemID
     entry.itemID = itemID
@@ -434,39 +404,35 @@ end
 
 local function CollectRacial(spellID)
     local hideKey = RacialKey(spellID)
-    local hidden = collectSettings.hiddenIcons
-    if seenScratch[spellID] or (hidden and hidden[hideKey]) then return end
-    local info = C_Spell.GetSpellInfo(spellID)
-    if not info then return end
+    if seenScratch[spellID] or collectSettings.hiddenIcons[hideKey] then return end
+    local iconID = C_Spell.GetSpellTexture(spellID)
+    if not iconID then return end
     local charges = C_Spell.GetSpellCharges(spellID)
     local entry = AcquireEntry()
     entry.id = spellID
-    entry.icon = info.iconID
+    entry.icon = iconID
     entry.iconType = "spell"
     entry.hiddenKey = hideKey
-    entry.hasCharges = charges ~= nil and (charges.maxCharges or 0) > 1
-    if entry.hasCharges then entry.cnt = C_Spell.GetSpellDisplayCount(spellID) end
+    entry.hasCharges = charges ~= nil and charges.maxCharges > 1
     Collect(entry)
 end
 
 local function CollectCustom(stored)
     local settings = collectSettings
-    local hidden = settings.hiddenIcons
     local entryID, isItem, isExplicitSpell = IconEngine.ExtractSpellItemID(stored)
-    if not entryID or (hidden and hidden[entryID]) then return end
+    if not entryID or settings.hiddenIcons[entryID] then return end
     local iconType, itemID = IconEngine.ClassifyAsSpellOrItem(entryID, isItem, nil, isExplicitSpell)
     if iconType == "spell" then
         if seenScratch[entryID] then return end
         if BUI.CDM.IsRacialSpell(entryID) and not C_SpellBook.IsSpellKnown(entryID) then return end
-        local info = C_Spell.GetSpellInfo(entryID)
-        if not info then return end
+        local iconID = C_Spell.GetSpellTexture(entryID)
+        if not iconID then return end
         local charges = C_Spell.GetSpellCharges(entryID)
         local entry = AcquireEntry()
         entry.id = entryID
-        entry.icon = info.iconID
+        entry.icon = iconID
         entry.iconType = "spell"
-        entry.hasCharges = charges ~= nil and (charges.maxCharges or 0) > 1
-        if entry.hasCharges then entry.cnt = C_Spell.GetSpellDisplayCount(entryID) end
+        entry.hasCharges = charges ~= nil and charges.maxCharges > 1
         Collect(entry)
     elseif iconType == "trinket" then
         local checkID = itemID or entryID
@@ -481,8 +447,8 @@ local function CollectCustom(stored)
         local checkID = itemID or entryID
         if seenScratch[checkID] then return end
         local priority = BUI.CDM.GetPotionPrioFor(stored)
-        local bagCount, bestID = ConsumableCount(checkID, priority)
-        if (bagCount or 0) <= 0 then
+        local bagCount, bestID = AggregateCountPrio(checkID, priority)
+        if bagCount <= 0 then
             if settings.hideWhenZero and settings.hideWhenZero[entryID] then return end
             if settings.hideIfNotInBags and not C_Item.IsEquippedItem(checkID) then return end
         end
@@ -491,7 +457,7 @@ local function CollectCustom(stored)
         entry.itemID = checkID
         entry.icon = C_Item.GetItemIconByID(bestID or checkID) or 134400
         entry.iconType = "consumable"
-        entry.cnt = bagCount or 0
+        entry.cnt = bagCount
         entry.prio = priority
         Collect(entry)
     end
@@ -528,16 +494,13 @@ local positionConfig = {}
 local function PositionBar(bar, settings)
     local frame = bar.frame
 
-    local strata = settings.frameStrata
-    if VALID_STRATA[strata] then frame:SetFrameStrata(strata) end
-    if type(settings.frameLevel) == "number" then
-        frame:SetFrameLevel(math.max(0, math.floor(settings.frameLevel)))
-    end
+    frame:SetFrameStrata(settings.frameStrata)
+    frame:SetFrameLevel(settings.frameLevel)
 
     local anchorPoint = settings.anchorPoint
 
     local extraY = 0
-    local pixelGap = BUI.Pixel.PixelSize(1)
+    local pixelGap = Pixel.PixelSize(1)
     if anchorPoint == "BOTTOM" or anchorPoint == "BOTTOMLEFT" or anchorPoint == "BOTTOMRIGHT" then
         extraY = -pixelGap
     elseif anchorPoint == "TOP" or anchorPoint == "TOPLEFT" or anchorPoint == "TOPRIGHT" then
@@ -555,7 +518,7 @@ local function PositionBar(bar, settings)
     local anchored = frame._isAnchored
     BUI.Dragging.SetLocked(frame, settings.locked)
 
-    if not settings.locked and frame.dragHint then
+    if not settings.locked then
         if anchored then
             frame.dragHint.text:SetText("Anchored | Right-click to Lock")
             frame.dragHint:Show()
@@ -563,15 +526,7 @@ local function PositionBar(bar, settings)
         else
             frame.dragHint.text:SetText("Drag to Reposition | Right-click to Lock")
         end
-        if not frame._hintSizeTimer then
-            frame._hintSizeTimer = true
-            BUI.Profiler.After("CDM.CustomBars hint width", 0, function()
-                frame._hintSizeTimer = nil
-                if frame.dragHint and frame.dragHint:IsShown() then
-                    frame.dragHint:SetWidth(Pixel.Scale(frame.dragHint.text:GetStringWidth() + 16))
-                end
-            end)
-        end
+        frame.dragHint:SetWidth(Pixel.Scale(frame.dragHint.text:GetStringWidth() + 16))
     end
 end
 
@@ -584,7 +539,7 @@ local function UpdateBar(index)
     if bar.frame.dragActive then return end
 
     local settings = GetBar(index)
-    if not settings or not settings.enabled then
+    if not settings.enabled then
         bar.frame:Hide()
         return
     end
@@ -615,7 +570,6 @@ local function UpdateBar(index)
         bar.icons[iconIndex] = icon
 
         if icon.itemID ~= entry.id then
-            icon._trinketSpellID = nil
             icon._lastBestTier = nil
         end
 
@@ -627,30 +581,23 @@ local function UpdateBar(index)
         icon.tex:SetTexture(entry.icon)
 
         if entry.iconType == "spell" then
-            local charges = IconEngine.ApplySpellVisual(icon.tex, icon.cd, entry.id, entry.hasCharges, bar.expiryCb, true)
+            local charges = IconEngine.ApplySpellVisual(icon.tex, icon.cd, entry.id, entry.hasCharges, bar.expiryCb, true, settings.hideGCD)
             if entry.hasCharges and settings.showStackText then
                 icon.stack:SetText(charges ~= nil and C_StringUtil.TruncateWhenZero(charges) or "")
-                icon.stack:Show()
-            elseif settings.showStackText and entry.cnt then
-                icon.stack:SetText(entry.cnt)
                 icon.stack:Show()
             else
                 icon.stack:Hide()
             end
         elseif entry.iconType == "trinket" then
-            if icon._trinketSpellID == nil then
-                local _, spellID = C_Item.GetItemSpell(entry.id)
-                icon._trinketSpellID = spellID or false
-            end
-            IconEngine.ApplyTrinketVisual(icon.tex, icon.cd, entry.id, icon._trinketSpellID or nil, bar.expiryCb, icon.stack)
+            IconEngine.ApplyTrinketVisual(icon.tex, icon.cd, entry.id, IconEngine.GetItemSpellID(entry.id), bar.expiryCb, icon.stack)
         elseif entry.iconType == "consumable" then
-            if settings.showStackText and entry.cnt then
+            if settings.showStackText then
                 icon.stack:SetText(entry.cnt)
                 icon.stack:Show()
             else
                 icon.stack:Hide()
             end
-            IconEngine.ApplyItemVisual(icon.tex, icon.cd, nil, nil, entry.cnt or 0, entry.id, bar.expiryCb)
+            IconEngine.ApplyItemVisual(icon.tex, icon.cd, entry.cnt, entry.id, bar.expiryCb)
         end
         icon.cd:SetHideCountdownNumbers(not settings.showCooldownText)
 
@@ -698,57 +645,31 @@ local function UpdateBar(index)
     end
 end
 
-local cooldownFrameCache = {}
-local cooldownFrameTime = -1
-
-local function GetFrameCachedSpellCooldown(spellID)
-    local now = GetTime()
-    if now ~= cooldownFrameTime then
-        cooldownFrameTime = now
-        wipe(cooldownFrameCache)
-    end
-    local entry = cooldownFrameCache[spellID]
-    if entry == nil then
-        entry = C_Spell.GetSpellCooldown(spellID) or false
-        cooldownFrameCache[spellID] = entry
-    end
-    return entry or nil
-end
-
 RefreshCooldowns = function(index)
     local bar = bars[index]
     if not (bar and bar.frame:IsShown()) then return end
 
-    local settings = GetBar(index)
-    local hideGCD = settings and settings.hideGCD
+    local hideGCD = GetBar(index).hideGCD
     local expiryCallback = bar.expiryCb
     for iconIndex = 1, #bar.icons do
         local icon = bar.icons[iconIndex]
         if icon:IsShown() and icon.itemID then
             if icon.iconType == "spell" then
-                local charges = IconEngine.ApplySpellVisual(icon.tex, icon.cd, icon.itemID, icon.hasCharges, expiryCallback, true)
+                local charges = IconEngine.ApplySpellVisual(icon.tex, icon.cd, icon.itemID, icon.hasCharges, expiryCallback, true, hideGCD)
                 if icon.hasCharges and icon.stack:IsShown() then
                     icon.stack:SetText(charges ~= nil and C_StringUtil.TruncateWhenZero(charges) or "")
                 end
-
-                if hideGCD and not icon.hasCharges then
-                    local cooldownInfo = GetFrameCachedSpellCooldown(icon.itemID)
-                    if cooldownInfo and cooldownInfo.isOnGCD == true then
-                        icon.cd:Clear()
-                    end
-                end
             elseif icon.iconType == "trinket" then
-                IconEngine.ApplyTrinketVisual(icon.tex, icon.cd, icon.itemID, icon._trinketSpellID or nil, expiryCallback, icon.stack)
+                IconEngine.ApplyTrinketVisual(icon.tex, icon.cd, icon.itemID, IconEngine.GetItemSpellID(icon.itemID), expiryCallback, icon.stack)
             elseif icon.iconType == "consumable" then
-                local count, bestID = ConsumableCount(icon.itemID, icon.potionPrio)
-                count = count or 0
+                local count, bestID = AggregateCountPrio(icon.itemID, icon.potionPrio)
                 if bestID and bestID ~= icon._lastBestTier then
                     icon._lastBestTier = bestID
                     local textureID = C_Item.GetItemIconByID(bestID)
                     if textureID then icon.tex:SetTexture(textureID) end
                 end
                 if icon.stack:IsShown() then icon.stack:SetText(count) end
-                IconEngine.ApplyItemVisual(icon.tex, icon.cd, nil, nil, count, icon.itemID, expiryCallback)
+                IconEngine.ApplyItemVisual(icon.tex, icon.cd, count, icon.itemID, expiryCallback)
             end
         end
     end
@@ -785,7 +706,6 @@ local function CreateBar(index)
 end
 
 function CustomBars.RefreshBar(index)
-    InvalidateStyle()
     local settings = GetBar(index)
     if not settings then
         local bar = bars[index]
@@ -808,8 +728,6 @@ function CustomBars.RefreshAllBars()
     for barIndex = 1, maxIndex do
         CustomBars.RefreshBar(barIndex)
     end
-    CustomBars.UpdateOpacity()
-    CustomBars.RefreshHotEventRegistration()
 end
 
 local function RepositionAnchoredBars()
@@ -906,15 +824,6 @@ function CustomBars.DeleteBar(index)
     local settings = GetSettings()
     if index < 1 or index > #settings then return false end
 
-    for barIndex = index, #settings do
-        local bar = bars[barIndex]
-        if bar then
-            bar.frame:Hide()
-            for iconIndex = 1, #bar.icons do bar.icons[iconIndex]:Hide() end
-        end
-        bars[barIndex] = nil
-    end
-
     local stores = GetAllSpellStores()
     local profileName = CurrentProfileName()
     local function ShiftDown(lists)
@@ -940,27 +849,14 @@ function CustomBars.GetBarCount()
 end
 
 
-local cooldownDispatchFrame
-local function FlushCooldownDispatch(self)
-    self:Hide()
+local function FlushCooldownDispatch()
     local settings = GetSettings()
     for barIndex = 1, #settings do
         if settings[barIndex].enabled then RefreshCooldowns(barIndex) end
     end
 end
 
-local function ScheduleCooldownRefresh()
-    if not cooldownDispatchFrame then
-        cooldownDispatchFrame = CreateFrame("Frame", "BUI_CustomBarsFlush")
-        cooldownDispatchFrame:Hide()
-        cooldownDispatchFrame:SetScript("OnUpdate", BUI.Profiler.Wrap("CDM.CustomBars cooldown flush", FlushCooldownDispatch))
-    end
-    cooldownDispatchFrame:Show()
-end
-
-local function OnHotEvent()
-    ScheduleCooldownRefresh()
-end
+local ScheduleCooldownRefresh = BUI.Dispatcher.New(FlushCooldownDispatch, "CustomBars.Cooldowns")
 
 local function HasEnabledBar()
     local settings = GetSettings()
@@ -975,6 +871,10 @@ local OnEvent = BUI.Dispatcher.NewDelayed(function()
     CustomBars.RefreshAllBars()
 end, 0.1, 'Custom bars bag refresh')
 
+local function OnEnteringWorld(_, isInitialLogin, isReloadingUi)
+    if isInitialLogin or isReloadingUi then OnEvent() end
+end
+
 local hotEventsRegistered = false
 
 function CustomBars.RefreshHotEventRegistration()
@@ -982,9 +882,9 @@ function CustomBars.RefreshHotEventRegistration()
     local needed = HasEnabledBar()
     if needed and not hotEventsRegistered then
         hotEventsRegistered = true
-        BUI.Events:Register("SPELL_UPDATE_COOLDOWN", "CustomBars.Hot",     OnHotEvent)
-        BUI.Events:Register("SPELL_UPDATE_CHARGES",  "CustomBars.Charges", OnHotEvent)
-        BUI.Events:Register("BAG_UPDATE_COOLDOWN",   "CustomBars.BagCD",   OnHotEvent)
+        BUI.Events:Register("SPELL_UPDATE_COOLDOWN", "CustomBars.Hot",     ScheduleCooldownRefresh)
+        BUI.Events:Register("SPELL_UPDATE_CHARGES",  "CustomBars.Charges", ScheduleCooldownRefresh)
+        BUI.Events:Register("BAG_UPDATE_COOLDOWN",   "CustomBars.BagCD",   ScheduleCooldownRefresh)
     elseif not needed and hotEventsRegistered then
         hotEventsRegistered = false
         BUI.Events:Unregister("SPELL_UPDATE_COOLDOWN", "CustomBars.Hot")
@@ -994,104 +894,19 @@ function CustomBars.RefreshHotEventRegistration()
 end
 
 function CustomBars.Enable()
-    if eventsRegistered then
-        CustomBars.RefreshAllBars()
-        return
-    end
+    if eventsRegistered then return end
     eventsRegistered = true
 
     BUI.Events:Register("PLAYER_EQUIPMENT_CHANGED", "CustomBars", OnEvent)
     BUI.Events:Register("BAG_UPDATE_DELAYED",       "CustomBars", OnEvent)
     BUI.Events:Register("ITEM_COUNT_CHANGED",       "CustomBars", OnEvent)
-    BUI.Events:Register("PLAYER_ENTERING_WORLD",    "CustomBars", OnEvent)
+    BUI.Events:Register("PLAYER_ENTERING_WORLD",    "CustomBars", OnEnteringWorld)
     CustomBars.RefreshHotEventRegistration()
 
     BUI.Visibility.Register("CustomBars", CustomBars.UpdateOpacity, true)
 
     Pixel.OnScaleChange("CustomBars", CustomBars.RefreshAllBars)
     BUI.Anchor.RegisterCallback("CustomBars", RepositionAnchoredBars)
-
-    CustomBars.RefreshAllBars()
-end
-
-local function RunMigrations(db)
-    if db.trackingBars then
-        if next(db.trackingBars) and not next(db.customBars) then
-            db.customBars = db.trackingBars
-        end
-        db.trackingBars = nil
-    end
-    local global = BUI.db.global
-    if global.charTrackingSpells then
-        if not global.charCustomBarsSpells then
-            global.charCustomBarsSpells = global.charTrackingSpells
-        end
-        global.charTrackingSpells = nil
-    end
-
-    if db.tracking then
-        local hasReal = db.customBars[1] and db.customBars[1].name
-        if not hasReal then
-            local tracking = db.tracking
-            db.customBars = { [1] = {
-                name = "Consumables", enabled = tracking.enabled ~= false,
-                locked = tracking.locked, iconSize = tracking.iconSize, spacing = tracking.spacing,
-                zoom = tracking.zoom or 0.08, borderSize = tracking.borderSize, borderColor = tracking.borderColor,
-                growDirection = tracking.growDirection, growVertical = tracking.growVertical, maxPerRow = tracking.maxPerRow,
-                showTrinkets = tracking.showTrinkets, showStackText = tracking.showStackText, showCooldownText = tracking.showCooldownText,
-                stackTextPosition = tracking.stackTextPosition, stackTextOffsetX = tracking.stackTextOffsetX, stackTextOffsetY = tracking.stackTextOffsetY,
-                cooldownTextPosition = tracking.cooldownTextPosition, cooldownTextOffsetX = tracking.cooldownTextOffsetX, cooldownTextOffsetY = tracking.cooldownTextOffsetY,
-                stackTextSize = tracking.stackTextSize, cooldownTextSize = tracking.cooldownTextSize,
-                posX = tracking.posX, posY = tracking.posY, anchorFrame = tracking.anchorFrame,
-                anchorPoint = tracking.anchorPoint or "BOTTOM", anchorOffsetX = tracking.anchorOffsetX, anchorOffsetY = tracking.anchorOffsetY,
-                customSpells = {},
-            }}
-            if tracking.customItems then
-                local destination = db.customBars[1].customSpells
-                for _, itemID in ipairs(tracking.customItems) do
-                    destination[#destination + 1] = "item:" .. itemID
-                end
-            end
-        end
-        db.tracking = nil
-    end
-
-    for _, bar in ipairs(db.customBars) do
-        if bar.items or bar.spells then
-            bar.customSpells = bar.customSpells or {}
-            local list, seen = bar.customSpells, {}
-            for _, value in ipairs(list) do seen[tostring(value)] = true end
-            for _, itemID in ipairs(bar.items or {}) do
-                local stored = "item:" .. itemID
-                if not seen[stored] then list[#list + 1] = stored; seen[stored] = true end
-            end
-            for _, spellID in ipairs(bar.spells or {}) do
-                if not seen[tostring(spellID)] then list[#list + 1] = spellID; seen[tostring(spellID)] = true end
-            end
-            bar.items, bar.spells, bar.blacklist = nil, nil, nil
-        end
-    end
-
-    for _, bar in ipairs(db.customBars) do
-        if not bar._trinketMigrated and bar.name and bar.name:lower():find('trinket') and not bar.showTrinkets then
-            bar.showTrinkets = true
-            if bar.customSpells then
-                local kept = {}
-                for _, value in ipairs(bar.customSpells) do
-                    local itemID = tonumber(tostring(value):match('^item:(%d+)$'))
-                    if itemID then
-                        local _, _, _, equipSlot = C_Item.GetItemInfoInstant(itemID)
-                        if equipSlot ~= 'INVTYPE_TRINKET' then kept[#kept + 1] = value end
-                    else
-                        kept[#kept + 1] = value
-                    end
-                end
-                bar.customSpells = kept
-            end
-            bar._trinketMigrated = true
-            BUI.Print('Bar "' .. bar.name .. '" now scans trinkets.')
-        end
-    end
 end
 
 local function BindSpellLists(db)
@@ -1123,7 +938,6 @@ end
 
 function CustomBars.Initialize()
     local db = BUI.GetDB()
-    RunMigrations(db)
     BindSpellLists(db)
     for _, bar in ipairs(db.customBars) do ApplyBarDefaults(bar) end
     CustomBars.Enable()

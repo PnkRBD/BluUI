@@ -19,9 +19,9 @@ local poolActiveBuf = {}
 local iconCache = {}
 local iconCacheValid = {}
 
-function CDM.SortByLayoutIndex(left, right)
-    local leftIndex = left.layoutIndex or left:GetID() or 0
-    local rightIndex = right.layoutIndex or right:GetID() or 0
+local function SortByLayoutIndex(left, right)
+    local leftIndex = left.layoutIndex or left:GetID()
+    local rightIndex = right.layoutIndex or right:GetID()
     if leftIndex ~= rightIndex then return leftIndex < rightIndex end
     local leftData = FrameData[left]
     local rightData = FrameData[right]
@@ -29,6 +29,7 @@ function CDM.SortByLayoutIndex(left, right)
 end
 
 local orderLookup = {}
+local deferredIconUpdate = false
 
 local function SortByUserOrder(left, right)
     local idA = CDM.GetSortKey(left)
@@ -36,7 +37,7 @@ local function SortByUserOrder(left, right)
     local posA = idA and orderLookup[idA] or 99999
     local posB = idB and orderLookup[idB] or 99999
     if posA ~= posB then return posA < posB end
-    return CDM.SortByLayoutIndex(left, right)
+    return SortByLayoutIndex(left, right)
 end
 
 local function CollectCustomIcons(viewerKey, outIcons)
@@ -52,12 +53,11 @@ local function CollectCustomIcons(viewerKey, outIcons)
                 local frameData = FrameData[icon]
 
                 local spellID = frameData and frameData.customSpellID
-                if spellID and not CDM._deferredIconUpdate then
-                    local aura = C_UnitAuras.GetPlayerAuraBySpellID(spellID)
-                    if aura then
-                        CDM._deferredIconUpdate = true
+                if spellID and not deferredIconUpdate then
+                    if (BUI.Tools.GetAuraStacks('player', spellID) or 0) > 0 then
+                        deferredIconUpdate = true
                         BUI.Profiler.After("CDM.Layout deferred icons", 0, function()
-                            CDM._deferredIconUpdate = nil
+                            deferredIconUpdate = false
                             local list, count = Custom.GetIcons("buffs")
                             if not list then return end
                             for hiddenIndex = 1, count do
@@ -78,7 +78,7 @@ local function ApplyUserOrder(viewerKey, icons)
     local savedOrder = CDM.GetIconOrder(config)
 
     if not savedOrder or #savedOrder == 0 then
-        sort(icons, CDM.SortByLayoutIndex)
+        sort(icons, SortByLayoutIndex)
         return
     end
 
@@ -94,14 +94,13 @@ local function BuildViewerIcons(viewerKey)
     wipe(iconBuffer)
 
     local viewer = _G[CDM.VIEWERS[viewerKey]]
-    if not viewer then return iconBuffer end
 
     CollectCustomIcons(viewerKey, iconBuffer)
 
     local isBuff = viewerKey == "buffs"
 
     local poolActive
-    if not isBuff and viewer.itemFramePool and viewer.itemFramePool.EnumerateActive then
+    if not isBuff then
         wipe(poolActiveBuf)
         for frame in viewer.itemFramePool:EnumerateActive() do
             poolActiveBuf[frame] = true
@@ -164,10 +163,9 @@ local function PlaceIcon(icon, key, anchor, left, top, settings, opacity)
     end
     local scaledWidth = anchor._cachedScaledW
     local scaledHeight = anchor._cachedScaledH
-    local visibilityAlpha = anchor._iconAlpha or 1
 
-    local anchorWidth = anchor._layoutW or scaledWidth
-    local anchorHeight = anchor._layoutH or scaledHeight
+    local anchorWidth = anchor._layoutW
+    local anchorHeight = anchor._layoutH
 
     if not frameData.parked and frameData.anchor == anchor and frameData.posCornerX == left and frameData.posCornerY == -top
        and frameData.sizeW == scaledWidth and frameData.sizeH == scaledHeight
@@ -177,7 +175,7 @@ local function PlaceIcon(icon, key, anchor, left, top, settings, opacity)
         end
         if not frameData.hidden then
             frameData.parked = nil
-            ApplyIconAlpha(icon, frameData, (opacity / 100) * visibilityAlpha)
+            ApplyIconAlpha(icon, frameData, opacity / 100)
         end
         return
     end
@@ -187,8 +185,6 @@ local function PlaceIcon(icon, key, anchor, left, top, settings, opacity)
     end
 
     frameData.anchor = anchor
-    frameData.posX = nil
-    frameData.posY = nil
     frameData.sizeW = scaledWidth
     frameData.sizeH = scaledHeight
     frameData.anchorW = anchorWidth
@@ -208,19 +204,19 @@ local function PlaceIcon(icon, key, anchor, left, top, settings, opacity)
     local wasParked = frameData.parked
     frameData.parked = nil
     frameData.hiddenParked = nil
-    icon:SetAlpha((opacity / 100) * visibilityAlpha)
+    icon:SetAlpha(opacity / 100)
     frameData.locking = false
     if wasParked then CDM.ResumeProcGlow(icon, frameData) end
 end
 
 local function HideWhenZeroCount(frameData, spellID)
     if frameData and frameData.itemID and frameData.iconType ~= 'trinket' then
-        return C_Item.GetItemCount(frameData.itemID) or 0
+        return C_Item.GetItemCount(frameData.itemID)
     end
     if spellID then
         local charges = C_Spell.GetSpellCharges(spellID)
-        if charges and (charges.maxCharges or 0) > 0 then
-            return charges.currentCharges or 0
+        if charges and charges.maxCharges > 0 then
+            return BUI.Tools.SafeNum(charges.currentCharges)
         end
     end
     return nil
@@ -315,14 +311,13 @@ end
 function CDM.HideWhenZeroChanged(key)
     local settings = BUI.GetDB().cdm[key]
     if not settings.enabled then return false end
-    local viewer = _G[CDM.VIEWERS[key]]
-    if not viewer or not viewer:IsShown() then return false end
+    if not _G[CDM.VIEWERS[key]]:IsShown() then return false end
 
     local hideWhenZero = CDM.GetHideWhenZero(settings)
     local hiddenSlots = settings.hiddenSlots
     local allIcons = CDM.GetViewerIcons(key)
     for iconIndex = 1, #allIcons do
-        if not (hiddenSlots and hiddenSlots[iconIndex]) then
+        if not hiddenSlots[iconIndex] then
             local icon = allIcons[iconIndex]
             local iconFrameData, baseID, overrideID, storedValue, customID = ResolveIconIDs(icon, FrameData[icon])
             local hideZeroKey = IconEntryKey(iconFrameData, baseID, overrideID, storedValue)
@@ -340,20 +335,18 @@ function CDM.ApplyIconPositions(key)
     local anchor = Anchors[key]
     if not anchor then return end
 
-    local viewerName = CDM.VIEWERS[key]
-    local viewer = viewerName and _G[viewerName]
-    if not viewer then return end
+    local viewer = _G[CDM.VIEWERS[key]]
 
     local db = BUI.GetDB()
     local settings = db.cdm[key]
-    if not settings or not settings.enabled then return end
+    if not settings.enabled then return end
 
     local iconWidth = settings.iconWidth
     local iconHeight = settings.iconHeight
     local spacing = settings.spacing
-    anchor._cachedScaledW = settings._pxW or (Pixel.Scale(iconWidth))
-    anchor._cachedScaledH = settings._pxH or (Pixel.Scale(iconHeight))
-    anchor._cachedScaledSpacing = settings._pxGap or Pixel.Scale(spacing)
+    anchor._cachedScaledW = Pixel.Scale(iconWidth)
+    anchor._cachedScaledH = Pixel.Scale(iconHeight)
+    anchor._cachedScaledSpacing = Pixel.Scale(spacing)
 
     if not viewer:IsShown() then
         anchor:Hide()
@@ -361,9 +354,8 @@ function CDM.ApplyIconPositions(key)
     end
 
     local allIcons = CDM.GetViewerIcons(key)
-    if not allIcons then return end
 
-    local opacity = CDM.GetContextualOpacity(key)
+    local opacity = CDM.GetContextualOpacity()
 
     local perRow = settings.iconsPerRow
     local vertical = settings.vertical
@@ -402,7 +394,7 @@ function CDM.ApplyIconPositions(key)
         local shouldHide = false
         local iconFrameData = FrameData[icon]
 
-        if hiddenSlots and hiddenSlots[iconIndex] then
+        if hiddenSlots[iconIndex] then
             shouldHide = true
         end
 
@@ -462,8 +454,6 @@ function CDM.ApplyIconPositions(key)
                 and iconFrameData.anchor == anchor
                 and iconFrameData.hiddenSkinVer == CDM.state.skinVersion) then
                 iconFrameData.anchor = anchor
-                iconFrameData.posX = nil
-                iconFrameData.posY = nil
                 iconFrameData.selfPoint = "TOPLEFT"
                 iconFrameData.relPoint = "TOPLEFT"
                 iconFrameData.posCornerX = 0
@@ -508,7 +498,7 @@ function CDM.ApplyIconPositions(key)
         if spellID and CDM.IsIconDetached(settings, spellID) then
             Detached.PlaceIcon(icon, key, iconWidth, iconHeight, settings)
         else
-            Detached.HookIcon(icon, key)
+            Detached.HookIcon(icon)
             gridCount = gridCount + 1
             layoutBuffer[gridCount] = icon
         end
@@ -566,8 +556,7 @@ function CDM.ApplyIconPositions(key)
         if not anchor._opacityHidden then anchor:Show() end
 
         if key == "buffs" then
-            local visibilityAlpha = anchor._iconAlpha or 1
-            local alpha = (opacity / 100) * visibilityAlpha
+            local alpha = opacity / 100
             for iconIndex = 1, count do
                 local icon = icons[iconIndex]
                 local iconFrameData = FitBuffIcon(icon, key, anchor, settings, scaledWidth, scaledHeight)
@@ -742,18 +731,14 @@ function CDM.NotifyDependents()
         end
     end
 
-    if CDM.state.initComplete and (anySize or anyOffset or anyPos) then
-        CDM.NotifyAnchoredFrames()
-    end
-
     if anySize or anyOffset or anyPos then
+        if CDM.state.initComplete then CDM.NotifyAnchoredFrames() end
         BUI.Anchor.OnAnchorSizeChanged()
     end
 end
 
 function CDM.RefreshLayoutOnly()
     CDM.InvalidateIconCache()
-    CDM.UpdateAllPixelValues()
     CDM.LayoutAllViewers()
     CDM.NotifyDependents()
     if CDM.state.initComplete then

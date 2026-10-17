@@ -11,7 +11,6 @@ local Widget = LibStub("BUILib").Widget
 local LibEMO = LibStub("LibEditModeOverride-1.0")
 CDM.Anchors = {}
 local Anchors = CDM.Anchors
-local anchorPlacements = {}
 
 local ANCHOR_NAMES = {
     essential = "BUI_EssentialCooldownViewer",
@@ -20,8 +19,8 @@ local ANCHOR_NAMES = {
 }
 
 local function PlaceContainerTopLeft(frame, x, y)
-    local width = frame._layoutW or frame:GetWidth() or 0
-    local height = frame._layoutH or frame:GetHeight() or 0
+    local width = frame._layoutW
+    local height = frame._layoutH
     local parentCenterX, parentCenterY = UIParent:GetCenter()
     local pixel = Pixel.PixelSize(1)
     local placed = frame._placedTopLeft
@@ -55,9 +54,7 @@ function CDM.CreateAnchor(key)
     local frameName = ANCHOR_NAMES[key]
     if not frameName then return end
 
-    local db = BUI.GetDB()
-    local settings = db.cdm[key]
-    if not settings then return end
+    local settings = BUI.GetDB().cdm[key]
 
     local frame = CreateFrame("Frame", frameName, UIParent)
 
@@ -80,13 +77,8 @@ function CDM.CreateAnchor(key)
     frame._cachedScaledSpacing = scaledSpacing
 
     local resolved
-    if settings.anchorFrame and settings.anchorFrame ~= "" then
-        resolved = BUI.Anchor.ApplyPosition(frame, {
-            anchorFrame = settings.anchorFrame,
-            anchorPoint = settings.anchorPoint,
-            anchorOffsetX = settings.anchorOffsetX,
-            anchorOffsetY = settings.anchorOffsetY,
-        })
+    if settings.anchorFrame ~= "" then
+        resolved = BUI.Anchor.ApplyPosition(frame, settings)
     end
     if not resolved then
         local x = settings.centerHorizontally and 0 or settings.positionX
@@ -107,27 +99,16 @@ function CDM.ApplyAnchorPosition(key)
     local anchor = Anchors[key]
     if not anchor then return end
 
-    local db = BUI.GetDB()
-    local settings = db.cdm[key]
-    if not settings then return end
+    local settings = BUI.GetDB().cdm[key]
 
-    if settings.anchorFrame and settings.anchorFrame ~= "" then
+    if settings.anchorFrame ~= "" then
         local target = BUI.ResolveAnchorFrame(settings.anchorFrame, settings.anchorPoint)
         if not target and anchor._everAnchored then
             return
         end
         if target then
-            local placement = anchorPlacements[key]
-            if not placement then
-                placement = {}
-                anchorPlacements[key] = placement
-            end
-            placement.anchorFrame = settings.anchorFrame
-            placement.anchorPoint = settings.anchorPoint
-            placement.anchorOffsetX = settings.anchorOffsetX
-            placement.anchorOffsetY = settings.anchorOffsetY
             anchor._placedTopLeft = nil
-            BUI.Anchor.ApplyPosition(anchor, placement)
+            BUI.Anchor.ApplyPosition(anchor, settings)
             anchor._everAnchored = true
             return
         end
@@ -147,19 +128,13 @@ local function StoredAnchorMatches(viewer, x, y)
     local anchor = systemInfo and not systemInfo.isInDefaultPosition and systemInfo.anchorInfo
     if not anchor then return false end
     return anchor.point == "CENTER" and anchor.relativeTo == "UIParent" and anchor.relativePoint == "CENTER"
-        and math.abs((anchor.offsetX or 0) - x) < ANCHOR_EPSILON
-        and math.abs((anchor.offsetY or 0) - (y or 0)) < ANCHOR_EPSILON
+        and math.abs(anchor.offsetX - x) < ANCHOR_EPSILON
+        and math.abs(anchor.offsetY - y) < ANCHOR_EPSILON
 end
 
 local function ReanchorViewer(key)
-    local viewerName = CDM.VIEWERS[key]
-    local viewer = viewerName and _G[viewerName]
-    if not viewer then return false end
-
-    local db = BUI.GetDB()
-    local settings = db.cdm[key]
-    if not settings then return false end
-
+    local viewer = _G[CDM.VIEWERS[key]]
+    local settings = BUI.GetDB().cdm[key]
     local x = settings.centerHorizontally and 0 or settings.positionX
     local y = settings.positionY
     if lastSavedX[key] == x and lastSavedY[key] == y then return false end
@@ -195,10 +170,7 @@ function CDM.ApplyAllPositions()
 end
 
 function CDM.OnCenterHorizontallyChanged(key, enabled)
-    local db = BUI.GetDB()
-    local settings = db.cdm[key]
-    if not settings then return end
-
+    local settings = BUI.GetDB().cdm[key]
     settings.centerHorizontally = enabled
 
     if enabled then

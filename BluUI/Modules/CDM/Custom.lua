@@ -7,12 +7,12 @@ local _G = _G
 local wipe = wipe
 local type, ipairs, pairs, tonumber = type, ipairs, pairs, tonumber
 local next = next
+local GetTime = GetTime
 
 local CreateFrame = CreateFrame
 local C_Spell = C_Spell
 local C_Container = C_Container
 local C_Item = C_Item
-local GetItemSpell = C_Item.GetItemSpell
 local IsSpellKnown = C_SpellBook.IsSpellKnown
 local IsEquippedItem = C_Item.IsEquippedItem
 
@@ -26,6 +26,7 @@ local Pixel = BUI.Pixel
 local Tools = BUI.Tools
 local GlowManager = BUI.GlowManager
 local SetColor = BUI.IconEngine.SetColor
+local GetItemSpellID = BUI.IconEngine.GetItemSpellID
 
 local function SafeGetPlayerAura(spellID)
 	if not spellID then return nil, false end
@@ -54,12 +55,11 @@ local function UpdateWarningText()
 		warningLastBucket = nil
 		return
 	end
-	local threshold = warningShowDecimals and (warningThreshold or 5) or 0
+	local threshold = warningShowDecimals and warningThreshold or 0
 	local bucket = BUI.TimeFormat.Bucket(remaining, threshold)
 	if bucket == warningLastBucket then return end
 	warningLastBucket = bucket
-	local display = warningTemplate or "BUFF EXPIRING!"
-	display = display:gsub("%[time%]", BUI.TimeFormat.Format(remaining, threshold))
+	local display = warningTemplate:gsub("%[time%]", BUI.TimeFormat.Format(remaining, threshold))
 	if warningSpellName then
 		display = display:gsub("%[name%]", warningSpellName)
 	end
@@ -94,7 +94,7 @@ local function ShowBuffWarning(icon, text, color, remaining, spellName, font, de
 	if not warningExpiry and remaining then
 		warningExpiry = GetTime() + remaining
 	end
-	if decimalThreshold then warningThreshold = decimalThreshold end
+	warningThreshold = decimalThreshold
 	warningShowDecimals = BUI.GetDB().cdm.buffs.showCooldownDecimals
 	warningFont, warningColor = font, color
 	if font then
@@ -165,11 +165,6 @@ local iconRegistry = {
 local consideredKeys = {}
 local placedKeys = {}
 
-local function CopyColor(source)
-    if not source then return { 0, 0, 0, 1 } end
-    return { source[1] or 0, source[2] or 0, source[3] or 0, source[4] or 1 }
-end
-
 local pool = {}
 local poolCount = 0
 
@@ -234,7 +229,9 @@ local function UnwatchIcon(icon)
     end
     UnmapBuffSpell(id, icon)
     UnmapBuffSpell(frameData.trackedBuff, icon)
-    UnmapBuffSpell(frameData._auraSpellID, icon)
+    if frameData.isItemByPrefix or frameData.iconType == "consumable" or frameData.iconType == "trinket" then
+        UnmapBuffSpell(GetItemSpellID(frameData.itemID or id), icon)
+    end
     UnmapBuffSpell(frameData._auraOverrideID, icon)
     frameData._auraOverrideID = nil
     if frameData._auraInstanceID then
@@ -246,7 +243,7 @@ end
 local function WatchBuffOverride(icon, frameData, overrideID)
     local previous = frameData._auraOverrideID
     if previous == overrideID then return end
-    if previous and previous ~= frameData.trackedBuff and previous ~= frameData._auraSpellID then
+    if previous and previous ~= frameData.trackedBuff then
         UnmapBuffSpell(previous, icon)
     end
     frameData._auraOverrideID = overrideID
@@ -266,18 +263,15 @@ local function AcquireIcon(parent, borderSize, borderColor, zoom)
 end
 
 local function ResetManualBuffOverlay(icon, frameData)
-    if not frameData then return end
     if frameData._manualGlowTimer then
         frameData._manualGlowTimer:Cancel()
         frameData._manualGlowTimer = nil
     end
     frameData._manualGlowActive = nil
-    local cooldown = icon and icon.Cooldown
-    if cooldown then cooldown:SetScript("OnCooldownDone", BUI.Profiler.Script('CDM.Custom cooldown OnCooldownDone', CDM.OnCooldownWidgetDone)) end
+    icon.Cooldown:SetScript("OnCooldownDone", CDM.OnCooldownWidgetDone)
 end
 
 local function ReleaseIcon(icon)
-    if not icon then return end
     CDM.StopProcGlow(icon)
     UnwatchIcon(icon)
     local frameData = FrameData[icon]
@@ -286,52 +280,41 @@ local function ReleaseIcon(icon)
     icon:ClearAllPoints()
     icon:SetParent(nil)
 
-    if frameData then
-        GlowManager.ResetIconState(frameData)
+    GlowManager.ResetIconState(frameData)
 
-        frameData.skinVer = nil
-        frameData.customIcon = nil
-        frameData.customSpellID = nil
-        frameData.customKey = nil
-        frameData.storedValue = nil
-        frameData.isItemByPrefix = nil
-        frameData.trinketSlot = nil
-        frameData.racialSlot = nil
-        frameData.iconType = nil
-        frameData.itemID = nil
-        frameData.trackedBuff = nil
-        frameData.tracked = nil
-        frameData.trackIndex = nil
-        frameData.anchor = nil
-        frameData.posX = nil
-        frameData.posY = nil
-        frameData.sizeW = nil
-        frameData.sizeH = nil
-        frameData.hidden = nil
-        frameData.glowActive = nil
-        frameData.glowType = nil
-        frameData.lastCDStart = nil
-        frameData._cdFingerStart = nil
-        frameData._cdFingerDuration = nil
-        frameData._trinketDurObj = nil
-        frameData._auraExpiry = nil
-        frameData._auraDuration = nil
-        frameData.lastCount = nil
-        frameData.lastBestTier = nil
-        frameData._manualBuff = nil
-        frameData._manualStart = nil
-        frameData._manualGlowActive = nil
-        frameData._auraSpellID = nil
-        frameData._origTexture = nil
-        frameData.hasCharges = nil
-        frameData.countFont = nil
-        frameData.countFontNil = nil
-    end
-    icon.cooldownInfo = nil
-    if icon.Icon then
-        icon.Icon:SetVertexColor(1, 1, 1)
-        icon.Icon:SetDesaturation(0)
-    end
+    frameData.skinVer = nil
+    frameData.customIcon = nil
+    frameData.customSpellID = nil
+    frameData.customKey = nil
+    frameData.storedValue = nil
+    frameData.isItemByPrefix = nil
+    frameData.trinketSlot = nil
+    frameData.racialSlot = nil
+    frameData.iconType = nil
+    frameData.itemID = nil
+    frameData.trackedBuff = nil
+    frameData.anchor = nil
+    frameData.sizeW = nil
+    frameData.sizeH = nil
+    frameData.hidden = nil
+    frameData.glowActive = nil
+    frameData.glowType = nil
+    frameData.lastCDStart = nil
+    frameData._cdFingerStart = nil
+    frameData._cdFingerDuration = nil
+    frameData._auraExpiry = nil
+    frameData._auraDuration = nil
+    frameData.lastCount = nil
+    frameData.lastBestTier = nil
+    frameData._manualBuff = nil
+    frameData._manualStart = nil
+    frameData._manualGlowActive = nil
+    frameData._origTexture = nil
+    frameData.hasCharges = nil
+    frameData.countFont = nil
+    frameData.countFontNil = nil
+    icon.Icon:SetVertexColor(1, 1, 1)
+    icon.Icon:SetDesaturation(0)
     icon.Count = nil
     if icon._chargeText then
         icon._chargeText:SetText("")
@@ -342,39 +325,56 @@ local function ReleaseIcon(icon)
 end
 
 local function ParkIcon(icon)
-    if not icon then return end
     CDM.StopProcGlow(icon)
     UnwatchIcon(icon)
     icon:Hide()
     icon:ClearAllPoints()
     local frameData = FrameData[icon]
-    if frameData then
-        frameData.parked = true
-        frameData.hidden = nil
-        frameData.hiddenParked = nil
-    end
+    frameData.parked = true
+    frameData.hidden = nil
+    frameData.hiddenParked = nil
 end
-
-local GetTime = GetTime
 
 local spellToItemID = {}
 local spellToItemCount = {}
 local cacheValid = false
 local bagItemCounts = {}
-local itemUseSpell = {}
 
 local familyData = {}
 local familyKeyMemo = {}
 local familyMembersCache = {}
 local pendingItems = {}
-local itemLoadFrame
+local itemLoadRegistered = false
+local ScheduleBagRescan
+
+local RefreshBarsAfterItemLoad = BUI.Dispatcher.NewDelayed(function()
+    BUI.CustomBars.RefreshAllBars()
+end, 0.1, 'CDM.Custom item load')
+
+local function OnItemDataLoaded(_, itemID, success)
+    if not pendingItems[itemID] then return end
+    pendingItems[itemID] = nil
+    if not success then return end
+    ScheduleBagRescan()
+    RefreshBarsAfterItemLoad()
+end
+
+local function RequestItemData(id)
+    if pendingItems[id] then return end
+    pendingItems[id] = true
+    C_Item.RequestLoadItemDataByID(id)
+    if itemLoadRegistered then return end
+    itemLoadRegistered = true
+    BUI.Events:Register('ITEM_DATA_LOAD_RESULT', 'CDM.Custom.ItemLoad', OnItemDataLoaded)
+end
+
 local function GetFamilyKey(id)
     local memo = familyKeyMemo[id]
     if memo ~= nil then return memo or nil end
     local _, _, _, _, _, itemClass, itemSubclass = C_Item.GetItemInfoInstant(id)
     if itemClass ~= Enum.ItemClass.Consumable
     or (itemSubclass ~= Enum.ItemConsumableSubclass.Potion
-    and itemSubclass ~= Enum.ItemConsumableSubclass.Flask) then
+    and itemSubclass ~= Enum.ItemConsumableSubclass.Flasksphials) then
         familyKeyMemo[id] = false
         return nil
     end
@@ -384,33 +384,13 @@ local function GetFamilyKey(id)
         familyKeyMemo[id] = key
         return key
     end
-    C_Item.RequestLoadItemDataByID(id)
-    pendingItems[id] = true
-    if not itemLoadFrame then
-        itemLoadFrame = true
-        BUI.Events:Register('ITEM_DATA_LOAD_RESULT', 'CDM.Custom.ItemLoad', function(event, itemID, success)
-            if pendingItems[itemID] then
-                pendingItems[itemID] = nil
-                if success then
-                    cacheValid = false
-                    CDM.Custom.Refresh()
-                    BUI.CustomBars.RefreshAllBars()
-                end
-            end
-        end)
-    end
+    RequestItemData(id)
 end
 
 local function ItemUseSpell(id)
-    local spellID = itemUseSpell[id]
-    if spellID ~= nil then return spellID end
-    local _, found = GetItemSpell(id)
-    if found then
-        itemUseSpell[id] = found
-    elseif C_Item.IsItemDataCachedByID(id) then
-        itemUseSpell[id] = false
-    end
-    return found
+    local spellID, settled = GetItemSpellID(id)
+    if not settled then RequestItemData(id) end
+    return spellID
 end
 
 local function RebuildBagCache()
@@ -467,8 +447,12 @@ local function AggregateCount(id)
     return C_Item.GetItemCount(id, true, true), id, nil
 end
 
-local function ItemQuality(id)
-    return (BUI.Lookup.CraftedQuality(id))
+local function FamilyRoot(baseKey)
+    local root = baseKey
+    for key in pairs(familyData) do
+        if key ~= root and #key < #root and root:find(key, 1, true) then root = key end
+    end
+    return root
 end
 
 local function FamilyMembersFor(baseKey)
@@ -476,10 +460,7 @@ local function FamilyMembersFor(baseKey)
     if members ~= nil then
         return members or nil
     end
-    local root = baseKey
-    for key in pairs(familyData) do
-        if key ~= root and #key < #root and root:find(key, 1, true) then root = key end
-    end
+    local root = FamilyRoot(baseKey)
     members = false
     for key, family in pairs(familyData) do
         if key == root or key:find(root, 1, true) then
@@ -567,17 +548,14 @@ local function GetPotionVersions(itemID)
         if seen[id] then return end
         seen[id] = true
         keyByID[id] = key
-        versions[#versions + 1] = { id = id, count = bagItemCounts[id] or 0, quality = ItemQuality(id) }
+        versions[#versions + 1] = { id = id, count = bagItemCounts[id] or 0, quality = BUI.Lookup.CraftedQuality(id) }
     end
 
     local baseKey = GetFamilyKey(itemID)
     if not baseKey then
         pending = { itemID }
     else
-        local root = baseKey
-        for key in pairs(familyData) do
-            if key ~= root and #key < #root and root:find(key, 1, true) then root = key end
-        end
+        local root = FamilyRoot(baseKey)
         for key, family in pairs(familyData) do
             if key == root or key:find(root, 1, true) then
                 for memberID in pairs(family.breakdown) do
@@ -616,7 +594,7 @@ local function GetPotionVersions(itemID)
                 if probeID > 0 and not seen[probeID] then
                     local _, _, _, _, _, classID, subclassID = C_Item.GetItemInfoInstant(probeID)
                     if classID == Enum.ItemClass.Consumable
-                    and (subclassID == Enum.ItemConsumableSubclass.Potion or subclassID == Enum.ItemConsumableSubclass.Flask) then
+                    and (subclassID == Enum.ItemConsumableSubclass.Potion or subclassID == Enum.ItemConsumableSubclass.Flasksphials) then
                         local probeKey = GetFamilyKey(probeID)
                         if not probeKey then
                             pending = pending or {}
@@ -699,21 +677,17 @@ end
 local function CreateIconFrame(parent, borderSize, borderColor, zoom)
     local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     frame:SetSize(Pixel.Scale(50), Pixel.Scale(50))
-    frame._edgeThickness = borderSize or 1
-    frame._baseColor = CopyColor(borderColor)
-    frame._zoom = zoom or 0.08
 
     local texture = frame:CreateTexture(nil, "ARTWORK")
-    local scaledEdge = Pixel.Scale(frame._edgeThickness)
+    local scaledEdge = Pixel.Scale(borderSize)
     texture:SetPoint("TOPLEFT", frame, "TOPLEFT", scaledEdge, -scaledEdge)
     texture:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -scaledEdge, scaledEdge)
     texture:SetSnapToPixelGrid(false)
     texture:SetTexelSnappingBias(0)
-    texture:SetTexCoord(frame._zoom, 1 - frame._zoom, frame._zoom, 1 - frame._zoom)
+    texture:SetTexCoord(zoom, 1 - zoom, zoom, 1 - zoom)
     frame.Icon = texture
 
-    local color = frame._baseColor
-    Pixel.ApplyBorder(frame, frame._edgeThickness, color[1], color[2], color[3], color[4])
+    Pixel.ApplyBorder(frame, borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
 
     local cooldown = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
 
@@ -725,25 +699,17 @@ local function CreateIconFrame(parent, borderSize, borderColor, zoom)
     cooldown:SetDrawBling(false)
     cooldown:SetDrawSwipe(true)
     cooldown:SetHideCountdownNumbers(true)
-    cooldown:SetScript("OnCooldownDone", BUI.Profiler.Script('CDM.Custom cooldown OnCooldownDone 2', CDM.OnCooldownWidgetDone))
+    cooldown:SetScript("OnCooldownDone", CDM.OnCooldownWidgetDone)
     frame.Cooldown = cooldown
 
     function frame:Update(newBorderSize, newBorderColor, newZoom)
-        if newBorderSize then self._edgeThickness = newBorderSize end
-        if newBorderColor then
-            local baseColor = self._baseColor
-            baseColor[1], baseColor[2], baseColor[3], baseColor[4] = newBorderColor[1] or 0, newBorderColor[2] or 0, newBorderColor[3] or 0, newBorderColor[4] or 1
-        end
-        if newZoom then self._zoom = newZoom end
+        Pixel.ApplyBorder(self, newBorderSize, newBorderColor[1], newBorderColor[2], newBorderColor[3], newBorderColor[4])
 
-        local baseColor = self._baseColor
-        Pixel.ApplyBorder(self, self._edgeThickness, baseColor[1], baseColor[2], baseColor[3], baseColor[4])
-
-        local edge = Pixel.Scale(self._edgeThickness)
+        local edge = Pixel.Scale(newBorderSize)
         self.Icon:ClearAllPoints()
         self.Icon:SetPoint("TOPLEFT", self, "TOPLEFT", edge, -edge)
         self.Icon:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -edge, edge)
-        self.Icon:SetTexCoord(self._zoom, 1 - self._zoom, self._zoom, 1 - self._zoom)
+        self.Icon:SetTexCoord(newZoom, 1 - newZoom, newZoom, 1 - newZoom)
         local cdEdge = edge - Pixel.PixelSize(1)
         if cdEdge < 0 then cdEdge = 0 end
         self.Cooldown:ClearAllPoints()
@@ -759,8 +725,7 @@ local function CreateIconFrame(parent, borderSize, borderColor, zoom)
     tooltipOverlay:SetScript("OnEnter", BUI.Profiler.Script('CDM.Custom tooltipOverlay OnEnter', function()
         local frameData = FrameData[frame]
         if not frameData or frameData.hidden then return end
-        local db = BUI.GetDB()
-        if db.cdm.showTooltips == false then return end
+        if not BUI.GetDB().cdm.showTooltips then return end
         GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
         local spellID = frameData.customSpellID
         if frameData.isItemByPrefix then
@@ -832,23 +797,21 @@ local function ScheduleManualBuffGlow(icon, frameData, glowConfig, expiry)
             ManualBuffActivateGlow(icon, frameData, glowConfig, remaining)
         else
             ManualBuffDeactivateGlow(icon, frameData)
-            frameData._manualGlowTimer = BUI.Profiler.NewTimer("CDM.Custom manual glow on", timeUntilThreshold, function()
-                frameData._manualGlowTimer = nil
+            Tools.ReplaceTimer(frameData, '_manualGlowTimer', "CDM.Custom manual glow on", timeUntilThreshold, function()
                 ManualBuffActivateGlow(icon, frameData, glowConfig, thresh)
             end)
         end
     elseif mode == 'above' then
         ManualBuffActivateGlow(icon, frameData, glowConfig, remaining)
         if timeUntilThreshold > 0 then
-            frameData._manualGlowTimer = BUI.Profiler.NewTimer("CDM.Custom manual glow off", timeUntilThreshold, function()
-                frameData._manualGlowTimer = nil
+            Tools.ReplaceTimer(frameData, '_manualGlowTimer', "CDM.Custom manual glow off", timeUntilThreshold, function()
                 ManualBuffDeactivateGlow(icon, frameData)
             end)
         end
     end
 end
 
-CleanupManualBuff = function(icon, frameData, caller)
+CleanupManualBuff = function(icon, frameData)
     local wasShown = icon:IsShown()
     if not wasShown and frameData.lastCDStart == 0 and not frameData._manualStart and not frameData._manualGlowActive
         and not frameData._manualGlowTimer and not frameData._glowTimer and not frameData.glowActive and warningOwner ~= icon then
@@ -858,10 +821,8 @@ CleanupManualBuff = function(icon, frameData, caller)
     frameData._manualStart = nil
     frameData._manualGlowActive = nil
     local cooldown = icon.Cooldown
-    if cooldown then
-        cooldown:SetScript("OnCooldownDone", BUI.Profiler.Script('CDM.Custom cooldown OnCooldownDone 3', CDM.OnCooldownWidgetDone))
-        cooldown:Clear()
-    end
+    cooldown:SetScript("OnCooldownDone", CDM.OnCooldownWidgetDone)
+    cooldown:Clear()
     GlowManager.CancelDeferred(frameData)
     CDM.StopProcGlow(icon)
     HideBuffWarning(icon)
@@ -872,7 +833,7 @@ end
 
 local function UpdateIcon(icon)
     local frameData = FrameData[icon]
-    if not frameData or not frameData.customSpellID then return end
+    if not frameData.customSpellID then return end
     local refresh = frameData._refreshClosure
     if not refresh then
         refresh = function() UpdateIcon(icon) end
@@ -901,10 +862,11 @@ local function UpdateIcon(icon)
         end
     end
 
-    if frameData.trackedBuff and icon._chargeText then
-        local aura = GetPlayerAuraBySpellID(frameData.trackedBuff)
+    local trackedAura, trackedBlocked
+    if frameData.trackedBuff then
+        trackedAura, trackedBlocked = SafeGetPlayerAura(frameData.trackedBuff)
         if frameData.viewerKey ~= "buffs" then
-            local newInstanceID = aura and Tools.SafeNum(aura.auraInstanceID)
+            local newInstanceID = trackedAura and Tools.SafeNum(trackedAura.auraInstanceID)
             if newInstanceID ~= frameData._auraInstanceID then
                 if frameData._auraInstanceID then
                     buffInstanceToIcon[frameData._auraInstanceID] = nil
@@ -913,12 +875,12 @@ local function UpdateIcon(icon)
                 if newInstanceID then buffInstanceToIcon[newInstanceID] = icon end
             end
         end
-        local text = aura and Tools.CountText(aura.applications)
+        local text = trackedAura and Tools.CountText(trackedAura.applications)
         if text then
             icon._chargeText:SetText(text)
             icon._chargeText:Show()
-        elseif aura then
-            local stacks = Tools.SafeNum(aura.applications) or 0
+        elseif trackedAura then
+            local stacks = Tools.SafeNum(trackedAura.applications) or 0
             if stacks > 0 then icon._chargeText:SetText(stacks); icon._chargeText:Show()
             else icon._chargeText:Hide() end
         else
@@ -960,7 +922,7 @@ local function UpdateIcon(icon)
             local manualBuff = frameData._manualBuff
             local duration = manualBuff.duration
             if not duration or duration <= 0 then
-                CleanupManualBuff(icon, frameData, "UI/bad-duration")
+                CleanupManualBuff(icon, frameData)
                 return
             end
             local now = GetTime()
@@ -977,36 +939,27 @@ local function UpdateIcon(icon)
                         frameData.lastCDStart = frameData._manualStart
                         cooldown:SetCooldown(frameData._manualStart, duration)
                         cooldown:SetScript("OnCooldownDone", Wrap("CDM.Custom manual buff end", function()
-                            CleanupManualBuff(icon, frameData, "OnCooldownDone")
+                            CleanupManualBuff(icon, frameData)
                         end))
                         ScheduleManualBuffGlow(icon, frameData, manualBuff.glow, expiry)
                     end
                     return
                 end
-                CleanupManualBuff(icon, frameData, "UI/expired")
+                CleanupManualBuff(icon, frameData)
                 return
             end
 
-            CleanupManualBuff(icon, frameData, "UI/no-start")
+            CleanupManualBuff(icon, frameData)
             return
         end
 
-        local aura, auraBlocked
-
-        if frameData.trackedBuff then
-            aura, auraBlocked = SafeGetPlayerAura(frameData.trackedBuff)
-        end
+        local aura, auraBlocked = trackedAura, trackedBlocked
 
         if not aura and (frameData.isItemByPrefix or iconType == "consumable" or iconType == "trinket") then
-            if frameData._auraSpellID == nil then
-                local _, sid = GetItemSpell(itemID or id)
-                frameData._auraSpellID = sid or false
-                if sid and frameData.viewerKey == "buffs" then
-                    MapBuffSpell(sid, icon)
-                end
-            end
-            if frameData._auraSpellID then
-                local a, blocked = SafeGetPlayerAura(frameData._auraSpellID)
+            local itemSpellID = ItemUseSpell(itemID or id)
+            if itemSpellID then
+                MapBuffSpell(itemSpellID, icon)
+                local a, blocked = SafeGetPlayerAura(itemSpellID)
                 aura = a
                 auraBlocked = auraBlocked or blocked
             end
@@ -1101,7 +1054,7 @@ local function UpdateIcon(icon)
                     end
                 end
             end
-            if icon._chargeText and not frameData.trackedBuff then
+            if not frameData.trackedBuff then
                 local text = Tools.GetAuraStacksText('player', aura.auraInstanceID)
                 if text then
                     icon._chargeText:SetText(text)
@@ -1133,68 +1086,27 @@ local function UpdateIcon(icon)
 
     if iconType == "trinket" then
         local checkID = itemID or id
-        if frameData._auraSpellID == nil then
-            local _, sid = GetItemSpell(checkID)
-            frameData._auraSpellID = sid or false
-        end
-        IconEngine.ApplyTrinketVisual(texture, cooldown, checkID, frameData._auraSpellID or nil, refresh, icon._chargeText)
+        IconEngine.ApplyTrinketVisual(texture, cooldown, checkID, ItemUseSpell(checkID), refresh, icon._chargeText)
         return
     end
 
     if iconType == "consumable" then
         local checkID = itemID or id
         local count, bestID = AggregateCountPrio(checkID, frameData.potionPrio)
-        if not frameData.trackedBuff and icon._chargeText then
+        if not frameData.trackedBuff then
             if count ~= frameData.lastCount then
                 frameData.lastCount = count
-                icon._chargeText:SetText(count or 0)
+                icon._chargeText:SetText(count)
             end
             icon._chargeText:Show()
         end
         if bestID and bestID ~= frameData.lastBestTier then
             frameData.lastBestTier = bestID
-            local iconTexture = select(10, C_Item.GetItemInfo(bestID))
+            local iconTexture = C_Item.GetItemIconByID(bestID)
             if iconTexture then texture:SetTexture(iconTexture) end
         end
 
-        if frameData.viewerKey == "buffs" then
-            local auraSpellID = frameData._auraSpellID
-            if auraSpellID == nil then
-                local _, sid = GetItemSpell(checkID)
-                auraSpellID = sid or id or false
-                frameData._auraSpellID = auraSpellID
-            end
-            if auraSpellID then
-                local aura, blocked = SafeGetPlayerAura(auraSpellID)
-                if not aura and blocked then return end
-                local duration = aura and Tools.SafeNum(aura.duration)
-                local expirationTime = aura and Tools.SafeNum(aura.expirationTime)
-                if aura and not expirationTime then
-                    SetColor(texture, 1, 1, 1)
-                    texture:SetDesaturation(0)
-                    return
-                end
-                if expirationTime and expirationTime > 0 and (expirationTime - GetTime()) > 0 then
-                    SetColor(texture, 1, 1, 1)
-                    texture:SetDesaturation(0)
-                    local start = expirationTime - duration
-                    if start ~= frameData.lastCDStart then
-                        frameData.lastCDStart = start
-                        cooldown:SetCooldown(start, duration)
-                    end
-                    return
-                end
-            end
-            texture:SetDesaturation(1)
-            SetColor(texture, 0.3, 0.3, 0.3)
-            if frameData.lastCDStart ~= 0 then
-                frameData.lastCDStart = 0
-                cooldown:Clear()
-            end
-            return
-        end
-
-        IconEngine.ApplyItemVisual(texture, cooldown, nil, nil, count or 0, checkID, refresh)
+        IconEngine.ApplyItemVisual(texture, cooldown, count, checkID, refresh)
         return
     end
 
@@ -1252,14 +1164,14 @@ local function UpdateIcon(icon)
     local tint = notEnoughPower and 0.5 or 1
     SetColor(texture, tint, tint, tint)
 
-    local charges = IconEngine.ApplySpellVisual(texture, cooldown, id, frameData.hasCharges, refresh, nil, isUsable, notEnoughPower, cdInfo)
-    if frameData.hasCharges then
-        if not frameData.trackedBuff and icon._chargeText then
+    local charges = IconEngine.ApplySpellVisual(texture, cooldown, id, frameData.hasCharges, refresh, nil, nil, isUsable, notEnoughPower, cdInfo)
+    if not frameData.trackedBuff then
+        if frameData.hasCharges then
             icon._chargeText:SetText(charges ~= nil and C_StringUtil.TruncateWhenZero(charges) or "")
             icon._chargeText:Show()
+        else
+            icon._chargeText:Hide()
         end
-    else
-        if not frameData.trackedBuff and icon._chargeText then icon._chargeText:Hide() end
     end
 end
 
@@ -1336,9 +1248,8 @@ local function SetupIcon(icon, storedValue, viewerKey, index)
         frameData._manualGlowActive = nil
         ResetManualBuffOverlay(icon, frameData)
     end
-    frameData._auraSpellID = nil
     frameData._origTexture = nil
-    icon.layoutIndex = 100000 + (index or 1)
+    icon.layoutIndex = 100000 + index
 
     local overrides = CDM.GetIconOverrides(config)
     local overrideTexture = overrides[storedValue] or overrides[spellID]
@@ -1383,13 +1294,8 @@ local function SetupIcon(icon, storedValue, viewerKey, index)
     elseif viewerKey == "buffs" and not isItemByPrefix then
         iconTexture = GetStableSpellTexture(storedValue) or GetStableSpellTexture(spellID)
     elseif isItemByPrefix then
-        local _, _, _, _, _, _, _, _, _, itemIcon = C_Item.GetItemInfo(spellID)
-        if not itemIcon then
-            local _, _, _, _, instantIcon = C_Item.GetItemInfoInstant(spellID)
-            itemIcon = instantIcon
-            C_Item.RequestLoadItemDataByID(spellID)
-        end
-        iconTexture = itemIcon or 134400
+        if not C_Item.IsItemDataCachedByID(spellID) then C_Item.RequestLoadItemDataByID(spellID) end
+        iconTexture = C_Item.GetItemIconByID(spellID)
         frameData.itemID = spellID
     elseif IsSpellKnown(spellID) then
         iconTexture = C_Spell.GetSpellTexture(spellID)
@@ -1397,7 +1303,7 @@ local function SetupIcon(icon, storedValue, viewerKey, index)
         local itemName, _, _, _, _, _, _, _, _, itemIcon = C_Item.GetItemInfo(spellID)
         local itemCount = C_Item.GetItemCount(spellID, true)
         if itemName and (itemCount > 0 or IsEquippedItem(spellID)) then
-            iconTexture = itemIcon or 134400
+            iconTexture = itemIcon
             frameData.itemID = spellID
         else
             iconTexture = C_Spell.GetSpellTexture(spellID)
@@ -1445,8 +1351,8 @@ local function ArmTrinketDataLoad(slot)
     end
     trinketSlotRetryCount[slot] = nil
     if trinketLoadPending[itemID] then return end
-    local ok, item = pcall(Item.CreateFromItemID, Item, itemID)
-    if not ok or not item or item:IsItemEmpty() then return end
+    local item = Item:CreateFromItemID(itemID)
+    if item:IsItemEmpty() then return end
     trinketLoadPending[itemID] = true
     item:ContinueOnItemLoad(function()
         trinketLoadPending[itemID] = nil
@@ -1473,9 +1379,6 @@ local function RefreshViewer(viewerKey)
     wipe(consideredKeys)
     wipe(placedKeys)
 
-    local opacity = CDM.GetContextualOpacity(viewerKey)
-    local visAlpha = anchor and anchor._iconAlpha or 1
-
     local alwaysShow = CDM.GetAlwaysShow(config)
     local visibleCount = 0
 
@@ -1487,22 +1390,22 @@ local function RefreshViewer(viewerKey)
         if viewerKey == "buffs" or forceShow or IsTrackedEntryUsable(v) then
             visibleCount = visibleCount + 1
             local icon = registry[v]
-            if not icon then
+            if icon then
+                icon:SetParent(parentFrame)
+            else
                 icon = AcquireIcon(parentFrame, config.borderSize, config.borderColor, config.zoom) or CreateIconFrame(parentFrame, config.borderSize, config.borderColor, config.zoom)
                 registry[v] = icon
             end
             viewerIcons[visibleCount] = icon
             placedKeys[v] = true
-            icon:SetParent(parentFrame)
             icon:SetFrameStrata(viewer:GetFrameStrata())
             icon:SetFrameLevel(viewer:GetFrameLevel() + 1)
             SetupIcon(icon, v, viewerKey, versionIndex)
             local frameData = FrameData[icon]
-            if not frameData or not frameData.tracked then
+            if not frameData.tracked then
                 CDM.TrackIcon(viewerKey, icon)
             end
             CDM.SkinIcon(icon, config, viewerKey)
-            if not frameData then frameData = GetFrameData(icon) end
 
             if not frameData.anchor then
                 frameData.locking = true
@@ -1538,7 +1441,7 @@ local function RefreshViewer(viewerKey)
         if not placedKeys[key] then
             CDM.UntrackIcon(viewerKey, icon)
             local frameData = FrameData[icon]
-            local manualStart = frameData and frameData._manualStart
+            local manualStart = frameData._manualStart
             local entry = manualStart and (manualBuffs[key] or manualBuffs[frameData.customSpellID])
             local duration = entry and entry.duration
             if consideredKeys[key] or (duration and duration > 0 and now < manualStart + duration) then
@@ -1560,32 +1463,17 @@ local function RefreshViewer(viewerKey)
     end
 end
 
-local function ForEachIcon(filter, callback)
+local function UpdateConsumableIcons()
     for viewerKey, viewerIcons in pairs(icons) do
-        local count = iconCounts[viewerKey]
-        for versionIndex = 1, count do
+        for versionIndex = 1, iconCounts[viewerKey] do
             local icon = viewerIcons[versionIndex]
-            if icon then
-                local frameData = FrameData[icon]
-                if not filter or (frameData and filter(frameData)) then
-                    callback(icon, frameData)
-                end
-            end
+            if FrameData[icon].iconType == "consumable" then UpdateIcon(icon) end
         end
     end
 end
 
-local function UpdateAllCooldowns()
-    ForEachIcon(nil, UpdateIcon)
-end
-
-local function UpdateIconsByType(targetType)
-    ForEachIcon(function(frameData) return frameData.iconType == targetType end, function(icon) UpdateIcon(icon) end)
-end
-
 local function UpdateTrackedBuffIcon(icon, auraBlocked)
     local frameData = FrameData[icon]
-    if not frameData then return end
     if frameData.viewerKey == "buffs" then
         if frameData.hidden then return end
         if auraBlocked and frameData._manualBuff == false and frameData.trackedBuff == false then return end
@@ -1600,21 +1488,16 @@ local function UpdateBufViewerIconsFull()
     local buffsIcons = icons.buffs
     local buffsCount = iconCounts.buffs
     for versionIndex = 1, buffsCount do
-        local icon = buffsIcons[versionIndex]
-        if icon then UpdateTrackedBuffIcon(icon, auraBlocked) end
+        UpdateTrackedBuffIcon(buffsIcons[versionIndex], auraBlocked)
     end
 end
 
 local function UpdateTrackedBuffOtherViewers()
     for viewerKey, viewerIcons in pairs(icons) do
         if viewerKey ~= "buffs" then
-            local count = iconCounts[viewerKey]
-            for versionIndex = 1, count do
+            for versionIndex = 1, iconCounts[viewerKey] do
                 local icon = viewerIcons[versionIndex]
-                if icon then
-                    local frameData = FrameData[icon]
-                    if frameData and frameData.trackedBuff then UpdateIcon(icon) end
-                end
+                if FrameData[icon].trackedBuff then UpdateIcon(icon) end
             end
         end
     end
@@ -1641,7 +1524,7 @@ end
 
 local function UpdateIconUsable(icon)
     local frameData = FrameData[icon]
-    if not frameData or not frameData.customSpellID or frameData.hidden then return end
+    if frameData.hidden then return end
     if frameData.iconType and frameData.iconType ~= "spell" then return end
     local isUsable, notEnoughPower = C_Spell.IsSpellUsable(frameData.customSpellID)
     if issecretvalue(isUsable) or issecretvalue(notEnoughPower) then return end
@@ -1691,9 +1574,9 @@ local RunBuffScanRelevant = Wrap("CDM.Custom changed buff scan", UpdateRelevantB
 local function WalkIconSet(iconSet, itemsOnly)
     for icon in pairs(iconSet) do
         local frameData = FrameData[icon]
-        if not flushSeen[icon] and (not itemsOnly or (frameData and frameData.itemID)) then
+        if not flushSeen[icon] and (not itemsOnly or frameData.itemID) then
             flushSeen[icon] = true
-            if not frameData or not frameData.hidden then
+            if not frameData.hidden then
                 UpdateIcon(icon)
             end
         end
@@ -1722,9 +1605,9 @@ end
 local RunItemWalk = Wrap("CDM.Custom item walk", function()
     for _, iconSet in pairs(itemMap) do
         for icon in pairs(iconSet) do
-            local frameData = FrameData[icon]
-            if frameData and not flushSeen[icon] then
+            if not flushSeen[icon] then
                 flushSeen[icon] = true
+                local frameData = FrameData[icon]
                 if not frameData.hidden and not ItemCooldownUnchanged(frameData) then UpdateIcon(icon) end
             end
         end
@@ -1809,11 +1692,16 @@ local function FlushBagUpdate()
 
     if SpellItemMapChanged() then
         DoRefresh()
-        UpdateAllCooldowns()
         CDM.SetUpdatePending(true)
     else
-        UpdateIconsByType("consumable")
+        UpdateConsumableIcons()
     end
+end
+
+ScheduleBagRescan = function()
+    if bagPending then return end
+    bagPending = true
+    After("CDM.Custom bag rescan", 0.05, FlushBagUpdate)
 end
 
 local manualSpellMap = {}
@@ -1839,8 +1727,7 @@ RebuildManualSpellMap = function()
                 AddToManualSpellMap(rawID, icon)
 
                 if frameData.isItemByPrefix or frameData.iconType == "consumable" or frameData.iconType == "trinket" then
-                    local _, sid = GetItemSpell(frameData.itemID or rawID)
-                    AddToManualSpellMap(sid, icon)
+                    AddToManualSpellMap(ItemUseSpell(frameData.itemID or rawID), icon)
                 end
             end
         end
@@ -1854,11 +1741,8 @@ local function OnSpellCastSucceeded(spellID)
     if not matched then return end
     local now = GetTime()
     for _, icon in ipairs(matched) do
-        local frameData = FrameData[icon]
-        if frameData then
-            frameData._manualStart = now
-            UpdateIcon(icon)
-        end
+        FrameData[icon]._manualStart = now
+        UpdateIcon(icon)
     end
 end
 
@@ -1968,12 +1852,7 @@ local function RegisterItemEvents()
         itemCooldownPending = true
         QueueDispatch()
     end)
-    BUI.Events:Register("BAG_UPDATE_DELAYED", "CDM.Custom.BagDelayed", function()
-        if not bagPending then
-            bagPending = true
-            After("CDM.Custom bag rescan", 0.05, FlushBagUpdate)
-        end
-    end)
+    BUI.Events:Register("BAG_UPDATE_DELAYED", "CDM.Custom.BagDelayed", ScheduleBagRescan)
 end
 
 local function UnregisterItemEvents()
@@ -1988,7 +1867,6 @@ local function UpdateHotEventState()
         RegisterHotEvents()
     else
         UnregisterHotEvents()
-        UnregisterItemEvents()
     end
 
     if next(itemMap) or next(trinketSlotIcons) then
@@ -2003,11 +1881,6 @@ BUI.Events:Register("PLAYER_ENTERING_WORLD", "CDM.Custom.PEW", function()
     InvalidateCache()
     DoRefresh()
     UpdateHotEventState()
-    After("CDM.Custom world settle", 2, function()
-        InvalidateCache()
-        DoRefresh()
-        UpdateHotEventState()
-    end)
 end)
 
 local RefreshAfterEquip = BUI.Dispatcher.New(function()
@@ -2036,7 +1909,7 @@ function CDM.Custom.IsPotionItem(itemID)
     local _, _, _, _, _, itemClass, itemSubclass = C_Item.GetItemInfoInstant(itemID)
     return itemClass == Enum.ItemClass.Consumable
         and (itemSubclass == Enum.ItemConsumableSubclass.Potion
-          or itemSubclass == Enum.ItemConsumableSubclass.Flask)
+          or itemSubclass == Enum.ItemConsumableSubclass.Flasksphials)
 end
 
 CDM.Custom.GetPotionVersions = GetPotionVersions
@@ -2047,7 +1920,7 @@ function CDM.Custom.InvalidateStaleBagCache()
     InvalidateCache()
 end
 
-IconEngine.SetBagResolver(GetItemForSpell, AggregateCount)
+IconEngine.SetBagResolver(GetItemForSpell)
 
 function CDM.Custom.Refresh(viewerKey)
     if viewerKey then
@@ -2061,7 +1934,7 @@ end
 
 function CDM.Custom.IsEquippedOrKnownOrInBagsIcon(icon)
     local frameData = FrameData[icon]
-    if not frameData or not frameData.customSpellID then return true end
+    if not frameData.customSpellID then return true end
     if frameData._availChecked then return frameData._availResult end
     frameData._availChecked = true
 
@@ -2071,7 +1944,7 @@ function CDM.Custom.IsEquippedOrKnownOrInBagsIcon(icon)
         frameData.itemID = itemID
     end
     if frameData.isItemByPrefix then
-        frameData._availResult = IsEquippedOrKnownOrInBags(frameData.iconType, frameData.customSpellID, frameData.itemID, true)
+        frameData._availResult = IsEquippedOrKnownOrInBags(frameData.iconType, frameData.customSpellID, frameData.itemID)
         return frameData._availResult
     end
     if not Tools.IsSpellUsable(frameData.customSpellID) and frameData.iconType ~= "trinket" then
@@ -2086,7 +1959,7 @@ function CDM.Custom.IsEquippedOrKnownOrInBagsIcon(icon)
             return false
         end
     end
-    frameData._availResult = IsEquippedOrKnownOrInBags(frameData.iconType, frameData.customSpellID, frameData.itemID, true)
+    frameData._availResult = IsEquippedOrKnownOrInBags(frameData.iconType, frameData.customSpellID, frameData.itemID)
     return frameData._availResult
 end
 
@@ -2095,7 +1968,4 @@ function CDM.Custom.GetIcons(viewerKey)
 end
 
 CDM.Custom.IsTrackedEntryUsable = IsTrackedEntryUsable
-
-function CDM.Custom.UpdateIcon(icon)
-    UpdateIcon(icon)
-end
+CDM.Custom.UpdateIcon = UpdateIcon

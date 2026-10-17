@@ -58,7 +58,7 @@ local function IsHighlightEnabled()
 end
 
 local function CurrentSuggestion()
-	return AssistedCombatManager and AssistedCombatManager.lastNextCastSpellID or nil
+	return AssistedCombatManager.lastNextCastSpellID
 end
 
 local function DesiredSpell(spellID)
@@ -72,11 +72,9 @@ end
 
 local function InstallHooks()
 	if hooked then return end
-	local manager = AssistedCombatManager
-	if not (manager and manager.UpdateAllAssistedHighlightFramesForSpell) then return end
 	hooked = true
 
-	Hook(manager, 'UpdateAllAssistedHighlightFramesForSpell', function(_, spellID)
+	Hook(AssistedCombatManager, 'UpdateAllAssistedHighlightFramesForSpell', function(_, spellID)
 		Resolve(DesiredSpell(spellID))
 	end)
 
@@ -96,7 +94,6 @@ local function Sync()
 end
 
 function CDM.InitAssistHighlight()
-	ReadAssistDB().enabled = nil
 	if not eventsRegistered then
 		eventsRegistered = true
 		BUI.Events:Register('PLAYER_DEAD', EVENT_KEY, ReEval)

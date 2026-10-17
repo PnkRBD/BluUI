@@ -5,6 +5,7 @@ local Controls, Layout, Modals, Widget = BUILib.Controls, BUILib.Layout, BUILib.
 local Pixel = BUI.Pixel
 
 local GetCooldownInfo = C_CooldownViewer.GetCooldownViewerCooldownInfo
+local GetCategorySet = C_CooldownViewer.GetCooldownViewerCategorySet
 
 local COLOR_BLUE   = '|cff5599dd'
 local COLOR_GREY   = '|cff888888'
@@ -13,14 +14,34 @@ local COLOR_GREEN  = '|cff00ff00'
 local COLOR_ORANGE = '|cffff8800'
 local COLOR_END    = '|r'
 local FALLBACK_TEX = 134400
+local HINT_HEIGHT = 14
+local HINT_GAP = 6
+
+local BUFF_CATEGORIES = { Enum.CooldownViewerCategory.TrackedBuff, Enum.CooldownViewerCategory.TrackedBar }
+local CLASS_CATEGORIES = { Enum.CooldownViewerCategory.Essential, Enum.CooldownViewerCategory.Utility }
+
+local function IsAutoSlotKey(id)
+	return type(id) == 'string' and (id:match('^trinket:%d$') ~= nil or id:match('^racial:%d$') ~= nil)
+end
+
+local function HideKeyFor(id, isCustom)
+	if isCustom and not IsAutoSlotKey(id) then
+		local numId = type(id) == 'string' and tonumber(id:match('%d+')) or id
+		if numId then return 'custom:' .. numId end
+	end
+	return id
+end
+
+local function ProcSpellIDFor(id)
+	if type(id) == 'number' then return id end
+	return tonumber(id:match('^%d+$'))
+end
 
 local function ReadTrackedSpells(CDM, viewerKey)
 	local set = {}
 	local list, count = CDM.GetTrackedIcons(viewerKey)
-	if not list then return set end
 	for iconIndex = 1, count do
-		local icon = list[iconIndex]
-		local cooldownInfo = icon and icon.cooldownInfo
+		local cooldownInfo = list[iconIndex].cooldownInfo
 		if cooldownInfo then
 			if cooldownInfo.spellID then set[cooldownInfo.spellID] = true end
 			if cooldownInfo.overrideSpellID then set[cooldownInfo.overrideSpellID] = true end
@@ -99,7 +120,7 @@ local function BuildCDMSectionMap()
 	for _, entry in ipairs(CDM_SECTION_VIEWERS) do
 		local viewer = _G[entry.frameName]
 		local pool = viewer and viewer.itemFramePool
-		if pool and pool.EnumerateActive then
+		if pool then
 			for frame in pool:EnumerateActive() do
 				local info = frame.cooldownInfo
 				if info and info.spellID then
@@ -110,7 +131,6 @@ local function BuildCDMSectionMap()
 	end
 	if not next(map) then return map end
 
-	local GetCategorySet = C_CooldownViewer.GetCooldownViewerCategorySet
 	for _, category in ipairs(CDM_SECTION_CATEGORIES) do
 		local allIDs = GetCategorySet(category, true)
 		if allIDs then
@@ -124,11 +144,7 @@ local function BuildCDMSectionMap()
 							if map[lid] then linkedHit = true; break end
 						end
 					end
-					local known = info.isKnown
-					if known == nil then
-						known = C_SpellBook.IsSpellKnown(spellID)
-					end
-					if not linkedHit and known then
+					if not linkedHit and info.isKnown then
 						MapCooldownInfo(map, info, nil, false)
 					end
 				end
@@ -140,14 +156,12 @@ end
 
 local function CollectTrackedIcons(CDM, viewerKey, viewerSettings, icons, seen, customSeen)
 	local list, count = CDM.GetTrackedIcons(viewerKey)
-	if not list or not count then return end
 	local overrides = CDM.GetIconOverrides(viewerSettings)
 
 	for i = 1, count do
 		local icon = list[i]
 		local frameData = CDM.FrameData[icon]
-		local isVisible = icon:IsShown()
-		if isVisible and not (frameData and frameData.customIcon) then
+		if icon:IsShown() and not (frameData and frameData.customIcon) then
 			local cooldownInfo = icon.cooldownInfo
 			local spellID = cooldownInfo and cooldownInfo.spellID
 			if spellID and (not seen[spellID] or customSeen[spellID]) and not seen['blizz:'..spellID] then
@@ -157,7 +171,6 @@ local function CollectTrackedIcons(CDM, viewerKey, viewerSettings, icons, seen, 
 					id = spellID,
 					name = C_Spell.GetSpellName(displayID) or C_Spell.GetSpellName(spellID) or ('Spell ' .. spellID),
 					icon = overrides[spellID] or C_Spell.GetSpellTexture(displayID) or C_Spell.GetSpellTexture(spellID) or FALLBACK_TEX,
-					defaultIcon = C_Spell.GetSpellTexture(displayID) or C_Spell.GetSpellTexture(spellID) or FALLBACK_TEX,
 					isCustom = false,
 					layoutIndex = icon.layoutIndex or 99999,
 				}
@@ -166,28 +179,24 @@ local function CollectTrackedIcons(CDM, viewerKey, viewerSettings, icons, seen, 
 	end
 end
 
-local function BuildRacialSlotEntry(slotNum, Custom, CDM, viewerSettings)
+local function BuildRacialSlotEntry(slotNum, CDM, viewerSettings)
 	local resolvedID = CDM.ResolveRacialSlot(slotNum)
 	local stored = 'racial:' .. slotNum
-	local slotLabel = 'Racial'
 	local displayName, displayIcon
 	local isBlacklisted = false
 	if resolvedID then
-		displayName = (C_Spell.GetSpellName(resolvedID) or ('Spell ' .. resolvedID)) .. ' [' .. slotLabel .. ']'
+		displayName = (C_Spell.GetSpellName(resolvedID) or ('Spell ' .. resolvedID)) .. ' [Racial]'
 		displayIcon = C_Spell.GetSpellTexture(resolvedID) or FALLBACK_TEX
-		if viewerSettings and CDM.IsRacialBlacklisted(viewerSettings, resolvedID) then
-			isBlacklisted = true
-		end
+		isBlacklisted = CDM.IsRacialBlacklisted(viewerSettings, resolvedID)
 	else
-		displayName = slotLabel .. ' [None]'
-		displayIcon = 134400
+		displayName = 'Racial [None]'
+		displayIcon = FALLBACK_TEX
 	end
 	return {
 		id = stored,
 		numericId = resolvedID,
 		name = displayName,
 		icon = displayIcon,
-		defaultIcon = displayIcon,
 		isCustom = true,
 		isItem = false,
 		isPermanent = true,
@@ -197,39 +206,28 @@ local function BuildRacialSlotEntry(slotNum, Custom, CDM, viewerSettings)
 	}
 end
 
-local function BuildTrinketSlotEntry(slotNum, Custom, CDM, viewerSettings)
-	local inv = slotNum == 1 and 13 or 14
-	local resolvedID = GetInventoryItemID('player', inv)
+local function BuildTrinketSlotEntry(slotNum, CDM, viewerSettings)
+	local resolvedID = BUI.IconEngine.ResolveTrinketSlot(slotNum)
 	local stored = 'trinket:' .. slotNum
 	local slotLabel = 'Trinket Slot ' .. slotNum
 	local displayName, displayIcon
 	local isBlacklisted = false
 	local isHiddenPassive = false
 	if resolvedID then
-		local itemName, _, _, _, _, _, _, _, _, itemIcon = C_Item.GetItemInfo(resolvedID)
-		if not itemIcon then
-			local _, _, _, _, instant = GetItemInfoInstant(resolvedID)
-			itemIcon = instant
-			C_Item.RequestLoadItemDataByID(resolvedID)
-		end
+		local itemIcon, itemName = BUI.Lookup.GetItemInfo(resolvedID)
 		displayName = (itemName or 'Item ' .. resolvedID) .. ' [' .. slotLabel .. ']'
 		displayIcon = itemIcon or FALLBACK_TEX
-		if viewerSettings and CDM.IsTrinketBlacklisted(viewerSettings, resolvedID) then
-			isBlacklisted = true
-		end
-		if not BUI.IconEngine.IsOnUseTrinketSlot(slotNum) then
-			isHiddenPassive = true
-		end
+		isBlacklisted = CDM.IsTrinketBlacklisted(viewerSettings, resolvedID)
+		isHiddenPassive = not BUI.IconEngine.IsOnUseTrinketSlot(slotNum)
 	else
 		displayName = slotLabel .. ' [Empty]'
-		displayIcon = 134400
+		displayIcon = FALLBACK_TEX
 	end
 	return {
 		id = stored,
 		numericId = resolvedID,
 		name = displayName,
 		icon = displayIcon,
-		defaultIcon = displayIcon,
 		isCustom = true,
 		isItem = true,
 		isPermanent = true,
@@ -242,18 +240,17 @@ end
 
 local function CollectCustomIcons(CDM, viewerSettings, icons, seen, customSeen, viewerKey)
 	local customSpells = CDM.GetCustomSpells(viewerSettings)
-	local Custom = CDM.Custom
 	local overrides = CDM.GetIconOverrides(viewerSettings)
 
 	if viewerKey == 'essential' then
-		icons[#icons + 1] = BuildTrinketSlotEntry(1, Custom, CDM, viewerSettings)
-		icons[#icons + 1] = BuildTrinketSlotEntry(2, Custom, CDM, viewerSettings)
+		icons[#icons + 1] = BuildTrinketSlotEntry(1, CDM, viewerSettings)
+		icons[#icons + 1] = BuildTrinketSlotEntry(2, CDM, viewerSettings)
 		seen['trinket:1'] = true
 		seen['trinket:2'] = true
 	end
 
 	if viewerKey == 'essential' or viewerKey == 'utility' then
-		icons[#icons + 1] = BuildRacialSlotEntry(1, Custom, CDM, viewerSettings)
+		icons[#icons + 1] = BuildRacialSlotEntry(1, CDM, viewerSettings)
 		seen['racial:1'] = true
 	end
 
@@ -261,40 +258,30 @@ local function CollectCustomIcons(CDM, viewerSettings, icons, seen, customSeen, 
 		if not seen[stored] then
 			seen[stored] = true
 
-			local numId = tonumber(tostring(stored):match('%d+'))
-			if numId then customSeen[numId] = true end
-
 			local isItemPrefix = type(stored) == 'string' and stored:match('^item:') ~= nil
 			local id = isItemPrefix and tonumber(stored:match('^item:(%d+)')) or tonumber(stored)
 
 			if id then
+				customSeen[id] = true
 				local overrideIcon = overrides[stored] or overrides[id]
 				local isItem = isItemPrefix
-				local itemName, itemLink, itemIcon
+				local itemName, itemIcon
 
 				if isItemPrefix then
-					itemName, itemLink, _, _, _, _, _, _, _, itemIcon = C_Item.GetItemInfo(id)
-					if not itemIcon then
-						local _, _, _, _, instant = GetItemInfoInstant(id)
-						itemIcon = instant
-						C_Item.RequestLoadItemDataByID(id)
-					end
-				else
-					local isKnownSpell = C_SpellBook.IsSpellKnown(id)
-					if not isKnownSpell and viewerKey ~= "buffs" then
-						itemName, itemLink, _, _, _, _, _, _, _, itemIcon = C_Item.GetItemInfo(id)
-						local count = C_Item.GetItemCount(id, true)
-						isItem = itemName and (count and count > 0 or IsEquippedItem(id))
-					end
+					itemIcon, itemName = BUI.Lookup.GetItemInfo(id)
+				elseif viewerKey ~= 'buffs' and not C_SpellBook.IsSpellKnown(id) then
+					local name, _, _, _, _, _, _, _, _, icon = C_Item.GetItemInfo(id)
+					itemName, itemIcon = name, icon
+					isItem = itemName and (C_Item.GetItemCount(id, true) > 0 or C_Item.IsEquippedItem(id))
 				end
 
-				local rank = itemLink and BUI.Lookup.CraftedQuality(id) or 0
+				local rank = itemName and BUI.Lookup.CraftedQuality(id) or 0
 				local rankTag = rank > 0 and (' R' .. rank) or ''
 
 				local displayID = id
 				if viewerKey ~= 'buffs' and not isItem then
 					local activeID = BUI.Tools.GetActiveChoice(id)
-					if activeID and activeID ~= id and C_SpellBook.IsSpellKnown(activeID) then
+					if activeID ~= id and C_SpellBook.IsSpellKnown(activeID) then
 						displayID = activeID
 					end
 				end
@@ -317,7 +304,6 @@ local function CollectCustomIcons(CDM, viewerSettings, icons, seen, customSeen, 
 					numericId = id,
 					name = displayName,
 					icon = displayIcon,
-					defaultIcon = isItem and (itemIcon or FALLBACK_TEX) or (C_Spell.GetSpellTexture(id) or FALLBACK_TEX),
 					isCustom = true,
 					isItem = isItem,
 					unavailableTag = viewerKey ~= 'buffs' and CDM.GetUnavailableTag(stored, isItem) or nil,
@@ -328,19 +314,17 @@ local function CollectCustomIcons(CDM, viewerSettings, icons, seen, customSeen, 
 	end
 end
 
-local function CollectCooldownViewerSpells(CDM, viewerKey, icons, seen, customSeen)
-	local GetCategorySet = C_CooldownViewer.GetCooldownViewerCategorySet
+local function CollectCooldownViewerSpells(CDM, viewerKey, icons)
 	local seenNumeric = {}
 	for _, entry in ipairs(icons) do
 		if not entry.isCustom then
-			local numericID = entry.numericId or entry.id
-			if type(numericID) == 'number' then seenNumeric[numericID] = true end
+			seenNumeric[entry.id] = true
 		end
 	end
 
 	if viewerKey == 'buffs' then
 		local catSeen = {}
-		for _, cat in ipairs({ Enum.CooldownViewerCategory.TrackedBuff, Enum.CooldownViewerCategory.TrackedBar }) do
+		for _, cat in ipairs(BUFF_CATEGORIES) do
 			local allIDs = GetCategorySet(cat, true)
 			if allIDs then
 				local enabledSet = {}
@@ -349,7 +333,7 @@ local function CollectCooldownViewerSpells(CDM, viewerKey, icons, seen, customSe
 
 				for _, cdID in ipairs(allIDs) do
 					local info = GetCooldownInfo(cdID)
-					if info then
+					if info and info.spellID then
 						local spellID = info.spellID
 						local linkedCollision = false
 						if info.linkedSpellIDs then
@@ -362,25 +346,16 @@ local function CollectCooldownViewerSpells(CDM, viewerKey, icons, seen, customSe
 						if not seenNumeric[spellID] and not catSeen[spellID] and not linkedCollision then
 							seenNumeric[spellID] = true
 							catSeen[spellID] = true
-							local displayed = enabledSet[cdID]
 							local known = info.isKnown
-							if known == nil then
-								known = C_SpellBook.IsSpellKnown(spellID)
-							end
-							local notLearned = not known
-							local notDisplayed = known and not displayed
 
 							icons[#icons + 1] = {
 								id = spellID,
 								name = C_Spell.GetSpellName(spellID) or ('Spell ' .. spellID),
 								icon = C_Spell.GetSpellTexture(spellID) or FALLBACK_TEX,
-								defaultIcon = C_Spell.GetSpellTexture(spellID) or FALLBACK_TEX,
 								isCustom = false,
-								isUnlearned = notLearned,
-								isNotDisplayed = notDisplayed,
-								hasCustomDuplicate = customSeen and customSeen[spellID] or false,
-								isCooldownViewerExtra = true,
-								unavailableTag = BuildTag(false, nil, notLearned),
+								isUnlearned = not known,
+								isNotDisplayed = known and not enabledSet[cdID],
+								unavailableTag = BuildTag(false, nil, not known),
 								layoutIndex = 200000 + cdID,
 							}
 						end
@@ -404,7 +379,7 @@ local function CollectCooldownViewerSpells(CDM, viewerKey, icons, seen, customSe
 	local otherPool = ReadTrackedSpells(CDM, otherKey)
 
 	local classCdIDs = {}
-	for _, cat in ipairs({ Enum.CooldownViewerCategory.Essential, Enum.CooldownViewerCategory.Utility }) do
+	for _, cat in ipairs(CLASS_CATEGORIES) do
 		local ids = GetCategorySet(cat, true)
 		if ids then
 			for _, cdID in ipairs(ids) do
@@ -415,7 +390,7 @@ local function CollectCooldownViewerSpells(CDM, viewerKey, icons, seen, customSe
 
 	for cdID in pairs(classCdIDs) do
 		local info = GetCooldownInfo(cdID)
-		if info then
+		if info and info.spellID then
 			local spellID = info.spellID
 			local linkedCollision = false
 			if info.linkedSpellIDs then
@@ -430,20 +405,16 @@ local function CollectCooldownViewerSpells(CDM, viewerKey, icons, seen, customSe
 
 				local known = C_SpellBook.IsSpellKnown(spellID)
 				local inOwnPool = IsInSet(ownPool, spellID, info.linkedSpellIDs)
-				local inOtherPool = IsInSet(otherPool, spellID, info.linkedSpellIDs)
-				local inOther = inOtherPool
-				local notDisplayed = known and not inOwnPool and not inOtherPool
+				local inOther = IsInSet(otherPool, spellID, info.linkedSpellIDs)
 
 				icons[#icons + 1] = {
 					id = spellID,
 					name = C_Spell.GetSpellName(spellID) or ('Spell ' .. spellID),
 					icon = C_Spell.GetSpellTexture(spellID) or FALLBACK_TEX,
-					defaultIcon = C_Spell.GetSpellTexture(spellID) or FALLBACK_TEX,
 					isCustom = false,
 					isUnlearned = not known,
 					isInOtherViewer = inOther,
-					isNotDisplayed = notDisplayed,
-					isCooldownViewerExtra = true,
+					isNotDisplayed = known and not inOwnPool and not inOther,
 					unavailableTag = BuildTag(inOther, otherLabel, not known),
 					layoutIndex = 200000 + cdID,
 				}
@@ -454,8 +425,7 @@ end
 
 local function GetDataSortKey(data)
 	if data.isCustom and not data.isPermanent then
-		local numId = data.numericId or (type(data.id) == 'number' and data.id)
-		if numId then return 'custom:' .. numId end
+		return 'custom:' .. data.numericId
 	end
 	return data.id
 end
@@ -463,7 +433,7 @@ end
 local function SortIcons(CDM, viewerSettings, icons)
 	local order = CDM.GetIconOrder(viewerSettings) or {}
 	if #order == 0 then
-		table.sort(icons, function(a, b) return (a.layoutIndex or 99999) < (b.layoutIndex or 99999) end)
+		table.sort(icons, function(a, b) return a.layoutIndex < b.layoutIndex end)
 		return
 	end
 	local pos = {}
@@ -472,7 +442,7 @@ local function SortIcons(CDM, viewerSettings, icons)
 		local posA = pos[GetDataSortKey(a)] or pos[a.id] or 99999
 		local posB = pos[GetDataSortKey(b)] or pos[b.id] or 99999
 		if posA ~= posB then return posA < posB end
-		return (a.layoutIndex or 99999) < (b.layoutIndex or 99999)
+		return a.layoutIndex < b.layoutIndex
 	end)
 end
 
@@ -485,6 +455,9 @@ local function ParseDurationFromText(text)
 	return sec and tonumber(sec) or nil
 end
 
+local SCANNER_NAME = 'BUI_DurScanner'
+local durationScanner
+
 local function ParseDurationFromDescription(spellID)
 	local raw = tostring(spellID)
 	local isItem = raw:match('^item:')
@@ -496,21 +469,20 @@ local function ParseDurationFromDescription(spellID)
 	if dur then return dur end
 
 	if isItem or not C_SpellBook.IsSpellKnown(numID) then
-		local _, sid = GetItemSpell(numID)
+		local _, sid = C_Item.GetItemSpell(numID)
 		if sid then
 			desc = C_Spell.GetSpellDescription(sid)
 			dur = ParseDurationFromText(desc)
 			if dur then return dur end
 		end
-		local scanner = _G['BUI_DurScanner']
-		if not scanner then
-			scanner = CreateFrame('GameTooltip', 'BUI_DurScanner', nil, 'GameTooltipTemplate')
-			scanner:SetOwner(UIParent, 'ANCHOR_NONE')
+		if not durationScanner then
+			durationScanner = CreateFrame('GameTooltip', SCANNER_NAME, nil, 'GameTooltipTemplate')
+			durationScanner:SetOwner(UIParent, 'ANCHOR_NONE')
 		end
-		scanner:ClearLines()
-		scanner:SetItemByID(numID)
-		for i = 1, scanner:NumLines() do
-			local line = _G['BUI_DurScannerTextLeft' .. i]
+		durationScanner:ClearLines()
+		durationScanner:SetItemByID(numID)
+		for i = 1, durationScanner:NumLines() do
+			local line = _G[SCANNER_NAME .. 'TextLeft' .. i]
 			local text = line and line:GetText()
 			dur = ParseDurationFromText(text)
 			if dur then return dur end
@@ -520,19 +492,14 @@ local function ParseDurationFromDescription(spellID)
 	return nil
 end
 
-local function ShowTrinketSlotModal(CDM, viewerSettings, storedValue, RefreshIconList)
-	local slotNum = tonumber(storedValue:match('^trinket:(%d)$'))
-	local inv = slotNum == 1 and 13 or 14
-	local equippedID = GetInventoryItemID('player', inv)
-	local itemName = equippedID and C_Item.GetItemNameByID(equippedID) or 'Empty'
-
-	local overlay, dialog, Close = Modals.CreateBase(400, 360, true, BUI.PageEngine.window.frame)
-	Modals.CreateTitle(dialog, 'Trinket Slot ' .. slotNum)
+local function ShowSlotBlacklistModal(CDM, viewerKey, RefreshIconList, spec)
+	local _, dialog, Close = Modals.CreateBase(400, 360, true, BUI.PageEngine.window.frame)
+	Modals.CreateTitle(dialog, spec.title)
 
 	local info = dialog:CreateFontString(nil, 'OVERLAY')
 	info:SetFont(BUILib.Font, 12, '')
 	info:SetPoint('TOPLEFT', dialog, 'TOPLEFT', Pixel.Scale(30), Pixel.Scale(-52))
-	info:SetText('|cffaaaaaaCurrent:|r ' .. itemName)
+	info:SetText('|cffaaaaaaCurrent:|r ' .. spec.currentName)
 
 	local blHeader = dialog:CreateFontString(nil, 'OVERLAY')
 	blHeader:SetFont(BUILib.Font, 13, 'OUTLINE')
@@ -542,49 +509,38 @@ local function ShowTrinketSlotModal(CDM, viewerSettings, storedValue, RefreshIco
 	local blHint = dialog:CreateFontString(nil, 'OVERLAY')
 	blHint:SetFont(BUILib.Font, 10, '')
 	blHint:SetTextColor(0.55, 0.55, 0.55)
-	blHint:SetText('Blacklisted trinkets are ignored when equipped in this slot.')
+	blHint:SetText(spec.hint)
 	blHint:SetPoint('TOPLEFT', blHeader, 'BOTTOMLEFT', 0, Pixel.Scale(-4))
 
 	local blList
 	local function RebuildBlList()
 		blList:ClearItems()
-		local map = CDM.GetTrinketBlacklist(viewerSettings)
-		for itemID in pairs(map) do
-			local iName, _, _, _, _, _, _, _, _, iIcon = C_Item.GetItemInfo(itemID)
-			if not iIcon then
-				local _, _, _, _, instant = GetItemInfoInstant(itemID)
-				iIcon = instant
-				C_Item.RequestLoadItemDataByID(itemID)
-			end
-			blList:AddItem(iIcon or 134400, iName or ('Item ' .. itemID), itemID, true, true)
+		for id in pairs(spec.GetBlacklist()) do
+			local icon, name = spec.Describe(id)
+			blList:AddItem(icon, name, id, true, true)
 		end
 	end
 
-	local curBtnLabel = equippedID and 'Blacklist Current Trinket' or 'No Trinket Equipped'
-	local curBtn = Controls.Button(dialog, curBtnLabel, 200, function()
-		if not equippedID then return end
-		CDM.SetTrinketBlacklisted(viewerSettings, equippedID, true)
+	local function SetBlacklisted(id, enabled)
+		spec.SetBlacklisted(id, enabled)
 		RebuildBlList()
-		CDM.Custom.Refresh('essential')
+		CDM.Custom.Refresh(viewerKey)
 		RefreshIconList()
+	end
+
+	local curBtn = Controls.Button(dialog, spec.currentID and spec.blacklistLabel or spec.emptyLabel, 200, function()
+		SetBlacklisted(spec.currentID, true)
 	end)
 	local curBtnFrame = curBtn.frame
 	curBtnFrame:SetPoint('TOPLEFT', blHint, 'BOTTOMLEFT', 0, Pixel.Scale(-8))
-	if not equippedID then curBtnFrame:SetEnabled(false) end
+	if not spec.currentID then curBtnFrame:SetEnabled(false) end
 
 	blList = Controls.ItemList(dialog, nil, 340, 140, nil, function(row)
-		if row and row.id then
-			CDM.SetTrinketBlacklisted(viewerSettings, row.id, nil)
-			RebuildBlList()
-			CDM.Custom.Refresh('essential')
-			RefreshIconList()
-		end
+		SetBlacklisted(row.id, nil)
 	end, nil, nil, false, nil, true)
-	local blListFrame = blList.frame
-	blListFrame:SetPoint('TOPLEFT', curBtnFrame, 'BOTTOMLEFT', 0, Pixel.Scale(-8))
+	blList.frame:SetPoint('TOPLEFT', curBtnFrame, 'BOTTOMLEFT', 0, Pixel.Scale(-8))
 	RebuildBlList()
 
-	overlay:SetScript('OnKeyDown', function(_, key) if key == 'ESCAPE' then Close() end end)
 	Modals.LayoutButtons(dialog, {
 		{ text = 'Close', color = Modals.BTN_CONFIRM, onClick = function(close)
 			close()
@@ -593,72 +549,41 @@ local function ShowTrinketSlotModal(CDM, viewerSettings, storedValue, RefreshIco
 	}, Close)
 end
 
+local function ShowTrinketSlotModal(CDM, viewerSettings, viewerKey, storedValue, RefreshIconList)
+	local slotNum = tonumber(storedValue:match('^trinket:(%d)$'))
+	local equippedID = BUI.IconEngine.ResolveTrinketSlot(slotNum)
+	ShowSlotBlacklistModal(CDM, viewerKey, RefreshIconList, {
+		title = 'Trinket Slot ' .. slotNum,
+		currentID = equippedID,
+		currentName = equippedID and C_Item.GetItemNameByID(equippedID) or 'Empty',
+		hint = 'Blacklisted trinkets are ignored when equipped in this slot.',
+		blacklistLabel = 'Blacklist Current Trinket',
+		emptyLabel = 'No Trinket Equipped',
+		GetBlacklist = function() return CDM.GetTrinketBlacklist(viewerSettings) end,
+		SetBlacklisted = function(id, enabled) CDM.SetTrinketBlacklisted(viewerSettings, id, enabled) end,
+		Describe = function(id)
+			local icon, name = BUI.Lookup.GetItemInfo(id)
+			return icon or FALLBACK_TEX, name or ('Item ' .. id)
+		end,
+	})
+end
+
 local function ShowRacialSlotModal(CDM, viewerSettings, viewerKey, storedValue, RefreshIconList)
 	local slotNum = tonumber(storedValue:match('^racial:(%d)$'))
 	local resolvedID = CDM.ResolveRacialSlot(slotNum)
-	local spellName = resolvedID and C_Spell.GetSpellName(resolvedID) or 'None'
-
-	local overlay, dialog, Close = Modals.CreateBase(400, 360, true, BUI.PageEngine.window.frame)
-	Modals.CreateTitle(dialog, 'Racial Slot')
-
-	local info = dialog:CreateFontString(nil, 'OVERLAY')
-	info:SetFont(BUILib.Font, 12, '')
-	info:SetPoint('TOPLEFT', dialog, 'TOPLEFT', Pixel.Scale(30), Pixel.Scale(-52))
-	info:SetText('|cffaaaaaaCurrent:|r ' .. spellName)
-
-	local blHeader = dialog:CreateFontString(nil, 'OVERLAY')
-	blHeader:SetFont(BUILib.Font, 13, 'OUTLINE')
-	blHeader:SetText('Blacklist')
-	blHeader:SetPoint('TOPLEFT', info, 'BOTTOMLEFT', 0, Pixel.Scale(-16))
-
-	local blHint = dialog:CreateFontString(nil, 'OVERLAY')
-	blHint:SetFont(BUILib.Font, 10, '')
-	blHint:SetTextColor(0.55, 0.55, 0.55)
-	blHint:SetText('Blacklisted racials are ignored in this viewer.')
-	blHint:SetPoint('TOPLEFT', blHeader, 'BOTTOMLEFT', 0, Pixel.Scale(-4))
-
-	local blList
-	local function RebuildBlList()
-		blList:ClearItems()
-		local map = CDM.GetRacialBlacklist(viewerSettings)
-		for spellID in pairs(map) do
-			local sName = C_Spell.GetSpellName(spellID) or ('Spell ' .. spellID)
-			local sIcon = C_Spell.GetSpellTexture(spellID) or 134400
-			blList:AddItem(sIcon, sName, spellID, true, true)
-		end
-	end
-
-	local curBtnLabel = resolvedID and 'Blacklist Current Racial' or 'No Racial Known'
-	local curBtn = Controls.Button(dialog, curBtnLabel, 200, function()
-		if not resolvedID then return end
-		CDM.SetRacialBlacklisted(viewerSettings, resolvedID, true)
-		RebuildBlList()
-		CDM.Custom.Refresh(viewerKey)
-		RefreshIconList()
-	end)
-	local curBtnFrame = curBtn.frame
-	curBtnFrame:SetPoint('TOPLEFT', blHint, 'BOTTOMLEFT', 0, Pixel.Scale(-8))
-	if not resolvedID then curBtnFrame:SetEnabled(false) end
-
-	blList = Controls.ItemList(dialog, nil, 340, 140, nil, function(row)
-		if row and row.id then
-			CDM.SetRacialBlacklisted(viewerSettings, row.id, nil)
-			RebuildBlList()
-			CDM.Custom.Refresh(viewerKey)
-			RefreshIconList()
-		end
-	end, nil, nil, false, nil, true)
-	local blListFrame = blList.frame
-	blListFrame:SetPoint('TOPLEFT', curBtnFrame, 'BOTTOMLEFT', 0, Pixel.Scale(-8))
-	RebuildBlList()
-
-	overlay:SetScript('OnKeyDown', function(_, key) if key == 'ESCAPE' then Close() end end)
-	Modals.LayoutButtons(dialog, {
-		{ text = 'Close', color = Modals.BTN_CONFIRM, onClick = function(close)
-			close()
-			RefreshIconList()
-		end },
-	}, Close)
+	ShowSlotBlacklistModal(CDM, viewerKey, RefreshIconList, {
+		title = 'Racial Slot',
+		currentID = resolvedID,
+		currentName = resolvedID and C_Spell.GetSpellName(resolvedID) or 'None',
+		hint = 'Blacklisted racials are ignored in this viewer.',
+		blacklistLabel = 'Blacklist Current Racial',
+		emptyLabel = 'No Racial Known',
+		GetBlacklist = function() return CDM.GetRacialBlacklist(viewerSettings) end,
+		SetBlacklisted = function(id, enabled) CDM.SetRacialBlacklisted(viewerSettings, id, enabled) end,
+		Describe = function(id)
+			return C_Spell.GetSpellTexture(id) or FALLBACK_TEX, C_Spell.GetSpellName(id) or ('Spell ' .. id)
+		end,
+	})
 end
 
 local SOUND_OPTIONS = {
@@ -683,16 +608,16 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 	if isItem and numID then
 		spellName = C_Item.GetItemNameByID(numID) or C_Spell.GetSpellName(numID) or raw
 		local _, _, _, _, icon = C_Item.GetItemInfoInstant(numID)
-		defaultIcon = icon or C_Spell.GetSpellTexture(numID) or 134400
+		defaultIcon = icon or C_Spell.GetSpellTexture(numID) or FALLBACK_TEX
 	else
 		spellName = numID and C_Spell.GetSpellName(numID) or raw
-		defaultIcon = numID and C_Spell.GetSpellTexture(numID) or 134400
+		defaultIcon = numID and C_Spell.GetSpellTexture(numID) or FALLBACK_TEX
 	end
 
 	local autoDur = ParseDurationFromDescription(spellID)
 	local defaultDur = existing.duration or autoDur
 
-	local overlay, dialog, Close = Modals.CreateBase(400, 500, true, BUI.PageEngine.window.frame)
+	local _, dialog, Close = Modals.CreateBase(400, 500, true, BUI.PageEngine.window.frame)
 	Modals.CreateTitle(dialog, 'Manual Buff')
 
 	local PAD = 30
@@ -726,10 +651,9 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 	idText:SetPoint('TOPLEFT', nameText, 'BOTTOMLEFT', 0, -2)
 	idText:SetText('|cff888888ID: ' .. tostring(spellID) .. '|r')
 
-	local Tools = BUI.Tools
 	local lastAnchor = preview
 	if numID and not isItem then
-		local overrideID = Tools.GetOverrideSpell(numID)
+		local overrideID = BUI.Tools.GetOverrideSpell(numID)
 		if overrideID ~= numID then
 			local ovName = C_Spell.GetSpellName(overrideID) or tostring(overrideID)
 			local ovIcon = C_Spell.GetSpellTexture(overrideID)
@@ -742,7 +666,7 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 			local ovPreview = dialog:CreateTexture(nil, 'ARTWORK')
 			ovPreview:SetSize(20, 20)
 			ovPreview:SetPoint('LEFT', ovText, 'RIGHT', 6, 0)
-			ovPreview:SetTexture(ovIcon or 134400)
+			ovPreview:SetTexture(ovIcon or FALLBACK_TEX)
 			ovPreview:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 
 			local ovNameText = dialog:CreateFontString(nil, 'OVERLAY')
@@ -762,7 +686,6 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 
 	local durInput = Modals.CreateInput(dialog, defaultDur and tostring(defaultDur) or '', halfW)
 	durInput:SetPoint('TOPLEFT', durLabel, 'BOTTOMLEFT', 0, -LABEL_GAP)
-	durInput:SetAutoFocus(true)
 	durInput:SetNumeric(true)
 
 	if autoDur and not existing.duration then
@@ -786,27 +709,17 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 		preview:SetTexture(tonumber(self:GetText()) or defaultIcon)
 	end)
 
-	local buffsSettings = BUI.GetDB().cdm.buffs
-	local decCB = Controls.StampCheckbox(dialog, 'Show Decimals', buffsSettings and buffsSettings.showCooldownDecimals or false, function(val)
-		if buffsSettings then
-			buffsSettings.showCooldownDecimals = val
-			CDM.RefreshSkinSettings()
-		end
-	end)
-	local decCBFrame = decCB.frame
-	decCBFrame:SetPoint('TOPLEFT', durInput, 'BOTTOMLEFT', 0, -ITEM_GAP)
-
 	local existingGlow = existing.glow or {}
 	local globalGlow = BUI.GetDB().cdm.glow
 	local glowEnabled = existingGlow.enabled ~= false
 	local glowMode = existingGlow.mode or 'always'
 	local glowThreshold = existingGlow.threshold or 5
 	local glowColor = existingGlow.color
-	local glowStyle = existingGlow.style or globalGlow.type or 'pixel'
+	local glowStyle = existingGlow.style or globalGlow.type
 
 	local glowCB = Controls.StampCheckbox(dialog, 'Enable Glow', glowEnabled, function(val) glowEnabled = val end)
 	local glowCBFrame = glowCB.frame
-	glowCBFrame:SetPoint('TOPLEFT', decCBFrame, 'BOTTOMLEFT', 0, -SECTION_GAP)
+	glowCBFrame:SetPoint('TOPLEFT', durInput, 'BOTTOMLEFT', 0, -SECTION_GAP)
 
 	local cr, cg, cb, ca = 0.95, 0.95, 0.32, 1
 	if glowColor then cr, cg, cb, ca = glowColor[1], glowColor[2], glowColor[3], glowColor[4] or 1 end
@@ -821,7 +734,6 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 		callback = function(r, g, b, a)
 			glowColor = { r, g, b, a }
 		end,
-		width = 18,
 	})
 	local colorSwatchFrame = colorSwatch.frame
 	colorSwatchFrame:SetPoint('LEFT', colorLabel, 'RIGHT', 4, 0)
@@ -842,15 +754,13 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 		local show = glowMode ~= 'always'
 		threshInput:SetShown(show)
 		secLabel:SetShown(show)
-		if warnCBFrame then
-			warnCBFrame:ClearAllPoints()
-			if show then
-				warnCBFrame:SetPoint('TOPLEFT', threshInput, 'BOTTOMLEFT', 0, -SECTION_GAP)
-			else
-				warnCBFrame:SetPoint('TOPLEFT', glowModeDDFrame, 'BOTTOMLEFT', 0, -SECTION_GAP)
-			end
+		warnCBFrame:ClearAllPoints()
+		if show then
+			warnCBFrame:SetPoint('TOPLEFT', threshInput, 'BOTTOMLEFT', 0, -SECTION_GAP)
+		else
+			warnCBFrame:SetPoint('TOPLEFT', glowModeDDFrame, 'BOTTOMLEFT', 0, -SECTION_GAP)
 		end
-		if FitHeight then FitHeight() end
+		FitHeight()
 	end
 
 	local glowModeDD = Controls.Dropdown(dialog, nil, {
@@ -877,15 +787,12 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 	threshInput:SetPoint('TOPLEFT', glowModeDDFrame, 'BOTTOMLEFT', 0, -ITEM_GAP)
 	secLabel:SetPoint('LEFT', threshInput, 'RIGHT', 4, 0)
 
-	UpdateThresholdVisibility()
-
 	local existingWarning = existingGlow.warning or {}
 	local warningEnabled = existingWarning.enabled or false
 	local warningText = existingWarning.text or (spellName .. ' EXPIRING!')
 
 	local warnCB = Controls.StampCheckbox(dialog, 'Show Warning Text', warningEnabled, function(val) warningEnabled = val end)
 	warnCBFrame = warnCB.frame
-	UpdateThresholdVisibility()
 
 	local warningColor = existingWarning.color
 	local wcr, wcg, wcb, wca = 1, 0.2, 0.2, 1
@@ -902,7 +809,6 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 		callback = function(r, g, b, a)
 			warningColor = { r, g, b, a }
 		end,
-		width = 18,
 	})
 	local warnSwatchFrame = warnColorSwatch.frame
 	warnSwatchFrame:SetPoint('LEFT', warnColorLabel, 'RIGHT', 4, 0)
@@ -982,7 +888,7 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 	function FitHeight()
 		dialog:SetHeight(math.ceil(dialog:GetTop() - perSpecCBFrame:GetBottom()) + FOOTER_ROOM)
 	end
-	FitHeight()
+	UpdateThresholdVisibility()
 
 	local fired = false
 	local function PerformSave()
@@ -1047,10 +953,7 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 				title = 'Convert to Per Spec?',
 				message = 'This buff is currently saved globally. Saving as Per Spec will remove it from all other specs.',
 				confirmText = 'Convert', cancelText = 'Cancel',
-				onConfirm = function()
-					existingScope = 'spec'
-					PerformSave()
-				end,
+				onConfirm = PerformSave,
 			})
 			return
 		end
@@ -1058,9 +961,8 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 		PerformSave()
 	end
 
-	durInput:SetScript('OnEnterPressed', function() DoConfirm() end)
-	iconInput:SetScript('OnEnterPressed', function() DoConfirm() end)
-	overlay:SetScript('OnKeyDown', function(_, key) if key == 'ESCAPE' then Close() end end)
+	durInput:SetScript('OnEnterPressed', DoConfirm)
+	iconInput:SetScript('OnEnterPressed', DoConfirm)
 	Modals.LayoutButtons(dialog, {
 		{ text = 'Save', color = Modals.BTN_CONFIRM, onClick = function() DoConfirm() end },
 		{ text = 'Cancel', color = Modals.BTN_CANCEL, onClick = function(close) close() end },
@@ -1077,13 +979,12 @@ local function ParseIconValue(text)
 end
 
 local function ShowIconOverrideModal(CDM, spellID, viewerSettings, onSaved)
-	if not viewerSettings then return end
 	local spellName = C_Spell.GetSpellName(spellID) or ('Spell ' .. tostring(spellID))
 	local defaultIcon = C_Spell.GetSpellTexture(spellID) or FALLBACK_TEX
 	local overrides = CDM.GetIconOverrides(viewerSettings)
 	local current = overrides[spellID]
 
-	local overlay, dialog, Close = Modals.CreateBase(560, 380, true, BUI.PageEngine.window.frame)
+	local _, dialog, Close = Modals.CreateBase(560, 380, true, BUI.PageEngine.window.frame)
 	Modals.CreateTitle(dialog, 'Change Icon')
 
 	BUI.IconSearch.EnsureIndex()
@@ -1166,8 +1067,7 @@ local function ShowIconOverrideModal(CDM, spellID, viewerSettings, onSaved)
 
 		local Idx = BUI.IconSearch
 		if Idx.Ready() then
-			local deep = Idx.Search(text, GRID_MAX) or {}
-			for _, hit in ipairs(deep) do
+			for _, hit in ipairs(Idx.Search(text, GRID_MAX)) do
 				if #hits >= GRID_MAX then break end
 				if not seen[hit.icon] then
 					seen[hit.icon] = true
@@ -1255,30 +1155,21 @@ local function ShowIconOverrideModal(CDM, spellID, viewerSettings, onSaved)
 	end
 
 	input:SetScript('OnEnterPressed', DoSave)
-	overlay:SetScript('OnKeyDown', function(_, key) if key == 'ESCAPE' then Close() end end)
 	Modals.LayoutButtons(dialog, {
-		{ text = 'Save', color = Modals.BTN_CONFIRM, onClick = function() DoSave() end },
+		{ text = 'Save', color = Modals.BTN_CONFIRM, onClick = DoSave },
 		{ text = 'Cancel', color = Modals.BTN_CANCEL, onClick = function(close) close() end },
 	}, Close)
 end
 
 local function ShowPotionDisplayModal(CDM, itemID, storedValue, viewerSettings, viewerKey, onChanged)
-	if not viewerSettings then return end
-	local itemName, _, _, _, _, _, _, _, _, itemIcon = C_Item.GetItemInfo(itemID or 0)
-	if not itemIcon and itemID then
-		local _, _, _, _, instantIcon = C_Item.GetItemInfoInstant(itemID)
-		itemIcon = instantIcon
-	end
-	itemName = itemName or (itemID and ('Item ' .. itemID)) or tostring(storedValue)
+	local itemIcon, itemName = BUI.Lookup.GetItemInfo(itemID)
+	itemName = itemName or ('Item ' .. itemID)
 
-	local isFlask
-	if itemID then
-		local _, _, _, _, _, classID, subclassID = C_Item.GetItemInfoInstant(itemID)
-		isFlask = classID == Enum.ItemClass.Consumable and subclassID == Enum.ItemConsumableSubclass.Flask
-	end
+	local _, _, _, _, _, classID, subclassID = C_Item.GetItemInfoInstant(itemID)
+	local isFlask = classID == Enum.ItemClass.Consumable and subclassID == Enum.ItemConsumableSubclass.Flasksphials
 	local kindWord = isFlask and 'flask' or 'potion'
 
-	local overlay, dialog, Close = Modals.CreateBase(560, 300, true, BUI.PageEngine.window.frame)
+	local _, dialog, Close = Modals.CreateBase(560, 300, true, BUI.PageEngine.window.frame)
 	Modals.CreateTitle(dialog, isFlask and 'Flask Display' or 'Potion Display')
 
 	local PAD = 24
@@ -1305,7 +1196,7 @@ local function ShowPotionDisplayModal(CDM, itemID, storedValue, viewerSettings, 
 	local idText = dialog:CreateFontString(nil, 'OVERLAY')
 	idText:SetFont(BUILib.Font, 11, '')
 	idText:SetPoint('TOPLEFT', nameText, 'BOTTOMLEFT', 0, -2)
-	idText:SetText('|cff888888ID: ' .. tostring(itemID or storedValue) .. '|r')
+	idText:SetText('|cff888888ID: ' .. itemID .. '|r')
 
 	local help = dialog:CreateFontString(nil, 'OVERLAY')
 	help:SetFont(BUILib.Font, 12, '')
@@ -1551,10 +1442,7 @@ local function ShowPotionDisplayModal(CDM, itemID, storedValue, viewerSettings, 
 
 	local function Rebuild()
 		local prio = CDM.GetPotionPrioFor(storedValue)
-		local versions, pending = {}, nil
-		if itemID then
-			versions, pending = CDM.Custom.GetPotionVersions(itemID)
-		end
+		local versions, pending = CDM.Custom.GetPotionVersions(itemID)
 		local countByID = {}
 		for _, v in ipairs(versions) do
 			countByID[v.id] = v.count
@@ -1684,7 +1572,6 @@ local function ShowPotionDisplayModal(CDM, itemID, storedValue, viewerSettings, 
 	end
 	WatchPending(Rebuild())
 
-	overlay:SetScript('OnKeyDown', function(_, key) if key == 'ESCAPE' then Close() end end)
 	Modals.LayoutButtons(dialog, {
 		{ text = 'Done', color = Modals.BTN_CONFIRM, onClick = function(close) close() end },
 		{ text = 'Reset', color = Modals.BTN_CANCEL, onClick = function()
@@ -1716,21 +1603,16 @@ local function ShowProcModal(CDM, spellID, RefreshIconList, backTo, viewerSettin
 	local spellName = C_Spell.GetSpellName(spellID) or tostring(spellID)
 	local defaultIcon = C_Spell.GetSpellTexture(spellID) or FALLBACK_TEX
 	local globalGlow = BUI.GetDB().cdm.glow
-	local hasTTS = BUI.TTS.IsAvailable()
 	local openedFromBuffs = viewerSettings ~= nil and viewerSettings == CDM.GetSettings('buffs')
 
 	local appliesSpells, sourceSpells = {}, {}
 	do
-		local GetCategorySet = C_CooldownViewer.GetCooldownViewerCategorySet
 		local seen = {}
-		local function IsCastable(id)
-			return C_SpellBook.IsSpellKnown(id)
-		end
+		local selfCast = C_SpellBook.IsSpellKnown(spellID)
 		local function AddRelated(relID, entrySaysApplies)
 			if relID == spellID or seen[relID] or not C_Spell.GetSpellName(relID) then return end
 			seen[relID] = true
-			local selfCast = IsCastable(spellID)
-			local relCast = IsCastable(relID)
+			local relCast = C_SpellBook.IsSpellKnown(relID)
 			local applies
 			if selfCast and not relCast then
 				applies = true
@@ -1745,7 +1627,7 @@ local function ShowProcModal(CDM, spellID, RefreshIconList, backTo, viewerSettin
 				sourceSpells[#sourceSpells + 1] = relID
 			end
 		end
-		for _, cat in ipairs({ Enum.CooldownViewerCategory.TrackedBuff, Enum.CooldownViewerCategory.TrackedBar }) do
+		for _, cat in ipairs(BUFF_CATEGORIES) do
 			local ids = GetCategorySet(cat, true)
 			if ids then
 				for _, cdID in ipairs(ids) do
@@ -1868,8 +1750,7 @@ local function ShowProcModal(CDM, spellID, RefreshIconList, backTo, viewerSettin
 	local function SearchTrackedBuffs(text)
 		local needle = text:lower()
 		local hits, seen = {}, {}
-		local GetCategorySet = C_CooldownViewer.GetCooldownViewerCategorySet
-		for _, cat in ipairs({ Enum.CooldownViewerCategory.TrackedBuff, Enum.CooldownViewerCategory.TrackedBar }) do
+		for _, cat in ipairs(BUFF_CATEGORIES) do
 			local ids = GetCategorySet(cat, true)
 			if ids then
 				for _, cdID in ipairs(ids) do
@@ -1913,7 +1794,7 @@ local function ShowProcModal(CDM, spellID, RefreshIconList, backTo, viewerSettin
 		buttons = buttons,
 	})
 	local dialog, child = content.dialog, content.child
-	local contentWidth = content.contentWidth or 510
+	local contentWidth = content.contentWidth
 	local ar, ag, ab = BUILib.Theme.GetAccent()
 
 	local blocks, totalHeight = {}, 0
@@ -1977,7 +1858,7 @@ local function ShowProcModal(CDM, spellID, RefreshIconList, backTo, viewerSettin
 			local controlFrame = Widget.Unwrap(control)
 			controlFrame:ClearAllPoints()
 			controlFrame:SetPoint('LEFT', frame, 'LEFT', frame.cursorX, 0)
-			frame.cursorX = frame.cursorX + (width or controlFrame:GetWidth() or 0) + (gap or 12)
+			frame.cursorX = frame.cursorX + width + (gap or 12)
 			return control
 		end
 		function frame:PlaceText(str, gap)
@@ -2335,7 +2216,7 @@ local function ShowProcModal(CDM, spellID, RefreshIconList, backTo, viewerSettin
 	end, 84, 24)
 	rowMsgOffset:Place(offYStep, 84)
 
-	local rowTTS = Row('Text-to-speech', function() return hasTTS end)
+	local rowTTS = Row('Text-to-speech')
 	local ttsToggle = Controls.Toggle(rowTTS, nil, ttsOn, function(v) ttsOn = v end, 0, true, nil, 40)
 	rowTTS:Place(ttsToggle, 40, 10)
 	rowTTS:PlaceText('Speaks the message aloud when the alert fires.')
@@ -2450,7 +2331,7 @@ local function ShowProcModal(CDM, spellID, RefreshIconList, backTo, viewerSettin
 	local initialCfg = CurrentCfg()
 
 	local function SaveIconOverride()
-		if not viewerSettings or not iconEdit then return end
+		if not iconEdit then return end
 		local text = iconEdit:GetText()
 		if text == initialIconText then return end
 		CDM.SetIconOverride(viewerSettings, spellID, ParseIconValue(text))
@@ -2529,7 +2410,7 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 		local customSeen = {}
 		CollectCustomIcons(CDM, viewerSettings, icons, seen, customSeen, viewerKey)
 		CollectTrackedIcons(CDM, viewerKey, viewerSettings, icons, seen, customSeen)
-		CollectCooldownViewerSpells(CDM, viewerKey, icons, seen, customSeen)
+		CollectCooldownViewerSpells(CDM, viewerKey, icons)
 		SortIcons(CDM, viewerSettings, icons)
 		return icons
 	end
@@ -2604,7 +2485,7 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 			if data.isCustom then
 				if not data.isPermanent and not data.isItem then sectionID = data.numericId end
 			elseif not data.isInOtherViewer then
-				sectionID = data.numericId or (type(data.id) == 'number' and data.id or nil)
+				sectionID = data.id
 			end
 			if sectionID then
 				local section = cdmSections[sectionID]
@@ -2628,7 +2509,7 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 				name = name .. ' (Racial)'
 			end
 			if not data.isItem then
-				local checkID = data.numericId or (type(data.id) == 'number' and data.id)
+				local checkID = data.numericId or (not data.isCustom and data.id or nil)
 				if checkID then
 					local alts = BUI.Tools.GetChoiceAlternatives(checkID)
 					if alts and #alts > 1 then
@@ -2637,9 +2518,7 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 				end
 			end
 
-			local isAutoSlotRow = type(data.id) == 'string' and
-				(data.id:match('^trinket:%d$') ~= nil or data.id:match('^racial:%d$') ~= nil)
-			local hiddenKey = (not isAutoSlotRow) and data.isCustom and data.numericId and ('custom:' .. data.numericId) or data.id
+			local hiddenKey = HideKeyFor(data.id, data.isCustom)
 			local forceShow = data.isCustom and viewerKey ~= 'buffs' and CDM.IsAlwaysShow(viewerSettings, hiddenKey)
 			local unavailable = data.isCustom and data.unavailableTag and not forceShow
 			local blocked = data.isUnlearned or data.isInOtherViewer or unavailable or data.isBlacklisted
@@ -2651,14 +2530,7 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 			if viewerKey ~= 'buffs' and CDM.IsHideWhenZero(viewerSettings, hiddenKey) then
 				name = name .. ' |cff44ddaa[Hide @ 0]|r'
 			end
-			local procTagID
-			if not isAutoSlotRow then
-				if type(data.id) == 'number' then
-					procTagID = data.id
-				elseif type(data.id) == 'string' then
-					procTagID = tonumber(data.id:match('^%d+$'))
-				end
-			end
+			local procTagID = ProcSpellIDFor(data.id)
 			if procTagID then
 				local procCfg = CDM.GetProcConfig(procTagID)
 				if procCfg then
@@ -2684,25 +2556,12 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 			local enabled = not blocked and not CDM.IsIconHiddenEffective(viewerKey, hidden, hiddenKey)
 			local removable = data.isCustom and not data.isPermanent
 			local row = iconList:AddItem(data.icon, name, data.id, removable, enabled)
-
-			if row then
-				row.data._sortKey = GetDataSortKey(data)
-			end
-			if blocked and row then
-				row:SetLocked(true)
-			end
-			if row and data.isNotDisplayed then
-				row.data._isNotDisplayed = true
-			end
+			row.data._sortKey = GetDataSortKey(data)
+			if blocked then row:SetLocked(true) end
+			if data.isNotDisplayed then row.data._isNotDisplayed = true end
 		end
 	end
 	CDM._iconListRefreshers[viewerKey] = function() RefreshIconList(true) end
-
-	local function CommitAdd(store)
-		CDM.AddCustomSpell(viewerSettings, store, false)
-		CDM.Custom.Refresh(viewerKey)
-		RefreshIconList()
-	end
 
 	local function NameFor(id, isItem)
 		if isItem then return (C_Item.GetItemInfo(id)) or ('Item ' .. id) end
@@ -2746,7 +2605,9 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 				RefreshIconList()
 			end)
 		else
-			CommitAdd(store)
+			CDM.AddCustomSpell(viewerSettings, store, false)
+			CDM.Custom.Refresh(viewerKey)
+			RefreshIconList()
 			BUILib.Toast.Success('Added!', NameFor(id, isItem))
 		end
 	end
@@ -2790,14 +2651,10 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 			local isTrinketRow = type(entry.id) == 'string' and entry.id:match('^trinket:%d$') ~= nil
 			local isRacialRow = type(entry.id) == 'string' and entry.id:match('^racial:%d$') ~= nil
 			local procRowSpellID
-			if not (isBuffRow or isTrinketRow or isRacialRow) and not entry._isNotDisplayed then
-				if type(entry.id) == 'number' then
-					procRowSpellID = entry.id
-				elseif type(entry.id) == 'string' then
-					procRowSpellID = tonumber(entry.id:match('^%d+$'))
-				end
+			if not isBuffRow and not entry._isNotDisplayed then
+				procRowSpellID = ProcSpellIDFor(entry.id)
 			end
-			if ((isBuffRow or isTrinketRow or isRacialRow) and frame.xBtn) or procRowSpellID then
+			if isBuffRow or isTrinketRow or isRacialRow or procRowSpellID then
 				if not frame._cogBtn then
 					local cogConfig = { size = Pixel.Scale(18), tooltip = 'Edit' }
 					local cog = Widget.Unwrap(Controls.Icon(frame, cogConfig))
@@ -2810,7 +2667,7 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 					frame._cogBtn:SetPoint('RIGHT', frame, 'RIGHT', Pixel.Scale(-6), 0)
 					frame._cogConfig.tooltip = 'Edit trinket slot'
 					frame._cogBtn:SetCallback(function()
-						ShowTrinketSlotModal(CDM, viewerSettings, entry.id, RefreshIconList)
+						ShowTrinketSlotModal(CDM, viewerSettings, viewerKey, entry.id, RefreshIconList)
 					end)
 				elseif isRacialRow then
 					frame._cogBtn:ClearAllPoints()
@@ -2850,10 +2707,9 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 			local dropSpell = text:match('^spell:(%d+)')
 			if dropSpell then DoAdd(tonumber(dropSpell), false); return end
 
-			local raw = text:match('^%s*(%d+)')
-			local num = raw and tonumber(raw)
-			if num and Controls.ShowDragDropPicker then
-				local _, itemSpellID = GetItemSpell(num)
+			local num = tonumber(text:match('^%s*(%d+)'))
+			if num then
+				local _, itemSpellID = C_Item.GetItemSpell(num)
 				Controls.ShowDragDropPicker(nil, num, itemSpellID or num,
 					function(selType, selID) DoAdd(selID, selType == 'item') end,
 					nil, nil, true
@@ -2861,7 +2717,6 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 				return
 			end
 			local id, isItem = BUI.Lookup.ParseSpellOrItemInput(text)
-			if not id then id = BUI.Lookup.ParseSpellInput(text) end
 			if not id then
 				BUILib.Toast.Error('Not found', 'No spell or item matched "' .. text .. '"')
 				return
@@ -2870,22 +2725,17 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 		end,
 		onSearchSelect = function(item) DoAdd(item.id, item.isItem) end,
 		onRemove = function(row)
-			if not row.id then return end
-			local isAutoSlot = type(row.id) == 'string' and
-				(row.id:match('^trinket:%d$') ~= nil or row.id:match('^racial:%d$') ~= nil)
 			local function DoDelete()
 				CDM.RemoveCustomSpell(viewerSettings, row.id)
 				CDM.SetManualBuff(viewerSettings, row.id, nil)
-				if not isAutoSlot then
-					local numericId = tonumber(tostring(row.id):match('%d+'))
-					if numericId then
-						if numericId ~= row.id then
-							CDM.RemoveCustomSpell(viewerSettings, numericId)
-							CDM.SetManualBuff(viewerSettings, numericId, nil)
-						end
-						CDM.SetBuffTracking(viewerSettings, numericId, nil)
-						CDM.SetIconOverride(viewerSettings, numericId, nil)
+				local numericId = tonumber(tostring(row.id):match('%d+'))
+				if numericId then
+					if numericId ~= row.id then
+						CDM.RemoveCustomSpell(viewerSettings, numericId)
+						CDM.SetManualBuff(viewerSettings, numericId, nil)
 					end
+					CDM.SetBuffTracking(viewerSettings, numericId, nil)
+					CDM.SetIconOverride(viewerSettings, numericId, nil)
 				end
 				CDM.SetIconOverride(viewerSettings, row.id, nil)
 				CDM.Custom.Refresh(viewerKey)
@@ -2910,101 +2760,43 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 		end,
 		onCheckboxChange = function(spellID, enabled, row)
 			if disabledIDs[spellID] then return end
-			local isCustom = row and row.data and row.data.removable
-			local isAutoSlot = type(spellID) == 'string' and
-				(spellID:match('^trinket:%d$') ~= nil or spellID:match('^racial:%d$') ~= nil)
-			local hideKey
-			if isAutoSlot then
-				hideKey = spellID
-			elseif isCustom then
-				local numId = type(spellID) == 'string' and tonumber(tostring(spellID):match('%d+')) or spellID
-				hideKey = numId and ('custom:' .. numId) or spellID
-			else
-				hideKey = spellID
-			end
-			CDM.SetHiddenIcon(viewerSettings, hideKey, not enabled)
+			CDM.SetHiddenIcon(viewerSettings, HideKeyFor(spellID, row.data.removable), not enabled)
 			CDM.RefreshLayoutOnly()
 		end,
 		onIconClick = function(spellID, row)
+			local isCustom = row.data.removable
 			if IsAltKeyDown() and viewerKey ~= 'buffs' then
-				local isCustom = row and row.data and row.data.removable
 				if not isCustom then return end
-				local numId = type(spellID) == 'string' and tonumber(tostring(spellID):match('%d+')) or spellID
-				local key = numId and ('custom:' .. numId) or spellID
-				local wasOn = CDM.IsAlwaysShow(viewerSettings, key)
-				CDM.SetAlwaysShow(viewerSettings, key, not wasOn)
+				local key = HideKeyFor(spellID, true)
+				CDM.SetAlwaysShow(viewerSettings, key, not CDM.IsAlwaysShow(viewerSettings, key))
 				CDM.SetUpdatePending(true)
 				RefreshIconList()
 				return
 			end
 			if IsShiftKeyDown() and viewerKey ~= 'buffs' then
-				local isCustom = row and row.data and row.data.removable
-				local hideKey
-				if isCustom then
-					local numId = type(spellID) == 'string' and tonumber(tostring(spellID):match('%d+')) or spellID
-					hideKey = numId and ('custom:' .. numId) or spellID
-				else
-					hideKey = spellID
-				end
-				local wasOn = CDM.IsShowOnlyOnCD(viewerSettings, hideKey)
-				CDM.SetShowOnlyOnCD(viewerSettings, hideKey, not wasOn)
+				local hideKey = HideKeyFor(spellID, isCustom)
+				CDM.SetShowOnlyOnCD(viewerSettings, hideKey, not CDM.IsShowOnlyOnCD(viewerSettings, hideKey))
 				CDM.UpdateShowOnlyOnCDWatcher()
 				CDM.RefreshLayoutOnly()
 				RefreshIconList()
 				return
 			end
-			if IsControlKeyDown() and viewerKey == "buffs" then
-				if row and row.data and row.data.removable then
-					ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, RefreshIconList)
-				end
+			if IsControlKeyDown() and viewerKey == "buffs" and isCustom then
+				ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, RefreshIconList)
 			end
 		end,
 		onRowRightClick = function(spellID, row)
-			if not row or not row.data then return end
 			local rowData = row.data
 			local isCustom = rowData.removable == true
 			local isTrinketRow = type(spellID) == 'string' and spellID:match('^trinket:%d$') ~= nil
 			local isRacialRow = type(spellID) == 'string' and spellID:match('^racial:%d$') ~= nil
 			local isAutoSlot = isTrinketRow or isRacialRow
 
-			local function ComputeHideKey()
-				if isAutoSlot then return spellID end
-				if isCustom then
-					local numId = type(spellID) == 'string' and tonumber(tostring(spellID):match('%d+')) or spellID
-					return numId and ('custom:' .. numId) or spellID
-				end
-				return spellID
-			end
-
 			local items = {}
 			items[#items + 1] = { text = rowData.name or tostring(spellID), title = true }
 
-			if viewerKey == 'buffs' then
-				local rowKey = rowData._sortKey or spellID
-				local curRow = CDM.GetBuffRow(viewerSettings, rowKey)
-				items[#items + 1] = { separator = true }
-				items[#items + 1] = {
-					text = 'Buff Row 1',
-					checked = curRow == 1,
-					callback = function()
-						CDM.SetBuffRow(viewerSettings, rowKey, 1)
-						CDM.CenterBuffsNow(true)
-						RefreshIconList()
-					end,
-				}
-				items[#items + 1] = {
-					text = 'Buff Row 2',
-					checked = curRow == 2,
-					callback = function()
-						CDM.SetBuffRow(viewerSettings, rowKey, 2)
-						CDM.CenterBuffsNow(true)
-						RefreshIconList()
-					end,
-				}
-			end
-
 			if viewerKey ~= 'buffs' then
-				local hideKey = ComputeHideKey()
+				local hideKey = HideKeyFor(spellID, isCustom)
 				items[#items + 1] = {
 					text = 'Show Only On Cooldown',
 					checked = CDM.IsShowOnlyOnCD(viewerSettings, hideKey) and true or false,
@@ -3056,14 +2848,7 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 				end
 			end
 
-			local procSpellID
-			if not isAutoSlot then
-				if type(spellID) == 'number' then
-					procSpellID = spellID
-				elseif type(spellID) == 'string' then
-					procSpellID = tonumber(spellID:match('^%d+$'))
-				end
-			end
+			local procSpellID = ProcSpellIDFor(spellID)
 			if procSpellID then
 				local procCfg = CDM.GetProcConfig(procSpellID)
 				items[#items + 1] = { separator = true }
@@ -3086,9 +2871,7 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 
 			if isTrinketRow then
 				items[#items + 1] = { separator = true }
-				local slotNum = tonumber(spellID:match('^trinket:(%d)$'))
-				local inv = slotNum == 1 and 13 or 14
-				local resolvedItemID = GetInventoryItemID('player', inv)
+				local resolvedItemID = BUI.IconEngine.ResolveTrinketSlot(tonumber(spellID:match('^trinket:(%d)$')))
 				local isBl = resolvedItemID and CDM.IsTrinketBlacklisted(viewerSettings, resolvedItemID) or false
 				items[#items + 1] = {
 					text = isBl and 'Unblacklist Equipped Trinket' or 'Blacklist Equipped Trinket',
@@ -3102,7 +2885,7 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 				}
 				items[#items + 1] = {
 					text = 'Edit Trinket Slot...',
-					callback = function() ShowTrinketSlotModal(CDM, viewerSettings, spellID, RefreshIconList) end,
+					callback = function() ShowTrinketSlotModal(CDM, viewerSettings, viewerKey, spellID, RefreshIconList) end,
 				}
 			elseif isRacialRow then
 				items[#items + 1] = { separator = true }
@@ -3149,19 +2932,20 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 		end,
 	})
 
-	do
-		local hint = container.child:CreateFontString(nil, 'OVERLAY')
-		hint:SetFont(BUILib.Font, 10, '')
-		hint:SetTextColor(0.45, 0.45, 0.45)
-		local parts = { 'Right-click for options' }
-		if viewerKey == "buffs" then
-			parts[#parts + 1] = 'Ctrl+click = set buff duration'
-		else
-			parts[#parts + 1] = 'Shift+click = show only on cooldown'
-			parts[#parts + 1] = 'Alt+click = always show (ignore Dynamic Show/Hide)'
-		end
-		hint:SetText(table.concat(parts, '  |  '))
+	local hint = container.child:CreateFontString(nil, 'OVERLAY')
+	hint:SetFont(BUILib.Font, 10, '')
+	hint:SetTextColor(0.55, 0.55, 0.55)
+	hint:SetWidth(container.width)
+	hint:SetJustifyH('LEFT')
+	local shortcuts = { 'Right-click for options' }
+	if viewerKey == 'buffs' then
+		shortcuts[#shortcuts + 1] = 'Ctrl+click the icon to set its duration'
+	else
+		shortcuts[#shortcuts + 1] = 'Shift+click the icon to show it only on cooldown'
+		shortcuts[#shortcuts + 1] = 'Alt+click a custom icon to always show it'
 	end
+	hint:SetText(table.concat(shortcuts, '  |  '))
+	Layout.PositionInTab(container, hint, HINT_HEIGHT, HINT_GAP)
 
 	local btnContainer = CreateFrame('Frame', nil, container.child)
 	btnContainer:SetSize(container.width, 26)
@@ -3185,7 +2969,8 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 		CDM.SetIconOrder(viewerSettings, order)
 		CDM.RefreshLayoutOnly()
 		RefreshIconList()
-		local _, specName = GetSpecializationInfo(GetSpecialization() or 1)
+		local specIndex = C_SpecializationInfo.GetSpecialization()
+		local specName = specIndex and select(2, C_SpecializationInfo.GetSpecializationInfo(specIndex))
 		BUILib.Toast.Success('Order saved', ('%s spec, %d entries'):format(specName or 'current', #order))
 	end)
 	saveBtn:SetPoint('LEFT', 0, 0)
@@ -3214,7 +2999,6 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 				if viewerSettings.buffTracking then viewerSettings.buffTracking[buildKey] = nil end
 				if viewerSettings.detachedIcons then viewerSettings.detachedIcons[buildKey] = nil end
 				if viewerSettings.barColors then viewerSettings.barColors[buildKey] = nil end
-				if viewerSettings.buffRows then viewerSettings.buffRows[buildKey] = nil end
 				CDM.Custom.Refresh(viewerKey)
 				RefreshIconList()
 				CDM.RefreshLayoutOnly()
@@ -3226,7 +3010,6 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 
 	Layout.PositionInTab(container, btnContainer, 26, 4)
 	C_Timer.After(0.1, RefreshIconList)
-	return iconList
 end
 
 local function CreateContentWrapper(parent, width)
@@ -3241,8 +3024,6 @@ local function CreateContentWrapper(parent, width)
 end
 
 function BUI.BuildCDMIconManagementTab(tab, db)
-	local CDM = BUI.CDM
-
 	local viewerKeys = { 'essential', 'utility', 'buffs' }
 	local viewerItems = {
 		{ value = 1, text = 'Essential' },
@@ -3254,7 +3035,6 @@ function BUI.BuildCDMIconManagementTab(tab, db)
 	local activeIdx = BUI._cdmViewerIdx or 1
 
 	local grid = BUILib.PageKit.RowGrid(tab)
-	local autosortRow
 	grid:Add({
 		spanFull = true,
 		title = 'Viewer',
@@ -3267,32 +3047,14 @@ function BUI.BuildCDMIconManagementTab(tab, db)
 				for i, card in ipairs(containers) do
 					card.frame:SetShown(i == val)
 				end
-				autosortRow:SetValue(db.cdm[viewerKeys[val]].noAutosort or false)
 			end, nil, 120)
 		end,
 	})
-	autosortRow = grid:Add({
-		spanFull = true,
-		title = 'No Autosort',
-		description = 'Keep manual order; new icons are not sorted in.',
-		checked = db.cdm[viewerKeys[activeIdx]].noAutosort or false,
-		callback = function(v)
-			local cfg = db.cdm[viewerKeys[activeIdx]]
-			cfg.noAutosort = v or nil
-			CDM.RefreshLayoutOnly()
-		end,
-	})
-	grid:Flush()
 
 	local dropdownAnchor = tab.lastControl
-
-	local OVERHEAD = 270
-	local tabVisH = tab.frame:GetHeight()
-	if not tabVisH or tabVisH < 100 then tabVisH = 600 end
-	local listH = math.max(200, tabVisH - OVERHEAD)
+	local listH = math.max(200, tab.frame:GetHeight() - 270)
 
 	for i, key in ipairs(viewerKeys) do
-		local viewerCfg = db.cdm[key]
 		local content = CreateContentWrapper(tab.child, tab.width)
 		content.frame:SetPoint('TOPLEFT', dropdownAnchor, 'BOTTOMLEFT', -Layout.DEFAULT_PADDING, 0)
 		content.frame:SetPoint('RIGHT', tab.child, 'RIGHT', 0, 0)
@@ -3302,9 +3064,8 @@ function BUI.BuildCDMIconManagementTab(tab, db)
 			content.frame:Hide()
 		end
 
-		local list = BuildIconManagementContent(content, key, viewerCfg, listH)
+		BuildIconManagementContent(content, key, db.cdm[key], listH)
 		content.frame:SetHeight(math.abs(content.y) + 20)
-		containers[i]._iconList = list
 	end
 
 	local maxH = 0
@@ -3313,19 +3074,6 @@ function BUI.BuildCDMIconManagementTab(tab, db)
 		if containerH > maxH then maxH = containerH end
 	end
 	tab:AddY(10 + maxH)
-
-	local baseContentH = containers[1] and math.abs(containers[1].y) + 20 or 400
-	local lastListH = listH
-	tab.frame:HookScript('OnSizeChanged', function(_, w, h)
-		local newListH = math.max(200, h - OVERHEAD)
-		if math.abs(newListH - lastListH) < 5 then return end
-		local delta = newListH - listH
-		lastListH = newListH
-		for _, card in ipairs(containers) do
-			card._iconList:SetListHeight(newListH)
-			card.frame:SetHeight(baseContentH + delta)
-		end
-	end)
 end
 
 BUI.ShowCDMProcModal = ShowProcModal

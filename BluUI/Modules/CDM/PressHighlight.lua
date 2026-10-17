@@ -114,7 +114,7 @@ local function CollectRawKeysForSpell(spellID)
     local variantCount = 1
     collectVariants[1] = spellID
     local baseSpellID = C_Spell.GetBaseSpell(spellID)
-    if baseSpellID and baseSpellID ~= 0 and baseSpellID ~= spellID then
+    if baseSpellID ~= 0 and baseSpellID ~= spellID then
         variantCount = variantCount + 1
         collectVariants[variantCount] = baseSpellID
     end
@@ -265,7 +265,7 @@ local function ConfigureOverlay(overlay, icon)
         overlay:SetAllPoints(icon)
     else
         overlay:SetColorTexture(1, 1, 1, 1)
-        overlay:SetAllPoints(icon.Icon or icon)
+        overlay:SetAllPoints(icon.Icon)
     end
     overlay:SetVertexColor(tintColor[1], tintColor[2], tintColor[3], tintColor[4])
 end
@@ -285,10 +285,7 @@ end
 
 local function SetupOverlayForAnim(icon)
     local overlay = GetOverlay(icon)
-    overlay:SetColorTexture(1, 1, 1, 1)
-    overlay:ClearAllPoints()
-    overlay:SetAllPoints(icon.Icon or icon)
-    overlay:SetVertexColor(tintColor[1], tintColor[2], tintColor[3], tintColor[4])
+    ConfigureOverlay(overlay, icon)
     overlay:Show()
     return overlay
 end
@@ -324,9 +321,8 @@ local function GetExplodeFrames(icon)
     local frameData = CDM.GetFrameData(icon)
     if frameData._pressExplode then return frameData._pressExplode end
 
-    local iconRegion = icon.Icon or icon
     local clip = CreateFrame('Frame', nil, icon)
-    clip:SetAllPoints(iconRegion)
+    clip:SetAllPoints(icon.Icon)
     clip:SetClipsChildren(true)
     clip:SetFrameLevel(icon:GetFrameLevel() + 4)
 
@@ -437,9 +433,8 @@ local function GetRippleFrames(icon)
     local frameData = CDM.GetFrameData(icon)
     if frameData._pressRipple then return frameData._pressRipple end
 
-    local iconRegion = icon.Icon or icon
     local clip = CreateFrame('Frame', nil, icon)
-    clip:SetAllPoints(iconRegion)
+    clip:SetAllPoints(icon.Icon)
     clip:SetClipsChildren(true)
     clip:SetFrameLevel(icon:GetFrameLevel() + 4)
 
@@ -506,10 +501,8 @@ local function GetGlassShine(icon)
     local frameData = CDM.GetFrameData(icon)
     if frameData._pressGlass then return frameData._pressGlass end
 
-    local iconRegion = icon.Icon or icon
-
     local clip = CreateFrame('Frame', nil, icon)
-    clip:SetAllPoints(iconRegion)
+    clip:SetAllPoints(icon.Icon)
     clip:SetClipsChildren(true)
     clip:SetFrameLevel(icon:GetFrameLevel() + 4)
 
@@ -590,7 +583,7 @@ local procOptions = {
     color = tintColor,
     duration = 1.0,
     key = PRESS_GLOW_KEY,
-    frameLevel = 15,
+    frameLevel = CDM.GLOW_LAYER,
     startAnim = false,
 }
 
@@ -616,11 +609,10 @@ local function StartAnimatedGlow(icon)
     elseif style == 'ripple' then StartRipple(icon)
     elseif style == 'glass' then StartGlass(icon)
     elseif style == 'pixel' then
-        LibCustomGlow.PixelGlow_Start(icon, tintColor, 8, 0.25, nil, 2, 0, 0, true, PRESS_GLOW_KEY, 15)
+        LibCustomGlow.PixelGlow_Start(icon, tintColor, 8, 0.25, nil, 2, 0, 0, true, PRESS_GLOW_KEY, CDM.GLOW_LAYER)
     elseif style == 'autocast' then
-        LibCustomGlow.AutoCastGlow_Start(icon, tintColor, 4, 0.6, 1.0, 0, 0, PRESS_GLOW_KEY, 15)
+        LibCustomGlow.AutoCastGlow_Start(icon, tintColor, 4, 0.6, 1.0, 0, 0, PRESS_GLOW_KEY, CDM.GLOW_LAYER)
     elseif style == 'proc' then
-        procOptions.color = tintColor
         LibCustomGlow.ProcGlow_Start(icon, procOptions)
     elseif style == 'buttonglow' then
         local proxy = GetButtonGlowProxy(icon)
@@ -879,19 +871,13 @@ local function SyncConfig()
         end
     end
 
-    showTint = config.showTint ~= false
+    showTint = config.showTint
     showBorder = config.showBorder
     overlayStyle = newStyle
     isAnimatedStyle = willBeAnimated
 
-    tintColor[1] = config.tintColor[1] or 1
-    tintColor[2] = config.tintColor[2] or 1
-    tintColor[3] = config.tintColor[3] or 1
-    tintColor[4] = config.tintColor[4] or 0.3
-    borderColor[1] = config.borderColor[1] or 1
-    borderColor[2] = config.borderColor[2] or 1
-    borderColor[3] = config.borderColor[3] or 1
-    borderColor[4] = config.borderColor[4] or 1
+    tintColor[1], tintColor[2], tintColor[3], tintColor[4] = config.tintColor[1], config.tintColor[2], config.tintColor[3], config.tintColor[4]
+    borderColor[1], borderColor[2], borderColor[3], borderColor[4] = config.borderColor[1], config.borderColor[2], config.borderColor[3], config.borderColor[4]
 
     if config.enabled and not running then
         running = true
