@@ -46,7 +46,6 @@ local BAR_DEFAULTS = {
     x            = 0,
     y            = 0,
 }
-Datatext.BAR_DEFAULTS = BAR_DEFAULTS
 
 local function FillDefaults(destination, source)
     for key, default in pairs(source) do
@@ -62,24 +61,60 @@ end
 local function ApplyBarDefaults(config)
     FillDefaults(config, BAR_DEFAULTS)
 end
-Datatext.ApplyBarDefaults = ApplyBarDefaults
 
 local function GetBars()
     return BUI.GetDB().datatextBars
 end
 
 local function GetBarConfig(barIndex) return GetBars()[barIndex] end
-local function GetConfig() return GetBarConfig(1) end
 local function GetMinimapConfig() return BUI.GetDB().datatextMinimap end
 local function ModuleEnabled() return BUI.GetDB().datatextEnabled ~= false end
 local function IsPanel(config) return config and config.kind == 'PANEL' end
 
 Datatext.GetBars = GetBars
 Datatext.GetBarConfig = GetBarConfig
-Datatext.GetDB = GetConfig
 Datatext.GetMinimapDB = GetMinimapConfig
 Datatext.ModuleEnabled = ModuleEnabled
 Datatext.IsPanel = IsPanel
+
+local function KindPrefix(kind)
+    return kind == 'PANEL' and 'Panel ' or 'Bar '
+end
+
+local function AutoNumber(name, prefix)
+    return tonumber(name:match('^' .. prefix .. '(%d+)$'))
+end
+
+local function UsedNumbers(kind, skipIndex)
+    local prefix, list, used = KindPrefix(kind), GetBars(), {}
+    for barIndex = 1, #list do
+        local config = list[barIndex]
+        if barIndex ~= skipIndex and IsPanel(config) == (kind == 'PANEL') then
+            local number = AutoNumber(config.name, prefix)
+            if number then used[number] = true end
+        end
+    end
+    return used
+end
+
+local function FreeName(kind, skipIndex)
+    local used = UsedNumbers(kind, skipIndex)
+    local number = 1
+    while used[number] do number = number + 1 end
+    return KindPrefix(kind) .. number
+end
+
+local function FixBarNames()
+    local list = GetBars()
+    for barIndex = 1, #list do
+        local config = list[barIndex]
+        local kind = IsPanel(config) and 'PANEL' or 'TEXT'
+        local number = AutoNumber(config.name, KindPrefix(kind))
+        if number and UsedNumbers(kind, barIndex)[number] then
+            config.name = FreeName(kind, barIndex)
+        end
+    end
+end
 
 function Datatext.MigrateBars()
     local profile = BUI.GetDB()
@@ -110,7 +145,6 @@ function Datatext.MigrateBars()
         list[1] = first
     end
     profile.datatextBarsInit = true
-    Datatext.FixBarNames()
     for barIndex = 1, #list do
         local config = list[barIndex]
         if not config.spacingPx then
@@ -125,55 +159,20 @@ function Datatext.MigrateBars()
             config.y = config.offsetBottom
         end
     end
+    FixBarNames()
+    local minimap = GetMinimapConfig()
+    if not minimap.spacingPx then
+        minimap.spacing = (tonumber(minimap.spacing) or 1) * 3
+        minimap.spacingPx = true
+    end
     if profile.datatextHideHoversInCombat == false or profile.datatextRosterTooltips == false then
         local hideHovers, roster = profile.datatextHideHoversInCombat ~= false, profile.datatextRosterTooltips ~= false
         for barIndex = 1, #list do
             list[barIndex].hideHoversInCombat, list[barIndex].rosterTooltips = hideHovers, roster
         end
-        local minimap = GetMinimapConfig()
         minimap.hideHoversInCombat, minimap.rosterTooltips = hideHovers, roster
     end
     profile.datatextHideHoversInCombat, profile.datatextRosterTooltips = nil, nil
-end
-
-local function KindPrefix(kind)
-    return kind == 'PANEL' and 'Panel ' or 'Bar '
-end
-
-local function AutoNumber(name, prefix)
-    if type(name) == 'string' then return tonumber(name:match('^' .. prefix .. '(%d+)$')) end
-    return nil
-end
-
-local function UsedNumbers(kind, skipIndex)
-    local prefix, list, used = KindPrefix(kind), GetBars(), {}
-    for barIndex = 1, #list do
-        local config = list[barIndex]
-        if barIndex ~= skipIndex and IsPanel(config) == (kind == 'PANEL') then
-            local number = AutoNumber(config.name, prefix)
-            if number then used[number] = true end
-        end
-    end
-    return used
-end
-
-local function FreeName(kind, skipIndex)
-    local used = UsedNumbers(kind, skipIndex)
-    local number = 1
-    while used[number] do number = number + 1 end
-    return KindPrefix(kind) .. number
-end
-
-function Datatext.FixBarNames()
-    local list = GetBars()
-    for barIndex = 1, #list do
-        local config = list[barIndex]
-        local kind = IsPanel(config) and 'PANEL' or 'TEXT'
-        local number = AutoNumber(config.name, KindPrefix(kind))
-        if number and UsedNumbers(kind, barIndex)[number] then
-            config.name = FreeName(kind, barIndex)
-        end
-    end
 end
 
 function Datatext.AddBar(kind)
@@ -216,19 +215,8 @@ function Datatext.AnyShows(key)
     return false
 end
 
-local QueueApply = BUI.Dispatcher.New(function()
-    if Datatext._initialized then Datatext.Apply() end
-end, 'Datatext.Register')
-
 function Datatext.Register(id, entry)
-    if registry[id] then
-        for listIndex = #registryList, 1, -1 do
-            if registryList[listIndex].id == id then table.remove(registryList, listIndex) end
-        end
-    end
     entry.id = id
-    entry.show = entry.show or ('show_' .. id)
-    entry.label = entry.label or (entry.name .. ':')
     entry.labelText = WHITE .. entry.label .. RESET .. ' '
     entry.hideLabel = 'hideLabel_' .. id
     entry.key = 'Datatext.' .. id
@@ -240,12 +228,6 @@ function Datatext.Register(id, entry)
     end
     registry[id] = entry
     registryList[#registryList + 1] = entry
-    if Datatext._initialized then
-        local list = GetBars()
-        for barIndex = 1, #list do ApplyBarDefaults(list[barIndex]) end
-        QueueApply()
-    end
-    return entry
 end
 
 function Datatext.Get(id) return registry[id] end
@@ -262,7 +244,7 @@ end
 
 function Datatext.ResolveOrder(config)
     local result, seen = {}, {}
-    local order = config and config.order
+    local order = config.order
     if order then
         for orderIndex = 1, #order do
             local id = order[orderIndex]
@@ -304,28 +286,6 @@ function Datatext.OpenCurrencyUI()
     ToggleCharacter('TokenFrame')
 end
 
-function Datatext.FormatMoney(copper, goldOnly)
-    copper = copper or 0
-    local negative = copper < 0
-    if negative then copper = -copper end
-    local gold = math.floor(copper / 10000)
-    local silver = math.floor((copper % 10000) / 100)
-    local cents = copper % 100
-    local goldText = BreakUpLargeNumbers(gold)
-    local text
-    if goldOnly or gold >= 1000 then
-        text = goldText .. '|cffffd700g|r'
-    elseif gold > 0 then
-        text = string.format('%s|cffffd700g|r %d|cffc7c7cfs|r', goldText, silver)
-    elseif silver > 0 then
-        text = string.format('%d|cffc7c7cfs|r %d|cffeda55fc|r', silver, cents)
-    else
-        text = string.format('%d|cffeda55fc|r', cents)
-    end
-    if negative then text = '-' .. text end
-    return text
-end
-
 function Datatext.BuildSampleParts(config)
     local valueColor = config.colorValue
     local valueHex = BUI.Hex(valueColor.r, valueColor.g, valueColor.b)
@@ -334,15 +294,8 @@ function Datatext.BuildSampleParts(config)
     local order = Datatext.ResolveOrder(config)
     for orderIndex = 1, #order do
         local entry = registry[order[orderIndex]]
-        if entry and config[entry.show] then
-            local label = Datatext.Label(config, entry)
-            local text
-            if entry.sample then
-                text = entry.sample(config, label, colorize)
-            else
-                text = label .. colorize('123')
-            end
-            if text and text ~= '' then parts[#parts + 1] = text end
+        if config[entry.show] then
+            parts[#parts + 1] = entry.sample(config, Datatext.Label(config, entry), colorize)
         end
     end
     return parts

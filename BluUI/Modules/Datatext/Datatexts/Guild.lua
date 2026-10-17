@@ -8,7 +8,7 @@ local function Read()
     local online = 0
     if IsInGuild() then
         local _, count = GetNumGuildMembers()
-        online = count or 0
+        online = count
     end
     if online ~= guildOnline then
         guildOnline = online
@@ -19,12 +19,12 @@ end
 Datatext.Register('guild', {
     name = 'Guild', show = 'showGuild', label = 'Guild:',
     events = { 'GUILD_ROSTER_UPDATE', 'PLAYER_GUILD_UPDATE', 'GROUP_ROSTER_UPDATE', 'PLAYER_ENTERING_WORLD' },
-    OnInit = function()
-        Datatext.RequestKeystones()
-    end,
     OnActivate = function()
         Read()
-        if IsInGuild() then C_GuildInfo.GuildRoster() end
+        if IsInGuild() then
+            C_GuildInfo.GuildRoster()
+            Datatext.RequestKeystones()
+        end
     end,
     OnEvent = function()
         if Read() then Datatext.Refresh('guild') end
@@ -35,8 +35,7 @@ Datatext.Register('guild', {
     end,
     OnClick = function(_, button)
         if button ~= 'LeftButton' then return end
-        local toggle = ToggleGuildFrame or ToggleCommunitiesFrame
-        if IsInGuild() and toggle then toggle() end
+        if IsInGuild() then ToggleGuildFrame() end
         return true
     end,
     OnEnter = function(hit)

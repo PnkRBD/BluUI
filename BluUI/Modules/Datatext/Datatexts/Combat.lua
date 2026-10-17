@@ -2,6 +2,7 @@ local _, BUI = ...
 
 local Datatext = BUI.Datatext
 local Pixel = BUI.Pixel
+local Painter = BUI.Painter
 
 local PULL_HISTORY_MAX = 10
 local COMBAT_END_GRACE = 1.5
@@ -83,6 +84,11 @@ local function OnCombatEnd()
     end)
 end
 
+local function PaintHint(fontString)
+    fontString:SetTextColor(BUI.ThemeColor('muted'))
+    fontString:SetText('|cff' .. BUI.Hex(BUI.ThemeColor('text')) .. 'Ctrl+Right-Click|r Clear')
+end
+
 local function BuildCombatPanel()
     if combatPanel then return end
     local panel = Datatext.CreateHoverPanel('BUI_DatatextCombat', PANEL_WIDTH)
@@ -99,10 +105,12 @@ local function BuildCombatPanel()
         name:SetWidth(Pixel.Scale(TIME_X - 18))
         name:SetWordWrap(false)
         name:SetJustifyH('LEFT')
+        Painter.Text(name, 'muted')
         local time = panel:CreateFontString(nil, 'OVERLAY')
         Pixel.ApplyFont(time, 11, font)
         time:SetPoint('TOPLEFT', Pixel.Scale(TIME_X), rowTop)
         time:SetJustifyH('LEFT')
+        Painter.Text(time, 'text')
         panel.rows[pullIndex] = { name = name, time = time }
     end
 
@@ -110,20 +118,12 @@ local function BuildCombatPanel()
     Pixel.ApplyFont(panel.empty, 11, font)
     panel.empty:SetPoint('TOPLEFT', Pixel.Scale(12), Pixel.Scale(-34))
     panel.empty:SetText('No pulls recorded')
+    Painter.Text(panel.empty, 'muted')
 
     panel.hint = panel:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(panel.hint, 10, font)
     panel.hint:SetPoint('BOTTOMLEFT', Pixel.Scale(10), Pixel.Scale(7))
-
-    function panel:PaintTheme()
-        for _, row in ipairs(self.rows) do
-            row.name:SetTextColor(BUI.ThemeColor('muted'))
-            row.time:SetTextColor(BUI.ThemeColor('text'))
-        end
-        self.empty:SetTextColor(BUI.ThemeColor('muted'))
-        self.hint:SetTextColor(BUI.ThemeColor('muted'))
-        self.hint:SetText('|cff' .. BUI.Hex(BUI.ThemeColor('accent')) .. 'Ctrl+Right-Click|r Clear')
-    end
+    Painter.Custom(panel.hint, PaintHint)
 
     combatPanel = panel
 end

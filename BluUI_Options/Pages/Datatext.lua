@@ -38,13 +38,8 @@ local items = {}
 local preview
 local fonts
 
-local function Window()
-	return BUI.PageEngine.window
-end
-
-local function Repaint()
-	Window():Repaint()
-end
+local Kit = BUI.OptionsKit
+local Window, Repaint, RebuildPage, Option, Swatch = Kit.Window, Kit.Repaint, Kit.RebuildPage, Kit.Option, Kit.TableColor
 
 local function Bars()
 	return Datatext.GetBars()
@@ -71,10 +66,6 @@ local function Apply()
 	RefreshPreview()
 end
 
-local function RebuildPage()
-	BUILib.Defer(function() BUI.PageEngine.RefreshCurrentPage() end)
-end
-
 local function Create(kind)
 	selected = Datatext.AddBar(kind)
 	RebuildPage()
@@ -93,25 +84,6 @@ local function ConfirmDelete(index)
 			RebuildPage()
 		end,
 	})
-end
-
-local function Option(config, label, key, extra)
-	local option = { label = label, get = function() return config[key] end, set = function(value) config[key] = value end }
-	for name, value in pairs(extra or {}) do option[name] = value end
-	return option
-end
-
-local function Swatch(config, label, key, opacity)
-	return {
-		kind = 'swatch', label = label, tooltip = label, opacity = opacity,
-		get = function()
-			local color = config[key]
-			return color.r, color.g, color.b, opacity and color.a or 1
-		end,
-		set = function(red, green, blue, alpha)
-			config[key] = opacity and { r = red, g = green, b = blue, a = alpha } or { r = red, g = green, b = blue }
-		end,
-	}
 end
 
 local function BackgroundSwatch(config)
@@ -227,6 +199,7 @@ local function BarSample(kit, cell, config)
 	sizer:SetPoint('LEFT')
 	local note = kit.Text(cell, 'No datatexts on this bar yet', 12, 'faint')
 	note:SetPoint('LEFT')
+	local widths = {}
 	return function()
 		local texts = Datatext.BuildSampleParts(config)
 		local count = #texts
@@ -237,7 +210,6 @@ local function BarSample(kit, cell, config)
 		if count == 0 then return math.ceil(note:GetStringWidth()) end
 		local fontPath = BUI.GetModuleFont(config)
 		Pixel.ApplyFont(sizer, config.fontSize, fontPath, '')
-		local widths = {}
 		for partIndex = 1, count do
 			sizer:SetText(texts[partIndex])
 			widths[partIndex] = math.ceil(sizer:GetStringWidth())
@@ -503,7 +475,7 @@ BUI.PageEngine.RegisterPage('datatext', {
 			RefreshPreview()
 		end
 		RefreshPreview()
-		Datatext.SetLockCallback(Repaint)
+		BUI.OnModuleChange('datatext', Repaint)
 		page:AutoRefresh()
 	end,
 })

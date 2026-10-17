@@ -2,6 +2,7 @@ local _, BUI = ...
 
 local Datatext = BUI.Datatext
 local Pixel = BUI.Pixel
+local Painter = BUI.Painter
 local BUILib = LibStub('BUILib')
 local Widget = BUILib.Widget
 
@@ -33,9 +34,9 @@ local specPanel
 local pendingSpecID, pendingConfigID, pendingUnflag
 
 local function CurrentSpecInfo()
-    local specIndex = GetSpecialization()
+    local specIndex = C_SpecializationInfo.GetSpecialization()
     if not specIndex then return nil, 'None' end
-    local specID, name = GetSpecializationInfo(specIndex)
+    local specID, name = C_SpecializationInfo.GetSpecializationInfo(specIndex)
     return specID, name or '?'
 end
 
@@ -53,12 +54,6 @@ local function Read()
         lootSpecName, currentSpecName = loot, current
         return true
     end
-end
-
-local function ActiveText(text, isActive)
-    if not isActive then return text end
-    local red, green, blue = BUI.ThemeColor('accent')
-    return '|cff' .. BUI.Hex(red, green, blue) .. text .. '|r'
 end
 
 local function ShowError(message)
@@ -85,18 +80,20 @@ local function OpenLootSpecMenu(anchor)
     local items = {
         { title = 'Loot Specialization' },
         {
-            text = ActiveText('Current Specialization (' .. currentName .. ')', lootSpecID == 0),
+            text = 'Current Specialization (' .. currentName .. ')',
             icon = CURRENT_SPEC_ICON,
+            checked = lootSpecID == 0,
             callback = function() SetLootSpecialization(0) end,
         },
         { separator = true },
     }
     for specIndex = 1, GetNumSpecializations() do
-        local specID, name, _, icon = GetSpecializationInfo(specIndex)
+        local specID, name, _, icon = C_SpecializationInfo.GetSpecializationInfo(specIndex)
         if specID then
             items[#items + 1] = {
-                text = ActiveText(name, lootSpecID == specID),
+                text = name,
                 icon = icon,
+                checked = lootSpecID == specID,
                 callback = function() SetLootSpecialization(specID) end,
             }
         end
@@ -176,7 +173,7 @@ local function OpenLoadoutMenu(anchor)
 end
 
 local function ActivateSpec(specIndex)
-    if specIndex == GetSpecialization() then return end
+    if specIndex == C_SpecializationInfo.GetSpecialization() then return end
     if InCombatLockdown() then
         ShowError(ERR_NOT_IN_COMBAT)
         return
@@ -253,17 +250,20 @@ local function CreateRow(panel, rowIndex, label, open)
     Pixel.ApplyFont(row.label, 11, font)
     row.label:SetPoint('LEFT', Pixel.Scale(ROW_INSET), 0)
     row.label:SetText(label)
+    Painter.Text(row.label, 'muted')
     row.chevron = row:CreateTexture(nil, 'OVERLAY')
     row.chevron:SetTexture(BUILib.GetLibMedia('dropdown'))
     row.chevron:SetSize(Pixel.Scale(CHEVRON_SIZE), Pixel.Scale(CHEVRON_SIZE))
     row.chevron:SetRotation(CHEVRON_ROTATION)
     row.chevron:SetPoint('RIGHT', -Pixel.Scale(ROW_INSET), 0)
+    Painter.Tint(row.chevron, 'muted')
     row.value = row:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(row.value, 11, font)
     row.value:SetJustifyH('RIGHT')
     row.value:SetWordWrap(false)
     row.value:SetPoint('LEFT', row.label, 'RIGHT', Pixel.Scale(8), 0)
     row.value:SetPoint('RIGHT', row.chevron, 'LEFT', -Pixel.Scale(6), 0)
+    Painter.Text(row.value, 'text')
     row.open = open
     row:SetScript('OnEnter', BUI.Profiler.Script('Datatext.LootSpec row OnEnter', RowEnter))
     row:SetScript('OnLeave', BUI.Profiler.Script('Datatext.LootSpec row OnLeave', RowLeave))
@@ -281,6 +281,7 @@ local function BuildSpecPanel()
     Pixel.ApplyFont(panel.current, 12, font)
     panel.current:SetPoint('TOPRIGHT', -Pixel.Scale(PANEL_PAD), Pixel.Scale(-8))
     panel.current:SetJustifyH('RIGHT')
+    Painter.Text(panel.current, 'text')
 
     panel.specButtons = {}
     for specIndex = 1, MAX_SPECS do panel.specButtons[specIndex] = CreateSpecButton(panel, specIndex) end
@@ -294,16 +295,7 @@ local function BuildSpecPanel()
     Pixel.ApplyFont(panel.note, 10, font)
     panel.note:SetPoint('TOPLEFT', Pixel.Scale(PANEL_PAD), Pixel.Scale(-(ROW_TOP + #panel.rows * (ROW_HEIGHT + ROW_GAP) + 2)))
     panel.note:SetText('Loot follows your current specialization')
-
-    function panel:PaintTheme()
-        self.current:SetTextColor(BUI.ThemeColor('accent'))
-        for _, row in ipairs(self.rows) do
-            row.label:SetTextColor(BUI.ThemeColor('muted'))
-            row.value:SetTextColor(BUI.ThemeColor('text'))
-            row.chevron:SetVertexColor(BUI.ThemeColor('muted'))
-        end
-        self.note:SetTextColor(BUI.ThemeColor('muted'))
-    end
+    Painter.Text(panel.note, 'muted')
 
     specPanel = panel
 end
@@ -311,18 +303,18 @@ end
 local function RenderSpecPanel()
     local panel = specPanel
     local specID, specName = CurrentSpecInfo()
-    local activeIndex = GetSpecialization()
+    local activeIndex = C_SpecializationInfo.GetSpecialization()
     local numSpecs = GetNumSpecializations()
     for specIndex = 1, MAX_SPECS do
         local button = panel.specButtons[specIndex]
         local id, name, _, icon
-        if specIndex <= numSpecs then id, name, _, icon = GetSpecializationInfo(specIndex) end
+        if specIndex <= numSpecs then id, name, _, icon = C_SpecializationInfo.GetSpecializationInfo(specIndex) end
         if id then
             button.specName = name
             button.active = specIndex == activeIndex
             button.icon:SetTexture(icon)
             button:SetAlpha(button.active and 1 or INACTIVE_ALPHA)
-            Pixel.SetBorderColor(button, BUI.ThemeColor(button.active and 'accent' or 'edge'))
+            Pixel.SetBorderColor(button, BUI.ThemeColor(button.active and 'text' or 'inputEdge'))
             button:Show()
         else
             button:Hide()

@@ -4,18 +4,18 @@ local Datatext = BUI.Datatext
 
 local localHour, localMinute = -1, -1
 local realmHour, realmMinute = -1, -1
+local lastMinute
 
 local raids, dungeons, worldBosses = {}, {}, {}
 
 local function ReadClock()
+    local minute = math.floor(time() / 60)
+    if minute == lastMinute then return end
+    lastMinute = minute
     local localTime = date('*t')
     local realmTime = C_DateAndTime.GetCurrentCalendarTime()
-    local newLocalHour, newLocalMinute = localTime.hour, localTime.min
-    local newRealmHour, newRealmMinute = realmTime.hour, realmTime.minute
-    if newLocalHour ~= localHour or newLocalMinute ~= localMinute or newRealmHour ~= realmHour or newRealmMinute ~= realmMinute then
-        localHour, localMinute, realmHour, realmMinute = newLocalHour, newLocalMinute, newRealmHour, newRealmMinute
-        return true
-    end
+    localHour, localMinute, realmHour, realmMinute = localTime.hour, localTime.min, realmTime.hour, realmTime.minute
+    return true
 end
 
 local function FormatClock(hour, minute, twentyFour)
@@ -94,12 +94,11 @@ Datatext.Register('time', {
     end,
     OnClick = function(_, button)
         if button ~= 'LeftButton' or InCombatLockdown() then return end
-        if ToggleCalendar then ToggleCalendar() end
+        ToggleCalendar()
         return true
     end,
     OnEnter = function(hit, bar)
-        local config = bar.getConfig()
-        local twentyFour = config and config.time24
+        local twentyFour = bar.getConfig().time24
         local tooltip = Datatext.Tooltip(hit)
         tooltip:AddLine('Time', 1, 1, 1)
         tooltip:AddDoubleLine('Local', FormatClock(localHour, localMinute, twentyFour), 0.7, 0.7, 0.7, 1, 1, 1)

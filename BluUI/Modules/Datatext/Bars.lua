@@ -57,9 +57,9 @@ local function BuildText(config)
 
     for orderIndex = 1, #order do
         local entry = registry[order[orderIndex]]
-        if entry and config[entry.show] then
+        if config[entry.show] then
             local text = entry.build(config, valueHex, entry)
-            if text and text ~= '' then
+            if text ~= '' then
                 partCount = partCount + 1
                 parts[partCount] = text
                 partEntries[partCount] = entry
@@ -98,9 +98,9 @@ end
 
 local function LockBar(bar)
     local config = bar.getConfig()
-    if not config or config.lock then return end
+    if config.lock then return end
     config.lock = true
-    if Datatext._onLock then Datatext._onLock() end
+    BUI.NotifyModuleChange('datatext')
     Datatext.Apply()
 end
 
@@ -119,7 +119,6 @@ local function EndBarDrag(bar)
     frame:StopMovingOrSizing()
     bar.dragging = nil
     local config = bar.getConfig()
-    if not config then return end
     local point, _, relPoint, offsetX, offsetY = frame:GetPoint()
     config.point, config.relPoint, config.x, config.y = point, relPoint, offsetX, offsetY
     config.alignMinimap = false
@@ -168,12 +167,7 @@ end
 local function HitOnEnter(self)
     if Datatext.HoversBlocked(self.bar.getConfig()) then return end
     local entry = self.entry
-    if not entry.OnEnter then return end
-    if entry._profOnEnter == nil or entry._profOnEnterRaw ~= entry.OnEnter then
-        entry._profOnEnterRaw = entry.OnEnter
-        entry._profOnEnter = entry.OnEnter
-    end
-    entry._profOnEnter(self, self.bar)
+    if entry.OnEnter then entry.OnEnter(self, self.bar) end
 end
 
 local function HitOnLeave(self)
@@ -193,7 +187,6 @@ local function GetHit(bar, entry)
         hit:SetScript('OnClick', BUI.Profiler.Script('Datatext.Bars hit OnClick', HitOnClick))
         hit:SetScript('OnEnter', BUI.Profiler.Script('Datatext.Bars hit OnEnter', HitOnEnter))
         hit:SetScript('OnLeave', BUI.Profiler.Script('Datatext.Bars hit OnLeave', HitOnLeave))
-        hit.isDatatextHit = true
         hit.bar = bar
         hit:Hide()
         bar.hits[entry.id] = hit
@@ -274,7 +267,6 @@ end
 
 local function HidePartStrings(bar, fromIndex)
     local strings = bar.partStrings
-    if not strings then return end
     for partIndex = fromIndex, #strings do strings[partIndex]:Hide() end
 end
 
@@ -285,7 +277,6 @@ end
 
 local function RenderCells(bar, config)
     local frame = bar.frame
-    bar.partStrings = bar.partStrings or {}
     local partTotal = partCount
     local fixedWidth = FixedSide(bar.anchoredWidth and frame:GetWidth(), config.width)
     local fixedHeight = FixedSide(bar.anchoredHeight and frame:GetHeight(), config.height)
@@ -379,7 +370,6 @@ local function RenderCells(bar, config)
 end
 
 local function RenderBar(bar)
-    if not bar then return end
     local config = bar.getConfig()
     if not config or not config.enabled or IsPanel(config) then return end
     if not bar.frame:IsShown() then
@@ -399,8 +389,8 @@ local function RenderBar(bar)
     end
     if bar._renderSig == signature then
         for partIndex = 1, partCount do
-            local fontString = bar.partStrings and bar.partStrings[partIndex]
-            if fontString and fontString._lastText ~= parts[partIndex] then
+            local fontString = bar.partStrings[partIndex]
+            if fontString._lastText ~= parts[partIndex] then
                 fontString._lastText = parts[partIndex]
                 fontString:SetText(parts[partIndex])
             end
@@ -456,7 +446,7 @@ local function SetEntryActive(entry, active)
     end
     if entry.OnUpdate then
         if not entry._scheduled then
-            BUI.Scheduler.RegisterUpdate(entry.key, entry.OnUpdate, entry.interval or 1, active)
+            BUI.Scheduler.RegisterUpdate(entry.key, entry.OnUpdate, entry.interval, active)
             entry._scheduled = true
         else
             BUI.Scheduler.SetUpdateEnabled(entry.key, active)
@@ -550,7 +540,7 @@ local function CreateMainBarObject(frameName, configProvider)
     frame.hint:SetText('Drag to Reposition | Right-Click to Lock')
     frame.hint:Hide()
 
-    local bar = { getConfig = configProvider, frame = frame, hits = {} }
+    local bar = { getConfig = configProvider, frame = frame, hits = {}, partStrings = {} }
     frame.bar = bar
 
     frame:SetScript('OnMouseUp', BUI.Profiler.Script('Datatext.Bars frame OnMouseUp', MainOnMouseUp))
@@ -568,7 +558,6 @@ local function EnsureBarObject(barIndex)
 end
 
 local function HideBarObject(bar)
-    if not bar then return end
     bar.frame:Hide()
     HideHits(bar)
 end
@@ -577,7 +566,7 @@ local function ApplyMainBar(bar)
     local config = bar.getConfig()
     local frame = bar.frame
 
-    if not config or not config.enabled or not ModuleEnabled() or BUI.Visibility.InPetBattle() then
+    if not config.enabled or not ModuleEnabled() or BUI.Visibility.InPetBattle() then
         HideBarObject(bar)
         return
     end
@@ -595,7 +584,7 @@ local function ApplyMainBar(bar)
     bar._cellKey = nil
 
     frame:ClearAllPoints()
-    local minimapEnabled = BUI.GetDB().interface.minimapEnabled ~= false
+    local minimapEnabled = BUI.IsModuleEnabled('minimap')
 
     local mirrorX, mirrorY, mirrorWidth, mirrorHeight
     if IsPanel(config) and config.mirrorChat then mirrorX, mirrorY, mirrorWidth, mirrorHeight = MirroredChatRect() end
@@ -684,17 +673,13 @@ local function BuildMinimapBar()
 
     CreateBorderEdges(frame)
 
-    minimapBar = { getConfig = GetMinimapConfig, frame = frame, hits = {} }
+    minimapBar = { getConfig = GetMinimapConfig, frame = frame, hits = {}, partStrings = {} }
     frame.bar = minimapBar
     frame:SetScript('OnShow', MainOnShow)
 end
 
 local function ApplyMinimapBar()
     local config = GetMinimapConfig()
-    if not config.spacingPx then
-        config.spacing = (tonumber(config.spacing) or 1) * 3
-        config.spacingPx = true
-    end
     if not config.enabled then
         if minimapBar then HideBarObject(minimapBar) end
         return
@@ -809,8 +794,4 @@ function Datatext.Apply()
     if minimapBar then minimapBar._renderSig = nil end
     RenderAll()
     SyncMouseover()
-end
-
-function Datatext.SetLockCallback(callback)
-    Datatext._onLock = callback
 end
