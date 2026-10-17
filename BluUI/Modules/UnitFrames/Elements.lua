@@ -2,200 +2,130 @@ local _, BUI = ...
 
 local UnitFrames = BUI.UnitFrames
 local Pixel = BUI.Pixel
+local SetColorTex = BUI.Tools.SetColorTex
+local TextSetting = UnitFrames.TextSetting
 
-local CreateFrame = CreateFrame
+local function ApplyBarTexture(bar, texture)
+	bar:SetStatusBarTexture(texture)
+	bar:GetStatusBarTexture():SetTexCoord(0.01, 0.99, 0.01, 0.99)
+end
 
 function UnitFrames.ApplyBarTextures(frame, texture)
-	local tint = BUI.GetGradientTint()
-	local red, green, blue, alpha = 1, 1, 1, 1
-	if tint then red, green, blue, alpha = tint[1], tint[2], tint[3], tint[4] or 1 end
-
-	for _, bar in ipairs({frame.Health, frame.Power}) do
-		if bar then
-			bar:SetStatusBarTexture(texture)
-			local barTexture = bar:GetStatusBarTexture()
-			if barTexture then
-				barTexture:SetTexCoord(0.01, 0.99, 0.01, 0.99)
-				if tint then barTexture:SetVertexColor(red, green, blue, alpha) end
-			end
-		end
-	end
+	ApplyBarTexture(frame.Health, texture)
+	ApplyBarTexture(frame.Power, texture)
 end
 
 function UnitFrames.ApplyBackgroundColors(frame, bgColor, powerBgColor)
-	if not bgColor or not bgColor[1] then return end
 	local settings = UnitFrames.GetSettings()
-
-	frame._transparentHealth = settings.transparentHealth
-	if frame.FrameBG then
-		local bgAlpha = frame._transparentHealth and 0 or (bgColor[4] or 1)
-		BUI.Tools.SetColorTex(frame.FrameBG, bgColor[1], bgColor[2], bgColor[3], bgAlpha)
-		frame.FrameBG:ClearAllPoints()
-		local edge = Pixel.Scale(Pixel.ClampBorder(settings.borderSize))
-		frame.FrameBG:SetPoint('TOPLEFT', frame, 'TOPLEFT', edge, -edge)
-		frame.FrameBG:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -edge, edge)
-	end
-	if frame.PowerBG then
-		local color = powerBgColor or bgColor
-		BUI.Tools.SetColorTex(frame.PowerBG, color[1], color[2], color[3], color[4] or 1)
-	end
+	local background = frame.FrameBG
+	SetColorTex(background, bgColor[1], bgColor[2], bgColor[3], settings.transparentHealth and 0 or bgColor[4])
+	background:ClearAllPoints()
+	local edge = Pixel.Scale(Pixel.ClampBorder(settings.borderSize))
+	background:SetPoint('TOPLEFT', frame, 'TOPLEFT', edge, -edge)
+	background:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -edge, edge)
+	local color = powerBgColor or bgColor
+	SetColorTex(frame.PowerBG, color[1], color[2], color[3], color[4])
 end
 
 local function ApplyAbsorbBar(frame, bar, direction, enabled)
-	if not frame.Health then return end
 	UnitFrames.AnchorAbsorb(bar, frame.Health, frame.Health:GetStatusBarTexture(), direction)
 	bar:SetShown(enabled)
 end
 
 function UnitFrames.ApplyAbsorbStyles(frame, settings)
-	if not frame.Absorb then return end
-	local config = UnitFrames.BuildAbsorbCfg(settings)
 	local enabled = settings.shieldEnabled ~= false
-	UnitFrames.ApplyAbsorbVisual(frame.Absorb, config)
+	UnitFrames.ApplyAbsorbVisual(frame.Absorb, settings.shieldOverlay, settings.shieldColor)
 	ApplyAbsorbBar(frame, frame.Absorb, settings.shieldDirection, enabled)
-	local color = config.color
-	UnitFrames.ApplyAbsorbVisual(frame.AbsorbBars.Overflow, { texture = config.texture, color = { color[1], color[2], color[3], 1 } })
+	UnitFrames.ApplyAbsorbVisual(frame.AbsorbBars.Overflow, settings.shieldOverlay, settings.shieldColor, 1)
 	UnitFrames.SetAbsorbOverflow(frame, enabled and settings.shieldDirection == 'right')
 end
 
 function UnitFrames.ApplyHealAbsorbStyles(frame, settings)
-	if not frame.HealAbsorb then return end
-	UnitFrames.ApplyHealAbsorbVisual(frame.HealAbsorb, UnitFrames.BuildHealAbsorbCfg(settings))
+	UnitFrames.ApplyAbsorbVisual(frame.HealAbsorb, settings.healAbsorbOverlay, settings.healAbsorbColor)
 	ApplyAbsorbBar(frame, frame.HealAbsorb, settings.healAbsorbDirection, settings.healAbsorbEnabled ~= false)
 end
 
 function UnitFrames.ApplyHealthBarLayout(frame, height, showPower, powerHeight, borderSize)
-	if not frame.Health then return end
+	powerHeight = Pixel.Scale(powerHeight)
+	local edge = Pixel.Scale(Pixel.ClampBorder(borderSize))
+	local health = frame.Health
 
-	powerHeight = Pixel.Scale(powerHeight or 0)
-	local edge = borderSize and Pixel.Scale(Pixel.ClampBorder(borderSize)) or Pixel.GetBorderSize(frame)
-
-	frame.Health:ClearAllPoints()
-	frame.Health:SetPoint('TOPLEFT', frame, 'TOPLEFT', edge, -edge)
-	frame.Health:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -edge, -edge)
+	health:ClearAllPoints()
+	health:SetPoint('TOPLEFT', frame, 'TOPLEFT', edge, -edge)
+	health:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -edge, -edge)
 
 	if showPower then
 		local healthHeight = height - (edge * 2) - powerHeight - edge
-		frame.Health:SetHeight(healthHeight)
+		health:SetHeight(healthHeight)
 
-		if not frame.PowerBorderFrame and frame.Power then
-			local separatorFrame = CreateFrame('Frame', nil, frame)
-			separatorFrame:SetFrameLevel(frame.Power:GetFrameLevel() + 5)
-			local separator = separatorFrame:CreateTexture(nil, 'OVERLAY', nil, 7)
-			separator:SetAllPoints()
-			local borderColor = frame._edgeRGBA or {0, 0, 0, 1}
-			BUI.Tools.SetColorTex(separator, borderColor[1], borderColor[2], borderColor[3], borderColor[4] or 1)
-			frame.PowerBorder = separator
-			frame.PowerBorderFrame = separatorFrame
-		end
-
-		if frame.PowerBorderFrame then
-			local separatorY = -(edge + (height - (edge * 2) - powerHeight - edge))
-			frame.PowerBorderFrame:SetHeight(edge)
-			frame.PowerBorderFrame:ClearAllPoints()
-			frame.PowerBorderFrame:SetPoint('TOPLEFT', frame, 'TOPLEFT', edge, separatorY)
-			frame.PowerBorderFrame:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -edge, separatorY)
-			frame.PowerBorderFrame:Show()
-			if frame.PowerBorder and frame._edgeRGBA then
-				local borderColor = frame._edgeRGBA
-				BUI.Tools.SetColorTex(frame.PowerBorder, borderColor[1], borderColor[2], borderColor[3], borderColor[4] or 1)
-			end
-		end
+		local separatorY = -(edge + healthHeight)
+		local separatorFrame = frame.PowerBorderFrame
+		separatorFrame:SetHeight(edge)
+		separatorFrame:ClearAllPoints()
+		separatorFrame:SetPoint('TOPLEFT', frame, 'TOPLEFT', edge, separatorY)
+		separatorFrame:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -edge, separatorY)
+		separatorFrame:Show()
 	else
-		frame.Health:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -edge, edge)
+		health:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -edge, edge)
 	end
 
-	if frame.Power then
-		frame.Power:ClearAllPoints()
-		frame.Power:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', edge, edge)
-		frame.Power:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -edge, edge)
-		frame.Power:SetHeight(powerHeight)
-	end
+	local power = frame.Power
+	power:ClearAllPoints()
+	power:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', edge, edge)
+	power:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -edge, edge)
+	power:SetHeight(powerHeight)
 end
 
-function UnitFrames.ApplyTextPosition(textElement, parent, position, offsetX, offsetY)
-	if not textElement then return end
-
+local function ApplyTextPosition(textElement, parent, position, offsetX, offsetY)
 	local point, relativePoint, marginX, marginY, justify = BUI.Tools.ResolvePlacement(position, 4, 1)
 
 	textElement:ClearAllPoints()
-	textElement:SetPoint(point, parent, relativePoint,
-		Pixel.Scale((offsetX or 0) + marginX), Pixel.Scale((offsetY or 0) + marginY))
+	textElement:SetPoint(point, parent, relativePoint, Pixel.Scale(offsetX + marginX), Pixel.Scale(offsetY + marginY))
 	textElement:SetJustifyH(justify)
 end
 
 function UnitFrames.FitNameWidth(frame)
-	local nameParent = frame.TextOverlay or frame.Health
-	if nameParent then
-		local parentWidth = nameParent:GetWidth()
-		if parentWidth and parentWidth > 0 then
-			frame.Name:SetWidth(parentWidth - 8)
-		end
-	end
+	local parentWidth = frame.TextOverlay:GetWidth()
+	if parentWidth > 0 then frame.Name:SetWidth(parentWidth - 8) end
 end
 
-function UnitFrames.ApplyTextStyles(frame, width, settings, unitSettings, unit)
+function UnitFrames.ApplyTextStyles(frame, settings, unitSettings, unit)
 	local font = UnitFrames.GetFont()
-	local function Text(key) return UnitFrames.TextSetting(unitSettings, key) end
-	local nameTextSize = Text('nameTextSize')
-	local healthTextSize = Text('healthTextSize')
-	local powerTextSize = Text('powerTextSize')
+	local overlay = frame.TextOverlay
 
-	if frame.Name then
-		Pixel.ApplyFont(frame.Name, nameTextSize, font)
-
-		local showName = unitSettings.showName
-		if showName == nil then showName = settings.showName ~= false end
-		frame.Name:SetShown(showName)
-
-		UnitFrames.ApplyTextPosition(frame.Name, frame.TextOverlay or frame.Health,
-			Text('namePosition'), Text('nameOffsetX'), Text('nameOffsetY'))
-
-		UnitFrames.FitNameWidth(frame)
-
-		if unitSettings.classColorName and UnitExists(unit) then
-			local red, green, blue = UnitFrames.GetNameColor(unit, unitSettings)
-			frame.Name:SetTextColor(red, green, blue)
-		else
-			local color = settings.nameColor
-			frame.Name:SetTextColor(color[1], color[2], color[3])
-		end
+	local name = frame.Name
+	Pixel.ApplyFont(name, TextSetting(unitSettings, 'nameTextSize'), font)
+	name:SetShown(unitSettings.showName)
+	ApplyTextPosition(name, overlay, TextSetting(unitSettings, 'namePosition'), TextSetting(unitSettings, 'nameOffsetX'), TextSetting(unitSettings, 'nameOffsetY'))
+	UnitFrames.FitNameWidth(frame)
+	if unitSettings.classColorName and UnitExists(unit) then
+		name:SetTextColor(UnitFrames.GetNameColor(unit, unitSettings))
+	else
+		local color = settings.nameColor
+		name:SetTextColor(color[1], color[2], color[3])
 	end
 
-	if frame.HealthText then
-		Pixel.ApplyFont(frame.HealthText, healthTextSize, font)
-		local color = settings.healthTextColor
-		frame.HealthText:SetTextColor(color[1], color[2], color[3])
-		UnitFrames.ApplyTextPosition(frame.HealthText, frame.TextOverlay or frame.Health,
-			Text('healthPosition'), Text('healthOffsetX'), Text('healthOffsetY'))
+	local healthText = frame.HealthText
+	Pixel.ApplyFont(healthText, TextSetting(unitSettings, 'healthTextSize'), font)
+	local healthTextColor = settings.healthTextColor
+	healthText:SetTextColor(healthTextColor[1], healthTextColor[2], healthTextColor[3])
+	ApplyTextPosition(healthText, overlay, TextSetting(unitSettings, 'healthPosition'), TextSetting(unitSettings, 'healthOffsetX'), TextSetting(unitSettings, 'healthOffsetY'))
+	healthText:SetShown(unitSettings.showHealthText)
 
-		local showHealthText = unitSettings.showHealthText
-		if showHealthText == nil then showHealthText = settings.showHealthText ~= false end
-		frame.HealthText:SetShown(showHealthText)
-	end
+	Pixel.ApplyFont(frame.StatusText, TextSetting(unitSettings, 'statusTextSize'), font)
+	ApplyTextPosition(frame.StatusText, overlay, TextSetting(unitSettings, 'statusPosition'), TextSetting(unitSettings, 'statusOffsetX'), TextSetting(unitSettings, 'statusOffsetY'))
+	UnitFrames.RefreshStatusText(frame)
 
-	if frame.StatusText then
-		Pixel.ApplyFont(frame.StatusText, Text('statusTextSize'), font)
-		UnitFrames.ApplyTextPosition(frame.StatusText, frame.TextOverlay or frame.Health,
-			Text('statusPosition'), Text('statusOffsetX'), Text('statusOffsetY'))
-		UnitFrames.RefreshStatusText(frame)
-	end
-
-	if frame.PowerText then
-		Pixel.ApplyFont(frame.PowerText, powerTextSize, font)
-		local color = settings.powerTextColor
-		frame.PowerText:SetTextColor(color[1], color[2], color[3])
-		UnitFrames.ApplyTextPosition(frame.PowerText, frame.Power,
-			Text('powerPosition'), Text('powerOffsetX'), Text('powerOffsetY'))
-	end
+	local powerText = frame.PowerText
+	Pixel.ApplyFont(powerText, TextSetting(unitSettings, 'powerTextSize'), font)
+	local powerTextColor = settings.powerTextColor
+	powerText:SetTextColor(powerTextColor[1], powerTextColor[2], powerTextColor[3])
+	ApplyTextPosition(powerText, frame.Power, TextSetting(unitSettings, 'powerPosition'), TextSetting(unitSettings, 'powerOffsetX'), TextSetting(unitSettings, 'powerOffsetY'))
 end
 
 function UnitFrames.ApplyRaidIconPosition(frame, settings, unitSettings)
 	local raidIcon = frame.RaidTargetIndicator
-	if not raidIcon then return end
-
-	local show = settings.raidIconMode ~= 'off'
-	if unitSettings and unitSettings.hideRaidIcon then show = false end
+	local show = settings.raidIconMode ~= 'off' and not unitSettings.hideRaidIcon
 
 	raidIcon._buiHidden = not show
 	raidIcon:SnapSize(settings.raidIconSize)
@@ -206,55 +136,42 @@ function UnitFrames.ApplyRaidIconPosition(frame, settings, unitSettings)
 	if not show then raidIcon:Hide() end
 end
 
-function UnitFrames.ApplyLeaderIconPosition(frame, settings)
-	local size    = settings.leaderIconSize
-	local anchor  = settings.leaderIconPosition
-	local offsetX = Pixel.Scale(settings.leaderIconOffsetX)
-	local offsetY = Pixel.Scale(settings.leaderIconOffsetY)
-	local hidden  = settings.leaderIconEnabled == false
-
-	for _, element in ipairs({ frame.LeaderIndicator, frame.AssistantIndicator }) do
-		if element then
-			element:SetSize(Pixel.Scale(size), Pixel.Scale(size))
-			element:ClearAllPoints()
-			element:SetPoint(anchor, frame, anchor, offsetX, offsetY)
-			element._buiHidden = hidden
-			if hidden then
-				element:Hide()
-			elseif element.ForceUpdate then
-				element:ForceUpdate()
-			end
-		end
+local function PlaceGroupIcon(frame, element, settings, hidden)
+	local size = Pixel.Scale(settings.leaderIconSize)
+	local anchor = settings.leaderIconPosition
+	element:SetSize(size, size)
+	element:ClearAllPoints()
+	element:SetPoint(anchor, frame, anchor, Pixel.Scale(settings.leaderIconOffsetX), Pixel.Scale(settings.leaderIconOffsetY))
+	element._buiHidden = hidden
+	if hidden then
+		element:Hide()
+	else
+		element:ForceUpdate()
 	end
 end
 
+function UnitFrames.ApplyLeaderIconPosition(frame, settings)
+	local hidden = settings.leaderIconEnabled == false
+	PlaceGroupIcon(frame, frame.LeaderIndicator, settings, hidden)
+	PlaceGroupIcon(frame, frame.AssistantIndicator, settings, hidden)
+end
+
 function UnitFrames.ApplyLevelTextStyles(frame, settings, unitSettings)
-	if not frame or not frame.LevelText then return end
-
-	local showLevel = settings.showLevel
-	if unitSettings and unitSettings.hideLevel then showLevel = false end
-
-	local font = UnitFrames.GetFont()
+	local levelText = frame.LevelText
 	local position = settings.levelPosition
 
-	Pixel.ApplyFont(frame.LevelText, settings.levelTextSize, font)
-	frame.LevelText:ClearAllPoints()
+	Pixel.ApplyFont(levelText, settings.levelTextSize, UnitFrames.GetFont())
+	levelText:ClearAllPoints()
 
 	local justify = 'CENTER'
 	if position:find('LEFT') then justify = 'LEFT'
 	elseif position:find('RIGHT') then justify = 'RIGHT' end
-	frame.LevelText:SetJustifyH(justify)
+	levelText:SetJustifyH(justify)
 
-	frame.LevelText:SetPoint(position, frame, position, Pixel.Scale(settings.levelOffsetX), Pixel.Scale(settings.levelOffsetY))
-	frame.LevelText:SetShown(showLevel and true or false)
+	levelText:SetPoint(position, frame, position, Pixel.Scale(settings.levelOffsetX), Pixel.Scale(settings.levelOffsetY))
+	levelText:SetShown(settings.showLevel and not unitSettings.hideLevel)
 end
 
 function UnitFrames.UpdateLevelTextVisibility(frame, unitType)
-	if not frame or not frame.LevelText then return end
-	local settings = UnitFrames.GetSettings()
-	local unitSettings = UnitFrames.GetUnitSettings(unitType)
-	local show = settings.showLevel and not (unitSettings and unitSettings.hideLevel)
-	frame.LevelText:SetShown(show and true or false)
+	frame.LevelText:SetShown(UnitFrames.GetSettings().showLevel and not UnitFrames.GetUnitSettings(unitType).hideLevel)
 end
-
-

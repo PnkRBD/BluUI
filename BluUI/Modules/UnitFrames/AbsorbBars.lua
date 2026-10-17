@@ -12,7 +12,7 @@ function UnitFrames.SetAbsorbOverflow(frame, shown)
 	local bars = frame.AbsorbBars
 	bars.Overflow:SetShown(shown)
 	bars.damageClamp = shown and DAMAGE_CLAMP.MissingHealthWithoutIncomingHeals or DAMAGE_CLAMP.MaximumHealth
-	if bars.values then bars.values:SetDamageAbsorbClampMode(bars.damageClamp) end
+	bars.values:SetDamageAbsorbClampMode(bars.damageClamp)
 end
 
 local function Fit(bars)
@@ -47,22 +47,18 @@ local function Update(self, _, unit)
 end
 
 local pending = {}
-local flushScheduled = false
 
-local Flush = BUI.Profiler.Wrap('UnitFrames.AbsorbBars flush', function()
-	flushScheduled = false
+local FlushPending = BUI.Dispatcher.New(function()
 	for frame in pairs(pending) do
 		pending[frame] = nil
 		Update(frame, nil, frame.__unit)
 	end
-end)
+end, 'UF.AbsorbBars')
 
 local function Queue(self, _, unit)
 	if self.__unit ~= unit then return end
 	pending[self] = true
-	if flushScheduled then return end
-	flushScheduled = true
-	C_Timer.After(0, Flush)
+	FlushPending()
 end
 
 local function Refresh(self, event, unit)
