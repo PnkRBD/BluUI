@@ -10,17 +10,11 @@ local Pixel      = BUI.Pixel
 local SETTINGS_KEY = 'cdAnnouncer'
 local FRAME_NAME   = 'BUI_CDAnnouncerFrame'
 local MODULE_KEY   = 'CDAnnouncer'
-local TOOLTIP_SCANNER_NAME = 'BUI_CDAnnouncerTooltipScanner'
-local MISSING_ICON = 134400
 
 local TICK_INTERVAL            = 0.1
 local DECIMAL_THRESHOLD        = 10
 local PREVIEW_REMAINING        = 12
 local ROW_SPACING              = 2
-local DEFAULT_GROWTH           = 'center'
-
-local DEFAULT_CD_FORMAT    = '[spell] [time]'
-local DEFAULT_READY_FORMAT = '[spell] Ready'
 
 local DEFAULT_LOW_COLOR   = { r = 1,   g = 0.2,  b = 0.2, a = 1 }
 
@@ -29,6 +23,7 @@ local SPELL_DEFAULTS = {
     showIconReady      = true,
     showText           = true,
     showTextReady      = true,
+    textAnchor         = 'right',
     timeInIcon         = false,
     iconTimeAnchor     = 'CENTER',
     iconTimeX          = 0,
@@ -38,11 +33,13 @@ local SPELL_DEFAULTS = {
     flashLow           = false,
     countdownLow       = false,
     countdownText      = '[spell] in [time]',
+    tts                = false,
+    ttsText            = '[spell] ready',
     readyMode          = 'flash',
     flashScope         = 'both',
     glowDuration       = 1,
-    cdDisplayFormat    = DEFAULT_CD_FORMAT,
-    readyDisplayFormat = DEFAULT_READY_FORMAT,
+    cdDisplayFormat    = '[spell] [time]',
+    readyDisplayFormat = '[spell] Ready',
     font               = BUI.C.GLOBAL_OPTION,
     fontSize           = 16,
     cdPhase            = true,
@@ -57,14 +54,14 @@ local SPELL_DEFAULTS = {
 local rows  = {}
 local state = {}
 local resolvedDurationCache = {}
+local spellInfoCache = {}
+local itemInfoCache  = {}
 local renderContext = {}
+local timers = {}
 
-local root, stack, anchorTexture, anchorTexturet
-local tooltipScanner
-local anchorCallback
+local root, stack, anchorTexture, anchorLabel
 local loginEpoch
 local previewActive = false
-local previewTimer
 local castEventsActive = false
 local itemEventsActive = false
 
@@ -116,8 +113,6 @@ local function ClearAllActiveCooldowns()
         ClearCast(spellID)
     end
 end
-
-function CDAnnouncer.RegisterAnchorCallback(callback) anchorCallback = callback end
 
 function CDAnnouncer.GetSpells()
     return GetSpellList()
@@ -173,19 +168,10 @@ local function MatchCooldownText(text)
     return nil
 end
 
-local function ScanTooltipForCooldown(setterName, sourceID)
-    if not tooltipScanner then
-        tooltipScanner = CreateFrame('GameTooltip', TOOLTIP_SCANNER_NAME, UIParent, 'GameTooltipTemplate')
-        tooltipScanner:SetOwner(UIParent, 'ANCHOR_NONE')
-    end
-    tooltipScanner:ClearLines()
-    tooltipScanner[setterName](tooltipScanner, sourceID)
-    for line = 1, tooltipScanner:NumLines() do
-        local left  = _G[TOOLTIP_SCANNER_NAME .. 'TextLeft' .. line]
-        local match = left and MatchCooldownText(left:GetText())
-        if match then return match end
-        local right = _G[TOOLTIP_SCANNER_NAME .. 'TextRight' .. line]
-        match = right and MatchCooldownText(right:GetText())
+local function CooldownFromTooltip(data)
+    if not data then return nil end
+    for _, line in ipairs(data.lines) do
+        local match = MatchCooldownText(line.leftText) or MatchCooldownText(line.rightText)
         if match then return match end
     end
     return nil
@@ -195,21 +181,19 @@ function CDAnnouncer.ResolveCooldownSeconds(spellID, kind)
     if kind == 'item' then
         local _, duration = C_Container.GetItemCooldown(spellID)
         if duration and duration > 1.5 then return duration end
-        local fromTooltip = ScanTooltipForCooldown('SetItemByID', spellID)
+        local fromTooltip = CooldownFromTooltip(C_TooltipInfo.GetItemByID(spellID))
         if fromTooltip then return fromTooltip end
         local _, itemSpellID = C_Item.GetItemSpell(spellID)
         if itemSpellID then return CDAnnouncer.ResolveCooldownSeconds(itemSpellID, 'spell') end
         return
     end
-    local fromTooltip = ScanTooltipForCooldown('SetSpellByID', spellID)
+    local fromTooltip = CooldownFromTooltip(C_TooltipInfo.GetSpellByID(spellID))
     if fromTooltip then return fromTooltip end
     local baseCooldownMS = GetSpellBaseCooldown(spellID)
     if baseCooldownMS and baseCooldownMS > 1500 then return baseCooldownMS / 1000 end
 end
 
-local function EffectiveDuration(entry)
-    if entry.kind == 'item' then return entry.duration end
-    local activeID = ActiveID(entry)
+local function EffectiveDuration(entry, activeID)
     if activeID == entry.spellID then return entry.duration end
     local cached = resolvedDurationCache[activeID]
     if cached == nil then
@@ -221,16 +205,21 @@ end
 
 local function LookupInfo(entry, activeID)
     if entry.kind == 'item' then
-        local name, _, _, _, _, _, _, _, _, icon = C_Item.GetItemInfo(entry.spellID)
-        if name then return { name = name, iconID = icon } end
-        return nil
+        local info = itemInfoCache[activeID]
+        if not info then
+            local name, _, _, _, _, _, _, _, _, icon = C_Item.GetItemInfo(activeID)
+            if not name then return nil end
+            info = { name = name, iconID = icon }
+            itemInfoCache[activeID] = info
+        end
+        return info
     end
-    return C_Spell.GetSpellInfo(activeID or ActiveID(entry))
-end
-
-local function ResolveIconTexture(entry, info, activeID)
-    if entry.kind == 'item' then return (info and info.iconID) or MISSING_ICON end
-    return (info and info.iconID) or C_Spell.GetSpellTexture(activeID or ActiveID(entry)) or MISSING_ICON
+    local info = spellInfoCache[activeID]
+    if not info then
+        info = C_Spell.GetSpellInfo(activeID)
+        spellInfoCache[activeID] = info
+    end
+    return info
 end
 
 local function ApplyText(fontString, text)
@@ -252,11 +241,12 @@ local function ApplyFont(fontString, font, size, outline)
 end
 
 local function GetDisplayParts(entry, info, spellState)
-    local name        = info.name or ''
-    local cdFormat    = entry.cdDisplayFormat    or DEFAULT_CD_FORMAT
-    local readyFormat = entry.readyDisplayFormat or DEFAULT_READY_FORMAT
+    local name        = info.name
+    local cdFormat    = entry.cdDisplayFormat
+    local readyFormat = entry.readyDisplayFormat
     if spellState._dispName == name and spellState._dispCd == cdFormat and spellState._dispReady == readyFormat then return end
     spellState._dispName, spellState._dispCd, spellState._dispReady = name, cdFormat, readyFormat
+    spellState._bucket = nil
 
     local resolved = cdFormat:gsub('%[spell%]', name):gsub('%[name%]', name)
     local timeStart, timeEnd = resolved:find('[time]', 1, true)
@@ -268,6 +258,16 @@ local function GetDisplayParts(entry, info, spellState)
     end
 
     spellState.readyText = readyFormat:gsub('%[spell%]', name):gsub('%[name%]', name)
+end
+
+local function CooldownText(spellState, remaining)
+    local bucket = TimeFormat.Bucket(remaining, DECIMAL_THRESHOLD)
+    if spellState._bucket ~= bucket then
+        spellState._bucket   = bucket
+        spellState._timeText = TimeFormat.Format(remaining, DECIMAL_THRESHOLD)
+        spellState._cdText   = spellState.cdPre .. spellState._timeText .. spellState.cdPost
+    end
+    return spellState._cdText
 end
 
 local function StartFlash(row)
@@ -386,15 +386,15 @@ local function ApplyPosition()
     root:SetPoint('CENTER', UIParent, 'CENTER', offsetX, config.posY)
 end
 
-local function HideAllRows()
-    for rowIndex = 1, #rows do rows[rowIndex]:Hide() end
-end
-
 local function HideRow(row)
     if row:IsShown() then row:Hide() end
     row._anchorTo = nil
     row._cAnchor  = nil
     StopRowEffects(row)
+end
+
+local function HideAllRows()
+    for rowIndex = 1, #rows do HideRow(rows[rowIndex]) end
 end
 
 local function ShowRow(row)
@@ -405,27 +405,29 @@ local function ShowRow(row)
     end
 end
 
-local function ResolveRowDisplay(entry, spellState, now, showAnchor)
+local function FlashHides(scope)
+    if scope == 'icon' then return true, false end
+    if scope == 'text' then return false, true end
+    return false, false
+end
+
+local function ResolveRowDisplay(entry, spellState, now, forcePreview)
     local onCD         = spellState.onCD
     local remaining    = spellState.remaining or 0
-    local cdEnabled    = entry.cdPhase ~= false
-    local readyEnabled = entry.readyPhase ~= false
+    local cdEnabled    = entry.cdPhase
+    local readyEnabled = entry.readyPhase
 
-    if showAnchor and not onCD then
+    if forcePreview and not onCD then
         if cdEnabled then return true, 'cd', PREVIEW_REMAINING, false, false end
         return true, 'ready', 0, false, false
     end
 
     if onCD then
         if readyEnabled and spellState.readyEndTime and now < spellState.readyEndTime then
-            local hideText, hideIcon = false, false
-            local scope = entry.flashScope or 'both'
-            if scope == 'icon' then hideText = true
-            elseif scope == 'text' then hideIcon = true end
-            return true, 'ready', 0, hideText, hideIcon
+            return true, 'ready', 0, FlashHides(entry.flashScope)
         end
         if cdEnabled then return true, 'cd', remaining, false, false end
-        if entry.lowPhase ~= false and remaining > 0 and remaining <= (entry.lowThreshold or 5) then
+        if entry.lowPhase and remaining > 0 and remaining <= entry.lowThreshold then
             return true, 'cd', remaining, false, false
         end
         return false
@@ -433,41 +435,35 @@ local function ResolveRowDisplay(entry, spellState, now, showAnchor)
 
     if not readyEnabled then return false end
 
-    local readyMode   = entry.readyMode or 'flash'
     local readyActive = spellState.readyEndTime and now < spellState.readyEndTime
-    if readyMode ~= 'persist' and not readyActive then return false end
+    if entry.readyMode ~= 'persist' and not readyActive then return false end
 
     local hideText, hideIcon = false, false
-    if readyActive then
-        local scope = entry.flashScope or 'both'
-        if scope == 'icon' then hideText = true
-        elseif scope == 'text' then hideIcon = true end
-    end
+    if readyActive then hideText, hideIcon = FlashHides(entry.flashScope) end
     return true, 'ready', 0, hideText, hideIcon
 end
 
 local function ResolveRowText(entry, spellState, isCD, remaining, hideText, context)
     if not isCD then
         return spellState.readyText, entry.readyColor or context.globalReady, false,
-               hideText or entry.showTextReady == false
+               hideText or not entry.showTextReady
     end
-    local text         = spellState.cdPre .. TimeFormat.Format(remaining, DECIMAL_THRESHOLD) .. spellState.cdPost
-    local lowThreshold = entry.lowThreshold or 5
-    if entry.lowPhase ~= false and remaining > 0 and remaining <= lowThreshold then
+    local text = CooldownText(spellState, remaining)
+    if entry.lowPhase and remaining > 0 and remaining <= entry.lowThreshold then
         return text, entry.lowColor or DEFAULT_LOW_COLOR, entry.flashLow,
-               hideText or entry.showText == false
+               hideText or not entry.showText
     end
     return text, entry.color or context.globalCD, false,
-           hideText or entry.showText == false
+           hideText or not entry.showText
 end
 
-local function ApplyRowVisuals(row, entry, info, activeID, text, color, font, outline, fontSize, hideText, hideIcon, isCD)
+local function ApplyRowVisuals(row, entry, info, text, color, font, outline, fontSize, hideText, hideIcon, isCD)
     ApplyFont(row.text, font, fontSize, outline)
     ApplyText(row.text, text)
     ApplyColor(row.text, color.r, color.g, color.b, color.a or 1)
     row.text:SetShown(not hideText)
 
-    local iconAllowed = (isCD and entry.showIcon ~= false) or (not isCD and entry.showIconReady ~= false)
+    local iconAllowed = (isCD and entry.showIcon) or (not isCD and entry.showIconReady)
     if hideIcon or not iconAllowed then
         row.icon:Hide()
         row.iconBorder:Hide()
@@ -479,13 +475,12 @@ local function ApplyRowVisuals(row, entry, info, activeID, text, color, font, ou
         return false
     end
 
-    if row.icon._spellID ~= activeID then
-        row.icon._spellID = activeID
-        row.icon:SetTexture(ResolveIconTexture(entry, info, activeID))
+    if row.icon._iconID ~= info.iconID then
+        row.icon._iconID = info.iconID
+        row.icon:SetTexture(info.iconID)
     end
-    local iconSize = entry.iconSize or (fontSize + 4)
-    local scaledIcon = Pixel.Scale(iconSize)
-    local textAnchor = entry.textAnchor or 'right'
+    local scaledIcon = Pixel.Scale(entry.iconSize)
+    local textAnchor = entry.textAnchor
     local layoutKey = textAnchor .. scaledIcon
     if row._layoutKey ~= layoutKey then
         row._layoutKey = layoutKey
@@ -513,7 +508,7 @@ local function MeasureRow(row, entry, fontSize, iconShown)
     local textWidth = row.text:IsShown() and row.text:GetStringWidth() or 0
     local iconWidth = iconShown and row.icon:GetWidth()  or 0
     local iconHeight = iconShown and row.icon:GetHeight() or 0
-    local textAnchor = entry.textAnchor or 'right'
+    local textAnchor = entry.textAnchor
 
     local rowWidth, rowHeight
     if iconShown and (textAnchor == 'top' or textAnchor == 'bottom') then
@@ -528,33 +523,19 @@ end
 
 local function UpdateRow(entry, index, context)
     local row = EnsureRow(index)
-
-    if not entry.enabled then
-        StopFlash(row)
-        return false
-    end
+    if not entry.enabled then return false end
 
     local activeID = ActiveID(entry)
-
-    if context.hideUnusable and entry.kind ~= 'item' and activeID and not C_SpellBook.IsSpellKnown(activeID) then
-        StopFlash(row)
-        return false
-    end
+    if context.hideUnusable and entry.kind ~= 'item' and not C_SpellBook.IsSpellKnown(activeID) then return false end
 
     local info = LookupInfo(entry, activeID)
-    if not info then
-        StopFlash(row)
-        return false
-    end
+    if not info then return false end
 
     local spellState = state[entry.spellID]
     if not spellState then spellState = {}; state[entry.spellID] = spellState end
 
     local show, phase, remaining, hideText, hideIcon = ResolveRowDisplay(entry, spellState, context.now, context.forcePreview)
-    if not show then
-        StopFlash(row)
-        return false
-    end
+    if not show then return false end
 
     GetDisplayParts(entry, info, spellState)
 
@@ -562,26 +543,23 @@ local function UpdateRow(entry, index, context)
     local text, color, wantFlash, finalHideText = ResolveRowText(entry, spellState, isCD, remaining, hideText, context)
     if wantFlash then StartFlash(row) else StopFlash(row) end
 
-    local fontSize = entry.fontSize or 16
+    local fontSize = entry.fontSize
     local font     = context.font
-    if entry.font and entry.font ~= BUI.C.GLOBAL_OPTION then
-        font = BUI.GetModuleFont({ font = entry.font })
-    end
-    local iconShown = ApplyRowVisuals(row, entry, info, activeID, text, color,
+    if entry.font ~= BUI.C.GLOBAL_OPTION then font = BUI.GetFontByName(entry.font) end
+    local iconShown = ApplyRowVisuals(row, entry, info, text, color,
         font, context.outline, fontSize, finalHideText, hideIcon, isCD)
 
     if isCD and entry.timeInIcon and iconShown then
-        local iconSize = entry.iconSize or 22
-        local timeSize = entry.iconTimeSize or math.max(8, math.floor(iconSize * 0.45))
+        local timeSize = entry.iconTimeSize or math.max(8, math.floor(entry.iconSize * 0.45))
         ApplyFont(row.iconTime, font, timeSize, context.outline)
-        local anchor = entry.iconTimeAnchor or 'CENTER'
-        local offsetX, offsetY = entry.iconTimeX or 0, entry.iconTimeY or 0
+        local anchor = entry.iconTimeAnchor
+        local offsetX, offsetY = entry.iconTimeX, entry.iconTimeY
         if row._itAnchor ~= anchor or row._itX ~= offsetX or row._itY ~= offsetY then
             row._itAnchor, row._itX, row._itY = anchor, offsetX, offsetY
             row.iconTime:ClearAllPoints()
             row.iconTime:SetPoint(anchor, row.icon, anchor, offsetX, offsetY)
         end
-        ApplyText(row.iconTime, TimeFormat.Format(remaining, DECIMAL_THRESHOLD))
+        ApplyText(row.iconTime, spellState._timeText)
         ApplyColor(row.iconTime, color.r, color.g, color.b, color.a or 1)
         if not row.iconTime:IsShown() then row.iconTime:Show() end
     elseif row.iconTime:IsShown() then
@@ -596,8 +574,8 @@ local function PlaceRow(row, entry, rowWidth, rowHeight, previousRow, totalHeigh
     row:SetSize(rowWidth, rowHeight)
 
     if entry.useCustomPos then
-        local anchor = entry.posAnchor or 'CENTER'
-        local posX, posY = entry.posX or 0, entry.posY or 0
+        local anchor = entry.posAnchor
+        local posX, posY = entry.posX, entry.posY
         if row._cAnchor ~= anchor or row._cX ~= posX or row._cY ~= posY then
             row._cAnchor, row._cX, row._cY = anchor, posX, posY
             row._anchorTo = nil
@@ -633,19 +611,19 @@ local function ApplyGrowth(growth)
     if stack._growth == growth then return end
     stack._growth = growth
     stack:ClearAllPoints()
-    anchorTexturet:ClearAllPoints()
+    anchorLabel:ClearAllPoints()
     if growth == 'up' then
         stack:SetPoint('BOTTOM', root, 'BOTTOM', 0, 0)
-        anchorTexturet:SetPoint('TOP', root, 'BOTTOM', 0, Pixel.Scale(-2))
-        anchorTexturet:SetText('Drag to Reposition | Right-Click to Lock\nNew rows stack upward from here')
+        anchorLabel:SetPoint('TOP', root, 'BOTTOM', 0, Pixel.Scale(-2))
+        anchorLabel:SetText('Drag to Reposition | Right-Click to Lock\nNew rows stack upward from here')
     elseif growth == 'down' then
         stack:SetPoint('TOP', root, 'TOP', 0, 0)
-        anchorTexturet:SetPoint('BOTTOM', root, 'TOP', 0, Pixel.Scale(2))
-        anchorTexturet:SetText('Drag to Reposition | Right-Click to Lock\nNew rows stack downward from here')
+        anchorLabel:SetPoint('BOTTOM', root, 'TOP', 0, Pixel.Scale(2))
+        anchorLabel:SetText('Drag to Reposition | Right-Click to Lock\nNew rows stack downward from here')
     else
         stack:SetPoint('CENTER', root, 'CENTER', 0, 0)
-        anchorTexturet:SetPoint('BOTTOM', root, 'TOP', 0, Pixel.Scale(2))
-        anchorTexturet:SetText('Drag to Reposition | Right-Click to Lock\nRows stack out from the middle')
+        anchorLabel:SetPoint('BOTTOM', root, 'TOP', 0, Pixel.Scale(2))
+        anchorLabel:SetText('Drag to Reposition | Right-Click to Lock\nRows stack out from the middle')
     end
 end
 
@@ -668,12 +646,7 @@ local function Render()
     local config     = GetConfig()
     local showAnchor = config.showAnchor
 
-    if not config.enabled and not showAnchor and not previewActive then
-        HideAllRows()
-        root:Hide()
-        return
-    end
-    if not showAnchor and not previewActive and UnitIsDeadOrGhost('player') then
+    if not showAnchor and not previewActive and (not config.enabled or UnitIsDeadOrGhost('player')) then
         HideAllRows()
         root:Hide()
         return
@@ -685,14 +658,12 @@ local function Render()
     context.globalCD     = config.cdColor
     context.globalReady  = config.readyColor
     context.now          = GetTime()
-    context.showAnchor   = showAnchor
-
     context.hideUnusable = config.hideUnusable and not showAnchor
 
     local spells = GetSpellList()
     local visible, maxWidth, totalHeight = 0, 0, 0
     local previousRow, firstRowHeight
-    local growth = config.growth or DEFAULT_GROWTH
+    local growth = config.growth
     ApplyGrowth(growth)
 
     for spellIndex = 1, #spells do
@@ -725,7 +696,7 @@ local function ScanItemCooldowns()
     local started = false
     for spellIndex = 1, #spells do
         local entry = spells[spellIndex]
-        if entry.kind == 'item' and entry.enabled and entry.spellID then
+        if entry.kind == 'item' and entry.enabled then
             local startTime, duration, isEnabled = C_Container.GetItemCooldown(entry.spellID)
             if isEnabled == 1 and duration and duration > 1.5 then
                 local spellID   = entry.spellID
@@ -748,24 +719,21 @@ local function ScanItemCooldowns()
     end
 end
 
-local function FireReadyEffects(entry, row, mode, duration, visualOnly)
+local function FireReadyEffects(entry, row, visualOnly)
     if not row then return end
     StopFlash(row)
     row:SetAlpha(1)
-    if mode == 'flash' then
+    if entry.readyMode == 'flash' then
         StartReadyPulse(row)
     else
         PlayReadyBlink(row)
     end
     if visualOnly then return end
-    if entry.soundReady and entry.soundReady ~= 'None' then
-        BUI.PlaySoundByName(entry.soundReady)
-    end
-    if entry.tts and BUI.TTS.IsAvailable() then
-        local info = LookupInfo(entry)
+    BUI.PlaySoundByName(entry.soundReady)
+    if entry.tts then
+        local info = LookupInfo(entry, ActiveID(entry))
         local name = info and info.name or ''
-        local phrase = (entry.ttsText or '[spell] ready')
-            :gsub('%[spell%]', name):gsub('%[name%]', name)
+        local phrase = entry.ttsText:gsub('%[spell%]', name):gsub('%[name%]', name)
         BUI.TTS.Speak(phrase)
     end
 end
@@ -774,24 +742,24 @@ local TTS_COUNT_LEAD  = 0.35
 local TTS_PHRASE_LEAD = 1.0
 
 local function FireLowEffects(entry, spellState)
-    local lowThreshold = entry.lowThreshold or 5
+    local lowThreshold = entry.lowThreshold
     local remaining = spellState.onCD and spellState.remaining
-    if entry.lowPhase == false or not remaining or remaining > lowThreshold + TTS_PHRASE_LEAD then
+    if not entry.lowPhase or not remaining or remaining > lowThreshold + TTS_PHRASE_LEAD then
         spellState.lowSoundFired = nil
         spellState.spokenCount   = nil
         spellState.announceFired = nil
         return
     end
 
-    if entry.countdownLow and BUI.TTS.IsAvailable() then
+    if entry.countdownLow then
         if not spellState.announceFired then
             spellState.announceFired = true
             local phraseSeconds = math.min(lowThreshold, math.ceil(remaining - TTS_COUNT_LEAD))
             if phraseSeconds >= 1 then
                 spellState.spokenCount = phraseSeconds
-                local info = LookupInfo(entry)
+                local info = LookupInfo(entry, ActiveID(entry))
                 local name = info and info.name or ''
-                local phrase = (entry.countdownText or '[spell] in [time]')
+                local phrase = entry.countdownText
                     :gsub('%[spell%]', name):gsub('%[name%]', name)
                     :gsub('%[time%]', tostring(phraseSeconds))
                 BUI.TTS.Speak(phrase)
@@ -807,20 +775,18 @@ local function FireLowEffects(entry, spellState)
     end
 
     if remaining > lowThreshold then return end
-    if entry.soundLow and entry.soundLow ~= 'None' and not spellState.lowSoundFired then
+    if not spellState.lowSoundFired then
         spellState.lowSoundFired = true
         BUI.PlaySoundByName(entry.soundLow)
     end
 end
 
-local function ChargeRecharging(entry)
-    if entry.kind == 'item' then return nil end
-    local activeID = ActiveID(entry)
-    if not Tools.IsChargeSpell(activeID) then return nil end
+local function ChargeRecharging(entry, activeID)
+    if entry.kind == 'item' or not Tools.IsChargeSpell(activeID) then return nil end
     local info = C_Spell.GetSpellCharges(activeID)
     if not info then return nil end
     local maxCharges = info.maxCharges
-    if Tools.IsSecretValue(maxCharges) or (maxCharges or 0) <= 1 then return nil end
+    if Tools.IsSecretValue(maxCharges) then return nil end
     local currentCharges = Tools.SafeNum(info.currentCharges)
     if currentCharges and currentCharges >= maxCharges then return false, info end
     return info.isActive == true, info
@@ -846,22 +812,23 @@ end
 
 local function UpdateEntryState(entry, nowEpoch, nowFrame, index)
     local spellID = entry.spellID
+    local activeID = ActiveID(entry)
     local spellState = state[spellID]
     if not spellState then spellState = {}; state[spellID] = spellState end
 
     local wasOnCD = spellState.onCD
 
     local recharging, chargeInfo
-    if not spellState.isPreview then recharging, chargeInfo = ChargeRecharging(entry) end
+    if not spellState.isPreview then recharging, chargeInfo = ChargeRecharging(entry, activeID) end
     if recharging ~= nil then
-        local duration = EffectiveDuration(entry) or 0
+        local duration = EffectiveDuration(entry, activeID) or 0
         if not recharging then
             spellState.onCD, spellState.remaining, spellState.castEpoch, spellState.rechargeAnchor = false, nil, nil, nil
             spellState.lastCharges = nil
             ClearCast(spellID)
         else
-            local liveStartTime = chargeInfo and Tools.SafeNum(chargeInfo.cooldownStartTime)
-            local liveDuration  = chargeInfo and Tools.SafeNum(chargeInfo.cooldownDuration)
+            local liveStartTime = Tools.SafeNum(chargeInfo.cooldownStartTime)
+            local liveDuration  = Tools.SafeNum(chargeInfo.cooldownDuration)
             if liveStartTime and liveDuration and liveDuration > 0 then
                 spellState.rechargeAnchor = liveStartTime
                 duration = liveDuration
@@ -870,7 +837,7 @@ local function UpdateEntryState(entry, nowEpoch, nowFrame, index)
             end
 
             local chargeReady = false
-            local currentCharges = chargeInfo and Tools.SafeNum(chargeInfo.currentCharges)
+            local currentCharges = Tools.SafeNum(chargeInfo.currentCharges)
             if currentCharges then
                 if spellState.lastCharges and currentCharges > spellState.lastCharges then chargeReady = true end
                 spellState.lastCharges = currentCharges
@@ -885,16 +852,14 @@ local function UpdateEntryState(entry, nowEpoch, nowFrame, index)
             spellState.onCD      = true
             spellState.remaining = math.max(0, spellState.rechargeAnchor + duration - nowFrame)
 
-            if chargeReady and not spellState.suppressReady and entry.readyPhase ~= false then
-                local mode = entry.readyMode    or 'flash'
-                local glowDuration = entry.glowDuration or 1
-                if mode ~= 'persist' then spellState.readyEndTime = nowFrame + glowDuration end
+            if chargeReady and not spellState.suppressReady and entry.readyPhase then
+                if entry.readyMode ~= 'persist' then spellState.readyEndTime = nowFrame + entry.glowDuration end
                 spellState.readyFiredAt = nowFrame
-                FireReadyEffects(entry, rows[index], mode, glowDuration, spellState.visualOnly)
+                FireReadyEffects(entry, rows[index], spellState.visualOnly)
             end
         end
     else
-        local duration = EffectiveDuration(entry)
+        local duration = EffectiveDuration(entry, activeID)
         if spellState.castEpoch and duration then
             local remaining = spellState.castEpoch + duration - nowEpoch
             local elapsed = nowEpoch - spellState.castEpoch
@@ -907,7 +872,7 @@ local function UpdateEntryState(entry, nowEpoch, nowFrame, index)
                 if entry.kind == 'item' then
                     liveState = LiveItemCooldownState(spellID)
                 else
-                    liveState = LiveCooldownState(ActiveID(entry))
+                    liveState = LiveCooldownState(activeID)
                 end
                 if liveState == false and elapsed > 0.5 then
                     finished = true
@@ -931,13 +896,11 @@ local function UpdateEntryState(entry, nowEpoch, nowFrame, index)
 
     if not spellState.visualOnly then FireLowEffects(entry, spellState) end
 
-    if wasOnCD and not spellState.onCD and not spellState.suppressReady and entry.readyPhase ~= false
+    if wasOnCD and not spellState.onCD and not spellState.suppressReady and entry.readyPhase
         and not (spellState.readyFiredAt and nowFrame - spellState.readyFiredAt < 1) then
-        local mode = entry.readyMode    or 'flash'
-        local glowDuration = entry.glowDuration or 1
-        spellState.readyEndTime = (mode == 'flash') and (nowFrame + glowDuration) or nil
+        spellState.readyEndTime = (entry.readyMode ~= 'persist') and (nowFrame + entry.glowDuration) or nil
         spellState.readyFiredAt = nowFrame
-        FireReadyEffects(entry, rows[index], mode, glowDuration, spellState.visualOnly)
+        FireReadyEffects(entry, rows[index], spellState.visualOnly)
     end
 end
 
@@ -952,7 +915,8 @@ local function AnyLiveState(spells, nowFrame)
 end
 
 local function Tick()
-    if not GetConfig().enabled and not previewActive then return end
+    local config = GetConfig()
+    if not config.enabled and not previewActive then return end
     local spells = GetSpellList()
     if #spells == 0 then
         Render()
@@ -971,21 +935,22 @@ local function Tick()
 
     Render()
 
-    if not previewActive and not GetConfig().showAnchor and not AnyLiveState(spells, nowFrame) then
+    if not previewActive and not config.showAnchor and not AnyLiveState(spells, nowFrame) then
         BUI.Scheduler.SetUpdateEnabled(MODULE_KEY, false)
     end
 end
 
 local function StartCooldown(entry, index, castEpoch)
-    if not entry or not entry.enabled or entry.kind == 'item' then return end
+    if not entry.enabled or entry.kind == 'item' then return end
+    local activeID = ActiveID(entry)
 
-    if ChargeRecharging(entry) ~= nil then
+    if ChargeRecharging(entry, activeID) ~= nil then
         local spellState = state[entry.spellID]
         if not spellState then spellState = {}; state[entry.spellID] = spellState end
         spellState.isPreview, spellState.suppressReady, spellState.visualOnly = nil, nil, nil
         spellState.readyEndTime = nil
         if not spellState.rechargeAnchor then spellState.rechargeAnchor = GetTime() end
-        local row = index and rows[index]
+        local row = rows[index]
         if row then StopReadyPulse(row) end
         UpdateEntryState(entry, NowEpoch(), GetTime(), index)
         BUI.Scheduler.SetUpdateEnabled(MODULE_KEY, true)
@@ -998,7 +963,7 @@ local function StartCooldown(entry, index, castEpoch)
         if freshDuration and freshDuration > 1.5 then entry.duration = freshDuration end
     end
 
-    local duration = EffectiveDuration(entry)
+    local duration = EffectiveDuration(entry, activeID)
     if not duration or duration <= 0 then return end
     local spellID = entry.spellID
     local spellState = state[spellID]
@@ -1010,7 +975,7 @@ local function StartCooldown(entry, index, castEpoch)
     spellState.suppressReady = nil
     spellState.isPreview     = nil
     spellState.visualOnly    = nil
-    local row = index and rows[index]
+    local row = rows[index]
     if row then StopReadyPulse(row) end
     PersistCast(spellID, castEpoch)
     BUI.Scheduler.SetUpdateEnabled(MODULE_KEY, true)
@@ -1031,6 +996,7 @@ end
 
 local function OnTalentBurst()
     wipe(resolvedDurationCache)
+    wipe(spellInfoCache)
     if not InCombatLockdown() then
         local spells = GetSpellList()
         for spellIndex = 1, #spells do
@@ -1050,7 +1016,7 @@ local function RestorePersistedCooldowns()
     local now = NowEpoch()
     for spellID, castEpoch in pairs(active) do
         local entry = CDAnnouncer.FindEntry(spellID)
-        local duration = entry and EffectiveDuration(entry)
+        local duration = entry and EffectiveDuration(entry, ActiveID(entry))
         local remaining = duration and (castEpoch + duration - now)
         if entry and entry.enabled and remaining and remaining > 0 then
             state[spellID] = { castEpoch = castEpoch, onCD = true, remaining = remaining }
@@ -1117,8 +1083,8 @@ function CDAnnouncer.SetSpellEnabled(spellID, enabled)
     if not entry then return end
     entry.enabled = enabled and true or false
     if not entry.enabled then
-        state[spellID] = nil
-        ClearCast(spellID)
+        state[entry.spellID] = nil
+        ClearCast(entry.spellID)
     end
     CDAnnouncer.Refresh()
 end
@@ -1136,69 +1102,49 @@ function CDAnnouncer.ReorderSpells(orderedIDs)
     CDAnnouncer.Refresh()
 end
 
-local function StartPreview(spellID, mode, duration)
+local function CancelPreviewTimer()
+    local timer = timers.preview
+    if not timer then return end
+    timer:Cancel()
+    timers.preview = nil
+end
+
+local function EndPreview(spellID)
+    previewActive = false
+    local current = state[spellID]
+    if current and current.isPreview then state[spellID] = nil end
+    for _, existingRow in ipairs(rows) do StopRowEffects(existingRow) end
+    root:SetFrameStrata('MEDIUM')
+    CDAnnouncer.Refresh()
+end
+
+function CDAnnouncer.PreviewSpell(spellID, duration)
     spellID = tonumber(spellID)
     local entry, index = CDAnnouncer.FindEntry(spellID)
     if not entry then return end
+    local fullDuration = EffectiveDuration(entry, ActiveID(entry))
+    if not fullDuration then return end
 
     local spellState = state[spellID] or {}
     state[spellID] = spellState
-    local row = index and rows[index]
+    local row = rows[index]
     if row then StopRowEffects(row) end
     ClearCast(spellID)
 
-    local readyMode     = entry.readyMode    or 'flash'
-    local readyDuration = entry.glowDuration or 1
-    local lifetime
-
-    if mode == 'cooldown' or mode == 'full' then
-        local fullDuration = EffectiveDuration(entry)
-        if not fullDuration then return end
-        spellState.castEpoch     = NowEpoch() + duration - fullDuration
-        spellState.onCD          = true
-        spellState.remaining     = duration
-        spellState.readyEndTime  = nil
-        spellState.suppressReady = (mode == 'cooldown') or nil
-        spellState.isPreview     = true
-        spellState.visualOnly    = nil
-        lifetime        = (mode == 'cooldown') and (duration + 0.5) or (duration + readyDuration + 1)
-    elseif mode == 'ready' then
-        spellState.castEpoch     = nil
-        spellState.onCD          = false
-        spellState.remaining     = nil
-        spellState.readyEndTime  = (readyMode == 'flash') and (GetTime() + readyDuration) or nil
-        spellState.suppressReady = nil
-        spellState.isPreview     = true
-        spellState.visualOnly    = nil
-        lifetime        = readyDuration + 1
-    else
-        return
-    end
+    spellState.castEpoch     = NowEpoch() + duration - fullDuration
+    spellState.onCD          = true
+    spellState.remaining     = duration
+    spellState.readyEndTime  = nil
+    spellState.suppressReady = nil
+    spellState.isPreview     = true
+    spellState.visualOnly    = nil
 
     previewActive = true
     root:SetFrameStrata('FULLSCREEN_DIALOG')
     BUI.Scheduler.SetUpdateEnabled(MODULE_KEY, true)
-
-    if previewTimer then previewTimer:Cancel() end
-    previewTimer = BUI.Profiler.NewTimer('CDAnnouncer.CDAnnouncer preview end', lifetime, function()
-        previewActive = false
-        previewTimer  = nil
-        local current = state[spellID]
-        if current and current.isPreview then state[spellID] = nil end
-        for _, existingRow in ipairs(rows) do StopRowEffects(existingRow) end
-        root:SetFrameStrata('MEDIUM')
-        CDAnnouncer.Refresh()
-    end)
-
+    Tools.ReplaceTimer(timers, 'preview', 'CDAnnouncer.CDAnnouncer preview end', duration + entry.glowDuration + 1, EndPreview, spellID)
     Render()
-
-    if mode == 'ready' and index then
-        local readyRow = rows[index]
-        if readyRow then FireReadyEffects(entry, readyRow, readyMode, readyDuration) end
-    end
 end
-
-function CDAnnouncer.PreviewSpell(spellID, duration)    StartPreview(spellID, 'full', duration) end
 
 local drivenPreviewID
 
@@ -1207,7 +1153,7 @@ function CDAnnouncer.DriveLivePreview(spellID, phase, remaining)
     local entry, index = CDAnnouncer.FindEntry(spellID)
     if not entry then return end
 
-    if previewTimer then previewTimer:Cancel(); previewTimer = nil end
+    CancelPreviewTimer()
 
     local spellState = state[spellID]
     if not spellState then spellState = {}; state[spellID] = spellState end
@@ -1223,19 +1169,14 @@ function CDAnnouncer.DriveLivePreview(spellID, phase, remaining)
         spellState.castEpoch, spellState.onCD, spellState.remaining = nil, false, nil
         spellState.drivenReady  = true
         spellState.readyEndTime = (entry.readyMode ~= 'persist') and (GetTime() + 0.3) or nil
-        if not wasReady then
-            local row = index and rows[index]
-            if row then
-                FireReadyEffects(entry, row, entry.readyMode or 'flash', entry.glowDuration or 1)
-            end
-        end
+        if not wasReady then FireReadyEffects(entry, rows[index]) end
     else
         if wasReady then
             spellState.drivenReady = nil
-            local row = index and rows[index]
+            local row = rows[index]
             if row then StopReadyPulse(row) end
         end
-        local fullDuration = EffectiveDuration(entry) or remaining
+        local fullDuration = EffectiveDuration(entry, ActiveID(entry)) or remaining
         spellState.onCD         = true
         spellState.remaining    = remaining
         spellState.castEpoch    = NowEpoch() - math.max(0, fullDuration - remaining)
@@ -1251,7 +1192,7 @@ function CDAnnouncer.StopLivePreview()
     if not drivenPreviewID then return end
     local spellID = drivenPreviewID
     drivenPreviewID = nil
-    if previewTimer then previewTimer:Cancel(); previewTimer = nil end
+    CancelPreviewTimer()
     previewActive = false
 
     local spellState = state[spellID]
@@ -1259,7 +1200,7 @@ function CDAnnouncer.StopLivePreview()
         state[spellID] = nil
         local entry = CDAnnouncer.FindEntry(spellID)
         local castEpoch = GetActiveTable()[spellID]
-        local duration = entry and EffectiveDuration(entry)
+        local duration = entry and EffectiveDuration(entry, ActiveID(entry))
         if entry and castEpoch and duration and (castEpoch + duration) > NowEpoch() then
             state[spellID] = {
                 castEpoch = castEpoch,
@@ -1285,17 +1226,17 @@ local function EnableDragging()
         onRightClick = function()
             GetConfig().showAnchor = false
             CDAnnouncer.Refresh()
-            if anchorCallback then anchorCallback(false) end
+            BUI.NotifyModuleChange('cdAnnouncer')
         end,
     })
     anchorTexture:Show()
-    anchorTexturet:Show()
+    anchorLabel:Show()
 end
 
 local function DisableDragging()
     BUI.Dragging.DisableAnchorDrag(root)
     anchorTexture:Hide()
-    anchorTexturet:Hide()
+    anchorLabel:Hide()
 end
 
 local function BuildFrame()
@@ -1315,17 +1256,16 @@ local function BuildFrame()
     Tools.SetColorTex(anchorTexture, 0, 0, 0, 0.3)
     anchorTexture:Hide()
 
-    anchorTexturet = root:CreateFontString(nil, 'OVERLAY')
-    Pixel.ApplyFont(anchorTexturet, 10, BUI.GetGlobalFont(), 'OUTLINE')
-    anchorTexturet:SetPoint('BOTTOM', root, 'TOP', 0, Pixel.Scale(2))
-    anchorTexturet:SetJustifyH('CENTER')
-    anchorTexturet:SetText('Drag to Reposition | Right-Click to Lock')
-    anchorTexturet:Hide()
+    anchorLabel = root:CreateFontString(nil, 'OVERLAY')
+    Pixel.ApplyFont(anchorLabel, 10, BUI.GetGlobalFont(), 'OUTLINE')
+    anchorLabel:SetPoint('BOTTOM', root, 'TOP', 0, Pixel.Scale(2))
+    anchorLabel:SetJustifyH('CENTER')
+    anchorLabel:SetText('Drag to Reposition | Right-Click to Lock')
+    anchorLabel:Hide()
 end
 
 local function UpdateOpacity()
-    local opacity = (BUI.Visibility.GetContextualOpacity('CDAnnouncer') or 100) / 100
-    root:SetAlpha(opacity)
+    root:SetAlpha(BUI.Visibility.GetContextualOpacity('CDAnnouncer') / 100)
 end
 
 local QueueItemScan = BUI.Dispatcher.New(ScanItemCooldowns, 'CDA.ItemScan')
@@ -1367,14 +1307,15 @@ end
 local function UpdateTickState()
     local config = GetConfig()
     local active = previewActive or (config.enabled and #GetSpellList() > 0)
-    BUI.Scheduler.SetUpdateEnabled(MODULE_KEY, active or false)
+    BUI.Scheduler.SetUpdateEnabled(MODULE_KEY, active)
 end
 
 function CDAnnouncer.Refresh()
+    local config = GetConfig()
     ApplyPosition()
-    if GetConfig().showAnchor then EnableDragging() else DisableDragging() end
+    if config.showAnchor then EnableDragging() else DisableDragging() end
     SyncEventRegistration()
-    if GetConfig().enabled then ScanItemCooldowns() end
+    if config.enabled then ScanItemCooldowns() end
     UpdateTickState()
     Render()
 end
@@ -1413,7 +1354,7 @@ local function MigrateCdColor()
     end
 end
 
-local function MigrateEntries()
+local function SettleEntries()
     local spells = GetSpellList()
     for spellIndex = #spells, 1, -1 do
         if spells[spellIndex].kind == 'bloodlust' then table.remove(spells, spellIndex) end
@@ -1429,6 +1370,7 @@ local function MigrateEntries()
         entry.readyIconSize      = nil
         entry._cachedDuration    = nil
         entry._cachedDurationFor = nil
+        CDAnnouncer.ApplyEntryDefaults(entry)
     end
 end
 
@@ -1436,7 +1378,7 @@ local function Initialize()
     loginEpoch = time() - GetTime()
     MigrateToProfileCharScope()
     MigrateCdColor()
-    MigrateEntries()
+    SettleEntries()
     BuildFrame()
     RestorePersistedCooldowns()
     BUI.Scheduler.RegisterUpdate(MODULE_KEY, Tick, TICK_INTERVAL, GetConfig().enabled)
