@@ -132,7 +132,7 @@ local entries = {
 
 	{ label = "Pet Warnings", page = "auras", tab = 1, panel = "General", keywords = "pet warning not attacking dead missing idle hurt low health grimoire of sacrifice font color position anchor" },
 	{ label = "Combat Timer", page = "auras", tab = 1, panel = "General", keywords = "combat timer readout milliseconds font size text color position anchor" },
-	{ label = "Combat Rez", page = "auras", tab = 1, panel = "General", keywords = "combat rez res brez battle resurrection charges rebirth raise ally soulstone recharge timer raid mythic plus keys" },
+	{ label = "Combat Rez", page = "auras", tab = 1, panel = "General", keywords = "combat rez res brez battle resurrection charges rebirth raise ally soulstone recharge timer raid mythic plus keys icon size border glow tile" },
 	{ label = "Combat Messages", page = "auras", tab = 1, panel = "General", keywords = "combat message text enter leave fade time font size color" },
 	{ label = "Crosshair", page = "auras", tab = 1, panel = "General", keywords = "crosshair reticle style hide out of combat town size thickness center gap opacity color range indicator melee ranged" },
 	{ label = "Low HP Warning", page = "auras", tab = 1, panel = "General", keywords = "low health warning hp threshold percent font size text color position anchor" },
