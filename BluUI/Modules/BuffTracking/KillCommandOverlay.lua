@@ -125,7 +125,7 @@ local function LiveTimerStamp(config, icon)
     return cachedTimerStamp
 end
 
-local function StyleLiveTimer(cooldown, button)
+local function StyleLiveTimer(cooldown)
     local config = GetConfig()
     cooldown:SetDrawSwipe(false)
     cooldown:SetDrawEdge(false)
@@ -139,7 +139,7 @@ local function StyleLiveTimer(cooldown, button)
     fontString:SetFont(BUI.GetGlobalFont(), config.timerSize, 'OUTLINE')
     fontString:SetTextColor(color.r, color.g, color.b, 1)
     fontString:ClearAllPoints()
-    fontString:SetPoint(anchor, button, anchor, Pixel.Scale(config.timerOffsetX), Pixel.Scale(config.timerOffsetY))
+    fontString:SetPoint(anchor, overlay.icon.Icon, anchor, Pixel.Scale(config.timerOffsetX), Pixel.Scale(config.timerOffsetY))
 end
 
 local function EnsureLiveTimer(entry, config, wanted)
