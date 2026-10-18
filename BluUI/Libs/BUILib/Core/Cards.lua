@@ -114,9 +114,9 @@ function Layout.CardKit(window)
 		local edge = opts.edge or 'cardEdge'
 		window:Paint(card.edge, edge)
 		if opts.onClick then
-			card:SetScript('OnEnter', function() window:Paint(card.edge, 'faint') end)
-			card:SetScript('OnLeave', function() window:Paint(card.edge, edge) end)
-			card:SetScript('OnClick', function() opts.onClick(card) end)
+			card:SetScript('OnEnter', BUILib.Timed('BUILib.Cards Card card OnEnter', function() window:Paint(card.edge, 'faint') end))
+			card:SetScript('OnLeave', BUILib.Timed('BUILib.Cards Card card OnLeave', function() window:Paint(card.edge, edge) end))
+			card:SetScript('OnClick', BUILib.Timed('BUILib.Cards Card card OnClick', function() opts.onClick(card) end))
 		end
 		card.height = height
 		return card
@@ -236,26 +236,26 @@ function Layout.CardKit(window)
 		local ticker
 		local function Start()
 			update()
-			if not ticker then ticker = C_Timer.NewTicker(seconds, update) end
+			if not ticker then ticker = C_Timer.NewTicker(seconds, BUILib.Timed('BUILib.Cards Start ticker', update)) end
 		end
 		local function Stop()
 			if ticker then ticker:Cancel() end
 			ticker = nil
 		end
-		frame:HookScript('OnShow', Start)
-		frame:HookScript('OnHide', Stop)
+		frame:HookScript('OnShow', BUILib.Timed('BUILib.Cards Every frame OnShow', Start))
+		frame:HookScript('OnHide', BUILib.Timed('BUILib.Cards Every frame OnHide', Stop))
 		if frame:IsVisible() then Start() else update() end
 	end
 
 	function cards.Listen(frame, events, update)
 		local listener = CreateFrame('Frame', nil, frame)
-		listener:SetScript('OnEvent', function() update() end)
+		listener:SetScript('OnEvent', BUILib.Timed('BUILib.Cards Listen listener OnEvent', function() update() end))
 		local function Start()
 			for _, event in ipairs(events) do listener:RegisterEvent(event) end
 			update()
 		end
-		frame:HookScript('OnShow', Start)
-		frame:HookScript('OnHide', function() listener:UnregisterAllEvents() end)
+		frame:HookScript('OnShow', BUILib.Timed('BUILib.Cards Listen frame OnShow', Start))
+		frame:HookScript('OnHide', BUILib.Timed('BUILib.Cards Listen frame OnHide', function() listener:UnregisterAllEvents() end))
 		if frame:IsVisible() then Start() else update() end
 	end
 
@@ -606,7 +606,7 @@ function Layout.CardKit(window)
 			chevron:SetPoint('RIGHT', -PAD, 0)
 			row.value = kit.Text(row, entry.value or '', 12, 'muted')
 			row.value:SetPoint('RIGHT', chevron, 'LEFT', -12, 0)
-			row:SetScript('OnClick', function(self) if entry.onClick then entry.onClick(self) end end)
+			row:SetScript('OnClick', BUILib.Timed('BUILib.Cards List row OnClick', function(self) if entry.onClick then entry.onClick(self) end end))
 			card.rows[index] = row
 		end
 		return card
@@ -760,7 +760,7 @@ function Layout.CardKit(window)
 			else
 				button.label:SetPoint('CENTER')
 			end
-			button:SetScript('OnClick', function() card:Select(index) end)
+			button:SetScript('OnClick', BUILib.Timed('BUILib.Cards Segmented button OnClick', function() card:Select(index) end))
 			buttons[index] = button
 		end
 		function card:SetSelected(index)

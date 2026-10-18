@@ -147,21 +147,21 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 			if spec.stretch then return end
 			button:SetWidth(math.ceil(x + label:GetStringWidth() + SELECT_GAP * 2 + 1 + value:GetStringWidth() + SELECT_CHEVRON_GAP + SELECT_CHEVRON + SELECT_PAD))
 		end)
-		button:SetScript('OnEnter', function()
+		button:SetScript('OnEnter', BUILib.Timed('BUILib.SplitPage Select button OnEnter', function()
 			window:Paint(edge, 'faint')
 			window:Paint(chevron, 'text')
-		end)
-		button:SetScript('OnLeave', function()
+		end))
+		button:SetScript('OnLeave', BUILib.Timed('BUILib.SplitPage Select button OnLeave', function()
 			window:Paint(edge, 'cardEdge')
 			window:Paint(chevron, 'muted')
-		end)
-		button:SetScript('OnClick', function(self)
+		end))
+		button:SetScript('OnClick', BUILib.Timed('BUILib.SplitPage Select button OnClick', function(self)
 			chevron:SetRotation(QUARTER_TURN * 2)
 			Controls.ContextMenu(spec.items(), {
 				anchor = self, width = math.max(self:GetWidth(), SELECT_MENU_WIDTH), offsetY = -4, window = window,
 				onClose = function() chevron:SetRotation(0) end,
 			})
-		end)
+		end))
 		return button
 	end
 end
@@ -246,9 +246,9 @@ local function PreviewCard(kit, window, parent, x, width, spec)
 		for layerIndex, layer in ipairs(layers) do layer:SetShown(layerIndex == index) end
 	end
 	ShowBackground(1)
-	stage:SetScript('OnSizeChanged', function(_, stageWidth, stageHeight)
+	stage:SetScript('OnSizeChanged', BUILib.Timed('BUILib.SplitPage PreviewCard stage OnSizeChanged', function(_, stageWidth, stageHeight)
 		for index, layer in ipairs(layers) do Fit(layer, backgrounds[index], stageWidth, stageHeight) end
-	end)
+	end))
 
 	local bar
 	if #backgrounds > 1 then
@@ -278,18 +278,18 @@ local function PreviewCard(kit, window, parent, x, width, spec)
 			thumb.frame:SetPoint('BOTTOMRIGHT', THUMB_FRAME, -THUMB_FRAME)
 			kit.Fill(thumb, 'card', 'BACKGROUND', 1):SetAllPoints()
 			Fit(Backdrop(window, thumb, background, 'ARTWORK'), background, THUMB_WIDTH, THUMB_HEIGHT)
-			thumb:SetScript('OnClick', function()
+			thumb:SetScript('OnClick', BUILib.Timed('BUILib.SplitPage PreviewCard thumb OnClick', function()
 				ShowBackground(index)
 				PaintThumbs()
-			end)
-			thumb:SetScript('OnEnter', function(self)
+			end))
+			thumb:SetScript('OnEnter', BUILib.Timed('BUILib.SplitPage PreviewCard thumb OnEnter', function(self)
 				PaintThumbs()
 				if background.label then Widget.ShowTip(self, background.label) end
-			end)
-			thumb:SetScript('OnLeave', function()
+			end))
+			thumb:SetScript('OnLeave', BUILib.Timed('BUILib.SplitPage PreviewCard thumb OnLeave', function()
 				PaintThumbs()
 				Widget.HideTip()
-			end)
+			end))
 			thumbs[index] = thumb
 		end
 		window:Bind(bar, function()
@@ -312,9 +312,9 @@ local function PreviewCard(kit, window, parent, x, width, spec)
 		local label = kit.Text(button, spec.action.text, 11, 'muted')
 		label:SetPoint('RIGHT')
 		window:Bind(button, function() button:SetWidth(math.ceil(label:GetStringWidth())) end)
-		button:SetScript('OnEnter', function() window:Paint(label, 'text') end)
-		button:SetScript('OnLeave', function() window:Paint(label, 'muted') end)
-		button:SetScript('OnClick', spec.action.onClick)
+		button:SetScript('OnEnter', BUILib.Timed('BUILib.SplitPage PreviewCard button OnEnter', function() window:Paint(label, 'text') end))
+		button:SetScript('OnLeave', BUILib.Timed('BUILib.SplitPage PreviewCard button OnLeave', function() window:Paint(label, 'muted') end))
+		button:SetScript('OnClick', BUILib.Timed('BUILib.SplitPage PreviewCard button OnClick', spec.action.onClick))
 	end
 
 	spec.build(stage, kit)
@@ -379,7 +379,7 @@ function Layout.SplitPage(tab, shell, spec)
 		end)
 	end
 	kit.Relayout = Resize
-	tab.frame:HookScript('OnShow', Resize)
+	tab.frame:HookScript('OnShow', BUILib.Timed('BUILib.SplitPage SplitPage frame OnShow', Resize))
 
 	Resize()
 	Layout.Add(tab, block, -Layout.DEFAULT_PADDING)

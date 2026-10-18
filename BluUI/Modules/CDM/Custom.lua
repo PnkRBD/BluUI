@@ -268,7 +268,7 @@ local function ResetManualBuffOverlay(icon, frameData)
         frameData._manualGlowTimer = nil
     end
     frameData._manualGlowActive = nil
-    icon.Cooldown:SetScript("OnCooldownDone", CDM.OnCooldownWidgetDone)
+    icon.Cooldown:SetScript("OnCooldownDone", BUI.Profiler.Timed('CDM.Custom ResetManualBuffOverlay Cooldown OnCooldownDone', CDM.OnCooldownWidgetDone))
 end
 
 local function ReleaseIcon(icon)
@@ -699,7 +699,7 @@ local function CreateIconFrame(parent, borderSize, borderColor, zoom)
     cooldown:SetDrawBling(false)
     cooldown:SetDrawSwipe(true)
     cooldown:SetHideCountdownNumbers(true)
-    cooldown:SetScript("OnCooldownDone", CDM.OnCooldownWidgetDone)
+    cooldown:SetScript("OnCooldownDone", BUI.Profiler.Timed('CDM.Custom CreateIconFrame cooldown OnCooldownDone', CDM.OnCooldownWidgetDone))
     frame.Cooldown = cooldown
 
     function frame:Update(newBorderSize, newBorderColor, newZoom)
@@ -821,7 +821,7 @@ CleanupManualBuff = function(icon, frameData)
     frameData._manualStart = nil
     frameData._manualGlowActive = nil
     local cooldown = icon.Cooldown
-    cooldown:SetScript("OnCooldownDone", CDM.OnCooldownWidgetDone)
+    cooldown:SetScript("OnCooldownDone", BUI.Profiler.Timed('CDM.Custom CleanupManualBuff cooldown OnCooldownDone', CDM.OnCooldownWidgetDone))
     cooldown:Clear()
     GlowManager.CancelDeferred(frameData)
     CDM.StopProcGlow(icon)

@@ -5,6 +5,8 @@ local BUILib = LibStub:NewLibrary(MAJOR, MINOR)
 LibStub(MAJOR).__loadChildren = BUILib ~= nil
 if not BUILib then return end
 
+function BUILib.Timed(_, callback) return callback end
+
 BUILib.FONT_SIZE = 11
 BUILib.CONTROL_HEIGHT = 36
 BUILib.ROW_HEIGHT = 28

@@ -40,12 +40,12 @@ local function SetLockTip(overlay, tooltipText)
 	if not overlay then return end
 	if not overlay._lockTipHooked then
 		overlay._lockTipHooked = true
-		overlay:SetScript("OnEnter", function(hoveredOverlay)
+		overlay:SetScript("OnEnter", BUILib.Timed('BUILib.Locks SetLockTip overlay OnEnter', function(hoveredOverlay)
 			if hoveredOverlay._lockTip and Widget.ShowTip then Widget.ShowTip(hoveredOverlay, hoveredOverlay._lockTip) end
-		end)
-		overlay:SetScript("OnLeave", function()
+		end))
+		overlay:SetScript("OnLeave", BUILib.Timed('BUILib.Locks SetLockTip overlay OnLeave', function()
 			if Widget.HideTip then Widget.HideTip() end
-		end)
+		end))
 	end
 	overlay._lockTip = tooltipText
 end

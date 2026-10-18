@@ -398,7 +398,7 @@ function Tools.OnAuraQueriesUnblocked(callback, label)
     wakeLabels[#wakeLabels + 1] = label
 end
 
-wakeDriver:SetScript('OnUpdate', function(self)
+wakeDriver:SetScript('OnUpdate', BUI.Profiler.Timed('Utility.Tools wakeDriver OnUpdate', function(self)
     wakeCursor = wakeCursor + 1
     local callback = wakeSubscribers[wakeCursor]
     if not callback or Tools.ShouldAurasBeSecret() or Tools.AuraQueriesBlocked() then
@@ -406,7 +406,7 @@ wakeDriver:SetScript('OnUpdate', function(self)
         return
     end
     Profiler.Run(Profiler.Label('Aura wake', wakeLabels[wakeCursor]), xpcall, callback, geterrorhandler())
-end)
+end))
 
 local function RunWakeNow()
     if Tools.ShouldAurasBeSecret() or Tools.AuraQueriesBlocked() then return end

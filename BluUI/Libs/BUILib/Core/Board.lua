@@ -60,10 +60,10 @@ function Board:AddSwitch(label, get, set, tip, room)
 	cell.label:SetPoint('RIGHT', -(LABEL_INSET + (room or 0)), 0)
 	cell.label:SetWordWrap(false)
 	cell.room = room or 0
-	cell:SetScript('OnClick', function() switch.toggle:Click() end)
+	cell:SetScript('OnClick', BUILib.Timed('BUILib.Board AddSwitch cell OnClick', function() switch.toggle:Click() end))
 	if tip then
-		cell:HookScript('OnEnter', function(self) Widget.ShowTip(self, tip) end)
-		cell:HookScript('OnLeave', Widget.HideTip)
+		cell:HookScript('OnEnter', BUILib.Timed('BUILib.Board AddSwitch cell OnEnter', function(self) Widget.ShowTip(self, tip) end))
+		cell:HookScript('OnLeave', BUILib.Timed('BUILib.Board AddSwitch cell OnLeave', Widget.HideTip))
 	end
 	self.rows[#self.rows + 1] = { kind = 'cell', frame = cell, search = label:lower() }
 	return switch, cell
@@ -356,7 +356,7 @@ local function StartDrag(board, frame, track, dimmed, title, subtitle, icon)
 	ghost:Show()
 	PaintGroups(board)
 	track(board)
-	frame:SetScript('OnUpdate', function() track(board) end)
+	frame:SetScript('OnUpdate', BUILib.Timed('BUILib.Board StartDrag frame OnUpdate', function() track(board) end))
 end
 
 local function JoinTarget(board, frame)
@@ -419,9 +419,9 @@ function Board:AddDragRow(label, room, sub, icon, group)
 	local title, subtitle = kit.RowTitle(row, label, sub, textX, self.panelWidth - textX - kit.ROW_INSET - room - CONTROL_GAP)
 	row:EnableMouse(true)
 	row:RegisterForDrag('LeftButton')
-	row:SetScript('OnMouseDown', Press)
-	row:SetScript('OnDragStart', function(frame) StartDrag(self, frame, TrackDrag, { frame }, title, subtitle, icon) end)
-	row:SetScript('OnDragStop', function(frame) EndDrag(self, frame) end)
+	row:SetScript('OnMouseDown', BUILib.Timed('BUILib.Board AddDragRow row OnMouseDown', Press))
+	row:SetScript('OnDragStart', BUILib.Timed('BUILib.Board AddDragRow row OnDragStart', function(frame) StartDrag(self, frame, TrackDrag, { frame }, title, subtitle, icon) end))
+	row:SetScript('OnDragStop', BUILib.Timed('BUILib.Board AddDragRow row OnDragStop', function(frame) EndDrag(self, frame) end))
 	return row, title, subtitle
 end
 
@@ -470,24 +470,24 @@ function Board:AddDragHeader(label, sub, tools, after, folded, onFold, tint)
 	row.controls = placer.controls
 	row:EnableMouse(true)
 	row:RegisterForDrag('LeftButton')
-	row:SetScript('OnMouseDown', function(frame)
+	row:SetScript('OnMouseDown', BUILib.Timed('BUILib.Board AddDragHeader row OnMouseDown', function(frame)
 		frame.dragged = false
 		Press(frame)
-	end)
-	row:SetScript('OnMouseUp', function(frame, button)
+	end))
+	row:SetScript('OnMouseUp', BUILib.Timed('BUILib.Board AddDragHeader row OnMouseUp', function(frame, button)
 		if button ~= 'LeftButton' or frame.dragged or not frame:IsMouseOver() then return end
 		onFold()
 		Turn()
-	end)
-	row:SetScript('OnDragStart', function(frame)
+	end))
+	row:SetScript('OnDragStart', BUILib.Timed('BUILib.Board AddDragHeader row OnDragStart', function(frame)
 		frame.dragged = true
 		local rows = drag.rows
 		local from = IndexOf(rows, frame)
 		local block = {}
 		for offset = 0, NodeSize(rows, from) - 1 do block[#block + 1] = rows[from + offset] end
 		StartDrag(self, frame, TrackBlock, block, title)
-	end)
-	row:SetScript('OnDragStop', function(frame) EndDrag(self, frame) end)
+	end))
+	row:SetScript('OnDragStop', BUILib.Timed('BUILib.Board AddDragHeader row OnDragStop', function(frame) EndDrag(self, frame) end))
 	return row, title, count
 end
 
@@ -695,13 +695,13 @@ function Grid:AddLine(cells, search)
 			window:Paint(edit, 'text')
 			window:SetFontRole(edit, 'control')
 			edit:SetText(cell.copy)
-			edit:SetScript('OnTextChanged', function(self, userInput) if userInput then self:SetText(cell.copy) end end)
-			edit:SetScript('OnEnterPressed', function(self) self:ClearFocus() end)
-			edit:SetScript('OnEscapePressed', function(self) self:ClearFocus() end)
-			edit:SetScript('OnEditFocusGained', function(self) self:HighlightText() end)
-			edit:SetScript('OnEditFocusLost', function(self) self:HighlightText(0, 0) end)
+			edit:SetScript('OnTextChanged', BUILib.Timed('BUILib.Board AddLine edit OnTextChanged', function(self, userInput) if userInput then self:SetText(cell.copy) end end))
+			edit:SetScript('OnEnterPressed', BUILib.Timed('BUILib.Board AddLine edit OnEnterPressed', function(self) self:ClearFocus() end))
+			edit:SetScript('OnEscapePressed', BUILib.Timed('BUILib.Board AddLine edit OnEscapePressed', function(self) self:ClearFocus() end))
+			edit:SetScript('OnEditFocusGained', BUILib.Timed('BUILib.Board AddLine edit OnEditFocusGained', function(self) self:HighlightText() end))
+			edit:SetScript('OnEditFocusLost', BUILib.Timed('BUILib.Board AddLine edit OnEditFocusLost', function(self) self:HighlightText(0, 0) end))
 			box:EnableMouse(true)
-			box:SetScript('OnMouseDown', function() edit:SetFocus() end)
+			box:SetScript('OnMouseDown', BUILib.Timed('BUILib.Board AddLine box OnMouseDown', function() edit:SetFocus() end))
 		else
 			local value = type(cell) == 'table' and cell.text or cell
 			local label = kit.Text(row, value, 12, type(cell) == 'table' and cell.role or 'text', inner)
@@ -714,12 +714,12 @@ function Grid:AddLine(cells, search)
 			hover:SetWidth(column.width)
 			hover:EnableMouse(true)
 			local tip = type(cell) == 'table' and cell.tip
-			hover:SetScript('OnEnter', function(self)
+			hover:SetScript('OnEnter', BUILib.Timed('BUILib.Board AddLine hover OnEnter', function(self)
 				local text = tip
 				if not text and label:IsTruncated() then text = value end
 				if text then Widget.ShowTip(self, text) end
-			end)
-			hover:SetScript('OnLeave', Widget.HideTip)
+			end))
+			hover:SetScript('OnLeave', BUILib.Timed('BUILib.Board AddLine hover OnLeave', Widget.HideTip))
 		end
 	end
 	FullRule(self)

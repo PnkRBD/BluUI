@@ -15,13 +15,13 @@ function BUILib.Defer(callback)
 	deferredCallbacks[#deferredCallbacks + 1] = callback
 	deferFrame:Show()
 end
-deferFrame:SetScript("OnUpdate", function(self)
+deferFrame:SetScript("OnUpdate", BUILib.Timed('BUILib.Layout deferFrame OnUpdate', function(self)
 	local callbacks = deferredCallbacks
 	deferredCallbacks = {}
 	self:Hide()
 	for callbackIndex = 1, #callbacks do deferredQueued[callbacks[callbackIndex]] = nil end
 	for callbackIndex = 1, #callbacks do callbacks[callbackIndex]() end
-end)
+end))
 deferFrame:Hide()
 
 Layout.DEFAULT_WIDTH = 876
@@ -259,7 +259,7 @@ function Layout.Page(parent, tabs, width)
 				content:Refresh()
 			end
 		end
-		container:SetScript("OnSizeChanged", function()
+		container:SetScript("OnSizeChanged", BUILib.Timed('BUILib.Layout CreateTabContent container OnSizeChanged', function()
 			if page.currentTab ~= index then return end
 			UpdateWrapperPosition()
 			if content and content._isRefreshing then return end
@@ -267,8 +267,8 @@ function Layout.Page(parent, tabs, width)
 			if sizeChangeTimer then return end
 			sizeChangeTimer = true
 			BUILib.Defer(DeferredSizeRefresh)
-		end)
-		container:SetScript("OnShow", function()
+		end))
+		container:SetScript("OnShow", BUILib.Timed('BUILib.Layout CreateTabContent container OnShow', function()
 
 			if page.currentTab ~= index then
 				container:Hide()
@@ -280,7 +280,7 @@ function Layout.Page(parent, tabs, width)
 					if page.currentTab == index then content:Refresh() end
 				end)
 			end
-		end)
+		end))
 		UpdateWrapperPosition()
 
 		content = Layout.ApplyContentMixin({
@@ -432,7 +432,7 @@ function Layout.ButtonRow(tab, buttonsOrDef, topMargin)
 		button:SetHeight(rowHeight)
 		if previousButton then button:SetPoint("RIGHT", previousButton, "LEFT", -gap, 0)
 		else button:SetPoint("RIGHT", rowFrame, "RIGHT", 0, 0) end
-		if buttonDef.callback then button:SetScript("OnClick", buttonDef.callback) end
+		if buttonDef.callback then button:SetScript("OnClick", BUILib.Timed('BUILib.Layout ButtonRow button OnClick', buttonDef.callback)) end
 		previousButton = button
 		table.insert(created, 1, button)
 	end
@@ -487,13 +487,13 @@ function Layout.TextArea(tab, labelOrDef, height, topMargin)
 	thumb:SetSize(6, 30)
 	scrollbar:SetThumbTexture(thumb)
 	scroll:EnableMouseWheel(true)
-	scroll:SetScript("OnMouseWheel", function(self, delta)
+	scroll:SetScript("OnMouseWheel", BUILib.Timed('BUILib.Layout TextArea scroll OnMouseWheel', function(self, delta)
 		local currentScroll = self:GetVerticalScroll()
 		local maxScroll = self:GetVerticalScrollRange()
 		self:SetVerticalScroll(math.floor(math.max(0, math.min(maxScroll, currentScroll - delta * 20)) + 0.5))
-	end)
+	end))
 	scroll:EnableMouse(true)
-	scroll:SetScript("OnMouseDown", function() editbox:SetFocus() end)
+	scroll:SetScript("OnMouseDown", BUILib.Timed('BUILib.Layout TextArea scroll OnMouseDown', function() editbox:SetFocus() end))
 
 	local measureFontString = scroll:CreateFontString(nil, "ARTWORK")
 	measureFontString:SetFont(BUILib.Font, 11, "")
@@ -514,16 +514,16 @@ function Layout.TextArea(tab, labelOrDef, height, topMargin)
 		if maxScroll > 0 then scrollbar:SetMinMaxValues(0, maxScroll) end
 	end
 
-	scroll:SetScript("OnVerticalScroll", function(_, offset)
+	scroll:SetScript("OnVerticalScroll", BUILib.Timed('BUILib.Layout TextArea scroll OnVerticalScroll', function(_, offset)
 		scrollbar:SetValue(offset)
-	end)
-	scroll:HookScript("OnSizeChanged", SyncLayout)
-	editbox:HookScript("OnTextChanged", SyncLayout)
-	editbox:HookScript("OnTextSet", SyncLayout)
+	end))
+	scroll:HookScript("OnSizeChanged", BUILib.Timed('BUILib.Layout TextArea scroll OnSizeChanged', SyncLayout))
+	editbox:HookScript("OnTextChanged", BUILib.Timed('BUILib.Layout TextArea editbox OnTextChanged', SyncLayout))
+	editbox:HookScript("OnTextSet", BUILib.Timed('BUILib.Layout TextArea editbox OnTextSet', SyncLayout))
 
-	scrollbar:SetScript("OnValueChanged", function(_, value) scroll:SetVerticalScroll(math.floor(value + 0.5)) end)
-	editbox:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
-	editbox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+	scrollbar:SetScript("OnValueChanged", BUILib.Timed('BUILib.Layout TextArea scrollbar OnValueChanged', function(_, value) scroll:SetVerticalScroll(math.floor(value + 0.5)) end))
+	editbox:SetScript("OnEditFocusGained", BUILib.Timed('BUILib.Layout TextArea editbox OnEditFocusGained', function(self) self:HighlightText() end))
+	editbox:SetScript("OnEscapePressed", BUILib.Timed('BUILib.Layout TextArea editbox OnEscapePressed', function(self) self:ClearFocus() end))
 	scrollbar:Hide()
 	container.editbox = editbox
 	container.scroll = scroll

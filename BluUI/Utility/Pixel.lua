@@ -141,7 +141,7 @@ local function HookSnapMethods(widget)
 
     for method, handler in pairs(SNAP_HOOKS) do
         if prototype[method] then
-            hooksecurefunc(prototype, method, handler)
+            hooksecurefunc(prototype, method, BUI.Profiler.Timed('Utility.Pixel HookSnapMethods hook', handler))
         end
     end
 end

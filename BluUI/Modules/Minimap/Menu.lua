@@ -76,8 +76,8 @@ local function ControlButton()
 	button.hover:SetAllPoints()
 	button.hover:SetColorTexture(hoverColor[1], hoverColor[2], hoverColor[3], hoverColor[4])
 	button.hover:Hide()
-	button:SetScript('OnEnter', ShowHover)
-	button:SetScript('OnLeave', HideHover)
+	button:SetScript('OnEnter', BUI.Profiler.Timed('Minimap.Menu ControlButton button OnEnter', ShowHover))
+	button:SetScript('OnLeave', BUI.Profiler.Timed('Minimap.Menu ControlButton button OnLeave', HideHover))
 	return button
 end
 

@@ -119,23 +119,23 @@ function Controls.Slider(parent, label, minValue, maxValue, value, callback, ind
 	valueBox:SetTextColor(1, 1, 1); valueBox:SetJustifyH("CENTER"); valueBox:SetMaxLetters(10)
 	valueBox:SetBackdrop(Widget.BACKDROP)
 	valueBox:SetBackdropColor(unpack(Theme.bg.input)); valueBox:SetBackdropBorderColor(unpack(Theme.border.dark))
-	valueBox:SetScript("OnEnter", function(editBox)
+	valueBox:SetScript("OnEnter", BUILib.Timed('BUILib.Slider Slider valueBox OnEnter', function(editBox)
 		if not state.locked then editBox:SetBackdropBorderColor(Theme.GetAccent()) end
-	end)
-	valueBox:SetScript("OnLeave", function(editBox)
+	end))
+	valueBox:SetScript("OnLeave", BUILib.Timed('BUILib.Slider Slider valueBox OnLeave', function(editBox)
 		if not editBox:HasFocus() then editBox:SetBackdropBorderColor(unpack(Theme.border.dark)) end
-	end)
+	end))
 	local function MakeStepButton(text, anchor, offset)
 		local stepButton = Widget.New(container, "Button", nil, {bg = Theme.button.normal, border = Theme.button.normal, size = {22, 22}})
 		stepButton.frame:SetPoint(anchor, valueBox, offset == -1 and "LEFT" or "RIGHT", offset * 4, 0)
 		local buttonLabel = stepButton:CreateText({size = 14, text = text, color = Theme.text.secondary})
 		buttonLabel:SetPoint("CENTER")
-		stepButton.frame:SetScript("OnEnter", function(buttonFrame)
+		stepButton.frame:SetScript("OnEnter", BUILib.Timed('BUILib.Slider MakeStepButton frame OnEnter', function(buttonFrame)
 			if not state.locked then buttonFrame:SetBackdropColor(unpack(Theme.button.hover)); buttonLabel:SetTextColor(1, 1, 1) end
-		end)
-		stepButton.frame:SetScript("OnLeave", function(buttonFrame)
+		end))
+		stepButton.frame:SetScript("OnLeave", BUILib.Timed('BUILib.Slider MakeStepButton frame OnLeave', function(buttonFrame)
 			buttonFrame:SetBackdropColor(unpack(Theme.button.normal)); buttonLabel:SetTextColor(unpack(Theme.text.secondary))
-		end)
+		end))
 		return stepButton.frame
 	end
 	local minusButton = MakeStepButton("\226\136\146", "RIGHT", -1)
@@ -162,14 +162,14 @@ function Controls.Slider(parent, label, minValue, maxValue, value, callback, ind
 		thumb:SetPoint("LEFT", track, "LEFT", percent * max(1, trackWidth - thumbWidth), 0)
 		valueBox:SetText(tostring(newValue))
 	end
-	minusButton:SetScript("OnClick", function()
+	minusButton:SetScript("OnClick", BUILib.Timed('BUILib.Slider Slider minusButton OnClick', function()
 		if not state.locked then UpdateThumb(state.value - step); if callback then callback(state.value) end end
-	end)
-	plusButton:SetScript("OnClick", function()
+	end))
+	plusButton:SetScript("OnClick", BUILib.Timed('BUILib.Slider Slider plusButton OnClick', function()
 		if not state.locked then UpdateThumb(state.value + step); if callback then callback(state.value) end end
-	end)
+	end))
 	track:EnableMouse(true)
-	track:SetScript("OnMouseDown", function(self, button)
+	track:SetScript("OnMouseDown", BUILib.Timed('BUILib.Slider Slider track OnMouseDown', function(self, button)
 		if button == "LeftButton" and not state.locked then
 			local trackLeft, trackWidth = self:GetLeft(), self:GetWidth()
 			if not trackLeft or not trackWidth or trackWidth <= 0 then return end
@@ -177,21 +177,21 @@ function Controls.Slider(parent, label, minValue, maxValue, value, callback, ind
 			UpdateThumb(minValue + max(0, min(1, (cursorX - trackLeft) / trackWidth)) * (maxValue - minValue))
 			if callback then callback(state.value) end
 		end
-	end)
-	valueBox:SetScript("OnEnterPressed", function(self)
+	end))
+	valueBox:SetScript("OnEnterPressed", BUILib.Timed('BUILib.Slider Slider valueBox OnEnterPressed', function(self)
 		local enteredNumber = tonumber(self:GetText())
 		if enteredNumber then UpdateThumb(enteredNumber); if callback then callback(state.value) end
 		else self:SetText(tostring(state.value)) end
 		self:ClearFocus()
-	end)
-	valueBox:SetScript("OnEscapePressed", function(editBox) editBox:ClearFocus() end)
-	valueBox:SetScript("OnEditFocusGained", function(editBox) editBox:SetBackdropBorderColor(Theme.GetAccent()) end)
-	valueBox:SetScript("OnEditFocusLost", function(editBox) editBox:SetBackdropBorderColor(unpack(Theme.border.dark)) end)
+	end))
+	valueBox:SetScript("OnEscapePressed", BUILib.Timed('BUILib.Slider Slider valueBox OnEscapePressed', function(editBox) editBox:ClearFocus() end))
+	valueBox:SetScript("OnEditFocusGained", BUILib.Timed('BUILib.Slider Slider valueBox OnEditFocusGained', function(editBox) editBox:SetBackdropBorderColor(Theme.GetAccent()) end))
+	valueBox:SetScript("OnEditFocusLost", BUILib.Timed('BUILib.Slider Slider valueBox OnEditFocusLost', function(editBox) editBox:SetBackdropBorderColor(unpack(Theme.border.dark)) end))
 	thumb:EnableMouse(true)
-	thumb:SetScript("OnMouseDown", function(self, button)
+	thumb:SetScript("OnMouseDown", BUILib.Timed('BUILib.Slider Slider thumb OnMouseDown', function(self, button)
 		if button == "LeftButton" and not state.locked then
 			self.dragging = true
-			self:SetScript("OnUpdate", function(thumbFrame)
+			self:SetScript("OnUpdate", BUILib.Timed('BUILib.Slider Slider self OnUpdate', function(thumbFrame)
 				if thumbFrame.dragging then
 					local trackLeft, trackWidth = track:GetLeft(), track:GetWidth()
 					if not trackLeft or not trackWidth or trackWidth <= 0 then return end
@@ -199,21 +199,21 @@ function Controls.Slider(parent, label, minValue, maxValue, value, callback, ind
 					local newValue = floor((minValue + max(0, min(1, (cursorX - trackLeft) / trackWidth)) * (maxValue - minValue)) / step + 0.5) * step
 					if newValue ~= state.value then UpdateThumb(newValue); if callback then callback(state.value) end end
 				end
-			end)
+			end))
 		end
-	end)
-	thumb:SetScript("OnMouseUp", function(thumbFrame) thumbFrame.dragging = false; thumbFrame:SetScript("OnUpdate", nil) end)
+	end))
+	thumb:SetScript("OnMouseUp", BUILib.Timed('BUILib.Slider Slider thumb OnMouseUp', function(thumbFrame) thumbFrame.dragging = false; thumbFrame:SetScript("OnUpdate", nil) end))
 	if tooltip then Widget.Tooltip(track, tooltip); Widget.Tooltip(thumb, tooltip) end
 	BUILib.Defer(function() UpdateThumb(state.value) end)
 	if state.locked then EnsureOverlay(); container._lockedOverlay:SetShown(true) end
 	local function DeferredThumbUpdate() if container and container.GetValue then UpdateThumb(state.value) end end
-	container:SetScript("OnSizeChanged", function(_, newWidth)
+	container:SetScript("OnSizeChanged", BUILib.Timed('BUILib.Slider Slider container OnSizeChanged', function(_, newWidth)
 		local newPadding = min(30, max(20, newWidth * 0.1))
 		track:ClearAllPoints()
 		track:SetPoint("TOPLEFT", container, "TOPLEFT", newPadding + indentPx, -24)
 		track:SetPoint("TOPRIGHT", container, "TOPRIGHT", -newPadding, -24)
 		BUILib.Defer(DeferredThumbUpdate)
-	end)
+	end))
 	function container:GetValue() return state.value end
 	function container:SetValue(newValue) UpdateThumb(newValue) end
 	function container:SetLockedText(text) EnsureOverlay(); container._lockedText:SetText(text or "LOCKED") end

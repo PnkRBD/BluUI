@@ -102,14 +102,14 @@ function Controls.MultiDropdown(parent, label, items, selected, callback, toolti
 		row.text:SetJustifyH("LEFT")
 
 		row.hl = Widget.Create(row, 0, 0, 0, 0); row.hl:SetAllPoints(); row.hl:SetDrawLayer("BACKGROUND")
-		row:SetScript("OnEnter", function(rowButton)
+		row:SetScript("OnEnter", BUILib.Timed('BUILib.MultiDropdown GetRow row OnEnter', function(rowButton)
 			Widget.SetColor(rowButton.hl, Theme.GetAccent()); rowButton.hl:SetAlpha(0.15)
 			rowButton.box:SetBackdropBorderColor(Theme.GetAccent())
-		end)
-		row:SetScript("OnLeave", function(rowButton)
+		end))
+		row:SetScript("OnLeave", BUILib.Timed('BUILib.MultiDropdown GetRow row OnLeave', function(rowButton)
 			rowButton.hl:SetAlpha(0)
 			rowButton.box:SetBackdropBorderColor(unpack(Theme.border.input))
-		end)
+		end))
 
 		rowPool[index] = row; return row
 	end
@@ -157,14 +157,14 @@ function Controls.MultiDropdown(parent, label, items, selected, callback, toolti
 		row.text:SetPoint("RIGHT", -6, 0)
 		row.text:SetJustifyH("LEFT")
 		row.hl = Widget.Create(row, 0, 0, 0, 0); row.hl:SetAllPoints(); row.hl:SetDrawLayer("BACKGROUND")
-		row:SetScript("OnEnter", function(rowButton)
+		row:SetScript("OnEnter", BUILib.Timed('BUILib.MultiDropdown GetActionRow row OnEnter', function(rowButton)
 			Widget.SetColor(rowButton.hl, Theme.GetAccent()); rowButton.hl:SetAlpha(0.15)
 			local accentRed, accentGreen, accentBlue = Theme.GetAccent(); rowButton.text:SetTextColor(accentRed, accentGreen, accentBlue, 1)
-		end)
-		row:SetScript("OnLeave", function(rowButton)
+		end))
+		row:SetScript("OnLeave", BUILib.Timed('BUILib.MultiDropdown GetActionRow row OnLeave', function(rowButton)
 			rowButton.hl:SetAlpha(0)
 			rowButton.text:SetTextColor(unpack(Theme.text.primary))
-		end)
+		end))
 		actionPool[index] = row; return row
 	end
 
@@ -187,9 +187,9 @@ function Controls.MultiDropdown(parent, label, items, selected, callback, toolti
 			row:SetPoint("TOPLEFT", 0, -offsetY); row:SetPoint("TOPRIGHT", 0, -offsetY)
 			row.text:SetText(action.text or "")
 			row.text:SetTextColor(unpack(Theme.text.primary))
-			row:SetScript("OnClick", function()
+			row:SetScript("OnClick", BUILib.Timed('BUILib.MultiDropdown BuildMenu row OnClick', function()
 				if action.onClick then action.onClick(state.items, SetSelected) end
-			end)
+			end))
 			offsetY = offsetY + ROW_HEIGHT
 		end
 		if #actions > 0 then
@@ -222,12 +222,12 @@ function Controls.MultiDropdown(parent, label, items, selected, callback, toolti
 			row.text:SetText(displayText)
 			row.val = itemValue
 			UpdateRowVisual(row, state.selected[itemValue])
-			row:SetScript("OnClick", function()
+			row:SetScript("OnClick", BUILib.Timed('BUILib.MultiDropdown BuildMenu row OnClick', function()
 				state.selected[itemValue] = not state.selected[itemValue] or nil
 				UpdateRowVisual(row, state.selected[itemValue])
 				UpdateButtonDisplay()
 				if callback then callback(state.selected) end
-			end)
+			end))
 			offsetY = offsetY + rowHeight
 		end
 		scrollChild:SetHeight(offsetY)
@@ -238,12 +238,12 @@ function Controls.MultiDropdown(parent, label, items, selected, callback, toolti
 		scrollFrame:SetVerticalScroll(0); BUILib.Defer(scrollLogic.UpdateThumb)
 	end
 
-	button:SetScript("OnClick", function()
+	button:SetScript("OnClick", BUILib.Timed('BUILib.MultiDropdown MultiDropdown button OnClick', function()
 		if menu:IsShown() then Widget.HideMenuAnimated(menu); SetExpandOpen(false)
 		else BuildMenu(); PositionMenu(); Widget.ShowMenuAnimated(menu); SetExpandOpen(true) end
-	end)
-	button:SetScript("OnEnter", function() SetButtonHighlighted(true); expandIcon:SetVertexColor(1, 1, 1) end)
-	button:SetScript("OnLeave", function() SetButtonHighlighted(false); expandIcon:SetVertexColor(unpack(Theme.text.secondary)) end)
+	end))
+	button:SetScript("OnEnter", BUILib.Timed('BUILib.MultiDropdown MultiDropdown button OnEnter', function() SetButtonHighlighted(true); expandIcon:SetVertexColor(1, 1, 1) end))
+	button:SetScript("OnLeave", BUILib.Timed('BUILib.MultiDropdown MultiDropdown button OnLeave', function() SetButtonHighlighted(false); expandIcon:SetVertexColor(unpack(Theme.text.secondary)) end))
 	if tooltip then Widget.Tooltip(button, tooltip) end
 	UpdateButtonDisplay()
 

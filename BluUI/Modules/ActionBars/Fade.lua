@@ -59,7 +59,7 @@ local function SetAlphaTarget(bar, target, seconds)
 	end
 	local fader = Fader(bar)
 	fader.from, fader.to, fader.start, fader.duration, fader.playing = current, target, GetTime(), seconds, true
-	header:SetScript('OnUpdate', fader.tick)
+	header:SetScript('OnUpdate', BUI.Profiler.Timed('ActionBars.Fade SetAlphaTarget header OnUpdate', fader.tick))
 end
 
 local function ApplyBar(bar)
@@ -113,7 +113,7 @@ local function StartGapWatch(bar)
 			end
 		end)
 	end
-	bar.gapWatch = C_Timer.NewTicker(GAP_INTERVAL, bar.gapCheck)
+	bar.gapWatch = C_Timer.NewTicker(GAP_INTERVAL, BUI.Profiler.Timed('ActionBars.Fade StartGapWatch ticker', bar.gapCheck))
 end
 
 local function Enter(bar)
@@ -139,7 +139,7 @@ local function Leave(bar)
 			end
 		end)
 	end
-	C_Timer.After(0, bar.leaveCheck)
+	C_Timer.After(0, BUI.Profiler.Timed('ActionBars.Fade Leave timer', bar.leaveCheck))
 end
 
 local function OnFrameEnter(frame) Enter(frame._buiFadeBar) end

@@ -47,7 +47,7 @@ local function StartGroup(group, seconds)
 	if not seconds or seconds <= 0 then return end
 	group.expiry = GetTime() + seconds
 	TickGroup(group)
-	group.ticker = C_Timer.NewTicker(1, group.tick)
+	group.ticker = C_Timer.NewTicker(1, BUI.Profiler.Timed('Skinning.QueuePopups StartGroup ticker', group.tick))
 end
 
 local function NewGroup()

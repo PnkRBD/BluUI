@@ -81,7 +81,7 @@ function Controls.Popover(options)
 	local checkFrame = CreateFrame("Frame")
 	local armed = not (IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton"))
 	local host = anchor or BUILib.GetPopupParent()
-	checkFrame:SetScript("OnUpdate", function(self)
+	checkFrame:SetScript("OnUpdate", BUILib.Timed('BUILib.Popover Popover checkFrame OnUpdate', function(self)
 		if not frame:IsShown() then self:SetScript("OnUpdate", nil); return end
 		if host and not host:IsVisible() then
 			self:SetScript("OnUpdate", nil)
@@ -97,15 +97,15 @@ function Controls.Popover(options)
 			self:SetScript("OnUpdate", nil)
 			ClosePopover()
 		end
-	end)
+	end))
 
 	frame._anchor = anchor
-	frame:SetScript("OnShow", function(self) self:Raise() end)
-	frame:SetScript("OnHide", function(self)
+	frame:SetScript("OnShow", BUILib.Timed('BUILib.Popover Popover frame OnShow', function(self) self:Raise() end))
+	frame:SetScript("OnHide", BUILib.Timed('BUILib.Popover Popover frame OnHide', function(self)
 		checkFrame:SetScript("OnUpdate", nil)
 		if activePopover == self then activePopover = nil end
 		if options.onClose then options.onClose() end
-	end)
+	end))
 
 	activePopover = frame
 	ShowMenu(frame)

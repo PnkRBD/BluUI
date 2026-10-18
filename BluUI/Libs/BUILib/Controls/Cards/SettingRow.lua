@@ -179,7 +179,7 @@ function Controls.SettingRow(parent, config)
 		local function AnimateTo(targetProgress)
 			local startProgress = progress
 			local startTime = GetTime()
-			track:SetScript("OnUpdate", function(self)
+			track:SetScript("OnUpdate", BUILib.Timed('BUILib.SettingRow AnimateTo track OnUpdate', function(self)
 				local elapsedFraction = (GetTime() - startTime) / ANIMATION_DURATION
 				if elapsedFraction >= 1 then
 					progress = targetProgress
@@ -188,10 +188,10 @@ function Controls.SettingRow(parent, config)
 					progress = startProgress + (targetProgress - startProgress) * EaseOutBack(elapsedFraction)
 				end
 				RenderSwitch()
-			end)
+			end))
 		end
 
-		row:SetScript("OnClick", function(_, button)
+		row:SetScript("OnClick", BUILib.Timed('BUILib.SettingRow SettingRow row OnClick', function(_, button)
 			if button == "RightButton" then
 				if config.onRightClick then config.onRightClick(row) end
 				return
@@ -200,27 +200,27 @@ function Controls.SettingRow(parent, config)
 			state.on = not state.on
 			AnimateTo(state.on and 1 or 0)
 			if config.callback then config.callback(state.on) end
-		end)
+		end))
 
-		row:SetScript("OnEnter", function()
+		row:SetScript("OnEnter", BUILib.Timed('BUILib.SettingRow SettingRow row OnEnter', function()
 			if state.disabled then return end
 			local red, green, blue = Theme.GetAccent()
 			if strokeRect then Widget.SetRectColor(strokeRect, red, green, blue, 0.40) end
 			if hairline then hairline:SetVertexColor(red, green, blue, 0.5) end
-		end)
-		row:SetScript("OnLeave", function()
+		end))
+		row:SetScript("OnLeave", BUILib.Timed('BUILib.SettingRow SettingRow row OnLeave', function()
 			if strokeRect then Widget.SetRectColor(strokeRect, unpack(STROKE)) end
 			if hairline then hairline:SetVertexColor(unpack(SHEET_HAIRLINE)) end
-		end)
+		end))
 
 		row._RenderSwitch = RenderSwitch
 		row._SetProgress = function(newProgress) progress = newProgress end
 	end
 
 	if config.onRightClick and (config.plain or config.control) then
-		row:SetScript("OnClick", function(_, button)
+		row:SetScript("OnClick", BUILib.Timed('BUILib.SettingRow SettingRow row OnClick', function(_, button)
 			if button == "RightButton" then config.onRightClick(row) end
-		end)
+		end))
 	end
 
 	if config.accessories then

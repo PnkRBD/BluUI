@@ -94,8 +94,8 @@ function Controls.SelectableList(parent, options)
 
 		local highlight = row:CreateTexture(nil, "BACKGROUND")
 		highlight:SetAllPoints(); highlight:SetColorTexture(1, 1, 1, 0.03); highlight:Hide()
-		row:SetScript("OnEnter", function() highlight:Show() end)
-		row:SetScript("OnLeave", function() highlight:Hide() end)
+		row:SetScript("OnEnter", BUILib.Timed('BUILib.SelectableList SelectableList row OnEnter', function() highlight:Show() end))
+		row:SetScript("OnLeave", BUILib.Timed('BUILib.SelectableList SelectableList row OnLeave', function() highlight:Hide() end))
 
 		local title = Controls.Text(row, item.title or item.key, FONT_SIZE, enabled and Theme.text.primary or Theme.text.disabled)
 		if item.desc then

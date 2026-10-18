@@ -116,33 +116,33 @@ function Controls.RowSlider(parent, minValue, maxValue, value, callback, config)
 	end
 
 	if valueBox then
-		valueBox:SetScript("OnEnterPressed", function(self)
+		valueBox:SetScript("OnEnterPressed", BUILib.Timed('BUILib.RowSlider RowSlider valueBox OnEnterPressed', function(self)
 			local parsed = ParseValue(self:GetText() or "")
 			self:ClearFocus()
 			if parsed then SetValue(parsed) else Render() end
-		end)
-		valueBox:SetScript("OnEscapePressed", function(self) self:ClearFocus(); Render() end)
-		valueBox:SetScript("OnEditFocusGained", function(self) SetBoxHighlighted(true); self:HighlightText() end)
-		valueBox:SetScript("OnEditFocusLost", function(self)
+		end))
+		valueBox:SetScript("OnEscapePressed", BUILib.Timed('BUILib.RowSlider RowSlider valueBox OnEscapePressed', function(self) self:ClearFocus(); Render() end))
+		valueBox:SetScript("OnEditFocusGained", BUILib.Timed('BUILib.RowSlider RowSlider valueBox OnEditFocusGained', function(self) SetBoxHighlighted(true); self:HighlightText() end))
+		valueBox:SetScript("OnEditFocusLost", BUILib.Timed('BUILib.RowSlider RowSlider valueBox OnEditFocusLost', function(self)
 			self:HighlightText(0, 0)
 			SetBoxHighlighted(false)
 			Render()
-		end)
-		valueBox:SetScript("OnEnter", function() SetBoxHighlighted(true) end)
-		valueBox:SetScript("OnLeave", function(self) if not self:HasFocus() then SetBoxHighlighted(false) end end)
+		end))
+		valueBox:SetScript("OnEnter", BUILib.Timed('BUILib.RowSlider RowSlider valueBox OnEnter', function() SetBoxHighlighted(true) end))
+		valueBox:SetScript("OnLeave", BUILib.Timed('BUILib.RowSlider RowSlider valueBox OnLeave', function(self) if not self:HasFocus() then SetBoxHighlighted(false) end end))
 		ApplyLocked()
 	end
 
 	local function OnDragUpdate() ValueFromCursor() end
 	local function StopDragging(self) self:SetScript("OnUpdate", nil) end
 
-	track:SetScript("OnMouseDown", function(self, button)
+	track:SetScript("OnMouseDown", BUILib.Timed('BUILib.RowSlider RowSlider track OnMouseDown', function(self, button)
 		if button ~= "LeftButton" or state.locked then return end
-		self:SetScript("OnUpdate", OnDragUpdate)
+		self:SetScript("OnUpdate", BUILib.Timed('BUILib.RowSlider RowSlider self OnUpdate', OnDragUpdate))
 		ValueFromCursor()
-	end)
-	track:SetScript("OnMouseUp", StopDragging)
-	track:SetScript("OnHide", StopDragging)
+	end))
+	track:SetScript("OnMouseUp", BUILib.Timed('BUILib.RowSlider RowSlider track OnMouseUp', StopDragging))
+	track:SetScript("OnHide", BUILib.Timed('BUILib.RowSlider RowSlider track OnHide', StopDragging))
 
 	if config.tooltip then Widget.Tooltip(track, config.tooltip) end
 

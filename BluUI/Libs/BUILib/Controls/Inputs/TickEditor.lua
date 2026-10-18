@@ -68,7 +68,7 @@ function Controls.TickEditor(parent, options)
 	end
 
 	local function StartDriver()
-		track:SetScript("OnUpdate", track.Driver)
+		track:SetScript("OnUpdate", BUILib.Timed('BUILib.TickEditor StartDriver track OnUpdate', track.Driver))
 	end
 
 	local function StopDriver()
@@ -94,35 +94,35 @@ function Controls.TickEditor(parent, options)
 				marker.line:SetColorTexture(1, 1, 1, 1)
 				marker.line:SetPoint("TOP")
 				marker.line:SetPoint("BOTTOM")
-				marker:SetScript("OnClick", function(self, buttonName)
+				marker:SetScript("OnClick", BUILib.Timed('BUILib.TickEditor Layout marker OnClick', function(self, buttonName)
 					if buttonName == "RightButton" and not dragIndex then
 						table.remove(options.get(), self.index)
 						track.Commit()
 					end
-				end)
-				marker:SetScript("OnDragStart", function(self)
+				end))
+				marker:SetScript("OnDragStart", BUILib.Timed('BUILib.TickEditor Layout marker OnDragStart', function(self)
 					dragIndex = self.index
 					StartDriver()
-				end)
-				marker:SetScript("OnDragStop", function()
+				end))
+				marker:SetScript("OnDragStop", BUILib.Timed('BUILib.TickEditor Layout marker OnDragStop', function()
 					dragIndex = nil
 					track.Commit()
 					StopDriver()
-				end)
-				marker:SetScript("OnEnter", function(self)
+				end))
+				marker:SetScript("OnEnter", BUILib.Timed('BUILib.TickEditor Layout marker OnEnter', function(self)
 					hovering = true
 					StartDriver()
 					local accentRed, accentGreen, accentBlue = Theme.GetAccent()
 					self.line:SetVertexColor(accentRed, accentGreen, accentBlue, 1)
 					if Widget.ShowTip then Widget.ShowTip(self, "Drag to move, right-click to remove") end
-				end)
-				marker:SetScript("OnLeave", function(self)
+				end))
+				marker:SetScript("OnLeave", BUILib.Timed('BUILib.TickEditor Layout marker OnLeave', function(self)
 					hovering = track:IsMouseOver()
 					StopDriver()
 					local lineRed, lineGreen, lineBlue, lineAlpha = LineColor()
 					self.line:SetVertexColor(lineRed, lineGreen, lineBlue, lineAlpha or 0.6)
 					if Widget.HideTip then Widget.HideTip() end
-				end)
+				end))
 				markers[tickIndex] = marker
 			end
 			marker.index = tickIndex
@@ -179,22 +179,22 @@ function Controls.TickEditor(parent, options)
 		end
 	end
 
-	track:SetScript("OnEnter", function()
+	track:SetScript("OnEnter", BUILib.Timed('BUILib.TickEditor TickEditor track OnEnter', function()
 		hovering = true
 		StartDriver()
-	end)
-	track:SetScript("OnLeave", function()
+	end))
+	track:SetScript("OnLeave", BUILib.Timed('BUILib.TickEditor TickEditor track OnLeave', function()
 		hovering = false
 		StopDriver()
-	end)
-	track:SetScript("OnClick", function()
+	end))
+	track:SetScript("OnClick", BUILib.Timed('BUILib.TickEditor TickEditor track OnClick', function()
 		local list = options.get()
 		local percent = CursorPercent()
 		for _, value in ipairs(list) do if value == percent then return end end
 		list[#list + 1] = percent
 		track.Commit()
-	end)
-	track:SetScript("OnSizeChanged", Layout)
+	end))
+	track:SetScript("OnSizeChanged", BUILib.Timed('BUILib.TickEditor TickEditor track OnSizeChanged', Layout))
 
 	track.Refresh = Layout
 	Layout()

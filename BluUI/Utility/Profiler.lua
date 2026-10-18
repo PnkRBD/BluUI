@@ -510,6 +510,20 @@ function Profiler.Script(label, callback)
 	return wrapper
 end
 
+local timedWrappers = setmetatable({}, { __mode = 'kv' })
+
+function Profiler.Timed(label, callback)
+	if callback == nil then return nil end
+	local wrapper = timedWrappers[callback]
+	if not wrapper then
+		wrapper = Profiler.Hot(label, callback)
+		timedWrappers[callback] = wrapper
+	end
+	return wrapper
+end
+
+LibStub('BUILib').Timed = Profiler.Timed
+
 local hookers, hookedMethods = {}, {}
 
 function Profiler.HookedMethod(label)
@@ -721,6 +735,24 @@ local function TimeActionButtons()
 	TimeScript(library.cooldownPassFrame, 'OnUpdate', 'ActionBars.Library cooldown pass')
 end
 
+local LIBRARY_FRAMES = {
+	{ major = 'LibKeystone', probe = 'Register', label = 'Keystone.Library' },
+	{ major = 'AceAddon-3.0', probe = 'NewAddon', label = 'Ace.Addon' },
+	{ major = 'AceDB-3.0', probe = 'New', label = 'Ace.DB' },
+}
+local ICON_LIBRARY = { major = 'LibDBIcon-1.0', probe = 'Register' }
+local ICON_SCRIPTS = { 'OnEnter', 'OnLeave', 'OnClick', 'OnDragStart', 'OnDragStop', 'OnMouseDown', 'OnMouseUp' }
+
+local function TimeLibraries()
+	for _, entry in ipairs(LIBRARY_FRAMES) do
+		if LibraryOwner(entry) == addonName then TimeEvents(LibStub(entry.major).frame, entry.label) end
+	end
+	if LibraryOwner(ICON_LIBRARY) ~= addonName then return end
+	for name, button in pairs(LibStub(ICON_LIBRARY.major).objects) do
+		for _, script in ipairs(ICON_SCRIPTS) do TimeScript(button, script, 'Minimap.Library ' .. name .. ' ' .. script) end
+	end
+end
+
 local function Calibrate()
 	local probe = function() end
 	local start = debugprofilestop()
@@ -744,6 +776,7 @@ function Profiler.Start()
 	EachRunningGlow(TimeRunningGlow)
 	TimeUnitFrames()
 	TimeActionButtons()
+	TimeLibraries()
 end
 
 function Profiler.Stop()

@@ -162,7 +162,7 @@ local function ClearStagger()
 	staggerDriver:Hide()
 end
 
-staggerDriver:SetScript('OnUpdate', function()
+staggerDriver:SetScript('OnUpdate', BUI.Profiler.Timed('Skinning.Core staggerDriver OnUpdate', function()
 	local start = debugprofilestop()
 	repeat
 		local id = staggerQueue[staggerCursor]
@@ -173,7 +173,7 @@ staggerDriver:SetScript('OnUpdate', function()
 		staggerCursor = staggerCursor + 1
 		RefreshSkin(id)
 	until debugprofilestop() - start > STAGGER_BUDGET_MS
-end)
+end))
 
 function Skin.RefreshAll()
 	ClearStagger()

@@ -140,13 +140,13 @@ function Widget.HoverFade(frame, host)
 		if frame:IsMouseOver() then frame._fadeTarget = 1.0
 		elseif host:IsMouseOver() then frame._fadeTarget = 0.5
 		else frame._fadeTarget = 0.0 end
-		if frame._fadeCurrent ~= frame._fadeTarget then frame:SetScript("OnUpdate", Tick) end
+		if frame._fadeCurrent ~= frame._fadeTarget then frame:SetScript("OnUpdate", BUILib.Timed('BUILib.Widget UpdateTarget frame OnUpdate', Tick)) end
 	end
 	host:EnableMouse(true)
-	host:HookScript("OnEnter", UpdateTarget)
-	host:HookScript("OnLeave", UpdateTarget)
-	frame:HookScript("OnEnter", UpdateTarget)
-	frame:HookScript("OnLeave", UpdateTarget)
+	host:HookScript("OnEnter", BUILib.Timed('BUILib.Widget HoverFade host OnEnter', UpdateTarget))
+	host:HookScript("OnLeave", BUILib.Timed('BUILib.Widget HoverFade host OnLeave', UpdateTarget))
+	frame:HookScript("OnEnter", BUILib.Timed('BUILib.Widget HoverFade frame OnEnter', UpdateTarget))
+	frame:HookScript("OnLeave", BUILib.Timed('BUILib.Widget HoverFade frame OnLeave', UpdateTarget))
 end
 
 local MENU_ANIM_DURATION = 0.12
@@ -452,8 +452,8 @@ function WidgetMethods:SetTooltip(text, anchor)
 	if not text or text == "" then return self end
 	local tipAnchor = anchor == "ANCHOR_LEFT" and "LEFT" or anchor == "ANCHOR_BOTTOM" and "BOTTOM" or anchor == "ANCHOR_RIGHT" and "RIGHT" or nil
 	local frame = self.frame
-	frame:HookScript("OnEnter", function(hoveredFrame) Widget.ShowTip(hoveredFrame, text, {anchor = tipAnchor}) end)
-	frame:HookScript("OnLeave", function() Widget.HideTip() end)
+	frame:HookScript("OnEnter", BUILib.Timed('BUILib.Widget SetTooltip frame OnEnter', function(hoveredFrame) Widget.ShowTip(hoveredFrame, text, {anchor = tipAnchor}) end))
+	frame:HookScript("OnLeave", BUILib.Timed('BUILib.Widget SetTooltip frame OnLeave', function() Widget.HideTip() end))
 	return self
 end
 
@@ -468,16 +468,16 @@ function WidgetMethods:SetHover(normalBg, hoverBg)
 		if self.accentLine then self.accentLine:SetAlpha(0) end
 	end
 	self.ClearHover = ClearHover
-	frame:HookScript("OnEnter", function(hoveredFrame)
+	frame:HookScript("OnEnter", BUILib.Timed('BUILib.Widget SetHover frame OnEnter', function(hoveredFrame)
 		hoveredFrame:SetBackdropColor(unpack(hoverBg))
 		if self.accentLine then self.accentLine:SetAlpha(1) end
 		watcher = watcher or CreateFrame("Frame", nil, hoveredFrame)
-		watcher:SetScript("OnUpdate", function()
+		watcher:SetScript("OnUpdate", BUILib.Timed('BUILib.Widget SetHover watcher OnUpdate', function()
 			if not frame:IsMouseOver() then ClearHover() end
-		end)
-	end)
-	frame:HookScript("OnLeave", ClearHover)
-	frame:HookScript("OnHide", ClearHover)
+		end))
+	end))
+	frame:HookScript("OnLeave", BUILib.Timed('BUILib.Widget SetHover frame OnLeave', ClearHover))
+	frame:HookScript("OnHide", BUILib.Timed('BUILib.Widget SetHover frame OnHide', ClearHover))
 	return self
 end
 
@@ -518,18 +518,18 @@ function WidgetMethods:SetupHoverBorder(editBox, normalBorder)
 			frame:SetBackdropBorderColor(unpack(normalBorder))
 		end
 	end
-	frame:SetScript("OnEnter", function() SetHovered(true) end)
-	frame:SetScript("OnLeave", function()
+	frame:SetScript("OnEnter", BUILib.Timed('BUILib.Widget SetupHoverBorder frame OnEnter', function() SetHovered(true) end))
+	frame:SetScript("OnLeave", BUILib.Timed('BUILib.Widget SetupHoverBorder frame OnLeave', function()
 		if editBox and editBox.HasFocus and editBox:HasFocus() then return end
 		SetHovered(false)
-	end)
+	end))
 	if editBox then
-		editBox:SetScript("OnEnter", function() SetHovered(true) end)
-		editBox:SetScript("OnLeave", function()
+		editBox:SetScript("OnEnter", BUILib.Timed('BUILib.Widget SetupHoverBorder editBox OnEnter', function() SetHovered(true) end))
+		editBox:SetScript("OnLeave", BUILib.Timed('BUILib.Widget SetupHoverBorder editBox OnLeave', function()
 			if not editBox:HasFocus() then SetHovered(false) end
-		end)
-		editBox:SetScript("OnEditFocusGained", function() SetHovered(true) end)
-		editBox:SetScript("OnEditFocusLost", function() SetHovered(false) end)
+		end))
+		editBox:SetScript("OnEditFocusGained", BUILib.Timed('BUILib.Widget SetupHoverBorder editBox OnEditFocusGained', function() SetHovered(true) end))
+		editBox:SetScript("OnEditFocusLost", BUILib.Timed('BUILib.Widget SetupHoverBorder editBox OnEditFocusLost', function() SetHovered(false) end))
 	end
 	return SetHovered
 end
@@ -595,12 +595,12 @@ do
 		tip._fadeIn = tip:CreateAnimationGroup()
 		local fadeInAnim = tip._fadeIn:CreateAnimation("Alpha")
 		fadeInAnim:SetFromAlpha(0); fadeInAnim:SetToAlpha(1); fadeInAnim:SetDuration(0.12); fadeInAnim:SetSmoothing("OUT")
-		tip._fadeIn:SetScript("OnFinished", function() tip:SetAlpha(1) end)
+		tip._fadeIn:SetScript("OnFinished", BUILib.Timed('BUILib.Widget AcquireTip _fadeIn OnFinished', function() tip:SetAlpha(1) end))
 
 		tip._fadeOut = tip:CreateAnimationGroup()
 		local fadeOutAnim = tip._fadeOut:CreateAnimation("Alpha")
 		fadeOutAnim:SetFromAlpha(1); fadeOutAnim:SetToAlpha(0); fadeOutAnim:SetDuration(0.1); fadeOutAnim:SetSmoothing("IN")
-		tip._fadeOut:SetScript("OnFinished", function() tip:SetAlpha(0); tip:Hide() end)
+		tip._fadeOut:SetScript("OnFinished", BUILib.Timed('BUILib.Widget AcquireTip _fadeOut OnFinished', function() tip:SetAlpha(0); tip:Hide() end))
 		tip:Hide()
 		return tip
 	end
@@ -751,8 +751,8 @@ do
 	function Widget.Tooltip(frame, text, anchor)
 		if not text or text == "" then return end
 		local tipConfig = anchor and {anchor = anchor} or nil
-		frame:HookScript("OnEnter", function(hoveredFrame) Widget.ShowTip(hoveredFrame, text, tipConfig) end)
-		frame:HookScript("OnLeave", function() Widget.HideTip() end)
+		frame:HookScript("OnEnter", BUILib.Timed('BUILib.Widget Tooltip frame OnEnter', function(hoveredFrame) Widget.ShowTip(hoveredFrame, text, tipConfig) end))
+		frame:HookScript("OnLeave", BUILib.Timed('BUILib.Widget Tooltip frame OnLeave', function() Widget.HideTip() end))
 	end
 end
 
@@ -819,7 +819,7 @@ function Widget.ScrollLogic(scrollFrame, child, track, thumb, config)
 
 	local animator = CreateFrame("Frame", nil, scrollFrame)
 	animator:Hide()
-	animator:SetScript("OnUpdate", function(self, elapsed)
+	animator:SetScript("OnUpdate", BUILib.Timed('BUILib.Widget ScrollLogic animator OnUpdate', function(self, elapsed)
 		if not target then self:Hide() return end
 		Measure()
 		target = math_max(0, math_min(range, target))
@@ -834,13 +834,13 @@ function Widget.ScrollLogic(scrollFrame, child, track, thumb, config)
 		local move = difference * (1 - math_exp(-elapsed * SCROLL_SPEED))
 		if math_abs(move) < 1 then move = difference > 0 and 1 or -1 end
 		Apply(current + move)
-	end)
-	animator:SetScript("OnHide", function()
+	end))
+	animator:SetScript("OnHide", BUILib.Timed('BUILib.Widget ScrollLogic animator OnHide', function()
 		if not target then return end
 		Measure()
 		Apply(target)
 		target = nil
-	end)
+	end))
 
 	local function Stop()
 		target = nil
@@ -864,26 +864,26 @@ function Widget.ScrollLogic(scrollFrame, child, track, thumb, config)
 	if config.draggable then
 		local grabStart, scrollStart
 		local function CursorY() return select(2, GetCursorPosition()) / track:GetEffectiveScale() end
-		thumb:SetScript("OnMouseDown", function(_, button)
+		thumb:SetScript("OnMouseDown", BUILib.Timed('BUILib.Widget ScrollLogic thumb OnMouseDown', function(_, button)
 			if button ~= "LeftButton" then return end
 			Stop()
 			Measure()
 			grabStart, scrollStart = CursorY(), scrollFrame:GetVerticalScroll()
-			thumb:SetScript("OnUpdate", function()
+			thumb:SetScript("OnUpdate", BUILib.Timed('BUILib.Widget ScrollLogic thumb OnUpdate', function()
 				local travel = track:GetHeight() - thumb:GetHeight()
 				if travel <= 0 then return end
 				Apply(scrollStart + (grabStart - CursorY()) / travel * range)
-			end)
-		end)
-		thumb:SetScript("OnMouseUp", function() thumb:SetScript("OnUpdate", nil) end)
+			end))
+		end))
+		thumb:SetScript("OnMouseUp", BUILib.Timed('BUILib.Widget ScrollLogic thumb OnMouseUp', function() thumb:SetScript("OnUpdate", nil) end))
 		track:EnableMouse(true)
-		track:SetScript("OnMouseDown", function(self, button)
+		track:SetScript("OnMouseDown", BUILib.Timed('BUILib.Widget ScrollLogic track OnMouseDown', function(self, button)
 			if button ~= "LeftButton" then return end
 			Stop()
 			Measure()
 			if range <= 0 then return end
 			Apply((self:GetTop() - CursorY()) / self:GetHeight() * range)
-		end)
+		end))
 	end
 
 	return { UpdateThumb = Refresh, DoScroll = DoScroll, Stop = Stop, ScrollTo = ScrollTo }
