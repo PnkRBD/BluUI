@@ -65,7 +65,7 @@ local function Settle(tween)
 	if tween.onComplete then tween.onComplete(tween.target) end
 end
 
-driver:SetScript('OnUpdate', function()
+driver:SetScript('OnUpdate', BUILib.Timed('BUILib.Motion driver OnUpdate', function()
 	local now, count = GetTime(), #tweens
 	for index = 1, count do snapshot[index] = tweens[index] end
 	for index = 1, count do
@@ -82,7 +82,7 @@ driver:SetScript('OnUpdate', function()
 			end
 		end
 	end
-end)
+end))
 
 function Motion.RegisterProperty(name, get, set)
 	properties[name] = { get = get, set = set }

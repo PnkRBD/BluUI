@@ -40,12 +40,12 @@ function Controls.Stepper(parent, label, value, minValue, maxValue, step, callba
 	valueBox:SetTextColor(unpack(Theme.text.primary)); valueBox:SetJustifyH("CENTER")
 	valueBox:SetAutoFocus(false); valueBox:SetMaxLetters(6)
 	if minValue < 0 then
-		valueBox:SetScript("OnTextChanged", function(editBox, userInput)
+		valueBox:SetScript("OnTextChanged", BUILib.Timed('BUILib.Stepper Stepper valueBox OnTextChanged', function(editBox, userInput)
 			if not userInput then return end
 			local text = editBox:GetText()
 			local clean = text:gsub("[^%d%-]", ""):gsub("(.)%-", "%1")
 			if clean ~= text then editBox:SetText(clean) end
-		end)
+		end))
 	else
 		valueBox:SetNumeric(true)
 	end
@@ -61,25 +61,25 @@ function Controls.Stepper(parent, label, value, minValue, maxValue, step, callba
 		if typed then state.value = Clamp(typed) end
 		UpdateDisplay(); if callback then callback(state.value) end
 	end
-	valueBox:SetScript("OnEnterPressed", function(editBox) editBox:ClearFocus() end)
-	valueBox:SetScript("OnEscapePressed", function(editBox) editBox:ClearFocus(); UpdateDisplay() end)
-	valueBox:SetScript("OnEditFocusLost", Commit)
-	minusButton:SetScript("OnClick", function()
+	valueBox:SetScript("OnEnterPressed", BUILib.Timed('BUILib.Stepper Stepper valueBox OnEnterPressed', function(editBox) editBox:ClearFocus() end))
+	valueBox:SetScript("OnEscapePressed", BUILib.Timed('BUILib.Stepper Stepper valueBox OnEscapePressed', function(editBox) editBox:ClearFocus(); UpdateDisplay() end))
+	valueBox:SetScript("OnEditFocusLost", BUILib.Timed('BUILib.Stepper Stepper valueBox OnEditFocusLost', Commit))
+	minusButton:SetScript("OnClick", BUILib.Timed('BUILib.Stepper Stepper minusButton OnClick', function()
 		state.value = math_max(minValue, state.value - step); UpdateDisplay()
 		if callback then callback(state.value) end
-	end)
-	plusButton:SetScript("OnClick", function()
+	end))
+	plusButton:SetScript("OnClick", BUILib.Timed('BUILib.Stepper Stepper plusButton OnClick', function()
 		state.value = Clamp(state.value + step); UpdateDisplay()
 		if callback then callback(state.value) end
-	end)
+	end))
 	local function RowEnter() row.frame:SetBackdropBorderColor(Theme.GetAccent()) end
 	local function RowLeave() row.frame:SetBackdropBorderColor(unpack(Theme.border.input)) end
-	minusButton:SetScript("OnEnter", function(stepButton) stepButton:SetBackdropColor(unpack(Theme.bg.light)); RowEnter() end)
-	minusButton:SetScript("OnLeave", function(stepButton) stepButton:SetBackdropColor(unpack(Theme.bg.medium)); RowLeave() end)
-	plusButton:SetScript("OnEnter", function(stepButton) stepButton:SetBackdropColor(unpack(Theme.bg.light)); RowEnter() end)
-	plusButton:SetScript("OnLeave", function(stepButton) stepButton:SetBackdropColor(unpack(Theme.bg.medium)); RowLeave() end)
+	minusButton:SetScript("OnEnter", BUILib.Timed('BUILib.Stepper Stepper minusButton OnEnter', function(stepButton) stepButton:SetBackdropColor(unpack(Theme.bg.light)); RowEnter() end))
+	minusButton:SetScript("OnLeave", BUILib.Timed('BUILib.Stepper Stepper minusButton OnLeave', function(stepButton) stepButton:SetBackdropColor(unpack(Theme.bg.medium)); RowLeave() end))
+	plusButton:SetScript("OnEnter", BUILib.Timed('BUILib.Stepper Stepper plusButton OnEnter', function(stepButton) stepButton:SetBackdropColor(unpack(Theme.bg.light)); RowEnter() end))
+	plusButton:SetScript("OnLeave", BUILib.Timed('BUILib.Stepper Stepper plusButton OnLeave', function(stepButton) stepButton:SetBackdropColor(unpack(Theme.bg.medium)); RowLeave() end))
 	row.frame:EnableMouse(true)
-	row.frame:SetScript("OnEnter", RowEnter); row.frame:SetScript("OnLeave", RowLeave)
+	row.frame:SetScript("OnEnter", BUILib.Timed('BUILib.Stepper Stepper frame OnEnter', RowEnter)); row.frame:SetScript("OnLeave", BUILib.Timed('BUILib.Stepper Stepper frame OnLeave', RowLeave))
 	UpdateDisplay()
 	function container:GetValue() return state.value end
 	function container:SetValue(newValue) state.value = newValue; UpdateDisplay() end

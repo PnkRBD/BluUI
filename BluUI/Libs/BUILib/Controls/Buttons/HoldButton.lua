@@ -49,14 +49,14 @@ function Controls.HoldButton(parent, text, callback, duration, width)
 		end
 	end
 
-	frame:SetScript("OnMouseDown", function(_, button)
+	frame:SetScript("OnMouseDown", BUILib.Timed('BUILib.HoldButton HoldButton frame OnMouseDown', function(_, button)
 		if button == "LeftButton" then
 			holding = true
 			startTime = GetTime()
-			frame:SetScript("OnUpdate", tick)
+			frame:SetScript("OnUpdate", BUILib.Timed('BUILib.HoldButton HoldButton frame OnUpdate', tick))
 		end
-	end)
-	frame:SetScript("OnMouseUp", stopHolding)
+	end))
+	frame:SetScript("OnMouseUp", BUILib.Timed('BUILib.HoldButton HoldButton frame OnMouseUp', stopHolding))
 
 	function frame:SetText(newText)
 		label:SetText(newText)

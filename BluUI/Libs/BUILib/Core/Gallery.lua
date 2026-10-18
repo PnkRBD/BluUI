@@ -113,7 +113,7 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 				sub:SetWordWrap(false)
 			end
 			if tileSpec.build then tileSpec.build(content, contentHeight, tile) end
-			tile:SetScript('OnClick', function(self) tileSpec.onClick(self) end)
+			tile:SetScript('OnClick', BUILib.Timed('BUILib.Gallery Gallery tile OnClick', function(self) tileSpec.onClick(self) end))
 			gallery.tiles[#gallery.tiles + 1] = { frame = tile, edge = edge, label = label, spec = tileSpec, search = (tileSpec.search or tileSpec.label):lower() }
 		end
 

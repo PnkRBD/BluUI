@@ -53,10 +53,10 @@ function Layout.SidebarPage(parent, config)
 	local scrollChild = scrollContainer.child
 
 	local scrollFrame = scrollContainer.scrollFrame or scrollContainer
-	scrollFrame:HookScript('OnSizeChanged', function(self)
+	scrollFrame:HookScript('OnSizeChanged', BUILib.Timed('BUILib.SidebarPage SidebarPage scrollFrame OnSizeChanged', function(self)
 		local width = self:GetWidth()
 		if width and width > 50 then scrollChild:SetWidth(width) end
-	end)
+	end))
 
 	local contentWrapper = CreateFrame('Frame', nil, scrollChild)
 	contentWrapper:SetWidth(contentWidth)
@@ -74,7 +74,7 @@ function Layout.SidebarPage(parent, config)
 		contentWrapper:SetWidth(effectiveWidth)
 	end
 
-	scrollChild:SetScript('OnSizeChanged', UpdateContentPosition)
+	scrollChild:SetScript('OnSizeChanged', BUILib.Timed('BUILib.SidebarPage SidebarPage scrollChild OnSizeChanged', UpdateContentPosition))
 	BUILib.Defer(function()
 		local width = scrollFrame:GetWidth()
 		if width and width > 50 then scrollChild:SetWidth(width) end
@@ -129,12 +129,12 @@ function Layout.SidebarPage(parent, config)
 		chevron:SetVertexColor(0.74, 0.74, 0.78, 1)
 		chevron:Hide()
 		chip.chevron = chevron
-		chip:HookScript('OnEnter', function(self)
+		chip:HookScript('OnEnter', BUILib.Timed('BUILib.SidebarPage GetOrCreateChip chip OnEnter', function(self)
 			if self.comingSoon then Widget.ShowTip(self, 'Coming Soon', { anchor = 'RIGHT' }) end
-		end)
-		chip:HookScript('OnLeave', function(self)
+		end))
+		chip:HookScript('OnLeave', BUILib.Timed('BUILib.SidebarPage GetOrCreateChip chip OnLeave', function(self)
 			if self.comingSoon then Widget.HideTip() end
-		end)
+		end))
 		chipFrames[index] = chip
 		return chip
 	end

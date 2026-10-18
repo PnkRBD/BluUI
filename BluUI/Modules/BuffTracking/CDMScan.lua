@@ -142,7 +142,7 @@ function BUI.BuffTracking.NewCDMScan(trackedSpellIDs, onRebuilt)
     BUI.Events:Register('PLAYER_REGEN_ENABLED', key, function()
         if pendingBuild or not next(cache) then scanner.ScheduleRebuild() end
     end)
-    EventRegistry:RegisterCallback('CooldownViewerSettings.OnDataChanged', scanner.ScheduleRebuild, scanner)
+    EventRegistry:RegisterCallback('CooldownViewerSettings.OnDataChanged', BUI.Profiler.Timed('BuffTracking.CDMScan NewCDMScan callback CooldownViewerSettings.OnDataChanged', scanner.ScheduleRebuild), scanner)
 
     return scanner
 end

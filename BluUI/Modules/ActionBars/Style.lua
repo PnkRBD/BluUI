@@ -93,9 +93,9 @@ end
 
 local QueueOverlayFit = BUI.Dispatcher.New(ActionBars.FitAllButtonOverlays, 'ActionBars.AssistSync')
 
-EventRegistry:RegisterCallback('AssistedCombatManager.OnSetActionSpell', QueueOverlayFit, ActionBars)
-EventRegistry:RegisterCallback('AssistedCombatManager.OnAssistedHighlightSpellChange', QueueOverlayFit, ActionBars)
-EventRegistry:RegisterCallback('AssistedCombatManager.OnSetUseAssistedHighlight', QueueOverlayFit, ActionBars)
+EventRegistry:RegisterCallback('AssistedCombatManager.OnSetActionSpell', BUI.Profiler.Timed('ActionBars.Style callback AssistedCombatManager.OnSetActionSpell', QueueOverlayFit), ActionBars)
+EventRegistry:RegisterCallback('AssistedCombatManager.OnAssistedHighlightSpellChange', BUI.Profiler.Timed('ActionBars.Style callback AssistedCombatManager.OnAssistedHighlightSpellChange', QueueOverlayFit), ActionBars)
+EventRegistry:RegisterCallback('AssistedCombatManager.OnSetUseAssistedHighlight', BUI.Profiler.Timed('ActionBars.Style callback AssistedCombatManager.OnSetUseAssistedHighlight', QueueOverlayFit), ActionBars)
 
 local function StripTemplateArt(button)
 	local normal = button.NormalTexture

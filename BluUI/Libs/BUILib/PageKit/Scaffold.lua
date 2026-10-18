@@ -68,9 +68,9 @@ function PageKit.Scaffold(pageFrame, options)
 	local scrollFrame = scrollWidget.frame.scrollFrame
 	local scrollChild = scrollWidget.frame.child
 	scrollChild:SetHeight(totalHeight)
-	scrollFrame:HookScript("OnSizeChanged", function(_, newWidth)
+	scrollFrame:HookScript("OnSizeChanged", BUILib.Timed('BUILib.Scaffold Scaffold scrollFrame OnSizeChanged', function(_, newWidth)
 		if newWidth and newWidth > 0 then scrollChild:SetWidth(newWidth) end
-	end)
+	end))
 
 	local root = CreateFrame("Frame", nil, scrollChild)
 	root:SetSize(width, totalHeight - PageKit.PAD)

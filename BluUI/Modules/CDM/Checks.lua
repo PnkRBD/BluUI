@@ -140,5 +140,5 @@ function CDM.CheckUtilityPrompt(done)
 	if db.cdm.utility.enabled then done() return end
 	if ViewersReady() then PromptForUtility(done) return end
 	pendingUtilityDone = done
-	EventRegistry:RegisterCallback(DATA_CHANGED_CALLBACK, OnViewerDataChanged, dataChangedOwner)
+	EventRegistry:RegisterCallback(DATA_CHANGED_CALLBACK, BUI.Profiler.Timed('CDM.Checks CheckUtilityPrompt callback ', OnViewerDataChanged), dataChangedOwner)
 end

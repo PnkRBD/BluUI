@@ -975,7 +975,7 @@ end)
 Stat.Enter = BUI.Profiler.Script('Skin.CharacterFrame stat row OnEnter', function(self)
     self.detailed = IsControlKeyDown() == true
     Stat.Tooltip(self)
-    if self.stat and self.stat.ratingID then self:SetScript('OnUpdate', Stat.Watch) end
+    if self.stat and self.stat.ratingID then self:SetScript('OnUpdate', BUI.Profiler.Timed('Skinning.CharacterFrame self OnUpdate', Stat.Watch)) end
 end)
 
 Stat.Leave = BUI.Profiler.Script('Skin.CharacterFrame stat row OnLeave', function(self)
@@ -1010,8 +1010,8 @@ local function CreateStatRow(parent)
     row.percent:SetPoint('RIGHT', row.separator, 'LEFT', -Pixel.Scale(COLUMN_GAP), 0)
     row.percent:SetJustifyH('RIGHT')
 
-    row:SetScript('OnEnter', Stat.Enter)
-    row:SetScript('OnLeave', Stat.Leave)
+    row:SetScript('OnEnter', BUI.Profiler.Timed('Skinning.CharacterFrame CreateStatRow row OnEnter', Stat.Enter))
+    row:SetScript('OnLeave', BUI.Profiler.Timed('Skinning.CharacterFrame CreateStatRow row OnLeave', Stat.Leave))
     return row
 end
 
@@ -1198,7 +1198,7 @@ RefreshTitles = function()
             local row = pane.rows[visible]
             if not row then
                 row = CreateListRow(child)
-                row:SetScript('OnClick', Titles.Pick)
+                row:SetScript('OnClick', BUI.Profiler.Timed('Skinning.CharacterFrame RefreshTitles row OnClick', Titles.Pick))
                 pane.rows[visible] = row
             end
             row.titleIndex = entry.index
@@ -1435,7 +1435,7 @@ local function SheetButton(parent, width, label, tooltip, onClick)
     button:HookScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame ' .. label .. ' OnEnter', function(self)
         Widget.ShowTip(self, tooltip, { anchor = 'TOP' })
     end))
-    button:HookScript('OnLeave', function() Widget.HideTip() end)
+    button:HookScript('OnLeave', BUI.Profiler.Timed('Skinning.CharacterFrame SheetButton button OnLeave', function() Widget.HideTip() end))
     return button
 end
 

@@ -1468,7 +1468,7 @@ function StartFader()
 		end)
 	end
 	if not fader:GetScript('OnUpdate') then
-		fader:SetScript('OnUpdate', fader._handler)
+		fader:SetScript('OnUpdate', BUI.Profiler.Timed('Skinning.Chat StartFader fader OnUpdate', fader._handler))
 	end
 end
 
@@ -1648,8 +1648,8 @@ do
 		end
 		if not button._buiAuxRelayout then
 			button._buiAuxRelayout = true
-			button:HookScript('OnShow', RepositionAuxLater)
-			button:HookScript('OnHide', RepositionAuxLater)
+			button:HookScript('OnShow', BUI.Profiler.Timed('Skinning.Chat PlaceAuxButton button OnShow', RepositionAuxLater))
+			button:HookScript('OnHide', BUI.Profiler.Timed('Skinning.Chat PlaceAuxButton button OnHide', RepositionAuxLater))
 		end
 		return button:IsShown() and button or previous
 	end
@@ -1865,9 +1865,9 @@ local function InstallChat(chat)
 		ApplyTabAlpha(tab)
 	end)
 
-	hooksecurefunc('FCFDock_UpdateTabs', function(dock)
+	hooksecurefunc('FCFDock_UpdateTabs', BUI.Profiler.Timed('Skinning.Chat InstallChat hook FCFDock_UpdateTabs', function(dock)
 		if dockTabsMoved then AlignDockTabs(dock) end
-	end)
+	end))
 
 	Hook('FCF_StartAlertFlash', function(chatFrame)
 		if not TabFlash() then return end

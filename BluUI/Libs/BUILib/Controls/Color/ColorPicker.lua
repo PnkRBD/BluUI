@@ -278,21 +278,21 @@ local function Link(parent, text, onClick, plain)
 	end
 	link.Paint = Paint
 	Paint()
-	link:SetScript('OnEnter', Paint)
-	link:SetScript('OnLeave', Paint)
-	link:SetScript('OnClick', function() onClick() end)
+	link:SetScript('OnEnter', BUILib.Timed('BUILib.ColorPicker Link link OnEnter', Paint))
+	link:SetScript('OnLeave', BUILib.Timed('BUILib.ColorPicker Link link OnLeave', Paint))
+	link:SetScript('OnClick', BUILib.Timed('BUILib.ColorPicker Link link OnClick', function() onClick() end))
 	Theme.RegisterAccentElement(label, Paint)
 	return link
 end
 
 local function Draggable(region, onMove)
 	region:EnableMouse(true)
-	region:SetScript('OnMouseDown', function(self)
+	region:SetScript('OnMouseDown', BUILib.Timed('BUILib.ColorPicker Draggable region OnMouseDown', function(self)
 		onMove()
-		self:SetScript('OnUpdate', function(dragged)
+		self:SetScript('OnUpdate', BUILib.Timed('BUILib.ColorPicker Draggable self OnUpdate', function(dragged)
 			if IsMouseButtonDown('LeftButton') then onMove() else dragged:SetScript('OnUpdate', nil) end
-		end)
-	end)
+		end))
+	end))
 end
 
 local function CursorOffset(region)
@@ -326,14 +326,14 @@ local function Dot(parent)
 		self.active = active
 		ring:SetShown(active)
 	end
-	dot:SetScript('OnEnter', function(self)
+	dot:SetScript('OnEnter', BUILib.Timed('BUILib.ColorPicker Dot dot OnEnter', function(self)
 		ring:Show()
 		if self.tooltip then Widget.ShowTip(self, self.tooltip) end
-	end)
-	dot:SetScript('OnLeave', function(self)
+	end))
+	dot:SetScript('OnLeave', BUILib.Timed('BUILib.ColorPicker Dot dot OnLeave', function(self)
 		ring:SetShown(self.active)
 		Widget.HideTip()
-	end)
+	end))
 	return dot
 end
 
@@ -356,9 +356,9 @@ local function Button(parent, text, onClick)
 	button.label:SetFont(BUILib.Font, 12, '')
 	button.label:SetPoint('CENTER')
 	button.label:SetText(text)
-	button:SetScript('OnEnter', function() hover:Show() end)
-	button:SetScript('OnLeave', function() hover:Hide() end)
-	button:SetScript('OnClick', function() onClick() end)
+	button:SetScript('OnEnter', BUILib.Timed('BUILib.ColorPicker Button button OnEnter', function() hover:Show() end))
+	button:SetScript('OnLeave', BUILib.Timed('BUILib.ColorPicker Button button OnLeave', function() hover:Hide() end))
+	button:SetScript('OnClick', BUILib.Timed('BUILib.ColorPicker Button button OnClick', function() onClick() end))
 	return button
 end
 
@@ -377,17 +377,17 @@ local function ValueBox(parent, width, justify, tooltip)
 	local measure = box:CreateFontString(nil, 'ARTWORK')
 	measure:SetFont(BUILib.Font, 12, '')
 	measure:Hide()
-	box:SetScript('OnTextChanged', function(self)
+	box:SetScript('OnTextChanged', BUILib.Timed('BUILib.ColorPicker ValueBox box OnTextChanged', function(self)
 		measure:SetText(self:GetText())
 		self.underline:SetWidth(math.max(8, math.ceil(measure:GetStringWidth())))
-	end)
+	end))
 	Widget.Tooltip(box, tooltip)
-	box:SetScript('OnEscapePressed', function(self) self:ClearFocus() end)
-	box:SetScript('OnEditFocusGained', function(self)
+	box:SetScript('OnEscapePressed', BUILib.Timed('BUILib.ColorPicker ValueBox box OnEscapePressed', function(self) self:ClearFocus() end))
+	box:SetScript('OnEditFocusGained', BUILib.Timed('BUILib.ColorPicker ValueBox box OnEditFocusGained', function(self)
 		self.underline:SetVertexColor(Theme.GetAccent())
 		self.underline:Show()
 		self:HighlightText()
-	end)
+	end))
 	return box
 end
 
@@ -428,18 +428,18 @@ local function BuildHexBox(center)
 	local measure = hexBox:CreateFontString(nil, 'ARTWORK')
 	measure:SetFont(BUILib.Font, L.HEX_SIZE, '')
 	measure:Hide()
-	hexBox:SetScript('OnTextChanged', function(self)
+	hexBox:SetScript('OnTextChanged', BUILib.Timed('BUILib.ColorPicker BuildHexBox hexBox OnTextChanged', function(self)
 		measure:SetText(self:GetText())
 		underline:SetWidth(math.max(8, math.ceil(measure:GetStringWidth())))
-	end)
+	end))
 	underline:Hide()
 	hexBox.underline = underline
-	hexBox:SetScript('OnEditFocusGained', function(self)
+	hexBox:SetScript('OnEditFocusGained', BUILib.Timed('BUILib.ColorPicker BuildHexBox hexBox OnEditFocusGained', function(self)
 		underline:SetVertexColor(Theme.GetAccent())
 		underline:Show()
 		self:HighlightText()
-	end)
-	hexBox:SetScript('OnEscapePressed', function(self) self:ClearFocus() end)
+	end))
+	hexBox:SetScript('OnEscapePressed', BUILib.Timed('BUILib.ColorPicker BuildHexBox hexBox OnEscapePressed', function(self) self:ClearFocus() end))
 	return hexBox
 end
 
@@ -500,7 +500,7 @@ local function BuildPicker()
 	copyLabel:SetPoint('CENTER')
 	copy:SetSize(math.ceil(copyLabel:GetStringWidth()), L.LABEL_HEIGHT)
 	copy:SetPoint('CENTER', 0, -26)
-	copy:SetScript('OnClick', function() hexBox:SetFocus() end)
+	copy:SetScript('OnClick', BUILib.Timed('BUILib.ColorPicker BuildPicker copy OnClick', function() hexBox:SetFocus() end))
 	Widget.Tooltip(copy, 'Selects the hex so Ctrl+C copies it')
 
 	frame.h, frame.s, frame.v, frame.a = 0, 1, 1, 1
@@ -637,18 +637,18 @@ local function BuildPicker()
 		Render(true)
 	end)
 	local function Typed(box, spec)
-		box:SetScript('OnEnterPressed', function(self)
+		box:SetScript('OnEnterPressed', BUILib.Timed('BUILib.ColorPicker Typed box OnEnterPressed', function(self)
 			local fraction = spec.parse(self:GetText())
 			self:ClearFocus()
 			if fraction then
 				spec.set(math.max(0, math.min(1, fraction)))
 				Render(true)
 			end
-		end)
-		box:SetScript('OnEditFocusLost', function(self)
+		end))
+		box:SetScript('OnEditFocusLost', BUILib.Timed('BUILib.ColorPicker Typed box OnEditFocusLost', function(self)
 			self.underline:Hide()
 			Render()
-		end)
+		end))
 	end
 	for _, slider in ipairs(sliders) do
 		Draggable(slider.track, function()
@@ -659,17 +659,17 @@ local function BuildPicker()
 	end
 	for _, spec in ipairs(readoutSpecs) do Typed(spec.box, spec) end
 
-	before:SetScript('OnClick', function() SetColor(unpack(frame.original)) end)
+	before:SetScript('OnClick', BUILib.Timed('BUILib.ColorPicker BuildPicker before OnClick', function() SetColor(unpack(frame.original)) end))
 
-	hexBox:SetScript('OnEnterPressed', function(self)
+	hexBox:SetScript('OnEnterPressed', BUILib.Timed('BUILib.ColorPicker BuildPicker hexBox OnEnterPressed', function(self)
 		local red, green, blue = HexToRGB(self:GetText())
 		self:ClearFocus()
 		if red then SetColor(red, green, blue, frame.a) end
-	end)
-	hexBox:SetScript('OnEditFocusLost', function(self)
+	end))
+	hexBox:SetScript('OnEditFocusLost', BUILib.Timed('BUILib.ColorPicker BuildPicker hexBox OnEditFocusLost', function(self)
 		self.underline:Hide()
 		Render()
-	end)
+	end))
 
 	local function RefreshSaved()
 		local favorites = Favorites()
@@ -705,11 +705,11 @@ local function BuildPicker()
 	end, true)
 
 	for _, dot in ipairs(classes.dots) do
-		dot:SetScript('OnClick', function(self) SetColor(self.color[1], self.color[2], self.color[3], frame.a) end)
+		dot:SetScript('OnClick', BUILib.Timed('BUILib.ColorPicker BuildPicker dot OnClick', function(self) SetColor(self.color[1], self.color[2], self.color[3], frame.a) end))
 	end
 	for index, dot in ipairs(saved.dots) do
 		dot.tooltip = 'Right-click to remove'
-		dot:SetScript('OnClick', function(self, button)
+		dot:SetScript('OnClick', BUILib.Timed('BUILib.ColorPicker BuildPicker dot OnClick', function(self, button)
 			if button == 'RightButton' then
 				table.remove(Favorites(), index)
 				Widget.HideTip()
@@ -718,10 +718,10 @@ local function BuildPicker()
 			else
 				SetColor(unpack(self.color))
 			end
-		end)
+		end))
 	end
 	for _, dot in ipairs(recent.dots) do
-		dot:SetScript('OnClick', function(self) SetColor(unpack(self.color)) end)
+		dot:SetScript('OnClick', BUILib.Timed('BUILib.ColorPicker BuildPicker dot OnClick', function(self) SetColor(unpack(self.color)) end))
 	end
 
 	local function Finish()
@@ -746,7 +746,7 @@ local function BuildPicker()
 	cancel:SetPoint('RIGHT', done, 'LEFT', -L.BUTTON_GAP, 0)
 
 	local watcher = CreateFrame('Frame', nil, frame)
-	watcher:SetScript('OnUpdate', function()
+	watcher:SetScript('OnUpdate', BUILib.Timed('BUILib.ColorPicker BuildPicker watcher OnUpdate', function()
 		if frame.anchor and not frame.anchor:IsVisible() then
 			Finish()
 			return
@@ -759,12 +759,12 @@ local function BuildPicker()
 			Finish()
 		end
 		frame.wasDown = down
-	end)
+	end))
 
-	frame:SetScript('OnHide', function()
+	frame:SetScript('OnHide', BUILib.Timed('BUILib.ColorPicker BuildPicker frame OnHide', function()
 		if not frame.confirmed and frame.cancel then frame.cancel() end
 		frame.confirmed, frame.cancel, frame.callback, frame.anchor = nil, nil, nil, nil
-	end)
+	end))
 
 	local function Place(top, region, x)
 		region:ClearAllPoints()
