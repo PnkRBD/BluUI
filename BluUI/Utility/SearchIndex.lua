@@ -136,6 +136,7 @@ local entries = {
 	{ label = "Combat Messages", page = "auras", tab = 1, panel = "General", keywords = "combat message text enter leave fade time font size color" },
 	{ label = "Crosshair", page = "auras", tab = 1, panel = "General", keywords = "crosshair reticle style hide out of combat town size thickness center gap opacity color range indicator melee ranged" },
 	{ label = "Low HP Warning", page = "auras", tab = 1, panel = "General", keywords = "low health warning hp threshold percent font size text color position anchor" },
+	{ label = "Durability Warning", page = "auras", tab = 1, panel = "General", keywords = "durability repair gear armor broken threshold percent slider text color position anchor" },
 	{ label = "Keystone Reminder", page = "auras", tab = 1, panel = "General", keywords = "keystone reminder dungeon teleport key group mythic plus" },
 	{ label = "Private raid warning", page = "auras", tab = 1, panel = "General", keywords = "private raid warning boss blizzard move position" },
 	{ label = "Gateway Alert", page = "auras", tab = 1, panel = "General", keywords = "demonic gateway alert warlock text sound in reach" },
