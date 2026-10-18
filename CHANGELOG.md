@@ -1,39 +1,35 @@
-# 5.11.0
+# 5.12.0
 
-Lust shows on your debuffs again, there's a new Micro Menu skin, and a pile of fixes from your reports.
+There's a combat rez tracker now, a button to clear out hidden quests that eat your FPS, and a long list of fixes from your reports.
 
-**Buffs & Debuffs**
+**Combat Rez**
 
-Sated, Exhaustion and the other lust debuffs were missing from your debuff frame. The buff and debuff frames were borrowing the raid frames' built-in hide list, which is there to keep lust off twenty raid frames at once. They have their own blacklist now. If you'd hidden anything yourself, it's been copied over.
+You can see your group's battle rez charges and how long until the next one. It only shows in raids and keystones, where the charges are shared. The spell icon has the timer in the middle and your charges in the corner, and you can move, resize or hide each piece. It glows when a charge comes back. Turn it on from the Weaker Auras page.
 
-You can pin buffs and debuffs on the Buffs & Debuffs page too. Pinned ones show first, and there's a switch to show nothing but your pins.
+**Quests**
 
-**Aura rules**
+Some characters carry piles of hidden tracked quests that quietly drag your FPS down. The Objective Tracker page has a Tracked quests row now that shows what you're tracking, and Untrack all clears every one of them, hidden and world quests included. Track the ones you want again from your quest log.
 
-Hover a rule in the list and it tells you what it shows. Buffs don't show up twice anymore when Important Buffs is in your list, and Important Buffs stays out of the party and raid Defensives row.
+Finished objectives get the BluUI check mark, and the item buttons on bonus objectives and world quests are square like the rest.
 
-Boss Debuffs and Role Debuffs are gone, since Boss & Role Debuffs already covers both. If you used either one, your list switches over by itself.
+**Dashboard**
 
-New profiles start with a hand-picked set of target buffs. Target of target auras keep up to date, and the unit frame preview doesn't turn hidden auras back on.
-
-**Dispels**
-
-Fade from the top and Fade from the bottom have a softer look. The bar tint opacity slider sits on the party and raid Dispels cog now, as well as the player's. The party dispel preview doesn't fill your chat anymore.
-
-**Micro Menu skin**
-
-There's a new skin for the row of game menu buttons. They're flat tiles that light up on hover and while their window is open. It's off by default, so turn it on with the other skins if you want it.
+Everything on the Overview tab fits on screen without scrolling. Best keys and currencies tighten their rows to make room instead of hiding anything.
 
 **Windows**
 
-Blizzard windows don't open on top of the merchant, trainer or character window anymore. The bonus roll stays in its spot when loot rolls restack. Socketing an item from the character sheet doesn't throw an error, and the language dropdowns in Blizzard's Options show the language names again.
+Reset positions puts windows you've dragged back straight away. The loot history, talking head, dressing room details and PvP scoreboard can be dragged again. Right-click spins your character in the barber shop again, and Hide Rested Zzz works again.
 
-**Minimap**
+The currency panel opens again, and the portals panel doesn't throw errors during keys or combat. Zone labels and dungeon pins on the world map resize while you zoom.
 
-The minimap preview looks like your real map now. Indicators sit where they really are and use the real art, and the button bar fits the map. Difficulty text lines up on whichever side it sits, and the delve letter clears when you leave a delve.
+**Errors in raids and keys**
+
+Typing /t, scrolling chat history, whispering from the social datatext and linking currencies don't throw secret value errors anymore. Settings pop-ups don't throw errors if you press a key during combat.
 
 **Fixes**
 
-Hovering one mouseover datatext bar doesn't bring the others up with it.
+The crosshair doesn't hide in combat. The Kill Command timer sits where the preview shows it. Negative message offsets show up in alert settings. Your gold tooltip lists your other characters again. Party frames you anchor to the power bar actually attach to it now. Death Knight runes show right at login, and the Vengeance soul fragment count doesn't break in keys.
+
+A couple of old options are gone, like the minimap icon dock and the gradient tint, and the old power bar stacking moved to the newer stack on its own. Almost every part of BluUI also got a cleanup pass, so things should run a little lighter.
 
 Updating by hand: delete the old BluUI and BluUI_Options folders, then extract the new ones. Your settings are kept. Restart the game rather than /reload.
