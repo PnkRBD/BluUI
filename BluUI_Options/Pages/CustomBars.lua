@@ -469,14 +469,14 @@ local function Panes(ui, _, parent, width, item, page)
 	return { SettingsBoard(ui, parent, width, bar, item.index, page), TrackedBoard(ui, parent, width, bar, page) }
 end
 
-local function RailGroup()
+local function RailGroup(canAdd)
 	local list = {}
 	wipe(railIcons)
 	for index, bar in ipairs(Bars()) do
 		railIcons[index] = FirstIcon(bar)
 		list[index] = { id = ID_PREFIX .. index, label = bar.name, texture = railIcons[index], icon = 'capsule', index = index }
 	end
-	list[#list + 1] = { id = NEW_ID, label = 'New bar', icon = 'plus' }
+	if canAdd then list[#list + 1] = { id = NEW_ID, label = 'New bar', icon = 'plus' } end
 	list[#list + 1] = { id = IMPORT_ID, label = 'Import', icon = 'copy' }
 	return { title = 'Custom bars', items = list }
 end

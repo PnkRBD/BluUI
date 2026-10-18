@@ -1327,8 +1327,7 @@ local RAIL_GROUPS = {
 }
 
 local function RailGroups(enabled)
-	if not enabled then return RAIL_GROUPS end
-	return { RAIL_GROUPS[1], RAIL_GROUPS[2], CustomBarsPage.RailGroup() }
+	return { RAIL_GROUPS[1], RAIL_GROUPS[2], CustomBarsPage.RailGroup(enabled) }
 end
 
 BUI.PageEngine.RegisterPage('cdm', {
@@ -1340,12 +1339,12 @@ BUI.PageEngine.RegisterPage('cdm', {
 		local page = Layout.Page(pageFrame, nil, PAGE_WIDTH)
 		local tab = page:GetTab(1)
 		local enabled = BUI.IsModuleEnabled('cdm')
+		CustomBarsPage.Prepare(fonts)
 		if enabled then
 			CDM().Initialize()
 			HookRefreshers()
-			CustomBarsPage.Prepare(fonts)
 		end
-		if CustomBarsPage.Owns(selected) then selected = enabled and CustomBarsPage.ActiveID() or 'general' end
+		if CustomBarsPage.Owns(selected) then selected = CustomBarsPage.ActiveID() end
 		local rail
 		rail = Layout.RailPage(tab, { window = Window() }, {
 			icon = 'wheel',
