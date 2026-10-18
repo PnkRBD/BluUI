@@ -5,7 +5,6 @@ local ipairs = ipairs
 local Skin = BUI.Skinning
 
 local BN_TOAST_TYPE_NEW_INVITE = 5
-local TOAST_NAMES = { 'BNToastFrame', 'TimeAlertFrame' }
 local TEXT_KEYS = { 'TopLine', 'MiddleLine', 'BottomLine', 'DoubleLine', 'Text' }
 
 local previewing = false
@@ -45,7 +44,10 @@ local context = Skin.Define('bnetToast', {
 local Fade, FadeRegions, Shell, Close, Body = context.Fade, context.FadeRegions, context.Shell, context.Close, context.Body
 
 local function SkinToast(frame)
-	frame:SetBackdrop(nil)
+	if frame.backdropInfo then
+		frame._buiBackdrop = frame.backdropInfo
+		frame:SetBackdrop(nil)
+	end
 	Fade(_G[frame:GetName() .. 'GlowFrame'])
 	Shell(frame)
 	Close(frame.CloseButton)
@@ -67,12 +69,13 @@ local function SkinToast(frame)
 	end
 end
 
-for _, name in ipairs(TOAST_NAMES) do context.Window(name, { skin = SkinToast }) end
+context.Window('BNToastFrame', { skin = SkinToast })
 
 context.OnDisable(function()
-	for _, name in ipairs(TOAST_NAMES) do
-		local frame = _G[name]
-		frame:ApplyBackdrop()
-		if frame.IconTexture then Skin.SetIconEdgeThickness(frame.IconTexture, 0) end
+	local frame = _G.BNToastFrame
+	if frame._buiBackdrop then
+		frame:SetBackdrop(frame._buiBackdrop)
+		frame._buiBackdrop = nil
 	end
+	Skin.SetIconEdgeThickness(frame.IconTexture, 0)
 end)
