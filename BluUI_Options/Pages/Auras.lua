@@ -315,6 +315,7 @@ local function BloodlustRow()
 		id = 'bloodlust', name = 'Bloodlust', sub = 'Lust timers and alerts', after = Bloodlust.Refresh,
 		switch = Toggle(db, nil, 'enabled'),
 		tools = {
+			Kit.Menu(db, 'style', BUI.C.TEXT_OR_ICON_OPTIONS, MENU_WIDTH),
 			Font(db, 'font'),
 			TextTool({ Option(db, 'Font size', 'fontSize', { min = 8, max = 48, step = 1 }) }),
 			PageCog('Bloodlust', 'bloodlust'),

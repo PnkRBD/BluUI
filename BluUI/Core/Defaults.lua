@@ -1690,8 +1690,10 @@ BUI.Defaults = {
 			anchorOffsetY      = 0,
 			font               = BUI.C.GLOBAL_OPTION,
 			fontSize           = 16,
+			style              = 'text',
 			showIcon           = true,
 			iconSize           = 22,
+			tileSize           = 46,
 
 			usedFormat         = '[spell] used!',
 			usedHoldDuration   = 3,

@@ -61,6 +61,10 @@ BUI.C.TEXT_PLACEMENT_OPTIONS = {
 	{ value = 'OUTSIDE_BOTTOM',      text = 'Outside Bottom'       },
 	{ value = 'OUTSIDE_BOTTOMRIGHT', text = 'Outside Bottom Right' },
 }
+BUI.C.TEXT_OR_ICON_OPTIONS = {
+	{ value = 'text', text = 'Text' },
+	{ value = 'icon', text = 'Icon' },
+}
 BUI.C.ANCHOR_PLACEMENT_OPTIONS = {
 	{ value = 'INSIDE_TOPLEFT',     text = 'Inside Top Left'      },
 	{ value = 'INSIDE_TOP',         text = 'Inside Top'           },
