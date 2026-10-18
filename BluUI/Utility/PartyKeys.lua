@@ -51,9 +51,24 @@ function PartyKeys.ForUnit(unit)
 	return key and keys[key]
 end
 
+local function LeadsGroup(unit)
+	if unit == 'player' and not IsInGroup() then return true end
+	return UnitIsGroupLeader(unit)
+end
+
 function PartyKeys.LevelFor(mapID)
+	local fallback, leaderReported
 	for _, unit in ipairs(PARTY_UNITS) do
 		local entry = UnitExists(unit) and PartyKeys.ForUnit(unit)
-		if entry and entry.mapID == mapID and entry.level > 0 then return entry.level end
+		if entry then
+			local matches = entry.mapID == mapID and entry.level > 0
+			if LeadsGroup(unit) then
+				if matches then return entry.level end
+				leaderReported = true
+			elseif matches then
+				fallback = fallback or entry.level
+			end
+		end
 	end
+	return leaderReported and fallback or nil
 end
