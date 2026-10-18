@@ -154,6 +154,7 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 		frame:SetSize(width, y - (POP_ROW - CONTROL_HEIGHT) / 2 + POP_PAD)
 		local watcher = CreateFrame('Frame')
 		frame:SetScript('OnShow', BUILib.Timed('BUILib.Tools BuildPopover frame OnShow', function(self)
+			if spec.onShow then spec.onShow() end
 			local armed = not (IsMouseButtonDown('LeftButton') or IsMouseButtonDown('RightButton'))
 			watcher:SetScript('OnUpdate', BUILib.Timed('BUILib.Tools BuildPopover watcher OnUpdate', function()
 				local down = IsMouseButtonDown('LeftButton') or IsMouseButtonDown('RightButton')
@@ -167,6 +168,7 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 		frame:SetScript('OnHide', BUILib.Timed('BUILib.Tools BuildPopover frame OnHide', function(self)
 			watcher:SetScript('OnUpdate', nil)
 			if active == self then active = nil end
+			if spec.onHide then spec.onHide() end
 		end))
 		anchor:HookScript('OnHide', BUILib.Timed('BUILib.Tools BuildPopover anchor OnHide', function()
 			if active == frame then frame:Hide() end
