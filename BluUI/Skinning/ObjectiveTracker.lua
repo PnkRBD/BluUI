@@ -1646,6 +1646,65 @@ end
 context.Window('ObjectiveTrackerFrame', { install = InstallTracker, skin = SkinTracker })
 context.OnDisable(RestoreTracker)
 
+local UNTRACK_ROOM = 130
+
+local function TrackedQuestTitles()
+	local titles = {}
+	local function Add(questID)
+		if questID then titles[#titles + 1] = C_QuestLog.GetTitleForQuestID(questID) or ('Quest ' .. questID) end
+	end
+	for index = 1, C_QuestLog.GetNumQuestWatches() do Add(C_QuestLog.GetQuestIDForQuestWatchIndex(index)) end
+	for index = 1, C_QuestLog.GetNumWorldQuestWatches() do Add(C_QuestLog.GetQuestIDForWorldQuestWatchIndex(index)) end
+	return titles
+end
+
+local function TrackedSummary()
+	local titles = TrackedQuestTitles()
+	if #titles == 0 then return 'Nothing tracked' end
+	if #titles == 1 then return 'Tracking ' .. titles[1] end
+	return ('Tracking %d quests, hover to see them'):format(#titles)
+end
+
+local function UntrackEverything()
+	for entryIndex = 1, C_QuestLog.GetNumQuestLogEntries() do
+		local info = C_QuestLog.GetInfo(entryIndex)
+		if info and not info.isHeader then C_QuestLog.RemoveQuestWatch(info.questID) end
+	end
+	for index = C_QuestLog.GetNumQuestWatches(), 1, -1 do C_QuestLog.RemoveQuestWatch(C_QuestLog.GetQuestIDForQuestWatchIndex(index)) end
+	for index = C_QuestLog.GetNumWorldQuestWatches(), 1, -1 do C_QuestLog.RemoveWorldQuestWatch(C_QuestLog.GetQuestIDForWorldQuestWatchIndex(index)) end
+end
+
+local function ConfirmUntrack()
+	if InCombatLockdown() then return end
+	BUILib.Modals.Confirm({
+		parent = BUI.PageEngine.window.frame,
+		title = 'Untrack All Quests',
+		message = 'This untracks every quest, hidden ones and world quests included. Old characters can carry hundreds of hidden ones that cost FPS. Track the quests you want again from the quest log.',
+		confirmText = 'Untrack',
+		onConfirm = function()
+			if InCombatLockdown() then return end
+			UntrackEverything()
+		end,
+	})
+end
+
+local function TrackedRow(board)
+	local row, _, sub = board:AddRow('Tracked quests', TrackedSummary(), UNTRACK_ROOM)
+	local button = board.kit.Button(row, 'Untrack all', 'control', ConfirmUntrack)
+	button:SetPoint('RIGHT', -board.kit.ROW_INSET, 0)
+	local function Update() sub:SetText(TrackedSummary()) end
+	row:RegisterEvent('QUEST_WATCH_LIST_CHANGED')
+	row:SetScript('OnEvent', BUI.Profiler.Timed('Skinning.ObjectiveTracker tracked quests changed', Update))
+	row:HookScript('OnShow', BUI.Profiler.Timed('Skinning.ObjectiveTracker tracked quests shown', Update))
+	row:EnableMouse(true)
+	row:HookScript('OnEnter', BUI.Profiler.Timed('Skinning.ObjectiveTracker tracked quests hover', function(self)
+		local titles = TrackedQuestTitles()
+		if #titles > 1 then LibWidget.ShowTip(self, table.concat(titles, '\n')) end
+	end))
+	row:HookScript('OnLeave', LibWidget.HideTip)
+	return row
+end
+
 local function BuildBoards(ui, parent, width)
 	local settings = GetSettings()
 
@@ -1751,6 +1810,7 @@ local function BuildBoards(ui, parent, width)
 		{ icon = 'reset', tooltip = 'Put the button back where it started', onClick = ResetItemButton },
 		{ get = OffByDefault('showQuestItemButton'), set = Store('showQuestItemButton') },
 	}, QuestItem.Update)
+	TrackedRow(quests)
 
 	return { text, panel, quests }
 end
