@@ -301,6 +301,54 @@ function CDM.IsIconHiddenByUser(key, hiddenIcons, icon)
     return IsHiddenByUser(key, hiddenIcons, iconFrameData, baseID, overrideID, storedValue) and true or false
 end
 
+local function ParkHiddenIcon(icon, iconFrameData, key, anchor)
+    iconFrameData.hidden = true
+    if iconFrameData.procGlow then CDM.StopProcGlow(icon) end
+
+    CDM.HookIconFrame(icon, key)
+    if not (iconFrameData.hiddenParked
+        and iconFrameData.anchor == anchor
+        and iconFrameData.hiddenSkinVer == CDM.state.skinVersion) then
+        iconFrameData.anchor = anchor
+        iconFrameData.selfPoint = "TOPLEFT"
+        iconFrameData.relPoint = "TOPLEFT"
+        iconFrameData.posCornerX = 0
+        iconFrameData.posCornerY = 0
+        iconFrameData.locking = true
+        icon:ClearAllPoints()
+        icon:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, 0)
+        iconFrameData.locking = false
+        icon:SetAlpha(0)
+        icon:EnableMouse(false)
+        if icon._tooltipOverlay then icon._tooltipOverlay:EnableMouse(false) end
+        iconFrameData.hiddenParked = true
+        iconFrameData.hiddenSkinVer = CDM.state.skinVersion
+    end
+end
+
+local function ClearHiddenIcon(icon, iconFrameData)
+    local wasHidden = iconFrameData.hidden
+    iconFrameData.hidden = nil
+    iconFrameData.hiddenParked = nil
+    if wasHidden then
+        CDM.ReclaimShownIconStyle(icon)
+        CDM.ResumeProcGlow(icon, iconFrameData)
+    end
+end
+
+local function SyncInactiveBuffIcons(viewer, anchor, hiddenIcons)
+    for icon in viewer.itemFramePool:EnumerateActive() do
+        if not icon:IsShown() then
+            local iconFrameData, baseID, overrideID, storedValue = ResolveIconIDs(icon, FrameData[icon])
+            if IsHiddenByUser("buffs", hiddenIcons, iconFrameData, baseID, overrideID, storedValue) then
+                ParkHiddenIcon(icon, iconFrameData, "buffs", anchor)
+            elseif iconFrameData then
+                ClearHiddenIcon(icon, iconFrameData)
+            end
+        end
+    end
+end
+
 local function IconEntryKey(iconFrameData, baseID, overrideID, storedValue)
     if iconFrameData and iconFrameData.customIcon then
         return iconFrameData.customKey
@@ -340,6 +388,9 @@ function CDM.ApplyIconPositions(key)
     local db = BUI.GetDB()
     local settings = db.cdm[key]
     if not settings.enabled then return end
+
+    local hiddenIcons = CDM.GetHiddenIcons(settings)
+    if key == "buffs" then SyncInactiveBuffIcons(viewer, anchor, hiddenIcons) end
 
     local iconWidth = settings.iconWidth
     local iconHeight = settings.iconHeight
@@ -381,7 +432,6 @@ function CDM.ApplyIconPositions(key)
 
     wipe(layoutBuffer)
     local hiddenSlots = settings.hiddenSlots
-    local hiddenIcons = CDM.GetHiddenIcons(settings)
     local showOnlyOnCD = key ~= 'buffs' and CDM.GetShowOnlyOnCD(settings) or nil
     local hideWhenZero = key ~= 'buffs' and CDM.GetHideWhenZero(settings) or nil
     local Custom = CDM.Custom
@@ -445,39 +495,9 @@ function CDM.ApplyIconPositions(key)
         end
 
         if shouldHide then
-            if not iconFrameData then iconFrameData = GetFrameData(icon) end
-            iconFrameData.hidden = true
-            if iconFrameData.procGlow then CDM.StopProcGlow(icon) end
-
-            CDM.HookIconFrame(icon, key)
-            if not (iconFrameData.hiddenParked
-                and iconFrameData.anchor == anchor
-                and iconFrameData.hiddenSkinVer == CDM.state.skinVersion) then
-                iconFrameData.anchor = anchor
-                iconFrameData.selfPoint = "TOPLEFT"
-                iconFrameData.relPoint = "TOPLEFT"
-                iconFrameData.posCornerX = 0
-                iconFrameData.posCornerY = 0
-                iconFrameData.locking = true
-                icon:ClearAllPoints()
-                icon:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, 0)
-                iconFrameData.locking = false
-                icon:SetAlpha(0)
-                icon:EnableMouse(false)
-                if icon._tooltipOverlay then icon._tooltipOverlay:EnableMouse(false) end
-                iconFrameData.hiddenParked = true
-                iconFrameData.hiddenSkinVer = CDM.state.skinVersion
-            end
+            ParkHiddenIcon(icon, iconFrameData or GetFrameData(icon), key, anchor)
         else
-            if iconFrameData then
-                local wasHidden = iconFrameData.hidden
-                iconFrameData.hidden = nil
-                iconFrameData.hiddenParked = nil
-                if wasHidden then
-                    CDM.ReclaimShownIconStyle(icon)
-                    CDM.ResumeProcGlow(icon, iconFrameData)
-                end
-            end
+            if iconFrameData then ClearHiddenIcon(icon, iconFrameData) end
             if not icon:IsMouseEnabled() then icon:EnableMouse(true) end
             local tooltipOverlay = icon._tooltipOverlay
             if tooltipOverlay and not tooltipOverlay:IsMouseEnabled() then tooltipOverlay:EnableMouse(true) end
