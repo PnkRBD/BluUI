@@ -678,9 +678,13 @@ local function BuildMinimapBar()
     frame:SetScript('OnShow', MainOnShow)
 end
 
+local function MinimapBarShown(config)
+    return config.enabled and ModuleEnabled() and BUI.IsModuleEnabled('minimap')
+end
+
 local function ApplyMinimapBar()
     local config = GetMinimapConfig()
-    if not config.enabled then
+    if not MinimapBarShown(config) then
         if minimapBar then HideBarObject(minimapBar) end
         return
     end
@@ -764,8 +768,7 @@ function Datatext.Apply()
     fontGeneration = fontGeneration + 1
 
     local list = GetBars()
-    local minimapConfig = GetMinimapConfig()
-    local anyEnabled = minimapConfig.enabled
+    local anyEnabled = MinimapBarShown(GetMinimapConfig())
     if ModuleEnabled() then
         for barIndex = 1, #list do
             if list[barIndex].enabled and not IsPanel(list[barIndex]) then anyEnabled = true end
