@@ -71,6 +71,8 @@ local RAID_MAX_DOTS = 14
 local TWO_UPGRADES, THREE_UPGRADES = 0.8, 0.6
 local KEY_ROW = 26
 local KEY_ROWS = 8
+local MIN_TABLE_ROW = 18
+local MIN_FIT_ROOM = 160
 local DUNGEON_ICON = 16
 local ICON_GAP = 10
 local CURRENCY_ROW = 28
@@ -1327,17 +1329,20 @@ local function BuildKeys()
         summary:SetText(table.concat(parts, '  ·  '))
     end
 
-    function keys:Layout(width)
+    function keys:Layout(width, room)
         local inner = width - PAD * 2
+        local rowHeight = KEY_ROW
+        if room then rowHeight = math.max(MIN_TABLE_ROW, math.min(KEY_ROW, math.floor((room - TABLE_ROWS_TOP - BOTTOM_PAD) / KEY_ROWS))) end
         PlaceHead(heads, width)
         local y = TABLE_ROWS_TOP
         for _, row in ipairs(rows) do
             Place(row, y)
+            row:SetHeight(rowHeight)
             row.name:SetWidth(inner * KEY_COLUMNS.key - DUNGEON_ICON - ICON_GAP * 2)
             row.key:SetPoint('LEFT', inner * KEY_COLUMNS.key, 0)
             row.time:SetPoint('LEFT', inner * KEY_COLUMNS.time, 0)
             row.under:SetPoint('LEFT', inner * KEY_COLUMNS.under, 0)
-            y = y + KEY_ROW
+            y = y + rowHeight
         end
         return y + BOTTOM_PAD
     end
@@ -1404,11 +1409,18 @@ local function BuildCurrencies()
         end
     end
 
-    function currencies:Layout()
+    function currencies:Layout(_, room)
+        local count = math.min(#data, CURRENCY_ROWS)
+        local hasGroups = count > 0 and data[1].crest and not data[count].crest
+        local rowHeight = CURRENCY_ROW
+        if room and count > 0 then
+            local spare = room - TABLE_ROWS_TOP - BOTTOM_PAD - (hasGroups and GROUP_RULE or 0)
+            rowHeight = math.max(MIN_TABLE_ROW, math.min(CURRENCY_ROW, math.floor(spare / count)))
+        end
         local y = TABLE_ROWS_TOP
         local previousCrest = false
         rule:Hide()
-        for index = 1, math.min(#data, CURRENCY_ROWS) do
+        for index = 1, count do
             local currency = data[index]
             if previousCrest and not currency.crest then
                 Place(rule, y + GROUP_RULE / 2)
@@ -1416,8 +1428,10 @@ local function BuildCurrencies()
                 y = y + GROUP_RULE
             end
             previousCrest = currency.crest
-            Place(rows[index], y)
-            y = y + CURRENCY_ROW
+            local row = rows[index]
+            Place(row, y)
+            row:SetHeight(rowHeight)
+            y = y + rowHeight
         end
         return y + BOTTOM_PAD
     end
@@ -1557,26 +1571,37 @@ local function BuildDashboard(pageFrame)
         return y + STRIP_HEIGHT + GAP
     end
 
+    local function VisibleBottom()
+        local height = tab.frame:GetHeight()
+        if height <= 0 then return nil end
+        return height - Layout.DEFAULT_PADDING
+    end
+
     local function PlaceRows(rows, y)
+        local bottom = VisibleBottom()
+        local shownRows = {}
         for _, row in ipairs(rows) do
             local shown = {}
             for _, card in ipairs(row) do
                 card:SetShown(not card.id or CardShown(card.id))
                 if card:IsShown() then shown[#shown + 1] = card end
             end
-            if #shown > 0 then
-                local widths = #shown == 2 and { LEFT_WIDTH, PAGE_WIDTH - LEFT_WIDTH - GAP } or { PAGE_WIDTH }
-                local height = 0
-                for index, card in ipairs(shown) do height = math.max(height, card:Layout(widths[index])) end
-                local x = 0
-                for index, card in ipairs(shown) do
-                    card:ClearAllPoints()
-                    card:SetPoint('TOPLEFT', x, -y)
-                    card:SetSize(widths[index], height)
-                    x = x + widths[index] + GAP
-                end
-                y = y + height + GAP
+            if #shown > 0 then shownRows[#shownRows + 1] = shown end
+        end
+        for rowIndex, shown in ipairs(shownRows) do
+            local room = rowIndex == #shownRows and bottom and bottom - y or nil
+            if room and room < MIN_FIT_ROOM then room = nil end
+            local widths = #shown == 2 and { LEFT_WIDTH, PAGE_WIDTH - LEFT_WIDTH - GAP } or { PAGE_WIDTH }
+            local height = 0
+            for index, card in ipairs(shown) do height = math.max(height, card:Layout(widths[index], room)) end
+            local x = 0
+            for index, card in ipairs(shown) do
+                card:ClearAllPoints()
+                card:SetPoint('TOPLEFT', x, -y)
+                card:SetSize(widths[index], height)
+                x = x + widths[index] + GAP
             end
+            y = y + height + GAP
         end
         return y
     end
@@ -1635,6 +1660,10 @@ local function BuildDashboard(pageFrame)
             sessionTicker:Cancel()
             sessionTicker = nil
         end
+    end))
+
+    tab.frame:HookScript('OnSizeChanged', BUI.Profiler.Timed('Pages.Dashboard fit to window', function()
+        if block:IsVisible() then Relayout() end
     end))
 
     Relayout()
