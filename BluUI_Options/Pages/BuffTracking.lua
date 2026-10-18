@@ -22,6 +22,7 @@ local SECONDS_WIDTH = 70
 local MIN_SECONDS, MAX_SECONDS = 0.5, 14
 
 local fonts, sounds, current
+local previews = {}
 
 local Kit = BUI.OptionsKit
 local Window, Repaint, Option, Toggle, Color = Kit.Window, Kit.Repaint, Kit.Option, Kit.Toggle, Kit.TableColor
@@ -118,7 +119,11 @@ local function Alert(board, spec)
 	local db = BUI.GetDB()[spec.key]
 	local Refresh = Refresher(spec)
 	local tools = { { icon = 'cog', tooltip = 'Open the ' .. spec.title .. ' page', onClick = function() Open(spec) end } }
-	if spec.eye then tools[#tools + 1] = spec.eye(db, Refresh, spec) end
+	if spec.eye then
+		local eye = spec.eye(db, Refresh, spec)
+		tools[#tools + 1] = eye
+		previews[#previews + 1] = { on = function() return db[spec.flag] == true end, eye = eye, after = Refresh }
+	end
 	tools[#tools + 1] = Toggle(db, nil, spec.flag)
 	board:AddTools(spec.title, spec.description, tools, Refresh, SpellIcon(spec.spell))
 end
@@ -313,6 +318,7 @@ local function Sections(ui, _, parent, width)
 	sounds = BUI.BuildSoundDropdownItems()
 	local Hunter, Monk, Druid, Mage = BuffTracking.Hunter, BuffTracking.Monk, BuffTracking.Druid, BuffTracking.Mage
 	local boards = {}
+	previews = {}
 	local function Board(title, description)
 		local board = ui.Board(parent, width, { stacked = true, title = title, description = description })
 		if #boards == 0 and not BUI.IsModuleEnabled('buffTracking') then
@@ -393,7 +399,7 @@ local function Detail(ui, _, parent, width)
 	return boards
 end
 
-BUI.BuffTrackingPage = { Class = Sections }
+BUI.BuffTrackingPage = { Class = Sections, Previews = function() return previews end }
 
 BUI.PageEngine.RegisterPage('classAlert', {
 	title = 'Class alert',

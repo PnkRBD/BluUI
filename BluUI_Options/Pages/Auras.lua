@@ -475,9 +475,54 @@ local ROWS = {
 	LowHpRow, DurabilityWarningRow, PetWarningsRow, GatewayRow, BloodlustRow, CDAnnouncerRow, CooldownFlashRow, CrosshairRow,
 }
 
+local generalPreviews = {}
+
+local function PreviewEntries(items)
+	local entries = {}
+	for _, item in ipairs(items) do
+		for _, tool in ipairs(item.tools) do
+			if tool.icon == 'eye' then
+				entries[#entries + 1] = { on = item.switch.get, eye = tool, after = item.after }
+				break
+			end
+		end
+	end
+	return entries
+end
+
+local function AnyPreviewing(entries)
+	for _, entry in ipairs(entries) do
+		if entry.eye.get() then return true end
+	end
+	return false
+end
+
+local function PreviewAll(entries, value)
+	for _, entry in ipairs(entries) do
+		local shown = entry.eye.get() and true or false
+		if shown ~= value and (not value or entry.on()) then
+			entry.eye.set(value)
+			entry.after()
+		end
+	end
+end
+
+local function PreviewAllTool(enabled)
+	local ClassPreviews = BUI.BuffTrackingPage.Previews
+	return { icon = 'eye', tooltip = 'Preview every aura that is on, so you can move them', get = function()
+		return enabled and (AnyPreviewing(generalPreviews) or AnyPreviewing(ClassPreviews()))
+	end, set = function(value)
+		if not enabled then return end
+		PreviewAll(generalPreviews, value)
+		PreviewAll(ClassPreviews(), value)
+		Repaint()
+	end }
+end
+
 local function GeneralBoard(ui, parent, width, page)
 	local items = {}
 	for index, Row in ipairs(ROWS) do items[index] = Row(ui) end
+	generalPreviews = PreviewEntries(items)
 	return ui.GroupBoard(parent, width, {
 		title = 'General',
 		description = 'Drag a row to reorder it or drop it on a group. The eye shows an alert so you can move it.',
@@ -511,6 +556,7 @@ BUI.PageEngine.RegisterPage('auras', {
 				{ icon = 'enable', tooltip = 'Turn the auras module on or off, needs a reload', get = function() return BUI.IsModuleEnabled('auras') end, set = function(value)
 					BUI.ModulesPage.ConfirmReload('auras', value, Repaint)
 				end },
+				PreviewAllTool(enabled),
 			},
 			tabs = {
 				{ label = 'General', build = General },
