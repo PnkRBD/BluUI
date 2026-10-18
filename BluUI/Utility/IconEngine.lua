@@ -220,8 +220,14 @@ local knownItemDurations = {
 }
 local ITEM_CD_THRESHOLD = 1.5
 
-function IconEngine.ItemCooldownKey(itemID)
+local function ItemCooldown(itemID)
 	local cooldownStart, cooldownDuration, enable = C_Container.GetItemCooldown(itemID)
+	if not cooldownStart then return 0, 0, 1 end
+	return cooldownStart, cooldownDuration, enable
+end
+
+function IconEngine.ItemCooldownKey(itemID)
+	local cooldownStart, cooldownDuration, enable = ItemCooldown(itemID)
 	if enable == 0 then return nil end
 	if cooldownStart > 0 and (cooldownDuration > ITEM_CD_THRESHOLD or knownItemDurations[itemID]) then
 		return cooldownStart
@@ -241,7 +247,7 @@ function IconEngine.ApplyItemVisual(texture, cooldown, count, itemID, onExpireCa
 		return
 	end
 
-	local cooldownStart, cooldownDuration, enable = C_Container.GetItemCooldown(itemID)
+	local cooldownStart, cooldownDuration, enable = ItemCooldown(itemID)
 	local known = knownItemDurations[itemID]
 
 	local fingerprint = cooldown._itemFP
@@ -324,7 +330,7 @@ local TRINKET_COOLDOWN_MIN = 1.6
 function IconEngine.ApplyTrinketVisual(texture, cooldown, itemID, itemSpellID, onExpireCallback, countText)
 	if countText then countText:Hide() end
 
-	local cooldownStart, cooldownDuration = C_Container.GetItemCooldown(itemID)
+	local cooldownStart, cooldownDuration = ItemCooldown(itemID)
 
 	local idle = cooldownStart == 0 and not cooldown._trinketLastStart
 	if idle and cooldown._trinketWasIdle then
