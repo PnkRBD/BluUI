@@ -435,6 +435,18 @@ function Tools.IsInTown()
     return IsResting() and not IsInInstance()
 end
 
+function Tools.LowestDurability()
+    local lowest = 100
+    for slotIndex = 1, 18 do
+        local current, maximum = GetInventoryItemDurability(slotIndex)
+        if current and maximum and maximum > 0 then
+            local percent = current / maximum * 100
+            if percent < lowest then lowest = percent end
+        end
+    end
+    return math.floor(lowest)
+end
+
 function Tools.IsChatHeaderSecret(editBox)
     return editBox.header:IsAnchoringSecret()
 end

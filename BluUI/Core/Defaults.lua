@@ -1533,6 +1533,24 @@ BUI.Defaults = {
 			anchorOffsetY      = 0,
 		},
 
+		durabilityWarning = {
+			enabled            = false,
+			locked             = true,
+			threshold          = 25,
+			text               = 'REPAIR',
+			showPercent        = true,
+			fontSize           = 28,
+			font               = BUI.C.GLOBAL_OPTION,
+			textColor          = { r = 1, g = 0.6, b = 0.1, a = 1 },
+			posX               = 0,
+			posY               = 150,
+			centerHorizontally = true,
+			anchorFrame        = "",
+			anchorPoint        = "BOTTOM",
+			anchorOffsetX      = 0,
+			anchorOffsetY      = 0,
+		},
+
 		secondaryStats = {
 			enabled            = false,
 			locked             = true,

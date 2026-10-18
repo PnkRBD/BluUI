@@ -221,6 +221,30 @@ local function LowHpRow()
 	}
 end
 
+local function DurabilityWarningRow()
+	local db = BUI.GetDB().durabilityWarning
+	local DurabilityWarning = BUI.Auras.DurabilityWarning
+	BUI.OnModuleChange('durabilityWarning', Repaint)
+	return {
+		id = 'durabilityWarning', name = 'Durability Warning', sub = 'Text when your gear needs repair', after = DurabilityWarning.Refresh,
+		switch = Toggle(db, nil, 'enabled'),
+		tools = {
+			TableColor(db, 'Text color', 'textColor', true),
+			Font(db, 'font'),
+			TextTool({
+				Option(db, 'Warning text', 'text', { kind = 'input', placeholder = 'Warning text' }),
+				Option(db, 'Font size', 'fontSize', { min = 10, max = 60, step = 1 }),
+				Option(db, 'Show percent', 'showPercent'),
+			}),
+			{ tooltip = 'Threshold', title = 'Durability warning', slot = 'settings', options = {
+				Option(db, 'Threshold %', 'threshold', { min = 5, max = 95, step = 5 }),
+			} },
+			Pin(db, { selfTag = 'BUI_DurabilityWarning' }),
+			Eye('Preview, drag to move', function() return not db.locked end, function(value) DurabilityWarning.SetLocked(not value) end),
+		},
+	}
+end
+
 local function PetWarningsRow()
 	local db = BUI.GetDB().auras
 	local Auras = BUI.Auras
@@ -443,7 +467,7 @@ end
 
 local ROWS = {
 	CombatTimerRow, CombatResRow, CombatMessagesRow, SecondaryStatsRow, KeystoneReminderRow, PrivateWarningRow,
-	LowHpRow, PetWarningsRow, GatewayRow, BloodlustRow, CDAnnouncerRow, CooldownFlashRow, CrosshairRow,
+	LowHpRow, DurabilityWarningRow, PetWarningsRow, GatewayRow, BloodlustRow, CDAnnouncerRow, CooldownFlashRow, CrosshairRow,
 }
 
 local function GeneralBoard(ui, parent, width, page)
@@ -509,6 +533,7 @@ BUI.PageEngine.RegisterPage('auras', {
 		if not db.secondaryStats.locked then BUI.Auras.SecondaryStats.SetLocked(true) end
 		if not db.keystoneReminder.locked then BUI.Auras.KeystoneReminder.SetLocked(true) end
 		if not db.privateWarning.locked then BUI.Auras.PrivateWarning.SetLocked(true) end
+		if not db.durabilityWarning.locked then BUI.Auras.DurabilityWarning.SetLocked(true) end
 		if not settings.markLocked then
 			settings.markLocked = true
 			BUI.Auras.UpdateMark()
