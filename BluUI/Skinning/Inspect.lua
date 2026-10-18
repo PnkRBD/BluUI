@@ -310,9 +310,7 @@ local function SkinPvpTalentSlot(slot)
 	Fade(slot.Border)
 	if slot._buiPvpSlot then return end
 	slot._buiPvpSlot = true
-	local icon = slot.Texture
-	icon:RemoveMaskTexture(slot.TextureMask)
-	Skin.SquareIcon(slot, icon)
+	Skin.SquareIcon(slot, slot.Texture)
 end
 
 local function SkinPvp(pvp)
