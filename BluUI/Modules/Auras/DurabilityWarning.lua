@@ -9,6 +9,7 @@ local EVENT_KEY = 'DurabilityWarning'
 
 local frame, text
 local eventsLive = false
+local previewing = false
 
 local function GetDB() return BUI.GetDB().durabilityWarning end
 
@@ -33,7 +34,7 @@ end
 local function Update()
     local db = GetDB()
     local percent = BUI.Tools.LowestDurability()
-    if not db.enabled or (db.locked and percent > db.threshold) then
+    if not db.enabled or (db.locked and not previewing and percent > db.threshold) then
         frame:Hide()
         return
     end
@@ -69,6 +70,11 @@ function DurabilityWarning.Refresh()
         BUI.Events:Register('PLAYER_EQUIPMENT_CHANGED', EVENT_KEY, UpdateSoon)
     end
     Update()
+end
+
+function DurabilityWarning.SetPreview(on)
+    previewing = on
+    if frame then Update() end
 end
 
 function DurabilityWarning.SetLocked(locked)

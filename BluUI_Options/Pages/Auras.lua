@@ -236,9 +236,13 @@ local function DurabilityWarningRow()
 				Option(db, 'Font size', 'fontSize', { min = 10, max = 60, step = 1 }),
 				Option(db, 'Show percent', 'showPercent'),
 			}),
-			{ tooltip = 'Threshold', title = 'Durability warning', slot = 'settings', options = {
-				Option(db, 'Threshold %', 'threshold', { min = 5, max = 95, step = 5 }),
-			} },
+			{ tooltip = 'Threshold', title = 'Durability warning', slot = 'settings',
+				onShow = function() DurabilityWarning.SetPreview(true) end,
+				onHide = function() DurabilityWarning.SetPreview(false) end,
+				options = {
+					Option(db, 'Threshold %', 'threshold', { min = 5, max = 95, step = 5 }),
+				},
+			},
 			Pin(db, { selfTag = 'BUI_DurabilityWarning' }),
 			Eye('Preview, drag to move', function() return not db.locked end, function(value) DurabilityWarning.SetLocked(not value) end),
 		},
