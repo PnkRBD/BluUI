@@ -25,6 +25,8 @@ local LOCKOUT_SET = {}
 for _, spellID in ipairs(LOCKOUT) do LOCKOUT_SET[spellID] = true end
 
 local frame, text, flash
+local tile, tileIcon, swipe, tileTimer
+local iconLook = false
 local iconPrefix = ''
 local lastText, lastState, lastBucket
 local previewState
@@ -119,9 +121,14 @@ local function GetLockoutCached(now)
 	return cachedLockout
 end
 
-local function GetActiveRemaining(lockout, now)
+local function LockoutStart(lockout)
 	if not lockout or IsSecret(lockout.expirationTime) or IsSecret(lockout.duration) then return nil end
-	local remaining = lockout.expirationTime - lockout.duration + BUFF_DURATION - now
+	return lockout.expirationTime - lockout.duration
+end
+
+local function GetActiveRemaining(start, now)
+	if not start then return nil end
+	local remaining = start + BUFF_DURATION - now
 	if remaining > 0 then return remaining end
 end
 
@@ -141,7 +148,7 @@ local function Build()
 	text:SetJustifyH('CENTER')
 	text:SetWordWrap(false)
 
-	flash = text:CreateAnimationGroup()
+	flash = frame:CreateAnimationGroup()
 	flash:SetLooping('REPEAT')
 	local fadeOut = flash:CreateAnimation('Alpha')
 	fadeOut:SetFromAlpha(1)
@@ -157,6 +164,30 @@ local function Build()
 	fadeIn:SetSmoothing('IN_OUT')
 end
 
+local function BuildTile()
+	if tile then return end
+	tile = CreateFrame('Frame', nil, frame)
+	tile:SetAllPoints()
+
+	tileIcon = tile:CreateTexture(nil, 'ARTWORK')
+	tileIcon:SetTexture(C_Spell.GetSpellTexture(BLOODLUST))
+	tileIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+	swipe = CreateFrame('Cooldown', nil, tile, 'CooldownFrameTemplate')
+	swipe:SetAllPoints(tileIcon)
+	swipe:SetDrawEdge(false)
+	swipe:SetDrawBling(false)
+	swipe:SetHideCountdownNumbers(true)
+	swipe:SetSwipeColor(0, 0, 0, 0.65)
+
+	local overlay = CreateFrame('Frame', nil, tile)
+	overlay:SetAllPoints()
+	overlay:SetFrameLevel(swipe:GetFrameLevel() + 2)
+
+	tileTimer = overlay:CreateFontString(nil, 'OVERLAY')
+	tileTimer:SetPoint('CENTER')
+end
+
 local function BuildIconPrefix(config)
 	if not config.showIcon then return '' end
 	return ('|T%s:%d:%d:0:0:64:64:5:59:5:59|t  '):format(C_Spell.GetSpellTexture(BLOODLUST), config.iconSize, config.iconSize)
@@ -165,25 +196,52 @@ end
 local function ApplyLayout()
 	Build()
 	local config = GetConfig()
-	local size = math.max(config.iconSize, config.fontSize + 4)
-	frame:SetSize(size, size)
+	local font = BUI.GetModuleFont(config)
+	iconLook = config.style == 'icon'
+	if iconLook then
+		BuildTile()
+		local size = Pixel.Scale(config.tileSize)
+		frame:SetSize(size, size)
+		Pixel.ApplyBorder(tile, 1, 0, 0, 0, 1)
+		local edge = Pixel.GetBorderSize(tile)
+		tileIcon:ClearAllPoints()
+		tileIcon:SetPoint('TOPLEFT', tile, 'TOPLEFT', edge, -edge)
+		tileIcon:SetPoint('BOTTOMRIGHT', tile, 'BOTTOMRIGHT', -edge, edge)
+		Pixel.ApplyFont(tileTimer, config.fontSize, font, BUI.GetFontOutline())
+	else
+		local size = math.max(config.iconSize, config.fontSize + 4)
+		frame:SetSize(size, size)
+		Pixel.ApplyFont(text, config.fontSize, font, BUI.GetFontOutline())
+		iconPrefix = BuildIconPrefix(config)
+	end
+	if tile then tile:SetShown(iconLook) end
+	text:SetShown(not iconLook)
 	BUI.Anchor.ApplyPosition(frame, config)
-	Pixel.ApplyFont(text, config.fontSize, BUI.GetModuleFont(config), BUI.GetFontOutline())
-	iconPrefix = BuildIconPrefix(config)
 	lastText, lastState, lastBucket = nil, nil, nil
 end
 
-local function Show(config, state, remaining)
+local function PaintTile(state, startTime, duration)
+	tileIcon:SetDesaturated(state == 'cd')
+	if startTime then swipe:SetCooldown(startTime, duration) else swipe:Clear() end
+end
+
+local function Show(config, state, remaining, startTime, duration)
 	local bucket = remaining and BUI.TimeFormat.Bucket(remaining, DECIMALS_BELOW)
 	if lastState == state and lastBucket == bucket and frame:IsShown() then return end
-	lastState, lastBucket = state, bucket
-	local newText = iconPrefix .. Format(config[state .. 'Format'], remaining)
-	if newText ~= lastText then
-		lastText = newText
-		text:SetText(newText)
-	end
 	local color = config[state .. 'Color']
-	text:SetTextColor(color[1], color[2], color[3], color[4])
+	if iconLook then
+		if lastState ~= state then PaintTile(state, startTime, duration) end
+		tileTimer:SetText(remaining and BUI.TimeFormat.Format(remaining, DECIMALS_BELOW) or '')
+		tileTimer:SetTextColor(color[1], color[2], color[3], color[4])
+	else
+		local newText = iconPrefix .. Format(config[state .. 'Format'], remaining)
+		if newText ~= lastText then
+			lastText = newText
+			text:SetText(newText)
+		end
+		text:SetTextColor(color[1], color[2], color[3], color[4])
+	end
+	lastState, lastBucket = state, bucket
 	frame:Show()
 end
 
@@ -196,7 +254,7 @@ end
 local function StopFlash()
 	flashGeneration = flashGeneration + 1
 	flash:Stop()
-	text:SetAlpha(1)
+	frame:SetAlpha(1)
 end
 
 local function PlayFlash(seconds)
@@ -252,7 +310,7 @@ local function TickPreview(config)
 	if phase == 'active' then
 		local remaining = PREVIEW_ACTIVE_DURATION - elapsed
 		if remaining > 0 then
-			if config.showWhenActive then Show(config, 'active', remaining) else frame:Hide() end
+			if config.showWhenActive then Show(config, 'active', remaining, previewState.startedAt, PREVIEW_ACTIVE_DURATION) else frame:Hide() end
 			return
 		end
 		if config.showWhenCD then
@@ -268,7 +326,7 @@ local function TickPreview(config)
 	if phase == 'cd' then
 		local remaining = PREVIEW_CD_DURATION - elapsed
 		if remaining > 0 then
-			Show(config, 'cd', remaining)
+			Show(config, 'cd', remaining, previewState.startedAt, PREVIEW_CD_DURATION)
 			FireWarnIfDue(config, remaining)
 			return
 		end
@@ -318,21 +376,23 @@ local function Tick()
 		FireUsedAlert(config)
 	end
 
+	local start = LockoutStart(lockout)
+	local activeRemaining = GetActiveRemaining(start, now)
+
 	if hasLockout and now < usedMessageUntil then
-		Show(config, 'used')
+		Show(config, 'used', activeRemaining, start, BUFF_DURATION)
 		wasLockedOut = true
 		return
 	end
 
-	local activeRemaining = GetActiveRemaining(lockout, now)
 	if activeRemaining then
-		if config.showWhenActive then Show(config, 'active', activeRemaining) else frame:Hide() end
+		if config.showWhenActive then Show(config, 'active', activeRemaining, start, BUFF_DURATION) else frame:Hide() end
 		wasLockedOut = true
 		return
 	end
 
 	if hasLockout then
-		if IsSecret(lockout.expirationTime) or IsSecret(lockout.duration) then
+		if not start then
 			wasLockedOut = true
 			return
 		end
@@ -340,7 +400,7 @@ local function Tick()
 		if remaining > 0 then
 			wasLockedOut = true
 			if config.showWhenCD and ShownHere(config.cdHideInTown, config.cdDungeonOnly) then
-				Show(config, 'cd', remaining)
+				Show(config, 'cd', remaining, start, lockout.duration)
 				FireWarnIfDue(config, remaining)
 				if remaining > DECIMALS_BELOW then SleepUntilNextSecond(remaining) end
 			else

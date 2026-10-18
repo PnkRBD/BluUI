@@ -140,7 +140,7 @@ local entries = {
 	{ label = "Keystone Reminder", page = "auras", tab = 1, panel = "General", keywords = "keystone reminder dungeon teleport key group mythic plus" },
 	{ label = "Private raid warning", page = "auras", tab = 1, panel = "General", keywords = "private raid warning boss blizzard move position" },
 	{ label = "Gateway Alert", page = "auras", tab = 1, panel = "General", keywords = "demonic gateway alert warlock text sound in reach" },
-	{ label = "Bloodlust", page = "auras", tab = 1, panel = "General", keywords = "bloodlust heroism time warp lust timer alert countdown tts sated exhaustion" },
+	{ label = "Bloodlust", page = "auras", tab = 1, panel = "General", keywords = "bloodlust heroism time warp primal rage fury of the aspects lust timer alert countdown tts sated exhaustion icon swipe" },
 
 	{ label = "Map", page = "minimap", tab = 1, panel = "Map", keywords = "minimap map enable size pixels scale border width position from right from top unlock move anchor" },
 	{ label = "Indicators", page = "minimap", tab = 2, panel = "Indicators", keywords = "difficulty mail crafting orders garrison mission indicators anchor letters text align" },

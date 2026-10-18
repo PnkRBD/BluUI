@@ -43,16 +43,18 @@ local function Sections(ui, _, parent, width)
 	local display = BUI.ResetBoard(ui, ui.Board(parent, width, {
 		stacked = true,
 		title = 'Display',
-		description = 'How the text looks and where it sits. Use [spell] for the buff name and [time] for the countdown.',
+		description = 'Text or one icon, and where it sits. Use [spell] for the buff name and [time] for the countdown.',
 	}))
-	display:AddTools('Text', 'Font, size, icon and position', {
+	display:AddTools('Look', 'Text or icon, font, size and position', {
+		Kit.Menu(db, 'style', BUI.C.TEXT_OR_ICON_OPTIONS, MENU_WIDTH),
 		Kit.Menu(db, 'font', fonts, MENU_WIDTH),
 		{ icon = 'text', tooltip = 'Size', title = 'Text', options = {
 			Option(db, 'Font size', 'fontSize', { min = 8, max = 48, step = 1 }),
 		} },
 		{ tooltip = 'Icon', title = 'Icon', options = {
-			Option(db, 'Show icon', 'showIcon'),
-			Option(db, 'Icon size', 'iconSize', { min = 12, max = 64, step = 1 }),
+			Option(db, 'Icon beside text', 'showIcon'),
+			Option(db, 'Size beside text', 'iconSize', { min = 12, max = 64, step = 1 }),
+			Option(db, 'Icon look size', 'tileSize', { min = 24, max = 96, step = 1, separator = true }),
 		} },
 		BUI.PositionTool(db),
 	}, Refresh)
