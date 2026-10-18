@@ -1647,12 +1647,16 @@ function Skin.Define(id, info)
 
 	context.Enabled, context.Guard, context.Safely, context.info = Enabled, Guard, Safely, info
 
+	local active = false
 	Skin.OnToggle(id, function(enabled)
 		if enabled then
+			active = true
 			context.ShowOwned(true)
 			for _, window in ipairs(windows) do WatchWindow(window) end
 			return
 		end
+		if not active then return end
+		active = false
 		context.Restore()
 		for _, window in ipairs(windows) do window.skinned = false end
 		for _, callback in ipairs(disablers) do callback() end
