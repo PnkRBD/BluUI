@@ -166,6 +166,7 @@ end
 
 local function InstallPrompt(listener)
 	countdownText = Own(listener:CreateFontString(nil, 'OVERLAY'))
+	Skin.TipFont(countdownText, 'body', CurrentScale())
 	countdownText:SetJustifyH('RIGHT')
 	listener:HookScript('OnHide', Wrap('Skin.ReadyCheck countdown stop', StopCountdown))
 	local text = _G.ReadyCheckFrameText
