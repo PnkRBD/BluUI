@@ -317,13 +317,22 @@ local function Remember(activity)
     Sync()
 end
 
+local function Forget()
+    group, dismissed = nil, nil
+    Sync()
+end
+
 local function OnJoined(_, resultID)
     Remember(ResultActivity(resultID))
 end
 
 local function OnListing()
     local entry = C_LFGList.GetActiveEntryInfo()
-    Remember(entry and MythicPlusActivity(entry.activityIDs[1]))
+    if entry then
+        Remember(MythicPlusActivity(entry.activityIDs[1]))
+    elseif not IsInGroup() then
+        Forget()
+    end
 end
 
 local function OnRoster()
@@ -332,11 +341,6 @@ local function OnRoster()
     elseif C_LFGList.HasActiveEntryInfo() then
         OnListing()
     end
-end
-
-local function Forget()
-    group, dismissed = nil, nil
-    Sync()
 end
 
 local function OnWorld()
