@@ -28,6 +28,7 @@ local REWARD_TEXT_KEYS = { 'description', 'rewardsDescription', 'xpLabel' }
 local SEARCH_ENTRY_TEXT_KEYS = { 'Name', 'ActivityName', 'Playstyle', 'ExpirationTime', 'PendingLabel' }
 local ENTRY_APPLIED_COLOR = { 0.25, 0.8, 0.35, 0.14 }
 local ENTRY_UNAVAILABLE_ALPHA = 0.45
+local ENTRY_DIM_KEYS = { 'Name', 'ActivityName', 'Playstyle', 'ExpirationTime', 'DataDisplay', 'VoiceChat' }
 local ENTRY_STATUS_SIZE = 14
 local ENTRY_STATUS_LEVEL = 10
 local ENTRY_PLATE_ALPHA = 0.8
@@ -346,7 +347,6 @@ local function SkinSearchEntry(button)
 	local cover = CreateFrame('Frame', nil, button)
 	cover:SetAllPoints()
 	cover:SetFrameLevel(button:GetFrameLevel() + ENTRY_STATUS_LEVEL)
-	cover:SetIgnoreParentAlpha(true)
 	cover:Hide()
 	local plate = BUI.Painter.Fill(cover:CreateTexture(nil, 'BACKGROUND'), 'skinBackground')
 	plate:SetAllPoints()
@@ -385,7 +385,8 @@ end
 
 local function PaintSearchEntryState(button)
 	local status = EntryStatus(button)
-	button:SetAlpha(status and ENTRY_UNAVAILABLE_ALPHA or 1)
+	local dim = status and ENTRY_UNAVAILABLE_ALPHA or 1
+	for _, key in ipairs(ENTRY_DIM_KEYS) do button[key]:SetAlpha(dim) end
 	button.PendingLabel:SetAlpha(status and 0 or 1)
 	button._buiStatus.label:SetText(status)
 	button._buiStatus:SetShown(status ~= nil)
