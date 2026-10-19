@@ -229,7 +229,7 @@ local function PackLeader(board)
 		end,
 	})
 	Alert(board, {
-		key = 'killCommandOverlay', title = 'Kill Command overlay', description = 'Pack Leader countdown and beast name on the Kill Command icon', spell = 34026,
+		key = 'killCommandOverlay', title = 'Kill Command overlay', description = 'Pack Leader countdown and the ready beast on the Kill Command icon', spell = 34026,
 		refresh = Overlay.Refresh, eye = Preview(Overlay),
 		build = function(db, Board, Refresh)
 			local overlay = Board('Kill Command overlay', 'The countdown and beast name drawn on the icon.')

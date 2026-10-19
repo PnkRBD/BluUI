@@ -161,7 +161,7 @@ local function ClearOverlay()
     overlay.cooldown:Hide()
     overlay.beastText:SetText('')
     overlay.beastText:Hide()
-    overlay.beastId, overlay.beastPhase = nil, nil
+    overlay.beastId = nil
     overlay.lastPreviewPhase = nil
 end
 
@@ -262,11 +262,7 @@ local function Tick()
             SoftIdle()
             return nil
         end
-        if phase == 'ready' then
-            beast = Hunter.GetPackLeaderReadyBeast()
-        else
-            beast = Hunter.GetNextBeastData()
-        end
+        if phase == 'ready' then beast = Hunter.GetPackLeaderReadyBeast() end
         if not icon:IsShown() then
             HideAllOverlays()
             return nil
@@ -294,20 +290,18 @@ local function Tick()
     end
     EnsureLiveTimer(entry, config, config.showTimer and not isPreview)
 
-    if config.showBeastName then
+    if config.showBeastName and phase == 'ready' and beast then
         local red, green, blue = Hunter.BeastColor(beast.id)
-        if entry.beastId ~= beast.id or entry.beastPhase ~= phase or entry.beastR ~= red or entry.beastG ~= green or entry.beastB ~= blue then
-            entry.beastId, entry.beastPhase = beast.id, phase
+        if entry.beastId ~= beast.id or entry.beastR ~= red or entry.beastG ~= green or entry.beastB ~= blue then
+            entry.beastId = beast.id
             entry.beastR, entry.beastG, entry.beastB = red, green, blue
-            local label = beast.short
-            if phase == 'ready' then label = 'SEND ' .. label:upper() end
-            entry.beastText:SetText(label)
+            entry.beastText:SetText(beast.short)
             entry.beastText:SetTextColor(red, green, blue, 1)
         end
         entry.beastText:Show()
     else
         if entry.beastId then
-            entry.beastId, entry.beastPhase = nil, nil
+            entry.beastId = nil
             entry.beastText:SetText('')
         end
         entry.beastText:Hide()
