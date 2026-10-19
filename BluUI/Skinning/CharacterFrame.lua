@@ -1200,7 +1200,7 @@ RefreshTitles = function()
 end
 
 
-local selectedSetID
+local selectedSetID, equippedSetID
 
 local function MissingSetItems(setID)
     local items = C_EquipmentSet.GetItemIDs(setID)
@@ -1544,7 +1544,9 @@ RefreshSets = function(followEquipped)
             PlaceListRow(row, child, count, SET.ROW_H)
         end
     end
-    if (followEquipped and anyEquipped) or not selectedStillExists then selectedSetID = anyEquipped end
+    local follow = followEquipped or anyEquipped ~= equippedSetID
+    equippedSetID = anyEquipped
+    if (follow and anyEquipped) or not selectedStillExists then selectedSetID = anyEquipped end
     for index = 1, count do Skin.SetActiveEdge(pane.rows[index], pane.rows[index].setID == selectedSetID) end
     for index = count + 1, #pane.rows do pane.rows[index]:Hide() end
     pane.empty:SetShown(count == 0)
