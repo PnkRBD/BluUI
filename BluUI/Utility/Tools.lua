@@ -435,6 +435,13 @@ function Tools.IsInTown()
     return IsResting() and not IsInInstance()
 end
 
+function Tools.ChallengeMapForActivity(activityName)
+    for _, mapID in ipairs(C_ChallengeMode.GetMapTable()) do
+        local name, _, _, texture, background = C_ChallengeMode.GetMapUIInfo(mapID)
+        if name and activityName:find(name, 1, true) then return name, texture, mapID, background end
+    end
+end
+
 function Tools.LowestDurability()
     local lowest = 100
     for slotIndex = 1, 18 do

@@ -24,6 +24,7 @@ local LIST_INSET, LIST_BOTTOM = 8, 12
 local function PaintBackdrop(frame, fill)
 	Painter.Custom(frame, function(target) Skin.ApplyBackdrop(target, fill, PALETTE.edge) end)
 end
+Skin.PaintBackdrop = PaintBackdrop
 
 local function HoverBorder(frame)
 	frame:SetBackdropBorderColor(unpack(Skin.HoverColor()))
@@ -43,6 +44,7 @@ function Skin.SmallButton(parent, width, height, label)
 	text:SetPoint('CENTER')
 	text:SetText(label)
 	Painter.Text(text, 'skinText')
+	button.label = text
 
 	button:HookScript('OnEnter', Wrap('Skin.Widgets button OnEnter', HoverBorder))
 	button:HookScript('OnLeave', Wrap('Skin.Widgets button OnLeave', RestBorder))
@@ -411,6 +413,113 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 	end))
 	menu:SetScript('OnHide', BUI.Profiler.Script('Skin.Widgets menu OnHide', function(menuFrame) menuFrame:SetScript('OnUpdate', nil) end))
 	return dropdown
+end
+
+local Motion = BUILib.Motion
+local SLIDE = { easing = Motion.Ease.outCubic }
+local SLIDE_TIME, DROP_TIME = 0.16, 0.24
+local GRIP_SIZE, GRIP_X, ITEM_TEXT_GAP = 14, 8, 8
+
+local function OrderIndex(order, key)
+	for index, each in ipairs(order) do
+		if each == key then return index end
+	end
+end
+
+local function OrderCursor(list)
+	local _, cursorY = GetCursorPosition()
+	return cursorY / list:GetEffectiveScale() - list:GetTop()
+end
+
+local function PlaceOrder(list, duration, skip)
+	for index, key in ipairs(list.order) do
+		local item = list.items[key]
+		if item ~= skip then Motion.To(item, 'y', -(index - 1) * list.step, duration, SLIDE) end
+	end
+end
+
+local TrackOrder = Wrap('Skin.Widgets order drag', function(item)
+	local list = item.list
+	local count = #list.order
+	local y = min(0, max(-(count - 1) * list.step, OrderCursor(list) - list.grab))
+	Motion.To(item, 'y', y, 0)
+	local target = min(count, max(1, math.floor(-y / list.step + 0.5) + 1))
+	local index = OrderIndex(list.order, item.key)
+	if target == index then return end
+	table.remove(list.order, index)
+	table.insert(list.order, target, item.key)
+	PlaceOrder(list, SLIDE_TIME, item)
+	list.onChange(list.order)
+end)
+
+local function StartOrderDrag(item)
+	local list = item.list
+	local _, _, _, _, offsetY = item:GetPoint(1)
+	list.dragging = item
+	list.grab = OrderCursor(list) - offsetY
+	item:SetFrameLevel(list:GetFrameLevel() + 3)
+	HoverBorder(item)
+	item:SetScript('OnUpdate', TrackOrder)
+end
+
+local function StopOrderDrag(item)
+	local list = item.list
+	item:SetScript('OnUpdate', nil)
+	list.dragging = nil
+	item:SetFrameLevel(list:GetFrameLevel() + 1)
+	if not item:IsMouseOver() then RestBorder(item) end
+	Motion.To(item, 'y', -(OrderIndex(list.order, item.key) - 1) * list.step, DROP_TIME, SLIDE)
+end
+
+local function OrderLeave(item)
+	if item.list.dragging ~= item then RestBorder(item) end
+end
+
+local function SetListOrder(list, order)
+	if list.dragging then return end
+	list.order = order
+	PlaceOrder(list, 0)
+end
+
+function Skin.CreateOrderList(parent, spec)
+	local list = CreateFrame('Frame', nil, parent)
+	local width, height, gap = Pixel.Scale(spec.width), Pixel.Scale(spec.rowHeight), Pixel.Scale(spec.gap)
+	list.step = height + gap
+	list:SetSize(width, #spec.items * list.step - gap)
+	list.order, list.onChange, list.items = spec.order, spec.onChange, {}
+	for _, entry in ipairs(spec.items) do
+		local item = CreateFrame('Button', nil, list)
+		item:SetSize(width, height)
+		item:SetPoint('TOPLEFT', list, 'TOPLEFT', 0, 0)
+		item:SetFrameLevel(list:GetFrameLevel() + 1)
+		PaintBackdrop(item, PALETTE.card)
+		item.key, item.list = entry.key, list
+
+		local grip = item:CreateTexture(nil, 'OVERLAY')
+		BUILib.Widget.SetGlyph(grip, BUILib.GetLibMedia('grabber'))
+		grip:SetSize(Pixel.Scale(GRIP_SIZE), Pixel.Scale(GRIP_SIZE))
+		grip:SetPoint('LEFT', Pixel.Scale(GRIP_X), 0)
+		Painter.Tint(grip, 'skinLabel')
+
+		local text = item:CreateFontString(nil, 'OVERLAY')
+		Pixel.ApplyFont(text, 11, FONT, '')
+		text:SetPoint('LEFT', grip, 'RIGHT', Pixel.Scale(ITEM_TEXT_GAP), 0)
+		text:SetPoint('RIGHT', Pixel.Scale(-ITEM_TEXT_GAP), 0)
+		text:SetJustifyH('LEFT')
+		text:SetWordWrap(false)
+		text:SetText(entry.label)
+		Painter.Text(text, 'skinText')
+
+		item:RegisterForDrag('LeftButton')
+		item:SetScript('OnDragStart', BUI.Profiler.Script('Skin.Widgets order OnDragStart', StartOrderDrag))
+		item:SetScript('OnDragStop', BUI.Profiler.Script('Skin.Widgets order OnDragStop', StopOrderDrag))
+		item:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets order OnEnter', HoverBorder))
+		item:SetScript('OnLeave', BUI.Profiler.Script('Skin.Widgets order OnLeave', OrderLeave))
+		list.items[entry.key] = item
+	end
+	list.SetOrder = SetListOrder
+	PlaceOrder(list, 0)
+	return list
 end
 
 local function SetHeaderTitle(header, title)

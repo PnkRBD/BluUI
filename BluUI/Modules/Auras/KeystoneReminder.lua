@@ -57,12 +57,7 @@ local function PlayerRole()
     return role
 end
 
-local function FindDungeon(activityName)
-    for _, mapID in ipairs(C_ChallengeMode.GetMapTable()) do
-        local name, _, _, texture = C_ChallengeMode.GetMapUIInfo(mapID)
-        if name and activityName:find(name, 1, true) then return name, texture, mapID end
-    end
-end
+local FindDungeon = BUI.Tools.ChallengeMapForActivity
 
 local function PaintPortalEdge(portal, hovered)
     portal:SetBackdropBorderColor(BUI.ThemeColor(hovered and 'accent' or 'edge'))
