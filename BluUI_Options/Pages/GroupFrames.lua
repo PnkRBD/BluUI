@@ -365,8 +365,7 @@ local function FramesBoard(ui, parent, width, key)
 		sizing[#sizing + 1] = Toggle(section, 'Vertical layout', 'vertical')
 		sizing[#sizing + 1] = Toggle(section, 'Grow upward', 'growUp')
 	end
-	board:AddTools('Frames', 'Texture, size and spacing', {
-		Menu(section, 'statusbarTexture', textures, WIDE_MENU),
+	board:AddTools('Frames', 'Size and spacing', {
 		{ tooltip = 'Size and spacing', title = 'Frames', options = sizing },
 	}, Refresh)
 	board:AddTools('Power bar', 'Resource bar under the health bar', {
@@ -382,6 +381,7 @@ local function FramesBoard(ui, parent, width, key)
 		title = 'Appearance',
 		description = 'Colors, absorbs and the borders that mark your target and mouseover.',
 	})
+	look:AddTools('Bar texture', 'How the health bar looks', { Menu(section, 'statusbarTexture', textures, WIDE_MENU) }, Refresh)
 	look:AddTools('Health and colors', 'Bar, border and background colors', {
 		Color(section, 'Health', 'healthColor'),
 		Color(section, 'Border', 'borderColor'),
