@@ -2013,9 +2013,8 @@ local function BuildFrame()
     Placement.Home()
 
     local titleBar = Skin.CreateTitleBar(frame, UnitName('player'), HEADER.BAR_H, function()
-        if CharacterFrame:IsShown() and not Skin.CloseBorrowed(CharacterFrame.CloseButton) then HideUIPanel(CharacterFrame) end
+        if CharacterFrame:IsShown() then HideUIPanel(CharacterFrame) end
     end)
-    frame.closeButton = titleBar.closeBtn.frame
     titleBar:EnableMouse(true)
     titleBar:RegisterForDrag('LeftButton')
     titleBar:SetScript('OnDragStart', BUI.Profiler.Script('Skin.CharacterFrame titleBar OnDragStart', BeginSheetDrag))
@@ -2092,7 +2091,6 @@ local function ShowSkin()
     UpdateSubtitle()
     Placement.OnShow()
     if not frame:IsShown() then frame:Show() end
-    Skin.BorrowCloseButton(CharacterFrame.CloseButton, frame.closeButton)
     if model then model.facing, model.scale = 0, 1.0 end
     RefreshModel()
     RefreshAll()
@@ -2100,7 +2098,6 @@ end
 
 local function HideSkin()
     Placement.OnHide()
-    Skin.ReturnCloseButton(CharacterFrame.CloseButton)
     if bagPopup then bagPopup:Hide() end
 end
 
