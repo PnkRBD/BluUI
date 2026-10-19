@@ -18,6 +18,7 @@ local HINT_HEIGHT = 14
 local HINT_GAP = 6
 
 local BUFF_CATEGORIES = { Enum.CooldownViewerCategory.TrackedBuff, Enum.CooldownViewerCategory.TrackedBar }
+local BUFF_VIEWERS = { 'BuffIconCooldownViewer', 'BuffBarCooldownViewer' }
 local CLASS_CATEGORIES = { Enum.CooldownViewerCategory.Essential, Enum.CooldownViewerCategory.Utility }
 
 local function IsAutoSlotKey(id)
@@ -314,6 +315,20 @@ local function CollectCustomIcons(CDM, viewerSettings, icons, seen, customSeen, 
 	end
 end
 
+local function BlizzardTrackedBuffs()
+	local tracked = {}
+	for _, name in ipairs(BUFF_VIEWERS) do
+		local viewer = _G[name]
+		if viewer and viewer.itemFramePool then
+			for itemFrame in viewer.itemFramePool:EnumerateActive() do
+				local cooldownID = itemFrame.cooldownID
+				if cooldownID and not issecretvalue(cooldownID) then tracked[cooldownID] = true end
+			end
+		end
+	end
+	return tracked
+end
+
 local function CollectCooldownViewerSpells(CDM, viewerKey, icons)
 	local seenNumeric = {}
 	for _, entry in ipairs(icons) do
@@ -324,6 +339,7 @@ local function CollectCooldownViewerSpells(CDM, viewerKey, icons)
 
 	if viewerKey == 'buffs' then
 		local catSeen = {}
+		local tracked = BlizzardTrackedBuffs()
 		for _, cat in ipairs(BUFF_CATEGORIES) do
 			local allIDs = GetCategorySet(cat, true)
 			if allIDs then
@@ -346,7 +362,7 @@ local function CollectCooldownViewerSpells(CDM, viewerKey, icons)
 						if not seenNumeric[spellID] and not catSeen[spellID] and not linkedCollision then
 							seenNumeric[spellID] = true
 							catSeen[spellID] = true
-							local known = info.isKnown
+							local known = info.isKnown or tracked[cdID] == true
 
 							icons[#icons + 1] = {
 								id = spellID,
@@ -354,7 +370,7 @@ local function CollectCooldownViewerSpells(CDM, viewerKey, icons)
 								icon = C_Spell.GetSpellTexture(spellID) or FALLBACK_TEX,
 								isCustom = false,
 								isUnlearned = not known,
-								isNotDisplayed = known and not enabledSet[cdID],
+								isNotDisplayed = known and not enabledSet[cdID] and not tracked[cdID],
 								unavailableTag = BuildTag(false, nil, not known),
 								layoutIndex = 200000 + cdID,
 							}
