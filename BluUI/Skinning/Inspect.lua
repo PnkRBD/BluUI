@@ -395,7 +395,7 @@ end)
 
 context.info.settings = {
 	{
-		label = 'Scale %', min = 80, max = 150, step = 5,
+		label = 'Scale %', min = 80, max = 150, step = 1,
 		get = function() return BUI.GetDB().skinning[SCALE_SETTING] end,
 		set = function(value)
 			BUI.GetDB().skinning[SCALE_SETTING] = value
