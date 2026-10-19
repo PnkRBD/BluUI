@@ -56,6 +56,7 @@ local function CommonSettings(sizes)
 		healthOpacity        = 35,
 		transparentHealth    = false,
 		statusbarTexture     = BUI.C.GLOBAL_OPTION,
+		fillDirection        = "RIGHT",
 
 		absorb = {
 			enabled = true, color = { 1, 1, 1, 0.6 },

@@ -16,7 +16,14 @@ function UnitFrames.SetAbsorbOverflow(frame, shown)
 end
 
 local function Fit(bars)
-	local width = bars.__owner.Health:GetWidth()
+	local health = bars.__owner.Health
+	if health:GetOrientation() == 'VERTICAL' then
+		local height = health:GetHeight()
+		bars.Damage:SetHeight(height)
+		bars.Heal:SetHeight(height)
+		return
+	end
+	local width = health:GetWidth()
 	bars.Damage:SetWidth(width)
 	bars.Heal:SetWidth(width)
 end
