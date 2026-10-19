@@ -597,6 +597,7 @@ BUI.Defaults = {
 		},
 
 		markers = {
+			locked         = true,
 			onlyInGroup    = false,
 			tooltips       = true,
 			showControls   = true,

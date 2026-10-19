@@ -5,7 +5,7 @@ local Layout = BUILib.Layout
 local PAGE_WIDTH = 960
 
 local Kit = BUI.OptionsKit
-local Window, Option, Toggle = Kit.Window, Kit.Option, Kit.Toggle
+local Window, Repaint, Option, Toggle = Kit.Window, Kit.Repaint, Kit.Option, Kit.Toggle
 
 local function Config()
 	return BUI.GetDB().markers
@@ -60,9 +60,13 @@ BUI.PageEngine.RegisterPage('markers', {
 			disabled = function() return not BUI.IsModuleEnabled('markers') end,
 			tools = {
 				{ icon = 'enable', tooltip = 'Turn the marker bar on or off', get = function() return BUI.IsModuleEnabled('markers') end, set = function(value) BUI.SetModuleEnabled('markers', value) end },
+				{ icon = 'eye', tooltip = 'Preview, drag to move, right-click it to lock', get = function() return not Config().locked end, set = function(value)
+					BUI.Markers.SetLocked(not value)
+				end },
 			},
 			tabs = { { label = 'Markers', build = Sections } },
 		})
+		BUI.OnModuleChange('markerLock', Repaint)
 		pageFrame._page = page
 		page:AutoRefresh()
 	end,
