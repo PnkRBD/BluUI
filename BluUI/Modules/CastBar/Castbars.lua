@@ -320,6 +320,14 @@ function CastBar.CreateCastbar(frame, barType)
 	frame.Castbar = castbar
 end
 
+local function IconShift(settings, iconTotal)
+	if not settings.showIcon then return 0 end
+	if settings.anchorFrame == '' then return (settings.height + 1) / 2 end
+	if settings.anchorPoint:match('LEFT') then return iconTotal end
+	if settings.anchorPoint:match('RIGHT') then return 0 end
+	return iconTotal / 2
+end
+
 local function LayoutContainer(container, settings)
 	local height = Pixel.ScaleEven(settings.height)
 	local gap = Pixel.PixelSize(1)
@@ -328,26 +336,16 @@ local function LayoutContainer(container, settings)
 	container:SetSize(settings.showIcon and width - iconTotal or width, height)
 	container._castbarIconWidth = settings.showIcon and iconTotal or 0
 
-	local anchorSettings = {
+	local shift = IconShift(settings, iconTotal)
+	local centered = settings.centerHorizontally and (settings.anchorFrame == '' or BUI.Anchor.CentersOnAnchor(settings))
+	BUI.Anchor.ApplyPosition(container, {
 		anchorFrame = settings.anchorFrame,
 		anchorPoint = settings.anchorPoint,
-		anchorOffsetX = settings.anchorOffsetX,
+		anchorOffsetX = (centered and 0 or settings.anchorOffsetX) + shift,
 		anchorOffsetY = settings.anchorOffsetY,
-		posX = settings.posX,
+		posX = (centered and 0 or settings.posX) + shift,
 		posY = settings.posY,
-		centerHorizontally = settings.centerHorizontally,
-	}
-	if settings.showIcon then
-		if settings.anchorFrame == '' then
-			anchorSettings.posX = settings.posX + (settings.height + 1) / 2
-		elseif settings.anchorPoint:match('LEFT') then
-			anchorSettings.anchorOffsetX = settings.anchorOffsetX + iconTotal
-		elseif not settings.anchorPoint:match('RIGHT') then
-			anchorSettings.anchorOffsetX = settings.anchorOffsetX + iconTotal / 2
-		end
-	end
-
-	BUI.Anchor.ApplyPosition(container, anchorSettings)
+	})
 
 	if container._isAnchored and settings.matchAnchorWidth then
 		local anchorWidth = BUI.Anchor.GetAnchorWidth(container, settings)
