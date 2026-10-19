@@ -958,6 +958,58 @@ function Skin.TipClose(button)
 	button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Core button OnLeave 3', CloseLeave))
 end
 
+local borrowedClose = {}
+
+local function ForwardBorrowed(button, script)
+	local over = borrowedClose[button]
+	local handler = over and over:GetScript(script)
+	if handler then handler(over) end
+end
+
+local function BorrowedEnter(button)
+	ForwardBorrowed(button, 'OnEnter')
+end
+
+local function BorrowedLeave(button)
+	ForwardBorrowed(button, 'OnLeave')
+end
+
+function Skin.BorrowCloseButton(button, over)
+	if not button or not over then return false end
+	if not button._buiBorrowHooked then
+		button._buiBorrowHooked = true
+		button.__buiKeepMouse = true
+		button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Core borrowed close OnEnter', BorrowedEnter))
+		button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Core borrowed close OnLeave', BorrowedLeave))
+	end
+	if not borrowedClose[button] then
+		local points = {}
+		for index = 1, button:GetNumPoints() do points[index] = { button:GetPoint(index) } end
+		button._buiHome = { points = points, strata = button:GetFrameStrata(), level = button:GetFrameLevel() }
+	end
+	borrowedClose[button] = over
+	button:ClearAllPoints()
+	button:SetAllPoints(over)
+	button:SetFrameStrata(over:GetFrameStrata())
+	button:SetFrameLevel(over:GetFrameLevel() + 5)
+	button:EnableMouse(true)
+	return true
+end
+
+function Skin.CloseBorrowed(button)
+	return button ~= nil and borrowedClose[button] ~= nil
+end
+
+function Skin.ReturnCloseButton(button)
+	local home = button and borrowedClose[button] and button._buiHome
+	if not home then return end
+	borrowedClose[button] = nil
+	button:ClearAllPoints()
+	for _, point in ipairs(home.points) do button:SetPoint(unpack(point)) end
+	button:SetFrameStrata(home.strata)
+	button:SetFrameLevel(home.level)
+end
+
 local STATE_TEXTURE_GETTERS = { 'GetNormalTexture', 'GetPushedTexture', 'GetHighlightTexture', 'GetDisabledTexture' }
 
 local function FadeStateTextures(button)
