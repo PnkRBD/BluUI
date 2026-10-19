@@ -19,15 +19,15 @@ FRAME.listBottom = FRAME.footerY + BUTTON_H + 8
 FRAME.listTop = FRAME.toolbarY + BUTTON_H + 2
 local STRIP = { top = 44, header = 18, tileH = 46, tileGap = 6, perRow = 8, tileIcon = 30, tileInset = 7, tileTextGap = 6, divider = 10 }
 local SIDE = { pad = 12, header = 18, section = 16, ratingW = 70, toggleH = 24, playstyleH = 26, toggleGap = 4, serversH = 28 }
-local BAR = { gap = 6, sortW = 130, searchW = 72, refreshGlyph = 14, editW = 70, blizzardW = 150, searchBoxGap = 24, searchBoxW = 380, searchH = 28, autoComplete = 'DIALOG',
-	hint = 'Search keys: +10, 10-15 or a dungeon', completeGap = 2, searchGlyph = 13, searchInset = 10, clearSize = 10,
+local BAR = { gap = 6, sortW = 130, searchW = 72, refreshGlyph = 14, editW = 70, blizzardW = 150, startW = 120, searchBoxGap = 12, autoComplete = 'DIALOG',
+	hint = 'Search +10, 10-15 or a dungeon', completeGap = 2, searchGlyph = 13, searchInset = 10, clearSize = 10, caretH = 14, blink = 0.5,
 }
 local ROW = { pad = 4, inset = 6, columnGap = 8, signUp = 64, cancel = 56, statusGap = 6, slot = 18, slotGap = 2, role = 24, roleIcon = 18, roleGap = 4, coverLevel = 10, coverSize = 14 }
 local LEVEL = { catcher = 20, popover = 40 }
 local POP = {
 	pad = 12, gap = 4, header = 18, headerMid = 6, linkGap = 10, section = 8, checkRow = 24, checkSize = 14, checkIcon = 18,
 	textGap = 8, tick = 2, dungeonW = 210, dungeonGap = 12, serversW = 290, serversListH = 240, serverRow = 24, eye = 16,
-	flagW = 52, flagH = 22, languageGap = 12, ratingStepGap = 4, ratingDigits = 4, columnsW = 240, columnRow = 28, columnGap = 4,
+	flagW = 52, flagH = 22, languageGap = 12, ratingDigits = 4, columnsW = 240, columnRow = 28, columnGap = 4,
 }
 local ALPHA = { dimmed = 0.45, emptyRole = 0.3, tileOff = 0.45, lit = 0.08, plate = 0.8 }
 local FILTER = {
@@ -49,7 +49,6 @@ local COLUMNS = {
 	{ key = 'leader', label = 'Leader score', width = 44 },
 	{ key = 'action', label = 'Sign up button', width = 104 },
 }
-local RATING_STEPS = { 1500, 2000, 2500, 3000 }
 local MENU_W = 230
 local MAX_APPLICATIONS = 5
 local DUNGEON_CATEGORY = 2
@@ -68,6 +67,19 @@ local REQUIRE = {
 	{ key = 'needsMyClass', label = LFG_LIST_CLASS_AVAILABLE:format(UnitClass('player')) },
 	{ key = 'hasTank', label = LFG_LIST_HAS_TANK },
 	{ key = 'hasHealer', label = LFG_LIST_HAS_HEALER },
+	{ key = 'hasLust', label = 'Has lust', own = true },
+}
+local Comp = {
+	lust = { 'SHAMAN', 'MAGE', 'HUNTER', 'EVOKER' },
+	choices = { { key = 'any', label = 'Any' }, { key = 'physical', label = 'Physical' }, { key = 'magic', label = 'Caster' } },
+	labels = { physical = 'Physical', magic = 'Caster', mixed = 'Mixed' },
+	damage = {
+		[71] = 'physical', [72] = 'physical', [103] = 'physical', [253] = 'physical', [254] = 'physical',
+		[255] = 'physical', [260] = 'physical', [261] = 'physical', [269] = 'physical',
+		[62] = 'magic', [63] = 'magic', [64] = 'magic', [70] = 'magic', [102] = 'magic', [251] = 'magic',
+		[252] = 'magic', [258] = 'magic', [259] = 'magic', [262] = 'magic', [263] = 'magic', [265] = 'magic',
+		[266] = 'magic', [267] = 'magic', [577] = 'magic', [1467] = 'magic', [1473] = 'magic', [1480] = 'magic',
+	},
 }
 local DIFFICULTIES = {
 	{ key = 'difficultyNormal', label = PLAYER_DIFFICULTY1 },
@@ -98,6 +110,7 @@ local SORT_ITEMS = {
 local LIVE_EVENTS = {
 	'LFG_LIST_SEARCH_RESULTS_RECEIVED', 'LFG_LIST_SEARCH_RESULT_UPDATED', 'LFG_LIST_SEARCH_FAILED',
 	'LFG_LIST_APPLICATION_STATUS_UPDATED', 'GROUP_ROSTER_UPDATE', 'PLAYER_SPECIALIZATION_CHANGED',
+	'LFG_LIST_ACTIVE_ENTRY_UPDATE',
 }
 local STATUS_TEXT = {
 	applied = 'Applied', invited = 'Invited', declined = 'Declined', declined_full = 'Group full',
@@ -211,7 +224,7 @@ end
 local function DungeonArt(info)
 	local name, texture, _, background = BUI.Tools.ChallengeMapForActivity(info.fullName)
 	if name then return name, texture, background end
-	local journalID = C_EncounterJournal.GetInstanceForGameMap(info.mapID)
+	local journalID = (info.mapID or 0) > 0 and C_EncounterJournal.GetInstanceForGameMap(info.mapID)
 	if not journalID then return info.fullName, FALLBACK_ICON end
 	local journalName, _, _, _, loreImage, buttonImage = EJ_GetInstanceInfo(journalID)
 	return journalName, buttonImage or FALLBACK_ICON, loreImage
@@ -353,6 +366,49 @@ local function SlotMember(byRole, slotIndex)
 	return byRole[SLOT_ROLES[slotIndex]][SLOT_RANK[slotIndex]]
 end
 
+function Comp.SpecDamage(player)
+	local specName = player.specName
+	if not specName or (issecretvalue and issecretvalue(specName)) then return nil end
+	local ids = Comp.specIDs
+	if not ids then
+		ids = {}
+		for classID = 1, GetNumClasses() do
+			local _, classFile = GetClassInfo(classID)
+			if classFile then
+				for index = 1, GetNumSpecializationsForClassID(classID) do
+					local specID, name = GetSpecializationInfoForClassID(classID, index)
+					if name then ids[classFile .. name] = specID end
+				end
+			end
+		end
+		Comp.specIDs = ids
+	end
+	return Comp.damage[ids[player.classFilename .. specName]]
+end
+
+function Comp.Of(entry)
+	if entry.comp == nil then
+		local comp = false
+		for _, player in ipairs(MembersByRole(entry).DAMAGER) do
+			local damage = Comp.SpecDamage(player) or 'mixed'
+			if not comp then
+				comp = damage
+			elseif comp ~= damage then
+				comp = 'mixed'
+			end
+		end
+		entry.comp = comp
+	end
+	return entry.comp or nil
+end
+
+function Comp.HasLust(counts)
+	for _, classFile in ipairs(Comp.lust) do
+		if counts[classFile] > 0 then return true end
+	end
+	return false
+end
+
 local function Passes(entry, classFile)
 	if entry.isApplication then return true end
 	local info, counts, activity = entry.info, entry.counts, entry.activity
@@ -370,6 +426,12 @@ local function Passes(entry, classFile)
 	if activity.difficulty and not advanced[activity.difficulty] then return false end
 	local playstyle = PLAYSTYLES[info.generalPlaystyle]
 	if playstyle and not advanced[playstyle.key] then return false end
+	local settings = Settings()
+	if settings.hasLust and not Comp.HasLust(counts) then return false end
+	if settings.comp ~= 'any' then
+		local comp = Comp.Of(entry)
+		if comp and comp ~= settings.comp then return false end
+	end
 	return true
 end
 
@@ -435,7 +497,7 @@ local function ReadEntry(resultID)
 	entry.appStatus, entry.pendingStatus = appStatus, pendingStatus
 	entry.isApplication = appStatus ~= 'none' or pendingStatus ~= nil
 	entry.region = REGIONS.split and entry.realm and (REGIONS.byRealm[(entry.realm:lower():gsub('[%s%p]', ''))] or 'us') or nil
-	entry.byRole, entry.dirty = nil, false
+	entry.byRole, entry.comp, entry.dirty = nil, nil, false
 	entryByID[resultID] = entry
 	return entry
 end
@@ -509,6 +571,8 @@ local function Subtitle(entry, settings)
 	if settings.showAge then text = text .. '  ·  ' .. Age(info.age) end
 	if info.requiredItemLevel > 0 then text = text .. ('  ·  %d+ ilvl'):format(info.requiredItemLevel) end
 	if (info.requiredDungeonScore or 0) > 0 then text = text .. ('  ·  %d+ score'):format(info.requiredDungeonScore) end
+	local comp = settings.showComp and Comp.Of(entry)
+	if comp then text = text .. '  ·  ' .. Comp.labels[comp] end
 	return text
 end
 
@@ -564,11 +628,13 @@ local function ToggleHidden(realm)
 	ToggleInSet(Realms().hidden, realm)
 	resortPending = true
 	RefreshContent()
+	Panel.Notify()
 end
 
 local function ToggleFlagged(realm)
 	ToggleInSet(Realms().flagged, realm)
 	RefreshContent()
+	Panel.Notify()
 end
 
 local function RealmMenu(realm)
@@ -717,17 +783,7 @@ local function CreateRow(parent, layout)
 	row.action:HookScript('OnLeave', Wrap('Skin.PremadeGroups action OnLeave', GameTooltip_Hide))
 	row.statusText = Text(action, 11, 'skinTitle', 'RIGHT')
 
-	row.cover = CreateFrame('Frame', nil, row)
-	row.cover:SetPoint('TOPLEFT', Pixel.PixelSize(1), -Pixel.PixelSize(1))
-	row.cover:SetPoint('BOTTOMRIGHT', -Pixel.PixelSize(1), Pixel.PixelSize(1))
-	row.cover:SetFrameLevel(row:GetFrameLevel() + ROW.coverLevel)
-	local plate = row.cover:CreateTexture(nil, 'BACKGROUND')
-	plate:SetAllPoints()
-	Painter.Fill(plate, 'skinBackground')
-	plate:SetAlpha(ALPHA.plate)
-	row.cover.label = Text(row.cover, ROW.coverSize, 'skinTitle', 'CENTER')
-	row.cover.label:SetPoint('CENTER')
-	row.cover:Hide()
+	row.cover = Strip.Cover(row)
 
 	row:RegisterForClicks('RightButtonUp')
 	row:SetScript('OnClick', Script('Skin.PremadeGroups row OnClick', OnRowClick))
@@ -866,7 +922,7 @@ local function EmptyMessage()
 end
 
 RefreshContent = function()
-	if not finder or not finder:IsShown() then return end
+	if not finder or not finder:IsShown() or not finder.main:IsShown() then return end
 	local settings = Settings()
 	local available = AvailableRoles()
 	local chosen = ChosenRoles(available)
@@ -875,6 +931,7 @@ RefreshContent = function()
 	resortPending = false
 	Strip.Paint(available)
 	PopulateRows(finder.child, SignUpBlocker(chosen), settings)
+	Strip.PaintStart()
 	local _, active = C_LFGList.GetNumApplications()
 	finder.countText:SetText(#entries == 1 and '1 group' or (#entries .. ' groups'))
 	finder.appText:SetText(('Applications %d/%d'):format(active, MAX_APPLICATIONS))
@@ -1026,10 +1083,40 @@ function Panel.SetChecked(check, checked)
 	Painter.Text(check.text, checked and 'skinTitle' or 'skinText')
 end
 
+function Panel.RequireOn(item)
+	if item.own then return Settings()[item.key] == true end
+	return advanced[item.key] == true
+end
+
+function Panel.RequireSummary()
+	local names = {}
+	for _, item in ipairs(REQUIRE) do
+		if Panel.RequireOn(item) then names[#names + 1] = item.label end
+	end
+	if #names == 0 then return ANY end
+	if #names == 1 then return names[1] end
+	return ('%d selected'):format(#names)
+end
+
 function Panel.ToggleRequire(check)
-	local key = check.item.key
-	advanced[key] = not advanced[key]
+	local item = check.item
+	if item.own then
+		local settings = Settings()
+		settings[item.key] = not settings[item.key]
+		ApplyFilters()
+		return
+	end
+	advanced[item.key] = not advanced[item.key]
 	FilterChanged()
+end
+
+function Panel.CompOn(button)
+	return Settings().comp == button.item.key
+end
+
+function Panel.ToggleComp(button)
+	Settings().comp = button.item.key
+	ApplyFilters()
 end
 
 function Panel.ToggleChoice(control)
@@ -1086,12 +1173,8 @@ function Panel.PaintRequire(checks, available)
 		local usable = not role or available[role] == true
 		check:SetEnabled(usable)
 		check:SetAlpha(usable and 1 or ALPHA.dimmed)
-		Panel.SetChecked(check, advanced[check.item.key] == true)
+		Panel.SetChecked(check, Panel.RequireOn(check.item))
 	end
-end
-
-function Panel.PaintChoices(checks)
-	for _, check in ipairs(checks) do Panel.SetChecked(check, advanced[check.item.key] == true) end
 end
 
 function Panel.PaintDungeons(checks)
@@ -1118,6 +1201,7 @@ function Panel.ToggleRegion(control)
 	ToggleInSet(hidden, key)
 	resortPending = true
 	RefreshContent()
+	Panel.Notify()
 end
 
 function Panel.ToggleTip(button)
@@ -1153,24 +1237,30 @@ function Panel.Toggle(parent, width, height, item, items, isOn, onClick)
 	return button
 end
 
-function Panel.RatingTyped(box, userInput)
-	if not userInput then return end
-	advanced.minimumRating = tonumber(box:GetText()) or 0
+function Panel.MinimumRating()
+	return advanced.minimumRating
+end
+
+function Panel.RatingTyped(rating)
+	advanced.minimumRating = rating
 	SaveFilter()
 	ApplyFilters()
 end
 
-function Panel.RatingEntered(box)
-	box:ClearFocus()
+function Panel.RatingEntered()
 	if Loosened() then Search() end
 end
 
-function Panel.RatingStep(button)
-	advanced.minimumRating = button.value
-	FilterChanged()
+function Panel.NumberTyped(box, userInput)
+	if userInput then box.onChange(tonumber(box:GetText()) or 0) end
 end
 
-function Panel.RatingBox(parent, width)
+function Panel.NumberEntered(box)
+	box:ClearFocus()
+	if box.onEnter then box.onEnter() end
+end
+
+function Panel.NumberBox(parent, width, getValue, onChange, onEnter)
 	local box = CreateFrame('EditBox', nil, parent, 'BackdropTemplate')
 	box:SetSize(Pixel.Scale(width), Pixel.Scale(BUTTON_H))
 	Skin.PaintBackdrop(box, PALETTE.card)
@@ -1180,26 +1270,27 @@ function Panel.RatingBox(parent, width)
 	box:SetNumeric(true)
 	box:SetMaxLetters(POP.ratingDigits)
 	box:SetAutoFocus(false)
-	box:SetScript('OnTextChanged', Script('Skin.PremadeGroups rating OnTextChanged', Panel.RatingTyped))
-	box:SetScript('OnEnterPressed', Script('Skin.PremadeGroups rating OnEnterPressed', Panel.RatingEntered))
-	box:SetScript('OnEscapePressed', Script('Skin.PremadeGroups rating OnEscapePressed', box.ClearFocus))
-	box:SetScript('OnEditFocusGained', Script('Skin.PremadeGroups rating OnEditFocusGained', Panel.RatingFocused))
-	box:SetScript('OnEditFocusLost', Script('Skin.PremadeGroups rating OnEditFocusLost', Panel.PaintRating))
+	box.getValue, box.onChange, box.onEnter = getValue, onChange, onEnter
+	box:SetScript('OnTextChanged', Script('Skin.PremadeGroups number OnTextChanged', Panel.NumberTyped))
+	box:SetScript('OnEnterPressed', Script('Skin.PremadeGroups number OnEnterPressed', Panel.NumberEntered))
+	box:SetScript('OnEscapePressed', Script('Skin.PremadeGroups number OnEscapePressed', box.ClearFocus))
+	box:SetScript('OnEditFocusGained', Script('Skin.PremadeGroups number OnEditFocusGained', Panel.NumberFocused))
+	box:SetScript('OnEditFocusLost', Script('Skin.PremadeGroups number OnEditFocusLost', Panel.PaintNumber))
 	box.hint = Text(box, 11, 'skinLabel', 'CENTER')
 	box.hint:SetPoint('CENTER')
 	box.hint:SetText(ANY)
 	return box
 end
 
-function Panel.RatingFocused(box)
+function Panel.NumberFocused(box)
 	box.hint:Hide()
 end
 
-function Panel.PaintRating(box)
+function Panel.PaintNumber(box)
 	if box:HasFocus() then return end
-	local rating = advanced.minimumRating
-	box:SetText(rating > 0 and tostring(rating) or '')
-	box.hint:SetShown(rating == 0)
+	local value = box.getValue()
+	box:SetText(value > 0 and tostring(value) or '')
+	box.hint:SetShown(value == 0)
 end
 
 function Panel.HideServer(button)
@@ -1230,7 +1321,7 @@ function Panel.ServerRow(holder)
 	return row
 end
 
-function Panel.FillServerRow(holder, index, realm, groups)
+function Panel.FillServerRow(holder, index, realm, count)
 	local row = holder.rows[index] or Panel.ServerRow(holder)
 	holder.rows[index] = row
 	row:SetPoint('TOPLEFT', 0, -Pixel.Scale(holder.rowTop + (index - 1) * POP.serverRow))
@@ -1240,7 +1331,8 @@ function Panel.FillServerRow(holder, index, realm, groups)
 	row.eye.realm, row.flag.realm = realm, realm
 	row.name:SetText(RealmText(realm))
 	Painter.Text(row.name, hidden and 'skinLabel' or 'skinText')
-	row.count:SetText(groups and (groups == 1 and '1 group' or (groups .. ' groups')) or 'Not in search')
+	local noun = count == 1 and holder.noun or holder.noun .. 's'
+	row.count:SetText(count and (count .. ' ' .. noun) or holder.absent)
 	BUILib.Widget.SetGlyph(row.eye.icon, BUILib.GetLibMedia(hidden and 'hide' or 'eye'))
 	Painter.Tint(row.eye.icon, hidden and 'skinLabel' or 'skinText')
 	row.flag.label:SetText(realms.flagged[realm] and 'Unflag' or 'Flag')
@@ -1254,20 +1346,21 @@ end
 function Panel.FillServers(holder)
 	wipe(inSearch)
 	wipe(notInSearch)
-	for realm in pairs(searchRealms) do
+	local counts = holder.counts
+	for realm in pairs(counts) do
 		if Panel.MatchesQuery(holder.query, realm) then inSearch[#inSearch + 1] = realm end
 	end
 	for realm in pairs(Realms().hidden) do
-		if not searchRealms[realm] and Panel.MatchesQuery(holder.query, realm) then notInSearch[#notInSearch + 1] = realm end
+		if not counts[realm] and Panel.MatchesQuery(holder.query, realm) then notInSearch[#notInSearch + 1] = realm end
 	end
 	table.sort(inSearch)
 	table.sort(notInSearch)
-	for index, realm in ipairs(inSearch) do Panel.FillServerRow(holder, index, realm, searchRealms[realm]) end
+	for index, realm in ipairs(inSearch) do Panel.FillServerRow(holder, index, realm, counts[realm]) end
 	for index, realm in ipairs(notInSearch) do Panel.FillServerRow(holder, #inSearch + index, realm, nil) end
 	local shown = #inSearch + #notInSearch
 	for index = shown + 1, #holder.rows do holder.rows[index]:Hide() end
 	holder.emptyText:SetShown(shown == 0)
-	holder.emptyText:SetText(next(searchRealms) and 'No servers match.' or 'Search to see servers.')
+	holder.emptyText:SetText(next(counts) and 'No servers match.' or holder.empty)
 	return shown
 end
 
@@ -1353,14 +1446,27 @@ function Panel.BuildOther()
 	return pop
 end
 
+Panel.SERVER_LISTS = {
+	servers = {
+		counts = searchRealms, noun = 'group', absent = 'Not in search', empty = 'Search to see servers.',
+		header = 'Servers in this search', languages = true,
+	},
+}
+
+function Panel.Notify()
+	if Panel.onRealmsChanged then Panel.onRealmsChanged() end
+end
+
 function Panel.RefreshServersPopover(pop)
 	local shown = Panel.FillServers(pop)
 	pop.list:SetHeight(math.max(1, Pixel.Scale(shown * POP.serverRow)))
 	Panel.PaintLanguages(pop)
 end
 
-function Panel.BuildServers()
-	local pop = Panel.Popover('servers', POP.serversW, 'BOTTOMLEFT', 'BOTTOMRIGHT', POP.gap, 0)
+function Panel.BuildServers(kind)
+	local list = Panel.SERVER_LISTS[kind]
+	local pop = Panel.Popover(kind, POP.serversW, 'BOTTOMLEFT', 'BOTTOMRIGHT', POP.gap, 0)
+	pop.counts, pop.noun, pop.absent, pop.empty = list.counts, list.noun, list.absent, list.empty
 	local inner = POP.serversW - POP.pad * 2
 	pop.search = Skin.CreateSearchBox(pop, inner, function(text)
 		pop.query = text
@@ -1368,7 +1474,7 @@ function Panel.BuildServers()
 	end)
 	pop.search:SetPoint('TOPLEFT', Pixel.Scale(POP.pad), Pixel.Scale(-POP.pad))
 	local y = POP.pad + BUTTON_H + POP.section
-	Panel.Header(pop, 'Servers in this search', POP.pad, y)
+	Panel.Header(pop, list.header, POP.pad, y)
 	y = y + POP.header
 	local area = CreateFrame('Frame', nil, pop)
 	area:SetPoint('TOPLEFT', Pixel.Scale(POP.pad), Pixel.Scale(-y))
@@ -1377,8 +1483,10 @@ function Panel.BuildServers()
 	pop.emptyText = Skin.CreateEmptyText(pop, area)
 	pop.rows, pop.rowTop = {}, 0
 	y = y + POP.serversListH + POP.section
-	Panel.Languages(pop, pop, inner)
-	y = Panel.PlaceLanguages(pop, pop, POP.pad, y)
+	if list.languages then
+		Panel.Languages(pop, pop, inner)
+		y = Panel.PlaceLanguages(pop, pop, POP.pad, y)
+	end
 	pop:SetHeight(Pixel.Scale(y + POP.pad))
 	pop.Refresh = Panel.RefreshServersPopover
 	return pop
@@ -1414,7 +1522,20 @@ function Panel.BuildColumns()
 	return pop
 end
 
-local BUILDERS = { other = Panel.BuildOther, servers = Panel.BuildServers, columns = Panel.BuildColumns }
+function Panel.RefreshRequire(pop)
+	Panel.PaintRequire(pop.checks, AvailableRoles())
+end
+
+function Panel.BuildRequire()
+	local width = FRAME.sideW - SIDE.pad * 2
+	local pop = Panel.Popover('require', width, 'TOPLEFT', 'BOTTOMLEFT', 0, -POP.gap)
+	pop.checks = Panel.ChecksFor(pop, REQUIRE, width - POP.pad * 2, POP.pad, POP.pad, Panel.ToggleRequire)
+	pop:SetHeight(Pixel.Scale(POP.pad * 2 + #REQUIRE * POP.checkRow))
+	pop.Refresh = Panel.RefreshRequire
+	return pop
+end
+
+Panel.BUILDERS = { other = Panel.BuildOther, servers = Panel.BuildServers, columns = Panel.BuildColumns, require = Panel.BuildRequire }
 
 local function HidePanel()
 	if not openPanel then return end
@@ -1425,7 +1546,7 @@ end
 
 function Panel.OpenPanel(anchor)
 	HidePanel()
-	local pop = panels[anchor.kind] or BUILDERS[anchor.kind]()
+	local pop = panels[anchor.kind] or Panel.BUILDERS[anchor.kind](anchor.kind)
 	pop:ClearAllPoints()
 	pop:SetPoint(pop.point, anchor, pop.relativePoint, Pixel.Scale(pop.offsetX), Pixel.Scale(pop.offsetY))
 	pop:Refresh()
@@ -1434,8 +1555,12 @@ function Panel.OpenPanel(anchor)
 	finder.catcher:Show()
 end
 
+function Strip.DungeonOn(tile)
+	return Panel.DungeonChecked(tile.groupID)
+end
+
 function Strip.PaintTile(tile)
-	local on = Panel.DungeonChecked(tile.groupID)
+	local on = tile.isOn(tile)
 	tile.icon:SetDesaturated(not on)
 	tile.icon:SetAlpha(on and 1 or ALPHA.tileOff)
 	Painter.Text(tile.text, on and 'skinTitle' or 'skinLabel')
@@ -1448,11 +1573,11 @@ function Strip.PaintTile(tile)
 	Pixel.SetBorderColor(tile, edge[1], edge[2], edge[3], edge[4])
 end
 
-function Strip.Tile(parent, group, width)
+function Strip.Tile(parent, group, width, isOn, onClick)
 	local tile = CreateFrame('Button', nil, parent, 'BackdropTemplate')
 	tile:SetSize(Pixel.Scale(width), Pixel.Scale(STRIP.tileH))
 	Skin.PaintBackdrop(tile, PALETTE.card)
-	tile.groupID = group.groupID
+	tile.groupID, tile.isOn = group.groupID, isOn
 	tile.icon = tile:CreateTexture(nil, 'ARTWORK')
 	tile.icon:SetSize(Pixel.Scale(STRIP.tileIcon), Pixel.Scale(STRIP.tileIcon))
 	tile.icon:SetPoint('LEFT', Pixel.Scale(STRIP.tileInset), 0)
@@ -1465,7 +1590,7 @@ function Strip.Tile(parent, group, width)
 	tile.text:SetMaxLines(2)
 	tile.text:SetText(group.label)
 	tile.label = group.label
-	tile:SetScript('OnClick', Script('Skin.PremadeGroups tile OnClick', Panel.ToggleDungeon))
+	tile:SetScript('OnClick', Script('Skin.PremadeGroups tile OnClick', onClick))
 	tile:SetScript('OnEnter', Script('Skin.PremadeGroups tile OnEnter', Strip.TileEnter))
 	tile:SetScript('OnLeave', Script('Skin.PremadeGroups tile OnLeave', Strip.TileLeave))
 	return tile
@@ -1504,7 +1629,7 @@ function Strip.Tiles(view, y)
 	local width = (FRAME.width - FRAME.edge * 2 - STRIP.tileGap * (STRIP.perRow - 1)) / STRIP.perRow
 	view.tiles = {}
 	for index, group in ipairs(season) do
-		local tile = Strip.Tile(view, group, width)
+		local tile = Strip.Tile(view, group, width, Strip.DungeonOn, Panel.ToggleDungeon)
 		local column, line = (index - 1) % STRIP.perRow, math.floor((index - 1) / STRIP.perRow)
 		tile:SetPoint('TOPLEFT', Pixel.Scale(FRAME.edge + column * (width + STRIP.tileGap)), Pixel.Scale(-(y + line * (STRIP.tileH + STRIP.tileGap))))
 		view.tiles[index] = tile
@@ -1513,31 +1638,63 @@ function Strip.Tiles(view, y)
 	return y + lines * STRIP.tileH + (lines - 1) * STRIP.tileGap
 end
 
-function Strip.ToggleGrid(view, items, perRow, height, y, isOn, onClick)
+function Strip.DropdownButton(parent, width, kind)
+	local button = Skin.SmallButton(parent, width, BUTTON_H, '')
+	button.label:ClearAllPoints()
+	button.label:SetPoint('LEFT', Pixel.Scale(SIDE.pad), 0)
+	button.label:SetPoint('RIGHT', Pixel.Scale(-SIDE.pad * 2), 0)
+	button.label:SetJustifyH('LEFT')
+	button.label:SetWordWrap(false)
+	Skin.TipArrow(button)
+	button.kind = kind
+	button:SetScript('OnClick', Script('Skin.PremadeGroups dropdown OnClick', Panel.OpenPanel))
+	return button
+end
+
+function Strip.PlaceToggles(view, pool, items, perRow, height, y, isOn, onClick)
 	local width = FRAME.sideW - SIDE.pad * 2
 	local buttonW = (width - SIDE.toggleGap * (perRow - 1)) / perRow
 	for index, item in ipairs(items) do
 		local column, line = (index - 1) % perRow, math.floor((index - 1) / perRow)
-		local button = Panel.Toggle(view, buttonW, height, item, items, isOn, onClick)
+		local button = pool[index]
+		if not button then
+			button = Panel.Toggle(view, buttonW, height, item, items, isOn, onClick)
+			pool[index] = button
+		end
+		button.item, button.items = item, items
+		button.label:SetText(item.label)
+		button:SetSize(Pixel.Scale(buttonW), Pixel.Scale(height))
+		button:ClearAllPoints()
 		button:SetPoint('TOPLEFT', Pixel.Scale(SIDE.pad + column * (buttonW + SIDE.toggleGap)), Pixel.Scale(-(y + line * (height + SIDE.toggleGap))))
-		view.toggles[#view.toggles + 1] = button
+		button:Show()
 	end
+	for index = #items + 1, #pool do pool[index]:Hide() end
 	local lines = math.ceil(#items / perRow)
-	return y + lines * height + (lines - 1) * SIDE.toggleGap
+	return y + lines * height + math.max(0, lines - 1) * SIDE.toggleGap
+end
+
+function Strip.ToggleGrid(view, items, perRow, height, y, isOn, onClick)
+	local pool = {}
+	y = Strip.PlaceToggles(view, pool, items, perRow, height, y, isOn, onClick)
+	for _, button in ipairs(pool) do view.toggles[#view.toggles + 1] = button end
+	return y
 end
 
 function Strip.Sidebar(view, top)
 	local width = FRAME.sideW - SIDE.pad * 2
 	local y = top + SIDE.pad
 	Panel.Header(view, LFG_LIST_REQUIRE, SIDE.pad, y)
-	view.requireChecks, y = Panel.ChecksFor(view, REQUIRE, width, SIDE.pad, y + SIDE.header, Panel.ToggleRequire)
-	y = y + SIDE.section
+	view.requireButton = Strip.DropdownButton(view, width, 'require')
+	view.requireButton:SetPoint('TOPLEFT', Pixel.Scale(SIDE.pad), Pixel.Scale(-(y + SIDE.header)))
+	y = y + SIDE.header + BUTTON_H + SIDE.section
+	Panel.Header(view, 'Comp', SIDE.pad, y)
+	view.toggles = {}
+	y = Strip.ToggleGrid(view, Comp.choices, #Comp.choices, SIDE.toggleH, y + SIDE.header, Panel.CompOn, Panel.ToggleComp) + SIDE.section
 	Panel.Header(view, 'Min rating', SIDE.pad, y + BUTTON_H / 2 - POP.headerMid)
-	view.ratingBox = Panel.RatingBox(view, SIDE.ratingW)
+	view.ratingBox = Panel.NumberBox(view, SIDE.ratingW, Panel.MinimumRating, Panel.RatingTyped, Panel.RatingEntered)
 	view.ratingBox:SetPoint('TOPRIGHT', view, 'TOPLEFT', Pixel.Scale(FRAME.sideW - SIDE.pad), Pixel.Scale(-y))
 	y = y + BUTTON_H + SIDE.section
 	Panel.Header(view, LFG_LIST_DIFFICULTY, SIDE.pad, y)
-	view.toggles = {}
 	y = Strip.ToggleGrid(view, DIFFICULTIES, #DIFFICULTIES, SIDE.toggleH, y + SIDE.header, Panel.FilterOn, Panel.ToggleChoice) + SIDE.section
 	Panel.Header(view, GROUP_FINDER_FILTER_PLAYSTYLE, SIDE.pad, y)
 	y = Strip.ToggleGrid(view, PLAYSTYLES, 2, SIDE.playstyleH, y + SIDE.header, Panel.FilterOn, Panel.ToggleChoice) + SIDE.section
@@ -1546,24 +1703,29 @@ function Strip.Sidebar(view, top)
 		Strip.ToggleGrid(view, REGIONS, 2, SIDE.toggleH, y + SIDE.header, Panel.RegionOn, Panel.ToggleRegion)
 	end
 
-	local servers = Skin.SmallButton(view, width, SIDE.serversH, 'Servers')
-	servers:SetPoint('BOTTOMLEFT', Pixel.Scale(SIDE.pad), Pixel.Scale(SIDE.pad))
+	view.servers = Strip.ServersButton(view, 'servers')
+	view.servers:SetPoint('BOTTOMLEFT', Pixel.Scale(SIDE.pad), Pixel.Scale(SIDE.pad))
+end
+
+function Strip.ServersButton(view, kind)
+	local servers = Skin.SmallButton(view, FRAME.sideW - SIDE.pad * 2, SIDE.serversH, 'Servers')
 	servers.label:ClearAllPoints()
 	servers.label:SetPoint('LEFT', Pixel.Scale(SIDE.pad), 0)
-	servers.kind = 'servers'
+	servers.kind = kind
 	servers:SetScript('OnClick', Script('Skin.PremadeGroups servers OnClick', Panel.OpenPanel))
-	view.serversValue = Text(servers, 11, 'skinLabel', 'RIGHT')
-	view.serversValue:SetPoint('RIGHT', Pixel.Scale(-SIDE.pad), 0)
+	servers.value = Text(servers, 11, 'skinLabel', 'RIGHT')
+	servers.value:SetPoint('RIGHT', Pixel.Scale(-SIDE.pad), 0)
+	return servers
 end
 
 function Strip.Paint(available)
 	local view = finder.stripView
 	view.count:SetText(('DUNGEONS · %d OF %d'):format(CheckedDungeons(), DungeonTotal()))
 	for _, tile in ipairs(view.tiles) do Strip.PaintTile(tile) end
-	Panel.PaintRequire(view.requireChecks, available)
+	view.requireButton.label:SetText(Panel.RequireSummary())
 	for _, button in ipairs(view.toggles) do Panel.PaintToggle(button) end
-	Panel.PaintRating(view.ratingBox)
-	view.serversValue:SetText(ServersSummary())
+	Panel.PaintNumber(view.ratingBox)
+	view.servers.value:SetText(ServersSummary())
 end
 
 function Strip.Build(frame)
@@ -1610,6 +1772,7 @@ local function MirrorSearchText()
 	finder.searchClear:SetShown(not empty)
 	local edge = focused and Skin.SELECTED_COLOR or PALETTE.edge
 	Pixel.SetBorderColor(finder.searchSlot, edge[1], edge[2], edge[3], edge[4])
+	Strip.PlaceCaret(finder.searchCaret, box, focused)
 end
 
 local function FocusSearchBox()
@@ -1657,89 +1820,140 @@ local function OnBlizzardSearch()
 	QueueRefresh()
 end
 
-local function ShowBlizzard()
-	skipTakeover = true
-	HidePanel()
-	ReturnSearchBox()
-	BUI.Events:UnregisterAll('Skinning.PremadeGroups')
-	finder:Hide()
-	Skin.RestoreBlizzardFrame(PVEFrame)
-end
-
-local function CloseFinder()
-	HideUIPanel(PVEFrame)
-end
-
-local function RefreshEnter(button)
+function Strip.GlyphEnter(button)
 	button.glyph:SetVertexColor(unpack(Skin.HoverColor()))
 	GameTooltip:SetOwner(button, 'ANCHOR_TOP')
-	GameTooltip:SetText('Search again')
+	GameTooltip:SetText(button.tip)
 	GameTooltip:Show()
 end
 
-local function RefreshLeave(button)
+function Strip.GlyphLeave(button)
 	Painter.Tint(button.glyph, 'skinTitle')
 	GameTooltip:Hide()
 end
 
-local function BuildToolbar(main)
-	local searchButton = Skin.SmallButton(main, BUTTON_H, BUTTON_H, '')
-	searchButton:SetPoint('TOPLEFT', Pixel.Scale(FRAME.edge), Pixel.Scale(-FRAME.toolbarY))
-	searchButton:SetScript('OnClick', Script('Skin.PremadeGroups search OnClick', Search))
-	searchButton:HookScript('OnEnter', Wrap('Skin.PremadeGroups search OnEnter', RefreshEnter))
-	searchButton:HookScript('OnLeave', Wrap('Skin.PremadeGroups search OnLeave', RefreshLeave))
-	searchButton.glyph = searchButton:CreateTexture(nil, 'ARTWORK')
-	searchButton.glyph:SetSize(Pixel.Scale(BAR.refreshGlyph), Pixel.Scale(BAR.refreshGlyph))
-	searchButton.glyph:SetPoint('CENTER')
-	BUILib.Widget.SetGlyph(searchButton.glyph, BUILib.GetLibMedia('reload'))
-	Painter.Tint(searchButton.glyph, 'skinTitle')
-	local sortDropdown = Skin.CreateDropdown(main, SORT_ITEMS, OnSort, BAR.sortW)
-	sortDropdown:SetPoint('LEFT', searchButton, 'RIGHT', Pixel.Scale(BAR.gap), 0)
-	sortDropdown.label:SetText(SortLabel(Settings().sort))
-	finder.editButton = Skin.SmallButton(main, BAR.editW, BUTTON_H, 'Edit row')
-	finder.editButton:SetPoint('LEFT', sortDropdown, 'RIGHT', Pixel.Scale(BAR.gap), 0)
-	finder.editButton.kind = 'columns'
-	finder.editButton:SetScript('OnClick', Script('Skin.PremadeGroups edit OnClick', Panel.OpenPanel))
-
-	finder.roleButtons = {}
-	local previous
-	for index = #ROLES, 1, -1 do
-		local button = RoleButton(main, ROLES[index])
-		if previous then
-			button:SetPoint('RIGHT', previous, 'LEFT', Pixel.Scale(-ROW.roleGap), 0)
-		else
-			button:SetPoint('TOPRIGHT', Pixel.Scale(-FRAME.edge), Pixel.Scale(-FRAME.toolbarY))
-		end
-		finder.roleButtons[index] = button
-		previous = button
-	end
-	local roleLabel = Text(main, 11, 'skinLabel', 'RIGHT')
-	roleLabel:SetPoint('RIGHT', previous, 'LEFT', Pixel.Scale(-BAR.gap), 0)
-	roleLabel:SetText('Sign up as')
+function Strip.GlyphButton(parent, glyph, tip, onClick)
+	local button = Skin.SmallButton(parent, BUTTON_H, BUTTON_H, '')
+	button.tip = tip
+	button:SetScript('OnClick', Script('Skin.PremadeGroups glyph OnClick', onClick))
+	button:HookScript('OnEnter', Wrap('Skin.PremadeGroups glyph OnEnter', Strip.GlyphEnter))
+	button:HookScript('OnLeave', Wrap('Skin.PremadeGroups glyph OnLeave', Strip.GlyphLeave))
+	button.glyph = button:CreateTexture(nil, 'ARTWORK')
+	button.glyph:SetSize(Pixel.Scale(BAR.refreshGlyph), Pixel.Scale(BAR.refreshGlyph))
+	button.glyph:SetPoint('CENTER')
+	BUILib.Widget.SetGlyph(button.glyph, BUILib.GetLibMedia(glyph))
+	Painter.Tint(button.glyph, 'skinTitle')
+	return button
 end
 
-local function BuildMain(frame)
-	local main = CreateFrame('Frame', nil, frame)
-	main:SetPoint('BOTTOMRIGHT')
-	frame.main = main
-	BuildToolbar(main)
+function Strip.Caret(parent, text, size)
+	local caret = parent:CreateTexture(nil, 'OVERLAY')
+	caret:SetSize(Pixel.Scale(1), Pixel.Scale(BAR.caretH))
+	Painter.Fill(caret, 'skinTitle')
+	caret.text = text
+	caret.measure = parent:CreateFontString(nil, 'OVERLAY')
+	Pixel.ApplyFont(caret.measure, size, FONT, '')
+	caret.measure:Hide()
+	caret.blink = caret:CreateAnimationGroup()
+	caret.blink:SetLooping('REPEAT')
+	for order, alpha in ipairs({ 0, 1 }) do
+		local step = caret.blink:CreateAnimation('Alpha')
+		step:SetFromAlpha(1 - alpha)
+		step:SetToAlpha(alpha)
+		step:SetDuration(0.01)
+		step:SetStartDelay(BAR.blink)
+		step:SetOrder(order)
+	end
+	caret:Hide()
+	return caret
+end
 
-	frame.listArea = CreateFrame('Frame', nil, main)
-	frame.listArea:SetPoint('TOPLEFT', Pixel.Scale(FRAME.edge - FRAME.scrollPad), Pixel.Scale(-FRAME.listTop))
-	frame.listArea:SetPoint('BOTTOMRIGHT', Pixel.Scale(FRAME.scrollPad - FRAME.edge), Pixel.Scale(FRAME.listBottom))
-	frame.scroll, frame.child = Skin.CreateScrollArea(frame.listArea, LAYOUTS.regular.height, FRAME.scrollPad)
-	frame.scroll:HookScript('OnVerticalScroll', Wrap('Skin.PremadeGroups list scroll', OnListScroll))
-	frame.emptyText = Skin.CreateEmptyText(main, frame.listArea)
+function Strip.PlaceCaret(caret, box, focused)
+	local text = box:GetText()
+	local plain = not (issecretvalue and issecretvalue(text)) and text or nil
+	caret.blink:Stop()
+	caret:SetShown(focused and plain ~= nil)
+	if not caret:IsShown() then return end
+	caret.measure:SetText(plain:sub(1, box:GetCursorPosition()))
+	local offset = math.min(caret.measure:GetUnboundedStringWidth(), caret.text:GetWidth())
+	caret:ClearAllPoints()
+	caret:SetPoint('LEFT', caret.text, 'LEFT', offset, 0)
+	caret.blink:Play()
+end
 
-	frame.appText = Text(main, 11, 'skinLabel')
-	frame.appText:SetPoint('LEFT', main, 'BOTTOMLEFT', Pixel.Scale(FRAME.edge), Pixel.Scale(FRAME.footerY + BUTTON_H / 2))
-	local blizzardButton = Skin.SmallButton(main, BAR.blizzardW, BUTTON_H, 'Blizzard group finder')
-	blizzardButton:SetPoint('BOTTOMRIGHT', Pixel.Scale(-FRAME.edge), Pixel.Scale(FRAME.footerY))
-	blizzardButton:SetScript('OnClick', Script('Skin.PremadeGroups blizzard OnClick', ShowBlizzard))
+function Strip.Cover(parent)
+	local cover = CreateFrame('Frame', nil, parent)
+	cover:SetPoint('TOPLEFT', Pixel.PixelSize(1), -Pixel.PixelSize(1))
+	cover:SetPoint('BOTTOMRIGHT', -Pixel.PixelSize(1), Pixel.PixelSize(1))
+	cover:SetFrameLevel(parent:GetFrameLevel() + ROW.coverLevel)
+	local plate = cover:CreateTexture(nil, 'BACKGROUND')
+	plate:SetAllPoints()
+	Painter.Fill(plate, 'skinBackground')
+	plate:SetAlpha(ALPHA.plate)
+	cover.label = Text(cover, ROW.coverSize, 'skinTitle', 'CENTER')
+	cover.label:SetPoint('CENTER')
+	cover:Hide()
+	return cover
+end
 
-	frame.sideRule = Rule(frame)
-	frame.sideRule:SetWidth(Pixel.PixelSize(1))
-	frame.sideRule:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', Pixel.Scale(FRAME.sideW), Pixel.Scale(1))
+function Strip.Hold()
+	finder.releasing = false
+	finder:Show()
+	Skin.SuppressBlizzardFrame(PVEFrame)
+end
+
+function Strip.FinishRelease()
+	if not finder.releasing then return end
+	finder.releasing = false
+	HidePanel()
+	finder:Hide()
+	Skin.RestoreBlizzardFrame(PVEFrame)
+end
+
+Strip.QueueRelease = BUI.Dispatcher.New(Strip.FinishRelease, 'Skin.PremadeGroups release')
+
+function Strip.Release(now)
+	finder.releasing = true
+	if now then
+		Strip.FinishRelease()
+	else
+		Strip.QueueRelease()
+	end
+end
+
+function Strip.ShowSearch(shown)
+	for _, page in pairs(finder.pages) do page:Hide() end
+	finder.stripView:SetShown(shown)
+	finder.main:SetShown(shown)
+	finder.sideRule:SetShown(shown)
+end
+
+function Strip.PaintStart()
+	local button = finder.startButton
+	local listed = C_LFGList.HasActiveEntryInfo()
+	button.blocker = not listed and not LFGListUtil_IsAppEmpowered() and LFG_LIST_NOT_LEADER or nil
+	button.label:SetText(listed and 'View applicants' or 'Start a group')
+	button:SetAlpha(button.blocker and ALPHA.dimmed or 1)
+end
+
+function Strip.StartGroup(button)
+	if button.blocker then return end
+	if C_LFGList.HasActiveEntryInfo() then
+		LFGListFrame_SetActivePanel(LFGListFrame, LFGListFrame.ApplicationViewer)
+	else
+		LFGListSearchPanel_CreateGroupInstead(LFGListFrame.SearchPanel)
+	end
+end
+
+local function ShowBlizzard()
+	skipTakeover = true
+	ReturnSearchBox()
+	BUI.Events:UnregisterAll('Skinning.PremadeGroups')
+	Strip.Release(true)
+end
+
+local function CloseFinder()
+	HideUIPanel(PVEFrame)
 end
 
 local function SearchFieldEnter(slot)
@@ -1756,11 +1970,12 @@ local function SearchGoLeave(button)
 	Painter.Text(button.label, 'skinText')
 end
 
-local function BuildSearchField(frame)
+local function BuildSearchField(frame, parent, left, right)
 	local pixel = Pixel.PixelSize(1)
-	local slot = CreateFrame('Button', nil, frame.titleBar, 'BackdropTemplate')
-	slot:SetSize(Pixel.Scale(BAR.searchBoxW), Pixel.Scale(BAR.searchH))
-	slot:SetPoint('LEFT', frame.titleText, 'RIGHT', Pixel.Scale(BAR.searchBoxGap), 0)
+	local slot = CreateFrame('Button', nil, parent, 'BackdropTemplate')
+	slot:SetHeight(Pixel.Scale(BUTTON_H))
+	slot:SetPoint('LEFT', left, 'RIGHT', Pixel.Scale(BAR.searchBoxGap), 0)
+	slot:SetPoint('RIGHT', right, 'LEFT', Pixel.Scale(-BAR.gap), 0)
 	Skin.PaintBackdrop(slot, PALETTE.card)
 	slot:SetScript('OnClick', Script('Skin.PremadeGroups search field OnClick', FocusSearchBox))
 	slot:SetScript('OnEnter', Script('Skin.PremadeGroups search field OnEnter', SearchFieldEnter))
@@ -1810,6 +2025,65 @@ local function BuildSearchField(frame)
 	frame.searchHint:SetPoint('LEFT', glyph, 'RIGHT', Pixel.Scale(BAR.searchInset), 0)
 	frame.searchHint:SetPoint('RIGHT', clear, 'LEFT', Pixel.Scale(-BAR.searchInset), 0)
 	frame.searchHint:SetText(BAR.hint)
+	frame.searchCaret = Strip.Caret(slot, frame.searchText, 12)
+end
+
+local function BuildToolbar(main)
+	local sortDropdown = Skin.CreateDropdown(main, SORT_ITEMS, OnSort, BAR.sortW)
+	sortDropdown:SetPoint('TOPLEFT', Pixel.Scale(FRAME.edge), Pixel.Scale(-FRAME.toolbarY))
+	sortDropdown.label:SetText(SortLabel(Settings().sort))
+	finder.editButton = Skin.SmallButton(main, BAR.editW, BUTTON_H, 'Edit row')
+	finder.editButton:SetPoint('LEFT', sortDropdown, 'RIGHT', Pixel.Scale(BAR.gap), 0)
+	finder.editButton.kind = 'columns'
+	finder.editButton:SetScript('OnClick', Script('Skin.PremadeGroups edit OnClick', Panel.OpenPanel))
+
+	finder.roleButtons = {}
+	local previous
+	for index = #ROLES, 1, -1 do
+		local button = RoleButton(main, ROLES[index])
+		if previous then
+			button:SetPoint('RIGHT', previous, 'LEFT', Pixel.Scale(-ROW.roleGap), 0)
+		else
+			button:SetPoint('TOPRIGHT', Pixel.Scale(-FRAME.edge), Pixel.Scale(-FRAME.toolbarY))
+		end
+		finder.roleButtons[index] = button
+		previous = button
+	end
+	local roleLabel = Text(main, 11, 'skinLabel', 'RIGHT')
+	roleLabel:SetPoint('RIGHT', previous, 'LEFT', Pixel.Scale(-BAR.gap), 0)
+	roleLabel:SetText('Sign up as')
+	local searchButton = Strip.GlyphButton(main, 'reload', 'Search again', Search)
+	searchButton:SetPoint('RIGHT', roleLabel, 'LEFT', Pixel.Scale(-BAR.searchBoxGap), 0)
+	BuildSearchField(finder, main, finder.editButton, searchButton)
+end
+
+local function BuildMain(frame)
+	local main = CreateFrame('Frame', nil, frame)
+	main:SetPoint('BOTTOMRIGHT')
+	frame.main = main
+	BuildToolbar(main)
+
+	frame.listArea = CreateFrame('Frame', nil, main)
+	frame.listArea:SetPoint('TOPLEFT', Pixel.Scale(FRAME.edge - FRAME.scrollPad), Pixel.Scale(-FRAME.listTop))
+	frame.listArea:SetPoint('BOTTOMRIGHT', Pixel.Scale(FRAME.scrollPad - FRAME.edge), Pixel.Scale(FRAME.listBottom))
+	frame.scroll, frame.child = Skin.CreateScrollArea(frame.listArea, LAYOUTS.regular.height, FRAME.scrollPad)
+	frame.scroll:HookScript('OnVerticalScroll', Wrap('Skin.PremadeGroups list scroll', OnListScroll))
+	frame.emptyText = Skin.CreateEmptyText(main, frame.listArea)
+
+	frame.appText = Text(main, 11, 'skinLabel')
+	frame.appText:SetPoint('LEFT', main, 'BOTTOMLEFT', Pixel.Scale(FRAME.edge), Pixel.Scale(FRAME.footerY + BUTTON_H / 2))
+	local blizzardButton = Skin.SmallButton(main, BAR.blizzardW, BUTTON_H, 'Blizzard group finder')
+	blizzardButton:SetPoint('BOTTOMRIGHT', Pixel.Scale(-FRAME.edge), Pixel.Scale(FRAME.footerY))
+	blizzardButton:SetScript('OnClick', Script('Skin.PremadeGroups blizzard OnClick', ShowBlizzard))
+	frame.startButton = Skin.SmallButton(main, BAR.startW, BUTTON_H, '')
+	frame.startButton:SetPoint('RIGHT', blizzardButton, 'LEFT', Pixel.Scale(-BAR.gap), 0)
+	frame.startButton:SetScript('OnClick', Script('Skin.PremadeGroups start OnClick', Strip.StartGroup))
+	frame.startButton:HookScript('OnEnter', Wrap('Skin.PremadeGroups start OnEnter', ShowActionTooltip))
+	frame.startButton:HookScript('OnLeave', Wrap('Skin.PremadeGroups start OnLeave', GameTooltip_Hide))
+
+	frame.sideRule = Rule(frame)
+	frame.sideRule:SetWidth(Pixel.PixelSize(1))
+	frame.sideRule:SetPoint('BOTTOMLEFT', frame, 'BOTTOMLEFT', Pixel.Scale(FRAME.sideW), Pixel.Scale(1))
 end
 
 local function BuildFrame()
@@ -1818,11 +2092,10 @@ local function BuildFrame()
 	frame:SetSize(Pixel.Scale(FRAME.width), Pixel.Scale(FRAME.height))
 	frame:SetFrameStrata('HIGH')
 	finder = frame
-	Skin.MakeDraggable(frame, 'premadeGroups', 'TOPLEFT', Pixel.Scale(FRAME.slotX), Pixel.Scale(FRAME.slotY), 'PVEFrame')
+	frame.pages = {}
+	Skin.MakeDraggable(frame, 'premadeGroups', 'TOPLEFT', Pixel.Scale(FRAME.slotX), Pixel.Scale(FRAME.slotY))
 	columnWidths = {}
 	for _, column in ipairs(COLUMNS) do columnWidths[column.key] = column.width and Pixel.Scale(column.width) end
-
-	BuildSearchField(frame)
 
 	frame.countText = Text(frame.titleBar, 11, 'skinLabel', 'RIGHT')
 	frame.countText:SetPoint('RIGHT', frame.titleBar.closeBtn.frame, 'LEFT', Pixel.Scale(-12), 0)
@@ -1843,24 +2116,22 @@ end
 local function Open()
 	BuildFrame()
 	LoadAdvanced()
+	Strip.ShowSearch(true)
 	Pixel.SetScale(finder, Settings().scale)
-	finder:Show()
+	Strip.Hold()
 	BorrowSearchBox()
-	Skin.SuppressBlizzardFrame(PVEFrame)
 	for _, event in ipairs(LIVE_EVENTS) do BUI.Events:Register(event, 'Skinning.PremadeGroups', OnLiveEvent) end
 	for _, row in ipairs(rows) do PlaceColumns(row, 0) end
 	resortPending = true
 	RefreshContent()
 end
 
-local function CloseWindow()
+local function CloseWindow(now)
 	BUI.Events:UnregisterAll('Skinning.PremadeGroups')
-	if finder then
-		HidePanel()
-		finder:Hide()
-	end
 	ReturnSearchBox()
-	Skin.RestoreBlizzardFrame(PVEFrame)
+	if not finder then return end
+	HidePanel()
+	Strip.Release(now)
 end
 
 local function OnSearchShown(panel)
@@ -1886,12 +2157,13 @@ context.Window('LFGListFrame', {
 		box:HookScript('OnTextChanged', Wrap('Skin.PremadeGroups search text', MirrorSearchText))
 		box:HookScript('OnEditFocusGained', Wrap('Skin.PremadeGroups search focus', MirrorSearchText))
 		box:HookScript('OnEditFocusLost', Wrap('Skin.PremadeGroups search blur', MirrorSearchText))
+		box:HookScript('OnCursorChanged', Wrap('Skin.PremadeGroups search cursor', MirrorSearchText))
 	end,
 })
 
 context.OnDisable(function()
 	skipTakeover = false
-	if finder and finder:IsShown() then CloseWindow() end
+	if finder and finder:IsShown() then CloseWindow(true) end
 end)
 
 local function LookOption(label, key, extra)
@@ -1914,4 +2186,20 @@ context.info.settings = {
 	LookOption('Show playstyle', 'showPlaystyle'),
 	LookOption('Show listing age', 'showAge'),
 	LookOption('Show leader best run', 'showBest'),
+	LookOption('Show group comp', 'showComp'),
+}
+
+BUI.Premade = {
+	context = context, Settings = Settings, Text = Text, Rule = Rule, Panel = Panel, Strip = Strip, Comp = Comp,
+	CreateSlot = CreateSlot, PaintSlot = PaintSlot, DungeonArt = DungeonArt, HidePanel = HidePanel,
+	Frame = function()
+		BuildFrame()
+		return finder
+	end,
+	BUTTON_H = BUTTON_H, FRAME = FRAME, STRIP = STRIP, SIDE = SIDE, BAR = BAR, ROW = ROW, POP = POP, ALPHA = ALPHA,
+	ROLES = ROLES, ROLE_ATLAS = ROLE_ATLAS, ROLE_NAMES = ROLE_NAMES, SLOT_ROLES = SLOT_ROLES, SLOT_RANK = SLOT_RANK,
+	PLAYSTYLES = PLAYSTYLES, DUNGEON_CATEGORY = DUNGEON_CATEGORY, FALLBACK_ICON = FALLBACK_ICON,
+	CENSORED_TITLE = CENSORED_TITLE, MENU_W = MENU_W, ALL = ALL, ANY = ANY, BlockerTip = ShowActionTooltip,
+	REGIONS = REGIONS, Realms = Realms, RealmText = RealmText, ServersSummary = ServersSummary,
+	ToggleHidden = ToggleHidden, ToggleFlagged = ToggleFlagged,
 }

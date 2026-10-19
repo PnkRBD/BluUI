@@ -1518,6 +1518,9 @@ BUI.Defaults = {
 			showPlaystyle      = true,
 			showAge            = true,
 			showBest           = true,
+			showComp           = true,
+			hasLust            = false,
+			comp               = 'any',
 		},
 
 		keystoneReminder = {

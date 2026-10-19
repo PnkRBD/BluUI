@@ -234,6 +234,7 @@ Skinning\LootHistory.lua
 Skinning\Friends.lua
 Skinning\GroupFinder.lua
 Skinning\PremadeGroups.lua
+Skinning\PremadeListing.lua
 Skinning\QueuePopups.lua
 Skinning\InstanceAbandon.lua
 Skinning\Mail.lua
