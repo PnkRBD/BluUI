@@ -454,6 +454,16 @@ function Tools.LowestDurability()
     return math.floor(lowest)
 end
 
+Tools.STARTER_BUILD = 'Starter Build'
+local DEFAULT_LOADOUT = 'Default Loadout'
+
+function Tools.ActiveLoadoutName(specID)
+    if C_ClassTalents.GetStarterBuildActive() then return Tools.STARTER_BUILD end
+    local configID = C_ClassTalents.GetLastSelectedSavedConfigID(specID)
+    local info = configID and C_Traits.GetConfigInfo(configID)
+    return info and info.name or DEFAULT_LOADOUT
+end
+
 function Tools.IsChatHeaderSecret(editBox)
     return editBox.header:IsAnchoringSecret()
 end

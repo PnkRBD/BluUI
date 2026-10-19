@@ -1567,6 +1567,28 @@ BUI.Defaults = {
 			anchorOffsetY      = 0,
 		},
 
+		talentReminder = {
+			enabled            = false,
+			locked             = true,
+			onReadyCheck       = true,
+			onCountdown        = false,
+			onInstance         = false,
+			inRaids            = true,
+			inDungeons         = true,
+			elsewhere          = true,
+			duration           = 5,
+			fontSize           = 24,
+			font               = BUI.C.GLOBAL_OPTION,
+			textColor          = { r = 1, g = 1, b = 1, a = 1 },
+			posX               = 0,
+			posY               = 220,
+			centerHorizontally = true,
+			anchorFrame        = "",
+			anchorPoint        = "BOTTOM",
+			anchorOffsetX      = 0,
+			anchorOffsetY      = 0,
+		},
+
 		secondaryStats = {
 			enabled            = false,
 			locked             = true,

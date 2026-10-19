@@ -25,8 +25,7 @@ local NOTE_HEIGHT = 16
 local BOTTOM_PAD = 10
 local MENU_WIDTH = 220
 local FLYOUT_GAP = 6
-local STARTER_BUILD = 'Starter Build'
-local DEFAULT_LOADOUT = 'Default Loadout'
+local STARTER_BUILD = BUI.Tools.STARTER_BUILD
 local SOLID, CLEAR = { 1, 1, 1, 1 }, { 0, 0, 0, 0 }
 
 local lootSpecName, currentSpecName = '', ''
@@ -99,13 +98,6 @@ local function OpenLootSpecMenu(anchor)
         end
     end
     BUI.Skinning.ContextMenu(items, MenuOptions(anchor))
-end
-
-local function ActiveLoadoutName(specID)
-    if C_ClassTalents.GetStarterBuildActive() then return STARTER_BUILD end
-    local configID = C_ClassTalents.GetLastSelectedSavedConfigID(specID)
-    local info = configID and C_Traits.GetConfigInfo(configID)
-    return info and info.name or DEFAULT_LOADOUT
 end
 
 local function ClearPendingLoadout()
@@ -321,7 +313,7 @@ local function RenderSpecPanel()
         end
     end
     panel.current:SetText(specName)
-    panel.rows[1].value:SetText(specID and ActiveLoadoutName(specID) or 'None')
+    panel.rows[1].value:SetText(specID and BUI.Tools.ActiveLoadoutName(specID) or 'None')
     panel.rows[2].value:SetText(lootSpecName)
     local following = GetLootSpecialization() == 0
     panel.note:SetShown(following)
