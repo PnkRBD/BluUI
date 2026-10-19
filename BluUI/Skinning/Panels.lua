@@ -86,6 +86,32 @@ local function SkinHousingPreview(frame, context)
 	context.Title(preview.NameContainer.Name)
 end
 
+local CHOICE_ART = { 'Background', 'NineSlice', 'BorderOverlay' }
+local choiceHooked = false
+
+local function SkinChoiceButtons(container, context)
+	if not container or not container.buttonFramePool then return end
+	for buttonFrame in container.buttonFramePool:EnumerateActive() do context.Button(buttonFrame.Button) end
+end
+
+local function PaintPlayerChoice(frame, context)
+	for index = 1, #CHOICE_ART do context.Fade(frame[CHOICE_ART[index]]) end
+	context.FadeRegions(frame.Title)
+	context.Title(frame.Title.Text)
+	SkinChoiceButtons(frame.OptionButtonsContainer, context)
+	for option in frame.optionPools:EnumerateActive() do SkinChoiceButtons(option.OptionButtonsContainer, context) end
+end
+
+local function SkinPlayerChoice(frame, context)
+	if not choiceHooked then
+		choiceHooked = true
+		context.Hook(frame, 'SetupOptions', function() PaintPlayerChoice(frame, context) end)
+	end
+	context.Shell(frame)
+	context.Close(frame.CloseButton)
+	PaintPlayerChoice(frame, context)
+end
+
 local TABARD_ROWS = 5
 local TABARD_BOXES = { 'TabardFrameCostFrame', 'TabardFrameMoneyInset' }
 
@@ -126,6 +152,7 @@ local WINDOWS = {
 		description = 'The card popup where a quest or event asks you to pick one option.',
 		icon = 'Interface/Icons/INV_Misc_Book_09',
 		frames = { 'PlayerChoiceFrame' },
+		skin = SkinPlayerChoice,
 	},
 	{
 		id = 'tradingpost',
@@ -268,6 +295,12 @@ for _, entry in ipairs(WINDOWS) do
 		legacy = entry.legacy,
 		newLook = entry.newLook,
 	})
-	local function SkinFrame(frame) SkinWindow(entry, frame, context) end
+	local function SkinFrame(frame)
+		if entry.skin then
+			entry.skin(frame, context)
+		else
+			SkinWindow(entry, frame, context)
+		end
+	end
 	for _, frameName in ipairs(entry.frames) do context.Window(frameName, { skin = SkinFrame }) end
 end
