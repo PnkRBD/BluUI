@@ -93,10 +93,9 @@ Datatext.Register('time', {
         return Datatext.Label(config, self) .. Datatext.Colored(FormatClock(hour, minute, config.time24), valueHex)
     end,
     OnClick = function(_, button)
-        if button ~= 'LeftButton' or InCombatLockdown() then return end
-        ToggleCalendar()
-        return true
+        return button == 'LeftButton'
     end,
+    secure = function() return 'click', GameTimeFrame end,
     OnEnter = function(hit, bar)
         local twentyFour = bar.getConfig().time24
         local tooltip = Datatext.Tooltip(hit)

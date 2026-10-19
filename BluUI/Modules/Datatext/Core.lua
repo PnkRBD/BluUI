@@ -283,7 +283,12 @@ function Datatext.OpenCurrencyUI()
         BUI.CurrencyManager.Toggle()
         return
     end
-    ToggleCharacter('TokenFrame')
+    if CharacterFrame:IsShown() then ToggleCharacter('TokenFrame', true) end
+end
+
+function Datatext.CurrencyRelay()
+    if BUI.Skinning.IsSkinEnabled('currencyManager') then return nil end
+    return 'click', CharacterMicroButton
 end
 
 function Datatext.BuildSampleParts(config)

@@ -35,8 +35,11 @@ Datatext.Register('guild', {
     end,
     OnClick = function(_, button)
         if button ~= 'LeftButton' then return end
-        if IsInGuild() then ToggleGuildFrame() end
+        if InCombatLockdown() and IsInGuild() then ToggleGuildFrame() end
         return true
+    end,
+    secure = function()
+        if IsInGuild() then return 'click', GuildMicroButton end
     end,
     OnEnter = function(hit)
         if not IsInGuild() then return end

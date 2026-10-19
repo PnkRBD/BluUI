@@ -27,9 +27,10 @@ Datatext.Register('friends', {
     end,
     OnClick = function(_, button)
         if button ~= 'LeftButton' then return end
-        ToggleFriendsFrame()
+        if InCombatLockdown() then ToggleFriendsFrame() end
         return true
     end,
+    secure = function() return 'click', QuickJoinToastButton end,
     OnEnter = function(hit)
         Datatext.OpenSocialHover(hit, 'friends')
     end,
