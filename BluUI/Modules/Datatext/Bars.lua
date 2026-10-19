@@ -9,6 +9,24 @@ local IsPanel = Datatext.IsPanel
 local GetBars, GetBarConfig, GetMinimapConfig, ModuleEnabled =
     Datatext.GetBars, Datatext.GetBarConfig, Datatext.GetMinimapDB, Datatext.ModuleEnabled
 
+local HIT_RELAY = {
+    action = function(hit)
+        local entry = hit.entry
+        if entry.secure then return entry.secure(hit) end
+        if entry.OnClick and not entry.passLeft then return nil end
+        return 'click', CharacterMicroButton
+    end,
+}
+
+local MAIN_RELAY = {
+    level = 5,
+    forward = 'OnMouseUp',
+    action = function(frame)
+        if IsPanel(frame.bar.getConfig()) then return nil end
+        return 'click', CharacterMicroButton
+    end,
+}
+
 local LAYOUT = {
     rowInset    = 6,
     columnInset = 6,
@@ -159,8 +177,6 @@ local function HitOnClick(self, mouseButton)
     if entry.OnClick and entry.OnClick(self, mouseButton, bar) then return end
     if mouseButton == 'RightButton' then
         LockBar(bar)
-    elseif mouseButton == 'LeftButton' and not InCombatLockdown() then
-        ToggleCharacter('PaperDollFrame')
     end
 end
 
@@ -189,6 +205,7 @@ local function GetHit(bar, entry)
         hit:SetScript('OnLeave', BUI.Profiler.Script('Datatext.Bars hit OnLeave', HitOnLeave))
         hit.bar = bar
         hit:Hide()
+        BUI.SecureRelay.Attach(hit, HIT_RELAY)
         bar.hits[entry.id] = hit
     end
     hit.entry = entry
@@ -473,13 +490,7 @@ local function MainOnMouseUp(self, mouseButton)
         self.justDragged = false
         return
     end
-    if mouseButton == 'LeftButton' then
-        if not IsPanel(self.bar.getConfig()) and not InCombatLockdown() then
-            ToggleCharacter('PaperDollFrame')
-        end
-    elseif mouseButton == 'RightButton' then
-        LockBar(self.bar)
-    end
+    if mouseButton == 'RightButton' then LockBar(self.bar) end
 end
 
 local MainOnShow = BUI.Profiler.Wrap('Datatext.Bars bar shown', function(self)
@@ -544,6 +555,7 @@ local function CreateMainBarObject(frameName, configProvider)
     frame.bar = bar
 
     frame:SetScript('OnMouseUp', BUI.Profiler.Script('Datatext.Bars frame OnMouseUp', MainOnMouseUp))
+    BUI.SecureRelay.Attach(frame, MAIN_RELAY)
     frame:SetScript('OnShow', MainOnShow)
     return bar
 end

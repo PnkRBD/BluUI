@@ -57,6 +57,7 @@ Utility\TTS.lua
 Utility\Anchors.lua
 Utility\SlidePanel.lua
 Utility\Dragging.lua
+Utility\SecureRelay.lua
 Utility\Lookup.lua
 Utility\IconSearch.lua
 Utility\IconEngine.lua

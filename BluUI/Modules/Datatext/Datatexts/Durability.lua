@@ -49,10 +49,9 @@ Datatext.Register('durability', {
         return Datatext.Label(config, self) .. ThresholdColor(percent, valueHex) .. percent .. RESET .. PERCENT
     end,
     OnClick = function(_, button)
-        if button ~= 'LeftButton' or InCombatLockdown() then return end
-        ToggleCharacter('PaperDollFrame')
-        return true
+        return button == 'LeftButton'
     end,
+    secure = function() return 'click', CharacterMicroButton end,
     OnEnter = function(hit, bar)
         local tooltip = Datatext.Tooltip(hit)
         tooltip:AddLine('Durability', 1, 1, 1)

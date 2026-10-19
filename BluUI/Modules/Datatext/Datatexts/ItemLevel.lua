@@ -24,10 +24,9 @@ Datatext.Register('ilvl', {
         return Datatext.Label(config, self) .. Datatext.Colored(equippedLevel, valueHex)
     end,
     OnClick = function(_, button)
-        if button ~= 'LeftButton' or InCombatLockdown() then return end
-        ToggleCharacter('PaperDollFrame')
-        return true
+        return button == 'LeftButton'
     end,
+    secure = function() return 'click', CharacterMicroButton end,
     OnEnter = function(hit)
         local tooltip = Datatext.Tooltip(hit)
         tooltip:AddLine('Item Level', 1, 1, 1)

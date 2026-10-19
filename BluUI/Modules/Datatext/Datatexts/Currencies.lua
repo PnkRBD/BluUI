@@ -58,6 +58,7 @@ Datatext.Register('currency', {
         Datatext.OpenCurrencyUI()
         return true
     end,
+    secure = function() return Datatext.CurrencyRelay() end,
     OnEnter = function(hit)
         local tooltip = Datatext.Tooltip(hit)
         tooltip:AddLine('Tracked Currencies', 1, 1, 1)

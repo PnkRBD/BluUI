@@ -79,6 +79,7 @@ Datatext.Register('gold', {
         Datatext.OpenCurrencyUI()
         return true
     end,
+    secure = function() return Datatext.CurrencyRelay() end,
     OnEnter = function(hit)
         local tooltip = Datatext.Tooltip(hit)
         tooltip:AddLine('Gold', 1, 1, 1)

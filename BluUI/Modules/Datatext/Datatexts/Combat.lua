@@ -172,6 +172,7 @@ Datatext.Register('combat', {
     build = function(config, valueHex, self)
         return Datatext.Label(config, self) .. Datatext.Colored(combatText, valueHex)
     end,
+    passLeft = true,
     OnClick = function(_, button)
         if button == 'RightButton' and IsControlKeyDown() then
             wipe(pullHistory)

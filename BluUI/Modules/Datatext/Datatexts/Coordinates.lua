@@ -36,10 +36,9 @@ Datatext.Register('coords', {
         return Datatext.Label(config, self) .. Datatext.Colored(coordX, valueHex) .. ', ' .. Datatext.Colored(coordY, valueHex)
     end,
     OnClick = function(_, button)
-        if button ~= 'LeftButton' or InCombatLockdown() then return end
-        ToggleWorldMap()
-        return true
+        return button == 'LeftButton'
     end,
+    secure = function() return 'click', MinimapCluster.ZoneTextButton end,
     OnEnter = function(hit)
         local tooltip = Datatext.Tooltip(hit)
         tooltip:AddLine(GetRealZoneText(), 1, 1, 1)
