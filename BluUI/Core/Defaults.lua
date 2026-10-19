@@ -233,6 +233,7 @@ BUI.Defaults = {
 		savedThemes    = {},
 		session        = {},
 		altOverview    = {},
+		premadeRealms  = { hidden = {}, flagged = {}, hiddenRegions = {} },
 		weeklyMplusHistory = {},
 		datatextGold   = {},
 	},
@@ -1506,6 +1507,17 @@ BUI.Defaults = {
 			enterColor         = { 1, 0.2, 0.2, 1 },
 			leaveColor         = { 0.2, 1, 0.2, 1 },
 			fadeTime           = 0.8,
+		},
+
+		premadeGroups = {
+			columns            = { 'dungeon', 'title', 'group', 'leader', 'action' },
+			sort               = 'score',
+			scale              = 1,
+			compact            = false,
+			showServer         = true,
+			showPlaystyle      = true,
+			showAge            = true,
+			showBest           = true,
 		},
 
 		keystoneReminder = {

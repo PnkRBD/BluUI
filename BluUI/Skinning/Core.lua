@@ -103,7 +103,7 @@ function Skin.SeedSkinStates()
 				local legacy = skinRegistry[id].legacy
 				if legacy and skinDB[legacy] == false then
 					skinDB[id] = false
-				elseif firstRun and (not hadKeys or BASELINE_SKINS[id]) then
+				elseif firstRun and not skinRegistry[id].optIn and (not hadKeys or BASELINE_SKINS[id]) then
 					skinDB[id] = true
 				else
 					skinDB[id] = false
