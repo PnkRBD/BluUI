@@ -147,6 +147,7 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 			label:SetJustifyH('LEFT')
 			label:SetWordWrap(false)
 			width = math.max(width, math.ceil(label:GetUnboundedStringWidth()) + LABEL_GAP + control:GetWidth() + POP_PAD * 2)
+			if option.disabled then Layout.DisableWhen(window, option.disabled, row, { row }):SetAllPoints(row) end
 			rows[#rows + 1] = row
 			y = y + POP_ROW
 		end
