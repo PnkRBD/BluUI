@@ -793,11 +793,12 @@ local function GeneralBoards(ui, parent, width, page)
 	blizzard[#blizzard + 1] = { text = 'Advanced CDM', onClick = function()
 		CooldownViewerSettings:SetShown(not CooldownViewerSettings:IsShown())
 	end }
-	blizzard[#blizzard + 1] = { text = 'Edit Mode', onClick = BUI.ToggleEditMode }
+	blizzard[#blizzard + 1] = { key = 'editMode', text = 'Edit Mode', onClick = SLASH_EDITMODE1 and nop or BUI.ToggleEditMode }
 	blizzard[#blizzard + 1] = { tooltip = 'Blizzard settings panel', title = 'Advanced CDM', options = {
 		Toggle(cdm, 'BluUI overlay on the panel', 'showBlizzardOverlay'),
 	} }
-	setup:AddTools('Blizzard settings', status, blizzard)
+	local blizzardRow = setup:AddTools('Blizzard settings', status, blizzard)
+	BUI.SecureRelay.Attach(blizzardRow.controls.editMode, { action = function() return BUI.SecureRelay.Slash('EDITMODE') end })
 	module._emStatusRefresh = function()
 		if selected == 'general' then RebuildPane(page) end
 	end

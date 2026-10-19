@@ -141,17 +141,12 @@ SLASH_BUIRL1 = '/rl'
 SlashCmdList['BUIRL'] = ReloadUI
 
 function BUI.ToggleEditMode()
-	local manager = EditModeManagerFrame
 	if InCombatLockdown() then
 		BUI.Print('Edit Mode opens when combat ends.')
 		BUI.Events:AfterCombat(BUI.ToggleEditMode, 'Core.ToggleEditMode')
 		return
 	end
-	if manager:IsShown() then
-		HideUIPanel(manager)
-	else
-		ShowUIPanel(manager)
-	end
+	EditModeManagerFrame:SetShown(not EditModeManagerFrame:IsShown())
 end
 
 SLASH_BUIEDIT1 = '/edit'
