@@ -138,6 +138,7 @@ local entries = {
 	{ label = "Low HP Warning", page = "auras", tab = 1, panel = "General", keywords = "low health warning hp threshold percent font size text color position anchor" },
 	{ label = "Durability Warning", page = "auras", tab = 1, panel = "General", keywords = "durability repair gear armor broken threshold percent slider text color position anchor" },
 	{ label = "Keystone Reminder", page = "auras", tab = 1, panel = "General", keywords = "keystone reminder dungeon teleport key group mythic plus" },
+	{ label = "Talent Reminder", page = "auras", tab = 1, panel = "General", keywords = "talent reminder ready check pull countdown dungeon raid instance spec loadout build check talents popup" },
 	{ label = "Private raid warning", page = "auras", tab = 1, panel = "General", keywords = "private raid warning boss blizzard move position" },
 	{ label = "Gateway Alert", page = "auras", tab = 1, panel = "General", keywords = "demonic gateway alert warlock text sound in reach" },
 	{ label = "Bloodlust", page = "auras", tab = 1, panel = "General", keywords = "bloodlust heroism time warp primal rage fury of the aspects lust timer alert countdown tts sated exhaustion icon swipe" },

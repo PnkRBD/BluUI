@@ -41,6 +41,7 @@ local GROUPS = {
 		{ key = 'keystoneReminder', name = 'Keystone Reminder' },
 		{ key = 'privateWarning',  name = 'Private Warning' },
 		{ key = 'durabilityWarning', name = 'Durability Warning' },
+		{ key = 'talentReminder',  name = 'Talent Reminder' },
 		{ key = 'secondaryStats',  name = 'Secondary Stats' },
 		{ key = 'auraGroups',      name = 'Aura Groups' },
 		{ key = 'recentAuras',     name = 'Recent Auras' },

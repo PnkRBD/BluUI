@@ -180,6 +180,32 @@ local function KeystoneReminderRow()
 	}
 end
 
+local function TalentReminderRow()
+	local db = BUI.GetDB().talentReminder
+	local TalentReminder = BUI.Auras.TalentReminder
+	BUI.OnModuleChange('talentReminder', Repaint)
+	return {
+		id = 'talentReminder', name = 'Talent Reminder', sub = 'Your spec and loadout on ready check', after = TalentReminder.Refresh,
+		switch = Toggle(db, nil, 'enabled'),
+		tools = {
+			TableColor(db, 'Text color', 'textColor', true),
+			Font(db, 'font'),
+			TextTool({ Option(db, 'Font size', 'fontSize', { min = 10, max = 60, step = 1 }) }),
+			{ tooltip = 'When it shows', title = 'Talent reminder', slot = 'settings', options = {
+				Option(db, 'On ready check', 'onReadyCheck'),
+				Option(db, 'On pull countdown', 'onCountdown'),
+				Option(db, 'On entering a dungeon or raid', 'onInstance'),
+				Option(db, 'In raids', 'inRaids', { separator = true }),
+				Option(db, 'In dungeons', 'inDungeons'),
+				Option(db, 'Everywhere else', 'elsewhere'),
+				Option(db, 'Show for (seconds)', 'duration', { min = 2, max = 15, step = 1, separator = true }),
+			} },
+			Pin(db, { selfTag = 'BUI_TalentReminder' }),
+			Eye('Preview, drag to move', function() return not db.locked end, function(value) TalentReminder.SetLocked(not value) end),
+		},
+	}
+end
+
 local function PrivateWarningRow()
 	local db = BUI.GetDB().privateWarning
 	local PrivateWarning = BUI.Auras.PrivateWarning
@@ -471,7 +497,7 @@ local function CrosshairRow(ui)
 end
 
 local ROWS = {
-	CombatTimerRow, CombatResRow, CombatMessagesRow, SecondaryStatsRow, KeystoneReminderRow, PrivateWarningRow,
+	CombatTimerRow, CombatResRow, CombatMessagesRow, SecondaryStatsRow, KeystoneReminderRow, TalentReminderRow, PrivateWarningRow,
 	LowHpRow, DurabilityWarningRow, PetWarningsRow, GatewayRow, BloodlustRow, CDAnnouncerRow, CooldownFlashRow, CrosshairRow,
 }
 
@@ -585,6 +611,7 @@ BUI.PageEngine.RegisterPage('auras', {
 		if not db.keystoneReminder.locked then BUI.Auras.KeystoneReminder.SetLocked(true) end
 		if not db.privateWarning.locked then BUI.Auras.PrivateWarning.SetLocked(true) end
 		if not db.durabilityWarning.locked then BUI.Auras.DurabilityWarning.SetLocked(true) end
+		if not db.talentReminder.locked then BUI.Auras.TalentReminder.SetLocked(true) end
 		if not settings.markLocked then
 			settings.markLocked = true
 			BUI.Auras.UpdateMark()
