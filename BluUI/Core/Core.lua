@@ -166,6 +166,24 @@ local function PromptAzorImport()
 	})
 end
 
+local PREVIEW_LOCKS = { 'combatTimer', 'combatRes', 'combatMessage', 'secondaryStats', 'keystoneReminder', 'privateWarning', 'durabilityWarning', 'auras', 'gcdHistory' }
+local AURA_PREVIEW_LOCKS = { 'lowHpLocked', 'markLocked' }
+
+local function ClosePreviews(profile)
+	for _, settings in pairs(profile) do
+		if type(settings) == 'table' and settings.showAnchor == true then settings.showAnchor = false end
+	end
+	for _, key in ipairs(PREVIEW_LOCKS) do
+		local settings = profile[key]
+		if type(settings) == 'table' and settings.locked == false then settings.locked = true end
+	end
+	local auras = profile.auras
+	if type(auras) ~= 'table' then return end
+	for _, key in ipairs(AURA_PREVIEW_LOCKS) do
+		if auras[key] == false then auras[key] = true end
+	end
+end
+
 function Addon:OnInitialize()
 	BUI.LaunchTrace.Begin(self)
 	local forcedAdopt = BluUI_DB and BluUI_DB.__forceAdoptOnLoad
@@ -230,6 +248,7 @@ end
 
 function Addon:OnEnable()
 	BUI.SpecProfiles.ApplyOnLogin()
+	ClosePreviews(BUI.db.profile)
 	BUI.Pixel.Sync()
 	BUI.ApplyScale()
 	BUI.BUILibClient.SetFont(BUI.WindowFont())
