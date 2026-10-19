@@ -347,10 +347,6 @@ local function CreateTestLoadouts()
 			if loadoutIndex > 10 then
 				watcher:UnregisterAllEvents()
 				watcher:SetScript('OnEvent', nil)
-				if PlayerSpellsFrame and PlayerSpellsFrame:IsShown() and not InCombatLockdown() then
-					HideUIPanel(PlayerSpellsFrame)
-					ShowUIPanel(PlayerSpellsFrame)
-				end
 				return
 			end
 			if C_ClassTalents.RequestNewConfig(('test_%s_%d'):format(timeStamp, loadoutIndex)) then
@@ -388,12 +384,6 @@ local function DeleteLoadouts()
 			local function finish()
 				watcher:UnregisterAllEvents()
 				watcher:SetScript('OnEvent', nil)
-				C_Timer.After(0.3, function()
-					if PlayerSpellsFrame and PlayerSpellsFrame:IsShown() and not InCombatLockdown() then
-						HideUIPanel(PlayerSpellsFrame)
-						ShowUIPanel(PlayerSpellsFrame)
-					end
-				end)
 			end
 
 			deleteNext = function()
