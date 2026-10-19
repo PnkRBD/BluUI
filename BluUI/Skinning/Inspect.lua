@@ -375,8 +375,13 @@ local function RefreshFrame(frame)
 	Skin.RefreshTabStrip(frame)
 end
 
+local function ClearModelOverlay(model)
+	if model == _G.InspectModelFrame then model.BackgroundOverlay:SetAlpha(0) end
+end
+
 local function InstallFrame()
 	context.Hook('InspectPaperDollItemSlotButton_Update', RefreshSlot)
+	context.Hook('SetPaperDollBackground', ClearModelOverlay)
 	BUI.Events:Register('INSPECT_READY', 'Skin.InspectLevels', function()
 		if not Enabled() or not skinned then return end
 		RefreshReadouts()
