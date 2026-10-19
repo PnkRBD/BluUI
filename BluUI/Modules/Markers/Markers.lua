@@ -85,7 +85,7 @@ local function UpdateVisibility()
         return
     end
     local config = GetConfig()
-    local shown = ModuleEnabled() and (not config.onlyInGroup or IsInGroup())
+    local shown = ModuleEnabled() and (not config.locked or not config.onlyInGroup or IsInGroup())
     bar:SetShown(shown)
 end
 
@@ -103,6 +103,7 @@ end
 
 local function TargetAlpha()
     local config = GetConfig()
+    if not config.locked then return 1 end
     local alpha = config.alpha / 100
     alpha = alpha * BUI.Visibility.GetContextualOpacity('Markers') / 100
     if config.fadeEnabled and not hovered then
@@ -304,19 +305,31 @@ local function Build()
 
     BUI.Dragging.MakeDraggable(bar, {
         skipClickThrough = true,
+        showHint = true,
+        showUnlockedBg = true,
+        isLocked = function() return GetConfig().locked end,
         onPositionChanged = function() BUI.Anchor.SaveDrop(bar, GetConfig()) end,
     })
 
     local OnBarDragStart, OnBarDragStop = bar:GetScript('OnDragStart'), bar:GetScript('OnDragStop')
-    local function OnButtonDragStart() OnBarDragStart(bar) end
-    local function OnButtonDragStop() OnBarDragStop(bar) end
-    local function ForwardDrag(button)
-        button:RegisterForDrag('LeftButton')
-        button:SetScript('OnDragStart', BUI.Profiler.Script('Markers.Markers button OnDragStart', OnButtonDragStart))
-        button:SetScript('OnDragStop', BUI.Profiler.Script('Markers.Markers button OnDragStop', OnButtonDragStop))
-    end
-    for _, button in ipairs(markerButtons) do ForwardDrag(button) end
-    for _, button in pairs(controls) do ForwardDrag(button) end
+    local unlock = CreateFrame('Frame', nil, bar)
+    unlock:SetAllPoints()
+    unlock:SetFrameLevel(bar:GetFrameLevel() + 5)
+    unlock:EnableMouse(true)
+    unlock:RegisterForDrag('LeftButton')
+    unlock:SetScript('OnDragStart', BUI.Profiler.Script('Markers.Markers unlock OnDragStart', function() OnBarDragStart(bar) end))
+    unlock:SetScript('OnDragStop', BUI.Profiler.Script('Markers.Markers unlock OnDragStop', function() OnBarDragStop(bar) end))
+    unlock:SetScript('OnMouseUp', BUI.Profiler.Script('Markers.Markers unlock OnMouseUp', function(_, mouseButton)
+        if mouseButton == 'RightButton' then Markers.SetLocked(true) end
+    end))
+    unlock:Hide()
+    bar.unlock = unlock
+end
+
+local function ApplyLock()
+    if not built then return end
+    bar:RefreshDragState()
+    bar.unlock:SetShown(not GetConfig().locked)
 end
 
 local CONTROL_ORDER = { 'clear', 'ready', 'timer' }
@@ -391,10 +404,17 @@ function Markers.Refresh()
     Build()
     if not built then return end
     Events:AfterCombat(ApplyLayout, 'Markers.Layout')
+    ApplyLock()
     UpdateVisibility()
     RefreshFade()
     UpdateIndicators()
     UpdateUsability()
+end
+
+function Markers.SetLocked(locked)
+    GetConfig().locked = locked
+    BUI.NotifyModuleChange('markerLock')
+    Markers.Refresh()
 end
 
 function Markers.Initialize()

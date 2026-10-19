@@ -166,7 +166,7 @@ local function PromptAzorImport()
 	})
 end
 
-local PREVIEW_LOCKS = { 'combatTimer', 'combatRes', 'combatMessage', 'secondaryStats', 'keystoneReminder', 'privateWarning', 'durabilityWarning', 'auras', 'gcdHistory' }
+local PREVIEW_LOCKS = { 'combatTimer', 'combatRes', 'combatMessage', 'secondaryStats', 'keystoneReminder', 'privateWarning', 'durabilityWarning', 'auras', 'gcdHistory', 'markers' }
 local AURA_PREVIEW_LOCKS = { 'lowHpLocked', 'markLocked' }
 
 local function ClosePreviews(profile)
