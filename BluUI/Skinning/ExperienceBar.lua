@@ -646,8 +646,8 @@ local function CreateBars()
 			if config.position == 'FREE' and not config.locked then
 				config.locked = true
 				ApplySettings()
-			else
-				ToggleCharacter('ReputationFrame')
+			elseif CharacterFrame:IsShown() then
+				ToggleCharacter('ReputationFrame', true)
 			end
 		end,
 		showHint = true,
@@ -655,6 +655,15 @@ local function CreateBars()
 		hintText = 'Drag to Reposition | Right-Click to Lock',
 		hintAnchor = 'TOP',
 		skipClickThrough = true,
+	})
+	BUI.SecureRelay.Attach(barFrame, {
+		button = 'RightButton',
+		forward = 'OnMouseUp',
+		action = function()
+			local config = GetConfig()
+			if config.position == 'FREE' and not config.locked then return nil end
+			return 'click', CharacterMicroButton
+		end,
 	})
 
 	local function OnXPBarEvent(event, _, levelPlayedTime)
