@@ -18,17 +18,23 @@ local function PositionTool(db, options)
 		for name, value in pairs(extra or {}) do option[name] = value end
 		return option
 	end
+	local getAnchor = Field('anchorFrame')
+	local function Anchored()
+		local anchor = getAnchor()
+		return anchor ~= nil and anchor ~= ''
+	end
+	local function Free() return not Anchored() end
 	local frames = { { value = '', text = 'None, free on the screen' } }
 	for _, frame in ipairs(options.frames or (options.selfTag and BUI.AnchorFramesExcept(options.selfTag)) or BUI.C.ANCHOR_FRAMES) do
 		frames[#frames + 1] = { value = frame.tag, text = frame.desc }
 	end
 	local rangeX, rangeY = options.rangeX or POSITION_RANGE_X, options.rangeY or POSITION_RANGE_Y
 	local rows = {
-		Option('Horizontal', 'posX', { min = -rangeX, max = rangeX, step = 1 }),
-		Option('Vertical', 'posY', { min = -rangeY, max = rangeY, step = 1 }),
+		Option('Horizontal', 'posX', { min = -rangeX, max = rangeX, step = 1, disabled = Anchored }),
+		Option('Vertical', 'posY', { min = -rangeY, max = rangeY, step = 1, disabled = Anchored }),
 	}
 	if not options.noCenter then
-		local centered = Option('Center horizontally', 'centerHorizontally')
+		local centered = Option('Center horizontally', 'centerHorizontally', { disabled = Anchored })
 		local setCentered = centered.set
 		local _, setX = Field('posX')
 		centered.set = function(value)
@@ -39,12 +45,12 @@ local function PositionTool(db, options)
 	end
 	if not options.noAnchor then
 		rows[#rows + 1] = Option('Anchor to', 'anchorFrame', { entries = frames, width = ANCHOR_MENU_WIDTH, separator = true })
-		rows[#rows + 1] = Option('Anchor side', 'anchorPoint', { entries = BUI.C.ANCHOR_PLACEMENT_OPTIONS, width = ANCHOR_MENU_WIDTH })
-		rows[#rows + 1] = Option('Anchor offset X', 'anchorOffsetX', { min = -ANCHOR_RANGE, max = ANCHOR_RANGE, step = 1 })
-		rows[#rows + 1] = Option('Anchor offset Y', 'anchorOffsetY', { min = -ANCHOR_RANGE, max = ANCHOR_RANGE, step = 1 })
+		rows[#rows + 1] = Option('Anchor side', 'anchorPoint', { entries = BUI.C.ANCHOR_PLACEMENT_OPTIONS, width = ANCHOR_MENU_WIDTH, disabled = Free })
+		rows[#rows + 1] = Option('Anchor offset X', 'anchorOffsetX', { min = -ANCHOR_RANGE, max = ANCHOR_RANGE, step = 1, disabled = Free })
+		rows[#rows + 1] = Option('Anchor offset Y', 'anchorOffsetY', { min = -ANCHOR_RANGE, max = ANCHOR_RANGE, step = 1, disabled = Free })
 	end
-	if options.matchWidth then rows[#rows + 1] = Option('Match anchor width', 'matchAnchorWidth') end
-	if options.matchHeight then rows[#rows + 1] = Option('Match anchor height', 'matchAnchorHeight') end
+	if options.matchWidth then rows[#rows + 1] = Option('Match anchor width', 'matchAnchorWidth', { disabled = Free }) end
+	if options.matchHeight then rows[#rows + 1] = Option('Match anchor height', 'matchAnchorHeight', { disabled = Free }) end
 	return { icon = 'location', tooltip = options.noAnchor and 'Position' or 'Position and anchor', title = 'Position', options = rows }
 end
 
