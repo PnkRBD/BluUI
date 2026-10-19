@@ -1900,6 +1900,7 @@ function Strip.Hold()
 	finder.releasing = false
 	finder:Show()
 	Skin.SuppressBlizzardFrame(PVEFrame)
+	Skin.BorrowCloseButton(PVEFrame.CloseButton, finder.titleBar.closeBtn.frame)
 end
 
 function Strip.FinishRelease()
@@ -1907,6 +1908,7 @@ function Strip.FinishRelease()
 	finder.releasing = false
 	HidePanel()
 	finder:Hide()
+	Skin.ReturnCloseButton(PVEFrame.CloseButton)
 	Skin.RestoreBlizzardFrame(PVEFrame)
 end
 
@@ -1953,7 +1955,7 @@ local function ShowBlizzard()
 end
 
 local function CloseFinder()
-	HideUIPanel(PVEFrame)
+	if not Skin.CloseBorrowed(PVEFrame.CloseButton) then HideUIPanel(PVEFrame) end
 end
 
 local function SearchFieldEnter(slot)
