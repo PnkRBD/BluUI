@@ -94,22 +94,19 @@ local function OnDivider(frame)
 	divider:SetHeight(OnePixel(divider))
 end
 
-local menuBackdrops = setmetatable({}, { __mode = 'k' })
 local pendingMenus = setmetatable({}, { __mode = 'k' })
 local flushScheduled = false
 
 local function ApplySkin(frame)
 	if not Enabled() or frame:IsForbidden() then return end
-	Skin3.StripTextures(frame)
-	local backdrop = Skin3.ChildBackdrop(frame, { inside = true })
-	menuBackdrops[frame] = backdrop
-	local fill, edge = MenuFill(), Skin.PALETTE.edge
-	local width, height = backdrop:GetSize()
-	if issecretvalue(width) or issecretvalue(height) then
-		backdrop:SetBackdropColor(fill[1], fill[2], fill[3], fill[4])
-		backdrop:SetBackdropBorderColor(edge[1], edge[2], edge[3], edge[4])
-	else
-		Skin.ApplyBackdrop(backdrop, fill, edge)
+	local fill = MenuFill()
+	for _, region in ipairs({ frame:GetRegions() }) do
+		if region:IsObjectType('Texture') then
+			region:SetColorTexture(fill[1], fill[2], fill[3], fill[4])
+			region:SetAlpha(1)
+			region:ClearAllPoints()
+			region:SetAllPoints(frame)
+		end
 	end
 end
 
@@ -160,9 +157,5 @@ end
 BUI.Events:OnLogin('Skinning.Menus', Install)
 
 context.OnDisable(function()
-	for frame, backdrop in pairs(menuBackdrops) do
-		backdrop:Hide()
-		menuBackdrops[frame] = nil
-	end
 	wipe(pendingMenus)
 end)
