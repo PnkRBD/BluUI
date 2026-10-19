@@ -23,7 +23,7 @@ local context = Skin.Define('gameMenu', {
 })
 local Fade, Shell, Card = context.Fade, context.Shell, context.Card
 
-local shortcut, dim
+local shortcut, dim, optionsHooked
 
 local function SkinPoolButton(button)
 	if not button._buiMenuButton then
@@ -39,24 +39,6 @@ end
 
 local function SkinButtons(frame)
 	for button in frame.buttonPool:EnumerateActive() do SkinPoolButton(button) end
-end
-
-local function OpenBluUI()
-	HideUIPanel(GameMenuFrame)
-	BUI.PageEngine.Toggle()
-end
-
-local function BuildShortcut(frame)
-	local button = CreateFrame('Button', nil, frame)
-	local bottom = SECTION_GAP - frame.topPadding
-	button:SetPoint('BOTTOMLEFT', frame, 'TOPLEFT', frame.leftPadding, bottom)
-	button:SetPoint('BOTTOMRIGHT', frame, 'TOPRIGHT', -frame.rightPadding, bottom)
-	button:SetHeight(BUTTON_HEIGHT)
-	button:SetScript('OnClick', BUI.Profiler.Script('Skin.GameMenu shortcut OnClick', OpenBluUI))
-	Skin.TipButtonFonts(button)
-	button:SetText('BluUI')
-	button:Hide()
-	return button
 end
 
 local function SwallowWheel() end
@@ -102,6 +84,45 @@ end
 
 local function HideDim()
 	dim:Hide()
+	Skin.RestoreBlizzardFrame(GameMenuFrame)
+end
+
+local function RestoreMenu()
+	if not GameMenuFrame._buiSuppressActive then return end
+	Skin.RestoreBlizzardFrame(GameMenuFrame)
+	if GameMenuFrame:IsShown() then ShowMenu(GameMenuFrame) end
+end
+
+local function WatchOptions()
+	local options = BUI.PageEngine.frame
+	if optionsHooked or not options then return end
+	optionsHooked = true
+	options:HookScript('OnHide', BUI.Profiler.Wrap('Skin.GameMenu options hidden', RestoreMenu))
+end
+
+local function OpenBluUI()
+	if InCombatLockdown() then
+		BUI.PageEngine.Show()
+		return
+	end
+	Skin.SuppressBlizzardFrame(GameMenuFrame)
+	dim:Hide()
+	BUI.PageEngine.Show()
+	WatchOptions()
+	BUI.Profiler.After('Skin.GameMenu watch options', 0, WatchOptions)
+end
+
+local function BuildShortcut(frame)
+	local button = CreateFrame('Button', nil, frame)
+	local bottom = SECTION_GAP - frame.topPadding
+	button:SetPoint('BOTTOMLEFT', frame, 'TOPLEFT', frame.leftPadding, bottom)
+	button:SetPoint('BOTTOMRIGHT', frame, 'TOPRIGHT', -frame.rightPadding, bottom)
+	button:SetHeight(BUTTON_HEIGHT)
+	button:SetScript('OnClick', BUI.Profiler.Script('Skin.GameMenu shortcut OnClick', OpenBluUI))
+	Skin.TipButtonFonts(button)
+	button:SetText('BluUI')
+	button:Hide()
+	return button
 end
 
 context.Window('GameMenuFrame', {
