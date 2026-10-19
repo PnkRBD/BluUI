@@ -283,7 +283,7 @@ local entries = {
 	{ label = "Visibility", page = "unitframes", tab = 11, panel = "Party", keywords = "self solo raid group show" },
 	{ label = "Layout", page = "unitframes", tab = 11, panel = "Party", keywords = "width height spacing size grow direction up down left right vertical horizontal" },
 	{ label = "Power bar", page = "unitframes", tab = 11, panel = "Party", keywords = "power bar show hide height healer mana" },
-	{ label = "Bar texture", page = "unitframes", tab = 11, panel = "Appearance", keywords = "texture statusbar health bar look" },
+	{ label = "Health bar", page = "unitframes", tab = 11, panel = "Appearance", keywords = "texture statusbar health bar look fill direction vertical reverse bottom top" },
 	{ label = "Health and colors", page = "unitframes", tab = 11, panel = "Appearance", keywords = "class color health border background transparent dead opacity" },
 	{ label = "Damage absorb", page = "unitframes", tab = 11, panel = "Appearance", keywords = "absorb shield heal texture direction" },
 	{ label = "Target border", page = "unitframes", tab = 11, panel = "Appearance", keywords = "target mouseover border highlight" },

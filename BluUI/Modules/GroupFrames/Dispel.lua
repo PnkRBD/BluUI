@@ -54,7 +54,7 @@ local function AnchorFill(kit, frame, alpha)
 	local settings = GroupFrames.SettingsForFrame(frame)
 	local _, style = GroupFrames.DispelLook(settings)
 	local absorb = BUI.UnitFrames.OverlappingAbsorb(frame, settings.absorb.enabled, settings.absorb.direction, settings.healAbsorb.enabled, settings.healAbsorb.direction)
-	BUI.UnitFrames.AnchorDispelFill(kit, frame, style, absorb, alpha)
+	BUI.UnitFrames.AnchorDispelFill(kit, frame, style, absorb, alpha, BUI.UnitFrames.FillDirection(settings.fillDirection))
 end
 
 local function BuildHighlightKit(host)

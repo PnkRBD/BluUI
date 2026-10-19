@@ -37,6 +37,12 @@ local GROWTHS = {
 	{ value = 'UP', text = 'Up' },
 	{ value = 'DOWN', text = 'Down' },
 }
+local FILL_DIRECTIONS = {
+	{ value = 'RIGHT', text = 'Left to right' },
+	{ value = 'LEFT', text = 'Right to left' },
+	{ value = 'UP', text = 'Bottom to top' },
+	{ value = 'DOWN', text = 'Top to bottom' },
+}
 local ABSORB_TEXTURES = {
 	{ value = 'Solid', text = 'Solid' },
 	{ value = 'Stripes', text = 'Diagonal stripes' },
@@ -385,7 +391,10 @@ local function FramesBoard(ui, parent, width, key)
 		title = 'Appearance',
 		description = 'Colors, absorbs and the borders that mark your target and mouseover.',
 	})
-	look:AddTools('Bar texture', 'How the health bar looks', { Menu(section, 'statusbarTexture', textures, WIDE_MENU) }, Refresh)
+	look:AddTools('Health bar', 'Fill direction and texture', {
+		Menu(section, 'fillDirection', FILL_DIRECTIONS),
+		Menu(section, 'statusbarTexture', textures, WIDE_MENU),
+	}, Refresh)
 	look:AddTools('Health and colors', 'Bar, border and background colors', {
 		Color(section, 'Health', 'healthColor'),
 		Color(section, 'Border', 'borderColor'),

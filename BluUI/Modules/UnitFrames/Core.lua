@@ -61,21 +61,43 @@ function UnitFrames.ApplyAbsorbVisual(bar, textureKey, color, alpha)
 	overlay:Show()
 end
 
-function UnitFrames.AnchorAbsorb(absorb, health, healthTexture, direction)
+local FILLS = {
+	RIGHT = { orientation = 'HORIZONTAL', reverse = false, start = 'LEFT',   lead = 'RIGHT' },
+	LEFT  = { orientation = 'HORIZONTAL', reverse = true,  start = 'RIGHT',  lead = 'LEFT' },
+	UP    = { orientation = 'VERTICAL',   reverse = false, start = 'BOTTOM', lead = 'TOP' },
+	DOWN  = { orientation = 'VERTICAL',   reverse = true,  start = 'TOP',    lead = 'BOTTOM' },
+}
+local SIDE_CORNERS = {
+	LEFT   = { 'TOPLEFT', 'BOTTOMLEFT' },
+	RIGHT  = { 'TOPRIGHT', 'BOTTOMRIGHT' },
+	TOP    = { 'TOPLEFT', 'TOPRIGHT' },
+	BOTTOM = { 'BOTTOMLEFT', 'BOTTOMRIGHT' },
+}
+
+function UnitFrames.FillDirection(key)
+	return FILLS[key] or FILLS.RIGHT
+end
+
+local function AttachSide(region, side, target, targetSide)
+	local from, to = SIDE_CORNERS[side], SIDE_CORNERS[targetSide]
+	region:SetPoint(from[1], target, to[1])
+	region:SetPoint(from[2], target, to[2])
+end
+UnitFrames.AttachSide = AttachSide
+
+function UnitFrames.AnchorAbsorb(absorb, health, healthTexture, direction, fillSpec)
+	fillSpec = fillSpec or FILLS.RIGHT
 	absorb:ClearAllPoints()
+	absorb:SetOrientation(fillSpec.orientation)
 	if direction == 'left' then
-		absorb:SetReverseFill(true)
-		absorb:SetPoint('TOPRIGHT', healthTexture, 'TOPRIGHT')
-		absorb:SetPoint('BOTTOMRIGHT', healthTexture, 'BOTTOMRIGHT')
+		absorb:SetReverseFill(not fillSpec.reverse)
+		AttachSide(absorb, fillSpec.lead, healthTexture, fillSpec.lead)
 	elseif direction == 'edge' then
-		absorb:SetReverseFill(true)
-		absorb:SetPoint('TOPRIGHT', health, 'TOPRIGHT', 0, 0)
-		absorb:SetPoint('BOTTOMRIGHT', health, 'BOTTOMRIGHT', 0, 0)
+		absorb:SetReverseFill(not fillSpec.reverse)
+		AttachSide(absorb, fillSpec.lead, health, fillSpec.lead)
 	else
-		absorb:SetReverseFill(false)
-		absorb:SetPoint('LEFT', healthTexture, 'RIGHT')
-		absorb:SetPoint('TOP', health, 'TOP')
-		absorb:SetPoint('BOTTOM', health, 'BOTTOM')
+		absorb:SetReverseFill(fillSpec.reverse)
+		AttachSide(absorb, fillSpec.start, healthTexture, fillSpec.lead)
 	end
 end
 
@@ -658,37 +680,48 @@ do
 		texture:SetAlpha(alpha)
 	end
 
-	function UnitFrames.AnchorDispelFill(kit, frame, style, absorb, alpha)
+	function UnitFrames.AnchorDispelFill(kit, frame, style, absorb, alpha, fillSpec)
+		fillSpec = fillSpec or FILLS.RIGHT
 		local healthTexture = frame.Health:GetStatusBarTexture()
-		local rightEdge, rightSide = healthTexture, 'RIGHT'
-		if absorb then rightEdge, rightSide = absorb:GetStatusBarTexture(), 'LEFT' end
+		local endEdge, endSide = healthTexture, fillSpec.lead
+		if absorb then endEdge, endSide = absorb:GetStatusBarTexture(), fillSpec.start end
 		local blend = UnitFrames.GetSettings().dispelBlend and 'ADD' or 'BLEND'
 		local half = style == 'top' or style == 'bottom'
 		local fill, fade = kit.fill, kit.fade
 		PrepFillTexture(fill, half and FADE_TEXTURE or WHITE8X8, blend, alpha)
 		PrepFillTexture(fade, FADE_TEXTURE, blend, alpha)
+		local startCorner, leadCorner, endCorner = SIDE_CORNERS[fillSpec.start][1], SIDE_CORNERS[fillSpec.lead][2], SIDE_CORNERS[endSide][2]
 		if not half then
 			fill:SetTexCoord(0, 1, 0, 1)
-			fill:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
-			fill:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
+			fill:SetPoint(startCorner, healthTexture, startCorner)
+			fill:SetPoint(leadCorner, endEdge, endCorner)
 			fade:SetTexCoord(0, 1, 1, 1)
-			fade:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
-			fade:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
+			fade:SetPoint(startCorner, healthTexture, startCorner)
+			fade:SetPoint(leadCorner, endEdge, endCorner)
 			return
 		end
-		if style == 'bottom' then
-			fill:SetPoint('TOPLEFT', healthTexture, 'LEFT')
-			fill:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
-			fill:SetTexCoord(0, 1, FADE_MIDDLE_COORD, 0)
+		if fillSpec.orientation == 'VERTICAL' then
+			fill:SetPoint(startCorner, healthTexture, startCorner)
+			fill:SetPoint(leadCorner, endEdge, endCorner)
+			if style == 'bottom' then fill:SetTexCoord(0, 1, FADE_FAR_COORD, 0) else fill:SetTexCoord(0, 1, 0, FADE_FAR_COORD) end
 			fade:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
-			fade:SetPoint('BOTTOMRIGHT', rightEdge, rightSide)
+			fade:SetPoint('BOTTOMRIGHT', healthTexture, 'TOPLEFT')
+			return
+		end
+		local startSide, leadSide = fillSpec.start, fillSpec.lead
+		if style == 'bottom' then
+			fill:SetPoint('TOP' .. startSide, healthTexture, startSide)
+			fill:SetPoint('BOTTOM' .. leadSide, endEdge, 'BOTTOM' .. endSide)
+			fill:SetTexCoord(0, 1, FADE_MIDDLE_COORD, 0)
+			fade:SetPoint('TOP' .. startSide, healthTexture, 'TOP' .. startSide)
+			fade:SetPoint('BOTTOM' .. leadSide, endEdge, endSide)
 			fade:SetTexCoord(0, 1, FADE_FAR_COORD, FADE_MIDDLE_COORD)
 		else
-			fill:SetPoint('TOPLEFT', healthTexture, 'TOPLEFT')
-			fill:SetPoint('BOTTOMRIGHT', rightEdge, rightSide)
+			fill:SetPoint('TOP' .. startSide, healthTexture, 'TOP' .. startSide)
+			fill:SetPoint('BOTTOM' .. leadSide, endEdge, endSide)
 			fill:SetTexCoord(0, 1, 0, FADE_MIDDLE_COORD)
-			fade:SetPoint('TOPLEFT', healthTexture, 'LEFT')
-			fade:SetPoint('BOTTOMRIGHT', rightEdge, 'BOTTOM' .. rightSide)
+			fade:SetPoint('TOP' .. startSide, healthTexture, startSide)
+			fade:SetPoint('BOTTOM' .. leadSide, endEdge, 'BOTTOM' .. endSide)
 			fade:SetTexCoord(0, 1, FADE_MIDDLE_COORD, FADE_FAR_COORD)
 		end
 	end

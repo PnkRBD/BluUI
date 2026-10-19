@@ -134,6 +134,21 @@ local function UpdateHealthColor(frame, event, unit)
 	end
 end
 
+local function FillSpec(settings)
+	return UnitFrames.FillDirection(settings.fillDirection)
+end
+
+local function ApplyFillDirection(healthBar, settings)
+	local fillSpec = FillSpec(settings)
+	healthBar:SetOrientation(fillSpec.orientation)
+	healthBar:SetReverseFill(fillSpec.reverse)
+	healthBar:SetRotatesTexture(fillSpec.orientation == "VERTICAL")
+	local deficit = healthBar.Deficit
+	deficit:ClearAllPoints()
+	UnitFrames.AttachSide(deficit, fillSpec.start, healthBar:GetStatusBarTexture(), fillSpec.lead)
+	UnitFrames.AttachSide(deficit, fillSpec.lead, healthBar, fillSpec.lead)
+end
+
 local function BuildHealth(frame, unit)
 	local settings  = GroupFrames.SettingsForFrame(frame)
 	local texture = ResolveTexture(settings.statusbarTexture)
@@ -155,12 +170,9 @@ local function BuildHealth(frame, unit)
 
 	local deficit = healthBar:CreateTexture(nil, "ARTWORK", nil, -1)
 	deficit:SetTexture(texture)
-	deficit:SetPoint("TOPLEFT", healthTexture, "TOPRIGHT")
-	deficit:SetPoint("BOTTOMLEFT", healthTexture, "BOTTOMRIGHT")
-	deficit:SetPoint("TOPRIGHT", healthBar, "TOPRIGHT")
-	deficit:SetPoint("BOTTOMRIGHT", healthBar, "BOTTOMRIGHT")
 	deficit:Hide()
 	healthBar.Deficit = deficit
+	ApplyFillDirection(healthBar, settings)
 
 	healthBar.PostUpdateColor = PostUpdateHealthColor
 	healthBar.UpdateColor = UpdateHealthColor
@@ -170,9 +182,9 @@ local function BuildHealth(frame, unit)
 	frame:RegisterEvent("PLAYER_FLAGS_CHANGED", CatchUpHealth)
 end
 
-local function ApplyAbsorbLook(bar, health, config)
+local function ApplyAbsorbLook(bar, health, config, settings)
 	UnitFrames.ApplyAbsorbVisual(bar, config.texture, config.color)
-	UnitFrames.AnchorAbsorb(bar, health, health:GetStatusBarTexture(), config.direction)
+	UnitFrames.AnchorAbsorb(bar, health, health:GetStatusBarTexture(), config.direction, FillSpec(settings))
 end
 
 local function BuildAbsorb(frame, unit)
@@ -185,22 +197,22 @@ local function BuildAbsorb(frame, unit)
 
 	local absorb = CreateFrame("StatusBar", nil, clip)
 	absorb:SetFrameLevel(clip:GetFrameLevel() + 1)
-	ApplyAbsorbLook(absorb, frame.Health, settings.absorb)
+	ApplyAbsorbLook(absorb, frame.Health, settings.absorb, settings)
 	absorb:SetShown(settings.absorb.enabled)
 	frame.Absorb = absorb
 
 	local healAbsorb = CreateFrame("StatusBar", nil, clip)
 	healAbsorb:SetFrameLevel(clip:GetFrameLevel() + 2)
-	ApplyAbsorbLook(healAbsorb, frame.Health, settings.healAbsorb)
+	ApplyAbsorbLook(healAbsorb, frame.Health, settings.healAbsorb, settings)
 	healAbsorb:SetShown(settings.healAbsorb.enabled)
 	frame.HealAbsorb = healAbsorb
 	frame.AbsorbBars = { Damage = absorb, Heal = healAbsorb }
 end
 
 function GroupFrames.ApplyAbsorbToChild(child, settings)
-	ApplyAbsorbLook(child.Absorb, child.Health, settings.absorb)
+	ApplyAbsorbLook(child.Absorb, child.Health, settings.absorb, settings)
 	child.Absorb:SetShown(settings.absorb.enabled)
-	ApplyAbsorbLook(child.HealAbsorb, child.Health, settings.healAbsorb)
+	ApplyAbsorbLook(child.HealAbsorb, child.Health, settings.healAbsorb, settings)
 	child.HealAbsorb:SetShown(settings.healAbsorb.enabled)
 	if child.unit and child:IsElementEnabled("AbsorbBars") then child.AbsorbBars:ForceUpdate() end
 end
@@ -432,6 +444,7 @@ function GroupFrames.ApplyBarTextures(child, settings)
 	child.Health.Deficit:SetTexture(texture)
 	child.Power:SetStatusBarTexture(texture)
 	child.Power.bg:SetTexture(texture)
+	ApplyFillDirection(child.Health, settings)
 end
 
 local function RangeOverride(self)
