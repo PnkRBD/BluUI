@@ -59,7 +59,7 @@ function Display.EnableDragging(tracker, GetConfig)
     if not frame then return end
 
     BUI.Dragging.EnableAnchorDrag(frame, {
-        isCentered = function() return GetConfig().centerHorizontally and not frame._isAnchored end,
+        isCentered = function() return GetConfig().centerHorizontally and (not frame._isAnchored or BUI.Anchor.CentersOnAnchor(GetConfig())) end,
         onSave     = function() BUI.Anchor.SaveDrop(frame, GetConfig()) end,
         onRightClick = function()
             GetConfig().showAnchor = false

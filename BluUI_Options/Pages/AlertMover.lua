@@ -24,6 +24,10 @@ local function PositionTool(db, options)
 		return anchor ~= nil and anchor ~= ''
 	end
 	local function Free() return not Anchored() end
+	local getCentered, getSide, getMode = Field('centerHorizontally'), Field('anchorPoint'), Field('horizontalMode')
+	local function SideCentered() return BUI.Anchor.IsCenteredSide(getSide(), getMode()) end
+	local function CenterLocked() return Anchored() and not SideCentered() end
+	local function OffsetXLocked() return Free() or (not options.noCenter and getCentered() == true and SideCentered()) end
 	local frames = { { value = '', text = 'None, free on the screen' } }
 	for _, frame in ipairs(options.frames or (options.selfTag and BUI.AnchorFramesExcept(options.selfTag)) or BUI.C.ANCHOR_FRAMES) do
 		frames[#frames + 1] = { value = frame.tag, text = frame.desc }
@@ -34,7 +38,7 @@ local function PositionTool(db, options)
 		Option('Vertical', 'posY', { min = -rangeY, max = rangeY, step = 1, disabled = Anchored }),
 	}
 	if not options.noCenter then
-		local centered = Option('Center horizontally', 'centerHorizontally', { disabled = Anchored })
+		local centered = Option('Center horizontally', 'centerHorizontally', { disabled = CenterLocked })
 		local setCentered = centered.set
 		local _, setX = Field('posX')
 		centered.set = function(value)
@@ -46,7 +50,7 @@ local function PositionTool(db, options)
 	if not options.noAnchor then
 		rows[#rows + 1] = Option('Anchor to', 'anchorFrame', { entries = frames, width = ANCHOR_MENU_WIDTH, separator = true })
 		rows[#rows + 1] = Option('Anchor side', 'anchorPoint', { entries = BUI.C.ANCHOR_PLACEMENT_OPTIONS, width = ANCHOR_MENU_WIDTH, disabled = Free })
-		rows[#rows + 1] = Option('Anchor offset X', 'anchorOffsetX', { min = -ANCHOR_RANGE, max = ANCHOR_RANGE, step = 1, disabled = Free })
+		rows[#rows + 1] = Option('Anchor offset X', 'anchorOffsetX', { min = -ANCHOR_RANGE, max = ANCHOR_RANGE, step = 1, disabled = OffsetXLocked })
 		rows[#rows + 1] = Option('Anchor offset Y', 'anchorOffsetY', { min = -ANCHOR_RANGE, max = ANCHOR_RANGE, step = 1, disabled = Free })
 	end
 	if options.matchWidth then rows[#rows + 1] = Option('Match anchor width', 'matchAnchorWidth', { disabled = Free }) end
