@@ -353,21 +353,25 @@ local function FramesBoard(ui, parent, width, key)
 		Option(section, 'Height', 'height', { min = 18, max = 80, step = 1 }),
 		Option(section, 'Frame spacing', 'spacing', { min = 0, max = 40, step = 1 }),
 	}
-	if not isParty then
+	local size = { icon = 'resize', tooltip = 'Size and spacing', title = 'Size', options = sizing }
+	if isParty then
+		board:AddTools('Layout', 'Growth, size and spacing', {
+			{ entries = GROWTHS, get = function() return GroupFrames.PartyGrowth(section) end, set = function(value)
+				section.growDirection = value
+			end },
+			size,
+		}, Refresh)
+	else
 		sizing[#sizing + 1] = Option(section, 'Group spacing', 'groupSpacing', { min = 0, max = 40, step = 1 })
 		sizing[#sizing + 1] = Option(section, 'Groups per row', 'groupsPerRow', { min = 1, max = 8, step = 1 })
+		board:AddTools('Layout', 'Size, spacing and growth', {
+			size,
+			{ tooltip = 'Direction', title = 'Layout', options = {
+				Toggle(section, 'Vertical layout', 'vertical'),
+				Toggle(section, 'Grow upward', 'growUp'),
+			} },
+		}, Refresh)
 	end
-	if isParty then
-		sizing[#sizing + 1] = { label = 'Grow', entries = GROWTHS, get = function() return GroupFrames.PartyGrowth(section) end, set = function(value)
-			section.growDirection = value
-		end }
-	else
-		sizing[#sizing + 1] = Toggle(section, 'Vertical layout', 'vertical')
-		sizing[#sizing + 1] = Toggle(section, 'Grow upward', 'growUp')
-	end
-	board:AddTools('Frames', 'Size and spacing', {
-		{ tooltip = 'Size and spacing', title = 'Frames', options = sizing },
-	}, Refresh)
 	board:AddTools('Power bar', 'Resource bar under the health bar', {
 		{ icon = 'resize', tooltip = 'Height and healer-only mana', title = 'Power bar', options = {
 			Option(section, 'Bar height', 'powerHeight', { min = 0, max = 16, step = 1 }),
