@@ -109,6 +109,17 @@ function Anchor.ResolveAnchorPoint(anchorPoint, horizontalMode)
     return anchorPoint, opposites[anchorPoint] or "CENTER", false
 end
 
+local CENTERED_SIDES = { TOP = true, BOTTOM = true, CENTER = true }
+
+function Anchor.IsCenteredSide(anchorPoint, horizontalMode)
+    if horizontalMode then return false end
+    return CENTERED_SIDES[(Anchor.ResolveAnchorPoint(anchorPoint))] == true
+end
+
+function Anchor.CentersOnAnchor(settings)
+    return settings.centerHorizontally == true and Anchor.IsCenteredSide(settings.anchorPoint, settings.horizontalMode)
+end
+
 local anchorCallbacks = {}
 local armedAt
 
@@ -287,7 +298,7 @@ function Anchor.ApplyPosition(frame, settings)
     if anchorTarget and Anchor.WouldCycle(frame, anchorTarget) then anchorTarget = nil end
     if anchorTarget then
         local anchorPoint, framePoint, isInside = Anchor.ResolveAnchorPoint(settings.anchorPoint, settings.horizontalMode)
-        local offsetX = settings.anchorOffsetX or 0
+        local offsetX = Anchor.CentersOnAnchor(settings) and 0 or (settings.anchorOffsetX or 0)
         local offsetY = settings.anchorOffsetY or 0
 
         offsetY = offsetY + GetCDMAnchorOffset(settings.anchorFrame, anchorPoint)
