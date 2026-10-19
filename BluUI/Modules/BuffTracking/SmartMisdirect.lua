@@ -25,7 +25,6 @@ BUI.BuffTracking.SmartMisdirect = SmartMisdirect
 local MISDIRECTION_SPELL = 34477
 local BUTTON_NAME = 'BUI_SmartMisdirect'
 local MACRO_NAME = 'BluUI Misdirect'
-local MACRO_BODY = '#showtooltip Misdirection\n/click ' .. BUTTON_NAME .. ' LeftButton'
 local MACRO_FALLBACK_ICON = 134400
 
 local TANK_ROLE_ONLY = 'roleOnly'
@@ -125,6 +124,10 @@ local function OverrideUnit(settings)
 	local wantedRealm = settings.overrideRealm
 	if wantedRealm == '' then wantedRealm = nil end
 	return FindGroupUnit(MatchesPinnedName, wantedName, wantedRealm)
+end
+
+local function MisdirectSpell()
+	return C_Spell.GetOverrideSpell(MISDIRECTION_SPELL) or MISDIRECTION_SPELL
 end
 
 local function ResolveTarget()
@@ -229,6 +232,7 @@ local function ApplyTarget()
 		return
 	end
 
+	button:SetAttribute('spell', MisdirectSpell())
 	local unit = ResolveTarget()
 	if unit then
 		button:SetAttribute('type', 'spell')
@@ -265,21 +269,46 @@ local function ClearPinnedName()
 	SetPinnedName('', '')
 end
 
+local function MacroContent()
+	local spellID = MisdirectSpell()
+	local name = C_Spell.GetSpellName(spellID) or C_Spell.GetSpellName(MISDIRECTION_SPELL) or 'Misdirection'
+	return '#showtooltip ' .. name .. '\n/click ' .. BUTTON_NAME .. ' LeftButton', C_Spell.GetSpellTexture(spellID) or MACRO_FALLBACK_ICON
+end
+
+local function SyncMacro()
+	local index = GetMacroIndexByName(MACRO_NAME)
+	if index == 0 then return end
+	if InCombatLockdown() then
+		BUI.Events:AfterCombat(SyncMacro, 'SmartMisdirect.SyncMacro')
+		return
+	end
+	local body, icon = MacroContent()
+	local _, _, current = GetMacroInfo(index)
+	if current ~= body then EditMacro(index, MACRO_NAME, icon, body) end
+end
+
+local DispatchSync = BUI.Dispatcher.New(SyncMacro, 'SmartMisdirect.SyncMacro')
+
+local function OnSpellsChanged()
+	DispatchSync()
+	DispatchApply()
+end
+
 function SmartMisdirect.CreateMacro()
 	if InCombatLockdown() then
 		BUI.Print('Leave combat before creating the macro.')
 		return
 	end
-	local icon = C_Spell.GetSpellTexture(MISDIRECTION_SPELL) or MACRO_FALLBACK_ICON
+	local body, icon = MacroContent()
 	local index = GetMacroIndexByName(MACRO_NAME)
 	if index > 0 then
-		EditMacro(index, MACRO_NAME, icon, MACRO_BODY)
+		EditMacro(index, MACRO_NAME, icon, body)
 	else
 		if GetNumMacros() >= Constants.MacroConsts.MAX_ACCOUNT_MACROS then
 			BUI.Print('No free account macro slots. Delete one and try again.')
 			return
 		end
-		index = CreateMacro(MACRO_NAME, icon, MACRO_BODY, false)
+		index = CreateMacro(MACRO_NAME, icon, body, false)
 	end
 	if not index or index <= 0 then
 		BUI.Print('Could not create the Misdirection macro.')
@@ -315,7 +344,7 @@ local function AddMenuEntry(_, rootDescription, contextData)
 end
 
 local function OnSpellCast(_, _, _, spellID)
-	if spellID ~= MISDIRECTION_SPELL then return end
+	if spellID ~= MISDIRECTION_SPELL and spellID ~= MisdirectSpell() then return end
 	if Settings().enabled and AlertSettings().flashOnCast then RefreshAlert(true) end
 end
 
@@ -339,6 +368,7 @@ function SmartMisdirect.Setup()
 	BUI.Events:Register('PLAYER_ROLES_ASSIGNED', 'SmartMisdirect', DispatchApply)
 	BUI.Events:Register('PLAYER_FOCUS_CHANGED', 'SmartMisdirect', DispatchApply)
 	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'SmartMisdirect', DispatchApplyStaggered)
+	BUI.Events:Register('SPELLS_CHANGED', 'SmartMisdirect', OnSpellsChanged)
 	BUI.Events:RegisterUnit('UNIT_PET', 'player', 'SmartMisdirect', DispatchApply)
 	BUI.Events:RegisterUnit('UNIT_SPELLCAST_SUCCEEDED', 'player', 'SmartMisdirect', OnSpellCast)
 
