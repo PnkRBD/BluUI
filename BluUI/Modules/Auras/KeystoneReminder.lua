@@ -321,9 +321,10 @@ local function OnJoined(_, resultID)
     Remember(ResultActivity(resultID))
 end
 
-local function OnListing()
+local function OnListing(_, created)
     local entry = C_LFGList.GetActiveEntryInfo()
     if entry then
+        if created then dismissed = nil end
         Remember(MythicPlusActivity(entry.activityIDs[1]))
     elseif not IsInGroup() then
         Forget()
@@ -340,7 +341,11 @@ end
 
 local function OnWorld()
     keyDone = false
-    if InDungeon() then Forget() end
+    if InDungeon() then
+        Forget()
+    else
+        Sync()
+    end
 end
 
 local function OnKeyDone()
