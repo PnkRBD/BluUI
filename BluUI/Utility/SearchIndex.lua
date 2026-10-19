@@ -281,7 +281,7 @@ local entries = {
 	{ label = "Party frames", page = "unitframes", tab = 11, panel = "Party", keywords = "party frames position anchor preview enable" },
 	{ label = "Sorting", page = "unitframes", tab = 11, panel = "Party", keywords = "sort role class order party slot" },
 	{ label = "Visibility", page = "unitframes", tab = 11, panel = "Party", keywords = "self solo raid group show" },
-	{ label = "Frames", page = "unitframes", tab = 11, panel = "Party", keywords = "width height spacing texture vertical" },
+	{ label = "Frames", page = "unitframes", tab = 11, panel = "Party", keywords = "width height spacing texture vertical grow direction up down left right" },
 	{ label = "Power bar", page = "unitframes", tab = 11, panel = "Party", keywords = "power bar show hide height healer mana" },
 	{ label = "Health and colors", page = "unitframes", tab = 11, panel = "Appearance", keywords = "class color health border background transparent dead opacity" },
 	{ label = "Damage absorb", page = "unitframes", tab = 11, panel = "Appearance", keywords = "absorb shield heal texture direction" },

@@ -357,8 +357,14 @@ local function FramesBoard(ui, parent, width, key)
 		sizing[#sizing + 1] = Option(section, 'Group spacing', 'groupSpacing', { min = 0, max = 40, step = 1 })
 		sizing[#sizing + 1] = Option(section, 'Groups per row', 'groupsPerRow', { min = 1, max = 8, step = 1 })
 	end
-	sizing[#sizing + 1] = Toggle(section, 'Vertical layout', 'vertical')
-	if not isParty then sizing[#sizing + 1] = Toggle(section, 'Grow upward', 'growUp') end
+	if isParty then
+		sizing[#sizing + 1] = { label = 'Grow', entries = GROWTHS, get = function() return GroupFrames.PartyGrowth(section) end, set = function(value)
+			section.growDirection = value
+		end }
+	else
+		sizing[#sizing + 1] = Toggle(section, 'Vertical layout', 'vertical')
+		sizing[#sizing + 1] = Toggle(section, 'Grow upward', 'growUp')
+	end
 	board:AddTools('Frames', 'Texture, size and spacing', {
 		Menu(section, 'statusbarTexture', textures, WIDE_MENU),
 		{ tooltip = 'Size and spacing', title = 'Frames', options = sizing },

@@ -20,16 +20,52 @@ local function AnchorWidth(partySettings, target)
 end
 
 local LEFT_PIN_VARIANT = { TOP = "TOPLEFT", BOTTOM = "BOTTOMLEFT", INSIDE_TOP = "INSIDE_TOPLEFT", INSIDE_BOTTOM = "INSIDE_BOTTOMLEFT" }
+local RIGHT_PIN_VARIANT = { TOP = "TOPRIGHT", BOTTOM = "BOTTOMRIGHT", INSIDE_TOP = "INSIDE_TOPRIGHT", INSIDE_BOTTOM = "INSIDE_BOTTOMRIGHT" }
+
+local GROWTH = {
+	DOWN  = { point = "TOP",    x = 0,  y = -1 },
+	UP    = { point = "BOTTOM", x = 0,  y = 1 },
+	RIGHT = { point = "LEFT",   x = 1,  y = 0 },
+	LEFT  = { point = "RIGHT",  x = -1, y = 0 },
+}
+
+function GroupFrames.PartyGrowth(partySettings)
+	if GROWTH[partySettings.growDirection] then return partySettings.growDirection end
+	return partySettings.vertical == false and "RIGHT" or "DOWN"
+end
+
+local function Growth(partySettings)
+	return GROWTH[GroupFrames.PartyGrowth(partySettings)]
+end
+
+local function LayoutAttributes(partySettings)
+	local growth, gap = Growth(partySettings), Scale(partySettings.spacing)
+	return growth.point, growth.x * gap, growth.y * gap
+end
+
+local function PlaceFree(header, partySettings, growth)
+	local point, x, y = partySettings.point, Scale(partySettings.x), Scale(partySettings.y)
+	if growth.y > 0 then
+		point = point:gsub("TOP", "BOTTOM")
+		y = y - Scale(partySettings.height)
+	elseif growth.x < 0 then
+		point = point:gsub("LEFT", "RIGHT")
+		x = x + Scale(partySettings.width)
+	end
+	header:ClearAllPoints()
+	header:SetPoint(point, UIParent, partySettings.relPoint, x, y)
+end
 
 local function PositionHeader(header, partySettings)
+	local growth = Growth(partySettings)
 	local target = ResolveAnchorTarget(partySettings)
 	if not target then
-		header:ClearAllPoints()
-		header:SetPoint(partySettings.point, UIParent, partySettings.relPoint, Scale(partySettings.x), Scale(partySettings.y))
+		PlaceFree(header, partySettings, growth)
 		return nil
 	end
+	local pins = growth.x < 0 and RIGHT_PIN_VARIANT or LEFT_PIN_VARIANT
 	Anchor.ApplyPosition(header, target, partySettings.anchorFrame,
-		LEFT_PIN_VARIANT[partySettings.anchorPoint] or partySettings.anchorPoint,
+		pins[partySettings.anchorPoint] or partySettings.anchorPoint,
 		partySettings.anchorOffsetX, partySettings.anchorOffsetY)
 	return target
 end
@@ -108,15 +144,15 @@ function GroupFrames.SpawnParty()
 	if GroupFrames.headers.party then return end
 	local partySettings = GroupFrames.GetDB().party
 
-	local gap = Scale(partySettings.spacing)
+	local point, xOffset, yOffset = LayoutAttributes(partySettings)
 	local header = GroupFrames.SpawnHeader(
 		GroupFrames.FRAME_PREFIX .. "Party",
 		"showParty",   true,
 		"showPlayer",  partySettings.showPlayer == true,
 		"showSolo",    (partySettings.showSolo and partySettings.showPlayer) == true,
-		"yOffset",     partySettings.vertical and -gap or 0,
-		"xOffset",     partySettings.vertical and 0 or gap,
-		"point",       partySettings.vertical and "TOP" or "LEFT",
+		"yOffset",     yOffset,
+		"xOffset",     xOffset,
+		"point",       point,
 		"groupBy",     partySettings.sortBy,
 		"groupingOrder", SortOrderFor(partySettings),
 		"sortMethod",  "INDEX",
@@ -154,11 +190,11 @@ function GroupFrames.RefreshParty()
 	WatchAnchorTarget(target)
 	local effectiveWidth = AnchorWidth(partySettings, target) or partySettings.width
 
-	local gap = Scale(partySettings.spacing)
+	local point, xOffset, yOffset = LayoutAttributes(partySettings)
 	SetHeaderAttribute(header, "oUF-initialConfigFunction", GroupFrames.ConfigSnippet(effectiveWidth, partySettings.height))
-	SetHeaderAttribute(header, "point",      partySettings.vertical and "TOP" or "LEFT")
-	SetHeaderAttribute(header, "xOffset",    partySettings.vertical and 0 or gap)
-	SetHeaderAttribute(header, "yOffset",    partySettings.vertical and -gap or 0)
+	SetHeaderAttribute(header, "point",      point)
+	SetHeaderAttribute(header, "xOffset",    xOffset)
+	SetHeaderAttribute(header, "yOffset",    yOffset)
 	SetHeaderAttribute(header, "showPlayer", partySettings.showPlayer == true)
 	SetHeaderAttribute(header, "showSolo",   (partySettings.showSolo and partySettings.showPlayer) == true)
 	GroupFrames.ApplyPartyRaidMode()
