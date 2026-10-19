@@ -286,7 +286,6 @@ local function SkinPaperDoll(paperDoll)
 	Body(_G.InspectLevelText)
 	Button(paperDoll.ViewButton)
 	FadeRegions(_G.InspectModelFrame)
-	Shell(_G.InspectModelFrame)
 	for _, slotName in ipairs(SLOT_NAMES) do SkinSlot(_G['Inspect' .. slotName .. 'Slot'], SLOT_INFO[slotName]) end
 end
 
