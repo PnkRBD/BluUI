@@ -41,6 +41,7 @@ local STATIC_CHECK = { texture = "Interface\\RaidFrame\\ReadyCheck-Ready", color
 local unpack = unpack
 
 local activeMenu
+local menuBuilds = 0
 
 local function Palette(window, surface)
 	if not window then
@@ -167,6 +168,7 @@ local function BindRow(row, item, onSelect, palette, textX)
 	row:SetScript("OnEnter", BUILib.Timed('BUILib.ContextMenu BindRow row OnEnter', function() PaintRow(row, palette, true) end))
 	row:SetScript("OnLeave", BUILib.Timed('BUILib.ContextMenu BindRow row OnLeave', function() PaintRow(row, palette, false) end))
 	row:SetScript("OnClick", BUILib.Timed('BUILib.ContextMenu BindRow row OnClick', function()
+		local build = menuBuilds
 		local keepOpen = false
 		if item.callback then keepOpen = item.callback(item) == true end
 		if onSelect then onSelect(item) end
@@ -174,6 +176,7 @@ local function BindRow(row, item, onSelect, palette, textX)
 			CloseActive()
 			return
 		end
+		if build ~= menuBuilds then return end
 		ShowCheck(row, item, palette)
 		ShowSub(row, item)
 		PaintRow(row, palette, row:IsMouseOver())
@@ -273,6 +276,7 @@ local function HidePools()
 end
 
 function Controls.ContextMenu(items, options)
+	menuBuilds = menuBuilds + 1
 	options = options or {}
 	local palette = Palette(options.window, options.surface)
 	local width = math.min(options.width or DEFAULT_WIDTH, MAX_WIDTH)
