@@ -275,7 +275,7 @@ local function BarRows(ui, board, key, title, db, spec)
 		board:AddTools('Arrangement', 'Buttons per row, spacing and scale, or a vertical stack', {
 			{ icon = 'resize', tooltip = 'Rows, spacing and scale', title = title, options = {
 				Option(db, 'Per row', 'buttonsPerRow', { min = 1, max = MICRO_COUNT, step = 1 }),
-				Option(db, 'Spacing', 'spacing', { min = 0, max = 12, step = 1 }),
+				Option(db, 'Spacing', 'spacing', { min = -3, max = 12, step = 1 }),
 				Option(db, 'Scale %', 'scale', { min = 50, max = 200, step = 1 }),
 				Toggle(db, 'Vertical', 'vertical'),
 			} },
