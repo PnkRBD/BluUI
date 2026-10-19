@@ -90,6 +90,10 @@ local function OpenCalendar()
 	BUI.Events:AfterCombat(function() GameTimeFrame:Click() end, 'MinimapMenu.Calendar')
 end
 
+local CALENDAR_RELAY = {
+	action = function() return 'click', GameTimeFrame end,
+}
+
 local function CollectSections()
 	local buckets = {}
 	for _, section in ipairs(SECTIONS) do
@@ -201,7 +205,7 @@ end
 
 local toolActions = {
 	{ label = 'Settings',  texture = BUI.C.ICON_PATH,    onClick = function() BUI.PageEngine.Toggle() end },
-	{ label = 'Calendar',  dynamic = true,               onClick = OpenCalendar },
+	{ label = 'Calendar',  dynamic = true,               onClick = nop },
 	{ label = 'Reload',    texture = LibMedia('reload'), tint = true, onClick = ReloadUI },
 }
 
@@ -235,7 +239,10 @@ local function BuildToolPane()
 	for actionIndex = 1, #toolActions do
 		local row = CreateToolRow(toolActions[actionIndex])
 		menu._toolRows[actionIndex] = row
-		if toolActions[actionIndex].dynamic then menu.calendarRow = row end
+		if toolActions[actionIndex].dynamic then
+			menu.calendarRow = row
+			BUI.SecureRelay.Attach(row, CALENDAR_RELAY)
+		end
 	end
 end
 
