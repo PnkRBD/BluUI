@@ -382,6 +382,7 @@ local function BuildLowHp()
         onRightClick = function()
             GetDB().lowHpLocked = true
             BUI.Dragging.SetLocked(lowHpFrame, true)
+            Auras.UpdateLowHp()
             BUI.NotifyModuleChange('lowHp')
         end,
     })
