@@ -512,6 +512,55 @@ local function SettingBoard(ui, parent, width, spec)
 	return board
 end
 
+local function TrackedQuestTitles()
+	local titles = {}
+	local function Add(questID)
+		if questID then titles[#titles + 1] = C_QuestLog.GetTitleForQuestID(questID) or ('Quest ' .. questID) end
+	end
+	for index = 1, C_QuestLog.GetNumQuestWatches() do Add(C_QuestLog.GetQuestIDForQuestWatchIndex(index)) end
+	for index = 1, C_QuestLog.GetNumWorldQuestWatches() do Add(C_QuestLog.GetQuestIDForWorldQuestWatchIndex(index)) end
+	return titles
+end
+
+local function TrackedSummary()
+	local titles = TrackedQuestTitles()
+	if #titles == 0 then return 'Nothing tracked' end
+	if #titles == 1 then return 'Tracking ' .. titles[1] end
+	return ('Tracking %d quests, hover to see them'):format(#titles)
+end
+
+local function UntrackEverything()
+	for entryIndex = 1, C_QuestLog.GetNumQuestLogEntries() do
+		local info = C_QuestLog.GetInfo(entryIndex)
+		if info and not info.isHeader then C_QuestLog.RemoveQuestWatch(info.questID) end
+	end
+	for index = C_QuestLog.GetNumQuestWatches(), 1, -1 do C_QuestLog.RemoveQuestWatch(C_QuestLog.GetQuestIDForQuestWatchIndex(index)) end
+	for index = C_QuestLog.GetNumWorldQuestWatches(), 1, -1 do C_QuestLog.RemoveWorldQuestWatch(C_QuestLog.GetQuestIDForWorldQuestWatchIndex(index)) end
+end
+
+local function ConfirmUntrack()
+	if InCombatLockdown() then return end
+	Confirm('Untrack All Quests', 'This untracks every quest, hidden ones and world quests included. Old characters can carry hundreds of hidden ones that cost FPS. Track the quests you want again from the quest log.', 'Untrack', function()
+		if InCombatLockdown() then return end
+		UntrackEverything()
+	end)
+end
+
+local function TrackedQuestsRow(ui, board)
+	local row, _, sub = board:AddRow('Tracked quests', TrackedSummary(), BUTTON_ROOM)
+	ui.Button(row, 'Untrack all', 'control', ConfirmUntrack):SetPoint('RIGHT', -ui.ROW_INSET, 0)
+	local function Update() sub:SetText(TrackedSummary()) end
+	row:RegisterEvent('QUEST_WATCH_LIST_CHANGED')
+	row:SetScript('OnEvent', BUI.Profiler.Timed('QualityOfLife tracked quests changed', Update))
+	row:HookScript('OnShow', BUI.Profiler.Timed('QualityOfLife tracked quests shown', Update))
+	row:EnableMouse(true)
+	row:HookScript('OnEnter', BUI.Profiler.Timed('QualityOfLife tracked quests hover', function(self)
+		local titles = TrackedQuestTitles()
+		if #titles > 1 then Widget.ShowTip(self, table.concat(titles, '\n')) end
+	end))
+	row:HookScript('OnLeave', Widget.HideTip)
+end
+
 local function GraphicsBoard(ui, parent, width)
 	local board = ui.Board(parent, width, {
 		title = 'Graphics',
@@ -528,6 +577,7 @@ local function GraphicsBoard(ui, parent, width)
 		local differing, known = PendingCVars()
 		status:SetText(differing == 0 and 'At the preset' or (differing .. ' of ' .. known .. ' differ'))
 	end)
+	TrackedQuestsRow(ui, board)
 	return board
 end
 

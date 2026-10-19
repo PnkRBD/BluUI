@@ -164,7 +164,6 @@ local entries = {
 	{ label = "Text", page = "objectivetracker", panel = "Text", keywords = "objective tracker quest skin enable font size outline single line wrap colors title hover objective completed ready time left" },
 	{ label = "Panel", page = "objectivetracker", panel = "Panel", keywords = "objective tracker quest background texture tint opacity border separator lines" },
 	{ label = "Quests", page = "objectivetracker", panel = "Quests", keywords = "objective tracker quest header icons dashes tooltips completion messages sound hide item button key" },
-	{ label = "Tracked quests", page = "objectivetracker", panel = "Quests", keywords = "untrack all hidden quests watch tracked world quests fps performance lag" },
 
 	{ label = "Cursor size", page = "cursor", panel = "General", keywords = "cursor ring circle enable size diameter" },
 	{ label = "Only in combat", page = "cursor", panel = "Visibility", keywords = "cursor combat hide show" },
@@ -258,6 +257,7 @@ local entries = {
 	{ label = "Hide Error Msgs", page = "qol", tab = 2, panel = "Interface", keywords = "error red text" },
 	{ label = "FPS preset", page = "qol", tab = 4, panel = "Graphics", keywords = "fps cvar performance graphics vsync apply" },
 	{ label = "Restore", page = "qol", tab = 4, panel = "Graphics", keywords = "fps cvar restore original" },
+	{ label = "Tracked quests", page = "qol", tab = 4, panel = "Graphics", keywords = "untrack all hidden quests watch tracked world quests fps performance lag" },
 	{ label = "BluUI settings", page = "qol", tab = 5, panel = "Danger zone", keywords = "reset wipe default settings bluui" },
 	{ label = "Celebrations", page = "qol", tab = 6, panel = "Celebrations", keywords = "confetti mythic plus m+ key timed boss kill raid dungeon celebrate" },
 	{ label = "Unit Frames", page = "settings", tab = 5, panel = "Modules", keywords = "enable disable module" },
