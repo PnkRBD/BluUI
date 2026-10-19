@@ -61,10 +61,11 @@ local function OverPopup(frame, anchor)
 end
 
 Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window)
-	local function Changed(tool, after)
+	local function Changed(tool, after, repaint)
 		return function(value)
 			tool.set(value)
 			if after then after() end
+			if repaint then window:Repaint() end
 		end
 	end
 
@@ -217,7 +218,7 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 		elseif kind == 'input' then
 			return kit.Input(parent, tool.width or POP_CONTROL, { placeholder = tool.placeholder, square = tool.square, get = tool.get, set = Changed(tool, after) })
 		end
-		return kit.Switch(parent, tool.get, Changed(tool, after))
+		return kit.Switch(parent, tool.get, Changed(tool, after, true))
 	end
 
 	function kit.Tools(row, tools, after)
