@@ -636,13 +636,17 @@ local function StyleMarkWarning()
     markText:SetTextColor(color.r, color.g, color.b, color.a)
 
     local iconSize = fontSize + 6
-    local showIcon = db.markShowIcon
+    local iconOnly = db.markIconOnly
+    local showIcon = db.markShowIcon or iconOnly
     markIcon:SetSize(iconSize, iconSize)
     markIcon:SetShown(showIcon)
+    markText:SetShown(not iconOnly)
 
     markText:ClearAllPoints()
     markIcon:ClearAllPoints()
-    if showIcon then
+    if iconOnly then
+        markIcon:SetPoint("CENTER", markPanel, "CENTER", 0, 0)
+    elseif showIcon then
         markText:SetPoint("CENTER", markPanel, "CENTER", math.floor(iconSize / 2) + 3, 0)
         markIcon:SetPoint("RIGHT", markText, "LEFT", -6, 0)
     else

@@ -1454,6 +1454,7 @@ BUI.Defaults = {
 			markFont                    = BUI.C.GLOBAL_OPTION,
 			markColor                   = { r = 1, g = 0.25, b = 0.35, a = 1 },
 			markShowIcon                = false,
+			markIconOnly                = false,
 			markPulse                   = true,
 			markPosX                    = 0,
 			markPosY                    = -150,
