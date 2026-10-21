@@ -27,6 +27,8 @@ local CATEGORY_HOVER_ATLAS = 'Options_List_Hover'
 local SETTINGS_TAB_KEYS = { 'GameTab', 'AddOnsTab' }
 local QUALITY_TAB_KEYS = { 'BaseTab', 'RaidTab' }
 local QUALITY_GROUP_KEYS = { 'BaseQualityControls', 'RaidQualityControls' }
+local QUALITY_TAB_H, QUALITY_TAB_X, QUALITY_TAB_Y = 24, -8, 4
+local QUALITY_BOX = { left = -12, right = 6, top = 28, bottom = -16 }
 local SETTINGS_BUTTON_KEYS = { 'ApplyButton', 'CloseButton' }
 local SLIDER_TEXT_KEYS = { 'LeftText', 'RightText', 'TopText', 'MinText', 'MaxText' }
 local BINDING_BUTTON_KEYS = { 'Button1', 'Button2', 'CustomButton' }
@@ -273,6 +275,17 @@ local function StyleRowText(row)
 	OnRowDisplayEnabled(row, RowTextEnabled(row))
 end
 
+local function StyleQualitySection(row)
+	if not row._buiQualityTabs then
+		row._buiQualityTabs = true
+		for _, key in ipairs(QUALITY_TAB_KEYS) do row[key]:SetHeight(QUALITY_TAB_H) end
+		row.RaidTab:ClearAllPoints()
+		row.RaidTab:SetPoint('TOPRIGHT', QUALITY_TAB_X, QUALITY_TAB_Y)
+	end
+	SegmentMinimalTabs(row, QUALITY_TAB_KEYS)
+	for _, key in ipairs(QUALITY_GROUP_KEYS) do StyleControls(row[key]) end
+end
+
 local function StyleSettingsRow(row)
 	if not Enabled() or row:IsForbidden() then return end
 	StyleRowText(row)
@@ -289,13 +302,10 @@ local function StyleSettingsRow(row)
 	for _, key in ipairs(ROW_BUTTON_KEYS) do Button(row[key]) end
 	if row.NineSlice then
 		Fade(row.NineSlice)
-		Shell(row)
+		Shell(row, row.BaseQualityControls and QUALITY_BOX)
 	end
 	StyleControls(row)
-	if row.BaseQualityControls then
-		SegmentMinimalTabs(row, QUALITY_TAB_KEYS)
-		for _, key in ipairs(QUALITY_GROUP_KEYS) do StyleControls(row[key]) end
-	end
+	if row.BaseQualityControls then StyleQualitySection(row) end
 end
 
 local function SkinSettingsPanel(frame)
