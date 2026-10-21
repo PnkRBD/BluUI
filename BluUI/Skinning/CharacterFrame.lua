@@ -2050,6 +2050,8 @@ local function ApplyScale()
     settingsSlide.Refit()
 end
 
+local ResetSheet
+
 local function IconButton(parent, icon, tooltip, onClick)
     return BUILib.Controls.Icon(parent, {
         icon = icon, size = 20, iconScale = 0.7, idleColor = { Painter.Color('skinLabel') },
@@ -2115,6 +2117,10 @@ local function BuildFrame()
     cog:SetPoint('RIGHT', titleBar.closeBtn.frame, 'LEFT', Pixel.Scale(-4), 0)
     cog:SetFrameLevel(frame:GetFrameLevel() + 10)
 
+    local reset = IconButton(frame, 'reset', 'Reset all sheet settings', ResetSheet)
+    reset:SetPoint('RIGHT', cog, 'LEFT', Pixel.Scale(-4), 0)
+    reset:SetFrameLevel(frame:GetFrameLevel() + 10)
+
     frame.titleText:ClearAllPoints()
     frame.titleText:SetPoint('TOPLEFT', titleBar, 'TOPLEFT', Pixel.Scale(14), Pixel.Scale(-HEADER.TOP_PAD))
     frame.subText = frame:CreateFontString(nil, 'OVERLAY')
@@ -2171,6 +2177,22 @@ local function RefreshAll()
     RefreshStats()
     RefreshTitles()
     RefreshSets(true)
+end
+
+ResetSheet = function()
+    local skinning = BUI.GetDB().skinning
+    local factory = BUI.ExportImport.FactoryProfile().skinning
+    for _, key in ipairs({ 'characterSheet', 'characterFrameTintEnabled', 'characterFrameTint', BAG.MARKER_KEY }) do
+        local value = factory[key]
+        skinning[key] = type(value) == 'table' and CopyTable(value) or value
+    end
+    ApplyScale()
+    ApplyRaceArt()
+    ApplyBackground()
+    LayoutSections()
+    LayoutToggles()
+    RefreshAll()
+    SyncSettings()
 end
 
 local SETTINGS_WIDTH = 320
