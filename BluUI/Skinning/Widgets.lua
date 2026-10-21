@@ -62,7 +62,7 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 
 	local scroll = CreateFrame('ScrollFrame', nil, parent)
 	scroll:SetPoint('TOPLEFT', Pixel.Scale(padding), Pixel.Scale(-padding))
-	scroll:SetPoint('BOTTOMRIGHT', Pixel.Scale(-padding - SCROLL_TRACK_SPACE), Pixel.Scale(padding))
+	scroll:SetPoint('BOTTOMRIGHT', Pixel.Scale(-padding), Pixel.Scale(padding))
 
 	local child = CreateFrame('Frame', nil, scroll)
 	local contentHeight = Pixel.PixelSize(1)
@@ -105,16 +105,13 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 		scroll:SetVerticalScroll(math.floor(percent * MaxScroll() + 0.5))
 	end
 
-	local function UpdateRange()
+	local function UpdateRange(width)
 		local maxScroll = MaxScroll()
-		if maxScroll <= 0 then
-			thumb:Hide()
-			track:Hide()
-			scroll:SetPoint('BOTTOMRIGHT', Pixel.Scale(-padding), Pixel.Scale(padding))
-		else
-			track:Show()
-			thumb:Show()
-			scroll:SetPoint('BOTTOMRIGHT', Pixel.Scale(-padding - SCROLL_TRACK_SPACE), Pixel.Scale(padding))
+		local scrolling = maxScroll > 0
+		track:SetShown(scrolling)
+		local room = width - (scrolling and Pixel.Scale(SCROLL_TRACK_SPACE) or 0)
+		if room > 0 then child:SetWidth(room) end
+		if scrolling then
 			local height = scroll:GetHeight()
 			thumb:SetHeight(max(20, track:GetHeight() * (height / (height + maxScroll))))
 		end
@@ -122,7 +119,7 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 
 	hooksecurefunc(child, 'SetHeight', Wrap('Skin.Widgets content height', function(_, height)
 		contentHeight = height
-		UpdateRange()
+		UpdateRange(scroll:GetWidth())
 	end))
 
 	local DragUpdate = Wrap('Skin.Widgets scroll drag', function() ApplyScrollPct(CursorToScrollPct()) end)
@@ -143,8 +140,7 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 	end))
 
 	scroll:SetScript('OnSizeChanged', Wrap('Skin.Widgets scroll resize', function(_, width)
-		if width > 0 then child:SetWidth(width) end
-		UpdateRange()
+		UpdateRange(width)
 	end))
 
 	scroll:SetScript('OnVerticalScroll', Wrap('Skin.Widgets scroll thumb', function(_, offset)
