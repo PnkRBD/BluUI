@@ -27,7 +27,7 @@ function BUI.SlidePanel.New(options)
         local anchor = Anchor()
         panel:ClearAllPoints()
         panel:SetPoint('TOPLEFT', anchor, 'TOPRIGHT', offsetX, 0)
-        panel:SetSize(Width(), anchor:GetHeight())
+        panel:SetSize(Width(), anchor:GetHeight() * anchor:GetEffectiveScale() / panel:GetEffectiveScale())
     end
 
     local function SlideTo(targetX, onDone)
@@ -86,6 +86,13 @@ function BUI.SlidePanel.New(options)
 
     function slidePanel.IsOpen()
         return slidePanel.open
+    end
+
+    function slidePanel.Refit()
+        local panel = options.panel()
+        if not slidePanel.open or not panel or panel:GetScript('OnUpdate') then return end
+        local _, _, _, offsetX = panel:GetPoint(1)
+        SetOffset(offsetX)
     end
 
     return slidePanel

@@ -118,6 +118,14 @@ local CONQUEST_CURRENCY, QUESTION_MARK_ICON = 1602, 134400
 
 local frame, model, sidebar, overlay
 local slotLabels = {}
+
+local function Sheet()
+    return BUI.GetDB().skinning.characterSheet
+end
+
+local function SheetScale()
+    return Sheet().scale / 100
+end
 local sections = {}
 
 function Skin.GetCharacterFrame()
@@ -632,6 +640,14 @@ local function RefreshGems(labels, link)
     SyncGemDim(labels)
 end
 
+local function ShowReadouts(labels)
+    local sheet = Sheet()
+    labels.ilvl:SetShown(sheet.ilvl)
+    labels.track:SetShown(sheet.track)
+    labels.enchant:SetShown(sheet.enchants)
+    if not sheet.enchants then labels.enchantHover:Hide() end
+end
+
 local function RefreshSlot(labels)
     local info, button = labels.info, labels.button
     local inventorySlot = GetInventorySlotInfo(info.id)
@@ -639,6 +655,7 @@ local function RefreshSlot(labels)
     local qualityColor = link and QualityColor(C_Item.GetItemQualityByID(link))
     button._buiQualityColor = qualityColor
     PaintSlotBorder(button)
+    ShowReadouts(labels)
 
     if not link or info.cosmetic then
         labels.ilvl:SetText('')
@@ -665,20 +682,21 @@ local function RefreshSlot(labels)
     labels.track:SetTextColor(color[1], color[2], color[3], 0.6)
 
     local hover = labels.enchantHover
+    local sheet = Sheet()
     if enchant ~= '' then
         Readout.PaintEnchant(labels.enchant, hover, enchant)
         hover.slot = inventorySlot
-        hover:Show()
+        hover:SetShown(sheet.enchants)
     elseif canEnchant and Readout.AtEnchantLevel('player') then
         Readout.PaintMissingEnchant(labels.enchant, hover)
         hover.slot = nil
-        hover:Show()
+        hover:SetShown(sheet.enchants)
     else
         labels.enchant:SetText('')
         hover:Hide()
     end
 
-    RefreshGems(labels, link)
+    RefreshGems(labels, sheet.gems and link or nil)
 end
 
 local function PlaceSlotButtons()
@@ -1052,29 +1070,34 @@ end
 LayoutSections = function()
     if not sidebar then return end
     local scrollChild = sidebar.statsScroll.child
+    local shownSections = Sheet().sections
     local offsetY = 0
     for _, section in ipairs(sections) do
-        local height = HEADER_HEIGHT
-        if not section.collapsed then
-            local rowY = -(HEADER_HEIGHT + HEADER_ROW_GAP)
-            for index = 1, section.rowCount do
-                local row = section.rows[index]
-                row:ClearAllPoints()
-                row:SetPoint('TOPLEFT', section.container, 'TOPLEFT', 0, Pixel.Scale(rowY))
-                row:SetPoint('TOPRIGHT', section.container, 'TOPRIGHT', 0, Pixel.Scale(rowY))
-                row:Show()
-                rowY = rowY - ROW_HEIGHT
+        local visible = shownSections[section.definition.title] ~= false
+        section.container:SetShown(visible)
+        if visible then
+            local height = HEADER_HEIGHT
+            if not section.collapsed then
+                local rowY = -(HEADER_HEIGHT + HEADER_ROW_GAP)
+                for index = 1, section.rowCount do
+                    local row = section.rows[index]
+                    row:ClearAllPoints()
+                    row:SetPoint('TOPLEFT', section.container, 'TOPLEFT', 0, Pixel.Scale(rowY))
+                    row:SetPoint('TOPRIGHT', section.container, 'TOPRIGHT', 0, Pixel.Scale(rowY))
+                    row:Show()
+                    rowY = rowY - ROW_HEIGHT
+                end
+                height = HEADER_HEIGHT + HEADER_ROW_GAP + section.rowCount * ROW_HEIGHT
+            else
+                for index = 1, section.rowCount do section.rows[index]:Hide() end
             end
-            height = HEADER_HEIGHT + HEADER_ROW_GAP + section.rowCount * ROW_HEIGHT
-        else
-            for index = 1, section.rowCount do section.rows[index]:Hide() end
+            section.container:ClearAllPoints()
+            section.container:SetPoint('TOPLEFT', scrollChild, 'TOPLEFT', 0, Pixel.Scale(offsetY))
+            section.container:SetPoint('TOPRIGHT', scrollChild, 'TOPRIGHT', 0, Pixel.Scale(offsetY))
+            section.container:SetHeight(Pixel.Scale(height))
+            section.header.text:SetAlpha(section.collapsed and 0.6 or 1)
+            offsetY = offsetY - height - SECTION_GAP
         end
-        section.container:ClearAllPoints()
-        section.container:SetPoint('TOPLEFT', scrollChild, 'TOPLEFT', 0, Pixel.Scale(offsetY))
-        section.container:SetPoint('TOPRIGHT', scrollChild, 'TOPRIGHT', 0, Pixel.Scale(offsetY))
-        section.container:SetHeight(Pixel.Scale(height))
-        section.header.text:SetAlpha(section.collapsed and 0.6 or 1)
-        offsetY = offsetY - height - SECTION_GAP
     end
     scrollChild:SetHeight(Pixel.Scale(-offsetY + 4))
 end
@@ -1802,11 +1825,30 @@ local function MakeToggleButton(parent, options)
 end
 
 local TOGGLES = {
-    { icon = 'Interface\\Icons\\Spell_Arcane_PortalDalaran', title = 'Portals', module = 'PortalManager' },
-    { icon = 'Interface\\Icons\\INV_Misc_Coin_01', title = 'Currency', module = 'CurrencyManager' },
-    { icon = 'Interface\\Icons\\Achievement_Reputation_01', title = 'Reputation', module = 'ReputationManager' },
-    { atlas = 'gficon-chest-evergreen-greatvault-complete', title = 'Great Vault', onClick = function() WeeklyRewards_ShowUI() end },
+    { key = 'PortalManager', icon = 'Interface\\Icons\\Spell_Arcane_PortalDalaran', title = 'Portals', module = 'PortalManager' },
+    { key = 'CurrencyManager', icon = 'Interface\\Icons\\INV_Misc_Coin_01', title = 'Currency', module = 'CurrencyManager' },
+    { key = 'ReputationManager', icon = 'Interface\\Icons\\Achievement_Reputation_01', title = 'Reputation', module = 'ReputationManager' },
+    { key = 'GreatVault', atlas = 'gficon-chest-evergreen-greatvault-complete', title = 'Great Vault', onClick = function() WeeklyRewards_ShowUI() end },
 }
+local toggleButtons = {}
+
+local function LayoutToggles()
+    local shown = Sheet().buttons
+    local previous
+    for index, toggle in ipairs(TOGGLES) do
+        local button = toggleButtons[index]
+        button:ClearAllPoints()
+        button:SetShown(shown[toggle.key] ~= false)
+        if button:IsShown() then
+            if previous then
+                button:SetPoint('RIGHT', previous, 'LEFT', Pixel.Scale(-6), 0)
+            else
+                button:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', Pixel.Scale(-10), Pixel.Scale(10))
+            end
+            previous = button
+        end
+    end
+end
 
 local function RaceBackgroundPath()
     local _, fileName = UnitRace('player')
@@ -1887,6 +1929,7 @@ local function BuildModel(parent)
     playerModel:EnableMouseWheel(true)
     playerModel.facing = 0
     playerModel.scale = 1.0
+    playerModel.art = art
 
     playerModel:SetScript('OnMouseDown', BUI.Profiler.Script('Skin.CharacterFrame playerModel OnMouseDown', function(self, button)
         if button == 'LeftButton' then
@@ -1975,6 +2018,22 @@ local function ApplyBackground()
     end
 end
 
+local function ApplyRaceArt()
+    if not model then return end
+    local shown = Sheet().raceArt
+    for _, piece in ipairs(model.art.pieces) do piece:SetShown(shown) end
+    model.art.overlay:SetShown(shown)
+end
+
+local function ApplyScale()
+    if frame then frame:SetScale(SheetScale()) end
+    if context.Enabled() and not HasConflictingCharSheet() then
+        Skin.ReserveWidth(CharacterFrame, FRAME_WIDTH * SheetScale(), CharacterFrame)
+    end
+end
+
+local settingsSlide
+
 local function BuildFrame()
     frame = CreateFrame('Frame', nil, CharacterFrame, 'BackdropTemplate')
     frame:SetSize(FRAME_WIDTH, FRAME_HEIGHT)
@@ -1984,19 +2043,21 @@ local function BuildFrame()
     frame:SetPoint('CENTER')
     frame:SetFrameStrata('HIGH')
     frame:SetFrameLevel(FRAME_LEVEL)
+    frame:SetScale(SheetScale())
 
     local dragger = CreateFrame('Frame', nil, frame)
     dragger:Hide()
     local function BeginSheetDrag()
         if bagPopup then bagPopup:Hide() end
         Placement.OnDragStart()
-        local scale = UIParent:GetEffectiveScale()
+        local scale = frame:GetEffectiveScale()
         local left, top = frame:GetLeft(), frame:GetTop()
         local cursorX, cursorY = GetCursorPosition()
         local grabX, grabY = cursorX / scale - left, cursorY / scale - top
         dragger:SetScript('OnUpdate', BUI.Profiler.Wrap('Skin.CharacterFrame sheet drag', function()
             local x, y = GetCursorPosition()
-            local screenWidth, screenHeight = UIParent:GetWidth(), UIParent:GetHeight()
+            local toSheet = UIParent:GetEffectiveScale() / scale
+            local screenWidth, screenHeight = UIParent:GetWidth() * toSheet, UIParent:GetHeight() * toSheet
             local width, height = frame:GetWidth(), frame:GetHeight()
             local newLeft = math.min(math.max(x / scale - grabX, 0), screenWidth - width)
             local newTop = math.min(math.max(y / scale - grabY, height), screenHeight)
@@ -2027,6 +2088,13 @@ local function BuildFrame()
     titleBar:SetScript('OnDragStart', BUI.Profiler.Script('Skin.CharacterFrame titleBar OnDragStart', BeginSheetDrag))
     titleBar:SetScript('OnDragStop', BUI.Profiler.Script('Skin.CharacterFrame titleBar OnDragStop', EndSheetDrag))
 
+    local cog = BUILib.Controls.Icon(frame, {
+        icon = 'cog', size = 20, iconScale = 0.7, idleColor = { Painter.Color('skinLabel') },
+        tooltip = 'Sheet settings', onClick = function() settingsSlide.Toggle() end,
+    })
+    cog.frame:SetPoint('RIGHT', titleBar.closeBtn.frame, 'LEFT', Pixel.Scale(-4), 0)
+    cog.frame:SetFrameLevel(frame:GetFrameLevel() + 10)
+
     frame.titleText:ClearAllPoints()
     frame.titleText:SetPoint('TOPLEFT', titleBar, 'TOPLEFT', Pixel.Scale(14), Pixel.Scale(-HEADER.TOP_PAD))
     frame.subText = frame:CreateFontString(nil, 'OVERLAY')
@@ -2035,6 +2103,7 @@ local function BuildFrame()
     Painter.Text(frame.subText, 'skinLabel')
 
     model = BuildModel(frame)
+    ApplyRaceArt()
 
     overlay = CreateFrame('Frame', nil, frame)
     overlay:SetAllPoints()
@@ -2043,16 +2112,8 @@ local function BuildFrame()
 
     BuildSidebar(frame)
 
-    local previous
-    for _, toggle in ipairs(TOGGLES) do
-        local button = MakeToggleButton(frame, toggle)
-        if previous then
-            button:SetPoint('RIGHT', previous, 'LEFT', Pixel.Scale(-6), 0)
-        else
-            button:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', Pixel.Scale(-10), Pixel.Scale(10))
-        end
-        previous = button
-    end
+    for index, toggle in ipairs(TOGGLES) do toggleButtons[index] = MakeToggleButton(frame, toggle) end
+    LayoutToggles()
 
     PlaceSlotButtons()
 end
@@ -2092,6 +2153,131 @@ local function RefreshAll()
     RefreshSets(true)
 end
 
+local TINT_DEFAULT = { 0.45, 0.45, 0.6, 0.15 }
+local SETTINGS = { W = 300, TOP = 44, HEADER_H = 22, HEADER_GAP = 4, ROW_H = 26, SLIDER_H = 42, COL_W = 138, GAP = 10, RESET_W = 110, RESET_H = 22 }
+local settingsPanel
+local settingsSync = {}
+
+local function SyncSettings()
+    for _, sync in ipairs(settingsSync) do sync() end
+end
+
+local function BuildSettingsPanel()
+    settingsPanel = Skin.CreatePanelWindow('Sheet settings', function() settingsSlide.Close(true) end)
+    local _, _, child = Skin.CreateListArea(settingsPanel, SETTINGS.TOP, SETTINGS.ROW_H)
+    local Controls = BUILib.Controls
+    local y, column = 0, 0
+
+    local function NewLine()
+        if column == 0 then return end
+        column = 0
+        y = y + SETTINGS.ROW_H
+    end
+    local function Header(title)
+        NewLine()
+        if y > 0 then y = y + SETTINGS.GAP end
+        local header = Skin.CreateListHeader(child, SETTINGS.HEADER_H)
+        header:SetTitle(title)
+        header:SetPoint('TOPLEFT', child, 'TOPLEFT', 0, -y)
+        header:SetPoint('TOPRIGHT', child, 'TOPRIGHT', 0, -y)
+        y = y + SETTINGS.HEADER_H + SETTINGS.HEADER_GAP
+    end
+    local function Place(control)
+        control:SetPoint('TOPLEFT', child, 'TOPLEFT', column * SETTINGS.COL_W, -y)
+        column = column + 1
+        if column == 2 then NewLine() end
+    end
+    local function Switch(label, get, set)
+        local toggle = Controls.Toggle(child, label, get(), set, nil, true, nil, SETTINGS.COL_W)
+        Place(toggle.frame)
+        settingsSync[#settingsSync + 1] = function() toggle.frame:SetValue(get()) end
+    end
+    local function Swatch(label, get, set)
+        local red, green, blue, alpha = get()
+        local swatch = Controls.ColorSwatch(child, { label = label, r = red, g = green, b = blue, a = alpha, width = SETTINGS.COL_W, callback = set })
+        Place(swatch.frame)
+        settingsSync[#settingsSync + 1] = function() swatch.frame:SetColor(get()) end
+    end
+    local function SheetSwitch(label, key, apply)
+        Switch(label, function() return Sheet()[key] end, function(value)
+            Sheet()[key] = value
+            apply()
+        end)
+    end
+
+    Header('Slot readouts')
+    SheetSwitch('Item level', 'ilvl', RefreshSlots)
+    SheetSwitch('Upgrade track', 'track', RefreshSlots)
+    SheetSwitch('Enchants', 'enchants', RefreshSlots)
+    SheetSwitch('Gems', 'gems', RefreshSlots)
+
+    Header('Size')
+    local slider = Controls.CompactSlider(child, 'Scale %', 80, 130, Sheet().scale, function(value)
+        Sheet().scale = value
+        ApplyScale()
+        settingsSlide.Refit()
+    end, 1, SETTINGS.COL_W * 2 - SETTINGS.GAP)
+    slider.frame:SetPoint('TOPLEFT', child, 'TOPLEFT', 0, -y)
+    settingsSync[#settingsSync + 1] = function() slider.frame:SetValue(Sheet().scale) end
+    y = y + SETTINGS.SLIDER_H
+
+    Header('Corner buttons')
+    for _, toggle in ipairs(TOGGLES) do
+        Switch(toggle.title, function() return Sheet().buttons[toggle.key] ~= false end, function(value)
+            Sheet().buttons[toggle.key] = value
+            LayoutToggles()
+        end)
+    end
+
+    Header('Look')
+    SheetSwitch('Race background', 'raceArt', ApplyRaceArt)
+    Switch('Tint the sheet', function() return BUI.GetDB().skinning.characterFrameTintEnabled == true end, function(value)
+        local skinning = BUI.GetDB().skinning
+        skinning.characterFrameTintEnabled = value
+        skinning.characterFrameTint = skinning.characterFrameTint or TINT_DEFAULT
+        ApplyBackground()
+    end)
+    Swatch('Tint color', function() return unpack(BUI.GetDB().skinning.characterFrameTint or TINT_DEFAULT) end, function(red, green, blue, alpha)
+        BUI.GetDB().skinning.characterFrameTint = { red, green, blue, alpha }
+        ApplyBackground()
+    end)
+    NewLine()
+    Swatch('Bag swap marker', function()
+        local color = BAG.MarkerColor()
+        return color[1], color[2], color[3], color[4] or 1
+    end, function(red, green, blue, alpha)
+        BUI.GetDB().skinning[BAG.MARKER_KEY] = { red, green, blue, alpha }
+        RefreshBagAlternatives()
+    end)
+    local reset = Skin.SmallButton(child, SETTINGS.RESET_W, SETTINGS.RESET_H, 'Reset marker')
+    reset:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame reset marker OnClick', function()
+        BUI.GetDB().skinning[BAG.MARKER_KEY] = nil
+        RefreshBagAlternatives()
+        SyncSettings()
+    end))
+    Place(reset)
+
+    Header('Stats sections')
+    for _, definition in ipairs(STAT_SECTIONS) do
+        local title = definition.title
+        Switch(title, function() return Sheet().sections[title] ~= false end, function(value)
+            Sheet().sections[title] = value
+            LayoutSections()
+        end)
+    end
+    NewLine()
+    child:SetHeight(y + SETTINGS.GAP)
+end
+
+settingsSlide = BUI.SlidePanel.New({
+    skin = 'characterFrame',
+    width = SETTINGS.W,
+    hiddenX = -SETTINGS.W,
+    panel = function() return settingsPanel end,
+    build = BuildSettingsPanel,
+    onOpen = SyncSettings,
+})
+
 local function ShowSkin()
     if HasConflictingCharSheet() then return end
     if not frame then BuildFrame() end
@@ -2106,6 +2292,7 @@ end
 local function HideSkin()
     Placement.OnHide()
     if bagPopup then bagPopup:Hide() end
+    settingsSlide.Close(true)
 end
 
 local function IsOpen()
@@ -2128,7 +2315,7 @@ context.Window('CharacterFrame', {
         blizzard:HookScript('OnHide', BUI.Profiler.Wrap('Skin.CharacterFrame frame restore', context.Guard(HideSkin)))
     end,
     enable = function(blizzard)
-        if not HasConflictingCharSheet() then Skin.ReserveWidth(blizzard, FRAME_WIDTH, blizzard) end
+        if not HasConflictingCharSheet() then Skin.ReserveWidth(blizzard, FRAME_WIDTH * SheetScale(), blizzard) end
     end,
 })
 
@@ -2194,44 +2381,3 @@ BUI.Events:RegisterUnit('UNIT_NAME_UPDATE', 'player', 'Skinning.CharacterFrame',
 BUI.Events:RegisterUnit('UNIT_MODEL_CHANGED', 'player', 'Skinning.CharacterFrame', On.Model)
 BUI.Events:Register('TRANSMOGRIFY_SUCCESS', 'Skinning.CharacterFrame', On.Model)
 BUI.Events:Register('BAG_UPDATE_DELAYED', 'Skinning.CharacterFrame', On.Bags)
-
-local TINT_DEFAULT = { 0.45, 0.45, 0.6, 0.15 }
-
-context.info.settings = {
-    {
-        label = 'Tint the sheet',
-        get = function() return BUI.GetDB().skinning.characterFrameTintEnabled == true end,
-        set = function(value)
-            local skinning = BUI.GetDB().skinning
-            skinning.characterFrameTintEnabled = value
-            skinning.characterFrameTint = skinning.characterFrameTint or TINT_DEFAULT
-            ApplyBackground()
-        end,
-    },
-    {
-        kind = 'swatch', label = 'Tint color and strength', opacity = true,
-        get = function() return unpack(BUI.GetDB().skinning.characterFrameTint or TINT_DEFAULT) end,
-        set = function(red, green, blue, alpha)
-            BUI.GetDB().skinning.characterFrameTint = { red, green, blue, alpha }
-            ApplyBackground()
-        end,
-    },
-    {
-        kind = 'swatch', label = 'Bag swap marker', opacity = true, separator = true,
-        get = function()
-            local color = BAG.MarkerColor()
-            return color[1], color[2], color[3], color[4] or 1
-        end,
-        set = function(red, green, blue, alpha)
-            BUI.GetDB().skinning[BAG.MARKER_KEY] = { red, green, blue, alpha }
-            RefreshBagAlternatives()
-        end,
-    },
-    {
-        label = 'Bag swap marker color', text = 'Reset',
-        onClick = function()
-            BUI.GetDB().skinning[BAG.MARKER_KEY] = nil
-            RefreshBagAlternatives()
-        end,
-    },
-}
