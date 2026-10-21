@@ -2028,7 +2028,17 @@ end
 local settingsSlide
 
 local function ApplyScale()
-    if frame then Pixel.SetScale(frame, SheetScale()) end
+    if frame then
+        local left, top, before = frame:GetLeft(), frame:GetTop(), frame:GetEffectiveScale()
+        Pixel.SetScale(frame, SheetScale())
+        local _, relativeTo = frame:GetPoint(1)
+        if left and relativeTo == UIParent then
+            local ratio = before / frame:GetEffectiveScale()
+            frame:ClearAllPoints()
+            frame:SetPoint('TOPLEFT', UIParent, 'BOTTOMLEFT', left * ratio, top * ratio)
+            Placement.OnDragStop()
+        end
+    end
     if context.Enabled() and not HasConflictingCharSheet() then
         Skin.ReserveWidth(CharacterFrame, FRAME_WIDTH * SheetScale(), CharacterFrame)
     end
