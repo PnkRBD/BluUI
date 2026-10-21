@@ -232,6 +232,48 @@ end
 
 Skin.MENU_THEME = MENU_THEME
 
+local KIT_WINDOW = { font = FONT }
+
+function KIT_WINDOW:Paint(region, role)
+	if type(role) == 'function' then return Painter.Custom(region, role) end
+	if region.SetTextColor then return Painter.Text(region, role) end
+	return Painter.Tint(region, role)
+end
+KIT_WINDOW.Bind = KIT_WINDOW.Paint
+
+function KIT_WINDOW:Fill(parent, role, layer, subLayer)
+	local texture = parent:CreateTexture(nil, layer or 'BACKGROUND', nil, subLayer or 0)
+	texture:SetTexture(BUILib.Widget.WHITE)
+	return Painter.Tint(texture, role)
+end
+
+function KIT_WINDOW:SetFontRole(region, fontRole)
+	local _, size, flags = region:GetFont()
+	region:SetFont(BUI.ThemeFontPath(fontRole), size, flags)
+	return region
+end
+
+local Kit = BUILib.Layout.TableKit(KIT_WINDOW)
+Skin.Kit = Kit
+
+local SWITCH_ROW_H, SWITCH_TEXT_GAP, SWITCH_TEXT_SIZE = 30, 8, 12
+
+function Skin.Switch(parent, label, get, set, width)
+	local cell = CreateFrame('Button', nil, parent)
+	cell:SetSize(width, SWITCH_ROW_H)
+	local switch = Kit.Switch(cell, get, set)
+	switch:SetPoint('LEFT')
+	switch.toggle:EnableMouse(false)
+	local text = cell:CreateFontString(nil, 'OVERLAY')
+	Pixel.ApplyFont(text, SWITCH_TEXT_SIZE, FONT, '')
+	text:SetPoint('LEFT', switch, 'RIGHT', SWITCH_TEXT_GAP, 0)
+	text:SetText(label)
+	Painter.Text(text, 'skinText')
+	cell:SetScript('OnClick', BUI.Profiler.Script('Skin.Widgets switch OnClick', function() switch.toggle:Click() end))
+	cell.Refresh = switch.Refresh
+	return cell
+end
+
 function Skin.ContextMenu(items, options)
 	options.window = MENU_THEME
 	options.surface = options.surface or 'skinBackground'
