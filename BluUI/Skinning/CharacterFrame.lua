@@ -2025,14 +2025,15 @@ local function ApplyRaceArt()
     model.art.overlay:SetShown(shown)
 end
 
+local settingsSlide
+
 local function ApplyScale()
     if frame then frame:SetScale(SheetScale()) end
     if context.Enabled() and not HasConflictingCharSheet() then
         Skin.ReserveWidth(CharacterFrame, FRAME_WIDTH * SheetScale(), CharacterFrame)
     end
+    settingsSlide.Refit()
 end
-
-local settingsSlide
 
 local function BuildFrame()
     frame = CreateFrame('Frame', nil, CharacterFrame, 'BackdropTemplate')
@@ -2154,7 +2155,7 @@ local function RefreshAll()
 end
 
 local TINT_DEFAULT = { 0.45, 0.45, 0.6, 0.15 }
-local SETTINGS = { W = 300, TOP = 44, HEADER_H = 22, HEADER_GAP = 4, ROW_H = 26, SLIDER_H = 42, COL_W = 138, GAP = 10, RESET_W = 110, RESET_H = 22 }
+local SETTINGS = { W = 320, TOP = 44, HEADER_H = 22, HEADER_GAP = 4, ROW_H = 30, LABEL_W = 60, LABEL_SIZE = 12, COL_W = 138, GAP = 10, RESET_W = 110, RESET_H = 22 }
 local settingsPanel
 local settingsSync = {}
 
@@ -2188,9 +2189,9 @@ local function BuildSettingsPanel()
         if column == 2 then NewLine() end
     end
     local function Switch(label, get, set)
-        local toggle = Controls.Toggle(child, label, get(), set, nil, true, nil, SETTINGS.COL_W)
-        Place(toggle.frame)
-        settingsSync[#settingsSync + 1] = function() toggle.frame:SetValue(get()) end
+        local cell = Skin.Switch(child, label, get, set, SETTINGS.COL_W)
+        Place(cell)
+        settingsSync[#settingsSync + 1] = cell.Refresh
     end
     local function Swatch(label, get, set)
         local red, green, blue, alpha = get()
@@ -2212,14 +2213,24 @@ local function BuildSettingsPanel()
     SheetSwitch('Gems', 'gems', RefreshSlots)
 
     Header('Size')
-    local slider = Controls.CompactSlider(child, 'Scale %', 80, 130, Sheet().scale, function(value)
-        Sheet().scale = value
-        ApplyScale()
-        settingsSlide.Refit()
-    end, 1, SETTINGS.COL_W * 2 - SETTINGS.GAP)
-    slider.frame:SetPoint('TOPLEFT', child, 'TOPLEFT', 0, -y)
-    settingsSync[#settingsSync + 1] = function() slider.frame:SetValue(Sheet().scale) end
-    y = y + SETTINGS.SLIDER_H
+    local label = child:CreateFontString(nil, 'OVERLAY')
+    Pixel.ApplyFont(label, SETTINGS.LABEL_SIZE, FONT, '')
+    label:SetPoint('LEFT', child, 'TOPLEFT', 0, -(y + SETTINGS.ROW_H / 2))
+    label:SetText('Scale %')
+    Painter.Text(label, 'skinText')
+    local scale
+    scale = Skin.Kit.Slider(child, SETTINGS.COL_W * 2 - SETTINGS.LABEL_W, {
+        min = 80, max = 130, step = 1,
+        get = function() return Sheet().scale end,
+        set = function(value)
+            Sheet().scale = value
+            if not scale.slider:IsDraggingThumb() then ApplyScale() end
+        end,
+    })
+    scale:SetPoint('TOPLEFT', child, 'TOPLEFT', SETTINGS.LABEL_W, -y)
+    scale.slider:HookScript('OnMouseUp', BUI.Profiler.Script('Skin.CharacterFrame scale OnMouseUp', ApplyScale))
+    settingsSync[#settingsSync + 1] = function() scale.slider:SetValue(Sheet().scale) end
+    y = y + SETTINGS.ROW_H
 
     Header('Corner buttons')
     for _, toggle in ipairs(TOGGLES) do
