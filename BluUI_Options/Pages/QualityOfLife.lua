@@ -18,7 +18,7 @@ local RAIL_GROUPS = {
 local TAB_IDS = { 'combat', 'interface', 'automation', 'graphics', 'danger', 'mythicplus' }
 local SLIDER_WIDTH = 220
 local BUTTON_ROOM = 130
-local STATUS_ROOM = 120
+local PRESET_ROOM = 170
 local BUTTON_GAP = 10
 local DANGER_BUTTON_WIDTH = 110
 local GATE_PAD = 24
@@ -88,6 +88,33 @@ local FPS_CVAR_GROUPS = {
 	{ label = 'Camera', cvars = { 'cameraFov', 'cameraDistanceMaxZoomFactor', 'CameraReduceUnexpectedMovement' } },
 }
 
+local LIGHT_CVARS = {
+	graphicsQuality = '9',
+	graphicsShadowQuality = '0', graphicsLiquidDetail = '0',
+	graphicsParticleDensity = '3', graphicsSSAO = '0',
+	graphicsDepthEffects = '0', graphicsComputeEffects = '0',
+	graphicsOutlineMode = '2', graphicsTextureResolution = '2',
+	graphicsSpellDensity = '0', graphicsProjectedTextures = '1',
+	graphicsViewDistance = '0', graphicsEnvironmentDetail = '0',
+	graphicsGroundClutter = '0',
+	waterDetail = '0', weatherDensity = '0',
+	vsync = '0', gxMaxFrameLatency = '2', renderScale = '1', useTargetFPS = '0',
+	MSAAQuality = '0', ffxAntiAliasingMode = '0', textureFilteringMode = '5',
+	shadowrt = '0', vrsValar = '0',
+	scriptProfile = '0',
+}
+
+local LIGHT_CVAR_GROUPS = {
+	{ label = 'Quality', cvars = { 'graphicsQuality' } },
+	{ label = 'Shadows and water', cvars = { 'graphicsShadowQuality', 'graphicsLiquidDetail', 'waterDetail', 'weatherDensity' } },
+	{ label = 'Spell effects', cvars = { 'graphicsParticleDensity', 'graphicsSpellDensity', 'graphicsProjectedTextures', 'graphicsOutlineMode' } },
+	{ label = 'Lighting', cvars = { 'graphicsSSAO', 'graphicsDepthEffects', 'graphicsComputeEffects', 'shadowrt' } },
+	{ label = 'Distance and detail', cvars = { 'graphicsViewDistance', 'graphicsEnvironmentDetail', 'graphicsGroundClutter', 'graphicsTextureResolution', 'textureFilteringMode' } },
+	{ label = 'Display', cvars = { 'vsync', 'gxMaxFrameLatency', 'renderScale', 'useTargetFPS', 'vrsValar' } },
+	{ label = 'Anti-aliasing', cvars = { 'MSAAQuality', 'ffxAntiAliasingMode' } },
+	{ label = 'Addons', cvars = { 'scriptProfile' } },
+}
+
 local GATE_TEXT = 'These tools permanently delete loadouts, macros or quests, or put every BluUI setting back to default. There is no undo.\n\nBy clicking below, I solemnly swear not to cry in Discord when my stuff disappears because I clearly cannot read.'
 
 local Window = BUI.OptionsKit.Window
@@ -147,9 +174,9 @@ local function SameCVarValue(current, target)
 	return current == target
 end
 
-local function PendingCVars()
+local function PendingCVars(preset)
 	local differing, known = 0, 0
-	for cvar, value in pairs(FPS_CVARS) do
+	for cvar, value in pairs(preset.cvars) do
 		local current = C_CVar.GetCVar(cvar)
 		if current then
 			known = known + 1
@@ -159,11 +186,11 @@ local function PendingCVars()
 	return differing, known
 end
 
-local function GroupedCVars()
+local function GroupedCVars(cvarValues, groupList)
 	local remaining = {}
-	for cvar in pairs(FPS_CVARS) do remaining[cvar] = true end
+	for cvar in pairs(cvarValues) do remaining[cvar] = true end
 	local groups = {}
-	for _, group in ipairs(FPS_CVAR_GROUPS) do
+	for _, group in ipairs(groupList) do
 		local cvars = {}
 		for _, cvar in ipairs(group.cvars) do
 			if remaining[cvar] then
@@ -176,23 +203,26 @@ local function GroupedCVars()
 	local others = {}
 	for cvar in pairs(remaining) do others[#others + 1] = cvar end
 	table.sort(others)
-	groups[#groups + 1] = { label = 'Other', cvars = others }
+	if #others > 0 then groups[#groups + 1] = { label = 'Other', cvars = others } end
 	return groups
 end
 
-local PRESET_GROUPS = GroupedCVars()
+local PRESETS = {
+	{ title = 'FPS preset', sub = 'Shadows, distance and particles', cvars = FPS_CVARS, groups = GroupedCVars(FPS_CVARS, FPS_CVAR_GROUPS) },
+	{ title = 'FPS preset 2', sub = 'Lighter effects, clear mechanics', cvars = LIGHT_CVARS, groups = GroupedCVars(LIGHT_CVARS, LIGHT_CVAR_GROUPS) },
+}
 
-local function BackupCVars()
+local function BackupCVars(cvarValues)
 	local globalDB = BUI.db.global
 	globalDB.cvarBackup = globalDB.cvarBackup or {}
-	for cvar in pairs(FPS_CVARS) do
+	for cvar in pairs(cvarValues) do
 		local current = C_CVar.GetCVar(cvar)
 		if current and not globalDB.cvarBackup[cvar] then globalDB.cvarBackup[cvar] = current end
 	end
 end
 
-local function SetSelected(selected, Target)
-	BackupCVars()
+local function SetSelected(preset, selected, Target)
+	BackupCVars(preset.cvars)
 	for cvar in pairs(selected) do
 		local current, target = C_CVar.GetCVar(cvar), Target(cvar)
 		if current and target and not SameCVarValue(current, target) then C_CVar.SetCVar(cvar, target) end
@@ -200,12 +230,12 @@ local function SetSelected(selected, Target)
 	Window():Repaint()
 end
 
-local function ApplyPreset(selected)
-	SetSelected(selected, function(cvar) return FPS_CVARS[cvar] end)
+local function ApplyPreset(preset, selected)
+	SetSelected(preset, selected, function(cvar) return preset.cvars[cvar] end)
 end
 
-local function ApplyDefaults(selected)
-	SetSelected(selected, C_CVar.GetCVarDefault)
+local function ApplyDefaults(preset, selected)
+	SetSelected(preset, selected, C_CVar.GetCVarDefault)
 end
 
 local function HasBackup()
@@ -235,11 +265,11 @@ local function Readout(kit, row, anchor, current, preset, changed)
 	now:SetPoint('RIGHT', arrow, 'LEFT', -ARROW_GAP, 0)
 end
 
-local function ShowPresetDialog()
+local function ShowPresetDialog(preset)
 	local window = Window()
 	local kit = Layout.TableKit(window)
 	local overlay, dialog, Close = Modals.CreateBase(DIALOG_WIDTH, DIALOG_HEIGHT, true, window.frame)
-	local title = Modals.CreateTitle(dialog, 'FPS preset')
+	local title = Modals.CreateTitle(dialog, preset.title)
 	local summary = Modals.CreateMessage(dialog, '', 'LEFT', title, -6)
 	local listWidth = DIALOG_WIDTH - DIALOG_PAD * 2
 	local boardWidth = listWidth - SCROLL_ROOM
@@ -273,7 +303,7 @@ local function ShowPresetDialog()
 			{ text = 'None', onClick = function() Select(function() return false end) end },
 		},
 	})
-	for _, group in ipairs(PRESET_GROUPS) do
+	for _, group in ipairs(preset.groups) do
 		local entries = {}
 		for _, cvar in ipairs(group.cvars) do
 			local current = C_CVar.GetCVar(cvar)
@@ -281,8 +311,8 @@ local function ShowPresetDialog()
 		end
 		if #entries > 0 then board:AddCaption(group.label) end
 		for _, entry in ipairs(entries) do
-			local cvar, current, preset = entry.cvar, entry.current, FPS_CVARS[cvar]
-			local changed = not SameCVarValue(current, preset)
+			local cvar, current, target = entry.cvar, entry.current, preset.cvars[entry.cvar]
+			local changed = not SameCVarValue(current, target)
 			differs[cvar] = changed
 			picked[cvar] = changed
 			total = total + 1
@@ -297,21 +327,21 @@ local function ShowPresetDialog()
 			end)
 			switch:SetPoint('RIGHT', -kit.ROW_INSET, 0)
 			switches[cvar] = switch
-			Readout(kit, row, switch, current, preset, changed)
+			Readout(kit, row, switch, current, target, changed)
 		end
 	end
 	list:SetChildHeight(board:Layout(0, ''))
 	RefreshSummary()
 
 	Modals.LayoutButtons(dialog, {
-		{ text = 'Apply', color = Modals.BTN_CONFIRM, onClick = function(close) close(); ApplyPreset(Selected(picked)) end },
-		{ text = 'Blizzard defaults', color = Modals.BTN_NEUTRAL, onClick = function(close) close(); ApplyDefaults(Selected(picked)) end },
+		{ text = 'Apply', color = Modals.BTN_CONFIRM, onClick = function(close) close(); ApplyPreset(preset, Selected(picked)) end },
+		{ text = 'Blizzard defaults', color = Modals.BTN_NEUTRAL, onClick = function(close) close(); ApplyDefaults(preset, Selected(picked)) end },
 		{ text = 'Cancel', color = Modals.BTN_CANCEL, onClick = function(close) close() end },
 	}, Close)
 	overlay:Show()
 end
 
-local function RestoreFPS()
+local function RestoreCVars()
 	if not HasBackup() then return end
 	local globalDB = BUI.db.global
 	for cvar, value in pairs(globalDB.cvarBackup) do
@@ -564,19 +594,22 @@ end
 local function GraphicsBoard(ui, parent, width)
 	local board = ui.Board(parent, width, {
 		title = 'Graphics',
-		description = 'A performance preset for the graphics CVars. Your current values are backed up the first time it is applied, and Restore puts them back.',
+		description = 'Performance presets for the graphics CVars. Your current values are backed up the first time one is applied, and Restore puts them back.',
 		buttons = {
-			{ text = 'Restore', icon = 'reset', onClick = RestoreFPS, disabled = not HasBackup() },
-			{ style = 'primary', text = 'Apply preset', onClick = ShowPresetDialog },
+			{ text = 'Restore', icon = 'reset', onClick = RestoreCVars, disabled = not HasBackup() },
 		},
 	})
-	local row = board:AddRow('FPS preset', 'Shadows, distance, particles and more', STATUS_ROOM)
-	local status = ui.Text(row, '', 11, 'muted')
-	status:SetPoint('RIGHT', -ui.ROW_INSET, 0)
-	ui.Bind(row, function()
-		local differing, known = PendingCVars()
-		status:SetText(differing == 0 and 'At the preset' or (differing .. ' of ' .. known .. ' differ'))
-	end)
+	for _, preset in ipairs(PRESETS) do
+		local row = board:AddRow(preset.title, preset.sub, PRESET_ROOM)
+		local apply = ui.Button(row, 'Apply', 'control', function() ShowPresetDialog(preset) end)
+		apply:SetPoint('RIGHT', -ui.ROW_INSET, 0)
+		local status = ui.Text(row, '', 11, 'muted')
+		status:SetPoint('RIGHT', apply, 'LEFT', -BUTTON_GAP, 0)
+		ui.Bind(row, function()
+			local differing, known = PendingCVars(preset)
+			status:SetText(differing == 0 and 'At the preset' or (differing .. ' of ' .. known .. ' differ'))
+		end)
+	end
 	TrackedQuestsRow(ui, board)
 	return board
 end

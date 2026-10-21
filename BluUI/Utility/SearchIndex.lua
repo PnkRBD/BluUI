@@ -257,6 +257,7 @@ local entries = {
 	{ label = "Hide Zone Text", page = "qol", tab = 2, panel = "Interface" },
 	{ label = "Hide Error Msgs", page = "qol", tab = 2, panel = "Interface", keywords = "error red text" },
 	{ label = "FPS preset", page = "qol", tab = 4, panel = "Graphics", keywords = "fps cvar performance graphics vsync apply" },
+	{ label = "FPS preset 2", page = "qol", tab = 4, panel = "Graphics", keywords = "fps cvar performance graphics optimization lighter apply" },
 	{ label = "Restore", page = "qol", tab = 4, panel = "Graphics", keywords = "fps cvar restore original" },
 	{ label = "Tracked quests", page = "qol", tab = 4, panel = "Graphics", keywords = "untrack all hidden quests watch tracked world quests fps performance lag" },
 	{ label = "BluUI settings", page = "qol", tab = 5, panel = "Danger zone", keywords = "reset wipe default settings bluui" },
