@@ -2026,6 +2026,11 @@ local function ApplyRaceArt()
 end
 
 local settingsSlide
+local settingsSync = {}
+
+local function SyncSettings()
+    for _, sync in ipairs(settingsSync) do sync() end
+end
 
 local function ApplyScale()
     if frame then
@@ -2043,6 +2048,13 @@ local function ApplyScale()
         Skin.ReserveWidth(CharacterFrame, FRAME_WIDTH * SheetScale(), CharacterFrame)
     end
     settingsSlide.Refit()
+end
+
+local function IconButton(parent, icon, tooltip, onClick)
+    return BUILib.Controls.Icon(parent, {
+        icon = icon, size = 20, iconScale = 0.7, idleColor = { Painter.Color('skinLabel') },
+        tooltip = tooltip, onClick = onClick,
+    }).frame
 end
 
 local function BuildFrame()
@@ -2099,12 +2111,9 @@ local function BuildFrame()
     titleBar:SetScript('OnDragStart', BUI.Profiler.Script('Skin.CharacterFrame titleBar OnDragStart', BeginSheetDrag))
     titleBar:SetScript('OnDragStop', BUI.Profiler.Script('Skin.CharacterFrame titleBar OnDragStop', EndSheetDrag))
 
-    local cog = BUILib.Controls.Icon(frame, {
-        icon = 'cog', size = 20, iconScale = 0.7, idleColor = { Painter.Color('skinLabel') },
-        tooltip = 'Sheet settings', onClick = function() settingsSlide.Toggle() end,
-    })
-    cog.frame:SetPoint('RIGHT', titleBar.closeBtn.frame, 'LEFT', Pixel.Scale(-4), 0)
-    cog.frame:SetFrameLevel(frame:GetFrameLevel() + 10)
+    local cog = IconButton(frame, 'cog', 'Sheet settings', function() settingsSlide.Toggle() end)
+    cog:SetPoint('RIGHT', titleBar.closeBtn.frame, 'LEFT', Pixel.Scale(-4), 0)
+    cog:SetFrameLevel(frame:GetFrameLevel() + 10)
 
     frame.titleText:ClearAllPoints()
     frame.titleText:SetPoint('TOPLEFT', titleBar, 'TOPLEFT', Pixel.Scale(14), Pixel.Scale(-HEADER.TOP_PAD))
@@ -2164,136 +2173,209 @@ local function RefreshAll()
     RefreshSets(true)
 end
 
-local TINT_DEFAULT = { 0.45, 0.45, 0.6, 0.15 }
-local SETTINGS = { W = 320, TOP = 44, HEADER_H = 22, HEADER_GAP = 4, ROW_H = 30, LABEL_W = 60, LABEL_SIZE = 12, COL_W = 138, GAP = 10, RESET_W = 110, RESET_H = 22 }
+local SETTINGS_WIDTH = 320
 local settingsPanel
-local settingsSync = {}
-
-local function SyncSettings()
-    for _, sync in ipairs(settingsSync) do sync() end
-end
 
 local function BuildSettingsPanel()
-    settingsPanel = Skin.CreatePanelWindow('Sheet settings', function() settingsSlide.Close(true) end)
-    local _, _, child = Skin.CreateListArea(settingsPanel, SETTINGS.TOP, SETTINGS.ROW_H)
-    local Controls = BUILib.Controls
-    local y, column = 0, 0
+    local TINT_DEFAULT = { 0.45, 0.45, 0.6, 0.15 }
+    local SETTINGS = {
+        TOP = 44, HEADER_H = 22, HEADER_GAP = 4, ROW_H = 30, CHECK_H = 24, GRID_W = 276, GAP = 10,
+        LABEL_W = 44, LABEL_SIZE = 12, ICON_GAP = 4, SWATCH_GAP = 8,
+    }
 
-    local function NewLine()
-        if column == 0 then return end
-        column = 0
-        y = y + SETTINGS.ROW_H
-    end
-    local function Header(title)
-        NewLine()
-        if y > 0 then y = y + SETTINGS.GAP end
-        local header = Skin.CreateListHeader(child, SETTINGS.HEADER_H)
-        header:SetTitle(title)
-        header:SetPoint('TOPLEFT', child, 'TOPLEFT', 0, -y)
-        header:SetPoint('TOPRIGHT', child, 'TOPRIGHT', 0, -y)
-        y = y + SETTINGS.HEADER_H + SETTINGS.HEADER_GAP
-    end
-    local function Place(control)
-        control:SetPoint('TOPLEFT', child, 'TOPLEFT', column * SETTINGS.COL_W, -y)
-        column = column + 1
-        if column == 2 then NewLine() end
-    end
-    local function Switch(label, get, set)
-        local cell = Skin.Switch(child, label, get, set, SETTINGS.COL_W)
-        Place(cell)
-        settingsSync[#settingsSync + 1] = cell.Refresh
-    end
-    local function Swatch(label, get, set)
-        local red, green, blue, alpha = get()
-        local swatch = Controls.ColorSwatch(child, { label = label, r = red, g = green, b = blue, a = alpha, width = SETTINGS.COL_W, callback = set })
-        Place(swatch.frame)
-        settingsSync[#settingsSync + 1] = function() swatch.frame:SetColor(get()) end
-    end
-    local function SheetSwitch(label, key, apply)
-        Switch(label, function() return Sheet()[key] end, function(value)
-            Sheet()[key] = value
-            apply()
-        end)
+    local function ResetScale()
+        Sheet().scale = BUI.ExportImport.FactoryProfile().skinning.characterSheet.scale
+        ApplyScale()
+        SyncSettings()
     end
 
-    Header('Slot readouts')
-    SheetSwitch('Item level', 'ilvl', RefreshSlots)
-    SheetSwitch('Upgrade track', 'track', RefreshSlots)
-    SheetSwitch('Enchants', 'enchants', RefreshSlots)
-    SheetSwitch('Gems', 'gems', RefreshSlots)
+    local function SheetOption(label, key, apply)
+        return {
+            label = label,
+            get = function() return Sheet()[key] end,
+            set = function(value)
+                Sheet()[key] = value
+                apply()
+            end,
+        }
+    end
 
-    Header('Size')
-    local label = child:CreateFontString(nil, 'OVERLAY')
-    Pixel.ApplyFont(label, SETTINGS.LABEL_SIZE, FONT, '')
-    label:SetPoint('LEFT', child, 'TOPLEFT', 0, -(y + SETTINGS.ROW_H / 2))
-    label:SetText('Scale %')
-    Painter.Text(label, 'skinText')
-    local scale
-    scale = Skin.Kit.Slider(child, SETTINGS.COL_W * 2 - SETTINGS.LABEL_W, {
-        min = 80, max = 130, step = 1,
-        get = function() return Sheet().scale end,
-        set = function(value)
-            Sheet().scale = value
-            if not scale.slider:IsDraggingThumb() then ApplyScale() end
-        end,
-    })
-    scale:SetPoint('TOPLEFT', child, 'TOPLEFT', SETTINGS.LABEL_W, -y)
-    scale.slider:HookScript('OnMouseUp', BUI.Profiler.Script('Skin.CharacterFrame scale OnMouseUp', ApplyScale))
-    settingsSync[#settingsSync + 1] = function() scale.slider:SetValue(Sheet().scale) end
-    y = y + SETTINGS.ROW_H
+    local function ListedOption(label, list, key, apply)
+        return {
+            label = label,
+            get = function() return Sheet()[list][key] ~= false end,
+            set = function(value)
+                Sheet()[list][key] = value
+                apply()
+            end,
+        }
+    end
 
-    Header('Corner buttons')
+    local OPTIONS = {
+        readouts = {
+            SheetOption('Item level', 'ilvl', RefreshSlots),
+            SheetOption('Upgrade track', 'track', RefreshSlots),
+            SheetOption('Enchants', 'enchants', RefreshSlots),
+            SheetOption('Gems', 'gems', RefreshSlots),
+        },
+        raceArt = SheetOption('Race background', 'raceArt', ApplyRaceArt),
+        tint = {
+            label = 'Tint',
+            get = function() return BUI.GetDB().skinning.characterFrameTintEnabled == true end,
+            set = function(value)
+                local skinning = BUI.GetDB().skinning
+                skinning.characterFrameTintEnabled = value
+                skinning.characterFrameTint = skinning.characterFrameTint or TINT_DEFAULT
+                ApplyBackground()
+            end,
+        },
+        sections = {},
+        corners = {},
+    }
+    for _, definition in ipairs(STAT_SECTIONS) do
+        OPTIONS.sections[#OPTIONS.sections + 1] = ListedOption(definition.title, 'sections', definition.title, LayoutSections)
+    end
     for _, toggle in ipairs(TOGGLES) do
-        Switch(toggle.title, function() return Sheet().buttons[toggle.key] ~= false end, function(value)
-            Sheet().buttons[toggle.key] = value
-            LayoutToggles()
-        end)
+        OPTIONS.corners[#OPTIONS.corners + 1] = ListedOption(toggle.title, 'buttons', toggle.key, LayoutToggles)
     end
 
-    Header('Look')
-    SheetSwitch('Race background', 'raceArt', ApplyRaceArt)
-    Switch('Tint the sheet', function() return BUI.GetDB().skinning.characterFrameTintEnabled == true end, function(value)
-        local skinning = BUI.GetDB().skinning
-        skinning.characterFrameTintEnabled = value
-        skinning.characterFrameTint = skinning.characterFrameTint or TINT_DEFAULT
-        ApplyBackground()
-    end)
-    Swatch('Tint color', function() return unpack(BUI.GetDB().skinning.characterFrameTint or TINT_DEFAULT) end, function(red, green, blue, alpha)
+    local function TintColor()
+        return unpack(BUI.GetDB().skinning.characterFrameTint or TINT_DEFAULT)
+    end
+
+    local function SetTintColor(red, green, blue, alpha)
         BUI.GetDB().skinning.characterFrameTint = { red, green, blue, alpha }
         ApplyBackground()
-    end)
-    NewLine()
-    Swatch('Bag swap marker', function()
+    end
+
+    local function MarkerColor()
         local color = BAG.MarkerColor()
         return color[1], color[2], color[3], color[4] or 1
-    end, function(red, green, blue, alpha)
+    end
+
+    local function SetMarkerColor(red, green, blue, alpha)
         BUI.GetDB().skinning[BAG.MARKER_KEY] = { red, green, blue, alpha }
         RefreshBagAlternatives()
-    end)
-    local reset = Skin.SmallButton(child, SETTINGS.RESET_W, SETTINGS.RESET_H, 'Reset marker')
-    reset:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame reset marker OnClick', function()
+    end
+
+    local function ResetMarker()
         BUI.GetDB().skinning[BAG.MARKER_KEY] = nil
         RefreshBagAlternatives()
         SyncSettings()
-    end))
-    Place(reset)
-
-    Header('Stats sections')
-    for _, definition in ipairs(STAT_SECTIONS) do
-        local title = definition.title
-        Switch(title, function() return Sheet().sections[title] ~= false end, function(value)
-            Sheet().sections[title] = value
-            LayoutSections()
-        end)
     end
-    NewLine()
-    child:SetHeight(y + SETTINGS.GAP)
+
+    local function Text(parent, text, size, role)
+        local label = parent:CreateFontString(nil, 'OVERLAY')
+        Pixel.ApplyFont(label, size, FONT, '')
+        label:SetText(text)
+        Painter.Text(label, role)
+        return label
+    end
+
+    local function Check(parent, option)
+        local box = BUILib.Controls.StampCheckbox(parent, option.label, option.get(), option.set, nil, nil, nil, 'small')
+        settingsSync[#settingsSync + 1] = function() box.frame:SetValue(option.get()) end
+        return box.frame
+    end
+
+    local function Swatch(parent, get, set)
+        local red, green, blue, alpha = get()
+        local swatch = BUILib.Controls.ColorSwatch(parent, { r = red, g = green, b = blue, a = alpha, callback = set })
+        settingsSync[#settingsSync + 1] = function() swatch.frame:SetColor(get()) end
+        return swatch.frame
+    end
+
+    local function Flow(child)
+        local flow = { y = 0, column = 0 }
+        function flow.Break()
+            if flow.column == 0 then return end
+            flow.column = 0
+            flow.y = flow.y + SETTINGS.CHECK_H
+        end
+        function flow.Header(title)
+            flow.Break()
+            if flow.y > 0 then flow.y = flow.y + SETTINGS.GAP end
+            local header = Skin.CreateListHeader(child, SETTINGS.HEADER_H)
+            header:SetTitle(title)
+            header:SetPoint('TOPLEFT', child, 'TOPLEFT', 0, -flow.y)
+            header:SetPoint('TOPRIGHT', child, 'TOPRIGHT', 0, -flow.y)
+            flow.y = flow.y + SETTINGS.HEADER_H + SETTINGS.HEADER_GAP
+        end
+        function flow.Row(height)
+            flow.Break()
+            local row = CreateFrame('Frame', nil, child)
+            row:SetPoint('TOPLEFT', child, 'TOPLEFT', 0, -flow.y)
+            row:SetPoint('TOPRIGHT', child, 'TOPRIGHT', 0, -flow.y)
+            row:SetHeight(height)
+            flow.y = flow.y + height
+            return row
+        end
+        function flow.Cell(control, columns)
+            control:SetPoint('LEFT', child, 'TOPLEFT', flow.column * SETTINGS.GRID_W / columns, -(flow.y + SETTINGS.CHECK_H / 2))
+            flow.column = flow.column + 1
+            if flow.column == columns then flow.Break() end
+        end
+        function flow.Finish()
+            flow.Break()
+            child:SetHeight(flow.y + SETTINGS.GAP)
+        end
+        return flow
+    end
+
+    local function ScaleRow(flow)
+        local row = flow.Row(SETTINGS.ROW_H)
+        Text(row, 'Scale', SETTINGS.LABEL_SIZE, 'skinText'):SetPoint('LEFT')
+        local reset = IconButton(row, 'reset', 'Reset sheet size', ResetScale)
+        reset:SetPoint('RIGHT')
+        local scale
+        scale = Skin.Kit.Slider(row, SETTINGS.GRID_W - SETTINGS.LABEL_W, {
+            min = 80, max = 130, step = 1,
+            format = function(value) return value .. '%' end,
+            get = function() return Sheet().scale end,
+            set = function(value)
+                Sheet().scale = value
+                if not scale.slider:IsDraggingThumb() then ApplyScale() end
+            end,
+        })
+        scale:SetPoint('LEFT', SETTINGS.LABEL_W, 0)
+        scale:SetPoint('RIGHT', reset, 'LEFT', -SETTINGS.ICON_GAP, 0)
+        scale.slider:HookScript('OnMouseUp', BUI.Profiler.Script('Skin.CharacterFrame scale OnMouseUp', ApplyScale))
+        settingsSync[#settingsSync + 1] = function() scale.slider:SetValue(Sheet().scale) end
+    end
+
+    local function MarkerRow(flow)
+        local row = flow.Row(SETTINGS.ROW_H)
+        Text(row, 'Bag swap marker', SETTINGS.LABEL_SIZE, 'skinText'):SetPoint('LEFT')
+        local reset = IconButton(row, 'reset', 'Reset marker color', ResetMarker)
+        reset:SetPoint('RIGHT')
+        Swatch(row, MarkerColor, SetMarkerColor):SetPoint('RIGHT', reset, 'LEFT', -SETTINGS.ICON_GAP, 0)
+    end
+
+    settingsPanel = Skin.CreatePanelWindow('Sheet settings', function() settingsSlide.Close(true) end)
+    local _, _, child = Skin.CreateListArea(settingsPanel, SETTINGS.TOP, SETTINGS.ROW_H)
+    local flow = Flow(child)
+    flow.Header('Sheet')
+    ScaleRow(flow)
+    local look = flow.Row(SETTINGS.ROW_H)
+    Check(look, OPTIONS.raceArt):SetPoint('LEFT')
+    local tintColor = Swatch(look, TintColor, SetTintColor)
+    tintColor:SetPoint('RIGHT')
+    Check(look, OPTIONS.tint):SetPoint('RIGHT', tintColor, 'LEFT', -SETTINGS.SWATCH_GAP, 0)
+    MarkerRow(flow)
+
+    flow.Header('Slot readouts')
+    for _, option in ipairs(OPTIONS.readouts) do flow.Cell(Check(child, option), 2) end
+    flow.Header('Stats sections')
+    for _, option in ipairs(OPTIONS.sections) do flow.Cell(Check(child, option), 3) end
+    flow.Header('Corner buttons')
+    for _, option in ipairs(OPTIONS.corners) do flow.Cell(Check(child, option), 2) end
+    flow.Finish()
 end
 
 settingsSlide = BUI.SlidePanel.New({
     skin = 'characterFrame',
-    width = SETTINGS.W,
-    hiddenX = -SETTINGS.W,
+    width = SETTINGS_WIDTH,
+    hiddenX = -SETTINGS_WIDTH,
     panel = function() return settingsPanel end,
     build = BuildSettingsPanel,
     onOpen = SyncSettings,
