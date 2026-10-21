@@ -635,9 +635,9 @@ local function StyleMarkWarning()
     local color = db.markColor
     markText:SetTextColor(color.r, color.g, color.b, color.a)
 
-    local iconSize = fontSize + 6
-    local iconOnly = db.markIconOnly
-    local showIcon = db.markShowIcon or iconOnly
+    local iconSize = db.markIconSize
+    local showIcon = db.markShowIcon
+    local iconOnly = showIcon and db.markIconOnly
     markIcon:SetSize(iconSize, iconSize)
     markIcon:SetShown(showIcon)
     markText:SetShown(not iconOnly)
