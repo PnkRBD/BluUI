@@ -1785,15 +1785,19 @@ local function MakeToggleButton(parent, options)
     local texture = button:CreateTexture(nil, 'ARTWORK')
     texture:SetPoint('TOPLEFT', 2, -2)
     texture:SetPoint('BOTTOMRIGHT', -2, 2)
-    texture:SetTexture(options.icon)
-    texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    if options.atlas then
+        texture:SetAtlas(options.atlas)
+    else
+        texture:SetTexture(options.icon)
+        texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    end
     button:HookScript('OnEnter', BUI.Profiler.Script('Skin.CharacterFrame button OnEnter', function(self)
         GameTooltip:SetOwner(self, 'ANCHOR_TOP')
         GameTooltip:SetText(options.title, 1, 1, 1)
         GameTooltip:Show()
     end))
     button:HookScript('OnLeave', GameTooltip_Hide)
-    button:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame button OnClick', function() BUI[options.module].Toggle() end))
+    button:SetScript('OnClick', BUI.Profiler.Script('Skin.CharacterFrame button OnClick', options.onClick or function() BUI[options.module].Toggle() end))
     return button
 end
 
@@ -1801,6 +1805,7 @@ local TOGGLES = {
     { icon = 'Interface\\Icons\\Spell_Arcane_PortalDalaran', title = 'Portals', module = 'PortalManager' },
     { icon = 'Interface\\Icons\\INV_Misc_Coin_01', title = 'Currency', module = 'CurrencyManager' },
     { icon = 'Interface\\Icons\\Achievement_Reputation_01', title = 'Reputation', module = 'ReputationManager' },
+    { atlas = 'gficon-chest-evergreen-greatvault-complete', title = 'Great Vault', onClick = function() WeeklyRewards_ShowUI() end },
 }
 
 local function RaceBackgroundPath()
