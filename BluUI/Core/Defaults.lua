@@ -1465,6 +1465,7 @@ BUI.Defaults = {
 			markColor                   = { r = 1, g = 0.25, b = 0.35, a = 1 },
 			markShowIcon                = false,
 			markIconOnly                = false,
+			markIconSize                = 30,
 			markPulse                   = true,
 			markPosX                    = 0,
 			markPosY                    = -150,

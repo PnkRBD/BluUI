@@ -31,7 +31,7 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 29
+local PROFILE_MIGRATION_VERSION = 30
 
 local AURA_GROUP_KINDS = { 'buffs', 'debuffs', 'bigDef', 'crowdControl' }
 
@@ -1109,6 +1109,13 @@ function BUI.MigrateProfile(profile)
 	if not general._cdAnnouncerSettled then
 		general._cdAnnouncerSettled = true
 		SettleAnnouncer(profile)
+	end
+
+	if not general._markIconSizeSplit then
+		general._markIconSizeSplit = true
+		local auras = profile.auras
+		local fontSize = type(auras) == 'table' and rawget(auras, 'markFontSize')
+		if fontSize and rawget(auras, 'markIconSize') == nil then auras.markIconSize = fontSize + 6 end
 	end
 
 	general._buiMigrationVersion = PROFILE_MIGRATION_VERSION

@@ -295,9 +295,6 @@ local function HuntersMark(board)
 		end,
 		build = function(db, Board, Refresh)
 			local mark = Board("Hunter's Mark", 'The callout, its icon and when it shows.')
-			Switch(mark, db, 'Spell icon', 'markShowIcon', Refresh)
-			Switch(mark, db, 'Icon only', 'markIconOnly', Refresh)
-			Switch(mark, db, 'Pulse icon', 'markPulse', Refresh)
 			Switch(mark, db, 'Combat only', 'markCombatOnly', Refresh)
 			Switch(mark, db, 'Group only', 'markGroupOnly', Refresh)
 			Switch(mark, db, 'Hide in town', 'markHideInTown', Refresh)
@@ -309,6 +306,14 @@ local function HuntersMark(board)
 					Option(db, 'Text size', 'markFontSize', { min = 10, max = 48, step = 1 }),
 				}),
 				BUI.PositionTool(db, { selfTag = 'BUI_MarkWarning', fields = MARK_FIELDS }),
+			}, Refresh)
+			mark:AddTools('Icon', 'Spell icon beside the text', {
+				{ icon = 'resize', tooltip = 'Size and pulse', title = 'Icon', options = {
+					Option(db, 'Icon size', 'markIconSize', { min = 12, max = 56, step = 1 }),
+					Toggle(db, 'Icon only', 'markIconOnly'),
+					Toggle(db, 'Pulse', 'markPulse'),
+				} },
+				Toggle(db, nil, 'markShowIcon'),
 			}, Refresh)
 		end,
 	})
