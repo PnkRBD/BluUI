@@ -249,26 +249,7 @@ function KIT_WINDOW:SetFontRole(region, fontRole)
 	return region
 end
 
-local Kit = BUILib.Layout.TableKit(KIT_WINDOW)
-Skin.Kit = Kit
-
-local SWITCH_ROW_H, SWITCH_TEXT_GAP, SWITCH_TEXT_SIZE = 30, 8, 12
-
-function Skin.Switch(parent, label, get, set, width)
-	local cell = CreateFrame('Button', nil, parent)
-	cell:SetSize(width, SWITCH_ROW_H)
-	local switch = Kit.Switch(cell, get, set)
-	switch:SetPoint('LEFT')
-	switch.toggle:EnableMouse(false)
-	local text = cell:CreateFontString(nil, 'OVERLAY')
-	Pixel.ApplyFont(text, SWITCH_TEXT_SIZE, FONT, '')
-	text:SetPoint('LEFT', switch, 'RIGHT', SWITCH_TEXT_GAP, 0)
-	text:SetText(label)
-	Painter.Text(text, 'skinText')
-	cell:SetScript('OnClick', BUI.Profiler.Script('Skin.Widgets switch OnClick', function() switch.toggle:Click() end))
-	cell.Refresh = switch.Refresh
-	return cell
-end
+Skin.Kit = BUILib.Layout.TableKit(KIT_WINDOW)
 
 function Skin.ContextMenu(items, options)
 	options.window = MENU_THEME
