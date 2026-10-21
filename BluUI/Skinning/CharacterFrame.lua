@@ -2028,7 +2028,7 @@ end
 local settingsSlide
 
 local function ApplyScale()
-    if frame then frame:SetScale(SheetScale()) end
+    if frame then Pixel.SetScale(frame, SheetScale()) end
     if context.Enabled() and not HasConflictingCharSheet() then
         Skin.ReserveWidth(CharacterFrame, FRAME_WIDTH * SheetScale(), CharacterFrame)
     end
