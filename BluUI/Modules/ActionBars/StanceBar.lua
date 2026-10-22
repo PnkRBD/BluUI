@@ -42,6 +42,7 @@ local function CreateButton(index)
 	button:SetScript('OnLeave', GameTooltip_Hide)
 	ActionBars.SkinButton(button)
 	ActionBars.ApplyHotkeyText(button)
+	ActionBars.TrackKeyPresses(button)
 	return button
 end
 

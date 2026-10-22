@@ -62,6 +62,7 @@ local function CreateButton(index)
 	button:SetScript('OnReceiveDrag', BUI.Profiler.Script('ActionBars.PetBar button OnReceiveDrag', OnReceiveDrag))
 	ActionBars.SkinButton(button)
 	ActionBars.ApplyHotkeyText(button)
+	ActionBars.TrackKeyPresses(button)
 	return button
 end
 
