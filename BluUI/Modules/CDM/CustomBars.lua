@@ -306,8 +306,7 @@ local function AcquireEntry()
         entryPool[poolCursor] = entry
     else
         entry.id = nil; entry.icon = nil; entry.cnt = nil
-        entry.slot = nil; entry.iconType = nil; entry.itemID = nil
-        entry.hasCharges = nil; entry.hiddenKey = nil; entry.prio = nil
+        entry.iconType = nil; entry.hasCharges = nil
     end
     return entry
 end
@@ -394,11 +393,8 @@ local function CollectSlot(slot)
     if settings.trinketsUsableOnly and IconEngine.GetItemSpellID(itemID) == nil then return end
     local entry = AcquireEntry()
     entry.id = itemID
-    entry.itemID = itemID
     entry.icon = GetInventoryItemTexture("player", slot)
-    entry.slot = slot
     entry.iconType = "trinket"
-    entry.hiddenKey = hideKey
     Collect(entry)
 end
 
@@ -412,7 +408,6 @@ local function CollectRacial(spellID)
     entry.id = spellID
     entry.icon = iconID
     entry.iconType = "spell"
-    entry.hiddenKey = hideKey
     entry.hasCharges = charges ~= nil and charges.maxCharges > 1
     Collect(entry)
 end
@@ -439,7 +434,6 @@ local function CollectCustom(stored)
         if seenScratch[checkID] then return end
         local entry = AcquireEntry()
         entry.id = checkID
-        entry.itemID = checkID
         entry.icon = C_Item.GetItemIconByID(checkID) or 134400
         entry.iconType = "trinket"
         Collect(entry)
@@ -454,11 +448,9 @@ local function CollectCustom(stored)
         end
         local entry = AcquireEntry()
         entry.id = checkID
-        entry.itemID = checkID
         entry.icon = C_Item.GetItemIconByID(bestID or checkID) or 134400
         entry.iconType = "consumable"
         entry.cnt = bagCount
-        entry.prio = priority
         Collect(entry)
     end
 end
@@ -569,19 +561,16 @@ local function UpdateBar(index)
         local icon = bar.icons[iconIndex] or CreateIcon(bar.frame, index, iconIndex)
         bar.icons[iconIndex] = icon
 
-        if icon.itemID ~= entry.id then
-            icon._lastBestTier = nil
-        end
-
         icon.itemID = entry.id
-        icon.slot = entry.slot
         icon.iconType = entry.iconType
         icon.hasCharges = entry.hasCharges
-        icon.potionPrio = entry.prio
+        icon.count = entry.cnt
         icon.tex:SetTexture(entry.icon)
 
         if entry.iconType == "spell" then
-            local charges = IconEngine.ApplySpellVisual(icon.tex, icon.cd, entry.id, entry.hasCharges, bar.expiryCb, true, settings.hideGCD)
+            local cooldownInfo = C_Spell.GetSpellCooldown(entry.id)
+            IconEngine.SpellCooldownChanged(icon, entry.id, entry.hasCharges, cooldownInfo)
+            local charges = IconEngine.ApplySpellVisual(icon.tex, icon.cd, entry.id, entry.hasCharges, bar.expiryCb, true, settings.hideGCD, nil, nil, cooldownInfo)
             if entry.hasCharges and settings.showStackText then
                 icon.stack:SetText(charges ~= nil and C_StringUtil.TruncateWhenZero(charges) or "")
                 icon.stack:Show()
@@ -618,6 +607,7 @@ local function UpdateBar(index)
         icon:SetHitRectInsets(0, 0, 0, 0)
         icon.hl:SetShown(iconIndex == 1 and not settings.locked)
     end
+    bar.count = count
 
     if count > 0 then
         local columnCount = math.min(count, maxPerRow)
@@ -645,32 +635,34 @@ local function UpdateBar(index)
     end
 end
 
-RefreshCooldowns = function(index)
+local function RefreshSpellIcon(icon, expiryCallback, hideGCD)
+    local spellID = icon.itemID
+    local cooldownInfo = C_Spell.GetSpellCooldown(spellID)
+    local isUsable, notEnoughPower = C_Spell.IsSpellUsable(spellID)
+    local cooldownChanged = IconEngine.SpellCooldownChanged(icon, spellID, icon.hasCharges, cooldownInfo)
+    if not (cooldownChanged or IconEngine.SpellUsableChanged(icon.tex, isUsable, notEnoughPower)) then return end
+    local charges = IconEngine.ApplySpellVisual(icon.tex, icon.cd, spellID, icon.hasCharges, expiryCallback, true, hideGCD, isUsable, notEnoughPower, cooldownInfo)
+    if icon.hasCharges and icon.stack:IsShown() then
+        icon.stack:SetText(charges ~= nil and C_StringUtil.TruncateWhenZero(charges) or "")
+    end
+end
+
+RefreshCooldowns = function(index, spells, items)
     local bar = bars[index]
     if not (bar and bar.frame:IsShown()) then return end
 
     local hideGCD = GetBar(index).hideGCD
     local expiryCallback = bar.expiryCb
-    for iconIndex = 1, #bar.icons do
-        local icon = bar.icons[iconIndex]
-        if icon:IsShown() and icon.itemID then
-            if icon.iconType == "spell" then
-                local charges = IconEngine.ApplySpellVisual(icon.tex, icon.cd, icon.itemID, icon.hasCharges, expiryCallback, true, hideGCD)
-                if icon.hasCharges and icon.stack:IsShown() then
-                    icon.stack:SetText(charges ~= nil and C_StringUtil.TruncateWhenZero(charges) or "")
-                end
-            elseif icon.iconType == "trinket" then
-                IconEngine.ApplyTrinketVisual(icon.tex, icon.cd, icon.itemID, IconEngine.GetItemSpellID(icon.itemID), expiryCallback, icon.stack)
-            elseif icon.iconType == "consumable" then
-                local count, bestID = AggregateCountPrio(icon.itemID, icon.potionPrio)
-                if bestID and bestID ~= icon._lastBestTier then
-                    icon._lastBestTier = bestID
-                    local textureID = C_Item.GetItemIconByID(bestID)
-                    if textureID then icon.tex:SetTexture(textureID) end
-                end
-                if icon.stack:IsShown() then icon.stack:SetText(count) end
-                IconEngine.ApplyItemVisual(icon.tex, icon.cd, count, icon.itemID, expiryCallback)
-            end
+    local icons = bar.icons
+    for iconIndex = 1, bar.count do
+        local icon = icons[iconIndex]
+        local iconType = icon.iconType
+        if iconType == "spell" then
+            if spells then RefreshSpellIcon(icon, expiryCallback, hideGCD) end
+        elseif iconType == "trinket" then
+            IconEngine.ApplyTrinketVisual(icon.tex, icon.cd, icon.itemID, IconEngine.GetItemSpellID(icon.itemID), expiryCallback, icon.stack)
+        elseif items then
+            IconEngine.ApplyItemVisual(icon.tex, icon.cd, icon.count, icon.itemID, expiryCallback)
         end
     end
 end
@@ -679,8 +671,8 @@ local function CreateBar(index)
     local settings = GetBar(index)
     if not settings then return nil end
 
-    local bar = { icons = {} }
-    bar.expiryCb = function() RefreshCooldowns(index) end
+    local bar = { icons = {}, count = 0 }
+    bar.expiryCb = function() RefreshCooldowns(index, true, true) end
 
     local frame = CreateFrame("Frame", "BUI_TrackingBar" .. index, UIParent)
     frame:SetFrameStrata("MEDIUM")
@@ -849,14 +841,28 @@ function CustomBars.GetBarCount()
 end
 
 
+local spellCooldownsPending, itemCooldownsPending = false, false
+
 local function FlushCooldownDispatch()
+    local spells, items = spellCooldownsPending, itemCooldownsPending
+    spellCooldownsPending, itemCooldownsPending = false, false
     local settings = GetSettings()
     for barIndex = 1, #settings do
-        if settings[barIndex].enabled then RefreshCooldowns(barIndex) end
+        if settings[barIndex].enabled then RefreshCooldowns(barIndex, spells, items) end
     end
 end
 
-local ScheduleCooldownRefresh = BUI.Dispatcher.New(FlushCooldownDispatch, "CustomBars.Cooldowns")
+local QueueCooldownFlush = BUI.Dispatcher.New(FlushCooldownDispatch, "CustomBars.Cooldowns")
+
+local function OnSpellCooldownEvent()
+    spellCooldownsPending = true
+    QueueCooldownFlush()
+end
+
+local function OnItemCooldownEvent()
+    itemCooldownsPending = true
+    QueueCooldownFlush()
+end
 
 local function HasEnabledBar()
     local settings = GetSettings()
@@ -875,21 +881,45 @@ local function OnEnteringWorld(_, isInitialLogin, isReloadingUi)
     if isInitialLogin or isReloadingUi then OnEvent() end
 end
 
-local hotEventsRegistered = false
+local spellEventsRegistered, itemEventsRegistered = false, false
+
+local function NeededCooldownEvents()
+    local settings = GetSettings()
+    local wantSpells, wantItems = false, false
+    for barIndex = 1, #settings do
+        local bar = bars[barIndex]
+        if bar and settings[barIndex].enabled then
+            local icons = bar.icons
+            for iconIndex = 1, bar.count do
+                local iconType = icons[iconIndex].iconType
+                if iconType ~= "consumable" then wantSpells = true end
+                if iconType ~= "spell" then wantItems = true end
+            end
+        end
+    end
+    return wantSpells, wantItems
+end
 
 function CustomBars.RefreshHotEventRegistration()
     if not eventsRegistered then return end
-    local needed = HasEnabledBar()
-    if needed and not hotEventsRegistered then
-        hotEventsRegistered = true
-        BUI.Events:Register("SPELL_UPDATE_COOLDOWN", "CustomBars.Hot",     ScheduleCooldownRefresh)
-        BUI.Events:Register("SPELL_UPDATE_CHARGES",  "CustomBars.Charges", ScheduleCooldownRefresh)
-        BUI.Events:Register("BAG_UPDATE_COOLDOWN",   "CustomBars.BagCD",   ScheduleCooldownRefresh)
-    elseif not needed and hotEventsRegistered then
-        hotEventsRegistered = false
-        BUI.Events:Unregister("SPELL_UPDATE_COOLDOWN", "CustomBars.Hot")
-        BUI.Events:Unregister("SPELL_UPDATE_CHARGES",  "CustomBars.Charges")
-        BUI.Events:Unregister("BAG_UPDATE_COOLDOWN",   "CustomBars.BagCD")
+    local wantSpells, wantItems = NeededCooldownEvents()
+    if wantSpells ~= spellEventsRegistered then
+        spellEventsRegistered = wantSpells
+        if wantSpells then
+            BUI.Events:Register("SPELL_UPDATE_COOLDOWN", "CustomBars.Hot",     OnSpellCooldownEvent)
+            BUI.Events:Register("SPELL_UPDATE_CHARGES",  "CustomBars.Charges", OnSpellCooldownEvent)
+        else
+            BUI.Events:Unregister("SPELL_UPDATE_COOLDOWN", "CustomBars.Hot")
+            BUI.Events:Unregister("SPELL_UPDATE_CHARGES",  "CustomBars.Charges")
+        end
+    end
+    if wantItems ~= itemEventsRegistered then
+        itemEventsRegistered = wantItems
+        if wantItems then
+            BUI.Events:Register("BAG_UPDATE_COOLDOWN", "CustomBars.BagCD", OnItemCooldownEvent)
+        else
+            BUI.Events:Unregister("BAG_UPDATE_COOLDOWN", "CustomBars.BagCD")
+        end
     end
 end
 

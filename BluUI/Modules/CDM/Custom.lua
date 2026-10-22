@@ -1114,45 +1114,14 @@ local function UpdateIcon(icon)
     if frameData.hasCharges == nil then
         frameData.hasCharges = C_Spell.GetSpellCharges(id) ~= nil
     end
-    if cdInfo then
-        local cdStart = cdInfo.startTime
-        local cdDuration = cdInfo.duration
-        if cdStart and not issecretvalue(cdStart) and not issecretvalue(cdDuration) then
-            local fingerValid = true
-            local chargeCount, chargeStart, chargeDuration
-            if frameData.hasCharges then
-                local chargeInfo = C_Spell.GetSpellCharges(id)
-                chargeCount = chargeInfo and Tools.SafeNum(chargeInfo.currentCharges)
-                chargeStart = chargeInfo and Tools.SafeNum(chargeInfo.cooldownStartTime)
-                chargeDuration = chargeInfo and Tools.SafeNum(chargeInfo.cooldownDuration)
-                fingerValid = chargeCount ~= nil and chargeStart ~= nil and chargeDuration ~= nil
-            end
-            if fingerValid and cdStart == frameData._cdFingerStart and cdDuration == frameData._cdFingerDuration
-                and chargeCount == frameData._cdFingerCharges
-                and chargeStart == frameData._cdFingerChargeStart
-                and chargeDuration == frameData._cdFingerChargeDuration then
-                local _, notEnoughPower = C_Spell.IsSpellUsable(id)
-                if not issecretvalue(notEnoughPower) and notEnoughPower ~= texture._lastNotEnoughPower then
-                    texture._lastNotEnoughPower = notEnoughPower
-                    local tint = notEnoughPower and 0.5 or 1
-                    SetColor(texture, tint, tint, tint)
-                end
-                return
-            end
-            if fingerValid then
-                frameData._cdFingerStart = cdStart
-                frameData._cdFingerDuration = cdDuration
-                frameData._cdFingerCharges = chargeCount
-                frameData._cdFingerChargeStart = chargeStart
-                frameData._cdFingerChargeDuration = chargeDuration
-            else
-                frameData._cdFingerStart = nil
-                frameData._cdFingerDuration = nil
-            end
-        else
-            frameData._cdFingerStart = nil
-            frameData._cdFingerDuration = nil
+    if not IconEngine.SpellCooldownChanged(frameData, id, frameData.hasCharges, cdInfo) then
+        local _, notEnoughPower = C_Spell.IsSpellUsable(id)
+        if not issecretvalue(notEnoughPower) and notEnoughPower ~= texture._lastNotEnoughPower then
+            texture._lastNotEnoughPower = notEnoughPower
+            local tint = notEnoughPower and 0.5 or 1
+            SetColor(texture, tint, tint, tint)
         end
+        return
     end
 
     local isUsable, notEnoughPower = C_Spell.IsSpellUsable(id)
