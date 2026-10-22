@@ -228,19 +228,41 @@ end
 
 Skin.MENU_THEME = MENU_THEME
 
-local KIT_WINDOW = { font = FONT }
+local KIT_WINDOW = { font = FONT, frame = UIParent }
+local KIT_ROLES = { page = 'skinBackground', edge = 'skinBorder', rule = 'skinBorder', text = 'skinText', muted = 'skinLabel', faint = 'skinLabel' }
+local kitBinds = setmetatable({}, { __mode = 'k' })
+
+local function KitRole(role)
+	return KIT_ROLES[role] or role
+end
 
 function KIT_WINDOW:Paint(region, role)
 	if type(role) == 'function' then return Painter.Custom(region, role) end
-	if region.SetTextColor then return Painter.Text(region, role) end
-	return Painter.Tint(region, role)
+	if region.SetTextColor then return Painter.Text(region, KitRole(role)) end
+	return Painter.Tint(region, KitRole(role))
 end
-KIT_WINDOW.Bind = KIT_WINDOW.Paint
+
+function KIT_WINDOW:Bind(region, update)
+	kitBinds[region] = update
+	update(region)
+	return region
+end
+
+function KIT_WINDOW:Repaint()
+	for region, update in pairs(kitBinds) do update(region) end
+end
 
 function KIT_WINDOW:Fill(parent, role, layer, subLayer)
 	local texture = parent:CreateTexture(nil, layer or 'BACKGROUND', nil, subLayer or 0)
 	texture:SetTexture(BUILib.Widget.WHITE)
-	return Painter.Tint(texture, role)
+	return Painter.Tint(texture, KitRole(role))
+end
+
+function KIT_WINDOW:Text(parent, text, size, role)
+	local label = parent:CreateFontString(nil, 'OVERLAY')
+	Pixel.ApplyFont(label, size, FONT, '')
+	label:SetText(text)
+	return self:Paint(label, role)
 end
 
 function KIT_WINDOW:SetFontRole(region, fontRole)
@@ -249,6 +271,7 @@ function KIT_WINDOW:SetFontRole(region, fontRole)
 	return region
 end
 
+Skin.KitWindow = KIT_WINDOW
 Skin.Kit = BUILib.Layout.TableKit(KIT_WINDOW)
 
 function Skin.ContextMenu(items, options)
