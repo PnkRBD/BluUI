@@ -279,29 +279,26 @@ end
 
 local reclaimingStyle = setmetatable({}, { __mode = 'k' })
 
+local function ReclaimSwipe(cooldown)
+    local cooldownFrameData = FrameData[cooldown]
+    if not cooldownFrameData or not cooldownFrameData.cdSetup or cooldownFrameData.swA == nil then return end
+    cooldown:SetDrawEdge(cooldownFrameData.showEdge or false)
+    cooldown:SetSwipeColor(cooldownFrameData.swR, cooldownFrameData.swG, cooldownFrameData.swB, cooldownFrameData.swA)
+end
+
 local function OnCooldownApplied(cooldown)
     local iconFrameData = FrameData[cooldown:GetParent()]
     if iconFrameData and iconFrameData.hidden then return end
     ReenforceCooldownStyle(cooldown)
     reclaimingStyle[cooldown] = true
     CDM.RestyleCooldown(cooldown)
+    ReclaimSwipe(cooldown)
     reclaimingStyle[cooldown] = nil
 end
 
 function CDM.ReclaimShownIconStyle(icon)
     OnCooldownApplied(icon.Cooldown)
     ApplyDesaturation(icon.Icon)
-end
-
-local function ReclaimDrawEdge(cooldown, drawEdge)
-    if reclaimingStyle[cooldown] then return end
-    local cooldownFrameData = FrameData[cooldown]
-    if not cooldownFrameData or not cooldownFrameData.cdSetup then return end
-    local wanted = cooldownFrameData.showEdge or false
-    if not issecretvalue(drawEdge) and (drawEdge and true or false) == wanted then return end
-    reclaimingStyle[cooldown] = true
-    cooldown:SetDrawEdge(wanted)
-    reclaimingStyle[cooldown] = nil
 end
 
 local function ReclaimReverse(cooldown, reverse)
@@ -312,21 +309,6 @@ local function ReclaimReverse(cooldown, reverse)
     if not issecretvalue(reverse) and (reverse and true or false) == wanted then return end
     reclaimingStyle[cooldown] = true
     cooldown:SetReverse(wanted)
-    reclaimingStyle[cooldown] = nil
-end
-
-local function SwipeColorMatches(cooldownFrameData, red, green, blue, alpha)
-    if issecretvalue(red) or issecretvalue(green) or issecretvalue(blue) or issecretvalue(alpha) then return false end
-    return red == cooldownFrameData.swR and green == cooldownFrameData.swG and blue == cooldownFrameData.swB and alpha == cooldownFrameData.swA
-end
-
-local function ReclaimSwipeColor(cooldown, red, green, blue, alpha)
-    if reclaimingStyle[cooldown] then return end
-    local cooldownFrameData = FrameData[cooldown]
-    if not cooldownFrameData or not cooldownFrameData.cdSetup or cooldownFrameData.swA == nil then return end
-    if SwipeColorMatches(cooldownFrameData, red, green, blue, alpha) then return end
-    reclaimingStyle[cooldown] = true
-    cooldown:SetSwipeColor(cooldownFrameData.swR, cooldownFrameData.swG, cooldownFrameData.swB, cooldownFrameData.swA)
     reclaimingStyle[cooldown] = nil
 end
 
@@ -373,9 +355,7 @@ local function SetupCooldown(cooldown)
         cooldownFrameData.cdHooked = true
         Hook(cooldown, 'SetCooldown', OnCooldownApplied)
         Hook(cooldown, 'SetCooldownFromDurationObject', ReenforceCooldownStyle)
-        Hook(cooldown, 'SetDrawEdge', ReclaimDrawEdge)
         Hook(cooldown, 'SetReverse', ReclaimReverse)
-        Hook(cooldown, 'SetSwipeColor', ReclaimSwipeColor)
         Hook(cooldown, 'SetDrawBling', ReclaimBling)
     end
 end
