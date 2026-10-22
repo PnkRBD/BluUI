@@ -19,6 +19,7 @@ local POP_TITLE = 24
 local POP_CONTROL = 200
 local POP_RADIUS = 8
 local POP_OFFSET = 4
+local POP_DOT = 8
 local LABEL_GAP = 16
 
 local active
@@ -142,12 +143,18 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 			row:SetPoint('TOPLEFT', POP_PAD, -y)
 			local control = kit.Tool(row, option, after)
 			control:SetPoint('RIGHT')
+			local edge, room = control, control:GetWidth()
+			if option.color then
+				local dot = kit.Disc(row, POP_DOT, option.color)
+				dot:SetPoint('RIGHT', control, 'LEFT', -LABEL_GAP, 0)
+				edge, room = dot, room + LABEL_GAP + POP_DOT
+			end
 			local label = kit.Text(row, option.label, 12, 'text')
 			label:SetPoint('LEFT')
-			label:SetPoint('RIGHT', control, 'LEFT', -LABEL_GAP, 0)
+			label:SetPoint('RIGHT', edge, 'LEFT', -LABEL_GAP, 0)
 			label:SetJustifyH('LEFT')
 			label:SetWordWrap(false)
-			width = math.max(width, math.ceil(label:GetUnboundedStringWidth()) + LABEL_GAP + control:GetWidth() + POP_PAD * 2)
+			width = math.max(width, math.ceil(label:GetUnboundedStringWidth()) + LABEL_GAP + room + POP_PAD * 2)
 			if option.disabled then Layout.DisableWhen(window, option.disabled, row, { row }):SetAllPoints(row) end
 			rows[#rows + 1] = row
 			y = y + POP_ROW
