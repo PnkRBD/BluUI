@@ -18,6 +18,7 @@ local GROWTH = { LEFT = { -1, 0 }, RIGHT = { 1, 0 }, UP = { 0, 1 }, DOWN = { 0, 
 
 local spellSets = setmetatable({}, { __mode = 'k' })
 local activeEntries, activeSet, activeSignature
+local specUnresolved = false
 local pending = {}
 
 local function CopyEntry(entry)
@@ -55,6 +56,7 @@ end
 
 function HotSlots.Invalidate()
 	activeEntries, activeSet, activeSignature = nil, nil, nil
+	specUnresolved = false
 end
 
 local NONE = {}
@@ -62,7 +64,10 @@ local NONE = {}
 local function Active()
 	if activeSignature then return activeEntries, activeSet, activeSignature end
 	local specID = PlayerUtil.GetCurrentSpecID()
-	if not specID then return NONE, NONE, '' end
+	if not specID then
+		specUnresolved = true
+		return NONE, NONE, ''
+	end
 	local list = HotSlots.SpellsFor(specID)
 	activeEntries, activeSet = {}, {}
 	if list then
@@ -225,6 +230,9 @@ end
 BUI.Tools.OnAuraQueriesUnblocked(ApplyPending, 'Group frame HoT slots')
 
 BUI.Events:OnTalentBurst('GroupFrames.HotSlots', function()
+	local before, unresolved = activeSignature, specUnresolved
 	HotSlots.Invalidate()
-	GroupFrames.RefreshAuras()
+	if before == nil and not unresolved then return end
+	local _, _, after = Active()
+	if after ~= before then GroupFrames.RefreshAuras() end
 end)
