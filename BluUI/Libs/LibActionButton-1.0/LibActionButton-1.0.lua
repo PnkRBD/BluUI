@@ -1725,14 +1725,18 @@ cooldownPassFrame:SetScript("OnUpdate", function(self)
 	local tooltipOwner = GameTooltip_GetOwnerForbidden()
 	if doActions then
 		for button in next, ActionButtons do
-			UpdateCooldown(button)
-			if tooltipOwner == button then UpdateTooltip(button) end
+			if button:IsVisible() then
+				UpdateCooldown(button)
+				if tooltipOwner == button then UpdateTooltip(button) end
+			end
 		end
 	end
 	if doSpells then
 		for button in next, NonActionButtons do
-			UpdateCooldown(button)
-			if tooltipOwner == button then UpdateTooltip(button) end
+			if button:IsVisible() then
+				UpdateCooldown(button)
+				if tooltipOwner == button then UpdateTooltip(button) end
+			end
 		end
 	end
 	cooldownPassLoC = nil
@@ -1966,6 +1970,11 @@ function Generic:UpdateAction(force)
 	end
 end
 
+local function ForgetCooldowns(self)
+	self.cooldown._labStart = nil
+	if self.chargeCooldown then self.chargeCooldown._labStart = nil end
+end
+
 function Update(self)
 	if self:HasAction() then
 		ActiveButtons[self] = true
@@ -1998,6 +2007,7 @@ function Update(self)
 
 		if ClearActionButtonCooldowns then
 			ClearActionButtonCooldowns(self.cooldown, self.chargeCooldown, self.lossOfControlCooldown)
+			ForgetCooldowns(self)
 		else
 			ClearChargeCooldown(self)
 		end
@@ -2060,6 +2070,7 @@ function Update(self)
 		self.icon:Hide()
 		if ClearActionButtonCooldowns then
 			ClearActionButtonCooldowns(self.cooldown, self.chargeCooldown, self.lossOfControlCooldown)
+			ForgetCooldowns(self)
 		else
 			self.cooldown:Hide()
 		end
@@ -2222,13 +2233,31 @@ local defaultChargeInfo = { currentCharges = 0; maxCharges = 0; cooldownStartTim
 local defaultLossOfControlInfo = { startTime = 0; duration = 0; modRate = 0; isActive = false; shouldReplaceNormalCooldown = false; }
 
 if Feat_CooldownDurationObject then
-	local function SetOrClearCooldown(cooldown, shouldShow, durationObject)
-		if not cooldown then return end
-		if not shouldShow or not durationObject then
-			cooldown:Clear()
+	local function ClearCooldown(cooldown)
+		if not cooldown or cooldown._labClear then return end
+		cooldown._labClear = true
+		cooldown._labStart = nil
+		cooldown:Clear()
+	end
+
+	local function SetCooldown(cooldown, durationObject)
+		if not durationObject then
+			cooldown._labStart = nil
+			ClearCooldown(cooldown)
 			return
 		end
+		cooldown._labClear = nil
 		cooldown:SetCooldownFromDurationObject(durationObject)
+	end
+
+	local function SameCooldown(cooldown, startTime, duration, modRate)
+		if issecretvalue(startTime) or issecretvalue(duration) or issecretvalue(modRate) then
+			cooldown._labStart = nil
+			return false
+		end
+		if cooldown._labStart == startTime and cooldown._labDuration == duration and cooldown._labRate == modRate then return true end
+		cooldown._labStart, cooldown._labDuration, cooldown._labRate = startTime, duration, modRate
+		return false
 	end
 
 	function UpdateCooldown(self, full)
@@ -2246,9 +2275,26 @@ if Feat_CooldownDurationObject then
 		end
 		local showCharge = not locShouldReplaceCooldown and chargeInfo.isActive
 
-		SetOrClearCooldown(self.cooldown, showNormal, showNormal and self:GetCooldownDuration() or nil)
-		SetOrClearCooldown(self.chargeCooldown, showCharge, showCharge and self:GetChargeDuration() or nil)
-		SetOrClearCooldown(self.lossOfControlCooldown, showLoC, showLoC and self:GetLoCCooldownDuration() or nil)
+		local cooldown = self.cooldown
+		if not showNormal then
+			ClearCooldown(cooldown)
+		elseif not SameCooldown(cooldown, cooldownInfo.startTime, cooldownInfo.duration, cooldownInfo.modRate) or full then
+			SetCooldown(cooldown, self:GetCooldownDuration())
+		end
+
+		local chargeCooldown = self.chargeCooldown
+		if not showCharge then
+			ClearCooldown(chargeCooldown)
+		elseif chargeCooldown and (not SameCooldown(chargeCooldown, chargeInfo.cooldownStartTime, chargeInfo.cooldownDuration, chargeInfo.chargeModRate) or full) then
+			SetCooldown(chargeCooldown, self:GetChargeDuration())
+		end
+
+		local lossOfControlCooldown = self.lossOfControlCooldown
+		if not showLoC then
+			ClearCooldown(lossOfControlCooldown)
+		elseif lossOfControlCooldown then
+			SetCooldown(lossOfControlCooldown, self:GetLoCCooldownDuration())
+		end
 	end
 else
 	function UpdateCooldown(self)
