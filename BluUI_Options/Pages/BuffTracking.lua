@@ -119,6 +119,7 @@ local function Alert(board, spec)
 	local db = BUI.GetDB()[spec.key]
 	local Refresh = Refresher(spec)
 	local tools = { { icon = 'cog', tooltip = 'Open the ' .. spec.title .. ' page', onClick = function() Open(spec) end } }
+	if spec.position then tools[#tools + 1] = BUI.PositionTool(db, spec.position) end
 	if spec.eye then
 		local eye = spec.eye(db, Refresh, spec)
 		tools[#tools + 1] = eye
@@ -130,6 +131,7 @@ end
 
 local function TextAlert(board, spec)
 	spec.eye = Eye
+	spec.position = { selfTag = spec.frame }
 	spec.build = function(db, Board, Refresh)
 		local alert = Board(spec.title, 'What it shows and how it sounds.')
 		local text = { Option(db, spec.textLabel or 'Text', 'customText', { kind = 'input', placeholder = 'Text' }) }
@@ -137,7 +139,7 @@ local function TextAlert(board, spec)
 		text[#text + 1] = Option(db, 'Text size', 'textSize', { min = 10, max = 48, step = 1 })
 		local tools = { Color(db, 'Text color', 'textColor', true), Font(db), TextTool('Text', text) }
 		if spec.textTiming then tools[#tools + 1] = Timing(spec.textTiming(db)) end
-		tools[#tools + 1] = BUI.PositionTool(db, { selfTag = spec.frame })
+		tools[#tools + 1] = BUI.PositionTool(db, spec.position)
 		tools[#tools + 1] = Toggle(db, nil, 'showText')
 		alert:AddTools('Text', 'Wording, font, size, color and where it sits', tools, Refresh)
 		SoundRow(alert, db, Refresh, spec.soundTiming and spec.soundTiming(db))
@@ -148,6 +150,7 @@ end
 
 local function StackAlert(board, spec)
 	spec.eye = Eye
+	spec.position = { selfTag = spec.frame }
 	spec.build = function(db, Board, Refresh)
 		local alert = Board(spec.title, 'The stack count as a number or as bars.')
 		alert:AddSwitch('Show bars', function() return db.displayMode == 'BARS' end, function(value)
@@ -164,7 +167,7 @@ local function StackAlert(board, spec)
 		text[#text + 1] = Color(db, 'Text color', 'textColor', true)
 		text[#text + 1] = Font(db)
 		text[#text + 1] = TextTool('Text', { Option(db, 'Text size', 'textSize', { min = 10, max = 48, step = 1 }) })
-		text[#text + 1] = BUI.PositionTool(db, { selfTag = spec.frame })
+		text[#text + 1] = BUI.PositionTool(db, spec.position)
 		alert:AddTools('Text', 'A color per stack count, the number itself and where it sits', text, Refresh)
 		alert:AddTools('Bars', 'Filled, empty and border colors, and the size of each bar', {
 			Color(db, 'Filled color', 'filledColor', true),
@@ -181,6 +184,9 @@ local function StackAlert(board, spec)
 	Alert(board, spec)
 end
 
+local PACK_LEADER_POSITION = { selfTag = 'BUI_PackLeader', noCenter = true }
+local MARK_POSITION = { selfTag = 'BUI_MarkWarning', fields = MARK_FIELDS }
+
 local function PackLeader(board)
 	local Overlay = BuffTracking.KillCommandOverlay
 	Alert(board, {
@@ -190,6 +196,7 @@ local function PackLeader(board)
 			Overlay.Refresh()
 		end,
 		eye = Eye,
+		position = PACK_LEADER_POSITION,
 		build = function(db, Board, Refresh)
 			local function Beast(key, label)
 				return {
@@ -224,7 +231,7 @@ local function PackLeader(board)
 					Option(db, 'Next icon size', 'nextIconSize', { min = 8, max = 64, step = 1 }),
 					Option(db, 'Spacing', 'spacing', { min = 0, max = 16, step = 1 }),
 				} },
-				BUI.PositionTool(db, { selfTag = 'BUI_PackLeader', noCenter = true }),
+				BUI.PositionTool(db, PACK_LEADER_POSITION),
 			}, Refresh)
 		end,
 	})
@@ -286,6 +293,7 @@ local function HuntersMark(board)
 	Alert(board, {
 		key = 'auras', flag = 'markWarning', title = "Hunter's Mark", description = "Callout while your target is missing Hunter's Mark", spell = 257284,
 		refresh = Auras.UpdateMark,
+		position = MARK_POSITION,
 		eye = function(db, Refresh)
 			BUI.OnModuleChange('markWarning', Repaint)
 			return { icon = 'eye', tooltip = 'Preview, drag to move, right-click it to lock', get = function() return db.markLocked == false end, set = function(value)
@@ -305,7 +313,7 @@ local function HuntersMark(board)
 					Option(db, 'Text', 'markText', { kind = 'input', placeholder = 'Text' }),
 					Option(db, 'Text size', 'markFontSize', { min = 10, max = 48, step = 1 }),
 				}),
-				BUI.PositionTool(db, { selfTag = 'BUI_MarkWarning', fields = MARK_FIELDS }),
+				BUI.PositionTool(db, MARK_POSITION),
 			}, Refresh)
 			mark:AddTools('Icon', 'Spell icon beside the text', {
 				{ icon = 'resize', tooltip = 'Size and pulse', title = 'Icon', options = {
