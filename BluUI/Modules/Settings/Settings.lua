@@ -39,7 +39,7 @@ local function HideFrameToggle(frame)
         if enabled then
             frame:Hide()
             if not AceHook.IsHooked(BUI, frame, "OnShow") then
-                AceHook.HookScript(BUI, frame, "OnShow", function(self) self:Hide() end)
+                AceHook.SecureHookScript(BUI, frame, "OnShow", function(self) self:Hide() end)
             end
         else
             if AceHook.IsHooked(BUI, frame, "OnShow") then AceHook.Unhook(BUI, frame, "OnShow") end
