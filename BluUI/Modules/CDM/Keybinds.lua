@@ -283,27 +283,48 @@ local function ForgetSpellVariants(spellID)
     if variant3 then ForgetEntry(variant3) end
 end
 
+local seenType, seenID, seenOverride = {}, {}, {}
+
+local function ForgetSeenSlots()
+    wipe(seenType)
+    wipe(seenID)
+    wipe(seenOverride)
+end
+
+local function SlotAction(slot)
+    if HasAction(slot) then return GetActionInfo(slot) end
+end
+
+local function SlotContentChanged(slot, actionType, actionID)
+    local override = actionType == "spell" and actionID and C_Spell.GetOverrideSpell(actionID) or false
+    actionType, actionID = actionType or false, actionID or false
+    if seenType[slot] == actionType and seenID[slot] == actionID and seenOverride[slot] == override then return false end
+    seenType[slot], seenID[slot], seenOverride[slot] = actionType, actionID, override
+    return true
+end
+
 local function InvalidateChangedSlots()
     if MainBarMappingStale() then return false end
     local anyBound = false
     for slot in pairs(pendingSlots) do
-        local actionType, actionID
-        if HasAction(slot) then actionType, actionID = GetActionInfo(slot) end
-        if itemSlots[slot] or actionType == "item" then ForgetItemMap() end
-        if KeybindForSlot(slot) then
-            anyBound = true
-            for id, owner in pairs(entrySlot) do
-                if owner == slot then ForgetEntry(id) end
-            end
-            if macroSlots[slot] then ForgetMacroMap() end
-            if actionType == "spell" and actionID then
-                ForgetSpellVariants(actionID)
-            elseif actionType == "item" and actionID then
-                ForgetEntry(actionID)
-                local _, itemSpellID = GetItemSpell(actionID)
-                if itemSpellID then ForgetSpellVariants(itemSpellID) end
-            elseif actionType then
-                return false
+        local actionType, actionID = SlotAction(slot)
+        if SlotContentChanged(slot, actionType, actionID) then
+            if itemSlots[slot] or actionType == "item" then ForgetItemMap() end
+            if KeybindForSlot(slot) then
+                anyBound = true
+                for id, owner in pairs(entrySlot) do
+                    if owner == slot then ForgetEntry(id) end
+                end
+                if macroSlots[slot] then ForgetMacroMap() end
+                if actionType == "spell" and actionID then
+                    ForgetSpellVariants(actionID)
+                elseif actionType == "item" and actionID then
+                    ForgetEntry(actionID)
+                    local _, itemSpellID = GetItemSpell(actionID)
+                    if itemSpellID then ForgetSpellVariants(itemSpellID) end
+                elseif actionType then
+                    return false
+                end
             end
         end
     end
@@ -628,6 +649,9 @@ end
 
 local function DoRefresh(full, bindingsStale)
     if not full and next(pendingSlots) and not InvalidateChangedSlots() then full = true end
+    if full then
+        for slot in pairs(pendingSlots) do SlotContentChanged(slot, SlotAction(slot)) end
+    end
     wipe(pendingSlots)
     if full then
         InvalidateAll()
@@ -778,6 +802,7 @@ local function UnregisterMappingEvents()
     for eventIndex = 1, #MAPPING_EVENTS do
         BUI.Events:Unregister(MAPPING_EVENTS[eventIndex], "CDM.Keybinds." .. MAPPING_EVENTS[eventIndex])
     end
+    ForgetSeenSlots()
 end
 
 function Keybinds.UpdateConsumerState()
