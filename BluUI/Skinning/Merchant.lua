@@ -784,6 +784,11 @@ local function ClearRowData()
 end
 
 local LIVE_EVENTS = { 'MERCHANT_UPDATE', 'BAG_UPDATE_DELAYED', 'PLAYER_MONEY', 'CURRENCY_DISPLAY_UPDATE' }
+local REPAIR_EVENTS = { 'UPDATE_INVENTORY_DURABILITY', 'GUILDBANK_UPDATE_MONEY', 'GUILDBANK_UPDATE_WITHDRAWMONEY' }
+
+local function RefreshRepair()
+	UpdateRepairState(merchantFrame)
+end
 
 local function RefreshLater()
 	if merchantFrame.pendingRefresh then return end
@@ -808,6 +813,7 @@ local function OpenMerchant(frame)
 		SetMerchantFilter(LE_LOOT_FILTER_ALL)
 	end
 	for _, event in ipairs(LIVE_EVENTS) do BUI.Events:Register(event, 'Skinning.Merchant.Live', RefreshLater) end
+	for _, event in ipairs(REPAIR_EVENTS) do BUI.Events:Register(event, 'Skinning.Merchant.Live', RefreshRepair) end
 	After('Skin.Merchant page reskin', 0, RefreshContent)
 end
 
