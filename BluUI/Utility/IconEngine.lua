@@ -382,6 +382,40 @@ function IconEngine.ApplyTrinketVisual(texture, cooldown, itemID, itemSpellID, o
 	SetColor(texture, 1, 1, 1)
 end
 
+function IconEngine.SpellCooldownChanged(state, spellID, hasCharges, cooldownInfo)
+	local start = cooldownInfo and cooldownInfo.startTime
+	local duration = cooldownInfo and cooldownInfo.duration
+	if start == nil or issecretvalue(start) or issecretvalue(duration) then
+		state._cdFingerStart = nil
+		return true
+	end
+	local charges, chargeStart, chargeDuration
+	if hasCharges then
+		local chargeInfo = C_Spell.GetSpellCharges(spellID)
+		local SafeNum = BUI.Tools.SafeNum
+		charges = chargeInfo and SafeNum(chargeInfo.currentCharges)
+		chargeStart = chargeInfo and SafeNum(chargeInfo.cooldownStartTime)
+		chargeDuration = chargeInfo and SafeNum(chargeInfo.cooldownDuration)
+		if charges == nil or chargeStart == nil or chargeDuration == nil then
+			state._cdFingerStart = nil
+			return true
+		end
+	end
+	if start == state._cdFingerStart and duration == state._cdFingerDuration and charges == state._cdFingerCharges
+		and chargeStart == state._cdFingerChargeStart and chargeDuration == state._cdFingerChargeDuration then
+		return false
+	end
+	state._cdFingerStart, state._cdFingerDuration = start, duration
+	state._cdFingerCharges, state._cdFingerChargeStart, state._cdFingerChargeDuration = charges, chargeStart, chargeDuration
+	return true
+end
+
+function IconEngine.SpellUsableChanged(texture, isUsable, notEnoughPower)
+	if not issecretvalue(isUsable) and isUsable == false then return texture._lastUsable ~= false end
+	if texture._lastUsable == false then return true end
+	return not issecretvalue(notEnoughPower) and notEnoughPower ~= texture._lastNotEnoughPower
+end
+
 function IconEngine.ApplySpellVisual(texture, cooldown, spellID, hasCharges, onExpireCallback, ignoreGCD, hideGCD, usableIn, notEnoughPowerIn, cooldownInfoIn)
 	local desaturationCurve = BUI.Tools.OnCooldownCurve
 	local isUsable, notEnoughPower
