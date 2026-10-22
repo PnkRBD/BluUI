@@ -698,7 +698,7 @@ local listener
 
 local MIN_VISIBLE = 0.05
 local MAX_HOLD = 2.0
-local HELD_POLL_INTERVAL = 0.25
+local HELD_POLL_INTERVAL = 0.05
 
 local pollQueued = false
 
@@ -832,7 +832,6 @@ local function StartInput()
         listener:EnableKeyboard(true)
         listener:SetPropagateKeyboardInput(true)
         listener:SetScript('OnKeyDown', BUI.Profiler.Script('CDM.PressHighlight listener OnKeyDown', function(_, key) OnInputDown(key) end))
-        listener:SetScript('OnKeyUp', BUI.Profiler.Script('CDM.PressHighlight listener OnKeyUp', function(_, key) OnInputUp(key) end))
     end
     listener:Show()
     for _, event in ipairs(KEY_CACHE_EVENTS) do BUI.Events:Register(event, 'CDM.PressHL.Keys', WipeKeyCache) end
