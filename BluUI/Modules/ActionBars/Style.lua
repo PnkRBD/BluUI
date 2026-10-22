@@ -249,7 +249,7 @@ function ActionBars.SkinButtonArt(button)
 	local pressColor = settings.pressColor
 	local pressAlpha = settings.showKeyPresses and settings.pressOpacity / 100 or 0
 	FlattenStateTexture(button.PushedTexture, pressColor[1], pressColor[2], pressColor[3], pressAlpha)
-	FlattenStateTexture(button.CheckedTexture, 1, 1, 1, 0.3)
+	FlattenStateTexture(button.CheckedTexture, 1, 1, 1, (button.config and button.config.actionButtonUI) and 0 or 0.3)
 	FlattenStateTexture(button.SpellHighlightTexture, 1, 0.85, 0.3, 0.35)
 	FlattenStateTexture(button.NewActionTexture, 1, 1, 1, 0.2)
 	Pixel.ApplyBorder(button, settings.borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4])

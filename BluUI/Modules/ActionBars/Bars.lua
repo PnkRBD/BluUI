@@ -31,6 +31,7 @@ local function CreateButtons(bar)
 		ActionBars.ApplyButtonLock(button)
 		ActionBars.SkinButton(button)
 		ActionBars.ApplyHotkeyText(button)
+		ActionBars.TrackKeyPresses(button)
 		bar.buttons[buttonIndex] = button
 	end
 end
