@@ -1340,7 +1340,6 @@ local function RefreshViewer(viewerKey)
     if not viewer then return end
 
     local anchor = CDM.Anchors[viewerKey]
-    local parentFrame = anchor or viewer
 
     local viewerIcons = icons[viewerKey]
     local oldCount = iconCounts[viewerKey]
@@ -1360,9 +1359,9 @@ local function RefreshViewer(viewerKey)
             visibleCount = visibleCount + 1
             local icon = registry[v]
             if icon then
-                icon:SetParent(parentFrame)
+                icon:SetParent(anchor)
             else
-                icon = AcquireIcon(parentFrame, config.borderSize, config.borderColor, config.zoom) or CreateIconFrame(parentFrame, config.borderSize, config.borderColor, config.zoom)
+                icon = AcquireIcon(anchor, config.borderSize, config.borderColor, config.zoom) or CreateIconFrame(anchor, config.borderSize, config.borderColor, config.zoom)
                 registry[v] = icon
             end
             viewerIcons[visibleCount] = icon
@@ -1845,19 +1844,17 @@ local function UpdateHotEventState()
     end
 end
 
-BUI.Events:Register("PLAYER_ENTERING_WORLD", "CDM.Custom.PEW", function()
+local function OnEnteringWorld()
     wipe(trinketSlotRetryCount)
     InvalidateCache()
     DoRefresh()
     UpdateHotEventState()
-end)
+end
 
 local RefreshAfterEquip = BUI.Dispatcher.New(function()
     DoRefresh()
     CDM.UpdateShowOnlyOnCDWatcher()
 end, "CDM.Custom.Equip")
-
-BUI.Events:Register("PLAYER_EQUIPMENT_CHANGED", "CDM.Custom.Equip", RefreshAfterEquip)
 
 BUI.Events:Register("TRAIT_CONFIG_UPDATED", "CDM.Custom.Traits", function(event, arg1)
     local activeID = C_ClassTalents.GetActiveConfigID()
@@ -1866,12 +1863,18 @@ BUI.Events:Register("TRAIT_CONFIG_UPDATED", "CDM.Custom.Traits", function(event,
     InvalidateCache()
 end)
 
-BUI.Events:OnTalentBurst("CDM.Custom", function()
+local function OnTalentBurst()
     DoRefresh()
     UpdateHotEventState()
-end)
+end
 
 CDM.Custom = {}
+
+function CDM.Custom.RegisterEvents()
+    BUI.Events:Register("PLAYER_ENTERING_WORLD", "CDM.Custom.PEW", OnEnteringWorld)
+    BUI.Events:Register("PLAYER_EQUIPMENT_CHANGED", "CDM.Custom.Equip", RefreshAfterEquip)
+    BUI.Events:OnTalentBurst("CDM.Custom", OnTalentBurst)
+end
 
 function CDM.Custom.IsPotionItem(itemID)
     if not itemID then return false end
