@@ -197,6 +197,7 @@ local function BuildAbsorb(frame, unit)
 
 	local absorb = CreateFrame("StatusBar", nil, clip)
 	absorb:SetFrameLevel(clip:GetFrameLevel() + 1)
+	UnitFrames.AddAbsorbExcess(absorb)
 	ApplyAbsorbLook(absorb, frame.Health, settings.absorb, settings)
 	absorb:SetShown(settings.absorb.enabled)
 	frame.Absorb = absorb

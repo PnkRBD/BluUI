@@ -178,10 +178,8 @@ local function SetFakeData(frame, unitType, index, sample, absorbs)
 	SetFakeCustomTags(frame, healthPercent, powerPercent)
 
 	UnitFrames.FitAbsorbBars(frame)
-	frame.Absorb:SetMinMaxValues(0, 100)
-	frame.Absorb:SetValue(absorbs == 'healAbsorb' and 0 or SAMPLE_ABSORB)
-	frame.HealAbsorb:SetMinMaxValues(0, 100)
-	frame.HealAbsorb:SetValue((absorbs == 'healAbsorb' or absorbs == 'both') and SAMPLE_HEAL_ABSORB or 0)
+	UnitFrames.FillAbsorb(frame.Absorb, 100, absorbs == 'healAbsorb' and 0 or SAMPLE_ABSORB)
+	UnitFrames.FillAbsorb(frame.HealAbsorb, 100, (absorbs == 'healAbsorb' or absorbs == 'both') and SAMPLE_HEAL_ABSORB or 0)
 end
 
 function UnitFrames.SetPreviewSpotlight(kind)
