@@ -272,6 +272,7 @@ local function Style(self, unit)
 
 	local absorb = CreateFrame('StatusBar', nil, absorbClip)
 	absorb:SetFrameLevel(absorbClip:GetFrameLevel() + 1)
+	UnitFrames.AddAbsorbExcess(absorb)
 	self.Absorb = absorb
 
 	local healAbsorb = CreateFrame('StatusBar', nil, absorbClip)

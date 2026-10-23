@@ -39,6 +39,7 @@ local WHITE_TEX = [[Interface\Buttons\WHITE8x8]]
 local STRIPES_TEXTURE = BUI.C.MEDIA_PATH .. 'stripes.tga'
 
 function UnitFrames.ApplyAbsorbVisual(bar, textureKey, color, alpha)
+	if bar.Excess then UnitFrames.ApplyAbsorbVisual(bar.Excess, textureKey, color, alpha) end
 	bar:SetStatusBarTexture(WHITE_TEX)
 	bar:SetStatusBarColor(color[1], color[2], color[3], alpha or color[4])
 	local base = bar:GetStatusBarTexture()
@@ -99,6 +100,24 @@ function UnitFrames.AnchorAbsorb(absorb, health, healthTexture, direction, fillS
 		absorb:SetReverseFill(fillSpec.reverse)
 		AttachSide(absorb, fillSpec.start, healthTexture, fillSpec.lead)
 	end
+	local excess = absorb.Excess
+	if not excess then return end
+	local clip = excess:GetParent()
+	clip:SetShown(direction == 'left')
+	if direction ~= 'left' then return end
+	clip:ClearAllPoints()
+	AttachSide(clip, fillSpec.start, healthTexture, fillSpec.lead)
+	AttachSide(clip, fillSpec.lead, health, fillSpec.lead)
+	excess:ClearAllPoints()
+	excess:SetOrientation(fillSpec.orientation)
+	excess:SetReverseFill(fillSpec.reverse)
+	AttachSide(excess, fillSpec.start, health, fillSpec.start)
+end
+
+function UnitFrames.AddAbsorbExcess(absorb)
+	local clip = CreateFrame('Frame', nil, absorb)
+	clip:SetClipsChildren(true)
+	absorb.Excess = CreateFrame('StatusBar', nil, clip)
 end
 
 local settingsCache

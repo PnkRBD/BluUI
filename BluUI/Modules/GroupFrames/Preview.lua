@@ -1,6 +1,7 @@
 local _, BUI = ...
 
 local GroupFrames = BUI.GroupFrames
+local UnitFrames = BUI.UnitFrames
 
 local AbbreviateNumbers   = AbbreviateNumbers
 local InCombatLockdown    = InCombatLockdown
@@ -154,8 +155,7 @@ local function PaintBars(child, decoy, settings)
 
 	local absorb = child.Absorb
 	if absorb then
-		absorb:SetMinMaxValues(0, 1)
-		absorb:SetValue(decoy.absorb)
+		UnitFrames.FillAbsorb(absorb, 1, decoy.absorb)
 		absorb:SetShown(settings.absorb.enabled and decoy.absorb > 0)
 	end
 	if child.HealAbsorb then child.HealAbsorb:Hide() end

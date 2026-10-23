@@ -17,15 +17,18 @@ end
 
 local function Fit(bars)
 	local health = bars.__owner.Health
+	local excess = bars.Damage.Excess
 	if health:GetOrientation() == 'VERTICAL' then
 		local height = health:GetHeight()
 		bars.Damage:SetHeight(height)
 		bars.Heal:SetHeight(height)
+		if excess then excess:SetHeight(height) end
 		return
 	end
 	local width = health:GetWidth()
 	bars.Damage:SetWidth(width)
 	bars.Heal:SetWidth(width)
+	if excess then excess:SetWidth(width) end
 end
 
 function UnitFrames.FitAbsorbBars(frame)
@@ -35,7 +38,13 @@ end
 local function Fill(bar, maxHealth, amount)
 	bar:SetMinMaxValues(0, maxHealth)
 	bar:SetValue(amount)
+	local excess = bar.Excess
+	if excess then
+		excess:SetMinMaxValues(0, maxHealth)
+		excess:SetValue(amount)
+	end
 end
+UnitFrames.FillAbsorb = Fill
 
 local function Update(self, _, unit)
 	if self.__unit ~= unit then return end
