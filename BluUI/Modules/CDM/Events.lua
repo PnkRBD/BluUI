@@ -553,4 +553,5 @@ function CDM.RegisterEvents()
     BUI.Events:OnTalentBurst("CDM", OnTalentBurst)
     BUI.Events:Register("COOLDOWN_VIEWER_DATA_LOADED", "CDM", OnCooldownViewerDataLoaded)
     BUI.Events:Register("EDIT_MODE_LAYOUTS_UPDATED", "CDM.Layout", function() RequestLayoutRefresh() end)
+    CDM.Custom.RegisterEvents()
 end

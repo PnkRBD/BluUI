@@ -111,10 +111,7 @@ local function BuildViewerIcons(viewerKey)
         local isCDMIcon = isBuff and child.Icon or CDM.IsCooldownIcon(child)
         local included = child:IsShown() or (poolActive and poolActive[child] and child.cooldownInfo and true)
         if included and isCDMIcon then
-            local childFrameData = FrameData[child]
-            if not (childFrameData and childFrameData.customIcon) then
-                iconBuffer[#iconBuffer + 1] = child
-            end
+            iconBuffer[#iconBuffer + 1] = child
         end
     end
 
