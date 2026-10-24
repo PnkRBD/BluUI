@@ -277,11 +277,7 @@ function GroupFrames.Setup()
 			end
 			DispatchRosterSweep()
 		end)
-		BUI.Tools.OnAuraQueriesUnblocked(function()
-			GroupFrames.PrecreateParty()
-			GroupFrames.PrecreateRaid()
-			GroupFrames.SyncPreviewChildren()
-		end)
+		BUI.Tools.OnAuraQueriesUnblocked(DispatchRosterSweep)
 	end
 	GroupFrames.SyncReachabilitySweep()
 end
