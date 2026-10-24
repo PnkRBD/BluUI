@@ -130,10 +130,6 @@ function GroupFrames.ApplyRaidVisibility()
 	if GroupFrames.headers.raidLargeWide then SetHeaderVisibility(GroupFrames.headers.raidLargeWide, WideVisibility("large")) end
 end
 
-local PRECREATE_STAGGER = 0.05
-local PRECREATE_BATCH = 5
-local precreateTicker
-
 local function PendingPrecreate()
 	local pending = {}
 	local raidSettings = GroupFrames.GetDB().raid
@@ -159,34 +155,13 @@ local function PendingPrecreate()
 	return pending
 end
 
-local function StopPrecreateStagger()
-	if precreateTicker then precreateTicker:Cancel(); precreateTicker = nil end
-end
-
-local function PrecreateStep()
-	if not GroupFrames.CanBuildChildren() then
-		StopPrecreateStagger()
-		return false
-	end
-	local pending = PendingPrecreate()
-	for index = 1, #pending do
-		local header, wanted = pending[index][1], pending[index][2]
-		local built = header and header._bluPrebuilt or 0
-		if header and built < wanted then
-			GroupFrames.PrecreateHeaderChildren(header, math.min(wanted, built + PRECREATE_BATCH))
-			return true
-		end
-	end
-	StopPrecreateStagger()
-	return false
-end
-
 function GroupFrames.PrecreateRaid()
 	if not GroupFrames.headers.raid or not GroupFrames.CanBuildChildren() then return end
-	local raidSettings = GroupFrames.GetDB().raid
-	if not raidSettings.enabled then return end
-	if precreateTicker or not PrecreateStep() then return end
-	precreateTicker = C_Timer.NewTicker(PRECREATE_STAGGER, PrecreateStep)
+	if not GroupFrames.GetDB().raid.enabled then return end
+	local pending = PendingPrecreate()
+	for index = 1, #pending do
+		GroupFrames.PrecreateHeaderChildren(pending[index][1], pending[index][2])
+	end
 end
 
 function GroupFrames.UpdateInstanceClamp()
