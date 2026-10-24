@@ -270,8 +270,10 @@ end
 
 function Container.Relayout()
     local settings = Container.GetDB()
+    local stackLocked = stackFrame and InCombatLockdown() and stackFrame:IsProtected()
+    if stackLocked then BUI.Events:AfterCombat(Container.Relayout, 'Power.Container relayout') end
     if not settings.enabled then
-        if stackFrame then stackFrame:Hide() end
+        if stackFrame and not stackLocked then stackFrame:Hide() end
         return
     end
     if relaying then
@@ -279,12 +281,20 @@ function Container.Relayout()
         return
     end
     relaying = true
-    EnsureStackFrame()
+    if not stackLocked then EnsureStackFrame() end
     HookMembers(settings)
 
     local gap = Pixel.Scale(settings.gap or 0)
     wipe(layoutY)
     local y, count, castbarIndex = LayoutPass(settings, gap, false, layoutY)
+
+    if stackLocked then
+        for key in pairs(layoutY) do
+            Container.PlaceMember(FrameFor(key))
+        end
+        relaying = false
+        return
+    end
 
     lastFullHeight = count > 0 and math.max(y, 1) or Pixel.Scale(20)
     lastCollapsedHeight = lastFullHeight
