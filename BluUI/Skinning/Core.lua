@@ -144,41 +144,9 @@ local function RunToggles(id)
 	for _, callback in ipairs(list) do callback(effective) end
 end
 
-local STAGGER_BUDGET_MS = 4
-local staggerQueue, staggerCursor = {}, 1
-local staggerDriver = CreateFrame('Frame')
-staggerDriver:Hide()
-
-local function ClearStagger()
-	wipe(staggerQueue)
-	staggerCursor = 1
-	staggerDriver:Hide()
-end
-
-staggerDriver:SetScript('OnUpdate', function()
-	local start = debugprofilestop()
-	repeat
-		local id = staggerQueue[staggerCursor]
-		if not id then
-			ClearStagger()
-			return
-		end
-		staggerCursor = staggerCursor + 1
-		RunToggles(id)
-	until debugprofilestop() - start > STAGGER_BUDGET_MS
-end)
-
 function Skin.RefreshAll()
-	ClearStagger()
 	RefreshPalette()
 	for _, id in ipairs(SortedOrder()) do RunToggles(id) end
-end
-
-function Skin.RefreshAllStaggered()
-	ClearStagger()
-	RefreshPalette()
-	for index, id in ipairs(SortedOrder()) do staggerQueue[index] = id end
-	staggerDriver:Show()
 end
 
 local SUPPRESS_MOUSE_DEPTH = 3

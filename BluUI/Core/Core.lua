@@ -297,7 +297,7 @@ function Addon:OnEnable()
 		else
 			if BUI.IsModuleEnabled('unitFrames') then BUI.UnitFrames.RefreshAnchoredFrames() end
 			BUI.GroupFrames.RefreshPartyAnchor()
-			BUI.Skinning.RefreshAllStaggered()
+			BUI.Skinning.RefreshAll()
 		end
 		if BUI.IsModuleEnabled('cdm') then BUI.QueueStartupCheck(BUI.CDM.CheckDisabled) end
 		BUI.QueueStartupCheck(BUI.CheckPlatynatorPrompt)
