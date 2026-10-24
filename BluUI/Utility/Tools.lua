@@ -387,28 +387,14 @@ local WAKE_EDGES = {
 }
 
 local wakeSubscribers = {}
-local wakeCursor = 0
-local wakeDriver = CreateFrame('Frame')
-wakeDriver:Hide()
 
 function Tools.OnAuraQueriesUnblocked(callback)
     wakeSubscribers[#wakeSubscribers + 1] = callback
 end
 
-wakeDriver:SetScript('OnUpdate', function(self)
-    wakeCursor = wakeCursor + 1
-    local callback = wakeSubscribers[wakeCursor]
-    if not callback or Tools.ShouldAurasBeSecret() or Tools.AuraQueriesBlocked() then
-        self:Hide()
-        return
-    end
-    xpcall(callback, geterrorhandler())
-end)
-
 local function RunWakeNow()
     if Tools.ShouldAurasBeSecret() or Tools.AuraQueriesBlocked() then return end
-    wakeCursor = 0
-    wakeDriver:Show()
+    for index = 1, #wakeSubscribers do xpcall(wakeSubscribers[index], geterrorhandler()) end
 end
 
 local function RunWakeSubscribers(event, cvarName)
