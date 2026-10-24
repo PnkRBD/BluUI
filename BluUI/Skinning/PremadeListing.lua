@@ -1259,9 +1259,8 @@ function Applicants.PaintCard(entry, activity)
 	Applicants.PaintGroup(card, activity)
 end
 
-function Applicants.Message(total, empowered)
+function Applicants.Message(total)
 	if Locked() then return 'Applicants show again once the encounter ends.' end
-	if not empowered then return 'Only the leader or an assistant can see applicants.' end
 	if total == 0 then return 'No applicants yet.' end
 	if #shown == 0 then return 'No applicants match your filters.' end
 end
@@ -1290,14 +1289,14 @@ function Applicants.Refresh()
 	applicants.ratingHeader:SetShown(activity.isMythicPlusActivity or activity.isRatedPvpActivity)
 	applicants.bestHeader:SetShown(activity.isMythicPlusActivity)
 	local total, hidden = 0, 0
-	if empowered and not Locked() then
-		total, hidden = Applicants.Collect(activityID, activity)
-	else
+	if Locked() then
 		wipe(shown)
 		wipe(applicantRealms)
+	else
+		total, hidden = Applicants.Collect(activityID, activity)
 	end
 	Applicants.Populate(activity, empowered)
-	local message = Applicants.Message(total, empowered)
+	local message = Applicants.Message(total)
 	applicants.emptyText:SetText(message or '')
 	applicants.emptyText:SetShown(message ~= nil)
 	local count = #shown == 1 and '1 applicant' or (#shown .. ' applicants')
