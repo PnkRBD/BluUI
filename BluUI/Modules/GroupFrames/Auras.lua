@@ -317,41 +317,15 @@ function GroupFrames.RefreshAuras(section)
 	if section ~= "party" then GroupFrames.EachRaidChild(ApplyAurasToChild) end
 end
 
-local function FinishChildAuraSetup(child)
-	if child._bluAurasBuilt or not child:GetAttribute("unit") then return end
+function GroupFrames.FinishChildAuraSetup(child)
+	if child._bluAurasBuilt or not child:GetAttribute("unit") or not GroupFrames.CanBuildChildren() then return end
 	BuildAuraContainers(child)
 	AttachReachabilityHooks(child)
 end
 
-local pendingSetup = {}
-local SETUP_BUDGET_MS = 4
-local debugprofilestop = debugprofilestop
-
-local setupDriver = CreateFrame("Frame")
-setupDriver:Hide()
-setupDriver:SetScript("OnUpdate", function(self)
-	if not GroupFrames.CanBuildChildren() then
-		self:Hide()
-		return
-	end
-	local startTime = debugprofilestop()
-	for child in pairs(pendingSetup) do
-		pendingSetup[child] = nil
-		FinishChildAuraSetup(child)
-		if debugprofilestop() - startTime > SETUP_BUDGET_MS then return end
-	end
-	self:Hide()
-end)
-
-function GroupFrames.QueueChildAuraSetup(child)
-	if child._bluAurasBuilt or not child:GetAttribute("unit") then return end
-	pendingSetup[child] = true
-	setupDriver:Show()
-end
-
 function GroupFrames.RebindAuraUnit(frame, unit)
 	if not frame._bluAurasBuilt then
-		GroupFrames.QueueChildAuraSetup(frame)
+		GroupFrames.FinishChildAuraSetup(frame)
 		return
 	end
 	if unit == frame._bluLastUnit then return end

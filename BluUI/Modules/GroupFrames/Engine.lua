@@ -198,7 +198,7 @@ local function SweepChild(child)
 	local changed = child._bluRosterUnit ~= unit or child._bluRosterGUID ~= guid or child._bluRosterRole ~= role
 	child._bluRosterUnit, child._bluRosterGUID, child._bluRosterRole = unit, guid, role
 
-	GroupFrames.QueueChildAuraSetup(child)
+	GroupFrames.FinishChildAuraSetup(child)
 	local settings = GroupFrames.SettingsForFrame(child)
 	if changed then
 		if sweepInCombat then
