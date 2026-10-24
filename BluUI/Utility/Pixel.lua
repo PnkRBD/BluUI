@@ -3,7 +3,7 @@ local _, BUI = ...
 local Pixel = {}
 BUI.Pixel = Pixel
 
-local floor, max = math.floor, math.max
+local floor, max, abs = math.floor, math.max, math.abs
 local type, getmetatable, rawget = type, getmetatable, rawget
 local FALLBACK_TEXTURE = BUI.C.FALLBACK_TEXTURE
 local VIRTUAL_HEIGHT = 768
@@ -11,6 +11,7 @@ local _, screenPixels = GetPhysicalScreenSize()
 local perfectScale = VIRTUAL_HEIGHT / screenPixels
 local gridUnit = 1
 local listeners = {}
+local WHOLE_PIXEL_TOLERANCE = 1e-6
 
 local function Recompute()
     local _, pixels = GetPhysicalScreenSize()
@@ -61,6 +62,9 @@ local function gridSnap(value)
     if value == 0 then return 0 end
     local unit = gridUnit
     if unit == 1 then return value end
+    local pixels = value / unit
+    local whole = floor(pixels + 0.5)
+    if abs(pixels - whole) < WHOLE_PIXEL_TOLERANCE then return whole * unit end
     local step = unit > 1 and unit or -unit
     return value - value % (value < 0 and step or -step)
 end
