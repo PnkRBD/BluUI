@@ -306,7 +306,7 @@ local function AcquireEntry()
         entryPool[poolCursor] = entry
     else
         entry.id = nil; entry.icon = nil; entry.cnt = nil
-        entry.iconType = nil; entry.hasCharges = nil
+        entry.iconType = nil; entry.hasCharges = nil; entry.prio = nil
     end
     return entry
 end
@@ -451,6 +451,7 @@ local function CollectCustom(stored)
         entry.icon = C_Item.GetItemIconByID(bestID or checkID) or 134400
         entry.iconType = "consumable"
         entry.cnt = bagCount
+        entry.prio = priority
         Collect(entry)
     end
 end
@@ -565,6 +566,7 @@ local function UpdateBar(index)
         icon.iconType = entry.iconType
         icon.hasCharges = entry.hasCharges
         icon.count = entry.cnt
+        icon.prio = entry.prio
         icon.tex:SetTexture(entry.icon)
 
         if entry.iconType == "spell" then
@@ -647,7 +649,15 @@ local function RefreshSpellIcon(icon, expiryCallback, hideGCD)
     end
 end
 
-RefreshCooldowns = function(index, spells, items)
+local function RefreshItemCount(icon)
+    local count = AggregateCountPrio(icon.itemID, icon.prio)
+    if count == icon.count then return false end
+    icon.count = count
+    if icon.stack:IsShown() then icon.stack:SetText(count) end
+    return true
+end
+
+RefreshCooldowns = function(index, spells, items, counts)
     local bar = bars[index]
     if not (bar and bar.frame:IsShown()) then return end
 
@@ -661,8 +671,11 @@ RefreshCooldowns = function(index, spells, items)
             if spells then RefreshSpellIcon(icon, expiryCallback, hideGCD) end
         elseif iconType == "trinket" then
             IconEngine.ApplyTrinketVisual(icon.tex, icon.cd, icon.itemID, IconEngine.GetItemSpellID(icon.itemID), expiryCallback, icon.stack)
-        elseif items then
-            IconEngine.ApplyItemVisual(icon.tex, icon.cd, icon.count, icon.itemID, expiryCallback)
+        else
+            local countChanged = counts and RefreshItemCount(icon)
+            if items or countChanged then
+                IconEngine.ApplyItemVisual(icon.tex, icon.cd, icon.count, icon.itemID, expiryCallback)
+            end
         end
     end
 end
@@ -841,14 +854,14 @@ function CustomBars.GetBarCount()
 end
 
 
-local spellCooldownsPending, itemCooldownsPending = false, false
+local spellCooldownsPending, itemCooldownsPending, itemCountsPending = false, false, false
 
 local function FlushCooldownDispatch()
-    local spells, items = spellCooldownsPending, itemCooldownsPending
-    spellCooldownsPending, itemCooldownsPending = false, false
+    local spells, items, counts = spellCooldownsPending, itemCooldownsPending, itemCountsPending
+    spellCooldownsPending, itemCooldownsPending, itemCountsPending = false, false, false
     local settings = GetSettings()
     for barIndex = 1, #settings do
-        if settings[barIndex].enabled then RefreshCooldowns(barIndex, spells, items) end
+        if settings[barIndex].enabled then RefreshCooldowns(barIndex, spells, items, counts) end
     end
 end
 
@@ -861,6 +874,12 @@ end
 
 local function OnItemCooldownEvent()
     itemCooldownsPending = true
+    QueueCooldownFlush()
+end
+
+local function OnChargesEvent()
+    spellCooldownsPending = true
+    itemCountsPending = true
     QueueCooldownFlush()
 end
 
@@ -881,11 +900,11 @@ local function OnEnteringWorld(_, isInitialLogin, isReloadingUi)
     if isInitialLogin or isReloadingUi then OnEvent() end
 end
 
-local spellEventsRegistered, itemEventsRegistered = false, false
+local spellEventsRegistered, itemEventsRegistered, chargeEventsRegistered = false, false, false
 
 local function NeededCooldownEvents()
     local settings = GetSettings()
-    local wantSpells, wantItems = false, false
+    local wantSpells, wantItems, wantCounts = false, false, false
     for barIndex = 1, #settings do
         local bar = bars[barIndex]
         if bar and settings[barIndex].enabled then
@@ -894,23 +913,31 @@ local function NeededCooldownEvents()
                 local iconType = icons[iconIndex].iconType
                 if iconType ~= "consumable" then wantSpells = true end
                 if iconType ~= "spell" then wantItems = true end
+                if iconType == "consumable" then wantCounts = true end
             end
         end
     end
-    return wantSpells, wantItems
+    return wantSpells, wantItems, wantCounts
 end
 
 function CustomBars.RefreshHotEventRegistration()
     if not eventsRegistered then return end
-    local wantSpells, wantItems = NeededCooldownEvents()
+    local wantSpells, wantItems, wantCounts = NeededCooldownEvents()
     if wantSpells ~= spellEventsRegistered then
         spellEventsRegistered = wantSpells
         if wantSpells then
-            BUI.Events:Register("SPELL_UPDATE_COOLDOWN", "CustomBars.Hot",     OnSpellCooldownEvent)
-            BUI.Events:Register("SPELL_UPDATE_CHARGES",  "CustomBars.Charges", OnSpellCooldownEvent)
+            BUI.Events:Register("SPELL_UPDATE_COOLDOWN", "CustomBars.Hot", OnSpellCooldownEvent)
         else
             BUI.Events:Unregister("SPELL_UPDATE_COOLDOWN", "CustomBars.Hot")
-            BUI.Events:Unregister("SPELL_UPDATE_CHARGES",  "CustomBars.Charges")
+        end
+    end
+    local wantCharges = wantSpells or wantCounts
+    if wantCharges ~= chargeEventsRegistered then
+        chargeEventsRegistered = wantCharges
+        if wantCharges then
+            BUI.Events:Register("SPELL_UPDATE_CHARGES", "CustomBars.Charges", OnChargesEvent)
+        else
+            BUI.Events:Unregister("SPELL_UPDATE_CHARGES", "CustomBars.Charges")
         end
     end
     if wantItems ~= itemEventsRegistered then
