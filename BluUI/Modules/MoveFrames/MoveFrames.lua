@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('MoveFrames.MoveFrames')
-
 local Events = BUI.Events
 
 local MoveFrames = {}
@@ -418,15 +416,15 @@ local function AutoResetIfDragged(target)
 	RestoreBlizzardPoints(target)
 end
 
-local OnTargetHide = BUI.Profiler.Wrap('MoveFrames.MoveFrames target hidden', function(target)
+local OnTargetHide = function(target)
 	StopDrag(target)
 	AutoResetIfDragged(target)
-end)
+end
 
-local OnTargetShow = BUI.Profiler.Wrap('MoveFrames.MoveFrames target shown', function(target)
+local OnTargetShow = function(target)
 	AutoResetIfDragged(target)
 	HoldDraggedPosition(target)
-end)
+end
 
 local function OnHandleDragStart(handle, button)
 	if button ~= 'LeftButton' or not MoveFrames.IsActive() then return end
@@ -454,8 +452,8 @@ end
 
 local function InstallHandleHooks(handle)
 	if not handle:GetScript('OnDragStart') then handle:RegisterForDrag('LeftButton') end
-	handle:HookScript('OnDragStart', BUI.Profiler.Wrap('MoveFrames.MoveFrames handle OnDragStart', OnHandleDragStart))
-	handle:HookScript('OnDragStop', BUI.Profiler.Wrap('MoveFrames.MoveFrames handle OnDragStop', OnHandleDragStop))
+	handle:HookScript('OnDragStart', OnHandleDragStart)
+	handle:HookScript('OnDragStop', OnHandleDragStop)
 end
 
 local function HookFrame(path, rootPath)
@@ -479,14 +477,14 @@ local function HookFrame(path, rootPath)
 	InstallHandleHooks(handle)
 
 	local rehooking = false
-	Hook(handle, 'SetScript', function(_, scriptName)
+	hooksecurefunc(handle, 'SetScript', function(_, scriptName)
 		if rehooking then return end
 		if scriptName ~= 'OnDragStart' and scriptName ~= 'OnDragStop' then return end
 		rehooking = true
 		if scriptName == 'OnDragStart' then
-			handle:HookScript('OnDragStart', BUI.Profiler.Wrap('MoveFrames.MoveFrames handle OnDragStart 2', OnHandleDragStart))
+			handle:HookScript('OnDragStart', OnHandleDragStart)
 		else
-			handle:HookScript('OnDragStop', BUI.Profiler.Wrap('MoveFrames.MoveFrames handle OnDragStop 2', OnHandleDragStop))
+			handle:HookScript('OnDragStop', OnHandleDragStop)
 		end
 		rehooking = false
 	end)
@@ -496,7 +494,7 @@ local function HookFrame(path, rootPath)
 		target:SetMovable(true)
 		target:SetClampedToScreen(true)
 		SnapshotBlizzardPoints(target)
-		Hook(target, 'SetPoint', OnTargetSetPoint)
+		hooksecurefunc(target, 'SetPoint', OnTargetSetPoint)
 		target:HookScript('OnHide', OnTargetHide)
 		target:HookScript('OnShow', OnTargetShow)
 		ApplySavedPosition(target)

@@ -5,12 +5,6 @@ local debugprofilestop = debugprofilestop
 local Events = {}
 BUI.Events = Events
 
-local Profiler = BUI.Profiler
-
-local function Call(group, key, callback, ...)
-    Profiler.Run(Profiler.Label(group, key), xpcall, callback, geterrorhandler(), ...)
-end
-
 local globalFrame = CreateFrame('Frame')
 local globalCallbacks = {}
 local onceCallbacks = {}
@@ -18,8 +12,8 @@ local onceSnapshot = {}
 
 globalFrame:SetScript('OnEvent', function(_, event, ...)
     if globalCallbacks[event] then
-        for key, callback in pairs(globalCallbacks[event]) do
-            Call(event, key, callback, event, ...)
+        for _, callback in pairs(globalCallbacks[event]) do
+            xpcall(callback, geterrorhandler(), event, ...)
         end
     end
 
@@ -32,7 +26,7 @@ globalFrame:SetScript('OnEvent', function(_, event, ...)
             if onceCallbacks[event] then
                 onceCallbacks[event][key] = nil
             end
-            Call(event, key, callback, event, ...)
+            xpcall(callback, geterrorhandler(), event, ...)
         end
         if onceCallbacks[event] and not next(onceCallbacks[event]) then
             onceCallbacks[event] = nil
@@ -72,8 +66,8 @@ local function AcquireUnitFrame(event, unit)
     frame:SetScript('OnEvent', function(_, firedEvent, ...)
         local handlers = unitCallbacks[firedEvent] and unitCallbacks[firedEvent][unit]
         if handlers then
-            for key, callback in pairs(handlers) do
-                Call(firedEvent, key, callback, firedEvent, ...)
+            for _, callback in pairs(handlers) do
+                xpcall(callback, geterrorhandler(), firedEvent, ...)
             end
         end
     end)
@@ -186,8 +180,8 @@ local FlushTalentBurst = BUI.Dispatcher.New(function()
     if not talentBurstPending then return end
     talentBurstPending = false
     talentBurstBackstopToken = talentBurstBackstopToken + 1
-    for key, callback in pairs(talentBurstCallbacks) do Call('Talent burst', key, callback) end
-end, 'TalentBurst')
+    for _, callback in pairs(talentBurstCallbacks) do xpcall(callback, geterrorhandler()) end
+end)
 
 local function MarkTalentBurstPending()
     talentBurstPending = true
@@ -252,7 +246,7 @@ local function FlushTick(self)
         combatTaskCursor = combatTaskCursor + 1
         local task = combatTasks[key]
         combatTasks[key] = nil
-        if task then Call('After combat', key, task) end
+        if task then xpcall(task, geterrorhandler()) end
         if debugprofilestop() - startTime > FLUSH_BUDGET_MS then return end
     end
 end

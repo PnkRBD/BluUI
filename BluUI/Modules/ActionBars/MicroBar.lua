@@ -1,12 +1,9 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('ActionBars.MicroBar')
-
 local ActionBars = BUI.ActionBars
 
 local BLIZZARD_PADDING = -5
 local SIZE_TOLERANCE = 0.5
-local EVENT_KEY = 'ActionBars.MicroBar'
 
 local microBar
 local QueueRetake
@@ -128,11 +125,11 @@ local function OnBlizzardMove()
 end
 
 local function InstallHooks()
-	Hook(MicroMenu, 'Layout', OnBlizzardLayout)
-	Hook(MicroMenu, 'ResetMicroMenuPosition', OnBlizzardMove)
-	Hook(MicroMenu, 'OverrideMicroMenuPosition', OnBlizzardMove)
-	Hook(MicroMenu, 'SetNormalScale', OnBlizzardMove)
-	Hook('MicroMenuBar_ClearFullScreenFrame', OnBlizzardMove)
+	hooksecurefunc(MicroMenu, 'Layout', OnBlizzardLayout)
+	hooksecurefunc(MicroMenu, 'ResetMicroMenuPosition', OnBlizzardMove)
+	hooksecurefunc(MicroMenu, 'OverrideMicroMenuPosition', OnBlizzardMove)
+	hooksecurefunc(MicroMenu, 'SetNormalScale', OnBlizzardMove)
+	hooksecurefunc('MicroMenuBar_ClearFullScreenFrame', OnBlizzardMove)
 end
 
 microBar = ActionBars.NewBlizzardBar({
@@ -143,7 +140,7 @@ microBar = ActionBars.NewBlizzardBar({
 	release = Release,
 	installHooks = InstallHooks,
 })
-QueueRetake = BUI.Dispatcher.New(function() Retake(microBar) end, EVENT_KEY)
+QueueRetake = BUI.Dispatcher.New(function() Retake(microBar) end)
 
 function ActionBars.RefreshMicroBar()
 	microBar:Refresh()

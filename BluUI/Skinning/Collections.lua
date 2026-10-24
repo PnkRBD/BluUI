@@ -238,7 +238,7 @@ local function InstallJournal()
 	context.Hook('MountJournal_InitMountButton', OnMountRow)
 	context.Hook('PetJournal_InitPetButton', OnPetRow)
 	context.Hook('ToySpellButton_UpdateButton', OnToyButton)
-	local toyEvent = BUI.Profiler.Wrap('Skin.Collections toy event', context.Guard(OnToyEvent))
+	local toyEvent = context.Guard(OnToyEvent)
 	for buttonIndex = 1, TOY_BUTTON_COUNT do _G.ToyBox.iconsFrame['spellButton' .. buttonIndex]:HookScript('OnEvent', toyEvent) end
 	context.Hook(_G.HeirloomsJournal, 'UpdateButton', OnHeirloomButton)
 	context.Hook(_G.WardrobeCollectionFrame.ItemsCollectionFrame, 'UpdateItems', OnWardrobeItems)

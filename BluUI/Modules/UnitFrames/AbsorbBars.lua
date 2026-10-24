@@ -69,7 +69,7 @@ local FlushPending = BUI.Dispatcher.New(function()
 		pending[frame] = nil
 		Update(frame, nil, frame.__unit)
 	end
-end, 'UF.AbsorbBars')
+end)
 
 local function Queue(self, _, unit)
 	if self.__unit ~= unit then return end
@@ -95,7 +95,7 @@ local function Enable(self)
 		bars.values = CreateUnitHealPredictionCalculator()
 		bars.values:SetDamageAbsorbClampMode(bars.damageClamp or DAMAGE_CLAMP.MaximumHealth)
 		bars.values:SetHealAbsorbClampMode(Enum.UnitHealAbsorbClampMode.MaximumHealth)
-		self.Health:HookScript('OnSizeChanged', BUI.Profiler.Wrap('UnitFrames.AbsorbBars fit', function() Fit(bars) end))
+		self.Health:HookScript('OnSizeChanged', function() Fit(bars) end)
 	end
 	for _, event in ipairs(SHIELD_EVENTS) do self:RegisterEvent(event, Queue) end
 	return true

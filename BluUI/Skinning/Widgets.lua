@@ -5,7 +5,6 @@ local GetCursorPosition = GetCursorPosition
 
 local Pixel = BUI.Pixel
 local Skin = BUI.Skinning
-local Wrap = BUI.Profiler.Wrap
 local BUILib = BluUI.BUILibClient
 local Controls = BUILib.Controls
 local FONT = BUILib.Font
@@ -46,8 +45,8 @@ function Skin.SmallButton(parent, width, height, label)
 	Painter.Text(text, 'skinText')
 	button.label = text
 
-	button:HookScript('OnEnter', Wrap('Skin.Widgets button OnEnter', HoverBorder))
-	button:HookScript('OnLeave', Wrap('Skin.Widgets button OnLeave', RestBorder))
+	button:HookScript('OnEnter', HoverBorder)
+	button:HookScript('OnLeave', RestBorder)
 	return button
 end
 
@@ -117,38 +116,38 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 		end
 	end
 
-	hooksecurefunc(child, 'SetHeight', Wrap('Skin.Widgets content height', function(_, height)
+	hooksecurefunc(child, 'SetHeight', function(_, height)
 		contentHeight = height
 		UpdateRange(scroll:GetWidth())
-	end))
+	end)
 
-	local DragUpdate = Wrap('Skin.Widgets scroll drag', function() ApplyScrollPct(CursorToScrollPct()) end)
+	local DragUpdate = function() ApplyScrollPct(CursorToScrollPct()) end
 	thumb:EnableMouse(true)
 	thumb:RegisterForDrag('LeftButton')
-	thumb:SetScript('OnDragStart', BUI.Profiler.Script('Skin.Widgets thumb OnDragStart', function(self) self:SetScript('OnUpdate', DragUpdate) end))
-	thumb:SetScript('OnDragStop', BUI.Profiler.Script('Skin.Widgets thumb OnDragStop', function(self) self:SetScript('OnUpdate', nil) end))
-	thumb:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets thumb OnEnter', function() SetColorTex(thumbTex, unpack(THUMB_HOVER)) end))
-	thumb:SetScript('OnLeave', BUI.Profiler.Script('Skin.Widgets thumb OnLeave', function() SetColorTex(thumbTex, unpack(THUMB_IDLE)) end))
+	thumb:SetScript('OnDragStart', function(self) self:SetScript('OnUpdate', DragUpdate) end)
+	thumb:SetScript('OnDragStop', function(self) self:SetScript('OnUpdate', nil) end)
+	thumb:SetScript('OnEnter', function() SetColorTex(thumbTex, unpack(THUMB_HOVER)) end)
+	thumb:SetScript('OnLeave', function() SetColorTex(thumbTex, unpack(THUMB_IDLE)) end)
 	track:EnableMouse(true)
-	track:SetScript('OnMouseDown', BUI.Profiler.Script('Skin.Widgets track OnMouseDown', function(_, button)
+	track:SetScript('OnMouseDown', function(_, button)
 		if button == 'LeftButton' then ApplyScrollPct(CursorToScrollPct()) end
-	end))
+	end)
 
 	scroll:EnableMouseWheel(true)
-	scroll:SetScript('OnMouseWheel', BUI.Profiler.Script('Skin.Widgets scroll OnMouseWheel', function(self, delta)
+	scroll:SetScript('OnMouseWheel', function(self, delta)
 		self:SetVerticalScroll(min(MaxScroll(), max(0, self:GetVerticalScroll() - delta * rowHeight * 2)))
-	end))
+	end)
 
-	scroll:SetScript('OnSizeChanged', Wrap('Skin.Widgets scroll resize', function(_, width)
+	scroll:SetScript('OnSizeChanged', function(_, width)
 		UpdateRange(width)
-	end))
+	end)
 
-	scroll:SetScript('OnVerticalScroll', Wrap('Skin.Widgets scroll thumb', function(_, offset)
+	scroll:SetScript('OnVerticalScroll', function(_, offset)
 		local maxScroll = MaxScroll()
 		if maxScroll <= 0 then return end
 		thumb:ClearAllPoints()
 		thumb:SetPoint('TOP', track, 'TOP', 0, -(offset / maxScroll) * (track:GetHeight() - thumb:GetHeight()))
-	end))
+	end)
 
 	return scroll, child
 end
@@ -170,26 +169,26 @@ function Skin.CreateSearchBox(parent, width, callback)
 	Pixel.ApplyFont(editBox, 11, FONT, '')
 	Painter.Text(editBox, 'skinText')
 	editBox:SetAutoFocus(false)
-	editBox:SetScript('OnTextChanged', BUI.Profiler.Script('Skin.Widgets editBox OnTextChanged', function(self, userInput)
+	editBox:SetScript('OnTextChanged', function(self, userInput)
 		if not userInput then return end
 		local text = self:GetText():lower()
 		hint:SetShown(text == '')
 		callback(text)
-	end))
-	editBox:SetScript('OnEscapePressed', BUI.Profiler.Script('Skin.Widgets editBox OnEscapePressed', function(self)
+	end)
+	editBox:SetScript('OnEscapePressed', function(self)
 		self:SetText('')
 		self:ClearFocus()
 		hint:Show()
 		callback('')
-	end))
-	editBox:SetScript('OnEnterPressed', BUI.Profiler.Script('Skin.Widgets editBox OnEnterPressed', editBox.ClearFocus))
+	end)
+	editBox:SetScript('OnEnterPressed', editBox.ClearFocus)
 	local function showHover() HoverBorder(container) end
 	local function showIdle() RestBorder(container) end
 
-	container:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets container OnEnter', showHover))
-	container:SetScript('OnLeave', BUI.Profiler.Script('Skin.Widgets container OnLeave', function() if not editBox:HasFocus() then showIdle() end end))
-	editBox:SetScript('OnEditFocusGained', BUI.Profiler.Script('Skin.Widgets editBox OnEditFocusGained', showHover))
-	editBox:SetScript('OnEditFocusLost', BUI.Profiler.Script('Skin.Widgets editBox OnEditFocusLost', showIdle))
+	container:SetScript('OnEnter', showHover)
+	container:SetScript('OnLeave', function() if not editBox:HasFocus() then showIdle() end end)
+	editBox:SetScript('OnEditFocusGained', showHover)
+	editBox:SetScript('OnEditFocusLost', showIdle)
 
 	container.editBox = editBox
 	container.hint = hint
@@ -356,11 +355,11 @@ function Skin.CreateListRow(parent, height, iconSize)
 	row.priceText:SetPoint('LEFT', row.iconBorder, 'RIGHT', Pixel.Scale(8), Pixel.Scale(-8))
 	Painter.Text(row.priceText, 'skinLabel')
 
-	row:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets row OnEnter', HoverBorder))
-	row:SetScript('OnLeave', BUI.Profiler.Script('Skin.Widgets row OnLeave', function(self)
+	row:SetScript('OnEnter', HoverBorder)
+	row:SetScript('OnLeave', function(self)
 		RestBorder(self)
 		GameTooltip:Hide()
-	end))
+	end)
 
 	return row
 end
@@ -412,17 +411,17 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 		highlight:SetAllPoints()
 		SetColorTex(highlight, 1, 1, 1, 0.06)
 
-		row:SetScript('OnClick', BUI.Profiler.Script('Skin.Widgets row OnClick', function()
+		row:SetScript('OnClick', function()
 			label:SetText(item.label)
 			menu:Hide()
 			SetArrowOpen(false)
 			onSelect(item)
-		end))
+		end)
 	end
 	menu:SetHeight(Pixel.Scale(#items * rowHeight + 4))
 
 	dropdown:EnableMouse(true)
-	dropdown:SetScript('OnMouseDown', BUI.Profiler.Script('Skin.Widgets dropdown OnMouseDown', function()
+	dropdown:SetScript('OnMouseDown', function()
 		if menu:IsShown() then
 			menu:Hide()
 			SetArrowOpen(false)
@@ -430,14 +429,14 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 			menu:Show()
 			SetArrowOpen(true)
 		end
-	end))
-	dropdown:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets dropdown OnEnter', HoverBorder))
-	dropdown:SetScript('OnLeave', BUI.Profiler.Script('Skin.Widgets dropdown OnLeave', function(self)
+	end)
+	dropdown:SetScript('OnEnter', HoverBorder)
+	dropdown:SetScript('OnLeave', function(self)
 		if not menu:IsShown() then RestBorder(self) end
-	end))
+	end)
 
 	local grace = 0
-	local autoClose = Wrap('Skin.Widgets menu autoclose', function(updatingMenu, elapsed)
+	local autoClose = function(updatingMenu, elapsed)
 		if dropdown:IsMouseOver() or updatingMenu:IsMouseOver() then
 			grace = 0
 		else
@@ -448,12 +447,12 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 				RestBorder(dropdown)
 			end
 		end
-	end)
-	menu:SetScript('OnShow', Wrap('Skin.Widgets menu open', function(menuFrame)
+	end
+	menu:SetScript('OnShow', function(menuFrame)
 		grace = 0
 		menuFrame:SetScript('OnUpdate', autoClose)
-	end))
-	menu:SetScript('OnHide', BUI.Profiler.Script('Skin.Widgets menu OnHide', function(menuFrame) menuFrame:SetScript('OnUpdate', nil) end))
+	end)
+	menu:SetScript('OnHide', function(menuFrame) menuFrame:SetScript('OnUpdate', nil) end)
 	return dropdown
 end
 
@@ -480,7 +479,7 @@ local function PlaceOrder(list, duration, skip)
 	end
 end
 
-local TrackOrder = Wrap('Skin.Widgets order drag', function(item)
+local TrackOrder = function(item)
 	local list = item.list
 	local count = #list.order
 	local y = min(0, max(-(count - 1) * list.step, OrderCursor(list) - list.grab))
@@ -492,7 +491,7 @@ local TrackOrder = Wrap('Skin.Widgets order drag', function(item)
 	table.insert(list.order, target, item.key)
 	PlaceOrder(list, SLIDE_TIME, item)
 	list.onChange(list.order)
-end)
+end
 
 local function StartOrderDrag(item)
 	local list = item.list
@@ -553,10 +552,10 @@ function Skin.CreateOrderList(parent, spec)
 		Painter.Text(text, 'skinText')
 
 		item:RegisterForDrag('LeftButton')
-		item:SetScript('OnDragStart', BUI.Profiler.Script('Skin.Widgets order OnDragStart', StartOrderDrag))
-		item:SetScript('OnDragStop', BUI.Profiler.Script('Skin.Widgets order OnDragStop', StopOrderDrag))
-		item:SetScript('OnEnter', BUI.Profiler.Script('Skin.Widgets order OnEnter', HoverBorder))
-		item:SetScript('OnLeave', BUI.Profiler.Script('Skin.Widgets order OnLeave', OrderLeave))
+		item:SetScript('OnDragStart', StartOrderDrag)
+		item:SetScript('OnDragStop', StopOrderDrag)
+		item:SetScript('OnEnter', HoverBorder)
+		item:SetScript('OnLeave', OrderLeave)
 		list.items[entry.key] = item
 	end
 	list.SetOrder = SetListOrder

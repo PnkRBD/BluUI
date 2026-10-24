@@ -54,7 +54,7 @@ local function Reevaluate()
         CancelPending()
         SetActive(true)
     elseif not pendingTimer or pendingTimer:IsCancelled() then
-        pendingTimer = BUI.Profiler.NewTimer('BuffTracking.PetAlert grace recheck', GRACE_SECONDS - elapsed, Reevaluate)
+        pendingTimer = C_Timer.NewTimer(GRACE_SECONDS - elapsed, Reevaluate)
     end
 end
 

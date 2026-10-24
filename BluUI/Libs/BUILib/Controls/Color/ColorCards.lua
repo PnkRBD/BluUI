@@ -49,8 +49,8 @@ function Controls.ColorGrid(parent, colors, options)
 
         local swatchButton = swatchFrame.swatch
         if swatchButton then
-            swatchButton:HookScript("OnEnter", BUILib.Timed('BUILib.ColorCards ColorGrid swatchButton OnEnter', function() highlight:Show() end))
-            swatchButton:HookScript("OnLeave", BUILib.Timed('BUILib.ColorCards ColorGrid swatchButton OnLeave', function() highlight:Hide() end))
+            swatchButton:HookScript("OnEnter", function() highlight:Show() end)
+            swatchButton:HookScript("OnLeave", function() highlight:Hide() end)
         end
 
         if entry.reset then
@@ -68,8 +68,8 @@ function Controls.ColorGrid(parent, colors, options)
             resetFrame:ClearAllPoints()
             resetFrame:SetPoint("TOPLEFT", cellX + 4, -(cellY + (ROW_HEIGHT - RESET_SIZE) / 2))
             resetFrame:SetFrameLevel(container:GetFrameLevel() + 6)
-            resetFrame:HookScript("OnEnter", BUILib.Timed('BUILib.ColorCards ColorGrid resetFrame OnEnter', function() highlight:Show() end))
-            resetFrame:HookScript("OnLeave", BUILib.Timed('BUILib.ColorCards ColorGrid resetFrame OnLeave', function() highlight:Hide() end))
+            resetFrame:HookScript("OnEnter", function() highlight:Show() end)
+            resetFrame:HookScript("OnLeave", function() highlight:Hide() end)
         end
 
         if swatchButton then
@@ -78,9 +78,9 @@ function Controls.ColorGrid(parent, colors, options)
             clicker:SetSize(math.max(1, (cellX + columnWidth - 6) - (swatchX - 2)), ROW_HEIGHT - 4)
             clicker:SetFrameLevel(container:GetFrameLevel() + 5)
             clicker:RegisterForClicks("AnyUp")
-            clicker:SetScript("OnEnter", BUILib.Timed('BUILib.ColorCards ColorGrid clicker OnEnter', function() highlight:Show() end))
-            clicker:SetScript("OnLeave", BUILib.Timed('BUILib.ColorCards ColorGrid clicker OnLeave', function() highlight:Hide() end))
-            clicker:SetScript("OnClick", BUILib.Timed('BUILib.ColorCards ColorGrid clicker OnClick', function() swatchButton:Click() end))
+            clicker:SetScript("OnEnter", function() highlight:Show() end)
+            clicker:SetScript("OnLeave", function() highlight:Hide() end)
+            clicker:SetScript("OnClick", function() swatchButton:Click() end)
         end
     end
 

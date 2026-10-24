@@ -85,8 +85,8 @@ end
 local cdPollTicker
 local CheckCDWatchList
 
-local QueueCDCheck = BUI.Dispatcher.New(function() CheckCDWatchList() end, 'CDM.CDWatch')
-local PollCDWatchList = BUI.Profiler.Wrap('CDM.Events cd poll', function() CheckCDWatchList() end)
+local QueueCDCheck = BUI.Dispatcher.New(function() CheckCDWatchList() end)
+local PollCDWatchList = function() CheckCDWatchList() end
 
 local function UpdateCDPollTicker()
     local needed = false
@@ -285,7 +285,7 @@ local function RefreshCDExpectation(spellID)
     if endTime <= now or cdExpectedEnd[spellID] == endTime then return end
     cdExpectedEnd[spellID] = endTime
     cdEstimatedEnd[spellID] = nil
-    BUI.Tools.ReplaceTimer(cdEndTimers, spellID, 'CDM.Events cd end', endTime - now + CD_END_GRACE, OnCDEndReached, spellID)
+    BUI.Tools.ReplaceTimer(cdEndTimers, spellID, endTime - now + CD_END_GRACE, OnCDEndReached, spellID)
 end
 
 CheckCDWatchList = function()
@@ -322,7 +322,7 @@ CheckCDWatchList = function()
             local endTime = start and duration and (start + duration)
             if endTime and endTime > now and itemExpectedEnd[itemID] ~= endTime then
                 itemExpectedEnd[itemID] = endTime
-                BUI.Tools.ReplaceTimer(itemEndTimers, itemID, 'CDM.Events item cd end', endTime - now + CD_END_GRACE, function()
+                BUI.Tools.ReplaceTimer(itemEndTimers, itemID, endTime - now + CD_END_GRACE, function()
                     itemExpectedEnd[itemID] = nil
                     QueueCDCheck()
                 end)
@@ -362,7 +362,7 @@ local function MarkWatchedSpellActive(targetID, castSpellID)
         if start and duration and duration > 0 and (start + duration) > now then
             cdExpectedEnd[targetID] = start + duration
             cdEstimatedEnd[targetID] = nil
-            BUI.Tools.ReplaceTimer(cdEndTimers, targetID, 'CDM.Events cd end', start + duration - now + CD_END_GRACE, OnCDEndReached, targetID)
+            BUI.Tools.ReplaceTimer(cdEndTimers, targetID, start + duration - now + CD_END_GRACE, OnCDEndReached, targetID)
         end
         return
     end
@@ -379,7 +379,7 @@ local function MarkWatchedSpellActive(targetID, castSpellID)
     if endTime and endTime > now then
         cdExpectedEnd[targetID] = endTime
         cdEstimatedEnd[targetID] = estimated
-        BUI.Tools.ReplaceTimer(cdEndTimers, targetID, 'CDM.Events cd end', endTime - now + CD_END_GRACE, OnCDEndReached, targetID)
+        BUI.Tools.ReplaceTimer(cdEndTimers, targetID, endTime - now + CD_END_GRACE, OnCDEndReached, targetID)
     end
     if cdWatchedSpells[targetID] == true then return end
     cdWatchedSpells[targetID] = true
@@ -461,9 +461,9 @@ local function OnIconCooldownDone(icon)
     QueueCDCheck()
 end
 
-CDM.OnCooldownWidgetDone = BUI.Profiler.Wrap('CDM.Events cooldown done', function(cooldown)
+CDM.OnCooldownWidgetDone = function(cooldown)
     OnIconCooldownDone(cooldown:GetParent())
-end)
+end
 
 local function ForEachHideWhenZeroViewer(callback)
     local db = BUI.GetDB()
@@ -522,7 +522,7 @@ CDM.FlushPendingLayoutRefresh = FlushPendingLayoutRefresh
 local function DoLayoutRefresh()
     layoutRefreshing = true
     CDM.RefreshAll(true)
-    BUI.Profiler.After('CDM.Events layout settle', 0.2, function()
+    C_Timer.After(0.2, function()
         layoutRefreshing = false
         FlushPendingLayoutRefresh()
     end)
@@ -546,7 +546,7 @@ RequestLayoutRefresh = function(force)
     end
     layoutRefreshPending = false
     layoutRefreshForced = false
-    BUI.Profiler.After('CDM.Events layout refresh', 0, DoLayoutRefresh)
+    C_Timer.After(0, DoLayoutRefresh)
 end
 
 function CDM.RegisterEvents()

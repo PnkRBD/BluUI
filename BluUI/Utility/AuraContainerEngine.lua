@@ -196,8 +196,6 @@ local function OnButtonMouseDown(button, mouseButton)
 	if container and buttonInfo then CaptureSpell(container, buttonInfo) end
 end
 
-local OnButtonMouseDownHook = BUI.Profiler.Wrap('AuraContainerEngine button OnMouseDown', OnButtonMouseDown)
-
 local function DisarmCapture()
 	if not armedButton then return end
 	if BUI.Tools.ShouldAurasBeSecret() then
@@ -378,7 +376,7 @@ local function MakeInitializer(container, groupInfo)
 		end
 
 		captureButtons[button] = container
-		button:HookScript('OnMouseDown', OnButtonMouseDownHook)
+		button:HookScript('OnMouseDown', OnButtonMouseDown)
 		button:SetMouseClickEnabled(false)
 
 		buttonInfo.created = true
@@ -858,7 +856,7 @@ HatchNext = BUI.Dispatcher.New(function()
 	if container._buiOnHatch then container._buiOnHatch() end
 	if container._buiUnit then container:UpdateAllAuras() end
 	if nest[1] then HatchNext() end
-end, 'AuraEngine.Hatch')
+end)
 
 BUI.Events:Once('PLAYER_ENTERING_WORLD', 'AuraEngine.Hatch', function()
 	worldReady = true
@@ -962,4 +960,4 @@ BUI.Events:Register('PLAYER_REGEN_ENABLED', 'AuraEngine.RestyleDrain', function(
 BUI.Events:Register('PLAYER_ENTERING_WORLD', 'AuraEngine.RestyleDrain', DrainRestyleQueue)
 BUI.Events:Register('MODIFIER_STATE_CHANGED', 'AuraEngine.Capture', OnModifierChanged)
 BUI.Events:Register('PLAYER_REGEN_DISABLED', 'AuraEngine.Capture', DisarmCapture)
-BUI.Tools.OnAuraQueriesUnblocked(FinishPendingDisarm, 'Aura blacklist capture')
+BUI.Tools.OnAuraQueriesUnblocked(FinishPendingDisarm)

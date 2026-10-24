@@ -244,11 +244,11 @@ local function NewGem(metrics)
 	gem.icon:SetPoint('TOPLEFT', 1, -1)
 	gem.icon:SetPoint('BOTTOMRIGHT', -1, 1)
 	gem:EnableMouse(true)
-	gem:SetScript('OnEnter', BUI.Profiler.Script('Skin.Readout gem OnEnter', GemTooltip))
-	gem:SetScript('OnLeave', BUI.Profiler.Script('Skin.Readout gem OnLeave', HideTooltip))
+	gem:SetScript('OnEnter', GemTooltip)
+	gem:SetScript('OnLeave', HideTooltip)
 	if metrics.onClick then
 		gem.onClick = metrics.onClick
-		gem:SetScript('OnMouseUp', BUI.Profiler.Script('Skin.Readout gem OnMouseUp', GemClick))
+		gem:SetScript('OnMouseUp', GemClick)
 	end
 	return gem
 end

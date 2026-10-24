@@ -13,9 +13,9 @@ function Controls.LinkText(parent, text, callback)
 	local red, green, blue = Theme.GetAccent()
 	fontString:SetTextColor(red, green, blue, 1)
 	button:SetWidth(math.ceil(fontString:GetStringWidth()) + 4)
-	button:SetScript("OnEnter", BUILib.Timed('BUILib.LinkText LinkText button OnEnter', function() fontString:SetTextColor(1, 1, 1, 1) end))
-	button:SetScript("OnLeave", BUILib.Timed('BUILib.LinkText LinkText button OnLeave', function() fontString:SetTextColor(red, green, blue, 1) end))
-	button:SetScript("OnClick", BUILib.Timed('BUILib.LinkText LinkText button OnClick', function() if callback then callback() end end))
+	button:SetScript("OnEnter", function() fontString:SetTextColor(1, 1, 1, 1) end)
+	button:SetScript("OnLeave", function() fontString:SetTextColor(red, green, blue, 1) end)
+	button:SetScript("OnClick", function() if callback then callback() end end)
 	button.text = fontString
 	return Widget.Wrap(button)
 end

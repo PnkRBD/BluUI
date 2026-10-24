@@ -30,12 +30,12 @@ function Layout.FlatButton(window, parent, spec)
 	local label = kit.Text(button, spec.text, 12, 'secondaryText')
 	label:SetPoint('LEFT', textX, 0)
 	button:SetSize(Widget.EvenSize(textX + label:GetStringWidth() + 14), 30)
-	button:SetScript('OnClick', BUILib.Timed('BUILib.TopNavWindow FlatButton button OnClick', function()
+	button:SetScript('OnClick', function()
 		if spec.callback then spec.callback() end
-	end))
+	end)
 	if spec.tooltip then
-		button:HookScript('OnEnter', BUILib.Timed('BUILib.TopNavWindow FlatButton button OnEnter', function(self) Widget.ShowTip(self, spec.tooltip) end))
-		button:HookScript('OnLeave', BUILib.Timed('BUILib.TopNavWindow FlatButton button OnLeave', Widget.HideTip))
+		button:HookScript('OnEnter', function(self) Widget.ShowTip(self, spec.tooltip) end)
+		button:HookScript('OnLeave', Widget.HideTip)
 	end
 	function button:SetActive(active)
 		if dot then window:Paint(dot, active and 'accent' or 'faint') end
@@ -96,9 +96,9 @@ function Layout.TopNavWindow(config)
 					selected = isSelected
 					window:Paint(label, isSelected and 'barText' or 'barMuted')
 				end
-				link:SetScript('OnEnter', BUILib.Timed('BUILib.TopNavWindow BuildLinks link OnEnter', function() window:Paint(label, 'barText') end))
-				link:SetScript('OnLeave', BUILib.Timed('BUILib.TopNavWindow BuildLinks link OnLeave', function() window:Paint(label, selected and 'barText' or 'barMuted') end))
-				link:SetScript('OnClick', BUILib.Timed('BUILib.TopNavWindow BuildLinks link OnClick', function() navConfig.showPage(index) end))
+				link:SetScript('OnEnter', function() window:Paint(label, 'barText') end)
+				link:SetScript('OnLeave', function() window:Paint(label, selected and 'barText' or 'barMuted') end)
+				link:SetScript('OnClick', function() navConfig.showPage(index) end)
 				window.navFrames[#window.navFrames + 1] = link
 				buttons[index] = link
 			end

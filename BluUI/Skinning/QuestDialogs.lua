@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Wrap = BUI.Profiler.Wrap
-
 local ipairs, pairs = ipairs, pairs
 
 local BUILib = BluUI.BUILibClient
@@ -390,8 +388,8 @@ local function ShapeGossipList(scrollBox, scrollBar)
 		PadGossipList(scrollBox, scrollBar)
 		scrollBox:FullUpdate()
 	end
-	scrollBar:HookScript('OnShow', Wrap('Skin.QuestDialogs gossip bar shown', Repad))
-	scrollBar:HookScript('OnHide', Wrap('Skin.QuestDialogs gossip bar hidden', Repad))
+	scrollBar:HookScript('OnShow', Repad)
+	scrollBar:HookScript('OnHide', Repad)
 	if view:GetDataProvider() then scrollBox:Rebuild(ScrollBoxConstants.RetainScrollPosition) end
 end
 
@@ -445,7 +443,7 @@ local function InstallQuest()
 	questInfoParents[_G.QuestDetailScrollChildFrame] = true
 	questInfoParents[_G.QuestRewardScrollChildFrame] = true
 	BuildBreakLine()
-	_G.QuestFrameGreetingPanel:HookScript('OnShow', Wrap('Skin.QuestDialogs greeting shown', context.Guard(RefreshGreeting)))
+	_G.QuestFrameGreetingPanel:HookScript('OnShow', context.Guard(RefreshGreeting))
 	context.Hook('QuestInfo_Display', OnQuestInfoDisplay)
 	context.Hook('QuestInfo_ShowRewards', OnQuestInfoRewards)
 	context.Hook('QuestFrame_SetTextColor', StylePanelText)
@@ -465,7 +463,7 @@ local function InstallGossip(frame)
 end
 
 local function InstallItemText(frame)
-	frame:HookScript('OnEvent', Wrap('Skin.QuestDialogs text event', context.Guard(OnItemTextEvent)))
+	frame:HookScript('OnEvent', context.Guard(OnItemTextEvent))
 end
 
 local function InstallAdventure(dialog)

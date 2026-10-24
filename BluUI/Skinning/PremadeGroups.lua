@@ -6,8 +6,6 @@ local Motion = BUILib.Motion
 local Skin = BUI.Skinning
 local Painter = BUI.Painter
 local Pixel = BUI.Pixel
-local Script = BUI.Profiler.Script
-local Wrap = BUI.Profiler.Wrap
 local PALETTE = Skin.PALETTE
 
 local BUTTON_H = 24
@@ -778,17 +776,17 @@ local function CreateRow(parent, layout)
 	local action = Column(row, 'action', height)
 	row.action = Skin.SmallButton(action, ROW.signUp, BUTTON_H, 'Sign up')
 	row.action:SetPoint('RIGHT')
-	row.action:SetScript('OnClick', Script('Skin.PremadeGroups action OnClick', OnAction))
-	row.action:HookScript('OnEnter', Wrap('Skin.PremadeGroups action OnEnter', ShowActionTooltip))
-	row.action:HookScript('OnLeave', Wrap('Skin.PremadeGroups action OnLeave', GameTooltip_Hide))
+	row.action:SetScript('OnClick', OnAction)
+	row.action:HookScript('OnEnter', ShowActionTooltip)
+	row.action:HookScript('OnLeave', GameTooltip_Hide)
 	row.statusText = Text(action, 11, 'skinTitle', 'RIGHT')
 
 	row.cover = Strip.Cover(row)
 
 	row:RegisterForClicks('RightButtonUp')
-	row:SetScript('OnClick', Script('Skin.PremadeGroups row OnClick', OnRowClick))
-	row:SetScript('OnEnter', Script('Skin.PremadeGroups row OnEnter', RowEnter))
-	row:SetScript('OnLeave', Script('Skin.PremadeGroups row OnLeave', RowLeave))
+	row:SetScript('OnClick', OnRowClick)
+	row:SetScript('OnEnter', RowEnter)
+	row:SetScript('OnLeave', RowLeave)
 	PlaceColumns(row, 0)
 	return row
 end
@@ -897,9 +895,9 @@ local function RoleButton(parent, role)
 	button.icon:SetPoint('CENTER')
 	button.icon:SetAtlas(ROLE_ATLAS[role])
 	button.role = role
-	button:SetScript('OnClick', Script('Skin.PremadeGroups role OnClick', RoleClick))
-	button:SetScript('OnEnter', Script('Skin.PremadeGroups role OnEnter', RoleEnter))
-	button:SetScript('OnLeave', Script('Skin.PremadeGroups role OnLeave', GameTooltip_Hide))
+	button:SetScript('OnClick', RoleClick)
+	button:SetScript('OnEnter', RoleEnter)
+	button:SetScript('OnLeave', GameTooltip_Hide)
 	return button
 end
 
@@ -940,7 +938,7 @@ RefreshContent = function()
 	if openPanel then openPanel:Refresh() end
 end
 
-local QueueRefresh = BUI.Dispatcher.New(function() RefreshContent() end, 'Skin.PremadeGroups refresh')
+local QueueRefresh = BUI.Dispatcher.New(function() RefreshContent() end)
 
 local function UpdateDirty()
 	if not finder:IsShown() then return end
@@ -959,7 +957,7 @@ local function UpdateDirty()
 	wipe(dirtyIDs)
 end
 
-local QueueDirty = BUI.Dispatcher.New(UpdateDirty, 'Skin.PremadeGroups result update')
+local QueueDirty = BUI.Dispatcher.New(UpdateDirty)
 
 local function OnLiveEvent(event, resultID)
 	local entry = resultID and entryByID[resultID]
@@ -1027,9 +1025,9 @@ function Panel.LinkButton(parent, label, onClick)
 	link.text:SetPoint('RIGHT')
 	link.text:SetText(label)
 	link:SetSize(link.text:GetUnboundedStringWidth(), Pixel.Scale(POP.header))
-	link:SetScript('OnClick', Script('Skin.PremadeGroups link OnClick', onClick))
-	link:SetScript('OnEnter', Script('Skin.PremadeGroups link OnEnter', Panel.LinkEnter))
-	link:SetScript('OnLeave', Script('Skin.PremadeGroups link OnLeave', Panel.LinkLeave))
+	link:SetScript('OnClick', onClick)
+	link:SetScript('OnEnter', Panel.LinkEnter)
+	link:SetScript('OnLeave', Panel.LinkLeave)
 	return link
 end
 
@@ -1072,9 +1070,9 @@ function Panel.CheckRow(parent, width, onClick, icon)
 	check.text = Text(check, 11, 'skinText')
 	check.text:SetPoint('LEFT', anchor, 'RIGHT', Pixel.Scale(POP.textGap), 0)
 	check.text:SetPoint('RIGHT')
-	check:SetScript('OnClick', Script('Skin.PremadeGroups check OnClick', onClick))
-	check:SetScript('OnEnter', Script('Skin.PremadeGroups check OnEnter', Panel.CheckEnter))
-	check:SetScript('OnLeave', Script('Skin.PremadeGroups check OnLeave', Panel.CheckLeave))
+	check:SetScript('OnClick', onClick)
+	check:SetScript('OnEnter', Panel.CheckEnter)
+	check:SetScript('OnLeave', Panel.CheckLeave)
 	return check
 end
 
@@ -1227,12 +1225,12 @@ function Panel.Toggle(parent, width, height, item, items, isOn, onClick)
 	button.lit:SetPoint('TOPLEFT', Pixel.PixelSize(1), -Pixel.PixelSize(1))
 	button.lit:SetPoint('BOTTOMRIGHT', -Pixel.PixelSize(1), Pixel.PixelSize(1))
 	Skin.SelectedTexture(button.lit, ALPHA.lit)
-	button:SetScript('OnClick', Script('Skin.PremadeGroups toggle OnClick', onClick))
-	button:HookScript('OnEnter', Wrap('Skin.PremadeGroups toggle OnEnter', Panel.PaintToggle))
-	button:HookScript('OnLeave', Wrap('Skin.PremadeGroups toggle OnLeave', Panel.PaintToggle))
+	button:SetScript('OnClick', onClick)
+	button:HookScript('OnEnter', Panel.PaintToggle)
+	button:HookScript('OnLeave', Panel.PaintToggle)
 	if item.tip then
-		button:HookScript('OnEnter', Wrap('Skin.PremadeGroups toggle tip', Panel.ToggleTip))
-		button:HookScript('OnLeave', Wrap('Skin.PremadeGroups toggle tip hide', GameTooltip_Hide))
+		button:HookScript('OnEnter', Panel.ToggleTip)
+		button:HookScript('OnLeave', GameTooltip_Hide)
 	end
 	return button
 end
@@ -1271,11 +1269,11 @@ function Panel.NumberBox(parent, width, getValue, onChange, onEnter)
 	box:SetMaxLetters(POP.ratingDigits)
 	box:SetAutoFocus(false)
 	box.getValue, box.onChange, box.onEnter = getValue, onChange, onEnter
-	box:SetScript('OnTextChanged', Script('Skin.PremadeGroups number OnTextChanged', Panel.NumberTyped))
-	box:SetScript('OnEnterPressed', Script('Skin.PremadeGroups number OnEnterPressed', Panel.NumberEntered))
-	box:SetScript('OnEscapePressed', Script('Skin.PremadeGroups number OnEscapePressed', box.ClearFocus))
-	box:SetScript('OnEditFocusGained', Script('Skin.PremadeGroups number OnEditFocusGained', Panel.NumberFocused))
-	box:SetScript('OnEditFocusLost', Script('Skin.PremadeGroups number OnEditFocusLost', Panel.PaintNumber))
+	box:SetScript('OnTextChanged', Panel.NumberTyped)
+	box:SetScript('OnEnterPressed', Panel.NumberEntered)
+	box:SetScript('OnEscapePressed', box.ClearFocus)
+	box:SetScript('OnEditFocusGained', Panel.NumberFocused)
+	box:SetScript('OnEditFocusLost', Panel.PaintNumber)
 	box.hint = Text(box, 11, 'skinLabel', 'CENTER')
 	box.hint:SetPoint('CENTER')
 	box.hint:SetText(ANY)
@@ -1306,11 +1304,11 @@ function Panel.ServerRow(holder)
 	row:SetHeight(Pixel.Scale(POP.serverRow))
 	row.flag = Skin.SmallButton(row, POP.flagW, POP.flagH, 'Flag')
 	row.flag:SetPoint('RIGHT', Pixel.Scale(-2), 0)
-	row.flag:SetScript('OnClick', Script('Skin.PremadeGroups server flag OnClick', Panel.FlagServer))
+	row.flag:SetScript('OnClick', Panel.FlagServer)
 	row.eye = CreateFrame('Button', nil, row)
 	row.eye:SetSize(Pixel.Scale(POP.eye), Pixel.Scale(POP.eye))
 	row.eye:SetPoint('RIGHT', row.flag, 'LEFT', Pixel.Scale(-POP.textGap), 0)
-	row.eye:SetScript('OnClick', Script('Skin.PremadeGroups server eye OnClick', Panel.HideServer))
+	row.eye:SetScript('OnClick', Panel.HideServer)
 	row.eye.icon = row.eye:CreateTexture(nil, 'ARTWORK')
 	row.eye.icon:SetAllPoints()
 	row.count = Text(row, 10, 'skinLabel', 'RIGHT')
@@ -1590,9 +1588,9 @@ function Strip.Tile(parent, group, width, isOn, onClick)
 	tile.text:SetMaxLines(2)
 	tile.text:SetText(group.label)
 	tile.label = group.label
-	tile:SetScript('OnClick', Script('Skin.PremadeGroups tile OnClick', onClick))
-	tile:SetScript('OnEnter', Script('Skin.PremadeGroups tile OnEnter', Strip.TileEnter))
-	tile:SetScript('OnLeave', Script('Skin.PremadeGroups tile OnLeave', Strip.TileLeave))
+	tile:SetScript('OnClick', onClick)
+	tile:SetScript('OnEnter', Strip.TileEnter)
+	tile:SetScript('OnLeave', Strip.TileLeave)
 	return tile
 end
 
@@ -1647,7 +1645,7 @@ function Strip.DropdownButton(parent, width, kind)
 	button.label:SetWordWrap(false)
 	Skin.TipArrow(button)
 	button.kind = kind
-	button:SetScript('OnClick', Script('Skin.PremadeGroups dropdown OnClick', Panel.OpenPanel))
+	button:SetScript('OnClick', Panel.OpenPanel)
 	return button
 end
 
@@ -1712,7 +1710,7 @@ function Strip.ServersButton(view, kind)
 	servers.label:ClearAllPoints()
 	servers.label:SetPoint('LEFT', Pixel.Scale(SIDE.pad), 0)
 	servers.kind = kind
-	servers:SetScript('OnClick', Script('Skin.PremadeGroups servers OnClick', Panel.OpenPanel))
+	servers:SetScript('OnClick', Panel.OpenPanel)
 	servers.value = Text(servers, 11, 'skinLabel', 'RIGHT')
 	servers.value:SetPoint('RIGHT', Pixel.Scale(-SIDE.pad), 0)
 	return servers
@@ -1835,9 +1833,9 @@ end
 function Strip.GlyphButton(parent, glyph, tip, onClick)
 	local button = Skin.SmallButton(parent, BUTTON_H, BUTTON_H, '')
 	button.tip = tip
-	button:SetScript('OnClick', Script('Skin.PremadeGroups glyph OnClick', onClick))
-	button:HookScript('OnEnter', Wrap('Skin.PremadeGroups glyph OnEnter', Strip.GlyphEnter))
-	button:HookScript('OnLeave', Wrap('Skin.PremadeGroups glyph OnLeave', Strip.GlyphLeave))
+	button:SetScript('OnClick', onClick)
+	button:HookScript('OnEnter', Strip.GlyphEnter)
+	button:HookScript('OnLeave', Strip.GlyphLeave)
 	button.glyph = button:CreateTexture(nil, 'ARTWORK')
 	button.glyph:SetSize(Pixel.Scale(BAR.refreshGlyph), Pixel.Scale(BAR.refreshGlyph))
 	button.glyph:SetPoint('CENTER')
@@ -1910,7 +1908,7 @@ function Strip.FinishRelease()
 	Skin.RestoreBlizzardFrame(PVEFrame)
 end
 
-Strip.QueueRelease = BUI.Dispatcher.New(Strip.FinishRelease, 'Skin.PremadeGroups release')
+Strip.QueueRelease = BUI.Dispatcher.New(Strip.FinishRelease)
 
 function Strip.Release(now)
 	finder.releasing = true
@@ -1977,9 +1975,9 @@ local function BuildSearchField(frame, parent, left, right)
 	slot:SetPoint('LEFT', left, 'RIGHT', Pixel.Scale(BAR.searchBoxGap), 0)
 	slot:SetPoint('RIGHT', right, 'LEFT', Pixel.Scale(-BAR.gap), 0)
 	Skin.PaintBackdrop(slot, PALETTE.card)
-	slot:SetScript('OnClick', Script('Skin.PremadeGroups search field OnClick', FocusSearchBox))
-	slot:SetScript('OnEnter', Script('Skin.PremadeGroups search field OnEnter', SearchFieldEnter))
-	slot:SetScript('OnLeave', Script('Skin.PremadeGroups search field OnLeave', MirrorSearchText))
+	slot:SetScript('OnClick', FocusSearchBox)
+	slot:SetScript('OnEnter', SearchFieldEnter)
+	slot:SetScript('OnLeave', MirrorSearchText)
 	frame.searchSlot = slot
 
 	local go = CreateFrame('Button', nil, slot)
@@ -1997,9 +1995,9 @@ local function BuildSearchField(frame, parent, left, right)
 	go.label = Text(go, 11, 'skinText', 'CENTER')
 	go.label:SetPoint('CENTER')
 	go.label:SetText(SEARCH)
-	go:SetScript('OnClick', Script('Skin.PremadeGroups search go OnClick', Search))
-	go:SetScript('OnEnter', Script('Skin.PremadeGroups search go OnEnter', SearchGoEnter))
-	go:SetScript('OnLeave', Script('Skin.PremadeGroups search go OnLeave', SearchGoLeave))
+	go:SetScript('OnClick', Search)
+	go:SetScript('OnEnter', SearchGoEnter)
+	go:SetScript('OnLeave', SearchGoLeave)
 
 	local glyph = slot:CreateTexture(nil, 'ARTWORK')
 	glyph:SetAtlas('common-search-magnifyingglass')
@@ -2014,7 +2012,7 @@ local function BuildSearchField(frame, parent, left, right)
 	clear.glyph:SetAllPoints()
 	BUILib.Widget.SetGlyph(clear.glyph, BUILib.GetLibMedia('x'))
 	Painter.Tint(clear.glyph, 'skinLabel')
-	clear:SetScript('OnClick', Script('Skin.PremadeGroups search clear OnClick', ClearSearchBox))
+	clear:SetScript('OnClick', ClearSearchBox)
 	clear:Hide()
 	frame.searchClear = clear
 
@@ -2035,7 +2033,7 @@ local function BuildToolbar(main)
 	finder.editButton = Skin.SmallButton(main, BAR.editW, BUTTON_H, 'Edit row')
 	finder.editButton:SetPoint('LEFT', sortDropdown, 'RIGHT', Pixel.Scale(BAR.gap), 0)
 	finder.editButton.kind = 'columns'
-	finder.editButton:SetScript('OnClick', Script('Skin.PremadeGroups edit OnClick', Panel.OpenPanel))
+	finder.editButton:SetScript('OnClick', Panel.OpenPanel)
 
 	finder.roleButtons = {}
 	local previous
@@ -2067,19 +2065,19 @@ local function BuildMain(frame)
 	frame.listArea:SetPoint('TOPLEFT', Pixel.Scale(FRAME.edge - FRAME.scrollPad), Pixel.Scale(-FRAME.listTop))
 	frame.listArea:SetPoint('BOTTOMRIGHT', Pixel.Scale(FRAME.scrollPad - FRAME.edge), Pixel.Scale(FRAME.listBottom))
 	frame.scroll, frame.child = Skin.CreateScrollArea(frame.listArea, LAYOUTS.regular.height, FRAME.scrollPad)
-	frame.scroll:HookScript('OnVerticalScroll', Wrap('Skin.PremadeGroups list scroll', OnListScroll))
+	frame.scroll:HookScript('OnVerticalScroll', OnListScroll)
 	frame.emptyText = Skin.CreateEmptyText(main, frame.listArea)
 
 	frame.appText = Text(main, 11, 'skinLabel')
 	frame.appText:SetPoint('LEFT', main, 'BOTTOMLEFT', Pixel.Scale(FRAME.edge), Pixel.Scale(FRAME.footerY + BUTTON_H / 2))
 	local blizzardButton = Skin.SmallButton(main, BAR.blizzardW, BUTTON_H, 'Blizzard group finder')
 	blizzardButton:SetPoint('BOTTOMRIGHT', Pixel.Scale(-FRAME.edge), Pixel.Scale(FRAME.footerY))
-	blizzardButton:SetScript('OnClick', Script('Skin.PremadeGroups blizzard OnClick', ShowBlizzard))
+	blizzardButton:SetScript('OnClick', ShowBlizzard)
 	frame.startButton = Skin.SmallButton(main, BAR.startW, BUTTON_H, '')
 	frame.startButton:SetPoint('RIGHT', blizzardButton, 'LEFT', Pixel.Scale(-BAR.gap), 0)
-	frame.startButton:SetScript('OnClick', Script('Skin.PremadeGroups start OnClick', Strip.StartGroup))
-	frame.startButton:HookScript('OnEnter', Wrap('Skin.PremadeGroups start OnEnter', ShowActionTooltip))
-	frame.startButton:HookScript('OnLeave', Wrap('Skin.PremadeGroups start OnLeave', GameTooltip_Hide))
+	frame.startButton:SetScript('OnClick', Strip.StartGroup)
+	frame.startButton:HookScript('OnEnter', ShowActionTooltip)
+	frame.startButton:HookScript('OnLeave', GameTooltip_Hide)
 
 	frame.sideRule = Rule(frame)
 	frame.sideRule:SetWidth(Pixel.PixelSize(1))
@@ -2109,7 +2107,7 @@ local function BuildFrame()
 	frame.catcher:SetAllPoints(UIParent)
 	frame.catcher:SetFrameLevel(frame:GetFrameLevel() + LEVEL.catcher)
 	frame.catcher:RegisterForClicks('AnyDown')
-	frame.catcher:SetScript('OnClick', Script('Skin.PremadeGroups catcher OnClick', HidePanel))
+	frame.catcher:SetScript('OnClick', HidePanel)
 	frame.catcher:Hide()
 end
 
@@ -2150,14 +2148,14 @@ end
 context.Window('LFGListFrame', {
 	install = function(frame)
 		local panel = frame.SearchPanel
-		panel:HookScript('OnShow', Wrap('Skin.PremadeGroups search shown', context.Guard(OnSearchShown)))
-		panel:HookScript('OnHide', Wrap('Skin.PremadeGroups search hidden', context.Guard(OnSearchHidden)))
-		hooksecurefunc('LFGListSearchPanel_DoSearch', Wrap('Skin.PremadeGroups blizzard search', context.Guard(OnBlizzardSearch)))
+		panel:HookScript('OnShow', context.Guard(OnSearchShown))
+		panel:HookScript('OnHide', context.Guard(OnSearchHidden))
+		hooksecurefunc('LFGListSearchPanel_DoSearch', context.Guard(OnBlizzardSearch))
 		local box = panel.SearchBox
-		box:HookScript('OnTextChanged', Wrap('Skin.PremadeGroups search text', MirrorSearchText))
-		box:HookScript('OnEditFocusGained', Wrap('Skin.PremadeGroups search focus', MirrorSearchText))
-		box:HookScript('OnEditFocusLost', Wrap('Skin.PremadeGroups search blur', MirrorSearchText))
-		box:HookScript('OnCursorChanged', Wrap('Skin.PremadeGroups search cursor', MirrorSearchText))
+		box:HookScript('OnTextChanged', MirrorSearchText)
+		box:HookScript('OnEditFocusGained', MirrorSearchText)
+		box:HookScript('OnEditFocusLost', MirrorSearchText)
+		box:HookScript('OnCursorChanged', MirrorSearchText)
 	end,
 })
 

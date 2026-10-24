@@ -155,9 +155,9 @@ local function Build()
     frame:SetFrameStrata("MEDIUM")
     frame:Hide()
     frame:EnableMouse(true)
-    local NotifyAnchorChange = BUI.Profiler.Wrap("Power.Power anchor notify", function()
+    local NotifyAnchorChange = function()
         BUI.Anchor.OnAnchorSizeChanged()
-    end)
+    end
     frame:HookScript("OnShow", NotifyAnchorChange)
     frame:HookScript("OnHide", NotifyAnchorChange)
 

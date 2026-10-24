@@ -1124,6 +1124,7 @@ end
 function BUI.RunMigrations()
 	local global = BUI.db.global
 	global.cdmProfile = nil
+	global.launchTrace, global.traceNextLogin, global.profileNextLogin, global.profileAlerts = nil, nil, nil, nil
 	if not global._layoutCenteredMigrated then
 		global._layoutCenteredMigrated = true
 		global.layoutStyle = 'centered'

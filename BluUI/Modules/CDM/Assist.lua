@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('CDM.Assist')
-
 local CDM = BUI.CDM
 
 local GetCVarBool = GetCVarBool
@@ -74,13 +72,13 @@ local function InstallHooks()
 	if hooked then return end
 	hooked = true
 
-	Hook(AssistedCombatManager, 'UpdateAllAssistedHighlightFramesForSpell', function(_, spellID)
+	hooksecurefunc(AssistedCombatManager, 'UpdateAllAssistedHighlightFramesForSpell', function(_, spellID)
 		Resolve(DesiredSpell(spellID))
 	end)
 
-	EventRegistry:RegisterCallback('AssistedCombatManager.OnSetUseAssistedHighlight', BUI.Profiler.Wrap('CDM.Assist highlight toggle', function()
+	EventRegistry:RegisterCallback('AssistedCombatManager.OnSetUseAssistedHighlight', function()
 		Resolve(DesiredSpell(CurrentSuggestion()))
-	end), {})
+	end, {})
 end
 
 local function Sync()

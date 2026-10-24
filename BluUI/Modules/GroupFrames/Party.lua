@@ -92,9 +92,9 @@ local function WatchAnchorTarget(target)
 	watchedTarget = target
 	if target and not target._bluFramesPartyHook then
 		target._bluFramesPartyHook = true
-		target:HookScript("OnSizeChanged", BUI.Profiler.Wrap("GroupFrames.Party anchor resize", function(self)
+		target:HookScript("OnSizeChanged", function(self)
 			if watchedTarget == self then SyncAnchorWidth() end
-		end))
+		end)
 	end
 end
 

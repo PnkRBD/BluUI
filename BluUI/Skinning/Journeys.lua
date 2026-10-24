@@ -220,7 +220,7 @@ local function SkinInfoHeader(header)
 		Fade(header.descriptionBG)
 		Fade(header.descriptionBGBottom)
 		Skin.TipFont(header.overviewDescription.Text, 'body')
-		button:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Journeys header OnShow', Guard(RefreshHeaderState)))
+		button:HookScript('OnShow', Guard(RefreshHeaderState))
 	end
 	RefreshHeaderState(button)
 end
@@ -342,8 +342,8 @@ end
 local function SkinJourneyCard(card)
 	if card._buiCard then return end
 	card._buiCard = true
-	card:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Journeys card OnEnter', CardEnter))
-	card:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Journeys card OnLeave', CardLeave))
+	card:HookScript('OnEnter', CardEnter)
+	card:HookScript('OnLeave', CardLeave)
 	FadeStates(card)
 	Skin.TipShell(card, CARD_INSET)
 	Skin.TipFont(card.RenownCardFactionName or card.JourneyCardName, 'title', CARD_TITLE_SCALE)

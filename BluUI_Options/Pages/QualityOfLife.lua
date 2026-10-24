@@ -581,13 +581,13 @@ local function TrackedQuestsRow(ui, board)
 	ui.Button(row, 'Untrack all', 'control', ConfirmUntrack):SetPoint('RIGHT', -ui.ROW_INSET, 0)
 	local function Update() sub:SetText(TrackedSummary()) end
 	row:RegisterEvent('QUEST_WATCH_LIST_CHANGED')
-	row:SetScript('OnEvent', BUI.Profiler.Timed('QualityOfLife tracked quests changed', Update))
-	row:HookScript('OnShow', BUI.Profiler.Timed('QualityOfLife tracked quests shown', Update))
+	row:SetScript('OnEvent', Update)
+	row:HookScript('OnShow', Update)
 	row:EnableMouse(true)
-	row:HookScript('OnEnter', BUI.Profiler.Timed('QualityOfLife tracked quests hover', function(self)
+	row:HookScript('OnEnter', function(self)
 		local titles = TrackedQuestTitles()
 		if #titles > 1 then Widget.ShowTip(self, table.concat(titles, '\n')) end
-	end))
+	end)
 	row:HookScript('OnLeave', Widget.HideTip)
 end
 

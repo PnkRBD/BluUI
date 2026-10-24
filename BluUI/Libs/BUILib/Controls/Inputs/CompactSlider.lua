@@ -79,42 +79,42 @@ function Controls.CompactSlider(parent, label, minVal, maxVal, value, callback, 
 		else button:SetBackdropColor(unpack(Theme.button.normal)); buttonText:SetTextColor(unpack(Theme.text.secondary)) end
 	end
 
-	minusButton:SetScript("OnClick", BUILib.Timed('BUILib.CompactSlider CompactSlider minusButton OnClick', function() Step(-1) end))
-	plusButton:SetScript("OnClick", BUILib.Timed('BUILib.CompactSlider CompactSlider plusButton OnClick', function() Step(1) end))
-	minusButton:SetScript("OnEnter", BUILib.Timed('BUILib.CompactSlider CompactSlider minusButton OnEnter', function(button) ButtonHover(button, minusText, true) end))
-	minusButton:SetScript("OnLeave", BUILib.Timed('BUILib.CompactSlider CompactSlider minusButton OnLeave', function(button) ButtonHover(button, minusText, false) end))
-	plusButton:SetScript("OnEnter", BUILib.Timed('BUILib.CompactSlider CompactSlider plusButton OnEnter', function(button) ButtonHover(button, plusText, true) end))
-	plusButton:SetScript("OnLeave", BUILib.Timed('BUILib.CompactSlider CompactSlider plusButton OnLeave', function(button) ButtonHover(button, plusText, false) end))
+	minusButton:SetScript("OnClick", function() Step(-1) end)
+	plusButton:SetScript("OnClick", function() Step(1) end)
+	minusButton:SetScript("OnEnter", function(button) ButtonHover(button, minusText, true) end)
+	minusButton:SetScript("OnLeave", function(button) ButtonHover(button, minusText, false) end)
+	plusButton:SetScript("OnEnter", function(button) ButtonHover(button, plusText, true) end)
+	plusButton:SetScript("OnLeave", function(button) ButtonHover(button, plusText, false) end)
 
 	track:EnableMouse(true)
-	track:SetScript("OnMouseDown", BUILib.Timed('BUILib.CompactSlider CompactSlider track OnMouseDown', function(self, mouseButton) if mouseButton == "LeftButton" then TrackClick(self) end end))
+	track:SetScript("OnMouseDown", function(self, mouseButton) if mouseButton == "LeftButton" then TrackClick(self) end end)
 
-	valueBox:SetScript("OnEnter", BUILib.Timed('BUILib.CompactSlider CompactSlider valueBox OnEnter', function(editBox) if not state.locked then editBox:SetBackdropBorderColor(Theme.GetAccent()) end end))
-	valueBox:SetScript("OnLeave", BUILib.Timed('BUILib.CompactSlider CompactSlider valueBox OnLeave', function(editBox) if not editBox:HasFocus() then editBox:SetBackdropBorderColor(unpack(Theme.border.dark)) end end))
-	valueBox:SetScript("OnEnterPressed", BUILib.Timed('BUILib.CompactSlider CompactSlider valueBox OnEnterPressed', function(editBox)
+	valueBox:SetScript("OnEnter", function(editBox) if not state.locked then editBox:SetBackdropBorderColor(Theme.GetAccent()) end end)
+	valueBox:SetScript("OnLeave", function(editBox) if not editBox:HasFocus() then editBox:SetBackdropBorderColor(unpack(Theme.border.dark)) end end)
+	valueBox:SetScript("OnEnterPressed", function(editBox)
 		local typedNumber = tonumber(editBox:GetText())
 		if typedNumber then UpdateThumb(typedNumber); if callback then callback(state.value) end else editBox:SetText(tostring(state.value)) end
 		editBox:ClearFocus()
-	end))
-	valueBox:SetScript("OnEscapePressed", BUILib.Timed('BUILib.CompactSlider CompactSlider valueBox OnEscapePressed', function(editBox) editBox:ClearFocus() end))
-	valueBox:SetScript("OnEditFocusGained", BUILib.Timed('BUILib.CompactSlider CompactSlider valueBox OnEditFocusGained', function(editBox) editBox:SetBackdropBorderColor(Theme.GetAccent()) end))
-	valueBox:SetScript("OnEditFocusLost", BUILib.Timed('BUILib.CompactSlider CompactSlider valueBox OnEditFocusLost', function(editBox) editBox:SetBackdropBorderColor(unpack(Theme.border.dark)) end))
+	end)
+	valueBox:SetScript("OnEscapePressed", function(editBox) editBox:ClearFocus() end)
+	valueBox:SetScript("OnEditFocusGained", function(editBox) editBox:SetBackdropBorderColor(Theme.GetAccent()) end)
+	valueBox:SetScript("OnEditFocusLost", function(editBox) editBox:SetBackdropBorderColor(unpack(Theme.border.dark)) end)
 
 	thumb:EnableMouse(true)
-	thumb:SetScript("OnMouseDown", BUILib.Timed('BUILib.CompactSlider CompactSlider thumb OnMouseDown', function(self, mouseButton)
+	thumb:SetScript("OnMouseDown", function(self, mouseButton)
 		if mouseButton == "LeftButton" and not state.locked then
 			self.dragging = true
-			self:SetScript("OnUpdate", BUILib.Timed('BUILib.CompactSlider CompactSlider self OnUpdate', function(draggedThumb)
+			self:SetScript("OnUpdate", function(draggedThumb)
 				if not draggedThumb.dragging then return end
 				local left, trackWidth = track:GetLeft(), track:GetWidth()
 				if not left or not trackWidth or trackWidth <= 0 then return end
 				local cursorX = select(1, GetCursorPosition()) / track:GetEffectiveScale()
 				local newValue = math_floor((minVal + math_max(0, math_min(1, (cursorX - left) / trackWidth)) * (maxVal - minVal)) / step + 0.5) * step
 				if newValue ~= state.value then UpdateThumb(newValue); if callback then callback(state.value) end end
-			end))
+			end)
 		end
-	end))
-	thumb:SetScript("OnMouseUp", BUILib.Timed('BUILib.CompactSlider CompactSlider thumb OnMouseUp', function(draggedThumb) draggedThumb.dragging = false; draggedThumb:SetScript("OnUpdate", nil) end))
+	end)
+	thumb:SetScript("OnMouseUp", function(draggedThumb) draggedThumb.dragging = false; draggedThumb:SetScript("OnUpdate", nil) end)
 
 	if tooltip then Widget.Tooltip(track, tooltip); Widget.Tooltip(thumb, tooltip) end
 	BUILib.Defer(function() UpdateThumb(state.value) end)
@@ -124,7 +124,7 @@ function Controls.CompactSlider(parent, label, minVal, maxVal, value, callback, 
 	end
 
 	local function DeferredThumbUpdate() if container.GetValue then UpdateThumb(state.value) end end
-	container:SetScript("OnSizeChanged", BUILib.Timed('BUILib.CompactSlider CompactSlider container OnSizeChanged', function() BUILib.Defer(DeferredThumbUpdate) end))
+	container:SetScript("OnSizeChanged", function() BUILib.Defer(DeferredThumbUpdate) end)
 	function container:GetValue() return state.value end
 	function container:SetValue(newValue) UpdateThumb(newValue) end
 	function container:SetLocked(isLocked)

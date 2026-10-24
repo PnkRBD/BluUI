@@ -110,7 +110,7 @@ local QueueSync = BUI.Dispatcher.New(function()
 	ActionBars.ForEachButton(SyncPendingButton)
 	wipe(pendingSpells)
 	pendingAll = false
-end, EVENT_KEY)
+end)
 
 local function OnOverlayGlowChanged(_, spellID)
 	spellID = Plain(spellID)

@@ -65,10 +65,10 @@ local function SleepUntilNextSecond(remaining)
 	Sleep()
 	if countdownWakePending then return end
 	countdownWakePending = true
-	BUI.Profiler.After('Bloodlust.Bloodlust countdown wake', remaining % 1, CountdownWake)
+	C_Timer.After(remaining % 1, CountdownWake)
 end
 
-BUI.Tools.OnAuraQueriesUnblocked(Wake, 'Bloodlust')
+BUI.Tools.OnAuraQueriesUnblocked(Wake)
 
 local function TouchesLockout(instanceIDs)
 	if not instanceIDs then return false end
@@ -262,7 +262,7 @@ local function PlayFlash(seconds)
 	local generation = flashGeneration
 	flash:Stop()
 	flash:Play()
-	BUI.Profiler.After('Bloodlust.Bloodlust flash stop', seconds, function()
+	C_Timer.After(seconds, function()
 		if generation == flashGeneration then StopFlash() end
 	end)
 end

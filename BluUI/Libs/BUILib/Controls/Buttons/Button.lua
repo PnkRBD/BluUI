@@ -27,8 +27,8 @@ function Controls.Button(parent, text, width, callback, tooltipOrOptions, accent
 		self = Widget.New(parent, "Button", nil, { raw = true, size = {width, ROW_HEIGHT} })
 		button = self.frame
 		fillRect, borderRect = Widget.RoundedShape(button, radius, normal, borderColor, "BACKGROUND", 0, 0)
-		button:HookScript("OnEnter", BUILib.Timed('BUILib.Button Button button OnEnter', function() Widget.SetShapeColor(fillRect, hover[1], hover[2], hover[3], hover[4] or 1) end))
-		button:HookScript("OnLeave", BUILib.Timed('BUILib.Button Button button OnLeave', function() Widget.SetShapeColor(fillRect, normal[1], normal[2], normal[3], normal[4] or 1) end))
+		button:HookScript("OnEnter", function() Widget.SetShapeColor(fillRect, hover[1], hover[2], hover[3], hover[4] or 1) end)
+		button:HookScript("OnLeave", function() Widget.SetShapeColor(fillRect, normal[1], normal[2], normal[3], normal[4] or 1) end)
 	else
 		self = Widget.New(parent, "Button", nil, { bg = normal, border = borderColor, size = {width, ROW_HEIGHT} })
 		button = self.frame
@@ -79,9 +79,9 @@ function Controls.Button(parent, text, width, callback, tooltipOrOptions, accent
 		UpdateIndicator()
 	end
 
-	button:SetScript("OnMouseDown", BUILib.Timed('BUILib.Button Button button OnMouseDown', function(buttonFrame) if buttonFrame:IsEnabled() then label:SetPoint("CENTER", labelOffsetX + 1, -1) end end))
-	button:SetScript("OnMouseUp", BUILib.Timed('BUILib.Button Button button OnMouseUp', function() label:SetPoint("CENTER", labelOffsetX, 0) end))
-	if callback then button:SetScript("OnClick", BUILib.Timed('BUILib.Button Button button OnClick', function() callback(state.active) end)) end
+	button:SetScript("OnMouseDown", function(buttonFrame) if buttonFrame:IsEnabled() then label:SetPoint("CENTER", labelOffsetX + 1, -1) end end)
+	button:SetScript("OnMouseUp", function() label:SetPoint("CENTER", labelOffsetX, 0) end)
+	if callback then button:SetScript("OnClick", function() callback(state.active) end) end
 
 	function button:SetText(newText)
 		label:SetText(newText)
@@ -89,7 +89,7 @@ function Controls.Button(parent, text, width, callback, tooltipOrOptions, accent
 		if newWidth > button:GetWidth() then button:SetWidth(Widget.EvenSize(newWidth)) end
 	end
 	function button:GetText() return label:GetText() end
-	function button:SetCallback(newCallback) button:SetScript("OnClick", BUILib.Timed('BUILib.Button SetCallback button OnClick', function() if newCallback then newCallback(state.active) end end)) end
+	function button:SetCallback(newCallback) button:SetScript("OnClick", function() if newCallback then newCallback(state.active) end end) end
 	function button:SetEnabled(enabled)
 		if enabled then
 			button:Enable()

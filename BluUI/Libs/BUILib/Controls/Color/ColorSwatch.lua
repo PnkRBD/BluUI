@@ -46,7 +46,7 @@ function Controls.ColorSwatch(parent, options)
         container = button
     end
 
-    button:SetScript("OnClick", BUILib.Timed('BUILib.ColorSwatch ColorSwatch button OnClick', function()
+    button:SetScript("OnClick", function()
         original.r, original.g, original.b, original.a = state.r, state.g, state.b, state.a
         Controls.OpenColorPicker({
             r = state.r, g = state.g, b = state.b, a = state.a,
@@ -62,7 +62,7 @@ function Controls.ColorSwatch(parent, options)
                 if options.callback then options.callback(state.r, state.g, state.b, state.a, cancelled, phase) end
             end,
         })
-    end))
+    end)
 
     if options.tooltip then Widget.Tooltip(button, options.tooltip) end
 

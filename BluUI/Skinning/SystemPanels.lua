@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Wrap = BUI.Profiler.Wrap
-
 local pairs, ipairs = pairs, ipairs
 
 local Skin = BUI.Skinning
@@ -136,7 +134,7 @@ local function SegmentMinimalTabs(owner, keys)
 		if not tab._buiSegmentHook then
 			tab._buiSegmentHook = true
 			Hook(tab, 'OnSelected', PaintMinimalTab)
-			local repaint = Wrap('Skin.SystemPanels tab hover', context.Guard(PaintMinimalTab))
+			local repaint = context.Guard(PaintMinimalTab)
 			tab:HookScript('OnEnter', repaint)
 			tab:HookScript('OnLeave', repaint)
 		end
@@ -247,7 +245,7 @@ local function StyleRowButton(row)
 		Shell(button)
 		Skin.TipArrow(button, false, ARROW_EXPANDED)
 		Skin.TipFont(button.Text, 'title')
-		button:HookScript('OnClick', Wrap('Skin.SystemPanels section toggle', context.Guard(OnSectionToggle)))
+		button:HookScript('OnClick', context.Guard(OnSectionToggle))
 	end
 	Refade(button.Left)
 	Refade(button.Right)

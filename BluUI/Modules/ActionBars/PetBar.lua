@@ -56,10 +56,10 @@ local function CreateButton(index)
 	button:SetID(index)
 	ActionBars.PrepareTemplateButton(button, 'pet', COMMAND .. index)
 	button:RegisterForDrag('LeftButton')
-	button:SetScript('OnEnter', BUI.Profiler.Script('ActionBars.PetBar button OnEnter', OnEnter))
+	button:SetScript('OnEnter', OnEnter)
 	button:SetScript('OnLeave', GameTooltip_Hide)
-	button:SetScript('OnDragStart', BUI.Profiler.Script('ActionBars.PetBar button OnDragStart', OnDragStart))
-	button:SetScript('OnReceiveDrag', BUI.Profiler.Script('ActionBars.PetBar button OnReceiveDrag', OnReceiveDrag))
+	button:SetScript('OnDragStart', OnDragStart)
+	button:SetScript('OnReceiveDrag', OnReceiveDrag)
 	ActionBars.SkinButton(button)
 	ActionBars.ApplyHotkeyText(button)
 	ActionBars.TrackKeyPresses(button)
@@ -115,7 +115,7 @@ local function UpdateAll()
 	end
 end
 
-QueueUpdate = BUI.Dispatcher.New(UpdateAll, EVENT_KEY)
+QueueUpdate = BUI.Dispatcher.New(UpdateAll)
 
 local function UpdateCooldowns()
 	if not bar then return end

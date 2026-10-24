@@ -63,7 +63,7 @@ function Controls.Toggle(parent, label, checked, callback, indentLevel, enabled,
 		animationFromProgress = progress
 		animationToProgress = state.enabled and 1 or 0
 		animationStartTime = GetTime()
-		container:SetScript("OnUpdate", BUILib.Timed('BUILib.Toggle StartAnimation container OnUpdate', function(self)
+		container:SetScript("OnUpdate", function(self)
 			local elapsedFraction = (GetTime() - animationStartTime) / ANIM_DURATION
 			if elapsedFraction >= 1 then
 				progress = animationToProgress
@@ -73,7 +73,7 @@ function Controls.Toggle(parent, label, checked, callback, indentLevel, enabled,
 				progress = animationFromProgress + (animationToProgress - animationFromProgress) * eased
 			end
 			Render()
-		end))
+		end)
 	end
 
 	local function Snap()
@@ -82,12 +82,12 @@ function Controls.Toggle(parent, label, checked, callback, indentLevel, enabled,
 		Render()
 	end
 
-	track:SetScript("OnClick", BUILib.Timed('BUILib.Toggle Toggle track OnClick', function()
+	track:SetScript("OnClick", function()
 		if state.disabled then return end
 		state.enabled = not state.enabled
 		StartAnimation()
 		if callback then callback(state.enabled) end
-	end))
+	end)
 	if tooltip then Widget.Tooltip(track, tooltip) end
 	Snap()
 	Theme.RegisterAccentElement(container, function() Render() end)

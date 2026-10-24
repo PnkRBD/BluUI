@@ -191,8 +191,8 @@ local function CreateSlotLabels(button, info)
 	labels.hover:SetPoint(inner, button, outer, offsetX, -LABEL_LINE_Y)
 	labels.hover:EnableMouse(true)
 	labels.hover.anchor = outer == 'RIGHT' and 'ANCHOR_RIGHT' or 'ANCHOR_LEFT'
-	labels.hover:SetScript('OnEnter', BUI.Profiler.Script('Skin.Inspect hover OnEnter', EnchantTooltip))
-	labels.hover:SetScript('OnLeave', BUI.Profiler.Script('Skin.Inspect hover OnLeave', function() GameTooltip:Hide() end))
+	labels.hover:SetScript('OnEnter', EnchantTooltip)
+	labels.hover:SetScript('OnLeave', function() GameTooltip:Hide() end)
 	labels.hover:Hide()
 
 	return labels

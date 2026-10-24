@@ -256,7 +256,7 @@ local RefreshFrames = BUI.Dispatcher.NewDelayed(function()
 	module:Refresh()
 	module.UpdatePreviews()
 	RefreshPreview()
-end, 0.1, 'Unit frames refresh')
+end, 0.1)
 
 local function RefreshAuras()
 	PropagatePlayer()

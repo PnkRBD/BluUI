@@ -53,7 +53,7 @@ local function EnsurePill(rail)
 	local ticker = CreateFrame('Frame', nil, rail)
 	ticker:Hide()
 	rail._navPillTicker = ticker
-	ticker:SetScript('OnUpdate', BUILib.Timed('BUILib.NavChip EnsurePill ticker OnUpdate', function(self)
+	ticker:SetScript('OnUpdate', function(self)
 		local pillState = rail._navPillState
 		if not pillState then self:Hide(); return end
 		local progress = (GetTime() - pillState.start) / pillState.dur
@@ -76,7 +76,7 @@ local function EnsurePill(rail)
 			pill:SetPoint('CENTER', rail, 'TOPLEFT', pillX, -pillState.toY)
 			pill:SetAlpha(progress)
 		end
-	end))
+	end)
 	return pill
 end
 
@@ -152,7 +152,7 @@ function Widget.NavChip(rail, label, callback, options)
 	chip:SetHeight(CHIP_HEIGHT)
 	chip:SetWidth(rail:GetWidth() - CHIP_X * 2)
 	chip:RegisterForClicks('LeftButtonUp')
-	if callback then chip:SetScript('OnClick', BUILib.Timed('BUILib.NavChip NavChip chip OnClick', callback)) end
+	if callback then chip:SetScript('OnClick', callback) end
 
 	local text = chip:CreateFontString(nil, 'OVERLAY', nil, 3)
 	text:SetFont(BUILib.Font, options.fontSize or 12, '')
@@ -172,16 +172,16 @@ function Widget.NavChip(rail, label, callback, options)
 		text:SetTextColor(unpack(colors[self.disabled and 'disabled' or self.selected and 'selected' or 'rest']))
 	end
 
-	chip:HookScript('OnEnter', BUILib.Timed('BUILib.NavChip NavChip chip OnEnter', function(self)
+	chip:HookScript('OnEnter', function(self)
 		if self.selected or self.disabled then return end
 		text:SetTextColor(unpack(Colors(rail).hover))
 		SetHoverShown(true)
-	end))
-	chip:HookScript('OnLeave', BUILib.Timed('BUILib.NavChip NavChip chip OnLeave', function(self)
+	end)
+	chip:HookScript('OnLeave', function(self)
 		if self.selected or self.disabled then return end
 		self:Repaint()
 		SetHoverShown(false)
-	end))
+	end)
 
 	function chip:SetSelected(isSelected)
 		if self.disabled then return end
@@ -218,7 +218,7 @@ end
 function Widget.NavChipEnable(chip, callback)
 	chip.disabled = nil
 	chip:EnableMouse(true)
-	chip:SetScript('OnClick', BUILib.Timed('BUILib.NavChip NavChipEnable chip OnClick', callback))
+	chip:SetScript('OnClick', callback)
 	chip:Repaint()
 end
 

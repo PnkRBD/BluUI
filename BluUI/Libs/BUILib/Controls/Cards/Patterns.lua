@@ -49,23 +49,23 @@ local function AttachCardHover(card, outerTextures, innerTextures, outerRestore,
 	end
 	card._selectedInner = selectedInner
 
-	card:SetScript("OnEnter", BUILib.Timed('BUILib.Patterns AttachCardHover card OnEnter', function(self)
+	card:SetScript("OnEnter", function(self)
 		if not self._selected then setAccent(0.9) end
 		maskInner()
-	end))
-	card:SetScript("OnLeave", BUILib.Timed('BUILib.Patterns AttachCardHover card OnLeave', function(self)
+	end)
+	card:SetScript("OnLeave", function(self)
 		if self._selected then
 			selectedInner()
 		else
 			restoreIdle()
 			restoreInner()
 		end
-	end))
-	card:SetScript("OnMouseDown", BUILib.Timed('BUILib.Patterns AttachCardHover card OnMouseDown', function(self)
+	end)
+	card:SetScript("OnMouseDown", function(self)
 		setAccent(1)
 		pressInner()
-	end))
-	card:SetScript("OnMouseUp", BUILib.Timed('BUILib.Patterns AttachCardHover card OnMouseUp', function(self)
+	end)
+	card:SetScript("OnMouseUp", function(self)
 		local hovering = self:IsMouseOver()
 		if self._selected then
 			setAccent(1)
@@ -79,7 +79,7 @@ local function AttachCardHover(card, outerTextures, innerTextures, outerRestore,
 			restoreIdle()
 			restoreInner()
 		end
-	end))
+	end)
 end
 
 function Controls.HeroCard(parent, config)
@@ -309,7 +309,7 @@ function Controls.HeroCard(parent, config)
 	end
 
 	if config.onClick then
-		card:SetScript("OnClick", BUILib.Timed('BUILib.Patterns HeroCard card OnClick', function() config.onClick(config, card) end))
+		card:SetScript("OnClick", function() config.onClick(config, card) end)
 	end
 
 	return Widget.Wrap(card)

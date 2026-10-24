@@ -61,15 +61,15 @@ Layout.CardKitExtensions[#Layout.CardKitExtensions + 1] = function(cards, kit, w
 		window:Paint(box, 'text')
 		window:SetFontRole(box, 'control')
 		box:SetTextInsets(10, 10, 0, 0)
-		box:SetScript('OnEscapePressed', BUILib.Timed('BUILib.CardsData Field box OnEscapePressed', function(self) self:ClearFocus() end))
-		box:SetScript('OnEditFocusGained', BUILib.Timed('BUILib.CardsData Field box OnEditFocusGained', function(self) self:HighlightText() end))
+		box:SetScript('OnEscapePressed', function(self) self:ClearFocus() end)
+		box:SetScript('OnEditFocusGained', function(self) self:HighlightText() end)
 		return box
 	end
 
 	function cards.Placeholder(box, text)
 		local hint = kit.Text(box, text, 12, 'faint')
 		hint:SetPoint('LEFT', 10, 0)
-		box:HookScript('OnTextChanged', BUILib.Timed('BUILib.CardsData Placeholder box OnTextChanged', function(self) hint:SetShown(self:GetText() == '') end))
+		box:HookScript('OnTextChanged', function(self) hint:SetShown(self:GetText() == '') end)
 		return hint
 	end
 
@@ -174,7 +174,7 @@ Layout.CardKitExtensions[#Layout.CardKitExtensions + 1] = function(cards, kit, w
 			local column = CreateFrame('Button', nil, card)
 			column:SetPoint('TOPLEFT', left, -48)
 			column:SetSize(columnWidth, height - 48 - PAD + 4)
-			column:SetScript('OnClick', BUILib.Timed('BUILib.CardsData Compare column OnClick', function() if entry.onClick then entry.onClick() end end))
+			column:SetScript('OnClick', function() if entry.onClick then entry.onClick() end end)
 			cards.Badge(column, entry.icon or 'glow', 36, 0, 2, true)
 			Capped(cards.Label(column, entry.title, 48, 4, 13, 'text'), columnWidth - 48)
 			Capped(cards.Label(column, entry.sub or '', 48, 24, 11, 'muted'), columnWidth - 48)
@@ -625,12 +625,12 @@ Layout.CardKitExtensions[#Layout.CardKitExtensions + 1] = function(cards, kit, w
 		cards.Description(card, spec.description or '', PAD, 38, width - PAD * 2)
 		local boxWidth = width - PAD * 2 - ACTION_ROOM
 		local export = cards.Field(card, PAD, 70, boxWidth)
-		export:SetScript('OnTextChanged', BUILib.Timed('BUILib.CardsData Share export OnTextChanged', function(self, userInput)
+		export:SetScript('OnTextChanged', function(self, userInput)
 			if userInput then
 				self:SetText(spec.value())
 				self:HighlightText()
 			end
-		end))
+		end)
 		export:SetText(spec.value())
 		local select = kit.Button(card, 'Select', 'secondary', function()
 			export:SetFocus()
@@ -673,10 +673,10 @@ Layout.CardKitExtensions[#Layout.CardKitExtensions + 1] = function(cards, kit, w
 			hint:SetShown(text == '')
 			card.count:SetText(#text .. ' / ' .. limit)
 		end
-		note:HookScript('OnTextChanged', BUILib.Timed('BUILib.CardsData Editor note OnTextChanged', function(self, userInput)
+		note:HookScript('OnTextChanged', function(self, userInput)
 			Update()
 			if userInput and spec.onChange then card.saved:SetText(spec.onChange(self:GetText()) or '') end
-		end))
+		end)
 		Update()
 		card.edit = note
 		return card
@@ -698,7 +698,7 @@ Layout.CardKitExtensions[#Layout.CardKitExtensions + 1] = function(cards, kit, w
 			chip:SetWidth(Widget.EvenSize(chip.label:GetStringWidth() + 22))
 			chip:SetPoint('TOPLEFT', chipX, -46)
 			chipX = chipX + chip:GetWidth() + CHIP_GAP
-			chip:SetScript('OnClick', BUILib.Timed('BUILib.CardsData Filter chip OnClick', function() card:Select(index) end))
+			chip:SetScript('OnClick', function() card:Select(index) end)
 			chips[index] = chip
 		end
 		local function Refresh()
@@ -740,10 +740,10 @@ Layout.CardKitExtensions[#Layout.CardKitExtensions + 1] = function(cards, kit, w
 			fill:SetPoint('BOTTOMRIGHT', -2, 2)
 			fill:SetVertexColor(color[1], color[2], color[3], 1)
 			swatch.ring = ring
-			swatch:SetScript('OnClick', BUILib.Timed('BUILib.CardsData Palette swatch OnClick', function()
+			swatch:SetScript('OnClick', function()
 				if spec.onPick then spec.onPick(index, color) end
 				card:Refresh()
-			end))
+			end)
 			swatches[index] = swatch
 		end
 		function card:Refresh()

@@ -2,7 +2,6 @@ local _, BUI = ...
 local GetTime = GetTime
 local C_Timer_After = C_Timer.After
 local huge = math.huge
-local Profiler = BUI.Profiler
 
 BUI.Scheduler = {}
 local Scheduler = BUI.Scheduler
@@ -89,7 +88,7 @@ frame:SetScript('OnUpdate', function()
         if entry.active then
             if now >= entry.due then
                 entry.due = now + entry.interval
-                Profiler.Run(entry.label, entry.fn)
+                entry.fn()
             end
             if entry.due < earliest then
                 earliest = entry.due
@@ -112,7 +111,6 @@ function Scheduler.RegisterUpdate(name, callback, interval, active)
 
     local enabled = active ~= false
     registry[name] = {
-        label    = 'Update ' .. name,
         fn       = callback,
         interval = interval,
         due      = GetTime(),

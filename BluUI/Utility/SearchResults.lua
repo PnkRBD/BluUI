@@ -1,6 +1,5 @@
 local _, BUI = ...
 local Pixel = BUI.Pixel
-local After = BUI.Profiler.After
 
 local BUILib = BluUI.BUILibClient
 local Theme = BUILib.Theme
@@ -61,7 +60,7 @@ local function GetRow(index)
 	row._label:SetPoint('TOPLEFT', Pixel.Scale(8), Pixel.Scale(-14))
 	row._label:SetTextColor(1, 1, 1)
 
-	row:SetScript('OnClick', BUI.Profiler.Script('SearchResults row OnClick', OnRowClick))
+	row:SetScript('OnClick', OnRowClick)
 
 	rows[index] = row
 	return row
@@ -138,7 +137,7 @@ local function ScrollIntoView(scroll, searchChild, target)
 	local start = scrollFrame:GetVerticalScroll()
 	local elapsedTime = 0
 	if not scrollAnim then scrollAnim = CreateFrame('Frame') end
-	scrollAnim:SetScript('OnUpdate', BUI.Profiler.Wrap('Utility.SearchResults scroll anim', function(self, deltaTime)
+	scrollAnim:SetScript('OnUpdate', function(self, deltaTime)
 		elapsedTime = elapsedTime + deltaTime
 		local progress = math.min(elapsedTime / 0.3, 1)
 		progress = 1 - (1 - progress) * (1 - progress)
@@ -149,7 +148,7 @@ local function ScrollIntoView(scroll, searchChild, target)
 			scroll:UpdateScroll()
 			self:SetScript('OnUpdate', nil)
 		end
-	end))
+	end)
 end
 
 local function HighlightSetting(pageFrame, result)
@@ -180,7 +179,7 @@ local function HighlightSetting(pageFrame, result)
 
 	local elapsed = 0
 	if not pulseAnim then pulseAnim = CreateFrame('Frame') end
-	pulseAnim:SetScript('OnUpdate', BUI.Profiler.Wrap('Utility.SearchResults pulse anim', function(self, deltaTime)
+	pulseAnim:SetScript('OnUpdate', function(self, deltaTime)
 		elapsed = elapsed + deltaTime
 		if elapsed < 4 then
 			bar:SetAlpha(0.4 + 0.2 * math.sin(elapsed * 8))
@@ -190,7 +189,7 @@ local function HighlightSetting(pageFrame, result)
 			ClearHighlight()
 			self:SetScript('OnUpdate', nil)
 		end
-	end))
+	end)
 
 	highlight = { bar = bar, target = target, origR = originalRed, origG = originalGreen, origB = originalBlue }
 end
@@ -205,7 +204,7 @@ function SearchResults.NavigateTo(result)
 
 	pageEngine.ShowPage(pageIndex)
 
-	After('Utility.SearchResults navigate', 0, function()
+	C_Timer.After(0, function()
 		local pageFrame = pageEngine.pages[result.page].frame
 		if not pageFrame then return end
 
@@ -222,7 +221,7 @@ function SearchResults.NavigateTo(result)
 				end
 			end
 		end
-		After('Utility.SearchResults highlight setting', 0.15, function()
+		C_Timer.After(0.15, function()
 			HighlightSetting(pageFrame, result)
 		end)
 	end)

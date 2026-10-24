@@ -83,7 +83,7 @@ local function Layer(host)
 	layer:SetClipsChildren(true)
 	layer:EnableMouse(false)
 	layer.pieces = {}
-	layer:SetScript('OnUpdate', BUI.Profiler.Timed('Utility.Confetti Layer layer OnUpdate', Step))
+	layer:SetScript('OnUpdate', Step)
 	layer:Hide()
 	host.confettiLayer = layer
 	return layer

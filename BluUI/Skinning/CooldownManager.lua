@@ -59,8 +59,8 @@ local function SkinGear(dropdown)
 	glyph:SetPoint('CENTER')
 	BUI.Painter.Tint(glyph, 'skinLabel')
 	dropdown._buiGear = glyph
-	dropdown:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.CooldownManager gear OnEnter', GearEnter))
-	dropdown:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.CooldownManager gear OnLeave', GearLeave))
+	dropdown:HookScript('OnEnter', GearEnter)
+	dropdown:HookScript('OnLeave', GearLeave)
 end
 
 local function SkinSideTabs(frame)

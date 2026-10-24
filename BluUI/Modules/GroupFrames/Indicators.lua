@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Wrap = BUI.Profiler.Wrap
-
 local GroupFrames    = BUI.GroupFrames
 local Util  = GroupFrames.Util
 local Pixel = BUI.Pixel
@@ -193,18 +191,18 @@ local function WirePlayerReadyCheck(frame, texture)
 			texture:Hide()
 		end
 	end
-	watcher:SetScript("OnEvent", Wrap("GroupFrames.Indicators ready check", function(_, event)
+	watcher:SetScript("OnEvent", function(_, event)
 		if hideTimer then hideTimer:Cancel(); hideTimer = nil end
 		if not Allowed() then return end
 		if event == "READY_CHECK_FINISHED" then
-			hideTimer = BUI.Profiler.NewTimer("GroupFrames.Indicators ready hide", 10, function()
+			hideTimer = C_Timer.NewTimer(10, function()
 				hideTimer = nil
 				if not texture._previewOn then texture:Hide() end
 			end)
 		else
 			ApplyReadyStatus()
 		end
-	end))
+	end)
 	watcher:RegisterEvent("READY_CHECK")
 	watcher:RegisterEvent("READY_CHECK_CONFIRM")
 	watcher:RegisterEvent("READY_CHECK_FINISHED")
@@ -348,15 +346,15 @@ local function UpdateSelection(frame)
 	selection:Show()
 end
 
-local SelectionEnter = Wrap('GroupFrames.Indicators frame OnEnter', function(self)
+local SelectionEnter = function(self)
 	self._isMouseover = true
 	UpdateSelection(self)
-end)
+end
 
-local SelectionLeave = Wrap('GroupFrames.Indicators frame OnLeave', function(self)
+local SelectionLeave = function(self)
 	self._isMouseover = false
 	UpdateSelection(self)
-end)
+end
 
 function GroupFrames.BuildSelection(frame)
 	local selection = CreateFrame("Frame", nil, frame)
@@ -387,14 +385,14 @@ function GroupFrames.HookSelection()
 	if selectionWatcher then return end
 	selectionWatcher = CreateFrame("Frame")
 	selectionWatcher:RegisterEvent("PLAYER_TARGET_CHANGED")
-	selectionWatcher:SetScript("OnEvent", Wrap("GroupFrames.Indicators target change", function()
+	selectionWatcher:SetScript("OnEvent", function()
 		for frame in pairs(targetedFrames) do previouslyTargeted[#previouslyTargeted + 1] = frame end
 		for index = #previouslyTargeted, 1, -1 do
 			UpdateSelection(previouslyTargeted[index])
 			previouslyTargeted[index] = nil
 		end
 		if TargetInGroup() then GroupFrames.EachChild(SelectIfTarget) end
-	end))
+	end)
 end
 
 BUI.oUF:RegisterInitCallback(function(frame)

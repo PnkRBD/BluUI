@@ -41,7 +41,7 @@ local function EnsureAcceptPulse(button)
 		fade:SetSmoothing('IN_OUT')
 	end
 	button._buiAcceptPulse = pulse
-	button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.StaticPopup button OnLeave', KeepAcceptEdges))
+	button:HookScript('OnLeave', KeepAcceptEdges)
 	return pulse
 end
 
@@ -93,7 +93,7 @@ local function ApplyShown()
 end
 
 local function InstallDialog(dialog)
-	dialog:HookScript('OnHide', BUI.Profiler.Wrap('Skin.StaticPopup glow stop', StopAcceptGlow))
+	dialog:HookScript('OnHide', StopAcceptGlow)
 end
 
 for dialogIndex = 1, DIALOG_COUNT do

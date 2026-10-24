@@ -56,7 +56,7 @@ local function CollectCustomIcons(viewerKey, outIcons)
                 if spellID and not deferredIconUpdate then
                     if (BUI.Tools.GetAuraStacks('player', spellID) or 0) > 0 then
                         deferredIconUpdate = true
-                        BUI.Profiler.After("CDM.Layout deferred icons", 0, function()
+                        C_Timer.After(0, function()
                             deferredIconUpdate = false
                             local list, count = Custom.GetIcons("buffs")
                             if not list then return end

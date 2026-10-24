@@ -146,7 +146,7 @@ local function ResolveEntry(spellID)
 	end
 end
 
-watcher:SetScript('OnEvent', BUI.Profiler.Wrap('CDM.ProcMenu proc event', function(_, event, spellID)
+watcher:SetScript('OnEvent', function(_, event, spellID)
 	if not spellID or IsSecret(spellID) then return end
 	if event == 'SPELL_ACTIVATION_OVERLAY_GLOW_HIDE' then
 		RemoveActive(spellID)
@@ -171,7 +171,7 @@ watcher:SetScript('OnEvent', BUI.Profiler.Wrap('CDM.ProcMenu proc event', functi
 	if entry.sound then
 		PlaySound(entry.sound, 'Master')
 	end
-end))
+end)
 
 local appearWatchEnabled = false
 local appearActive = {}
@@ -224,7 +224,7 @@ local function StartAppearGlow(key, icon, entry)
 		if untilThreshold <= 0 then
 			AppearGlowNow(icon, entry)
 		else
-			Tools.ReplaceTimer(appearTimers, icon, 'CDM.ProcMenu appear glow on', untilThreshold, function()
+			Tools.ReplaceTimer(appearTimers, icon, untilThreshold, function()
 				if IsAppearIconLive(key, icon) and icon:IsShown() then
 					AppearGlowNow(icon, entry)
 				end
@@ -233,7 +233,7 @@ local function StartAppearGlow(key, icon, entry)
 	elseif mode == 'above' then
 		AppearGlowNow(icon, entry)
 		if untilThreshold > 0 then
-			Tools.ReplaceTimer(appearTimers, icon, 'CDM.ProcMenu appear glow off', untilThreshold, function()
+			Tools.ReplaceTimer(appearTimers, icon, untilThreshold, function()
 				if IsAppearIconLive(key, icon) then
 					CDM.StopProcGlow(icon)
 				end
@@ -673,7 +673,7 @@ local function ScanAppearIcons()
 	end
 end
 
-local QueueAppearScan = BUI.Dispatcher.New(ScanAppearIcons, 'CDM.AppearScan')
+local QueueAppearScan = BUI.Dispatcher.New(ScanAppearIcons)
 
 local function WakeAppearScan()
 	if appearWatchEnabled then QueueAppearScan() end
@@ -686,9 +686,9 @@ HookBarViewer = function()
 end
 
 local auraWatcher = CreateFrame('Frame')
-auraWatcher:SetScript('OnEvent', BUI.Profiler.Wrap('CDM.ProcMenu aura watch', function()
+auraWatcher:SetScript('OnEvent', function()
 	if appearWatchEnabled then QueueAppearScan() end
-end))
+end)
 
 local trackHooked = false
 

@@ -210,10 +210,10 @@ local function CreateAuraElements(frame, unitType)
 	if unitType == 'targettarget' then targetTargetFrames[frame] = true end
 end
 
-local TargetTargetShown = BUI.Profiler.Wrap('UnitFrames.Auras targettarget show', function(shownFrame)
+local TargetTargetShown = function(shownFrame)
 	BindUnit(shownFrame, true)
 	EnsureEventlessTicker()
-end)
+end
 
 BUI.oUF:RegisterInitCallback(function(frame)
 	if targetTargetFrames[frame] then frame:HookScript('OnShow', TargetTargetShown) end
@@ -290,7 +290,7 @@ local function RefreshEventless(frame)
 end
 
 local eventlessTicker
-local PollEventlessUnits = BUI.Profiler.Wrap('UnitFrames.Auras eventless poll', function()
+local PollEventlessUnits = function()
 	local active = false
 	for _, entry in ipairs(auraFrames) do
 		if entry.unitType == 'targettarget' and entry.frame:IsVisible() then
@@ -302,7 +302,7 @@ local PollEventlessUnits = BUI.Profiler.Wrap('UnitFrames.Auras eventless poll', 
 		eventlessTicker:Cancel()
 		eventlessTicker = nil
 	end
-end)
+end
 function EnsureEventlessTicker()
 	if eventlessTicker then return end
 	for _, entry in ipairs(auraFrames) do

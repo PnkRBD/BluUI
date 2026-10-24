@@ -35,8 +35,6 @@ Data\DefaultProfile.lua
 Data\MinimapTiles.lua
 Data\Portals.lua
 Data\PetDebuffs.lua
-Utility\Profiler.lua
-Utility\LaunchTrace.lua
 Core\Core.lua
 Core\Startup.lua
 Core\Commands.lua
@@ -106,7 +104,6 @@ Modules\GroupFrames\Raid.lua
 Modules\GroupFrames\Preview.lua
 Modules\GroupFrames\AuraPreview.lua
 Modules\GroupFrames\Initialize.lua
-Modules\UnitFrames\Profiler.lua
 
 Modules\CastBar\Helpers.lua
 Modules\CastBar\Core.lua
@@ -165,7 +162,6 @@ Modules\CDM\BuffBarSkin.lua
 Modules\CDM\EditModeLock.lua
 Modules\CDM\Profiles.lua
 Modules\CDM\Initialize.lua
-Modules\CDM\Profiler.lua
 
 Modules\Celebrations\Celebrations.lua
 Modules\Auras\Auras.lua

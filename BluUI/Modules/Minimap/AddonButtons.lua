@@ -201,7 +201,7 @@ local function Relayout()
 	display.Layout(Sorted(false))
 end
 
-local QueueRelayout = BUI.Dispatcher.New(Relayout, 'Minimap.AddonButtons')
+local QueueRelayout = BUI.Dispatcher.New(Relayout)
 
 local function CaptureButton(button)
 	if captured[button] or ShouldIgnore(button) then return end

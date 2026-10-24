@@ -159,7 +159,7 @@ local function DrainHighlightRestyles()
 	end
 end
 
-BUI.Tools.OnAuraQueriesUnblocked(DrainHighlightRestyles, 'Group frame dispel highlight')
+BUI.Tools.OnAuraQueriesUnblocked(DrainHighlightRestyles)
 
 local excludeSource, excludeSet, excludeSignature
 
@@ -314,13 +314,12 @@ local function StepCycle()
 	cycleIndex = cycleIndex + 1
 	PreviewDispelOnAllParty(cycleIndex)
 end
-local StepCycleTimed = BUI.Profiler.Wrap("GroupFrames.Dispel preview cycle", StepCycle)
 
 function GroupFrames.StartDispelPartyPreview()
 	StopCycle()
 	cycleIndex = 0
 	StepCycle()
-	cycleTicker = C_Timer.NewTicker(DISPEL_INTERVAL, StepCycleTimed)
+	cycleTicker = C_Timer.NewTicker(DISPEL_INTERVAL, StepCycle)
 end
 
 function GroupFrames.StopDispelPreview() StopCycle() end

@@ -48,7 +48,7 @@ local function CreateSlot(parent)
     slot.cd:SetDrawEdge(false)
     slot.cd:SetDrawBling(false)
     slot.cd:SetHideCountdownNumbers(true)
-    slot.cd:SetScript('OnCooldownDone', BUI.Profiler.Wrap('Cursor.Cursor cooldown done', function() slot.cd:Hide() end))
+    slot.cd:SetScript('OnCooldownDone', function() slot.cd:Hide() end)
     slot.cd:Hide()
 
     return slot
@@ -130,13 +130,13 @@ local function ShowCastOnSlots()
     end
 end
 
-local FollowCursor = BUI.Profiler.Hot('Cursor.Cursor follow', function()
+local FollowCursor = function()
     local cursorX, cursorY = GetCursorPosition()
     if cursorX ~= lastX or cursorY ~= lastY then
         lastX, lastY = cursorX, cursorY
         cursorFrame:SetPoint('CENTER', UIParent, 'BOTTOMLEFT', cursorX / screenScale, cursorY / screenScale)
     end
-end)
+end
 
 local function SetClicking(down)
     clicking = down
@@ -149,7 +149,7 @@ end
 local function OnMouseDown() SetClicking(true) end
 local function OnMouseUp() SetClicking(false) end
 
-local QueueGCDUpdate = BUI.Dispatcher.New(UpdateGCDSlots, 'Cursor.GCD')
+local QueueGCDUpdate = BUI.Dispatcher.New(UpdateGCDSlots)
 
 local function ConfigureKindEvents()
     if enabled and HasSlotKind('gcd') then
@@ -208,8 +208,8 @@ local function Build()
         slots[name] = CreateSlot(cursorFrame)
     end
 
-    cursorFrame:SetScript('OnShow', BUI.Profiler.Wrap('Cursor.Cursor wire', WireCursor))
-    cursorFrame:SetScript('OnHide', BUI.Profiler.Wrap('Cursor.Cursor unwire', UnwireCursor))
+    cursorFrame:SetScript('OnShow', WireCursor)
+    cursorFrame:SetScript('OnHide', UnwireCursor)
 end
 
 local function ShowCursor()

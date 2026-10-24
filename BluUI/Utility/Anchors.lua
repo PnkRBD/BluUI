@@ -1,5 +1,4 @@
 local _, BUI = ...
-local Profiler = BUI.Profiler
 local Widget = BUI.BUILibClient.Widget
 BUI.C.ANCHOR_FRAMES = {
     { tag = "BUI_PlayerFrame", desc = "Player frame" },
@@ -133,10 +132,10 @@ FlushAnchors = BUI.Dispatcher.New(function()
         FlushAnchors()
         return
     end
-    for key, callback in pairs(anchorCallbacks) do
-        Profiler.Run(Profiler.Label('Anchor moved', key), callback)
+    for _, callback in pairs(anchorCallbacks) do
+        callback()
     end
-end, 'Anchors')
+end)
 
 function Anchor.OnAnchorSizeChanged()
     armedAt = GetTime()
@@ -178,14 +177,14 @@ local function ApplyMouseAnchor(frame, settings)
     frame._isAnchored = true
 
     follower:Show()
-    follower:SetScript("OnUpdate", Profiler.Wrap("Utility.Anchors mouse follow", function(self)
+    follower:SetScript("OnUpdate", function(self)
         local x, y = GetCursorPosition()
         if x == self._lastX and y == self._lastY then return end
         self._lastX, self._lastY = x, y
         local effectiveScale = UIParent:GetEffectiveScale()
 
         frame:SetPoint(framePoint, UIParent, "BOTTOMLEFT", x / effectiveScale + offsetX, y / effectiveScale + offsetY)
-    end))
+    end)
 end
 
 local MODE_POS_KEYS = {
@@ -246,7 +245,7 @@ local function PlaceIntent(frame)
     frame:SetPoint(intent.point, intent.relativeTo, intent.relativePoint, intent.placedX, intent.placedY)
 end
 
-local OnPlacedSizeChanged = Profiler.Wrap("Utility.Anchors placed resize", function(frame)
+local OnPlacedSizeChanged = function(frame)
     local intent = frame._pixelIntent
     if not intent or frame:GetNumPoints() ~= 1 then return end
     if InCombatLockdown() and frame:IsProtected() then return end
@@ -257,7 +256,7 @@ local OnPlacedSizeChanged = Profiler.Wrap("Utility.Anchors placed resize", funct
         return
     end
     PlaceIntent(frame)
-end)
+end
 
 function Anchor.PlaceOnPixels(frame, point, relativeTo, relativePoint, x, y)
     local intent = frame._pixelSlot

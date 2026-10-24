@@ -121,11 +121,11 @@ end
 local function HookButton(button)
 	if state.hooked[button] then return end
 	state.hooked[button] = true
-	button:HookScript('OnEnter', BUI.Profiler.Wrap('ActionBars.KeybindMode button OnEnter', function(self) SetHovered(self) end))
-	button:HookScript('OnLeave', BUI.Profiler.Wrap('ActionBars.KeybindMode button OnLeave', function(self)
+	button:HookScript('OnEnter', function(self) SetHovered(self) end)
+	button:HookScript('OnLeave', function(self)
 		if state.hovered == self then SetHovered(nil) end
-	end))
-	button:HookScript('OnMouseDown', BUI.Profiler.Wrap('ActionBars.KeybindMode button OnMouseDown', OnButtonMouseDown))
+	end)
+	button:HookScript('OnMouseDown', OnButtonMouseDown)
 end
 
 local function SetWheelCapture(enabled)
@@ -133,7 +133,7 @@ local function SetWheelCapture(enabled)
 		if not ButtonCommand(button) then return end
 		if enabled then
 			button:EnableMouseWheel(true)
-			button:SetScript('OnMouseWheel', BUI.Profiler.Script('ActionBars.KeybindMode button OnMouseWheel', OnButtonWheel))
+			button:SetScript('OnMouseWheel', OnButtonWheel)
 		else
 			button:SetScript('OnMouseWheel', nil)
 			button:EnableMouseWheel(false)
@@ -146,7 +146,7 @@ local function EnsureFrames()
 	capture = CreateFrame('Frame', 'BUI_KeybindCapture', UIParent)
 	capture:SetSize(1, 1)
 	capture:SetPoint('CENTER')
-	capture:SetScript('OnKeyDown', BUI.Profiler.Script('ActionBars.KeybindMode capture OnKeyDown', OnKeyDown))
+	capture:SetScript('OnKeyDown', OnKeyDown)
 	capture:Hide()
 
 	highlight = CreateFrame('Frame', nil, UIParent)

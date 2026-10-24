@@ -100,7 +100,7 @@ end
 local function ScheduleHide()
 	if not active then return end
 	CancelHide()
-	hideTimer = BUI.Profiler.NewTimer('Minimap.Drawer hide drawer', HIDE_DELAY, HideDrawer)
+	hideTimer = C_Timer.NewTimer(HIDE_DELAY, HideDrawer)
 end
 
 local function AnchorToTab(target)
@@ -113,8 +113,8 @@ local function StyleButton(button)
 	AddonButtons.Dress(button, bar, Pixel.Scale(BUTTON_SIZE), Pixel.Scale(ICON_SIZE), Pixel.Scale(ICON_BORDER_BOX), BUTTON_LEVEL)
 	if not button._buiDrawerHooked then
 		button._buiDrawerHooked = true
-		button:HookScript('OnEnter', BUI.Profiler.Wrap('Minimap.Drawer button OnEnter', CancelHide))
-		button:HookScript('OnLeave', BUI.Profiler.Wrap('Minimap.Drawer button OnLeave', ScheduleHide))
+		button:HookScript('OnEnter', CancelHide)
+		button:HookScript('OnLeave', ScheduleHide)
 	end
 end
 
@@ -175,17 +175,17 @@ local function Create()
 	tab:SetFrameStrata('MEDIUM')
 	tab:SetFrameLevel(111)
 
-	tab:SetScript('OnEnter', BUI.Profiler.Script('Minimap.Drawer tab OnEnter', ShowDrawer))
-	tab:SetScript('OnLeave', BUI.Profiler.Script('Minimap.Drawer tab OnLeave', ScheduleHide))
-	bar:SetScript('OnEnter', BUI.Profiler.Script('Minimap.Drawer bar OnEnter', CancelHide))
-	bar:SetScript('OnLeave', BUI.Profiler.Script('Minimap.Drawer bar OnLeave', ScheduleHide))
-	bgFrame:SetScript('OnEnter', BUI.Profiler.Script('Minimap.Drawer bgFrame OnEnter', CancelHide))
-	bgFrame:SetScript('OnLeave', BUI.Profiler.Script('Minimap.Drawer bgFrame OnLeave', ScheduleHide))
+	tab:SetScript('OnEnter', ShowDrawer)
+	tab:SetScript('OnLeave', ScheduleHide)
+	bar:SetScript('OnEnter', CancelHide)
+	bar:SetScript('OnLeave', ScheduleHide)
+	bgFrame:SetScript('OnEnter', CancelHide)
+	bgFrame:SetScript('OnLeave', ScheduleHide)
 
 	if _G.BugGrabber then
 		local dataObject = LibStub('LibDataBroker-1.1'):GetDataObjectByName('BugSack')
 		hasSessionError = dataObject and (tonumber(dataObject.text) or 0) > 0 or false
-		EventRegistry:RegisterCallback('BugGrabber.BugGrabbed', BUI.Profiler.Wrap('Minimap.Drawer error caught', OnErrorCaught), Drawer)
+		EventRegistry:RegisterCallback('BugGrabber.BugGrabbed', OnErrorCaught, Drawer)
 	end
 end
 

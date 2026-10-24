@@ -353,8 +353,8 @@ local function Sync()
     end
 end
 
-SyncWrapped = BUI.Profiler.Wrap('BuffTracking.KillCommandOverlay tick', Sync)
-QueueTick = BUI.Dispatcher.New(Sync, 'KCO.Tick')
+SyncWrapped = Sync
+QueueTick = BUI.Dispatcher.New(Sync)
 
 function KillCommandOverlay.Refresh()
     if not IsHunterLoaded() then return end
@@ -403,7 +403,7 @@ end
 
 BUI.Events:OnLogin('BuffTrackingKCO', KillCommandOverlay.Initialize, 'buffTracking')
 
-local QueueRefresh = BUI.Dispatcher.New(KillCommandOverlay.Refresh, 'KCO.Refresh')
+local QueueRefresh = BUI.Dispatcher.New(KillCommandOverlay.Refresh)
 
 local function DirtyAndRefresh()
     MarkCacheDirty()

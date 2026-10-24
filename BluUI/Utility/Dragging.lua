@@ -23,7 +23,7 @@ function Dragging.GetCenterOffset(frame)
     return Scale(frameX - parentX), Scale(frameY - parentY)
 end
 
-local OnDragUpdate = BUI.Profiler.Wrap("Utility.Dragging drag update", function(self)
+local OnDragUpdate = function(self)
     if not self.dragActive then return end
 
     if self.dragLockHorizontal and self._dragLockedX then
@@ -42,7 +42,7 @@ local OnDragUpdate = BUI.Profiler.Wrap("Utility.Dragging drag update", function(
         end
         self.dragOnDragging(offsetX, offsetY)
     end
-end)
+end
 
 local function OnDragStart(self)
     local locked = self.dragLocked
@@ -149,7 +149,7 @@ local function CreateHintUI(parent, options)
     label:SetText(options.hintText or HintText)
     hint.text = label
 
-    BUI.Profiler.After("Utility.Dragging hint size", 0, function()
+    C_Timer.After(0, function()
         if hint:IsShown() then hint:SnapSize(label:GetStringWidth() + 16, 20) end
     end)
     hint:SnapSize(120, 20)
@@ -190,10 +190,10 @@ function Dragging.MakeDraggable(frame, options)
 
     if options.showHint then frame.dragHint = CreateHintUI(frame, options) end
 
-    frame:SetScript("OnDragStart", BUI.Profiler.Script('Dragging frame OnDragStart', OnDragStart))
-    frame:SetScript("OnDragStop", BUI.Profiler.Script('Dragging frame OnDragStop', OnDragStop))
+    frame:SetScript("OnDragStart", OnDragStart)
+    frame:SetScript("OnDragStop", OnDragStop)
     if options.onRightClick then
-        frame:SetScript("OnMouseUp", BUI.Profiler.Script('Dragging frame OnMouseUp', OnMouseUp))
+        frame:SetScript("OnMouseUp", OnMouseUp)
     end
     UpdateDragVisuals(frame)
 
@@ -251,43 +251,43 @@ function Dragging.SaveCenterPosition(frame, config, honorCenter)
     return config.posX, config.posY
 end
 
-local CenterDragOnUpdate = BUI.Profiler.Wrap("Utility.Dragging center drag", function(frame)
+local CenterDragOnUpdate = function(frame)
     local _, centerY = frame:GetCenter()
     local _, uiCenterY = UIParent:GetCenter()
     if centerY and uiCenterY then
         frame:ClearAllPoints()
         frame:SetPoint("CENTER", UIParent, "CENTER", 0, BUI.Round(centerY - uiCenterY))
     end
-end)
+end
 
 function Dragging.EnableAnchorDrag(frame, options)
     frame:EnableMouse(true)
     frame:SetMovable(true)
     frame:RegisterForDrag("LeftButton")
 
-    frame:SetScript("OnDragStart", BUI.Profiler.Script('Dragging frame OnDragStart 2', function(self)
+    frame:SetScript("OnDragStart", function(self)
         self:StartMoving()
         self:SetUserPlaced(false)
         if options.isCentered and options.isCentered() then
             self._centerDrag = true
             self:SetScript("OnUpdate", CenterDragOnUpdate)
         end
-    end))
+    end)
 
-    frame:SetScript("OnDragStop", BUI.Profiler.Script('Dragging frame OnDragStop 2', function(self)
+    frame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
         if self._centerDrag then
             self:SetScript("OnUpdate", nil)
             self._centerDrag = nil
         end
         if options.onSave then options.onSave() end
-    end))
+    end)
 
-    frame:SetScript("OnMouseDown", BUI.Profiler.Script('Dragging frame OnMouseDown', function(_, button)
+    frame:SetScript("OnMouseDown", function(_, button)
         if button == "RightButton" and options.onRightClick then
             options.onRightClick()
         end
-    end))
+    end)
 end
 
 function Dragging.DisableAnchorDrag(frame)

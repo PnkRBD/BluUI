@@ -562,23 +562,23 @@ local function ApplySecureClicks(frame)
 end
 
 local function HookTooltip(frame)
-	frame:HookScript("OnEnter", BUI.Profiler.Wrap('GroupFrames.Style frame OnEnter', function(self)
+	frame:HookScript("OnEnter", function(self)
 		local settings = GroupFrames.SettingsForFrame(self)
 		if not settings.showUnitTooltips or not self.unit or not UnitExists(self.unit) then return end
 		if GetMouseFoci()[1] ~= self then return end
 		GameTooltip_SetDefaultAnchor(GameTooltip, self)
 		GameTooltip:SetUnit(self.unit)
-	end))
-	frame:HookScript("OnLeave", BUI.Profiler.Wrap('GroupFrames.Style frame OnLeave', function() GameTooltip:Hide() end))
+	end)
+	frame:HookScript("OnLeave", function() GameTooltip:Hide() end)
 end
 
-local ShowClicks = BUI.Profiler.Wrap("GroupFrames.Style show clicks", function(self)
+local ShowClicks = function(self)
 	if self._bluClicksMode == GroupFrames.GetDB().clickMode and self:GetFrameStrata() == "LOW" then return end
-	BUI.Profiler.After("GroupFrames.Style secure clicks", 0, function() ApplySecureClicks(self) end)
-end)
+	C_Timer.After(0, function() ApplySecureClicks(self) end)
+end
 
 local function GroupFrameStyle(frame, unit)
-	BUI.Profiler.After("GroupFrames.Style secure clicks", 0, function() ApplySecureClicks(frame) end)
+	C_Timer.After(0, function() ApplySecureClicks(frame) end)
 
 	HookTooltip(frame)
 
@@ -598,13 +598,13 @@ end
 
 GroupFrames.Style = GroupFrameStyle
 
-local UnitChanged = BUI.Profiler.Wrap("GroupFrames.Style unit change", function(frame, unit)
+local UnitChanged = function(frame, unit)
 	if unit then
 		SyncUnitClass(frame)
 		PostUpdateHealthColor(frame.Health, frame.unit)
 	end
 	GroupFrames.RebindAuraUnit(frame, unit)
-end)
+end
 
 local function OnAttributeChanged(frame, name, value)
 	if name ~= "unit" then return end
@@ -613,7 +613,7 @@ end
 
 BUI.oUF:RegisterInitCallback(function(frame)
 	if frame.style ~= GroupFrames.STYLE_NAME then return end
-	frame:HookScript("OnAttributeChanged", BUI.Profiler.Wrap('GroupFrames.Style frame OnAttributeChanged', OnAttributeChanged))
+	frame:HookScript("OnAttributeChanged", OnAttributeChanged)
 	frame:HookScript("OnShow", ShowClicks)
 	local settings = GroupFrames.SettingsForFrame(frame)
 	GroupFrames.ApplyGeometry(frame, settings)

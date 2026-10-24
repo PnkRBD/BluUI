@@ -61,7 +61,7 @@ end
 function CDM.CheckDisabled(done)
 	if not AnyViewerEnabled(BUI.GetDB()) or C_CVar.GetCVarBool(COOLDOWN_VIEWER_CVAR) then done() return end
 
-	BUI.Profiler.After('CDM.Checks disabled prompt', LAYOUT_SETTLE_SECONDS, function()
+	C_Timer.After(LAYOUT_SETTLE_SECONDS, function()
 		if C_CVar.GetCVarBool(COOLDOWN_VIEWER_CVAR) then done() return end
 		Modals.Confirm({
 			title       = 'Cooldown Manager Disabled',
@@ -105,7 +105,7 @@ local function PromptForUtility(done)
 				title       = 'Open Cooldown Manager',
 				desc        = 'Move the spells from the Utility section into Essential, where the Essential Viewer shows them.',
 				onClick     = function()
-					BUI.Profiler.After('CDM.Checks open settings', 0, function()
+					C_Timer.After(0, function()
 						CooldownViewerSettings:SetShown(true)
 					end)
 				end,
@@ -125,7 +125,7 @@ local function PromptForUtility(done)
 end
 
 local function OnViewerDataChanged()
-	BUI.Profiler.After('CDM.Checks viewer data', 0, function()
+	C_Timer.After(0, function()
 		local done = pendingUtilityDone
 		if not done or not ViewersReady() then return end
 		pendingUtilityDone = nil
@@ -140,5 +140,5 @@ function CDM.CheckUtilityPrompt(done)
 	if db.cdm.utility.enabled then done() return end
 	if ViewersReady() then PromptForUtility(done) return end
 	pendingUtilityDone = done
-	EventRegistry:RegisterCallback(DATA_CHANGED_CALLBACK, BUI.Profiler.Timed('CDM.Checks CheckUtilityPrompt callback ', OnViewerDataChanged), dataChangedOwner)
+	EventRegistry:RegisterCallback(DATA_CHANGED_CALLBACK, OnViewerDataChanged, dataChangedOwner)
 end

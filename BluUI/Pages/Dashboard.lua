@@ -551,7 +551,7 @@ local function SnapshotCurrentChar()
     }
 end
 
-local QueueSnapshot = BUI.Dispatcher.NewDelayed(SnapshotCurrentChar, SNAPSHOT_DELAY, 'Dashboard.Snapshot')
+local QueueSnapshot = BUI.Dispatcher.NewDelayed(SnapshotCurrentChar, SNAPSHOT_DELAY)
 for _, event in ipairs({ 'PLAYER_AVG_ITEM_LEVEL_UPDATE', 'WEEKLY_REWARDS_UPDATE', 'CHALLENGE_MODE_COMPLETED', 'CHALLENGE_MODE_MAPS_UPDATE' }) do
     BUI.Events:Register(event, 'Dashboard.Snapshot', QueueSnapshot)
 end
@@ -686,7 +686,7 @@ local FlushRefresh = BUI.Dispatcher.New(function()
         refresh()
     end
     Relayout()
-end, 'Dashboard.Refresh')
+end)
 
 local function Tint(region, red, green, blue)
     window:Paint(region, function(target) target:SetTextColor(red, green, blue) end)
@@ -827,13 +827,13 @@ local function BuildStats()
     window:Paint(weekly.icon, 'muted')
     weekly.sub:SetText('Runs completed')
     weekly:EnableMouse(true)
-    weekly:SetScript('OnEnter', BUI.Profiler.Timed('Pages.Dashboard BuildStats weekly OnEnter', function(self)
+    weekly:SetScript('OnEnter', function(self)
         local rows = WeeklyHistoryRows()
         rows[#rows + 1] = { space = true }
         rows[#rows + 1] = { left = 'This season', right = tostring(#C_MythicPlus.GetRunHistory(true, false, true)) }
         Tip(self, 'Weekly M+ runs', rows)
-    end))
-    weekly:SetScript('OnLeave', BUI.Profiler.Timed('Pages.Dashboard BuildStats weekly OnLeave', Widget.HideTip))
+    end)
+    weekly:SetScript('OnLeave', Widget.HideTip)
     local session = Stat('stat_session', 'SESSION')
     Widget.SetGlyph(session.icon, BUILib.GetLibMedia('clock'))
     window:Paint(session.icon, 'muted')
@@ -880,13 +880,13 @@ local function VaultArt(tile, atlas, shades)
     local left = info.leftTexCoord + (info.rightTexCoord - info.leftTexCoord) * VAULT_ART.trim
     local top = info.topTexCoord + (info.bottomTexCoord - info.topTexCoord) * VAULT_ART.trim
     local artWidth, artHeight = info.width * (1 - VAULT_ART.trim * 2), info.height * (1 - VAULT_ART.trim * 2)
-    tile:HookScript('OnSizeChanged', BUI.Profiler.Timed('Pages.Dashboard VaultArt tile OnSizeChanged', function(_, width, height)
+    tile:HookScript('OnSizeChanged', function(_, width, height)
         if width <= 0 or height <= 0 then return end
         local scale = math.max(width / artWidth, height / artHeight)
         local cropX = (1 - width / (artWidth * scale)) / 2 * spanX
         local cropY = (1 - height / (artHeight * scale)) / 2 * spanY
         art:SetTexCoord(left + cropX, left + spanX - cropX, top + cropY, top + spanY - cropY)
-    end))
+    end)
     local shade, shadeEdge = Widget.DrawCardShape(tile, INSET_RADIUS, WHITE, WHITE, 'BACKGROUND', -1, 1)
     shadeEdge:Hide()
     window:Paint(shade, function(texture)
@@ -1033,7 +1033,7 @@ local function BuildVault(onChange)
         end
         row.chip = VaultChip(row)
         row.chrome = { row.icon, row.label, row.chip }
-        row:SetScript('OnClick', BUI.Profiler.Timed('Pages.Dashboard BuildVault row OnClick', function(self)
+        row:SetScript('OnClick', function(self)
             if self.open then return end
             local closing
             for _, other in ipairs(rows) do
@@ -1043,9 +1043,9 @@ local function BuildVault(onChange)
             vault.Refresh()
             if closing then StartFold(self, closing) end
             onChange()
-        end))
-        row:SetScript('OnEnter', BUI.Profiler.Timed('Pages.Dashboard BuildVault row OnEnter', function(self) self.hover:SetShown(not self.open) end))
-        row:SetScript('OnLeave', BUI.Profiler.Timed('Pages.Dashboard BuildVault row OnLeave', function(self) self.hover:Hide() end))
+        end)
+        row:SetScript('OnEnter', function(self) self.hover:SetShown(not self.open) end)
+        row:SetScript('OnLeave', function(self) self.hover:Hide() end)
         rows[index] = row
     end
 
@@ -1223,8 +1223,8 @@ local function BuildRaid()
     local linkText = kit.Text(link, 'View bosses', 12, 'accent')
     linkText:SetPoint('RIGHT', chevron, 'LEFT', -LINK_GAP, 0)
     window:Bind(link, function() link:SetWidth(math.ceil(linkText:GetStringWidth()) + LINK_GAP + CHEVRON) end)
-    link:SetScript('OnEnter', BUI.Profiler.Timed('Pages.Dashboard BuildRaid link OnEnter', function(self) Tip(self, current.name, BossRows(current)) end))
-    link:SetScript('OnLeave', BUI.Profiler.Timed('Pages.Dashboard BuildRaid link OnLeave', Widget.HideTip))
+    link:SetScript('OnEnter', function(self) Tip(self, current.name, BossRows(current)) end)
+    link:SetScript('OnLeave', Widget.HideTip)
     local bossCount = 0
 
     function raid.Refresh()
@@ -1639,32 +1639,32 @@ local function BuildDashboard(pageFrame)
         CURRENCY_DISPLAY_UPDATE = { currencies.Refresh },
     }
     for event in pairs(handlers) do pageFrame:RegisterEvent(event) end
-    pageFrame:SetScript('OnEvent', BUI.Profiler.Wrap('Pages.Dashboard event', function(self, event)
+    pageFrame:SetScript('OnEvent', function(self, event)
         if not self:IsVisible() then return end
         for _, refresh in ipairs(handlers[event]) do pendingRefresh[refresh] = true end
         FlushRefresh()
-    end))
+    end)
 
     local sessionTicker
-    block:SetScript('OnShow', BUI.Profiler.Timed('Pages.Dashboard BuildDashboard block OnShow', function()
+    block:SetScript('OnShow', function()
         C_MythicPlus.RequestMapInfo()
         RequestRaidInfo()
         header.Refresh()
         for _, card in ipairs(cards) do card.Refresh() end
         Relayout()
-        sessionTicker = C_Timer.NewTicker(SESSION_TICK, BUI.Profiler.Timed('Pages.Dashboard BuildDashboard ticker', strip.RefreshSession))
+        sessionTicker = C_Timer.NewTicker(SESSION_TICK, strip.RefreshSession)
         SlideIn(panes[selected].cards)
-    end))
-    block:SetScript('OnHide', BUI.Profiler.Timed('Pages.Dashboard BuildDashboard block OnHide', function()
+    end)
+    block:SetScript('OnHide', function()
         if sessionTicker then
             sessionTicker:Cancel()
             sessionTicker = nil
         end
-    end))
+    end)
 
-    tab.frame:HookScript('OnSizeChanged', BUI.Profiler.Timed('Pages.Dashboard fit to window', function()
+    tab.frame:HookScript('OnSizeChanged', function()
         if block:IsVisible() then Relayout() end
-    end))
+    end)
 
     Relayout()
     Layout.Add(tab, block, -Layout.DEFAULT_PADDING)

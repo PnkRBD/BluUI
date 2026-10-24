@@ -165,9 +165,9 @@ local function BindRow(row, item, onSelect, palette, textX)
 	row:EnableMouse(true)
 	row.text:SetTextColor(unpack(item.color or palette.text))
 	row.sub:SetTextColor(unpack(palette.muted))
-	row:SetScript("OnEnter", BUILib.Timed('BUILib.ContextMenu BindRow row OnEnter', function() PaintRow(row, palette, true) end))
-	row:SetScript("OnLeave", BUILib.Timed('BUILib.ContextMenu BindRow row OnLeave', function() PaintRow(row, palette, false) end))
-	row:SetScript("OnClick", BUILib.Timed('BUILib.ContextMenu BindRow row OnClick', function()
+	row:SetScript("OnEnter", function() PaintRow(row, palette, true) end)
+	row:SetScript("OnLeave", function() PaintRow(row, palette, false) end)
+	row:SetScript("OnClick", function()
 		local build = menuBuilds
 		local keepOpen = false
 		if item.callback then keepOpen = item.callback(item) == true end
@@ -180,7 +180,7 @@ local function BindRow(row, item, onSelect, palette, textX)
 		ShowCheck(row, item, palette)
 		ShowSub(row, item)
 		PaintRow(row, palette, row:IsMouseOver())
-	end))
+	end)
 end
 
 local function MakeTitle(parent)
@@ -244,9 +244,9 @@ local function EnsureMenu()
 	scrollThumb:Hide()
 	scrollLogic = Widget.ScrollLogic(scrollFrame, scrollChild, scrollTrack, scrollThumb, { step = ROW_HEIGHT * 2, draggable = true })
 	menu:EnableMouseWheel(true)
-	menu:SetScript("OnMouseWheel", BUILib.Timed('BUILib.ContextMenu EnsureMenu menu OnMouseWheel', function(_, delta) scrollLogic.DoScroll(delta) end))
+	menu:SetScript("OnMouseWheel", function(_, delta) scrollLogic.DoScroll(delta) end)
 
-	menu:SetScript("OnShow", BUILib.Timed('BUILib.ContextMenu EnsureMenu menu OnShow', function(self) self:Raise() end))
+	menu:SetScript("OnShow", function(self) self:Raise() end)
 	sharedMenu = menu
 	return menu
 end
@@ -385,7 +385,7 @@ function Controls.ContextMenu(items, options)
 	local armed = not (IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton"))
 	local anchor = not options.atCursor and options.anchor
 	local anchorTop = anchor and anchor:GetTop()
-	checkFrame:SetScript("OnUpdate", BUILib.Timed('BUILib.ContextMenu ContextMenu checkFrame OnUpdate', function(self)
+	checkFrame:SetScript("OnUpdate", function(self)
 		if not menu:IsShown() then
 			self:SetScript("OnUpdate", nil)
 			return
@@ -404,16 +404,16 @@ function Controls.ContextMenu(items, options)
 			self:SetScript("OnUpdate", nil)
 			CloseActive()
 		end
-	end))
+	end)
 
 	menu._onClose = options.onClose
-	menu:SetScript("OnHide", BUILib.Timed('BUILib.ContextMenu ContextMenu menu OnHide', function(self)
+	menu:SetScript("OnHide", function(self)
 		checkFrame:SetScript("OnUpdate", nil)
 		if activeMenu == self then activeMenu = nil end
 		local onClose = self._onClose
 		self._onClose = nil
 		if onClose then onClose() end
-	end))
+	end)
 
 	activeMenu = menu
 	if not alreadyShown then ShowMenu(menu) end

@@ -1142,7 +1142,7 @@ function CDAnnouncer.PreviewSpell(spellID, duration)
     previewActive = true
     root:SetFrameStrata('FULLSCREEN_DIALOG')
     BUI.Scheduler.SetUpdateEnabled(MODULE_KEY, true)
-    Tools.ReplaceTimer(timers, 'preview', 'CDAnnouncer.CDAnnouncer preview end', duration + entry.glowDuration + 1, EndPreview, spellID)
+    Tools.ReplaceTimer(timers, 'preview', duration + entry.glowDuration + 1, EndPreview, spellID)
     Render()
 end
 
@@ -1268,7 +1268,7 @@ local function UpdateOpacity()
     root:SetAlpha(BUI.Visibility.GetContextualOpacity('CDAnnouncer') / 100)
 end
 
-local QueueItemScan = BUI.Dispatcher.New(ScanItemCooldowns, 'CDA.ItemScan')
+local QueueItemScan = BUI.Dispatcher.New(ScanItemCooldowns)
 
 local function HasEnabledItemEntry()
     for _, entry in ipairs(GetSpellList()) do

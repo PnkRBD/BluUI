@@ -59,7 +59,7 @@ end
 
 local function Fade(token, seconds, from, to, onDone)
 	local started = GetTime()
-	token.frame:SetScript('OnUpdate', BUILib.Timed('BUILib.Toast Fade frame OnUpdate', function(self)
+	token.frame:SetScript('OnUpdate', function(self)
 		local progress = math.min(1, (GetTime() - started) / seconds)
 		local eased = progress * (2 - progress)
 		self:SetAlpha(from + (to - from) * eased)
@@ -67,12 +67,12 @@ local function Fade(token, seconds, from, to, onDone)
 			self:SetScript('OnUpdate', nil)
 			onDone(token)
 		end
-	end))
+	end)
 end
 
 local function Sit(token)
 	local started = GetTime()
-	token.frame:SetScript('OnUpdate', BUILib.Timed('BUILib.Toast Sit frame OnUpdate', function(self)
+	token.frame:SetScript('OnUpdate', function(self)
 		local progress = (GetTime() - started) / token.duration
 		if progress >= 1 then
 			self:SetScript('OnUpdate', nil)
@@ -80,7 +80,7 @@ local function Sit(token)
 			return
 		end
 		token.line:SetWidth(math.max(1, (self:GetWidth() - PADDING_X * 2) * (1 - progress)))
-	end))
+	end)
 end
 
 local function Dismiss(token)
@@ -136,10 +136,10 @@ local function Build(token, text, subtext, color, onClick)
 	line:SetPoint('BOTTOMLEFT', PADDING_X, LINE_INSET)
 	line:SetHeight(LINE_HEIGHT)
 
-	frame:SetScript('OnClick', BUILib.Timed('BUILib.Toast Build frame OnClick', function()
+	frame:SetScript('OnClick', function()
 		if onClick then onClick() end
 		token:Dismiss()
-	end))
+	end)
 	token.frame, token.line = frame, line
 end
 

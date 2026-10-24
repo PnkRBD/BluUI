@@ -197,11 +197,11 @@ local function RefreshAlert(shouldFlash)
 	UIFrameFadeIn(frame, FADE_IN_SECONDS, 0, 1)
 
 	local holdSeconds = settings.flashSeconds
-	BUI.Profiler.After('BuffTracking.SmartMisdirect flash fade', holdSeconds, function()
+	C_Timer.After(holdSeconds, function()
 		if flashToken ~= token then return end
 		UIFrameFadeOut(frame, FADE_OUT_SECONDS, frame:GetAlpha(), 0)
 	end)
-	BUI.Profiler.After('BuffTracking.SmartMisdirect flash end', holdSeconds + FADE_OUT_SECONDS, function()
+	C_Timer.After(holdSeconds + FADE_OUT_SECONDS, function()
 		if flashToken ~= token then return end
 		UIFrameFadeRemoveFrame(frame)
 		flashShowing = false
@@ -246,9 +246,9 @@ local function ApplyTarget()
 	Announce(unit)
 end
 
-local DispatchApply = BUI.Dispatcher.New(ApplyTarget, 'SmartMisdirect.Apply')
-local DispatchApplySoon = BUI.Dispatcher.NewDelayed(ApplyTarget, 2, 'Misdirect apply soon')
-local DispatchApplyLate = BUI.Dispatcher.NewDelayed(ApplyTarget, 5, 'Misdirect apply late')
+local DispatchApply = BUI.Dispatcher.New(ApplyTarget)
+local DispatchApplySoon = BUI.Dispatcher.NewDelayed(ApplyTarget, 2)
+local DispatchApplyLate = BUI.Dispatcher.NewDelayed(ApplyTarget, 5)
 
 local function DispatchApplyStaggered()
 	DispatchApply()
@@ -287,7 +287,7 @@ local function SyncMacro()
 	if current ~= body then EditMacro(index, MACRO_NAME, icon, body) end
 end
 
-local DispatchSync = BUI.Dispatcher.New(SyncMacro, 'SmartMisdirect.SyncMacro')
+local DispatchSync = BUI.Dispatcher.New(SyncMacro)
 
 local function OnSpellsChanged()
 	DispatchSync()
@@ -359,10 +359,10 @@ function SmartMisdirect.Setup()
 	button:EnableMouse(false)
 	button:Show()
 
-	Menu.ModifyMenu('MENU_UNIT_PARTY', BUI.Profiler.Timed('BuffTracking.SmartMisdirect Setup menu MENU_UNIT_PARTY', AddMenuEntry))
-	Menu.ModifyMenu('MENU_UNIT_RAID_PLAYER', BUI.Profiler.Timed('BuffTracking.SmartMisdirect Setup menu MENU_UNIT_RAID_PLAYER', AddMenuEntry))
-	Menu.ModifyMenu('MENU_UNIT_FOCUS', BUI.Profiler.Timed('BuffTracking.SmartMisdirect Setup menu MENU_UNIT_FOCUS', AddMenuEntry))
-	Menu.ModifyMenu('MENU_UNIT_TARGET', BUI.Profiler.Timed('BuffTracking.SmartMisdirect Setup menu MENU_UNIT_TARGET', AddMenuEntry))
+	Menu.ModifyMenu('MENU_UNIT_PARTY', AddMenuEntry)
+	Menu.ModifyMenu('MENU_UNIT_RAID_PLAYER', AddMenuEntry)
+	Menu.ModifyMenu('MENU_UNIT_FOCUS', AddMenuEntry)
+	Menu.ModifyMenu('MENU_UNIT_TARGET', AddMenuEntry)
 
 	BUI.Events:Register('GROUP_ROSTER_UPDATE', 'SmartMisdirect', DispatchApply)
 	BUI.Events:Register('PLAYER_ROLES_ASSIGNED', 'SmartMisdirect', DispatchApply)

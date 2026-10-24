@@ -210,9 +210,9 @@ local function CreateSpecButton(panel, specIndex)
     button.icon:SetPoint('BOTTOMRIGHT', -edge, edge)
     button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     button.specIndex = specIndex
-    button:SetScript('OnEnter', BUI.Profiler.Script('Datatext.LootSpec spec OnEnter', SpecButtonEnter))
-    button:SetScript('OnLeave', BUI.Profiler.Script('Datatext.LootSpec spec OnLeave', SpecButtonLeave))
-    button:SetScript('OnClick', BUI.Profiler.Script('Datatext.LootSpec spec OnClick', SpecButtonClick))
+    button:SetScript('OnEnter', SpecButtonEnter)
+    button:SetScript('OnLeave', SpecButtonLeave)
+    button:SetScript('OnClick', SpecButtonClick)
     return button
 end
 
@@ -257,9 +257,9 @@ local function CreateRow(panel, rowIndex, label, open)
     row.value:SetPoint('RIGHT', row.chevron, 'LEFT', -Pixel.Scale(6), 0)
     Painter.Text(row.value, 'text')
     row.open = open
-    row:SetScript('OnEnter', BUI.Profiler.Script('Datatext.LootSpec row OnEnter', RowEnter))
-    row:SetScript('OnLeave', BUI.Profiler.Script('Datatext.LootSpec row OnLeave', RowLeave))
-    row:SetScript('OnClick', BUI.Profiler.Script('Datatext.LootSpec row OnClick', RowClick))
+    row:SetScript('OnEnter', RowEnter)
+    row:SetScript('OnLeave', RowLeave)
+    row:SetScript('OnClick', RowClick)
     return row
 end
 

@@ -18,13 +18,13 @@ function Widget.ToggleLabel(container, anchor, label, offset)
 end
 
 function Widget.AttachToggle(container, state, progressRef, render, snap, clickFrame, callback, tooltip, labelFontString, duration, easeFunction)
-	clickFrame:SetScript("OnClick", BUILib.Timed('BUILib.ToggleVariants AttachToggle clickFrame OnClick', function()
+	clickFrame:SetScript("OnClick", function()
 		if state.disabled then return end
 		state.enabled = not state.enabled
 		local startProgress = progressRef.progress
 		local targetProgress = state.enabled and 1 or 0
 		local startTime = GetTime()
-		container:SetScript("OnUpdate", BUILib.Timed('BUILib.ToggleVariants AttachToggle container OnUpdate', function(self)
+		container:SetScript("OnUpdate", function(self)
 			local elapsedFraction = (GetTime() - startTime) / duration
 			if elapsedFraction >= 1 then
 				progressRef.progress = targetProgress
@@ -33,9 +33,9 @@ function Widget.AttachToggle(container, state, progressRef, render, snap, clickF
 				progressRef.progress = startProgress + (targetProgress - startProgress) * easeFunction(elapsedFraction)
 			end
 			render()
-		end))
+		end)
 		if callback then callback(state.enabled) end
-	end))
+	end)
 	if tooltip then Widget.Tooltip(clickFrame, tooltip) end
 	snap()
 	Theme.RegisterAccentElement(container, function() render() end)
@@ -133,8 +133,8 @@ function Controls.StampCheckbox(parent, label, checked, callback, indentLevel, e
 		if labelFontString then labelFontString:SetTextColor(unpack(state.enabled and Theme.text.primary or Theme.text.muted)) end
 	end
 
-	track:SetScript("OnEnter", BUILib.Timed('BUILib.ToggleVariants StampCheckbox track OnEnter', function() hover = true; Render() end))
-	track:SetScript("OnLeave", BUILib.Timed('BUILib.ToggleVariants StampCheckbox track OnLeave', function() hover = false; Render() end))
+	track:SetScript("OnEnter", function() hover = true; Render() end)
+	track:SetScript("OnLeave", function() hover = false; Render() end)
 
 	local function Snap()
 		container:SetScript("OnUpdate", nil)
@@ -175,24 +175,24 @@ function Controls.IconToggle(parent, checked, callback, options)
 		end
 	end
 
-	button:SetScript("OnClick", BUILib.Timed('BUILib.ToggleVariants IconToggle button OnClick', function()
+	button:SetScript("OnClick", function()
 		if disabled then return end
 		state = not state
 		Render()
 		if callback then callback(state) end
-	end))
-	button:SetScript("OnEnter", BUILib.Timed('BUILib.ToggleVariants IconToggle button OnEnter', function(self)
+	end)
+	button:SetScript("OnEnter", function(self)
 		if disabled then
 			if options.disabledTooltip and Widget.ShowTip then Widget.ShowTip(self, options.disabledTooltip) end
 			return
 		end
 		if not state then icon:SetVertexColor(0.7, 0.7, 0.72, 1) end
 		if options.tooltip and Widget.ShowTip then Widget.ShowTip(self, options.tooltip) end
-	end))
-	button:SetScript("OnLeave", BUILib.Timed('BUILib.ToggleVariants IconToggle button OnLeave', function()
+	end)
+	button:SetScript("OnLeave", function()
 		Render()
 		if (options.tooltip or options.disabledTooltip) and Widget.HideTip then Widget.HideTip() end
-	end))
+	end)
 	Theme.RegisterAccentElement(button, function() Render() end)
 	Render()
 

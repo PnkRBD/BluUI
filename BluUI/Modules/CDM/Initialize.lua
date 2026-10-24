@@ -37,7 +37,7 @@ function CDM.Initialize()
     CDM.UpdateShowOnlyOnCDWatcher()
     CDM.UpdateHideWhenZeroWatcher()
     CDM.NotifyAnchoredFrames()
-    BUI.Profiler.After("CDM.Initialize settle", 0, function()
+    C_Timer.After(0, function()
         CDM.state.settling = nil
         CDM.MarkAllDirty()
     end)

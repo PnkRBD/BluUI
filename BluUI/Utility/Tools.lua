@@ -386,27 +386,24 @@ local WAKE_EDGES = {
     'ZONE_CHANGED_NEW_AREA', 'CVAR_UPDATE',
 }
 
-local Profiler = BUI.Profiler
 local wakeSubscribers = {}
-local wakeLabels = {}
 local wakeCursor = 0
 local wakeDriver = CreateFrame('Frame')
 wakeDriver:Hide()
 
-function Tools.OnAuraQueriesUnblocked(callback, label)
+function Tools.OnAuraQueriesUnblocked(callback)
     wakeSubscribers[#wakeSubscribers + 1] = callback
-    wakeLabels[#wakeLabels + 1] = label
 end
 
-wakeDriver:SetScript('OnUpdate', BUI.Profiler.Timed('Utility.Tools wakeDriver OnUpdate', function(self)
+wakeDriver:SetScript('OnUpdate', function(self)
     wakeCursor = wakeCursor + 1
     local callback = wakeSubscribers[wakeCursor]
     if not callback or Tools.ShouldAurasBeSecret() or Tools.AuraQueriesBlocked() then
         self:Hide()
         return
     end
-    Profiler.Run(Profiler.Label('Aura wake', wakeLabels[wakeCursor]), xpcall, callback, geterrorhandler())
-end))
+    xpcall(callback, geterrorhandler())
+end)
 
 local function RunWakeNow()
     if Tools.ShouldAurasBeSecret() or Tools.AuraQueriesBlocked() then return end
@@ -497,10 +494,10 @@ function Tools.DeepCopy(original)
     return CopyTable(original)
 end
 
-function Tools.ReplaceTimer(holder, key, label, delay, callback, arg)
+function Tools.ReplaceTimer(holder, key, delay, callback, arg)
     local timer = holder[key]
     if timer then timer:Cancel() end
-    holder[key] = BUI.Profiler.NewTimer(label, delay, function()
+    holder[key] = C_Timer.NewTimer(delay, function()
         holder[key] = nil
         callback(arg)
     end)

@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('CDM.Overlay')
-
 local CreateFrame = CreateFrame
 local UIParent = UIParent
 
@@ -43,13 +41,13 @@ function CDM.SetupBlizzardOverlay()
     buttonText:SetText("Dismiss")
     Painter.Text(buttonText, 'skinText')
 
-    dismissButton:SetScript("OnEnter", BUI.Profiler.Script('CDM.Overlay dismissButton OnEnter', function(self) self:SetBackdropBorderColor(unpack(Skin.HoverColor())) end))
-    dismissButton:SetScript("OnLeave", BUI.Profiler.Script('CDM.Overlay dismissButton OnLeave', Skin.PaintPanelBackdrop))
+    dismissButton:SetScript("OnEnter", function(self) self:SetBackdropBorderColor(unpack(Skin.HoverColor())) end)
+    dismissButton:SetScript("OnLeave", Skin.PaintPanelBackdrop)
     local dismissed = false
-    dismissButton:SetScript("OnClick", BUI.Profiler.Script('CDM.Overlay dismissButton OnClick', function()
+    dismissButton:SetScript("OnClick", function()
         dismissed = true
         overlay:Hide()
-    end))
+    end)
 
     local function Refresh()
         local cdm = BUI.GetDB().cdm
@@ -59,12 +57,12 @@ function CDM.SetupBlizzardOverlay()
             and CooldownViewerSettings.displayMode == "spells")
     end
 
-    Hook(CooldownViewerSettings, "SetDisplayMode", Refresh)
-    CooldownViewerSettings:HookScript("OnShow", BUI.Profiler.Wrap("CDM.Overlay settings show", Refresh))
-    CooldownViewerSettings:HookScript("OnHide", BUI.Profiler.Wrap("CDM.Overlay settings hide", function()
+    hooksecurefunc(CooldownViewerSettings, "SetDisplayMode", Refresh)
+    CooldownViewerSettings:HookScript("OnShow", Refresh)
+    CooldownViewerSettings:HookScript("OnHide", function()
         overlay:Hide()
         dismissed = false
-    end))
+    end)
 
     if CooldownViewerSettings:IsShown() then Refresh() end
 end

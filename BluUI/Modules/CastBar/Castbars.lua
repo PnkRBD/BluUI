@@ -193,7 +193,7 @@ local function PaintEmpoweredStage(castbar)
 	if stage < castbar._numStages then
 		local startTime = castbar._empowerStart
 		local nextStageAt = startTime + castbar._pipFractions[stage] * (castbar._empowerEnd - startTime)
-		castbar._stageTimer = BUI.Profiler.NewTimer('CastBar.Castbars empower stage', nextStageAt - now, function() PaintEmpoweredStage(castbar) end)
+		castbar._stageTimer = C_Timer.NewTimer(nextStageAt - now, function() PaintEmpoweredStage(castbar) end)
 	end
 end
 
@@ -281,7 +281,7 @@ function CastBar.CreateCastbar(frame, barType)
 	castbar.PostCastInterruptible = PostCastInterruptible
 	castbar.UpdatePips = UpdatePips
 
-	castbar:HookScript('OnHide', BUI.Profiler.Wrap('CastBar.Castbars castbar hide', function(self)
+	castbar:HookScript('OnHide', function(self)
 		CancelStageColors(self)
 		self._pipFractions = nil
 		self._lastStage = nil
@@ -290,7 +290,7 @@ function CastBar.CreateCastbar(frame, barType)
 		CastBar.HideChannelTicks(self)
 		if self._suppressAutoPreview then return end
 		container:Hide()
-	end))
+	end)
 
 	local function SaveDragPosition(x, y)
 		local settings = CastBar.GetSettings(barType)

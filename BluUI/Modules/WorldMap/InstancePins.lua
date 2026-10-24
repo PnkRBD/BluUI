@@ -11,7 +11,7 @@ local MIN_FONT_SIZE, MAX_FONT_SIZE = 6, 32
 local pins = {}
 local seen = {}
 
-local PinEnter = BUI.Profiler.Script('WorldMap.InstancePins pin OnEnter', function(self)
+local PinEnter = function(self)
     self.icon:SetVertexColor(1, 0.82, 0)
     GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
     GameTooltip:SetText(self._name, 1, 1, 1)
@@ -23,12 +23,12 @@ local PinEnter = BUI.Profiler.Script('WorldMap.InstancePins pin OnEnter', functi
     GameTooltip:AddLine(self._zoneName, 0.7, 0.7, 0.7)
     GameTooltip:AddLine('Click to view zone', 0.5, 0.5, 0.5)
     GameTooltip:Show()
-end)
+end
 
-local PinLeave = BUI.Profiler.Script('WorldMap.InstancePins pin OnLeave', function(self)
+local PinLeave = function(self)
     self.icon:SetVertexColor(1, 1, 1)
     GameTooltip:Hide()
-end)
+end
 
 local function CreatePin(shelf)
     local pin = CreateFrame('Button', nil, shelf)

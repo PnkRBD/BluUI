@@ -31,7 +31,7 @@ end
 IconEngine.SetColor = SetColor
 
 local function ScheduleExpiry(cooldown, remaining, callback)
-	BUI.Tools.ReplaceTimer(cooldown, '_expiryTimer', 'Utility.IconEngine cooldown expiry', remaining + 0.1, callback)
+	BUI.Tools.ReplaceTimer(cooldown, '_expiryTimer', remaining + 0.1, callback)
 end
 
 local function ScheduleSpellExpiry(cooldown, cooldownInfo, callback)

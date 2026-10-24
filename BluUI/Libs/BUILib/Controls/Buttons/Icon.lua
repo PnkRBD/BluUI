@@ -150,25 +150,25 @@ function Controls.Icon(parent, config)
 	end
 	ApplyIdleColor()
 
-	button:SetScript("OnEnter", BUILib.Timed('BUILib.Icon Icon button OnEnter', function(self)
+	button:SetScript("OnEnter", function(self)
 		ApplyHoverColor()
 		if config.tooltip and Widget.ShowTip then Widget.ShowTip(self, config.tooltip) end
-	end))
-	button:SetScript("OnLeave", BUILib.Timed('BUILib.Icon Icon button OnLeave', function()
+	end)
+	button:SetScript("OnLeave", function()
 		ApplyIdleColor()
 		if config.tooltip and Widget.HideTip then Widget.HideTip() end
-	end))
+	end)
 
 	local onClick = config.onClick
 	if config.options then
 		onClick = function(clickedButton) BuildOptionsPopover(clickedButton, config) end
 	end
-	if onClick then button:SetScript("OnClick", BUILib.Timed('BUILib.Icon Icon button OnClick', function() onClick(button) end)) end
+	if onClick then button:SetScript("OnClick", function() onClick(button) end) end
 
 	if config.fadeHost then Widget.HoverFade(button, config.fadeHost) end
 
 	button.icon = icon
-	function button:SetCallback(callback) button:SetScript("OnClick", BUILib.Timed('BUILib.Icon SetCallback button OnClick', function() if callback then callback(button) end end)) end
+	function button:SetCallback(callback) button:SetScript("OnClick", function() if callback then callback(button) end end) end
 	function button:SetIcon(nameOrPath)
 		if type(nameOrPath) == "string" and nameOrPath:find("\\") then
 			Widget.SetGlyph(icon, nameOrPath)

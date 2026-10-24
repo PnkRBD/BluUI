@@ -1,8 +1,6 @@
 local _, BUI = ...
 
 local ipairs = ipairs
-local SecureHook = BUI.Profiler.Hooker('Skin.Professions')
-local Wrap = BUI.Profiler.Wrap
 
 local BUILib = BluUI.BUILibClient
 local Skin = BUI.Skinning
@@ -705,9 +703,9 @@ end
 local function InstallCraftingHooks(frame)
 	InstallTemplates()
 	Hook(ProfessionsCraftingOutputLogElementMixin, 'Init', OnOutputEntry)
-	frame:HookScript('OnShow', Wrap('Skin.Professions hide until sized', context.Guard(HideUntilSized)))
-	SecureHook(frame, 'SetTab', RevealOnceSized)
-	SecureHook(frame, 'ApplyDesiredWidth', RevealOnceSized)
+	frame:HookScript('OnShow', context.Guard(HideUntilSized))
+	hooksecurefunc(frame, 'SetTab', RevealOnceSized)
+	hooksecurefunc(frame, 'ApplyDesiredWidth', RevealOnceSized)
 end
 
 context.Window('ProfessionsFrame', { skin = SkinProfessionsFrame, install = InstallCraftingHooks })

@@ -7,7 +7,6 @@ local unpack = unpack
 local Skin = BUI.Skinning
 local SELECTED = Skin.SELECTED_COLOR
 local BUILib = BluUI.BUILibClient
-local Wrap = BUI.Profiler.Wrap
 
 local BORDER_ART = { 'Bg', 'TopTileStreaks', 'InsetBorderTop', 'Underlay' }
 local DETAILS_ART = { 'Bg', 'SealMaterialBG' }
@@ -211,7 +210,7 @@ local function SkinOverlayFrames(map)
 	end
 end
 
-local SyncSearchRoom = Wrap('Skin.WorldMap search room', function()
+local SyncSearchRoom = function()
 	if not navCorner then return end
 	local room = rareScannerSearch.EditBox:IsShown() and SEARCH_ROOM or 0
 	if room == searchRoom then return end
@@ -219,7 +218,7 @@ local SyncSearchRoom = Wrap('Skin.WorldMap search room', function()
 	local navBar = WorldMapFrame.NavBar
 	navBar:SetPoint('BOTTOMRIGHT', navCorner[1], navCorner[2], navCorner[3] - room, navCorner[4])
 	NavBar_CheckLength(navBar)
-end)
+end
 
 local function FindRareScannerSearch(map)
 	local mixin = _G.RSSearchMixin
@@ -282,13 +281,13 @@ local function RefreshSideTabs()
 	Skin.LayoutSideTabs(questLog, sideTabs, SIDE_TAB_TOP_OFFSET)
 end
 
-local SyncRowHighlight = Wrap('Skin.WorldMap quest row highlight', function(texture)
+local SyncRowHighlight = function(texture)
 	local row = texture:GetParent()
 	local lit = texture:IsShown()
 	if row._buiLit == lit then return end
 	row._buiLit = lit
 	Skin.TipShellEdges(row, lit and Skin.HoverColor())
-end)
+end
 
 local function SkinTrackBox(checkbox)
 	local check = checkbox.CheckMark

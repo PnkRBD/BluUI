@@ -76,8 +76,8 @@ local function ControlButton()
 	button.hover:SetAllPoints()
 	button.hover:SetColorTexture(hoverColor[1], hoverColor[2], hoverColor[3], hoverColor[4])
 	button.hover:Hide()
-	button:SetScript('OnEnter', BUI.Profiler.Timed('Minimap.Menu ControlButton button OnEnter', ShowHover))
-	button:SetScript('OnLeave', BUI.Profiler.Timed('Minimap.Menu ControlButton button OnLeave', HideHover))
+	button:SetScript('OnEnter', ShowHover)
+	button:SetScript('OnLeave', HideHover)
 	return button
 end
 
@@ -160,7 +160,7 @@ local function CreateDropdown(row)
 	button.arrow:SetTexture(LibMedia('dropdown'))
 	button.arrow:SetSize(Pixel.Scale(ARROW_SIZE), Pixel.Scale(ARROW_SIZE))
 	button.arrow:SetPoint('RIGHT', -Pixel.Scale(DROPDOWN_TEXT_X), 0)
-	button:SetScript('OnClick', BUI.Profiler.Script('Minimap.Menu dropdown OnClick', function(self) OpenList(row, self) end))
+	button:SetScript('OnClick', function(self) OpenList(row, self) end)
 	return button
 end
 
@@ -227,10 +227,10 @@ local function CreateToolRow(action)
 	button.dot:SetSize(Pixel.Scale(DOT_SIZE), Pixel.Scale(DOT_SIZE))
 	button.dot:SetPoint('TOPRIGHT', -Pixel.Scale(DOT_INSET), -Pixel.Scale(DOT_INSET))
 	button.dot:Hide()
-	button:SetScript('OnClick', BUI.Profiler.Script('Minimap.Menu tool OnClick', function(self)
+	button:SetScript('OnClick', function(self)
 		menu:Hide()
 		self.action.onClick()
-	end))
+	end)
 	return button
 end
 
@@ -295,17 +295,17 @@ local function BuildMenu()
 			menu:Hide()
 		end
 	end
-	menu:SetScript('OnShow', BUI.Profiler.Wrap('Minimap.Menu menu shown', function()
+	menu:SetScript('OnShow', function()
 		pressedOutside = false
 		BUI.Events:Register('GLOBAL_MOUSE_DOWN', 'Minimap.Menu', OnGlobalMouse)
 		BUI.Events:Register('GLOBAL_MOUSE_UP',   'Minimap.Menu', OnGlobalMouse)
 		BUI.Events:Register('MINIMAP_UPDATE_TRACKING', 'Minimap.Menu', function()
 			if menu:IsShown() then RefreshSelection() end
 		end)
-	end))
-	menu:SetScript('OnHide', BUI.Profiler.Wrap('Minimap.Menu menu hidden', function()
+	end)
+	menu:SetScript('OnHide', function()
 		BUI.Events:UnregisterAll('Minimap.Menu')
-	end))
+	end)
 
 	menu.title = menu:CreateFontString(nil, 'OVERLAY')
 	menu.title:SetPoint('TOPLEFT', Pixel.Scale(PAD), Pixel.Scale(-PAD))
@@ -390,7 +390,7 @@ function Menu.Setup()
 	BuildMenu()
 	local minimap = _G.Minimap
 	local originalOnMouseUp = minimap:GetScript('OnMouseUp')
-	minimap:SetScript('OnMouseUp', BUI.Profiler.Script('Minimap.Menu minimap OnMouseUp', function(self, button, ...)
+	minimap:SetScript('OnMouseUp', function(self, button, ...)
 		if button == 'RightButton' then
 			Menu.Show()
 		elseif button == 'MiddleButton' then
@@ -398,5 +398,5 @@ function Menu.Setup()
 		elseif originalOnMouseUp then
 			originalOnMouseUp(self, button, ...)
 		end
-	end))
+	end)
 end

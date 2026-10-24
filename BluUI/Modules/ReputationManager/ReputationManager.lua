@@ -105,9 +105,9 @@ local function BuildJourneyPanel()
 
     journeyPanel.lines = {}
 
-    journeyPanel:HookScript('OnHide', BUI.Profiler.Wrap('ReputationManager.ReputationManager journey hidden', function()
+    journeyPanel:HookScript('OnHide', function()
         BUI.Events:Unregister('GLOBAL_MOUSE_DOWN', 'RepManager.Journey')
-    end))
+    end)
 end
 
 local function GetJourneyLine(index)
@@ -327,7 +327,7 @@ local function AddParagonTooltipLines(factionID, name)
     if hasReward then GameTooltip:AddLine('Reward ready to collect', 0.2, 1, 0.2) end
 end
 
-local RowEnter = BUI.Profiler.Script('ReputationManager.ReputationManager row OnEnter', function(self)
+local RowEnter = function(self)
     GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
     GameTooltip:SetText(self._name, 1, 1, 1)
     GameTooltip:AddLine(self._standingLabel, 0.7, 0.7, 0.7, true)
@@ -342,9 +342,7 @@ local RowEnter = BUI.Profiler.Script('ReputationManager.ReputationManager row On
     GameTooltip:AddLine(' ')
     GameTooltip:AddLine('|cff888888Right-click for options|r', 0.7, 0.7, 0.7)
     GameTooltip:Show()
-end)
-
-local RowClick = BUI.Profiler.Script('ReputationManager.ReputationManager row OnClick', ShowRowMenu)
+end
 
 local function CreateRow(parent)
     local row = CreateFrame('Button', nil, parent)
@@ -352,7 +350,7 @@ local function CreateRow(parent)
     row:RegisterForClicks('RightButtonUp')
     row:SetScript('OnEnter', RowEnter)
     row:SetScript('OnLeave', GameTooltip_Hide)
-    row:SetScript('OnClick', RowClick)
+    row:SetScript('OnClick', ShowRowMenu)
     Skin.CardRow(row)
 
     local watched = row:CreateFontString(nil, 'OVERLAY')
@@ -533,7 +531,7 @@ RefreshContent = function()
     panel.emptyText:SetText(searchText ~= '' and 'No matching factions.' or 'No factions tracked.')
 end
 
-local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3, 'Reputation refresh')
+local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3)
 
 local function OnRepEvent()
     ThrottledRefresh()
@@ -567,5 +565,5 @@ function BUI.ReputationManager.IsOpen()
     return slide.IsOpen()
 end
 
-CharacterFrame:HookScript('OnHide', BUI.Profiler.Wrap('ReputationManager.ReputationManager character hide', function() slide.Close(true) end))
+CharacterFrame:HookScript('OnHide', function() slide.Close(true) end)
 context.OnDisable(function() slide.Close(true) end)

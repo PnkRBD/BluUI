@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('ActionBars.ExtraBar')
-
 local ActionBars = BUI.ActionBars
 local Pixel = BUI.Pixel
 
@@ -188,13 +186,13 @@ end
 local function InstallHooks()
 	local container = Container()
 	container:SetScript('OnShow', nil)
-	Hook(container, 'ApplySystemAnchor', OnBlizzardAnchor)
-	Hook(container, 'Layout', OnBlizzardLayout)
-	Hook(container, 'AddFrame', OnFrameAdded)
-	Hook(container, 'RemoveFrame', OnBlizzardLayout)
-	container:HookScript('OnHide', BUI.Profiler.Wrap('ActionBars.ExtraBar container hide', OnBlizzardLayout))
-	Hook(_G.ExtraActionButton1, 'UpdateHotkeys', OnHotkeysUpdated)
-	Hook(_G.ZoneAbilityFrame, 'UpdateDisplayedZoneAbilities', OnZoneAbilitiesUpdated)
+	hooksecurefunc(container, 'ApplySystemAnchor', OnBlizzardAnchor)
+	hooksecurefunc(container, 'Layout', OnBlizzardLayout)
+	hooksecurefunc(container, 'AddFrame', OnFrameAdded)
+	hooksecurefunc(container, 'RemoveFrame', OnBlizzardLayout)
+	container:HookScript('OnHide', OnBlizzardLayout)
+	hooksecurefunc(_G.ExtraActionButton1, 'UpdateHotkeys', OnHotkeysUpdated)
+	hooksecurefunc(_G.ZoneAbilityFrame, 'UpdateDisplayedZoneAbilities', OnZoneAbilitiesUpdated)
 	BUI.Events:Register('UPDATE_EXTRA_ACTIONBAR', EVENT_KEY .. '.Art', RefreshArt)
 	BUI.Events:Register('ZONE_CHANGED_NEW_AREA', EVENT_KEY .. '.Art', RefreshArt)
 end
@@ -207,8 +205,8 @@ extraBar = ActionBars.NewBlizzardBar({
 	release = Release,
 	installHooks = InstallHooks,
 })
-QueueRetake = BUI.Dispatcher.New(function() Retake(extraBar) end, EVENT_KEY .. '.Retake')
-QueueMeasure = BUI.Dispatcher.New(function() Measure(extraBar) end, EVENT_KEY .. '.Measure')
+QueueRetake = BUI.Dispatcher.New(function() Retake(extraBar) end)
+QueueMeasure = BUI.Dispatcher.New(function() Measure(extraBar) end)
 
 function ActionBars.RefreshExtraBar()
 	if not Container() then return end

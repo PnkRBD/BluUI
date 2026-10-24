@@ -103,11 +103,11 @@ local function Surface(frame, fillColor, edgeColor)
 end
 
 local function CloseOnEscape(overlay, onEscape)
-	overlay:SetScript("OnKeyDown", BUILib.Timed('BUILib.Modals CloseOnEscape overlay OnKeyDown', function(self, key)
+	overlay:SetScript("OnKeyDown", function(self, key)
 		local escape = key == "ESCAPE"
 		if not InCombatLockdown() then self:SetPropagateKeyboardInput(not escape) end
 		if escape then onEscape() end
-	end))
+	end)
 end
 
 function Modals.CreateBase(width, height, bounded, parent)
@@ -206,8 +206,8 @@ function Modals.CreateButton(dialog, text, color, width)
 		end
 	end
 
-	button:SetScript("OnEnter", BUILib.Timed('BUILib.Modals CreateButton button OnEnter', function() hover:Show() end))
-	button:SetScript("OnLeave", BUILib.Timed('BUILib.Modals CreateButton button OnLeave', function() hover:Hide() end))
+	button:SetScript("OnEnter", function() hover:Show() end)
+	button:SetScript("OnLeave", function() hover:Hide() end)
 	return button
 end
 
@@ -296,9 +296,9 @@ function Modals.LayoutButtons(dialog, buttons, closeFunc, bottomMargin)
 		anchor = button
 
 		if buttonOptions.onClick then
-			button:SetScript("OnClick", BUILib.Timed('BUILib.Modals LayoutButtons button OnClick', function() buttonOptions.onClick(closeFunc) end))
+			button:SetScript("OnClick", function() buttonOptions.onClick(closeFunc) end)
 		else
-			button:SetScript("OnClick", BUILib.Timed('BUILib.Modals LayoutButtons button OnClick', closeFunc))
+			button:SetScript("OnClick", closeFunc)
 		end
 	end
 
@@ -365,13 +365,13 @@ function Modals.Input(options)
 
 	CloseOnEscape(overlay, function() Close(); fireOnce(options.onCancel) end)
 
-	input:SetScript("OnEnterPressed", BUILib.Timed('BUILib.Modals Input input OnEnterPressed', function()
+	input:SetScript("OnEnterPressed", function()
 		local text = input:GetText()
 		Close(); fireOnce(options.onConfirm, text)
-	end))
-	input:SetScript("OnEscapePressed", BUILib.Timed('BUILib.Modals Input input OnEscapePressed', function()
+	end)
+	input:SetScript("OnEscapePressed", function()
 		Close(); fireOnce(options.onCancel)
-	end))
+	end)
 
 	Modals.LayoutButtons(dialog, {
 		{text = options.confirmText or "OK", color = Modals.BTN_CONFIRM, width = options.buttonWidth,
@@ -395,14 +395,14 @@ function Modals.Copy(options)
 	local messageText = Modals.CreateMessage(dialog, options.message)
 	local input = Modals.CreateInput(dialog, options.text, dialog:GetWidth() - SIZES.padding * 2)
 	input:SetPoint("TOPLEFT", messageText, "BOTTOMLEFT", 0, OFFSETS.inputY)
-	input:SetScript("OnTextChanged", BUILib.Timed('BUILib.Modals Copy input OnTextChanged', function(self, userInput)
+	input:SetScript("OnTextChanged", function(self, userInput)
 		if userInput then
 			self:SetText(options.text)
 			self:HighlightText()
 		end
-	end))
-	input:SetScript("OnEnterPressed", BUILib.Timed('BUILib.Modals Copy input OnEnterPressed', function() Close() end))
-	input:SetScript("OnEscapePressed", BUILib.Timed('BUILib.Modals Copy input OnEscapePressed', function() Close() end))
+	end)
+	input:SetScript("OnEnterPressed", function() Close() end)
+	input:SetScript("OnEscapePressed", function() Close() end)
 
 	CloseOnEscape(overlay, Close)
 
@@ -494,12 +494,12 @@ local function MakeCard(parent, offsetX, cardOptions, accentRed, accentGreen, ac
 	description:SetJustifyH("CENTER")
 	description:SetSpacing(2)
 
-	card:SetScript("OnEnter", BUILib.Timed('BUILib.Modals MakeCard card OnEnter', function(self) self:SetBackdropBorderColor(accentRed, accentGreen, accentBlue, 1) end))
-	card:SetScript("OnLeave", BUILib.Timed('BUILib.Modals MakeCard card OnLeave', function(self) self:SetBackdropBorderColor(unpack(theme.border.default)) end))
-	card:SetScript("OnClick", BUILib.Timed('BUILib.Modals MakeCard card OnClick', function()
+	card:SetScript("OnEnter", function(self) self:SetBackdropBorderColor(accentRed, accentGreen, accentBlue, 1) end)
+	card:SetScript("OnLeave", function(self) self:SetBackdropBorderColor(unpack(theme.border.default)) end)
+	card:SetScript("OnClick", function()
 		Close()
 		if cardOptions.onClick then cardOptions.onClick() end
-	end))
+	end)
 end
 
 function Modals.CardPicker(options)
@@ -518,11 +518,11 @@ function Modals.CardPicker(options)
 
 	if options.onHide then
 		local fired = false
-		overlay:HookScript("OnHide", BUILib.Timed('BUILib.Modals CardPicker overlay OnHide', function()
+		overlay:HookScript("OnHide", function()
 			if fired then return end
 			fired = true
 			options.onHide()
-		end))
+		end)
 	end
 
 	local accentRed, accentGreen, accentBlue = theme.GetAccent()
@@ -541,10 +541,10 @@ function Modals.CardPicker(options)
 	if options.dismissText then
 		local dismissButton = Modals.CreateButton(dialog, options.dismissText, Modals.BTN_WARNING, options.dismissWidth or 140)
 		dismissButton:SetPoint("BOTTOM", dialog, "BOTTOM", 0, SIZES.buttonBottomMargin)
-		dismissButton:SetScript("OnClick", BUILib.Timed('BUILib.Modals CardPicker dismissButton OnClick', function()
+		dismissButton:SetScript("OnClick", function()
 			Close()
 			if options.onDismiss then options.onDismiss() end
-		end))
+		end)
 	end
 
 	overlay:Show()
@@ -719,12 +719,12 @@ function Modals.Number(options)
 			text:SetText(mark.label)
 			text:SetPoint('CENTER')
 			button:SetSize(math.ceil(text:GetStringWidth()) + 8, 16)
-			button:SetScript('OnClick', BUILib.Timed('BUILib.Modals Number button OnClick', function()
+			button:SetScript('OnClick', function()
 				Set(mark.value)
 				field:ClearFocus()
-			end))
-			button:SetScript('OnEnter', BUILib.Timed('BUILib.Modals Number button OnEnter', function() text:SetTextColor(unpack(theme.text.primary)) end))
-			button:SetScript('OnLeave', BUILib.Timed('BUILib.Modals Number button OnLeave', function() PaintMarks(value) end))
+			end)
+			button:SetScript('OnEnter', function() text:SetTextColor(unpack(theme.text.primary)) end)
+			button:SetScript('OnLeave', function() PaintMarks(value) end)
 			mark.tick, mark.button, mark.text = tick, button, text
 			mark.width = button:GetWidth()
 			mark.left = math.max(0, math.min(innerWidth - mark.width, mark.fraction * innerWidth - mark.width / 2))
@@ -806,20 +806,20 @@ function Modals.Number(options)
 		return minimum + fraction * (maximum - minimum)
 	end
 
-	track:SetScript('OnMouseDown', BUILib.Timed('BUILib.Modals Number track OnMouseDown', function(self)
+	track:SetScript('OnMouseDown', function(self)
 		Set(ValueAtCursor())
 		field:ClearFocus()
-		self:SetScript('OnUpdate', BUILib.Timed('BUILib.Modals Number self OnUpdate', function(frame)
+		self:SetScript('OnUpdate', function(frame)
 			if IsMouseButtonDown('LeftButton') then
 				Set(ValueAtCursor())
 			else
 				frame:SetScript('OnUpdate', nil)
 			end
-		end))
-	end))
-	track:SetScript('OnMouseWheel', BUILib.Timed('BUILib.Modals Number track OnMouseWheel', function(_, delta) Set(value + delta * wheelStep) end))
+		end)
+	end)
+	track:SetScript('OnMouseWheel', function(_, delta) Set(value + delta * wheelStep) end)
 
-	field:SetScript('OnTextChanged', BUILib.Timed('BUILib.Modals Number field OnTextChanged', function(self, userInput)
+	field:SetScript('OnTextChanged', function(self, userInput)
 		if not userInput then return end
 		local parsed = tonumber(self:GetText())
 		if parsed and parsed >= minimum and parsed <= maximum then
@@ -827,19 +827,19 @@ function Modals.Number(options)
 		else
 			PaintField(true)
 		end
-	end))
-	field:SetScript('OnEditFocusGained', BUILib.Timed('BUILib.Modals Number field OnEditFocusGained', function(self)
+	end)
+	field:SetScript('OnEditFocusGained', function(self)
 		fieldFocused = true
 		PaintField(false)
 		self:HighlightText()
-	end))
-	field:SetScript('OnEditFocusLost', BUILib.Timed('BUILib.Modals Number field OnEditFocusLost', function(self)
+	end)
+	field:SetScript('OnEditFocusLost', function(self)
 		fieldFocused = false
 		self:SetText(Format(value))
 		PaintField(false)
-	end))
-	field:SetScript('OnEnterPressed', BUILib.Timed('BUILib.Modals Number field OnEnterPressed', Confirm))
-	field:SetScript('OnEscapePressed', BUILib.Timed('BUILib.Modals Number field OnEscapePressed', Cancel))
+	end)
+	field:SetScript('OnEnterPressed', Confirm)
+	field:SetScript('OnEscapePressed', Cancel)
 
 	dialog:SetHeight(Widget.EvenSize(y + NUMBER.buttonArea))
 	Modals.LayoutButtons(dialog, {
@@ -933,8 +933,8 @@ function Modals.Settings(options)
 	thumb:SetPoint("TOP", track, "TOP", 0, 0)
 	thumb:EnableMouse(true)
 	thumb:Hide()
-	thumb:SetScript("OnEnter", BUILib.Timed('BUILib.Modals Settings thumb OnEnter', function(self) self:SetBackdropColor(unpack(theme.scrollbar.thumbHover)) end))
-	thumb:SetScript("OnLeave", BUILib.Timed('BUILib.Modals Settings thumb OnLeave', function(self) self:SetBackdropColor(unpack(theme.scrollbar.thumb)) end))
+	thumb:SetScript("OnEnter", function(self) self:SetBackdropColor(unpack(theme.scrollbar.thumbHover)) end)
+	thumb:SetScript("OnLeave", function(self) self:SetBackdropColor(unpack(theme.scrollbar.thumb)) end)
 
 	local scrollLogic = Widget.ScrollLogic(scrollFrame, scrollChild, track, thumb, {draggable = true})
 
@@ -1015,9 +1015,9 @@ function Modals.Settings(options)
 	local activeClient = BUILib.GetActiveClient()
 	local prevPopupStrata, prevPopupLevel, prevPopupParent = activeClient.popupStrata, activeClient.popupLevel, activeClient.popupParent
 	BUILib.SetPopupParent(dialog)
-	overlay:HookScript("OnHide", BUILib.Timed('BUILib.Modals Settings overlay OnHide', function()
+	overlay:HookScript("OnHide", function()
 		activeClient.popupStrata, activeClient.popupLevel, activeClient.popupParent = prevPopupStrata, prevPopupLevel, prevPopupParent
-	end))
+	end)
 
 	BUILib.Defer(function()
 		if content.Refresh then content:Refresh() end

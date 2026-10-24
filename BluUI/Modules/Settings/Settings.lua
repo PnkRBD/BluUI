@@ -2,7 +2,6 @@ local _, BUI = ...
 local AceHook = LibStub('AceHook-3.0')
 
 local Pixel = BUI.Pixel
-local After = BUI.Profiler.After
 local BUILib = BluUI.BUILibClient
 local Controls = BUILib.Controls
 local Widget = BUILib.Widget
@@ -282,7 +281,7 @@ do
 			pendingGossipType = event == 'QUEST_GREETING' and 'greeting' or 'gossip'
 			if not gossipPending then
 				gossipPending = true
-				After('Settings.Settings quest gossip', 0, DeferredGossip)
+				C_Timer.After(0, DeferredGossip)
 			end
 		elseif event == 'QUEST_DETAIL' and WantAccept() then
 			if not IsQuestLogFull() then AcceptQuest() end
@@ -298,7 +297,7 @@ do
 		elseif event == 'QUEST_COMPLETE' and WantComplete() then
 			if not completePending then
 				completePending = true
-				After('Settings.Settings quest complete', 0, DeferredComplete)
+				C_Timer.After(0, DeferredComplete)
 			end
 		elseif event == 'QUEST_AUTOCOMPLETE' and WantComplete() then
 			local index = C_QuestLog.GetLogIndexForQuestID(arg1)
@@ -413,10 +412,10 @@ local roleCheckHooked = false
 Settings.ToggleAutoConfirmRole = function(_, enabled)
 	if not enabled or roleCheckHooked then return end
 	roleCheckHooked = true
-	LFDRoleCheckPopupAcceptButton:HookScript('OnShow', BUI.Profiler.Wrap('Settings.Settings role check', function(self)
+	LFDRoleCheckPopupAcceptButton:HookScript('OnShow', function(self)
 		if not BUI.GetDB().social.autoConfirmRole then return end
 		self:Click()
-	end))
+	end)
 end
 
 Settings.ToggleEasyItemDestroy = EventToggle("destroy", "DELETE_ITEM_CONFIRM", function()
@@ -453,7 +452,7 @@ local function ForceCurrentExpansion()
 end
 
 local function HookAuctionHouse()
-    AuctionHouseFrame:HookScript('OnShow', BUI.Profiler.Wrap('Settings.AHFilter OnShow', ForceCurrentExpansion))
+    AuctionHouseFrame:HookScript('OnShow', ForceCurrentExpansion)
 end
 
 Settings.ToggleAHCurrentExpansion = function(_, enabled)
@@ -486,7 +485,7 @@ Settings.ToggleFasterMovieSkip = function(_, enabled)
             end
             if not AceHook.IsHooked(BUI, frame, "OnShow") then
                 AceHook.SecureHookScript(BUI, frame, "OnShow", function()
-                    After("Settings.Settings movie skip", 0, function() if frame:IsShown() then button:Click() end end)
+                    C_Timer.After(0, function() if frame:IsShown() then button:Click() end end)
                 end)
             end
         else

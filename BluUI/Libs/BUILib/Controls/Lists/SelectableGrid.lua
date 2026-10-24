@@ -44,8 +44,8 @@ function Controls.SelectableGrid(parent, config)
 		Widget.SetColor(selectAllCheck, red, green, blue, 1)
 		selectAllCheck:Hide()
 
-		selectAllBox:SetScript("OnEnter", BUILib.Timed('BUILib.SelectableGrid SelectableGrid selectAllBox OnEnter', function(self) self:SetBackdropBorderColor(unpack(Theme.border.hover)) end))
-		selectAllBox:SetScript("OnLeave", BUILib.Timed('BUILib.SelectableGrid SelectableGrid selectAllBox OnLeave', function(self) self:SetBackdropBorderColor(unpack(Theme.border.input)) end))
+		selectAllBox:SetScript("OnEnter", function(self) self:SetBackdropBorderColor(unpack(Theme.border.hover)) end)
+		selectAllBox:SetScript("OnLeave", function(self) self:SetBackdropBorderColor(unpack(Theme.border.input)) end)
 		container._selectAllBox = selectAllBox
 		columnCursorX = columnCursorX + 28
 	end
@@ -144,11 +144,11 @@ function Controls.SelectableGrid(parent, config)
 
 			row._checkBox = checkBox; row._checkTex = checkTexture
 
-			checkBox:SetScript("OnClick", BUILib.Timed('BUILib.SelectableGrid AddRow checkBox OnClick', function()
+			checkBox:SetScript("OnClick", function()
 				selection[rowIndex] = not selection[rowIndex]
 				UpdateRowVisual(row, rowIndex); UpdateSelectAll()
 				if onSelect then onSelect(container:GetSelected()) end
-			end))
+			end)
 			cellX = cellX + 28
 		else
 			local stub = CreateFrame("Frame", nil, row); stub:Hide()
@@ -213,24 +213,24 @@ function Controls.SelectableGrid(parent, config)
 		local border = Widget.Create(row, 0.06, 0.06, 0.06, 0.5)
 		border:SetPoint("BOTTOMLEFT"); border:SetPoint("BOTTOMRIGHT"); border:SetHeight(1)
 
-		row:SetScript("OnEnter", BUILib.Timed('BUILib.SelectableGrid AddRow row OnEnter', function() Widget.SetColor(hoverBg, 0.08, 0.08, 0.1, 0.4) end))
-		row:SetScript("OnLeave", BUILib.Timed('BUILib.SelectableGrid AddRow row OnLeave', function() Widget.SetColor(hoverBg, 0.08, 0.08, 0.1, 0) end))
+		row:SetScript("OnEnter", function() Widget.SetColor(hoverBg, 0.08, 0.08, 0.1, 0.4) end)
+		row:SetScript("OnLeave", function() Widget.SetColor(hoverBg, 0.08, 0.08, 0.1, 0) end)
 
-		row:SetScript("OnClick", BUILib.Timed('BUILib.SelectableGrid AddRow row OnClick', function()
+		row:SetScript("OnClick", function()
 			if onRowClick then onRowClick(rowIndex, rowData)
 			elseif selectable then
 				selection[rowIndex] = not selection[rowIndex]
 				UpdateRowVisual(row, rowIndex); UpdateSelectAll()
 				if onSelect then onSelect(container:GetSelected()) end
 			end
-		end))
+		end)
 
 		rows[rowIndex] = row; UpdateHeight()
 		return row
 	end
 
 	if container._selectAllBox then
-		container._selectAllBox:SetScript("OnClick", BUILib.Timed('BUILib.SelectableGrid SelectableGrid _selectAllBox OnClick', function()
+		container._selectAllBox:SetScript("OnClick", function()
 			local allSelected = true
 			for rowIndex in ipairs(rows) do if not selection[rowIndex] then allSelected = false; break end end
 			for rowIndex, row in ipairs(rows) do
@@ -238,7 +238,7 @@ function Controls.SelectableGrid(parent, config)
 			end
 			UpdateSelectAll()
 			if onSelect then onSelect(container:GetSelected()) end
-		end))
+		end)
 	end
 
 	function container:GetSelected()

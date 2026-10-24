@@ -65,12 +65,12 @@ local function Build()
 	if propagates then relay:SetPropagateMouseMotion(true) end
 	relay:SetAttribute('_onattributechanged', HIDE_IN_COMBAT)
 	RegisterAttributeDriver(relay, 'state-combat', '[combat] 1; 0')
-	relay:SetScript('OnEnter', BUI.Profiler.Script('SecureRelay OnEnter', RelayEnter))
-	relay:SetScript('OnLeave', BUI.Profiler.Script('SecureRelay OnLeave', RelayLeave))
-	relay:SetScript('PostClick', BUI.Profiler.Script('SecureRelay PostClick', RelayClick))
-	relay:SetScript('OnDragStart', BUI.Profiler.Script('SecureRelay OnDragStart', RelayDragStart))
-	relay:SetScript('OnDragStop', BUI.Profiler.Script('SecureRelay OnDragStop', RelayDragStop))
-	relay:HookScript('OnHide', BUI.Profiler.Wrap('SecureRelay hidden', RelayHidden))
+	relay:SetScript('OnEnter', RelayEnter)
+	relay:SetScript('OnLeave', RelayLeave)
+	relay:SetScript('PostClick', RelayClick)
+	relay:SetScript('OnDragStart', RelayDragStart)
+	relay:SetScript('OnDragStop', RelayDragStop)
+	relay:HookScript('OnHide', RelayHidden)
 	relay:Hide()
 end
 
@@ -115,8 +115,8 @@ function SecureRelay.Attach(host, spec)
 	local hooked = specs[host] ~= nil
 	specs[host] = spec
 	if hooked then return end
-	host:HookScript('OnEnter', BUI.Profiler.Wrap('SecureRelay host OnEnter', HostEnter))
-	host:HookScript('OnHide', BUI.Profiler.Wrap('SecureRelay host OnHide', HostHidden))
+	host:HookScript('OnEnter', HostEnter)
+	host:HookScript('OnHide', HostHidden)
 end
 
 function SecureRelay.Slash(command)

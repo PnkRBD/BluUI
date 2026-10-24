@@ -254,7 +254,7 @@ local function CenterNow()
 	lastGrowUp = growUp
 end
 
-local FlushCenter = BUI.Dispatcher.New(CenterNow, 'CDM.BuffCenter flush')
+local FlushCenter = BUI.Dispatcher.New(CenterNow)
 
 local function ScheduleCenter()
 	if active then FlushCenter() end

@@ -7,7 +7,6 @@ local FONT = BUILib.Font
 local Skin = BUI.Skinning
 local Painter = BUI.Painter
 local Pixel = BUI.Pixel
-local After = BUI.Profiler.After
 local PoolGet = BUI.Tools.PoolGet
 
 local TAB_BUY, TAB_BUYBACK, TAB_BULK = 1, 2, 3
@@ -237,14 +236,14 @@ local function CreateIconLabel(parent, fontSize)
 	frame.qtyText:SetPoint('LEFT', frame.icon, 'RIGHT', Pixel.Scale(2), 0)
 	Painter.Text(frame.qtyText, 'skinText')
 
-	frame:SetScript('OnEnter', BUI.Profiler.Script('Skin.Merchant frame OnEnter', function(self)
+	frame:SetScript('OnEnter', function(self)
 		if self.link then
 			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 			GameTooltip:SetHyperlink(self.link)
 			GameTooltip:Show()
 		end
-	end))
-	frame:SetScript('OnLeave', BUI.Profiler.Script('Skin.Merchant frame OnLeave', function() GameTooltip:Hide() end))
+	end)
+	frame:SetScript('OnLeave', function() GameTooltip:Hide() end)
 	return frame
 end
 
@@ -357,7 +356,7 @@ local function PurchaseNext()
 		return
 	end
 	BuyMerchantItem(step.idx, step.qty)
-	After('Skin.Merchant buy step', BUY_STEP, PurchaseNext)
+	C_Timer.After(BUY_STEP, PurchaseNext)
 end
 
 local function Enqueue(entry, units)
@@ -416,7 +415,7 @@ local function CreateBuyRow(parent)
 	row.qty = 0
 	row.onLimit = function() if row.entry then LimitMessage(row.entry) end end
 
-	buyButton:SetScript('OnClick', BUI.Profiler.Script('Skin.Merchant buyButton OnClick', function()
+	buyButton:SetScript('OnClick', function()
 		local entry = row.entry
 		if not entry then return end
 		if stepperFrame.valueBox:HasFocus() then stepperFrame.valueBox:ClearFocus() end
@@ -431,9 +430,9 @@ local function CreateBuyRow(parent)
 		if units < 1 then return end
 		Enqueue(entry, units)
 		StartPurchases()
-	end))
+	end)
 
-	row:HookScript('OnClick', BUI.Profiler.Wrap('Skin.Merchant row OnClick', function(self)
+	row:HookScript('OnClick', function(self)
 		if not self.merchantIdx then return end
 		if IsModifiedClick('DRESSUP') then
 			local link = GetMerchantItemLink(self.merchantIdx)
@@ -441,15 +440,15 @@ local function CreateBuyRow(parent)
 		elseif IsModifiedClick('CHATLINK') then
 			ChatFrameUtil.InsertLink(GetMerchantItemLink(self.merchantIdx))
 		end
-	end))
+	end)
 
-	row:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Merchant row OnEnter', function(self)
+	row:HookScript('OnEnter', function(self)
 		if self.merchantIdx then
 			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 			GameTooltip:SetMerchantItem(self.merchantIdx)
 			GameTooltip:Show()
 		end
-	end))
+	end)
 
 	return row
 end
@@ -460,11 +459,11 @@ local function CreateBuybackRow(parent)
 
 	local buybackButton = Skin.SmallButton(row, 62, 22, 'Buyback')
 	buybackButton:SetPoint('RIGHT', row, 'RIGHT', Pixel.Scale(-8), 0)
-	buybackButton:SetScript('OnClick', BUI.Profiler.Script('Skin.Merchant buybackButton OnClick', function()
+	buybackButton:SetScript('OnClick', function()
 		if row.buybackIdx then BuybackItem(row.buybackIdx) end
-	end))
+	end)
 
-	row:HookScript('OnClick', BUI.Profiler.Wrap('Skin.Merchant row OnClick 2', function(self)
+	row:HookScript('OnClick', function(self)
 		if not self.buybackIdx then return end
 		local link = GetBuybackItemLink(self.buybackIdx)
 		if not link then return end
@@ -473,15 +472,15 @@ local function CreateBuybackRow(parent)
 		elseif IsModifiedClick('CHATLINK') then
 			ChatFrameUtil.InsertLink(link)
 		end
-	end))
+	end)
 
-	row:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Merchant row OnEnter 2', function(self)
+	row:HookScript('OnEnter', function(self)
 		if self.buybackIdx then
 			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 			GameTooltip:SetBuybackItem(self.buybackIdx)
 			GameTooltip:Show()
 		end
-	end))
+	end)
 
 	return row
 end
@@ -641,7 +640,7 @@ local function BuildFrame()
 			if previousCount and numItems >= previousCount then return end
 			previousCount = numItems
 			BuybackItem(numItems)
-			After('Skin.Merchant buyback step', BUY_STEP, BuybackNext)
+			C_Timer.After(BUY_STEP, BuybackNext)
 		end
 		BuybackNext()
 	end)
@@ -733,7 +732,7 @@ RefreshContent = function()
 			return
 		end
 		local previous = scroll:GetVerticalScroll()
-		After('Skin.Merchant scroll restore', 0, function()
+		C_Timer.After(0, function()
 			local maxScroll = math.max(0, scroll:GetScrollChild():GetHeight() - scroll:GetHeight())
 			scroll:SetVerticalScroll(math.min(previous, maxScroll))
 		end)
@@ -793,7 +792,7 @@ end
 local function RefreshLater()
 	if merchantFrame.pendingRefresh then return end
 	merchantFrame.pendingRefresh = true
-	After('Skin.Merchant live refresh', 0.1, function()
+	C_Timer.After(0.1, function()
 		merchantFrame.pendingRefresh = false
 		RefreshContent()
 	end)
@@ -814,7 +813,7 @@ local function OpenMerchant(frame)
 	end
 	for _, event in ipairs(LIVE_EVENTS) do BUI.Events:Register(event, 'Skinning.Merchant.Live', RefreshLater) end
 	for _, event in ipairs(REPAIR_EVENTS) do BUI.Events:Register(event, 'Skinning.Merchant.Live', RefreshRepair) end
-	After('Skin.Merchant page reskin', 0, RefreshContent)
+	C_Timer.After(0, RefreshContent)
 end
 
 local function CloseMerchantWindow(frame)
@@ -830,7 +829,7 @@ end
 context.Window('MerchantFrame', {
 	skin = BuildFrame,
 	show = OpenMerchant,
-	install = function(frame) frame:HookScript('OnHide', BUI.Profiler.Wrap('Skin.Merchant closed', CloseMerchantWindow)) end,
+	install = function(frame) frame:HookScript('OnHide', CloseMerchantWindow) end,
 	enable = function(frame) Skin.ReserveWidth(frame, Pixel.Scale(FRAME_WIDTH), UIParent) end,
 })
 

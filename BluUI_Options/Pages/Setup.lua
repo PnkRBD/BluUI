@@ -268,7 +268,7 @@ local function Welcome(kit, _, parent, width, _, page)
 	hero:SetUnit('player')
 	hero:SetFacing(0.35)
 	hero:SetAnimation(WAVE_ANIMATION)
-	BUI.Profiler.After('Setup hero wave', WAVE_SECONDS, function()
+	C_Timer.After(WAVE_SECONDS, function()
 		if hero:IsVisible() then hero:SetAnimation(0) end
 	end)
 	return { Footer(kit, frame, math.max(y, PAD + HERO_HEIGHT) + 12, nil, { text = 'Start', onClick = function() Go(page, 'profile') end }) }
@@ -293,7 +293,7 @@ end
 local pendingScale, scalePage
 
 local function RefreshScale()
-	BUI.Profiler.After('Setup scale refresh', 0.05, function() scalePage:Rebuild('scale') end)
+	C_Timer.After(0.05, function() scalePage:Rebuild('scale') end)
 end
 
 BUI.Scheduler.RegisterUpdate(SCALE_APPLY_KEY, function()
@@ -670,7 +670,7 @@ local function Theme(kit, shell, parent, width, _, page)
 		module:Refresh()
 		BUI.Installer.SyncGroupFrames()
 		PaintStage()
-	end, REFRESH_DELAY, 'Setup theme refresh')
+	end, REFRESH_DELAY)
 
 	local rows = {
 		{ title = 'Match party and raid frames', note = 'Party and raid frames get the same look', build = function(row)

@@ -66,7 +66,7 @@ local function OpenWarbandTransfer(currencyID, isRetry)
     if not C_CurrencyInfo.IsAccountCharacterCurrencyDataReady() then
         C_CurrencyInfo.RequestCurrencyDataForAccountCharacters()
         if not isRetry then
-            BUI.Profiler.After('CurrencyManager.CurrencyManager transfer retry', 0.5, function() OpenWarbandTransfer(currencyID, true) end)
+            C_Timer.After(0.5, function() OpenWarbandTransfer(currencyID, true) end)
         end
         return
     end
@@ -77,10 +77,10 @@ local function OpenWarbandTransfer(currencyID, isRetry)
     end
     if not transferMenuHooked then
         transferMenuHooked = true
-        CurrencyTransferMenu:HookScript('OnShow', BUI.Profiler.Wrap('CurrencyManager.CurrencyManager transfer menu shown', PositionTransferMenu))
+        CurrencyTransferMenu:HookScript('OnShow', PositionTransferMenu)
     end
     CurrencyTransferMenu:TriggerEvent(CurrencyTransferMenuMixin.Event.CurrencyTransferRequested, currencyID)
-    BUI.Profiler.After('CurrencyManager.CurrencyManager transfer menu position', 0, PositionTransferMenu)
+    C_Timer.After(0, PositionTransferMenu)
 end
 
 local function ShowRowMenu(row)
@@ -115,21 +115,21 @@ local function ShowRowMenu(row)
     Skin.ContextMenu(items, { atCursor = true, width = 240 })
 end
 
-local RowEnter = BUI.Profiler.Script('CurrencyManager.CurrencyManager row OnEnter', function(self)
+local RowEnter = function(self)
     GameTooltip:SetOwner(self, 'ANCHOR_NONE')
     GameTooltip:SetPoint('TOPRIGHT', self, 'TOPLEFT', -6, 0)
     GameTooltip:SetCurrencyToken(self._listIndex)
     GameTooltip:Show()
-end)
+end
 
-local RowClick = BUI.Profiler.Script('CurrencyManager.CurrencyManager row OnClick', function(self, mouseButton)
+local RowClick = function(self, mouseButton)
     GameTooltip:Hide()
     if mouseButton == 'RightButton' then
         ShowRowMenu(self)
     elseif self._isTransferable then
         OpenWarbandTransfer(self._currencyID)
     end
-end)
+end
 
 local function CreateRow(parent)
     local row = CreateFrame('Button', nil, parent)
@@ -199,14 +199,14 @@ local function BuildWallet()
     hideText:SetPoint('LEFT')
     hideText:SetText('Hide Unused')
     Painter.Custom(hideText, PaintHideButton)
-    hideButton:SetScript('OnEnter', BUI.Profiler.Script('CurrencyManager.CurrencyManager hideButton OnEnter', function() hideText:SetAlpha(0.85) end))
-    hideButton:SetScript('OnLeave', BUI.Profiler.Script('CurrencyManager.CurrencyManager hideButton OnLeave', function() hideText:SetAlpha(1) end))
-    hideButton:SetScript('OnClick', BUI.Profiler.Script('CurrencyManager.CurrencyManager hideButton OnClick', function()
+    hideButton:SetScript('OnEnter', function() hideText:SetAlpha(0.85) end)
+    hideButton:SetScript('OnLeave', function() hideText:SetAlpha(1) end)
+    hideButton:SetScript('OnClick', function()
         hideUnused = not hideUnused
         PaintHideButton(hideText)
         RefreshContent()
         panel.scroll:SetVerticalScroll(0)
-    end))
+    end)
 
     local moneyText = wallet:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(moneyText, 12, FONT, '')
@@ -320,7 +320,7 @@ RefreshContent = function()
     panel.emptyText:SetText(searchText ~= '' and 'No matching currencies.' or 'No currencies.')
 end
 
-local ThrottledRefresh = BUI.Dispatcher.NewDelayed(RefreshContent, 0.3, 'Currency refresh')
+local ThrottledRefresh = BUI.Dispatcher.NewDelayed(RefreshContent, 0.3)
 
 local EVENTS = { 'CURRENCY_DISPLAY_UPDATE', 'PLAYER_MONEY' }
 
@@ -346,5 +346,5 @@ function BUI.CurrencyManager.Toggle()
     slide.Toggle()
 end
 
-CharacterFrame:HookScript('OnHide', BUI.Profiler.Wrap('CurrencyManager.CurrencyManager character hide', function() slide.Close(true) end))
+CharacterFrame:HookScript('OnHide', function() slide.Close(true) end)
 context.OnDisable(function() slide.Close(true) end)

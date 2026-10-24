@@ -241,8 +241,8 @@ function Controls.AttachCardDimming(content, card)
 		blocker:SetFrameLevel(cardFrame:GetFrameLevel() + 50)
 		blocker:EnableMouse(true)
 		blocker:EnableMouseWheel(true)
-		blocker:SetScript("OnMouseDown", BUILib.Timed('BUILib.SettingsCard BuildDimBlocker blocker OnMouseDown', function() end))
-		blocker:SetScript("OnMouseWheel", BUILib.Timed('BUILib.SettingsCard BuildDimBlocker blocker OnMouseWheel', function() end))
+		blocker:SetScript("OnMouseDown", function() end)
+		blocker:SetScript("OnMouseWheel", function() end)
 		blocker:SetIgnoreParentAlpha(true)
 		blocker:SetAlpha(0)
 		blocker:Hide()
@@ -297,7 +297,7 @@ function Controls.AttachCardDimming(content, card)
 		local elapsed = 0
 		local DURATION = 0.18
 		if not self._dimAnimFrame then self._dimAnimFrame = CreateFrame("Frame") end
-		self._dimAnimFrame:SetScript("OnUpdate", BUILib.Timed('BUILib.SettingsCard SetDimmed _dimAnimFrame OnUpdate', function(animFrame, deltaTime)
+		self._dimAnimFrame:SetScript("OnUpdate", function(animFrame, deltaTime)
 			elapsed = elapsed + deltaTime
 			local progress = elapsed / DURATION
 			if progress >= 1 then
@@ -310,7 +310,7 @@ function Controls.AttachCardDimming(content, card)
 				cardFrame:SetAlpha(cardFrom + (cardTarget - cardFrom) * eased)
 				blocker:SetAlpha(labelFrom + (labelTarget - labelFrom) * eased)
 			end
-		end))
+		end)
 	end
 end
 

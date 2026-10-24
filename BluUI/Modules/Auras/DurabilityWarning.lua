@@ -43,7 +43,7 @@ local function Update()
     frame:Show()
 end
 
-local UpdateSoon = BUI.Dispatcher.New(Update, 'Auras.DurabilityWarning')
+local UpdateSoon = BUI.Dispatcher.New(Update)
 
 local function Apply()
     local db = GetDB()

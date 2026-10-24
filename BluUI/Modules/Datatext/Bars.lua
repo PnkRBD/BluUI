@@ -159,8 +159,8 @@ local function SetHitDrag(hit, enabled)
     hit._dragEnabled = enabled
     if enabled then
         hit:RegisterForDrag('LeftButton')
-        hit:SetScript('OnDragStart', BUI.Profiler.Script('Datatext.Bars hit OnDragStart', HitOnDragStart))
-        hit:SetScript('OnDragStop', BUI.Profiler.Script('Datatext.Bars hit OnDragStop', HitOnDragStop))
+        hit:SetScript('OnDragStart', HitOnDragStart)
+        hit:SetScript('OnDragStop', HitOnDragStop)
     else
         hit:RegisterForDrag()
         hit:SetScript('OnDragStart', nil)
@@ -200,9 +200,9 @@ local function GetHit(bar, entry)
         hit:SetFrameLevel(bar.frame:GetFrameLevel() + 10)
         hit:EnableMouse(true)
         hit:RegisterForClicks('LeftButtonUp', 'RightButtonUp')
-        hit:SetScript('OnClick', BUI.Profiler.Script('Datatext.Bars hit OnClick', HitOnClick))
-        hit:SetScript('OnEnter', BUI.Profiler.Script('Datatext.Bars hit OnEnter', HitOnEnter))
-        hit:SetScript('OnLeave', BUI.Profiler.Script('Datatext.Bars hit OnLeave', HitOnLeave))
+        hit:SetScript('OnClick', HitOnClick)
+        hit:SetScript('OnEnter', HitOnEnter)
+        hit:SetScript('OnLeave', HitOnLeave)
         hit.bar = bar
         hit:Hide()
         BUI.SecureRelay.Attach(hit, HIT_RELAY)
@@ -441,7 +441,7 @@ local DispatchRender = BUI.Dispatcher.New(function()
     end
     if minimapBar and ShowsChanged(minimapBar) then RenderBar(minimapBar) end
     wipe(changedEntries)
-end, 'Datatext.Render')
+end)
 
 function Datatext.Refresh(id)
     if not Datatext._initialized then return end
@@ -493,9 +493,9 @@ local function MainOnMouseUp(self, mouseButton)
     if mouseButton == 'RightButton' then LockBar(self.bar) end
 end
 
-local MainOnShow = BUI.Profiler.Wrap('Datatext.Bars bar shown', function(self)
+local MainOnShow = function(self)
     if self.bar._pendingRender then RenderBar(self.bar) end
-end)
+end
 
 local EDGE_POINTS = {
     { 'TOPLEFT', 'TOPRIGHT', true },
@@ -554,7 +554,7 @@ local function CreateMainBarObject(frameName, configProvider)
     local bar = { getConfig = configProvider, frame = frame, hits = {}, partStrings = {} }
     frame.bar = bar
 
-    frame:SetScript('OnMouseUp', BUI.Profiler.Script('Datatext.Bars frame OnMouseUp', MainOnMouseUp))
+    frame:SetScript('OnMouseUp', MainOnMouseUp)
     BUI.SecureRelay.Attach(frame, MAIN_RELAY)
     frame:SetScript('OnShow', MainOnShow)
     return bar
@@ -620,8 +620,8 @@ local function ApplyMainBar(bar)
         frame.bg:SetShown(bgAlpha > 0)
         frame.hint:Hide()
     else
-        frame:SetScript('OnDragStart', BUI.Profiler.Script('Datatext.Bars frame OnDragStart', MainOnDragStart))
-        frame:SetScript('OnDragStop', BUI.Profiler.Script('Datatext.Bars frame OnDragStop', MainOnDragStop))
+        frame:SetScript('OnDragStart', MainOnDragStart)
+        frame:SetScript('OnDragStop', MainOnDragStop)
         BUI.Tools.SetColorTex(frame.bg, backgroundColor.r, backgroundColor.g, backgroundColor.b, math.max(bgAlpha, 0.5))
         frame.bg:Show()
         frame.hint:Show()

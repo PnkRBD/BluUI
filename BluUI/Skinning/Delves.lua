@@ -82,8 +82,8 @@ local function SkinRewardsButton(button)
 	glyph:SetPoint('CENTER')
 	BUI.Painter.Tint(glyph, 'skinLabel')
 	button._buiRewardsGlyph = glyph
-	button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Delves rewards OnEnter', RewardsGlyphEnter))
-	button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.Delves rewards OnLeave', RewardsGlyphLeave))
+	button:HookScript('OnEnter', RewardsGlyphEnter)
+	button:HookScript('OnLeave', RewardsGlyphLeave)
 end
 
 local function SkinPicker(frame)
@@ -100,9 +100,9 @@ local function SkinPicker(frame)
 	Skin.SweepScrollBox(rewards.ScrollBox, Guard(SkinReward))
 	if not frame._buiDelvesFit then
 		frame._buiDelvesFit = true
-		frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Delves cover fit', Guard(FitCover)))
+		frame:HookScript('OnShow', Guard(FitCover))
 	end
-	if not FitCover(frame) then BUI.Profiler.After('Skin.Delves cover fit', 0, function() FitCover(frame) end) end
+	if not FitCover(frame) then C_Timer.After(0, function() FitCover(frame) end) end
 end
 
 local function InitOptionRow(row)

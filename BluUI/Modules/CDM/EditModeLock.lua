@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('CDM.EditModeLock')
-
 local CDM = BUI.CDM
 local EditModeLock = {}
 CDM.EditModeLock = EditModeLock
@@ -97,7 +95,7 @@ local function ShowLockText(systemFrame)
     state.notice:Show()
     state.token = state.token + 1
     local myToken = state.token
-    BUI.Profiler.After("CDM.EditModeLock lock text", LOCK_TEXT_TIMEOUT, function()
+    C_Timer.After(LOCK_TEXT_TIMEOUT, function()
         if state.token == myToken then state.notice:Hide() end
     end)
 end
@@ -124,9 +122,9 @@ local function OnSelectSystem(systemFrame)
 end
 
 local function HookSystemFrame(frame)
-    Hook(frame, "SelectSystem", OnSelectSystem)
-    Hook(frame, "HighlightSystem", OnSelectSystem)
-    Hook(frame, "ClearHighlight", HideLockText)
+    hooksecurefunc(frame, "SelectSystem", OnSelectSystem)
+    hooksecurefunc(frame, "HighlightSystem", OnSelectSystem)
+    hooksecurefunc(frame, "ClearHighlight", HideLockText)
 end
 
 local function SyncBarsLock()
@@ -153,7 +151,7 @@ local function OnEditModeHide()
 end
 
 local function MarkDirtySoon()
-    BUI.Profiler.After("CDM.EditModeLock edit mode dirty", 0, CDM.MarkAllDirty)
+    C_Timer.After(0, CDM.MarkAllDirty)
 end
 
 local function OnManagerShow()
@@ -260,7 +258,7 @@ function EditModeLock.ApplyRecommendedSettings()
 end
 
 function EditModeLock.Initialize()
-    Hook(EditModeSystemSettingsDialog, "AttachToSystemFrame", OnDialogAttach)
+    hooksecurefunc(EditModeSystemSettingsDialog, "AttachToSystemFrame", OnDialogAttach)
     for _, name in ipairs(CDM_SYSTEM_FRAMES) do
         local frame = _G[name]
         frame.isLocked = true
@@ -269,7 +267,7 @@ function EditModeLock.Initialize()
     HookSystemFrame(_G[BAR_VIEWER])
     SyncBarsLock()
 
-    EditModeManagerFrame:HookScript("OnShow", BUI.Profiler.Wrap("CDM.EditModeLock edit mode show", OnManagerShow))
-    EditModeManagerFrame:HookScript("OnHide", BUI.Profiler.Wrap("CDM.EditModeLock edit mode hide", OnManagerHide))
+    EditModeManagerFrame:HookScript("OnShow", OnManagerShow)
+    EditModeManagerFrame:HookScript("OnHide", OnManagerHide)
     if EditModeManagerFrame:IsShown() then OnEditModeShow() end
 end

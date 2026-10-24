@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Wrap = BUI.Profiler.Wrap
-
 local GroupFrames = BUI.GroupFrames
 local Util   = GroupFrames.Util
 local Pixel  = BUI.Pixel
@@ -197,7 +195,7 @@ local FlushDirtyFrames = BUI.Dispatcher.New(function()
 		local unit = frame.unit
 		if unit then GroupFrames.SyncLifeState(frame, UnitIsDeadOrGhost(unit) and true or false, not UnitIsConnected(unit)) end
 	end
-end, "GroupFrames.AuraFlush")
+end)
 
 function GroupFrames.MarkAurasDirty(frame)
 	dirtyFrames[frame] = true
@@ -266,14 +264,13 @@ GroupFrames.ReflowAuraVisibility = reflowAuraVisibility
 
 local REACHABILITY_EVENTS = { "UNIT_CONNECTION", "UNIT_PHASE", "UNIT_FACTION", "UNIT_IN_RANGE_UPDATE", "UNIT_DISTANCE_CHECK_UPDATE" }
 
-local ReflowOnEvent = Wrap("GroupFrames.Auras reachability event", reflowAuraVisibility)
-local ReflowOnShow  = Wrap("GroupFrames.Auras show reflow", reflowAuraVisibility)
+local reflowAuraVisibility  = reflowAuraVisibility
 
 local function AttachReachabilityHooks(frame)
 	for eventIndex = 1, #REACHABILITY_EVENTS do
-		frame:RegisterEvent(REACHABILITY_EVENTS[eventIndex], ReflowOnEvent)
+		frame:RegisterEvent(REACHABILITY_EVENTS[eventIndex], reflowAuraVisibility)
 	end
-	frame:HookScript("OnShow", ReflowOnShow)
+	frame:HookScript("OnShow", reflowAuraVisibility)
 	frame._bluAurasVisible = nil
 	reflowAuraVisibility(frame)
 end
@@ -285,9 +282,9 @@ local function SweepIfVisible(child)
 	if child:IsVisible() then reflowAuraVisibility(child) end
 end
 
-local SweepReachability = Wrap("GroupFrames.Auras reachability sweep", function()
+local SweepReachability = function()
 	GroupFrames.EachChild(SweepIfVisible)
-end)
+end
 
 function GroupFrames.SyncReachabilitySweep()
 	local wanted = GroupFrames.IsActive() and GroupFrames.GetDB().enabled and IsInGroup()
@@ -332,7 +329,7 @@ local debugprofilestop = debugprofilestop
 
 local setupDriver = CreateFrame("Frame")
 setupDriver:Hide()
-setupDriver:SetScript("OnUpdate", Wrap("GroupFrames.Auras staggered setup", function(self)
+setupDriver:SetScript("OnUpdate", function(self)
 	if not GroupFrames.CanBuildChildren() then
 		self:Hide()
 		return
@@ -344,7 +341,7 @@ setupDriver:SetScript("OnUpdate", Wrap("GroupFrames.Auras staggered setup", func
 		if debugprofilestop() - startTime > SETUP_BUDGET_MS then return end
 	end
 	self:Hide()
-end))
+end)
 
 function GroupFrames.QueueChildAuraSetup(child)
 	if child._bluAurasBuilt or not child:GetAttribute("unit") then return end

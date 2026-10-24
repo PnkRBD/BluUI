@@ -77,7 +77,7 @@ local function OnCombatEnd()
     if not combatActive then return end
     combatEndToken = combatEndToken + 1
     local token = combatEndToken
-    BUI.Profiler.After('Datatext.Combat combat end', COMBAT_END_GRACE, function()
+    C_Timer.After(COMBAT_END_GRACE, function()
         if combatEndToken == token and not UnitAffectingCombat('player') then
             FinalizePull()
         end

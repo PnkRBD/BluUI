@@ -47,12 +47,12 @@ local function StartGroup(group, seconds)
 	if not seconds or seconds <= 0 then return end
 	group.expiry = GetTime() + seconds
 	TickGroup(group)
-	group.ticker = C_Timer.NewTicker(1, BUI.Profiler.Timed('Skinning.QueuePopups StartGroup ticker', group.tick))
+	group.ticker = C_Timer.NewTicker(1, group.tick)
 end
 
 local function NewGroup()
 	local group = { texts = {} }
-	group.tick = BUI.Profiler.Wrap('Skin.QueuePopups countdown tick', function() TickGroup(group) end)
+	group.tick = function() TickGroup(group) end
 	return group
 end
 
@@ -161,7 +161,7 @@ local function InstallProposal()
 end
 
 local function InstallPvpReady(dialog)
-	dialog:HookScript('OnHide', BUI.Profiler.Wrap('Skin.QueuePopups pvp stop', OnPvpReadyHide))
+	dialog:HookScript('OnHide', OnPvpReadyHide)
 end
 
 context.Window('LFGInvitePopup', { skin = SkinInvitePopup })

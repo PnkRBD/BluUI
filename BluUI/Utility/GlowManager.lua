@@ -65,7 +65,7 @@ function GlowManager.CancelDeferred(frameData)
 end
 
 function GlowManager.ScheduleDeferred(frameData, delay, callback)
-    BUI.Tools.ReplaceTimer(frameData, '_glowTimer', 'Utility.GlowManager deferred glow', delay, callback)
+    BUI.Tools.ReplaceTimer(frameData, '_glowTimer', delay, callback)
 end
 
 function GlowManager.ResetIconState(frameData)

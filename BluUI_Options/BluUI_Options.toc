@@ -44,4 +44,3 @@ Pages\Help.lua
 Pages\Settings.lua
 Pages\ExportImport.lua
 Pages\Setup.lua
-LaunchTrace.lua

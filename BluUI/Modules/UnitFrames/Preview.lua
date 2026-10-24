@@ -712,7 +712,7 @@ local function ShowAll()
 	end
 	if not animFrame then
 		animFrame = CreateFrame('Frame')
-		animFrame:SetScript('OnUpdate', BUI.Profiler.Wrap('UnitFrames.Preview test animation', Animate))
+		animFrame:SetScript('OnUpdate', Animate)
 	end
 	animFrame:Show()
 end
