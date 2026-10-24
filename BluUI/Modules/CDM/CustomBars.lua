@@ -187,6 +187,7 @@ local function CreateIcon(parent, barIndex, iconIndex)
     local icon = CreateFrame("Frame", "BUI_TrackBar" .. barIndex .. "Icon" .. iconIndex, parent)
     icon:SnapSize(40)
     icon:EnableMouse(true)
+    icon._keepMouseForTooltip = true
     icon:RegisterForDrag("LeftButton")
 
     icon:SetScript("OnDragStart", BUI.Profiler.Script('CDM.CustomBars icon OnDragStart', function()
