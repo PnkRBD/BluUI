@@ -66,6 +66,7 @@ local REQUIRE = {
 	{ key = 'hasTank', label = LFG_LIST_HAS_TANK },
 	{ key = 'hasHealer', label = LFG_LIST_HAS_HEALER },
 	{ key = 'hasLust', label = 'Has lust', own = true },
+	{ key = 'groupFit', label = 'Fits my group', own = true },
 }
 local Comp = {
 	lust = { 'SHAMAN', 'MAGE', 'HUNTER', 'EVOKER' },
@@ -108,7 +109,7 @@ local SORT_ITEMS = {
 local LIVE_EVENTS = {
 	'LFG_LIST_SEARCH_RESULTS_RECEIVED', 'LFG_LIST_SEARCH_RESULT_UPDATED', 'LFG_LIST_SEARCH_FAILED',
 	'LFG_LIST_APPLICATION_STATUS_UPDATED', 'GROUP_ROSTER_UPDATE', 'PLAYER_SPECIALIZATION_CHANGED',
-	'LFG_LIST_ACTIVE_ENTRY_UPDATE',
+	'LFG_LIST_ACTIVE_ENTRY_UPDATE', 'PLAYER_ROLES_ASSIGNED',
 }
 local STATUS_TEXT = {
 	applied = 'Applied', invited = 'Invited', declined = 'Declined', declined_full = 'Group full',
@@ -348,6 +349,28 @@ local function OpenSlotFor(counts, chosen)
 	return false
 end
 
+local function GroupRoles()
+	if not IsInGroup(LE_PARTY_CATEGORY_HOME) then return nil end
+	local roles = { TANK = 0, HEALER = 0, DAMAGER = 0, NONE = 0 }
+	for index = 0, GetNumSubgroupMembers(LE_PARTY_CATEGORY_HOME) do
+		local role = UnitGroupRolesAssigned(index == 0 and 'player' or 'party' .. index)
+		if (issecretvalue and issecretvalue(role)) or not roles[role] then role = 'NONE' end
+		roles[role] = roles[role] + 1
+	end
+	return roles
+end
+
+local function GroupFits(counts, roles, chosen)
+	if not roles then return OpenSlotFor(counts, chosen) end
+	local free = 0
+	for _, role in ipairs(ROLES) do
+		local left = counts[role .. '_REMAINING'] - roles[role]
+		if left < 0 then return false end
+		free = free + left
+	end
+	return free >= roles.NONE
+end
+
 local function MembersByRole(entry)
 	if entry.byRole then return entry.byRole end
 	local byRole = { TANK = {}, HEALER = {}, DAMAGER = {} }
@@ -407,7 +430,7 @@ function Comp.HasLust(counts)
 	return false
 end
 
-local function Passes(entry, classFile)
+local function Passes(entry, classFile, chosen, roles)
 	if entry.isApplication then return true end
 	local info, counts, activity = entry.info, entry.counts, entry.activity
 	if info.isDelisted then return false end
@@ -426,6 +449,7 @@ local function Passes(entry, classFile)
 	if playstyle and not advanced[playstyle.key] then return false end
 	local settings = Settings()
 	if settings.hasLust and not Comp.HasLust(counts) then return false end
+	if settings.groupFit and not GroupFits(counts, roles, chosen) then return false end
 	if settings.comp ~= 'any' then
 		local comp = Comp.Of(entry)
 		if comp and comp ~= settings.comp then return false end
@@ -500,8 +524,8 @@ local function ReadEntry(resultID)
 	return entry
 end
 
-local function JudgeEntry(entry, chosen, classFile)
-	entry.stale = not Passes(entry, classFile)
+local function JudgeEntry(entry, chosen, classFile, roles)
+	entry.stale = not Passes(entry, classFile, chosen, roles)
 	entry.stateText, entry.dimmed = EntryState(entry, chosen)
 end
 
@@ -511,13 +535,14 @@ local function CollectEntries(chosen, resort)
 	wipe(seen)
 	wipe(dirtyIDs)
 	local _, classFile = UnitClass('player')
+	local roles = GroupRoles()
 	local function Consider(resultID)
 		if seen[resultID] then return end
 		seen[resultID] = true
 		local entry = ReadEntry(resultID)
 		if not entry then return end
 		if entry.realm then searchRealms[entry.realm] = (searchRealms[entry.realm] or 0) + 1 end
-		JudgeEntry(entry, chosen, classFile)
+		JudgeEntry(entry, chosen, classFile, roles)
 		if not entry.stale or (not resort and rank[resultID]) then entries[#entries + 1] = entry end
 	end
 	for _, resultID in ipairs(C_LFGList.GetApplications()) do Consider(resultID) end
@@ -946,11 +971,12 @@ local function UpdateDirty()
 	local chosen = ChosenRoles(AvailableRoles())
 	local blocker = SignUpBlocker(chosen)
 	local _, classFile = UnitClass('player')
+	local roles = GroupRoles()
 	for resultID in pairs(dirtyIDs) do
 		local row = rowByID[resultID]
 		local entry = row and ReadEntry(resultID)
 		if entry then
-			JudgeEntry(entry, chosen, classFile)
+			JudgeEntry(entry, chosen, classFile, roles)
 			FillRow(row, entry, blocker, settings)
 		end
 	end
@@ -975,6 +1001,8 @@ local function OnLiveEvent(event, resultID)
 		searching, searchFailed = false, true
 	elseif event == 'LFG_LIST_APPLICATION_STATUS_UPDATED' and entry then
 		entry.dirty = true
+	elseif event == 'PLAYER_ROLES_ASSIGNED' and not Settings().groupFit then
+		return
 	end
 	QueueRefresh()
 end

@@ -1533,6 +1533,7 @@ BUI.Defaults = {
 			showBest           = true,
 			showComp           = true,
 			hasLust            = false,
+			groupFit           = false,
 			comp               = 'any',
 		},
 
