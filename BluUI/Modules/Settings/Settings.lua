@@ -480,12 +480,12 @@ Settings.ToggleFasterMovieSkip = function(_, enabled)
     local function hookSkip(frame, button)
         if enabled then
             if not AceHook.IsHooked(BUI, frame, "OnKeyUp") then
-                AceHook.HookScript(BUI, frame, "OnKeyUp", function(_, key)
+                AceHook.SecureHookScript(BUI, frame, "OnKeyUp", function(_, key)
                     if key == "ESCAPE" or key == "SPACE" or key == "ENTER" then button:Click() end
                 end)
             end
             if not AceHook.IsHooked(BUI, frame, "OnShow") then
-                AceHook.HookScript(BUI, frame, "OnShow", function()
+                AceHook.SecureHookScript(BUI, frame, "OnShow", function()
                     After("Settings.Settings movie skip", 0, function() if frame:IsShown() then button:Click() end end)
                 end)
             end
