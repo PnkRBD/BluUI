@@ -1,6 +1,5 @@
 local _, BUI = ...
 local pairs, next, ipairs, type = pairs, next, ipairs, type
-local debugprofilestop = debugprofilestop
 
 local Events = {}
 BUI.Events = Events
@@ -220,38 +219,18 @@ function Events:OnLogin(key, callback, module)
 end
 
 local SETTLE_DELAY = 0.35
-local FLUSH_BUDGET_MS = 4
 
 local combatTasks = {}
 local combatTaskOrder = {}
-local combatTaskCursor = 1
 local settlePending = false
 
-local flushDriver = CreateFrame('Frame')
-flushDriver:Hide()
-
-local function FlushTick(self)
-    local startTime = debugprofilestop()
-    while true do
-        local key = combatTaskOrder[combatTaskCursor]
-        if not key then
-            combatTasks, combatTaskOrder, combatTaskCursor = {}, {}, 1
-            self:Hide()
-            return
-        end
-        if InCombatLockdown() then
-            self:Hide()
-            return
-        end
-        combatTaskCursor = combatTaskCursor + 1
-        local task = combatTasks[key]
-        combatTasks[key] = nil
-        if task then xpcall(task, geterrorhandler()) end
-        if debugprofilestop() - startTime > FLUSH_BUDGET_MS then return end
+local function Flush()
+    local tasks, order = combatTasks, combatTaskOrder
+    combatTasks, combatTaskOrder = {}, {}
+    for index = 1, #order do
+        xpcall(tasks[order[index]], geterrorhandler())
     end
 end
-
-flushDriver:SetScript('OnUpdate', FlushTick)
 
 local function Enqueue(callback, key)
     key = key or tostring(callback)
@@ -267,7 +246,7 @@ local function ArmSettle()
     C_Timer.After(SETTLE_DELAY, function()
         settlePending = false
         if InCombatLockdown() then return end
-        if combatTaskOrder[combatTaskCursor] then flushDriver:Show() end
+        Flush()
     end)
 end
 
@@ -286,5 +265,5 @@ function Events:AfterCombatSettled(callback, key)
 end
 
 Events:Register('PLAYER_REGEN_ENABLED', '_CombatQueue', function()
-    if combatTaskOrder[combatTaskCursor] then ArmSettle() end
+    if combatTaskOrder[1] then ArmSettle() end
 end)
