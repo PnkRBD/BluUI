@@ -175,6 +175,7 @@ local trinketSlotIcons = {}
 local spellCooldownPending = false
 local changedCooldownSpells = {}
 local itemCooldownPending = false
+local itemCountPending = false
 local auraPending = false
 local usablePending = false
 
@@ -1607,6 +1608,10 @@ local function FlushDispatch()
             RunItemWalk()
         end
     end
+    if itemCountPending then
+        itemCountPending = false
+        UpdateConsumableIcons()
+    end
     if usablePending then
         usablePending = false
         RunUsableWalk()
@@ -1739,9 +1744,9 @@ local function RegisterHotEvents()
         QueueDispatch()
     end)
     BUI.Events:Register("SPELL_UPDATE_CHARGES", "CDM.Custom.Charges", function()
-        if not next(spellMap) then return end
-        spellCooldownPending = true
-        QueueDispatch()
+        if next(spellMap) then spellCooldownPending = true end
+        if next(itemMap) then itemCountPending = true end
+        if spellCooldownPending or itemCountPending then QueueDispatch() end
     end)
     BUI.Events:Register("SPELL_UPDATE_USABLE", "CDM.Custom.Usable", function()
         if not next(spellMap) then return end
