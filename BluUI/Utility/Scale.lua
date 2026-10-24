@@ -127,6 +127,10 @@ function Scale.SyncButtons()
     RefreshButtons(GetSavedScale())
 end
 
+function Scale.Reset()
+    Apply(BUI.ClampedUIScale())
+end
+
 local function ProtectScale()
     if BUI._applyingScale then return end
     if InCombatLockdown() then return end

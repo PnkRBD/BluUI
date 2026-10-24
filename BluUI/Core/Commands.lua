@@ -76,6 +76,16 @@ local function ProfileCommand(option)
 	end
 end
 
+local function ScaleCommand(option)
+	if option ~= 'reset' then
+		BUI.Print('/bui scale reset puts the interface scale back to pixel perfect.')
+		return
+	end
+	BUI.Scale.Reset()
+	local width, height = GetPhysicalScreenSize()
+	BUI.Print(('Scale reset to pixel perfect for %d x %d.'):format(width, height))
+end
+
 local function PrintHelp()
 	local function line(command, description)
 		print('  |cff' .. BUI.C.COLOR_BRAND .. command .. '|r  ' .. description)
@@ -86,6 +96,7 @@ local function PrintHelp()
 	line('/bui ?', 'this help')
 	line('/bui install', 'run the setup wizard')
 	line('/bui keybind', 'toggle action bar keybind mode (hover a button, press a key)')
+	line('/bui scale reset', 'put the interface scale back to pixel perfect for your screen')
 	line('/bui profile', 'start or stop timing BluUI, the report opens when you stop')
 	line('/bui profile report', 'show the timings so far without stopping')
 	line('/bui profile login', 'reload and time everything from login onwards')
@@ -119,6 +130,8 @@ SlashCmdList['BUI'] = BUI.Profiler.Wrap('Core.Commands /bui', function(message)
 		BUI.Installer.Open()
 	elseif command == 'keybind' or command == 'kb' then
 		BUI.ActionBars.ToggleKeybindMode()
+	elseif command == 'scale' then
+		ScaleCommand(rest:lower())
 	elseif command == 'profile' then
 		ProfileCommand(rest:lower())
 	elseif SESSIONS[command] then
