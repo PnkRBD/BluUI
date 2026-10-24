@@ -289,8 +289,8 @@ local function SpellBoard(ui, parent, width, entry)
 			Option(entry, 'Placement', 'iconTimeAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS_SHORT }),
 		} },
 		{ icon = 'location', tooltip = 'Nudge', title = 'Countdown inside icon', options = {
-			Option(entry, 'Horizontal', 'iconTimeX', { min = -ICON_TIME_RANGE, max = ICON_TIME_RANGE, step = 1 }),
-			Option(entry, 'Vertical', 'iconTimeY', { min = -ICON_TIME_RANGE, max = ICON_TIME_RANGE, step = 1 }),
+			Kit.Pixels(Option(entry, 'Horizontal', 'iconTimeX', { min = -ICON_TIME_RANGE, max = ICON_TIME_RANGE, step = 1 })),
+			Kit.Pixels(Option(entry, 'Vertical', 'iconTimeY', { min = -ICON_TIME_RANGE, max = ICON_TIME_RANGE, step = 1 })),
 		} },
 		Toggle(entry, nil, 'timeInIcon'),
 	}, Apply)
@@ -339,8 +339,8 @@ local function SpellBoard(ui, parent, width, entry)
 	board:AddTools('Own position', 'Somewhere other than the shared anchor', {
 		{ icon = 'location', tooltip = 'Anchor and offsets', title = 'Own position', options = {
 			Option(entry, 'Anchor point', 'posAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
-			Option(entry, 'Horizontal', 'posX', { min = -POSITION_RANGE_X, max = POSITION_RANGE_X, step = 1 }),
-			Option(entry, 'Vertical', 'posY', { min = -POSITION_RANGE_Y, max = POSITION_RANGE_Y, step = 1 }),
+			Kit.Pixels(Option(entry, 'Horizontal', 'posX', { min = -POSITION_RANGE_X, max = POSITION_RANGE_X, step = 1 })),
+			Kit.Pixels(Option(entry, 'Vertical', 'posY', { min = -POSITION_RANGE_Y, max = POSITION_RANGE_Y, step = 1 })),
 		} },
 		Toggle(entry, nil, 'useCustomPos'),
 	}, Apply)

@@ -106,8 +106,8 @@ local function PositionTool(config)
 			config.point, config.relPoint = value, value
 			config.alignMinimap = false
 		end },
-		Option(config, 'Horizontal offset', 'x', { min = -1500, max = 1500, step = 1 }),
-		Option(config, 'Vertical offset', 'y', { min = -1500, max = 1500, step = 1 }),
+		Kit.Pixels(Option(config, 'Horizontal offset', 'x', { min = -1500, max = 1500, step = 1 })),
+		Kit.Pixels(Option(config, 'Vertical offset', 'y', { min = -1500, max = 1500, step = 1 })),
 		{ label = 'Center horizontally', get = function() return CENTERED[config.point] == true and config.x == 0 end, set = function(value)
 			if not value then return end
 			config.point = CENTER_POINT[config.point] or config.point
@@ -169,8 +169,8 @@ local function BarTools(config, index)
 				Option(config, 'Title', 'title', { kind = 'input', placeholder = 'No title' }),
 				Option(config, 'Anchor', 'titleAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS_SHORT }),
 				Option(config, 'Size', 'titleSize', { min = 8, max = 32, step = 1 }),
-				Option(config, 'Horizontal offset', 'titleX', { min = -300, max = 300, step = 1 }),
-				Option(config, 'Vertical offset', 'titleY', { min = -300, max = 300, step = 1 }),
+				Kit.Pixels(Option(config, 'Horizontal offset', 'titleX', { min = -300, max = 300, step = 1 })),
+				Kit.Pixels(Option(config, 'Vertical offset', 'titleY', { min = -300, max = 300, step = 1 })),
 			} },
 			{ tooltip = 'Size and backdrop', title = 'Panel', options = {
 				Option(config, 'Width', 'width', { min = 0, max = 1200, step = 1 }),

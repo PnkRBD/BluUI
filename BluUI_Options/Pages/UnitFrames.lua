@@ -466,8 +466,8 @@ local function AppearanceBoards(ui, parent, width, page)
 	end
 	typeIcons[#typeIcons + 1] = { tooltip = 'Size, position and prompts', title = 'Type icons', options = {
 		Option(player, 'Size', 'debuffHighlightBadgeSize', { min = 10, max = 48, step = 1 }),
-		Option(player, 'Horizontal', 'debuffHighlightBadgeOffsetX', { min = -BADGE_RANGE_X, max = BADGE_RANGE_X, step = 1 }),
-		Option(player, 'Vertical', 'debuffHighlightBadgeOffsetY', { min = -BADGE_RANGE_Y, max = BADGE_RANGE_Y, step = 1 }),
+		Kit.Pixels(Option(player, 'Horizontal', 'debuffHighlightBadgeOffsetX', { min = -BADGE_RANGE_X, max = BADGE_RANGE_X, step = 1 })),
+		Kit.Pixels(Option(player, 'Vertical', 'debuffHighlightBadgeOffsetY', { min = -BADGE_RANGE_Y, max = BADGE_RANGE_Y, step = 1 })),
 		Toggle(player, 'Cleanse callouts, FD, TURT and SF prompts', 'debuffHighlightTypeText', { separator = true }),
 		Toggle(settings, 'Recolor the Blizzard debuff icons to match', 'dispelRecolor'),
 	} }
@@ -480,8 +480,8 @@ local function AppearanceBoards(ui, parent, width, page)
 		{ tooltip = 'Position and size', title = 'Raid icon', options = {
 			Option(settings, 'Position', 'raidIconPosition', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
 			Option(settings, 'Size', 'raidIconSize', { min = 8, max = 50, step = 1 }),
-			Option(settings, 'Horizontal', 'raidIconOffsetX', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
-			Option(settings, 'Vertical', 'raidIconOffsetY', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
+			Kit.Pixels(Option(settings, 'Horizontal', 'raidIconOffsetX', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 })),
+			Kit.Pixels(Option(settings, 'Vertical', 'raidIconOffsetY', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 })),
 		} },
 		{ get = function() return settings.raidIconMode ~= 'off' end, set = function(value) settings.raidIconMode = value and 'icon' or 'off' end, default = function() return BUI.FactoryOf(settings).raidIconMode ~= 'off' end },
 	}, RefreshFrames)
@@ -489,8 +489,8 @@ local function AppearanceBoards(ui, parent, width, page)
 		{ tooltip = 'Position and size', title = 'Leader icon', options = {
 			Option(settings, 'Position', 'leaderIconPosition', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
 			Option(settings, 'Size', 'leaderIconSize', { min = 8, max = 32, step = 1 }),
-			Option(settings, 'Horizontal', 'leaderIconOffsetX', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
-			Option(settings, 'Vertical', 'leaderIconOffsetY', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
+			Kit.Pixels(Option(settings, 'Horizontal', 'leaderIconOffsetX', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 })),
+			Kit.Pixels(Option(settings, 'Vertical', 'leaderIconOffsetY', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 })),
 		} },
 		OnUnlessOff(settings, nil, 'leaderIconEnabled'),
 	}, RefreshFrames)
@@ -538,8 +538,8 @@ local function CustomTagsBoard(ui, parent, width, page)
 			} },
 			{ icon = 'location', tooltip = 'Anchor and offset', title = label, options = {
 				Option(entry, 'Anchor', 'point', { entries = BUI.C.ANCHOR_POINT_OPTIONS_SHORT }),
-				Option(entry, 'Horizontal', 'x', { min = -TAG_RANGE, max = TAG_RANGE, step = 1 }),
-				Option(entry, 'Vertical', 'y', { min = -TAG_RANGE, max = TAG_RANGE, step = 1 }),
+				Kit.Pixels(Option(entry, 'Horizontal', 'x', { min = -TAG_RANGE, max = TAG_RANGE, step = 1 })),
+				Kit.Pixels(Option(entry, 'Vertical', 'y', { min = -TAG_RANGE, max = TAG_RANGE, step = 1 })),
 			} },
 			OnUnlessOff(entry, nil, 'enabled'),
 			{ slot = 'erase', icon = 'erase', size = Layout.ERASE_SIZE, hover = 'danger', tooltip = 'Remove this tag', onClick = function()
@@ -659,8 +659,8 @@ local function DefaultTagsBoard(ui, parent, width, page)
 		} }
 		tools[#tools + 1] = { icon = 'location', tooltip = 'Position and offset', title = label, options = {
 			Option(settings, 'Position', prefix .. 'Position', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS }),
-			Option(settings, 'Horizontal', prefix .. 'OffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-			Option(settings, 'Vertical', prefix .. 'OffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+			Kit.Pixels(Option(settings, 'Horizontal', prefix .. 'OffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 })),
+			Kit.Pixels(Option(settings, 'Vertical', prefix .. 'OffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 })),
 		} }
 		local reset = ResetTool(ui, 'Changed from the factory default, click to restore it', function() return DefaultRowChanged(settings, prefix) end, function()
 			ResetDefaultRow(settings, prefix)
@@ -726,12 +726,12 @@ end
 local function PositionTool(unitKey, unitSettings)
 	if not ANCHORABLE[unitKey] then
 		return { icon = 'location', tooltip = 'Position', title = 'Position', options = {
-			{ label = 'Horizontal', min = -POSITION_RANGE_X, max = POSITION_RANGE_X, step = 1, get = function() return unitSettings.position.x end, set = function(value)
+			Kit.Pixels({ label = 'Horizontal', min = -POSITION_RANGE_X, max = POSITION_RANGE_X, step = 1, get = function() return unitSettings.position.x end, set = function(value)
 				unitSettings.position.x, unitSettings.position.point, unitSettings.position.relPoint = value, 'CENTER', 'CENTER'
-			end },
-			{ label = 'Vertical', min = -POSITION_RANGE_Y, max = POSITION_RANGE_Y, step = 1, get = function() return unitSettings.position.y end, set = function(value)
+			end }),
+			Kit.Pixels({ label = 'Vertical', min = -POSITION_RANGE_Y, max = POSITION_RANGE_Y, step = 1, get = function() return unitSettings.position.y end, set = function(value)
 				unitSettings.position.y, unitSettings.position.point, unitSettings.position.relPoint = value, 'CENTER', 'CENTER'
-			end },
+			end }),
 		} }
 	end
 	local module = UnitFrames()
@@ -792,8 +792,8 @@ local function AuraRow(board, unitKey, unitSettings, isDebuff)
 		end },
 		{ label = 'Grow', entries = GROWTHS_X, get = function() return unitSettings[Key('GrowthX')] or 'RIGHT' end, set = function(value) unitSettings[Key('GrowthX')] = value end },
 		{ label = 'Rows grow', entries = GROWTHS_Y, get = function() return unitSettings[Key('GrowthY')] or 'DOWN' end, set = function(value) unitSettings[Key('GrowthY')] = value end },
-		{ label = 'Horizontal', min = -AURA_RANGE, max = AURA_RANGE, step = 1, get = function() return unitSettings[Key('OffsetX')] or 0 end, set = function(value) unitSettings[Key('OffsetX')] = value end },
-		{ label = 'Vertical', min = -AURA_RANGE, max = AURA_RANGE, step = 1, get = function() return unitSettings[Key('OffsetY')] or (isDebuff and 4 or -4) end, set = function(value) unitSettings[Key('OffsetY')] = value end },
+		Kit.Pixels({ label = 'Horizontal', min = -AURA_RANGE, max = AURA_RANGE, step = 1, get = function() return unitSettings[Key('OffsetX')] or 0 end, set = function(value) unitSettings[Key('OffsetX')] = value end }),
+		Kit.Pixels({ label = 'Vertical', min = -AURA_RANGE, max = AURA_RANGE, step = 1, get = function() return unitSettings[Key('OffsetY')] or (isDebuff and 4 or -4) end, set = function(value) unitSettings[Key('OffsetY')] = value end }),
 	}
 	local sizing = {
 		{ label = 'Icon size', min = 12, max = 80, step = 1, get = function() return unitSettings[Key('IconSize')] or unitSettings.auraIconSize end, set = function(value) unitSettings[Key('IconSize')] = value end },
@@ -966,8 +966,8 @@ local function UnitBoards(ui, parent, width, unit)
 		local options = extra or {}
 		options[#options + 1] = Inherit(unitSettings, 'Position', prefix .. 'Position', { entries = BUI.C.TEXT_PLACEMENT_OPTIONS, separator = #options > 0 })
 		options[#options + 1] = Inherit(unitSettings, 'Text size', prefix .. 'TextSize', { min = 8, max = sizeMax, step = 1 })
-		options[#options + 1] = Inherit(unitSettings, 'Horizontal', prefix .. 'OffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 })
-		options[#options + 1] = Inherit(unitSettings, 'Vertical', prefix .. 'OffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 })
+		options[#options + 1] = Kit.Pixels(Inherit(unitSettings, 'Horizontal', prefix .. 'OffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }))
+		options[#options + 1] = Kit.Pixels(Inherit(unitSettings, 'Vertical', prefix .. 'OffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }))
 		return { icon = 'text', tooltip = 'Position and size', title = title, options = options }
 	end
 	local nameExtras = { Toggle(unitSettings, 'Class or reaction color', 'classColorName') }

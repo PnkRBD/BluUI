@@ -17,6 +17,7 @@ local function PositionTool(db, options)
 		for name, value in pairs(extra or {}) do option[name] = value end
 		return option
 	end
+	local Pixels = BUI.OptionsKit.Pixels
 	local getAnchor = Field('anchorFrame')
 	local function Anchored()
 		local anchor = getAnchor()
@@ -33,8 +34,8 @@ local function PositionTool(db, options)
 	end
 	local rangeX, rangeY = options.rangeX or POSITION_RANGE_X, options.rangeY or POSITION_RANGE_Y
 	local rows = {
-		Option('Horizontal', 'posX', { min = -rangeX, max = rangeX, step = 1, disabled = Anchored }),
-		Option('Vertical', 'posY', { min = -rangeY, max = rangeY, step = 1, disabled = Anchored }),
+		Pixels(Option('Horizontal', 'posX', { min = -rangeX, max = rangeX, step = 1, disabled = Anchored })),
+		Pixels(Option('Vertical', 'posY', { min = -rangeY, max = rangeY, step = 1, disabled = Anchored })),
 	}
 	if not options.noCenter then
 		local centered = Option('Center horizontally', 'centerHorizontally', { disabled = CenterLocked })
@@ -49,8 +50,8 @@ local function PositionTool(db, options)
 	if not options.noAnchor then
 		rows[#rows + 1] = Option('Anchor to', 'anchorFrame', { entries = frames, width = ANCHOR_MENU_WIDTH, separator = true })
 		rows[#rows + 1] = Option('Anchor side', 'anchorPoint', { entries = BUI.C.ANCHOR_PLACEMENT_OPTIONS, width = ANCHOR_MENU_WIDTH, disabled = Free })
-		rows[#rows + 1] = Option('Anchor offset X', 'anchorOffsetX', { min = -rangeX, max = rangeX, step = 1, disabled = OffsetXLocked })
-		rows[#rows + 1] = Option('Anchor offset Y', 'anchorOffsetY', { min = -rangeY, max = rangeY, step = 1, disabled = Free })
+		rows[#rows + 1] = Pixels(Option('Anchor offset X', 'anchorOffsetX', { min = -rangeX, max = rangeX, step = 1, disabled = OffsetXLocked }))
+		rows[#rows + 1] = Pixels(Option('Anchor offset Y', 'anchorOffsetY', { min = -rangeY, max = rangeY, step = 1, disabled = Free }))
 	end
 	if options.matchWidth then rows[#rows + 1] = Option('Match anchor width', 'matchAnchorWidth', { disabled = Free }) end
 	if options.matchHeight then rows[#rows + 1] = Option('Match anchor height', 'matchAnchorHeight', { disabled = Free }) end

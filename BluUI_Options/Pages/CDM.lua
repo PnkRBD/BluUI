@@ -1022,8 +1022,8 @@ local function ViewerBoards(ui, parent, width, viewer)
 		{ icon = 'text', tooltip = 'Position, size, decimals and the warning color', title = 'Cooldown text', options = {
 			Synced('Position', 'cooldownTextPosition', { entries = POINTS }),
 			Synced('Size', 'cooldownTextSize', { min = 0, max = 30, step = 1 }),
-			Synced('Horizontal', 'cooldownTextOffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-			Synced('Vertical', 'cooldownTextOffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+			Kit.Pixels(Synced('Horizontal', 'cooldownTextOffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 })),
+			Kit.Pixels(Synced('Vertical', 'cooldownTextOffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 })),
 			SyncedToggle('Decimals', 'showCooldownDecimals'),
 			Synced('Decimals under seconds', 'cooldownDecimalThreshold', { min = 1, max = 30, step = 1 }),
 			Synced('Warning under seconds', 'cooldownWarnSeconds', { min = 0, max = 10, step = 1 }),
@@ -1035,8 +1035,8 @@ local function ViewerBoards(ui, parent, width, viewer)
 		{ icon = 'text', tooltip = 'Position and size', title = 'Stack text', options = {
 			Synced('Position', 'textPosition', { entries = POINTS }),
 			Synced('Size', 'textSize', { min = 0, max = 30, step = 1 }),
-			Synced('Horizontal', 'textOffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-			Synced('Vertical', 'textOffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+			Kit.Pixels(Synced('Horizontal', 'textOffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 })),
+			Kit.Pixels(Synced('Vertical', 'textOffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 })),
 		} },
 	})
 	if viewer.keybinds then
@@ -1047,8 +1047,8 @@ local function ViewerBoards(ui, parent, width, viewer)
 			{ icon = 'text', tooltip = 'Anchor, size and offset', title = 'Keybind text', options = {
 				Option(viewerSettings, 'Anchor', 'keybindAnchor', { entries = POINTS }),
 				Option(viewerSettings, 'Size', 'keybindFontSize', { min = 8, max = 24, step = 1 }),
-				Option(viewerSettings, 'Horizontal', 'keybindOffsetX', { min = -KEYBIND_RANGE, max = KEYBIND_RANGE, step = 1 }),
-				Option(viewerSettings, 'Vertical', 'keybindOffsetY', { min = -KEYBIND_RANGE, max = KEYBIND_RANGE, step = 1 }),
+				Kit.Pixels(Option(viewerSettings, 'Horizontal', 'keybindOffsetX', { min = -KEYBIND_RANGE, max = KEYBIND_RANGE, step = 1 })),
+				Kit.Pixels(Option(viewerSettings, 'Vertical', 'keybindOffsetY', { min = -KEYBIND_RANGE, max = KEYBIND_RANGE, step = 1 })),
 			} },
 			{ get = function() return viewerSettings.showKeybinds == true end, set = function(value)
 				viewerSettings.showKeybinds = value
@@ -1136,8 +1136,8 @@ local function BuffBarBoards(ui, parent, width)
 		{ icon = 'text', tooltip = 'Placement and size', title = 'Duration', options = {
 			Option(config, 'Position', 'durationPoint', { entries = POINTS }),
 			Option(config, 'Size', 'durationSize', { min = 6, max = 24, step = 1 }),
-			Option(config, 'Horizontal', 'durationOffsetX', { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 }),
-			Option(config, 'Vertical', 'durationOffsetY', { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 }),
+			Kit.Pixels(Option(config, 'Horizontal', 'durationOffsetX', { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 })),
+			Kit.Pixels(Option(config, 'Vertical', 'durationOffsetY', { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 })),
 		} },
 		Toggle(config, nil, 'showDuration'),
 	}, Refresh)
@@ -1147,8 +1147,8 @@ local function BuffBarBoards(ui, parent, width)
 			Option(config, 'Attach to', 'stackAttach', { entries = STACK_ATTACH }),
 			Option(config, 'Position', 'stackPoint', { entries = POINTS }),
 			Option(config, 'Size', 'stackSize', { min = 6, max = 24, step = 1 }),
-			Option(config, 'Horizontal', 'stackOffsetX', { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 }),
-			Option(config, 'Vertical', 'stackOffsetY', { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 }),
+			Kit.Pixels(Option(config, 'Horizontal', 'stackOffsetX', { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 })),
+			Kit.Pixels(Option(config, 'Vertical', 'stackOffsetY', { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 })),
 		} },
 		Toggle(config, nil, 'showStacks'),
 	}, Refresh)

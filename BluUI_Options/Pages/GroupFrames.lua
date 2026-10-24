@@ -131,8 +131,8 @@ local function TextOptions(text, extra)
 		Option(text, 'Size', 'size', { min = 6, max = 28, step = 1 }),
 		Option(text, 'Outline', 'outline', { entries = OUTLINES }),
 		Option(text, 'Anchor', 'anchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
-		Option(text, 'Horizontal', 'offsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-		Option(text, 'Vertical', 'offsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+		Kit.Pixels(Option(text, 'Horizontal', 'offsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 })),
+		Kit.Pixels(Option(text, 'Vertical', 'offsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 })),
 	}
 	if extra then
 		for _, option in ipairs(extra) do options[#options + 1] = option end
@@ -189,8 +189,8 @@ local function AurasBoards(ui, parent, width, key)
 				{ label = 'Sort by', entries = sortItems, get = function() return settings.sortMethod end, set = function(value) settings.sortMethod = value end },
 				Option(settings, 'Grow', 'growDirection', { entries = GROWTHS }),
 				Placement(settings),
-				Option(settings, 'Horizontal', 'offsetX', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
-				Option(settings, 'Vertical', 'offsetY', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
+				Kit.Pixels(Option(settings, 'Horizontal', 'offsetX', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 })),
+				Kit.Pixels(Option(settings, 'Vertical', 'offsetY', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 })),
 			} },
 			Eye('Show sample icons on the frames', function() return GroupFrames.IsAuraPreviewing(key, container.key) end, function(value) GroupFrames.PreviewAuraKind(key, container.key, value) end),
 			Toggle(settings, nil, 'enabled'),
@@ -232,8 +232,8 @@ local function AurasBoards(ui, parent, width, key)
 			Toggle(border, 'Dispel icon', 'showBadge'),
 			Option(badge, 'Icon size', 'size', { min = 10, max = 48, step = 1 }),
 			Option(badge, 'Icon anchor', 'anchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
-			Option(badge, 'Icon horizontal', 'offsetX', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
-			Option(badge, 'Icon vertical', 'offsetY', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 }),
+			Kit.Pixels(Option(badge, 'Icon horizontal', 'offsetX', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 })),
+			Kit.Pixels(Option(badge, 'Icon vertical', 'offsetY', { min = -AURA_RANGE, max = AURA_RANGE, step = 1 })),
 			opacity,
 		} },
 		Eye('Cycle the dispel colors on the party frames', GroupFrames.IsDispelPreviewActive, function(value)
@@ -290,8 +290,8 @@ local function FramesBoard(ui, parent, width, key)
 		position = BUI.PositionTool(section, { selfTag = 'BUI_GroupParty', fields = PARTY_FIELDS, noCenter = true, matchWidth = true, rangeX = POSITION_RANGE, rangeY = POSITION_RANGE })
 	else
 		position = { icon = 'location', tooltip = 'Position', title = 'Position', options = {
-			Option(section, 'Horizontal', 'x', { min = -POSITION_RANGE, max = POSITION_RANGE, step = 1 }),
-			Option(section, 'Vertical', 'y', { min = -POSITION_RANGE, max = POSITION_RANGE, step = 1 }),
+			Kit.Pixels(Option(section, 'Horizontal', 'x', { min = -POSITION_RANGE, max = POSITION_RANGE, step = 1 })),
+			Kit.Pixels(Option(section, 'Vertical', 'y', { min = -POSITION_RANGE, max = POSITION_RANGE, step = 1 })),
 		} }
 	end
 	board:AddTools(isParty and 'Party frames' or 'Raid frames', 'On or off, preview and position', {
@@ -495,8 +495,8 @@ local function FramesBoard(ui, parent, width, key)
 			Menu(settings, 'anchor', BUI.C.ANCHOR_POINT_OPTIONS),
 			{ tooltip = 'Size and offset', title = indicator.label, options = {
 				Option(settings, 'Size', 'size', { min = 6, max = 48, step = 1 }),
-				Option(settings, 'Horizontal', 'offsetX', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
-				Option(settings, 'Vertical', 'offsetY', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
+				Kit.Pixels(Option(settings, 'Horizontal', 'offsetX', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 })),
+				Kit.Pixels(Option(settings, 'Vertical', 'offsetY', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 })),
 			} },
 			Eye('Preview it on the frames', function() return GroupFrames.IsIndicatorPreviewing(indicator.kind) end, function(value) GroupFrames.PreviewIndicator(indicator.kind, value) end),
 			Toggle(settings, nil, 'enabled'),
@@ -618,8 +618,8 @@ local function HotLayoutBoard(ui, parent, width)
 				Option(slots, 'Size', 'size', { min = 4, max = 24, step = 1 }),
 				Option(slots, 'Spacing', 'spacing', { min = 0, max = 8, step = 1 }),
 				Option(slots, 'Grow', 'growth', { entries = GROWTHS }),
-				Option(slots, 'Horizontal', 'offsetX', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
-				Option(slots, 'Vertical', 'offsetY', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 }),
+				Kit.Pixels(Option(slots, 'Horizontal', 'offsetX', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 })),
+				Kit.Pixels(Option(slots, 'Vertical', 'offsetY', { min = -ICON_RANGE, max = ICON_RANGE, step = 1 })),
 			} },
 			Toggle(slots, nil, 'enabled'),
 		}, function() GroupFrames.RefreshAuras(section.key) end)
