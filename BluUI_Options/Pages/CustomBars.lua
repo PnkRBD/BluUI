@@ -249,8 +249,8 @@ local function SettingsBoard(ui, parent, width, bar, index, page)
 		{ icon = 'text', tooltip = 'Size and placement', title = 'Cooldown text', options = {
 			Option(bar, 'Size', 'cooldownTextSize', { min = 8, max = 24, step = 1 }),
 			Option(bar, 'Position', 'cooldownTextPosition', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
-			Option(bar, 'Horizontal offset', 'cooldownTextOffsetX', { min = -20, max = 20, step = 1 }),
-			Option(bar, 'Vertical offset', 'cooldownTextOffsetY', { min = -20, max = 20, step = 1 }),
+			Kit.Pixels(Option(bar, 'Horizontal offset', 'cooldownTextOffsetX', { min = -20, max = 20, step = 1 })),
+			Kit.Pixels(Option(bar, 'Vertical offset', 'cooldownTextOffsetY', { min = -20, max = 20, step = 1 })),
 		} },
 		OnUnlessOff(bar, nil, 'showCooldownText'),
 	}, Apply)
@@ -258,8 +258,8 @@ local function SettingsBoard(ui, parent, width, bar, index, page)
 		{ icon = 'text', tooltip = 'Size and placement', title = 'Stack text', options = {
 			Option(bar, 'Size', 'stackTextSize', { min = 8, max = 20, step = 1 }),
 			Option(bar, 'Position', 'stackTextPosition', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
-			Option(bar, 'Horizontal offset', 'stackTextOffsetX', { min = -20, max = 20, step = 1 }),
-			Option(bar, 'Vertical offset', 'stackTextOffsetY', { min = -20, max = 20, step = 1 }),
+			Kit.Pixels(Option(bar, 'Horizontal offset', 'stackTextOffsetX', { min = -20, max = 20, step = 1 })),
+			Kit.Pixels(Option(bar, 'Vertical offset', 'stackTextOffsetY', { min = -20, max = 20, step = 1 })),
 		} },
 		OnUnlessOff(bar, nil, 'showStackText'),
 	}, Apply)

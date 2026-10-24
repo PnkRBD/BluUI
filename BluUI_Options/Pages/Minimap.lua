@@ -7,6 +7,7 @@ local Datatext = BUI.Datatext
 local ButtonBar = BUI.MinimapButtonBar
 local AddonButtons = BUI.AddonButtons
 local Pixel = BUI.Pixel
+local Kit = BUI.OptionsKit
 
 local floor, max, min, abs = math.floor, math.max, math.min, math.abs
 local format = string.format
@@ -829,8 +830,8 @@ local function TextBoard(ui, parent, width)
 		{ tooltip = 'Format and offsets', title = 'Clock', options = {
 			{ label = '24-hour', get = function() return Interface().minimapClock24h == true end, set = function(value) Interface().minimapClock24h = value MinimapModule.SetClockFormat(value) end },
 			{ label = 'Server time', get = function() return Interface().minimapClockServer == true end, set = function(value) Interface().minimapClockServer = value MinimapModule.SetClockSource(value) end },
-			{ label = 'Horizontal offset', min = -300, max = 300, step = 1, get = function() return Interface().minimapClockX end, set = function(value) Interface().minimapClockX = value MinimapModule.RefreshClock() end },
-			{ label = 'Vertical offset', min = -300, max = 300, step = 1, get = function() return Interface().minimapClockY end, set = function(value) Interface().minimapClockY = value MinimapModule.RefreshClock() end },
+			Kit.Pixels({ label = 'Horizontal offset', min = -300, max = 300, step = 1, get = function() return Interface().minimapClockX end, set = function(value) Interface().minimapClockX = value MinimapModule.RefreshClock() end }),
+			Kit.Pixels({ label = 'Vertical offset', min = -300, max = 300, step = 1, get = function() return Interface().minimapClockY end, set = function(value) Interface().minimapClockY = value MinimapModule.RefreshClock() end }),
 		} },
 		{ get = function() return Interface().minimapClock == true end, set = function(value) Interface().minimapClock = value MinimapModule.ToggleClock(value) end },
 	}, RefreshPreview)
@@ -850,8 +851,8 @@ local function TextBoard(ui, parent, width)
 		} },
 		{ tooltip = 'Color and offsets', title = 'Zone name', options = {
 			{ label = 'Custom color, off colors by zone type', get = function() return Interface().minimapZoneColorCustom == true end, set = function(value) Interface().minimapZoneColorCustom = value MinimapModule.RefreshZoneText() end },
-			{ label = 'Horizontal offset', min = -300, max = 300, step = 1, get = function() return Interface().minimapZoneX end, set = function(value) Interface().minimapZoneX = value MinimapModule.RefreshZoneText() end },
-			{ label = 'Vertical offset', min = -300, max = 300, step = 1, get = function() return Interface().minimapZoneY end, set = function(value) Interface().minimapZoneY = value MinimapModule.RefreshZoneText() end },
+			Kit.Pixels({ label = 'Horizontal offset', min = -300, max = 300, step = 1, get = function() return Interface().minimapZoneX end, set = function(value) Interface().minimapZoneX = value MinimapModule.RefreshZoneText() end }),
+			Kit.Pixels({ label = 'Vertical offset', min = -300, max = 300, step = 1, get = function() return Interface().minimapZoneY end, set = function(value) Interface().minimapZoneY = value MinimapModule.RefreshZoneText() end }),
 		} },
 		{ get = function() return Interface().minimapZone == true end, set = function(value) Interface().minimapZone = value MinimapModule.ToggleZoneText(value) end },
 	}, RefreshPreview)
@@ -899,8 +900,8 @@ local function AddonButtonsBoard(ui, parent, width)
 	board:AddTools('Drawer', 'Collects the buttons behind a tab on the edge of the map', {
 		{ icon = 'location', tooltip = 'Side and offsets', title = 'Drawer', options = {
 			{ label = 'Side', entries = SIDES, get = function() return Interface().drawerSide end, set = function(value) Interface().drawerSide = value end },
-			{ label = 'Horizontal offset', min = -300, max = 300, step = 1, get = function() return Interface().drawerX end, set = function(value) Interface().drawerX = value end },
-			{ label = 'Vertical offset', min = -300, max = 300, step = 1, get = function() return Interface().drawerY end, set = function(value) Interface().drawerY = value end },
+			Kit.Pixels({ label = 'Horizontal offset', min = -300, max = 300, step = 1, get = function() return Interface().drawerX end, set = function(value) Interface().drawerX = value end }),
+			Kit.Pixels({ label = 'Vertical offset', min = -300, max = 300, step = 1, get = function() return Interface().drawerY end, set = function(value) Interface().drawerY = value end }),
 		} },
 		ModeSwitch('DRAWER'),
 	}, Refresh)
@@ -917,8 +918,8 @@ local function AddonButtonsBoard(ui, parent, width)
 			{ label = 'Side', entries = SIDES, get = function() return Buttons().side end, set = function(value) Buttons().side = value end },
 			{ label = 'Align', entries = ALIGNS, get = function() return Buttons().align end, set = function(value) Buttons().align = value end },
 			{ label = 'Gap from the map', min = 0, max = 10, step = 1, get = function() return Buttons().gap end, set = function(value) Buttons().gap = value end },
-			{ label = 'Horizontal offset', min = -300, max = 300, step = 1, get = function() return Buttons().offsetX end, set = function(value) Buttons().offsetX = value end },
-			{ label = 'Vertical offset', min = -300, max = 300, step = 1, get = function() return Buttons().offsetY end, set = function(value) Buttons().offsetY = value end },
+			Kit.Pixels({ label = 'Horizontal offset', min = -300, max = 300, step = 1, get = function() return Buttons().offsetX end, set = function(value) Buttons().offsetX = value end }),
+			Kit.Pixels({ label = 'Vertical offset', min = -300, max = 300, step = 1, get = function() return Buttons().offsetY end, set = function(value) Buttons().offsetY = value end }),
 		} },
 		ModeSwitch('BAR'),
 	}, Refresh)

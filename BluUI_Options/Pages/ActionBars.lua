@@ -107,8 +107,8 @@ end
 local function TextPlacement(db, title, prefix)
 	return { icon = 'location', tooltip = 'Anchor and offset', title = title, options = {
 		Option(db, 'Anchor', prefix .. 'Anchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS_SHORT }),
-		Option(db, 'Horizontal', prefix .. 'OffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
-		Option(db, 'Vertical', prefix .. 'OffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 }),
+		Kit.Pixels(Option(db, 'Horizontal', prefix .. 'OffsetX', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 })),
+		Kit.Pixels(Option(db, 'Vertical', prefix .. 'OffsetY', { min = -TEXT_RANGE, max = TEXT_RANGE, step = 1 })),
 	} }
 end
 

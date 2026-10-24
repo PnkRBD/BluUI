@@ -184,8 +184,8 @@ end
 
 local function Offsets(db, title, xKey, yKey, extra)
 	local options = {
-		Option(db, 'Horizontal', xKey, { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 }),
-		Option(db, 'Vertical', yKey, { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 }),
+		Kit.Pixels(Option(db, 'Horizontal', xKey, { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 })),
+		Kit.Pixels(Option(db, 'Vertical', yKey, { min = -OFFSET_RANGE, max = OFFSET_RANGE, step = 1 })),
 	}
 	for _, option in ipairs(extra or {}) do options[#options + 1] = option end
 	return { icon = 'location', tooltip = 'Text offset', title = title, options = options }

@@ -71,6 +71,8 @@ end
 
 Pixel.Scale = gridSnap
 Pixel.Snap = nearestPixel
+Pixel.ToPixels = pixelsFor
+Pixel.FromPixels = unitsFor
 
 function Pixel.ScaleFor(region, value)
     if value == 0 then return 0 end

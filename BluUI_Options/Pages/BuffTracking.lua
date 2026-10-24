@@ -219,10 +219,10 @@ local function PackLeader(board)
 			cycle:AddTools('Labels', 'Size and placement of the countdown and the next beast', {
 				TextTool('Labels', {
 					Option(db, 'Label size', 'labelTextSize', { min = 6, max = 32, step = 1 }),
-					Option(db, 'Top text horizontal', 'topTextOffsetX', { min = -LABEL_RANGE, max = LABEL_RANGE, step = 1, separator = true }),
-					Option(db, 'Top text vertical', 'topTextOffsetY', { min = -LABEL_RANGE, max = LABEL_RANGE, step = 1 }),
-					Option(db, 'Bottom text horizontal', 'bottomTextOffsetX', { min = -LABEL_RANGE, max = LABEL_RANGE, step = 1, separator = true }),
-					Option(db, 'Bottom text vertical', 'bottomTextOffsetY', { min = -LABEL_RANGE, max = LABEL_RANGE, step = 1 }),
+					Kit.Pixels(Option(db, 'Top text horizontal', 'topTextOffsetX', { min = -LABEL_RANGE, max = LABEL_RANGE, step = 1, separator = true })),
+					Kit.Pixels(Option(db, 'Top text vertical', 'topTextOffsetY', { min = -LABEL_RANGE, max = LABEL_RANGE, step = 1 })),
+					Kit.Pixels(Option(db, 'Bottom text horizontal', 'bottomTextOffsetX', { min = -LABEL_RANGE, max = LABEL_RANGE, step = 1, separator = true })),
+					Kit.Pixels(Option(db, 'Bottom text vertical', 'bottomTextOffsetY', { min = -LABEL_RANGE, max = LABEL_RANGE, step = 1 })),
 				}),
 			}, Refresh)
 			cycle:AddTools('Icons', 'Size of the current and next icon, the gap between them and where they sit', {
@@ -248,8 +248,8 @@ local function PackLeader(board)
 				TextTool('Timer', {
 					Option(db, 'Timer size', 'timerSize', { min = 6, max = 72, step = 1 }),
 					Option(db, 'Timer anchor', 'timerAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
-					Option(db, 'Timer horizontal', 'timerOffsetX', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 }),
-					Option(db, 'Timer vertical', 'timerOffsetY', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 }),
+					Kit.Pixels(Option(db, 'Timer horizontal', 'timerOffsetX', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 })),
+					Kit.Pixels(Option(db, 'Timer vertical', 'timerOffsetY', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 })),
 					Option(db, 'Decimals under seconds', 'decimalThreshold', { min = 1, max = 10, step = 1, separator = true }),
 				}),
 			}, Refresh)
@@ -257,8 +257,8 @@ local function PackLeader(board)
 				TextTool('Beast name', {
 					Option(db, 'Beast name size', 'beastSize', { min = 6, max = 24, step = 1 }),
 					Option(db, 'Beast name anchor', 'beastAnchor', { entries = BUI.C.ANCHOR_POINT_OPTIONS }),
-					Option(db, 'Beast name horizontal', 'beastOffsetX', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 }),
-					Option(db, 'Beast name vertical', 'beastOffsetY', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 }),
+					Kit.Pixels(Option(db, 'Beast name horizontal', 'beastOffsetX', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 })),
+					Kit.Pixels(Option(db, 'Beast name vertical', 'beastOffsetY', { min = -OVERLAY_RANGE, max = OVERLAY_RANGE, step = 1 })),
 				}),
 			}, Refresh)
 		end,

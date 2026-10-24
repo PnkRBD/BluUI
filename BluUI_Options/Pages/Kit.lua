@@ -3,6 +3,8 @@ local BUILib = BUI.BUILibClient
 
 local MENU_WIDTH = 150
 
+local Pixel = BUI.Pixel
+
 local Kit = {}
 BUI.OptionsKit = Kit
 
@@ -45,6 +47,19 @@ end
 
 function Kit.Option(db, label, key, extra)
 	return Kit.Setting(db, label, key, nil, extra)
+end
+
+local function WholePixels(value)
+	return math.floor(Pixel.ToPixels(value) + 0.5)
+end
+
+function Kit.Pixels(option)
+	local get, set, default = option.get, option.set, option.default
+	option.get = function() return WholePixels(get() or 0) end
+	option.set = function(value) set(Pixel.FromPixels(value)) end
+	if default then option.default = function() return WholePixels(default() or 0) end end
+	option.min, option.max = WholePixels(option.min), WholePixels(option.max)
+	return option
 end
 
 function Kit.Toggle(db, label, key, extra)
