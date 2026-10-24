@@ -1193,9 +1193,9 @@ do
 		end
 	end
 
-	local function ScanPlayer()
+	local ScanPlayer = BUI.Dispatcher.New(function()
 		UnitFrames.UpdateDebuffHighlight(UnitFrames.player)
-	end
+	end)
 
 	BUI.Tools.OnAuraQueriesUnblocked(ScanPlayer)
 	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'UF.DebuffHighlight.Scan', ScanPlayer)
