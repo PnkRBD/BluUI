@@ -162,7 +162,7 @@ local Dispatch = BUI.Dispatcher.New(function()
 	local instant = pendingInstant
 	pendingInstant = false
 	ApplyUpdate(instant)
-end, 'Visibility')
+end)
 
 function Visibility.Update(instant)
 	if instant then pendingInstant = true end
@@ -201,9 +201,9 @@ local function EnsureFlyStateDriver()
 	if not FlyingMatters() then return end
 	if InCombatLockdown() then return end
 	flyStateFrame = CreateFrame('Frame', 'BUI_FlyStateDriver')
-	flyStateFrame:SetScript('OnAttributeChanged', BUI.Profiler.Wrap('Utility.Visibility fly state', function(_, attributeName)
+	flyStateFrame:SetScript('OnAttributeChanged', function(_, attributeName)
 		if attributeName == 'state-buiflying' then Visibility.Update() end
-	end))
+	end)
 	RegisterStateDriver(flyStateFrame, 'buiflying', '[flying] fly; [mounted] mounted; ground')
 end
 
@@ -234,7 +234,7 @@ local function OnVisibilityEvent(event)
 	elseif event == 'PLAYER_ENTERING_WORLD' then
 		SetPetBattle(C_PetBattles.IsInBattle())
 		forceInstant = true
-		BUI.Profiler.After('Utility.Visibility instant reset', 1, ClearForceInstant)
+		C_Timer.After(1, ClearForceInstant)
 	end
 
 	Visibility.Update(forceInstant)

@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Wrap = BUI.Profiler.Wrap
-
 local max, min, floor = math.max, math.min, math.floor
 local GetTime = GetTime
 
@@ -64,14 +62,14 @@ local function StopCountdown()
 	if countdownText then countdownText:SetText('') end
 end
 
-local CountdownTick = Wrap('Skin.ReadyCheck countdown tick', function()
+local CountdownTick = function()
 	local remaining = countdownExpiry - GetTime()
 	if remaining <= 0 then
 		StopCountdown()
 		return
 	end
 	BUILib.Skin.SetCountdownText(countdownText, floor(remaining + 0.5), BUILib.Skin.COUNTDOWN_GREEN_COLOR)
-end)
+end
 
 local function StartCountdown(timeLeft)
 	StopCountdown()
@@ -168,7 +166,7 @@ local function InstallPrompt(listener)
 	countdownText = Own(listener:CreateFontString(nil, 'OVERLAY'))
 	Skin.TipFont(countdownText, 'body', CurrentScale())
 	countdownText:SetJustifyH('RIGHT')
-	listener:HookScript('OnHide', Wrap('Skin.ReadyCheck countdown stop', StopCountdown))
+	listener:HookScript('OnHide', StopCountdown)
 	local text = _G.ReadyCheckFrameText
 	context.Hook(text, 'SetText', OnPromptText)
 	context.Hook(text, 'SetFormattedText', OnPromptText)

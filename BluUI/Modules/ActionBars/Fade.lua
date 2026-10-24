@@ -26,7 +26,7 @@ local function Fader(bar)
 	if fader then return fader end
 	local header = bar.header
 	fader = { header = header, from = 1, to = 1, start = 0, duration = 0, playing = false }
-	fader.tick = BUI.Profiler.Script('ActionBars.Fade tween', function()
+	fader.tick = function()
 		local progress = (GetTime() - fader.start) / fader.duration
 		if progress >= 1 then
 			header:SetAlpha(fader.to)
@@ -35,7 +35,7 @@ local function Fader(bar)
 		end
 		local eased = progress * progress * (3 - 2 * progress)
 		header:SetAlpha(fader.from + (fader.to - fader.from) * eased)
-	end)
+	end
 	bar.fader = fader
 	return fader
 end
@@ -59,7 +59,7 @@ local function SetAlphaTarget(bar, target, seconds)
 	end
 	local fader = Fader(bar)
 	fader.from, fader.to, fader.start, fader.duration, fader.playing = current, target, GetTime(), seconds, true
-	header:SetScript('OnUpdate', BUI.Profiler.Timed('ActionBars.Fade SetAlphaTarget header OnUpdate', fader.tick))
+	header:SetScript('OnUpdate', fader.tick)
 end
 
 local function ApplyBar(bar)
@@ -104,16 +104,16 @@ end
 local function StartGapWatch(bar)
 	if bar.gapWatch then return end
 	if not bar.gapCheck then
-		bar.gapCheck = BUI.Profiler.Wrap('ActionBars.Fade gap watch', function()
+		bar.gapCheck = function()
 			if bar.hoverCount > 0 then
 				StopGapWatch(bar)
 			elseif not CursorOverBar(bar) then
 				StopGapWatch(bar)
 				SetHovered(bar, false)
 			end
-		end)
+		end
 	end
-	bar.gapWatch = C_Timer.NewTicker(GAP_INTERVAL, BUI.Profiler.Timed('ActionBars.Fade StartGapWatch ticker', bar.gapCheck))
+	bar.gapWatch = C_Timer.NewTicker(GAP_INTERVAL, bar.gapCheck)
 end
 
 local function Enter(bar)
@@ -129,7 +129,7 @@ local function Leave(bar)
 	if bar.hoverCount > 0 or bar.leavePending then return end
 	bar.leavePending = true
 	if not bar.leaveCheck then
-		bar.leaveCheck = BUI.Profiler.Wrap('ActionBars.Fade leave check', function()
+		bar.leaveCheck = function()
 			bar.leavePending = nil
 			if bar.hoverCount > 0 then return end
 			if CursorOverBar(bar) then
@@ -137,9 +137,9 @@ local function Leave(bar)
 			else
 				SetHovered(bar, false)
 			end
-		end)
+		end
 	end
-	C_Timer.After(0, BUI.Profiler.Timed('ActionBars.Fade Leave timer', bar.leaveCheck))
+	C_Timer.After(0, bar.leaveCheck)
 end
 
 local function OnFrameEnter(frame) Enter(frame._buiFadeBar) end
@@ -159,8 +159,8 @@ local function HookHoverFrame(frame, bar)
 	frame._buiFadeBar = bar
 	if frame._buiFadeHooked then return end
 	frame._buiFadeHooked = true
-	frame:HookScript('OnEnter', BUI.Profiler.Wrap('ActionBars.Fade frame OnEnter', OnFrameEnter))
-	frame:HookScript('OnLeave', BUI.Profiler.Wrap('ActionBars.Fade frame OnLeave', OnFrameLeave))
+	frame:HookScript('OnEnter', OnFrameEnter)
+	frame:HookScript('OnLeave', OnFrameLeave)
 end
 
 function ActionBars.HookFadeFrames(bar, frames)
@@ -173,12 +173,12 @@ end
 local function HookFlyoutButton(button)
 	if button._buiFadeHooked then return end
 	button._buiFadeHooked = true
-	button:HookScript('OnEnter', BUI.Profiler.Wrap('ActionBars.Fade button OnEnter', OnFlyoutButtonEnter))
-	button:HookScript('OnLeave', BUI.Profiler.Wrap('ActionBars.Fade button OnLeave', OnFlyoutButtonLeave))
+	button:HookScript('OnEnter', OnFlyoutButtonEnter)
+	button:HookScript('OnLeave', OnFlyoutButtonLeave)
 	local handler = LibActionButton.flyoutHandler
 	if handler and not handler._buiFadeHooked then
 		handler._buiFadeHooked = true
-		handler:HookScript('OnHide', BUI.Profiler.Wrap('ActionBars.Fade flyout hide', OnFlyoutHidden))
+		handler:HookScript('OnHide', OnFlyoutHidden)
 	end
 end
 
@@ -193,7 +193,7 @@ end
 local function EnsureHooks(bar)
 	local header = bar.header
 	if not header._buiFadeHooked then
-		header:HookScript('OnShow', BUI.Profiler.Wrap('ActionBars.Fade header show', OnHeaderShown))
+		header:HookScript('OnShow', OnHeaderShown)
 	end
 	HookHoverFrame(header, bar)
 	for _, button in ipairs(bar.buttons) do HookHoverFrame(button, bar) end

@@ -124,7 +124,7 @@ local function SkinFrame(frame)
 	pendingMenus[frame] = true
 	if flushScheduled then return end
 	flushScheduled = true
-	BUI.Profiler.After('Skin.Menus pending flush', 0, FlushPending)
+	C_Timer.After(0, FlushPending)
 end
 
 local function SkinAttachments(compositor)
@@ -147,7 +147,7 @@ local function Install()
 	local manager = Menu.GetManager()
 	context.Hook(manager, 'OpenMenu', OnMenuOpen)
 	context.Hook(manager, 'OpenContextMenu', OnMenuOpen)
-	Menu.ModifyMenu(LOADOUT_MENU_TAG, BUI.Profiler.Timed('Skinning.Menus Install menu ', OnLoadoutMenu))
+	Menu.ModifyMenu(LOADOUT_MENU_TAG, OnLoadoutMenu)
 	context.Hook(MenuVariants, 'CreateCheckbox', OnCheckbox)
 	context.Hook(MenuVariants, 'CreateRadio', OnRadio)
 	context.Hook(MenuVariants, 'CreateDivider', OnDivider)

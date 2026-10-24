@@ -1410,7 +1410,7 @@ local function RefreshIfOpen()
 	for _, callback in pairs(module._iconListRefreshers) do callback() end
 end
 
-local RefreshSoon = BUI.Dispatcher.NewDelayed(RefreshIfOpen, 0.3, 'CDM page refresh')
+local RefreshSoon = BUI.Dispatcher.NewDelayed(RefreshIfOpen, 0.3)
 
 BUI.Events:Register('PLAYER_SPECIALIZATION_CHANGED', 'CDMPage', function(_, unit)
 	if unit == 'player' then RefreshSoon() end

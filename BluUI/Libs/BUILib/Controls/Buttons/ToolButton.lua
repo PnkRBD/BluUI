@@ -77,19 +77,19 @@ function Controls.ToolButton(parent, options)
 	if options.atlas then button:SetIconAtlas(options.atlas)
 	elseif options.texture then button:SetIconTexture(options.texture) end
 
-	button:SetScript("OnEnter", BUILib.Timed('BUILib.ToolButton ToolButton button OnEnter', function(self)
+	button:SetScript("OnEnter", function(self)
 		local red, green, blue = Theme.GetAccent()
 		Widget.SetShapeColor(self.fill, red * hoverScale, green * hoverScale, blue * hoverScale, 1)
 		self.icon:SetVertexColor(1, 1, 1)
 		self.label:SetTextColor(1, 1, 1)
-	end))
-	button:SetScript("OnLeave", BUILib.Timed('BUILib.ToolButton ToolButton button OnLeave', function(self)
+	end)
+	button:SetScript("OnLeave", function(self)
 		Widget.SetShapeColor(self.fill, fill[1], fill[2], fill[3], fill[4] or 1)
 		self.icon:SetVertexColor(ICON_IDLE[1], ICON_IDLE[2], ICON_IDLE[3])
 		self.label:SetTextColor(LABEL_IDLE[1], LABEL_IDLE[2], LABEL_IDLE[3])
-	end))
+	end)
 	if options.onClick then
-		button:SetScript("OnClick", BUILib.Timed('BUILib.ToolButton ToolButton button OnClick', function(self, mouseButton) options.onClick(self, mouseButton) end))
+		button:SetScript("OnClick", function(self, mouseButton) options.onClick(self, mouseButton) end)
 	end
 
 	return button

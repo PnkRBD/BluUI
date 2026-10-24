@@ -502,7 +502,7 @@ local RefreshFaction = BUI.Dispatcher.New(function()
 	LayoutBars()
 	ApplyBarPosition()
 	UpdateAll()
-end, 'Skin.ExperienceBar.Faction')
+end)
 
 local function CreateBars()
 	if barFrame then return end
@@ -570,15 +570,15 @@ local function CreateBars()
 	hoverTicker = CreateFrame('Frame')
 	hoverTicker:Hide()
 	local tickElapsed = 0
-	hoverTicker:SetScript('OnUpdate', BUI.Profiler.Wrap('Skin.ExperienceBar hover stats', function(_, elapsed)
+	hoverTicker:SetScript('OnUpdate', function(_, elapsed)
 		tickElapsed = tickElapsed + elapsed
 		if tickElapsed < 0.5 then return end
 		tickElapsed = 0
 		UpdateHoverStats()
-	end))
+	end)
 
 	barFrame:EnableMouse(true)
-	barFrame:SetScript('OnEnter', BUI.Profiler.Script('Skin.ExperienceBar barFrame OnEnter', function(self)
+	barFrame:SetScript('OnEnter', function(self)
 		local config = GetConfig()
 		local hover = config.hoverHeight
 		local position = config.position
@@ -618,16 +618,16 @@ local function CreateBars()
 
 		UpdateHoverStats()
 		hoverTicker:Show()
-	end))
+	end)
 
-	barFrame:SetScript('OnLeave', BUI.Profiler.Script('Skin.ExperienceBar barFrame OnLeave', function()
+	barFrame:SetScript('OnLeave', function()
 		xpText:Hide()
 		reputationText:Hide()
 		HideHoverStats()
 		hoverTicker:Hide()
 		LayoutBars()
 		ApplyBarPosition()
-	end))
+	end)
 
 	Dragging.MakeDraggable(barFrame, {
 		isLocked = function()

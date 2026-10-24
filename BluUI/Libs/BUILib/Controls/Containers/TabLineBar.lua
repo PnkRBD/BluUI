@@ -23,7 +23,7 @@ function Controls.TabLineBar(parent, tabs, selected, callback, width)
 	local function StartLineAnim()
 		if animating then return end
 		animating = true
-		container:SetScript("OnUpdate", BUILib.Timed('BUILib.TabLineBar StartLineAnim container OnUpdate', function(_, deltaTime)
+		container:SetScript("OnUpdate", function(_, deltaTime)
 			local lerpFactor = 1 - math.exp(-16 * deltaTime)
 			local settled = true
 			for index, button in ipairs(buttons) do
@@ -42,7 +42,7 @@ function Controls.TabLineBar(parent, tabs, selected, callback, width)
 				animating = false
 				container:SetScript("OnUpdate", nil)
 			end
-		end))
+		end)
 	end
 
 	local function UpdateAll()
@@ -83,19 +83,19 @@ function Controls.TabLineBar(parent, tabs, selected, callback, width)
 		button.indicator:SetPoint("BOTTOM")
 		button.indicator:SetWidth(1)
 		button.indicator:Hide()
-		button:SetScript("OnClick", BUILib.Timed('BUILib.TabLineBar TabLineBar button OnClick', function()
+		button:SetScript("OnClick", function()
 			state.selected = tabIndex
 			UpdateAll()
 			if callback then callback(tabIndex, tabInfo) end
-		end))
-		button:SetScript("OnEnter", BUILib.Timed('BUILib.TabLineBar TabLineBar button OnEnter', function()
+		end)
+		button:SetScript("OnEnter", function()
 			button._hover = true
 			UpdateAll()
-		end))
-		button:SetScript("OnLeave", BUILib.Timed('BUILib.TabLineBar TabLineBar button OnLeave', function()
+		end)
+		button:SetScript("OnLeave", function()
 			button._hover = nil
 			UpdateAll()
-		end))
+		end)
 		buttons[tabIndex] = button
 	end
 

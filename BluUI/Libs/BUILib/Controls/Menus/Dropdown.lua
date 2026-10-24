@@ -46,7 +46,7 @@ function Widget.DropdownMenuScaffold(parentFrame, anchorButton, menuWidth, scrol
 			scrollFrame:SetPoint("BOTTOMRIGHT", needs and -(panelInset + 8) or -panelInset, panelInset)
 		end,
 	})
-	menu:EnableMouseWheel(true); menu:SetScript("OnMouseWheel", BUILib.Timed('BUILib.Dropdown DropdownMenuScaffold menu OnMouseWheel', function(_, delta) scrollLogic.DoScroll(delta) end))
+	menu:EnableMouseWheel(true); menu:SetScript("OnMouseWheel", function(_, delta) scrollLogic.DoScroll(delta) end)
 
 	local function PositionMenu()
 		Widget.MatchScale(menu, anchorButton)
@@ -56,12 +56,12 @@ function Widget.DropdownMenuScaffold(parentFrame, anchorButton, menuWidth, scrol
 		else menu:SetPoint("TOPLEFT", anchorButton, "BOTTOMLEFT", 0, -2) end
 	end
 
-	menu:SetScript("OnShow", BUILib.Timed('BUILib.Dropdown DropdownMenuScaffold menu OnShow', function(self)
+	menu:SetScript("OnShow", function(self)
 		self:Raise()
 		BUILib._popupCount = (BUILib._popupCount or 0) + 1
 		self.checkFrame = self.checkFrame or CreateFrame("Frame")
 		local anchorTop = anchorButton:GetTop()
-		self.checkFrame:SetScript("OnUpdate", BUILib.Timed('BUILib.Dropdown DropdownMenuScaffold checkFrame OnUpdate', function(updateFrame)
+		self.checkFrame:SetScript("OnUpdate", function(updateFrame)
 			if not anchorButton:IsVisible() or Widget.AnchorMoved(anchorButton, anchorTop) then
 				HideMenu(menu); onClose(); updateFrame:SetScript("OnUpdate", nil)
 				return
@@ -71,12 +71,12 @@ function Widget.DropdownMenuScaffold(parentFrame, anchorButton, menuWidth, scrol
 					HideMenu(menu); onClose(); updateFrame:SetScript("OnUpdate", nil)
 				end
 			end
-		end))
-	end))
-	menu:SetScript("OnHide", BUILib.Timed('BUILib.Dropdown DropdownMenuScaffold menu OnHide', function(self)
+		end)
+	end)
+	menu:SetScript("OnHide", function(self)
 		BUILib._popupCount = math.max(0, (BUILib._popupCount or 0) - 1)
 		if self.checkFrame then self.checkFrame:SetScript("OnUpdate", nil) end
-	end))
+	end)
 
 	return menu, scrollFrame, scrollChild, scrollLogic, PositionMenu
 end
@@ -166,28 +166,28 @@ function Controls.Dropdown(parent, label, items, selected, callback, tooltip, wi
 			row.check:SetTexture(BUILib.GetLibMedia("check"))
 			row.check:SetSize(CHECK_SIZE, CHECK_SIZE); row.check:SetPoint("RIGHT", -10, 0)
 			row.check:SetVertexColor(unpack(Theme.text.primary))
-			row:SetScript("OnEnter", BUILib.Timed('BUILib.Dropdown GetRow row OnEnter', function(rowButton)
+			row:SetScript("OnEnter", function(rowButton)
 				rowButton.bg:SetColorTexture(unpack(BUILib.Layout.SOLID_HOVER))
 				if rowButton.tip then Widget.ShowTip(rowButton, rowButton.tip) end
-			end))
-			row:SetScript("OnLeave", BUILib.Timed('BUILib.Dropdown GetRow row OnLeave', function(rowButton)
+			end)
+			row:SetScript("OnLeave", function(rowButton)
 				rowButton.bg:SetColorTexture(unpack(rowButton._selected and SELECTED or CLEAR))
 				if rowButton.tip then Widget.HideTip() end
-			end))
+			end)
 		else
 			row.text = row:CreateFontString(nil, "OVERLAY"); row.text:SetFont(BUILib.Font, 11, ""); row.text:SetPoint("LEFT", 6, 0)
 			row.hl = row:CreateTexture(nil, "BACKGROUND"); row.hl:SetAllPoints(); row.hl:SetColorTexture(unpack(SELECTED)); row.hl:Hide()
 			row.hover = row:CreateTexture(nil, "BACKGROUND", nil, 1)
 			row.hover:SetAllPoints(); row.hover:SetColorTexture(unpack(BUILib.Layout.SOLID_HOVER)); row.hover:Hide()
-			row:SetScript("OnEnter", BUILib.Timed('BUILib.Dropdown GetRow row OnEnter', function(rowButton)
+			row:SetScript("OnEnter", function(rowButton)
 				rowButton.hover:Show(); rowButton.text:SetTextColor(1, 1, 1)
 				if rowButton.tip then Widget.ShowTip(rowButton, rowButton.tip) end
-			end))
-			row:SetScript("OnLeave", BUILib.Timed('BUILib.Dropdown GetRow row OnLeave', function(rowButton)
+			end)
+			row:SetScript("OnLeave", function(rowButton)
 				rowButton.hover:Hide()
 				if not rowButton._selected then rowButton.text:SetTextColor(unpack(Theme.text.secondary)) end
 				if rowButton.tip then Widget.HideTip() end
-			end))
+			end)
 		end
 		rowPool[index] = row; return row
 	end
@@ -219,7 +219,7 @@ function Controls.Dropdown(parent, label, items, selected, callback, tooltip, wi
 				row.hl:SetShown(isSelected)
 				row.text:SetTextColor(unpack(isSelected and Theme.text.primary or Theme.text.secondary))
 			end
-			row:SetScript("OnClick", BUILib.Timed('BUILib.Dropdown BuildMenu row OnClick', function()
+			row:SetScript("OnClick", function()
 				state.value = value; UpdateButtonDisplay()
 				local left, top = menu:GetLeft(), menu:GetTop()
 				if left and top then
@@ -228,7 +228,7 @@ function Controls.Dropdown(parent, label, items, selected, callback, tooltip, wi
 				end
 				HideMenu(menu); SetExpandOpen(false)
 				if callback then callback(value, item) end
-			end))
+			end)
 			offsetY = offsetY + rowHeight
 		end
 		scrollChild:SetHeight(offsetY)
@@ -236,12 +236,12 @@ function Controls.Dropdown(parent, label, items, selected, callback, tooltip, wi
 		menu._targetH = menu:GetHeight()
 		scrollFrame:SetVerticalScroll(0); BUILib.Defer(scrollLogic.UpdateThumb)
 	end
-	button:SetScript("OnClick", BUILib.Timed('BUILib.Dropdown Dropdown button OnClick', function()
+	button:SetScript("OnClick", function()
 		if menu:IsShown() then HideMenu(menu); SetExpandOpen(false)
 		else BuildMenu(); PositionMenu(); ShowMenu(menu); SetExpandOpen(true) end
-	end))
-	button:SetScript("OnEnter", BUILib.Timed('BUILib.Dropdown Dropdown button OnEnter', function() SetButtonHighlighted(true); expandIcon:SetVertexColor(1, 1, 1) end))
-	button:SetScript("OnLeave", BUILib.Timed('BUILib.Dropdown Dropdown button OnLeave', function() SetButtonHighlighted(false); expandIcon:SetVertexColor(unpack(Theme.text.secondary)) end))
+	end)
+	button:SetScript("OnEnter", function() SetButtonHighlighted(true); expandIcon:SetVertexColor(1, 1, 1) end)
+	button:SetScript("OnLeave", function() SetButtonHighlighted(false); expandIcon:SetVertexColor(unpack(Theme.text.secondary)) end)
 	if tooltip then Widget.Tooltip(button, tooltip) end
 	UpdateButtonDisplay()
 	function container:GetValue() return state.value end

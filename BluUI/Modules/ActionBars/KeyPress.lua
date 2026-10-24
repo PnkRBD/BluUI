@@ -16,10 +16,10 @@ end
 
 local function Tap(button)
 	button:SetButtonState('PUSHED')
-	BUI.Tools.ReplaceTimer(button, '_buiTapTimer', 'ActionBars.KeyPress tap release', TAP_SECONDS, Release, button)
+	BUI.Tools.ReplaceTimer(button, '_buiTapTimer', TAP_SECONDS, Release, button)
 end
 
-local OnPostClick = BUI.Profiler.Script('ActionBars.KeyPress button PostClick', function(button, _, down)
+local OnPostClick = function(button, _, down)
 	if not running then return end
 	if down then
 		held[button] = true
@@ -29,7 +29,7 @@ local OnPostClick = BUI.Profiler.Script('ActionBars.KeyPress button PostClick', 
 	elseif not button:IsMouseOver() then
 		Tap(button)
 	end
-end)
+end
 
 function ActionBars.TrackKeyPresses(button)
 	button:HookScript('PostClick', OnPostClick)

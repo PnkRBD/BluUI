@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('CDM.Hooks')
-
 local abs = math.abs
 local _G = _G
 local wipe = wipe
@@ -154,29 +152,29 @@ function CDM.HookIconFrame(icon, key)
     frameData.posHooked = true
     frameData.viewerKey = key
     if key ~= 'buffs' and icon.Cooldown and not frameData.customIcon then
-        icon.Cooldown:HookScript('OnCooldownDone', BUI.Profiler.Timed('CDM.Hooks HookIconFrame Cooldown OnCooldownDone', CDM.OnCooldownWidgetDone))
+        icon.Cooldown:HookScript('OnCooldownDone', CDM.OnCooldownWidgetDone)
     end
 
-    Hook(icon, "SetPoint", OnIconSetPoint)
-    Hook(icon, "SetScale", OnIconSetScale)
-    Hook(icon, "SetAlpha", OnIconSetAlpha)
-    Hook(icon, "SetSize", OnIconSetSize)
-    Hook(icon, "SetWidth", OnIconSetSize)
-    Hook(icon, "SetHeight", OnIconSetSize)
+    hooksecurefunc(icon, "SetPoint", OnIconSetPoint)
+    hooksecurefunc(icon, "SetScale", OnIconSetScale)
+    hooksecurefunc(icon, "SetAlpha", OnIconSetAlpha)
+    hooksecurefunc(icon, "SetSize", OnIconSetSize)
+    hooksecurefunc(icon, "SetWidth", OnIconSetSize)
+    hooksecurefunc(icon, "SetHeight", OnIconSetSize)
     if icon.SetCooldownID then
         local cooldownID = icon.cooldownID
         if not issecretvalue(cooldownID) then
             frameData.lastCooldownID = cooldownID
         end
-        Hook(icon, "SetCooldownID", OnIconSetCooldownID)
+        hooksecurefunc(icon, "SetCooldownID", OnIconSetCooldownID)
     end
     if icon.OnActiveStateChanged then
-        Hook(icon, "OnActiveStateChanged", OnIconActiveStateChanged)
+        hooksecurefunc(icon, "OnActiveStateChanged", OnIconActiveStateChanged)
     end
     if key == 'buffs' then
-        Hook(icon, "Show", CDM.MarkBuffCenterDirty)
-        Hook(icon, "Hide", CDM.MarkBuffCenterDirty)
-        Hook(icon, "SetShown", CDM.MarkBuffCenterDirty)
+        hooksecurefunc(icon, "Show", CDM.MarkBuffCenterDirty)
+        hooksecurefunc(icon, "Hide", CDM.MarkBuffCenterDirty)
+        hooksecurefunc(icon, "SetShown", CDM.MarkBuffCenterDirty)
     end
 end
 
@@ -243,14 +241,13 @@ function CDM.HookViewer(viewer, key)
         viewerFrameData.hooked = true
         viewerFrameData.viewerKey = key
 
-        Hook(viewer, "Show", OnViewerVisibilityChanged)
-        Hook(viewer, "Hide", OnViewerVisibilityChanged)
-        Hook(viewer, "SetShown", OnViewerVisibilityChanged)
+        hooksecurefunc(viewer, "Show", OnViewerVisibilityChanged)
+        hooksecurefunc(viewer, "Hide", OnViewerVisibilityChanged)
+        hooksecurefunc(viewer, "SetShown", OnViewerVisibilityChanged)
 
         local pool = viewer.itemFramePool
-        local HookViewer = BUI.Profiler.Hooker("CDM." .. key)
-        HookViewer(viewer, "OnAcquireItemFrame", OnViewerAcquireFrame)
-        HookViewer(viewer, "RefreshLayout", OnRefreshLayoutComplete)
+        hooksecurefunc(viewer, "OnAcquireItemFrame", OnViewerAcquireFrame)
+        hooksecurefunc(viewer, "RefreshLayout", OnRefreshLayoutComplete)
 
         local enabled = BUI.GetDB().cdm[key].enabled
         for frame in pool:EnumerateActive() do
@@ -305,9 +302,8 @@ function CDM.HookBarViewer(onAcquire, onLayout)
     barLayoutListeners[#barLayoutListeners + 1] = onLayout
     if not barViewerHooked then
         barViewerHooked = true
-        local HookBars = BUI.Profiler.Hooker("CDM.bars")
-        HookBars(viewer, "OnAcquireItemFrame", OnBarViewerAcquire)
-        HookBars(viewer, "RefreshLayout", OnBarViewerLayout)
+        hooksecurefunc(viewer, "OnAcquireItemFrame", OnBarViewerAcquire)
+        hooksecurefunc(viewer, "RefreshLayout", OnBarViewerLayout)
     end
     return true
 end

@@ -143,8 +143,8 @@ function Layout.PlayerPortrait(texture)
 	local watcher = CreateFrame('Frame', nil, owner)
 	watcher:RegisterUnitEvent('UNIT_PORTRAIT_UPDATE', 'player')
 	watcher:RegisterEvent('PORTRAITS_UPDATED')
-	watcher:SetScript('OnEvent', BUILib.Timed('BUILib.Window PlayerPortrait watcher OnEvent', Refresh))
-	owner:HookScript('OnShow', BUILib.Timed('BUILib.Window PlayerPortrait owner OnShow', Refresh))
+	watcher:SetScript('OnEvent', Refresh)
+	owner:HookScript('OnShow', Refresh)
 	Refresh()
 end
 
@@ -213,7 +213,7 @@ function Layout.WindowFrame(config)
 		dragLeft, dragTop = frame:GetLeft(), frame:GetTop()
 		if not dragLeft or not dragTop then return end
 		dragCursorX, dragCursorY = GetCursorPosition()
-		dragDriver:SetScript('OnUpdate', BUILib.Timed('BUILib.Window StartMoving dragDriver OnUpdate', FollowCursor))
+		dragDriver:SetScript('OnUpdate', FollowCursor)
 	end
 	local function StopMoving()
 		dragDriver:SetScript('OnUpdate', nil)
@@ -227,8 +227,8 @@ function Layout.WindowFrame(config)
 	function window:DragWith(region)
 		region:EnableMouse(true)
 		region:RegisterForDrag('LeftButton')
-		region:HookScript('OnDragStart', BUILib.Timed('BUILib.Window DragWith region OnDragStart', StartMoving))
-		region:HookScript('OnDragStop', BUILib.Timed('BUILib.Window DragWith region OnDragStop', StopMoving))
+		region:HookScript('OnDragStart', StartMoving)
+		region:HookScript('OnDragStop', StopMoving)
 	end
 
 	if config.resizable ~= false then
@@ -248,10 +248,10 @@ function Layout.WindowFrame(config)
 		end
 		local function RepaintGrip() PaintGrip(Theme.GetAccent()) end
 		Theme.RegisterAccentElement(grip, function(_, red, green, blue) PaintGrip(red, green, blue) end)
-		resize:SetScript('OnMouseDown', BUILib.Timed('BUILib.Window WindowFrame resize OnMouseDown', function() frame:StartSizing('BOTTOMRIGHT') end))
-		resize:SetScript('OnMouseUp', BUILib.Timed('BUILib.Window WindowFrame resize OnMouseUp', StopMoving))
-		resize:SetScript('OnEnter', BUILib.Timed('BUILib.Window WindowFrame resize OnEnter', RepaintGrip))
-		resize:SetScript('OnLeave', BUILib.Timed('BUILib.Window WindowFrame resize OnLeave', RepaintGrip))
+		resize:SetScript('OnMouseDown', function() frame:StartSizing('BOTTOMRIGHT') end)
+		resize:SetScript('OnMouseUp', StopMoving)
+		resize:SetScript('OnEnter', RepaintGrip)
+		resize:SetScript('OnLeave', RepaintGrip)
 		RepaintGrip()
 	end
 
@@ -485,12 +485,12 @@ function Layout.Window(config)
 		end
 		local container = searchBox.frame
 		if searchConfig.onSubmit then
-			container.editbox:SetScript('OnEnterPressed', BUILib.Timed('BUILib.Window Window editbox OnEnterPressed', function(self)
+			container.editbox:SetScript('OnEnterPressed', function(self)
 				if searchConfig.onSubmit(self:GetText()) then
 					self:SetText('')
 					self:ClearFocus()
 				end
-			end))
+			end)
 		end
 		window:DragWith(container)
 		window:DragWith(container.editbox)

@@ -84,7 +84,7 @@ function Controls.Frames(parent, label, initial, callback, width, hint, suggesti
 			scrollFrame:SetPoint("TOPRIGHT", needsScrollbar and -10 or -2, -listTop)
 		end,
 	})
-	panel:EnableMouseWheel(true); panel:SetScript("OnMouseWheel", BUILib.Timed('BUILib.Frames Frames panel OnMouseWheel', function(_, delta) framesScrollLogic.DoScroll(delta) end))
+	panel:EnableMouseWheel(true); panel:SetScript("OnMouseWheel", function(_, delta) framesScrollLogic.DoScroll(delta) end)
 	local resultItems = {}
 	local filteredSuggestions = {}
 
@@ -118,8 +118,8 @@ function Controls.Frames(parent, label, initial, callback, width, hint, suggesti
 		descriptionText:SetTextColor(unpack(Theme.text.muted)); descriptionText:SetJustifyH("RIGHT")
 		descriptionText:SetWordWrap(false); item.desc = descriptionText
 		itemText:SetTextColor(unpack(Theme.text.primary)); item.text = itemText
-		item:SetScript("OnEnter", BUILib.Timed('BUILib.Frames Frames item OnEnter', function() state.selectedIndex = itemIndex; UpdateHighlight() end))
-		item:SetScript("OnClick", BUILib.Timed('BUILib.Frames Frames item OnClick', function(self) if self.value then SelectFrame(self.value) end end))
+		item:SetScript("OnEnter", function() state.selectedIndex = itemIndex; UpdateHighlight() end)
+		item:SetScript("OnClick", function(self) if self.value then SelectFrame(self.value) end end)
 		item:Hide(); resultItems[itemIndex] = item
 	end
 
@@ -171,23 +171,23 @@ function Controls.Frames(parent, label, initial, callback, width, hint, suggesti
 		panel:Hide(); chevron:SetText("+"); searchBox:ClearFocus(); syncIcons()
 	end
 
-	button:SetScript("OnClick", BUILib.Timed('BUILib.Frames Frames button OnClick', function()
+	button:SetScript("OnClick", function()
 		if panel:IsShown() then ClosePanel() else OpenPanel() end
-	end))
-	button:SetScript("OnEnter", BUILib.Timed('BUILib.Frames Frames button OnEnter', function(self) self:SetBackdropBorderColor(Theme.GetAccent()) end))
-	button:SetScript("OnLeave", BUILib.Timed('BUILib.Frames Frames button OnLeave', function(self) self:SetBackdropBorderColor(unpack(Theme.border.input)) end))
+	end)
+	button:SetScript("OnEnter", function(self) self:SetBackdropBorderColor(Theme.GetAccent()) end)
+	button:SetScript("OnLeave", function(self) self:SetBackdropBorderColor(unpack(Theme.border.input)) end)
 
-	searchBox:SetScript("OnTextChanged", BUILib.Timed('BUILib.Frames Frames searchBox OnTextChanged', function(_, userInput)
+	searchBox:SetScript("OnTextChanged", function(_, userInput)
 		searchPlaceholder:SetShown(searchBox:GetText() == "")
 		if userInput then FilterAndShow() end
-	end))
-	searchBox:SetScript("OnEnterPressed", BUILib.Timed('BUILib.Frames Frames searchBox OnEnterPressed', function()
+	end)
+	searchBox:SetScript("OnEnterPressed", function()
 		if state.selectedIndex > 0 and filteredSuggestions[state.selectedIndex] then
 			local selectedSuggestion = filteredSuggestions[state.selectedIndex]
 			SelectFrame(type(selectedSuggestion) == "table" and selectedSuggestion.tag or selectedSuggestion)
 		end
-	end))
-	searchBox:SetScript("OnEscapePressed", BUILib.Timed('BUILib.Frames Frames searchBox OnEscapePressed', function() ClosePanel() end))
+	end)
+	searchBox:SetScript("OnEscapePressed", function() ClosePanel() end)
 	local function ScrollToSelected()
 		if state.selectedIndex <= 0 then return end
 		local itemTop = (state.selectedIndex - 1) * itemHeight
@@ -197,18 +197,18 @@ function Controls.Frames(parent, label, initial, callback, width, hint, suggesti
 		if itemTop < scroll then framesScrollLogic.ScrollTo(itemTop)
 		elseif itemBottom > scroll + viewHeight then framesScrollLogic.ScrollTo(itemBottom - viewHeight) end
 	end
-	searchBox:SetScript("OnKeyDown", BUILib.Timed('BUILib.Frames Frames searchBox OnKeyDown', function(_, key)
+	searchBox:SetScript("OnKeyDown", function(_, key)
 		if key == "DOWN" then state.selectedIndex = math_min(state.selectedIndex + 1, #filteredSuggestions); UpdateHighlight(); ScrollToSelected()
 		elseif key == "UP" then state.selectedIndex = math_max(state.selectedIndex - 1, 1); UpdateHighlight(); ScrollToSelected()
 		elseif key == "TAB" and state.selectedIndex > 0 and filteredSuggestions[state.selectedIndex] then
 			local selectedSuggestion = filteredSuggestions[state.selectedIndex]
 			SelectFrame(type(selectedSuggestion) == "table" and selectedSuggestion.tag or selectedSuggestion)
 		end
-	end))
+	end)
 
-	panel:SetScript("OnShow", BUILib.Timed('BUILib.Frames Frames panel OnShow', function(self)
+	panel:SetScript("OnShow", function(self)
 		self.checkFrame = self.checkFrame or CreateFrame("Frame")
-		self.checkFrame:SetScript("OnUpdate", BUILib.Timed('BUILib.Frames Frames checkFrame OnUpdate', function(checkFrame)
+		self.checkFrame:SetScript("OnUpdate", function(checkFrame)
 			if not button:IsVisible() then
 				ClosePanel(); checkFrame:SetScript("OnUpdate", nil)
 				return
@@ -218,17 +218,17 @@ function Controls.Frames(parent, label, initial, callback, width, hint, suggesti
 					ClosePanel(); checkFrame:SetScript("OnUpdate", nil)
 				end
 			end
-		end))
-	end))
-	panel:SetScript("OnHide", BUILib.Timed('BUILib.Frames Frames panel OnHide', function(self) if self.checkFrame then self.checkFrame:SetScript("OnUpdate", nil) end end))
+		end)
+	end)
+	panel:SetScript("OnHide", function(self) if self.checkFrame then self.checkFrame:SetScript("OnUpdate", nil) end end)
 
 	local clearButton = Controls.Icon(button, { preset = "clear", size = 16 })
 	clearButton:SetPoint("RIGHT", -4, 0)
 	container._clearBtn = clearButton
-	clearButton:SetScript("OnClick", BUILib.Timed('BUILib.Frames Frames clearButton OnClick', function()
+	clearButton:SetScript("OnClick", function()
 		state.text = ""; UpdateButtonText(); ClosePanel()
 		if callback then callback("") end
-	end))
+	end)
 	syncIcons = function()
 		local hasValue = state.text ~= ""
 		local isOpen = panel:IsShown()

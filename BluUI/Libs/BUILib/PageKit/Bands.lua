@@ -11,14 +11,14 @@ function PageKit.PreviewBand(pageFrame, width, height, top, noDivider)
 	pinned:EnableMouse(true)
 	pinned:RegisterForDrag("LeftButton")
 
-	pinned:SetScript("OnDragStart", BUILib.Timed('BUILib.Bands PreviewBand pinned OnDragStart', function(self)
+	pinned:SetScript("OnDragStart", function(self)
 		local window = BUILib.ClientOf(self).popupParent
 		if window and window.StartMoving then window:StartMoving() end
-	end))
-	pinned:SetScript("OnDragStop", BUILib.Timed('BUILib.Bands PreviewBand pinned OnDragStop', function(self)
+	end)
+	pinned:SetScript("OnDragStop", function(self)
 		local window = BUILib.ClientOf(self).popupParent
 		if window and window.StopMovingOrSizing then window:StopMovingOrSizing() end
-	end))
+	end)
 
 	if not noDivider then
 		local divider = pinned:CreateTexture(nil, "OVERLAY")
@@ -49,13 +49,13 @@ function PageKit.PreviewStage(parent, options)
 	card.stage = stage
 	if options.tick then
 		local elapsed = 0
-		card:SetScript("OnUpdate", BUILib.Timed('BUILib.Bands PreviewStage card OnUpdate', function(self, deltaTime)
+		card:SetScript("OnUpdate", function(self, deltaTime)
 			elapsed = elapsed + deltaTime
 			if elapsed >= options.tick then
 				elapsed = 0
 				if self.UpdatePreview then self:UpdatePreview() end
 			end
-		end))
+		end)
 	end
 	return card, stage
 end

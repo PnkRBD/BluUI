@@ -934,10 +934,10 @@ do
 	local DISPEL_PREVIEW_SECONDS = 1.5
 	local previewTicker, previewCycle = nil, 0
 
-	local StepDispelPreview = BUI.Profiler.Wrap('UnitFrames dispel preview', function()
+	local StepDispelPreview = function()
 		previewCycle = previewCycle % #HL_TYPES + 1
 		PinDispelPreview(HL_TYPES[previewCycle])
-	end)
+	end
 
 	function UnitFrames.StopDispelPreview()
 		if previewTicker then previewTicker:Cancel() end
@@ -1076,7 +1076,7 @@ do
 		end
 	end
 
-	local QueueCalloutReadiness = BUI.Dispatcher.NewDelayed(ApplyCalloutReadiness, 0.25, 'Callout readiness')
+	local QueueCalloutReadiness = BUI.Dispatcher.NewDelayed(ApplyCalloutReadiness, 0.25)
 
 	local calloutEventsOn
 	local function StartCalloutEvents()
@@ -1197,7 +1197,7 @@ do
 		UnitFrames.UpdateDebuffHighlight(UnitFrames.player)
 	end
 
-	BUI.Tools.OnAuraQueriesUnblocked(ScanPlayer, 'Unit frame debuff highlight')
+	BUI.Tools.OnAuraQueriesUnblocked(ScanPlayer)
 	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'UF.DebuffHighlight.Scan', ScanPlayer)
 
 	BUI.Events:OnTalentBurst('UF.DebuffHighlight', ScanPlayer)
@@ -1213,7 +1213,7 @@ do
 			if unitFrame then UpdateCombatBorder(unitFrame, unitType, inCombat) end
 		end
 		if not inCombat then UnitFrames.RefreshAnchoredFrames() end
-	end, 'UF.CombatBorder')
+	end)
 
 	local function OnCombatBorderEvent(event)
 		if event == 'UNIT_THREAT_SITUATION_UPDATE' then

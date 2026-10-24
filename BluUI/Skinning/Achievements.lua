@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Wrap = BUI.Profiler.Wrap
-
 local ipairs = ipairs
 
 local BUILib = BluUI.BUILibClient
@@ -147,10 +145,9 @@ local function BuildMeter(bar, gutter)
 	bar._buiMeter = meter
 	bar._buiGutter = gutter
 	meters[#meters + 1] = meter
-	local layout = Wrap('Skin.Achievements meter layout', LayoutMeter)
-	bar:HookScript('OnValueChanged', layout)
-	bar:HookScript('OnMinMaxChanged', layout)
-	bar:HookScript('OnSizeChanged', layout)
+	bar:HookScript('OnValueChanged', LayoutMeter)
+	bar:HookScript('OnMinMaxChanged', LayoutMeter)
+	bar:HookScript('OnSizeChanged', LayoutMeter)
 end
 
 local function MeterText(fontString)

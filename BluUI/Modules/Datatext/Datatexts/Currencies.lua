@@ -35,7 +35,7 @@ end
 
 local DispatchRead = BUI.Dispatcher.New(function()
     if Read() then Datatext.Refresh('currency') end
-end, 'Datatext.Currency')
+end)
 
 Datatext.Register('currency', {
     name = 'Currencies', show = 'showCurrency', label = 'Cur:',

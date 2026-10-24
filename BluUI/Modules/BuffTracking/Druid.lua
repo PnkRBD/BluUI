@@ -20,7 +20,6 @@ local FLOURISH_SECONDS  = 6
 local FERAL        = 2
 local RESTORATION  = 4
 local CLEARCASTING_BY_SPEC = { [FERAL] = 135700, [RESTORATION] = 16870 }
-local TIMER_LABEL  = 'BuffTracking.Druid lifebloom'
 
 local playerIsDruid = select(2, UnitClass('player')) == 'DRUID'
 local spec
@@ -96,7 +95,7 @@ local function Expire(entry)
 end
 
 local function After(seconds, callback)
-    return BUI.Profiler.NewTimer(TIMER_LABEL, math.max(seconds, 0), callback)
+    return C_Timer.NewTimer(math.max(seconds, 0), callback)
 end
 
 local function Schedule(entry, settings)

@@ -63,7 +63,7 @@ local function Flash(inCombat)
     messageFrame:SetAlpha(1)
     messageFrame:Show()
 
-    BUI.Profiler.After("Auras.CombatMessage fade out", GetDB().fadeTime, function()
+    C_Timer.After(GetDB().fadeTime, function()
         if flashToken ~= token then return end
         UIFrameFade(messageFrame, { mode = "OUT", timeToFade = FADE_OUT, startAlpha = 1, endAlpha = 0, finishedFunc = HideMessage })
     end)

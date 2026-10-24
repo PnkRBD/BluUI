@@ -700,7 +700,7 @@ end
 local function InstallChallenges(frame)
 	Hook(frame, 'Update', OnChallengesUpdated)
 	local keystone = _G.ChallengesKeystoneFrame
-	keystone:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GroupFinder keystone reskin', context.Guard(SkinKeystoneFrame)))
+	keystone:HookScript('OnShow', context.Guard(SkinKeystoneFrame))
 	Hook(keystone, 'Reset', RefadeKeystoneArt)
 end
 

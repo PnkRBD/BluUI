@@ -98,7 +98,7 @@ end
 
 local function FlashGlow()
     BUI.GlowManager.Start(tile, "proc", nil, 100, nil, nil, GLOW_KEY, nil, nil, true)
-    BUI.Profiler.After("Auras.CombatRes glow", GLOW_SECONDS, StopGlow)
+    C_Timer.After(GLOW_SECONDS, StopGlow)
 end
 
 local function Refresh()
@@ -119,7 +119,7 @@ local function Refresh()
     BUI.Scheduler.SetUpdateEnabled("CombatRes", readyAt ~= nil)
 end
 
-Update = BUI.Dispatcher.New(Refresh, "Auras.CombatRes")
+Update = BUI.Dispatcher.New(Refresh)
 
 local function Build()
     if frame then return end

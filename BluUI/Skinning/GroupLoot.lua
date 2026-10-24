@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local AnchorHook = BUI.Profiler.Hooker('Skin.GroupLoot')
-
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
@@ -123,7 +121,7 @@ local function SkinAll()
 	end
 end
 
-local Resweep = BUI.Dispatcher.New(SkinAll, 'Skin.GroupLoot')
+local Resweep = BUI.Dispatcher.New(SkinAll)
 
 local function SetRollButton(button, enabled)
 	if enabled then
@@ -189,7 +187,7 @@ local function Install()
 	local frame = _G['GroupLootFrame' .. index]
 	while frame do
 		rollFrames[frame] = true
-		frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GroupLoot frame OnShow', RaiseTimer))
+		frame:HookScript('OnShow', RaiseTimer)
 		index = index + 1
 		frame = _G['GroupLootFrame' .. index]
 	end
@@ -197,7 +195,7 @@ local function Install()
 end
 
 local function AnchorHooks(reapply)
-	AnchorHook(BottomManagedFrameContainer, 'Layout', reapply)
+	hooksecurefunc(BottomManagedFrameContainer, 'Layout', reapply)
 end
 
 local function GrowPoint()

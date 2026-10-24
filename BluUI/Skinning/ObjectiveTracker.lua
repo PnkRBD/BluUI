@@ -2,8 +2,6 @@ local _, BUI = ...
 
 local pairs = pairs
 local ipairs = ipairs
-local Wrap = BUI.Profiler.Wrap
-local After = BUI.Profiler.After
 
 local BUILib = BluUI.BUILibClient or LibStub('BUILib')
 local LibSkin = BUILib.Skin
@@ -326,23 +324,21 @@ local function CreateTrackerCard(trackerFrame)
 	trackerCard:SetFrameLevel(0)
 	Pixel.SetTemplate(trackerCard, 0, 0, 0, 0, 0, 0, 0, 0, 1)
 	trackerCard:Hide()
-	trackerCard:HookScript('OnSizeChanged', Wrap('Skin.ObjectiveTracker tracker clamp', TrackerClamp))
-	local dockStrip = Wrap('Skin.ObjectiveTracker top strip dock', PlaceTopStrip)
-	trackerCard:HookScript('OnShow', dockStrip)
-	trackerCard:HookScript('OnHide', dockStrip)
+	trackerCard:HookScript('OnSizeChanged', TrackerClamp)
+	trackerCard:HookScript('OnShow', PlaceTopStrip)
+	trackerCard:HookScript('OnHide', PlaceTopStrip)
 
 	local nineSlice = trackerFrame.NineSlice
-	local syncShown = Wrap('Skin.ObjectiveTracker card sync', SyncTrackerCardShown)
 	Hook(trackerFrame, 'SetCollapsed', UpdateCardAnchors)
 	Hook(trackerFrame, 'SetAlpha', OnTrackerAlpha)
 	Hook(nineSlice, 'SetPoint', UpdateCardAnchors)
 	Hook(nineSlice, 'SetAlpha', function(self, alpha)
 		if alpha ~= 0 then self:SetAlpha(0) end
 	end)
-	nineSlice:HookScript('OnShow', syncShown)
-	nineSlice:HookScript('OnHide', syncShown)
-	trackerFrame:HookScript('OnShow', syncShown)
-	trackerFrame:HookScript('OnHide', syncShown)
+	nineSlice:HookScript('OnShow', SyncTrackerCardShown)
+	nineSlice:HookScript('OnHide', SyncTrackerCardShown)
+	trackerFrame:HookScript('OnShow', SyncTrackerCardShown)
+	trackerFrame:HookScript('OnHide', SyncTrackerCardShown)
 end
 
 function Skin.AttachTrackerStrip(frame)
@@ -356,9 +352,8 @@ function Skin.AttachTrackerStrip(frame)
 	frame.__buiRule = rule
 	rules[rule] = true
 	PaintRule(rule)
-	local resizeCard = Wrap('Skin.ObjectiveTracker top strip size', UpdateCardAnchors)
-	frame:HookScript('OnShow', resizeCard)
-	frame:HookScript('OnHide', resizeCard)
+	frame:HookScript('OnShow', UpdateCardAnchors)
+	frame:HookScript('OnHide', UpdateCardAnchors)
 	PlaceTopStrip()
 	UpdateCardAnchors()
 end
@@ -533,10 +528,10 @@ function QuestItem.Ensure()
 	highlight:SetAllPoints(button)
 	SquareItemButton(button, icon, highlight)
 
-	button:SetScript('OnEnter', BUI.Profiler.Script('Skin.ObjectiveTracker button OnEnter', QuestItem.OnEnter))
+	button:SetScript('OnEnter', QuestItem.OnEnter)
 	button:SetScript('OnLeave', GameTooltip_Hide)
-	button:SetScript('OnDragStart', BUI.Profiler.Script('Skin.ObjectiveTracker button OnDragStart', QuestItem.OnDragStart))
-	button:SetScript('OnDragStop', BUI.Profiler.Script('Skin.ObjectiveTracker button OnDragStop', QuestItem.OnDragStop))
+	button:SetScript('OnDragStart', QuestItem.OnDragStart)
+	button:SetScript('OnDragStop', QuestItem.OnDragStop)
 	QuestItem.button = button
 end
 
@@ -638,18 +633,18 @@ function QuestItem.KeyTool(ui)
 			Listen(not listening)
 		end)
 		button:SetPoint('RIGHT')
-		button:HookScript('OnEnter', BUI.Profiler.Timed('Skinning.ObjectiveTracker build button OnEnter', function(self) LibWidget.ShowTip(self, 'Click, then press a key. Escape clears it.') end))
-		button:HookScript('OnLeave', BUI.Profiler.Timed('Skinning.ObjectiveTracker build button OnLeave', LibWidget.HideTip))
+		button:HookScript('OnEnter', function(self) LibWidget.ShowTip(self, 'Click, then press a key. Escape clears it.') end)
+		button:HookScript('OnLeave', LibWidget.HideTip)
 		holder:SetSize(KEY_TOOL_WIDTH, button:GetHeight())
-		holder:SetScript('OnKeyDown', BUI.Profiler.Timed('Skinning.ObjectiveTracker build holder OnKeyDown', function(_, key)
+		holder:SetScript('OnKeyDown', function(_, key)
 			if MODIFIER_KEYS[key] then return end
 			settings.questItemKey = key == 'ESCAPE' and 'NONE' or PressedKey(key)
 			Listen(false)
 			QuestItem.Update()
-		end))
-		holder:SetScript('OnHide', BUI.Profiler.Timed('Skinning.ObjectiveTracker build holder OnHide', function()
+		end)
+		holder:SetScript('OnHide', function()
 			if listening then Listen(false) end
-		end))
+		end)
 		return holder
 	end }
 end
@@ -697,16 +692,16 @@ function QuestInfo.AddTomTomButton(rootDescription)
 end
 
 local function InstallMenuHook()
-	Menu.ModifyMenu('MENU_QUEST_OBJECTIVE_TRACKER', BUI.Profiler.Timed('Skinning.ObjectiveTracker InstallMenuHook menu MENU_QUEST_OBJECTIVE_TRACKER', Guard(function(_, rootDescription)
+	Menu.ModifyMenu('MENU_QUEST_OBJECTIVE_TRACKER', Guard(function(_, rootDescription)
 		QuestInfo.AddTomTomButton(rootDescription)
 		QuestInfo.AddWowheadButton(rootDescription, 'quest', pendingMenuQuestID)
-	end)))
-	Menu.ModifyMenu('MENU_BONUS_OBJECTIVE_TRACKER', BUI.Profiler.Timed('Skinning.ObjectiveTracker InstallMenuHook menu MENU_BONUS_OBJECTIVE_TRACKER', Guard(function(_, rootDescription, block)
+	end))
+	Menu.ModifyMenu('MENU_BONUS_OBJECTIVE_TRACKER', Guard(function(_, rootDescription, block)
 		QuestInfo.AddWowheadButton(rootDescription, 'quest', block and block.id)
-	end)))
-	Menu.ModifyMenu('MENU_ACHIEVEMENT_TRACKER', BUI.Profiler.Timed('Skinning.ObjectiveTracker InstallMenuHook menu MENU_ACHIEVEMENT_TRACKER', Guard(function(_, rootDescription, block)
+	end))
+	Menu.ModifyMenu('MENU_ACHIEVEMENT_TRACKER', Guard(function(_, rootDescription, block)
 		QuestInfo.AddWowheadButton(rootDescription, 'achievement', block and block.id)
-	end)))
+	end))
 end
 
 local function SingleLineTitlesEnabled()
@@ -1002,7 +997,7 @@ local function RefreshQuestCache()
 	if chime then BUI.PlaySoundByName(GetSettings().completionSound) end
 end
 
-local RefreshQuestCacheSoon = BUI.Dispatcher.NewDelayed(RefreshQuestCache, 0.3, 'Quest cache refresh')
+local RefreshQuestCacheSoon = BUI.Dispatcher.NewDelayed(RefreshQuestCache, 0.3)
 
 local flashQuestID
 
@@ -1017,12 +1012,12 @@ local function FlashProgressBlock()
 	if not targetBlock or not targetBlock.usedLines then return end
 	local red, green, blue = Painter.Color('skinTitle')
 	for _, line in pairs(targetBlock.usedLines) do line.Text:SetTextColor(red, green, blue, 1) end
-	After('Skin.ObjectiveTracker flash restore', FLASH_SECONDS, function()
+	C_Timer.After(FLASH_SECONDS, function()
 		if Enabled() then OnUpdateHighlight(targetBlock) end
 	end)
 end
 
-local FlashProgressSoon = BUI.Dispatcher.NewDelayed(FlashProgressBlock, 0.15, 'Quest progress flash')
+local FlashProgressSoon = BUI.Dispatcher.NewDelayed(FlashProgressBlock, 0.15)
 
 local function OnQuestProgress(_, questID)
 	if not questID then return end
@@ -1059,11 +1054,11 @@ local function HeaderControls(parent, anchor)
 	filterGlyph:SetSize(Pixel.Scale(GLYPH_SIZE + 2), Pixel.Scale(GLYPH_SIZE + 2))
 	filterButton.glyph = filterGlyph
 	headerFilter = filterButton
-	filterButton:SetScript('OnEnter', BUI.Profiler.Script('Skin.ObjectiveTracker filterButton OnEnter', function()
+	filterButton:SetScript('OnEnter', function()
 		PaintGlyph(filterGlyph, true)
-	end))
-	filterButton:SetScript('OnLeave', BUI.Profiler.Script('Skin.ObjectiveTracker filterButton OnLeave', QuestFilter.UpdateTint))
-	filterButton:SetScript('OnClick', BUI.Profiler.Script('Skin.ObjectiveTracker filterButton OnClick', QuestFilter.ShowMenu))
+	end)
+	filterButton:SetScript('OnLeave', QuestFilter.UpdateTint)
+	filterButton:SetScript('OnClick', QuestFilter.ShowMenu)
 	QuestFilter.UpdateTint()
 
 	headerCounts = parent:CreateFontString(nil, 'ARTWORK')
@@ -1142,12 +1137,12 @@ local function SkinMinimizeButton(header)
 	chevrons[chevron] = true
 	PaintGlyph(chevron, false)
 
-	button:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.ObjectiveTracker minimize OnEnter', function()
+	button:HookScript('OnEnter', function()
 		if Enabled() then PaintGlyph(chevron, true) end
-	end))
-	button:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.ObjectiveTracker minimize OnLeave', function()
+	end)
+	button:HookScript('OnLeave', function()
 		PaintGlyph(chevron, false)
-	end))
+	end)
 
 	SetCollapsedGlyph(header, header.isCollapsed)
 	Hook(header, 'SetCollapsed', SetCollapsedGlyph)
@@ -1226,9 +1221,9 @@ local function SkinBar(bar)
 	Painter.Custom(bar, PaintBar)
 	local backdrop = CardBackdrop(bar)
 	skinnedBars[bar] = backdrop
-	bar:HookScript('OnShow', Wrap('Skin.ObjectiveTracker bar backdrop', function(self)
+	bar:HookScript('OnShow', function(self)
 		backdrop:SetShown(Enabled() and self:IsShown())
-	end))
+	end)
 	backdrop:SetShown(Enabled() and bar:IsShown())
 
 	local label = bar.Label
@@ -1259,8 +1254,8 @@ local function SkinStageBlock()
 	HideBlizzardTexture(stageBlock.GlowTexture)
 
 	skinnedBars[stageBlock] = CardBackdrop(stageBlock)
-	stageBlock:HookScript('OnShow', Wrap('Skin.ObjectiveTracker stage backdrop', Scenario.SyncStageBackdrop))
-	stageBlock:HookScript('OnHide', Wrap('Skin.ObjectiveTracker stage backdrop', Scenario.SyncStageBackdrop))
+	stageBlock:HookScript('OnShow', Scenario.SyncStageBackdrop)
+	stageBlock:HookScript('OnHide', Scenario.SyncStageBackdrop)
 	Hook(stageBlock, 'UpdateWidgetRegistration', Scenario.SyncStageBackdrop)
 	Hook(stageBlock, 'SetupStageTransition', Scenario.SyncStageBackdrop)
 	Scenario.SyncStageBackdrop(stageBlock)
@@ -1356,9 +1351,9 @@ local function OnAddPOIButton(block)
 	end
 end
 
-local OnBlockMouseDown = BUI.Profiler.Wrap('Skin.ObjectiveTracker block OnMouseDown', function(block)
+local OnBlockMouseDown = function(block)
 	pendingMenuQuestID = block.poiQuestID or block.id
-end)
+end
 
 local function HookBlock(block)
 	block.__buiHooked = true
@@ -1447,7 +1442,7 @@ function Scenario.ApplyHeader(widget)
 			skinnedBars[widget] = backdrop
 		end
 		if not Scenario.FitHeaderBackdrop(widget, backdrop) then
-			After('Skin.ObjectiveTracker header fit', 0, function() Scenario.FitHeaderBackdrop(widget, backdrop) end)
+			C_Timer.After(0, function() Scenario.FitHeaderBackdrop(widget, backdrop) end)
 		end
 		ApplySkinFont(widget.HeaderText, 'title')
 		widget.HeaderText:SetTextColor(TrackerColorRGB('title'))
@@ -1513,7 +1508,7 @@ function Scenario.SyncStageBackdrop(stageBlock)
 	local shown = Enabled() and stageBlock:IsShown() and not stageBlock.widgetSetID
 	backdrop:SetShown(shown)
 	if shown and not Scenario.FitStageBackdrop(stageBlock, backdrop) then
-		After('Skin.ObjectiveTracker stage fit', 0, function()
+		C_Timer.After(0, function()
 			if backdrop:IsShown() then Scenario.FitStageBackdrop(stageBlock, backdrop) end
 		end)
 	end
@@ -1548,7 +1543,7 @@ end
 local function InstallTracker(trackerFrame)
 	Scenario.InstallHeaderHooks()
 	InstallMenuHook()
-	EventRegistry:RegisterCallback('OnQuestBlockHeader.OnEnter', BUI.Profiler.Timed('Skinning.ObjectiveTracker InstallTracker callback OnQuestBlockHeader.OnEnter', Guard(OnQuestBlockHeaderEnter)), context)
+	EventRegistry:RegisterCallback('OnQuestBlockHeader.OnEnter', Guard(OnQuestBlockHeaderEnter), context)
 	Hook(trackerFrame, 'UpdateClampOffsets', TrackerClamp)
 	Hook(trackerFrame, 'Init', DecorateHeader)
 	CreateTrackerCard(trackerFrame)

@@ -212,7 +212,7 @@ local function GetDragFrame()
     DragFrame:SetFrameStrata("TOOLTIP")
     DragFrame:SetSize(Pixel.Scale(50), Pixel.Scale(50))
     DragFrame:Hide()
-    DragFrame:SetScript("OnUpdate", BUI.Profiler.Wrap("CDM.Detached drag update", DragFrameOnUpdate))
+    DragFrame:SetScript("OnUpdate", DragFrameOnUpdate)
     return DragFrame
 end
 
@@ -352,7 +352,7 @@ local function EnsureOverlay(icon, key)
     overlay:SetAllPoints(icon)
     overlay:SetFrameLevel(icon:GetFrameLevel() + 10)
 
-    overlay:SetScript("OnMouseDown", BUI.Profiler.Script('CDM.Detached overlay OnMouseDown', function(self, button)
+    overlay:SetScript("OnMouseDown", function(self, button)
         if not IsIndividualMoveEnabled() then return end
         if InCombatLockdown() then return end
 
@@ -367,13 +367,13 @@ local function EnsureOverlay(icon, key)
                 CDM.SetUpdatePending(true)
             end
         end
-    end))
+    end)
 
     overlay:EnableMouseWheel(true)
-    overlay:SetScript("OnMouseWheel", BUI.Profiler.Script('CDM.Detached overlay OnMouseWheel', function(_, delta)
+    overlay:SetScript("OnMouseWheel", function(_, delta)
         if not IsControlKeyDown() then return end
         ResizeDetachedIcon(icon, key, delta)
-    end))
+    end)
 
     overlay:EnableMouse(true)
     iconFrameData.detachOverlay = overlay

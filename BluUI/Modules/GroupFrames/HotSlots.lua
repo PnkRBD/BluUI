@@ -227,7 +227,7 @@ local function ApplyPending()
 	end
 end
 
-BUI.Tools.OnAuraQueriesUnblocked(ApplyPending, 'Group frame HoT slots')
+BUI.Tools.OnAuraQueriesUnblocked(ApplyPending)
 
 BUI.Events:OnTalentBurst('GroupFrames.HotSlots', function()
 	local before, unresolved = activeSignature, specUnresolved

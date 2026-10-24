@@ -788,7 +788,7 @@ local function BuildPreview(band, kit)
 
 	local QueueUpdate = BUI.Dispatcher.New(function()
 		if band:IsVisible() then band:Update() end
-	end, 'Power.Preview')
+	end)
 
 	band:HookScript('OnShow', function()
 		BUI.Events:RegisterUnit('UNIT_POWER_FREQUENT', 'player', EVENT_KEY, QueueUpdate)

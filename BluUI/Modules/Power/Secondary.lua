@@ -892,9 +892,9 @@ local function Build()
     frame:SetFrameStrata("LOW")
     frame:Hide()
     frame:EnableMouse(true)
-    local NotifyAnchorChange = BUI.Profiler.Wrap("Power.Secondary anchor notify", function()
+    local NotifyAnchorChange = function()
         BUI.Anchor.OnAnchorSizeChanged()
-    end)
+    end
     frame:HookScript("OnShow", NotifyAnchorChange)
     frame:HookScript("OnHide", NotifyAnchorChange)
 

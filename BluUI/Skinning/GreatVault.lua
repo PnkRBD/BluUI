@@ -206,7 +206,7 @@ local function InstallFrame(frame)
 	Hook(frame, 'SetUpActivity', OnSetUpActivity)
 	Hook(frame, 'UpdateOverlay', OnOverlay)
 	Hook(frame, 'SelectReward', OnSelectReward)
-	_G.WeeklyRewardExpirationWarningDialog:HookScript('OnShow', BUI.Profiler.Wrap('Skin.GreatVault warning reskin', context.Guard(SkinWarning)))
+	_G.WeeklyRewardExpirationWarningDialog:HookScript('OnShow', context.Guard(SkinWarning))
 end
 
 context.Window('WeeklyRewardsFrame', { install = InstallFrame, skin = SkinMainFrame, show = ShowFrame })

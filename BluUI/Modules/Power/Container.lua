@@ -67,7 +67,7 @@ function Container.IsEnabled()
     return Container.GetDB().enabled
 end
 
-Container.QueueRelayout = BUI.Dispatcher.New(function() Container.Relayout() end, 'Power.Container relayout')
+Container.QueueRelayout = BUI.Dispatcher.New(function() Container.Relayout() end)
 
 local function MemberKeyFor(frame)
     if not stackFrame or not stackFrame:IsShown() then return nil end
@@ -172,15 +172,15 @@ local function MemberVisualWidth(key)
     return width
 end
 
-local OnMemberVisibility = BUI.Profiler.Wrap('Power.Container member visibility', function(frame)
+local OnMemberVisibility = function(frame)
     local settings = Container.GetDB()
     if not settings.enabled then return end
     local key = hooked[frame]
     if not settings.attached[key] or (key == 'castbar' and settings.castbarMode == 'hold') then return end
     Container.Relayout()
-end)
+end
 
-local OnMemberResize = BUI.Profiler.Wrap('Power.Container member resize', function() Container.QueueRelayout() end)
+local OnMemberResize = function() Container.QueueRelayout() end
 
 local function HookMembers(settings)
     for keyIndex = 1, #MEMBER_KEYS do
@@ -421,7 +421,7 @@ BUI.Events:OnLogin('StackLab', function()
     BUI.Events:Register('UPDATE_SHAPESHIFT_FORMS', 'StackLab', RequestRelayout)
     BUI.Events:RegisterUnit('UNIT_DISPLAYPOWER', 'player', 'StackLab', RequestRelayout)
 
-    BUI.Profiler.After('Power.Container stack setup', 0.3, function()
+    C_Timer.After(0.3, function()
         if Container.IsEnabled() then Container.ApplyAll() end
     end)
 end)

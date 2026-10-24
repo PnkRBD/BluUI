@@ -92,13 +92,13 @@ local UpdateAllTrackers = BUI.Dispatcher.New(function()
     for _, tracker in pairs(trackers) do
         if TrackerLive(tracker) then tracker.Update() end
     end
-end, 'BuffTracking.Trackers')
+end)
 
 local RecheckAllActive = BUI.Dispatcher.New(function()
     for _, tracker in pairs(trackers) do
         tracker.RecheckActive()
     end
-end, 'BuffTracking.RecheckActive')
+end)
 
 local function OnCombat(event)
     inCombat = (event == "PLAYER_REGEN_DISABLED")

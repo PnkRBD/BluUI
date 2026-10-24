@@ -1,8 +1,5 @@
 local _, BUI = ...
 
-local Wrap = BUI.Profiler.Wrap
-local AnchorHook = BUI.Profiler.Hooker('Skin.BonusRoll')
-
 local ceil = math.ceil
 
 local Skin = BUI.Skinning
@@ -60,8 +57,6 @@ local function RefreshHint()
 	if not holding then SetHint(HoldEnabled() and 'idle') end
 end
 
-local ResetHint = Wrap('Skin.BonusRoll hint reset', RefreshHint)
-
 local function ResetHold()
 	holding = false
 	rollButton:SetScript('OnUpdate', nil)
@@ -69,7 +64,7 @@ local function ResetHold()
 	sweep:Hide()
 end
 
-local OnHoldUpdate = BUI.Profiler.Hot('Skin.BonusRoll hold update', function(button, elapsed)
+local OnHoldUpdate = function(button, elapsed)
 	holdElapsed = holdElapsed + elapsed
 	local remaining = HOLD_SECONDS - holdElapsed
 	if remaining <= 0 then
@@ -82,7 +77,7 @@ local OnHoldUpdate = BUI.Profiler.Hot('Skin.BonusRoll hold update', function(but
 	if second == holdSecond then return end
 	holdSecond = second
 	sweep.count:SetFormattedText('%d', second)
-end)
+end
 
 local function OnRollMouseDown(button, mouseButton)
 	if mouseButton ~= 'LeftButton' or not button:IsEnabled() or not HoldEnabled() then return end
@@ -98,16 +93,16 @@ local function OnRollMouseUp()
 	if not holding then return end
 	ResetHold()
 	SetHint('warn')
-	C_Timer.After(HINT_WARN_SECONDS, ResetHint)
+	C_Timer.After(HINT_WARN_SECONDS, RefreshHint)
 end
 
 local function OnRollHide()
 	if holding then ResetHold() end
 end
 
-local OnRollClick = BUI.Profiler.Script('Skin.BonusRoll roll OnClick', function(button, ...)
+local OnRollClick = function(button, ...)
 	if not HoldEnabled() then rollClick(button, ...) end
-end)
+end
 
 local function OnRollEnter()
 	if not HoldEnabled() then return end
@@ -169,11 +164,11 @@ local function InstallFrame(frame)
 	rollButton, specIcon = prompt.RollButton, frame.SpecIcon
 	rollClick = rollButton:GetScript('OnClick')
 	BuildHold(rollButton)
-	rollButton:HookScript('OnMouseDown', Wrap('Skin.BonusRoll roll OnMouseDown', OnRollMouseDown))
-	rollButton:HookScript('OnMouseUp', Wrap('Skin.BonusRoll roll OnMouseUp', OnRollMouseUp))
-	rollButton:HookScript('OnEnter', Wrap('Skin.BonusRoll roll OnEnter', OnRollEnter))
-	rollButton:HookScript('OnShow', Wrap('Skin.BonusRoll roll OnShow', RefreshHint))
-	rollButton:HookScript('OnHide', Wrap('Skin.BonusRoll roll OnHide', OnRollHide))
+	rollButton:HookScript('OnMouseDown', OnRollMouseDown)
+	rollButton:HookScript('OnMouseUp', OnRollMouseUp)
+	rollButton:HookScript('OnEnter', OnRollEnter)
+	rollButton:HookScript('OnShow', RefreshHint)
+	rollButton:HookScript('OnHide', OnRollHide)
 	context.Hook(prompt.Icon, 'SetTexture', CropIcon)
 	context.Hook(specIcon, 'Show', SyncSpecEdges)
 	context.Hook(specIcon, 'Hide', SyncSpecEdges)
@@ -202,7 +197,7 @@ Skin.ToastAnchors.Register({
 	followFrame = true,
 	defaultY = 340,
 	frame = function() return _G.BonusRollFrame end,
-	hooks = function(reapply) AnchorHook(BottomManagedFrameContainer, 'Layout', reapply) end,
+	hooks = function(reapply) hooksecurefunc(BottomManagedFrameContainer, 'Layout', reapply) end,
 })
 
 context.info.settings = {

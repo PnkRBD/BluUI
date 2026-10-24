@@ -102,8 +102,6 @@ function Pixel.PixelSizeFor(frame, pixels)
     return Pixel.ClampBorder(pixels) * perfectScale / frame:GetEffectiveScale()
 end
 
-local Profiler = BUI.Profiler
-
 local function KillSnap(object)
     if rawget(object, "_noSnap") or rawget(object, "_keepSnap") or object:IsForbidden() then return end
 
@@ -130,14 +128,12 @@ local function RearmSnap(object, enabled)
     if parent and rawget(parent, "_noSnap") then parent._noSnap = nil end
 end
 
-local TimedKillSnap = Profiler.Hot("Pixel texture snap hook", KillSnap)
-
 local SNAP_HOOKS = {
-    SetAtlas = TimedKillSnap,
-    SetColorTexture = TimedKillSnap,
-    SetSnapToPixelGrid = Profiler.Hot("Pixel texture snap rearm", RearmSnap),
-    SetStatusBarTexture = TimedKillSnap,
-    SetTexture = TimedKillSnap,
+    SetAtlas = KillSnap,
+    SetColorTexture = KillSnap,
+    SetSnapToPixelGrid = RearmSnap,
+    SetStatusBarTexture = KillSnap,
+    SetTexture = KillSnap,
 }
 
 local function HookSnapMethods(widget)
@@ -147,12 +143,12 @@ local function HookSnapMethods(widget)
 
     for method, handler in pairs(SNAP_HOOKS) do
         if prototype[method] then
-            hooksecurefunc(prototype, method, BUI.Profiler.Timed('Utility.Pixel HookSnapMethods hook', handler))
+            hooksecurefunc(prototype, method, handler)
         end
     end
 end
 
-local OnBackdropSizeChanged = Profiler.Wrap("Pixel backdrop resize", BackdropTemplateMixin.OnBackdropSizeChanged)
+local OnBackdropSizeChanged = BackdropTemplateMixin.OnBackdropSizeChanged
 
 local function GiveBackdrop(frame)
     if frame.SetBackdrop then return end
@@ -354,12 +350,12 @@ end
 
 local function OnGXRestarted()
     OnScaleChanged()
-    Profiler.After("Pixel scale change", 0, OnScaleChanged)
+    C_Timer.After(0, OnScaleChanged)
 end
 
 BUI.Events:Register('UI_SCALE_CHANGED', 'Pixel', OnScaleChanged)
 BUI.Events:Register('DISPLAY_SIZE_CHANGED', 'Pixel', OnScaleChanged)
 BUI.Events:Register('GX_RESTARTED', 'Pixel', OnGXRestarted)
-hooksecurefunc(UIParent, "SetScale", Profiler.Wrap('Pixel hook SetScale', OnScaleChanged))
+hooksecurefunc(UIParent, "SetScale", OnScaleChanged)
 
 Recompute()

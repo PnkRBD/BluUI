@@ -94,7 +94,7 @@ function PageKit.PageTitle(pageFrame, text, width, options)
 				hint:SetShown(allowed and not toggleFrame:GetValue())
 			end
 			ApplyGate()
-			holder:HookScript("OnShow", BUILib.Timed('BUILib.Title PageTitle holder OnShow', ApplyGate))
+			holder:HookScript("OnShow", ApplyGate)
 			holder.ApplyEnableGate = ApplyGate
 		end
 	end

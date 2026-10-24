@@ -55,11 +55,11 @@ local function ShowDragDropPicker(parent, itemID, spellID, onSelect, onCancel, i
 
 	local cancelButton = Modals.CreateButton(dialog, "Cancel", Modals.BTN_CANCEL, 100)
 	cancelButton:SetPoint("BOTTOM", 0, 15)
-	cancelButton:SetScript("OnClick", BUILib.Timed('BUILib.ItemList ShowDragDropPicker cancelButton OnClick', function() Close(); if onCancel then onCancel() end end))
+	cancelButton:SetScript("OnClick", function() Close(); if onCancel then onCancel() end end)
 
-	overlay:SetScript("OnKeyDown", BUILib.Timed('BUILib.ItemList ShowDragDropPicker overlay OnKeyDown', function(_, key)
+	overlay:SetScript("OnKeyDown", function(_, key)
 		if key == "ESCAPE" then Close(); if onCancel then onCancel() end end
-	end))
+	end)
 	overlay:Show()
 	return overlay, Close
 end
@@ -71,8 +71,8 @@ local function CreateAutocomplete(editBox, searchFunc, onSelect, anchor)
 	dropdown:SetFrameStrata(BUILib.GetPopupStrata()); dropdown:SetFrameLevel(BUILib.GetPopupLevel())
 	dropdown:SetBackdrop(Widget.BACKDROP); dropdown:SetBackdropColor(0.12, 0.12, 0.12, 0.98)
 	dropdown:SetBackdropBorderColor(0.4, 0.4, 0.4, 1); dropdown:Hide()
-	dropdown:SetScript("OnShow", BUILib.Timed('BUILib.ItemList CreateAutocomplete dropdown OnShow', function() BUILib._popupCount = (BUILib._popupCount or 0) + 1 end))
-	dropdown:SetScript("OnHide", BUILib.Timed('BUILib.ItemList CreateAutocomplete dropdown OnHide', function() BUILib._popupCount = math.max(0, (BUILib._popupCount or 0) - 1) end))
+	dropdown:SetScript("OnShow", function() BUILib._popupCount = (BUILib._popupCount or 0) + 1 end)
+	dropdown:SetScript("OnHide", function() BUILib._popupCount = math.max(0, (BUILib._popupCount or 0) - 1) end)
 
 	local rows = {}
 	for rowIndex = 1, 10 do
@@ -85,11 +85,11 @@ local function CreateAutocomplete(editBox, searchFunc, onSelect, anchor)
 		name:SetFont(BUILib.Font, 12, ""); name:SetPoint("LEFT", icon, "RIGHT", 8, 0); name:SetTextColor(1, 1, 1); row._name = name
 		local idText = row:CreateFontString(nil, "OVERLAY")
 		idText:SetFont(BUILib.Font, 11, ""); idText:SetPoint("RIGHT", -8, 0); idText:SetTextColor(0.5, 0.5, 0.5); row._id = idText
-		row:SetScript("OnEnter", BUILib.Timed('BUILib.ItemList CreateAutocomplete row OnEnter', function() Widget.SetColor(background, 1, 1, 1, 0.1) end))
-		row:SetScript("OnLeave", BUILib.Timed('BUILib.ItemList CreateAutocomplete row OnLeave', function() Widget.SetColor(background, 1, 1, 1, 0) end))
-		row:SetScript("OnClick", BUILib.Timed('BUILib.ItemList CreateAutocomplete row OnClick', function()
+		row:SetScript("OnEnter", function() Widget.SetColor(background, 1, 1, 1, 0.1) end)
+		row:SetScript("OnLeave", function() Widget.SetColor(background, 1, 1, 1, 0) end)
+		row:SetScript("OnClick", function()
 			if row._data and onSelect then dropdown:Hide(); editBox:SetText(""); editBox:ClearFocus(); onSelect(row._data) end
-		end))
+		end)
 		row:Hide(); rows[rowIndex] = row
 	end
 
@@ -114,15 +114,15 @@ local function CreateAutocomplete(editBox, searchFunc, onSelect, anchor)
 		else dropdown:Hide() end
 	end
 
-	editBox:HookScript("OnTextChanged", BUILib.Timed('BUILib.ItemList CreateAutocomplete editBox OnTextChanged', function(self, userInput)
+	editBox:HookScript("OnTextChanged", function(self, userInput)
 		if not userInput then return end
 		local text = self:GetText()
 		if #text >= 2 then Update(searchFunc(text)) else dropdown:Hide() end
-	end))
-	editBox:HookScript("OnEscapePressed", BUILib.Timed('BUILib.ItemList CreateAutocomplete editBox OnEscapePressed', function() dropdown:Hide() end))
-	editBox:HookScript("OnEditFocusLost", BUILib.Timed('BUILib.ItemList CreateAutocomplete editBox OnEditFocusLost', function()
-		C_Timer.After(0.15, BUILib.Timed('BUILib.ItemList CreateAutocomplete timer', function() if not dropdown:IsMouseOver() then dropdown:Hide() end end))
-	end))
+	end)
+	editBox:HookScript("OnEscapePressed", function() dropdown:Hide() end)
+	editBox:HookScript("OnEditFocusLost", function()
+		C_Timer.After(0.15, function() if not dropdown:IsMouseOver() then dropdown:Hide() end end)
+	end)
 	return dropdown
 end
 
@@ -135,31 +135,31 @@ local function CreateInputRow(parent, inputWidth, inputHeight, placeholder, onAd
 	local inputBox = inputBoxWidget.frame
 	inputBox:SetPoint("TOPLEFT", 0, 0)
 	inputBox:EnableMouse(true)
-	inputBox:SetScript("OnMouseDown", BUILib.Timed('BUILib.ItemList CreateInputRow inputBox OnMouseDown', function(_, button) if button == "LeftButton" and HandleDrop then HandleDrop() end end))
-	if HandleDrop then inputBox:SetScript("OnReceiveDrag", BUILib.Timed('BUILib.ItemList CreateInputRow inputBox OnReceiveDrag', HandleDrop)) end
+	inputBox:SetScript("OnMouseDown", function(_, button) if button == "LeftButton" and HandleDrop then HandleDrop() end end)
+	if HandleDrop then inputBox:SetScript("OnReceiveDrag", HandleDrop) end
 
 	local SetInputHovered = inputBoxWidget:SetupHoverBorder(nil, Theme.border.input)
 
 	local editBox = CreateFrame("EditBox", nil, inputBox)
 	editBox:SetPoint("LEFT", 10, 0); editBox:SetPoint("RIGHT", -10, 0); editBox:SetHeight(20)
 	editBox:SetAutoFocus(false); editBox:SetFont(BUILib.Font, FONT_SIZE, ""); editBox:SetTextColor(unpack(Theme.text.primary))
-	editBox:SetScript("OnEscapePressed", BUILib.Timed('BUILib.ItemList CreateInputRow editBox OnEscapePressed', function(self) self:ClearFocus() end))
-	editBox:SetScript("OnEnter", BUILib.Timed('BUILib.ItemList CreateInputRow editBox OnEnter', function() SetInputHovered(true) end))
-	editBox:SetScript("OnLeave", BUILib.Timed('BUILib.ItemList CreateInputRow editBox OnLeave', function() if not editBox:HasFocus() then SetInputHovered(false) end end))
-	editBox:SetScript("OnEditFocusGained", BUILib.Timed('BUILib.ItemList CreateInputRow editBox OnEditFocusGained', function() SetInputHovered(true) end))
-	editBox:SetScript("OnEditFocusLost", BUILib.Timed('BUILib.ItemList CreateInputRow editBox OnEditFocusLost', function() SetInputHovered(false) end))
+	editBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+	editBox:SetScript("OnEnter", function() SetInputHovered(true) end)
+	editBox:SetScript("OnLeave", function() if not editBox:HasFocus() then SetInputHovered(false) end end)
+	editBox:SetScript("OnEditFocusGained", function() SetInputHovered(true) end)
+	editBox:SetScript("OnEditFocusLost", function() SetInputHovered(false) end)
 
 	if HandleDrop then
-		editBox:SetScript("OnReceiveDrag", BUILib.Timed('BUILib.ItemList CreateInputRow editBox OnReceiveDrag', HandleDrop))
-		editBox:SetScript("OnMouseDown", BUILib.Timed('BUILib.ItemList CreateInputRow editBox OnMouseDown', function(self, button)
+		editBox:SetScript("OnReceiveDrag", HandleDrop)
+		editBox:SetScript("OnMouseDown", function(self, button)
 			if button == "LeftButton" and not HandleDrop() then self:SetFocus() end
-		end))
+		end)
 	end
 
 	local placeholderText = editBox:CreateFontString(nil, "OVERLAY")
 	placeholderText:SetFont(BUILib.Font, FONT_SIZE, ""); placeholderText:SetPoint("LEFT")
 	placeholderText:SetText(placeholder or ""); placeholderText:SetTextColor(unpack(Theme.text.muted))
-	editBox:SetScript("OnTextChanged", BUILib.Timed('BUILib.ItemList CreateInputRow editBox OnTextChanged', function(self) placeholderText:SetShown(self:GetText() == "") end))
+	editBox:SetScript("OnTextChanged", function(self) placeholderText:SetShown(self:GetText() == "") end)
 
 	local addButton = Controls.Button(parent, "Add", 50, function()
 		local text = editBox:GetText()
@@ -167,10 +167,10 @@ local function CreateInputRow(parent, inputWidth, inputHeight, placeholder, onAd
 	end)
 	addButton:SetHeight(inputHeight); addButton:SetPoint("LEFT", inputBox, "RIGHT", 4, 0)
 
-	editBox:SetScript("OnEnterPressed", BUILib.Timed('BUILib.ItemList CreateInputRow editBox OnEnterPressed', function(self)
+	editBox:SetScript("OnEnterPressed", function(self)
 		local text = self:GetText()
 		if text ~= "" and onAdd then onAdd(text); self:SetText(""); self:ClearFocus(); placeholderText:Show() end
-	end))
+	end)
 
 	if searchFunc then CreateAutocomplete(editBox, searchFunc, onSearchSelect or onAdd) end
 	return inputBox, editBox
@@ -277,14 +277,14 @@ function Controls.ItemList(parent, placeholder, width, height, onAdd, onRemove, 
 	local listFrame = Widget.New(container, "Frame", nil, {bg = Theme.bg.dark, border = Theme.border.default, size = {width, height}}).frame
 	listFrame:SetPoint("TOPLEFT", 0, -listOffset)
 	listFrame:EnableMouse(true)
-	listFrame:SetScript("OnMouseDown", BUILib.Timed('BUILib.ItemList ItemList listFrame OnMouseDown', function(_, button) if button == "LeftButton" then HandleDrop() end end))
-	listFrame:SetScript("OnReceiveDrag", BUILib.Timed('BUILib.ItemList ItemList listFrame OnReceiveDrag', HandleDrop))
+	listFrame:SetScript("OnMouseDown", function(_, button) if button == "LeftButton" then HandleDrop() end end)
+	listFrame:SetScript("OnReceiveDrag", HandleDrop)
 
 	local scroll = Controls.ScrollFrame(listFrame, width, height, height)
 	scroll:SetPoint("TOPLEFT", 0, 0)
 	scroll.child:EnableMouse(true)
-	scroll.child:SetScript("OnMouseDown", BUILib.Timed('BUILib.ItemList ItemList child OnMouseDown', function(_, button) if button == "LeftButton" then HandleDrop() end end))
-	scroll.child:SetScript("OnReceiveDrag", BUILib.Timed('BUILib.ItemList ItemList child OnReceiveDrag', HandleDrop))
+	scroll.child:SetScript("OnMouseDown", function(_, button) if button == "LeftButton" then HandleDrop() end end)
+	scroll.child:SetScript("OnReceiveDrag", HandleDrop)
 
 	local data = {}
 	local rowWidth = width - 14
@@ -325,7 +325,7 @@ function Controls.ItemList(parent, placeholder, width, height, onAdd, onRemove, 
 			row._checkMark = checkMark; row._enabled = true
 			row._checkbox = checkFrame
 
-			checkFrame:SetScript("OnClick", BUILib.Timed('BUILib.ItemList CreatePoolFrame checkFrame OnClick', function()
+			checkFrame:SetScript("OnClick", function()
 				if row._locked then return end
 				row._enabled = not row._enabled; checkMark:SetShown(row._enabled)
 				if row.data then row.data.enabled = row._enabled end
@@ -337,14 +337,14 @@ function Controls.ItemList(parent, placeholder, width, height, onAdd, onRemove, 
 					row.icon:SetDesaturated(true); row.icon:SetAlpha(0.5)
 				end
 				if onCheckboxChange and row.data then onCheckboxChange(row.data.id, row._enabled, row) end
-			end))
-			checkFrame:SetScript("OnEnter", BUILib.Timed('BUILib.ItemList CreatePoolFrame checkFrame OnEnter', function()
+			end)
+			checkFrame:SetScript("OnEnter", function()
 				if row._locked then return end
 				local accentRed, accentGreen, accentBlue = Theme.GetAccent(); checkFrame:SetBackdropBorderColor(accentRed, accentGreen, accentBlue, 1)
-			end))
-			checkFrame:SetScript("OnLeave", BUILib.Timed('BUILib.ItemList CreatePoolFrame checkFrame OnLeave', function()
+			end)
+			checkFrame:SetScript("OnLeave", function()
 				if row._locked then return end; checkFrame:SetBackdropBorderColor(unpack(Theme.border.input))
-			end))
+			end)
 
 			function row:SetLocked(locked)
 				self._locked = locked
@@ -368,9 +368,9 @@ function Controls.ItemList(parent, placeholder, width, height, onAdd, onRemove, 
 
 		if onIconClick then
 			iconBg:EnableMouse(true)
-			iconBg:SetScript("OnMouseDown", BUILib.Timed('BUILib.ItemList CreatePoolFrame iconBg OnMouseDown', function(_, mouseButton) if mouseButton == "LeftButton" and row.data then onIconClick(row.data.id, row) end end))
-			iconBg:SetScript("OnEnter", BUILib.Timed('BUILib.ItemList CreatePoolFrame iconBg OnEnter', function() iconBg:SetBackdropBorderColor(unpack(Theme.border.hover)) end))
-			iconBg:SetScript("OnLeave", BUILib.Timed('BUILib.ItemList CreatePoolFrame iconBg OnLeave', function() iconBg:SetBackdropBorderColor(unpack(Theme.border.default)) end))
+			iconBg:SetScript("OnMouseDown", function(_, mouseButton) if mouseButton == "LeftButton" and row.data then onIconClick(row.data.id, row) end end)
+			iconBg:SetScript("OnEnter", function() iconBg:SetBackdropBorderColor(unpack(Theme.border.hover)) end)
+			iconBg:SetScript("OnLeave", function() iconBg:SetBackdropBorderColor(unpack(Theme.border.default)) end)
 		end
 
 		local nameText = row:CreateFontString(nil, "OVERLAY")
@@ -387,14 +387,14 @@ function Controls.ItemList(parent, placeholder, width, height, onAdd, onRemove, 
 		row:EnableMouse(true)
 
 		if onRowRightClick then
-			row:SetScript("OnMouseUp", BUILib.Timed('BUILib.ItemList CreatePoolFrame row OnMouseUp', function(self, button)
+			row:SetScript("OnMouseUp", function(self, button)
 				if button == "RightButton" and self.data then
 					onRowRightClick(self.data.id, self)
 				end
-			end))
+			end)
 		end
 
-		row:SetScript("OnEnter", BUILib.Timed('BUILib.ItemList CreatePoolFrame row OnEnter', function()
+		row:SetScript("OnEnter", function()
 			row:SetBackdropColor(unpack(Theme.bg.hover)); row:SetBackdropBorderColor(unpack(Theme.border.hover))
 			if row.data then
 				GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
@@ -404,19 +404,19 @@ function Controls.ItemList(parent, placeholder, width, height, onAdd, onRemove, 
 				if entryID and not hideID then GameTooltip:AddLine("ID: " .. tostring(entryID), 0.5, 0.5, 0.5) end
 				GameTooltip:Show()
 			end
-		end))
-		row:SetScript("OnLeave", BUILib.Timed('BUILib.ItemList CreatePoolFrame row OnLeave', function()
+		end)
+		row:SetScript("OnLeave", function()
 			if dragIndex ~= row._dataIndex then
 				row:SetBackdropColor(unpack(Theme.bg.light)); row:SetBackdropBorderColor(unpack(Theme.border.default))
 			end
 			GameTooltip:Hide()
-		end))
+		end)
 
 		if orderable then
-			row:SetScript("OnDragStart", BUILib.Timed('BUILib.ItemList CreatePoolFrame row OnDragStart', function()
+			row:SetScript("OnDragStart", function()
 				dragIndex = row._dataIndex
 				ghost._icon:SetTexture(row.icon:GetTexture()); ghost._name:SetText(row.name:GetText()); ghost:Show()
-				listFrame:SetScript("OnUpdate", BUILib.Timed('BUILib.ItemList CreatePoolFrame listFrame OnUpdate', function()
+				listFrame:SetScript("OnUpdate", function()
 					local cursorX, cursorY = GetCursorPosition()
 					local scale = UIParent:GetEffectiveScale()
 					cursorX, cursorY = cursorX / scale, cursorY / scale
@@ -434,13 +434,13 @@ function Controls.ItemList(parent, placeholder, width, height, onAdd, onRemove, 
 							container:_renderVisible()
 						end
 					end
-				end))
-			end))
-			row:SetScript("OnDragStop", BUILib.Timed('BUILib.ItemList CreatePoolFrame row OnDragStop', function()
+				end)
+			end)
+			row:SetScript("OnDragStop", function()
 				dragIndex = nil; ghost:Hide(); listFrame:SetScript("OnUpdate", nil)
 				container:_renderVisible()
 				if onReorder then onReorder(data) end
-			end))
+			end)
 		end
 
 		local closeButton = Controls.Icon(row, { preset = "close", size = 24, onClick = function() if row.data then container:RemoveItem(row.data) end end })
@@ -504,7 +504,7 @@ function Controls.ItemList(parent, placeholder, width, height, onAdd, onRemove, 
 			local slideOffset = previousY - targetY
 			local startTime = GetTime()
 			frame:SetPoint("TOPLEFT", scroll.child, "TOPLEFT", 0, targetY + slideOffset)
-			frame:SetScript("OnUpdate", BUILib.Timed('BUILib.ItemList PlaceRow frame OnUpdate', function(self)
+			frame:SetScript("OnUpdate", function(self)
 				local elapsedFraction = (GetTime() - startTime) / SLIDE_DURATION
 				if elapsedFraction >= 1 then
 					self:SetScript("OnUpdate", nil)
@@ -515,7 +515,7 @@ function Controls.ItemList(parent, placeholder, width, height, onAdd, onRemove, 
 					self:ClearAllPoints()
 					self:SetPoint("TOPLEFT", scroll.child, "TOPLEFT", 0, targetY + slideOffset * (1 - eased))
 				end
-			end))
+			end)
 		else
 			frame:SetPoint("TOPLEFT", scroll.child, "TOPLEFT", 0, targetY)
 		end
@@ -553,15 +553,15 @@ function Controls.ItemList(parent, placeholder, width, height, onAdd, onRemove, 
 	local function RequestLayout()
 		if layoutPending then return end
 		layoutPending = true
-		C_Timer.After(0, BUILib.Timed('BUILib.ItemList RequestLayout timer', function()
+		C_Timer.After(0, function()
 			layoutPending = false
 			UpdateLayout()
-		end))
+		end)
 	end
 
-	hooksecurefunc(scroll.scrollFrame, "SetVerticalScroll", BUILib.Timed('BUILib.ItemList ItemList hook SetVerticalScroll', function()
+	hooksecurefunc(scroll.scrollFrame, "SetVerticalScroll", function()
 		container:_renderVisible()
-	end))
+	end)
 
 	function container:AddItem(icon, name, id, removable, enabled)
 		if enabled == nil then enabled = true end
@@ -630,14 +630,14 @@ function Controls.SpellColorList(parent, placeholder, width, height, onAdd, onRe
 	local listFrame = Widget.New(container, "Frame", nil, {bg = Theme.bg.dark, border = Theme.border.default, size = {width, height}}).frame
 	listFrame:SetPoint("TOPLEFT", 0, -(INPUT_HEIGHT + GAP))
 	listFrame:EnableMouse(true)
-	listFrame:SetScript("OnMouseDown", BUILib.Timed('BUILib.ItemList SpellColorList listFrame OnMouseDown', function(_, button) if button == "LeftButton" then HandleDrop() end end))
-	listFrame:SetScript("OnReceiveDrag", BUILib.Timed('BUILib.ItemList SpellColorList listFrame OnReceiveDrag', HandleDrop))
+	listFrame:SetScript("OnMouseDown", function(_, button) if button == "LeftButton" then HandleDrop() end end)
+	listFrame:SetScript("OnReceiveDrag", HandleDrop)
 
 	local scroll = Controls.ScrollFrame(listFrame, width, height, height)
 	scroll:SetPoint("TOPLEFT", 0, 0)
 	scroll.child:EnableMouse(true)
-	scroll.child:SetScript("OnMouseDown", BUILib.Timed('BUILib.ItemList SpellColorList child OnMouseDown', function(_, button) if button == "LeftButton" then HandleDrop() end end))
-	scroll.child:SetScript("OnReceiveDrag", BUILib.Timed('BUILib.ItemList SpellColorList child OnReceiveDrag', HandleDrop))
+	scroll.child:SetScript("OnMouseDown", function(_, button) if button == "LeftButton" then HandleDrop() end end)
+	scroll.child:SetScript("OnReceiveDrag", HandleDrop)
 
 	local rows, data = {}, {}
 	local rowWidth = width - 14
@@ -672,7 +672,7 @@ function Controls.SpellColorList(parent, placeholder, width, height, onAdd, onRe
 		swatchTexture:SetDrawLayer("ARTWORK"); swatchTexture:SetPoint("TOPLEFT", 1, -1); swatchTexture:SetPoint("BOTTOMRIGHT", -1, 1)
 		row.swatch = swatchTexture; row.color = color
 
-		swatch:SetScript("OnClick", BUILib.Timed('BUILib.ItemList CreateRow swatch OnClick', function()
+		swatch:SetScript("OnClick", function()
 			Controls.OpenColorPicker({
 				r = color[1], g = color[2], b = color[3], a = 1,
 				anchorTo = swatch,
@@ -682,7 +682,7 @@ function Controls.SpellColorList(parent, placeholder, width, height, onAdd, onRe
 					if onColorChange and row.data then onColorChange(row.data.id, {red, green, blue, 1}) end
 				end,
 			})
-		end))
+		end)
 
 		local idText = row:CreateFontString(nil, "OVERLAY")
 		idText:SetFont(BUILib.Font, 10, ""); idText:SetPoint("RIGHT", -36, 0)

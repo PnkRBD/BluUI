@@ -549,9 +549,9 @@ local function GetSocialRow(rowIndex)
             row.cols[columnIndex] = fontString
         end
 
-        row:SetScript('OnEnter', BUI.Profiler.Script('Datatext.Social row OnEnter', RowOnEnter))
-        row:SetScript('OnLeave', BUI.Profiler.Script('Datatext.Social row OnLeave', RowOnLeave))
-        row:SetScript('OnClick', BUI.Profiler.Script('Datatext.Social row OnClick', RowOnClick))
+        row:SetScript('OnEnter', RowOnEnter)
+        row:SetScript('OnLeave', RowOnLeave)
+        row:SetScript('OnClick', RowOnClick)
 
         socialRows[rowIndex] = row
     end
@@ -693,7 +693,7 @@ local DispatchSocialRefresh = BUI.Dispatcher.NewDelayed(function()
             break
         end
     end
-end, 0.4, 'Social list refresh')
+end, 0.4)
 
 local function RefreshOpenSocialPanel()
     if socialPanel and socialPanel:IsShown() then DispatchSocialRefresh() end
@@ -753,15 +753,15 @@ local function BuildSocialPanel()
     advancedLabel:SetPoint('RIGHT', advancedBox, 'LEFT', -Pixel.Scale(5), 0)
     Painter.Text(advancedLabel, 'faint')
     panel.advancedToggle:SetWidth(Pixel.Scale(19) + advancedLabel:GetStringWidth())
-    panel.advancedToggle:SetScript('OnEnter', BUI.Profiler.Script('Datatext.Social advancedToggle OnEnter', function() advancedLabel:SetTextColor(Role('text')) end))
-    panel.advancedToggle:SetScript('OnLeave', BUI.Profiler.Script('Datatext.Social advancedToggle OnLeave', function() advancedLabel:SetTextColor(Role('faint')) end))
-    panel.advancedToggle:SetScript('OnClick', BUI.Profiler.Script('Datatext.Social advancedToggle OnClick', function()
+    panel.advancedToggle:SetScript('OnEnter', function() advancedLabel:SetTextColor(Role('text')) end)
+    panel.advancedToggle:SetScript('OnLeave', function() advancedLabel:SetTextColor(Role('faint')) end)
+    panel.advancedToggle:SetScript('OnClick', function()
         local profile = BUI.GetDB()
         profile.socialAdvancedView = not profile.socialAdvancedView
         panel.advancedCheck:SetShown(profile.socialAdvancedView)
         RenderSocial()
         panel.scroll:UpdateScroll()
-    end))
+    end)
 
     local scroll = Controls.ScrollFrame(panel, Pixel.Scale(initialContainerWidth), Pixel.Scale(SOCIAL_MAX_ROWS * SOCIAL_ROW_HEIGHT + 4), nil, Pixel.Scale(initialChildWidth)).frame
     scroll:ClearAllPoints()
@@ -788,9 +788,9 @@ local function BuildSocialPanel()
         headerButton.arrow:SetPoint('LEFT', headerButton.label, 'RIGHT', Pixel.Scale(1), 0)
         Painter.Tint(headerButton.arrow, 'muted')
         headerButton.arrow:Hide()
-        headerButton:SetScript('OnEnter', BUI.Profiler.Script('Datatext.Social headerButton OnEnter', function(self) self.label:SetTextColor(Role('text')) end))
-        headerButton:SetScript('OnLeave', BUI.Profiler.Script('Datatext.Social headerButton OnLeave', function(self) self.label:SetTextColor(Role('faint')) end))
-        headerButton:SetScript('OnClick', BUI.Profiler.Script('Datatext.Social headerButton OnClick', function(self)
+        headerButton:SetScript('OnEnter', function(self) self.label:SetTextColor(Role('text')) end)
+        headerButton:SetScript('OnLeave', function(self) self.label:SetTextColor(Role('faint')) end)
+        headerButton:SetScript('OnClick', function(self)
             local openPanel = socialPanel
             if openPanel.sortCol == self.col then
                 openPanel.sortDir = -openPanel.sortDir
@@ -800,7 +800,7 @@ local function BuildSocialPanel()
             GetSortState()[openPanel.kind] = { col = openPanel.sortCol, dir = openPanel.sortDir }
             RenderSocial()
             openPanel.scroll:ScrollToTop()
-        end))
+        end)
         panel.header[columnIndex] = headerButton
     end
     panel.headerLine = panel:CreateTexture(nil, 'ARTWORK')
@@ -822,12 +822,12 @@ local function BuildSocialPanel()
             panel:FadeOut()
         end
     end
-    panel:SetScript('OnShow', BUI.Profiler.Wrap('Datatext.Social panel shown', function()
+    panel:SetScript('OnShow', function()
         pressedOutside = false
         BUI.Events:Register('GLOBAL_MOUSE_DOWN', 'Datatext.Social', OnGlobalMouse)
         BUI.Events:Register('GLOBAL_MOUSE_UP',   'Datatext.Social', OnGlobalMouse)
-    end))
-    panel:SetScript('OnHide', BUI.Profiler.Wrap('Datatext.Social panel hidden', function() BUI.Events:UnregisterAll('Datatext.Social') end))
+    end)
+    panel:SetScript('OnHide', function() BUI.Events:UnregisterAll('Datatext.Social') end)
 
     socialPanel = panel
 end

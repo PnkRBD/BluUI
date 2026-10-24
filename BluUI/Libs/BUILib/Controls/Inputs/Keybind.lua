@@ -12,11 +12,11 @@ local function SafeSetPropagateKeyboardInput(frame, value)
 	if InCombatLockdown() then
 		local eventFrame = CreateFrame("Frame")
 		eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-		eventFrame:SetScript("OnEvent", BUILib.Timed('BUILib.Keybind SafeSetPropagateKeyboardInput eventFrame OnEvent', function(self)
+		eventFrame:SetScript("OnEvent", function(self)
 			self:UnregisterAllEvents()
 			if frame and frame.SetPropagateKeyboardInput then frame:SetPropagateKeyboardInput(value) end
 			self:SetScript("OnEvent", nil)
-		end))
+		end)
 	else frame:SetPropagateKeyboardInput(value) end
 end
 
@@ -44,7 +44,7 @@ function Controls.Keybind(parent, label, key, callback, width)
 	keyText:SetTextColor(unpack(Theme.text.primary))
 	local listener = CreateFrame("Frame", nil, UIParent)
 	listener:EnableKeyboard(true); listener:Hide()
-	listener:SetScript("OnShow", BUILib.Timed('BUILib.Keybind Keybind listener OnShow', function(listenerFrame) SafeSetPropagateKeyboardInput(listenerFrame, true) end))
+	listener:SetScript("OnShow", function(listenerFrame) SafeSetPropagateKeyboardInput(listenerFrame, true) end)
 	local function UpdateDisplay()
 		if state.listening then
 			keyText:SetText("Press a key..."); keyText:SetTextColor(1, 1, 1, 1)
@@ -57,14 +57,14 @@ function Controls.Keybind(parent, label, key, callback, width)
 			editButton:SetText("Edit Keybind"); clearButton:SetShown(state.key ~= "NONE")
 		end
 	end
-	clearButton:SetScript("OnClick", BUILib.Timed('BUILib.Keybind Keybind clearButton OnClick', function()
+	clearButton:SetScript("OnClick", function()
 		state.key = "NONE"; UpdateDisplay()
 		if callback then callback(state.key) end
-	end))
+	end)
 	row:EnableMouse(true)
-	row:SetScript("OnEnter", BUILib.Timed('BUILib.Keybind Keybind row OnEnter', function(hoveredRow) if not state.listening then hoveredRow:SetBackdropBorderColor(Theme.GetAccent()) end end))
-	row:SetScript("OnLeave", BUILib.Timed('BUILib.Keybind Keybind row OnLeave', function(hoveredRow) if not state.listening then hoveredRow:SetBackdropBorderColor(unpack(Theme.border.input)) end end))
-	listener:SetScript("OnKeyDown", BUILib.Timed('BUILib.Keybind Keybind listener OnKeyDown', function(self, keyPressed)
+	row:SetScript("OnEnter", function(hoveredRow) if not state.listening then hoveredRow:SetBackdropBorderColor(Theme.GetAccent()) end end)
+	row:SetScript("OnLeave", function(hoveredRow) if not state.listening then hoveredRow:SetBackdropBorderColor(unpack(Theme.border.input)) end end)
+	listener:SetScript("OnKeyDown", function(self, keyPressed)
 		if not state.listening then return end
 		if keyPressed == "LSHIFT" or keyPressed == "RSHIFT" or keyPressed == "LCTRL" or keyPressed == "RCTRL" or keyPressed == "LALT" or keyPressed == "RALT" then return end
 		SafeSetPropagateKeyboardInput(self, false)
@@ -77,13 +77,13 @@ function Controls.Keybind(parent, label, key, callback, width)
 			if callback then callback(state.key) end
 		end
 		state.listening = false; self:Hide(); UpdateDisplay()
-	end))
-	editButton:SetScript("OnClick", BUILib.Timed('BUILib.Keybind Keybind editButton OnClick', function()
+	end)
+	editButton:SetScript("OnClick", function()
 		if InCombatLockdown() then return end
 		if state.listening then state.listening = false; listener:Hide()
 		else state.listening = true; listener:Show() end
 		UpdateDisplay()
-	end))
+	end)
 	UpdateDisplay()
 	function container:GetValue() return state.key end
 	function container:SetValue(value) state.key = value or "NONE"; UpdateDisplay() end

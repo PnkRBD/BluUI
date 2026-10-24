@@ -191,11 +191,11 @@ local function RowForSpell(spellID)
     return nil
 end
 
-castDriver:SetScript('OnUpdate', BUI.Profiler.Wrap('PortalManager.PortalManager cast fill', function()
+castDriver:SetScript('OnUpdate', function()
     if not castingRow then return end
     local progress = math.min(1, (GetTime() - castStart) / (castEnd - castStart))
     castingRow.castFill:SetWidth(math.max(1, (castingRow:GetWidth() - Pixel.Scale(2)) * progress))
-end))
+end)
 
 local function StartCastFill(spellID)
     local row = RowForSpell(spellID)
@@ -208,12 +208,12 @@ local function StartCastFill(spellID)
     castDriver:Show()
 end
 
-local RowEnter = BUI.Profiler.Script('PortalManager.PortalManager row OnEnter', function(self)
+local RowEnter = function(self)
     GameTooltip:SetOwner(self, 'ANCHOR_NONE')
     GameTooltip:SetPoint('TOPRIGHT', self, 'TOPLEFT', -6, 0)
     GameTooltip:SetSpellByID(self._spellID)
     GameTooltip:Show()
-end)
+end
 
 local function CreateRow(parent, index)
     local row = CreateFrame('Button', nil, parent, 'SecureActionButtonTemplate')
@@ -320,7 +320,7 @@ local function BuildPanel()
 
     local _
     _, panel.scroll, panel.child = Skin.CreateListArea(panel, LIST_TOP, ROW_H)
-    panel:HookScript('OnHide', BUI.Profiler.Wrap('PortalManager.PortalManager panel hidden', StopCastFill))
+    panel:HookScript('OnHide', StopCastFill)
 end
 
 local function SortedEntries(entries)
@@ -449,8 +449,8 @@ RefreshContent = function()
     panel.child:SetHeight(Pixel.Scale(math.max(1, shown * (ROW_H + ROW_GAP))))
 end
 
-local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3, 'Portal refresh')
-local QueueCooldowns = BUI.Dispatcher.New(RefreshCooldowns, 'Portal cooldowns')
+local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3)
+local QueueCooldowns = BUI.Dispatcher.New(RefreshCooldowns)
 
 local function OnMapsUpdated()
     RebuildMapLookup()
@@ -516,5 +516,5 @@ function BUI.PortalManager.IsOpen()
     return slide.IsOpen()
 end
 
-CharacterFrame:HookScript('OnHide', BUI.Profiler.Wrap('PortalManager.PortalManager character hide', function() slide.Close(true) end))
+CharacterFrame:HookScript('OnHide', function() slide.Close(true) end)
 context.OnDisable(function() slide.Close(true) end)

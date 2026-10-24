@@ -125,7 +125,7 @@ function PowerPrediction.Attach(parentBar, options)
 
     ApplyAnchors(instance)
 
-    parentBar:HookScript('OnSizeChanged', BUI.Profiler.Wrap('Utility.PowerPrediction bar resized', function() ApplyAnchors(instance) end))
+    parentBar:HookScript('OnSizeChanged', function() ApplyAnchors(instance) end)
 
     return predict
 end

@@ -202,21 +202,21 @@ function Controls.DraggableCardGrid(parent, config)
 			return entry.minVal + ratio * (entry.maxVal - entry.minVal)
 		end
 
-		hitArea:SetScript("OnMouseDown", BUILib.Timed('BUILib.DraggableCardGrid CreateCard hitArea OnMouseDown', function(_, mouseButton)
+		hitArea:SetScript("OnMouseDown", function(_, mouseButton)
 			if mouseButton ~= "LeftButton" or dragMode then return end
 			dragging = true
 			SetValue(ValueAtCursor(), true)
-			hitArea:SetScript("OnUpdate", BUILib.Timed('BUILib.DraggableCardGrid CreateCard hitArea OnUpdate', function() SetValue(ValueAtCursor(), true) end))
-		end))
+			hitArea:SetScript("OnUpdate", function() SetValue(ValueAtCursor(), true) end)
+		end)
 		local function EndDrag()
 			if not dragging then return end
 			dragging = false
 			hitArea:SetScript("OnUpdate", nil)
 		end
-		hitArea:SetScript("OnMouseUp", BUILib.Timed('BUILib.DraggableCardGrid CreateCard hitArea OnMouseUp', EndDrag))
-		hitArea:SetScript("OnHide", BUILib.Timed('BUILib.DraggableCardGrid CreateCard hitArea OnHide', EndDrag))
-		hitArea:SetScript("OnEnter", BUILib.Timed('BUILib.DraggableCardGrid CreateCard hitArea OnEnter', function() if not dragMode then SetRing("hover") end end))
-		hitArea:SetScript("OnLeave", BUILib.Timed('BUILib.DraggableCardGrid CreateCard hitArea OnLeave', function() if not dragMode then SetRing("normal") end end))
+		hitArea:SetScript("OnMouseUp", EndDrag)
+		hitArea:SetScript("OnHide", EndDrag)
+		hitArea:SetScript("OnEnter", function() if not dragMode then SetRing("hover") end end)
+		hitArea:SetScript("OnLeave", function() if not dragMode then SetRing("normal") end end)
 
 		entry._slider = {
 			SetValue = function(_, newValue) SetValue(newValue, false) end,
@@ -237,27 +237,27 @@ function Controls.DraggableCardGrid(parent, config)
 		sliderOverlay:SetAllPoints()
 		sliderOverlay:EnableMouse(true); sliderOverlay:SetFrameLevel(card:GetFrameLevel() + 20)
 		sliderOverlay:RegisterForDrag("LeftButton")
-		sliderOverlay:SetScript("OnDragStart", BUILib.Timed('BUILib.DraggableCardGrid CreateCard sliderOverlay OnDragStart', function()
+		sliderOverlay:SetScript("OnDragStart", function()
 			local handler = card:GetScript("OnDragStart")
 			if handler then handler(card) end
-		end))
-		sliderOverlay:SetScript("OnDragStop", BUILib.Timed('BUILib.DraggableCardGrid CreateCard sliderOverlay OnDragStop', function()
+		end)
+		sliderOverlay:SetScript("OnDragStop", function()
 			local handler = card:GetScript("OnDragStop")
 			if handler then handler(card) end
-		end))
-		sliderOverlay:SetScript("OnEnter", BUILib.Timed('BUILib.DraggableCardGrid CreateCard sliderOverlay OnEnter', function()
+		end)
+		sliderOverlay:SetScript("OnEnter", function()
 			local handler = card:GetScript("OnEnter")
 			if handler then handler(card) end
-		end))
-		sliderOverlay:SetScript("OnLeave", BUILib.Timed('BUILib.DraggableCardGrid CreateCard sliderOverlay OnLeave', function()
+		end)
+		sliderOverlay:SetScript("OnLeave", function()
 			local handler = card:GetScript("OnLeave")
 			if handler then handler(card) end
-		end))
+		end)
 		sliderOverlay:Hide()
 		entry._sliderOverlay = sliderOverlay
 
 		card:EnableMouse(true); card:RegisterForDrag("LeftButton")
-		card:SetScript("OnDragStart", BUILib.Timed('BUILib.DraggableCardGrid CreateCard card OnDragStart', function()
+		card:SetScript("OnDragStart", function()
 			if not dragMode then return end
 			dragIndex = entry._index
 			ghostIcon:SetTexture(iconTexture:GetTexture())
@@ -265,7 +265,7 @@ function Controls.DraggableCardGrid(parent, config)
 			ghostFrame:Show()
 			card:SetAlpha(0.3)
 
-			container:SetScript("OnUpdate", BUILib.Timed('BUILib.DraggableCardGrid CreateCard container OnUpdate', function()
+			container:SetScript("OnUpdate", function()
 				local cursorX, cursorY = GetCursorPosition()
 				local scale = UIParent:GetEffectiveScale()
 				cursorX, cursorY = cursorX / scale, cursorY / scale
@@ -279,9 +279,9 @@ function Controls.DraggableCardGrid(parent, config)
 					dragIndex = targetIndex
 					UpdateLayout()
 				end
-			end))
-		end))
-		card:SetScript("OnDragStop", BUILib.Timed('BUILib.DraggableCardGrid CreateCard card OnDragStop', function()
+			end)
+		end)
+		card:SetScript("OnDragStop", function()
 			if not dragIndex then return end
 			card:SetAlpha(1)
 			ghostFrame:Hide()
@@ -293,10 +293,10 @@ function Controls.DraggableCardGrid(parent, config)
 				for index, orderedCard in ipairs(cards) do order[index] = orderedCard.id end
 				onReorder(order)
 			end
-		end))
+		end)
 
-		card:SetScript("OnEnter", BUILib.Timed('BUILib.DraggableCardGrid CreateCard card OnEnter', function() if dragMode then SetRing("draghover") end end))
-		card:SetScript("OnLeave", BUILib.Timed('BUILib.DraggableCardGrid CreateCard card OnLeave', function() if dragMode then SetRing("drag") end end))
+		card:SetScript("OnEnter", function() if dragMode then SetRing("draghover") end end)
+		card:SetScript("OnLeave", function() if dragMode then SetRing("drag") end end)
 
 		return entry
 	end

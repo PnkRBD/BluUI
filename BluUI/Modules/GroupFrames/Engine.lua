@@ -233,7 +233,7 @@ local function RosterSweep()
 	GroupFrames.EachChild(SweepChild)
 end
 
-local DispatchRosterSweep = BUI.Dispatcher.New(RosterSweep, 'GroupFrames.RosterSweep')
+local DispatchRosterSweep = BUI.Dispatcher.New(RosterSweep)
 
 function GroupFrames.RefreshColors()
 	local db = GroupFrames.GetDB()
@@ -270,18 +270,18 @@ function GroupFrames.Setup()
 		rosterWatcher:RegisterEvent("PARTY_MEMBER_DISABLE")
 		rosterWatcher:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 		rosterWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
-		rosterWatcher:SetScript("OnEvent", BUI.Profiler.Wrap("GroupFrames.Engine roster event", function(_, event)
+		rosterWatcher:SetScript("OnEvent", function(_, event)
 			if event == "PLAYER_REGEN_ENABLED" then
 				BUI.Events:AfterCombatSettled(DispatchRosterSweep, "GF.RosterSweep")
 				return
 			end
 			DispatchRosterSweep()
-		end))
+		end)
 		BUI.Tools.OnAuraQueriesUnblocked(function()
 			GroupFrames.PrecreateParty()
 			GroupFrames.PrecreateRaid()
 			GroupFrames.SyncPreviewChildren()
-		end, 'Group frame precreate')
+		end)
 	end
 	GroupFrames.SyncReachabilitySweep()
 end

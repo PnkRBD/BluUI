@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('CDM.Glow')
-
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
 
@@ -244,9 +242,9 @@ function CDM.SetupGlowHooks()
 			pendingHide[icon] = nil
 			CDM.StopProcGlow(icon)
 		end
-	end, 'CDM.Glow hide drain')
+	end)
 
-	Hook(ActionButtonSpellAlertManager, 'ShowAlert', function(_, frame)
+	hooksecurefunc(ActionButtonSpellAlertManager, 'ShowAlert', function(_, frame)
 		local icon = ResolveViewerIcon(frame)
 		if not icon then return end
 		local frameData = GetFrameData(icon)
@@ -260,7 +258,7 @@ function CDM.SetupGlowHooks()
 		StartBlizzardProc(icon, frameData)
 	end)
 
-	Hook(ActionButtonSpellAlertManager, 'HideAlert', function(_, frame)
+	hooksecurefunc(ActionButtonSpellAlertManager, 'HideAlert', function(_, frame)
 		local icon = ResolveViewerIcon(frame)
 		if not icon then return end
 		local frameData = FrameData[icon]

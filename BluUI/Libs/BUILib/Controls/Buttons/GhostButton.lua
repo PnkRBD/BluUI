@@ -16,25 +16,25 @@ function Controls.GhostButton(parent, text, width, callback, tooltip)
 	label:SetPoint("CENTER")
 	local textWidth = label:GetStringWidth() + 24
 	if textWidth > width then frame:SetWidth(Widget.EvenSize(textWidth)) end
-	frame:HookScript("OnEnter", BUILib.Timed('BUILib.GhostButton GhostButton frame OnEnter', function(button)
+	frame:HookScript("OnEnter", function(button)
 		local red, green, blue = Theme.GetAccent()
 		Widget.SetShapeColor(ghostBorder, red, green, blue, 1)
 		label:SetTextColor(red, green, blue, 1)
-	end))
-	frame:HookScript("OnLeave", BUILib.Timed('BUILib.GhostButton GhostButton frame OnLeave', function(button)
+	end)
+	frame:HookScript("OnLeave", function(button)
 		Widget.SetShapeColor(ghostBorder, unpack(Theme.border.light))
 		label:SetTextColor(unpack(Theme.text.secondary))
-	end))
-	frame:SetScript("OnMouseDown", BUILib.Timed('BUILib.GhostButton GhostButton frame OnMouseDown', function(button) if button:IsEnabled() then label:SetPoint("CENTER", 1, -1) end end))
-	frame:SetScript("OnMouseUp", BUILib.Timed('BUILib.GhostButton GhostButton frame OnMouseUp', function() label:SetPoint("CENTER", 0, 0) end))
-	if callback then frame:SetScript("OnClick", BUILib.Timed('BUILib.GhostButton GhostButton frame OnClick', function() callback() end)) end
+	end)
+	frame:SetScript("OnMouseDown", function(button) if button:IsEnabled() then label:SetPoint("CENTER", 1, -1) end end)
+	frame:SetScript("OnMouseUp", function() label:SetPoint("CENTER", 0, 0) end)
+	if callback then frame:SetScript("OnClick", function() callback() end) end
 	function frame:SetText(newText)
 		label:SetText(newText)
 		local newWidth = label:GetStringWidth() + 24
 		if newWidth > frame:GetWidth() then frame:SetWidth(Widget.EvenSize(newWidth)) end
 	end
 	function frame:GetText() return label:GetText() end
-	function frame:SetCallback(newCallback) frame:SetScript("OnClick", BUILib.Timed('BUILib.GhostButton SetCallback frame OnClick', function() if newCallback then newCallback() end end)) end
+	function frame:SetCallback(newCallback) frame:SetScript("OnClick", function() if newCallback then newCallback() end end) end
 	function frame:SetEnabled(enabled)
 		if enabled then
 			frame:Enable()

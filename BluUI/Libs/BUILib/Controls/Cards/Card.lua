@@ -35,9 +35,9 @@ function Controls.Card(parent, icon, title, description, width, height, clickabl
 	end
 	content:SetHeight(Widget.EvenSize(yOffset + 4))
 	if clickable then
-		card:SetScript("OnEnter", BUILib.Timed('BUILib.Card Card card OnEnter', function(self) self:SetBackdropBorderColor(Theme.GetAccent()) end))
-		card:SetScript("OnLeave", BUILib.Timed('BUILib.Card Card card OnLeave', function(self) self:SetBackdropBorderColor(0.4, 0.4, 0.4, 1) end))
-		card:SetScript("OnClick", BUILib.Timed('BUILib.Card Card card OnClick', function(self) if callback then callback(self) end end))
+		card:SetScript("OnEnter", function(self) self:SetBackdropBorderColor(Theme.GetAccent()) end)
+		card:SetScript("OnLeave", function(self) self:SetBackdropBorderColor(0.4, 0.4, 0.4, 1) end)
+		card:SetScript("OnClick", function(self) if callback then callback(self) end end)
 	end
 	function card:SetIcon(texture) if card.icon then card.icon:SetTexture(texture) end end
 	return card

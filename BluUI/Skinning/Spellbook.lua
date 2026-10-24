@@ -273,7 +273,7 @@ local function InstallFrame(frame)
 	Hook(frame.SpecFrame, 'UpdateSpecFrame', StyleSpecContents)
 	Hook(_G.HeroTalentsSelectionDialog, 'ShowDialog', StyleHeroSpecContents)
 	for _, container in ipairs({ frame.SpellBookFrame.SearchPreviewContainer, frame.TalentsFrame.SearchPreviewContainer }) do
-		container:HookScript('OnShow', BUI.Profiler.Wrap('Skin.Spellbook search preview', context.Guard(StyleSearchPreview)))
+		container:HookScript('OnShow', context.Guard(StyleSearchPreview))
 	end
 end
 

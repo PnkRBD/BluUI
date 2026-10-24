@@ -72,7 +72,7 @@ function Controls.Tags(parent, label, initial, callback, width, placeholder, sug
 		end,
 	})
 	dropdown:EnableMouseWheel(true)
-	dropdown:SetScript("OnMouseWheel", BUILib.Timed('BUILib.Tags Tags dropdown OnMouseWheel', function(_, delta) tagsScrollLogic.DoScroll(delta) end))
+	dropdown:SetScript("OnMouseWheel", function(_, delta) tagsScrollLogic.DoScroll(delta) end)
 
 	local function PositionDropdown()
 		dropdown:ClearAllPoints(); dropdown:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 0, -2)
@@ -108,9 +108,9 @@ function Controls.Tags(parent, label, initial, callback, width, placeholder, sug
 		descText:SetFont(BUILib.Font, 10, ""); descText:SetPoint("LEFT", 10 + tagColumnWidth + 8, 0)
 		descText:SetPoint("RIGHT", -10, 0); descText:SetJustifyH("LEFT"); descText:SetWordWrap(false)
 		descText:SetTextColor(unpack(Theme.text.muted)); item.desc = descText
-		item:SetScript("OnEnter", BUILib.Timed('BUILib.Tags Tags item OnEnter', function(self) state.selectedIndex = self.index or itemIndex; UpdateDropdownHighlight() end))
-		item:SetScript("OnLeave", BUILib.Timed('BUILib.Tags Tags item OnLeave', function() end))
-		item:SetScript("OnClick", BUILib.Timed('BUILib.Tags Tags item OnClick', function(self) if self.value then InsertTag(self.value) end end))
+		item:SetScript("OnEnter", function(self) state.selectedIndex = self.index or itemIndex; UpdateDropdownHighlight() end)
+		item:SetScript("OnLeave", function() end)
+		item:SetScript("OnClick", function(self) if self.value then InsertTag(self.value) end end)
 		item:Hide(); dropdownItems[itemIndex] = item
 	end
 
@@ -175,33 +175,33 @@ function Controls.Tags(parent, label, initial, callback, width, placeholder, sug
 
 	rowWidget:SetupHoverBorder(editBox, Theme.border.input)
 	row:EnableMouse(true)
-	row:SetScript("OnMouseDown", BUILib.Timed('BUILib.Tags Tags row OnMouseDown', function() editBox:SetFocus() end))
+	row:SetScript("OnMouseDown", function() editBox:SetFocus() end)
 
 	local function UpdateDisplay()
 		state.text = editBox:GetText()
 		placeholderText:SetShown(state.text == ""); clearButton:SetShown(state.text ~= "")
 	end
 
-	clearButton:SetScript("OnClick", BUILib.Timed('BUILib.Tags Tags clearButton OnClick', function()
+	clearButton:SetScript("OnClick", function()
 		editBox:SetText(""); state.text = ""; UpdateDisplay(); dropdown:Hide()
 		if callback then callback("") end
-	end))
+	end)
 
-	editBox:SetScript("OnTextChanged", BUILib.Timed('BUILib.Tags Tags editBox OnTextChanged', function(self, userInput)
+	editBox:SetScript("OnTextChanged", function(self, userInput)
 		UpdateDisplay(); if userInput then UpdateDropdown() end
-	end))
+	end)
 
-	editBox:SetScript("OnEnterPressed", BUILib.Timed('BUILib.Tags Tags editBox OnEnterPressed', function(self)
+	editBox:SetScript("OnEnterPressed", function(self)
 		if dropdown:IsShown() and state.selectedIndex > 0 and filteredSuggestions[state.selectedIndex] then
 			local suggestion = filteredSuggestions[state.selectedIndex]
 			InsertTag(type(suggestion) == "table" and suggestion.tag or suggestion)
 		else self:ClearFocus(); dropdown:Hide(); if callback then callback(state.text) end end
-	end))
-	editBox:SetScript("OnEscapePressed", BUILib.Timed('BUILib.Tags Tags editBox OnEscapePressed', function(self) self:ClearFocus(); dropdown:Hide() end))
+	end)
+	editBox:SetScript("OnEscapePressed", function(self) self:ClearFocus(); dropdown:Hide() end)
 
-	editBox:HookScript("OnEditFocusLost", BUILib.Timed('BUILib.Tags Tags editBox OnEditFocusLost', function()
-		C_Timer.After(0.15, BUILib.Timed('BUILib.Tags Tags timer', function() if not editBox:HasFocus() then dropdown:Hide() end end))
-	end))
+	editBox:HookScript("OnEditFocusLost", function()
+		C_Timer.After(0.15, function() if not editBox:HasFocus() then dropdown:Hide() end end)
+	end)
 
 	local function ScrollToSelected()
 		if state.selectedIndex <= 0 or #filteredSuggestions <= maxVisible then return end
@@ -213,7 +213,7 @@ function Controls.Tags(parent, label, initial, callback, width, placeholder, sug
 		elseif itemBottom > viewBottom then tagsScrollLogic.ScrollTo(itemBottom - scrollFrame:GetHeight()) end
 	end
 
-	editBox:SetScript("OnKeyDown", BUILib.Timed('BUILib.Tags Tags editBox OnKeyDown', function(self, key)
+	editBox:SetScript("OnKeyDown", function(self, key)
 		if not dropdown:IsShown() then return end
 		if key == "DOWN" then state.selectedIndex = math_min(state.selectedIndex + 1, #filteredSuggestions); UpdateDropdownHighlight(); ScrollToSelected()
 		elseif key == "UP" then state.selectedIndex = math_max(state.selectedIndex - 1, 1); UpdateDropdownHighlight(); ScrollToSelected()
@@ -221,11 +221,11 @@ function Controls.Tags(parent, label, initial, callback, width, placeholder, sug
 			local suggestion = filteredSuggestions[state.selectedIndex]
 			InsertTag(type(suggestion) == "table" and suggestion.tag or suggestion)
 		end
-	end))
+	end)
 
-	editBox:SetScript("OnChar", BUILib.Timed('BUILib.Tags Tags editBox OnChar', function(self, char)
+	editBox:SetScript("OnChar", function(self, char)
 		if char == "[" then BUILib.Defer(UpdateDropdown) end
-	end))
+	end)
 
 	UpdateDisplay()
 

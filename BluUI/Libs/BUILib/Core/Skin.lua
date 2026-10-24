@@ -80,16 +80,16 @@ function Skin.ChildBackdrop(frame, options)
 		backdrop:SetPoint('TOPLEFT', frame, 'TOPLEFT', inset, -inset)
 		backdrop:SetPoint('BOTTOMRIGHT', frame, 'BOTTOMRIGHT', -inset, inset)
 		frame._buiBackdrop = backdrop
-		frame:HookScript('OnHide', BUILib.Timed('BUILib.Skin ChildBackdrop frame OnHide', function() backdrop:Hide() end))
+		frame:HookScript('OnHide', function() backdrop:Hide() end)
 	end
 	local strata, level = frame:GetFrameStrata(), frame:GetFrameLevel()
 	if issecretvalue and (issecretvalue(strata) or issecretvalue(level)) then
-		C_Timer.After(0, BUILib.Timed('BUILib.Skin ChildBackdrop timer', function()
+		C_Timer.After(0, function()
 			local resolvedStrata, resolvedLevel = frame:GetFrameStrata(), frame:GetFrameLevel()
 			if issecretvalue(resolvedStrata) or issecretvalue(resolvedLevel) then return end
 			backdrop:SetFrameStrata(resolvedStrata)
 			backdrop:SetFrameLevel(max(0, resolvedLevel - 1))
-		end))
+		end)
 	else
 		backdrop:SetFrameStrata(strata)
 		backdrop:SetFrameLevel(max(0, level - 1))
@@ -105,8 +105,8 @@ function Skin.Button(button, options)
 	local border = options.border or Theme.border.default
 	Skin.StripTextures(button)
 	Skin.Backdrop(button, { bg = options.bg or Theme.bg.light, border = border })
-	button:HookScript('OnEnter', BUILib.Timed('BUILib.Skin Button button OnEnter', function(self) self:SetBackdropBorderColor(Theme.GetAccent()) end))
-	button:HookScript('OnLeave', BUILib.Timed('BUILib.Skin Button button OnLeave', function(self) self:SetBackdropBorderColor(border[1], border[2], border[3], border[4] or 1) end))
+	button:HookScript('OnEnter', function(self) self:SetBackdropBorderColor(Theme.GetAccent()) end)
+	button:HookScript('OnLeave', function(self) self:SetBackdropBorderColor(border[1], border[2], border[3], border[4] or 1) end)
 end
 
 local aligners = setmetatable({}, { __mode = 'k' })
@@ -144,7 +144,7 @@ end
 function Skin.QueuePixelAlign()
 	if alignQueued then return end
 	alignQueued = true
-	C_Timer.After(0, BUILib.Timed('BUILib.Skin QueuePixelAlign timer', AlignAll))
+	C_Timer.After(0, AlignAll)
 end
 
 local function OnHostSizeChanged(host)
@@ -157,9 +157,9 @@ function Skin.PixelAlign(host, region, apply)
 	if not entries then
 		entries = {}
 		aligners[host] = entries
-		host:HookScript('OnShow', BUILib.Timed('BUILib.Skin PixelAlign host OnShow', AlignHost))
-		host:HookScript('OnSizeChanged', BUILib.Timed('BUILib.Skin PixelAlign host OnSizeChanged', OnHostSizeChanged))
-		hooksecurefunc(host, 'SetPoint', BUILib.Timed('BUILib.Skin PixelAlign hook SetPoint', Skin.QueuePixelAlign))
+		host:HookScript('OnShow', AlignHost)
+		host:HookScript('OnSizeChanged', OnHostSizeChanged)
+		hooksecurefunc(host, 'SetPoint', Skin.QueuePixelAlign)
 	end
 	local entry = { region = region, apply = apply, last = {} }
 	entries[#entries + 1] = entry
@@ -175,7 +175,7 @@ end
 local scaleWatcher = CreateFrame('Frame')
 scaleWatcher:RegisterEvent('UI_SCALE_CHANGED')
 scaleWatcher:RegisterEvent('DISPLAY_SIZE_CHANGED')
-scaleWatcher:SetScript('OnEvent', BUILib.Timed('BUILib.Skin scaleWatcher OnEvent', Skin.QueuePixelAlign))
+scaleWatcher:SetScript('OnEvent', Skin.QueuePixelAlign)
 
 local function AlignBox(owner, fill, top, bottom, left, right, insets, thickness)
 	return function(frameLeft, frameRight, frameTop, frameBottom, pixel)
@@ -447,8 +447,8 @@ function Skin.Tab(tab, style, fused)
 		Skin.StripButton(tab)
 		state = { selected = false, fused = false }
 		tab._buiTab = state
-		tab:HookScript('OnEnter', BUILib.Timed('BUILib.Skin Tab tab OnEnter', TabEnter))
-		tab:HookScript('OnLeave', BUILib.Timed('BUILib.Skin Tab tab OnLeave', TabLeave))
+		tab:HookScript('OnEnter', TabEnter)
+		tab:HookScript('OnLeave', TabLeave)
 	end
 	state.style = style
 	if fused ~= nil then state.fused = fused and true or false end

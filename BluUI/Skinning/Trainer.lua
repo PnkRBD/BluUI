@@ -5,7 +5,6 @@ local FONT = BUILib.Font
 local Skin = BUI.Skinning
 local Painter = BUI.Painter
 local Pixel = BUI.Pixel
-local After = BUI.Profiler.After
 
 local FRAME_WIDTH = 480
 local FRAME_HEIGHT = 560
@@ -81,16 +80,16 @@ local function CreateRow(parent)
 	row.trainBtn = Skin.SmallButton(row, 50, ROW_HEIGHT - 6, 'Train')
 	row.trainBtn:SetPoint('RIGHT', Pixel.Scale(-4), 0)
 	row.trainBtn:SetFrameLevel(row:GetFrameLevel() + 5)
-	row.trainBtn:SetScript('OnClick', BUI.Profiler.Script('Skin.Trainer trainBtn OnClick', function(self)
+	row.trainBtn:SetScript('OnClick', function(self)
 		BuyTrainerService(self:GetParent().serviceIndex)
-		After('Skin.Trainer list refresh', 0.1, RefreshContent)
-	end))
+		C_Timer.After(0.1, RefreshContent)
+	end)
 
-	row:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.Trainer row OnEnter', function(self)
+	row:HookScript('OnEnter', function(self)
 		GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 		GameTooltip:SetTrainerService(self.serviceIndex)
 		GameTooltip:Show()
-	end))
+	end)
 	return row
 end
 
@@ -158,7 +157,7 @@ local function TrainAll()
 		queueIndex = queueIndex + 1
 		if not queue[queueIndex] then return end
 		BuyTrainerService(queue[queueIndex])
-		After('Skin.Trainer train all', BUY_DELAY, BuyNext)
+		C_Timer.After(BUY_DELAY, BuyNext)
 	end
 	BuyNext()
 end
@@ -207,7 +206,7 @@ local function BuildFrame()
 	Painter.Text(frame.moneyText, 'skinText')
 
 	frame.trainAllBtn = Skin.SmallButton(frame, TRAIN_ALL_W, BUTTON_H, 'Train All')
-	frame.trainAllBtn:SetScript('OnClick', BUI.Profiler.Script('Skin.Trainer trainAll OnClick', TrainAll))
+	frame.trainAllBtn:SetScript('OnClick', TrainAll)
 	frame.trainAllBtn:SetPoint('BOTTOMRIGHT', Pixel.Scale(-12), Pixel.Scale(14))
 	frame.trainAllBtn:SetFrameLevel(frame:GetFrameLevel() + 10)
 end
@@ -259,7 +258,7 @@ local function OpenTrainer(blizzard)
 	trainerFrame:Show()
 	Skin.SuppressBlizzardFrame(blizzard)
 	for _, event in ipairs(LIVE_EVENTS) do BUI.Events:Register(event, 'Skinning.Trainer', OnLiveEvent) end
-	After('Skin.Trainer first refresh', 0, function()
+	C_Timer.After(0, function()
 		RefreshContent()
 		trainerFrame.scroll:SetVerticalScroll(0)
 	end)
@@ -276,7 +275,7 @@ end
 context.Window('ClassTrainerFrame', {
 	show = OpenTrainer,
 	install = function(blizzard)
-		blizzard:HookScript('OnHide', BUI.Profiler.Wrap('Skin.Trainer blizzard hide', context.Guard(CloseTrainerSkin)))
+		blizzard:HookScript('OnHide', context.Guard(CloseTrainerSkin))
 	end,
 	enable = function(blizzard)
 		Skin.ReserveWidth(blizzard, FRAME_WIDTH, UIParent)

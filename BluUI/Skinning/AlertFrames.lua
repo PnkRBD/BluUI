@@ -3,7 +3,6 @@ local _, BUI = ...
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
-local AnchorHook = BUI.Profiler.Hooker('Skin.AlertFrames')
 
 local ANCHOR_KEY = 'alerts'
 local ANCHOR_DEFAULT_Y = 180
@@ -148,5 +147,5 @@ Skin.ToastAnchors.Register({
 		frame:ClearAllPoints()
 		frame:SetAllPoints(anchor)
 	end,
-	hooks = function(reapply) AnchorHook(_G.AlertFrame, 'UpdateAnchors', reapply) end,
+	hooks = function(reapply) hooksecurefunc(_G.AlertFrame, 'UpdateAnchors', reapply) end,
 })

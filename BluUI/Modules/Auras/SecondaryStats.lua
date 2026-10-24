@@ -136,7 +136,7 @@ local function Paint()
     end
 end
 
-local Update = BUI.Dispatcher.NewDelayed(Paint, PAINT_DELAY, 'Auras.SecondaryStats')
+local Update = BUI.Dispatcher.NewDelayed(Paint, PAINT_DELAY)
 
 local function Build()
     if holder then return end

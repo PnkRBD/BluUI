@@ -38,7 +38,7 @@ local function CreateButton(index)
 	button:SetID(index)
 	ActionBars.PrepareTemplateButton(button, 'stance', COMMAND .. index)
 	button:SetAttribute('type', 'spell')
-	button:SetScript('OnEnter', BUI.Profiler.Script('ActionBars.StanceBar button OnEnter', OnEnter))
+	button:SetScript('OnEnter', OnEnter)
 	button:SetScript('OnLeave', GameTooltip_Hide)
 	ActionBars.SkinButton(button)
 	ActionBars.ApplyHotkeyText(button)
@@ -69,7 +69,7 @@ local function UpdateVisuals()
 	end
 end
 
-local QueueVisuals = BUI.Dispatcher.New(UpdateVisuals, EVENT_KEY)
+local QueueVisuals = BUI.Dispatcher.New(UpdateVisuals)
 
 local function OnFormChanged()
 	if GetShapeshiftForm() == paintedForm and GetShapeshiftFormID() == paintedFormID then return end

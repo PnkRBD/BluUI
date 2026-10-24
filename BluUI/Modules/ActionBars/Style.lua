@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('ActionBars.Style')
-
 local ActionBars = BUI.ActionBars
 local Pixel = BUI.Pixel
 local LibActionButton = LibStub('LibActionButton-1.0-BluUI')
@@ -91,11 +89,11 @@ function ActionBars.FitAllButtonOverlays()
 	ActionBars.ForEachButton(ActionBars.FitButtonOverlays)
 end
 
-local QueueOverlayFit = BUI.Dispatcher.New(ActionBars.FitAllButtonOverlays, 'ActionBars.AssistSync')
+local QueueOverlayFit = BUI.Dispatcher.New(ActionBars.FitAllButtonOverlays)
 
-EventRegistry:RegisterCallback('AssistedCombatManager.OnSetActionSpell', BUI.Profiler.Timed('ActionBars.Style callback AssistedCombatManager.OnSetActionSpell', QueueOverlayFit), ActionBars)
-EventRegistry:RegisterCallback('AssistedCombatManager.OnAssistedHighlightSpellChange', BUI.Profiler.Timed('ActionBars.Style callback AssistedCombatManager.OnAssistedHighlightSpellChange', QueueOverlayFit), ActionBars)
-EventRegistry:RegisterCallback('AssistedCombatManager.OnSetUseAssistedHighlight', BUI.Profiler.Timed('ActionBars.Style callback AssistedCombatManager.OnSetUseAssistedHighlight', QueueOverlayFit), ActionBars)
+EventRegistry:RegisterCallback('AssistedCombatManager.OnSetActionSpell', QueueOverlayFit, ActionBars)
+EventRegistry:RegisterCallback('AssistedCombatManager.OnAssistedHighlightSpellChange', QueueOverlayFit, ActionBars)
+EventRegistry:RegisterCallback('AssistedCombatManager.OnSetUseAssistedHighlight', QueueOverlayFit, ActionBars)
 
 local function StripTemplateArt(button)
 	local normal = button.NormalTexture
@@ -172,9 +170,9 @@ end
 function ActionBars.StyleCooldown(cooldown)
 	if not cooldown._buiStyleHooked then
 		cooldown._buiStyleHooked = true
-		Hook(cooldown, 'SetSwipeColor', OnSwipeColorSet)
-		Hook(cooldown, 'SetCooldown', ApplyCooldownStyle)
-		Hook(cooldown, 'SetCooldownFromDurationObject', ApplyCooldownStyle)
+		hooksecurefunc(cooldown, 'SetSwipeColor', OnSwipeColorSet)
+		hooksecurefunc(cooldown, 'SetCooldown', ApplyCooldownStyle)
+		hooksecurefunc(cooldown, 'SetCooldownFromDurationObject', ApplyCooldownStyle)
 	end
 	cooldown._buiTextStyled = nil
 	cooldown._buiSwipeApplied = nil
@@ -290,7 +288,7 @@ function ActionBars.SyncAllEmptyButtonAlpha()
 	ActionBars.ForEachButton(ActionBars.SyncEmptyButtonAlpha)
 end
 
-local QueueEmptyButtonSync = BUI.Dispatcher.New(ActionBars.SyncAllEmptyButtonAlpha, 'ActionBars.GridSync')
+local QueueEmptyButtonSync = BUI.Dispatcher.New(ActionBars.SyncAllEmptyButtonAlpha)
 
 local function ResyncAllButtons()
 	if InCombatLockdown() then
@@ -301,7 +299,7 @@ local function ResyncAllButtons()
 		if button.UpdateAction then button:UpdateAction(true) end
 	end)
 end
-local QueueResync = BUI.Dispatcher.New(ResyncAllButtons, 'ActionBars.Resync')
+local QueueResync = BUI.Dispatcher.New(ResyncAllButtons)
 for _, event in ipairs({ 'ENCOUNTER_END', 'PLAYER_ALIVE', 'PLAYER_UNGHOST' }) do
 	BUI.Events:Register(event, 'ActionBars.Resync', QueueResync)
 end
@@ -322,7 +320,7 @@ function ActionBars.RefreshAllHotkeyText()
 	ActionBars.ForEachButton(ActionBars.ApplyHotkeyText)
 end
 
-local QueueHotkeyText = BUI.Dispatcher.New(ActionBars.RefreshAllHotkeyText, 'ActionBars.HotkeyText')
+local QueueHotkeyText = BUI.Dispatcher.New(ActionBars.RefreshAllHotkeyText)
 
 BUI.Events:Register('UPDATE_BINDINGS', 'ActionBars.HotkeyText', QueueHotkeyText)
 

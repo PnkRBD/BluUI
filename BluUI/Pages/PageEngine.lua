@@ -64,7 +64,7 @@ local function CreateWindow()
 	BUI.Tools.AddPageWatermark(window.content)
 	BUI.Scale.SetupButtons(window, PageEngine.frame)
 
-	window.frame:HookScript('OnHide', BUI.Profiler.Wrap('Pages.PageEngine window hidden', HideCurrentPage))
+	window.frame:HookScript('OnHide', HideCurrentPage)
 
 	local buttonFrame = window.footerLeftmost
 	local searchBox = Controls.SearchBox(buttonFrame:GetParent(), 'Search...', function(query)
@@ -82,7 +82,7 @@ local function CreateWindow()
 	searchBoxFrame:SetPoint('BOTTOM', buttonFrame, 'BOTTOM', 0, 0)
 	searchBoxFrame:SetPoint('LEFT', window.footerVersion, 'RIGHT', Pixel.Scale(12), 0)
 	searchBoxFrame:SetPoint('RIGHT', buttonFrame, 'LEFT', Pixel.Scale(-8), 0)
-	searchBoxFrame.editbox:SetScript('OnEnterPressed', BUI.Profiler.Script('Pages.PageEngine editbox OnEnterPressed', function(self)
+	searchBoxFrame.editbox:SetScript('OnEnterPressed', function(self)
 		local results = SearchIndex.Search(self:GetText())
 		if results[1] then
 			SearchResults.Hide()
@@ -90,7 +90,7 @@ local function CreateWindow()
 			self:SetText('')
 			self:ClearFocus()
 		end
-	end))
+	end)
 end
 
 function PageEngine.SetWindowScale(percent)
@@ -176,7 +176,7 @@ function PageEngine.Show()
 
 	BUI.ReassertBUILib()
 	if not PageEngine.optionsLoaded then
-		if PageEngine.EnsureLoaded() then BUI.Profiler.After('Pages.PageEngine open after load', 0, PageEngine.Show) end
+		if PageEngine.EnsureLoaded() then C_Timer.After(0, PageEngine.Show) end
 		return
 	end
 	if not PageEngine.window then

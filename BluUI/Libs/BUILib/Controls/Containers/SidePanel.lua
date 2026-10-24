@@ -29,7 +29,7 @@ function Controls.SidePanel(parent, options)
 	local dimTexture = dimmer:CreateTexture(nil, "BACKGROUND")
 	dimTexture:SetAllPoints()
 	dimTexture:SetColorTexture(0, 0, 0, 0.55)
-	dimmer:SetScript("OnMouseDown", BUILib.Timed('BUILib.SidePanel SidePanel dimmer OnMouseDown', function() if panelWidget then panelWidget:Close() end end))
+	dimmer:SetScript("OnMouseDown", function() if panelWidget then panelWidget:Close() end end)
 	dimmer:Hide()
 
 	local host = CreateFrame("Frame", nil, parentFrame)
@@ -64,14 +64,14 @@ function Controls.SidePanel(parent, options)
 	header:EnableMouse(true)
 	header:RegisterForDrag("LeftButton")
 
-	header:SetScript("OnDragStart", BUILib.Timed('BUILib.SidePanel SidePanel header OnDragStart', function(self)
+	header:SetScript("OnDragStart", function(self)
 		local window = BUILib.ClientOf(self).popupParent
 		if window and window.StartMoving then window:StartMoving() end
-	end))
-	header:SetScript("OnDragStop", BUILib.Timed('BUILib.SidePanel SidePanel header OnDragStop', function(self)
+	end)
+	header:SetScript("OnDragStop", function(self)
 		local window = BUILib.ClientOf(self).popupParent
 		if window and window.StopMovingOrSizing then window:StopMovingOrSizing() end
-	end))
+	end)
 	local headerBackground = header:CreateTexture(nil, "BACKGROUND")
 	headerBackground:SetAllPoints()
 	headerBackground:SetColorTexture(0, 0, 0, 0.25)
@@ -113,7 +113,7 @@ function Controls.SidePanel(parent, options)
 	local from, to, elapsed, hideAtEnd = width, width, 0, false
 	local driver = CreateFrame("Frame", nil, host)
 	driver:Hide()
-	driver:SetScript("OnUpdate", BUILib.Timed('BUILib.SidePanel SidePanel driver OnUpdate', function(self, deltaTime)
+	driver:SetScript("OnUpdate", function(self, deltaTime)
 		elapsed = elapsed + deltaTime
 		local progress = (SLIDE_TIME > 0) and math.min(elapsed / SLIDE_TIME, 1) or 1
 		local eased = 1 - (1 - progress) * (1 - progress)
@@ -125,7 +125,7 @@ function Controls.SidePanel(parent, options)
 				dimmer:Hide()
 			end
 		end
-	end))
+	end)
 	local function slide(target, hideWhenDone)
 		from = panel._x or width
 		to = target

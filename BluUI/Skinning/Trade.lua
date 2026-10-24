@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Wrap = BUI.Profiler.Wrap
-
 local ipairs = ipairs
 
 local Skin = BUI.Skinning
@@ -166,7 +164,7 @@ local function InstallFrame()
 	context.Hook('TradeFrame_UpdatePlayerItem', function(slotIndex) RefreshItemEdges(_G[ITEM_PREFIXES[1] .. slotIndex .. 'ItemButton']) end)
 	context.Hook('TradeFrame_UpdateTargetItem', function(slotIndex) RefreshItemEdges(_G[ITEM_PREFIXES[2] .. slotIndex .. 'ItemButton']) end)
 	for _, column in ipairs(COLUMNS) do
-		local refresh = Wrap('Skin.Trade column accepted', context.Guard(function() SetColumnAccepted(column) end))
+		local refresh = context.Guard(function() SetColumnAccepted(column) end)
 		_G[column.highlights[1]]:HookScript('OnShow', refresh)
 		_G[column.highlights[1]]:HookScript('OnHide', refresh)
 	end

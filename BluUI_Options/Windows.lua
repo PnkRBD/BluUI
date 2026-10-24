@@ -28,7 +28,7 @@ function OptionsWindow.New(id, config)
 		onWindowCreated = function(window)
 			window.frame:SetScale(BUI.db.global.windowScale / 100)
 			if config.onClosed then
-				window.frame:HookScript('OnHide', BUI.Profiler.Wrap(config.title .. ' window closed', config.onClosed))
+				window.frame:HookScript('OnHide', config.onClosed)
 			end
 			if config.modal then
 				local overlay = CreateFrame('Frame', nil, UIParent, 'BackdropTemplate')

@@ -373,7 +373,7 @@ local function Build()
 	end)
 	BUI.Tools.OnAuraQueriesUnblocked(function()
 		if restylePending then RestyleButtons() end
-	end, 'Buff frames restyle')
+	end)
 end
 
 Events:Once('PLAYER_ENTERING_WORLD', 'BuffFrames', Build)

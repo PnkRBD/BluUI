@@ -1,21 +1,19 @@
 local _, BUI = ...
 
 local CreateFrame = CreateFrame
-local Profiler = BUI.Profiler
 
 local Dispatcher = {}
 BUI.Dispatcher = Dispatcher
 
-function Dispatcher.New(callback, name)
-    local frame = CreateFrame('Frame', 'BUI_Dispatch_' .. name:gsub('%W', ''))
+function Dispatcher.New(callback)
+    local frame = CreateFrame('Frame')
     frame:Hide()
     local pending = false
-    local label = 'Next frame ' .. name
 
     frame:SetScript('OnUpdate', function(self)
         self:Hide()
         pending = false
-        Profiler.Run(label, callback)
+        callback()
     end)
 
     return function()
@@ -25,13 +23,12 @@ function Dispatcher.New(callback, name)
     end
 end
 
-function Dispatcher.NewDelayed(callback, delay, name)
+function Dispatcher.NewDelayed(callback, delay)
     local pending = false
-    local label = 'After ' .. delay .. 's ' .. name
 
     local function Run()
         pending = false
-        Profiler.Run(label, callback)
+        callback()
     end
 
     return function()

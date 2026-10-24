@@ -1,8 +1,5 @@
 local _, BUI = ...
 
-local Wrap = BUI.Profiler.Wrap
-local After = BUI.Profiler.After
-
 local _G = _G
 local wipe = wipe
 local type, ipairs, pairs, tonumber = type, ipairs, pairs, tonumber
@@ -78,7 +75,7 @@ local function ShowBuffWarning(icon, text, color, remaining, spellName, font, de
 		warningText = warningFrame:CreateFontString(nil, "OVERLAY")
 		Pixel.ApplyFont(warningText, 28)
 		warningText:SetPoint("CENTER")
-		warningFrame:SetScript("OnUpdate", Wrap("CDM.Custom warning text", UpdateWarningText))
+		warningFrame:SetScript("OnUpdate", UpdateWarningText)
 	end
 	text = text or "BUFF EXPIRING!"
 	if warningOwner == icon and warningTemplate == text and warningSpellName == spellName
@@ -269,7 +266,7 @@ local function ResetManualBuffOverlay(icon, frameData)
         frameData._manualGlowTimer = nil
     end
     frameData._manualGlowActive = nil
-    icon.Cooldown:SetScript("OnCooldownDone", BUI.Profiler.Timed('CDM.Custom ResetManualBuffOverlay Cooldown OnCooldownDone', CDM.OnCooldownWidgetDone))
+    icon.Cooldown:SetScript("OnCooldownDone", CDM.OnCooldownWidgetDone)
 end
 
 local function ReleaseIcon(icon)
@@ -350,7 +347,7 @@ local ScheduleBagRescan
 
 local RefreshBarsAfterItemLoad = BUI.Dispatcher.NewDelayed(function()
     BUI.CustomBars.RefreshAllBars()
-end, 0.1, 'CDM.Custom item load')
+end, 0.1)
 
 local function OnItemDataLoaded(_, itemID, success)
     if not pendingItems[itemID] then return end
@@ -700,7 +697,7 @@ local function CreateIconFrame(parent, borderSize, borderColor, zoom)
     cooldown:SetDrawBling(false)
     cooldown:SetDrawSwipe(true)
     cooldown:SetHideCountdownNumbers(true)
-    cooldown:SetScript("OnCooldownDone", BUI.Profiler.Timed('CDM.Custom CreateIconFrame cooldown OnCooldownDone', CDM.OnCooldownWidgetDone))
+    cooldown:SetScript("OnCooldownDone", CDM.OnCooldownWidgetDone)
     frame.Cooldown = cooldown
 
     function frame:Update(newBorderSize, newBorderColor, newZoom)
@@ -723,7 +720,7 @@ local function CreateIconFrame(parent, borderSize, borderColor, zoom)
     tooltipOverlay:SetFrameLevel(frame:GetFrameLevel() + 5)
     tooltipOverlay:EnableMouse(true)
     frame._tooltipOverlay = tooltipOverlay
-    tooltipOverlay:SetScript("OnEnter", BUI.Profiler.Script('CDM.Custom tooltipOverlay OnEnter', function()
+    tooltipOverlay:SetScript("OnEnter", function()
         local frameData = FrameData[frame]
         if not frameData or frameData.hidden then return end
         if not BUI.GetDB().cdm.showTooltips then return end
@@ -737,10 +734,10 @@ local function CreateIconFrame(parent, borderSize, borderColor, zoom)
             GameTooltip:SetSpellByID(spellID)
         end
         GameTooltip:Show()
-    end))
-    tooltipOverlay:SetScript("OnLeave", BUI.Profiler.Script('CDM.Custom tooltipOverlay OnLeave', function()
+    end)
+    tooltipOverlay:SetScript("OnLeave", function()
         GameTooltip:Hide()
-    end))
+    end)
 
     local frameData = GetFrameData(frame)
     frameData.customIcon = true
@@ -798,14 +795,14 @@ local function ScheduleManualBuffGlow(icon, frameData, glowConfig, expiry)
             ManualBuffActivateGlow(icon, frameData, glowConfig, remaining)
         else
             ManualBuffDeactivateGlow(icon, frameData)
-            Tools.ReplaceTimer(frameData, '_manualGlowTimer', "CDM.Custom manual glow on", timeUntilThreshold, function()
+            Tools.ReplaceTimer(frameData, '_manualGlowTimer', timeUntilThreshold, function()
                 ManualBuffActivateGlow(icon, frameData, glowConfig, thresh)
             end)
         end
     elseif mode == 'above' then
         ManualBuffActivateGlow(icon, frameData, glowConfig, remaining)
         if timeUntilThreshold > 0 then
-            Tools.ReplaceTimer(frameData, '_manualGlowTimer', "CDM.Custom manual glow off", timeUntilThreshold, function()
+            Tools.ReplaceTimer(frameData, '_manualGlowTimer', timeUntilThreshold, function()
                 ManualBuffDeactivateGlow(icon, frameData)
             end)
         end
@@ -822,7 +819,7 @@ CleanupManualBuff = function(icon, frameData)
     frameData._manualStart = nil
     frameData._manualGlowActive = nil
     local cooldown = icon.Cooldown
-    cooldown:SetScript("OnCooldownDone", BUI.Profiler.Timed('CDM.Custom CleanupManualBuff cooldown OnCooldownDone', CDM.OnCooldownWidgetDone))
+    cooldown:SetScript("OnCooldownDone", CDM.OnCooldownWidgetDone)
     cooldown:Clear()
     GlowManager.CancelDeferred(frameData)
     CDM.StopProcGlow(icon)
@@ -939,9 +936,9 @@ local function UpdateIcon(icon)
                     if frameData._manualStart ~= frameData.lastCDStart then
                         frameData.lastCDStart = frameData._manualStart
                         cooldown:SetCooldown(frameData._manualStart, duration)
-                        cooldown:SetScript("OnCooldownDone", Wrap("CDM.Custom manual buff end", function()
+                        cooldown:SetScript("OnCooldownDone", function()
                             CleanupManualBuff(icon, frameData)
-                        end))
+                        end)
                         ScheduleManualBuffGlow(icon, frameData, manualBuff.glow, expiry)
                     end
                     return
@@ -1313,7 +1310,7 @@ local function ArmTrinketDataLoad(slot)
         if attempts > MAX_TRINKET_SLOT_RETRIES then return end
         trinketSlotRetryCount[slot] = attempts
         trinketSlotRetryPending[slot] = true
-        After("CDM.Custom trinket retry", 0.5, function()
+        C_Timer.After(0.5, function()
             trinketSlotRetryPending[slot] = nil
             CDM.Custom.Refresh("essential")
         end)
@@ -1537,9 +1534,6 @@ local function UpdateRelevantBuffIcons()
     end
 end
 
-local RunBuffScanFull = Wrap("CDM.Custom buff scan", UpdateTrackedBuffIcons)
-local RunBuffScanRelevant = Wrap("CDM.Custom changed buff scan", UpdateRelevantBuffIcons)
-
 local function WalkIconSet(iconSet, itemsOnly)
     for icon in pairs(iconSet) do
         local frameData = FrameData[icon]
@@ -1552,16 +1546,16 @@ local function WalkIconSet(iconSet, itemsOnly)
     end
 end
 
-local RunSpellWalk = Wrap("CDM.Custom spell walk", function()
+local RunSpellWalk = function()
     for _, iconSet in pairs(spellMap) do WalkIconSet(iconSet) end
-end)
+end
 
-local RunChangedSpellWalk = Wrap("CDM.Custom changed spell walk", function()
+local RunChangedSpellWalk = function()
     for spellID in pairs(changedCooldownSpells) do
         local iconSet = spellMap[spellID]
         if iconSet then WalkIconSet(iconSet) end
     end
-end)
+end
 
 local function ItemCooldownUnchanged(frameData)
     if frameData.iconType ~= "consumable" then return false end
@@ -1571,7 +1565,7 @@ local function ItemCooldownUnchanged(frameData)
     return false
 end
 
-local RunItemWalk = Wrap("CDM.Custom item walk", function()
+local RunItemWalk = function()
     for _, iconSet in pairs(itemMap) do
         for icon in pairs(iconSet) do
             if not flushSeen[icon] then
@@ -1582,15 +1576,15 @@ local RunItemWalk = Wrap("CDM.Custom item walk", function()
         end
     end
     for _, iconSet in pairs(spellMap) do WalkIconSet(iconSet, true) end
-end)
+end
 
-local RunUsableWalk = Wrap("CDM.Custom usable walk", function()
+local RunUsableWalk = function()
     for _, iconSet in pairs(spellMap) do
         for icon in pairs(iconSet) do
             UpdateIconUsable(icon)
         end
     end
-end)
+end
 
 local function FlushDispatch()
     if spellCooldownPending or itemCooldownPending or next(changedCooldownSpells) then
@@ -1622,9 +1616,9 @@ local function FlushDispatch()
             needsFullBuffScan = false
             wipe(changedBuffSpellIDs)
             wipe(changedBuffInstanceIDs)
-            RunBuffScanFull()
+            UpdateTrackedBuffIcons()
         else
-            RunBuffScanRelevant()
+            UpdateRelevantBuffIcons()
         end
     end
 end
@@ -1644,7 +1638,7 @@ local function QueueDispatch()
     if flushQueued then return end
     flushQueued = true
     local wait = FLUSH_MIN_INTERVAL - (GetTime() - lastFlushTime)
-    After("CDM.Custom dispatch flush", wait > 0 and wait or 0, RunQueuedFlush)
+    C_Timer.After(wait > 0 and wait or 0, RunQueuedFlush)
 end
 
 local bagPending = false
@@ -1674,7 +1668,7 @@ end
 ScheduleBagRescan = function()
     if bagPending then return end
     bagPending = true
-    After("CDM.Custom bag rescan", 0.05, FlushBagUpdate)
+    C_Timer.After(0.05, FlushBagUpdate)
 end
 
 local manualSpellMap = {}
@@ -1859,7 +1853,7 @@ end
 local RefreshAfterEquip = BUI.Dispatcher.New(function()
     DoRefresh()
     CDM.UpdateShowOnlyOnCDWatcher()
-end, "CDM.Custom.Equip")
+end)
 
 BUI.Events:Register("TRAIT_CONFIG_UPDATED", "CDM.Custom.Traits", function(event, arg1)
     local activeID = C_ClassTalents.GetActiveConfigID()

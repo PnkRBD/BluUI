@@ -95,9 +95,9 @@ function BlizzardBar:Refresh()
 		self:ReleaseFrame()
 		if not self.hideHooked then
 			self.hideHooked = true
-			frame:HookScript('OnShow', BUI.Profiler.Wrap('ActionBars.BlizzardBar hide guard', function(shown)
+			frame:HookScript('OnShow', function(shown)
 				if self:Hidden() then shown:Hide() end
-			end))
+			end)
 		end
 		frame:Hide()
 		return

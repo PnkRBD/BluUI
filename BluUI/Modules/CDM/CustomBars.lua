@@ -190,24 +190,24 @@ local function CreateIcon(parent, barIndex, iconIndex)
     icon._keepMouseForTooltip = true
     icon:RegisterForDrag("LeftButton")
 
-    icon:SetScript("OnDragStart", BUI.Profiler.Script('CDM.CustomBars icon OnDragStart', function()
+    icon:SetScript("OnDragStart", function()
         if IsDragBlocked(barIndex) then return end
         parent.dragActive = true
         parent:StartMoving()
-    end))
-    icon:SetScript("OnDragStop", BUI.Profiler.Script('CDM.CustomBars icon OnDragStop', function()
+    end)
+    icon:SetScript("OnDragStop", function()
         parent:StopMovingOrSizing()
         parent.dragActive = false
         local settings = GetBar(barIndex)
         if settings and not parent._isAnchored then
             settings.posX, settings.posY = BUI.Dragging.GetCenterOffset(parent)
         end
-    end))
-    icon:SetScript("OnMouseUp", BUI.Profiler.Script('CDM.CustomBars icon OnMouseUp', function(_, button)
+    end)
+    icon:SetScript("OnMouseUp", function(_, button)
         if button == "RightButton" and not parent.dragActive then
             LockBar(barIndex)
         end
-    end))
+    end)
 
     icon.tex = icon:CreateTexture(nil, "ARTWORK")
     icon.tex:SetAllPoints()
@@ -229,7 +229,7 @@ local function CreateIcon(parent, barIndex, iconIndex)
     overlay:SetFrameLevel(icon:GetFrameLevel() + 20)
     overlay:EnableMouse(false)
 
-    icon:SetScript("OnEnter", BUI.Profiler.Script('CDM.CustomBars icon OnEnter', function()
+    icon:SetScript("OnEnter", function()
         if not GetBar(barIndex).showTooltips then return end
         if not icon.itemID then return end
         GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
@@ -239,8 +239,8 @@ local function CreateIcon(parent, barIndex, iconIndex)
             GameTooltip:SetItemByID(icon.itemID)
         end
         GameTooltip:Show()
-    end))
-    icon:SetScript("OnLeave", BUI.Profiler.Script('CDM.CustomBars icon OnLeave', function() GameTooltip:Hide() end))
+    end)
+    icon:SetScript("OnLeave", function() GameTooltip:Hide() end)
     icon.stack = overlay:CreateFontString(nil, "OVERLAY")
     Pixel.ApplyFont(icon.stack, 12, BUI.GetTrackingFont())
 
@@ -866,7 +866,7 @@ local function FlushCooldownDispatch()
     end
 end
 
-local QueueCooldownFlush = BUI.Dispatcher.New(FlushCooldownDispatch, "CustomBars.Cooldowns")
+local QueueCooldownFlush = BUI.Dispatcher.New(FlushCooldownDispatch)
 
 local function OnSpellCooldownEvent()
     spellCooldownsPending = true
@@ -895,7 +895,7 @@ end
 local OnEvent = BUI.Dispatcher.NewDelayed(function()
     if HasEnabledBar() then BUI.CDM.Custom.InvalidateStaleBagCache() end
     CustomBars.RefreshAllBars()
-end, 0.1, 'Custom bars bag refresh')
+end, 0.1)
 
 local function OnEnteringWorld(_, isInitialLogin, isReloadingUi)
     if isInitialLogin or isReloadingUi then OnEvent() end

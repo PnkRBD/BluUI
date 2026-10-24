@@ -18,7 +18,7 @@ local function StartPreview()
 	local toast = _G.BNToastFrame
 	previewing = true
 	toast:AddToast(BN_TOAST_TYPE_NEW_INVITE)
-	BUI.Profiler.After('Skin.BNToast preview hold', 0.05, function()
+	C_Timer.After(0.05, function()
 		if previewing and toast:IsShown() then AlertFrame_PauseOutAnimation(toast) end
 	end)
 end

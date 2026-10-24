@@ -185,7 +185,7 @@ function CombatLogging.ToggleAnchor()
 	CombatLogging.Refresh()
 end
 
-local queueApply = BUI.Dispatcher.New(ApplyLoggingState, 'CombatLogging.Apply')
+local queueApply = BUI.Dispatcher.New(ApplyLoggingState)
 
 local function Initialize()
 	BUI.Scheduler.RegisterUpdate(MODULE_KEY, UpdateIndicator, 2, GetConfig().showIndicator)

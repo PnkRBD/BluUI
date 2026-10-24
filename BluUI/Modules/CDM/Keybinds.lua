@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('CDM.Keybinds')
-
 local _G = _G
 local wipe, type = wipe, type
 local tonumber = tonumber
@@ -714,12 +712,12 @@ local QueueRebuild = BUI.Dispatcher.New(function()
 
     if needsRetry then
         needsRetry = false
-        BUI.Profiler.After("CDM.Keybinds refresh retry", 0.1, function()
+        C_Timer.After(0.1, function()
             pendingFull = true
             Keybinds.ScheduleRebuild()
         end)
     end
-end, "CDM.Keybinds refresh")
+end)
 
 function Keybinds.ScheduleRebuild()
     if not active then return end
@@ -734,13 +732,13 @@ local function EnsureHooks()
     for key, viewerName in pairs(CDM.VIEWERS) do
         local viewer = key ~= 'buffs' and _G[viewerName]
         if viewer then
-            Hook(viewer, "RefreshLayout", Keybinds.ScheduleRebuild)
+            hooksecurefunc(viewer, "RefreshLayout", Keybinds.ScheduleRebuild)
             hookedViewer = true
         end
     end
 
     if not hookedViewer then return end
-    Hook(CDM, "NotifyDependents", Keybinds.Apply)
+    hooksecurefunc(CDM, "NotifyDependents", Keybinds.Apply)
     hooksInstalled = true
 end
 

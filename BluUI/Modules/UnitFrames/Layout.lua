@@ -155,27 +155,27 @@ function UnitFrames.RefreshLifeVisuals()
 end
 
 local function SetupTooltip(frame)
-	frame:HookScript('OnEnter', BUI.Profiler.Wrap('UnitFrames.Layout frame OnEnter', function(self)
+	frame:HookScript('OnEnter', function(self)
 		if not self.unit or GetMouseFoci()[1] ~= self then return end
 		if UnitFrames.GetSettings().showTooltips ~= false then
 			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
 			GameTooltip:SetUnit(self.unit)
 		end
-	end))
-	frame:HookScript('OnLeave', BUI.Profiler.Wrap('UnitFrames.Layout frame OnLeave', function()
+	end)
+	frame:HookScript('OnLeave', function()
 		GameTooltip:Hide()
-	end))
+	end)
 end
 
-local BossEnter = BUI.Profiler.Wrap('UnitFrames.Layout boss OnEnter', function(self)
+local BossEnter = function(self)
 	self._hovered = true
 	UnitFrames.UpdateBossMouseover(self)
-end)
+end
 
-local BossLeave = BUI.Profiler.Wrap('UnitFrames.Layout boss OnLeave', function(self)
+local BossLeave = function(self)
 	self._hovered = false
 	UnitFrames.UpdateBossMouseover(self)
-end)
+end
 
 local function HideWhenMuted(element)
 	if element._buiHidden then element:Hide() end

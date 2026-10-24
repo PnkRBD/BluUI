@@ -157,8 +157,8 @@ local function Swatch(swatch)
 	fill:ClearAllPoints()
 	fill:SetPoint('TOPLEFT', swatch, 'TOPLEFT', SWATCH_INSET, -SWATCH_INSET)
 	fill:SetPoint('BOTTOMRIGHT', swatch, 'BOTTOMRIGHT', -SWATCH_INSET, SWATCH_INSET)
-	swatch:HookScript('OnEnter', BUI.Profiler.Wrap('Skin.ChatConfig swatch OnEnter', SwatchEnter))
-	swatch:HookScript('OnLeave', BUI.Profiler.Wrap('Skin.ChatConfig swatch OnLeave', SwatchLeave))
+	swatch:HookScript('OnEnter', SwatchEnter)
+	swatch:HookScript('OnLeave', SwatchLeave)
 end
 
 local function CheckRow(row)
@@ -444,7 +444,7 @@ local function QueueEntries(frame, pending)
 		SkinEntries(frame)
 	elseif not frame._buiEntriesHook then
 		frame._buiEntriesHook = true
-		frame:HookScript('OnShow', BUI.Profiler.Wrap('Skin.ChatConfig entries reskin', SkinEntries))
+		frame:HookScript('OnShow', SkinEntries)
 	end
 end
 

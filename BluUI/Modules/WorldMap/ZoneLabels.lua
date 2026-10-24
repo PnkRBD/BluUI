@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('WorldMap.ZoneLabels')
-
 local Pixel = BUI.Pixel
 
 local BASE_FONT_SIZE = 13
@@ -115,10 +113,10 @@ local function RefreshAll()
     for _, entry in ipairs(overlays) do entry.Refresh() end
 end
 
-local OnCanvasScaleChanged = BUI.Dispatcher.New(RefreshAll, 'WorldMapOverlays.Rescale')
+local OnCanvasScaleChanged = BUI.Dispatcher.New(RefreshAll)
 
 BUI.Events:OnLogin('WorldMapOverlays', function()
-    Hook(WorldMapFrame, 'OnMapChanged', RefreshAll)
-    Hook(WorldMapFrame, 'OnCanvasScaleChanged', OnCanvasScaleChanged)
-    WorldMapFrame:HookScript('OnShow', BUI.Profiler.Wrap('WorldMap.ZoneLabels map shown', RefreshAll))
+    hooksecurefunc(WorldMapFrame, 'OnMapChanged', RefreshAll)
+    hooksecurefunc(WorldMapFrame, 'OnCanvasScaleChanged', OnCanvasScaleChanged)
+    WorldMapFrame:HookScript('OnShow', RefreshAll)
 end)

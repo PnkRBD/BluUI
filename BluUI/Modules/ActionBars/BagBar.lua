@@ -1,10 +1,7 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('ActionBars.BagBar')
-
 local ActionBars = BUI.ActionBars
 
-local EVENT_KEY = 'ActionBars.BagBar'
 local RELEASE_INSET = 4
 local BAG_BUTTON_NAMES = {
 	'MainMenuBarBackpackButton', 'CharacterBag0Slot', 'CharacterBag1Slot', 'CharacterBag2Slot', 'CharacterBag3Slot',
@@ -87,7 +84,7 @@ local function SkinBagButton(button, settings)
 	button.icon:SetDrawLayer('BACKGROUND')
 	ActionBars.ApplyIconCrop(button)
 	StyleBagState(button)
-	Hook(button, 'UpdateTextures', StyleBagState)
+	hooksecurefunc(button, 'UpdateTextures', StyleBagState)
 	local borderColor = settings.borderColor
 	BUI.Pixel.ApplyBorder(button, settings.borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
 	BUI.Pixel.ApplyFont(button.Count, COUNT_SIZE, BUI.GetGlobalFont(), 'OUTLINE')
@@ -101,8 +98,8 @@ local function SkinBagButtons()
 	local backpack = MainMenuBarBackpackButton
 	backpack.Count:ClearAllPoints()
 	backpack.Count:SetPoint('BOTTOM', backpack, 'BOTTOM', 0, 2)
-	Hook(backpack, 'UpdateFreeSlots', ShowFreeSlots)
-	Hook(backpack, 'SetItemButtonTexture', ShowBackpackIcon)
+	hooksecurefunc(backpack, 'UpdateFreeSlots', ShowFreeSlots)
+	hooksecurefunc(backpack, 'SetItemButtonTexture', ShowBackpackIcon)
 	ShowBackpackIcon(backpack)
 	ShowFreeSlots(backpack)
 end
@@ -189,13 +186,12 @@ local function AfterBlizzardLayout()
 end
 
 local function InstallHooks()
-	Hook(BagsBar, 'ApplySystemAnchor', OnBlizzardAnchor)
-	Hook(BagsBar, 'Layout', AfterBlizzardLayout)
-	Hook(BagsBar, 'UpdateSystemSettingSize', OnBlizzardLayout)
-	local onSlotLayout = BUI.Profiler.Wrap('ActionBars.BagBar slot layout', OnBlizzardLayout)
+	hooksecurefunc(BagsBar, 'ApplySystemAnchor', OnBlizzardAnchor)
+	hooksecurefunc(BagsBar, 'Layout', AfterBlizzardLayout)
+	hooksecurefunc(BagsBar, 'UpdateSystemSettingSize', OnBlizzardLayout)
 	local function HookSlot(slot)
-		slot:HookScript('OnShow', onSlotLayout)
-		slot:HookScript('OnHide', onSlotLayout)
+		slot:HookScript('OnShow', OnBlizzardLayout)
+		slot:HookScript('OnHide', OnBlizzardLayout)
 	end
 	for _, name in ipairs(BAG_BUTTON_NAMES) do HookSlot(_G[name]) end
 	HookSlot(BagBarExpandToggle)
@@ -209,8 +205,8 @@ bagBar = ActionBars.NewBlizzardBar({
 	release = Release,
 	installHooks = InstallHooks,
 })
-QueueRetake = BUI.Dispatcher.New(function() Retake(bagBar) end, EVENT_KEY .. '.Retake')
-QueueMeasure = BUI.Dispatcher.New(function() Measure(bagBar) end, EVENT_KEY .. '.Measure')
+QueueRetake = BUI.Dispatcher.New(function() Retake(bagBar) end)
+QueueMeasure = BUI.Dispatcher.New(function() Measure(bagBar) end)
 
 function ActionBars.RefreshBagBar()
 	bagBar:Refresh()

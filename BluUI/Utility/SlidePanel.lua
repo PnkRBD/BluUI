@@ -34,7 +34,7 @@ function BUI.SlidePanel.New(options)
         local panel = options.panel()
         local _, _, _, startX = panel:GetPoint(1)
         local elapsed = 0
-        panel:SetScript('OnUpdate', BUI.Profiler.Wrap('Utility.SlidePanel slide anim', function(self, deltaTime)
+        panel:SetScript('OnUpdate', function(self, deltaTime)
             elapsed = elapsed + deltaTime
             local progress = math.min(1, elapsed / SLIDE_DURATION)
             local eased = 1 - (1 - progress) * (1 - progress) * (1 - progress)
@@ -43,7 +43,7 @@ function BUI.SlidePanel.New(options)
                 self:SetScript('OnUpdate', nil)
                 if onDone then onDone() end
             end
-        end))
+        end)
     end
 
     function slidePanel.Open()

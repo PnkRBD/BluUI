@@ -83,7 +83,7 @@ end
 local Apply = BUI.Dispatcher.NewDelayed(function()
 	ActionBars.Refresh()
 	RefreshPreview()
-end, 0.15, 'Action bars page apply')
+end, 0.15)
 
 local applyByKey = {}
 local function ApplyFor(key)
@@ -92,7 +92,7 @@ local function ApplyFor(key)
 		apply = BUI.Dispatcher.NewDelayed(function()
 			ActionBars.RefreshOnly(key)
 			RefreshPreview()
-		end, 0.15, 'Action bars page apply ' .. key)
+		end, 0.15)
 		applyByKey[key] = apply
 	end
 	return apply

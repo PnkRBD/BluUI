@@ -310,7 +310,7 @@ function CastBar.TrackInterrupts(castbar, settings, barColor, unit)
 	castbar._ttsSoonAnnounced = nil
 	if not castbar._intHideHooked then
 		castbar._intHideHooked = true
-		castbar:HookScript('OnHide', BUI.Profiler.Wrap('CastBar.Core interrupt hide', CastBar.HideInterruptOverlays))
+		castbar:HookScript('OnHide', CastBar.HideInterruptOverlays)
 	end
 	trackedCastbars[castbar] = true
 	BUI.Scheduler.SetUpdateEnabled(POLL_KEY, true)
@@ -416,7 +416,7 @@ function CastBar.PreviewInterrupt(barType)
 	local onCooldownColor, readyColor = settings.interruptOnCDColor, settings.interruptReadyColor
 	local elapsed = 0
 	local spokeSoon, spokeReady = false, false
-	local ticker = C_Timer.NewTicker(PREVIEW_STEP, BUI.Profiler.Wrap('CastBar.Core interrupt preview', function()
+	local ticker = C_Timer.NewTicker(PREVIEW_STEP, function()
 		elapsed = elapsed + PREVIEW_STEP
 		local progress = elapsed / PREVIEW_SECONDS
 		if progress >= 1 then
@@ -447,7 +447,7 @@ function CastBar.PreviewInterrupt(barType)
 				BUI.TTS.Speak(settings.interruptTTSText)
 			end
 		end
-	end))
+	end)
 	previewTickers[barType] = { ticker = ticker, castbar = castbar, parent = parent, strata = strata, frame = frame }
 end
 
@@ -629,7 +629,7 @@ function CastBar.UpdateChannelTicks(castbar, settings)
 
 	if not castbar._chanTicks then
 		castbar._chanTicks = {}
-		castbar:HookScript('OnSizeChanged', BUI.Profiler.Wrap('CastBar.Core castbar OnSizeChanged', PlaceChannelTicks))
+		castbar:HookScript('OnSizeChanged', PlaceChannelTicks)
 	end
 	local color = settings.channelTickColor
 	local tickWidth = Pixel.PixelSize(settings.channelTickWidth)

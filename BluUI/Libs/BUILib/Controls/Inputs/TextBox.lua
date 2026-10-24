@@ -36,12 +36,12 @@ function Controls.TextBox(parent, label, initial, callback, tooltip, width, labe
 			container.label:SetPoint("LEFT"); box:SetPoint("LEFT", container.label, "RIGHT", 8, 0)
 		else box:SetPoint("LEFT"); container.label:SetPoint("LEFT", box, "RIGHT", 8, 0) end
 	else box:SetPoint("LEFT"); box:SetPoint("RIGHT") end
-	box:SetScript("OnEnter", BUILib.Timed('BUILib.TextBox TextBox box OnEnter', function() SetBoxHighlighted(true) end))
-	box:SetScript("OnLeave", BUILib.Timed('BUILib.TextBox TextBox box OnLeave', function() if not box:HasFocus() then SetBoxHighlighted(false) end end))
-	box:SetScript("OnEditFocusGained", BUILib.Timed('BUILib.TextBox TextBox box OnEditFocusGained', function() SetBoxHighlighted(true) end))
-	box:SetScript("OnEditFocusLost", BUILib.Timed('BUILib.TextBox TextBox box OnEditFocusLost', function() SetBoxHighlighted(false) end))
-	box:SetScript("OnEnterPressed", BUILib.Timed('BUILib.TextBox TextBox box OnEnterPressed', function(editBox) editBox:ClearFocus(); if callback then callback(editBox:GetText()) end end))
-	box:SetScript("OnEscapePressed", BUILib.Timed('BUILib.TextBox TextBox box OnEscapePressed', function(editBox) editBox:ClearFocus() end))
+	box:SetScript("OnEnter", function() SetBoxHighlighted(true) end)
+	box:SetScript("OnLeave", function() if not box:HasFocus() then SetBoxHighlighted(false) end end)
+	box:SetScript("OnEditFocusGained", function() SetBoxHighlighted(true) end)
+	box:SetScript("OnEditFocusLost", function() SetBoxHighlighted(false) end)
+	box:SetScript("OnEnterPressed", function(editBox) editBox:ClearFocus(); if callback then callback(editBox:GetText()) end end)
+	box:SetScript("OnEscapePressed", function(editBox) editBox:ClearFocus() end)
 	if tooltip then Widget.Tooltip(box, tooltip) end
 	function container:GetValue() return box:GetText() end
 	function container:SetValue(value) box:SetText(value or "") end

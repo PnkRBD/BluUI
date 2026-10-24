@@ -30,7 +30,7 @@ local function FlushDirty(self)
 end
 
 local UpdateFrame = CreateFrame("Frame", "BUI_CDMDirtyFlush")
-UpdateFrame:SetScript("OnUpdate", BUI.Profiler.Wrap("CDM.DirtyTracking flush", FlushDirty))
+UpdateFrame:SetScript("OnUpdate", FlushDirty)
 UpdateFrame:Hide()
 
 function CDM.MarkDirty(key)

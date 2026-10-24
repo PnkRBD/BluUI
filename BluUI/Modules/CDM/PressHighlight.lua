@@ -770,7 +770,7 @@ end
 QueueHeldPoll = function()
     if pollQueued then return end
     pollQueued = true
-    BUI.Profiler.After('CDM.PressHighlight held poll', HELD_POLL_INTERVAL, PollHeld)
+    C_Timer.After(HELD_POLL_INTERVAL, PollHeld)
 end
 
 local function ReleaseTap(keyName, pressedAt)
@@ -795,7 +795,7 @@ local function OnInputUp(keyName)
     if not pressedAt then return end
     local elapsed = GetTime() - pressedAt
     if elapsed < MIN_VISIBLE then
-        BUI.Profiler.After('CDM.PressHighlight tap release', MIN_VISIBLE - elapsed, function()
+        C_Timer.After(MIN_VISIBLE - elapsed, function()
             ReleaseTap(keyName, pressedAt)
         end)
         return
@@ -831,7 +831,7 @@ local function StartInput()
         listener = CreateFrame('Frame', nil, UIParent)
         listener:EnableKeyboard(true)
         listener:SetPropagateKeyboardInput(true)
-        listener:SetScript('OnKeyDown', BUI.Profiler.Script('CDM.PressHighlight listener OnKeyDown', function(_, key) OnInputDown(key) end))
+        listener:SetScript('OnKeyDown', function(_, key) OnInputDown(key) end)
     end
     listener:Show()
     for _, event in ipairs(KEY_CACHE_EVENTS) do BUI.Events:Register(event, 'CDM.PressHL.Keys', WipeKeyCache) end

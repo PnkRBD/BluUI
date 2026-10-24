@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('CDM.BuffBarSkin')
-
 local _G = _G
 
 local CDM = BUI.CDM
@@ -146,7 +144,7 @@ local function PositionViewer()
     elseif config.anchorFrame ~= "" and not anchorRetryScheduled and anchorRetries < 5 then
         anchorRetries = anchorRetries + 1
         anchorRetryScheduled = true
-        BUI.Profiler.After("CDM.BuffBarSkin anchor retry", 1, function()
+        C_Timer.After(1, function()
             anchorRetryScheduled = nil
             PositionViewer()
         end)
@@ -158,7 +156,7 @@ BUI.Anchor.RegisterCallback('CDM.BuffBarSkin', function()
     PositionViewer()
 end)
 
-local ScheduleReposition = BUI.Dispatcher.New(PositionViewer, 'CDM.BuffBarReposition')
+local ScheduleReposition = BUI.Dispatcher.New(PositionViewer)
 
 local HookItemVisibility
 
@@ -215,7 +213,7 @@ local function SkinBarItem(item)
     item.DebuffBorder:Hide()
     if not item._buiDebuffBorderHooked then
         item._buiDebuffBorderHooked = true
-        Hook(item.DebuffBorder, "Show", HideSelf)
+        hooksecurefunc(item.DebuffBorder, "Show", HideSelf)
     end
 
     local iconFrame = item.Icon
@@ -244,7 +242,7 @@ local function SkinBarItem(item)
     bar.Pip:SetAlpha(0)
     if not bar._buiPipHooked then
         bar._buiPipHooked = true
-        Hook(bar.Pip, "Show", HidePip)
+        hooksecurefunc(bar.Pip, "Show", HidePip)
     end
 
     if not bar._buiBorderHost then
@@ -316,7 +314,7 @@ function CDM.RepositionBuffBarRack()
     if previewShelf then ApplyAnchor(previewShelf, GetSettings()) end
 end
 
-local ScheduleReflow = BUI.Dispatcher.New(RestackItems, 'CDM.BuffBarReflow')
+local ScheduleReflow = BUI.Dispatcher.New(RestackItems)
 
 local function ReflowUnlessFitting()
     if not fitting then ScheduleReflow() end
@@ -329,13 +327,13 @@ end
 HookItemVisibility = function(item)
     if item._buiVisHooked then return end
     item._buiVisHooked = true
-    Hook(item, "Show", ScheduleReflow)
-    Hook(item, "Hide", ScheduleReflow)
-    Hook(item, "SetShown", ScheduleReflow)
-    Hook(item, "SetSize", ReflowUnlessFitting)
-    Hook(item, "SetWidth", ReflowUnlessFitting)
-    Hook(item, "SetHeight", ReflowUnlessFitting)
-    Hook(item, "SetPoint", ReflowUnlessRestacking)
+    hooksecurefunc(item, "Show", ScheduleReflow)
+    hooksecurefunc(item, "Hide", ScheduleReflow)
+    hooksecurefunc(item, "SetShown", ScheduleReflow)
+    hooksecurefunc(item, "SetSize", ReflowUnlessFitting)
+    hooksecurefunc(item, "SetWidth", ReflowUnlessFitting)
+    hooksecurefunc(item, "SetHeight", ReflowUnlessFitting)
+    hooksecurefunc(item, "SetPoint", ReflowUnlessRestacking)
 end
 
 function CDM.RefreshBuffBarSkin()
@@ -363,7 +361,7 @@ local function RefitActiveItems()
     RestackItems(viewer)
 end
 
-local ScheduleRefit = BUI.Dispatcher.New(RefitActiveItems, 'CDM.BuffBarRefit')
+local ScheduleRefit = BUI.Dispatcher.New(RefitActiveItems)
 
 local function OnBarItemAcquired(_, item)
     SkinBarItem(item)
@@ -382,7 +380,7 @@ local function HookBuffBarViewer()
     RestackItems(viewer)
     PositionViewer()
 
-    Hook(viewer, "SetPoint", function()
+    hooksecurefunc(viewer, "SetPoint", function()
         if positioning then return end
         viewerMoved = true
         if GetSettings().skinEnabled then ScheduleReposition() end

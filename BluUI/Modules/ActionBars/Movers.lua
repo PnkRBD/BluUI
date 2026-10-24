@@ -172,7 +172,7 @@ end
 
 local EndDrag
 
-local DragUpdate = BUI.Profiler.Wrap('ActionBars.Movers drag update', function(overlay)
+local DragUpdate = function(overlay)
 	local bar = state.dragging
 	if not bar then
 		overlay:SetScript('OnUpdate', nil)
@@ -193,7 +193,7 @@ local DragUpdate = BUI.Profiler.Wrap('ActionBars.Movers drag update', function(o
 	ShowGuides(snapX, snapY)
 	local uiCenterX, uiCenterY = UIParent:GetCenter()
 	overlay.hint:SetText(('%d, %d%s'):format(centerX - uiCenterX, centerY - uiCenterY, (snapX or snapY) and '   snapped' or ''))
-end)
+end
 
 local function BeginDrag(bar, overlay)
 	if InCombatLockdown() or state.dragging then return end
@@ -284,7 +284,7 @@ local function CreateOverlay(bar)
 		end
 		self:SetFrameLevel(level + OVERLAY_LEVEL)
 	end
-	overlay:SetScript('OnSizeChanged', BUI.Profiler.Script('ActionBars.Movers overlay OnSizeChanged', overlay.Fit))
+	overlay:SetScript('OnSizeChanged', overlay.Fit)
 
 	function overlay:Paint(active)
 		local red, green, blue = MOVER_COLOR[1], MOVER_COLOR[2], MOVER_COLOR[3]
@@ -295,7 +295,7 @@ local function CreateOverlay(bar)
 		hint:SetText(ActionBars.GetBarSettings(bar.key).centerHorizontally and CENTERED_HINT or HINT_TEXT)
 	end
 
-	overlay:SetScript('OnEnter', BUI.Profiler.Script('ActionBars.Movers overlay OnEnter', function(self)
+	overlay:SetScript('OnEnter', function(self)
 		self:Paint(true)
 		if self.hintFits then self.hint:Show() end
 		if not self.label:IsShown() then
@@ -303,23 +303,23 @@ local function CreateOverlay(bar)
 			GameTooltip:SetText(bar.label)
 			GameTooltip:Show()
 		end
-	end))
-	overlay:SetScript('OnLeave', BUI.Profiler.Script('ActionBars.Movers overlay OnLeave', function(self)
+	end)
+	overlay:SetScript('OnLeave', function(self)
 		if state.dragging == bar then return end
 		self:Paint(false)
 		self.hint:Hide()
 		if GameTooltip:GetOwner() == self then GameTooltip:Hide() end
-	end))
-	overlay:SetScript('OnMouseUp', BUI.Profiler.Script('ActionBars.Movers overlay OnMouseUp', function(_, button)
+	end)
+	overlay:SetScript('OnMouseUp', function(_, button)
 		if button ~= 'RightButton' or state.dragging then return end
 		if state.bars[bar.key] and not state.unlocked then
 			ActionBars.SetBarUnlocked(bar.key, false)
 		else
 			ActionBars.SetMoversUnlocked(false)
 		end
-	end))
-	overlay:SetScript('OnDragStart', BUI.Profiler.Script('ActionBars.Movers overlay OnDragStart', function(self) BeginDrag(bar, self) end))
-	overlay:SetScript('OnDragStop', BUI.Profiler.Script('ActionBars.Movers overlay OnDragStop', function(self) EndDrag(bar, self) end))
+	end)
+	overlay:SetScript('OnDragStart', function(self) BeginDrag(bar, self) end)
+	overlay:SetScript('OnDragStop', function(self) EndDrag(bar, self) end)
 	overlay:Paint(false)
 	overlay:RefreshHint()
 	bar.mover = overlay
@@ -402,13 +402,13 @@ BUI.Events:Register('PLAYER_REGEN_ENABLED', 'ActionBars.Movers.Settled', functio
 	ActionBars.RefreshMovers()
 end)
 
-EditModeManagerFrame:HookScript('OnShow', BUI.Profiler.Wrap('ActionBars.Movers edit mode show', function()
+EditModeManagerFrame:HookScript('OnShow', function()
 	if not BUI.IsModuleEnabled('actionBars') or state.unlocked then return end
 	state.editMode = true
 	ActionBars.SetMoversUnlocked(true)
-end))
-EditModeManagerFrame:HookScript('OnHide', BUI.Profiler.Wrap('ActionBars.Movers edit mode hide', function()
+end)
+EditModeManagerFrame:HookScript('OnHide', function()
 	if not state.editMode then return end
 	state.editMode = false
 	ActionBars.SetMoversUnlocked(false)
-end))
+end)

@@ -180,14 +180,13 @@ local function PrecreateStep()
 	StopPrecreateStagger()
 	return false
 end
-local PrecreateStepTimed = BUI.Profiler.Wrap("GroupFrames.Raid precreate step", PrecreateStep)
 
 function GroupFrames.PrecreateRaid()
 	if not GroupFrames.headers.raid or not GroupFrames.CanBuildChildren() then return end
 	local raidSettings = GroupFrames.GetDB().raid
 	if not raidSettings.enabled then return end
 	if precreateTicker or not PrecreateStep() then return end
-	precreateTicker = C_Timer.NewTicker(PRECREATE_STAGGER, PrecreateStepTimed)
+	precreateTicker = C_Timer.NewTicker(PRECREATE_STAGGER, PrecreateStep)
 end
 
 function GroupFrames.UpdateInstanceClamp()

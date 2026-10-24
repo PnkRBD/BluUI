@@ -129,7 +129,7 @@ local function ApplyVehicleToggle()
 	end
 end
 
-local QueueVehicleToggle = BUI.Dispatcher.New(ApplyVehicleToggle, 'UF.VehicleToggle')
+local QueueVehicleToggle = BUI.Dispatcher.New(ApplyVehicleToggle)
 
 local function RefreshPlayerFrame()
 	local frame = UnitFrames.player

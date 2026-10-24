@@ -89,7 +89,7 @@ function BUI.SpellSearch(ui, parent, width, options)
 	local function Suggest(text)
 		pending = pending + 1
 		local token = pending
-		BUI.Profiler.After('SpellSearch suggest', DEBOUNCE, function()
+		C_Timer.After(DEBOUNCE, function()
 			if token ~= pending or not box.edit:HasFocus() then return end
 			hits = Results(text)
 			ShowResults()

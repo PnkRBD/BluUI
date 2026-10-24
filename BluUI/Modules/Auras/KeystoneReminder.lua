@@ -91,17 +91,17 @@ local function BuildPortal(parent)
     portal.level = overlay:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(portal.level, LEVEL_SIZE, FONT, 'OUTLINE')
     portal.level:SetPoint('BOTTOMRIGHT', Pixel.Scale(-2), Pixel.Scale(2))
-    portal:SetScript('OnEnter', BUI.Profiler.Script('Auras.KeystoneReminder portal OnEnter', function(self)
+    portal:SetScript('OnEnter', function(self)
         PaintPortalEdge(self, true)
         if not self._spellID then return end
         GameTooltip:SetOwner(self, 'ANCHOR_TOP')
         GameTooltip:SetSpellByID(self._spellID)
         GameTooltip:Show()
-    end))
-    portal:SetScript('OnLeave', BUI.Profiler.Script('Auras.KeystoneReminder portal OnLeave', function(self)
+    end)
+    portal:SetScript('OnLeave', function(self)
         PaintPortalEdge(self, false)
         GameTooltip:Hide()
-    end))
+    end)
     return portal
 end
 
@@ -359,7 +359,7 @@ local function Settle()
 end
 
 local function OnGroupLeft()
-    BUI.Profiler.After('Auras.KeystoneReminder group left', LEAVE_SETTLE, Settle)
+    C_Timer.After(LEAVE_SETTLE, Settle)
 end
 
 function KeystoneReminder.Enable()

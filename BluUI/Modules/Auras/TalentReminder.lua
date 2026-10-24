@@ -69,7 +69,7 @@ local function Remind()
     Paint()
     showToken = showToken + 1
     local token = showToken
-    BUI.Profiler.After('Auras.TalentReminder fade out', GetDB().duration, function()
+    C_Timer.After(GetDB().duration, function()
         if showToken ~= token or not GetDB().locked then return end
         UIFrameFade(frame, { mode = 'OUT', timeToFade = FADE_OUT, startAlpha = 1, endAlpha = 0, finishedFunc = HideReminder })
     end)

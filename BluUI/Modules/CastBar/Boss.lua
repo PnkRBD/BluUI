@@ -33,8 +33,8 @@ function CastBar.CreateBossCastbar(frame)
 	overlay:SetFrameLevel(castbar:GetFrameLevel() + 10)
 	castbar._bossIndex = tonumber(frame.unit:match('%d+'))
 
-	castbar:HookScript('OnShow', BUI.Profiler.Wrap('CastBar.Boss castbar show', function() container:Show() end))
-	castbar:HookScript('OnHide', BUI.Profiler.Wrap('CastBar.Boss castbar hide', function() container:Hide() end))
+	castbar:HookScript('OnShow', function() container:Show() end)
+	castbar:HookScript('OnHide', function() container:Hide() end)
 	castbar.PostCastStart = BossPostCastStart
 	castbar.PostCastFail = CastBar.HideInterruptOverlays
 	castbar.PostCastInterruptible = BossPostCastInterruptible
@@ -58,9 +58,9 @@ function CastBar.ApplyBossCastbar(frame, index)
 	if frame:GetWidth() == 0 then
 		if not frame._castbarSizeHooked then
 			frame._castbarSizeHooked = true
-			frame:HookScript('OnSizeChanged', BUI.Profiler.Wrap('CastBar.Boss size wait', function(self)
+			frame:HookScript('OnSizeChanged', function(self)
 				if self:GetWidth() > 0 then CastBar.ApplyBossCastbar(self) end
-			end))
+			end)
 		end
 		return
 	end

@@ -37,8 +37,8 @@ function Controls.ScrollFrame(parent, width, height, childHeight, childWidth)
 	thumb:SetMovable(true)
 	thumb:SetHitRectInsets(-4, -4, 0, 0)
 	thumb:Hide()
-	thumb:SetScript("OnEnter", BUILib.Timed('BUILib.ScrollFrame ScrollFrame thumb OnEnter', function(frame) frame:SetBackdropColor(unpack(Theme.scrollbar.thumbHover)) end))
-	thumb:SetScript("OnLeave", BUILib.Timed('BUILib.ScrollFrame ScrollFrame thumb OnLeave', function(frame) frame:SetBackdropColor(unpack(Theme.scrollbar.thumb)) end))
+	thumb:SetScript("OnEnter", function(frame) frame:SetBackdropColor(unpack(Theme.scrollbar.thumbHover)) end)
+	thumb:SetScript("OnLeave", function(frame) frame:SetBackdropColor(unpack(Theme.scrollbar.thumb)) end)
 
 	local scrollLogic = Widget.ScrollLogic(scrollFrame, child, track, thumb, {draggable = true})
 	local Refresh = scrollLogic.UpdateThumb
@@ -54,7 +54,7 @@ function Controls.ScrollFrame(parent, width, height, childHeight, childWidth)
 	end
 
 	container:EnableMouseWheel(true)
-	container:SetScript("OnMouseWheel", BUILib.Timed('BUILib.ScrollFrame ScrollFrame container OnMouseWheel', function(_, delta)
+	container:SetScript("OnMouseWheel", function(_, delta)
 		local range = math.max(0, child:GetHeight() - scrollFrame:GetHeight())
 		local current = scrollFrame:GetVerticalScroll()
 		local atEdge = (delta < 0 and current >= range - 1) or (delta > 0 and current <= 1)
@@ -64,11 +64,11 @@ function Controls.ScrollFrame(parent, width, height, childHeight, childWidth)
 		end
 		local ancestor = WheelAncestor()
 		if ancestor then ancestor:GetScript("OnMouseWheel")(ancestor, delta) else scrollLogic.DoScroll(delta) end
-	end))
+	end)
 
-	scrollFrame:SetScript("OnScrollRangeChanged", BUILib.Timed('BUILib.ScrollFrame ScrollFrame scrollFrame OnScrollRangeChanged', Refresh))
-	scrollFrame:SetScript("OnSizeChanged", BUILib.Timed('BUILib.ScrollFrame ScrollFrame scrollFrame OnSizeChanged', Refresh))
-	child:SetScript("OnSizeChanged", BUILib.Timed('BUILib.ScrollFrame ScrollFrame child OnSizeChanged', Refresh))
+	scrollFrame:SetScript("OnScrollRangeChanged", Refresh)
+	scrollFrame:SetScript("OnSizeChanged", Refresh)
+	child:SetScript("OnSizeChanged", Refresh)
 	BUILib.Defer(Refresh)
 
 	container.scrollFrame = scrollFrame

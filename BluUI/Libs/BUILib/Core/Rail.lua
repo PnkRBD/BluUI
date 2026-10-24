@@ -147,7 +147,7 @@ function Layout.Rail(window, parent, width, spec)
 			local index = #rail.entries + 1
 			local button = rail.steps and StepButton(window, kit, frame, item, index, width) or ListButton(window, kit, frame, item, width, iconColumn)
 			button:SetPoint('TOPLEFT', 0, -y)
-			button:SetScript('OnClick', BUILib.Timed('BUILib.Rail Rail button OnClick', function() rail:Click(item) end))
+			button:SetScript('OnClick', function() rail:Click(item) end)
 			local entry = { item = item, button = button }
 			rail.entries[index] = entry
 			rail.byID[item.id] = entry

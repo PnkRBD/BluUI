@@ -6,8 +6,6 @@ local FONT = BUILib.Font
 local Skin = BUI.Skinning
 local Painter = BUI.Painter
 local Pixel = BUI.Pixel
-local Script = BUI.Profiler.Script
-local Wrap = BUI.Profiler.Wrap
 local PALETTE = Skin.PALETTE
 
 local context, Settings = Premade.context, Premade.Settings
@@ -165,7 +163,7 @@ local function NewPage()
 	page.header = Panel.Header(page, '', FRAME.edge, STRIP.top)
 	local blizzard = Skin.SmallButton(page.side, FRAME.sideW - SIDE.pad * 2, SIDE.serversH, 'Blizzard group finder')
 	blizzard:SetPoint('BOTTOMLEFT', Pixel.Scale(SIDE.pad), Pixel.Scale(SIDE.pad))
-	blizzard:SetScript('OnClick', Script('Skin.PremadeListing blizzard OnClick', ShowBlizzardPanel))
+	blizzard:SetScript('OnClick', ShowBlizzardPanel)
 	page.blizzard = blizzard
 	return page
 end
@@ -177,8 +175,8 @@ local function PlaceBody(page, top)
 	page.main:SetPoint('TOPLEFT', Pixel.Scale(FRAME.sideW), Pixel.Scale(-top))
 end
 
-local QueuePaint = BUI.Dispatcher.New(function() Listing.Paint() end, 'Skin.PremadeListing paint')
-local QueueApplicants = BUI.Dispatcher.New(function() Applicants.Refresh() end, 'Skin.PremadeListing applicants')
+local QueuePaint = BUI.Dispatcher.New(function() Listing.Paint() end)
+local QueueApplicants = BUI.Dispatcher.New(function() Applicants.Refresh() end)
 
 local function OwnedKey()
 	local activityID, groupID, level = C_LFGList.GetOwnedKeystoneActivityAndGroupAndLevel()
@@ -548,9 +546,9 @@ function Listing.Field(parent, height, hint, multiline)
 	else
 		slot.caret = Strip.Caret(slot, slot.text, 12)
 	end
-	slot:SetScript('OnClick', Script('Skin.PremadeListing field OnClick', Listing.FocusField))
-	slot:SetScript('OnEnter', Script('Skin.PremadeListing field OnEnter', Listing.FieldEnter))
-	slot:SetScript('OnLeave', Script('Skin.PremadeListing field OnLeave', Listing.FieldLeave))
+	slot:SetScript('OnClick', Listing.FocusField)
+	slot:SetScript('OnEnter', Listing.FieldEnter)
+	slot:SetScript('OnLeave', Listing.FieldLeave)
 	return slot
 end
 
@@ -716,13 +714,13 @@ function Listing.BuildMain(main)
 
 	local list = Skin.SmallButton(main, FORM.listW, BUTTON_H, '')
 	list:SetPoint('BOTTOMRIGHT', Pixel.Scale(-FRAME.edge), Pixel.Scale(FRAME.footerY))
-	list:SetScript('OnClick', Script('Skin.PremadeListing list OnClick', Listing.Submit))
-	list:HookScript('OnEnter', Wrap('Skin.PremadeListing list OnEnter', Premade.BlockerTip))
-	list:HookScript('OnLeave', Wrap('Skin.PremadeListing list OnLeave', GameTooltip_Hide))
+	list:SetScript('OnClick', Listing.Submit)
+	list:HookScript('OnEnter', Premade.BlockerTip)
+	list:HookScript('OnLeave', GameTooltip_Hide)
 	listing.listButton = list
 	local back = Skin.SmallButton(main, FORM.backW, BUTTON_H, 'Back')
 	back:SetPoint('RIGHT', list, 'LEFT', Pixel.Scale(-BAR.gap), 0)
-	back:SetScript('OnClick', Script('Skin.PremadeListing back OnClick', Listing.Back))
+	back:SetScript('OnClick', Listing.Back)
 	listing.keyText = Text(main, 11, 'skinLabel')
 	listing.keyText:SetPoint('LEFT', main, 'BOTTOMLEFT', Pixel.Scale(FRAME.edge), Pixel.Scale(FRAME.footerY + BUTTON_H / 2))
 end
@@ -1009,9 +1007,9 @@ function Applicants.Line(card, index)
 		button:SetMotionScriptsWhileDisabled(true)
 		button.icon = button:CreateTexture(nil, 'ARTWORK')
 		button.icon:SetAllPoints()
-		button:SetScript('OnClick', Script('Skin.PremadeListing role OnClick', Applicants.SwitchRole))
-		button:SetScript('OnEnter', Script('Skin.PremadeListing role OnEnter', Applicants.RoleEnter))
-		button:SetScript('OnLeave', Script('Skin.PremadeListing role OnLeave', GameTooltip_Hide))
+		button:SetScript('OnClick', Applicants.SwitchRole)
+		button:SetScript('OnEnter', Applicants.RoleEnter)
+		button:SetScript('OnLeave', GameTooltip_Hide)
 		line.roles[slot] = button
 	end
 	line.spec = line:CreateTexture(nil, 'ARTWORK')
@@ -1034,9 +1032,9 @@ function Applicants.Line(card, index)
 	line.tags:SetPoint('LEFT', line.name, 'RIGHT', Pixel.Scale(APPS.columnGap), 0)
 	line.tags:SetPoint('RIGHT', line.ilvl, 'LEFT', Pixel.Scale(-APPS.columnGap), 0)
 	line:RegisterForClicks('RightButtonUp')
-	line:SetScript('OnClick', Script('Skin.PremadeListing member OnClick', Applicants.MemberMenu))
-	line:SetScript('OnEnter', Script('Skin.PremadeListing member OnEnter', Applicants.MemberEnter))
-	line:SetScript('OnLeave', Script('Skin.PremadeListing member OnLeave', Applicants.MemberLeave))
+	line:SetScript('OnClick', Applicants.MemberMenu)
+	line:SetScript('OnEnter', Applicants.MemberEnter)
+	line:SetScript('OnLeave', Applicants.MemberLeave)
 	return line
 end
 
@@ -1133,12 +1131,12 @@ function Applicants.Card(parent)
 	card.lines = {}
 	card.decline = Skin.SmallButton(card, APPS.declineW, BUTTON_H, DECLINE)
 	card.decline:SetPoint('RIGHT', Pixel.Scale(-ROW.inset), 0)
-	card.decline:SetScript('OnClick', Script('Skin.PremadeListing decline OnClick', Applicants.Decline))
+	card.decline:SetScript('OnClick', Applicants.Decline)
 	card.invite = Skin.SmallButton(card, APPS.inviteW, BUTTON_H, INVITE)
 	card.invite:SetPoint('RIGHT', card.decline, 'LEFT', Pixel.Scale(-APPS.actionGap), 0)
-	card.invite:SetScript('OnClick', Script('Skin.PremadeListing invite OnClick', Applicants.Invite))
-	card.invite:HookScript('OnEnter', Wrap('Skin.PremadeListing invite OnEnter', Premade.BlockerTip))
-	card.invite:HookScript('OnLeave', Wrap('Skin.PremadeListing invite OnLeave', GameTooltip_Hide))
+	card.invite:SetScript('OnClick', Applicants.Invite)
+	card.invite:HookScript('OnEnter', Premade.BlockerTip)
+	card.invite:HookScript('OnLeave', GameTooltip_Hide)
 	card.status = Text(card, 11, 'skinTitle', 'RIGHT')
 	card.status:SetPoint('RIGHT', Pixel.Scale(-ROW.inset * 2), 0)
 	card.cover = Strip.Cover(card)
@@ -1150,9 +1148,9 @@ function Applicants.Card(parent)
 	card.clear.glyph:SetAllPoints()
 	BUILib.Widget.SetGlyph(card.clear.glyph, BUILib.GetLibMedia('x'))
 	Painter.Tint(card.clear.glyph, 'skinLabel')
-	card.clear:SetScript('OnClick', Script('Skin.PremadeListing clear OnClick', Applicants.Clear))
-	card.clear:SetScript('OnEnter', Script('Skin.PremadeListing clear OnEnter', Applicants.ClearEnter))
-	card.clear:SetScript('OnLeave', Script('Skin.PremadeListing clear OnLeave', Applicants.ClearLeave))
+	card.clear:SetScript('OnClick', Applicants.Clear)
+	card.clear:SetScript('OnEnter', Applicants.ClearEnter)
+	card.clear:SetScript('OnLeave', Applicants.ClearLeave)
 	return card
 end
 
@@ -1405,7 +1403,7 @@ function Applicants.FooterButton(main, width, label, onClick, anchor)
 	else
 		button:SetPoint('BOTTOMRIGHT', Pixel.Scale(-FRAME.edge), Pixel.Scale(FRAME.footerY))
 	end
-	button:SetScript('OnClick', Script('Skin.PremadeListing footer OnClick', onClick))
+	button:SetScript('OnClick', onClick)
 	return button
 end
 
@@ -1428,8 +1426,8 @@ function Applicants.BuildMain(main)
 	applicants.countText:SetPoint('LEFT', main, 'BOTTOMLEFT', Pixel.Scale(FRAME.edge), Pixel.Scale(FRAME.footerY + BUTTON_H / 2))
 	local browse = Applicants.FooterButton(main, APPS.browseW, 'Browse groups', Applicants.Browse)
 	applicants.edit = Applicants.FooterButton(main, APPS.editW, 'Edit', Applicants.Edit, browse)
-	applicants.edit:HookScript('OnEnter', Wrap('Skin.PremadeListing edit OnEnter', Premade.BlockerTip))
-	applicants.edit:HookScript('OnLeave', Wrap('Skin.PremadeListing edit OnLeave', GameTooltip_Hide))
+	applicants.edit:HookScript('OnEnter', Premade.BlockerTip)
+	applicants.edit:HookScript('OnLeave', GameTooltip_Hide)
 	local delist = Applicants.FooterButton(main, APPS.editW, 'Delist', Applicants.Delist, applicants.edit)
 	applicants.leaderButtons = { browse, applicants.edit, delist }
 end
@@ -1460,15 +1458,15 @@ end
 context.Window('LFGListFrame', {
 	install = function(frame)
 		local creation, viewer = frame.EntryCreation, frame.ApplicationViewer
-		creation:HookScript('OnShow', Wrap('Skin.PremadeListing creation shown', context.Guard(Listing.Shown)))
-		creation:HookScript('OnHide', Wrap('Skin.PremadeListing creation hidden', context.Guard(Listing.Hidden)))
-		viewer:HookScript('OnShow', Wrap('Skin.PremadeListing applicants shown', context.Guard(Applicants.Shown)))
-		viewer:HookScript('OnHide', Wrap('Skin.PremadeListing applicants hidden', context.Guard(Applicants.Hidden)))
+		creation:HookScript('OnShow', context.Guard(Listing.Shown))
+		creation:HookScript('OnHide', context.Guard(Listing.Hidden))
+		viewer:HookScript('OnShow', context.Guard(Applicants.Shown))
+		viewer:HookScript('OnHide', context.Guard(Applicants.Hidden))
 		for _, box in ipairs({ creation.Name, creation.Description.EditBox }) do
-			box:HookScript('OnTextChanged', Wrap('Skin.PremadeListing field text', QueuePaint))
-			box:HookScript('OnEditFocusGained', Wrap('Skin.PremadeListing field focus', QueuePaint))
-			box:HookScript('OnEditFocusLost', Wrap('Skin.PremadeListing field blur', QueuePaint))
-			box:HookScript('OnCursorChanged', Wrap('Skin.PremadeListing field cursor', QueuePaint))
+			box:HookScript('OnTextChanged', QueuePaint)
+			box:HookScript('OnEditFocusGained', QueuePaint)
+			box:HookScript('OnEditFocusLost', QueuePaint)
+			box:HookScript('OnCursorChanged', QueuePaint)
 		end
 	end,
 })

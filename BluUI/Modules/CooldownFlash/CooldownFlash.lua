@@ -257,9 +257,9 @@ local function NewSlot()
     out:SetToAlpha(0)
     out:SetDuration(FADE_SECONDS)
     out:SetSmoothing('IN')
-    fade:SetScript('OnFinished', BUI.Profiler.Timed('CooldownFlash NewSlot fade OnFinished', function()
+    fade:SetScript('OnFinished', function()
         if GetConfig().showAnchor then slot.enter:Play() else Release(slot) end
-    end))
+    end)
     slot.fade, slot.hold = fade, hold
 
     local enter = slot:CreateAnimationGroup()
@@ -281,7 +281,7 @@ local function NewSlot()
     vanish:SetToAlpha(0)
     vanish:SetDuration(FADE_SECONDS)
     vanish:SetSmoothing('IN')
-    exit:SetScript('OnFinished', BUI.Profiler.Timed('CooldownFlash NewSlot exit OnFinished', function() Release(slot) end))
+    exit:SetScript('OnFinished', function() Release(slot) end)
     slot.exit = exit
     return slot
 end
@@ -375,7 +375,7 @@ local function Scan(mayFlash)
     BUI.Scheduler.SetUpdateEnabled(EVENT_KEY, AnyBusy())
 end
 
-local OnCooldowns = BUI.Dispatcher.New(function() Scan(true) end, 'CooldownFlash')
+local OnCooldowns = BUI.Dispatcher.New(function() Scan(true) end)
 
 local function SyncTracked()
     wipe(tracked)

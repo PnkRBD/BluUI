@@ -48,7 +48,7 @@ local function BuildDim()
 	frame:SetAllPoints()
 	frame:EnableMouse(true)
 	frame:EnableMouseWheel(true)
-	frame:SetScript('OnMouseWheel', BUI.Profiler.Timed('Skinning.GameMenu BuildDim frame OnMouseWheel', SwallowWheel))
+	frame:SetScript('OnMouseWheel', SwallowWheel)
 	local fill = BUI.Painter.Fill(frame:CreateTexture(nil, 'BACKGROUND'), 'skinBackground')
 	fill:SetAllPoints()
 	fill:SetAlpha(DIM_ALPHA)
@@ -97,7 +97,7 @@ local function WatchOptions()
 	local options = BUI.PageEngine.frame
 	if optionsHooked or not options then return end
 	optionsHooked = true
-	options:HookScript('OnHide', BUI.Profiler.Wrap('Skin.GameMenu options hidden', RestoreMenu))
+	options:HookScript('OnHide', RestoreMenu)
 end
 
 local function OpenBluUI()
@@ -109,7 +109,7 @@ local function OpenBluUI()
 	dim:Hide()
 	BUI.PageEngine.Show()
 	WatchOptions()
-	BUI.Profiler.After('Skin.GameMenu watch options', 0, WatchOptions)
+	C_Timer.After(0, WatchOptions)
 end
 
 local function BuildShortcut(frame)
@@ -118,7 +118,7 @@ local function BuildShortcut(frame)
 	button:SetPoint('BOTTOMLEFT', frame, 'TOPLEFT', frame.leftPadding, bottom)
 	button:SetPoint('BOTTOMRIGHT', frame, 'TOPRIGHT', -frame.rightPadding, bottom)
 	button:SetHeight(BUTTON_HEIGHT)
-	button:SetScript('OnClick', BUI.Profiler.Script('Skin.GameMenu shortcut OnClick', OpenBluUI))
+	button:SetScript('OnClick', OpenBluUI)
 	Skin.TipButtonFonts(button)
 	button:SetText('BluUI')
 	button:Hide()
@@ -132,7 +132,7 @@ context.Window('GameMenuFrame', {
 		shortcut = BuildShortcut(frame)
 		dim = BuildDim()
 		context.Hook(frame, 'InitButtons', SkinButtons)
-		frame:HookScript('OnHide', BUI.Profiler.Wrap('Skin.GameMenu dim hide', HideDim))
+		frame:HookScript('OnHide', HideDim)
 	end,
 })
 

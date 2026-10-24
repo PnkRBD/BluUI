@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Wrap = BUI.Profiler.Wrap
-
 local floor = math.floor
 
 local BUILib = BluUI.BUILibClient
@@ -39,14 +37,14 @@ local function StopCountdown()
 	countdown:SetText('')
 end
 
-local TickCountdown = Wrap('Skin.InstanceAbandon countdown tick', function()
+local TickCountdown = function()
 	local remaining = Dialog().timeleft
 	if remaining <= 0 then
 		StopCountdown()
 		return
 	end
 	BUILib.Skin.SetCountdownText(countdown, floor(remaining + 0.5))
-end)
+end
 
 local function StartCountdown()
 	StopCountdown()
@@ -103,7 +101,7 @@ local function InstallPopup(frame)
 	track:SetPoint('RIGHT', frame.ProgressBarBorder, 'RIGHT', -FILL_INSET, 0)
 	track:SetHeight(BAR_HEIGHT)
 	BUI.Painter.Fill(track, 'skinLine')
-	frame:HookScript('OnHide', Wrap('Skin.InstanceAbandon countdown stop', StopCountdown))
+	frame:HookScript('OnHide', StopCountdown)
 	context.Hook(frame, 'Resize', FitTitle)
 	context.Hook(_G.InstanceAbandonFrame, 'Refresh', OnRefresh)
 	context.Hook('StaticPopup_SetProgressBarTime', OnProgressBarTime)

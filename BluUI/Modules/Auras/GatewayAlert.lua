@@ -68,14 +68,14 @@ end
 
 local Update = BUI.Dispatcher.New(function()
     if tracker and shardCount > 0 then tracker.Update() end
-end, 'Auras.GatewayAlert')
+end)
 
 local SyncEvents
 
 local Recheck = BUI.Dispatcher.New(function()
     SyncEvents()
     if tracker then tracker.RecheckActive() end
-end, 'Auras.GatewayAlert.Scan')
+end)
 
 local function OnSlotChanged(_, slot)
     if not slot or slot == 0 then

@@ -126,7 +126,7 @@ local function Blank(kit, window, parent, spec)
 	if spec.sub then
 		kit.Text(frame, spec.sub, 11, 'faint'):SetPoint('TOP', label, 'BOTTOM', 0, -6)
 	end
-	frame:SetScript('OnClick', BUILib.Timed('BUILib.Deck Blank frame OnClick', function(self) spec.onClick(self) end))
+	frame:SetScript('OnClick', function(self) spec.onClick(self) end)
 	return frame
 end
 

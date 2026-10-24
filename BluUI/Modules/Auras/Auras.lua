@@ -99,7 +99,7 @@ local attackRecheckPending = false
 
 local ScheduleCheck = BUI.Dispatcher.New(function()
     CheckPet()
-end, 'Auras.PetCheck')
+end)
 
 local function BuildPetWarning()
     if warningFrame then return end
@@ -215,7 +215,7 @@ local function EvaluatePet()
                 return false
             elseif not attackRecheckPending then
                 attackRecheckPending = true
-                BUI.Profiler.After("Auras.Auras attack recheck", ATTACK_GRACE - elapsed + 0.05, function()
+                C_Timer.After(ATTACK_GRACE - elapsed + 0.05, function()
                     attackRecheckPending = false
                     ScheduleCheck()
                 end)
@@ -407,7 +407,7 @@ local function UpdateLowHpAlpha()
     ApplyThresholdAlpha(lowHpFrame, "player", db.lowHpThreshold)
 end
 
-local UpdateLowHpAlphaDispatch = BUI.Dispatcher.New(UpdateLowHpAlpha, "Auras.LowHpAlpha")
+local UpdateLowHpAlphaDispatch = BUI.Dispatcher.New(UpdateLowHpAlpha)
 local lowHpEventsRegistered = false
 
 local function HideLowHp()
@@ -528,7 +528,7 @@ local function RefreshMarkTarget()
     RefreshMarkShown()
 end
 
-local RefreshMarkShownDispatch = BUI.Dispatcher.New(RefreshMarkShown, "Auras.MarkCheck")
+local RefreshMarkShownDispatch = BUI.Dispatcher.New(RefreshMarkShown)
 
 local function OnMarkTargetHealth()
     local dead = UnitIsDeadOrGhost("target")

@@ -1,7 +1,5 @@
 local _, BUI = ...
 
-local Hook = BUI.Profiler.Hooker('BuffTracking.CDMScan')
-
 local GetCooldownInfo = C_CooldownViewer.GetCooldownViewerCooldownInfo
 local GetCategorySet  = C_CooldownViewer.GetCooldownViewerCategorySet
 local issecretvalue = issecretvalue
@@ -32,8 +30,8 @@ local function HookCDMViewers()
     viewersHooked = true
     for _, name in ipairs(CDM_FRAME_NAMES) do
         local viewer = _G[name]
-        Hook(viewer, 'RefreshLayout', MarkFrameMapStale)
-        Hook(viewer, 'RefreshData', MarkFrameMapStale)
+        hooksecurefunc(viewer, 'RefreshLayout', MarkFrameMapStale)
+        hooksecurefunc(viewer, 'RefreshData', MarkFrameMapStale)
     end
 end
 
@@ -105,7 +103,7 @@ function BUI.BuffTracking.NewCDMScan(trackedSpellIDs, onRebuilt)
 
     scannerCount = scannerCount + 1
     local key = 'CDMScan' .. scannerCount
-    scanner.ScheduleRebuild = BUI.Dispatcher.New(scanner.Build, key .. '.Build')
+    scanner.ScheduleRebuild = BUI.Dispatcher.New(scanner.Build)
 
     function scanner.GetEntry(spellID) return cache[spellID] end
 
@@ -142,7 +140,7 @@ function BUI.BuffTracking.NewCDMScan(trackedSpellIDs, onRebuilt)
     BUI.Events:Register('PLAYER_REGEN_ENABLED', key, function()
         if pendingBuild or not next(cache) then scanner.ScheduleRebuild() end
     end)
-    EventRegistry:RegisterCallback('CooldownViewerSettings.OnDataChanged', BUI.Profiler.Timed('BuffTracking.CDMScan NewCDMScan callback CooldownViewerSettings.OnDataChanged', scanner.ScheduleRebuild), scanner)
+    EventRegistry:RegisterCallback('CooldownViewerSettings.OnDataChanged', scanner.ScheduleRebuild, scanner)
 
     return scanner
 end

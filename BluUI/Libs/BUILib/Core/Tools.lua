@@ -100,8 +100,8 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 			})
 		end)
 		if tool.tooltip then
-			swatch:SetScript('OnEnter', BUILib.Timed('BUILib.Tools ColorSwatch swatch OnEnter', function(self) Widget.ShowTip(self, tool.tooltip) end))
-			swatch:SetScript('OnLeave', BUILib.Timed('BUILib.Tools ColorSwatch swatch OnLeave', Widget.HideTip))
+			swatch:SetScript('OnEnter', function(self) Widget.ShowTip(self, tool.tooltip) end)
+			swatch:SetScript('OnLeave', Widget.HideTip)
 		end
 		kit.Bind(swatch, function()
 			local red, green, blue, alpha = tool.get()
@@ -118,7 +118,7 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 		frame:SetClampedToScreen(true)
 		frame:EnableMouse(true)
 		frame:EnableMouseWheel(true)
-		frame:SetScript('OnMouseWheel', BUILib.Timed('BUILib.Tools BuildPopover frame OnMouseWheel', function() end))
+		frame:SetScript('OnMouseWheel', function() end)
 		frame:SetPoint('TOPRIGHT', anchor, 'BOTTOMRIGHT', 0, -POP_OFFSET)
 		frame:Hide()
 		local fill, edge = Widget.DrawCardShape(frame, POP_RADIUS, { 1, 1, 1, 1 }, { 1, 1, 1, 1 }, 'BACKGROUND', 0, 0)
@@ -162,26 +162,26 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 		for _, row in ipairs(rows) do row:SetSize(width - POP_PAD * 2, POP_ROW) end
 		frame:SetSize(width, y - (POP_ROW - CONTROL_HEIGHT) / 2 + POP_PAD)
 		local watcher = CreateFrame('Frame')
-		frame:SetScript('OnShow', BUILib.Timed('BUILib.Tools BuildPopover frame OnShow', function(self)
+		frame:SetScript('OnShow', function(self)
 			if spec.onShow then spec.onShow() end
 			local armed = not (IsMouseButtonDown('LeftButton') or IsMouseButtonDown('RightButton'))
-			watcher:SetScript('OnUpdate', BUILib.Timed('BUILib.Tools BuildPopover watcher OnUpdate', function()
+			watcher:SetScript('OnUpdate', function()
 				local down = IsMouseButtonDown('LeftButton') or IsMouseButtonDown('RightButton')
 				if not armed then
 					armed = not down
 				elseif down and not OverPopup(self, anchor) then
 					Close()
 				end
-			end))
-		end))
-		frame:SetScript('OnHide', BUILib.Timed('BUILib.Tools BuildPopover frame OnHide', function(self)
+			end)
+		end)
+		frame:SetScript('OnHide', function(self)
 			watcher:SetScript('OnUpdate', nil)
 			if active == self then active = nil end
 			if spec.onHide then spec.onHide() end
-		end))
-		anchor:HookScript('OnHide', BUILib.Timed('BUILib.Tools BuildPopover anchor OnHide', function()
+		end)
+		anchor:HookScript('OnHide', function()
 			if active == frame then frame:Hide() end
-		end))
+		end)
 		return frame
 	end
 
@@ -212,8 +212,8 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 		elseif kind == 'button' then
 			local button = kit.Button(parent, tool.text, tool.style, tool.onClick, tool.icon)
 			if tool.tooltip then
-				button:HookScript('OnEnter', BUILib.Timed('BUILib.Tools Tool button OnEnter', function(self) Widget.ShowTip(self, tool.tooltip) end))
-				button:HookScript('OnLeave', BUILib.Timed('BUILib.Tools Tool button OnLeave', Widget.HideTip))
+				button:HookScript('OnEnter', function(self) Widget.ShowTip(self, tool.tooltip) end)
+				button:HookScript('OnLeave', Widget.HideTip)
 			end
 			return button
 		elseif kind == 'menu' then
