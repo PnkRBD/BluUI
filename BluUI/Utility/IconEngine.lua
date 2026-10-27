@@ -244,6 +244,17 @@ local function ItemCooldown(itemID)
 	return cooldownStart, cooldownDuration, enable
 end
 
+local function ItemUsable(itemID)
+	local usable = C_Item.IsUsableItem(itemID)
+	return issecretvalue(usable) or usable ~= false
+end
+
+local function TintItem(texture, usable, desaturation)
+	texture:SetDesaturation(desaturation)
+	local shade = usable and 1 or 0.4
+	SetColor(texture, shade, shade, shade)
+end
+
 function IconEngine.ItemCooldownKey(itemID)
 	local cooldownStart, cooldownDuration, enable = ItemCooldown(itemID)
 	if enable == 0 then return nil end
@@ -267,20 +278,21 @@ function IconEngine.ApplyItemVisual(texture, cooldown, count, itemID, onExpireCa
 
 	local cooldownStart, cooldownDuration, enable = ItemCooldown(itemID)
 	local known = knownItemDurations[itemID]
+	local usable = ItemUsable(itemID)
 
 	local fingerprint = cooldown._itemFP
-	if fingerprint and fingerprint.start == cooldownStart and fingerprint.duration == cooldownDuration and fingerprint.enable == enable and fingerprint.count == count then
+	if fingerprint and fingerprint.start == cooldownStart and fingerprint.duration == cooldownDuration and fingerprint.enable == enable and fingerprint.count == count and fingerprint.usable == usable then
 		local desaturation = 0
 		if enable == 0 then
 			desaturation = known and 1 or 0
 		elseif cooldownStart > 0 and (cooldownDuration > ITEM_CD_THRESHOLD or known) then
 			desaturation = 1
 		end
-		texture:SetDesaturation(desaturation)
+		TintItem(texture, usable, desaturation)
 		return
 	end
 	if not fingerprint then fingerprint = {}; cooldown._itemFP = fingerprint end
-	fingerprint.start, fingerprint.duration, fingerprint.enable, fingerprint.count = cooldownStart, cooldownDuration, enable, count
+	fingerprint.start, fingerprint.duration, fingerprint.enable, fingerprint.count, fingerprint.usable = cooldownStart, cooldownDuration, enable, count, usable
 
 	if enable == 0 and known then
 		if cooldown._lastItemState ~= "locked" then
@@ -288,8 +300,7 @@ function IconEngine.ApplyItemVisual(texture, cooldown, count, itemID, onExpireCa
 			cooldown._lastItemStart = nil
 			cooldown:Clear()
 		end
-		texture:SetDesaturation(1)
-		SetColor(texture, 1, 1, 1)
+		TintItem(texture, usable, 1)
 		return
 	elseif enable == 0 then
 		local itemSpellID = GetItemSpellID(itemID)
@@ -303,8 +314,7 @@ function IconEngine.ApplyItemVisual(texture, cooldown, count, itemID, onExpireCa
 			cooldown._lastItemStart = nil
 			cooldown:Clear()
 		end
-		texture:SetDesaturation(0)
-		SetColor(texture, 1, 1, 1)
+		TintItem(texture, usable, 0)
 		return
 	end
 
@@ -325,8 +335,7 @@ function IconEngine.ApplyItemVisual(texture, cooldown, count, itemID, onExpireCa
 			cooldown._itemDurObj:SetTimeFromStart(cooldownStart, duration)
 			cooldown:SetCooldownFromDurationObject(cooldown._itemDurObj)
 		end
-		texture:SetDesaturation(cooldown._itemDurObj:EvaluateRemainingDuration(BUI.Tools.OnCooldownCurve, 0))
-		SetColor(texture, 1, 1, 1)
+		TintItem(texture, usable, cooldown._itemDurObj:EvaluateRemainingDuration(BUI.Tools.OnCooldownCurve, 0))
 
 		if onExpireCallback then
 			local remaining = (cooldownStart + duration) - GetTime()
@@ -338,8 +347,7 @@ function IconEngine.ApplyItemVisual(texture, cooldown, count, itemID, onExpireCa
 			cooldown._lastItemStart = nil
 			cooldown:Clear()
 		end
-		texture:SetDesaturation(0)
-		SetColor(texture, 1, 1, 1)
+		TintItem(texture, usable, 0)
 	end
 end
 

@@ -1812,6 +1812,11 @@ local function UnregisterHotEvents()
     BUI.Events:Unregister("UNIT_SPELLCAST_SUCCEEDED", "CDM.Custom.Cast")
 end
 
+local function OnItemUsableChanged()
+    itemCountPending = true
+    QueueDispatch()
+end
+
 local function RegisterItemEvents()
     if itemEventsRegistered then return end
     itemEventsRegistered = true
@@ -1820,6 +1825,8 @@ local function RegisterItemEvents()
         QueueDispatch()
     end)
     BUI.Events:Register("BAG_UPDATE_DELAYED", "CDM.Custom.BagDelayed", ScheduleBagRescan)
+    BUI.Events:Register("PLAYER_REGEN_DISABLED", "CDM.Custom.ItemUsable", OnItemUsableChanged)
+    BUI.Events:Register("PLAYER_REGEN_ENABLED", "CDM.Custom.ItemUsable", OnItemUsableChanged)
 end
 
 local function UnregisterItemEvents()
@@ -1827,6 +1834,8 @@ local function UnregisterItemEvents()
     itemEventsRegistered = false
     BUI.Events:Unregister("BAG_UPDATE_COOLDOWN", "CDM.Custom.BagCD")
     BUI.Events:Unregister("BAG_UPDATE_DELAYED", "CDM.Custom.BagDelayed")
+    BUI.Events:Unregister("PLAYER_REGEN_DISABLED", "CDM.Custom.ItemUsable")
+    BUI.Events:Unregister("PLAYER_REGEN_ENABLED", "CDM.Custom.ItemUsable")
 end
 
 local function UpdateHotEventState()

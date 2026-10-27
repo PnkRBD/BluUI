@@ -959,8 +959,12 @@ function CustomBars.RefreshHotEventRegistration()
         itemEventsRegistered = wantItems
         if wantItems then
             BUI.Events:Register("BAG_UPDATE_COOLDOWN", "CustomBars.BagCD", OnItemCooldownEvent)
+            BUI.Events:Register("PLAYER_REGEN_DISABLED", "CustomBars.BagCD", OnItemCooldownEvent)
+            BUI.Events:Register("PLAYER_REGEN_ENABLED", "CustomBars.BagCD", OnItemCooldownEvent)
         else
             BUI.Events:Unregister("BAG_UPDATE_COOLDOWN", "CustomBars.BagCD")
+            BUI.Events:Unregister("PLAYER_REGEN_DISABLED", "CustomBars.BagCD")
+            BUI.Events:Unregister("PLAYER_REGEN_ENABLED", "CustomBars.BagCD")
         end
     end
     if wantCounts ~= castEventsRegistered then
