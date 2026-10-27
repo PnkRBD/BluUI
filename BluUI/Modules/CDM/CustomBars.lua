@@ -223,6 +223,8 @@ local function CreateIcon(parent, barIndex, iconIndex)
     icon.cd:SetDrawEdge(false)
     icon.cd:SetDrawBling(false)
     icon.cd:SetHideCountdownNumbers(true)
+    icon.cd:SetCountdownMillisecondsThreshold(0)
+    icon.cd:SetCountdownFormatter(BUI.TimeFormat.GetFormatter(0))
     icon.cd:SetSwipeColor(0, 0, 0, 0.8)
 
     local overlay = CreateFrame("Frame", nil, icon)
