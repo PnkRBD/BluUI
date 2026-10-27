@@ -390,7 +390,13 @@ function ActionBars.SkinFlyoutButton(button)
 	ActionBars.SyncEmptyButtonAlpha(button)
 end
 
+local function HideFlyoutArt()
+	local handler = LibActionButton.flyoutHandler
+	if handler and handler.Background then handler.Background:Hide() end
+end
+
 function ActionBars.RefreshFlyoutButtons()
+	HideFlyoutArt()
 	for _, button in ipairs(LibActionButton.FlyoutButtons) do
 		ActionBars.SkinFlyoutButton(button)
 	end
