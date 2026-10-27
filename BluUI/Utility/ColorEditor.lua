@@ -149,6 +149,7 @@ BUI.Colors = {
 }
 
 function BUI.ApplyColors()
+    BUI.AuraEngine.InvalidateDispelPalette()
     BUI.Power.Primary.Apply()
     BUI.Power.Secondary.UpdateAppearance()
     BUI.UnitFrames:Refresh()

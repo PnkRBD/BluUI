@@ -242,6 +242,7 @@ function GroupFrames.ConfigureDispelHighlight(frame)
 end
 
 function GroupFrames.RestyleAllDispelBadges()
+	Engine.InvalidateDispelPalette()
 	GroupFrames.EachChild(function(child)
 		GroupFrames.RestyleDispelHighlight(child)
 		local previewKit = child._dispelPreviewKit

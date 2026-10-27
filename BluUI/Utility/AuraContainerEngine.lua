@@ -71,13 +71,22 @@ function Engine.BuildDispelCurve(zeroColor)
 	return curve, Engine.DispelPaletteStamp()
 end
 
+local paletteStamp, paletteSource
+local paletteParts = {}
+
+function Engine.InvalidateDispelPalette()
+	paletteStamp = nil
+end
+
 function Engine.DispelPaletteStamp()
-	local parts = {}
+	local source = BUI.GetDB().colors
+	if paletteStamp and source == paletteSource then return paletteStamp end
 	for tokenIndex = 1, #DISPEL_TOKENS do
 		local red, green, blue = Engine.DispelColorRGB(DISPEL_TOKENS[tokenIndex])
-		parts[tokenIndex] = floor(red * 255) .. ':' .. floor(green * 255) .. ':' .. floor(blue * 255)
+		paletteParts[tokenIndex] = floor(red * 255) .. ':' .. floor(green * 255) .. ':' .. floor(blue * 255)
 	end
-	return tconcat(parts, '|')
+	paletteStamp, paletteSource = tconcat(paletteParts, '|'), source
+	return paletteStamp
 end
 
 local borderCurve, borderStamp
@@ -305,6 +314,7 @@ local function AttemptRestyle(container, button)
 end
 
 function Engine.RepaintDispelBorders()
+	Engine.InvalidateDispelPalette()
 	for button, container in pairs(captureButtons) do
 		local buttonInfo = buttonData[button]
 		if buttonInfo.dispelStamp then
@@ -828,6 +838,7 @@ local function StyleSignature(style)
 	end
 	local baseColor = style.baseColor
 	signatureParts[#signatureParts + 1] = ('%.2f,%.2f,%.2f,%.2f'):format(baseColor[1], baseColor[2], baseColor[3], baseColor[4])
+	signatureParts[#signatureParts + 1] = Pixel.PixelSize(1)
 	return tconcat(signatureParts, '|')
 end
 
@@ -874,7 +885,7 @@ ConfigureContainer = function(container, sets, forced)
 	local signature = SetsSignature(sets)
 	local styleChanged = forced or signature ~= container._buiStyleSig
 	container._buiStyleSig = signature
-	container._buiStyleStamp = container._buiStyleStamp + 1
+	if styleChanged then container._buiStyleStamp = container._buiStyleStamp + 1 end
 
 	local regenerated = false
 	if styleChanged and HasLiveButtons(container) and RestyleRestricted() then
