@@ -3,7 +3,6 @@ local _, BUI = ...
 local oUF = BUI.oUF
 local UnitFrames = BUI.UnitFrames
 local Pixel = BUI.Pixel
-local SafeBool = BUI.Tools.SafeBool
 
 local CreateFrame = CreateFrame
 local UnitExists = UnitExists
@@ -154,17 +153,8 @@ function UnitFrames.RefreshLifeVisuals()
 	end
 end
 
-local function SetupTooltip(frame)
-	frame:HookScript('OnEnter', function(self)
-		if not self.unit or GetMouseFoci()[1] ~= self then return end
-		if UnitFrames.GetSettings().showTooltips ~= false then
-			GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
-			GameTooltip:SetUnit(self.unit)
-		end
-	end)
-	frame:HookScript('OnLeave', function()
-		GameTooltip:Hide()
-	end)
+local function TooltipAnchor()
+	if UnitFrames.GetSettings().showTooltips ~= false then return UIParent end
 end
 
 local BossEnter = function(self)
@@ -183,7 +173,7 @@ end
 
 local function LeaderOverride(frame)
 	local indicator = frame.LeaderIndicator
-	if indicator._buiHidden or not frame.unit or not UnitInParty(frame.unit) or not SafeBool(UnitIsGroupLeader(frame.unit)) then
+	if indicator._buiHidden or not BUI.Tools.UnitLeadsGroup(frame.unit) then
 		indicator:Hide()
 	else
 		indicator:SetAtlas('UI-HUD-UnitFrame-Player-Group-LeaderIcon')
@@ -193,7 +183,7 @@ end
 
 local function AssistantOverride(frame)
 	local indicator = frame.AssistantIndicator
-	if indicator._buiHidden or not frame.unit or not UnitInParty(frame.unit) or not SafeBool(UnitIsGroupAssistant(frame.unit)) or SafeBool(UnitIsGroupLeader(frame.unit)) then
+	if indicator._buiHidden or not BUI.Tools.UnitAssistsGroup(frame.unit) then
 		indicator:Hide()
 	else
 		indicator:SetAtlas('UI-HUD-UnitFrame-Party-PortraitOn-Icon-Assist')
@@ -435,7 +425,7 @@ local function Style(self, unit)
 	self:RegisterEvent('UNIT_FACTION', HealthUpdateColor)
 	self:RegisterEvent('UNIT_FACTION', PowerUpdateColor)
 
-	SetupTooltip(self)
+	BUI.Tools.HookUnitTooltip(self, TooltipAnchor)
 
 	local savedPosition = unitSettings.position
 	self:ClearAllPoints()

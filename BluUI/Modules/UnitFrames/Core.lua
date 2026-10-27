@@ -2,7 +2,6 @@ local _, BUI = ...
 
 local Pixel = BUI.Pixel
 local Motion = BUI.BUILibClient.Motion
-local sharedMedia = LibStub('LibSharedMedia-3.0')
 
 local CreateFrame = CreateFrame
 
@@ -165,9 +164,7 @@ end
 function UnitFrames.GetTexture()
 	if not cachedTexture then
 		local settings = UnitFrames.GetSettings()
-		cachedTexture = settings.texture == 'GLOBAL'
-			and BUI.GetGlobalTexture()
-			or (sharedMedia:Fetch('statusbar', settings.texture, true) or BUI.GetGlobalTexture())
+		cachedTexture = BUI.Tools.ResolveBarTexture(settings.texture)
 	end
 	return cachedTexture
 end
@@ -398,9 +395,7 @@ local function BossOutline(frame, key, enabled, color, levelOffset)
 		return
 	end
 	if not outline then
-		outline = CreateFrame('Frame', nil, frame)
-		outline:SetAllPoints()
-		outline:SetFrameLevel(frame:GetFrameLevel() + levelOffset)
+		outline = BUI.Tools.OutlineFrame(frame, levelOffset)
 		frame[key] = outline
 	end
 	Pixel.SetTemplate(outline, 0, 0, 0, 0, color[1], color[2], color[3], color[4], OUTLINE_THICKNESS)

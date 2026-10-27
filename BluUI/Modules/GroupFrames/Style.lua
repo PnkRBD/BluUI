@@ -10,15 +10,9 @@ local UnitIsConnected          = UnitIsConnected
 local UnitIsUnit               = UnitIsUnit
 local UnitInRange              = UnitInRange
 local InCombatLockdown         = InCombatLockdown
-local sharedMedia              = LibStub("LibSharedMedia-3.0")
 
 local NAME_TAG   = "[blu:name]"
 local STATUS_TAG = "[blu:status]"
-
-local function ResolveTexture(name)
-	if not name or name == BUI.C.GLOBAL_OPTION then return BUI.GetGlobalTexture() end
-	return sharedMedia:Fetch("statusbar", name, true) or BUI.GetGlobalTexture()
-end
 
 local function ResolveBackgroundColor(settings, unit, frame)
 	local background = settings.bgColor
@@ -151,7 +145,7 @@ end
 
 local function BuildHealth(frame, unit)
 	local settings  = GroupFrames.SettingsForFrame(frame)
-	local texture = ResolveTexture(settings.statusbarTexture)
+	local texture = BUI.Tools.ResolveBarTexture(settings.statusbarTexture)
 
 	local edge = Pixel.Scale(Pixel.ClampBorder(1))
 	local healthBar = CreateFrame("StatusBar", nil, frame)
@@ -235,7 +229,7 @@ end
 
 local function BuildPower(frame, unit)
 	local settings  = GroupFrames.SettingsForFrame(frame)
-	local texture = ResolveTexture(settings.statusbarTexture)
+	local texture = BUI.Tools.ResolveBarTexture(settings.statusbarTexture)
 
 	local powerBar = CreateFrame("StatusBar", nil, frame)
 	powerBar:SetStatusBarTexture(texture)
@@ -439,7 +433,7 @@ function GroupFrames.ApplyGeometry(frame, settings)
 end
 
 function GroupFrames.ApplyBarTextures(child, settings)
-	local texture = ResolveTexture(settings.statusbarTexture)
+	local texture = BUI.Tools.ResolveBarTexture(settings.statusbarTexture)
 	child.Health:SetStatusBarTexture(texture)
 	child.Health.bg:SetTexture(texture)
 	child.Health.Deficit:SetTexture(texture)
@@ -560,15 +554,8 @@ local function ApplySecureClicks(frame)
 	SetClicks(frame, GroupFrames.GetDB().clickMode)
 end
 
-local function HookTooltip(frame)
-	frame:HookScript("OnEnter", function(self)
-		local settings = GroupFrames.SettingsForFrame(self)
-		if not settings.showUnitTooltips or not self.unit or not UnitExists(self.unit) then return end
-		if GetMouseFoci()[1] ~= self then return end
-		GameTooltip_SetDefaultAnchor(GameTooltip, self)
-		GameTooltip:SetUnit(self.unit)
-	end)
-	frame:HookScript("OnLeave", function() GameTooltip:Hide() end)
+local function TooltipAnchor(frame)
+	if GroupFrames.SettingsForFrame(frame).showUnitTooltips then return frame end
 end
 
 local ShowClicks = function(self)
@@ -579,7 +566,7 @@ end
 local function GroupFrameStyle(frame, unit)
 	C_Timer.After(0, function() ApplySecureClicks(frame) end)
 
-	HookTooltip(frame)
+	BUI.Tools.HookUnitTooltip(frame, TooltipAnchor)
 
 	BuildBackdrop(frame, unit)
 	BuildHealth(frame, unit)
@@ -617,4 +604,5 @@ BUI.oUF:RegisterInitCallback(function(frame)
 	local settings = GroupFrames.SettingsForFrame(frame)
 	GroupFrames.ApplyGeometry(frame, settings)
 	GroupFrames.ApplyAggroToChild(frame, settings)
+	GroupFrames.ApplyIndicatorsToChild(frame, settings)
 end)

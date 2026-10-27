@@ -36,8 +36,9 @@ function Util.FrameClass(frame, unit)
 end
 
 function Util.ClassColor(unit, frame)
-	local class = Util.FrameClass(frame, unit)
-	local classColor = class and RAID_CLASS_COLORS[class]
+	local previewClass = frame and frame._previewClass
+	if not previewClass then return BUI.Tools.GetUnitClassColor(unit) end
+	local classColor = RAID_CLASS_COLORS[previewClass]
 	if classColor then return classColor.r, classColor.g, classColor.b end
 end
 

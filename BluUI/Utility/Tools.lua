@@ -5,6 +5,7 @@ local C_Spell = C_Spell
 local format = string.format
 
 local Tools = {}
+local sharedMedia = LibStub('LibSharedMedia-3.0')
 BUI.Tools = Tools
 
 function Tools.IsSpellUsable(spellID)
@@ -272,10 +273,15 @@ function AggroOutline:Empty()
     for _, edge in ipairs(self.edges) do edge:SetValue(0) end
 end
 
-function Tools.AggroOutline(parent, levelOffset)
+function Tools.OutlineFrame(parent, levelOffset)
     local outline = CreateFrame('Frame', nil, parent)
     outline:SetAllPoints()
     outline:SetFrameLevel(parent:GetFrameLevel() + levelOffset)
+    return outline
+end
+
+function Tools.AggroOutline(parent, levelOffset)
+    local outline = Tools.OutlineFrame(parent, levelOffset)
     outline.edges = {}
     for index, spec in ipairs(AGGRO_EDGES) do
         local edge = CreateFrame('StatusBar', nil, outline)
@@ -458,6 +464,31 @@ function Tools.GetUnitClassColor(unit)
     local classColor = class and RAID_CLASS_COLORS[class]
     if not classColor then return nil end
     return classColor.r, classColor.g, classColor.b
+end
+
+function Tools.ResolveBarTexture(name)
+    if not name or name == BUI.C.GLOBAL_OPTION then return BUI.GetGlobalTexture() end
+    return sharedMedia:Fetch('statusbar', name, true) or BUI.GetGlobalTexture()
+end
+
+function Tools.HookUnitTooltip(frame, AnchorFor)
+    frame:HookScript('OnEnter', function(self)
+        if not self.unit or not UnitExists(self.unit) or GetMouseFoci()[1] ~= self then return end
+        local anchor = AnchorFor(self)
+        if not anchor then return end
+        GameTooltip_SetDefaultAnchor(GameTooltip, anchor)
+        GameTooltip:SetUnit(self.unit)
+    end)
+    frame:HookScript('OnLeave', function() GameTooltip:Hide() end)
+end
+
+function Tools.UnitLeadsGroup(unit)
+    return unit ~= nil and UnitInParty(unit) and Tools.SafeBool(UnitIsGroupLeader(unit)) and true or false
+end
+
+function Tools.UnitAssistsGroup(unit)
+    if not unit or not UnitInParty(unit) or Tools.SafeBool(UnitIsGroupLeader(unit)) then return false end
+    return Tools.SafeBool(UnitIsGroupAssistant(unit)) and true or false
 end
 
 function Tools.SafeUnitClass(unit)
