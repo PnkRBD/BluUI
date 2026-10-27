@@ -1406,6 +1406,7 @@ BUI.Defaults = {
 			autoRepairShowSummary  = true,
 			sellJunk               = true,
 			autoKeystone           = true,
+			autoDismount           = false,
 			autoAcceptQuests       = false,
 			autoCompleteQuests     = false,
 			castOnKeyDown          = true,

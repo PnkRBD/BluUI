@@ -139,6 +139,17 @@ Settings.ToggleAutoRepair = EventToggle('repair', 'MERCHANT_SHOW', function()
 	end
 end)
 
+local SKYRIDING_DISMOUNT_SPELLS = { [372608] = true, [361584] = true, [403092] = true }
+
+local function DismountIfGrounded(spellID)
+	if SKYRIDING_DISMOUNT_SPELLS[spellID] and IsMounted() and not IsFlying() then Dismount() end
+end
+
+Settings.ToggleAutoDismount = EventToggle('dismount', { 'UNIT_SPELLCAST_SENT', 'UNIT_SPELLCAST_FAILED_QUIET' }, function(event, unit, ...)
+	if unit ~= 'player' then return end
+	DismountIfGrounded(select(event == 'UNIT_SPELLCAST_SENT' and 3 or 2, ...))
+end)
+
 Settings.ToggleSellJunk = EventToggle("junk", "MERCHANT_SHOW", function()
     if C_MerchantFrame.IsSellAllJunkEnabled() and C_MerchantFrame.GetNumJunkItems() > 0 then
         C_MerchantFrame.SellAllJunkItems()
@@ -507,6 +518,7 @@ function Settings:Initialize()
         { db.automation, "autoRepair", "ToggleAutoRepair" },
         { db.automation, "sellJunk", "ToggleSellJunk" },
         { db.automation, "autoKeystone", "ToggleAutoKeystone" },
+        { db.automation, "autoDismount", "ToggleAutoDismount" },
         { db.automation, "castOnKeyDown", "ToggleCastOnKeyDown" },
         { db.automation, "autoAcceptQuests", "ToggleAutoAcceptQuests" },
         { db.automation, "autoCompleteQuests", "ToggleAutoCompleteQuests" },
@@ -550,6 +562,7 @@ Settings.checkboxSections = {
     { header = "Casting", items = {
         { db = "automation", key = "castOnKeyDown", label = "Cast on Key Down", fn = "ToggleCastOnKeyDown", cvarInit = "ActionButtonUseKeyDown" },
         { db = "automation", key = "autoKeystone", label = "Auto Keystone", toggle = "ToggleAutoKeystone" },
+        { db = "automation", key = "autoDismount", label = "Skyriding Dismount on the Ground", toggle = "ToggleAutoDismount" },
         { type = "slider", db = "automation", key = "spellQueueWindow",  label = "Spell Queue (ms)", sub = "Queue the next spell this early", min = 0, max = 400, fn = "SetSpellQueueWindow", cvarInit = "SpellQueueWindow" },
     }},
     { header = "Combat Logging", items = {
