@@ -22,12 +22,6 @@ local TRIMMED_ATLAS = ROLE_ATLAS.HEALER
 local TRIM_COLUMN   = 1
 local TRIM_ROW      = 5
 
-local READY_ATLAS = {
-	ready    = "UI-LFG-ReadyMark-Raid",
-	notready = "UI-LFG-DeclineMark-Raid",
-	waiting  = "UI-LFG-PendingMark-Raid",
-}
-
 local function MakeIndicator(frame, config, elementName)
 	local holder = CreateFrame("Frame", nil, frame)
 	holder:SetFrameLevel(frame:GetFrameLevel() + GroupFrames.Layers.indicators)
@@ -177,38 +171,7 @@ local function AssistantOverride(self)
 	end
 end
 
-local function WirePlayerReadyCheck(frame, texture)
-	local watcher = CreateFrame("Frame", nil, frame)
-	local hideTimer
-	local function Allowed()
-		return not texture._previewOn and GroupFrames.SettingsForFrame(frame).readyCheckIcon.enabled
-	end
-	local function ApplyReadyStatus()
-		local status = GetReadyCheckStatus("player")
-		if status and READY_ATLAS[status] then
-			texture:SetAtlas(READY_ATLAS[status]); texture:Show()
-		else
-			texture:Hide()
-		end
-	end
-	watcher:SetScript("OnEvent", function(_, event)
-		if hideTimer then hideTimer:Cancel(); hideTimer = nil end
-		if not Allowed() then return end
-		if event == "READY_CHECK_FINISHED" then
-			hideTimer = C_Timer.NewTimer(10, function()
-				hideTimer = nil
-				if not texture._previewOn then texture:Hide() end
-			end)
-		else
-			ApplyReadyStatus()
-		end
-	end)
-	watcher:RegisterEvent("READY_CHECK")
-	watcher:RegisterEvent("READY_CHECK_CONFIRM")
-	watcher:RegisterEvent("READY_CHECK_FINISHED")
-end
-
-function GroupFrames.BuildIndicators(frame, unit)
+function GroupFrames.BuildIndicators(frame)
 	local settings = GroupFrames.SettingsForFrame(frame)
 	frame.GroupRoleIndicator  = MakeIndicator(frame, settings.roleIcon,       "GroupRoleIndicator")
 	frame.LeaderIndicator     = MakeIndicator(frame, settings.leaderIcon,     "LeaderIndicator")
@@ -232,10 +195,6 @@ function GroupFrames.BuildIndicators(frame, unit)
 	frame.GroupRoleIndicator._slices  = slices
 	frame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED", RoleOverride, true)
 	frame:RegisterEvent("PLAYER_ROLES_ASSIGNED", RoleOverride, true)
-
-	if unit == "player" then
-		WirePlayerReadyCheck(frame, frame.ReadyCheckIndicator)
-	end
 end
 
 function GroupFrames.ApplyIndicatorsToChild(child, settings)

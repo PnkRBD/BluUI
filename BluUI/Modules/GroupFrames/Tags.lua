@@ -124,7 +124,7 @@ Methods["blu:name"] = function(unit)
 	if not unit then return "" end
 	local name = UnitName(unit)
 	if not name or IsSecret(name) then return "" end
-	local limit = GroupFrames.SettingsForUnit(unit).nameMaxLength
+	local limit = GroupFrames.SettingsForFrame(_FRAME).nameMaxLength
 	if limit > 0 then return Tools.TruncateName(name, limit) end
 	return name
 end

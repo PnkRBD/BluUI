@@ -41,12 +41,6 @@ function GroupFrames.SetHeaderAttribute(header, name, value)
 	header:SetAttribute(name, value)
 end
 
-function GroupFrames.SettingsForUnit(unit)
-	local db = GroupFrames.GetDB()
-	if unit and unit:sub(1, 4) == "raid" then return db.raid end
-	return db.party
-end
-
 local largeMerged
 
 function GroupFrames.InvalidateLargeRaidSettings()
@@ -195,24 +189,23 @@ local function SweepChild(child)
 	if guid and IsSecret(guid) then guid = child._bluRosterGUID end
 	local role = unit and UnitGroupRolesAssigned(unit) or ""
 	if IsSecret(role) then role = "" end
-	local changed = child._bluRosterUnit ~= unit or child._bluRosterGUID ~= guid or child._bluRosterRole ~= role
+	local roleChanged = child._bluRosterRole ~= role
+	local changed = roleChanged or child._bluRosterUnit ~= unit or child._bluRosterGUID ~= guid
 	child._bluRosterUnit, child._bluRosterGUID, child._bluRosterRole = unit, guid, role
 
 	GroupFrames.FinishChildAuraSetup(child)
 	local settings = GroupFrames.SettingsForFrame(child)
-	if changed then
+	if roleChanged or not child._bluRosterGeom then
 		if sweepInCombat then
 			child._bluRosterGeom = false
 		else
 			GroupFrames.ApplyGeometry(child, settings)
 			child._bluRosterGeom = true
 		end
-		if unit and child:IsElementEnabled("Power") then child.Power:ForceUpdate() end
+	end
+	if changed then
 		GroupFrames.ApplyTextColors(child, settings)
 		GroupFrames.MarkAurasDirty(child)
-	elseif not child._bluRosterGeom and not sweepInCombat then
-		GroupFrames.ApplyGeometry(child, settings)
-		child._bluRosterGeom = true
 	end
 	GroupFrames.ReflowAuraVisibility(child)
 	GroupFrames.RepaintPreviewChild(child)
@@ -283,10 +276,6 @@ function GroupFrames.Setup()
 end
 
 function GroupFrames.SetFramesEnabled(enabled)
-	if enabled and not GroupFrames.headers.party and not GroupFrames.headers.raid then
-		GroupFrames.Setup()
-		return
-	end
 	GroupFrames.SetPartyEnabled(enabled)
 	GroupFrames.SetRaidEnabled(enabled)
 	GroupFrames.SyncReachabilitySweep()

@@ -470,8 +470,7 @@ local function RangeOverride(self)
 	self:SetAlphaFromBoolean(inRange, element.insideAlpha, element.outsideAlpha)
 end
 
-local function BuildRangeFade(frame, unit)
-	if unit == "player" then return end
+local function BuildRangeFade(frame)
 	local rangeSettings = GroupFrames.GetDB().range
 	frame.Range = {
 		insideAlpha  = rangeSettings.insideAlpha,
@@ -587,10 +586,10 @@ local function GroupFrameStyle(frame, unit)
 	BuildPower(frame, unit)
 	BuildText(frame, unit)
 	BuildAbsorb(frame, unit)
-	GroupFrames.BuildIndicators(frame, unit)
+	GroupFrames.BuildIndicators(frame)
 	GroupFrames.BuildSelection(frame, unit)
 	if GroupFrames.SectionForFrame(frame) == "party" then BuildAggro(frame) end
-	BuildRangeFade(frame, unit)
+	BuildRangeFade(frame)
 	GroupFrames.BuildKeystone(frame, unit)
 
 	frame.PreUpdate = SyncUnitClass
