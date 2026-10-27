@@ -214,6 +214,24 @@ function IconEngine.IsTrackedEntryUsable(storedValue, itemForSpellFn)
 	return IconEngine.IsEquippedOrKnownOrInBags(iconType, spellID, itemID)
 end
 
+function IconEngine.SetItemTooltip(tooltip, itemID)
+	for bag = 0, NUM_TOTAL_EQUIPPED_BAG_SLOTS do
+		for slot = 1, C_Container.GetContainerNumSlots(bag) do
+			if C_Container.GetContainerItemID(bag, slot) == itemID then
+				tooltip:SetBagItem(bag, slot)
+				return
+			end
+		end
+	end
+	for slot = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
+		if GetInventoryItemID("player", slot) == itemID then
+			tooltip:SetInventoryItem("player", slot)
+			return
+		end
+	end
+	tooltip:SetItemByID(itemID)
+end
+
 local knownItemDurations = {
 	[5512]   = 60,
 	[224464] = 60,

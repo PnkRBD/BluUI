@@ -237,7 +237,7 @@ local function CreateIcon(parent, barIndex, iconIndex)
         if icon.iconType == "spell" then
             GameTooltip:SetSpellByID(icon.itemID)
         else
-            GameTooltip:SetItemByID(icon.itemID)
+            IconEngine.SetItemTooltip(GameTooltip, icon.itemID)
         end
         GameTooltip:Show()
     end)

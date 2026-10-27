@@ -727,9 +727,9 @@ local function CreateIconFrame(parent, borderSize, borderColor, zoom)
         GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
         local spellID = frameData.customSpellID
         if frameData.isItemByPrefix then
-            GameTooltip:SetItemByID(spellID)
+            IconEngine.SetItemTooltip(GameTooltip, spellID)
         elseif frameData.itemID and (frameData.iconType == "consumable" or frameData.iconType == "trinket") then
-            GameTooltip:SetItemByID(frameData.itemID)
+            IconEngine.SetItemTooltip(GameTooltip, frameData.itemID)
         else
             GameTooltip:SetSpellByID(spellID)
         end
