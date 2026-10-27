@@ -42,6 +42,12 @@ local function GridSize(buttonCount, perRow, buttonSize, buttonHeight, spacing)
 	return columns * buttonSize + (columns - 1) * spacing, rows * buttonHeight + (rows - 1) * spacing
 end
 
+local function SetFlyoutMetrics(button, width, height, gap)
+	if button:GetAttribute('buiFlyoutWidth') ~= width then button:SetAttribute('buiFlyoutWidth', width) end
+	if button:GetAttribute('buiFlyoutHeight') ~= height then button:SetAttribute('buiFlyoutHeight', height) end
+	if button:GetAttribute('buiFlyoutGap') ~= gap then button:SetAttribute('buiFlyoutGap', gap) end
+end
+
 function ActionBars.LayoutBar(bar, buttonCountOverride)
 	local barSettings = ActionBars.GetBarSettings(bar.key)
 	local buttonSize = Pixel.Scale(barSettings.buttonSize)
@@ -63,6 +69,7 @@ function ActionBars.LayoutBar(bar, buttonCountOverride)
 			local rowIndex = math.floor((buttonIndex - 1) / perRow)
 			local columnIndex = (buttonIndex - 1) % perRow
 			button:SetSize(buttonSize, buttonHeight)
+			SetFlyoutMetrics(button, buttonSize, buttonHeight, spacing)
 			button:ClearAllPoints()
 			button:SetPoint(point, bar.header, point,
 				(fromRight and -1 or 1) * columnIndex * (buttonSize + spacing),

@@ -384,19 +384,70 @@ end
 
 function ActionBars.SkinFlyoutButton(button)
 	button._buiBar = 'flyout'
+	if button:GetScale() ~= 1 and not InCombatLockdown() then button:SetScale(1) end
 	button:UpdateConfig(ActionBars.BuildFlyoutConfig())
 	ActionBars.SkinButton(button)
 	button._formattedHotkey = ''
 	ActionBars.SyncEmptyButtonAlpha(button)
+	if not button._buiFlyoutCrop then
+		button._buiFlyoutCrop = true
+		button:HookScript('OnSizeChanged', ActionBars.ApplyIconCrop)
+	end
 end
 
-local function HideFlyoutArt()
+local FLYOUT_LAYOUT = [[
+	self:RunAttribute("BUI_LABHandleFlyout", ...)
+	if not self:IsShown() then return end
+	local parent = self:GetAttribute("flyoutParentHandle")
+	local width = parent and parent:GetAttribute("buiFlyoutWidth")
+	if not width then return end
+	local height = parent:GetAttribute("buiFlyoutHeight") or width
+	local gap = parent:GetAttribute("buiFlyoutGap") or 0
+	local direction = parent:GetAttribute("flyoutDirection") or "UP"
+	local count, previous = 0, nil
+	for index = 1, self:GetAttribute("numFlyoutButtons") do
+		local button = self:GetFrameRef("flyoutButton" .. index)
+		if not button or not button:IsShown() then break end
+		count = index
+		button:SetScale(1)
+		button:SetWidth(width)
+		button:SetHeight(height)
+		button:ClearAllPoints()
+		if direction == "UP" then
+			button:SetPoint("BOTTOM", previous or self, previous and "TOP" or "BOTTOM", 0, gap)
+		elseif direction == "DOWN" then
+			button:SetPoint("TOP", previous or self, previous and "BOTTOM" or "TOP", 0, -gap)
+		elseif direction == "LEFT" then
+			button:SetPoint("RIGHT", previous or self, previous and "LEFT" or "RIGHT", -gap, 0)
+		else
+			button:SetPoint("LEFT", previous or self, previous and "RIGHT" or "LEFT", gap, 0)
+		end
+		previous = button
+	end
+	if direction == "UP" or direction == "DOWN" then
+		self:SetWidth(width)
+		self:SetHeight((height + gap) * count + gap)
+	else
+		self:SetWidth((width + gap) * count + gap)
+		self:SetHeight(height)
+	end
+]]
+
+local function PrepareFlyoutHandler()
 	local handler = LibActionButton.flyoutHandler
-	if handler and handler.Background then handler.Background:Hide() end
+	if not handler then return end
+	if handler.Background then handler.Background:Hide() end
+	if handler:GetAttribute('HandleFlyout') == FLYOUT_LAYOUT then return end
+	if InCombatLockdown() then
+		ActionBars.RunSecure('FlyoutLayout', PrepareFlyoutHandler)
+		return
+	end
+	handler:SetAttribute('BUI_LABHandleFlyout', handler:GetAttribute('HandleFlyout'))
+	handler:SetAttribute('HandleFlyout', FLYOUT_LAYOUT)
 end
 
 function ActionBars.RefreshFlyoutButtons()
-	HideFlyoutArt()
+	PrepareFlyoutHandler()
 	for _, button in ipairs(LibActionButton.FlyoutButtons) do
 		ActionBars.SkinFlyoutButton(button)
 	end
