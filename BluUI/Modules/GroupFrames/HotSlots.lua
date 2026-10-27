@@ -28,12 +28,15 @@ local function CopyEntry(entry)
 end
 
 function HotSlots.SpellsFor(specID)
+	return GroupFrames.GetDB().hotSpells[specID] or GroupFrames.AuraRegistry.healerHots[specID]
+end
+
+function HotSlots.EditableSpellsFor(specID)
 	local stored = GroupFrames.GetDB().hotSpells
-	if stored[specID] then return stored[specID] end
-	local defaults = GroupFrames.AuraRegistry.healerHots[specID]
-	if not defaults then return nil end
-	local list = {}
-	for index, entry in ipairs(defaults) do list[index] = CopyEntry(entry) end
+	local list = stored[specID]
+	if list then return list end
+	list = {}
+	for index, entry in ipairs(GroupFrames.AuraRegistry.healerHots[specID] or list) do list[index] = CopyEntry(entry) end
 	stored[specID] = list
 	return list
 end

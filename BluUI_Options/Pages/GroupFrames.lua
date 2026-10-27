@@ -630,7 +630,7 @@ end
 local function HotSpellsBoard(ui, parent, width, page)
 	local HotSlots = GroupFrames.HotSlots
 	hotSpec = hotSpec or DefaultHotSpec()
-	local list = HotSlots.SpellsFor(hotSpec)
+	local list = HotSlots.EditableSpellsFor(hotSpec)
 	local function Changed()
 		HotSlots.Invalidate()
 		GroupFrames.RefreshAuras()
