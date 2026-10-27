@@ -17,6 +17,7 @@ local CORNER_OFFSETS = {
 local bars = {}
 local eventsRegistered = false
 local playerKey
+local ApplyBarDefaults
 
 local function GetPlayerKey()
     if not playerKey then
@@ -230,7 +231,7 @@ local function CreateIcon(parent, barIndex, iconIndex)
     overlay:EnableMouse(false)
 
     icon:SetScript("OnEnter", function()
-        if not GetBar(barIndex).showTooltips then return end
+        if GetBar(barIndex).showTooltips == false then return end
         if not icon.itemID then return end
         GameTooltip_SetDefaultAnchor(GameTooltip, UIParent)
         if icon.iconType == "spell" then
@@ -719,6 +720,7 @@ function CustomBars.RefreshBar(index)
         CustomBars.RefreshHotEventRegistration()
         return
     end
+    ApplyBarDefaults(settings)
     local bar = bars[index] or CreateBar(index)
     PositionBar(bar, settings)
     UpdateBar(index)
@@ -801,7 +803,7 @@ local BAR_DEFAULTS = {
     barOpacity = 100,
 }
 
-local function ApplyBarDefaults(bar)
+ApplyBarDefaults = function(bar)
     for key, default in pairs(BAR_DEFAULTS) do
         if bar[key] == nil then
             if type(default) == "table" then
@@ -875,7 +877,19 @@ end
 
 local function OnItemCooldownEvent()
     itemCooldownsPending = true
+    itemCountsPending = true
     QueueCooldownFlush()
+end
+
+local RecheckItemCounts = BUI.Dispatcher.NewDelayed(function()
+    itemCountsPending = true
+    QueueCooldownFlush()
+end, 0.2)
+
+local function OnPlayerCastSucceeded()
+    itemCountsPending = true
+    QueueCooldownFlush()
+    RecheckItemCounts()
 end
 
 local function OnChargesEvent()
@@ -901,7 +915,7 @@ local function OnEnteringWorld(_, isInitialLogin, isReloadingUi)
     if isInitialLogin or isReloadingUi then OnEvent() end
 end
 
-local spellEventsRegistered, itemEventsRegistered, chargeEventsRegistered = false, false, false
+local spellEventsRegistered, itemEventsRegistered, chargeEventsRegistered, castEventsRegistered = false, false, false, false
 
 local function NeededCooldownEvents()
     local settings = GetSettings()
@@ -947,6 +961,14 @@ function CustomBars.RefreshHotEventRegistration()
             BUI.Events:Register("BAG_UPDATE_COOLDOWN", "CustomBars.BagCD", OnItemCooldownEvent)
         else
             BUI.Events:Unregister("BAG_UPDATE_COOLDOWN", "CustomBars.BagCD")
+        end
+    end
+    if wantCounts ~= castEventsRegistered then
+        castEventsRegistered = wantCounts
+        if wantCounts then
+            BUI.Events:RegisterUnit("UNIT_SPELLCAST_SUCCEEDED", "player", "CustomBars.Cast", OnPlayerCastSucceeded)
+        else
+            BUI.Events:Unregister("UNIT_SPELLCAST_SUCCEEDED", "CustomBars.Cast")
         end
     end
 end
