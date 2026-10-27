@@ -22,10 +22,10 @@ local function CreateIcon(parent, index, iconID)
     icon.textOverlay = textOverlay
 
     icon.Count = textOverlay:CreateFontString(nil, "OVERLAY")
-    icon.Count:SetText(index > 1 and tostring(index) or "")
+    icon.countText = index > 1 and tostring(index) or ""
 
     icon.cdText = textOverlay:CreateFontString(nil, "OVERLAY")
-    icon.cdText:SetText(index == 1 and "" or tostring(index + 3))
+    icon.timerText = index == 1 and "" or tostring(index + 3)
 
     return icon
 end
@@ -52,12 +52,14 @@ local function UpdateIcon(icon, settings)
     icon.Count:ClearAllPoints()
     icon.Count:SetPoint(settings.textPosition, icon.Icon, settings.textPosition, settings.textOffsetX, settings.textOffsetY)
     Pixel.ApplyFont(icon.Count, settings.textSize, BUI.GetCDMFont())
+    icon.Count:SetText(icon.countText)
     local textColor = settings.textColor
     icon.Count:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4])
 
     icon.cdText:ClearAllPoints()
     icon.cdText:SetPoint(settings.cooldownTextPosition, icon.Icon, settings.cooldownTextPosition, settings.cooldownTextOffsetX, settings.cooldownTextOffsetY)
     Pixel.ApplyFont(icon.cdText, settings.cooldownTextSize, BUI.GetCDMFont())
+    icon.cdText:SetText(icon.timerText)
     local cdTextColor = settings.cooldownTextColor
     icon.cdText:SetTextColor(cdTextColor[1], cdTextColor[2], cdTextColor[3], cdTextColor[4])
 end
