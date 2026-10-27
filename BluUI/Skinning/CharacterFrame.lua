@@ -2110,10 +2110,6 @@ local function BuildFrame()
     cog:SetPoint('RIGHT', titleBar.closeBtn.frame, 'LEFT', Pixel.Scale(-4), 0)
     cog:SetFrameLevel(frame:GetFrameLevel() + 10)
 
-    local reset = IconButton(frame, 'reset', 'Reset all sheet settings', ResetSheet)
-    reset:SetPoint('RIGHT', cog, 'LEFT', Pixel.Scale(-4), 0)
-    reset:SetFrameLevel(frame:GetFrameLevel() + 10)
-
     frame.titleText:ClearAllPoints()
     frame.titleText:SetPoint('TOPLEFT', titleBar, 'TOPLEFT', Pixel.Scale(14), Pixel.Scale(-HEADER.TOP_PAD))
     frame.subText = frame:CreateFontString(nil, 'OVERLAY')
@@ -2342,6 +2338,9 @@ local function BuildSettingsPanel()
     Row('Bag swap marker', 'Marks better gear in your bags', {
         { kind = 'swatch', opacity = true, tooltip = 'Marker color', get = MarkerColor, set = SetMarkerColor },
         { icon = 'reset', tooltip = 'Reset marker color', onClick = ResetMarker },
+    })
+    Row('Reset all', 'Every setting above back to its default', {
+        { icon = 'reset', tooltip = 'Reset all sheet settings', onClick = ResetSheet },
     })
     child:SetHeight(y)
 end
