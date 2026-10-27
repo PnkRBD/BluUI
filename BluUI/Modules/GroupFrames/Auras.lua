@@ -228,9 +228,9 @@ local function RebindOnWorldEntry(child)
 	GroupFrames.RewireAuraEvents(child, child.unit)
 end
 
-BUI.Events:Register("PLAYER_ENTERING_WORLD", "GroupFrames.AuraRebind", function()
+function GroupFrames.RebindAllAuras()
 	GroupFrames.EachChild(RebindOnWorldEntry)
-end)
+end
 
 function GroupFrames.RefreshDispelBorder(frame)
 	if frame._bluAurasBuilt then GroupFrames.ConfigureDispelHighlight(frame) end
@@ -264,8 +264,6 @@ GroupFrames.ReflowAuraVisibility = reflowAuraVisibility
 
 local REACHABILITY_EVENTS = { "UNIT_CONNECTION", "UNIT_PHASE", "UNIT_FACTION", "UNIT_IN_RANGE_UPDATE", "UNIT_DISTANCE_CHECK_UPDATE" }
 
-local reflowAuraVisibility  = reflowAuraVisibility
-
 local function AttachReachabilityHooks(frame)
 	for eventIndex = 1, #REACHABILITY_EVENTS do
 		frame:RegisterEvent(REACHABILITY_EVENTS[eventIndex], reflowAuraVisibility)
@@ -275,7 +273,7 @@ local function AttachReachabilityHooks(frame)
 	reflowAuraVisibility(frame)
 end
 
-local REACHABILITY_SWEEP_SECONDS = 1
+local REACHABILITY_SWEEP_SECONDS = 3
 local reachabilityTicker
 
 local function SweepIfVisible(child)
@@ -296,9 +294,6 @@ function GroupFrames.SyncReachabilitySweep()
 	end
 end
 
-BUI.Events:Register("GROUP_ROSTER_UPDATE", "GroupFrames.ReachabilitySweep", GroupFrames.SyncReachabilitySweep)
-BUI.Events:Register("PLAYER_ENTERING_WORLD", "GroupFrames.ReachabilitySweep", GroupFrames.SyncReachabilitySweep)
-
 local function ApplyAurasToChild(child)
 	if not child._bluAurasBuilt then return end
 	local settings = GroupFrames.SettingsForFrame(child)
@@ -315,6 +310,7 @@ end
 function GroupFrames.RefreshAuras(section)
 	if section ~= "raid"  then GroupFrames.EachPartyChild(ApplyAurasToChild) end
 	if section ~= "party" then GroupFrames.EachRaidChild(ApplyAurasToChild) end
+	GroupFrames.ReapplyAuraPreviewsLater()
 end
 
 function GroupFrames.FinishChildAuraSetup(child)

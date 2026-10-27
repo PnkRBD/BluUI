@@ -224,6 +224,8 @@ local function RosterSweep()
 	sweepInCombat = InCombatLockdown()
 	if not sweepInCombat then GroupFrames.SyncPreviewChildren() end
 	GroupFrames.EachChild(SweepChild)
+	GroupFrames.SyncReachabilitySweep()
+	GroupFrames.Keystone.Sync()
 end
 
 local DispatchRosterSweep = BUI.Dispatcher.New(RosterSweep)
@@ -268,6 +270,7 @@ function GroupFrames.Setup()
 				BUI.Events:AfterCombatSettled(DispatchRosterSweep, "GF.RosterSweep")
 				return
 			end
+			if event == "PLAYER_ENTERING_WORLD" then GroupFrames.RebindAllAuras() end
 			DispatchRosterSweep()
 		end)
 		BUI.Tools.OnAuraQueriesUnblocked(DispatchRosterSweep)

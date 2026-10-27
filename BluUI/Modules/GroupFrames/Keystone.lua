@@ -140,12 +140,9 @@ BUI.Events:Register("ZONE_CHANGED_NEW_AREA", "GroupFramesKeystone", function()
 	SetRunState(ReadRunState())
 end)
 
-BUI.Events:Register("GROUP_ROSTER_UPDATE", "GroupFramesKeystone", Keystone.Sync)
-
 BUI.Events:Register("CHALLENGE_MODE_MAPS_UPDATE", "GroupFramesKeystone", QueueRefresh)
 
 BUI.Events:Register("PLAYER_ENTERING_WORLD", "GroupFramesKeystone", function()
 	SetRunState(ReadRunState())
 	C_MythicPlus.RequestMapInfo()
-	Keystone.Sync()
 end)

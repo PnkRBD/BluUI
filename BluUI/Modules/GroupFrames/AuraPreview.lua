@@ -158,9 +158,7 @@ function GroupFrames.ClearAuraPreviews()
 	for index = 1, #entries do ApplyKind(entries[index].section, entries[index].kind, false) end
 end
 
-local function ReapplyLater()
+function GroupFrames.ReapplyAuraPreviewsLater()
 	if next(active) == nil then return end
 	C_Timer.After(0, GroupFrames.ReapplyAuraPreviews)
 end
-
-hooksecurefunc(GroupFrames, 'RefreshAuras', ReapplyLater)
