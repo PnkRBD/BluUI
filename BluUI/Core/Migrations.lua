@@ -31,7 +31,7 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 30
+local PROFILE_MIGRATION_VERSION = 31
 
 local AURA_GROUP_KINDS = { 'buffs', 'debuffs', 'bigDef', 'crowdControl' }
 
@@ -858,6 +858,16 @@ function BUI.MigrateProfile(profile)
 			end
 			interface.drawerEnabled = nil
 			if type(buttonBar) == 'table' then buttonBar.enabled = nil end
+		end
+	end
+
+	if not general._partyGrowDirection then
+		general._partyGrowDirection = true
+		local groupFrames = profile.groupFrames
+		local party = type(groupFrames) == 'table' and groupFrames.party
+		if type(party) == 'table' then
+			if rawget(party, 'growDirection') == nil and rawget(party, 'vertical') == false then party.growDirection = 'RIGHT' end
+			party.vertical = nil
 		end
 	end
 

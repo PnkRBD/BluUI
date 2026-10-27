@@ -162,7 +162,7 @@ end
 local function AurasBoards(ui, parent, width, key)
 	local section = Config()[key]
 	local sortItems = BUI.AuraEngine.SortMethodItems()
-	local function Refresh() GroupFrames.Refresh(key) end
+	local function Refresh() GroupFrames.Refresh(key, true) end
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Auras',
@@ -362,7 +362,7 @@ local function FramesBoard(ui, parent, width, key)
 	local size = { icon = 'resize', tooltip = 'Size and spacing', title = 'Size', options = sizing }
 	if isParty then
 		board:AddTools('Layout', 'Growth, size and spacing', {
-			{ entries = GROWTHS, get = function() return GroupFrames.PartyGrowth(section) end, set = function(value)
+			{ entries = GROWTHS, get = function() return section.growDirection end, set = function(value)
 				section.growDirection = value
 			end },
 			size,

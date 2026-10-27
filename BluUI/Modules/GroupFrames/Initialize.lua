@@ -96,6 +96,11 @@ function GroupFrames.ImportStandaloneProfile()
 	if standaloneDB.global and standaloneDB.global.hideBlizzardFrames ~= nil then
 		groupFramesSettings.hideBlizzardFrames = standaloneDB.global.hideBlizzardFrames
 	end
+	local party = groupFramesSettings.party
+	if rawget(party, 'vertical') ~= nil then
+		party.growDirection = party.vertical == false and 'RIGHT' or 'DOWN'
+		party.vertical = nil
+	end
 	BUI.Print("Imported your standalone Blu Frames settings into Group Frames.")
 end
 

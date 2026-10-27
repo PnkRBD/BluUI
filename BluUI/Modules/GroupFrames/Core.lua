@@ -16,8 +16,7 @@ GroupFrames.Layers = {
 }
 
 function GroupFrames.GetDB()
-	local profile = BUI.GetDB()
-	return profile and profile.groupFrames or BUI.Defaults.profile.groupFrames
+	return BUI.GetDB().groupFrames
 end
 
 local Util = {}
@@ -75,100 +74,29 @@ function Util.JustifyFor(anchor)
 	return "CENTER"
 end
 
-local Anchor = {}
-GroupFrames.Anchor = Anchor
-
-local CDM_FRAMES = {
-	BUI_EssentialCooldownViewer = true,
-	BUI_UtilityCooldownViewer   = true,
-	BUI_BuffCooldownViewer      = true,
-}
-
-local OPPOSITES = {
-	TOP = "BOTTOM", BOTTOM = "TOP",
-	LEFT = "RIGHT", RIGHT = "LEFT",
-	TOPLEFT = "BOTTOMLEFT", TOPRIGHT = "BOTTOMRIGHT",
-	BOTTOMLEFT = "TOPLEFT", BOTTOMRIGHT = "TOPRIGHT",
-	CENTER = "CENTER",
-}
-
-local function CDMOffset(target, point)
-	if point == "TOP" or point == "TOPLEFT" or point == "TOPRIGHT" then
-		return -(target._topEdgeOffset or 0)
-	end
-	if point == "BOTTOM" or point == "BOTTOMLEFT" or point == "BOTTOMRIGHT" then
-		return target._bottomEdgeOffset or 0
-	end
-	return 0
-end
-
-local function CDMPointInUIParent(frame, point)
-	local left, right, top, bottom = frame:GetLeft(), frame:GetRight(), frame:GetTop(), frame:GetBottom()
-	if not left or not right or not top or not bottom then return nil, nil end
-	local centerX, centerY = (left + right) / 2, (top + bottom) / 2
-	if point == "TOPLEFT"     then return left,    top     end
-	if point == "TOP"         then return centerX, top     end
-	if point == "TOPRIGHT"    then return right,   top     end
-	if point == "LEFT"        then return left,    centerY end
-	if point == "RIGHT"       then return right,   centerY end
-	if point == "BOTTOMLEFT"  then return left,    bottom  end
-	if point == "BOTTOM"      then return centerX, bottom  end
-	if point == "BOTTOMRIGHT" then return right,   bottom  end
-	return centerX, centerY
-end
-
-local function GapOffsets(point, offsetX, offsetY)
-	if point:find("BOTTOM") then return offsetX, offsetY - 1 end
-	if point:find("TOP")    then return offsetX, offsetY + 1 end
-	if point == "LEFT"      then return offsetX - 1, offsetY end
-	if point == "RIGHT"     then return offsetX + 1, offsetY end
-	return offsetX, offsetY
-end
-
-function Anchor.ApplyPosition(frame, target, anchorFrame, anchorPoint, offsetX, offsetY)
-	local Scale = BUI.Pixel.Scale
-	local isCDM = CDM_FRAMES[anchorFrame]
-
-	frame:ClearAllPoints()
-	local point, framePoint, isInside = BUI.Anchor.ResolveAnchorPoint(anchorPoint)
-	if isCDM then offsetY = offsetY + CDMOffset(target, point) * (isInside and -1 or 1) end
-	offsetX, offsetY = GapOffsets(isInside and OPPOSITES[point] or point, offsetX, offsetY)
-
-	if isCDM then
-		local anchorX, anchorY = CDMPointInUIParent(target, point)
-		if anchorX then
-			if target._row1CenterOffsetX
-				and (point == "TOP" or point == "BOTTOM" or point == "CENTER") then
-				anchorX = anchorX + target._row1CenterOffsetX
-			end
-			frame:SetPoint(framePoint, UIParent, "BOTTOMLEFT", Scale(anchorX + offsetX), Scale(anchorY + offsetY))
-			return
-		end
-	end
-
-	frame:SetPoint(framePoint, target, point, Scale(offsetX), Scale(offsetY))
-end
-
 function GroupFrames.AfterCombat(callback, key)
 	BUI.Events:AfterCombat(callback, key)
 end
 
 do
 	local queued = false
-	local queuedSection
+	local queuedSection, queuedAurasOnly
 
-	function GroupFrames.Refresh(section)
+	function GroupFrames.Refresh(section, aurasOnly)
 		if queued then
 			if queuedSection ~= section then queuedSection = nil end
+			if not aurasOnly then queuedAurasOnly = false end
 			return
 		end
 		queued = true
-		queuedSection = section
+		queuedSection, queuedAurasOnly = section, aurasOnly == true
 		C_Timer.After(0, function()
-			local pendingSection = queuedSection
-			queued, queuedSection = false, nil
+			local pendingSection, pendingAurasOnly = queuedSection, queuedAurasOnly
+			queued, queuedSection, queuedAurasOnly = false, nil, nil
 			GroupFrames.InvalidateLargeRaidSettings()
-			GroupFrames.AfterCombat(function() GroupFrames.RefreshAll(pendingSection) end, "GF.RefreshAll:" .. (pendingSection or "all"))
+			local work = pendingAurasOnly and GroupFrames.RefreshAuras or GroupFrames.RefreshAll
+			local key = (pendingAurasOnly and "GF.RefreshAuras:" or "GF.RefreshAll:") .. (pendingSection or "all")
+			GroupFrames.AfterCombat(function() work(pendingSection) end, key)
 		end)
 	end
 end

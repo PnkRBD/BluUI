@@ -1,7 +1,6 @@
 local _, BUI = ...
 
 local GroupFrames     = BUI.GroupFrames
-local Anchor = GroupFrames.Anchor
 
 local UIParent           = UIParent
 local InCombatLockdown   = InCombatLockdown
@@ -29,13 +28,8 @@ local GROWTH = {
 	LEFT  = { point = "RIGHT",  x = -1, y = 0 },
 }
 
-function GroupFrames.PartyGrowth(partySettings)
-	if GROWTH[partySettings.growDirection] then return partySettings.growDirection end
-	return partySettings.vertical == false and "RIGHT" or "DOWN"
-end
-
 local function Growth(partySettings)
-	return GROWTH[GroupFrames.PartyGrowth(partySettings)]
+	return GROWTH[partySettings.growDirection]
 end
 
 local function LayoutAttributes(partySettings)
@@ -56,18 +50,29 @@ local function PlaceFree(header, partySettings, growth)
 	header:SetPoint(point, UIParent, partySettings.relPoint, x, y)
 end
 
+local function PinGap(anchorPoint)
+	local point, _, isInside = BUI.Anchor.ResolveAnchorPoint(anchorPoint)
+	local gap = isInside and -1 or 1
+	if point:find("BOTTOM") then return -gap end
+	if point:find("TOP") then return gap end
+	return 0
+end
+
+local anchorMeta = {}
+local anchorView = setmetatable({ scaleOffsets = true }, anchorMeta)
+
 local function PositionHeader(header, partySettings)
 	local growth = Growth(partySettings)
-	local target = ResolveAnchorTarget(partySettings)
-	if not target then
+	if not ResolveAnchorTarget(partySettings) then
 		PlaceFree(header, partySettings, growth)
 		return nil
 	end
-	local pins = growth.x < 0 and RIGHT_PIN_VARIANT or LEFT_PIN_VARIANT
-	Anchor.ApplyPosition(header, target, partySettings.anchorFrame,
-		pins[partySettings.anchorPoint] or partySettings.anchorPoint,
-		partySettings.anchorOffsetX, partySettings.anchorOffsetY)
-	return target
+	local pinned = (growth.x < 0 and RIGHT_PIN_VARIANT or LEFT_PIN_VARIANT)[partySettings.anchorPoint]
+	anchorMeta.__index = partySettings
+	anchorView.anchorPoint = pinned or partySettings.anchorPoint
+	anchorView.noGap = pinned ~= nil
+	anchorView.anchorOffsetY = pinned and (partySettings.anchorOffsetY + PinGap(partySettings.anchorPoint)) or nil
+	return BUI.Anchor.ApplyPosition(header, anchorView)
 end
 
 local lastSyncedWidth

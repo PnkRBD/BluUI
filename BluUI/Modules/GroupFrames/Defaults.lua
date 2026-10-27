@@ -140,7 +140,7 @@ MergeTable(PARTY, {
 	relPoint    = "TOPLEFT",
 	x           = 30,
 	y           = -200,
-	vertical    = true,
+	growDirection = "DOWN",
 	raidGroup   = "off",
 	showName    = true,
 	showHpText  = true,
