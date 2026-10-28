@@ -9,6 +9,7 @@ local UnitExists             = UnitExists
 local issecretvalue          = issecretvalue
 
 local PARTY_UNITS = { 'player', 'party1', 'party2', 'party3', 'party4' }
+PartyKeys.UNITS = PARTY_UNITS
 
 local keys = {}
 local listeners = {}
@@ -46,7 +47,16 @@ function PartyKeys.Listen(name, callback)
 	listeners[name] = callback
 end
 
+local own = {}
+
+function PartyKeys.Own()
+	own.level = C_MythicPlus.GetOwnedKeystoneLevel() or 0
+	own.mapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID() or 0
+	return own
+end
+
 function PartyKeys.ForUnit(unit)
+	if unit == 'player' then return PartyKeys.Own() end
 	local key = NameKey(GetUnitName(unit, true))
 	return key and keys[key]
 end

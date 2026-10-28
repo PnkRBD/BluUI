@@ -69,6 +69,8 @@ SlashCmdList['BUI'] = function(message)
 		BUI.ActionBars.ToggleKeybindMode()
 	elseif command == 'scale' then
 		ScaleCommand(rest:lower())
+	elseif command == 'keys' then
+		BUI.Auras.KeystoneReminder.Debug()
 	elseif command == 'perf' then
 		PerfCommand(rest:lower())
 	else

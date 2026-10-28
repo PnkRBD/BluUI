@@ -17,6 +17,10 @@ local LIST_TOP   = 96
 local DROPDOWN_W = 170
 local FILL_ALPHA = 0.45
 local COUNTDOWN_SIZE = 11
+local PARTY_SETTING = 'portalManagerPartyKeys'
+local PARTY_LABEL = 'Party Keys'
+local NO_KEY_TEXT = 'No key'
+local KEYSTONE_ICON = 'Interface\\Icons\\INV_Relics_Hourglass'
 
 local CHEST_COLORS = {
     [0] = { 0.6, 0.6, 0.6 },
@@ -25,14 +29,34 @@ local CHEST_COLORS = {
     [3] = { 1, 0.45, 0 },
 }
 
+BUI.PortalManager = {}
+
+local function PartyEnabled()
+    return BUI.GetDB().skinning[PARTY_SETTING] == true
+end
+
+function BUI.PortalManager.ShowsPartyKeys()
+    return PartyEnabled()
+end
+
 local context = Skin.Define('portalManager', {
     name = 'Portal Manager',
     description = 'Dungeon and raid portals beside the Character frame.',
     icon = 'Interface\\Icons\\Spell_Arcane_PortalDalaran',
     newLook = true,
+    settings = {
+        {
+            label = "Show the party's keys",
+            get = PartyEnabled,
+            set = function(value)
+                BUI.GetDB().skinning[PARTY_SETTING] = value
+                BUI.PortalManager.RefreshLists()
+                local reminder = BUI.Auras and BUI.Auras.KeystoneReminder
+                if reminder then reminder.Refresh() end
+            end,
+        },
+    },
 })
-
-BUI.PortalManager = {}
 
 local panel, slide
 local rows = {}
@@ -92,7 +116,9 @@ end
 
 local function BuildLists()
     local data = BUI.PortalData
-    local built = { { label = 'Current Season', entries = CurrentSeason().dungeons } }
+    local built = {}
+    if PartyEnabled() then built[1] = { label = PARTY_LABEL, party = true, entries = {} } end
+    built[#built + 1] = { label = 'Current Season', entries = CurrentSeason().dungeons }
     for _, season in ipairs(data.seasons) do
         built[#built + 1] = { label = season.name, entries = season.dungeons }
     end
@@ -209,6 +235,7 @@ local function StartCastFill(spellID)
 end
 
 local RowEnter = function(self)
+    if not self._spellID then return end
     GameTooltip:SetOwner(self, 'ANCHOR_NONE')
     GameTooltip:SetPoint('TOPRIGHT', self, 'TOPLEFT', -6, 0)
     GameTooltip:SetSpellByID(self._spellID)
@@ -287,12 +314,10 @@ local function EnsureRows(count)
     for index = #rows + 1, count do rows[index] = CreateRow(panel.child, index) end
 end
 
-local function BuildPanel()
-    if panel then return end
+local function BuildDropdown()
+    if panel.dropdown then panel.dropdown:Hide() end
     lists = BuildLists()
     activeList = lists[1]
-
-    panel = Skin.CreatePanelWindow('Portals', function() slide.Close(true) end)
     panel.dropdown = Skin.CreateDropdown(panel, lists, function(item)
         if InCombatLockdown() then
             panel.dropdown.label:SetText(activeList.label)
@@ -303,6 +328,12 @@ local function BuildPanel()
         panel.scroll:SetVerticalScroll(0)
     end, DROPDOWN_W)
     panel.dropdown:SetPoint('TOPLEFT', Pixel.Scale(12), Pixel.Scale(-44))
+end
+
+local function BuildPanel()
+    if panel then return end
+    panel = Skin.CreatePanelWindow('Portals', function() slide.Close(true) end)
+    BuildDropdown()
 
     panel.combatText = panel:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(panel.combatText, 11, FONT, '')
@@ -390,27 +421,75 @@ local function RefreshCooldowns()
     end
 end
 
+local function PartyItems()
+    local PartyKeys = BUI.PartyKeys
+    local items = {}
+    for _, unit in ipairs(PartyKeys.UNITS) do
+        if UnitExists(unit) then
+            local key = PartyKeys.ForUnit(unit)
+            local level = key and key.level or 0
+            local dungeon = level > 0 and C_ChallengeMode.GetMapUIInfo(key.mapID) or nil
+            local classFile = select(2, UnitClass(unit))
+            items[#items + 1] = {
+                entry = dungeon and (FindEntry(dungeon) or { name = dungeon }) or { name = NO_KEY_TEXT },
+                mapID = dungeon and key.mapID or nil,
+                level = dungeon and level or nil,
+                player = UnitName(unit),
+                class = not issecretvalue(classFile) and classFile or nil,
+                order = #items + 1,
+            }
+        end
+    end
+    table.sort(items, function(a, b)
+        if (a.level or 0) ~= (b.level or 0) then return (a.level or 0) > (b.level or 0) end
+        return a.order < b.order
+    end)
+    return items
+end
+
+local function PartySummary(items)
+    local reported = 0
+    for _, item in ipairs(items) do
+        if item.level then reported = reported + 1 end
+    end
+    return ('Keys reported |cffffffff%d/%d|r'):format(reported, #items)
+end
+
 local function FillRow(row, item, inCombat)
     local spellID = ResolveSpellID(item.entry)
-    local known = C_SpellBook.IsSpellInSpellBook(spellID)
+    local known = spellID ~= nil and C_SpellBook.IsSpellInSpellBook(spellID)
     row._spellID, row._known = spellID, known
     if not inCombat then
         row:SetAttribute('spell', known and spellID or nil)
         row:Show()
     end
 
-    row.icon:SetTexture(C_Spell.GetSpellTexture(spellID))
+    row.icon:SetTexture(spellID and C_Spell.GetSpellTexture(spellID) or KEYSTONE_ICON)
     row.icon:SetDesaturated(not known)
     row.nameText:SetText(item.entry.name)
     Painter.Text(row.nameText, known and 'skinText' or 'skinLabel')
 
     row.nameText:ClearAllPoints()
     row.nameText:SetPoint('RIGHT', row, 'RIGHT', Pixel.Scale(-8), 0)
-    if item.mapID then
+    if item.mapID or item.player then
         row.nameText:SetPoint('TOPLEFT', row.icon, 'TOPRIGHT', Pixel.Scale(8), Pixel.Scale(-1))
     else
         row.nameText:SetPoint('LEFT', row.icon, 'RIGHT', Pixel.Scale(8), 0)
     end
+
+    if item.player then
+        row.levelText:SetText(item.level and ('+' .. item.level) or '')
+        Painter.Text(row.levelText, 'skinText')
+        row.timeText:SetText(item.player)
+        local color = item.class and RAID_CLASS_COLORS[item.class]
+        if color then
+            row.timeText:SetTextColor(color.r, color.g, color.b, 1)
+        else
+            Painter.Text(row.timeText, 'skinLabel')
+        end
+        return
+    end
+    Painter.Text(row.timeText, 'skinLabel')
 
     local run = item.run
     if run then
@@ -429,8 +508,10 @@ RefreshContent = function()
     local inCombat = InCombatLockdown()
     panel.combatText:SetShown(inCombat)
 
-    local sorted = SortedEntries(activeList.entries)
-    panel.summaryText:SetText(SummaryText(sorted))
+    local party = activeList.party
+    local sorted = party and PartyItems() or SortedEntries(activeList.entries)
+    panel.summaryText:SetText(party and PartySummary(sorted) or SummaryText(sorted))
+    if party then BUI.PartyKeys.Request() end
     EnsureRows(#sorted)
     local shown = math.min(#rows, #sorted)
     for index = 1, shown do FillRow(rows[index], sorted[index], inCombat) end
@@ -471,6 +552,7 @@ local EVENTS = {
     CHALLENGE_MODE_MAPS_UPDATE = OnMapsUpdated,
     PLAYER_REGEN_ENABLED = ThrottledRefresh,
     PLAYER_REGEN_DISABLED = ThrottledRefresh,
+    GROUP_ROSTER_UPDATE = ThrottledRefresh,
 }
 local CAST_EVENTS = {
     UNIT_SPELLCAST_START = OnCastStart,
@@ -497,6 +579,7 @@ slide = BUI.SlidePanel.New({
     build = BuildPanel,
     onOpen = function()
         ListenWhileOpen(true)
+        BUI.PartyKeys.Listen('PortalManager', ThrottledRefresh)
         C_MythicPlus.RequestMapInfo()
         RebuildMapLookup()
         RefreshContent()
@@ -504,9 +587,17 @@ slide = BUI.SlidePanel.New({
     end,
     onClose = function()
         ListenWhileOpen(false)
+        BUI.PartyKeys.Listen('PortalManager', nil)
         StopCastFill()
     end,
 })
+
+function BUI.PortalManager.RefreshLists()
+    if not panel then return end
+    BuildDropdown()
+    RefreshContent()
+    if panel:IsShown() then panel.scroll:SetVerticalScroll(0) end
+end
 
 function BUI.PortalManager.Toggle()
     slide.Toggle()
