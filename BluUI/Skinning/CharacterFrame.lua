@@ -2052,6 +2052,41 @@ local function IconButton(parent, icon, tooltip, onClick)
     }).frame
 end
 
+local closeHome
+
+local function BindBlizzardClose(closeIcon)
+    local blizzardClose = CharacterFrame.CloseButton
+    if not closeHome then
+        closeHome = { blizzardClose:GetPoint(1) }
+        closeHome.strata, closeHome.level = blizzardClose:GetFrameStrata(), blizzardClose:GetFrameLevel()
+        closeHome.width, closeHome.height = blizzardClose:GetSize()
+        blizzardClose:HookScript('OnEnter', function() closeIcon:GetScript('OnEnter')(closeIcon) end)
+        blizzardClose:HookScript('OnLeave', function() closeIcon:GetScript('OnLeave')(closeIcon) end)
+    end
+    blizzardClose.__buiKeepMouse = true
+    blizzardClose:SetIgnoreParentAlpha(true)
+    blizzardClose:SetAlpha(0)
+    blizzardClose:ClearAllPoints()
+    blizzardClose:SetPoint('TOPLEFT', closeIcon, 'TOPLEFT')
+    blizzardClose:SetPoint('BOTTOMRIGHT', closeIcon, 'BOTTOMRIGHT')
+    blizzardClose:SetFrameStrata(closeIcon:GetFrameStrata())
+    blizzardClose:SetFrameLevel(closeIcon:GetFrameLevel() + 1)
+    blizzardClose:EnableMouse(true)
+    blizzardClose:Show()
+end
+
+local function ReleaseBlizzardClose()
+    if not closeHome then return end
+    local blizzardClose = CharacterFrame.CloseButton
+    blizzardClose:SetIgnoreParentAlpha(false)
+    blizzardClose:SetAlpha(1)
+    blizzardClose:ClearAllPoints()
+    blizzardClose:SetPoint(unpack(closeHome, 1, 5))
+    blizzardClose:SetFrameStrata(closeHome.strata)
+    blizzardClose:SetFrameLevel(closeHome.level)
+    blizzardClose:SetSize(closeHome.width, closeHome.height)
+end
+
 local function BuildFrame()
     frame = CreateFrame('Frame', nil, CharacterFrame, 'BackdropTemplate')
     frame:SetSize(FRAME_WIDTH, FRAME_HEIGHT)
@@ -2109,6 +2144,9 @@ local function BuildFrame()
     local cog = IconButton(frame, 'cog', 'Sheet settings', function() settingsSlide.Toggle() end)
     cog:SetPoint('RIGHT', titleBar.closeBtn.frame, 'LEFT', Pixel.Scale(-4), 0)
     cog:SetFrameLevel(frame:GetFrameLevel() + 10)
+
+    titleBar.closeBtn.frame:EnableMouse(false)
+    BindBlizzardClose(titleBar.closeBtn.frame)
 
     frame.titleText:ClearAllPoints()
     frame.titleText:SetPoint('TOPLEFT', titleBar, 'TOPLEFT', Pixel.Scale(14), Pixel.Scale(-HEADER.TOP_PAD))
@@ -2399,6 +2437,7 @@ context.OnDisable(function()
     HideSkin()
     if frame then frame:Hide() end
     Skin.ReleaseWidth(CharacterFrame)
+    ReleaseBlizzardClose()
     Skin.RestoreBlizzardFrame(CharacterFrame)
 end)
 
