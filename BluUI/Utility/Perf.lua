@@ -92,13 +92,17 @@ local function Breakdown()
 	PrintTimed(hooks, 'Watched hooks and layout passes')
 end
 
+local function NameOf(frame)
+	return frame:GetName()
+end
+
 local function ClientLoad()
 	local total, named = 0, 0
 	local frame = EnumerateFrames()
 	while frame do
 		total = total + 1
-		local name = frame.GetName and not frame:IsForbidden() and frame:GetName()
-		if type(name) == 'string' and name:find('^BUI') then named = named + 1 end
+		local ok, name = pcall(NameOf, frame)
+		if ok and type(name) == 'string' and name:find('^BUI') then named = named + 1 end
 		frame = EnumerateFrames(frame)
 	end
 	Line('frames in the whole UI', ('%d, of which %d named BUI'):format(total, named))
