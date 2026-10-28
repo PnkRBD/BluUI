@@ -687,6 +687,8 @@ local function EnsureRuleGroups(container, sets)
 	SyncGatedGroups(container)
 end
 
+local liveContainers = setmetatable({}, { __mode = 'k' })
+
 function Engine.NewContainer(parent, isDebuff, levelOffset)
 	local container = CreateFrame('AuraContainer', nil, parent, 'CustomAuraContainerTemplate')
 	container:SetFrameLevel(parent:GetFrameLevel() + (levelOffset or 10))
@@ -698,7 +700,25 @@ function Engine.NewContainer(parent, isDebuff, levelOffset)
 	container._buiStyleStamp = 1
 	container._buiGeneration = 0
 	container._buiGroupSeq = 0
+	liveContainers[container] = true
 	return container
+end
+
+function Engine.CountAuraGroups()
+	local containers, shown, groups, slots = 0, 0, 0, 0
+	for container in pairs(liveContainers) do
+		containers = containers + 1
+		if container:IsVisible() then
+			shown = shown + 1
+			for _, info in pairs(container._buiGroups) do
+				if info.active then
+					groups = groups + 1
+					slots = slots + (info.max or 0)
+				end
+			end
+		end
+	end
+	return containers, shown, groups, slots
 end
 
 function Engine.NewAuraDriver(parent)

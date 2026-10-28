@@ -92,6 +92,22 @@ local function Breakdown()
 	PrintTimed(hooks, 'Watched hooks and layout passes')
 end
 
+local function ClientLoad()
+	local total, named = 0, 0
+	local frame = EnumerateFrames()
+	while frame do
+		total = total + 1
+		local name = frame.GetName and not frame:IsForbidden() and frame:GetName()
+		if name and name:find('^BUI') then named = named + 1 end
+		frame = EnumerateFrames(frame)
+	end
+	Line('frames in the whole UI', ('%d, of which %d named BUI'):format(total, named))
+	if BUI.AuraEngine and BUI.AuraEngine.CountAuraGroups then
+		local containers, shown, groups, slots = BUI.AuraEngine.CountAuraGroups()
+		Line('native aura containers', ('%d shown of %d, %d aura groups active, %d icon slots'):format(shown, containers, groups, slots))
+	end
+end
+
 local function Stop()
 	session.ticker:Cancel()
 	Sample()
@@ -100,6 +116,7 @@ local function Stop()
 	Line('average per frame', Ms(session.count > 0 and session.sum / session.count or 0))
 	Line('worst second', Ms(session.max))
 	Line('frames over 5 / 10 / 50 / 100 ms', ('%d / %d / %d / %d'):format(now[1] - before[1], now[2] - before[2], now[3] - before[3], now[4] - before[4]))
+	ClientLoad()
 	if ScriptProfiling() then
 		Breakdown()
 	else
@@ -129,6 +146,7 @@ function Perf.Report()
 	Line('worst frame', Ms(Metric(metrics.PeakTime)))
 	Line('frames over 5 / 10 / 50 / 100 ms', ('%d / %d / %d / %d'):format(
 		Metric(metrics.CountTimeOver5Ms), Metric(metrics.CountTimeOver10Ms), Metric(metrics.CountTimeOver50Ms), Metric(metrics.CountTimeOver100Ms)))
+	ClientLoad()
 	if ScriptProfiling() then Breakdown() end
 end
 
