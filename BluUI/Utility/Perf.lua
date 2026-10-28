@@ -36,11 +36,15 @@ local function ReportAddon(name)
 		Metric(name, metrics.CountTimeOver5Ms), Metric(name, metrics.CountTimeOver10Ms), Metric(name, metrics.CountTimeOver50Ms)))
 end
 
-local function ReportTop(metric, label)
+local function ReportTop(metric, label, Format)
 	BUI.Print(label)
 	for _, entry in ipairs(C_AddOnProfiler.GetTopKAddOnsForMetric(metric, TOP_ADDONS)) do
-		Line(entry.addOnName, Ms(entry.metricValue))
+		Line(entry.addOnName, (Format or Ms)(entry.metricValue))
 	end
+end
+
+local function Count(value)
+	return ("%d frames"):format(value or 0)
 end
 
 function Perf.Report()
@@ -54,6 +58,8 @@ function Perf.Report()
 	if ok and overall then Line('all addons, encounter average', Ms(overall)) end
 	ReportTop(metrics.EncounterAverageTime, 'Heaviest addons this encounter')
 	ReportTop(metrics.PeakTime, 'Heaviest single frame since login')
+	ReportTop(metrics.CountTimeOver50Ms, 'Most frames over 50 ms since login', Count)
+	ReportTop(metrics.CountTimeOver10Ms, 'Most frames over 10 ms since login', Count)
 	BUI.Print('Numbers reset on reload. Mouse scripts such as clicks and tooltips are not counted.')
 end
 
