@@ -245,6 +245,7 @@ end
 local function reflowAuraVisibility(frame)
 	local unit = frame.unit
 	if not unit then return end
+	if UnitIsCharmed("player") then return end
 	local isVisible = IsReachable(unit)
 	if frame._bluAurasVisible == isVisible then return end
 	frame._bluAurasVisible = isVisible
