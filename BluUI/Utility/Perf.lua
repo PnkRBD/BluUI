@@ -92,20 +92,42 @@ local function Breakdown()
 	PrintTimed(hooks, 'Watched hooks and layout passes')
 end
 
-local function NameOf(frame)
-	return frame:GetName()
+local TOP_ROOTS = 8
+
+local function Inspect(frame)
+	local root = frame
+	local parent = root:GetParent()
+	while parent and parent ~= UIParent do
+		root = parent
+		parent = root:GetParent()
+	end
+	local name = root:GetName()
+	if type(name) ~= 'string' then name = root._bluHolder and 'group header' or '(unnamed)' end
+	return name, frame:GetNumRegions(), root ~= frame and root or nil
 end
 
 local function ClientLoad()
-	local total, named = 0, 0
+	local total, ownedFrames, ownedRegions = 0, 0, 0
+	local roots = {}
 	local frame = EnumerateFrames()
 	while frame do
 		total = total + 1
-		local ok, name = pcall(NameOf, frame)
-		if ok and type(name) == 'string' and name:find('^BUI') then named = named + 1 end
+		local ok, rootName, regions, root = pcall(Inspect, frame)
+		if ok and (rootName:find('^BUI') or rootName == 'group header' or (root or frame)._buiAuraContainer) then
+			ownedFrames, ownedRegions = ownedFrames + 1, ownedRegions + regions
+			local entry = roots[rootName] or { name = rootName, frames = 0, regions = 0 }
+			roots[rootName] = entry
+			entry.frames, entry.regions = entry.frames + 1, entry.regions + regions
+		end
 		frame = EnumerateFrames(frame)
 	end
-	Line('frames in the whole UI', ('%d, of which %d named BUI'):format(total, named))
+	Line('frames in the whole UI', ('%d, BluUI owns %d frames and %d textures or texts'):format(total, ownedFrames, ownedRegions))
+	local list = {}
+	for _, entry in pairs(roots) do list[#list + 1] = entry end
+	table.sort(list, function(a, b) return a.frames + a.regions > b.frames + b.regions end)
+	for index = 1, math.min(TOP_ROOTS, #list) do
+		Line(list[index].name, ('%d frames, %d textures or texts'):format(list[index].frames, list[index].regions))
+	end
 	if BUI.AuraEngine and BUI.AuraEngine.CountAuraGroups then
 		local containers, shown, groups, slots = BUI.AuraEngine.CountAuraGroups()
 		Line('native aura containers', ('%d shown of %d, %d aura groups active, %d icon slots'):format(shown, containers, groups, slots))
