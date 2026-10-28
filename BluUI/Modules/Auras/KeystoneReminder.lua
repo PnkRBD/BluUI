@@ -17,19 +17,11 @@ local PORTAL_KEY = 'KeystoneReminder.Portal.'
 local WIDTH, HEIGHT = 260, 62
 local PAD = 10
 local PORTAL_SIZE = 42
-local ROW_HEIGHT = 36
-local ROW_SPACING = 4
-local ROW_PORTAL = 28
-local ROW_PAD = 4
-local ROW_RADIUS = 6
-local ROWS_TOP = 22
-local BADGE_W, BADGE_H = 36, 18
-local BADGE_RADIUS = 4
-local BADGE_FILL_ALPHA = 0.16
-local BADGE_EDGE_ALPHA = 0.45
+local ROW_HEIGHT = 32
+local ROW_PORTAL = 26
+local ROWS_TOP = 8
 local LEVEL_SIZE = 13
-local ROW_LEVEL_SIZE = 11
-local PARTY_LABEL = 'PARTY KEYS'
+local ROW_LEVEL_SIZE = 13
 local PREVIEW_LEVEL = 12
 local FULL_PARTY = 5
 local PREVIEW_SIZE = 3
@@ -185,11 +177,6 @@ local function Build()
     card.divider:SetColorTexture(1, 1, 1, 1)
     card.divider:Hide()
 
-    card.partyLabel = CardText(card, 9)
-    card.partyLabel:SetPoint('TOPLEFT', card.divider, 'BOTTOMLEFT', Pixel.Scale(2), -Pixel.Scale(5))
-    card.partyLabel:SetText(PARTY_LABEL)
-    card.partyLabel:Hide()
-
     card:EnableMouse(true)
     BUI.Dragging.MakeDraggable(card, {
         skipClickThrough = true,
@@ -201,30 +188,24 @@ end
 local function BuildRow(index)
     local row = CreateFrame('Frame', nil, card)
     row:SetSize(Pixel.Scale(WIDTH - PAD * 2), Pixel.Scale(ROW_HEIGHT))
-    row:SetPoint('TOPLEFT', card, 'TOPLEFT', Pixel.Scale(PAD), -Pixel.Scale(HEIGHT + ROWS_TOP + (index - 1) * (ROW_HEIGHT + ROW_SPACING)))
-    row.fill, row.edge = Widget.DrawCardShape(row, ROW_RADIUS, SOLID, SOLID, 'BACKGROUND', 0, 0)
+    row:SetPoint('TOPLEFT', card, 'TOPLEFT', Pixel.Scale(PAD), -Pixel.Scale(HEIGHT + ROWS_TOP + (index - 1) * ROW_HEIGHT))
 
     row.portal = BuildPortal(row, ROW_PORTAL, index)
-    row.portal:SetPoint('LEFT', Pixel.Scale(ROW_PAD), 0)
+    row.portal:SetPoint('LEFT')
 
-    row.badge = CreateFrame('Frame', nil, row)
-    row.badge:SetSize(Pixel.Scale(BADGE_W), Pixel.Scale(BADGE_H))
-    row.badge:SetPoint('RIGHT', -Pixel.Scale(ROW_PAD + 2), 0)
-    row.badge.fill, row.badge.edge = Widget.DrawCardShape(row.badge, BADGE_RADIUS, SOLID, SOLID, 'BACKGROUND', 0, 0)
-
-    row.level = CardText(row.badge, ROW_LEVEL_SIZE)
-    row.level:SetJustifyH('CENTER')
-    row.level:SetPoint('CENTER', 0, 0)
+    row.level = CardText(row, ROW_LEVEL_SIZE)
+    row.level:SetJustifyH('RIGHT')
+    row.level:SetPoint('RIGHT', -Pixel.Scale(2), 0)
 
     local textLeft = Pixel.Scale(ROW_GAP)
     local textRight = -Pixel.Scale(ROW_GAP)
     row.name = CardText(row, 11)
-    row.name:SetPoint('TOPLEFT', row.portal, 'TOPRIGHT', textLeft, -Pixel.Scale(1))
-    row.name:SetPoint('RIGHT', row.badge, 'LEFT', textRight, 0)
+    row.name:SetPoint('TOPLEFT', row.portal, 'TOPRIGHT', textLeft, 0)
+    row.name:SetPoint('RIGHT', row.level, 'LEFT', textRight, 0)
 
     row.key = CardText(row, 10)
-    row.key:SetPoint('BOTTOMLEFT', row.portal, 'BOTTOMRIGHT', textLeft, Pixel.Scale(1))
-    row.key:SetPoint('RIGHT', row.badge, 'LEFT', textRight, 0)
+    row.key:SetPoint('BOTTOMLEFT', row.portal, 'BOTTOMRIGHT', textLeft, 0)
+    row.key:SetPoint('RIGHT', row.level, 'LEFT', textRight, 0)
     return row
 end
 
@@ -234,7 +215,6 @@ local function PaintCard()
     card.name:SetTextColor(BUI.ThemeColor('text'))
     card.meta:SetTextColor(BUI.ThemeColor('muted'))
     card.divider:SetVertexColor(BUI.ThemeColor('edge'))
-    card.partyLabel:SetTextColor(BUI.ThemeColor('muted'))
     PaintPortalEdge(card.portal, card.portal:IsMouseOver())
 end
 
@@ -355,16 +335,8 @@ local function PaintRow(row, entry)
     end
     row.key:SetText(dungeon or NO_KEY_TEXT)
     row.key:SetTextColor(BUI.ThemeColor('muted'))
-    row.fill:SetVertexColor(BUI.ThemeColor('card'))
-    row.edge:SetVertexColor(BUI.ThemeColor('edge'))
-    row.badge:SetShown(entry.level ~= nil)
-    if entry.level then
-        local red, green, blue = BUI.ThemeColor('accent')
-        row.badge.fill:SetVertexColor(red, green, blue, BADGE_FILL_ALPHA)
-        row.badge.edge:SetVertexColor(red, green, blue, BADGE_EDGE_ALPHA)
-        row.level:SetText('+' .. entry.level)
-        row.level:SetTextColor(red, green, blue, 1)
-    end
+    row.level:SetText(entry.level and ('+' .. entry.level) or '')
+    row.level:SetTextColor(BUI.ThemeColor('text'))
     SetPortal(row.portal, dungeon and BUI.PortalManager.TeleportSpell(dungeon), texture)
     row:Show()
 end
@@ -382,8 +354,7 @@ local function PaintRows()
     for index = #entries + 1, #card.rows do card.rows[index]:Hide() end
     local count = #entries
     card.divider:SetShown(count > 0)
-    card.partyLabel:SetShown(count > 0)
-    local extra = count > 0 and (ROWS_TOP + count * ROW_HEIGHT + (count - 1) * ROW_SPACING + PAD) or 0
+    local extra = count > 0 and (ROWS_TOP + count * ROW_HEIGHT + PAD) or 0
     card:SetSize(Pixel.Scale(WIDTH), Pixel.Scale(HEIGHT + extra))
 end
 
