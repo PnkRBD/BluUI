@@ -15,6 +15,7 @@ local EVENTS = {
     "CHALLENGE_MODE_START", "CHALLENGE_MODE_COMPLETED", "CHALLENGE_MODE_RESET",
     "ENCOUNTER_START", "ENCOUNTER_END", "SPELL_UPDATE_CHARGES",
 }
+local RAID_DIFFICULTIES = { [14] = true, [15] = true, [16] = true, [17] = true, [33] = true, [233] = true, [250] = true }
 
 local floor = math.floor
 
@@ -22,24 +23,31 @@ local frame, tile, icon, cooldown, timerText, chargesText
 local enabled = false
 local previewing = false
 local charges, rechargeStart, rechargeDuration, readyAt
-local shownCharges
+local shownCharges, poolLive
 local Update
 
 local function GetDB() return BUI.GetDB().combatRes end
 
-local function PoolActive()
-    local _, instanceType = IsInInstance()
-    if instanceType == "raid" then return true end
-    return instanceType == "party" and C_ChallengeMode.IsChallengeModeActive()
+local function PoolState()
+    local _, instanceType, difficulty = GetInstanceInfo()
+    if RAID_DIFFICULTIES[difficulty] then
+        return true, C_InstanceEncounter.IsEncounterInProgress()
+    end
+    local live = instanceType == "party" and C_ChallengeMode.IsChallengeModeActive()
+    return live, live
 end
 
 local function ReadCharges()
     charges, rechargeStart, rechargeDuration, readyAt = nil, nil, nil, nil
-    if not PoolActive() then return false end
+    local present, live = PoolState()
+    poolLive = live
+    if not present then return false end
+    charges = 0
+    if not live then return true end
     local info = C_Spell.GetSpellCharges(REBIRTH)
-    if not info then return false end
-    charges = Tools.SafeNum(info.currentCharges)
-    if not charges then return false end
+    local current = info and Tools.SafeNum(info.currentCharges)
+    if not current then return true end
+    charges = current
     local start, duration = Tools.SafeNum(info.cooldownStartTime), Tools.SafeNum(info.cooldownDuration)
     if info.isActive and start and duration and start > 0 and start + duration > GetTime() then
         rechargeStart, rechargeDuration, readyAt = start, duration, start + duration
@@ -111,8 +119,8 @@ local function Refresh()
         frame:Hide()
         return
     end
-    if not previewing and shownCharges and charges > shownCharges and GetDB().glowOnCharge then FlashGlow() end
-    shownCharges = not previewing and charges or nil
+    if not previewing and poolLive and shownCharges and charges > shownCharges and GetDB().glowOnCharge then FlashGlow() end
+    shownCharges = (not previewing and poolLive) and charges or nil
     Paint()
     Tick()
     frame:Show()
