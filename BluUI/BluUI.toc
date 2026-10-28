@@ -44,7 +44,7 @@ Utility\Theme.lua
 Utility\Painter.lua
 Utility\Dispatcher.lua
 Utility\Events.lua
-UtilityPerf.lua
+Utility\Perf.lua
 Utility\Visibility.lua
 Utility\Math.lua
 Utility\TimeFormat.lua
