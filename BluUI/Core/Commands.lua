@@ -24,8 +24,10 @@ local function PerfCommand(option)
 		BUI.Perf.Handlers()
 	elseif option == 'reset' then
 		BUI.Perf.Reset()
-	else
+	elseif option == 'now' then
 		BUI.Perf.Report()
+	else
+		BUI.Perf.Toggle()
 	end
 end
 
@@ -40,7 +42,8 @@ local function PrintHelp()
 	line('/bui install', 'run the setup wizard')
 	line('/bui keybind', 'toggle action bar keybind mode (hover a button, press a key)')
 	line('/bui scale reset', 'put the interface scale back to pixel perfect for your screen')
-	line('/bui perf', 'how much frame time BluUI took this encounter, next to other addons')
+	line('/bui perf', 'start measuring; type it again after the pull for the report')
+	line('/bui perf now', 'frame time since login, next to other addons')
 	line('/bui perf handlers', 'heaviest BluUI event handlers (needs scriptProfile 1 and a reload)')
 	line('/bui perf reset', 'restart the handler timers')
 	line('/cdm', "toggle Blizzard's Cooldown Viewer settings")
