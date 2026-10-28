@@ -2377,8 +2377,16 @@ local function BuildSettingsPanel()
         { kind = 'swatch', opacity = true, tooltip = 'Marker color', get = MarkerColor, set = SetMarkerColor },
         { icon = 'reset', tooltip = 'Reset marker color', onClick = ResetMarker },
     })
-    Row('Reset all', 'Every setting above back to its default', {
-        { icon = 'reset', tooltip = 'Reset all sheet settings', onClick = ResetSheet },
+    Row('Defaults', 'Put every setting above back to its default', {
+        { kind = 'button', text = 'Reset all', style = 'danger', onClick = function()
+            BUILib.Modals.Confirm({
+                parent = frame,
+                title = 'Reset sheet settings',
+                message = 'Scale, readouts, sections, corner buttons, background, tint and the bag marker all go back to their defaults.',
+                confirmText = 'Reset', cancelText = 'Cancel',
+                onConfirm = ResetSheet,
+            })
+        end },
     })
     child:SetHeight(y)
 end
