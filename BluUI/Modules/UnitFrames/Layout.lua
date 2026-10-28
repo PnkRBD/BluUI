@@ -436,6 +436,7 @@ local function Style(self, unit)
 		Pixel.Scale(savedPosition.x),
 		Pixel.Scale(savedPosition.y)
 	)
+	if InCombatLockdown() then UnitFrames.ApplySettings(self, unitType, tonumber(unit:match('%d+$'))) end
 end
 
 local function StageStyle(self, unit)
