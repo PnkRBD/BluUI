@@ -133,6 +133,17 @@ function Events:Unregister(event, key)
     end
 end
 
+function Events:EachHandler(visit)
+    for event, handlers in pairs(globalCallbacks) do
+        for key, callback in pairs(handlers) do visit(event, key, callback) end
+    end
+    for event, units in pairs(unitCallbacks) do
+        for unit, handlers in pairs(units) do
+            for key, callback in pairs(handlers) do visit(event, key, callback, unit) end
+        end
+    end
+end
+
 function Events:UnregisterAll(key)
     for event, handlers in pairs(globalCallbacks) do
         if handlers[key] then
