@@ -24,7 +24,6 @@ local ROW_HOVER_INSET = 4
 local ROW_HOVER_TRIM = 1
 local ROW_HOVER_RADIUS = 6
 local ROW_HOVER_ALPHA = 0.08
-local ROW_STRIPE_ALPHA = 0.035
 local ROW_STATUS_SIZE = 10
 local ROW_READY_TEXT = 'Ready'
 local ROW_COOLDOWN_TEXT = 'On cooldown'
@@ -222,12 +221,6 @@ local function BuildRow(index)
     hover:Hide()
     row.hover = hover
 
-    local stripe = row:CreateTexture(nil, 'BACKGROUND', nil, -1)
-    stripe:SetColorTexture(1, 1, 1, 1)
-    stripe:SetPoint('TOPLEFT', -Pixel.Scale(ROW_HOVER_INSET), 0)
-    stripe:SetPoint('BOTTOMRIGHT', Pixel.Scale(ROW_HOVER_INSET), 0)
-    stripe:SetShown(index % 2 == 0)
-    row.stripe = stripe
 
     row.portal = BuildPortal(row, ROW_PORTAL, index, row)
     row.portal:SetPoint('LEFT')
@@ -383,7 +376,6 @@ local function PaintRow(row, entry)
     row.key:SetTextColor(BUI.ThemeColor('muted'))
     local red, green, blue = BUI.ThemeColor('text')
     row.hover:SetVertexColor(red, green, blue, ROW_HOVER_ALPHA)
-    row.stripe:SetVertexColor(red, green, blue, ROW_STRIPE_ALPHA)
     SetPortal(row.portal, dungeon and BUI.PortalManager.TeleportSpell(dungeon), texture)
     row.portal.level:SetText(entry.level and ('+' .. entry.level) or '')
     row.status:SetText(RowStatus(row.portal))
