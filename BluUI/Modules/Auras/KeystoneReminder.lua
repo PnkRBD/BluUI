@@ -221,7 +221,6 @@ local function BuildRow(index)
     hover:Hide()
     row.hover = hover
 
-
     row.portal = BuildPortal(row, ROW_PORTAL, index, row)
     row.portal:SetPoint('LEFT')
     Pixel.ApplyFont(row.portal.level, ROW_LEVEL_SIZE, FONT, 'OUTLINE')
