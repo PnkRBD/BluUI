@@ -291,7 +291,8 @@ function Skin.HomePosition(frame, dbKey, point, x, y, follow)
 	local left, top
 	if panel then left, top = LastPanelSlot(panel) end
 	if left then
-		frame:SetPoint('TOPLEFT', UIParent, 'TOPLEFT', left, top)
+		local ratio = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
+		frame:SetPoint('TOPLEFT', UIParent, 'TOPLEFT', left / ratio, top / ratio)
 	else
 		point = point or 'CENTER'
 		frame:SetPoint(point, UIParent, point, x or 0, y or 0)

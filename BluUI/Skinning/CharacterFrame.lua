@@ -2405,6 +2405,7 @@ end
 
 local function HideSkin()
     Placement.OnHide()
+    if frame then frame:Hide() end
     if bagPopup then bagPopup:Hide() end
     settingsSlide.Close(true)
 end
@@ -2435,7 +2436,6 @@ context.Window('CharacterFrame', {
 
 context.OnDisable(function()
     HideSkin()
-    if frame then frame:Hide() end
     Skin.ReleaseWidth(CharacterFrame)
     ReleaseBlizzardClose()
     Skin.RestoreBlizzardFrame(CharacterFrame)
