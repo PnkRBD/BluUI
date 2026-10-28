@@ -98,7 +98,7 @@ local function ClientLoad()
 	while frame do
 		total = total + 1
 		local name = frame.GetName and not frame:IsForbidden() and frame:GetName()
-		if name and name:find('^BUI') then named = named + 1 end
+		if type(name) == 'string' and name:find('^BUI') then named = named + 1 end
 		frame = EnumerateFrames(frame)
 	end
 	Line('frames in the whole UI', ('%d, of which %d named BUI'):format(total, named))
