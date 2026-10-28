@@ -20,6 +20,9 @@ local PORTAL_SIZE = 42
 local ROW_HEIGHT = 32
 local ROW_PORTAL = 26
 local ROWS_TOP = 8
+local ROW_HOVER_INSET = 4
+local ROW_HOVER_RADIUS = 6
+local ROW_HOVER_ALPHA = 0.08
 local LEVEL_SIZE = 13
 local ROW_LEVEL_SIZE = 13
 local PREVIEW_LEVEL = 12
@@ -41,11 +44,11 @@ local CLOSE_SIZE = 14
 local CARD_RADIUS = 8
 local SOLID = { 1, 1, 1, 1 }
 local EMPTY = {}
-local ROLE_MARKUP = '|TInterface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES:12:12:0:0:64:64:%d:%d:%d:%d|t '
-local ROLE_COORDS = {
-    TANK    = { 0, 19, 22, 41 },
-    HEALER  = { 20, 39, 1, 20 },
-    DAMAGER = { 20, 39, 22, 41 },
+local ROLE_MARKUP = '|A:%s:12:12|a '
+local ROLE_ATLAS = {
+    TANK    = 'UI-LFG-RoleIcon-Tank-Micro-Raid',
+    HEALER  = 'UI-LFG-RoleIcon-Healer-Micro-Raid',
+    DAMAGER = 'UI-LFG-RoleIcon-DPS-Micro-Raid',
 }
 local ROLE_NAMES = { TANK = 'Tank', HEALER = 'Healer', DAMAGER = 'DPS' }
 local KEYSTONE_ICON = 'Interface\\Icons\\INV_Relics_Hourglass'
@@ -84,14 +87,21 @@ local function PaintPortalEdge(portal, hovered)
     portal:SetBackdropBorderColor(BUI.ThemeColor(hovered and 'accent' or 'edge'))
 end
 
-local function BuildPortal(parent, size, id)
-    local portal = CreateFrame('Button', nil, parent, 'SecureActionButtonTemplate, BackdropTemplate')
+local function BuildPortal(parent, size, id, host)
+    local portal
+    if host then
+        portal = CreateFrame('Frame', nil, parent, 'BackdropTemplate')
+    else
+        portal = CreateFrame('Button', nil, parent, 'SecureActionButtonTemplate, BackdropTemplate')
+    end
+    local button = host or portal
     portal:SetSize(Pixel.Scale(size), Pixel.Scale(size))
     Pixel.SetTemplate(portal, 0, 0, 0, 1, 0, 0, 0, 1, 1)
-    portal:RegisterForClicks('LeftButtonUp')
-    portal:SetAttribute('type', 'spell')
-    portal:SetAttribute('useOnKeyDown', false)
-    portal._keepMouseForTooltip = true
+    button:RegisterForClicks('LeftButtonUp')
+    button:SetAttribute('type', 'spell')
+    button:SetAttribute('useOnKeyDown', false)
+    button._keepMouseForTooltip = true
+    portal.button = button
     portal._combatKey = PORTAL_KEY .. id
     local inset = Pixel.PixelSize(1)
     portal.icon = portal:CreateTexture(nil, 'ARTWORK')
@@ -112,15 +122,17 @@ local function BuildPortal(parent, size, id)
     portal.level = overlay:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(portal.level, LEVEL_SIZE, FONT, 'OUTLINE')
     portal.level:SetPoint('BOTTOMRIGHT', Pixel.Scale(-2), Pixel.Scale(2))
-    portal:SetScript('OnEnter', function(self)
-        PaintPortalEdge(self, true)
-        if not self._spellID then return end
-        GameTooltip:SetOwner(self, 'ANCHOR_TOP')
-        GameTooltip:SetSpellByID(self._spellID)
+    button:SetScript('OnEnter', function()
+        PaintPortalEdge(portal, true)
+        if button.hover then button.hover:Show() end
+        if not portal._spellID then return end
+        GameTooltip:SetOwner(portal, 'ANCHOR_TOP')
+        GameTooltip:SetSpellByID(portal._spellID)
         GameTooltip:Show()
     end)
-    portal:SetScript('OnLeave', function(self)
-        PaintPortalEdge(self, false)
+    button:SetScript('OnLeave', function()
+        PaintPortalEdge(portal, false)
+        if button.hover then button.hover:Hide() end
         GameTooltip:Hide()
     end)
     return portal
@@ -186,11 +198,16 @@ local function Build()
 end
 
 local function BuildRow(index)
-    local row = CreateFrame('Frame', nil, card)
+    local row = CreateFrame('Button', nil, card, 'SecureActionButtonTemplate')
     row:SetSize(Pixel.Scale(WIDTH - PAD * 2), Pixel.Scale(ROW_HEIGHT))
     row:SetPoint('TOPLEFT', card, 'TOPLEFT', Pixel.Scale(PAD), -Pixel.Scale(HEIGHT + ROWS_TOP + (index - 1) * ROW_HEIGHT))
 
-    row.portal = BuildPortal(row, ROW_PORTAL, index)
+    local hover, hoverEdge = Widget.DrawCardShape(row, ROW_HOVER_RADIUS, SOLID, SOLID, 'BACKGROUND', 0, -Pixel.Scale(ROW_HOVER_INSET))
+    hoverEdge:Hide()
+    hover:Hide()
+    row.hover = hover
+
+    row.portal = BuildPortal(row, ROW_PORTAL, index, row)
     row.portal:SetPoint('LEFT')
 
     row.level = CardText(row, ROW_LEVEL_SIZE)
@@ -241,7 +258,7 @@ local function SetPortal(portal, spellID, texture)
     PaintPortalEdge(portal, portal:IsMouseOver())
     PaintCooldown(portal)
     BUI.Events:AfterCombat(function()
-        portal:SetAttribute('spell', known and spellID or nil)
+        portal.button:SetAttribute('spell', known and spellID or nil)
     end, portal._combatKey)
 end
 
@@ -253,8 +270,8 @@ local function PortalStatus()
 end
 
 local function RoleMarkup(role)
-    local coords = ROLE_COORDS[role]
-    return coords and ROLE_MARKUP:format(coords[1], coords[2], coords[3], coords[4]) or ''
+    local atlas = ROLE_ATLAS[role]
+    return atlas and ROLE_MARKUP:format(atlas) or ''
 end
 
 local function PaintMeta()
@@ -337,6 +354,8 @@ local function PaintRow(row, entry)
     row.key:SetTextColor(BUI.ThemeColor('muted'))
     row.level:SetText(entry.level and ('+' .. entry.level) or '')
     row.level:SetTextColor(BUI.ThemeColor('text'))
+    local red, green, blue = BUI.ThemeColor('text')
+    row.hover:SetVertexColor(red, green, blue, ROW_HOVER_ALPHA)
     SetPortal(row.portal, dungeon and BUI.PortalManager.TeleportSpell(dungeon), texture)
     row:Show()
 end
