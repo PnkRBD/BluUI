@@ -24,6 +24,11 @@ local ROW_HOVER_INSET = 4
 local ROW_HOVER_TRIM = 1
 local ROW_HOVER_RADIUS = 6
 local ROW_HOVER_ALPHA = 0.08
+local ROW_STRIPE_ALPHA = 0.035
+local ROW_STATUS_SIZE = 10
+local ROW_READY_TEXT = 'Ready'
+local ROW_COOLDOWN_TEXT = 'On cooldown'
+local ROW_UNLEARNED_TEXT = 'Not learned'
 local TEST_PARTY = {
     { name = 'Brickwall', class = 'WARRIOR', role = 'TANK', level = 15 },
     { name = 'Lightmender', class = 'PRIEST', role = 'HEALER', level = 14 },
@@ -31,7 +36,7 @@ local TEST_PARTY = {
     { name = 'Shadowfang', class = 'ROGUE', role = 'DAMAGER' },
 }
 local LEVEL_SIZE = 13
-local ROW_LEVEL_SIZE = 13
+local ROW_LEVEL_SIZE = 11
 local PREVIEW_LEVEL = 12
 local FULL_PARTY = 5
 local PREVIEW_SIZE = 3
@@ -217,22 +222,30 @@ local function BuildRow(index)
     hover:Hide()
     row.hover = hover
 
+    local stripe = row:CreateTexture(nil, 'BACKGROUND', nil, -1)
+    stripe:SetColorTexture(1, 1, 1, 1)
+    stripe:SetPoint('TOPLEFT', -Pixel.Scale(ROW_HOVER_INSET), 0)
+    stripe:SetPoint('BOTTOMRIGHT', Pixel.Scale(ROW_HOVER_INSET), 0)
+    stripe:SetShown(index % 2 == 0)
+    row.stripe = stripe
+
     row.portal = BuildPortal(row, ROW_PORTAL, index, row)
     row.portal:SetPoint('LEFT')
+    Pixel.ApplyFont(row.portal.level, ROW_LEVEL_SIZE, FONT, 'OUTLINE')
 
-    row.level = CardText(row, ROW_LEVEL_SIZE)
-    row.level:SetJustifyH('RIGHT')
-    row.level:SetPoint('RIGHT', -Pixel.Scale(2), 0)
+    row.status = CardText(row, ROW_STATUS_SIZE)
+    row.status:SetJustifyH('RIGHT')
+    row.status:SetPoint('RIGHT', -Pixel.Scale(2), 0)
 
     local textLeft = Pixel.Scale(ROW_GAP)
     local textRight = -Pixel.Scale(ROW_GAP)
     row.name = CardText(row, 11)
     row.name:SetPoint('TOPLEFT', row.portal, 'TOPRIGHT', textLeft, 0)
-    row.name:SetPoint('RIGHT', row.level, 'LEFT', textRight, 0)
+    row.name:SetPoint('RIGHT', row.status, 'LEFT', textRight, 0)
 
     row.key = CardText(row, 10)
     row.key:SetPoint('BOTTOMLEFT', row.portal, 'BOTTOMRIGHT', textLeft, 0)
-    row.key:SetPoint('RIGHT', row.level, 'LEFT', textRight, 0)
+    row.key:SetPoint('RIGHT', row.status, 'LEFT', textRight, 0)
     return row
 end
 
@@ -277,6 +290,12 @@ local function PortalStatus()
     if not portal._spellID then return nil end
     if not portal._known then return UNLEARNED_TEXT end
     return portal._cooling and COOLDOWN_TEXT or READY_TEXT
+end
+
+local function RowStatus(portal)
+    if not portal._spellID then return '' end
+    if not portal._known then return ROW_UNLEARNED_TEXT end
+    return portal._cooling and ROW_COOLDOWN_TEXT or ROW_READY_TEXT
 end
 
 local function RoleMarkup(role)
@@ -362,11 +381,13 @@ local function PaintRow(row, entry)
     end
     row.key:SetText(dungeon or NO_KEY_TEXT)
     row.key:SetTextColor(BUI.ThemeColor('muted'))
-    row.level:SetText(entry.level and ('+' .. entry.level) or '')
-    row.level:SetTextColor(BUI.ThemeColor('text'))
     local red, green, blue = BUI.ThemeColor('text')
     row.hover:SetVertexColor(red, green, blue, ROW_HOVER_ALPHA)
+    row.stripe:SetVertexColor(red, green, blue, ROW_STRIPE_ALPHA)
     SetPortal(row.portal, dungeon and BUI.PortalManager.TeleportSpell(dungeon), texture)
+    row.portal.level:SetText(entry.level and ('+' .. entry.level) or '')
+    row.status:SetText(RowStatus(row.portal))
+    row.status:SetTextColor(BUI.ThemeColor('muted'))
     row:Show()
 end
 
@@ -390,7 +411,7 @@ end
 local function OnCooldown()
     if PaintCooldown(card.portal) then PaintMeta() end
     for _, row in ipairs(card.rows) do
-        if row:IsShown() then PaintCooldown(row.portal) end
+        if row:IsShown() and PaintCooldown(row.portal) then row.status:SetText(RowStatus(row.portal)) end
     end
 end
 
