@@ -21,8 +21,15 @@ local ROW_HEIGHT = 32
 local ROW_PORTAL = 26
 local ROWS_TOP = 8
 local ROW_HOVER_INSET = 4
+local ROW_HOVER_TRIM = 1
 local ROW_HOVER_RADIUS = 6
 local ROW_HOVER_ALPHA = 0.08
+local TEST_PARTY = {
+    { name = 'Brickwall', class = 'WARRIOR', role = 'TANK', level = 15 },
+    { name = 'Lightmender', class = 'PRIEST', role = 'HEALER', level = 14 },
+    { name = 'Pyrobelle', class = 'MAGE', role = 'DAMAGER', level = 12 },
+    { name = 'Shadowfang', class = 'ROGUE', role = 'DAMAGER' },
+}
 local LEVEL_SIZE = 13
 local ROW_LEVEL_SIZE = 13
 local PREVIEW_LEVEL = 12
@@ -202,8 +209,11 @@ local function BuildRow(index)
     row:SetSize(Pixel.Scale(WIDTH - PAD * 2), Pixel.Scale(ROW_HEIGHT))
     row:SetPoint('TOPLEFT', card, 'TOPLEFT', Pixel.Scale(PAD), -Pixel.Scale(HEIGHT + ROWS_TOP + (index - 1) * ROW_HEIGHT))
 
-    local hover, hoverEdge = Widget.DrawCardShape(row, ROW_HOVER_RADIUS, SOLID, SOLID, 'BACKGROUND', 0, -Pixel.Scale(ROW_HOVER_INSET))
+    local hover, hoverEdge = Widget.DrawCardShape(row, ROW_HOVER_RADIUS, SOLID, SOLID, 'BACKGROUND', 0, 0)
     hoverEdge:Hide()
+    hover:ClearAllPoints()
+    hover:SetPoint('TOPLEFT', -Pixel.Scale(ROW_HOVER_INSET), -Pixel.Scale(ROW_HOVER_TRIM))
+    hover:SetPoint('BOTTOMRIGHT', Pixel.Scale(ROW_HOVER_INSET), Pixel.Scale(ROW_HOVER_TRIM))
     hover:Hide()
     row.hover = hover
 
@@ -552,6 +562,7 @@ end
 
 local function Sync()
     if not GetDB().locked then return end
+    if current and current.test then return end
     local wanted = WantedActivity()
     if not wanted then
         if current then KeystoneReminder.Hide() end
@@ -683,6 +694,40 @@ function KeystoneReminder.Refresh()
     end
     KeystoneReminder.Enable()
     if not db.locked then KeystoneReminder.ShowPreview() end
+end
+
+function KeystoneReminder.ToggleTest()
+    if current and current.test then
+        KeystoneReminder.Hide()
+        Sync()
+        BUI.Print('Keystone reminder test hidden.')
+        return
+    end
+    Build()
+    Apply()
+    local maps = C_ChallengeMode.GetMapTable()
+    local party = {}
+    for index, member in ipairs(TEST_PARTY) do
+        party[index] = {
+            name = member.name,
+            class = member.class,
+            role = member.role,
+            level = member.level,
+            mapID = member.level and maps[index] or nil,
+        }
+    end
+    local dungeon, texture = MapInfo(maps[#maps])
+    KeystoneReminder.Show({
+        dungeon = dungeon or NO_KEY_NAME,
+        mapID = maps[#maps],
+        level = PREVIEW_LEVEL + 3,
+        size = FULL_PARTY,
+        texture = texture,
+        spellID = dungeon and BUI.PortalManager.TeleportSpell(dungeon),
+        party = party,
+        test = true,
+    })
+    BUI.Print('Keystone reminder test shown. Run /bui party again to hide it.')
 end
 
 function KeystoneReminder.Debug()
