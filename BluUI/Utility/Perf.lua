@@ -6,6 +6,11 @@ BUI.Perf = Perf
 local ADDONS = { 'BluUI', 'BluUI_Options' }
 local TOP_ADDONS = 5
 local TOP_HANDLERS = 20
+local tracked = {}
+
+function Perf.Track(name, callback)
+	tracked[#tracked + 1] = { name = name, callback = callback }
+end
 
 local function Line(label, value)
 	print('  |cff' .. BUI.C.COLOR_BRAND .. label .. '|r  ' .. value)
@@ -77,6 +82,16 @@ function Perf.Handlers()
 		local row = rows[index]
 		local where = row.unit and (row.event .. ' ' .. row.unit) or row.event
 		Line(row.key .. ' on ' .. where, ('%s over %d calls, %.3f ms each'):format(Ms(row.usage), row.calls, row.usage / row.calls))
+	end
+	local hooks = {}
+	for _, entry in ipairs(tracked) do
+		local usage, calls = GetFunctionCPUUsage(entry.callback, true)
+		if calls > 0 then hooks[#hooks + 1] = { name = entry.name, usage = usage, calls = calls } end
+	end
+	table.sort(hooks, function(a, b) return a.usage > b.usage end)
+	BUI.Print('Watched hooks and layout passes')
+	for _, row in ipairs(hooks) do
+		Line(row.name, ('%s over %d calls, %.3f ms each'):format(Ms(row.usage), row.calls, row.usage / row.calls))
 	end
 	BUI.Print('Handlers are the event side only. Frame scripts and unit frame elements show in the addon total but not in this list.')
 end

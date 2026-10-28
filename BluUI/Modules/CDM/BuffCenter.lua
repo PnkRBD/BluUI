@@ -295,3 +295,5 @@ function CDM.SetupBuffCentering()
 	forceLayout = true
 	CenterNow()
 end
+
+BUI.Perf.Track('CDM.CenterNow', CenterNow)

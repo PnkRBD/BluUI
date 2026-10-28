@@ -180,3 +180,5 @@ local function DirectHpDisable(self)
 end
 
 oUF:AddElement("BluHpTextDirect", DirectHpPath, DirectHpEnable, DirectHpDisable)
+
+BUI.Perf.Track('GroupFrames.DirectHpUpdate', DirectHpUpdate)

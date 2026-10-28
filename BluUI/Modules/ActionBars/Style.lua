@@ -466,3 +466,6 @@ function ActionBars.ApplyButtonConfig(bar)
 		ActionBars.SyncEmptyButtonAlpha(button)
 	end
 end
+
+BUI.Perf.Track('ActionBars.ApplyCooldownStyle', ApplyCooldownStyle)
+BUI.Perf.Track('ActionBars.OnSwipeColorSet', OnSwipeColorSet)

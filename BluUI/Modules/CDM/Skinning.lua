@@ -600,3 +600,7 @@ function CDM.UnskinViewer(key)
         UnskinIcon(list[iconIndex])
     end
 end
+
+BUI.Perf.Track('CDM.OnCooldownApplied', OnCooldownApplied)
+BUI.Perf.Track('CDM.ReapplyDesaturation', ReapplyDesaturation)
+BUI.Perf.Track('CDM.ApplyAuraCooldownOverride', ApplyAuraCooldownOverride)

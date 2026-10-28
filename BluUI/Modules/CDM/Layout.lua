@@ -764,3 +764,5 @@ function CDM.RefreshLayoutOnly()
     CDM.RefreshBuffsPreview()
     CDM.SetupBuffCentering()
 end
+
+BUI.Perf.Track('CDM.ApplyIconPositions', CDM.ApplyIconPositions)

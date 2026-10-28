@@ -345,3 +345,7 @@ function CDM.RestyleCooldown(cooldown)
     end
     cooldown:SetDrawSwipe(true)
 end
+
+BUI.Perf.Track('CDM.OnRefreshLayoutComplete', OnRefreshLayoutComplete)
+BUI.Perf.Track('CDM.OnIconSetPoint', OnIconSetPoint)
+BUI.Perf.Track('CDM.OnIconSetSize', OnIconSetSize)

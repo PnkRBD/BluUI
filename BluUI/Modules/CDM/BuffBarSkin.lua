@@ -534,3 +534,5 @@ end
 function CDM.IsBuffBarPreviewShown()
     return previewFrames and previewFrames[1] and previewFrames[1]:IsShown() or false
 end
+
+BUI.Perf.Track('CDM.RestackItems', RestackItems)

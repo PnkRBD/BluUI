@@ -555,3 +555,5 @@ function CDM.RegisterEvents()
     BUI.Events:Register("EDIT_MODE_LAYOUTS_UPDATED", "CDM.Layout", function() RequestLayoutRefresh() end)
     CDM.Custom.RegisterEvents()
 end
+
+BUI.Perf.Track('CDM.CheckCDWatchList', CheckCDWatchList)

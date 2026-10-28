@@ -1751,3 +1751,7 @@ local function BuildBoards(ui, parent, width)
 end
 
 context.info.buildBoards = BuildBoards
+
+BUI.Perf.Track('ObjectiveTracker.OnSetStringText', OnSetStringText)
+BUI.Perf.Track('ObjectiveTracker.OnUpdateHighlight', OnUpdateHighlight)
+BUI.Perf.Track('ObjectiveTracker.UpdateCardAnchors', UpdateCardAnchors)

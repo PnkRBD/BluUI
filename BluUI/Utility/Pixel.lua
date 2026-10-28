@@ -359,3 +359,6 @@ BUI.Events:Register('GX_RESTARTED', 'Pixel', OnGXRestarted)
 hooksecurefunc(UIParent, "SetScale", OnScaleChanged)
 
 Recompute()
+
+BUI.Perf.Track('Pixel.KillSnap', KillSnap)
+BUI.Perf.Track('Pixel.RearmSnap', RearmSnap)

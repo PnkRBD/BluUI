@@ -914,3 +914,6 @@ function PressHighlight.Initialize()
 
     CDM.OnTrackedIconsChanged(PressHighlight.Invalidate)
 end
+
+BUI.Perf.Track('CDM.PressHighlight.RefreshActive', RefreshActive)
+BUI.Perf.Track('CDM.PressHighlight.PollHeld', PollHeld)
