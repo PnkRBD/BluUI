@@ -96,13 +96,6 @@ local function Reader(key)
 	return function() return GetConfig()[key] end
 end
 
-local function ColorReader(key)
-	return function()
-		local color = GetConfig()[key]
-		return color[1], color[2], color[3]
-	end
-end
-
 local function BGColor()
 	local config = GetConfig()
 	local color = config.bgColor
@@ -121,52 +114,13 @@ local function BorderColor()
 	return color[1], color[2], color[3], 1
 end
 
-local function SelectedColor()
-	local color = GetConfig().selectedColor
-	return color[1], color[2], color[3]
-end
-
-local InactiveColor = ColorReader('inactiveColor')
-local FlashColor = ColorReader('flashColor')
+local Config = setmetatable({}, { __index = function(_, key) return GetConfig()[key] end })
 
 local function ResolveFont()
 	local name = GetConfig().font
 	if name == GLOBAL_OPTION then return BUI.GetGlobalFont() end
 	return sharedMedia:Fetch('font', name, true) or BUI.GetGlobalFont()
 end
-
-local MsgFontSize = Reader('fontSize')
-local EditFontSize = Reader('editFontSize')
-local TabFontSize = Reader('tabFontSize')
-local SelectedAlpha = Reader('selectedAlpha')
-local DockedAlpha = Reader('dockedAlpha')
-local BorderThickness = Reader('borderThickness')
-local InsetX = Reader('insetX')
-local InsetTop = Reader('insetTop')
-local InsetBottom = Reader('insetBottom')
-local EditBoxHeight = Reader('editboxHeight')
-local ScrollLines = Reader('scrollLines')
-local MsgFadeTime = Reader('msgFadeTime')
-local FadeDelay = Reader('fadeDelay')
-
-local BGTexture = Reader('bgTexture')
-local TabStyle = Reader('tabStyle')
-local MsgFlags = Reader('fontFlags')
-local TabFlags = Reader('tabFontFlags')
-
-local FontShadow = Reader('fontShadow')
-local TabUppercase = Reader('tabUppercase')
-local TabFlash = Reader('tabFlash')
-local HideLogTab = Reader('hideLogTab')
-local EditHistory = Reader('editHistory')
-local DragToMove = Reader('dragToMove')
-local MsgFade = Reader('msgFade')
-local FadeEnabled = Reader('mouseoverFade')
-local SizerEnabled = Reader('showSizer')
-local HideButtons = Reader('hideButtons')
-local HideVoiceButtons = Reader('hideVoiceButtons')
-local ShowCopyButton = Reader('showCopyButton')
-local Locked = Reader('locked')
 
 local function EditBoxPos()
 	local position = GetConfig().editboxPosition
@@ -175,7 +129,7 @@ local function EditBoxPos()
 end
 
 local function ApplyShadow(fontObject)
-	if FontShadow() then
+	if Config.fontShadow then
 		fontObject:SetShadowColor(0, 0, 0, 1); fontObject:SetShadowOffset(1, -1)
 	else
 		fontObject:SetShadowColor(0, 0, 0, 0); fontObject:SetShadowOffset(0, 0)
@@ -183,7 +137,7 @@ local function ApplyShadow(fontObject)
 end
 
 local function ApplyChatFont(chatFrame, size)
-	chatFrame:SetFont(ResolveFont(), size or MsgFontSize(), MsgFlags())
+	chatFrame:SetFont(ResolveFont(), size or Config.fontSize, Config.fontFlags)
 end
 
 local function HideTexture(texture)
@@ -280,7 +234,7 @@ end
 
 local function NormalizeDock()
 	local dock, chat = GeneralDockManager, ChatFrame1
-	local height = InsetTop()
+	local height = Config.insetTop
 	dock:ClearAllPoints()
 	dock:SetPoint('BOTTOMLEFT', chat, 'TOPLEFT', 0, 0)
 	dock:SetPoint('BOTTOMRIGHT', chat, 'TOPRIGHT', 0, 0)
@@ -736,7 +690,7 @@ local function SetupEditHistory(editBox)
 
 	editBox:HookScript('OnKeyDown', function(self, key)
 		if C_ChatInfo.InChatMessagingLockdown() or BUI.Tools.IsChatHeaderSecret(self) then return end
-		if not (Enabled() and EditHistory()) then return end
+		if not (Enabled() and Config.editHistory) then return end
 		local history = GetHistory()
 		local historyCount = #history
 		if historyCount == 0 then return end
@@ -765,7 +719,7 @@ local function SetupEditHistory(editBox)
 	editBox:HookScript('OnEditFocusLost', function(self) self._histIdx = nil end)
 
 	Hook(editBox, 'AddHistoryLine', function(self, line)
-		if not EditHistory() then return end
+		if not Config.editHistory then return end
 		self._histIdx = nil
 		PushHistory(line)
 	end)
@@ -777,12 +731,12 @@ end
 
 local function ApplyTabColor(tab, selected)
 	local text = tab._buiText
-	local style = TabStyle()
-	local red, green, blue = SelectedColor()
+	local style = Config.tabStyle
+	local red, green, blue = unpack(Config.selectedColor)
 	if selected then
 		if style == 'TEXT' then text:SetTextColor(red, green, blue) else text:SetTextColor(1, 1, 1) end
 	else
-		text:SetTextColor(InactiveColor())
+		text:SetTextColor(unpack(Config.inactiveColor))
 	end
 	local showLine = selected and style ~= 'TEXT'
 	tab._buiLine:SetColorTexture(red, green, blue, 1)
@@ -804,7 +758,7 @@ end
 local function DesiredTabAlpha(tab)
 	if tab._buiCollapsed then return 0 end
 	local chat = tab._buiChat
-	local base = (not chat.isDocked or chat == GeneralDockManager.selected or tab._buiPulse) and SelectedAlpha() or DockedAlpha()
+	local base = (not chat.isDocked or chat == GeneralDockManager.selected or tab._buiPulse) and Config.selectedAlpha or Config.dockedAlpha
 	return base * fadeState.alpha
 end
 
@@ -878,15 +832,15 @@ local function StyleTab(tab)
 	local text = tab._buiText
 	StripTabRegions(tab)
 	EnsureTabArt(tab)
-	tab:SetHeight(InsetTop())
-	text:SetFont(ResolveFont(), TabFontSize(), TabFlags())
+	tab:SetHeight(Config.insetTop)
+	text:SetFont(ResolveFont(), Config.tabFontSize, Config.tabFontFlags)
 	text:SetWordWrap(false)
 	text:SetJustifyH('CENTER')
 	local chat = tab._buiChat
 	local tabText = text:GetText()
 	if tabText and not issecretvalue(tabText) then
 		if text._buiName == nil or text._buiName:upper() ~= tabText then text._buiName = tabText end
-		local wanted = (TabUppercase() and not chat.isTemporary) and text._buiName:upper() or text._buiName
+		local wanted = (Config.tabUppercase and not chat.isTemporary) and text._buiName:upper() or text._buiName
 		if wanted ~= tabText then text:SetText(wanted) end
 	end
 	text:ClearAllPoints()
@@ -953,24 +907,24 @@ local function PositionEditBox(chat)
 	local position = EditBoxPos()
 	editBox:ClearAllPoints()
 	if position == 'TOP' then
-		editBox:SetPoint('BOTTOMLEFT', chat, 'TOPLEFT', -InsetX(), InsetTop())
-		editBox:SetPoint('BOTTOMRIGHT', chat, 'TOPRIGHT', InsetX(), InsetTop())
+		editBox:SetPoint('BOTTOMLEFT', chat, 'TOPLEFT', -Config.insetX, Config.insetTop)
+		editBox:SetPoint('BOTTOMRIGHT', chat, 'TOPRIGHT', Config.insetX, Config.insetTop)
 	elseif position == 'INSIDE_TOP' then
-		editBox:SetPoint('TOPLEFT', chat, 'TOPLEFT', -InsetX(), 0)
-		editBox:SetPoint('TOPRIGHT', chat, 'TOPRIGHT', InsetX(), 0)
+		editBox:SetPoint('TOPLEFT', chat, 'TOPLEFT', -Config.insetX, 0)
+		editBox:SetPoint('TOPRIGHT', chat, 'TOPRIGHT', Config.insetX, 0)
 	elseif position == 'INSIDE_BOTTOM' then
-		editBox:SetPoint('BOTTOMLEFT', chat, 'BOTTOMLEFT', -InsetX(), 0)
-		editBox:SetPoint('BOTTOMRIGHT', chat, 'BOTTOMRIGHT', InsetX(), 0)
+		editBox:SetPoint('BOTTOMLEFT', chat, 'BOTTOMLEFT', -Config.insetX, 0)
+		editBox:SetPoint('BOTTOMRIGHT', chat, 'BOTTOMRIGHT', Config.insetX, 0)
 	else
-		editBox:SetPoint('TOPLEFT', chat, 'BOTTOMLEFT', -InsetX(), -InsetBottom())
-		editBox:SetPoint('TOPRIGHT', chat, 'BOTTOMRIGHT', InsetX(), -InsetBottom())
+		editBox:SetPoint('TOPLEFT', chat, 'BOTTOMLEFT', -Config.insetX, -Config.insetBottom)
+		editBox:SetPoint('TOPRIGHT', chat, 'BOTTOMRIGHT', Config.insetX, -Config.insetBottom)
 	end
-	editBox:SetHeight(EditBoxHeight())
+	editBox:SetHeight(Config.editboxHeight)
 	editBox:SetClampedToScreen(true)
 end
 
 local function StyleEditBox(editBox)
-	editBox:SetFont(ResolveFont(), EditFontSize(), '')
+	editBox:SetFont(ResolveFont(), Config.editFontSize, '')
 	editBox:SetTextColor(1, 1, 1)
 	ApplyShadow(editBox)
 	editBox:SetBackdropColor(EditBoxBGColor())
@@ -1004,36 +958,36 @@ end
 local function AnchorPanel()
 	local chat = ChatFrame1
 	chatPanel:ClearAllPoints()
-	chatPanel:SetPoint('BOTTOMLEFT', chat, 'BOTTOMLEFT', -InsetX(), -InsetBottom())
-	chatPanel:SetPoint('TOPRIGHT', chat, 'TOPRIGHT', InsetX() + SCROLL_GUTTER, InsetTop())
+	chatPanel:SetPoint('BOTTOMLEFT', chat, 'BOTTOMLEFT', -Config.insetX, -Config.insetBottom)
+	chatPanel:SetPoint('TOPRIGHT', chat, 'TOPRIGHT', Config.insetX + SCROLL_GUTTER, Config.insetTop)
 end
 
 local function ApplyTopStrip()
-	local thickness = BorderThickness()
+	local thickness = Config.borderThickness
 	local strip = chatPanel._strip
 	strip:ClearAllPoints()
 	strip:SetPoint('TOPLEFT', chatPanel, 'TOPLEFT', thickness, -thickness)
 	strip:SetPoint('TOPRIGHT', chatPanel, 'TOPRIGHT', -thickness, -thickness)
-	strip:SetHeight(InsetTop())
+	strip:SetHeight(Config.insetTop)
 end
 
 local function ApplyRightStrip()
-	local thickness = BorderThickness()
+	local thickness = Config.borderThickness
 	local verticalStrip = chatPanel._vstrip
 	verticalStrip:ClearAllPoints()
 	verticalStrip:SetWidth(BAR_WIDTH)
-	verticalStrip:SetPoint('TOPRIGHT', chatPanel, 'TOPRIGHT', -thickness, -(InsetTop() + thickness))
+	verticalStrip:SetPoint('TOPRIGHT', chatPanel, 'TOPRIGHT', -thickness, -(Config.insetTop + thickness))
 	verticalStrip:SetPoint('BOTTOMRIGHT', chatPanel, 'BOTTOMRIGHT', -thickness, thickness)
 	local gutter = chatPanel._gutter
 	gutter:ClearAllPoints()
 	gutter:SetWidth(SCROLL_GUTTER)
-	gutter:SetPoint('TOPRIGHT', chatPanel, 'TOPRIGHT', -thickness, -(InsetTop() + thickness))
+	gutter:SetPoint('TOPRIGHT', chatPanel, 'TOPRIGHT', -thickness, -(Config.insetTop + thickness))
 	gutter:SetPoint('BOTTOMRIGHT', chatPanel, 'BOTTOMRIGHT', -thickness, thickness)
 end
 
 local function ApplyPanelFill()
 	local red, green, blue, alpha = BGColor()
-	local textureName = BGTexture()
+	local textureName = Config.bgTexture
 	local path = textureName ~= 'SOLID' and sharedMedia:Fetch('statusbar', textureName) or nil
 	if path then
 		panelSquare.fill:SetTexture(path)
@@ -1045,7 +999,7 @@ local function ApplyPanelFill()
 end
 
 local function ApplyBorder()
-	local thickness = BorderThickness()
+	local thickness = Config.borderThickness
 	panelSquare.top:SetHeight(thickness); panelSquare.bottom:SetHeight(thickness)
 	panelSquare.left:SetWidth(thickness); panelSquare.right:SetWidth(thickness)
 	for _, edgeKey in ipairs(EDGES) do panelSquare[edgeKey]:SetColorTexture(BorderColor()) end
@@ -1054,10 +1008,10 @@ end
 local function UpdateCornerButtons()
 	local chat = ChatFrame1
 	local hovered = chatPanel._gutter:IsMouseOver()
-	local alpha = (hovered and 1 or BUTTON_IDLE_ALPHA) * (FadeEnabled() and fadeState.alpha or 1)
+	local alpha = (hovered and 1 or BUTTON_IDLE_ALPHA) * (Config.mouseoverFade and fadeState.alpha or 1)
 	chat._buiCog:SetAlpha(alpha)
 	chat._buiLock:SetAlpha(alpha)
-	if ShowCopyButton() then chat._buiCopy:SetAlpha(alpha) end
+	if Config.showCopyButton then chat._buiCopy:SetAlpha(alpha) end
 	for button, paint in pairs(auxPainters) do
 		if button:IsMouseOver() then
 			local hover = HoverColor()
@@ -1097,7 +1051,7 @@ local function MakeCornerButton(chat, mediaKey)
 end
 
 local function UpdateCopyButton()
-	ChatFrame1._buiCopy:SetShown(ShowCopyButton())
+	ChatFrame1._buiCopy:SetShown(Config.showCopyButton)
 end
 
 local function SkinPanel()
@@ -1170,7 +1124,7 @@ local function SkinPanel()
 		end
 	end
 	local function UpdateLockIcon()
-		lock._lockedTint = Locked() and true or false
+		lock._lockedTint = Config.locked and true or false
 		PaintLock(lock:IsMouseOver())
 	end
 	lock.Refresh = UpdateLockIcon
@@ -1183,7 +1137,7 @@ local function SkinPanel()
 		UpdateCornerButtons()
 	end)
 	lock:SetScript('OnClick', function()
-		GetConfig().locked = not Locked()
+		GetConfig().locked = not Config.locked
 		UpdateLockIcon()
 		UpdateMover()
 		UpdateSizer()
@@ -1195,13 +1149,13 @@ end
 local function PositionMover()
 	local chat = ChatFrame1
 	mover:ClearAllPoints()
-	mover:SetPoint('TOPLEFT', chat, 'TOPLEFT', -InsetX(), InsetTop())
-	mover:SetPoint('BOTTOMRIGHT', chat, 'TOPRIGHT', InsetX(), 0)
+	mover:SetPoint('TOPLEFT', chat, 'TOPLEFT', -Config.insetX, Config.insetTop)
+	mover:SetPoint('BOTTOMRIGHT', chat, 'TOPRIGHT', Config.insetX, 0)
 end
 
 function UpdateMover()
 	PositionMover()
-	if DragToMove() and not Locked() then mover:EnableMouse(true); mover:Show() else mover:EnableMouse(false); mover:Hide() end
+	if Config.dragToMove and not Config.locked then mover:EnableMouse(true); mover:Show() else mover:EnableMouse(false); mover:Hide() end
 end
 
 local function CreateMover()
@@ -1232,14 +1186,14 @@ local function CreateMover()
 end
 
 local function PositionSizer()
-	local thickness = BorderThickness()
+	local thickness = Config.borderThickness
 	sizer:ClearAllPoints()
 	sizer:SetPoint('TOPRIGHT', chatPanel, 'TOPRIGHT', -thickness - 1, -thickness - 1)
 end
 
 function UpdateSizer()
 	PositionSizer()
-	if SizerEnabled() and not Locked() then sizer:Show() else sizer:Hide() end
+	if Config.showSizer and not Config.locked then sizer:Show() else sizer:Hide() end
 end
 
 local function CreateSizer()
@@ -1327,7 +1281,7 @@ local function SetupScroll(frame)
 		if IsShiftKeyDown() then
 			if delta > 0 then self:ScrollToTop() else self:ScrollToBottom() end
 		else
-			local lines = ScrollLines()
+			local lines = Config.scrollLines
 			if delta > 0 then
 				for _ = 1, lines do self:ScrollUp() end
 			else
@@ -1338,7 +1292,7 @@ local function SetupScroll(frame)
 			local maxOffset = ChatMaxScrollOffset(self)
 			if self:GetScrollOffset() > maxOffset then self:SetScrollOffset(maxOffset) end
 		end
-		if FadeEnabled() then fadeState.lastActive = GetTime(); StartFader() end
+		if Config.mouseoverFade then fadeState.lastActive = GetTime(); StartFader() end
 	end)
 	frame:EnableMouseWheel(true)
 	frame:EnableMouse(true)
@@ -1350,7 +1304,7 @@ local function SetupScroll(frame)
 		editBox._buiFadeHook = true
 		editBox:HookScript('OnEditFocusGained', function()
 			if not Enabled() then return end
-			if FadeEnabled() then fadeState.lastActive = GetTime() end
+			if Config.mouseoverFade then fadeState.lastActive = GetTime() end
 			StartFader()
 		end)
 		editBox:HookScript('OnTextChanged', function(self, userInput)
@@ -1395,11 +1349,11 @@ end
 
 local function PositionScrollBar(chat)
 	local scrollBar = chat._buiSB
-	local thickness = BorderThickness()
-	local offsetX = InsetX() + SCROLL_GUTTER - thickness - BAR_WIDTH - 4
+	local thickness = Config.borderThickness
+	local offsetX = Config.insetX + SCROLL_GUTTER - thickness - BAR_WIDTH - 4
 	scrollBar:ClearAllPoints()
 	scrollBar:SetPoint('TOP', chat, 'TOPRIGHT', offsetX, -(thickness + 2))
-	scrollBar:SetPoint('BOTTOM', chat, 'BOTTOMRIGHT', offsetX, -InsetBottom() + thickness + 2)
+	scrollBar:SetPoint('BOTTOM', chat, 'BOTTOMRIGHT', offsetX, -Config.insetBottom + thickness + 2)
 end
 
 local function CreateChatScrollBar(chat)
@@ -1483,7 +1437,7 @@ function StartFader()
 				fadeState.lastHovered = hovered
 				UpdateCornerButtons()
 			end
-			if not FadeEnabled() then
+			if not Config.mouseoverFade then
 				fadeState.target = nil
 				if fadeState.alpha ~= 1 then
 					fadeState.alpha = 1
@@ -1495,7 +1449,7 @@ function StartFader()
 			end
 			local now = GetTime()
 			if IsChatHovered() then fadeState.lastActive = now end
-			local target = (now - fadeState.lastActive) < FadeDelay() and 1 or 0
+			local target = (now - fadeState.lastActive) < Config.fadeDelay and 1 or 0
 			fadeState.target = target
 			local alpha = fadeState.alpha
 			if alpha < target then alpha = min(target, alpha + elapsed * 4)
@@ -1709,12 +1663,12 @@ end
 function RepositionAuxButtons()
 	if not Enabled() or not chatPanel then return end
 	local previous = ChatFrame1._buiLock
-	if not HideVoiceButtons() then
+	if not Config.hideVoiceButtons then
 		previous = PlaceAuxButton(ChatFrameChannelButton, previous, 8)
 		previous = PlaceAuxButton(ChatFrameToggleVoiceDeafenButton, previous)
 		previous = PlaceAuxButton(ChatFrameToggleVoiceMuteButton, previous)
 	end
-	if not HideButtons() then
+	if not Config.hideButtons then
 		previous = PlaceAuxButton(ChatFrameMenuButton, previous, 8)
 		previous = PlaceAuxButton(QuickJoinToastButton, previous)
 	end
@@ -1770,7 +1724,7 @@ local function StartTabPulse(tab)
 	overlay:SetJustifyH(text:GetJustifyH())
 	overlay:SetWordWrap(false)
 	overlay:SetText(text:GetText())
-	overlay:SetTextColor(FlashColor())
+	overlay:SetTextColor(unpack(Config.flashColor))
 	tab._buiPulse = overlay
 	ApplyTabColor(tab, false)
 	ApplyTabAlpha(tab)
@@ -1783,7 +1737,7 @@ local function RefreshTabPulses()
 		local tab = skinnedTabs[tabIndex]
 		if tab._buiPulse then
 			StopTabPulse(tab)
-			if TabFlash() then StartTabPulse(tab) end
+			if Config.tabFlash then StartTabPulse(tab) end
 		end
 	end
 end
@@ -1804,20 +1758,20 @@ local function ApplySettings()
 		ApplyChatFont(chatFrame)
 		ApplyShadow(chatFrame)
 		chatFrame:SetClampRectInsets(0, 0, 0, 0)
-		chatFrame:SetFading(MsgFade())
-		chatFrame:SetTimeVisible(MsgFadeTime())
+		chatFrame:SetFading(Config.msgFade)
+		chatFrame:SetTimeVisible(Config.msgFadeTime)
 		PositionEditBox(chatFrame)
 		PositionScrollBar(chatFrame)
 		chatFrame._buiSB._update()
 		StyleEditBox(chatFrame.editBox)
 	end
 
-	ManageHidden(ChatFrameMenuButton, HideButtons())
-	ManageHidden(QuickJoinToastButton, HideButtons())
-	ManageHidden(ChatFrameChannelButton, HideVoiceButtons())
-	ManageHidden(ChatFrameToggleVoiceDeafenButton, HideVoiceButtons())
-	ManageHidden(ChatFrameToggleVoiceMuteButton, HideVoiceButtons())
-	CollapseChatTab(ChatFrame2Tab, HideLogTab())
+	ManageHidden(ChatFrameMenuButton, Config.hideButtons)
+	ManageHidden(QuickJoinToastButton, Config.hideButtons)
+	ManageHidden(ChatFrameChannelButton, Config.hideVoiceButtons)
+	ManageHidden(ChatFrameToggleVoiceDeafenButton, Config.hideVoiceButtons)
+	ManageHidden(ChatFrameToggleVoiceMuteButton, Config.hideVoiceButtons)
+	CollapseChatTab(ChatFrame2Tab, Config.hideLogTab)
 	RefreshTabs()
 	RefreshTabPulses()
 
@@ -1828,7 +1782,7 @@ local function ApplySettings()
 	UpdateSizer()
 	ChatFrame1._buiLock.Refresh()
 
-	if FadeEnabled() then StartFader() else StopFader() end
+	if Config.mouseoverFade then StartFader() else StopFader() end
 end
 
 local chatHiddenActive = false
@@ -1913,7 +1867,7 @@ local function InstallChat(chat)
 	end)
 
 	Hook('FCF_StartAlertFlash', function(chatFrame)
-		if not TabFlash() then return end
+		if not Config.tabFlash then return end
 		local tab = TabOf(chatFrame)
 		if tab._buiChat then StartTabPulse(tab) end
 	end)
@@ -2053,29 +2007,29 @@ function context.info.buildBoards(ui, parent, width)
 	local function Store(key)
 		return function(value) config[key] = value end
 	end
-	local function Slider(label, key, read, low, high, step)
-		return { label = label, min = low, max = high, step = step or 1, get = read, set = Store(key) }
+	local function Slider(label, key, low, high, step)
+		return { label = label, min = low, max = high, step = step or 1, get = Reader(key), set = Store(key) }
 	end
-	local function Percent(label, key, read, low)
-		return { label = label, min = low, max = 100, step = 1, get = function() return floor(read() * 100 + 0.5) end, set = function(value) config[key] = value / 100 end }
+	local function Percent(label, key, low)
+		return { label = label, min = low, max = 100, step = 1, get = function() return floor(config[key] * 100 + 0.5) end, set = function(value) config[key] = value / 100 end }
 	end
-	local function Check(label, key, read)
-		return { label = label, get = read, set = Store(key) }
+	local function Check(label, key)
+		return { label = label, get = Reader(key), set = Store(key) }
 	end
 	local function Choice(label, key, entries, read)
-		return { label = label, entries = entries, get = read, set = Store(key) }
+		return { label = label, entries = entries, get = read or Reader(key), set = Store(key) }
 	end
-	local function Color(tooltip, key, read)
+	local function Color(tooltip, key)
 		return { kind = 'swatch', tooltip = tooltip, get = function()
-			local red, green, blue = read()
-			return red, green, blue, 1
+			local color = config[key]
+			return color[1], color[2], color[3], 1
 		end, set = function(red, green, blue) config[key] = { red, green, blue } end }
 	end
 	local function Cog(tooltip, title, options, icon)
 		return { icon = icon, tooltip = tooltip, title = title, options = options }
 	end
-	local function Switch(read, key)
-		return { get = read, set = Store(key) }
+	local function Switch(key)
+		return { get = Reader(key), set = Store(key) }
 	end
 
 	local function ChatGeo()
@@ -2107,12 +2061,12 @@ function context.info.buildBoards(ui, parent, width)
 
 	local panel = ui.Board(parent, width, { stacked = true, title = 'Panel', description = 'The panel behind the chat dock: font, background, border, edit box and where it sits.' })
 	panel:AddTools('Font', 'Typeface, message and edit box size, outline and shadow', {
-		Choice(nil, 'font', BUI.BuildFontDropdownItems(GLOBAL_OPTION), function() return config.font end),
+		Choice(nil, 'font', BUI.BuildFontDropdownItems(GLOBAL_OPTION)),
 		Cog('Sizes, outline and shadow', 'Font', {
-			Slider('Message size', 'fontSize', MsgFontSize, 8, 22),
-			Slider('Edit box size', 'editFontSize', EditFontSize, 8, 22),
-			Choice('Outline', 'fontFlags', FLAG_OPTIONS, MsgFlags),
-			Check('Shadow', 'fontShadow', FontShadow),
+			Slider('Message size', 'fontSize', 8, 22),
+			Slider('Edit box size', 'editFontSize', 8, 22),
+			Choice('Outline', 'fontFlags', FLAG_OPTIONS),
+			Check('Shadow', 'fontShadow'),
 		}),
 	}, ApplySettings)
 	panel:AddTools('Background', 'Color, opacity and texture behind the messages', {
@@ -2120,16 +2074,16 @@ function context.info.buildBoards(ui, parent, width)
 			config.bgColor = { red, green, blue }
 			config.bgAlpha = alpha
 		end },
-		Choice(nil, 'bgTexture', BuildTextureItems(), BGTexture),
+		Choice(nil, 'bgTexture', BuildTextureItems()),
 	}, ApplySettings)
 	panel:AddTools('Border', 'The edge around the panel', {
-		Color('Border color', 'borderColor', ColorReader('borderColor')),
-		Cog('Thickness', 'Border', { Slider('Thickness', 'borderThickness', BorderThickness, 1, 4) }),
-		Switch(function() return config.showBorder end, 'showBorder'),
+		Color('Border color', 'borderColor'),
+		Cog('Thickness', 'Border', { Slider('Thickness', 'borderThickness', 1, 4) }),
+		Switch('showBorder'),
 	}, ApplySettings)
 	panel:AddTools('Edit box', 'Where you type, and how tall it is', {
 		Choice(nil, 'editboxPosition', EDITBOX_OPTIONS, EditBoxPos),
-		Cog('Height', 'Edit box', { Slider('Height', 'editboxHeight', EditBoxHeight, 16, 40) }),
+		Cog('Height', 'Edit box', { Slider('Height', 'editboxHeight', 16, 40) }),
 	}, ApplySettings)
 	panel:AddTools('Layout', 'Where the panel sits, its size and padding, and how it moves', {
 		Cog('Position on screen', 'Position', {
@@ -2139,43 +2093,38 @@ function context.info.buildBoards(ui, parent, width)
 		Cog('Size and padding', 'Size', {
 			Geo('w', 'Width', 200, max(screenWidth, 400)),
 			Geo('h', 'Height', 80, max(screenHeight, 200)),
-			Slider('Side padding', 'insetX', InsetX, 0, 20),
-			Slider('Top bar height', 'insetTop', InsetTop, 12, 40),
-			Slider('Bottom padding', 'insetBottom', InsetBottom, 0, 20),
+			Slider('Side padding', 'insetX', 0, 20),
+			Slider('Top bar height', 'insetTop', 12, 40),
+			Slider('Bottom padding', 'insetBottom', 0, 20),
 		}, 'resize'),
 		Cog('Moving and resizing', 'Moving', {
-			Check('Lock the frame', 'locked', Locked),
-			Check('Drag the top bar to move', 'dragToMove', DragToMove),
-			Check('Show the resize grip', 'showSizer', SizerEnabled),
+			Check('Lock the frame', 'locked'),
+			Check('Drag the top bar to move', 'dragToMove'),
+			Check('Show the resize grip', 'showSizer'),
 		}),
 	}, ApplySettings)
 
 	local tabs = ui.Board(parent, width, { stacked = true, title = 'Tabs', description = 'The chat tabs along the top of the panel.' })
 	tabs:AddTools('Style', 'Tab look, font and names', {
-		Choice(nil, 'tabStyle', TAB_STYLE_OPTIONS, TabStyle),
+		Choice(nil, 'tabStyle', TAB_STYLE_OPTIONS),
 		Cog('Font and names', 'Tabs', {
-			Slider('Font size', 'tabFontSize', TabFontSize, 8, 18),
-			Choice('Outline', 'tabFontFlags', FLAG_OPTIONS, TabFlags),
-			Check('Uppercase names', 'tabUppercase', TabUppercase),
-			Check('Hide the combat log tab', 'hideLogTab', HideLogTab),
+			Slider('Font size', 'tabFontSize', 8, 18),
+			Choice('Outline', 'tabFontFlags', FLAG_OPTIONS),
+			Check('Uppercase names', 'tabUppercase'),
+			Check('Hide the combat log tab', 'hideLogTab'),
 		}),
 	}, ApplySettings)
 	tabs:AddTools('Colors', 'Background tabs, the active tab and how see-through they are', {
-		Color('Background tabs', 'inactiveColor', InactiveColor),
-		{ kind = 'swatch', tooltip = 'Active tab', get = function()
-			local red, green, blue = SelectedColor()
-			return red, green, blue, 1
-		end, set = function(red, green, blue)
-			config.selectedColor = { red, green, blue }
-		end },
+		Color('Background tabs', 'inactiveColor'),
+		Color('Active tab', 'selectedColor'),
 		Cog('Opacity', 'Tab opacity', {
-			Percent('Active tab', 'selectedAlpha', SelectedAlpha, 10),
-			Percent('Background tabs', 'dockedAlpha', DockedAlpha, 0),
+			Percent('Active tab', 'selectedAlpha', 10),
+			Percent('Background tabs', 'dockedAlpha', 0),
 		}),
 	}, ApplySettings)
 	tabs:AddTools('Flash on message', 'Pulse a background tab when a message arrives', {
-		Color('Flash color', 'flashColor', FlashColor),
-		Switch(TabFlash, 'tabFlash'),
+		Color('Flash color', 'flashColor'),
+		Switch('tabFlash'),
 	}, ApplySettings)
 
 	local messages = ui.Board(parent, width, { stacked = true, title = 'Messages', description = 'What each line shows, fading, history and the side buttons.' })
@@ -2184,27 +2133,27 @@ function context.info.buildBoards(ui, parent, width)
 	messages:AddSwitch('Link tooltips', Reader('hoverTooltips'), Store('hoverTooltips'), 'Tooltips when hovering links')
 	messages:AddSwitch('Hide channel numbers', Reader('hideChannelNumbers'), Store('hideChannelNumbers'))
 	messages:AddSwitch('Abbreviate channel names', Reader('abbreviateChannels'), Store('abbreviateChannels'))
-	messages:AddSwitch('Fade old messages', MsgFade, Applied('msgFade'), 'Messages fade out after a while')
-	messages:AddSwitch('Fade when not hovered', FadeEnabled, function(value)
+	messages:AddSwitch('Fade old messages', Reader('msgFade'), Applied('msgFade'), 'Messages fade out after a while')
+	messages:AddSwitch('Fade when not hovered', Reader('mouseoverFade'), function(value)
 		config.mouseoverFade = value
 		if value and chatPanel then StartFader() else StopFader() end
 	end, 'The chat fades until the cursor is over it')
-	messages:AddSwitch('Input history', EditHistory, Store('editHistory'), 'Up and down arrows step through what you typed')
-	messages:AddSwitch('Copy chat button', ShowCopyButton, Applied('showCopyButton'))
-	messages:AddSwitch('Hide menu and social buttons', HideButtons, Applied('hideButtons'))
-	messages:AddSwitch('Hide voice buttons', HideVoiceButtons, Applied('hideVoiceButtons'))
-	messages:AddSwitch('Hide chat completely', function() return config.chatHidden end, function(value)
+	messages:AddSwitch('Input history', Reader('editHistory'), Store('editHistory'), 'Up and down arrows step through what you typed')
+	messages:AddSwitch('Copy chat button', Reader('showCopyButton'), Applied('showCopyButton'))
+	messages:AddSwitch('Hide menu and social buttons', Reader('hideButtons'), Applied('hideButtons'))
+	messages:AddSwitch('Hide voice buttons', Reader('hideVoiceButtons'), Applied('hideVoiceButtons'))
+	messages:AddSwitch('Hide chat completely', Reader('chatHidden'), function(value)
 		config.chatHidden = value
 		ApplyChatHidden()
 	end, 'Hide every chat window and tab')
 	messages:AddTools('Details', 'Timestamp and link colors, timestamp format, scroll speed and fade timing', {
-		Color('Timestamp color', 'timestampColor', ColorReader('timestampColor')),
-		Color('Link color', 'urlColor', ColorReader('urlColor')),
+		Color('Timestamp color', 'timestampColor'),
+		Color('Link color', 'urlColor'),
 		Cog('Format, scrolling and fade timing', 'Details', {
-			Choice('Timestamp format', 'timestampFormat', TIMESTAMP_OPTIONS, Reader('timestampFormat')),
-			Slider('Lines per scroll', 'scrollLines', ScrollLines, 1, 10, 1),
-			{ label = 'Messages visible for (sec)', min = 10, max = 300, step = 5, separator = true, get = MsgFadeTime, set = Store('msgFadeTime') },
-			Slider('Hover fade delay (sec)', 'fadeDelay', FadeDelay, 0, 10),
+			Choice('Timestamp format', 'timestampFormat', TIMESTAMP_OPTIONS),
+			Slider('Lines per scroll', 'scrollLines', 1, 10, 1),
+			{ label = 'Messages visible for (sec)', min = 10, max = 300, step = 5, separator = true, get = Reader('msgFadeTime'), set = Store('msgFadeTime') },
+			Slider('Hover fade delay (sec)', 'fadeDelay', 0, 10),
 		}),
 		{ text = 'Clear history', onClick = function() wipe(GetHistory()) end },
 	}, ApplySettings)
