@@ -85,13 +85,22 @@ local function ReleaseUnitFrame(event, unit)
     if not next(unitFramePool[event]) then unitFramePool[event] = nil end
 end
 
+local profiling = C_CVar.GetCVarBool('scriptProfile')
+
+local function Isolate(callback)
+    if not profiling then return callback end
+    return function(...) return callback(...) end
+end
+
 function Events:Register(event, key, callback)
+    callback = Isolate(callback)
     EnsureGlobalEvent(event)
     globalCallbacks[event][key] = callback
 end
 
 function Events:RegisterUnit(event, units, key, callback)
     local unitList = type(units) == 'string' and { units } or units
+    callback = Isolate(callback)
     for _, unit in ipairs(unitList) do
         if not unitCallbacks[event] then unitCallbacks[event] = {} end
         if not unitCallbacks[event][unit] then unitCallbacks[event][unit] = {} end
