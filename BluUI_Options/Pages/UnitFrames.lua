@@ -19,8 +19,6 @@ local DISPEL_COLUMNS = { { 'Setting', 'name', 130 }, { 'Shows', 'sub' }, { 'Colo
 local NAME_WIDTH = 200
 local TEXT_RANGE = 50
 local AURA_RANGE = 500
-local BADGE_RANGE_X = 600
-local BADGE_RANGE_Y = 400
 local ICON_RANGE = 50
 local TAG_RANGE = 200
 local POSITION_RANGE_X = 4000
@@ -464,16 +462,11 @@ local function AppearanceBoards(ui, parent, width, page)
 	for _, typeName in ipairs(DISPEL_TYPES) do
 		typeIcons[#typeIcons + 1] = StoreColor(BUI.AuraEngine.DispelColorKey(typeName), typeName .. ', shared with the party and raid frames')
 	end
-	typeIcons[#typeIcons + 1] = { tooltip = 'Size, position and prompts', title = 'Type icons', options = {
-		Option(player, 'Size', 'debuffHighlightBadgeSize', { min = 10, max = 48, step = 1 }),
-		Kit.Pixels(Option(player, 'Horizontal', 'debuffHighlightBadgeOffsetX', { min = -BADGE_RANGE_X, max = BADGE_RANGE_X, step = 1 })),
-		Kit.Pixels(Option(player, 'Vertical', 'debuffHighlightBadgeOffsetY', { min = -BADGE_RANGE_Y, max = BADGE_RANGE_Y, step = 1 })),
-		Toggle(player, 'Cleanse callouts, FD, TURT and SF prompts', 'debuffHighlightTypeText', { separator = true }),
-		Toggle(settings, 'Recolor the Blizzard debuff icons to match', 'dispelRecolor'),
+	typeIcons[#typeIcons + 1] = { tooltip = 'Prompts', title = 'Type colors', options = {
+		Toggle(player, 'Cleanse callouts, FD, TURT and SF prompts', 'debuffHighlightTypeText'),
 	} }
 	typeIcons[#typeIcons + 1] = DispelPreviewEye()
-	typeIcons[#typeIcons + 1] = OnUnlessOff(player, nil, 'debuffHighlightBadge')
-	dispel:AddTools('Type icons', 'Debuff type icons above the frame, one color each', typeIcons, RefreshDispel)
+	dispel:AddTools('Type colors', 'One color per debuff type, shared with the party and raid frames', typeIcons, RefreshDispel)
 
 	local indicators = ToolGrid(ui, parent, width, 'Indicators', 'Icons layered on every frame.', SETTING_COLUMNS)
 	indicators:AddTools('Raid icon', 'Raid target marker on each frame', {

@@ -435,14 +435,6 @@ end)
 do
 	local Engine = BUI.AuraEngine
 
-	local DISPEL_BADGE_ATLAS = {
-		Magic   = 'RaidFrame-Icon-DebuffMagic',
-		Curse   = 'RaidFrame-Icon-DebuffCurse',
-		Disease = 'RaidFrame-Icon-DebuffDisease',
-		Poison  = 'RaidFrame-Icon-DebuffPoison',
-		Bleed   = 'RaidFrame-Icon-DebuffBleed',
-	}
-
 	local _, playerClass = UnitClass('player')
 	local IS_HUNTER = playerClass == 'HUNTER'
 	local EMERGENCY_SALVE_SPELL_ID = 459517
@@ -497,7 +489,6 @@ do
 	end
 
 	local HL_TYPES = { 'Magic', 'Curse', 'Disease', 'Poison', 'Bleed' }
-	local TYPE_ICON_GAP = 6
 	local PLAIN_FILTER, BYME_FILTER = 'HARMFUL', 'HARMFUL|RAID_PLAYER_DISPELLABLE'
 
 	local function SyncDispelTypeGroups(container, groups, addGroup)
@@ -524,94 +515,7 @@ do
 		end
 	end
 
-	local typeRowHost, typeRowContainer
-	local typeRowKits = {}
-	local typeRowRestylePending = false
-
-	local TYPE_ROW_BASE_Y = 44
-
-	local function PlaceTypeRowHost()
-		if not typeRowHost then return end
-		local unitSettings = UnitFrames.GetUnitSettings('player')
-		typeRowHost:ClearAllPoints()
-		typeRowHost:SetPoint('CENTER', UIParent, 'CENTER',
-			Pixel.Scale(unitSettings.debuffHighlightBadgeOffsetX),
-			Pixel.Scale(TYPE_ROW_BASE_Y + unitSettings.debuffHighlightBadgeOffsetY))
-	end
-
-	local function TypeRowHost()
-		if typeRowHost then return typeRowHost end
-		typeRowHost = CreateFrame('Frame', nil, UIParent)
-		typeRowHost:SetSize(Pixel.Scale(1), Pixel.Scale(1))
-		typeRowHost:SetFrameStrata('HIGH')
-		typeRowHost:EnableMouse(false)
-		PlaceTypeRowHost()
-		return typeRowHost
-	end
-
-	local function TypeRowIconSize()
-		local unitSettings = UnitFrames.GetUnitSettings('player')
-		return unitSettings.debuffHighlightBadgeSize
-	end
-
-	local function StyleTypeRowKit(kit)
-		local settings = UnitFrames.GetSettings()
-		local size = Pixel.Scale(TypeRowIconSize())
-		kit.button:SetSize(size, size)
-		kit.icon:ClearAllPoints()
-		kit.icon:SetAllPoints(kit.button)
-		if settings.dispelRecolor then
-			kit.icon:SetDesaturated(true)
-			kit.icon:SetVertexColor(Engine.DispelColorRGB(kit.typeName))
-		else
-			kit.icon:SetDesaturated(false)
-			kit.icon:SetVertexColor(1, 1, 1)
-		end
-	end
-
-	local function RestyleTypeRow()
-		if BUI.Tools.ShouldAurasBeSecret() then
-			typeRowRestylePending = true
-			return
-		end
-		typeRowRestylePending = false
-		for kitIndex = 1, #typeRowKits do
-			StyleTypeRowKit(typeRowKits[kitIndex])
-		end
-	end
-
-	local function TypeRowInitializer(typeName)
-		return function(button)
-			local kit = { typeName = typeName, button = button }
-			kit.icon = button:CreateTexture(nil, 'OVERLAY', nil, 7)
-			kit.icon:SetAtlas(DISPEL_BADGE_ATLAS[typeName])
-			typeRowKits[#typeRowKits + 1] = kit
-			StyleTypeRowKit(kit)
-			button:SetMouseClickEnabled(false)
-			button:SetMouseMotionEnabled(false)
-		end
-	end
-
-	local function EnsureTypeRowGroups(container)
-		SyncDispelTypeGroups(container, container._rowGroups, function(slot, typeName, filter)
-			container._rowSeq = (container._rowSeq or 0) + 1
-			local key = 'row' .. container._rowSeq
-			local size = TypeRowIconSize()
-			container:AddAuraGroup(key, filter, {
-				maxFrameCount = 1,
-				initializeFrame = TypeRowInitializer(typeName),
-				candidateFilters = { includeDispelTypes = { [typeName] = true } },
-				layout = {
-					elementWidth = size, elementHeight = size,
-					elementSpacing = TYPE_ICON_GAP, lineSpacing = TYPE_ICON_GAP,
-					layoutIndex = slot,
-				},
-			})
-			return key
-		end)
-	end
-
-	local HIGHLIGHT_SETTING_INPUTS = 10
+	local HIGHLIGHT_SETTING_INPUTS = 6
 	local HIGHLIGHT_INPUT_COUNT = HIGHLIGHT_SETTING_INPUTS + #HL_TYPES * 3
 	local highlightInputs = {}
 
@@ -619,15 +523,11 @@ do
 		local settings = UnitFrames.GetSettings()
 		local classFilter = unitSettings.debuffHighlightClassFilter ~= false
 		highlightInputs[1] = classFilter
-		highlightInputs[2] = unitSettings.debuffHighlightBadgeSize
-		highlightInputs[3] = unitSettings.debuffHighlightBadgeOffsetX
-		highlightInputs[4] = unitSettings.debuffHighlightBadgeOffsetY
-		highlightInputs[5] = settings.dispelRecolor
-		highlightInputs[6] = settings.dispelBlend
-		highlightInputs[7] = settings.dispelOpacity
-		highlightInputs[8] = unitSettings.debuffHighlightBar
-		highlightInputs[9] = unitSettings.debuffHighlightStyle
-		highlightInputs[10] = classFilter and select(2, GetSelfCleanseTypes()) or ''
+		highlightInputs[2] = settings.dispelBlend
+		highlightInputs[3] = settings.dispelOpacity
+		highlightInputs[4] = unitSettings.debuffHighlightBar
+		highlightInputs[5] = unitSettings.debuffHighlightStyle
+		highlightInputs[6] = classFilter and select(2, GetSelfCleanseTypes()) or ''
 		for typeIndex = 1, #HL_TYPES do
 			local slot = HIGHLIGHT_SETTING_INPUTS + (typeIndex - 1) * 3
 			highlightInputs[slot + 1], highlightInputs[slot + 2], highlightInputs[slot + 3] = Engine.DispelColorRGB(HL_TYPES[typeIndex])
@@ -644,36 +544,6 @@ do
 			end
 		end
 		return changed
-	end
-
-	local function ConfigureTypeRow(wanted)
-		if not wanted then
-			if typeRowContainer then
-				typeRowContainer:Hide()
-				Engine.BindUnit(typeRowContainer, nil)
-				wipe(typeRowContainer._highlightInputs)
-			end
-			return
-		end
-		if not typeRowContainer then
-			local host = TypeRowHost()
-			typeRowContainer = Engine.NewContainer(host, true, 1)
-			typeRowContainer:SetPoint('CENTER', host, 'CENTER')
-			typeRowContainer._rowGroups = {}
-			typeRowContainer._highlightInputs = {}
-		end
-		if HighlightInputsChanged(typeRowContainer._highlightInputs) then
-			PlaceTypeRowHost()
-			local size = TypeRowIconSize()
-			Engine.ApplyFlowLayout(typeRowContainer, {
-				growX = 'RIGHT', growY = 'DOWN',
-				gap = TYPE_ICON_GAP, size = size, perRow = #HL_TYPES,
-			})
-			EnsureTypeRowGroups(typeRowContainer)
-			RestyleTypeRow()
-		end
-		typeRowContainer:Show()
-		Engine.BindUnit(typeRowContainer, 'player')
 	end
 
 	local WHITE8X8 = [[Interface\Buttons\WHITE8X8]]
@@ -839,8 +709,7 @@ do
 		Engine.BindUnit(container, frame.unit or 'player')
 	end
 
-	local previewPin, previewKit, previewIconHost
-	local previewIcons = {}
+	local previewPin, previewKit
 
 	local function PreviewTypeIndex()
 		for typeIndex = 1, #HL_TYPES do
@@ -864,56 +733,16 @@ do
 		return kit
 	end
 
-	local function EnsurePreviewIcons()
-		if previewIconHost then return previewIconHost end
-		local host = TypeRowHost()
-		previewIconHost = CreateFrame('Frame', nil, host)
-		previewIconHost:SetAllPoints(host)
-		previewIconHost:EnableMouse(false)
-		previewIconHost:Hide()
-		for typeIndex = 1, #HL_TYPES do
-			local texture = previewIconHost:CreateTexture(nil, 'OVERLAY', nil, 7)
-			texture:SetAtlas(DISPEL_BADGE_ATLAS[HL_TYPES[typeIndex]])
-			previewIcons[typeIndex] = texture
-		end
-		return previewIconHost
-	end
-
 	local function HidePreview()
 		if previewKit then previewKit.host:Hide() end
-		if previewIconHost then previewIconHost:Hide() end
 	end
 
 	function UnitFrames.RefreshDispelPreview()
 		if not previewPin then HidePreview() return end
-		local recolor = UnitFrames.GetSettings().dispelRecolor
-		local active = PreviewTypeIndex()
-
 		local kit = EnsurePreviewKit()
-		if kit then
-			PaintDispelVisual(kit.frame, kit, HL_TYPES[active], true)
-			kit.host:Show()
-		end
-
-		local host = EnsurePreviewIcons()
-		local size = TypeRowIconSize()
-		local typeCount = #HL_TYPES
-		local left = -((typeCount * size + (typeCount - 1) * TYPE_ICON_GAP) / 2) + size / 2
-		for typeIndex = 1, typeCount do
-			local texture = previewIcons[typeIndex]
-			texture:SetSize(Pixel.Scale(size), Pixel.Scale(size))
-			texture:ClearAllPoints()
-			texture:SetPoint('CENTER', host, 'CENTER', Pixel.Scale(left + (typeIndex - 1) * (size + TYPE_ICON_GAP)), 0)
-			if recolor then
-				texture:SetDesaturated(true)
-				texture:SetVertexColor(Engine.DispelColorRGB(HL_TYPES[typeIndex]))
-			else
-				texture:SetDesaturated(false)
-				texture:SetVertexColor(1, 1, 1)
-			end
-			texture:SetAlpha(typeIndex == active and 1 or 0.35)
-		end
-		host:Show()
+		if not kit then return end
+		PaintDispelVisual(kit.frame, kit, HL_TYPES[PreviewTypeIndex()], true)
+		kit.host:Show()
 	end
 
 	local function PinDispelPreview(typeName)
@@ -1159,7 +988,6 @@ do
 	end
 
 	local function DrainPendingRestyles()
-		if typeRowRestylePending then RestyleTypeRow() end
 		for frame in pairs(framePending) do
 			framePending[frame] = nil
 			RestyleFrameKits(frame)
@@ -1173,10 +1001,8 @@ do
 	function UnitFrames.UpdateDebuffHighlight(frame)
 		if not frame then return end
 		local unitSettings = UnitFrames.GetUnitSettings('player')
-		local badgeWanted = unitSettings.debuffHighlightBadge ~= false
 		local frameColorsWanted = unitSettings.debuffHighlightBar
-		if badgeWanted or frameColorsWanted then GatherHighlightInputs(unitSettings) end
-		ConfigureTypeRow(badgeWanted)
+		if frameColorsWanted then GatherHighlightInputs(unitSettings) end
 		ConfigureCallouts(unitSettings.debuffHighlightTypeText)
 		ConfigureFrameColors(frame, frameColorsWanted)
 	end

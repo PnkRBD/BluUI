@@ -577,7 +577,6 @@ function BUI.MigrateProfile(profile)
 			local unitTable = profile.unitFrames[unitKey]
 			if type(unitTable) == 'table' then
 				unitTable.debuffHighlightBar = true
-				unitTable.debuffHighlightBadge = true
 				unitTable.debuffHighlightClassFilter = true
 				for _, deadKey in ipairs(deadKeys) do unitTable[deadKey] = nil end
 			end
