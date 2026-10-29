@@ -91,7 +91,7 @@ local profiling = C_CVar.GetCVarBool('scriptProfile')
 
 local function Isolate(callback)
     if not profiling then return callback end
-    return function(...) return callback(...) end
+    return function(...) callback(...) end
 end
 
 function Events:Register(event, key, callback)
