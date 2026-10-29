@@ -116,7 +116,7 @@ end
 local OnCanvasScaleChanged = BUI.Dispatcher.New(RefreshAll)
 
 BUI.Events:OnLogin('WorldMapOverlays', function()
-    hooksecurefunc(WorldMapFrame, 'OnMapChanged', RefreshAll)
-    hooksecurefunc(WorldMapFrame, 'OnCanvasScaleChanged', OnCanvasScaleChanged)
+    BUI.Hook('ZoneLabels.RefreshAll', WorldMapFrame, 'OnMapChanged', RefreshAll)
+    BUI.Hook('ZoneLabels.OnCanvasScaleChanged', WorldMapFrame, 'OnCanvasScaleChanged', OnCanvasScaleChanged)
     WorldMapFrame:HookScript('OnShow', RefreshAll)
 end)

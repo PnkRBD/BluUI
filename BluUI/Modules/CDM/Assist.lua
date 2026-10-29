@@ -72,7 +72,7 @@ local function InstallHooks()
 	if hooked then return end
 	hooked = true
 
-	hooksecurefunc(AssistedCombatManager, 'UpdateAllAssistedHighlightFramesForSpell', function(_, spellID)
+	BUI.Hook('Assist.UpdateAllAssistedHighlightFramesForSpell', AssistedCombatManager, 'UpdateAllAssistedHighlightFramesForSpell', function(_, spellID)
 		Resolve(DesiredSpell(spellID))
 	end)
 

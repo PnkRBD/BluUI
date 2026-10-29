@@ -704,8 +704,8 @@ local function InstallCraftingHooks(frame)
 	InstallTemplates()
 	Hook(ProfessionsCraftingOutputLogElementMixin, 'Init', OnOutputEntry)
 	frame:HookScript('OnShow', context.Guard(HideUntilSized))
-	hooksecurefunc(frame, 'SetTab', RevealOnceSized)
-	hooksecurefunc(frame, 'ApplyDesiredWidth', RevealOnceSized)
+	BUI.Hook('Professions.RevealOnceSized', frame, 'SetTab', RevealOnceSized)
+	BUI.Hook('Professions.RevealOnceSized', frame, 'ApplyDesiredWidth', RevealOnceSized)
 end
 
 context.Window('ProfessionsFrame', { skin = SkinProfessionsFrame, install = InstallCraftingHooks })

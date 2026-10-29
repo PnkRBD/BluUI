@@ -30,8 +30,8 @@ local function HookCDMViewers()
     viewersHooked = true
     for _, name in ipairs(CDM_FRAME_NAMES) do
         local viewer = _G[name]
-        hooksecurefunc(viewer, 'RefreshLayout', MarkFrameMapStale)
-        hooksecurefunc(viewer, 'RefreshData', MarkFrameMapStale)
+        BUI.Hook('CDMScan.MarkFrameMapStale', viewer, 'RefreshLayout', MarkFrameMapStale)
+        BUI.Hook('CDMScan.MarkFrameMapStale', viewer, 'RefreshData', MarkFrameMapStale)
     end
 end
 

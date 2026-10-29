@@ -5,13 +5,34 @@ BUI.Perf = Perf
 
 local ADDON = 'BluUI'
 local TOP_HANDLERS = 20
+local TOP_FRAMES = 12
+local TOP_ROOTS = 8
 local SAMPLE_SECONDS = 1
 local tracked = {}
+local trackedNames = {}
 local session
 
 function Perf.Track(name, callback)
+	local names = trackedNames[callback]
+	if names and names[name] then return end
+	if not names then
+		names = {}
+		trackedNames[callback] = names
+	end
+	names[name] = true
 	tracked[#tracked + 1] = { name = name, callback = callback }
 end
+
+function Perf.Hook(name, target, method, handler)
+	if handler then
+		hooksecurefunc(target, method, handler)
+		Perf.Track(name, handler)
+	else
+		hooksecurefunc(target, method)
+		Perf.Track(name, method)
+	end
+end
+BUI.Hook = Perf.Hook
 
 local function Line(label, value)
 	print('  |cff' .. BUI.C.COLOR_BRAND .. label .. '|r  ' .. value)
@@ -61,38 +82,75 @@ local function Start()
 	end
 end
 
-local function PrintTimed(rows, label)
+local function PrintTimed(rows, label, limit)
 	table.sort(rows, function(a, b) return a.usage > b.usage end)
 	BUI.Print(label)
-	for index = 1, math.min(TOP_HANDLERS, #rows) do
+	for index = 1, math.min(limit or TOP_HANDLERS, #rows) do
 		local row = rows[index]
 		Line(row.name, ('%s over %d calls, %.3f ms each'):format(Ms(row.usage), row.calls, row.usage / row.calls))
 	end
 	if #rows == 0 then Line('none', '-') end
 end
 
-local function Breakdown()
-	UpdateAddOnCPUUsage()
-	Line('total Lua time, every entry point', Ms(GetAddOnCPUUsage(ADDON)))
-	local rows, seen = {}, {}
+local function FrameRows(roots)
+	local rows, total = {}, 0
+	for _, entry in ipairs(roots) do
+		if entry.calls > 0 then
+			rows[#rows + 1] = { name = entry.name, usage = entry.cpu, calls = entry.calls }
+			total = total + entry.cpu
+		end
+	end
+	return rows, total
+end
+
+local function HandlerRows()
+	local rows = {}
 	BUI.Events:EachHandler(function(event, key, callback, unit)
-		if seen[callback] then return end
-		seen[callback] = true
 		local usage, calls = GetFunctionCPUUsage(callback, true)
 		if calls > 0 then
 			rows[#rows + 1] = { name = key .. ' on ' .. (unit and (event .. ' ' .. unit) or event), usage = usage, calls = calls }
 		end
 	end)
-	PrintTimed(rows, 'Heaviest event handlers')
-	local hooks = {}
-	for _, entry in ipairs(tracked) do
-		local usage, calls = GetFunctionCPUUsage(entry.callback, true)
-		if calls > 0 then hooks[#hooks + 1] = { name = entry.name, usage = usage, calls = calls } end
-	end
-	PrintTimed(hooks, 'Watched hooks and layout passes')
+	return rows
 end
 
-local TOP_ROOTS = 8
+local function HookRows()
+	local rows, byName, total = {}, {}, 0
+	for _, entry in ipairs(tracked) do
+		local usage, calls = GetFunctionCPUUsage(entry.callback, true)
+		if calls > 0 then
+			local row = byName[entry.name]
+			if not row then
+				row = { name = entry.name, usage = 0, calls = 0 }
+				byName[entry.name] = row
+				rows[#rows + 1] = row
+			end
+			row.usage, row.calls = row.usage + usage, row.calls + calls
+			total = total + usage
+		end
+	end
+	return rows, total
+end
+
+local function Breakdown(roots)
+	UpdateAddOnCPUUsage()
+	local total = GetAddOnCPUUsage(ADDON)
+	Line('total Lua time, every entry point', Ms(total))
+	local frameRows, frameTotal = FrameRows(roots)
+	PrintTimed(frameRows, 'Heaviest frames, every script on frames BluUI owns', TOP_FRAMES)
+	PrintTimed(HandlerRows(), 'Heaviest event handlers')
+	local hookRows, hookTotal = HookRows()
+	PrintTimed(hookRows, 'Watched hooks, ticks and layout passes')
+	Line('coverage', ('%s ran inside BluUI frames and %s inside watched hooks of %s total; anything left is timers or library code'):format(Ms(frameTotal), Ms(hookTotal), Ms(total)))
+end
+
+local frameTiming = false
+
+local function RootName(root)
+	local name = root._buiPerfName or root:GetName()
+	if type(name) ~= 'string' then name = root._bluHolder and 'group header' or '(unnamed)' end
+	return name
+end
 
 local function Inspect(frame)
 	local root = frame
@@ -101,23 +159,25 @@ local function Inspect(frame)
 		root = parent
 		parent = root:GetParent()
 	end
-	local name = root:GetName()
-	if type(name) ~= 'string' then name = root._bluHolder and 'group header' or '(unnamed)' end
-	return name, frame:GetNumRegions(), root ~= frame and root or nil
+	local cpu, calls = 0, 0
+	if frameTiming then cpu, calls = GetFrameCPUUsage(frame, false) end
+	return RootName(root), frame:GetNumRegions(), root ~= frame and root or nil, cpu, calls
 end
 
 local function ClientLoad()
+	frameTiming = ScriptProfiling() and GetFrameCPUUsage ~= nil
 	local total, ownedFrames, ownedRegions = 0, 0, 0
 	local roots = {}
 	local frame = EnumerateFrames()
 	while frame do
 		total = total + 1
-		local ok, rootName, regions, root = pcall(Inspect, frame)
+		local ok, rootName, regions, root, cpu, calls = pcall(Inspect, frame)
 		if ok and (rootName:find('^BUI') or rootName == 'group header' or (root or frame)._buiAuraContainer) then
 			ownedFrames, ownedRegions = ownedFrames + 1, ownedRegions + regions
-			local entry = roots[rootName] or { name = rootName, frames = 0, regions = 0 }
+			local entry = roots[rootName] or { name = rootName, frames = 0, regions = 0, cpu = 0, calls = 0 }
 			roots[rootName] = entry
 			entry.frames, entry.regions = entry.frames + 1, entry.regions + regions
+			entry.cpu, entry.calls = entry.cpu + (cpu or 0), entry.calls + (calls or 0)
 		end
 		frame = EnumerateFrames(frame)
 	end
@@ -132,6 +192,7 @@ local function ClientLoad()
 		local containers, shown, groups, slots = BUI.AuraEngine.CountAuraGroups()
 		Line('native aura containers', ('%d shown of %d, %d aura groups active, %d icon slots'):format(shown, containers, groups, slots))
 	end
+	return list
 end
 
 local function Stop()
@@ -142,9 +203,9 @@ local function Stop()
 	Line('average per frame', Ms(session.count > 0 and session.sum / session.count or 0))
 	Line('worst second', Ms(session.max))
 	Line('frames over 5 / 10 / 50 / 100 ms', ('%d / %d / %d / %d'):format(now[1] - before[1], now[2] - before[2], now[3] - before[3], now[4] - before[4]))
-	ClientLoad()
+	local roots = ClientLoad()
 	if ScriptProfiling() then
-		Breakdown()
+		Breakdown(roots)
 	else
 		Line('note', 'event and timer work only; hooks run from Blizzard code need /console scriptProfile 1 and a reload')
 	end
@@ -172,8 +233,8 @@ function Perf.Report()
 	Line('worst frame', Ms(Metric(metrics.PeakTime)))
 	Line('frames over 5 / 10 / 50 / 100 ms', ('%d / %d / %d / %d'):format(
 		Metric(metrics.CountTimeOver5Ms), Metric(metrics.CountTimeOver10Ms), Metric(metrics.CountTimeOver50Ms), Metric(metrics.CountTimeOver100Ms)))
-	ClientLoad()
-	if ScriptProfiling() then Breakdown() end
+	local roots = ClientLoad()
+	if ScriptProfiling() then Breakdown(roots) end
 end
 
 function Perf.Handlers()
@@ -185,7 +246,7 @@ function Perf.Handlers()
 		BUI.Print('Function timing is off. Run /console scriptProfile 1 and /reload, then /bui perf before and after a pull. Afterwards run /console scriptProfile 0 and /reload, since timing costs frames on its own.')
 		return
 	end
-	Breakdown()
+	Breakdown(ClientLoad())
 end
 
 function Perf.Reset()

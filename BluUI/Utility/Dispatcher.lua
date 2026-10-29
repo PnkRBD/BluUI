@@ -7,6 +7,7 @@ BUI.Dispatcher = Dispatcher
 
 function Dispatcher.New(callback)
     local frame = CreateFrame('Frame')
+    frame._buiPerfName = 'BUI_Dispatcher'
     frame:Hide()
     local pending = false
 

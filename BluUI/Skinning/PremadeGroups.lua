@@ -2178,7 +2178,7 @@ context.Window('LFGListFrame', {
 		local panel = frame.SearchPanel
 		panel:HookScript('OnShow', context.Guard(OnSearchShown))
 		panel:HookScript('OnHide', context.Guard(OnSearchHidden))
-		hooksecurefunc('LFGListSearchPanel_DoSearch', context.Guard(OnBlizzardSearch))
+		BUI.Hook('PremadeGroups.LFGListSearchPanel_DoSearch', 'LFGListSearchPanel_DoSearch', context.Guard(OnBlizzardSearch))
 		local box = panel.SearchBox
 		box:HookScript('OnTextChanged', MirrorSearchText)
 		box:HookScript('OnEditFocusGained', MirrorSearchText)

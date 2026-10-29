@@ -206,7 +206,7 @@ function Skin.ReserveWidth(frame, width, space)
 	if not reservedWidths[frame] then blizzardWidths[frame] = frame:GetWidth() end
 	if not widthHooked[frame] then
 		widthHooked[frame] = true
-		hooksecurefunc(frame, 'SetWidth', HoldReservedWidth)
+		BUI.Hook('Core.HoldReservedWidth', frame, 'SetWidth', HoldReservedWidth)
 	end
 	reservedWidths[frame] = reserved
 	frame:SetWidth(reserved)
@@ -453,7 +453,7 @@ local function TipCollapseButton(button, enabled)
 	if not button._buiCollapseEnabled then
 		button._buiCollapseEnabled = enabled
 		Painter.Tint(button.Icon, 'skinLabel')
-		hooksecurefunc(button, 'UpdateCollapsedState', PaintCollapseGlyph)
+		BUI.Hook('Core.PaintCollapseGlyph', button, 'UpdateCollapsedState', PaintCollapseGlyph)
 	end
 	PaintCollapseGlyph(button, button.collapsed)
 end
@@ -857,8 +857,8 @@ function Skin.SegmentTabs(tabSystem, enabled)
 		if not tab._buiSegment then
 			Skin.SegmentButton(tab)
 			tab._buiSegment = enabled
-			hooksecurefunc(tab, 'SetTabSelected', PaintSegment)
-			hooksecurefunc(tab, 'UpdateTabWidth', SizeSegment)
+			BUI.Hook('Core.PaintSegment', tab, 'SetTabSelected', PaintSegment)
+			BUI.Hook('Core.SizeSegment', tab, 'UpdateTabWidth', SizeSegment)
 		end
 		PaintSegment(tab)
 		SizeSegment(tab)
@@ -1223,7 +1223,7 @@ function Skin.SideTab(context, tab, options)
 				if options.crop then Skin.CropIcon(icon) end
 				if options.iconWidth then icon:SetSize(options.iconWidth, options.iconHeight or options.iconWidth) end
 				CenterSideTabIcon(icon)
-				hooksecurefunc(icon, 'SetPoint', CenterSideTabIcon)
+				BUI.Hook('Core.CenterSideTabIcon', icon, 'SetPoint', CenterSideTabIcon)
 				icons[#icons + 1] = icon
 			end
 		end
@@ -1590,11 +1590,14 @@ function Skin.Define(id, info)
 	end
 
 	function context.Hook(target, method, handler)
+		local guarded = Guard(handler or method)
+		local label = 'Skin.' .. id .. '.' .. (handler and method or target)
 		if handler then
-			hooksecurefunc(target, method, Guard(handler))
+			hooksecurefunc(target, method, guarded)
 		else
-			hooksecurefunc(target, Guard(method))
+			hooksecurefunc(target, guarded)
 		end
+		BUI.Perf.Track(label, guarded)
 	end
 
 	function context.Window(name, spec)
@@ -1647,10 +1650,10 @@ end
 local function InstallTabHooks()
 	if tabHooksInstalled then return end
 	tabHooksInstalled = true
-	hooksecurefunc('PanelTemplates_UpdateTabs', OnTabsChanged)
-	hooksecurefunc('PanelTemplates_ShowTab', OnTabsChanged)
-	hooksecurefunc('PanelTemplates_HideTab', OnTabsChanged)
-	hooksecurefunc('PanelTemplates_TabResize', OnTabResized)
+	BUI.Hook('Core.OnTabsChanged', 'PanelTemplates_UpdateTabs', OnTabsChanged)
+	BUI.Hook('Core.OnTabsChanged', 'PanelTemplates_ShowTab', OnTabsChanged)
+	BUI.Hook('Core.OnTabsChanged', 'PanelTemplates_HideTab', OnTabsChanged)
+	BUI.Hook('Core.OnTabResized', 'PanelTemplates_TabResize', OnTabResized)
 end
 
 function Skin.RegisterTabStrip(frame, tabs, context)
@@ -1685,8 +1688,8 @@ end
 function Skin.RegisterTabSystem(tabSystem, context, panel)
 	if not tabSystem or tabSystems[tabSystem] then return end
 	tabSystems[tabSystem] = { context = context, panel = panel }
-	hooksecurefunc(tabSystem, 'SetTabVisuallySelected', OnTabSystemChanged)
-	hooksecurefunc(tabSystem, 'Layout', OnTabSystemChanged)
+	BUI.Hook('Core.OnTabSystemChanged', tabSystem, 'SetTabVisuallySelected', OnTabSystemChanged)
+	BUI.Hook('Core.OnTabSystemChanged', tabSystem, 'Layout', OnTabSystemChanged)
 	Skin.RefreshTabSystem(tabSystem)
 end
 
@@ -1813,7 +1816,7 @@ function Skin.SweepScrollBox(scrollBox, callback)
 	if not scrollBox or scrollBox._buiSweep then return end
 	scrollBox._buiSweep = true
 	local function Sweep(box) Skin.ForEachScrollFrame(box, callback) end
-	hooksecurefunc(scrollBox, 'Update', Sweep)
+	BUI.Hook('Core.Sweep', scrollBox, 'Update', Sweep)
 	Sweep(scrollBox)
 end
 
@@ -1860,7 +1863,7 @@ function Skin.TipIconSelector(context, selector)
 	end)
 	if selector.UpdateAllSelectedTextures and not selector._buiSelectionHook then
 		selector._buiSelectionHook = true
-		hooksecurefunc(selector, 'UpdateAllSelectedTextures', function(host)
+		BUI.Hook('Core.UpdateAllSelectedTextures', selector, 'UpdateAllSelectedTextures', function(host)
 			if context.enabled() then Skin.SweepIconSelector(host) end
 		end)
 	end

@@ -71,7 +71,7 @@ local function Suppress(frame)
 	frame:UnregisterAllEvents()
 	frame:SetParent(Hider())
 	frame:HookScript('OnShow', Rehide)
-	hooksecurefunc(frame, 'SetParent', SnapParent)
+	BUI.Hook('BlizzardHide.SnapParent', frame, 'SetParent', SnapParent)
 	HideFrame(frame)
 end
 

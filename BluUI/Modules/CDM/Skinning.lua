@@ -67,7 +67,7 @@ local function KillOverlays(icon)
                 region:SetAtlas(nil)
                 region:Hide()
                 region:SetAlpha(0)
-                hooksecurefunc(region, "Show", SuppressShow)
+                BUI.Hook('Skinning.SuppressShow', region, "Show", SuppressShow)
             end
         end
     end
@@ -82,11 +82,11 @@ local function KillDebuffBorder(icon)
 
     debuffBorder:Hide()
     debuffBorder:SetAlpha(0)
-    hooksecurefunc(debuffBorder, "Show", SuppressShow)
+    BUI.Hook('Skinning.SuppressShow', debuffBorder, "Show", SuppressShow)
 
     debuffBorder.Texture:Hide()
     debuffBorder.Texture:SetAlpha(0)
-    hooksecurefunc(debuffBorder.Texture, "Show", SuppressShow)
+    BUI.Hook('Skinning.SuppressShow', debuffBorder.Texture, "Show", SuppressShow)
 
     borderFrameData.killed = true
 end
@@ -264,8 +264,8 @@ local function HookIconDesaturation(texture)
     if frameData.desatHooked then return end
     frameData.desatHooked = true
 
-    hooksecurefunc(texture, "SetDesaturation", ReapplyDesaturation)
-    hooksecurefunc(texture, "SetDesaturated", ReapplyDesaturation)
+    BUI.Hook('Skinning.ReapplyDesaturation', texture, "SetDesaturation", ReapplyDesaturation)
+    BUI.Hook('Skinning.ReapplyDesaturation', texture, "SetDesaturated", ReapplyDesaturation)
 end
 
 local function ReenforceCooldownStyle(cooldown)
@@ -351,10 +351,10 @@ local function SetupCooldown(cooldown)
 
     if not cooldownFrameData.cdHooked then
         cooldownFrameData.cdHooked = true
-        hooksecurefunc(cooldown, 'SetCooldown', OnCooldownApplied)
-        hooksecurefunc(cooldown, 'SetCooldownFromDurationObject', ReenforceCooldownStyle)
-        hooksecurefunc(cooldown, 'SetReverse', ReclaimReverse)
-        hooksecurefunc(cooldown, 'SetDrawBling', ReclaimBling)
+        BUI.Hook('Skinning.OnCooldownApplied', cooldown, 'SetCooldown', OnCooldownApplied)
+        BUI.Hook('Skinning.ReenforceCooldownStyle', cooldown, 'SetCooldownFromDurationObject', ReenforceCooldownStyle)
+        BUI.Hook('Skinning.ReclaimReverse', cooldown, 'SetReverse', ReclaimReverse)
+        BUI.Hook('Skinning.ReclaimBling', cooldown, 'SetDrawBling', ReclaimBling)
     end
 end
 
@@ -469,7 +469,7 @@ function CDM.SkinIcon(icon, settings, key)
 
     if not iconFrameData.texHooked then
         iconFrameData.texHooked = true
-        hooksecurefunc(texture, 'SetTexture', OnIconTextureChanged)
+        BUI.Hook('Skinning.OnIconTextureChanged', texture, 'SetTexture', OnIconTextureChanged)
     end
     ApplyIconOverrideTexture(icon, iconFrameData)
 
@@ -513,8 +513,8 @@ function CDM.SkinIcon(icon, settings, key)
         local flashFrameData = GetFrameData(flash)
         if not flashFrameData.showHooked then
             flashFrameData.showHooked = true
-            hooksecurefunc(flash, "Show", OnCooldownFlashShow)
-            hooksecurefunc(flash.FlashAnim, "Play", OnCooldownFlashPlay)
+            BUI.Hook('Skinning.OnCooldownFlashShow', flash, "Show", OnCooldownFlashShow)
+            BUI.Hook('Skinning.OnCooldownFlashPlay', flash.FlashAnim, "Play", OnCooldownFlashPlay)
         end
         flashFrameData.viewerKey = key
         if not settings.showFlash then

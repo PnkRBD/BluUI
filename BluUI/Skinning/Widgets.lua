@@ -116,7 +116,7 @@ function Skin.CreateScrollArea(parent, rowHeight, padding)
 		end
 	end
 
-	hooksecurefunc(child, 'SetHeight', function(_, height)
+	BUI.Hook('Widgets.SetHeight', child, 'SetHeight', function(_, height)
 		contentHeight = height
 		UpdateRange(scroll:GetWidth())
 	end)

@@ -122,9 +122,9 @@ local function OnSelectSystem(systemFrame)
 end
 
 local function HookSystemFrame(frame)
-    hooksecurefunc(frame, "SelectSystem", OnSelectSystem)
-    hooksecurefunc(frame, "HighlightSystem", OnSelectSystem)
-    hooksecurefunc(frame, "ClearHighlight", HideLockText)
+    BUI.Hook('EditModeLock.OnSelectSystem', frame, "SelectSystem", OnSelectSystem)
+    BUI.Hook('EditModeLock.OnSelectSystem', frame, "HighlightSystem", OnSelectSystem)
+    BUI.Hook('EditModeLock.HideLockText', frame, "ClearHighlight", HideLockText)
 end
 
 local function SyncBarsLock()
@@ -258,7 +258,7 @@ function EditModeLock.ApplyRecommendedSettings()
 end
 
 function EditModeLock.Initialize()
-    hooksecurefunc(EditModeSystemSettingsDialog, "AttachToSystemFrame", OnDialogAttach)
+    BUI.Hook('EditModeLock.OnDialogAttach', EditModeSystemSettingsDialog, "AttachToSystemFrame", OnDialogAttach)
     for _, name in ipairs(CDM_SYSTEM_FRAMES) do
         local frame = _G[name]
         frame.isLocked = true

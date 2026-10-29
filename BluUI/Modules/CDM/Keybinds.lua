@@ -732,13 +732,13 @@ local function EnsureHooks()
     for key, viewerName in pairs(CDM.VIEWERS) do
         local viewer = key ~= 'buffs' and _G[viewerName]
         if viewer then
-            hooksecurefunc(viewer, "RefreshLayout", Keybinds.ScheduleRebuild)
+            BUI.Hook('Keybinds.ScheduleRebuild', viewer, "RefreshLayout", Keybinds.ScheduleRebuild)
             hookedViewer = true
         end
     end
 
     if not hookedViewer then return end
-    hooksecurefunc(CDM, "NotifyDependents", Keybinds.Apply)
+    BUI.Hook('Keybinds.Apply', CDM, "NotifyDependents", Keybinds.Apply)
     hooksInstalled = true
 end
 

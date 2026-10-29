@@ -196,8 +196,8 @@ local function StayHidden(frame, flag, shouldHide)
 	if frame[flag] then return end
 	frame[flag] = true
 	local function Reassert(shownFrame) if shouldHide(shownFrame) then shownFrame:Hide() end end
-	hooksecurefunc(frame, 'Show', Reassert)
-	hooksecurefunc(frame, 'SetShown', function(shownFrame, shown) if shown then Reassert(shownFrame) end end)
+	BUI.Hook('Chat.Reassert', frame, 'Show', Reassert)
+	BUI.Hook('Chat.SetShown', frame, 'SetShown', function(shownFrame, shown) if shown then Reassert(shownFrame) end end)
 end
 
 local function Always() return true end
@@ -1861,7 +1861,7 @@ local function InstallChat(chat)
 		ApplyTabAlpha(tab)
 	end)
 
-	hooksecurefunc('FCFDock_UpdateTabs', function(dock)
+	BUI.Hook('Chat.FCFDock_UpdateTabs', 'FCFDock_UpdateTabs', function(dock)
 		if dockTabsMoved then AlignDockTabs(dock) end
 	end)
 

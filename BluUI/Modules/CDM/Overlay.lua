@@ -57,7 +57,7 @@ function CDM.SetupBlizzardOverlay()
             and CooldownViewerSettings.displayMode == "spells")
     end
 
-    hooksecurefunc(CooldownViewerSettings, "SetDisplayMode", Refresh)
+    BUI.Hook('Overlay.Refresh', CooldownViewerSettings, "SetDisplayMode", Refresh)
     CooldownViewerSettings:HookScript("OnShow", Refresh)
     CooldownViewerSettings:HookScript("OnHide", function()
         overlay:Hide()

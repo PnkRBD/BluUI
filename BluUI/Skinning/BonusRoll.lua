@@ -197,7 +197,7 @@ Skin.ToastAnchors.Register({
 	followFrame = true,
 	defaultY = 340,
 	frame = function() return _G.BonusRollFrame end,
-	hooks = function(reapply) hooksecurefunc(BottomManagedFrameContainer, 'Layout', reapply) end,
+	hooks = function(reapply) BUI.Hook('BonusRoll.reapply', BottomManagedFrameContainer, 'Layout', reapply) end,
 })
 
 context.info.settings = {

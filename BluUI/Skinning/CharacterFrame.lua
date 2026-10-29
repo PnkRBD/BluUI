@@ -623,9 +623,9 @@ local function BuildSlotLabels(button, info)
 
     local contextOverlay = button.ItemContextOverlay
     local function Sync() SyncGemDim(labels) end
-    hooksecurefunc(contextOverlay, 'Show', Sync)
-    hooksecurefunc(contextOverlay, 'Hide', Sync)
-    hooksecurefunc(contextOverlay, 'SetShown', Sync)
+    BUI.Hook('CharacterFrame.Sync', contextOverlay, 'Show', Sync)
+    BUI.Hook('CharacterFrame.Sync', contextOverlay, 'Hide', Sync)
+    BUI.Hook('CharacterFrame.Sync', contextOverlay, 'SetShown', Sync)
 
     return labels
 end

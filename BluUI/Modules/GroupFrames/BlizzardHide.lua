@@ -71,9 +71,9 @@ local compactHookInstalled = false
 local function installCompactHook()
 	if compactHookInstalled then return end
 	compactHookInstalled = true
-	hooksecurefunc("CompactUnitFrame_UpdateUnitEvents", stripCompactUnitEvents)
-	hooksecurefunc("CompactUnitFrame_SetUpFrame", markCompactSetup)
-	hooksecurefunc("CompactUnitFrame_SetUnit", silenceCompactUnit)
+	BUI.Hook('BlizzardHide.stripCompactUnitEvents', "CompactUnitFrame_UpdateUnitEvents", stripCompactUnitEvents)
+	BUI.Hook('BlizzardHide.markCompactSetup', "CompactUnitFrame_SetUpFrame", markCompactSetup)
+	BUI.Hook('BlizzardHide.silenceCompactUnit', "CompactUnitFrame_SetUnit", silenceCompactUnit)
 end
 
 local partyHidden = false

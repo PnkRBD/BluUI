@@ -195,7 +195,7 @@ local function Install()
 end
 
 local function AnchorHooks(reapply)
-	hooksecurefunc(BottomManagedFrameContainer, 'Layout', reapply)
+	BUI.Hook('GroupLoot.reapply', BottomManagedFrameContainer, 'Layout', reapply)
 end
 
 local function GrowPoint()

@@ -125,11 +125,11 @@ local function OnBlizzardMove()
 end
 
 local function InstallHooks()
-	hooksecurefunc(MicroMenu, 'Layout', OnBlizzardLayout)
-	hooksecurefunc(MicroMenu, 'ResetMicroMenuPosition', OnBlizzardMove)
-	hooksecurefunc(MicroMenu, 'OverrideMicroMenuPosition', OnBlizzardMove)
-	hooksecurefunc(MicroMenu, 'SetNormalScale', OnBlizzardMove)
-	hooksecurefunc('MicroMenuBar_ClearFullScreenFrame', OnBlizzardMove)
+	BUI.Hook('MicroBar.OnBlizzardLayout', MicroMenu, 'Layout', OnBlizzardLayout)
+	BUI.Hook('MicroBar.OnBlizzardMove', MicroMenu, 'ResetMicroMenuPosition', OnBlizzardMove)
+	BUI.Hook('MicroBar.OnBlizzardMove', MicroMenu, 'OverrideMicroMenuPosition', OnBlizzardMove)
+	BUI.Hook('MicroBar.OnBlizzardMove', MicroMenu, 'SetNormalScale', OnBlizzardMove)
+	BUI.Hook('MicroBar.OnBlizzardMove', 'MicroMenuBar_ClearFullScreenFrame', OnBlizzardMove)
 end
 
 microBar = ActionBars.NewBlizzardBar({

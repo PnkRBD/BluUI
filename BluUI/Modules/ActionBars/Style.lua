@@ -170,9 +170,9 @@ end
 function ActionBars.StyleCooldown(cooldown)
 	if not cooldown._buiStyleHooked then
 		cooldown._buiStyleHooked = true
-		hooksecurefunc(cooldown, 'SetSwipeColor', OnSwipeColorSet)
-		hooksecurefunc(cooldown, 'SetCooldown', ApplyCooldownStyle)
-		hooksecurefunc(cooldown, 'SetCooldownFromDurationObject', ApplyCooldownStyle)
+		BUI.Hook('Style.OnSwipeColorSet', cooldown, 'SetSwipeColor', OnSwipeColorSet)
+		BUI.Hook('Style.ApplyCooldownStyle', cooldown, 'SetCooldown', ApplyCooldownStyle)
+		BUI.Hook('Style.ApplyCooldownStyle', cooldown, 'SetCooldownFromDurationObject', ApplyCooldownStyle)
 	end
 	cooldown._buiTextStyled = nil
 	cooldown._buiSwipeApplied = nil

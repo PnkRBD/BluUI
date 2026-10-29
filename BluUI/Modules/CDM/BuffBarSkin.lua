@@ -213,7 +213,7 @@ local function SkinBarItem(item)
     item.DebuffBorder:Hide()
     if not item._buiDebuffBorderHooked then
         item._buiDebuffBorderHooked = true
-        hooksecurefunc(item.DebuffBorder, "Show", HideSelf)
+        BUI.Hook('BuffBarSkin.HideSelf', item.DebuffBorder, "Show", HideSelf)
     end
 
     local iconFrame = item.Icon
@@ -242,7 +242,7 @@ local function SkinBarItem(item)
     bar.Pip:SetAlpha(0)
     if not bar._buiPipHooked then
         bar._buiPipHooked = true
-        hooksecurefunc(bar.Pip, "Show", HidePip)
+        BUI.Hook('BuffBarSkin.HidePip', bar.Pip, "Show", HidePip)
     end
 
     if not bar._buiBorderHost then
@@ -327,13 +327,13 @@ end
 HookItemVisibility = function(item)
     if item._buiVisHooked then return end
     item._buiVisHooked = true
-    hooksecurefunc(item, "Show", ScheduleReflow)
-    hooksecurefunc(item, "Hide", ScheduleReflow)
-    hooksecurefunc(item, "SetShown", ScheduleReflow)
-    hooksecurefunc(item, "SetSize", ReflowUnlessFitting)
-    hooksecurefunc(item, "SetWidth", ReflowUnlessFitting)
-    hooksecurefunc(item, "SetHeight", ReflowUnlessFitting)
-    hooksecurefunc(item, "SetPoint", ReflowUnlessRestacking)
+    BUI.Hook('BuffBarSkin.ScheduleReflow', item, "Show", ScheduleReflow)
+    BUI.Hook('BuffBarSkin.ScheduleReflow', item, "Hide", ScheduleReflow)
+    BUI.Hook('BuffBarSkin.ScheduleReflow', item, "SetShown", ScheduleReflow)
+    BUI.Hook('BuffBarSkin.ReflowUnlessFitting', item, "SetSize", ReflowUnlessFitting)
+    BUI.Hook('BuffBarSkin.ReflowUnlessFitting', item, "SetWidth", ReflowUnlessFitting)
+    BUI.Hook('BuffBarSkin.ReflowUnlessFitting', item, "SetHeight", ReflowUnlessFitting)
+    BUI.Hook('BuffBarSkin.ReflowUnlessRestacking', item, "SetPoint", ReflowUnlessRestacking)
 end
 
 function CDM.RefreshBuffBarSkin()
@@ -380,7 +380,7 @@ local function HookBuffBarViewer()
     RestackItems(viewer)
     PositionViewer()
 
-    hooksecurefunc(viewer, "SetPoint", function()
+    BUI.Hook('BuffBarSkin.SetPoint', viewer, "SetPoint", function()
         if positioning then return end
         viewerMoved = true
         if GetSettings().skinEnabled then ScheduleReposition() end

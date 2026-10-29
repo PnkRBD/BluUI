@@ -117,6 +117,7 @@ function Scheduler.RegisterUpdate(name, callback, interval, active)
         active   = enabled,
     }
     if enabled then activeCount = activeCount + 1 end
+    if BUI.Perf then BUI.Perf.Track('Tick.' .. name, callback) end
     Refresh()
 end
 

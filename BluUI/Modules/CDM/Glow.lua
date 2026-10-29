@@ -244,7 +244,7 @@ function CDM.SetupGlowHooks()
 		end
 	end)
 
-	hooksecurefunc(ActionButtonSpellAlertManager, 'ShowAlert', function(_, frame)
+	BUI.Hook('Glow.ShowAlert', ActionButtonSpellAlertManager, 'ShowAlert', function(_, frame)
 		local icon = ResolveViewerIcon(frame)
 		if not icon then return end
 		local frameData = GetFrameData(icon)
@@ -258,7 +258,7 @@ function CDM.SetupGlowHooks()
 		StartBlizzardProc(icon, frameData)
 	end)
 
-	hooksecurefunc(ActionButtonSpellAlertManager, 'HideAlert', function(_, frame)
+	BUI.Hook('Glow.HideAlert', ActionButtonSpellAlertManager, 'HideAlert', function(_, frame)
 		local icon = ResolveViewerIcon(frame)
 		if not icon then return end
 		local frameData = FrameData[icon]

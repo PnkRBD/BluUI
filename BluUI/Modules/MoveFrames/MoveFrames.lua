@@ -477,7 +477,7 @@ local function HookFrame(path, rootPath)
 	InstallHandleHooks(handle)
 
 	local rehooking = false
-	hooksecurefunc(handle, 'SetScript', function(_, scriptName)
+	BUI.Hook('MoveFrames.SetScript', handle, 'SetScript', function(_, scriptName)
 		if rehooking then return end
 		if scriptName ~= 'OnDragStart' and scriptName ~= 'OnDragStop' then return end
 		rehooking = true
@@ -494,7 +494,7 @@ local function HookFrame(path, rootPath)
 		target:SetMovable(true)
 		target:SetClampedToScreen(true)
 		SnapshotBlizzardPoints(target)
-		hooksecurefunc(target, 'SetPoint', OnTargetSetPoint)
+		BUI.Hook('MoveFrames.OnTargetSetPoint', target, 'SetPoint', OnTargetSetPoint)
 		target:HookScript('OnHide', OnTargetHide)
 		target:HookScript('OnShow', OnTargetShow)
 		ApplySavedPosition(target)

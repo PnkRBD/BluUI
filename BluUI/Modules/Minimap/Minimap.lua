@@ -753,8 +753,8 @@ local function HookSetPoint(frame, key, repositionCallback)
 			repositionLock[key] = false
 		end
 	end
-	hooksecurefunc(frame, 'SetPoint', Reassert)
-	hooksecurefunc(frame, 'SetScale', Reassert)
+	BUI.Hook('Minimap.Reassert', frame, 'SetPoint', Reassert)
+	BUI.Hook('Minimap.Reassert', frame, 'SetScale', Reassert)
 end
 
 local landingTamed = false
@@ -771,7 +771,7 @@ local function TameLandingButton()
 		clamping = false
 	end
 	Clamp()
-	hooksecurefunc(button, 'SetSize', Clamp)
+	BUI.Hook('Minimap.Clamp', button, 'SetSize', Clamp)
 end
 
 Minimap.TEXT_INSET, Minimap.TEXT_BOX_HEIGHT, Minimap.DIFFICULTY_FONT_SIZE = TEXT_INSET, TEXT_BOX_HEIGHT, DIFFICULTY_FONT_SIZE

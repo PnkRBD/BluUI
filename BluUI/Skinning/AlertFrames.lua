@@ -147,5 +147,5 @@ Skin.ToastAnchors.Register({
 		frame:ClearAllPoints()
 		frame:SetAllPoints(anchor)
 	end,
-	hooks = function(reapply) hooksecurefunc(_G.AlertFrame, 'UpdateAnchors', reapply) end,
+	hooks = function(reapply) BUI.Hook('AlertFrames.reapply', _G.AlertFrame, 'UpdateAnchors', reapply) end,
 })

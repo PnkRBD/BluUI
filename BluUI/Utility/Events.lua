@@ -5,6 +5,7 @@ local Events = {}
 BUI.Events = Events
 
 local globalFrame = CreateFrame('Frame')
+globalFrame._buiPerfName = 'BUI_Events'
 local globalCallbacks = {}
 local onceCallbacks = {}
 local onceSnapshot = {}
@@ -61,6 +62,7 @@ local function AcquireUnitFrame(event, unit)
     if unitFramePool[event][unit] then return unitFramePool[event][unit] end
 
     local frame = table.remove(retiredUnitFrames) or CreateFrame('Frame')
+    frame._buiPerfName = 'BUI_Events'
     frame:RegisterUnitEvent(event, unit)
     frame:SetScript('OnEvent', function(_, firedEvent, ...)
         local handlers = unitCallbacks[firedEvent] and unitCallbacks[firedEvent][unit]

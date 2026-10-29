@@ -356,7 +356,7 @@ end
 BUI.Events:Register('UI_SCALE_CHANGED', 'Pixel', OnScaleChanged)
 BUI.Events:Register('DISPLAY_SIZE_CHANGED', 'Pixel', OnScaleChanged)
 BUI.Events:Register('GX_RESTARTED', 'Pixel', OnGXRestarted)
-hooksecurefunc(UIParent, "SetScale", OnScaleChanged)
+BUI.Hook('Pixel.OnScaleChanged', UIParent, "SetScale", OnScaleChanged)
 
 Recompute()
 
