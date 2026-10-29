@@ -38,8 +38,6 @@ local TIMESTAMP_OPTIONS = {
 	{ value = '%I:%M', text = '02:30' },
 	{ value = '%I:%M %p', text = '02:30 PM' },
 }
-local DIGITS = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' }
-local STAMP_SPACER = '|T' .. BUILib.GetLibMedia('blank') .. ':1:%d|t'
 local CHANNEL_ABBR = {
 	['LookingForGroup'] = 'LFG', ['LocalDefense'] = 'Defense',
 	['General'] = 'Gen', ['Trade'] = 'Trade', ['Services'] = 'Svc',
@@ -397,21 +395,6 @@ local function ProcessChannels(text, config)
 	return (gsub(text, '(|Hchannel:[^|]*|h)(%[[^%]]*%])(|h)', ShortChannel))
 end
 
-local lastCheckedFormat, lastFormatValid
-local function ValidStampFormat(formatString)
-	if formatString ~= lastCheckedFormat then
-		lastCheckedFormat = formatString
-		lastFormatValid = true
-		for spec in formatString:gmatch('%%(.?)') do
-			if not spec:find('^[aAbBcCdDeHIjMmnpRrSTtUuVWwXxYyZz%%]') then
-				lastFormatValid = false
-				break
-			end
-		end
-	end
-	return lastFormatValid
-end
-
 local function Measurer(chat)
 	local measure = chat._buiMeasure
 	if not measure then
@@ -424,41 +407,61 @@ local function Measurer(chat)
 	return measure
 end
 
-local function DigitPads(chat)
-	local font, size, flags = chat:GetFont()
-	local pads = chat._buiDigitPads
-	if pads and pads.font == font and pads.size == size and pads.flags == flags then return pads end
-	pads = { font = font, size = size, flags = flags }
-	local measure = Measurer(chat)
-	local widest = 0
-	for _, digit in ipairs(DIGITS) do
-		measure:SetText(digit)
-		pads[digit] = measure:GetUnboundedStringWidth()
-		widest = max(widest, pads[digit])
+local ValidStampFormat, TabularStamp
+do
+	local DIGITS = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' }
+	local STAMP_SPACER = '|T' .. BUILib.GetLibMedia('blank') .. ':1:%d|t'
+	local lastCheckedFormat, lastFormatValid
+	local stampPads, idealPad, placedPad
+
+	function ValidStampFormat(formatString)
+		if formatString ~= lastCheckedFormat then
+			lastCheckedFormat = formatString
+			lastFormatValid = true
+			for spec in formatString:gmatch('%%(.?)') do
+				if not spec:find('^[aAbBcCdDeHIjMmnpRrSTtUuVWwXxYyZz%%]') then
+					lastFormatValid = false
+					break
+				end
+			end
+		end
+		return lastFormatValid
 	end
-	for _, digit in ipairs(DIGITS) do pads[digit] = (widest - pads[digit]) / 2 end
-	chat._buiDigitPads = pads
-	return pads
-end
 
-local stampPads, idealPad, placedPad
+	local function DigitPads(chat)
+		local font, size, flags = chat:GetFont()
+		local pads = chat._buiDigitPads
+		if pads and pads.font == font and pads.size == size and pads.flags == flags then return pads end
+		pads = { font = font, size = size, flags = flags }
+		local measure = Measurer(chat)
+		local widest = 0
+		for _, digit in ipairs(DIGITS) do
+			measure:SetText(digit)
+			pads[digit] = measure:GetUnboundedStringWidth()
+			widest = max(widest, pads[digit])
+		end
+		for _, digit in ipairs(DIGITS) do pads[digit] = (widest - pads[digit]) / 2 end
+		chat._buiDigitPads = pads
+		return pads
+	end
 
-local function StampSpacer(half)
-	idealPad = idealPad + half
-	local width = floor(idealPad + 0.5) - placedPad
-	if width == 0 then return '' end
-	placedPad = placedPad + width
-	return STAMP_SPACER:format(width)
-end
+	local function StampSpacer(half)
+		idealPad = idealPad + half
+		local width = floor(idealPad + 0.5) - placedPad
+		if width == 0 then return '' end
+		placedPad = placedPad + width
+		return STAMP_SPACER:format(width)
+	end
 
-local function PadDigit(digit)
-	local half = stampPads[digit]
-	return StampSpacer(half) .. digit .. StampSpacer(half)
-end
+	local function PadDigit(digit)
+		local half = stampPads[digit]
+		return StampSpacer(half) .. digit .. StampSpacer(half)
+	end
 
-local function TabularStamp(chat, stamp)
-	stampPads, idealPad, placedPad = DigitPads(chat), 0, 0
-	return (gsub(stamp, '%d', PadDigit))
+	function TabularStamp(chat, stamp)
+		stampPads, idealPad, placedPad = DigitPads(chat), 0, 0
+		return (gsub(stamp, '%d', PadDigit))
+	end
 end
 
 local function HookAddMessage(frame)
