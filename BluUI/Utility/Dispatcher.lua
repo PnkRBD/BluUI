@@ -5,9 +5,15 @@ local CreateFrame = CreateFrame
 local Dispatcher = {}
 BUI.Dispatcher = Dispatcher
 
+local function Site()
+    local stack = debugstack(3, 1, 0) or ''
+    local file, line = stack:match('AddOns/BluUI/([^"]+)"%]:(%d+)')
+    return file and (file .. ':' .. line) or '?'
+end
+
 function Dispatcher.New(callback)
     local frame = CreateFrame('Frame')
-    frame._buiPerfName = 'BUI_Dispatcher'
+    frame._buiPerfName = 'BUI_Dispatcher ' .. Site()
     frame:Hide()
     local pending = false
 
@@ -25,6 +31,7 @@ function Dispatcher.New(callback)
 end
 
 function Dispatcher.NewDelayed(callback, delay)
+    if BUI.Perf then BUI.Perf.Track('Delayed ' .. Site(), callback) end
     local pending = false
 
     local function Run()

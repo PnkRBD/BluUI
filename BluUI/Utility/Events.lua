@@ -62,7 +62,7 @@ local function AcquireUnitFrame(event, unit)
     if unitFramePool[event][unit] then return unitFramePool[event][unit] end
 
     local frame = table.remove(retiredUnitFrames) or CreateFrame('Frame')
-    frame._buiPerfName = 'BUI_Events'
+    frame._buiPerfName = 'BUI_Events ' .. event .. ' ' .. unit
     frame:RegisterUnitEvent(event, unit)
     frame:SetScript('OnEvent', function(_, firedEvent, ...)
         local handlers = unitCallbacks[firedEvent] and unitCallbacks[firedEvent][unit]

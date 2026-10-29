@@ -88,11 +88,22 @@ local function PrintTimed(rows, label, limit)
 	if #rows == 0 then Line('none', '-') end
 end
 
+local function GlobalNames()
+	local names = {}
+	for name, value in pairs(_G) do
+		if type(value) == 'function' and type(name) == 'string' then names[value] = name end
+	end
+	return names
+end
+
 local function FrameRows(scripts)
 	local rows, total = {}, 0
+	local globals = GlobalNames()
 	for callback, name in pairs(scripts) do
 		local usage, calls = GetFunctionCPUUsage(callback, true)
 		if calls > 0 then
+			local globalName = globals[callback]
+			if globalName then name = 'Blizzard ' .. globalName .. ', first seen on ' .. name end
 			rows[#rows + 1] = { name = name, usage = usage, calls = calls }
 			total = total + usage
 		end
