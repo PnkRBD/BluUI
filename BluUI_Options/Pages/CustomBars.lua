@@ -167,6 +167,49 @@ local function RefreshList(page)
 	if RailIconChanged() then RebuildPage() else RebuildPane(page) end
 end
 
+local function PlayerSpecs()
+	local specs = {}
+	for specIndex = 1, GetNumSpecializations() do
+		local specID, name = C_SpecializationInfo.GetSpecializationInfo(specIndex)
+		specs[#specs + 1] = { key = tostring(specID), name = name }
+	end
+	return specs
+end
+
+local function SpecOptions(bar, entry, specs)
+	local options = {}
+	for _, spec in ipairs(specs) do
+		options[#options + 1] = { label = 'Show as ' .. spec.name, get = function()
+			local shown = bar.iconSpecs[entry.hideKey]
+			return shown == nil or shown[spec.key] == true
+		end, set = function(value)
+			local shown = bar.iconSpecs[entry.hideKey]
+			if not shown then
+				shown = {}
+				for _, other in ipairs(specs) do shown[other.key] = true end
+				bar.iconSpecs[entry.hideKey] = shown
+			end
+			shown[spec.key] = value or nil
+			for _, other in ipairs(specs) do
+				if not shown[other.key] then return end
+			end
+			bar.iconSpecs[entry.hideKey] = nil
+		end }
+	end
+	return options
+end
+
+local function SpecSuffix(bar, entry, specs)
+	local shown = bar.iconSpecs[entry.hideKey]
+	if not shown then return '' end
+	local names = {}
+	for _, spec in ipairs(specs) do
+		if shown[spec.key] then names[#names + 1] = spec.name end
+	end
+	if #names == 0 then return ', no spec' end
+	return ', ' .. table.concat(names, ' and ') .. ' only'
+end
+
 local function PotionLabel(entry)
 	local _, _, _, _, _, _, subclassID = C_Item.GetItemInfoInstant(entry.id)
 	local label = subclassID == Enum.ItemConsumableSubclass.Flasksphials and 'Flask display' or 'Potion display'
@@ -269,6 +312,7 @@ end
 local function TrackedBoard(ui, parent, width, bar, page)
 	local spells = bar.customSpells
 	local entries = Entries(bar)
+	local specs = PlayerSpecs()
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = 'Tracked spells and items',
@@ -330,7 +374,7 @@ local function TrackedBoard(ui, parent, width, bar, page)
 				end)
 			end), TOOL_SIZE)
 		end
-		local options = {}
+		local options = SpecOptions(bar, entry, specs)
 		if entry.consumable then
 			options[#options + 1] = { label = 'Hide when you have none', get = function() return bar.hideWhenZero ~= nil and bar.hideWhenZero[entry.id] == true end, set = function(value)
 				bar.hideWhenZero = bar.hideWhenZero or {}
@@ -338,17 +382,18 @@ local function TrackedBoard(ui, parent, width, bar, page)
 			end }
 		end
 		if entry.itemID then
-			ui.Bind(subtitle, function() subtitle:SetText(entry.sub .. (bar.trinketBlacklist[entry.itemID] and ', skipped' or '')) end)
 			options[#options + 1] = { label = 'Skip this trinket', get = function() return bar.trinketBlacklist[entry.itemID] == true end, set = function(value)
 				bar.trinketBlacklist[entry.itemID] = value or nil
 			end }
 		end
-		if #options > 0 then
-			Put(ui.Tool(row, { tooltip = entry.name .. ' options', title = entry.name, options = options }, function()
-				Apply()
-				Repaint()
-			end), TOOL_SIZE)
-		end
+		ui.Bind(subtitle, function()
+			local skipped = entry.itemID and bar.trinketBlacklist[entry.itemID] and ', skipped' or ''
+			subtitle:SetText(entry.sub .. skipped .. SpecSuffix(bar, entry, specs))
+		end)
+		Put(ui.Tool(row, { tooltip = entry.name .. ' options', title = entry.name, options = options }, function()
+			Apply()
+			Repaint()
+		end), TOOL_SIZE)
 	end
 	if #entries == 0 then
 		local empty = Section.AddRow(board, 'nothing tracked yet')

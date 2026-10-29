@@ -503,7 +503,8 @@ local C_CooldownViewer = C_CooldownViewer
 local cachedBuildKey
 local function GetBuildKey()
     if cachedBuildKey then return cachedBuildKey end
-    local specID = PlayerUtil.GetCurrentSpecID() or 0
+    local specID = PlayerUtil.GetCurrentSpecID()
+    if not specID then return "0" end
     cachedBuildKey = tostring(specID)
     return cachedBuildKey
 end

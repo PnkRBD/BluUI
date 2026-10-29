@@ -122,18 +122,17 @@ end
 
 local UNCOPIED_KEYS = { name = true, posX = true, posY = true, customSpells = true }
 
+local function CopyValue(value)
+    if type(value) ~= "table" then return value end
+    local copy = {}
+    for tableKey, tableValue in pairs(value) do copy[tableKey] = CopyValue(tableValue) end
+    return copy
+end
+
 local function CopyBar(destination, source, spells)
     if source then
         for key, value in pairs(source) do
-            if not UNCOPIED_KEYS[key] then
-                if type(value) == "table" then
-                    local copy = {}
-                    for tableKey, tableValue in pairs(value) do copy[tableKey] = tableValue end
-                    destination[key] = copy
-                else
-                    destination[key] = value
-                end
-            end
+            if not UNCOPIED_KEYS[key] then destination[key] = CopyValue(value) end
         end
     end
     wipe(destination.customSpells)
@@ -383,6 +382,12 @@ end
 
 local collectSettings, collectOut, collectCount
 
+local function Skipped(hideKey)
+    if collectSettings.hiddenIcons[hideKey] then return true end
+    local specs = collectSettings.iconSpecs[hideKey]
+    return specs ~= nil and specs[BUI.CDM.GetBuildKey()] ~= true
+end
+
 local function Collect(entry)
     collectCount = collectCount + 1
     collectOut[collectCount] = entry
@@ -393,7 +398,7 @@ local function CollectSlot(slot)
     local settings = collectSettings
     local itemID = GetInventoryItemID("player", slot)
     local hideKey = SLOT_KEYS[slot]
-    if not itemID or settings.hiddenIcons[hideKey] or settings.trinketBlacklist[itemID] then return end
+    if not itemID or Skipped(hideKey) or settings.trinketBlacklist[itemID] then return end
     if settings.trinketsUsableOnly and IconEngine.GetItemSpellID(itemID) == nil then return end
     local entry = AcquireEntry()
     entry.id = itemID
@@ -404,7 +409,7 @@ end
 
 local function CollectRacial(spellID)
     local hideKey = RacialKey(spellID)
-    if seenScratch[spellID] or collectSettings.hiddenIcons[hideKey] then return end
+    if seenScratch[spellID] or Skipped(hideKey) then return end
     local iconID = C_Spell.GetSpellTexture(spellID)
     if not iconID then return end
     local charges = C_Spell.GetSpellCharges(spellID)
@@ -419,7 +424,7 @@ end
 local function CollectCustom(stored)
     local settings = collectSettings
     local entryID, isItem, isExplicitSpell = IconEngine.ExtractSpellItemID(stored)
-    if not entryID or settings.hiddenIcons[entryID] then return end
+    if not entryID or Skipped(entryID) then return end
     local iconType, itemID = IconEngine.ClassifyAsSpellOrItem(entryID, isItem, nil, isExplicitSpell)
     if iconType == "spell" then
         if seenScratch[entryID] then return end
@@ -782,6 +787,7 @@ local BAR_DEFAULTS = {
     hideIfNotInBags = false,
     showTooltips = true,
     hiddenIcons = {},
+    iconSpecs = {},
     trinketBlacklist = {},
     showStackText = true,
     showCooldownText = true,
@@ -917,6 +923,11 @@ local function OnEnteringWorld(_, isInitialLogin, isReloadingUi)
     if isInitialLogin or isReloadingUi then OnEvent() end
 end
 
+local function OnTalentBurst()
+    BUI.CDM.InvalidateBuildKey()
+    CustomBars.RefreshAllBars()
+end
+
 local spellEventsRegistered, itemEventsRegistered, chargeEventsRegistered, castEventsRegistered = false, false, false, false
 
 local function NeededCooldownEvents()
@@ -987,6 +998,7 @@ function CustomBars.Enable()
     BUI.Events:Register("BAG_UPDATE_DELAYED",       "CustomBars", OnEvent)
     BUI.Events:Register("ITEM_COUNT_CHANGED",       "CustomBars", OnEvent)
     BUI.Events:Register("PLAYER_ENTERING_WORLD",    "CustomBars", OnEnteringWorld)
+    BUI.Events:OnTalentBurst("CustomBars", OnTalentBurst)
     CustomBars.RefreshHotEventRegistration()
 
     BUI.Visibility.Register("CustomBars", CustomBars.UpdateOpacity, true)
