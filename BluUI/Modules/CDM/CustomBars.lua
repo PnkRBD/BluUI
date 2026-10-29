@@ -385,7 +385,7 @@ local collectSettings, collectOut, collectCount
 local function Skipped(hideKey)
     if collectSettings.hiddenIcons[hideKey] then return true end
     local specs = collectSettings.iconSpecs[hideKey]
-    return specs ~= nil and specs[BUI.CDM.GetBuildKey()] ~= true
+    return specs ~= nil and specs[BUI.CDM.GetBuildKey()] == false
 end
 
 local function Collect(entry)

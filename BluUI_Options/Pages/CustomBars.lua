@@ -180,32 +180,34 @@ local function SpecOptions(bar, entry, specs)
 	local options = {}
 	for _, spec in ipairs(specs) do
 		options[#options + 1] = { label = 'Show as ' .. spec.name, get = function()
-			local shown = bar.iconSpecs[entry.hideKey]
-			return shown == nil or shown[spec.key] == true
+			local hidden = bar.iconSpecs[entry.hideKey]
+			return not hidden or hidden[spec.key] ~= false
 		end, set = function(value)
-			local shown = bar.iconSpecs[entry.hideKey]
-			if not shown then
-				shown = {}
-				for _, other in ipairs(specs) do shown[other.key] = true end
-				bar.iconSpecs[entry.hideKey] = shown
+			local hidden = bar.iconSpecs[entry.hideKey]
+			if value then
+				if not hidden then return end
+				hidden[spec.key] = nil
+				if next(hidden) == nil then bar.iconSpecs[entry.hideKey] = nil end
+			else
+				if not hidden then
+					hidden = {}
+					bar.iconSpecs[entry.hideKey] = hidden
+				end
+				hidden[spec.key] = false
 			end
-			shown[spec.key] = value or nil
-			for _, other in ipairs(specs) do
-				if not shown[other.key] then return end
-			end
-			bar.iconSpecs[entry.hideKey] = nil
 		end }
 	end
 	return options
 end
 
 local function SpecSuffix(bar, entry, specs)
-	local shown = bar.iconSpecs[entry.hideKey]
-	if not shown then return '' end
+	local hidden = bar.iconSpecs[entry.hideKey]
+	if not hidden then return '' end
 	local names = {}
 	for _, spec in ipairs(specs) do
-		if shown[spec.key] then names[#names + 1] = spec.name end
+		if hidden[spec.key] ~= false then names[#names + 1] = spec.name end
 	end
+	if #names == #specs then return '' end
 	if #names == 0 then return ', no spec' end
 	return ', ' .. table.concat(names, ' and ') .. ' only'
 end
