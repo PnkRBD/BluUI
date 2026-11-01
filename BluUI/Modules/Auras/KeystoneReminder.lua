@@ -13,6 +13,7 @@ local FRAME_NAME = 'BUI_KeystoneReminder'
 local EVENT_KEY = 'KeystoneReminder'
 local COOLDOWN_KEY = 'KeystoneReminder.Cooldown'
 local CARD_KEY = 'KeystoneReminder.Card'
+local ROWS_KEY = 'KeystoneReminder.Rows'
 local PORTAL_KEY = 'KeystoneReminder.Portal.'
 local WIDTH, HEIGHT = 260, 62
 local PAD = 10
@@ -158,6 +159,9 @@ local function Dismiss()
     KeystoneReminder.SetLocked(true)
 end
 
+local BuildRow
+local shownRows = 0
+
 local function Build()
     if card then return end
     card = CreateFrame('Frame', FRAME_NAME, UIParent)
@@ -169,6 +173,7 @@ local function Build()
     card.portal = BuildPortal(card, PORTAL_SIZE, 'main')
     card.portal:SetPoint('TOPLEFT', Pixel.Scale(PAD), -Pixel.Scale(PAD))
     card.rows = {}
+    for index = 1, FULL_PARTY do card.rows[index] = BuildRow(index) end
 
     local close = Controls.Icon(card, { preset = 'close', size = CLOSE_SIZE, onClick = Dismiss })
     close:SetPoint('TOPRIGHT', Pixel.Scale(-8), Pixel.Scale(-8))
@@ -204,8 +209,9 @@ local function Build()
     })
 end
 
-local function BuildRow(index)
+BuildRow = function(index)
     local row = CreateFrame('Button', nil, card, 'SecureActionButtonTemplate')
+    row:Hide()
     row:SetSize(Pixel.Scale(WIDTH - PAD * 2), Pixel.Scale(ROW_HEIGHT))
     row:SetPoint('TOPLEFT', card, 'TOPLEFT', Pixel.Scale(PAD), -Pixel.Scale(HEIGHT + ROWS_TOP + (index - 1) * ROW_HEIGHT))
 
@@ -284,9 +290,19 @@ local function RoleMarkup(role)
     return atlas and ROLE_MARKUP:format(atlas) or ''
 end
 
+local function OwnerLabel(unit)
+    if not unit or not UnitExists(unit) then return nil end
+    local name = UnitName(unit)
+    if issecretvalue(name) then return nil end
+    local classFile = select(2, UnitClass(unit))
+    local color = not issecretvalue(classFile) and RAID_CLASS_COLORS[classFile]
+    local label = RoleMarkup(UnitGroupRolesAssigned(unit)) .. name
+    return color and color:WrapTextInColorCode(label) or label
+end
+
 local function PaintMeta()
     local playerRole = PlayerRole()
-    local role = ROLE_NAMES[playerRole] and (RoleMarkup(playerRole) .. ROLE_NAMES[playerRole])
+    local role = current.keyOwner or (ROLE_NAMES[playerRole] and (RoleMarkup(playerRole) .. ROLE_NAMES[playerRole]))
     local status = PortalStatus()
     if role and status then
         card.meta:SetText(role .. '  ·  ' .. status)
@@ -367,20 +383,19 @@ local function PaintRow(row, entry)
     SetPortal(row.portal, dungeon and BUI.PortalManager.TeleportSpell(dungeon), texture)
     row.level:SetText(entry.level and ('+' .. entry.level) or '')
     row.level:SetTextColor(BUI.ThemeColor('text'))
-    row:Show()
+end
+
+local function SyncRows()
+    for index, row in ipairs(card.rows) do row:SetShown(index <= shownRows) end
 end
 
 local function PaintRows()
     local entries = current.party or (BUI.PortalManager.ShowsPartyKeys() and PartyEntries(current.keyUnit)) or EMPTY
     for index, entry in ipairs(entries) do
-        local row = card.rows[index]
-        if not row then
-            row = BuildRow(index)
-            card.rows[index] = row
-        end
-        PaintRow(row, entry)
+        PaintRow(card.rows[index], entry)
     end
-    for index = #entries + 1, #card.rows do card.rows[index]:Hide() end
+    shownRows = #entries
+    BUI.Events:AfterCombat(SyncRows, ROWS_KEY)
     local count = #entries
     card.divider:SetShown(count > 0)
     local extra = count > 0 and (ROWS_TOP + count * ROW_HEIGHT + PAD) or 0
@@ -531,6 +546,7 @@ ShowParty = function()
         mapID = mapID,
         level = level,
         keyUnit = unit,
+        keyOwner = OwnerLabel(unit),
         activity = PARTY_ACTIVITY,
         texture = texture,
         spellID = dungeon and BUI.PortalManager.TeleportSpell(dungeon),
