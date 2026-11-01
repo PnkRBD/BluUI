@@ -102,19 +102,19 @@ Events["blu:absorb"] = "UNIT_ABSORB_AMOUNT_CHANGED UNIT_CONNECTION"
 
 Methods["blu:pwr"] = function(unit)
 	if IsOffline(unit) then return "" end
-	return AbbreviateNumbers(UnitPower(unit))
+	return AbbreviateNumbers(UnitPower(unit, Util.DisplayPowerType(unit)))
 end
 Events["blu:pwr"] = "UNIT_POWER_UPDATE UNIT_MAXPOWER UNIT_DISPLAYPOWER UNIT_CONNECTION"
 
 Methods["blu:pwrmax"] = function(unit)
 	if IsOffline(unit) then return "" end
-	return AbbreviateNumbers(UnitPowerMax(unit))
+	return AbbreviateNumbers(UnitPowerMax(unit, Util.DisplayPowerType(unit)))
 end
 Events["blu:pwrmax"] = "UNIT_MAXPOWER UNIT_DISPLAYPOWER UNIT_CONNECTION"
 
 Methods["blu:pwrpct"] = function(unit)
 	if IsOffline(unit) then return "" end
-	local percent = UnitPowerPercent(unit, nil, true, SCALE_100)
+	local percent = UnitPowerPercent(unit, Util.DisplayPowerType(unit), true, SCALE_100)
 	if percent == nil then return "" end
 	return ("%d%%"):format(percent)
 end

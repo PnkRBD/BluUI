@@ -241,6 +241,8 @@ local function BuildPower(frame, unit)
 	powerBar.bg.multiplier = 0.25
 
 	powerBar.colorPower = true
+	powerBar.displayAltPower = true
+	powerBar.GetDisplayPower = function(_, unit) return Util.DisplayPowerType(unit) end
 	powerBar.PostUpdateColor = PostUpdatePowerColor
 	powerBar.smoothing = UnitFrames.GetBarSmoothing()
 

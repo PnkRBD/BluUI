@@ -49,15 +49,23 @@ function Util.PlayerSpecRole()
 	return role
 end
 
+function Util.UnitRole(unit)
+	local role = UnitGroupRolesAssigned(unit)
+	if IsSecret(role) then return nil end
+	if role ~= "NONE" then return role end
+	if UnitIsUnit(unit, "player") then return Util.PlayerSpecRole() end
+end
+
 function Util.FrameRole(frame)
 	if not frame then return nil end
 	if frame._previewRole then return frame._previewRole end
 	local unit = frame.unit
 	if not unit then return nil end
-	local role = UnitGroupRolesAssigned(unit)
-	if IsSecret(role) then return nil end
-	if role ~= "NONE" then return role end
-	if UnitIsUnit(unit, "player") then return Util.PlayerSpecRole() end
+	return Util.UnitRole(unit)
+end
+
+function Util.DisplayPowerType(unit)
+	if Util.UnitRole(unit) == "HEALER" then return Enum.PowerType.Mana end
 end
 
 function Util.ResolveGrowth(anchorPoint, growDirection)
