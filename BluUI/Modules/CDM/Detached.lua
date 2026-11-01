@@ -200,6 +200,8 @@ local function DragFrameOnUpdate(self)
     lastDragX, lastDragY = x, y
 
     local frameData = GetFrameData(DragIcon)
+    frameData.posCornerX = x
+    frameData.posCornerY = y
     frameData.locking = true
     DragIcon:ClearAllPoints()
     DragIcon:SetPoint("CENTER", UIParent, "CENTER", x, y)
@@ -260,7 +262,11 @@ function Detached.StartDrag(icon, key)
     end
 
     local frameData = GetFrameData(icon)
-    frameData.anchor = nil
+    frameData.anchor = UIParent
+    frameData.selfPoint = "CENTER"
+    frameData.relPoint = "CENTER"
+    frameData.posCornerX = DragStartX
+    frameData.posCornerY = DragStartY
 
     CollectSnapTargets()
     GetDragFrame():Show()

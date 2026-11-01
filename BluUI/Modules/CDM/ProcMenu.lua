@@ -63,6 +63,11 @@ local function OverlayAnchor(icon)
 	return icon.Icon or icon
 end
 
+local function LinkedIDs(cooldownInfo)
+	local linked = cooldownInfo and cooldownInfo.linkedSpellIDs
+	if linked and not IsSecret(linked) then return linked end
+end
+
 local watcher = CreateFrame('Frame')
 local activeEntries = {}
 local activeIcons = {}
@@ -378,7 +383,7 @@ local function ResolveEntryForIcon(icon, perSpell)
 		AddCandidate(perSpell, cooldownInfo.overrideSpellID)
 	end
 	AddCandidate(perSpell, CDM.GetStableSpellID(icon))
-	local linked = cooldownInfo and cooldownInfo.linkedSpellIDs
+	local linked = LinkedIDs(cooldownInfo)
 	if linked then
 		for _, linkedSpellID in ipairs(linked) do
 			AddCandidate(perSpell, linkedSpellID)
@@ -465,8 +470,9 @@ local function IconBuffActive(icon)
 	if cooldownInfo then
 		local stamp = AuraStamp(cooldownInfo.overrideSpellID) or AuraStamp(cooldownInfo.spellID)
 		if stamp then return stamp end
-		if cooldownInfo.linkedSpellIDs then
-			for _, linkedSpellID in ipairs(cooldownInfo.linkedSpellIDs) do
+		local linked = LinkedIDs(cooldownInfo)
+		if linked then
+			for _, linkedSpellID in ipairs(linked) do
 				stamp = AuraStamp(linkedSpellID)
 				if stamp then return stamp end
 			end
@@ -515,7 +521,7 @@ local function CollectBuffSource(icon, perSpell)
 	local cooldownInfo = icon.cooldownInfo
 	local stableID = CDM.GetStableSpellID(icon)
 	local overrideID = cooldownInfo and cooldownInfo.overrideSpellID
-	local linked = cooldownInfo and cooldownInfo.linkedSpellIDs
+	local linked = LinkedIDs(cooldownInfo)
 	CarryIcon(stableID, icon)
 	CarryIcon(overrideID, icon)
 	if linked then
@@ -766,7 +772,7 @@ end
 
 local function CooldownInfoMatch(info, spellID)
 	if SafeEquals(info.spellID, spellID) or SafeEquals(info.overrideSpellID, spellID) then return true, false end
-	local linked = info.linkedSpellIDs
+	local linked = LinkedIDs(info)
 	if linked then
 		for linkedIndex = 1, #linked do
 			if SafeEquals(linked[linkedIndex], spellID) then return true, true end

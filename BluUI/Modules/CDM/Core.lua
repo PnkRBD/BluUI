@@ -56,7 +56,6 @@ CDM.state = {
     skinVersion = 1,
 }
 
-
 function CDM.PackInto(buf, ...)
     local count = select('#', ...)
     for i = 1, count do buf[i] = select(i, ...) end
@@ -384,7 +383,6 @@ function CDM.GetUnavailableTag(storedValue, isItemID)
     return "Unavailable"
 end
 
-
 function CDM.GetCountFont(icon)
     local frameData = FrameData[icon]
     if frameData then
@@ -500,20 +498,18 @@ end
 local tostring = tostring
 local C_CooldownViewer = C_CooldownViewer
 
-local cachedBuildKey
+local cachedBuildKey, cachedSpecIndex
 local function GetBuildKey()
-    if cachedBuildKey then return cachedBuildKey end
-    local specID = PlayerUtil.GetCurrentSpecID()
+    local specIndex = C_SpecializationInfo.GetSpecialization()
+    if cachedBuildKey and specIndex == cachedSpecIndex then return cachedBuildKey end
+    local specID = specIndex and C_SpecializationInfo.GetSpecializationInfo(specIndex)
     if not specID then return "0" end
+    cachedSpecIndex = specIndex
     cachedBuildKey = tostring(specID)
     return cachedBuildKey
 end
 
 CDM.GetBuildKey = GetBuildKey
-
-function CDM.InvalidateBuildKey()
-    cachedBuildKey = nil
-end
 
 local VIEWER_CATEGORY
 local blizzardCDMSpellCache = {}

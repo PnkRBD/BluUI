@@ -588,7 +588,7 @@ local function ApplyViewer(viewerKey)
         local icon = list[iconIndex]
         local frameData = GetFrameData(icon)
 
-        if not config.showKeybinds then
+        if not config.enabled or not config.showKeybinds then
             if frameData.keybindText then frameData.keybindText:Hide() end
             frameData.keybind = nil
             frameData.keybindGeneration = nil
@@ -632,7 +632,8 @@ local pendingBindings = false
 
 local function AnyViewerShowsKeybinds()
     for viewerIndex = 1, CDM.VIEWER_KEYS_COUNT do
-        if CDM.GetSettings(CDM.VIEWER_KEYS[viewerIndex]).showKeybinds then return true end
+        local settings = CDM.GetSettings(CDM.VIEWER_KEYS[viewerIndex])
+        if settings.enabled and settings.showKeybinds then return true end
     end
     return false
 end
@@ -728,18 +729,12 @@ local hooksInstalled = false
 
 local function EnsureHooks()
     if hooksInstalled then return end
-    local hookedViewer = false
+    hooksInstalled = true
     for key, viewerName in pairs(CDM.VIEWERS) do
-        local viewer = key ~= 'buffs' and _G[viewerName]
-        if viewer then
-            BUI.Hook('Keybinds.ScheduleRebuild', viewer, "RefreshLayout", Keybinds.ScheduleRebuild)
-            hookedViewer = true
+        if key ~= 'buffs' then
+            BUI.Hook('Keybinds.ScheduleRebuild', _G[viewerName], "RefreshLayout", Keybinds.ScheduleRebuild)
         end
     end
-
-    if not hookedViewer then return end
-    BUI.Hook('Keybinds.Apply', CDM, "NotifyDependents", Keybinds.Apply)
-    hooksInstalled = true
 end
 
 local RETRY_EVENTS = {
@@ -818,6 +813,7 @@ function Keybinds.UpdateConsumerState()
 end
 
 BUI.Events:Register("PLAYER_ENTERING_WORLD", "CDM.Keybinds.EnterWorld", function()
+    if not CDM.state.initialized then return end
     EnsureHooks()
     Keybinds.UpdateConsumerState()
     if active then

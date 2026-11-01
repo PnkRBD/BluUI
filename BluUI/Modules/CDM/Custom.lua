@@ -15,8 +15,6 @@ local IsEquippedItem = C_Item.IsEquippedItem
 
 local STANDARD_TEXT_FONT = STANDARD_TEXT_FONT
 
-local C_ClassTalents = C_ClassTalents
-
 local GetPlayerAuraBySpellID = C_UnitAuras.GetPlayerAuraBySpellID
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
@@ -26,11 +24,11 @@ local SetColor = BUI.IconEngine.SetColor
 local GetItemSpellID = BUI.IconEngine.GetItemSpellID
 
 local function SafeGetPlayerAura(spellID)
-	if not spellID then return nil, false end
-	if Tools.AuraQueriesBlocked() then return nil, true end
-	local aura = GetPlayerAuraBySpellID(spellID)
-	if issecretvalue(aura) then return nil, true end
-	return aura, false
+    if not spellID then return nil, false end
+    if Tools.AuraQueriesBlocked() then return nil, true end
+    local aura = GetPlayerAuraBySpellID(spellID)
+    if issecretvalue(aura) then return nil, true end
+    return aura, false
 end
 
 local FrameData = CDM.FrameData
@@ -43,86 +41,85 @@ local warningTemplate, warningExpiry, warningSpellName, warningThreshold
 local warningShowDecimals, warningLastBucket, warningFont, warningColor
 
 local function UpdateWarningText()
-	if not warningFrame or not warningFrame:IsShown() then return end
-	if not warningExpiry then return end
-	local remaining = warningExpiry - GetTime()
-	if remaining <= 0 then
-		warningFrame:Hide()
-		warningExpiry = nil
-		warningLastBucket = nil
-		return
-	end
-	local threshold = warningShowDecimals and warningThreshold or 0
-	local bucket = BUI.TimeFormat.Bucket(remaining, threshold)
-	if bucket == warningLastBucket then return end
-	warningLastBucket = bucket
-	local display = warningTemplate:gsub("%[time%]", BUI.TimeFormat.Format(remaining, threshold))
-	if warningSpellName then
-		display = display:gsub("%[name%]", warningSpellName)
-	end
-	warningText:SetText(display)
+    if not warningFrame or not warningFrame:IsShown() then return end
+    if not warningExpiry then return end
+    local remaining = warningExpiry - GetTime()
+    if remaining <= 0 then
+        warningFrame:Hide()
+        warningExpiry = nil
+        warningLastBucket = nil
+        return
+    end
+    local threshold = warningShowDecimals and warningThreshold or 0
+    local bucket = BUI.TimeFormat.Bucket(remaining, threshold)
+    if bucket == warningLastBucket then return end
+    warningLastBucket = bucket
+    local display = warningTemplate:gsub("%[time%]", BUI.TimeFormat.Format(remaining, threshold))
+    if warningSpellName then
+        display = display:gsub("%[name%]", warningSpellName)
+    end
+    warningText:SetText(display)
 end
 
 local warningLastSound
 
 local function ShowBuffWarning(icon, text, color, remaining, spellName, font, decimalThreshold)
-	if not warningFrame then
-		warningFrame = CreateFrame("Frame", nil, UIParent)
-		warningFrame:SetSize(Pixel.Scale(500), Pixel.Scale(50))
-		warningFrame:SetPoint("CENTER", UIParent, "CENTER", 0, Pixel.Scale(200))
-		warningFrame:SetFrameStrata("HIGH")
-		warningFrame:SetFrameLevel(99)
-		warningText = warningFrame:CreateFontString(nil, "OVERLAY")
-		Pixel.ApplyFont(warningText, 28)
-		warningText:SetPoint("CENTER")
-		warningFrame:SetScript("OnUpdate", UpdateWarningText)
-	end
-	text = text or "BUFF EXPIRING!"
-	if warningOwner == icon and warningTemplate == text and warningSpellName == spellName
-		and warningFont == font and warningColor == color and warningFrame:IsShown() then
-		return
-	end
-	warningOwner = icon
-	warningTemplate = text
-	if spellName ~= warningSpellName then warningExpiry = nil end
-	warningSpellName = spellName
-	warningLastBucket = nil
+    if not warningFrame then
+        warningFrame = CreateFrame("Frame", nil, UIParent)
+        warningFrame:SetSize(Pixel.Scale(500), Pixel.Scale(50))
+        warningFrame:SetPoint("CENTER", UIParent, "CENTER", 0, Pixel.Scale(200))
+        warningFrame:SetFrameStrata("HIGH")
+        warningFrame:SetFrameLevel(99)
+        warningText = warningFrame:CreateFontString(nil, "OVERLAY")
+        Pixel.ApplyFont(warningText, 28)
+        warningText:SetPoint("CENTER")
+        warningFrame:SetScript("OnUpdate", UpdateWarningText)
+    end
+    text = text or "BUFF EXPIRING!"
+    if warningOwner == icon and warningTemplate == text and warningSpellName == spellName
+        and warningFont == font and warningColor == color and warningFrame:IsShown() then
+        return
+    end
+    warningOwner = icon
+    warningTemplate = text
+    if spellName ~= warningSpellName then warningExpiry = nil end
+    warningSpellName = spellName
+    warningLastBucket = nil
 
-	if not warningExpiry and remaining then
-		warningExpiry = GetTime() + remaining
-	end
-	warningThreshold = decimalThreshold
-	warningShowDecimals = BUI.GetDB().cdm.buffs.showCooldownDecimals
-	warningFont, warningColor = font, color
-	if font then
-		Pixel.ApplyFont(warningText, 28, font)
-	else
-		Pixel.ApplyFont(warningText, 28)
-	end
-	if color then
-		warningText:SetTextColor(color[1], color[2], color[3], color[4] or 1)
-	else
-		warningText:SetTextColor(1, 0.2, 0.2, 1)
-	end
-	UpdateWarningText()
-	warningFrame:Show()
+    if not warningExpiry and remaining then
+        warningExpiry = GetTime() + remaining
+    end
+    warningThreshold = decimalThreshold
+    warningShowDecimals = BUI.GetDB().cdm.buffs.showCooldownDecimals
+    warningFont, warningColor = font, color
+    if font then
+        Pixel.ApplyFont(warningText, 28, font)
+    else
+        Pixel.ApplyFont(warningText, 28)
+    end
+    if color then
+        warningText:SetTextColor(color[1], color[2], color[3], color[4] or 1)
+    else
+        warningText:SetTextColor(1, 0.2, 0.2, 1)
+    end
+    UpdateWarningText()
+    warningFrame:Show()
 end
 
 local function HideBuffWarning(icon)
-	if warningOwner ~= icon then return end
-	warningFrame:Hide()
-	warningOwner = nil
-	warningTemplate = nil
-	warningExpiry = nil
-	warningSpellName = nil
-	warningLastSound = nil
-	warningThreshold = nil
-	warningShowDecimals = nil
-	warningLastBucket = nil
-	warningFont = nil
-	warningColor = nil
+    if warningOwner ~= icon then return end
+    warningFrame:Hide()
+    warningOwner = nil
+    warningTemplate = nil
+    warningExpiry = nil
+    warningSpellName = nil
+    warningLastSound = nil
+    warningThreshold = nil
+    warningShowDecimals = nil
+    warningLastBucket = nil
+    warningFont = nil
+    warningColor = nil
 end
-
 
 local function DeferredGlowActivate(icon, frameData)
     local glowConfig = frameData._deferredGlowCfg
@@ -1862,13 +1859,6 @@ end
 local RefreshAfterEquip = BUI.Dispatcher.New(function()
     DoRefresh()
     CDM.UpdateShowOnlyOnCDWatcher()
-end)
-
-BUI.Events:Register("TRAIT_CONFIG_UPDATED", "CDM.Custom.Traits", function(event, arg1)
-    local activeID = C_ClassTalents.GetActiveConfigID()
-    if arg1 and activeID and arg1 ~= activeID then return end
-    CDM.InvalidateBuildKey()
-    InvalidateCache()
 end)
 
 local function OnTalentBurst()

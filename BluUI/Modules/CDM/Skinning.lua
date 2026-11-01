@@ -192,7 +192,7 @@ local function ApplyAuraCooldownOverride(cooldown)
 
     local info = icon.cooldownInfo
     if not info then return end
-    local spellID = info.overrideSpellID or info.spellID
+    local spellID = BUI.Tools.SafeNum(info.overrideSpellID) or BUI.Tools.SafeNum(info.spellID)
     if not spellID then return end
 
     local hasChargeSource = icon:HasVisualDataSource_Charges()
@@ -208,7 +208,7 @@ end
 local function ResolveDesaturationValue(icon)
     local info = icon.cooldownInfo
     if not info then return nil end
-    local spellID = info.overrideSpellID or info.spellID
+    local spellID = BUI.Tools.SafeNum(info.overrideSpellID) or BUI.Tools.SafeNum(info.spellID)
     if not spellID then return nil end
 
     if icon:HasVisualDataSource_Charges() then

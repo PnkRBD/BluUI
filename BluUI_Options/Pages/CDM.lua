@@ -939,7 +939,7 @@ local function ViewerBoards(ui, parent, width, viewer)
 	local tools = { BUI.PositionTool(position, { fields = { posX = 'positionX', posY = 'positionY' }, frames = frames }) }
 	if viewerKey == 'buffs' then
 		tools[#tools + 1] = Eye('Show a movable preview of the buff icons', function() return module.state.buffsPreview ~= nil and module.state.buffsPreview:IsShown() end, function(value)
-			if value then module.ShowBuffsPreview(viewerSettings) else module.HideBuffsPreview() end
+			if value then module.ShowBuffsPreview() else module.HideBuffsPreview() end
 		end)
 	end
 	tools[#tools + 1] = { get = function() return viewerSettings.enabled == true end, set = function(value)

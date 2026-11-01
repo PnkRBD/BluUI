@@ -864,7 +864,6 @@ function CustomBars.GetBarCount()
     return #GetSettings()
 end
 
-
 local spellCooldownsPending, itemCooldownsPending, itemCountsPending = false, false, false
 
 local function FlushCooldownDispatch()
@@ -921,11 +920,6 @@ end, 0.1)
 
 local function OnEnteringWorld(_, isInitialLogin, isReloadingUi)
     if isInitialLogin or isReloadingUi then OnEvent() end
-end
-
-local function OnTalentBurst()
-    BUI.CDM.InvalidateBuildKey()
-    CustomBars.RefreshAllBars()
 end
 
 local spellEventsRegistered, itemEventsRegistered, chargeEventsRegistered, castEventsRegistered = false, false, false, false
@@ -998,7 +992,7 @@ function CustomBars.Enable()
     BUI.Events:Register("BAG_UPDATE_DELAYED",       "CustomBars", OnEvent)
     BUI.Events:Register("ITEM_COUNT_CHANGED",       "CustomBars", OnEvent)
     BUI.Events:Register("PLAYER_ENTERING_WORLD",    "CustomBars", OnEnteringWorld)
-    BUI.Events:OnTalentBurst("CustomBars", OnTalentBurst)
+    BUI.Events:OnTalentBurst("CustomBars", CustomBars.RefreshAllBars)
     CustomBars.RefreshHotEventRegistration()
 
     BUI.Visibility.Register("CustomBars", CustomBars.UpdateOpacity, true)

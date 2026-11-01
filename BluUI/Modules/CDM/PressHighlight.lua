@@ -150,7 +150,7 @@ local function CollectRawKeysForItem(itemID)
     if not itemID then return nil end
     wipe(collectSeen)
     local resultCount = 0
-    for slot = 1, 180 do
+    for slot = 1, 192 do
         if HasAction(slot) then
             local actionType, id = GetActionInfo(slot)
             if actionType == 'item' and id == itemID then

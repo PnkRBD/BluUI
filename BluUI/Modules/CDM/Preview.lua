@@ -96,7 +96,7 @@ local function LayoutIcons(icons, container, settings)
     return maxColumns * iconWidth + (maxColumns - 1) * gap, rowCount * iconHeight + (rowCount - 1) * gap
 end
 
-function CDM.ShowBuffsPreview(buffsSettings)
+function CDM.ShowBuffsPreview()
     local state = CDM.state
     if state.buffsPreview then
         state.buffsPreview:Show()

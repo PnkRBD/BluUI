@@ -4,7 +4,6 @@ local abs = math.abs
 local _G = _G
 local wipe = wipe
 
-
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
 local FrameData = CDM.FrameData
@@ -103,7 +102,7 @@ end
 
 local function OnIconSetScale(self, scale)
     local frameData = FrameData[self]
-    if not frameData or frameData.locking then return end
+    if not frameData or frameData.locking or not frameData.anchor then return end
     if abs(scale - 1) > 0.01 then
         RawSetScale(self, 1)
     end
@@ -275,6 +274,10 @@ function CDM.RestoreViewer(viewer, key)
         if frameData then
             frameData.anchor = nil
             frameData.parked = nil
+            frameData.hidden = nil
+            frameData.hiddenParked = nil
+            frameData.sizeW = nil
+            frameData.sizeH = nil
             frameData.locking = true
             icon:SetAlpha(1)
             frameData.locking = false

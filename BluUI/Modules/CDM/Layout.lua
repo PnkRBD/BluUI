@@ -4,7 +4,6 @@ local _G = _G
 local ipairs, wipe = ipairs, wipe
 local sort = table.sort
 
-
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
 local FrameData = CDM.FrameData
@@ -752,6 +751,7 @@ function CDM.NotifyDependents()
         if CDM.state.initComplete then CDM.NotifyAnchoredFrames() end
         BUI.Anchor.OnAnchorSizeChanged()
     end
+    CDM.Keybinds.Apply()
 end
 
 function CDM.RefreshLayoutOnly()
