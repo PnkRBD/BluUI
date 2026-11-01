@@ -54,6 +54,8 @@ end
 local ENCHANT_PATTERN = PatternFromFormat(ENCHANTED_TOOLTIP_LINE)
 local UPGRADE_PATTERN = '^' .. EscapePattern(ITEM_UPGRADE_TOOLTIP_FORMAT):gsub('%%%%s', '(.-)'):gsub('%%%%d', '(%%d+)') .. '$'
 local LIMIT_PATTERN = '^' .. EscapePattern(ITEM_LIMIT_CATEGORY_MULTIPLE):gsub('%%%%s', '(.-)'):gsub('%%%%d', '%%d+') .. '$'
+local VENOM_PATTERN = 'Venomforged:%s*(%a+)%s*$'
+local VENOM_PREFIX = 'Venomforged '
 local EMBELLISH_CATEGORY = 'Embellish'
 local MARK_GAP = '  '
 local TIER_MARK = GREEN_FONT_COLOR:WrapTextInColorCode('Tier')
@@ -93,7 +95,12 @@ local function ScanTrack(lines)
 		local raw = StripColors(line.leftText)
 		if not scan.text then
 			local track, current, maximum = ParseUpgradeLine(raw)
-			if track then scan.text, scan.color = track .. ' ' .. current .. '/' .. maximum, TRACK_COLORS[track:lower():match('^(%a+)')] end
+			if track then
+				scan.text, scan.color = track .. ' ' .. current .. '/' .. maximum, TRACK_COLORS[track:lower():match('^(%a+)')]
+			else
+				local forged = raw:match(VENOM_PATTERN)
+				if forged then scan.text, scan.color = VENOM_PREFIX .. forged, BUI.Lookup.VENOM_COLOR end
+			end
 		end
 		if not scan.embellished and IsEmbellishLine(raw) then scan.embellished = true end
 	end

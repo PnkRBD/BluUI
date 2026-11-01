@@ -100,7 +100,8 @@ function Lookup.CraftedQuality(itemID)
     return info.quality, info.iconInventory
 end
 
-local VENOM_RED, VENOM_GREEN, VENOM_BLUE = 0.45, 1, 0.25
+local VENOM_COLOR = { 0.45, 1, 0.25 }
+Lookup.VENOM_COLOR = VENOM_COLOR
 local venomstoneCache = {}
 
 function Lookup.IsVenomstone(itemID)
@@ -115,7 +116,7 @@ function Lookup.IsVenomstone(itemID)
 end
 
 function Lookup.ItemCountColor(itemID)
-    if Lookup.IsVenomstone(itemID) then return VENOM_RED, VENOM_GREEN, VENOM_BLUE end
+    if Lookup.IsVenomstone(itemID) then return VENOM_COLOR[1], VENOM_COLOR[2], VENOM_COLOR[3] end
 end
 
 function Lookup.ParseSpellInput(input)
