@@ -1848,23 +1848,26 @@ local function InstallChat(chat)
 
 	Hook(ChatAlertFrame, 'UpdateAnchors', RepositionAuxLater)
 
+	local function ReassertNow()
+		if not Enabled() or GeometryMatches() then return end
+		RestoreGeometry()
+		NormalizeDock()
+		AnchorPanel()
+		PositionEditBox(chat)
+		PositionScrollBar(chat)
+		UpdateMover()
+		UpdateSizer()
+	end
 	local geometryReassertPending = false
 	local function ReassertGeometry()
 		if geometryReassertPending or not Enabled() then return end
 		geometryReassertPending = true
 		C_Timer.After(0, function()
 			geometryReassertPending = false
-			if not Enabled() or GeometryMatches() then return end
-			RestoreGeometry()
-			NormalizeDock()
-			AnchorPanel()
-			PositionEditBox(chat)
-			PositionScrollBar(chat)
-			UpdateMover()
-			UpdateSizer()
+			ReassertNow()
 		end)
 	end
-	BUI.Events:Register('EDIT_MODE_LAYOUTS_UPDATED', 'Skinning.Chat', ReassertGeometry)
+	Hook(chat, 'UpdateSystem', ReassertNow)
 	BUI.Events:Register('PLAYER_ENTERING_WORLD', 'Skinning.Chat', ReassertGeometry)
 
 	local function OnExternalMove()
