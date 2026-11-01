@@ -385,6 +385,9 @@ local function HookBuffBarViewer()
         viewerMoved = true
         if GetSettings().skinEnabled then ScheduleReposition() end
     end)
+    BUI.Hook('BuffBarSkin.UpdateSystem', viewer, "UpdateSystem", function()
+        if GetSettings().skinEnabled then PositionViewer() end
+    end)
 
     return true
 end

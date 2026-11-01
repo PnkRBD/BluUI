@@ -171,7 +171,7 @@ local function Release(self)
 end
 
 local function OnBlizzardAnchor()
-	if extraBar:Active() then QueueRetake() end
+	if extraBar:Active() then Retake(extraBar) end
 end
 
 local function OnBlizzardLayout()

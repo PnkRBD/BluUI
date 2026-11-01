@@ -14,7 +14,7 @@ local BACKPACK_ICON = 133633
 local EXPAND_CVAR = 'expandBagBar'
 
 local bagBar
-local QueueRetake, QueueMeasure
+local QueueMeasure
 local bagButtonsSkinned = false
 local singleApplied = false
 
@@ -173,7 +173,7 @@ local function Release()
 end
 
 local function OnBlizzardAnchor()
-	if bagBar:Active() then QueueRetake() end
+	if bagBar:Active() then Retake(bagBar) end
 end
 
 local function OnBlizzardLayout()
@@ -205,7 +205,6 @@ bagBar = ActionBars.NewBlizzardBar({
 	release = Release,
 	installHooks = InstallHooks,
 })
-QueueRetake = BUI.Dispatcher.New(function() Retake(bagBar) end)
 QueueMeasure = BUI.Dispatcher.New(function() Measure(bagBar) end)
 
 function ActionBars.RefreshBagBar()
