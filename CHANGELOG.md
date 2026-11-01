@@ -1,51 +1,37 @@
-# 5.15.0
+# 5.16.0
 
-This one's a big catch-up: a talent reminder, a settings panel for your character sheet, party frames that grow any way you like, and a lot of fixes.
+Party keys in the portal manager, no more jumping on spec change, and a good tidy of the cooldown manager.
 
-**Talent Reminder**
+**Party keys**
 
-When a ready check goes out, a reminder shows your spec and loadout, so you don't pull with the wrong talents.
+The Portal Manager and the keystone reminder show your party's keys: who has which dungeon, the level on the right of each row, and whether you can teleport there. Rows use the group frame role icons and light up when you hover them. This is on by default. Turn it off under Skins > Portal Manager if you'd rather not see it.
 
-**Character sheet**
+**Spec changes**
 
-The character sheet has its own settings panel now, with a reset button that puts everything back to default. There's a Great Vault button on the sheet too.
-
-Changing the sheet's scale keeps it where you put it, and the borders redraw properly. When you switch gear sets, the highlight moves to the one you're wearing. The inspect window lost the dark box behind the model.
-
-**Party and raid frames**
-
-Party frames can grow up, down, left or right, and the Grow menu sits right on the Layout row. Health bars can fill in any direction. Shields bigger than your current health show properly when they sit on the left.
-
-**Moving things around**
-
-Every position and offset slider moves one pixel at a time now, even if your UI scale isn't pixel perfect. No more jumping two pixels on some steps. Anchor offsets can go past 200, and Center horizontally lines things up on the anchor when you anchor to its top, bottom or center.
-
-The Class tab alerts on the Weaker Auras page have their own position button. And if your scale ever gets out of hand, type /bui scale reset to put it back to pixel perfect for your screen.
-
-**Hunter**
-
-The Hunter's Mark callout has an Icon only option and an icon size slider. The Kill Command overlay only shows the beast that's ready.
+Chat, the bag bar, the extra action bar and the buff bars stay put when you switch spec. The cooldown manager reads your per-spec icon settings for the new spec straight away, so hidden icons and custom order from the old spec don't flash through first.
 
 **Cooldown manager and custom bars**
 
-Healthstones and other items with charges count down the moment you use one, on custom bars and in the cooldown manager. Custom bar tooltips keep working after the bar snaps to its anchor.
+Custom bar icons can show only in the specs you pick, and the picks are kept per class. Venomstone counts show in venom green. Unusable items dim like they do on the action bars, icon tooltips show the real bag item, and custom bar cooldown text rounds the same way as the action bars. Press highlight finds items on the last action bar too, dragging a buff icon out of the viewer doesn't snap back, and keybind text stays off on a viewer you've turned off.
 
-If you turn our cooldown manager off and use Blizzard's instead, BluUI keeps its icons out of Blizzard's bars. Talent buffs aren't locked as disabled in the buff list anymore.
+**Party and raid frames**
+
+A healer's power bar stays on mana, even on a druid shifting forms. Raid frames build in one go instead of five at a time, auras appear as soon as a frame gets a unit, and anything held back for combat runs all at once when it ends. Frames that spawn during combat lay out fully, aura containers stay put while you're mind controlled, and the combat res counter stays up between raid bosses. Loading screens no longer sweep the frames twice.
+
+**Character sheet**
+
+Reset all lives in the settings panel and asks before it wipes anything. The sheet closes through Blizzard's own close button and doesn't flash at its old spot. The debuff type icon row above the character is gone.
+
+**Premade groups**
+
+There's a Fits my group filter, and applicants show to the whole group, not just the leader.
 
 **Action bars**
 
-Buttons don't stay lit after you let go of the key, and the press highlight on cooldown icons clears sooner. The micro menu can sit tighter, right down to touching tiles, and the latency bar sits inside the last button.
-
-**Quality of life**
-
-There's a second FPS preset with lighter effects, and the Graphics Quality tabs work again.
-
-Faster movie skip and the hide talking head, rested and zone text options don't cause Blizzard errors anymore. Opening things from BluUI doesn't break the world map either, whether it's a datatext click, reputation from the XP bar, the calendar from the minimap menu or Edit Mode.
+Flyout buttons follow their bar's size and spacing, with Blizzard's flyout art hidden behind the skinned buttons.
 
 **Everything else**
 
-Action bars, the cooldown manager and party frames skip work when nothing has changed, so combat runs a bit lighter. The /bui profile, cdm, uf and trace commands are gone.
-
-And a handful of small fixes, like the delve altar menu showing again, cast bars centering with their icon, the talent loadout buttons not reopening the talent window, and the game menu waiting behind BluUI instead of closing.
+Chat timestamps show plain, with no digit padding. There's an option to dismount when you use a skyriding ability on the ground. Skins all apply at once on login. And /bui perf measures a pull and reports BluUI's frame time, heaviest handlers and stalls, if you ever want to see what's costing you.
 
 Updating by hand: delete the old BluUI and BluUI_Options folders, then extract the new ones. Your settings are kept. Restart the game rather than /reload.
