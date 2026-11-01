@@ -312,7 +312,12 @@ local function PaintMeta()
 end
 
 local function PaintLevel()
-    local level = current.level or (current.mapID and PartyKeys.LevelFor(current.mapID))
+    local level = current.level
+    if not level and current.mapID then
+        local unit
+        level, unit = PartyKeys.LevelFor(current.mapID)
+        current.keyUnit, current.keyOwner = unit, OwnerLabel(unit)
+    end
     card.portal.level:SetText(level and ('+' .. level) or '')
 end
 
@@ -432,6 +437,7 @@ local function OnKeys()
         return
     end
     PaintLevel()
+    PaintMeta()
     PaintRows()
 end
 
@@ -444,8 +450,8 @@ local function Paint(info)
     PaintStatus()
     card.name:SetText(info.dungeon or info.activity)
     SetPortal(card.portal, info.spellID, info.texture)
-    PaintMeta()
     PaintLevel()
+    PaintMeta()
     PaintRows()
 end
 
@@ -558,6 +564,7 @@ local function Repaint()
         ShowParty()
         return
     end
+    PaintLevel()
     PaintMeta()
     PaintStatus()
     PaintRows()

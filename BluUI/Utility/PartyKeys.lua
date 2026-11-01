@@ -67,18 +67,13 @@ local function LeadsGroup(unit)
 end
 
 function PartyKeys.LevelFor(mapID)
-	local fallback, leaderReported
+	local fallback, fallbackUnit
 	for _, unit in ipairs(PARTY_UNITS) do
 		local entry = UnitExists(unit) and PartyKeys.ForUnit(unit)
-		if entry then
-			local matches = entry.mapID == mapID and entry.level > 0
-			if LeadsGroup(unit) then
-				if matches then return entry.level end
-				leaderReported = true
-			elseif matches then
-				fallback = fallback or entry.level
-			end
+		if entry and entry.mapID == mapID and entry.level > 0 then
+			if LeadsGroup(unit) then return entry.level, unit end
+			if not fallback then fallback, fallbackUnit = entry.level, unit end
 		end
 	end
-	return leaderReported and fallback or nil
+	return fallback, fallbackUnit
 end
