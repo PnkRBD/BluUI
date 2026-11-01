@@ -32,7 +32,7 @@ local CHEST_COLORS = {
 BUI.PortalManager = {}
 
 local function PartyEnabled()
-    return BUI.GetDB().skinning[PARTY_SETTING] == true
+    return BUI.GetDB().skinning[PARTY_SETTING] ~= false
 end
 
 function BUI.PortalManager.ShowsPartyKeys()
