@@ -540,7 +540,8 @@ function CDM.SkinIcon(icon, settings, key)
         countFont:SetPoint(settings.textPosition, texture, settings.textPosition, settings.textOffsetX, settings.textOffsetY)
         Pixel.ApplyFont(countFont, settings.textSize, BUI.GetCDMFont())
         local textColor = settings.textColor
-        countFont:SetTextColor(textColor[1], textColor[2], textColor[3], textColor[4])
+        local red, green, blue = BUI.Lookup.ItemCountColor(iconFrameData.itemID)
+        countFont:SetTextColor(red or textColor[1], green or textColor[2], blue or textColor[3], textColor[4])
     end
 
     StyleCooldownText(cooldown, settings)

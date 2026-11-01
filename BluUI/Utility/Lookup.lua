@@ -100,6 +100,24 @@ function Lookup.CraftedQuality(itemID)
     return info.quality, info.iconInventory
 end
 
+local VENOM_RED, VENOM_GREEN, VENOM_BLUE = 0.45, 1, 0.25
+local venomstoneCache = {}
+
+function Lookup.IsVenomstone(itemID)
+    if not itemID then return false end
+    local cached = venomstoneCache[itemID]
+    if cached ~= nil then return cached end
+    local name = C_Item.GetItemNameByID(itemID)
+    if not name then return false end
+    cached = name:find('Venomstone', 1, true) ~= nil
+    venomstoneCache[itemID] = cached
+    return cached
+end
+
+function Lookup.ItemCountColor(itemID)
+    if Lookup.IsVenomstone(itemID) then return VENOM_RED, VENOM_GREEN, VENOM_BLUE end
+end
+
 function Lookup.ParseSpellInput(input)
     if not input or input == "" then return nil end
     local numericID = tonumber(input)

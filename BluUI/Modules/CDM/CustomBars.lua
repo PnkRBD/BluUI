@@ -281,6 +281,8 @@ local function StyleIcon(icon, settings)
         Pixel.Scale(settings.stackTextOffsetX + stackOffset[1]),
         Pixel.Scale(settings.stackTextOffsetY + stackOffset[2]))
     Pixel.ApplyFont(icon.stack, settings.stackTextSize, BUI.GetTrackingFont())
+    local red, green, blue = BUI.Lookup.ItemCountColor(icon.iconType ~= "spell" and icon.itemID or nil)
+    icon.stack:SetTextColor(red or 1, green or 1, blue or 1)
 
     local cooldownPosition = settings.cooldownTextPosition
     local cooldownOffset = CORNER_OFFSETS[cooldownPosition]
