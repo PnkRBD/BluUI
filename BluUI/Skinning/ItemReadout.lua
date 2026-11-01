@@ -54,7 +54,7 @@ end
 local ENCHANT_PATTERN = PatternFromFormat(ENCHANTED_TOOLTIP_LINE)
 local UPGRADE_PATTERN = '^' .. EscapePattern(ITEM_UPGRADE_TOOLTIP_FORMAT):gsub('%%%%s', '(.-)'):gsub('%%%%d', '(%%d+)') .. '$'
 local LIMIT_PATTERN = '^' .. EscapePattern(ITEM_LIMIT_CATEGORY_MULTIPLE):gsub('%%%%s', '(.-)'):gsub('%%%%d', '%%d+') .. '$'
-local VENOM_PATTERN = 'Venomforged:%s*(%a+)%s*$'
+local VENOM_MARK = 'Venomforged'
 local VENOM_PREFIX = 'Venomforged '
 local EMBELLISH_CATEGORY = 'Embellish'
 local MARK_GAP = '  '
@@ -82,6 +82,14 @@ local function ParseUpgradeLine(raw)
 	if track and TRACK_COLORS[track:lower()] then return track, current, maximum end
 end
 
+local function ParseVenomforged(raw)
+	local _, stop = raw:find(VENOM_MARK, 1, true)
+	if not stop then return nil end
+	for word in raw:sub(stop + 1):gmatch('%a+') do
+		if TRACK_COLORS[word:lower()] then return word end
+	end
+end
+
 local trackCache, enchantCache = {}, {}
 
 local function IsEmbellishLine(raw)
@@ -98,7 +106,7 @@ local function ScanTrack(lines)
 			if track then
 				scan.text, scan.color = track .. ' ' .. current .. '/' .. maximum, TRACK_COLORS[track:lower():match('^(%a+)')]
 			else
-				local forged = raw:match(VENOM_PATTERN)
+				local forged = ParseVenomforged(raw)
 				if forged then scan.text, scan.color = VENOM_PREFIX .. forged, BUI.Lookup.VENOM_COLOR end
 			end
 		end
