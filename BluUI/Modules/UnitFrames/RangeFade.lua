@@ -9,65 +9,59 @@ local TICK_SECONDS = 0.25
 local CHECK_YARDS = 40
 local FRAME_KEYS = { 'target', 'focus', 'boss1', 'boss2', 'boss3', 'boss4', 'boss5' }
 local FRAME_TYPES = { 'target', 'focus', 'boss', 'boss', 'boss', 'boss', 'boss' }
-local UNIT_TYPES = { target = true, focus = true, boss = true }
+local UNIT_TYPES = { 'target', 'focus', 'boss' }
 
-local typeByUnit = {}
-for index = 1, #FRAME_KEYS do typeByUnit[FRAME_KEYS[index]] = FRAME_TYPES[index] end
+local harm, friend
+local checkersStale = true
 
-local checker
-local checkerStale = true
+local function Checkers()
+	if not checkersStale then return end
+	harm = rangeCheck:GetHarmMaxChecker(CHECK_YARDS, true)
+	friend = rangeCheck:GetFriendMaxChecker(CHECK_YARDS, true)
+	checkersStale = false
+end
 
-local function Checker()
-	if checkerStale then
-		checker = rangeCheck:GetSmartMaxChecker(CHECK_YARDS, true)
-		checkerStale = false
-	end
-	return checker
+local function InRange(unit)
+	if UnitIsDeadOrGhost(unit) then return true end
+	if UnitCanAttack('player', unit) then return not harm or harm(unit) end
+	if UnitIsPlayer(unit) and UnitCanAssist('player', unit) then return not friend or friend(unit) end
+	return true
 end
 
 local function AnyFadeEnabled()
-	for unitType in pairs(UNIT_TYPES) do
-		if UnitFrames.GetUnitSettings(unitType).rangeFade then return true end
+	for index = 1, #UNIT_TYPES do
+		if UnitFrames.GetUnitSettings(UNIT_TYPES[index]).rangeFade then return true end
 	end
 	return false
 end
 
-local function ApplyRange(frame, settings, check)
-	local opacity = frame._ufOpacity or 1
-	local inside = settings.rangeInsideAlpha * opacity
-	local inRange = check and check(frame.unit)
-	if inRange == nil then
-		frame:SetAlpha(inside)
-	else
-		frame:SetAlphaFromBoolean(inRange, inside, settings.rangeOutsideAlpha * opacity)
-	end
+local function Paint(frame)
+	frame:SetAlpha((frame._ufOpacity or 1) * (frame._ufRangeAlpha or 1))
 end
 
 function UnitFrames.ApplyFrameOpacity(frame, opacity)
 	frame._ufOpacity = opacity
-	local unitType = not frame._isPreview and typeByUnit[frame.unit]
-	local settings = unitType and UnitFrames.GetUnitSettings(unitType)
-	if settings and settings.rangeFade then
-		ApplyRange(frame, settings, Checker())
-	else
-		frame:SetAlpha(opacity)
-	end
+	Paint(frame)
 end
 
 local function Tick()
-	local check = Checker()
-	local shown = false
+	Checkers()
+	local active = false
 	for index = 1, #FRAME_KEYS do
 		local frame = UnitFrames[FRAME_KEYS[index]]
 		if frame and frame:IsShown() then
 			local settings = UnitFrames.GetUnitSettings(FRAME_TYPES[index])
 			if settings.rangeFade then
-				shown = true
-				ApplyRange(frame, settings, check)
+				active = true
+				local factor = InRange(frame.unit) and settings.rangeInsideAlpha or settings.rangeOutsideAlpha
+				if frame._ufRangeAlpha ~= factor then
+					frame._ufRangeAlpha = factor
+					Paint(frame)
+				end
 			end
 		end
 	end
-	if not shown then Scheduler.SetUpdateEnabled(TICK_KEY, false) end
+	if not active then Scheduler.SetUpdateEnabled(TICK_KEY, false) end
 end
 
 local function Wake()
@@ -77,13 +71,16 @@ end
 function UnitFrames.RefreshRangeFade()
 	for index = 1, #FRAME_KEYS do
 		local frame = UnitFrames[FRAME_KEYS[index]]
-		if frame then UnitFrames.ApplyFrameOpacity(frame, frame._ufOpacity or 1) end
+		if frame then
+			frame._ufRangeAlpha = nil
+			Paint(frame)
+		end
 	end
 	Wake()
 end
 
 Scheduler.RegisterUpdate(TICK_KEY, Tick, TICK_SECONDS, false)
-rangeCheck.RegisterCallback(UnitFrames, rangeCheck.CHECKERS_CHANGED, function() checkerStale = true end)
+rangeCheck.RegisterCallback(UnitFrames, rangeCheck.CHECKERS_CHANGED, function() checkersStale = true end)
 BUI.Events:Register('PLAYER_TARGET_CHANGED', 'UF.RangeFade', Wake)
 BUI.Events:Register('PLAYER_FOCUS_CHANGED', 'UF.RangeFade', Wake)
 BUI.Events:Register('INSTANCE_ENCOUNTER_ENGAGE_UNIT', 'UF.RangeFade', Wake)
