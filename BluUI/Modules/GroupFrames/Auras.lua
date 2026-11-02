@@ -128,6 +128,8 @@ local function KindStyle(settings, kind)
 		showStack      = true,
 		stackSize      = config.stackSize,
 		stackPos       = "BOTTOMRIGHT",
+		stackOffsetX   = 0,
+		stackOffsetY   = 0,
 		showCd         = true,
 		cdSize         = 11,
 		decimals       = config.showCooldownDecimals and config.cooldownDecimalThreshold or 0,

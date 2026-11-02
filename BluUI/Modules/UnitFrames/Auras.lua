@@ -88,8 +88,13 @@ local function ResolveStyle(settings, isDebuff)
 	style.showStack = GetAuraSetting(settings, isDebuff, 'debuffShowStack', 'buffShowStack', 'auraShowStack')
 	style.stackSize = GetAuraSetting(settings, isDebuff, 'debuffStackSize', 'buffStackSize', 'auraStackSize')
 	style.stackPos  = GetAuraSetting(settings, isDebuff, 'debuffStackPos', 'buffStackPos', nil, 'BOTTOMRIGHT')
+	style.stackOffsetX = GetAuraSetting(settings, isDebuff, 'debuffStackOffsetX', 'buffStackOffsetX', nil, 0)
+	style.stackOffsetY = GetAuraSetting(settings, isDebuff, 'debuffStackOffsetY', 'buffStackOffsetY', nil, 0)
 	style.showCd    = GetAuraSetting(settings, isDebuff, 'debuffShowCd', 'buffShowCd', 'auraShowCd')
 	style.cdSize    = GetAuraSetting(settings, isDebuff, 'debuffCdSize', 'buffCdSize', 'auraCdSize')
+	style.cdPos     = GetAuraSetting(settings, isDebuff, 'debuffCdPos', 'buffCdPos', nil, 'CENTER')
+	style.cdOffsetX = GetAuraSetting(settings, isDebuff, 'debuffCdOffsetX', 'buffCdOffsetX', nil, 0)
+	style.cdOffsetY = GetAuraSetting(settings, isDebuff, 'debuffCdOffsetY', 'buffCdOffsetY', nil, 0)
 	local showDecimals = GetAuraSetting(settings, isDebuff, 'debuffShowDecimals', 'buffShowDecimals', nil, false)
 	style.decimals  = showDecimals and GetAuraSetting(settings, isDebuff, 'debuffDecimalThreshold', 'buffDecimalThreshold', nil, 5) or 0
 	style.reverseSwipe = settings.auraReverseSwipe

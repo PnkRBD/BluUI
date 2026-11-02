@@ -520,7 +520,7 @@ local function CreateViewerMock(stage, withKeybinds)
 					cell.cooldown:ClearAllPoints()
 					local point = viewerSettings.cooldownTextPosition
 					local offsetY = viewerSettings.cooldownTextOffsetY
-					if point == 'CENTER' and viewerSettings.cooldownTextSize > 0 then offsetY = offsetY - module.CooldownTextCenterDrop(viewerSettings.cooldownTextSize) end
+					if point == 'CENTER' and viewerSettings.cooldownTextSize > 0 then offsetY = offsetY - BUI.Tools.CooldownTextCenterDrop(viewerSettings.cooldownTextSize) end
 					cell.cooldown:SetPoint(point, cell.icon, point, viewerSettings.cooldownTextOffsetX, offsetY)
 					cell.cooldown:SetTextColor(cooldownColor[1], cooldownColor[2], cooldownColor[3], cooldownColor[4])
 					cell.cooldown:Show()

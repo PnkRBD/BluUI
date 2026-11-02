@@ -589,6 +589,16 @@ function Tools.CooldownFontString(cooldown)
     return nil
 end
 
+function Tools.CooldownTextCenterDrop(fontSize)
+    return math.floor(fontSize * 0.1 + 0.5)
+end
+
+function Tools.PlaceCooldownText(fontString, cooldown, position, offsetX, offsetY, fontSize)
+    if position == 'CENTER' and fontSize > 0 then offsetY = offsetY - Tools.CooldownTextCenterDrop(fontSize) end
+    fontString:ClearAllPoints()
+    fontString:SetPoint(position, cooldown, position, offsetX, offsetY)
+end
+
 local truncateFormats = {}
 
 function Tools.TruncateName(name, limit)

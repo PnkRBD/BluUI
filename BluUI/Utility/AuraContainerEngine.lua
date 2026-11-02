@@ -242,9 +242,13 @@ local function FinishPendingDisarm()
 	if disarmPending then DisarmCapture() end
 end
 
-local function ApplyCooldownFont(cooldown, size, font, flags)
+local function ApplyCooldownText(cooldown, style)
 	local region = BUI.Tools.CooldownFontString(cooldown)
-	if region then Pixel.ApplyFont(region, size, font, flags) end
+	if not region then return end
+	Pixel.ApplyFont(region, style.cdSize, style.font, style.fontFlags)
+	if style.cdPos then
+		BUI.Tools.PlaceCooldownText(region, cooldown, style.cdPos, style.cdOffsetX, style.cdOffsetY, style.cdSize)
+	end
 end
 
 local function RestyleButton(container, button, buttonInfo, style)
@@ -267,7 +271,7 @@ local function RestyleButton(container, button, buttonInfo, style)
 		Pixel.ApplyFont(buttonInfo.count, style.stackSize, style.font, style.fontFlags)
 		local posData = Engine.StackAnchors[style.stackPos] or Engine.StackAnchors.BOTTOMRIGHT
 		buttonInfo.count:ClearAllPoints()
-		buttonInfo.count:SetPoint(posData[1], button, posData[1], posData[2], posData[3])
+		buttonInfo.count:SetPoint(posData[1], button, posData[1], posData[2] + style.stackOffsetX, posData[3] + style.stackOffsetY)
 		buttonInfo.count:Show()
 	end
 
@@ -275,7 +279,7 @@ local function RestyleButton(container, button, buttonInfo, style)
 	buttonInfo.cooldown:SetHideCountdownNumbers(style.showCd == false)
 	buttonInfo.cooldown:SetCountdownMillisecondsThreshold(style.decimals)
 	if style.showCd ~= false then
-		ApplyCooldownFont(buttonInfo.cooldown, style.cdSize, style.font, style.fontFlags)
+		ApplyCooldownText(buttonInfo.cooldown, style)
 	end
 
 	if InCombatLockdown() then
@@ -848,6 +852,7 @@ end
 local STYLE_SIGNATURE_KEYS = {
 	'size', 'gap', 'rowGap', 'perRow', 'max', 'growX', 'growY', 'sortMethod', 'showDispelType', 'showStack',
 	'stackSize', 'stackPos', 'showCd', 'cdSize', 'reverseSwipe', 'showTooltips', 'font', 'fontFlags', 'decimals',
+	'stackOffsetX', 'stackOffsetY', 'cdPos', 'cdOffsetX', 'cdOffsetY',
 }
 
 local signatureParts = {}

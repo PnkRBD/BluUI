@@ -358,25 +358,15 @@ local function SetupCooldown(cooldown)
     end
 end
 
-function CDM.CooldownTextCenterDrop(fontSize)
-    return math.floor(fontSize * 0.1 + 0.5)
-end
-
 local function StyleCooldownText(cooldown, settings)
     local fontString = BUI.Tools.CooldownFontString(cooldown)
     if not fontString then return end
 
     local fontSize = settings.cooldownTextSize
-    local position = settings.cooldownTextPosition
-    local offsetY = settings.cooldownTextOffsetY
-    if position == "CENTER" and fontSize > 0 then
-        offsetY = offsetY - CDM.CooldownTextCenterDrop(fontSize)
-    end
     local cdTextColor = settings.cooldownTextColor
 
     Pixel.ApplyFont(fontString, fontSize, BUI.GetCDMFont())
-    fontString:ClearAllPoints()
-    fontString:SetPoint(position, cooldown, position, settings.cooldownTextOffsetX, offsetY)
+    BUI.Tools.PlaceCooldownText(fontString, cooldown, settings.cooldownTextPosition, settings.cooldownTextOffsetX, settings.cooldownTextOffsetY, fontSize)
     fontString:SetTextColor(cdTextColor[1], cdTextColor[2], cdTextColor[3], cdTextColor[4])
     fontString:SetDrawLayer("OVERLAY", 7)
 end

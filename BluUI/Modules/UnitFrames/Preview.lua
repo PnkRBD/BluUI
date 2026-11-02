@@ -203,7 +203,6 @@ local function MakeIcon(parent)
 	overlay:SetFrameLevel(icon:GetFrameLevel() + 20)
 	icon.stacks = overlay:CreateFontString(nil, 'OVERLAY')
 	icon.cd = overlay:CreateFontString(nil, 'OVERLAY')
-	icon.cd:SetPoint('CENTER')
 	return icon
 end
 
@@ -212,8 +211,10 @@ local function StyleIconText(icon, style)
 	Pixel.ApplyFont(icon.cd, style.cdSize, style.font)
 	local stackAnchor = Engine.StackAnchors[style.stackPos]
 	icon.stacks:ClearAllPoints()
-	icon.stacks:SetPoint(stackAnchor[1], icon, stackAnchor[1], stackAnchor[2], stackAnchor[3])
+	icon.stacks:SetPoint(stackAnchor[1], icon, stackAnchor[1], stackAnchor[2] + style.stackOffsetX, stackAnchor[3] + style.stackOffsetY)
 	icon.stacks:SetShown(style.showStack)
+	icon.cd:ClearAllPoints()
+	icon.cd:SetPoint(style.cdPos, icon, style.cdPos, style.cdOffsetX, style.cdOffsetY)
 	icon.cd:SetShown(style.showCd)
 end
 
