@@ -13,6 +13,12 @@ function Range.SpellBracket(unit)
     return rangeCheck:GetRange(unit, false, false, CACHE_DURATION)
 end
 
+function Range.InAttackRange(unit)
+    local minYards, maxYards = Range.SpellBracket(unit)
+    if minYards == nil then return true end
+    return maxYards ~= nil and maxYards <= ATTACK_RANGE
+end
+
 local function Colorize(text, minYards, maxYards)
     local color
     if maxYards and maxYards <= ATTACK_RANGE then
