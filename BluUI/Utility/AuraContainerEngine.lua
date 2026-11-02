@@ -246,9 +246,7 @@ local function ApplyCooldownText(cooldown, style)
 	local region = BUI.Tools.CooldownFontString(cooldown)
 	if not region then return end
 	Pixel.ApplyFont(region, style.cdSize, style.font, style.fontFlags)
-	if style.cdPos then
-		BUI.Tools.PlaceCooldownText(region, cooldown, style.cdPos, style.cdOffsetX, style.cdOffsetY, style.cdSize)
-	end
+	BUI.Tools.PlaceCooldownText(region, cooldown, style.cdPos, style.cdOffsetX, style.cdOffsetY, style.cdSize)
 end
 
 local function RestyleButton(container, button, buttonInfo, style)

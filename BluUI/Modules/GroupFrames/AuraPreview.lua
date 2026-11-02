@@ -41,7 +41,6 @@ local function SampleIcon(holder, index)
 	icon.texture:SetPoint('BOTTOMRIGHT', -edge, edge)
 	icon.texture:SetTexCoord(ICON_CROP, 1 - ICON_CROP, ICON_CROP, 1 - ICON_CROP)
 	icon.count = icon:CreateFontString(nil, 'OVERLAY')
-	icon.count:SetPoint('BOTTOMRIGHT', icon, 'BOTTOMRIGHT', -1, 1)
 	holder.icons[index] = icon
 	return icon
 end
@@ -79,6 +78,7 @@ local function LayoutHolder(holder, kind, child, layout)
 	holder:ClearAllPoints()
 	holder:SetPoint(layout.anchorPoint, child, layout.relativePoint, Pixel.Scale(layout.offsetX), Pixel.Scale(layout.offsetY))
 
+	local stackAnchor = BUI.AuraEngine.StackAnchors[layout.stackPos]
 	for index = 1, count do
 		local icon = SampleIcon(holder, index)
 		local column = (index - 1) % perRow
@@ -98,6 +98,8 @@ local function LayoutHolder(holder, kind, child, layout)
 		local stack = stacks and stacks[sample]
 		if stack then
 			Pixel.ApplyFont(icon.count, layout.stackSize, STANDARD_TEXT_FONT, 'OUTLINE')
+			icon.count:ClearAllPoints()
+			icon.count:SetPoint(stackAnchor[1], icon, stackAnchor[1], stackAnchor[2] + layout.stackOffsetX, stackAnchor[3] + layout.stackOffsetY)
 			icon.count:SetText(stack)
 			icon.count:Show()
 		else
