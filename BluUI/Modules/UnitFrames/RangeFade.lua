@@ -50,14 +50,18 @@ local function Tick()
 	for index = 1, #FRAME_KEYS do
 		local frame = UnitFrames[FRAME_KEYS[index]]
 		if frame and frame:IsShown() then
+			local unit = frame.unit
 			local settings = UnitFrames.GetUnitSettings(FRAME_TYPES[index])
-			if settings.rangeFade then
+			if unit and settings.rangeFade then
 				active = true
-				local factor = InRange(frame.unit) and settings.rangeInsideAlpha or settings.rangeOutsideAlpha
+				local factor = InRange(unit) and settings.rangeInsideAlpha or settings.rangeOutsideAlpha
 				if frame._ufRangeAlpha ~= factor then
 					frame._ufRangeAlpha = factor
 					Paint(frame)
 				end
+			elseif frame._ufRangeAlpha then
+				frame._ufRangeAlpha = nil
+				Paint(frame)
 			end
 		end
 	end
