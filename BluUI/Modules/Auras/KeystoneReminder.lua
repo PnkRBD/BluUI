@@ -14,6 +14,7 @@ local EVENT_KEY = 'KeystoneReminder'
 local COOLDOWN_KEY = 'KeystoneReminder.Cooldown'
 local CARD_KEY = 'KeystoneReminder.Card'
 local ROWS_KEY = 'KeystoneReminder.Rows'
+local PLACE_KEY = 'KeystoneReminder.Place'
 local PORTAL_KEY = 'KeystoneReminder.Portal.'
 local WIDTH, HEIGHT = 260, 62
 local PAD = 10
@@ -70,8 +71,12 @@ local ShowParty
 
 local function GetDB() return BUI.GetDB().keystoneReminder end
 
-local function Apply()
+local function Place()
     BUI.Anchor.ApplyPosition(card, GetDB())
+end
+
+local function Apply()
+    BUI.Events:AfterCombat(Place, PLACE_KEY)
 end
 
 local function PlayerRole()
@@ -392,6 +397,8 @@ end
 
 local function SyncRows()
     for index, row in ipairs(card.rows) do row:SetShown(index <= shownRows) end
+    local extra = shownRows > 0 and (ROWS_TOP + shownRows * ROW_HEIGHT + PAD) or 0
+    card:SetSize(Pixel.Scale(WIDTH), Pixel.Scale(HEIGHT + extra))
 end
 
 local function PaintRows()
@@ -400,11 +407,8 @@ local function PaintRows()
         PaintRow(card.rows[index], entry)
     end
     shownRows = #entries
+    card.divider:SetShown(shownRows > 0)
     BUI.Events:AfterCombat(SyncRows, ROWS_KEY)
-    local count = #entries
-    card.divider:SetShown(count > 0)
-    local extra = count > 0 and (ROWS_TOP + count * ROW_HEIGHT + PAD) or 0
-    card:SetSize(Pixel.Scale(WIDTH), Pixel.Scale(HEIGHT + extra))
 end
 
 local function OnCooldown()
