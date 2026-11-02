@@ -87,6 +87,7 @@ Modules\UnitFrames\AbsorbBars.lua
 Modules\UnitFrames\Auras.lua
 Modules\UnitFrames\Preview.lua
 Modules\UnitFrames\Initialize.lua
+Modules\UnitFrames\RangeFade.lua
 
 Modules\GroupFrames\Core.lua
 Modules\GroupFrames\Defaults.lua

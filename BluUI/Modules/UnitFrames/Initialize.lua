@@ -55,9 +55,7 @@ local function ApplySettings(frame, unitType, index)
 	frame.PowerBG:SetShown(showPower)
 	frame.PowerBorderFrame:SetShown(showPower)
 
-	local opacity = BUI.Visibility.GetContextualOpacity('UnitFrames') / 100
-	frame._ufOpacity = opacity
-	frame:SetAlpha(opacity)
+	UnitFrames.ApplyFrameOpacity(frame, BUI.Visibility.GetContextualOpacity('UnitFrames') / 100)
 
 	local isPet = unitType == 'pet'
 	UnitFrames.ApplyBackgroundColors(frame, isPet and settings.petBgColor or settings.bgColor, isPet and settings.petPowerBgColor or settings.powerBgColor)
@@ -227,6 +225,7 @@ function UnitFrames:Refresh()
 			BUI.Events:AfterCombat(function() bossFrame:Disable() end, 'UF.DisableBoss:' .. bossIndex)
 		end
 	end
+	UnitFrames.RefreshRangeFade()
 end
 
 local ANCHORABLE_UNITS = {'player', 'target', 'focus', 'pet', 'targettarget'}

@@ -1892,6 +1892,9 @@ BUI.Defaults = {
 				buffStackPos            = 'BOTTOMRIGHT',
 				buffSortMethod          = 'expiration',
 				debuffSortMethod        = 'expiration',
+				rangeFade               = false,
+				rangeInsideAlpha        = 1,
+				rangeOutsideAlpha       = 0.45,
 			}),
 
 			targettarget = Merge(UnitFrameBase, UnitBuffBase, {
@@ -1921,6 +1924,9 @@ BUI.Defaults = {
 				maxBuffs                = 6,
 				debuffsPerRow           = 6,
 				buffsPerRow             = 6,
+				rangeFade               = false,
+				rangeInsideAlpha        = 1,
+				rangeOutsideAlpha       = 0.45,
 			}),
 
 			focustarget = Merge(UnitFrameBase, {
@@ -1957,6 +1963,9 @@ BUI.Defaults = {
 				targetBorderColor    = { 1, 1, 0, 1 },
 				mouseoverBorder      = false,
 				mouseoverBorderColor = { 1, 1, 1, 0.7 },
+				rangeFade            = false,
+				rangeInsideAlpha     = 1,
+				rangeOutsideAlpha    = 0.45,
 			}),
 		},
 	},

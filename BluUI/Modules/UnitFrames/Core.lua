@@ -324,14 +324,9 @@ function UnitFrames.ApplyPosition(frame, unitType, index)
 	end
 end
 
-local function SetFrameOpacity(frame, opacity)
-	frame._ufOpacity = opacity
-	frame:SetAlpha(opacity)
-end
-
 Motion.RegisterProperty('ufOpacity',
 	function(frame) return frame._ufOpacity or 1 end,
-	function(frame, value) SetFrameOpacity(frame, value) end
+	function(frame, value) UnitFrames.ApplyFrameOpacity(frame, value) end
 )
 
 local OPACITY_UNITS = {'player', 'target', 'targettarget', 'focus', 'pet'}

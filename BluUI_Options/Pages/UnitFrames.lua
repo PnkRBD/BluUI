@@ -939,6 +939,13 @@ local function UnitBoards(ui, parent, width, unit)
 			Toggle(unitSettings, nil, 'mouseoverBorder'),
 		}, RefreshFrames)
 	end
+	if unitKey == 'target' or unitKey == 'focus' or unitKey == 'boss' then
+		board:AddTools('Range fade', 'Fade the frame while the unit is out of your range', {
+			Option(unitSettings, 'In range opacity', 'rangeInsideAlpha', { min = 0.1, max = 1, step = 0.05 }),
+			Option(unitSettings, 'Out of range opacity', 'rangeOutsideAlpha', { min = 0.1, max = 1, step = 0.05 }),
+			Toggle(unitSettings, nil, 'rangeFade'),
+		}, RefreshFrames)
+	end
 	if unitKey == 'pet' then
 		board:AddTools('Pet colors', 'Health, power, backgrounds and border', {
 			Color(settings, 'Health', 'petHealthColor'),
