@@ -12,6 +12,7 @@ local SLOTS = {
 
 local lowest = 100
 local slotPercent = {}
+local scratch = {}
 
 local function ThresholdColor(percent, valueHex)
     if percent <= 30 then return RED end
@@ -24,16 +25,19 @@ local function Read()
     for slotIndex = 1, #SLOTS do
         local slot = SLOTS[slotIndex][1]
         local current, maximum = GetInventoryItemDurability(slot)
-        if current and maximum and maximum > 0 then
+        local percent = current and maximum and maximum > 0 and (current / maximum) * 100 or nil
+        scratch[slot] = percent
+        if percent then
             sampled = true
-            local percent = (current / maximum) * 100
-            slotPercent[slot] = percent
             if percent < minimum then minimum = percent end
-        else
-            slotPercent[slot] = nil
         end
     end
-    if sampled then lowest = minimum end
+    if not sampled then return end
+    lowest = minimum
+    for slotIndex = 1, #SLOTS do
+        local slot = SLOTS[slotIndex][1]
+        slotPercent[slot] = scratch[slot]
+    end
 end
 
 Datatext.Register('durability', {
@@ -53,6 +57,7 @@ Datatext.Register('durability', {
     end,
     secure = function() return 'click', CharacterMicroButton end,
     OnEnter = function(hit, bar)
+        Read()
         local tooltip = Datatext.Tooltip(hit)
         tooltip:AddLine('Durability', 1, 1, 1)
         local config = bar.getConfig()
