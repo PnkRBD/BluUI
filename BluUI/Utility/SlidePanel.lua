@@ -7,19 +7,31 @@ local STRATA_BELOW = { MEDIUM = 'LOW', HIGH = 'MEDIUM', DIALOG = 'HIGH', FULLSCR
 
 local panels = {}
 
-local function Anchor()
-    return BUI.Skinning.GetCharacterFrame() or CharacterFrame
-end
-
 function BUI.SlidePanel.New(options)
     local slidePanel = { open = false }
     panels[#panels + 1] = slidePanel
 
     local hiddenX = options.hiddenX
 
+    local function Anchor()
+        local host = options.anchor and options.anchor()
+        return host or BUI.Skinning.GetCharacterFrame() or CharacterFrame
+    end
+
     local function Width()
         if type(options.width) == 'function' then return options.width() end
         return options.width
+    end
+
+    local function Layer()
+        local panel = options.panel()
+        local host = options.anchor and options.anchor()
+        if host then
+            panel:SetFrameStrata(host:GetFrameStrata())
+            panel:SetFrameLevel(math.max(0, host:GetFrameLevel() - 1))
+        else
+            panel:SetFrameStrata(STRATA_BELOW[Anchor():GetFrameStrata()])
+        end
     end
 
     local function SetOffset(offsetX)
@@ -55,7 +67,7 @@ function BUI.SlidePanel.New(options)
         end
         if not options.panel() then options.build() end
         local panel = options.panel()
-        panel:SetFrameStrata(STRATA_BELOW[Anchor():GetFrameStrata()])
+        Layer()
         SetOffset(hiddenX)
         panel:Show()
         if options.onOpen then options.onOpen() end
@@ -92,6 +104,7 @@ function BUI.SlidePanel.New(options)
         local panel = options.panel()
         if not slidePanel.open or not panel or panel:GetScript('OnUpdate') then return end
         local _, _, _, offsetX = panel:GetPoint(1)
+        Layer()
         SetOffset(offsetX)
     end
 

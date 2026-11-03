@@ -41,7 +41,7 @@ end
 
 local context = Skin.Define('portalManager', {
     name = 'Portal Manager',
-    description = 'Dungeon and raid portals beside the Character frame.',
+    description = 'Dungeon and raid portals beside the Character frame and the Premade Groups list.',
     icon = 'Interface\\Icons\\Spell_Arcane_PortalDalaran',
     newLook = true,
     settings = {
@@ -59,6 +59,7 @@ local context = Skin.Define('portalManager', {
 })
 
 local panel, slide
+local host, hostClosed
 local rows = {}
 local lists, activeList
 local mapIDByName, timeLimitByMap = {}, {}
@@ -408,17 +409,19 @@ local function StyleCountdown(cooldown)
     Pixel.ApplyFont(text, COUNTDOWN_SIZE, FONT, 'OUTLINE')
 end
 
+local function ApplyCooldown(button)
+    local duration = button:IsShown() and button._known and C_Spell.GetSpellCooldownDuration(button._spellID, true)
+    if duration then
+        button.cooldown:SetCooldownFromDurationObject(duration)
+        StyleCountdown(button.cooldown)
+    else
+        button.cooldown:Clear()
+    end
+end
+
 local function RefreshCooldowns()
     if not panel:IsShown() then return end
-    for _, row in ipairs(rows) do
-        local duration = row:IsShown() and row._known and C_Spell.GetSpellCooldownDuration(row._spellID, true)
-        if duration then
-            row.cooldown:SetCooldownFromDurationObject(duration)
-            StyleCountdown(row.cooldown)
-        else
-            row.cooldown:Clear()
-        end
-    end
+    for _, row in ipairs(rows) do ApplyCooldown(row) end
 end
 
 local function PartyItems()
@@ -571,10 +574,128 @@ local function ListenWhileOpen(open)
     end
 end
 
+local STRIP = { icon = 36, gap = 4, pad = 6, offset = 4, levelSize = 10 }
+local strip
+local stripButtons = {}
+local RefreshStrip
+
+local function StripEntries()
+    local entries = {}
+    for index, entry in ipairs(CurrentSeason().dungeons) do entries[index] = entry end
+    table.sort(entries, function(a, b) return a.name < b.name end)
+    return entries
+end
+
+local function StripEnter(button)
+    GameTooltip:SetOwner(button, 'ANCHOR_RIGHT')
+    GameTooltip:SetText(button._name, 1, 1, 1)
+    local run = button._run
+    if run then
+        local color = CHEST_COLORS[run.chests]
+        GameTooltip:AddLine(('+%d  %s %s'):format(run.level, SecondsToClock(run.durationSec), DeltaText(run.delta)), color[1], color[2], color[3])
+    elseif button._mapID then
+        GameTooltip:AddLine('No run this season', 0.6, 0.6, 0.6)
+    end
+    if not button._known then GameTooltip:AddLine('Teleport not learned', 0.6, 0.6, 0.6) end
+    GameTooltip:Show()
+end
+
+local function CreateStripButton(index)
+    local button = CreateFrame('Button', nil, strip, 'SecureActionButtonTemplate')
+    button:SetSize(Pixel.Scale(STRIP.icon), Pixel.Scale(STRIP.icon))
+    button:SetPoint('TOP', 0, Pixel.Scale(-(STRIP.pad + (index - 1) * (STRIP.icon + STRIP.gap))))
+    button:RegisterForClicks('LeftButtonUp')
+    button:SetAttribute('type', 'spell')
+    button:SetAttribute('useOnKeyDown', false)
+    button:SetScript('OnEnter', StripEnter)
+    button:SetScript('OnLeave', GameTooltip_Hide)
+
+    local icon = button:CreateTexture(nil, 'ARTWORK')
+    icon:SetPoint('TOPLEFT', Pixel.PixelSize(1), -Pixel.PixelSize(1))
+    icon:SetPoint('BOTTOMRIGHT', -Pixel.PixelSize(1), Pixel.PixelSize(1))
+    Skin.SquareIcon(button, icon, 1)
+    button.icon = icon
+
+    local cooldown = CreateFrame('Cooldown', nil, button, 'CooldownFrameTemplate')
+    cooldown:SetAllPoints(icon)
+    cooldown:SetDrawEdge(false)
+    cooldown:SetHideCountdownNumbers(false)
+    button.cooldown = cooldown
+
+    local level = cooldown:CreateFontString(nil, 'OVERLAY')
+    Pixel.ApplyFont(level, STRIP.levelSize, FONT, 'OUTLINE')
+    level:SetPoint('BOTTOMRIGHT', Pixel.Scale(-2), Pixel.Scale(2))
+    button.levelText = level
+    return button
+end
+
+local function FillStripButton(button, entry, inCombat)
+    local spellID = ResolveSpellID(entry)
+    local known = spellID ~= nil and C_SpellBook.IsSpellInSpellBook(spellID)
+    local mapID = mapIDByName[entry.name]
+    local run = mapID and BestRun(mapID)
+    button._spellID, button._known, button._name, button._mapID, button._run = spellID, known, entry.name, mapID, run
+    if not inCombat then
+        button:SetAttribute('spell', known and spellID or nil)
+        button:Show()
+    end
+    button.icon:SetTexture(spellID and C_Spell.GetSpellTexture(spellID) or KEYSTONE_ICON)
+    button.icon:SetDesaturated(not known)
+    if run then
+        local color = CHEST_COLORS[run.chests]
+        button.levelText:SetText('+' .. run.level)
+        button.levelText:SetTextColor(color[1], color[2], color[3], 1)
+    else
+        button.levelText:SetText('')
+    end
+    ApplyCooldown(button)
+end
+
+RefreshStrip = function()
+    if not strip or not strip:IsShown() then return end
+    local inCombat = InCombatLockdown()
+    local entries = StripEntries()
+    if #stripButtons < #entries then
+        if inCombat then
+            BUI.Events:AfterCombat(RefreshStrip, 'PortalManager.Strip')
+            return
+        end
+        for index = #stripButtons + 1, #entries do stripButtons[index] = CreateStripButton(index) end
+    end
+    for index, entry in ipairs(entries) do FillStripButton(stripButtons[index], entry, inCombat) end
+    if not inCombat then
+        for index = #entries + 1, #stripButtons do stripButtons[index]:Hide() end
+    end
+    strip:SetSize(Pixel.Scale(STRIP.icon + STRIP.pad * 2), Pixel.Scale(STRIP.pad * 2 + #entries * (STRIP.icon + STRIP.gap) - STRIP.gap))
+end
+
+local function RefreshStripCooldowns()
+    if not strip or not strip:IsShown() then return end
+    for _, button in ipairs(stripButtons) do ApplyCooldown(button) end
+end
+
+local QueueStrip = BUI.Dispatcher.New(RefreshStrip)
+local QueueStripCooldowns = BUI.Dispatcher.New(RefreshStripCooldowns)
+
+local STRIP_EVENTS = {
+    SPELL_UPDATE_COOLDOWN = QueueStripCooldowns,
+    SPELLS_CHANGED = QueueStrip,
+    PLAYER_REGEN_ENABLED = QueueStrip,
+    CHALLENGE_MODE_MAPS_UPDATE = function()
+        RebuildMapLookup()
+        QueueStrip()
+    end,
+}
+
+local function Undock()
+    host, hostClosed = nil, nil
+end
+
 slide = BUI.SlidePanel.New({
     skin = 'portalManager',
     width = PANEL_W,
     hiddenX = -PANEL_W,
+    anchor = function() return host end,
     panel = function() return panel end,
     build = BuildPanel,
     onOpen = function()
@@ -589,6 +710,7 @@ slide = BUI.SlidePanel.New({
         ListenWhileOpen(false)
         BUI.PartyKeys.Listen('PortalManager', nil)
         StopCastFill()
+        if hostClosed then hostClosed() end
     end,
 })
 
@@ -600,6 +722,12 @@ function BUI.PortalManager.RefreshLists()
 end
 
 function BUI.PortalManager.Toggle()
+    local docked = host ~= nil
+    Undock()
+    if docked and slide.IsOpen() then
+        slide.Refit()
+        return
+    end
     slide.Toggle()
 end
 
@@ -607,5 +735,44 @@ function BUI.PortalManager.IsOpen()
     return slide.IsOpen()
 end
 
-CharacterFrame:HookScript('OnHide', function() slide.Close(true) end)
-context.OnDisable(function() slide.Close(true) end)
+function BUI.PortalManager.OpenBeside(frame, onClosed)
+    host, hostClosed = frame, onClosed
+    if slide.IsOpen() then slide.Refit() else slide.Open() end
+end
+
+function BUI.PortalManager.CloseBeside(frame)
+    if host ~= frame then return end
+    Undock()
+    if slide.IsOpen() then slide.Close(true) end
+end
+
+function BUI.PortalManager.ShowStrip(parent)
+    if not BUI.Skinning.IsSkinEnabled('portalManager') then return end
+    if not strip then
+        strip = CreateFrame('Frame', nil, parent, 'BackdropTemplate')
+        Skin.PaintBackdrop(strip, Skin.PALETTE.panel)
+    end
+    strip:SetParent(parent)
+    strip:ClearAllPoints()
+    strip:SetPoint('TOPLEFT', parent, 'TOPRIGHT', Pixel.Scale(STRIP.offset), 0)
+    strip:Show()
+    for event, handler in pairs(STRIP_EVENTS) do BUI.Events:Register(event, 'PortalManager.Strip', handler) end
+    C_MythicPlus.RequestMapInfo()
+    RebuildMapLookup()
+    RefreshStrip()
+end
+
+function BUI.PortalManager.HideStrip()
+    if not strip then return end
+    for event in pairs(STRIP_EVENTS) do BUI.Events:Unregister(event, 'PortalManager.Strip') end
+    strip:Hide()
+end
+
+CharacterFrame:HookScript('OnHide', function()
+    if not host then slide.Close(true) end
+end)
+context.OnDisable(function()
+    Undock()
+    slide.Close(true)
+    BUI.PortalManager.HideStrip()
+end)

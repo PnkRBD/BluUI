@@ -1532,6 +1532,8 @@ BUI.Defaults = {
 			hasLust            = false,
 			groupFit           = false,
 			comp               = 'any',
+			portals            = true,
+			portalStyle        = 'icons',
 		},
 
 		keystoneReminder = {

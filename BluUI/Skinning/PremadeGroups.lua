@@ -17,7 +17,7 @@ FRAME.listBottom = FRAME.footerY + BUTTON_H + 8
 FRAME.listTop = FRAME.toolbarY + BUTTON_H + 2
 local STRIP = { top = 44, header = 18, tileH = 46, tileGap = 6, perRow = 8, tileIcon = 30, tileInset = 7, tileTextGap = 6, divider = 10 }
 local SIDE = { pad = 12, header = 18, section = 16, ratingW = 70, toggleH = 24, playstyleH = 26, toggleGap = 4, serversH = 28 }
-local BAR = { gap = 6, sortW = 130, searchW = 72, refreshGlyph = 14, editW = 70, blizzardW = 150, startW = 120, searchBoxGap = 12, autoComplete = 'DIALOG',
+local BAR = { gap = 6, sortW = 130, searchW = 72, refreshGlyph = 14, editW = 70, blizzardW = 150, mythicW = 120, portalsW = 70, startW = 120, searchBoxGap = 12, autoComplete = 'DIALOG',
 	hint = 'Search +10, 10-15 or a dungeon', completeGap = 2, searchGlyph = 13, searchInset = 10, clearSize = 10, caretH = 14, blink = 0.5,
 }
 local ROW = { pad = 4, inset = 6, columnGap = 8, signUp = 64, cancel = 56, statusGap = 6, slot = 18, slotGap = 2, role = 24, roleIcon = 18, roleGap = 4, coverLevel = 10, coverSize = 14 }
@@ -49,6 +49,7 @@ local COLUMNS = {
 }
 local MENU_W = 230
 local MAX_APPLICATIONS = 5
+local PORTAL_STYLES = { { value = 'icons', text = 'Icons' }, { value = 'list', text = 'List' } }
 local DUNGEON_CATEGORY = 2
 local FALLBACK_ICON = 'Interface/Icons/INV_Relics_Hourglass'
 local CENSORED_TITLE = 'Title hidden'
@@ -1922,10 +1923,36 @@ function Strip.Cover(parent)
 	return cover
 end
 
+local function OnPortalsClosed()
+	Settings().portals = false
+end
+
+local function SyncPortals()
+	local settings = Settings()
+	local style = settings.portals and settings.portalStyle
+	if style == 'list' then
+		BUI.PortalManager.HideStrip()
+		BUI.PortalManager.OpenBeside(finder, OnPortalsClosed)
+		return
+	end
+	BUI.PortalManager.CloseBeside(finder)
+	if style == 'icons' then
+		BUI.PortalManager.ShowStrip(finder)
+	else
+		BUI.PortalManager.HideStrip()
+	end
+end
+
+local function TogglePortals()
+	Settings().portals = not Settings().portals
+	SyncPortals()
+end
+
 function Strip.Hold()
 	finder.releasing = false
 	finder:Show()
 	Skin.SuppressBlizzardFrame(PVEFrame)
+	SyncPortals()
 end
 
 function Strip.FinishRelease()
@@ -1933,6 +1960,8 @@ function Strip.FinishRelease()
 	finder.releasing = false
 	HidePanel()
 	finder:Hide()
+	BUI.PortalManager.CloseBeside(finder)
+	BUI.PortalManager.HideStrip()
 	Skin.RestoreBlizzardFrame(PVEFrame)
 end
 
@@ -1976,6 +2005,10 @@ local function ShowBlizzard()
 	ReturnSearchBox()
 	BUI.Events:UnregisterAll('Skinning.PremadeGroups')
 	Strip.Release(true)
+end
+
+local function ShowMythicPlus()
+	PVEFrame_ShowFrame('ChallengesFrame')
 end
 
 local function CloseFinder()
@@ -2101,8 +2134,14 @@ local function BuildMain(frame)
 	local blizzardButton = Skin.SmallButton(main, BAR.blizzardW, BUTTON_H, 'Blizzard group finder')
 	blizzardButton:SetPoint('BOTTOMRIGHT', Pixel.Scale(-FRAME.edge), Pixel.Scale(FRAME.footerY))
 	blizzardButton:SetScript('OnClick', ShowBlizzard)
+	local mythicButton = Skin.SmallButton(main, BAR.mythicW, BUTTON_H, 'Mythic+ Dungeons')
+	mythicButton:SetPoint('RIGHT', blizzardButton, 'LEFT', Pixel.Scale(-BAR.gap), 0)
+	mythicButton:SetScript('OnClick', ShowMythicPlus)
+	local portalsButton = Skin.SmallButton(main, BAR.portalsW, BUTTON_H, 'Portals')
+	portalsButton:SetPoint('RIGHT', mythicButton, 'LEFT', Pixel.Scale(-BAR.gap), 0)
+	portalsButton:SetScript('OnClick', TogglePortals)
 	frame.startButton = Skin.SmallButton(main, BAR.startW, BUTTON_H, '')
-	frame.startButton:SetPoint('RIGHT', blizzardButton, 'LEFT', Pixel.Scale(-BAR.gap), 0)
+	frame.startButton:SetPoint('RIGHT', portalsButton, 'LEFT', Pixel.Scale(-BAR.gap), 0)
 	frame.startButton:SetScript('OnClick', Strip.StartGroup)
 	frame.startButton:HookScript('OnEnter', ShowActionTooltip)
 	frame.startButton:HookScript('OnLeave', GameTooltip_Hide)
@@ -2213,6 +2252,23 @@ context.info.settings = {
 	LookOption('Show listing age', 'showAge'),
 	LookOption('Show leader best run', 'showBest'),
 	LookOption('Show group comp', 'showComp'),
+	{
+		label = 'Portals beside the list',
+		get = function() return Settings().portals end,
+		set = function(value)
+			Settings().portals = value
+			if finder and finder:IsShown() then SyncPortals() end
+		end,
+	},
+	{
+		label = 'Portal style',
+		entries = PORTAL_STYLES,
+		get = function() return Settings().portalStyle end,
+		set = function(value)
+			Settings().portalStyle = value
+			if finder and finder:IsShown() then SyncPortals() end
+		end,
+	},
 }
 
 BUI.Premade = {
