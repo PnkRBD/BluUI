@@ -1927,17 +1927,19 @@ local function OnPortalsClosed()
 	Settings().portals = false
 end
 
+local PortalOptions
+
 local function SyncPortals()
 	local settings = Settings()
 	local style = settings.portals and settings.portalStyle
 	if style == 'list' then
 		BUI.PortalManager.HideStrip()
-		BUI.PortalManager.OpenBeside(finder, OnPortalsClosed)
+		BUI.PortalManager.OpenBeside(finder, PortalOptions)
 		return
 	end
 	BUI.PortalManager.CloseBeside(finder)
 	if style == 'icons' then
-		BUI.PortalManager.ShowStrip(finder)
+		BUI.PortalManager.ShowStrip(finder, PortalOptions)
 	else
 		BUI.PortalManager.HideStrip()
 	end
@@ -1947,6 +1949,30 @@ local function TogglePortals()
 	Settings().portals = not Settings().portals
 	SyncPortals()
 end
+
+PortalOptions = {
+	onClosed = OnPortalsClosed,
+	levels = function() return Settings().portalLevels end,
+	settings = {
+		{
+			label = 'Best key on icons',
+			get = function() return Settings().portalLevels end,
+			set = function(value)
+				Settings().portalLevels = value
+				BUI.PortalManager.RefreshStrip()
+			end,
+		},
+		{
+			kind = 'dropdown', label = 'Style', items = PORTAL_STYLES,
+			get = function() return Settings().portalStyle end,
+			set = function(value)
+				Settings().portalStyle = value
+				BUILib.Controls.ClosePopover()
+				SyncPortals()
+			end,
+		},
+	},
+}
 
 function Strip.Hold()
 	finder.releasing = false
@@ -2252,23 +2278,6 @@ context.info.settings = {
 	LookOption('Show listing age', 'showAge'),
 	LookOption('Show leader best run', 'showBest'),
 	LookOption('Show group comp', 'showComp'),
-	{
-		label = 'Portals beside the list',
-		get = function() return Settings().portals end,
-		set = function(value)
-			Settings().portals = value
-			if finder and finder:IsShown() then SyncPortals() end
-		end,
-	},
-	{
-		label = 'Portal style',
-		entries = PORTAL_STYLES,
-		get = function() return Settings().portalStyle end,
-		set = function(value)
-			Settings().portalStyle = value
-			if finder and finder:IsShown() then SyncPortals() end
-		end,
-	},
 }
 
 BUI.Premade = {

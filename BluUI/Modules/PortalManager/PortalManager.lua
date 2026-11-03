@@ -59,7 +59,7 @@ local context = Skin.Define('portalManager', {
 })
 
 local panel, slide
-local host, hostClosed
+local host, hostOptions
 local rows = {}
 local lists, activeList
 local mapIDByName, timeLimitByMap = {}, {}
@@ -574,13 +574,35 @@ local function ListenWhileOpen(open)
     end
 end
 
-local STRIP = { icon = 36, levelSize = 12 }
+local STRIP = { icon = 36, levelSize = 12, nameSize = 9 }
+local SHORT_SKIP = { of = true, the = true, ['and'] = true }
 local strip
 local stripButtons = {}
 local RefreshStrip
 
 local function StripPitch()
     return Pixel.Scale(STRIP.icon) - Pixel.PixelSize(1)
+end
+
+local function ShortName(entry)
+    if entry.short then return entry.short end
+    local letters = ''
+    for word in entry.name:gmatch('%a+') do
+        if not SHORT_SKIP[word:lower()] then letters = letters .. word:sub(1, 1):upper() end
+    end
+    return letters
+end
+
+local function CogConfig(settings)
+    return {
+        icon = 'cog', size = 20, iconScale = 0.7, idleColor = { Painter.Color('skinLabel') },
+        tooltip = 'Portal options', title = 'Portals', width = 220, options = settings,
+    }
+end
+
+local function FillSettings(target, source)
+    wipe(target)
+    for index, option in ipairs(source) do target[index] = option end
 end
 
 local function StripEntries()
@@ -633,6 +655,12 @@ local function CreateStripButton(index)
     Pixel.ApplyFont(level, STRIP.levelSize, FONT, 'OUTLINE')
     level:SetPoint('BOTTOMRIGHT', Pixel.Scale(-2), Pixel.Scale(1))
     button.levelText = level
+
+    local name = plate:CreateFontString(nil, 'OVERLAY')
+    Pixel.ApplyFont(name, STRIP.nameSize, FONT, 'OUTLINE')
+    name:SetPoint('TOPLEFT', Pixel.Scale(2), Pixel.Scale(-1))
+    Painter.Text(name, 'skinTitle')
+    button.nameText = name
     return button
 end
 
@@ -648,7 +676,8 @@ local function FillStripButton(button, entry, inCombat)
     end
     button.icon:SetTexture(spellID and C_Spell.GetSpellTexture(spellID) or KEYSTONE_ICON)
     button.icon:SetDesaturated(not known)
-    if run then
+    button.nameText:SetText(ShortName(entry))
+    if run and strip.options.levels() then
         local color = CHEST_COLORS[run.chests]
         button.levelText:SetText('+' .. run.level)
         button.levelText:SetTextColor(color[1], color[2], color[3], 1)
@@ -673,7 +702,9 @@ RefreshStrip = function()
     if not inCombat then
         for index = #entries + 1, #stripButtons do stripButtons[index]:Hide() end
     end
-    strip:SetSize(Pixel.Scale(STRIP.icon), #entries * StripPitch() + Pixel.PixelSize(1))
+    strip.cog:ClearAllPoints()
+    strip.cog:SetPoint('TOP', 0, -(#entries * StripPitch()))
+    strip:SetSize(Pixel.Scale(STRIP.icon), (#entries + 1) * StripPitch() + Pixel.PixelSize(1))
 end
 
 local function RefreshStripCooldowns()
@@ -694,8 +725,25 @@ local STRIP_EVENTS = {
     end,
 }
 
+local function SyncPanelCog()
+    if not panel then return end
+    if not hostOptions then
+        if panel.cog then panel.cog:Hide() end
+        return
+    end
+    if not panel.cog then
+        panel.settings = {}
+        panel.cog = BUILib.Controls.Icon(panel, CogConfig(panel.settings)).frame
+        panel.cog:SetPoint('RIGHT', panel.titleBar.closeBtn.frame, 'LEFT', Pixel.Scale(-4), 0)
+        panel.cog:SetFrameLevel(panel:GetFrameLevel() + 10)
+    end
+    FillSettings(panel.settings, hostOptions.settings)
+    panel.cog:Show()
+end
+
 local function Undock()
-    host, hostClosed = nil, nil
+    host, hostOptions = nil, nil
+    SyncPanelCog()
 end
 
 slide = BUI.SlidePanel.New({
@@ -712,12 +760,13 @@ slide = BUI.SlidePanel.New({
         RebuildMapLookup()
         RefreshContent()
         panel.scroll:SetVerticalScroll(0)
+        SyncPanelCog()
     end,
     onClose = function()
         ListenWhileOpen(false)
         BUI.PartyKeys.Listen('PortalManager', nil)
         StopCastFill()
-        if hostClosed then hostClosed() end
+        if hostOptions then hostOptions.onClosed() end
     end,
 })
 
@@ -742,9 +791,10 @@ function BUI.PortalManager.IsOpen()
     return slide.IsOpen()
 end
 
-function BUI.PortalManager.OpenBeside(frame, onClosed)
-    host, hostClosed = frame, onClosed
+function BUI.PortalManager.OpenBeside(frame, options)
+    host, hostOptions = frame, options
     if slide.IsOpen() then slide.Refit() else slide.Open() end
+    SyncPanelCog()
 end
 
 function BUI.PortalManager.CloseBeside(frame)
@@ -753,12 +803,23 @@ function BUI.PortalManager.CloseBeside(frame)
     if slide.IsOpen() then slide.Close(true) end
 end
 
-function BUI.PortalManager.ShowStrip(parent)
+function BUI.PortalManager.RefreshStrip()
+    RefreshStrip()
+end
+
+function BUI.PortalManager.ShowStrip(parent, options)
     if not BUI.Skinning.IsSkinEnabled('portalManager') then return end
     if not strip then
         strip = CreateFrame('Frame', nil, parent, 'BackdropTemplate')
         Skin.PaintBackdrop(strip, Skin.PALETTE.panel)
+        strip.cog = CreateFrame('Frame', nil, strip, 'BackdropTemplate')
+        strip.cog:SetSize(Pixel.Scale(STRIP.icon), Pixel.Scale(STRIP.icon))
+        Skin.PaintBackdrop(strip.cog, Skin.PALETTE.panel)
+        strip.settings = {}
+        BUILib.Controls.Icon(strip.cog, CogConfig(strip.settings)).frame:SetPoint('CENTER')
     end
+    strip.options = options
+    FillSettings(strip.settings, options.settings)
     strip:SetParent(parent)
     strip:ClearAllPoints()
     strip:SetPoint('TOPLEFT', parent, 'TOPRIGHT', -Pixel.PixelSize(1), 0)
