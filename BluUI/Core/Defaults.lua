@@ -1047,7 +1047,7 @@ BUI.Defaults = {
 			timerColor         = { r = 1, g = 1, b = 1 },
 			beastAnchor        = 'BOTTOM',
 			beastOffsetX       = 0,
-			beastOffsetY       = -2,
+			beastOffsetY       = 2,
 		},
 
 		smartMisdirect = {

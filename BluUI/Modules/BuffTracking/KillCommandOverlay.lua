@@ -9,14 +9,6 @@ local SETTINGS_KEY = 'killCommandOverlay'
 local PREVIEW_READY_SECONDS = 4
 local PREVIEW_TICK_SECONDS = 8
 
-local OPPOSITE_ANCHOR = {
-    TOP         = 'BOTTOM',      BOTTOM      = 'TOP',
-    LEFT        = 'RIGHT',       RIGHT       = 'LEFT',
-    TOPLEFT     = 'BOTTOMRIGHT', TOPRIGHT    = 'BOTTOMLEFT',
-    BOTTOMLEFT  = 'TOPRIGHT',    BOTTOMRIGHT = 'TOPLEFT',
-    CENTER      = 'CENTER',
-}
-
 local function GetHunter() return BUI.BuffTracking.Hunter end
 
 local function IsHunterLoaded()
@@ -220,7 +212,7 @@ local function ApplyBeastLayout(entry, icon, config)
     end
     if entry.beastAnchor ~= anchor or entry.beastOX ~= offsetX or entry.beastOY ~= offsetY then
         entry.beastText:ClearAllPoints()
-        entry.beastText:SetPoint(OPPOSITE_ANCHOR[anchor], icon.Icon, anchor, Pixel.Scale(offsetX), Pixel.Scale(offsetY))
+        entry.beastText:SetPoint(anchor, icon.Icon, anchor, Pixel.Scale(offsetX), Pixel.Scale(offsetY))
         entry.beastAnchor, entry.beastOX, entry.beastOY = anchor, offsetX, offsetY
     end
 end

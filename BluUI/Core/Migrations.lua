@@ -31,7 +31,7 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 31
+local PROFILE_MIGRATION_VERSION = 32
 
 local AURA_GROUP_KINDS = { 'buffs', 'debuffs', 'bigDef', 'crowdControl' }
 
@@ -536,6 +536,20 @@ local function SettleAnnouncer(profile)
 			if type(slot.spells) == 'table' then SettleAnnouncerEntries(slot.spells) end
 		end
 	end
+end
+
+local function SettleBeastLabel(overlay)
+	if type(overlay) ~= 'table' or next(overlay) == nil then return end
+	local anchor = rawget(overlay, 'beastAnchor') or 'BOTTOM'
+	local size = rawget(overlay, 'beastSize') or 12
+	local width = math.floor(size * 1.25 + 0.5)
+	local offsetX = rawget(overlay, 'beastOffsetX') or 0
+	local offsetY = rawget(overlay, 'beastOffsetY') or -2
+	if anchor:find('LEFT') then offsetX = offsetX - width end
+	if anchor:find('RIGHT') then offsetX = offsetX + width end
+	if anchor:find('TOP') then offsetY = offsetY + size end
+	if anchor:find('BOTTOM') then offsetY = offsetY - size end
+	overlay.beastOffsetX, overlay.beastOffsetY = offsetX, offsetY
 end
 
 function BUI.MigrateProfile(profile)
@@ -1125,6 +1139,11 @@ function BUI.MigrateProfile(profile)
 		local auras = profile.auras
 		local fontSize = type(auras) == 'table' and rawget(auras, 'markFontSize')
 		if fontSize and rawget(auras, 'markIconSize') == nil then auras.markIconSize = fontSize + 6 end
+	end
+
+	if not general._beastLabelAnchored then
+		general._beastLabelAnchored = true
+		SettleBeastLabel(profile.killCommandOverlay)
 	end
 
 	general._buiMigrationVersion = PROFILE_MIGRATION_VERSION
