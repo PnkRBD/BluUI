@@ -574,7 +574,7 @@ local function ListenWhileOpen(open)
     end
 end
 
-local STRIP = { icon = 36, gap = 4, pad = 6, offset = 4, levelSize = 10 }
+local STRIP = { icon = 36, gap = 4, pad = 2, levelSize = 12 }
 local strip
 local stripButtons = {}
 local RefreshStrip
@@ -622,9 +622,12 @@ local function CreateStripButton(index)
     cooldown:SetHideCountdownNumbers(false)
     button.cooldown = cooldown
 
-    local level = cooldown:CreateFontString(nil, 'OVERLAY')
+    local plate = CreateFrame('Frame', nil, button)
+    plate:SetAllPoints(icon)
+    plate:SetFrameLevel(cooldown:GetFrameLevel() + 1)
+    local level = plate:CreateFontString(nil, 'OVERLAY')
     Pixel.ApplyFont(level, STRIP.levelSize, FONT, 'OUTLINE')
-    level:SetPoint('BOTTOMRIGHT', Pixel.Scale(-2), Pixel.Scale(2))
+    level:SetPoint('BOTTOMRIGHT', Pixel.Scale(-2), Pixel.Scale(1))
     button.levelText = level
     return button
 end
@@ -754,7 +757,7 @@ function BUI.PortalManager.ShowStrip(parent)
     end
     strip:SetParent(parent)
     strip:ClearAllPoints()
-    strip:SetPoint('TOPLEFT', parent, 'TOPRIGHT', Pixel.Scale(STRIP.offset), 0)
+    strip:SetPoint('TOPLEFT', parent, 'TOPRIGHT', -Pixel.PixelSize(1), 0)
     strip:Show()
     for event, handler in pairs(STRIP_EVENTS) do BUI.Events:Register(event, 'PortalManager.Strip', handler) end
     C_MythicPlus.RequestMapInfo()
