@@ -15,6 +15,7 @@ local QUESTION_MARK_ICON = 134400
 local ENCHANT_ALPHA = 0.95
 local ENCHANT_LINE_TYPE = Enum.TooltipDataLineType.ItemEnchantmentPermanent
 local ATLAS_MARKUP = '|A:[^|]+|a'
+local TEXTURE_MARKUP = '|T[^|]+|t'
 
 Readout.MISSING_COLOR = { 0.898, 0.286, 0.286, 1 }
 Readout.TRACK_COLORS = {
@@ -54,6 +55,12 @@ end
 local ENCHANT_PATTERN = PatternFromFormat(ENCHANTED_TOOLTIP_LINE)
 local UPGRADE_PATTERN = '^' .. EscapePattern(ITEM_UPGRADE_TOOLTIP_FORMAT):gsub('%%%%s', '(.-)'):gsub('%%%%d', '(%%d+)') .. '$'
 local LIMIT_PATTERN = '^' .. EscapePattern(ITEM_LIMIT_CATEGORY_MULTIPLE):gsub('%%%%s', '(.-)'):gsub('%%%%d', '%%d+') .. '$'
+local STAT_LINE = '^%s*%+([%d' .. EscapePattern(LARGE_NUMBER_SEPERATOR) .. ']+)%s+(.+)$'
+local GEAR_STATS = {
+	'ITEM_MOD_STRENGTH_SHORT', 'ITEM_MOD_AGILITY_SHORT', 'ITEM_MOD_INTELLECT_SHORT', 'ITEM_MOD_STAMINA_SHORT',
+	'ITEM_MOD_CRIT_RATING_SHORT', 'ITEM_MOD_HASTE_RATING_SHORT', 'ITEM_MOD_MASTERY_RATING_SHORT', 'ITEM_MOD_VERSATILITY',
+	'ITEM_MOD_CR_LIFESTEAL_SHORT', 'ITEM_MOD_CR_AVOIDANCE_SHORT', 'ITEM_MOD_CR_SPEED_SHORT',
+}
 local VENOM_MARK = 'Venomforged'
 local VENOM_PREFIX = 'Venomforged '
 local EMBELLISH_CATEGORY = 'Embellish'
@@ -61,13 +68,16 @@ local MARK_GAP = '  '
 local TIER_MARK = GREEN_FONT_COLOR:WrapTextInColorCode('Tier')
 local EMBELLISH_MARK = NORMAL_FONT_COLOR:WrapTextInColorCode('Embellished')
 
-local function StripColors(text)
+local function StripMarkup(text)
 	if not text then return '' end
 	text = text:gsub('|cn.-:(.-)|r', '%1')
 	text = text:gsub('|c%x%x%x%x%x%x%x%x', '')
 	text = text:gsub('|r', '')
-	text = text:gsub('^%s*[%+&]%s*', '')
 	return text
+end
+
+local function StripColors(text)
+	return (StripMarkup(text):gsub('^%s*[%+&]%s*', ''))
 end
 
 local function Lines(unit, slotID, link)
@@ -189,6 +199,28 @@ function Readout.PaintMissingEnchant(label, hover)
 	label:SetText('No Enchant')
 	label:SetTextColor(color[1], color[2], color[3], color[4])
 	hover.tooltip = 'Enchant missing'
+end
+
+local function StatLine(text)
+	text = StripMarkup(text):gsub(TEXTURE_MARKUP, '')
+	text = text:gsub(ATLAS_MARKUP, '')
+	return text:match(STAT_LINE)
+end
+
+function Readout.GearStats(unit, slotID, link)
+	local stats = {}
+	local lines = Lines(unit, slotID, link)
+	if not lines then return stats end
+	for _, line in ipairs(lines) do
+		local amount, names = StatLine(line.leftText)
+		if amount then
+			amount = tonumber((amount:gsub('%D', '')))
+			for _, key in ipairs(GEAR_STATS) do
+				if names:find(_G[key], 1, true) then stats[key] = (stats[key] or 0) + amount end
+			end
+		end
+	end
+	return stats
 end
 
 local socketIcons, socketLinks, socketIndexes, takenSockets = {}, {}, {}, {}

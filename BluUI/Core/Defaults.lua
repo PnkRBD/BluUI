@@ -436,6 +436,7 @@ BUI.Defaults = {
 				track    = true,
 				enchants = true,
 				gems     = true,
+				gearStats = true,
 				raceArt  = true,
 				buttons  = { PortalManager = true, CurrencyManager = true, ReputationManager = true, GreatVault = true },
 				sections = { Attributes = true, Secondary = true, Tertiary = true, Attack = true, Defense = true, PvP = true },

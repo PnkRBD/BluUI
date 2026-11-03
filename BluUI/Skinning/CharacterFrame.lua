@@ -216,7 +216,7 @@ local function QualityColor(quality)
 end
 
 local function PaintSlotBorder(button)
-    local color = button._buiQualityColor or PALETTE.edge
+    local color = button._buiHighlightColor or button._buiQualityColor or PALETTE.edge
     button:SetBackdropBorderColor(color[1], color[2], color[3], 1)
 end
 
@@ -548,6 +548,122 @@ local function SyncGemDim(labels)
     for _, gem in ipairs(labels.gems) do gem:SetAlpha(alpha) end
 end
 
+local Highlight = {
+    SCRIM = 0.55, MISSING_SCRIM = 0.8, AMOUNT_SIZE = 11, MISSING_SIZE = 9,
+    KEYS = {
+        ['Strength']        = { key = 'ITEM_MOD_STRENGTH_SHORT',       short = 'STR' },
+        ['Agility']         = { key = 'ITEM_MOD_AGILITY_SHORT',        short = 'AGI' },
+        ['Intellect']       = { key = 'ITEM_MOD_INTELLECT_SHORT',      short = 'INT' },
+        ['Stamina']         = { key = 'ITEM_MOD_STAMINA_SHORT',        short = 'STAM' },
+        ['Critical Strike'] = { key = 'ITEM_MOD_CRIT_RATING_SHORT',    short = 'CRIT' },
+        ['Haste']           = { key = 'ITEM_MOD_HASTE_RATING_SHORT',   short = 'HASTE' },
+        ['Mastery']         = { key = 'ITEM_MOD_MASTERY_RATING_SHORT', short = 'MASTERY' },
+        ['Versatility']     = { key = 'ITEM_MOD_VERSATILITY',          short = 'VERS' },
+        ['Leech']           = { key = 'ITEM_MOD_CR_LIFESTEAL_SHORT',   short = 'LEECH' },
+        ['Avoidance']       = { key = 'ITEM_MOD_CR_AVOIDANCE_SHORT',   short = 'AVOID' },
+        ['Speed']           = { key = 'ITEM_MOD_CR_SPEED_SHORT',       short = 'SPEED' },
+    },
+}
+
+function Highlight.Key(stat)
+    local name = type(stat.name) == 'function' and stat.name() or stat.name
+    return Highlight.KEYS[name]
+end
+
+function Highlight.Current()
+    if not Sheet().gearStats then return nil end
+    if Highlight.hover then return Highlight.hover, Highlight.hoverColor end
+    return Highlight.pinned, Highlight.pinnedColor
+end
+
+function Highlight.PaintSlot(labels, gear, color)
+    local badge, button = labels.badge, labels.button
+    local slotID = GetInventorySlotInfo(labels.info.id)
+    local link = not labels.info.cosmetic and GetInventoryItemLink('player', slotID)
+    local amount
+    if link then
+        if not labels.gear then labels.gear = Readout.GearStats('player', slotID, link) end
+        amount = labels.gear[gear.key]
+    end
+    button._buiHighlightColor = amount and color or nil
+    PaintSlotBorder(button)
+    if not link then
+        badge:Hide()
+        return
+    end
+    badge.scrim:SetColorTexture(0, 0, 0, amount and Highlight.SCRIM or Highlight.MISSING_SCRIM)
+    badge.amount:SetShown(amount ~= nil)
+    badge.missing:SetShown(amount == nil)
+    if amount then
+        badge.amount:SetText('+' .. BreakUpLargeNumbers(amount))
+        badge.amount:SetTextColor(color[1], color[2], color[3], 1)
+    else
+        badge.missing:SetText('NO\n' .. gear.short)
+    end
+    badge:Show()
+end
+
+function Highlight.Clear()
+    for _, labels in pairs(slotLabels) do
+        labels.badge:Hide()
+        if labels.button._buiHighlightColor then
+            labels.button._buiHighlightColor = nil
+            PaintSlotBorder(labels.button)
+        end
+    end
+end
+
+function Highlight.Reapply()
+    local stat, color = Highlight.Current()
+    if not stat then
+        Highlight.Clear()
+        return
+    end
+    local gear = Highlight.Key(stat)
+    for _, labels in pairs(slotLabels) do Highlight.PaintSlot(labels, gear, color) end
+end
+
+function Highlight.MarkRow(row)
+    if row.stat == Highlight.pinned then
+        local color = row.sectionColor
+        row.label:SetTextColor(color[1], color[2], color[3], 1)
+    else
+        row.label:SetTextColor(Painter.Color('skinText'))
+    end
+end
+
+function Highlight.MarkRows()
+    for _, section in ipairs(sections) do
+        for index = 1, section.rowCount do Highlight.MarkRow(section.rows[index]) end
+    end
+end
+
+function Highlight.Hover(row)
+    local stat = row and row.stat
+    if stat and not Highlight.Key(stat) then stat = nil end
+    Highlight.hover, Highlight.hoverColor = stat, stat and row.sectionColor or nil
+    Highlight.Reapply()
+end
+
+function Highlight.Pin(row)
+    local stat = row.stat
+    if not Sheet().gearStats or not stat or not Highlight.Key(stat) then return false end
+    if Highlight.pinned == stat then
+        Highlight.pinned, Highlight.pinnedColor = nil, nil
+    else
+        Highlight.pinned, Highlight.pinnedColor = stat, row.sectionColor
+    end
+    Highlight.MarkRows()
+    Highlight.Reapply()
+    return true
+end
+
+function Highlight.Reset()
+    Highlight.hover, Highlight.hoverColor, Highlight.pinned, Highlight.pinnedColor = nil, nil, nil, nil
+    Highlight.MarkRows()
+    Highlight.Clear()
+end
+
 local function BuildSlotLabels(button, info)
     local labels = { info = info, button = button, gems = {} }
     local outer, inner = SlotSides(info)
@@ -621,6 +737,23 @@ local function BuildSlotLabels(button, info)
     marker:SetScript('OnClick', function() ToggleBagPopup(labels) end)
     marker:Hide()
 
+    local badge = CreateFrame('Frame', nil, overlay)
+    labels.badge = badge
+    badge:SetPoint('TOPLEFT', button, 'TOPLEFT', 1, -1)
+    badge:SetPoint('BOTTOMRIGHT', button, 'BOTTOMRIGHT', -1, 1)
+    badge:SetFrameLevel(overlay:GetFrameLevel() + 2)
+    badge.scrim = badge:CreateTexture(nil, 'BACKGROUND')
+    badge.scrim:SetAllPoints()
+    badge.amount = badge:CreateFontString(nil, 'OVERLAY')
+    Pixel.ApplyFont(badge.amount, Highlight.AMOUNT_SIZE, FONT, 'OUTLINE')
+    badge.amount:SetPoint('CENTER')
+    badge.missing = badge:CreateFontString(nil, 'OVERLAY')
+    Pixel.ApplyFont(badge.missing, Highlight.MISSING_SIZE, FONT, 'OUTLINE')
+    badge.missing:SetPoint('CENTER')
+    badge.missing:SetJustifyH('CENTER')
+    badge.missing:SetTextColor(MISSING_COLOR[1], MISSING_COLOR[2], MISSING_COLOR[3], 1)
+    badge:Hide()
+
     local contextOverlay = button.ItemContextOverlay
     local function Sync() SyncGemDim(labels) end
     BUI.Hook('CharacterFrame.Sync', contextOverlay, 'Show', Sync)
@@ -648,6 +781,7 @@ end
 
 local function RefreshSlot(labels)
     local info, button = labels.info, labels.button
+    labels.gear = nil
     local inventorySlot = GetInventorySlotInfo(info.id)
     local link = GetInventoryItemLink('player', inventorySlot)
     local qualityColor = link and QualityColor(C_Item.GetItemQualityByID(link))
@@ -921,7 +1055,8 @@ function Stat.Tooltip(self)
     local blurb = stat.tooltip
     if type(blurb) == 'function' then blurb = blurb() end
     local dr = stat.ratingID and BUI.TrueStats.Get(stat.ratingID)
-    if not detail and not blurb and not dr then return end
+    local gear = Sheet().gearStats and Highlight.Key(stat)
+    if not detail and not blurb and not dr and not gear then return end
     local heading = stat.title
     if type(heading) == 'function' then heading = heading() end
     local red, green, blue = unpack(self.sectionColor)
@@ -965,6 +1100,9 @@ function Stat.Tooltip(self)
             GameTooltip:AddLine('Hold Ctrl for details', 0.45, 0.45, 0.5)
         end
     end
+    if gear then
+        GameTooltip:AddLine(Highlight.pinned == stat and 'Click to unpin it from your gear' or 'Click to pin it on your gear', 0.45, 0.45, 0.5)
+    end
     GameTooltip:Show()
 end
 
@@ -980,11 +1118,18 @@ Stat.Enter = function(self)
     self.detailed = IsControlKeyDown() == true
     Stat.Tooltip(self)
     if self.stat and self.stat.ratingID then self:SetScript('OnUpdate', Stat.Watch) end
+    Highlight.Hover(self)
 end
 
 Stat.Leave = function(self)
     self:SetScript('OnUpdate', nil)
     GameTooltip:Hide()
+    Highlight.Hover(nil)
+end
+
+Stat.Click = function(self, mouseButton)
+    if mouseButton ~= 'LeftButton' or not Highlight.Pin(self) then return end
+    Stat.Tooltip(self)
 end
 
 local function CreateStatRow(parent)
@@ -1016,6 +1161,7 @@ local function CreateStatRow(parent)
 
     row:SetScript('OnEnter', Stat.Enter)
     row:SetScript('OnLeave', Stat.Leave)
+    row:SetScript('OnMouseUp', Stat.Click)
     return row
 end
 
@@ -1059,6 +1205,7 @@ local function FillSection(section)
             row.sectionColor = color
             row.value:SetTextColor(color[1], color[2], color[3], 1)
             row.percent:SetTextColor(color[1], color[2], color[3], 1)
+            Highlight.MarkRow(row)
         end
     end
     for index = count + 1, #section.rows do section.rows[index]:Hide() end
@@ -2194,6 +2341,7 @@ local function RefreshSlots()
         local labels = slotLabels[info.id]
         if labels then RefreshSlot(labels) end
     end
+    Highlight.Reapply()
 end
 
 local function RefreshAll()
@@ -2275,6 +2423,7 @@ local function BuildSettingsPanel()
         corners[#corners + 1] = ListedOption(toggle.title, 'buttons', toggle.key, LayoutToggles)
     end
     local raceArt = SheetOption('Race background', 'raceArt', ApplyRaceArt)
+    local gearStats = SheetOption('Stat on gear', 'gearStats', Highlight.Reset)
     local tint = {
         get = function() return BUI.GetDB().skinning.characterFrameTintEnabled == true end,
         set = function(value)
@@ -2367,6 +2516,7 @@ local function BuildSettingsPanel()
     })
     Row('Slot readouts', 'Item level, track, enchants, gems', { Picker('Slot readouts', readouts) })
     Counted(Row('Stats sections', Shown(sections), { Picker('Stats sections', sections) }), sections)
+    Row('Stat on gear', 'Hover a stat to see it on every slot, click to pin it', { gearStats })
     Counted(Row('Corner buttons', Shown(corners), { Picker('Corner buttons', corners) }), corners)
     Row('Race background', 'Art behind your character', { raceArt })
     Row('Tint', 'Color wash over the sheet', {
@@ -2382,7 +2532,7 @@ local function BuildSettingsPanel()
             BUILib.Modals.Confirm({
                 parent = frame,
                 title = 'Reset sheet settings',
-                message = 'Scale, readouts, sections, corner buttons, background, tint and the bag marker all go back to their defaults.',
+                message = 'Scale, readouts, sections, stat on gear, corner buttons, background, tint and the bag marker all go back to their defaults.',
                 confirmText = 'Reset', cancelText = 'Cancel',
                 onConfirm = ResetSheet,
             })
@@ -2415,6 +2565,7 @@ local function HideSkin()
     Placement.OnHide()
     if frame then frame:Hide() end
     if bagPopup then bagPopup:Hide() end
+    Highlight.Reset()
     settingsSlide.Close(true)
 end
 
