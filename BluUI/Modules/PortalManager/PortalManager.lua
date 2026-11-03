@@ -574,10 +574,14 @@ local function ListenWhileOpen(open)
     end
 end
 
-local STRIP = { icon = 36, gap = 4, pad = 2, levelSize = 12 }
+local STRIP = { icon = 36, levelSize = 12 }
 local strip
 local stripButtons = {}
 local RefreshStrip
+
+local function StripPitch()
+    return Pixel.Scale(STRIP.icon) - Pixel.PixelSize(1)
+end
 
 local function StripEntries()
     local entries = {}
@@ -603,7 +607,7 @@ end
 local function CreateStripButton(index)
     local button = CreateFrame('Button', nil, strip, 'SecureActionButtonTemplate')
     button:SetSize(Pixel.Scale(STRIP.icon), Pixel.Scale(STRIP.icon))
-    button:SetPoint('TOP', 0, Pixel.Scale(-(STRIP.pad + (index - 1) * (STRIP.icon + STRIP.gap))))
+    button:SetPoint('TOP', 0, -(index - 1) * StripPitch())
     button:RegisterForClicks('LeftButtonUp')
     button:SetAttribute('type', 'spell')
     button:SetAttribute('useOnKeyDown', false)
@@ -669,7 +673,7 @@ RefreshStrip = function()
     if not inCombat then
         for index = #entries + 1, #stripButtons do stripButtons[index]:Hide() end
     end
-    strip:SetSize(Pixel.Scale(STRIP.icon + STRIP.pad * 2), Pixel.Scale(STRIP.pad * 2 + #entries * (STRIP.icon + STRIP.gap) - STRIP.gap))
+    strip:SetSize(Pixel.Scale(STRIP.icon), #entries * StripPitch() + Pixel.PixelSize(1))
 end
 
 local function RefreshStripCooldowns()
