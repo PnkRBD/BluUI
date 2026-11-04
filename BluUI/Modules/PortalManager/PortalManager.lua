@@ -574,14 +574,18 @@ local function ListenWhileOpen(open)
     end
 end
 
-local STRIP = { icon = 36, levelSize = 12, nameSize = 9 }
+local STRIP = { icon = 44, pad = 2, levelSize = 14, nameSize = 10 }
 local SHORT_SKIP = { of = true, the = true, ['and'] = true }
 local strip
 local stripButtons = {}
 local RefreshStrip
 
 local function StripPitch()
-    return Pixel.Scale(STRIP.icon) - Pixel.PixelSize(1)
+    return Pixel.Scale(STRIP.icon) + Pixel.PixelSize(1)
+end
+
+local function StripPad()
+    return Pixel.PixelSize(STRIP.pad)
 end
 
 local function ShortName(entry)
@@ -629,7 +633,7 @@ end
 local function CreateStripButton(index)
     local button = CreateFrame('Button', nil, strip, 'SecureActionButtonTemplate')
     button:SetSize(Pixel.Scale(STRIP.icon), Pixel.Scale(STRIP.icon))
-    button:SetPoint('TOP', 0, -(index - 1) * StripPitch())
+    button:SetPoint('TOP', 0, -(StripPad() + (index - 1) * StripPitch()))
     button:RegisterForClicks('LeftButtonUp')
     button:SetAttribute('type', 'spell')
     button:SetAttribute('useOnKeyDown', false)
@@ -703,8 +707,9 @@ RefreshStrip = function()
         for index = #entries + 1, #stripButtons do stripButtons[index]:Hide() end
     end
     strip.cog:ClearAllPoints()
-    strip.cog:SetPoint('TOP', 0, -(#entries * StripPitch()))
-    strip:SetSize(Pixel.Scale(STRIP.icon), (#entries + 1) * StripPitch() + Pixel.PixelSize(1))
+    strip.cog:SetPoint('TOP', 0, -(StripPad() + #entries * StripPitch()))
+    local pad = StripPad() * 2
+    strip:SetSize(Pixel.Scale(STRIP.icon) + pad, (#entries + 1) * StripPitch() - Pixel.PixelSize(1) + pad)
 end
 
 local function RefreshStripCooldowns()
