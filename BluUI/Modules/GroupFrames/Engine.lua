@@ -273,7 +273,7 @@ function GroupFrames.Setup()
 			if event == "PLAYER_ENTERING_WORLD" then GroupFrames.RebindAllAuras() end
 			DispatchRosterSweep()
 		end)
-		BUI.Tools.OnAuraQueriesUnblocked(DispatchRosterSweep)
+		BUI.Tools.OnAuraQueriesUnblocked(DispatchRosterSweep, "GF.RosterSweep")
 	end
 	GroupFrames.SyncReachabilitySweep()
 end

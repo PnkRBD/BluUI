@@ -394,13 +394,22 @@ local WAKE_EDGES = {
 
 local wakeSubscribers = {}
 
-function Tools.OnAuraQueriesUnblocked(callback)
-    wakeSubscribers[#wakeSubscribers + 1] = callback
+local function WakeAllowed()
+    return not Tools.ShouldAurasBeSecret() and not Tools.AuraQueriesBlocked()
+end
+
+function Tools.OnAuraQueriesUnblocked(callback, settleKey)
+    local index = #wakeSubscribers + 1
+    wakeSubscribers[index] = {
+        callback = callback,
+        key = settleKey or ('Tools.AuraWake:' .. index),
+        settled = settleKey and callback or function() if WakeAllowed() then callback() end end,
+    }
 end
 
 local function RunWakeNow()
-    if Tools.ShouldAurasBeSecret() or Tools.AuraQueriesBlocked() then return end
-    for index = 1, #wakeSubscribers do xpcall(wakeSubscribers[index], geterrorhandler()) end
+    if not WakeAllowed() then return end
+    for index = 1, #wakeSubscribers do xpcall(wakeSubscribers[index].callback, geterrorhandler()) end
 end
 
 local function RunWakeSubscribers(event, cvarName)
@@ -410,7 +419,10 @@ local function RunWakeSubscribers(event, cvarName)
         if not cvarName:find('RestrictionsForced', 1, true) then return end
     end
     if event == 'PLAYER_REGEN_ENABLED' then
-        BUI.Events:AfterCombatSettled(RunWakeNow, 'Tools.AuraWake')
+        for index = 1, #wakeSubscribers do
+            local subscriber = wakeSubscribers[index]
+            BUI.Events:AfterCombatSettled(subscriber.settled, subscriber.key)
+        end
         return
     end
     RunWakeNow()

@@ -241,18 +241,17 @@ function Events:OnLogin(key, callback, module)
 end
 
 local SETTLE_DELAY = 0.35
+local DRAIN_BUDGET_MS = 1
 
 local combatTasks = {}
 local combatTaskOrder = {}
 local settlePending = false
+local draining, drainingTasks, drainPosition
+local ArmSettle
 
-local function Flush()
-    local tasks, order = combatTasks, combatTaskOrder
-    combatTasks, combatTaskOrder = {}, {}
-    for index = 1, #order do
-        xpcall(tasks[order[index]], geterrorhandler())
-    end
-end
+local drainer = CreateFrame('Frame')
+drainer._buiPerfName = 'BUI_Events combat drain'
+drainer:Hide()
 
 local function Enqueue(callback, key)
     key = key or tostring(callback)
@@ -262,13 +261,56 @@ local function Enqueue(callback, key)
     combatTasks[key] = callback
 end
 
-local function ArmSettle()
+local function StartDrain()
+    if InCombatLockdown() or draining or not combatTaskOrder[1] then return end
+    draining, drainingTasks, drainPosition = combatTaskOrder, combatTasks, 1
+    combatTasks, combatTaskOrder = {}, {}
+    drainer:Show()
+end
+
+local function Requeue()
+    local order, tasks = {}, {}
+    for index = drainPosition, #draining do
+        local key = draining[index]
+        order[#order + 1] = key
+        tasks[key] = combatTasks[key] or drainingTasks[key]
+    end
+    for index = 1, #combatTaskOrder do
+        local key = combatTaskOrder[index]
+        if tasks[key] == nil then
+            order[#order + 1] = key
+            tasks[key] = combatTasks[key]
+        end
+    end
+    combatTasks, combatTaskOrder = tasks, order
+    draining, drainingTasks = nil, nil
+    drainer:Hide()
+end
+
+local function DrainStep()
+    if InCombatLockdown() then
+        Requeue()
+        return
+    end
+    local deadline = debugprofilestop() + DRAIN_BUDGET_MS
+    while drainPosition <= #draining do
+        local key = draining[drainPosition]
+        drainPosition = drainPosition + 1
+        xpcall(drainingTasks[key], geterrorhandler())
+        if debugprofilestop() > deadline then return end
+    end
+    draining, drainingTasks = nil, nil
+    drainer:Hide()
+    if combatTaskOrder[1] then ArmSettle() end
+end
+drainer:SetScript('OnUpdate', DrainStep)
+
+ArmSettle = function()
     if settlePending then return end
     settlePending = true
     C_Timer.After(SETTLE_DELAY, function()
         settlePending = false
-        if InCombatLockdown() then return end
-        Flush()
+        StartDrain()
     end)
 end
 
