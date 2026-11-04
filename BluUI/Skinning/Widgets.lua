@@ -364,6 +364,13 @@ function Skin.CreateListRow(parent, height, iconSize)
 	return row
 end
 
+local MENU_FILL = {}
+
+local function PaintMenu(menu)
+	MENU_FILL[1], MENU_FILL[2], MENU_FILL[3], MENU_FILL[4] = PALETTE.panel[1], PALETTE.panel[2], PALETTE.panel[3], 1
+	Skin.ApplyBackdrop(menu, MENU_FILL, PALETTE.edge)
+end
+
 function Skin.CreateDropdown(parent, items, onSelect, width)
 	width = width or 148
 
@@ -388,9 +395,10 @@ function Skin.CreateDropdown(parent, items, onSelect, width)
 
 	local menu = CreateFrame('Frame', nil, dropdown, 'BackdropTemplate')
 	menu:SetFrameStrata('FULLSCREEN_DIALOG')
+	menu:SetFixedFrameStrata(true)
 	menu:SetPoint('TOPLEFT', dropdown, 'BOTTOMLEFT', 0, Pixel.Scale(-2))
 	menu:SetWidth(Pixel.Scale(width))
-	PaintBackdrop(menu, PALETTE.panel)
+	Painter.Custom(menu, PaintMenu)
 	menu:Hide()
 
 	local rowHeight = 22
