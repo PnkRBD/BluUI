@@ -71,34 +71,26 @@ end
 BUI.Tools.OnAuraQueriesUnblocked(Wake)
 
 local function TouchesLockout(instanceIDs)
-	if not instanceIDs then return false end
-	for _, instanceID in ipairs(instanceIDs) do
-		if IsSecret(instanceID) or instanceID == lockoutInstanceID then return true end
+	for index = 1, #instanceIDs do
+		if instanceIDs[index] == lockoutInstanceID then return true end
 	end
 	return false
 end
 
 local function OnPlayerAura(_, _, updateInfo)
 	if not GetConfig().enabled then return end
-	if not updateInfo then
+	local full, addedSpellIDs, changedInstanceIDs = BUI.Tools.ReadAuraUpdate(updateInfo)
+	if full then
 		Wake()
 		return
 	end
-	local full, added = updateInfo.isFullUpdate, updateInfo.addedAuras
-	local removed, updated = updateInfo.removedAuraInstanceIDs, updateInfo.updatedAuraInstanceIDs
-	if IsSecret(full) or IsSecret(added) or IsSecret(removed) or IsSecret(updated) or full then
-		Wake()
-		return
-	end
-	if added then
-		for _, aura in ipairs(added) do
-			if IsSecret(aura) or (not IsSecret(aura.spellId) and LOCKOUT_SET[aura.spellId]) then
-				Wake()
-				return
-			end
+	for index = 1, #addedSpellIDs do
+		if LOCKOUT_SET[addedSpellIDs[index]] then
+			Wake()
+			return
 		end
 	end
-	if lockoutInstanceID and (TouchesLockout(removed) or TouchesLockout(updated)) then Wake() end
+	if lockoutInstanceID and TouchesLockout(changedInstanceIDs) then Wake() end
 end
 
 local function GetLockoutAura()

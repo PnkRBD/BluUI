@@ -1744,53 +1744,14 @@ local function RegisterHotEvents()
         usablePending = true
         QueueDispatch()
     end)
-    BUI.Events:RegisterUnit("UNIT_AURA", "player", "CDM.Custom.Aura", function(event, unit, updateInfo)
+    BUI.Events:RegisterUnit("UNIT_AURA", "player", "CDM.Custom.Aura", function(_, _, updateInfo)
         auraPending = true
-        local fullUpdate = true
-        if updateInfo then
-            local rawFullUpdate = updateInfo.isFullUpdate
-            fullUpdate = issecretvalue(rawFullUpdate) and true or rawFullUpdate
-        end
+        local fullUpdate, addedSpellIDs, changedInstanceIDs = Tools.ReadAuraUpdate(updateInfo)
         if fullUpdate then
             needsFullBuffScan = true
         elseif not needsFullBuffScan then
-            local added   = updateInfo.addedAuras
-            local removed = updateInfo.removedAuraInstanceIDs
-            local updated = updateInfo.updatedAuraInstanceIDs
-            if issecretvalue(added) or issecretvalue(removed) or issecretvalue(updated) then
-                needsFullBuffScan = true
-            else
-                if added then
-                    for _, auraData in ipairs(added) do
-                        local addedSpellID = auraData.spellId
-                        if addedSpellID and not issecretvalue(addedSpellID) then
-                            changedBuffSpellIDs[addedSpellID] = true
-                        elseif addedSpellID then
-                            needsFullBuffScan = true
-                        end
-                    end
-                end
-                if removed then
-                    for _, rawInstanceID in ipairs(removed) do
-                        local removedInstanceID = Tools.SafeNum(rawInstanceID)
-                        if removedInstanceID then
-                            changedBuffInstanceIDs[removedInstanceID] = true
-                        else
-                            needsFullBuffScan = true
-                        end
-                    end
-                end
-                if updated then
-                    for _, rawInstanceID in ipairs(updated) do
-                        local updatedInstanceID = Tools.SafeNum(rawInstanceID)
-                        if updatedInstanceID then
-                            changedBuffInstanceIDs[updatedInstanceID] = true
-                        else
-                            needsFullBuffScan = true
-                        end
-                    end
-                end
-            end
+            for index = 1, #addedSpellIDs do changedBuffSpellIDs[addedSpellIDs[index]] = true end
+            for index = 1, #changedInstanceIDs do changedBuffInstanceIDs[changedInstanceIDs[index]] = true end
         end
         QueueDispatch()
     end)

@@ -373,6 +373,38 @@ function Tools.SafeBool(value)
     return value
 end
 
+local auraAdded, auraChanged = {}, {}
+
+local function CollectInstanceIDs(list)
+    if not list then return true end
+    for index = 1, #list do
+        local instanceID = Tools.SafeNum(list[index])
+        if not instanceID then return false end
+        auraChanged[#auraChanged + 1] = instanceID
+    end
+    return true
+end
+
+function Tools.ReadAuraUpdate(updateInfo)
+    wipe(auraAdded)
+    wipe(auraChanged)
+    if not updateInfo then return true end
+    local full = updateInfo.isFullUpdate
+    if issecretvalue(full) or full then return true end
+    local added, removed, updated = updateInfo.addedAuras, updateInfo.removedAuraInstanceIDs, updateInfo.updatedAuraInstanceIDs
+    if issecretvalue(added) or issecretvalue(removed) or issecretvalue(updated) then return true end
+    if added then
+        for index = 1, #added do
+            local aura = added[index]
+            local spellID = not issecretvalue(aura) and aura.spellId
+            if not spellID or issecretvalue(spellID) then return true end
+            auraAdded[#auraAdded + 1] = spellID
+        end
+    end
+    if not CollectInstanceIDs(removed) or not CollectInstanceIDs(updated) then return true end
+    return false, auraAdded, auraChanged
+end
+
 function Tools.ShouldAurasBeSecret()
     return C_Secrets.ShouldAurasBeSecret()
 end
