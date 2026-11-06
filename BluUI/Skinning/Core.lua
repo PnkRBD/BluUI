@@ -308,6 +308,7 @@ function Skin.MakeDraggable(frame, dbKey, point, x, y, follow)
 		clamp = true,
 		keepPlacement = true,
 		skipClickThrough = true,
+		moveOnPress = true,
 		onPositionChanged = function()
 			if dbKey and Skin.PositionMode() == 'remember' then Skin.SavePosition(frame, dbKey) end
 		end,

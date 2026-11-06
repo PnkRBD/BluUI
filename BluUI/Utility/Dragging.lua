@@ -5,6 +5,7 @@ local Pixel = BUI.Pixel
 local Scale = Pixel.Scale
 local HintText = "Drag to Reposition | Right-Click to Lock"
 local HintFontSize, UnlockBgAlpha = 11, 0.3
+local PRESS_SLOP = 3
 
 function Dragging.GetCenterOffset(frame)
     if not frame then return 0, 0 end
@@ -45,6 +46,7 @@ local OnDragUpdate = function(self)
 end
 
 local function OnDragStart(self)
+    if self.dragActive then return end
     local locked = self.dragLocked
     if self.dragIsLockedFn then locked = self.dragIsLockedFn() end
     if locked then return end
@@ -97,8 +99,28 @@ local function OnDragStop(self)
     end
 end
 
+local function OnPressUpdate(self)
+    if not self.dragActive then
+        local x, y = GetCursorPosition()
+        local dx, dy = x - self._pressX, y - self._pressY
+        if dx * dx + dy * dy < PRESS_SLOP * PRESS_SLOP then return end
+    end
+    self:SetScript("OnUpdate", nil)
+    OnDragStart(self)
+end
+
+local function OnMouseDown(self, button)
+    if button ~= "LeftButton" or self.dragActive then return end
+    self._pressX, self._pressY = GetCursorPosition()
+    self:SetScript("OnUpdate", OnPressUpdate)
+end
+
 local function OnMouseUp(self, button)
-    if button == "RightButton" and not self.dragActive and self.dragOnRightClick then
+    if button == "LeftButton" then
+        if not self.dragOnPress then return end
+        if self:GetScript("OnUpdate") == OnPressUpdate then self:SetScript("OnUpdate", nil) end
+        OnDragStop(self)
+    elseif button == "RightButton" and not self.dragActive and self.dragOnRightClick then
         self.dragOnRightClick()
     end
 end
@@ -180,6 +202,7 @@ function Dragging.MakeDraggable(frame, options)
     end
     frame.dragGetLockedX = options.getLockedX
     frame.dragSkipClickThrough = options.skipClickThrough
+    frame.dragOnPress = options.moveOnPress
 
     if options.showUnlockedBg then
         local background = frame:CreateTexture(nil, "BACKGROUND")
@@ -192,7 +215,8 @@ function Dragging.MakeDraggable(frame, options)
 
     frame:SetScript("OnDragStart", OnDragStart)
     frame:SetScript("OnDragStop", OnDragStop)
-    if options.onRightClick then
+    if options.moveOnPress then frame:SetScript("OnMouseDown", OnMouseDown) end
+    if options.onRightClick or options.moveOnPress then
         frame:SetScript("OnMouseUp", OnMouseUp)
     end
     UpdateDragVisuals(frame)
@@ -207,6 +231,7 @@ end
 function Dragging.Release(frame)
     frame:SetScript("OnDragStart", nil)
     frame:SetScript("OnDragStop", nil)
+    frame:SetScript("OnMouseDown", nil)
     frame:SetScript("OnMouseUp", nil)
     frame:SetScript("OnUpdate", nil)
     frame:SetMovable(false)
@@ -214,6 +239,7 @@ function Dragging.Release(frame)
     if frame.dragHint then frame.dragHint:Hide() end
     if frame.dragUnlockBg then frame.dragUnlockBg:Hide() end
     frame.dragActive = nil
+    frame.dragOnPress = nil
     frame.dragLocked = nil
     frame.dragOnPosition = nil
     frame.dragOnDragging = nil
