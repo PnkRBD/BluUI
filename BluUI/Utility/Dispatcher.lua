@@ -7,7 +7,7 @@ BUI.Dispatcher = Dispatcher
 
 local function Site()
     local stack = debugstack(3, 1, 0) or ''
-    local file, line = stack:match('AddOns/BluUI/([^"]+)"%]:(%d+)')
+    local file, line = stack:match('AddOns/BluUI/([^%]]+)%]:(%d+)')
     return file and (file .. ':' .. line) or '?'
 end
 
