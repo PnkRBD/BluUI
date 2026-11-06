@@ -21,7 +21,7 @@ local BAR = { gap = 6, sortW = 130, searchW = 72, refreshGlyph = 14, editW = 70,
 	hint = 'Search +10, 10-15 or a dungeon', completeGap = 2, searchGlyph = 13, searchInset = 10, clearSize = 10, caretH = 14, blink = 0.5,
 }
 local ROW = { pad = 4, inset = 6, columnGap = 8, signUp = 64, cancel = 56, statusGap = 6, slot = 18, slotGap = 2, role = 24, roleIcon = 18, roleGap = 4, coverLevel = 10, coverSize = 14 }
-local LEVEL = { catcher = 20, popover = 40 }
+local LEVEL = { popover = 40 }
 local POP = {
 	pad = 12, gap = 4, header = 18, headerMid = 6, linkGap = 10, section = 8, checkRow = 24, checkSize = 14, checkIcon = 18,
 	textGap = 8, tick = 2, dungeonW = 210, dungeonGap = 12, serversW = 290, serversListH = 240, serverRow = 24, eye = 16,
@@ -1566,20 +1566,30 @@ Panel.BUILDERS = { other = Panel.BuildOther, servers = Panel.BuildServers, colum
 
 local function HidePanel()
 	if not openPanel then return end
+	BUI.Events:Unregister('GLOBAL_MOUSE_DOWN', 'Skinning.PremadeGroups')
 	openPanel:Hide()
 	openPanel = nil
-	finder.catcher:Hide()
+end
+
+function Panel.OutsidePress()
+	if openPanel:IsMouseOver() or openPanel.anchor:IsMouseOver() then return end
+	HidePanel()
 end
 
 function Panel.OpenPanel(anchor)
-	HidePanel()
 	local pop = panels[anchor.kind] or Panel.BUILDERS[anchor.kind](anchor.kind)
+	if pop == openPanel then
+		HidePanel()
+		return
+	end
+	HidePanel()
+	pop.anchor = anchor
 	pop:ClearAllPoints()
 	pop:SetPoint(pop.point, anchor, pop.relativePoint, Pixel.Scale(pop.offsetX), Pixel.Scale(pop.offsetY))
 	pop:Refresh()
 	pop:Show()
 	openPanel = pop
-	finder.catcher:Show()
+	BUI.Events:Register('GLOBAL_MOUSE_DOWN', 'Skinning.PremadeGroups', Panel.OutsidePress)
 end
 
 function Strip.DungeonOn(tile)
@@ -2195,13 +2205,6 @@ local function BuildFrame()
 	frame.bodyTop = Strip.Build(frame).bodyTop
 	frame.main:SetPoint('TOPLEFT', Pixel.Scale(FRAME.sideW), Pixel.Scale(-frame.bodyTop))
 	frame.sideRule:SetPoint('TOPLEFT', Pixel.Scale(FRAME.sideW), Pixel.Scale(-frame.bodyTop))
-
-	frame.catcher = CreateFrame('Button', nil, frame)
-	frame.catcher:SetAllPoints(UIParent)
-	frame.catcher:SetFrameLevel(frame:GetFrameLevel() + LEVEL.catcher)
-	frame.catcher:RegisterForClicks('AnyDown')
-	frame.catcher:SetScript('OnClick', HidePanel)
-	frame.catcher:Hide()
 end
 
 local function Open()
