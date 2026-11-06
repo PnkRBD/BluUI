@@ -945,7 +945,7 @@ local function ArmorReduction()
     return FormatPct(reduction * 100) .. ' physical damage reduced'
 end
 
-local Stat = { DETAIL_STEP = 100 }
+local Stat = { DETAIL_STEP = 100, TIP_GAP = 6 }
 
 function Stat.MasterySpell()
     local specIndex = C_SpecializationInfo.GetSpecialization()
@@ -1048,6 +1048,18 @@ local STAT_SECTIONS = {
     },
 }
 
+function Stat.Anchor(row)
+    GameTooltip:SetOwner(row, 'ANCHOR_NONE')
+    GameTooltip:SetPoint('TOPLEFT', Stat.TipHost(), 'TOPRIGHT', Pixel.Scale(Stat.TIP_GAP), 0)
+end
+
+function Stat.Fit()
+    local right = GameTooltip:GetRight()
+    if not right or right * GameTooltip:GetEffectiveScale() <= UIParent:GetRight() * UIParent:GetEffectiveScale() then return end
+    GameTooltip:ClearAllPoints()
+    GameTooltip:SetPoint('TOPRIGHT', frame, 'TOPLEFT', -Pixel.Scale(Stat.TIP_GAP), 0)
+end
+
 function Stat.Tooltip(self)
     local stat = self.stat
     if not stat then return end
@@ -1060,7 +1072,7 @@ function Stat.Tooltip(self)
     local heading = stat.title
     if type(heading) == 'function' then heading = heading() end
     local red, green, blue = unpack(self.sectionColor)
-    GameTooltip:SetOwner(self, 'ANCHOR_LEFT')
+    Stat.Anchor(self)
     GameTooltip:SetText(heading or self.label:GetText(), red, green, blue)
     if detail then GameTooltip:AddLine(detail, red, green, blue) end
     if blurb then
@@ -1104,6 +1116,7 @@ function Stat.Tooltip(self)
         GameTooltip:AddLine(Highlight.pinned == stat and 'Click to unpin it from your gear' or 'Click to pin it on your gear', 0.45, 0.45, 0.5)
     end
     GameTooltip:Show()
+    Stat.Fit()
 end
 
 Stat.Watch = function(self)
@@ -2549,6 +2562,11 @@ settingsSlide = BUI.SlidePanel.New({
     build = BuildSettingsPanel,
     onOpen = function() Skin.KitWindow:Repaint() end,
 })
+
+function Stat.TipHost()
+    if settingsSlide.IsOpen() and settingsPanel and settingsPanel:IsShown() then return settingsPanel end
+    return frame
+end
 
 local function ShowSkin()
     if HasConflictingCharSheet() then return end
