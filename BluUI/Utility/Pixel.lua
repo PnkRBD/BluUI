@@ -103,11 +103,11 @@ function Pixel.PixelSizeFor(frame, pixels)
 end
 
 local function KillSnap(object)
-    if rawget(object, "_noSnap") or rawget(object, "_keepSnap") or object:IsForbidden() then return end
+    if issecrettable(object) or rawget(object, "_noSnap") or rawget(object, "_keepSnap") or object:IsForbidden() then return end
 
     local snapsItself = object.SetSnapToPixelGrid ~= nil
     local target = snapsItself and object or object:GetStatusBarTexture()
-    if not target then return end
+    if type(target) ~= "table" or not target.SetSnapToPixelGrid then return end
     if not snapsItself then object._noSnap = true end
     if rawget(target, "_noSnap") then return end
 
@@ -122,7 +122,7 @@ function Pixel.KeepSnap(texture)
 end
 
 local function RearmSnap(object, enabled)
-    if not enabled or not rawget(object, "_noSnap") or object:IsForbidden() then return end
+    if not enabled or issecrettable(object) or not rawget(object, "_noSnap") or object:IsForbidden() then return end
     object._noSnap = nil
     local parent = object:GetParent()
     if parent and rawget(parent, "_noSnap") then parent._noSnap = nil end
@@ -133,7 +133,9 @@ local SNAP_HOOKS = {
     SetColorTexture = KillSnap,
     SetSnapToPixelGrid = RearmSnap,
     SetStatusBarTexture = KillSnap,
+    SetTexCoord = KillSnap,
     SetTexture = KillSnap,
+    SetVertexColor = KillSnap,
 }
 
 local function HookSnapMethods(widget)
