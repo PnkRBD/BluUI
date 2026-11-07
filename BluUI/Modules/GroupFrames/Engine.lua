@@ -244,7 +244,11 @@ function GroupFrames.CloseAllPreviews()
 	GroupFrames.SetRaidPreview(false)
 end
 
-local rosterWatcher
+local rosterHooked
+local ROSTER_EVENTS = {
+	"GROUP_ROSTER_UPDATE", "PLAYER_ENTERING_WORLD", "PLAYER_ROLES_ASSIGNED", "PARTY_MEMBER_ENABLE",
+	"PARTY_MEMBER_DISABLE", "ZONE_CHANGED_NEW_AREA", "PLAYER_REGEN_ENABLED",
+}
 
 function GroupFrames.Setup()
 	local oUF = BUI.oUF
@@ -256,23 +260,17 @@ function GroupFrames.Setup()
 	end)
 	GroupFrames.HookSelection()
 
-	if not rosterWatcher then
-		rosterWatcher = CreateFrame("Frame")
-		rosterWatcher:RegisterEvent("GROUP_ROSTER_UPDATE")
-		rosterWatcher:RegisterEvent("PLAYER_ENTERING_WORLD")
-		rosterWatcher:RegisterEvent("PLAYER_ROLES_ASSIGNED")
-		rosterWatcher:RegisterEvent("PARTY_MEMBER_ENABLE")
-		rosterWatcher:RegisterEvent("PARTY_MEMBER_DISABLE")
-		rosterWatcher:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-		rosterWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
-		rosterWatcher:SetScript("OnEvent", function(_, event)
+	if not rosterHooked then
+		rosterHooked = true
+		local function OnRosterEvent(event)
 			if event == "PLAYER_REGEN_ENABLED" then
 				BUI.Events:AfterCombatSettled(DispatchRosterSweep, "GF.RosterSweep")
 				return
 			end
 			if event == "PLAYER_ENTERING_WORLD" then GroupFrames.RebindAllAuras() end
 			DispatchRosterSweep()
-		end)
+		end
+		for _, event in ipairs(ROSTER_EVENTS) do BUI.Events:Register(event, "GF.Roster", OnRosterEvent) end
 		BUI.Tools.OnAuraQueriesUnblocked(DispatchRosterSweep, "GF.RosterSweep")
 	end
 	GroupFrames.SyncReachabilitySweep()

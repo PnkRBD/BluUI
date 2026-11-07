@@ -68,7 +68,6 @@ local function LinkedIDs(cooldownInfo)
 	if linked and not IsSecret(linked) then return linked end
 end
 
-local watcher = CreateFrame('Frame')
 local activeEntries = {}
 local activeIcons = {}
 local appearManaged = {}
@@ -151,7 +150,7 @@ local function ResolveEntry(spellID)
 	end
 end
 
-watcher:SetScript('OnEvent', function(_, event, spellID)
+local function OnOverlayGlow(event, spellID)
 	if not spellID or IsSecret(spellID) then return end
 	if event == 'SPELL_ACTIVATION_OVERLAY_GLOW_HIDE' then
 		RemoveActive(spellID)
@@ -176,7 +175,7 @@ watcher:SetScript('OnEvent', function(_, event, spellID)
 	if entry.sound then
 		PlaySound(entry.sound, 'Master')
 	end
-end)
+end
 
 local appearWatchEnabled = false
 local appearActive = {}
@@ -691,10 +690,9 @@ HookBarViewer = function()
 	barViewerHooked = CDM.HookBarViewer(WakeAppearScan, WakeAppearScan)
 end
 
-local auraWatcher = CreateFrame('Frame')
-auraWatcher:SetScript('OnEvent', function()
+local function OnAppearEvent()
 	if appearWatchEnabled then QueueAppearScan() end
-end)
+end
 
 local trackHooked = false
 
@@ -736,10 +734,10 @@ function CDM.RefreshProcMsgWatcher()
 	end
 
 	if procWant then
-		watcher:RegisterEvent('SPELL_ACTIVATION_OVERLAY_GLOW_SHOW')
-		watcher:RegisterEvent('SPELL_ACTIVATION_OVERLAY_GLOW_HIDE')
+		BUI.Events:Register('SPELL_ACTIVATION_OVERLAY_GLOW_SHOW', 'CDM.ProcMenu.Glow', OnOverlayGlow)
+		BUI.Events:Register('SPELL_ACTIVATION_OVERLAY_GLOW_HIDE', 'CDM.ProcMenu.Glow', OnOverlayGlow)
 	else
-		watcher:UnregisterAllEvents()
+		BUI.Events:UnregisterAll('CDM.ProcMenu.Glow')
 		for key in pairs(activeEntries) do
 			if not appearManaged[key] then HideOverlayFor(key) end
 		end
@@ -749,11 +747,11 @@ function CDM.RefreshProcMsgWatcher()
 	appearWatchEnabled = appearWant
 	if appearWant then
 		HookBarViewer()
-		auraWatcher:RegisterUnitEvent('UNIT_AURA', 'player')
-		auraWatcher:RegisterUnitEvent('UNIT_SPELLCAST_SUCCEEDED', 'player')
+		BUI.Events:RegisterUnit('UNIT_AURA', 'player', 'CDM.ProcMenu.Appear', OnAppearEvent)
+		BUI.Events:RegisterUnit('UNIT_SPELLCAST_SUCCEEDED', 'player', 'CDM.ProcMenu.Appear', OnAppearEvent)
 		QueueAppearScan()
 	else
-		auraWatcher:UnregisterAllEvents()
+		BUI.Events:UnregisterAll('CDM.ProcMenu.Appear')
 		for key, icons in pairs(appearActive) do
 			appearActive[key] = nil
 			StopAppearAlert(key, icons)

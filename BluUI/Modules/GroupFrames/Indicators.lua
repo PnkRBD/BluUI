@@ -331,12 +331,11 @@ local function TargetInGroup()
 	return UnitPlayerOrPetInRaid("target") or UnitPlayerOrPetInParty("target") or UnitIsUnit("target", "player")
 end
 
-local selectionWatcher
+local selectionHooked
 function GroupFrames.HookSelection()
-	if selectionWatcher then return end
-	selectionWatcher = CreateFrame("Frame")
-	selectionWatcher:RegisterEvent("PLAYER_TARGET_CHANGED")
-	selectionWatcher:SetScript("OnEvent", function()
+	if selectionHooked then return end
+	selectionHooked = true
+	BUI.Events:Register("PLAYER_TARGET_CHANGED", "GF.Selection", function()
 		for frame in pairs(targetedFrames) do previouslyTargeted[#previouslyTargeted + 1] = frame end
 		for index = #previouslyTargeted, 1, -1 do
 			UpdateSelection(previouslyTargeted[index])
