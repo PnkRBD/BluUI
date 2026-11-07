@@ -1,3 +1,25 @@
+# 5.18.0
+
+Portals docked beside the group finder, stat tooltips kept off the character sheet, and windows that move the moment you drag them.
+
+**Portals in Premade Groups**
+
+Press Portals in the Premade Groups window to dock your portals beside it, as a rail of icons or as the list. The rail names each dungeon by its initials, shows your best key on the icon, and ends in a cog that switches between the rail and the list.
+
+**Character sheet**
+
+Stat tooltips sit outside the sheet, to the right of the panel or of the settings panel when that is open, so they no longer cover your character. Hovering a stat shows how much of it each piece of gear gives, the same way pinning one does.
+
+**Windows and menus**
+
+Every BluUI window starts moving after the first few pixels of a drag instead of waiting on the game to notice one. Clicking outside a Premade Groups menu closes it and the click still lands where you aimed it. Dropdown menus stay solid and on top.
+
+**Under the hood**
+
+Work that waits for combat to end is spread across frames so leaving combat does not hitch. Player aura changes are read once through a shared helper, group frames and proc alerts take their events from the shared bus instead of frames of their own, and pixel snapping matches ElvUI's current code. The perf report names the file and line behind every dispatcher.
+
+Updating by hand: delete the old BluUI and BluUI_Options folders, then extract the new ones. Your settings are kept. Restart the game rather than /reload.
+
 # 5.17.0
 
 Range fading for target, focus and boss frames, text placement for every aura icon, and three small fixes.
