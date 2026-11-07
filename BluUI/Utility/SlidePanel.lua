@@ -100,6 +100,11 @@ function BUI.SlidePanel.New(options)
         return slidePanel.open
     end
 
+    function slidePanel.OnSheet()
+        local host = options.anchor and options.anchor()
+        return not host
+    end
+
     function slidePanel.Refit()
         local panel = options.panel()
         if not slidePanel.open or not panel or panel:GetScript('OnUpdate') then return end
@@ -110,3 +115,10 @@ function BUI.SlidePanel.New(options)
 
     return slidePanel
 end
+
+CharacterFrame:HookScript('OnHide', function()
+    for panelIndex = 1, #panels do
+        local slidePanel = panels[panelIndex]
+        if slidePanel.OnSheet() then slidePanel.Close(true) end
+    end
+end)

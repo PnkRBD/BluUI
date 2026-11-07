@@ -346,5 +346,4 @@ function BUI.CurrencyManager.Toggle()
     slide.Toggle()
 end
 
-CharacterFrame:HookScript('OnHide', function() slide.Close(true) end)
 context.OnDisable(function() slide.Close(true) end)

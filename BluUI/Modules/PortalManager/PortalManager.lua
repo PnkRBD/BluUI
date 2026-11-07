@@ -841,9 +841,6 @@ function BUI.PortalManager.HideStrip()
     strip:Hide()
 end
 
-CharacterFrame:HookScript('OnHide', function()
-    if not host then slide.Close(true) end
-end)
 context.OnDisable(function()
     Undock()
     slide.Close(true)
