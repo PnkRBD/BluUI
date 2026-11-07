@@ -126,6 +126,7 @@ local function SheetScale()
     return Sheet().scale / 100
 end
 local sections = {}
+local orderList
 
 function Skin.GetCharacterFrame()
     return frame
@@ -1228,7 +1229,12 @@ end
 LayoutSections = function()
     if not sidebar then return end
     local scrollChild = sidebar.statsScroll.child
-    local shownSections = Sheet().sections
+    local sheet = Sheet()
+    local shownSections, order = sheet.sections, sheet.sectionOrder
+    local rank = {}
+    for index, title in ipairs(order) do rank[title] = index end
+    table.sort(sections, function(left, right) return (rank[left.definition.title] or 99) < (rank[right.definition.title] or 99) end)
+    if orderList and orderList.order ~= order then orderList:SetOrder(order) end
     local offsetY = 0
     for _, section in ipairs(sections) do
         local visible = shownSections[section.definition.title] ~= false
@@ -1967,7 +1973,11 @@ local function MakeToggleButton(parent, options)
     texture:SetPoint('TOPLEFT', 2, -2)
     texture:SetPoint('BOTTOMRIGHT', -2, 2)
     if options.atlas then
-        texture:SetAtlas(options.atlas)
+        local info = C_Texture.GetAtlasInfo(options.atlas)
+        local trimX = (info.rightTexCoord - info.leftTexCoord) * options.trim
+        local trimY = (info.bottomTexCoord - info.topTexCoord) * options.trim
+        texture:SetTexture(info.file)
+        texture:SetTexCoord(info.leftTexCoord + trimX, info.rightTexCoord - trimX, info.topTexCoord + trimY, info.bottomTexCoord - trimY)
     else
         texture:SetTexture(options.icon)
         texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -1986,7 +1996,7 @@ local TOGGLES = {
     { key = 'PortalManager', icon = 'Interface\\Icons\\Spell_Arcane_PortalDalaran', title = 'Portals', module = 'PortalManager' },
     { key = 'CurrencyManager', icon = 'Interface\\Icons\\INV_Misc_Coin_01', title = 'Currency', module = 'CurrencyManager' },
     { key = 'ReputationManager', icon = 'Interface\\Icons\\Achievement_Reputation_01', title = 'Reputation', module = 'ReputationManager' },
-    { key = 'GreatVault', atlas = 'gficon-chest-evergreen-greatvault-complete', title = 'Great Vault', onClick = function() WeeklyRewards_ShowUI() end },
+    { key = 'GreatVault', atlas = 'gficon-chest-evergreen-greatvault-complete', trim = 0.16, title = 'Great Vault', onClick = function() WeeklyRewards_ShowUI() end },
 }
 local toggleButtons = {}
 
@@ -2390,6 +2400,7 @@ local function BuildSettingsPanel()
     local kit = Skin.Kit
     local TINT_DEFAULT = { 0.45, 0.45, 0.6, 0.15 }
     local ROW_H, TEXT_X, SLIDER_W, POPOVER_W = 48, 12, 180, 240
+    local ORDER_W, ORDER_ROW, ORDER_GAP = 150, 22, 4
 
     local function ResetScale()
         Sheet().scale = BUI.ExportImport.FactoryProfile().skinning.characterSheet.scale
@@ -2484,6 +2495,13 @@ local function BuildSettingsPanel()
         return { icon = 'cog', tooltip = 'Choose ' .. title:lower(), title = title, width = POPOVER_W, options = options }
     end
 
+    local function OrderList(parent)
+        local items = {}
+        for index, definition in ipairs(STAT_SECTIONS) do items[index] = { key = definition.title, label = definition.title } end
+        orderList = Skin.CreateOrderList(parent, { items = items, order = Sheet().sectionOrder, width = ORDER_W, rowHeight = ORDER_ROW, gap = ORDER_GAP, onChange = LayoutSections })
+        return orderList
+    end
+
     local function Slider(parent)
         local scale
         scale = kit.Slider(parent, SLIDER_W, {
@@ -2502,11 +2520,11 @@ local function BuildSettingsPanel()
     settingsPanel = Skin.CreatePanelWindow('Sheet settings', function() settingsSlide.Close(true) end)
     local _, _, child = Skin.CreateListArea(settingsPanel, 44, ROW_H)
     local y = 0
-    local function Row(name, sub, tools)
+    local function Row(name, sub, tools, height)
         local row = CreateFrame('Frame', nil, child)
         row:SetPoint('TOPLEFT', child, 'TOPLEFT', 0, -y)
         row:SetPoint('TOPRIGHT', child, 'TOPRIGHT', 0, -y)
-        row:SetHeight(ROW_H)
+        row:SetHeight(height or ROW_H)
         if y > 0 then
             local rule = row:CreateTexture(nil, 'BACKGROUND')
             rule:SetHeight(Pixel.PixelSize(1))
@@ -2516,7 +2534,7 @@ local function BuildSettingsPanel()
         end
         local _, subtitle = kit.RowTitle(row, name, sub, TEXT_X)
         kit.Tools(row, tools).Place({})
-        y = y + ROW_H
+        y = y + (height or ROW_H)
         return subtitle
     end
     local function Counted(subtitle, options)
@@ -2529,6 +2547,7 @@ local function BuildSettingsPanel()
     })
     Row('Slot readouts', 'Item level, track, enchants, gems', { Picker('Slot readouts', readouts) })
     Counted(Row('Stats sections', Shown(sections), { Picker('Stats sections', sections) }), sections)
+    Row('Section order', 'Drag to arrange top to bottom', { { build = OrderList } }, Pixel.Scale(#STAT_SECTIONS * (ORDER_ROW + ORDER_GAP) - ORDER_GAP) + 16)
     Row('Stat on gear', 'Hover a stat to see it on every slot, click to pin it', { gearStats })
     Counted(Row('Corner buttons', Shown(corners), { Picker('Corner buttons', corners) }), corners)
     Row('Race background', 'Art behind your character', { raceArt })

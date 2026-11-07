@@ -440,6 +440,7 @@ BUI.Defaults = {
 				raceArt  = true,
 				buttons  = { PortalManager = true, CurrencyManager = true, ReputationManager = true, GreatVault = true },
 				sections = { Attributes = true, Secondary = true, Tertiary = true, Attack = true, Defense = true, PvP = true },
+				sectionOrder = { 'Attributes', 'Secondary', 'Tertiary', 'Attack', 'Defense', 'PvP' },
 			},
 			chat = false,
 			readycheck = true,
