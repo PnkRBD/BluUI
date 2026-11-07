@@ -100,6 +100,10 @@ local function OnDragStop(self)
 end
 
 local function OnPressUpdate(self)
+    if not IsMouseButtonDown("LeftButton") then
+        self:SetScript("OnUpdate", nil)
+        return
+    end
     if not self.dragActive then
         local x, y = GetCursorPosition()
         local dx, dy = x - self._pressX, y - self._pressY
