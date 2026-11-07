@@ -1974,10 +1974,10 @@ local function MakeToggleButton(parent, options)
     texture:SetPoint('BOTTOMRIGHT', -2, 2)
     if options.atlas then
         local info = C_Texture.GetAtlasInfo(options.atlas)
-        local trimX = (info.rightTexCoord - info.leftTexCoord) * options.trim
-        local trimY = (info.bottomTexCoord - info.topTexCoord) * options.trim
+        local crop = options.crop
+        local spanX, spanY = info.rightTexCoord - info.leftTexCoord, info.bottomTexCoord - info.topTexCoord
         texture:SetTexture(info.file)
-        texture:SetTexCoord(info.leftTexCoord + trimX, info.rightTexCoord - trimX, info.topTexCoord + trimY, info.bottomTexCoord - trimY)
+        texture:SetTexCoord(info.leftTexCoord + spanX * crop[1], info.leftTexCoord + spanX * crop[2], info.topTexCoord + spanY * crop[3], info.topTexCoord + spanY * crop[4])
     else
         texture:SetTexture(options.icon)
         texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -1996,7 +1996,7 @@ local TOGGLES = {
     { key = 'PortalManager', icon = 'Interface\\Icons\\Spell_Arcane_PortalDalaran', title = 'Portals', module = 'PortalManager' },
     { key = 'CurrencyManager', icon = 'Interface\\Icons\\INV_Misc_Coin_01', title = 'Currency', module = 'CurrencyManager' },
     { key = 'ReputationManager', icon = 'Interface\\Icons\\Achievement_Reputation_01', title = 'Reputation', module = 'ReputationManager' },
-    { key = 'GreatVault', atlas = 'gficon-chest-evergreen-greatvault-complete', trim = 0.16, title = 'Great Vault', onClick = function() WeeklyRewards_ShowUI() end },
+    { key = 'GreatVault', atlas = 'gficon-chest-evergreen-greatvault-complete', crop = { 0.173, 0.858, 0.093, 0.872 }, title = 'Great Vault', onClick = function() WeeklyRewards_ShowUI() end },
 }
 local toggleButtons = {}
 
