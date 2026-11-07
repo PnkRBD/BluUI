@@ -998,11 +998,10 @@ local function UpdateIcon(icon)
             local expiry = Tools.SafeNum(aura.expirationTime)
             local auraDuration = Tools.SafeNum(aura.duration)
             if expiry and auraDuration then
-                local auraStart = expiry - auraDuration
-                if auraStart ~= frameData._auraExpiry or auraDuration ~= frameData._auraDuration then
-                    frameData._auraExpiry = auraStart
+                if expiry ~= frameData._auraExpiry or auraDuration ~= frameData._auraDuration then
+                    frameData._auraExpiry = expiry
                     frameData._auraDuration = auraDuration
-                    cooldown:SetCooldown(auraStart, auraDuration)
+                    cooldown:SetCooldownFromExpirationTime(expiry, auraDuration)
                 end
             elseif frameData._auraExpiry ~= 'secret' then
                 frameData._auraExpiry = 'secret'
