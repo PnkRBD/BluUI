@@ -379,7 +379,7 @@ local function StampPad(chat, stamp)
 	measure:SetText(stamp)
 	local gap = math.floor(full - measure:GetStringWidth() + 0.5)
 	if gap < 1 then return '' end
-	return ('|T%s:0:%d|t'):format(BUILib.GetLibMedia('blank'), gap)
+	return ('|T%s:1:%d|t'):format(BUILib.GetLibMedia('blank'), gap)
 end
 
 local ValidStampFormat
