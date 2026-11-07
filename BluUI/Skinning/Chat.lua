@@ -361,6 +361,27 @@ local function Measurer(chat)
 	return measure
 end
 
+local function StampPad(chat, stamp)
+	local measure = Measurer(chat)
+	local path, size, flags = chat:GetFont()
+	local font = path .. size .. (flags or '')
+	if chat._buiStampFont ~= font then
+		local widest, widestWidth = '0', 0
+		for digit = 0, 9 do
+			measure:SetText(tostring(digit))
+			local width = measure:GetStringWidth()
+			if width > widestWidth then widest, widestWidth = tostring(digit), width end
+		end
+		chat._buiStampFont, chat._buiWideDigit = font, widest
+	end
+	measure:SetText((stamp:gsub('%d', chat._buiWideDigit)))
+	local full = measure:GetStringWidth()
+	measure:SetText(stamp)
+	local gap = math.floor(full - measure:GetStringWidth() + 0.5)
+	if gap < 1 then return '' end
+	return ('|T%s:0:%d|t'):format(BUILib.GetLibMedia('blank'), gap)
+end
+
 local ValidStampFormat
 do
 	local lastCheckedFormat, lastFormatValid
@@ -394,7 +415,8 @@ local function HookAddMessage(frame)
 					local stampFormat = config.timestampFormat
 					if ValidStampFormat(stampFormat) then
 						local stampColor = config.timestampColor
-						newText = '|cff' .. BUI.Hex(stampColor[1], stampColor[2], stampColor[3]) .. date(stampFormat) .. '|r ' .. newText
+						local stamp = date(stampFormat)
+						newText = '|cff' .. BUI.Hex(stampColor[1], stampColor[2], stampColor[3]) .. stamp .. '|r' .. StampPad(self, stamp) .. ' ' .. newText
 					end
 				end
 				if newText ~= text then
