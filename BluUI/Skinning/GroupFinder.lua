@@ -332,6 +332,7 @@ end
 
 local function OnCategoryButton(selection, buttonIndex, categoryID, filters)
 	local button = selection.CategoryButtons[buttonIndex]
+	if not button then return end
 	SkinCategoryButton(button)
 	Shell(button)
 	Skin.TipShellEdges(button, selection.selectedCategory == categoryID and selection.selectedFilters == filters)
