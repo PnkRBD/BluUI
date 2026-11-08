@@ -361,7 +361,7 @@ local function Measurer(chat)
 	return measure
 end
 
-local function StampPad(chat, stamp)
+local function PaddedStamp(chat, stamp)
 	local measure = chat._buiStampMeasure
 	if not measure then
 		measure = chat:CreateFontString(nil, 'BACKGROUND')
@@ -370,25 +370,32 @@ local function StampPad(chat, stamp)
 	end
 	local path, size, flags = chat:GetFont()
 	local font = path .. size .. (flags or '')
+	local pads = chat._buiDigitPads
 	if chat._buiStampFont ~= font then
 		measure:SetFont(path, size, flags)
-		local widest, widestWidth = '0', 0
+		pads = {}
+		local widest = 0
 		for digit = 0, 9 do
 			measure:SetText(tostring(digit))
 			local width = measure:GetStringWidth()
-			if issecretvalue(width) then return '' end
-			if width > widestWidth then widest, widestWidth = tostring(digit), width end
+			if issecretvalue(width) then return stamp end
+			pads[tostring(digit)] = width
+			if width > widest then widest = width end
 		end
-		chat._buiStampFont, chat._buiWideDigit = font, widest
+		for digit, width in pairs(pads) do pads[digit] = widest - width end
+		chat._buiStampFont, chat._buiDigitPads = font, pads
 	end
-	measure:SetText((stamp:gsub('%d', chat._buiWideDigit)))
-	local full = measure:GetStringWidth()
-	measure:SetText(stamp)
-	local width = measure:GetStringWidth()
-	if issecretvalue(full) or issecretvalue(width) then return '' end
-	local gap = math.floor(full - width + 0.5)
-	if gap < 1 then return '' end
-	return ('|T%s:1:%d|t'):format(BUILib.GetLibMedia('blank'), gap)
+	local blank = BUILib.GetLibMedia('blank')
+	local owed, paid = 0, 0
+	return (stamp:gsub('%d', function(digit)
+		owed = owed + pads[digit]
+		local pad = math.floor(owed - paid + 0.5)
+		if pad < 1 then return nil end
+		paid = paid + pad
+		local left = math.floor(pad / 2)
+		local right = pad - left
+		return (left > 0 and ('|T%s:1:%d|t'):format(blank, left) or '') .. digit .. ('|T%s:1:%d|t'):format(blank, right)
+	end))
 end
 
 local ValidStampFormat
@@ -425,7 +432,7 @@ local function HookAddMessage(frame)
 					if ValidStampFormat(stampFormat) then
 						local stampColor = config.timestampColor
 						local stamp = date(stampFormat)
-						newText = '|cff' .. BUI.Hex(stampColor[1], stampColor[2], stampColor[3]) .. stamp .. '|r' .. StampPad(self, stamp) .. ' ' .. newText
+						newText = '|cff' .. BUI.Hex(stampColor[1], stampColor[2], stampColor[3]) .. PaddedStamp(self, stamp) .. '|r ' .. newText
 					end
 				end
 				if newText ~= text then
