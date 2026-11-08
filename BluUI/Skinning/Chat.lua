@@ -362,14 +362,21 @@ local function Measurer(chat)
 end
 
 local function StampPad(chat, stamp)
-	local measure = Measurer(chat)
+	local measure = chat._buiStampMeasure
+	if not measure then
+		measure = chat:CreateFontString(nil, 'BACKGROUND')
+		measure:Hide()
+		chat._buiStampMeasure = measure
+	end
 	local path, size, flags = chat:GetFont()
 	local font = path .. size .. (flags or '')
 	if chat._buiStampFont ~= font then
+		measure:SetFont(path, size, flags)
 		local widest, widestWidth = '0', 0
 		for digit = 0, 9 do
 			measure:SetText(tostring(digit))
 			local width = measure:GetStringWidth()
+			if issecretvalue(width) then return '' end
 			if width > widestWidth then widest, widestWidth = tostring(digit), width end
 		end
 		chat._buiStampFont, chat._buiWideDigit = font, widest
@@ -377,7 +384,9 @@ local function StampPad(chat, stamp)
 	measure:SetText((stamp:gsub('%d', chat._buiWideDigit)))
 	local full = measure:GetStringWidth()
 	measure:SetText(stamp)
-	local gap = math.floor(full - measure:GetStringWidth() + 0.5)
+	local width = measure:GetStringWidth()
+	if issecretvalue(full) or issecretvalue(width) then return '' end
+	local gap = math.floor(full - width + 0.5)
 	if gap < 1 then return '' end
 	return ('|T%s:1:%d|t'):format(BUILib.GetLibMedia('blank'), gap)
 end
