@@ -8,6 +8,7 @@ local TOP_HANDLERS = 20
 local TOP_FRAMES = 12
 local TOP_ROOTS = 8
 local SAMPLE_SECONDS = 1
+local CALIBRATION_CALLS = 20000
 local SCRIPTS = { 'OnEvent', 'OnUpdate', 'OnShow', 'OnHide', 'OnSizeChanged', 'OnAttributeChanged', 'OnValueChanged', 'OnEnter', 'OnLeave', 'OnClick' }
 local tracked = {}
 local trackedCallbacks = {}
@@ -47,7 +48,11 @@ local function Duration(seconds)
 end
 
 local function ScriptProfiling()
-	return GetAddOnCPUUsage ~= nil and C_CVar.GetCVarBool('scriptProfile')
+	if not GetFunctionCPUUsage or not C_CVar.GetCVarBool('scriptProfile') then return false end
+	local probe = function() end
+	probe()
+	local _, calls = GetFunctionCPUUsage(probe, false)
+	return calls > 0
 end
 
 local function CountMetrics()
@@ -73,6 +78,8 @@ local function Start()
 	if ResetCPUUsage then ResetCPUUsage() end
 	if ScriptProfiling() then
 		BUI.Print('Measuring with the script profiler on. Type /bui perf again when the pull is over.')
+	elseif C_CVar.GetCVarBool('scriptProfile') then
+		BUI.Print('scriptProfile is set but does not run until you reload. Measuring event and timer work only. Type /bui perf again when the pull is over.')
 	else
 		BUI.Print('Measuring event and timer work only. For hooks run from Blizzard code, such as the cooldown manager skin, set /console scriptProfile 1 and reload first. Type /bui perf again when the pull is over.')
 	end
@@ -140,16 +147,31 @@ local function HookRows()
 	return rows, total
 end
 
+local function CallCount(rows)
+	local calls = 0
+	for _, row in ipairs(rows) do calls = calls + row.calls end
+	return calls
+end
+
+local function ProfilerOverhead(calls)
+	local probe = function() end
+	local started = debugprofilestop()
+	for _ = 1, CALIBRATION_CALLS do probe() end
+	return (debugprofilestop() - started) / CALIBRATION_CALLS * calls
+end
+
 local function Breakdown(scripts)
 	UpdateAddOnCPUUsage()
 	local total = GetAddOnCPUUsage(ADDON)
 	Line('total Lua time, every entry point', Ms(total))
 	local frameRows, frameTotal = FrameRows(scripts)
 	PrintTimed(frameRows, 'Heaviest frame scripts, one row per script function on frames BluUI owns', TOP_FRAMES)
-	PrintTimed(HandlerRows(), 'Heaviest event handlers')
+	local handlerRows = HandlerRows()
+	PrintTimed(handlerRows, 'Heaviest event handlers')
 	local hookRows, hookTotal = HookRows()
 	PrintTimed(hookRows, 'Watched hooks, ticks and layout passes')
-	Line('coverage', ('%s in frame scripts (Blizzard template code on BluUI frames included) and %s in watched hooks against %s of BluUI Lua; anything left is timers or library code'):format(Ms(frameTotal), Ms(hookTotal), Ms(total)))
+	local calls = CallCount(frameRows) + CallCount(handlerRows) + CallCount(hookRows)
+	Line('coverage', ('%s in frame scripts (Blizzard template code on BluUI frames included) and %s in watched hooks against %s of BluUI Lua; the profiler itself costs about %s to count those %d calls, and anything left is timers or library code'):format(Ms(frameTotal), Ms(hookTotal), Ms(total), Ms(ProfilerOverhead(calls)), calls))
 end
 
 local function RootName(root)
