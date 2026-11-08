@@ -97,8 +97,9 @@ local REGIONS = {
 	byRealm = {},
 	split = GetCurrentRegion() == 1,
 }
+function REGIONS.Key(realm) return (realm:lower():gsub('[%s%p]', '')) end
 for _, region in ipairs(REGIONS) do
-	for _, realm in ipairs(region.realms or {}) do REGIONS.byRealm[(realm:lower():gsub('[%s%p]', ''))] = region.key end
+	for _, realm in ipairs(region.realms or {}) do REGIONS.byRealm[REGIONS.Key(realm)] = region.key end
 	region.tip = region.tip or table.concat(region.realms, ', ')
 end
 local SORT_ITEMS = {
@@ -519,7 +520,7 @@ local function ReadEntry(resultID)
 	entry.counts = C_LFGList.GetSearchResultMemberCounts(resultID)
 	entry.appStatus, entry.pendingStatus = appStatus, pendingStatus
 	entry.isApplication = appStatus ~= 'none' or pendingStatus ~= nil
-	entry.region = REGIONS.split and entry.realm and (REGIONS.byRealm[(entry.realm:lower():gsub('[%s%p]', ''))] or 'us') or nil
+	entry.region = REGIONS.split and entry.realm and (REGIONS.byRealm[REGIONS.Key(entry.realm)] or 'us') or nil
 	entry.byRole, entry.comp, entry.dirty = nil, nil, false
 	entryByID[resultID] = entry
 	return entry
@@ -648,17 +649,20 @@ local function ShowRowTooltip(row)
 	GameTooltip:Show()
 end
 
-local function ToggleHidden(realm)
-	ToggleInSet(Realms().hidden, realm)
-	resortPending = true
+local function RealmsChanged(resort)
+	if resort then resortPending = true end
 	RefreshContent()
 	Panel.Notify()
 end
 
+local function ToggleHidden(realm)
+	ToggleInSet(Realms().hidden, realm)
+	RealmsChanged(true)
+end
+
 local function ToggleFlagged(realm)
 	ToggleInSet(Realms().flagged, realm)
-	RefreshContent()
-	Panel.Notify()
+	RealmsChanged(false)
 end
 
 local function RealmMenu(realm)
@@ -1028,11 +1032,12 @@ local function ServersSummary()
 	local realms = Realms()
 	local parts = {}
 	if REGIONS.split and next(realms.hiddenRegions) then
-		local shown = {}
+		local shown, hidden = {}, {}
 		for _, region in ipairs(REGIONS) do
-			if not realms.hiddenRegions[region.key] then shown[#shown + 1] = region.label end
+			local list = realms.hiddenRegions[region.key] and hidden or shown
+			list[#list + 1] = region.label
 		end
-		parts[1] = table.concat(shown, ', ') .. ' only'
+		parts[1] = #hidden < #shown and (table.concat(hidden, ', ') .. ' off') or (table.concat(shown, ', ') .. ' only')
 	end
 	local hidden, flagged = CountKeys(realms.hidden), CountKeys(realms.flagged)
 	if hidden > 0 then parts[#parts + 1] = hidden .. ' hidden' end
@@ -1226,9 +1231,7 @@ function Panel.ToggleRegion(control)
 		if shown == 1 then return end
 	end
 	ToggleInSet(hidden, key)
-	resortPending = true
-	RefreshContent()
-	Panel.Notify()
+	RealmsChanged(true)
 end
 
 function Panel.ToggleTip(button)
@@ -1751,6 +1754,7 @@ function Strip.ServersButton(view, kind)
 	servers.kind = kind
 	servers:SetScript('OnClick', Panel.OpenPanel)
 	servers.value = Text(servers, 11, 'skinLabel', 'RIGHT')
+	servers.value:SetPoint('LEFT', servers.label, 'RIGHT', Pixel.Scale(SIDE.pad), 0)
 	servers.value:SetPoint('RIGHT', Pixel.Scale(-SIDE.pad), 0)
 	return servers
 end
