@@ -1588,7 +1588,10 @@ function Skin.Define(id, info)
 	local function Guard(handler, label)
 		if not label then
 			local stack = debugstack(2, 1, 0)
-			local file, line = not IsSecret(stack) and stack and stack:match('AddOns/BluUI/([^%]]+)%]:(%d+)')
+			local file, line
+			if stack and not IsSecret(stack) then
+				file, line = stack:match('AddOns/BluUI/([^%]]+)%]:(%d+)')
+			end
 			label = 'Skin.' .. id .. ' guard ' .. (file and (file .. ':' .. line) or '?')
 		end
 		local guarded = function(...)
