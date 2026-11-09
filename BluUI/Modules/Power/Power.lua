@@ -9,7 +9,7 @@ local SafeNum = BUI.Tools.SafeNum
 
 local frame, text, barContainer, bar, barText, barTexture, textOverlay
 local lowPowerCurve
-local livePowerType, livePower, liveMax
+local livePowerType, liveIsMana, livePower, liveMax
 
 local function GetDB() return BUI.Power.GetPrimaryDB() end
 local function ShouldShow() local db = GetDB() return db.enabled and db.source ~= "none" and BUI.IsModuleEnabled("power") end
@@ -39,10 +39,9 @@ end
 
 local function UpdateDisplay()
     local db = GetDB()
-    local powerType, isMana = ClassPowers.GetPrimaryPowerType()
+    local powerType, isMana = livePowerType, liveIsMana
     local currentPower = UnitPower("player", powerType)
     local maxPower = UnitPowerMax("player", powerType)
-    livePowerType = powerType
 
     if db.barMode then
         text:Hide()
@@ -89,7 +88,8 @@ local styledPowerType, styledAnchorWidth
 local function Style()
     local db = GetDB()
     livePower = nil
-    styledPowerType = ClassPowers.GetPrimaryPowerType()
+    styledPowerType, liveIsMana = ClassPowers.GetPrimaryPowerType()
+    livePowerType = styledPowerType
     styledAnchorWidth = BUI.Anchor.GetAnchorWidth(frame, db)
     frame:SetFrameStrata(db.barMode and 'LOW' or db.frameStrata)
     textOverlay:SetFrameStrata(db.textStrata)
