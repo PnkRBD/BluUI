@@ -1,3 +1,31 @@
+# 5.19.0
+
+Chat lines that wrap under the name, a cooldown manager that reacts in the frame an event lands, and a profiler that names what called what.
+
+**Chat**
+
+Long messages continue under the name instead of under the time. Turn it off under Messages, Align wrapped lines, if you prefer the old flow. Timestamps are drawn plain, the same way ElvUI draws them.
+
+**Cooldown manager**
+
+Custom icons and custom bars update in the frame their event arrives. The old code held cooldown, usable, aura and bag changes back by up to a tenth of a second and rescanned bags on a delay. The same clean-up went through the rest of the addon: secondary stats, the dispel callout, the objective tracker, the merchant and trainer windows, the currency, reputation and portal panels, and the dashboard all refresh on the next frame instead of on a timer.
+
+Ctrl-click to detach single icons is gone. Positions saved for detached icons are cleared the first time this version loads.
+
+**Character sheet**
+
+The vault icon is cropped to a centred square and zoomed to fill its slot. Stat sections can be dragged into the order you want.
+
+**Premade Groups**
+
+The servers summary sits clear of its label and reads shorter. Category buttons the game never created no longer throw an error.
+
+**Under the hood**
+
+/bui perf lists the most called BluUI functions with who called them and how often, counts BluUI's own secret-value checks exactly, names glow frames and Blizzard template code running on BluUI frames, and reports its own overhead. Every secret-value check in the addon goes through one function so that count is BluUI's alone.
+
+Updating by hand: delete the old BluUI and BluUI_Options folders, then extract the new ones. Your settings are kept. Restart the game rather than /reload.
+
 # 5.18.0
 
 Portals docked beside the group finder, stat tooltips kept off the character sheet, and windows that move the moment you drag them.
