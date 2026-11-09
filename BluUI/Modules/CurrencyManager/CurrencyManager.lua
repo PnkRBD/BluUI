@@ -61,13 +61,11 @@ local function PositionTransferMenu()
     CurrencyTransferMenu:SetFrameStrata('FULLSCREEN_DIALOG')
 end
 
-local function OpenWarbandTransfer(currencyID, isRetry)
+local function OpenWarbandTransfer(currencyID)
     if InCombatLockdown() then return end
     if not C_CurrencyInfo.IsAccountCharacterCurrencyDataReady() then
+        BUI.Events:Once('ACCOUNT_CHARACTER_CURRENCY_DATA_RECEIVED', 'CurrencyManager.Transfer', function() OpenWarbandTransfer(currencyID) end)
         C_CurrencyInfo.RequestCurrencyDataForAccountCharacters()
-        if not isRetry then
-            C_Timer.After(0.5, function() OpenWarbandTransfer(currencyID, true) end)
-        end
         return
     end
     local canTransfer, failureReason = C_CurrencyInfo.CanTransferCurrency(currencyID)
@@ -320,7 +318,7 @@ RefreshContent = function()
     panel.emptyText:SetText(searchText ~= '' and 'No matching currencies.' or 'No currencies.')
 end
 
-local ThrottledRefresh = BUI.Dispatcher.NewDelayed(RefreshContent, 0.3)
+local QueueRefresh = BUI.Dispatcher.New(RefreshContent)
 
 local EVENTS = { 'CURRENCY_DISPLAY_UPDATE', 'PLAYER_MONEY' }
 
@@ -331,7 +329,7 @@ slide = BUI.SlidePanel.New({
     panel = function() return panel end,
     build = BuildPanel,
     onOpen = function()
-        for _, event in ipairs(EVENTS) do BUI.Events:Register(event, 'CurrencyManager', ThrottledRefresh) end
+        for _, event in ipairs(EVENTS) do BUI.Events:Register(event, 'CurrencyManager', QueueRefresh) end
         C_CurrencyInfo.RequestCurrencyDataForAccountCharacters()
         ExpandAllCurrencyHeaders()
         RefreshContent()

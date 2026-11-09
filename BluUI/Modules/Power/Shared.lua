@@ -62,7 +62,7 @@ function Shared.ShouldReanchor(frame, db)
 end
 
 function Shared.DeferRefresh(getFrame, getDB, reposition)
-    C_Timer.After(0.1, function()
+    C_Timer.After(0, function()
         if getFrame() and getDB().enabled then reposition() end
     end)
 end

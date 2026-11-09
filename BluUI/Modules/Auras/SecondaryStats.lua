@@ -8,7 +8,6 @@ BUI.Auras.SecondaryStats = SecondaryStats
 local FRAME_NAME = 'BUI_SecondaryStats'
 local EVENT_KEY = 'SecondaryStats'
 local FIRST_SPELL_SCHOOL = 2
-local PAINT_DELAY = 0.1
 local LINE_GAP = 2
 local PAD = 6
 local SAMPLE_VALUE = '888,888'
@@ -136,7 +135,7 @@ local function Paint()
     end
 end
 
-local Update = BUI.Dispatcher.NewDelayed(Paint, PAINT_DELAY)
+local Update = BUI.Dispatcher.New(Paint)
 
 local function Build()
     if holder then return end

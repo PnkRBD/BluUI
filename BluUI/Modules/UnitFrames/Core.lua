@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local Pixel = BUI.Pixel
 local Motion = BUI.BUILibClient.Motion
@@ -478,7 +479,7 @@ do
 		local cooldown = C_Spell.GetSpellCooldown(spellID)
 		if not cooldown then return true end
 		local enabled, active = cooldown.isEnabled, cooldown.isActive
-		if issecretvalue(enabled) or issecretvalue(active) then return nil end
+		if IsSecret(enabled) or IsSecret(active) then return nil end
 		if enabled == false then return false end
 		return not active
 	end
@@ -895,7 +896,7 @@ do
 		end
 	end
 
-	local QueueCalloutReadiness = BUI.Dispatcher.NewDelayed(ApplyCalloutReadiness, 0.25)
+	local QueueCalloutReadiness = BUI.Dispatcher.New(ApplyCalloutReadiness)
 
 	local calloutEventsOn
 	local function StartCalloutEvents()

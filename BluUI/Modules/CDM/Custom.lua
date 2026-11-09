@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local _G = _G
 local wipe = wipe
@@ -27,7 +28,7 @@ local function SafeGetPlayerAura(spellID)
     if not spellID then return nil, false end
     if Tools.AuraQueriesBlocked() then return nil, true end
     local aura = GetPlayerAuraBySpellID(spellID)
-    if issecretvalue(aura) then return nil, true end
+    if IsSecret(aura) then return nil, true end
     return aura, false
 end
 
@@ -66,6 +67,7 @@ local warningLastSound
 local function ShowBuffWarning(icon, text, color, remaining, spellName, font, decimalThreshold)
     if not warningFrame then
         warningFrame = CreateFrame("Frame", nil, UIParent)
+        warningFrame._buiPerfName = "BUI_CDMBuffWarning"
         warningFrame:SetSize(Pixel.Scale(500), Pixel.Scale(50))
         warningFrame:SetPoint("CENTER", UIParent, "CENTER", 0, Pixel.Scale(200))
         warningFrame:SetFrameStrata("HIGH")
@@ -342,9 +344,9 @@ local pendingItems = {}
 local itemLoadRegistered = false
 local ScheduleBagRescan
 
-local RefreshBarsAfterItemLoad = BUI.Dispatcher.NewDelayed(function()
+local RefreshBarsAfterItemLoad = BUI.Dispatcher.New(function()
     BUI.CustomBars.RefreshAllBars()
-end, 0.1)
+end)
 
 local function OnItemDataLoaded(_, itemID, success)
     if not pendingItems[itemID] then return end
@@ -1110,7 +1112,7 @@ local function UpdateIcon(icon)
     end
     if not IconEngine.SpellCooldownChanged(frameData, id, frameData.hasCharges, cdInfo) then
         local _, notEnoughPower = C_Spell.IsSpellUsable(id)
-        if not issecretvalue(notEnoughPower) and notEnoughPower ~= texture._lastNotEnoughPower then
+        if not IsSecret(notEnoughPower) and notEnoughPower ~= texture._lastNotEnoughPower then
             texture._lastNotEnoughPower = notEnoughPower
             local tint = notEnoughPower and 0.5 or 1
             SetColor(texture, tint, tint, tint)
@@ -1119,9 +1121,9 @@ local function UpdateIcon(icon)
     end
 
     local isUsable, notEnoughPower = C_Spell.IsSpellUsable(id)
-    if issecretvalue(notEnoughPower) then notEnoughPower = false end
+    if IsSecret(notEnoughPower) then notEnoughPower = false end
     texture._lastNotEnoughPower = notEnoughPower
-    if not issecretvalue(isUsable) then
+    if not IsSecret(isUsable) then
         frameData._usableKey = (isUsable and 1 or 0) + (notEnoughPower and 2 or 0)
     end
     local tint = notEnoughPower and 0.5 or 1
@@ -1294,31 +1296,22 @@ local function SetupIcon(icon, storedValue, viewerKey, index)
 end
 
 local trinketLoadPending = {}
-local trinketSlotRetryPending = {}
-local trinketSlotRetryCount = {}
-local MAX_TRINKET_SLOT_RETRIES = 6
 
 local function ArmTrinketDataLoad(slot)
     local itemID = IconEngine.ResolveTrinketSlot(slot)
-    if not itemID then
-        if trinketSlotRetryPending[slot] or not IconEngine.TrinketSlotHasItem(slot) then return end
-        local attempts = (trinketSlotRetryCount[slot] or 0) + 1
-        if attempts > MAX_TRINKET_SLOT_RETRIES then return end
-        trinketSlotRetryCount[slot] = attempts
-        trinketSlotRetryPending[slot] = true
-        C_Timer.After(0.5, function()
-            trinketSlotRetryPending[slot] = nil
-            CDM.Custom.Refresh("essential")
-        end)
-        return
+    local key = itemID or slot
+    if trinketLoadPending[key] then return end
+    local item
+    if itemID then
+        item = Item:CreateFromItemID(itemID)
+    else
+        if not IconEngine.TrinketSlotHasItem(slot) then return end
+        item = Item:CreateFromEquipmentSlot(IconEngine.TrinketInventorySlot(slot))
     end
-    trinketSlotRetryCount[slot] = nil
-    if trinketLoadPending[itemID] then return end
-    local item = Item:CreateFromItemID(itemID)
     if item:IsItemEmpty() then return end
-    trinketLoadPending[itemID] = true
+    trinketLoadPending[key] = true
     item:ContinueOnItemLoad(function()
-        trinketLoadPending[itemID] = nil
+        trinketLoadPending[key] = nil
         CDM.Custom.Refresh("essential")
     end)
 end
@@ -1489,7 +1482,7 @@ local function UpdateIconUsable(icon)
     if frameData.hidden then return end
     if frameData.iconType and frameData.iconType ~= "spell" then return end
     local isUsable, notEnoughPower = C_Spell.IsSpellUsable(frameData.customSpellID)
-    if issecretvalue(isUsable) or issecretvalue(notEnoughPower) then return end
+    if IsSecret(isUsable) or IsSecret(notEnoughPower) then return end
     local key = (isUsable and 1 or 0) + (notEnoughPower and 2 or 0)
     if frameData._usableKey == key then return end
     frameData._usableKey = key
@@ -1619,23 +1612,7 @@ local function FlushDispatch()
     end
 end
 
-local FLUSH_MIN_INTERVAL = 0.1
-local lastFlushTime = 0
-local flushQueued = false
-local RunFlush = FlushDispatch
-
-local function RunQueuedFlush()
-    flushQueued = false
-    lastFlushTime = GetTime()
-    RunFlush()
-end
-
-local function QueueDispatch()
-    if flushQueued then return end
-    flushQueued = true
-    local wait = FLUSH_MIN_INTERVAL - (GetTime() - lastFlushTime)
-    C_Timer.After(wait > 0 and wait or 0, RunQueuedFlush)
-end
+local QueueDispatch = BUI.Dispatcher.New(FlushDispatch)
 
 local bagPending = false
 
@@ -1661,10 +1638,11 @@ local function FlushBagUpdate()
     end
 end
 
+local RunBagUpdate = BUI.Dispatcher.New(FlushBagUpdate)
+
 ScheduleBagRescan = function()
-    if bagPending then return end
     bagPending = true
-    C_Timer.After(0.05, FlushBagUpdate)
+    RunBagUpdate()
 end
 
 local manualSpellMap = {}
@@ -1699,7 +1677,7 @@ end
 
 local function OnSpellCastSucceeded(spellID)
     if not spellID then return end
-    if issecretvalue(spellID) then return end
+    if IsSecret(spellID) then return end
     local matched = manualSpellMap[spellID]
     if not matched then return end
     local now = GetTime()
@@ -1712,7 +1690,7 @@ end
 local GLOBAL_RECOVERY_CATEGORY = Constants.SpellCooldownConsts.GLOBAL_RECOVERY_CATEGORY
 
 local function IsAllCooldownsUpdate(spellID, baseSpellID, startRecoveryCategory)
-    if issecretvalue(spellID) or issecretvalue(baseSpellID) or issecretvalue(startRecoveryCategory) then return true end
+    if IsSecret(spellID) or IsSecret(baseSpellID) or IsSecret(startRecoveryCategory) then return true end
     return spellID == nil or startRecoveryCategory == GLOBAL_RECOVERY_CATEGORY
 end
 
@@ -1810,7 +1788,6 @@ local function UpdateHotEventState()
 end
 
 local function OnEnteringWorld()
-    wipe(trinketSlotRetryCount)
     InvalidateCache()
     DoRefresh()
     UpdateHotEventState()
@@ -1899,3 +1876,20 @@ end
 
 CDM.Custom.IsTrackedEntryUsable = IsTrackedEntryUsable
 CDM.Custom.UpdateIcon = UpdateIcon
+
+BUI.Perf.Track('CDM.Custom.Flush', FlushDispatch)
+BUI.Perf.Track('CDM.Custom.SpellWalk', RunSpellWalk)
+BUI.Perf.Track('CDM.Custom.ChangedSpellWalk', RunChangedSpellWalk)
+BUI.Perf.Track('CDM.Custom.ItemWalk', RunItemWalk)
+BUI.Perf.Track('CDM.Custom.UsableWalk', RunUsableWalk)
+BUI.Perf.Track('CDM.Custom.UpdateTrackedBuffIcons', UpdateTrackedBuffIcons)
+BUI.Perf.Track('CDM.Custom.UpdateRelevantBuffIcons', UpdateRelevantBuffIcons)
+BUI.Perf.Track('CDM.Custom.UpdateConsumableIcons', UpdateConsumableIcons)
+BUI.Perf.Track('CDM.Custom.RebuildBagCache', RebuildBagCache)
+BUI.Perf.Track('CDM.Custom.FlushBagUpdate', FlushBagUpdate)
+BUI.Perf.Track('CDM.Custom.AggregateCountPrio', AggregateCountPrio)
+BUI.Perf.Track('CDM.Custom.GetPotionVersions', GetPotionVersions)
+BUI.Perf.Track('CDM.Custom.DoRefresh', DoRefresh)
+BUI.Perf.Track('CDM.Custom.RefreshViewer', RefreshViewer)
+BUI.Perf.Track('CDM.Custom.SetupIcon', SetupIcon)
+BUI.Perf.Track('CDM.Custom.UpdateIcon', UpdateIcon)

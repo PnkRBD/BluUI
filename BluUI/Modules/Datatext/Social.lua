@@ -682,7 +682,7 @@ RenderSocial = function()
     panel:SetHeight(Pixel.Scale(44 + visible * SOCIAL_ROW_HEIGHT + 8 + 22))
 end
 
-local DispatchSocialRefresh = BUI.Dispatcher.NewDelayed(function()
+local DispatchSocialRefresh = BUI.Dispatcher.New(function()
     if not socialPanel:IsShown() then return end
     socialPanel.data = (socialPanel.kind == 'guild') and GatherGuild() or GatherFriends()
     RenderSocial()
@@ -693,7 +693,7 @@ local DispatchSocialRefresh = BUI.Dispatcher.NewDelayed(function()
             break
         end
     end
-end, 0.4)
+end)
 
 local function RefreshOpenSocialPanel()
     if socialPanel and socialPanel:IsShown() then DispatchSocialRefresh() end

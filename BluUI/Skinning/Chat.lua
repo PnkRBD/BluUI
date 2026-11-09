@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local tconcat = table.concat
 local find = string.find
@@ -177,7 +178,7 @@ end
 
 local function NormalizeGeometry(chat)
 	local left, bottom = chat:GetLeft(), chat:GetBottom()
-	if not left or not bottom or issecretvalue(left) or issecretvalue(bottom) then return end
+	if not left or not bottom or IsSecret(left) or IsSecret(bottom) then return end
 	local pixel = BUI.Pixel.PixelSizeFor(chat, 1)
 	local width, height = chat:GetSize()
 	local restoring = chat._buiRestoringGeo
@@ -390,7 +391,7 @@ local function PaddedStamp(chat, stamp)
 		for digit = 0, 9 do
 			measure:SetText(tostring(digit))
 			local width = measure:GetStringWidth()
-			if issecretvalue(width) then return stamp end
+			if IsSecret(width) then return stamp end
 			pads[tostring(digit)] = width
 			if width > widest then widest = width end
 		end
@@ -413,7 +414,7 @@ end
 local function Fits(measure, text, continued)
 	measure:SetText(continued and ('\n' .. text) or text)
 	local lines = measure:GetNumLines()
-	if issecretvalue(lines) then return nil end
+	if IsSecret(lines) then return nil end
 	return lines <= (continued and 2 or 1)
 end
 
@@ -441,7 +442,7 @@ local function HangWrap(chat, text, head)
 	if fits ~= false then return text end
 	measure:SetText(strsub(text, 1, head))
 	local gutter = measure:GetUnboundedStringWidth()
-	if issecretvalue(gutter) then return text end
+	if IsSecret(gutter) then return text end
 	gutter = floor(gutter + 0.5)
 	if gutter < 1 or chat:GetWidth() - gutter < MIN_WRAP_WIDTH then return text end
 	local spacer = ('|T%s:1:%d|t'):format(BUILib.GetLibMedia('blank'), gutter)
@@ -493,12 +494,18 @@ local function Reflow(chat)
 	if changed then chat:MarkDisplayDirty() end
 end
 
+local reflowDirty = {}
+
+local ReflowDirty = BUI.Dispatcher.New(function()
+	for chat in pairs(reflowDirty) do
+		reflowDirty[chat] = nil
+		Reflow(chat)
+	end
+end)
+
 function ReflowLater(chat)
-	local generation = (chat._buiReflowGen or 0) + 1
-	chat._buiReflowGen = generation
-	C_Timer.After(0.1, function()
-		if chat._buiReflowGen == generation then Reflow(chat) end
-	end)
+	reflowDirty[chat] = true
+	ReflowDirty()
 end
 
 local ValidStampFormat
@@ -525,7 +532,7 @@ local function HookAddMessage(frame)
 	frame._buiAddMessage = true
 	frame:HookScript('OnSizeChanged', ReflowLater)
 	Hook(frame, 'AddMessage', function(self, text)
-		if self ~= ChatFrame2 and type(text) == 'string' and not issecretvalue(text) and text ~= '' then
+		if self ~= ChatFrame2 and type(text) == 'string' and not IsSecret(text) and text ~= '' then
 			local entry = self.historyBuffer:GetEntryAtIndex(1)
 			if entry and entry.message == text then
 				local config = GetConfig()
@@ -755,7 +762,7 @@ local function CopyChat(frame)
 	local lines = {}
 	for messageIndex = 1, frame:GetNumMessages() do
 		local message, red, green, blue = frame:GetMessageInfo(messageIndex)
-		if type(message) == 'string' and not issecretvalue(message) and message ~= '' then
+		if type(message) == 'string' and not IsSecret(message) and message ~= '' then
 			message = StripEscapes(message)
 			if red and green and blue then
 				message = '|cff' .. BUI.Hex(red, green, blue) .. message .. '|r'
@@ -779,7 +786,7 @@ local function GetHistory()
 end
 
 local function PushHistory(text)
-	if issecretvalue(text) then return end
+	if IsSecret(text) then return end
 	text = strtrim(text)
 	if text == '' then return end
 	local command = text:match('^(/%S+)')
@@ -945,7 +952,7 @@ local function StyleTab(tab)
 	text:SetJustifyH('CENTER')
 	local chat = tab._buiChat
 	local tabText = text:GetText()
-	if tabText and not issecretvalue(tabText) then
+	if tabText and not IsSecret(tabText) then
 		if text._buiName == nil or text._buiName:upper() ~= tabText then text._buiName = tabText end
 		local wanted = (Config.tabUppercase and not chat.isTemporary) and text._buiName:upper() or text._buiName
 		if wanted ~= tabText then text:SetText(wanted) end
@@ -1359,7 +1366,7 @@ local function ChatMaxScrollOffset(chat)
 		if entry.message ~= nil then
 			measure:SetText(entry.message)
 			local measured = measure:GetStringHeight()
-			if not issecretvalue(measured) and measured > 0 then height = measured end
+			if not IsSecret(measured) and measured > 0 then height = measured end
 		end
 		if filled + height > frameHeight then return messageIndex end
 		filled = filled + height + spacing
@@ -1417,7 +1424,7 @@ local function SetupScroll(frame)
 		editBox:HookScript('OnTextChanged', function(self, userInput)
 			if not userInput or not Enabled() then return end
 			local text = self:GetText()
-			if issecretvalue(text) or not TARGET_TELL_COMMANDS[text:lower()] then return end
+			if IsSecret(text) or not TARGET_TELL_COMMANDS[text:lower()] then return end
 			if BUI.Tools.IsChatHeaderSecret(self) then return end
 			if not UnitExists('target') or not UnitIsPlayer('target') then return end
 			local name = GetUnitName('target', true)
@@ -1433,7 +1440,7 @@ local function SetupScroll(frame)
 		frame:HookScript('OnHyperlinkEnter', function(self, link)
 			if not Enabled() then return end
 			if not GetConfig().hoverTooltips then return end
-			if issecretvalue(link) then return end
+			if IsSecret(link) then return end
 			local linkType = link:match('^([^:]+)')
 			if not HOVER_LINK_TYPES[linkType] then return end
 			GameTooltip:SetOwner(self, 'ANCHOR_CURSOR')

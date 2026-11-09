@@ -531,10 +531,10 @@ RefreshContent = function()
     panel.emptyText:SetText(searchText ~= '' and 'No matching factions.' or 'No factions tracked.')
 end
 
-local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3)
+local QueueRefresh = BUI.Dispatcher.New(function() RefreshContent() end)
 
 local function OnRepEvent()
-    ThrottledRefresh()
+    QueueRefresh()
 end
 
 local EVENTS = { 'UPDATE_FACTION', 'MAJOR_FACTION_UNLOCKED', 'MAJOR_FACTION_RENOWN_LEVEL_CHANGED' }

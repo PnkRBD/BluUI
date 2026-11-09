@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local pairs = pairs
 local ipairs = ipairs
@@ -198,7 +199,7 @@ local function PaintGlyph(glyph, bright)
 end
 
 local function IsFiniteNumber(value)
-	if type(value) ~= 'number' or issecretvalue(value) then return false end
+	if type(value) ~= 'number' or IsSecret(value) then return false end
 	return value == value and value ~= math.huge and value ~= -math.huge
 end
 
@@ -312,7 +313,7 @@ end
 BUI.Visibility.OnPetBattle('ObjectiveTracker', FadeTrackerForPetBattle)
 
 local function OnTrackerAlpha(_, alpha)
-	local fadedOut = not issecretvalue(alpha) and alpha == 0 and not trackerStashScale
+	local fadedOut = not IsSecret(alpha) and alpha == 0 and not trackerStashScale
 	if fadedOut == (trackerFadedOut or false) then return end
 	trackerFadedOut = fadedOut or nil
 	SyncTrackerCardShown()
@@ -997,7 +998,7 @@ local function RefreshQuestCache()
 	if chime then BUI.PlaySoundByName(GetSettings().completionSound) end
 end
 
-local RefreshQuestCacheSoon = BUI.Dispatcher.NewDelayed(RefreshQuestCache, 0.3)
+local RefreshQuestCacheSoon = BUI.Dispatcher.New(RefreshQuestCache)
 
 local flashQuestID
 

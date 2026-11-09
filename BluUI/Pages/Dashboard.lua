@@ -86,7 +86,6 @@ local CHAR_ROWS = 20
 local CLASS_ICON = 16
 local SESSION_TICK = 30
 local SESSION_RESET_GAP = 120
-local SNAPSHOT_DELAY = 2
 local CURRENCY_RESCAN = 30
 local KEYSTONE_ITEM = 180653
 local SLIDE_STAGGER, SLIDE_TIME, SLIDE_OFFSET = 0.045, 0.38, -18
@@ -551,7 +550,7 @@ local function SnapshotCurrentChar()
     }
 end
 
-local QueueSnapshot = BUI.Dispatcher.NewDelayed(SnapshotCurrentChar, SNAPSHOT_DELAY)
+local QueueSnapshot = BUI.Dispatcher.New(SnapshotCurrentChar)
 for _, event in ipairs({ 'PLAYER_AVG_ITEM_LEVEL_UPDATE', 'WEEKLY_REWARDS_UPDATE', 'CHALLENGE_MODE_COMPLETED', 'CHALLENGE_MODE_MAPS_UPDATE' }) do
     BUI.Events:Register(event, 'Dashboard.Snapshot', QueueSnapshot)
 end

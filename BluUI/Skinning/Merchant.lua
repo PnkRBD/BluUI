@@ -789,14 +789,7 @@ local function RefreshRepair()
 	UpdateRepairState(merchantFrame)
 end
 
-local function RefreshLater()
-	if merchantFrame.pendingRefresh then return end
-	merchantFrame.pendingRefresh = true
-	C_Timer.After(0.1, function()
-		merchantFrame.pendingRefresh = false
-		RefreshContent()
-	end)
-end
+local RefreshLater = BUI.Dispatcher.New(function() RefreshContent() end)
 
 local function OpenMerchant(frame)
 	Skin.SuppressBlizzardFrame(frame)

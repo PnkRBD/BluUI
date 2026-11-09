@@ -82,7 +82,6 @@ local function CreateRow(parent)
 	row.trainBtn:SetFrameLevel(row:GetFrameLevel() + 5)
 	row.trainBtn:SetScript('OnClick', function(self)
 		BuyTrainerService(self:GetParent().serviceIndex)
-		C_Timer.After(0.1, RefreshContent)
 	end)
 
 	row:HookScript('OnEnter', function(self)

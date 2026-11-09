@@ -890,15 +890,9 @@ local function OnItemCooldownEvent()
     QueueCooldownFlush()
 end
 
-local RecheckItemCounts = BUI.Dispatcher.NewDelayed(function()
-    itemCountsPending = true
-    QueueCooldownFlush()
-end, 0.2)
-
 local function OnPlayerCastSucceeded()
     itemCountsPending = true
     QueueCooldownFlush()
-    RecheckItemCounts()
 end
 
 local function OnChargesEvent()
@@ -915,10 +909,10 @@ local function HasEnabledBar()
     return false
 end
 
-local OnEvent = BUI.Dispatcher.NewDelayed(function()
+local OnEvent = BUI.Dispatcher.New(function()
     if HasEnabledBar() then BUI.CDM.Custom.InvalidateStaleBagCache() end
     CustomBars.RefreshAllBars()
-end, 0.1)
+end)
 
 local function OnEnteringWorld(_, isInitialLogin, isReloadingUi)
     if isInitialLogin or isReloadingUi then OnEvent() end

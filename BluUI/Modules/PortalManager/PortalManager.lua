@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 local Pixel   = BUI.Pixel
 local Painter = BUI.Painter
 local Skin    = BUI.Skinning
@@ -186,6 +187,7 @@ local function DeltaText(delta)
 end
 
 local castDriver = CreateFrame('Frame')
+castDriver._buiPerfName = 'BUI_PortalCast'
 castDriver:Hide()
 
 local function DetachCastFill()
@@ -438,7 +440,7 @@ local function PartyItems()
                 mapID = dungeon and key.mapID or nil,
                 level = dungeon and level or nil,
                 player = UnitName(unit),
-                class = not issecretvalue(classFile) and classFile or nil,
+                class = not IsSecret(classFile) and classFile or nil,
                 order = #items + 1,
             }
         end
@@ -533,12 +535,12 @@ RefreshContent = function()
     panel.child:SetHeight(Pixel.Scale(math.max(1, shown * (ROW_H + ROW_GAP))))
 end
 
-local ThrottledRefresh = BUI.Dispatcher.NewDelayed(function() RefreshContent() end, 0.3)
+local QueueRefresh = BUI.Dispatcher.New(function() RefreshContent() end)
 local QueueCooldowns = BUI.Dispatcher.New(RefreshCooldowns)
 
 local function OnMapsUpdated()
     RebuildMapLookup()
-    ThrottledRefresh()
+    QueueRefresh()
 end
 
 local function OnCastStart(_, _, _, spellID)
@@ -551,11 +553,11 @@ end
 
 local EVENTS = {
     SPELL_UPDATE_COOLDOWN = QueueCooldowns,
-    SPELLS_CHANGED = ThrottledRefresh,
+    SPELLS_CHANGED = QueueRefresh,
     CHALLENGE_MODE_MAPS_UPDATE = OnMapsUpdated,
-    PLAYER_REGEN_ENABLED = ThrottledRefresh,
-    PLAYER_REGEN_DISABLED = ThrottledRefresh,
-    GROUP_ROSTER_UPDATE = ThrottledRefresh,
+    PLAYER_REGEN_ENABLED = QueueRefresh,
+    PLAYER_REGEN_DISABLED = QueueRefresh,
+    GROUP_ROSTER_UPDATE = QueueRefresh,
 }
 local CAST_EVENTS = {
     UNIT_SPELLCAST_START = OnCastStart,
@@ -755,7 +757,7 @@ slide = BUI.SlidePanel.New({
     build = BuildPanel,
     onOpen = function()
         ListenWhileOpen(true)
-        BUI.PartyKeys.Listen('PortalManager', ThrottledRefresh)
+        BUI.PartyKeys.Listen('PortalManager', QueueRefresh)
         C_MythicPlus.RequestMapInfo()
         RebuildMapLookup()
         RefreshContent()
