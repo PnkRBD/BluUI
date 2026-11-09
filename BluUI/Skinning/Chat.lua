@@ -376,39 +376,7 @@ local function StampMeasure(chat)
 	end
 	measure:SetFontObject(chat:GetFontObject())
 	measure:SetWidth(chat:GetWidth())
-	local path, size, flags = chat:GetFont()
-	local font = path .. size .. (flags or '')
-	if chat._buiStampFont ~= font then chat._buiStampFont, chat._buiDigitPads = font, nil end
 	return measure
-end
-
-local function PaddedStamp(chat, stamp)
-	local measure = StampMeasure(chat)
-	local pads = chat._buiDigitPads
-	if not pads then
-		pads = {}
-		local widest = 0
-		for digit = 0, 9 do
-			measure:SetText(tostring(digit))
-			local width = measure:GetStringWidth()
-			if IsSecret(width) then return stamp end
-			pads[tostring(digit)] = width
-			if width > widest then widest = width end
-		end
-		for digit, width in pairs(pads) do pads[digit] = widest - width end
-		chat._buiDigitPads = pads
-	end
-	local blank = BUILib.GetLibMedia('blank')
-	local owed, paid = 0, 0
-	return (gsub(stamp, '%d', function(digit)
-		owed = owed + pads[digit]
-		local pad = floor(owed - paid + 0.5)
-		if pad < 1 then return nil end
-		paid = paid + pad
-		local left = floor(pad / 2)
-		local right = pad - left
-		return (left > 0 and ('|T%s:1:%d|t'):format(blank, left) or '') .. digit .. ('|T%s:1:%d|t'):format(blank, right)
-	end))
 end
 
 local function Fits(measure, text, continued)
@@ -542,7 +510,7 @@ local function HookAddMessage(frame)
 					local stampFormat = config.timestampFormat
 					if ValidStampFormat(stampFormat) then
 						local stampColor = config.timestampColor
-						local prefix = '|cff' .. BUI.Hex(stampColor[1], stampColor[2], stampColor[3]) .. PaddedStamp(self, date(stampFormat)) .. '|r '
+						local prefix = '|cff' .. BUI.Hex(stampColor[1], stampColor[2], stampColor[3]) .. date(stampFormat) .. '|r '
 						newText = prefix .. newText
 						entry._buiFlow, entry._buiHead = newText, #prefix
 						newText = HangWrap(self, newText, #prefix)
