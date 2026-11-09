@@ -22,9 +22,8 @@ end
 local Util = {}
 GroupFrames.Util = Util
 
-local IsSecret  = issecretvalue
+local IsSecret  = BUI.Tools.IsSecretValue
 local CanAccess = canaccessvalue
-Util.IsSecret   = IsSecret
 Util.CanAccess  = CanAccess
 
 function Util.FrameClass(frame, unit)

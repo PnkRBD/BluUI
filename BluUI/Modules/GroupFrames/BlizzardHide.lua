@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local GroupFrames = BUI.GroupFrames
 
@@ -54,7 +55,7 @@ local setupFrames = setmetatable({}, { __mode = "k" })
 local function markCompactSetup(frame, setup)
 	if setup ~= DefaultCompactUnitFrameSetup or not frame or frame:IsForbidden() then return end
 	local name = frame:GetDebugName()
-	if not name or issecretvalue(name) then return end
+	if not name or IsSecret(name) then return end
 	if (partyActive and name:find("^CompactPartyFrameMember%d+$"))
 		or (raidActive and name:find("^CompactRaidGroup%d+Member%d+$")) then
 		setupFrames[frame] = true

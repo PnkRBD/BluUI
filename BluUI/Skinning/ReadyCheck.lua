@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local max, min, floor = math.max, math.min, math.floor
 local GetTime = GetTime
@@ -29,7 +30,7 @@ local function ColorInitiator()
 	if not initiatorName then return end
 	local text = _G.ReadyCheckFrameText
 	local current = text:GetText()
-	if not current or issecretvalue(current) or current:find('|c', 1, true) then return end
+	if not current or IsSecret(current) or current:find('|c', 1, true) then return end
 	local red, green, blue = BUI.Tools.GetUnitClassColor(initiatorName)
 	if not red then return end
 	local pattern = initiatorName:gsub('%W', '%%%0')
@@ -92,7 +93,7 @@ local function LayoutPrompt()
 
 	text:SetWidth(0)
 	local needed = text:GetStringWidth()
-	if issecretvalue(needed) then return end
+	if IsSecret(needed) then return end
 	local width = Even(max(Scaled(MIN_WIDTH, scale), min(floor(needed + 0.5) + paddingX * 2, Scaled(MAX_WIDTH, scale))))
 
 	local title = listener.TitleContainer.TitleText
@@ -110,7 +111,7 @@ local function LayoutPrompt()
 	text:ClearAllPoints()
 	text:SetPoint('TOPLEFT', listener, 'TOPLEFT', paddingX, -(paddingY + titleBlock))
 	local textHeight = text:GetStringHeight()
-	if issecretvalue(textHeight) then textHeight = Scaled(FALLBACK_TEXT_HEIGHT, scale) end
+	if IsSecret(textHeight) then textHeight = Scaled(FALLBACK_TEXT_HEIGHT, scale) end
 
 	local yes, no = _G.ReadyCheckFrameYesButton, _G.ReadyCheckFrameNoButton
 	local buttonWidth = floor((width - paddingX * 2 - buttonGap) / 2)

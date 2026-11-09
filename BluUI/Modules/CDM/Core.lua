@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local pairs, ipairs, wipe = pairs, ipairs, wipe
 local type, select, tonumber = type, select, tonumber
@@ -156,14 +157,14 @@ function CDM.IconMatchesSpell(icon, spellID)
     local cooldownInfo = icon.cooldownInfo
     if not cooldownInfo then return false end
     local overrideSpellID = cooldownInfo.overrideSpellID
-    if not issecretvalue(overrideSpellID) and overrideSpellID == spellID then return true end
+    if not IsSecret(overrideSpellID) and overrideSpellID == spellID then return true end
     local sid = cooldownInfo.spellID
-    if not issecretvalue(sid) and sid == spellID then return true end
+    if not IsSecret(sid) and sid == spellID then return true end
     local linked = cooldownInfo.linkedSpellIDs
-    if linked and not issecretvalue(linked) then
+    if linked and not IsSecret(linked) then
         for j = 1, #linked do
             local linkedID = linked[j]
-            if not issecretvalue(linkedID) and linkedID == spellID then return true end
+            if not IsSecret(linkedID) and linkedID == spellID then return true end
         end
     end
     return false
@@ -210,10 +211,10 @@ end
 
 local function ReadCooldownSpellID(cooldownInfo)
     local sid = cooldownInfo.spellID
-    if issecretvalue(sid) then sid = nil end
+    if IsSecret(sid) then sid = nil end
     if sid then return sid end
     local overrideSpellID = cooldownInfo.overrideSpellID
-    if issecretvalue(overrideSpellID) then overrideSpellID = nil end
+    if IsSecret(overrideSpellID) then overrideSpellID = nil end
     return overrideSpellID
 end
 

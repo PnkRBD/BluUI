@@ -5,7 +5,7 @@ local GroupFrames = BUI.GroupFrames
 local CreateFrame         = CreateFrame
 local UIParent            = UIParent
 local RegisterStateDriver = RegisterStateDriver
-local IsSecret            = GroupFrames.Util.IsSecret
+local IsSecret            = BUI.Tools.IsSecretValue
 
 function GroupFrames.ConfigSnippet(width, height)
 	return ([[

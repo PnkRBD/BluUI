@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local ActionBars = {}
 BUI.ActionBars = ActionBars
@@ -90,7 +91,7 @@ function ActionBars.ForEachButton(callback)
 end
 
 function ActionBars.Plain(value)
-	if issecretvalue(value) then return nil end
+	if IsSecret(value) then return nil end
 	return value
 end
 

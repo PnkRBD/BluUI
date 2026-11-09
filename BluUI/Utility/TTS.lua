@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local TTS = {}
 BUI.TTS = TTS
@@ -56,7 +57,7 @@ end
 local warnedNoVoices = false
 
 function TTS.Speak(text, options)
-    if type(text) ~= 'string' or issecretvalue(text) or not text:match('%S') then
+    if type(text) ~= 'string' or IsSecret(text) or not text:match('%S') then
         return
     end
     if #Voices() == 0 then

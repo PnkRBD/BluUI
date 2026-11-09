@@ -198,6 +198,7 @@ local function Build()
     if cursorFrame then return end
 
     cursorFrame = CreateFrame('Frame', nil, UIParent)
+    cursorFrame._buiPerfName = 'BUI_Cursor'
     cursorFrame:SetFrameStrata('HIGH')
     cursorFrame:SetFrameLevel(100)
     cursorFrame:SetSize(1, 1)

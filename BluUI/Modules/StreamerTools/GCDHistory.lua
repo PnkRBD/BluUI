@@ -16,7 +16,7 @@ local C_Item = C_Item
 local GetInventoryItemID = GetInventoryItemID
 local UnitCastingInfo = UnitCastingInfo
 local UnitChannelInfo = UnitChannelInfo
-local issecretvalue = issecretvalue
+local IsSecret = BUI.Tools.IsSecretValue
 
 local function GetDB() return BUI.GetDB().gcdHistory end
 
@@ -62,7 +62,7 @@ local function RebuildItemSpellMap()
 end
 
 local function ResolveIcon(spellID)
-    if not spellID or spellID == 0 or issecretvalue(spellID) then return nil end
+    if not spellID or spellID == 0 or IsSecret(spellID) then return nil end
     if itemSpellMapDirty then RebuildItemSpellMap() end
     local itemID = itemSpellMap[spellID]
     if itemID then
@@ -73,14 +73,14 @@ local function ResolveIcon(spellID)
 end
 
 local function ResolveValidIcon(spellID)
-    if not spellID or spellID == 0 or issecretvalue(spellID) then return nil end
+    if not spellID or spellID == 0 or IsSecret(spellID) then return nil end
     local settings = GetDB()
     if settings.hideAutoAttacks and AUTO_ATTACK_IDS[spellID] then return nil end
     if settings.blacklist[spellID] then return nil end
     local texture = ResolveIcon(spellID)
     if not texture or texture == BLANK_ICON then return nil end
     local name = C_Spell.GetSpellName(spellID)
-    if name and not issecretvalue(name) then
+    if name and not IsSecret(name) then
         if name:find('%[DNT%]') or name:find('%(DNT%)') then return nil end
         if name:find(' [Ee]nd$') or name:find(' [Hh]it$') or name:find(' [Aa]ura$') then return nil end
     end
@@ -156,6 +156,7 @@ local function ReleaseFade(frame)
 end
 
 local fadeDriver = CreateFrame('Frame')
+fadeDriver._buiPerfName = 'BUI_GCDHistoryFade'
 fadeDriver:Hide()
 fadeDriver:SetScript('OnUpdate', function(_, deltaTime)
     local alive = false

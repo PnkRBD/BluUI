@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 BUI.Power.Secondary = {}
 local SecondaryPower = BUI.Power.Secondary
@@ -65,7 +66,7 @@ local function UpdateStaggerCache()
     local now = GetTime()
     if now - staggerCache.time < 0.016 then return end
     local value = UnitStagger("player") or 0
-    if issecretvalue(value) then
+    if IsSecret(value) then
         staggerCache.time = now
         return
     end

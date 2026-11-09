@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 BUI.Skinning = {}
 local Skin = BUI.Skinning
@@ -233,7 +234,7 @@ function Skin.SavePosition(frame, dbKey)
 	if not db.framePositions then db.framePositions = {} end
 	PinFrame(frame)
 	local left, top = frame:GetLeft(), frame:GetTop()
-	if issecretvalue(left) or issecretvalue(top) or not left then return end
+	if IsSecret(left) or IsSecret(top) or not left then return end
 	db.framePositions[dbKey] = { point = 'TOPLEFT', relPoint = 'BOTTOMLEFT', x = left, y = top }
 end
 
@@ -274,7 +275,7 @@ end
 
 local function LastPanelSlot(panel)
 	local left, top = panel:GetLeft(), panel:GetTop()
-	if issecretvalue(left) or issecretvalue(top) or not left then return end
+	if IsSecret(left) or IsSecret(top) or not left then return end
 	local ratio = panel:GetEffectiveScale() / UIParent:GetEffectiveScale()
 	return left * ratio, top * ratio - UIParent:GetHeight()
 end
@@ -1119,7 +1120,7 @@ function Skin.SetIconEdgeColor(icon, red, green, blue)
 	local edges = icon and icon._buiIconFrame
 	if not edges then return end
 	if red then
-		local secret = issecretvalue(red) or issecretvalue(green) or issecretvalue(blue)
+		local secret = IsSecret(red) or IsSecret(green) or IsSecret(blue)
 		if not secret and icon._buiEdgeR == red and icon._buiEdgeG == green and icon._buiEdgeB == blue then return end
 		if secret then
 			icon._buiEdgeR, icon._buiEdgeG, icon._buiEdgeB = nil, nil, nil

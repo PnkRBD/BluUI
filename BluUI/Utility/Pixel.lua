@@ -1,5 +1,6 @@
 -- Pixel perfect code used with permission from Simpy @ ElvUI. If you have questions, please PM pinkrbd on Discord!
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 local Pixel = {}
 BUI.Pixel = Pixel
 
@@ -81,7 +82,7 @@ Pixel.FromPixels = unitsFor
 function Pixel.ScaleFor(region, value)
     if value == 0 then return 0 end
     local scale = region:GetEffectiveScale()
-    if issecretvalue(scale) or scale <= 0 then return gridSnap(value) end
+    if IsSecret(scale) or scale <= 0 then return gridSnap(value) end
     return floor(value / gridUnit + 0.5) * perfectScale / scale
 end
 

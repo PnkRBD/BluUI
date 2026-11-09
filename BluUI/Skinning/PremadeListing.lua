@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local Premade = BUI.Premade
 local BUILib = BluUI.BUILibClient
@@ -70,7 +71,7 @@ local appSort = 'rating'
 local Listing, Applicants = {}, {}
 
 local function Plain(value)
-	if issecretvalue and issecretvalue(value) then return nil end
+	if IsSecret(value) then return nil end
 	return value
 end
 

@@ -358,9 +358,15 @@ function Tools.CountText(count)
     return C_StringUtil.TruncateWhenZero(count)
 end
 
+local tallySecretCheck
+
 function Tools.IsSecretValue(value)
-    if value == nil then return false end
+    if tallySecretCheck then tallySecretCheck() end
     return issecretvalue(value)
+end
+
+function Tools.TallySecretChecks(tally)
+    tallySecretCheck = tally
 end
 
 function Tools.SafeNum(value)

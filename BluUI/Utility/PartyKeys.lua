@@ -6,7 +6,7 @@ BUI.PartyKeys = PartyKeys
 local GetUnitName            = GetUnitName
 local GetNormalizedRealmName = GetNormalizedRealmName
 local UnitExists             = UnitExists
-local issecretvalue          = issecretvalue
+local IsSecret               = BUI.Tools.IsSecretValue
 
 local PARTY_UNITS = { 'player', 'party1', 'party2', 'party3', 'party4' }
 PartyKeys.UNITS = PARTY_UNITS
@@ -16,7 +16,7 @@ local listeners = {}
 local library
 
 local function NameKey(name)
-	if type(name) ~= 'string' or issecretvalue(name) or name == '' then return nil end
+	if type(name) ~= 'string' or IsSecret(name) or name == '' then return nil end
 	if name:find('-', 1, true) then return name end
 	local realm = GetNormalizedRealmName()
 	if type(realm) ~= 'string' or realm == '' then return name end

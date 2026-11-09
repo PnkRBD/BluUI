@@ -25,7 +25,7 @@ local CurveConstants      = CurveConstants
 local C_StringUtil        = C_StringUtil
 local AbbreviateNumbers   = AbbreviateNumbers
 
-local IsSecret  = Util.IsSecret
+local IsSecret  = BUI.Tools.IsSecretValue
 local CanAccess = Util.CanAccess
 
 local Methods = oUF.Tags.Methods

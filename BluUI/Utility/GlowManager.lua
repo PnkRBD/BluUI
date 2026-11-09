@@ -48,8 +48,17 @@ local Stop = {
     proc = function(frame, key) LibCustomGlow.ProcGlow_Stop(frame, key) end,
 }
 
+local GLOW_FIELDS = { pixel = '_PixelGlow', autocast = '_AutoCastGlow', proc = '_ProcGlow' }
+
+local function GlowFrame(frame, style, key)
+    if style == 'button' then return frame._ButtonGlow end
+    return frame[GLOW_FIELDS[style] .. (key or '')]
+end
+
 function GlowManager.Start(frame, style, color, speed, lines, thickness, key, layer, length, startAnim)
     Start[style](frame, color, speed, lines, thickness, key, layer, length, startAnim)
+    local glow = GlowFrame(frame, style, key)
+    if glow then glow._buiPerfName = style .. ' glow' end
 end
 
 function GlowManager.Stop(frame, style, key)
@@ -74,3 +83,6 @@ function GlowManager.ResetIconState(frameData)
     frameData._deferredGlowSpellID = nil
     frameData._deferredGlowExpiry = nil
 end
+
+BUI.Perf.Track('GlowManager.Start', GlowManager.Start)
+BUI.Perf.Track('GlowManager.Stop', GlowManager.Stop)

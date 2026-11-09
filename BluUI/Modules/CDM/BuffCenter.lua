@@ -297,3 +297,4 @@ function CDM.SetupBuffCentering()
 end
 
 BUI.Perf.Track('CDM.CenterNow', CenterNow)
+BUI.Perf.Track('CDM.MarkBuffCenterDirty', CDM.MarkBuffCenterDirty)

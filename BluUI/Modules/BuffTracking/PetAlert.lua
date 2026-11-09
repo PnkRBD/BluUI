@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local PetAlert = {}
 BUI.BuffTracking.PetAlert = PetAlert
@@ -21,7 +22,7 @@ local function ShouldAlert()
     if not UnitCanAttack('player', 'target') then return false end
     if not UnitExists('pettarget') then return false end
     local sameTarget = UnitIsUnit('pettarget', 'target')
-    if issecretvalue(sameTarget) then return false end
+    if IsSecret(sameTarget) then return false end
     return not sameTarget
 end
 

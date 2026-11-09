@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local abs = math.abs
 local _G = _G
@@ -43,7 +44,7 @@ local function ActiveIconsMoved(pool)
         local layoutIndex = frame.layoutIndex
         local cooldownID = frame.cooldownID
         local included = (frame:IsShown() or frame.cooldownInfo) and true or false
-        if issecretvalue(cooldownID) then
+        if IsSecret(cooldownID) then
             moved = true
         elseif frameData.seenLayoutIndex ~= layoutIndex or frameData.seenCooldownID ~= cooldownID or frameData.seenIncluded ~= included then
             frameData.seenLayoutIndex = layoutIndex
@@ -122,7 +123,7 @@ local function OnIconSetSize(self)
     local wantedWidth, wantedHeight = frameData.sizeW, frameData.sizeH
     if not wantedWidth or not wantedHeight then return end
     local width, height = self:GetSize()
-    if issecretvalue(width) or issecretvalue(height) then return end
+    if IsSecret(width) or IsSecret(height) then return end
     if not width or not height or abs(width - wantedWidth) > 0.5 or abs(height - wantedHeight) > 0.5 then
         RawSetSize(self, wantedWidth, wantedHeight)
     end
@@ -135,7 +136,7 @@ local function OnIconActiveStateChanged(self)
 end
 
 local function OnIconSetCooldownID(self, cooldownID)
-    if issecretvalue(cooldownID) then return end
+    if IsSecret(cooldownID) then return end
     local frameData = FrameData[self]
     if not frameData then return end
     if frameData.lastCooldownID == cooldownID then return end
@@ -162,7 +163,7 @@ function CDM.HookIconFrame(icon, key)
     hooksecurefunc(icon, "SetHeight", OnIconSetSize)
     if icon.SetCooldownID then
         local cooldownID = icon.cooldownID
-        if not issecretvalue(cooldownID) then
+        if not IsSecret(cooldownID) then
             frameData.lastCooldownID = cooldownID
         end
         hooksecurefunc(icon, "SetCooldownID", OnIconSetCooldownID)
@@ -335,7 +336,7 @@ local function ApplyCooldownStyle(cooldown, cooldownFrameData)
 end
 
 function CDM.RestyleCooldown(cooldown)
-    if issecretvalue(cooldown) then return end
+    if IsSecret(cooldown) then return end
     if not CDMCooldowns[cooldown] then return end
 
     local cooldownFrameData = FrameData[cooldown]
@@ -352,3 +353,11 @@ end
 BUI.Perf.Track('CDM.OnRefreshLayoutComplete', OnRefreshLayoutComplete)
 BUI.Perf.Track('CDM.OnIconSetPoint', OnIconSetPoint)
 BUI.Perf.Track('CDM.OnIconSetSize', OnIconSetSize)
+BUI.Perf.Track('CDM.OnIconSetScale', OnIconSetScale)
+BUI.Perf.Track('CDM.OnIconSetAlpha', OnIconSetAlpha)
+BUI.Perf.Track('CDM.OnIconActiveStateChanged', OnIconActiveStateChanged)
+BUI.Perf.Track('CDM.OnIconSetCooldownID', OnIconSetCooldownID)
+BUI.Perf.Track('CDM.OnViewerVisibilityChanged', OnViewerVisibilityChanged)
+BUI.Perf.Track('CDM.OnViewerAcquireFrame', OnViewerAcquireFrame)
+BUI.Perf.Track('CDM.OnBarViewerAcquire', OnBarViewerAcquire)
+BUI.Perf.Track('CDM.OnBarViewerLayout', OnBarViewerLayout)

@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 local CDM    = BUI.CDM
 local Modals = BUI.BUILibClient.Modals
 
@@ -32,7 +33,7 @@ local function CollectSpellIDs(viewer)
 			if spellID    then spellIDSet[spellID]    = true end
 			if overrideID then spellIDSet[overrideID] = true end
 			local linked = cooldownInfo.linkedSpellIDs
-			if linked and not issecretvalue(linked) then
+			if linked and not IsSecret(linked) then
 				for _, linkedID in ipairs(linked) do
 					local id = SafeNum(linkedID)
 					if id then spellIDSet[id] = true end
@@ -49,7 +50,7 @@ local function IsSpellCoveredBySet(cooldownInfo, spellIDSet)
 	if spellID and spellIDSet[spellID] then return true end
 	if overrideID and spellIDSet[overrideID] then return true end
 	local linked = cooldownInfo.linkedSpellIDs
-	if linked and not issecretvalue(linked) then
+	if linked and not IsSecret(linked) then
 		for _, linkedID in ipairs(linked) do
 			local id = SafeNum(linkedID)
 			if id and spellIDSet[id] then return true end

@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 local Pixel = BUI.Pixel
 
 local BUILib = BluUI.BUILibClient
@@ -298,9 +299,9 @@ end
 local function OwnerLabel(unit)
     if not unit or not UnitExists(unit) then return nil end
     local name = UnitName(unit)
-    if issecretvalue(name) then return nil end
+    if IsSecret(name) then return nil end
     local classFile = select(2, UnitClass(unit))
-    local color = not issecretvalue(classFile) and RAID_CLASS_COLORS[classFile]
+    local color = not IsSecret(classFile) and RAID_CLASS_COLORS[classFile]
     local label = RoleMarkup(UnitGroupRolesAssigned(unit)) .. name
     return color and color:WrapTextInColorCode(label) or label
 end
@@ -340,7 +341,7 @@ local function PartyEntries(skipUnit)
             local classFile = select(2, UnitClass(unit))
             entries[#entries + 1] = {
                 name = UnitName(unit),
-                class = not issecretvalue(classFile) and classFile or nil,
+                class = not IsSecret(classFile) and classFile or nil,
                 role = UnitGroupRolesAssigned(unit),
                 level = level,
                 mapID = mapID,
@@ -376,7 +377,7 @@ local function PaintRow(row, entry)
     local dungeon, texture = MapInfo(entry.mapID)
     local color = entry.class and RAID_CLASS_COLORS[entry.class]
     local name = entry.name or ''
-    if issecretvalue(name) then
+    if IsSecret(name) then
         row.name:SetText(name)
     else
         row.name:SetText(RoleMarkup(entry.role) .. name)

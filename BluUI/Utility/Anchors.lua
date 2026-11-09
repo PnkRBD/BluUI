@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 local Widget = BUI.BUILibClient.Widget
 BUI.C.ANCHOR_FRAMES = {
     { tag = "BUI_PlayerFrame", desc = "Player frame" },
@@ -236,7 +237,7 @@ local function PlaceIntent(frame)
     frame:SetPoint(intent.point, intent.relativeTo, intent.relativePoint, intent.x, intent.y)
     intent.placedX, intent.placedY = intent.x, intent.y
     local left, top = frame:GetLeft(), frame:GetTop()
-    if not left or not top or issecretvalue(left) or issecretvalue(top) then return end
+    if not left or not top or IsSecret(left) or IsSecret(top) then return end
     local pixel = BUI.Pixel.PixelSizeFor(frame, 1)
     local shiftX = Widget.SnapX(left, pixel) - left
     local shiftY = Widget.SnapY(top, pixel) - top

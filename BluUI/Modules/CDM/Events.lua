@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local GetTime = GetTime
 local wipe = wipe
@@ -207,14 +208,14 @@ IsSpellEngaged = function(spellID)
         local icon = CDM.FindIconForSpell(spellID, true)
         if icon then
             local fromCharges = icon.wasSetFromCharges
-            if fromCharges ~= nil and not issecretvalue(fromCharges) then
+            if fromCharges ~= nil and not IsSecret(fromCharges) then
                 if fromCharges then return false end
                 local desaturated = icon.cooldownDesaturated
-                if desaturated ~= nil and not issecretvalue(desaturated) then
+                if desaturated ~= nil and not IsSecret(desaturated) then
                     return desaturated == true
                 end
                 local actual = icon.isOnActualCooldown
-                if actual ~= nil and not issecretvalue(actual) then
+                if actual ~= nil and not IsSecret(actual) then
                     return actual == true
                 end
             end
@@ -226,7 +227,7 @@ IsSpellEngaged = function(spellID)
     local cdInfo = GetCooldownCached(spellID)
     local rawActive = cdInfo and cdInfo.isActive
     local rawOnGCD = cdInfo and cdInfo.isOnGCD
-    if not cdInfo or issecretvalue(rawActive) or issecretvalue(rawOnGCD) then
+    if not cdInfo or IsSecret(rawActive) or IsSecret(rawOnGCD) then
         local durationObject = C_Spell.GetSpellCooldownDuration(spellID)
         if durationObject then
             return durationObject:EvaluateRemainingDuration(BUI.Tools.GCDFilterCurve, 0) > 0.5
@@ -277,7 +278,7 @@ end
 local function RefreshCDExpectation(spellID)
     if BUI.Tools.IsChargeSpell(spellID) then return end
     local cdInfo = GetCooldownCached(spellID)
-    if not cdInfo or issecretvalue(cdInfo.startTime) or issecretvalue(cdInfo.duration) then return end
+    if not cdInfo or IsSecret(cdInfo.startTime) or IsSecret(cdInfo.duration) then return end
     local startTime, duration = cdInfo.startTime, cdInfo.duration
     if duration <= 1.5 then return end
     local endTime = startTime + duration
@@ -369,7 +370,7 @@ local function MarkWatchedSpellActive(targetID, castSpellID)
     local endTime, estimated
 
     local cdInfo = C_Spell.GetSpellCooldown(castSpellID or targetID)
-    if cdInfo and not issecretvalue(cdInfo.startTime) and not issecretvalue(cdInfo.duration)
+    if cdInfo and not IsSecret(cdInfo.startTime) and not IsSecret(cdInfo.duration)
        and cdInfo.duration > 1.5 then
         endTime = cdInfo.startTime + cdInfo.duration
     else

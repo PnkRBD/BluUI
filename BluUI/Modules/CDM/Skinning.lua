@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local CDM = BUI.CDM
 local Pixel = BUI.Pixel
@@ -304,7 +305,7 @@ local function ReclaimReverse(cooldown, reverse)
     local cooldownFrameData = FrameData[cooldown]
     if not cooldownFrameData or not cooldownFrameData.cdSetup then return end
     local wanted = cooldownFrameData.reverseSwipe or false
-    if not issecretvalue(reverse) and (reverse and true or false) == wanted then return end
+    if not IsSecret(reverse) and (reverse and true or false) == wanted then return end
     reclaimingStyle[cooldown] = true
     cooldown:SetReverse(wanted)
     reclaimingStyle[cooldown] = nil
@@ -314,7 +315,7 @@ local function ReclaimBling(cooldown, drawBling)
     if reclaimingStyle[cooldown] then return end
     local cooldownFrameData = FrameData[cooldown]
     if not cooldownFrameData or not cooldownFrameData.cdSetup then return end
-    if not issecretvalue(drawBling) and not drawBling then return end
+    if not IsSecret(drawBling) and not drawBling then return end
     reclaimingStyle[cooldown] = true
     cooldown:SetDrawBling(false)
     reclaimingStyle[cooldown] = nil
@@ -417,7 +418,7 @@ local function ApplyIconOverrideTexture(icon, iconFrameData)
     if not wantedTexture then return end
     local texture = icon.Icon
     local current = texture:GetTexture()
-    if issecretvalue(current) then current = nil end
+    if IsSecret(current) then current = nil end
     if current == wantedTexture then return end
     iconFrameData.locking = true
     texture:SetTexture(wantedTexture)

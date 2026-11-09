@@ -15,7 +15,7 @@ local UnitIsPlayerControlledOrGroupMember = UnitIsPlayerControlledOrGroupMember
 local GetTime          = GetTime
 local InCombatLockdown = InCombatLockdown
 local IsShiftKeyDown   = IsShiftKeyDown
-local IsSecret         = issecretvalue
+local IsSecret         = BUI.Tools.IsSecretValue
 local CanAccess        = canaccessvalue
 
 local WHITE8X8 = [[Interface\Buttons\WHITE8X8]]

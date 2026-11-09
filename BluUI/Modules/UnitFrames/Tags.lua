@@ -56,7 +56,7 @@ local GetInspectItemLevel = C_PaperDollInfo.GetInspectItemLevel
 local GetInstanceInfo = GetInstanceInfo
 local GetDifficultyInfo = GetDifficultyInfo
 local WrapString = C_StringUtil.WrapString
-local issecretvalue = issecretvalue
+local IsSecret = BUI.Tools.IsSecretValue
 
 local ScaleTo100 = CurveConstants.ScaleTo100
 local PowerTypeMana = Enum.PowerType.Mana
@@ -111,7 +111,7 @@ end
 
 local function HealthPlusAbsorb(unit)
 	local health, absorb = UnitHealth(unit), UnitGetTotalAbsorbs(unit)
-	if issecretvalue(health) or issecretvalue(absorb) then return health end
+	if IsSecret(health) or IsSecret(absorb) then return health end
 	return health + absorb
 end
 
@@ -219,7 +219,7 @@ end
 
 local function GetClassColorCode(unit)
 	local _, class = UnitClass(unit)
-	if not class or issecretvalue(class) then return nil end
+	if not class or IsSecret(class) then return nil end
 	local code = classColorCodes[class]
 	if code == nil then
 		local red, green, blue = Tools.GetUnitClassColor(unit)
@@ -334,7 +334,7 @@ local Handlers = {
 	['threat'] = function()
 		if not UnitExists('target') then return '' end
 		local _, _, threatPercent = UnitDetailedThreatSituation('player', 'target')
-		if threatPercent and not issecretvalue(threatPercent) then return format('%d%%', threatPercent) end
+		if threatPercent and not IsSecret(threatPercent) then return format('%d%%', threatPercent) end
 		return ''
 	end,
 	['creature'] = function(unit) return UnitCreatureFamily(unit) or UnitCreatureType(unit) or '' end,
@@ -374,7 +374,7 @@ local Handlers = {
 			return ''
 		end
 		local specID = GetInspectSpecialization(unit)
-		if not issecretvalue(specID) and specID > 0 then
+		if not IsSecret(specID) and specID > 0 then
 			local _, name = GetSpecializationInfoByID(specID)
 			return name or ''
 		end
@@ -383,7 +383,7 @@ local Handlers = {
 	['title'] = function(unit)
 		local name = UnitPVPName(unit)
 		local plainName = UnitName(unit)
-		if issecretvalue(name) or issecretvalue(plainName) then return '' end
+		if IsSecret(name) or IsSecret(plainName) then return '' end
 		if name and plainName and name ~= plainName then
 			return name:gsub(plainName, ''):gsub('^%s+', ''):gsub('%s+$', ''):gsub(',%s*$', '')
 		end
@@ -607,7 +607,7 @@ local function EnsureRegistered(tagName)
 			local targetUnit = unit .. 'target'
 			local targetName = UnitName(targetUnit)
 			if nameLimit then name = Tools.TruncateName(name, nameLimit) end
-			if targetName and (issecretvalue(targetName) or targetName ~= '') then
+			if targetName and (IsSecret(targetName) or targetName ~= '') then
 				if targetLimit then targetName = Tools.TruncateName(targetName, targetLimit) end
 				targetName = ClassColoredName(targetUnit, targetName, GetParentUnitType(unit))
 				return format('%s |cFFFFFFFF%s|r %s', name, separator, targetName)

@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local BUILib = BluUI.BUILibClient
 local FONT = BUILib.Font
@@ -356,7 +357,7 @@ local function GroupRoles()
 	local roles = { TANK = 0, HEALER = 0, DAMAGER = 0, NONE = 0 }
 	for index = 0, GetNumSubgroupMembers(LE_PARTY_CATEGORY_HOME) do
 		local role = UnitGroupRolesAssigned(index == 0 and 'player' or 'party' .. index)
-		if (issecretvalue and issecretvalue(role)) or not roles[role] then role = 'NONE' end
+		if IsSecret(role) or not roles[role] then role = 'NONE' end
 		roles[role] = roles[role] + 1
 	end
 	return roles
@@ -391,7 +392,7 @@ end
 
 function Comp.SpecDamage(player)
 	local specName = player.specName
-	if not specName or (issecretvalue and issecretvalue(specName)) then return nil end
+	if not specName or IsSecret(specName) then return nil end
 	local ids = Comp.specIDs
 	if not ids then
 		ids = {}
@@ -1806,7 +1807,7 @@ local function MirrorSearchText()
 	local box = SearchBox()
 	local text = box:GetText()
 	local focused = box:HasFocus()
-	local known = not (issecretvalue and issecretvalue(text))
+	local known = not IsSecret(text)
 	local empty = known and text == ''
 	finder.searchText:SetText(text)
 	finder.searchHint:SetShown(empty and not focused)
@@ -1911,7 +1912,7 @@ end
 
 function Strip.PlaceCaret(caret, box, focused)
 	local text = box:GetText()
-	local plain = not (issecretvalue and issecretvalue(text)) and text or nil
+	local plain = not IsSecret(text) and text or nil
 	caret.blink:Stop()
 	caret:SetShown(focused and plain ~= nil)
 	if not caret:IsShown() then return end

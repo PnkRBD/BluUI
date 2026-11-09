@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local Skin = BUI.Skinning
 
@@ -180,7 +181,7 @@ end
 
 function Readout.AtEnchantLevel(unit)
 	local level = UnitLevel(unit)
-	if not level or issecretvalue(level) then return false end
+	if not level or IsSecret(level) then return false end
 	return level >= GetMaxLevelForPlayerExpansion()
 end
 

@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local GatewayAlert = {}
 BUI.Auras.GatewayAlert = GatewayAlert
@@ -57,7 +58,7 @@ local function GateReady()
     if shardCount == 0 or UnitIsDeadOrGhost('player') then return false end
     for slot in pairs(shardSlots) do
         local usable = IsUsableAction(slot)
-        if not issecretvalue(usable) and usable then return true end
+        if not IsSecret(usable) and usable then return true end
     end
     return false
 end

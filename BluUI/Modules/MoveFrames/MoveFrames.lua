@@ -7,7 +7,7 @@ BUI.MoveFrames = MoveFrames
 
 local InCombatLockdown = InCombatLockdown
 local IsAddOnLoaded = C_AddOns.IsAddOnLoaded
-local IsSecret = issecretvalue
+local IsSecret = BUI.Tools.IsSecretValue
 local Widget = LibStub('BUILib').Widget
 
 local CONFLICTING_ADDONS = { 'BlizzMove', 'MoveAnything' }

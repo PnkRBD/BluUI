@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local Skin = BUI.Skinning
 
@@ -45,14 +46,14 @@ end
 
 local function ScreenOffset(frame, point)
 	local x, y = frame:GetCenter()
-	if not x or issecretvalue(x) or issecretvalue(y) then return nil end
+	if not x or IsSecret(x) or IsSecret(y) then return nil end
 	if point == 'BOTTOM' then
 		local bottom = frame:GetBottom()
-		if issecretvalue(bottom) then return nil end
+		if IsSecret(bottom) then return nil end
 		y = bottom + ANCHOR_HEIGHT / 2
 	elseif point == 'TOP' then
 		local top = frame:GetTop()
-		if issecretvalue(top) then return nil end
+		if IsSecret(top) then return nil end
 		y = top - ANCHOR_HEIGHT / 2
 	end
 	local parentX, parentY = UIParent:GetCenter()

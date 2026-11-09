@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local ipairs = ipairs
 
@@ -53,7 +54,7 @@ local rollFrames = {}
 
 local function QualityColor(frame)
 	local _, _, _, quality = GetLootRollItemInfo(frame.rollID)
-	if not quality or issecretvalue(quality) or quality < 2 then return nil end
+	if not quality or IsSecret(quality) or quality < 2 then return nil end
 	return ITEM_QUALITY_COLORS[quality]
 end
 

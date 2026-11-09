@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local tonumber, type = tonumber, type
 local C_Item = C_Item
@@ -61,6 +62,10 @@ function IconEngine.ResolveTrinketSlot(slot)
 	local inventorySlot = TRINKET_SLOT_INV[slot]
 	if not inventorySlot then return nil end
 	return GetInventoryItemID("player", inventorySlot)
+end
+
+function IconEngine.TrinketInventorySlot(slot)
+	return TRINKET_SLOT_INV[slot]
 end
 
 local itemSpellIDs = {}
@@ -246,7 +251,7 @@ end
 
 local function ItemUsable(itemID)
 	local usable = C_Item.IsUsableItem(itemID)
-	return issecretvalue(usable) or usable ~= false
+	return IsSecret(usable) or usable ~= false
 end
 
 local function TintItem(texture, usable, desaturation)
@@ -411,7 +416,7 @@ end
 function IconEngine.SpellCooldownChanged(state, spellID, hasCharges, cooldownInfo)
 	local start = cooldownInfo and cooldownInfo.startTime
 	local duration = cooldownInfo and cooldownInfo.duration
-	if start == nil or issecretvalue(start) or issecretvalue(duration) then
+	if start == nil or IsSecret(start) or IsSecret(duration) then
 		state._cdFingerStart = nil
 		return true
 	end
@@ -437,9 +442,9 @@ function IconEngine.SpellCooldownChanged(state, spellID, hasCharges, cooldownInf
 end
 
 function IconEngine.SpellUsableChanged(texture, isUsable, notEnoughPower)
-	if not issecretvalue(isUsable) and isUsable == false then return texture._lastUsable ~= false end
+	if not IsSecret(isUsable) and isUsable == false then return texture._lastUsable ~= false end
 	if texture._lastUsable == false then return true end
-	return not issecretvalue(notEnoughPower) and notEnoughPower ~= texture._lastNotEnoughPower
+	return not IsSecret(notEnoughPower) and notEnoughPower ~= texture._lastNotEnoughPower
 end
 
 function IconEngine.ApplySpellVisual(texture, cooldown, spellID, hasCharges, onExpireCallback, ignoreGCD, hideGCD, usableIn, notEnoughPowerIn, cooldownInfoIn)
@@ -451,7 +456,7 @@ function IconEngine.ApplySpellVisual(texture, cooldown, spellID, hasCharges, onE
 		isUsable, notEnoughPower = C_Spell.IsSpellUsable(spellID)
 	end
 
-	local castable = issecretvalue(isUsable) or isUsable ~= false
+	local castable = IsSecret(isUsable) or isUsable ~= false
 	if not castable then
 		if texture._lastUsable ~= false then
 			texture._lastUsable = false
@@ -466,7 +471,7 @@ function IconEngine.ApplySpellVisual(texture, cooldown, spellID, hasCharges, onE
 		texture:SetDesaturation(0)
 	end
 
-	if not issecretvalue(notEnoughPower) and notEnoughPower ~= texture._lastNotEnoughPower then
+	if not IsSecret(notEnoughPower) and notEnoughPower ~= texture._lastNotEnoughPower then
 		texture._lastNotEnoughPower = notEnoughPower
 		local shade = notEnoughPower and 0.5 or 1
 		SetColor(texture, shade, shade, shade)

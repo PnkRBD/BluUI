@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local Druid = {}
 BUI.BuffTracking.Druid = Druid
@@ -123,7 +124,7 @@ local function LifebloomOn(target)
 end
 
 local function OnCastSent(_, _, target, castGUID, spellID)
-    if (spellID == LIFEBLOOM or spellID == REGROWTH) and not issecretvalue(target) then pendingCast, pendingTarget = castGUID, target end
+    if (spellID == LIFEBLOOM or spellID == REGROWTH) and not IsSecret(target) then pendingCast, pendingTarget = castGUID, target end
 end
 
 local function OnLifebloomCast(target, settings)
