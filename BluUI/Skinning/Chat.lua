@@ -66,7 +66,7 @@ local BUTTON_IDLE_ALPHA = 0.25
 local SCROLL_METHODS = { 'SetScrollOffset', 'ScrollUp', 'ScrollDown', 'ScrollToTop', 'ScrollToBottom', 'PageUp', 'PageDown' }
 local auxPainters = {}
 local chatPanel, panelSquare, sizer, fader, copyWindow, mover
-local UpdateMover, UpdateSizer, ApplyMsgFontSize, ReflowLater
+local UpdateMover, UpdateSizer, ApplyMsgFontSize
 local skinnedTabs = {}
 local skinnedFrames = {}
 local fadeState = { alpha = 1, lastActive = 0 }
@@ -139,8 +139,7 @@ end
 
 local function ApplyChatFont(chatFrame, size)
 	chatFrame:SetFont(ResolveFont(), size or Config.fontSize, Config.fontFlags)
-	chatFrame:SetIndentedWordWrap(not Config.hangWrap)
-	ReflowLater(chatFrame)
+	chatFrame:SetIndentedWordWrap(true)
 end
 
 local function HideTexture(texture)
@@ -364,118 +363,6 @@ local function Measurer(chat)
 	return measure
 end
 
-local MIN_WRAP_WIDTH = 40
-
-local function StampMeasure(chat)
-	local measure = chat._buiStampMeasure
-	if not measure then
-		measure = chat:CreateFontString(nil, 'BACKGROUND')
-		measure:Hide()
-		measure:SetNonSpaceWrap(true)
-		chat._buiStampMeasure = measure
-	end
-	measure:SetFontObject(chat:GetFontObject())
-	measure:SetWidth(chat:GetWidth())
-	return measure
-end
-
-local function Fits(measure, text, continued)
-	measure:SetText(continued and ('\n' .. text) or text)
-	local lines = measure:GetNumLines()
-	if IsSecret(lines) then return nil end
-	return lines <= (continued and 2 or 1)
-end
-
-local function SplitToken(measure, token, spacer, continued)
-	local starts = {}
-	for index = 1, #token do
-		local code = strbyte(token, index)
-		if code < 0x80 or code >= 0xC0 then starts[#starts + 1] = index end
-	end
-	local low, high = 1, #starts
-	while low < high do
-		local mid = ceil((low + high) / 2)
-		local fits = Fits(measure, spacer .. strsub(token, 1, (starts[mid + 1] or #token + 1) - 1), continued)
-		if fits == nil then return nil end
-		if fits then low = mid else high = mid - 1 end
-	end
-	local cut = (starts[low + 1] or #token + 1) - 1
-	return strsub(token, 1, cut), strsub(token, cut + 1)
-end
-
-local function HangWrap(chat, text, head)
-	if not Config.hangWrap or find(text, '\n', 1, true) then return text end
-	local measure = StampMeasure(chat)
-	local fits = Fits(measure, text)
-	if fits ~= false then return text end
-	measure:SetText(strsub(text, 1, head))
-	local gutter = measure:GetUnboundedStringWidth()
-	if IsSecret(gutter) then return text end
-	gutter = floor(gutter + 0.5)
-	if gutter < 1 or chat:GetWidth() - gutter < MIN_WRAP_WIDTH then return text end
-	local spacer = ('|T%s:1:%d|t'):format(BUILib.GetLibMedia('blank'), gutter)
-	local protected = gsub(text, '|H.-|h.-|h', function(link) return (gsub(link, ' ', '\1')) end)
-	local lines, line = {}, nil
-	local function Flush()
-		lines[#lines + 1] = #lines == 0 and line or (spacer .. line)
-		line = nil
-	end
-	for token in gmatch(protected .. ' ', '([^ ]*) ') do
-		local candidate = line and (line .. ' ' .. token) or token
-		fits = Fits(measure, (#lines == 0 and '' or spacer) .. candidate, #lines > 0)
-		if fits == nil then return text end
-		if fits then
-			line = candidate
-		else
-			if line then Flush() end
-			while true do
-				local prefix = #lines == 0 and '' or spacer
-				fits = Fits(measure, prefix .. token, #lines > 0)
-				if fits == nil then return text end
-				if fits or find(token, '|', 1, true) or find(token, '\1', 1, true) then
-					line = token
-					break
-				end
-				local kept, rest = SplitToken(measure, token, prefix, #lines > 0)
-				if not kept then return text end
-				line = kept
-				Flush()
-				token = rest
-			end
-		end
-	end
-	if line and line ~= '' then Flush() end
-	return (gsub(tconcat(lines, '\n'), '\1', ' '))
-end
-
-local function Reflow(chat)
-	local buffer = chat.historyBuffer
-	local changed = false
-	for index = 1, chat:GetNumMessages() do
-		local entry = buffer:GetEntryAtIndex(index)
-		local flow = entry and entry._buiFlow
-		if flow then
-			local wrapped = HangWrap(chat, flow, entry._buiHead)
-			if wrapped ~= entry.message then entry.message, changed = wrapped, true end
-		end
-	end
-	if changed then chat:MarkDisplayDirty() end
-end
-
-local reflowDirty = {}
-
-local ReflowDirty = BUI.Dispatcher.New(function()
-	for chat in pairs(reflowDirty) do
-		reflowDirty[chat] = nil
-		Reflow(chat)
-	end
-end)
-
-function ReflowLater(chat)
-	reflowDirty[chat] = true
-	ReflowDirty()
-end
-
 local ValidStampFormat
 do
 	local lastCheckedFormat, lastFormatValid
@@ -498,7 +385,6 @@ end
 local function HookAddMessage(frame)
 	if frame._buiAddMessage then return end
 	frame._buiAddMessage = true
-	frame:HookScript('OnSizeChanged', ReflowLater)
 	Hook(frame, 'AddMessage', function(self, text)
 		if self ~= ChatFrame2 and type(text) == 'string' and not IsSecret(text) and text ~= '' then
 			local entry = self.historyBuffer:GetEntryAtIndex(1)
@@ -512,8 +398,6 @@ local function HookAddMessage(frame)
 						local stampColor = config.timestampColor
 						local prefix = '|cff' .. BUI.Hex(stampColor[1], stampColor[2], stampColor[3]) .. date(stampFormat) .. '|r '
 						newText = prefix .. newText
-						entry._buiFlow, entry._buiHead = newText, #prefix
-						newText = HangWrap(self, newText, #prefix)
 					end
 				end
 				if newText ~= text then
@@ -527,7 +411,6 @@ local function HookAddMessage(frame)
 end
 
 local function StripEscapes(text)
-	text = gsub(text, '\n|T.-|t', ' ')
 	text = gsub(text, '|c%x%x%x%x%x%x%x%x|Hurl:(.-)|h.-|h|r', '%1')
 	text = gsub(text, '|Hurl:(.-)|h.-|h', '%1')
 	text = gsub(text, '|H.-|h(.-)|h', '%1')
@@ -2214,7 +2097,6 @@ function context.info.buildBoards(ui, parent, width)
 
 	local messages = ui.Board(parent, width, { stacked = true, title = 'Messages', description = 'What each line shows, fading, history and the side buttons.' })
 	messages:AddSwitch('Timestamps', Reader('timestamps'), Applied('timestamps'), 'The time in front of each line')
-	messages:AddSwitch('Align wrapped lines', Reader('hangWrap'), Applied('hangWrap'), 'Continue long messages under the name instead of under the time')
 	messages:AddSwitch('Clickable links', Reader('urlCopy'), Store('urlCopy'), 'Turn web addresses into links you can copy')
 	messages:AddSwitch('Link tooltips', Reader('hoverTooltips'), Store('hoverTooltips'), 'Tooltips when hovering links')
 	messages:AddSwitch('Hide channel numbers', Reader('hideChannelNumbers'), Store('hideChannelNumbers'))

@@ -31,7 +31,7 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 33
+local PROFILE_MIGRATION_VERSION = 34
 
 local AURA_GROUP_KINDS = { 'buffs', 'debuffs', 'bigDef', 'crowdControl' }
 
@@ -1155,6 +1155,13 @@ function BUI.MigrateProfile(profile)
 				if type(viewer) == 'table' then viewer.detachedIcons = nil end
 			end
 		end
+	end
+
+	if not general._hangWrapRetired then
+		general._hangWrapRetired = true
+		local skinning = profile.skinning
+		local chat = type(skinning) == 'table' and skinning.chatSettings
+		if type(chat) == 'table' then chat.hangWrap = nil end
 	end
 
 	general._buiMigrationVersion = PROFILE_MIGRATION_VERSION

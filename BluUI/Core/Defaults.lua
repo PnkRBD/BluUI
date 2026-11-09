@@ -505,7 +505,6 @@ BUI.Defaults = {
 				timestamps         = false,
 				timestampFormat    = '%H:%M',
 				timestampColor     = { 0.6, 0.6, 0.6 },
-				hangWrap           = true,
 				hideChannelNumbers = false,
 				abbreviateChannels = false,
 				scrollLines        = 3,
