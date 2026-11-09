@@ -1585,21 +1585,26 @@ function Skin.Define(id, info)
 	local context = NewContext(Enabled)
 	local windows, disablers = {}, {}
 
-	local function Guard(handler)
-		return function(...)
+	local function Guard(handler, label)
+		if not label then
+			local stack = debugstack(2, 1, 0)
+			local file, line = not IsSecret(stack) and stack and stack:match('AddOns/BluUI/([^%]]+)%]:(%d+)')
+			label = 'Skin.' .. id .. ' guard ' .. (file and (file .. ':' .. line) or '?')
+		end
+		local guarded = function(...)
 			if Enabled() then Safely(handler, ...) end
 		end
+		BUI.Perf.Track(label, guarded)
+		return guarded
 	end
 
 	function context.Hook(target, method, handler)
-		local guarded = Guard(handler or method)
-		local label = 'Skin.' .. id .. '.' .. (handler and method or target)
+		local guarded = Guard(handler or method, 'Skin.' .. id .. '.' .. (handler and method or target))
 		if handler then
 			hooksecurefunc(target, method, guarded)
 		else
 			hooksecurefunc(target, guarded)
 		end
-		BUI.Perf.Track(label, guarded)
 	end
 
 	function context.Window(name, spec)
