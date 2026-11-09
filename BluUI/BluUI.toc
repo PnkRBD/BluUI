@@ -45,6 +45,7 @@ Utility\Painter.lua
 Utility\Dispatcher.lua
 Utility\Events.lua
 Utility\Perf.lua
+Utility\Tools.lua
 Utility\Visibility.lua
 Utility\Math.lua
 Utility\TimeFormat.lua
@@ -63,7 +64,6 @@ Utility\IconEngine.lua
 Utility\RangeEngine.lua
 Utility\AuraRules.lua
 Utility\AuraBlacklist.lua
-Utility\Tools.lua
 Utility\PartyKeys.lua
 Utility\TrueStats.lua
 Utility\AuraContainerEngine.lua
@@ -156,7 +156,6 @@ Modules\CDM\Anchors.lua
 Modules\CDM\Hooks.lua
 Modules\CDM\Layout.lua
 Modules\CDM\BuffCenter.lua
-Modules\CDM\Detached.lua
 Modules\CDM\Custom.lua
 Modules\CDM\Overlay.lua
 Modules\CDM\Events.lua

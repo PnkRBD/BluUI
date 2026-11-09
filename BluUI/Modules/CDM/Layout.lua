@@ -1,4 +1,5 @@
 local _, BUI = ...
+local IsSecret = BUI.Tools.IsSecretValue
 
 local _G = _G
 local ipairs, wipe = ipairs, wipe
@@ -143,7 +144,7 @@ end
 
 local function ApplyIconAlpha(icon, frameData, alpha)
     local current = icon:GetAlpha()
-    if not issecretvalue(current) and current == alpha then return end
+    if not IsSecret(current) and current == alpha then return end
     frameData.locking = true
     icon:SetAlpha(alpha)
     frameData.locking = false
@@ -367,7 +368,7 @@ function CDM.HideWhenZeroChanged(key)
             local hideZeroKey = IconEntryKey(iconFrameData, baseID, overrideID, storedValue)
             if hideZeroKey and hideWhenZero[hideZeroKey] then
                 local count = HideWhenZeroCount(iconFrameData, customID or baseID or overrideID)
-                if issecretvalue(count) or iconFrameData.zeroHidden ~= (count == 0) then return true end
+                if IsSecret(count) or iconFrameData.zeroHidden ~= (count == 0) then return true end
             end
         end
     end
@@ -483,11 +484,8 @@ function CDM.ApplyIconPositions(key)
         end
 
         if not shouldHide and cap then
-            local stableID = CDM.GetStableSpellID(icon)
-            if not (stableID and CDM.IsIconDetached(settings, stableID)) then
-                gridSeen = gridSeen + 1
-                if gridSeen > cap then shouldHide = true end
-            end
+            gridSeen = gridSeen + 1
+            if gridSeen > cap then shouldHide = true end
         end
 
         if shouldHide then
@@ -506,30 +504,8 @@ function CDM.ApplyIconPositions(key)
         return
     end
 
-    local Detached = CDM.Detached
-    local gridCount = 0
-    for iconIndex = 1, #layoutBuffer do
-        local icon = layoutBuffer[iconIndex]
-        local spellID = CDM.GetStableSpellID(icon)
-        if spellID and CDM.IsIconDetached(settings, spellID) then
-            Detached.PlaceIcon(icon, key, iconWidth, iconHeight, settings)
-        else
-            Detached.HookIcon(icon)
-            gridCount = gridCount + 1
-            layoutBuffer[gridCount] = icon
-        end
-    end
-    for iconIndex = gridCount + 1, #layoutBuffer do
-        layoutBuffer[iconIndex] = nil
-    end
-
     local icons = layoutBuffer
-    local count = gridCount
-
-    if count == 0 then
-        anchor:Hide()
-        return
-    end
+    local count = #layoutBuffer
 
     local growUp = settings.rowGrowth == "Up"
     local scaledWidth = anchor._cachedScaledW

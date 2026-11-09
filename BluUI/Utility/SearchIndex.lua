@@ -36,7 +36,6 @@ local entries = {
 	{ label = "Sync settings", page = "cdm", tab = 1, panel = "Behavior", keywords = "sync essential utility share appearance" },
 	{ label = "Tooltips", page = "cdm", tab = 1, panel = "Behavior", keywords = "spell tooltip hover icons" },
 	{ label = "Buff time on cooldowns", page = "cdm", tab = 1, panel = "Behavior", keywords = "buff duration remaining time cooldown desaturate" },
-	{ label = "Move icons individually", page = "cdm", tab = 1, panel = "Behavior", keywords = "detach drag resize snapping reset positions" },
 	{ label = "Font", page = "cdm", tab = 1, panel = "Behavior", keywords = "timer stack text font" },
 	{ label = "Custom glows", page = "cdm", tab = 1, panel = "Glow and highlights", keywords = "glow proc alert color type speed lines thickness preview pixel autocast button" },
 	{ label = "Assisted highlight", page = "cdm", tab = 1, panel = "Glow and highlights", keywords = "assist assisted combat highlight color next spell marker on off" },

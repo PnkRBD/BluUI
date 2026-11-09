@@ -258,7 +258,6 @@ local function RefreshAllModules()
         BUI.CDM.RefreshAssistHighlight()
         BUI.CDM.PressHighlight.Refresh()
         BUI.CDM.RefreshProcMsgWatcher()
-        BUI.CDM.Detached.UpdateModifierWatcher()
     end
 
     local powerOn = on('power')

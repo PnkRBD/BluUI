@@ -31,7 +31,7 @@ function BUI.FixLegacyValues(targetTable)
 	FixLegacyValues(targetTable, 1)
 end
 
-local PROFILE_MIGRATION_VERSION = 32
+local PROFILE_MIGRATION_VERSION = 33
 
 local AURA_GROUP_KINDS = { 'buffs', 'debuffs', 'bigDef', 'crowdControl' }
 
@@ -1144,6 +1144,17 @@ function BUI.MigrateProfile(profile)
 	if not general._beastLabelAnchored then
 		general._beastLabelAnchored = true
 		SettleBeastLabel(profile.killCommandOverlay)
+	end
+
+	if not general._detachedIconsRemoved then
+		general._detachedIconsRemoved = true
+		local cdm = profile.cdm
+		if type(cdm) == 'table' then
+			cdm.allowIndividualMove, cdm.allowIndividualResize, cdm.disableSnapping = nil, nil, nil
+			for _, viewer in pairs(cdm) do
+				if type(viewer) == 'table' then viewer.detachedIcons = nil end
+			end
+		end
 	end
 
 	general._buiMigrationVersion = PROFILE_MIGRATION_VERSION

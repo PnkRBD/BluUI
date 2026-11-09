@@ -234,31 +234,6 @@ function CDM.SetManualBuff(config, id, data, asGlobal)
     end
 end
 
-local function GetDetachedIcons(config) return PerSpecGet(config, 'detachedIcons') end
-
-function CDM.IsIconDetached(config, id)
-    return GetDetachedIcons(config)[id] ~= nil
-end
-
-function CDM.GetDetachedPosition(config, id)
-    return GetDetachedIcons(config)[id]
-end
-
-function CDM.SetDetachedIcon(config, id, x, y, width, height)
-    local key = GetBuildKey()
-    config.detachedIcons[key] = config.detachedIcons[key] or {}
-    config.detachedIcons[key][id] = { x = x, y = y, w = width, h = height }
-end
-
-function CDM.ClearDetachedIcon(config, id)
-    local detached = config.detachedIcons[GetBuildKey()]
-    if detached then detached[id] = nil end
-end
-
-function CDM.ClearAllDetachedIcons(config)
-    config.detachedIcons[GetBuildKey()] = {}
-end
-
 function CDM.GetShowOnlyOnCD(config) return PerSpecGet(config, 'showOnlyOnCD') end
 
 function CDM.IsShowOnlyOnCD(config, id)

@@ -136,7 +136,6 @@ local CdmViewerBase = {
 	anchorOffsetX         = 0,
 	anchorOffsetY         = 0,
 	hiddenSlots           = {},
-	detachedIcons         = {},
 	customSpells          = {},
 	iconOrder             = {},
 	hiddenIcons           = {},
@@ -1256,9 +1255,6 @@ BUI.Defaults = {
 
 		cdm = {
 			syncViewers          = false,
-			allowIndividualMove   = false,
-			allowIndividualResize = true,
-			disableSnapping      = false,
 			showBlizzardOverlay  = true,
 			showBuffDuration     = true,
 			showTooltips         = true,

@@ -71,7 +71,6 @@ function CDM.Initialize()
         end
     end)
 
-    CDM.Detached.UpdateModifierWatcher()
     CDM.SetupBlizzardOverlay()
 
     BUI.Visibility.Register("CDM", CDM.UpdateOpacity)
