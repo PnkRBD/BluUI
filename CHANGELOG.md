@@ -4,7 +4,7 @@ Chat lines that wrap under the name, a cooldown manager that reacts in the frame
 
 **Chat**
 
-Long messages continue under the name instead of under the time. Turn it off under Messages, Align wrapped lines, if you prefer the old flow. Timestamps are drawn plain, the same way ElvUI draws them.
+Long messages continue under the name instead of under the time. Turn it off under Messages, Align wrapped lines, if you prefer the old flow. Timestamps are drawn plain.
 
 **Cooldown manager**
 
@@ -44,7 +44,7 @@ Every BluUI window starts moving after the first few pixels of a drag instead of
 
 **Under the hood**
 
-Work that waits for combat to end is spread across frames so leaving combat does not hitch. Player aura changes are read once through a shared helper, group frames and proc alerts take their events from the shared bus instead of frames of their own, and pixel snapping matches ElvUI's current code. The perf report names the file and line behind every dispatcher.
+Work that waits for combat to end is spread across frames so leaving combat does not hitch. Player aura changes are read once through a shared helper, group frames and proc alerts take their events from the shared bus instead of frames of their own, and the pixel snapping hooks are brought up to date. The perf report names the file and line behind every dispatcher.
 
 Updating by hand: delete the old BluUI and BluUI_Options folders, then extract the new ones. Your settings are kept. Restart the game rather than /reload.
 
