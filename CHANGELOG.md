@@ -1,3 +1,17 @@
+# 5.19.2
+
+Chat wraps the way it used to, and a crash in the skinned windows is gone.
+
+**Chat**
+
+Long messages continue under the time again. The Align wrapped lines switch is gone, and a profile that had it on is reset the first time this version loads.
+
+**Fixes**
+
+Skinned windows no longer throw an error while a guarded hook is being named. The character sheet hit it on every refresh.
+
+Updating by hand: delete the old BluUI and BluUI_Options folders, then extract the new ones. Your settings are kept. Restart the game rather than /reload.
+
 # 5.19.1
 
 Two small follow-ups to 5.19.0.
