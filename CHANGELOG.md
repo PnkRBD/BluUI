@@ -1,3 +1,17 @@
+# 5.19.1
+
+Two small follow-ups to 5.19.0.
+
+**Power text**
+
+The primary power type is worked out once per form, spec or display-power change instead of on every power tick.
+
+**Under the hood**
+
+The perf report lists every guarded skin hook under its own call site, so a busy hook in a skinned window can be named instead of counted.
+
+Updating by hand: delete the old BluUI and BluUI_Options folders, then extract the new ones. Your settings are kept. Restart the game rather than /reload.
+
 # 5.19.0
 
 Chat lines that wrap under the name, a cooldown manager that reacts in the frame an event lands, and a profiler that names what called what.
