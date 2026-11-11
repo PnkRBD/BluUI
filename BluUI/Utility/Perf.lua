@@ -15,8 +15,19 @@ local SECRET_CHECK = 'Tools.IsSecretValue'
 local SITE_FIRST, SITE_MID, SITE_EVERY, SITE_RARE = 100, 2000, 16, 256
 local SAMPLE_SECONDS = 1
 local CALIBRATION_CALLS = 20000
-local SCRIPTS = { 'OnEvent', 'OnUpdate', 'OnShow', 'OnHide', 'OnSizeChanged', 'OnAttributeChanged', 'OnValueChanged', 'OnEnter', 'OnLeave', 'OnClick' }
+local HANDLER_EVENTS = 3
+local SOURCE_CVAR = 'enableSourceLocationLookup'
+local SCRIPTS = {
+	'OnEvent', 'OnUpdate', 'OnShow', 'OnHide', 'OnSizeChanged', 'OnAttributeChanged', 'OnValueChanged', 'OnMinMaxChanged',
+	'OnEnter', 'OnLeave', 'OnClick', 'OnDoubleClick', 'OnMouseDown', 'OnMouseUp', 'OnMouseWheel',
+	'OnDragStart', 'OnDragStop', 'OnReceiveDrag', 'OnKeyDown', 'OnEnable', 'OnDisable', 'OnCooldownDone',
+	'OnVerticalScroll', 'OnScrollRangeChanged', 'OnTextChanged', 'OnCursorChanged', 'OnEditFocusGained', 'OnEditFocusLost',
+	'OnEnterPressed', 'OnEscapePressed', 'OnHyperlinkEnter', 'OnHyperlinkLeave',
+}
 local scriptFrames = {}
+local outsideFrames = {}
+local handlerEvents = {}
+local handlerFrames = {}
 local tracked = {}
 local trackedCallbacks = {}
 local byWrapper = {}
@@ -222,9 +233,17 @@ end
 local function PrintTimed(rows, label, limit)
 	table.sort(rows, function(a, b) return a.usage > b.usage end)
 	BUI.Print(label)
-	for index = 1, math.min(limit or TOP_HANDLERS, #rows) do
+	local shown = math.min(limit or TOP_HANDLERS, #rows)
+	for index = 1, shown do
 		local row = rows[index]
 		Line(row.name, ('%s over %d calls, %.3f ms each'):format(Ms(row.usage), row.calls, row.usage / row.calls))
+	end
+	if #rows > shown then
+		local usage, calls = 0, 0
+		for index = shown + 1, #rows do
+			usage, calls = usage + rows[index].usage, calls + rows[index].calls
+		end
+		Line(('%d more rows below the cut'):format(#rows - shown), ('%s over %d calls'):format(Ms(usage), calls))
 	end
 	if #rows == 0 then Line('none', '-') end
 end
@@ -273,6 +292,15 @@ local function GlobalNames()
 	return names
 end
 
+local function EventList(events)
+	local names = {}
+	for event in pairs(events) do names[#names + 1] = event end
+	table.sort(names)
+	local extra = #names - HANDLER_EVENTS
+	if extra <= 0 then return table.concat(names, ', ') end
+	return ('%s and %d more'):format(table.concat(names, ', ', 1, HANDLER_EVENTS), extra)
+end
+
 local function FrameRows(scripts)
 	local rows, total = {}, 0
 	local globals = GlobalNames()
@@ -280,11 +308,18 @@ local function FrameRows(scripts)
 		local usage, calls = GetFunctionCPUUsage(callback, true)
 		if calls > 0 then
 			local globalName = globals[callback]
-			if globalName then name = 'Blizzard ' .. globalName .. ', first seen on ' .. name end
-			local shared = scriptFrames[callback]
-			if shared and shared > 1 then name = ('%s on %d frames'):format(name, shared) end
+			local events = handlerEvents[callback]
+			if events then
+				name = ('%s handler shared by %d unit frames, first seen on %s'):format(EventList(events), handlerFrames[callback], name)
+			else
+				if globalName then name = 'Blizzard ' .. globalName .. ' across the whole UI, first seen on ' .. name end
+				local shared = scriptFrames[callback]
+				if shared and shared > 1 then name = ('%s on %d frames'):format(name, shared) end
+				local outside = outsideFrames[callback]
+				if outside then name = ('%s, same timer as %d frames outside BluUI'):format(name, outside) end
+			end
 			rows[#rows + 1] = { name = name, usage = usage, calls = calls }
-			total = total + usage
+			if not globalName and not outsideFrames[callback] then total = total + usage end
 		end
 	end
 	return rows, total
@@ -361,14 +396,24 @@ local function Breakdown(scripts, entries)
 	local functionRows = NamespaceRows(entries or CollectAll())
 	PrintCalled(functionRows, 'Most called BluUI functions and who called them', TOP_FUNCTIONS)
 	PrintTimed(functionRows, 'Heaviest BluUI functions by own time, callees excluded', TOP_FUNCTIONS)
+	local named = 0
+	for _, row in ipairs(functionRows) do named = named + row.usage end
+	Line('own time in functions this list can name', ('%s of %s; the rest runs in file-local functions, which only show up through the frame script, handler or hook that calls them'):format(Ms(named), Ms(total)))
 	local calls = CallCount(frameRows) + CallCount(handlerRows) + CallCount(hookRows)
-	Line('coverage', ('%s in frame scripts (Blizzard template code on BluUI frames included) and %s in watched hooks against %s of BluUI Lua; the profiler itself costs about %s to count those %d calls, and anything left is timers or library code'):format(Ms(frameTotal), Ms(hookTotal), Ms(total), Ms(ProfilerOverhead(calls)), calls))
+	Line('coverage', ('frame scripts add up to %s and watched hooks to %s, against %s of BluUI Lua. Both sums include whatever a script or hook calls, Blizzard code too, and count a script twice when it fires inside another, so they overlap, can pass the total and leave no remainder to read. Blizzard template rows and scripts shared with frames outside BluUI are kept out of the frame script sum. Timer callbacks, scripts cleared before this report and frames not tied to BluUI only appear when tracked by name. Counting these %d calls costs about %s'):format(Ms(frameTotal), Ms(hookTotal), Ms(total), calls, Ms(ProfilerOverhead(calls))))
 end
 
 local function RootName(root)
 	local name = root._buiPerfName or root:GetName()
 	if type(name) ~= 'string' then name = root._bluHolder and 'group header' or '(unnamed)' end
 	return name
+end
+
+local function CreationSite(frame)
+	local location = frame:GetSourceLocation()
+	if type(location) ~= 'string' then return end
+	local _, last = location:lower():find('addons[\\/]bluui[\\/]')
+	return last and location:sub(last + 1)
 end
 
 local function Inspect(frame)
@@ -378,7 +423,32 @@ local function Inspect(frame)
 		root = parent
 		parent = root:GetParent()
 	end
-	return RootName(root), frame:GetNumRegions(), root ~= frame and root or nil
+	local rootName, regions = RootName(root), frame:GetNumRegions()
+	if rootName:find('^BUI') or rootName == 'group header' or root._buiAuraContainer then return rootName, regions, rootName end
+	local site = CreationSite(frame)
+	if site then return 'frames created in ' .. site:gsub(':%d+$', '', 1), regions, site end
+end
+
+local function NoteHandler(callback, event, rootName, scripts, counted)
+	if not scripts[callback] then scripts[callback] = rootName end
+	local events = handlerEvents[callback]
+	if not events then
+		events = {}
+		handlerEvents[callback] = events
+	end
+	events[event] = true
+	if counted[callback] then return end
+	counted[callback] = true
+	handlerFrames[callback] = (handlerFrames[callback] or 0) + 1
+end
+
+local function NoteOutsideScripts(frame)
+	for _, script in ipairs(SCRIPTS) do
+		if frame:HasScript(script) then
+			local callback = frame:GetScript(script)
+			if callback then outsideFrames[callback] = (outsideFrames[callback] or 0) + 1 end
+		end
+	end
 end
 
 local function CollectScripts(frame, rootName, scripts)
@@ -394,13 +464,14 @@ local function CollectScripts(frame, rootName, scripts)
 		end
 	end
 	if not frame.__unit then return end
+	local counted = {}
 	for key, value in pairs(frame) do
 		if type(key) == 'string' and key:find('^[A-Z][A-Z_0-9]+$') then
 			if type(value) == 'function' then
-				if not scripts[value] then scripts[value] = key .. ' handler, first seen on ' .. rootName end
+				NoteHandler(value, key, rootName, scripts, counted)
 			elseif type(value) == 'table' then
-				for _, callback in ipairs(value) do
-					if type(callback) == 'function' and not scripts[callback] then scripts[callback] = key .. ' handler, first seen on ' .. rootName end
+				for _, callback in pairs(value) do
+					if type(callback) == 'function' then NoteHandler(callback, key, rootName, scripts, counted) end
 				end
 			end
 		end
@@ -412,20 +483,28 @@ local function ClientLoad()
 	local total, ownedFrames, ownedRegions = 0, 0, 0
 	local roots, scripts = {}, {}
 	wipe(scriptFrames)
+	wipe(outsideFrames)
+	wipe(handlerEvents)
+	wipe(handlerFrames)
 	local frame = EnumerateFrames()
 	while frame do
 		total = total + 1
-		local ok, rootName, regions, root = pcall(Inspect, frame)
-		if ok and (rootName:find('^BUI') or rootName == 'group header' or (root or frame)._buiAuraContainer) then
+		local ok, rootName, regions, label = pcall(Inspect, frame)
+		if ok and rootName then
 			ownedFrames, ownedRegions = ownedFrames + 1, ownedRegions + regions
 			local entry = roots[rootName] or { name = rootName, frames = 0, regions = 0 }
 			roots[rootName] = entry
 			entry.frames, entry.regions = entry.frames + 1, entry.regions + regions
-			if timing then pcall(CollectScripts, frame, rootName, scripts) end
+			if timing then pcall(CollectScripts, frame, label, scripts) end
+		elseif timing then
+			pcall(NoteOutsideScripts, frame)
 		end
 		frame = EnumerateFrames(frame)
 	end
 	Line('frames in the whole UI', ('%d, BluUI owns %d frames and %d textures or texts'):format(total, ownedFrames, ownedRegions))
+	if not C_CVar.GetCVarBool(SOURCE_CVAR) then
+		Line('not counted', ('unnamed frames outside a BUI_ parent; set /console %s 1 and reload to tie them to the file that created them'):format(SOURCE_CVAR))
+	end
 	local list = {}
 	for _, entry in pairs(roots) do list[#list + 1] = entry end
 	table.sort(list, function(a, b) return a.frames + a.regions > b.frames + b.regions end)
