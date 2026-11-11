@@ -3,7 +3,7 @@ local IsSecret = BUI.Tools.IsSecretValue
 
 local _G = _G
 local wipe = wipe
-local type, ipairs, pairs, tonumber = type, ipairs, pairs, tonumber
+local ipairs, pairs = ipairs, pairs
 local next = next
 local GetTime = GetTime
 
@@ -94,11 +94,7 @@ local function ShowBuffWarning(icon, text, color, remaining, spellName, font, de
     warningThreshold = decimalThreshold
     warningShowDecimals = BUI.GetDB().cdm.buffs.showCooldownDecimals
     warningFont, warningColor = font, color
-    if font then
-        Pixel.ApplyFont(warningText, 28, font)
-    else
-        Pixel.ApplyFont(warningText, 28)
-    end
+    Pixel.ApplyFont(warningText, 28, font)
     if color then
         warningText:SetTextColor(color[1], color[2], color[3], color[4] or 1)
     else
@@ -123,24 +119,39 @@ local function HideBuffWarning(icon)
     warningColor = nil
 end
 
+local function AnnounceGlow(icon, glowConfig, remaining, spellID, repeatSound)
+    CDM.StartProcGlow(icon, glowConfig)
+    local warning = glowConfig.warning
+    if not warning then return end
+    local sound = warning.sound
+    if sound and sound ~= 0 and (repeatSound or sound ~= warningLastSound) then
+        warningLastSound = sound
+        PlaySound(sound, 'Master')
+    end
+    if warning.enabled then
+        ShowBuffWarning(icon, warning.text, warning.color, remaining, C_Spell.GetSpellName(spellID) or tostring(spellID), warning.font, glowConfig.threshold or 5)
+    end
+end
+
 local function DeferredGlowActivate(icon, frameData)
     local glowConfig = frameData._deferredGlowCfg
     if not glowConfig then return end
-    CDM.StartProcGlow(icon, glowConfig)
-    local warning = glowConfig.warning
-    if warning then
-        if warning.sound and warning.sound ~= 0 then
-            warningLastSound = warning.sound
-            PlaySound(warning.sound, 'Master')
-        end
-        if warning.enabled then
-            local threshold = glowConfig.threshold or 5
-            local spellName = C_Spell.GetSpellName(frameData._deferredGlowSpellID) or tostring(frameData._deferredGlowSpellID)
-            ShowBuffWarning(icon, warning.text, warning.color, threshold, spellName, warning.font, threshold)
-        end
-    end
+    AnnounceGlow(icon, glowConfig, glowConfig.threshold or 5, frameData._deferredGlowSpellID, true)
     frameData._deferredGlowCfg = nil
     frameData._deferredGlowSpellID = nil
+end
+
+local function ShowStacks(chargeText, text, applications)
+    if not text then
+        local stacks = Tools.SafeNum(applications) or 0
+        if stacks > 0 then text = stacks end
+    end
+    if text then
+        chargeText:SetText(text)
+        chargeText:Show()
+    else
+        chargeText:Hide()
+    end
 end
 
 local icons = {
@@ -247,23 +258,24 @@ local function WatchBuffOverride(icon, frameData, overrideID)
     MapBuffSpell(overrideID, icon)
 end
 
-local function AcquireIcon(parent, borderSize, borderColor, zoom)
-    if poolCount > 0 then
-        local icon = pool[poolCount]
-        pool[poolCount] = nil
-        poolCount = poolCount - 1
-        icon:SetParent(parent)
-        icon:Update(borderSize, borderColor, zoom)
-        return icon
-    end
-    return nil
+local function AcquireIcon(parent)
+    if poolCount == 0 then return nil end
+    local icon = pool[poolCount]
+    pool[poolCount] = nil
+    poolCount = poolCount - 1
+    icon:SetParent(parent)
+    return icon
 end
 
-local function ResetManualBuffOverlay(icon, frameData)
+local function CancelManualBuffGlowTimer(frameData)
     if frameData._manualGlowTimer then
         frameData._manualGlowTimer:Cancel()
         frameData._manualGlowTimer = nil
     end
+end
+
+local function ResetManualBuffOverlay(icon, frameData)
+    CancelManualBuffGlowTimer(frameData)
     frameData._manualGlowActive = nil
     icon.Cooldown:SetScript("OnCooldownDone", CDM.OnCooldownWidgetDone)
 end
@@ -285,8 +297,6 @@ local function ReleaseIcon(icon)
     frameData.customKey = nil
     frameData.storedValue = nil
     frameData.isItemByPrefix = nil
-    frameData.trinketSlot = nil
-    frameData.racialSlot = nil
     frameData.iconType = nil
     frameData.itemID = nil
     frameData.trackedBuff = nil
@@ -305,13 +315,11 @@ local function ReleaseIcon(icon)
     frameData.lastBestTier = nil
     frameData._manualBuff = nil
     frameData._manualStart = nil
-    frameData._manualGlowActive = nil
     frameData._origTexture = nil
     frameData.hasCharges = nil
     frameData.countFont = nil
     frameData.countFontNil = nil
-    icon.Icon:SetVertexColor(1, 1, 1)
-    icon.Icon:SetDesaturation(0)
+    BUI.IconEngine.ResetVisual(icon.Icon, icon.Cooldown)
     icon.Count = nil
     if icon._chargeText then
         icon._chargeText:SetText("")
@@ -671,48 +679,14 @@ local function CreateChargeText(icon)
     return text
 end
 
-local function CreateIconFrame(parent, borderSize, borderColor, zoom)
+local function CreateIconFrame(parent)
     local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     frame:SetSize(Pixel.Scale(50), Pixel.Scale(50))
-
-    local texture = frame:CreateTexture(nil, "ARTWORK")
-    local scaledEdge = Pixel.Scale(borderSize)
-    texture:SetPoint("TOPLEFT", frame, "TOPLEFT", scaledEdge, -scaledEdge)
-    texture:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -scaledEdge, scaledEdge)
-    texture:SetSnapToPixelGrid(false)
-    texture:SetTexelSnappingBias(0)
-    texture:SetTexCoord(zoom, 1 - zoom, zoom, 1 - zoom)
-    frame.Icon = texture
-
-    Pixel.ApplyBorder(frame, borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
+    frame.Icon = frame:CreateTexture(nil, "ARTWORK")
 
     local cooldown = CreateFrame("Cooldown", nil, frame, "CooldownFrameTemplate")
-
-    local cdEdge = scaledEdge - Pixel.PixelSize(1)
-    if cdEdge < 0 then cdEdge = 0 end
-    cooldown:SetPoint("TOPLEFT", frame, "TOPLEFT", cdEdge, -cdEdge)
-    cooldown:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -cdEdge, cdEdge)
-    cooldown:SetDrawEdge(false)
-    cooldown:SetDrawBling(false)
-    cooldown:SetDrawSwipe(true)
-    cooldown:SetHideCountdownNumbers(true)
     cooldown:SetScript("OnCooldownDone", CDM.OnCooldownWidgetDone)
     frame.Cooldown = cooldown
-
-    function frame:Update(newBorderSize, newBorderColor, newZoom)
-        Pixel.ApplyBorder(self, newBorderSize, newBorderColor[1], newBorderColor[2], newBorderColor[3], newBorderColor[4])
-
-        local edge = Pixel.Scale(newBorderSize)
-        self.Icon:ClearAllPoints()
-        self.Icon:SetPoint("TOPLEFT", self, "TOPLEFT", edge, -edge)
-        self.Icon:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -edge, edge)
-        self.Icon:SetTexCoord(newZoom, 1 - newZoom, newZoom, 1 - newZoom)
-        local cdEdge = edge - Pixel.PixelSize(1)
-        if cdEdge < 0 then cdEdge = 0 end
-        self.Cooldown:ClearAllPoints()
-        self.Cooldown:SetPoint("TOPLEFT", self, "TOPLEFT", cdEdge, -cdEdge)
-        self.Cooldown:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -cdEdge, cdEdge)
-    end
 
     local tooltipOverlay = CreateFrame("Frame", nil, frame)
     tooltipOverlay:SetAllPoints()
@@ -743,23 +717,10 @@ local function CreateIconFrame(parent, borderSize, borderColor, zoom)
     return frame
 end
 
-local CancelManualBuffGlowTimer
-local CleanupManualBuff
-
 local function ManualBuffActivateGlow(icon, frameData, glowConfig, remaining)
     if frameData._manualGlowActive then return end
     frameData._manualGlowActive = true
-    CDM.StartProcGlow(icon, glowConfig)
-    local warn = glowConfig.warning
-    if not warn then return end
-    if warn.sound and warn.sound ~= 0 then
-        warningLastSound = warn.sound
-        PlaySound(warn.sound, 'Master')
-    end
-    if warn.enabled then
-        local spellName = C_Spell.GetSpellName(frameData.customSpellID) or tostring(frameData.customSpellID)
-        ShowBuffWarning(icon, warn.text, warn.color, remaining, spellName, warn.font, glowConfig.threshold or 5)
-    end
+    AnnounceGlow(icon, glowConfig, remaining, frameData.customSpellID, true)
 end
 
 local function ManualBuffDeactivateGlow(icon, frameData)
@@ -767,13 +728,6 @@ local function ManualBuffDeactivateGlow(icon, frameData)
     frameData._manualGlowActive = false
     CDM.StopProcGlow(icon)
     HideBuffWarning(icon)
-end
-
-CancelManualBuffGlowTimer = function(frameData)
-    if frameData._manualGlowTimer then
-        frameData._manualGlowTimer:Cancel()
-        frameData._manualGlowTimer = nil
-    end
 end
 
 local function ScheduleManualBuffGlow(icon, frameData, glowConfig, expiry)
@@ -808,7 +762,7 @@ local function ScheduleManualBuffGlow(icon, frameData, glowConfig, expiry)
     end
 end
 
-CleanupManualBuff = function(icon, frameData)
+local function CleanupManualBuff(icon, frameData)
     local wasShown = icon:IsShown()
     if not wasShown and frameData.lastCDStart == 0 and not frameData._manualStart and not frameData._manualGlowActive
         and not frameData._manualGlowTimer and not frameData._glowTimer and not frameData.glowActive and warningOwner ~= icon then
@@ -872,17 +826,8 @@ local function UpdateIcon(icon)
                 if newInstanceID then buffInstanceToIcon[newInstanceID] = icon end
             end
         end
-        local text = trackedAura and Tools.CountText(trackedAura.applications)
-        if text then
-            icon._chargeText:SetText(text)
-            icon._chargeText:Show()
-        elseif trackedAura then
-            local stacks = Tools.SafeNum(trackedAura.applications) or 0
-            if stacks > 0 then icon._chargeText:SetText(stacks); icon._chargeText:Show()
-            else icon._chargeText:Hide() end
-        else
-            icon._chargeText:Hide()
-        end
+        local applications = trackedAura and trackedAura.applications
+        ShowStacks(icon._chargeText, trackedAura and Tools.CountText(applications), applications)
     end
 
     if frameData.viewerKey == "buffs" then
@@ -1026,17 +971,7 @@ local function UpdateIcon(icon)
                     or (glowConfig.mode == 'above' and remaining >= thresh)
 
                 if shouldGlow then
-                    CDM.StartProcGlow(icon, glowConfig)
-                    local warn = glowConfig.warning
-                    if warn then
-                        if warn.sound and warn.sound ~= 0 and warn.sound ~= warningLastSound then
-                            warningLastSound = warn.sound
-                            PlaySound(warn.sound, 'Master')
-                        end
-                        if warn.enabled then
-                            ShowBuffWarning(icon, warn.text, warn.color, remaining, C_Spell.GetSpellName(id) or tostring(id), warn.font, glowConfig.threshold or 5)
-                        end
-                    end
+                    AnnounceGlow(icon, glowConfig, remaining, id, false)
                 else
                     CDM.StopProcGlow(icon)
                     HideBuffWarning(icon)
@@ -1051,15 +986,7 @@ local function UpdateIcon(icon)
                 end
             end
             if not frameData.trackedBuff then
-                local text = Tools.GetAuraStacksText('player', aura.auraInstanceID)
-                if text then
-                    icon._chargeText:SetText(text)
-                    icon._chargeText:Show()
-                else
-                    local stacks = Tools.SafeNum(aura.applications) or 0
-                    if stacks > 0 then icon._chargeText:SetText(stacks); icon._chargeText:Show()
-                    else icon._chargeText:Hide() end
-                end
+                ShowStacks(icon._chargeText, Tools.GetAuraStacksText('player', aura.auraInstanceID), aura.applications)
             end
             return
         end
@@ -1146,7 +1073,6 @@ local function SetupIcon(icon, storedValue, viewerKey, index)
     local spellID, isItemByPrefix = ExtractSpellItemID(storedValue)
 
     if trinketSlot then
-        trinketSlotIcons[icon] = true
         if spellID and CDM.IsTrinketBlacklisted(BUI.GetDB().cdm[viewerKey], spellID) then
             spellID = nil
         end
@@ -1177,12 +1103,10 @@ local function SetupIcon(icon, storedValue, viewerKey, index)
     frameData.customIcon = true
     frameData.customSpellID = spellID
 
-    frameData.customKey = (trinketSlot or racialSlot) and storedValue or ('custom:' .. spellID)
+    frameData.customKey = (trinketSlot or racialSlot) and storedValue or IconEngine.CustomKey(spellID)
     frameData.storedValue = storedValue
     frameData.viewerKey = viewerKey
     frameData.isItemByPrefix = isItemByPrefix
-    frameData.trinketSlot = trinketSlot
-    frameData.racialSlot = racialSlot
     frameData.iconType = nil
     frameData._availChecked = nil
     local config = BUI.GetDB().cdm[viewerKey]
@@ -1239,7 +1163,7 @@ local function SetupIcon(icon, storedValue, viewerKey, index)
             if activeID ~= spellID and IsSpellKnown(activeID) then
                 spellID = activeID
                 frameData.customSpellID = spellID
-                frameData.customKey = 'custom:' .. spellID
+                frameData.customKey = IconEngine.CustomKey(spellID)
                 spellKnown = true
             end
         end
@@ -1339,8 +1263,8 @@ local function RefreshViewer(viewerKey)
 
     local function Place(v, versionIndex)
         consideredKeys[v] = true
-        local numId = tonumber(tostring(v):match('(%d+)'))
-        local customKey = numId and ('custom:' .. numId)
+        local numId = IconEngine.EntryNumber(v)
+        local customKey = numId and IconEngine.CustomKey(numId)
         local forceShow = customKey and alwaysShow[customKey]
         if viewerKey == "buffs" or forceShow or IsTrackedEntryUsable(v) then
             visibleCount = visibleCount + 1
@@ -1348,7 +1272,7 @@ local function RefreshViewer(viewerKey)
             if icon then
                 icon:SetParent(anchor)
             else
-                icon = AcquireIcon(anchor, config.borderSize, config.borderColor, config.zoom) or CreateIconFrame(anchor, config.borderSize, config.borderColor, config.zoom)
+                icon = AcquireIcon(anchor) or CreateIconFrame(anchor)
                 registry[v] = icon
             end
             viewerIcons[visibleCount] = icon
@@ -1371,8 +1295,7 @@ local function RefreshViewer(viewerKey)
     end
 
     for versionIndex, v in ipairs(spells) do
-        local isSlotEntry = type(v) == "string" and
-            (v:match("^trinket:%d$") or v:match("^racial:%d$"))
+        local isSlotEntry = IconEngine.GetTrinketSlotNumber(v) or IconEngine.GetRacialSlotNumber(v)
         if not isSlotEntry then
             Place(v, versionIndex)
         end
@@ -1381,13 +1304,13 @@ local function RefreshViewer(viewerKey)
     if viewerKey == "essential" then
         for slot = 1, 2 do
             local onUse, conclusive = IconEngine.IsOnUseTrinketSlot(slot)
-            if onUse then Place('trinket:' .. slot, 90000 + slot) end
+            if onUse then Place(IconEngine.TrinketEntry(slot), 90000 + slot) end
             if not conclusive then ArmTrinketDataLoad(slot) end
         end
     end
 
     if viewerKey == "essential" or viewerKey == "utility" then
-        Place('racial:1', 90010)
+        Place(IconEngine.RacialEntry(1), 90010)
     end
 
     local manualBuffs = CDM.GetManualBuffs(config)
@@ -1632,7 +1555,7 @@ local function FlushBagUpdate()
 
     if SpellItemMapChanged() then
         DoRefresh()
-        CDM.SetUpdatePending(true)
+        CDM.MarkAllDirty()
     else
         UpdateConsumableIcons()
     end
@@ -1858,7 +1781,7 @@ function CDM.Custom.IsEquippedOrKnownOrInBagsIcon(icon)
         local activeID = frameData._activeChoiceID
         if activeID and activeID ~= frameData.customSpellID and Tools.IsSpellUsable(activeID) then
             frameData.customSpellID = activeID
-            frameData.customKey = 'custom:' .. activeID
+            frameData.customKey = IconEngine.CustomKey(activeID)
             frameData.iconType = nil
             frameData.itemID = nil
         else

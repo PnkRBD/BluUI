@@ -2,7 +2,7 @@ local _, BUI = ...
 local IsSecret = BUI.Tools.IsSecretValue
 
 local pairs, ipairs, wipe = pairs, ipairs, wipe
-local type, select, tonumber = type, select, tonumber
+local select, tonumber = select, tonumber
 
 local C_Item = C_Item
 local C_Spell = C_Spell
@@ -25,6 +25,14 @@ local function GetFrameData(frame)
     return data
 end
 CDM.GetFrameData = GetFrameData
+
+local SafeNum = BUI.Tools.SafeNum
+
+local function CooldownSpellIDs(cooldownInfo)
+    if not cooldownInfo then return nil, nil end
+    return SafeNum(cooldownInfo.spellID), SafeNum(cooldownInfo.overrideSpellID)
+end
+CDM.CooldownSpellIDs = CooldownSpellIDs
 
 CDM.VIEWERS = {
     essential = "EssentialCooldownViewer",
@@ -156,10 +164,8 @@ end
 function CDM.IconMatchesSpell(icon, spellID)
     local cooldownInfo = icon.cooldownInfo
     if not cooldownInfo then return false end
-    local overrideSpellID = cooldownInfo.overrideSpellID
-    if not IsSecret(overrideSpellID) and overrideSpellID == spellID then return true end
-    local sid = cooldownInfo.spellID
-    if not IsSecret(sid) and sid == spellID then return true end
+    local baseID, overrideID = CooldownSpellIDs(cooldownInfo)
+    if overrideID == spellID or baseID == spellID then return true end
     local linked = cooldownInfo.linkedSpellIDs
     if linked and not IsSecret(linked) then
         for j = 1, #linked do
@@ -209,36 +215,20 @@ function CDM.IsCooldownIcon(frame)
     return frame.Icon and frame.Cooldown
 end
 
-local function ReadCooldownSpellID(cooldownInfo)
-    local sid = cooldownInfo.spellID
-    if IsSecret(sid) then sid = nil end
-    if sid then return sid end
-    local overrideSpellID = cooldownInfo.overrideSpellID
-    if IsSecret(overrideSpellID) then overrideSpellID = nil end
-    return overrideSpellID
-end
-
 function CDM.GetStableSpellID(icon)
     local frameData = FrameData[icon]
     if frameData then
         if frameData.storedValue then return frameData.storedValue end
         if frameData.customSpellID then return frameData.customSpellID end
     end
-    local cooldownInfo = icon.cooldownInfo
-    if not cooldownInfo then return nil end
-    return ReadCooldownSpellID(cooldownInfo)
+    local baseID, overrideID = CooldownSpellIDs(icon.cooldownInfo)
+    return baseID or overrideID
 end
 
 function CDM.GetSortKey(icon)
     local frameData = FrameData[icon]
-    if frameData then
-        if frameData.customIcon and frameData.customKey then return frameData.customKey end
-        if frameData.storedValue then return frameData.storedValue end
-        if frameData.customSpellID then return frameData.customSpellID end
-    end
-    local cooldownInfo = icon.cooldownInfo
-    if not cooldownInfo then return nil end
-    return ReadCooldownSpellID(cooldownInfo)
+    if frameData and frameData.customIcon and frameData.customKey then return frameData.customKey end
+    return CDM.GetStableSpellID(icon)
 end
 
 local RACIAL_SPELL_IDS = {
@@ -292,19 +282,21 @@ local RACIAL_SPELL_IDS = {
 
 function CDM.IsRacialSpell(spellID) return RACIAL_SPELL_IDS[spellID] == true end
 
-function CDM.GetKnownRacialSpellIDs(out)
-    wipe(out)
-    for id in pairs(RACIAL_SPELL_IDS) do
-        if C_SpellBook.IsSpellKnown(id) then
-            out[#out + 1] = id
-        end
-    end
-    table.sort(out)
-    return out
-end
-
 local knownRacials = {}
 local knownRacialsValid = false
+
+function CDM.KnownRacials()
+    if knownRacialsValid then return knownRacials end
+    wipe(knownRacials)
+    for id in pairs(RACIAL_SPELL_IDS) do
+        if C_SpellBook.IsSpellKnown(id) then
+            knownRacials[#knownRacials + 1] = id
+        end
+    end
+    table.sort(knownRacials)
+    knownRacialsValid = true
+    return knownRacials
+end
 
 local function InvalidateKnownRacials()
     knownRacialsValid = false
@@ -315,11 +307,7 @@ BUI.Events:Register("PLAYER_TALENT_UPDATE", "CDM.KnownRacials", InvalidateKnownR
 BUI.Events:RegisterUnit("PLAYER_SPECIALIZATION_CHANGED", "player", "CDM.KnownRacials", InvalidateKnownRacials)
 
 function CDM.ResolveRacialSlot(slot)
-    if not knownRacialsValid then
-        CDM.GetKnownRacialSpellIDs(knownRacials)
-        knownRacialsValid = true
-    end
-    return knownRacials[slot]
+    return CDM.KnownRacials()[slot]
 end
 
 BUI.IconEngine._isRacialSpell = CDM.IsRacialSpell
@@ -330,30 +318,20 @@ function CDM.GetUnavailableTag(storedValue, isItemID)
         return nil
     end
 
-    if type(storedValue) == "string" then
-        local rSlot = storedValue:match("^racial:(%d)$")
-        if rSlot then
-            local resolved = CDM.ResolveRacialSlot(tonumber(rSlot))
-            if resolved then return nil end
-            return "No Racial"
-        end
+    local IconEngine = BUI.IconEngine
+    local racialSlot = IconEngine.GetRacialSlotNumber(storedValue)
+    if racialSlot then
+        if CDM.ResolveRacialSlot(racialSlot) then return nil end
+        return "No Racial"
     end
 
     if isItemID then
-        if type(storedValue) == "string" then
-            local slot = storedValue:match("^trinket:(%d)$")
-            if slot then
-                local resolved = GetInventoryItemID("player", slot == "1" and 13 or 14)
-                if resolved then return nil end
-                return "Empty Slot"
-            end
+        local trinketSlot = IconEngine.GetTrinketSlotNumber(storedValue)
+        if trinketSlot then
+            if IconEngine.ResolveTrinketSlot(trinketSlot) then return nil end
+            return "Empty Slot"
         end
-        local id
-        if type(storedValue) == "string" and storedValue:match("^item:") then
-            id = tonumber(storedValue:match("^item:(%d+)"))
-        else
-            id = tonumber(storedValue)
-        end
+        local id = IconEngine.GetItemEntryID(storedValue) or tonumber(storedValue)
         if id then
             local _, _, _, equipLoc = C_Item.GetItemInfoInstant(id)
             if equipLoc == "INVTYPE_TRINKET" then

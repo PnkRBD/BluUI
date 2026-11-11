@@ -11,7 +11,6 @@ local ASSIST_LAYER = 14
 local activeIcon
 local lastSpellID
 local hooked = false
-local eventsRegistered = false
 local EVENT_KEY = 'CDM.Assist'
 
 local function ReadAssistDB()
@@ -68,6 +67,11 @@ local function ReEval()
 	Resolve(DesiredSpell(CurrentSuggestion()))
 end
 
+CDM.RecheckAssistHighlight = BUI.Dispatcher.New(function()
+	lastSpellID = nil
+	ReEval()
+end)
+
 local function InstallHooks()
 	if hooked then return end
 	hooked = true
@@ -76,9 +80,8 @@ local function InstallHooks()
 		Resolve(DesiredSpell(spellID))
 	end)
 
-	EventRegistry:RegisterCallback('AssistedCombatManager.OnSetUseAssistedHighlight', function()
-		Resolve(DesiredSpell(CurrentSuggestion()))
-	end, {})
+	EventRegistry:RegisterCallback('AssistedCombatManager.OnSetUseAssistedHighlight', ReEval, {})
+	CDM.OnTrackedIconsChanged(CDM.RecheckAssistHighlight)
 end
 
 local function Sync()
@@ -92,16 +95,13 @@ local function Sync()
 end
 
 function CDM.InitAssistHighlight()
-	if not eventsRegistered then
-		eventsRegistered = true
-		BUI.Events:Register('PLAYER_DEAD', EVENT_KEY, ReEval)
-		BUI.Events:Register('PLAYER_UNGHOST', EVENT_KEY, ReEval)
-		BUI.Events:Register('PLAYER_ALIVE', EVENT_KEY, ReEval)
-		BUI.Events:RegisterUnit('UNIT_SPELLCAST_START', 'player', EVENT_KEY, ReEval)
-		BUI.Events:RegisterUnit('UNIT_SPELLCAST_STOP', 'player', EVENT_KEY, ReEval)
-		BUI.Events:RegisterUnit('UNIT_SPELLCAST_CHANNEL_START', 'player', EVENT_KEY, ReEval)
-		BUI.Events:RegisterUnit('UNIT_SPELLCAST_CHANNEL_STOP', 'player', EVENT_KEY, ReEval)
-	end
+	BUI.Events:Register('PLAYER_DEAD', EVENT_KEY, ReEval)
+	BUI.Events:Register('PLAYER_UNGHOST', EVENT_KEY, ReEval)
+	BUI.Events:Register('PLAYER_ALIVE', EVENT_KEY, ReEval)
+	BUI.Events:RegisterUnit('UNIT_SPELLCAST_START', 'player', EVENT_KEY, ReEval)
+	BUI.Events:RegisterUnit('UNIT_SPELLCAST_STOP', 'player', EVENT_KEY, ReEval)
+	BUI.Events:RegisterUnit('UNIT_SPELLCAST_CHANNEL_START', 'player', EVENT_KEY, ReEval)
+	BUI.Events:RegisterUnit('UNIT_SPELLCAST_CHANNEL_STOP', 'player', EVENT_KEY, ReEval)
 	Sync()
 end
 

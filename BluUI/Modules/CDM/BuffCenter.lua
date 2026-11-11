@@ -129,10 +129,6 @@ local function PlaceRow(list, iconCount, anchor, vertical, growUp, stepX, stepY,
 	end
 end
 
-local function StopBuffCentering()
-	active = false
-end
-
 local function CenterNow()
 	if not active then return end
 
@@ -141,7 +137,7 @@ local function CenterNow()
 
 	local settings = BUI.GetDB().cdm.buffs
 	if not settings.enabled then
-		StopBuffCentering()
+		active = false
 		return
 	end
 
@@ -256,22 +252,13 @@ end
 
 local FlushCenter = BUI.Dispatcher.New(CenterNow)
 
-local function ScheduleCenter()
+function CDM.MarkBuffCenterDirty()
 	if active then FlushCenter() end
 end
 
-function CDM.MarkBuffCenterDirty()
-	ScheduleCenter()
-end
-
-function CDM.CenterBuffsNow(force)
-	if force then
-		forceLayout = true
-		CenterNow()
-		return
-	end
-
-	ScheduleCenter()
+function CDM.CenterBuffsNow()
+	forceLayout = true
+	CenterNow()
 end
 
 function CDM.RefreshBuffOpacityCache()
@@ -279,7 +266,7 @@ function CDM.RefreshBuffOpacityCache()
 	if opacity == cachedOpacity then return end
 	cachedOpacity = opacity
 	forceLayout = true
-	ScheduleCenter()
+	CDM.MarkBuffCenterDirty()
 end
 
 function CDM.CenterBuffList(icons, count)

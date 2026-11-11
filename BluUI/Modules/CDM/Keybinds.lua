@@ -233,7 +233,6 @@ local pendingSlots = {}
 local macroMapBuilt = false
 local itemMapBuilt = false
 local generation = 0
-local appliedGeneration = -1
 
 local function ForgetMacroMap()
     macroByName = nil
@@ -527,9 +526,7 @@ local function ResolveIconIDs(icon)
     local itemID
     if frameData.isItemByPrefix then itemID = frameData.itemID or frameData.customSpellID end
     local customID = frameData.customSpellID
-    local cooldownInfo = icon.cooldownInfo
-    local overrideID = cooldownInfo and Tools.SafeNum(cooldownInfo.overrideSpellID)
-    local spellID = cooldownInfo and Tools.SafeNum(cooldownInfo.spellID)
+    local spellID, overrideID = CDM.CooldownSpellIDs(icon.cooldownInfo)
 
     if not spellID and not overrideID and frameData.storedValue and not itemID then
         spellID = Tools.SafeNum(frameData.storedValue)
@@ -660,7 +657,6 @@ local function DoRefresh(full, bindingsStale)
     if AnyViewerShowsKeybinds() then
         ApplyAllViewers()
     end
-    appliedGeneration = generation
 end
 
 function Keybinds.GetRawBindingForIcon(icon)
@@ -673,10 +669,7 @@ function Keybinds.GetGeneration()
 end
 
 function Keybinds.Apply()
-    if not active then return end
-    if generation == appliedGeneration then return end
-    appliedGeneration = generation
-    if AnyViewerShowsKeybinds() then
+    if active and AnyViewerShowsKeybinds() then
         ApplyAllViewers()
     end
 end

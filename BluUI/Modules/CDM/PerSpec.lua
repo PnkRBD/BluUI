@@ -145,7 +145,8 @@ function CDM.GetHiddenIcons(config) return PerSpecGet(config, 'hiddenIcons') end
 
 function CDM.SetHiddenIcon(config, id, isHidden) PerSpecSet(config, 'hiddenIcons', id, isHidden and true or false) end
 
-local UTILITY_AUTO_SLOTS = { ['racial:1'] = true, ['trinket:1'] = true, ['trinket:2'] = true }
+local IconEngine = BUI.IconEngine
+local UTILITY_AUTO_SLOTS = { [IconEngine.RacialEntry(1)] = true, [IconEngine.TrinketEntry(1)] = true, [IconEngine.TrinketEntry(2)] = true }
 
 function CDM.IsIconHiddenEffective(viewerKey, hiddenIcons, id)
     local hiddenState = hiddenIcons and hiddenIcons[id]
@@ -159,12 +160,8 @@ function CDM.GetIconOverrides(config) return PerSpecGet(config, 'iconOverrides')
 function CDM.SetIconOverride(config, id, textureID) PerSpecSet(config, 'iconOverrides', id, textureID) end
 
 local function PotionPrioKey(storedValue)
-    if type(storedValue) == 'string' then
-        return tonumber(storedValue)
-            or tonumber(storedValue:match('^item:(%d+)'))
-            or storedValue
-    end
-    return storedValue
+    if type(storedValue) ~= 'string' then return storedValue end
+    return tonumber(storedValue) or IconEngine.GetItemEntryID(storedValue) or storedValue
 end
 
 CDM.PotionPrioKey = PotionPrioKey

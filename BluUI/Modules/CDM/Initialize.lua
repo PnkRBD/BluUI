@@ -57,7 +57,7 @@ function CDM.Initialize()
             if db.cdm[key].anchorFrame ~= "" then
                 CDM.ApplyAnchorPosition(key)
                 if key == "buffs" then
-                    CDM.CenterBuffsNow(true)
+                    CDM.CenterBuffsNow()
                 end
             end
         end

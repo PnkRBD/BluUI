@@ -53,10 +53,31 @@ end
 
 local TRINKET_SLOT_INV = { [1] = 13, [2] = 14 }
 
-function IconEngine.GetTrinketSlotNumber(value)
+local function PrefixedNumber(value, pattern)
 	if type(value) ~= "string" then return nil end
-	return tonumber(value:match("^trinket:(%d)$"))
+	return tonumber(value:match(pattern))
 end
+
+function IconEngine.GetTrinketSlotNumber(value) return PrefixedNumber(value, "^trinket:(%d)$") end
+function IconEngine.GetRacialSlotNumber(value) return PrefixedNumber(value, "^racial:(%d)$") end
+function IconEngine.GetItemEntryID(value) return PrefixedNumber(value, "^item:(%d+)") end
+function IconEngine.GetSpellEntryID(value) return PrefixedNumber(value, "^spell:(%d+)") end
+function IconEngine.GetCustomKeyID(value) return PrefixedNumber(value, "^custom:(%d+)") end
+
+function IconEngine.IsSlotEntry(value)
+	return (IconEngine.GetTrinketSlotNumber(value) or IconEngine.GetRacialSlotNumber(value)) ~= nil
+end
+
+function IconEngine.EntryNumber(value)
+	if type(value) == "number" then return value end
+	return tonumber(tostring(value):match("%d+"))
+end
+
+function IconEngine.TrinketEntry(slot) return "trinket:" .. slot end
+function IconEngine.RacialEntry(slot) return "racial:" .. slot end
+function IconEngine.ItemEntry(itemID) return "item:" .. itemID end
+function IconEngine.SpellEntry(spellID) return "spell:" .. spellID end
+function IconEngine.CustomKey(id) return "custom:" .. id end
 
 function IconEngine.ResolveTrinketSlot(slot)
 	local inventorySlot = TRINKET_SLOT_INV[slot]
@@ -117,32 +138,19 @@ end
 local racialSlotResolver
 function IconEngine.SetRacialSlotResolver(resolver) racialSlotResolver = resolver end
 
-function IconEngine.GetRacialSlotNumber(value)
-	if type(value) ~= "string" then return nil end
-	return tonumber(value:match("^racial:(%d)$"))
-end
-
 function IconEngine.ResolveRacialSlot(slot)
 	return racialSlotResolver(slot)
 end
 
 function IconEngine.ExtractSpellItemID(value)
-	if type(value) == "string" then
-		local slot = IconEngine.GetTrinketSlotNumber(value)
-		if slot then
-			return IconEngine.ResolveTrinketSlot(slot), true
-		end
-		slot = IconEngine.GetRacialSlotNumber(value)
-		if slot then
-			return IconEngine.ResolveRacialSlot(slot), false
-		end
-		if value:match("^item:") then
-			return tonumber(value:match("^item:(%d+)")), true
-		end
-		if value:match("^spell:") then
-			return tonumber(value:match("^spell:(%d+)")), false, true
-		end
-	end
+	local slot = IconEngine.GetTrinketSlotNumber(value)
+	if slot then return IconEngine.ResolveTrinketSlot(slot), true end
+	slot = IconEngine.GetRacialSlotNumber(value)
+	if slot then return IconEngine.ResolveRacialSlot(slot), false end
+	local itemID = IconEngine.GetItemEntryID(value)
+	if itemID then return itemID, true end
+	local spellID = IconEngine.GetSpellEntryID(value)
+	if spellID then return spellID, false, true end
 	return tonumber(value), false
 end
 
@@ -258,6 +266,15 @@ local function TintItem(texture, usable, desaturation)
 	texture:SetDesaturation(desaturation)
 	local shade = usable and 1 or 0.4
 	SetColor(texture, shade, shade, shade)
+end
+
+function IconEngine.ResetVisual(texture, cooldown)
+	cooldown:Clear()
+	cooldown._itemFP, cooldown._lastItemState, cooldown._lastItemStart = nil, nil, nil
+	cooldown._trinketWasIdle, cooldown._trinketLastStart = nil, nil
+	texture._lastUsable, texture._lastNotEnoughPower = nil, nil
+	texture:SetDesaturation(0)
+	SetColor(texture, 1, 1, 1)
 end
 
 function IconEngine.ItemCooldownKey(itemID)

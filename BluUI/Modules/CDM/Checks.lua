@@ -28,8 +28,7 @@ local function CollectSpellIDs(viewer)
 	for frame in viewer.itemFramePool:EnumerateActive() do
 		local cooldownInfo = frame.cooldownInfo
 		if cooldownInfo then
-			local spellID = SafeNum(cooldownInfo.spellID)
-			local overrideID = SafeNum(cooldownInfo.overrideSpellID)
+			local spellID, overrideID = CDM.CooldownSpellIDs(cooldownInfo)
 			if spellID    then spellIDSet[spellID]    = true end
 			if overrideID then spellIDSet[overrideID] = true end
 			local linked = cooldownInfo.linkedSpellIDs
@@ -45,8 +44,7 @@ local function CollectSpellIDs(viewer)
 end
 
 local function IsSpellCoveredBySet(cooldownInfo, spellIDSet)
-	local spellID = SafeNum(cooldownInfo.spellID)
-	local overrideID = SafeNum(cooldownInfo.overrideSpellID)
+	local spellID, overrideID = CDM.CooldownSpellIDs(cooldownInfo)
 	if spellID and spellIDSet[spellID] then return true end
 	if overrideID and spellIDSet[overrideID] then return true end
 	local linked = cooldownInfo.linkedSpellIDs
@@ -88,7 +86,7 @@ local function PromptForUtility(done)
 	local hasUniqueUtilitySpell = false
 	for frame in UtilityCooldownViewer.itemFramePool:EnumerateActive() do
 		local cooldownInfo = frame.cooldownInfo
-		if cooldownInfo and cooldownInfo.spellID and not IsSpellCoveredBySet(cooldownInfo, essentialSpellIDs) then
+		if CDM.CooldownSpellIDs(cooldownInfo) and not IsSpellCoveredBySet(cooldownInfo, essentialSpellIDs) then
 			hasUniqueUtilitySpell = true
 			break
 		end

@@ -204,35 +204,28 @@ do
 	end
 end
 
-local function ResolveViewerIcon(frame)
-	if not frame then return nil end
-	local host = frame:GetParent()
-	local cached = FrameData[frame]
-	if cached and cached.cdmGlowResolvedIcon ~= nil and cached.cdmGlowResolvedHost == host then
-		return cached.cdmGlowResolvedIcon or nil
-	end
-
+local function FindViewerIcon(frame)
 	local current = frame
 	for _ = 1, 8 do
 		local parent = current:GetParent()
-		if not parent then break end
+		if not parent then return nil end
 		local name = parent:GetName()
-		if name then
-			local key = CDM.ViewerNameToKey[name]
-			if key and CDM.IsViewerEnabled(key) then
-				local frameData = GetFrameData(frame)
-				frameData.cdmGlowResolvedIcon = current
-				frameData.cdmGlowResolvedHost = host
-				return current
-			end
-		end
+		local key = name and CDM.ViewerNameToKey[name]
+		if key then return current, key end
 		current = parent
 	end
+end
 
+local function ResolveViewerIcon(frame)
+	if not frame then return nil end
+	local host = frame:GetParent()
 	local frameData = GetFrameData(frame)
-	frameData.cdmGlowResolvedIcon = false
-	frameData.cdmGlowResolvedHost = host
-	return nil
+	if frameData.cdmGlowResolvedHost ~= host then
+		frameData.cdmGlowResolvedHost = host
+		frameData.cdmGlowResolvedIcon, frameData.cdmGlowResolvedKey = FindViewerIcon(frame)
+	end
+	local key = frameData.cdmGlowResolvedKey
+	if key and CDM.IsViewerEnabled(key) then return frameData.cdmGlowResolvedIcon end
 end
 
 function CDM.SetupGlowHooks()

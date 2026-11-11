@@ -322,7 +322,7 @@ local function TrackedBoard(ui, parent, width, bar, page)
 		columns = { { 'Spell or item', LIST_ICON_X } },
 	})
 	local function Add(id, isItem)
-		local stored = (isItem and 'item:' or 'spell:') .. id
+		local stored = isItem and IconEngine.ItemEntry(id) or IconEngine.SpellEntry(id)
 		if StoredIndex(spells, stored) then return end
 		spells[#spells + 1] = stored
 		Apply()

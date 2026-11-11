@@ -65,7 +65,3 @@ function CDM.ClearDirty()
     wipe(DirtyViewers)
     UpdateFrame:Hide()
 end
-
-function CDM.SetUpdatePending(pending)
-    if pending then CDM.MarkAllDirty() else CDM.ClearDirty() end
-end

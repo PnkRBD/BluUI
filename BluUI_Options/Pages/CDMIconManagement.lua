@@ -3,6 +3,7 @@ local BUI = BluUI
 local BUILib = BluUI.BUILibClient
 local Controls, Layout, Modals, Widget = BUILib.Controls, BUILib.Layout, BUILib.Modals, BUILib.Widget
 local Pixel = BUI.Pixel
+local IconEngine = BUI.IconEngine
 
 local GetCooldownInfo = C_CooldownViewer.GetCooldownViewerCooldownInfo
 local GetCategorySet = C_CooldownViewer.GetCooldownViewerCategorySet
@@ -21,14 +22,10 @@ local BUFF_CATEGORIES = { Enum.CooldownViewerCategory.TrackedBuff, Enum.Cooldown
 local BUFF_VIEWERS = { 'BuffIconCooldownViewer', 'BuffBarCooldownViewer' }
 local CLASS_CATEGORIES = { Enum.CooldownViewerCategory.Essential, Enum.CooldownViewerCategory.Utility }
 
-local function IsAutoSlotKey(id)
-	return type(id) == 'string' and (id:match('^trinket:%d$') ~= nil or id:match('^racial:%d$') ~= nil)
-end
-
 local function HideKeyFor(id, isCustom)
-	if isCustom and not IsAutoSlotKey(id) then
-		local numId = type(id) == 'string' and tonumber(id:match('%d+')) or id
-		if numId then return 'custom:' .. numId end
+	if isCustom and not IconEngine.IsSlotEntry(id) then
+		local numId = IconEngine.EntryNumber(id)
+		if numId then return IconEngine.CustomKey(numId) end
 	end
 	return id
 end
@@ -182,7 +179,7 @@ end
 
 local function BuildRacialSlotEntry(slotNum, CDM, viewerSettings)
 	local resolvedID = CDM.ResolveRacialSlot(slotNum)
-	local stored = 'racial:' .. slotNum
+	local stored = IconEngine.RacialEntry(slotNum)
 	local displayName, displayIcon
 	local isBlacklisted = false
 	if resolvedID then
@@ -208,8 +205,8 @@ local function BuildRacialSlotEntry(slotNum, CDM, viewerSettings)
 end
 
 local function BuildTrinketSlotEntry(slotNum, CDM, viewerSettings)
-	local resolvedID = BUI.IconEngine.ResolveTrinketSlot(slotNum)
-	local stored = 'trinket:' .. slotNum
+	local resolvedID = IconEngine.ResolveTrinketSlot(slotNum)
+	local stored = IconEngine.TrinketEntry(slotNum)
 	local slotLabel = 'Trinket Slot ' .. slotNum
 	local displayName, displayIcon
 	local isBlacklisted = false
@@ -219,7 +216,7 @@ local function BuildTrinketSlotEntry(slotNum, CDM, viewerSettings)
 		displayName = (itemName or 'Item ' .. resolvedID) .. ' [' .. slotLabel .. ']'
 		displayIcon = itemIcon or FALLBACK_TEX
 		isBlacklisted = CDM.IsTrinketBlacklisted(viewerSettings, resolvedID)
-		isHiddenPassive = not BUI.IconEngine.IsOnUseTrinketSlot(slotNum)
+		isHiddenPassive = not IconEngine.IsOnUseTrinketSlot(slotNum)
 	else
 		displayName = slotLabel .. ' [Empty]'
 		displayIcon = FALLBACK_TEX
@@ -246,21 +243,22 @@ local function CollectCustomIcons(CDM, viewerSettings, icons, seen, customSeen, 
 	if viewerKey == 'essential' then
 		icons[#icons + 1] = BuildTrinketSlotEntry(1, CDM, viewerSettings)
 		icons[#icons + 1] = BuildTrinketSlotEntry(2, CDM, viewerSettings)
-		seen['trinket:1'] = true
-		seen['trinket:2'] = true
+		seen[IconEngine.TrinketEntry(1)] = true
+		seen[IconEngine.TrinketEntry(2)] = true
 	end
 
 	if viewerKey == 'essential' or viewerKey == 'utility' then
 		icons[#icons + 1] = BuildRacialSlotEntry(1, CDM, viewerSettings)
-		seen['racial:1'] = true
+		seen[IconEngine.RacialEntry(1)] = true
 	end
 
 	for i, stored in ipairs(customSpells) do
 		if not seen[stored] then
 			seen[stored] = true
 
-			local isItemPrefix = type(stored) == 'string' and stored:match('^item:') ~= nil
-			local id = isItemPrefix and tonumber(stored:match('^item:(%d+)')) or tonumber(stored)
+			local itemEntryID = IconEngine.GetItemEntryID(stored)
+			local isItemPrefix = itemEntryID ~= nil
+			local id = itemEntryID or tonumber(stored)
 
 			if id then
 				customSeen[id] = true
@@ -441,7 +439,7 @@ end
 
 local function GetDataSortKey(data)
 	if data.isCustom and not data.isPermanent then
-		return 'custom:' .. data.numericId
+		return IconEngine.CustomKey(data.numericId)
 	end
 	return data.id
 end
@@ -475,9 +473,8 @@ local SCANNER_NAME = 'BUI_DurScanner'
 local durationScanner
 
 local function ParseDurationFromDescription(spellID)
-	local raw = tostring(spellID)
-	local isItem = raw:match('^item:')
-	local numID = tonumber(raw:match('%d+'))
+	local isItem = IconEngine.GetItemEntryID(spellID) ~= nil
+	local numID = IconEngine.EntryNumber(spellID)
 	if not numID then return nil end
 
 	local desc = C_Spell.GetSpellDescription(numID)
@@ -566,8 +563,8 @@ local function ShowSlotBlacklistModal(CDM, viewerKey, RefreshIconList, spec)
 end
 
 local function ShowTrinketSlotModal(CDM, viewerSettings, viewerKey, storedValue, RefreshIconList)
-	local slotNum = tonumber(storedValue:match('^trinket:(%d)$'))
-	local equippedID = BUI.IconEngine.ResolveTrinketSlot(slotNum)
+	local slotNum = IconEngine.GetTrinketSlotNumber(storedValue)
+	local equippedID = IconEngine.ResolveTrinketSlot(slotNum)
 	ShowSlotBlacklistModal(CDM, viewerKey, RefreshIconList, {
 		title = 'Trinket Slot ' .. slotNum,
 		currentID = equippedID,
@@ -585,7 +582,7 @@ local function ShowTrinketSlotModal(CDM, viewerSettings, viewerKey, storedValue,
 end
 
 local function ShowRacialSlotModal(CDM, viewerSettings, viewerKey, storedValue, RefreshIconList)
-	local slotNum = tonumber(storedValue:match('^racial:(%d)$'))
+	local slotNum = IconEngine.GetRacialSlotNumber(storedValue)
 	local resolvedID = CDM.ResolveRacialSlot(slotNum)
 	ShowSlotBlacklistModal(CDM, viewerKey, RefreshIconList, {
 		title = 'Racial Slot',
@@ -618,8 +615,8 @@ local function ShowManualBuffModal(CDM, viewerSettings, viewerKey, spellID, Refr
 	local existing = existingData or {}
 	local saveGlobally = existingScope == 'global'
 	local raw = tostring(spellID)
-	local isItem = raw:match('^item:')
-	local numID = tonumber(raw:match('%d+'))
+	local isItem = IconEngine.GetItemEntryID(spellID) ~= nil
+	local numID = IconEngine.EntryNumber(spellID)
 	local spellName, defaultIcon
 	if isItem and numID then
 		spellName = C_Item.GetItemNameByID(numID) or C_Spell.GetSpellName(numID) or raw
@@ -2599,7 +2596,7 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 		end
 
 		local spells = CDM.GetCustomSpells(viewerSettings)
-		local store = isItem and ('item:' .. id) or id
+		local store = isItem and IconEngine.ItemEntry(id) or id
 		for _, existing in ipairs(spells) do
 			if existing == store or (not isItem and tonumber(existing) == id) then
 				BUILib.Toast.Info('Already added', NameFor(id, isItem))
@@ -2664,8 +2661,8 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 			end
 
 			local isBuffRow = viewerKey == 'buffs' and entry.removable
-			local isTrinketRow = type(entry.id) == 'string' and entry.id:match('^trinket:%d$') ~= nil
-			local isRacialRow = type(entry.id) == 'string' and entry.id:match('^racial:%d$') ~= nil
+			local isTrinketRow = IconEngine.GetTrinketSlotNumber(entry.id) ~= nil
+			local isRacialRow = IconEngine.GetRacialSlotNumber(entry.id) ~= nil
 			local procRowSpellID
 			if not isBuffRow and not entry._isNotDisplayed then
 				procRowSpellID = ProcSpellIDFor(entry.id)
@@ -2718,10 +2715,10 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 				return
 			end
 
-			local dropItem = text:match('^item:(%d+)')
-			if dropItem then DoAdd(tonumber(dropItem), true); return end
-			local dropSpell = text:match('^spell:(%d+)')
-			if dropSpell then DoAdd(tonumber(dropSpell), false); return end
+			local dropItem = IconEngine.GetItemEntryID(text)
+			if dropItem then DoAdd(dropItem, true); return end
+			local dropSpell = IconEngine.GetSpellEntryID(text)
+			if dropSpell then DoAdd(dropSpell, false); return end
 
 			local num = tonumber(text:match('^%s*(%d+)'))
 			if num then
@@ -2744,7 +2741,7 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 			local function DoDelete()
 				CDM.RemoveCustomSpell(viewerSettings, row.id)
 				CDM.SetManualBuff(viewerSettings, row.id, nil)
-				local numericId = tonumber(tostring(row.id):match('%d+'))
+				local numericId = IconEngine.EntryNumber(row.id)
 				if numericId then
 					if numericId ~= row.id then
 						CDM.RemoveCustomSpell(viewerSettings, numericId)
@@ -2785,7 +2782,7 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 				if not isCustom then return end
 				local key = HideKeyFor(spellID, true)
 				CDM.SetAlwaysShow(viewerSettings, key, not CDM.IsAlwaysShow(viewerSettings, key))
-				CDM.SetUpdatePending(true)
+				CDM.MarkAllDirty()
 				RefreshIconList()
 				return
 			end
@@ -2804,8 +2801,10 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 		onRowRightClick = function(spellID, row)
 			local rowData = row.data
 			local isCustom = rowData.removable == true
-			local isTrinketRow = type(spellID) == 'string' and spellID:match('^trinket:%d$') ~= nil
-			local isRacialRow = type(spellID) == 'string' and spellID:match('^racial:%d$') ~= nil
+			local trinketSlot = IconEngine.GetTrinketSlotNumber(spellID)
+			local racialSlot = IconEngine.GetRacialSlotNumber(spellID)
+			local isTrinketRow = trinketSlot ~= nil
+			local isRacialRow = racialSlot ~= nil
 			local isAutoSlot = isTrinketRow or isRacialRow
 
 			local items = {}
@@ -2825,10 +2824,7 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 					end,
 				}
 
-				local hideZeroItemID
-				if type(spellID) == 'string' then
-					hideZeroItemID = tonumber(spellID:match('^item:(%d+)'))
-				end
+				local hideZeroItemID = IconEngine.GetItemEntryID(spellID)
 				if not hideZeroItemID and rowData.numericId then
 					hideZeroItemID = rowData.numericId
 				end
@@ -2857,7 +2853,7 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 						callback = function()
 							local wasOn = CDM.IsAlwaysShow(viewerSettings, hideKey)
 							CDM.SetAlwaysShow(viewerSettings, hideKey, not wasOn)
-							CDM.SetUpdatePending(true)
+							CDM.MarkAllDirty()
 							RefreshIconList()
 						end,
 					}
@@ -2887,7 +2883,7 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 
 			if isTrinketRow then
 				items[#items + 1] = { separator = true }
-				local resolvedItemID = BUI.IconEngine.ResolveTrinketSlot(tonumber(spellID:match('^trinket:(%d)$')))
+				local resolvedItemID = IconEngine.ResolveTrinketSlot(trinketSlot)
 				local isBl = resolvedItemID and CDM.IsTrinketBlacklisted(viewerSettings, resolvedItemID) or false
 				items[#items + 1] = {
 					text = isBl and 'Unblacklist Equipped Trinket' or 'Blacklist Equipped Trinket',
@@ -2905,8 +2901,7 @@ local function BuildIconManagementContent(container, viewerKey, viewerSettings, 
 				}
 			elseif isRacialRow then
 				items[#items + 1] = { separator = true }
-				local slotNum = tonumber(spellID:match('^racial:(%d)$'))
-				local resolvedSpellID = CDM.ResolveRacialSlot(slotNum)
+				local resolvedSpellID = CDM.ResolveRacialSlot(racialSlot)
 				local isBl = resolvedSpellID and CDM.IsRacialBlacklisted(viewerSettings, resolvedSpellID) or false
 				items[#items + 1] = {
 					text = isBl and 'Unblacklist Current Racial' or 'Blacklist Current Racial',

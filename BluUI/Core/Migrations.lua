@@ -58,7 +58,7 @@ local function StripAutoSlots(list)
 	if type(list) ~= 'table' then return end
 	for slotIndex = #list, 1, -1 do
 		local entry = list[slotIndex]
-		if type(entry) == 'string' and (entry:match('^trinket:%d$') or entry:match('^racial:%d$')) then
+		if BUI.IconEngine.IsSlotEntry(entry) then
 			table.remove(list, slotIndex)
 		end
 	end
@@ -88,8 +88,8 @@ local function SettleIconOrderKeys(iconOrder)
 		local stringKey = tostring(key)
 		if type(list) == 'table' and not iconOrder[stringKey] then
 			for entryIndex, id in ipairs(list) do
-				local itemID = type(id) == 'string' and id:match('^item:(%d+)$')
-				if itemID then list[entryIndex] = 'custom:' .. itemID end
+				local itemID = BUI.IconEngine.GetItemEntryID(id)
+				if itemID then list[entryIndex] = BUI.IconEngine.CustomKey(itemID) end
 			end
 			iconOrder[stringKey] = list
 		end
@@ -137,7 +137,7 @@ local function ConsumablesBarFromTracking(tracking)
 	}
 	if type(tracking.customItems) == 'table' then
 		for _, itemID in ipairs(tracking.customItems) do
-			bar.customSpells[#bar.customSpells + 1] = 'item:' .. itemID
+			bar.customSpells[#bar.customSpells + 1] = BUI.IconEngine.ItemEntry(itemID)
 		end
 	end
 	return bar
@@ -149,7 +149,7 @@ local function FoldLegacyBarLists(bar)
 	local list, seen = bar.customSpells, {}
 	for _, value in ipairs(list) do seen[tostring(value)] = true end
 	for _, itemID in ipairs(type(bar.items) == 'table' and bar.items or {}) do
-		local stored = 'item:' .. itemID
+		local stored = BUI.IconEngine.ItemEntry(itemID)
 		if not seen[stored] then list[#list + 1] = stored; seen[stored] = true end
 	end
 	for _, spellID in ipairs(type(bar.spells) == 'table' and bar.spells or {}) do
@@ -164,7 +164,7 @@ local function ScanTrinketsOnTrinketBar(bar)
 	if type(bar.customSpells) ~= 'table' then return end
 	local kept = {}
 	for _, value in ipairs(bar.customSpells) do
-		local itemID = tonumber(tostring(value):match('^item:(%d+)$'))
+		local itemID = BUI.IconEngine.GetItemEntryID(value)
 		local equipSlot = itemID and select(4, C_Item.GetItemInfoInstant(itemID))
 		if equipSlot ~= 'INVTYPE_TRINKET' then kept[#kept + 1] = value end
 	end

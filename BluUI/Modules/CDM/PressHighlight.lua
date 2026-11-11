@@ -182,20 +182,21 @@ local function GetAllRawKeysForIcon(icon)
     local cacheKey, isItem
 
     if frameData and frameData.isItemByPrefix then
-        cacheKey = frameData.itemID or (frameData.customSpellID and tonumber(tostring(frameData.customSpellID):match('%d+')))
+        cacheKey = frameData.itemID or frameData.customSpellID
         isItem = true
     else
-        local stableID = CDM.GetStableSpellID(icon)
+        local stableID = (frameData and frameData.customSpellID) or CDM.GetStableSpellID(icon)
         if type(stableID) == 'string' then
-            local numericID = tonumber(stableID:match('%d+'))
-            if not numericID then return nil end
-            stableID = numericID
+            stableID = BUI.IconEngine.EntryNumber(stableID)
+            if not stableID then return nil end
         end
         cacheKey = stableID
     end
 
-    local cached = cacheKey and iconKeyCache[cacheKey]
-    if cached then return cached end
+    if cacheKey then
+        local cached = iconKeyCache[cacheKey]
+        if cached ~= nil then return cached or nil end
+    end
 
     local result
     if isItem then
@@ -207,16 +208,21 @@ local function GetAllRawKeysForIcon(icon)
             if rawKey then result = {rawKey} end
         end
     end
-    if cacheKey and result then iconKeyCache[cacheKey] = result end
+    if cacheKey then iconKeyCache[cacheKey] = result or false end
     return result
 end
 
+local cacheGeneration = -1
+
 local function RebuildBindings()
-    for _, bindingArray in pairs(bindingsByKey) do wipe(bindingArray) end
     wipe(bindingsByKey)
     wipe(keyModMasks)
     wipe(mouseButtonForKey)
     builtGeneration = CDM.Keybinds.GetGeneration()
+    if builtGeneration ~= cacheGeneration then
+        cacheGeneration = builtGeneration
+        WipeKeyCache()
+    end
 
     for viewerIndex = 1, CDM.VIEWER_KEYS_COUNT do
         local viewerKey = CDM.VIEWER_KEYS[viewerIndex]
@@ -317,14 +323,26 @@ local function StartPulse(icon)
     GetPulseGroup(icon):Play()
 end
 
-local function GetExplodeFrames(icon)
-    local frameData = CDM.GetFrameData(icon)
-    if frameData._pressExplode then return frameData._pressExplode end
-
+local function NewEffectClip(icon)
     local clip = CreateFrame('Frame', nil, icon)
     clip:SetAllPoints(icon.Icon)
     clip:SetClipsChildren(true)
     clip:SetFrameLevel(icon:GetFrameLevel() + 4)
+    return clip
+end
+
+local function EffectSize(icon)
+    local frameData = FrameData[icon]
+    local width = frameData and frameData.sizeW
+    local height = frameData and frameData.sizeH
+    if width and height and width >= 1 and height >= 1 then return width, height end
+end
+
+local function GetExplodeFrames(icon)
+    local frameData = CDM.GetFrameData(icon)
+    if frameData._pressExplode then return frameData._pressExplode end
+
+    local clip = NewEffectClip(icon)
 
     local flash = clip:CreateTexture(nil, 'OVERLAY', nil, 6)
     flash:SetAtlas('bags-glow-white')
@@ -380,10 +398,8 @@ end
 
 local function StartExplode(icon)
     local clip = GetExplodeFrames(icon)
-    local frameData = FrameData[icon]
-    local width = frameData and frameData.sizeW
-    local height = frameData and frameData.sizeH
-    if not width or not height or width < 1 or height < 1 then return end
+    local width, height = EffectSize(icon)
+    if not width then return end
 
     clip.flash:SetSize(width * 1.2, height * 1.2)
     clip.flash:SetVertexColor(tintColor[1], tintColor[2], tintColor[3], 1)
@@ -433,10 +449,7 @@ local function GetRippleFrames(icon)
     local frameData = CDM.GetFrameData(icon)
     if frameData._pressRipple then return frameData._pressRipple end
 
-    local clip = CreateFrame('Frame', nil, icon)
-    clip:SetAllPoints(icon.Icon)
-    clip:SetClipsChildren(true)
-    clip:SetFrameLevel(icon:GetFrameLevel() + 4)
+    local clip = NewEffectClip(icon)
 
     local waves = {}
     local waveGroups = {}
@@ -482,10 +495,8 @@ end
 
 local function StartRipple(icon)
     local clip = GetRippleFrames(icon)
-    local frameData = FrameData[icon]
-    local width = frameData and frameData.sizeW
-    local height = frameData and frameData.sizeH
-    if not width or not height or width < 1 or height < 1 then return end
+    local width, height = EffectSize(icon)
+    if not width then return end
 
     for waveIndex = 1, 3 do
         clip.waves[waveIndex]:SetSize(width, height)
@@ -501,10 +512,7 @@ local function GetGlassShine(icon)
     local frameData = CDM.GetFrameData(icon)
     if frameData._pressGlass then return frameData._pressGlass end
 
-    local clip = CreateFrame('Frame', nil, icon)
-    clip:SetAllPoints(icon.Icon)
-    clip:SetClipsChildren(true)
-    clip:SetFrameLevel(icon:GetFrameLevel() + 4)
+    local clip = NewEffectClip(icon)
 
     local broad = clip:CreateTexture(nil, 'OVERLAY', nil, 6)
     broad:SetColorTexture(1, 1, 1, 1)
@@ -524,10 +532,8 @@ end
 
 local function StartGlass(icon)
     local clip = GetGlassShine(icon)
-    local frameData = FrameData[icon]
-    local width = frameData and frameData.sizeW
-    local height = frameData and frameData.sizeH
-    if not width or not height or width < 1 or height < 1 then return end
+    local width, height = EffectSize(icon)
+    if not width then return end
 
     local broad = clip.broad
     local sharp = clip.sharp
@@ -852,8 +858,8 @@ local function StartInput()
     end)
 end
 
-function PressHighlight.Invalidate()
-    WipeKeyCache()
+function PressHighlight.Invalidate(viewerKey)
+    if viewerKey == 'buffs' then return end
     builtGeneration = -1
 end
 
@@ -884,7 +890,6 @@ local function SyncConfig()
     elseif not config.enabled and running then
         running = false
         StopInput()
-        for _, bindingArray in pairs(bindingsByKey) do wipe(bindingArray) end
         wipe(bindingsByKey)
         wipe(keyModMasks)
         wipe(mouseButtonForKey)

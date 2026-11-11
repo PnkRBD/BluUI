@@ -136,6 +136,7 @@ local function GetCachedSpellCooldown(spellID)
     end
     return entry or nil
 end
+CDM.GetCachedSpellCooldown = GetCachedSpellCooldown
 
 local function GetCachedSpellCooldownDuration(spellID)
     local now = GetTime()
@@ -185,15 +186,18 @@ local function ShouldOverrideBuffDuration(cooldown)
     return true, icon
 end
 
+local function ShownSpellID(icon)
+    local baseID, overrideID = CDM.CooldownSpellIDs(icon.cooldownInfo)
+    return overrideID or baseID
+end
+
 local function ApplyAuraCooldownOverride(cooldown)
     if cooldownOverrideGuard[cooldown] then return end
 
     local override, icon = ShouldOverrideBuffDuration(cooldown)
     if not override then return end
 
-    local info = icon.cooldownInfo
-    if not info then return end
-    local spellID = BUI.Tools.SafeNum(info.overrideSpellID) or BUI.Tools.SafeNum(info.spellID)
+    local spellID = ShownSpellID(icon)
     if not spellID then return end
 
     local hasChargeSource = icon:HasVisualDataSource_Charges()
@@ -207,9 +211,7 @@ local function ApplyAuraCooldownOverride(cooldown)
 end
 
 local function ResolveDesaturationValue(icon)
-    local info = icon.cooldownInfo
-    if not info then return nil end
-    local spellID = BUI.Tools.SafeNum(info.overrideSpellID) or BUI.Tools.SafeNum(info.spellID)
+    local spellID = ShownSpellID(icon)
     if not spellID then return nil end
 
     if icon:HasVisualDataSource_Charges() then
@@ -270,7 +272,6 @@ local function HookIconDesaturation(texture)
 end
 
 local function ReenforceCooldownStyle(cooldown)
-    if cooldownOverrideGuard[cooldown] then return end
     local cooldownFrameData = FrameData[cooldown]
     if not cooldownFrameData or not cooldownFrameData.cdSetup then return end
     ApplyAuraCooldownOverride(cooldown)
@@ -382,11 +383,14 @@ function CDM.ApplyFlashGeometry(icon, settings)
     flash:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", overhangX, -overhangY)
 end
 
+local function FlashDisabled(flash)
+    local frameData = FrameData[flash]
+    local settings = frameData and frameData.viewerKey and CDM.GetSettings(frameData.viewerKey)
+    return settings and not settings.showFlash
+end
+
 local function OnCooldownFlashShow(self)
-    local frameData = FrameData[self]
-    if not frameData then return end
-    local settings = frameData.viewerKey and CDM.GetSettings(frameData.viewerKey)
-    if settings and not settings.showFlash then
+    if FlashDisabled(self) then
         self:Hide()
         self.FlashAnim:Stop()
     end
@@ -394,10 +398,7 @@ end
 
 local function OnCooldownFlashPlay(self)
     local flash = self:GetParent()
-    local frameData = FrameData[flash]
-    if not frameData then return end
-    local settings = frameData.viewerKey and CDM.GetSettings(frameData.viewerKey)
-    if settings and not settings.showFlash then
+    if FlashDisabled(flash) then
         self:Stop()
         flash:Hide()
     end
@@ -408,8 +409,7 @@ local function ResolveOverrideTexture(icon, iconFrameData)
     local info = icon.cooldownInfo
     if not info then return nil end
     local overrides = CDM.GetIconOverrides(BUI.GetDB().cdm[iconFrameData.viewerKey])
-    local overrideID = BUI.Tools.SafeNum(info.overrideSpellID)
-    local baseID = BUI.Tools.SafeNum(info.spellID)
+    local baseID, overrideID = CDM.CooldownSpellIDs(info)
     return (overrideID and overrides[overrideID]) or (baseID and overrides[baseID])
 end
 
@@ -438,8 +438,7 @@ function CDM.RefreshIconOverrideForSpell(spellID)
         if iconFrameData.customIcon then return end
         local info = icon.cooldownInfo
         if not info then return end
-        local base = BUI.Tools.SafeNum(info.spellID)
-        local override = BUI.Tools.SafeNum(info.overrideSpellID)
+        local base, override = CDM.CooldownSpellIDs(info)
         if base ~= spellID and override ~= spellID then return end
         local wantedTexture = ResolveOverrideTexture(icon, iconFrameData)
             or (override and C_Spell.GetSpellTexture(override))

@@ -160,11 +160,10 @@ local ScheduleReposition = BUI.Dispatcher.New(PositionViewer)
 
 local HookItemVisibility
 
-local function FitBarItem(item, config)
+local function FitBarItem(item, config, barWidth)
     local showIcon = config.showIcon
     local iconSize = config.iconSize
     local barHeight = config.barHeight
-    local barWidth = GetEffectiveBarWidth(config)
     fitting = true
     item:SetSize((showIcon and (iconSize + ICON_GAP) or 0) + barWidth, math.max(showIcon and iconSize or 0, barHeight))
     fitting = false
@@ -193,35 +192,20 @@ local function HidePip(self)
     self:SetAlpha(0)
 end
 
-local function SkinBarItem(item)
-    if skinnedItems[item] then return end
-    local config = GetSettings()
-    if not config.skinEnabled then return end
-
-    skinnedItems[item] = true
-    HookItemVisibility(item)
-
+local function StyleBarParts(item, config, barWidth)
     local texture = BUI.GetGlobalTexture()
     local font = BUI.GetCDMFont()
     local border = config.borderColor
     local borderSize = config.borderSize
     local backgroundColor = config.bgColor
     local showIcon = config.showIcon
-    local iconSize = config.iconSize
-    FitBarItem(item, config)
-
-    item.DebuffBorder:Hide()
-    if not item._buiDebuffBorderHooked then
-        item._buiDebuffBorderHooked = true
-        BUI.Hook('BuffBarSkin.HideSelf', item.DebuffBorder, "Show", HideSelf)
-    end
+    FitBarItem(item, config, barWidth)
 
     local iconFrame = item.Icon
     if showIcon then
+        local iconSize = config.iconSize
         iconFrame:SetSize(iconSize, iconSize)
-        StripCDMAtlases(iconFrame)
         local inner = iconFrame.Icon
-        CDM.RemoveMasks(inner)
         inner:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         inner:ClearAllPoints()
         inner:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", 1, -1)
@@ -237,13 +221,6 @@ local function SkinBarItem(item)
     bar.BarBG:SetVertexColor(backgroundColor[1], backgroundColor[2], backgroundColor[3], backgroundColor[4])
     bar.BarBG:ClearAllPoints()
     bar.BarBG:SetAllPoints(bar)
-
-    bar.Pip:Hide()
-    bar.Pip:SetAlpha(0)
-    if not bar._buiPipHooked then
-        bar._buiPipHooked = true
-        BUI.Hook('BuffBarSkin.HidePip', bar.Pip, "Show", HidePip)
-    end
 
     if not bar._buiBorderHost then
         bar._buiBorderHost = CreateFrame("Frame", nil, bar)
@@ -264,6 +241,36 @@ local function SkinBarItem(item)
 
     Pixel.ApplyFont(bar.Name, math.max(6, config.nameSize), font)
     Pixel.ApplyFont(bar.Duration, math.max(6, config.durationSize), font)
+end
+
+local function SkinBarItem(item)
+    if skinnedItems[item] then return end
+    local config = GetSettings()
+    if not config.skinEnabled then return end
+
+    skinnedItems[item] = true
+    HookItemVisibility(item)
+
+    item.DebuffBorder:Hide()
+    if not item._buiDebuffBorderHooked then
+        item._buiDebuffBorderHooked = true
+        BUI.Hook('BuffBarSkin.HideSelf', item.DebuffBorder, "Show", HideSelf)
+    end
+
+    if config.showIcon then
+        StripCDMAtlases(item.Icon)
+        CDM.RemoveMasks(item.Icon.Icon)
+    end
+
+    local pip = item.Bar.Pip
+    pip:Hide()
+    pip:SetAlpha(0)
+    if not item.Bar._buiPipHooked then
+        item.Bar._buiPipHooked = true
+        BUI.Hook('BuffBarSkin.HidePip', pip, "Show", HidePip)
+    end
+
+    StyleBarParts(item, config, GetEffectiveBarWidth(config))
 end
 
 local rackItems = {}
@@ -314,7 +321,36 @@ function CDM.RepositionBuffBarRack()
     if previewShelf then ApplyAnchor(previewShelf, GetSettings()) end
 end
 
-local ScheduleReflow = BUI.Dispatcher.New(RestackItems)
+local function RefitActiveItems()
+    local viewer = _G.BuffBarCooldownViewer
+    local config = GetSettings()
+    if not config.skinEnabled then return end
+    local barWidth = GetEffectiveBarWidth(config)
+    for item in viewer.itemFramePool:EnumerateActive() do
+        if skinnedItems[item] then
+            FitBarItem(item, config, barWidth)
+        else
+            SkinBarItem(item)
+        end
+    end
+    RestackItems(viewer)
+end
+
+local refitPending = false
+
+local ScheduleReflow = BUI.Dispatcher.New(function()
+    if refitPending then
+        refitPending = false
+        RefitActiveItems()
+    else
+        RestackItems()
+    end
+end)
+
+local function ScheduleRefit()
+    refitPending = true
+    ScheduleReflow()
+end
 
 local function ReflowUnlessFitting()
     if not fitting then ScheduleReflow() end
@@ -346,22 +382,6 @@ function CDM.RefreshBuffBarSkin()
     RestackItems(viewer)
     if CDM.IsBuffBarPreviewShown() then CDM.ShowBuffBarPreview() end
 end
-
-local function RefitActiveItems()
-    local viewer = _G.BuffBarCooldownViewer
-    local config = GetSettings()
-    if not config.skinEnabled then return end
-    for item in viewer.itemFramePool:EnumerateActive() do
-        if skinnedItems[item] then
-            FitBarItem(item, config)
-        else
-            SkinBarItem(item)
-        end
-    end
-    RestackItems(viewer)
-end
-
-local ScheduleRefit = BUI.Dispatcher.New(RefitActiveItems)
 
 local function OnBarItemAcquired(_, item)
     SkinBarItem(item)
@@ -418,83 +438,28 @@ local function GetPreviewShelf(viewer)
     return previewShelf
 end
 
-local function BuildPreviewFrame(previewIndex, shelf)
+local function BuildPreviewFrame(shelf)
     local frame = CreateFrame("Frame", nil, shelf)
     frame.Icon = CreateFrame("Frame", nil, frame)
+    frame.Icon:SetPoint("LEFT", frame, "LEFT", 0, 0)
     frame.Icon.Icon = frame.Icon:CreateTexture(nil, "ARTWORK")
+    frame.Icon.Applications = frame.Icon:CreateFontString(nil, "OVERLAY")
     frame.Bar = CreateFrame("StatusBar", nil, frame)
-    frame.BarBG = frame.Bar:CreateTexture(nil, "BACKGROUND")
-    frame.TextLayer = CreateFrame("Frame", nil, frame.Bar)
-    frame.TextLayer:SetFrameLevel(frame.Bar:GetFrameLevel() + 2)
-    frame.Stacks = frame.TextLayer:CreateFontString(nil, "OVERLAY")
+    frame.Bar:SetMinMaxValues(0, 1)
+    frame.Bar.BarBG = frame.Bar:CreateTexture(nil, "BACKGROUND")
     frame.Bar.Name = frame.Bar:CreateFontString(nil, "OVERLAY")
+    frame.Bar.Name:SetPoint("LEFT", frame.Bar, "LEFT", 4, 0)
     frame.Bar.Duration = frame.Bar:CreateFontString(nil, "OVERLAY")
     return frame
 end
 
-local function StylePreviewFrame(frame, previewIndex, config)
-    local showIcon = config.showIcon
-    local iconSize = config.iconSize
-    local barWidth = GetEffectiveBarWidth(config)
-    local barHeight = config.barHeight
-    local border = config.borderColor
-    local borderSize = config.borderSize
-    local backgroundColor = config.bgColor
-    local texture = BUI.GetGlobalTexture()
-    local font = BUI.GetCDMFont()
-    local slotHeight = math.max(showIcon and iconSize or 0, barHeight)
-
-    frame:SetSize((showIcon and (iconSize + ICON_GAP) or 0) + barWidth, slotHeight)
-
-    frame.Icon:SetShown(showIcon)
-    if showIcon then
-        frame.Icon:ClearAllPoints()
-        frame.Icon:SetPoint("LEFT", frame, "LEFT", 0, 0)
-        frame.Icon:SetSize(iconSize, iconSize)
-        Pixel.ApplyBorder(frame.Icon, borderSize, border[1], border[2], border[3], border[4])
-        frame.Icon.Icon:ClearAllPoints()
-        frame.Icon.Icon:SetPoint("TOPLEFT", frame.Icon, "TOPLEFT", Pixel.Scale(1), Pixel.Scale(-1))
-        frame.Icon.Icon:SetPoint("BOTTOMRIGHT", frame.Icon, "BOTTOMRIGHT", Pixel.Scale(-1), Pixel.Scale(1))
-        frame.Icon.Icon:SetTexture(PREVIEW_ICONS[((previewIndex - 1) % #PREVIEW_ICONS) + 1])
-        frame.Icon.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    end
-
-    frame.Bar:ClearAllPoints()
-    if showIcon then
-        frame.Bar:SetPoint("LEFT", frame.Icon, "RIGHT", Pixel.Scale(ICON_GAP), 0)
-    else
-        frame.Bar:SetPoint("LEFT", frame, "LEFT", 0, 0)
-    end
-    frame.Bar:SetSize(barWidth, barHeight)
-    frame.Bar:SetStatusBarTexture(texture)
-    frame.Bar:SetStatusBarColor(GetBarColor(config))
-    frame.Bar:SetMinMaxValues(0, 1)
+local function FillPreviewFrame(frame, previewIndex, config)
+    StyleBarParts(frame, config, GetEffectiveBarWidth(config))
+    frame.Icon.Icon:SetTexture(PREVIEW_ICONS[previewIndex])
+    frame.Icon.Applications:SetText(PREVIEW_STACKS[previewIndex])
     frame.Bar:SetValue(0.15 + (previewIndex * 0.17) % 0.85)
-    frame.BarBG:SetTexture(texture)
-    frame.BarBG:SetVertexColor(backgroundColor[1], backgroundColor[2], backgroundColor[3], backgroundColor[4])
-    frame.BarBG:ClearAllPoints()
-    frame.BarBG:SetAllPoints(frame.Bar)
-    if not frame.Bar._buiBorderHost then
-        frame.Bar._buiBorderHost = CreateFrame("Frame", nil, frame.Bar)
-        frame.Bar._buiBorderHost:SetFrameLevel(frame.Bar:GetFrameLevel() + 1)
-    end
-    frame.Bar._buiBorderHost:ClearAllPoints()
-    frame.Bar._buiBorderHost:SetAllPoints(frame.Bar)
-    Pixel.ApplyBorder(frame.Bar._buiBorderHost, borderSize, border[1], border[2], border[3], border[4])
-
-    Pixel.ApplyFont(frame.Stacks, math.max(6, config.stackSize), font, "OUTLINE")
-    frame.Stacks:SetText(PREVIEW_STACKS[((previewIndex - 1) % #PREVIEW_STACKS) + 1])
-    PlaceStacks(frame.Stacks, config, frame.Icon, frame.Bar, showIcon)
-
-    Pixel.ApplyFont(frame.Bar.Name, math.max(6, config.nameSize), font)
-    frame.Bar.Name:ClearAllPoints()
-    frame.Bar.Name:SetPoint("LEFT", frame.Bar, "LEFT", Pixel.Scale(4), 0)
-    frame.Bar.Name:SetText(PREVIEW_NAMES[((previewIndex - 1) % #PREVIEW_NAMES) + 1])
-    frame.Bar.Name:SetShown(config.showName)
-
-    Pixel.ApplyFont(frame.Bar.Duration, math.max(6, config.durationSize), font)
+    frame.Bar.Name:SetText(PREVIEW_NAMES[previewIndex])
     frame.Bar.Duration:SetText(((PREVIEW_COUNT + 1 - previewIndex) * 3) .. "s")
-    PlaceDuration(frame.Bar.Duration, config, frame.Bar)
 end
 
 local function PositionPreviewFrame(frame, previewIndex, config, shelf)
@@ -519,11 +484,10 @@ function CDM.ShowBuffBarPreview()
     for previewIndex = 1, PREVIEW_COUNT do
         local frame = previewFrames[previewIndex]
         if not frame then
-            frame = BuildPreviewFrame(previewIndex, shelf)
+            frame = BuildPreviewFrame(shelf)
             previewFrames[previewIndex] = frame
         end
-        if frame:GetParent() ~= shelf then frame:SetParent(shelf) end
-        StylePreviewFrame(frame, previewIndex, config)
+        FillPreviewFrame(frame, previewIndex, config)
         PositionPreviewFrame(frame, previewIndex, config, shelf)
         frame:Show()
     end

@@ -228,6 +228,7 @@ local function StartAppearGlow(key, icon, entry)
 		if untilThreshold <= 0 then
 			AppearGlowNow(icon, entry)
 		else
+			CDM.StopProcGlow(icon)
 			Tools.ReplaceTimer(appearTimers, icon, untilThreshold, function()
 				if IsAppearIconLive(key, icon) and icon:IsShown() then
 					AppearGlowNow(icon, entry)
@@ -690,15 +691,11 @@ HookBarViewer = function()
 	barViewerHooked = CDM.HookBarViewer(WakeAppearScan, WakeAppearScan)
 end
 
-local function OnAppearEvent()
-	if appearWatchEnabled then QueueAppearScan() end
-end
-
 local trackHooked = false
 
 local function OnTrackedIconsChanged()
 	if next(activeIcons) then RefreshActiveOverlays() end
-	if appearWatchEnabled then QueueAppearScan() end
+	WakeAppearScan()
 end
 
 function CDM.RefreshProcMsgWatcher()
@@ -747,8 +744,8 @@ function CDM.RefreshProcMsgWatcher()
 	appearWatchEnabled = appearWant
 	if appearWant then
 		HookBarViewer()
-		BUI.Events:RegisterUnit('UNIT_AURA', 'player', 'CDM.ProcMenu.Appear', OnAppearEvent)
-		BUI.Events:RegisterUnit('UNIT_SPELLCAST_SUCCEEDED', 'player', 'CDM.ProcMenu.Appear', OnAppearEvent)
+		BUI.Events:RegisterUnit('UNIT_AURA', 'player', 'CDM.ProcMenu.Appear', WakeAppearScan)
+		BUI.Events:RegisterUnit('UNIT_SPELLCAST_SUCCEEDED', 'player', 'CDM.ProcMenu.Appear', WakeAppearScan)
 		QueueAppearScan()
 	else
 		BUI.Events:UnregisterAll('CDM.ProcMenu.Appear')

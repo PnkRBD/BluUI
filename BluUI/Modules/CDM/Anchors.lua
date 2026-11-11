@@ -80,7 +80,9 @@ function CDM.CreateAnchor(key)
     if settings.anchorFrame ~= "" then
         resolved = BUI.Anchor.ApplyPosition(frame, settings)
     end
-    if not resolved then
+    if resolved then
+        frame._everAnchored = true
+    else
         local x = settings.centerHorizontally and 0 or settings.positionX
         local y = settings.positionY
         PlaceContainerTopLeft(frame, x, y)
@@ -108,9 +110,10 @@ function CDM.ApplyAnchorPosition(key)
         end
         if target then
             anchor._placedTopLeft = nil
-            BUI.Anchor.ApplyPosition(anchor, settings)
-            anchor._everAnchored = true
-            return
+            if BUI.Anchor.ApplyPosition(anchor, settings) then
+                anchor._everAnchored = true
+                return
+            end
         end
     end
 

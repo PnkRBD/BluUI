@@ -132,7 +132,7 @@ end
 local function OnIconActiveStateChanged(self)
     local frameData = FrameData[self]
     if not frameData or frameData.viewerKey ~= 'buffs' then return end
-    CDM.CenterBuffsNow()
+    CDM.MarkBuffCenterDirty()
 end
 
 local function OnIconSetCooldownID(self, cooldownID)
@@ -143,7 +143,8 @@ local function OnIconSetCooldownID(self, cooldownID)
     frameData.lastCooldownID = cooldownID
     local key = frameData.tracked or frameData.viewerKey
     if key then CDM.MarkDirty(key) end
-    CDM.PressHighlight.Invalidate()
+    CDM.PressHighlight.Invalidate(key)
+    CDM.RecheckAssistHighlight()
 end
 
 function CDM.HookIconFrame(icon, key)

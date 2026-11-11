@@ -21,24 +21,7 @@ local function OnCooldownViewerDataLoaded()
     CDM.MarkAllDirty()
 end
 
-local cdSnapshotTime = 0
-
-local cdSnapshot = {}
-
-local function GetCooldownCached(spellID)
-    local now = GetTime()
-    if now ~= cdSnapshotTime then
-        cdSnapshotTime = now
-        wipe(cdSnapshot)
-    end
-    local cached = cdSnapshot[spellID]
-    if cached ~= nil then
-        return cached ~= false and cached or nil
-    end
-    local info = C_Spell.GetSpellCooldown(spellID)
-    cdSnapshot[spellID] = info or false
-    return info
-end
+local GetCooldownCached = CDM.GetCachedSpellCooldown
 
 local cdLayoutRegistered = false
 local cdWatchedSpells = {}
@@ -69,18 +52,22 @@ local function ClearCDExpectation(spellID)
     CancelCDEndTimer(spellID)
 end
 
-local function CancelAllCDEndTimers()
+local function ClearSpellExpectations()
     for _, timer in pairs(cdEndTimers) do
         timer:Cancel()
     end
     wipe(cdEndTimers)
+    wipe(cdExpectedEnd)
+    wipe(cdEstimatedEnd)
+end
+
+local function CancelAllCDEndTimers()
+    ClearSpellExpectations()
     for _, timer in pairs(itemEndTimers) do
         timer:Cancel()
     end
     wipe(itemEndTimers)
     wipe(itemExpectedEnd)
-    wipe(cdExpectedEnd)
-    wipe(cdEstimatedEnd)
 end
 
 local cdPollTicker
@@ -150,25 +137,25 @@ local function ParseEntry(id)
         return 'spell', id
     end
 
-    local idString = tostring(id)
-    local trinketSlot = idString:match('^trinket:(%d)$')
+    local IconEngine = BUI.IconEngine
+    local trinketSlot = IconEngine.GetTrinketSlotNumber(id)
     if trinketSlot then
         parseKindCache[id] = 'trinket-slot'
-        parseNumCache[id] = tonumber(trinketSlot)
-        return 'trinket-slot', parseNumCache[id]
+        parseNumCache[id] = trinketSlot
+        return 'trinket-slot', trinketSlot
     end
-    local racialSlot = idString:match('^racial:(%d)$')
+    local racialSlot = IconEngine.GetRacialSlotNumber(id)
     if racialSlot then
         parseKindCache[id] = 'racial-slot'
-        parseNumCache[id] = tonumber(racialSlot)
-        return 'racial-slot', parseNumCache[id]
+        parseNumCache[id] = racialSlot
+        return 'racial-slot', racialSlot
     end
-    local numericID = tonumber(idString:match('(%d+)'))
+    local numericID = IconEngine.EntryNumber(id)
     if not numericID then
         parseKindCache[id] = false
         return nil, nil
     end
-    local kind = idString:find('^custom:') and 'custom' or 'spell'
+    local kind = IconEngine.GetCustomKeyID(id) and 'custom' or 'spell'
     parseKindCache[id] = kind
     parseNumCache[id] = numericID
     return kind, numericID
@@ -197,7 +184,12 @@ local function ClassifyWatchEntry(id)
     return nil
 end
 
-local IsItemCDActive
+local function ItemCooldownEnd(itemID)
+    local start, duration = C_Container.GetItemCooldown(itemID)
+    if not start or not duration or duration < ITEM_CD_THRESHOLD then return nil end
+    local endTime = start + duration
+    if endTime > GetTime() then return endTime end
+end
 
 IsSpellEngaged = function(spellID)
     if BUI.Tools.IsChargeSpell(spellID) then
@@ -253,7 +245,7 @@ local function RebuildCDWatchList()
                 local kind, numericID = ClassifyWatchEntry(id)
                 if numericID then
                     if kind == 'item' then
-                        cdWatchedItems[numericID] = IsItemCDActive(numericID)
+                        cdWatchedItems[numericID] = ItemCooldownEnd(numericID) ~= nil
                     else
                         cdWatchedSpells[numericID] = IsSpellEngaged(numericID)
                     end
@@ -267,12 +259,6 @@ local function RebuildCDWatchList()
     end
     UpdateCDPollTicker()
     return any
-end
-
-IsItemCDActive = function(itemID)
-    local start, duration = C_Container.GetItemCooldown(itemID)
-    if not start or not duration or duration < ITEM_CD_THRESHOLD then return false end
-    return (start + duration) > GetTime()
 end
 
 local function RefreshCDExpectation(spellID)
@@ -317,11 +303,10 @@ CheckCDWatchList = function()
         end
     end
     for itemID, wasActive in pairs(cdWatchedItems) do
-        local isActive = IsItemCDActive(itemID)
+        local endTime = ItemCooldownEnd(itemID)
+        local isActive = endTime ~= nil
         if isActive then
-            local start, duration = C_Container.GetItemCooldown(itemID)
-            local endTime = start and duration and (start + duration)
-            if endTime and endTime > now and itemExpectedEnd[itemID] ~= endTime then
+            if itemExpectedEnd[itemID] ~= endTime then
                 itemExpectedEnd[itemID] = endTime
                 BUI.Tools.ReplaceTimer(itemEndTimers, itemID, endTime - now + CD_END_GRACE, function()
                     itemExpectedEnd[itemID] = nil
@@ -388,15 +373,11 @@ local function MarkWatchedSpellActive(targetID, castSpellID)
     UpdateCDPollTicker()
 end
 
-local function ActiveTalentConfigID()
-    return C_ClassTalents.GetActiveConfigID()
-end
-
 local function BuildCDAltIndex()
     wipe(cdAltToWatched)
     cdAltConfigID = nil
     local GetChoiceAlternatives = BUI.Tools.GetChoiceAlternatives
-    local configID = ActiveTalentConfigID()
+    local configID = C_ClassTalents.GetActiveConfigID()
     if not configID then return end
     for watchedID in pairs(cdWatchedSpells) do
         local alternatives = GetChoiceAlternatives(watchedID)
@@ -410,13 +391,13 @@ local function BuildCDAltIndex()
     cdAltConfigID = configID
 end
 
-local function OnPlayerCastSucceeded(_, unit, _, spellID)
-    if unit ~= "player" or not spellID then return end
+local function OnPlayerCastSucceeded(_, _, _, spellID)
+    if not spellID then return end
     if cdWatchedSpells[spellID] ~= nil then
         MarkWatchedSpellActive(spellID, spellID)
         return
     end
-    local configID = ActiveTalentConfigID()
+    local configID = C_ClassTalents.GetActiveConfigID()
     if configID and cdAltConfigID ~= configID then BuildCDAltIndex() end
     local watchedID = cdAltToWatched[spellID]
     if watchedID then MarkWatchedSpellActive(watchedID, spellID) end
@@ -452,10 +433,7 @@ local function OnIconCooldownDone(icon)
     local watched = id
     if watched ~= nil and cdWatchedSpells[watched] == nil then watched = cdAltToWatched[watched] end
     if id == nil then
-        for _, timer in pairs(cdEndTimers) do timer:Cancel() end
-        wipe(cdEndTimers)
-        wipe(cdExpectedEnd)
-        wipe(cdEstimatedEnd)
+        ClearSpellExpectations()
     elseif watched ~= nil and cdWatchedSpells[watched] ~= nil then
         ClearCDExpectation(watched)
     end

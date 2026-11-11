@@ -151,20 +151,20 @@ end
 
 local function HiddenKeyLabel(key)
 	if type(key) == 'number' then return C_Spell.GetSpellName(key) or ('Spell ' .. key) end
-	local text = tostring(key)
-	local itemID = tonumber(text:match('^item:(%d+)$'))
+	local IconEngine = BUI.IconEngine
+	local itemID = IconEngine.GetItemEntryID(key)
 	if itemID then return C_Item.GetItemNameByID(itemID) or ('Item ' .. itemID) end
-	local customID = tonumber(text:match('^custom:(%d+)$'))
+	local customID = IconEngine.GetCustomKeyID(key)
 	if customID then
 		if not C_SpellBook.IsSpellKnown(customID) and C_Item.GetItemInfoInstant(customID) then
 			return C_Item.GetItemNameByID(customID) or ('Item ' .. customID)
 		end
 		return C_Spell.GetSpellName(customID) or ('Custom ' .. customID)
 	end
-	local trinketSlot = text:match('^trinket:(%d)$')
+	local trinketSlot = IconEngine.GetTrinketSlotNumber(key)
 	if trinketSlot then return 'Trinket slot ' .. trinketSlot end
-	if text:match('^racial:') then return 'Racial' end
-	return text
+	if IconEngine.GetRacialSlotNumber(key) then return 'Racial' end
+	return tostring(key)
 end
 
 local function CreateViewerMock(stage, withKeybinds)

@@ -249,14 +249,6 @@ local function CreateIcon(parent, barIndex, iconIndex)
     return icon
 end
 
-local function FindFontStringRegion(...)
-    for regionIndex = 1, select('#', ...) do
-        local region = select(regionIndex, ...)
-        if region and region:GetObjectType() == "FontString" then return region end
-    end
-    return nil
-end
-
 local function StyleIcon(icon, settings)
     local size = settings.iconSize
     local zoom = settings.zoom
@@ -281,14 +273,12 @@ local function StyleIcon(icon, settings)
         Pixel.Scale(settings.stackTextOffsetX + stackOffset[1]),
         Pixel.Scale(settings.stackTextOffsetY + stackOffset[2]))
     Pixel.ApplyFont(icon.stack, settings.stackTextSize, BUI.GetTrackingFont())
-    local red, green, blue = BUI.Lookup.ItemCountColor(icon.iconType ~= "spell" and icon.itemID or nil)
-    icon.stack:SetTextColor(red or 1, green or 1, blue or 1)
 
     local cooldownPosition = settings.cooldownTextPosition
     local cooldownOffset = CORNER_OFFSETS[cooldownPosition]
     local cooldownOffsetX = settings.cooldownTextOffsetX + cooldownOffset[1]
     local cooldownOffsetY = settings.cooldownTextOffsetY + cooldownOffset[2]
-    local cooldownFontString = FindFontStringRegion(icon.cd:GetRegions())
+    local cooldownFontString = BUI.Tools.CooldownFontString(icon.cd)
     if cooldownFontString then
         Pixel.ApplyFont(cooldownFontString, settings.cooldownTextSize, BUI.GetTrackingFont())
         cooldownFontString:ClearAllPoints()
@@ -298,6 +288,12 @@ local function StyleIcon(icon, settings)
     local borderColor = settings.borderColor
     Pixel.ApplyBorder(icon, borderSize, borderColor[1], borderColor[2], borderColor[3], borderColor[4])
     Pixel.ShowBorder(icon)
+    return cooldownFontString ~= nil
+end
+
+local function TintStackText(icon)
+    local red, green, blue = BUI.Lookup.ItemCountColor(icon.iconType ~= "spell" and icon.itemID or nil)
+    icon.stack:SetTextColor(red or 1, green or 1, blue or 1)
 end
 
 local entryPool = {}
@@ -317,7 +313,6 @@ local function AcquireEntry()
 end
 
 local seenScratch = {}
-local racialScratch = {}
 local placedScratch = {}
 local knownScratch = {}
 local customScratch = {}
@@ -365,7 +360,7 @@ function CustomBars.ForEachIcon(settings, visit)
         end
     end
     if settings.showRacials then
-        for _, spellID in ipairs(BUI.CDM.GetKnownRacialSpellIDs(racialScratch)) do
+        for _, spellID in ipairs(BUI.CDM.KnownRacials()) do
             known[spellID] = true
             if not placed[RacialKey(spellID)] and not custom[spellID] then visit("racial", spellID) end
         end
@@ -567,12 +562,16 @@ local function UpdateBar(index)
     local growDown = settings.growVertical ~= "UP"
     local maxPerRow = settings.maxPerRow > 0 and settings.maxPerRow or 9999
     local cursorAnchored = settings.anchorFrame == "Mouse"
+    local anchor = (growDown and "TOP" or "BOTTOM") .. (growRight and "LEFT" or "RIGHT")
+    local styleStamp = bar.styleStamp
 
     for iconIndex = 1, count do
         local entry = itemsBuffer[iconIndex]
         local icon = bar.icons[iconIndex] or CreateIcon(bar.frame, index, iconIndex)
         bar.icons[iconIndex] = icon
 
+        local reassigned = icon.itemID ~= entry.id or icon.iconType ~= entry.iconType
+        if reassigned then IconEngine.ResetVisual(icon.tex, icon.cd) end
         icon.itemID = entry.id
         icon.iconType = entry.iconType
         icon.hasCharges = entry.hasCharges
@@ -602,19 +601,18 @@ local function UpdateBar(index)
             IconEngine.ApplyItemVisual(icon.tex, icon.cd, entry.cnt, entry.id, bar.expiryCb)
         end
         icon.cd:SetHideCountdownNumbers(not settings.showCooldownText)
+        TintStackText(icon)
 
-        StyleIcon(icon, settings)
-        icon:ClearAllPoints()
+        if icon.styleStamp ~= styleStamp then
+            if StyleIcon(icon, settings) then icon.styleStamp = styleStamp end
 
-        local column = (iconIndex - 1) % maxPerRow
-        local row = math.floor((iconIndex - 1) / maxPerRow)
-        local offsetX = column * (scaledSize + gap)
-        local offsetY = row * (scaledSize + gap)
-
-        local horizontalAnchor = growRight and "LEFT" or "RIGHT"
-        local verticalAnchor = growDown and "TOP" or "BOTTOM"
-        local anchor = verticalAnchor .. horizontalAnchor
-        icon:SetPoint(anchor, bar.frame, anchor, growRight and offsetX or -offsetX, growDown and -offsetY or offsetY)
+            local column = (iconIndex - 1) % maxPerRow
+            local row = math.floor((iconIndex - 1) / maxPerRow)
+            local offsetX = column * (scaledSize + gap)
+            local offsetY = row * (scaledSize + gap)
+            icon:ClearAllPoints()
+            icon:SetPoint(anchor, bar.frame, anchor, growRight and offsetX or -offsetX, growDown and -offsetY or offsetY)
+        end
         icon:Show()
         icon:EnableMouse(not cursorAnchored)
         icon:SetHitRectInsets(0, 0, 0, 0)
@@ -721,18 +719,22 @@ local function CreateBar(index)
     return bar
 end
 
-function CustomBars.RefreshBar(index)
+local function RebuildBar(index)
     local settings = GetBar(index)
     if not settings then
         local bar = bars[index]
         if bar then bar.frame:Hide() end
-        CustomBars.RefreshHotEventRegistration()
         return
     end
     ApplyBarDefaults(settings)
     local bar = bars[index] or CreateBar(index)
+    bar.styleStamp = (bar.styleStamp or 0) + 1
     PositionBar(bar, settings)
     UpdateBar(index)
+end
+
+function CustomBars.RefreshBar(index)
+    RebuildBar(index)
     CustomBars.RefreshHotEventRegistration()
 end
 
@@ -743,8 +745,33 @@ function CustomBars.RefreshAllBars()
         if index > maxIndex then maxIndex = index end
     end
     for barIndex = 1, maxIndex do
-        CustomBars.RefreshBar(barIndex)
+        RebuildBar(barIndex)
     end
+    CustomBars.RefreshHotEventRegistration()
+end
+
+local function AnchorStale(frame, settings)
+    local anchorFrame = settings.anchorFrame
+    if anchorFrame == "" then return false end
+    return not frame._isAnchored or frame._anchorTarget ~= BUI.ResolveAnchorFrame(anchorFrame, settings.anchorPoint)
+end
+
+local function RefreshBarContents()
+    local settings = GetSettings()
+    for barIndex = 1, #settings do
+        local bar = bars[barIndex]
+        if bar then
+            local barSettings = settings[barIndex]
+            local iconCount = #bar.icons
+            UpdateBar(barIndex)
+            if #bar.icons ~= iconCount or AnchorStale(bar.frame, barSettings) then
+                PositionBar(bar, barSettings)
+            end
+        else
+            RebuildBar(barIndex)
+        end
+    end
+    CustomBars.RefreshHotEventRegistration()
 end
 
 local function RepositionAnchoredBars()
@@ -911,7 +938,7 @@ end
 
 local OnEvent = BUI.Dispatcher.New(function()
     if HasEnabledBar() then BUI.CDM.Custom.InvalidateStaleBagCache() end
-    CustomBars.RefreshAllBars()
+    RefreshBarContents()
 end)
 
 local function OnEnteringWorld(_, isInitialLogin, isReloadingUi)

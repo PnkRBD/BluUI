@@ -269,8 +269,7 @@ end
 
 local function ResolveIconIDs(icon, iconFrameData)
     local cooldownInfo = icon.cooldownInfo
-    local baseID = cooldownInfo and BUI.Tools.SafeNum(cooldownInfo.spellID)
-    local overrideID = cooldownInfo and BUI.Tools.SafeNum(cooldownInfo.overrideSpellID)
+    local baseID, overrideID = CDM.CooldownSpellIDs(cooldownInfo)
     if cooldownInfo then
         local cooldownID = BUI.Tools.SafeNum(cooldownInfo.cooldownID)
         if baseID or overrideID then
