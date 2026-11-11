@@ -257,25 +257,88 @@ local knownItemDurations = {
 }
 local ITEM_CD_THRESHOLD = 1.5
 
-local cooldownFrameTime = -1
-local cooldownStarts, cooldownDurations, cooldownEnables = {}, {}, {}
+local NEVER = math.huge
+local ITEM_CAST_WINDOW = 0.5
+local ITEM_RESET_WINDOW = 5
+local itemChangePossibleUntil = 0
+local cooldownStarts, cooldownDurations, cooldownEnables, cooldownEnds = {}, {}, {}, {}
+local trinketSlotByItem = {}
 
-BUI.Events:Register('BAG_UPDATE_COOLDOWN', 'IconEngineItemCooldown', function() cooldownFrameTime = -1 end)
+local function ExpectItemChange(window)
+	local windowEnd = GetTime() + window
+	if windowEnd > itemChangePossibleUntil then itemChangePossibleUntil = windowEnd end
+end
+
+local function OnPlayerCast()
+	ExpectItemChange(ITEM_CAST_WINDOW)
+end
+
+local function ForgetItemCooldowns()
+	wipe(cooldownStarts)
+	ExpectItemChange(ITEM_CAST_WINDOW)
+end
+
+local function OnEquipmentLoaded()
+	wipe(trinketSlotByItem)
+	for _, inventorySlot in pairs(TRINKET_SLOT_INV) do
+		local itemID = GetInventoryItemID('player', inventorySlot)
+		if itemID then trinketSlotByItem[itemID] = inventorySlot end
+	end
+	ForgetItemCooldowns()
+end
+
+local function OnCooldownsReset()
+	wipe(cooldownStarts)
+	ExpectItemChange(ITEM_RESET_WINDOW)
+end
+
+local function OnItemCooldownEvent()
+	if GetTime() <= itemChangePossibleUntil then
+		wipe(cooldownStarts)
+		return
+	end
+	for itemID in pairs(cooldownStarts) do
+		if cooldownEnables[itemID] == 0 then cooldownStarts[itemID] = nil end
+	end
+end
+
+BUI.Events:Register('BAG_UPDATE_COOLDOWN',      'IconEngineItemCooldown', OnItemCooldownEvent)
+BUI.Events:Register('BAG_UPDATE_DELAYED',       'IconEngineItemCooldown', ForgetItemCooldowns)
+BUI.Events:Register('PLAYER_REGEN_DISABLED',    'IconEngineItemCooldown', ForgetItemCooldowns)
+BUI.Events:Register('PLAYER_REGEN_ENABLED',     'IconEngineItemCooldown', ForgetItemCooldowns)
+BUI.Events:Register('PLAYER_EQUIPMENT_CHANGED', 'IconEngineItemCooldown', OnEquipmentLoaded)
+BUI.Events:Register('PLAYER_ENTERING_WORLD',    'IconEngineItemCooldown', OnEquipmentLoaded)
+BUI.Events:Register('ENCOUNTER_END',            'IconEngineItemCooldown', OnCooldownsReset)
+BUI.Events:Register('CHALLENGE_MODE_START',     'IconEngineItemCooldown', OnCooldownsReset)
+BUI.Events:RegisterUnit('UNIT_SPELLCAST_START',         'player', 'IconEngineItemCooldown', OnPlayerCast)
+BUI.Events:RegisterUnit('UNIT_SPELLCAST_CHANNEL_START', 'player', 'IconEngineItemCooldown', OnPlayerCast)
+BUI.Events:RegisterUnit('UNIT_SPELLCAST_EMPOWER_START', 'player', 'IconEngineItemCooldown', OnPlayerCast)
+BUI.Events:RegisterUnit('UNIT_SPELLCAST_SUCCEEDED',     'player', 'IconEngineItemCooldown', OnPlayerCast)
+
+local function StoreItemCooldown(itemID, cooldownStart, cooldownDuration, enable)
+	cooldownStarts[itemID], cooldownDurations[itemID], cooldownEnables[itemID] = cooldownStart, cooldownDuration, enable
+	cooldownEnds[itemID] = cooldownStart > 0 and cooldownStart + cooldownDuration or NEVER
+end
+
+local function ReadTrinketCooldown(itemID, inventorySlot)
+	local cooldownStart, cooldownDuration = GetInventoryItemCooldown('player', inventorySlot)
+	StoreItemCooldown(itemID, cooldownStart, cooldownDuration, 1)
+end
+BUI.Perf.Track('IconEngine.ReadTrinketCooldown', ReadTrinketCooldown)
+
+local function ReadItemCooldown(itemID)
+	local cooldownStart, cooldownDuration, enable = C_Container.GetItemCooldown(itemID)
+	if not cooldownStart then cooldownStart, cooldownDuration, enable = 0, 0, 1 end
+	StoreItemCooldown(itemID, cooldownStart, cooldownDuration, enable)
+end
+BUI.Perf.Track('IconEngine.ReadItemCooldown', ReadItemCooldown)
 
 local function ItemCooldown(itemID)
-	local now = GetTime()
-	if now ~= cooldownFrameTime then
-		cooldownFrameTime = now
-		wipe(cooldownStarts)
+	if cooldownStarts[itemID] == nil or GetTime() >= cooldownEnds[itemID] then
+		local inventorySlot = trinketSlotByItem[itemID]
+		if inventorySlot then ReadTrinketCooldown(itemID, inventorySlot) else ReadItemCooldown(itemID) end
 	end
-	local cooldownStart = cooldownStarts[itemID]
-	if cooldownStart == nil then
-		local cooldownDuration, enable
-		cooldownStart, cooldownDuration, enable = C_Container.GetItemCooldown(itemID)
-		if not cooldownStart then cooldownStart, cooldownDuration, enable = 0, 0, 1 end
-		cooldownStarts[itemID], cooldownDurations[itemID], cooldownEnables[itemID] = cooldownStart, cooldownDuration, enable
-	end
-	return cooldownStart, cooldownDurations[itemID], cooldownEnables[itemID]
+	return cooldownStarts[itemID], cooldownDurations[itemID], cooldownEnables[itemID]
 end
 IconEngine.ItemCooldownState = ItemCooldown
 

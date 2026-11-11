@@ -183,6 +183,7 @@ local spellCooldownPending = false
 local changedCooldownSpells = {}
 local itemCooldownPending = false
 local itemCountPending = false
+local itemUsablePending = false
 local auraPending = false
 local usablePending = false
 
@@ -1340,11 +1341,21 @@ local function RefreshViewer(viewerKey)
     end
 end
 
-local function UpdateConsumableIcons()
+local function ConsumableCountUnchanged(frameData)
+    local count, shownID = AggregateCountPrio(frameData.itemID or frameData.customSpellID, frameData.potionPrio)
+    if count == frameData._countSeen and shownID == frameData._shownIDSeen then return true end
+    frameData._countSeen, frameData._shownIDSeen = count, shownID
+    return false
+end
+
+local function UpdateConsumableIcons(countsOnly)
     for viewerKey, viewerIcons in pairs(icons) do
         for versionIndex = 1, iconCounts[viewerKey] do
             local icon = viewerIcons[versionIndex]
-            if FrameData[icon].iconType == "consumable" then UpdateIcon(icon) end
+            local frameData = FrameData[icon]
+            if frameData.iconType == "consumable" and not (countsOnly and ConsumableCountUnchanged(frameData)) then
+                UpdateIcon(icon)
+            end
         end
     end
 end
@@ -1526,9 +1537,10 @@ local function FlushDispatch()
             RunItemWalk()
         end
     end
-    if itemCountPending then
-        itemCountPending = false
-        UpdateConsumableIcons()
+    if itemCountPending or itemUsablePending then
+        local countsOnly = not itemUsablePending
+        itemCountPending, itemUsablePending = false, false
+        UpdateConsumableIcons(countsOnly)
     end
     if usablePending then
         usablePending = false
@@ -1683,7 +1695,7 @@ local function UnregisterHotEvents()
 end
 
 local function OnItemUsableChanged()
-    itemCountPending = true
+    itemUsablePending = true
     QueueDispatch()
 end
 
