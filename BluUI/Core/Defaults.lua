@@ -224,6 +224,7 @@ BUI.Defaults = {
 	global = {
 		layoutStyle    = 'centered',
 		windowScale    = 100,
+		dockPages      = { dashboard = true, actionbars = true, power = true, cdm = true, castbars = true, unitframes = true, settings = true },
 		installerMatchGroups = true,
 		savedThemes    = {},
 		session        = {},

@@ -203,7 +203,7 @@ Layout.TableKitExtensions[#Layout.TableKitExtensions + 1] = function(kit, window
 			return tool.build(parent)
 		elseif kind == 'options' then
 			local button
-			button = kit.IconButton(parent, tool.icon or 'cog', tool.tooltip, function() kit.Popover(button, tool, after) end)
+			button = kit.IconButton(parent, tool.icon or 'cog', tool.tooltip, function() kit.Popover(button, tool, after) end, tool.hover, tool.size)
 			return button
 		elseif kind == 'icon' then
 			return kit.IconButton(parent, tool.icon, tool.tooltip, tool.onClick, tool.hover, tool.size)

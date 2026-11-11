@@ -94,10 +94,10 @@ local function RestoreMenu()
 end
 
 local function WatchOptions()
-	local options = BUI.PageEngine.frame
+	local options = BUI.PageEngine.window
 	if optionsHooked or not options then return end
 	optionsHooked = true
-	options:HookScript('OnHide', RestoreMenu)
+	options:OnClosed(RestoreMenu)
 end
 
 local function OpenBluUI()

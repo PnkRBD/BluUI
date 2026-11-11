@@ -162,6 +162,12 @@ local function SpecLine()
     return (specName and (specName .. ' ' .. className) or className) .. '  ·  ' .. GetRealmName()
 end
 
+BUI.Dashboard = { SpecLine = SpecLine }
+
+function BUI.Dashboard.Greeting()
+    return 'Welcome back, ' .. UnitName('player')
+end
+
 local function OwnedKeystone()
     local level = C_MythicPlus.GetOwnedKeystoneLevel()
     local mapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
@@ -776,7 +782,7 @@ local function PlaceHead(heads, width)
 end
 
 local function BuildHeader(onCards)
-    local greeting = kit.Text(block, 'Welcome back, ' .. UnitName('player'), 22, 'text')
+    local greeting = kit.Text(block, BUI.Dashboard.Greeting(), 22, 'text')
     greeting:SetPoint('TOPLEFT')
     local specLine = kit.Text(block, '', 13, 'muted')
     specLine:SetPoint('TOPLEFT', greeting, 'BOTTOMLEFT', 0, -2)
@@ -788,7 +794,7 @@ local function BuildHeader(onCards)
             set = function(value) DashboardDB().cardVisibility[entry.id] = value end,
         }
     end
-    kit.Tool(block, { icon = 'cog', tooltip = 'Choose cards', title = 'Cards', options = options }, onCards):SetPoint('TOPRIGHT', 0, -4)
+    kit.Tool(block, { icon = 'cog', size = 18, tooltip = 'Choose cards', title = 'Cards', options = options }, onCards):SetPoint('LEFT', greeting, 'RIGHT', 6, 0)
     return { Refresh = function() specLine:SetText(SpecLine()) end }
 end
 

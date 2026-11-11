@@ -55,6 +55,12 @@ local function CreateWindow()
 		clampedToScreen = false,
 		theme        = BUI.GetDB().windowTheme,
 		resolveFont  = BUI.FetchFont,
+		card         = {
+			onRestore  = PageEngine.Show,
+			heading    = BUI.Dashboard.Greeting,
+			subheading = BUI.Dashboard.SpecLine,
+			items      = BUI.Nav.Shortcuts,
+		},
 	})
 	window.frame:Hide()
 	window.frame:SetScale(BUI.db.global.windowScale / 100)
@@ -64,7 +70,7 @@ local function CreateWindow()
 	BUI.Tools.AddPageWatermark(window.content)
 	BUI.Scale.SetupButtons(window, PageEngine.frame)
 
-	window.frame:HookScript('OnHide', HideCurrentPage)
+	window:OnClosed(HideCurrentPage)
 
 	local buttonFrame = window.footerLeftmost
 	local searchBox = Controls.SearchBox(buttonFrame:GetParent(), 'Search...', function(query)

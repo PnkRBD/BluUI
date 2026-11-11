@@ -19,6 +19,9 @@ local GRIP_SIZE = 14
 local NAV_RAIL_INSET = 12
 local PORTRAIT_SIZE = 32
 local BRAND_SIZE = 15
+local BAR_ICON_GAP = 14
+local CARD_HEAD = 50
+local CARD_PAD = 14
 local BORDER_ACCENT_SCALE = 0.45
 local GRIP_ACCENT_SCALE = 0.85
 local GRIP_IDLE_ALPHA = 0.55
@@ -146,6 +149,12 @@ function Layout.PlayerPortrait(texture)
 	watcher:SetScript('OnEvent', Refresh)
 	owner:HookScript('OnShow', Refresh)
 	Refresh()
+end
+
+local function BarIcon(window, parent, glyph, tooltip, onClick)
+	local icon = Controls.Icon(parent, { size = 14, texture = BUILib.GetLibMedia(glyph), tooltip = tooltip, onClick = onClick })
+	window:Bind(Widget.Unwrap(icon), function() icon:SetIdleColor(window:Color('barIcon')) end)
+	return icon
 end
 
 function Layout.WindowFrame(config)
@@ -412,14 +421,166 @@ function Layout.TitleBar(window, config)
 		brand:SetPoint('LEFT', portrait, 'RIGHT', 12, 0)
 	end
 
-	local close = Controls.Icon(bar, {
-		size = 14, texture = BUILib.GetLibMedia('x'), tooltip = 'Close',
-		onClick = function() window.frame:Hide() end,
-	})
+	local close = BarIcon(window, bar, 'x', 'Close', function() window.frame:Hide() end)
 	close:SetPoint('RIGHT', -16, 0)
-	window:Bind(Widget.Unwrap(close), function() close:SetIdleColor(window:Color('barIcon')) end)
+
+	if config.card then
+		BarIcon(window, bar, 'minus', 'Minimize', function() window:Minimize() end):SetPoint('RIGHT', Widget.Unwrap(close), 'LEFT', -BAR_ICON_GAP, 0)
+		Layout.MinimizedCard(window, config, Widget.Unwrap(close))
+	end
 
 	return { frame = bar, close = close }
+end
+
+local function Chip(window, kit, parent, icon, label, on)
+	local chip = CreateFrame('Button', nil, parent)
+	chip:SetHeight(28)
+	local fill = window:Fill(chip, 'secondary')
+	fill:SetAllPoints()
+	kit.Hover(chip)
+	local glyph = kit.Glyph(chip, icon, 13, 'muted')
+	glyph:SetPoint('LEFT', 8, 0)
+	local text = label and kit.Text(chip, label, 12, 'muted', nil, 'title')
+	if text then text:SetPoint('LEFT', glyph, 'RIGHT', 8, 0) end
+	chip:SetWidth(29 + (text and 8 + math.ceil(text:GetStringWidth()) or 0))
+	function chip:SetOn(value)
+		fill:SetShown(value)
+		window:Paint(glyph, value and 'accent' or 'muted')
+		if text then window:Paint(text, value and 'text' or 'muted') end
+	end
+	chip:SetOn(on)
+	return chip
+end
+
+function Layout.MinimizedCard(window, config, windowClose)
+	local frame, spec, kit = window.frame, config.card, Layout.TableKit(window)
+	local minimized, closedCallbacks, chips = false, {}, {}
+	local cog, Refresh
+
+	local card = CreateFrame('Button', nil, UIParent)
+	card:SetFrameStrata(frame:GetFrameStrata())
+	card:SetFrameLevel(frame:GetFrameLevel())
+	card:SetMovable(true)
+	card:SetClampedToScreen(true)
+	card:RegisterForDrag('LeftButton')
+	card:SetScript('OnDragStart', card.StartMoving)
+	card:SetScript('OnDragStop', card.StopMovingOrSizing)
+	card:SetScript('OnClick', spec.onRestore)
+	card:Hide()
+	card._paintOwner = frame
+	local edges, background = Layout.FrameChrome(card)
+	for _, edge in ipairs(edges) do window:Paint(edge, 'edge') end
+	window:Paint(background, 'page')
+	local rule = window:Fill(card, 'rule', 'ARTWORK')
+	rule:SetPoint('TOPLEFT', 1, -CARD_HEAD - 1)
+	rule:SetPoint('BOTTOMRIGHT', card, 'TOPRIGHT', -1, -CARD_HEAD - 2)
+
+	local logo = card:CreateTexture(nil, 'ARTWORK')
+	logo:SetSize(28, 28)
+	logo:SetPoint('LEFT', card, 'TOPLEFT', CARD_PAD + 1, -CARD_HEAD / 2 - 1)
+	logo:SetTexture(config.icon)
+	logo:SetMask(BUILib.GetLibMedia('circle_mask'))
+	local heading = window:Text(card, '', 15, 'barText')
+	heading:SetPoint('BOTTOMLEFT', logo, 'RIGHT', 12, 1)
+	local subheading = window:Text(card, '', 11, 'muted')
+	subheading:SetPoint('TOPLEFT', heading, 'BOTTOMLEFT', 0, -2)
+
+	local function Closed()
+		for _, callback in ipairs(closedCallbacks) do callback() end
+	end
+	local close = BarIcon(window, card, 'x', 'Close', function()
+		minimized = false
+		card:Hide()
+		Closed()
+	end)
+	close:SetPoint('RIGHT', card, 'TOPRIGHT', -CARD_PAD - 1, -CARD_HEAD / 2 - 1)
+	local expand = BarIcon(window, card, 'resize', 'Expand', spec.onRestore)
+	expand:SetPoint('RIGHT', Widget.Unwrap(close), 'LEFT', -BAR_ICON_GAP, 0)
+	local divider = window:Fill(card, 'rule', 'ARTWORK')
+	divider:SetSize(1, 24)
+	divider:SetPoint('RIGHT', Widget.Unwrap(expand), 'LEFT', -12, 0)
+
+	local function Rebuild()
+		local right, top = card:GetRight(), card:GetTop()
+		Refresh()
+		card:ClearAllPoints()
+		card:SetPoint('TOPRIGHT', UIParent, 'BOTTOMLEFT', right, top)
+	end
+	cog = kit.IconButton(card, 'cog', 'Choose shortcuts', function()
+		local items = spec.items()
+		local rows = math.ceil(#items / 2)
+		Controls.Popover({
+			anchor = cog, width = 300, height = rows * 30 - 2, title = 'Shortcuts',
+			bg = { window:Color('page') }, border = { window:Color('edge') },
+			build = function(panel)
+				local width = (panel.width - 2) / 2
+				for index, item in ipairs(items) do
+					local chip = Chip(window, kit, panel, item.icon, item.label, item.get())
+					chip:SetWidth(width)
+					chip:SetPoint('TOPLEFT', math.floor((index - 1) / rows) * (width + 2), -((index - 1) % rows) * 30)
+					chip:SetScript('OnClick', function()
+						item.set(not item.get())
+						chip:SetOn(item.get())
+						Rebuild()
+					end)
+				end
+			end,
+		})
+	end)
+	cog:SetPoint('RIGHT', divider, 'LEFT', -8, 0)
+
+	function Refresh()
+		heading:SetText(spec.heading())
+		subheading:SetText(spec.subheading())
+		for _, chip in ipairs(chips) do
+			chip:Hide()
+			chip:SetParent(nil)
+		end
+		wipe(chips)
+		local x = 9
+		for _, item in ipairs(spec.items()) do
+			if item.current or item.get() then
+				local chip = Chip(window, kit, card, item.icon, item.current and item.label, item.current)
+				chip:SetPoint('TOPLEFT', x, -CARD_HEAD - 6)
+				chip:SetScript('OnClick', item.open)
+				if item.current then
+					local bar = window:Fill(chip, 'accent', 'ARTWORK')
+					bar:SetPoint('BOTTOMLEFT')
+					bar:SetPoint('TOPRIGHT', chip, 'BOTTOMRIGHT', 0, 2)
+				else
+					chip:HookScript('OnEnter', function(self) Widget.ShowTip(self, item.label) end)
+					chip:HookScript('OnLeave', Widget.HideTip)
+				end
+				chips[#chips + 1] = chip
+				x = x + chip:GetWidth() + 2
+			end
+		end
+		local text = math.max(heading:GetStringWidth(), subheading:GetStringWidth())
+		card:SetSize(Widget.EvenSize(math.max(x + 7, text + cog:GetWidth() + 117 + CARD_PAD * 2)), CARD_HEAD + 41)
+	end
+
+	frame:HookScript('OnShow', function()
+		minimized = false
+		card:Hide()
+	end)
+	frame:HookScript('OnHide', function()
+		if not minimized then Closed() end
+	end)
+
+	function window:OnClosed(callback)
+		closedCallbacks[#closedCallbacks + 1] = callback
+	end
+
+	function window:Minimize()
+		local x, y = windowClose:GetCenter()
+		minimized = true
+		frame:Hide()
+		card:SetScale(frame:GetScale())
+		Refresh()
+		card:ClearAllPoints()
+		card:SetPoint('TOPRIGHT', UIParent, 'BOTTOMLEFT', x + 8 + CARD_PAD, y + CARD_HEAD / 2 + 1)
+		card:Show()
+	end
 end
 
 function Layout.ReservePage(window, pageWidth, sidebarWidth, footerHeight)
