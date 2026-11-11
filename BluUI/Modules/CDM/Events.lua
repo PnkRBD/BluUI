@@ -185,8 +185,8 @@ local function ClassifyWatchEntry(id)
 end
 
 local function ItemCooldownEnd(itemID)
-    local start, duration = C_Container.GetItemCooldown(itemID)
-    if not start or not duration or duration < ITEM_CD_THRESHOLD then return nil end
+    local start, duration = BUI.IconEngine.ItemCooldownState(itemID)
+    if duration < ITEM_CD_THRESHOLD then return nil end
     local endTime = start + duration
     if endTime > GetTime() then return endTime end
 end

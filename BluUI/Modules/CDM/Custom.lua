@@ -1120,6 +1120,7 @@ local function SetupIcon(icon, storedValue, viewerKey, index)
     frameData.lastCount = nil
     frameData._cdFingerStart = nil
     frameData._cdFingerDuration = nil
+    frameData._itemCooldownKey = nil
     frameData._manualBuff = nil
 
     local preservedStart = priorManualStart
@@ -1444,12 +1445,11 @@ local function UpdateRelevantBuffIcons()
     end
 end
 
-local function WalkIconSet(iconSet, itemsOnly)
+local function WalkIconSet(iconSet)
     for icon in pairs(iconSet) do
-        local frameData = FrameData[icon]
-        if not flushSeen[icon] and (not itemsOnly or frameData.itemID) then
+        if not flushSeen[icon] then
             flushSeen[icon] = true
-            if not frameData.hidden then
+            if not FrameData[icon].hidden then
                 UpdateIcon(icon)
             end
         end
@@ -1468,24 +1468,38 @@ local RunChangedSpellWalk = function()
 end
 
 local function ItemCooldownUnchanged(frameData)
-    if frameData.iconType ~= "consumable" then return false end
-    local key = IconEngine.ItemCooldownKey(frameData.itemID or frameData.customSpellID)
-    if key ~= nil and key == frameData._itemCooldownKey then return true end
-    frameData._itemCooldownKey = key
+    local itemID = frameData.itemID or frameData.customSpellID
+    local iconType = frameData.iconType
+    local key, span
+    if iconType == "consumable" then
+        key = IconEngine.ItemCooldownKey(itemID)
+    elseif iconType == "trinket" then
+        local start, duration, enable = IconEngine.ItemCooldownState(itemID)
+        if enable ~= 0 then key, span = start, duration end
+    end
+    if key ~= nil and itemID == frameData._itemWalkID and key == frameData._itemCooldownKey and span == frameData._itemCooldownSpan then
+        return true
+    end
+    frameData._itemWalkID, frameData._itemCooldownKey, frameData._itemCooldownSpan = itemID, key, span
     return false
+end
+
+local function WalkItemIcon(icon)
+    if flushSeen[icon] then return end
+    flushSeen[icon] = true
+    local frameData = FrameData[icon]
+    if not frameData.hidden and not ItemCooldownUnchanged(frameData) then UpdateIcon(icon) end
 end
 
 local RunItemWalk = function()
     for _, iconSet in pairs(itemMap) do
+        for icon in pairs(iconSet) do WalkItemIcon(icon) end
+    end
+    for _, iconSet in pairs(spellMap) do
         for icon in pairs(iconSet) do
-            if not flushSeen[icon] then
-                flushSeen[icon] = true
-                local frameData = FrameData[icon]
-                if not frameData.hidden and not ItemCooldownUnchanged(frameData) then UpdateIcon(icon) end
-            end
+            if FrameData[icon].itemID then WalkItemIcon(icon) end
         end
     end
-    for _, iconSet in pairs(spellMap) do WalkIconSet(iconSet, true) end
 end
 
 local RunUsableWalk = function()

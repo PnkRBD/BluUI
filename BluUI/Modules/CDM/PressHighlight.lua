@@ -170,12 +170,6 @@ local function CollectRawKeysForItem(itemID)
 end
 
 local iconKeyCache = {}
-local KEY_CACHE_EVENTS = {
-    'UPDATE_BINDINGS', 'ACTIONBAR_SLOT_CHANGED', 'ACTIONBAR_PAGE_CHANGED', 'UPDATE_BONUS_ACTIONBAR',
-    'UPDATE_OVERRIDE_ACTIONBAR', 'UPDATE_VEHICLE_ACTIONBAR', 'PLAYER_SPECIALIZATION_CHANGED', 'SPELLS_CHANGED',
-}
-
-local function WipeKeyCache() wipe(iconKeyCache) end
 
 local function GetAllRawKeysForIcon(icon)
     local frameData = CDM.FrameData[icon]
@@ -221,7 +215,7 @@ local function RebuildBindings()
     builtGeneration = CDM.Keybinds.GetGeneration()
     if builtGeneration ~= cacheGeneration then
         cacheGeneration = builtGeneration
-        WipeKeyCache()
+        wipe(iconKeyCache)
     end
 
     for viewerIndex = 1, CDM.VIEWER_KEYS_COUNT do
@@ -818,7 +812,6 @@ local MOUSE_KEY = {
 local function StopInput()
     if listener then listener:Hide() end
     BUI.Events:Unregister('GLOBAL_MOUSE_DOWN', 'CDM.PressHL')
-    for _, event in ipairs(KEY_CACHE_EVENTS) do BUI.Events:Unregister(event, 'CDM.PressHL.Keys') end
     BUI.Events:Unregister('GLOBAL_MOUSE_UP', 'CDM.PressHL')
     BUI.Events:Unregister('MODIFIER_STATE_CHANGED', 'CDM.PressHL')
     BUI.Events:Unregister('PLAYER_DEAD', 'CDM.PressHL')
@@ -840,7 +833,6 @@ local function StartInput()
         listener:SetScript('OnKeyDown', function(_, key) OnInputDown(key) end)
     end
     listener:Show()
-    for _, event in ipairs(KEY_CACHE_EVENTS) do BUI.Events:Register(event, 'CDM.PressHL.Keys', WipeKeyCache) end
     BUI.Events:Register('GLOBAL_MOUSE_DOWN', 'CDM.PressHL', function(_, button)
         local keyName = MOUSE_KEY[button]
         if keyName then OnInputDown(keyName) end

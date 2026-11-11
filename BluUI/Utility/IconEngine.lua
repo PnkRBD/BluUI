@@ -257,11 +257,27 @@ local knownItemDurations = {
 }
 local ITEM_CD_THRESHOLD = 1.5
 
+local cooldownFrameTime = -1
+local cooldownStarts, cooldownDurations, cooldownEnables = {}, {}, {}
+
+BUI.Events:Register('BAG_UPDATE_COOLDOWN', 'IconEngineItemCooldown', function() cooldownFrameTime = -1 end)
+
 local function ItemCooldown(itemID)
-	local cooldownStart, cooldownDuration, enable = C_Container.GetItemCooldown(itemID)
-	if not cooldownStart then return 0, 0, 1 end
-	return cooldownStart, cooldownDuration, enable
+	local now = GetTime()
+	if now ~= cooldownFrameTime then
+		cooldownFrameTime = now
+		wipe(cooldownStarts)
+	end
+	local cooldownStart = cooldownStarts[itemID]
+	if cooldownStart == nil then
+		local cooldownDuration, enable
+		cooldownStart, cooldownDuration, enable = C_Container.GetItemCooldown(itemID)
+		if not cooldownStart then cooldownStart, cooldownDuration, enable = 0, 0, 1 end
+		cooldownStarts[itemID], cooldownDurations[itemID], cooldownEnables[itemID] = cooldownStart, cooldownDuration, enable
+	end
+	return cooldownStart, cooldownDurations[itemID], cooldownEnables[itemID]
 end
+IconEngine.ItemCooldownState = ItemCooldown
 
 local function ItemUsable(itemID)
 	local usable = C_Item.IsUsableItem(itemID)

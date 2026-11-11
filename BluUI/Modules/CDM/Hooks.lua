@@ -6,7 +6,6 @@ local _G = _G
 local wipe = wipe
 
 local CDM = BUI.CDM
-local Pixel = BUI.Pixel
 local FrameData = CDM.FrameData
 local GetFrameData = CDM.GetFrameData
 
@@ -318,20 +317,7 @@ local function ApplyCooldownStyle(cooldown, cooldownFrameData)
     local parentFrameData = FrameData[parent]
     local settings = CDM.GetSettings(parentFrameData.viewerKey)
 
-    local scaledEdge = (parentFrameData.skinVer and settings.borderSize > 0)
-        and (Pixel.Scale(settings.borderSize) - Pixel.PixelSize(1)) or 0
-    if cooldownFrameData.anchoredParent ~= parent or cooldownFrameData.anchoredEdge ~= scaledEdge then
-        cooldownFrameData.anchoredParent = parent
-        cooldownFrameData.anchoredEdge = scaledEdge
-        cooldown:ClearAllPoints()
-        if scaledEdge > 0 then
-            cooldown:SetPoint("TOPLEFT", parent, "TOPLEFT", scaledEdge, -scaledEdge)
-            cooldown:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -scaledEdge, scaledEdge)
-        else
-            cooldown:SetAllPoints(parent)
-        end
-    end
-
+    CDM.AnchorCooldown(cooldown, cooldownFrameData, parent, parentFrameData.skinVer and settings.borderSize or 0)
     CDM.ApplyCooldownSwipeStyle(cooldown, settings)
     cooldownFrameData.styleVer = CDM.state.skinVersion
 end

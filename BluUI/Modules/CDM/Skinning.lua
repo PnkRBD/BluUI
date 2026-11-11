@@ -360,6 +360,20 @@ local function SetupCooldown(cooldown)
     end
 end
 
+function CDM.AnchorCooldown(cooldown, cooldownFrameData, icon, borderSize)
+    local edge = borderSize > 0 and (Pixel.Scale(borderSize) - Pixel.PixelSize(1)) or 0
+    if cooldownFrameData.anchoredParent == icon and cooldownFrameData.anchoredEdge == edge then return end
+    cooldownFrameData.anchoredParent = icon
+    cooldownFrameData.anchoredEdge = edge
+    cooldown:ClearAllPoints()
+    if edge > 0 then
+        cooldown:SetPoint("TOPLEFT", icon, "TOPLEFT", edge, -edge)
+        cooldown:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -edge, edge)
+    else
+        cooldown:SetAllPoints(icon)
+    end
+end
+
 local function StyleCooldownText(cooldown, settings)
     local fontString = BUI.Tools.CooldownFontString(cooldown)
     if not fontString then return end
@@ -482,13 +496,9 @@ function CDM.SkinIcon(icon, settings, key)
     local cooldown = icon.Cooldown
     SetupCooldown(cooldown)
 
-    local cooldownEdge = scaledEdge - Pixel.PixelSize(1)
-    if cooldownEdge < 0 then cooldownEdge = 0 end
-    cooldown:ClearAllPoints()
-    cooldown:SetPoint("TOPLEFT", icon, "TOPLEFT", cooldownEdge, -cooldownEdge)
-    cooldown:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", -cooldownEdge, cooldownEdge)
     local cooldownFrameData = FrameData[cooldown]
     cooldownFrameData.anchoredParent = nil
+    CDM.AnchorCooldown(cooldown, cooldownFrameData, icon, borderSize)
     cooldownFrameData.styleVer = nil
     CDM.ApplyCooldownSwipeStyle(cooldown, settings)
     local decimalThreshold = settings.showCooldownDecimals and settings.cooldownDecimalThreshold or 0
