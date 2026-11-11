@@ -1,3 +1,21 @@
+# 5.19.3
+
+A lighter cooldown manager in combat, and two fixes for where its icons sit and when they show.
+
+**Cooldown manager**
+
+Trinket and item icons do far less work on every key press. An item's cooldown is only read again when a cast could have changed it, and equipped trinkets are read from their slot. Potion and item counts are only redrawn when the number changes.
+
+Always show now works on the trinket and racial slot icons.
+
+Moving a viewer is saved to your Edit Mode layout whenever it changes, not only in the first seconds after login.
+
+**Under the hood**
+
+The perf report says how many rows fell below each cut, marks scripts shared with frames outside BluUI, and counts real item cooldown reads.
+
+Updating by hand: delete the old BluUI and BluUI_Options folders, then extract the new ones. Your settings are kept. Restart the game rather than /reload.
+
 # 5.19.2
 
 Chat wraps the way it used to, and a crash in the skinned windows is gone.
