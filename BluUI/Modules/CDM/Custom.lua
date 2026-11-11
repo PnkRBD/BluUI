@@ -1103,7 +1103,7 @@ local function SetupIcon(icon, storedValue, viewerKey, index)
     frameData.customIcon = true
     frameData.customSpellID = spellID
 
-    frameData.customKey = (trinketSlot or racialSlot) and storedValue or IconEngine.CustomKey(spellID)
+    frameData.customKey = IconEngine.EntryKey(storedValue)
     frameData.storedValue = storedValue
     frameData.viewerKey = viewerKey
     frameData.isItemByPrefix = isItemByPrefix
@@ -1263,9 +1263,7 @@ local function RefreshViewer(viewerKey)
 
     local function Place(v, versionIndex)
         consideredKeys[v] = true
-        local numId = IconEngine.EntryNumber(v)
-        local customKey = numId and IconEngine.CustomKey(numId)
-        local forceShow = customKey and alwaysShow[customKey]
+        local forceShow = alwaysShow[IconEngine.EntryKey(v)]
         if viewerKey == "buffs" or forceShow or IsTrackedEntryUsable(v) then
             visibleCount = visibleCount + 1
             local icon = registry[v]

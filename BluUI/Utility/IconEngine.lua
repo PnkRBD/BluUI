@@ -79,6 +79,12 @@ function IconEngine.ItemEntry(itemID) return "item:" .. itemID end
 function IconEngine.SpellEntry(spellID) return "spell:" .. spellID end
 function IconEngine.CustomKey(id) return "custom:" .. id end
 
+function IconEngine.EntryKey(value)
+	if IconEngine.IsSlotEntry(value) then return value end
+	local id = IconEngine.EntryNumber(value)
+	return id and IconEngine.CustomKey(id) or value
+end
+
 function IconEngine.ResolveTrinketSlot(slot)
 	local inventorySlot = TRINKET_SLOT_INV[slot]
 	if not inventorySlot then return nil end

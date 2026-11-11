@@ -23,10 +23,7 @@ local BUFF_VIEWERS = { 'BuffIconCooldownViewer', 'BuffBarCooldownViewer' }
 local CLASS_CATEGORIES = { Enum.CooldownViewerCategory.Essential, Enum.CooldownViewerCategory.Utility }
 
 local function HideKeyFor(id, isCustom)
-	if isCustom and not IconEngine.IsSlotEntry(id) then
-		local numId = IconEngine.EntryNumber(id)
-		if numId then return IconEngine.CustomKey(numId) end
-	end
+	if isCustom then return IconEngine.EntryKey(id) end
 	return id
 end
 
