@@ -5,23 +5,15 @@ BUI.ADDON_NAME = ADDON_NAME
 
 function BUI.Print(message) print(BUI.C.CHAT_PREFIX .. message) end
 
-local EDIT_MODE_WRITE_WINDOW = 10
-local editModeWriteWindowOpen = true
-
-function BUI.CanWriteEditModeLayout()
-	return editModeWriteWindowOpen
-end
-
-function BUI.CloseEditModeWriteWindow()
-	C_Timer.After(EDIT_MODE_WRITE_WINDOW, function() editModeWriteWindowOpen = false end)
-end
-
 local LibEMO = LibStub('LibEditModeOverride-1.0')
+local leftWithInfo = setmetatable({}, { __mode = 'k' })
 
 function BUI.LeaveFrameManager(frame, point, relativePoint, offsetX, offsetY)
 	local systemInfo = frame.systemInfo
 	if not (systemInfo and systemInfo.isInDefaultPosition) then return end
-	if not editModeWriteWindowOpen or InCombatLockdown() or not LibEMO:IsReady() then return end
+	if leftWithInfo[frame] == systemInfo then return end
+	if InCombatLockdown() or not LibEMO:IsReady() then return end
+	leftWithInfo[frame] = systemInfo
 	LibEMO:LoadLayouts()
 	if not LibEMO:CanEditActiveLayout() or not LibEMO:HasEditModeSettings(frame) then return end
 	LibEMO:ReanchorFrame(frame, point, UIParent, relativePoint, offsetX, offsetY)
@@ -291,7 +283,6 @@ function Addon:OnEnable()
 		ReassertBUILib()
 		local scaleBefore = UIParent:GetScale()
 		BUI.ApplyScale()
-		BUI.CloseEditModeWriteWindow()
 		if not BUI.ApproxEqual(scaleBefore, UIParent:GetScale()) then
 			BUI.ExportImport.RefreshAllModules()
 		else

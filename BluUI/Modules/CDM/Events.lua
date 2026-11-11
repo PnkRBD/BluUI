@@ -525,6 +525,7 @@ RequestLayoutRefresh = function(force)
     end
     layoutRefreshPending = false
     layoutRefreshForced = false
+    CDM.ForgetEditModeAnchors()
     C_Timer.After(0, DoLayoutRefresh)
 end
 

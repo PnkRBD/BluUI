@@ -142,7 +142,6 @@ local function ReanchorViewer(key)
     local y = settings.positionY
     if lastSavedX[key] == x and lastSavedY[key] == y then return false end
 
-    if not LibEMO:IsReady() then return false end
     if StoredAnchorMatches(viewer, x, y) then
         lastSavedX[key], lastSavedY[key] = x, y
         return false
@@ -156,20 +155,40 @@ local function ReanchorViewer(key)
     return true
 end
 
+local SAVE_DELAY = 1
+local saveTimer = {}
+local pendingSaves = {}
+
+local function FlushSaves()
+    if InCombatLockdown() then
+        BUI.Events:AfterCombat(FlushSaves, "CDM.EditModeSave")
+        return
+    end
+    if not LibEMO:IsReady() or EditModeManagerFrame:IsShown() then return end
+    local dirty = false
+    for key in pairs(pendingSaves) do
+        pendingSaves[key] = nil
+        if ReanchorViewer(key) then dirty = true end
+    end
+    if dirty then LibEMO:SaveOnly() end
+end
+
 function CDM.SaveToEditModeLayout(key)
-    if not BUI.CanWriteEditModeLayout() then return end
-    if ReanchorViewer(key) then LibEMO:SaveOnly() end
+    pendingSaves[key] = true
+    BUI.Tools.ReplaceTimer(saveTimer, "pending", SAVE_DELAY, FlushSaves)
+end
+
+function CDM.ForgetEditModeAnchors()
+    wipe(lastSavedX)
+    wipe(lastSavedY)
 end
 
 function CDM.ApplyAllPositions()
-    local dirty = false
-    local canWrite = BUI.CanWriteEditModeLayout()
     for keyIndex = 1, CDM.VIEWER_KEYS_COUNT do
         local key = CDM.VIEWER_KEYS[keyIndex]
         CDM.ApplyAnchorPosition(key)
-        if canWrite and ReanchorViewer(key) then dirty = true end
+        CDM.SaveToEditModeLayout(key)
     end
-    if dirty then LibEMO:SaveOnly() end
 end
 
 function CDM.OnCenterHorizontallyChanged(key, enabled)
