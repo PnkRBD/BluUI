@@ -414,8 +414,8 @@ local function StripEscapes(text)
 	text = gsub(text, '|c%x%x%x%x%x%x%x%x|Hurl:(.-)|h.-|h|r', '%1')
 	text = gsub(text, '|Hurl:(.-)|h.-|h', '%1')
 	text = gsub(text, '|H.-|h(.-)|h', '%1')
-	text = gsub(text, '|T.-|t', '')
-	text = gsub(text, '|A.-|a', '')
+	text = gsub(text, ' ?|T.-|t', '')
+	text = gsub(text, ' ?|A.-|a', '')
 	text = gsub(text, '|K.-|k', '')
 	return text
 end
