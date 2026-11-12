@@ -185,14 +185,6 @@ local function RefreshSubtitle()
 	local subZone = GetSubZoneText()
 	if zone and zone ~= '' then parts[#parts + 1] = zone end
 	if subZone and subZone ~= '' and subZone ~= zone then parts[#parts + 1] = subZone end
-
-	local activeCount = 0
-	for trackingIndex = 1, C_Minimap.GetNumTrackingTypes() do
-		local info = C_Minimap.GetTrackingInfo(trackingIndex)
-		if info and info.active then activeCount = activeCount + 1 end
-	end
-	parts[#parts + 1] = format('%d tracking active', activeCount)
-
 	menu.subtitle:SetText(table.concat(parts, ' · '))
 end
 
@@ -200,7 +192,6 @@ local function RefreshSelection()
 	for _, row in pairs(sectionRows) do
 		if row.dropdown:IsShown() then row.dropdown.label:SetText(Summary(row)) end
 	end
-	RefreshSubtitle()
 end
 
 local toolActions = {
@@ -313,7 +304,9 @@ local function BuildMenu()
 
 	menu.subtitle = menu:CreateFontString(nil, 'OVERLAY')
 	menu.subtitle:SetPoint('TOPLEFT', menu.title, 'BOTTOMLEFT', 0, -Pixel.Scale(SUBTITLE_GAP))
+	menu.subtitle:SetWidth(Pixel.Scale(CONTENT_W))
 	menu.subtitle:SetJustifyH('LEFT')
+	menu.subtitle:SetWordWrap(false)
 
 	for _, section in ipairs(SECTIONS) do BuildSectionRow(section) end
 
