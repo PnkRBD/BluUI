@@ -103,18 +103,25 @@ function Pixel.PixelSizeFor(frame, pixels)
     return Pixel.ClampBorder(pixels) * perfectScale / frame:GetEffectiveScale()
 end
 
+local function WatchSnap(object, snap)
+    if not issecrettable(object) and not object:IsForbidden() and object._noSnap and snap then
+        object._noSnap = nil
+    end
+end
+
 local function KillSnap(object)
-    if issecrettable(object) or rawget(object, "_noSnap") or rawget(object, "_keepSnap") or object:IsForbidden() then return end
-
-    local snapsItself = object.SetSnapToPixelGrid ~= nil
-    local target = snapsItself and object or object:GetStatusBarTexture()
-    if type(target) ~= "table" or not target.SetSnapToPixelGrid then return end
-    if not snapsItself then object._noSnap = true end
-    if rawget(target, "_noSnap") then return end
-
-    target:SetSnapToPixelGrid(false)
-    target:SetTexelSnappingBias(0)
-    target._noSnap = true
+    if issecrettable(object) or object:IsForbidden() or object._noSnap or object._keepSnap then return end
+    if object.SetSnapToPixelGrid then
+        object:SetSnapToPixelGrid(false)
+        object:SetTexelSnappingBias(0)
+    elseif object.GetStatusBarTexture then
+        local texture = object:GetStatusBarTexture()
+        if type(texture) == "table" and texture.SetSnapToPixelGrid then
+            texture:SetSnapToPixelGrid(false)
+            texture:SetTexelSnappingBias(0)
+        end
+    end
+    object._noSnap = true
 end
 
 function Pixel.KeepSnap(texture)
@@ -122,32 +129,16 @@ function Pixel.KeepSnap(texture)
     texture:SetSnapToPixelGrid(true)
 end
 
-local function RearmSnap(object, enabled)
-    if not enabled or issecrettable(object) or not rawget(object, "_noSnap") or object:IsForbidden() then return end
-    object._noSnap = nil
-    local parent = object:GetParent()
-    if parent and rawget(parent, "_noSnap") then parent._noSnap = nil end
-end
-
-local SNAP_HOOKS = {
-    SetAtlas = KillSnap,
-    SetColorTexture = KillSnap,
-    SetSnapToPixelGrid = RearmSnap,
-    SetStatusBarTexture = KillSnap,
-    SetTexCoord = KillSnap,
-    SetTexture = KillSnap,
-    SetVertexColor = KillSnap,
-}
+local SNAP_KILLERS = { "SetStatusBarTexture", "SetColorTexture", "SetVertexColor", "CreateTexture", "SetTexCoord", "SetTexture" }
 
 local function HookSnapMethods(widget)
     local prototype = getmetatable(widget).__index
     if rawget(prototype, "_snapHooked") then return end
     prototype._snapHooked = true
 
-    for method, handler in pairs(SNAP_HOOKS) do
-        if prototype[method] then
-            hooksecurefunc(prototype, method, handler)
-        end
+    if prototype.SetSnapToPixelGrid then hooksecurefunc(prototype, "SetSnapToPixelGrid", WatchSnap) end
+    for _, method in ipairs(SNAP_KILLERS) do
+        if prototype[method] then hooksecurefunc(prototype, method, KillSnap) end
     end
 end
 
@@ -333,10 +324,26 @@ GrantSnapMixins(probeFrame:CreateTexture())
 GrantSnapMixins(probeFrame:CreateMaskTexture())
 GrantSnapMixins(probeFrame:CreateFontString())
 
-HookSnapMethods(probeFrame:CreateTexture())
-HookSnapMethods(probeFrame:CreateMaskTexture())
-HookSnapMethods(probeFrame:CreateLine())
-HookSnapMethods(CreateFrame("StatusBar"))
+do
+    local hookedTypes = { Frame = true }
+    HookSnapMethods(probeFrame)
+    HookSnapMethods(probeFrame:CreateTexture())
+    HookSnapMethods(probeFrame:CreateFontString())
+    HookSnapMethods(probeFrame:CreateMaskTexture())
+
+    local widget = EnumerateFrames()
+    while widget do
+        local widgetType = widget:GetObjectType()
+        if not hookedTypes[widgetType] and not widget:IsForbidden() then
+            HookSnapMethods(widget)
+            hookedTypes[widgetType] = true
+        end
+        widget = EnumerateFrames(widget)
+    end
+
+    HookSnapMethods(_G.GameFontNormal)
+    HookSnapMethods(CreateFrame("ScrollFrame"))
+end
 
 function BUI.RefreshAllFonts()
     for fontString, fontData in pairs(fontRegistry) do
@@ -364,4 +371,4 @@ BUI.Hook('Pixel.OnScaleChanged', UIParent, "SetScale", OnScaleChanged)
 Recompute()
 
 BUI.Perf.Track('Pixel.KillSnap', KillSnap)
-BUI.Perf.Track('Pixel.RearmSnap', RearmSnap)
+BUI.Perf.Track('Pixel.WatchSnap', WatchSnap)
