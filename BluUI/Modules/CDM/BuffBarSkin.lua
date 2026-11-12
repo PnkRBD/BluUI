@@ -15,6 +15,7 @@ local viewerMoved = true
 local placedAnchor, placedAnchorPoint, placedOffsetX, placedOffsetY
 local placedGrowDirection, placedCentered, placedPositionX, placedPositionY
 local anchorRetryScheduled
+local fittedWidth
 
 local BAR_ATLAS_PREFIX = "UI-HUD-CoolDownManager"
 local ICON_GAP = 1
@@ -151,11 +152,6 @@ local function PositionViewer()
     end
 end
 
-BUI.Anchor.RegisterCallback('CDM.BuffBarSkin', function()
-    anchorRetries = 0
-    PositionViewer()
-end)
-
 local ScheduleReposition = BUI.Dispatcher.New(PositionViewer)
 
 local HookItemVisibility
@@ -164,6 +160,7 @@ local function FitBarItem(item, config, barWidth)
     local showIcon = config.showIcon
     local iconSize = config.iconSize
     local barHeight = config.barHeight
+    fittedWidth = barWidth
     fitting = true
     item:SetSize((showIcon and (iconSize + ICON_GAP) or 0) + barWidth, math.max(showIcon and iconSize or 0, barHeight))
     fitting = false
@@ -351,6 +348,15 @@ local function ScheduleRefit()
     refitPending = true
     ScheduleReflow()
 end
+
+BUI.Anchor.RegisterCallback('CDM.BuffBarSkin', function()
+    anchorRetries = 0
+    PositionViewer()
+    local config = GetSettings()
+    if not config.skinEnabled or GetEffectiveBarWidth(config) == fittedWidth then return end
+    if hooked then ScheduleRefit() end
+    if CDM.IsBuffBarPreviewShown() then CDM.ShowBuffBarPreview() end
+end)
 
 local function ReflowUnlessFitting()
     if not fitting then ScheduleReflow() end
