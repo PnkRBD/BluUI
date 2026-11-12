@@ -219,6 +219,7 @@ local TargetTargetShown = function(shownFrame)
 	BindUnit(shownFrame, true)
 	EnsureEventlessTicker()
 end
+BUI.Perf.Track('UnitFrames.TargetTargetShown', TargetTargetShown)
 
 BUI.oUF:RegisterInitCallback(function(frame)
 	if targetTargetFrames[frame] then frame:HookScript('OnShow', TargetTargetShown) end
@@ -308,6 +309,7 @@ local PollEventlessUnits = function()
 		eventlessTicker = nil
 	end
 end
+BUI.Perf.Track('UnitFrames.PollEventlessUnits', PollEventlessUnits)
 function EnsureEventlessTicker()
 	if eventlessTicker then return end
 	for _, entry in ipairs(auraFrames) do

@@ -11,6 +11,7 @@ local TOP_FUNCTIONS = 15
 local TOP_CALLERS = 3
 local NAMESPACE_DEPTH = 3
 local NAMESPACE_SKIP = { db = true, Perf = true, C = true, oUF = true, Events = true, Dispatcher = true, Scheduler = true }
+local SHARED_HELPER_TABLES = { context = true }
 local SECRET_CHECK = 'Tools.IsSecretValue'
 local SITE_FIRST, SITE_MID, SITE_EVERY, SITE_RARE = 100, 2000, 16, 256
 local SAMPLE_SECONDS = 1
@@ -163,7 +164,7 @@ local function Collect(tbl, prefix, depth, seen, entries, queue)
 					seen[original] = true
 					entries[#entries + 1] = { owner = tbl, key = key, name = prefix .. key, original = original, count = 0, external = 0, callers = {} }
 				end
-			elseif kind == 'table' and depth < NAMESPACE_DEPTH and not seen[value] and type(rawget(value, 0)) ~= 'userdata' and not (depth == 0 and NAMESPACE_SKIP[key]) then
+			elseif kind == 'table' and depth < NAMESPACE_DEPTH and not seen[value] and type(rawget(value, 0)) ~= 'userdata' and not (depth == 0 and NAMESPACE_SKIP[key]) and not SHARED_HELPER_TABLES[key] then
 				seen[value] = true
 				queue[#queue + 1] = { value, prefix .. key .. '.', depth + 1 }
 			end

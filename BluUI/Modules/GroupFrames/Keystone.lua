@@ -76,6 +76,7 @@ local function RefreshAll()
 	refreshQueued = false
 	GroupFrames.EachPartyChild(Keystone.Update)
 end
+BUI.Perf.Track('GroupFrames.Keystone.RefreshAll', RefreshAll)
 
 local function QueueRefresh()
 	if refreshQueued then return end

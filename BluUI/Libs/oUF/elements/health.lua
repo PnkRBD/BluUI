@@ -357,8 +357,9 @@ local function Path(self, ...)
 	* unit  - the unit accompanying the event (string)
 	* ...   - the arguments accompanying the event
 	--]]
-	if(shouldUpdatePredictionSize(self)) then
-		(self.Health.UpdatePredictionSize or UpdatePredictionSize) (self, ...)
+	local element = self.Health
+	if((element.HealingAll or element.HealingPlayer or element.HealingOther or element.DamageAbsorb or element.HealAbsorb) and shouldUpdatePredictionSize(self)) then
+		(element.UpdatePredictionSize or UpdatePredictionSize) (self, ...)
 	end
 
 	--[[ Override: Health.Override(self, event, unit)

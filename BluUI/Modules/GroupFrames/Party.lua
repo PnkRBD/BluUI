@@ -92,14 +92,17 @@ local function SyncAnchorWidth()
 end
 
 local watchedTarget
+local function OnAnchorTargetResized(target)
+	if watchedTarget == target then SyncAnchorWidth() end
+end
+BUI.Perf.Track('GroupFrames.OnAnchorTargetResized', OnAnchorTargetResized)
+
 local function WatchAnchorTarget(target)
 	if target == watchedTarget then return end
 	watchedTarget = target
 	if target and not target._bluFramesPartyHook then
 		target._bluFramesPartyHook = true
-		target:HookScript("OnSizeChanged", function(self)
-			if watchedTarget == self then SyncAnchorWidth() end
-		end)
+		target:HookScript("OnSizeChanged", OnAnchorTargetResized)
 	end
 end
 

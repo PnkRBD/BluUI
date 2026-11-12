@@ -86,6 +86,7 @@ end
 local function CreateMover(key)
 	local mover = CreateFrame("Frame", nil, UIParent)
 	mover.key = key
+	mover._buiPerfName = "BUI_GroupMover " .. key
 	mover:SetFrameStrata("MEDIUM")
 	mover:SetFrameLevel(200)
 	mover:Hide()

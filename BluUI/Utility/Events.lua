@@ -144,17 +144,6 @@ function Events:Unregister(event, key)
     end
 end
 
-function Events:EachHandler(visit)
-    for event, handlers in pairs(globalCallbacks) do
-        for key, callback in pairs(handlers) do visit(event, key, callback) end
-    end
-    for event, units in pairs(unitCallbacks) do
-        for unit, handlers in pairs(units) do
-            for key, callback in pairs(handlers) do visit(event, key, callback, unit) end
-        end
-    end
-end
-
 function Events:UnregisterAll(key)
     for event, handlers in pairs(globalCallbacks) do
         if handlers[key] then
@@ -228,6 +217,18 @@ function Events:OnTalentBurst(key, callback)
         self:Register('SPELLS_CHANGED', '_TalentBurst:SPELLS_CHANGED', OnTerminalSpellsChanged)
     end
     talentBurstCallbacks[key] = callback
+end
+
+function Events:EachHandler(visit)
+    for event, handlers in pairs(globalCallbacks) do
+        for key, callback in pairs(handlers) do visit(event, key, callback) end
+    end
+    for event, units in pairs(unitCallbacks) do
+        for unit, handlers in pairs(units) do
+            for key, callback in pairs(handlers) do visit(event, key, callback, unit) end
+        end
+    end
+    for key, callback in pairs(talentBurstCallbacks) do visit('talent change', key, callback) end
 end
 
 function Events:OnLogin(key, callback, module)

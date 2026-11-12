@@ -31,6 +31,8 @@ local function Fit(bars)
 	if excess then excess:SetWidth(width) end
 end
 
+BUI.Perf.Track('UnitFrames.AbsorbBars.Fit', Fit)
+
 function UnitFrames.FitAbsorbBars(frame)
 	Fit(frame.AbsorbBars)
 end

@@ -7,6 +7,7 @@ local Pixel = BUI.Pixel
 
 local CreateFrame              = CreateFrame
 local UnitIsConnected          = UnitIsConnected
+local UnitIsDeadOrGhost        = UnitIsDeadOrGhost
 local UnitIsUnit               = UnitIsUnit
 local UnitInRange              = UnitInRange
 local InCombatLockdown         = InCombatLockdown
@@ -76,7 +77,9 @@ local function PaintHealth(self, updatedUnit, offline)
 	local live = not owner._preview and updatedUnit
 	offline = (live and offline) and true or false
 	local deadOrGhost = (live and UnitIsDeadOrGhost(updatedUnit)) and true or false
-	if live then GroupFrames.SyncLifeState(owner, deadOrGhost, offline) end
+	if live and (deadOrGhost or owner._bluWasDead ~= deadOrGhost or owner._bluWasOffline ~= offline) then
+		GroupFrames.SyncLifeState(owner, deadOrGhost, offline)
+	end
 	if offline then self:SetValue(0) end
 	local dead = deadOrGhost and not offline
 	local class = owner._bluClass
@@ -476,7 +479,6 @@ local function BuildRangeFade(frame)
 		Override     = RangeOverride,
 	}
 	frame:RegisterEvent("UNIT_PHASE", RangeOverride)
-	frame:RegisterEvent("UNIT_FLAGS", RangeOverride)
 end
 
 local function TankOrHealer()
@@ -608,3 +610,7 @@ BUI.oUF:RegisterInitCallback(function(frame)
 	GroupFrames.ApplyAggroToChild(frame, settings)
 	GroupFrames.ApplyIndicatorsToChild(frame, settings)
 end)
+
+BUI.Perf.Track('GroupFrames.OnAttributeChanged', OnAttributeChanged)
+BUI.Perf.Track('GroupFrames.ShowClicks', ShowClicks)
+BUI.Perf.Track('GroupFrames.ApplySecureClicks', ApplySecureClicks)

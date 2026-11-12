@@ -309,6 +309,8 @@ local SelectionLeave = function(self)
 	self._isMouseover = false
 	UpdateSelection(self)
 end
+BUI.Perf.Track('GroupFrames.SelectionEnter', SelectionEnter)
+BUI.Perf.Track('GroupFrames.SelectionLeave', SelectionLeave)
 
 function GroupFrames.BuildSelection(frame)
 	local selection = BUI.Tools.OutlineFrame(frame, GroupFrames.Layers.selection)

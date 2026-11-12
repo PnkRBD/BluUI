@@ -166,6 +166,8 @@ local BossLeave = function(self)
 	self._hovered = false
 	UnitFrames.UpdateBossMouseover(self)
 end
+BUI.Perf.Track('UnitFrames.BossEnter', BossEnter)
+BUI.Perf.Track('UnitFrames.BossLeave', BossLeave)
 
 local function HideWhenMuted(element)
 	if element._buiHidden then element:Hide() end

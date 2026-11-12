@@ -462,6 +462,7 @@ local UpdateRestingTags = function()
 	restingIndex = restingIndex % #restingFrames + 1
 	UpdateDirectGroup('resting')
 end
+BUI.Perf.Track('UnitFrames.UpdateRestingTags', UpdateRestingTags)
 
 local function StartRestingAnimation()
 	if restingTicker then return end
@@ -506,6 +507,7 @@ do
 		combatTimerText = FormatCombatTime(GetTime() - combatStartTime)
 		UpdateDirectGroup('combattime')
 	end
+	BUI.Perf.Track('UnitFrames.UpdateCombatTimerTags', UpdateCombatTimerTags)
 
 	local function StopWatchingGroup()
 		if not groupWatchActive then return end

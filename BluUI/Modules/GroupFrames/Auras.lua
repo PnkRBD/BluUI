@@ -289,6 +289,7 @@ end
 local SweepReachability = function()
 	GroupFrames.EachChild(SweepIfVisible)
 end
+BUI.Perf.Track('GroupFrames.SweepReachability', SweepReachability)
 
 function GroupFrames.SyncReachabilitySweep()
 	local wanted = GroupFrames.IsActive() and GroupFrames.GetDB().enabled and IsInGroup()
