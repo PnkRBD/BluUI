@@ -220,6 +220,11 @@ local function WideColumnAnchor(raidSettings)
 	return "LEFT"
 end
 
+local function PlaceWide(header, raidSettings)
+	header:ClearAllPoints()
+	header:SetPoint(raidSettings.point, UIParent, raidSettings.relPoint, Scale(raidSettings.x), Scale(raidSettings.y))
+end
+
 local function ConfigureWide(header, bank, raidSettings)
 	local memberPoint, memberX, memberY = MemberAttrs(raidSettings)
 	local unitsPerColumn = math.max(1, math.min(40, raidSettings.wideUnitsPerColumn))
@@ -235,8 +240,7 @@ local function ConfigureWide(header, bank, raidSettings)
 	SetHeaderAttribute(header, "groupBy",           groupBy)
 	SetHeaderAttribute(header, "groupingOrder",     order)
 	SetHeaderAttribute(header, "sortMethod",        sortMethod)
-	header:ClearAllPoints()
-	header:SetPoint(raidSettings.point, UIParent, raidSettings.relPoint, Scale(raidSettings.x), Scale(raidSettings.y))
+	PlaceWide(header, raidSettings)
 	SetHeaderVisibility(header, WideVisibility(bank))
 end
 
@@ -275,6 +279,17 @@ function GroupFrames.SpawnRaid()
 	GroupFrames.UpdateInstanceClamp()
 	GroupFrames.ApplyRaidRoleFilter()
 	GroupFrames.PrecreateRaid()
+end
+
+function GroupFrames.PlaceRaidHeaders()
+	local raidSettings = GroupFrames.GetDB().raid
+	for groupIndex, header in ipairs(GroupFrames.headers.raid) do PlaceGroup(header, groupIndex, raidSettings) end
+	PlaceWide(GroupFrames.headers.raidWide, raidSettings)
+	local large = GroupFrames.headers.raidLarge
+	if not large then return end
+	local largeRaidSettings = GroupFrames.LargeRaidSettings()
+	for groupIndex, header in ipairs(large) do PlaceGroup(header, groupIndex, largeRaidSettings) end
+	PlaceWide(GroupFrames.headers.raidLargeWide, largeRaidSettings)
 end
 
 function GroupFrames.PreviewRaidHeaders()
@@ -333,4 +348,5 @@ function GroupFrames.RefreshRaid()
 	GroupFrames.ApplyRaidRoleFilter()
 	GroupFrames.PrecreateRaid()
 	GroupFrames.SyncPreviewChildren()
+	GroupFrames.RefitMover("raid")
 end

@@ -224,4 +224,5 @@ function GroupFrames.RefreshParty()
 	GroupFrames.EachPartyChild(function(child) GroupFrames.ApplyChildAll(child, partySettings, geometry) end)
 	GroupFrames.SyncPreviewChildren()
 	GroupFrames.Keystone.Sync()
+	GroupFrames.RefitMover("party")
 end

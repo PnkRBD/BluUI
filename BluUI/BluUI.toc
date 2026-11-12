@@ -104,6 +104,7 @@ Modules\GroupFrames\BlizzardHide.lua
 Modules\GroupFrames\Party.lua
 Modules\GroupFrames\Raid.lua
 Modules\GroupFrames\Preview.lua
+Modules\GroupFrames\Movers.lua
 Modules\GroupFrames\AuraPreview.lua
 Modules\GroupFrames\Initialize.lua
 

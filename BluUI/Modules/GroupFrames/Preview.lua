@@ -333,6 +333,3 @@ end
 
 function GroupFrames.IsPartyPreviewShown() return active.party end
 function GroupFrames.IsRaidPreviewShown()  return active.raid  end
-
-function GroupFrames.TogglePartyPreview() GroupFrames.SetPartyPreview(not active.party) end
-function GroupFrames.ToggleRaidPreview()  GroupFrames.SetRaidPreview(not active.raid)   end

@@ -237,6 +237,7 @@ function GroupFrames.RefreshColors()
 end
 
 function GroupFrames.CloseAllPreviews()
+	GroupFrames.LockMovers()
 	GroupFrames.StopDispelPreview()
 	GroupFrames.ClearIndicatorPreviews()
 	GroupFrames.ClearAuraPreviews()

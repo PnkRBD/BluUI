@@ -291,8 +291,8 @@ local function FramesBoard(ui, parent, width, key)
 	local board = ui.Board(parent, width, {
 		stacked = true,
 		title = isParty and 'Party frames' or 'Raid frames',
-		description = isParty and 'Compact party frames with auras, dispels and indicators. The eye forces the frames to show so you can place them.'
-			or 'Group based raid frames for 10 to 40 players. The eye forces the frames to show so you can place them.',
+		description = isParty and 'Compact party frames with auras, dispels and indicators. The eye shows and unlocks them, drag them into place and right-click to lock.'
+			or 'Group based raid frames for 10 to 40 players. The eye shows and unlocks them, drag them into place and right-click to lock.',
 	})
 	local position
 	if isParty then
@@ -303,13 +303,10 @@ local function FramesBoard(ui, parent, width, key)
 			Kit.Pixels(Option(section, 'Vertical', 'y', { min = -POSITION_RANGE, max = POSITION_RANGE, step = 1 })),
 		} }
 	end
-	board:AddTools(isParty and 'Party frames' or 'Raid frames', 'On or off, preview and position', {
+	board:AddTools(isParty and 'Party frames' or 'Raid frames', 'On or off, unlock to drag, and position', {
 		position,
-		Eye('Force the frames to show', function()
-			if isParty then return GroupFrames.IsPartyPreviewShown() end
-			return GroupFrames.IsRaidPreviewShown()
-		end, function()
-			if isParty then GroupFrames.TogglePartyPreview() else GroupFrames.ToggleRaidPreview() end
+		Eye('Unlock the frames to drag them, right-click them to lock', function() return GroupFrames.IsMoverUnlocked(key) end, function(value)
+			GroupFrames.SetMoverUnlocked(key, value)
 		end),
 		Toggle(section, nil, 'enabled'),
 	}, Refresh)
