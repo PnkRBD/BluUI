@@ -11,10 +11,10 @@ local ICON_KEYS = { 'Icon', 'dungeonTexture', 'QuestTexture' }
 local PART_KEYS = { 'Icon', 'Shield', 'lootItem' }
 local KEEP_KEYS = { 'RollTypeIcon', 'SpecIcon', 'heroicIcon', 'DigsiteTypeTexture', 'EmblemIcon', 'GuildTabardEmblem', 'MissionType', 'Portrait', 'DieIcon', 'Banner', 'Checkmark' }
 local EFFECT_KEYS = {
-	'Background', 'Background2', 'Background3', 'Ring1', 'Particles1', 'Particles2', 'Particles3', 'Starglow',
+	'Background2', 'Background3', 'Ring1', 'Particles1', 'Particles2', 'Particles3', 'Starglow',
 	'Sheen', 'BorderGlow', 'BaseQualityBorder', 'UpgradeQualityBorder', 'Glow', 'LightRays', 'LightRays2', 'Sparkles',
 }
-local FLASH_KEYS = { 'glow', 'shine' }
+local RESHOWN_KEYS = { 'glow', 'shine', 'Background', 'BGAtlas', 'PvPBackground', 'RatedPvPBackground' }
 local CAPTION_KEYS = { 'Label', 'Title', 'Unlocked', 'ToastText', 'completionText', 'HeaderLabel', 'CollectedLabel', 'CompletedLabel' }
 local NAME_KEYS = { 'Name', 'Amount', 'instanceName', 'dungeonName', 'QuestName', 'ZoneName', 'DigsiteType', 'Description', 'GuildName', 'DecorName', 'TaskName' }
 
@@ -82,7 +82,7 @@ local function SkinAlert(frame)
 end
 
 local function RefreshAlert(frame)
-	HideKeys(frame, FLASH_KEYS)
+	HideKeys(frame, RESHOWN_KEYS)
 	if frame.tradeSkillID then
 		frame.Icon:SetMask('')
 		CropIcon(frame.Icon)
