@@ -19,7 +19,9 @@ local GRIP_SIZE = 14
 local NAV_RAIL_INSET = 12
 local PORTRAIT_SIZE = 32
 local BRAND_SIZE = 15
-local BAR_ICON_GAP = 14
+local BAR_ICON_BOX = 28
+local BAR_ICON_GLYPH = 14
+local BAR_ICON_EDGE = 9
 local CARD_HEAD = 50
 local CARD_PAD = 14
 local BORDER_ACCENT_SCALE = 0.45
@@ -152,8 +154,14 @@ function Layout.PlayerPortrait(texture)
 end
 
 local function BarIcon(window, parent, glyph, tooltip, onClick)
-	local icon = Controls.Icon(parent, { size = 14, texture = BUILib.GetLibMedia(glyph), tooltip = tooltip, onClick = onClick })
-	window:Bind(Widget.Unwrap(icon), function() icon:SetIdleColor(window:Color('barIcon')) end)
+	local icon = Controls.Icon(parent, { size = BAR_ICON_BOX, iconScale = BAR_ICON_GLYPH / BAR_ICON_BOX, texture = BUILib.GetLibMedia(glyph), tooltip = tooltip, onClick = onClick })
+	local button = Widget.Unwrap(icon)
+	window:Bind(button, function() icon:SetIdleColor(window:Color('barIcon')) end)
+	local hover = window:Fill(button, 'hover')
+	hover:SetAllPoints()
+	hover:Hide()
+	button:HookScript('OnEnter', function() hover:Show() end)
+	button:HookScript('OnLeave', function() hover:Hide() end)
 	return icon
 end
 
@@ -422,10 +430,10 @@ function Layout.TitleBar(window, config)
 	end
 
 	local close = BarIcon(window, bar, 'x', 'Close', function() window.frame:Hide() end)
-	close:SetPoint('RIGHT', -16, 0)
+	close:SetPoint('RIGHT', -BAR_ICON_EDGE, 0)
 
 	if config.card then
-		BarIcon(window, bar, 'minus', 'Minimize', function() window:Minimize() end):SetPoint('RIGHT', Widget.Unwrap(close), 'LEFT', -BAR_ICON_GAP, 0)
+		BarIcon(window, bar, 'minus', 'Minimize', function() window:Minimize() end):SetPoint('RIGHT', Widget.Unwrap(close), 'LEFT')
 		Layout.MinimizedCard(window, config, Widget.Unwrap(close))
 	end
 
@@ -493,12 +501,12 @@ function Layout.MinimizedCard(window, config, windowClose)
 		card:Hide()
 		Closed()
 	end)
-	close:SetPoint('RIGHT', card, 'TOPRIGHT', -CARD_PAD - 1, -CARD_HEAD / 2 - 1)
+	close:SetPoint('RIGHT', card, 'TOPRIGHT', -BAR_ICON_EDGE, -CARD_HEAD / 2 - 1)
 	local expand = BarIcon(window, card, 'resize', 'Expand', spec.onRestore)
-	expand:SetPoint('RIGHT', Widget.Unwrap(close), 'LEFT', -BAR_ICON_GAP, 0)
+	expand:SetPoint('RIGHT', Widget.Unwrap(close), 'LEFT')
 	local divider = window:Fill(card, 'rule', 'ARTWORK')
 	divider:SetSize(1, 24)
-	divider:SetPoint('RIGHT', Widget.Unwrap(expand), 'LEFT', -12, 0)
+	divider:SetPoint('RIGHT', Widget.Unwrap(expand), 'LEFT', -4, 0)
 
 	local function Rebuild()
 		local right, top = card:GetRight(), card:GetTop()
