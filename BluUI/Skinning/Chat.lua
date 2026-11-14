@@ -1200,13 +1200,23 @@ local function CreateSizer()
 	UpdateSizer()
 end
 
+local function LineWidth(chat)
+	local _, fontSize = chat:GetFont()
+	return chat:GetWidth() - floor(fontSize / 2)
+end
+
+local function NarrowLines(chat)
+	local width = LineWidth(chat)
+	for _, line in ipairs(chat.visibleLines) do line:SetWidth(width) end
+end
+
 local function ChatMaxScrollOffset(chat)
 	local count = chat:GetNumMessages()
 	if count <= 1 then return 0 end
 	local frameHeight = chat:GetHeight()
 	if frameHeight <= 0 then return count - 1 end
 	local measure = Measurer(chat)
-	measure:SetWidth(chat:GetWidth())
+	measure:SetWidth(LineWidth(chat))
 	local lineHeight = max(1, measure:GetLineHeight())
 	local spacing = measure:GetSpacing()
 	local buffer = chat.historyBuffer
@@ -1453,6 +1463,7 @@ local function SkinChatFrame(chat)
 		chat.Background:Hide()
 		StayHidden(chat.Background, '_buiKilled', Always)
 		chat:SetClampRectInsets(0, 0, 0, 0)
+		Hook(chat, 'RefreshLayout', NarrowLines)
 		ApplyChatFont(chat)
 	end
 
