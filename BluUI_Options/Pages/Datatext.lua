@@ -347,7 +347,6 @@ local function DatatextsBoard(ui, parent, width, config, page, after)
 			return menu
 		end)
 		dropdown:SetPoint('RIGHT', -ui.ROW_INSET, 0)
-		dropdown.label:SetText('Pick one')
 	end
 	board:DragList(function(index, delta, count)
 		Layout.ShiftBlock(active, index, delta, count)
